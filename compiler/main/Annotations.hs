@@ -70,17 +70,17 @@ instance Outputable name => Outputable (AnnTarget name) where
     ppr (ModuleTarget mod) = text "Module target" <+> ppr mod
 
 instance Binary name => Binary (AnnTarget name) where
-    put_ bh (NamedTarget a) = do
-        putByte bh 0
-        put_ bh a
-    put_ bh (ModuleTarget a) = do
-        putByte bh 1
-        put_ bh a
-    get bh = do
-        h <- getByte bh
+    put (NamedTarget a) = do
+        putByte 0
+        put a
+    put (ModuleTarget a) = do
+        putByte 1
+        put a
+    get = do
+        h <- getByte
         case h of
-            0 -> liftM NamedTarget  $ get bh
-            _ -> liftM ModuleTarget $ get bh
+            0 -> liftM NamedTarget  $ get
+            _ -> liftM ModuleTarget $ get
 
 instance Outputable Annotation where
     ppr ann = ppr (ann_target ann)

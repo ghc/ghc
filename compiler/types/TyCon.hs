@@ -654,13 +654,13 @@ instance Outputable tv => Outputable (VarBndr tv TyConBndrVis) where
       ppr_bi (NamedTCB Inferred)  = text "inf"
 
 instance Binary TyConBndrVis where
-  put_ bh (AnonTCB af)   = do { putByte bh 0; put_ bh af }
-  put_ bh (NamedTCB vis) = do { putByte bh 1; put_ bh vis }
+  put (AnonTCB af)   = do { putByte 0; put af }
+  put (NamedTCB vis) = do { putByte 1; put vis }
 
-  get bh = do { h <- getByte bh
-              ; case h of
-                  0 -> do { af  <- get bh; return (AnonTCB af) }
-                  _ -> do { vis <- get bh; return (NamedTCB vis) } }
+  get = do h <- getByte
+           case h of
+             0 -> AnonTCB <$> get
+             _ -> NamedTCB <$> get
 
 
 {- *********************************************************************
@@ -2654,14 +2654,13 @@ instance Data.Data TyCon where
     dataTypeOf _ = mkNoRepType "TyCon"
 
 instance Binary Injectivity where
-    put_ bh NotInjective   = putByte bh 0
-    put_ bh (Injective xs) = putByte bh 1 >> put_ bh xs
+    put NotInjective   = putByte 0
+    put (Injective xs) = putByte 1 >> put xs
 
-    get bh = do { h <- getByte bh
-                ; case h of
-                    0 -> return NotInjective
-                    _ -> do { xs <- get bh
-                            ; return (Injective xs) } }
+    get = do h <- getByte
+             case h of
+               0 -> return NotInjective
+               _ -> Injective <$> get
 
 {-
 ************************************************************************

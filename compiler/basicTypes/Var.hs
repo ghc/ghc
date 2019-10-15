@@ -415,12 +415,12 @@ instance Outputable ArgFlag where
   ppr Inferred  = text "[infrd]"
 
 instance Binary ArgFlag where
-  put_ bh Required  = putByte bh 0
-  put_ bh Specified = putByte bh 1
-  put_ bh Inferred  = putByte bh 2
+  put Required  = putByte 0
+  put Specified = putByte 1
+  put Inferred  = putByte 2
 
-  get bh = do
-    h <- getByte bh
+  get = do
+    h <- getByte
     case h of
       0 -> return Required
       1 -> return Specified
@@ -444,11 +444,11 @@ instance Outputable AnonArgFlag where
   ppr InvisArg = text "[invis]"
 
 instance Binary AnonArgFlag where
-  put_ bh VisArg   = putByte bh 0
-  put_ bh InvisArg = putByte bh 1
+  put VisArg   = putByte 0
+  put InvisArg = putByte 1
 
-  get bh = do
-    h <- getByte bh
+  get = do
+    h <- getByte
     case h of
       0 -> return VisArg
       _ -> return InvisArg
@@ -564,9 +564,8 @@ instance Outputable tv => Outputable (VarBndr tv ArgFlag) where
   ppr (Bndr v Inferred)  = braces (ppr v)
 
 instance (Binary tv, Binary vis) => Binary (VarBndr tv vis) where
-  put_ bh (Bndr tv vis) = do { put_ bh tv; put_ bh vis }
-
-  get bh = do { tv <- get bh; vis <- get bh; return (Bndr tv vis) }
+  put (Bndr tv vis) = put tv >> put vis
+  get = Bndr <$> get <*> get
 
 instance NamedThing tv => NamedThing (VarBndr tv flag) where
   getName (Bndr tv _) = getName tv

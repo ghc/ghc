@@ -105,6 +105,7 @@ import Util             hiding ( eqListBy )
 import FastString
 import Maybes
 import Binary
+import Binary.Unsafe    (ioP)
 import Fingerprint
 import Exception
 import UniqSet
@@ -484,13 +485,13 @@ addFingerprints hsc_env iface0 new_decls
         -- change if the fingerprint for anything it refers to (transitively)
         -- changes.
        mk_put_name :: OccEnv (OccName,Fingerprint)
-                   -> BinHandle -> Name -> IO  ()
-       mk_put_name local_env bh name
-          | isWiredInName name  =  putNameLiterally bh name
+                   -> Name -> Put ()
+       mk_put_name local_env name
+          | isWiredInName name  =  putNameLiterally name
            -- wired-in names don't have fingerprints
           | otherwise
           = ASSERT2( isExternalName name, ppr name )
-            let hash | nameModule name /= semantic_mod =  global_hash_fn name
+            let hash | nameModule name /= semantic_mod = global_hash_fn name
                      -- Get it from the REAL interface!!
                      -- This will trigger when we compile an hsig file
                      -- and we know a backing impl for it.
@@ -507,7 +508,7 @@ addFingerprints hsc_env iface0 new_decls
                 -- pprTraces below, run the compile again, and inspect
                 -- the output and the generated .hi file with
                 -- --show-iface.
-            in hash >>= put_ bh
+            in ioP hash >>= put
 
         -- take a strongly-connected group of declarations and compute
         -- its fingerprint.
@@ -911,27 +912,27 @@ ppr_id_extras (IdExtras fix rules anns) = ppr fix $$ vcat (map ppr rules) $$ vca
 
 -- This instance is used only to compute fingerprints
 instance Binary IfaceDeclExtras where
-  get _bh = panic "no get for IfaceDeclExtras"
-  put_ bh (IfaceIdExtras extras) = do
-   putByte bh 1; put_ bh extras
-  put_ bh (IfaceDataExtras fix insts anns cons) = do
-   putByte bh 2; put_ bh fix; put_ bh insts; put_ bh anns; put_ bh cons
-  put_ bh (IfaceClassExtras fix insts anns methods defms) = do
-   putByte bh 3
-   put_ bh fix
-   put_ bh insts
-   put_ bh anns
-   put_ bh methods
-   put_ bh defms
-  put_ bh (IfaceSynonymExtras fix anns) = do
-   putByte bh 4; put_ bh fix; put_ bh anns
-  put_ bh (IfaceFamilyExtras fix finsts anns) = do
-   putByte bh 5; put_ bh fix; put_ bh finsts; put_ bh anns
-  put_ bh IfaceOtherDeclExtras = putByte bh 6
+  get = panic "no get for IfaceDeclExtras"
+  put (IfaceIdExtras extras) = do
+   putByte 1; put extras
+  put (IfaceDataExtras fix insts anns cons) = do
+   putByte 2; put fix; put insts; put anns; put cons
+  put (IfaceClassExtras fix insts anns methods defms) = do
+   putByte 3
+   put fix
+   put insts
+   put anns
+   put methods
+   put defms
+  put (IfaceSynonymExtras fix anns) = do
+   putByte 4; put fix; put anns
+  put (IfaceFamilyExtras fix finsts anns) = do
+   putByte 5; put fix; put finsts; put anns
+  put IfaceOtherDeclExtras = putByte 6
 
 instance Binary IfaceIdExtras where
-  get _bh = panic "no get for IfaceIdExtras"
-  put_ bh (IdExtras fix rules anns)= do { put_ bh fix; put_ bh rules; put_ bh anns }
+  get = panic "no get for IfaceIdExtras"
+  put (IdExtras fix rules anns) = do { put fix; put rules; put anns }
 
 declExtras :: (OccName -> Maybe Fixity)
            -> (OccName -> [AnnPayload])

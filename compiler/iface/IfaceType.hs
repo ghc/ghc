@@ -783,27 +783,23 @@ pprIfaceTyConBinders suppress_sig = sep . map go
         ppr_bndr = pprIfaceTvBndr bndr suppress_sig
 
 instance Binary IfaceBndr where
-    put_ bh (IfaceIdBndr aa) = do
-            putByte bh 0
-            put_ bh aa
-    put_ bh (IfaceTvBndr ab) = do
-            putByte bh 1
-            put_ bh ab
-    get bh = do
-            h <- getByte bh
+    put (IfaceIdBndr aa) = do
+            putByte 0
+            put aa
+    put (IfaceTvBndr ab) = do
+            putByte 1
+            put ab
+    get = do
+            h <- getByte
             case h of
-              0 -> do aa <- get bh
-                      return (IfaceIdBndr aa)
-              _ -> do ab <- get bh
-                      return (IfaceTvBndr ab)
+              0 -> IfaceIdBndr <$> get
+              _ -> IfaceTvBndr <$> get
 
 instance Binary IfaceOneShot where
-    put_ bh IfaceNoOneShot = do
-            putByte bh 0
-    put_ bh IfaceOneShot = do
-            putByte bh 1
-    get bh = do
-            h <- getByte bh
+    put IfaceNoOneShot = putByte 0
+    put IfaceOneShot   = putByte 1
+    get = do
+            h <- getByte
             case h of
               0 -> do return IfaceNoOneShot
               _ -> do return IfaceOneShot
@@ -1610,60 +1606,55 @@ instance Outputable IfaceCoercion where
   ppr = pprIfaceCoercion
 
 instance Binary IfaceTyCon where
-   put_ bh (IfaceTyCon n i) = put_ bh n >> put_ bh i
-
-   get bh = do n <- get bh
-               i <- get bh
-               return (IfaceTyCon n i)
+   put (IfaceTyCon n i) = put n >> put i
+   get = IfaceTyCon <$> get <*> get
 
 instance Binary IfaceTyConSort where
-   put_ bh IfaceNormalTyCon             = putByte bh 0
-   put_ bh (IfaceTupleTyCon arity sort) = putByte bh 1 >> put_ bh arity >> put_ bh sort
-   put_ bh (IfaceSumTyCon arity)        = putByte bh 2 >> put_ bh arity
-   put_ bh IfaceEqualityTyCon           = putByte bh 3
+   put IfaceNormalTyCon             = putByte 0
+   put (IfaceTupleTyCon arity sort) = putByte 1 >> put arity >> put sort
+   put (IfaceSumTyCon arity)        = putByte 2 >> put arity
+   put IfaceEqualityTyCon           = putByte 3
 
-   get bh = do
-       n <- getByte bh
+   get = do
+       n <- getByte
        case n of
          0 -> return IfaceNormalTyCon
-         1 -> IfaceTupleTyCon <$> get bh <*> get bh
-         2 -> IfaceSumTyCon <$> get bh
+         1 -> IfaceTupleTyCon <$> get <*> get
+         2 -> IfaceSumTyCon <$> get
          _ -> return IfaceEqualityTyCon
 
 instance Binary IfaceTyConInfo where
-   put_ bh (IfaceTyConInfo i s) = put_ bh i >> put_ bh s
+   put (IfaceTyConInfo i s) = put i >> put s
 
-   get bh = IfaceTyConInfo <$> get bh <*> get bh
+   get = IfaceTyConInfo <$> get <*> get
 
 instance Outputable IfaceTyLit where
   ppr = pprIfaceTyLit
 
 instance Binary IfaceTyLit where
-  put_ bh (IfaceNumTyLit n)  = putByte bh 1 >> put_ bh n
-  put_ bh (IfaceStrTyLit n)  = putByte bh 2 >> put_ bh n
+  put (IfaceNumTyLit n) = putByte 1 >> put n
+  put (IfaceStrTyLit n) = putByte 2 >> put n
 
-  get bh =
-    do tag <- getByte bh
+  get =
+    do tag <- getByte
        case tag of
-         1 -> do { n <- get bh
-                 ; return (IfaceNumTyLit n) }
-         2 -> do { n <- get bh
-                 ; return (IfaceStrTyLit n) }
+         1 -> IfaceNumTyLit <$> get
+         2 -> IfaceStrTyLit <$> get
          _ -> panic ("get IfaceTyLit " ++ show tag)
 
 instance Binary IfaceAppArgs where
-  put_ bh tk =
+  put tk =
     case tk of
-      IA_Arg t a ts -> putByte bh 0 >> put_ bh t >> put_ bh a >> put_ bh ts
-      IA_Nil        -> putByte bh 1
+      IA_Arg t a ts -> putByte 0 >> put t >> put a >> put ts
+      IA_Nil        -> putByte 1
 
-  get bh =
-    do c <- getByte bh
+  get =
+    do c <- getByte
        case c of
          0 -> do
-           t  <- get bh
-           a  <- get bh
-           ts <- get bh
+           t  <- get
+           a  <- get
+           ts <- get
            return $! IA_Arg t a ts
          1 -> return IA_Nil
          _ -> panic ("get IfaceAppArgs " ++ show c)
@@ -1721,246 +1712,246 @@ ppr_parend_preds :: [IfacePredType] -> SDoc
 ppr_parend_preds preds = parens (fsep (punctuate comma (map ppr preds)))
 
 instance Binary IfaceType where
-    put_ _ (IfaceFreeTyVar tv)
+    put (IfaceFreeTyVar tv)
        = pprPanic "Can't serialise IfaceFreeTyVar" (ppr tv)
 
-    put_ bh (IfaceForAllTy aa ab) = do
-            putByte bh 0
-            put_ bh aa
-            put_ bh ab
-    put_ bh (IfaceTyVar ad) = do
-            putByte bh 1
-            put_ bh ad
-    put_ bh (IfaceAppTy ae af) = do
-            putByte bh 2
-            put_ bh ae
-            put_ bh af
-    put_ bh (IfaceFunTy af ag ah) = do
-            putByte bh 3
-            put_ bh af
-            put_ bh ag
-            put_ bh ah
-    put_ bh (IfaceTyConApp tc tys)
-      = do { putByte bh 5; put_ bh tc; put_ bh tys }
-    put_ bh (IfaceCastTy a b)
-      = do { putByte bh 6; put_ bh a; put_ bh b }
-    put_ bh (IfaceCoercionTy a)
-      = do { putByte bh 7; put_ bh a }
-    put_ bh (IfaceTupleTy s i tys)
-      = do { putByte bh 8; put_ bh s; put_ bh i; put_ bh tys }
-    put_ bh (IfaceLitTy n)
-      = do { putByte bh 9; put_ bh n }
+    put (IfaceForAllTy aa ab) = do
+            putByte 0
+            put aa
+            put ab
+    put (IfaceTyVar ad) = do
+            putByte 1
+            put ad
+    put (IfaceAppTy ae af) = do
+            putByte 2
+            put ae
+            put af
+    put (IfaceFunTy af ag ah) = do
+            putByte 3
+            put af
+            put ag
+            put ah
+    put (IfaceTyConApp tc tys)
+      = do { putByte 5; put tc; put tys }
+    put (IfaceCastTy a b)
+      = do { putByte 6; put a; put b }
+    put (IfaceCoercionTy a)
+      = do { putByte 7; put a }
+    put (IfaceTupleTy s i tys)
+      = do { putByte 8; put s; put i; put tys }
+    put (IfaceLitTy n)
+      = do { putByte 9; put n }
 
-    get bh = do
-            h <- getByte bh
+    get = do
+            h <- getByte
             case h of
-              0 -> do aa <- get bh
-                      ab <- get bh
+              0 -> do aa <- get
+                      ab <- get
                       return (IfaceForAllTy aa ab)
-              1 -> do ad <- get bh
+              1 -> do ad <- get
                       return (IfaceTyVar ad)
-              2 -> do ae <- get bh
-                      af <- get bh
+              2 -> do ae <- get
+                      af <- get
                       return (IfaceAppTy ae af)
-              3 -> do af <- get bh
-                      ag <- get bh
-                      ah <- get bh
+              3 -> do af <- get
+                      ag <- get
+                      ah <- get
                       return (IfaceFunTy af ag ah)
-              5 -> do { tc <- get bh; tys <- get bh
+              5 -> do { tc <- get; tys <- get
                       ; return (IfaceTyConApp tc tys) }
-              6 -> do { a <- get bh; b <- get bh
+              6 -> do { a <- get; b <- get
                       ; return (IfaceCastTy a b) }
-              7 -> do { a <- get bh
+              7 -> do { a <- get
                       ; return (IfaceCoercionTy a) }
 
-              8 -> do { s <- get bh; i <- get bh; tys <- get bh
+              8 -> do { s <- get; i <- get; tys <- get
                       ; return (IfaceTupleTy s i tys) }
-              _  -> do n <- get bh
+              _  -> do n <- get
                        return (IfaceLitTy n)
 
 instance Binary IfaceMCoercion where
-  put_ bh IfaceMRefl = do
-          putByte bh 1
-  put_ bh (IfaceMCo co) = do
-          putByte bh 2
-          put_ bh co
+  put IfaceMRefl = do
+      putByte 1
+  put (IfaceMCo co) = do
+      putByte 2
+      put co
 
-  get bh = do
-    tag <- getByte bh
+  get = do
+    tag <- getByte
     case tag of
          1 -> return IfaceMRefl
-         2 -> do a <- get bh
+         2 -> do a <- get
                  return $ IfaceMCo a
          _ -> panic ("get IfaceMCoercion " ++ show tag)
 
 instance Binary IfaceCoercion where
-  put_ bh (IfaceReflCo a) = do
-          putByte bh 1
-          put_ bh a
-  put_ bh (IfaceGReflCo a b c) = do
-          putByte bh 2
-          put_ bh a
-          put_ bh b
-          put_ bh c
-  put_ bh (IfaceFunCo a b c) = do
-          putByte bh 3
-          put_ bh a
-          put_ bh b
-          put_ bh c
-  put_ bh (IfaceTyConAppCo a b c) = do
-          putByte bh 4
-          put_ bh a
-          put_ bh b
-          put_ bh c
-  put_ bh (IfaceAppCo a b) = do
-          putByte bh 5
-          put_ bh a
-          put_ bh b
-  put_ bh (IfaceForAllCo a b c) = do
-          putByte bh 6
-          put_ bh a
-          put_ bh b
-          put_ bh c
-  put_ bh (IfaceCoVarCo a) = do
-          putByte bh 7
-          put_ bh a
-  put_ bh (IfaceAxiomInstCo a b c) = do
-          putByte bh 8
-          put_ bh a
-          put_ bh b
-          put_ bh c
-  put_ bh (IfaceUnivCo a b c d) = do
-          putByte bh 9
-          put_ bh a
-          put_ bh b
-          put_ bh c
-          put_ bh d
-  put_ bh (IfaceSymCo a) = do
-          putByte bh 10
-          put_ bh a
-  put_ bh (IfaceTransCo a b) = do
-          putByte bh 11
-          put_ bh a
-          put_ bh b
-  put_ bh (IfaceNthCo a b) = do
-          putByte bh 12
-          put_ bh a
-          put_ bh b
-  put_ bh (IfaceLRCo a b) = do
-          putByte bh 13
-          put_ bh a
-          put_ bh b
-  put_ bh (IfaceInstCo a b) = do
-          putByte bh 14
-          put_ bh a
-          put_ bh b
-  put_ bh (IfaceKindCo a) = do
-          putByte bh 15
-          put_ bh a
-  put_ bh (IfaceSubCo a) = do
-          putByte bh 16
-          put_ bh a
-  put_ bh (IfaceAxiomRuleCo a b) = do
-          putByte bh 17
-          put_ bh a
-          put_ bh b
-  put_ _ (IfaceFreeCoVar cv)
-       = pprPanic "Can't serialise IfaceFreeCoVar" (ppr cv)
-  put_ _  (IfaceHoleCo cv)
-       = pprPanic "Can't serialise IfaceHoleCo" (ppr cv)
+  put (IfaceReflCo a) = do
+      putByte 1
+      put a
+  put (IfaceGReflCo a b c) = do
+      putByte 2
+      put a
+      put b
+      put c
+  put (IfaceFunCo a b c) = do
+      putByte 3
+      put a
+      put b
+      put c
+  put (IfaceTyConAppCo a b c) = do
+      putByte 4
+      put a
+      put b
+      put c
+  put (IfaceAppCo a b) = do
+      putByte 5
+      put a
+      put b
+  put (IfaceForAllCo a b c) = do
+      putByte 6
+      put a
+      put b
+      put c
+  put (IfaceCoVarCo a) = do
+      putByte 7
+      put a
+  put (IfaceAxiomInstCo a b c) = do
+      putByte 8
+      put a
+      put b
+      put c
+  put (IfaceUnivCo a b c d) = do
+      putByte 9
+      put a
+      put b
+      put c
+      put d
+  put (IfaceSymCo a) = do
+      putByte 10
+      put a
+  put (IfaceTransCo a b) = do
+      putByte 11
+      put a
+      put b
+  put (IfaceNthCo a b) = do
+      putByte 12
+      put a
+      put b
+  put (IfaceLRCo a b) = do
+      putByte 13
+      put a
+      put b
+  put (IfaceInstCo a b) = do
+      putByte 14
+      put a
+      put b
+  put (IfaceKindCo a) = do
+      putByte 15
+      put a
+  put (IfaceSubCo a) = do
+      putByte 16
+      put a
+  put (IfaceAxiomRuleCo a b) = do
+      putByte 17
+      put a
+      put b
+  put (IfaceFreeCoVar cv)
+      = pprPanic "Can't serialise IfaceFreeCoVar" (ppr cv)
+  put (IfaceHoleCo cv)
+      = pprPanic "Can't serialise IfaceHoleCo" (ppr cv)
           -- See Note [Holes in IfaceCoercion]
 
-  get bh = do
-      tag <- getByte bh
+  get = do
+      tag <- getByte
       case tag of
-           1 -> do a <- get bh
+           1 -> do a <- get
                    return $ IfaceReflCo a
-           2 -> do a <- get bh
-                   b <- get bh
-                   c <- get bh
+           2 -> do a <- get
+                   b <- get
+                   c <- get
                    return $ IfaceGReflCo a b c
-           3 -> do a <- get bh
-                   b <- get bh
-                   c <- get bh
+           3 -> do a <- get
+                   b <- get
+                   c <- get
                    return $ IfaceFunCo a b c
-           4 -> do a <- get bh
-                   b <- get bh
-                   c <- get bh
+           4 -> do a <- get
+                   b <- get
+                   c <- get
                    return $ IfaceTyConAppCo a b c
-           5 -> do a <- get bh
-                   b <- get bh
+           5 -> do a <- get
+                   b <- get
                    return $ IfaceAppCo a b
-           6 -> do a <- get bh
-                   b <- get bh
-                   c <- get bh
+           6 -> do a <- get
+                   b <- get
+                   c <- get
                    return $ IfaceForAllCo a b c
-           7 -> do a <- get bh
+           7 -> do a <- get
                    return $ IfaceCoVarCo a
-           8 -> do a <- get bh
-                   b <- get bh
-                   c <- get bh
+           8 -> do a <- get
+                   b <- get
+                   c <- get
                    return $ IfaceAxiomInstCo a b c
-           9 -> do a <- get bh
-                   b <- get bh
-                   c <- get bh
-                   d <- get bh
+           9 -> do a <- get
+                   b <- get
+                   c <- get
+                   d <- get
                    return $ IfaceUnivCo a b c d
-           10-> do a <- get bh
+           10-> do a <- get
                    return $ IfaceSymCo a
-           11-> do a <- get bh
-                   b <- get bh
+           11-> do a <- get
+                   b <- get
                    return $ IfaceTransCo a b
-           12-> do a <- get bh
-                   b <- get bh
+           12-> do a <- get
+                   b <- get
                    return $ IfaceNthCo a b
-           13-> do a <- get bh
-                   b <- get bh
+           13-> do a <- get
+                   b <- get
                    return $ IfaceLRCo a b
-           14-> do a <- get bh
-                   b <- get bh
+           14-> do a <- get
+                   b <- get
                    return $ IfaceInstCo a b
-           15-> do a <- get bh
+           15-> do a <- get
                    return $ IfaceKindCo a
-           16-> do a <- get bh
+           16-> do a <- get
                    return $ IfaceSubCo a
-           17-> do a <- get bh
-                   b <- get bh
+           17-> do a <- get
+                   b <- get
                    return $ IfaceAxiomRuleCo a b
            _ -> panic ("get IfaceCoercion " ++ show tag)
 
 instance Binary IfaceUnivCoProv where
-  put_ bh IfaceUnsafeCoerceProv = putByte bh 1
-  put_ bh (IfacePhantomProv a) = do
-          putByte bh 2
-          put_ bh a
-  put_ bh (IfaceProofIrrelProv a) = do
-          putByte bh 3
-          put_ bh a
-  put_ bh (IfacePluginProv a) = do
-          putByte bh 4
-          put_ bh a
+  put IfaceUnsafeCoerceProv = putByte 1
+  put (IfacePhantomProv a) = do
+          putByte 2
+          put a
+  put (IfaceProofIrrelProv a) = do
+          putByte 3
+          put a
+  put (IfacePluginProv a) = do
+          putByte 4
+          put a
 
-  get bh = do
-      tag <- getByte bh
+  get = do
+      tag <- getByte
       case tag of
            1 -> return $ IfaceUnsafeCoerceProv
-           2 -> do a <- get bh
+           2 -> do a <- get
                    return $ IfacePhantomProv a
-           3 -> do a <- get bh
+           3 -> do a <- get
                    return $ IfaceProofIrrelProv a
-           4 -> do a <- get bh
+           4 -> do a <- get
                    return $ IfacePluginProv a
            _ -> panic ("get IfaceUnivCoProv " ++ show tag)
 
 
 instance Binary (DefMethSpec IfaceType) where
-    put_ bh VanillaDM     = putByte bh 0
-    put_ bh (GenericDM t) = putByte bh 1 >> put_ bh t
-    get bh = do
-            h <- getByte bh
+    put VanillaDM     = putByte 0
+    put (GenericDM t) = putByte 1 >> put t
+    get = do
+            h <- getByte
             case h of
               0 -> return VanillaDM
-              _ -> do { t <- get bh; return (GenericDM t) }
+              _ -> do { t <- get; return (GenericDM t) }
 
 instance NFData IfaceType where
   rnf = \case

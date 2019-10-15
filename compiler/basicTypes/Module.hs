@@ -339,8 +339,8 @@ instance Outputable ModuleName where
   ppr = pprModuleName
 
 instance Binary ModuleName where
-  put_ bh (ModuleName fs) = put_ bh fs
-  get bh = do fs <- get bh; return (ModuleName fs)
+  put (ModuleName fs) = put fs
+  get = ModuleName <$> get
 
 instance BinaryStringRep ModuleName where
   fromStringRep = mkModuleNameFS . mkFastStringByteString
@@ -445,8 +445,8 @@ instance Outputable Module where
   ppr = pprModule
 
 instance Binary Module where
-  put_ bh (Module p n) = put_ bh p >> put_ bh n
-  get bh = do p <- get bh; n <- get bh; return (Module p n)
+  put (Module p n) = put p >> put n
+  get = Module <$> get <*> get
 
 instance Data Module where
   -- don't traverse?
@@ -602,12 +602,12 @@ instance Ord IndefUnitId where
   u1 `compare` u2 = indefUnitIdFS u1 `compare` indefUnitIdFS u2
 
 instance Binary IndefUnitId where
-  put_ bh indef = do
-    put_ bh (indefUnitIdComponentId indef)
-    put_ bh (indefUnitIdInsts indef)
-  get bh = do
-    cid   <- get bh
-    insts <- get bh
+  put indef = do
+    put (indefUnitIdComponentId indef)
+    put (indefUnitIdInsts indef)
+  get = do
+    cid   <- get
+    insts <- get
     let fs = hashUnitId cid insts
     return IndefUnitId {
             indefUnitIdComponentId = cid,
@@ -678,8 +678,8 @@ newtype InstalledUnitId =
     }
 
 instance Binary InstalledUnitId where
-  put_ bh (InstalledUnitId fs) = put_ bh fs
-  get bh = do fs <- get bh; return (InstalledUnitId fs)
+  put (InstalledUnitId fs) = put fs
+  get = InstalledUnitId <$> get
 
 instance BinaryStringRep InstalledUnitId where
   fromStringRep bs = InstalledUnitId (mkFastStringByteString bs)
@@ -772,8 +772,8 @@ instance Outputable DefUnitId where
     ppr (DefUnitId uid) = ppr uid
 
 instance Binary DefUnitId where
-    put_ bh (DefUnitId uid) = put_ bh uid
-    get bh = do uid <- get bh; return (DefUnitId uid)
+    put (DefUnitId uid) = put uid
+    get = DefUnitId <$> get
 
 -- | A map keyed off of 'InstalledModule'
 newtype InstalledModuleEnv elt = InstalledModuleEnv (Map InstalledModule elt)
@@ -896,20 +896,20 @@ instance Outputable UnitId where
 
 -- Performance: would prefer to have a NameCache like thing
 instance Binary UnitId where
-  put_ bh (DefiniteUnitId def_uid) = do
-    putByte bh 0
-    put_ bh def_uid
-  put_ bh (IndefiniteUnitId indef_uid) = do
-    putByte bh 1
-    put_ bh indef_uid
-  get bh = do b <- getByte bh
-              case b of
-                0 -> fmap DefiniteUnitId   (get bh)
-                _ -> fmap IndefiniteUnitId (get bh)
+  put (DefiniteUnitId def_uid) = do
+    putByte 0
+    put def_uid
+  put (IndefiniteUnitId indef_uid) = do
+    putByte 1
+    put indef_uid
+  get = do b <- getByte
+           case b of
+             0 -> DefiniteUnitId   <$> get
+             _ -> IndefiniteUnitId <$> get
 
 instance Binary ComponentId where
-  put_ bh (ComponentId fs) = put_ bh fs
-  get bh = do { fs <- get bh; return (ComponentId fs) }
+  put (ComponentId fs) = put fs
+  get = ComponentId <$> get
 
 -- | Create a new simple unit identifier (no holes) from a 'ComponentId'.
 newSimpleUnitId :: ComponentId -> UnitId

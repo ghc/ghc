@@ -36,6 +36,7 @@ import UniqFM
 import UniqSupply
 import Panic
 import Binary
+import Binary.Unsafe (ioP, ioG)
 import SrcLoc
 import ErrUtils
 import FastMutInt
@@ -93,174 +94,166 @@ readBinIface_ dflags checkHiWay traceBinIFaceReading hi_path ncu = do
                                     sd
                       QuietBinIFaceReading -> \_ -> return ()
 
-        wantedGot :: String -> a -> a -> (a -> SDoc) -> IO ()
-        wantedGot what wanted got ppr' =
+        wantedGot :: String -> a -> a -> (a -> SDoc) -> Get ()
+        wantedGot what wanted got ppr' = ioG $
             printer (text what <> text ": " <>
                      vcat [text "Wanted " <> ppr' wanted <> text ",",
                            text "got    " <> ppr' got])
 
-        errorOnMismatch :: (Eq a, Show a) => String -> a -> a -> IO ()
-        errorOnMismatch what wanted got =
+        errorOnMismatch :: (Eq a, Show a) => String -> a -> a -> Get ()
+        errorOnMismatch what wanted got = ioG $
             -- This will be caught by readIface which will emit an error
             -- msg containing the iface module name.
             when (wanted /= got) $ throwGhcExceptionIO $ ProgramError
                          (what ++ " (wanted " ++ show wanted
                                ++ ", got "    ++ show got ++ ")")
-    bh <- Binary.readBinMem hi_path
 
-    -- Read the magic number to check that this really is a GHC .hi file
-    -- (This magic number does not change when we change
-    --  GHC interface file format)
-    magic <- get bh
-    wantedGot "Magic" (binaryInterfaceMagic dflags) magic ppr
-    errorOnMismatch "magic number mismatch: old/corrupt interface file?"
-        (binaryInterfaceMagic dflags) magic
+    bd <- Binary.readBinData hi_path
 
-    -- Note [dummy iface field]
-    -- read a dummy 32/64 bit value.  This field used to hold the
-    -- dictionary pointer in old interface file formats, but now
-    -- the dictionary pointer is after the version (where it
-    -- should be).  Also, the serialisation of value of type "Bin
-    -- a" used to depend on the word size of the machine, now they
-    -- are always 32 bits.
-    if wORD_SIZE dflags == 4
-        then do _ <- Binary.get bh :: IO Word32; return ()
-        else do _ <- Binary.get bh :: IO Word64; return ()
+    runGetIO bd $ do
+      -- Read the magic number to check that this really is a GHC .hi file
+      -- (This magic number does not change when we change
+      --  GHC interface file format)
+      magic <- get
+      wantedGot "Magic" (binaryInterfaceMagic dflags) magic ppr
+      errorOnMismatch "magic number mismatch: old/corrupt interface file?"
+          (binaryInterfaceMagic dflags) magic
 
-    -- Check the interface file version and ways.
-    check_ver  <- get bh
-    let our_ver = show hiVersion
-    wantedGot "Version" our_ver check_ver text
-    errorOnMismatch "mismatched interface file versions" our_ver check_ver
+      -- Note [dummy iface field]
+      -- read a dummy 32/64 bit value.  This field used to hold the
+      -- dictionary pointer in old interface file formats, but now
+      -- the dictionary pointer is after the version (where it
+      -- should be).  Also, the serialisation of value of type "Bin
+      -- a" used to depend on the word size of the machine, now they
+      -- are always 32 bits.
+      if wORD_SIZE dflags == 4
+          then do _ <- Binary.get :: Get Word32; return ()
+          else do _ <- Binary.get :: Get Word64; return ()
 
-    check_way <- get bh
-    let way_descr = getWayDescr dflags
-    wantedGot "Way" way_descr check_way ppr
-    when (checkHiWay == CheckHiWay) $
-        errorOnMismatch "mismatched interface file ways" way_descr check_way
-    getWithUserData ncu bh
+      -- Check the interface file version and ways.
+      check_ver  <- get
+      let our_ver = show hiVersion
+      wantedGot "Version" our_ver check_ver text
+      errorOnMismatch "mismatched interface file versions" our_ver check_ver
+
+      check_way <- get
+      let way_descr = getWayDescr dflags
+      wantedGot "Way" way_descr check_way ppr
+      when (checkHiWay == CheckHiWay) $
+          errorOnMismatch "mismatched interface file ways" way_descr check_way
+      getWithUserData ncu
 
 
 -- | This performs a get action after reading the dictionary and symbol
 -- table. It is necessary to run this before trying to deserialise any
 -- Names or FastStrings.
-getWithUserData :: Binary a => NameCacheUpdater -> BinHandle -> IO a
-getWithUserData ncu bh = do
+getWithUserData :: Binary a => NameCacheUpdater -> Get a
+getWithUserData ncu = do
     -- Read the dictionary
     -- The next word in the file is a pointer to where the dictionary is
     -- (probably at the end of the file)
-    dict_p <- Binary.get bh
-    data_p <- tellBin bh          -- Remember where we are now
-    seekBin bh dict_p
-    dict   <- getDictionary bh
-    seekBin bh data_p             -- Back to where we were before
+    dict_p <- Binary.get
+    data_p <- tellG               -- Remember where we are now
+    seekG dict_p
+    dict   <- getDictionary
+    seekG data_p                -- Back to where we were before
 
-    -- Initialise the user-data field of bh
-    bh <- do
-        bh <- return $ setUserData bh $ newReadState (error "getSymtabName")
-                                                     (getDictFastString dict)
-        symtab_p <- Binary.get bh     -- Get the symtab ptr
-        data_p <- tellBin bh          -- Remember where we are now
-        seekBin bh symtab_p
-        symtab <- getSymbolTable bh ncu
-        seekBin bh data_p             -- Back to where we were before
+    readState (error "getSymtabName") (getDictFastString dict) $ do
 
-        -- It is only now that we know how to get a Name
-        return $ setUserData bh $ newReadState (getSymtabName ncu dict symtab)
-                                               (getDictFastString dict)
+      symtab_p <- Binary.get       -- Get the symtab ptr
+      data_p <- tellG              -- Remember where we are now
+      seekG symtab_p
+      symtab <- getSymbolTable ncu
+      seekG data_p                 -- Back to where we were before
 
-    -- Read the interface file
-    get bh
+      -- It is only now that we know how to get a `Name`
+      readState (getSymtabName ncu dict symtab) (getDictFastString dict) get
 
 -- | Write an interface file
 writeBinIface :: DynFlags -> FilePath -> ModIface -> IO ()
 writeBinIface dflags hi_path mod_iface = do
-    bh <- openBinMem initBinMemSize
-    put_ bh (binaryInterfaceMagic dflags)
 
-   -- dummy 32/64-bit field before the version/way for
-   -- compatibility with older interface file formats.
-   -- See Note [dummy iface field] above.
-    if wORD_SIZE dflags == 4
-        then Binary.put_ bh (0 :: Word32)
-        else Binary.put_ bh (0 :: Word64)
+    bd <- runPutIO $ do
+      put (binaryInterfaceMagic dflags)
 
-    -- The version and way descriptor go next
-    put_ bh (show hiVersion)
-    let way_descr = getWayDescr dflags
-    put_  bh way_descr
+      -- dummy 32/64-bit field before the version/way for
+      -- compatibility with older interface file formats.
+      -- See Note [dummy iface field] above.
+      if wORD_SIZE dflags == 4
+        then Binary.put (0 :: Word32)
+        else Binary.put (0 :: Word64)
 
+      -- The version and way descriptor go next
+      put (show hiVersion)
+      let way_descr = getWayDescr dflags
+      put way_descr
 
-    putWithUserData (debugTraceMsg dflags 3) bh mod_iface
+      putWithUserData (ioP . debugTraceMsg dflags 3) mod_iface
+
     -- And send the result to the file
-    writeBinMem bh hi_path
+    writeBinData bd hi_path
 
 -- | Put a piece of data with an initialised `UserData` field. This
 -- is necessary if you want to serialise Names or FastStrings.
 -- It also writes a symbol table and the dictionary.
 -- This segment should be read using `getWithUserData`.
-putWithUserData :: Binary a => (SDoc -> IO ()) -> BinHandle -> a -> IO ()
-putWithUserData log_action bh payload = do
+putWithUserData :: Binary a => (SDoc -> Put ()) -> a -> Put ()
+putWithUserData log_action payload = do
     -- Remember where the dictionary pointer will go
-    dict_p_p <- tellBin bh
+    dict_p_p <- tellP
     -- Placeholder for ptr to dictionary
-    put_ bh dict_p_p
+    put dict_p_p
 
     -- Remember where the symbol table pointer will go
-    symtab_p_p <- tellBin bh
-    put_ bh symtab_p_p
+    symtab_p_p <- tellP
+    put symtab_p_p
     -- Make some initial state
-    symtab_next <- newFastMutInt
-    writeFastMutInt symtab_next 0
-    symtab_map <- newIORef emptyUFM
+    symtab_next <- ioP $ newFastMutInt
+    ioP $ writeFastMutInt symtab_next 0
+    symtab_map <- ioP $ newIORef emptyUFM
     let bin_symtab = BinSymbolTable {
                          bin_symtab_next = symtab_next,
                          bin_symtab_map  = symtab_map }
-    dict_next_ref <- newFastMutInt
-    writeFastMutInt dict_next_ref 0
-    dict_map_ref <- newIORef emptyUFM
+    dict_next_ref <- ioP $ newFastMutInt
+    ioP $ writeFastMutInt dict_next_ref 0
+    dict_map_ref <- ioP $ newIORef emptyUFM
     let bin_dict = BinDictionary {
                        bin_dict_next = dict_next_ref,
                        bin_dict_map  = dict_map_ref }
 
     -- Put the main thing,
-    bh <- return $ setUserData bh $ newWriteState (putName bin_dict bin_symtab)
-                                                  (putName bin_dict bin_symtab)
-                                                  (putFastString bin_dict)
-    put_ bh payload
+    writeState (putName bin_dict bin_symtab)
+               (putName bin_dict bin_symtab)
+               (putFastString bin_dict) $ do
+      put payload
 
-    -- Write the symtab pointer at the front of the file
-    symtab_p <- tellBin bh        -- This is where the symtab will start
-    putAt bh symtab_p_p symtab_p  -- Fill in the placeholder
-    seekBin bh symtab_p           -- Seek back to the end of the file
+      -- Write the symtab pointer at the front of the file
+      symtab_p <- tellP             -- This is where the symtab will start
+      putAt symtab_p_p symtab_p     -- Fill in the placeholder
+      seekP symtab_p           -- Seek back to the end of the file
 
-    -- Write the symbol table itself
-    symtab_next <- readFastMutInt symtab_next
-    symtab_map  <- readIORef symtab_map
-    putSymbolTable bh symtab_next symtab_map
-    log_action (text "writeBinIface:" <+> int symtab_next
-                                <+> text "Names")
+      -- Write the symbol table itself
+      symtab_next <- ioP $ readFastMutInt symtab_next
+      symtab_map  <- ioP $ readIORef symtab_map
+      putSymbolTable symtab_next symtab_map
+      log_action (text "writeBinIface:" <+> int symtab_next
+                                        <+> text "Names")
 
-    -- NB. write the dictionary after the symbol table, because
-    -- writing the symbol table may create more dictionary entries.
+      -- NB. write the dictionary after the symbol table, because
+      -- writing the symbol table may create more dictionary entries.
 
-    -- Write the dictionary pointer at the front of the file
-    dict_p <- tellBin bh          -- This is where the dictionary will start
-    putAt bh dict_p_p dict_p      -- Fill in the placeholder
-    seekBin bh dict_p             -- Seek back to the end of the file
+      -- Write the dictionary pointer at the front of the file
+      dict_p <- tellP               -- This is where the dictionary will start
+      putAt dict_p_p dict_p         -- Fill in the placeholder
+      seekP dict_p                  -- Seek back to the end of the file
 
-    -- Write the dictionary itself
-    dict_next <- readFastMutInt dict_next_ref
-    dict_map  <- readIORef dict_map_ref
-    putDictionary bh dict_next dict_map
-    log_action (text "writeBinIface:" <+> int dict_next
-                                <+> text "dict entries")
+      -- Write the dictionary itself
+      dict_next <- ioP $ readFastMutInt dict_next_ref
+      dict_map  <- ioP $ readIORef dict_map_ref
+      putDictionary dict_next dict_map
+      log_action (text "writeBinIface:" <+> int dict_next
+                                        <+> text "dict entries")
 
-
-
--- | Initial ram buffer to allocate for writing interface files
-initBinMemSize :: Int
-initBinMemSize = 1024 * 1024
 
 binaryInterfaceMagic :: DynFlags -> Word32
 binaryInterfaceMagic dflags
@@ -272,19 +265,19 @@ binaryInterfaceMagic dflags
 -- The symbol table
 --
 
-putSymbolTable :: BinHandle -> Int -> UniqFM (Int,Name) -> IO ()
-putSymbolTable bh next_off symtab = do
-    put_ bh next_off
+putSymbolTable :: Int -> UniqFM (Int,Name) -> Put ()
+putSymbolTable next_off symtab = do
+    put next_off
     let names = elems (array (0,next_off-1) (nonDetEltsUFM symtab))
       -- It's OK to use nonDetEltsUFM here because the elements have
       -- indices that array uses to create order
-    mapM_ (\n -> serialiseName bh n symtab) names
+    mapM_ (\n -> serialiseName n symtab) names
 
-getSymbolTable :: BinHandle -> NameCacheUpdater -> IO SymbolTable
-getSymbolTable bh ncu = do
-    sz <- get bh
-    od_names <- sequence (replicate sz (get bh))
-    updateNameCache ncu $ \namecache ->
+getSymbolTable :: NameCacheUpdater -> Get SymbolTable
+getSymbolTable ncu = do
+    sz <- get
+    od_names <- sequence (replicate sz get)
+    ioG $ updateNameCache ncu $ \namecache ->
         runST $ flip State.evalStateT namecache $ do
             mut_arr <- lift $ newSTArray_ (0, sz-1)
             for_ (zip [0..] od_names) $ \(i, odn) -> do
@@ -313,10 +306,10 @@ fromOnDiskName nc (pid, mod_name, occ) =
                    new_cache  = extendNameCache cache mod occ name
                in ( nc{ nsUniqs = us, nsNames = new_cache }, name )
 
-serialiseName :: BinHandle -> Name -> UniqFM (Int,Name) -> IO ()
-serialiseName bh name _ = do
+serialiseName :: Name -> UniqFM (Int,Name) -> Put ()
+serialiseName name _ = do
     let mod = ASSERT2( isExternalName name, ppr name ) nameModule name
-    put_ bh (moduleUnitId mod, moduleName mod, nameOccName name)
+    put (moduleUnitId mod, moduleName mod, nameOccName name)
 
 
 -- Note [Symbol table representation of names]
@@ -337,36 +330,36 @@ serialiseName bh name _ = do
 
 
 -- See Note [Symbol table representation of names]
-putName :: BinDictionary -> BinSymbolTable -> BinHandle -> Name -> IO ()
+putName :: BinDictionary -> BinSymbolTable -> Name -> Put ()
 putName _dict BinSymbolTable{
                bin_symtab_map = symtab_map_ref,
                bin_symtab_next = symtab_next }
-        bh name
+        name
   | isKnownKeyName name
   , let (c, u) = unpkUnique (nameUnique name) -- INVARIANT: (ord c) fits in 8 bits
   = -- ASSERT(u < 2^(22 :: Int))
-    put_ bh (0x80000000
-             .|. (fromIntegral (ord c) `shiftL` 22)
-             .|. (fromIntegral u :: Word32))
+    put (0x80000000
+         .|. (fromIntegral (ord c) `shiftL` 22)
+         .|. (fromIntegral u :: Word32))
 
   | otherwise
-  = do symtab_map <- readIORef symtab_map_ref
+  = do symtab_map <- ioP $ readIORef symtab_map_ref
        case lookupUFM symtab_map name of
-         Just (off,_) -> put_ bh (fromIntegral off :: Word32)
+         Just (off,_) -> put (fromIntegral off :: Word32)
          Nothing -> do
-            off <- readFastMutInt symtab_next
+            off <- ioP $ readFastMutInt symtab_next
             -- MASSERT(off < 2^(30 :: Int))
-            writeFastMutInt symtab_next (off+1)
-            writeIORef symtab_map_ref
+            ioP $ writeFastMutInt symtab_next (off+1)
+            ioP $ writeIORef symtab_map_ref
                 $! addToUFM symtab_map name (off,name)
-            put_ bh (fromIntegral off :: Word32)
+            put (fromIntegral off :: Word32)
 
 -- See Note [Symbol table representation of names]
 getSymtabName :: NameCacheUpdater
               -> Dictionary -> SymbolTable
-              -> BinHandle -> IO Name
-getSymtabName _ncu _dict symtab bh = do
-    i :: Word32 <- get bh
+              -> Get Name
+getSymtabName _ncu _dict symtab = do
+    i :: Word32 <- get
     case i .&. 0xC0000000 of
       0x00000000 -> return $! symtab ! fromIntegral i
 
@@ -389,8 +382,8 @@ data BinSymbolTable = BinSymbolTable {
                                 -- indexed by Name
   }
 
-putFastString :: BinDictionary -> BinHandle -> FastString -> IO ()
-putFastString dict bh fs = allocateFastString dict fs >>= put_ bh
+putFastString :: BinDictionary -> FastString -> Put ()
+putFastString dict fs = ioP (allocateFastString dict fs) >>= put
 
 allocateFastString :: BinDictionary -> FastString -> IO Word32
 allocateFastString BinDictionary { bin_dict_next = j_r,
@@ -405,9 +398,9 @@ allocateFastString BinDictionary { bin_dict_next = j_r,
            writeIORef out_r $! addToUFM out uniq (j, f)
            return (fromIntegral j :: Word32)
 
-getDictFastString :: Dictionary -> BinHandle -> IO FastString
-getDictFastString dict bh = do
-    j <- get bh
+getDictFastString :: Dictionary -> Get FastString
+getDictFastString dict = do
+    j <- get
     return $! (dict ! fromIntegral (j :: Word32))
 
 data BinDictionary = BinDictionary {

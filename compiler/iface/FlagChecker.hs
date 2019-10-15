@@ -30,7 +30,7 @@ import System.FilePath (normalise)
 -- *interface* file, not the actual 'Module' according to our
 -- 'DynFlags'.
 fingerprintDynFlags :: DynFlags -> Module
-                    -> (BinHandle -> Name -> IO ())
+                    -> (Name -> Put ())
                     -> IO Fingerprint
 
 fingerprintDynFlags dflags@DynFlags{..} this_mod nameio =
@@ -68,8 +68,8 @@ fingerprintDynFlags dflags@DynFlags{..} this_mod nameio =
 -- object files as they can.
 -- See Note [Ignoring some flag changes]
 fingerprintOptFlags :: DynFlags
-                      -> (BinHandle -> Name -> IO ())
-                      -> IO Fingerprint
+                    -> (Name -> Put ())
+                    -> IO Fingerprint
 fingerprintOptFlags DynFlags{..} nameio =
       let
         -- See https://gitlab.haskell.org/ghc/ghc/issues/10923
@@ -86,8 +86,8 @@ fingerprintOptFlags DynFlags{..} nameio =
 -- file compiled for HPC when not actually using HPC.
 -- See Note [Ignoring some flag changes]
 fingerprintHpcFlags :: DynFlags
-                      -> (BinHandle -> Name -> IO ())
-                      -> IO Fingerprint
+                    -> (Name -> Put ())
+                    -> IO Fingerprint
 fingerprintHpcFlags dflags@DynFlags{..} nameio =
       let
         -- -fhpc, see https://gitlab.haskell.org/ghc/ghc/issues/11798

@@ -314,43 +314,32 @@ costCentreSrcSpan :: CostCentre -> SrcSpan
 costCentreSrcSpan = cc_loc
 
 instance Binary CCFlavour where
-    put_ bh CafCC = do
-            putByte bh 0
-    put_ bh (ExprCC i) = do
-            putByte bh 1
-            put_ bh i
-    put_ bh (DeclCC i) = do
-            putByte bh 2
-            put_ bh i
-    put_ bh (HpcCC i) = do
-            putByte bh 3
-            put_ bh i
-    get bh = do
-            h <- getByte bh
+    put CafCC      = putByte 0
+    put (ExprCC i) = putByte 1 >> put i
+    put (DeclCC i) = putByte 2 >> put i
+    put (HpcCC i)  = putByte 3 >> put i
+    get = do
+            h <- getByte
             case h of
               0 -> do return CafCC
-              1 -> ExprCC <$> get bh
-              2 -> DeclCC <$> get bh
-              _ -> HpcCC <$> get bh
+              1 -> ExprCC <$> get
+              2 -> DeclCC <$> get
+              _ -> HpcCC <$> get
 
 instance Binary CostCentre where
-    put_ bh (NormalCC aa ab ac _ad) = do
-            putByte bh 0
-            put_ bh aa
-            put_ bh ab
-            put_ bh ac
-    put_ bh (AllCafsCC ae _af) = do
-            putByte bh 1
-            put_ bh ae
-    get bh = do
-            h <- getByte bh
+    put (NormalCC aa ab ac _ad) = do
+         putByte 0
+         put aa
+         put ab
+         put ac
+    put (AllCafsCC ae _af) = do
+         putByte 1
+         put ae
+    get = do
+            h <- getByte
             case h of
-              0 -> do aa <- get bh
-                      ab <- get bh
-                      ac <- get bh
-                      return (NormalCC aa ab ac noSrcSpan)
-              _ -> do ae <- get bh
-                      return (AllCafsCC ae noSrcSpan)
+              0 -> NormalCC <$> get <*> get <*> get <*> return noSrcSpan
+              _ -> AllCafsCC <$> get <*> return noSrcSpan
 
     -- We ignore the SrcSpans in CostCentres when we serialise them,
     -- and set the SrcSpans to noSrcSpan when deserialising.  This is
