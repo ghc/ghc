@@ -235,28 +235,34 @@ def _use_specs( name, opts, specs ):
 # -----
 
 def expect_fail_for( ways: List[WayName] ):
-    assert isinstance(ways, list)
-    return lambda name, opts, w=ways: _expect_fail_for( name, opts, w )
+    assert all(way in all_ways for way in ways)
 
-def _expect_fail_for( name, opts, ways ):
-    opts.expect_fail_for = ways
+    def helper( name, opts ):
+        opts.expect_fail_for = ways
+
+    return helper
+
 
 def expect_broken( bug: IssueNumber ):
-    # This test is a expected not to work due to the indicated trac bug
-    # number.
-    return lambda name, opts, b=bug: _expect_broken (name, opts, b )
+    """
+    This test is a expected not to work due to the indicated issue number.
+    """
+    def helper( name: TestName, opts ):
+        record_broken(name, opts, bug)
+        opts.expect = 'fail';
 
-def _expect_broken( name: TestName, opts, bug: IssueNumber ):
-    record_broken(name, opts, bug)
-    opts.expect = 'fail';
+    return helper
+
 
 def expect_broken_for( bug: IssueNumber, ways: List[WayName] ):
-    assert isinstance(ways, list)
-    return lambda name, opts, b=bug, w=ways: _expect_broken_for( name, opts, b, w )
+    assert all(way in all_ways for way in ways)
 
-def _expect_broken_for( name: TestName, opts, bug: IssueNumber, ways ):
-    record_broken(name, opts, bug)
-    opts.expect_fail_for = ways
+    def helper( name: TestName, opts ):
+        record_broken(name, opts, bug)
+        opts.expect_fail_for = ways
+
+    return helper
+
 
 def record_broken(name: TestName, opts, bug: IssueNumber):
     me = (bug, opts.testdir, name)
@@ -286,6 +292,8 @@ def fragile_for( bug: IssueNumber, ways: List[WayName] ):
     Indicates that failures of this test should be ignored due to fragility in
     the given test ways as documented in the given ticket.
     """
+    assert all(way in all_ways for way in ways)
+
     def helper( name, opts, bug=bug, ways=ways ):
         record_broken(name, opts, bug)
         opts.fragile_ways += ways
@@ -295,30 +303,33 @@ def fragile_for( bug: IssueNumber, ways: List[WayName] ):
 # -----
 
 def omit_ways( ways: List[WayName] ):
-    assert isinstance(ways, list)
-    return lambda name, opts, w=ways: _omit_ways( name, opts, w )
+    assert all(way in all_ways for way in ways)
 
-def _omit_ways( name, opts, ways ):
-    assert ways.__class__ is list
-    opts.omit_ways += ways
+    def helper( name, opts ):
+        opts.omit_ways += ways
+
+    return helper
 
 # -----
 
 def only_ways( ways: List[WayName] ):
-    assert isinstance(ways, list)
-    return lambda name, opts, w=ways: _only_ways( name, opts, w )
+    assert all(way in all_ways for way in ways)
 
-def _only_ways( name, opts, ways ):
-    opts.only_ways = ways
+    def helper( name, opts ):
+        opts.only_ways = ways
+
+    return helper
 
 # -----
 
 def extra_ways( ways: List[WayName] ):
-    assert isinstance(ways, list)
-    return lambda name, opts, w=ways: _extra_ways( name, opts, w )
+    assert all(way in all_ways for way in ways)
 
-def _extra_ways( name, opts, ways ):
-    opts.extra_ways = ways
+    def helper( name, opts ):
+        opts.extra_ways = ways
+
+    return helper
+
 
 # -----
 
