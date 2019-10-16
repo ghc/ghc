@@ -258,4 +258,3 @@ castTupleRepWith
             (b :: TYPE ('TupleRep '[ 'TupleRep '[], 'LiftedRep, 'LiftedRep])) .
      UnsafeHeteroEquality a b -> a -> b
 castTupleRepWith UnsafeHRefl x = x
-

@@ -351,7 +351,7 @@ ensureCFinalizerWeak ref@(IORef (STRef r#)) value = do
       CFinalizers weak -> return (MyWeak weak)
       HaskellFinalizers{} -> noMixingError
       NoFinalizers -> IO $ \s ->
-          case mkWeakNoFinalizer# r# (unsafeCastWith unsafeEqualityProof value) s of { (# s1, w #) ->
+          case mkWeakNoFinalizer# r# (unsafeCoerce value) s of { (# s1, w #) ->
              -- See Note [MallocPtr finalizers] (#10904)
           case atomicModifyMutVar2# r# (update w) s1 of
               { (# s2, _, (_, (weak, needKill )) #) ->
