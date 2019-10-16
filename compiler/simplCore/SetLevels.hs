@@ -47,9 +47,20 @@
   The simplifier tries to get rid of occurrences of x, in favour of wild,
   in the hope that there will only be one remaining occurrence of x, namely
   the scrutinee of the case, and we can inline it.
+
+  This can only work if @wild@ is an unrestricted binder. Indeed, even with the
+  extended typing rule (in the linter) for case expressions, if
+       case x of wild # 1 { p -> e}
+  is well-typed, then
+       case x of wild # 1 { p -> e[wild\x] }
+  is only well-typed if @e[wild\x] = e@ (that is, if @wild@ is not used in @e@
+  at all). In which case, it is, of course, pointless to do the substitution
+  anyway. So for a linear binder (and really anything which isn't unrestricted),
+  doing this substitution would either produce ill-typed terms or be the
+  identity.
 -}
 
-{-# LANGUAGE CPP, MultiWayIf #-}
+{-# LANGUAGE CPP, MultiWayIf, PatternSynonyms #-}
 module SetLevels (
         setLevels,
 
@@ -90,6 +101,7 @@ import Name             ( getOccName, mkSystemVarName )
 import OccName          ( occNameString )
 import Type             ( Type, mkLamTypes, splitTyConApp_maybe, tyCoVarsOfType
                         , isUnliftedType, closeOverKindsDSet )
+import Multiplicity     ( pattern Omega )
 import BasicTypes       ( Arity, RecFlag(..), isRec )
 import DataCon          ( dataConOrigResTy )
 import TysWiredIn
@@ -466,6 +478,7 @@ lvlCase env scrut_fvs scrut' case_bndr ty alts
   , exprIsHNF (deTagExpr scrut')  -- See Note [Check the output scrutinee for exprIsHNF]
   , not (isTopLvl dest_lvl)       -- Can't have top-level cases
   , not (floatTopLvlOnly env)     -- Can float anywhere
+  , Omega <- idMult case_bndr     -- See Note [Floating linear case]
   =     -- Always float the case if possible
         -- Unlike lets we don't insist that it escapes a value lambda
     do { (env1, (case_bndr' : bs')) <- cloneCaseBndrs env dest_lvl (case_bndr : bs)
@@ -535,6 +548,17 @@ Things to note:
    If we floated the cases out we could eliminate one of them.
 
  * We only do this with a single-alternative case
+
+Note [Floating linear case]
+~~~~~~~~~~~~~~~~~~~~~~~~~~~
+Linear case can't be floated past case branches:
+    case u of { p1 -> case[1] v of { C x -> ...x...}; p2 -> ... }
+Is well typed, but
+    case[1] v of { C x -> case u of { p1 -> ...x...; p2 -> ... }}
+Will not be, because of how `x` is used in one alternative but not the other.
+
+It is not easy to float this linear cases precisely, so, instead, we elect, for
+the moment, to simply not float linear case.
 
 Note [Check the output scrutinee for exprIsHNF]
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
@@ -1531,6 +1555,7 @@ extendCaseBndrEnv :: LevelEnv
                   -> LevelEnv
 extendCaseBndrEnv le@(LE { le_subst = subst, le_env = id_env })
                   case_bndr (Var scrut_var)
+    | Omega <- varMult case_bndr
   = le { le_subst   = extendSubstWithVar subst case_bndr scrut_var
        , le_env     = add_id id_env (case_bndr, scrut_var) }
 extendCaseBndrEnv env _ _ = env
@@ -1632,7 +1657,7 @@ newPolyBndrs dest_lvl
 
     mk_poly_bndr bndr uniq = transferPolyIdInfo bndr abs_vars $         -- Note [transferPolyIdInfo] in Id.hs
                              transfer_join_info bndr $
-                             mkSysLocalOrCoVar (mkFastString str) uniq poly_ty
+                             mkSysLocalOrCoVar (mkFastString str) uniq (idMult bndr) poly_ty
                            where
                              str     = "poly_" ++ occNameString (getOccName bndr)
                              poly_ty = mkLamTypes abs_vars (CoreSubst.substTy subst (idType bndr))
@@ -1667,7 +1692,7 @@ newLvlVar lvld_rhs join_arity_maybe is_mk_static
       = mkExportedVanillaId (mkSystemVarName uniq (mkFastString "static_ptr"))
                             rhs_ty
       | otherwise
-      = mkSysLocalOrCoVar (mkFastString "lvl") uniq rhs_ty
+      = mkSysLocalOrCoVar (mkFastString "lvl") uniq Omega rhs_ty
 
 cloneCaseBndrs :: LevelEnv -> Level -> [Var] -> LvlM (LevelEnv, [Var])
 cloneCaseBndrs env@(LE { le_subst = subst, le_lvl_env = lvl_env, le_env = id_env })

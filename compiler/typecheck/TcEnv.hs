@@ -33,6 +33,8 @@ module TcEnv(
         tcExtendIdEnv, tcExtendIdEnv1, tcExtendIdEnv2,
         tcExtendBinderStack, tcExtendLocalTypeEnv,
         isTypeClosedLetBndr,
+        tcEmitBindingUsage, tcCollectingUsage, tcScalingUsage,
+        tcCheckUsage,
 
         tcLookup, tcLookupLocated, tcLookupLocalIds,
         tcLookupId, tcLookupIdMaybe, tcLookupTyVar,
@@ -78,7 +80,10 @@ import HsSyn
 import IfaceEnv
 import TcRnMonad
 import TcMType
+import TcEvidence (HsWrapper, idHsWrapper)
+import UsageEnv
 import TcType
+import {-# SOURCE #-} TcUnify ( tcSubMult )
 import LoadIface
 import PrelNames
 import TysWiredIn
@@ -110,6 +115,7 @@ import ListSetOps
 import ErrUtils
 import Util
 import Maybes( MaybeErr(..), orElse )
+import Multiplicity
 import qualified GHC.LanguageExtensions as LangExt
 
 import Data.IORef
@@ -640,6 +646,50 @@ tcExtendLocalTypeEnv lcl_env@(TcLclEnv { tcl_env = lcl_type_env }) tc_ty_things
         --
         -- Nor must we generalise g over any kind variables free in r's kind
 
+-- | @tcCollectingUsage thing_inside@ runs @thing_inside@ and returns the usage
+-- information which was collected as part of the execution of
+-- @thing_inside@. Careful: @tcCollectingUsage thing_inside@ itself does not
+-- report any usage information, it's up to the caller to incorporate the
+-- returned usage information into the larger context appropriately.
+tcCollectingUsage :: TcM a -> TcM (UsageEnv,a)
+tcCollectingUsage thing_inside
+  = do { env0 <- getLclEnv
+       ; local_usage_ref <- newTcRef zeroUE
+       ; let env1 = env0 { tcl_usage = local_usage_ref }
+       ; result <- setLclEnv env1 thing_inside
+       ; local_usage <- readTcRef local_usage_ref
+       ; return (local_usage,result) }
+
+-- | @tcScalingUsage mult thing_inside@ runs @thing_inside@ and scales all the
+-- usage information by @mult@.
+tcScalingUsage :: Mult -> TcM a -> TcM a
+tcScalingUsage mult thing_inside
+  = do { (usage, result) <- tcCollectingUsage thing_inside
+       ; traceTc "tcScalingUsage" (ppr mult)
+       ; tcEmitBindingUsage $ scaleUE mult usage
+       ; return result }
+
+-- | @tcCheckUsage name mult thing_inside@ runs @thing_inside@,
+-- checks that the usage of @name@ is a submultiplicity of @mult@,
+-- and removes @name@ from the usage environment.
+tcCheckUsage :: Name -> Mult -> TcM a -> TcM (a, HsWrapper)
+tcCheckUsage name id_mult thing_inside
+  = do { (local_usage, result) <- tcCollectingUsage thing_inside
+       ; wrapper <- check_then_add_usage local_usage
+       ; return (result, wrapper) }
+    where
+    check_then_add_usage :: UsageEnv -> TcM HsWrapper
+    -- Checks that the usage of the newly introduced binder is compatible with
+    -- its multiplicity, and combines the usage of non-new binders to |uenv|
+    check_then_add_usage uenv
+      = do { let actual_u = lookupUE uenv name
+           ; traceTc "check_then_add_usage" (ppr id_mult $$ ppr actual_u)
+           ; wrapper <- case actual_u of
+               Bottom -> return idHsWrapper
+               Zero     -> tcSubMult (UsageEnvironmentOf name) Omega id_mult
+               MUsage m -> tcSubMult (UsageEnvironmentOf name) m id_mult
+           ; tcEmitBindingUsage (deleteUE uenv name)
+           ; return wrapper }
 
 {- *********************************************************************
 *                                                                      *
@@ -652,6 +702,12 @@ tcExtendBinderStack bndrs thing_inside
   = do { traceTc "tcExtendBinderStack" (ppr bndrs)
        ; updLclEnv (\env -> env { tcl_bndrs = bndrs ++ tcl_bndrs env })
                    thing_inside }
+
+tcEmitBindingUsage :: UsageEnv -> TcM ()
+tcEmitBindingUsage ue
+  = do { lcl_env <- getLclEnv
+       ; let usage = tcl_usage lcl_env
+       ; updTcRef usage (addUE ue) }
 
 tcInitTidyEnv :: TcM TidyEnv
 -- We initialise the "tidy-env", used for tidying types before printing,

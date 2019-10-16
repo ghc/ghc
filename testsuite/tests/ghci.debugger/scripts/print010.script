@@ -4,6 +4,7 @@
 :l Test
 
 let o = O (map id [0..3])
+seq o ()
 :p o
 seq _t1 ()
 :p o

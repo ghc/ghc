@@ -3,7 +3,7 @@
 module Type where
 
 import GhcPrelude
-import TyCon
+import {-# SOURCE #-} TyCon
 import {-# SOURCE #-} TyCoRep( Type, Coercion )
 import Util
 
@@ -20,3 +20,4 @@ coreView :: Type -> Maybe Type
 tcView :: Type -> Maybe Type
 
 splitTyConApp_maybe :: HasDebugCallStack => Type -> Maybe (TyCon, [Type])
+mkTyConApp :: TyCon -> [Type] -> Type

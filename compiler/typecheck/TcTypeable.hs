@@ -7,6 +7,7 @@
 {-# LANGUAGE RecordWildCards #-}
 {-# LANGUAGE GeneralizedNewtypeDeriving #-}
 {-# LANGUAGE TypeFamilies #-}
+{-# OPTIONS_GHC -O0 #-}
 
 module TcTypeable(mkTypeableBinds) where
 
@@ -31,6 +32,7 @@ import TysWiredIn ( tupleTyCon, sumTyCon, runtimeRepTyCon
 import Name
 import Id
 import Type
+import Multiplicity
 import TyCon
 import DataCon
 import Module
@@ -432,8 +434,8 @@ liftTc = KindRepM . lift
 builtInKindReps :: [(Kind, Name)]
 builtInKindReps =
     [ (star, starKindRepName)
-    , (mkVisFunTy star star, starArrStarKindRepName)
-    , (mkVisFunTys [star, star] star, starArrStarArrStarKindRepName)
+    , (mkVisFunTyOm star star, starArrStarKindRepName)
+    , (mkVisFunTysOm [star, star] star, starArrStarArrStarKindRepName)
     ]
   where
     star = liftedTypeKind
@@ -503,7 +505,7 @@ getKindRep stuff@(Stuff {..}) in_scope = go
       = do -- Place a NOINLINE pragma on KindReps since they tend to be quite
            -- large and bloat interface files.
            rep_bndr <- (`setInlinePragma` neverInlinePragma)
-                   <$> newSysLocalId (fsLit "$krep") (mkTyConTy kindRepTyCon)
+                   <$> newSysLocalId (fsLit "$krep") Omega (mkTyConTy kindRepTyCon)
 
            -- do we need to tie a knot here?
            flip runStateT env $ unKindRepM $ do
@@ -557,7 +559,7 @@ mkKindRepRhs stuff@(Stuff {..}) in_scope = new_kind_rep
     new_kind_rep (ForAllTy (Bndr var _) ty)
       = pprPanic "mkTyConKindRepBinds(ForAllTy)" (ppr var $$ ppr ty)
 
-    new_kind_rep (FunTy _ t1 t2)
+    new_kind_rep (FunTy _ _ t1 t2)
       = do rep1 <- getKindRep stuff in_scope t1
            rep2 <- getKindRep stuff in_scope t2
            return $ nlHsDataCon kindRepFunDataCon

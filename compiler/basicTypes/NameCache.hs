@@ -1,3 +1,4 @@
+{-# OPTIONS_GHC -O0 #-}
 {-# LANGUAGE CPP #-}
 {-# LANGUAGE RankNTypes #-}
 

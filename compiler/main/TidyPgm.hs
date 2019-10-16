@@ -218,7 +218,7 @@ globaliseAndTidyBootId :: Id -> Id
 --     * VanillaIdInfo (makes a conservative assumption about Caf-hood and arity)
 --     * BootUnfolding (see Note [Inlining and hs-boot files] in ToIface)
 globaliseAndTidyBootId id
-  = globaliseId id `setIdType`      tidyTopType (idType id)
+  = Id.updateIdTypeAndMult tidyTopType (globaliseId id)
                    `setIdUnfolding` BootUnfolding
 
 {-
