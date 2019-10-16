@@ -25,7 +25,7 @@ import GhcPrelude
 
 import Type
 import Pair
-import TcType     ( TcType, tcEqType )
+import TcType     ( tcEqType )
 import TyCon      ( TyCon, FamTyConFlav(..), mkFamilyTyCon
                   , Injectivity(..) )
 import Coercion   ( Role(..) )

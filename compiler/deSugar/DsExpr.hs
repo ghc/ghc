@@ -194,7 +194,7 @@ dsUnliftedBind (AbsBinds { abs_tvs = [], abs_ev_vars = []
 
 dsUnliftedBind (FunBind { fun_id = (dL->L l fun)
                         , fun_matches = matches
-                        , fun_co_fn = co_fn
+                        , fun_ext = co_fn
                         , fun_tick = tick }) body
                -- Can't be a bang pattern (that looks like a PatBind)
                -- so must be simply unboxed
@@ -274,7 +274,7 @@ ds_expr _ (HsOverLit _ lit)
   = do { warnAboutOverflowedOverLit lit
        ; dsOverLit lit }
 
-ds_expr _ (HsWrap _ co_fn e)
+ds_expr _ (XExpr (HsWrap co_fn e))
   = do { e' <- ds_expr True e    -- This is the one place where we recurse to
                                  -- ds_expr (passing True), rather than dsExpr
        ; wrap' <- dsHsWrapper co_fn
@@ -755,7 +755,6 @@ ds_expr _ (HsTickPragma _ _ _ _ expr) = do
 ds_expr _ (HsBracket     {})  = panic "dsExpr:HsBracket"
 ds_expr _ (HsDo          {})  = panic "dsExpr:HsDo"
 ds_expr _ (HsRecFld      {})  = panic "dsExpr:HsRecFld"
-ds_expr _ (XExpr nec)         = noExtCon nec
 
 
 ------------------------------
@@ -772,6 +771,7 @@ dsSyntaxExpr (SyntaxExpr { syn_expr      = expr
                       (\_ -> core_res_wrap (mkApps fun wrapped_args)) }
   where
     mk_doc n = text "In the" <+> speakNth n <+> text "argument of" <+> quotes (ppr expr)
+dsSyntaxExpr NoSyntaxExpr _ = panic "dsSyntaxExpr"
 
 findField :: [LHsRecField GhcTc arg] -> Name -> [arg]
 findField rbinds sel

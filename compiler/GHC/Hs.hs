@@ -50,7 +50,7 @@ import GHC.Hs.Types
 import BasicTypes       ( Fixity, WarningTxt )
 import GHC.Hs.Utils
 import GHC.Hs.Doc
-import GHC.Hs.Instances () -- For Data instances
+import GHC.Hs.Instances ( DataX ) -- For Data instances
 
 -- others:
 import Outputable
@@ -114,9 +114,9 @@ data HsModule pass
 
      -- For details on above see note [Api annotations] in ApiAnnotation
 -- deriving instance (DataIdLR name name) => Data (HsModule name)
-deriving instance Data (HsModule GhcPs)
-deriving instance Data (HsModule GhcRn)
-deriving instance Data (HsModule GhcTc)
+deriving instance DataX => Data (HsModule GhcPs)
+deriving instance DataX => Data (HsModule GhcRn)
+deriving instance DataX => Data (HsModule GhcTc)
 
 instance (p ~ GhcPass pass, OutputableBndrId p) => Outputable (HsModule p) where
 

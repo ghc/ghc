@@ -112,7 +112,6 @@ import CoAxiom          ( Role, fsFromRole )
 import RdrName
 import Name
 import BasicTypes
-import TcEvidence       ( idHsWrapper )
 import Lexer
 import Lexeme           ( isLexCon )
 import Type             ( TyThing(..), funTyCon )
@@ -1218,7 +1217,6 @@ makeFunBind fn ms
   = FunBind { fun_ext = noExtField,
               fun_id = fn,
               fun_matches = mkMatchGroup FromSource ms,
-              fun_co_fn = idHsWrapper,
               fun_tick = [] }
 
 checkPatBind :: LPat GhcPs

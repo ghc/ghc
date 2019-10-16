@@ -332,7 +332,6 @@ GHC #12785.
 
 -- See Note [TcTyVars and TyVars in the typechecker]
 type TcCoVar = CoVar    -- Used only during type inference
-type TcType = Type      -- A TcType can have mutable type variables
 type TcTyCoVar = Var    -- Either a TcTyVar or a CoVar
         -- Invariant on ForAllTy in TcTypes:
         --      forall a. T

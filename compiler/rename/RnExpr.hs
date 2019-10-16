@@ -518,7 +518,6 @@ rnCmd (HsCmdDo x (L l stmts))
             rnStmts ArrowExpr rnLCmd stmts (\ _ -> return ((), emptyFVs))
         ; return ( HsCmdDo x (L l stmts'), fvs ) }
 
-rnCmd cmd@(HsCmdWrap {}) = pprPanic "rnCmd" (ppr cmd)
 rnCmd     (XCmd nec)     = noExtCon nec
 
 ---------------------------------------------------
@@ -536,7 +535,6 @@ methodNamesCmd (HsCmdArrApp _ _arrow _arg HsFirstOrderApp _rtl)
 methodNamesCmd (HsCmdArrApp _ _arrow _arg HsHigherOrderApp _rtl)
   = unitFV appAName
 methodNamesCmd (HsCmdArrForm {}) = emptyFVs
-methodNamesCmd (HsCmdWrap _ _ cmd) = methodNamesCmd cmd
 
 methodNamesCmd (HsCmdPar _ c) = methodNamesLCmd c
 
@@ -2125,15 +2123,15 @@ getMonadFailOp
   where
     reallyGetMonadFailOp rebindableSyntax overloadedStrings
       | rebindableSyntax && overloadedStrings = do
-        (failExpr, failFvs) <- lookupSyntaxName failMName
-        (fromStringExpr, fromStringFvs) <- lookupSyntaxName fromStringName
+        (Just failExpr, failFvs) <- lookupSyntaxName failMName
+        (Just fromStringExpr, fromStringFvs) <- lookupSyntaxName fromStringName
         let arg_lit = fsLit "arg"
             arg_name = mkSystemVarName (mkVarOccUnique arg_lit) arg_lit
-            arg_syn_expr = mkRnSyntaxExpr arg_name
+            Just arg_syn_expr = mkRnSyntaxExpr arg_name
         let body :: LHsExpr GhcRn =
-              nlHsApp (noLoc $ syn_expr failExpr)
-                      (nlHsApp (noLoc $ syn_expr fromStringExpr)
-                                (noLoc $ syn_expr arg_syn_expr))
+              nlHsApp (noLoc failExpr)
+                      (nlHsApp (noLoc $ fromStringExpr)
+                                (noLoc $ arg_syn_expr))
         let failAfterFromStringExpr :: HsExpr GhcRn =
               unLoc $ mkHsLam [noLoc $ VarPat noExtField $ noLoc arg_name] body
         let failAfterFromStringSynExpr :: SyntaxExpr GhcRn =
