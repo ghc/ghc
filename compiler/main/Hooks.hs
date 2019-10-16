@@ -87,7 +87,7 @@ data Hooks = Hooks
                Maybe (HscEnv -> SrcSpan -> CoreExpr -> IO ForeignHValue)
   , ghcPrimIfaceHook       :: Maybe ModIface
   , runPhaseHook           :: Maybe (PhasePlus -> FilePath -> DynFlags
-                                         -> CompPipeline (PhasePlus, FilePath))
+                                         -> CompPipeline (PhasePlus, FilePath, Maybe ModIface))
   , runMetaHook            :: Maybe (MetaHook TcM)
   , linkHook               :: Maybe (GhcLink -> DynFlags -> Bool
                                          -> HomePackageTable -> IO SuccessFlag)

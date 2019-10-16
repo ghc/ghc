@@ -245,8 +245,11 @@ data HscStatus
                             -- ^ Information for the code generator.
         , hscs_summary    :: ModSummary
                             -- ^ Module info
-        , hscs_iface_gen  :: IO (ModIface, Bool)
-                            -- ^ Action to generate iface after codegen.
+        , hscs_partial_iface  :: !PartialModIface
+                            -- ^ Partial interface
+        , hscs_old_iface_hash :: !(Maybe Fingerprint)
+                            -- ^ Old interface hash for this compilation
+                            -- (if an old interface file exists)
         }
 -- Should HscStatus contain the HomeModInfo?
 -- All places where we return a status we also return a HomeModInfo.
