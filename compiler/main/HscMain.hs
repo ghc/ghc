@@ -727,7 +727,7 @@ hscIncrementalCompile :: Bool
                       -> SourceModified
                       -> Maybe ModIface
                       -> (Int,Int)
-                      -> IO (HscStatus, ModDetails)
+                      -> IO (HscStatus, ModDetails, DynFlags)
 hscIncrementalCompile always_do_basic_recompilation_check m_tc_result
     mHscMessage hsc_env' mod_summary source_modified mb_old_iface mod_index
   = do
@@ -768,13 +768,14 @@ hscIncrementalCompile always_do_basic_recompilation_check m_tc_result
                 -- in make mode, since this HMI will go into the HPT.
                 details <- genModDetails hsc_env' iface
                 return details
-            return (HscUpToDate iface, details)
+            return (HscUpToDate iface, details, dflags)
         -- We finished type checking.  (mb_old_hash is the hash of
         -- the interface that existed on disk; it's possible we had
         -- to retypecheck but the resulting interface is exactly
         -- the same.)
-        Right (FrontendTypecheck tc_result, mb_old_hash) ->
-            finish mod_summary tc_result mb_old_hash
+        Right (FrontendTypecheck tc_result, mb_old_hash) -> do
+            (status, mb_old_hash) <- finish mod_summary tc_result mb_old_hash
+            return (status, mb_old_hash, dflags)
 
 -- Runs the post-typechecking frontend (desugar and simplify). We want to
 -- generate most of the interface as late as possible. This gets us up-to-date
@@ -801,10 +802,10 @@ finish summary tc_result mb_old_hash = do
         ms_mod summary /= gHC_PRIM && hsc_src == HsSrcFile
       mk_simple_iface :: Hsc (HscStatus, ModDetails)
       mk_simple_iface = do
-        (iface, no_change, details) <- liftIO $
+        (iface, mb_old_iface_hash, details) <- liftIO $
           hscSimpleIface hsc_env tc_result mb_old_hash
 
-        liftIO $ hscMaybeWriteIface dflags iface no_change (ms_location summary)
+        liftIO $ hscMaybeWriteIface dflags iface mb_old_iface_hash (ms_location summary)
 
         let hsc_status =
               case (target, hsc_src) of
@@ -838,19 +839,12 @@ finish summary tc_result mb_old_hash = do
                 -- See Note [Avoiding space leaks in toIface*] for details.
                 force (mkPartialIface hsc_env details desugared_guts)
 
-          let iface_gen :: IO (ModIface, Bool)
-              iface_gen = do
-                  -- Build a fully instantiated ModIface.
-                  -- This has to happen *after* code gen so that the back-end
-                  -- info has been set.
-                  -- This captures hsc_env, but it seems we keep it alive in other
-                  -- ways as well so we don't bother extracting only the relevant parts.
-                  dumpIfaceStats hsc_env
-                  final_iface <- mkFullIface hsc_env partial_iface
-                  let no_change = mb_old_hash == Just (mi_iface_hash (mi_final_exts final_iface))
-                  return (final_iface, no_change)
-
-          return ( HscRecomp cg_guts summary iface_gen, details )
+          return ( HscRecomp { hscs_guts = cg_guts,
+                               hscs_summary = summary,
+                               hscs_partial_iface = partial_iface,
+                               hscs_old_iface_hash = mb_old_hash,
+                               hscs_iface_dflags = dflags },
+                   details )
     else mk_simple_iface
 
 
@@ -868,15 +862,17 @@ hscMaybeWriteIface, but only once per compilation (twice with dynamic-too).
   In this case we create the interface file inside RunPhase using the interface
   generator contained inside the HscRecomp status.
 -}
-hscMaybeWriteIface :: DynFlags -> ModIface -> Bool -> ModLocation -> IO ()
-hscMaybeWriteIface dflags iface no_change location =
+hscMaybeWriteIface :: DynFlags -> ModIface -> Maybe Fingerprint -> ModLocation -> IO ()
+hscMaybeWriteIface dflags iface old_iface location = do
     let force_write_interface = gopt Opt_WriteInterface dflags
         write_interface = case hscTarget dflags of
                             HscNothing      -> False
                             HscInterpreted  -> False
                             _               -> True
-    in when (write_interface || force_write_interface) $
-            hscWriteIface dflags iface no_change location
+        no_change = old_iface == Just (mi_iface_hash (mi_final_exts iface))
+
+    when (write_interface || force_write_interface) $
+          hscWriteIface dflags iface no_change location
 
 --------------------------------------------------------------
 -- NoRecomp handlers
@@ -1341,13 +1337,13 @@ hscSimplify' plugins ds_result = do
 hscSimpleIface :: HscEnv
                -> TcGblEnv
                -> Maybe Fingerprint
-               -> IO (ModIface, Bool, ModDetails)
+               -> IO (ModIface, Maybe Fingerprint, ModDetails)
 hscSimpleIface hsc_env tc_result mb_old_iface
     = runHsc hsc_env $ hscSimpleIface' tc_result mb_old_iface
 
 hscSimpleIface' :: TcGblEnv
                 -> Maybe Fingerprint
-                -> Hsc (ModIface, Bool, ModDetails)
+                -> Hsc (ModIface, Maybe Fingerprint, ModDetails)
 hscSimpleIface' tc_result mb_old_iface = do
     hsc_env   <- getHscEnv
     details   <- liftIO $ mkBootModDetailsTc hsc_env tc_result
@@ -1356,10 +1352,9 @@ hscSimpleIface' tc_result mb_old_iface = do
         <- {-# SCC "MkFinalIface" #-}
            liftIO $
                mkIfaceTc hsc_env safe_mode details tc_result
-    let no_change = mb_old_iface == Just (mi_iface_hash (mi_final_exts new_iface))
     -- And the answer is ...
     liftIO $ dumpIfaceStats hsc_env
-    return (new_iface, no_change, details)
+    return (new_iface, mb_old_iface, details)
 
 --------------------------------------------------------------
 -- BackEnd combinators
