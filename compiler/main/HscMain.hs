@@ -727,7 +727,7 @@ hscIncrementalCompile :: Bool
                       -> SourceModified
                       -> Maybe ModIface
                       -> (Int,Int)
-                      -> IO (HscStatus, ModDetails, Maybe ModIface)
+                      -> IO (HscStatus, ModDetails)
 hscIncrementalCompile always_do_basic_recompilation_check m_tc_result
     mHscMessage hsc_env' mod_summary source_modified mb_old_iface mod_index
   = do
@@ -768,7 +768,7 @@ hscIncrementalCompile always_do_basic_recompilation_check m_tc_result
                 -- in make mode, since this HMI will go into the HPT.
                 details <- genModDetails hsc_env' iface
                 return details
-            return (HscUpToDate, details, Just iface)
+            return (HscUpToDate iface, details)
         -- We finished type checking.  (mb_old_hash is the hash of
         -- the interface that existed on disk; it's possible we had
         -- to retypecheck but the resulting interface is exactly
@@ -791,7 +791,7 @@ hscIncrementalCompile always_do_basic_recompilation_check m_tc_result
 finish :: ModSummary
        -> TcGblEnv
        -> Maybe Fingerprint
-       -> Hsc (HscStatus, ModDetails, Maybe ModIface)
+       -> Hsc (HscStatus, ModDetails)
 finish summary tc_result mb_old_hash = do
   hsc_env <- getHscEnv
   let dflags = hsc_dflags hsc_env
@@ -799,19 +799,20 @@ finish summary tc_result mb_old_hash = do
       hsc_src = ms_hsc_src summary
       should_desugar =
         ms_mod summary /= gHC_PRIM && hsc_src == HsSrcFile
-      mk_simple_iface :: Hsc (HscStatus, ModDetails, Maybe ModIface)
+      mk_simple_iface :: Hsc (HscStatus, ModDetails)
       mk_simple_iface = do
-        let hsc_status =
-              case (target, hsc_src) of
-                (HscNothing, _) -> HscNotGeneratingCode
-                (_, HsBootFile) -> HscUpdateBoot
-                (_, HsigFile) -> HscUpdateSig
-                _ -> panic "finish"
         (iface, no_change, details) <- liftIO $
           hscSimpleIface hsc_env tc_result mb_old_hash
 
         liftIO $ hscMaybeWriteIface dflags iface no_change (ms_location summary)
-        return (hsc_status, details, Just iface)
+
+        let hsc_status =
+              case (target, hsc_src) of
+                (HscNothing, _) -> HscNotGeneratingCode iface
+                (_, HsBootFile) -> HscUpdateBoot iface
+                (_, HsigFile) -> HscUpdateSig iface
+                _ -> panic "finish"
+        return (hsc_status, details)
 
   -- we usually desugar even when we are not generating code, otherwise
   -- we would miss errors thrown by the desugaring (see #10600). The only
@@ -849,8 +850,7 @@ finish summary tc_result mb_old_hash = do
                   let no_change = mb_old_hash == Just (mi_iface_hash (mi_final_exts final_iface))
                   return (final_iface, no_change)
 
-          return ( HscRecomp cg_guts summary iface_gen
-                 , details, Nothing )
+          return ( HscRecomp cg_guts summary iface_gen, details )
     else mk_simple_iface
 
 

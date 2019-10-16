@@ -231,11 +231,16 @@ import Control.DeepSeq
 
 -- | Status of a compilation to hard-code
 data HscStatus
-    = HscNotGeneratingCode  -- ^ Nothing to do.
-    | HscUpToDate           -- ^ Nothing to do because code already exists.
-    | HscUpdateBoot         -- ^ Update boot file result.
-    | HscUpdateSig          -- ^ Generate signature file (backpack)
-    | HscRecomp             -- ^ Recompile this module.
+    -- | Nothing to do.
+    = HscNotGeneratingCode ModIface
+    -- | Nothing to do because code already exists.
+    | HscUpToDate ModIface
+    -- | Update boot file result.
+    | HscUpdateBoot ModIface
+    -- | Generate signature file (backpack)
+    | HscUpdateSig ModIface
+    -- | Recompile this module.
+    | HscRecomp
         { hscs_guts       :: CgGuts
                             -- ^ Information for the code generator.
         , hscs_summary    :: ModSummary
