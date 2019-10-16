@@ -852,6 +852,10 @@ extern void DEBUG_LoadSymbols( const char *name STG_UNUSED )
 
 #endif /* USING_LIBBFD */
 
+// findPtr takes a callback so external tools such as ghc-debug can invoke it
+// and intercept the intermediate results. When findPtr successfully finds
+// a closure containing an address then the callback is called on the address
+// of that closure. The `StgClosure` argument is an untagged closure pointer.
 typedef void (*FindPtrCb)(void *user, StgClosure *);
 
 void findPtr(P_ p, int);                /* keep gcc -Wall happy */
@@ -903,7 +907,7 @@ findPtrBlocks (FindPtrCb cb, void* user, StgPtr p, bdescr *bd, StgPtr arr[], int
 }
 
 static void
-findPtr_gen(FindPtrCb c, void *user, P_ p, int follow)
+findPtr_gen(FindPtrCb cb, void *user, P_ p, int follow)
 {
   uint32_t g, n;
   bdescr *bd;
@@ -925,20 +929,20 @@ findPtr_gen(FindPtrCb c, void *user, P_ p, int follow)
 
   for (g = 0; g < RtsFlags.GcFlags.generations; g++) {
       bd = generations[g].blocks;
-      i = findPtrBlocks(c, user,p,bd,arr,arr_size,i);
+      i = findPtrBlocks(cb, user,p,bd,arr,arr_size,i);
       bd = generations[g].large_objects;
-      i = findPtrBlocks(c, user, p,bd,arr,arr_size,i);
+      i = findPtrBlocks(cb, user, p,bd,arr,arr_size,i);
       if (i >= arr_size) return;
       for (n = 0; n < n_capabilities; n++) {
-          i = findPtrBlocks(c, user, p, gc_threads[n]->gens[g].part_list,
+          i = findPtrBlocks(cb, user, p, gc_threads[n]->gens[g].part_list,
                             arr, arr_size, i);
-          i = findPtrBlocks(c, user, p, gc_threads[n]->gens[g].todo_bd,
+          i = findPtrBlocks(cb, user, p, gc_threads[n]->gens[g].todo_bd,
                             arr, arr_size, i);
       }
       if (i >= arr_size) return;
   }
   if (follow && i == 1) {
-      ASSERT(c == &findPtr_default_callback);
+      ASSERT(cb == &findPtr_default_callback);
       debugBelch("-->\n");
       // Non-standard callback expects follow=0
       findPtr(arr[0], 1);
