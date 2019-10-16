@@ -1,3 +1,6 @@
+-- We don't to strictness analysis on this file to avoid turning loopy unsafe
+-- equality terms below to actual loops. See Note [unsafeCoerce magic] below for
+-- how they're supposed to be compiled.
 {-# OPTIONS_GHC -fno-strictness #-}
 
 {-# LANGUAGE Unsafe, NoImplicitPrelude, MagicHash, GADTs, TypeApplications,
@@ -6,10 +9,10 @@
 
 module Unsafe.Coerce
   ( unsafeCoerce
-  , unsafeCoerceUnlifted, unsafeCoerceAddr
+  , unsafeCoerceUnlifted
+  , unsafeCoerceAddr
   , unsafeEqualityProof
   , unsafeHeteroEqualityProof
-  , unsafeCastWith
   , UnsafeEquality (..)
   , UnsafeHeteroEquality (..)
   ) where
@@ -19,21 +22,24 @@ import GHC.Natural () -- See Note [Depend on GHC.Natural] in GHC.Base
 import GHC.Base
 import GHC.Types
 
-{- *************************************************************
-*       This section is deep magic                             *
-*                                                              *
-*   * The compiler transforms                                  *
-*         case unsafeEqualtityProof of UnsafeRefl -> blah      *
-*      -->                                                     *
-*         blah                                                 *
-*     in the Core-to-STG pass                                  *
-*                                                              *
-*   * The compiler is careful not to eliminate                 *
-*     a case alternative                                       *
-*         UnsafeRefl (g :: Int ~ Bool) -> blah                 *
-*     even though the coercion is "impossible".                *
-*                                                              *
-************************************************************* -}
+{-
+Note [unsafeCoerce magic]
+~~~~~~~~~~~~~~~~~~~~~~~~~
+
+- The compiler transforms
+
+      case unsafeEqualityProof of UnsafeRefl -> blah
+      ==>
+      blah
+
+  in Core-to-STG pass.
+
+- The compiler is careful not to eliminate the case alternative
+
+      UnsafeRefl (g :: Int ~ Bool) -> blah
+
+  even though the coercion is "impossible". See DataCon.dataConCannotMatch.
+-}
 
 data UnsafeEquality a b where
   UnsafeRefl :: UnsafeEquality a a
@@ -42,38 +48,30 @@ data UnsafeEquality a b where
 unsafeEqualityProof :: forall a b . UnsafeEquality a b
 unsafeEqualityProof = case unsafeEqualityProof @a @b of UnsafeRefl -> UnsafeRefl
 
-
-{- *************************************************************
-*                End of deep magic                             *
-*     Everything from here on is regular Haskell               *
-*                                                              *
-************************************************************* -}
-
 {-# INLINE unsafeCoerce #-}
--- The INLINE will almost certainly happen automatically,
--- but it's almost certain to generate (slightly) better
--- code, so let's do it.  For example
+-- The INLINE will almost certainly happen automatically, but it's almost
+-- certain to generate (slightly) better code, so let's do it.  For example
+--
 --   case (unsafeCoerce blah) of ...
+--
 -- will turn into
+--
 --   case unsafeEqualityProov of UnsafeRefl -> case blah of ...
+--
 -- which is definitely better.
-
 unsafeCoerce :: forall (a :: Type) (b :: Type) . a -> b
-unsafeCoerce x = case (unsafeEqualityProof @a @b) of UnsafeRefl -> x
+unsafeCoerce x = case unsafeEqualityProof @a @b of UnsafeRefl -> x
 
 {-# INLINE unsafeCoerceUnlifted #-}
 unsafeCoerceUnlifted :: forall (a :: TYPE 'UnliftedRep) (b :: TYPE 'UnliftedRep) . a -> b
-unsafeCoerceUnlifted x = case (unsafeEqualityProof @a @b) of UnsafeRefl -> x
+unsafeCoerceUnlifted x = case unsafeEqualityProof @a @b of UnsafeRefl -> x
 
 {-# INLINE unsafeCoerceAddr #-}
 unsafeCoerceAddr :: forall (a :: TYPE 'AddrRep) (b :: TYPE 'AddrRep) . a -> b
--- Addr# and (StablePtr# a) both have kind (TYPE AddrRep),
--- and we might want to coerce between them
-unsafeCoerceAddr x = case (unsafeEqualityProof @a @b) of UnsafeRefl -> x
-
-{-# INLINE unsafeCastWith #-}
-unsafeCastWith :: UnsafeEquality a b -> a -> b
-unsafeCastWith UnsafeRefl x = x
+-- Addr# and (StablePtr# a) both have kind (TYPE AddrRep), and we might want to
+-- coerce between them. See castStablePtrToPtr and castPtrToStablePtr in
+-- GHC.Stable.
+unsafeCoerceAddr x = case unsafeEqualityProof @a @b of UnsafeRefl -> x
 
 type UnsafeHeteroEquality :: k1 -> k2 -> Type
 
