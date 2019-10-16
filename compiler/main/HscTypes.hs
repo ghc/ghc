@@ -242,11 +242,21 @@ data HscStatus
     -- | Recompile this module.
     | HscRecomp
         { hscs_guts       :: CgGuts
-                            -- ^ Information for the code generator.
+          -- ^ Information for the code generator.
         , hscs_summary    :: ModSummary
-                            -- ^ Module info
-        , hscs_iface_gen  :: IO (ModIface, Bool)
-                            -- ^ Action to generate iface after codegen.
+          -- ^ Module info
+        , hscs_partial_iface  :: !PartialModIface
+          -- ^ Partial interface
+        , hscs_old_iface_hash :: !(Maybe Fingerprint)
+          -- ^ Old interface hash for this compilation, if an old interface file
+          -- exists. Pass to `hscMaybeWriteIface` when writing the interface to
+          -- avoid updating the existing interface when the interface isn't
+          -- changed.
+        , hscs_iface_dflags :: !DynFlags
+          -- ^ Generate final iface using this DynFlags.
+          -- FIXME (osa): I don't understand why this is necessary, but I spent
+          -- almost two days trying to figure this out and I couldn't .. perhaps
+          -- someone who understands this code better will remove this later.
         }
 -- Should HscStatus contain the HomeModInfo?
 -- All places where we return a status we also return a HomeModInfo.
