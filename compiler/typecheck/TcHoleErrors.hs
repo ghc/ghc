@@ -23,6 +23,7 @@ import Constraint
 import TcOrigin
 import TcMType
 import TcEvidence
+import Predicate
 import TcType
 import Type
 import DataCon
@@ -623,8 +624,9 @@ findValidHoleFits tidy_env implics simples ct | isExprHoleCt ct =
   where
     -- We extract the type, the tcLevel and the types free variables
     -- from from the constraint.
-    hole_ty :: TcPredType
-    hole_ty = ctPred ct
+    hole_ty :: TcType
+    hole_ty = case ctPred ct of UserPred (IrredPred ty) -> ty
+                                _                       -> pprPanic "hole_ty" (ppr ct)
     hole_fvs :: FV
     hole_fvs = tyCoFVsOfType hole_ty
     hole_lvl = ctLocLevel $ ctEvLoc $ ctEvidence ct
@@ -671,7 +673,7 @@ findValidHoleFits tidy_env implics simples ct | isExprHoleCt ct =
     relevantCts = if isEmptyVarSet (fvVarSet hole_fvs) then []
                   else filter isRelevant simples
       where ctFreeVarSet :: Ct -> VarSet
-            ctFreeVarSet = fvVarSet . tyCoFVsOfType . ctPred
+            ctFreeVarSet = fvVarSet . tyCoFVsOfPred . ctPred
             hole_fv_set = fvVarSet hole_fvs
             anyFVMentioned :: Ct -> Bool
             anyFVMentioned ct = not $ isEmptyVarSet $

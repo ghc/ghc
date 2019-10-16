@@ -1,8 +1,4 @@
-module GHC.Iface.Type
-   ( IfaceType, IfaceTyCon, IfaceForAllBndr
-   , IfaceCoercion, IfaceTyLit, IfaceAppArgs
-   )
-where
+module GHC.Iface.Type where
 
 import Var (VarBndr, ArgFlag)
 
@@ -14,3 +10,4 @@ data IfaceTyLit
 data IfaceCoercion
 data IfaceBndr
 type IfaceForAllBndr  = VarBndr IfaceBndr ArgFlag
+data IfacePred

@@ -1437,7 +1437,7 @@ Consider (#14939)
 
 Here 'cls' appears free in b's kind, which would usually be illegal
 (because in (forall a. ty), ty's kind should not mention 'a'). But
-#in this case (Alg cls *) = *, so all is well.  Currently we allow
+in this case (Alg cls *) = *, so all is well.  Currently we allow
 this, and make Lint expand synonyms where necessary to make it so.
 
 c.f. TcUnify.occCheckExpand and CoreUtils.coreAltsType which deal

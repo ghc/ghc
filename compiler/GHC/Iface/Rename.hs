@@ -449,7 +449,7 @@ rnIfaceDecl d@IfaceId{} = do
 rnIfaceDecl d@IfaceData{} = do
             name <- rnIfaceGlobal (ifName d)
             binders <- mapM rnIfaceTyConBinder (ifBinders d)
-            ctxt <- mapM rnIfaceType (ifCtxt d)
+            ctxt <- mapM rnIfaceUserPred (ifCtxt d)
             cons <- rnIfaceConDecls (ifCons d)
             res_kind <- rnIfaceType (ifResKind d)
             parent <- rnIfaceTyConParent (ifParent d)
@@ -503,8 +503,8 @@ rnIfaceDecl d@IfacePatSyn{} =  do
             pat_builder <- T.traverse rnPat (ifPatBuilder d)
             pat_univ_bndrs <- mapM rnIfaceForAllBndr (ifPatUnivBndrs d)
             pat_ex_bndrs <- mapM rnIfaceForAllBndr (ifPatExBndrs d)
-            pat_prov_ctxt <- mapM rnIfaceType (ifPatProvCtxt d)
-            pat_req_ctxt <- mapM rnIfaceType (ifPatReqCtxt d)
+            pat_prov_ctxt <- mapM rnIfaceUserPred (ifPatProvCtxt d)
+            pat_req_ctxt <- mapM rnIfaceUserPred (ifPatReqCtxt d)
             pat_args <- mapM rnIfaceType (ifPatArgs d)
             pat_ty <- rnIfaceType (ifPatTy d)
             return d { ifName = name
@@ -521,7 +521,7 @@ rnIfaceDecl d@IfacePatSyn{} =  do
 rnIfaceClassBody :: Rename IfaceClassBody
 rnIfaceClassBody IfAbstractClass = return IfAbstractClass
 rnIfaceClassBody d@IfConcreteClass{} = do
-    ctxt <- mapM rnIfaceType (ifClassCtxt d)
+    ctxt <- mapM rnIfaceUserPred (ifClassCtxt d)
     ats <- mapM rnIfaceAT (ifATs d)
     sigs <- mapM rnIfaceClassOp (ifSigs d)
     return d { ifClassCtxt = ctxt, ifATs = ats, ifSigs = sigs }
@@ -556,7 +556,7 @@ rnIfaceConDecl d = do
     con_user_tvbs <- mapM rnIfaceForAllBndr (ifConUserTvBinders d)
     let rnIfConEqSpec (n,t) = (,) n <$> rnIfaceType t
     con_eq_spec <- mapM rnIfConEqSpec (ifConEqSpec d)
-    con_ctxt <- mapM rnIfaceType (ifConCtxt d)
+    con_ctxt <- mapM rnIfaceUserPred (ifConCtxt d)
     con_arg_tys <- mapM rnIfaceType (ifConArgTys d)
     con_fields <- mapM rnFieldLabel (ifConFields d)
     let rnIfaceBang (IfUnpackCo co) = IfUnpackCo <$> rnIfaceCo co
@@ -735,6 +735,17 @@ rnIfaceType (IfaceCoercionTy co)
     = IfaceCoercionTy <$> rnIfaceCo co
 rnIfaceType (IfaceCastTy ty co)
     = IfaceCastTy <$> rnIfaceType ty <*> rnIfaceCo co
+
+rnIfaceUserPred :: Rename IfaceUserPred
+rnIfaceUserPred (IfaceClassPred cls_tc args)
+  = IfaceClassPred <$> rnIfaceTyCon cls_tc <*> rnIfaceAppArgs args
+rnIfaceUserPred (IfaceIrredPred pred_ty)
+  = IfaceIrredPred <$> rnIfaceType pred_ty
+rnIfaceUserPred (IfaceForAllPred tvs ctxt pred)
+  = IfaceForAllPred <$>
+      mapM rnIfaceTvBndr tvs <*>
+      mapM rnIfaceUserPred ctxt <*>
+      rnIfaceUserPred pred
 
 rnIfaceForAllBndr :: Rename IfaceForAllBndr
 rnIfaceForAllBndr (Bndr tv vis) = Bndr <$> rnIfaceBndr tv <*> pure vis

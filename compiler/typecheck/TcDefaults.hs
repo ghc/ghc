@@ -19,6 +19,7 @@ import TcHsSyn
 import TcSimplify
 import TcValidity
 import TcType
+import Predicate
 import PrelNames
 import SrcLoc
 import Outputable

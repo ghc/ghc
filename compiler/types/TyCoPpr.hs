@@ -8,11 +8,10 @@ module TyCoPpr
         pprType, pprParendType, pprTidiedType, pprPrecType, pprPrecTypeX,
         pprTypeApp, pprTCvBndr, pprTCvBndrs,
         pprSigmaType,
-        pprTheta, pprParendTheta, pprForAll, pprUserForAll,
+        pprForAll, pprUserForAll,
         pprTyVar, pprTyVars,
-        pprThetaArrowTy, pprClassPred,
         pprKind, pprParendKind, pprTyLit,
-        pprDataCons, pprWithExplicitKindsWhen,
+        pprWithExplicitKindsWhen,
         pprWithTYPE, pprSourceTyCon,
 
 
@@ -23,17 +22,14 @@ module TyCoPpr
 
         -- * Pretty-printing 'TyThing's
         pprTyThingCategory, pprShortTyThing,
+
+        tidyToIfaceTypeX
   ) where
 
 import GhcPrelude
 
-import {-# SOURCE #-} GHC.CoreToIface
-   ( toIfaceTypeX, toIfaceTyLit, toIfaceForAllBndr
-   , toIfaceTyCon, toIfaceTcArgs, toIfaceCoercionX )
-
-import {-# SOURCE #-} DataCon( dataConFullSig
-                             , dataConUserTyVarBinders
-                             , DataCon )
+import {-# SOURCE #-} GHC.CoreToIface( toIfaceTypeX, toIfaceTyLit, toIfaceForAllBndr
+                                     , toIfaceTyCon, toIfaceTcArgs, toIfaceCoercionX )
 
 import {-# SOURCE #-} Type( isLiftedTypeKind )
 
@@ -41,7 +37,6 @@ import TyCon
 import TyCoRep
 import TyCoTidy
 import TyCoFVs
-import Class
 import Var
 
 import GHC.Iface.Type
@@ -150,19 +145,6 @@ tidyToIfaceCo co = toIfaceCoercionX (mkVarSet free_tcvs) (tidyCo env co)
   where
     env       = tidyFreeTyCoVars emptyTidyEnv free_tcvs
     free_tcvs = scopedSort $ tyCoVarsOfCoList co
-------------
-pprClassPred :: Class -> [Type] -> SDoc
-pprClassPred clas tys = pprTypeApp (classTyCon clas) tys
-
-------------
-pprTheta :: ThetaType -> SDoc
-pprTheta = pprIfaceContext topPrec . map tidyToIfaceType
-
-pprParendTheta :: ThetaType -> SDoc
-pprParendTheta = pprIfaceContext appPrec . map tidyToIfaceType
-
-pprThetaArrowTy :: ThetaType -> SDoc
-pprThetaArrowTy = pprIfaceContextArr . map tidyToIfaceType
 
 ------------------
 pprSigmaType :: Type -> SDoc
@@ -289,22 +271,6 @@ remember to parenthesise the operator, thus
 
 See #2766.
 -}
-
-pprDataCons :: TyCon -> SDoc
-pprDataCons = sepWithVBars . fmap pprDataConWithArgs . tyConDataCons
-  where
-    sepWithVBars [] = empty
-    sepWithVBars docs = sep (punctuate (space <> vbar) docs)
-
-pprDataConWithArgs :: DataCon -> SDoc
-pprDataConWithArgs dc = sep [forAllDoc, thetaDoc, ppr dc <+> argsDoc]
-  where
-    (_univ_tvs, _ex_tvs, _eq_spec, theta, arg_tys, _res_ty) = dataConFullSig dc
-    user_bndrs = dataConUserTyVarBinders dc
-    forAllDoc  = pprUserForAll user_bndrs
-    thetaDoc   = pprThetaArrowTy theta
-    argsDoc    = hsep (fmap pprParendType arg_tys)
-
 
 pprTypeApp :: TyCon -> [Type] -> SDoc
 pprTypeApp tc tys

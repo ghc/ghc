@@ -339,9 +339,11 @@ tcHsDeriv hs_ty
                tcTopLHsType typeLevelMode hs_ty AnyKind
        ; let (tvs, pred)    = splitForAllTys ty
              (kind_args, _) = splitFunTys (tcTypeKind pred)
-       ; case getClassPredTys_maybe pred of
-           Just (cls, tys) -> return (tvs, cls, tys, kind_args)
-           Nothing -> failWithTc (text "Illegal deriving item" <+> quotes (ppr hs_ty)) }
+       ; case splitTyConApp_maybe pred of
+           Just (cls_tc, tys)
+             | Just cls <- tyConClass_maybe cls_tc
+             -> return (tvs, cls, tys, kind_args)
+           _ -> failWithTc (text "Illegal deriving item" <+> quotes (ppr hs_ty)) }
 
 -- | Typecheck a deriving strategy. For most deriving strategies, this is a
 -- no-op, but for the @via@ strategy, this requires typechecking the @via@ type.
@@ -833,7 +835,7 @@ tc_hs_type mode rn_ty@(HsIParamTy _ (L _ n) ty) exp_kind
        ; ty' <- tc_lhs_type mode ty liftedTypeKind
        ; let n' = mkStrLitTy $ hsIPNameFS n
        ; ipClass <- tcLookupClass ipClassName
-       ; checkExpectedKind rn_ty (mkClassPred ipClass [n',ty'])
+       ; checkExpectedKind rn_ty (mkClassPredTy ipClass [n',ty'])
                            constraintKind exp_kind }
 
 tc_hs_type _ rn_ty@(HsStarTy _ _) exp_kind
@@ -1475,21 +1477,21 @@ checkExpectedKind_pp pp_hs_ty ty act_kind exp_kind
 
 
 ---------------------------
-tcHsMbContext :: Maybe (LHsContext GhcRn) -> TcM [PredType]
+tcHsMbContext :: Maybe (LHsContext GhcRn) -> TcM [UserPred]
 tcHsMbContext Nothing    = return []
 tcHsMbContext (Just cxt) = tcHsContext cxt
 
-tcHsContext :: LHsContext GhcRn -> TcM [PredType]
+tcHsContext :: LHsContext GhcRn -> TcM [UserPred]
 tcHsContext = tc_hs_context typeLevelMode
 
-tcLHsPredType :: LHsType GhcRn -> TcM PredType
-tcLHsPredType = tc_lhs_pred typeLevelMode
+tcLHsPredType :: LHsType GhcRn -> TcM UserPred
+tcLHsPredType hs_pred = tc_lhs_pred typeLevelMode hs_pred
 
-tc_hs_context :: TcTyMode -> LHsContext GhcRn -> TcM [PredType]
+tc_hs_context :: TcTyMode -> LHsContext GhcRn -> TcM [UserPred]
 tc_hs_context mode ctxt = mapM (tc_lhs_pred mode) (unLoc ctxt)
 
-tc_lhs_pred :: TcTyMode -> LHsType GhcRn -> TcM PredType
-tc_lhs_pred mode pred = tc_lhs_type mode pred constraintKind
+tc_lhs_pred :: TcTyMode -> LHsType GhcRn -> TcM UserPred
+tc_lhs_pred mode pred = classifyUserPredType <$> tc_lhs_type mode pred constraintKind
 
 ---------------------------
 tcTyVar :: TcTyMode -> Name -> TcM (TcType, TcKind)
@@ -1542,8 +1544,8 @@ tcTyVar mode name         -- Could be a tyvar, a tycon, or a datacon
     -- We cannot promote a data constructor with a context that contains
     -- constraints other than equalities, so error if we find one.
     -- See Note [Constraints in kinds] in TyCoRep
-    dc_theta_illegal_constraint :: ThetaType -> Maybe PredType
-    dc_theta_illegal_constraint = find (not . isEqPred)
+    dc_theta_illegal_constraint :: [UserPred] -> Maybe UserPred
+    dc_theta_illegal_constraint = find (not . isLiftedEqPred)
 
 {-
 Note [GADT kind self-reference]
@@ -3181,7 +3183,7 @@ tcHsPartialSigType
          , Maybe TcType       -- Extra-constraints wildcard
          , [(Name,TcTyVar)]   -- Original tyvar names, in correspondence with
                               --   the implicitly and explicitly bound type variables
-         , TcThetaType        -- Theta part
+         , [UserPred]         -- Theta part
          , TcType )           -- Tau part
 -- See Note [Checking partial type signatures]
 tcHsPartialSigType ctxt sig_ty
@@ -3233,7 +3235,7 @@ tcHsPartialSigType ctxt sig_ty
 tcHsPartialSigType _ (HsWC _ (XHsImplicitBndrs nec)) = noExtCon nec
 tcHsPartialSigType _ (XHsWildCardBndrs nec) = noExtCon nec
 
-tcPartialContext :: HsContext GhcRn -> TcM (TcThetaType, Maybe TcType)
+tcPartialContext :: HsContext GhcRn -> TcM ([UserPred], Maybe TcType)
 tcPartialContext hs_theta
   | Just (hs_theta1, hs_ctxt_last) <- snocView hs_theta
   , L wc_loc wc@(HsWildCardTy _) <- ignoreParens hs_ctxt_last

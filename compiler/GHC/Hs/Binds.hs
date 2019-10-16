@@ -285,7 +285,7 @@ data HsBindLR idL idR
   | AbsBinds {                      -- Binds abstraction; TRANSLATION
         abs_ext     :: XAbsBinds idL idR,
         abs_tvs     :: [TyVar],
-        abs_ev_vars :: [EvVar],  -- ^ Includes equality constraints
+        abs_ev_vars :: [EvVarBinder],  -- ^ Includes lifted equality constraints
 
        -- | AbsBinds only gets used when idL = idR after renaming,
        -- but these need to be idL's for the collect... code in HsUtil

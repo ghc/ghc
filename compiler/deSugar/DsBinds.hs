@@ -58,7 +58,6 @@ import Name
 import VarSet
 import Rules
 import VarEnv
-import Var( EvVar )
 import Outputable
 import Module
 import SrcLoc
@@ -196,13 +195,13 @@ dsHsBind dflags (AbsBinds { abs_tvs = tyvars, abs_ev_vars = dicts
                                -- addTyCsDs: push type constraints deeper
                                --            for inner pattern match check
                                -- See Check, Note [Type and Term Equality Propagation]
-                               (addTyCsDs (listToBag dicts))
+                               (addTyCsDs (listToBag $ toEvCoVarBinders dicts))
                                (dsLHsBinds binds)
 
        ; ds_ev_binds <- dsTcEvBinds_s ev_binds
 
        -- dsAbsBinds does the hard work
-       ; dsAbsBinds dflags tyvars dicts exports ds_ev_binds ds_binds has_sig }
+       ; dsAbsBinds dflags tyvars (evbsVars dicts) exports ds_ev_binds ds_binds has_sig }
 
 dsHsBind _ (PatSynBind{}) = panic "dsHsBind: PatSynBind"
 dsHsBind _ (XHsBindsLR nec) = noExtCon nec

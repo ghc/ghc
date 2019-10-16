@@ -5,6 +5,7 @@
 module TcFlatten(
    FlattenMode(..),
    flatten, flattenKind, flattenArgsNom,
+   flattenUserPred, flattenForAllPred,
    rewriteTyVar,
 
    unflattenWanteds
@@ -24,6 +25,7 @@ import TcEvidence
 import TyCon
 import TyCoRep   -- performs delicate algorithm on types
 import Coercion
+import Class     ( classTyCon )
 import Var
 import VarSet
 import VarEnv
@@ -777,6 +779,34 @@ flatten mode ev ty
        ; (ty', co) <- runFlattenCtEv mode ev (flatten_one ty)
        ; traceTcS "flatten }" (ppr ty')
        ; return (ty', co) }
+
+-- | Flatten a 'UserPred' with FM_SubstOnly; see Note [Flattening] and 'flatten'.
+-- The returned coercion relates (userPredType output ~N userPredType input).
+-- This function keeps the structure of IrredPreds intact; if you want
+-- to expose a flattening of an IrredPred into e.g. a ClassPred, reclassify
+-- yourself.
+flattenUserPred :: CtEvidence -> UserPred
+                -> TcS (UserPred, TcCoercion)
+flattenUserPred ev pred
+  = ASSERT( ctEvEqRel ev == NomEq )   -- we assume nominal equality here.
+    do { traceTcS "flattenUserPred {" (ppr pred)
+       ; (pred', co) <- runFlattenCtEv FM_SubstOnly ev $
+                        flatten_user_pred pred
+       ; traceTcS "flattenUserPred }" (ppr pred')
+       ; return (pred', co) }
+  where
+
+-- | Flatten the pieces of a 'ForAllPred' with FM_SubstOnly. See Note [Flattening].
+-- Result is always a 'ForAllPred', and the coercion relates the new back to the
+-- old.
+flattenForAllPred :: CtEvidence -> [TyVar] -> [UserPred] -> UserPred
+                  -> TcS (UserPred, TcCoercion)
+flattenForAllPred ev tvs theta head
+  = do { traceTcS "flattenForAllPred {" (ppr tvs $$ ppr theta $$ ppr head)
+       ; (pred', co) <- runFlattenCtEv FM_SubstOnly ev $
+                        flatten_forall_pred tvs theta head
+       ; traceTcS "flattenForAllPred }" (ppr pred')
+       ; return (pred', co) }
 
 -- Apply the inert set as an *inert generalised substitution* to
 -- a variable, zonking along the way.
@@ -1712,8 +1742,36 @@ is an example; all the constraints here are Givens
 Because the incoming given rewrites all the inert givens, we get more and
 more duplication in the inert set.  But this really only happens in pathological
 casee, so we don't care.
+-}
 
+-- the co :: userPredType result ~ userPredType input
+flatten_user_pred :: UserPred -> FlatM (UserPred, TcCoercion)
+flatten_user_pred (ClassPred cls tys)
+  = do { let cls_tc = classTyCon cls
+       ; (xis, cos, _refl) <- flatten_args_tc cls_tc (repeat Nominal) tys
+           -- last coercion is always refl because ClassPreds are always saturated
+           -- and have kind Constraint
+       ; return (ClassPred cls xis, mkTyConAppCo Nominal cls_tc cos) }
 
+flatten_user_pred (IrredPred pred_ty)
+  = do { (xi, co) <- flatten_one pred_ty
+       ; return (IrredPred xi, co) }
+
+flatten_user_pred (ForAllPred tvs theta head)
+  = flatten_forall_pred tvs theta head
+
+-- used to flatten ForAllPred
+-- output is always an assembled ForAllPred
+flatten_forall_pred :: [TyVar] -> [UserPred] -> UserPred
+                    -> FlatM (UserPred, TcCoercion)
+flatten_forall_pred tvs theta head
+  = do { (theta', theta_cos) <- mapAndUnzipM flatten_user_pred theta
+       ; (head', head_co)    <- flatten_user_pred head
+       ; return (ForAllPred tvs theta' head',
+                 mkForAllCos [ (tv, mkNomReflCo (tyVarKind tv)) | tv <- tvs] $
+                 mkFunCos Nominal theta_cos head_co) }
+
+{-
 ************************************************************************
 *                                                                      *
              Unflattening

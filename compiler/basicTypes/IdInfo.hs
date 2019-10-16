@@ -16,7 +16,7 @@ Haskell. [WDP 94/11])
 module IdInfo (
         -- * The IdDetails type
         IdDetails(..), pprIdDetails, coVarDetails, isCoVarDetails,
-        JoinArity, isJoinIdDetails_maybe,
+        JoinArity, isJoinIdDetails_maybe, isEvVarDetails,
         RecSelParent(..),
 
         -- * The IdInfo type
@@ -130,6 +130,9 @@ infixl  1 `setRuleInfo`,
 data IdDetails
   = VanillaId
 
+  | EvidenceId  -- ^ an EvVar
+                -- INVARIANT: typeKind (varType id) == Constraint
+
   -- | The 'Id' for a record selector
   | RecSelId
     { sel_tycon   :: RecSelParent
@@ -186,6 +189,12 @@ isCoVarDetails :: IdDetails -> Bool
 isCoVarDetails CoVarId = True
 isCoVarDetails _       = False
 
+-- | Check whether an 'IdDetails' is an 'EvidenceId', and extract out
+-- the predicate
+isEvVarDetails :: IdDetails -> Bool
+isEvVarDetails EvidenceId = True
+isEvVarDetails _          = False
+
 isJoinIdDetails_maybe :: IdDetails -> Maybe JoinArity
 isJoinIdDetails_maybe (JoinId join_arity) = Just join_arity
 isJoinIdDetails_maybe _                   = Nothing
@@ -198,6 +207,7 @@ pprIdDetails VanillaId = empty
 pprIdDetails other     = brackets (pp other)
  where
    pp VanillaId               = panic "pprIdDetails"
+   pp EvidenceId              = text "EvVar"
    pp (DataConWorkId _)       = text "DataCon"
    pp (DataConWrapId _)       = text "DataConWrapper"
    pp (ClassOpId {})          = text "ClassOp"

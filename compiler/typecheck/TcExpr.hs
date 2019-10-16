@@ -64,6 +64,7 @@ import TyCoPpr
 import TyCoSubst (substTyWithInScope)
 import Type
 import TcEvidence
+import Predicate
 import VarSet
 import TysWiredIn
 import TysPrim( intPrimTy )
@@ -78,7 +79,6 @@ import Maybes
 import Outputable
 import FastString
 import Control.Monad
-import Class(classTyCon)
 import UniqSet ( nonDetEltsUniqSet )
 import qualified GHC.LanguageExtensions as LangExt
 
@@ -602,8 +602,7 @@ tcExpr (HsStatic fvs expr) res_ty
         -- of the StaticPointers extension.
         ; typeableClass <- tcLookupClass typeableClassName
         ; _ <- emitWantedEvVar StaticOrigin $
-                  mkTyConApp (classTyCon typeableClass)
-                             [liftedTypeKind, expr_ty]
+                  mkClassPred typeableClass [liftedTypeKind, expr_ty]
 
         -- Insert the constraints of the static form in a global list for later
         -- validation.
@@ -1604,7 +1603,7 @@ tcExprSig :: LHsExpr GhcRn -> TcIdSigInfo -> TcM (LHsExpr GhcTcId, TcType)
 tcExprSig expr (CompleteSig { sig_bndr = poly_id, sig_loc = loc })
   = setSrcSpan loc $   -- Sets the location for the implication constraint
     do { (tv_prs, theta, tau) <- tcInstType tcInstSkolTyVars poly_id
-       ; given <- newEvVars theta
+       ; given <- newEvVarBinders theta
        ; traceTc "tcExprSig: CompleteSig" $
          vcat [ text "poly_id:" <+> ppr poly_id <+> dcolon <+> ppr (idType poly_id)
               , text "tv_prs:" <+> ppr tv_prs ]
@@ -1616,7 +1615,7 @@ tcExprSig expr (CompleteSig { sig_bndr = poly_id, sig_loc = loc })
                               tcPolyExprNC expr tau
 
        ; let poly_wrap = mkWpTyLams   skol_tvs
-                         <.> mkWpLams given
+                         <.> mkWpLams (evbsVars given)
                          <.> mkWpLet  ev_binds
        ; return (mkLHsWrap poly_wrap expr', idType poly_id) }
 
@@ -1641,12 +1640,12 @@ tcExprSig expr sig@(PartialSig { psig_name = name, sig_loc = loc })
        ; emitConstraints residual
 
        ; tau <- zonkTcType tau
-       ; let inferred_theta = map evVarPred givens
-             tau_tvs        = tyCoVarsOfType tau
-       ; (binders, my_theta) <- chooseInferredQuantifiers inferred_theta
+       ; let tau_tvs        = tyCoVarsOfType tau
+             given_preds    = evbsPreds givens
+       ; (binders, my_theta) <- chooseInferredQuantifiers given_preds
                                    tau_tvs qtvs (Just sig_inst)
-       ; let inferred_sigma = mkInfSigmaTy qtvs inferred_theta tau
-             my_sigma       = mkForAllTys binders (mkPhiTy  my_theta tau)
+       ; let inferred_sigma = mkInfSigmaTy qtvs given_preds tau
+             my_sigma       = mkForAllTys binders (mkPhiTy my_theta tau)
        ; wrap <- if inferred_sigma `eqType` my_sigma -- NB: eqType ignores vis.
                  then return idHsWrapper  -- Fast path; also avoids complaint when we infer
                                           -- an ambiguous type and have AllowAmbiguousType
@@ -1656,7 +1655,7 @@ tcExprSig expr sig@(PartialSig { psig_name = name, sig_loc = loc })
        ; traceTc "tcExpSig" (ppr qtvs $$ ppr givens $$ ppr inferred_sigma $$ ppr my_sigma)
        ; let poly_wrap = wrap
                          <.> mkWpTyLams qtvs
-                         <.> mkWpLams givens
+                         <.> mkWpLams (evbsVars givens)
                          <.> mkWpLet  ev_binds
        ; return (mkLHsWrap poly_wrap expr', my_sigma) }
 
@@ -2068,20 +2067,24 @@ getFixedTyVars upd_fld_occs univ_tvs cons
                       , let (u_tvs, _, eqspec, prov_theta
                              , req_theta, arg_tys, _)
                               = conLikeFullSig con
-                            theta = eqSpecPreds eqspec
-                                     ++ prov_theta
-                                     ++ req_theta
+
                             flds = conLikeFieldLabels con
+                            fixed_tys = [ty | (fl, ty) <- zip flds arg_tys
+                                            , not (flLabel fl `elem` upd_fld_occs)]
+
+                            theta_fvs = unionVarSets
+                                          [ tyCoVarsOfEqPreds (eqSpecPreds eqspec)
+                                          , tyCoVarsOfUserPreds prov_theta
+                                          , tyCoVarsOfUserPreds req_theta ]
+
                             fixed_tvs = exactTyCoVarsOfTypes fixed_tys
                                     -- fixed_tys: See Note [Type of a record update]
-                                        `unionVarSet` tyCoVarsOfTypes theta
+                                        `unionVarSet` theta_fvs
                                     -- Universally-quantified tyvars that
                                     -- appear in any of the *implicit*
                                     -- arguments to the constructor are fixed
                                     -- See Note [Implicit type sharing]
 
-                            fixed_tys = [ty | (fl, ty) <- zip flds arg_tys
-                                            , not (flLabel fl `elem` upd_fld_occs)]
                       , (tv1,tv) <- univ_tvs `zip` u_tvs
                       , tv `elemVarSet` fixed_tvs ]
 

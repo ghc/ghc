@@ -32,14 +32,13 @@ import FamInstEnv
 import Inst
 import GHC.IfaceToCore
 import TcMType
-import TcType
 import TcSimplify
 import Constraint
 import TcOrigin
+import Predicate
 import GHC.Iface.Load
 import GHC.Rename.Names
 import ErrUtils
-import Id
 import Module
 import Name
 import NameEnv
@@ -48,7 +47,6 @@ import Avail
 import SrcLoc
 import HscTypes
 import Outputable
-import Type
 import FastString
 import GHC.Rename.Fixity ( lookupFixityRn )
 import Maybes
@@ -201,28 +199,24 @@ check_inst sig_inst = do
     -- tugged... but it didn't work?
     mapM_ tcLookupImported_maybe (nameSetElemsStable (orphNamesOfClsInst sig_inst))
     -- Based off of 'simplifyDeriv'
-    let ty = idType (instanceDFunId sig_inst)
-        skol_info = InstSkol
-        -- Based off of tcSplitDFunTy
-        (tvs, theta, pred) =
-           case tcSplitForAllTys ty of { (tvs, rho)   ->
-           case splitFunTys rho     of { (theta, pred) ->
-           (tvs, theta, pred) }}
+    let skol_info = InstSkol
+        (tvs, theta, cls, args) = instanceSig sig_inst
         origin = InstProvidedOrigin (tcg_semantic_mod tcg_env) sig_inst
     (skol_subst, tvs_skols) <- tcInstSkolTyVars tvs -- Skolemize
     (tclvl,cts) <- pushTcLevelM $ do
        wanted <- newWanted origin
                            (Just TypeLevel)
-                           (substTy skol_subst pred)
+                           (fromUserPred $ substUserPred skol_subst (mkClassPred cls args))
        givens <- forM theta $ \given -> do
            loc <- getCtLocM origin (Just TypeLevel)
-           let given_pred = substTy skol_subst given
+           let given_pred = substUserPred skol_subst given
+
            new_ev <- newEvVar given_pred
-           return CtGiven { ctev_pred = given_pred
-                          -- Doesn't matter, make something up
-                          , ctev_evar = new_ev
-                          , ctev_loc = loc
-                          }
+           return $ CtGiven { ctev_pred = fromUserPred given_pred
+                              -- Doesn't matter, make something up
+                            , ctev_evar = new_ev
+                            , ctev_loc = loc
+                            }
        return $ wanted : givens
     unsolved <- simplifyWantedsTcM cts
 

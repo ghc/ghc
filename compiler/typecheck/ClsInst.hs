@@ -27,7 +27,6 @@ import Inst( instDFunType )
 import FamInst( tcGetFamInstEnvs, tcInstNewTyCon_maybe, tcLookupDataFamInst )
 
 import TysWiredIn
-import TysPrim( eqPrimTyCon, eqReprPrimTyCon )
 import PrelNames
 
 import Id
@@ -86,7 +85,7 @@ type SafeOverlapping = Bool
 data ClsInstResult
   = NoInstance   -- Definitely no instance
 
-  | OneInst { cir_new_theta :: [TcPredType]
+  | OneInst { cir_new_theta :: [Pred]
             , cir_mk_ev     :: [EvExpr] -> EvTerm
             , cir_what      :: InstanceWhat }
 
@@ -205,7 +204,7 @@ match_one so dfun_id mb_inst_tys
   = do { traceTc "match_one" (ppr dfun_id $$ ppr mb_inst_tys)
        ; (tys, theta) <- instDFunType dfun_id mb_inst_tys
        ; traceTc "match_one 2" (ppr dfun_id $$ ppr tys $$ ppr theta)
-       ; return $ OneInst { cir_new_theta = theta
+       ; return $ OneInst { cir_new_theta = fromUserPreds theta
                           , cir_mk_ev     = evDFunApp dfun_id tys
                           , cir_what      = TopLevInstance { iw_dfun_id = dfun_id
                                                            , iw_safe_over = so } } }
@@ -240,7 +239,7 @@ was a puzzling example.
 
 matchCTuple :: Class -> [Type] -> TcM ClsInstResult
 matchCTuple clas tys   -- (isCTupleClass clas) holds
-  = return (OneInst { cir_new_theta = tys
+  = return (OneInst { cir_new_theta = map (fromUserPred . classifyUserPredType) tys
                     , cir_mk_ev     = tuple_ev
                     , cir_what      = BuiltinInstance })
             -- The dfun *is* the data constructor!
@@ -488,15 +487,15 @@ doTyApp clas ty f tk
 
 
 -- Emit a `Typeable` constraint for the given type.
-mk_typeable_pred :: Class -> Type -> PredType
-mk_typeable_pred clas ty = mkClassPred clas [ tcTypeKind ty, ty ]
+mk_typeable_pred :: Class -> Type -> Pred
+mk_typeable_pred clas ty = fromUserPred $ mkClassPred clas [ tcTypeKind ty, ty ]
 
   -- Typeable is implied by KnownNat/KnownSymbol. In the case of a type literal
   -- we generate a sub-goal for the appropriate class.
   -- See Note [Typeable for Nat and Symbol]
 doTyLit :: Name -> Type -> TcM ClsInstResult
 doTyLit kc t = do { kc_clas <- tcLookupClass kc
-                  ; let kc_pred    = mkClassPred kc_clas [ t ]
+                  ; let kc_pred    = fromUserPred $ mkClassPred kc_clas [ t ]
                         mk_ev [ev] = evTypeable t $ EvTypeableTyLit (EvExpr ev)
                         mk_ev _    = panic "doTyLit"
                   ; return (OneInst { cir_new_theta = [kc_pred]
@@ -572,27 +571,26 @@ if you'd written
 -- See also Note [The equality types story] in TysPrim
 matchHeteroEquality :: [Type] -> TcM ClsInstResult
 -- Solves (t1 ~~ t2)
-matchHeteroEquality args
-  = return (OneInst { cir_new_theta = [ mkTyConApp eqPrimTyCon args ]
+matchHeteroEquality args@[_, _, t1, t2]
+  = return (OneInst { cir_new_theta = [ mkEqualityPred NomEq t1 t2 ]
                     , cir_mk_ev     = evDataConApp heqDataCon args
                     , cir_what      = BuiltinEqInstance })
+matchHeteroEquality args = pprPanic "matchHeteroEquality" (ppr args)
 
 matchHomoEquality :: [Type] -> TcM ClsInstResult
 -- Solves (t1 ~ t2)
-matchHomoEquality args@[k,t1,t2]
-  = return (OneInst { cir_new_theta = [ mkTyConApp eqPrimTyCon [k,k,t1,t2] ]
+matchHomoEquality args@[_,t1,t2]
+  = return (OneInst { cir_new_theta = [ mkEqualityPred NomEq t1 t2 ]
                     , cir_mk_ev     = evDataConApp eqDataCon args
                     , cir_what      = BuiltinEqInstance })
 matchHomoEquality args = pprPanic "matchHomoEquality" (ppr args)
 
 -- See also Note [The equality types story] in TysPrim
 matchCoercible :: [Type] -> TcM ClsInstResult
-matchCoercible args@[k, t1, t2]
-  = return (OneInst { cir_new_theta = [ mkTyConApp eqReprPrimTyCon args' ]
+matchCoercible args@[_, t1, t2]
+  = return (OneInst { cir_new_theta = [ mkEqualityPred ReprEq t1 t2 ]
                     , cir_mk_ev     = evDataConApp coercibleDataCon args
                     , cir_what      = BuiltinEqInstance })
-  where
-    args' = [k, k, t1, t2]
 matchCoercible args = pprPanic "matchLiftedCoercible" (ppr args)
 
 
@@ -685,7 +683,8 @@ matchHasField dflags short_cut clas tys
                          -- the HasField x r a dictionary.  The preds will
                          -- typically be empty, but if the datatype has a
                          -- "stupid theta" then we have to include it here.
-                   ; let theta = mkPrimEqPred sel_ty (mkVisFunTy r_ty a_ty) : preds
+                   ; let sel_eq_pred = mkEqPred NomEq sel_ty (mkVisFunTy r_ty a_ty)
+                         theta = fromEqPred sel_eq_pred : fromUserPreds preds
 
                          -- Use the equality proof to cast the selector Id to
                          -- type (r -> a), then use the newtype coercion to cast

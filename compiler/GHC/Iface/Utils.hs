@@ -77,6 +77,7 @@ import TyCon
 import CoAxiom
 import ConLike
 import DataCon
+import Predicate
 import Type
 import TcType
 import InstEnv
@@ -1964,12 +1965,22 @@ classToIfaceDecl env clas
   where
     (_, clas_fds, sc_theta, _, clas_ats, op_stuff)
       = classExtraBigSig clas
+
+      -- superclasses can be non-UserPreds... but only for wired-in
+      -- things, which are not written to iface files.
+      -- For printing, though, we work through IfaceSyn, so we
+      -- can't just fail for non-UserPreds.
+    un_userpred (UserPred up) = Just up
+    un_userpred _             = Nothing
+
+    sc_userpreds = mapMaybe un_userpred sc_theta
+
     tycon = classTyCon clas
 
     body | isAbstractTyCon tycon = IfAbstractClass
          | otherwise
          = IfConcreteClass {
-                ifClassCtxt   = tidyToIfaceContext env1 sc_theta,
+                ifClassCtxt   = tidyToIfaceContext env1 sc_userpreds,
                 ifATs    = map toIfaceAT clas_ats,
                 ifSigs   = map toIfaceClassOp op_stuff,
                 ifMinDef = fmap getOccFS (classMinimalDef clas)

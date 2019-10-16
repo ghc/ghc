@@ -31,7 +31,7 @@ import GhcPrelude
 import Bag
 import Class         ( Class, classKey, classTyCon )
 import DynFlags
-import Id            ( idType, mkLocalId )
+import Id            ( mkLocalId )
 import Inst
 import ListSetOps
 import Name
@@ -300,7 +300,7 @@ defaultCallStacks wanteds
          ; setImplicationStatus (implic { ic_wanted = wanteds }) }
 
   defaultCallStack ct
-    | ClassPred cls tys <- classifyPredType (ctPred ct)
+    | UserPred (ClassPred cls tys) <- ctPred ct
     , Just {} <- isCallStackPred cls tys
     = do { solveCallStack (ctEvidence ct) EvCsEmpty
          ; return Nothing }
@@ -593,17 +593,17 @@ simplifyInteractive wanteds
     simplifyTop wanteds
 
 ------------------
-simplifyDefault :: ThetaType    -- Wanted; has no type variables in it
-                -> TcM ()       -- Succeeds if the constraint is soluble
+simplifyDefault :: [UserPred]    -- Wanted; has no type variables in it
+                -> TcM ()        -- Succeeds if the constraint is soluble
 simplifyDefault theta
   = do { traceTc "simplifyDefault" empty
-       ; wanteds  <- newWanteds DefaultOrigin theta
+       ; wanteds  <- newWanteds DefaultOrigin (fromUserPreds theta)
        ; unsolved <- runTcSDeriveds (solveWantedsAndDrop (mkSimpleWC wanteds))
        ; reportAllUnsolved unsolved
        ; return () }
 
 ------------------
-tcCheckSatisfiability :: Bag EvVar -> TcM Bool
+tcCheckSatisfiability :: Bag EvCoVarBinder -> TcM Bool
 -- Return True if satisfiable, False if definitely contradictory
 tcCheckSatisfiability given_ids
   = do { lcl_env <- TcM.getLclEnv
@@ -634,7 +634,7 @@ tcCheckSatisfiability given_ids
 
 -- | Normalise a type as much as possible using the given constraints.
 -- See @Note [tcNormalise]@.
-tcNormalise :: Bag EvVar -> Type -> TcM Type
+tcNormalise :: Bag EvCoVarBinder -> Type -> TcM Type
 tcNormalise given_ids ty
   = do { lcl_env <- TcM.getLclEnv
        ; let given_loc = mkGivenLoc topTcLevel UnkSkol lcl_env
@@ -647,7 +647,9 @@ tcNormalise given_ids ty
                   -- It's an invariant that this wc_simple will always be
                   -- a singleton Ct, since that's what we fed in as input.
                 ; let ty' = case bagToList (wc_simple wcs) of
-                              (ct:_) -> ctEvPred (ctEvidence ct)
+                              (ct:_)
+                                | UserPred (IrredPred typ) <- ctPred ct
+                                -> typ
                               cts    -> pprPanic "tcNormalise" (ppr cts)
                 ; traceTcS "tcNormalise }" (ppr ty')
                 ; pure ty' }
@@ -749,11 +751,11 @@ simplifyInfer :: TcLevel               -- Used when generating the constraints
               -> [(Name, TcTauType)]   -- Variables to be generalised,
                                        -- and their tau-types
               -> WantedConstraints
-              -> TcM ([TcTyVar],    -- Quantify over these type variables
-                      [EvVar],      -- ... and these constraints (fully zonked)
-                      TcEvBinds,    -- ... binding these evidence variables
+              -> TcM ([TcTyVar],         -- Quantify over these type variables
+                      [EvVarBinder],     -- ... and these constraints (fully zonked)
+                      TcEvBinds,         -- ... binding these evidence variables
                       WantedConstraints, -- Redidual as-yet-unsolved constraints
-                      Bool)         -- True <=> the residual constraints are insoluble
+                      Bool)              -- True <=> the residual constraints are insoluble
 
 simplifyInfer rhs_tclvl infer_mode sigs name_taus wanteds
   | isEmptyWC wanteds
@@ -764,7 +766,10 @@ simplifyInfer rhs_tclvl infer_mode sigs name_taus wanteds
               psig_theta  = [ pred | sig <- partial_sigs
                                    , pred <- sig_inst_theta sig ]
 
-       ; dep_vars <- candidateQTyVarsOfTypes (psig_tv_tys ++ psig_theta ++ map snd name_taus)
+       ; dep_vars <- mconcat <$> sequence
+                       [ candidateQTyVarsOfTypes psig_tv_tys
+                       , candidateQTyVarsOfUserPreds psig_theta
+                       , candidateQTyVarsOfTypes (map snd name_taus) ]
        ; qtkvs <- quantifyTyVars dep_vars
        ; traceTc "simplifyInfer: empty WC" (ppr name_taus $$ ppr qtkvs)
        ; return (qtkvs, [], emptyTcEvBinds, emptyWC, False) }
@@ -790,13 +795,13 @@ simplifyInfer rhs_tclvl infer_mode sigs name_taus wanteds
 
        ; tc_env          <- TcM.getEnv
        ; ev_binds_var    <- TcM.newTcEvBinds
-       ; psig_theta_vars <- mapM TcM.newEvVar psig_theta
+       ; psig_theta_vars <- TcM.newEvVarBinders psig_theta
        ; wanted_transformed_incl_derivs
             <- setTcLevel rhs_tclvl $
                runTcSWithEvBinds ev_binds_var $
                do { let loc         = mkGivenLoc rhs_tclvl UnkSkol $
                                       env_lcl tc_env
-                        psig_givens = mkGivens loc psig_theta_vars
+                        psig_givens = mkGivens loc (map toEvCoVarBinder psig_theta_vars)
                   ; _ <- solveSimpleGivens psig_givens
                          -- See Note [Add signature contexts as givens]
                   ; solveWanteds wanteds }
@@ -825,17 +830,18 @@ simplifyInfer rhs_tclvl infer_mode sigs name_taus wanteds
        ; (qtvs, bound_theta, co_vars) <- decideQuantification infer_mode rhs_tclvl
                                                      name_taus partial_sigs
                                                      quant_pred_candidates
-       ; bound_theta_vars <- mapM TcM.newEvVar bound_theta
+       ; bound_theta_vars <- TcM.newEvVarBinders bound_theta
 
        -- We must produce bindings for the psig_theta_vars, because we may have
        -- used them in evidence bindings constructed by solveWanteds earlier
        -- Easiest way to do this is to emit them as new Wanteds (#14643)
        ; ct_loc <- getCtLocM AnnOrigin Nothing
-       ; let psig_wanted = [ CtWanted { ctev_pred = idType psig_theta_var
-                                      , ctev_dest = EvVarDest psig_theta_var
+       ; let psig_wanted = [ CtWanted { ctev_pred = fromUserPred psig_pred
+                                      , ctev_dest = EvVarDest (evbVar psig_theta_var)
                                       , ctev_nosh = WDeriv
                                       , ctev_loc  = ct_loc }
-                           | psig_theta_var <- psig_theta_vars ]
+                           | (psig_pred, psig_theta_var)
+                                <- psig_theta `zip` psig_theta_vars]
 
        -- Now construct the residual constraint
        ; residual_wanted <- mkResidualConstraints rhs_tclvl ev_binds_var
@@ -859,7 +865,7 @@ simplifyInfer rhs_tclvl infer_mode sigs name_taus wanteds
 --------------------
 mkResidualConstraints :: TcLevel -> EvBindsVar
                       -> [(Name, TcTauType)]
-                      -> VarSet -> [TcTyVar] -> [EvVar]
+                      -> VarSet -> [TcTyVar] -> [EvVarBinder]
                       -> WantedConstraints -> TcM WantedConstraints
 -- Emit the remaining constraints from the RHS.
 -- See Note [Emitting the residual implication in simplifyInfer]
@@ -883,7 +889,7 @@ mkResidualConstraints rhs_tclvl ev_binds_var
                                       implic1  { ic_tclvl  = rhs_tclvl
                                                , ic_skols  = qtvs
                                                , ic_telescope = Nothing
-                                               , ic_given  = full_theta_vars
+                                               , ic_given  = toEvCoVarBinders full_theta_vars
                                                , ic_wanted = inner_wanted
                                                , ic_binds  = ev_binds_var
                                                , ic_no_eqs = False
@@ -892,7 +898,7 @@ mkResidualConstraints rhs_tclvl ev_binds_var
         ; return (WC { wc_simple = outer_simple
                      , wc_impl   = implics })}
   where
-    full_theta = map idType full_theta_vars
+    full_theta = evbsPreds full_theta_vars
     skol_info  = InferSkol [ (name, mkSigmaTy [] full_theta ty)
                            | (name, ty) <- name_taus ]
                  -- Don't add the quantified variables here, because
@@ -900,7 +906,7 @@ mkResidualConstraints rhs_tclvl ev_binds_var
                  -- to be tidied uniformly
 
 --------------------
-ctsPreds :: Cts -> [PredType]
+ctsPreds :: Cts -> [Pred]
 ctsPreds cts = [ ctEvPred ev | ct <- bagToList cts
                              , let ev = ctEvidence ct ]
 
@@ -1012,9 +1018,9 @@ decideQuantification
   -> TcLevel
   -> [(Name, TcTauType)]   -- Variables to be generalised
   -> [TcIdSigInst]         -- Partial type signatures (if any)
-  -> [PredType]            -- Candidate theta; already zonked
+  -> [Pred]                -- Candidate theta; already zonked
   -> TcM ( [TcTyVar]       -- Quantify over these (skolems)
-         , [PredType]      -- and this context (fully zonked)
+         , [UserPred]      -- and this context (fully zonked)
          , VarSet)
 -- See Note [Deciding quantification]
 decideQuantification infer_mode rhs_tclvl name_taus psigs candidates
@@ -1033,15 +1039,15 @@ decideQuantification infer_mode rhs_tclvl name_taus psigs candidates
        --         predicates to actually quantify over
        -- NB: decideQuantifiedTyVars turned some meta tyvars
        -- into quantified skolems, so we have to zonk again
-       ; candidates <- TcM.zonkTcTypes candidates
-       ; psig_theta <- TcM.zonkTcTypes (concatMap sig_inst_theta psigs)
+       ; candidates <- mapM TcM.zonkTcPred candidates
+       ; psig_theta <- mapM TcM.zonkUserPred (concatMap sig_inst_theta psigs)
        ; let quantifiable_candidates
                = pickQuantifiablePreds (mkVarSet qtvs) candidates
              -- NB: do /not/ run pickQuantifiablePreds over psig_theta,
              -- because we always want to quantify over psig_theta, and not
              -- drop any of them; e.g. CallStack constraints.  c.f #14658
 
-             theta = mkMinimalBySCs id $  -- See Note [Minimize by Superclasses]
+             theta = mkMinimalBySCs fromUserPred $  -- See Note [Minimize by Superclasses]
                      (psig_theta ++ quantifiable_candidates)
 
        ; traceTc "decideQuantification"
@@ -1058,8 +1064,8 @@ decideQuantification infer_mode rhs_tclvl name_taus psigs candidates
 decideMonoTyVars :: InferMode
                  -> [(Name,TcType)]
                  -> [TcIdSigInst]
-                 -> [PredType]
-                 -> TcM (TcTyCoVarSet, [PredType], CoVarSet)
+                 -> [Pred]
+                 -> TcM (TcTyCoVarSet, [Pred], CoVarSet)
 -- Decide which tyvars and covars cannot be generalised:
 --   (a) Free in the environment
 --   (b) Mentioned in a constraint we can't generalise
@@ -1074,15 +1080,14 @@ decideMonoTyVars infer_mode name_taus psigs candidates
        ; psig_qtvs <- mapM zonkTcTyVarToTyVar $
                       concatMap (map snd . sig_inst_skols) psigs
 
-       ; psig_theta <- mapM TcM.zonkTcType $
+       ; psig_theta <- mapM TcM.zonkUserPred $
                        concatMap sig_inst_theta psigs
 
        ; taus <- mapM (TcM.zonkTcType . snd) name_taus
 
        ; tc_lvl <- TcM.getTcLevel
-       ; let psig_tys = mkTyVarTys psig_qtvs ++ psig_theta
-
-             co_vars = coVarsOfTypes (psig_tys ++ taus)
+       ; let co_vars = coVarsOfTypes (mkTyVarTys psig_qtvs ++ taus)
+                       `unionVarSet` coVarsOfUserPreds psig_theta
              co_var_tvs = closeOverKinds co_vars
                -- The co_var_tvs are tvs mentioned in the types of covars or
                -- coercion holes. We can't quantify over these covars, so we
@@ -1091,7 +1096,7 @@ decideMonoTyVars infer_mode name_taus psigs candidates
                --       quantify over k either!  Hence closeOverKinds
 
              mono_tvs0 = filterVarSet (not . isQuantifiableTv tc_lvl) $
-                         tyCoVarsOfTypes candidates
+                         tyCoVarsOfPreds candidates
                -- We need to grab all the non-quantifiable tyvars in the
                -- candidates so that we can grow this set to find other
                -- non-quantifiable tyvars. This can happen with something
@@ -1106,12 +1111,12 @@ decideMonoTyVars infer_mode name_taus psigs candidates
 
              mono_tvs1 = mono_tvs0 `unionVarSet` co_var_tvs
 
-             eq_constraints = filter isEqPrimPred candidates
+             eq_constraints = filter isEqPred candidates
              mono_tvs2      = growThetaTyVars eq_constraints mono_tvs1
 
              constrained_tvs = filterVarSet (isQuantifiableTv tc_lvl) $
                                (growThetaTyVars eq_constraints
-                                               (tyCoVarsOfTypes no_quant)
+                                               (tyCoVarsOfPreds no_quant)
                                 `minusVarSet` mono_tvs2)
                                `delVarSetList` psig_qtvs
              -- constrained_tvs: the tyvars that we are not going to
@@ -1147,7 +1152,7 @@ decideMonoTyVars infer_mode name_taus psigs candidates
 
        ; return (mono_tvs, maybe_quant, co_vars) }
   where
-    pick :: InferMode -> [PredType] -> TcM ([PredType], [PredType])
+    pick :: InferMode -> [Pred] -> TcM ([Pred], [Pred])
     -- Split the candidates into ones we definitely
     -- won't quantify, and ones that we might
     pick NoRestrictions  cand = return ([], cand)
@@ -1158,7 +1163,7 @@ decideMonoTyVars infer_mode name_taus psigs candidates
     -- For EagerDefaulting, do not quantify over
     -- over any interactive class constraint
     is_int_ct ovl_strings pred
-      | Just (cls, _) <- getClassPredTys_maybe pred
+      | UserPred (ClassPred cls _) <- pred
       = isInteractiveClass ovl_strings cls
       | otherwise
       = False
@@ -1175,8 +1180,8 @@ decideMonoTyVars infer_mode name_taus psigs candidates
 -------------------
 defaultTyVarsAndSimplify :: TcLevel
                          -> TyCoVarSet
-                         -> [PredType]          -- Assumed zonked
-                         -> TcM [PredType]      -- Guaranteed zonked
+                         -> [Pred]           -- Assumed zonked
+                         -> TcM [Pred]       -- Guaranteed zonked
 -- Default any tyvar free in the constraints,
 -- and re-simplify in case the defaulting allows further simplification
 defaultTyVarsAndSimplify rhs_tclvl mono_tvs candidates
@@ -1187,7 +1192,7 @@ defaultTyVarsAndSimplify rhs_tclvl mono_tvs candidates
 
        -- Default any kind/levity vars
        ; DV {dv_kvs = cand_kvs, dv_tvs = cand_tvs}
-                <- candidateQTyVarsOfTypes candidates
+                <- candidateQTyVarsOfPreds candidates
                 -- any covars should already be handled by
                 -- the logic in decideMonoTyVars, which looks at
                 -- the constraints generated
@@ -1201,7 +1206,7 @@ defaultTyVarsAndSimplify rhs_tclvl mono_tvs candidates
 
        ; case () of
            _ | some_default -> simplify_cand candidates
-             | prom         -> mapM TcM.zonkTcType candidates
+             | prom         -> mapM TcM.zonkTcPred candidates
              | otherwise    -> return candidates
        }
   where
@@ -1229,7 +1234,7 @@ defaultTyVarsAndSimplify rhs_tclvl mono_tvs candidates
 decideQuantifiedTyVars
    :: [(Name,TcType)]   -- Annotated theta and (name,tau) pairs
    -> [TcIdSigInst]     -- Partial signatures
-   -> [PredType]        -- Candidates, zonked
+   -> [Pred]            -- Candidates, zonked
    -> TcM [TyVar]
 -- Fix what tyvars we are going to quantify over, and quantify them
 decideQuantifiedTyVars name_taus psigs candidates
@@ -1238,16 +1243,16 @@ decideQuantifiedTyVars name_taus psigs candidates
              --     Wrinkles 2 and 3
        ; psig_tv_tys <- mapM TcM.zonkTcTyVar [ tv | sig <- psigs
                                                   , (_,tv) <- sig_inst_skols sig ]
-       ; psig_theta <- mapM TcM.zonkTcType [ pred | sig <- psigs
-                                                  , pred <- sig_inst_theta sig ]
+       ; psig_theta <- mapM TcM.zonkUserPred [ pred | sig <- psigs
+                                                    , pred <- sig_inst_theta sig ]
        ; tau_tys  <- mapM (TcM.zonkTcType . snd) name_taus
 
        ; let -- Try to quantify over variables free in these types
-             psig_tys = psig_tv_tys ++ psig_theta
-             seed_tys = psig_tys ++ tau_tys
+             seed_tvs = tyCoVarsOfTypes (psig_tv_tys ++ tau_tys)
+                        `unionVarSet` tyCoVarsOfUserPreds psig_theta
 
              -- Now "grow" those seeds to find ones reachable via 'candidates'
-             grown_tcvs = growThetaTyVars candidates (tyCoVarsOfTypes seed_tys)
+             grown_tcvs = growThetaTyVars candidates seed_tvs
 
        -- Now we have to classify them into kind variables and type variables
        -- (sigh) just for the benefit of -XNoPolyKinds; see quantifyTyVars
@@ -1255,29 +1260,32 @@ decideQuantifiedTyVars name_taus psigs candidates
        -- Keep the psig_tys first, so that candidateQTyVarsOfTypes produces
        -- them in that order, so that the final qtvs quantifies in the same
        -- order as the partial signatures do (#13524)
-       ; dv@DV {dv_kvs = cand_kvs, dv_tvs = cand_tvs} <- candidateQTyVarsOfTypes $
-                                                         psig_tys ++ candidates ++ tau_tys
+       ; dv@DV {dv_kvs = cand_kvs, dv_tvs = cand_tvs}
+           <- mconcat <$> sequence [ candidateQTyVarsOfTypes psig_tv_tys
+                                   , candidateQTyVarsOfUserPreds psig_theta
+                                   , candidateQTyVarsOfPreds candidates
+                                   , candidateQTyVarsOfTypes tau_tys ]
+
        ; let pick     = (`dVarSetIntersectVarSet` grown_tcvs)
              dvs_plus = dv { dv_kvs = pick cand_kvs, dv_tvs = pick cand_tvs }
 
        ; traceTc "decideQuantifiedTyVars" (vcat
            [ text "candidates =" <+> ppr candidates
            , text "tau_tys =" <+> ppr tau_tys
-           , text "seed_tys =" <+> ppr seed_tys
-           , text "seed_tcvs =" <+> ppr (tyCoVarsOfTypes seed_tys)
+           , text "seed_tvs =" <+> ppr seed_tvs
            , text "grown_tcvs =" <+> ppr grown_tcvs
            , text "dvs =" <+> ppr dvs_plus])
 
        ; quantifyTyVars dvs_plus }
 
 ------------------
-growThetaTyVars :: ThetaType -> TyCoVarSet -> TyCoVarSet
+growThetaTyVars :: [Pred] -> TyCoVarSet -> TyCoVarSet
 -- See Note [Growing the tau-tvs using constraints]
 growThetaTyVars theta tcvs
   | null theta = tcvs
   | otherwise  = transCloVarSet mk_next seed_tcvs
   where
-    seed_tcvs = tcvs `unionVarSet` tyCoVarsOfTypes ips
+    seed_tcvs = tcvs `unionVarSet` tyCoVarsOfPreds ips
     (ips, non_ips) = partition isIPPred theta
                          -- See Note [Inheriting implicit parameters] in TcType
 
@@ -1287,7 +1295,7 @@ growThetaTyVars theta tcvs
        | pred_tcvs `intersectsVarSet` so_far = tcvs `unionVarSet` pred_tcvs
        | otherwise                           = tcvs
        where
-         pred_tcvs = tyCoVarsOfType pred
+         pred_tcvs = tyCoVarsOfPred pred
 
 
 {- Note [Promote momomorphic tyvars]
@@ -1682,7 +1690,7 @@ solveImplication imp@(Implic { ic_tclvl  = tclvl
                   ; return (no_eqs, given_insols, residual_wanted) }
 
        ; (floated_eqs, residual_wanted)
-             <- floatEqualities skols given_ids ev_binds_var
+             <- floatEqualities skols (evbsVars given_ids) ev_binds_var
                                 no_given_eqs residual_wanted
 
        ; traceTcS "solveImplication 2"
@@ -1756,7 +1764,7 @@ setImplicationStatus implic@(Implic { ic_status     = status
       ; bad_telescope <- checkBadTelescope implic
 
       ; let dead_givens | warnRedundantGivens info
-                        = filterOut (`elemVarSet` need_inner) givens
+                        = filterOut ((`elemVarSet` need_inner) . evbVar) givens
                         | otherwise = []   -- None to report
 
             discard_entire_implication  -- Can we discard the entire implication?
@@ -1767,7 +1775,9 @@ setImplicationStatus implic@(Implic { ic_status     = status
 
             final_status
               | bad_telescope = IC_BadTelescope
-              | otherwise     = IC_Solved { ics_dead = dead_givens }
+              | otherwise
+              = IC_Solved { ics_dead = map (toEvVarBinder "setImplicationStatus")
+                                           dead_givens }
             final_implic = implic { ic_status = final_status
                                   , ic_wanted = pruned_wc }
 
@@ -1821,6 +1831,8 @@ checkBadTelescope (Implic { ic_telescope  = m_telescope
       = go (later_skols `extendVarSet` one_skol) earlier_skols
 
 warnRedundantGivens :: SkolemInfo -> Bool
+-- INVARIANT: If warnRedundantGivens info returns True, then
+--            all givens are UserPreds.
 warnRedundantGivens (SigSkol ctxt _ _)
   = case ctxt of
        FunSigCtxt _ warn_redundant -> warn_redundant
@@ -1867,7 +1879,7 @@ neededEvVars implic@(Implic { ic_given = givens
             need_inner    = findNeededEvVars ev_binds seeds3
             live_ev_binds = filterEvBindMap (needed_ev_bind need_inner) ev_binds
             need_outer    = foldEvBindMap del_ev_bndr need_inner live_ev_binds
-                            `delVarSetList` givens
+                            `delVarSetList` evbsVars givens
 
       ; TcS.setTcEvBindsMap ev_binds_var live_ev_binds
            -- See Note [Delete dead Given evidence bindings]
@@ -2022,6 +2034,10 @@ works:
      other set False in
         - TcBinds.tcSpecPrag
         - TcBinds.tcTySig
+
+   - Because we do not want to report internal predicates (non-UserPreds),
+     we have an invariant that any time warnRedundantGivens returns True,
+     all givens must be UserPreds.
 
   This decision is taken in setImplicationStatus, rather than TcErrors
   so that we can discard implication constraints that we don't need.
@@ -2430,8 +2446,8 @@ floatEqualities skols given_ids ev_binds_var no_given_eqs
     -- Float out alpha ~ ty, or ty ~ alpha which might be unified outside
     -- See Note [Which equalities to float]
     is_float_eq_candidate ct
-      | pred <- ctPred ct
-      , EqPred NomEq ty1 ty2 <- classifyPredType pred
+      | let pred = ctPred ct
+      , EqualityPred (EqPred NomEq ty1 ty2) <- pred
       , tcTypeKind ty1 `tcEqType` tcTypeKind ty2
       = case (tcGetTyVar_maybe ty1, tcGetTyVar_maybe ty2) of
           (Just tv1, _) -> float_tv_eq_candidate tv1 ty2
@@ -2670,7 +2686,10 @@ disambigGroup (default_ty:default_tys) group@(the_tv, wanteds)
       = do { lcl_env <- TcS.getLclEnv
            ; tc_lvl <- TcS.getTcLevel
            ; let loc = mkGivenLoc tc_lvl UnkSkol lcl_env
-           ; wanted_evs <- mapM (newWantedEvVarNC loc . substTy subst . ctPred)
+           ; wanted_evs <- mapM (newWantedEvVarNC loc .
+                                 substUserPred subst .
+                                 toUserPred "disambigGroup" .
+                                 ctPred)
                                 wanteds
            ; fmap isEmptyWC $
              solveSimpleWanteds $ listToBag $

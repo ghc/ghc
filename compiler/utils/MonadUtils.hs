@@ -17,6 +17,7 @@ module MonadUtils
         , fmapMaybeM, fmapEitherM
         , anyM, allM, orM
         , foldlM, foldlM_, foldrM
+        , foldMapM
         , maybeMapM
         , whenM, unlessM
         , filterOutM
@@ -189,6 +190,10 @@ allM f (b:bs) = (f b) >>= (\bv -> if bv then allM f bs else return False)
 -- | Monadic version of or
 orM :: Monad m => m Bool -> m Bool -> m Bool
 orM m1 m2 = m1 >>= \x -> if x then return True else m2
+
+-- | Monadic version of 'foldMap'
+foldMapM :: (Monad m, Foldable t, Monoid b) => (a -> m b) -> t a -> m b
+foldMapM f = foldlM (\b a -> mappend b <$> f a) mempty
 
 -- | Monadic version of foldl that discards its result
 foldlM_ :: (Monad m, Foldable t) => (a -> b -> m a) -> a -> t b -> m ()

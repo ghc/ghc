@@ -36,7 +36,7 @@
 
 module Var (
         -- * The main data type and synonyms
-        Var, CoVar, Id, NcId, DictId, DFunId, EvVar, EqVar, EvId, IpId, JoinId,
+        Var, CoVar, Id, NcId, DictId, DFunId, EvVar, EvCoVar, EqVar, EvId, IpId, JoinId,
         TyVar, TcTyVar, TypeVar, KindVar, TKVar, TyCoVar,
 
         -- * In and Out variants
@@ -152,6 +152,9 @@ type EvId   = Id        -- Term-level evidence: DictId, IpId, or EqVar
 
 -- | Evidence Variable
 type EvVar  = EvId      -- ...historical name for EvId
+
+-- | Evidence or Coercion variable
+type EvCoVar = Id
 
 -- | Dictionary Function Identifier
 type DFunId = Id        -- A dictionary function

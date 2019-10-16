@@ -28,6 +28,7 @@ import GhcPrelude
 
 import Type
 import TyCoPpr
+import Predicate
 import Name
 import Outputable
 import Unique
@@ -70,13 +71,13 @@ data PatSyn
         psUnivTyVars  :: [TyVarBinder],
 
         -- Required dictionaries (may mention psUnivTyVars)
-        psReqTheta    :: ThetaType,
+        psReqTheta    :: [UserPred],
 
         -- Existentially-quantified type vars
         psExTyVars    :: [TyVarBinder],
 
         -- Provided dictionaries (may mention psUnivTyVars or psExTyVars)
-        psProvTheta   :: ThetaType,
+        psProvTheta   :: [UserPred],
 
         -- Result type
         psResultTy   :: Type,  -- Mentions only psUnivTyVars
@@ -354,10 +355,10 @@ instance Data.Data PatSyn where
 -- | Build a new pattern synonym
 mkPatSyn :: Name
          -> Bool                 -- ^ Is the pattern synonym declared infix?
-         -> ([TyVarBinder], ThetaType) -- ^ Universially-quantified type
-                                       -- variables and required dicts
-         -> ([TyVarBinder], ThetaType) -- ^ Existentially-quantified type
-                                       -- variables and provided dicts
+         -> ([TyVarBinder], [UserPred]) -- ^ Universially-quantified type
+                                        -- variables and required dicts
+         -> ([TyVarBinder], [UserPred]) -- ^ Existentially-quantified type
+                                        -- variables and provided dicts
          -> [Type]               -- ^ Original arguments
          -> Type                 -- ^ Original result type
          -> (Id, Bool)           -- ^ Name of matcher
@@ -420,7 +421,7 @@ patSynExTyVars ps = binderVars (psExTyVars ps)
 patSynExTyVarBinders :: PatSyn -> [TyVarBinder]
 patSynExTyVarBinders = psExTyVars
 
-patSynSig :: PatSyn -> ([TyVar], ThetaType, [TyVar], ThetaType, [Type], Type)
+patSynSig :: PatSyn -> ([TyVar], [UserPred], [TyVar], [UserPred], [Type], Type)
 patSynSig (MkPatSyn { psUnivTyVars = univ_tvs, psExTyVars = ex_tvs
                     , psProvTheta = prov, psReqTheta = req
                     , psArgs = arg_tys, psResultTy = res_ty })
@@ -479,6 +480,6 @@ pprPatSynType (MkPatSyn { psUnivTyVars = univ_tvs,  psReqTheta  = req_theta
         , pprType sigma_ty ]
   where
     sigma_ty = mkForAllTys ex_tvs  $
-               mkInvisFunTys prov_theta $
+               mkPhiTy prov_theta $
                mkVisFunTys orig_args orig_res_ty
     insert_empty_ctxt = null req_theta && not (null prov_theta && null ex_tvs)

@@ -39,7 +39,6 @@ import GhcPrelude
 import Util
 import Bag
 import FastString
-import Var (EvVar)
 import Id
 import VarEnv
 import UniqDSet
@@ -51,6 +50,7 @@ import Outputable
 import Maybes
 import Type
 import TyCon
+import TcEvidence
 import Literal
 import CoreSyn
 import CoreMap
@@ -58,7 +58,6 @@ import CoreUtils (exprType)
 import PrelNames
 import TysWiredIn
 import TysPrim
-import TcType (evVarPred)
 
 import Numeric (fromRat)
 import Data.Foldable (find)
@@ -510,12 +509,12 @@ initTmState = TmSt emptySDIE emptyCoreMap
 
 -- | The type oracle state. A poor man's 'TcSMonad.InsertSet': The invariant is
 -- that all constraints in there are mutually compatible.
-newtype TyState = TySt (Bag EvVar)
+newtype TyState = TySt (Bag EvCoVarBinder)
 
 -- | Not user-facing.
 instance Outputable TyState where
   ppr (TySt evs)
-    = braces $ hcat $ punctuate comma $ map (ppr . evVarPred) $ bagToList evs
+    = braces $ hcat $ punctuate comma $ map (ppr . evbPred) $ bagToList evs
 
 initTyState :: TyState
 initTyState = TySt emptyBag

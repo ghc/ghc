@@ -23,7 +23,7 @@ module Constraint (
         isGivenCt, isHoleCt, isOutOfScopeCt, isExprHoleCt, isTypeHoleCt,
         isUserTypeErrorCt, getUserTypeErrorMsg,
         ctEvidence, ctLoc, setCtLoc, ctPred, ctFlavour, ctEqRel, ctOrigin,
-        ctEvId, mkTcEqPredLikeEv,
+        ctEvId,
         mkNonCanonical, mkNonCanonicalCt, mkGivens,
         mkIrredCt, mkInsolubleCt,
         ctEvPred, ctEvLoc, ctEvOrigin, ctEvEqRel,
@@ -55,7 +55,7 @@ module Constraint (
         isWanted, isGiven, isDerived, isGivenOrWDeriv,
         ctEvRole,
 
-        wrapType, wrapTypeWithImplication,
+        wrapType,
 
         CtFlavour(..), ShadowInfo(..), ctEvFlavour,
         CtFlavourRole, ctEvFlavourRole, ctFlavourRole,
@@ -64,7 +64,7 @@ module Constraint (
         funEqCanDischarge, funEqCanDischargeF,
 
         -- Pretty printing
-        pprEvVarTheta,
+        pprEvVarTheta, pprEvCoVarTheta,
         pprEvVars, pprEvVarWithType,
 
         -- holes
@@ -86,7 +86,6 @@ import Coercion
 import Class
 import TyCon
 import Var
-import Id
 
 import TcType
 import TcEvidence
@@ -159,6 +158,12 @@ data Ct
         -- The definitely-insoluble case is for things like
         --    Int ~ Bool      tycons don't match
         --    a ~ [a]         occurs check
+
+        -- INVARIANT: The predicate is either an equality (EqualityPred)
+        --            or irreducible (IrredPred). No classes or quantified
+        --            constraints here.
+        -- INVARIANT: If the Irred is insoluble, then the predicate is
+        --            an equality.
     }
 
   | CTyEqCan {  -- tv ~ rhs
@@ -210,7 +215,7 @@ data Ct
   | CHoleCan {             -- See Note [Hole constraints]
        -- Treated as an "insoluble" constraint
        -- See Note [Insoluble constraints]
-      cc_ev   :: CtEvidence,
+      cc_ev   :: CtEvidence, -- INVARIANT: always an IrredPred.
       cc_occ  :: OccName,   -- The name of this hole
       cc_hole :: HoleSort   -- The sort of this hole (expr, type, ...)
     }
@@ -223,10 +228,10 @@ data Ct
 ------------
 data QCInst  -- A much simplified version of ClsInst
              -- See Note [Quantified constraints] in TcCanonical
-  = QCI { qci_ev   :: CtEvidence -- Always of type forall tvs. context => ty
+  = QCI { qci_ev   :: CtEvidence -- Always of type forall tvs. context => pred
                                  -- Always Given
         , qci_tvs  :: [TcTyVar]  -- The tvs
-        , qci_pred :: TcPredType -- The ty
+        , qci_pred :: UserPred   -- The pred
         , qci_pend_sc :: Bool    -- Same as cc_pend_sc flag in CDictCan
                                  -- Invariant: True => qci_pred is a ClassPred
     }
@@ -353,12 +358,12 @@ mkIrredCt ev = CIrredCan { cc_ev = ev, cc_insol = False }
 mkInsolubleCt :: CtEvidence -> Ct
 mkInsolubleCt ev = CIrredCan { cc_ev = ev, cc_insol = True }
 
-mkGivens :: CtLoc -> [EvId] -> [Ct]
+mkGivens :: CtLoc -> [EvCoVarBinder] -> [Ct]
 mkGivens loc ev_ids
   = map mk ev_ids
   where
-    mk ev_id = mkNonCanonical (CtGiven { ctev_evar = ev_id
-                                       , ctev_pred = evVarPred ev_id
+    mk ev_id = mkNonCanonical (CtGiven { ctev_evar = evbVar  ev_id
+                                       , ctev_pred = evbPred ev_id
                                        , ctev_loc = loc })
 
 ctEvidence :: Ct -> CtEvidence
@@ -374,23 +379,13 @@ setCtLoc ct loc = ct { cc_ev = (cc_ev ct) { ctev_loc = loc } }
 ctOrigin :: Ct -> CtOrigin
 ctOrigin = ctLocOrigin . ctLoc
 
-ctPred :: Ct -> PredType
+ctPred :: Ct -> Pred
 -- See Note [Ct/evidence invariant]
 ctPred ct = ctEvPred (ctEvidence ct)
 
 ctEvId :: Ct -> EvVar
 -- The evidence Id for this Ct
 ctEvId ct = ctEvEvId (ctEvidence ct)
-
--- | Makes a new equality predicate with the same role as the given
--- evidence.
-mkTcEqPredLikeEv :: CtEvidence -> TcType -> TcType -> TcType
-mkTcEqPredLikeEv ev
-  = case predTypeEqRel pred of
-      NomEq  -> mkPrimEqPred
-      ReprEq -> mkReprPrimEqPred
-  where
-    pred = ctEvPred ev
 
 -- | Get the flavour of the given 'Ct'
 ctFlavour :: Ct -> CtFlavour
@@ -447,7 +442,7 @@ tyCoFVsOfCt (CFunEqCan { cc_tyargs = tys, cc_fsk = fsk })
   = tyCoFVsOfTypes tys `unionFV` FV.unitFV fsk
                        `unionFV` tyCoFVsOfType (tyVarKind fsk)
 tyCoFVsOfCt (CDictCan { cc_tyargs = tys }) = tyCoFVsOfTypes tys
-tyCoFVsOfCt ct = tyCoFVsOfType (ctPred ct)
+tyCoFVsOfCt ct = tyCoFVsOfPred (ctPred ct)
 
 -- | Returns free variables of a bag of constraints as a non-deterministic
 -- set. See Note [Deterministic FV] in FV.
@@ -495,7 +490,7 @@ tyCoFVsOfImplic (Implic { ic_skols = skols
   = emptyFV
   | otherwise
   = tyCoFVsVarBndrs skols  $
-    tyCoFVsVarBndrs givens $
+    tyCoFVsVarBndrs (evbsVars givens) $
     tyCoFVsOfWC wanted
 
 tyCoFVsOfBag :: (a -> FV) -> Bag a -> FV
@@ -737,19 +732,19 @@ Eq (F (TypeError msg))  -- Here the type error is nested under a type-function
 getUserTypeErrorMsg :: Ct -> Maybe Type
 getUserTypeErrorMsg ct = findUserTypeError (ctPred ct)
   where
-  findUserTypeError t = msum ( userTypeError_maybe t
-                             : map findUserTypeError (subTys t)
-                             )
+  findUserTypeError (EqualityPred {}) = Nothing
+  findUserTypeError (UserPred upred)  = go (userPredType upred)
 
-  subTys t            = case splitAppTys t of
-                          (t,[]) ->
-                            case splitTyConApp_maybe t of
-                              Nothing     -> []
-                              Just (_,ts) -> ts
-                          (t,ts) -> t : ts
+  go t = msum ( userTypeError_maybe t
+              : map go (subTys t)
+              )
 
-
-
+  subTys t = case splitAppTys t of
+               (t,[]) ->
+                 case splitTyConApp_maybe t of
+                   Nothing     -> []
+                   Just (_,ts) -> ts
+               (t,ts) -> t : ts
 
 isUserTypeErrorCt :: Ct -> Bool
 isUserTypeErrorCt ct = case getUserTypeErrorMsg ct of
@@ -1070,9 +1065,9 @@ data Implication
       ic_telescope :: Maybe SDoc,  -- User-written telescope, if there is one
                                    -- See Note [Checking telescopes]
 
-      ic_given  :: [EvVar],      -- Given evidence variables
-                                 --   (order does not matter)
-                                 -- See Invariant (GivenInv) in TcType
+      ic_given  :: [EvCoVarBinder], -- Given evidence variables
+                                    --   (order does not matter)
+                                    -- See Invariant (GivenInv) in TcType
 
       ic_no_eqs :: Bool,         -- True  <=> ic_givens have no equalities, for sure
                                  -- False <=> ic_givens might have equalities
@@ -1130,7 +1125,7 @@ implicationPrototype
 
 data ImplicStatus
   = IC_Solved     -- All wanteds in the tree are solved, all the way down
-       { ics_dead :: [EvVar] }  -- Subset of ic_given that are not needed
+       { ics_dead :: [EvVarBinder] }  -- Subset of ic_given that are not needed
          -- See Note [Tracking redundant constraints] in TcSimplify
 
   | IC_Insoluble  -- At least one insoluble constraint in the tree
@@ -1152,7 +1147,7 @@ instance Outputable Implication where
                , text "Skolems =" <+> pprTyVars skols
                , text "No-eqs =" <+> ppr no_eqs
                , text "Status =" <+> ppr status
-               , hang (text "Given =")  2 (pprEvVars given)
+               , hang (text "Given =")  2 (ppr given)
                , hang (text "Wanted =") 2 (ppr wanted)
                , text "Binds =" <+> ppr binds
                , whenPprDebug (text "Needed inner =" <+> ppr need_in)
@@ -1278,28 +1273,17 @@ never see it.
 pprEvVars :: [EvVar] -> SDoc    -- Print with their types
 pprEvVars ev_vars = vcat (map pprEvVarWithType ev_vars)
 
-pprEvVarTheta :: [EvVar] -> SDoc
-pprEvVarTheta ev_vars = pprTheta (map evVarPred ev_vars)
+pprEvVarTheta :: [EvVarBinder] -> SDoc
+pprEvVarTheta ev_vars = pprTheta (evbsPreds ev_vars)
+
+pprEvCoVarTheta :: [EvCoVarBinder] -> SDoc
+pprEvCoVarTheta ev_vars = pprPredsContext (evbsPreds ev_vars)
 
 pprEvVarWithType :: EvVar -> SDoc
-pprEvVarWithType v = ppr v <+> dcolon <+> pprType (evVarPred v)
+pprEvVarWithType v = ppr v <+> dcolon <+> pprType (varType v)
 
-
-
--- | Wraps the given type with the constraints (via ic_given) in the given
--- implication, according to the variables mentioned (via ic_skols)
--- in the implication, but taking care to only wrap those variables
--- that are mentioned in the type or the implication.
-wrapTypeWithImplication :: Type -> Implication -> Type
-wrapTypeWithImplication ty impl = wrapType ty mentioned_skols givens
-    where givens = map idType $ ic_given impl
-          skols = ic_skols impl
-          freeVars = fvVarSet $ tyCoFVsOfTypes (ty:givens)
-          mentioned_skols = filter (`elemVarSet` freeVars) skols
-
-wrapType :: Type -> [TyVar] -> [PredType] -> Type
+wrapType :: Type -> [TyVar] -> [UserPred] -> Type
 wrapType ty skols givens = mkSpecForAllTys skols $ mkPhiTy givens ty
-
 
 {-
 ************************************************************************
@@ -1344,23 +1328,27 @@ So a Given has EvVar inside it rather than (as previously) an EvTerm.
 -- Wanted equalities are always HoleDest; other wanteds are always
 -- EvVarDest.
 data TcEvDest
-  = EvVarDest EvVar         -- ^ bind this var to the evidence
+  = EvVarDest EvVar
+              -- ^ bind this var to the evidence
               -- EvVarDest is always used for non-type-equalities
               -- e.g. class constraints
 
-  | HoleDest  CoercionHole  -- ^ fill in this hole with the evidence
+  | HoleDest CoercionHole
+              -- ^ fill in this hole with the evidence
               -- HoleDest is always used for type-equalities
               -- See Note [Coercion holes] in TyCoRep
 
 data CtEvidence
   = CtGiven    -- Truly given, not depending on subgoals
-      { ctev_pred :: TcPredType      -- See Note [Ct/evidence invariant]
-      , ctev_evar :: EvVar           -- See Note [Evidence field of CtEvidence]
+      { ctev_pred :: Pred            -- See Note [Ct/evidence invariant]
+      , ctev_evar :: EvCoVar         -- See Note [Evidence field of CtEvidence]
+                           -- INVARIANT: varType ctev_var == predType ctev_pred
+                           --            (modulo zonking, see the Note)
       , ctev_loc  :: CtLoc }
 
 
   | CtWanted   -- Wanted goal
-      { ctev_pred :: TcPredType     -- See Note [Ct/evidence invariant]
+      { ctev_pred :: Pred           -- See Note [Ct/evidence invariant]
       , ctev_dest :: TcEvDest
       , ctev_nosh :: ShadowInfo     -- See Note [Constraint flavours]
       , ctev_loc  :: CtLoc }
@@ -1369,10 +1357,10 @@ data CtEvidence
                -- immediately rewrite anything other than a derived
                -- (there's no evidence!) but if we do manage to solve
                -- it may help in solving other goals.
-      { ctev_pred :: TcPredType
+      { ctev_pred :: Pred
       , ctev_loc  :: CtLoc }
 
-ctEvPred :: CtEvidence -> TcPredType
+ctEvPred :: CtEvidence -> Pred
 -- The predicate of a flavor
 ctEvPred = ctev_pred
 
@@ -1384,7 +1372,7 @@ ctEvOrigin = ctLocOrigin . ctEvLoc
 
 -- | Get the equality relation relevant for a 'CtEvidence'
 ctEvEqRel :: CtEvidence -> EqRel
-ctEvEqRel = predTypeEqRel . ctEvPred
+ctEvEqRel = predEqRel . ctEvPred
 
 -- | Get the role relevant for a 'CtEvidence'
 ctEvRole :: CtEvidence -> Role
@@ -1409,7 +1397,7 @@ ctEvCoercion (CtWanted { ctev_dest = dest })
 ctEvCoercion ev
   = pprPanic "ctEvCoercion" (ppr ev)
 
-ctEvEvId :: CtEvidence -> EvVar
+ctEvEvId :: CtEvidence -> EvCoVar
 ctEvEvId (CtWanted { ctev_dest = EvVarDest ev }) = ev
 ctEvEvId (CtWanted { ctev_dest = HoleDest h })   = coHoleCoVar h
 ctEvEvId (CtGiven  { ctev_evar = ev })           = ev

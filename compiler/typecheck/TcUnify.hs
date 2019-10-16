@@ -17,8 +17,8 @@ module TcUnify (
   tcWrapResult, tcWrapResultO, tcSkolemise, tcSkolemiseET,
   tcSubTypeHR, tcSubTypeO, tcSubType_NC, tcSubTypeDS,
   tcSubTypeDS_NC_O, tcSubTypeET,
-  checkConstraints, checkTvConstraints,
-  buildImplicationFor, emitResidualTvConstraint,
+  checkConstraints, checkConstraintsEqs, checkTvConstraints,
+  buildImplicationFor, buildImplicationForEqs, emitResidualTvConstraint,
 
   -- Various unifications
   unifyType, unifyKind,
@@ -1023,7 +1023,7 @@ promoteTcType dest_lvl ty
                                         , uo_thing    = Nothing
                                         , uo_visible  = False }
 
-           ; co <- emitWantedEq eq_orig TypeLevel Nominal ty prom_ty
+           ; co <- emitWantedEq eq_orig TypeLevel ty prom_ty
            ; return (co, prom_ty) }
 
     dont_promote_it :: TcM (TcCoercion, TcType)
@@ -1174,16 +1174,23 @@ tcSkolemiseET ctxt (Check ty) thing_inside
 
 checkConstraints :: SkolemInfo
                  -> [TcTyVar]           -- Skolems
-                 -> [EvVar]             -- Given
+                 -> [EvVarBinder]       -- Given
                  -> TcM result
                  -> TcM (TcEvBinds, result)
+checkConstraints info tvs given = checkConstraintsEqs info tvs (toEvCoVarBinders given)
 
-checkConstraints skol_info skol_tvs given thing_inside
+
+checkConstraintsEqs :: SkolemInfo
+                    -> [TcTyVar]        -- Skolems
+                    -> [EvCoVarBinder]  -- Given
+                    -> TcM result
+                    -> TcM (TcEvBinds, result)
+checkConstraintsEqs skol_info skol_tvs given thing_inside
   = do { implication_needed <- implicationNeeded skol_info skol_tvs given
 
        ; if implication_needed
          then do { (tclvl, wanted, result) <- pushLevelAndCaptureConstraints thing_inside
-                 ; (implics, ev_binds) <- buildImplicationFor tclvl skol_info skol_tvs given wanted
+                 ; (implics, ev_binds) <- buildImplicationForEqs tclvl skol_info skol_tvs given wanted
                  ; traceTc "checkConstraints" (ppr tclvl $$ ppr skol_tvs)
                  ; emitImplications implics
                  ; return (ev_binds, result) }
@@ -1238,7 +1245,7 @@ emitResidualTvConstraint skol_info m_telescope skol_tvs tclvl wanted
                 , ic_binds     = ev_binds
                 , ic_info      = skol_info } }
 
-implicationNeeded :: SkolemInfo -> [TcTyVar] -> [EvVar] -> TcM Bool
+implicationNeeded :: SkolemInfo -> [TcTyVar] -> [EvCoVarBinder] -> TcM Bool
 -- See Note [When to build an implication]
 implicationNeeded skol_info skol_tvs given
   | null skol_tvs
@@ -1276,9 +1283,15 @@ alwaysBuildImplication _                  = False
 -}
 
 buildImplicationFor :: TcLevel -> SkolemInfo -> [TcTyVar]
-                   -> [EvVar] -> WantedConstraints
-                   -> TcM (Bag Implication, TcEvBinds)
+                    -> [EvVarBinder] -> WantedConstraints
+                    -> TcM (Bag Implication, TcEvBinds)
 buildImplicationFor tclvl skol_info skol_tvs given wanted
+  = buildImplicationForEqs tclvl skol_info skol_tvs (toEvCoVarBinders given) wanted
+
+buildImplicationForEqs :: TcLevel -> SkolemInfo -> [TcTyVar]
+                       -> [EvCoVarBinder] -> WantedConstraints
+                       -> TcM (Bag Implication, TcEvBinds)
+buildImplicationForEqs tclvl skol_info skol_tvs given wanted
   | isEmptyWC wanted && null given
              -- Optimisation : if there are no wanteds, and no givens
              -- don't generate an implication at all.
@@ -1386,7 +1399,7 @@ uType, uType_defer
 -- It is always safe to defer unification to the main constraint solver
 -- See Note [Deferred unification]
 uType_defer t_or_k origin ty1 ty2
-  = do { co <- emitWantedEq origin t_or_k Nominal ty1 ty2
+  = do { co <- emitWantedEq origin t_or_k ty1 ty2
 
        -- Error trace only
        -- NB. do *not* call mkErrInfo unless tracing is on,

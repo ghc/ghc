@@ -362,7 +362,7 @@ runTcPlugins plugins all_cts
 
     eqCt :: Ct -> Ct -> Bool
     eqCt c c' = ctFlavour c == ctFlavour c'
-             && ctPred c `tcEqType` ctPred c'
+             && ctPred c `tcEqPred` ctPred c'
 
     add :: [(EvTerm,Ct)] -> SolvedCts -> SolvedCts
     add xs scs = foldl' addOne scs xs
@@ -722,7 +722,7 @@ interactIrred _ wi = pprPanic "interactIrred" (ppr wi)
 
 findMatchingIrreds :: Cts -> CtEvidence -> (Bag (Ct, SwapFlag), Bag Ct)
 findMatchingIrreds irreds ev
-  | EqPred eq_rel1 lty1 rty1 <- classifyPredType pred
+  | EqualityPred (EqPred eq_rel1 lty1 rty1) <- pred
     -- See Note [Solving irreducible equalities]
   = partitionBagWith (match_eq eq_rel1 lty1 rty1) irreds
   | otherwise
@@ -730,11 +730,11 @@ findMatchingIrreds irreds ev
   where
     pred = ctEvPred ev
     match_non_eq ct
-      | ctPred ct `tcEqTypeNoKindCheck` pred = Left (ct, NotSwapped)
-      | otherwise                            = Right ct
+      | ctPred ct `tcEqPred` pred = Left (ct, NotSwapped)
+      | otherwise                 = Right ct
 
     match_eq eq_rel1 lty1 rty1 ct
-      | EqPred eq_rel2 lty2 rty2 <- classifyPredType (ctPred ct)
+      | EqualityPred (EqPred eq_rel2 lty2 rty2) <- ctPred ct
       , eq_rel1 == eq_rel2
       , Just swap <- match_eq_help lty1 rty1 lty2 rty2
       = Left (ct, swap)
@@ -1106,21 +1106,21 @@ shortCutSolver dflags ev_w ev_i
     try_solve_from_instance (ev_binds, solved_dicts) ev
       | let pred = ctEvPred ev
             loc  = ctEvLoc  ev
-      , ClassPred cls tys <- classifyPredType pred
+      , UserPred user_pred@(ClassPred cls tys) <- pred
       = do { inst_res <- lift $ matchGlobalInst dflags True cls tys
            ; case inst_res of
                OneInst { cir_new_theta = preds
                        , cir_mk_ev     = mk_ev
                        , cir_what      = what }
                  | safeOverlap what
-                 , all isTyFamFree preds  -- Note [Shortcut solving: type families]
+                 , all isTyFamFreePred preds  -- Note [Shortcut solving: type families]
                  -> do { let solved_dicts' = addDict solved_dicts cls tys ev
                              -- solved_dicts': it is important that we add our goal
                              -- to the cache before we solve! Otherwise we may end
                              -- up in a loop while solving recursive dictionaries.
 
                        ; lift $ traceTcS "shortCutSolver: found instance" (ppr preds)
-                       ; loc' <- lift $ checkInstanceOK loc what pred
+                       ; loc' <- lift $ checkInstanceOK loc what user_pred
 
                        ; evc_vs <- mapM (new_wanted_cached loc' solved_dicts') preds
                                   -- Emit work for subgoals but use our local cache
@@ -1141,12 +1141,12 @@ shortCutSolver dflags ev_w ev_i
     -- Use a local cache of solved dicts while emitting EvVars for new work
     -- We bail out of the entire computation if we need to emit an EvVar for
     -- a subgoal that isn't a ClassPred.
-    new_wanted_cached :: CtLoc -> DictMap CtEvidence -> TcPredType -> MaybeT TcS MaybeNew
-    new_wanted_cached loc cache pty
-      | ClassPred cls tys <- classifyPredType pty
+    new_wanted_cached :: CtLoc -> DictMap CtEvidence -> Pred -> MaybeT TcS MaybeNew
+    new_wanted_cached loc cache pred
+      | UserPred (ClassPred cls tys) <- pred
       = lift $ case findDict cache loc_w cls tys of
           Just ctev -> return $ Cached (ctEvExpr ctev)
-          Nothing   -> Fresh <$> newWantedNC loc pty
+          Nothing   -> Fresh <$> newWantedNC loc pred
       | otherwise = mzero
 
 addFunDepWork :: InertCans -> CtEvidence -> Class -> TcS ()
@@ -1161,7 +1161,7 @@ addFunDepWork inerts work_ev cls
   | otherwise
   = return ()
   where
-    work_pred = ctEvPred work_ev
+    work_pred = toUserPred "addFunDepWork 1" $ ctEvPred work_ev
     work_loc  = ctEvLoc work_ev
 
     add_fds inert_ct
@@ -1183,7 +1183,7 @@ addFunDepWork inerts work_ev cls
       = return ()
       where
         inert_ev   = ctEvidence inert_ct
-        inert_pred = ctEvPred inert_ev
+        inert_pred = toUserPred "addFunDepWork 2" $ ctEvPred inert_ev
         inert_loc  = ctEvLoc inert_ev
         derived_loc = work_loc { ctl_depth  = ctl_depth work_loc `maxSubGoalDepth`
                                               ctl_depth inert_loc
@@ -1407,8 +1407,8 @@ improveLocalFunEqs work_ev inerts fam_tc args fsk
     mk_fd_eqns inert_ev eqns
       | null eqns  = []
       | otherwise  = [ FDEqn { fd_qtvs = [], fd_eqs = eqns
-                             , fd_pred1 = work_pred
-                             , fd_pred2 = ctEvPred inert_ev
+                             , fd_pred1 = toUserPred "improveLocalFunEqs 1" work_pred
+                             , fd_pred2 = toUserPred "improveLocalFunEqs 2" $ ctEvPred inert_ev
                              , fd_loc   = loc } ]
       where
         inert_loc = ctEvLoc inert_ev
@@ -1835,11 +1835,11 @@ doTopReactOther work_item
   | isGiven ev
   = continueWith work_item
 
-  | EqPred eq_rel t1 t2 <- classifyPredType pred
+  | EqualityPred (EqPred eq_rel t1 t2) <- pred
   = doTopReactEqPred work_item eq_rel t1 t2
 
-  | otherwise
-  = do { res <- matchLocalInst pred loc
+  | UserPred u_pred <- pred
+  = do { res <- matchLocalInst u_pred loc
        ; case res of
            OneInst {} -> chooseInstance work_item res
            _          -> continueWith work_item }
@@ -2096,13 +2096,13 @@ shortCutReduction old_ev fsk ax_co fam_tc tc_args
                -- ax_co :: F args ~ G tc_args
                -- old_ev :: F args ~ fsk
     do { new_ev <- case ctEvFlavour old_ev of
-           Given -> newGivenEvVar deeper_loc
-                         ( mkPrimEqPred (mkTyConApp fam_tc tc_args) (mkTyVarTy fsk)
+           Given -> newGivenEv deeper_loc
+                         ( mkEqualityPred NomEq (mkTyConApp fam_tc tc_args) (mkTyVarTy fsk)
                          , evCoercion (mkTcSymCo ax_co
                                        `mkTcTransCo` ctEvCoercion old_ev) )
 
            Wanted {} ->
-             do { (new_ev, new_co) <- newWantedEq deeper_loc Nominal
+             do { (new_ev, new_co) <- newWantedEq deeper_loc NomEq
                                         (mkTyConApp fam_tc tc_args) (mkTyVarTy fsk)
                 ; setWantedEq (ctev_dest old_ev) $ ax_co `mkTcTransCo` new_co
                 ; return new_ev }
@@ -2355,7 +2355,7 @@ doTopReactDict inerts work_item@(CDictCan { cc_ev = ev, cc_class = cls
              ; emitFunDepDeriveds $
                improveFromInstEnv instEnvs mk_ct_loc dict_pred }
 
-     mk_ct_loc :: PredType   -- From instance decl
+     mk_ct_loc :: UserPred   -- From instance decl
                -> SrcSpan    -- also from instance deol
                -> CtLoc
      mk_ct_loc inst_pred inst_loc
@@ -2371,7 +2371,7 @@ chooseInstance work_item
                         , cir_what      = what
                         , cir_mk_ev     = mk_ev })
   = do { traceTcS "doTopReact/found instance for" $ ppr ev
-       ; deeper_loc <- checkInstanceOK loc what pred
+       ; deeper_loc <- checkInstanceOK loc what (toUserPred "chooseInstance" pred)
        ; if isDerived ev then finish_derived deeper_loc theta
                          else finish_wanted  deeper_loc theta mk_ev }
   where
@@ -2379,7 +2379,7 @@ chooseInstance work_item
      pred       = ctEvPred ev
      loc        = ctEvLoc ev
 
-     finish_wanted :: CtLoc -> [TcPredType]
+     finish_wanted :: CtLoc -> [Pred]
                    -> ([EvExpr] -> EvTerm) -> TcS (StopOrContinue Ct)
       -- Precondition: evidence term matches the predicate workItem
      finish_wanted loc theta mk_ev
@@ -2405,14 +2405,14 @@ chooseInstance work_item
 chooseInstance work_item lookup_res
   = pprPanic "chooseInstance" (ppr work_item $$ ppr lookup_res)
 
-checkInstanceOK :: CtLoc -> InstanceWhat -> TcPredType -> TcS CtLoc
+checkInstanceOK :: CtLoc -> InstanceWhat -> UserPred -> TcS CtLoc
 -- Check that it's OK to use this insstance:
 --    (a) the use is well staged in the Template Haskell sense
 --    (b) we have not recursed too deep
 -- Returns the CtLoc to used for sub-goals
 checkInstanceOK loc what pred
   = do { checkWellStagedDFun loc what pred
-       ; checkReductionDepth deeper_loc pred
+       ; checkReductionDepth deeper_loc (userPredType pred)
        ; return deeper_loc }
   where
      deeper_loc = zap_origin (bumpCtLocDepth loc)
@@ -2456,7 +2456,7 @@ matchClassInst dflags inerts clas tys loc
 -- ee Note [Instance and Given overlap]
   | not (xopt LangExt.IncoherentInstances dflags)
   , not (naturallyCoherentClass clas)
-  , let matchable_givens = matchableGivens loc pred inerts
+  , let matchable_givens = matchableGivens loc (fromUserPred pred) inerts
   , not (isEmptyBag matchable_givens)
   = do { traceTcS "Delaying instance application" $
            vcat [ text "Work item=" <+> pprClassPred clas tys
@@ -2649,7 +2649,7 @@ those instances to build evidence to pass to f. That's just the
 nullary case of what's happening here.
 -}
 
-matchLocalInst :: TcPredType -> CtLoc -> TcS ClsInstResult
+matchLocalInst :: UserPred -> CtLoc -> TcS ClsInstResult
 -- Look up the predicate in Given quantified constraints,
 -- which are effectively just local instance declarations.
 matchLocalInst pred loc
@@ -2660,12 +2660,12 @@ matchLocalInst pred loc
              | not unifs
              -> do { let dfun_id = ctEvEvId dfun_ev
                    ; (tys, theta) <- instDFunType dfun_id inst_tys
-                   ; return $ OneInst { cir_new_theta = theta
+                   ; return $ OneInst { cir_new_theta = fromUserPreds theta
                                       , cir_mk_ev     = evDFunApp dfun_id tys
                                       , cir_what      = LocalInstance } }
            _ -> return NotSure }
   where
-    pred_tv_set = tyCoVarsOfType pred
+    pred_tv_set = tyCoVarsOfUserPred pred
 
     match_local_inst :: [QCInst]
                      -> ( [(CtEvidence, [DFunInstType])]
@@ -2677,17 +2677,18 @@ matchLocalInst pred loc
                      : qcis)
       | let in_scope = mkInScopeSet (qtv_set `unionVarSet` pred_tv_set)
       , Just tv_subst <- ruleMatchTyKiX qtv_set (mkRnEnv2 in_scope)
-                                        emptyTvSubstEnv qpred pred
+                           emptyTvSubstEnv (userPredType qpred) (userPredType pred)
       , let match = (ev, map (lookupVarEnv tv_subst) qtvs)
       = (match:matches, unif)
 
       | otherwise
-      = ASSERT2( disjointVarSet qtv_set (tyCoVarsOfType pred)
+      = ASSERT2( disjointVarSet qtv_set (tyCoVarsOfUserPred pred)
                , ppr qci $$ ppr pred )
             -- ASSERT: unification relies on the
             -- quantified variables being fresh
         (matches, unif || this_unif)
       where
         qtv_set = mkVarSet qtvs
-        this_unif = mightMatchLater qpred (ctEvLoc ev) pred loc
+        this_unif = mightMatchLater (fromUserPred qpred) (ctEvLoc ev)
+                                    (fromUserPred pred) loc
         (matches, unif) = match_local_inst qcis

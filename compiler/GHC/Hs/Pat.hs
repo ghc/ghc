@@ -183,7 +183,7 @@ data Pat p
 
         pat_tvs   :: [TyVar],           -- Existentially bound type variables
                                         -- in correctly-scoped order e.g. [k:*, x:k]
-        pat_dicts :: [EvVar],           -- Ditto *coercion variables* and *dictionaries*
+        pat_dicts :: [EvCoVarBinder],   -- Ditto *coercion variables* and *dictionaries*
                                         -- One reason for putting coercion variable here, I think,
                                         --      is to ensure their kinds are zonked
 
@@ -555,7 +555,7 @@ pprPat (ConPatOut { pat_con = con
        -- and we want to make sure it prints nicely
     if gopt Opt_PrintTypecheckerElaboration dflags then
         ppr con
-          <> braces (sep [ hsep (map pprPatBndr (tvs ++ dicts))
+          <> braces (sep [ hsep (map pprPatBndr tvs ++ map ppr dicts)
                          , pprIfTc @p $ ppr binds ])
           <+> pprConArgs details
     else pprUserCon (unLoc con) details
@@ -803,13 +803,13 @@ parenthesizePat p lpat@(L loc pat)
 -}
 
 -- May need to add more cases
-collectEvVarsPats :: [Pat GhcTc] -> Bag EvVar
+collectEvVarsPats :: [Pat GhcTc] -> Bag EvCoVarBinder
 collectEvVarsPats = unionManyBags . map collectEvVarsPat
 
-collectEvVarsLPat :: LPat GhcTc -> Bag EvVar
+collectEvVarsLPat :: LPat GhcTc -> Bag EvCoVarBinder
 collectEvVarsLPat = collectEvVarsPat . unLoc
 
-collectEvVarsPat :: Pat GhcTc -> Bag EvVar
+collectEvVarsPat :: Pat GhcTc -> Bag EvCoVarBinder
 collectEvVarsPat pat =
   case pat of
     LazyPat _ p      -> collectEvVarsLPat p

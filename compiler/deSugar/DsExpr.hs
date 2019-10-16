@@ -54,6 +54,7 @@ import Module
 import ConLike
 import DataCon
 import TyCoPpr( pprWithTYPE )
+import Predicate
 import TysWiredIn
 import PrelNames
 import BasicTypes
@@ -647,8 +648,10 @@ ds_expr _ expr@(RecordUpd { rupd_expr = record_expr, rupd_flds = fields
                  out_subst = zipTvSubst univ_tvs out_inst_tys
 
                 -- I'm not bothering to clone the ex_tvs
-           ; eqs_vars   <- mapM newPredVarDs (substTheta in_subst (eqSpecPreds eq_spec))
-           ; theta_vars <- mapM newPredVarDs (substTheta in_subst prov_theta)
+           ; eqs_vars   <- mapM (newPredVarDs . fromEqPred)
+                                (map (substEqPred in_subst) (eqSpecPreds eq_spec))
+           ; theta_vars <- mapM (newPredVarDs . fromUserPred)
+                                (substTheta       in_subst prov_theta)
            ; arg_ids    <- newSysLocalsDs (substTysUnchecked in_subst arg_tys)
            ; let field_labels = conLikeFieldLabels con
                  val_args = zipWithEqual "dsExpr:RecordUpd" mk_val_arg
@@ -658,7 +661,7 @@ ds_expr _ expr@(RecordUpd { rupd_expr = record_expr, rupd_flds = fields
 
                  inst_con = noLoc $ mkHsWrap wrap (HsConLikeOut noExtField con)
                         -- Reconstruct with the WrapId so that unpacking happens
-                 wrap = mkWpEvVarApps theta_vars                                <.>
+                 wrap = mkWpEvVarApps (evbsVars theta_vars)                     <.>
                         dict_req_wrap                                           <.>
                         mkWpTyApps    [ lookupTyVar out_subst tv
                                           `orElse` mkTyVarTy tv
@@ -692,7 +695,7 @@ ds_expr _ expr@(RecordUpd { rupd_expr = record_expr, rupd_flds = fields
                     PatSynCon _ -> rhs
 
                  wrap_subst =
-                  mkVarEnv [ (tv, mkTcSymCo (mkTcCoVarCo eq_var))
+                  mkVarEnv [ (tv, mkTcSymCo (mkTcCoVarCo (evbVar eq_var)))
                            | (spec, eq_var) <- eq_spec `zip` eqs_vars
                            , let tv = eqSpecTyVar spec ]
 

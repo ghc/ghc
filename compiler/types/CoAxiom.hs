@@ -24,6 +24,7 @@ module CoAxiom (
        placeHolderIncomps,
 
        Role(..), fsFromRole,
+       EqRel(..), eqRelRole, roleEqRel, roleEqRel_maybe,
 
        CoAxiomRule(..), TypeEqn,
        BuiltInSynFamily(..), trivialBuiltInFamily
@@ -503,6 +504,31 @@ instance Binary Role where
                           2 -> return Representational
                           3 -> return Phantom
                           _ -> panic ("get Role " ++ show tag)
+
+-- | A choice of equality relation. This is separate from the type 'Role'
+-- because 'Phantom' does not define a (non-trivial) equality relation.
+data EqRel = NomEq | ReprEq
+  deriving (Eq, Ord, Data.Data)
+
+instance Outputable EqRel where
+  ppr NomEq  = text "nominal equality"
+  ppr ReprEq = text "representational equality"
+
+eqRelRole :: EqRel -> Role
+eqRelRole NomEq  = Nominal
+eqRelRole ReprEq = Representational
+
+roleEqRel_maybe :: Role -> Maybe EqRel
+roleEqRel_maybe Nominal          = Just NomEq
+roleEqRel_maybe Representational = Just ReprEq
+roleEqRel_maybe Phantom          = Nothing
+
+roleEqRel :: HasDebugCallStack => String -> Role -> EqRel
+roleEqRel err role
+  | Just eq_rel <- roleEqRel_maybe role
+  = eq_rel
+  | otherwise
+  = panic ("roleEqRel " ++ err)
 
 {-
 ************************************************************************

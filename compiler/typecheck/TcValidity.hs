@@ -46,7 +46,7 @@ import Predicate
 import TcOrigin
 
 -- others:
-import GHC.Iface.Type   ( pprIfaceType, pprIfaceTypeApp )
+import GHC.Iface.Type   ( pprIfaceType, pprIfaceTypeApp, pprIfaceContext )
 import GHC.CoreToIface  ( toIfaceTyCon, toIfaceTcArgs, toIfaceType )
 import GHC.Hs           -- HsType
 import TcRnMonad        -- TcType, amongst others
@@ -418,7 +418,8 @@ checkTySynRhs ctxt ty
          then  when (tcIsConstraintKind actual_kind)
                     (do { dflags <- getDynFlags
                         ; expand <- initialExpandMode
-                        ; check_pred_ty emptyTidyEnv dflags ctxt expand ty })
+                        ; check_user_pred emptyTidyEnv dflags ctxt expand
+                                          (classifyUserPredType ty) })
          else addErrTcM (constraintSynErr emptyTidyEnv actual_kind) }
 
   | otherwise
@@ -886,7 +887,7 @@ forAllTyErr env rank ty
 
 -- | Reject type variables that would escape their escape through a kind.
 -- See @Note [Type variables escaping through kinds]@.
-checkEscapingKind :: TidyEnv -> [TyVarBinder] -> ThetaType -> Type -> TcM ()
+checkEscapingKind :: TidyEnv -> [TyVarBinder] -> [UserPred] -> Type -> TcM ()
 checkEscapingKind env tvbs theta tau =
   case occCheckExpand (binderVars tvbs) phi_kind of
     -- Ensure that none of the tvs occur in the kind of the forall
@@ -900,7 +901,7 @@ checkEscapingKind env tvbs theta tau =
              | otherwise  = liftedTypeKind
         -- If there are any constraints, the kind is *. (#11405)
 
-forAllEscapeErr :: TidyEnv -> [TyVarBinder] -> ThetaType -> Type -> Kind
+forAllEscapeErr :: TidyEnv -> [TyVarBinder] -> [UserPred] -> Type -> Kind
                 -> (TidyEnv, SDoc)
 forAllEscapeErr env tvbs theta tau tau_kind
   = ( env
@@ -937,14 +938,14 @@ ubxArgTyErr env ty
                       , ppr_tidy env ty ]
                 , text "Perhaps you intended to use UnboxedTuples" ] )
 
-checkConstraintsOK :: ValidityEnv -> ThetaType -> Type -> TcM ()
+checkConstraintsOK :: ValidityEnv -> [UserPred] -> Type -> TcM ()
 checkConstraintsOK ve theta ty
   | null theta                         = return ()
   | allConstraintsAllowed (ve_ctxt ve) = return ()
   | otherwise
   = -- We are in a kind, where we allow only equality predicates
     -- See Note [Constraints in kinds] in TyCoRep, and #16263
-    checkTcM (all isEqPred theta) $
+    checkTcM (all isLiftedEqPred theta) $
     constraintTyErr (ve_tidy_env ve) ty
 
 constraintTyErr :: TidyEnv -> Type -> (TidyEnv, SDoc)
@@ -1034,17 +1035,17 @@ in e.  For example, a constraint Foo [Int] might come out of e, and
 applying the instance decl would show up two uses of ?x.  #8912.
 -}
 
-checkValidTheta :: UserTypeCtxt -> ThetaType -> TcM ()
+checkValidTheta :: UserTypeCtxt -> [UserPred] -> TcM ()
 -- Assumes argument is fully zonked
 checkValidTheta ctxt theta
   = addErrCtxtM (checkThetaCtxt ctxt theta) $
-    do { env <- tcInitOpenTidyEnv (tyCoVarsOfTypesList theta)
+    do { env <- tcInitOpenTidyEnv (tyCoVarsOfUserPredsList theta)
        ; expand <- initialExpandMode
        ; check_valid_theta env ctxt expand theta }
 
 -------------------------
 check_valid_theta :: TidyEnv -> UserTypeCtxt -> ExpandMode
-                  -> [PredType] -> TcM ()
+                  -> [UserPred] -> TcM ()
 check_valid_theta _ _ _ []
   = return ()
 check_valid_theta env ctxt expand theta
@@ -1053,10 +1054,10 @@ check_valid_theta env ctxt expand theta
                  (wopt Opt_WarnDuplicateConstraints dflags && notNull dups)
                  (dupPredWarn env dups)
        ; traceTc "check_valid_theta" (ppr theta)
-       ; mapM_ (check_pred_ty env dflags ctxt expand) theta }
+       ; mapM_ (check_user_pred env dflags ctxt expand) theta }
   where
-    (_,dups) = removeDups nonDetCmpType theta
-    -- It's OK to use nonDetCmpType because dups only appears in the
+    (_,dups) = removeDups nonDetCmpUserPred theta
+    -- It's OK to use nonDetCmpUserPred because dups only appears in the
     -- warning
 
 -------------------------
@@ -1084,13 +1085,13 @@ to avoid requiring language extensions at the use site.  Main example
 We don't want to require ConstraintKinds in module B.
 -}
 
-check_pred_ty :: TidyEnv -> DynFlags -> UserTypeCtxt -> ExpandMode
-              -> PredType -> TcM ()
+check_user_pred :: TidyEnv -> DynFlags -> UserTypeCtxt -> ExpandMode
+                -> UserPred -> TcM ()
 -- Check the validity of a predicate in a signature
 -- See Note [Validity checking for constraints]
-check_pred_ty env dflags ctxt expand pred
-  = do { check_type ve pred
-       ; check_pred_help False env dflags ctxt pred }
+check_user_pred env dflags ctxt expand pred
+  = do { check_type ve (userPredType pred)
+       ; check_pred_help env dflags ctxt pred }
   where
     rank | xopt LangExt.QuantifiedConstraints dflags
          = ArbitraryRank
@@ -1103,35 +1104,18 @@ check_pred_ty env dflags ctxt expand pred
                     , ve_rank     = rank
                     , ve_expand   = expand }
 
-check_pred_help :: Bool    -- True <=> under a type synonym
-                -> TidyEnv
+check_pred_help :: TidyEnv
                 -> DynFlags -> UserTypeCtxt
-                -> PredType -> TcM ()
-check_pred_help under_syn env dflags ctxt pred
-  | Just pred' <- tcView pred  -- Switch on under_syn when going under a
-                                 -- synonym (#9838, yuk)
-  = check_pred_help True env dflags ctxt pred'
+                -> UserPred -> TcM ()
+check_pred_help env dflags ctxt pred@(ClassPred cls tys)
+  | isCTupleClass cls = check_tuple_pred env dflags ctxt pred tys
+  | otherwise         = check_class_pred env dflags ctxt pred cls tys
+check_pred_help env dflags ctxt pred@(ForAllPred _ theta head)
+  = check_quant_pred env dflags ctxt pred theta head
+check_pred_help env dflags ctxt (IrredPred pred_ty)
+  = check_irred_pred env dflags ctxt pred_ty
 
-  | otherwise  -- A bit like classifyPredType, but not the same
-               -- E.g. we treat (~) like (~#); and we look inside tuples
-  = case classifyPredType pred of
-      ClassPred cls tys
-        | isCTupleClass cls   -> check_tuple_pred under_syn env dflags ctxt pred tys
-        | otherwise           -> check_class_pred env dflags ctxt pred cls tys
-
-      EqPred _ _ _      -> pprPanic "check_pred_help" (ppr pred)
-              -- EqPreds, such as (t1 ~ #t2) or (t1 ~R# t2), don't even have kind Constraint
-              -- and should never appear before the '=>' of a type.  Thus
-              --     f :: (a ~# b) => blah
-              -- is wrong.  For user written signatures, it'll be rejected by kind-checking
-              -- well before we get to validity checking.  For inferred types we are careful
-              -- to box such constraints in TcType.pickQuantifiablePreds, as described
-              -- in Note [Lift equality constraints when quantifying] in TcType
-
-      ForAllPred _ theta head -> check_quant_pred env dflags ctxt pred theta head
-      IrredPred {}            -> check_irred_pred under_syn env dflags ctxt pred
-
-check_eq_pred :: TidyEnv -> DynFlags -> PredType -> TcM ()
+check_eq_pred :: TidyEnv -> DynFlags -> UserPred -> TcM ()
 check_eq_pred env dflags pred
   =         -- Equational constraints are valid in all contexts if type
             -- families are permitted
@@ -1140,55 +1124,57 @@ check_eq_pred env dflags pred
              (eqPredTyErr env pred)
 
 check_quant_pred :: TidyEnv -> DynFlags -> UserTypeCtxt
-                 -> PredType -> ThetaType -> PredType -> TcM ()
+                 -> UserPred -> [UserPred] -> UserPred -> TcM ()
 check_quant_pred env dflags ctxt pred theta head_pred
   = addErrCtxt (text "In the quantified constraint" <+> quotes (ppr pred)) $
     do { -- Check the instance head
-         case classifyPredType head_pred of
+         case head_pred of
+            ClassPred cls tys -> do { checkValidInstHead SigmaCtxt cls tys
                                  -- SigmaCtxt tells checkValidInstHead that
                                  -- this is the head of a quantified constraint
-            ClassPred cls tys -> do { checkValidInstHead SigmaCtxt cls tys
-                                    ; check_pred_help False env dflags ctxt head_pred }
+                                    ; check_pred_help env dflags ctxt head_pred }
                                -- need check_pred_help to do extra pred-only validity
                                -- checks, such as for (~). Otherwise, we get #17563
                                -- NB: checks for the context are covered by the check_type
                                -- in check_pred_ty
-            IrredPred {}      | hasTyVarHead head_pred
-                              -> return ()
-            _                 -> failWithTcM (badQuantHeadErr env pred)
+            IrredPred head_pred_ty
+              | hasTyVarHead head_pred_ty
+              -> return ()
+
+            _ -> failWithTcM (badQuantHeadErr env pred)
 
          -- Check for termination
        ; unless (xopt LangExt.UndecidableInstances dflags) $
          checkInstTermination theta head_pred
     }
 
-check_tuple_pred :: Bool -> TidyEnv -> DynFlags -> UserTypeCtxt -> PredType -> [PredType] -> TcM ()
-check_tuple_pred under_syn env dflags ctxt pred ts
+check_tuple_pred :: TidyEnv -> DynFlags -> UserTypeCtxt -> UserPred -> [PredType] -> TcM ()
+check_tuple_pred env dflags ctxt pred ts
   = do { -- See Note [ConstraintKinds in predicates]
-         checkTcM (under_syn || xopt LangExt.ConstraintKinds dflags)
+         checkTcM (xopt LangExt.ConstraintKinds dflags)
                   (predTupleErr env pred)
-       ; mapM_ (check_pred_help under_syn env dflags ctxt) ts }
+       ; mapM_ (check_pred_help env dflags ctxt) (map classifyUserPredType ts) }
     -- This case will not normally be executed because without
     -- -XConstraintKinds tuple types are only kind-checked as *
 
-check_irred_pred :: Bool -> TidyEnv -> DynFlags -> UserTypeCtxt -> PredType -> TcM ()
-check_irred_pred under_syn env dflags ctxt pred
+check_irred_pred :: TidyEnv -> DynFlags -> UserTypeCtxt -> PredType -> TcM ()
+check_irred_pred env dflags ctxt pred_ty
     -- The predicate looks like (X t1 t2) or (x t1 t2) :: Constraint
     -- where X is a type function
   = do { -- If it looks like (x t1 t2), require ConstraintKinds
          --   see Note [ConstraintKinds in predicates]
          -- But (X t1 t2) is always ok because we just require ConstraintKinds
          -- at the definition site (#9838)
-        failIfTcM (not under_syn && not (xopt LangExt.ConstraintKinds dflags)
-                                && hasTyVarHead pred)
-                  (predIrredErr env pred)
+        failIfTcM (not (xopt LangExt.ConstraintKinds dflags)
+                                && hasTyVarHead pred_ty)
+                  (predIrredErr env pred_ty)
 
          -- Make sure it is OK to have an irred pred in this context
          -- See Note [Irreducible predicates in superclasses]
        ; failIfTcM (is_superclass ctxt
                     && not (xopt LangExt.UndecidableInstances dflags)
-                    && has_tyfun_head pred)
-                   (predSuperClassErr env pred) }
+                    && has_tyfun_head pred_ty)
+                   (predSuperClassErr env pred_ty) }
   where
     is_superclass ctxt = case ctxt of { ClassSCCtxt _ -> True; _ -> False }
     has_tyfun_head ty
@@ -1221,7 +1207,7 @@ solved to add+canonicalise another (Foo a) constraint.  -}
 
 -------------------------
 check_class_pred :: TidyEnv -> DynFlags -> UserTypeCtxt
-                 -> PredType -> Class -> [TcType] -> TcM ()
+                 -> UserPred -> Class -> [TcType] -> TcM ()
 check_class_pred env dflags ctxt pred cls tys
   | isEqPredClass cls    -- (~) and (~~) are classified as classes,
                          -- but here we want to treat them as equalities
@@ -1278,7 +1264,7 @@ checkSimplifiableClassConstraint env dflags ctxt cls tys
 
     simplifiable_constraint_warn :: InstanceWhat -> SDoc
     simplifiable_constraint_warn what
-     = vcat [ hang (text "The constraint" <+> quotes (ppr (tidyType env pred))
+     = vcat [ hang (text "The constraint" <+> quotes (ppr (tidyUserPred env pred))
                     <+> text "matches")
                  2 (ppr what)
             , hang (text "This makes type inference for inner bindings fragile;")
@@ -1373,26 +1359,30 @@ Flexibility check:
   generalized actually.
 -}
 
-checkThetaCtxt :: UserTypeCtxt -> ThetaType -> TidyEnv -> TcM (TidyEnv, SDoc)
+checkThetaCtxt :: UserTypeCtxt -> [UserPred] -> TidyEnv -> TcM (TidyEnv, SDoc)
 checkThetaCtxt ctxt theta env
   = return ( env
-           , vcat [ text "In the context:" <+> pprTheta (tidyTypes env theta)
+           , vcat [ text "In the context:" <+> ppr_theta
                   , text "While checking" <+> pprUserTypeCtxt ctxt ] )
+  where
+    -- inline pprTheta in order to pass a custom TidyEnv
+    ppr_theta = pprIfaceContext topPrec (map (tidyToIfaceTypeX env . userPredType) theta)
 
-eqPredTyErr, predTupleErr, predIrredErr,
-   predSuperClassErr, badQuantHeadErr :: TidyEnv -> PredType -> (TidyEnv, SDoc)
+eqPredTyErr, predTupleErr, badQuantHeadErr :: TidyEnv -> UserPred -> (TidyEnv, SDoc)
 badQuantHeadErr env pred
   = ( env
     , hang (text "Quantified predicate must have a class or type variable head:")
-         2 (ppr_tidy env pred) )
+         2 (ppr_tidy_user_pred env pred) )
 eqPredTyErr  env pred
   = ( env
-    , text "Illegal equational constraint" <+> ppr_tidy env pred $$
+    , text "Illegal equational constraint" <+> ppr_tidy_user_pred env pred $$
       parens (text "Use GADTs or TypeFamilies to permit this") )
 predTupleErr env pred
   = ( env
-    , hang (text "Illegal tuple constraint:" <+> ppr_tidy env pred)
+    , hang (text "Illegal tuple constraint:" <+> ppr_tidy_user_pred env pred)
          2 (parens constraintKindsMsg) )
+
+predIrredErr, predSuperClassErr :: TidyEnv -> PredType -> (TidyEnv, SDoc)
 predIrredErr env pred
   = ( env
     , hang (text "Illegal constraint:" <+> ppr_tidy env pred)
@@ -1403,17 +1393,17 @@ predSuperClassErr env pred
             <+> text "in a superclass context")
          2 (parens undecidableMsg) )
 
-predTyVarErr :: TidyEnv -> PredType -> (TidyEnv, SDoc)
+predTyVarErr :: TidyEnv -> UserPred -> (TidyEnv, SDoc)
 predTyVarErr env pred
   = (env
     , vcat [ hang (text "Non type-variable argument")
-                2 (text "in the constraint:" <+> ppr_tidy env pred)
+                2 (text "in the constraint:" <+> ppr_tidy_user_pred env pred)
            , parens (text "Use FlexibleContexts to permit this") ])
 
-badIPPred :: TidyEnv -> PredType -> (TidyEnv, SDoc)
+badIPPred :: TidyEnv -> UserPred -> (TidyEnv, SDoc)
 badIPPred env pred
   = ( env
-    , text "Illegal implicit parameter" <+> quotes (ppr_tidy env pred) )
+    , text "Illegal implicit parameter" <+> quotes (ppr_tidy_user_pred env pred) )
 
 constraintSynErr :: TidyEnv -> Type -> (TidyEnv, SDoc)
 constraintSynErr env kind
@@ -1421,11 +1411,11 @@ constraintSynErr env kind
     , hang (text "Illegal constraint synonym of kind:" <+> quotes (ppr_tidy env kind))
          2 (parens constraintKindsMsg) )
 
-dupPredWarn :: TidyEnv -> [NE.NonEmpty PredType] -> (TidyEnv, SDoc)
+dupPredWarn :: TidyEnv -> [NE.NonEmpty UserPred] -> (TidyEnv, SDoc)
 dupPredWarn env dups
   = ( env
     , text "Duplicate constraint" <> plural primaryDups <> text ":"
-      <+> pprWithCommas (ppr_tidy env) primaryDups )
+      <+> pprWithCommas (ppr_tidy_user_pred env) primaryDups )
   where
     primaryDups = map NE.head dups
 
@@ -1774,24 +1764,29 @@ instances only in the defining module.
 
 -}
 
-validDerivPred :: TyVarSet -> PredType -> Bool
+validDerivPred :: TyVarSet -> Pred -> Maybe UserPred
 -- See Note [Valid 'deriving' predicate]
-validDerivPred tv_set pred
-  = case classifyPredType pred of
-       ClassPred cls tys -> cls `hasKey` typeableClassKey
+validDerivPred _      (EqualityPred {}) = Nothing  -- reject equality constraints
+validDerivPred tv_set (UserPred pred@(ClassPred cls tys))
+  | cls `hasKey` typeableClassKey
                 -- Typeable constraints are bigger than they appear due
                 -- to kind polymorphism, but that's OK
-                       || check_tys cls tys
-       EqPred {}       -> False  -- reject equality constraints
-       _               -> True   -- Non-class predicates are ok
+  || check_tys cls tys
+  = Just pred
+
+  | otherwise
+  = Nothing
   where
     check_tys cls tys
               = hasNoDups fvs
                    -- use sizePred to ignore implicit args
-                && lengthIs fvs (sizePred pred)
+                && lengthIs fvs (sizeUserPred pred)
                 && all (`elemVarSet` tv_set) fvs
       where tys' = filterOutInvisibleTypes (classTyCon cls) tys
             fvs  = fvTypes tys'
+
+validDerivPred _ (UserPred u_pred) = Just u_pred   -- Non-class predicates are ok
+
 
 {-
 ************************************************************************
@@ -1825,19 +1820,11 @@ synonyms, by matching on TyConApp directly.
 
 checkValidInstance :: UserTypeCtxt -> LHsSigType GhcRn -> Type -> TcM ()
 checkValidInstance ctxt hs_type ty
-  | not is_tc_app
-  = failWithTc (hang (text "Instance head is not headed by a class:")
-                   2 ( ppr tau))
+  | ClassPred clas inst_tys <- head_pred
+  = do  { unless (inst_tys `lengthIs` classArity clas) $
+          failWithTc (text "Arity mis-match in instance head")
 
-  | isNothing mb_cls
-  = failWithTc (vcat [ text "Illegal instance for a" <+> ppr (tyConFlavour tc)
-                     , text "A class instance must be for a class" ])
-
-  | not arity_ok
-  = failWithTc (text "Arity mis-match in instance head")
-
-  | otherwise
-  = do  { setSrcSpan head_loc $
+        ; setSrcSpan head_loc $
           checkValidInstHead ctxt clas inst_tys
 
         ; traceTc "checkValidInstance {" (ppr ty)
@@ -1859,9 +1846,9 @@ checkValidInstance ctxt hs_type ty
         ; undecidable_ok <- xoptM LangExt.UndecidableInstances
         ; if undecidable_ok
           then checkAmbiguity ctxt ty
-          else checkInstTermination theta tau
+          else checkInstTermination theta head_pred
 
-        ; traceTc "cvi 2" (ppr ty)
+        ; traceTc "checkValidInstance 2" (ppr ty)
 
         ; case (checkInstCoverage undecidable_ok clas theta inst_tys) of
             IsValid      -> return ()   -- Check succeeded
@@ -1870,13 +1857,13 @@ checkValidInstance ctxt hs_type ty
         ; traceTc "End checkValidInstance }" empty
 
         ; return () }
+
+  | otherwise
+  = failWithTc (hang (text "Instance head is not headed by a class:")
+                   2 (ppr head_pred))
+
   where
-    (_tvs, theta, tau)   = tcSplitSigmaTy ty
-    is_tc_app            = case tau of { TyConApp {} -> True; _ -> False }
-    TyConApp tc inst_tys = tau   -- See Note [Instances and constraint synonyms]
-    mb_cls               = tyConClass_maybe tc
-    Just clas            = mb_cls
-    arity_ok             = inst_tys `lengthIs` classArity clas
+    (_tvs, theta, classifyUserPredType -> head_pred) = tcSplitSigmaTy ty
 
         -- The location of the "head" of the instance
     head_loc = getLoc (getLHsInstDeclHead hs_type)
@@ -1901,49 +1888,48 @@ The underlying idea is that
     context has fewer type constructors than the head.
 -}
 
-checkInstTermination :: ThetaType -> TcPredType -> TcM ()
+checkInstTermination :: [UserPred] -> UserPred -> TcM ()
 -- See Note [Paterson conditions]
 checkInstTermination theta head_pred
   = check_preds emptyVarSet theta
   where
-   head_fvs  = fvType head_pred
-   head_size = sizeType head_pred
+   head_fvs  = fvUserPred head_pred
+   head_size = sizeUserPred head_pred
 
-   check_preds :: VarSet -> [PredType] -> TcM ()
+   check_preds :: VarSet -> [UserPred] -> TcM ()
    check_preds foralld_tvs preds = mapM_ (check foralld_tvs) preds
 
-   check :: VarSet -> PredType -> TcM ()
-   check foralld_tvs pred
-     = case classifyPredType pred of
-         EqPred {}    -> return ()  -- See #4200.
-         IrredPred {} -> check2 foralld_tvs pred (sizeType pred)
-         ClassPred cls tys
-           | isTerminatingClass cls
-           -> return ()
+   check :: VarSet -> UserPred -> TcM ()
+   check foralld_tvs pred@(IrredPred {}) = check2 foralld_tvs pred (sizeUserPred pred)
+   check foralld_tvs pred@(ClassPred cls tys)
+     | isTerminatingClass cls
+     = return ()
 
-           | isCTupleClass cls  -- Look inside tuple predicates; #8359
-           -> check_preds foralld_tvs tys
+     | isCTupleClass cls  -- Look inside tuple predicates; #8359
+     = check_preds foralld_tvs (map classifyUserPredType tys)
 
-           | otherwise          -- Other ClassPreds
-           -> check2 foralld_tvs pred bogus_size
-           where
-              bogus_size = 1 + sizeTypes (filterOutInvisibleTypes (classTyCon cls) tys)
+     | otherwise          -- Other ClassPreds
+     = check2 foralld_tvs pred bogus_size
+
+     where
+       bogus_size = 1 + sizeTypes (filterOutInvisibleTypes (classTyCon cls) tys)
                                -- See Note [Invisible arguments and termination]
 
-         ForAllPred tvs _ head_pred'
-           -> check (foralld_tvs `extendVarSetList` binderVars tvs) head_pred'
+   check foralld_tvs (ForAllPred tvs _ head_pred')
+     = check (foralld_tvs `extendVarSetList` tvs) head_pred'
               -- Termination of the quantified predicate itself is checked
               -- when the predicates are individually checked for validity
 
+   check2 :: VarSet -> UserPred -> Int -> TcM ()
    check2 foralld_tvs pred pred_size
-     | not (null bad_tvs)     = failWithTc (noMoreMsg bad_tvs what (ppr head_pred))
-     | not (isTyFamFree pred) = failWithTc (nestedMsg what)
-     | pred_size >= head_size = failWithTc (smallerMsg what (ppr head_pred))
-     | otherwise              = return ()
+     | not (null bad_tvs)             = failWithTc (noMoreMsg bad_tvs what (ppr head_pred))
+     | not (isTyFamFreeUserPred pred) = failWithTc (nestedMsg what)
+     | pred_size >= head_size         = failWithTc (smallerMsg what (ppr head_pred))
+     | otherwise                      = return ()
      -- isTyFamFree: see Note [Type families in instance contexts]
      where
         what    = text "constraint" <+> quotes (ppr pred)
-        bad_tvs = filterOut (`elemVarSet` foralld_tvs) (fvType pred)
+        bad_tvs = filterOut (`elemVarSet` foralld_tvs) (fvUserPred pred)
                   \\ head_fvs
 
 smallerMsg :: SDoc -> SDoc -> SDoc
@@ -2840,6 +2826,9 @@ fvType (CoercionTy {})       = []
 fvTypes :: [Type] -> [TyVar]
 fvTypes tys                = concat (map fvType tys)
 
+fvUserPred :: UserPred -> [TyVar]
+fvUserPred = fvType . userPredType
+
 sizeType :: Type -> Int
 -- Size of a type: the number of variables and constructors
 sizeType ty | Just exp_ty <- tcView ty = sizeType exp_ty
@@ -2865,19 +2854,16 @@ sizeTyConAppArgs _tc tys = sizeTypes tys -- (filterOutInvisibleTypes tc tys)
 -- Equality constraints and constraints for the implicit
 -- parameter class always terminate so it is safe to say "size 0".
 -- See #4200.
-sizePred :: PredType -> Int
-sizePred ty = goClass ty
+sizeUserPred :: UserPred -> Int
+sizeUserPred = go
   where
-    goClass p = go (classifyPredType p)
-
     go (ClassPred cls tys')
       | isTerminatingClass cls = 0
       | otherwise = sizeTypes (filterOutInvisibleTypes (classTyCon cls) tys')
                     -- The filtering looks bogus
                     -- See Note [Invisible arguments and termination]
-    go (EqPred {})           = 0
     go (IrredPred ty)        = sizeType ty
-    go (ForAllPred _ _ pred) = goClass pred
+    go (ForAllPred _ _ pred) = go pred
 
 -- | When this says "True", ignore this class constraint during
 -- a termination check
@@ -2893,6 +2879,9 @@ isTerminatingClass cls
 -- | Tidy before printing a type
 ppr_tidy :: TidyEnv -> Type -> SDoc
 ppr_tidy env ty = pprType (tidyType env ty)
+
+ppr_tidy_user_pred :: TidyEnv -> UserPred -> SDoc
+ppr_tidy_user_pred env pred = pprUserPred (tidyUserPred env pred)
 
 allDistinctTyVars :: TyVarSet -> [KindOrType] -> Bool
 -- (allDistinctTyVars tvs tys) returns True if tys are

@@ -93,6 +93,7 @@ import TyCon    ( TyCon, tyConKind )
 import PatSyn   ( PatSyn )
 import Id       ( idType, idName )
 import FieldLabel ( FieldLabel )
+import Predicate
 import TcType
 import Constraint
 import TcOrigin
@@ -1076,7 +1077,7 @@ data PromotionErr
   | FamDataConPE     -- Data constructor for a data family
                      -- See Note [AFamDataCon: not promoting data family constructors]
                      -- in TcEnv.
-  | ConstrainedDataConPE PredType
+  | ConstrainedDataConPE UserPred
                      -- Data constructor with a non-equality context
                      -- See Note [Don't promote data constructors with
                      --           non-equality contexts] in TcHsType
@@ -1523,7 +1524,7 @@ data TcIdSigInst
                --     for a CompleteSig, but for a PartialSig see
                --     Note [Quantified variables in partial type signatures]
 
-         , sig_inst_theta  :: TcThetaType
+         , sig_inst_theta  :: [UserPred]
                -- Instantiated theta.  In the case of a
                -- PartialSig, sig_theta does not include
                -- the extra-constraints wildcard
@@ -1600,9 +1601,9 @@ data TcPatSynInfo
                                                 -- implicitly-bound type vars (Specified)
           -- See Note [The pattern-synonym signature splitting rule] in TcPatSyn
         patsig_univ_bndrs     :: [TyVar],       -- Bound by explicit user forall
-        patsig_req            :: TcThetaType,
+        patsig_req            :: [UserPred],
         patsig_ex_bndrs       :: [TyVar],       -- Bound by explicit user forall
-        patsig_prov           :: TcThetaType,
+        patsig_prov           :: [UserPred],
         patsig_body_ty        :: TcSigmaType
     }
 

@@ -110,8 +110,8 @@ mkMetaWrappers q@(QuoteWrapper quote_var_raw m_var) = do
           -- the expected type
           tyvars = dataConUserTyVarBinders (classDataCon cls)
           expected_ty = mkForAllTys tyvars $
-                          mkInvisFunTy (mkClassPred cls (mkTyVarTys (binderVars tyvars)))
-                                       (mkClassPred monad_cls (mkTyVarTys (binderVars tyvars)))
+                          mkInvisFunTy (mkClassPredTy cls (mkTyVarTys (binderVars tyvars)))
+                                       (mkClassPredTy monad_cls (mkTyVarTys (binderVars tyvars)))
 
       MASSERT2( idType monad_sel `eqType` expected_ty, ppr monad_sel $$ ppr expected_ty)
 

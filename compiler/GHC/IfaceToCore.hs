@@ -34,6 +34,7 @@ import BuildTyCl
 import TcRnMonad
 import TcType
 import Type
+import Predicate
 import Coercion
 import CoAxiom
 import TyCoRep    -- needs to build types & coercions in a knot
@@ -753,7 +754,7 @@ tc_iface_decl _parent ignore_prags
               ; buildClass tc_name binders' roles fds (Just (ctxt, ats, sigs, mindef)) }
     ; return (ATyCon (classTyCon cls)) }
   where
-   tc_sc pred = forkM (mk_sc_doc pred) (tcIfaceType pred)
+   tc_sc pred = forkM (mk_sc_doc pred) (tcIfaceUserPred pred)
         -- The *length* of the superclasses is used by buildClass, and hence must
         -- not be inside the thunk.  But the *content* maybe recursive and hence
         -- must be lazy (via forkM).  Example:
@@ -1195,8 +1196,21 @@ tcIfaceAppArgs :: IfaceAppArgs -> IfL [Type]
 tcIfaceAppArgs = mapM tcIfaceType . appArgsIfaceTypes
 
 -----------------------------------------
-tcIfaceCtxt :: IfaceContext -> IfL ThetaType
-tcIfaceCtxt sts = mapM tcIfaceType sts
+tcIfaceCtxt :: IfaceContext -> IfL [UserPred]
+tcIfaceCtxt sts = mapM tcIfaceUserPred sts
+
+tcIfaceUserPred :: IfaceUserPred -> IfL UserPred
+tcIfaceUserPred (IfaceClassPred cls_tc args)
+  = do { cls_tc' <- tcIfaceTyCon cls_tc
+       ; tks' <- mapM tcIfaceType (appArgsIfaceTypes args)
+       ; pure (ClassPred (expectJust "tcIfaceUserPred" (tyConClass_maybe cls_tc')) tks') }
+tcIfaceUserPred (IfaceIrredPred pred_ty)
+  = IrredPred <$> tcIfaceType pred_ty
+tcIfaceUserPred (IfaceForAllPred tvs ctxt pred)
+  = bindIfaceTyVars tvs $ \tvs' ->
+    do { ctxt' <- tcIfaceCtxt ctxt
+       ; pred' <- tcIfaceUserPred pred
+       ; pure (ForAllPred tvs' ctxt' pred') }
 
 -----------------------------------------
 tcIfaceTyLit :: IfaceTyLit -> IfL TyLit

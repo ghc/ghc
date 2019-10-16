@@ -55,6 +55,7 @@ module DsMonad (
 import GhcPrelude
 
 import TcRnMonad
+import TcEvidence
 import FamInstEnv
 import CoreSyn
 import MkCore    ( unitExpr )
@@ -69,6 +70,7 @@ import Bag
 import BasicTypes ( Origin )
 import DataCon
 import ConLike
+import Predicate
 import TyCon
 import GHC.HsToCore.PmCheck.Types
 import Id
@@ -348,9 +350,10 @@ duplicateLocalDs old_local
   = do  { uniq <- newUnique
         ; return (setIdUnique old_local uniq) }
 
-newPredVarDs :: PredType -> DsM Var
-newPredVarDs
- = mkSysLocalOrCoVarM (fsLit "ds")  -- like newSysLocalDs, but we allow covars
+newPredVarDs :: Pred -> DsM EvCoVarBinder
+newPredVarDs pred
+ = do { id <- mkSysLocalOrCoVarM (fsLit "ds") (predType pred)
+      ; return (mkEvCoVarBinder id pred) }
 
 newSysLocalDsNoLP, newSysLocalDs, newFailLocalDs :: Type -> DsM Id
 newSysLocalDsNoLP  = mk_local (fsLit "ds")

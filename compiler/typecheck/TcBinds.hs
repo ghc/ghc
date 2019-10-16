@@ -39,6 +39,8 @@ import FamInstEnv( normaliseType )
 import FamInst( tcGetFamInstEnvs )
 import TyCon
 import TcType
+import Class
+import Predicate
 import Type( mkStrLitTy, tidyOpenType, splitTyConApp_maybe, mkCastTy)
 import TysPrim
 import TysWiredIn( mkBoxedTupleTy )
@@ -345,13 +347,15 @@ tcLocalBinds (HsIPBinds x (IPBinds _ ip_binds)) thing_inside
         -- I wonder if we should do these one at a time
         -- Consider     ?x = 4
         --              ?y = ?x + 1
+    tc_ip_bind :: Class -> IPBind GhcRn -> TcM (EvVarBinder, IPBind GhcTc)
     tc_ip_bind ipClass (IPBind _ (Left (L _ ip)) expr)
        = do { ty <- newOpenFlexiTyVarTy
             ; let p = mkStrLitTy $ hsIPNameFS ip
             ; ip_id <- newDict ipClass [ p, ty ]
             ; expr' <- tcMonoExpr expr (mkCheckExpType ty)
             ; let d = toDict ipClass p ty `fmap` expr'
-            ; return (ip_id, (IPBind noExtField (Right ip_id) d)) }
+            ; return ( mkEvVarBinder ip_id (mkClassPred ipClass [p, ty])
+                     , (IPBind noExtField (Right ip_id) d) ) }
     tc_ip_bind _ (IPBind _ (Right {}) _) = panic "tc_ip_bind"
     tc_ip_bind _ (XIPBind nec) = noExtCon nec
 
@@ -693,7 +697,7 @@ tcPolyCheck prag_fn
                 -- See Note [Instantiate sig with fresh variables]
 
        ; mono_name <- newNameAt (nameOccName name) nm_loc
-       ; ev_vars   <- newEvVars theta
+       ; ev_vars   <- newEvVarBinders theta
        ; let mono_id   = mkLocalId mono_name tau
              skol_info = SigSkol ctxt (idType poly_id) tv_prs
              skol_tvs  = map snd tv_prs
@@ -799,9 +803,8 @@ tcPolyInfer rec_tc prag_fn tc_sig_fn mono bind_list
                  <- simplifyInfer tclvl infer_mode sigs name_taus wanted
        ; emitConstraints residual
 
-       ; let inferred_theta = map evVarPred givens
        ; exports <- checkNoErrs $
-                    mapM (mkExport prag_fn insoluble qtvs inferred_theta) mono_infos
+                    mapM (mkExport prag_fn insoluble qtvs (evbsPreds givens)) mono_infos
 
        ; loc <- getSrcSpanM
        ; let poly_ids = map abe_poly exports
@@ -820,7 +823,7 @@ tcPolyInfer rec_tc prag_fn tc_sig_fn mono bind_list
 mkExport :: TcPragEnv
          -> Bool                        -- True <=> there was an insoluble type error
                                         --          when typechecking the bindings
-         -> [TyVar] -> TcThetaType      -- Both already zonked
+         -> [TyVar] -> [UserPred]       -- Both already zonked
          -> MonoBindInfo
          -> TcM (ABExport GhcTc)
 -- Only called for generalisation plan InferGen, not by CheckGen or NoGen
@@ -879,7 +882,7 @@ mkExport prag_fn insoluble qtvs theta
 
 mkInferredPolyId :: Bool  -- True <=> there was an insoluble error when
                           --          checking the binding group for this Id
-                 -> [TyVar] -> TcThetaType
+                 -> [TyVar] -> [UserPred]
                  -> Name -> Maybe TcIdSigInst -> TcType
                  -> TcM TcId
 mkInferredPolyId insoluble qtvs inferred_theta poly_name mb_sig_inst mono_ty
@@ -921,14 +924,14 @@ mkInferredPolyId insoluble qtvs inferred_theta poly_name mb_sig_inst mono_ty
        ; return (mkLocalId poly_name inferred_poly_ty) }
 
 
-chooseInferredQuantifiers :: TcThetaType   -- inferred
+chooseInferredQuantifiers :: [UserPred]    -- inferred
                           -> TcTyVarSet    -- tvs free in tau type
                           -> [TcTyVar]     -- inferred quantified tvs
                           -> Maybe TcIdSigInst
-                          -> TcM ([TyVarBinder], TcThetaType)
+                          -> TcM ([TyVarBinder], [UserPred])
 chooseInferredQuantifiers inferred_theta tau_tvs qtvs Nothing
   = -- No type signature (partial or complete) for this binder,
-    do { let free_tvs = closeOverKinds (growThetaTyVars inferred_theta tau_tvs)
+    do { let free_tvs = closeOverKinds (growThetaTyVars (fromUserPreds inferred_theta) tau_tvs)
                         -- Include kind variables!  #7916
              my_theta = pickCapturedPreds free_tvs inferred_theta
              binders  = [ mkTyVarBinder Inferred tv
@@ -958,7 +961,7 @@ chooseInferredQuantifiers inferred_theta tau_tvs qtvs
 
        ; let psig_qtvs = mkVarSet (map snd psig_qtv_prs)
 
-       ; annotated_theta      <- zonkTcTypes annotated_theta
+       ; annotated_theta      <- mapM zonkUserPred annotated_theta
        ; (free_tvs, my_theta) <- choose_psig_context psig_qtvs annotated_theta wcx
 
        ; let keep_me    = free_tvs `unionVarSet` psig_qtvs
@@ -988,19 +991,19 @@ chooseInferredQuantifiers inferred_theta tau_tvs qtvs
       | otherwise -- Can't happen; by now we know it's a partial sig
       = pprPanic "report_mono_sig_tv_err" (ppr sig)
 
-    choose_psig_context :: VarSet -> TcThetaType -> Maybe TcType
-                        -> TcM (VarSet, TcThetaType)
+    choose_psig_context :: VarSet -> [UserPred] -> Maybe TcType
+                        -> TcM (VarSet, [UserPred])
     choose_psig_context _ annotated_theta Nothing
-      = do { let free_tvs = closeOverKinds (tyCoVarsOfTypes annotated_theta
+      = do { let free_tvs = closeOverKinds (tyCoVarsOfUserPreds annotated_theta
                                             `unionVarSet` tau_tvs)
            ; return (free_tvs, annotated_theta) }
 
     choose_psig_context psig_qtvs annotated_theta (Just wc_var_ty)
-      = do { let free_tvs = closeOverKinds (growThetaTyVars inferred_theta seed_tvs)
+      = do { let free_tvs = closeOverKinds (growThetaTyVars (fromUserPreds inferred_theta) seed_tvs)
                             -- growThetaVars just like the no-type-sig case
                             -- Omitting this caused #12844
-                 seed_tvs = tyCoVarsOfTypes annotated_theta  -- These are put there
-                            `unionVarSet` tau_tvs            --       by the user
+                 seed_tvs = tyCoVarsOfUserPreds annotated_theta  -- These are put there
+                            `unionVarSet` tau_tvs                --       by the user
 
            ; let keep_me  = psig_qtvs `unionVarSet` free_tvs
                  my_theta = pickCapturedPreds keep_me inferred_theta
@@ -1011,7 +1014,7 @@ chooseInferredQuantifiers inferred_theta tau_tvs qtvs
            -- NB: my_theta already includes all the annotated constraints
            ; let inferred_diff = [ pred
                                  | pred <- my_theta
-                                 , all (not . (`eqType` pred)) annotated_theta ]
+                                 , all (not . (`eqUserPred` pred)) annotated_theta ]
            ; ctuple <- mk_ctuple inferred_diff
 
            ; case tcGetCastedTyVar_maybe wc_var_ty of
@@ -1027,7 +1030,7 @@ chooseInferredQuantifiers inferred_theta tau_tvs qtvs
                      , ppr inferred_diff ]
            ; return (free_tvs, my_theta) }
 
-    mk_ctuple preds = return (mkBoxedTupleTy preds)
+    mk_ctuple preds = return (mkBoxedTupleTy (map userPredType preds))
        -- Hack alert!  See TcHsType:
        -- Note [Extra-constraint holes in partial type signatures]
 

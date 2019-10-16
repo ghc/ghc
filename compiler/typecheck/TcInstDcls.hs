@@ -50,6 +50,7 @@ import CoreUnfold ( mkInlineUnfoldingWithArity, mkDFunUnfolding )
 import Type
 import TcEvidence
 import TyCon
+import Predicate
 import CoAxiom
 import DataCon
 import ConLike
@@ -790,7 +791,7 @@ tcDataFamInstHeader
     -> LexicalFixity -> LHsContext GhcRn
     -> HsTyPats GhcRn -> Maybe (LHsKind GhcRn) -> [LConDecl GhcRn]
     -> NewOrData
-    -> TcM ([TyVar], [Type], Kind, ThetaType)
+    -> TcM ([TyVar], [Type], Kind, [UserPred])
 -- The "header" of a data family instance is the part other than
 -- the data constructors themselves
 --    e.g.  data instance D [a] :: * -> * where ...
@@ -832,7 +833,7 @@ tcDataFamInstHeader mb_clsinfo fam_tc imp_vars mb_bndrs fixity
        ; (ze, qtvs)   <- zonkTyBndrs qtvs
               -- See Note [Unifying data family kinds] about the discardCast
        ; lhs_ty       <- zonkTcTypeToTypeX ze (discardCast lhs_ty)
-       ; stupid_theta <- zonkTcTypesToTypesX ze stupid_theta
+       ; stupid_theta <- mapM (zonkTcUserPredToUserPredX ze) stupid_theta
 
        -- Check that type patterns match the class instance head
        -- The call to splitTyConApp_maybe here is just an inlining of
@@ -1040,13 +1041,15 @@ tcInstDecl2 (InstInfo { iSpec = ispec, iBinds = ibinds })
     addErrCtxt (instDeclCtxt2 (idType dfun_id)) $
     do {  -- Instantiate the instance decl with skolem constants
        ; (inst_tyvars, dfun_theta, inst_head) <- tcSkolDFunType dfun_id
-       ; dfun_ev_vars <- newEvVars dfun_theta
+       ; dfun_ev_vars <- newEvVarBinders dfun_theta
                      -- We instantiate the dfun_id with superSkolems.
                      -- See Note [Subtle interaction of recursion and overlap]
                      -- and Note [Binding when looking up instances]
 
        ; let (clas, inst_tys) = tcSplitDFunHead inst_head
-             (class_tyvars, sc_theta, _, op_items) = classBigSig clas
+             (class_tyvars, sc_preds, _, op_items) = classBigSig clas
+             sc_theta  = map (toUserPred "tcInstDecl2") sc_preds
+
              sc_theta' = substTheta (zipTvSubst class_tyvars inst_tys) sc_theta
 
        ; traceTc "tcInstDecl2" (vcat [ppr inst_tyvars, ppr inst_tys, ppr dfun_theta, ppr sc_theta'])
@@ -1080,7 +1083,7 @@ tcInstDecl2 (InstInfo { iSpec = ispec, iBinds = ibinds })
        ; emitImplication $
          imp { ic_tclvl  = tclvl
              , ic_skols  = inst_tyvars
-             , ic_given  = dfun_ev_vars
+             , ic_given  = toEvCoVarBinders dfun_ev_vars
              , ic_wanted = mkImplicWC sc_meth_implics
              , ic_binds  = dfun_ev_binds_var
              , ic_info   = InstSkol }
@@ -1112,7 +1115,7 @@ tcInstDecl2 (InstInfo { iSpec = ispec, iBinds = ibinds })
                                             (L loc (wrapId arg_wrapper meth_id))
 
              inst_tv_tys = mkTyVarTys inst_tyvars
-             arg_wrapper = mkWpEvVarApps dfun_ev_vars <.> mkWpTyApps inst_tv_tys
+             arg_wrapper = mkWpEvVarApps (evbsVars dfun_ev_vars) <.> mkWpTyApps inst_tv_tys
 
              is_newtype = isNewTyCon class_tc
              dfun_id_w_prags = addDFunPrags dfun_id sc_meth_ids
@@ -1168,7 +1171,7 @@ addDFunPrags dfun_id sc_meth_ids
                 [mkVarApps (Var id) dfun_bndrs | id <- sc_meth_ids]
 
    (dfun_tvs, dfun_theta, clas, inst_tys) = tcSplitDFunTy (idType dfun_id)
-   ev_ids      = mkTemplateLocalsNum 1                    dfun_theta
+   ev_ids      = mkTemplateLocalsNum 1 (map userPredType dfun_theta)
    dfun_bndrs  = dfun_tvs ++ ev_ids
    clas_tc     = classTyCon clas
    [dict_con]  = tyConDataCons clas_tc
@@ -1246,9 +1249,9 @@ Notice that
 ************************************************************************
 -}
 
-tcSuperClasses :: DFunId -> Class -> [TcTyVar] -> [EvVar] -> [TcType]
+tcSuperClasses :: DFunId -> Class -> [TcTyVar] -> [EvVarBinder] -> [TcType]
                -> TcEvBinds
-               -> TcThetaType
+               -> [UserPred]
                -> TcM ([EvVar], LHsBinds GhcTc, Bag Implication)
 -- Make a new top-level function binding for each superclass,
 -- something like
@@ -1265,14 +1268,15 @@ tcSuperClasses dfun_id cls tyvars dfun_evs inst_tys dfun_ev_binds sc_theta
     loc = getSrcSpan dfun_id
     size = sizeTypes inst_tys
     tc_super (sc_pred, n)
-      = do { (sc_implic, ev_binds_var, sc_ev_tm)
-                <- checkInstConstraints $ emitWanted (ScOrigin size) sc_pred
+      = do { (sc_implic, ev_binds_var, [sc_ev_tm])
+                <- checkInstConstraints $ emitTheta (ScOrigin size) [sc_pred]
 
            ; sc_top_name  <- newName (mkSuperDictAuxOcc n (getOccName cls))
            ; sc_ev_id     <- newEvVar sc_pred
            ; addTcEvBind ev_binds_var $ mkWantedEvBind sc_ev_id sc_ev_tm
            ; let sc_top_ty = mkInvForAllTys tyvars $
-                             mkPhiTy (map idType dfun_evs) sc_pred
+                             mkPhiTy (evbsPreds dfun_evs) $
+                             userPredType sc_pred
                  sc_top_id = mkLocalId sc_top_name sc_top_ty
                  export = ABE { abe_ext  = noExtField
                               , abe_wrap = idHsWrapper
@@ -1503,7 +1507,7 @@ tcMethod
 -}
 
 tcMethods :: DFunId -> Class
-          -> [TcTyVar] -> [EvVar]
+          -> [TcTyVar] -> [EvVarBinder]
           -> [TcType]
           -> TcEvBinds
           -> ([Located TcSpecPrag], TcPragEnv)
@@ -1583,7 +1587,7 @@ tcMethods dfun_id clas tyvars dfun_ev_vars inst_tys
         meth_tau     = funResultTy (piResultTys (idType sel_id) inst_tys)
         error_string dflags = showSDoc dflags
                               (hcat [ppr inst_loc, vbar, ppr sel_id ])
-        lam_wrapper  = mkWpTyLams tyvars <.> mkWpLams dfun_ev_vars
+        lam_wrapper  = mkWpTyLams tyvars <.> mkWpLams (evbsVars dfun_ev_vars)
 
     ----------------------
     -- Check if one of the minimal complete definitions is satisfied
@@ -1674,7 +1678,7 @@ Instead, we take the much simpler approach of always disabling
 -}
 
 ------------------------
-tcMethodBody :: Class -> [TcTyVar] -> [EvVar] -> [TcType]
+tcMethodBody :: Class -> [TcTyVar] -> [EvVarBinder] -> [TcType]
              -> TcEvBinds -> Bool
              -> HsSigFun
              -> [LTcSpecPrag] -> [LSig GhcRn]
@@ -1788,7 +1792,7 @@ tcMethodBodyHelp hs_sig_fn sel_id local_meth_id meth_bind
 
 
 ------------------------
-mkMethIds :: Class -> [TcTyVar] -> [EvVar]
+mkMethIds :: Class -> [TcTyVar] -> [EvVarBinder]
           -> [TcType] -> Id -> TcM (TcId, TcId)
              -- returns (poly_id, local_id), but ignoring any instance signature
              -- See Note [Instance method signatures]
@@ -1806,7 +1810,7 @@ mkMethIds clas tyvars dfun_ev_vars inst_tys sel_id
     sel_occ       = nameOccName sel_name
     local_meth_ty = instantiateMethod clas sel_id inst_tys
     poly_meth_ty  = mkSpecSigmaTy tyvars theta local_meth_ty
-    theta         = map idType dfun_ev_vars
+    theta         = evbsPreds dfun_ev_vars
 
 methSigCtxt :: Name -> TcType -> TcType -> TidyEnv -> TcM (TidyEnv, MsgDoc)
 methSigCtxt sel_name sig_ty meth_ty env0

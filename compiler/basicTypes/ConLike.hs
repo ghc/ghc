@@ -30,12 +30,13 @@ import GhcPrelude
 
 import DataCon
 import PatSyn
+import Predicate
 import Outputable
 import Unique
 import Util
 import Name
 import BasicTypes
-import TyCoRep (Type, ThetaType)
+import TyCoRep (Type)
 import Var
 import Type (mkTyConApp)
 
@@ -126,7 +127,7 @@ conLikeName (PatSynCon pat_syn)    = patSynName pat_syn
 --
 -- > data Eq a => T a = ...
 -- It is empty for `PatSynCon` as they do not allow such contexts.
-conLikeStupidTheta :: ConLike -> ThetaType
+conLikeStupidTheta :: ConLike -> [UserPred]
 conLikeStupidTheta (RealDataCon data_con) = dataConStupidTheta data_con
 conLikeStupidTheta (PatSynCon {})         = []
 
@@ -168,7 +169,7 @@ conLikeFullSig :: ConLike
                -> ([TyVar], [TyCoVar], [EqSpec]
                    -- Why tyvars for universal but tycovars for existential?
                    -- See Note [Existential coercion variables] in DataCon
-                  , ThetaType, ThetaType, [Type], Type)
+                  , [UserPred], [UserPred], [Type], Type)
 conLikeFullSig (RealDataCon con) =
   let (univ_tvs, ex_tvs, eq_spec, theta, arg_tys, res_ty) = dataConFullSig con
   -- Required theta is empty as normal data cons require no additional

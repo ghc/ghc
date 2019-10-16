@@ -55,6 +55,7 @@ import TyCoRep   -- for checkValidRoles
 import TyCoPpr( pprTyVars, pprWithExplicitKindsWhen )
 import Class
 import CoAxiom
+import Predicate
 import TyCon
 import DataCon
 import Id
@@ -2038,7 +2039,7 @@ tcClassDecl1 roles_info class_name hs_ctxt meths fundeps sigs ats at_defs
        -- The zonk also squeeze out the TcTyCons, and converts
        -- Skolems to tyvars.
        ; ze        <- emptyZonkEnv
-       ; ctxt      <- zonkTcTypesToTypesX ze ctxt
+       ; ctxt      <- mapM (zonkTcUserPredToUserPredX ze) ctxt
        ; sig_stuff <- mapM (zonkTcMethInfoToMethInfoX ze) sig_stuff
          -- ToDo: do we need to zonk at_stuff?
 
@@ -2471,7 +2472,8 @@ tcDataDefn err_ctxt roles_info tc_name
          checkDataKindSig (DataDeclSort new_or_data) final_res_kind
 
        ; stupid_tc_theta <- pushTcLevelM_ $ solveEqualities $ tcHsContext ctxt
-       ; stupid_theta    <- zonkTcTypesToTypes stupid_tc_theta
+       ; stupid_theta    <- initZonkEnv $ \ze ->
+                            mapM (zonkTcUserPredToUserPredX ze) stupid_tc_theta
        ; kind_signatures <- xoptM LangExt.KindSignatures
 
              -- Check that we don't use kind signatures without Glasgow extensions
@@ -2971,7 +2973,7 @@ tcConDecl rep_tycon tag_map tmpl_bndrs res_kind res_tmpl new_or_data
        ; (ze, qkvs)      <- zonkTyBndrs kvs
        ; (ze, user_qtvs) <- zonkTyBndrsX ze exp_tvs
        ; arg_tys         <- zonkTcTypesToTypesX ze arg_tys
-       ; ctxt            <- zonkTcTypesToTypesX ze ctxt
+       ; ctxt            <- mapM (zonkTcUserPredToUserPredX ze) ctxt
 
        ; fam_envs <- tcGetFamInstEnvs
 
@@ -3048,7 +3050,7 @@ tcConDecl rep_tycon tag_map tmpl_bndrs _res_kind res_tmpl new_or_data
        ; (ze, tkvs)     <- zonkTyBndrs tkvs
        ; (ze, user_tvs) <- zonkTyBndrsX ze user_tvs
        ; arg_tys <- zonkTcTypesToTypesX ze arg_tys
-       ; ctxt    <- zonkTcTypesToTypesX ze ctxt
+       ; ctxt    <- mapM (zonkTcUserPredToUserPredX ze) ctxt
        ; res_ty  <- zonkTcTypeToTypeX   ze res_ty
 
        ; let (univ_tvs, ex_tvs, tkvs', user_tvs', eq_preds, arg_subst)
@@ -3064,7 +3066,7 @@ tcConDecl rep_tycon tag_map tmpl_bndrs _res_kind res_tmpl new_or_data
              user_tv_bndrs  = mkTyVarBinders Specified user_tvs'
              all_user_bndrs = tkv_bndrs ++ user_tv_bndrs
 
-             ctxt'      = substTys arg_subst ctxt
+             ctxt'      = substTheta arg_subst ctxt
              arg_tys'   = substTys arg_subst arg_tys
              res_ty'    = substTy  arg_subst res_ty
 
@@ -3917,7 +3919,7 @@ checkValidClass cls
         ; checkTc (fundep_classes || null fundeps) (classFunDepsErr cls)
 
         -- Check the super-classes
-        ; checkValidTheta (ClassSCCtxt (className cls)) theta
+        ; check_valid_theta (ClassSCCtxt (className cls)) theta
 
           -- Now check for cyclic superclasses
           -- If there are superclass cycles, checkClassCycleErrs bails.
@@ -3940,6 +3942,11 @@ checkValidClass cls
     cls_arity = length (tyConVisibleTyVars (classTyCon cls))
        -- Ignore invisible variables
     cls_tv_set = mkVarSet tyvars
+
+      -- superclasses can be non-UserPreds, but only for wired-in classes
+      -- like (~), and so we won't see them here.
+    check_valid_theta ctxt preds = checkValidTheta ctxt $
+                                   map (toUserPred "checkValidClass") preds
 
     check_op constrained_class_methods (sel_id, dm)
       = setSrcSpan (getSrcSpan sel_id) $
@@ -3972,13 +3979,13 @@ checkValidClass cls
           -- See Note [Splitting nested sigma types in class type signatures]
           (_,op_theta,tau2) = tcSplitNestedSigmaTys tau1
 
-          check_constraint :: TcPredType -> TcM ()
+          check_constraint :: UserPred -> TcM ()
           check_constraint pred -- See Note [Class method constraints]
             = when (not (isEmptyVarSet pred_tvs) &&
                     pred_tvs `subVarSet` cls_tv_set)
                    (addErrTc (badMethPred sel_id pred))
             where
-              pred_tvs = tyCoVarsOfType pred
+              pred_tvs = tyCoVarsOfUserPred pred
 
     check_at (ATI fam_tc m_dflt_rhs)
       = do { checkTc (cls_arity == 0 || any (`elemVarSet` cls_tv_set) fam_tvs)
@@ -3996,7 +4003,7 @@ checkValidClass cls
         where
           fam_tvs = tyConTyVars fam_tc
 
-    check_dm :: UserTypeCtxt -> Id -> PredType -> Type -> DefMethInfo -> TcM ()
+    check_dm :: UserTypeCtxt -> Id -> UserPred -> Type -> DefMethInfo -> TcM ()
     -- Check validity of the /top-level/ generic-default type
     -- E.g for   class C a where
     --             default op :: forall b. (a~b) => blah
@@ -4345,7 +4352,9 @@ checkValidRoles tc
     check_dc_roles datacon
       = do { traceTc "check_dc_roles" (ppr datacon <+> ppr (tyConRoles tc))
            ; mapM_ (check_ty_roles role_env Representational) $
-                    eqSpecPreds eq_spec ++ theta ++ arg_tys }
+                    map eqPredType (eqSpecPreds eq_spec) ++
+                    map userPredType theta ++
+                    arg_tys }
                     -- See Note [Role-checking data constructor arguments] in TcTyDecls
       where
         (univ_tvs, ex_tvs, eq_spec, theta, arg_tys, _res_ty)
@@ -4527,7 +4536,7 @@ classFunDepsErr cls
   = vcat [text "Fundeps in class" <+> quotes (ppr cls),
           parens (text "Enable FunctionalDependencies to allow fundeps")]
 
-badMethPred :: Id -> TcPredType -> SDoc
+badMethPred :: Id -> UserPred -> SDoc
 badMethPred sel_id pred
   = vcat [ hang (text "Constraint" <+> quotes (ppr pred)
                  <+> text "in the type of" <+> quotes (ppr sel_id))

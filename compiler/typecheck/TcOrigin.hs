@@ -29,6 +29,7 @@ module TcOrigin (
 import GhcPrelude
 
 import TcType
+import Predicate
 
 import GHC.Hs
 
@@ -192,8 +193,8 @@ data SkolemInfo
 
   | ForAllSkol SDoc     -- Bound by a user-written "forall".
 
-  | DerivSkol Type      -- Bound by a 'deriving' clause;
-                        -- the type is the instance we are trying to derive
+  | DerivSkol UserPred  -- Bound by a 'deriving' clause;
+                        -- the pred is the instance we are trying to derive
 
   | InstSkol            -- Bound at an instance decl
   | InstSC TypeSize     -- A "given" constraint obtained by superclass selection.
@@ -361,7 +362,7 @@ data CtOrigin
                        -- visible.) Only used for prioritizing error messages.
                  }
 
-  | KindEqOrigin  -- See Note [Equalities with incompatible kinds] in TcCanonical.
+  | KindEqOrigin
       TcType (Maybe TcType)     -- A kind equality arising from unifying these two types
       CtOrigin                  -- originally arising from this
       (Maybe TypeOrKind)        -- the level of the eq this arises from
@@ -421,12 +422,12 @@ data CtOrigin
   | AnnOrigin           -- An annotation
 
   | FunDepOrigin1       -- A functional dependency from combining
-        PredType CtOrigin RealSrcSpan      -- This constraint arising from ...
-        PredType CtOrigin RealSrcSpan      -- and this constraint arising from ...
+        UserPred CtOrigin RealSrcSpan      -- This constraint arising from ...
+        UserPred CtOrigin RealSrcSpan      -- and this constraint arising from ...
 
   | FunDepOrigin2       -- A functional dependency from combining
-        PredType CtOrigin   -- This constraint arising from ...
-        PredType SrcSpan    -- and this top-level instance
+        UserPred CtOrigin   -- This constraint arising from ...
+        UserPred SrcSpan    -- and this top-level instance
         -- We only need a CtOrigin on the first, because the location
         -- is pinned on the entire error message
 
@@ -498,7 +499,7 @@ exprCtOrigin (SectionR _ _ _)     = SectionOrigin
 exprCtOrigin (ExplicitTuple {})   = Shouldn'tHappenOrigin "explicit tuple"
 exprCtOrigin ExplicitSum{}        = Shouldn'tHappenOrigin "explicit sum"
 exprCtOrigin (HsCase _ _ matches) = matchesCtOrigin matches
-exprCtOrigin (HsIf _ (SyntaxExprRn syn) _ _ _) = exprCtOrigin syn
+exprCtOrigin (HsIf _ (Just (SyntaxExprRn syn)) _ _ _) = exprCtOrigin syn
 exprCtOrigin (HsIf {})           = Shouldn'tHappenOrigin "if expression"
 exprCtOrigin (HsMultiIf _ rhs)   = lGRHSCtOrigin rhs
 exprCtOrigin (HsLet _ _ e)       = lexprCtOrigin e

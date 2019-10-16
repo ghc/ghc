@@ -41,9 +41,11 @@ module TcMType (
 
   --------------------------------
   -- Creating new evidence variables
-  newEvVar, newEvVars, newDict,
+  newEvVar, newEvCoVar, newCoVar,
+  newEvVarBinder, newEvVarBinders, newEvCoVarBinder, newEvCoVarBinders,
+  newDict,
   newWanted, newWanteds, newHoleCt, cloneWanted, cloneWC,
-  emitWanted, emitWantedEq, emitWantedEvVar, emitWantedEvVars,
+  emitTheta, emitWanted, emitWantedEq, emitWantedEvVar,
   emitDerivedEqs,
   newTcEvBinds, newNoTcEvBinds, addTcEvBind,
 
@@ -68,20 +70,23 @@ module TcMType (
   --------------------------------
   -- Zonking and tidying
   zonkTidyTcType, zonkTidyTcTypes, zonkTidyOrigin,
-  tidyEvVar, tidyCt, tidySkolemInfo,
+  tidyEvCoVarBinder, tidyCt, tidySkolemInfo,
     zonkTcTyVar, zonkTcTyVars,
   zonkTcTyVarToTyVar, zonkTyVarTyVarPairs,
   zonkTyCoVarsAndFV, zonkTcTypeAndFV, zonkDTyCoVarSetAndFV,
   zonkTyCoVarsAndFVList,
   candidateQTyVarsOfType,  candidateQTyVarsOfKind,
   candidateQTyVarsOfTypes, candidateQTyVarsOfKinds,
+  candidateQTyVarsOfUserPred, candidateQTyVarsOfUserPreds,
+  candidateQTyVarsOfPred, candidateQTyVarsOfPreds,
   CandidatesQTvs(..), delCandidates, candidateKindVars, partitionCandidates,
   zonkAndSkolemise, skolemiseQuantifiedTyVar,
   defaultTyVar, quantifyTyVars, isQuantifiableTv,
   zonkTcType, zonkTcTypes, zonkCo,
   zonkTyCoVarKind,
+  zonkTcPred, zonkUserPred,
 
-  zonkEvVar, zonkWC, zonkSimples,
+  zonkWC, zonkSimples,
   zonkId, zonkCoVar,
   zonkCt, zonkSkolemInfo,
 
@@ -170,35 +175,56 @@ newMetaKindVars n = replicateM n newMetaKindVar
 ************************************************************************
 -}
 
-newEvVars :: TcThetaType -> TcM [EvVar]
-newEvVars theta = mapM newEvVar theta
+newEvVarBinders :: [UserPred] -> TcM [EvVarBinder]
+newEvVarBinders = mapM newEvVarBinder
+
+newEvVarBinder :: UserPred -> TcM EvVarBinder
+newEvVarBinder pred = mkEvVarBinder <$> newEvVar pred <*> pure pred
+
+newEvCoVarBinders :: [Pred] -> TcM [EvCoVarBinder]
+newEvCoVarBinders = mapM newEvCoVarBinder
+
+newEvCoVarBinder :: Pred -> TcM EvCoVarBinder
+newEvCoVarBinder pred = mkEvCoVarBinder <$> newEvCoVar pred <*> pure pred
 
 --------------
 
-newEvVar :: TcPredType -> TcRnIf gbl lcl EvVar
+newEvVar :: UserPred -> TcRnIf gbl lcl EvVar
 -- Creates new *rigid* variables for predicates
-newEvVar ty = do { name <- newSysName (predTypeOccName ty)
-                 ; return (mkLocalIdOrCoVar name ty) }
+newEvVar pred = do { name <- newSysName (predTypeOccName ty)
+                   ; return (mkLocalId name ty) }
+  where ty = userPredType pred
 
-newWanted :: CtOrigin -> Maybe TypeOrKind -> PredType -> TcM CtEvidence
+-- Like 'newEvVar', but for equality predicates
+newCoVar :: EqPred -> TcRnIf gbl lcl CoVar
+newCoVar pred = do { name <- newSysName (predTypeOccName ty)
+                   ; return (mkCoVar name ty) }
+  where ty = eqPredType pred
+
+newEvCoVar :: Pred -> TcRnIf gbl lcl EvCoVar
+newEvCoVar (UserPred u_pred)     = newEvVar u_pred
+newEvCoVar (EqualityPred e_pred) = newCoVar e_pred
+
+newWanted :: CtOrigin -> Maybe TypeOrKind -> Pred -> TcM CtEvidence
 -- Deals with both equality and non-equality predicates
-newWanted orig t_or_k pty
+newWanted orig t_or_k pred
   = do loc <- getCtLocM orig t_or_k
-       d <- if isEqPrimPred pty then HoleDest  <$> newCoercionHole pty
-                                else EvVarDest <$> newEvVar pty
+       d <- case pred of
+              EqualityPred eq_pred -> HoleDest <$> newCoercionHole eq_pred
+              UserPred     u_pred  -> EvVarDest <$> newEvVar u_pred
        return $ CtWanted { ctev_dest = d
-                         , ctev_pred = pty
+                         , ctev_pred = pred
                          , ctev_nosh = WDeriv
                          , ctev_loc = loc }
 
-newWanteds :: CtOrigin -> ThetaType -> TcM [CtEvidence]
+newWanteds :: CtOrigin -> [Pred] -> TcM [CtEvidence]
 newWanteds orig = mapM (newWanted orig Nothing)
 
 -- | Create a new 'CHoleCan' 'Ct'.
 newHoleCt :: HoleSort -> Id -> Type -> TcM Ct
 newHoleCt hole ev ty = do
   loc <- getCtLocM HoleOrigin Nothing
-  pure $ CHoleCan { cc_ev = CtWanted { ctev_pred = ty
+  pure $ CHoleCan { cc_ev = CtWanted { ctev_pred = fromUserPred $ IrredPred ty
                                      , ctev_dest = EvVarDest ev
                                      , ctev_nosh = WDeriv
                                      , ctev_loc  = loc }
@@ -211,8 +237,9 @@ newHoleCt hole ev ty = do
 
 cloneWanted :: Ct -> TcM Ct
 cloneWanted ct
-  | ev@(CtWanted { ctev_dest = HoleDest {}, ctev_pred = pty }) <- ctEvidence ct
-  = do { co_hole <- newCoercionHole pty
+  | ev@(CtWanted { ctev_dest = HoleDest {}
+                 , ctev_pred = EqualityPred eq_pred }) <- ctEvidence ct
+  = do { co_hole <- newCoercionHole eq_pred
        ; return (mkNonCanonical (ev { ctev_dest = HoleDest co_hole })) }
   | otherwise
   = return ct
@@ -238,10 +265,14 @@ cloneImplication implic@(Implic { ic_binds = binds, ic_wanted = inner_wanted })
 -- Emitting constraints
 ----------------------------------------------
 
+-- | Emits a list of UserPreds.
+emitTheta :: CtOrigin -> [UserPred] -> TcM [EvTerm]
+emitTheta origin = mapM (emitWanted origin . fromUserPred)
+
 -- | Emits a new Wanted. Deals with both equalities and non-equalities.
-emitWanted :: CtOrigin -> TcPredType -> TcM EvTerm
-emitWanted origin pty
-  = do { ev <- newWanted origin Nothing pty
+emitWanted :: CtOrigin -> Pred -> TcM EvTerm
+emitWanted origin pred
+  = do { ev <- newWanted origin Nothing pred
        ; emitSimple $ mkNonCanonical ev
        ; return $ ctEvTerm ev }
 
@@ -256,48 +287,47 @@ emitDerivedEqs origin pairs
   where
     mk_one loc (ty1, ty2)
        = mkNonCanonical $
-         CtDerived { ctev_pred = mkPrimEqPred ty1 ty2
+         CtDerived { ctev_pred = mkEqualityPred NomEq ty1 ty2
                    , ctev_loc = loc }
 
--- | Emits a new equality constraint
-emitWantedEq :: CtOrigin -> TypeOrKind -> Role -> TcType -> TcType -> TcM Coercion
-emitWantedEq origin t_or_k role ty1 ty2
-  = do { hole <- newCoercionHole pty
+-- | Emits a new nominal equality constraint
+emitWantedEq :: CtOrigin -> TypeOrKind -> TcType -> TcType -> TcM CoercionN
+emitWantedEq origin t_or_k ty1 ty2
+  = do { hole <- newCoercionHole eq_pred
        ; loc <- getCtLocM origin (Just t_or_k)
        ; emitSimple $ mkNonCanonical $
-         CtWanted { ctev_pred = pty, ctev_dest = HoleDest hole
-                  , ctev_nosh = WDeriv, ctev_loc = loc }
+         CtWanted { ctev_pred = fromEqPred eq_pred
+                  , ctev_dest = HoleDest hole
+                  , ctev_nosh = WDeriv
+                  , ctev_loc = loc }
        ; return (HoleCo hole) }
   where
-    pty = mkPrimEqPredRole role ty1 ty2
+    eq_pred = mkEqPred NomEq ty1 ty2
 
 -- | Creates a new EvVar and immediately emits it as a Wanted.
 -- No equality predicates here.
-emitWantedEvVar :: CtOrigin -> TcPredType -> TcM EvVar
-emitWantedEvVar origin ty
-  = do { new_cv <- newEvVar ty
+emitWantedEvVar :: CtOrigin -> UserPred -> TcM EvVar
+emitWantedEvVar origin pred
+  = do { new_cv <- newEvVar pred
        ; loc <- getCtLocM origin Nothing
        ; let ctev = CtWanted { ctev_dest = EvVarDest new_cv
-                             , ctev_pred = ty
+                             , ctev_pred = fromUserPred pred
                              , ctev_nosh = WDeriv
                              , ctev_loc  = loc }
        ; emitSimple $ mkNonCanonical ctev
        ; return new_cv }
 
-emitWantedEvVars :: CtOrigin -> [TcPredType] -> TcM [EvVar]
-emitWantedEvVars orig = mapM (emitWantedEvVar orig)
-
 newDict :: Class -> [TcType] -> TcM DictId
 newDict cls tys
   = do { name <- newSysName (mkDictOcc (getOccName cls))
-       ; return (mkLocalId name (mkClassPred cls tys)) }
+       ; return (mkLocalId name (mkClassPredTy cls tys)) }
 
 predTypeOccName :: PredType -> OccName
 predTypeOccName ty = case classifyPredType ty of
-    ClassPred cls _ -> mkDictOcc (getOccName cls)
-    EqPred {}       -> mkVarOccFS (fsLit "co")
-    IrredPred {}    -> mkVarOccFS (fsLit "irred")
-    ForAllPred {}   -> mkVarOccFS (fsLit "df")
+    UserPred (ClassPred cls _) -> mkDictOcc (getOccName cls)
+    EqualityPred {}            -> mkVarOccFS (fsLit "co")
+    UserPred (IrredPred {})    -> mkVarOccFS (fsLit "irred")
+    UserPred (ForAllPred {})   -> mkVarOccFS (fsLit "df")
 
 -- | Create a new 'Implication' with as many sensible defaults for its fields
 -- as possible. Note that the 'ic_tclvl', 'ic_binds', and 'ic_info' fields do
@@ -323,9 +353,9 @@ newImplication
 ************************************************************************
 -}
 
-newCoercionHole :: TcPredType -> TcM CoercionHole
-newCoercionHole pred_ty
-  = do { co_var <- newEvVar pred_ty
+newCoercionHole :: EqPred -> TcM CoercionHole
+newCoercionHole pred
+  = do { co_var <- newCoVar pred
        ; traceTc "New coercion hole:" (ppr co_var)
        ; ref <- newMutVar Nothing
        ; return $ CoercionHole { ch_co_var = co_var, ch_ref = ref } }
@@ -379,7 +409,7 @@ checkCoercionHole cv co
 
   where
     (Pair t1 t2, role) = coercionKindRole co
-    ok cv_ty | EqPred cv_rel cv_t1 cv_t2 <- classifyPredType cv_ty
+    ok cv_ty | EqualityPred (EqPred cv_rel cv_t1 cv_t2) <- classifyPredType cv_ty
              =  t1 `eqType` cv_t1
              && t2 `eqType` cv_t2
              && role == eqRelRole cv_rel
@@ -512,7 +542,7 @@ inferResultToType (IR { ir_uniq = u, ir_lvl = tc_lvl
 tcInstType :: ([TyVar] -> TcM (TCvSubst, [TcTyVar]))
                    -- ^ How to instantiate the type variables
            -> Id                                            -- ^ Type to instantiate
-           -> TcM ([(Name, TcTyVar)], TcThetaType, TcType)  -- ^ Result
+           -> TcM ([(Name, TcTyVar)], [UserPred], TcType)  -- ^ Result
                 -- (type vars, preds (incl equalities), rho)
 tcInstType inst_tyvars id
   = case tcSplitForAllTys (idType id) of
@@ -527,7 +557,7 @@ tcInstType inst_tyvars id
                                   tv_prs       = map tyVarName tyvars `zip` tyvars'
                             ; return (tv_prs, theta, tau) }
 
-tcSkolDFunType :: DFunId -> TcM ([TcTyVar], TcThetaType, TcType)
+tcSkolDFunType :: DFunId -> TcM ([TcTyVar], [UserPred], TcType)
 -- Instantiate a type signature with skolem constants.
 -- We could give them fresh names, but no need to do so
 tcSkolDFunType dfun
@@ -1259,6 +1289,24 @@ candidateQTyVarsOfKinds :: [TcKind]    -- Not necessarily zonked
 candidateQTyVarsOfKinds tys = foldM (\acc ty -> collect_cand_qtvs ty True emptyVarSet acc ty)
                                     mempty tys
 
+-- | Like 'candidateQTyVarsOfType', but over 'UserPred's.
+candidateQTyVarsOfUserPreds :: [UserPred] -> TcM CandidatesQTvs
+candidateQTyVarsOfUserPreds = foldMapM candidateQTyVarsOfUserPred
+
+-- | Like 'candidateQTyVarsOfType', but over 'UserPred'.
+candidateQTyVarsOfUserPred :: UserPred -> TcM CandidatesQTvs
+candidateQTyVarsOfUserPred = candidateQTyVarsOfType . userPredType
+
+-- | Like 'candidateQTyVarsOfType', but over 'Pred's.
+candidateQTyVarsOfPreds :: [Pred] -> TcM CandidatesQTvs
+candidateQTyVarsOfPreds = foldMapM candidateQTyVarsOfPred
+
+-- | Like 'candidateQTyVarsOfType', but over 'Pred'.
+candidateQTyVarsOfPred :: Pred -> TcM CandidatesQTvs
+candidateQTyVarsOfPred (EqualityPred (EqPred _ ty1 ty2))
+  = mappend <$> candidateQTyVarsOfType ty1 <*> candidateQTyVarsOfType ty2
+candidateQTyVarsOfPred (UserPred u_pred) = candidateQTyVarsOfUserPred u_pred
+
 delCandidates :: CandidatesQTvs -> [Var] -> CandidatesQTvs
 delCandidates (DV { dv_kvs = kvs, dv_tvs = tvs, dv_cvs = cvs }) vars
   = DV { dv_kvs = kvs `delDVarSetList` vars
@@ -1280,7 +1328,7 @@ collect_cand_qtvs
 --   * Needs to be monadic anyway, because it handles naughty
 --     quantification; see Note [Naughty quantification candidates]
 --
---   * Returns fully-zonked CandidateQTvs, including their kinds
+--   * Returns fully-zonked CandidatesQTvs, including their kinds
 --     so that subsequent dependency analysis (to build a well
 --     scoped telescope) works correctly
 
@@ -1557,7 +1605,7 @@ quantifyTyVars
 -- Can be given a mixture of TcTyVars and TyVars, in the case of
 --   associated type declarations. Also accepts covars, but *never* returns any.
 -- According to Note [Use level numbers for quantification] and the
--- invariants on CandidateQTvs, we do not have to filter out variables
+-- invariants on CandidatesQTvs, we do not have to filter out variables
 -- free in the environment here. Just quantify unconditionally, subject
 -- to the restrictions in Note [quantifyTyVars].
 quantifyTyVars dvs@(DV{ dv_kvs = dep_tkvs, dv_tvs = nondep_tkvs })
@@ -1993,7 +2041,7 @@ zonkImplication implic@(Implic { ic_skols  = skols
                                , ic_info   = info })
   = do { skols'  <- mapM zonkTyCoVarKind skols  -- Need to zonk their kinds!
                                                 -- as #7230 showed
-       ; given'  <- mapM zonkEvVar given
+       ; given'  <- mapM zonkEvCoVarBinder given
        ; info'   <- zonkSkolemInfo info
        ; wanted' <- zonkWCRec wanted
        ; return (implic { ic_skols  = skols'
@@ -2001,10 +2049,11 @@ zonkImplication implic@(Implic { ic_skols  = skols
                         , ic_wanted = wanted'
                         , ic_info   = info' }) }
 
-zonkEvVar :: EvVar -> TcM EvVar
-zonkEvVar var = do { ty' <- zonkTcType (varType var)
-                   ; return (setVarType var ty') }
-
+zonkEvCoVarBinder :: EvCoVarBinder -> TcM EvCoVarBinder
+zonkEvCoVarBinder evb
+  = do { pred' <- zonkTcPred (evbPred evb)
+       ; let ty' = predType pred'
+       ; return (mkEvCoVarBinder (setVarType (evbVar evb) ty') pred') }
 
 zonkWC :: WantedConstraints -> TcM WantedConstraints
 zonkWC wc = zonkWCRec wc
@@ -2078,17 +2127,19 @@ zonkCt ct
 
 zonkCtEvidence :: CtEvidence -> TcM CtEvidence
 zonkCtEvidence ctev@(CtGiven { ctev_pred = pred })
-  = do { pred' <- zonkTcType pred
+  = do { pred' <- zonkTcPred pred
        ; return (ctev { ctev_pred = pred'}) }
 zonkCtEvidence ctev@(CtWanted { ctev_pred = pred, ctev_dest = dest })
-  = do { pred' <- zonkTcType pred
+  = do { pred' <- zonkTcPred pred
        ; let dest' = case dest of
-                       EvVarDest ev -> EvVarDest $ setVarType ev pred'
+                       EvVarDest ev
+                         -> EvVarDest $ setVarType ev (predType pred')
                          -- necessary in simplifyInfer
+
                        HoleDest h   -> HoleDest h
        ; return (ctev { ctev_pred = pred', ctev_dest = dest' }) }
 zonkCtEvidence ctev@(CtDerived { ctev_pred = pred })
-  = do { pred' <- zonkTcType pred
+  = do { pred' <- zonkTcPred pred
        ; return (ctev { ctev_pred = pred' }) }
 
 zonkSkolemInfo :: SkolemInfo -> TcM SkolemInfo
@@ -2099,6 +2150,21 @@ zonkSkolemInfo (InferSkol ntys) = do { ntys' <- mapM do_one ntys
   where
     do_one (n, ty) = do { ty' <- zonkTcType ty; return (n, ty') }
 zonkSkolemInfo skol_info = return skol_info
+
+zonkTcPred :: Pred -> TcM Pred
+zonkTcPred (EqualityPred eq_pred) = EqualityPred <$> zonkEqPred eq_pred
+zonkTcPred (UserPred u_pred)      = UserPred <$> zonkUserPred u_pred
+
+zonkEqPred :: EqPred -> TcM EqPred
+zonkEqPred (EqPred r ty1 ty2) = EqPred r <$> zonkTcType ty1 <*> zonkTcType ty2
+
+zonkUserPred :: UserPred -> TcM UserPred
+zonkUserPred (ClassPred cls tys)         = ClassPred cls <$> zonkTcTypes tys
+zonkUserPred (IrredPred pred_ty)         = IrredPred <$> zonkTcType pred_ty
+zonkUserPred (ForAllPred tvs theta pred)
+  = ForAllPred <$> mapM zonkTcTyVarToTyVar tvs
+               <*> mapM zonkUserPred theta
+               <*> zonkUserPred pred
 
 {-
 %************************************************************************
@@ -2236,6 +2302,10 @@ zonkTidyTcTypes = zonkTidyTcTypes' []
           = do { (env', ty') <- zonkTidyTcType env ty
                ; zonkTidyTcTypes' (ty':zs) env' tys }
 
+zonkTidyTcUserPred :: TidyEnv -> UserPred -> TcM (TidyEnv, UserPred)
+zonkTidyTcUserPred env pred = do { pred' <- zonkUserPred pred
+                                 ; return (tidyOpenUserPred env pred') }
+
 zonkTidyOrigin :: TidyEnv -> CtOrigin -> TcM (TidyEnv, CtOrigin)
 zonkTidyOrigin env (GivenOrigin skol_info)
   = do { skol_info1 <- zonkSkolemInfo skol_info
@@ -2255,12 +2325,12 @@ zonkTidyOrigin env (KindEqOrigin ty1 m_ty2 orig t_or_k)
        ; (env3, orig')  <- zonkTidyOrigin env2 orig
        ; return (env3, KindEqOrigin ty1' m_ty2' orig' t_or_k) }
 zonkTidyOrigin env (FunDepOrigin1 p1 o1 l1 p2 o2 l2)
-  = do { (env1, p1') <- zonkTidyTcType env  p1
-       ; (env2, p2') <- zonkTidyTcType env1 p2
+  = do { (env1, p1') <- zonkTidyTcUserPred env  p1
+       ; (env2, p2') <- zonkTidyTcUserPred env1 p2
        ; return (env2, FunDepOrigin1 p1' o1 l1 p2' o2 l2) }
 zonkTidyOrigin env (FunDepOrigin2 p1 o1 p2 l2)
-  = do { (env1, p1') <- zonkTidyTcType env  p1
-       ; (env2, p2') <- zonkTidyTcType env1 p2
+  = do { (env1, p1') <- zonkTidyTcUserPred env  p1
+       ; (env2, p2') <- zonkTidyTcUserPred env1 p2
        ; (env3, o1') <- zonkTidyOrigin env2 o1
        ; return (env3, FunDepOrigin2 p1' o1' p2' l2) }
 zonkTidyOrigin env orig = return (env, orig)
@@ -2279,19 +2349,23 @@ tidyCt env ct
      -- NB: we do not tidy the ctev_evar field because we don't
      --     show it in error messages
     tidy_ev env ctev@(CtGiven { ctev_pred = pred })
-      = ctev { ctev_pred = tidyType env pred }
+      = ctev { ctev_pred = tidyPred env pred }
     tidy_ev env ctev@(CtWanted { ctev_pred = pred })
-      = ctev { ctev_pred = tidyType env pred }
+      = ctev { ctev_pred = tidyPred env pred }
     tidy_ev env ctev@(CtDerived { ctev_pred = pred })
-      = ctev { ctev_pred = tidyType env pred }
+      = ctev { ctev_pred = tidyPred env pred }
 
 ----------------
-tidyEvVar :: TidyEnv -> EvVar -> EvVar
-tidyEvVar env var = setVarType var (tidyType env (varType var))
+tidyEvCoVarBinder :: TidyEnv -> EvCoVarBinder -> EvCoVarBinder
+tidyEvCoVarBinder env var
+  = mkEvCoVarBinder (setVarType (evbVar var) ty') pred'
+  where
+    pred' = tidyPred env (evbPred var)
+    ty'   = predType pred'
 
 ----------------
 tidySkolemInfo :: TidyEnv -> SkolemInfo -> SkolemInfo
-tidySkolemInfo env (DerivSkol ty)         = DerivSkol (tidyType env ty)
+tidySkolemInfo env (DerivSkol ty)         = DerivSkol (tidyUserPred env ty)
 tidySkolemInfo env (SigSkol cx ty tv_prs) = tidySigSkol env cx ty tv_prs
 tidySkolemInfo env (InferSkol ids)        = InferSkol (mapSnd (tidyType env) ids)
 tidySkolemInfo env (UnifyForAllSkol ty)   = UnifyForAllSkol (tidyType env ty)

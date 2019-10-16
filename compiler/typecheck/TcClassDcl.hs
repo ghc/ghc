@@ -27,7 +27,7 @@ import GhcPrelude
 import GHC.Hs
 import TcEnv
 import TcSigs
-import TcEvidence ( idHsWrapper )
+import TcEvidence
 import TcBinds
 import TcUnify
 import TcHsType
@@ -198,7 +198,7 @@ tcClassDecl2 (L _ (ClassDecl {tcdLName = class_name, tcdSigs = sigs,
               sig_fn      = mkHsSigFun sigs
               clas_tyvars = snd (tcSuperSkolTyVars tyvars)
               pred        = mkClassPred clas (mkTyVarTys clas_tyvars)
-        ; this_dict <- newEvVar pred
+        ; this_dict <- newEvVarBinder pred
 
         ; let tc_item = tcDefMeth clas clas_tyvars this_dict
                                   default_binds sig_fn prag_fn
@@ -209,7 +209,7 @@ tcClassDecl2 (L _ (ClassDecl {tcdLName = class_name, tcdSigs = sigs,
 
 tcClassDecl2 d = pprPanic "tcClassDecl2" (ppr d)
 
-tcDefMeth :: Class -> [TyVar] -> EvVar -> LHsBinds GhcRn
+tcDefMeth :: Class -> [TyVar] -> EvVarBinder -> LHsBinds GhcRn
           -> HsSigFun -> TcPragEnv -> ClassOpItem
           -> TcM (LHsBinds GhcTcId)
 -- Generate code for default methods
@@ -345,9 +345,9 @@ instantiateMethod clas sel_id inst_tys
     (first_pred, local_meth_ty) = tcSplitPredFunTy_maybe rho_ty
                 `orElse` pprPanic "tcInstanceMethod" (ppr sel_id)
 
-    ok_first_pred = case getClassPredTys_maybe first_pred of
-                      Just (clas1, _tys) -> clas == clas1
-                      Nothing -> False
+    ok_first_pred = case first_pred of
+                      ClassPred clas1  _tys -> clas == clas1
+                      _                     -> False
               -- The first predicate should be of form (C a b)
               -- where C is the class in question
 

@@ -124,6 +124,7 @@ import ListSetOps
 import Outputable
 import ConLike
 import DataCon
+import Predicate
 import Type
 import Class
 import BasicTypes hiding( SuccessFlag(..) )
@@ -1061,7 +1062,8 @@ checkBootTyCon is_boot tc1 tc2
     check (eqListBy eqFD clas_fds1 clas_fds2)
           (text "The functional dependencies do not match") `andThenCheck`
     checkUnless (isAbstractTyCon tc1) $
-    check (eqListBy (eqTypeX env) sc_theta1 sc_theta2)
+    check (eqListBy (eqUserPredX env) (toUserPreds "checkBootTyCon 1" sc_theta1)
+                                      (toUserPreds "checkBootTyCon 2" sc_theta2))
           (text "The class constraints do not match") `andThenCheck`
     checkListBy eqSig op_stuff1 op_stuff2 (text "methods") `andThenCheck`
     checkListBy eqAT ats1 ats2 (text "associated types") `andThenCheck`
@@ -1129,7 +1131,7 @@ checkBootTyCon is_boot tc1 tc2
   , Just env <- eqVarBndrs emptyRnEnv2 (tyConTyVars tc1) (tyConTyVars tc2)
   = ASSERT(tc1 == tc2)
     checkRoles roles1 roles2 `andThenCheck`
-    check (eqListBy (eqTypeX env)
+    check (eqListBy (eqUserPredX env)
                      (tyConStupidTheta tc1) (tyConStupidTheta tc2))
           (text "The datatype contexts do not match") `andThenCheck`
     eqAlgRhs tc1 (algTyConRhs tc1) (algTyConRhs tc2)
@@ -2396,7 +2398,7 @@ tcRnExpr hsc_env mode rdr_expr
          simplifyInteractive residual ;
 
     let { all_expr_ty = mkInvForAllTys qtvs $
-                        mkPhiTy (map idType dicts) res_ty } ;
+                        mkPhiTy (evbsPreds dicts) res_ty } ;
     ty <- zonkTcType all_expr_ty ;
 
     -- We normalise type families, so that the type of an expression is the

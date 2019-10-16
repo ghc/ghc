@@ -93,6 +93,7 @@ import GHC.Iface.Load
 import Class
 import TyCon
 import CoAxiom
+import Predicate
 import PatSyn
 import ConLike
 import DataCon
@@ -239,9 +240,9 @@ mkMetaTyVar =
 -- | For a type 'm', emit the constraint 'Quote m'.
 emitQuoteWanted :: Type -> TcM EvVar
 emitQuoteWanted m_var =  do
-        quote_con <- tcLookupTyCon quoteClassName
+        quote_con <- tcLookupClass quoteClassName
         emitWantedEvVar BracketOrigin $
-          mkTyConApp quote_con [m_var]
+          mkClassPred quote_con [m_var]
 
 ---------------
 -- | Compute the expected type of a quotation, and also the QuoteWrapper in
@@ -1735,7 +1736,7 @@ reifyDataCon isGadtDataCon tys dc
            <- freshenTyVarBndrs $
               filterOut (`elemVarSet` eq_spec_tvs) g_univ_tvs
        ; let (tvb_subst, g_user_tvs) = substTyVarBndrs univ_subst g_user_tvs'
-             g_theta   = substTys tvb_subst g_theta'
+             g_theta   = substTheta tvb_subst g_theta'
              g_arg_tys = substTys tvb_subst g_arg_tys'
              g_res_ty  = substTy  tvb_subst g_res_ty'
 
@@ -1767,7 +1768,7 @@ reifyDataCon isGadtDataCon tys dc
        ; let (ex_tvs', theta') | isGadtDataCon = (g_user_tvs, g_theta)
                                | otherwise     = ASSERT( all isTyVar ex_tvs )
                                                  -- no covars for haskell syntax
-                                                 (ex_tvs, theta)
+                                                 (ex_tvs, map strip_user_pred theta)
              ret_con | null ex_tvs' && null theta' = return main_con
                      | otherwise                   = do
                          { cxt <- reifyCxt theta'
@@ -1775,6 +1776,13 @@ reifyDataCon isGadtDataCon tys dc
                          ; return (TH.ForallC ex_tvs'' cxt main_con) }
        ; ASSERT( arg_tys `equalLength` dcdBangs )
          ret_con }
+
+  where
+    strip_user_pred :: Pred -> UserPred
+    strip_user_pred (UserPred up) = up
+    strip_user_pred p             = pprPanic "strip_user_pred" (ppr p)
+      -- this is called only for H98 constructors, which never contain
+      -- non-UserPreds (which would arise from GADT equalities)
 
 {-
 Note [Freshen reified GADT constructors' universal tyvars]
@@ -1804,7 +1812,8 @@ counterparts in the tycon.
 ------------------------------
 reifyClass :: Class -> TcM TH.Info
 reifyClass cls
-  = do  { cxt <- reifyCxt theta
+  = do  { theta' <- mapMaybeM un_userpred theta
+        ; cxt <- reifyCxt theta'
         ; inst_envs <- tcGetInstEnvs
         ; insts <- reifyClassInstances cls (InstEnv.classInstances inst_envs cls)
         ; assocTys <- concatMapM reifyAT ats
@@ -1814,6 +1823,14 @@ reifyClass cls
         ; return (TH.ClassI dec insts) }
   where
     (_, fds, theta, _, ats, op_stuff) = classExtraBigSig cls
+
+    un_userpred :: Pred -> TcM (Maybe UserPred)
+    un_userpred (UserPred up) = return (Just up)
+    un_userpred other         = do { addErrTc $ hang (text "Cannot reify GHC-internal predicate:")
+                                                   2 (ppr other)
+                                             $$ text "Are you trying to reify a magical class? GHC does not support that."
+                                   ; return Nothing }
+
     fds' = map reifyFunDep fds
     reify_op (op, def_meth)
       = do { let (_, _, ty) = tcSplitMethodTy (idType op)
@@ -2113,7 +2130,7 @@ reifyTypes :: [Type] -> TcM [TH.Type]
 reifyTypes = mapM reifyType
 
 reifyPatSynType
-  :: ([TyVar], ThetaType, [TyVar], ThetaType, [Type], Type) -> TcM TH.Type
+  :: ([TyVar], [UserPred], [TyVar], [UserPred], [Type], Type) -> TcM TH.Type
 -- reifies a pattern synonym's type and returns its *complete* type
 -- signature; see NOTE [Pattern synonym signatures and Template
 -- Haskell]
@@ -2129,8 +2146,8 @@ reifyPatSynType (univTyVars, req, exTyVars, prov, argTys, resTy)
 reifyKind :: Kind -> TcM TH.Kind
 reifyKind = reifyType
 
-reifyCxt :: [PredType] -> TcM [TH.Pred]
-reifyCxt   = mapM reifyType
+reifyCxt :: [UserPred] -> TcM [TH.Pred]
+reifyCxt   = mapM (reifyType . userPredType)
 
 reifyFunDep :: ([TyVar], [TyVar]) -> TH.FunDep
 reifyFunDep (xs, ys) = TH.FunDep (map reifyName xs) (map reifyName ys)

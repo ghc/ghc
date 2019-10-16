@@ -65,7 +65,7 @@ import MkId( mkDictFunId )
 import CoreSyn( Expr(..) )  -- For the Coercion constructor
 import Id
 import Name
-import Var      ( EvVar, tyVarName, VarBndr(..) )
+import Var      ( tyVarName, VarBndr(..) )
 import DataCon
 import VarEnv
 import PrelNames
@@ -149,7 +149,7 @@ ToDo: this eta-abstraction plays fast and loose with termination,
 deeplySkolemise :: TcSigmaType
                 -> TcM ( HsWrapper
                        , [(Name,TyVar)]     -- All skolemised variables
-                       , [EvVar]            -- All "given"s
+                       , [EvVarBinder]      -- All "given"s
                        , TcRhoType )
 
 deeplySkolemise ty
@@ -162,12 +162,12 @@ deeplySkolemise ty
       = do { let arg_tys' = substTys subst arg_tys
            ; ids1           <- newSysLocalIds (fsLit "dk") arg_tys'
            ; (subst', tvs1) <- tcInstSkolTyVarsX subst tvs
-           ; ev_vars1       <- newEvVars (substTheta subst' theta)
+           ; ev_vars1       <- newEvVarBinders (substTheta subst' theta)
            ; (wrap, tvs_prs2, ev_vars2, rho) <- go subst' ty'
            ; let tv_prs1 = map tyVarName tvs `zip` tvs1
            ; return ( mkWpLams ids1
                       <.> mkWpTyLams tvs1
-                      <.> mkWpLams ev_vars1
+                      <.> mkWpLams (evbsVars ev_vars1)
                       <.> wrap
                       <.> mkWpEvVarApps ids1
                     , tv_prs1  ++ tvs_prs2
@@ -313,7 +313,7 @@ instTyVarsWith orig tvs tys
       | tv_kind `tcEqType` ty_kind
       = go (extendTvSubstAndInScope subst tv ty) tvs tys
       | otherwise
-      = do { co <- emitWantedEq orig KindLevel Nominal ty_kind tv_kind
+      = do { co <- emitWantedEq orig KindLevel ty_kind tv_kind
            ; go (extendTvSubstAndInScope subst tv (ty `mkCastTy` co)) tvs tys }
       where
         tv_kind = substTy subst (tyVarKind tv)
@@ -341,7 +341,7 @@ So we simply check for this case and make the right boxing of evidence.
 -}
 
 ----------------
-instCall :: CtOrigin -> [TcType] -> TcThetaType -> TcM HsWrapper
+instCall :: CtOrigin -> [TcType] -> [UserPred] -> TcM HsWrapper
 -- Instantiate the constraints of a call
 --      (instCall o tys theta)
 -- (a) Makes fresh dictionaries as necessary for the constraints (theta)
@@ -353,7 +353,7 @@ instCall orig tys theta
         ; return (dict_app <.> mkWpTyApps tys) }
 
 ----------------
-instCallConstraints :: CtOrigin -> TcThetaType -> TcM HsWrapper
+instCallConstraints :: CtOrigin -> [UserPred] -> TcM HsWrapper
 -- Instantiates the TcTheta, puts all constraints thereby generated
 -- into the LIE, and returns a HsWrapper to enclose the call site.
 
@@ -365,24 +365,24 @@ instCallConstraints orig preds
        ; traceTc "instCallConstraints" (ppr evs)
        ; return (mkWpEvApps evs) }
   where
-    go :: TcPredType -> TcM EvTerm
-    go pred
-     | Just (Nominal, ty1, ty2) <- getEqPredTys_maybe pred -- Try short-cut #1
-     = do  { co <- unifyType Nothing ty1 ty2
-           ; return (evCoercion co) }
-
-       -- Try short-cut #2
-     | Just (tc, args@[_, _, ty1, ty2]) <- splitTyConApp_maybe pred
-     , tc `hasKey` heqTyConKey
+    go :: UserPred -> TcM EvTerm
+       -- Try short-cut for equality predicates:
+    go (ClassPred cls args)
+     | [_, _, ty1, ty2] <- args
+     , cls `hasKey` heqTyConKey
      = do { co <- unifyType Nothing ty1 ty2
           ; return (evDFunApp (dataConWrapId heqDataCon) args [Coercion co]) }
 
-     | otherwise
-     = emitWanted orig pred
+     | [_, ty1, ty2] <- args
+     , cls `hasKey` eqTyConKey
+     = do { co <- unifyType Nothing ty1 ty2
+          ; return (evDFunApp (dataConWrapId eqDataCon) args [Coercion co]) }
+
+    go pred = emitWanted orig (fromUserPred pred)
 
 instDFunType :: DFunId -> [DFunInstType]
              -> TcM ( [TcType]      -- instantiated argument types
-                    , TcThetaType ) -- instantiated constraint
+                    , [UserPred] )  -- instantiated constraint
 -- See Note [DFunInstType: instantiating types] in InstEnv
 instDFunType dfun_id dfun_inst_tys
   = do { (subst, inst_tys) <- go empty_subst dfun_tvs dfun_inst_tys
@@ -408,7 +408,7 @@ instDFunType dfun_id dfun_inst_tys
     go _ _ _ = pprPanic "instDFunTypes" (ppr dfun_id $$ ppr dfun_inst_tys)
 
 ----------------
-instStupidTheta :: CtOrigin -> TcThetaType -> TcM ()
+instStupidTheta :: CtOrigin -> [UserPred] -> TcM ()
 -- Similar to instCall, but only emit the constraints in the LIE
 -- Used exclusively for the 'stupid theta' of a data constructor
 instStupidTheta orig theta
@@ -681,7 +681,7 @@ tcGetInsts :: TcM [ClsInst]
 -- Gets the local class instances.
 tcGetInsts = fmap tcg_insts getGblEnv
 
-newClsInst :: Maybe OverlapMode -> Name -> [TyVar] -> ThetaType
+newClsInst :: Maybe OverlapMode -> Name -> [TyVar] -> [UserPred]
            -> Class -> [Type] -> TcM ClsInst
 newClsInst overlap_mode dfun_name tvs theta clas tys
   = do { (subst, tvs') <- freshenTyVarBndrs tvs

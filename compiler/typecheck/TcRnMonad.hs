@@ -157,6 +157,7 @@ import Module
 import RdrName
 import Name
 import Type
+import Predicate
 
 import TcType
 import InstEnv
@@ -1649,7 +1650,7 @@ emitAnonWildCardHoleConstraint :: TcTyVar -> TcM ()
 emitAnonWildCardHoleConstraint tv
   = do { ct_loc <- getCtLocM HoleOrigin Nothing
        ; emitInsolubles $ unitBag $
-         CHoleCan { cc_ev = CtDerived { ctev_pred = mkTyVarTy tv
+         CHoleCan { cc_ev = CtDerived { ctev_pred = fromUserPred $ IrredPred $ mkTyVarTy tv
                                       , ctev_loc  = ct_loc }
                   , cc_occ = mkTyVarOcc "_"
                   , cc_hole = TypeHole } }
@@ -1662,7 +1663,7 @@ emitNamedWildCardHoleConstraints wcs
   where
     do_one :: CtLoc -> (Name, TcTyVar) -> Ct
     do_one ct_loc (name, tv)
-       = CHoleCan { cc_ev = CtDerived { ctev_pred = mkTyVarTy tv
+       = CHoleCan { cc_ev = CtDerived { ctev_pred = fromUserPred $ IrredPred $ mkTyVarTy tv
                                       , ctev_loc  = ct_loc' }
                   , cc_occ = occName name
                   , cc_hole = TypeHole }

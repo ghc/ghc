@@ -114,6 +114,7 @@ import RdrName
 import Var
 import TyCoRep
 import Type   ( appTyArgFlags, splitAppTys, tyConArgFlags, tyConAppNeedsKindSig )
+import Predicate
 import TysWiredIn ( unitTy )
 import TcType
 import DataCon
@@ -655,7 +656,7 @@ typeToLHsType ty
       = case af of
           VisArg   -> nlHsFunTy (go arg) (go res)
           InvisArg | (theta, tau) <- tcSplitPhiTy ty
-                   -> noLoc (HsQualTy { hst_ctxt = noLoc (map go theta)
+                   -> noLoc (HsQualTy { hst_ctxt = noLoc (map go_user_pred theta)
                                       , hst_xqual = noExtField
                                       , hst_body = go tau })
 
@@ -706,6 +707,9 @@ typeToLHsType ty
     go_tv :: TyVar -> LHsTyVarBndr GhcPs
     go_tv tv = noLoc $ KindedTyVar noExtField (noLoc (getRdrName tv))
                                    (go (tyVarKind tv))
+
+    go_user_pred :: UserPred -> LHsType GhcPs
+    go_user_pred = go . userPredType
 
 {-
 Note [Kind signatures in typeToLHsType]

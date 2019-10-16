@@ -1072,15 +1072,12 @@ parseInstanceHead str = withSession $ \hsc_env0 -> do
   return ty
 
 -- Get all the constraints required of a dictionary binding
-getDictionaryBindings :: PredType -> TcM WantedConstraints
+getDictionaryBindings :: UserPred -> TcM WantedConstraints
 getDictionaryBindings theta = do
-  dictName <- newName (mkDictOcc (mkVarOcc "magic"))
-  let dict_var = mkVanillaGlobal dictName theta
   loc <- getCtLocM (GivenOrigin UnkSkol) Nothing
-  let wCs = mkSimpleWC [CtDerived
-          { ctev_pred = varType dict_var
-          , ctev_loc = loc
-          }]
+  let wCs = mkSimpleWC [CtDerived { ctev_pred = fromUserPred theta
+                                  , ctev_loc = loc
+                                  }]
 
   return wCs
 
@@ -1117,7 +1114,7 @@ checkForExistence res mb_inst_tys = do
   let all_residual_constraints = bagToList $ wc_simple residuals
   let preds = map ctPred all_residual_constraints
   if all isSatisfiablePred preds && (null $ wc_impl residuals)
-  then return . Just $ substInstArgs tys preds res
+  then return . Just $ substInstArgs tys (toUserPreds "checkForExistence" preds) res
   else return Nothing
 
   where
@@ -1127,10 +1124,10 @@ checkForExistence res mb_inst_tys = do
   -- that all residual constraints mention a type-hole somewhere in the constraint,
   -- meaning that with the correct choice of a concrete type it could be possible for
   -- the constraint to be discharged.
-  isSatisfiablePred :: PredType -> Bool
+  isSatisfiablePred :: Pred -> Bool
   isSatisfiablePred ty = case getClassPredTys_maybe ty of
       Just (_, tys@(_:_)) -> all isTyVarTy tys
-      _                   -> isTyVarTy ty
+      _                   -> False
 
   empty_subst = mkEmptyTCvSubst (mkInScopeSet (tyCoVarsOfType (idType $ is_dfun res)))
 
@@ -1139,11 +1136,11 @@ checkForExistence res mb_inst_tys = do
      The thetas are the list of constraints that couldn't be solved because
      they mention a type-hole.
   -}
-  substInstArgs ::  [Type] -> [PredType] -> ClsInst -> ClsInst
+  substInstArgs ::  [Type] -> [UserPred] -> ClsInst -> ClsInst
   substInstArgs tys thetas inst = let
       subst = foldl' (\a b -> uncurry (extendTvSubstAndInScope a) b) empty_subst (zip dfun_tvs tys)
       -- Build instance head with arguments substituted in
-      tau   = mkClassPred cls (substTheta subst args)
+      tau   = mkClassPredTy cls (substTys subst args)
       -- Constrain the instance with any residual constraints
       phi   = mkPhiTy thetas tau
       sigma = mkForAllTys (map (\v -> Bndr v Inferred) dfun_tvs) phi

@@ -92,7 +92,7 @@ Overall plan
 -}
 
 data EarlyDerivSpec = InferTheta (DerivSpec [ThetaOrigin])
-                    | GivenTheta (DerivSpec ThetaType)
+                    | GivenTheta (DerivSpec [UserPred])
         -- InferTheta ds => the context for the instance should be inferred
         --      In this case ds_theta is the list of all the sets of
         --      constraints needed, such as (Eq [a], Eq a), together with a
@@ -105,7 +105,7 @@ data EarlyDerivSpec = InferTheta (DerivSpec [ThetaOrigin])
         -- See Note [Inferring the instance context] in TcDerivInfer
 
 splitEarlyDerivSpec :: [EarlyDerivSpec]
-                    -> ([DerivSpec [ThetaOrigin]], [DerivSpec ThetaType])
+                    -> ([DerivSpec [ThetaOrigin]], [DerivSpec [UserPred]])
 splitEarlyDerivSpec [] = ([],[])
 splitEarlyDerivSpec (InferTheta spec : specs) =
     case splitEarlyDerivSpec specs of (is, gs) -> (spec : is, gs)
@@ -259,8 +259,8 @@ tcDeriving deriv_infos deriv_decls
 
     -- Apply the suspended computations given by genInst calls.
     -- See Note [Staging of tcDeriving]
-    apply_inst_infos :: [ThetaType -> TcM (InstInfo GhcPs)]
-                     -> [DerivSpec ThetaType] -> TcM [InstInfo GhcPs]
+    apply_inst_infos :: [[UserPred] -> TcM (InstInfo GhcPs)]
+                     -> [DerivSpec [UserPred]] -> TcM [InstInfo GhcPs]
     apply_inst_infos = zipWithM (\f ds -> f (ds_theta ds))
 
 -- Prints the representable type family instance
@@ -662,7 +662,7 @@ deriveStandalone (L loc (DerivDecl _ deriv_ty mb_lderiv_strat overlap_mode))
                                         && not (v `elemVarSet` ki_subst_range))
                                           tvs
                    (subst, _)    = substTyVarBndrs kind_subst unmapped_tkvs
-                   (final_deriv_ctxt, final_deriv_ctxt_tys)
+                   (final_deriv_ctxt, final_deriv_ctxt_preds)
                      = case deriv_ctxt of
                          InferContext wc -> (InferContext wc, [])
                          SupplyContext theta ->
@@ -671,9 +671,9 @@ deriveStandalone (L loc (DerivDecl _ deriv_ty mb_lderiv_strat overlap_mode))
                    final_inst_tys   = substTys subst inst_tys
                    final_via_ty     = substTy  subst via_ty
                    -- See Note [Floating `via` type variables]
-                   final_tvs        = tyCoVarsOfTypesWellScoped $
-                                      final_deriv_ctxt_tys ++ final_inst_tys
-                                        ++ [final_via_ty]
+                   final_tvs        = scopedSort $
+                                      tyCoVarsOfUserPredsList final_deriv_ctxt_preds ++
+                                      tyCoVarsOfTypesList (final_inst_tys ++ [final_via_ty])
                pure ( final_tvs, final_deriv_ctxt, final_inst_tys
                     , Just (ViaStrategy final_via_ty) )
 
@@ -1839,7 +1839,7 @@ the renamer.  What a great hack!
 -- Generate the InstInfo for the required instance
 -- plus any auxiliary bindings required
 genInst :: DerivSpec theta
-        -> TcM (ThetaType -> TcM (InstInfo GhcPs), BagDerivStuff, [Name])
+        -> TcM ([UserPred] -> TcM (InstInfo GhcPs), BagDerivStuff, [Name])
 -- We must use continuation-returning style here to get the order in which we
 -- typecheck family instances and derived instances right.
 -- See Note [Staging of tcDeriving]
@@ -1986,7 +1986,7 @@ doDerivInstErrorChecks1 mechanism =
              <+> text "in a kind, which is not (yet) allowed")
       unless ats_look_sensible $ bale_out cant_derive_err
 
-doDerivInstErrorChecks2 :: Class -> ClsInst -> ThetaType -> Maybe SrcSpan
+doDerivInstErrorChecks2 :: Class -> ClsInst -> [UserPred] -> Maybe SrcSpan
                         -> DerivSpecMechanism -> TcM ()
 doDerivInstErrorChecks2 clas clas_inst theta wildcard mechanism
   = do { traceTc "doDerivInstErrorChecks2" (ppr clas_inst)

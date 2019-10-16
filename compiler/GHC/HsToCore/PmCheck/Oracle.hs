@@ -40,7 +40,6 @@ import Unique
 import Id
 import VarEnv
 import UniqDFM
-import Var           (EvVar)
 import Name
 import CoreSyn
 import CoreFVs ( exprFreeVars )
@@ -55,6 +54,9 @@ import ListSetOps (unionLists)
 import Maybes
 import ConLike
 import DataCon
+import Predicate
+import TcEvidence ( EvCoVarBinder, mkEvCoVarBinder )
+import TcType     ( dataConHasGadtEquality )
 import PatSyn
 import TyCon
 import TysWiredIn
@@ -150,7 +152,8 @@ mkOneConFull arg_tys con = do
   vars <- mapM mkPmId field_tys'
   -- All constraints bound by the constructor (alpha-renamed), these are added
   -- to the type oracle
-  let ty_cs = substTheta subst (eqSpecPreds eq_spec ++ thetas)
+  let ty_cs = substPreds subst (fromEqPreds (eqSpecPreds eq_spec) ++
+                                fromUserPreds thetas)
   -- Figure out the types of strict constructor fields
   let arg_is_strict
         | RealDataCon dc <- con
@@ -495,17 +498,17 @@ equalities (such as i ~ Int) that may be in scope.
 ----------------
 -- * Type oracle
 
--- | Allocates a fresh 'EvVar' name for 'PredTy's.
-nameTyCt :: PredType -> DsM EvVar
-nameTyCt pred_ty = do
+-- | Allocates a fresh 'EvVar' name for 'PredTy's
+nameTyCt :: Pred -> DsM EvCoVarBinder
+nameTyCt pred = do
   unique <- getUniqueM
   let occname = mkVarOccFS (fsLit ("pm_"++show unique))
       idname  = mkInternalName unique occname noSrcSpan
-  return (mkLocalIdOrCoVar idname pred_ty)
+  return (mkEvCoVarBinder (mkLocalId idname (predType pred)) pred)
 
 -- | Add some extra type constraints to the 'TyState'; return 'Nothing' if we
 -- find a contradiction (e.g. @Int ~ Bool@).
-tyOracle :: TyState -> Bag PredType -> DsM (Maybe TyState)
+tyOracle :: TyState -> Bag TyCt -> DsM (Maybe TyState)
 tyOracle (TySt inert) cts
   = do { evs <- traverse nameTyCt cts
        ; let new_inert = inert `unionBags` evs
@@ -521,7 +524,7 @@ tyOracle (TySt inert) cts
 -- ones. Doesn't bother calling out to the type oracle if the bag of new type
 -- constraints was empty. Will only recheck 'PossibleMatches' in the term oracle
 -- for emptiness if the first argument is 'True'.
-tyIsSatisfiable :: Bool -> Bag PredType -> SatisfiabilityCheck
+tyIsSatisfiable :: Bool -> Bag TyCt -> SatisfiabilityCheck
 tyIsSatisfiable recheck_complete_sets new_ty_cs = SC $ \delta ->
   if isEmptyBag new_ty_cs
     then pure (Just delta)
@@ -841,7 +844,7 @@ instance Outputable TmCt where
   ppr (TmBotCt x)              = ppr x <+> text "~ ⊥"
   ppr (TmNotBotCt x)           = ppr x <+> text "/~ ⊥"
 
-type TyCt = PredType
+type TyCt = Pred
 
 -- | An oracle constraint.
 data PmCt
@@ -1148,7 +1151,7 @@ addVarConCt delta@MkDelta{ delta_tm_st = TmSt env reps } x alt tvs args = do
 
 equateTyVarsCts :: [TyVar] -> [TyVar] -> [PmCt]
 equateTyVarsCts as bs
-  = map (\(a, b) -> PmTyCt $ mkPrimEqPred (mkTyVarTy a) (mkTyVarTy b))
+  = map (\(a, b) -> PmTyCt $ fromEqPred $ mkEqPred NomEq (mkTyVarTy a) (mkTyVarTy b))
   -- The following line filters out trivial Refl constraints, so that we don't
   -- need to initialise the type oracle that often
   $ filter (uncurry (/=))
@@ -1372,8 +1375,8 @@ definitelyInhabitedType ty_st ty = do
   where
     meets_criteria :: (Type, DataCon, Type) -> Bool
     meets_criteria (_, con, _) =
-      null (dataConEqSpec con) && -- (1)
-      null (dataConImplBangs con) -- (2)
+      not (dataConHasGadtEquality con) && -- (1)
+      null (dataConImplBangs con)  -- (2)
 
 {- Note [Strict argument type constraints]
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~

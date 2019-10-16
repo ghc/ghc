@@ -25,12 +25,11 @@ import TcType
 import TcHsType
 import TcExpr
 import TcEnv
-import TcUnify( buildImplicationFor )
-import TcEvidence( mkTcCoVarCo )
+import TcUnify( buildImplicationForEqs )
+import TcEvidence( mkTcCoVarCo, EvCoVarBinder, mkEvCoVarBinder, evbsVars )
 import Type
 import TyCon( isTypeFamilyTyCon )
 import Id
-import Var( EvVar )
 import VarSet
 import BasicTypes       ( RuleName )
 import SrcLoc
@@ -112,7 +111,7 @@ tcRule (HsRule { rd_ext  = ext
        -- the LHS, lest they otherwise get defaulted to Any; but we do that
        -- during zonking (see TcHsSyn.zonkRule)
 
-       ; let tpl_ids = lhs_evs ++ id_bndrs
+       ; let tpl_ids = evbsVars lhs_evs ++ id_bndrs
        ; forall_tkvs <- candidateQTyVarsOfTypes $
                         map (mkSpecForAllTys tv_bndrs) $  -- don't quantify over lexical tyvars
                         rule_ty : map idType tpl_ids
@@ -132,9 +131,9 @@ tcRule (HsRule { rd_ext  = ext
        -- (b) so that we bind any soluble ones
        ; let all_qtkvs = qtkvs ++ tv_bndrs
              skol_info = RuleSkol name
-       ; (lhs_implic, lhs_binds) <- buildImplicationFor tc_lvl skol_info all_qtkvs
+       ; (lhs_implic, lhs_binds) <- buildImplicationForEqs tc_lvl skol_info all_qtkvs
                                          lhs_evs residual_lhs_wanted
-       ; (rhs_implic, rhs_binds) <- buildImplicationFor tc_lvl skol_info all_qtkvs
+       ; (rhs_implic, rhs_binds) <- buildImplicationForEqs tc_lvl skol_info all_qtkvs
                                          lhs_evs rhs_wanted
 
        ; emitImplications (lhs_implic `unionBags` rhs_implic)
@@ -281,7 +280,7 @@ revert to SimplCheck when going under an implication.
 * Step 2: Zonk the ORIGINAL (unsimplified) LHS constraints, to take
           advantage of those unifications
 
-* Setp 3: Partition the LHS constraints into the ones we will
+* Step 3: Partition the LHS constraints into the ones we will
           quantify over, and the others.
           See Note [RULE quantification over equalities]
 
@@ -357,7 +356,7 @@ simplifyRule :: RuleName
              -> TcLevel                 -- Level at which to solve the constraints
              -> WantedConstraints       -- Constraints from LHS
              -> WantedConstraints       -- Constraints from RHS
-             -> TcM ( [EvVar]               -- Quantify over these LHS vars
+             -> TcM ( [EvCoVarBinder]       -- Quantify over these LHS vars
                     , WantedConstraints)    -- Residual un-quantified LHS constraints
 -- See Note [The SimplifyRule Plan]
 -- NB: This consumes all simple constraints on the LHS, but not
@@ -396,15 +395,19 @@ simplifyRule name tc_lvl lhs_wanted rhs_wanted
        ; return (quant_evs, residual_lhs_wanted) }
 
   where
-    mk_quant_ev :: Ct -> TcM EvVar
+    mk_quant_ev :: Ct -> TcM EvCoVarBinder
     mk_quant_ev ct
       | CtWanted { ctev_dest = dest, ctev_pred = pred } <- ctEvidence ct
       = case dest of
-          EvVarDest ev_id -> return ev_id
-          HoleDest hole   -> -- See Note [Quantifying over coercion holes]
-                             do { ev_id <- newEvVar pred
-                                ; fillCoercionHole hole (mkTcCoVarCo ev_id)
-                                ; return ev_id }
+          EvVarDest ev_id -> return (mkEvCoVarBinder ev_id pred)
+          HoleDest hole
+            | EqualityPred eq_pred <- pred
+            -> -- See Note [Quantifying over coercion holes]
+                do { ev_id <- newCoVar eq_pred
+                   ; fillCoercionHole hole (mkTcCoVarCo ev_id)
+                   ; return (mkEvCoVarBinder ev_id pred) }
+            | otherwise
+            -> pprPanic "mk_quant_ev 2" (ppr dest $$ ppr pred)
     mk_quant_ev ct = pprPanic "mk_quant_ev" (ppr ct)
 
 
@@ -447,7 +450,7 @@ getRuleQuantCts wc
 
     rule_quant_ct :: TcTyCoVarSet -> Ct -> Bool
     rule_quant_ct skol_tvs ct
-      | EqPred _ t1 t2 <- classifyPredType (ctPred ct)
+      | EqualityPred (EqPred _ t1 t2) <- ctPred ct
       , not (ok_eq t1 t2)
        = False        -- Note [RULE quantification over equalities]
       | isHoleCt ct

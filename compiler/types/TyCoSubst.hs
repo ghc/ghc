@@ -34,15 +34,16 @@ module TyCoSubst
         substTyWith, substTyWithCoVars, substTysWith, substTysWithCoVars,
         substCoWith,
         substTy, substTyAddInScope,
-        substTyUnchecked, substTysUnchecked, substThetaUnchecked,
+        substTyUnchecked, substTysUnchecked,
         substTyWithUnchecked,
         substCoUnchecked, substCoWithUnchecked,
         substTyWithInScope,
-        substTys, substTheta,
+        substTys,
         lookupTyVar,
         substCo, substCos, substCoVar, substCoVars, lookupCoVar,
         cloneTyVarBndr, cloneTyVarBndrs,
-        substVarBndr, substVarBndrs,
+        substVarBndr, substVarBndrs, substVarBndrUnchecked,
+        substTyCoVarBinder, substTyCoVarBinders,
         substTyVarBndr, substTyVarBndrs,
         substCoVarBndr,
         substTyVar, substTyVars, substTyCoVars,
@@ -687,21 +688,6 @@ substTysUnchecked subst tys
                  | isEmptyTCvSubst subst = tys
                  | otherwise             = map (subst_ty subst) tys
 
--- | Substitute within a 'ThetaType'
--- The substitution has to satisfy the invariants described in
--- Note [The substitution invariant].
-substTheta :: HasCallStack => TCvSubst -> ThetaType -> ThetaType
-substTheta = substTys
-
--- | Substitute within a 'ThetaType' disabling the sanity checks.
--- The problems that the sanity checks in substTys catch are described in
--- Note [The substitution invariant].
--- The goal of #11371 is to migrate all the calls of substThetaUnchecked to
--- substTheta and remove this function. Please don't use in new code.
-substThetaUnchecked :: TCvSubst -> ThetaType -> ThetaType
-substThetaUnchecked = substTysUnchecked
-
-
 subst_ty :: TCvSubst -> Type -> Type
 -- subst_ty is the main workhorse for type substitution
 --
@@ -930,6 +916,13 @@ substVarBndrs = mapAccumL substVarBndr
 substCoVarBndr :: HasCallStack => TCvSubst -> CoVar -> (TCvSubst, CoVar)
 substCoVarBndr = substCoVarBndrUsing substTy
 
+substTyCoVarBinder :: HasCallStack => TCvSubst -> TyCoVarBinder -> (TCvSubst, TyCoVarBinder)
+substTyCoVarBinder subst (Bndr tcv flag) = (subst', Bndr tcv' flag)
+  where (subst', tcv') = substVarBndr subst tcv
+
+substTyCoVarBinders :: HasCallStack => TCvSubst -> [TyCoVarBinder] -> (TCvSubst, [TyCoVarBinder])
+substTyCoVarBinders = mapAccumL substTyCoVarBinder
+
 -- | Like 'substVarBndr', but disables sanity checks.
 -- The problems that the sanity checks in substTy catch are described in
 -- Note [The substitution invariant].
@@ -1027,4 +1020,3 @@ cloneTyVarBndrs subst (t:ts)  usupply = (subst'', tv:tvs)
     (uniq, usupply') = takeUniqFromSupply usupply
     (subst' , tv )   = cloneTyVarBndr subst t uniq
     (subst'', tvs)   = cloneTyVarBndrs subst' ts usupply'
-

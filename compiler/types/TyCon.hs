@@ -135,13 +135,13 @@ module TyCon(
 
 import GhcPrelude
 
-import {-# SOURCE #-} TyCoRep    ( Kind, Type, PredType, mkForAllTy, mkFunTy )
+import {-# SOURCE #-} TyCoRep    ( Kind, Type, mkForAllTy, mkFunTy )
 import {-# SOURCE #-} TyCoPpr    ( pprType )
 import {-# SOURCE #-} TysWiredIn ( runtimeRepTyCon, constraintKind
                                  , vecCountTyCon, vecElemTyCon, liftedTypeKind )
 import {-# SOURCE #-} DataCon    ( DataCon, dataConExTyCoVars, dataConFieldLabels
-                                 , dataConTyCon, dataConFullSig
-                                 , isUnboxedSumCon )
+                                 , dataConTyCon, isEnumDataCon, isUnboxedSumCon )
+import {-# SOURCE #-} Predicate  ( UserPred )
 
 import Binary
 import Var
@@ -758,7 +758,7 @@ data TyCon
                                     -- was used.  This field is used only to
                                     -- guide pretty-printing
 
-        algTcStupidTheta :: [PredType], -- ^ The \"stupid theta\" for the data
+        algTcStupidTheta :: [UserPred], -- ^ The \"stupid theta\" for the data
                                         -- type (always empty for GADTs).  A
                                         -- \"stupid theta\" is the context to
                                         -- the left of an algebraic type
@@ -1021,14 +1021,10 @@ mkDataTyConRhs cons
   = DataTyCon {
         data_cons = cons,
         data_cons_size = length cons,
-        is_enum = not (null cons) && all is_enum_con cons
+        is_enum = not (null cons) && all isEnumDataCon cons
                   -- See Note [Enumeration types] in TyCon
     }
   where
-    is_enum_con con
-       | (_univ_tvs, ex_tvs, eq_spec, theta, arg_tys, _res)
-           <- dataConFullSig con
-       = null ex_tvs && null eq_spec && null theta && null arg_tys
 
 -- | Some promoted datacons signify extra info relevant to GHC. For example,
 -- the @IntRep@ constructor of @RuntimeRep@ corresponds to the 'IntRep'
@@ -1602,7 +1598,7 @@ mkAlgTyCon :: Name
            -> [Role]            -- ^ The roles for each TyVar
            -> Maybe CType       -- ^ The C type this type corresponds to
                                 --   when using the CAPI FFI
-           -> [PredType]        -- ^ Stupid theta: see 'algTcStupidTheta'
+           -> [UserPred]        -- ^ Stupid theta: see 'algTcStupidTheta'
            -> AlgTyConRhs       -- ^ Information about data constructors
            -> AlgTyConFlav      -- ^ What flavour is it?
                                 -- (e.g. vanilla, type family)
@@ -2442,7 +2438,7 @@ newTyConDataCon_maybe _ = Nothing
 -- | Find the \"stupid theta\" of the 'TyCon'. A \"stupid theta\" is the context
 -- to the left of an algebraic type declaration, e.g. @Eq a@ in the declaration
 -- @data Eq a => T a ...@
-tyConStupidTheta :: TyCon -> [PredType]
+tyConStupidTheta :: TyCon -> [UserPred]
 tyConStupidTheta (AlgTyCon {algTcStupidTheta = stupid}) = stupid
 tyConStupidTheta (FunTyCon {}) = []
 tyConStupidTheta tycon = pprPanic "tyConStupidTheta" (ppr tycon)

@@ -214,7 +214,7 @@ for them, e.g. to compile the constructor's info table.
 Furthermore the type of MkCoercible cannot be written in Haskell
 (no syntax for ~#R).
 
-So we define them as regular data types in GHC.Types, and do magic in TysWiredIn,
+So we define them as classes in GHC.Types, and do magic in TysWiredIn,
 inside GHC, to change the kind and type.
 -}
 

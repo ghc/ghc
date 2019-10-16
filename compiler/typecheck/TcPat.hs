@@ -44,6 +44,7 @@ import TcEvidence
 import TcOrigin
 import TyCon
 import DataCon
+import Predicate
 import PatSyn
 import ConLike
 import PrelNames
@@ -755,8 +756,10 @@ tcDataConPat penv (L con_span con_name) data_con pat_ty
           -- Add the stupid theta
         ; setSrcSpan con_span $ addDataConStupidTheta data_con ctxt_res_tys
 
-        ; let all_arg_tys = eqSpecPreds eq_spec ++ theta ++ arg_tys
-        ; checkExistentials ex_tvs all_arg_tys penv
+        ; let all_arg_tvs = unionVarSets [ tyCoVarsOfEqPreds (eqSpecPreds eq_spec)
+                                         , tyCoVarsOfUserPreds theta
+                                         , tyCoVarsOfTypes arg_tys ]
+        ; checkExistentials ex_tvs all_arg_tvs penv
 
         ; tenv <- instTyVarsWith PatOrigin univ_tvs ctxt_res_tys
                   -- NB: Do not use zipTvSubst!  See #14154
@@ -797,10 +800,11 @@ tcDataConPat penv (L con_span con_name) data_con pat_ty
 
           else do   -- The general case, with existential,
                     -- and local equality constraints
-        { let theta'     = substTheta tenv (eqSpecPreds eq_spec ++ theta)
+        { let theta'     = substPreds tenv (fromEqPreds (eqSpecPreds eq_spec) ++
+                                            fromUserPreds theta)
                            -- order is *important* as we generate the list of
                            -- dictionary binders from theta'
-              no_equalities = null eq_spec && not (any isEqPred theta)
+              no_equalities = null eq_spec && not (any isLiftedEqPred theta)
               skol_info = PatSkol (RealDataCon data_con) mc
               mc = case pe_ctxt penv of
                      LamPat mc -> mc
@@ -815,9 +819,9 @@ tcDataConPat penv (L con_span con_name) data_con pat_ty
                   -- should require the GADT language flag.
                   -- Re TypeFamilies see also #7156
 
-        ; given <- newEvVars theta'
+        ; given <- newEvCoVarBinders theta'
         ; (ev_binds, (arg_pats', res))
-             <- checkConstraints skol_info ex_tvs' given $
+             <- checkConstraintsEqs skol_info ex_tvs' given $
                 tcConArgs (RealDataCon data_con) arg_tys' arg_pats penv thing_inside
 
         ; let res_pat = ConPatOut { pat_con   = header,
@@ -839,8 +843,10 @@ tcPatSynPat penv (L con_span _) pat_syn pat_ty arg_pats thing_inside
 
         ; (subst, univ_tvs') <- newMetaTyVars univ_tvs
 
-        ; let all_arg_tys = ty : prov_theta ++ arg_tys
-        ; checkExistentials ex_tvs all_arg_tys penv
+        ; let all_arg_tvs = unionVarSets [ tyCoVarsOfType ty
+                                         , tyCoVarsOfUserPreds prov_theta
+                                         , tyCoVarsOfTypes arg_tys ]
+        ; checkExistentials ex_tvs all_arg_tvs penv
         ; (tenv, ex_tvs') <- tcInstSuperSkolTyVarsX subst ex_tvs
         ; let ty'         = substTy tenv ty
               arg_tys'    = substTys tenv arg_tys
@@ -856,7 +862,7 @@ tcPatSynPat penv (L con_span _) pat_syn pat_ty arg_pats thing_inside
                                  ppr req_theta' $$
                                  ppr arg_tys')
 
-        ; prov_dicts' <- newEvVars prov_theta'
+        ; prov_dicts' <- newEvVarBinders prov_theta'
 
         ; let skol_info = case pe_ctxt penv of
                             LamPat mc -> PatSkol (PatSynCon pat_syn) mc
@@ -873,7 +879,7 @@ tcPatSynPat penv (L con_span _) pat_syn pat_ty arg_pats thing_inside
         ; traceTc "checkConstraints }" (ppr ev_binds)
         ; let res_pat = ConPatOut { pat_con   = L con_span $ PatSynCon pat_syn,
                                     pat_tvs   = ex_tvs',
-                                    pat_dicts = prov_dicts',
+                                    pat_dicts = toEvCoVarBinders prov_dicts',
                                     pat_binds = ev_binds,
                                     pat_args  = arg_pats',
                                     pat_arg_tys = mkTyVarTys univ_tvs',
@@ -1174,13 +1180,13 @@ maybeWrapPatCtxt pat tcm thing_inside
    msg = hang (text "In the pattern:") 2 (ppr pat)
 
 -----------------------------------------------
-checkExistentials :: [TyVar]   -- existentials
-                  -> [Type]    -- argument types
+checkExistentials :: [TyVar]       -- existentials
+                  -> TyCoVarSet    -- argument fvs
                   -> PatEnv -> TcM ()
     -- See Note [Existential check]]
     -- See Note [Arrows and patterns]
-checkExistentials ex_tvs tys _
-  | all (not . (`elemVarSet` tyCoVarsOfTypes tys)) ex_tvs = return ()
+checkExistentials ex_tvs arg_fvs _
+  | all (not . (`elemVarSet` arg_fvs)) ex_tvs = return ()
 checkExistentials _ _ (PE { pe_ctxt = LetPat {}})         = return ()
 checkExistentials _ _ (PE { pe_ctxt = LamPat ProcExpr })  = failWithTc existentialProcPat
 checkExistentials _ _ (PE { pe_lazy = True })             = failWithTc existentialLazyPat

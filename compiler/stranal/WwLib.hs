@@ -27,10 +27,10 @@ import MkId             ( voidArgId, voidPrimId )
 import TysWiredIn       ( tupleDataCon )
 import TysPrim          ( voidPrimTy )
 import Literal          ( absentLiteralOf, rubbishLit )
+import Predicate        ( isDictTy )
 import VarEnv           ( mkInScopeSet )
 import VarSet           ( VarSet )
 import Type
-import Predicate        ( isClassPred )
 import GHC.Types.RepType          ( isVoidTy, typePrimRep )
 import Coercion
 import FamInstEnv
@@ -588,7 +588,7 @@ mkWWstr_one dflags fam_envs has_inlineable_prag arg
   | isStrictDmd dmd
   , Just cs <- splitProdDmd_maybe dmd
       -- See Note [Unpacking arguments with product and polymorphic demands]
-  , not (has_inlineable_prag && isClassPred arg_ty)
+  , not (has_inlineable_prag && isDictTy arg_ty)
       -- See Note [Do not unpack class dictionaries]
   , Just stuff@(_, _, inst_con_arg_tys, _) <- deepSplitProductType_maybe fam_envs arg_ty
   , cs `equalLength` inst_con_arg_tys
@@ -906,7 +906,7 @@ and the type-class specialiser can't specialise that.  An example is
 
 But in any other situation a dictionary is just an ordinary value,
 and can be unpacked.  So we track the INLINABLE pragma, and switch
-off the unpacking in mkWWstr_one (see the isClassPred test).
+off the unpacking in mkWWstr_one (see the isDictTy test).
 
 Historical note: #14955 describes how I got this fix wrong
 the first time.

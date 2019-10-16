@@ -76,6 +76,7 @@ module TcType (
   -- Again, newtypes are opaque
   eqType, eqTypes, nonDetCmpType, nonDetCmpTypes, eqTypeX,
   pickyEqType, tcEqType, tcEqKind, tcEqTypeNoKindCheck, tcEqTypeVis,
+  tcEqPred,
   isSigmaTy, isRhoTy, isRhoExpTy, isOverloadedTy,
   isFloatingTy, isDoubleTy, isFloatTy, isIntTy, isWordTy, isStringTy,
   isIntegerTy, isBoolTy, isUnitTy, isCharTy, isCallStackTy, isCallStackPred,
@@ -90,21 +91,22 @@ module TcType (
   deNoteType,
   orphNamesOfType, orphNamesOfCo,
   orphNamesOfTypes, orphNamesOfCoCon,
-  getDFunTyKey, evVarPred,
+  getDFunTyKey,
 
   ---------------------------------
   -- Predicate types
   mkMinimalBySCs, transSuperClasses,
   pickQuantifiablePreds, pickCapturedPreds,
   immSuperClasses, boxEqPred,
-  isImprovementPred,
+  isImprovementPred, dataConHasGadtEquality,
 
   -- * Finding type instances
-  tcTyFamInsts, tcTyFamInstsAndVis, tcTyConAppTyFamInstsAndVis, isTyFamFree,
+  tcTyFamInsts, tcTyFamInstsAndVis, tcTyConAppTyFamInstsAndVis,
+  isTyFamFree, isTyFamFreeUserPred, isTyFamFreePred,
 
   -- * Finding "exact" (non-dead) type variables
   exactTyCoVarsOfType, exactTyCoVarsOfTypes,
-  anyRewritableTyVar,
+  anyRewritableTyVar, anyRewritableTyVarPred,
 
   ---------------------------------
   -- Foreign import and export
@@ -139,8 +141,8 @@ module TcType (
   mkTyConTy, mkTyVarTy, mkTyVarTys,
   mkTyCoVarTy, mkTyCoVarTys,
 
-  isClassPred, isEqPrimPred, isIPPred, isEqPred, isEqPredClass,
-  mkClassPred,
+  isIPPred, isLiftedEqPred, isEqPredClass,
+  mkClassPredTy,
   tcSplitDFunTy, tcSplitDFunHead, tcSplitMethodTy,
   isRuntimeRepVar, isKindLevPoly,
   isVisibleBinder, isInvisibleBinder,
@@ -206,6 +208,7 @@ import Type
 import Predicate
 import GHC.Types.RepType
 import TyCon
+import DataCon
 
 -- others:
 import DynFlags
@@ -842,6 +845,16 @@ isTyFamFree :: Type -> Bool
 -- ^ Check that a type does not contain any type family applications.
 isTyFamFree = null . tcTyFamInsts
 
+-- | Check that a 'UserPred' does not contain any type family applications
+isTyFamFreeUserPred :: UserPred -> Bool
+isTyFamFreeUserPred = isTyFamFree . userPredType
+
+-- | Check that a 'Pred' does not contain any type family applications.
+isTyFamFreePred :: Pred -> Bool
+isTyFamFreePred (EqualityPred (EqPred _ ty1 ty2))
+  = isTyFamFree ty1 && isTyFamFree ty2
+isTyFamFreePred (UserPred u_pred) = isTyFamFreeUserPred u_pred
+
 anyRewritableTyVar :: Bool    -- Ignore casts and coercions
                    -> EqRel   -- Ambient role
                    -> (EqRel -> TcTyVar -> Bool)
@@ -878,6 +891,22 @@ anyRewritableTyVar ignore_cos role pred ty
       | otherwise  = anyVarSet (go_tv rl bvs) (tyCoVarsOfCo co)
       -- We don't have an equivalent of anyRewritableTyVar for coercions
       -- (at least not yet) so take the free vars and test them
+
+anyRewritableTyVarPred :: Bool   -- Ignore casts an coercions
+                       -> EqRel  -- ambient role
+                       -> (EqRel -> TcTyVar -> Bool)
+                       -> Pred -> Bool
+-- like anyRewritableTyVar, but over Preds
+anyRewritableTyVarPred ignore_cos role f (EqualityPred (EqPred eq_rel ty1 ty2))
+  = anyRewritableTyVar ignore_cos NomEq f (typeKind ty1) ||
+    anyRewritableTyVar ignore_cos NomEq f (typeKind ty2) ||
+    anyRewritableTyVar ignore_cos (min role eq_rel) f ty1 ||
+    anyRewritableTyVar ignore_cos (min role eq_rel) f ty2
+anyRewritableTyVarPred ignore_cos role f (UserPred pred)
+  = anyRewritableTyVar ignore_cos role f (userPredType pred)
+    -- we could write this out, but it would be annoying, because preds can quantify
+    -- over their own local variables
+
 
 {- Note [anyRewritableTyVar must be role-aware]
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
@@ -1079,21 +1108,18 @@ findDupTyVarTvs prs
 ************************************************************************
 -}
 
-mkSigmaTy :: [TyCoVarBinder] -> [PredType] -> Type -> Type
+mkSigmaTy :: [TyCoVarBinder] -> [UserPred] -> Type -> Type
 mkSigmaTy bndrs theta tau = mkForAllTys bndrs (mkPhiTy theta tau)
 
 -- | Make a sigma ty where all type variables are 'Inferred'. That is,
 -- they cannot be used with visible type application.
-mkInfSigmaTy :: [TyCoVar] -> [PredType] -> Type -> Type
+mkInfSigmaTy :: [TyCoVar] -> [UserPred] -> Type -> Type
 mkInfSigmaTy tyvars theta ty = mkSigmaTy (mkTyCoVarBinders Inferred tyvars) theta ty
 
 -- | Make a sigma ty where all type variables are "specified". That is,
 -- they can be used with visible type application
-mkSpecSigmaTy :: [TyVar] -> [PredType] -> Type -> Type
+mkSpecSigmaTy :: [TyVar] -> [UserPred] -> Type -> Type
 mkSpecSigmaTy tyvars preds ty = mkSigmaTy (mkTyCoVarBinders Specified tyvars) preds ty
-
-mkPhiTy :: [PredType] -> Type -> Type
-mkPhiTy = mkInvisFunTys
 
 ---------------
 getDFunTyKey :: Type -> OccName -- Get some string from a type, to be used to
@@ -1193,17 +1219,17 @@ tcIsForAllTy ty | Just ty' <- tcView ty = tcIsForAllTy ty'
 tcIsForAllTy (ForAllTy {}) = True
 tcIsForAllTy _             = False
 
-tcSplitPredFunTy_maybe :: Type -> Maybe (PredType, Type)
+tcSplitPredFunTy_maybe :: Type -> Maybe (UserPred, Type)
 -- Split off the first predicate argument from a type
 tcSplitPredFunTy_maybe ty
   | Just ty' <- tcView ty = tcSplitPredFunTy_maybe ty'
 tcSplitPredFunTy_maybe (FunTy { ft_af = InvisArg
                               , ft_arg = arg, ft_res = res })
-  = Just (arg, res)
+  = Just (classifyUserPredType arg, res)
 tcSplitPredFunTy_maybe _
   = Nothing
 
-tcSplitPhiTy :: Type -> (ThetaType, Type)
+tcSplitPhiTy :: Type -> ([UserPred], Type)
 tcSplitPhiTy ty
   = split ty []
   where
@@ -1213,7 +1239,7 @@ tcSplitPhiTy ty
           Nothing         -> (reverse ts, ty)
 
 -- | Split a sigma type into its parts.
-tcSplitSigmaTy :: Type -> ([TyVar], ThetaType, Type)
+tcSplitSigmaTy :: Type -> ([TyVar], [UserPred], Type)
 tcSplitSigmaTy ty = case tcSplitForAllTys ty of
                         (tvs, rho) -> case tcSplitPhiTy rho of
                                         (theta, tau) -> (tvs, theta, tau)
@@ -1234,7 +1260,7 @@ tcSplitSigmaTy ty = case tcSplitForAllTys ty of
 -- then it would return @([s,t,a,b], [Each s t a b], Traversal s t a b)@. But
 -- if you instead called @tcSplitNestedSigmaTys@ on the type, it would return
 -- @([s,t,a,b,f], [Each s t a b, Applicative f], (a -> f b) -> s -> f t)@.
-tcSplitNestedSigmaTys :: Type -> ([TyVar], ThetaType, Type)
+tcSplitNestedSigmaTys :: Type -> ([TyVar], [UserPred], Type)
 -- NB: This is basically a pure version of deeplyInstantiate (from Inst) that
 -- doesn't compute an HsWrapper.
 tcSplitNestedSigmaTys ty
@@ -1248,7 +1274,7 @@ tcSplitNestedSigmaTys ty
 
 -----------------------
 tcDeepSplitSigmaTy_maybe
-  :: TcSigmaType -> Maybe ([TcType], [TyVar], ThetaType, TcSigmaType)
+  :: TcSigmaType -> Maybe ([TcType], [TyVar], [UserPred], TcSigmaType)
 -- Looks for a *non-trivial* quantified type, under zero or more function arrows
 -- By "non-trivial" we mean either tyvars or constraints are non-empty
 
@@ -1403,7 +1429,7 @@ tcIsTyVarTy (TyVarTy _)   = True
 tcIsTyVarTy _             = False
 
 -----------------------
-tcSplitDFunTy :: Type -> ([TyVar], [Type], Class, [Type])
+tcSplitDFunTy :: Type -> ([TyVar], [UserPred], Class, [Type])
 -- Split the type of a dictionary function
 -- We don't use tcSplitSigmaTy,  because a DFun may (with NDP)
 -- have non-Pred arguments, such as
@@ -1416,12 +1442,14 @@ tcSplitDFunTy ty
   = case tcSplitForAllTys ty   of { (tvs, rho)    ->
     case splitFunTys rho       of { (theta, tau)  ->
     case tcSplitDFunHead tau   of { (clas, tys)   ->
-    (tvs, theta, clas, tys) }}}
+    (tvs, map classifyUserPredType theta, clas, tys) }}}
 
 tcSplitDFunHead :: Type -> (Class, [Type])
-tcSplitDFunHead = getClassPredTys
+tcSplitDFunHead ty = case classifyUserPredType ty of
+  ClassPred cls tys -> (cls, tys)
+  _                 -> pprPanic "tcSplitDFunHead" (ppr ty)
 
-tcSplitMethodTy :: Type -> ([TyVar], PredType, Type)
+tcSplitMethodTy :: Type -> ([TyVar], UserPred, Type)
 -- A class method (selector) always has a type like
 --   forall as. C as => blah
 -- So if the class looks like
@@ -1448,6 +1476,20 @@ tcSplitMethodTy ty
 
 tcEqKind :: HasDebugCallStack => TcKind -> TcKind -> Bool
 tcEqKind = tcEqType
+
+tcEqPred :: HasDebugCallStack => Pred -> Pred -> Bool
+tcEqPred (EqualityPred eq_pred1) (EqualityPred eq_pred2)
+  = tcEqEqPred eq_pred1 eq_pred2
+tcEqPred (UserPred u1) (UserPred u2)
+  = tcEqUserPred u1 u2
+tcEqPred _ _ = False
+
+tcEqEqPred :: HasDebugCallStack => EqPred -> EqPred -> Bool
+tcEqEqPred (EqPred r1 ty11 ty21) (EqPred r2 ty12 ty22)
+  = r1 == r2 && ty11 `tcEqType` ty12 && ty21 `tcEqType` ty22
+
+tcEqUserPred :: HasDebugCallStack => UserPred -> UserPred -> Bool
+tcEqUserPred u1 u2 = userPredType u1 `tcEqType` userPredType u2
 
 tcEqType :: HasDebugCallStack => TcType -> TcType -> Bool
 -- tcEqType is a proper implements the same Note [Non-trivial definitional
@@ -1583,10 +1625,9 @@ Here the (C f) in the signature is really (C * f), and we
 don't want to complain that the * isn't a type variable!
 -}
 
-isTyVarClassPred :: PredType -> Bool
-isTyVarClassPred ty = case getClassPredTys_maybe ty of
-    Just (_, tys) -> all isTyVarTy tys
-    _             -> False
+isTyVarClassPred :: Pred -> Bool
+isTyVarClassPred (UserPred (ClassPred _ tys)) = all isTyVarTy tys
+isTyVarClassPred _                            = False
 
 -------------------------
 checkValidClsArgs :: Bool -> Class -> [KindOrType] -> Bool
@@ -1610,16 +1651,6 @@ hasTyVarHead ty                 -- Haskell 98 allows predicates of form
        Just (ty, _) -> hasTyVarHead ty
        Nothing      -> False
 
-evVarPred :: EvVar -> PredType
-evVarPred var = varType var
-  -- Historical note: I used to have an ASSERT here,
-  -- checking (isEvVarType (varType var)).  But with something like
-  --   f :: c => _ -> _
-  -- we end up with (c :: kappa), and (kappa ~ Constraint).  Until
-  -- we solve and zonk (which there is no particular reason to do for
-  -- partial signatures, (isEvVarType kappa) will return False. But
-  -- nothing is wrong.  So I just removed the ASSERT.
-
 ------------------
 -- | When inferring types, should we quantify over a given predicate?
 -- Generally true of classes; generally false of equality constraints.
@@ -1628,8 +1659,8 @@ evVarPred var = varType var
 -- [Inheriting implicit parameters] and [Quantifying over equality constraints]
 pickQuantifiablePreds
   :: TyVarSet           -- Quantifying over these
-  -> TcThetaType        -- Proposed constraints to quantify
-  -> TcThetaType        -- A subset that we can actually quantify
+  -> [Pred]             -- Proposed constraints to quantify
+  -> [UserPred]         -- A subset that we can actually quantify
 -- This function decides whether a particular constraint should be
 -- quantified over, given the type variables that are being quantified
 pickQuantifiablePreds qtvs theta
@@ -1638,10 +1669,11 @@ pickQuantifiablePreds qtvs theta
          -- flex_ctxt <- xoptM Opt_FlexibleContexts
     mapMaybe (pick_me flex_ctxt) theta
   where
+    pick_me :: Bool -> Pred -> Maybe UserPred
     pick_me flex_ctxt pred
-      = case classifyPredType pred of
+      = case pred of
 
-          ClassPred cls tys
+          UserPred upred@(ClassPred cls tys)
             | Just {} <- isCallStackPred cls tys
               -- NEVER infer a CallStack constraint.  Otherwise we let
               -- the constraints bubble up to be solved from the outer
@@ -1650,24 +1682,23 @@ pickQuantifiablePreds qtvs theta
             -> Nothing
 
             | isIPClass cls
-            -> Just pred -- See note [Inheriting implicit parameters]
+            -> Just upred -- See note [Inheriting implicit parameters]
 
             | pick_cls_pred flex_ctxt cls tys
-            -> Just pred
+            -> Just upred
 
-          EqPred eq_rel ty1 ty2
+          EqualityPred (EqPred eq_rel ty1 ty2)
             | quantify_equality eq_rel ty1 ty2
             , Just (cls, tys) <- boxEqPred eq_rel ty1 ty2
               -- boxEqPred: See Note [Lift equality constraints when quantifying]
             , pick_cls_pred flex_ctxt cls tys
             -> Just (mkClassPred cls tys)
 
-          IrredPred ty
+          UserPred upred@(IrredPred ty)
             | tyCoVarsOfType ty `intersectsVarSet` qtvs
-            -> Just pred
+            -> Just upred
 
           _ -> Nothing
-
 
     pick_cls_pred flex_ctxt cls tys
       = tyCoVarsOfTypes tys `intersectsVarSet` qtvs
@@ -1703,22 +1734,22 @@ boxEqPred eq_rel ty1 ty2
 
 pickCapturedPreds
   :: TyVarSet           -- Quantifying over these
-  -> TcThetaType        -- Proposed constraints to quantify
-  -> TcThetaType        -- A subset that we can actually quantify
+  -> [UserPred]         -- Proposed constraints to quantify
+  -> [UserPred]         -- A subset that we can actually quantify
 -- A simpler version of pickQuantifiablePreds, used to winnow down
 -- the inferred constraints of a group of bindings, into those for
 -- one particular identifier
 pickCapturedPreds qtvs theta
   = filter captured theta
   where
-    captured pred = isIPPred pred || (tyCoVarsOfType pred `intersectsVarSet` qtvs)
-
+    captured upred
+      = isIPUserPred upred || (tyCoVarsOfUserPred upred `intersectsVarSet` qtvs)
 
 -- Superclasses
 
-type PredWithSCs a = (PredType, [PredType], a)
+type PredWithSCs a = (Pred, [Pred], a)
 
-mkMinimalBySCs :: forall a. (a -> PredType) -> [a] -> [a]
+mkMinimalBySCs :: forall a. (a -> Pred) -> [a] -> [a]
 -- Remove predicates that
 --
 --   - are the same as another predicate
@@ -1747,7 +1778,7 @@ mkMinimalBySCs get_pred xs = go preds_with_scs []
        -- means that the results are returned in the same
        -- order as the input, which is generally saner
    go (work_item@(p,_,_) : work_list) min_preds
-     | EqPred _ t1 t2 <- classifyPredType p
+     | EqualityPred (EqPred _ t1 t2) <- p
      , t1 `tcEqType` t2   -- See TcPatSyn
                           -- Note [Remove redundant provided dicts]
      = go work_list min_preds
@@ -1756,19 +1787,19 @@ mkMinimalBySCs get_pred xs = go preds_with_scs []
      | otherwise
      = go work_list (work_item : min_preds)
 
-   in_cloud :: PredType -> [PredWithSCs a] -> Bool
-   in_cloud p ps = or [ p `tcEqType` p' | (_, scs, _) <- ps, p' <- scs ]
+   in_cloud :: Pred -> [PredWithSCs a] -> Bool
+   in_cloud p ps = or [ p `tcEqPred` p' | (_, scs, _) <- ps, p' <- scs ]
 
-transSuperClasses :: PredType -> [PredType]
+transSuperClasses :: Pred -> [Pred]
 -- (transSuperClasses p) returns (p's superclasses) not including p
 -- Stop if you encounter the same class again
 -- See Note [Expanding superclasses]
 transSuperClasses p
   = go emptyNameSet p
   where
-    go :: NameSet -> PredType -> [PredType]
+    go :: NameSet -> Pred -> [Pred]
     go rec_clss p
-       | ClassPred cls tys <- classifyPredType p
+       | UserPred (ClassPred cls tys) <- p
        , let cls_nm = className cls
        , not (cls_nm `elemNameSet` rec_clss)
        , let rec_clss' | isCTupleClass cls = rec_clss
@@ -1778,21 +1809,19 @@ transSuperClasses p
        | otherwise
        = []
 
-immSuperClasses :: Class -> [Type] -> [PredType]
+immSuperClasses :: Class -> [Type] -> [Pred]
 immSuperClasses cls tys
-  = substTheta (zipTvSubst tyvars tys) sc_theta
+  = substPreds (zipTvSubst tyvars tys) sc_theta
   where
     (tyvars,sc_theta,_,_) = classBigSig cls
 
-isImprovementPred :: PredType -> Bool
+isImprovementPred :: Pred -> Bool
 -- Either it's an equality, or has some functional dependency
-isImprovementPred ty
-  = case classifyPredType ty of
-      EqPred NomEq t1 t2 -> not (t1 `tcEqType` t2)
-      EqPred ReprEq _ _  -> False
-      ClassPred cls _    -> classHasFds cls
-      IrredPred {}       -> True -- Might have equalities after reduction?
-      ForAllPred {}      -> False
+isImprovementPred (EqualityPred (EqPred NomEq t1 t2)) = not (t1 `tcEqType` t2)
+isImprovementPred (EqualityPred (EqPred ReprEq _ _ )) = False
+isImprovementPred (UserPred (ClassPred cls _))        = classHasFds cls
+isImprovementPred (UserPred (IrredPred {}))           = True -- Might have equalities after reduction?
+isImprovementPred (UserPred (ForAllPred {}))          = False
 
 -- | Is the equality
 --        a ~r ...a....
@@ -1827,6 +1856,30 @@ isInsolubleOccursCheck eq_rel tv ty
          -- has an insoluble occurs check
 
     role = eqRelRole eq_rel
+
+-- | Checks whether a DataCon has a GADT-like equality. This includes both
+-- the eqSpec and any hand-written equality constraints.
+dataConHasGadtEquality :: DataCon -> Bool
+dataConHasGadtEquality con
+  = not no_eqs
+  where
+    (_, _, eq_spec, theta, _, _) = dataConFullSig con
+
+    no_eqs = null (dataConKindEqSpec con) &&
+             null eq_spec &&
+             not (any is_gadt_eq theta)
+
+    is_gadt_eq (ClassPred tc tys)
+      | tc `hasKey` heqTyConKey  -- heterogeneous equality
+      , [_k1, _k2, ty1, ty2] <- tys
+      = tcIsTyVarTy ty1 || tcIsTyVarTy ty2
+
+      | tc `hasKey` eqTyConKey   -- homogeneous equality
+      , [_k, ty1, ty2] <- tys
+      = tcIsTyVarTy ty1 || tcIsTyVarTy ty2
+
+    is_gadt_eq _ = False
+
 
 {- Note [Expanding superclasses]
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~

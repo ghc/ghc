@@ -1,5 +1,6 @@
 module TysWiredIn where
 
+import Class                     ( Class )
 import {-# SOURCE #-} TyCon      ( TyCon )
 import {-# SOURCE #-} TyCoRep    (Type, Kind)
 
@@ -10,6 +11,7 @@ listTyCon :: TyCon
 typeNatKind, typeSymbolKind :: Type
 mkBoxedTupleTy :: [Type] -> Type
 
+coercibleClass, heqClass :: Class
 coercibleTyCon, heqTyCon :: TyCon
 
 unitTy :: Type

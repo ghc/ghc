@@ -111,8 +111,8 @@ data FunDepEqn loc
                                  -- Non-empty only for FunDepEqns arising from instance decls
 
           , fd_eqs   :: [TypeEqn]  -- Make these pairs of types equal
-          , fd_pred1 :: PredType   -- The FunDepEqn arose from
-          , fd_pred2 :: PredType   --  combining these two constraints
+          , fd_pred1 :: UserPred   -- The FunDepEqn arose from
+          , fd_pred2 :: UserPred   --  combining these two constraints
           , fd_loc   :: loc  }
 
 {-
@@ -165,14 +165,14 @@ zipAndComputeFDEqs _ _ _ = []
 -- Improve a class constraint from another class constraint
 -- ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 improveFromAnother :: loc
-                   -> PredType -- Template item (usually given, or inert)
-                   -> PredType -- Workitem [that can be improved]
+                   -> UserPred -- Template item (usually given, or inert)
+                   -> UserPred -- Workitem [that can be improved]
                    -> [FunDepEqn loc]
 -- Post: FDEqs always oriented from the other to the workitem
 --       Equations have empty quantified variables
 improveFromAnother loc pred1 pred2
-  | Just (cls1, tys1) <- getClassPredTys_maybe pred1
-  , Just (cls2, tys2) <- getClassPredTys_maybe pred2
+  | ClassPred cls1 tys1 <- pred1
+  , ClassPred cls2 tys2 <- pred2
   , cls1 == cls2
   = [ FDEqn { fd_qtvs = [], fd_eqs = eqs, fd_pred1 = pred1, fd_pred2 = pred2, fd_loc = loc }
     | let (cls_tvs, cls_fds) = classTvsFds cls1
@@ -199,14 +199,13 @@ pprEquation (FDEqn { fd_qtvs = qtvs, fd_eqs = pairs })
                        | Pair t1 t2 <- pairs])]
 
 improveFromInstEnv :: InstEnvs
-                   -> (PredType -> SrcSpan -> loc)
-                   -> PredType
+                   -> (UserPred -> SrcSpan -> loc)
+                   -> UserPred
                    -> [FunDepEqn loc] -- Needs to be a FunDepEqn because
                                       -- of quantified variables
 -- Post: Equations oriented from the template (matching instance) to the workitem!
 improveFromInstEnv inst_env mk_loc pred
-  | Just (cls, tys) <- ASSERT2( isClassPred pred, ppr pred )
-                       getClassPredTys_maybe pred
+  | ClassPred cls tys <- pred
   , let (cls_tvs, cls_fds) = classTvsFds cls
         instances          = classInstances inst_env cls
         rough_tcs          = roughMatchTcs tys
@@ -367,7 +366,7 @@ makes instance inference go into a loop, because it requires the constraint
 -}
 
 checkInstCoverage :: Bool   -- Be liberal
-                  -> Class -> [PredType] -> [Type]
+                  -> Class -> [UserPred] -> [Type]
                   -> Validity
 -- "be_liberal" flag says whether to use "liberal" coverage of
 --              See Note [Coverage Condition] below
@@ -538,7 +537,7 @@ in its second parameter.
 Hence the tyCoVarsOfTypes/injTyVarsOfTypes dance in tv_fds.
 -}
 
-oclose :: [PredType] -> TyCoVarSet -> TyCoVarSet
+oclose :: [UserPred] -> TyCoVarSet -> TyCoVarSet
 -- See Note [The liberal coverage condition]
 oclose preds fixed_tvs
   | null tv_fds = fixed_tvs -- Fast escape hatch for common case.
@@ -554,20 +553,20 @@ oclose preds fixed_tvs
     tv_fds  :: [(TyCoVarSet,TyCoVarSet)]
     tv_fds  = [ (tyCoVarsOfTypes ls, fvVarSet $ injectiveVarsOfTypes True rs)
                   -- See Note [Care with type functions]
-              | pred <- preds
+              | user_pred <- preds
+              , let pred = fromUserPred user_pred
               , pred' <- pred : transSuperClasses pred
                    -- Look for fundeps in superclasses too
               , (ls, rs) <- determined pred' ]
 
-    determined :: PredType -> [([Type],[Type])]
-    determined pred
-       = case classifyPredType pred of
-            EqPred NomEq t1 t2 -> [([t1],[t2]), ([t2],[t1])]
+    determined :: Pred -> [([Type],[Type])]
+    determined (EqualityPred (EqPred NomEq t1 t2)) = [([t1],[t2]), ([t2],[t1])]
                -- See Note [Equality superclasses]
-            ClassPred cls tys  -> [ instFD fd cls_tvs tys
-                                  | let (cls_tvs, cls_fds) = classTvsFds cls
-                                  , fd <- cls_fds ]
-            _ -> []
+    determined (UserPred (ClassPred cls tys))
+      = [ instFD fd cls_tvs tys
+        | let (cls_tvs, cls_fds) = classTvsFds cls
+        , fd <- cls_fds ]
+    determined _ = []
 
 
 {- *********************************************************************

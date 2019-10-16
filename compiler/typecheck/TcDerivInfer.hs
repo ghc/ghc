@@ -32,6 +32,7 @@ import TcGenGenerics
 import TcMType
 import TcRnMonad
 import TcOrigin
+import TcEvidence
 import Constraint
 import Predicate
 import TcType
@@ -113,7 +114,7 @@ inferConstraints mechanism
                                      , ppr main_cls <+> ppr inst_tys )
                               [ mkThetaOrigin (mkDerivOrigin wildcard)
                                               TypeLevel [] [] [] $
-                                substTheta cls_subst (classSCTheta main_cls) ]
+                                substPreds cls_subst (classSCTheta main_cls) ]
              cls_subst = ASSERT( equalLength cls_tvs inst_tys )
                          zipTvSubst cls_tvs inst_tys
 
@@ -244,7 +245,7 @@ inferConstraintsStock (DerivInstTys { dit_cls_tys     = cls_tys
               = map $ \ty -> let ki = tcTypeKind ty in
                              ( [ mk_cls_pred orig t_or_k cls ty
                                , mkPredOrigin orig KindLevel
-                                   (mkPrimEqPred ki typeToTypeKind) ]
+                                   (mkEqualityPred NomEq ki typeToTypeKind) ]
                              , tcUnifyTy ki typeToTypeKind
                              )
 
@@ -264,6 +265,7 @@ inferConstraintsStock (DerivInstTys { dit_cls_tys     = cls_tys
                -- Stupid constraints
            stupid_constraints
              = [ mkThetaOrigin deriv_origin TypeLevel [] [] [] $
+                 fromUserPreds $
                  substTheta tc_subst (tyConStupidTheta rep_tc) ]
            tc_subst = -- See the comment with all_rep_tc_args for an
                       -- explanation of this assertion
@@ -290,7 +292,7 @@ inferConstraintsStock (DerivInstTys { dit_cls_tys     = cls_tys
 
            mk_cls_pred orig t_or_k cls ty
                 -- Don't forget to apply to cls_tys' too
-              = mkPredOrigin orig t_or_k (mkClassPred cls (cls_tys' ++ [ty]))
+              = mkPredOrigin orig t_or_k (fromUserPred $ mkClassPred cls (cls_tys' ++ [ty]))
            cls_tys' | is_generic1 = []
                       -- In the awkward Generic1 case, cls_tys' should be
                       -- empty, since we are applying the class Functor.
@@ -362,9 +364,10 @@ inferConstraintsAnyclass
                           gen_dm_ty' = substTyWith cls_tvs inst_tys gen_dm_ty
                           (dm_tvs, dm_theta, dm_tau)
                                      = tcSplitNestedSigmaTys gen_dm_ty'
-                          tau_eq     = mkPrimEqPred meth_tau dm_tau
+                          tau_eq     = mkEqPred NomEq meth_tau dm_tau
                     ; return (mkThetaOrigin (mkDerivOrigin wildcard) TypeLevel
-                                meth_tvs dm_tvs meth_theta (tau_eq:dm_theta)) }
+                                meth_tvs dm_tvs meth_theta (fromEqPred tau_eq :
+                                                            fromUserPreds dm_theta)) }
 
        ; theta_origins <- lift $ mapM do_one_meth gen_dms
        ; return theta_origins }
@@ -391,7 +394,7 @@ inferConstraintsCoerceBased cls_tys rep_ty = do
       -- newtype (for GeneralizedNewtypeDeriving) or a @via@ type
       -- (for DerivingVia).
       rep_tys ty  = cls_tys ++ [ty]
-      rep_pred ty = mkClassPred cls (rep_tys ty)
+      rep_pred ty = fromUserPred $ mkClassPred cls (rep_tys ty)
       rep_pred_o ty = mkPredOrigin deriv_origin TypeLevel (rep_pred ty)
               -- rep_pred is the representation dictionary, from where
               -- we are going to get all the methods for the final
@@ -410,7 +413,7 @@ inferConstraintsCoerceBased cls_tys rep_ty = do
       meths = classMethods cls
       coercible_constraints ty
         = [ mkPredOrigin (DerivOriginCoerce meth t1 t2 sa_wildcard)
-                         TypeLevel (mkReprPrimEqPred t1 t2)
+                         TypeLevel (mkEqualityPred ReprEq t1 t2)
           | meth <- meths
           , let (Pair t1 t2) = mkCoerceClassMethEqn cls tvs
                                        inst_tys ty meth ]
@@ -634,7 +637,7 @@ See also Note [nonDetCmpType nondeterminism]
 
 
 simplifyInstanceContexts :: [DerivSpec [ThetaOrigin]]
-                         -> TcM [DerivSpec ThetaType]
+                         -> TcM [DerivSpec [UserPred]]
 -- Used only for deriving clauses or standalone deriving with an
 -- extra-constraints wildcard (InferContext)
 -- See Note [Simplifying the instance context]
@@ -649,7 +652,7 @@ simplifyInstanceContexts infer_specs
         -- The initial solutions for the equations claim that each
         -- instance has an empty context; this solution is certainly
         -- in canonical form.
-    initial_solutions :: [ThetaType]
+    initial_solutions :: [[UserPred]]
     initial_solutions = [ [] | _ <- infer_specs ]
 
     ------------------------------------------------------------------
@@ -657,7 +660,7 @@ simplifyInstanceContexts infer_specs
         -- compares it with the current one; finishes if they are the
         -- same, otherwise recurses with the new solutions.
         -- It fails if any iteration fails
-    iterate_deriv :: Int -> [ThetaType] -> TcM [DerivSpec ThetaType]
+    iterate_deriv :: Int -> [[UserPred]] -> TcM [DerivSpec [UserPred]]
     iterate_deriv n current_solns
       | n > 20  -- Looks as if we are in an infinite loop
                 -- This can happen if we have -XUndecidableInstances
@@ -678,12 +681,12 @@ simplifyInstanceContexts infer_specs
              else
                 iterate_deriv (n+1) new_solns }
 
-    eqSolution a b = eqListBy (eqListBy eqType) (canSolution a) (canSolution b)
+    eqSolution a b = eqListBy (eqListBy eqUserPred) (canSolution a) (canSolution b)
        -- Canonicalise for comparison
        -- See Note [Deterministic simplifyInstanceContexts]
-    canSolution = map (sortBy nonDetCmpType)
+    canSolution = map (sortBy nonDetCmpUserPred)
     ------------------------------------------------------------------
-    gen_soln :: DerivSpec [ThetaOrigin] -> TcM ThetaType
+    gen_soln :: DerivSpec [ThetaOrigin] -> TcM [UserPred]
     gen_soln (DS { ds_loc = loc, ds_tvs = tyvars
                  , ds_cls = clas, ds_tys = inst_tys, ds_theta = deriv_rhs })
       = setSrcSpan loc  $
@@ -700,7 +703,7 @@ simplifyInstanceContexts infer_specs
       where
         the_pred = mkClassPred clas inst_tys
 
-derivInstCtxt :: PredType -> MsgDoc
+derivInstCtxt :: UserPred -> MsgDoc
 derivInstCtxt pred
   = text "When deriving the instance for" <+> parens (ppr pred)
 
@@ -714,12 +717,12 @@ derivInstCtxt pred
 
 -- | Given @instance (wanted) => C inst_ty@, simplify 'wanted' as much
 -- as possible. Fail if not possible.
-simplifyDeriv :: PredType -- ^ @C inst_ty@, head of the instance we are
+simplifyDeriv :: UserPred -- ^ @C inst_ty@, head of the instance we are
                           -- deriving.  Only used for SkolemInfo.
               -> [TyVar]  -- ^ The tyvars bound by @inst_ty@.
               -> [ThetaOrigin] -- ^ Given and wanted constraints
-              -> TcM ThetaType -- ^ Needed constraints (after simplification),
-                               -- i.e. @['PredType']@.
+              -> TcM [UserPred] -- ^ Needed constraints (after simplification),
+                                -- i.e. @['PredType']@.
 simplifyDeriv pred tvs thetas
   = do { (skol_subst, tvs_skols) <- tcInstSkolTyVars tvs -- Skolemize
                 -- The constraint solving machinery
@@ -731,10 +734,10 @@ simplifyDeriv pred tvs thetas
              skol_info = DerivSkol pred
              doc = text "deriving" <+> parens (ppr pred)
 
-             mk_given_ev :: PredType -> TcM EvVar
+             mk_given_ev :: UserPred -> TcM EvVarBinder
              mk_given_ev given =
-               let given_pred = substTy skol_subst given
-               in newEvVar given_pred
+               let given_pred = substUserPred skol_subst given
+               in newEvVarBinder given_pred
 
              emit_wanted_constraints :: [TyVar] -> [PredOrigin] -> TcM ()
              emit_wanted_constraints metas_to_be preds
@@ -749,7 +752,7 @@ simplifyDeriv pred tvs thetas
                     ; let wanted_subst = skol_subst `unionTCvSubst` meta_subst
                           mk_wanted_ct (PredOrigin wanted orig t_or_k)
                             = do { ev <- newWanted orig (Just t_or_k) $
-                                         substTyUnchecked wanted_subst wanted
+                                         substPredUnchecked wanted_subst wanted
                                  ; return (mkNonCanonical ev) }
                     ; cts <- mapM mk_wanted_ct preds
 
@@ -807,10 +810,10 @@ simplifyDeriv pred tvs thetas
        ; let residual_simple = approximateWC True solved_wanteds
              (bad, good) = partitionBagWith get_good residual_simple
 
-             get_good :: Ct -> Either Ct PredType
-             get_good ct | validDerivPred skol_set p
+             get_good :: Ct -> Either Ct UserPred
+             get_good ct | Just u_pred <- validDerivPred skol_set p
                          , isWantedCt ct
-                         = Right p
+                         = Right u_pred
                           -- TODO: This is wrong
                           -- NB re 'isWantedCt': residual_wanted may contain
                           -- unsolved CtDerived and we stick them into the
@@ -824,7 +827,7 @@ simplifyDeriv pred tvs thetas
          vcat [ ppr tvs_skols, ppr residual_simple, ppr good, ppr bad ]
 
        -- Return the good unsolved constraints (unskolemizing on the way out.)
-       ; let min_theta = mkMinimalBySCs id (bagToList good)
+       ; let min_theta = mkMinimalBySCs fromUserPred (bagToList good)
              -- An important property of mkMinimalBySCs (used above) is that in
              -- addition to removing constraints that are made redundant by
              -- superclass relationships, it also removes _duplicate_
@@ -835,7 +838,7 @@ simplifyDeriv pred tvs thetas
                           -- The reverse substitution (sigh)
 
        -- See [STEP DAC RESIDUAL]
-       ; min_theta_vars <- mapM newEvVar min_theta
+       ; min_theta_vars <- newEvVarBinders min_theta
        ; (leftover_implic, _)
            <- buildImplicationFor tc_lvl skol_info tvs_skols
                                   min_theta_vars solved_wanteds

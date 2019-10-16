@@ -15,7 +15,7 @@ This module defines interface types and binders
 module GHC.Iface.Type (
         IfExtName, IfLclName,
 
-        IfaceType(..), IfacePredType, IfaceKind, IfaceCoercion(..),
+        IfaceType(..), IfacePred(..), IfaceUserPred(..), IfaceKind, IfaceCoercion(..),
         IfaceMCoercion(..),
         IfaceUnivCoProv(..),
         IfaceTyCon(..), IfaceTyConInfo(..), IfaceTyConSort(..),
@@ -40,13 +40,15 @@ module GHC.Iface.Type (
         SuppressBndrSig(..),
         UseBndrParens(..),
         pprIfaceType, pprParendIfaceType, pprPrecIfaceType,
-        pprIfaceContext, pprIfaceContextArr,
+        pprIfaceContext, pprIfaceContextPreds,
+        pprIfaceContextArr, pprIfaceContextArrPreds,
         pprIfaceIdBndr, pprIfaceLamBndr, pprIfaceTvBndr, pprIfaceTyConBinders,
         pprIfaceBndrs, pprIfaceAppArgs, pprParendIfaceAppArgs,
         pprIfaceForAllPart, pprIfaceForAllPartMust, pprIfaceForAll,
         pprIfaceSigmaType, pprIfaceTyLit,
         pprIfaceCoercion, pprParendIfaceCoercion,
         splitIfaceSigmaTy, pprIfaceTypeApp, pprUserIfaceForAll,
+        pprIfacePred, pprParendIfacePred,
         pprIfaceCoTcApp, pprTyTcApp, pprIfacePrefixApp,
         isIfaceTauType,
 
@@ -159,8 +161,31 @@ data IfaceType
        IfaceAppArgs               -- arity = length args
           -- For promoted data cons, the kind args are omitted
 
-type IfacePredType = IfaceType
-type IfaceContext = [IfacePredType]
+-- | Serializable equivalent to UserPred. When we convert core Types to
+-- IfaceTypes, we don't actually use this, because there is no point in
+-- detecting constraints in a Core type. Instead, this is used e.g. to
+-- store predicates of a pattern synonym. It is not used in pretty-printing;
+-- pretty-printing a 'UserPred' goes via 'IfaceType'
+data IfaceUserPred
+  = IfaceClassPred IfaceTyCon IfaceAppArgs
+  | IfaceIrredPred IfaceType
+  | IfaceForAllPred [IfaceTvBndr] [IfaceUserPred] IfaceUserPred
+type IfaceContext = [IfaceUserPred]
+
+ifaceUserPredType :: IfaceUserPred -> IfaceType
+ifaceUserPredType (IfaceClassPred tc args) = IfaceTyConApp tc args
+ifaceUserPredType (IfaceIrredPred ty)      = ty
+ifaceUserPredType (IfaceForAllPred bndrs ctxt pred)
+  = foldr IfaceForAllTy (foldr (IfaceFunTy InvisArg) (ifaceUserPredType pred)
+                                                     (map ifaceUserPredType ctxt))
+          (map (mkIfaceForAllTvBndr Specified) bndrs)
+
+-- | Serializable equivalent to Pred. Used only for pretty-printing.
+data IfacePred
+  = IfaceEqualityPred EqRel Bool -- is this heterogeneous?
+                      IfaceKind IfaceKind
+                      IfaceType IfaceType   -- no need for IfaceEqPred indirection
+  | IfaceUserPred IfaceType -- because we're only pretty-printing, IfaceType is simpler here
 
 data IfaceTyLit
   = IfaceNumTyLit Integer
@@ -386,7 +411,7 @@ isIfaceLiftedTypeKind (IfaceTyConApp tc
   && ptr_rep_lifted `ifaceTyConHasKey` liftedRepDataConKey
 isIfaceLiftedTypeKind _ = False
 
-splitIfaceSigmaTy :: IfaceType -> ([IfaceForAllBndr], [IfacePredType], IfaceType)
+splitIfaceSigmaTy :: IfaceType -> ([IfaceForAllBndr], [IfaceType], IfaceType)
 -- Mainly for printing purposes
 --
 -- Here we split nested IfaceSigmaTy properly.
@@ -881,6 +906,29 @@ ppr_ty ctxt_prec (IfaceCoercionTy co)
       (ppr_co ctxt_prec co)
       (text "<>")
 
+-- ----------------------------- Printing IfacePred ------------------------------------
+
+instance Outputable IfaceUserPred where
+  ppr pred = pprIfaceUserPred pred
+
+pprIfaceUserPred :: IfaceUserPred -> SDoc
+pprIfaceUserPred = pprIfaceType . ifaceUserPredType
+
+instance Outputable IfacePred where
+  ppr = pprIfacePred
+
+pprIfacePred :: IfacePred -> SDoc
+pprIfacePred = ppr_pred topPrec
+
+pprParendIfacePred :: IfacePred -> SDoc
+pprParendIfacePred = ppr_pred appPrec
+
+ppr_pred :: PprPrec -> IfacePred -> SDoc
+ppr_pred ctxt_prec (IfaceEqualityPred eq_rel hetero k1 k2 ty1 ty2)
+  = printEquality ctxt_prec hetero eq_rel Unboxed (k1, k2, ty1, ty2)
+ppr_pred ctxt_prec (IfaceUserPred pred_ty)
+  = ppr_ty ctxt_prec pred_ty
+
 {- Note [Defaulting RuntimeRep variables]
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 RuntimeRep variables are considered by many (most?) users to be little
@@ -1043,21 +1091,21 @@ ppr_app_arg ctx_prec (t, argf) =
        _         -> empty
 
 -------------------
-pprIfaceForAllPart :: [IfaceForAllBndr] -> [IfacePredType] -> SDoc -> SDoc
+pprIfaceForAllPart :: [IfaceForAllBndr] -> [IfaceUserPred] -> SDoc -> SDoc
 pprIfaceForAllPart tvs ctxt sdoc
-  = ppr_iface_forall_part ShowForAllWhen tvs ctxt sdoc
+  = ppr_iface_forall_part ShowForAllWhen tvs (map ifaceUserPredType ctxt) sdoc
 
 -- | Like 'pprIfaceForAllPart', but always uses an explicit @forall@.
-pprIfaceForAllPartMust :: [IfaceForAllBndr] -> [IfacePredType] -> SDoc -> SDoc
+pprIfaceForAllPartMust :: [IfaceForAllBndr] -> [IfaceUserPred] -> SDoc -> SDoc
 pprIfaceForAllPartMust tvs ctxt sdoc
-  = ppr_iface_forall_part ShowForAllMust tvs ctxt sdoc
+  = ppr_iface_forall_part ShowForAllMust tvs (map ifaceUserPredType ctxt) sdoc
 
 pprIfaceForAllCoPart :: [(IfLclName, IfaceCoercion)] -> SDoc -> SDoc
 pprIfaceForAllCoPart tvs sdoc
   = sep [ pprIfaceForAllCo tvs, sdoc ]
 
 ppr_iface_forall_part :: ShowForAllFlag
-                      -> [IfaceForAllBndr] -> [IfacePredType] -> SDoc -> SDoc
+                      -> [IfaceForAllBndr] -> [IfaceType] -> SDoc -> SDoc
 ppr_iface_forall_part show_forall tvs ctxt sdoc
   = sep [ case show_forall of
             ShowForAllMust -> pprIfaceForAll tvs
@@ -1351,17 +1399,18 @@ ppr_kind_type ctxt_prec =
 -- and Note [The equality types story] in TysPrim
 ppr_equality :: PprPrec -> IfaceTyCon -> [IfaceType] -> Maybe SDoc
 ppr_equality ctxt_prec tc args
-  | hetero_eq_tc
+  | Just (True, eq_rel, boxity) <- stuff
   , [k1, k2, t1, t2] <- args
-  = Just $ print_equality (k1, k2, t1, t2)
+  = Just $ printEquality ctxt_prec hetero eq_rel boxity (k1, k2, t1, t2)
 
-  | hom_eq_tc
+  | Just (False, eq_rel, boxity) <- stuff
   , [k, t1, t2] <- args
-  = Just $ print_equality (k, k, t1, t2)
+  = Just $ printEquality ctxt_prec hetero eq_rel boxity (k, k, t1, t2)
 
   | otherwise
   = Nothing
   where
+    hetero      = not homogeneous
     homogeneous = tc_name `hasKey` eqTyConKey -- (~)
                || hetero_tc_used_homogeneously
       where
@@ -1373,42 +1422,65 @@ ppr_equality ctxt_prec tc args
              --          are (in this case) of the same kind
 
     tc_name = ifaceTyConName tc
-    pp = ppr_ty
-    hom_eq_tc = tc_name `hasKey` eqTyConKey            -- (~)
-    hetero_eq_tc = tc_name `hasKey` eqPrimTyConKey     -- (~#)
-                || tc_name `hasKey` eqReprPrimTyConKey -- (~R#)
-                || tc_name `hasKey` heqTyConKey        -- (~~)
-    nominal_eq_tc = tc_name `hasKey` heqTyConKey       -- (~~)
-                 || tc_name `hasKey` eqPrimTyConKey    -- (~#)
-    print_equality args =
-        sdocWithDynFlags $ \dflags ->
-        getPprStyle      $ \style  ->
-        print_equality' args style dflags
 
-    print_equality' (ki1, ki2, ty1, ty2) style dflags
+    stuff
+      | tc_name `hasKey` eqPrimTyConKey        -- (~#)
+      = Just (True, NomEq, Unboxed)
+      | tc_name `hasKey` eqReprPrimTyConKey    -- (~R#)
+      = Just (True, ReprEq, Unboxed)
+      | tc_name `hasKey` heqTyConKey           -- (~~)
+      = Just (True, NomEq, Boxed)
+      | tc_name `hasKey` eqTyConKey            -- (~)
+      = Just (False, NomEq, Boxed)
+      | otherwise
+      = Nothing
+
+printEquality :: PprPrec
+              -> Bool   -- True <=> equality is heterogeneous
+              -> EqRel
+              -> Boxity
+              -> (IfaceKind, IfaceKind, IfaceType, IfaceType)
+              -> SDoc
+printEquality ctxt_prec hetero eq_rel boxity args@(ki1, ki2, ty1, ty2)
+  = sdocWithDynFlags $ \dflags ->
+    getPprStyle        $ \style  ->
+    print_equality' style dflags
+  where
+    ppr_tc = case (hetero, eq_rel, boxity) of
+      (True, NomEq, Boxed)     -> text "~~"
+      (True, NomEq, Unboxed)   -> text "~#"
+      (True, ReprEq, Boxed)    -> pprPanic "printEquality (True, ReprEq, Boxed)" (ppr args)
+      (True, ReprEq, Unboxed)  -> text "~R#"
+      (False, NomEq, Boxed)    -> text "~"
+      (False, NomEq, Unboxed)  -> pprPanic "printEquality (False, NomEq, Unboxed)" (ppr args)
+      (False, ReprEq, Boxed)   -> text "`Coercible`"  -- this shouldn't really happen
+      (False, ReprEq, Unboxed) -> pprPanic "printEquality (False, ReprEq, Unboxed)" (ppr args)
+
+    print_equality' style dflags
       | -- If -fprint-equality-relations is on, just print the original TyCon
         print_eqs
-      = ppr_infix_eq (ppr tc)
+      = ppr_infix_eq ppr_tc
 
       | -- Homogeneous use of heterogeneous equality (ty1 ~~ ty2)
         --                 or unlifted equality      (ty1 ~# ty2)
-        nominal_eq_tc, homogeneous
+        NomEq <- eq_rel, not hetero
       = ppr_infix_eq (text "~")
 
       | -- Heterogeneous use of unlifted equality (ty1 ~# ty2)
-        not homogeneous
+        --                   or lifted equality   (ty1 ~~ ty2)
+        hetero
       = ppr_infix_eq (ppr heqTyCon)
 
       | -- Homogeneous use of representational unlifted equality (ty1 ~R# ty2)
-        tc_name `hasKey` eqReprPrimTyConKey, homogeneous
-      = let ki | print_kinds = [pp appPrec ki1]
+        ReprEq <- eq_rel, not hetero
+      = let ki | print_kinds = [ppr_ty appPrec ki1]
                | otherwise   = []
         in pprIfacePrefixApp ctxt_prec (ppr coercibleTyCon)
-                            (ki ++ [pp appPrec ty1, pp appPrec ty2])
+                            (ki ++ [ppr_ty appPrec ty1, ppr_ty appPrec ty2])
 
         -- The other cases work as you'd expect
       | otherwise
-      = ppr_infix_eq (ppr tc)
+      = ppr_infix_eq ppr_tc
       where
         ppr_infix_eq :: SDoc -> SDoc
         ppr_infix_eq eq_op = pprIfaceInfixApp ctxt_prec eq_op
@@ -1416,9 +1488,9 @@ ppr_equality ctxt_prec tc args
           where
             pp_ty_ki ty ki
               | print_kinds
-              = parens (pp topPrec ty <+> dcolon <+> pp opPrec ki)
+              = parens (ppr_ty topPrec ty <+> dcolon <+> ppr_ty opPrec ki)
               | otherwise
-              = pp opPrec ty
+              = ppr_ty opPrec ty
 
         print_kinds = gopt Opt_PrintExplicitKinds dflags
         print_eqs   = gopt Opt_PrintEqualityRelations dflags ||
@@ -1730,20 +1802,34 @@ instance Binary IfaceAppArgs where
 -- Used when we want to print a context in a type, so we
 -- use 'funPrec' to decide whether to parenthesise a singleton
 -- predicate; e.g.   Num a => a -> a
-pprIfaceContextArr :: [IfacePredType] -> SDoc
+pprIfaceContextArr :: [IfaceType] -> SDoc
 pprIfaceContextArr []     = empty
 pprIfaceContextArr [pred] = ppr_ty funPrec pred <+> darrow
-pprIfaceContextArr preds  = ppr_parend_preds preds <+> darrow
+pprIfaceContextArr preds  = ppr_parend_tys preds <+> darrow
+
+-- | Prints "(C a, D b) =>", including the arrow.
+-- Used when we want to print a context in a type, so we
+-- use 'funPrec' to decide whether to parenthesise a singleton
+-- predicate; e.g.   Num a => a -> a
+pprIfaceContextArrPreds :: [IfaceUserPred] -> SDoc
+pprIfaceContextArrPreds = pprIfaceContextArr . map ifaceUserPredType
 
 -- | Prints a context or @()@ if empty
 -- You give it the context precedence
-pprIfaceContext :: PprPrec -> [IfacePredType] -> SDoc
+pprIfaceContext :: PprPrec -> [IfaceType] -> SDoc
 pprIfaceContext _    []     = text "()"
 pprIfaceContext prec [pred] = ppr_ty prec pred
-pprIfaceContext _    preds  = ppr_parend_preds preds
+pprIfaceContext _    preds  = ppr_parend_tys preds
 
-ppr_parend_preds :: [IfacePredType] -> SDoc
-ppr_parend_preds preds = parens (fsep (punctuate comma (map ppr preds)))
+-- | Prints a context or @()@ if empty
+-- You give it the context precedence
+pprIfaceContextPreds :: PprPrec -> [IfacePred] -> SDoc
+pprIfaceContextPreds _    []     = text "()"
+pprIfaceContextPreds prec [pred] = ppr_pred prec pred
+pprIfaceContextPreds _    preds  = parens (fsep (punctuate comma (map ppr preds)))
+
+ppr_parend_tys :: [IfaceType] -> SDoc
+ppr_parend_tys preds = parens (fsep (punctuate comma (map ppr preds)))
 
 instance Binary IfaceType where
     put_ _ (IfaceFreeTyVar tv)
@@ -1987,6 +2073,34 @@ instance Binary (DefMethSpec IfaceType) where
               0 -> return VanillaDM
               _ -> do { t <- get bh; return (GenericDM t) }
 
+instance Binary IfaceUserPred where
+    put_ bh (IfaceClassPred a b) = do
+      putByte bh 1
+      put_ bh a
+      put_ bh b
+    put_ bh (IfaceIrredPred a) = do
+      putByte bh 2
+      put_ bh a
+    put_ bh (IfaceForAllPred a b c) = do
+      putByte bh 3
+      put_ bh a
+      put_ bh b
+      put_ bh c
+
+    get bh = do
+      tag <- getByte bh
+      case tag of
+        1 -> do a <- get bh
+                b <- get bh
+                return $ IfaceClassPred a b
+        2 -> do a <- get bh
+                return $ IfaceIrredPred a
+        3 -> do a <- get bh
+                b <- get bh
+                c <- get bh
+                return $ IfaceForAllPred a b c
+        _ -> panic ("get IfaceUserPred " ++ show tag)
+
 instance NFData IfaceType where
   rnf = \case
     IfaceFreeTyVar f1 -> f1 `seq` ()
@@ -2058,3 +2172,9 @@ instance NFData IfaceAppArgs where
   rnf = \case
     IA_Nil -> ()
     IA_Arg f1 f2 f3 -> rnf f1 `seq` f2 `seq` rnf f3
+
+instance NFData IfaceUserPred where
+  rnf = \case
+    IfaceClassPred a b -> rnf a `seq` rnf b
+    IfaceIrredPred a -> rnf a
+    IfaceForAllPred a b c -> rnf a `seq` rnf b `seq` rnf c

@@ -26,8 +26,9 @@ module Class (
 import GhcPrelude
 
 import {-# SOURCE #-} TyCon     ( TyCon )
-import {-# SOURCE #-} TyCoRep   ( Type, PredType )
+import {-# SOURCE #-} TyCoRep   ( Type )
 import {-# SOURCE #-} TyCoPpr   ( pprType )
+import {-# SOURCE #-} Predicate ( Pred )
 import Var
 import Name
 import BasicTypes
@@ -108,7 +109,7 @@ data ClassBody
         -- Superclasses: eg: (F a ~ b, F b ~ G a, Eq a, Show b)
         -- We need value-level selectors for both the dictionary
         -- superclasses and the equality superclasses
-        cls_sc_theta :: [PredType],     -- Immediate superclasses,
+        cls_sc_theta :: [Pred],         -- Immediate superclasses,
         cls_sc_sel_ids :: [Id],          -- Selector functions to extract the
                                         --   superclasses from a
                                         --   dictionary of this class
@@ -166,7 +167,7 @@ The SrcSpan is for the entire original declaration.
 
 mkClass :: Name -> [TyVar]
         -> [FunDep TyVar]
-        -> [PredType] -> [Id]
+        -> [Pred] -> [Id]
         -> [ClassATItem]
         -> [ClassOpItem]
         -> ClassMinimalDef
@@ -279,7 +280,7 @@ classATItems (Class { classBody = ConcreteClass { cls_ats = at_stuff }})
   = at_stuff
 classATItems _ = []
 
-classSCTheta :: Class -> [PredType]
+classSCTheta :: Class -> [Pred]
 classSCTheta (Class { classBody = ConcreteClass { cls_sc_theta = theta_stuff }})
   = theta_stuff
 classSCTheta _ = []
@@ -290,7 +291,7 @@ classTvsFds c = (classTyVars c, classFunDeps c)
 classHasFds :: Class -> Bool
 classHasFds (Class { classFunDeps = fds }) = not (null fds)
 
-classBigSig :: Class -> ([TyVar], [PredType], [Id], [ClassOpItem])
+classBigSig :: Class -> ([TyVar], [Pred], [Id], [ClassOpItem])
 classBigSig (Class {classTyVars = tyvars,
                     classBody = AbstractClass})
   = (tyvars, [], [], [])
@@ -302,7 +303,7 @@ classBigSig (Class {classTyVars = tyvars,
                     }})
   = (tyvars, sc_theta, sc_sels, op_stuff)
 
-classExtraBigSig :: Class -> ([TyVar], [FunDep TyVar], [PredType], [Id], [ClassATItem], [ClassOpItem])
+classExtraBigSig :: Class -> ([TyVar], [FunDep TyVar], [Pred], [Id], [ClassATItem], [ClassOpItem])
 classExtraBigSig (Class {classTyVars = tyvars, classFunDeps = fundeps,
                          classBody = AbstractClass})
   = (tyvars, fundeps, [], [], [], [])

@@ -46,6 +46,7 @@ import TysPrim
 import TysWiredIn
 import PrelRules
 import Type
+import Predicate
 import FamInstEnv
 import Coercion
 import TcType
@@ -405,7 +406,7 @@ mkDictSelId name clas
     val_index      = assoc "MkId.mkDictSelId" (sel_names `zip` [0..]) name
 
     sel_ty = mkForAllTys tyvars $
-             mkInvisFunTy (mkClassPred clas (mkTyVarTys (binderVars tyvars))) $
+             mkInvisFunTy (mkClassPredTy clas (mkTyVarTys (binderVars tyvars))) $
              getNth arg_tys val_index
 
     base_info = noCafIdInfo
@@ -458,8 +459,8 @@ mkDictSelRhs clas val_index
     arg_tys        = dataConRepArgTys data_con  -- Includes the dictionary superclasses
 
     the_arg_id     = getNth arg_ids val_index
-    pred           = mkClassPred clas (mkTyVarTys tyvars)
-    dict_id        = mkTemplateLocal 1 pred
+    pred_ty        = mkClassPredTy clas (mkTyVarTys tyvars)
+    dict_id        = mkTemplateLocal 1 pred_ty
     arg_ids        = mkTemplateLocalsNum 2 arg_tys
 
     rhs_body | new_tycon = unwrapNewTypeBody tycon (mkTyVarTys tyvars)
@@ -702,12 +703,13 @@ mkDataConRep dflags fam_envs wrap_name mb_bangs data_con
 
     tycon        = dataConTyCon data_con       -- The representation TyCon (not family)
     wrap_ty      = dataConUserType data_con
-    ev_tys       = eqSpecPreds eq_spec ++ theta
-    all_arg_tys  = ev_tys ++ orig_arg_tys
-    ev_ibangs    = map (const HsLazy) ev_tys
+    all_arg_tys  = map eqPredType (eqSpecPreds eq_spec) ++
+                   map userPredType theta ++
+                   orig_arg_tys
+    ev_ibangs    = map (const HsLazy) eq_spec ++ map (const HsLazy) theta
     orig_bangs   = dataConSrcBangs data_con
 
-    wrap_arg_tys = theta ++ orig_arg_tys
+    wrap_arg_tys = map userPredType theta ++ orig_arg_tys
     wrap_arity   = count isCoVar ex_tvs + length wrap_arg_tys
              -- The wrap_args are the arguments *other than* the eq_spec
              -- Because we are going to apply the eq_spec args manually in the
@@ -1280,7 +1282,7 @@ NB: See also Note [Exported LocalIds] in Id
 
 mkDictFunId :: Name      -- Name to use for the dict fun;
             -> [TyVar]
-            -> ThetaType
+            -> [UserPred]
             -> Class
             -> [Type]
             -> Id
@@ -1295,9 +1297,9 @@ mkDictFunId dfun_name tvs theta clas tys
     is_nt = isNewTyCon (classTyCon clas)
     dfun_ty = mkDictFunTy tvs theta clas tys
 
-mkDictFunTy :: [TyVar] -> ThetaType -> Class -> [Type] -> Type
+mkDictFunTy :: [TyVar] -> [UserPred] -> Class -> [Type] -> Type
 mkDictFunTy tvs theta clas tys
- = mkSpecSigmaTy tvs theta (mkClassPred clas tys)
+ = mkSpecSigmaTy tvs theta (mkClassPredTy clas tys)
 
 {-
 ************************************************************************

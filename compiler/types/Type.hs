@@ -189,9 +189,9 @@ module Type (
         isEmptyTCvSubst, unionTCvSubst,
 
         -- ** Performing substitution on types and kinds
-        substTy, substTys, substTyWith, substTysWith, substTheta,
+        substTy, substTys, substTyWith, substTysWith,
         substTyAddInScope,
-        substTyUnchecked, substTysUnchecked, substThetaUnchecked,
+        substTyUnchecked, substTysUnchecked,
         substTyWithUnchecked,
         substCoUnchecked, substCoWithUnchecked,
         substTyVarBndr, substTyVarBndrs, substTyVar, substTyVars,

@@ -964,10 +964,10 @@ pprIfaceDecl _ (IfacePatSyn { ifName = name,
     mk_msg dflags
       = hang (text "pattern" <+> pprPrefixOcc name)
            2 (dcolon <+> sep [univ_msg
-                             , pprIfaceContextArr req_ctxt
+                             , pprIfaceContextArrPreds req_ctxt
                              , ppWhen insert_empty_ctxt $ parens empty <+> darrow
                              , ex_msg
-                             , pprIfaceContextArr prov_ctxt
+                             , pprIfaceContextArrPreds prov_ctxt
                              , pprIfaceType $ foldr (IfaceFunTy VisArg) pat_ty arg_tys ])
       where
         univ_msg = pprUserIfaceForAll univ_bndrs
@@ -1061,7 +1061,7 @@ pprIfaceDeclHead :: SuppressBndrSig
                  -> SDoc
 pprIfaceDeclHead suppress_sig context ss tc_occ bndrs
   = sdocWithDynFlags $ \ dflags ->
-    sep [ pprIfaceContextArr context
+    sep [ pprIfaceContextArrPreds context
         , pprPrefixIfDeclBndr (ss_how_much ss) (occName tc_occ)
           <+> pprIfaceTyConBinders suppress_sig
                 (suppressIfaceInvisibles dflags bndrs bndrs) ]
@@ -1516,7 +1516,15 @@ freeNamesIfFamFlav IfaceAbstractClosedSynFamilyTyCon   = emptyNameSet
 freeNamesIfFamFlav IfaceBuiltInSynFamTyCon             = emptyNameSet
 
 freeNamesIfContext :: IfaceContext -> NameSet
-freeNamesIfContext = fnList freeNamesIfType
+freeNamesIfContext = fnList freeNamesIfUserPred
+
+freeNamesIfUserPred :: IfaceUserPred -> NameSet
+freeNamesIfUserPred (IfaceClassPred cls_tc args)
+  = freeNamesIfTc cls_tc &&& freeNamesIfAppArgs args
+freeNamesIfUserPred (IfaceIrredPred pred_ty)
+  = freeNamesIfType pred_ty
+freeNamesIfUserPred (IfaceForAllPred tvs ctxt pred)
+  = fnList freeNamesIfTvBndr tvs &&& freeNamesIfContext ctxt &&& freeNamesIfUserPred pred
 
 freeNamesIfAT :: IfaceAT -> NameSet
 freeNamesIfAT (IfaceAT decl mb_def)

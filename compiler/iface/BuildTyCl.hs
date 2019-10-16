@@ -28,6 +28,7 @@ import PatSyn
 import Var
 import VarSet
 import BasicTypes
+import Predicate
 import Name
 import NameEnv
 import MkId
@@ -108,7 +109,7 @@ buildDataCon :: FamInstEnvs
            -> [TyCoVar]                -- Existentials
            -> [TyVarBinder]            -- User-written 'TyVarBinder's
            -> [EqSpec]                 -- Equality spec
-           -> KnotTied ThetaType       -- Does not include the "stupid theta"
+           -> KnotTied [UserPred]      -- Does not include the "stupid theta"
                                        -- or the GADT equalities
            -> [KnotTied Type]          -- Arguments
            -> KnotTied Type            -- Result types
@@ -152,7 +153,7 @@ buildDataCon fam_envs src_name declared_infix prom_info src_bangs impl_bangs
 -- the type variables mentioned in the arg_tys
 -- ToDo: Or functionally dependent on?
 --       This whole stupid theta thing is, well, stupid.
-mkDataConStupidTheta :: TyCon -> [Type] -> [TyVar] -> [PredType]
+mkDataConStupidTheta :: TyCon -> [Type] -> [TyVar] -> [UserPred]
 mkDataConStupidTheta tycon arg_tys univ_tvs
   | null stupid_theta = []      -- The common case
   | otherwise         = filter in_arg_tys stupid_theta
@@ -165,14 +166,14 @@ mkDataConStupidTheta tycon arg_tys univ_tvs
 
     arg_tyvars      = tyCoVarsOfTypes arg_tys
     in_arg_tys pred = not $ isEmptyVarSet $
-                      tyCoVarsOfType pred `intersectVarSet` arg_tyvars
+                      tyCoVarsOfUserPred pred `intersectVarSet` arg_tyvars
 
 
 ------------------------------------------------------
 buildPatSyn :: Name -> Bool
             -> (Id,Bool) -> Maybe (Id, Bool)
-            -> ([TyVarBinder], ThetaType) -- ^ Univ and req
-            -> ([TyVarBinder], ThetaType) -- ^ Ex and prov
+            -> ([TyVarBinder], [UserPred]) -- ^ Univ and req
+            -> ([TyVarBinder], [UserPred]) -- ^ Ex and prov
             -> [Type]               -- ^ Argument types
             -> Type                 -- ^ Result type
             -> [FieldLabel]         -- ^ Field labels for
@@ -186,8 +187,8 @@ buildPatSyn src_name declared_infix matcher@(matcher_id,_) builder
     ASSERT2((and [ univ_tvs `equalLength` univ_tvs1
                  , ex_tvs `equalLength` ex_tvs1
                  , pat_ty `eqType` substTy subst pat_ty1
-                 , prov_theta `eqTypes` substTys subst prov_theta1
-                 , req_theta `eqTypes` substTys subst req_theta1
+                 , prov_theta `eqUserPreds` substTheta subst prov_theta1
+                 , req_theta `eqUserPreds` substTheta subst req_theta1
                  , compareArgTys arg_tys (substTys subst arg_tys1)
                  ])
             , (vcat [ ppr univ_tvs <+> twiddle <+> ppr univ_tvs1
@@ -243,7 +244,7 @@ buildClass :: Name  -- Name of the class/tycon (they have the same Name)
            -> [FunDep TyVar]               -- Functional dependencies
            -- Super classes, associated types, method info, minimal complete def.
            -- This is Nothing if the class is abstract.
-           -> Maybe (KnotTied ThetaType, [ClassATItem], [KnotTied MethInfo], ClassMinimalDef)
+           -> Maybe (KnotTied [UserPred], [ClassATItem], [KnotTied MethInfo], ClassMinimalDef)
            -> TcRnIf m n Class
 
 buildClass tycon_name binders roles fds Nothing
@@ -297,7 +298,7 @@ buildClass tycon_name binders roles fds
               args       = sc_sel_names ++ op_names
               op_tys     = [ty | (_,ty,_) <- sig_stuff]
               op_names   = [op | (op,_,_) <- sig_stuff]
-              arg_tys    = sc_theta ++ op_tys
+              arg_tys    = map userPredType sc_theta ++ op_tys
               rec_tycon  = classTyCon rec_clas
               univ_bndrs = tyConTyVarBinders binders
               univ_tvs   = binderVars univ_bndrs
@@ -341,7 +342,8 @@ buildClass tycon_name binders roles fds
                 -- type]
 
               ; result = mkClass tycon_name univ_tvs fds
-                                 sc_theta sc_sel_ids at_items
+                                 (fromUserPreds sc_theta)
+                                 sc_sel_ids at_items
                                  op_items mindef tycon
               }
         ; traceIf (text "buildClass" <+> ppr tycon)

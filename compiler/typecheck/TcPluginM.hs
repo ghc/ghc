@@ -45,7 +45,7 @@ module TcPluginM (
         newCoercionHole,
 
         -- * Manipulating evidence bindings
-        newEvVar,
+        newEvCoVar,
         setEvBind,
         getEvBindsTcPluginM
     ) where
@@ -69,12 +69,13 @@ import TcMType    ( TcTyVar, TcType )
 import TcEnv      ( TcTyThing )
 import TcEvidence ( TcCoercion, CoercionHole, EvTerm(..)
                   , EvExpr, EvBind, mkGivenEvBind )
-import Var        ( EvVar )
+import Var        ( EvCoVar )
 
 import Module
 import Name
 import TyCon
 import DataCon
+import Predicate
 import Class
 import HscTypes
 import Outputable
@@ -154,31 +155,30 @@ zonkTcType = unsafeTcPluginTcM . TcM.zonkTcType
 zonkCt :: Ct -> TcPluginM Ct
 zonkCt = unsafeTcPluginTcM . TcM.zonkCt
 
-
 -- | Create a new wanted constraint.
-newWanted  :: CtLoc -> PredType -> TcPluginM CtEvidence
+newWanted  :: CtLoc -> Pred -> TcPluginM CtEvidence
 newWanted loc pty
   = unsafeTcPluginTcM (TcM.newWanted (ctLocOrigin loc) Nothing pty)
 
 -- | Create a new derived constraint.
-newDerived :: CtLoc -> PredType -> TcPluginM CtEvidence
+newDerived :: CtLoc -> Pred -> TcPluginM CtEvidence
 newDerived loc pty = return CtDerived { ctev_pred = pty, ctev_loc = loc }
 
 -- | Create a new given constraint, with the supplied evidence.  This
 -- must not be invoked from 'tcPluginInit' or 'tcPluginStop', or it
 -- will panic.
-newGiven :: CtLoc -> PredType -> EvExpr -> TcPluginM CtEvidence
-newGiven loc pty evtm = do
-   new_ev <- newEvVar pty
-   setEvBind $ mkGivenEvBind new_ev (EvExpr evtm)
-   return CtGiven { ctev_pred = pty, ctev_evar = new_ev, ctev_loc = loc }
+newGiven :: CtLoc -> Pred -> EvExpr -> TcPluginM CtEvidence
+newGiven loc pred evtm
+  = do new_ev <- newEvCoVar pred
+       setEvBind $ mkGivenEvBind new_ev (EvExpr evtm)
+       return CtGiven { ctev_pred = pred, ctev_evar = new_ev, ctev_loc = loc }
 
 -- | Create a fresh evidence variable.
-newEvVar :: PredType -> TcPluginM EvVar
-newEvVar = unsafeTcPluginTcM . TcM.newEvVar
+newEvCoVar :: Pred -> TcPluginM EvCoVar
+newEvCoVar = unsafeTcPluginTcM . TcM.newEvCoVar
 
 -- | Create a fresh coercion hole.
-newCoercionHole :: PredType -> TcPluginM CoercionHole
+newCoercionHole :: EqPred -> TcPluginM CoercionHole
 newCoercionHole = unsafeTcPluginTcM . TcM.newCoercionHole
 
 -- | Bind an evidence variable.  This must not be invoked from

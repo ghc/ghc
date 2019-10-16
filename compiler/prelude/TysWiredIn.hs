@@ -146,6 +146,7 @@ import Id
 import Constants        ( mAX_TUPLE_SIZE, mAX_CTUPLE_SIZE, mAX_SUM_SIZE )
 import Module           ( Module )
 import Type
+import Predicate
 import GHC.Types.RepType
 import DataCon
 import {-# SOURCE #-} ConLike
@@ -1104,15 +1105,15 @@ eqSCSelId, heqSCSelId, coercibleSCSelId :: Id
                              rhs klass
                              (mkPrelTyConRepName eqTyConName)
     klass     = mk_class tycon sc_pred sc_sel_id
-    datacon   = pcDataCon eqDataConName tvs [sc_pred] tycon
+    datacon   = pcDataCon eqDataConName tvs [predType sc_pred] tycon
 
     -- Kind: forall k. k -> k -> Constraint
     binders   = mkTemplateTyConBinders [liftedTypeKind] (\[k] -> [k,k])
     roles     = [Nominal, Nominal, Nominal]
     rhs       = mkDataTyConRhs [datacon]
 
-    tvs@[k,a,b] = binderVars binders
-    sc_pred     = mkTyConApp eqPrimTyCon (mkTyVarTys [k,k,a,b])
+    tvs@[_,a,b] = binderVars binders
+    sc_pred     = mkEqualityPred NomEq (mkTyVarTy a) (mkTyVarTy b)
     sc_sel_id   = mkDictSelId eqSCSelIdName klass
 
 (heqTyCon, heqClass, heqDataCon, heqSCSelId)
@@ -1122,15 +1123,15 @@ eqSCSelId, heqSCSelId, coercibleSCSelId :: Id
                              rhs klass
                              (mkPrelTyConRepName heqTyConName)
     klass     = mk_class tycon sc_pred sc_sel_id
-    datacon   = pcDataCon heqDataConName tvs [sc_pred] tycon
+    datacon   = pcDataCon heqDataConName tvs [predType sc_pred] tycon
 
     -- Kind: forall k1 k2. k1 -> k2 -> Constraint
     binders   = mkTemplateTyConBinders [liftedTypeKind, liftedTypeKind] id
     roles     = [Nominal, Nominal, Nominal, Nominal]
     rhs       = mkDataTyConRhs [datacon]
 
-    tvs       = binderVars binders
-    sc_pred   = mkTyConApp eqPrimTyCon (mkTyVarTys tvs)
+    tvs@[_,_,a,b] = binderVars binders
+    sc_pred   = mkEqualityPred NomEq (mkTyVarTy a) (mkTyVarTy b)
     sc_sel_id = mkDictSelId heqSCSelIdName klass
 
 (coercibleTyCon, coercibleClass, coercibleDataCon, coercibleSCSelId)
@@ -1140,18 +1141,18 @@ eqSCSelId, heqSCSelId, coercibleSCSelId :: Id
                              rhs klass
                              (mkPrelTyConRepName coercibleTyConName)
     klass     = mk_class tycon sc_pred sc_sel_id
-    datacon   = pcDataCon coercibleDataConName tvs [sc_pred] tycon
+    datacon   = pcDataCon coercibleDataConName tvs [predType sc_pred] tycon
 
     -- Kind: forall k. k -> k -> Constraint
     binders   = mkTemplateTyConBinders [liftedTypeKind] (\[k] -> [k,k])
     roles     = [Nominal, Representational, Representational]
     rhs       = mkDataTyConRhs [datacon]
 
-    tvs@[k,a,b] = binderVars binders
-    sc_pred     = mkTyConApp eqReprPrimTyCon (mkTyVarTys [k, k, a, b])
+    tvs@[_,a,b] = binderVars binders
+    sc_pred     = mkEqualityPred ReprEq (mkTyVarTy a) (mkTyVarTy b)
     sc_sel_id   = mkDictSelId coercibleSCSelIdName klass
 
-mk_class :: TyCon -> PredType -> Id -> Class
+mk_class :: TyCon -> Pred -> Id -> Class
 mk_class tycon sc_pred sc_sel_id
   = mkClass (tyConName tycon) (tyConTyVars tycon) [] [sc_pred] [sc_sel_id]
             [] [] (mkAnd []) tycon

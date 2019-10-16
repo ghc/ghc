@@ -19,10 +19,15 @@ module TcEvidence (
   EvBind(..), emptyTcEvBinds, isEmptyTcEvBinds, mkGivenEvBind, mkWantedEvBind,
   evBindVar, isCoEvBindsVar,
 
+  -- * Evidence variables
+  EvVar, EvBndr, EvCoVarBinder, EvVarBinder, evbVar, evbsVars, evbPred, evbsPreds,
+  toEvCoVarBinder, toEvCoVarBinders, toEvVarBinder,
+  mkEvVarBinder, mkEvCoVarBinder, mapPredM,
+
   -- * EvTerm (already a CoreExpr)
   EvTerm(..), EvExpr,
   evId, evCoercion, evCast, evDFunApp,  evDataConApp, evSelector,
-  mkEvCast, evVarsOfTerm, mkEvScSelectors, evTypeable, findNeededEvVars,
+  mkEvCast, evVarsOfTerm, evTypeable, findNeededEvVars,
 
   evTermCoercion, evTermCoercion_maybe,
   EvCallStack(..),
@@ -62,7 +67,7 @@ import TcType
 import Type
 import TyCon
 import DataCon( DataCon, dataConWrapId )
-import Class( Class )
+import Class( classTyCon )
 import PrelNames
 import DynFlags   ( gopt, GeneralFlag(Opt_PrintTypecheckerElaboration) )
 import VarEnv
@@ -72,7 +77,6 @@ import Name
 import Pair
 
 import CoreSyn
-import Class ( classSCSelId )
 import CoreFVs ( exprSomeFreeVars )
 
 import Util
@@ -82,6 +86,8 @@ import Outputable
 import SrcLoc
 import Data.IORef( IORef )
 import UniqSet
+
+import Data.Data ( Data )
 
 {-
 Note [TcCoercions]
@@ -508,7 +514,7 @@ instance Outputable EvBindMap where
 -----------------
 -- All evidence is bound by EvBinds; no side effects
 data EvBind
-  = EvBind { eb_lhs      :: EvVar
+  = EvBind { eb_lhs      :: EvCoVar
            , eb_rhs      :: EvTerm
            , eb_is_given :: Bool  -- True <=> given
                  -- See Note [Tracking redundant constraints] in TcSimplify
@@ -520,10 +526,67 @@ evBindVar = eb_lhs
 mkWantedEvBind :: EvVar -> EvTerm -> EvBind
 mkWantedEvBind ev tm = EvBind { eb_is_given = False, eb_lhs = ev, eb_rhs = tm }
 
--- EvTypeable are never given, so we can work with EvExpr here instead of EvTerm
 mkGivenEvBind :: EvVar -> EvTerm -> EvBind
 mkGivenEvBind ev tm = EvBind { eb_is_given = True, eb_lhs = ev, eb_rhs = tm }
 
+{-
+************************************************************************
+*                                                                      *
+                  Evidence variables
+*                                                                      *
+************************************************************************
+-}
+
+-- | Stores an EvVar with its pred.
+-- Invariant: classifyPredType ev_var == predType user_pred
+data EvBndr pred = EVB EvVar pred
+  deriving Data
+
+type EvVarBinder   = EvBndr UserPred  -- no covars
+type EvCoVarBinder = EvBndr Pred      -- could be a covar
+
+instance Outputable pred => Outputable (EvBndr pred) where
+  ppr (EVB var pred) = parens $ ppr var <+> dcolon <+> ppr pred
+
+evbVar :: EvBndr pred -> EvVar
+evbVar (EVB var _) = var
+
+evbPred :: EvBndr pred -> pred
+evbPred (EVB _ pred) = pred
+
+evbsVars :: [EvBndr pred] -> [EvVar]
+evbsVars = map evbVar
+
+evbsPreds :: [EvBndr pred] -> [pred]
+evbsPreds = map evbPred
+
+toEvCoVarBinder :: EvVarBinder -> EvCoVarBinder
+toEvCoVarBinder (EVB var user_pred) = EVB var (fromUserPred user_pred)
+
+toEvCoVarBinders :: [EvVarBinder] -> [EvCoVarBinder]
+toEvCoVarBinders = map toEvCoVarBinder
+
+toEvVarBinder :: String -> EvCoVarBinder -> EvVarBinder
+toEvVarBinder _err_msg (EVB var (UserPred u)) = EVB var u
+toEvVarBinder err_msg  evb
+  = pprPanic ("toEvVarBinder " ++ err_msg) (ppr evb)
+
+mkEvVarBinder :: EvVar -> UserPred -> EvVarBinder
+mkEvVarBinder = EVB
+
+mkEvCoVarBinder :: EvCoVar -> Pred -> EvCoVarBinder
+mkEvCoVarBinder = EVB
+
+mapPredM :: Monad m => (pred1 -> m pred2) -> EvBndr pred1 -> m (EvBndr pred2)
+mapPredM f (EVB var pred) = EVB var <$> f pred
+
+{-
+************************************************************************
+*                                                                      *
+                  Evidence terms
+*                                                                      *
+************************************************************************
+-}
 
 -- An EvTerm is, conceptually, a CoreExpr that implements the constraint.
 -- Unfortunately, we cannot just do
@@ -548,9 +611,10 @@ type EvExpr = CoreExpr
 -- An EvTerm is (usually) constructed by any of the constructors here
 -- and those more complicates ones who were moved to module TcEvTerm
 
--- | Any sort of evidence Id, including coercions
+-- | No coercions here
 evId ::  EvId -> EvExpr
-evId = Var
+evId var = ASSERT( not (isCoVar var) )
+           Var var
 
 -- coercion bindings
 -- See Note [Coercion evidence terms]
@@ -607,9 +671,9 @@ data EvTypeable
 data EvCallStack
   -- See Note [Overview of implicit CallStacks]
   = EvCsEmpty
-  | EvCsPushCall Name RealSrcSpan EvExpr
-    -- ^ @EvCsPushCall name loc stk@ represents a call to @name@, occurring at
-    -- @loc@, in a calling context @stk@.
+  | EvCsPushCall Name RealSrcSpan EvExpr UserPred
+    -- ^ @EvCsPushCall name loc stk pred@ represents a call to @name@, occurring at
+    -- @loc@, in a calling context @stk :: pred@.
   deriving Data.Data
 
 {-
@@ -711,7 +775,7 @@ important) are solved in three steps:
 
    from which we build the evidence term
 
-     EvCsPushCall "error" <error's location> (EvId d)
+     EvCsPushCall "error" <error's location> (EvId d) (varType d)
 
    that we use to solve the call to `error`. The new wanted `d` will
    then be solved per rule (1), ie as a regular IP.
@@ -799,19 +863,6 @@ mkEvCast ev lco
            , (vcat [text "Coercion of wrong role passed to mkEvCast:", ppr ev, ppr lco]))
     isTcReflCo lco = EvExpr ev
   | otherwise      = evCast ev lco
-
-
-mkEvScSelectors         -- Assume   class (..., D ty, ...) => C a b
-  :: Class -> [TcType]  -- C ty1 ty2
-  -> [(TcPredType,      -- D ty[ty1/a,ty2/b]
-       EvExpr)          -- :: C ty1 ty2 -> D ty[ty1/a,ty2/b]
-     ]
-mkEvScSelectors cls tys
-   = zipWith mk_pr (immSuperClasses cls tys) [0..]
-  where
-    mk_pr pred i = (pred, Var sc_sel_id `mkTyApps` tys)
-      where
-        sc_sel_id  = classSCSelId cls i -- Zero-indexed
 
 emptyTcEvBinds :: TcEvBinds
 emptyTcEvBinds = EvBinds emptyBag
@@ -971,7 +1022,7 @@ instance Outputable EvTerm where
 instance Outputable EvCallStack where
   ppr EvCsEmpty
     = text "[]"
-  ppr (EvCsPushCall name loc tm)
+  ppr (EvCsPushCall name loc tm _pred)
     = ppr (name,loc) <+> text ":" <+> ppr tm
 
 instance Outputable EvTypeable where
@@ -991,20 +1042,19 @@ instance Outputable EvTypeable where
 -- and return a 'Coercion' `co :: IP sym ty ~ ty` or
 -- `co :: IsLabel sym ty ~ Proxy# sym -> ty`.  See also
 -- Note [Type-checking overloaded labels] in TcExpr.
-unwrapIP :: Type -> CoercionR
-unwrapIP ty =
-  case unwrapNewTyCon_maybe tc of
-    Just (_,_,ax) -> mkUnbranchedAxInstCo Representational ax tys []
-    Nothing       -> pprPanic "unwrapIP" $
-                       text "The dictionary for" <+> quotes (ppr tc)
-                         <+> text "is not a newtype!"
-  where
-  (tc, tys) = splitTyConApp ty
+unwrapIP :: UserPred -> CoercionR
+unwrapIP (ClassPred cls tys)
+  | Just (_,_,ax) <- unwrapNewTyCon_maybe (classTyCon cls)
+  = mkUnbranchedAxInstCo Representational ax tys []
+unwrapIP pred
+  = pprPanic "unwrapIP" $
+      text "The dictionary for" <+> quotes (ppr pred)
+                                <+> text "is not a newtype!"
 
 -- | Create a 'Coercion' that wraps a value in an implicit-parameter
 -- dictionary. See 'unwrapIP'.
-wrapIP :: Type -> CoercionR
-wrapIP ty = mkSymCo (unwrapIP ty)
+wrapIP :: UserPred -> CoercionR
+wrapIP pred = mkSymCo (unwrapIP pred)
 
 ----------------------------------------------------------------------
 -- A datatype used to pass information when desugaring quotations

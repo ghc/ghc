@@ -47,6 +47,7 @@ import TcGenGenerics
 import TcOrigin
 import TcRnMonad
 import TcType
+import Predicate
 import THNames (liftClassKey)
 import TyCon
 import TyCoPpr (pprSourceTyCon)
@@ -410,7 +411,7 @@ data DerivContext
                                  --
                                  -- GHC should infer the context.
 
-  | SupplyContext ThetaType      -- ^ @'SupplyContext' theta@ is a standalone
+  | SupplyContext [UserPred]     -- ^ @'SupplyContext' theta@ is a standalone
                                  -- deriving declaration, where @theta@ is the
                                  -- context supplied by the user.
 
@@ -436,7 +437,7 @@ data OriginativeDerivStatus
 
 -- | A 'PredType' annotated with the origin of the constraint 'CtOrigin',
 -- and whether or the constraint deals in types or kinds.
-data PredOrigin = PredOrigin PredType CtOrigin TypeOrKind
+data PredOrigin = PredOrigin Pred CtOrigin TypeOrKind
 
 -- | A list of wanted 'PredOrigin' constraints ('to_wanted_origins') to
 -- simplify when inferring a derived instance's context. These are used in all
@@ -506,11 +507,11 @@ data PredOrigin = PredOrigin PredType CtOrigin TypeOrKind
 data ThetaOrigin
   = ThetaOrigin { to_anyclass_skols  :: [TyVar]
                 , to_anyclass_metas  :: [TyVar]
-                , to_anyclass_givens :: ThetaType
+                , to_anyclass_givens :: [UserPred]
                 , to_wanted_origins  :: [PredOrigin] }
 
 instance Outputable PredOrigin where
-  ppr (PredOrigin ty _ _) = ppr ty -- The origin is not so interesting when debugging
+  ppr (PredOrigin pred _ _) = ppr pred -- The origin is not so interesting when debugging
 
 instance Outputable ThetaOrigin where
   ppr (ThetaOrigin { to_anyclass_skols  = ac_skols
@@ -523,23 +524,29 @@ instance Outputable ThetaOrigin where
                  , text "to_anyclass_givens =" <+> ppr ac_givens
                  , text "to_wanted_origins  =" <+> ppr wanted_origins ])
 
-mkPredOrigin :: CtOrigin -> TypeOrKind -> PredType -> PredOrigin
+mkPredOrigin :: CtOrigin -> TypeOrKind -> Pred -> PredOrigin
 mkPredOrigin origin t_or_k pred = PredOrigin pred origin t_or_k
 
 mkThetaOrigin :: CtOrigin -> TypeOrKind
-              -> [TyVar] -> [TyVar] -> ThetaType -> ThetaType
+              -> [TyVar] -> [TyVar] -> [UserPred] -> [Pred]
               -> ThetaOrigin
-mkThetaOrigin origin t_or_k skols metas givens
-  = ThetaOrigin skols metas givens . map (mkPredOrigin origin t_or_k)
+mkThetaOrigin origin t_or_k skols metas givens preds
+  = ThetaOrigin { to_anyclass_skols  = skols
+                , to_anyclass_metas  = metas
+                , to_anyclass_givens = givens
+                , to_wanted_origins  = map (mkPredOrigin origin t_or_k) preds }
 
 -- A common case where the ThetaOrigin only contains wanted constraints, with
 -- no givens or locally scoped type variables.
 mkThetaOriginFromPreds :: [PredOrigin] -> ThetaOrigin
-mkThetaOriginFromPreds = ThetaOrigin [] [] []
+mkThetaOriginFromPreds preds = ThetaOrigin { to_anyclass_skols  = []
+                                           , to_anyclass_metas  = []
+                                           , to_anyclass_givens = []
+                                           , to_wanted_origins  = preds }
 
 substPredOrigin :: HasCallStack => TCvSubst -> PredOrigin -> PredOrigin
 substPredOrigin subst (PredOrigin pred origin t_or_k)
-  = PredOrigin (substTy subst pred) origin t_or_k
+  = PredOrigin (substPred subst pred) origin t_or_k
 
 {-
 ************************************************************************
@@ -944,7 +951,7 @@ cond_functorOK allowFunctions allowExQuantifiedLastTyVar _ _ rep_tc
     tc_tvs            = tyConTyVars rep_tc
     last_tv           = last tc_tvs
     bad_stupid_theta  = filter is_bad (tyConStupidTheta rep_tc)
-    is_bad pred       = last_tv `elemVarSet` exactTyCoVarsOfType pred
+    is_bad pred       = last_tv `elemVarSet` exactTyCoVarsOfUserPred pred
       -- See Note [Check that the type variable is truly universal]
 
     data_cons = tyConDataCons rep_tc
@@ -957,7 +964,7 @@ cond_functorOK allowFunctions allowExQuantifiedLastTyVar _ _ rep_tc
                 -- in TcGenFunctor
       | Just tv <- getTyVar_maybe (last (tyConAppArgs (dataConOrigResTy con)))
       , tv `elem` dataConUnivTyVars con
-      , not (tv `elemVarSet` exactTyCoVarsOfTypes (dataConTheta con))
+      , not (tv `elemVarSet` exactTyCoVarsOfPreds (dataConTheta con))
       = IsValid   -- See Note [Check that the type variable is truly universal]
       | otherwise
       = NotValid (badCon con existential)
@@ -1014,7 +1021,7 @@ badCon con msg = text "Constructor" <+> quotes (ppr con) <+> msg
 
 ------------------------------------------------------------------
 
-newDerivClsInst :: ThetaType -> DerivSpec theta -> TcM ClsInst
+newDerivClsInst :: [UserPred] -> DerivSpec theta -> TcM ClsInst
 newDerivClsInst theta (DS { ds_name = dfun_name, ds_overlap = overlap_mode
                           , ds_tvs = tvs, ds_cls = clas, ds_tys = tys })
   = newClsInst overlap_mode dfun_name tvs theta clas tys

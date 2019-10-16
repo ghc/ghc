@@ -406,8 +406,8 @@ tcPatSynSig name sig_ty
        ; implicit_tvs <- zonkAndScopedSort implicit_tvs
        ; univ_tvs     <- mapM zonkTyCoVarKind univ_tvs
        ; ex_tvs       <- mapM zonkTyCoVarKind ex_tvs
-       ; req          <- zonkTcTypes req
-       ; prov         <- zonkTcTypes prov
+       ; req          <- mapM zonkUserPred req
+       ; prov         <- mapM zonkUserPred prov
        ; body_ty      <- zonkTcType  body_ty
 
        -- Skolems have TcLevels too, though they're used only for debugging.

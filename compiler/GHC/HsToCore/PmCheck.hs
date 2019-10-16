@@ -43,10 +43,8 @@ import Util
 import Outputable
 import DataCon
 import TyCon
-import Var (EvVar)
 import Coercion
 import TcEvidence
-import TcType (evVarPred)
 import {-# SOURCE #-} DsExpr (dsExpr, dsLExpr, dsSyntaxExpr)
 import {-# SOURCE #-} DsBinds (dsHsWrapper)
 import DsUtils (selectMatchVar)
@@ -96,7 +94,7 @@ data PmGrd
       pm_id          :: !Id,
       pm_con_con     :: !PmAltCon,
       pm_con_tvs     :: ![TyVar],
-      pm_con_dicts   :: ![EvVar],
+      pm_con_dicts   :: ![EvCoVarBinder],
       pm_con_args    :: ![Id]
     }
 
@@ -114,7 +112,7 @@ data PmGrd
 
 -- | Should not be user-facing.
 instance Outputable PmGrd where
-  ppr (PmCon x alt _tvs _con_dicts con_args)
+  ppr (PmCon { pm_id = x, pm_con_con = alt, pm_con_args = con_args })
     = hsep [ppr alt, hsep (map ppr con_args), text "<-", ppr x]
   ppr (PmBang x) = char '!' <> ppr x
   ppr (PmLet x expr) = hsep [text "let", ppr x, text "=", ppr expr]
@@ -548,7 +546,7 @@ translateListPat fam_insts x pats = do
 
 -- | Translate a constructor pattern
 translateConPatOut :: FamInstEnvs -> Id -> ConLike -> [Type] -> [TyVar]
-                   -> [EvVar] -> HsConPatDetails GhcTc -> DsM GrdVec
+                   -> [EvCoVarBinder] -> HsConPatDetails GhcTc -> DsM GrdVec
 translateConPatOut fam_insts x con univ_tys ex_tvs dicts = \case
     PrefixCon ps                 -> go_field_pats (zip [0..] ps)
     InfixCon  p1 p2              -> go_field_pats (zip [0..] [p1,p2])
@@ -587,7 +585,11 @@ translateConPatOut fam_insts x con univ_tys ex_tvs dicts = \case
 
       -- 1. the constructor pattern match itself
       arg_ids <- zipWithM get_pat_id [0..] arg_tys
-      let con_grd = PmCon x (PmAltConLike con) ex_tvs dicts arg_ids
+      let con_grd = PmCon { pm_id        = x
+                          , pm_con_con   = PmAltConLike con
+                          , pm_con_tvs   = ex_tvs
+                          , pm_con_dicts = dicts
+                          , pm_con_args  = arg_ids }
 
       -- 2. bang strict fields
       let arg_is_banged = map isBanged $ conLikeImplBangs con
@@ -944,7 +946,7 @@ checkGrdTree' (Guard (PmCon x con tvs dicts args) tree) deltas = do
       else pure False
   unc_this <- addPmCtDeltas deltas (PmNotConCt x con)
   deltas' <- addPmCtsDeltas deltas $
-    listToBag (PmTyCt . evVarPred <$> dicts) `snocBag` PmConCt x con tvs args
+    listToBag (PmTyCt . evbPred <$> dicts) `snocBag` PmConCt x con tvs args
   CheckResult tree' unc_inner prec <- checkGrdTree' tree deltas'
   limit <- maxPmCheckModels <$> getDynFlags
   let (prec', unc') = throttle limit deltas (unc_this Semi.<> unc_inner)
@@ -1018,9 +1020,9 @@ locallyExtendPmDelta ext k = getPmDelta >>= ext >>= \case
   Just delta' -> updPmDelta delta' k
 
 -- | Add in-scope type constraints
-addTyCsDs :: Bag EvVar -> DsM a -> DsM a
+addTyCsDs :: Bag EvCoVarBinder -> DsM a -> DsM a
 addTyCsDs ev_vars =
-  locallyExtendPmDelta (\delta -> addPmCts delta (PmTyCt . evVarPred <$> ev_vars))
+  locallyExtendPmDelta (\delta -> addPmCts delta (PmTyCt . evbPred <$> ev_vars))
 
 -- | Add equalities for the scrutinee to the local 'DsM' environment when
 -- checking a case expression:
@@ -1034,9 +1036,9 @@ addScrutTmCs (Just scr) [x] k = do
   locallyExtendPmDelta (\delta -> addPmCts delta (unitBag (PmCoreCt x scr_e))) k
 addScrutTmCs _   _   _ = panic "addScrutTmCs: HsCase with more than one case binder"
 
-addPmConCts :: Delta -> Id -> PmAltCon -> [TyVar] -> [EvVar] -> [Id] -> DsM (Maybe Delta)
+addPmConCts :: Delta -> Id -> PmAltCon -> [TyVar] -> [EvCoVarBinder] -> [Id] -> DsM (Maybe Delta)
 addPmConCts delta x con tvs dicts fields = runMaybeT $ do
-  delta_ty    <- MaybeT $ addPmCts delta (listToBag (PmTyCt . evVarPred <$> dicts))
+  delta_ty    <- MaybeT $ addPmCts delta (listToBag (PmTyCt . evbPred <$> dicts))
   delta_tm_ty <- MaybeT $ addPmCts delta_ty (unitBag (PmConCt x con tvs fields))
   pure delta_tm_ty
 

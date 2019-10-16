@@ -701,8 +701,7 @@ Let's take these one at a time:
     --------------------------
 This is The Type Of Equality in GHC. It classifies nominal coercions.
 This type is used in the solver for recording equality constraints.
-It responds "yes" to Type.isEqPrimPred and classifies as an EqPred in
-Type.classifyPredType.
+It classifies as an EqualityPred in Predicate.classifyPredType.
 
 All wanted constraints of this type are built with coercion holes.
 (See Note [Coercion holes] in TyCoRep.) But see also
@@ -736,6 +735,11 @@ Here's what's unusual about it:
    don't worry if a (~~) constraint is too big, as we know that solving
    equality terminates.
 
+ * The "instance" has no DFun. (If it did, it would be strange, because
+   the constraint on the DFun, headed with ~#, would not be of the right
+   kind.) Instead, Wanteds involving ~~ are handled specially, by
+   matchHeteroEquality.
+
 On the other hand, this behaves just like any class w.r.t. eager superclass
 unpacking in the solver. So a lifted equality given quickly becomes an unlifted
 equality given. This is good, because the solver knows all about unlifted
@@ -754,7 +758,8 @@ It is an almost-ordinary class defined as if by
   class a ~# b => (a :: k) ~ (b :: k)
   instance a ~# b => a ~ b
 
- * All the bullets for (~~) apply
+ * All the bullets for (~~) apply. Matching a Wanted is handled
+   by matchHomoEquality.
 
  * In addition (~) is magical syntax, as ~ is a reserved symbol.
    It cannot be exported or imported.

@@ -2193,7 +2193,7 @@ callSpecArity :: [TyCoBinder] -> Int
 callSpecArity = length . filter (not . isNamedBinder) . dropWhileEndLE isVisibleBinder
 
 getTheta :: [TyCoBinder] -> [PredType]
-getTheta = fmap tyBinderType . filter isInvisibleBinder . filter (not . isNamedBinder)
+getTheta = map tyBinderType . filter isInvisibleBinder . filter (not . isNamedBinder)
 
 
 ------------------------------------------------------------
@@ -2273,11 +2273,11 @@ mkCallUDs' env f args
 
     type_determines_value pred    -- See Note [Type determines value]
         = case classifyPredType pred of
-            ClassPred cls _ -> not (isIPClass cls)  -- Superclasses can't be IPs
-            EqPred {}       -> True
-            IrredPred {}    -> True   -- Things like (D []) where D is a
-                                      -- Constraint-ranged family; #7785
-            ForAllPred {}   -> True
+            UserPred (ClassPred cls _) -> not (isIPClass cls)  -- Superclasses can't be IPs
+            EqualityPred {}            -> True
+            UserPred (IrredPred {})    -> True   -- Things like (D []) where D is a
+                                                 -- Constraint-ranged family; #7785
+            UserPred (ForAllPred {})   -> True
 
 {-
 Note [Type determines value]

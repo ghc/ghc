@@ -25,6 +25,7 @@ import DsBinds
 import ConLike
 import BasicTypes ( Origin(..) )
 import TcType
+import TcEvidence
 import DsMonad
 import DsUtils
 import MkCore   ( mkCoreLets )
@@ -147,8 +148,8 @@ matchOneConLike vars ty (eqn1 :| eqns)   -- All eqns for a single constructor
                                                              pat_binds = bind, pat_args = args
                                                   } : pats }))
                 = do ds_bind <- dsTcEvBinds bind
-                     return ( wrapBinds (tvs `zip` tvs1)
-                            . wrapBinds (ds  `zip` dicts1)
+                     return ( wrapBinds (tvs          `zip` tvs1)
+                            . wrapBinds (evbsVars ds  `zip` dict1_vars)
                             . mkCoreLets ds_bind
                             , eqn { eqn_orig = Generated
                                   , eqn_pats = conArgPats val_arg_tys args ++ pats }
@@ -167,7 +168,7 @@ matchOneConLike vars ty (eqn1 :| eqns)   -- All eqns for a single constructor
         ; match_results <- mapM (match_group arg_vars) groups
 
         ; return $ MkCaseAlt{ alt_pat = con1,
-                              alt_bndrs = tvs1 ++ dicts1 ++ arg_vars,
+                              alt_bndrs = tvs1 ++ dict1_vars ++ arg_vars,
                               alt_wrapper = wrapper1,
                               alt_result = foldr1 combineMatchResults match_results } }
   where
@@ -175,7 +176,8 @@ matchOneConLike vars ty (eqn1 :| eqns)   -- All eqns for a single constructor
               , pat_arg_tys = arg_tys, pat_wrap = wrapper1,
                 pat_tvs = tvs1, pat_dicts = dicts1, pat_args = args1 }
               = firstPat eqn1
-    fields1 = map flSelector (conLikeFieldLabels con1)
+    dict1_vars = evbsVars dicts1
+    fields1    = map flSelector (conLikeFieldLabels con1)
 
     ex_tvs = conLikeExTyCoVars con1
 

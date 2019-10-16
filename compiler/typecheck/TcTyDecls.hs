@@ -308,28 +308,29 @@ checkClassCycles cls
                         map (go_pred so_far) $
                         immSuperClasses cls tys
 
-    go_pred :: NameSet -> PredType -> Maybe (Bool, SDoc)
+    go_pred :: NameSet -> Pred -> Maybe (Bool, SDoc)
        -- Nothing <=> ok
        -- Just (True, err)  <=> definite cycle
        -- Just (False, err) <=> possible cycle
-    go_pred so_far pred  -- NB: tcSplitTyConApp looks through synonyms
-       | Just (tc, tys) <- tcSplitTyConApp_maybe pred
-       = go_tc so_far pred tc tys
-       | hasTyVarHead pred
-       = Just (False, hang (text "one of whose superclass constraints is headed by a type variable:")
-                         2 (quotes (ppr pred)))
-       | otherwise
-       = Nothing
+    go_pred so_far (UserPred u_pred) = go_user_pred so_far u_pred
+    go_pred _      (EqualityPred {}) = Nothing  -- equalities aren't recursive
 
-    go_tc :: NameSet -> PredType -> TyCon -> [Type] -> Maybe (Bool, SDoc)
-    go_tc so_far pred tc tys
-      | isFamilyTyCon tc
-      = Just (False, hang (text "one of whose superclass constraints is headed by a type family:")
-                        2 (quotes (ppr pred)))
-      | Just cls <- tyConClass_maybe tc
-      = go_cls so_far cls tys
-      | otherwise   -- Equality predicate, for example
-      = Nothing
+    go_user_pred :: NameSet -> UserPred -> Maybe (Bool, SDoc)
+    go_user_pred so_far (ClassPred cls tys)   = go_cls so_far cls tys
+    go_user_pred so_far (ForAllPred _ _ head) = go_user_pred so_far head
+    go_user_pred _      (IrredPred pred_ty)
+      = Just (False, hang herald 2 (quotes (ppr pred_ty)))
+      where
+        herald = text "one of whose superclass constraints is headed by a"
+                   <+> what <> colon
+
+        what | hasTyVarHead pred_ty
+             = text "type variable"
+             | Just (tc, _) <- tcSplitTyConApp_maybe pred_ty
+             , isTypeFamilyTyCon tc
+             = text "type family"
+             | otherwise
+             = pprPanic "checkClassCycles" (ppr pred_ty)
 
     go_cls :: NameSet -> Class -> [Type] -> Maybe (Bool, SDoc)
     go_cls so_far cls tys
@@ -551,7 +552,7 @@ irTyCon tc
        ; unless (all (== Nominal) old_roles) $  -- also catches data families,
                                                 -- which don't want or need role inference
          irTcTyVars tc $
-         do { mapM_ (irType emptyVarSet) (tyConStupidTheta tc)  -- See #8958
+         do { mapM_ (irType emptyVarSet . userPredType) (tyConStupidTheta tc)  -- See #8958
             ; whenIsJust (tyConClass_maybe tc) irClass
             ; mapM_ irDataCon (visibleDataCons $ algTyConRhs tc) }}
 
@@ -580,7 +581,10 @@ irDataCon datacon
   = setRoleInferenceVars univ_tvs $
     irExTyVars ex_tvs $ \ ex_var_set ->
     mapM_ (irType ex_var_set)
-          (map tyVarKind ex_tvs ++ eqSpecPreds eq_spec ++ theta ++ arg_tys)
+          (concat [ map tyVarKind ex_tvs
+                  , map eqPredType (eqSpecPreds eq_spec)
+                  , map userPredType theta
+                  , arg_tys ])
       -- See Note [Role-checking data constructor arguments]
   where
     (univ_tvs, ex_tvs, eq_spec, theta, arg_tys, _res_ty)

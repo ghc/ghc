@@ -38,6 +38,7 @@ import TcType -- InstEnv is really part of the type checker,
 import CoreSyn ( IsOrphan(..), isOrphan, chooseOrphanAnchor )
 import Module
 import Class
+import Predicate
 import Var
 import VarSet
 import Name
@@ -252,7 +253,7 @@ orphNamesOfClsInst :: ClsInst -> NameSet
 orphNamesOfClsInst (ClsInst { is_cls_nm = cls_nm, is_tys = tys })
   = orphNamesOfTypes tys `unionNameSet` unitNameSet cls_nm
 
-instanceSig :: ClsInst -> ([TyVar], [Type], Class, [Type])
+instanceSig :: ClsInst -> ([TyVar], [UserPred], Class, [Type])
 -- Decomposes the DFunId
 instanceSig ispec = tcSplitDFunTy (idType (is_dfun ispec))
 

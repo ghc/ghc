@@ -18,6 +18,7 @@ module GHC.CoreToIface
     , toIfaceTyCon
     , toIfaceTyCon_name
     , toIfaceTyLit
+    , toIfacePredX
       -- * Tidying types
     , tidyToIfaceType
     , tidyToIfaceContext
@@ -53,7 +54,9 @@ import Id
 import IdInfo
 import CoreSyn
 import TyCon hiding ( pprPromotionQuote )
+import Class
 import CoAxiom
+import Predicate
 import TysPrim ( eqPrimTyCon, eqReprPrimTyCon )
 import TysWiredIn ( heqTyCon )
 import MkId ( noinlineIdName )
@@ -211,6 +214,17 @@ toIfaceForAllBndr = toIfaceForAllBndrX emptyVarSet
 toIfaceForAllBndrX :: VarSet -> TyCoVarBinder -> IfaceForAllBndr
 toIfaceForAllBndrX fr (Bndr v vis) = Bndr (toIfaceBndrX fr v) vis
 
+toIfacePredX :: VarSet -> Pred -> IfacePred
+toIfacePredX fr (EqualityPred (EqPred rel t1 t2))
+  = IfaceEqualityPred rel (not $ k1 `eqType` k2)
+                          (toIfaceTypeX fr k1) (toIfaceTypeX fr k2)
+                          (toIfaceTypeX fr t1) (toIfaceTypeX fr t2)
+  where
+    k1 = typeKind t1
+    k2 = typeKind t2
+toIfacePredX fr (UserPred up)
+  = IfaceUserPred (toIfaceTypeX fr (userPredType up))
+
 ----------------
 toIfaceTyCon :: TyCon -> IfaceTyCon
 toIfaceTyCon tc
@@ -361,14 +375,26 @@ toIfaceAppArgsX fr kind ty_args
         WARN( True, ppr kind $$ ppr ty_args )
         IA_Arg (toIfaceTypeX fr t1) Required (go env ty ts1)
 
+toIfaceUserPred :: UserPred -> IfaceUserPred
+toIfaceUserPred (ClassPred cls tys) = IfaceClassPred (toIfaceTyCon tc)
+                                                     (toIfaceTcArgs tc tys)
+  where tc = classTyCon cls
+toIfaceUserPred (IrredPred pred_ty) = IfaceIrredPred (toIfaceType pred_ty)
+toIfaceUserPred (ForAllPred tvs theta head)
+  = IfaceForAllPred (toIfaceTvBndrs tvs) (map toIfaceUserPred theta)
+                    (toIfaceUserPred head)
+
 tidyToIfaceType :: TidyEnv -> Type -> IfaceType
 tidyToIfaceType env ty = toIfaceType (tidyType env ty)
 
 tidyToIfaceTcArgs :: TidyEnv -> TyCon -> [Type] -> IfaceAppArgs
 tidyToIfaceTcArgs env tc tys = toIfaceTcArgs tc (tidyTypes env tys)
 
-tidyToIfaceContext :: TidyEnv -> ThetaType -> IfaceContext
-tidyToIfaceContext env theta = map (tidyToIfaceType env) theta
+tidyToIfaceContext :: TidyEnv -> [UserPred] -> IfaceContext
+tidyToIfaceContext env theta = map (tidyToIfaceUserPred env) theta
+
+tidyToIfaceUserPred :: TidyEnv -> UserPred -> IfaceUserPred
+tidyToIfaceUserPred env pred = toIfaceUserPred (tidyUserPred env pred)
 
 {-
 ************************************************************************
