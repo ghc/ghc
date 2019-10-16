@@ -2610,7 +2610,7 @@ getPreprocessedImports
     -- ^ optional source code buffer and modification time
     -> ExceptT ErrorMessages IO PreprocessedImports
 getPreprocessedImports hsc_env src_fn mb_phase maybe_buf = do
-  (pi_local_dflags, pi_hspp_fn)
+  (pi_local_dflags, pi_hspp_fn, _)
       <- ExceptT $ preprocess hsc_env src_fn (fst <$> maybe_buf) mb_phase
   pi_hspp_buf <- liftIO $ hGetStringBuffer pi_hspp_fn
   (pi_srcimps, pi_theimps, L pi_mod_name_loc pi_mod_name)

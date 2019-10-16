@@ -839,19 +839,7 @@ finish summary tc_result mb_old_hash = do
                 -- See Note [Avoiding space leaks in toIface*] for details.
                 force (mkPartialIface hsc_env details desugared_guts)
 
-          let iface_gen :: IO (ModIface, Bool)
-              iface_gen = do
-                  -- Build a fully instantiated ModIface.
-                  -- This has to happen *after* code gen so that the back-end
-                  -- info has been set.
-                  -- This captures hsc_env, but it seems we keep it alive in other
-                  -- ways as well so we don't bother extracting only the relevant parts.
-                  dumpIfaceStats hsc_env
-                  final_iface <- mkFullIface hsc_env partial_iface
-                  let no_change = mb_old_hash == Just (mi_iface_hash (mi_final_exts final_iface))
-                  return (final_iface, no_change)
-
-          return ( HscRecomp cg_guts summary iface_gen, details )
+          return ( HscRecomp cg_guts summary partial_iface mb_old_hash, details )
     else mk_simple_iface
 
 
