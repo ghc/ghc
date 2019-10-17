@@ -987,7 +987,6 @@ AS_IF([test "x$with_system_libffi" = "xyes"],
   [UseSystemLibFFI="YES"], [UseSystemLibFFI="NO"]
 )
 
-
 AC_SUBST(UseSystemLibFFI)
 
 AC_ARG_WITH([ffi-includes],
