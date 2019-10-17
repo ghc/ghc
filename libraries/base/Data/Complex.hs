@@ -39,6 +39,8 @@ module Data.Complex
 import GHC.Base (Applicative (..))
 import GHC.Generics (Generic, Generic1)
 import GHC.Float (Floating(..))
+import Data.List.NonEmpty (NonEmpty (..))
+import Data.Foldable1 (Foldable1 (foldMap1, toNonEmpty))
 import Data.Data (Data)
 import Foreign (Storable, castPtr, peek, poke, pokeElemOff, peekElemOff, sizeOf,
                 alignment)
@@ -72,6 +74,10 @@ data Complex a
                  , Foldable    -- ^ @since 4.9.0.0
                  , Traversable -- ^ @since 4.9.0.0
                  )
+
+instance Foldable1 Complex where
+    foldMap1 f (x :+ y) = f x <> f y
+    toNonEmpty (x :+ y) = x :| y : []
 
 -- -----------------------------------------------------------------------------
 -- Functions over Complex
