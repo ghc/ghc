@@ -668,6 +668,8 @@ instance MonadIO ErrMsgGhc where
 -- * Pass sensitive types
 -----------------------------------------------------------------------------
 
+type instance XRec DocNameI f = Located (f DocNameI)
+
 type instance XForAllTy        DocNameI = NoExtField
 type instance XQualTy          DocNameI = NoExtField
 type instance XTyVar           DocNameI = NoExtField
@@ -748,19 +750,4 @@ type instance XHsQTvs        DocNameI = NoExtField
 type instance XConDeclField  DocNameI = NoExtField
 type instance XXConDeclField DocNameI = NoExtCon
 
-type instance XXPat DocNameI = Located (Pat DocNameI)
-
-type instance SrcSpanLess (LPat DocNameI) = Pat DocNameI
-instance HasSrcSpan (LPat DocNameI) where
-  -- NB: The following chooses the behaviour of the outer location
-  --     wrapper replacing the inner ones.
-  composeSrcSpan (L sp p) =  if sp == noSrcSpan
-                             then p
-                             else XPat (L sp (stripSrcSpanPat p))
-   -- NB: The following only returns the top-level location, if any.
-  decomposeSrcSpan (XPat (L sp p)) = L sp (stripSrcSpanPat p)
-  decomposeSrcSpan p               = L noSrcSpan  p
-
-stripSrcSpanPat :: LPat DocNameI -> Pat DocNameI
-stripSrcSpanPat (XPat (L _ p)) = stripSrcSpanPat p
-stripSrcSpanPat p              = p
+type instance XXPat DocNameI = NoExtCon
