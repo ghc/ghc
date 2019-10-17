@@ -4,6 +4,7 @@
 {-# LANGUAGE FlexibleContexts #-}
 {-# LANGUAGE FlexibleInstances #-}
 {-# LANGUAGE UndecidableInstances #-}
+{-# LANGUAGE CPP #-}
 {-# OPTIONS_GHC -fno-warn-orphans #-}
 module GHC.Hs.Instances where
 
@@ -16,7 +17,12 @@ module GHC.Hs.Instances where
 
 import Data.Data hiding ( Fixity )
 
+#include "HsVersions.h"
+
 import GhcPrelude
+import Outputable
+import Util
+
 import GHC.Hs.Extension
 import GHC.Hs.Binds
 import GHC.Hs.Decls
@@ -351,6 +357,28 @@ deriving instance Data (HsOverLit GhcTc)
 deriving instance Data (Pat GhcPs)
 deriving instance Data (Pat GhcRn)
 deriving instance Data (Pat GhcTc)
+
+-- deriving instance (DataIdLR p p) => Data (LPat p)
+--
+-- But we define it by hand here because the deriving code can't omit NoExtCon
+-- constructors, because we are not strict in the constructor extension field.
+--
+-- For serialising purposes, we treat LPat as a separate refinement of Pat.
+-- This spares us from the code bloat and boilerplate involved with duplicating
+-- also those other instances for Loc p, i.e. HsRecFields (Loc GhcPs) body, ...
+lpatDataType :: DataType
+lpatDataType = mkDataType "LPat" [lpatXPatConstr]
+
+lpatXPatConstr :: Constr
+lpatXPatConstr = mkConstr lpatDataType "XPat" [] Prefix
+
+instance (Typeable p, Data (Pat (GhcPass p))) => Data (LPat (GhcPass p)) where
+  gfoldl k z (XPat pat) = z XPat `k` pat
+  gfoldl _ _ _          = panic "Data LPat: not XPat"
+  toConstr (XPat _)     = lpatXPatConstr
+  toConstr _            = panic "Data LPat: not XPat"
+  dataTypeOf _          = lpatDataType
+  gunfold k z c         = ASSERT( c == lpatXPatConstr ) (k (z XPat))
 
 deriving instance Data ListPatTc
 
