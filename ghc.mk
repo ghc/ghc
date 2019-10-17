@@ -1041,7 +1041,7 @@ $(eval $(call bindist-list,.,\
     $(wildcard compiler/stage2/doc) \
     $(wildcard libraries/*/dist-install/doc/) \
     $(wildcard libraries/*/*/dist-install/doc/) \
-    $(filter-out llvm-targets llvm-passes,$(INSTALL_LIBS)) \
+    $(filter-out llvm-targets llvm-passes $(includes_SETTINGS),$(INSTALL_LIBS)) \
     $(RTS_INSTALL_LIBS) \
     $(filter-out %/project.mk mk/config.mk %/mk/install.mk,$(MAKEFILE_LIST)) \
     mk/project.mk \
