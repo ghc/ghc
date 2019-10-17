@@ -53,7 +53,7 @@ import Control.Monad
 import Control.Monad.ST.Strict
 
 import Data.Array.ST
-import Data.Array.Base
+import Data.Array.Base hiding ((!))
   -- (unsafeNewArray_
   -- ,unsafeWrite,unsafeRead
   -- ,readArray,writeArray)
