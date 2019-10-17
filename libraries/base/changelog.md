@@ -39,6 +39,8 @@
   * Add `Functor`, `Applicative` and `Monad` instances to `(,,) a b`
     and `(,,,) a b c`
 
+  * Add `Foldable1` type-class for non-empty structures that can be folded
+
 ## 4.13.0.0 *TBA*
   * Bundled with GHC *TBA*
 
