@@ -286,10 +286,8 @@ hadrian-ghc-in-ghci:
     - |
       THREADS=`mk/detect-cpu-count.sh`
       make V=0 -j$THREADS WERROR=-Werror
-    - |
-      make bindisttest
-    - |
-      make binary-dist TAR_COMP_OPTS="-1"
+    - make binary-dist-prep TAR_COMP_OPTS="-1"
+    - make test_bindist TEST_PREP=YES
     - |
       # Prepare to push git notes.
       METRICS_FILE=$CI_PROJECT_DIR/performance-metrics.tsv
@@ -307,7 +305,7 @@ hadrian-ghc-in-ghci:
       junit: junit.xml
     expire_in: 2 week
     paths:
-      - ghc-*.tar.xz
+      - $BIN_DIST_PREP_TAR_COMP
       - junit.xml
       - performance-metrics.tsv
 
@@ -323,7 +321,7 @@ validate-x86_64-darwin:
   variables:
     GHC_VERSION: 8.6.5
     CABAL_INSTALL_VERSION: 2.4.1.0
-    BIN_DIST_PREP_TAR_COMP: "bindistprep/ghc-x86_64-apple-darwin.tar.xz"
+    BIN_DIST_PREP_TAR_COMP: "ghc-x86_64-apple-darwin.tar.xz"
     MACOSX_DEPLOYMENT_TARGET: "10.7"
     # Only Sierra and onwards supports clock_gettime. See #12858
     ac_cv_func_clock_gettime: "no"
@@ -431,7 +429,7 @@ validate-x86_64-darwin:
   allow_failure: true
   variables:
     TEST_ENV: "aarch64-linux-deb9"
-    BIN_DIST_PREP_TAR_COMP: "bindistprep/ghc-aarch64-linux-deb9.tar.xz"
+    BIN_DIST_PREP_TAR_COMP: "ghc-aarch64-linux-deb9.tar.xz"
   cache:
     key: linux-aarch64-deb9
   tags:
@@ -464,7 +462,7 @@ nightly-aarch64-linux-deb9:
   allow_failure: true
   variables:
     TEST_ENV: "armv7-linux-deb9"
-    BIN_DIST_PREP_TAR_COMP: "bindistprep/ghc-armv7-linux-deb9.tar.xz"
+    BIN_DIST_PREP_TAR_COMP: "ghc-armv7-linux-deb9.tar.xz"
     CONFIGURE_ARGS: "--host=arm-linux-gnueabihf --build=arm-linux-gnueabihf --target=arm-linux-gnueabihf"
   cache:
     key: linux-armv7-deb9
@@ -497,7 +495,7 @@ nightly-armv7-linux-deb9:
   image: "registry.gitlab.haskell.org/ghc/ci-images/i386-linux-deb9:$DOCKER_REV"
   variables:
     TEST_ENV: "i386-linux-deb9"
-    BIN_DIST_PREP_TAR_COMP: "bindistprep/ghc-i386-deb9-linux.tar.xz"
+    BIN_DIST_PREP_TAR_COMP: "ghc-i386-deb9-linux.tar.xz"
   cache:
     key: linux-i386-deb9
 
@@ -528,7 +526,7 @@ nightly-i386-linux-deb9:
   image: "registry.gitlab.haskell.org/ghc/ci-images/x86_64-linux-deb9:$DOCKER_REV"
   variables:
     TEST_ENV: "x86_64-linux-deb9"
-    BIN_DIST_PREP_TAR_COMP: "bindistprep/ghc-x86_64-deb9-linux.tar.xz"
+    BIN_DIST_PREP_TAR_COMP: "./ghc-x86_64-deb9-linux.tar.xz"
   cache:
     key: linux-x86_64-deb9
 
@@ -561,6 +559,7 @@ validate-x86_64-linux-deb9-debug:
     BUILD_SPHINX_PDF: "YES"
     TEST_TYPE: slowtest
     TEST_ENV: "x86_64-linux-deb9-debug"
+    BIN_DIST_PREP_COMP: "ghc-x86_64-deb9-linux-debug.tar.xz"
   artifacts:
     when: always
     expire_in: 2 week
@@ -589,7 +588,7 @@ validate-x86_64-linux-deb9-integer-simple:
   variables:
     INTEGER_LIBRARY: integer-simple
     TEST_ENV: "x86_64-linux-deb9-integer-simple"
-    BIN_DIST_PREP_TAR_COMP: "bindistprep/ghc-x86_64-deb9-linux-integer-simple.tar.xz"
+    BIN_DIST_PREP_TAR_COMP: "ghc-x86_64-deb9-linux-integer-simple.tar.xz"
 
 nightly-x86_64-linux-deb9-integer-simple:
   extends: .build-x86_64-linux-deb9
@@ -612,6 +611,7 @@ release-x86_64-linux-deb9-dwarf:
     CONFIGURE_ARGS: "--enable-dwarf-unwind"
     BUILD_FLAVOUR: dwarf
     TEST_ENV: "x86_64-linux-deb9-dwarf"
+    BIN_DIST_PREP_TAR_COMP: "ghc-x86_64-deb9-linux-dwarf.tar.xz"
   artifacts:
     when: always
     expire_in: 2 week
@@ -629,7 +629,7 @@ release-x86_64-linux-deb8:
   image: "registry.gitlab.haskell.org/ghc/ci-images/x86_64-linux-deb8:$DOCKER_REV"
   variables:
     TEST_ENV: "x86_64-linux-deb8"
-    BIN_DIST_PREP_TAR_COMP: "bindistprep/ghc-x86_64-deb8-linux.tar.xz"
+    BIN_DIST_PREP_TAR_COMP: "ghc-x86_64-deb8-linux.tar.xz"
   only:
     - tags
   cache:
@@ -651,7 +651,7 @@ release-x86_64-linux-deb8:
   variables:
     BUILD_SPHINX_PDF: "NO"
     TEST_ENV: "x86_64-linux-alpine"
-    BIN_DIST_PREP_TAR_COMP: "bindistprep/ghc-x86_64-alpine-linux.tar.xz"
+    BIN_DIST_PREP_TAR_COMP: "ghc-x86_64-alpine-linux.tar.xz"
     # Can't use ld.gold due to #13958.
     CONFIGURE_ARGS: "--disable-ld-override"
   cache:
@@ -684,7 +684,7 @@ release-x86_64-linux-centos7:
     BUILD_SPHINX_HTML: "NO"
     BUILD_SPHINX_PDF: "NO"
     TEST_ENV: "x86_64-linux-centos7"
-    BIN_DIST_PREP_TAR_COMP: "bindistprep/ghc-x86_64-centos7-linux.tar.xz"
+    BIN_DIST_PREP_TAR_COMP: "ghc-x86_64-centos7-linux.tar.xz"
   only:
     - tags
   cache:
@@ -703,7 +703,7 @@ validate-x86_64-linux-fedora27:
   image: "registry.gitlab.haskell.org/ghc/ci-images/x86_64-linux-fedora27:$DOCKER_REV"
   variables:
     TEST_ENV: "x86_64-linux-fedora27"
-    BIN_DIST_PREP_TAR_COMP: "bindistprep/ghc-x86_64-fedora27-linux.tar.xz"
+    BIN_DIST_PREP_TAR_COMP: "ghc-x86_64-fedora27-linux.tar.xz"
   cache:
     key: linux-x86_64-fedora27
   artifacts:
@@ -805,7 +805,7 @@ nightly-i386-windows-hadrian:
   variables:
     BUILD_FLAVOUR: "quick"
     GHC_VERSION: "8.6.5"
-    BIN_DIST_PREP_TAR_COMP: "bindistprep/ghc-x86_64-mingw32.tar.xz"
+    BIN_DIST_PREP_TAR_COMP: "ghc-x86_64-mingw32.tar.xz"
   script:
     - |
       python boot
@@ -813,8 +813,8 @@ nightly-i386-windows-hadrian:
     - bash -c "echo include mk/flavours/${BUILD_FLAVOUR}.mk > mk/build.mk"
     - bash -c "echo 'GhcLibHcOpts+=-haddock' >> mk/build.mk"
     - bash -c "PATH=`pwd`/toolchain/bin:$PATH make -j`mk/detect-cpu-count.sh`"
-    - bash -c "PATH=`pwd`/toolchain/bin:$PATH make bindisttest"
-    - bash -c "PATH=`pwd`/toolchain/bin:$PATH make binary-dist TAR_COMP_OPTS=-1"
+    - bash -c "PATH=`pwd`/toolchain/bin:$PATH make binary-dist-prep TAR_COMP_OPTS=-1"
+    - bash -c "PATH=`pwd`/toolchain/bin:$PATH make test_bindist TEST_PREP=YES"
     - bash -c 'make V=0 test THREADS=`mk/detect-cpu-count.sh` JUNIT_FILE=../../junit.xml'
   tags:
     - x86_64-windows
@@ -824,7 +824,7 @@ nightly-i386-windows-hadrian:
     reports:
       junit: junit.xml
     paths:
-      - ghc-*.tar.xz
+      - $BIN_DIST_PREP_TAR_COMP
       - junit.xml
 
 validate-x86_64-windows:
@@ -1049,7 +1049,7 @@ perf-nofib:
     - root=$(pwd)/ghc
     - |
       mkdir tmp
-      tar -xf ghc-*-x86_64-unknown-linux.tar.xz -C tmp
+      tar -xf ghc-x86_64-deb9-linux-dwarf.tar.xz -C tmp
       pushd tmp/ghc-*/
       ./configure --prefix=$root
       make install
