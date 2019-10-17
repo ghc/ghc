@@ -374,6 +374,7 @@ isSmallFamily dflags fam_size = fam_size <= mAX_PTR_TAG dflags
 
 tagForCon :: DynFlags -> DataCon -> DynTag
 tagForCon dflags con = min (dataConTag con) (mAX_PTR_TAG dflags)
+-- NB: 1-indexed
 
 tagForArity :: DynFlags -> RepArity -> DynTag
 tagForArity dflags arity
