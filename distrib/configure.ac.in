@@ -18,8 +18,8 @@ FP_GMP
 dnl Various things from the source distribution configure
 bootstrap_target=@TargetPlatform@
 
-HaveRTSLinker=@HaveRTSLinker@
-AC_SUBST(HaveRTSLinker)
+TargetHasRTSLinker=@TargetHasRTSLinker@
+AC_SUBST(TargetHasRTSLinker)
 
 FFIIncludeDir=@FFIIncludeDir@
 FFILibDir=@FFILibDir@
@@ -42,10 +42,12 @@ FP_FIND_ROOT
 CrossCompiling=NO
 CrossCompilePrefix=""
 TargetPlatformFull="${target}"
+TablesNextToCode="@TablesNextToCode@"
 
 AC_SUBST(CrossCompiling)
 AC_SUBST(CrossCompilePrefix)
 AC_SUBST(TargetPlatformFull)
+AC_SUBST(TablesNextToCode)
 
 Unregisterised="@Unregisterised@"
 AC_SUBST(Unregisterised)
