@@ -273,10 +273,8 @@ hadrian-ghc-in-ghci:
     - |
       THREADS=`mk/detect-cpu-count.sh`
       make V=0 -j$THREADS WERROR=-Werror
-    - |
-      make bindisttest
-    - |
-      make binary-dist TAR_COMP_OPTS="-1"
+    - make binary-dist TAR_COMP_OPTS="-1"
+    - make test_bindist TEST_PREP=YES
     - |
       # Prepare to push git notes.
       METRICS_FILE=$(mktemp)
@@ -364,6 +362,7 @@ validate-x86_64-darwin:
     - ./boot
     - ./configure $CONFIGURE_ARGS
     - hadrian/build.cabal.sh --flavour=$FLAVOUR -j`mk/detect-cpu-count.sh` --docs=no-sphinx binary-dist
+    - make test_bindist
     - hadrian/build.cabal.sh --flavour=$FLAVOUR -j`mk/detect-cpu-count.sh` --docs=no-sphinx test --summary-junit=./junit.xml
     - mv _build/bindist/ghc*.tar.xz ghc.tar.xz
   after_script:
@@ -770,7 +769,7 @@ nightly-i386-windows-hadrian:
     - bash -c "echo include mk/flavours/${BUILD_FLAVOUR}.mk > mk/build.mk"
     - bash -c "echo 'GhcLibHcOpts+=-haddock' >> mk/build.mk"
     - bash -c "PATH=`pwd`/toolchain/bin:$PATH make -j`mk/detect-cpu-count.sh`"
-    - bash -c "PATH=`pwd`/toolchain/bin:$PATH make bindisttest"
+    - bash -c "PATH=`pwd`/toolchain/bin:$PATH make test_bindist TEST_PREP=YES"
     - bash -c "PATH=`pwd`/toolchain/bin:$PATH make binary-dist TAR_COMP_OPTS=-1"
     - bash -c 'make V=0 test THREADS=`mk/detect-cpu-count.sh` JUNIT_FILE=../../junit.xml'
   tags:
