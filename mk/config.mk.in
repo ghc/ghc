@@ -440,7 +440,8 @@ EXECUTABLE_FILE = chmod +x
 
 # $(GHC) points to installed version of the compiler.
 #
-# NOTE: Don't override $(GHC) in build.mk, use configure --with-ghc instead
+# NOTE: Don't override $(GHC) in build.mk, use
+# `./configure GHC=...` instead
 # (because the version numbers have to be calculated).
 
 GHC := @WithGhc@
