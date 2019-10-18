@@ -1,7 +1,7 @@
 
 EmptyCase009.hs:21:9: warning: [-Wincomplete-patterns (in -Wextra)]
     Pattern match(es) are non-exhaustive
-    In a case alternative: Patterns not matched: _ :: Bar f
+    In a case alternative: Patterns not matched: Bar _
 
 EmptyCase009.hs:33:7: warning: [-Wincomplete-patterns (in -Wextra)]
     Pattern match(es) are non-exhaustive

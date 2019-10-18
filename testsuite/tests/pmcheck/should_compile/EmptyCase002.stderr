@@ -1,21 +1,16 @@
 
 EmptyCase002.hs:16:6: warning: [-Wincomplete-patterns (in -Wextra)]
     Pattern match(es) are non-exhaustive
-    In a case alternative: Patterns not matched: MkT _
+    In a case alternative:
+        Patterns not matched: MkT (MkH (MkG (MkT (MkH (MkG _)))))
 
 EmptyCase002.hs:43:6: warning: [-Wincomplete-patterns (in -Wextra)]
     Pattern match(es) are non-exhaustive
-    In a case alternative:
-        Patterns not matched:
-            MkT1 B1
-            MkT1 B2
+    In a case alternative: Patterns not matched: MkT1 _
 
 EmptyCase002.hs:47:6: warning: [-Wincomplete-patterns (in -Wextra)]
     Pattern match(es) are non-exhaustive
-    In a case alternative:
-        Patterns not matched:
-            MkT1 False
-            MkT1 True
+    In a case alternative: Patterns not matched: MkT1 _
 
 EmptyCase002.hs:51:6: warning: [-Wincomplete-patterns (in -Wextra)]
     Pattern match(es) are non-exhaustive
