@@ -595,9 +595,9 @@ void updateRemembSetPushStack(Capability *cap, StgStack *stack)
 {
     // N.B. caller responsible for checking nonmoving_write_barrier_enabled
     if (needs_upd_rem_set_mark((StgClosure *) stack)) {
-        StgWord marking = stack->marking;
+        StgWord8 marking = stack->marking;
         // See Note [StgStack dirtiness flags and concurrent marking]
-        if (cas(&stack->marking, marking, nonmovingMarkEpoch)
+        if (cas_word8(&stack->marking, marking, nonmovingMarkEpoch)
               != nonmovingMarkEpoch) {
             // We have claimed the right to mark the stack.
             debugTrace(DEBUG_nonmoving_gc, "upd_rem_set: STACK %p", stack->sp);
@@ -1341,11 +1341,11 @@ mark_closure (MarkQueue *queue, StgClosure *p, StgClosure **origin)
     case STACK: {
         // See Note [StgStack dirtiness flags and concurrent marking]
         StgStack *stack = (StgStack *) p;
-        StgWord marking = stack->marking;
+        StgWord8 marking = stack->marking;
 
         // N.B. stack->marking must be != nonmovingMarkEpoch unless
         // someone has already marked it.
-        if (cas(&stack->marking, marking, nonmovingMarkEpoch)
+        if (cas_word8(&stack->marking, marking, nonmovingMarkEpoch)
               != nonmovingMarkEpoch) {
             // We have claimed the right to mark the stack.
             mark_stack(queue, stack);
