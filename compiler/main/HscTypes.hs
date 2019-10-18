@@ -14,6 +14,7 @@
 {-# LANGUAGE FlexibleContexts #-}
 {-# LANGUAGE UndecidableInstances #-}
 {-# LANGUAGE DataKinds #-}
+{-# LANGUAGE BangPatterns #-}
 
 -- | Types for the per-module compiler
 module HscTypes (
@@ -1219,7 +1220,7 @@ instance Binary ModIface where
         doc_hdr     <- lazyGet bh
         decl_docs   <- lazyGet bh
         arg_docs    <- lazyGet bh
-        lf_info     <- (get bh :: IO  (Maybe [(Name,IfLFInfo)]))
+        !lf_info    <- (get bh :: IO  (Maybe [(Name,IfLFInfo)]))
         return (ModIface {
                  mi_module      = mod,
                  mi_sig_of      = sig_of,
@@ -1258,7 +1259,7 @@ instance Binary ModIface where
                    mi_warn_fn = mkIfaceWarnCache warns,
                    mi_fix_fn = mkIfaceFixCache fixities,
                    mi_hash_fn = mkIfaceHashCache decls,
-                   mi_lf_info     = lf_info
+                   mi_lf_info = lf_info
                  }})
 
 -- | The original names declared of a certain module that are exported

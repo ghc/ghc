@@ -11,6 +11,8 @@ import CoreSyn     ( CoreRule )
 import HscTypes    ( CompleteMatch )
 import Annotations ( Annotation )
 import GHC.StgToCmm.CgTypes     ( LambdaFormInfo )
+import Name        ( Name )
+import NameEnv     ( NameEnv )
 
 tcIfaceDecl         :: Bool -> IfaceDecl -> IfL TyThing
 tcIfaceRules        :: Bool -> [IfaceRule] -> IfL [CoreRule]
@@ -19,4 +21,5 @@ tcIfaceFamInst      :: IfaceFamInst -> IfL FamInst
 tcIfaceAnnotations  :: [IfaceAnnotation] -> IfL [Annotation]
 tcIfaceCompleteSigs :: [IfaceCompleteMatch] -> IfL [CompleteMatch]
 
-tcCodeGenInfos  :: [(a,IfLFInfo)] -> IfL [(a,LambdaFormInfo)]
+tcCodeGenInfos :: NameEnv LambdaFormInfo -> [(Name,IfLFInfo)] -> IfL (NameEnv LambdaFormInfo)
+

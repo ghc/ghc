@@ -474,7 +474,8 @@ loadInterface doc_str mod from
         ; new_eps_rules     <- tcIfaceRules ignore_prags (mi_rules iface)
         ; new_eps_anns      <- tcIfaceAnnotations (mi_anns iface)
         ; new_eps_complete_sigs <- tcIfaceCompleteSigs (mi_complete_sigs iface)
-        ; new_eps_cg_info_env <- tcCodeGenInfos (fromMaybe [] $ mi_lf_info $ mi_final_exts iface)
+        -- This is manually fused for performance reasons.
+        ; cg_info <- {-# SCC computeLF_Map #-} tcCodeGenInfos (eps_cg_info_env eps) (fromMaybe [] $ mi_lf_info $ mi_final_exts iface)
 
 
         ; let { final_ext = (mi_final_exts iface) {
@@ -529,7 +530,7 @@ loadInterface doc_str mod from
                                      extendModuleEnv (eps_mod_fam_inst_env eps)
                                                      mod
                                                      fam_inst_env,
-                  eps_cg_info_env  = extendNameEnvList (eps_cg_info_env eps) new_eps_cg_info_env,
+                  eps_cg_info_env  = cg_info,
 
 
                   -- TODO: Stats

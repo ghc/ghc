@@ -415,10 +415,11 @@ addFingerprints
         -> [IfaceDecl]       -- The new decls
         -> Maybe [(Name,IfLFInfo)]
         -> IO ModIface       -- Updated interface
-addFingerprints hsc_env iface0 new_decls lf_infos
+addFingerprints hsc_env iface0 new_decls lf_infos_undet
  = do
    eps <- hscEPS hsc_env
    let
+       lf_infos = sortBy (\x y -> stableNameCmp (fst x) (fst y)) <$> lf_infos_undet
        warn_fn = mkIfaceWarnCache (mi_warns iface0)
        fix_fn = mkIfaceFixCache (mi_fixities iface0)
 
@@ -523,7 +524,7 @@ addFingerprints hsc_env iface0 new_decls lf_infos
 
        fingerprint_group (local_env, decls_w_hashes) (AcyclicSCC abi)
           = do let hash_fn = mk_put_name local_env
-                   decl = abiDecl abi
+                   decl = abiDecl abi :: IfaceDecl
                --pprTrace "fingerprinting" (ppr (ifName decl) ) $ do
                hash <- computeFingerprint hash_fn abi
                env' <- extend_hash_env local_env (hash,decl)
@@ -668,10 +669,12 @@ addFingerprints hsc_env iface0 new_decls lf_infos
    --   - orphans
    --   - deprecations
    --   - flag abi hash
+   --   - lf infos of exports
    mod_hash <- computeFingerprint putNameLiterally
                       (map fst sorted_decls,
                        export_hash,  -- includes orphan_hash
-                       mi_warns iface0)
+                       mi_warns iface0,
+                       lf_infos)
 
    -- The interface hash depends on:
    --   - the ABI hash, plus
