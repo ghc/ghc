@@ -5,10 +5,7 @@ EmptyCase001.hs:9:6: warning: [-Wincomplete-patterns (in -Wextra)]
 
 EmptyCase001.hs:14:8: warning: [-Wincomplete-patterns (in -Wextra)]
     Pattern match(es) are non-exhaustive
-    In a case alternative:
-        Patterns not matched:
-            []
-            (_:_)
+    In a case alternative: Patterns not matched: _ :: String
 
 EmptyCase001.hs:18:8: warning: [-Wincomplete-patterns (in -Wextra)]
     Pattern match(es) are non-exhaustive

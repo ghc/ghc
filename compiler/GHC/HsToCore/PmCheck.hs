@@ -42,6 +42,7 @@ import SrcLoc
 import Util
 import Outputable
 import DataCon
+import TyCon
 import Var (EvVar)
 import Coercion
 import TcEvidence
@@ -236,7 +237,7 @@ instance Monoid PartialResult where
 data PmResult =
   PmResult {
       pmresultRedundant    :: [Located [LPat GhcTc]]
-    , pmresultUncovered    :: UncoveredCandidates
+    , pmresultUncovered    :: [Delta]
     , pmresultInaccessible :: [Located [LPat GhcTc]]
     , pmresultApproximate  :: Precision }
 
@@ -247,24 +248,6 @@ instance Outputable PmResult where
     , text "pmresultInaccessible" <+> ppr (pmresultInaccessible pmr)
     , text "pmresultApproximate" <+> ppr (pmresultApproximate pmr)
     ]
-
--- | Either a list of patterns that are not covered, or their type, in case we
--- have no patterns at hand. Not having patterns at hand can arise when
--- handling EmptyCase expressions, in two cases:
---
--- * The type of the scrutinee is a trivially inhabited type (like Int or Char)
--- * The type of the scrutinee cannot be reduced to WHNF.
---
--- In both these cases we have no inhabitation candidates for the type at hand,
--- but we don't want to issue just a wildcard as missing. Instead, we print a
--- type annotated wildcard, so that the user knows what kind of patterns is
--- expected (e.g. (_ :: Int), or (_ :: F Int), where F Int does not reduce).
-data UncoveredCandidates = UncoveredPatterns [Id] [Delta]
-                         | TypeOfUncovered Type
-
-instance Outputable UncoveredCandidates where
-  ppr (UncoveredPatterns vva deltas) = text "UnPat" <+> ppr vva $$ ppr deltas
-  ppr (TypeOfUncovered ty)   = text "UnTy" <+> ppr ty
 
 {-
 %************************************************************************
@@ -279,7 +262,7 @@ checkSingle :: DynFlags -> DsMatchContext -> Id -> Pat GhcTc -> DsM ()
 checkSingle dflags ctxt@(DsMatchContext _ locn) var p = do
   tracePm "checkSingle" (vcat [ppr ctxt, ppr var, ppr p])
   res <- checkSingle' locn var p
-  dsPmWarn dflags ctxt res
+  dsPmWarn dflags ctxt [var] res
 
 -- | Check a single pattern binding (let)
 checkSingle' :: SrcSpan -> Id -> Pat GhcTc -> DsM PmResult
@@ -291,11 +274,10 @@ checkSingle' locn var p = do
   PartialResult cs us ds pc <- pmCheck grds [] 1 missing
   dflags <- getDynFlags
   us' <- getNFirstUncovered [var] (maxUncoveredPatterns dflags + 1) us
-  let uc = UncoveredPatterns [var] us'
   return $ case (cs,ds) of
-    (Covered,  _    )         -> PmResult [] uc [] pc -- useful
-    (NotCovered, NotDiverged) -> PmResult m  uc [] pc -- redundant
-    (NotCovered, Diverged )   -> PmResult [] uc m  pc -- inaccessible rhs
+    (Covered,  _    )         -> PmResult [] us' [] pc -- useful
+    (NotCovered, NotDiverged) -> PmResult m  us' [] pc -- redundant
+    (NotCovered, Diverged )   -> PmResult [] us' m  pc -- inaccessible rhs
   where m = [cL locn [cL locn p]]
 
 -- | Exhaustive for guard matches, is used for guards in pattern bindings and
@@ -324,30 +306,30 @@ checkMatches dflags ctxt vars matches = do
                                , text "Matches:"])
                                2
                                (vcat (map ppr matches)))
-  res <- case matches of
-    -- Check EmptyCase separately
-    -- See Note [Checking EmptyCase Expressions] in GHC.HsToCore.PmCheck.Oracle
-    [] | [var] <- vars -> checkEmptyCase' var
-    _normal_match      -> checkMatches' vars matches
-  dsPmWarn dflags ctxt res
+  res <- checkMatches' vars matches
+  dsPmWarn dflags ctxt vars res
 
--- | Check a matchgroup (case, functions, etc.). To be called on a non-empty
--- list of matches. For empty case expressions, use checkEmptyCase' instead.
+-- | Check a matchgroup (case, functions, etc.).
 checkMatches' :: [Id] -> [LMatch GhcTc (LHsExpr GhcTc)] -> DsM PmResult
-checkMatches' vars matches
-  | null matches = panic "checkMatches': EmptyCase"
-  | otherwise = do
-      missing    <- getPmDelta
-      tracePm "checkMatches': missing" (ppr missing)
-      (rs,us,ds,pc) <- go matches [missing]
-      dflags <- getDynFlags
-      us' <- getNFirstUncovered vars (maxUncoveredPatterns dflags + 1) us
-      let up = UncoveredPatterns vars us'
-      return $ PmResult {
-                   pmresultRedundant    = map hsLMatchToLPats rs
-                 , pmresultUncovered    = up
-                 , pmresultInaccessible = map hsLMatchToLPats ds
-                 , pmresultApproximate  = pc }
+checkMatches' vars matches = do
+  missing <- case matches of
+    [] | [var] <- vars -> do
+      -- This must be an -XEmptyCase.
+      -- -XEmptyCase is strict in its match var x. So we add x /~ ⊥ as the first
+      -- step by calling pmCheck on a fake clause @!x | False@.
+      delta <- getPmDelta
+      grds <- mkFailingSeqClause var
+      presultUncovered <$> pmCheck grds [] 1 delta
+    _       -> singleton <$> getPmDelta
+  tracePm "checkMatches': missing" (ppr missing)
+  (rs,us,ds,pc) <- go matches missing
+  dflags <- getDynFlags
+  us' <- getNFirstUncovered vars (maxUncoveredPatterns dflags + 1) us
+  return $ PmResult {
+                pmresultRedundant    = map hsLMatchToLPats rs
+              , pmresultUncovered    = us'
+              , pmresultInaccessible = map hsLMatchToLPats ds
+              , pmresultApproximate  = pc }
   where
     go :: [LMatch GhcTc (LHsExpr GhcTc)] -> Uncovered
        -> DsM ( [LMatch GhcTc (LHsExpr GhcTc)]
@@ -381,19 +363,13 @@ checkMatches' vars matches
     hsLMatchToLPats (dL->L l (Match { m_pats = pats })) = cL l pats
     hsLMatchToLPats _                                   = panic "checkMatches'"
 
--- | Check an empty case expression. Since there are no clauses to process, we
---   only compute the uncovered set. See Note [Checking EmptyCase Expressions]
---   in "GHC.HsToCore.PmCheck.Oracle" for details.
-checkEmptyCase' :: Id -> DsM PmResult
-checkEmptyCase' x = do
-  delta         <- getPmDelta
-  us <- inhabitants delta (idType x) >>= \case
-    -- Inhabitation checking failed / the type is trivially inhabited
-    Left ty            -> pure (TypeOfUncovered ty)
-    -- A list of oracle states for the different satisfiable constructors is
-    -- available. Turn this into a value set abstraction.
-    Right (va, deltas) -> pure (UncoveredPatterns [va] deltas)
-  pure (PmResult [] us [] Precise)
+-- | Returns a clause that is strict in the given match variable and always
+-- fails. @mkFailingSeqClause x ==> [!x, let b = False, True <- b]@.
+mkFailingSeqClause :: Id -> DsM GrdVec
+mkFailingSeqClause var = do
+  b <- mkPmId boolTy
+  let fail_clause = [PmLet b (Var falseDataConId), vanillaConGrd b trueDataCon []]
+  pure $ PmBang var : fail_clause
 
 getNFirstUncovered :: [Id] -> Int -> [Delta] -> DsM [Delta]
 getNFirstUncovered _    0 _              = pure []
@@ -1069,7 +1045,8 @@ pmCheck' (p : ps) guards n delta
   pr_pos <- pmCheckM ps guards n (addPmConCts delta x con dicts args)
 
   -- The var is forced regardless of whether @con@ was satisfiable
-  let pr_pos' = forceIfCanDiverge delta x pr_pos
+  -- See Note [Divergence of Newtype matches]
+  let pr_pos' = addConMatchStrictness delta x con pr_pos
 
   -- Stuff for <next equation>
   pr_neg <- addRefutableAltCon delta x con >>= \case
@@ -1113,6 +1090,13 @@ forceIfCanDiverge :: Delta -> Id -> PartialResult -> PartialResult
 forceIfCanDiverge delta x
   | canDiverge delta x = forces
   | otherwise          = id
+
+-- | 'forceIfCanDiverge' if the 'PmAltCon' was not a Newtype.
+-- See Note [Divergence of Newtype matches].
+addConMatchStrictness :: Delta -> Id -> PmAltCon -> PartialResult -> PartialResult
+addConMatchStrictness _     _ (PmAltConLike (RealDataCon dc)) res
+  | isNewTyCon (dataConTyCon dc) = res
+addConMatchStrictness delta x _ res = forceIfCanDiverge delta x res
 
 -- ----------------------------------------------------------------------------
 -- * Propagation of term constraints inwards when checking nested matches
@@ -1236,14 +1220,12 @@ needToRunPmCheck dflags origin
   = notNull (filter (`wopt` dflags) allPmCheckWarnings)
 
 -- | Issue all the warnings (coverage, exhaustiveness, inaccessibility)
-dsPmWarn :: DynFlags -> DsMatchContext -> PmResult -> DsM ()
-dsPmWarn dflags ctx@(DsMatchContext kind loc) pm_result
+dsPmWarn :: DynFlags -> DsMatchContext -> [Id] -> PmResult -> DsM ()
+dsPmWarn dflags ctx@(DsMatchContext kind loc) vars pm_result
   = when (flag_i || flag_u) $ do
       let exists_r = flag_i && notNull redundant
           exists_i = flag_i && notNull inaccessible && not is_rec_upd
-          exists_u = flag_u && (case uncovered of
-                                  TypeOfUncovered   _     -> True
-                                  UncoveredPatterns _ unc -> notNull unc)
+          exists_u = flag_u && notNull uncovered
           approx   = precision == Approximate
 
       when (approx && (exists_u || exists_i)) $
@@ -1256,9 +1238,7 @@ dsPmWarn dflags ctx@(DsMatchContext kind loc) pm_result
         putSrcSpanDs l (warnDs (Reason Opt_WarnOverlappingPatterns)
                                (pprEqn q "has inaccessible right hand side"))
       when exists_u $ putSrcSpanDs loc $ warnDs flag_u_reason $
-        case uncovered of
-          TypeOfUncovered ty    -> warnEmptyCase ty
-          UncoveredPatterns vars unc -> pprEqns vars unc
+        pprEqns vars uncovered
   where
     PmResult
       { pmresultRedundant = redundant
@@ -1286,11 +1266,6 @@ dsPmWarn dflags ctx@(DsMatchContext kind loc) pm_result
            _  -> let us = map (\delta -> pprUncovered delta vars) deltas
                  in  hang (text "Patterns not matched:") 4
                        (vcat (take maxPatterns us) $$ dots maxPatterns us)
-
-    -- Print a type-annotated wildcard (for non-exhaustive `EmptyCase`s for
-    -- which we only know the type and have no inhabitants at hand)
-    warnEmptyCase ty = pprContext False ctx (text "are non-exhaustive") $ \_ ->
-      hang (text "Patterns not matched:") 4 (underscore <+> dcolon <+> ppr ty)
 
     approx_msg = vcat
       [ hang
