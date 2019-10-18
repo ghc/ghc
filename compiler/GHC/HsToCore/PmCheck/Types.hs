@@ -128,44 +128,6 @@ instance Eq PmLit where
 pmLitType :: PmLit -> Type
 pmLitType (PmLit ty _) = ty
 
--- | Type of a 'PmAltCon'
-pmAltConType :: PmAltCon -> [Type] -> Type
-pmAltConType (PmAltLit lit)     _arg_tys = ASSERT( null _arg_tys ) pmLitType lit
-pmAltConType (PmAltConLike con) arg_tys  = conLikeResTy con arg_tys
-
-instance Outputable PmLitValue where
-  ppr (PmLitInt i)        = ppr i
-  ppr (PmLitRat r)        = ppr (double (fromRat r)) -- good enough
-  ppr (PmLitChar c)       = pprHsChar c
-  ppr (PmLitString s)     = pprHsString s
-  ppr (PmLitOverInt n i)  = minuses n (ppr i)
-  ppr (PmLitOverRat n r)  = minuses n (ppr (double (fromRat r)))
-  ppr (PmLitOverString s) = pprHsString s
-
--- Take care of negated literals
-minuses :: Int -> SDoc -> SDoc
-minuses n sdoc = iterate (\sdoc -> parens (char '-' <> sdoc)) sdoc !! n
-
-instance Outputable PmLit where
-  ppr (PmLit ty v) = ppr v <> suffix
-    where
-      -- Some ad-hoc hackery for displaying proper lit suffixes based on type
-      tbl = [ (intPrimTy, primIntSuffix)
-            , (int64PrimTy, primInt64Suffix)
-            , (wordPrimTy, primWordSuffix)
-            , (word64PrimTy, primWord64Suffix)
-            , (charPrimTy, primCharSuffix)
-            , (floatPrimTy, primFloatSuffix)
-            , (doublePrimTy, primDoubleSuffix) ]
-      suffix = fromMaybe empty (snd <$> find (eqType ty . fst) tbl)
-
-instance Outputable PmAltCon where
-  ppr (PmAltConLike cl) = ppr cl
-  ppr (PmAltLit l)      = ppr l
-
-instance Outputable PmEquality where
-  ppr = text . show
-
 -- | Undecidable equality for values represented by 'ConLike's.
 -- See Note [Undecidable Equality for PmAltCons].
 -- 'PatSynCon's aren't enforced to be generative, so two syntactically different
@@ -221,6 +183,11 @@ eqPmAltCon _                  _                  = PossiblyOverlap
 -- | Syntactic equality.
 instance Eq PmAltCon where
   a == b = eqPmAltCon a b == Equal
+
+-- | Type of a 'PmAltCon'
+pmAltConType :: PmAltCon -> [Type] -> Type
+pmAltConType (PmAltLit lit)     _arg_tys = ASSERT( null _arg_tys ) pmLitType lit
+pmAltConType (PmAltConLike con) arg_tys  = conLikeResTy con arg_tys
 
 {- Note [Undecidable Equality for PmAltCons]
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
@@ -364,20 +331,53 @@ coreExprAsPmLit e = case collectArgs e of
       | otherwise
       = False
 
+instance Outputable PmLitValue where
+  ppr (PmLitInt i)        = ppr i
+  ppr (PmLitRat r)        = ppr (double (fromRat r)) -- good enough
+  ppr (PmLitChar c)       = pprHsChar c
+  ppr (PmLitString s)     = pprHsString s
+  ppr (PmLitOverInt n i)  = minuses n (ppr i)
+  ppr (PmLitOverRat n r)  = minuses n (ppr (double (fromRat r)))
+  ppr (PmLitOverString s) = pprHsString s
+
+-- Take care of negated literals
+minuses :: Int -> SDoc -> SDoc
+minuses n sdoc = iterate (\sdoc -> parens (char '-' <> sdoc)) sdoc !! n
+
+instance Outputable PmLit where
+  ppr (PmLit ty v) = ppr v <> suffix
+    where
+      -- Some ad-hoc hackery for displaying proper lit suffixes based on type
+      tbl = [ (intPrimTy, primIntSuffix)
+            , (int64PrimTy, primInt64Suffix)
+            , (wordPrimTy, primWordSuffix)
+            , (word64PrimTy, primWord64Suffix)
+            , (charPrimTy, primCharSuffix)
+            , (floatPrimTy, primFloatSuffix)
+            , (doublePrimTy, primDoubleSuffix) ]
+      suffix = fromMaybe empty (snd <$> find (eqType ty . fst) tbl)
+
+instance Outputable PmAltCon where
+  ppr (PmAltConLike cl) = ppr cl
+  ppr (PmAltLit l)      = ppr l
+
+instance Outputable PmEquality where
+  ppr = text . show
+
 type ConLikeSet = UniqDSet ConLike
 
 -- | A data type caching the results of 'completeMatchConLikes' with support for
--- deletion of contructors that were already matched on.
+-- deletion of constructors that were already matched on.
 data PossibleMatches
-  = PM TyCon (NonEmpty.NonEmpty ConLikeSet)
-  -- ^ Each ConLikeSet is a (subset of) the constructors in a COMPLETE pragma
+  = PM (NonEmpty.NonEmpty ConLikeSet)
+  -- ^ Each ConLikeSet is a (subset of) the constructors in a COMPLETE set
   -- 'NonEmpty' because the empty case would mean that the type has no COMPLETE
-  -- set at all, for which we have 'NoPM'
+  -- set at all, for which we have 'NoPM'.
   | NoPM
   -- ^ No COMPLETE set for this type (yet). Think of overloaded literals.
 
 instance Outputable PossibleMatches where
-  ppr (PM _tc cs) = ppr (NonEmpty.toList cs)
+  ppr (PM cs) = ppr (NonEmpty.toList cs)
   ppr NoPM = text "<NoPM>"
 
 -- | Either @Indirect x@, meaning the value is represented by that of @x@, or
