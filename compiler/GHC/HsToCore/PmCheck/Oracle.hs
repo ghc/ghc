@@ -538,7 +538,7 @@ tyIsSatisfiable recheck_complete_sets new_ty_cs = SC $ \delta ->
       Just ty_st'               -> do
         let delta' = delta{ delta_ty_st = ty_st' }
         if recheck_complete_sets
-          then ensureAllPossibleMatchesInhabited delta'
+          then ensureNonVoidsInhabited delta'
           else pure (Just delta')
 
 
@@ -603,16 +603,16 @@ The term oracle state is never obviously (i.e., without consulting the type
 oracle) contradictory. This implies a few invariants:
 * Whenever vi_pos overlaps with vi_neg according to 'eqPmAltCon', we refute.
   This is implied by the Note [Pos/Neg invariant].
-* Whenever vi_neg subsumes a COMPLETE set, we refute. We consult vi_cache to
-  detect this, but we could just compare whole COMPLETE sets to vi_neg every
-  time, if it weren't for performance.
+* Whenever vi_neg subsumes a COMPLETE set and vi_bot is False, we refute. We
+  consult vi_cache to detect this, but we could just compare whole COMPLETE sets
+  to vi_neg every time, if it weren't for performance.
 
-Maintaining these invariants in 'addVarVarCt' (the core of the term oracle) and
+Maintaining these invariants in 'addTmCt' (the core of the term oracle) and
 'addRefutableAltCon' is subtle.
-* Merging VarInfos. Example: Add the fact @x ~ y@ (see 'equate').
+* Merging VarInfos. Example: Add the fact @x ~ y@ (see 'addVarVarCt').
   - (COMPLETE) If we had @x /~ True@ and @y /~ False@, then we get
     @x /~ [True,False]@. This is vacuous by matter of comparing to the built-in
-    COMPLETE set, so should refute.
+    COMPLETE set, so should refute. (In this case, we also have vi_pos = False.)
   - (Pos/Neg) If we had @x /~ True@ and @y ~ True@, we have to refute.
 * Adding positive information. Example: Add the fact @x ~ K ys@ (see 'addVarConCt')
   - (Neg) If we had @x /~ K@, refute.
@@ -627,6 +627,8 @@ Maintaining these invariants in 'addVarVarCt' (the core of the term oracle) and
   - (COMPLETE) If K=Nothing and we had @x /~ Just@, then we get
     @x /~ [Just,Nothing]@. This is vacuous by matter of comparing to the built-in
     COMPLETE set, so should refute.
+* Adding a non-void constraint. Example: Add the fact @(x :: Void) /~ ⊥@ (see 'addVarNonVoidCt')
+  - (COMPLETE) The builtin COMPLETE set attached to Void is empty, so we refute.
 
 Note that merging VarInfo in equate can be done by calling out to 'addVarConCt' and
 'addRefutableAltCon' for each of the facts individually.
@@ -932,16 +934,17 @@ guessConLikeUnivTyArgsFromResTy _   res_ty (PatSynCon ps)  = do
   subst <- tcMatchTy con_res_ty res_ty
   traverse (lookupTyVar subst) univ_tvs
 
--- | Kind of tries to add a non-void contraint to 'Delta', but doesn't really
--- commit to upholding that constraint in the future. This will be rectified
--- in a follow-up patch. The status quo should work good enough for now.
+-- | Adds a non-void contraint to 'Delta' and preserves that constraint.
 addVarNonVoidCt :: Delta -> Id -> MaybeT DsM Delta
 addVarNonVoidCt delta@MkDelta{ delta_tm_st = TmSt env reps } x = do
   vi  <- lift $ initLookupVarInfo delta x
-  vi' <- MaybeT $ ensureInhabited delta vi
-  -- vi' has probably constructed and then thinned out some PossibleMatches.
-  -- We want to cache that work
-  pure delta{ delta_tm_st = TmSt (setEntrySDIE env x vi') reps}
+  if vi_bot vi
+    -- The constraint is redundant and we already made sure x is inhabited
+    then pure delta
+    else do
+      vi_inh <- MaybeT $ ensureInhabited delta vi
+      let vi' = vi_inh{ vi_bot = False }
+      pure delta{ delta_tm_st = TmSt (setEntrySDIE env x vi') reps}
 
 ensureInhabited :: Delta -> VarInfo -> DsM (Maybe VarInfo)
    -- Returns (Just vi) if at least one member of each ConLike in the COMPLETE
@@ -987,22 +990,24 @@ ensureInhabited delta vi = fmap (set_cache vi) <$> test (vi_cache vi) -- This wo
           -- No need to run the term oracle compared to pmIsSatisfiable
           fmap isJust <$> runSatisfiabilityCheck delta $ mconcat
             -- Important to pass False to tyIsSatisfiable here, so that we won't
-            -- recursively call ensureAllPossibleMatchesInhabited, leading to an
+            -- recursively call ensureNonVoidsInhabited, leading to an
             -- endless recursion.
             [ tyIsSatisfiable False ty_cs
             , tysAreNonVoid initRecTc strict_arg_tys
             ]
 
--- | Checks if every 'VarInfo' in the term oracle has still an inhabited
--- 'vi_cache', considering the current type information in 'Delta'.
--- This check is necessary after having matched on a GADT con to weed out
--- impossible matches.
-ensureAllPossibleMatchesInhabited :: Delta -> DsM (Maybe Delta)
-ensureAllPossibleMatchesInhabited delta@MkDelta{ delta_tm_st = TmSt env reps }
+-- | Checks if every non-void 'VarInfo' (these will have @'vi_bot' = False@) in
+-- the term oracle has still an inhabited 'vi_cache', considering the current
+-- type information in 'Delta'. This check is necessary after having matched on
+-- a GADT con to weed out impossible matches.
+ensureNonVoidsInhabited :: Delta -> DsM (Maybe Delta)
+ensureNonVoidsInhabited delta@MkDelta{ delta_tm_st = TmSt env reps }
   = runMaybeT (set_tm_cs_env delta <$> traverseSDIE go env)
   where
     set_tm_cs_env delta env = delta{ delta_tm_st = TmSt env reps }
-    go vi = MaybeT (ensureInhabited delta vi)
+    go vi
+      | vi_bot vi = pure vi -- ⊥ is still an inhabitant
+      | otherwise = MaybeT (ensureInhabited delta vi)
 
 --------------------------------------
 -- * Term oracle unification procedure
@@ -1448,7 +1453,7 @@ provideEvidence = go
     go []     _ delta = pure [delta]
     go (x:xs) n delta = do
       tracePm "provideEvidence" (ppr x $$ ppr xs $$ ppr delta $$ ppr n)
-      VI _ pos neg _ <- initLookupVarInfo delta x
+      VI{ vi_pos = pos, vi_neg = neg } <- initLookupVarInfo delta x
       case pos of
         _:_ -> do
           -- All solutions must be valid at once. Try to find candidates for their
