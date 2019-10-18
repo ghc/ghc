@@ -240,8 +240,8 @@ typedef struct StgTSO_ {
 typedef struct StgStack_ {
     StgHeader  header;
     StgWord32  stack_size;     // stack size in *words*
-    StgWord    dirty;          // non-zero => dirty
-    StgWord    marking;        // non-zero => someone is currently marking the stack
+    StgWord8   dirty;          // non-zero => dirty
+    StgWord8   marking;        // non-zero => someone is currently marking the stack
     StgPtr     sp;             // current stack pointer
     StgWord    stack[];
 } StgStack;
