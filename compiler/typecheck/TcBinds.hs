@@ -241,7 +241,11 @@ tcCompleteSigs sigs =
 
           mkMatch :: [ConLike] -> TyCon -> CompleteMatch
           mkMatch cls ty_con = CompleteMatch {
-            completeMatchConLikes = map conLikeName cls,
+            -- foldM is a left-fold and will have accumulated the ConLikes in
+            -- the reverse order. foldrM would accumulate in the correct order,
+            -- but would type-check the last ConLike first, which might also be
+            -- confusing from the user's perspective. Hence reverse here.
+            completeMatchConLikes = reverse (map conLikeName cls),
             completeMatchTyCon = tyConName ty_con
             }
       doOne _ = return Nothing
@@ -287,7 +291,10 @@ tcCompleteSigs sigs =
                   <+> parens (quotes (ppr tc)
                                <+> text "resp."
                                <+> quotes (ppr tc'))
-  in  mapMaybeM (addLocM doOne) sigs
+  -- For some reason I haven't investigated further, the signatures come in
+  -- backwards wrt. declaration order. So we reverse them here, because it makes
+  -- a difference for incomplete match suggestions.
+  in  mapMaybeM (addLocM doOne) (reverse sigs) -- process in declaration order
 
 tcHsBootSigs :: [(RecFlag, LHsBinds GhcRn)] -> [LSig GhcRn] -> TcM [Id]
 -- A hs-boot file has only one BindGroup, and it only has type

@@ -31,7 +31,7 @@ EmptyCase010.hs:45:7: warning: [-Wincomplete-patterns (in -Wextra)]
 
 EmptyCase010.hs:57:7: warning: [-Wincomplete-patterns (in -Wextra)]
     Pattern match(es) are non-exhaustive
-    In a case alternative: Patterns not matched: _ :: Baz (DC ()) a
+    In a case alternative: Patterns not matched: Baz _
 
 EmptyCase010.hs:69:7: warning: [-Wincomplete-patterns (in -Wextra)]
     Pattern match(es) are non-exhaustive
@@ -39,4 +39,4 @@ EmptyCase010.hs:69:7: warning: [-Wincomplete-patterns (in -Wextra)]
 
 EmptyCase010.hs:73:9: warning: [-Wincomplete-patterns (in -Wextra)]
     Pattern match(es) are non-exhaustive
-    In a case alternative: Patterns not matched: _ :: Baz f a
+    In a case alternative: Patterns not matched: Baz _
