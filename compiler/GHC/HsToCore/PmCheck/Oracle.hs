@@ -153,8 +153,7 @@ mkOneConFull arg_tys con = do
   let ty_cs = map TyCt (substTheta subst (eqSpecPreds eq_spec ++ thetas))
   -- Figure out the types of strict constructor fields
   let arg_is_strict
-        | RealDataCon dc <- con
-        , isNewTyCon (dataConTyCon dc)
+        | RealDataCon dc <- con, isNewTyCon (dataConTyCon dc)
         = [True] -- See Note [Divergence of Newtype matches]
         | otherwise
         = map isBanged $ conLikeImplBangs con
@@ -666,7 +665,11 @@ tmIsSatisfiable new_tm_cs = SC $ \delta -> runMaybeT $ foldlM go delta new_tm_cs
 -- * Looking up VarInfo
 
 emptyVarInfo :: Id -> VarInfo
-emptyVarInfo x = VI (idType x) [] [] NoPM
+emptyVarInfo x = VI ty bot [] [] NoPM
+  where
+    ty = idType x
+    bot | Just False <- isLiftedType_maybe ty = False
+        | otherwise                           = True
 
 lookupVarInfo :: TmState -> Id -> VarInfo
 -- (lookupVarInfo tms x) tells what we know about 'x'
@@ -763,14 +766,7 @@ TyCon, so tc_rep = tc_fam afterwards.
 
 -- | Check whether adding a constraint @x ~ BOT@ to 'Delta' succeeds.
 canDiverge :: Delta -> Id -> Bool
-canDiverge delta@MkDelta{ delta_tm_st = ts } x
-  | VI _ pos neg _ <- lookupVarInfo ts x
-  = null neg && all pos_can_diverge pos
-  where
-    pos_can_diverge (PmAltConLike (RealDataCon dc), [y])
-      -- See Note [Divergence of Newtype matches]
-      | isNewTyCon (dataConTyCon dc) = canDiverge delta y
-    pos_can_diverge _ = False
+canDiverge MkDelta{ delta_tm_st = ts } x = vi_bot (lookupVarInfo ts x)
 
 {- Note [Divergence of Newtype matches]
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
@@ -791,9 +787,9 @@ If we treat Newtypes like we treat regular DataCons, we would mark the third
 clause as redundant, which clearly is unsound. The solution:
 1. When checking the PmCon in 'pmCheck', never mark the result as Divergent if
    it's a Newtype match.
-2. Regard @T2 x@ as 'canDiverge' iff @x@ 'canDiverge'. E.g. @T2 x ~ _|_@ <=>
-   @x ~ _|_@. This way, the third clause will still be marked as inaccessible
-   RHS instead of redundant.
+2. Contrary to data types, a constraint @x ~ T2 y@ will not imply @x /~ ⊥@,
+   while a constraint @x /~ T2@ will still imply @x /~ ⊥@. This way, the third
+   clause will still be marked as inaccessible RHS instead of redundant.
 3. When testing for inhabitants ('mkOneConFull'), we regard the newtype field as
    strict, so that the newtype is inhabited iff its field is inhabited.
 -}
@@ -853,7 +849,7 @@ addTmCt delta ct = runMaybeT $ case ct of
 -- See Note [TmState invariants].
 addRefutableAltCon :: Delta -> Id -> PmAltCon -> DsM (Maybe Delta)
 addRefutableAltCon delta@MkDelta{ delta_tm_st = TmSt env reps } x nalt = runMaybeT $ do
-  vi@(VI _ pos neg pm) <- lift (initLookupVarInfo delta x)
+  vi@(VI _ _ pos neg pm) <- lift (initLookupVarInfo delta x)
   -- 1. Bail out quickly when nalt contradicts a solution
   let contradicts nalt (cl, _args) = eqPmAltCon cl nalt == Equal
   guard (not (any (contradicts nalt) pos))
@@ -865,7 +861,9 @@ addRefutableAltCon delta@MkDelta{ delta_tm_st = TmSt env reps } x nalt = runMayb
         -- See Note [Completeness checking with required Thetas]
         | hasRequiredTheta nalt  = neg
         | otherwise              = unionLists neg [nalt]
-  let vi_ext = vi{ vi_neg = neg' }
+  -- See Note [Divergence of Newtype matches]
+  let bot' = False
+  let vi_ext = vi{ vi_bot = bot', vi_neg = neg' }
   -- 3. Make sure there's at least one other possible constructor
   vi' <- case nalt of
     PmAltConLike cl
@@ -1065,7 +1063,7 @@ equate delta@MkDelta{ delta_tm_st = TmSt env reps } x y
 -- See Note [TmState invariants].
 addVarConCt :: Delta -> Id -> PmAltCon -> [Id] -> MaybeT DsM Delta
 addVarConCt delta@MkDelta{ delta_tm_st = TmSt env reps } x alt args = do
-  VI ty pos neg cache <- lift (initLookupVarInfo delta x)
+  VI ty bot pos neg cache <- lift (initLookupVarInfo delta x)
   -- First try to refute with a negative fact
   guard (all ((/= Equal) . eqPmAltCon alt) neg)
   -- Then see if any of the other solutions (remember: each of them is an
@@ -1082,7 +1080,11 @@ addVarConCt delta@MkDelta{ delta_tm_st = TmSt env reps } x alt args = do
       -- the new solution)
       let neg' = filter ((== PossiblyOverlap) . eqPmAltCon alt) neg
       let pos' = (alt,args):pos
-      pure delta{ delta_tm_st = TmSt (setEntrySDIE env x (VI ty pos' neg' cache)) reps}
+      -- Can only be ⊥ if it was before and this was a newtype AltCon
+      -- See Note [Divergence of Newtype matches]
+      let bot' = bot && isNewtypeAltCon alt
+      -- Really bot = False here? I don't think that works for newtypes
+      pure delta{ delta_tm_st = TmSt (setEntrySDIE env x (VI ty bot' pos' neg' cache)) reps}
 
 ----------------------------------------
 -- * Enumerating inhabitation candidates

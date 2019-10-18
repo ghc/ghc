@@ -42,7 +42,6 @@ import SrcLoc
 import Util
 import Outputable
 import DataCon
-import TyCon
 import Var (EvVar)
 import Coercion
 import TcEvidence
@@ -1104,9 +1103,9 @@ forceIfCanDiverge delta x
 -- | 'forceIfCanDiverge' if the 'PmAltCon' was not a Newtype.
 -- See Note [Divergence of Newtype matches].
 addConMatchStrictness :: Delta -> Id -> PmAltCon -> PartialResult -> PartialResult
-addConMatchStrictness _     _ (PmAltConLike (RealDataCon dc)) res
-  | isNewTyCon (dataConTyCon dc) = res
-addConMatchStrictness delta x _ res = forceIfCanDiverge delta x res
+addConMatchStrictness _     _ alt res
+  | isNewtypeAltCon alt = res
+addConMatchStrictness delta x _   res = forceIfCanDiverge delta x res
 
 -- ----------------------------------------------------------------------------
 -- * Propagation of term constraints inwards when checking nested matches

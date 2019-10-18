@@ -13,6 +13,7 @@ Author: George Karachalias <george.karachalias@cs.kuleuven.be>
 module GHC.HsToCore.PmCheck.Types (
         -- * Representations for Literals and AltCons
         PmLit(..), PmLitValue(..), PmAltCon(..), pmLitType, pmAltConType,
+        isNewtypeAltCon,
 
         -- ** Equality on 'PmAltCon's
         PmEquality(..), eqPmAltCon,
@@ -188,6 +189,10 @@ instance Eq PmAltCon where
 pmAltConType :: PmAltCon -> [Type] -> Type
 pmAltConType (PmAltLit lit)     _arg_tys = ASSERT( null _arg_tys ) pmLitType lit
 pmAltConType (PmAltConLike con) arg_tys  = conLikeResTy con arg_tys
+
+isNewtypeAltCon :: PmAltCon -> Bool
+isNewtypeAltCon (PmAltConLike (RealDataCon dc)) = isNewTyCon (dataConTyCon dc)
+isNewtypeAltCon _                               = False
 
 {- Note [Undecidable Equality for PmAltCons]
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
@@ -465,6 +470,10 @@ data VarInfo
   -- ^ The type of the variable. Important for rejecting possible GADT
   -- constructors or incompatible pattern synonyms (@Just42 :: Maybe Int@).
 
+  , vi_bot :: Bool
+  -- ^ Whether evaluation of this variable can still diverge. Initially @True@
+  -- for lifted types.
+
   , vi_pos :: ![(PmAltCon, [Id])]
   -- ^ Positive info: 'PmAltCon' apps it is (i.e. @x ~ [Just y, PatSyn z]@), all
   -- at the same time (i.e. conjunctive).  We need a list because of nested
@@ -501,8 +510,10 @@ instance Outputable TmState where
 
 -- | Not user-facing.
 instance Outputable VarInfo where
-  ppr (VI ty pos neg cache)
-    = braces (hcat (punctuate comma [ppr ty, ppr pos, ppr neg, ppr cache]))
+  ppr (VI ty bot pos neg cache)
+    = braces (hcat (punctuate comma [ppr ty, ppr mark, ppr pos, ppr neg, ppr cache]))
+    where
+      mark = if bot then char '~' else char '!'
 
 -- | Initial state of the term oracle.
 initTmState :: TmState
