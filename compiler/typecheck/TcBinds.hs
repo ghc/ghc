@@ -241,7 +241,7 @@ tcCompleteSigs sigs =
 
           mkMatch :: [ConLike] -> TyCon -> CompleteMatch
           mkMatch cls ty_con = CompleteMatch {
-            completeMatchConLikes = map conLikeName cls,
+            completeMatchConLikes = reverse (map conLikeName cls),
             completeMatchTyCon = tyConName ty_con
             }
       doOne _ = return Nothing
@@ -287,7 +287,7 @@ tcCompleteSigs sigs =
                   <+> parens (quotes (ppr tc)
                                <+> text "resp."
                                <+> quotes (ppr tc'))
-  in  mapMaybeM (addLocM doOne) sigs
+  in  mapMaybeM (addLocM doOne) (reverse sigs) -- process in declaration order
 
 tcHsBootSigs :: [(RecFlag, LHsBinds GhcRn)] -> [LSig GhcRn] -> TcM [Id]
 -- A hs-boot file has only one BindGroup, and it only has type

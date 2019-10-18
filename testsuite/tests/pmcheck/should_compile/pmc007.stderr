@@ -10,8 +10,8 @@ pmc007.hs:12:1: warning: [-Wincomplete-patterns (in -Wextra)]
         Patterns not matched:
             ('a':'b':_:_)
             ('a':'c':_:_)
-            ('a':p:_) where p is not one of {'b', 'c'}
-            ['a']
+            ['a', p] where p is not one of {'b', 'c'}
+            ('a':p:_:_) where p is not one of {'b', 'c'}
             ...
 
 pmc007.hs:18:11: warning: [-Wincomplete-patterns (in -Wextra)]
@@ -20,6 +20,6 @@ pmc007.hs:18:11: warning: [-Wincomplete-patterns (in -Wextra)]
         Patterns not matched:
             ('a':'b':_:_)
             ('a':'c':_:_)
-            ('a':p:_) where p is not one of {'b', 'c'}
-            ['a']
+            ['a', p] where p is not one of {'b', 'c'}
+            ('a':p:_:_) where p is not one of {'b', 'c'}
             ...
