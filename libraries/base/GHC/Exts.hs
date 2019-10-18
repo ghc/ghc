@@ -87,7 +87,10 @@ module GHC.Exts
         Any,
 
         -- * Overloaded lists
-        IsList(..)
+        IsList(..),
+
+       -- * Lifted-to-lifted version of the old unsafeCoerce# primop (now gone)
+        unsafeCoerce#
        ) where
 
 import GHC.Prim hiding ( coerce, TYPE )
@@ -258,3 +261,15 @@ castTupleRepWith
             (b :: TYPE ('TupleRep '[ 'TupleRep '[], 'LiftedRep, 'LiftedRep])) .
      UnsafeHeteroEquality a b -> a -> b
 castTupleRepWith UnsafeHRefl x = x
+
+-- | Just `Unsafe.Coerce.unsafeCoerce` with a different name.
+--
+-- Until GHC 8.10 we had an `unsafeCoerce#` primop that could coerce between
+-- types of different kinds. It had soundness issues, and was removed as a part
+-- of #16893. This lifted-to-lifted version is exported here to keep the
+-- breakage small: most uses of `unsafeCoerce#` that we could see were coercion
+-- from lifted to lifted anyway, so with this those uses will keep working, but
+-- will be safe.
+{-# DEPRECATED unsafeCoerce# "Use 'Unsafe.Coerce.unsafeCoerce'" #-} -- deprecated in 8.10
+unsafeCoerce# :: forall (a :: Type) (b :: Type) . a -> b
+unsafeCoerce# = unsafeCoerce
