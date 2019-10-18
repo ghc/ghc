@@ -8,7 +8,12 @@ TooManyDeltas.hs:14:1: warning:
 
 TooManyDeltas.hs:14:1: warning: [-Wincomplete-patterns (in -Wextra)]
     Pattern match(es) are non-exhaustive
-    In an equation for ‘f’: Patterns not matched: _ _
+    In an equation for ‘f’:
+        Patterns not matched:
+            A A
+            A B
+            B A
+            B B
 
 TooManyDeltas.hs:19:1: warning:
     Pattern match checker ran into -fmax-pmcheck-models=0 limit, so
