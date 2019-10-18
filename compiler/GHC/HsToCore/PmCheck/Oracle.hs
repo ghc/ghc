@@ -8,20 +8,20 @@ Authors: George Karachalias <george.karachalias@cs.kuleuven.be>
 
 -- | The pattern match oracle. The main export of the module are the functions
 -- 'addTmCt', 'addVarCoreCt', 'addRefutableAltCon' and 'addTypeEvidence' for
--- adding facts to the oracle, and 'provideEvidenceForEquation' to turn a
+-- adding facts to the oracle, and 'provideEvidence' to turn a
 -- 'Delta' into a concrete evidence for an equation.
 module GHC.HsToCore.PmCheck.Oracle (
 
         DsM, tracePm, mkPmId,
-        Delta, initDelta, canDiverge, lookupRefuts, lookupSolution,
+        Delta, initDelta, lookupRefuts, lookupSolution,
 
         TmCt(..),
-        inhabitants,
         addTypeEvidence,    -- Add type equalities
         addRefutableAltCon, -- Add a negative term equality
         addTmCt,            -- Add a positive term equality x ~ e
         addVarCoreCt,       -- Add a positive term equality x ~ core_expr
-        provideEvidenceForEquation,
+        canDiverge,         -- Try to add the term equality x ~ ⊥
+        provideEvidence,
     ) where
 
 #include "HsVersions.h"
@@ -35,6 +35,7 @@ import Outputable
 import ErrUtils
 import Util
 import Bag
+import UniqSet
 import UniqDSet
 import Unique
 import Id
@@ -75,9 +76,10 @@ import Control.Monad (guard, mzero)
 import Control.Monad.Trans.Class (lift)
 import Control.Monad.Trans.State.Strict
 import Data.Bifunctor (second)
-import Data.Foldable (foldlM)
+import Data.Foldable (foldlM, minimumBy)
 import Data.List     (find)
 import qualified Data.List.NonEmpty as NonEmpty
+import Data.Ord      (comparing)
 import qualified Data.Semigroup as Semigroup
 import Data.Tuple    (swap)
 
@@ -101,32 +103,10 @@ mkPmId ty = getUniqueM >>= \unique ->
 -- * Caching possible matches of a COMPLETE set
 
 markMatched :: ConLike -> PossibleMatches -> PossibleMatches
-markMatched con (PM tc ms) = PM tc (fmap (`delOneFromUniqDSet` con) ms)
-markMatched _   NoPM = NoPM
-
--- | Satisfiability decisions as a data type. The @proof@ can carry a witness
--- for satisfiability and might even be instantiated to 'Data.Void.Void' to
--- degenerate into a semi-decision predicate.
-data Satisfiability proof
-  = Unsatisfiable
-  | PossiblySatisfiable
-  | Satisfiable !proof
-
-maybeSatisfiable :: Maybe a -> Satisfiability a
-maybeSatisfiable (Just a) = Satisfiable a
-maybeSatisfiable Nothing  = Unsatisfiable
-
--- | Tries to return one of the possible 'ConLike's from one of the COMPLETE
--- sets. If the 'PossibleMatches' was inhabited before (cf. 'ensureInhabited')
--- this 'ConLike' is evidence for that assurance.
-getUnmatchedConstructor :: PossibleMatches -> Satisfiability ConLike
-getUnmatchedConstructor NoPM = PossiblySatisfiable
-getUnmatchedConstructor (PM _tc ms)
-  = maybeSatisfiable $ NonEmpty.head <$> traverse pick_one_conlike ms
+markMatched _   NoPM    = NoPM
+markMatched con (PM ms) = PM (del_one_con con <$> ms)
   where
-    pick_one_conlike cs = case uniqDSetToList cs of
-      [] -> Nothing
-      (cl:_) -> Just cl
+    del_one_con = flip delOneFromUniqDSet
 
 ---------------------------------------------------
 -- * Instantiating constructors, types and evidence
@@ -172,8 +152,13 @@ mkOneConFull arg_tys con = do
   -- to the type oracle
   let ty_cs = map TyCt (substTheta subst (eqSpecPreds eq_spec ++ thetas))
   -- Figure out the types of strict constructor fields
-  let arg_is_banged = map isBanged $ conLikeImplBangs con
-      strict_arg_tys = filterByList arg_is_banged field_tys'
+  let arg_is_strict
+        | RealDataCon dc <- con
+        , isNewTyCon (dataConTyCon dc)
+        = [True] -- See Note [Divergence of Newtype matches]
+        | otherwise
+        = map isBanged $ conLikeImplBangs con
+      strict_arg_tys = filterByList arg_is_strict field_tys'
   return (vars, listToBag ty_cs, strict_arg_tys)
 
 -------------------------
@@ -277,7 +262,7 @@ data TopNormaliseTypeResult
   -- ^ 'tcNormalise' was able to simplify the type with some local constraint
   -- from the type oracle, but 'topNormaliseTypeX' couldn't identify a type
   -- redex.
-  | HadRedexes Type [(Type, DataCon)] Type
+  | HadRedexes Type [(Type, DataCon, Type)] Type
   -- ^ 'tcNormalise' may or may not been able to simplify the type, but
   -- 'topNormaliseTypeX' made progress either way and got rid of at least one
   -- outermost type or data family redex or newtype.
@@ -289,14 +274,22 @@ data TopNormaliseTypeResult
   -- Core (modulo casts).
   -- The second field is the list of Newtype 'DataCon's that we looked through
   -- in the chain of reduction steps between the Source type and the Core type.
-  -- We also keep the type of the DataCon application, so that we don't have to
-  -- reconstruct it in inhabitationCandidates.build_newtype.
+  -- We also keep the type of the DataCon application and its field, so that we
+  -- don't have to reconstruct it in 'inhabitationCandidates' and
+  -- 'provideEvidence'.
 
 -- | Just give me the potentially normalised source type, unchanged or not!
 normalisedSourceType :: TopNormaliseTypeResult -> Type
 normalisedSourceType (NoChange ty)                = ty
 normalisedSourceType (NormalisedByConstraints ty) = ty
 normalisedSourceType (HadRedexes ty _ _)          = ty
+
+-- | Return the fields of 'HadRedexes'. Returns appropriate defaults in the
+-- other cases.
+tntrGuts :: TopNormaliseTypeResult -> (Type, [(Type, DataCon, Type)], Type)
+tntrGuts (NoChange ty)                  = (ty,     [],      ty)
+tntrGuts (NormalisedByConstraints ty)   = (ty,     [],      ty)
+tntrGuts (HadRedexes src_ty ds core_ty) = (src_ty, ds, core_ty)
 
 instance Outputable TopNormaliseTypeResult where
   ppr (NoChange ty)                  = text "NoChange" <+> ppr ty
@@ -364,13 +357,13 @@ pmTopNormaliseType (TySt inert) typ
 
     -- A 'NormaliseStepper' that unwraps newtypes, careful not to fall into
     -- a loop. If it would fall into a loop, it produces 'NS_Abort'.
-    newTypeStepper :: NormaliseStepper ([Type] -> [Type],[(Type, DataCon)] -> [(Type, DataCon)])
+    newTypeStepper :: NormaliseStepper ([Type] -> [Type],[(Type, DataCon, Type)] -> [(Type, DataCon, Type)])
     newTypeStepper rec_nts tc tys
       | Just (ty', _co) <- instNewTyCon_maybe tc tys
       , let orig_ty = TyConApp tc tys
       = case checkRecTc rec_nts tc of
           Just rec_nts' -> let tyf = (orig_ty:)
-                               tmf = ((orig_ty, tyConSingleDataCon tc):)
+                               tmf = ((orig_ty, tyConSingleDataCon tc, ty'):)
                            in  NS_Step rec_nts' ty' (tyf, tmf)
           Nothing       -> NS_Abort
       | otherwise
@@ -684,6 +677,12 @@ initPossibleMatches ty_st vi@VI{ vi_ty = ty, vi_cache = NoPM } = do
   let ty' = normalisedSourceType res
   case splitTyConApp_maybe ty' of
     Nothing -> pure vi{ vi_ty = ty' }
+    Just (tc, [_])
+      | tc == tYPETyCon
+      -- TYPE acts like an empty data type on the term-level (#14086), but
+      -- it is a PrimTyCon, so tyConDataCons_maybe returns Nothing. Hence a
+      -- special case.
+      -> pure vi{ vi_ty = ty', vi_cache = PM (pure emptyUniqDSet) }
     Just (tc, tc_args) -> do
       -- See Note [COMPLETE sets on data families]
       (tc_rep, tc_fam) <- case tyConFamInst_maybe tc of
@@ -703,7 +702,7 @@ initPossibleMatches ty_st vi@VI{ vi_ty = ty, vi_cache = NoPM } = do
       -- pprTrace "initPossibleMatches" (ppr ty $$ ppr ty' $$ ppr tc_rep <+> ppr tc_fam <+> ppr tc_args $$ ppr (rdcs ++ pscs)) (return ())
       case NonEmpty.nonEmpty (rdcs ++ pscs) of
         Nothing -> pure vi{ vi_ty = ty' } -- Didn't find any COMPLETE sets
-        Just cs -> pure vi{ vi_ty = ty', vi_cache = PM tc_rep (mkUniqDSet <$> cs) }
+        Just cs -> pure vi{ vi_ty = ty', vi_cache = PM (mkUniqDSet <$> cs) }
 initPossibleMatches _     vi                                   = pure vi
 
 -- | @initLookupVarInfo ts x@ looks up the 'VarInfo' for @x@ in @ts@ and tries
@@ -759,20 +758,42 @@ TyCon, so tc_rep = tc_fam afterwards.
 ------------------------------------------------
 -- * Exported utility functions querying 'Delta'
 
--- | Check whether a constraint (x ~ BOT) can succeed,
--- given the resulting state of the term oracle.
+-- | Check whether adding a constraint @x ~ BOT@ to 'Delta' succeeds.
 canDiverge :: Delta -> Id -> Bool
-canDiverge MkDelta{ delta_tm_st = ts } x
-  -- If the variable seems not evaluated, there is a possibility for
-  -- constraint x ~ BOT to be satisfiable. That's the case when we haven't found
-  -- a solution (i.e. some equivalent literal or constructor) for it yet.
-  -- Even if we don't have a solution yet, it might be involved in a negative
-  -- constraint, in which case we must already have evaluated it earlier.
-  | VI _ [] [] _ <- lookupVarInfo ts x
-  = True
-  -- Variable x is already in WHNF or we know some refutable shape, so the
-  -- constraint is non-satisfiable
-  | otherwise = False
+canDiverge delta@MkDelta{ delta_tm_st = ts } x
+  | VI _ pos neg _ <- lookupVarInfo ts x
+  = all pos_can_diverge pos && null neg
+  where
+    pos_can_diverge (PmAltConLike (RealDataCon dc), [y])
+      -- See Note [Divergence of Newtype matches]
+      | isNewTyCon (dataConTyCon dc) = canDiverge delta y
+    pos_can_diverge _ = False
+
+{- Note [Divergence of Newtype matches]
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+Newtypes behave rather strangely when compared to ordinary DataCons. In a
+pattern-match, they behave like a irrefutable (lazy) match, but for inhabitation
+testing purposes (e.g. at construction sites), they behave rather like a DataCon
+with a *strict* field, because they don't contribute their own bottom and are
+inhabited iff the wrapped type is inhabited.
+
+This distinction becomes apparent in #17248:
+
+  newtype T2 a = T2 a
+  g _      True = ()
+  g (T2 _) True = ()
+  g !_     True = ()
+
+If we treat Newtypes like we treat regular DataCons, we would mark the third
+clause as redundant, which clearly is unsound. The solution:
+1. When checking the PmCon in 'pmCheck', never mark the result as Divergent if
+   it's a Newtype match.
+2. Regard @T2 x@ as 'canDiverge' iff @x@ 'canDiverge'. E.g. @T2 x ~ _|_@ <=>
+   @x ~ _|_@. This way, the third clause will still be marked as inaccessible
+   RHS instead of redundant.
+3. When testing for inhabitants ('mkOneConFull'), we regard the newtype field as
+   strict, so that the newtype is inhabited iff its field is inhabited.
+-}
 
 lookupRefuts :: Uniquable k => Delta -> k -> [PmAltCon]
 -- Unfortunately we need the extra bit of polymorphism and the unfortunate
@@ -922,8 +943,8 @@ addVarNonVoidCt delta@MkDelta{ delta_tm_st = TmSt env reps } x = do
   pure delta{ delta_tm_st = TmSt (setEntrySDIE env x vi') reps}
 
 ensureInhabited :: Delta -> VarInfo -> DsM (Maybe VarInfo)
-   -- Returns (Just vi) guarantees that at least one member
-   -- of each ConLike in the COMPLETE set satisfies the oracle
+   -- Returns (Just vi) if at least one member of each ConLike in the COMPLETE
+   -- set satisfies the oracle
    --
    -- Internally uses and updates the ConLikeSets in vi_cache.
    --
@@ -934,8 +955,8 @@ ensureInhabited delta vi = fmap (set_cache vi) <$> test (vi_cache vi) -- This wo
   where
     set_cache vi cache = vi { vi_cache = cache }
 
-    test NoPM       = pure (Just NoPM)
-    test (PM tc ms) = runMaybeT (PM tc <$> traverse one_set ms)
+    test NoPM    = pure (Just NoPM)
+    test (PM ms) = runMaybeT (PM <$> traverse one_set ms)
 
     one_set cs = find_one_inh cs (uniqDSetToList cs)
 
@@ -1108,27 +1129,23 @@ inhabitationCandidates MkDelta{ delta_ty_st = ty_st } ty = do
     NormalisedByConstraints ty'   -> alts_to_check ty'    ty'     []
     HadRedexes src_ty dcs core_ty -> alts_to_check src_ty core_ty dcs
   where
-    -- All these types are trivially inhabited
-    trivially_inhabited = [ charTyCon, doubleTyCon, floatTyCon
-                          , intTyCon, wordTyCon, word8TyCon ]
-
-    build_newtype :: (Type, DataCon) -> Id -> DsM (Id, TmCt)
-    build_newtype (ty, dc) x = do
+    build_newtype :: (Type, DataCon, Type) -> Id -> DsM (Id, TmCt)
+    build_newtype (ty, dc, _arg_ty) x = do
       -- ty is the type of @dc x@. It's a @dataConTyCon dc@ application.
       y <- mkPmId ty
       pure (y, TmVarCon y (PmAltConLike (RealDataCon dc)) [x])
 
-    build_newtypes :: Id -> [(Type, DataCon)] -> DsM (Id, [TmCt])
+    build_newtypes :: Id -> [(Type, DataCon, Type)] -> DsM (Id, [TmCt])
     build_newtypes x = foldrM (\dc (x, cts) -> go dc x cts) (x, [])
       where
         go dc x cts = second (:cts) <$> build_newtype dc x
 
     -- Inhabitation candidates, using the result of pmTopNormaliseType
-    alts_to_check :: Type -> Type -> [(Type, DataCon)]
+    alts_to_check :: Type -> Type -> [(Type, DataCon, Type)]
                   -> DsM (Either Type (TyCon, Id, [InhabitationCandidate]))
     alts_to_check src_ty core_ty dcs = case splitTyConApp_maybe core_ty of
       Just (tc, _)
-        |  tc `elem` trivially_inhabited
+        |  isTyConTriviallyInhabited tc
         -> case dcs of
              []    -> return (Left src_ty)
              (_:_) -> do inner <- mkPmId core_ty
@@ -1150,16 +1167,14 @@ inhabitationCandidates MkDelta{ delta_ty_st = ty_st } ty = do
       -- For other types conservatively assume that they are inhabited.
       _other -> return (Left src_ty)
 
-inhabitants :: Delta -> Type -> DsM (Either Type (Id, [Delta]))
-inhabitants delta ty = inhabitationCandidates delta ty >>= \case
-  Left ty' -> pure (Left ty')
-  Right (_, va, candidates) -> do
-    deltas <- flip mapMaybeM candidates $
-        \InhabitationCandidate{ ic_tm_cs = tm_cs
-                              , ic_ty_cs = ty_cs
-                              , ic_strict_arg_tys = strict_arg_tys } -> do
-      pmIsSatisfiable delta tm_cs ty_cs strict_arg_tys
-    pure (Right (va, deltas))
+-- | All these types are trivially inhabited
+triviallyInhabitedTyCons :: UniqSet TyCon
+triviallyInhabitedTyCons = mkUniqSet [
+    charTyCon, doubleTyCon, floatTyCon, intTyCon, wordTyCon, word8TyCon
+  ]
+
+isTyConTriviallyInhabited :: TyCon -> Bool
+isTyConTriviallyInhabited tc = elementOfUniqSet tc triviallyInhabitedTyCons
 
 ----------------------------
 -- * Detecting vacuous types
@@ -1282,8 +1297,8 @@ definitelyInhabitedType ty_st ty = do
            HadRedexes _ cons _ -> any meets_criteria cons
            _                   -> False
   where
-    meets_criteria :: (Type, DataCon) -> Bool
-    meets_criteria (_, con) =
+    meets_criteria :: (Type, DataCon, Type) -> Bool
+    meets_criteria (_, con, _) =
       null (dataConEqSpec con) && -- (1)
       null (dataConImplBangs con) -- (2)
 
@@ -1415,22 +1430,18 @@ on a list of strict argument types, we filter out all of the DI ones.
 --------------------------------------------
 -- * Providing positive evidence for a Delta
 
--- | @provideEvidenceForEquation vs n delta@ returns a list of
+-- | @provideEvidence vs n delta@ returns a list of
 -- at most @n@ (but perhaps empty) refinements of @delta@ that instantiate
 -- @vs@ to compatible constructor applications or wildcards.
 -- Negative information is only retained if literals are involved or when
 -- for recursive GADTs.
-provideEvidenceForEquation :: [Id] -> Int -> Delta -> DsM [Delta]
-provideEvidenceForEquation = go init_ts
+provideEvidence :: [Id] -> Int -> Delta -> DsM [Delta]
+provideEvidence = go
   where
-    -- Choosing 1 here will not be enough for RedBlack, but any other bound
-    -- might potentially lead to combinatorial explosion, so we are extremely
-    -- cautious and pick 2 here.
-    init_ts                  = setRecTcMaxBound 2 initRecTc
-    go _      _      0 _     = pure []
-    go _      []     _ delta = pure [delta]
-    go rec_ts (x:xs) n delta = do
-      VI ty pos neg pm <- initLookupVarInfo delta x
+    go _      0 _     = pure []
+    go []     _ delta = pure [delta]
+    go (x:xs) n delta = do
+      VI _ pos neg _ <- initLookupVarInfo delta x
       case pos of
         _:_ -> do
           -- All solutions must be valid at once. Try to find candidates for their
@@ -1443,91 +1454,80 @@ provideEvidenceForEquation = go init_ts
           -- some @y@ and @SomePatSyn z@ for some @z@. We must find evidence for @y@
           -- and @z@ that is valid at the same time. These constitute arg_vas below.
           let arg_vas = concatMap (\(_cl, args) -> args) pos
-          go rec_ts (arg_vas ++ xs) n delta
+          go (arg_vas ++ xs) n delta
         []
-          -- First the simple case where we don't need to query the oracles
-          | isVanillaDataType ty
-              -- So no type info unleashed in pattern match
-          , null neg
-              -- No term-level info either
-          || notNull [ l | PmAltLit l <- neg ]
-              -- ... or there are literals involved, in which case we don't want
-              -- to split on possible constructors
-          -> go rec_ts xs n delta
-        [] -> do
-          -- We have to pick one of the available constructors and try it
-          -- It's important that each of the ConLikeSets in pm is still inhabited,
-          -- so that it doesn't matter from which we pick.
-          -- I think we implicitly uphold that invariant, but not too sure
-          case getUnmatchedConstructor pm of
-            Unsatisfiable -> pure []
-            -- No COMPLETE sets available, so we can assume it's inhabited
-            PossiblySatisfiable -> go rec_ts xs n delta
-            Satisfiable cl
-              | Just rec_ts' <- checkRecTc rec_ts (fst (splitTyConApp ty))
-              -> split_at_con rec_ts' delta n x xs cl
-              | otherwise
-              -- We ran out of fuel; just conservatively assume that this is
-              -- inhabited.
-              -> go rec_ts xs n delta
+          -- When there are literals involved, just print negative info
+          -- instead of listing missed constructors
+          | notNull [ l | PmAltLit l <- neg ]
+          -> go xs n delta
+        [] -> try_instantiate x xs n delta
 
-    -- | @split_at_con _ delta _ x _ con@ splits the given delta into two
-    -- models: One where we assume x is con and one where we assume it can't be
-    -- con. Really similar to the ConVar case in Check, only that we don't
-    -- really have a pattern driving the split.
-    split_at_con
-      :: RecTcChecker -- ^ Detects when we split the same TyCon too often
-      -> Delta        -- ^ The model we like to refine to the split
-      -> Int          -- ^ The number of equations still to produce
-      -> Id -> [Id]   -- ^ Head and tail of the value abstractions
-      -> ConLike      -- ^ The ConLike over which to split
-      -> DsM [Delta]
-    split_at_con rec_ts delta n x xs cl = do
-      -- This will be really similar to the ConVar case
-      -- We may need to reduce type famlies/synonyms in x's type first
-      res <- pmTopNormaliseType (delta_ty_st delta) (idType x)
-      let res_ty = normalisedSourceType res
+    -- | Tries to instantiate a variable by possibly following the chain of
+    -- newtypes and then instantiating to all ConLikes of the wrapped type's
+    -- minimal residual COMPLETE set.
+    try_instantiate :: Id -> [Id] -> Int -> Delta -> DsM [Delta]
+    -- Convention: x binds the outer constructor in the chain, y the inner one.
+    try_instantiate x xs n delta = do
+      (_src_ty, dcs, core_ty) <- tntrGuts <$> pmTopNormaliseType (delta_ty_st delta) (idType x)
+      let build_newtype (x, delta) (_ty, dc, arg_ty) = do
+            y <- lift $ mkPmId arg_ty
+            delta' <- addVarConCt delta x (PmAltConLike (RealDataCon dc)) [y]
+            pure (y, delta')
+      runMaybeT (foldlM build_newtype (x, delta) dcs) >>= \case
+        Nothing -> pure []
+        Just (y, newty_delta) -> do
+          -- Pick a COMPLETE set and instantiate it (n at max). Take care of ⊥.
+          pm     <- vi_cache <$> initLookupVarInfo newty_delta y
+          mb_cls <- pickMinimalCompleteSet newty_delta pm
+          case uniqDSetToList <$> mb_cls of
+            Just cls@(_:_) -> instantiate_cons y core_ty xs n newty_delta cls
+            Just [] | not (canDiverge newty_delta y) -> pure []
+            -- Either ⊥ is still possible (think Void) or there are no COMPLETE
+            -- sets available, so we can assume it's inhabited
+            _ -> go xs n newty_delta
+
+    instantiate_cons :: Id -> Type -> [Id] -> Int -> Delta -> [ConLike] -> DsM [Delta]
+    instantiate_cons _ _  _  _ _     []       = pure []
+    instantiate_cons _ ty xs n delta _
+      -- We don't want to expose users to GHC-specific constructors for Int etc.
+      | fmap (isTyConTriviallyInhabited . fst) (splitTyConApp_maybe ty) == Just True
+      = go xs n delta
+    instantiate_cons x ty xs n delta (cl:cls) = do
       env <- dsGetFamInstEnvs
-      case guessConLikeUnivTyArgsFromResTy env res_ty cl of
-        Nothing      -> pure [delta] -- We can't split this one, so assume it's inhabited
+      case guessConLikeUnivTyArgsFromResTy env ty cl of
+        Nothing -> pure [delta] -- No idea idea how to refine this one, so just finish off with a wildcard
         Just arg_tys -> do
           (arg_vars, new_ty_cs, strict_arg_tys) <- mkOneConFull arg_tys cl
           let new_tm_cs = unitBag (TmVarCon x (PmAltConLike cl) arg_vars)
           -- Now check satifiability
           mb_delta <- pmIsSatisfiable delta new_tm_cs new_ty_cs strict_arg_tys
-          tracePm "split_at_con" (vcat [ ppr x
-                                       , ppr new_tm_cs
-                                       , ppr new_ty_cs
-                                       , ppr strict_arg_tys
-                                       , ppr delta
-                                       , ppr mb_delta ])
-          ev_pos <- case mb_delta of
+          tracePm "instantiate_cons" (vcat [ ppr x
+                                           , ppr (idType x)
+                                           , ppr ty
+                                           , ppr cl
+                                           , ppr arg_tys
+                                           , ppr new_tm_cs
+                                           , ppr new_ty_cs
+                                           , ppr strict_arg_tys
+                                           , ppr delta
+                                           , ppr mb_delta
+                                           , ppr n ])
+          con_deltas <- case mb_delta of
             Nothing     -> pure []
-            Just delta' -> go rec_ts (arg_vars ++ xs) n delta'
+            -- NB: We don't prepend arg_vars as we don't have any evidence on
+            -- them and we only want to split once on a data type. They are
+            -- inhabited, otherwise pmIsSatisfiable would have refuted.
+            Just delta' -> go xs n delta'
+          other_cons_deltas <- instantiate_cons x ty xs (n - length con_deltas) delta cls
+          pure (con_deltas ++ other_cons_deltas)
 
-          -- Only n' more equations to go...
-          let n' = n - length ev_pos
-          ev_neg <- addRefutableAltCon delta x (PmAltConLike cl) >>= \case
-            Nothing                          -> pure []
-            Just delta'                      -> go rec_ts (x:xs) n' delta'
-
-          -- Actually there was no need to split if we see that both branches
-          -- were inhabited and we had no negative information on the variable!
-          -- So only refine delta if we find that one branch was indeed
-          -- uninhabited.
-          let neg = lookupRefuts delta x
-          case (ev_pos, ev_neg) of
-            ([], _)       -> pure ev_neg
-            (_, [])       -> pure ev_pos
-            _ | null neg  -> pure [delta]
-              | otherwise -> pure (ev_pos ++ ev_neg)
-
--- | Checks if every data con of the type 'isVanillaDataCon'.
-isVanillaDataType :: Type -> Bool
-isVanillaDataType ty = fromMaybe False $ do
-  (tc, _) <- splitTyConApp_maybe ty
-  dcs <- tyConDataCons_maybe tc
-  pure (all isVanillaDataCon dcs)
+pickMinimalCompleteSet :: Delta -> PossibleMatches -> DsM (Maybe ConLikeSet)
+pickMinimalCompleteSet _ NoPM      = pure Nothing
+-- TODO: First prune sets with type info in delta. But this is good enough for
+-- now and less costly. See #17386.
+pickMinimalCompleteSet _ (PM clss) = do
+  tracePm "pickMinimalCompleteSet" (ppr $ NonEmpty.toList clss)
+  pure (Just (minimumBy (comparing sizeUniqDSet) clss))
 
 -- | See if we already encountered a semantically equivalent expression and
 -- return its representative.
