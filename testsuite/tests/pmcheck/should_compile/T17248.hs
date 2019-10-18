@@ -1,3 +1,4 @@
+{-# LANGUAGE BangPatterns #-}
 module Lib where
 
 data T1 a = T1 a
@@ -10,6 +11,7 @@ f _      _    = ()
 
 g :: T2 a -> Bool -> ()
 g _      True = ()
-g (T2 _) True = ()
+g (T2 _) True = () -- redundant
+g !_     True = () -- inaccessible
 g _      _    = ()
 
