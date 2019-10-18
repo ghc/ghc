@@ -1,12 +1,11 @@
-{-# LANGUAGE CPP #-}
-{-# LANGUAGE DataKinds #-}
-{-# LANGUAGE PolyKinds #-}
-{-# LANGUAGE MagicHash #-}
-{-# LANGUAGE UnboxedTuples #-}
+{-# LANGUAGE CPP, DataKinds, PolyKinds, MagicHash, UnboxedTuples,
+             FlexibleInstances, TypeInType, TypeFamilies, ScopedTypeVariables,
+             TypeApplications #-}
 
-{-# LANGUAGE FlexibleInstances #-}
-{-# LANGUAGE TypeInType #-}
-{-# LANGUAGE TypeFamilies #-}
+#if __GLASGOW_HASKELL__ >= 809
+-- Necessary for the unsafe coercions below
+{-# OPTIONS_GHC -Wno-overlapping-patterns -Wno-inaccessible-code #-}
+#endif
 
 {-|
 Module      :  GHC.Exts.Heap
@@ -60,8 +59,12 @@ import Control.Monad
 import Data.Bits
 import GHC.Arr
 import GHC.Exts
--- import GHC.Int
--- import GHC.Word
+import GHC.Int
+import GHC.Word
+
+#if __GLASGOW_HASKELL__ >= 809
+import Unsafe.Coerce
+#endif
 
 #include "ghcconfig.h"
 
@@ -82,17 +85,38 @@ instance Word# ~ a => HasHeapRep (a :: TYPE 'WordRep) where
     getClosureData x = return $
         WordClosure { ptipe = PWord, wordVal = W# x }
 
--- instance Int64# ~ a => HasHeapRep (a :: TYPE 'Int64Rep) where
---     getClosureData x = return $
---         Int64Closure { ptipe = PInt64, int64Val = I64# (unsafeCoerce# x) }
 
--- instance Word64# ~ a => HasHeapRep (a :: TYPE 'Word64Rep) where
---     getClosureData x = return $
---         Word64Closure { ptipe = PWord64, word64Val = W64# (unsafeCoerce# x) }
+#if __GLASGOW_HASKELL__ >= 809
 
--- instance Addr# ~ a => HasHeapRep (a :: TYPE 'AddrRep) where
---     getClosureData x = return $
---         AddrClosure { ptipe = PAddr, addrVal = I# (unsafeCoerce# x) }
+instance Int64# ~ a => HasHeapRep (a :: TYPE 'Int64Rep) where
+    getClosureData x = return $
+        Int64Closure { ptipe = PInt64, int64Val = I64# (coerceInt64ToInt x) }
+
+instance Word64# ~ a => HasHeapRep (a :: TYPE 'Word64Rep) where
+    getClosureData x = return $
+        Word64Closure { ptipe = PWord64, word64Val = W64# (coerceWord64ToWord x) }
+
+coerceInt64ToInt :: forall (a :: TYPE 'Int64Rep) (b :: TYPE 'IntRep) . a -> b
+coerceInt64ToInt x = case unsafeHeteroEqualityProof @a @b of UnsafeHRefl -> x
+
+coerceWord64ToWord :: forall (a :: TYPE 'Word64Rep) (b :: TYPE 'WordRep) . a -> b
+coerceWord64ToWord x = case unsafeHeteroEqualityProof @a @b of UnsafeHRefl -> x
+
+#else
+
+instance Int64# ~ a => HasHeapRep (a :: TYPE 'Int64Rep) where
+    getClosureData x = return $
+        Int64Closure { ptipe = PInt64, int64Val = I64# (unsafeCoerce# x) }
+
+instance Word64# ~ a => HasHeapRep (a :: TYPE 'Word64Rep) where
+    getClosureData x = return $
+        Word64Closure { ptipe = PWord64, word64Val = W64# (unsafeCoerce# x) }
+
+#endif
+
+instance Addr# ~ a => HasHeapRep (a :: TYPE 'AddrRep) where
+    getClosureData x = return $
+        AddrClosure { ptipe = PAddr, addrVal = I# (addr2Int# x) }
 
 instance Float# ~ a => HasHeapRep (a :: TYPE 'FloatRep) where
     getClosureData x = return $
