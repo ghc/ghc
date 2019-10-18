@@ -850,7 +850,7 @@ HAPPY_VERSION		= @HappyVersion@
 #
 # Options to pass to Happy when we're going to compile the output with GHC
 #
-SRC_HAPPY_OPTS		= -agn --strict
+SRC_HAPPY_OPTS		= -agc --strict
 
 #
 # Alex
