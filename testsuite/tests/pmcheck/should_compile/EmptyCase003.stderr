@@ -9,4 +9,4 @@ EmptyCase003.hs:32:6: warning: [-Wincomplete-patterns (in -Wextra)]
 
 EmptyCase003.hs:37:6: warning: [-Wincomplete-patterns (in -Wextra)]
     Pattern match(es) are non-exhaustive
-    In a case alternative: Patterns not matched: _ :: Char
+    In a case alternative: Patterns not matched: _ :: C Int

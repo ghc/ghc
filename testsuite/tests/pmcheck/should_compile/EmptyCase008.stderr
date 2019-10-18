@@ -8,7 +8,7 @@ EmptyCase008.hs:17:7: warning: [-Wincomplete-patterns (in -Wextra)]
 
 EmptyCase008.hs:21:7: warning: [-Wincomplete-patterns (in -Wextra)]
     Pattern match(es) are non-exhaustive
-    In a case alternative: Patterns not matched: _ :: Foo3 a
+    In a case alternative: Patterns not matched: Foo3 _
 
 EmptyCase008.hs:40:7: warning: [-Wincomplete-patterns (in -Wextra)]
     Pattern match(es) are non-exhaustive
@@ -16,4 +16,4 @@ EmptyCase008.hs:40:7: warning: [-Wincomplete-patterns (in -Wextra)]
 
 EmptyCase008.hs:48:7: warning: [-Wincomplete-patterns (in -Wextra)]
     Pattern match(es) are non-exhaustive
-    In a case alternative: Patterns not matched: _ :: Foo4 a b
+    In a case alternative: Patterns not matched: Foo4 _

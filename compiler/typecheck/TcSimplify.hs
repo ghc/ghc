@@ -693,7 +693,7 @@ It does *not* reduce type or data family applications or look through newtypes.
 Why is this useful? As one example, when coverage-checking an EmptyCase
 expression, it's possible that the type of the scrutinee will only reduce
 if some local equalities are solved for. See "Wrinkle: Local equalities"
-in Note [Type normalisation for EmptyCase] in Check.
+in Note [Type normalisation] in Check.
 
 To accomplish its stated goal, tcNormalise first feeds the local constraints
 into solveSimpleGivens, then stuffs the argument type in a CHoleCan, and feeds
