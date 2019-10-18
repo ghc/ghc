@@ -5,10 +5,7 @@ EmptyCase004.hs:15:6: warning: [-Wincomplete-patterns (in -Wextra)]
 
 EmptyCase004.hs:19:6: warning: [-Wincomplete-patterns (in -Wextra)]
     Pattern match(es) are non-exhaustive
-    In a case alternative:
-        Patterns not matched:
-            A1
-            A2
+    In a case alternative: Patterns not matched: _ :: A a
 
 EmptyCase004.hs:31:8: warning: [-Wincomplete-patterns (in -Wextra)]
     Pattern match(es) are non-exhaustive
@@ -16,17 +13,11 @@ EmptyCase004.hs:31:8: warning: [-Wincomplete-patterns (in -Wextra)]
 
 EmptyCase004.hs:35:6: warning: [-Wincomplete-patterns (in -Wextra)]
     Pattern match(es) are non-exhaustive
-    In a case alternative:
-        Patterns not matched:
-            B1 _
-            B2
+    In a case alternative: Patterns not matched: _ :: B a b
 
 EmptyCase004.hs:47:6: warning: [-Wincomplete-patterns (in -Wextra)]
     Pattern match(es) are non-exhaustive
-    In a case alternative:
-        Patterns not matched:
-            A1
-            A2
+    In a case alternative: Patterns not matched: _ :: A a
 
 EmptyCase004.hs:50:9: warning: [-Wincomplete-patterns (in -Wextra)]
     Pattern match(es) are non-exhaustive
