@@ -22,3 +22,4 @@ tcIfaceAnnotations  :: [IfaceAnnotation] -> IfL [Annotation]
 tcIfaceCompleteSigs :: [IfaceCompleteMatch] -> IfL [CompleteMatch]
 
 tcCodeGenInfos :: NameEnv LambdaFormInfo -> [(Name,IfLFInfo)] -> IfL (NameEnv LambdaFormInfo)
+
