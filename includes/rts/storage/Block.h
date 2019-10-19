@@ -280,17 +280,21 @@ extern void initBlockAllocator(void);
 
 /* Allocation -------------------------------------------------------------- */
 
-bdescr *allocGroup(W_ n);
+bdescr *allocGroup(W_ n)
+    WARD_NEED(may_call_sm);
 
-EXTERN_INLINE bdescr* allocBlock(void);
+EXTERN_INLINE bdescr* allocBlock(void)
+    WARD_NEED(may_call_sm);
 EXTERN_INLINE bdescr* allocBlock(void)
 {
     return allocGroup(1);
 }
 
-bdescr *allocGroupOnNode(uint32_t node, W_ n);
+bdescr *allocGroupOnNode(uint32_t node, W_ n)
+    WARD_NEED(may_call_sm);
 
-EXTERN_INLINE bdescr* allocBlockOnNode(uint32_t node);
+EXTERN_INLINE bdescr* allocBlockOnNode(uint32_t node)
+    WARD_NEED(may_call_sm);
 EXTERN_INLINE bdescr* allocBlockOnNode(uint32_t node)
 {
     return allocGroupOnNode(node,1);
@@ -305,8 +309,10 @@ bdescr *allocBlockOnNode_lock(uint32_t node);
 
 /* De-Allocation ----------------------------------------------------------- */
 
-void freeGroup(bdescr *p);
-void freeChain(bdescr *p);
+void freeGroup(bdescr *p)
+    WARD_NEED(may_call_sm);
+void freeChain(bdescr *p)
+    WARD_NEED(may_call_sm);
 
 // versions that take the storage manager lock for you:
 void freeGroup_lock(bdescr *p);

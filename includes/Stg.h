@@ -197,7 +197,7 @@
 #endif
 
 /* Used to mark a switch case that falls-through */
-#if (defined(__GNUC__) && __GNUC__ >= 7)
+#if (defined(__GNUC__) && __GNUC__ >= 7) && !defined(WARD)
 // N.B. Don't enable fallthrough annotations when compiling with Clang.
 // Apparently clang doesn't enable implicitly fallthrough warnings by default
 // http://llvm.org/viewvc/llvm-project?revision=167655&view=revision

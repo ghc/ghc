@@ -1,0 +1,26 @@
+WARD = /opt/exp/haskell-packages/ward/dist-newstyle/build/x86_64-linux/ghc-8.6.5/Ward-0.1.0.0/x/ward/build/ward/ward
+
+WARD_CONFIG = rts/ward.config
+
+CPP_FLAGS = -Iincludes -Irts -Irts/dist/build -DWARD -DTHREADED_RTS
+
+WARD_OPTS += --config=${WARD_CONFIG} $(addprefix -P,${CPP_FLAGS})
+
+#SRCS=$(filter-out \
+#	 $(shell find rts/win32 -iname '*.c') \
+#	 $(shell find rts/posix/itimer -iname '*.c'), \
+#	 $(shell find rts/linker -iname '*.c'), \
+#	 $(shell find rts -iname '*.c')) \
+#	 rts/posix/itimer/Pthread.c
+SRCS = $(wildcard rts/*.c rts/sm/*.c rts/eventlog/*.c)
+
+all : ward.report
+
+%.ward.graph : %.c ${WARD_CONFIG}
+	$(WARD) cc --mode=graph $(WARD_OPTS) $< > $@
+
+ward.report : $(subst .c,.ward.graph,$(SRCS))
+	$(WARD) cc --mode=compiler $(WARD_OPTS) $+
+
+ward-combined.report : $(SRCS)
+	$(WARD) cc --mode=compiler $(WARD_OPTS) $+
