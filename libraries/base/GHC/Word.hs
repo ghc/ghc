@@ -97,10 +97,10 @@ instance Ord Word8 where
 {-# INLINE [1] ltWord8 #-}
 {-# INLINE [1] leWord8 #-}
 gtWord8, geWord8, ltWord8, leWord8 :: Word8 -> Word8 -> Bool
-(W8# x) `gtWord8` (W8# y) = isTrue# ((word8ToWord# x) `gtWord#` (word8ToWord# y))
-(W8# x) `geWord8` (W8# y) = isTrue# ((word8ToWord# x) `geWord#` (word8ToWord# y))
-(W8# x) `ltWord8` (W8# y) = isTrue# ((word8ToWord# x) `ltWord#` (word8ToWord# y))
-(W8# x) `leWord8` (W8# y) = isTrue# ((word8ToWord# x) `leWord#` (word8ToWord# y))
+(W8# x) `gtWord8` (W8# y) = isTrue# (x `gtWord8#` y)
+(W8# x) `geWord8` (W8# y) = isTrue# (x `geWord8#` y)
+(W8# x) `ltWord8` (W8# y) = isTrue# (x `ltWord8#` y)
+(W8# x) `leWord8` (W8# y) = isTrue# (x `leWord8#` y)
 
 -- | @since 2.01
 instance Show Word8 where
@@ -288,10 +288,10 @@ instance Ord Word16 where
 {-# INLINE [1] ltWord16 #-}
 {-# INLINE [1] leWord16 #-}
 gtWord16, geWord16, ltWord16, leWord16 :: Word16 -> Word16 -> Bool
-(W16# x) `gtWord16` (W16# y) = isTrue# ((word16ToWord# x) `gtWord#` (word16ToWord# y))
-(W16# x) `geWord16` (W16# y) = isTrue# ((word16ToWord# x) `geWord#` (word16ToWord# y))
-(W16# x) `ltWord16` (W16# y) = isTrue# ((word16ToWord# x) `ltWord#` (word16ToWord# y))
-(W16# x) `leWord16` (W16# y) = isTrue# ((word16ToWord# x) `leWord#` (word16ToWord# y))
+(W16# x) `gtWord16` (W16# y) = isTrue# (x `gtWord16#` y)
+(W16# x) `geWord16` (W16# y) = isTrue# (x `geWord16#` y)
+(W16# x) `ltWord16` (W16# y) = isTrue# (x `ltWord16#` y)
+(W16# x) `leWord16` (W16# y) = isTrue# (x `leWord16#` y)
 
 -- | @since 2.01
 instance Show Word16 where
@@ -522,10 +522,10 @@ instance Ord Word32 where
 {-# INLINE [1] ltWord32 #-}
 {-# INLINE [1] leWord32 #-}
 gtWord32, geWord32, ltWord32, leWord32 :: Word32 -> Word32 -> Bool
-(W32# x) `gtWord32` (W32# y) = isTrue# ((word32ToWord# x) `gtWord#` (word32ToWord# y))
-(W32# x) `geWord32` (W32# y) = isTrue# ((word32ToWord# x) `geWord#` (word32ToWord# y))
-(W32# x) `ltWord32` (W32# y) = isTrue# ((word32ToWord# x) `ltWord#` (word32ToWord# y))
-(W32# x) `leWord32` (W32# y) = isTrue# ((word32ToWord# x) `leWord#` (word32ToWord# y))
+(W32# x) `gtWord32` (W32# y) = isTrue# (x `gtWord32#` y)
+(W32# x) `geWord32` (W32# y) = isTrue# (x `geWord32#` y)
+(W32# x) `ltWord32` (W32# y) = isTrue# (x `ltWord32#` y)
+(W32# x) `leWord32` (W32# y) = isTrue# (x `leWord32#` y)
 
 -- | @since 2.01
 instance Num Word32 where
