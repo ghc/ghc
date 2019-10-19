@@ -1852,9 +1852,13 @@ bindIfaceTyConBinderX bind_tv (Bndr tv vis) thing_inside
 
 -- We also force the LambaForms to WHNF.Otherwise they end up keeping
 -- the ILFInfos alive.
+-- Allocating a thunk for the computation is also about as bad
+-- as computing them eagerly and causes more allocation. Overall no reason
+-- not to.
 
-tcCodeGenInfos :: [(a,IfLFInfo)] -> IfL [(a,LambdaFormInfo)]
-tcCodeGenInfos = mapSndM tcLFInfo
+tcCodeGenInfos :: NameEnv LambdaFormInfo -> [(Name,IfLFInfo)] -> IfL (NameEnv LambdaFormInfo)
+tcCodeGenInfos env xs = do
+  foldM (\env (name,if_lf) -> extendNameEnv env name <$> (tcLFInfo if_lf)) env xs
 
 tcLFInfo :: IfLFInfo -> IfL LambdaFormInfo
 tcLFInfo (ILFReEntrant oneshot rep fvs_flag) = do
@@ -1864,4 +1868,4 @@ tcLFInfo (ILFThunk (fvs_flag, upd_flag, fun_flag) sfi) = do
 tcLFInfo (ILFUnlifted) = pure $ LFUnlifted
 tcLFInfo (ILFCon conName) =
     forkM (text "Loading LFCon constructor:" <+> ppr conName) $ do
-        LFCon <$!> tcIfaceDataCon conName
+        LFCon <$!> {-# SCC tcIfaceDataCon #-} tcIfaceDataCon conName
