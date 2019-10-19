@@ -180,26 +180,26 @@ instance Bits Word8 where
     {-# INLINE testBit #-}
     {-# INLINE popCount #-}
 
-    (W8# x#) .&.   (W8# y#)   = W8# (wordToWord8# ((word8ToWord# x#) `and#` (word8ToWord# y#)))
-    (W8# x#) .|.   (W8# y#)   = W8# (wordToWord8# ((word8ToWord# x#) `or#`  (word8ToWord# y#)))
-    (W8# x#) `xor` (W8# y#)   = W8# (wordToWord8# ((word8ToWord# x#) `xor#` (word8ToWord# y#)))
-    complement (W8# x#)       = W8# (wordToWord8# (not# (word8ToWord# x#)))
+    (W8# x#) .&.   (W8# y#)   = W8# (x# `andWord8#` y#)
+    (W8# x#) .|.   (W8# y#)   = W8# (x# `orWord8#`  y#)
+    (W8# x#) `xor` (W8# y#)   = W8# (x# `xorWord8#` y#)
+    complement (W8# x#)       = W8# (notWord8# x#)
     (W8# x#) `shift` (I# i#)
-        | isTrue# (i# >=# 0#) = W8# (wordToWord8# ((word8ToWord# x#) `shiftL#` i#))
-        | otherwise           = W8# (wordToWord8# ((word8ToWord# x#) `shiftRL#` negateInt# i#))
+        | isTrue# (i# >=# 0#) = W8# (x# `shiftLWord8#` i#)
+        | otherwise           = W8# (x# `shiftRLWord8#` negateInt# i#)
     (W8# x#) `shiftL`       (I# i#)
-        | isTrue# (i# >=# 0#) = W8# (wordToWord8# ((word8ToWord# x#) `shiftL#` i#))
+        | isTrue# (i# >=# 0#) = W8# (x# `shiftLWord8#` i#)
         | otherwise           = overflowError
     (W8# x#) `unsafeShiftL` (I# i#) =
-        W8# (wordToWord8# ((word8ToWord# x#) `uncheckedShiftL#` i#))
+        W8# (x# `uncheckedShiftLWord8#` i#)
     (W8# x#) `shiftR`       (I# i#)
-        | isTrue# (i# >=# 0#) = W8# (wordToWord8# ((word8ToWord# x#) `shiftRL#` i#))
+        | isTrue# (i# >=# 0#) = W8# (x# `shiftRLWord8#` i#)
         | otherwise           = overflowError
-    (W8# x#) `unsafeShiftR` (I# i#) = W8# (wordToWord8# ((word8ToWord# x#) `uncheckedShiftRL#` i#))
+    (W8# x#) `unsafeShiftR` (I# i#) = W8# (x# `uncheckedShiftRLWord8#` i#)
     (W8# x#) `rotate`       (I# i#)
         | isTrue# (i'# ==# 0#) = W8# x#
-        | otherwise  = W8# (wordToWord8# (((word8ToWord# x#) `uncheckedShiftL#` i'#) `or#`
-                                          ((word8ToWord# x#) `uncheckedShiftRL#` (8# -# i'#))))
+        | otherwise  = W8# ((x# `uncheckedShiftLWord8#` i'#) `orWord8#`
+                            (x# `uncheckedShiftRLWord8#` (8# -# i'#)))
         where
         !i'# = word2Int# (int2Word# i# `and#` 7##)
     bitSizeMaybe i            = Just (finiteBitSize i)
@@ -331,25 +331,24 @@ instance Enum Word16 where
 -- | @since 2.01
 instance Integral Word16 where
     quot    (W16# x#) y@(W16# y#)
-        | y /= 0                    = W16# (wordToWord16# ((word16ToWord# x#) `quotWord#` (word16ToWord# y#)))
+        | y /= 0                    = W16# (x# `quotWord16#` y#)
         | otherwise                 = divZeroError
     rem     (W16# x#) y@(W16# y#)
-        | y /= 0                    = W16# (wordToWord16# ((word16ToWord# x#) `remWord#` (word16ToWord# y#)))
+        | y /= 0                    = W16# (x# `remWord16#` y#)
         | otherwise                 = divZeroError
     div     (W16# x#) y@(W16# y#)
-        | y /= 0                    = W16# (wordToWord16# ((word16ToWord# x#) `quotWord#` (word16ToWord# y#)))
+        | y /= 0                    = W16# (x# `quotWord16#` y#)
         | otherwise                 = divZeroError
     mod     (W16# x#) y@(W16# y#)
-        | y /= 0                    = W16# (wordToWord16# ((word16ToWord# x#) `remWord#` (word16ToWord# y#)))
+        | y /= 0                    = W16# (x# `remWord16#` y#)
         | otherwise                 = divZeroError
     quotRem (W16# x#) y@(W16# y#)
-        | y /= 0                  = case (word16ToWord# x#) `quotRemWord#` (word16ToWord# y#) of
-                                    (# q, r #) ->
-                                        (W16# (wordToWord16# q), W16# (wordToWord16# r))
+        | y /= 0                  = case x# `quotRemWord16#` y# of
+                                    (# q, r #) -> (W16# q, W16# r)
         | otherwise                 = divZeroError
     divMod  (W16# x#) y@(W16# y#)
-        | y /= 0                    = (W16# (wordToWord16# ((word16ToWord# x#) `quotWord#` (word16ToWord# y#)))
-                                      ,W16# (wordToWord16# ((word16ToWord# x#) `remWord#` (word16ToWord# y#))))
+        | y /= 0                    = (W16# (x# `quotWord16#` y#)
+                                      ,W16# (x# `remWord16#` y#))
         | otherwise                 = divZeroError
     toInteger (W16# x#)             = IS (word2Int# (word16ToWord# x#))
 
@@ -371,26 +370,26 @@ instance Bits Word16 where
     {-# INLINE testBit #-}
     {-# INLINE popCount #-}
 
-    (W16# x#) .&.   (W16# y#)  = W16# (wordToWord16# ((word16ToWord# x#) `and#` (word16ToWord# y#)))
-    (W16# x#) .|.   (W16# y#)  = W16# (wordToWord16# ((word16ToWord# x#) `or#`  (word16ToWord# y#)))
-    (W16# x#) `xor` (W16# y#)  = W16# (wordToWord16# ((word16ToWord# x#) `xor#` (word16ToWord# y#)))
-    complement (W16# x#)       = W16# (wordToWord16# (not# (word16ToWord# x#)))
+    (W16# x#) .&.   (W16# y#)  = W16# (x# `andWord16#` y#)
+    (W16# x#) .|.   (W16# y#)  = W16# (x# `orWord16#`  y#)
+    (W16# x#) `xor` (W16# y#)  = W16# (x# `xorWord16#` y#)
+    complement (W16# x#)       = W16# (notWord16# x#)
     (W16# x#) `shift` (I# i#)
-        | isTrue# (i# >=# 0#)  = W16# (wordToWord16# ((word16ToWord# x#) `shiftL#` i#))
-        | otherwise            = W16# (wordToWord16# ((word16ToWord# x#) `shiftRL#` negateInt# i#))
+        | isTrue# (i# >=# 0#)  = W16# (x# `shiftLWord16#` i#)
+        | otherwise            = W16# (x# `shiftRLWord16#` negateInt# i#)
     (W16# x#) `shiftL`       (I# i#)
-        | isTrue# (i# >=# 0#)  = W16# (wordToWord16# ((word16ToWord# x#) `shiftL#` i#))
+        | isTrue# (i# >=# 0#)  = W16# (x# `shiftLWord16#` i#)
         | otherwise            = overflowError
     (W16# x#) `unsafeShiftL` (I# i#) =
-        W16# (wordToWord16# ((word16ToWord# x#) `uncheckedShiftL#` i#))
+        W16# (x# `uncheckedShiftLWord16#` i#)
     (W16# x#) `shiftR`       (I# i#)
-        | isTrue# (i# >=# 0#)  = W16# (wordToWord16# ((word16ToWord# x#) `shiftRL#` i#))
+        | isTrue# (i# >=# 0#)  = W16# (x# `shiftRLWord16#` i#)
         | otherwise            = overflowError
-    (W16# x#) `unsafeShiftR` (I# i#) = W16# (wordToWord16# ((word16ToWord# x#) `uncheckedShiftRL#` i#))
+    (W16# x#) `unsafeShiftR` (I# i#) = W16# (x# `uncheckedShiftRLWord16#` i#)
     (W16# x#) `rotate`       (I# i#)
         | isTrue# (i'# ==# 0#) = W16# x#
-        | otherwise  = W16# (wordToWord16# (((word16ToWord# x#) `uncheckedShiftL#` i'#) `or#`
-                                            ((word16ToWord# x#) `uncheckedShiftRL#` (16# -# i'#))))
+        | otherwise  = W16# ((x# `uncheckedShiftLWord16#` i'#) `orWord16#`
+                             (x# `uncheckedShiftRLWord16#` (16# -# i'#)))
         where
         !i'# = word2Int# (int2Word# i# `and#` 15##)
     bitSizeMaybe i            = Just (finiteBitSize i)
@@ -608,26 +607,26 @@ instance Bits Word32 where
     {-# INLINE testBit #-}
     {-# INLINE popCount #-}
 
-    (W32# x#) .&.   (W32# y#)  = W32# (wordToWord32# ((word32ToWord# x#) `and#` (word32ToWord# y#)))
-    (W32# x#) .|.   (W32# y#)  = W32# (wordToWord32# ((word32ToWord# x#) `or#`  (word32ToWord# y#)))
-    (W32# x#) `xor` (W32# y#)  = W32# (wordToWord32# ((word32ToWord# x#) `xor#` (word32ToWord# y#)))
-    complement (W32# x#)       = W32# (wordToWord32# (not# (word32ToWord# x#)))
+    (W32# x#) .&.   (W32# y#)  = W32# (x# `andWord32#` y#)
+    (W32# x#) .|.   (W32# y#)  = W32# (x# `orWord32#`  y#)
+    (W32# x#) `xor` (W32# y#)  = W32# (x# `xorWord32#` y#)
+    complement (W32# x#)       = W32# (notWord32# x#)
     (W32# x#) `shift` (I# i#)
-        | isTrue# (i# >=# 0#)  = W32# (wordToWord32# ((word32ToWord# x#) `shiftL#` i#))
-        | otherwise            = W32# (wordToWord32# ((word32ToWord# x#) `shiftRL#` negateInt# i#))
+        | isTrue# (i# >=# 0#)  = W32# (x# `shiftLWord32#` i#)
+        | otherwise            = W32# (x# `shiftRLWord32#` negateInt# i#)
     (W32# x#) `shiftL`       (I# i#)
-        | isTrue# (i# >=# 0#)  = W32# (wordToWord32# ((word32ToWord# x#) `shiftL#` i#))
+        | isTrue# (i# >=# 0#)  = W32# (x# `shiftLWord32#` i#)
         | otherwise            = overflowError
     (W32# x#) `unsafeShiftL` (I# i#) =
-        W32# (wordToWord32# ((word32ToWord# x#) `uncheckedShiftL#` i#))
+        W32# (x# `uncheckedShiftLWord32#` i#)
     (W32# x#) `shiftR`       (I# i#)
-        | isTrue# (i# >=# 0#)  = W32# (wordToWord32# ((word32ToWord# x#) `shiftRL#` i#))
+        | isTrue# (i# >=# 0#)  = W32# (x# `shiftRLWord32#` i#)
         | otherwise            = overflowError
-    (W32# x#) `unsafeShiftR` (I# i#) = W32# (wordToWord32# ((word32ToWord# x#) `uncheckedShiftRL#` i#))
+    (W32# x#) `unsafeShiftR` (I# i#) = W32# (x# `uncheckedShiftRLWord32#` i#)
     (W32# x#) `rotate`       (I# i#)
         | isTrue# (i'# ==# 0#) = W32# x#
-        | otherwise   = W32# (wordToWord32# (((word32ToWord# x#) `uncheckedShiftL#` i'#) `or#`
-                                            ((word32ToWord# x#) `uncheckedShiftRL#` (32# -# i'#))))
+        | otherwise   = W32# ((x# `uncheckedShiftLWord32#` i'#) `orWord32#`
+                              (x# `uncheckedShiftRLWord32#` (32# -# i'#)))
         where
         !i'# = word2Int# (int2Word# i# `and#` 31##)
     bitSizeMaybe i            = Just (finiteBitSize i)
