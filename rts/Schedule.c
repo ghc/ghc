@@ -2257,6 +2257,12 @@ setNumCapabilities (uint32_t new_n_capabilities USED_IF_THREADS)
         // structures, the nursery, etc.
         //
         for (n = new_n_capabilities; n < enabled_capabilities; n++) {
+            // Disabled capabilities do not participate in the nonmoving collector's
+            // final mark synchronization. Consequently it is very important that we
+            // flush a capability's update remembered set before disabling it since
+            // otherwise the nonmoving collector may not see live references.
+            nonmovingAddUpdRemSetBlocks(&capabilities[n]->upd_rem_set.queue);
+
             capabilities[n]->disabled = true;
             traceCapDisable(capabilities[n]);
         }
