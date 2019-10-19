@@ -74,6 +74,7 @@ import GHC.Core.Coercion   (mkUnbranchedAxInstCo,mkSymCo,Role(..))
 import Control.Applicative ( Alternative(..) )
 
 import Control.Monad
+import Data.Functor (($>))
 import Data.Bits as Bits
 import qualified Data.ByteString as BS
 import Data.Ratio
@@ -101,6 +102,222 @@ primOpRules ::  Name -> PrimOp -> Maybe CoreRule
 primOpRules nm = \case
    TagToEnumOp -> mkPrimOpRule nm 2 [ tagToEnumRule ]
    DataToTagOp -> mkPrimOpRule nm 2 [ dataToTagRule ]
+
+   -- Int8 operations
+   Int8AddOp   -> mkPrimOpRule nm 2 [ binaryLit (int8Op2 (+))
+                                    , identity zeroI8
+                                    , addFoldingRules Int8AddOp int8Ops
+                                    ]
+   Int8SubOp   -> mkPrimOpRule nm 2 [ binaryLit (int8Op2 (-))
+                                    , rightIdentity zeroI8
+                                    , equalArgs $> Lit zeroI8
+                                    , subFoldingRules Int8SubOp int8Ops
+                                    ]
+   Int8MulOp   -> mkPrimOpRule nm 2 [ binaryLit (int8Op2 (*))
+                                    , zeroElem $ \_ -> zeroI8
+                                    , identity oneI8
+                                    , mulFoldingRules Int8MulOp int8Ops
+                                    ]
+   Int8QuotOp  -> mkPrimOpRule nm 2 [ nonZeroLit 1 >> binaryLit (int8Op2 quot)
+                                    , leftZero $ \_ -> zeroI8
+                                    , rightIdentity oneI8
+                                    , equalArgs $> Lit oneI8 ]
+   Int8RemOp   -> mkPrimOpRule nm 2 [ nonZeroLit 1 >> binaryLit (int8Op2 rem)
+                                    , leftZero $ \_ -> zeroI8
+                                    , do l <- getLiteral 1
+                                         guard $ l == oneI8
+                                         pure $ Lit zeroI8
+                                    , equalArgs $> Lit zeroI8
+                                    , equalArgs $> Lit zeroI8 ]
+   Int8NegOp   -> mkPrimOpRule nm 1 [ unaryLit negOp
+                                    , semiInversePrimOp Int8NegOp ]
+   Int8SllOp   -> mkPrimOpRule nm 2 [ shiftRule LitNumInt (const Bits.shiftL)
+                                    , rightIdentity zeroI8 ]
+   Int8SraOp   -> mkPrimOpRule nm 2 [ shiftRule LitNumInt (const Bits.shiftR)
+                                    , rightIdentity zeroI8 ]
+   Int8SrlOp   -> mkPrimOpRule nm 2 [ shiftRule LitNumInt shiftRightLogical
+                                    , rightIdentity zeroI8 ]
+
+   -- Word8 operations
+   Word8AddOp  -> mkPrimOpRule nm 2 [ binaryLit (word8Op2 (+))
+                                    , identity zeroW8
+                                    , addFoldingRules Word8AddOp word8Ops
+                                    ]
+   Word8SubOp  -> mkPrimOpRule nm 2 [ binaryLit (word8Op2 (-))
+                                    , rightIdentity zeroW8
+                                    , equalArgs $> Lit zeroW8
+                                    , subFoldingRules Word8SubOp word8Ops
+                                    ]
+   Word8MulOp  -> mkPrimOpRule nm 2 [ binaryLit (word8Op2 (*))
+                                    , identity oneW8
+                                    , mulFoldingRules Word8MulOp word8Ops
+                                    ]
+   Word8QuotOp -> mkPrimOpRule nm 2 [ nonZeroLit 1 >> binaryLit (word8Op2 quot)
+                                    , rightIdentity oneW8 ]
+   Word8RemOp  -> mkPrimOpRule nm 2 [ nonZeroLit 1 >> binaryLit (word8Op2 rem)
+                                    , leftZero $ \_ -> zeroW8
+                                    , do l <- getLiteral 1
+                                         guard $ l == oneW8
+                                         pure $ Lit zeroW8
+                                    , equalArgs $> Lit zeroW8 ]
+   Word8AndOp  -> mkPrimOpRule nm 2 [ binaryLit (word8Op2 (.&.))
+                                    , idempotent
+                                    , zeroElem $ \_ -> zeroW8 ]
+   Word8OrOp   -> mkPrimOpRule nm 2 [ binaryLit (word8Op2 (.|.))
+                                    , idempotent
+                                    , identity zeroW8 ]
+   Word8XorOp  -> mkPrimOpRule nm 2 [ binaryLit (word8Op2 xor)
+                                    , identity zeroW8
+                                    , equalArgs $> Lit zeroW8 ]
+   Word8NotOp  -> mkPrimOpRule nm 1 [ unaryLit complementOp
+                                    , semiInversePrimOp Word8NotOp ]
+   Word8SllOp  -> mkPrimOpRule nm 2 [ shiftRule LitNumWord (const Bits.shiftL) ]
+   Word8SrlOp  -> mkPrimOpRule nm 2 [ shiftRule LitNumWord shiftRightLogical ]
+
+
+   -- Int16 operations
+   Int16AddOp  -> mkPrimOpRule nm 2 [ binaryLit (int16Op2 (+))
+                                    , identity zeroI16
+                                    , addFoldingRules Int16AddOp int16Ops
+                                    ]
+   Int16SubOp  -> mkPrimOpRule nm 2 [ binaryLit (int16Op2 (-))
+                                    , rightIdentity zeroI16
+                                    , equalArgs $> Lit zeroI16
+                                    , subFoldingRules Int16SubOp int16Ops
+                                    ]
+   Int16MulOp  -> mkPrimOpRule nm 2 [ binaryLit (int16Op2 (*))
+                                    , zeroElem $ \_ -> zeroI16
+                                    , identity oneI16
+                                    , mulFoldingRules Int16MulOp int16Ops
+                                    ]
+   Int16QuotOp -> mkPrimOpRule nm 2 [ nonZeroLit 1 >> binaryLit (int16Op2 quot)
+                                    , leftZero $ \_ -> zeroI16
+                                    , rightIdentity oneI16
+                                    , equalArgs $> Lit oneI16 ]
+   Int16RemOp  -> mkPrimOpRule nm 2 [ nonZeroLit 1 >> binaryLit (int16Op2 rem)
+                                    , leftZero $ \_ -> zeroI16
+                                    , do l <- getLiteral 1
+                                         guard $ l == oneI16
+                                         pure $ Lit zeroI16
+                                    , equalArgs $> Lit zeroI16
+                                    , equalArgs $> Lit zeroI16 ]
+   Int16NegOp  -> mkPrimOpRule nm 1 [ unaryLit negOp
+                                    , semiInversePrimOp Int16NegOp ]
+   Int16SllOp  -> mkPrimOpRule nm 2 [ shiftRule LitNumInt (const Bits.shiftL)
+                                    , rightIdentity zeroI16 ]
+   Int16SraOp  -> mkPrimOpRule nm 2 [ shiftRule LitNumInt (const Bits.shiftR)
+                                    , rightIdentity zeroI16 ]
+   Int16SrlOp  -> mkPrimOpRule nm 2 [ shiftRule LitNumInt shiftRightLogical
+                                    , rightIdentity zeroI16 ]
+
+   -- Word16 operations
+   Word16AddOp -> mkPrimOpRule nm 2 [ binaryLit (word16Op2 (+))
+                                    , identity zeroW16
+                                    , addFoldingRules Word16AddOp word16Ops
+                                    ]
+   Word16SubOp -> mkPrimOpRule nm 2 [ binaryLit (word16Op2 (-))
+                                    , rightIdentity zeroW16
+                                    , equalArgs $> Lit zeroW16
+                                    , subFoldingRules Word16SubOp word16Ops
+                                    ]
+   Word16MulOp -> mkPrimOpRule nm 2 [ binaryLit (word16Op2 (*))
+                                    , identity oneW16
+                                    , mulFoldingRules Word16MulOp word16Ops
+                                    ]
+   Word16QuotOp-> mkPrimOpRule nm 2 [ nonZeroLit 1 >> binaryLit (word16Op2 quot)
+                                    , rightIdentity oneW16 ]
+   Word16RemOp -> mkPrimOpRule nm 2 [ nonZeroLit 1 >> binaryLit (word16Op2 rem)
+                                    , leftZero $ \_ -> zeroW16
+                                    , do l <- getLiteral 1
+                                         guard $ l == oneW16
+                                         pure $ Lit zeroW16
+                                    , equalArgs $> Lit zeroW16 ]
+   Word16AndOp -> mkPrimOpRule nm 2 [ binaryLit (word16Op2 (.&.))
+                                    , idempotent
+                                    , zeroElem $ \_ -> zeroW16 ]
+   Word16OrOp  -> mkPrimOpRule nm 2 [ binaryLit (word16Op2 (.|.))
+                                    , idempotent
+                                    , identity zeroW16 ]
+   Word16XorOp -> mkPrimOpRule nm 2 [ binaryLit (word16Op2 xor)
+                                    , identity zeroW16
+                                    , equalArgs $> Lit zeroW16 ]
+   Word16NotOp -> mkPrimOpRule nm 1 [ unaryLit complementOp
+                                    , semiInversePrimOp Word16NotOp ]
+   Word16SllOp -> mkPrimOpRule nm 2 [ shiftRule LitNumWord (const Bits.shiftL) ]
+   Word16SrlOp -> mkPrimOpRule nm 2 [ shiftRule LitNumWord shiftRightLogical ]
+
+
+   -- Int32 operations
+   Int32AddOp  -> mkPrimOpRule nm 2 [ binaryLit (int32Op2 (+))
+                                    , identity zeroI32
+                                    , addFoldingRules Int32AddOp int32Ops
+                                    ]
+   Int32SubOp  -> mkPrimOpRule nm 2 [ binaryLit (int32Op2 (-))
+                                    , rightIdentity zeroI32
+                                    , equalArgs $> Lit zeroI32
+                                    , subFoldingRules Int32SubOp int32Ops
+                                    ]
+   Int32MulOp  -> mkPrimOpRule nm 2 [ binaryLit (int32Op2 (*))
+                                    , zeroElem $ \_ -> zeroI32
+                                    , identity oneI32
+                                    , mulFoldingRules Int32MulOp int32Ops
+                                    ]
+   Int32QuotOp -> mkPrimOpRule nm 2 [ nonZeroLit 1 >> binaryLit (int32Op2 quot)
+                                    , leftZero $ \_ -> zeroI32
+                                    , rightIdentity oneI32
+                                    , equalArgs $> Lit oneI32 ]
+   Int32RemOp  -> mkPrimOpRule nm 2 [ nonZeroLit 1 >> binaryLit (int32Op2 rem)
+                                    , leftZero $ \_ -> zeroI32
+                                    , do l <- getLiteral 1
+                                         guard $ l == oneI32
+                                         pure $ Lit zeroI32
+                                    , equalArgs $> Lit zeroI32
+                                    , equalArgs $> Lit zeroI32 ]
+   Int32NegOp  -> mkPrimOpRule nm 1 [ unaryLit negOp
+                                    , semiInversePrimOp Int32NegOp ]
+   Int32SllOp  -> mkPrimOpRule nm 2 [ shiftRule LitNumInt (const Bits.shiftL)
+                                    , rightIdentity zeroI32 ]
+   Int32SraOp  -> mkPrimOpRule nm 2 [ shiftRule LitNumInt (const Bits.shiftR)
+                                    , rightIdentity zeroI32 ]
+   Int32SrlOp  -> mkPrimOpRule nm 2 [ shiftRule LitNumInt shiftRightLogical
+                                    , rightIdentity zeroI32 ]
+
+   -- Word32 operations
+   Word32AddOp -> mkPrimOpRule nm 2 [ binaryLit (word32Op2 (+))
+                                    , identity zeroW32
+                                    , addFoldingRules Word32AddOp word32Ops
+                                    ]
+   Word32SubOp -> mkPrimOpRule nm 2 [ binaryLit (word32Op2 (-))
+                                    , rightIdentity zeroW32
+                                    , equalArgs $> Lit zeroW32
+                                    , subFoldingRules Word32SubOp word32Ops
+                                    ]
+   Word32MulOp -> mkPrimOpRule nm 2 [ binaryLit (word32Op2 (*))
+                                    , identity oneW32
+                                    , mulFoldingRules Word32MulOp word32Ops
+                                    ]
+   Word32QuotOp-> mkPrimOpRule nm 2 [ nonZeroLit 1 >> binaryLit (word32Op2 quot)
+                                    , rightIdentity oneW32 ]
+   Word32RemOp -> mkPrimOpRule nm 2 [ nonZeroLit 1 >> binaryLit (word32Op2 rem)
+                                    , leftZero $ \_ -> zeroW32
+                                    , do l <- getLiteral 1
+                                         guard $ l == oneW32
+                                         pure $ Lit zeroW32
+                                    , equalArgs $> Lit zeroW32 ]
+   Word32AndOp -> mkPrimOpRule nm 2 [ binaryLit (word32Op2 (.&.))
+                                    , idempotent
+                                    , zeroElem $ \_ -> zeroW32 ]
+   Word32OrOp  -> mkPrimOpRule nm 2 [ binaryLit (word32Op2 (.|.))
+                                    , idempotent
+                                    , identity zeroW32 ]
+   Word32XorOp -> mkPrimOpRule nm 2 [ binaryLit (word32Op2 xor)
+                                    , identity zeroW32
+                                    , equalArgs $> Lit zeroW32 ]
+   Word32NotOp -> mkPrimOpRule nm 1 [ unaryLit complementOp
+                                    , semiInversePrimOp Word32NotOp ]
+   Word32SllOp -> mkPrimOpRule nm 2 [ shiftRule LitNumWord (const Bits.shiftL) ]
+   Word32SrlOp -> mkPrimOpRule nm 2 [ shiftRule LitNumWord shiftRightLogical ]
+
 
    -- Int operations
    IntAddOp    -> mkPrimOpRule nm 2 [ binaryLit (intOp2 (+))
@@ -144,9 +361,9 @@ primOpRules nm = \case
                                     , identityPlatform zeroi
                                     , equalArgs >> retLit zeroi ]
    IntNotOp    -> mkPrimOpRule nm 1 [ unaryLit complementOp
-                                    , inversePrimOp IntNotOp ]
+                                    , semiInversePrimOp IntNotOp ]
    IntNegOp    -> mkPrimOpRule nm 1 [ unaryLit negOp
-                                    , inversePrimOp IntNegOp ]
+                                    , semiInversePrimOp IntNegOp ]
    IntSllOp    -> mkPrimOpRule nm 2 [ shiftRule LitNumInt (const Bits.shiftL)
                                     , rightIdentityPlatform zeroi ]
    IntSraOp    -> mkPrimOpRule nm 2 [ shiftRule LitNumInt (const Bits.shiftR)
@@ -192,7 +409,7 @@ primOpRules nm = \case
                                     , identityPlatform zerow
                                     , equalArgs >> retLit zerow ]
    WordNotOp   -> mkPrimOpRule nm 1 [ unaryLit complementOp
-                                    , inversePrimOp WordNotOp ]
+                                    , semiInversePrimOp WordNotOp ]
    WordSllOp   -> mkPrimOpRule nm 2 [ shiftRule LitNumWord (const Bits.shiftL) ]
    WordSrlOp   -> mkPrimOpRule nm 2 [ shiftRule LitNumWord shiftRightLogical ]
 
@@ -202,16 +419,13 @@ primOpRules nm = \case
    Int16ToIntOp   -> mkPrimOpRule nm 1 [ liftLitPlatform extendIntLit ]
    Int32ToIntOp   -> mkPrimOpRule nm 1 [ liftLitPlatform extendIntLit ]
    IntToInt8Op    -> mkPrimOpRule nm 1 [ liftLit narrowInt8Lit
-                                       , subsumedByPrimOp IntToInt8Op
+                                       , semiInversePrimOp Int8ToIntOp
                                        , narrowSubsumesAnd IntAndOp IntToInt8Op 8 ]
    IntToInt16Op   -> mkPrimOpRule nm 1 [ liftLit narrowInt16Lit
-                                       , subsumedByPrimOp IntToInt8Op
-                                       , subsumedByPrimOp IntToInt16Op
+                                       , semiInversePrimOp Int16ToIntOp
                                        , narrowSubsumesAnd IntAndOp IntToInt16Op 16 ]
    IntToInt32Op   -> mkPrimOpRule nm 1 [ liftLit narrowInt32Lit
-                                       , subsumedByPrimOp IntToInt8Op
-                                       , subsumedByPrimOp IntToInt16Op
-                                       , subsumedByPrimOp IntToInt32Op
+                                       , semiInversePrimOp Int32ToIntOp
                                        , narrowSubsumesAnd IntAndOp IntToInt32Op 32 ]
 
    Word8ToWordOp  -> mkPrimOpRule nm 1 [ liftLitPlatform extendWordLit
@@ -224,23 +438,20 @@ primOpRules nm = \case
                                        , extendNarrowPassthrough WordToWord32Op 0xFFFFFFFF
                                        ]
    WordToWord8Op  -> mkPrimOpRule nm 1 [ liftLit narrowWord8Lit
-                                       , subsumedByPrimOp WordToWord8Op
+                                       , semiInversePrimOp Word8ToWordOp
                                        , narrowSubsumesAnd WordAndOp WordToWord8Op 8 ]
    WordToWord16Op -> mkPrimOpRule nm 1 [ liftLit narrowWord16Lit
-                                       , subsumedByPrimOp WordToWord8Op
-                                       , subsumedByPrimOp WordToWord16Op
+                                       , semiInversePrimOp Word16ToWordOp
                                        , narrowSubsumesAnd WordAndOp WordToWord16Op 16 ]
    WordToWord32Op -> mkPrimOpRule nm 1 [ liftLit narrowWord32Lit
-                                       , subsumedByPrimOp WordToWord8Op
-                                       , subsumedByPrimOp WordToWord16Op
-                                       , subsumedByPrimOp WordToWord32Op
+                                       , semiInversePrimOp Word32ToWordOp
                                        , narrowSubsumesAnd WordAndOp WordToWord32Op 32 ]
 
 
    WordToIntOp    -> mkPrimOpRule nm 1 [ liftLitPlatform (litNumCoerce LitNumInt)
-                                       , inversePrimOp IntToWordOp ]
+                                       , semiInversePrimOp IntToWordOp ]
    IntToWordOp    -> mkPrimOpRule nm 1 [ liftLitPlatform (litNumCoerce LitNumWord)
-                                       , inversePrimOp WordToIntOp ]
+                                       , semiInversePrimOp WordToIntOp ]
 
    Narrow8IntOp   -> mkPrimOpRule nm 1 [ liftLitPlatform (litNumNarrow LitNumInt8)
                                        , subsumedByPrimOp Narrow8IntOp
@@ -274,12 +485,13 @@ primOpRules nm = \case
                                        , subsumedByPrimOp Narrow32WordOp
                                        , removeOp32
                                        , narrowSubsumesAnd WordAndOp Narrow32WordOp 32 ]
+
    OrdOp          -> mkPrimOpRule nm 1 [ liftLit charToIntLit
-                                       , inversePrimOp ChrOp ]
+                                       , semiInversePrimOp ChrOp ]
    ChrOp          -> mkPrimOpRule nm 1 [ do [Lit lit] <- getArgs
                                             guard (litFitsInChar lit)
                                             liftLit intToCharLit
-                                       , inversePrimOp OrdOp ]
+                                       , semiInversePrimOp OrdOp ]
    FloatToIntOp    -> mkPrimOpRule nm 1 [ liftLit floatToIntLit ]
    IntToFloatOp    -> mkPrimOpRule nm 1 [ liftLit intToFloatLit ]
    DoubleToIntOp   -> mkPrimOpRule nm 1 [ liftLit doubleToIntLit ]
@@ -300,7 +512,7 @@ primOpRules nm = \case
    FloatDivOp        -> mkPrimOpRule nm 2 [ guardFloatDiv >> binaryLit (floatOp2 (/))
                                           , rightIdentity onef ]
    FloatNegOp        -> mkPrimOpRule nm 1 [ unaryLit negOp
-                                          , inversePrimOp FloatNegOp ]
+                                          , semiInversePrimOp FloatNegOp ]
    FloatDecode_IntOp -> mkPrimOpRule nm 1 [ unaryLit floatDecodeOp ]
 
    -- Double
@@ -315,7 +527,7 @@ primOpRules nm = \case
    DoubleDivOp          -> mkPrimOpRule nm 2 [ guardDoubleDiv >> binaryLit (doubleOp2 (/))
                                              , rightIdentity oned ]
    DoubleNegOp          -> mkPrimOpRule nm 1 [ unaryLit negOp
-                                             , inversePrimOp DoubleNegOp ]
+                                             , semiInversePrimOp DoubleNegOp ]
    DoubleDecode_Int64Op -> mkPrimOpRule nm 1 [ unaryLit doubleDecodeOp ]
 
    -- Relational operators
@@ -429,6 +641,24 @@ onei  platform = mkLitInt  platform 1
 zerow platform = mkLitWord platform 0
 onew  platform = mkLitWord platform 1
 
+zeroI8, oneI8, zeroW8, oneW8 :: Literal
+zeroI8 = mkLitInt8  0
+oneI8  = mkLitInt8  1
+zeroW8 = mkLitWord8 0
+oneW8  = mkLitWord8 1
+
+zeroI16, oneI16, zeroW16, oneW16 :: Literal
+zeroI16 = mkLitInt16  0
+oneI16  = mkLitInt16  1
+zeroW16 = mkLitWord16 0
+oneW16  = mkLitWord16 1
+
+zeroI32, oneI32, zeroW32, oneW32 :: Literal
+zeroI32 = mkLitInt32  0
+oneI32  = mkLitInt32  1
+zeroW32 = mkLitWord32 0
+oneW32  = mkLitWord32 1
+
 zerof, onef, twof, zerod, oned, twod :: Literal
 zerof = mkLitFloat 0.0
 onef  = mkLitFloat 1.0
@@ -470,6 +700,30 @@ complementOp env (LitNumber nt i) =
    Just (Lit (mkLitNumberWrap (roPlatform env) nt (complement i)))
 complementOp _      _            = Nothing
 
+int8Op2
+  :: (Integral a, Integral b)
+  => (a -> b -> Integer)
+  -> RuleOpts -> Literal -> Literal -> Maybe CoreExpr
+int8Op2 op _ (LitNumber LitNumInt8 i1) (LitNumber LitNumInt8 i2) =
+  int8Result (fromInteger i1 `op` fromInteger i2)
+int8Op2 _ _ _ _ = Nothing  -- Could find LitLit
+
+int16Op2
+  :: (Integral a, Integral b)
+  => (a -> b -> Integer)
+  -> RuleOpts -> Literal -> Literal -> Maybe CoreExpr
+int16Op2 op _ (LitNumber LitNumInt16 i1) (LitNumber LitNumInt16 i2) =
+  int16Result (fromInteger i1 `op` fromInteger i2)
+int16Op2 _ _ _ _ = Nothing  -- Could find LitLit
+
+int32Op2
+  :: (Integral a, Integral b)
+  => (a -> b -> Integer)
+  -> RuleOpts -> Literal -> Literal -> Maybe CoreExpr
+int32Op2 op _ (LitNumber LitNumInt32 i1) (LitNumber LitNumInt32 i2) =
+  int32Result (fromInteger i1 `op` fromInteger i2)
+int32Op2 _ _ _ _ = Nothing  -- Could find LitLit
+
 intOp2 :: (Integral a, Integral b)
        => (a -> b -> Integer)
        -> RuleOpts -> Literal -> Literal -> Maybe CoreExpr
@@ -509,6 +763,30 @@ retLitNoC l = do platform <- getPlatform
                  let lit = l platform
                  let ty = literalType lit
                  return $ mkCoreUbxTup [ty, ty] [Lit lit, Lit (zeroi platform)]
+
+word8Op2
+  :: (Integral a, Integral b)
+  => (a -> b -> Integer)
+  -> RuleOpts -> Literal -> Literal -> Maybe CoreExpr
+word8Op2 op _ (LitNumber LitNumWord8 i1) (LitNumber LitNumWord8 i2) =
+  word8Result (fromInteger i1 `op` fromInteger i2)
+word8Op2 _ _ _ _ = Nothing  -- Could find LitLit
+
+word16Op2
+  :: (Integral a, Integral b)
+  => (a -> b -> Integer)
+  -> RuleOpts -> Literal -> Literal -> Maybe CoreExpr
+word16Op2 op _ (LitNumber LitNumWord16 i1) (LitNumber LitNumWord16 i2) =
+  word16Result (fromInteger i1 `op` fromInteger i2)
+word16Op2 _ _ _ _ = Nothing  -- Could find LitLit
+
+word32Op2
+  :: (Integral a, Integral b)
+  => (a -> b -> Integer)
+  -> RuleOpts -> Literal -> Literal -> Maybe CoreExpr
+word32Op2 op _ (LitNumber LitNumWord32 i1) (LitNumber LitNumWord32 i2) =
+  word32Result (fromInteger i1 `op` fromInteger i2)
+word32Op2 _ _ _ _ = Nothing  -- Could find LitLit
 
 wordOp2 :: (Integral a, Integral b)
         => (a -> b -> Integer)
@@ -663,6 +941,28 @@ mkRuleFn _ _ _ _                                           = Nothing
 
 -- | Create an Int literal expression while ensuring the given Integer is in the
 -- target Int range
+int8Result :: Integer -> Maybe CoreExpr
+int8Result result = Just (int8Result' result)
+
+int8Result' :: Integer -> CoreExpr
+int8Result' result = Lit (mkLitInt8Wrap result)
+
+-- | Create an Int literal expression while ensuring the given Integer is in the
+-- target Int range
+int16Result :: Integer -> Maybe CoreExpr
+int16Result result = Just (int16Result' result)
+
+int16Result' :: Integer -> CoreExpr
+int16Result' result = Lit (mkLitInt16Wrap result)
+
+-- | Create an Int literal expression while ensuring the given Integer is in the
+-- target Int range
+int32Result :: Integer -> Maybe CoreExpr
+int32Result result = Just (int32Result' result)
+
+int32Result' :: Integer -> CoreExpr
+int32Result' result = Lit (mkLitInt32Wrap result)
+
 intResult :: Platform -> Integer -> Maybe CoreExpr
 intResult platform result = Just (intResult' platform result)
 
@@ -678,6 +978,30 @@ intCResult platform result = Just (mkPair [Lit lit, Lit c])
     mkPair = mkCoreUbxTup [intPrimTy, intPrimTy]
     (lit, b) = mkLitIntWrapC platform result
     c = if b then onei platform else zeroi platform
+
+-- | Create a Word literal expression while ensuring the given Integer is in the
+-- target Word range
+word8Result :: Integer -> Maybe CoreExpr
+word8Result result = Just (word8Result' result)
+
+word8Result' :: Integer -> CoreExpr
+word8Result' result = Lit (mkLitWord8Wrap result)
+
+-- | Create a Word literal expression while ensuring the given Integer is in the
+-- target Word range
+word16Result :: Integer -> Maybe CoreExpr
+word16Result result = Just (word16Result' result)
+
+word16Result' :: Integer -> CoreExpr
+word16Result' result = Lit (mkLitWord16Wrap result)
+
+-- | Create a Word literal expression while ensuring the given Integer is in the
+-- target Word range
+word32Result :: Integer -> Maybe CoreExpr
+word32Result result = Just (word32Result' result)
+
+word32Result' :: Integer -> CoreExpr
+word32Result' result = Lit (mkLitWord32Wrap result)
 
 -- | Create a Word literal expression while ensuring the given Integer is in the
 -- target Word range
@@ -697,8 +1021,9 @@ wordCResult platform result = Just (mkPair [Lit lit, Lit c])
     (lit, b) = mkLitWordWrapC platform result
     c = if b then onei platform else zeroi platform
 
-inversePrimOp :: PrimOp -> RuleM CoreExpr
-inversePrimOp primop = do
+-- | 'ambiant (primop x) = x', but not nececesarily 'primop (ambient x) = x'.
+semiInversePrimOp :: PrimOp -> RuleM CoreExpr
+semiInversePrimOp primop = do
   [Var primop_id `App` e] <- getArgs
   matchPrimOpId primop primop_id
   return e
@@ -2234,6 +2559,54 @@ data NumOps = NumOps
 -- | Create a numeric literal
 mkNumLiteral :: Platform -> NumOps -> Integer -> Literal
 mkNumLiteral platform ops i = mkLitNumberWrap platform (numLitType ops) i
+
+int8Ops :: NumOps
+int8Ops = NumOps
+   { numAdd     = Int8AddOp
+   , numSub     = Int8SubOp
+   , numMul     = Int8MulOp
+   , numLitType = LitNumInt8
+   }
+
+word8Ops :: NumOps
+word8Ops = NumOps
+   { numAdd     = Word8AddOp
+   , numSub     = Word8SubOp
+   , numMul     = Word8MulOp
+   , numLitType = LitNumWord8
+   }
+
+int16Ops :: NumOps
+int16Ops = NumOps
+   { numAdd     = Int16AddOp
+   , numSub     = Int16SubOp
+   , numMul     = Int16MulOp
+   , numLitType = LitNumInt16
+   }
+
+word16Ops :: NumOps
+word16Ops = NumOps
+   { numAdd     = Word16AddOp
+   , numSub     = Word16SubOp
+   , numMul     = Word16MulOp
+   , numLitType = LitNumWord16
+   }
+
+int32Ops :: NumOps
+int32Ops = NumOps
+   { numAdd     = Int32AddOp
+   , numSub     = Int32SubOp
+   , numMul     = Int32MulOp
+   , numLitType = LitNumInt32
+   }
+
+word32Ops :: NumOps
+word32Ops = NumOps
+   { numAdd     = Word32AddOp
+   , numSub     = Word32SubOp
+   , numMul     = Word32MulOp
+   , numLitType = LitNumWord32
+   }
 
 intOps :: NumOps
 intOps = NumOps
