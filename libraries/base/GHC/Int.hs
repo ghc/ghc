@@ -100,10 +100,10 @@ instance Show Int8 where
 
 -- | @since 2.01
 instance Num Int8 where
-    (I8# x#) + (I8# y#)    = I8# (intToInt8# ((int8ToInt# x#) +# (int8ToInt# y#)))
-    (I8# x#) - (I8# y#)    = I8# (intToInt8# ((int8ToInt# x#) -# (int8ToInt# y#)))
-    (I8# x#) * (I8# y#)    = I8# (intToInt8# ((int8ToInt# x#) *# (int8ToInt# y#)))
-    negate (I8# x#)        = I8# (intToInt8# (negateInt# (int8ToInt# x#)))
+    (I8# x#) + (I8# y#)    = I8# (x# `plusInt8#` y#)
+    (I8# x#) - (I8# y#)    = I8# (x# `subInt8#` y#)
+    (I8# x#) * (I8# y#)    = I8# (x# `timesInt8#` y#)
+    negate (I8# x#)        = I8# (negateInt8# x#)
     abs x | x >= 0         = x
           | otherwise      = negate x
     signum x | x > 0       = 1
@@ -136,7 +136,7 @@ instance Integral Int8 where
     quot    x@(I8# x#) y@(I8# y#)
         | y == 0                     = divZeroError
         | y == (-1) && x == minBound = overflowError -- Note [Order of tests]
-        | otherwise                  = I8# (intToInt8# ((int8ToInt# x#) `quotInt#` (int8ToInt# y#)))
+        | otherwise                  = I8# (x# `quotInt8#` y#)
     rem     (I8# x#) y@(I8# y#)
         | y == 0                     = divZeroError
           -- The quotRem CPU instruction might fail for 'minBound
@@ -144,11 +144,11 @@ instance Integral Int8 where
           -- width of signed integer. But, 'minBound `rem` -1' is
           -- well-defined (0). We therefore special-case it.
         | y == (-1)                  = 0
-        | otherwise                  = I8# (intToInt8# ((int8ToInt# x#) `remInt#` (int8ToInt# y#)))
+        | otherwise                  = I8# (x# `remInt8#` y#)
     div     x@(I8# x#) y@(I8# y#)
         | y == 0                     = divZeroError
         | y == (-1) && x == minBound = overflowError -- Note [Order of tests]
-        | otherwise                  = I8# (intToInt8# ((int8ToInt# x#) `divInt#` (int8ToInt# y#)))
+        | otherwise                  = I8# (x# `divInt8#` y#)
     mod       (I8# x#) y@(I8# y#)
         | y == 0                     = divZeroError
           -- The divMod CPU instruction might fail for 'minBound
@@ -156,23 +156,19 @@ instance Integral Int8 where
           -- width of signed integer. But, 'minBound `mod` -1' is
           -- well-defined (0). We therefore special-case it.
         | y == (-1)                  = 0
-        | otherwise                  = I8# (intToInt8# ((int8ToInt# x#) `modInt#` (int8ToInt# y#)))
+        | otherwise                  = I8# (x# `modInt8#` y#)
     quotRem x@(I8# x#) y@(I8# y#)
         | y == 0                     = divZeroError
           -- Note [Order of tests]
         | y == (-1) && x == minBound = (overflowError, 0)
-        | otherwise                  = case (int8ToInt# x#) `quotRemInt#` (int8ToInt# y#) of
-                                       (# q, r #) ->
-                                           (I8# (intToInt8# q),
-                                            I8# (intToInt8# r))
+        | otherwise                  = case x# `quotRemInt8#` y# of
+                                       (# q, r #) -> (I8# q, I8# r)
     divMod  x@(I8# x#) y@(I8# y#)
         | y == 0                     = divZeroError
           -- Note [Order of tests]
         | y == (-1) && x == minBound = (overflowError, 0)
-        | otherwise                  = case (int8ToInt# x#) `divModInt#` (int8ToInt# y#) of
-                                       (# d, m #) ->
-                                           (I8# (intToInt8# d),
-                                            I8# (intToInt8# m))
+        | otherwise                  = case  x# `divModInt8#` y# of
+                                       (# d, m #) -> (I8# d, I8# m)
     toInteger (I8# x#)               = IS (int8ToInt# x#)
 
 -- | @since 2.01
@@ -317,10 +313,10 @@ instance Show Int16 where
 
 -- | @since 2.01
 instance Num Int16 where
-    (I16# x#) + (I16# y#)  = I16# (intToInt16# ((int16ToInt# x#) +# (int16ToInt# y#)))
-    (I16# x#) - (I16# y#)  = I16# (intToInt16# ((int16ToInt# x#) -# (int16ToInt# y#)))
-    (I16# x#) * (I16# y#)  = I16# (intToInt16# ((int16ToInt# x#) *# (int16ToInt# y#)))
-    negate (I16# x#)       = I16# (intToInt16# (negateInt# (int16ToInt# x#)))
+    (I16# x#) + (I16# y#)  = I16# (x# `plusInt16#` y#)
+    (I16# x#) - (I16# y#)  = I16# (x# `subInt16#` y#)
+    (I16# x#) * (I16# y#)  = I16# (x# `timesInt16#` y#)
+    negate (I16# x#)       = I16# (negateInt16# x#)
     abs x | x >= 0         = x
           | otherwise      = negate x
     signum x | x > 0       = 1
@@ -353,7 +349,7 @@ instance Integral Int16 where
     quot    x@(I16# x#) y@(I16# y#)
         | y == 0                     = divZeroError
         | y == (-1) && x == minBound = overflowError -- Note [Order of tests]
-        | otherwise                  = I16# (intToInt16# ((int16ToInt# x#) `quotInt#` (int16ToInt# y#)))
+        | otherwise                  = I16# (x# `quotInt16#` y#)
     rem       (I16# x#) y@(I16# y#)
         | y == 0                     = divZeroError
           -- The quotRem CPU instruction might fail for 'minBound
@@ -361,11 +357,11 @@ instance Integral Int16 where
           -- width of signed integer. But, 'minBound `rem` -1' is
           -- well-defined (0). We therefore special-case it.
         | y == (-1)                  = 0
-        | otherwise                  = I16# (intToInt16# ((int16ToInt# x#) `remInt#` (int16ToInt# y#)))
+        | otherwise                  = I16# (x# `remInt16#` y#)
     div     x@(I16# x#) y@(I16# y#)
         | y == 0                     = divZeroError
         | y == (-1) && x == minBound = overflowError -- Note [Order of tests]
-        | otherwise                  = I16# (intToInt16# ((int16ToInt# x#) `divInt#` (int16ToInt# y#)))
+        | otherwise                  = I16# (x# `divInt16#` y#)
     mod       (I16# x#) y@(I16# y#)
         | y == 0                     = divZeroError
           -- The divMod CPU instruction might fail for 'minBound
@@ -373,23 +369,19 @@ instance Integral Int16 where
           -- width of signed integer. But, 'minBound `mod` -1' is
           -- well-defined (0). We therefore special-case it.
         | y == (-1)                  = 0
-        | otherwise                  = I16# (intToInt16# ((int16ToInt# x#) `modInt#` (int16ToInt# y#)))
+        | otherwise                  = I16# (x# `modInt16#` y#)
     quotRem x@(I16# x#) y@(I16# y#)
         | y == 0                     = divZeroError
           -- Note [Order of tests]
         | y == (-1) && x == minBound = (overflowError, 0)
-        | otherwise                  = case (int16ToInt# x#) `quotRemInt#` (int16ToInt# y#) of
-                                       (# q, r #) ->
-                                           (I16# (intToInt16# q),
-                                            I16# (intToInt16# r))
+        | otherwise                  = case x# `quotRemInt16#` y# of
+                                       (# q, r #) -> (I16# q, I16# r)
     divMod  x@(I16# x#) y@(I16# y#)
         | y == 0                     = divZeroError
           -- Note [Order of tests]
         | y == (-1) && x == minBound = (overflowError, 0)
-        | otherwise                  = case (int16ToInt# x#) `divModInt#` (int16ToInt# y#) of
-                                       (# d, m #) ->
-                                           (I16# (intToInt16# d),
-                                            I16# (intToInt16# m))
+        | otherwise                  = case x# `divModInt16#` y# of
+                                       (# d, m #) -> (I16# d, I16# m)
     toInteger (I16# x#)              = IS (int16ToInt# x#)
 
 -- | @since 2.01
@@ -539,10 +531,10 @@ instance Show Int32 where
 
 -- | @since 2.01
 instance Num Int32 where
-    (I32# x#) + (I32# y#)  = I32# (intToInt32# ((int32ToInt# x#) +# (int32ToInt# y#)))
-    (I32# x#) - (I32# y#)  = I32# (intToInt32# ((int32ToInt# x#) -# (int32ToInt# y#)))
-    (I32# x#) * (I32# y#)  = I32# (intToInt32# ((int32ToInt# x#) *# (int32ToInt# y#)))
-    negate (I32# x#)       = I32# (intToInt32# (negateInt# (int32ToInt# x#)))
+    (I32# x#) + (I32# y#)  = I32# (x# `plusInt32#` y#)
+    (I32# x#) - (I32# y#)  = I32# (x# `subInt32#` y#)
+    (I32# x#) * (I32# y#)  = I32# (x# `timesInt32#` y#)
+    negate (I32# x#)       = I32# (negateInt32# x#)
     abs x | x >= 0         = x
           | otherwise      = negate x
     signum x | x > 0       = 1
@@ -575,7 +567,7 @@ instance Integral Int32 where
     quot    x@(I32# x#) y@(I32# y#)
         | y == 0                     = divZeroError
         | y == (-1) && x == minBound = overflowError -- Note [Order of tests]
-        | otherwise                  = I32# (intToInt32# ((int32ToInt# x#) `quotInt#` (int32ToInt# y#)))
+        | otherwise                  = I32# (x# `quotInt32#` y#)
     rem       (I32# x#) y@(I32# y#)
         | y == 0                     = divZeroError
           -- The quotRem CPU instruction might fail for 'minBound
@@ -583,11 +575,11 @@ instance Integral Int32 where
           -- width of signed integer. But, 'minBound `rem` -1' is
           -- well-defined (0). We therefore special-case it.
         | y == (-1)                  = 0
-        | otherwise                  = I32# (intToInt32# ((int32ToInt# x#) `remInt#` (int32ToInt# y#)))
+        | otherwise                  = I32# (x# `remInt32#` y#)
     div     x@(I32# x#) y@(I32# y#)
         | y == 0                     = divZeroError
         | y == (-1) && x == minBound = overflowError -- Note [Order of tests]
-        | otherwise                  = I32# (intToInt32# ((int32ToInt# x#) `divInt#` (int32ToInt# y#)))
+        | otherwise                  = I32# (x# `divInt32#` y#)
     mod       (I32# x#) y@(I32# y#)
         | y == 0                     = divZeroError
           -- The divMod CPU instruction might fail for 'minBound
@@ -595,23 +587,19 @@ instance Integral Int32 where
           -- width of signed integer. But, 'minBound `mod` -1' is
           -- well-defined (0). We therefore special-case it.
         | y == (-1)                  = 0
-        | otherwise                  = I32# (intToInt32# ((int32ToInt# x#) `modInt#` (int32ToInt# y#)))
+        | otherwise                  = I32# (x# `modInt32#` y#)
     quotRem x@(I32# x#) y@(I32# y#)
         | y == 0                     = divZeroError
           -- Note [Order of tests]
         | y == (-1) && x == minBound = (overflowError, 0)
-        | otherwise                  = case (int32ToInt# x#) `quotRemInt#` (int32ToInt# y#) of
-                                       (# q, r #) ->
-                                           (I32# (intToInt32# q),
-                                            I32# (intToInt32# r))
+        | otherwise                  = case x# `quotRemInt32#` y# of
+                                       (# q, r #) -> (I32# q, I32# r)
     divMod  x@(I32# x#) y@(I32# y#)
         | y == 0                     = divZeroError
           -- Note [Order of tests]
         | y == (-1) && x == minBound = (overflowError, 0)
-        | otherwise                  = case (int32ToInt# x#) `divModInt#` (int32ToInt# y#) of
-                                       (# d, m #) ->
-                                           (I32# (intToInt32# d),
-                                            I32# (intToInt32# m))
+        | otherwise                  = case x# `divModInt32#` y# of
+                                       (# d, m #) -> (I32# d, I32# m)
     toInteger (I32# x#)              = IS (int32ToInt# x#)
 
 -- | @since 2.01
