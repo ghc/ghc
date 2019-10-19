@@ -22,7 +22,6 @@ import Settings
 import Target
 import Utilities
 
-import Data.List (union)
 import qualified Data.Set    as Set
 import qualified Text.Parsec as Parsec
 
