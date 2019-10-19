@@ -1858,7 +1858,7 @@ bindIfaceTyConBinderX bind_tv (Bndr tv vis) thing_inside
 
 tcCodeGenInfos :: NameEnv LambdaFormInfo -> [(Name,IfLFInfo)] -> IfL (NameEnv LambdaFormInfo)
 tcCodeGenInfos env xs = do
-  foldM (\env (name,if_lf) -> extendNameEnv env name <$> (tcLFInfo if_lf)) env xs
+  foldM (\env (name,if_lf) -> extendNameEnv env name <$!> (tcLFInfo if_lf)) env xs
 
 tcLFInfo :: IfLFInfo -> IfL LambdaFormInfo
 tcLFInfo (ILFReEntrant oneshot rep fvs_flag) = do
