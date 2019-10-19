@@ -51,7 +51,9 @@ module GHC.Classes(
     (&&), (||), not,
 
     -- * Integer arithmetic
-    divInt#, modInt#, divModInt#
+    divInt#, divInt8#, divInt16#, divInt32#,
+    modInt#, modInt8#, modInt16#, modInt32#
+    divModInt#, divModInt8#, divModInt16#, divModInt32#
  ) where
 
 -- GHC.Magic is used in some derived instances
@@ -541,10 +543,7 @@ not False               =  True
 -- put them
 
 -- These functions have built-in rules.
-{-# INLINE [0] divInt# #-}
-{-# INLINE [0] modInt# #-}
-{-# INLINE [0] divModInt# #-}
-
+{-# NOINLINE [0] divInt# #-}
 divInt# :: Int# -> Int# -> Int#
 x# `divInt#` y# = ((x# +# bias#) `quotInt#` y#) -# hard#
    where
@@ -555,30 +554,41 @@ x# `divInt#` y# = ((x# +# bias#) `quotInt#` y#) -# hard#
       !bias# = c0# -# c1#
       !hard# = c0# `orI#` c1#
 
-modInt# :: Int# -> Int# -> Int#
-x# `modInt#` y# = r# +# k#
-  where
-    -- See Note [modInt# implementation]
-    !yn# = y# <# 0#
-    !c0# = (x# <# 0#) `andI#` (notI# yn#)
-    !c1# = (x# ># 0#) `andI#` yn#
-    !s#  = 0# -# ((c0# `orI#` c1#) `andI#` (r# /=# 0#))
-    !k#  = s# `andI#` y#
-    !r#  = x# `remInt#` y#
+{-# NOINLINE [0] divInt8# #-}
+-- FIXME make branchless after we have sized bit-twiddling primops.
+divInt8# :: Int8# -> Int8# -> Int8#
+x# `divInt8#` y#
+    | y0x = ((x# `subInt8#` one#) `quotInt8#` y#) `subInt8#` one#
+    | x0y = ((x# `plusInt8#` one#) `quotInt8#` y#) `subInt8#` one#
+    | True = x# `quotInt8#` y#
+  where zero# = intToInt8# 0#
+        one# = intToInt8# 1#
+        y0x = isTrue# (x# `gtInt8#` zero#) && isTrue# (y# `ltInt8#` zero#)
+        x0y = isTrue# (x# `ltInt8#` zero#) && isTrue# (y# `gtInt8#` zero#)
 
-divModInt# :: Int# -> Int# -> (# Int#, Int# #)
-x# `divModInt#` y# = case (x# +# bias#) `quotRemInt#` y# of
-  (# q#, r# #) -> (# q# -# hard#, r# +# k# #)
-  where
-    -- See Note [divModInt# implementation]
-    !yn#   = y# <# 0#
-    !c0#   = (x# <# 0#) `andI#` (notI# yn#)
-    !c1#   = (x# ># 0#) `andI#` yn#
-    !bias# = c0# -# c1#
-    !hard# = c0# `orI#` c1#
-    !s#    = 0# -# hard#
-    !k#    = (s# `andI#` y#) -# bias#
+{-# NOINLINE [0] divInt16# #-}
+-- FIXME make branchless after we have sized bit-twiddling primops.
+divInt16# :: Int16# -> Int16# -> Int16#
+x# `divInt16#` y#
+    | y0x = ((x# `subInt16#` one#) `quotInt16#` y#) `subInt16#` one#
+    | x0y = ((x# `plusInt16#` one#) `quotInt16#` y#) `subInt16#` one#
+    | True = x# `quotInt16#` y#
+  where zero# = intToInt16# 0#
+        one# = intToInt16# 1#
+        y0x = isTrue# (x# `gtInt16#` zero#) && isTrue# (y# `ltInt16#` zero#)
+        x0y = isTrue# (x# `ltInt16#` zero#) && isTrue# (y# `gtInt16#` zero#)
 
+{-# NOINLINE [0] divInt32# #-}
+-- FIXME make branchless after we have sized bit-twiddling primops.
+divInt32# :: Int32# -> Int32# -> Int32#
+x# `divInt32#` y#
+    | y0x = ((x# `subInt32#` one#) `quotInt32#` y#) `subInt32#` one#
+    | x0y = ((x# `plusInt32#` one#) `quotInt32#` y#) `subInt32#` one#
+    | True = x# `quotInt32#` y#
+  where zero# = intToInt32# 0#
+        one# = intToInt32# 1#
+        y0x = isTrue# (x# `gtInt32#` zero#) && isTrue# (y# `ltInt32#` zero#)
+        x0y = isTrue# (x# `ltInt32#` zero#) && isTrue# (y# `gtInt32#` zero#)
 
 -- See Note [divInt# implementation]
 -- ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
@@ -638,6 +648,53 @@ x# `divModInt#` y# = case (x# +# bias#) `quotRemInt#` y# of
 --    | (x# ># 0#) && (y# <# 0#) = ((x# -# y#) -# 1#) `quotInt#` y#
 --    | (x# <# 0#) && (y# ># 0#) = ((x# -# y#) +# 1#) `quotInt#` y#
 
+{-# INLINE [0] modInt# #-}
+modInt# :: Int# -> Int# -> Int#
+x# `modInt#` y# = r# +# k#
+  where
+    -- See Note [modInt# implementation]
+    !yn# = y# <# 0#
+    !c0# = (x# <# 0#) `andI#` (notI# yn#)
+    !c1# = (x# ># 0#) `andI#` yn#
+    !s#  = 0# -# ((c0# `orI#` c1#) `andI#` (r# /=# 0#))
+    !k#  = s# `andI#` y#
+    !r#  = x# `remInt#` y#
+
+{-# NOINLINE [0] modInt8# #-}
+-- FIXME make branchless after we have sized bit-twiddling primops.
+modInt8# :: Int8# -> Int8# -> Int8#
+x# `modInt8#` y#
+    = if isTrue# (x# `gtInt8#` zero#) && isTrue# (y# `ltInt8#` zero#) ||
+         isTrue# (x# `ltInt8#` zero#) && isTrue# (y# `gtInt8#` zero#)
+      then if isTrue# (r# `neInt8#` zero#) then r# `plusInt8#` y# else zero#
+      else r#
+    where
+    !r# = x# `remInt8#` y#
+    zero# = intToInt8# 0#
+
+{-# NOINLINE [0] modInt16# #-}
+-- FIXME make branchless after we have sized bit-twiddling primops.
+modInt16# :: Int16# -> Int16# -> Int16#
+x# `modInt16#` y#
+    = if isTrue# (x# `gtInt16#` zero#) && isTrue# (y# `ltInt16#` zero#) ||
+         isTrue# (x# `ltInt16#` zero#) && isTrue# (y# `gtInt16#` zero#)
+      then if isTrue# (r# `neInt16#` zero#) then r# `plusInt16#` y# else zero#
+      else r#
+    where
+    !r# = x# `remInt16#` y#
+    zero# = intToInt16# 0#
+
+{-# NOINLINE [0] modInt32# #-}
+-- FIXME make branchless after we have sized bit-twiddling primops.
+modInt32# :: Int32# -> Int32# -> Int32#
+x# `modInt32#` y#
+    = if isTrue# (x# `gtInt32#` zero#) && isTrue# (y# `ltInt32#` zero#) ||
+         isTrue# (x# `ltInt32#` zero#) && isTrue# (y# `gtInt32#` zero#)
+      then if isTrue# (r# `neInt32#` zero#) then r# `plusInt32#` y# else zero#
+      else r#
+    where
+    !r# = x# `remInt32#` y#
+    zero# = intToInt32# 0#
 
 -- Note [modInt# implementation]
 -- ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
@@ -673,7 +730,7 @@ x# `divModInt#` y# = case (x# +# bias#) `quotRemInt#` y# of
 --                then y#
 --                else 0#
 --        r#  = x# `remInt#` y#
---
+e-
 --  ===> { Select y# or 0# in branchless way }
 --
 --    r# +# k#
@@ -688,6 +745,65 @@ x# `divModInt#` y# = case (x# +# bias#) `quotRemInt#` y# of
 --        s#  = 0# -# ((c0# ||# c1#) &&# (r# /=# 0#))
 --        k#  = s# &&# y#
 --        r#  = x# `remInt#` y#
+
+{-# INLINE [0] divModInt# #-}
+divModInt# :: Int# -> Int# -> (# Int#, Int# #)
+x# `divModInt#` y# = case (x# +# bias#) `quotRemInt#` y# of
+  (# q#, r# #) -> (# q# -# hard#, r# +# k# #)
+  where
+    -- See Note [divModInt# implementation]
+    !yn#   = y# <# 0#
+    !c0#   = (x# <# 0#) `andI#` (notI# yn#)
+    !c1#   = (x# ># 0#) `andI#` yn#
+    !bias# = c0# -# c1#
+    !hard# = c0# `orI#` c1#
+    !s#    = 0# -# hard#
+    !k#    = (s# `andI#` y#) -# bias#
+
+{-# INLINE [0] divModInt8# #-}
+-- FIXME make branchless after we have sized bit-twiddling primops.
+divModInt8# :: Int8# -> Int8# -> (# Int8#, Int8# #)
+x# `divModInt8#` y#
+  | isTrue# (x# `gtInt8#` zero#) && isTrue# (y# `ltInt8#` zero#) =
+      case (x# `subInt8#` one#) `quotRemInt8#` y# of
+        (# q, r #) -> (# q `subInt8#` one#, r `plusInt8#` y# `plusInt8#` one# #)
+  | isTrue# (x# `ltInt8#` zero#) && isTrue# (y# `gtInt8#` zero#) =
+      case (x# `plusInt8#` one#) `quotRemInt8#` y# of
+        (# q, r #) -> (# q `subInt8#` one#, r `plusInt8#` y# `subInt8#` one# #)
+  | otherwise =
+      x# `quotRemInt8#` y#
+  where zero# = intToInt8# 0#
+        one# = intToInt8# 1#
+
+{-# INLINE [0] divModInt16# #-}
+-- FIXME make branchless after we have sized bit-twiddling primops.
+divModInt16# :: Int16# -> Int16# -> (# Int16#, Int16# #)
+x# `divModInt16#` y#
+  | isTrue# (x# `gtInt16#` zero#) && isTrue# (y# `ltInt16#` zero#) =
+      case (x# `subInt16#` one#) `quotRemInt16#` y# of
+        (# q, r #) -> (# q `subInt16#` one#, r `plusInt16#` y# `plusInt16#` one# #)
+  | isTrue# (x# `ltInt16#` zero#) && isTrue# (y# `gtInt16#` zero#) =
+      case (x# `plusInt16#` one#) `quotRemInt16#` y# of
+        (# q, r #) -> (# q `subInt16#` one#, r `plusInt16#` y# `subInt16#` one# #)
+  | otherwise =
+      x# `quotRemInt16#` y#
+  where zero# = intToInt16# 0#
+        one# = intToInt16# 1#
+
+{-# INLINE [0] divModInt32# #-}
+-- FIXME make branchless after we have sized bit-twiddling primops.
+divModInt32# :: Int32# -> Int32# -> (# Int32#, Int32# #)
+x# `divModInt32#` y#
+  | isTrue# (x# `gtInt32#` zero#) && isTrue# (y# `ltInt32#` zero#) =
+      case (x# `subInt32#` one#) `quotRemInt32#` y# of
+        (# q, r #) -> (# q `subInt32#` one#, r `plusInt32#` y# `plusInt32#` one# #)
+  | isTrue# (x# `ltInt32#` zero#) && isTrue# (y# `gtInt32#` zero#) =
+      case (x# `plusInt32#` one#) `quotRemInt32#` y# of
+        (# q, r #) -> (# q `subInt32#` one#, r `plusInt32#` y# `subInt32#` one# #)
+  | otherwise =
+      x# `quotRemInt32#` y#
+  where zero# = intToInt32# 0#
+        one# = intToInt32# 1#
 
 -- Note [divModInt# implementation]
 -- ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
