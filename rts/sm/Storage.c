@@ -846,6 +846,7 @@ countNurseryBlocks (void)
 //
 // Resize each of the nurseries to the specified size.
 //
+WARD_NEED(may_call_sm)
 static void
 resizeNurseriesEach (W_ blocks)
 {

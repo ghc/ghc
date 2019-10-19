@@ -34,8 +34,22 @@ extern Mutex sm_mutex;
 #endif
 
 #if defined(THREADED_RTS)
-#define ACQUIRE_SM_LOCK   ACQUIRE_LOCK(&sm_mutex);
-#define RELEASE_SM_LOCK   RELEASE_LOCK(&sm_mutex);
+INLINE_HEADER acquire_sm_lock_(void)
+    WARD_NEED(may_take_sm_lock)
+    WARD_GRANT(sm_lock_held);
+INLINE_HEADER acquire_sm_lock_(void) { ACQUIRE_LOCK(&sm_mutex); }
+
+INLINE_HEADER release_sm_lock_(void)
+    WARD_NEED(sm_lock_held)
+    WARD_REVOKE(sm_lock_held);
+INLINE_HEADER release_sm_lock_(void) { RELEASE_LOCK(&sm_mutex); }
+
+INLINE_HEADER assert_sm_lock_(void)
+    WARD_NEED(sm_lock_held);
+INLINE_HEADER assert_sm_lock_(void) { ASSERT_LOCK_HELD(&sm_mutex); }
+
+#define ACQUIRE_SM_LOCK   acquire_sm_lock_();
+#define RELEASE_SM_LOCK   release_sm_lock_();
 #define ASSERT_SM_LOCK()  ASSERT_LOCK_HELD(&sm_mutex);
 #else
 #define ACQUIRE_SM_LOCK

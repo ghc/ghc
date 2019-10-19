@@ -81,6 +81,17 @@ extern "C" {
 #define RTS_LIKELY(p) (p)
 #endif
 
+// Apply Ward annotations. See Note [Static verification with Ward].
+#if defined(WARD)
+#define WARD_ANN(...) GNUC3_ATTRIBUTE(ward(__VA_ARGS__))
+#else
+#define WARD_ANN(...)
+#endif
+#define WARD_NEED(perm) WARD_ANN(need(perm))
+#define WARD_USES(perm) WARD_ANN(uses(perm))
+#define WARD_GRANT(perm) WARD_ANN(grant(perm))
+#define WARD_REVOKE(perm) WARD_ANN(revoke(perm))
+
 /* __builtin_unreachable is supported since GNU C 4.5 */
 #if __GNUC__ > 4 || (__GNUC__ == 4 && __GNUC_MINOR__ >= 5)
 #define RTS_UNREACHABLE __builtin_unreachable()

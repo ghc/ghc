@@ -1124,6 +1124,7 @@ static void heapOverflow(void)
    Initialise the gc_thread structures.
    -------------------------------------------------------------------------- */
 
+WARD_NEED(may_call_sm)
 static void
 new_gc_thread (uint32_t n, gc_thread *t)
 {
@@ -1622,6 +1623,7 @@ stash_mut_list (Capability *cap, uint32_t gen_no)
    Initialise a generation that is to be collected
    ------------------------------------------------------------------------- */
 
+WARD_NEED(may_call_sm)
 static void
 prepare_collected_gen (generation *gen)
 {
