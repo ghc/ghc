@@ -316,6 +316,13 @@ primop Int8QuotRemOp "quotRemInt8#" GenPrimOp Int8# -> Int8# -> (# Int8#, Int8# 
   with
     can_fail = True
 
+primop Int8SllOp "uncheckedShiftLInt8#"  GenPrimOp Int8# -> Int# -> Int8#
+primop Int8SraOp "uncheckedShiftRAInt8#" GenPrimOp Int8# -> Int# -> Int8#
+primop Int8SrlOp "uncheckedShiftRLInt8#" GenPrimOp Int8# -> Int# -> Int8#
+
+primop Int8ToWord8Op "int8ToWord8#" GenPrimOp Int8# -> Word8#
+   with code_size = 0
+
 primop Int8EqOp "eqInt8#" Compare Int8# -> Int8# -> Int#
 primop Int8GeOp "geInt8#" Compare Int8# -> Int8# -> Int#
 primop Int8GtOp "gtInt8#" Compare Int8# -> Int8# -> Int#
@@ -332,8 +339,6 @@ primtype Word8#
 
 primop Word8ToWordOp "extendWord8#" GenPrimOp Word8# -> Word#
 primop WordToWord8Op "narrowWord8#" GenPrimOp Word# -> Word8#
-
-primop Word8NotOp "notWord8#" GenPrimOp Word8# -> Word8#
 
 primop Word8AddOp "plusWord8#" GenPrimOp Word8# -> Word8# -> Word8#
   with
@@ -356,6 +361,23 @@ primop Word8RemOp "remWord8#" GenPrimOp Word8# -> Word8# -> Word8#
 primop Word8QuotRemOp "quotRemWord8#" GenPrimOp Word8# -> Word8# -> (# Word8#, Word8# #)
   with
     can_fail = True
+
+primop Word8AndOp "andWord8#" GenPrimOp Word8# -> Word8# -> Word8#
+   with commutable = True
+
+primop Word8OrOp "orWord8#" GenPrimOp Word8# -> Word8# -> Word8#
+   with commutable = True
+
+primop Word8XorOp "xorWord8#" GenPrimOp Word8# -> Word8# -> Word8#
+   with commutable = True
+
+primop Word8NotOp "notWord8#" GenPrimOp Word8# -> Word8#
+
+primop Word8SllOp "uncheckedShiftLWord8#"  GenPrimOp Word8# -> Int# -> Word8#
+primop Word8SrlOp "uncheckedShiftRLWord8#" GenPrimOp Word8# -> Int# -> Word8#
+
+primop Word8ToInt8Op "word8ToInt8#" GenPrimOp Word8# -> Int8#
+   with code_size = 0
 
 primop Word8EqOp "eqWord8#" Compare Word8# -> Word8# -> Int#
 primop Word8GeOp "geWord8#" Compare Word8# -> Word8# -> Int#
@@ -398,6 +420,13 @@ primop Int16QuotRemOp "quotRemInt16#" GenPrimOp Int16# -> Int16# -> (# Int16#, I
   with
     can_fail = True
 
+primop Int16SllOp "uncheckedShiftLInt16#"  GenPrimOp Int16# -> Int# -> Int16#
+primop Int16SraOp "uncheckedShiftRAInt16#" GenPrimOp Int16# -> Int# -> Int16#
+primop Int16SrlOp "uncheckedShiftRLInt16#" GenPrimOp Int16# -> Int# -> Int16#
+
+primop Int16ToWord16Op "int16ToWord16#" GenPrimOp Int16# -> Word16#
+   with code_size = 0
+
 primop Int16EqOp "eqInt16#" Compare Int16# -> Int16# -> Int#
 primop Int16GeOp "geInt16#" Compare Int16# -> Int16# -> Int#
 primop Int16GtOp "gtInt16#" Compare Int16# -> Int16# -> Int#
@@ -414,8 +443,6 @@ primtype Word16#
 
 primop Word16ToWordOp "extendWord16#" GenPrimOp Word16# -> Word#
 primop WordToWord16Op "narrowWord16#" GenPrimOp Word# -> Word16#
-
-primop Word16NotOp "notWord16#" GenPrimOp Word16# -> Word16#
 
 primop Word16AddOp "plusWord16#" GenPrimOp Word16# -> Word16# -> Word16#
   with
@@ -438,6 +465,23 @@ primop Word16RemOp "remWord16#" GenPrimOp Word16# -> Word16# -> Word16#
 primop Word16QuotRemOp "quotRemWord16#" GenPrimOp Word16# -> Word16# -> (# Word16#, Word16# #)
   with
     can_fail = True
+
+primop Word16AndOp "andWord16#" GenPrimOp Word16# -> Word16# -> Word16#
+   with commutable = True
+
+primop Word16OrOp "orWord16#" GenPrimOp Word16# -> Word16# -> Word16#
+   with commutable = True
+
+primop Word16XorOp "xorWord16#" GenPrimOp Word16# -> Word16# -> Word16#
+   with commutable = True
+
+primop Word16NotOp "notWord16#" GenPrimOp Word16# -> Word16#
+
+primop Word16SllOp "uncheckedShiftLWord16#"  GenPrimOp Word16# -> Int# -> Word16#
+primop Word16SrlOp "uncheckedShiftRLWord16#" GenPrimOp Word16# -> Int# -> Word16#
+
+primop Word16ToInt16Op "word16ToInt16#" GenPrimOp Word16# -> Int16#
+   with code_size = 0
 
 primop Word16EqOp "eqWord16#" Compare Word16# -> Word16# -> Int#
 primop Word16GeOp "geWord16#" Compare Word16# -> Word16# -> Int#
