@@ -535,7 +535,7 @@ primop Word32OrOp "orWord32#" GenPrimOp Word32# -> Word32# -> Word32#
 primop Word32XorOp "xorWord32#" GenPrimOp Word32# -> Word32# -> Word32#
    with commutable = True
 
-primop Word32NotOp "not32Word#" GenPrimOp Word32# -> Word32#
+primop Word32NotOp "notWord32#" GenPrimOp Word32# -> Word32#
 
 primop Word32SllOp "uncheckedShiftLWord32#"  GenPrimOp Word32# -> Int# -> Word32#
 primop Word32SrlOp "uncheckedShiftRLWord32#" GenPrimOp Word32# -> Int# -> Word32#
