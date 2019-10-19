@@ -131,10 +131,10 @@ Language
 
       bar = foo
 
-  Notice that ``A`` enables :ghc-flag:`RankNTypes`, but ``B`` does not.
+  Notice that ``A`` enables :ghc-flag:`-XRankNTypes`, but ``B`` does not.
   Previous versions of GHC would allow ``bar`` to typecheck, even though its
   inferred type is higher-rank. GHC 8.10 will now reject this, as one must now
-  enable :ghc-flag:`RankNTypes` in ``B`` to accept the inferred type signature.
+  enable :ghc-flag:`-XRankNTypes` in ``B`` to accept the inferred type signature.
 
 Compiler
 ~~~~~~~~
