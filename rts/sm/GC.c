@@ -104,6 +104,7 @@
  */
 uint32_t N;
 bool major_gc;
+bool deadlock_detect_gc;
 
 /* Data used for allocation area sizing.
  */
@@ -194,6 +195,7 @@ StgPtr mark_sp;            // pointer to the next unallocated mark stack entry
 void
 GarbageCollect (uint32_t collect_gen,
                 const bool do_heap_census,
+                const bool deadlock_detect,
                 uint32_t gc_type USED_IF_THREADS,
                 Capability *cap,
                 bool idle_cap[])
@@ -271,7 +273,25 @@ GarbageCollect (uint32_t collect_gen,
   N = collect_gen;
   major_gc = (N == RtsFlags.GcFlags.generations-1);
 
-  if (major_gc) {
+  /* See Note [Deadlock detection under nonmoving collector]. */
+  deadlock_detect_gc = deadlock_detect;
+
+#if defined(THREADED_RTS)
+  if (major_gc && RtsFlags.GcFlags.useNonmoving && concurrent_coll_running) {
+      /* If there is already a concurrent major collection running then
+       * there is no benefit to starting another.
+       * TODO: Catch heap-size runaway.
+       */
+      N--;
+      collect_gen--;
+      major_gc = false;
+  }
+#endif
+
+  /* N.B. The nonmoving collector works a bit differently. See
+   * Note [Static objects under the nonmoving collector].
+   */
+  if (major_gc && !RtsFlags.GcFlags.useNonmoving) {
       prev_static_flag = static_flag;
       static_flag =
           static_flag == STATIC_FLAG_A ? STATIC_FLAG_B : STATIC_FLAG_A;
@@ -718,6 +738,14 @@ GarbageCollect (uint32_t collect_gen,
     }
   } // for all generations
 
+  // Flush the update remembered set. See Note [Eager update remembered set
+  // flushing] in NonMovingMark.c
+  if (RtsFlags.GcFlags.useNonmoving) {
+      RELEASE_SM_LOCK;
+      nonmovingAddUpdRemSetBlocks(&gct->cap->upd_rem_set.queue);
+      ACQUIRE_SM_LOCK;
+  }
+
   // Mark and sweep the oldest generation.
   // N.B. This can only happen after we've moved
   // oldest_gen->scavenged_large_objects back to oldest_gen->large_objects.
@@ -744,6 +772,11 @@ GarbageCollect (uint32_t collect_gen,
       // so we need to mark those too.
       // Note that in sequential case these lists will be appended with more
       // weaks and threads found to be dead in mark.
+#if !defined(THREADED_RTS)
+      // In the non-threaded runtime this is the only time we push to the
+      // upd_rem_set
+      nonmovingAddUpdRemSetBlocks(&gct->cap->upd_rem_set.queue);
+#endif
       nonmovingCollect(&dead_weak_ptr_list, &resurrected_threads);
       ACQUIRE_SM_LOCK;
   }
