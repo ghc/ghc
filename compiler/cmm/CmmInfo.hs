@@ -74,7 +74,7 @@ cmmToRawCmm dflags cmms
        ; let do_one :: UniqSupply -> [CmmDecl] -> IO (UniqSupply, [RawCmmDecl])
              do_one uniqs cmm =
                -- NB. strictness fixes a space leak.  DO NOT REMOVE.
-               withTimingSilent (return dflags) (text "Cmm -> Raw Cmm")
+               withTimingSilent dflags (text "Cmm -> Raw Cmm")
                                 forceRes $
                  case initUs uniqs $ concatMapM (mkInfoTable dflags) cmm of
                    (b,uniqs') -> return (uniqs',b)

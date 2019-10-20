@@ -50,7 +50,8 @@ module ErrUtils (
         errorMsg, warningMsg,
         fatalErrorMsg, fatalErrorMsg'',
         compilationProgressMsg,
-        showPass, withTiming, withTimingSilent,
+        showPass,
+        withTiming, withTimingSilent, withTimingD, withTimingSilentD,
         debugTraceMsg,
         ghcExit,
         prettyPrintGhcErrors,
@@ -647,15 +648,25 @@ data PrintTimings = PrintTimings | DontPrintTimings
 --
 -- See Note [withTiming] for more.
 withTiming :: MonadIO m
-           => m DynFlags   -- ^ A means of getting a 'DynFlags' (often
-                           -- 'getDynFlags' will work here)
+           => DynFlags     -- ^ DynFlags
            -> SDoc         -- ^ The name of the phase
            -> (a -> ())    -- ^ A function to force the result
                            -- (often either @const ()@ or 'rnf')
            -> m a          -- ^ The body of the phase to be timed
            -> m a
-withTiming getDFlags what force action =
-  withTiming' getDFlags what force PrintTimings action
+withTiming dflags what force action =
+  withTiming' dflags what force PrintTimings action
+
+-- | Like withTiming but get DynFlags from the Monad.
+withTimingD :: (MonadIO m, HasDynFlags m)
+           => SDoc         -- ^ The name of the phase
+           -> (a -> ())    -- ^ A function to force the result
+                           -- (often either @const ()@ or 'rnf')
+           -> m a          -- ^ The body of the phase to be timed
+           -> m a
+withTimingD what force action = do
+  dflags <- getDynFlags
+  withTiming' dflags what force PrintTimings action
 
 
 -- | Same as 'withTiming', but doesn't print timings in the
@@ -664,19 +675,34 @@ withTiming getDFlags what force action =
 --   See Note [withTiming] for more.
 withTimingSilent
   :: MonadIO m
-  => m DynFlags -- ^ A means of getting a 'DynFlags' (often
-                -- 'getDynFlags' will work here)
+  => DynFlags   -- ^ DynFlags
   -> SDoc       -- ^ The name of the phase
   -> (a -> ())  -- ^ A function to force the result
                 -- (often either @const ()@ or 'rnf')
   -> m a        -- ^ The body of the phase to be timed
   -> m a
-withTimingSilent getDFlags what force action =
-  withTiming' getDFlags what force DontPrintTimings action
+withTimingSilent dflags what force action =
+  withTiming' dflags what force DontPrintTimings action
+
+-- | Same as 'withTiming', but doesn't print timings in the
+--   console (when given @-vN@, @N >= 2@ or @-ddump-timings@)
+--   and gets the DynFlags from the given Monad.
+--
+--   See Note [withTiming] for more.
+withTimingSilentD
+  :: (MonadIO m, HasDynFlags m)
+  => SDoc       -- ^ The name of the phase
+  -> (a -> ())  -- ^ A function to force the result
+                -- (often either @const ()@ or 'rnf')
+  -> m a        -- ^ The body of the phase to be timed
+  -> m a
+withTimingSilentD what force action = do
+  dflags <- getDynFlags
+  withTiming' dflags what force DontPrintTimings action
 
 -- | Worker for 'withTiming' and 'withTimingSilent'.
 withTiming' :: MonadIO m
-            => m DynFlags   -- ^ A means of getting a 'DynFlags' (often
+            => DynFlags   -- ^ A means of getting a 'DynFlags' (often
                             -- 'getDynFlags' will work here)
             -> SDoc         -- ^ The name of the phase
             -> (a -> ())    -- ^ A function to force the result
@@ -684,9 +710,8 @@ withTiming' :: MonadIO m
             -> PrintTimings -- ^ Whether to print the timings
             -> m a          -- ^ The body of the phase to be timed
             -> m a
-withTiming' getDFlags what force_result prtimings action
-  = do dflags <- getDFlags
-       if verbosity dflags >= 2 || dopt Opt_D_dump_timings dflags
+withTiming' dflags what force_result prtimings action
+  = do if verbosity dflags >= 2 || dopt Opt_D_dump_timings dflags
           then do whenPrintTimings $
                     logInfo dflags (defaultUserStyle dflags) $
                       text "***" <+> what <> colon

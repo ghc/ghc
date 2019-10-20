@@ -39,7 +39,7 @@ cmmPipeline
  -> CmmGroup             -- Input C-- with Procedures
  -> IO (ModuleSRTInfo, CmmGroup) -- Output CPS transformed C--
 
-cmmPipeline hsc_env srtInfo prog = withTimingSilent (return dflags) (text "Cmm pipeline") forceRes $
+cmmPipeline hsc_env srtInfo prog = withTimingSilent dflags (text "Cmm pipeline") forceRes $
   do let dflags = hsc_dflags hsc_env
 
      tops <- {-# SCC "tops" #-} mapM (cpsTop hsc_env) prog
