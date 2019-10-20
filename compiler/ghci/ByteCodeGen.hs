@@ -86,7 +86,7 @@ byteCodeGen :: HscEnv
             -> Maybe ModBreaks
             -> IO CompiledByteCode
 byteCodeGen hsc_env this_mod binds tycs mb_modBreaks
-   = withTiming (pure dflags)
+   = withTiming dflags
                 (text "ByteCodeGen"<+>brackets (ppr this_mod))
                 (const ()) $ do
         -- Split top-level binds into strings and others.
@@ -158,7 +158,7 @@ coreExprToBCOs :: HscEnv
                -> CoreExpr
                -> IO UnlinkedBCO
 coreExprToBCOs hsc_env this_mod expr
- = withTiming (pure dflags)
+ = withTiming dflags
               (text "ByteCodeGen"<+>brackets (ppr this_mod))
               (const ()) $ do
       -- create a totally bogus name for the top-level BCO; this
