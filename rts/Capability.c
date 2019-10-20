@@ -475,6 +475,7 @@ void interruptAllCapabilities(void)
 
 #if defined(THREADED_RTS)
 WARD_NEED(capability_lock_held)
+WARD_GRANT(TASK_OWNS_CAPABILITY(task, cap))
 static void
 giveCapabilityToTask (Capability *cap USED_IF_DEBUG, Task *task)
 {
@@ -719,6 +720,7 @@ static Capability * waitForWorkerCapability (Task *task)
 
 #if defined(THREADED_RTS)
 
+WARD_GRANT(TASK_OWNS_CAPABILITY(task, *return))
 static Capability * waitForReturnCapability (Task *task)
 {
     Capability *cap;
@@ -765,6 +767,7 @@ static Capability * waitForReturnCapability (Task *task)
  *
  * ------------------------------------------------------------------------- */
 
+WARD_GRANT(TASK_OWNS_CAPABILITY(task, *cap))
 void waitForCapability (Capability **pCap, Task *task)
 {
 #if !defined(THREADED_RTS)
@@ -861,6 +864,7 @@ void waitForCapability (Capability **pCap, Task *task)
 
 /* See Note [GC livelock] in Schedule.c for why we have gcAllowed
    and return the bool */
+WARD_REVOKE(TASK_OWNS_CAPABILITY(task, *cap))
 bool /* Did we GC? */
 yieldCapability (Capability** pCap, Task *task, bool gcAllowed)
 {
