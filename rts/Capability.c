@@ -493,6 +493,7 @@ void interruptAllCapabilities(void)
  * ------------------------------------------------------------------------- */
 
 #if defined(THREADED_RTS)
+WARD_NEED(capability_lock_held)
 static void
 giveCapabilityToTask (Capability *cap USED_IF_DEBUG, Task *task)
 {
@@ -625,6 +626,7 @@ releaseAndWakeupCapability (Capability* cap USED_IF_THREADS)
     RELEASE_LOCK(&cap->lock);
 }
 
+WARD_NEED(capability_lock_held)
 static void
 enqueueWorker (Capability* cap USED_IF_THREADS)
 {
