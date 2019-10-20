@@ -121,6 +121,7 @@ static void enlargeStablePtrTable(void);
  * calls to freeStablePtr().
  * -------------------------------------------------------------------------- */
 
+WARD_GRANT(stable_ptr_lock_held)
 void
 stablePtrLock(void)
 {
@@ -128,6 +129,8 @@ stablePtrLock(void)
     ACQUIRE_LOCK(&stable_ptr_mutex);
 }
 
+WARD_REVOKE(stable_ptr_lock_held)
+WARD_NEED(stable_ptr_lock_held)
 void
 stablePtrUnlock(void)
 {
@@ -168,6 +171,7 @@ initStablePtrTable(void)
  * -------------------------------------------------------------------------- */
 
 // Must be holding stable_ptr_mutex
+WARD_NEED(stable_ptr_lock_held)
 static void
 enlargeStablePtrTable(void)
 {
