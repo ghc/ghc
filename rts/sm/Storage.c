@@ -1404,6 +1404,8 @@ allocatePinned (Capability *cap, W_ n /*words*/, W_ alignment /*bytes*/, W_ alig
    Note that it is responsibility of the caller to do the
    stg_MUT_VAR_CLEAN comparison.
 */
+WARD_NEED(may_take_sm_lock)
+WARD_NEED(may_call_sm)
 void
 dirty_MUT_VAR(StgRegTable *reg, StgMutVar *mvar, StgClosure *old)
 {
@@ -1420,6 +1422,7 @@ dirty_MUT_VAR(StgRegTable *reg, StgMutVar *mvar, StgClosure *old)
     }
 }
 
+
 /*
  * This is the write barrier for TVARs.
  * old is the pointer that we overwrote, which is required by the concurrent
@@ -1427,6 +1430,8 @@ dirty_MUT_VAR(StgRegTable *reg, StgMutVar *mvar, StgClosure *old)
  * only overwrite one per dirty_TVAR call so we only need to take one old
  * pointer argument.
  */
+WARD_NEED(may_take_sm_lock)
+WARD_NEED(may_call_sm)
 void
 dirty_TVAR(Capability *cap, StgTVar *p,
            StgClosure *old)
@@ -1448,6 +1453,8 @@ dirty_TVAR(Capability *cap, StgTVar *p,
 //    * setting the link field to END_TSO_QUEUE
 //    * setting the link field of the currently running TSO, as it
 //      will already be dirty.
+WARD_NEED(may_take_sm_lock)
+WARD_NEED(may_call_sm)
 void
 setTSOLink (Capability *cap, StgTSO *tso, StgTSO *target)
 {
@@ -1461,6 +1468,8 @@ setTSOLink (Capability *cap, StgTSO *tso, StgTSO *target)
     tso->_link = target;
 }
 
+WARD_NEED(may_take_sm_lock)
+WARD_NEED(may_call_sm)
 void
 setTSOPrev (Capability *cap, StgTSO *tso, StgTSO *target)
 {
@@ -1474,6 +1483,8 @@ setTSOPrev (Capability *cap, StgTSO *tso, StgTSO *target)
     tso->block_info.prev = target;
 }
 
+WARD_NEED(may_take_sm_lock)
+WARD_NEED(may_call_sm)
 void
 dirty_TSO (Capability *cap, StgTSO *tso)
 {
@@ -1487,6 +1498,8 @@ dirty_TSO (Capability *cap, StgTSO *tso)
     }
 }
 
+WARD_NEED(may_take_sm_lock)
+WARD_NEED(may_call_sm)
 void
 dirty_STACK (Capability *cap, StgStack *stack)
 {
@@ -1535,6 +1548,8 @@ update_MVAR(StgRegTable *reg, StgClosure *p, StgClosure *old_val)
    this really does make a difference on concurrency-heavy benchmarks
    such as Chaneneos and cheap-concurrency.
 */
+WARD_NEED(may_take_sm_lock)
+WARD_NEED(may_call_sm)
 void
 dirty_MVAR(StgRegTable *reg, StgClosure *p, StgClosure *old_val)
 {

@@ -585,6 +585,8 @@ run_thread:
  * Run queue operations
  * -------------------------------------------------------------------------- */
 
+WARD_NEED(may_take_sm_lock)
+WARD_NEED(may_call_sm)
 static void
 removeFromRunQueue (Capability *cap, StgTSO *tso)
 {
@@ -606,6 +608,8 @@ removeFromRunQueue (Capability *cap, StgTSO *tso)
     IF_DEBUG(sanity, checkRunQueue(cap));
 }
 
+WARD_NEED(may_take_sm_lock)
+WARD_NEED(may_call_sm)
 void
 promoteInRunQueue (Capability *cap, StgTSO *tso)
 {
@@ -1562,6 +1566,7 @@ void releaseAllCapabilities(uint32_t n, Capability *keep_cap, Task *task)
 
 // N.B. See Note [Deadlock detection under nonmoving collector] for rationale
 // behind deadlock_detect argument.
+WARD_NEED(may_take_sm_lock)
 static void
 scheduleDoGC (Capability **pcap, Task *task USED_IF_THREADS,
               bool force_major, bool is_overflow_gc, bool deadlock_detect)
