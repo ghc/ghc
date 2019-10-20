@@ -12,7 +12,9 @@ WARD_OPTS += --config=${WARD_CONFIG} $(addprefix -P,${CPP_FLAGS})
 #	 $(shell find rts/linker -iname '*.c'), \
 #	 $(shell find rts -iname '*.c')) \
 #	 rts/posix/itimer/Pthread.c
-SRCS = $(wildcard rts/*.c rts/sm/*.c rts/eventlog/*.c)
+SRCS = \
+  $(filter-out rts/sm/Evac_thr.c rts/sm/Scav_thr.c, \
+    $(wildcard rts/*.c rts/sm/*.c rts/eventlog/*.c))
 
 all : ward.report
 

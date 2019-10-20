@@ -23,7 +23,8 @@ void GarbageCollect (uint32_t collect_gen,
                      bool deadlock_detect,
                      uint32_t gc_type,
                      Capability *cap,
-                     bool idle_cap[]);
+                     bool idle_cap[])
+  WARD_NEED(may_take_sm_lock);
 
 typedef void (*evac_fn)(void *user, StgClosure **root);
 

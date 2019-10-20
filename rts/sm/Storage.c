@@ -107,7 +107,8 @@ volatile StgWord next_nursery[MAX_NUMA_NODES];
 Mutex sm_mutex;
 #endif
 
-static void allocNurseries (uint32_t from, uint32_t to);
+static void allocNurseries (uint32_t from, uint32_t to)
+  WARD_NEED(may_call_sm);
 static void assignNurseriesToCapabilities (uint32_t from, uint32_t to);
 static StgInd * lockCAF (StgRegTable *reg, StgIndStatic *caf);
 
@@ -712,6 +713,7 @@ StgInd* newGCdCAF (StgRegTable *reg, StgIndStatic *caf)
    Nursery management.
    -------------------------------------------------------------------------- */
 
+WARD_NEED(may_call_sm)
 static bdescr *
 allocNursery (uint32_t node, bdescr *tail, W_ blocks)
 {

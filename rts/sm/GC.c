@@ -239,6 +239,29 @@ bdescr *mark_stack_top_bd; // topmost block in the mark stack
 bdescr *mark_stack_bd;     // current block in the mark stack
 StgPtr mark_sp;            // pointer to the next unallocated mark stack entry
 
+WARD_NEED(may_take_sm_lock)
+WARD_REVOKE(may_take_sm_lock)
+WARD_GRANT(sharing_sm_lock)
+WARD_GRANT(may_call_sm) // TODO: This shouldn't be available with taking spinlock
+WARD_GRANT(sm_lock_held)
+static void
+SHARE_SM_LOCK(void)
+{
+  ACQUIRE_SM_LOCK;
+}
+
+WARD_GRANT(may_take_sm_lock)
+WARD_NEED(sharing_sm_lock)
+WARD_REVOKE(sharing_sm_lock)
+WARD_NEED(sm_lock_held)
+WARD_REVOKE(sm_lock_held)
+WARD_NEED(may_call_sm) // TODO: This shouldn't be available with taking spinlock
+WARD_REVOKE(may_call_sm) // TODO: This shouldn't be available with taking spinlock
+static void
+UNSHARE_SM_LOCK(void)
+{
+  RELEASE_SM_LOCK;
+}
 
 /* -----------------------------------------------------------------------------
    Statistics from mut_list scavenging
@@ -1612,6 +1635,8 @@ releaseGCThreads (Capability *cap USED_IF_THREADS, bool idle_cap[])
    during GC
    ------------------------------------------------------------------------- */
 
+WARD_NEED(may_call_sm)
+WARD_NEED(sharing_sm_lock)
 static void
 stash_mut_list (Capability *cap, uint32_t gen_no)
 {
@@ -1624,6 +1649,7 @@ stash_mut_list (Capability *cap, uint32_t gen_no)
    ------------------------------------------------------------------------- */
 
 WARD_NEED(may_call_sm)
+WARD_NEED(sharing_sm_lock)
 static void
 prepare_collected_gen (generation *gen)
 {
@@ -1767,6 +1793,8 @@ prepare_collected_gen (generation *gen)
    Initialise a generation that is *not* to be collected
    ------------------------------------------------------------------------- */
 
+WARD_NEED(may_call_sm)
+WARD_NEED(sharing_sm_lock)
 static void
 prepare_uncollected_gen (generation *gen)
 {
@@ -2036,6 +2064,7 @@ resizeGenerations (void)
    Calculate the new size of the nursery, and resize it.
    -------------------------------------------------------------------------- */
 
+WARD_NEED(may_call_sm)
 static void
 resize_nursery (void)
 {
