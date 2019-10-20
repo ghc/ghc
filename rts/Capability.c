@@ -643,6 +643,41 @@ enqueueWorker (Capability* cap USED_IF_THREADS)
 
 #if defined(THREADED_RTS)
 
+// Returns true when we have the worker capability.
+WARD_NEED(capability_lock_held)
+static bool
+tryWaitForWorkerCapability (Task *task, Capability *cap)
+{
+    if (get_running_task(cap) != NULL) {
+        debugTrace(DEBUG_sched,
+                   "capability %d is owned by another task", cap->no);
+        return false;
+    }
+
+    if (task->cap != cap) {
+        // see Note [migrated bound threads]
+        debugTrace(DEBUG_sched,
+                   "task has been migrated to cap %d", task->cap->no);
+        return false;
+    }
+
+    if (task->incall->tso == NULL) {
+        ASSERT(cap->spare_workers != NULL);
+        // if we're not at the front of the queue, release it
+            // again.  This is unlikely to happen.
+        if (cap->spare_workers != task) {
+            giveCapabilityToTask(cap,cap->spare_workers);
+            return false;
+        }
+        cap->spare_workers = task->next;
+        task->next = NULL;
+        cap->n_spare_workers--;
+    }
+
+    set_running_task(cap, task);
+    return true;
+}
+
 static Capability * waitForWorkerCapability (Task *task)
 {
     Capability *cap;
@@ -658,38 +693,11 @@ static Capability * waitForWorkerCapability (Task *task)
         debugTrace(DEBUG_sched, "woken up on capability %d", cap->no);
 
         acquire_capability_lock(cap);
-        if (get_running_task(cap) != NULL) {
-            debugTrace(DEBUG_sched,
-                       "capability %d is owned by another task", cap->no);
-            release_capability_lock(cap);
-            continue;
-        }
-
-        if (task->cap != cap) {
-            // see Note [migrated bound threads]
-            debugTrace(DEBUG_sched,
-                       "task has been migrated to cap %d", task->cap->no);
-            release_capability_lock(cap);
-            continue;
-        }
-
-        if (task->incall->tso == NULL) {
-            ASSERT(cap->spare_workers != NULL);
-            // if we're not at the front of the queue, release it
-                // again.  This is unlikely to happen.
-            if (cap->spare_workers != task) {
-                giveCapabilityToTask(cap,cap->spare_workers);
-                release_capability_lock(cap);
-                continue;
-            }
-            cap->spare_workers = task->next;
-            task->next = NULL;
-            cap->n_spare_workers--;
-        }
-
-        set_running_task(cap, task);
+        bool done = tryWaitForWorkerCapability(task, cap);
         release_capability_lock(cap);
-        break;
+        if (done) {
+            break;
+        }
     }
 
     return cap;
