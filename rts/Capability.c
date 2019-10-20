@@ -472,6 +472,7 @@ void interruptAllCapabilities(void)
  * ------------------------------------------------------------------------- */
 
 #if defined(THREADED_RTS)
+WARD_NEED(capability_lock_held)
 static void
 giveCapabilityToTask (Capability *cap USED_IF_DEBUG, Task *task)
 {
@@ -587,19 +588,20 @@ releaseCapability_ (Capability* cap,
 void
 releaseCapability (Capability* cap USED_IF_THREADS)
 {
-    ACQUIRE_LOCK(&cap->lock);
+    acquire_capability_lock(cap);
     releaseCapability_(cap, false);
-    RELEASE_LOCK(&cap->lock);
+    release_capability_lock(cap);
 }
 
 void
 releaseAndWakeupCapability (Capability* cap USED_IF_THREADS)
 {
-    ACQUIRE_LOCK(&cap->lock);
+    acquire_capability_lock(cap);
     releaseCapability_(cap, true);
-    RELEASE_LOCK(&cap->lock);
+    release_capability_lock(cap);
 }
 
+WARD_NEED(capability_lock_held)
 static void
 enqueueWorker (Capability* cap USED_IF_THREADS)
 {
@@ -625,7 +627,7 @@ enqueueWorker (Capability* cap USED_IF_THREADS)
         releaseCapability_(cap,false);
         // hold the lock until after workerTaskStop; c.f. scheduleWorker()
         workerTaskStop(task);
-        RELEASE_LOCK(&cap->lock);
+        RELEASE_MUTEX(&cap->lock);
         shutdownThread();
     }
 }
@@ -655,11 +657,11 @@ static Capability * waitForWorkerCapability (Task *task)
 
         debugTrace(DEBUG_sched, "woken up on capability %d", cap->no);
 
-        ACQUIRE_LOCK(&cap->lock);
-        if (cap->running_task != NULL) {
+        acquire_capability_lock(cap);
+        if (get_running_task(cap) != NULL) {
             debugTrace(DEBUG_sched,
                        "capability %d is owned by another task", cap->no);
-            RELEASE_LOCK(&cap->lock);
+            release_capability_lock(cap);
             continue;
         }
 
@@ -667,7 +669,7 @@ static Capability * waitForWorkerCapability (Task *task)
             // see Note [migrated bound threads]
             debugTrace(DEBUG_sched,
                        "task has been migrated to cap %d", task->cap->no);
-            RELEASE_LOCK(&cap->lock);
+            release_capability_lock(cap);
             continue;
         }
 
@@ -677,7 +679,7 @@ static Capability * waitForWorkerCapability (Task *task)
                 // again.  This is unlikely to happen.
             if (cap->spare_workers != task) {
                 giveCapabilityToTask(cap,cap->spare_workers);
-                RELEASE_LOCK(&cap->lock);
+                release_capability_lock(cap);
                 continue;
             }
             cap->spare_workers = task->next;
@@ -685,8 +687,8 @@ static Capability * waitForWorkerCapability (Task *task)
             cap->n_spare_workers--;
         }
 
-        cap->running_task = task;
-        RELEASE_LOCK(&cap->lock);
+        set_running_task(cap, task);
+        release_capability_lock(cap);
         break;
     }
 
@@ -719,19 +721,21 @@ static Capability * waitForReturnCapability (Task *task)
         RELEASE_LOCK(&task->lock);
 
         // now check whether we should wake up...
-        ACQUIRE_LOCK(&cap->lock);
-        if (cap->running_task == NULL) {
+        acquire_capability_lock(cap);
+        if (get_running_task(cap) == NULL) {
             if (cap->returning_tasks_hd != task) {
                 giveCapabilityToTask(cap,cap->returning_tasks_hd);
-                RELEASE_LOCK(&cap->lock);
+                release_capability_lock(cap);
                 continue;
+            } else {
+                set_running_task(cap, task);
+                popReturningTask(cap);
+                release_capability_lock(cap);
+                break;
             }
-            cap->running_task = task;
-            popReturningTask(cap);
-            RELEASE_LOCK(&cap->lock);
-            break;
+        } else {
+            release_capability_lock(cap);
         }
-        RELEASE_LOCK(&cap->lock);
     }
 
     return cap;
@@ -874,7 +878,7 @@ yieldCapability (Capability** pCap, Task *task, bool gcAllowed)
     // We must now release the capability and wait to be woken up again.
     task->wakeup = false;
 
-    ACQUIRE_LOCK(&cap->lock);
+    acquire_capability_lock(cap);
 
     // If this is a worker thread, put it on the spare_workers queue
     if (isWorker(task)) {
@@ -884,7 +888,7 @@ yieldCapability (Capability** pCap, Task *task, bool gcAllowed)
     releaseCapability_(cap, false);
 
     if (isWorker(task) || isBoundTask(task)) {
-        RELEASE_LOCK(&cap->lock);
+        release_capability(lock);
         cap = waitForWorkerCapability(task);
     } else {
         // Not a worker Task, or a bound Task.  The only way we can be woken up
@@ -893,7 +897,7 @@ yieldCapability (Capability** pCap, Task *task, bool gcAllowed)
         // The Task waiting for this Capability does not have it
         // yet, so we can be sure to be woken up later. (see #10545)
         newReturningTask(cap,task);
-        RELEASE_LOCK(&cap->lock);
+        release_capability(lock);
         cap = waitForReturnCapability(task);
     }
 
@@ -1007,14 +1011,84 @@ tryGrabCapability (Capability *cap, Task *task)
  *
  * ------------------------------------------------------------------------- */
 
+// Returns true if successful.
+WARD_NEED(capability_lock_held)
+WARD_REVOKE(capability_lock_held)
+static bool
+tryShutdownCapability (Capability *cap USED_IF_THREADS,
+                       Task *task USED_IF_THREADS,
+                       bool safe USED_IF_THREADS)
+{
+    ASSERT(sched_state == SCHED_SHUTTING_DOWN);
+
+    if (cap->spare_workers) {
+        // Look for workers that have died without removing
+        // themselves from the list; this could happen if the OS
+        // summarily killed the thread, for example.  This
+        // actually happens on Windows when the system is
+        // terminating the program, and the RTS is running in a
+        // DLL.
+        Task *t, *prev;
+        prev = NULL;
+        for (t = cap->spare_workers; t != NULL; t = t->next) {
+            if (!osThreadIsAlive(t->id)) {
+                debugTrace(DEBUG_sched,
+                           "worker thread %p has died unexpectedly", (void *)(size_t)t->id);
+                cap->n_spare_workers--;
+                if (!prev) {
+                    cap->spare_workers = t->next;
+                } else {
+                    prev->next = t->next;
+                }
+                prev = t;
+            }
+        }
+    }
+
+    if (!emptyRunQueue(cap) || cap->spare_workers) {
+        debugTrace(DEBUG_sched,
+                   "runnable threads or workers still alive, yielding");
+        releaseCapability_(cap,false); // this will wake up a worker
+        release_capability_lock(cap);
+        yieldThread();
+        return false;
+
+    // If "safe", then busy-wait for any threads currently doing
+    // foreign calls.  If we're about to unload this DLL, for
+    // example, we need to be sure that there are no OS threads
+    // that will try to return to code that has been unloaded.
+    // We can be a bit more relaxed when this is a standalone
+    // program that is about to terminate, and let safe=false.
+    } else if (cap->suspended_ccalls && safe) {
+        debugTrace(DEBUG_sched,
+                   "thread(s) are involved in foreign calls, yielding");
+        cap->running_task = NULL;
+        RELEASE_LOCK(&cap->lock);
+        // The IO manager thread might have been slow to start up,
+        // so the first attempt to kill it might not have
+        // succeeded.  Just in case, try again - the kill message
+        // will only be sent once.
+        //
+        // To reproduce this deadlock: run ffi002(threaded1)
+        // repeatedly on a loaded machine.
+        ioManagerDie();
+        yieldThread();
+        return false;
+
+    // Successfully stopped
+    } else {
+        traceSparkCounters(cap);
+        release_capability_lock(cap);
+        return true;
+    }
+}
+
 static void
 shutdownCapability (Capability *cap USED_IF_THREADS,
                     Task *task USED_IF_THREADS,
                     bool safe USED_IF_THREADS)
 {
 #if defined(THREADED_RTS)
-    uint32_t i;
-
     task->cap = cap;
 
     // Loop indefinitely until all the workers have exited and there
@@ -1023,80 +1097,23 @@ shutdownCapability (Capability *cap USED_IF_THREADS,
     // running which caused problems later (the closeMutex() below
     // isn't safe, for one thing).
 
-    for (i = 0; /* i < 50 */; i++) {
-        ASSERT(sched_state == SCHED_SHUTTING_DOWN);
-
+    for (uint32_t i = 0; /* i < 50 */; i++) {
         debugTrace(DEBUG_sched,
                    "shutting down capability %d, attempt %d", cap->no, i);
-        ACQUIRE_LOCK(&cap->lock);
-        if (cap->running_task) {
-            RELEASE_LOCK(&cap->lock);
+        acquire_capability_lock(cap);
+        if (get_running_task(cap)) {
+            release_capability_lock(cap);
             debugTrace(DEBUG_sched, "not owner, yielding");
             yieldThread();
-            continue;
-        }
-        cap->running_task = task;
 
-        if (cap->spare_workers) {
-            // Look for workers that have died without removing
-            // themselves from the list; this could happen if the OS
-            // summarily killed the thread, for example.  This
-            // actually happens on Windows when the system is
-            // terminating the program, and the RTS is running in a
-            // DLL.
-            Task *t, *prev;
-            prev = NULL;
-            for (t = cap->spare_workers; t != NULL; t = t->next) {
-                if (!osThreadIsAlive(t->id)) {
-                    debugTrace(DEBUG_sched,
-                               "worker thread %p has died unexpectedly", (void *)(size_t)t->id);
-                    cap->n_spare_workers--;
-                    if (!prev) {
-                        cap->spare_workers = t->next;
-                    } else {
-                        prev->next = t->next;
-                    }
-                    prev = t;
-                }
+        } else {
+            set_running_task(cap, task);
+            if (tryShutdownCapability(cap, task, safe)) {
+                break;
             }
         }
-
-        if (!emptyRunQueue(cap) || cap->spare_workers) {
-            debugTrace(DEBUG_sched,
-                       "runnable threads or workers still alive, yielding");
-            releaseCapability_(cap,false); // this will wake up a worker
-            RELEASE_LOCK(&cap->lock);
-            yieldThread();
-            continue;
-        }
-
-        // If "safe", then busy-wait for any threads currently doing
-        // foreign calls.  If we're about to unload this DLL, for
-        // example, we need to be sure that there are no OS threads
-        // that will try to return to code that has been unloaded.
-        // We can be a bit more relaxed when this is a standalone
-        // program that is about to terminate, and let safe=false.
-        if (cap->suspended_ccalls && safe) {
-            debugTrace(DEBUG_sched,
-                       "thread(s) are involved in foreign calls, yielding");
-            cap->running_task = NULL;
-            RELEASE_LOCK(&cap->lock);
-            // The IO manager thread might have been slow to start up,
-            // so the first attempt to kill it might not have
-            // succeeded.  Just in case, try again - the kill message
-            // will only be sent once.
-            //
-            // To reproduce this deadlock: run ffi002(threaded1)
-            // repeatedly on a loaded machine.
-            ioManagerDie();
-            yieldThread();
-            continue;
-        }
-
-        traceSparkCounters(cap);
-        RELEASE_LOCK(&cap->lock);
-        break;
     }
+
     // we now have the Capability, its run queue and spare workers
     // list are both empty.
 
