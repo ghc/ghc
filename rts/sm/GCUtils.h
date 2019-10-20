@@ -20,18 +20,22 @@
 bdescr* allocGroup_sync(uint32_t n);
 bdescr* allocGroupOnNode_sync(uint32_t node, uint32_t n);
 
+WARD_NEED(sharing_sm_lock)
 INLINE_HEADER bdescr *allocBlock_sync(void)
 {
     return allocGroup_sync(1);
 }
 
+WARD_NEED(sharing_sm_lock)
 INLINE_HEADER bdescr *allocBlockOnNode_sync(uint32_t node)
 {
     return allocGroupOnNode_sync(node,1);
 }
 
-void    freeChain_sync(bdescr *bd);
-void    freeGroup_sync(bdescr *bd);
+void    freeChain_sync(bdescr *bd)
+  WARD_NEED(sharing_sm_lock);
+void    freeGroup_sync(bdescr *bd)
+  WARD_NEED(sharing_sm_lock);
 
 void    push_scanned_block   (bdescr *bd, gen_workspace *ws);
 StgPtr  todo_block_full      (uint32_t size, gen_workspace *ws);
@@ -54,6 +58,7 @@ isPartiallyFull(bdescr *bd)
 // Version of recordMutableGen for use during GC.  This uses the
 // mutable lists attached to the current gc_thread structure, which
 // are the same as the mutable lists on the Capability.
+WARD_NEED(sharing_sm_lock)
 INLINE_HEADER void
 recordMutableGen_GC (StgClosure *p, uint32_t gen_no)
 {

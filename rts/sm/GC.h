@@ -19,7 +19,8 @@
 
 void GarbageCollect (uint32_t force_major_gc,
                      bool do_heap_census,
-                     uint32_t gc_type, Capability *cap, bool idle_cap[]);
+                     uint32_t gc_type, Capability *cap, bool idle_cap[])
+  WARD_NEED(may_take_sm_lock);
 
 typedef void (*evac_fn)(void *user, StgClosure **root);
 

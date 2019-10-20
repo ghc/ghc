@@ -30,32 +30,51 @@
 SpinLock gc_alloc_block_sync;
 #endif
 
+WARD_NEED(sharing_sm_lock)
+WARD_GRANT(gc_block_alloc_spin_held)
+WARD_GRANT(may_call_sm)
+static void ACQUIRE_ALLOC_SPIN_LOCK(void)
+{
+    ACQUIRE_SPIN_LOCK(&gc_alloc_block_sync);
+}
+
+WARD_NEED(sharing_sm_lock)
+WARD_NEED(gc_block_alloc_spin_held)
+WARD_REVOKE(gc_block_alloc_spin_held)
+WARD_NEED(may_call_sm)
+WARD_REVOKE(may_call_sm)
+static void RELEASE_ALLOC_SPIN_LOCK(void)
+{
+    RELEASE_SPIN_LOCK(&gc_alloc_block_sync);
+}
+
 bdescr* allocGroup_sync(uint32_t n)
 {
     bdescr *bd;
     uint32_t node = capNoToNumaNode(gct->thread_index);
-    ACQUIRE_SPIN_LOCK(&gc_alloc_block_sync);
+    ACQUIRE_ALLOC_SPIN_LOCK();
     bd = allocGroupOnNode(node,n);
-    RELEASE_SPIN_LOCK(&gc_alloc_block_sync);
+    RELEASE_ALLOC_SPIN_LOCK();
     return bd;
 }
 
 bdescr* allocGroupOnNode_sync(uint32_t node, uint32_t n)
 {
     bdescr *bd;
-    ACQUIRE_SPIN_LOCK(&gc_alloc_block_sync);
+    ACQUIRE_ALLOC_SPIN_LOCK();
     bd = allocGroupOnNode(node,n);
-    RELEASE_SPIN_LOCK(&gc_alloc_block_sync);
+    RELEASE_ALLOC_SPIN_LOCK();
     return bd;
 }
 
+WARD_NEED(sharing_sm_lock)
 static uint32_t
 allocBlocks_sync(uint32_t n, bdescr **hd)
 {
     bdescr *bd;
     uint32_t i;
     uint32_t node = capNoToNumaNode(gct->thread_index);
-    ACQUIRE_SPIN_LOCK(&gc_alloc_block_sync);
+    ACQUIRE_ALLOC_SPIN_LOCK();
     bd = allocLargeChunkOnNode(node,1,n);
     // NB. allocLargeChunk, rather than allocGroup(n), to allocate in a
     // fragmentation-friendly way.
@@ -68,7 +87,7 @@ allocBlocks_sync(uint32_t n, bdescr **hd)
     bd[n-1].link = NULL;
     // We have to hold the lock until we've finished fiddling with the metadata,
     // otherwise the block allocator can get confused.
-    RELEASE_SPIN_LOCK(&gc_alloc_block_sync);
+    RELEASE_ALLOC_SPIN_LOCK();
     *hd = bd;
     return n;
 }
@@ -76,17 +95,17 @@ allocBlocks_sync(uint32_t n, bdescr **hd)
 void
 freeChain_sync(bdescr *bd)
 {
-    ACQUIRE_SPIN_LOCK(&gc_alloc_block_sync);
+    ACQUIRE_ALLOC_SPIN_LOCK();
     freeChain(bd);
-    RELEASE_SPIN_LOCK(&gc_alloc_block_sync);
+    RELEASE_ALLOC_SPIN_LOCK();
 }
 
 void
 freeGroup_sync(bdescr *bd)
 {
-    ACQUIRE_SPIN_LOCK(&gc_alloc_block_sync);
+    ACQUIRE_ALLOC_SPIN_LOCK();
     freeGroup(bd);
-    RELEASE_SPIN_LOCK(&gc_alloc_block_sync);
+    RELEASE_ALLOC_SPIN_LOCK();
 }
 
 /* -----------------------------------------------------------------------------
