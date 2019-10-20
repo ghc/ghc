@@ -36,7 +36,7 @@ import FloatIn          ( floatInwards )
 import FloatOut         ( floatOutwards )
 import FamInstEnv
 import Id
-import ErrUtils         ( withTiming )
+import ErrUtils         ( withTiming, withTimingD )
 import BasicTypes       ( CompilerPhase(..), isDefaultInlinePragma, defaultInlinePragma )
 import VarSet
 import VarEnv
@@ -410,8 +410,9 @@ runCorePasses passes guts
   where
     do_pass guts CoreDoNothing = return guts
     do_pass guts (CoreDoPasses ps) = runCorePasses ps guts
-    do_pass guts pass
-       = withTiming getDynFlags
+    do_pass guts pass = do
+       dflags <- getDynFlags
+       withTiming dflags
                     (ppr pass <+> brackets (ppr mod))
                     (const ()) $ do
             { guts' <- lintAnnots (ppr pass) (doCorePass pass) guts
@@ -484,9 +485,8 @@ printCore dflags binds
 
 ruleCheckPass :: CompilerPhase -> String -> ModGuts -> CoreM ModGuts
 ruleCheckPass current_phase pat guts =
-    withTiming getDynFlags
-               (text "RuleCheck"<+>brackets (ppr $ mg_module guts))
-               (const ()) $ do
+    withTimingD (text "RuleCheck"<+>brackets (ppr $ mg_module guts))
+                (const ()) $ do
     { rb <- getRuleBase
     ; dflags <- getDynFlags
     ; vis_orphs <- getVisibleOrphanMods
@@ -564,7 +564,7 @@ simplifyExpr :: DynFlags -- includes spec of what core-to-core passes to do
 --
 -- Also used by Template Haskell
 simplifyExpr dflags expr
-  = withTiming (pure dflags) (text "Simplify [expr]") (const ()) $
+  = withTiming dflags (text "Simplify [expr]") (const ()) $
     do  {
         ; us <-  mkSplitUniqSupply 's'
 
