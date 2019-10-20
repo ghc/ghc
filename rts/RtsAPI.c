@@ -26,6 +26,7 @@
          however it is not unsafe (the constructor code will do it)
          just inefficient.
    ------------------------------------------------------------------------- */
+WARD_NEED(may_take_sm_lock)
 HaskellObj
 rts_mkChar (Capability *cap, HsChar c)
 {
@@ -35,6 +36,7 @@ rts_mkChar (Capability *cap, HsChar c)
   return p;
 }
 
+WARD_NEED(may_take_sm_lock)
 HaskellObj
 rts_mkInt (Capability *cap, HsInt i)
 {
@@ -44,6 +46,7 @@ rts_mkInt (Capability *cap, HsInt i)
   return p;
 }
 
+WARD_NEED(may_take_sm_lock)
 HaskellObj
 rts_mkInt8 (Capability *cap, HsInt8 i)
 {
@@ -54,6 +57,7 @@ rts_mkInt8 (Capability *cap, HsInt8 i)
   return p;
 }
 
+WARD_NEED(may_take_sm_lock)
 HaskellObj
 rts_mkInt16 (Capability *cap, HsInt16 i)
 {
@@ -64,6 +68,7 @@ rts_mkInt16 (Capability *cap, HsInt16 i)
   return p;
 }
 
+WARD_NEED(may_take_sm_lock)
 HaskellObj
 rts_mkInt32 (Capability *cap, HsInt32 i)
 {
@@ -73,6 +78,7 @@ rts_mkInt32 (Capability *cap, HsInt32 i)
   return p;
 }
 
+WARD_NEED(may_take_sm_lock)
 HaskellObj
 rts_mkInt64 (Capability *cap, HsInt64 i)
 {
@@ -82,6 +88,7 @@ rts_mkInt64 (Capability *cap, HsInt64 i)
   return p;
 }
 
+WARD_NEED(may_take_sm_lock)
 HaskellObj
 rts_mkWord (Capability *cap, HsWord i)
 {
@@ -91,6 +98,7 @@ rts_mkWord (Capability *cap, HsWord i)
   return p;
 }
 
+WARD_NEED(may_take_sm_lock)
 HaskellObj
 rts_mkWord8 (Capability *cap, HsWord8 w)
 {
@@ -101,6 +109,7 @@ rts_mkWord8 (Capability *cap, HsWord8 w)
   return p;
 }
 
+WARD_NEED(may_take_sm_lock)
 HaskellObj
 rts_mkWord16 (Capability *cap, HsWord16 w)
 {
@@ -111,6 +120,7 @@ rts_mkWord16 (Capability *cap, HsWord16 w)
   return p;
 }
 
+WARD_NEED(may_take_sm_lock)
 HaskellObj
 rts_mkWord32 (Capability *cap, HsWord32 w)
 {
@@ -121,6 +131,7 @@ rts_mkWord32 (Capability *cap, HsWord32 w)
   return p;
 }
 
+WARD_NEED(may_take_sm_lock)
 HaskellObj
 rts_mkWord64 (Capability *cap, HsWord64 w)
 {
@@ -132,6 +143,7 @@ rts_mkWord64 (Capability *cap, HsWord64 w)
 }
 
 
+WARD_NEED(may_take_sm_lock)
 HaskellObj
 rts_mkFloat (Capability *cap, HsFloat f)
 {
@@ -141,6 +153,7 @@ rts_mkFloat (Capability *cap, HsFloat f)
   return p;
 }
 
+WARD_NEED(may_take_sm_lock)
 HaskellObj
 rts_mkDouble (Capability *cap, HsDouble d)
 {
@@ -150,6 +163,7 @@ rts_mkDouble (Capability *cap, HsDouble d)
   return p;
 }
 
+WARD_NEED(may_take_sm_lock)
 HaskellObj
 rts_mkStablePtr (Capability *cap, HsStablePtr s)
 {
@@ -159,6 +173,7 @@ rts_mkStablePtr (Capability *cap, HsStablePtr s)
   return p;
 }
 
+WARD_NEED(may_take_sm_lock)
 HaskellObj
 rts_mkPtr (Capability *cap, HsPtr a)
 {
@@ -168,6 +183,7 @@ rts_mkPtr (Capability *cap, HsPtr a)
   return p;
 }
 
+WARD_NEED(may_take_sm_lock)
 HaskellObj
 rts_mkFunPtr (Capability *cap, HsFunPtr a)
 {
@@ -177,6 +193,7 @@ rts_mkFunPtr (Capability *cap, HsFunPtr a)
   return p;
 }
 
+WARD_NEED(may_take_sm_lock)
 HaskellObj
 rts_mkBool (Capability *cap STG_UNUSED, HsBool b)
 {
@@ -187,12 +204,14 @@ rts_mkBool (Capability *cap STG_UNUSED, HsBool b)
   }
 }
 
+WARD_NEED(may_take_sm_lock)
 HaskellObj
 rts_mkString (Capability *cap, char *s)
 {
   return rts_apply(cap, (StgClosure *)unpackCString_closure, rts_mkPtr(cap,s));
 }
 
+WARD_NEED(may_take_sm_lock)
 HaskellObj
 rts_apply (Capability *cap, HaskellObj f, HaskellObj arg)
 {
