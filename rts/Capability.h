@@ -386,6 +386,8 @@ void markCapabilities (evac_fn evac, void *user);
 
 void traverseSparkQueues (evac_fn evac, void *user);
 
+#define TASK_OWNS_CAPABILITY(task, cap) task_owns_capability
+
 WARD_GRANT(capability_lock_held)
 INLINE_HEADER void
 acquire_capability_lock(Capability *cap) {
