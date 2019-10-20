@@ -24,7 +24,7 @@
 
 void sendMessage(Capability *from_cap, Capability *to_cap, Message *msg)
 {
-    ACQUIRE_LOCK(&to_cap->lock);
+    acquire_capability_lock(to_cap);
 
 #if defined(DEBUG)
     {
@@ -53,7 +53,7 @@ void sendMessage(Capability *from_cap, Capability *to_cap, Message *msg)
         interruptCapability(to_cap);
     }
 
-    RELEASE_LOCK(&to_cap->lock);
+    release_capability_lock(to_cap);
 }
 
 #endif /* THREADED_RTS */

@@ -2489,13 +2489,13 @@ suspendThread (StgRegTable *reg, bool interruptible)
   // Otherwise allocate() will write to invalid memory.
   cap->r.rCurrentTSO = NULL;
 
-  ACQUIRE_LOCK(&cap->lock);
+  acquire_capability_lock(cap);
 
   suspendTask(cap,task);
   cap->in_haskell = false;
   releaseCapability_(cap,false);
 
-  RELEASE_LOCK(&cap->lock);
+  release_capability_lock(cap);
 
   errno = saved_errno;
 #if defined(mingw32_HOST_OS)
