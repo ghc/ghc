@@ -15,6 +15,7 @@
 #include "RaiseAsync.h"
 #include "Trace.h"
 #include "Threads.h"
+#include "sm/NonMovingMark.h"
 
 #include <string.h> // for memmove()
 
@@ -243,6 +244,9 @@ threadPaused(Capability *cap, StgTSO *tso)
 
             bh = ((StgUpdateFrame *)frame)->updatee;
             bh_info = bh->header.info;
+            IF_NONMOVING_WRITE_BARRIER_ENABLED {
+                updateRemembSetPushClosure(cap, (StgClosure *) bh);
+            }
 
 #if defined(THREADED_RTS)
         retry:
