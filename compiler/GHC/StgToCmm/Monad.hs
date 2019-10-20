@@ -150,10 +150,10 @@ initC  = do { uniqs <- mkSplitUniqSupply 'c'
 
 runC :: DynFlags -> Module -> CgState -> CgIfaceInfo -> FCode a -> (a,CgState)
 runC dflags mod st imported fcode
-  = doFCode fcode
-            (initCgInfoGlobal dflags mod imported)
-            (initCgInfoDown dflags)
-            st
+  = doFCode fcode cg_global cg_down st
+  where
+    !cg_global = initCgInfoGlobal dflags mod imported
+    !cg_down = initCgInfoDown dflags
 
 fixC :: (a -> FCode a) -> FCode a
 fixC fcode = FCode $
@@ -428,7 +428,7 @@ getState :: FCode CgState
 getState = FCode $ \_globals _info_down state -> (state, state)
 
 setState :: CgState -> FCode ()
-setState state = FCode $ \_globals _info_down _ -> ((), state)
+setState !state = FCode $ \_globals _info_down _ -> ((), state)
 
 getHpUsage :: FCode HeapUsage
 getHpUsage = do
@@ -461,7 +461,7 @@ getBinds = do
         return $ cgs_binds state
 
 setBinds :: CgBindings -> FCode ()
-setBinds new_binds = do
+setBinds !new_binds = do
         state <- getState
         setState $ state {cgs_binds = new_binds}
 
