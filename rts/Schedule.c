@@ -1756,7 +1756,6 @@ scheduleDoGC (Capability **pcap, Task *task USED_IF_THREADS,
 
     IF_DEBUG(scheduler, printAllThreads());
 
-#if 0
 delete_threads_and_gc:
     /*
      * We now have all the capabilities; if we're in an interrupting
@@ -1897,7 +1896,7 @@ delete_threads_and_gc:
         releaseGCThreads(cap, idle_cap);
     }
 #endif
-#endif
+
     if (heap_overflow && sched_state == SCHED_RUNNING) {
         // GC set the heap_overflow flag.  We should throw an exception if we
         // can, or shut down otherwise.
@@ -2422,13 +2421,13 @@ suspendThread (StgRegTable *reg, bool interruptible)
   // Otherwise allocate() will write to invalid memory.
   cap->r.rCurrentTSO = NULL;
 
-  ACQUIRE_LOCK(&cap->lock);
+  acquire_capability_lock(cap);
 
   suspendTask(cap,task);
   cap->in_haskell = false;
   releaseCapability_(cap,false);
 
-  RELEASE_LOCK(&cap->lock);
+  release_capability_lock(cap);
 
   errno = saved_errno;
 #if defined(mingw32_HOST_OS)

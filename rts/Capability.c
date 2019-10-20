@@ -504,18 +504,19 @@ giveCapabilityToTask (Capability *cap USED_IF_DEBUG, Task *task)
  * ------------------------------------------------------------------------- */
 
 #if defined(THREADED_RTS)
+WARD_NEED(capability_lock_held)
 void
 releaseCapability_ (Capability* cap,
                     bool always_wakeup)
 {
     Task *task;
 
-    task = cap->running_task;
+    task = get_running_task(cap);
 
     ASSERT_PARTIAL_CAPABILITY_INVARIANTS(cap,task);
     ASSERT_RETURNING_TASKS(cap,task);
 
-    cap->running_task = NULL;
+    set_running_task(cap);
 
     // Check to see whether a worker thread can be given
     // the go-ahead to return the result of an external call..
@@ -965,12 +966,12 @@ yieldCapability (Capability** pCap, Task *task, bool gcAllowed)
 void
 prodCapability (Capability *cap, Task *task)
 {
-    ACQUIRE_LOCK(&cap->lock);
-    if (!cap->running_task) {
-        cap->running_task = task;
+    acquire_capability_lock(cap);
+    if (get_running_task(cap) == NULL) {
+        set_running_task(cap, task);
         releaseCapability_(cap,true);
     }
-    RELEASE_LOCK(&cap->lock);
+    release_capability_lock(cap);
 }
 
 #endif /* THREADED_RTS */
