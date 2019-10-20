@@ -188,6 +188,7 @@ static void deleteThread_(StgTSO *tso);
 
    ------------------------------------------------------------------------ */
 
+WARD_NEED(may_take_sm_lock)
 static Capability *
 schedule (Capability *initialCapability, Task *task)
 {
@@ -623,6 +624,7 @@ promoteInRunQueue (Capability *cap, StgTSO *tso)
  * Search for work to do, and handle messages from elsewhere.
  * -------------------------------------------------------------------------- */
 
+WARD_NEED(may_take_sm_lock)
 static void
 scheduleFindWork (Capability **pcap)
 {
@@ -725,6 +727,7 @@ scheduleYield (Capability **pcap, Task *task)
  * Push work to other Capabilities if we have some.
  * -------------------------------------------------------------------------- */
 
+WARD_NEED(may_take_sm_lock)
 static void
 schedulePushWork(Capability *cap USED_IF_THREADS,
                  Task *task      USED_IF_THREADS)
@@ -925,6 +928,7 @@ scheduleCheckBlockedThreads(Capability *cap USED_IF_NOT_THREADS)
  * Detect deadlock conditions and attempt to resolve them.
  * ------------------------------------------------------------------------- */
 
+WARD_NEED(may_take_sm_lock)
 static void
 scheduleDetectDeadlock (Capability **pcap, Task *task)
 {
@@ -991,6 +995,7 @@ scheduleDetectDeadlock (Capability **pcap, Task *task)
  * Process message in the current Capability's inbox
  * ------------------------------------------------------------------------- */
 
+WARD_NEED(may_take_sm_lock)
 static void
 scheduleProcessInbox (Capability **pcap USED_IF_THREADS)
 {
@@ -1066,6 +1071,7 @@ scheduleActivateSpark(Capability *cap)
  * After running a thread...
  * ------------------------------------------------------------------------- */
 
+WARD_NEED(may_take_sm_lock)
 static void
 schedulePostRunThread (Capability *cap, StgTSO *t)
 {
@@ -1116,6 +1122,7 @@ schedulePostRunThread (Capability *cap, StgTSO *t)
  * Handle a thread that returned to the scheduler with ThreadHeapOverflow
  * -------------------------------------------------------------------------- */
 
+WARD_NEED(may_take_sm_lock)
 static bool
 scheduleHandleHeapOverflow( Capability *cap, StgTSO *t )
 {
@@ -1199,6 +1206,7 @@ scheduleHandleHeapOverflow( Capability *cap, StgTSO *t )
  * Handle a thread that returned to the scheduler with ThreadYielding
  * -------------------------------------------------------------------------- */
 
+WARD_NEED(may_take_sm_lock)
 static bool
 scheduleHandleYield( Capability *cap, StgTSO *t, uint32_t prev_what_next )
 {
@@ -1270,6 +1278,7 @@ scheduleHandleThreadBlocked( StgTSO *t
  * Handle a thread that returned to the scheduler with ThreadFinished
  * -------------------------------------------------------------------------- */
 
+WARD_NEED(may_take_sm_lock)
 static bool
 scheduleHandleThreadFinished (Capability *cap, Task *task, StgTSO *t)
 {
@@ -2349,6 +2358,7 @@ setNumCapabilities (uint32_t new_n_capabilities USED_IF_THREADS)
  * Delete all the threads in the system
  * ------------------------------------------------------------------------- */
 
+WARD_NEED(may_take_sm_lock)
 static void
 deleteAllThreads ()
 {
@@ -2816,6 +2826,7 @@ void markScheduler (evac_fn evac USED_IF_NOT_THREADS,
    collect when called from Haskell via _ccall_GC.
    -------------------------------------------------------------------------- */
 
+WARD_NEED(may_take_sm_lock)
 static void
 performGC_(bool force_major)
 {
@@ -2894,6 +2905,7 @@ void wakeUpRts(void)
    exception.
    -------------------------------------------------------------------------- */
 
+WARD_NEED(may_take_sm_lock)
 static void
 deleteThread (StgTSO *tso)
 {
@@ -2909,6 +2921,7 @@ deleteThread (StgTSO *tso)
 }
 
 #if defined(FORKPROCESS_PRIMOP_SUPPORTED)
+WARD_NEED(may_take_sm_lock)
 static void
 deleteThread_(StgTSO *tso)
 { // for forkProcess only:
@@ -3227,6 +3240,7 @@ findAtomicallyFrameHelper (Capability *cap, StgTSO *tso)
    Locks: assumes we hold *all* the capabilities.
    -------------------------------------------------------------------------- */
 
+WARD_NEED(may_take_sm_lock)
 void
 resurrectThreads (StgTSO *threads)
 {

@@ -51,6 +51,7 @@ static void throwToSendMsg (Capability *cap USED_IF_THREADS,
    has been raised.
    -------------------------------------------------------------------------- */
 
+WARD_NEED(may_take_sm_lock)
 static void
 throwToSingleThreaded__ (Capability *cap, StgTSO *tso, StgClosure *exception,
                          bool stop_at_atomically, StgUpdateFrame *stop_here)
@@ -493,6 +494,7 @@ check_target:
     barf("throwTo");
 }
 
+WARD_NEED(may_take_sm_lock)
 static void
 throwToSendMsg (Capability *cap STG_UNUSED,
                 Capability *target_cap USED_IF_THREADS,
@@ -509,6 +511,7 @@ throwToSendMsg (Capability *cap STG_UNUSED,
 // Block a throwTo message on the target TSO's blocked_exceptions
 // queue.  The current Capability must own the target TSO in order to
 // modify the blocked_exceptions queue.
+WARD_NEED(may_take_sm_lock)
 void
 blockedThrowTo (Capability *cap, StgTSO *target, MessageThrowTo *msg)
 {
@@ -769,6 +772,7 @@ removeFromQueues(Capability *cap, StgTSO *tso)
  *
  * -------------------------------------------------------------------------- */
 
+WARD_NEED(may_take_sm_lock)
 StgTSO *
 raiseAsync(Capability *cap, StgTSO *tso, StgClosure *exception,
            bool stop_at_atomically, StgUpdateFrame *stop_here)

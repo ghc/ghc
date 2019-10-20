@@ -512,6 +512,7 @@ void listAllBlocks (ListBlocksCb cb, void *user)
 
    -------------------------------------------------------------------------- */
 
+WARD_NEED(may_take_sm_lock)
 static StgInd *
 lockCAF (StgRegTable *reg, StgIndStatic *caf)
 {
@@ -584,6 +585,7 @@ lockCAF (StgRegTable *reg, StgIndStatic *caf)
     return bh;
 }
 
+WARD_NEED(may_take_sm_lock)
 StgInd *
 newCAF(StgRegTable *reg, StgIndStatic *caf)
 {
@@ -663,6 +665,7 @@ setHighMemDynamic (void)
 // The linker hackily arranges that references to newCAF from dynamic
 // code end up pointing to newRetainedCAF.
 //
+WARD_NEED(may_take_sm_lock)
 StgInd* newRetainedCAF (StgRegTable *reg, StgIndStatic *caf)
 {
     StgInd *bh;
@@ -691,6 +694,7 @@ StgInd* newRetainedCAF (StgRegTable *reg, StgIndStatic *caf)
 // So for this case, we set keepCAFs to true, and link newCAF to newGCdCAF
 // for dynamically-linked code.
 //
+WARD_NEED(may_take_sm_lock)
 StgInd* newGCdCAF (StgRegTable *reg, StgIndStatic *caf)
 {
     StgInd *bh;
@@ -792,6 +796,7 @@ assignNurseriesToCapabilities (uint32_t from, uint32_t to)
     }
 }
 
+WARD_NEED(may_call_sm)
 static void
 allocNurseries (uint32_t from, uint32_t to)
 {
@@ -1066,6 +1071,7 @@ accountAllocation(Capability *cap, W_ n)
  * Allocate some n words of heap memory; terminating
  * on heap overflow
  */
+WARD_NEED(may_take_sm_lock)
 StgPtr
 allocate (Capability *cap, W_ n)
 {
@@ -1087,6 +1093,7 @@ allocate (Capability *cap, W_ n)
  * Allocate some n words of heap memory; returning NULL
  * on heap overflow
  */
+WARD_NEED(may_take_sm_lock)
 StgPtr
 allocateMightFail (Capability *cap, W_ n)
 {
@@ -1237,6 +1244,7 @@ allocateMightFail (Capability *cap, W_ n)
    this returns NULL on heap overflow.
    ------------------------------------------------------------------------- */
 
+WARD_NEED(may_take_sm_lock)
 StgPtr
 allocatePinned (Capability *cap, W_ n /*words*/, W_ alignment /*bytes*/, W_ align_off /*bytes*/)
 {
@@ -1405,7 +1413,6 @@ allocatePinned (Capability *cap, W_ n /*words*/, W_ alignment /*bytes*/, W_ alig
    stg_MUT_VAR_CLEAN comparison.
 */
 WARD_NEED(may_take_sm_lock)
-WARD_NEED(may_call_sm)
 void
 dirty_MUT_VAR(StgRegTable *reg, StgMutVar *mvar, StgClosure *old)
 {
@@ -1431,7 +1438,6 @@ dirty_MUT_VAR(StgRegTable *reg, StgMutVar *mvar, StgClosure *old)
  * pointer argument.
  */
 WARD_NEED(may_take_sm_lock)
-WARD_NEED(may_call_sm)
 void
 dirty_TVAR(Capability *cap, StgTVar *p,
            StgClosure *old)
@@ -1454,7 +1460,6 @@ dirty_TVAR(Capability *cap, StgTVar *p,
 //    * setting the link field of the currently running TSO, as it
 //      will already be dirty.
 WARD_NEED(may_take_sm_lock)
-WARD_NEED(may_call_sm)
 void
 setTSOLink (Capability *cap, StgTSO *tso, StgTSO *target)
 {
@@ -1469,7 +1474,6 @@ setTSOLink (Capability *cap, StgTSO *tso, StgTSO *target)
 }
 
 WARD_NEED(may_take_sm_lock)
-WARD_NEED(may_call_sm)
 void
 setTSOPrev (Capability *cap, StgTSO *tso, StgTSO *target)
 {
@@ -1484,7 +1488,6 @@ setTSOPrev (Capability *cap, StgTSO *tso, StgTSO *target)
 }
 
 WARD_NEED(may_take_sm_lock)
-WARD_NEED(may_call_sm)
 void
 dirty_TSO (Capability *cap, StgTSO *tso)
 {
@@ -1499,7 +1502,6 @@ dirty_TSO (Capability *cap, StgTSO *tso)
 }
 
 WARD_NEED(may_take_sm_lock)
-WARD_NEED(may_call_sm)
 void
 dirty_STACK (Capability *cap, StgStack *stack)
 {
@@ -1549,7 +1551,6 @@ update_MVAR(StgRegTable *reg, StgClosure *p, StgClosure *old_val)
    such as Chaneneos and cheap-concurrency.
 */
 WARD_NEED(may_take_sm_lock)
-WARD_NEED(may_call_sm)
 void
 dirty_MVAR(StgRegTable *reg, StgClosure *p, StgClosure *old_val)
 {

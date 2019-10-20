@@ -1416,7 +1416,9 @@ WARD_GRANT(sharing_sm_lock)
 static void enter_gc_thread(void) {}
 
 WARD_REVOKE(may_call_sm)
+WARD_NEED(may_call_sm)
 WARD_REVOKE(sharing_sm_lock)
+WARD_NEED(sharing_sm_lock)
 static void leave_gc_thread(void) {}
 
 void
