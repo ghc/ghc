@@ -1157,10 +1157,19 @@ loop:
 
 #if defined(THREADED_RTS)
 
+WARD_GRANT(may_call_sm)
+WARD_GRANT(sharing_sm_lock)
+static void enter_gc_thread(void) {}
+
+WARD_REVOKE(may_call_sm)
+WARD_REVOKE(sharing_sm_lock)
+static void leave_gc_thread(void) {}
+
 void
 gcWorkerThread (Capability *cap)
 {
     gc_thread *saved_gct;
+    enter_gc_thread();
 
     // necessary if we stole a callee-saves register for gct:
     saved_gct = gct;
@@ -1209,6 +1218,7 @@ gcWorkerThread (Capability *cap)
     debugTrace(DEBUG_gc, "GC thread %d on my way...", gct->thread_index);
 
     SET_GCT(saved_gct);
+    leave_gc_thread();
 }
 
 #endif

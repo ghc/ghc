@@ -1082,6 +1082,8 @@ allocatePinned (Capability *cap, W_ n)
    is.  When written to, a MUT_VAR_CLEAN turns into a MUT_VAR_DIRTY
    and is put on the mutable list.
 */
+WARD_NEED(may_take_sm_lock)
+WARD_NEED(may_call_sm)
 void
 dirty_MUT_VAR(StgRegTable *reg, StgClosure *p)
 {
@@ -1094,6 +1096,8 @@ dirty_MUT_VAR(StgRegTable *reg, StgClosure *p)
     }
 }
 
+WARD_NEED(may_take_sm_lock)
+WARD_NEED(may_call_sm)
 void
 dirty_TVAR(Capability *cap, StgTVar *p)
 {
@@ -1110,6 +1114,8 @@ dirty_TVAR(Capability *cap, StgTVar *p)
 //    * setting the link field to END_TSO_QUEUE
 //    * setting the link field of the currently running TSO, as it
 //      will already be dirty.
+WARD_NEED(may_take_sm_lock)
+WARD_NEED(may_call_sm)
 void
 setTSOLink (Capability *cap, StgTSO *tso, StgTSO *target)
 {
@@ -1120,6 +1126,8 @@ setTSOLink (Capability *cap, StgTSO *tso, StgTSO *target)
     tso->_link = target;
 }
 
+WARD_NEED(may_take_sm_lock)
+WARD_NEED(may_call_sm)
 void
 setTSOPrev (Capability *cap, StgTSO *tso, StgTSO *target)
 {
@@ -1130,6 +1138,8 @@ setTSOPrev (Capability *cap, StgTSO *tso, StgTSO *target)
     tso->block_info.prev = target;
 }
 
+WARD_NEED(may_take_sm_lock)
+WARD_NEED(may_call_sm)
 void
 dirty_TSO (Capability *cap, StgTSO *tso)
 {
@@ -1139,6 +1149,8 @@ dirty_TSO (Capability *cap, StgTSO *tso)
     }
 }
 
+WARD_NEED(may_take_sm_lock)
+WARD_NEED(may_call_sm)
 void
 dirty_STACK (Capability *cap, StgStack *stack)
 {
@@ -1156,6 +1168,8 @@ dirty_STACK (Capability *cap, StgStack *stack)
    this really does make a difference on concurrency-heavy benchmarks
    such as Chaneneos and cheap-concurrency.
 */
+WARD_NEED(may_take_sm_lock)
+WARD_NEED(may_call_sm)
 void
 dirty_MVAR(StgRegTable *reg, StgClosure *p)
 {
