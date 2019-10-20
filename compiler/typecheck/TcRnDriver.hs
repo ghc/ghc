@@ -165,7 +165,7 @@ tcRnModule :: HscEnv
 tcRnModule hsc_env mod_sum save_rn_syntax
    parsedModule@HsParsedModule {hpm_module= (dL->L loc this_module)}
  | RealSrcSpan real_loc <- loc
- = withTiming (pure dflags)
+ = withTiming dflags
               (text "Renamer/typechecker"<+>brackets (ppr this_mod))
               (const ()) $
    initTc hsc_env hsc_src save_rn_syntax this_mod real_loc $

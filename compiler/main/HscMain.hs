@@ -331,9 +331,8 @@ hscParse' :: ModSummary -> Hsc HsParsedModule
 hscParse' mod_summary
  | Just r <- ms_parsed_mod mod_summary = return r
  | otherwise = {-# SCC "Parser" #-}
-    withTiming getDynFlags
-               (text "Parser"<+>brackets (ppr $ ms_mod mod_summary))
-               (const ()) $ do
+    withTimingD (text "Parser"<+>brackets (ppr $ ms_mod mod_summary))
+                (const ()) $ do
     dflags <- getDynFlags
     let src_filename  = ms_hspp_file mod_summary
         maybe_src_buf = ms_hspp_buf  mod_summary
@@ -1454,7 +1453,7 @@ hscGenHardCode hsc_env cgguts mod_summary output_filename = do
         -- top-level function, so showPass isn't very useful here.
         -- Hence we have one showPass for the whole backend, the
         -- next showPass after this will be "Assembler".
-        withTiming (pure dflags)
+        withTiming dflags
                    (text "CodeGen"<+>brackets (ppr this_mod))
                    (const ()) $ do
             cmms <- {-# SCC "StgToCmm" #-}
@@ -1851,7 +1850,7 @@ hscParseThing = hscParseThingWithLocation "<interactive>" 1
 hscParseThingWithLocation :: (Outputable thing, Data thing) => String -> Int
                           -> Lexer.P thing -> String -> Hsc thing
 hscParseThingWithLocation source linenumber parser str
-  = withTiming getDynFlags
+  = withTimingD
                (text "Parser [source]")
                (const ()) $ {-# SCC "Parser" #-} do
     dflags <- getDynFlags

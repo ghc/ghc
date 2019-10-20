@@ -469,7 +469,7 @@ listPackageConfigMap dflags = eltsUDFM pkg_map
 -- 'pkgState' in 'DynFlags' and return a list of packages to
 -- link in.
 initPackages :: DynFlags -> IO (DynFlags, [PreloadUnitId])
-initPackages dflags0 = withTiming (return dflags0)
+initPackages dflags0 = withTiming dflags0
                                   (text "initializing package database")
                                   forcePkgDb $ do
   dflags <- interpretPackageEnv dflags0
