@@ -78,9 +78,7 @@ typedef enum { WeakPtrs, WeakThreads, WeakDone } WeakStage;
 static WeakStage weak_stage;
 
 static void    collectDeadWeakPtrs (generation *gen, StgWeak **dead_weak_ptr_list);
-static bool tidyWeakList (generation *gen)
-  WARD_NEED(sharing_sm_lock)
-  WARD_NEED(may_call_sm);
+static bool tidyWeakList (generation *gen);
 static bool resurrectUnreachableThreads (generation *gen, StgTSO **resurrected_threads);
 static void    tidyThreadList (generation *gen);
 
@@ -227,6 +225,7 @@ static bool resurrectUnreachableThreads (generation *gen, StgTSO **resurrected_t
     return flag;
 }
 
+WARD_NEED(sharing_sm_lock)
 static bool tidyWeakList(generation *gen)
 {
     StgWeak *w, **last_w, *next_w;
