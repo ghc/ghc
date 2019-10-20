@@ -589,6 +589,7 @@ static void remove_watch_queue_entries_for_trec(Capability *cap,
 
 /*......................................................................*/
 
+WARD_NEED(may_take_sm_lock)
 static TRecEntry *get_new_entry(Capability *cap,
                                 StgTRecHeader *t) {
   TRecEntry *result;
@@ -654,6 +655,7 @@ static void merge_update_into(Capability *cap,
 
 /*......................................................................*/
 
+WARD_NEED(may_take_sm_lock)
 static void merge_read_into(Capability *cap,
                             StgTRecHeader *trec,
                             StgTVar *tvar,
@@ -931,6 +933,7 @@ static void getToken(Capability *cap STG_UNUSED) {
 
 /*......................................................................*/
 
+WARD_NEED(may_take_sm_lock)
 StgTRecHeader *stmStartTransaction(Capability *cap,
                                    StgTRecHeader *outer) {
   StgTRecHeader *t;
@@ -947,6 +950,7 @@ StgTRecHeader *stmStartTransaction(Capability *cap,
 
 /*......................................................................*/
 
+WARD_NEED(may_take_sm_lock)
 void stmAbortTransaction(Capability *cap,
                          StgTRecHeader *trec) {
   StgTRecHeader *et;
@@ -1002,6 +1006,7 @@ void stmFreeAbortedTRec(Capability *cap,
 
 /*......................................................................*/
 
+WARD_NEED(may_take_sm_lock)
 void stmCondemnTransaction(Capability *cap,
                            StgTRecHeader *trec) {
   TRACE("%p : stmCondemnTransaction", trec);
@@ -1024,6 +1029,7 @@ void stmCondemnTransaction(Capability *cap,
 
 /*......................................................................*/
 
+WARD_NEED(may_take_sm_lock)
 StgBool stmValidateNestOfTransactions(Capability *cap, StgTRecHeader *trec) {
   StgTRecHeader *t;
 
@@ -1153,6 +1159,7 @@ StgBool stmCommitTransaction(Capability *cap, StgTRecHeader *trec) {
 
 /*......................................................................*/
 
+WARD_NEED(may_take_sm_lock)
 StgBool stmCommitNestedTransaction(Capability *cap, StgTRecHeader *trec) {
   StgTRecHeader *et;
   ASSERT(trec != NO_TREC && trec -> enclosing_trec != NO_TREC);
@@ -1204,6 +1211,7 @@ StgBool stmCommitNestedTransaction(Capability *cap, StgTRecHeader *trec) {
 
 /*......................................................................*/
 
+WARD_NEED(may_take_sm_lock)
 StgBool stmWait(Capability *cap, StgTSO *tso, StgTRecHeader *trec) {
   TRACE("%p : stmWait(%p)", trec, tso);
   ASSERT(trec != NO_TREC);
@@ -1243,6 +1251,7 @@ StgBool stmWait(Capability *cap, StgTSO *tso, StgTRecHeader *trec) {
 }
 
 
+WARD_NEED(may_take_sm_lock)
 void
 stmWaitUnlock(Capability *cap, StgTRecHeader *trec) {
     revert_ownership(cap, trec, true);
@@ -1251,6 +1260,7 @@ stmWaitUnlock(Capability *cap, StgTRecHeader *trec) {
 
 /*......................................................................*/
 
+WARD_NEED(may_take_sm_lock)
 StgBool stmReWait(Capability *cap, StgTSO *tso) {
   StgTRecHeader *trec = tso->trec;
 
@@ -1302,6 +1312,7 @@ static StgClosure *read_current_value(StgTRecHeader *trec STG_UNUSED, StgTVar *t
 
 /*......................................................................*/
 
+WARD_NEED(may_take_sm_lock)
 StgClosure *stmReadTVar(Capability *cap,
                         StgTRecHeader *trec,
                         StgTVar *tvar) {
@@ -1343,6 +1354,7 @@ StgClosure *stmReadTVar(Capability *cap,
 
 /*......................................................................*/
 
+WARD_NEED(may_take_sm_lock)
 void stmWriteTVar(Capability *cap,
                   StgTRecHeader *trec,
                   StgTVar *tvar,
