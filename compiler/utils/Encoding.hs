@@ -13,7 +13,8 @@
 
 module Encoding (
         -- * UTF-8
-        utf8DecodeChar#,
+        utf8DecodeCharArr#,
+        utf8DecodeCharAddr#,
         utf8PrevChar,
         utf8CharStart,
         utf8DecodeChar,
@@ -62,9 +63,9 @@ import GHC.Exts
 -- To make this safe, we add extra sentinel bytes to unparsed UTF-8 sequences
 -- before decoding them (see StringBuffer.hs).
 
-{-# INLINE utf8DecodeChar# #-}
-utf8DecodeChar# :: (Int# -> Word#) -> (# Char#, Int# #)
-utf8DecodeChar# indexWord8# =
+{-# INLINE utf8DecodeCharX# #-}
+utf8DecodeCharX# :: (Int# -> Word#) -> (# Char#, Int# #)
+utf8DecodeCharX# indexWord8# =
   let !ch0 = word2Int# (indexWord8# 0#) in
   case () of
     _ | isTrue# (ch0 <=# 0x7F#) -> (# chr# ch0, 1# #)
@@ -109,9 +110,24 @@ utf8DecodeChar# indexWord8# =
         -- confusing parse error later on.  Instead we use '\0' which
         -- will signal a lexer error immediately.
 
+
+-- | Wrapper for things with a fixed addr, making use of utf8DecodeCharX#
+utf8DecodeCharAddr# :: Addr# -> Int# -> (# Char#, Int# #)
+utf8DecodeCharAddr# addr# off =
+  utf8DecodeCharX# (indexWord8OffAddr# (addr# `plusAddr#` off))
+{-# NOINLINE[0] utf8DecodeCharAddr# #-}
+{-# NOINLINE[0] utf8DecodeCharArr# #-}
+
+
+-- | Wrapper for unpinned things, making use of utf8DecodeCharX#
+utf8DecodeCharArr# :: ByteArray# -> Int# -> (# Char#, Int# #)
+utf8DecodeCharArr# arr byteOffset =
+  utf8DecodeCharX# (\j -> indexWord8Array# arr (j +# byteOffset))
+
+
 utf8DecodeChar :: Ptr Word8 -> (Char, Int)
 utf8DecodeChar (Ptr a#) =
-  case utf8DecodeChar# (indexWord8OffAddr# a#) of
+  case utf8DecodeCharAddr# a# 0# of
     (# c#, nBytes# #) -> ( C# c#, I# nBytes# )
 
 -- UTF-8 is cleverly designed so that we can always figure out where
@@ -133,25 +149,23 @@ utf8DecodeByteString (BS.PS fptr offset (I# len#))
   = unsafeDupablePerformIO $ do
     withForeignPtr fptr $ \ptr ->
       let addr# = unPtr (ptr `plusPtr` offset)
-          index# = indexWord8OffAddr# addr# in
-      utf8DecodeLazy# (touchForeignPtr fptr) index# len#
+      in utf8DecodeLazy# (touchForeignPtr fptr) (utf8DecodeCharAddr# addr#) len#
 
 utf8DecodeShortByteString :: ShortByteString -> [Char]
 utf8DecodeShortByteString (SBS ba#)
-  = unsafeDupablePerformIO $ utf8DecodeLazy# (return ()) index# len#
+  = unsafeDupablePerformIO $ utf8DecodeLazy# (return ()) (utf8DecodeCharArr# ba#) len#
   where
-    index# = indexWord8Array# ba#
     len# = sizeofByteArray# ba#
 
 {-# INLINE utf8DecodeLazy# #-}
-utf8DecodeLazy# :: (IO ()) -> (Int# -> Word#) -> Int# -> IO [Char]
+utf8DecodeLazy# :: (IO ()) -> (Int# -> (# Char#, Int# #)) -> Int# -> IO [Char]
 utf8DecodeLazy# retain indexWord8# len#
   = unpack 0#
   where
     unpack i#
         | isTrue# (i# >=# len#) = retain >> return []
         | otherwise =
-            case utf8DecodeChar# (\j# -> indexWord8# (i# +# j#)) of
+            case indexWord8# i# of
               (# c#, nBytes# #) -> do
                 rest <- unsafeDupableInterleaveIO $ unpack (i# +# nBytes#)
                 return (C# c# : rest)
@@ -160,8 +174,7 @@ utf8DecodeStringLazy :: ForeignPtr Word8 -> Int -> Int -> [Char]
 utf8DecodeStringLazy fp offset (I# len#)
   = unsafeDupablePerformIO $ withForeignPtr fp $ \ptr ->
       let ptr# = unPtr (ptr `plusPtr` offset)
-          index# = indexWord8OffAddr# ptr# in
-      utf8DecodeLazy# (touchForeignPtr fp) index# len#
+      in utf8DecodeLazy# (touchForeignPtr fp) (utf8DecodeCharAddr# ptr#) len#
 
 countUTF8Chars :: ShortByteString -> IO Int
 countUTF8Chars (SBS ba) = go 0# 0#
@@ -171,7 +184,7 @@ countUTF8Chars (SBS ba) = go 0# 0#
       | isTrue# (i# >=# len#) =
           return (I# n#)
       | otherwise = do
-          case utf8DecodeChar# (\j# -> indexWord8Array# ba (i# +# j#)) of
+          case utf8DecodeCharArr# ba i#  of
             (# _, nBytes# #) -> go (i# +# nBytes#) (n# +# 1#)
 
 unPtr :: Ptr a -> Addr#
