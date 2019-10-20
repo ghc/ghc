@@ -22,10 +22,10 @@
 
 /* select and supporting types is not Posix */
 /* #include "PosixSource.h" */
+#include "Rts.h"
 #include <limits.h>
 #include <stdbool.h>
 #include "HsBase.h"
-#include "Rts.h"
 #if !defined(_WIN32)
 #include <poll.h>
 #endif

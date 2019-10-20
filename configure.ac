@@ -329,7 +329,7 @@ then
     if test "$HostArch" = "i386"
     then
         mingw_arch="i686"
-        tarball_dest_dir="mingw-w64/x86"
+        tarball_dest_dir="mingw-w64/i686"
         tarball_mingw_dir="mingw32"
     else
         mingw_arch="x86_64"

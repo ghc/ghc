@@ -16,6 +16,12 @@
 extern "C" {
 #endif
 
+/* get types from GHC's runtime system */
+#include "ghcconfig.h"
+/* We have to include Types.h before everything else as this defines some
+   macros that will change the behaviour of system headers.  */
+#include "stg/Types.h"
+
 /* We include windows.h very early, as on Win64 the CONTEXT type has
    fields "R8", "R9" and "R10", which goes bad if we've already
    #define'd those names for our own purposes (in stg/Regs.h) */

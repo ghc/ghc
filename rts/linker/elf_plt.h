@@ -1,9 +1,9 @@
 #pragma once
 
+#if defined(arm_HOST_ARCH) || defined(aarch64_HOST_ARCH)
+
 #include "ghcplatform.h"
 #include <LinkerInternals.h>
-
-#if defined(arm_HOST_ARCH) || defined(aarch64_HOST_ARCH)
 
 #include "elf_plt_arm.h"
 #include "elf_plt_aarch64.h"
