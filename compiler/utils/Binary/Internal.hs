@@ -42,6 +42,7 @@ module Binary.Internal (
   putByte, getByte,
 
   putByteString, getByteString,
+  putFS, getFS,
   putAFastString, getAFastString,
 
   putNonBindingName, putBindingName,
@@ -189,12 +190,10 @@ getInt64 = getSLEB128
 -- -----------------------------------------------------------------------------
 
 putBin :: Bin a -> Put ()
-putBin (BinPtr !p) = putInt p
+putBin (BinPtr !p) = putWord32 (fromIntegral p :: Word32)
 
 getBin :: Get (Bin a)
-getBin = do
-  p <- getInt
-  return . BinPtr $ fromIntegral p
+getBin = BinPtr . fromIntegral <$> getWord32
 
 -- -----------------------------------------------------------------------------
 -- ByteString
@@ -221,10 +220,18 @@ getByteString = do
 -- -----------------------------------------------------------------------------
 
 putAFastString :: FastString -> Put ()
-putAFastString fs = put_fs <$> userDataP >>= ($ fs)
+putAFastString fs = put_fs <$!> userDataP >>= ($! fs)
 
 getAFastString :: Get FastString
 getAFastString = get_fs =<< userDataG
+
+putFS :: FastString -> Put ()
+putFS = putByteString . bytesFS
+
+getFS :: Get FastString
+getFS = do
+  l <- getInt
+  getPrim l (\src -> pure $! mkFastStringBytes src l)
 
 putNonBindingName :: Name -> Put ()
 putNonBindingName n = put_nonbinding_name <$> userDataP >>= ($ n)
@@ -353,9 +360,9 @@ putInt i = putSLEB128 (fromIntegral i :: Int64)
 getInt :: Get Int
 getInt = (fromIntegral $!) <$> (getSLEB128 :: Get Int64)
 
----------------------------------------------------------
+--------------------------------------------------------------------------------
 -- The Dictionary
----------------------------------------------------------
+--------------------------------------------------------------------------------
 
 type Dictionary = Array Int FastString -- The dictionary
                                        -- Should be 0-indexed
@@ -363,19 +370,19 @@ type Dictionary = Array Int FastString -- The dictionary
 putDictionary :: Int -> UniqFM (Int,FastString) -> Put ()
 putDictionary sz dict = do
   putInt sz
-  mapM_ putAFastString (elems (array (0,sz-1) (nonDetEltsUFM dict)))
+  mapM_ putFS (elems (array (0,sz-1) (nonDetEltsUFM dict)))
     -- It's OK to use nonDetEltsUFM here because the elements have indices
     -- that array uses to create order
 
 getDictionary :: Get Dictionary
 getDictionary = do
   sz <- getInt
-  elems <- sequence (GhcPrelude.take sz (repeat getAFastString))
+  elems <- sequence (GhcPrelude.take sz (repeat getFS))
   return (listArray (0,sz-1) elems)
 
----------------------------------------------------------
+--------------------------------------------------------------------------------
 -- The Symbol Table
----------------------------------------------------------
+--------------------------------------------------------------------------------
 
 -- On disk, the symbol table is an array of IfExtName, when
 -- reading it in we turn it into a SymbolTable.
