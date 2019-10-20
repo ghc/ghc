@@ -5,6 +5,7 @@ module Binary.Unsafe where
 
 import GhcPrelude
 
+import Control.Monad.Fail
 import Control.Monad.Reader
 import Data.IORef
 import Data.ByteString (ByteString)
@@ -47,7 +48,7 @@ withBinBuffer (BinData sz arr) action =
 -- -----------------------------------------------------------------------------
 
 newtype Put a = Put { unput :: ReaderT EnvP IO a }
-  deriving (Functor, Applicative, Monad)
+  deriving (Functor, Applicative, Monad, MonadFail)
 
 -- Internal reader data for `Put` monad.
 data EnvP
@@ -156,7 +157,7 @@ tellP = BinPtr <$> offsetP
 -- -----------------------------------------------------------------------------
 
 newtype Get a = Get { unget :: ReaderT EnvG IO a }
-  deriving (Functor, Applicative, Monad)
+  deriving (Functor, Applicative, Monad, MonadFail)
 
 -- Internal reader data for `Get` monad.
 data EnvG
@@ -168,7 +169,7 @@ data EnvG
      }
 
 runGetIO :: BinData -> Get a -> IO a
-runGetIO bd m = (runReaderT (unget m) =<< mkEnvG bd)
+runGetIO bd m = runReaderT (unget m) =<< mkEnvG bd
 
 runGet :: BinData -> Get a -> a
 runGet bd = unsafePerformIO . runGetIO bd
@@ -214,7 +215,7 @@ getPrim :: Int -> (Ptr Word8 -> IO a) -> Get a
 getPrim n f = do
   ix  <- getOffset
   end <- getEnd
-  when (ix + n >= end) $
+  when (ix + n > end) $
     ioG $ ioError (mkIOError eofErrorType "Binary.Internal.getPrim" Nothing Nothing)
   arr <- getArr
   do

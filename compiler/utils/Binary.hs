@@ -167,7 +167,7 @@ instance GBinary (M1 i c a) => GSumBinary (M1 i c a) where
   gsget _   = gget
 
 sumSize :: forall f. GSumBinary f => Int8
-sumSize = fromIntegral $ natVal' (proxy# @Nat @(SumSize f))
+sumSize = fromIntegral $ natVal' (proxy# :: Proxy# (SumSize f))
 
 maxIndex :: forall f. GSumBinary f => Int8
 maxIndex = sumSize @f - 1
