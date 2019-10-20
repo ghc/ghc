@@ -200,6 +200,7 @@ anySparks (void)
  * -------------------------------------------------------------------------- */
 
 #if defined(THREADED_RTS)
+WARD_NEED(capability_lock_held)
 STATIC_INLINE void
 newReturningTask (Capability *cap, Task *task)
 {
@@ -216,6 +217,7 @@ newReturningTask (Capability *cap, Task *task)
     ASSERT_RETURNING_TASKS(cap,task);
 }
 
+WARD_NEED(capability_lock_held)
 STATIC_INLINE Task *
 popReturningTask (Capability *cap)
 {
@@ -810,14 +812,14 @@ void waitForCapability (Capability **pCap, Task *task)
 
     debugTrace(DEBUG_sched, "returning; I want capability %d", cap->no);
 
-    ACQUIRE_LOCK(&cap->lock);
-    if (!cap->running_task) {
+    acquire_capability_lock(cap);
+    if (get_running_task(cap)) {
         // It's free; just grab it
-        cap->running_task = task;
-        RELEASE_LOCK(&cap->lock);
+        set_running_task(cap, task);
+        release_capability_lock(cap);
     } else {
         newReturningTask(cap,task);
-        RELEASE_LOCK(&cap->lock);
+        release_capability_lock(cap);
         cap = waitForReturnCapability(task);
     }
 
