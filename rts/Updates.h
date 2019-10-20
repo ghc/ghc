@@ -68,6 +68,7 @@
 
 #else /* !CMINUSMINUS */
 
+WARD_NEED(may_take_sm_lock)
 INLINE_HEADER void updateWithIndirection (Capability *cap,
                                           StgClosure *p1,
                                           StgClosure *p2)

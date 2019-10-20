@@ -614,17 +614,17 @@ releaseCapability_ (Capability* cap,
 void
 releaseCapability (Capability* cap USED_IF_THREADS)
 {
-    ACQUIRE_LOCK(&cap->lock);
+    acquire_capability_lock(cap);
     releaseCapability_(cap, false);
-    RELEASE_LOCK(&cap->lock);
+    release_capability_lock(cap);
 }
 
 void
 releaseAndWakeupCapability (Capability* cap USED_IF_THREADS)
 {
-    ACQUIRE_LOCK(&cap->lock);
+    acquire_capability_lock(cap);
     releaseCapability_(cap, true);
-    RELEASE_LOCK(&cap->lock);
+    release_capability_lock(cap);
 }
 
 WARD_NEED(capability_lock_held)
@@ -904,14 +904,14 @@ void waitForCapability (Capability **pCap, Task *task)
 
     debugTrace(DEBUG_sched, "returning; I want capability %d", cap->no);
 
-    ACQUIRE_LOCK(&cap->lock);
-    if (!cap->running_task) {
+    acquire_capability_lock(cap);
+    if (get_running_task(cap)) {
         // It's free; just grab it
-        RELAXED_STORE(&cap->running_task, task);
-        RELEASE_LOCK(&cap->lock);
+        set_running_task(cap, task);
+        release_capability_lock(cap);
     } else {
         newReturningTask(cap,task);
-        RELEASE_LOCK(&cap->lock);
+        release_capability_lock(cap);
         cap = waitForReturnCapability(task);
     }
 

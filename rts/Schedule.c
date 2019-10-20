@@ -2011,6 +2011,7 @@ delete_threads_and_gc:
  * Singleton fork(). Do not copy any running threads.
  * ------------------------------------------------------------------------- */
 
+WARD_NEED(may_take_sm_lock)
 pid_t
 forkProcess(HsStablePtr *entry
 #if !defined(FORKPROCESS_PRIMOP_SUPPORTED)
@@ -2620,6 +2621,7 @@ scheduleThreadOn(Capability *cap, StgWord cpu USED_IF_THREADS, StgTSO *tso)
 }
 
 // See rts/include/rts/Threads.h
+WARD_NEED(may_take_sm_lock)
 void
 scheduleWaitThread (StgTSO* tso, /*[out]*/HaskellObj* ret, Capability **pcap)
 {
@@ -2661,6 +2663,7 @@ scheduleWaitThread (StgTSO* tso, /*[out]*/HaskellObj* ret, Capability **pcap)
  * ------------------------------------------------------------------------- */
 
 #if defined(THREADED_RTS)
+WARD_NEED(may_take_sm_lock)
 void scheduleWorker (Capability *cap, Task *task)
 {
     ASSERT_FULL_CAPABILITY_INVARIANTS(cap, task);
@@ -2760,6 +2763,7 @@ initScheduler(void)
 
 }
 
+WARD_NEED(may_take_sm_lock)
 void
 exitScheduler (bool wait_foreign USED_IF_THREADS)
                /* see Capability.c, shutdownCapability() */
@@ -2846,12 +2850,14 @@ performGC_(bool force_major)
     exitMyTask();
 }
 
+WARD_NEED(may_take_sm_lock)
 void
 performGC(void)
 {
     performGC_(false);
 }
 
+WARD_NEED(may_take_sm_lock)
 void
 performMajorGC(void)
 {
