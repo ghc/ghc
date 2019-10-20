@@ -1104,6 +1104,8 @@ any_work (void)
     return false;
 }
 
+WARD_NEED(sharing_sm_lock)
+WARD_NEED(may_call_sm)
 static void
 scavenge_until_all_done (void)
 {
