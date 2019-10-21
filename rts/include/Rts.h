@@ -91,6 +91,7 @@ extern "C" {
 #define WARD_USES(perm) WARD_ANN(uses(perm))
 #define WARD_GRANT(perm) WARD_ANN(grant(perm))
 #define WARD_REVOKE(perm) WARD_ANN(revoke(perm))
+#define WARD_WAIVE(perm) WARD_ANN(waive(perm))
 
 /* __builtin_unreachable is supported since GNU C 4.5 */
 #if __GNUC__ > 4 || (__GNUC__ == 4 && __GNUC_MINOR__ >= 5)

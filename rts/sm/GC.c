@@ -251,6 +251,7 @@ SHARE_SM_LOCK(void)
 }
 
 WARD_GRANT(may_take_sm_lock)
+WARD_WAIVE(may_take_sm_lock)
 WARD_NEED(sharing_sm_lock)
 WARD_REVOKE(sharing_sm_lock)
 WARD_NEED(sm_lock_held)

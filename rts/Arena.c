@@ -98,6 +98,7 @@ arenaAlloc( Arena *arena, size_t size )
 }
 
 // Free an entire arena
+WARD_NEED(may_take_sm_lock)
 void
 arenaFree( Arena *arena )
 {
