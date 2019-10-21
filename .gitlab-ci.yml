@@ -231,6 +231,13 @@ validate-x86_64-linux-deb9-hadrian:
   tags:
     - x86_64-linux
 
+validate-x86_64-linux-deb9-unreg-hadrian:
+  extends: validate-x86_64-linux-deb9-hadrian
+  stage: full-build
+  variables:
+    CONFIGURE_ARGS: --enable-unregisterised
+    TEST_ENV: "x86_64-linux-deb9-unreg"
+
 hadrian-ghc-in-ghci:
   <<: *only-default
   stage: quick-build
@@ -593,13 +600,6 @@ nightly-x86_64-linux-deb9-integer-simple:
   only:
     variables:
       - $NIGHTLY
-
-validate-x86_64-linux-deb9-unreg:
-  extends: .build-x86_64-linux-deb9
-  stage: full-build
-  variables:
-    CONFIGURE_ARGS: --enable-unregisterised
-    TEST_ENV: "x86_64-linux-deb9-unreg"
 
 release-x86_64-linux-deb9-dwarf:
   extends: .validate-linux
