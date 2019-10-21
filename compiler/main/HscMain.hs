@@ -815,12 +815,12 @@ finish summary tc_result mb_old_hash = do
                 _ -> panic "finish"
         return (hsc_status, details)
 
-  -- we usually desugar even when we are not generating code, otherwise
-  -- we would miss errors thrown by the desugaring (see #10600). The only
-  -- exceptions are when the Module is Ghc.Prim or when
-  -- it is not a HsSrcFile Module.
   if should_desugar
     then do
+      -- We usually desugar even when we are not generating code, otherwise we
+      -- would miss errors thrown by the desugaring (see #10600). The only
+      -- exceptions are when the Module is Ghc.Prim or when it is not a
+      -- HsSrcFile Module.
       desugared_guts0 <- hscDesugar' (ms_location summary) tc_result
       if target == HscNothing
         -- We are not generating code, so we can skip simplification
