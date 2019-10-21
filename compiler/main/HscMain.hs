@@ -1217,12 +1217,11 @@ hscCheckSafe' m l = do
 
     lookup' :: Module -> Hsc (Maybe ModIface)
     lookup' m = do
-        dflags <- getDynFlags
         hsc_env <- getHscEnv
         hsc_eps <- liftIO $ hscEPS hsc_env
         let pkgIfaceT = eps_PIT hsc_eps
             homePkgT  = hsc_HPT hsc_env
-            iface     = lookupIfaceByModule dflags homePkgT pkgIfaceT m
+            iface     = lookupIfaceByModule homePkgT pkgIfaceT m
         -- the 'lookupIfaceByModule' method will always fail when calling from GHCi
         -- as the compiler hasn't filled in the various module tables
         -- so we need to call 'getModuleInterface' to load from disk

@@ -409,7 +409,7 @@ loadInterface doc_str mod from
 
                 -- Check whether we have the interface already
         ; dflags <- getDynFlags
-        ; case lookupIfaceByModule dflags hpt (eps_PIT eps) mod of {
+        ; case lookupIfaceByModule hpt (eps_PIT eps) mod of {
             Just iface
                 -> return (Succeeded iface) ;   -- Already loaded
                         -- The (src_imp == mi_boot iface) test checks that the already-loaded
@@ -675,14 +675,13 @@ moduleFreeHolesPrecise doc_str mod
         traceIf (text "Considering whether to load" <+> ppr mod <+>
                  text "to compute precise free module holes")
         (eps, hpt) <- getEpsAndHpt
-        dflags <- getDynFlags
-        case tryEpsAndHpt dflags eps hpt `firstJust` tryDepsCache eps imod insts of
+        case tryEpsAndHpt eps hpt `firstJust` tryDepsCache eps imod insts of
             Just r -> return (Succeeded r)
             Nothing -> readAndCache imod insts
     (_, Nothing) -> return (Succeeded emptyUniqDSet)
   where
-    tryEpsAndHpt dflags eps hpt =
-        fmap mi_free_holes (lookupIfaceByModule dflags hpt (eps_PIT eps) mod)
+    tryEpsAndHpt eps hpt =
+        fmap mi_free_holes (lookupIfaceByModule hpt (eps_PIT eps) mod)
     tryDepsCache eps imod insts =
         case lookupInstalledModuleEnv (eps_free_holes eps) imod of
             Just ifhs  -> Just (renameFreeHoles ifhs insts)

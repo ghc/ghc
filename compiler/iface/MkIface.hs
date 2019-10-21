@@ -365,7 +365,7 @@ mkHashFun hsc_env eps name
       orig_mod = nameModule name
       lookup mod = do
         MASSERT2( isExternalName name, ppr name )
-        iface <- case lookupIfaceByModule dflags hpt pit mod of
+        iface <- case lookupIfaceByModule hpt pit mod of
                   Just iface -> return iface
                   Nothing -> do
                       -- This can occur when we're writing out ifaces for
@@ -751,9 +751,8 @@ getOrphanHashes hsc_env mods = do
   let
     hpt        = hsc_HPT hsc_env
     pit        = eps_PIT eps
-    dflags     = hsc_dflags hsc_env
     get_orph_hash mod =
-          case lookupIfaceByModule dflags hpt pit mod of
+          case lookupIfaceByModule hpt pit mod of
             Just iface -> return (mi_orphan_hash (mi_final_exts iface))
             Nothing    -> do -- similar to 'mkHashFun'
                 iface <- initIfaceLoad hsc_env . withException

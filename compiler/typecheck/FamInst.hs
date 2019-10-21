@@ -304,13 +304,12 @@ This is basically the idea from #13092, comment:14.
 -- See Note [The type family instance consistency story].
 checkFamInstConsistency :: [Module] -> TcM ()
 checkFamInstConsistency directlyImpMods
-  = do { dflags     <- getDynFlags
-       ; (eps, hpt) <- getEpsAndHpt
+  = do { (eps, hpt) <- getEpsAndHpt
        ; traceTc "checkFamInstConsistency" (ppr directlyImpMods)
        ; let { -- Fetch the iface of a given module.  Must succeed as
                -- all directly imported modules must already have been loaded.
                modIface mod =
-                 case lookupIfaceByModule dflags hpt (eps_PIT eps) mod of
+                 case lookupIfaceByModule hpt (eps_PIT eps) mod of
                    Nothing    -> panicDoc "FamInst.checkFamInstConsistency"
                                           (ppr mod $$ pprHPT hpt)
                    Just iface -> iface
