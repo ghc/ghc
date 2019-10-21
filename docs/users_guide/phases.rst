@@ -233,6 +233,19 @@ Options affecting the C pre-processor
 
     :since: 6.8.1
 
+    The :extension:`CPP` language extension enables the C pre-processor.
+    This can be turned into a command-line flag by prefixing it with
+    ``-X``; For example:
+
+    .. code-block:: sh
+
+        $ ghc -XCPP foo.hs
+
+    The :extension:`CPP` language extension can also be enabled using
+    the :ref:`LANGUAGE <language-pragma>` pragma; For example: ::
+
+        {-# LANGUAGE CPP #-}
+
 .. index::
    single: pre-processing: cpp
    single: C pre-processor options
@@ -243,8 +256,8 @@ Options affecting the C pre-processor
     :type: dynamic
     :category: cpp
 
-    The C pre-processor :command:`cpp` is run over your Haskell code only if
-    the ``-cpp`` option -cpp option is given. Unless you are building a
+    The C pre-processor :command:`cpp` is run over your Haskell code if
+    the ``-cpp`` option or ``-XCPP`` extension are given. Unless you are building a
     large system with significant doses of conditional compilation, you
     really shouldn't need it.
 
