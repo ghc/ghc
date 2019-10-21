@@ -60,6 +60,10 @@ import FastString
 import GhcPrelude
 import {-# SOURCE #-} Name (Name)
 
+#if defined(DEBUG)
+import PlainPanic
+#endif
+
 import Control.Monad
 
 import Data.Array
