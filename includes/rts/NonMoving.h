@@ -13,10 +13,31 @@
 
 #pragma once
 
+// Forward declaration for Stg.h
+struct StgClosure_;
+struct StgThunk_;
+struct Capability_;
+
 /* This is called by the code generator */
 extern DLL_IMPORT_RTS
-void updateRemembSetPushClosure_(StgRegTable *reg, StgClosure *p);
+void updateRemembSetPushClosure_(StgRegTable *reg, struct StgClosure_ *p);
 
-void updateRemembSetPushClosure(Capability *cap, StgClosure *p);
+extern DLL_IMPORT_RTS
+void updateRemembSetPushThunk_(StgRegTable *reg, struct StgThunk_ *p);
 
-void updateRemembSetPushThunk_(StgRegTable *reg, StgThunk *p);
+// Forward declaration for unregisterised backend.
+EF_(stg_copyArray_barrier);
+
+// Note that RTS code should not condition on this directly by rather
+// use the IF_NONMOVING_WRITE_BARRIER_ENABLED macro to ensure that
+// the barrier is eliminated in the non-threaded RTS.
+extern StgWord DLL_IMPORT_DATA_VAR(nonmoving_write_barrier_enabled);
+
+// A similar macro is defined in includes/Cmm.h for C-- code.
+#if defined(THREADED_RTS)
+#define IF_NONMOVING_WRITE_BARRIER_ENABLED \
+    if (RTS_UNLIKELY(nonmoving_write_barrier_enabled))
+#else
+#define IF_NONMOVING_WRITE_BARRIER_ENABLED \
+    if (0)
+#endif

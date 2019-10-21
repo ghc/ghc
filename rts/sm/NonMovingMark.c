@@ -536,7 +536,7 @@ inline void updateRemembSetPushClosure(Capability *cap, StgClosure *p)
     push_closure(queue, p, NULL);
 }
 
-void updateRemembSetPushClosure_(StgRegTable *reg, StgClosure *p)
+void updateRemembSetPushClosure_(StgRegTable *reg, struct StgClosure_ *p)
 {
     updateRemembSetPushClosure(regTableToCapability(reg), p);
 }
