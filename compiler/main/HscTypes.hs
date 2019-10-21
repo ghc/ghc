@@ -684,12 +684,11 @@ data HomeModInfo
 -- | Find the 'ModIface' for a 'Module', searching in both the loaded home
 -- and external package module information
 lookupIfaceByModule
-        :: DynFlags
-        -> HomePackageTable
+        :: HomePackageTable
         -> PackageIfaceTable
         -> Module
         -> Maybe ModIface
-lookupIfaceByModule _dflags hpt pit mod
+lookupIfaceByModule hpt pit mod
   = case lookupHptByModule hpt mod of
        Just hm -> Just (hm_iface hm)
        Nothing -> lookupModuleEnv pit mod
