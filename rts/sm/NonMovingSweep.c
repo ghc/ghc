@@ -309,6 +309,8 @@ static void freeChain_lock_max(bdescr *bd, int max_dur)
     if (i == max_dur) {
         RELEASE_SM_LOCK;
         yieldThread();
+        usleep(10); // sadly it seems yieldThread isn't sufficient here to
+                    // avoid starvation
         ACQUIRE_SM_LOCK;
         i = 0;
     }
