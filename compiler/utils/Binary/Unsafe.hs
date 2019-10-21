@@ -3,7 +3,7 @@
 
 module Binary.Unsafe where
 
-#if MIN_VERSION_base(4,11,0)
+#if !MIN_VERSION_base(4,13,0)
 import Control.Monad.Fail (MonadFail)
 #endif
 
@@ -51,11 +51,7 @@ withBinBuffer (BinData sz arr) action =
 -- -----------------------------------------------------------------------------
 
 newtype Put a = Put { unput :: ReaderT EnvP IO a }
-#if MIN_VERSION_base(4,11,0)
   deriving (Functor, Applicative, Monad, MonadFail)
-#else
-  deriving (Functor, Applicative, Monad)
-#endif
 
 -- Internal reader data for `Put` monad.
 data EnvP
@@ -164,11 +160,7 @@ tellP = BinPtr <$> offsetP
 -- -----------------------------------------------------------------------------
 
 newtype Get a = Get { unget :: ReaderT EnvG IO a }
-#if MIN_VERSION_base(4,11,0)
   deriving (Functor, Applicative, Monad, MonadFail)
-#else
-  deriving (Functor, Applicative, Monad)
-#endif
 
 -- Internal reader data for `Get` monad.
 data EnvG
