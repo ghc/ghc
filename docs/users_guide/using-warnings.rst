@@ -1719,7 +1719,7 @@ of ``-W(no-)*``.
     :reverse: -Wno-unused-packages
     :category:
 
-    :since: 8.8
+    :since: 8.10
 
     The option :ghc-flag:`-Wunused-packages` warns about packages, specified on
     command line via :ghc-flag:`-package ⟨pkg⟩` or
