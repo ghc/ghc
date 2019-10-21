@@ -312,3 +312,4 @@ test('T16804', extra_files(['T16804a.hs', 'T16804b.hs', 'T16804c.hs']), ghci_scr
 test('T15546', normal, ghci_script, ['T15546.script'])
 test('T16876', normal, ghci_script, ['T16876.script'])
 test('T17345', normal, ghci_script, ['T17345.script'])
+test('T17384', normal, ghci_script, ['T17384.script'])
