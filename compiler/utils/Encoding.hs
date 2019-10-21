@@ -21,7 +21,6 @@ module Encoding (
         utf8DecodeByteString,
         utf8DecodeShortByteString,
         utf8DecodeStringLazy,
-        utf8EncodeChar,
         utf8EncodeString,
         utf8EncodeShortByteString,
         utf8EncodedLength,
@@ -157,7 +156,6 @@ utf8DecodeShortByteString (SBS ba#)
   where
     len# = sizeofByteArray# ba#
 
-{-# INLINE utf8DecodeLazy# #-}
 utf8DecodeLazy# :: (IO ()) -> (Int# -> (# Char#, Int# #)) -> Int# -> IO [Char]
 utf8DecodeLazy# retain indexWord8# len#
   = unpack 0#
@@ -190,10 +188,10 @@ countUTF8Chars (SBS ba) = go 0# 0#
 unPtr :: Ptr a -> Addr#
 unPtr (Ptr a) = a
 
-{-# INLINE utf8EncodeChar #-}
-utf8EncodeChar :: (Int# -> Word# -> State# s -> State# s)
+{-# INLINE utf8EncodeCharX #-}
+utf8EncodeCharX :: (Int# -> Word# -> State# s -> State# s)
                -> Char -> ST s Int
-utf8EncodeChar write# c =
+utf8EncodeCharX write# c =
   let x = ord c in
   case () of
     _ | x > 0 && x <= 0x007f -> do
@@ -222,12 +220,24 @@ utf8EncodeChar write# c =
       case write# off# (int2Word# c#) s of
         s -> (# s, () #)
 
+utf8EncodeCharAddr# :: Addr# -> Char -> ST s Int
+utf8EncodeCharAddr# a c = utf8EncodeCharX (writeWord8OffAddr# a) c
+
+utf8EncodeCharArr# :: MutableByteArray# s -> Int# -> Char -> ST s Int
+utf8EncodeCharArr# mba# i# =
+  utf8EncodeCharX (\j# -> writeWord8Array# mba# (i# +# j#))
+
+{-# NOINLINE[0] utf8EncodeCharAddr# #-}
+{-# NOINLINE[0] utf8EncodeCharArr# #-}
+
+
 utf8EncodeString :: Ptr Word8 -> String -> IO ()
 utf8EncodeString ptr str = go ptr str
   where go !_   []     = return ()
         go ptr (c:cs) = do
-          off <- stToIO $ utf8EncodeChar (writeWord8OffAddr# (unPtr ptr)) c
+          off <- stToIO $ utf8EncodeCharAddr# (unPtr ptr) c
           go (ptr `plusPtr` off) cs
+
 
 utf8EncodeShortByteString :: String -> IO ShortByteString
 utf8EncodeShortByteString str = stToIO $ ST $ \s ->
@@ -240,7 +250,7 @@ utf8EncodeShortByteString str = stToIO $ ST $ \s ->
   where
     go _ _ [] = return ()
     go mba# i# (c:cs) = do
-      I# off# <- utf8EncodeChar (\j# -> writeWord8Array# mba# (i# +# j#)) c
+      I# off# <- utf8EncodeCharArr# mba# i# c
       go mba# (i# +# off#) cs
 
 utf8EncodedLength :: String -> Int
