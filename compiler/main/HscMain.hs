@@ -728,7 +728,7 @@ hscIncrementalCompile :: Bool
                       -> SourceModified
                       -> Maybe ModIface
                       -> (Int,Int)
-                      -> IO (HscStatus, ModDetails)
+                      -> IO (HscStatus, ModDetails, DynFlags)
 hscIncrementalCompile always_do_basic_recompilation_check m_tc_result
     mHscMessage hsc_env' mod_summary source_modified mb_old_iface mod_index
   = do
@@ -769,13 +769,14 @@ hscIncrementalCompile always_do_basic_recompilation_check m_tc_result
                 -- in make mode, since this HMI will go into the HPT.
                 details <- genModDetails hsc_env' iface
                 return details
-            return (HscUpToDate iface, details)
+            return (HscUpToDate iface, details, dflags)
         -- We finished type checking.  (mb_old_hash is the hash of
         -- the interface that existed on disk; it's possible we had
         -- to retypecheck but the resulting interface is exactly
         -- the same.)
-        Right (FrontendTypecheck tc_result, mb_old_hash) ->
-            finish mod_summary tc_result mb_old_hash
+        Right (FrontendTypecheck tc_result, mb_old_hash) -> do
+            (status, mb_old_hash) <- finish mod_summary tc_result mb_old_hash
+            return (status, mb_old_hash, dflags)
 
 -- Runs the post-typechecking frontend (desugar and simplify). We want to
 -- generate most of the interface as late as possible. This gets us up-to-date

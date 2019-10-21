@@ -162,7 +162,7 @@ compileOne' m_tc_result mHscMessage
    debugTraceMsg dflags1 2 (text "compile: input file" <+> text input_fnpp)
 
    -- Run the pipeline up to codeGen (so everything up to, but not including, STG)
-   (status, hmi_details) <- hscIncrementalCompile
+   (status, hmi_details, plugin_dflags) <- hscIncrementalCompile
                         always_do_basic_recompilation_check
                         m_tc_result mHscMessage
                         hsc_env summary source_modified mb_old_iface (mod_index, nmods)
@@ -174,6 +174,10 @@ compileOne' m_tc_result mHscMessage
            unless (gopt Opt_KeepOFiles flags) $
                addFilesToClean flags TFL_GhcSession $
                    [ml_obj_file $ ms_location summary]
+
+   -- Use an HscEnv with DynFlags updated with the plugin info (returned from
+   -- hscIncrementalCompile)
+   let hsc_env' = hsc_env{ hsc_dflags = plugin_dflags }
 
    case (status, hsc_lang) of
         (HscUpToDate iface, _) ->
@@ -204,7 +208,7 @@ compileOne' m_tc_result mHscMessage
             -- #10660: Use the pipeline instead of calling
             -- compileEmptyStub directly, so -dynamic-too gets
             -- handled properly
-            _ <- runPipeline StopLn hsc_env
+            _ <- runPipeline StopLn hsc_env'
                               (output_fn,
                                Nothing,
                                Just (HscOut src_flavour
@@ -219,15 +223,15 @@ compileOne' m_tc_result mHscMessage
         (HscRecomp cgguts summary partial_iface mb_old_iface_hash, HscInterpreted) -> do
             -- In interpreted mode the regular codeGen backend is not run so we
             -- generate a interface without codeGen info.
-            final_iface <- mkFullIface hsc_env partial_iface
+            final_iface <- mkFullIface hsc_env' partial_iface
             liftIO $ hscMaybeWriteIface dflags final_iface mb_old_iface_hash (ms_location summary)
 
-            (hasStub, comp_bc, spt_entries) <- hscInteractive hsc_env cgguts summary
+            (hasStub, comp_bc, spt_entries) <- hscInteractive hsc_env' cgguts summary
 
             stub_o <- case hasStub of
                       Nothing -> return []
                       Just stub_c -> do
-                          stub_o <- compileStub hsc_env stub_c
+                          stub_o <- compileStub hsc_env' stub_c
                           return [DotO stub_o]
 
             let hs_unlinked = [BCOs comp_bc spt_entries]
@@ -246,7 +250,7 @@ compileOne' m_tc_result mHscMessage
                             (Temporary TFL_CurrentModule)
                             basename dflags next_phase (Just location)
             -- We're in --make mode: finish the compilation pipeline.
-            (_, _, Just iface) <- runPipeline StopLn hsc_env
+            (_, _, Just iface) <- runPipeline StopLn hsc_env'
                               (output_fn,
                                Nothing,
                                Just (HscOut src_flavour mod_name status))
@@ -1130,9 +1134,12 @@ runPhase (RealPhase (Hsc src_flavour)) input_fn dflags0
 
   -- run the compiler!
         let msg hsc_env _ what _ = oneShotMsg hsc_env what
-        (result, _mod_details) <-
+        (result, _mod_details, plugin_dflags) <-
           liftIO $ hscIncrementalCompile True Nothing (Just msg) hsc_env'
                             mod_summary source_unchanged Nothing (1,1)
+
+        -- In the rest of the pipeline use the dflags with plugin info
+        setDynFlags plugin_dflags
 
         return (HscOut src_flavour mod_name result,
                 panic "HscOut doesn't have an input filename")
