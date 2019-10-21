@@ -88,17 +88,23 @@ typedef struct bdescr_ {
 
     StgPtr start;              // [READ ONLY] start addr of memory
 
-    StgPtr free;               // First free byte of memory.
-                               // allocGroup() sets this to the value of start.
-                               // NB. during use this value should lie
-                               // between start and start + blocks *
-                               // BLOCK_SIZE.  Values outside this
-                               // range are reserved for use by the
-                               // block allocator.  In particular, the
-                               // value (StgPtr)(-1) is used to
-                               // indicate that a block is unallocated.
-                               //
-                               // Unused by the non-moving allocator.
+    union {
+        StgPtr free;               // First free byte of memory.
+                                   // allocGroup() sets this to the value of start.
+                                   // NB. during use this value should lie
+                                   // between start and start + blocks *
+                                   // BLOCK_SIZE.  Values outside this
+                                   // range are reserved for use by the
+                                   // block allocator.  In particular, the
+                                   // value (StgPtr)(-1) is used to
+                                   // indicate that a block is unallocated.
+                                   //
+                                   // Unused by the non-moving allocator.
+        struct NonmovingSegmentInfo {
+            StgWord8 log_block_size;
+            StgWord16 next_free_snap;
+        } nonmoving_segment;
+    };
 
     struct bdescr_ *link;      // used for chaining blocks together
 
