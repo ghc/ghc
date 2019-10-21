@@ -385,7 +385,9 @@ test ('T9630',
       extra_clean(['T9630a.hi', 'T9630a.o']),
 
       # Use `+RTS -G1` for more stable residency measurements. Note [residency].
-      extra_hc_opts('+RTS -G1 -RTS')
+      extra_hc_opts('+RTS -G1 -RTS'),
+      # The nonmoving collector does not support -G1
+      omit_ways(['nonmoving', 'nonmoving_thr', 'nonmoving_thr_ghc'])
       ],
       multimod_compile,
       ['T9630', '-v0 -O'])
