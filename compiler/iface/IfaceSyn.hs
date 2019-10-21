@@ -1203,7 +1203,7 @@ pprIfaceConDecl ss gadt_style tycon tc_binders parent
     --    [VarBndrs, TyCoVarBinders, TyConBinders, and visibility] in TyCoRep.)
     ppr_tc_app gadt_subst =
       pprPrefixIfDeclBndr how_much (occName tycon)
-      <+> pprIfaceAppArgs
+      <+> pprParendIfaceAppArgs
             (substIfaceAppArgs gadt_subst (mk_tc_app_args tc_binders))
 
     mk_tc_app_args :: [IfaceTyConBinder] -> IfaceAppArgs
