@@ -229,9 +229,9 @@ instance Data FastString where
   dataTypeOf _ = mkNoRepType "FastString"
 
 cmpFS :: FastString -> FastString -> Ordering
-cmpFS f1@(FastString u1 _ _) f2@(FastString u2 _ _) =
+cmpFS f1@(FastString u1 sbs1 _) f2@(FastString u2 sbs2 _) =
   if u1 == u2 then EQ else
-  compare (bytesFS f1) (bytesFS f2)
+    compare sbs1 sbs2
 
 -- -----------------------------------------------------------------------------
 -- Construction
