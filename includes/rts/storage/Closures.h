@@ -94,7 +94,7 @@ typedef struct StgClosure_ {
     struct StgClosure_ *payload[];
 } *StgClosurePtr; // StgClosure defined in rts/Types.h
 
-typedef struct {
+typedef struct StgThunk_ {
     StgThunkHeader  header;
     struct StgClosure_ *payload[];
 } StgThunk;
