@@ -30,7 +30,7 @@ setTestOpts(no_lint)
 test('T1969',
      [# expect_broken(12437),
       collect_compiler_stats(['peak_megabytes_allocated','max_bytes_used'],15),
-      collect_compiler_stats('bytes allocated',5),
+      collect_compiler_stats('bytes allocated', 1),
       only_ways(['normal']),
 
       extra_hc_opts('-dcore-lint -static'),
@@ -58,7 +58,7 @@ else:
 test('T3294',
      [
       collect_compiler_stats('max_bytes_used',15),
-      collect_compiler_stats('bytes allocated',5),
+      collect_compiler_stats('bytes allocated', 1),
       conf_3294,
 
       # Use `+RTS -G1` for more stable residency measurements. Note [residency].
@@ -72,7 +72,7 @@ test('T4801',
       # expect_broken(5224),
       # temporarily unbroken (#5227)
       # deactivated for now, as this metric became too volatile recently
-      collect_compiler_stats('bytes allocated',10),
+      collect_compiler_stats('bytes allocated',2),
       # collect_compiler_stats('max_bytes_used',5),
       only_ways(['normal']),
       extra_hc_opts('-static'),
@@ -85,7 +85,7 @@ test('T4801',
 
 test('T3064',
      [collect_compiler_stats('peak_megabytes_allocated',20),
-      collect_compiler_stats('bytes allocated',10),
+      collect_compiler_stats('bytes allocated',2),
 
       # deactivated for now, as this metric became too volatile recently
       # collect_compiler_stats('max_bytes_used',20)
@@ -101,7 +101,7 @@ test('T3064',
 test('T4007', normal, makefile_test, ['T4007'])
 
 test('T5030',
-     [collect_compiler_stats('bytes allocated', 10),
+     [collect_compiler_stats('bytes allocated', 2),
 
        only_ways(['normal'])
       ],
@@ -109,14 +109,14 @@ test('T5030',
      ['-freduction-depth=300'])
 
 test('T5631',
-     [collect_compiler_stats('bytes allocated',10),
+     [collect_compiler_stats('bytes allocated',2),
       only_ways(['normal'])
       ],
      compile,
      [''])
 
 test('parsing001',
-     [collect_compiler_stats('bytes allocated',10),
+     [collect_compiler_stats('bytes allocated',2),
        only_ways(['normal']),
       ],
      compile_fail, [''])
@@ -124,45 +124,45 @@ test('parsing001',
 
 test('T783',
      [ only_ways(['normal']),  # no optimisation for this one
-      collect_compiler_stats('bytes allocated',10),
+      collect_compiler_stats('bytes allocated',2),
       extra_hc_opts('-static')
       ],
       compile,[''])
 
 test('T5321Fun',
      [ only_ways(['normal']),  # no optimisation for this one
-       collect_compiler_stats('bytes allocated',10)
+       collect_compiler_stats('bytes allocated',2)
       ],
       compile,[''])
 
 test('T5321FD',
      [ only_ways(['normal']),  # no optimisation for this one
-      collect_compiler_stats('bytes allocated',10)
+      collect_compiler_stats('bytes allocated',2)
       ],
       compile,[''])
 
 test('T5642',
      [ only_ways(['normal']),
        normal,
-       collect_compiler_stats('bytes allocated',10)
+       collect_compiler_stats('bytes allocated',2)
       ],
       compile,['-O'])
 
 test('T5837',
      [ only_ways(['normal']),
-      collect_compiler_stats('bytes allocated',10)
+      collect_compiler_stats('bytes allocated',2)
       ],
       compile, ['-freduction-depth=50'])
 
 test('T6048',
      [ only_ways(['optasm']),
-      collect_compiler_stats('bytes allocated',10)
+      collect_compiler_stats('bytes allocated',2)
       ],
       compile,[''])
 
 test('T9020',
      [ only_ways(['optasm']),
-      collect_compiler_stats('bytes allocated',10)
+      collect_compiler_stats('bytes allocated',2)
       ],
       compile,[''])
 
@@ -170,7 +170,7 @@ test('T9675',
      [ only_ways(['optasm']),
        # Note [residency]
        collect_compiler_stats(['max_bytes_used','peak_megabytes_allocated'],15),
-       collect_compiler_stats('bytes allocated',10),
+       collect_compiler_stats('bytes allocated',2),
 
        # Use `+RTS -G1` for more stable residency measurements. Note [residency].
        extra_hc_opts('+RTS -G1 -RTS')
@@ -180,40 +180,40 @@ test('T9675',
 
 test('T9872a',
      [ only_ways(['normal']),
-       collect_compiler_stats('bytes allocated',5)
+       collect_compiler_stats('bytes allocated', 1)
       ],
      compile_fail,
      [''])
 
 test('T9872b',
      [ only_ways(['normal']),
-       collect_compiler_stats('bytes allocated',5)
+       collect_compiler_stats('bytes allocated', 1)
       ],
      compile_fail,
      [''])
 test('T9872c',
      [ only_ways(['normal']),
-       collect_compiler_stats('bytes allocated',5)
+       collect_compiler_stats('bytes allocated', 1)
       ],
      compile_fail,
      [''])
 test('T9872d',
      [ only_ways(['normal']),
-       collect_compiler_stats('bytes allocated',5)
+       collect_compiler_stats('bytes allocated', 1)
       ],
      compile,
      [''])
 
 test('T9961',
      [ only_ways(['normal']),
-       collect_compiler_stats('bytes allocated',5)
+       collect_compiler_stats('bytes allocated', 1)
       ],
      compile,
      ['-O'])
 
 test('T9233',
     [ only_ways(['normal']),
-      collect_compiler_stats('bytes allocated',5),
+      collect_compiler_stats('bytes allocated', 1),
       extra_clean(['T9233a.hi', 'T9233a.o'])
     ],
     multimod_compile,
@@ -230,14 +230,14 @@ test('T10370',
      [''])
 
 test('T10547',
-     [ collect_compiler_stats('bytes allocated', 20),
+     [ collect_compiler_stats('bytes allocated', 4),
      ],
      compile_fail,
      ['-fprint-expanded-synonyms'])
 
 test('T12227',
      [ only_ways(['normal']),
-       collect_compiler_stats('bytes allocated',5)
+       collect_compiler_stats('bytes allocated', 1)
      ],
      compile,
      # Use `-M1G` to prevent memory thrashing with ghc-8.0.1.
@@ -245,21 +245,21 @@ test('T12227',
 
 test('T12425',
      [ only_ways(['optasm']),
-       collect_compiler_stats('bytes allocated',5)
+       collect_compiler_stats('bytes allocated', 1)
      ],
      compile,
      [''])
 
 test('T12234',
      [ only_ways(['optasm']),
-       collect_compiler_stats('bytes allocated',5),
+       collect_compiler_stats('bytes allocated', 1),
      ],
      compile,
      [''])
 
 test('T12545',
      [ only_ways(['normal']),
-       collect_compiler_stats('bytes allocated',5),
+       collect_compiler_stats('bytes allocated', 1),
        extra_clean(['T12545a.hi', 'T12545a.o'])
      ],
      multimod_compile,
@@ -267,39 +267,39 @@ test('T12545',
 
 test('T13035',
      [ only_ways(['normal']),
-       collect_compiler_stats('bytes allocated',5),
+       collect_compiler_stats('bytes allocated', 1),
      ],
      compile,
      [''] )
 
 test('T13056',
      [ only_ways(['optasm']),
-       collect_compiler_stats('bytes allocated',10),
+       collect_compiler_stats('bytes allocated',2),
      ],
      compile,
      ['-O1'])
 
 test('T12707',
-     [ collect_compiler_stats('bytes allocated',5),
+     [ collect_compiler_stats('bytes allocated', 1),
      ],
      compile,
      [''])
 
 test('T12150',
      [ only_ways(['optasm']),
-       collect_compiler_stats('bytes allocated',5)
+       collect_compiler_stats('bytes allocated', 1)
      ],
     compile,
      [''])
 
 test('T13379',
-     [ collect_compiler_stats('bytes allocated',10),
+     [ collect_compiler_stats('bytes allocated',2),
      ],
      compile,
      [''])
 
 test('MultiLayerModules',
-     [ collect_compiler_stats('bytes allocated',10),
+     [ collect_compiler_stats('bytes allocated',2),
        pre_cmd('./genMultiLayerModules'),
        extra_files(['genMultiLayerModules']),
        compile_timeout_multiplier(5)
@@ -312,7 +312,7 @@ test('MultiLayerModules',
      ['MultiLayerModules', '-v0'])
 
 test('ManyConstructors',
-     [ collect_compiler_stats('bytes allocated',10),
+     [ collect_compiler_stats('bytes allocated',2),
        pre_cmd('./genManyConstructors'),
        extra_files(['genManyConstructors']),
      ],
@@ -320,7 +320,7 @@ test('ManyConstructors',
      ['ManyConstructors', '-v0'])
 
 test('ManyAlternatives',
-     [ collect_compiler_stats('bytes allocated',10),
+     [ collect_compiler_stats('bytes allocated',2),
        pre_cmd('./genManyAlternatives'),
        extra_files(['genManyAlternatives']),
      ],
@@ -328,7 +328,7 @@ test('ManyAlternatives',
      ['ManyAlternatives', '-v0'])
 
 test('T13701',
-     [ collect_compiler_stats('bytes allocated',10),
+     [ collect_compiler_stats('bytes allocated',2),
        pre_cmd('./genT13701'),
        extra_files(['genT13701']),
        compile_timeout_multiplier(4)
@@ -341,7 +341,7 @@ test('T13701',
      ['T13701', '-v0'])
 
 test('T13719',
-     [ collect_compiler_stats('bytes allocated',10),
+     [ collect_compiler_stats('bytes allocated',2),
        pre_cmd('./genT13719'),
        extra_files(['genT13719']),
        compile_timeout_multiplier(2)
@@ -354,7 +354,7 @@ test('T13719',
      ['T13719', '-v0'])
 
 test('T14697',
-     [ collect_compiler_stats('bytes allocated',10),
+     [ collect_compiler_stats('bytes allocated',2),
        # This generates too large of a command-line for poor Windows and
        # Darwin. The solution is to teach the testsuite driver to
        # invoke GHC with a response file.
@@ -367,7 +367,7 @@ test('T14697',
      ['T14697', '-v0'])
 
 test('T14683',
-     [ collect_compiler_stats('bytes allocated',10),
+     [ collect_compiler_stats('bytes allocated',2),
      ],
      multimod_compile,
      ['T14683', '-v0'])
@@ -375,7 +375,7 @@ test('T14683',
 test('Naperian',
      [ reqlib('vector'),
        only_ways(['optasm']),
-       collect_compiler_stats('bytes allocated',10),
+       collect_compiler_stats('bytes allocated',2),
      ],
      compile,
      [''])
@@ -391,14 +391,14 @@ test ('T9630',
       ['T9630', '-v0 -O'])
 
 test ('T15164',
-      [ collect_compiler_stats('bytes allocated',10)
+      [ collect_compiler_stats('bytes allocated',2)
       ],
       compile,
       ['-v0 -O'])
 
 # See https://gitlab.haskell.org/ghc/ghc/merge_requests/312#note_186960
 test ('WWRec',
-      [ collect_compiler_stats('bytes allocated',10)
+      [ collect_compiler_stats('bytes allocated',2)
       ],
       compile,
       ['-v0 -O'])
