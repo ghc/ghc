@@ -361,7 +361,7 @@ render dflags flags sinceQual qual ifaces installedIfaces extSrcMap = do
   let withQuickjump = Flag_QuickJumpIndex `elem` flags
 
   when (Flag_GenIndex `elem` flags) $ do
-    withTiming (pure dflags') "ppHtmlIndex" (const ()) $ do
+    withTiming dflags' "ppHtmlIndex" (const ()) $ do
       _ <- {-# SCC ppHtmlIndex #-}
            ppHtmlIndex odir title pkgStr
                   themes opt_mathjax opt_contents_url sourceUrls' opt_wiki_urls
@@ -371,7 +371,7 @@ render dflags flags sinceQual qual ifaces installedIfaces extSrcMap = do
     copyHtmlBits odir libDir themes withQuickjump
 
   when (Flag_GenContents `elem` flags) $ do
-    withTiming (pure dflags') "ppHtmlContents" (const ()) $ do
+    withTiming dflags' "ppHtmlContents" (const ()) $ do
       _ <- {-# SCC ppHtmlContents #-}
            ppHtmlContents dflags' odir title pkgStr
                      themes opt_mathjax opt_index_url sourceUrls' opt_wiki_urls
@@ -381,7 +381,7 @@ render dflags flags sinceQual qual ifaces installedIfaces extSrcMap = do
     copyHtmlBits odir libDir themes withQuickjump
 
   when (Flag_Html `elem` flags) $ do
-    withTiming (pure dflags') "ppHtml" (const ()) $ do
+    withTiming dflags' "ppHtml" (const ()) $ do
       _ <- {-# SCC ppHtml #-}
            ppHtml dflags' title pkgStr visibleIfaces reexportedIfaces odir
                   prologue
@@ -416,14 +416,14 @@ render dflags flags sinceQual qual ifaces installedIfaces extSrcMap = do
           ]
 
   when (Flag_LaTeX `elem` flags) $ do
-    withTiming (pure dflags') "ppLatex" (const ()) $ do
+    withTiming dflags' "ppLatex" (const ()) $ do
       _ <- {-# SCC ppLatex #-}
            ppLaTeX title pkgStr visibleIfaces odir (fmap _doc prologue) opt_latex_style
                    libDir
       return ()
 
   when (Flag_HyperlinkedSource `elem` flags && not (null ifaces)) $ do
-    withTiming (pure dflags') "ppHyperlinkedSource" (const ()) $ do
+    withTiming dflags' "ppHyperlinkedSource" (const ()) $ do
       _ <- {-# SCC ppHyperlinkedSource #-}
            ppHyperlinkedSource odir libDir opt_source_css pretty srcMap ifaces
       return ()
