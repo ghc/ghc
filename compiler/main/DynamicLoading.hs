@@ -52,7 +52,7 @@ import Exception
 import Hooks
 
 import Control.Monad     ( when, unless )
-import Data.Maybe        ( mapMaybe )
+import Data.Maybe        ( mapMaybe, catMaybes )
 import GHC.Exts          ( unsafeCoerce# )
 
 -- | Loads the plugins specified in the pluginModNames field of the dynamic
@@ -69,7 +69,10 @@ initializePlugins hsc_env df
   = return df -- no need to reload plugins
   | otherwise
   = do loadedPlugins <- loadPlugins (hsc_env { hsc_dflags = df })
-       return $ df { cachedPlugins = loadedPlugins }
+       let df' = df { cachedPlugins = loadedPlugins }
+           updateHooks = foldr (.) id $ catMaybes (mapPlugins df' hooksPlugin)
+       return $ df' { hooks = updateHooks (hooks df') }
+
   where argumentsForPlugin p = map snd . filter ((== lpModuleName p) . fst)
 
 loadPlugins :: HscEnv -> IO [LoadedPlugin]

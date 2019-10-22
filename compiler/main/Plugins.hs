@@ -55,6 +55,7 @@ import TcRnTypes ( TcGblEnv, IfM, TcM, tcg_rn_decls, tcg_rn_exports  )
 import TcHoleFitTypes ( HoleFitPluginR )
 import GHC.Hs
 import DynFlags
+import Hooks
 import HscTypes
 import GhcMonad
 import DriverPhases
@@ -92,6 +93,9 @@ data Plugin = Plugin {
   , holeFitPlugin :: HoleFitPlugin
     -- ^ An optional plugin to handle hole fits, which may re-order
     --   or change the list of valid hole fits and refinement hole fits.
+  , hooksPlugin :: HooksPlugin
+    -- ^ An optional plugin to register hooks, by supplying a
+    --   @'Hooks' -> 'Hooks'@ function to GHC.
   , pluginRecompile :: [CommandLineOption] -> IO PluginRecompile
     -- ^ Specify how the plugin should affect recompilation.
   , parsedResultAction :: [CommandLineOption] -> ModSummary -> HsParsedModule
@@ -183,6 +187,7 @@ instance Monoid PluginRecompile where
 type CorePlugin = [CommandLineOption] -> [CoreToDo] -> CoreM [CoreToDo]
 type TcPlugin = [CommandLineOption] -> Maybe TcRnTypes.TcPlugin
 type HoleFitPlugin = [CommandLineOption] -> Maybe HoleFitPluginR
+type HooksPlugin = [CommandLineOption] -> Maybe (Hooks -> Hooks)
 
 purePlugin, impurePlugin, flagRecompile :: [CommandLineOption] -> IO PluginRecompile
 purePlugin _args = return NoForceRecompile
@@ -201,6 +206,7 @@ defaultPlugin = Plugin {
         installCoreToDos      = const return
       , tcPlugin              = const Nothing
       , holeFitPlugin         = const Nothing
+      , hooksPlugin           = const Nothing
       , pluginRecompile       = impurePlugin
       , renamedResultAction   = \_ env grp -> return (env, grp)
       , parsedResultAction    = \_ _ -> return

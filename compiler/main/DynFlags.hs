@@ -1108,7 +1108,7 @@ data DynFlags = DynFlags {
     -- To add dynamically loaded plugins through the GHC API see
     -- 'addPluginModuleName' instead.
 
-  -- GHC API hooks
+  -- GHC API/plugin hooks
   hooks                 :: Hooks,
 
   --  For ghc -M
