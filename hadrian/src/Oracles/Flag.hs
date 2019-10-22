@@ -1,6 +1,8 @@
+{-# LANGUAGE MultiWayIf #-}
+
 module Oracles.Flag (
-    Flag (..), flag, getFlag, platformSupportsSharedLibs, ghcWithSMP,
-    ghcWithNativeCodeGen
+    Flag (..), flag, getFlag, platformSupportsSharedLibs,
+    ghcWithNativeCodeGen, targetSupportsSMP
     ) where
 
 import Hadrian.Oracles.TextFile
@@ -57,11 +59,20 @@ platformSupportsSharedLibs = do
     solarisBroken <- flag SolarisBrokenShld
     return $ not (badPlatform || solaris && solarisBroken)
 
-ghcWithSMP :: Action Bool
-ghcWithSMP = do
-    goodArch <- anyTargetArch ["i386", "x86_64", "sparc", "powerpc", "arm", "s390x"]
-    ghcUnreg <- flag GhcUnregisterised
-    return $ goodArch && not ghcUnreg
+-- | Does the target support the threaded runtime system?
+targetSupportsSMP :: Action Bool
+targetSupportsSMP = do
+  unreg <- flag GhcUnregisterised
+  armVer <- targetArmVersion
+  goodArch <- anyTargetArch ["i386", "x86_64", "sparc", "powerpc", "arm", "s390x"]
+  if   -- The THREADED_RTS requires `BaseReg` to be in a register and the
+       -- Unregisterised mode doesn't allow that.
+     | unreg                -> return False
+       -- We don't support load/store barriers pre-ARMv7. See #10433.
+     | Just ver <- armVer
+     , ver < ARMv7          -> return False
+     | goodArch             -> return True
+     | otherwise            -> return False
 
 ghcWithNativeCodeGen :: Action Bool
 ghcWithNativeCodeGen = do
