@@ -13,7 +13,23 @@ module GHC.IO.Handle.Lock (
 
 #include "HsBaseConfig.h"
 
-#if HAVE_FLOCK
+#if HAVE_OFD_LOCKING
+
+#include <sys/unistd.h>
+#include <sys/fcntl.h>
+
+import Data.Function
+import Foreign.C.Error
+import Foreign.C.Types
+import Foreign.Marshal.Utils
+import Foreign.Storable
+import GHC.Ptr
+import GHC.IO.Exception
+import GHC.IO.FD
+import GHC.IO.Handle.FD
+import System.Posix.Types (COff, CPid)
+
+#elif HAVE_FLOCK
 
 #include <sys/file.h>
 
@@ -116,7 +132,7 @@ hUnlock = unlockImpl
 -- multi-threaded environments.
 
 foreign import ccall interruptible "fcntl"
-  c_fcntl :: CInt -> CInt -> Ptr () -> IO CInt
+  c_fcntl :: CInt -> CInt -> Ptr FLock -> IO CInt
 
 data FLock  = FLock { l_type   :: CShort
                     , l_whence :: CShort
@@ -126,27 +142,27 @@ data FLock  = FLock { l_type   :: CShort
                     }
 
 instance Storable FLock where
-    sizeOf _ = #{size flock}
-    alignment _ = #{alignment flock}
+    sizeOf _ = #{size struct flock}
+    alignment _ = #{alignment struct flock}
     poke ptr x = do
         fillBytes ptr 0 (sizeOf x)
-        #{poke flock, l_type}   ptr (l_type x)
-        #{poke flock, l_whence} ptr (l_whence x)
-        #{poke flock, l_start}  ptr (l_start x)
-        #{poke flock, l_len}    ptr (l_len x)
-        #{poke flock, l_pid}    ptr (l_pid x)
+        #{poke struct flock, l_type}   ptr (l_type x)
+        #{poke struct flock, l_whence} ptr (l_whence x)
+        #{poke struct flock, l_start}  ptr (l_start x)
+        #{poke struct flock, l_len}    ptr (l_len x)
+        #{poke struct flock, l_pid}    ptr (l_pid x)
     peek ptr = do
-        FLock <$> #{peek flock, l_type}   ptr
-              <*> #{peek flock, l_whence} ptr
-              <*> #{peek flock, l_start}  ptr
-              <*> #{peek flock, l_len}    ptr
-              <*> #{peek flock, l_pid}    ptr
+        FLock <$> #{peek struct flock, l_type}   ptr
+              <*> #{peek struct flock, l_whence} ptr
+              <*> #{peek struct flock, l_start}  ptr
+              <*> #{peek struct flock, l_len}    ptr
+              <*> #{peek struct flock, l_pid}    ptr
 
 lockImpl :: Handle -> String -> LockMode -> Bool -> IO Bool
 lockImpl h ctx mode block = do
   FD{fdFD = fd} <- handleToFd h
   with flock $ \flock_ptr -> fix $ \retry -> do
-      ret <- with flock $ fcntl fd mode flock_ptr
+      ret <- c_fcntl fd mode' flock_ptr
       case ret of
         0 -> return True
         _ -> getErrno >>= \errno -> if
@@ -160,10 +176,11 @@ lockImpl h ctx mode block = do
                   , l_whence = #{const SEEK_SET}
                   , l_start = 0
                   , l_len = 0
+                  , l_pid = 0
                   }
-    mode
-      | block     = #{const F_SETLKW}
-      | otherwise = #{const F_SETLK}
+    mode'
+      | block     = #{const F_OFD_SETLKW}
+      | otherwise = #{const F_OFD_SETLK}
 
 unlockImpl :: Handle -> IO ()
 unlockImpl h = do
@@ -172,9 +189,10 @@ unlockImpl h = do
                     , l_whence = #{const SEEK_SET}
                     , l_start = 0
                     , l_len = 0
+                    , l_pid = 0
                     }
   throwErrnoIfMinus1_ "hUnlock"
-      $ with flock $ c_fcntl fd #{const F_SETLK}
+      $ with flock $ c_fcntl fd #{const F_OFD_SETLK}
 
 #elif HAVE_FLOCK
 
