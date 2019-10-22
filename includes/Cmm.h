@@ -843,6 +843,10 @@
       if (__gen > 0) { recordMutableCap(__p, __gen); }
 
 /* -----------------------------------------------------------------------------
+   Update remembered set write barrier
+   -------------------------------------------------------------------------- */
+
+/* -----------------------------------------------------------------------------
    Arrays
    -------------------------------------------------------------------------- */
 
@@ -944,3 +948,25 @@
     prim %memcpy(dst_p, src_p, n * SIZEOF_W, SIZEOF_W);        \
                                                                \
     return (dst);
+
+
+//
+// Nonmoving write barrier helpers
+//
+// See Note [Update remembered set] in NonMovingMark.c.
+
+#if defined(THREADED_RTS)
+#define IF_NONMOVING_WRITE_BARRIER_ENABLED                     \
+    if (W_[nonmoving_write_barrier_enabled] != 0) (likely: False)
+#else
+// A similar measure is also taken in rts/NonMoving.h, but that isn't visible from C--
+#define IF_NONMOVING_WRITE_BARRIER_ENABLED                     \
+    if (0)
+#define nonmoving_write_barrier_enabled 0
+#endif
+
+// A useful helper for pushing a pointer to the update remembered set.
+#define updateRemembSetPushPtr(p)                                    \
+    IF_NONMOVING_WRITE_BARRIER_ENABLED {                             \
+      ccall updateRemembSetPushClosure_(BaseReg "ptr", p "ptr");     \
+    }

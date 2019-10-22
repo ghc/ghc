@@ -94,8 +94,8 @@ extern struct NonmovingHeap nonmovingHeap;
 extern memcount nonmoving_live_words;
 
 void nonmovingInit(void);
+void nonmovingStop(void);
 void nonmovingExit(void);
-void nonmovingWaitUntilFinished(void);
 
 
 // dead_weaks and resurrected_threads lists are used for two things:

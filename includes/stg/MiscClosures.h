@@ -543,4 +543,11 @@ void * pushCostCentre (void *ccs, void *cc);
 // Capability.c
 extern unsigned int n_capabilities;
 
+/* -----------------------------------------------------------------------------
+   Nonmoving GC write barrier
+   -------------------------------------------------------------------------- */
+
+#include <rts/NonMoving.h>
+
+
 #endif

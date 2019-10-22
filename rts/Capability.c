@@ -292,6 +292,11 @@ initCapability (Capability *cap, uint32_t i)
                                           RtsFlags.GcFlags.generations,
                                           "initCapability");
 
+
+    // At this point storage manager is not initialized yet, so this will be
+    // initialized in initStorage().
+    cap->upd_rem_set.queue.blocks = NULL;
+
     for (g = 0; g < RtsFlags.GcFlags.generations; g++) {
         cap->mut_lists[g] = NULL;
     }
@@ -861,16 +866,27 @@ yieldCapability (Capability** pCap, Task *task, bool gcAllowed)
     {
         PendingSync *sync = pending_sync;
 
-        if (sync && sync->type == SYNC_GC_PAR) {
-            if (! sync->idle[cap->no]) {
-                traceEventGcStart(cap);
-                gcWorkerThread(cap);
-                traceEventGcEnd(cap);
-                traceSparkCounters(cap);
-                // See Note [migrated bound threads 2]
-                if (task->cap == cap) {
-                    return true;
+        if (sync) {
+            switch (sync->type) {
+            case SYNC_GC_PAR:
+                if (! sync->idle[cap->no]) {
+                    traceEventGcStart(cap);
+                    gcWorkerThread(cap);
+                    traceEventGcEnd(cap);
+                    traceSparkCounters(cap);
+                    // See Note [migrated bound threads 2]
+                    if (task->cap == cap) {
+                        return true;
+                    }
                 }
+                break;
+
+            case SYNC_FLUSH_UPD_REM_SET:
+                debugTrace(DEBUG_nonmoving_gc, "Flushing update remembered set blocks...");
+                break;
+
+            default:
+                break;
             }
         }
     }
