@@ -47,7 +47,9 @@ testRules = do
     -- Using program shipped with testsuite to generate ghcconfig file.
     root -/- ghcConfigProgPath %> \_ -> do
         ghc0Path <- (<.> exe) <$> getCompilerPath "stage0"
-        cmd [ghc0Path] [ghcConfigHsPath, "-o" , root -/- ghcConfigProgPath]
+        -- Invoke via bash to work around #17362.
+        -- Reasons why this is required are not entirely clear.
+        cmd ["bash"] ["-c", ghc0Path ++ " " ++ ghcConfigHsPath ++ " -o " ++ (root -/- ghcConfigProgPath)]
 
     -- Rules for building check-ppr and check-ppr-annotations with the compiler
     -- we are going to test (in-tree or out-of-tree).
