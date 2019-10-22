@@ -1475,8 +1475,8 @@ provideEvidenceForEquation = go init_ts
           -- First the simple case where we don't need to query the oracles
           | isVanillaDataType ty
               -- So no type info unleashed in pattern match
-          , fmap (isTyConTriviallyInhabited . fst) (splitTyConApp_maybe ty) == Just True
-              -- We don't want to print GHC-specific constructors for Int etc.
+          , null neg
+              -- No term-level info either
           || notNull [ l | PmAltLit l <- neg ]
               -- ... or there are literals involved, in which case we don't want
               -- to split on possible constructors
