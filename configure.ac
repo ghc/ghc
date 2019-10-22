@@ -830,6 +830,7 @@ then
 fi
 
 dnl ** check for Python3
+AC_ARG_VAR(PYTHON,[Use as the path to python [default=autodetect]])
 FPTOOLS_PYTHON
 
 dnl ** check for Sphinx toolchain
