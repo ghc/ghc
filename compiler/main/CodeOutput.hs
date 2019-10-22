@@ -71,7 +71,7 @@ codeOutput dflags this_mod filenm location foreign_stubs foreign_fps pkg_deps
                     else cmm_stream
 
               do_lint cmm = withTimingSilent
-                  (pure dflags)
+                  dflags
                   (text "CmmLint"<+>brackets (ppr this_mod))
                   (const ()) $ do
                 { case cmmLint dflags cmm of
@@ -118,7 +118,7 @@ outputC :: DynFlags
 
 outputC dflags filenm cmm_stream packages
   = do
-       withTiming (return dflags) (text "C codegen") (\a -> seq a () {- FIXME -}) $ do
+       withTiming dflags (text "C codegen") (\a -> seq a () {- FIXME -}) $ do
 
          -- figure out which header files to #include in the generated .hc file:
          --
