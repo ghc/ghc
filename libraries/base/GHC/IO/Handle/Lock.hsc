@@ -128,17 +128,17 @@ instance Storable FLock where
     alignment _ = #{alignment flock}
     poke ptr x = do
         fillBytes ptr 0 (sizeOf x)
-        #{poke flock, l_type}   ptr (l_type x)
-        #{poke flock, l_whence} ptr (l_whence x)
-        #{poke flock, l_start}  ptr (l_start x)
-        #{poke flock, l_len}    ptr (l_len x)
-        #{poke flock, l_pid}    ptr (l_pid x)
+        #{poke struct flock, l_type}   ptr (l_type x)
+        #{poke struct flock, l_whence} ptr (l_whence x)
+        #{poke struct flock, l_start}  ptr (l_start x)
+        #{poke struct flock, l_len}    ptr (l_len x)
+        #{poke struct flock, l_pid}    ptr (l_pid x)
     peek ptr = do
-        FLock <$> #{peek flock, l_type}   ptr
-              <*> #{peek flock, l_whence} ptr
-              <*> #{peek flock, l_start}  ptr
-              <*> #{peek flock, l_len}    ptr
-              <*> #{peek flock, l_pid}    ptr
+        FLock <$> #{peek struct flock, l_type}   ptr
+              <*> #{peek struct flock, l_whence} ptr
+              <*> #{peek struct flock, l_start}  ptr
+              <*> #{peek struct flock, l_len}    ptr
+              <*> #{peek struct flock, l_pid}    ptr
 
 lockImpl :: Handle -> String -> LockMode -> Bool -> IO Bool
 lockImpl h ctx mode block = do
