@@ -1397,7 +1397,8 @@ dataConCannotMatch :: [Type] -> DataCon -> Bool
 --                  where T is the dcRepTyCon for the data con
 dataConCannotMatch tys con
   -- See Note [unsafeCoerce magic] in Unsafe.Coerce
-  | dataConName con == unsafeReflDataConName
+  | dataConName con == unsafeReflDataConName ||
+    dataConName con == unsafeHReflDataConName
                       = False
   | null inst_theta   = False   -- Common
   | all isTyVarTy tys = False   -- Also common
