@@ -405,7 +405,7 @@ instance FiniteBits Word16 where
     countLeadingZeros  (W16# x#) = I# (word2Int# (clz16# x#))
     countTrailingZeros (W16# x#) = I# (word2Int# (ctz16# x#))
 
--- | Swap bytes in 'Word16'.
+-- | Reverse order of bytes in 'Word16'.
 --
 -- @since 4.7.0.0
 byteSwap16 :: Word16 -> Word16
