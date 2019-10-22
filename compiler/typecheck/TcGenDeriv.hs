@@ -168,9 +168,11 @@ gen_Eq_binds loc tycon = do
     -- If there are ten or more (arbitrary number) nullary constructors,
     -- use the con2tag stuff.  For small types it's better to use
     -- ordinary pattern matching.
-    (tag_match_cons, pat_match_cons)
-       | nullary_cons `lengthExceeds` 10 = (nullary_cons, non_nullary_cons)
-       | otherwise                       = ([],           all_cons)
+    -- (tag_match_cons, pat_match_cons)
+    --    | nullary_cons `lengthExceeds` 10 = (nullary_cons, non_nullary_cons)
+    --    | otherwise                       = ([],           all_cons)
+
+    (tag_match_cons, pat_match_cons) = (nullary_cons, non_nullary_cons)
 
     no_tag_match_cons = null tag_match_cons
 
