@@ -11,6 +11,7 @@
 #include "rts/EventLogFormat.h"
 #include "rts/EventLogWriter.h"
 #include "Capability.h"
+#include "sm/NonMovingCensus.h"
 
 #include "BeginPrivate.h"
 
@@ -39,6 +40,7 @@ void postSchedEvent(Capability *cap, EventTypeNum tag,
  * Post a nullary event.
  */
 void postEvent(Capability *cap, EventTypeNum tag);
+void postEventNoCap(EventTypeNum tag);
 
 void postEventAtTimestamp (Capability *cap, EventTimestamp ts,
                            EventTypeNum tag);
@@ -159,6 +161,11 @@ void postHeapProfSampleCostCentre(StgWord8 profile_id,
                                   StgWord64 residency);
 #endif /* PROFILING */
 
+void postConcUpdRemSetFlush(Capability *cap);
+void postConcMarkEnd(StgWord32 marked_obj_count);
+void postNonmovingHeapCensus(int log_blk_size,
+                             const struct NonmovingAllocCensus *census);
+
 #else /* !TRACING */
 
 INLINE_HEADER void postSchedEvent (Capability *cap  STG_UNUSED,
@@ -170,6 +177,9 @@ INLINE_HEADER void postSchedEvent (Capability *cap  STG_UNUSED,
 
 INLINE_HEADER void postEvent (Capability *cap  STG_UNUSED,
                               EventTypeNum tag STG_UNUSED)
+{ /* nothing */ }
+
+INLINE_HEADER void postEventNoCap (EventTypeNum tag STG_UNUSED)
 { /* nothing */ }
 
 INLINE_HEADER void postMsg (char *msg STG_UNUSED,
