@@ -215,9 +215,8 @@ lint-release-changelogs:
       - ghc.tar.xz
       - junit.xml
 
-validate-x86_64-linux-deb9-hadrian:
+.validate-linux-hadrian:
   extends: .validate-hadrian
-  stage: build
   image: "registry.gitlab.haskell.org/ghc/ci-images/x86_64-linux-deb9:$DOCKER_REV"
   variables:
     TEST_ENV: "x86_64-linux-deb9-hadrian"
@@ -231,8 +230,12 @@ validate-x86_64-linux-deb9-hadrian:
   tags:
     - x86_64-linux
 
+validate-x86_64-linux-deb9-hadrian:
+  extends: .validate-linux-hadrian
+  stage: build
+
 validate-x86_64-linux-deb9-unreg-hadrian:
-  extends: validate-x86_64-linux-deb9-hadrian
+  extends: .validate-linux-hadrian
   stage: full-build
   variables:
     CONFIGURE_ARGS: --enable-unregisterised
