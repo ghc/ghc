@@ -119,6 +119,7 @@ trivColorable platform virtualRegSqueeze realRegSqueeze RcInteger conflicts excl
                             ArchAlpha     -> panic "trivColorable ArchAlpha"
                             ArchMipseb    -> panic "trivColorable ArchMipseb"
                             ArchMipsel    -> panic "trivColorable ArchMipsel"
+                            ArchS390X     -> panic "trivColorable ArchS390X"
                             ArchJavaScript-> panic "trivColorable ArchJavaScript"
                             ArchUnknown   -> panic "trivColorable ArchUnknown")
         , count2        <- accSqueeze 0 cALLOCATABLE_REGS_INTEGER
@@ -149,6 +150,7 @@ trivColorable platform virtualRegSqueeze realRegSqueeze RcFloat conflicts exclus
                             ArchAlpha     -> panic "trivColorable ArchAlpha"
                             ArchMipseb    -> panic "trivColorable ArchMipseb"
                             ArchMipsel    -> panic "trivColorable ArchMipsel"
+                            ArchS390X     -> panic "trivColorable ArchS390X"
                             ArchJavaScript-> panic "trivColorable ArchJavaScript"
                             ArchUnknown   -> panic "trivColorable ArchUnknown")
         , count2        <- accSqueeze 0 cALLOCATABLE_REGS_FLOAT
@@ -181,6 +183,7 @@ trivColorable platform virtualRegSqueeze realRegSqueeze RcDouble conflicts exclu
                             ArchAlpha     -> panic "trivColorable ArchAlpha"
                             ArchMipseb    -> panic "trivColorable ArchMipseb"
                             ArchMipsel    -> panic "trivColorable ArchMipsel"
+                            ArchS390X     -> panic "trivColorable ArchS390X"
                             ArchJavaScript-> panic "trivColorable ArchJavaScript"
                             ArchUnknown   -> panic "trivColorable ArchUnknown")
         , count2        <- accSqueeze 0 cALLOCATABLE_REGS_DOUBLE

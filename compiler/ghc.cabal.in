@@ -285,6 +285,7 @@ Library
         GHC.Platform.ARM64
         GHC.Platform.NoRegs
         GHC.Platform.PPC
+        GHC.Platform.S390X
         GHC.Platform.SPARC
         GHC.Platform.X86
         GHC.Platform.X86_64

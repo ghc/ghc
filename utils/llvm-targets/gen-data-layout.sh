@@ -70,6 +70,8 @@ TARGETS=(
     "powerpc64le-unknown-linux-gnu"
     "powerpc64le-unknown-linux-musl"
     "powerpc64le-unknown-linux"
+    # Linux s390x
+    "s390x-ibm-linux"
 
     #########################
     # Darwin
@@ -92,8 +94,8 @@ TARGETS=(
 
     # FreeBSD ARM
     "aarch64-unknown-freebsd"
-    "armv6-unknown-freebsd-gnueabihf"
-    "armv7-unknown-freebsd-gnueabihf"
+    "armv6-unknown-freebsd"
+    "armv7-unknown-freebsd"
 
     #########################
     # Other

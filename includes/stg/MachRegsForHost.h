@@ -67,6 +67,10 @@
 #define MACHREGS_darwin   1
 #endif
 
+#if defined(s390x_HOST_ARCH)
+#define MACHREGS_s390x    1
+#endif
+
 #endif
 
 #include "MachRegs.h"

@@ -370,7 +370,7 @@ library
 
     if arch(i386) || arch(powerpc) || arch(powerpc64)
        asm-sources: AdjustorAsm.S
-    if arch(powerpc) || arch(powerpc64) || arch(powerpc64le)
+    if arch(powerpc) || arch(powerpc64) || arch(powerpc64le) || arch(s390x)
        asm-sources: StgCRunAsm.S
 
     c-sources: Adjustor.c

@@ -59,7 +59,7 @@ platformSupportsSharedLibs = do
 
 ghcWithSMP :: Action Bool
 ghcWithSMP = do
-    goodArch <- anyTargetArch ["i386", "x86_64", "sparc", "powerpc", "arm"]
+    goodArch <- anyTargetArch ["i386", "x86_64", "sparc", "powerpc", "arm", "s390x"]
     ghcUnreg <- flag GhcUnregisterised
     return $ goodArch && not ghcUnreg
 
