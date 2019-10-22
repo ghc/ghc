@@ -72,6 +72,9 @@ fi
 # Linux open file descriptor locks
 AC_CHECK_DECL([F_OFD_SETLK], [
   AC_DEFINE([HAVE_OFD_LOCKING], [1], [Define if you have open file descriptor lock support.])
+], [], [
+  #include <unistd.h>
+  #include <fcntl.h>
 ])
 
 # flock
