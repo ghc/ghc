@@ -19,6 +19,7 @@ before_script:
 
 stages:
   - lint        # Source linting
+  - hello
   - quick-build # A very quick smoke-test to weed out broken commits
   - build       # A quick smoke-test to weed out broken commits
   - full-build  # Build all the things
@@ -236,7 +237,7 @@ validate-x86_64-linux-deb9-hadrian:
 
 validate-x86_64-linux-deb9-unreg-hadrian:
   extends: .validate-linux-hadrian
-  stage: full-build
+  stage: hello
   variables:
     CONFIGURE_ARGS: --enable-unregisterised
     TEST_ENV: "x86_64-linux-deb9-unreg"
