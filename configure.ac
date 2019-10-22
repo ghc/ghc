@@ -829,6 +829,9 @@ then
     HSCOLOUR=`cygpath -m ${HSCOLOUR}`
 fi
 
+dnl ** check for Python3
+FPTOOLS_PYTHON
+
 dnl ** check for Sphinx toolchain
 AC_PATH_PROG(SPHINXBUILD,sphinx-build)
 AC_CACHE_CHECK([for version of sphinx-build], fp_cv_sphinx_version,
@@ -1392,6 +1395,7 @@ echo "\
    genlib       : $GenlibCmd
    Happy        : $HappyCmd ($HappyVersion)
    Alex         : $AlexCmd ($AlexVersion)
+   python       : $PythonCmd ($PythonVersion)
    sphinx-build : $SPHINXBUILD
    xelatex      : $XELATEX
    makeinfo     : $MAKEINFO

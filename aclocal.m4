@@ -1038,6 +1038,34 @@ AC_SUBST(AlexVersion)
 ])
 
 
+dnl
+dnl Check for Python and version.
+dnl
+dnl 1. Use python specified in env var PYTHON
+dnl 2. Find python in path
+dnl 3. Check python version
+dnl
+AC_DEFUN([FPTOOLS_PYTHON],
+[AC_PATH_PROGS(PYTHON,python3 python,)
+AC_SUBST(PythonCmd,$PYTHON)
+AC_CACHE_CHECK([for version of python], fp_cv_python_version,
+changequote(, )dnl
+[
+if test x"$PythonCmd" != x; then
+   fp_cv_python_version=`"$PythonCmd" --version 2>&1 |
+       sed 's/Python *\([0-9]\.[0-9]\+\.[0-9]\+\).*/\1/' | head -n1`;
+else
+   fp_cv_python_version="";
+fi;
+changequote([, ])dnl
+])
+FP_COMPARE_VERSIONS([$fp_cv_python_version],[-lt],[3.0.0],
+      [AC_MSG_ERROR([Python version 3.0.0 or later is required to build documentation and to run testsuites.])])[]
+PythonVersion=$fp_cv_python_version;
+AC_SUBST(PythonVersion)
+])
+
+
 # FP_PROG_LD_FLAG
 # ---------------
 # Sets the output variable $2 to $1 if ld supports the $1 flag.
