@@ -14,6 +14,7 @@
 {-# LANGUAGE FlexibleContexts #-}
 {-# LANGUAGE UndecidableInstances #-}
 {-# LANGUAGE DataKinds #-}
+{-# LANGUAGE BangPatterns #-}
 
 -- | Types for the per-module compiler
 module HscTypes (
@@ -215,6 +216,8 @@ import UniqDSet
 import GHC.Serialized   ( Serialized )
 import qualified GHC.LanguageExtensions as LangExt
 
+import GHC.StgToCmm.CgTypes          ( LambdaFormInfo )
+
 import Foreign
 import Control.Monad    ( guard, liftM, ap )
 import Data.IORef
@@ -240,7 +243,7 @@ data HscStatus
                             -- ^ Information for the code generator.
         , hscs_summary    :: ModSummary
                             -- ^ Module info
-        , hscs_iface_gen  :: IO (ModIface, Bool)
+        , hscs_iface_gen  :: Maybe [(Name,LambdaFormInfo)] -> IO (ModIface, Bool)
                             -- ^ Action to generate iface after codegen.
         }
 -- Should HscStatus contain the HomeModInfo?
@@ -933,6 +936,14 @@ data ModIfaceBackend = ModIfaceBackend
     -- the thing isn't in decls. It's useful to know that when seeing if we are
     -- up to date wrt. the old interface. The 'OccName' is the parent of the
     -- name, if it has one.
+
+    -- TODO: Generalize as CgInfo
+  , mi_lf_info  :: Maybe [(Name,IfLFInfo)]
+            -- ^ Lambda form information, deterministically derived
+            -- from core level information. Hence not fingerprinted (TODO:Verify).
+            -- Nothing for typecheck-only interface files.
+            -- Maybe allows differentiating empty modules from no information.
+
   }
 
 data ModIfacePhase
@@ -1140,7 +1151,8 @@ instance Binary ModIface where
                    mi_orphan = orphan,
                    mi_finsts = hasFamInsts,
                    mi_exp_hash = exp_hash,
-                   mi_orphan_hash = orphan_hash
+                   mi_orphan_hash = orphan_hash,
+                   mi_lf_info   = lf_info
                  }}) = do
         put_ bh mod
         put_ bh sig_of
@@ -1173,6 +1185,8 @@ instance Binary ModIface where
         lazyPut bh doc_hdr
         lazyPut bh decl_docs
         lazyPut bh arg_docs
+        put_ bh ( lf_info :: Maybe [(Name,IfLFInfo)])
+
 
    get bh = do
         mod         <- get bh
@@ -1206,6 +1220,7 @@ instance Binary ModIface where
         doc_hdr     <- lazyGet bh
         decl_docs   <- lazyGet bh
         arg_docs    <- lazyGet bh
+        !lf_info    <- (get bh :: IO  (Maybe [(Name,IfLFInfo)]))
         return (ModIface {
                  mi_module      = mod,
                  mi_sig_of      = sig_of,
@@ -1243,7 +1258,8 @@ instance Binary ModIface where
                    mi_orphan_hash = orphan_hash,
                    mi_warn_fn = mkIfaceWarnCache warns,
                    mi_fix_fn = mkIfaceFixCache fixities,
-                   mi_hash_fn = mkIfaceHashCache decls
+                   mi_hash_fn = mkIfaceHashCache decls,
+                   mi_lf_info = lf_info
                  }})
 
 -- | The original names declared of a certain module that are exported
@@ -1292,7 +1308,8 @@ emptyFullModIface mod =
           mi_orphan_hash = fingerprint0,
           mi_warn_fn = emptyIfaceWarnCache,
           mi_fix_fn = emptyIfaceFixCache,
-          mi_hash_fn = emptyIfaceHashCache } }
+          mi_hash_fn = emptyIfaceHashCache,
+          mi_lf_info = Nothing } }
 
 -- | Constructs cache for the 'mi_hash_fn' field of a 'ModIface'
 mkIfaceHashCache :: [(Fingerprint,IfaceDecl)]
@@ -2626,6 +2643,7 @@ type PackageInstEnv          = InstEnv
 type PackageFamInstEnv       = FamInstEnv
 type PackageAnnEnv           = AnnEnv
 type PackageCompleteMatchMap = CompleteMatchMap
+type PackageCgInfoEnv        = NameEnv LambdaFormInfo
 
 -- | Information about other packages that we have slurped in by reading
 -- their interface files
@@ -2693,6 +2711,8 @@ data ExternalPackageState
 
         eps_mod_fam_inst_env :: !(ModuleEnv FamInstEnv), -- ^ The family instances accumulated from external
                                                          -- packages, keyed off the module that declared them
+
+        eps_cg_info_env :: !PackageCgInfoEnv,  -- ^ A map from names to the code generators view of them.
 
         eps_stats :: !EpsStats                 -- ^ Stastics about what was loaded from external packages
   }

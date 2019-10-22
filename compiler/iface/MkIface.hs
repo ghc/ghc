@@ -126,6 +126,7 @@ import Plugins ( PluginRecompile(..), PluginWithArgs(..), LoadedPlugin(..),
 --Qualified import so we can define a Semigroup instance
 -- but it doesn't clash with Outputable.<>
 import qualified Data.Semigroup
+import GHC.StgToCmm.CgTypes
 
 {-
 ************************************************************************
@@ -160,11 +161,12 @@ mkPartialIface hsc_env mod_details
 
 -- | Fully instantiate a interface
 -- Adds fingerprints and potentially code generator produced information.
-mkFullIface :: HscEnv -> PartialModIface -> IO ModIface
-mkFullIface hsc_env partial_iface = do
+mkFullIface :: HscEnv -> PartialModIface -> Maybe [(Name,LambdaFormInfo)] -> IO ModIface
+mkFullIface hsc_env partial_iface lf_infos = do
+    let if_lf_infos = mapSnd toIfLFInfo <$> lf_infos
     full_iface <-
       {-# SCC "addFingerprints" #-}
-      addFingerprints hsc_env partial_iface (mi_decls partial_iface)
+      addFingerprints hsc_env partial_iface (mi_decls partial_iface) if_lf_infos
 
     -- Debug printing
     dumpIfSet_dyn (hsc_dflags hsc_env) Opt_D_dump_hi "FINAL INTERFACE" (pprModIface full_iface)
@@ -221,7 +223,7 @@ mkIfaceTc hsc_env safe_mode mod_details
                    doc_hdr' doc_map arg_map
                    mod_details
 
-          mkFullIface hsc_env partial_iface
+          mkFullIface hsc_env partial_iface Nothing
 
 mkIface_ :: HscEnv -> Module -> HscSource
          -> Bool -> Dependencies -> GlobalRdrEnv
@@ -411,11 +413,13 @@ addFingerprints
         :: HscEnv
         -> PartialModIface   -- The new interface (lacking decls)
         -> [IfaceDecl]       -- The new decls
+        -> Maybe [(Name,IfLFInfo)]
         -> IO ModIface       -- Updated interface
-addFingerprints hsc_env iface0 new_decls
+addFingerprints hsc_env iface0 new_decls lf_infos_undet
  = do
    eps <- hscEPS hsc_env
    let
+       lf_infos = sortBy (\x y -> stableNameCmp (fst x) (fst y)) <$> lf_infos_undet
        warn_fn = mkIfaceWarnCache (mi_warns iface0)
        fix_fn = mkIfaceFixCache (mi_fixities iface0)
 
@@ -520,7 +524,7 @@ addFingerprints hsc_env iface0 new_decls
 
        fingerprint_group (local_env, decls_w_hashes) (AcyclicSCC abi)
           = do let hash_fn = mk_put_name local_env
-                   decl = abiDecl abi
+                   decl = abiDecl abi :: IfaceDecl
                --pprTrace "fingerprinting" (ppr (ifName decl) ) $ do
                hash <- computeFingerprint hash_fn abi
                env' <- extend_hash_env local_env (hash,decl)
@@ -665,10 +669,12 @@ addFingerprints hsc_env iface0 new_decls
    --   - orphans
    --   - deprecations
    --   - flag abi hash
+   --   - lf infos of exports
    mod_hash <- computeFingerprint putNameLiterally
                       (map fst sorted_decls,
                        export_hash,  -- includes orphan_hash
-                       mi_warns iface0)
+                       mi_warns iface0,
+                       lf_infos)
 
    -- The interface hash depends on:
    --   - the ABI hash, plus
@@ -701,6 +707,7 @@ addFingerprints hsc_env iface0 new_decls
       , mi_warn_fn     = warn_fn
       , mi_fix_fn      = fix_fn
       , mi_hash_fn     = lookupOccEnv local_env
+      , mi_lf_info     = lf_infos
       }
     final_iface = iface0 { mi_decls = sorted_decls, mi_final_exts = final_iface_exts }
    --

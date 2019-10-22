@@ -322,10 +322,10 @@ nativeCodeGen' dflags this_mod modLoc ncgImpl h us cmms
         -- printDocs here (in order to do codegen in constant space).
         bufh <- newBufHandle h
         let ngs0 = NGS [] [] [] [] [] [] emptyUFM mapEmpty
-        (ngs, us', a) <- cmmNativeGenStream dflags this_mod modLoc ncgImpl bufh us
-                                         cmms ngs0
-        _ <- finishNativeGen dflags modLoc bufh us' ngs
-        return a
+        (!ngs, !us', !result) <- cmmNativeGenStream dflags this_mod modLoc ncgImpl
+                                        bufh us cmms ngs0
+        !_ <- finishNativeGen dflags modLoc bufh us' ngs
+        return result
 
 finishNativeGen :: Instruction instr
                 => DynFlags
@@ -391,7 +391,7 @@ cmmNativeGenStream :: (Outputable statics, Outputable instr
               -> IO (NativeGenAcc statics instr, UniqSupply, a)
 
 cmmNativeGenStream dflags this_mod modLoc ncgImpl h us cmm_stream ngs
- = do r <- Stream.runStream cmm_stream
+ = do !r <- Stream.runStream cmm_stream
       case r of
         Left a ->
           return (ngs { ngs_imports = reverse $ ngs_imports ngs
