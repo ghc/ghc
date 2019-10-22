@@ -48,22 +48,23 @@ stg2stg :: DynFlags                  -- includes spec of what stg-to-stg passes 
         -> IO [StgTopBinding]        -- output program
 
 stg2stg dflags this_mod binds
-  = do  { showPass dflags "Stg2Stg"
+  = do  { dump_when Opt_D_dump_stg "STG:" binds
+        ; showPass dflags "Stg2Stg"
         ; us <- mkSplitUniqSupply 'g'
 
         -- Do the main business!
         ; binds' <- runStgM us $
             foldM do_stg_pass binds (getStgToDo dflags)
 
-        ; dump_when Opt_D_dump_stg "STG syntax:" binds'
+        ; dump_when Opt_D_dump_stg_final "Final STG:" binds'
 
         ; return binds'
    }
 
   where
-    stg_linter what
+    stg_linter unarised
       | gopt Opt_DoStgLinting dflags
-      = lintStgTopBindings dflags this_mod what
+      = lintStgTopBindings dflags this_mod unarised
       | otherwise
       = \ _whodunnit _binds -> return ()
 
@@ -87,10 +88,10 @@ stg2stg dflags this_mod binds
             end_pass "StgLiftLams" binds'
 
           StgUnarise -> do
-            liftIO (dump_when Opt_D_dump_stg "Pre unarise:" binds)
             us <- getUniqueSupplyM
             liftIO (stg_linter False "Pre-unarise" binds)
             let binds' = unarise us binds
+            liftIO (dump_when Opt_D_dump_stg_unarised "Unarised STG:" binds')
             liftIO (stg_linter True "Unarise" binds')
             return binds'
 

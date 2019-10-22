@@ -369,16 +369,22 @@ STG representation
 These flags dump various phases of GHC's STG pipeline.
 
 .. ghc-flag:: -ddump-stg
-    :shortdesc: Dump final STG
+    :shortdesc: Show CoreToStg output
     :type: dynamic
 
-    Dump output of STG-to-STG passes
+    Show the output of CoreToStg pass.
 
 .. ghc-flag:: -dverbose-stg2stg
     :shortdesc: Show output from each STG-to-STG pass
     :type: dynamic
 
     Show the output of the intermediate STG-to-STG pass. (*lots* of output!)
+
+.. ghc-flag:: -ddump-stg-unarised
+    :shortdesc: Show unarised STG
+    :type: dynamic
+
+    Show the output of the unarise pass.
 
 .. ghc-flag:: -ddump-stg-final
     :shortdesc: Show output of last STG pass.

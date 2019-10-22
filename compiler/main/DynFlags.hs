@@ -454,8 +454,9 @@ data DumpFlag
    | Opt_D_dump_simpl_iterations
    | Opt_D_dump_spec
    | Opt_D_dump_prep
-   | Opt_D_dump_stg
-   | Opt_D_dump_stg_final
+   | Opt_D_dump_stg -- CoreToStg output
+   | Opt_D_dump_stg_unarised -- STG after unarise
+   | Opt_D_dump_stg_final -- STG after stg2stg
    | Opt_D_dump_call_arity
    | Opt_D_dump_exitify
    | Opt_D_dump_stranal
@@ -3396,6 +3397,8 @@ dynamic_flags_deps = [
         (setDumpFlag Opt_D_dump_prep)
   , make_ord_flag defGhcFlag "ddump-stg"
         (setDumpFlag Opt_D_dump_stg)
+  , make_ord_flag defGhcFlag "ddump-stg-unarised"
+        (setDumpFlag Opt_D_dump_stg_unarised)
   , make_ord_flag defGhcFlag "ddump-stg-final"
         (setDumpFlag Opt_D_dump_stg_final)
   , make_ord_flag defGhcFlag "ddump-call-arity"
