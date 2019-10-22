@@ -16,6 +16,7 @@ nonmovingScavengeOne (StgClosure *q)
     ASSERT(LOOKS_LIKE_CLOSURE_PTR(q));
     StgPtr p = (StgPtr)q;
     const StgInfoTable *info = get_itbl(q);
+    const bool saved_eager_promotion = gct->eager_promotion;
 
     switch (info->type) {
 
@@ -23,9 +24,11 @@ nonmovingScavengeOne (StgClosure *q)
     case MVAR_DIRTY:
     {
         StgMVar *mvar = ((StgMVar *)p);
+        gct->eager_promotion = false;
         evacuate((StgClosure **)&mvar->head);
         evacuate((StgClosure **)&mvar->tail);
         evacuate((StgClosure **)&mvar->value);
+        gct->eager_promotion = saved_eager_promotion;
         if (gct->failed_to_evac) {
             mvar->header.info = &stg_MVAR_DIRTY_info;
         } else {
@@ -37,8 +40,10 @@ nonmovingScavengeOne (StgClosure *q)
     case TVAR:
     {
         StgTVar *tvar = ((StgTVar *)p);
+        gct->eager_promotion = false;
         evacuate((StgClosure **)&tvar->current_value);
         evacuate((StgClosure **)&tvar->first_watch_queue_entry);
+        gct->eager_promotion = saved_eager_promotion;
         if (gct->failed_to_evac) {
             tvar->header.info = &stg_TVAR_DIRTY_info;
         } else {
@@ -122,10 +127,21 @@ nonmovingScavengeOne (StgClosure *q)
         break;
     }
 
+    case WEAK:
+    {
+        // We must evacuate the key since it may refer to an object in the
+        // moving heap which may be long gone by the time we call
+        // nonmovingTidyWeaks.
+        StgWeak *weak = (StgWeak *) p;
+        gct->eager_promotion = true;
+        evacuate(&weak->key);
+        gct->eager_promotion = saved_eager_promotion;
+        goto gen_obj;
+    }
+
     gen_obj:
     case CONSTR:
     case CONSTR_NOCAF:
-    case WEAK:
     case PRIM:
     {
         StgPtr end = (P_)((StgClosure *)p)->payload + info->layout.payload.ptrs;
@@ -145,7 +161,9 @@ nonmovingScavengeOne (StgClosure *q)
 
     case MUT_VAR_CLEAN:
     case MUT_VAR_DIRTY:
+        gct->eager_promotion = false;
         evacuate(&((StgMutVar *)p)->var);
+        gct->eager_promotion = saved_eager_promotion;
         if (gct->failed_to_evac) {
             ((StgClosure *)q)->header.info = &stg_MUT_VAR_DIRTY_info;
         } else {
@@ -157,10 +175,12 @@ nonmovingScavengeOne (StgClosure *q)
     {
         StgBlockingQueue *bq = (StgBlockingQueue *)p;
 
+        gct->eager_promotion = false;
         evacuate(&bq->bh);
         evacuate((StgClosure**)&bq->owner);
         evacuate((StgClosure**)&bq->queue);
         evacuate((StgClosure**)&bq->link);
+        gct->eager_promotion = saved_eager_promotion;
 
         if (gct->failed_to_evac) {
             bq->header.info = &stg_BLOCKING_QUEUE_DIRTY_info;
@@ -202,11 +222,9 @@ nonmovingScavengeOne (StgClosure *q)
     case MUT_ARR_PTRS_CLEAN:
     case MUT_ARR_PTRS_DIRTY:
     {
-        // We don't eagerly promote objects pointed to by a mutable
-        // array, but if we find the array only points to objects in
-        // the same or an older generation, we mark it "clean" and
-        // avoid traversing it during minor GCs.
+        gct->eager_promotion = false;
         scavenge_mut_arr_ptrs((StgMutArrPtrs*)p);
+        gct->eager_promotion = saved_eager_promotion;
         if (gct->failed_to_evac) {
             ((StgClosure *)q)->header.info = &stg_MUT_ARR_PTRS_DIRTY_info;
         } else {
@@ -234,14 +252,13 @@ nonmovingScavengeOne (StgClosure *q)
     case SMALL_MUT_ARR_PTRS_DIRTY:
         // follow everything
     {
-        // We don't eagerly promote objects pointed to by a mutable
-        // array, but if we find the array only points to objects in
-        // the same or an older generation, we mark it "clean" and
-        // avoid traversing it during minor GCs.
         StgPtr next = p + small_mut_arr_ptrs_sizeW((StgSmallMutArrPtrs*)p);
+        gct->eager_promotion = false;
         for (p = (P_)((StgSmallMutArrPtrs *)p)->payload; p < next; p++) {
             evacuate((StgClosure **)p);
         }
+        gct->eager_promotion = saved_eager_promotion;
+
         if (gct->failed_to_evac) {
             ((StgClosure *)q)->header.info = &stg_SMALL_MUT_ARR_PTRS_DIRTY_info;
         } else {
@@ -278,21 +295,21 @@ nonmovingScavengeOne (StgClosure *q)
     {
         StgStack *stack = (StgStack*)p;
 
+        gct->eager_promotion = false;
         scavenge_stack(stack->sp, stack->stack + stack->stack_size);
+        gct->eager_promotion = saved_eager_promotion;
         stack->dirty = gct->failed_to_evac;
-        // TODO (osa): There may be something special about stacks that we're
-        // missing. All other mut objects are marked by using a different info
-        // table except stacks.
-
         break;
     }
 
     case MUT_PRIM:
     {
         StgPtr end = (P_)((StgClosure *)p)->payload + info->layout.payload.ptrs;
+        gct->eager_promotion = false;
         for (p = (P_)((StgClosure *)p)->payload; p < end; p++) {
             evacuate((StgClosure **)p);
         }
+        gct->eager_promotion = saved_eager_promotion;
         gct->failed_to_evac = true; // mutable
         break;
     }
@@ -302,12 +319,14 @@ nonmovingScavengeOne (StgClosure *q)
         StgWord i;
         StgTRecChunk *tc = ((StgTRecChunk *) p);
         TRecEntry *e = &(tc -> entries[0]);
+        gct->eager_promotion = false;
         evacuate((StgClosure **)&tc->prev_chunk);
         for (i = 0; i < tc -> next_entry_idx; i ++, e++ ) {
           evacuate((StgClosure **)&e->tvar);
           evacuate((StgClosure **)&e->expected_value);
           evacuate((StgClosure **)&e->new_value);
         }
+        gct->eager_promotion = saved_eager_promotion;
         gct->failed_to_evac = true; // mutable
         break;
       }

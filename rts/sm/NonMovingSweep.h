@@ -22,11 +22,7 @@ void nonmovingSweepLargeObjects(void);
 // Remove dead entries in the stable name table
 void nonmovingSweepStableNameTable(void);
 
-// Collect the set of segments to be collected during a major GC into
-// nonmovingHeap.sweep_list.
-void nonmovingPrepareSweep(void);
-
 #if defined(DEBUG)
 // The non-moving equivalent of the moving collector's gcCAFs.
-void nonmovingGcCafs(struct MarkQueue_ *queue);
+void nonmovingGcCafs(void);
 #endif
