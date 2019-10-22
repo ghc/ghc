@@ -848,6 +848,13 @@ static void checkGeneration (generation *gen,
         total_cnf_blocks += n_nonmoving_compact_blocks + oldest_gen->n_compact_blocks;
         total_cnf_blocks += n_nonmoving_marked_compact_blocks;
 
+        if (counted_cnf_blocks != total_cnf_blocks) {
+          debugBelch("count(nonmoving_compact_objects = %ld\n", countCompactBlocks(nonmoving_compact_objects));
+          debugBelch("n_nonmoving_compact_blocks = %ld\n", n_nonmoving_compact_blocks);
+          debugBelch("oldest_gen->n_compact_blocks = %ld\n", oldest_gen->n_compact_blocks);
+          debugBelch("count(nonmoving_marked_compact_objects = %ld\n", countCompactBlocks(nonmoving_marked_compact_objects));
+          debugBelch("n_nonmoving_marked_compact_blocks = %ld\n", n_nonmoving_marked_compact_blocks);
+        }
         ASSERT(counted_cnf_blocks == total_cnf_blocks);
     }
 
