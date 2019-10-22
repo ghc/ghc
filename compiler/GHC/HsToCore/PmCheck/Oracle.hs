@@ -1183,10 +1183,13 @@ inhabitationCandidates MkDelta{ delta_ty_st = ty_st } ty = do
       _other -> return (Left src_ty)
 
 -- | All these types are trivially inhabited
+triviallyInhabitedTyCons :: UniqSet TyCon
+triviallyInhabitedTyCons = mkUniqSet [
+    charTyCon, doubleTyCon, floatTyCon, intTyCon, wordTyCon, word8TyCon
+  ]
+
 isTyConTriviallyInhabited :: TyCon -> Bool
-isTyConTriviallyInhabited tc =
-  elementOfUniqSet tc $ mkUniqSet [ charTyCon, doubleTyCon, floatTyCon
-                                  , intTyCon, wordTyCon, word8TyCon ]
+isTyConTriviallyInhabited tc = elementOfUniqSet tc triviallyInhabitedTyCons
 
 ----------------------------
 -- * Detecting vacuous types
