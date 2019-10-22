@@ -19,6 +19,7 @@ before_script:
 
 stages:
   - lint        # Source linting
+  - hello
   - quick-build # A very quick smoke-test to weed out broken commits
   - build       # A quick smoke-test to weed out broken commits
   - full-build  # Build all the things
@@ -212,8 +213,9 @@ lint-release-changelogs:
       - ghc.tar.xz
       - junit.xml
 
-.validate-linux-hadrian:
+validate-x86_64-linux-deb9-hadrian:
   extends: .validate-hadrian
+  stage: build
   image: "registry.gitlab.haskell.org/ghc/ci-images/x86_64-linux-deb9:$DOCKER_REV"
   variables:
     TEST_ENV: "x86_64-linux-deb9-hadrian"
@@ -227,13 +229,9 @@ lint-release-changelogs:
   tags:
     - x86_64-linux
 
-validate-x86_64-linux-deb9-hadrian:
-  extends: .validate-linux-hadrian
-  stage: build
-
 validate-x86_64-linux-deb9-unreg-hadrian:
-  extends: .validate-linux-hadrian
-  stage: full-build
+  extends: validate-x86_64-linux-deb9-hadrian
+  stage: hello
   variables:
     CONFIGURE_ARGS: --enable-unregisterised
     TEST_ENV: "x86_64-linux-deb9-unreg"
