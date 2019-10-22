@@ -10,10 +10,7 @@ module TcBackpack (
     implicitRequirements',
     implicitRequirements,
     checkUnitId,
-    tcRnCheckUnitId,
-    tcRnMergeSignatures,
     mergeSignatures,
-    tcRnInstantiateSignature,
     instantiateSignature,
 ) where
 
@@ -38,7 +35,6 @@ import Constraint
 import TcOrigin
 import LoadIface
 import RnNames
-import ErrUtils
 import Id
 import Module
 import Name
@@ -55,7 +51,6 @@ import Maybes
 import TcEnv
 import Var
 import IfaceSyn
-import PrelNames
 import qualified Data.Map as Map
 
 import Finder
@@ -324,42 +319,6 @@ checkUnitId uid = do
                 _ <- mod `checkImplements` IndefModule indef mod_name
                 return ()
       _ -> return () -- if it's hashed, must be well-typed
-
--- | Top-level driver for signature instantiation (run when compiling
--- an @hsig@ file.)
-tcRnCheckUnitId ::
-    HscEnv -> UnitId ->
-    IO (Messages, Maybe ())
-tcRnCheckUnitId hsc_env uid =
-   withTiming (pure dflags)
-              (text "Check unit id" <+> ppr uid)
-              (const ()) $
-   initTc hsc_env
-          HsigFile -- bogus
-          False
-          mAIN -- bogus
-          (realSrcLocSpan (mkRealSrcLoc (fsLit loc_str) 0 0)) -- bogus
-    $ checkUnitId uid
-  where
-   dflags = hsc_dflags hsc_env
-   loc_str = "Command line argument: -unit-id " ++ showSDoc dflags (ppr uid)
-
--- TODO: Maybe lcl_iface0 should be pre-renamed to the right thing? Unclear...
-
--- | Top-level driver for signature merging (run after typechecking
--- an @hsig@ file).
-tcRnMergeSignatures :: HscEnv -> HsParsedModule -> TcGblEnv {- from local sig -} -> ModIface
-                    -> IO (Messages, Maybe TcGblEnv)
-tcRnMergeSignatures hsc_env hpm orig_tcg_env iface =
-  withTiming (pure dflags)
-             (text "Signature merging" <+> brackets (ppr this_mod))
-             (const ()) $
-  initTc hsc_env HsigFile False this_mod real_loc $
-    mergeSignatures hpm orig_tcg_env iface
- where
-  dflags   = hsc_dflags hsc_env
-  this_mod = mi_module iface
-  real_loc = tcg_top_loc orig_tcg_env
 
 thinModIface :: [AvailInfo] -> ModIface -> ModIface
 thinModIface avails iface =
@@ -872,19 +831,6 @@ mergeSignatures
     addDependentFiles src_files
 
     return tcg_env
-
--- | Top-level driver for signature instantiation (run when compiling
--- an @hsig@ file.)
-tcRnInstantiateSignature ::
-    HscEnv -> Module -> RealSrcSpan ->
-    IO (Messages, Maybe TcGblEnv)
-tcRnInstantiateSignature hsc_env this_mod real_loc =
-   withTiming (pure dflags)
-              (text "Signature instantiation"<+>brackets (ppr this_mod))
-              (const ()) $
-   initTc hsc_env HsigFile False this_mod real_loc $ instantiateSignature
-  where
-   dflags = hsc_dflags hsc_env
 
 exportOccs :: [AvailInfo] -> [OccName]
 exportOccs = concatMap (map occName . availNames)
