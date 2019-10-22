@@ -45,5 +45,5 @@ includeCcArgs = do
             , arg "-Irts"
             , arg "-Iincludes"
             , arg $ "-I" ++ libPath
-            , notM ghcWithSMP ? arg "-DNOSMP"
+            , notM targetSupportsSMP ? arg "-DNOSMP"
             , arg "-fcommon" ]

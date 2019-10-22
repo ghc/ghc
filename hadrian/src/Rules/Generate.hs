@@ -315,7 +315,7 @@ generateSettings = do
         , ("integer library", pkgName <$> getIntegerPackage)
         , ("Use interpreter", expr $ yesNo <$> ghcWithInterpreter)
         , ("Use native code generator", expr $ yesNo <$> ghcWithNativeCodeGen)
-        , ("Support SMP", expr $ yesNo <$> ghcWithSMP)
+        , ("Support SMP", expr $ yesNo <$> targetSupportsSMP)
         , ("RTS ways", unwords . map show <$> getRtsWays)
         , ("Tables next to code", expr $ yesNo <$> flag TablesNextToCode)
         , ("Leading underscore", expr $ yesNo <$> flag LeadingUnderscore)
