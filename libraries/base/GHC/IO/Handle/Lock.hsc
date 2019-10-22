@@ -100,6 +100,8 @@ hTryLock :: Handle -> LockMode -> IO Bool
 hTryLock h mode = lockImpl h "hTryLock" mode False
 
 -- | Release a lock taken with 'hLock' or 'hTryLock'.
+--
+-- @since 4.11.0.0
 hUnlock :: Handle -> IO ()
 hUnlock = unlockImpl
 
