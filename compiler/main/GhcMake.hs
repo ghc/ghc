@@ -154,7 +154,7 @@ depanalPartial excluded_mods allow_dup_roots = do
          targets = hsc_targets hsc_env
          old_graph = hsc_mod_graph hsc_env
 
-  withTiming (pure dflags) (text "Chasing dependencies") (const ()) $ do
+  withTiming dflags (text "Chasing dependencies") (const ()) $ do
     liftIO $ debugTraceMsg dflags 2 (hcat [
               text "Chasing modules from: ",
               hcat (punctuate comma (map pprTarget targets))])

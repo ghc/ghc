@@ -400,7 +400,7 @@ loadInterface doc_str mod from
        -- Redo search for our local hole module
        loadInterface doc_str (mkModule (thisPackage dflags) (moduleName mod)) from
   | otherwise
-  = withTimingSilent getDynFlags (text "loading interface") (pure ()) $
+  = withTimingSilentD (text "loading interface") (pure ()) $
     do  {       -- Read the state
           (eps,hpt) <- getEpsAndHpt
         ; gbl_env <- getGblEnv
