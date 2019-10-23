@@ -131,6 +131,49 @@ StgIndStatic *debug_caf_list_snapshot = (StgIndStatic*)END_OF_CAF_LIST;
  * The mark phase is responsible for freeing update remembered set block
  * allocations.
  *
+ * Note that we eagerly flush update remembered sets during minor GCs as
+ * described in Note [Eager update remembered set flushing].
+ *
+ *
+ * Note [Eager update remembered set flushing]
+ * ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+ *
+ * We eagerly flush update remembered sets during minor GCs to avoid scenarios
+ * like the following which could result in long sync pauses:
+ *
+ *  1. We start a major GC, all thread stacks are added to the mark queue.
+ *  2. The concurrent mark thread starts.
+ *  3. The mutator is allowed to resume. One mutator thread T is scheduled and marks its
+ *     stack to its local update remembered set.
+ *  4. The mark thread eventually encounters the mutator thread's stack but
+ *     sees that it has already been marked; skips it.
+ *  5. Thread T continues running but does not push enough to its update
+ *     remembered set to require a flush.
+ *  6. Eventually the mark thread finished marking and requests a final sync.
+ *  7. The thread T flushes its update remembered set.
+ *  8. We find that a large fraction of the heap (namely the subset that is
+ *     only reachable from the thread T's stack) needs to be marked, incurring
+ *     a large sync pause
+ *
+ * We avoid this by periodically (during minor GC) forcing a flush of the
+ * update remembered set.
+ *
+ * A better (but more complex) approach that would be worthwhile trying in the
+ * future would be to rather do the following:
+ *
+ *  1. Concurrent mark phase is on-going
+ *  2. Mark thread runs out of things to mark
+ *  3. Mark thread sends a signal to capabilities requesting that they send
+ *     their update remembered sets without suspending their execution
+ *  4. The mark thread marks everything it was sent; runs out of things to mark
+ *  5. Mark thread initiates a sync
+ *  6. Capabilities send their final update remembered sets and suspend execution
+ *  7. Mark thread marks everything is was sent
+ *  8. Mark thead allows capabilities to resume.
+ *
+ * However, this is obviously a fair amount of complexity and so far the
+ * periodic eager flushing approach has been sufficient.
+ *
  *
  * Note [Concurrent read barrier on deRefWeak#]
  * ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
@@ -361,7 +404,7 @@ push (MarkQueue *q, const MarkQueueEnt *ent)
         } else {
             // allocate a fresh block.
             ACQUIRE_SM_LOCK;
-            bdescr *bd = allocGroup(1);
+            bdescr *bd = allocGroup(MARK_QUEUE_BLOCKS);
             bd->link = q->blocks;
             q->blocks = bd;
             q->top = (MarkQueueBlock *) bd->start;
@@ -392,7 +435,7 @@ markQueuePushClosureGC (MarkQueue *q, StgClosure *p)
         // Yes, this block is full.
         // allocate a fresh block.
         ACQUIRE_SPIN_LOCK(&gc_alloc_block_sync);
-        bdescr *bd = allocGroup(1);
+        bdescr *bd = allocGroup(MARK_QUEUE_BLOCKS);
         bd->link = q->blocks;
         q->blocks = bd;
         q->top = (MarkQueueBlock *) bd->start;
@@ -401,7 +444,6 @@ markQueuePushClosureGC (MarkQueue *q, StgClosure *p)
     }
 
     MarkQueueEnt ent = {
-        .type = MARK_CLOSURE,
         .mark_closure = {
             .p = UNTAG_CLOSURE(p),
             .origin = NULL,
@@ -416,11 +458,8 @@ void push_closure (MarkQueue *q,
                    StgClosure *p,
                    StgClosure **origin)
 {
-    // TODO: Push this into callers where they already have the Bdescr
-    if (HEAP_ALLOCED_GC(p) && (Bdescr((StgPtr) p)->gen != oldest_gen))
-        return;
-
 #if defined(DEBUG)
+    ASSERT(!HEAP_ALLOCED_GC(p) || (Bdescr((StgPtr) p)->gen == oldest_gen));
     ASSERT(LOOKS_LIKE_CLOSURE_PTR(p));
     // Commenting out: too slow
     // if (RtsFlags.DebugFlags.sanity) {
@@ -430,8 +469,12 @@ void push_closure (MarkQueue *q,
     // }
 #endif
 
+    // This must be true as origin points to a pointer and therefore must be
+    // word-aligned. However, we check this as otherwise we would confuse this
+    // with a mark_array entry
+    ASSERT(((uintptr_t) origin & 0x3) == 0);
+
     MarkQueueEnt ent = {
-        .type = MARK_CLOSURE,
         .mark_closure = {
             .p = UNTAG_CLOSURE(p),
             .origin = origin,
@@ -450,10 +493,9 @@ void push_array (MarkQueue *q,
         return;
 
     MarkQueueEnt ent = {
-        .type = MARK_ARRAY,
         .mark_array = {
             .array = array,
-            .start_index = start_index
+            .start_index = (start_index << 16) | 0x3,
         }
     };
     push(q, &ent);
@@ -530,15 +572,11 @@ void updateRemembSetPushThunkEager(Capability *cap,
         MarkQueue *queue = &cap->upd_rem_set.queue;
         push_thunk_srt(queue, &info->i);
 
-        // Don't record the origin of objects living outside of the nonmoving
-        // heap; we can't perform the selector optimisation on them anyways.
-        bool record_origin = check_in_nonmoving_heap((StgClosure*)thunk);
-
         for (StgWord i = 0; i < info->i.layout.payload.ptrs; i++) {
             if (check_in_nonmoving_heap(thunk->payload[i])) {
-                push_closure(queue,
-                             thunk->payload[i],
-                             record_origin ? &thunk->payload[i] : NULL);
+                // Don't bother to push origin; it makes the barrier needlessly
+                // expensive with little benefit.
+                push_closure(queue, thunk->payload[i], NULL);
             }
         }
         break;
@@ -547,7 +585,9 @@ void updateRemembSetPushThunkEager(Capability *cap,
     {
         MarkQueue *queue = &cap->upd_rem_set.queue;
         StgAP *ap = (StgAP *) thunk;
-        push_closure(queue, ap->fun, &ap->fun);
+        if (check_in_nonmoving_heap(ap->fun)) {
+            push_closure(queue, ap->fun, NULL);
+        }
         mark_PAP_payload(queue, ap->fun, ap->payload, ap->n_args);
         break;
     }
@@ -568,9 +608,10 @@ void updateRemembSetPushThunk_(StgRegTable *reg, StgThunk *p)
 
 inline void updateRemembSetPushClosure(Capability *cap, StgClosure *p)
 {
-    if (!check_in_nonmoving_heap(p)) return;
-    MarkQueue *queue = &cap->upd_rem_set.queue;
-    push_closure(queue, p, NULL);
+    if (check_in_nonmoving_heap(p)) {
+        MarkQueue *queue = &cap->upd_rem_set.queue;
+        push_closure(queue, p, NULL);
+    }
 }
 
 void updateRemembSetPushClosure_(StgRegTable *reg, struct StgClosure_ *p)
@@ -667,7 +708,10 @@ void markQueuePushClosure (MarkQueue *q,
                            StgClosure *p,
                            StgClosure **origin)
 {
-    push_closure(q, p, origin);
+    // TODO: Push this into callers where they already have the Bdescr
+    if (check_in_nonmoving_heap(p)) {
+        push_closure(q, p, origin);
+    }
 }
 
 /* TODO: Do we really never want to specify the origin here? */
@@ -704,7 +748,7 @@ void markQueuePushArray (MarkQueue *q,
  *********************************************************/
 
 // Returns invalid MarkQueueEnt if queue is empty.
-static MarkQueueEnt markQueuePop (MarkQueue *q)
+static MarkQueueEnt markQueuePop_ (MarkQueue *q)
 {
     MarkQueueBlock *top;
 
@@ -716,7 +760,7 @@ again:
         // Is this the first block of the queue?
         if (q->blocks->link == NULL) {
             // Yes, therefore queue is empty...
-            MarkQueueEnt none = { .type = NULL_ENTRY };
+            MarkQueueEnt none = { .null_entry = { .p = NULL } };
             return none;
         } else {
             // No, unwind to the previous block and try popping again...
@@ -735,6 +779,47 @@ again:
     return ent;
 }
 
+static MarkQueueEnt markQueuePop (MarkQueue *q)
+{
+#if MARK_PREFETCH_QUEUE_DEPTH == 0
+    return markQueuePop_(q);
+#else
+    unsigned int i = q->prefetch_head;
+    while (nonmovingMarkQueueEntryType(&q->prefetch_queue[i]) == NULL_ENTRY) {
+        MarkQueueEnt new = markQueuePop_(q);
+        if (nonmovingMarkQueueEntryType(&new) == NULL_ENTRY) {
+            // Mark queue is empty; look for any valid entries in the prefetch
+            // queue
+            for (unsigned int j = (i+1) % MARK_PREFETCH_QUEUE_DEPTH;
+                 j != i;
+                 j = (j+1) % MARK_PREFETCH_QUEUE_DEPTH)
+            {
+                if (nonmovingMarkQueueEntryType(&q->prefetch_queue[j]) != NULL_ENTRY) {
+                    i = j;
+                    goto done;
+                }
+            }
+            return new;
+        }
+
+        // The entry may not be a MARK_CLOSURE but it doesn't matter, our
+        // MarkQueueEnt encoding always places the pointer to the object to be
+        // marked first.
+        prefetchForRead(&new.mark_closure.p->header.info);
+        prefetchForRead(&nonmovingGetSegment_unchecked((StgPtr) new.mark_closure.p)->block_size);
+        q->prefetch_queue[i] = new;
+        i = (i + 1) % MARK_PREFETCH_QUEUE_DEPTH;
+    }
+
+  done:
+    ;
+    MarkQueueEnt ret = q->prefetch_queue[i];
+    q->prefetch_queue[i].null_entry.p = NULL;
+    q->prefetch_head = i;
+    return ret;
+#endif
+}
+
 /*********************************************************
  * Creating and destroying MarkQueues and UpdRemSets
  *********************************************************/
@@ -742,10 +827,14 @@ again:
 /* Must hold sm_mutex. */
 static void init_mark_queue_ (MarkQueue *queue)
 {
-    bdescr *bd = allocGroup(1);
+    bdescr *bd = allocGroup(MARK_QUEUE_BLOCKS);
     queue->blocks = bd;
     queue->top = (MarkQueueBlock *) bd->start;
     queue->top->head = 0;
+#if MARK_PREFETCH_QUEUE_DEPTH > 0
+    memset(&queue->prefetch_queue, 0, sizeof(queue->prefetch_queue));
+    queue->prefetch_head = 0;
+#endif
 }
 
 /* Must hold sm_mutex. */
@@ -1492,13 +1581,13 @@ nonmovingMark (MarkQueue *queue)
         count++;
         MarkQueueEnt ent = markQueuePop(queue);
 
-        switch (ent.type) {
+        switch (nonmovingMarkQueueEntryType(&ent)) {
         case MARK_CLOSURE:
             mark_closure(queue, ent.mark_closure.p, ent.mark_closure.origin);
             break;
         case MARK_ARRAY: {
             const StgMutArrPtrs *arr = ent.mark_array.array;
-            StgWord start = ent.mark_array.start_index;
+            StgWord start = ent.mark_array.start_index >> 16;
             StgWord end = start + MARK_ARRAY_CHUNK_LENGTH;
             if (end < arr->ptrs) {
                 markQueuePushArray(queue, ent.mark_array.array, end);
@@ -1743,13 +1832,17 @@ void nonmovingResurrectThreads (struct MarkQueue_ *queue, StgTSO **resurrected_t
 
 void printMarkQueueEntry (MarkQueueEnt *ent)
 {
-    if (ent->type == MARK_CLOSURE) {
+    switch(nonmovingMarkQueueEntryType(ent)) {
+      case MARK_CLOSURE:
         debugBelch("Closure: ");
         printClosure(ent->mark_closure.p);
-    } else if (ent->type == MARK_ARRAY) {
+        break;
+      case MARK_ARRAY:
         debugBelch("Array\n");
-    } else {
+        break;
+      case NULL_ENTRY:
         debugBelch("End of mark\n");
+        break;
     }
 }
 
