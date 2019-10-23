@@ -335,7 +335,7 @@ finishNativeGen :: Instruction instr
                 -> NativeGenAcc statics instr
                 -> IO UniqSupply
 finishNativeGen dflags modLoc bufh@(BufHandle _ _ h) us ngs
- = withTimingSilent (return dflags) (text "NCG") (`seq` ()) $ do
+ = withTimingSilent dflags (text "NCG") (`seq` ()) $ do
         -- Write debug data and finish
         let emitDw = debugLevel dflags > 0
         us' <- if not emitDw then return us else do
@@ -404,7 +404,7 @@ cmmNativeGenStream dflags this_mod modLoc ncgImpl h us cmm_stream ngs
         Right (cmms, cmm_stream') -> do
           (us', ngs'') <-
             withTimingSilent
-                (return dflags)
+                dflags
                 ncglabel (\(a, b) -> a `seq` b `seq` ()) $ do
               -- Generate debug information
               let debugFlag = debugLevel dflags > 0
