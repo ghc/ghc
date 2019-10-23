@@ -840,7 +840,7 @@ finish summary tc_result mb_old_hash = do
                 -- See Note [Avoiding space leaks in toIface*] for details.
                 force (mkPartialIface hsc_env details desugared_guts)
 
-          return ( HscRecomp cg_guts summary partial_iface mb_old_hash, details )
+          return ( HscRecomp cg_guts summary partial_iface mb_old_hash dflags, details )
     else mk_simple_iface
 
 
