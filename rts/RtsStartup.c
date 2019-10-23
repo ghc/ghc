@@ -392,7 +392,8 @@ hs_exit_(bool wait_foreign)
     ioManagerDie();
 #endif
 
-    /* stop all running tasks */
+    /* stop all running tasks. This is also where we stop concurrent non-moving
+     * collection if it's running */
     exitScheduler(wait_foreign);
 
     /* run C finalizers for all active weak pointers */

@@ -29,6 +29,7 @@
 #include "Trace.h"
 #include "GC.h"
 #include "Evac.h"
+#include "NonMoving.h"
 #if defined(ios_HOST_OS)
 #include "Hash.h"
 #endif
@@ -82,7 +83,7 @@ Mutex sm_mutex;
 static void allocNurseries (uint32_t from, uint32_t to);
 static void assignNurseriesToCapabilities (uint32_t from, uint32_t to);
 
-static void
+void
 initGeneration (generation *gen, int g)
 {
     gen->no = g;
@@ -170,6 +171,18 @@ initStorage (void)
   }
   oldest_gen->to = oldest_gen;
 
+  // Nonmoving heap uses oldest_gen so initialize it after initializing oldest_gen
+  nonmovingInit();
+
+#if defined(THREADED_RTS)
+  // nonmovingAddCapabilities allocates segments, which requires taking the gc
+  // sync lock, so initialize it before nonmovingAddCapabilities
+  initSpinLock(&gc_alloc_block_sync);
+#endif
+
+  if (RtsFlags.GcFlags.useNonmoving)
+      nonmovingAddCapabilities(n_capabilities);
+
   /* The oldest generation has one step. */
   if (RtsFlags.GcFlags.compact || RtsFlags.GcFlags.sweep) {
       if (RtsFlags.GcFlags.generations == 1) {
@@ -195,9 +208,6 @@ initStorage (void)
 
   exec_block = NULL;
 
-#if defined(THREADED_RTS)
-  initSpinLock(&gc_alloc_block_sync);
-#endif
   N = 0;
 
   for (n = 0; n < n_numa_nodes; n++) {
@@ -271,6 +281,14 @@ void storageAddCapabilities (uint32_t from, uint32_t to)
         }
     }
 
+    // Initialize NonmovingAllocators and UpdRemSets
+    if (RtsFlags.GcFlags.useNonmoving) {
+        nonmovingAddCapabilities(to);
+        for (i = 0; i < to; ++i) {
+            init_upd_rem_set(&capabilities[i]->upd_rem_set);
+        }
+    }
+
 #if defined(THREADED_RTS) && defined(CC_LLVM_BACKEND) && (CC_SUPPORTS_TLS == 0)
     newThreadLocalKey(&gctKey);
 #endif
@@ -282,6 +300,7 @@ void storageAddCapabilities (uint32_t from, uint32_t to)
 void
 exitStorage (void)
 {
+    nonmovingExit();
     updateNurseriesStats();
     stat_exit();
 }
@@ -302,7 +321,8 @@ freeStorage (bool free_heap)
 }
 
 /* -----------------------------------------------------------------------------
-   Note [CAF management].
+   Note [CAF management]
+   ~~~~~~~~~~~~~~~~~~~~~
 
    The entry code for every CAF does the following:
 
@@ -337,6 +357,7 @@ freeStorage (bool free_heap)
 
    ------------------
    Note [atomic CAF entry]
+   ~~~~~~~~~~~~~~~~~~~~~~~
 
    With THREADED_RTS, newCAF() is required to be atomic (see
    #5558). This is because if two threads happened to enter the same
@@ -350,6 +371,7 @@ freeStorage (bool free_heap)
 
    ------------------
    Note [GHCi CAFs]
+   ~~~~~~~~~~~~~~~~
 
    For GHCI, we have additional requirements when dealing with CAFs:
 
@@ -368,6 +390,51 @@ freeStorage (bool free_heap)
       (see GC.c:revertCAFs()).
 
       -- SDM 29/1/01
+
+   ------------------
+   Note [Static objects under the nonmoving collector]
+   ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+
+   Static object management is a bit tricky under the nonmoving collector as we
+   need to maintain a bit more state than in the moving collector. In
+   particular, the moving collector uses the low bits of the STATIC_LINK field
+   to determine whether the object has been moved to the scavenger's work list
+   (see Note [STATIC_LINK fields] in Storage.h).
+
+   However, the nonmoving collector also needs a place to keep its mark bit.
+   This is problematic as we therefore need at least three bits of state
+   but can assume only two bits are available in STATIC_LINK (due to 32-bit
+   systems).
+
+   To accomodate this we move handling of static objects entirely to the
+   oldest generation when the nonmoving collector is in use. To do this safely
+   and efficiently we allocate the blackhole created by lockCAF() directly in
+   the non-moving heap. This means that the moving collector can completely
+   ignore static objects in minor collections since they are guaranteed not to
+   have any references into the moving heap. Of course, the blackhole itself
+   likely will contain a reference into the moving heap but this is
+   significantly easier to handle, being a heap-allocated object (see Note
+   [Aging under the non-moving collector] in NonMoving.c for details).
+
+   During the moving phase of a major collection we treat static objects
+   as we do any other reference into the non-moving heap by pushing them
+   to the non-moving mark queue (see Note [Aging under the non-moving
+   collector]).
+
+   This allows the non-moving collector to have full control over the flags
+   in STATIC_LINK, which it uses as described in Note [STATIC_LINK fields]).
+   This is implemented by NonMovingMark.c:bump_static_flag.
+
+   In short, the plan is:
+
+     - lockCAF allocates its blackhole in the nonmoving heap. This is important
+       to ensure that we do not need to place the static object on the mut_list
+       lest we would need somw way to ensure that it evacuate only once during
+       a moving collection.
+
+     - evacuate_static_object adds merely pushes objects to the mark queue
+
+     - the nonmoving collector uses the flags in STATIC_LINK as its mark bit.
 
    -------------------------------------------------------------------------- */
 
@@ -402,11 +469,36 @@ lockCAF (StgRegTable *reg, StgIndStatic *caf)
     // successfully claimed by us; overwrite with IND_STATIC
 #endif
 
+    // Push stuff that will become unreachable after updating to UpdRemSet to
+    // maintain snapshot invariant
+    const StgInfoTable *orig_info_tbl = INFO_PTR_TO_STRUCT(orig_info);
+    // OSA: Assertions to make sure my understanding of static thunks is correct
+    ASSERT(orig_info_tbl->type == THUNK_STATIC);
+    // Secondly I think static thunks can't have payload: anything that they
+    // reference should be in SRTs
+    ASSERT(orig_info_tbl->layout.payload.ptrs == 0);
+    // Becuase the payload is empty we just push the SRT
+    IF_NONMOVING_WRITE_BARRIER_ENABLED {
+        StgThunkInfoTable *thunk_info = itbl_to_thunk_itbl(orig_info_tbl);
+        if (thunk_info->i.srt) {
+            updateRemembSetPushClosure(cap, GET_SRT(thunk_info));
+        }
+    }
+
     // For the benefit of revertCAFs(), save the original info pointer
     caf->saved_info = orig_info;
 
     // Allocate the blackhole indirection closure
-    bh = (StgInd *)allocate(cap, sizeofW(*bh));
+    if (RtsFlags.GcFlags.useNonmoving) {
+        // See Note [Static objects under the nonmoving collector].
+        ACQUIRE_SM_LOCK;
+        bh = (StgInd *)nonmovingAllocate(cap, sizeofW(*bh));
+        RELEASE_SM_LOCK;
+        recordMutableCap((StgClosure*)bh,
+                         regTableToCapability(reg), oldest_gen->no);
+    } else {
+        bh = (StgInd *)allocate(cap, sizeofW(*bh));
+    }
     bh->indirectee = (StgClosure *)cap->r.rCurrentTSO;
     SET_HDR(bh, &stg_CAF_BLACKHOLE_info, caf->header.prof.ccs);
     // Ensure that above writes are visible before we introduce reference as CAF indirectee.
@@ -448,7 +540,9 @@ newCAF(StgRegTable *reg, StgIndStatic *caf)
     else
     {
         // Put this CAF on the mutable list for the old generation.
-        if (oldest_gen->no != 0) {
+        // N.B. the nonmoving collector works a bit differently: see
+        // Note [Static objects under the nonmoving collector].
+        if (oldest_gen->no != 0 && !RtsFlags.GcFlags.useNonmoving) {
             recordMutableCap((StgClosure*)caf,
                              regTableToCapability(reg), oldest_gen->no);
         }
@@ -525,7 +619,9 @@ StgInd* newGCdCAF (StgRegTable *reg, StgIndStatic *caf)
     if (!bh) return NULL;
 
     // Put this CAF on the mutable list for the old generation.
-    if (oldest_gen->no != 0) {
+    // N.B. the nonmoving collector works a bit differently:
+    // see Note [Static objects under the nonmoving collector].
+    if (oldest_gen->no != 0 && !RtsFlags.GcFlags.useNonmoving) {
         recordMutableCap((StgClosure*)caf,
                          regTableToCapability(reg), oldest_gen->no);
     }
@@ -1073,6 +1169,27 @@ allocatePinned (Capability *cap, W_ n)
    Write Barriers
    -------------------------------------------------------------------------- */
 
+/* These write barriers on heavily mutated objects serve two purposes:
+ *
+ * - Efficient maintenance of the generational invariant: Record whether or not
+ *   we have added a particular mutable object to mut_list as they may contain
+ *   references to younger generations.
+ *
+ * - Maintenance of the nonmoving collector's snapshot invariant: Record objects
+ *   which are about to no longer be reachable due to mutation.
+ *
+ * In each case we record whether the object has been added to the mutable list
+ * by way of either the info pointer or a dedicated "dirty" flag. The GC will
+ * clear this flag and remove the object from mut_list (or rather, not re-add it)
+ * to if it finds the object contains no references into any younger generation.
+ *
+ * Note that all dirty objects will be marked as clean during preparation for a
+ * concurrent collection. Consequently, we can use the dirtiness flag to determine
+ * whether or not we need to add overwritten pointers to the update remembered
+ * set (since we need only write the value prior to the first update to maintain
+ * the snapshot invariant).
+ */
+
 /*
    This is the write barrier for MUT_VARs, a.k.a. IORefs.  A
    MUT_VAR_CLEAN object is not on the mutable list; a MUT_VAR_DIRTY
@@ -1080,25 +1197,39 @@ allocatePinned (Capability *cap, W_ n)
    and is put on the mutable list.
 */
 void
-dirty_MUT_VAR(StgRegTable *reg, StgClosure *p)
+dirty_MUT_VAR(StgRegTable *reg, StgMutVar *mvar, StgClosure *old)
 {
     Capability *cap = regTableToCapability(reg);
     // No barrier required here as no other heap object fields are read. See
     // note [Heap memory barriers] in SMP.h.
-    if (p->header.info == &stg_MUT_VAR_CLEAN_info) {
-        p->header.info = &stg_MUT_VAR_DIRTY_info;
-        recordClosureMutated(cap,p);
+    if (mvar->header.info == &stg_MUT_VAR_CLEAN_info) {
+        mvar->header.info = &stg_MUT_VAR_DIRTY_info;
+        recordClosureMutated(cap, (StgClosure *) mvar);
+        IF_NONMOVING_WRITE_BARRIER_ENABLED {
+            updateRemembSetPushClosure_(reg, old);
+        }
     }
 }
 
+/*
+ * This is the write barrier for TVARs.
+ * old is the pointer that we overwrote, which is required by the concurrent
+ * garbage collector. Note that we, while StgTVars contain multiple pointers,
+ * only overwrite one per dirty_TVAR call so we only need to take one old
+ * pointer argument.
+ */
 void
-dirty_TVAR(Capability *cap, StgTVar *p)
+dirty_TVAR(Capability *cap, StgTVar *p,
+           StgClosure *old)
 {
     // No barrier required here as no other heap object fields are read. See
     // note [Heap memory barriers] in SMP.h.
     if (p->header.info == &stg_TVAR_CLEAN_info) {
         p->header.info = &stg_TVAR_DIRTY_info;
         recordClosureMutated(cap,(StgClosure*)p);
+        IF_NONMOVING_WRITE_BARRIER_ENABLED {
+            updateRemembSetPushClosure(cap, old);
+        }
     }
 }
 
@@ -1113,6 +1244,9 @@ setTSOLink (Capability *cap, StgTSO *tso, StgTSO *target)
     if (tso->dirty == 0) {
         tso->dirty = 1;
         recordClosureMutated(cap,(StgClosure*)tso);
+        IF_NONMOVING_WRITE_BARRIER_ENABLED {
+            updateRemembSetPushClosure(cap, (StgClosure *) tso->_link);
+        }
     }
     tso->_link = target;
 }
@@ -1123,6 +1257,9 @@ setTSOPrev (Capability *cap, StgTSO *tso, StgTSO *target)
     if (tso->dirty == 0) {
         tso->dirty = 1;
         recordClosureMutated(cap,(StgClosure*)tso);
+        IF_NONMOVING_WRITE_BARRIER_ENABLED {
+            updateRemembSetPushClosure(cap, (StgClosure *) tso->block_info.prev);
+        }
     }
     tso->block_info.prev = target;
 }
@@ -1134,14 +1271,48 @@ dirty_TSO (Capability *cap, StgTSO *tso)
         tso->dirty = 1;
         recordClosureMutated(cap,(StgClosure*)tso);
     }
+
+    IF_NONMOVING_WRITE_BARRIER_ENABLED {
+        updateRemembSetPushTSO(cap, tso);
+    }
 }
 
 void
 dirty_STACK (Capability *cap, StgStack *stack)
 {
-    if (stack->dirty == 0) {
-        stack->dirty = 1;
+    // First push to upd_rem_set before we set stack->dirty since we
+    // the nonmoving collector may already be marking the stack.
+    IF_NONMOVING_WRITE_BARRIER_ENABLED {
+        updateRemembSetPushStack(cap, stack);
+    }
+
+    if (! (stack->dirty & STACK_DIRTY)) {
+        stack->dirty = STACK_DIRTY;
         recordClosureMutated(cap,(StgClosure*)stack);
+    }
+
+}
+
+/*
+ * This is the concurrent collector's write barrier for MVARs. In the other
+ * write barriers above this is folded into the dirty_* functions.  However, in
+ * the case of MVars we need to separate the acts of adding the MVar to the
+ * mutable list and adding its fields to the update remembered set.
+ *
+ * Specifically, the wakeup loop in stg_putMVarzh wants to freely mutate the
+ * pointers of the MVar but needs to keep its lock, meaning we can't yet add it
+ * to the mutable list lest the assertion checking for clean MVars on the
+ * mutable list would fail.
+ */
+void
+update_MVAR(StgRegTable *reg, StgClosure *p, StgClosure *old_val)
+{
+    Capability *cap = regTableToCapability(reg);
+    IF_NONMOVING_WRITE_BARRIER_ENABLED {
+        StgMVar *mvar = (StgMVar *) p;
+        updateRemembSetPushClosure(cap, old_val);
+        updateRemembSetPushClosure(cap, (StgClosure *) mvar->head);
+        updateRemembSetPushClosure(cap, (StgClosure *) mvar->tail);
     }
 }
 
@@ -1154,9 +1325,11 @@ dirty_STACK (Capability *cap, StgStack *stack)
    such as Chaneneos and cheap-concurrency.
 */
 void
-dirty_MVAR(StgRegTable *reg, StgClosure *p)
+dirty_MVAR(StgRegTable *reg, StgClosure *p, StgClosure *old_val)
 {
-    recordClosureMutated(regTableToCapability(reg),p);
+    Capability *cap = regTableToCapability(reg);
+    update_MVAR(reg, p, old_val);
+    recordClosureMutated(cap, p);
 }
 
 /* -----------------------------------------------------------------------------
@@ -1232,8 +1405,8 @@ W_ countOccupied (bdescr *bd)
 
 W_ genLiveWords (generation *gen)
 {
-    return gen->n_words + gen->n_large_words +
-        gen->n_compact_blocks * BLOCK_SIZE_W;
+    return (gen->live_estimate ? gen->live_estimate : gen->n_words) +
+        gen->n_large_words + gen->n_compact_blocks * BLOCK_SIZE_W;
 }
 
 W_ genLiveBlocks (generation *gen)
@@ -1289,9 +1462,9 @@ calcNeeded (bool force_major, memcount *blocks_needed)
     for (uint32_t g = 0; g < RtsFlags.GcFlags.generations; g++) {
         generation *gen = &generations[g];
 
-        W_ blocks = gen->n_blocks // or: gen->n_words / BLOCK_SIZE_W (?)
-                  + gen->n_large_blocks
-                  + gen->n_compact_blocks;
+        W_ blocks = gen->live_estimate ? (gen->live_estimate / BLOCK_SIZE_W) : gen->n_blocks;
+        blocks += gen->n_large_blocks
+                + gen->n_compact_blocks;
 
         // we need at least this much space
         needed += blocks;
@@ -1309,7 +1482,7 @@ calcNeeded (bool force_major, memcount *blocks_needed)
                 //  mark stack:
                 needed += gen->n_blocks / 100;
             }
-            if (gen->compact) {
+            if (gen->compact || (RtsFlags.GcFlags.useNonmoving && gen == oldest_gen)) {
                 continue; // no additional space needed for compaction
             } else {
                 needed += gen->n_blocks;
@@ -1408,6 +1581,7 @@ void flushExec (W_ len, AdjustorExecutable exec_addr)
   __clear_cache((void*)begin, (void*)end);
 # endif
 #elif defined(__GNUC__)
+  /* For all other platforms, fall back to a libgcc builtin. */
   unsigned char* begin = (unsigned char*)exec_addr;
   unsigned char* end   = begin + len;
 # if GCC_HAS_BUILTIN_CLEAR_CACHE

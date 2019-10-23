@@ -21,7 +21,7 @@
 
 snEntry *stable_name_table = NULL;
 static snEntry *stable_name_free = NULL;
-static unsigned int SNT_size = 0;
+unsigned int SNT_size = 0;
 #define INIT_SNT_SIZE 64
 
 #if defined(THREADED_RTS)
@@ -128,7 +128,7 @@ exitStableNameTable(void)
 #endif
 }
 
-STATIC_INLINE void
+void
 freeSnEntry(snEntry *sn)
 {
   ASSERT(sn->sn_obj == NULL);
@@ -218,27 +218,6 @@ lookupStableName (StgPtr p)
  * Remember old stable name addresses
  * -------------------------------------------------------------------------- */
 
-#define FOR_EACH_STABLE_NAME(p, CODE)                                   \
-    do {                                                                \
-        snEntry *p;                                                     \
-        snEntry *__end_ptr = &stable_name_table[SNT_size];              \
-        for (p = stable_name_table + 1; p < __end_ptr; p++) {           \
-            /* Internal pointers are free slots.  */                    \
-            /* If p->addr == NULL, it's a */                            \
-            /* stable name where the object has been GC'd, but the */   \
-            /* StableName object (sn_obj) is still alive. */            \
-            if ((p->addr < (P_)stable_name_table ||                     \
-                 p->addr >= (P_)__end_ptr))                             \
-            {                                                           \
-                /* NOTE: There is an ambiguity here if p->addr == NULL */ \
-                /* it is either the last item in the free list or it */ \
-                /* is a stable name whose pointee died. sn_obj == NULL */ \
-                /* disambiguates as last free list item. */             \
-                do { CODE } while(0);                                   \
-            }                                                           \
-        }                                                               \
-    } while(0)
-
 void
 rememberOldStableNameAddresses(void)
 {
@@ -284,6 +263,9 @@ threadStableNameTable( evac_fn evac, void *user )
 void
 gcStableNameTable( void )
 {
+    // We must take the stable name lock lest we race with the nonmoving
+    // collector (namely nonmovingSweepStableNameTable).
+    stableNameLock();
     FOR_EACH_STABLE_NAME(
         p, {
             // FOR_EACH_STABLE_NAME traverses free entries too, so
@@ -307,6 +289,7 @@ gcStableNameTable( void )
                 }
             }
         });
+    stableNameUnlock();
 }
 
 /* -----------------------------------------------------------------------------

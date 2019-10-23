@@ -150,21 +150,22 @@ data MiscFlags = MiscFlags
 --
 -- @since 4.8.0.0
 data DebugFlags = DebugFlags
-    { scheduler   :: Bool -- ^ @s@
-    , interpreter :: Bool -- ^ @i@
-    , weak        :: Bool -- ^ @w@
-    , gccafs      :: Bool -- ^ @G@
-    , gc          :: Bool -- ^ @g@
-    , block_alloc :: Bool -- ^ @b@
-    , sanity      :: Bool -- ^ @S@
-    , stable      :: Bool -- ^ @t@
-    , prof        :: Bool -- ^ @p@
-    , linker      :: Bool -- ^ @l@ the object linker
-    , apply       :: Bool -- ^ @a@
-    , stm         :: Bool -- ^ @m@
-    , squeeze     :: Bool -- ^ @z@ stack squeezing & lazy blackholing
-    , hpc         :: Bool -- ^ @c@ coverage
-    , sparks      :: Bool -- ^ @r@
+    { scheduler      :: Bool -- ^ @s@
+    , interpreter    :: Bool -- ^ @i@
+    , weak           :: Bool -- ^ @w@
+    , gccafs         :: Bool -- ^ @G@
+    , gc             :: Bool -- ^ @g@
+    , nonmoving_gc   :: Bool -- ^ @n@
+    , block_alloc    :: Bool -- ^ @b@
+    , sanity         :: Bool -- ^ @S@
+    , stable         :: Bool -- ^ @t@
+    , prof           :: Bool -- ^ @p@
+    , linker         :: Bool -- ^ @l@ the object linker
+    , apply          :: Bool -- ^ @a@
+    , stm            :: Bool -- ^ @m@
+    , squeeze        :: Bool -- ^ @z@ stack squeezing & lazy blackholing
+    , hpc            :: Bool -- ^ @c@ coverage
+    , sparks         :: Bool -- ^ @r@
     } deriving ( Show -- ^ @since 4.8.0.0
                )
 
@@ -291,6 +292,8 @@ data TraceFlags = TraceFlags
     , timestamp      :: Bool -- ^ show timestamp in stderr output
     , traceScheduler :: Bool -- ^ trace scheduler events
     , traceGc        :: Bool -- ^ trace GC events
+    , traceNonmovingGc
+                     :: Bool -- ^ trace nonmoving GC heap census samples
     , sparksSampled  :: Bool -- ^ trace spark events by a sampled method
     , sparksFull     :: Bool -- ^ trace spark events 100% accurately
     , user           :: Bool -- ^ trace user events (emitted from Haskell code)
@@ -463,6 +466,8 @@ getDebugFlags = do
              <*> (toBool <$>
                    (#{peek DEBUG_FLAGS, gc} ptr :: IO CBool))
              <*> (toBool <$>
+                   (#{peek DEBUG_FLAGS, nonmoving_gc} ptr :: IO CBool))
+             <*> (toBool <$>
                    (#{peek DEBUG_FLAGS, block_alloc} ptr :: IO CBool))
              <*> (toBool <$>
                    (#{peek DEBUG_FLAGS, sanity} ptr :: IO CBool))
@@ -522,6 +527,8 @@ getTraceFlags = do
                    (#{peek TRACE_FLAGS, scheduler} ptr :: IO CBool))
              <*> (toBool <$>
                    (#{peek TRACE_FLAGS, gc} ptr :: IO CBool))
+             <*> (toBool <$>
+                   (#{peek TRACE_FLAGS, nonmoving_gc} ptr :: IO CBool))
              <*> (toBool <$>
                    (#{peek TRACE_FLAGS, sparks_sampled} ptr :: IO CBool))
              <*> (toBool <$>

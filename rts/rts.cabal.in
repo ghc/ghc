@@ -139,6 +139,7 @@ library
                       rts/Linker.h
                       rts/Main.h
                       rts/Messages.h
+                      rts/NonMoving.h
                       rts/OSThreads.h
                       rts/Parallel.h
                       rts/PrimFloat.h
@@ -465,6 +466,12 @@ library
                sm/GCUtils.c
                sm/MBlock.c
                sm/MarkWeak.c
+               sm/NonMoving.c
+               sm/NonMovingCensus.c
+               sm/NonMovingMark.c
+               sm/NonMovingScav.c
+               sm/NonMovingShortcut.c
+               sm/NonMovingSweep.c
                sm/Sanity.c
                sm/Scav.c
                sm/Scav_thr.c

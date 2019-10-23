@@ -80,6 +80,10 @@ extern "C" {
 #define RTS_UNREACHABLE abort()
 #endif
 
+/* Prefetch primitives */
+#define prefetchForRead(ptr) __builtin_prefetch(ptr, 0)
+#define prefetchForWrite(ptr) __builtin_prefetch(ptr, 1)
+
 /* Fix for mingw stat problem (done here so it's early enough) */
 #if defined(mingw32_HOST_OS)
 #define __MSVCRT__ 1
@@ -203,6 +207,7 @@ void _assertFail(const char *filename, unsigned int linenum)
 #include "rts/storage/ClosureMacros.h"
 #include "rts/storage/MBlock.h"
 #include "rts/storage/GC.h"
+#include "rts/NonMoving.h"
 
 /* Other RTS external APIs */
 #include "rts/Parallel.h"
@@ -287,26 +292,27 @@ TICK_VAR(2)
 #define IF_RTSFLAGS(c,s)  if (RtsFlags.c) { s; } doNothing()
 
 #if defined(DEBUG)
+/* See Note [RtsFlags is a pointer in STG code] */
 #if IN_STG_CODE
 #define IF_DEBUG(c,s)  if (RtsFlags[0].DebugFlags.c) { s; } doNothing()
 #else
 #define IF_DEBUG(c,s)  if (RtsFlags.DebugFlags.c) { s; } doNothing()
-#endif
+#endif /* IN_STG_CODE */
 #else
 #define IF_DEBUG(c,s)  doNothing()
-#endif
+#endif /* DEBUG */
 
 #if defined(DEBUG)
 #define DEBUG_ONLY(s) s
 #else
 #define DEBUG_ONLY(s) doNothing()
-#endif
+#endif /* DEBUG */
 
 #if defined(DEBUG)
 #define DEBUG_IS_ON   1
 #else
 #define DEBUG_IS_ON   0
-#endif
+#endif /* DEBUG */
 
 /* -----------------------------------------------------------------------------
    Useful macros and inline functions

@@ -52,6 +52,9 @@ typedef struct _GC_FLAGS {
     double  oldGenFactor;
     double  pcFreeHeap;
 
+    bool         useNonmoving; // default = false
+    bool         nonmovingSelectorOpt; // Do selector optimization in the
+                                       // non-moving heap, default = false
     uint32_t     generations;
     bool squeezeUpdFrames;
 
@@ -95,6 +98,7 @@ typedef struct _DEBUG_FLAGS {
     bool weak;           /* 'w' */
     bool gccafs;         /* 'G' */
     bool gc;             /* 'g' */
+    bool nonmoving_gc;   /* 'n' */
     bool block_alloc;    /* 'b' */
     bool sanity;         /* 'S'   warning: might be expensive! */
     bool zero_on_gc;     /* 'Z' */
@@ -168,6 +172,7 @@ typedef struct _TRACE_FLAGS {
     bool timestamp;      /* show timestamp in stderr output */
     bool scheduler;      /* trace scheduler events */
     bool gc;             /* trace GC events */
+    bool nonmoving_gc;   /* trace nonmoving GC events */
     bool sparks_sampled; /* trace spark events by a sampled method */
     bool sparks_full;    /* trace spark events 100% accurately */
     bool user;           /* trace user events (emitted from Haskell code) */
@@ -268,7 +273,11 @@ typedef struct _RTS_FLAGS {
 #if defined(COMPILING_RTS_MAIN)
 extern DLLIMPORT RTS_FLAGS RtsFlags;
 #elif IN_STG_CODE
-/* Hack because the C code generator can't generate '&label'. */
+/* Note [RtsFlags is a pointer in STG code]
+ * ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+ * When compiling with IN_STG_CODE the RtsFlags symbol is defined as a pointer.
+ * This is necessary because the C code generator can't generate '&label'.
+ */
 extern RTS_FLAGS RtsFlags[];
 #else
 extern RTS_FLAGS RtsFlags;

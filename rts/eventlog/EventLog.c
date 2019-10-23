@@ -109,7 +109,15 @@ char *EventDesc[] = {
   [EVENT_HEAP_PROF_SAMPLE_COST_CENTRE] = "Heap profile cost-centre sample",
   [EVENT_PROF_SAMPLE_COST_CENTRE] = "Time profile cost-centre stack",
   [EVENT_PROF_BEGIN] = "Start of a time profile",
-  [EVENT_USER_BINARY_MSG]     = "User binary message"
+  [EVENT_USER_BINARY_MSG]     = "User binary message",
+  [EVENT_CONC_MARK_BEGIN]        = "Begin concurrent mark phase",
+  [EVENT_CONC_MARK_END]          = "End concurrent mark phase",
+  [EVENT_CONC_SYNC_BEGIN]        = "Begin concurrent GC synchronisation",
+  [EVENT_CONC_SYNC_END]          = "End concurrent GC synchronisation",
+  [EVENT_CONC_SWEEP_BEGIN]       = "Begin concurrent sweep",
+  [EVENT_CONC_SWEEP_END]         = "End concurrent sweep",
+  [EVENT_CONC_UPD_REM_SET_FLUSH] = "Update remembered set flushed",
+  [EVENT_NONMOVING_HEAP_CENSUS]  = "Nonmoving heap census"
 };
 
 // Event type.
@@ -456,6 +464,27 @@ init_event_types(void)
             eventTypes[t].size = EVENT_SIZE_DYNAMIC;
             break;
 
+        case EVENT_CONC_MARK_BEGIN:
+        case EVENT_CONC_SYNC_BEGIN:
+        case EVENT_CONC_SYNC_END:
+        case EVENT_CONC_SWEEP_BEGIN:
+        case EVENT_CONC_SWEEP_END:
+            eventTypes[t].size = 0;
+            break;
+
+        case EVENT_CONC_MARK_END:
+            eventTypes[t].size = 4;
+            break;
+
+        case EVENT_CONC_UPD_REM_SET_FLUSH: // (cap)
+            eventTypes[t].size =
+                sizeof(EventCapNo);
+            break;
+
+        case EVENT_NONMOVING_HEAP_CENSUS: // (cap, blk_size, active_segs, filled_segs, live_blks)
+            eventTypes[t].size = 13;
+            break;
+
         default:
             continue; /* ignore deprecated events */
         }
@@ -497,8 +526,10 @@ initEventLogging(const EventLogWriter *ev_writer)
     event_log_writer = ev_writer;
     initEventLogWriter();
 
-    if (sizeof(EventDesc) / sizeof(char*) != NUM_GHC_EVENT_TAGS) {
-        barf("EventDesc array has the wrong number of elements");
+    int num_descs = sizeof(EventDesc) / sizeof(char*);
+    if (num_descs != NUM_GHC_EVENT_TAGS) {
+        barf("EventDesc array has the wrong number of elements (%d, NUM_GHC_EVENT_TAGS=%d)",
+             num_descs, NUM_GHC_EVENT_TAGS);
     }
 
     /*
@@ -1015,6 +1046,15 @@ void postTaskDeleteEvent (EventTaskId taskId)
 }
 
 void
+postEventNoCap (EventTypeNum tag)
+{
+    ACQUIRE_LOCK(&eventBufMutex);
+    ensureRoomForEvent(&eventBuf, tag);
+    postEventHeader(&eventBuf, tag);
+    RELEASE_LOCK(&eventBufMutex);
+}
+
+void
 postEvent (Capability *cap, EventTypeNum tag)
 {
     EventsBuf *eb = &capEventBuf[cap->no];
@@ -1138,6 +1178,35 @@ void postThreadLabel(Capability    *cap,
     postPayloadSize(eb, size);
     postThreadID(eb, id);
     postBuf(eb, (StgWord8*) label, strsize);
+}
+
+void postConcUpdRemSetFlush(Capability *cap)
+{
+    EventsBuf *eb = &capEventBuf[cap->no];
+    ensureRoomForEvent(eb, EVENT_CONC_UPD_REM_SET_FLUSH);
+    postEventHeader(eb, EVENT_CONC_UPD_REM_SET_FLUSH);
+    postCapNo(eb, cap->no);
+}
+
+void postConcMarkEnd(StgWord32 marked_obj_count)
+{
+    ACQUIRE_LOCK(&eventBufMutex);
+    ensureRoomForEvent(&eventBuf, EVENT_CONC_MARK_END);
+    postEventHeader(&eventBuf, EVENT_CONC_MARK_END);
+    postWord32(&eventBuf, marked_obj_count);
+    RELEASE_LOCK(&eventBufMutex);
+}
+
+void postNonmovingHeapCensus(int log_blk_size,
+                             const struct NonmovingAllocCensus *census)
+{
+    ACQUIRE_LOCK(&eventBufMutex);
+    postEventHeader(&eventBuf, EVENT_NONMOVING_HEAP_CENSUS);
+    postWord8(&eventBuf, log_blk_size);
+    postWord32(&eventBuf, census->n_active_segs);
+    postWord32(&eventBuf, census->n_filled_segs);
+    postWord32(&eventBuf, census->n_live_blocks);
+    RELEASE_LOCK(&eventBufMutex);
 }
 
 void closeBlockMarker (EventsBuf *ebuf)

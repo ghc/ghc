@@ -9,6 +9,7 @@
 #pragma once
 
 #include "rts/EventLogFormat.h"
+#include "sm/NonMovingCensus.h"
 #include "Capability.h"
 
 #if defined(DTRACE)
@@ -50,6 +51,7 @@ enum CapsetType { CapsetTypeCustom = CAPSET_TYPE_CUSTOM,
 #define DEBUG_weak        RtsFlags.DebugFlags.weak
 #define DEBUG_gccafs      RtsFlags.DebugFlags.gccafs
 #define DEBUG_gc          RtsFlags.DebugFlags.gc
+#define DEBUG_nonmoving_gc RtsFlags.DebugFlags.nonmoving_gc
 #define DEBUG_block_alloc RtsFlags.DebugFlags.alloc
 #define DEBUG_sanity      RtsFlags.DebugFlags.sanity
 #define DEBUG_zero_on_gc  RtsFlags.DebugFlags.zero_on_gc
@@ -71,6 +73,7 @@ extern int TRACE_spark_sampled;
 extern int TRACE_spark_full;
 /* extern int TRACE_user; */  // only used in Trace.c
 extern int TRACE_cap;
+extern int TRACE_nonmoving_gc;
 
 // -----------------------------------------------------------------------------
 // Posting events
@@ -307,6 +310,16 @@ void traceProfSampleCostCentre(Capability *cap,
 void traceProfBegin(void);
 #endif /* PROFILING */
 
+void traceConcMarkBegin(void);
+void traceConcMarkEnd(StgWord32 marked_obj_count);
+void traceConcSyncBegin(void);
+void traceConcSyncEnd(void);
+void traceConcSweepBegin(void);
+void traceConcSweepEnd(void);
+void traceConcUpdRemSetFlush(Capability *cap);
+void traceNonmovingHeapCensus(uint32_t log_blk_size,
+                              const struct NonmovingAllocCensus *census);
+
 void flushTrace(void);
 
 #else /* !TRACING */
@@ -346,6 +359,15 @@ void flushTrace(void);
 #define traceHeapProfSampleEnd(era) /* nothing */
 #define traceHeapProfSampleCostCentre(profile_id, stack, residency) /* nothing */
 #define traceHeapProfSampleString(profile_id, label, residency) /* nothing */
+
+#define traceConcMarkBegin() /* nothing */
+#define traceConcMarkEnd(marked_obj_count) /* nothing */
+#define traceConcSyncBegin() /* nothing */
+#define traceConcSyncEnd() /* nothing */
+#define traceConcSweepBegin() /* nothing */
+#define traceConcSweepEnd() /* nothing */
+#define traceConcUpdRemSetFlush(cap) /* nothing */
+#define traceNonmovingHeapCensus(blk_size, census) /* nothing */
 
 #define flushTrace() /* nothing */
 

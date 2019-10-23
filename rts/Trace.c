@@ -30,6 +30,7 @@
 // events
 int TRACE_sched;
 int TRACE_gc;
+int TRACE_nonmoving_gc;
 int TRACE_spark_sampled;
 int TRACE_spark_full;
 int TRACE_user;
@@ -71,6 +72,9 @@ void initTracing (void)
     if (TRACE_gc && RtsFlags.GcFlags.giveStats == NO_GC_STATS) {
         RtsFlags.GcFlags.giveStats = COLLECT_GC_STATS;
     }
+
+    TRACE_nonmoving_gc =
+        RtsFlags.TraceFlags.nonmoving_gc;
 
     TRACE_spark_sampled =
         RtsFlags.TraceFlags.sparks_sampled;
@@ -816,6 +820,55 @@ void traceThreadLabel_(Capability *cap,
     {
         postThreadLabel(cap, tso->id, label);
     }
+}
+
+void traceConcMarkBegin()
+{
+    if (eventlog_enabled)
+        postEventNoCap(EVENT_CONC_MARK_BEGIN);
+}
+
+void traceConcMarkEnd(StgWord32 marked_obj_count)
+{
+    if (eventlog_enabled)
+        postConcMarkEnd(marked_obj_count);
+}
+
+void traceConcSyncBegin()
+{
+    if (eventlog_enabled)
+        postEventNoCap(EVENT_CONC_SYNC_BEGIN);
+}
+
+void traceConcSyncEnd()
+{
+    if (eventlog_enabled)
+        postEventNoCap(EVENT_CONC_SYNC_END);
+}
+
+void traceConcSweepBegin()
+{
+    if (eventlog_enabled)
+        postEventNoCap(EVENT_CONC_SWEEP_BEGIN);
+}
+
+void traceConcSweepEnd()
+{
+    if (eventlog_enabled)
+        postEventNoCap(EVENT_CONC_SWEEP_END);
+}
+
+void traceConcUpdRemSetFlush(Capability *cap)
+{
+    if (eventlog_enabled)
+        postConcUpdRemSetFlush(cap);
+}
+
+void traceNonmovingHeapCensus(uint32_t log_blk_size,
+                              const struct NonmovingAllocCensus *census)
+{
+    if (eventlog_enabled && TRACE_nonmoving_gc)
+        postNonmovingHeapCensus(log_blk_size, census);
 }
 
 void traceThreadStatus_ (StgTSO *tso USED_IF_DEBUG)

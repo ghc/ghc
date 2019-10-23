@@ -49,6 +49,7 @@ EXTERN_INLINE StgWord xchg(StgPtr p, StgWord w);
  * }
  */
 EXTERN_INLINE StgWord cas(StgVolatilePtr p, StgWord o, StgWord n);
+EXTERN_INLINE StgWord8 cas_word8(StgWord8 *volatile p, StgWord8 o, StgWord8 n);
 
 /*
  * Atomic addition by the provided quantity
@@ -283,6 +284,12 @@ cas(StgVolatilePtr p, StgWord o, StgWord n)
     return __sync_val_compare_and_swap(p, o, n);
 }
 
+EXTERN_INLINE StgWord8
+cas_word8(StgWord8 *volatile p, StgWord8 o, StgWord8 n)
+{
+    return __sync_val_compare_and_swap(p, o, n);
+}
+
 // RRN: Generalized to arbitrary increments to enable fetch-and-add in
 // Haskell code (fetchAddIntArray#).
 // PT: add-and-fetch, returns new value
@@ -427,6 +434,18 @@ EXTERN_INLINE StgWord
 cas(StgVolatilePtr p, StgWord o, StgWord n)
 {
     StgWord result;
+    result = *p;
+    if (result == o) {
+        *p = n;
+    }
+    return result;
+}
+
+EXTERN_INLINE StgWord8 cas_word8(StgWord8 *volatile p, StgWord8 o, StgWord8 n);
+EXTERN_INLINE StgWord8
+cas_word8(StgWord8 *volatile p, StgWord8 o, StgWord8 n)
+{
+    StgWord8 result;
     result = *p;
     if (result == o) {
         *p = n;
