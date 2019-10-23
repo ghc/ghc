@@ -293,9 +293,33 @@ void nonmovingSweepMutLists()
     }
 }
 
+/* A variant of freeChain_lock that will only hold the lock for at most max_dur
+ * freed blocks to ensure that we don't starve other lock users (e.g. the
+ * mutator).
+ */
+static void freeChain_lock_max(bdescr *bd, int max_dur)
+{
+  ACQUIRE_SM_LOCK;
+  bdescr *next_bd;
+  int i = 0;
+  while (bd != NULL) {
+    next_bd = bd->link;
+    freeGroup(bd);
+    bd = next_bd;
+    if (i == max_dur) {
+        RELEASE_SM_LOCK;
+        yieldThread();
+        ACQUIRE_SM_LOCK;
+        i = 0;
+    }
+    i++;
+  }
+  RELEASE_SM_LOCK;
+}
+
 void nonmovingSweepLargeObjects()
 {
-    freeChain_lock(nonmoving_large_objects);
+    freeChain_lock_max(nonmoving_large_objects, 10000);
     nonmoving_large_objects = nonmoving_marked_large_objects;
     n_nonmoving_large_blocks = n_nonmoving_marked_large_blocks;
     nonmoving_marked_large_objects = NULL;
