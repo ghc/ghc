@@ -638,29 +638,29 @@ cgAlts gc_plan bndr (AlgAlt tycon) alts
               ptag_expr = cmmConstrTag1 dflags (CmmReg bndr_reg)
               branches' = first succ <$> branches
               maxpt = mAX_PTR_TAG dflags
-              (ptr, info) = partition ((< maxpt) . fst) branches'
+              (via_ptr, via_info) = partition ((< maxpt) . fst) branches'
               small = isSmallFamily dflags fam_sz
 
-                    -- Is the constructor tag in the node reg?
-                    -- See Note [Tagging big families]
+                -- Is the constructor tag in the node reg?
+                -- See Note [Tagging big families]
         ; if small || null info
-           then -- Yes, bndr_reg has constr. tag in ls bits
+           then -- Yes, bndr_reg has constructor tag in ls bits
                emitSwitch ptag_expr branches' mb_deflt 1
                  (if small then fam_sz else maxpt)
 
-           else -- No, get exact tag from info table when mAX_PTR_TAG
+           else -- No, the get exact tag from info table when mAX_PTR_TAG
                 -- See Note [Double switching for big families]
               do
                 let untagged_ptr = cmmUntag dflags (CmmReg bndr_reg)
                     itag_expr = getConstrTag dflags untagged_ptr
-                    info0 = first pred <$> info
-                if null ptr then
+                    info0 = first pred <$> via_info
+                if null via_ptr then
                   emitSwitch itag_expr info0 mb_deflt 0 (fam_sz - 1)
                 else do
                   infos_lbl <- newBlockId
                   infos_scp <- getTickScope
 
-                  let catchall = (maxpt, (mkBranch infos_lbl, infos_scp))
+                  let spillover = (maxpt, (mkBranch infos_lbl, infos_scp))
                       prelabel (Just (stmts, scp)) =
                         do lbl <- newBlockId
                            return ( Just (mkLabel lbl scp <*> stmts, scp)
@@ -669,7 +669,7 @@ cgAlts gc_plan bndr (AlgAlt tycon) alts
 
                   (mb_deflt, mb_branch) <- prelabel mb_deflt
                   -- Switch on pointer tag
-                  emitSwitch ptag_expr (catchall : ptr) mb_deflt 1 maxpt
+                  emitSwitch ptag_expr (spillover : via_ptr) mb_deflt 1 maxpt
                   join_lbl <- newBlockId
                   emit (mkBranch join_lbl)
                   -- Switch on info table tag
