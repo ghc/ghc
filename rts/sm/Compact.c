@@ -70,16 +70,95 @@
    if we throw away some of the tags).
    ------------------------------------------------------------------------- */
 
-STATIC_INLINE W_
-UNTAG_PTR(W_ p)
-{
-    return p & ~TAG_MASK;
-}
+// STATIC_INLINE W_
+// UNTAG_PTR(W_ p)
+// {
+//     return p & ~TAG_MASK;
+// }
 
 STATIC_INLINE W_
 GET_PTR_TAG(W_ p)
 {
     return p & TAG_MASK;
+}
+
+static W_
+get_iptr_tag(StgInfoTable *iptr)
+{
+    const StgInfoTable *info = INFO_PTR_TO_STRUCT(iptr);
+    switch (info->type) {
+        /*
+    case THUNK:
+    case THUNK_1_0:
+    case THUNK_0_1:
+    case THUNK_2_0:
+    case THUNK_1_1:
+    case THUNK_0_2:
+    case THUNK_STATIC:
+    case THUNK_SELECTOR:
+    case BLACKHOLE:
+    case WHITEHOLE:
+    case MUT_VAR_CLEAN:
+    case MUT_VAR_DIRTY:
+    case MVAR_CLEAN:
+    case MVAR_DIRTY:
+    case TVAR:
+    case BLOCKING_QUEUE:
+    case WEAK:
+    case PRIM:
+    case MUT_PRIM:
+    case BCO:
+    case IND:
+    case PAP:
+    case AP:
+    case AP_STACK:
+    case ARR_WORDS:
+    case MUT_ARR_PTRS_CLEAN:
+    case MUT_ARR_PTRS_DIRTY:
+    case MUT_ARR_FROZEN_CLEAN:
+    case MUT_ARR_FROZEN_DIRTY:
+    case TSO:
+    case STACK:
+    case TREC_CHUNK:
+        return 0;
+        */
+
+    case CONSTR:
+    case CONSTR_1_0:
+    case CONSTR_0_1:
+    case CONSTR_2_0:
+    case CONSTR_1_1:
+    case CONSTR_0_2:
+    case CONSTR_NOCAF:
+    {
+        W_ con_tag = info->srt + 1;
+        if (con_tag > TAG_MASK) {
+            return TAG_MASK;
+        } else {
+            return con_tag;
+        }
+    }
+
+    case FUN:
+    case FUN_1_0:
+    case FUN_0_1:
+    case FUN_2_0:
+    case FUN_1_1:
+    case FUN_0_2:
+    case FUN_STATIC:
+    {
+        const StgFunInfoTable *fun_itbl = FUN_INFO_PTR_TO_STRUCT(iptr);
+        W_ arity = fun_itbl->f.arity;
+        if (arity <= TAG_MASK) {
+            return arity;
+        } else {
+            return 0;
+        }
+    }
+
+    default:
+        return 0;
+    }
 }
 
 STATIC_INLINE void
@@ -103,7 +182,7 @@ thread (StgClosure **p)
             case 0:
                 // this is the info pointer; we are creating a new chain.
                 // save the original tag at the end of the chain.
-                *p = (StgClosure *)((W_)iptr + GET_CLOSURE_TAG(q0));
+                *p = (StgClosure *)iptr;
                 *q = (W_)p + 1;
                 break;
             case 1:
@@ -121,6 +200,12 @@ static void
 thread_root (void *user STG_UNUSED, StgClosure **p)
 {
     thread(p);
+}
+
+static void
+untag_root (void* user STG_UNUSED, StgClosure **p)
+{
+    *p = UNTAG_CLOSURE(*p);
 }
 
 // This version of thread() takes a (void *), used to circumvent
@@ -142,7 +227,8 @@ loop:
         P_ q0 = (P_)(q-1);
         W_ r = *q0;  // r is the info ptr, tagged with the pointer-tag
         *q0 = free;
-        *p = (W_)UNTAG_PTR(r);
+        ASSERT(GET_PTR_TAG(r) == 0);
+        *p = r;
         return;
     }
     case 2:
@@ -162,7 +248,7 @@ loop:
 // The info pointer is also tagged with the appropriate pointer tag
 // for this closure, which should be attached to the pointer
 // subsequently passed to unthread().
-STATIC_INLINE W_
+STATIC_INLINE StgInfoTable*
 get_threaded_info( P_ p )
 {
     W_ q = (W_)GET_INFO(UNTAG_CLOSURE((StgClosure *)p));
@@ -172,12 +258,13 @@ loop:
     {
     case 0:
         ASSERT(LOOKS_LIKE_INFO_PTR(q));
-        return q;
+        return (StgInfoTable*)q;
     case 1:
     {
         W_ r = *(P_)(q-1);
-        ASSERT(LOOKS_LIKE_INFO_PTR((W_)UNTAG_CONST_CLOSURE((StgClosure *)r)));
-        return r;
+        ASSERT(GET_PTR_TAG(r) == 0);
+        ASSERT(LOOKS_LIKE_INFO_PTR(r));
+        return (StgInfoTable*)r;
     }
     case 2:
         q = *(P_)(q-2);
@@ -353,8 +440,7 @@ thread_stack(P_ p, P_ stack_end)
         {
             StgRetFun *ret_fun = (StgRetFun *)p;
             StgFunInfoTable *fun_info =
-                FUN_INFO_PTR_TO_STRUCT((StgInfoTable *)UNTAG_PTR(
-                           get_threaded_info((P_)ret_fun->fun)));
+                FUN_INFO_PTR_TO_STRUCT(get_threaded_info((P_)ret_fun->fun));
                  // *before* threading it!
             thread(&ret_fun->fun);
             p = thread_arg_block(fun_info, ret_fun->payload);
@@ -372,7 +458,7 @@ STATIC_INLINE P_
 thread_PAP_payload (StgClosure *fun, StgClosure **payload, W_ size)
 {
     StgFunInfoTable *fun_info =
-        FUN_INFO_PTR_TO_STRUCT((StgInfoTable *)UNTAG_PTR(get_threaded_info((P_)fun)));
+        FUN_INFO_PTR_TO_STRUCT(get_threaded_info((P_)fun));
     ASSERT(fun_info->i.type != PAP);
 
     P_ p = (P_)payload;
@@ -762,8 +848,8 @@ update_fwd_compact( bdescr *blocks )
             // ToDo: one possible avenue of attack is to use the fact
             // that if (p&BLOCK_MASK) >= (free&BLOCK_MASK), then we
             // definitely have enough room.  Also see bug #1147.
-            W_ iptr = get_threaded_info(p);
-            StgInfoTable *info = INFO_PTR_TO_STRUCT((StgInfoTable *)UNTAG_PTR(iptr));
+            StgInfoTable *iptr = get_threaded_info(p);
+            StgInfoTable *info = INFO_PTR_TO_STRUCT(iptr);
 
             P_ q = p;
 
@@ -783,7 +869,8 @@ update_fwd_compact( bdescr *blocks )
                 ASSERT(!is_marked(q+1,bd));
             }
 
-            unthread(q,(W_)free + GET_PTR_TAG(iptr));
+            StgWord iptr_tag = get_iptr_tag(iptr);
+            unthread(q,(W_)free + iptr_tag);
             free += size;
         }
     }
@@ -819,8 +906,9 @@ update_bkwd_compact( generation *gen )
                 free_blocks++;
             }
 
-            W_ iptr = get_threaded_info(p);
-            unthread(p, (W_)free + GET_PTR_TAG(iptr));
+            StgInfoTable *iptr = get_threaded_info(p);
+            StgWord iptr_tag = get_iptr_tag(iptr);
+            unthread(p, (W_)free + iptr_tag);
             ASSERT(LOOKS_LIKE_INFO_PTR((W_)((StgClosure *)p)->header.info));
             const StgInfoTable *info = get_itbl((StgClosure *)p);
             W_ size = closure_sizeW_((StgClosure *)p,info);
@@ -937,5 +1025,20 @@ compact(StgClosure *static_objects,
                    "update_bkwd: %d (compact, old: %d blocks, now %d blocks)",
                    gen->no, gen->n_old_blocks, blocks);
         gen->n_old_blocks = blocks;
+    }
+
+    // 4. untag roots (run queues, mut_lists, and spark queues)
+    markCapabilities((evac_fn)untag_root, NULL);
+    markScheduler((evac_fn)untag_root, NULL);
+
+    for (W_ g = 1; g < RtsFlags.GcFlags.generations; g++) {
+        for (W_ n = 0; n < n_capabilities; n++) {
+            for (bdescr *bd = capabilities[n]->mut_lists[g];
+                 bd != NULL; bd = bd->link) {
+                for (StgClosure **p = (StgClosure**)bd->start; p < (StgClosure**)bd->free; p++) {
+                    *p = UNTAG_CLOSURE(*p);
+                }
+            }
+        }
     }
 }
