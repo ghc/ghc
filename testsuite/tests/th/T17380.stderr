@@ -1,0 +1,26 @@
+
+T17380.hs:7:7: error:
+    • Couldn't match expected type ‘Unit String’
+                  with actual type ‘[Char]’
+    • In the expression: "wat"
+      In an equation for ‘foo’: foo = "wat"
+
+T17380.hs:10:9: error:
+    • Couldn't match type ‘Unit [Char]’ with ‘[Char]’
+      Expected type: String
+        Actual type: Unit [Char]
+    • In the expression: (Unit "wat")
+      In an equation for ‘bar’: bar = (Unit "wat")
+
+T17380.hs:13:5: error:
+    • Couldn't match expected type ‘Unit String’
+                  with actual type ‘[Char]’
+    • In the pattern: "wat"
+      In an equation for ‘baz’: baz "wat" = "frerf"
+
+T17380.hs:16:8: error:
+    • Couldn't match type ‘Unit [Char]’ with ‘[Char]’
+      Expected type: String
+        Actual type: Unit [Char]
+    • In the pattern: Unit"wat"
+      In an equation for ‘quux’: quux (Unit"wat") = "frerf"

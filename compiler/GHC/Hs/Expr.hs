@@ -12,6 +12,7 @@
 {-# LANGUAGE ExistentialQuantification #-}
 {-# LANGUAGE DeriveFunctor #-}
 {-# LANGUAGE TypeFamilies #-}
+{-# LANGUAGE ViewPatterns #-}
 
 -- | Abstract Haskell syntax for expressions.
 module GHC.Hs.Expr where
@@ -42,6 +43,7 @@ import Util
 import Outputable
 import FastString
 import Type
+import TysWiredIn (mkTupleStr)
 import TcType (TcType)
 import {-# SOURCE #-} TcRnTypes (TcLclEnv)
 
@@ -907,6 +909,10 @@ ppr_expr (SectionR _ op expr)
     pp_infixly v = sep [v, pp_expr]
 
 ppr_expr (ExplicitTuple _ exprs boxity)
+  | [dL -> L _ (Present _ expr)] <- exprs
+  , Boxed <- boxity
+  = hsep [text (mkTupleStr Boxed 1), ppr expr]
+  | otherwise
   = tupleParens (boxityTupleSort boxity) (fcat (ppr_tup_args $ map unLoc exprs))
   where
     ppr_tup_args []               = []
