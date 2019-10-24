@@ -661,20 +661,20 @@ cgAlts gc_plan bndr (AlgAlt tycon) alts
                   infos_scp <- getTickScope
 
                   let spillover = (maxpt, (mkBranch infos_lbl, infos_scp))
-                      prelabel (Just (stmts, scp)) =
-                        do lbl <- newBlockId
-                           return ( Just (mkLabel lbl scp <*> stmts, scp)
-                                  , Just (mkBranch lbl, scp))
-                      prelabel _ = return (Nothing, Nothing)
 
-                  (mb_deflt, mb_branch) <- prelabel mb_deflt
+                  (mb_shared_deflt, mb_shared_branch) <- case mb_deflt of
+                      (Just (stmts, scp)) ->
+                          do lbl <- newBlockId
+                             return ( Just (mkLabel lbl scp <*> stmts, scp)
+                                    , Just (mkBranch lbl, scp))
+                      _ -> return (Nothing, Nothing)
                   -- Switch on pointer tag
-                  emitSwitch ptag_expr (spillover : via_ptr) mb_deflt 1 maxpt
+                  emitSwitch ptag_expr (spillover : via_ptr) mb_shared_deflt 1 maxpt
                   join_lbl <- newBlockId
                   emit (mkBranch join_lbl)
                   -- Switch on info table tag
                   emitLabel infos_lbl
-                  emitSwitch itag_expr info0 mb_branch
+                  emitSwitch itag_expr info0 mb_shared_branch
                     (maxpt - 1) (fam_sz - 1)
                   emitLabel join_lbl
 
