@@ -529,8 +529,14 @@ pprPat (CoPat _ co pat _)       = pprHsWrapper co $ \parens
                                                  else pprPat pat
 pprPat (SigPat _ pat ty)        = ppr pat <+> dcolon <+> ppr ty
 pprPat (ListPat _ pats)         = brackets (interpp'SP pats)
-pprPat (TuplePat _ pats bx)     = tupleParens (boxityTupleSort bx)
-                                              (pprWithCommas ppr pats)
+pprPat (TuplePat _ pats bx)
+    -- Special-case unary boxed tuples so that they are pretty-printed as
+    -- `Unit x`, not `(x)`
+  | [pat] <- pats
+  , Boxed <- bx
+  = hcat [text (mkTupleStr Boxed 1), pprParendLPat appPrec pat]
+  | otherwise
+  = tupleParens (boxityTupleSort bx) (pprWithCommas ppr pats)
 pprPat (SumPat _ pat alt arity) = sumParens (pprAlternative ppr pat alt arity)
 pprPat (ConPatIn con details)   = pprUserCon (unLoc con) details
 pprPat (ConPatOut { pat_con = con

@@ -219,9 +219,12 @@ Template Haskell
   :extension:`DeriveLift` has been simplified to take advantage of expression
   quotations.
 
-- Explicit boxed 1-tuples from ``HsSyn`` are now treated as actual 1-tuples,
-  without flattening. In most of the cases these will be obtained using
-  Template Haskell since it is uncommon to deal with 1-tuples in the source.
+- Using ``TupleT 1``, ``TupE [exp]``, or ``TupP [pat]`` will now produce unary
+  tuples (i.e., involving the ``Unit`` type from ``GHC.Tuple``) instead of
+  silently dropping the parentheses. This brings Template Haskell's treatment
+  of boxed tuples in line with that of unboxed tuples, as ``UnboxedTupleT`,
+  ``UnboxedTupE``, and ``UnboxedTupP`` also produce unary unboxed tuples
+  (i.e., ``Unit#``) when applied to only one argument.
 
 - GHC's constraint solver now solves constraints in each top-level group
   sooner. This has practical consequences for Template Haskell, as TH splices

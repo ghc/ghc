@@ -908,9 +908,6 @@ cvtl e = wrapL (cvt e)
                             ; return $ HsLamCase noExtField
                                                    (mkMatchGroup FromSource ms')
                             }
-    cvt (TupE [Just e]) = do { e' <- cvtl e; return $ HsPar noExtField e' }
-                                 -- Note [Dropping constructors]
-                                 -- Singleton tuples treated like nothing (just parens)
     cvt (TupE es)        = cvt_tup es Boxed
     cvt (UnboxedTupE es) = cvt_tup es Unboxed
     cvt (UnboxedSumE e alt arity) = do { e' <- cvtl e
@@ -1018,14 +1015,13 @@ ensureValidOpExp _e _m =
 
 {- Note [Dropping constructors]
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
-When we drop constructors from the input (for instance, when we encounter @TupE [e]@)
-we must insert parentheses around the argument. Otherwise, @UInfix@ constructors in @e@
-could meet @UInfix@ constructors containing the @TupE [e]@. For example:
+When we drop constructors from the input, we must insert parentheses around the
+argument. For example:
 
-  UInfixE x * (TupE [UInfixE y + z])
+  UInfixE x * (AppE (InfixE (Just y) + Nothing) z)
 
-If we drop the singleton tuple but don't insert parentheses, the @UInfixE@s would meet
-and the above expression would be reassociated to
+If we convert the InfixE expression to an operator section but don't insert
+parentheses, the above expression would be reassociated to
 
   OpApp (OpApp x * y) + z
 
@@ -1254,8 +1250,6 @@ cvtp (TH.LitP l)
   | otherwise          = do { l' <- cvtLit l; return $ Hs.LitPat noExtField l' }
 cvtp (TH.VarP s)       = do { s' <- vName s
                             ; return $ Hs.VarPat noExtField (noLoc s') }
-cvtp (TupP [p])        = do { p' <- cvtPat p; return $ ParPat noExtField p' }
-                                         -- Note [Dropping constructors]
 cvtp (TupP ps)         = do { ps' <- cvtPats ps
                             ; return $ TuplePat noExtField ps' Boxed }
 cvtp (UnboxedTupP ps)  = do { ps' <- cvtPats ps

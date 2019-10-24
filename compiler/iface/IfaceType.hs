@@ -62,7 +62,7 @@ module IfaceType (
 import GhcPrelude
 
 import {-# SOURCE #-} TysWiredIn ( coercibleTyCon, heqTyCon
-                                 , liftedRepDataConTyCon )
+                                 , liftedRepDataConTyCon, tupleTyConName )
 import {-# SOURCE #-} TyCoRep    ( isRuntimeRepTy )
 
 import DynFlags
@@ -1466,30 +1466,47 @@ pprSum _arity is_promoted args
        <> sumParens (pprWithBars (ppr_ty topPrec) args')
 
 pprTuple :: PprPrec -> TupleSort -> PromotionFlag -> IfaceAppArgs -> SDoc
-pprTuple ctxt_prec ConstraintTuple NotPromoted IA_Nil
-  = maybeParen ctxt_prec sigPrec $
-    text "() :: Constraint"
+pprTuple ctxt_prec sort promoted args =
+  case promoted of
+    IsPromoted
+      -> let tys = appArgsIfaceTypes args
+             args' = drop (length tys `div` 2) tys
+             spaceIfPromoted = case args' of
+               arg0:_ -> pprSpaceIfPromotedTyCon arg0
+               _ -> id
+         in ppr_tuple_app args' $
+            pprPromotionQuoteI IsPromoted <>
+            tupleParens sort (spaceIfPromoted (pprWithCommas pprIfaceType args'))
 
--- All promoted constructors have kind arguments
-pprTuple _ sort IsPromoted args
-  = let tys = appArgsIfaceTypes args
-        args' = drop (length tys `div` 2) tys
-        spaceIfPromoted = case args' of
-          arg0:_ -> pprSpaceIfPromotedTyCon arg0
-          _ -> id
-    in pprPromotionQuoteI IsPromoted <>
-       tupleParens sort (spaceIfPromoted (pprWithCommas pprIfaceType args'))
+    NotPromoted
+      |  ConstraintTuple <- sort
+      ,  IA_Nil <- args
+      -> maybeParen ctxt_prec sigPrec $
+         text "() :: Constraint"
 
-pprTuple _ sort promoted args
-  =   -- drop the RuntimeRep vars.
-      -- See Note [Unboxed tuple RuntimeRep vars] in TyCon
-    let tys   = appArgsIfaceTypes args
-        args' = case sort of
-                  UnboxedTuple -> drop (length tys `div` 2) tys
-                  _            -> tys
-    in
-    pprPromotionQuoteI promoted <>
-    tupleParens sort (pprWithCommas pprIfaceType args')
+      | otherwise
+      ->   -- drop the RuntimeRep vars.
+           -- See Note [Unboxed tuple RuntimeRep vars] in TyCon
+         let tys   = appArgsIfaceTypes args
+             args' = case sort of
+                       UnboxedTuple -> drop (length tys `div` 2) tys
+                       _            -> tys
+         in
+         ppr_tuple_app args' $
+         pprPromotionQuoteI promoted <>
+         tupleParens sort (pprWithCommas pprIfaceType args')
+  where
+    ppr_tuple_app :: [IfaceType] -> SDoc -> SDoc
+    ppr_tuple_app args_wo_runtime_reps ppr_args_w_parens
+        -- Special-case unary boxed tuples so that they are pretty-printed as
+        -- `Unit x`, not `(x)`
+      | [_] <- args_wo_runtime_reps
+      , BoxedTuple <- sort
+      = let unit_tc_info = IfaceTyConInfo promoted IfaceNormalTyCon
+            unit_tc = IfaceTyCon (tupleTyConName sort 1) unit_tc_info in
+        pprPrecIfaceType ctxt_prec $ IfaceTyConApp unit_tc args
+      | otherwise
+      = ppr_args_w_parens
 
 pprIfaceTyLit :: IfaceTyLit -> SDoc
 pprIfaceTyLit (IfaceNumTyLit n) = integer n
