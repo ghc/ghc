@@ -1,5 +1,5 @@
 pattern Q1 x1_0 x2_1 x3_2 <- ((x1_0, x2_1), [x3_2], _, _)
-pattern x1_0 Q2 x2_1 = ((x1_0, x2_1))
+pattern x1_0 Q2 x2_1 = GHC.Tuple.Unit (x1_0, x2_1)
 pattern Q3 {qx3, qy3, qz3} <- ((qx3, qy3), [qz3]) where
                                   Q3 qx3 qy3 qz3 = ((qx3, qy3), [qz3])
 T8761.hs:(16,1)-(39,13): Splicing declarations
@@ -8,17 +8,13 @@ T8761.hs:(16,1)-(39,13): Splicing declarations
        let nm1 = mkName "Q1"
            prefixPat
              = patSynD
-                 nm1
-                 (prefixPatSyn [qx1, qy1, qz1])
-                 unidir
+                 nm1 (prefixPatSyn [qx1, qy1, qz1]) unidir
                  (tupP [tupP [varP qx1, varP qy1], listP [varP qz1], wildP, wildP])
        [qx2, qy2] <- mapM (\ i -> newName $ "x" ++ show i) [1, 2]
        let nm2 = mkName "Q2"
            infixPat
              = patSynD
-                 nm2
-                 (infixPatSyn qx2 qy2)
-                 implBidir
+                 nm2 (infixPatSyn qx2 qy2) implBidir
                  (tupP [tupP [varP qx2, varP qy2]])
        let nm3 = mkName "Q3"
            [qx3, qy3, qz3] = map mkName ["qx3", "qy3", "qz3"]
@@ -32,7 +28,7 @@ T8761.hs:(16,1)-(39,13): Splicing declarations
        return pats
   ======>
     pattern Q1 x1 x2 x3 <- ((x1, x2), [x3], _, _)
-    pattern x1 `Q2` x2 = ((x1, x2))
+    pattern x1 `Q2` x2 = Unit(x1, x2)
     pattern Q3{qx3, qy3, qz3} <- ((qx3, qy3), [qz3]) where
                                 Q3 qx3 qy3 qz3 = ((qx3, qy3), [qz3])
 T8761.hs:(42,1)-(46,29): Splicing declarations
