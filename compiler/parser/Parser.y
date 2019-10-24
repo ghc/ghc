@@ -726,8 +726,8 @@ unitdecl :: { LHsUnitDecl PackageName }
              -- XXX not accurate
              { sL1 $2 $ DeclD
                  (case snd $3 of
-                   Nothing -> HsSrcFile
-                   Just _ -> HsBootFile)
+                   False -> HsSrcFile
+                   True  -> HsBootFile)
                  $4
                  (Just $ sL1 $2 (HsModule (Just $4) $6 (fst $ snd $8) (snd $ snd $8) $5 $1)) }
         | maybedocheader 'signature' modid maybemodwarning maybeexports 'where' body
@@ -739,8 +739,8 @@ unitdecl :: { LHsUnitDecl PackageName }
         -- will prevent us from parsing both forms.
         | maybedocheader 'module' maybe_src modid
              { sL1 $2 $ DeclD (case snd $3 of
-                   Nothing -> HsSrcFile
-                   Just _ -> HsBootFile) $4 Nothing }
+                   False -> HsSrcFile
+                   True  -> HsBootFile) $4 Nothing }
         | maybedocheader 'signature' modid
              { sL1 $2 $ DeclD HsigFile $3 Nothing }
         | 'dependency' unitid mayberns
@@ -974,24 +974,23 @@ importdecl :: { LImportDecl GhcPs }
                   ; checkImportDecl $4 $7
                   ; ams (cL (comb4 $1 $6 (snd $8) $9) $
                       ImportDecl { ideclExt = noExtField
-                                  , ideclSourceSrc = fst $2
+                                  , ideclSourceSrc = snd $ fst $2
                                   , ideclName = $6, ideclPkgQual = snd $5
-                                  , ideclSource = isJust $ snd $2, ideclSafe = snd $3
+                                  , ideclSource = snd $2, ideclSafe = snd $3
                                   , ideclQualified = importDeclQualifiedStyle $4 $7
                                   , ideclImplicit = False
                                   , ideclAs = unLoc (snd $8)
                                   , ideclHiding = unLoc $9 })
-                         ((mj AnnImport $1 : fst $3 ++ fmap (mj AnnQualified) (maybeToList $4)
-                                          ++ fst $5 ++ fmap (mj AnnQualified) (maybeToList $7) ++ fst $8))
+                         (mj AnnImport $1 : fst (fst $2) ++ fst $3 ++ fmap (mj AnnQualified) (maybeToList $4)
+                                          ++ fst $5 ++ fmap (mj AnnQualified) (maybeToList $7) ++ fst $8)
                   }
                 }
 
-maybe_src :: { (SourceText, Maybe SrcSpan) }
-        : '{-# SOURCE' '#-}'        {% do { let { openL = getLoc $1 }
-                                          ; addAnnsAt openL [mo $1,mc $2]
-                                          ; pure (getSOURCE_PRAGs $1, Just openL)
-                                          } }
-        | {- empty -}               { (NoSourceText, Nothing) }
+
+maybe_src :: { (([AddAnn],SourceText),IsBootInterface) }
+        : '{-# SOURCE' '#-}'        { (([mo $1,mc $2],getSOURCE_PRAGs $1)
+                                      , True) }
+        | {- empty -}               { (([],NoSourceText),False) }
 
 maybe_safe :: { ([AddAnn],Bool) }
         : 'safe'                                { ([mj AnnSafe $1],True) }
