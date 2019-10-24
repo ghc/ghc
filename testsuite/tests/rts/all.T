@@ -413,3 +413,7 @@ test('T13676',
 test('InitEventLogging',
      [only_ways(['normal']), extra_run_opts('+RTS -RTS')],
      compile_and_run, ['-eventlog InitEventLogging_c.c'])
+
+test('T17088',
+     [only_ways(['normal']), extra_run_opts('+RTS -c -A256k -RTS')],
+     compile_and_run, ['-rtsopts -O2'])
