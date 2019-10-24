@@ -649,7 +649,7 @@ cgAlts gc_plan bndr (AlgAlt tycon) alts
                  (if small then fam_sz else maxpt)
 
            else -- No, get exact tag from info table when mAX_PTR_TAG
-                -- See Note [double switching for big families]
+                -- See Note [Double switching for big families]
               do
                 let untagged_ptr = cmmUntag dflags (CmmReg bndr_reg)
                     itag_expr = getConstrTag dflags untagged_ptr
@@ -683,7 +683,7 @@ cgAlts gc_plan bndr (AlgAlt tycon) alts
 cgAlts _ _ _ _ = panic "cgAlts"
         -- UbxTupAlt and PolyAlt have only one alternative
 
--- Note [double switching for big families]
+-- Note [Double switching for big families]
 -- ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 --
 -- Generally, switching on big family alternatives
@@ -706,9 +706,17 @@ cgAlts _ _ _ _ = panic "cgAlts"
 -- switch generates the actual code with a prepended fresh label,
 -- while the inner one only generates a jump to that label.
 --
--- Consider the following data type
----    data Big = T0 | T1 | T2 | T3 | T4 | T5 | T6 | T7 | T8
+-- For example, let's assume a 64-bit architecture, so that all
+-- heap objects are 8-byte aligned, and hence the address of a
+-- heap object ends in `000` (three zero bits).
+--
+-- Then consider the following data type
+--
+--   > data Big = T0 | T1 | T2 | T3 | T4 | T5 | T6 | T7 | T8
 --   Ptr tag:      1    2    3    4    5    6    7    7    7
+--   As bits:    001  010  011  100  101  110  111  111  111
+--   Info pointer tag (zero based):
+--                 0    1    2    3    4    5    6    7    8
 --
 -- Then     \case T2 -> True; T8 -> True; _ -> False
 -- will result in following code (slightly cleaned-up and
@@ -744,6 +752,12 @@ cgAlts _ _ _ _ = panic "cgAlts"
            R1 = GHC.Types.False_closure+1;
            call (P64[(old + 8)])(R1) args: 8, res: 0, upd: 8;
 -}
+--
+-- For 32-bit systems we only have 2 tag bits in the pointers at our disposal,
+-- so the performance win is dubious, especially in face of the increased code
+-- size due to double switching. But we can take the viewpoint that 32-bit
+-- architectures are not relevant for performance any more, so this can be
+-- considered as moot.
 
 
 -- Note [alg-alt heap check]
@@ -770,11 +784,32 @@ cgAlts _ _ _ _ = panic "cgAlts"
 -- Note [Tagging big families]
 -- ~~~~~~~~~~~~~~~~~~~~~~~~~~~
 --
--- Now both the big and the small constructor families were tagged,
+-- Both the big and the small constructor families are tagged,
 -- that is, greater unions which overflow the tag space of TAG_BITS
 -- (i.e. 3 on 32 resp. 7 constructors on 64 bit archs).
 --
--- We employ a clever way of combining pointer and info-table
+-- For example, let's assume a 64-bit architecture, so that all
+-- heap objects are 8-byte aligned,  and hence the address of a
+-- heap object ends in `000` (three zero bits).  Then consider
+-- > data Maybe a = Nothing | Just a
+-- > data Grade = G1 | G2 | G3 | G4 | G5 | G6 | G7 | G8 | G9 | G10
+--
+-- Since `Grade` has more than 7 constructors, it counts as a
+-- "big data type" (also referred to as "big constructor family" in papers).
+-- On the other hand, `Maybe` have 7 constructors or fewer, so it is
+-- a "small data type".
+--
+-- Then
+--   * A pointer to an unevaluated thunk of type `Maybe Int` or `Grade` will end in `000`
+--   * A tagged pointer to a `Nothing` will end in `001`
+--   * A tagged pointer to a `Just` will end in `010`
+--   * A tagged pointer to `G1` will end in `001`
+--   * A tagged pointer to `G2` will end in `010`
+--   * A tagged pointer to `G3` will end in `011`
+--   * A tagged pointer to `G6` will end in `110`
+--   * A tagged pointer to `G7` or `G8` or `G9` or `G10`  will end in `111`
+--
+-- We employ a mildly clever way of combining pointer and info-table
 -- tagging. We use 1..MAX_PTR_TAG-1 as pointer-resident tags where
 -- the tags in the pointer and the info table are in a one-to-one
 -- relation, whereas tag MAX_PTR_TAG is used as "spill over", signifying
@@ -787,11 +822,12 @@ cgAlts _ _ _ _ = panic "cgAlts"
 -- tricky part is that the default case needs (logical) duplication.
 -- To do this we emit an extra label for it and branch to that from
 -- the second switch. This avoids duplicated codegen. See Trac #14373.
--- See note [double switching for big families] for the mechanics
+-- See note [Double switching for big families] for the mechanics
 -- involved.
 --
 -- Also see note [Data constructor dynamic tags]
-
+-- and the wiki https://gitlab.haskell.org/ghc/ghc/wikis/commentary/rts/haskell-execution/pointer-tagging
+--
 
 -------------------
 cgAlgAltRhss :: (GcPlan,ReturnKind) -> NonVoid Id -> [CgStgAlt]
