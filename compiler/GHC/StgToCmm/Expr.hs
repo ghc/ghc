@@ -642,7 +642,7 @@ cgAlts gc_plan bndr (AlgAlt tycon) alts
               small = isSmallFamily dflags fam_sz
 
                     -- Is the constructor tag in the node reg?
-                    -- See Note [tagging big families]
+                    -- See Note [Tagging big families]
         ; if small || null info
            then -- Yes, bndr_reg has constr. tag in ls bits
                emitSwitch ptag_expr branches' mb_deflt 1
@@ -688,7 +688,7 @@ cgAlts _ _ _ _ = panic "cgAlts"
 --
 -- Generally, switching on big family alternatives
 -- is done by two nested switch statements. According to
--- note [tagging big families], the outer switch
+-- note [Tagging big families], the outer switch
 -- looks at the pointer tag and the inner dereferences the
 -- pointer and switches on the info table tag.
 --
@@ -767,7 +767,7 @@ cgAlts _ _ _ _ = panic "cgAlts"
 --   goto L1
 
 
--- Note [tagging big families]
+-- Note [Tagging big families]
 -- ~~~~~~~~~~~~~~~~~~~~~~~~~~~
 --
 -- Now both the big and the small constructor families were tagged,
