@@ -18,6 +18,7 @@ before_script:
   - "git fetch https://gitlab.haskell.org/ghc/ghc-performance-notes.git refs/notes/perf:refs/notes/perf || true"
 
 stages:
+  - hello
   - lint        # Source linting
   - quick-build # A very quick smoke-test to weed out broken commits
   - build       # A quick smoke-test to weed out broken commits
@@ -444,7 +445,7 @@ nightly-aarch64-linux-deb9:
 
 .build-armv7-linux-deb9:
   extends: .validate-linux
-  stage: full-build
+  stage: hello
   image: "registry.gitlab.haskell.org/ghc/ci-images/armv7-linux-deb9:$DOCKER_REV"
   allow_failure: true
   variables:
