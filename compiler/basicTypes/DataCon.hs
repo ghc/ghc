@@ -85,7 +85,6 @@ import Binary
 import UniqSet
 import Unique( mkAlphaTyVarUnique )
 
-import Data.ByteString (ByteString)
 import qualified Data.ByteString.Builder as BSB
 import qualified Data.ByteString.Short as BSS
 import qualified Data.ByteString.Lazy    as LBS

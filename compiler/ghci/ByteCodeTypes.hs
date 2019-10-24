@@ -32,7 +32,6 @@ import Control.DeepSeq
 import Foreign
 import Data.Array
 import Data.Array.Base  ( UArray(..) )
-import Data.ByteString (ByteString)
 import Data.ByteString.Short (ShortByteString)
 import Data.IntMap (IntMap)
 import qualified Data.IntMap as IntMap

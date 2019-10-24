@@ -50,7 +50,6 @@ import FastString
 import Data.List
 import System.IO
 
-import qualified Data.ByteString as BS
 import qualified Data.ByteString.Short as BSS
 
 

@@ -75,7 +75,6 @@ import Control.Monad
 import Control.Monad.IO.Class
 import Data.Binary
 import Data.Binary.Put
-import Data.ByteString (ByteString)
 import Data.ByteString.Short (ShortByteString)
 import qualified Data.ByteString.Lazy as LB
 import Data.IORef

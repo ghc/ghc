@@ -73,7 +73,6 @@ import Outputable
 import RepType
 
 import Data.ByteString.Short (ShortByteString)
-import qualified Data.ByteString.Char8 as BS8
 import qualified Data.Map as M
 import Data.Char
 import Data.List

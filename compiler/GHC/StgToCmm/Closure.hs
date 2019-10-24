@@ -89,7 +89,6 @@ import DynFlags
 import Util
 
 import Data.Coerce (coerce)
-import qualified Data.ByteString.Char8 as BS8
 import FastString
 
 -----------------------------------------------------------------------------

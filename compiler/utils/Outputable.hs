@@ -108,7 +108,6 @@ import Panic
 import GHC.Serialized
 import GHC.LanguageExtensions (Extension)
 
-import Data.ByteString (ByteString)
 import qualified Data.ByteString.Short as BS
 import Data.Char
 import qualified Data.Map as M

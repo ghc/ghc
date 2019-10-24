@@ -28,7 +28,6 @@ import Outputable
 import FastString
 import GHC.Hs.Extension
 
-import Data.ByteString (ByteString)
 import Data.ByteString.Short (ShortByteString)
 import Data.Data hiding ( Fixity )
 

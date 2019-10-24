@@ -67,7 +67,6 @@ import Outputable
 import ForeignCall
 import Name
 
-import qualified Data.ByteString as BS
 import Data.List
 
 {-

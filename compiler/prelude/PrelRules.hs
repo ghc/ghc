@@ -61,7 +61,6 @@ import Control.Applicative ( Alternative(..) )
 import Control.Monad
 import qualified Control.Monad.Fail as MonadFail
 import Data.Bits as Bits
-import qualified Data.ByteString as BS
 import Data.Int
 import Data.Ratio
 import Data.Word
