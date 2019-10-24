@@ -85,6 +85,7 @@ import RdrName ( RdrName )
 import DataCon( HsSrcBang(..), HsImplBang(..),
                 SrcStrictness(..), SrcUnpackedness(..) )
 import TysPrim( funTyConName )
+import TysWiredIn( mkTupleStr )
 import Type
 import GHC.Hs.Doc
 import BasicTypes
@@ -1600,7 +1601,12 @@ ppr_mono_ty (HsTyVar _ prom (L _ name))
   | isPromoted prom = quote (pprPrefixOcc name)
   | otherwise       = pprPrefixOcc name
 ppr_mono_ty (HsFunTy _ ty1 ty2)   = ppr_fun_ty ty1 ty2
-ppr_mono_ty (HsTupleTy _ con tys) = tupleParens std_con (pprWithCommas ppr tys)
+ppr_mono_ty (HsTupleTy _ con tys)
+  | [ty] <- tys
+  , BoxedTuple <- std_con
+  = sep [text (mkTupleStr Boxed 1), ppr_mono_lty ty]
+  | otherwise
+  = tupleParens std_con (pprWithCommas ppr tys)
   where std_con = case con of
                     HsUnboxedTuple -> UnboxedTuple
                     _              -> BoxedTuple

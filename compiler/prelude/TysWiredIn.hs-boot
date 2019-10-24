@@ -3,6 +3,9 @@ module TysWiredIn where
 import {-# SOURCE #-} TyCon      ( TyCon )
 import {-# SOURCE #-} TyCoRep    (Type, Kind)
 
+import BasicTypes (Arity, TupleSort)
+import Name (Name)
+
 listTyCon :: TyCon
 typeNatKind, typeSymbolKind :: Type
 mkBoxedTupleTy :: [Type] -> Type
@@ -38,3 +41,5 @@ int8ElemRepDataConTy, int16ElemRepDataConTy, int32ElemRepDataConTy,
 anyTypeOfKind :: Kind -> Type
 unboxedTupleKind :: [Type] -> Type
 mkPromotedListTy :: Type -> [Type] -> Type
+
+tupleTyConName :: TupleSort -> Arity -> Name
