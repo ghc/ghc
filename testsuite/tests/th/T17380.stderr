@@ -1,0 +1,40 @@
+
+T17380.hs:9:7: error:
+    • Couldn't match expected type ‘Unit String’
+                  with actual type ‘[Char]’
+    • In the expression: "wat"
+      In an equation for ‘foo’: foo = "wat"
+
+T17380.hs:12:9: error:
+    • Couldn't match type ‘Unit [Char]’ with ‘[Char]’
+      Expected type: String
+        Actual type: Unit [Char]
+    • In the expression: (Unit "wat")
+      In an equation for ‘bar’: bar = (Unit "wat")
+
+T17380.hs:15:5: error:
+    • Couldn't match expected type ‘Unit String’
+                  with actual type ‘[Char]’
+    • In the pattern: "wat"
+      In an equation for ‘baz’: baz "wat" = "frerf"
+
+T17380.hs:18:8: error:
+    • Couldn't match type ‘Unit [Char]’ with ‘[Char]’
+      Expected type: String
+        Actual type: Unit [Char]
+    • In the pattern: Unit"wat"
+      In an equation for ‘quux’: quux (Unit"wat") = "frerf"
+
+T17380.hs:21:8: error:
+    • Couldn't match type ‘[Char]’ with ‘'Unit String’
+      Expected type: Proxy ('Unit String)
+        Actual type: Proxy String
+    • In the expression: Proxy :: Proxy String
+      In an equation for ‘quuz’: quuz = Proxy :: Proxy String
+
+T17380.hs:24:8: error:
+    • Couldn't match type ‘'Unit String’ with ‘[Char]’
+      Expected type: Proxy String
+        Actual type: Proxy ('Unit String)
+    • In the expression: Proxy :: Proxy ('Unit String)
+      In an equation for ‘fred’: fred = Proxy :: Proxy ('Unit String)
