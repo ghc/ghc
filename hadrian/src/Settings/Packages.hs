@@ -199,15 +199,27 @@ rtsPackageArgs = package rts ? do
     libffiName     <- expr libffiLibraryName
     ffiIncludeDir  <- getSetting FfiIncludeDir
     ffiLibraryDir  <- getSetting FfiLibDir
-    let cArgs = mconcat
+
+    -- Arguments passed to GHC when compiling C and .cmm sources.
+    let ghcArgs = mconcat
           [ arg "-Irts"
-          , rtsWarnings
           , arg $ "-I" ++ path
-          , flag UseSystemFfi ? arg ("-I" ++ ffiIncludeDir)
           , arg $ "-DRtsWay=\"rts_" ++ show way ++ "\""
           -- Set the namespace for the rts fs functions
           , arg $ "-DFS_NAMESPACE=rts"
           , arg $ "-DCOMPILING_RTS"
+          , notM targetSupportsSMP           ? arg "-DNOSMP"
+          , way `elem` [debug, debugDynamic] ? arg "-DTICKY_TICKY"
+          , Profiling `wayUnit` way          ? arg "-DPROFILING"
+          , Threaded  `wayUnit` way          ? arg "-DTHREADED_RTS"
+          , notM targetSupportsSMP           ? pure [ "-DNOSMP"
+                                                    , "-optc-DNOSMP" ]
+          ]
+
+    let cArgs = mconcat
+          [ rtsWarnings
+          , flag UseSystemFfi ? arg ("-I" ++ ffiIncludeDir)
+          , arg "-fomit-frame-pointer"
           -- RTS *must* be compiled with optimisations. The INLINE_HEADER macro
           -- requires that functions are inlined to work as expected. Inlining
           -- only happens for optimised builds. Otherwise we can assume that
@@ -215,23 +227,20 @@ rtsPackageArgs = package rts ? do
           -- provide non-inlined alternatives and hence needs the function to
           -- be inlined. See https://github.com/snowleopard/hadrian/issues/90.
           , arg "-O2"
-          , arg "-fomit-frame-pointer"
           , arg "-g"
+
+          , arg "-Irts"
+          , arg $ "-I" ++ path
 
           , Debug     `wayUnit` way          ? pure [ "-DDEBUG"
                                                     , "-fno-omit-frame-pointer"
                                                     , "-g3"
                                                     , "-O0" ]
-          , way `elem` [debug, debugDynamic] ? arg "-DTICKY_TICKY"
-          , Profiling `wayUnit` way          ? arg "-DPROFILING"
-          , Threaded  `wayUnit` way          ? arg "-DTHREADED_RTS"
 
           , useLibFFIForAdjustors            ? arg "-DUSE_LIBFFI_FOR_ADJUSTORS"
 
           , inputs ["**/RtsMessages.c", "**/Trace.c"] ?
             arg ("-DProjectVersion=" ++ show projectVersion)
-
-          , notM targetSupportsSMP           ? arg "-DNOSMP"
 
           , input "**/RtsUtils.c" ? pure
             [ "-DProjectVersion="            ++ show projectVersion
@@ -305,7 +314,7 @@ rtsPackageArgs = package rts ? do
           ]
         , builder (Cc FindCDependencies) ? cArgs
         , builder (Ghc CompileCWithGhc) ? map ("-optc" ++) <$> cArgs
-        , builder Ghc ? arg "-Irts"
+        , builder Ghc ? ghcArgs
 
           , builder HsCpp ? pure
           [ "-DTOP="             ++ show top
