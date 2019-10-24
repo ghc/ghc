@@ -70,11 +70,11 @@
    if we throw away some of the tags).
    ------------------------------------------------------------------------- */
 
-// STATIC_INLINE W_
-// UNTAG_PTR(W_ p)
-// {
-//     return p & ~TAG_MASK;
-// }
+STATIC_INLINE W_
+UNTAG_PTR(W_ p)
+{
+    return p & ~TAG_MASK;
+}
 
 STATIC_INLINE W_
 GET_PTR_TAG(W_ p)
@@ -87,42 +87,6 @@ get_iptr_tag(StgInfoTable *iptr)
 {
     const StgInfoTable *info = INFO_PTR_TO_STRUCT(iptr);
     switch (info->type) {
-        /*
-    case THUNK:
-    case THUNK_1_0:
-    case THUNK_0_1:
-    case THUNK_2_0:
-    case THUNK_1_1:
-    case THUNK_0_2:
-    case THUNK_STATIC:
-    case THUNK_SELECTOR:
-    case BLACKHOLE:
-    case WHITEHOLE:
-    case MUT_VAR_CLEAN:
-    case MUT_VAR_DIRTY:
-    case MVAR_CLEAN:
-    case MVAR_DIRTY:
-    case TVAR:
-    case BLOCKING_QUEUE:
-    case WEAK:
-    case PRIM:
-    case MUT_PRIM:
-    case BCO:
-    case IND:
-    case PAP:
-    case AP:
-    case AP_STACK:
-    case ARR_WORDS:
-    case MUT_ARR_PTRS_CLEAN:
-    case MUT_ARR_PTRS_DIRTY:
-    case MUT_ARR_FROZEN_CLEAN:
-    case MUT_ARR_FROZEN_DIRTY:
-    case TSO:
-    case STACK:
-    case TREC_CHUNK:
-        return 0;
-        */
-
     case CONSTR:
     case CONSTR_1_0:
     case CONSTR_0_1:
@@ -165,6 +129,7 @@ STATIC_INLINE void
 thread (StgClosure **p)
 {
     StgClosure *q0  = *p;
+    bool q0_tagged = GET_CLOSURE_TAG(q0) != 0;
     P_ q = (P_)UNTAG_CLOSURE(q0);
 
     // It doesn't look like a closure at the moment, because the info
@@ -177,17 +142,8 @@ thread (StgClosure **p)
         if (bd->flags & BF_MARKED)
         {
             W_ iptr = *q;
-            switch (GET_PTR_TAG(iptr))
-            {
-            case 0:
-                *p = (StgClosure *)iptr;
-                *q = (W_)p + 1;
-                break;
-            case 1:
-                *p = (StgClosure *)iptr;
-                *q = (W_)p + 1;
-                break;
-            }
+            *p = (StgClosure *)iptr;
+            *q = (W_)p + 1 + (q0_tagged ? 1 : 0);
         }
     }
 }
@@ -198,18 +154,12 @@ thread_root (void *user STG_UNUSED, StgClosure **p)
     thread(p);
 }
 
-static void
-untag_root (void* user STG_UNUSED, StgClosure **p)
-{
-    *p = UNTAG_CLOSURE(*p);
-}
-
 // This version of thread() takes a (void *), used to circumvent
 // warnings from gcc about pointer punning and strict aliasing.
 STATIC_INLINE void thread_ (void *p) { thread((StgClosure **)p); }
 
 STATIC_INLINE void
-unthread( const P_ p, W_ free )
+unthread( const P_ p, W_ free, W_ tag )
 {
     W_ q = *p;
 loop:
@@ -224,6 +174,14 @@ loop:
         P_ q0 = (P_)(q-1);
         W_ r = *q0;
         *q0 = free;
+        q = r;
+        goto loop;
+    }
+    case 2:
+    {
+        P_ q0 = (P_)(q-2);
+        W_ r = *q0;
+        *q0 = free + tag;
         q = r;
         goto loop;
     }
@@ -248,8 +206,9 @@ loop:
         ASSERT(LOOKS_LIKE_INFO_PTR(q));
         return (StgInfoTable*)q;
     case 1:
+    case 2:
     {
-        q = *(P_)(q-1);
+        q = *(P_)(UNTAG_PTR(q));
         goto loop;
     }
     default:
@@ -853,7 +812,7 @@ update_fwd_compact( bdescr *blocks )
             }
 
             StgWord iptr_tag = get_iptr_tag(iptr);
-            unthread(q,(W_)free + iptr_tag);
+            unthread(q, (W_)free, iptr_tag);
             free += size;
         }
     }
@@ -891,7 +850,7 @@ update_bkwd_compact( generation *gen )
 
             StgInfoTable *iptr = get_threaded_info(p);
             StgWord iptr_tag = get_iptr_tag(iptr);
-            unthread(p, (W_)free + iptr_tag);
+            unthread(p, (W_)free, iptr_tag);
             ASSERT(LOOKS_LIKE_INFO_PTR((W_)((StgClosure *)p)->header.info));
             const StgInfoTable *info = get_itbl((StgClosure *)p);
             W_ size = closure_sizeW_((StgClosure *)p,info);
@@ -1008,20 +967,5 @@ compact(StgClosure *static_objects,
                    "update_bkwd: %d (compact, old: %d blocks, now %d blocks)",
                    gen->no, gen->n_old_blocks, blocks);
         gen->n_old_blocks = blocks;
-    }
-
-    // 4. untag roots (run queues, mut_lists, and spark queues)
-    markCapabilities((evac_fn)untag_root, NULL);
-    markScheduler((evac_fn)untag_root, NULL);
-
-    for (W_ g = 1; g < RtsFlags.GcFlags.generations; g++) {
-        for (W_ n = 0; n < n_capabilities; n++) {
-            for (bdescr *bd = capabilities[n]->mut_lists[g];
-                 bd != NULL; bd = bd->link) {
-                for (StgClosure **p = (StgClosure**)bd->start; p < (StgClosure**)bd->free; p++) {
-                    *p = UNTAG_CLOSURE(*p);
-                }
-            }
-        }
     }
 }
