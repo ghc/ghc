@@ -406,3 +406,8 @@ test('T13676',
      [when(opsys('darwin') or opsys('mingw32'), expect_broken(17447)),
       extra_files(['T13676.hs'])],
      ghci_script, ['T13676.script'])
+
+test('T17088',
+     [only_ways(['normal']), extra_run_opts('+RTS -c -A256k -RTS')],
+     compile_and_run, ['-rtsopts -O2'])
+
