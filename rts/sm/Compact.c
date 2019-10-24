@@ -180,16 +180,12 @@ thread (StgClosure **p)
             switch (GET_PTR_TAG(iptr))
             {
             case 0:
-                // this is the info pointer; we are creating a new chain.
-                // save the original tag at the end of the chain.
                 *p = (StgClosure *)iptr;
                 *q = (W_)p + 1;
                 break;
             case 1:
-            case 2:
-                // this is a chain of length 1 or more
                 *p = (StgClosure *)iptr;
-                *q = (W_)p + 2;
+                *q = (W_)p + 1;
                 break;
             }
         }
@@ -213,7 +209,7 @@ untag_root (void* user STG_UNUSED, StgClosure **p)
 STATIC_INLINE void thread_ (void *p) { thread((StgClosure **)p); }
 
 STATIC_INLINE void
-unthread( P_ p, W_ free )
+unthread( const P_ p, W_ free )
 {
     W_ q = *p;
 loop:
@@ -221,19 +217,11 @@ loop:
     {
     case 0:
         // nothing to do; the chain is length zero
+        *p = q;
         return;
     case 1:
     {
         P_ q0 = (P_)(q-1);
-        W_ r = *q0;  // r is the info ptr, tagged with the pointer-tag
-        *q0 = free;
-        ASSERT(GET_PTR_TAG(r) == 0);
-        *p = r;
-        return;
-    }
-    case 2:
-    {
-        P_ q0 = (P_)(q-2);
         W_ r = *q0;
         *q0 = free;
         q = r;
@@ -261,14 +249,9 @@ loop:
         return (StgInfoTable*)q;
     case 1:
     {
-        W_ r = *(P_)(q-1);
-        ASSERT(GET_PTR_TAG(r) == 0);
-        ASSERT(LOOKS_LIKE_INFO_PTR(r));
-        return (StgInfoTable*)r;
-    }
-    case 2:
-        q = *(P_)(q-2);
+        q = *(P_)(q-1);
         goto loop;
+    }
     default:
         barf("get_threaded_info");
     }
