@@ -37,37 +37,35 @@
 /* ----------------------------------------------------------------------------
    Threading / unthreading pointers.
 
-   The basic idea here is to chain together all the fields pointing at
-   a particular object, with the root of the chain in the object's
-   info table field.  The original contents of the info pointer goes
-   at the end of the chain.
+   The basic idea here is to chain together all the fields pointing at a
+   particular object, with the root of the chain in the object's info table
+   field.  The original contents of the info pointer goes at the end of the
+   chain.
 
-   Adding a new field to the chain is a matter of swapping the
-   contents of the field with the contents of the object's info table
-   field.
+   Adding a new field to the chain is a matter of swapping the contents of the
+   field with the contents of the object's info table field:
 
-   To unthread the chain, we walk down it updating all the fields on
-   the chain with the new location of the object.  We stop when we
-   reach the info pointer at the end.
+       *field, **field = **field, field
 
-   The main difficulty here is that we need to be able to identify the
-   info pointer at the end of the chain.  We can't use the low bits of
-   the pointer for this; they are already being used for
-   pointer-tagging.  What's more, we need to retain the
-   pointer-tagging tag bits on each pointer during the
-   threading/unthreading process.
+   To unthread the chain, we walk down it updating all the fields on the chain
+   with the new location of the object.  We stop when we reach the info pointer
+   at the end.
 
-   Our solution is as follows:
-     - an info pointer (chain length zero) is identified by having tag 0
-     - in a threaded chain of length > 0:
-        - the pointer-tagging tag bits are attached to the info pointer
-        - the first entry in the chain has tag 1
-        - second and subsequent entries in the chain have tag 2
+   The main difficulty here is that not all pointers to the same object are
+   tagged: pointers from roots (e.g. mut_lists) are not tagged, but pointers
+   from mutators are. So when unthreading a chain we need to distinguish a field
+   that had a tagged pointer from a field that had an untagged pointer.
 
-   This exploits the fact that the tag on each pointer to a given
-   closure is normally the same (if they are not the same, then
-   presumably the tag is not essential and it therefore doesn't matter
-   if we throw away some of the tags).
+    Our solution is as follows: when chaining a field, if the field is NOT
+    tagged then we tag the pointer to the field with 1. I.e.
+
+        *field, **field = **field, field + 1
+
+    If the field is tagged then we tag to the pointer to it with 2.
+
+    When unchaining we look at the tag in the pointer to the field, if it's 1
+    then we write an untagged pointer to "free" to it, otherwise we tag the
+    pointer.
    ------------------------------------------------------------------------- */
 
 STATIC_INLINE W_
