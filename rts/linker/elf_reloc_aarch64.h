@@ -1,8 +1,8 @@
 #pragma once
 
-#if defined(OBJFORMAT_ELF)
-
 #include "LinkerInternals.h"
+
+#if defined(OBJFORMAT_ELF)
 
 bool
 relocateObjectCodeAarch64(ObjectCode * oc);
