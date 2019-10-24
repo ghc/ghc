@@ -55,7 +55,7 @@ import MonadUtils
 import Util
 import Outputable
 
-import Data.ByteString (ByteString)
+import Data.ByteString.Short (ShortByteString)
 import Data.Bits
 
 -- When we split at proc points, we need an empty info table.
@@ -423,7 +423,7 @@ mkProfLits _ (ProfilingInfo td cd)
        ; (cd_lit, cd_decl) <- newStringLit cd
        ; return ((td_lit,cd_lit), [td_decl,cd_decl]) }
 
-newStringLit :: ByteString -> UniqSM (CmmLit, GenCmmDecl CmmStatics info stmt)
+newStringLit :: ShortByteString -> UniqSM (CmmLit, GenCmmDecl CmmStatics info stmt)
 newStringLit bytes
   = do { uniq <- getUniqueM
        ; return (mkByteStringCLit (mkStringLitLabel uniq) bytes) }

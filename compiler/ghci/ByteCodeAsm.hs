@@ -453,7 +453,7 @@ assembleI dflags i = case i of
     literal (LitFloat r)      = float (fromRational r)
     literal (LitDouble r)     = double (fromRational r)
     literal (LitChar c)       = int (ord c)
-    literal (LitString bs)    = lit [BCONPtrStr bs]
+    literal (LitString bs)    = lit [BCONPtrStr (fastStringToShortByteString bs)]
        -- LitString requires a zero-terminator when emitted
     literal (LitNumber nt i _) = case nt of
       LitNumInt     -> int (fromIntegral i)

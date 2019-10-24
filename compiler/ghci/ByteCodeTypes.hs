@@ -33,6 +33,7 @@ import Foreign
 import Data.Array
 import Data.Array.Base  ( UArray(..) )
 import Data.ByteString (ByteString)
+import Data.ByteString.Short (ShortByteString)
 import Data.IntMap (IntMap)
 import qualified Data.IntMap as IntMap
 import Data.Maybe (catMaybes)
@@ -103,7 +104,7 @@ data BCONPtr
   = BCONPtrWord  {-# UNPACK #-} !Word
   | BCONPtrLbl   !FastString
   | BCONPtrItbl  !Name
-  | BCONPtrStr   !ByteString
+  | BCONPtrStr   !ShortByteString
 
 instance NFData BCONPtr where
   rnf x = x `seq` ()

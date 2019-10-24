@@ -54,7 +54,7 @@ import FastString
 
 import Data.Word
 import Data.Bits
-import Data.ByteString (ByteString)
+import Data.ByteString.Short (ShortByteString)
 
 {-
 ************************************************************************
@@ -192,7 +192,7 @@ data ClosureTypeInfo
   | BlackHole
   | IndStatic
 
-type ConstrDescription = ByteString -- result of dataConIdentity
+type ConstrDescription = ShortByteString -- result of dataConIdentity
 type FunArity          = Int
 type SelectorOffset    = Int
 

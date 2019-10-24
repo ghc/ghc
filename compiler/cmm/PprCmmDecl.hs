@@ -51,6 +51,7 @@ import Data.List
 import System.IO
 
 import qualified Data.ByteString as BS
+import qualified Data.ByteString.Short as BSS
 
 
 pprCmms :: (Outputable info, Outputable g)
@@ -120,8 +121,8 @@ pprInfoTable (CmmInfoTable { cit_lbl = lbl, cit_rep = rep
          , case prof_info of
              NoProfilingInfo -> empty
              ProfilingInfo ct cd ->
-               vcat [ text "type: " <> text (show (BS.unpack ct))
-                    , text "desc: " <> text (show (BS.unpack cd)) ]
+               vcat [ text "type: " <> text (show (BSS.unpack ct))
+                    , text "desc: " <> text (show (BSS.unpack cd)) ]
          , text "srt: " <> ppr srt ]
 
 instance Outputable ForeignHint where

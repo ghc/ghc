@@ -39,6 +39,7 @@ import Hoopl.Collections
 import Hoopl.Graph
 import Hoopl.Label
 import Outputable
+import Data.ByteString.Short (ShortByteString)
 import Data.ByteString (ByteString)
 
 -----------------------------------------------------------------------------
@@ -158,7 +159,7 @@ data CmmInfoTable
 
 data ProfilingInfo
   = NoProfilingInfo
-  | ProfilingInfo ByteString ByteString -- closure_type, closure_desc
+  | ProfilingInfo ShortByteString ShortByteString -- closure_type, closure_desc
 
 -----------------------------------------------------------------------------
 --              Static Data

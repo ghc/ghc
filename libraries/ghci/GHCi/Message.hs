@@ -38,6 +38,7 @@ import Data.Binary
 import Data.Binary.Get
 import Data.Binary.Put
 import Data.ByteString (ByteString)
+import Data.ByteString.Short (ShortByteString)
 import qualified Data.ByteString as B
 import qualified Data.ByteString.Lazy as LB
 import Data.Dynamic
@@ -93,8 +94,8 @@ data Message a where
   AddSptEntry :: Fingerprint -> HValueRef -> Message ()
 
   -- | Malloc some data and return a 'RemotePtr' to it
-  MallocData :: ByteString -> Message (RemotePtr ())
-  MallocStrings :: [ByteString] -> Message [RemotePtr ()]
+  MallocData :: ShortByteString -> Message (RemotePtr ())
+  MallocStrings :: [ShortByteString] -> Message [RemotePtr ()]
 
   -- | Calls 'GHCi.FFI.prepareForeignCall'
   PrepFFI :: FFIConv -> [FFIType] -> FFIType -> Message (RemotePtr C_ffi_cif)
@@ -108,7 +109,7 @@ data Message a where
    -> Int     -- non-ptr words
    -> Int     -- constr tag
    -> Int     -- pointer tag
-   -> ByteString -- constructor desccription
+   -> ShortByteString -- constructor description
    -> Message (RemotePtr StgInfoTable)
 
   -- | Evaluate a statement

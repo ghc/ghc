@@ -29,6 +29,7 @@ import FastString
 import GHC.Hs.Extension
 
 import Data.ByteString (ByteString)
+import Data.ByteString.Short (ShortByteString)
 import Data.Data hiding ( Fixity )
 
 {-
@@ -50,7 +51,7 @@ data HsLit x
       -- ^ Unboxed character
   | HsString (XHsString x) {- SourceText -} FastString
       -- ^ String
-  | HsStringPrim (XHsStringPrim x) {- SourceText -} ByteString
+  | HsStringPrim (XHsStringPrim x) {- SourceText -} ShortByteString
       -- ^ Packed bytes
   | HsInt (XHsInt x)  IntegralLit
       -- ^ Genuinely an Int; arises from

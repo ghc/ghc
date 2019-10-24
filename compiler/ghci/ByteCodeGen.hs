@@ -67,6 +67,7 @@ import Module
 import Control.Exception
 import Data.Array
 import Data.ByteString (ByteString)
+import Data.ByteString.Short (ShortByteString)
 import Data.Map (Map)
 import Data.IntMap (IntMap)
 import qualified Data.Map as Map
@@ -94,7 +95,7 @@ byteCodeGen hsc_env this_mod binds tycs mb_modBreaks
         let (strings, flatBinds) = partitionEithers $ do  -- list monad
                 (bndr, rhs) <- flattenBinds binds
                 return $ case exprIsTickedString_maybe rhs of
-                    Just str -> Left (bndr, str)
+                    Just str -> Left (bndr, fastStringToShortByteString str)
                     _ -> Right (bndr, simpleFreeVars rhs)
         stringPtrs <- allocateTopStrings hsc_env strings
 
@@ -128,7 +129,7 @@ byteCodeGen hsc_env this_mod binds tycs mb_modBreaks
 
 allocateTopStrings
   :: HscEnv
-  -> [(Id, ByteString)]
+  -> [(Id, ShortByteString)]
   -> IO [(Var, RemotePtr ())]
 allocateTopStrings hsc_env topStrings = do
   let !(bndrs, strings) = unzip topStrings

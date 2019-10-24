@@ -110,6 +110,7 @@ import Control.Concurrent.MVar
 import Control.DeepSeq
 import Control.Monad
 import Data.ByteString (ByteString)
+import Data.ByteString.Internal(c2w)
 import Data.ByteString.Short (ShortByteString)
 import qualified Data.ByteString          as BS
 import qualified Data.ByteString.Char8    as BSC
@@ -150,8 +151,8 @@ fastZStringToByteString :: FastZString -> ByteString
 fastZStringToByteString (FastZString bs) = bs
 
 -- This will drop information if any character > '\xFF'
-unsafeMkByteString :: String -> ByteString
-unsafeMkByteString = BSC.pack
+unsafeMkByteString :: String -> ShortByteString
+unsafeMkByteString = SBS.pack . map c2w
 
 hashFastString :: FastString -> Int
 hashFastString (FastString _ sbs _) = hashStr sbs

@@ -76,6 +76,7 @@ import Control.Monad.IO.Class
 import Data.Binary
 import Data.Binary.Put
 import Data.ByteString (ByteString)
+import Data.ByteString.Short (ShortByteString)
 import qualified Data.ByteString.Lazy as LB
 import Data.IORef
 import Foreign hiding (void)
@@ -283,7 +284,7 @@ evalStringToIOString hsc_env fhv str = do
 
 -- | Allocate and store the given bytes in memory, returning a pointer
 -- to the memory in the remote process.
-mallocData :: HscEnv -> ByteString -> IO (RemotePtr ())
+mallocData :: HscEnv -> ShortByteString -> IO (RemotePtr ())
 mallocData hsc_env bs = iservCmd hsc_env (MallocData bs)
 
 mkCostCentres

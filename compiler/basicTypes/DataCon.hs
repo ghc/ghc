@@ -87,6 +87,7 @@ import Unique( mkAlphaTyVarUnique )
 
 import Data.ByteString (ByteString)
 import qualified Data.ByteString.Builder as BSB
+import qualified Data.ByteString.Short as BSS
 import qualified Data.ByteString.Lazy    as LBS
 import qualified Data.Data as Data
 import Data.Char
@@ -1356,9 +1357,9 @@ dataConRepArgTys (MkData { dcRep = rep
 
 -- | The string @package:module.name@ identifying a constructor, which is attached
 -- to its info table and used by the GHCi debugger and the heap profiler
-dataConIdentity :: DataCon -> ByteString
+dataConIdentity :: DataCon -> BSS.ShortByteString
 -- We want this string to be UTF-8, so we get the bytes directly from the FastStrings.
-dataConIdentity dc = LBS.toStrict $ BSB.toLazyByteString $ mconcat
+dataConIdentity dc = BSS.toShort $ LBS.toStrict $ BSB.toLazyByteString $ mconcat
    [ BSB.shortByteString $ fastStringToShortByteString $
        unitIdFS $ moduleUnitId mod
    , BSB.int8 $ fromIntegral (ord ':')

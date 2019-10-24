@@ -1932,7 +1932,7 @@ exprIsTickedString = isJust . exprIsTickedString_maybe
 -- wrapped around a literal string. Returns Nothing if the expression has a
 -- different shape.
 -- Used to "look through" Ticks in places that need to handle literal strings.
-exprIsTickedString_maybe :: CoreExpr -> Maybe ByteString
+exprIsTickedString_maybe :: CoreExpr -> Maybe FastString
 exprIsTickedString_maybe (Lit (LitString bs)) = Just bs
 exprIsTickedString_maybe (Tick t e)
   -- we don't tick literals with CostCentre ticks, compare to mkTick

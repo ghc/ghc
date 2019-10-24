@@ -109,7 +109,7 @@ import GHC.Serialized
 import GHC.LanguageExtensions (Extension)
 
 import Data.ByteString (ByteString)
-import qualified Data.ByteString as BS
+import qualified Data.ByteString.Short as BS
 import Data.Char
 import qualified Data.Map as M
 import Data.Int
@@ -962,7 +962,7 @@ pprHsString :: FastString -> SDoc
 pprHsString fs = vcat (map text (showMultiLineString (unpackFS fs)))
 
 -- | Special combinator for showing bytestring literals.
-pprHsBytes :: ByteString -> SDoc
+pprHsBytes :: BS.ShortByteString -> SDoc
 pprHsBytes bs = let escaped = concatMap escape $ BS.unpack bs
                 in vcat (map text (showMultiLineString escaped)) <> char '#'
     where escape :: Word8 -> String

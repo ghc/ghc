@@ -255,7 +255,7 @@ coreTopBindToStg _ _ env ccs (NonRec id e)
   = let
         env' = extendVarEnv env id how_bound
         how_bound = LetBound TopLet 0
-    in (env', ccs, StgTopStringLit id str)
+    in (env', ccs, StgTopStringLit id (fastStringToShortByteString str))
 
 coreTopBindToStg dflags this_mod env ccs (NonRec id rhs)
   = let

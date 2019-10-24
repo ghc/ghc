@@ -46,7 +46,7 @@ import Control.Monad.Trans.Class
 import Control.Monad.Trans.RWS.Strict ( RWST, runRWST )
 import qualified Control.Monad.Trans.RWS.Strict as RWS
 import Control.Monad.Trans.Cont ( ContT (..) )
-import Data.ByteString ( ByteString )
+import Data.ByteString.Short ( ShortByteString )
 
 -- | @uncurry 'mkStgBinding' . 'decomposeStgBinding' = id@
 decomposeStgBinding :: GenStgBinding pass -> (RecFlag, [(BinderP pass, GenStgRhs pass)])
@@ -240,7 +240,7 @@ withCaffyness caffy action
   = LiftM (RWS.local (\e -> e { e_in_caffy_context = caffy }) (unwrapLiftM action))
 
 -- | Writes a plain 'StgTopStringLit' to the output.
-addTopStringLit :: OutId -> ByteString -> LiftM ()
+addTopStringLit :: OutId -> ShortByteString -> LiftM ()
 addTopStringLit id = LiftM . RWS.tell . unitOL . PlainTopBinding . StgTopStringLit id
 
 -- | Starts a recursive binding group. See #floats# and 'collectFloats'.

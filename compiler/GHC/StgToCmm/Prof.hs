@@ -214,11 +214,11 @@ emitCostCentreDecl cc = do
   ; let is_caf | isCafCC cc = mkIntCLit dflags (ord 'c') -- 'c' == is a CAF
                | otherwise  = zero dflags
                         -- NB. bytesFS: we want the UTF-8 bytes here (#5559)
-  ; label <- newByteStringCLit (bytesFS $ costCentreUserNameFS cc)
-  ; modl  <- newByteStringCLit (bytesFS $ Module.moduleNameFS
+  ; label <- newByteStringCLit (fastStringToShortByteString $ costCentreUserNameFS cc)
+  ; modl  <- newByteStringCLit (fastStringToShortByteString $ Module.moduleNameFS
                                         $ Module.moduleName
                                         $ cc_mod cc)
-  ; loc <- newByteStringCLit $ bytesFS $ mkFastString $
+  ; loc <- newByteStringCLit $ fastStringToShortByteString $ mkFastString $
                    showPpr dflags (costCentreSrcSpan cc)
            -- XXX going via FastString to get UTF-8 encoding is silly
   ; let

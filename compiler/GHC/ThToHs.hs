@@ -45,7 +45,7 @@ import FastString
 import Outputable
 import MonadUtils ( foldrM )
 
-import qualified Data.ByteString as BS
+import qualified Data.ByteString.Short as BSS
 import Control.Monad( unless, ap )
 
 import Data.Maybe( catMaybes, isNothing )
@@ -1217,12 +1217,12 @@ cvtLit (CharPrimL c)   = do { force c; return $ HsCharPrim NoSourceText c }
 cvtLit (StringL s)     = do { let { s' = mkFastString s }
                             ; force s'
                             ; return $ HsString (quotedSourceText s) s' }
-cvtLit (StringPrimL s) = do { let { s' = BS.pack s }
+cvtLit (StringPrimL s) = do { let { s' = BSS.pack s }
                             ; force s'
                             ; return $ HsStringPrim NoSourceText s' }
 cvtLit (BytesPrimL (Bytes fptr off sz)) = do
   let bs = unsafePerformIO $ withForeignPtr fptr $ \ptr ->
-             BS.packCStringLen (ptr `plusPtr` fromIntegral off, fromIntegral sz)
+             BSS.packCStringLen (ptr `plusPtr` fromIntegral off, fromIntegral sz)
   force bs
   return $ HsStringPrim NoSourceText bs
 cvtLit _ = panic "Convert.cvtLit: Unexpected literal"

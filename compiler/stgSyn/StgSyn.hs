@@ -63,7 +63,7 @@ import GhcPrelude
 
 import CoreSyn     ( AltCon, Tickish )
 import CostCentre  ( CostCentreStack )
-import Data.ByteString ( ByteString )
+import Data.ByteString.Short ( ShortByteString )
 import Data.Data   ( Data )
 import Data.List   ( intersperse )
 import DataCon
@@ -102,7 +102,7 @@ binder and occurrence information (just as in @CoreSyn@):
 data GenStgTopBinding pass
 -- See Note [CoreSyn top-level string literals]
   = StgTopLifted (GenStgBinding pass)
-  | StgTopStringLit Id ByteString
+  | StgTopStringLit Id ShortByteString
 
 data GenStgBinding pass
   = StgNonRec (BinderP pass) (GenStgRhs pass)

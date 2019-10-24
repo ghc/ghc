@@ -1098,27 +1098,25 @@ exprIsConApp_maybe (in_scope, id_unf) expr
 
 
 -- See Note [exprIsConApp_maybe on literal strings]
-dealWithStringLiteral :: Var -> BS.ByteString -> Coercion
+dealWithStringLiteral :: Var -> FastString -> Coercion
                       -> Maybe (DataCon, [Type], [CoreExpr])
 
 -- This is not possible with user-supplied empty literals, MkCore.mkStringExprFS
 -- turns those into [] automatically, but just in case something else in GHC
 -- generates a string literal directly.
 dealWithStringLiteral _   str co
-  | BS.null str
+  | nullFS str
   = pushCoDataCon nilDataCon [Type charTy] co
 
-dealWithStringLiteral fun str co
-  = let strFS = mkFastStringByteString str
-
-        char = mkConApp charDataCon [mkCharLit (headFS strFS)]
+dealWithStringLiteral fun strFS co
+  = let char = mkConApp charDataCon [mkCharLit (headFS strFS)]
         charTail = BS.tail (bytesFS strFS)
 
         -- In singleton strings, just add [] instead of unpackCstring# ""#.
         rest = if BS.null charTail
                  then mkConApp nilDataCon [Type charTy]
                  else App (Var fun)
-                          (Lit (LitString charTail))
+                          (Lit (LitString (mkFastStringByteString charTail)))
 
     in pushCoDataCon consDataCon [Type charTy, char, rest] co
 

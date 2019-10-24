@@ -65,7 +65,7 @@ import GHC.Platform
 import UniqFM
 import Util
 
-import Data.ByteString (ByteString)
+import Data.ByteString.Short (ShortByteString)
 import Data.Int
 import Data.Word
 import Data.Char
@@ -114,7 +114,7 @@ data Literal
                                 -- See Note [Types of LitNumbers] below for the
                                 -- Type field.
 
-  | LitString  ByteString       -- ^ A string-literal: stored and emitted
+  | LitString  FastString       -- ^ A string-literal: stored and emitted
                                 -- UTF-8 encoded, we'll arrange to decode it
                                 -- at runtime.  Also emitted with a @\'\\0\'@
                                 -- terminator. Create with 'mkLitString'
@@ -428,7 +428,7 @@ mkLitChar = LitChar
 -- e.g. some of the \"error\" functions in GHC.Err such as @GHC.Err.runtimeError@
 mkLitString :: String -> Literal
 -- stored UTF-8 encoded
-mkLitString s = LitString (bytesFS $ mkFastString s)
+mkLitString s = LitString (mkFastString s)
 
 mkLitInteger :: Integer -> Type -> Literal
 mkLitInteger x ty = LitNumber LitNumInteger x ty
@@ -732,7 +732,7 @@ litTag (LitRubbish)       = 8
 
 pprLiteral :: (SDoc -> SDoc) -> Literal -> SDoc
 pprLiteral _       (LitChar c)     = pprPrimChar c
-pprLiteral _       (LitString s)   = pprHsBytes s
+pprLiteral _       (LitString s)   = pprHsBytes (fastStringToShortByteString s)
 pprLiteral _       (LitNullAddr)   = text "__NULL"
 pprLiteral _       (LitFloat f)    = float (fromRat f) <> primFloatSuffix
 pprLiteral _       (LitDouble d)   = double (fromRat d) <> primDoubleSuffix
