@@ -1,0 +1,8 @@
+Note: The above commit message has an unfortunate mistake:
+
+> This heap structure enables collection via mark-and-sweep, which can be
+> performed concurrently via a snapshot-at-the-beginning scheme (although
+> concurrent collection is not implemented in this patch).
+
+The final parenthetical is incorrect and the result of a copy-and-paste error.
+The patches merged here do implement concurrent collection.
