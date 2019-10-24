@@ -1,5 +1,4 @@
-#if !defined(RTS_LINKER_ELF_UTIL_H)
-#define RTS_LINKER_ELF_UTIL_H
+#pragma once
 
 #include "LinkerInternals.h"
 
@@ -13,4 +12,3 @@ ElfSymbol * findSymbol(ObjectCode * oc,
                        unsigned long symbolIndex);
 
 #endif
-#endif //RTS_LINKER_ELF_UTIL_H
