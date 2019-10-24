@@ -37,37 +37,35 @@
 /* ----------------------------------------------------------------------------
    Threading / unthreading pointers.
 
-   The basic idea here is to chain together all the fields pointing at
-   a particular object, with the root of the chain in the object's
-   info table field.  The original contents of the info pointer goes
-   at the end of the chain.
+   The basic idea here is to chain together all the fields pointing at a
+   particular object, with the root of the chain in the object's info table
+   field.  The original contents of the info pointer goes at the end of the
+   chain.
 
-   Adding a new field to the chain is a matter of swapping the
-   contents of the field with the contents of the object's info table
-   field.
+   Adding a new field to the chain is a matter of swapping the contents of the
+   field with the contents of the object's info table field:
 
-   To unthread the chain, we walk down it updating all the fields on
-   the chain with the new location of the object.  We stop when we
-   reach the info pointer at the end.
+       *field, **field = **field, field
 
-   The main difficulty here is that we need to be able to identify the
-   info pointer at the end of the chain.  We can't use the low bits of
-   the pointer for this; they are already being used for
-   pointer-tagging.  What's more, we need to retain the
-   pointer-tagging tag bits on each pointer during the
-   threading/unthreading process.
+   To unthread the chain, we walk down it updating all the fields on the chain
+   with the new location of the object.  We stop when we reach the info pointer
+   at the end.
 
-   Our solution is as follows:
-     - an info pointer (chain length zero) is identified by having tag 0
-     - in a threaded chain of length > 0:
-        - the pointer-tagging tag bits are attached to the info pointer
-        - the first entry in the chain has tag 1
-        - second and subsequent entries in the chain have tag 2
+   The main difficulty here is that not all pointers to the same object are
+   tagged: pointers from roots (e.g. mut_lists) are not tagged, but pointers
+   from mutators are. So when unthreading a chain we need to distinguish a field
+   that had a tagged pointer from a field that had an untagged pointer.
 
-   This exploits the fact that the tag on each pointer to a given
-   closure is normally the same (if they are not the same, then
-   presumably the tag is not essential and it therefore doesn't matter
-   if we throw away some of the tags).
+    Our solution is as follows: when chaining a field, if the field is NOT
+    tagged then we tag the pointer to the field with 1. I.e.
+
+        *field, **field = **field, field + 1
+
+    If the field is tagged then we tag to the pointer to it with 2.
+
+    When unchaining we look at the tag in the pointer to the field, if it's 1
+    then we write an untagged pointer to "free" to it, otherwise we tag the
+    pointer.
    ------------------------------------------------------------------------- */
 
 STATIC_INLINE W_
@@ -82,10 +80,54 @@ GET_PTR_TAG(W_ p)
     return p & TAG_MASK;
 }
 
+static W_
+get_iptr_tag(StgInfoTable *iptr)
+{
+    const StgInfoTable *info = INFO_PTR_TO_STRUCT(iptr);
+    switch (info->type) {
+    case CONSTR:
+    case CONSTR_1_0:
+    case CONSTR_0_1:
+    case CONSTR_2_0:
+    case CONSTR_1_1:
+    case CONSTR_0_2:
+    case CONSTR_NOCAF:
+    {
+        W_ con_tag = info->srt + 1;
+        if (con_tag > TAG_MASK) {
+            return TAG_MASK;
+        } else {
+            return con_tag;
+        }
+    }
+
+    case FUN:
+    case FUN_1_0:
+    case FUN_0_1:
+    case FUN_2_0:
+    case FUN_1_1:
+    case FUN_0_2:
+    case FUN_STATIC:
+    {
+        const StgFunInfoTable *fun_itbl = FUN_INFO_PTR_TO_STRUCT(iptr);
+        W_ arity = fun_itbl->f.arity;
+        if (arity <= TAG_MASK) {
+            return arity;
+        } else {
+            return 0;
+        }
+    }
+
+    default:
+        return 0;
+    }
+}
+
 STATIC_INLINE void
 thread (StgClosure **p)
 {
     StgClosure *q0  = *p;
+    bool q0_tagged = GET_CLOSURE_TAG(q0) != 0;
     P_ q = (P_)UNTAG_CLOSURE(q0);
 
     // It doesn't look like a closure at the moment, because the info
@@ -98,21 +140,8 @@ thread (StgClosure **p)
         if (bd->flags & BF_MARKED)
         {
             W_ iptr = *q;
-            switch (GET_PTR_TAG(iptr))
-            {
-            case 0:
-                // this is the info pointer; we are creating a new chain.
-                // save the original tag at the end of the chain.
-                *p = (StgClosure *)((W_)iptr + GET_CLOSURE_TAG(q0));
-                *q = (W_)p + 1;
-                break;
-            case 1:
-            case 2:
-                // this is a chain of length 1 or more
-                *p = (StgClosure *)iptr;
-                *q = (W_)p + 2;
-                break;
-            }
+            *p = (StgClosure *)iptr;
+            *q = (W_)p + 1 + (q0_tagged ? 1 : 0);
         }
     }
 }
@@ -128,7 +157,7 @@ thread_root (void *user STG_UNUSED, StgClosure **p)
 STATIC_INLINE void thread_ (void *p) { thread((StgClosure **)p); }
 
 STATIC_INLINE void
-unthread( P_ p, W_ free )
+unthread( const P_ p, W_ free, W_ tag )
 {
     W_ q = *p;
 loop:
@@ -136,20 +165,21 @@ loop:
     {
     case 0:
         // nothing to do; the chain is length zero
+        *p = q;
         return;
     case 1:
     {
         P_ q0 = (P_)(q-1);
-        W_ r = *q0;  // r is the info ptr, tagged with the pointer-tag
+        W_ r = *q0;
         *q0 = free;
-        *p = (W_)UNTAG_PTR(r);
-        return;
+        q = r;
+        goto loop;
     }
     case 2:
     {
         P_ q0 = (P_)(q-2);
         W_ r = *q0;
-        *q0 = free;
+        *q0 = free + tag;
         q = r;
         goto loop;
     }
@@ -162,7 +192,7 @@ loop:
 // The info pointer is also tagged with the appropriate pointer tag
 // for this closure, which should be attached to the pointer
 // subsequently passed to unthread().
-STATIC_INLINE W_
+STATIC_INLINE StgInfoTable*
 get_threaded_info( P_ p )
 {
     W_ q = (W_)GET_INFO(UNTAG_CLOSURE((StgClosure *)p));
@@ -172,16 +202,13 @@ loop:
     {
     case 0:
         ASSERT(LOOKS_LIKE_INFO_PTR(q));
-        return q;
+        return (StgInfoTable*)q;
     case 1:
-    {
-        W_ r = *(P_)(q-1);
-        ASSERT(LOOKS_LIKE_INFO_PTR((W_)UNTAG_CONST_CLOSURE((StgClosure *)r)));
-        return r;
-    }
     case 2:
-        q = *(P_)(q-2);
+    {
+        q = *(P_)(UNTAG_PTR(q));
         goto loop;
+    }
     default:
         barf("get_threaded_info");
     }
@@ -353,8 +380,7 @@ thread_stack(P_ p, P_ stack_end)
         {
             StgRetFun *ret_fun = (StgRetFun *)p;
             StgFunInfoTable *fun_info =
-                FUN_INFO_PTR_TO_STRUCT((StgInfoTable *)UNTAG_PTR(
-                           get_threaded_info((P_)ret_fun->fun)));
+                FUN_INFO_PTR_TO_STRUCT(get_threaded_info((P_)ret_fun->fun));
                  // *before* threading it!
             thread(&ret_fun->fun);
             p = thread_arg_block(fun_info, ret_fun->payload);
@@ -372,7 +398,7 @@ STATIC_INLINE P_
 thread_PAP_payload (StgClosure *fun, StgClosure **payload, W_ size)
 {
     StgFunInfoTable *fun_info =
-        FUN_INFO_PTR_TO_STRUCT((StgInfoTable *)UNTAG_PTR(get_threaded_info((P_)fun)));
+        FUN_INFO_PTR_TO_STRUCT(get_threaded_info((P_)fun));
     ASSERT(fun_info->i.type != PAP);
 
     P_ p = (P_)payload;
@@ -762,8 +788,8 @@ update_fwd_compact( bdescr *blocks )
             // ToDo: one possible avenue of attack is to use the fact
             // that if (p&BLOCK_MASK) >= (free&BLOCK_MASK), then we
             // definitely have enough room.  Also see bug #1147.
-            W_ iptr = get_threaded_info(p);
-            StgInfoTable *info = INFO_PTR_TO_STRUCT((StgInfoTable *)UNTAG_PTR(iptr));
+            StgInfoTable *iptr = get_threaded_info(p);
+            StgInfoTable *info = INFO_PTR_TO_STRUCT(iptr);
 
             P_ q = p;
 
@@ -783,7 +809,8 @@ update_fwd_compact( bdescr *blocks )
                 ASSERT(!is_marked(q+1,bd));
             }
 
-            unthread(q,(W_)free + GET_PTR_TAG(iptr));
+            StgWord iptr_tag = get_iptr_tag(iptr);
+            unthread(q, (W_)free, iptr_tag);
             free += size;
         }
     }
@@ -819,8 +846,9 @@ update_bkwd_compact( generation *gen )
                 free_blocks++;
             }
 
-            W_ iptr = get_threaded_info(p);
-            unthread(p, (W_)free + GET_PTR_TAG(iptr));
+            StgInfoTable *iptr = get_threaded_info(p);
+            StgWord iptr_tag = get_iptr_tag(iptr);
+            unthread(p, (W_)free, iptr_tag);
             ASSERT(LOOKS_LIKE_INFO_PTR((W_)((StgClosure *)p)->header.info));
             const StgInfoTable *info = get_itbl((StgClosure *)p);
             W_ size = closure_sizeW_((StgClosure *)p,info);
