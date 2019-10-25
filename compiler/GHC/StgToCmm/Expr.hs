@@ -796,7 +796,7 @@ cgAlts _ _ _ _ = panic "cgAlts"
 --
 -- Since `Grade` has more than 7 constructors, it counts as a
 -- "big data type" (also referred to as "big constructor family" in papers).
--- On the other hand, `Maybe` have 7 constructors or fewer, so it is
+-- On the other hand, `Maybe` has 7 constructors or fewer, so it is
 -- a "small data type".
 --
 -- Then
