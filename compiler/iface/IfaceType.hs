@@ -1467,7 +1467,7 @@ pprSum _arity is_promoted args
 
 pprTuple :: PprPrec -> TupleSort -> PromotionFlag -> IfaceAppArgs -> SDoc
 pprTuple ctxt_prec ConstraintTuple NotPromoted IA_Nil
-  = maybeParen ctxt_prec appPrec $
+  = maybeParen ctxt_prec sigPrec $
     text "() :: Constraint"
 
 -- All promoted constructors have kind arguments
