@@ -459,13 +459,12 @@ by saying ``-fno-wombat``.
     residency.
 
     .. note::
-       GHC doesn't implement complete full-laziness. When
-       optimisation in on, and ``-fno-full-laziness`` is not given, some
-       transformations that increase sharing are performed, such as
-       extracting repeated computations from a loop. These are the same
-       transformations that a fully lazy implementation would do, the
-       difference is that GHC doesn't consistently apply full-laziness, so
-       don't rely on it.
+        GHC doesn't implement complete full laziness. Although GHC's
+        full-laziness optimisation does enable some transformations
+        which would be performed by a fully lazy implementation (such as
+        extracting repeated computations from loops), these
+        transformations are not applied consistently, so don't rely on
+        them.
 
 .. ghc-flag:: -ffun-to-thunk
     :shortdesc: Allow worker-wrapper to convert a function closure into a thunk
