@@ -10,9 +10,6 @@
 {-# LANGUAGE TupleSections #-}
 {-# LANGUAGE ViewPatterns #-}
 
-{-# OPTIONS -fno-cse #-}
--- -fno-cse is needed for GLOBAL_VAR's to behave properly
-
 -----------------------------------------------------------------------------
 --
 -- GHC Interactive User Interface
