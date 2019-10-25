@@ -829,6 +829,10 @@ then
     HSCOLOUR=`cygpath -m ${HSCOLOUR}`
 fi
 
+dnl ** check for Python3
+AC_ARG_VAR(PYTHON,[Use as the path to python [default=autodetect]])
+FPTOOLS_PYTHON
+
 dnl ** check for Sphinx toolchain
 AC_PATH_PROG(SPHINXBUILD,sphinx-build)
 AC_CACHE_CHECK([for version of sphinx-build], fp_cv_sphinx_version,
@@ -840,6 +844,9 @@ changequote([, ])dnl
 ])
 FP_COMPARE_VERSIONS([$fp_cv_sphinx_version],-lt,1.0.0,
     [AC_MSG_WARN([Sphinx version 1.0.0 or later is required to build documentation]); SPHINXBUILD=;])
+if $PythonCmd -c "import sphinx" > /dev/null 2>&1; then true; else
+    AC_MSG_ERROR([Sphinx for python3 is required to build documentation.])
+fi
 
 dnl ** check for xelatex
 AC_PATH_PROG(XELATEX,xelatex)
@@ -1392,6 +1399,7 @@ echo "\
    genlib       : $GenlibCmd
    Happy        : $HappyCmd ($HappyVersion)
    Alex         : $AlexCmd ($AlexVersion)
+   python       : $PythonCmd ($PythonVersion)
    sphinx-build : $SPHINXBUILD
    xelatex      : $XELATEX
    makeinfo     : $MAKEINFO
