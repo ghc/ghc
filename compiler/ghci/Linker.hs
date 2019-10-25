@@ -1,7 +1,5 @@
 {-# LANGUAGE CPP, NondecreasingIndentation, TupleSections, RecordWildCards #-}
 {-# LANGUAGE BangPatterns #-}
-{-# OPTIONS_GHC -fno-cse #-}
--- -fno-cse is needed for GLOBAL_VAR's to behave properly
 
 --
 --  (c) The University of Glasgow 2002-2006
