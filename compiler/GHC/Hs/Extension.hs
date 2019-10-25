@@ -1162,13 +1162,13 @@ type OutputableX p = -- See Note [OutputableX]
 -- ----------------------------------------------------------------------
 
 -- |Constraint type to bundle up the requirement for 'OutputableBndr' on both
--- the @id@ and the 'NameOrRdrName' type for it
-type OutputableBndrId id =
-  ( OutputableBndr (NameOrRdrName (IdP id))
-  , OutputableBndr (IdP id)
-  , OutputableBndr (NameOrRdrName (IdP (NoGhcTc id)))
-  , OutputableBndr (IdP (NoGhcTc id))
-  , NoGhcTc id ~ NoGhcTc (NoGhcTc id)
-  , OutputableX id
-  , OutputableX (NoGhcTc id)
+-- the @p@ and the 'NameOrRdrName' type for it
+type OutputableBndrId pass =
+  ( OutputableBndr (NameOrRdrName (IdP (GhcPass pass)))
+  , OutputableBndr (IdP (GhcPass pass))
+  , OutputableBndr (NameOrRdrName (IdP (NoGhcTc (GhcPass pass))))
+  , OutputableBndr (IdP (NoGhcTc (GhcPass pass)))
+  , NoGhcTc (GhcPass pass) ~ NoGhcTc (NoGhcTc (GhcPass pass))
+  , OutputableX (GhcPass pass)
+  , OutputableX (NoGhcTc (GhcPass pass))
   )
