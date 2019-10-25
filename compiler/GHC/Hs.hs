@@ -118,7 +118,7 @@ deriving instance Data (HsModule GhcPs)
 deriving instance Data (HsModule GhcRn)
 deriving instance Data (HsModule GhcTc)
 
-instance (p ~ GhcPass pass, OutputableBndrId p) => Outputable (HsModule p) where
+instance (OutputableBndrId p) => Outputable (HsModule (GhcPass p)) where
 
     ppr (HsModule Nothing _ imports decls _ mbDoc)
       = pp_mb mbDoc $$ pp_nonnull imports

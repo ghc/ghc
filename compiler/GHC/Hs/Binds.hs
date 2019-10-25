@@ -11,6 +11,7 @@ Datatype for: @BindGroup@, @Bind@, @Sig@, @Bind@.
 {-# LANGUAGE DeriveFunctor #-}
 {-# LANGUAGE StandaloneDeriving #-}
 {-# LANGUAGE FlexibleContexts #-}
+{-# LANGUAGE FlexibleInstances #-}
 {-# LANGUAGE UndecidableInstances #-} -- Note [Pass sensitive types]
                                       -- in module GHC.Hs.PlaceHolder
 {-# LANGUAGE ConstraintKinds #-}
@@ -617,17 +618,15 @@ Specifically,
     it's just an error thunk
 -}
 
-instance (idL ~ GhcPass pl, idR ~ GhcPass pr,
-          OutputableBndrId idL, OutputableBndrId idR)
-        => Outputable (HsLocalBindsLR idL idR) where
+instance (OutputableBndrId pl, OutputableBndrId pr)
+        => Outputable (HsLocalBindsLR (GhcPass pl) (GhcPass pr)) where
   ppr (HsValBinds _ bs)   = ppr bs
   ppr (HsIPBinds _ bs)    = ppr bs
   ppr (EmptyLocalBinds _) = empty
   ppr (XHsLocalBindsLR x) = ppr x
 
-instance (idL ~ GhcPass pl, idR ~ GhcPass pr,
-          OutputableBndrId idL, OutputableBndrId idR)
-        => Outputable (HsValBindsLR idL idR) where
+instance (OutputableBndrId pl, OutputableBndrId pr)
+        => Outputable (HsValBindsLR (GhcPass pl) (GhcPass pr)) where
   ppr (ValBinds _ binds sigs)
    = pprDeclList (pprLHsBindsForUser binds sigs)
 
@@ -642,15 +641,15 @@ instance (idL ~ GhcPass pl, idR ~ GhcPass pr,
      pp_rec Recursive    = text "rec"
      pp_rec NonRecursive = text "nonrec"
 
-pprLHsBinds :: (OutputableBndrId (GhcPass idL), OutputableBndrId (GhcPass idR))
+pprLHsBinds :: (OutputableBndrId idL, OutputableBndrId idR)
             => LHsBindsLR (GhcPass idL) (GhcPass idR) -> SDoc
 pprLHsBinds binds
   | isEmptyLHsBinds binds = empty
   | otherwise = pprDeclList (map ppr (bagToList binds))
 
-pprLHsBindsForUser :: (OutputableBndrId (GhcPass idL),
-                       OutputableBndrId (GhcPass idR),
-                       OutputableBndrId (GhcPass id2))
+pprLHsBindsForUser :: (OutputableBndrId idL,
+                       OutputableBndrId idR,
+                       OutputableBndrId id2)
      => LHsBindsLR (GhcPass idL) (GhcPass idR) -> [LSig (GhcPass id2)] -> [SDoc]
 --  pprLHsBindsForUser is different to pprLHsBinds because
 --  a) No braces: 'let' and 'where' include a list of HsBindGroups
@@ -725,12 +724,11 @@ plusHsValBinds (XValBindsLR (NValBinds ds1 sigs1))
 plusHsValBinds _ _
   = panic "HsBinds.plusHsValBinds"
 
-instance (idL ~ GhcPass pl, idR ~ GhcPass pr,
-          OutputableBndrId idL, OutputableBndrId idR)
-         => Outputable (HsBindLR idL idR) where
+instance (OutputableBndrId pl, OutputableBndrId pr)
+         => Outputable (HsBindLR (GhcPass pl) (GhcPass pr)) where
     ppr mbind = ppr_monobind mbind
 
-ppr_monobind :: (OutputableBndrId (GhcPass idL), OutputableBndrId (GhcPass idR))
+ppr_monobind :: (OutputableBndrId idL, OutputableBndrId idR)
              => HsBindLR (GhcPass idL) (GhcPass idR) -> SDoc
 
 ppr_monobind (PatBind { pat_lhs = pat, pat_rhs = grhss })
@@ -766,16 +764,16 @@ ppr_monobind (AbsBinds { abs_tvs = tyvars, abs_ev_vars = dictvars
       pprLHsBinds val_binds
 ppr_monobind (XHsBindsLR x) = ppr x
 
-instance (p ~ GhcPass pass, OutputableBndrId p) => Outputable (ABExport p) where
+instance OutputableBndrId p => Outputable (ABExport (GhcPass p)) where
   ppr (ABE { abe_wrap = wrap, abe_poly = gbl, abe_mono = lcl, abe_prags = prags })
     = vcat [ ppr gbl <+> text "<=" <+> ppr lcl
            , nest 2 (pprTcSpecPrags prags)
            , nest 2 (text "wrap:" <+> ppr wrap)]
   ppr (XABExport x) = ppr x
 
-instance (idR ~ GhcPass pr,OutputableBndrId idL, OutputableBndrId idR,
-         Outputable (XXPatSynBind idL idR))
-          => Outputable (PatSynBind idL idR) where
+instance (OutputableBndrId l, OutputableBndrId r,
+         Outputable (XXPatSynBind (GhcPass l) (GhcPass r)))
+          => Outputable (PatSynBind (GhcPass l) (GhcPass r)) where
   ppr (PSB{ psb_id = (L _ psyn), psb_args = details, psb_def = pat,
             psb_dir = dir })
       = ppr_lhs <+> ppr_rhs
@@ -866,13 +864,13 @@ data IPBind id
 type instance XCIPBind    (GhcPass p) = NoExtField
 type instance XXIPBind    (GhcPass p) = NoExtCon
 
-instance (p ~ GhcPass pass, OutputableBndrId p)
-       => Outputable (HsIPBinds p) where
+instance OutputableBndrId p
+       => Outputable (HsIPBinds (GhcPass p)) where
   ppr (IPBinds ds bs) = pprDeeperList vcat (map ppr bs)
                         $$ whenPprDebug (ppr ds)
   ppr (XHsIPBinds x) = ppr x
 
-instance (p ~ GhcPass pass, OutputableBndrId p) => Outputable (IPBind p) where
+instance OutputableBndrId p => Outputable (IPBind (GhcPass p)) where
   ppr (IPBind _ lr rhs) = name <+> equals <+> pprExpr (unLoc rhs)
     where name = case lr of
                    Left (L _ ip) -> pprBndr LetBind ip
@@ -1168,10 +1166,10 @@ signatures. Since some of the signatures contain a list of names, testing for
 equality is not enough -- we have to check if they overlap.
 -}
 
-instance (p ~ GhcPass pass, OutputableBndrId p) => Outputable (Sig p) where
+instance OutputableBndrId p => Outputable (Sig (GhcPass p)) where
     ppr sig = ppr_sig sig
 
-ppr_sig :: (OutputableBndrId (GhcPass p)) => Sig (GhcPass p) -> SDoc
+ppr_sig :: (OutputableBndrId p) => Sig (GhcPass p) -> SDoc
 ppr_sig (TypeSig _ vars ty)  = pprVarSig (map unLoc vars) (ppr ty)
 ppr_sig (ClassOpSig _ is_deflt vars ty)
   | is_deflt                 = text "default" <+> pprVarSig (map unLoc vars) (ppr ty)
@@ -1204,8 +1202,8 @@ ppr_sig (CompleteMatchSig _ src cs mty)
     opt_sig = maybe empty ((\t -> dcolon <+> ppr t) . unLoc) mty
 ppr_sig (XSig x) = ppr x
 
-instance (p ~ GhcPass pass, OutputableBndrId p)
-       => Outputable (FixitySig p) where
+instance OutputableBndrId p
+       => Outputable (FixitySig (GhcPass p)) where
   ppr (FixitySig _ names fixity) = sep [ppr fixity, pprops]
     where
       pprops = hsep $ punctuate comma (map (pprInfixOcc . unLoc) names)

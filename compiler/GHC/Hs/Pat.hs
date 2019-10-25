@@ -504,7 +504,7 @@ hsRecUpdFieldOcc = fmap unambiguousFieldOcc . hsRecFieldLbl
 ************************************************************************
 -}
 
-instance (p ~ GhcPass pass, OutputableBndrId p) => Outputable (Pat p) where
+instance OutputableBndrId p => Outputable (Pat (GhcPass p)) where
     ppr = pprPat
 
 pprPatBndr :: OutputableBndr name => name -> SDoc
@@ -516,11 +516,11 @@ pprPatBndr var                  -- Print with type info if -dppr-debug is on
     else
         pprPrefixOcc var
 
-pprParendLPat :: (OutputableBndrId (GhcPass p))
+pprParendLPat :: (OutputableBndrId p)
               => PprPrec -> LPat (GhcPass p) -> SDoc
 pprParendLPat p = pprParendPat p . unLoc
 
-pprParendPat :: (OutputableBndrId (GhcPass p))
+pprParendPat :: (OutputableBndrId p)
              => PprPrec -> Pat (GhcPass p) -> SDoc
 pprParendPat p pat = sdocWithDynFlags $ \ dflags ->
                      if need_parens dflags pat
@@ -535,7 +535,7 @@ pprParendPat p pat = sdocWithDynFlags $ \ dflags ->
       -- But otherwise the CoPat is discarded, so it
       -- is the pattern inside that matters.  Sigh.
 
-pprPat :: (OutputableBndrId (GhcPass p)) => Pat (GhcPass p) -> SDoc
+pprPat :: (OutputableBndrId p) => Pat (GhcPass p) -> SDoc
 pprPat (VarPat _ lvar)          = pprPatBndr (unLoc lvar)
 pprPat (WildPat _)              = char '_'
 pprPat (LazyPat _ pat)          = char '~' <> pprParendLPat appPrec pat
@@ -577,12 +577,12 @@ pprPat (ConPatOut { pat_con = con
 pprPat (XPat x)               = ppr x
 
 
-pprUserCon :: (OutputableBndr con, OutputableBndrId (GhcPass p))
+pprUserCon :: (OutputableBndr con, OutputableBndrId p)
            => con -> HsConPatDetails (GhcPass p) -> SDoc
 pprUserCon c (InfixCon p1 p2) = ppr p1 <+> pprInfixOcc c <+> ppr p2
 pprUserCon c details          = pprPrefixOcc c <+> pprConArgs details
 
-pprConArgs :: (OutputableBndrId (GhcPass p))
+pprConArgs :: (OutputableBndrId p)
            => HsConPatDetails (GhcPass p) -> SDoc
 pprConArgs (PrefixCon pats) = fsep (map (pprParendLPat appPrec) pats)
 pprConArgs (InfixCon p1 p2) = sep [ pprParendLPat appPrec p1
@@ -696,7 +696,7 @@ looksLazyPat (VarPat {})   = False
 looksLazyPat (WildPat {})  = False
 looksLazyPat _             = True
 
-isIrrefutableHsPat :: (OutputableBndrId (GhcPass p)) => LPat (GhcPass p) -> Bool
+isIrrefutableHsPat :: (OutputableBndrId p) => LPat (GhcPass p) -> Bool
 -- (isIrrefutableHsPat p) is true if matching against p cannot fail,
 -- in the sense of falling through to the next pattern.
 --      (NB: this is not quite the same as the (silly) defn
