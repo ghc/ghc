@@ -1,5 +1,6 @@
 {-# LANGUAGE CPP, KindSignatures #-}
 {-# LANGUAGE FlexibleContexts #-}
+{-# LANGUAGE FlexibleInstances #-}
 {-# LANGUAGE UndecidableInstances #-} -- Note [Pass sensitive types]
                                       -- in module GHC.Hs.PlaceHolder
 {-# LANGUAGE ConstraintKinds #-}
@@ -28,8 +29,8 @@ data MatchGroup (a :: *) (body :: *)
 data GRHSs (a :: *) (body :: *)
 data SyntaxExpr (i :: *)
 
-instance (p ~ GhcPass pass, OutputableBndrId p) => Outputable (HsExpr p)
-instance (p ~ GhcPass pass, OutputableBndrId p) => Outputable (HsCmd p)
+instance OutputableBndrId (GhcPass p) => Outputable (HsExpr (GhcPass p))
+instance OutputableBndrId (GhcPass p) => Outputable (HsCmd (GhcPass p))
 
 type LHsExpr a = Located (HsExpr a)
 

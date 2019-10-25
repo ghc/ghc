@@ -11,6 +11,7 @@ Datatype for: @BindGroup@, @Bind@, @Sig@, @Bind@.
 {-# LANGUAGE DeriveFunctor #-}
 {-# LANGUAGE StandaloneDeriving #-}
 {-# LANGUAGE FlexibleContexts #-}
+{-# LANGUAGE FlexibleInstances #-}
 {-# LANGUAGE UndecidableInstances #-} -- Note [Pass sensitive types]
                                       -- in module GHC.Hs.PlaceHolder
 {-# LANGUAGE ConstraintKinds #-}
@@ -766,16 +767,16 @@ ppr_monobind (AbsBinds { abs_tvs = tyvars, abs_ev_vars = dictvars
       pprLHsBinds val_binds
 ppr_monobind (XHsBindsLR x) = ppr x
 
-instance (p ~ GhcPass pass, OutputableBndrId p) => Outputable (ABExport p) where
+instance OutputableBndrId (GhcPass p) => Outputable (ABExport (GhcPass p)) where
   ppr (ABE { abe_wrap = wrap, abe_poly = gbl, abe_mono = lcl, abe_prags = prags })
     = vcat [ ppr gbl <+> text "<=" <+> ppr lcl
            , nest 2 (pprTcSpecPrags prags)
            , nest 2 (text "wrap:" <+> ppr wrap)]
   ppr (XABExport x) = ppr x
 
-instance (idR ~ GhcPass pr,OutputableBndrId idL, OutputableBndrId idR,
-         Outputable (XXPatSynBind idL idR))
-          => Outputable (PatSynBind idL idR) where
+instance (OutputableBndrId idL, OutputableBndrId (GhcPass r),
+         Outputable (XXPatSynBind idL (GhcPass r)))
+          => Outputable (PatSynBind idL (GhcPass r)) where
   ppr (PSB{ psb_id = (L _ psyn), psb_args = details, psb_def = pat,
             psb_dir = dir })
       = ppr_lhs <+> ppr_rhs
@@ -866,13 +867,13 @@ data IPBind id
 type instance XCIPBind    (GhcPass p) = NoExtField
 type instance XXIPBind    (GhcPass p) = NoExtCon
 
-instance (p ~ GhcPass pass, OutputableBndrId p)
-       => Outputable (HsIPBinds p) where
+instance OutputableBndrId (GhcPass p)
+       => Outputable (HsIPBinds (GhcPass p)) where
   ppr (IPBinds ds bs) = pprDeeperList vcat (map ppr bs)
                         $$ whenPprDebug (ppr ds)
   ppr (XHsIPBinds x) = ppr x
 
-instance (p ~ GhcPass pass, OutputableBndrId p) => Outputable (IPBind p) where
+instance OutputableBndrId (GhcPass p) => Outputable (IPBind (GhcPass p)) where
   ppr (IPBind _ lr rhs) = name <+> equals <+> pprExpr (unLoc rhs)
     where name = case lr of
                    Left (L _ ip) -> pprBndr LetBind ip
@@ -1168,7 +1169,7 @@ signatures. Since some of the signatures contain a list of names, testing for
 equality is not enough -- we have to check if they overlap.
 -}
 
-instance (p ~ GhcPass pass, OutputableBndrId p) => Outputable (Sig p) where
+instance OutputableBndrId (GhcPass p) => Outputable (Sig (GhcPass p)) where
     ppr sig = ppr_sig sig
 
 ppr_sig :: (OutputableBndrId (GhcPass p)) => Sig (GhcPass p) -> SDoc
@@ -1204,8 +1205,8 @@ ppr_sig (CompleteMatchSig _ src cs mty)
     opt_sig = maybe empty ((\t -> dcolon <+> ppr t) . unLoc) mty
 ppr_sig (XSig x) = ppr x
 
-instance (p ~ GhcPass pass, OutputableBndrId p)
-       => Outputable (FixitySig p) where
+instance OutputableBndrId (GhcPass p)
+       => Outputable (FixitySig (GhcPass p)) where
   ppr (FixitySig _ names fixity) = sep [ppr fixity, pprops]
     where
       pprops = hsep $ punctuate comma (map (pprInfixOcc . unLoc) names)

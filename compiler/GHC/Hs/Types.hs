@@ -901,8 +901,8 @@ data ConDeclField pass  -- Record fields have Haddoc docs on them
 type instance XConDeclField  (GhcPass _) = NoExtField
 type instance XXConDeclField (GhcPass _) = NoExtCon
 
-instance (p ~ GhcPass pass, OutputableBndrId p)
-       => Outputable (ConDeclField p) where
+instance OutputableBndrId (GhcPass p)
+       => Outputable (ConDeclField (GhcPass p)) where
   ppr (ConDeclField _ fld_n fld_ty _) = ppr fld_n <+> dcolon <+> ppr fld_ty
   ppr (XConDeclField x) = ppr x
 
@@ -1377,8 +1377,8 @@ data FieldOcc pass = FieldOcc { extFieldOcc     :: XCFieldOcc pass
 
   | XFieldOcc
       (XXFieldOcc pass)
-deriving instance (p ~ GhcPass pass, Eq (XCFieldOcc p)) => Eq  (FieldOcc p)
-deriving instance (p ~ GhcPass pass, Ord (XCFieldOcc p)) => Ord (FieldOcc p)
+deriving instance Eq  (XCFieldOcc (GhcPass p)) => Eq  (FieldOcc (GhcPass p))
+deriving instance Ord (XCFieldOcc (GhcPass p)) => Ord (FieldOcc (GhcPass p))
 
 type instance XCFieldOcc GhcPs = NoExtField
 type instance XCFieldOcc GhcRn = Name
@@ -1420,10 +1420,10 @@ type instance XAmbiguous GhcTc = Id
 
 type instance XXAmbiguousFieldOcc (GhcPass _) = NoExtCon
 
-instance p ~ GhcPass pass => Outputable (AmbiguousFieldOcc p) where
+instance Outputable (AmbiguousFieldOcc (GhcPass p)) where
   ppr = ppr . rdrNameAmbiguousFieldOcc
 
-instance p ~ GhcPass pass => OutputableBndr (AmbiguousFieldOcc p) where
+instance OutputableBndr (AmbiguousFieldOcc (GhcPass p)) where
   pprInfixOcc  = pprInfixOcc . rdrNameAmbiguousFieldOcc
   pprPrefixOcc = pprPrefixOcc . rdrNameAmbiguousFieldOcc
 
@@ -1459,30 +1459,30 @@ ambiguousFieldOcc (XFieldOcc nec) = noExtCon nec
 ************************************************************************
 -}
 
-instance (p ~ GhcPass pass, OutputableBndrId p) => Outputable (HsType p) where
+instance OutputableBndrId (GhcPass p) => Outputable (HsType (GhcPass p)) where
     ppr ty = pprHsType ty
 
 instance Outputable HsTyLit where
     ppr = ppr_tylit
 
-instance (p ~ GhcPass pass, OutputableBndrId p)
-       => Outputable (LHsQTyVars p) where
+instance OutputableBndrId (GhcPass p)
+       => Outputable (LHsQTyVars (GhcPass p)) where
     ppr (HsQTvs { hsq_explicit = tvs }) = interppSP tvs
     ppr (XLHsQTyVars x) = ppr x
 
-instance (p ~ GhcPass pass, OutputableBndrId p)
-       => Outputable (HsTyVarBndr p) where
+instance OutputableBndrId (GhcPass p)
+       => Outputable (HsTyVarBndr (GhcPass p)) where
     ppr (UserTyVar _ n)     = ppr n
     ppr (KindedTyVar _ n k) = parens $ hsep [ppr n, dcolon, ppr k]
     ppr (XTyVarBndr nec)    = noExtCon nec
 
-instance (p ~ GhcPass pass,Outputable thing)
-       => Outputable (HsImplicitBndrs p thing) where
+instance Outputable thing
+       => Outputable (HsImplicitBndrs (GhcPass p) thing) where
     ppr (HsIB { hsib_body = ty }) = ppr ty
     ppr (XHsImplicitBndrs x) = ppr x
 
-instance (p ~ GhcPass pass,Outputable thing)
-       => Outputable (HsWildCardBndrs p thing) where
+instance Outputable thing
+       => Outputable (HsWildCardBndrs (GhcPass p) thing) where
     ppr (HsWC { hswc_body = ty }) = ppr ty
     ppr (XHsWildCardBndrs x) = ppr x
 

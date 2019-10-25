@@ -6,6 +6,7 @@
 {-# LANGUAGE CPP, DeriveDataTypeable, ScopedTypeVariables #-}
 {-# LANGUAGE StandaloneDeriving #-}
 {-# LANGUAGE FlexibleContexts #-}
+{-# LANGUAGE FlexibleInstances #-}
 {-# LANGUAGE UndecidableInstances #-} -- Note [Pass sensitive types]
                                       -- in module GHC.Hs.PlaceHolder
 {-# LANGUAGE ConstraintKinds #-}
@@ -133,8 +134,8 @@ mkRnSyntaxExpr name = mkSyntaxExpr $ HsVar noExtField $ noLoc name
   -- don't care about filling in syn_arg_wraps because we're clearly
   -- not past the typechecker
 
-instance (p ~ GhcPass pass, OutputableBndrId p)
-       => Outputable (SyntaxExpr p) where
+instance OutputableBndrId (GhcPass p)
+       => Outputable (SyntaxExpr (GhcPass p)) where
   ppr (SyntaxExpr { syn_expr      = expr
                   , syn_arg_wraps = arg_wraps
                   , syn_res_wrap  = res_wrap })
@@ -811,7 +812,7 @@ an empty ExplicitList when -XOverloadedLists.
 See also #13680, which requested [] @Int to work.
 -}
 
-instance (p ~ GhcPass pass, OutputableBndrId p) => Outputable (HsExpr p) where
+instance (OutputableBndrId (GhcPass p)) => Outputable (HsExpr (GhcPass p)) where
     ppr expr = pprExpr expr
 
 -----------------------
@@ -1316,7 +1317,7 @@ type instance XCmdTop  GhcTc = CmdTopTc
 
 type instance XXCmdTop (GhcPass _) = NoExtCon
 
-instance (p ~ GhcPass pass, OutputableBndrId p) => Outputable (HsCmd p) where
+instance (OutputableBndrId (GhcPass p)) => Outputable (HsCmd (GhcPass p)) where
     ppr cmd = pprCmd cmd
 
 -----------------------
@@ -1409,7 +1410,7 @@ pprCmdArg (HsCmdTop _ cmd)
   = ppr_lcmd cmd
 pprCmdArg (XCmdTop x) = ppr x
 
-instance (p ~ GhcPass pass, OutputableBndrId p) => Outputable (HsCmdTop p) where
+instance (OutputableBndrId (GhcPass p)) => Outputable (HsCmdTop (GhcPass p)) where
     ppr = pprCmdArg
 
 {-
@@ -2420,13 +2421,13 @@ splices. In contrast, when pretty printing the output of the type checker, we
 sense, although I hate to add another constructor to HsExpr.
 -}
 
-instance (p ~ GhcPass pass, OutputableBndrId p)
-       => Outputable (HsSplicedThing p) where
+instance OutputableBndrId (GhcPass p)
+       => Outputable (HsSplicedThing (GhcPass p)) where
   ppr (HsSplicedExpr e) = ppr_expr e
   ppr (HsSplicedTy   t) = ppr t
   ppr (HsSplicedPat  p) = ppr p
 
-instance (p ~ GhcPass pass, OutputableBndrId p) => Outputable (HsSplice p) where
+instance (OutputableBndrId (GhcPass p)) => Outputable (HsSplice (GhcPass p)) where
   ppr s = pprSplice s
 
 pprPendingSplice :: (OutputableBndrId (GhcPass p))
@@ -2497,8 +2498,8 @@ isTypedBracket :: HsBracket id -> Bool
 isTypedBracket (TExpBr {}) = True
 isTypedBracket _           = False
 
-instance (p ~ GhcPass pass, OutputableBndrId p)
-          => Outputable (HsBracket p) where
+instance OutputableBndrId (GhcPass p)
+          => Outputable (HsBracket (GhcPass p)) where
   ppr = pprHsBracket
 
 
@@ -2548,8 +2549,8 @@ data ArithSeqInfo id
                     (LHsExpr id)
 -- AZ: Sould ArithSeqInfo have a TTG extension?
 
-instance (p ~ GhcPass pass, OutputableBndrId p)
-         => Outputable (ArithSeqInfo p) where
+instance OutputableBndrId (GhcPass p)
+         => Outputable (ArithSeqInfo (GhcPass p)) where
     ppr (From e1)             = hcat [ppr e1, pp_dotdot]
     ppr (FromThen e1 e2)      = hcat [ppr e1, comma, space, ppr e2, pp_dotdot]
     ppr (FromTo e1 e3)        = hcat [ppr e1, pp_dotdot, ppr e3]
@@ -2739,8 +2740,8 @@ pprStmtContext (TransStmtCtxt c) =
   ifPprDebug (sep [text "transformed branch of", pprAStmtContext c])
              (pprStmtContext c)
 
-instance (Outputable p, Outputable (NameOrRdrName p))
-      => Outputable (HsStmtContext p) where
+instance (Outputable (GhcPass p), Outputable (NameOrRdrName (GhcPass p)))
+      => Outputable (HsStmtContext (GhcPass p)) where
     ppr = pprStmtContext
 
 -- Used to generate the string for a *runtime* error message
