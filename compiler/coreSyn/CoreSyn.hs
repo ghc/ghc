@@ -681,9 +681,21 @@ Join points must follow these invariants:
   2. For join arity n, the right-hand side must begin with at least n lambdas.
      No ticks, no casts, just lambdas!  C.f. CoreUtils.joinRhsArity.
 
-  2a. Moreover, this same constraint applies to any unfolding of the binder.
-     Reason: if we want to push a continuation into the RHS we must push it
-     into the unfolding as well.
+     2a. Moreover, this same constraint applies to any unfolding of
+         the binder.  Reason: if we want to push a continuation into
+         the RHS we must push it into the unfolding as well.
+
+     2b. The Arity (in the IdInfo) of a join point is the number of value
+         binders in the top n lambdas, where n is the join arity.
+
+         So arity <= join arity; the former counts only value binders
+         while the latter counts all binders.
+         e.g. Suppose $j has join arity 1
+               let j = \x y. e in case x of { A -> j 1; B -> j 2 }
+         Then its ordinary arity is also 1, not 2.
+
+         The arity of a join point isn't very important; but short of setting
+         it to zero, it is helpful to have an invariant.  E.g. #17294.
 
   3. If the binding is recursive, then all other bindings in the recursive group
      must also be join points.
