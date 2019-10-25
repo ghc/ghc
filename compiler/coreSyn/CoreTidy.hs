@@ -18,7 +18,6 @@ import GhcPrelude
 
 import CoreSyn
 import CoreSeq ( seqUnfolding )
-import CoreArity
 import Id
 import IdInfo
 import Demand ( zapUsageEnvSig )
@@ -45,14 +44,15 @@ tidyBind :: TidyEnv
          ->  (TidyEnv, CoreBind)
 
 tidyBind env (NonRec bndr rhs)
-  = tidyLetBndr env env (bndr,rhs) =: \ (env', bndr') ->
+  = tidyLetBndr env env bndr =: \ (env', bndr') ->
     (env', NonRec bndr' (tidyExpr env' rhs))
 
 tidyBind env (Rec prs)
   = let
-       (env', bndrs') = mapAccumL (tidyLetBndr env') env prs
+       (bndrs, rhss)  = unzip prs
+       (env', bndrs') = mapAccumL (tidyLetBndr env') env bndrs
     in
-    map (tidyExpr env') (map snd prs)   =: \ rhss' ->
+    map (tidyExpr env') rhss =: \ rhss' ->
     (env', Rec (zip bndrs' rhss'))
 
 
@@ -166,10 +166,10 @@ tidyIdBndr env@(tidy_env, var_env) id
 
 tidyLetBndr :: TidyEnv         -- Knot-tied version for unfoldings
             -> TidyEnv         -- The one to extend
-            -> (Id, CoreExpr) -> (TidyEnv, Var)
+            -> Id -> (TidyEnv, Id)
 -- Used for local (non-top-level) let(rec)s
 -- Just like tidyIdBndr above, but with more IdInfo
-tidyLetBndr rec_tidy_env env@(tidy_env, var_env) (id,rhs)
+tidyLetBndr rec_tidy_env env@(tidy_env, var_env) id
   = case tidyOccName tidy_env (getOccName id) of { (tidy_env', occ') ->
     let
         ty'      = tidyType env (idType id)
@@ -193,13 +193,15 @@ tidyLetBndr rec_tidy_env env@(tidy_env, var_env) (id,rhs)
         --      (See Note [Zapping DmdEnv after Demand Analyzer] in WorkWrap)
         --
         -- Similarly arity info for eta expansion in CorePrep
+        -- Don't attempt to recompute arity here; this is just tidying!
+        -- Trying to do so led to #17294
         --
         -- Set inline-prag info so that we preseve it across
         -- separate compilation boundaries
         old_info = idInfo id
         new_info = vanillaIdInfo
                     `setOccInfo`        occInfo old_info
-                    `setArityInfo`      exprArity rhs
+                    `setArityInfo`      arityInfo old_info
                     `setStrictnessInfo` zapUsageEnvSig (strictnessInfo old_info)
                     `setDemandInfo`     demandInfo old_info
                     `setInlinePragInfo` inlinePragInfo old_info
@@ -209,6 +211,7 @@ tidyLetBndr rec_tidy_env env@(tidy_env, var_env) (id,rhs)
         new_unf | isStableUnfolding old_unf = tidyUnfolding rec_tidy_env old_unf old_unf
                 | otherwise                 = zapUnfolding old_unf
                                               -- See Note [Preserve evaluatedness]
+
     in
     ((tidy_env', var_env'), id') }
 
