@@ -1,6 +1,4 @@
 {-# LANGUAGE CPP, NamedFieldPuns, NondecreasingIndentation, BangPatterns, MultiWayIf #-}
-{-# OPTIONS_GHC -fno-cse #-}
--- -fno-cse is needed for GLOBAL_VAR's to behave properly
 
 -----------------------------------------------------------------------------
 --
