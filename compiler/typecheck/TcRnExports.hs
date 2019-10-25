@@ -778,7 +778,7 @@ exportErrCtxt herald exp =
   text "In the" <+> text (herald ++ ":") <+> ppr exp
 
 
-addExportErrCtxt :: (OutputableBndrId (GhcPass p))
+addExportErrCtxt :: (OutputableBndrId p)
                  => IE (GhcPass p) -> TcM a -> TcM a
 addExportErrCtxt ie = addErrCtxt exportCtxt
   where

@@ -1,5 +1,6 @@
 {-# LANGUAGE CPP, KindSignatures #-}
 {-# LANGUAGE FlexibleContexts #-}
+{-# LANGUAGE FlexibleInstances #-}
 {-# LANGUAGE UndecidableInstances #-} -- Note [Pass sensitive types]
                                       -- in module GHC.Hs.PlaceHolder
 {-# LANGUAGE ConstraintKinds #-}
@@ -15,4 +16,4 @@ type role Pat nominal
 data Pat (i :: *)
 type LPat i = Pat i
 
-instance (p ~ GhcPass pass, OutputableBndrId p) => Outputable (Pat p)
+instance (OutputableBndrId p) => Outputable (Pat (GhcPass p))
