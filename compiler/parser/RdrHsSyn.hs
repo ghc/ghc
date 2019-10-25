@@ -6,6 +6,7 @@
 
 {-# LANGUAGE CPP #-}
 {-# LANGUAGE FlexibleContexts #-}
+{-# LANGUAGE FlexibleInstances #-}
 {-# LANGUAGE TypeFamilies #-}
 {-# LANGUAGE MagicHash #-}
 {-# LANGUAGE ViewPatterns #-}
@@ -2119,7 +2120,7 @@ patBuilderBang bang p =
   cL (bang `combineSrcSpans` getLoc p) $
   PatBuilderBang bang p
 
-instance p ~ GhcPs => Outputable (PatBuilder p) where
+instance Outputable (PatBuilder GhcPs) where
   ppr (PatBuilderPat p) = ppr p
   ppr (PatBuilderBang _ (L _ p)) = text "!" <+> ppr p
   ppr (PatBuilderPar (L _ p)) = parens (ppr p)
@@ -2128,8 +2129,8 @@ instance p ~ GhcPs => Outputable (PatBuilder p) where
   ppr (PatBuilderVar v) = ppr v
   ppr (PatBuilderOverLit l) = ppr l
 
-instance p ~ GhcPs => DisambECP (PatBuilder p) where
-  type Body (PatBuilder p) = PatBuilder
+instance DisambECP (PatBuilder GhcPs) where
+  type Body (PatBuilder GhcPs) = PatBuilder
   ecpFromCmd' (dL-> L l c) =
     addFatalError l $
       text "Command syntax in pattern:" <+> ppr c
@@ -2140,13 +2141,13 @@ instance p ~ GhcPs => DisambECP (PatBuilder p) where
     text "Lambda-syntax in pattern." $$
     text "Pattern matching on functions is not possible."
   mkHsLetPV l _ _ = addFatalError l $ text "(let ... in ...)-syntax in pattern"
-  type InfixOp (PatBuilder p) = RdrName
+  type InfixOp (PatBuilder GhcPs) = RdrName
   superInfixOp m = m
   mkHsOpAppPV l p1 op p2 = do
     warnSpaceAfterBang op (getLoc p2)
     return $ cL l $ PatBuilderOpApp p1 op p2
   mkHsCasePV l _ _ = addFatalError l $ text "(case ... of ...)-syntax in pattern"
-  type FunArg (PatBuilder p) = PatBuilder p
+  type FunArg (PatBuilder GhcPs) = PatBuilder GhcPs
   superFunArg m = m
   mkHsAppPV l p1 p2 = return $ cL l (PatBuilderApp p1 p2)
   mkHsIfPV l _ _ _ _ _ = addFatalError l $ text "(if ... then ... else ...)-syntax in pattern"

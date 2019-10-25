@@ -8,6 +8,7 @@ GHC.Hs.ImpExp: Abstract syntax: imports, exports, interfaces
 
 {-# LANGUAGE DeriveDataTypeable #-}
 {-# LANGUAGE FlexibleContexts #-}
+{-# LANGUAGE FlexibleInstances #-}
 {-# LANGUAGE StandaloneDeriving #-}
 {-# LANGUAGE TypeFamilies #-}
 {-# LANGUAGE UndecidableInstances #-} -- Note [Pass sensitive types]
@@ -125,8 +126,8 @@ simpleImportDecl mn = ImportDecl {
       ideclHiding    = Nothing
     }
 
-instance (p ~ GhcPass pass,OutputableBndrId p)
-       => Outputable (ImportDecl p) where
+instance OutputableBndrId p
+       => Outputable (ImportDecl (GhcPass p)) where
     ppr (ImportDecl { ideclSourceSrc = mSrcText, ideclName = mod'
                     , ideclPkgQual = pkg
                     , ideclSource = from, ideclSafe = safe
@@ -322,7 +323,7 @@ replaceWrappedName (IEType    (L l _)) n = IEType    (L l n)
 replaceLWrappedName :: LIEWrappedName name1 -> name2 -> LIEWrappedName name2
 replaceLWrappedName (L l n) n' = L l (replaceWrappedName n n')
 
-instance (p ~ GhcPass pass,OutputableBndrId p) => Outputable (IE p) where
+instance OutputableBndrId p => Outputable (IE (GhcPass p)) where
     ppr (IEVar       _     var) = ppr (unLoc var)
     ppr (IEThingAbs  _   thing) = ppr (unLoc thing)
     ppr (IEThingAll  _   thing) = hcat [ppr (unLoc thing), text "(..)"]
