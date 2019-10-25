@@ -36,7 +36,8 @@ import Outputable
 import FastString
 import MonadUtils
 import ErrUtils as Err
-import Panic (throwGhcExceptionIO, GhcException (..))
+import Util                ( count )
+import Panic               (throwGhcExceptionIO, GhcException (..))
 import BasicTypes          ( IntWithInf, treatZeroAsInf, mkIntWithInf )
 import Control.Monad       ( ap )
 
@@ -186,8 +187,8 @@ newJoinId bndrs body_ty
   = do { uniq <- getUniqueM
        ; let name       = mkSystemVarName uniq (fsLit "$j")
              join_id_ty = mkLamTypes bndrs body_ty  -- Note [Funky mkLamTypes]
-             -- Note [idArity for join points] in SimplUtils
-             arity      = length (filter isId bndrs)
+             arity      = count isId bndrs
+             -- arity: See Note [Invariants on join points] invariant 2b, in CoreSyn
              join_arity = length bndrs
              details    = JoinId join_arity
              id_info    = vanillaIdInfo `setArityInfo` arity

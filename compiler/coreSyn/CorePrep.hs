@@ -560,6 +560,7 @@ it seems good for CorePrep to be robust.
 cpeJoinPair :: CorePrepEnv -> JoinId -> CoreExpr
             -> UniqSM (JoinId, CpeRhs)
 -- Used for all join bindings
+-- No eta-expansion: see Note [Do not eta-expand join points] in SimplUtils
 cpeJoinPair env bndr rhs
   = ASSERT(isJoinId bndr)
     do { let Just join_arity = isJoinId_maybe bndr
