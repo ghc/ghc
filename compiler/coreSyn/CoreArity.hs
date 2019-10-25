@@ -881,7 +881,7 @@ inside the RHS of the join as well as into the body.  AND if j
 has an unfolding we have to push it into there too.  AND j might
 be recursive...
 
-So for now I'm abandonig the no-crap rule in this case. I think
+So for now I'm abandoning the no-crap rule in this case. I think
 that for the use in CorePrep it really doesn't matter; and if
 it does, then CoreToStg.myCollectArgs will fall over.
 
