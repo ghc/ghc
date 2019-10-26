@@ -840,6 +840,11 @@ changequote([, ])dnl
 ])
 FP_COMPARE_VERSIONS([$fp_cv_sphinx_version],-lt,1.0.0,
     [AC_MSG_WARN([Sphinx version 1.0.0 or later is required to build documentation]); SPHINXBUILD=;])
+if test -n "$SPHINXBUILD"; then
+  if "$SPHINXBUILD" -b text utils/check-sphinx utils/check-sphinx/dist > /dev/null 2>&1; then true; else
+    AC_MSG_ERROR([Sphinx for python3 is required to build documentation.])
+  fi
+fi
 
 dnl ** check for xelatex
 AC_PATH_PROG(XELATEX,xelatex)
