@@ -844,6 +844,37 @@ loop:
     return true;
 }
 
+StgMutArrPtrs *listThreads(Capability *cap)
+{
+    // First count how many threads we have...
+    StgWord n = 0;
+    for (unsigned g = 0; g < RtsFlags.GcFlags.generations; g++) {
+        for (StgTSO *t = generations[g].threads; t != END_TSO_QUEUE; t = next) {
+            n++;
+        }
+    }
+
+    // Allocate a suitably-sized array...
+    StgWord size = n + mutArrPtrsCardTableSize(n);
+    StgMutArrPtrs *arr =
+        (StgMutArrPtrs *)allocate(cap, sizeofW(StgMutArrPtrs) + size);
+    TICK_ALLOC_PRIM(sizeofW(StgMutArrPtrs), n, 0);
+    arr->ptrs = n;
+    arr->size = size;
+
+    // Populate it...
+    StgWord i = 0;
+    for (unsigned g = 0; g < RtsFlags.GcFlags.generations; g++) {
+        for (StgTSO *t = generations[g].threads; t != END_TSO_QUEUE; t = next) {
+            if (i == n)
+                break;
+            arr->payload[i] = (StgClosure *) t;
+            i++;
+        }
+    }
+    return arr;
+}
+
 /* ----------------------------------------------------------------------------
  * Debugging: why is a thread blocked
  * ------------------------------------------------------------------------- */
