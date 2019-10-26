@@ -3,7 +3,7 @@
 Hadrian supports a few predefined _build flavours_, i.e. collections of build
 settings that fully define a GHC build (see `src/Flavour.hs`). Users can add their
 own build flavours if need be, as described
-[here](https://github.com/snowleopard/hadrian/blob/master/doc/user-settings.md#build-flavour).
+[here](https://gitlab.haskell.org/ghc/ghc/blob/master/hadrian/doc/user-settings.md#build-flavour).
 
 ## Arguments
 
