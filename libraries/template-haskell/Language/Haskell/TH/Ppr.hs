@@ -14,6 +14,7 @@ import Data.Char ( toLower, chr)
 import GHC.Show  ( showMultiLineString )
 import GHC.Lexeme( startsVarSym )
 import Data.Ratio ( numerator, denominator )
+import qualified Data.List.NonEmpty as NE
 import Prelude hiding ((<>))
 
 nestDepth :: Int
@@ -620,21 +621,21 @@ instance Ppr Con where
                          <+> pprBangType st2
 
     ppr (ForallC ns ctxt (GadtC c sts ty))
-        = commaSepApplied c <+> dcolon <+> pprForall ns ctxt
+        = commaSepApplied (NE.toList c) <+> dcolon <+> pprForall ns ctxt
       <+> pprGadtRHS sts ty
 
     ppr (ForallC ns ctxt (RecGadtC c vsts ty))
-        = commaSepApplied c <+> dcolon <+> pprForall ns ctxt
+        = commaSepApplied (NE.toList c) <+> dcolon <+> pprForall ns ctxt
       <+> pprRecFields vsts ty
 
     ppr (ForallC ns ctxt con)
         = pprForall ns ctxt <+> ppr con
 
     ppr (GadtC c sts ty)
-        = commaSepApplied c <+> dcolon <+> pprGadtRHS sts ty
+        = commaSepApplied (NE.toList c) <+> dcolon <+> pprGadtRHS sts ty
 
     ppr (RecGadtC c vsts ty)
-        = commaSepApplied c <+> dcolon <+> pprRecFields vsts ty
+        = commaSepApplied (NE.toList c) <+> dcolon <+> pprRecFields vsts ty
 
 instance Ppr PatSynDir where
   ppr Unidir        = text "<-"

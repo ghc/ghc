@@ -22,6 +22,8 @@
   * Introduce `reifyType` to reify the type or kind of a thing referenced by
     `Name`.
 
+  * Require `GadtC` and `RecGadtC` to have at least one constructor name (#17379)
+
 ## 2.15.0.0 *TBA*
 
   * In `Language.Haskell.TH.Syntax`, `DataInstD`, `NewTypeInstD`, `TySynEqn`,

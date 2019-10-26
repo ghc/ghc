@@ -104,6 +104,7 @@ import Util
 import Unique
 import VarSet
 import Data.List        ( find )
+import qualified Data.List.NonEmpty as NE
 import Data.Maybe
 import FastString
 import BasicTypes hiding( SuccessFlag(..) )
@@ -1602,7 +1603,7 @@ reifyDataCon isGadtDataCon tys dc
                                          dcdBangs r_arg_tys)
               | not (null fields) -> do
                   { res_ty <- reifyType g_res_ty
-                  ; return $ TH.RecGadtC [name]
+                  ; return $ TH.RecGadtC (name NE.:| [])
                                      (zip3 (map (reifyName . flSelector) fields)
                                       dcdBangs r_arg_tys) res_ty }
                 -- We need to check not isGadtDataCon here because GADT
@@ -1615,7 +1616,7 @@ reifyDataCon isGadtDataCon tys dc
                   ; return $ TH.InfixC (s1,r_a1) name (s2,r_a2) }
               | isGadtDataCon -> do
                   { res_ty <- reifyType g_res_ty
-                  ; return $ TH.GadtC [name] (dcdBangs `zip` r_arg_tys) res_ty }
+                  ; return $ TH.GadtC (name NE.:| []) (dcdBangs `zip` r_arg_tys) res_ty }
               | otherwise ->
                   return $ TH.NormalC name (dcdBangs `zip` r_arg_tys)
 

@@ -55,6 +55,8 @@ import Foreign.ForeignPtr
 import Foreign.Ptr
 import System.IO.Unsafe
 
+import qualified Data.List.NonEmpty as NE
+
 -------------------------------------------------------------------
 --              The external interface
 
@@ -601,14 +603,14 @@ cvtConstr (ForallC tvs ctxt con)
     add_forall _ _ (XConDecl nec) = noExtCon nec
 
 cvtConstr (GadtC c strtys ty)
-  = do  { c'      <- mapM cNameL c
+  = do  { c'      <- mapM cNameL (NE.toList c)
         ; args    <- mapM cvt_arg strtys
         ; (dL->L _ ty') <- cvtType ty
         ; c_ty    <- mk_arr_apps args ty'
         ; returnL $ fst $ mkGadtDecl c' c_ty}
 
 cvtConstr (RecGadtC c varstrtys ty)
-  = do  { c'       <- mapM cNameL c
+  = do  { c'       <- mapM cNameL (NE.toList c)
         ; ty'      <- cvtType ty
         ; rec_flds <- mapM cvt_id_arg varstrtys
         ; let rec_ty = noLoc (HsFunTy noExtField

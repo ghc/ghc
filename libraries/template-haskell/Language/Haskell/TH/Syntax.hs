@@ -2284,10 +2284,10 @@ data Con = NormalC Name [BangType]       -- ^ @C Int a@
          | RecC Name [VarBangType]       -- ^ @C { v :: Int, w :: a }@
          | InfixC BangType Name BangType -- ^ @Int :+ a@
          | ForallC [TyVarBndr] Cxt Con   -- ^ @forall a. Eq a => C [a]@
-         | GadtC [Name] [BangType]
+         | GadtC (NonEmpty Name) [BangType]
                  Type                    -- See Note [GADT return type]
                                          -- ^ @C :: a -> b -> T b Int@
-         | RecGadtC [Name] [VarBangType]
+         | RecGadtC (NonEmpty Name) [VarBangType]
                     Type                 -- See Note [GADT return type]
                                          -- ^ @C :: { v :: Int } -> T b Int@
         deriving (Show, Eq, Ord, Data, Generic)

@@ -18,6 +18,7 @@ import Language.Haskell.TH.Syntax hiding (Role, InjectivityAnn)
 import qualified Language.Haskell.TH.Syntax as TH
 import Control.Monad( liftM, liftM2 )
 import Data.Word( Word8 )
+import qualified Data.List.NonEmpty as NE
 import Prelude
 
 ----------------------------------------------------------
@@ -636,10 +637,10 @@ forallC ns ctxt con = do
   pure $ ForallC ns' ctxt' con'
 
 gadtC :: [Name] -> [StrictTypeQ] -> TypeQ -> ConQ
-gadtC cons strtys ty = liftM2 (GadtC cons) (sequence strtys) ty
+gadtC cons strtys ty = liftM2 (GadtC (NE.fromList cons)) (sequence strtys) ty
 
 recGadtC :: [Name] -> [VarStrictTypeQ] -> TypeQ -> ConQ
-recGadtC cons varstrtys ty = liftM2 (RecGadtC cons) (sequence varstrtys) ty
+recGadtC cons varstrtys ty = liftM2 (RecGadtC (NE.fromList cons)) (sequence varstrtys) ty
 
 -------------------------------------------------------------------------------
 -- *   Type
