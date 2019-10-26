@@ -685,6 +685,7 @@
       SymI_HasProto(stg_isCurrentThreadBoundzh)                         \
       SymI_HasProto(stg_isEmptyMVarzh)                                  \
       SymI_HasProto(stg_killThreadzh)                                   \
+      SymI_HasProto(stg_listThreadszh)                                  \
       SymI_HasProto(loadArchive)                                        \
       SymI_HasProto(loadObj)                                            \
       SymI_HasProto(purgeObj)                                           \

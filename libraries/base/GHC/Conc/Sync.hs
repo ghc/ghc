@@ -52,6 +52,7 @@ module GHC.Conc.Sync
         , yield
         , labelThread
         , mkWeakThreadId
+        , listThreads
 
         , ThreadStatus(..), BlockReason(..)
         , threadStatus
@@ -523,6 +524,27 @@ runSparks = IO loop
                       if isTrue# (n ==# 0#)
                       then (# s', () #)
                       else p `seq` loop s'
+
+-- | List the Haskell threads of the current process.
+listThreads :: IO [ThreadId]
+listThreads = IO $ \s ->
+    case listThreads# s of
+      (# s', marr #) ->
+        case unsafeFreezeArray# marr s' of
+          (# s'', arr #) -> (# s'', mapListArray toThreadId arr #)
+  where
+    -- Ideally we would use UnliftedArray# but sadly this doesn't exist.
+    -- Instead listThreads# returns a polymorphic `Array# a` and we coerce.
+    toThreadId :: a -> ThreadId
+    toThreadId tid = ThreadId (unsafeCoerce# tid)
+
+mapListArray :: (a -> b) -> Array# a -> [b]
+mapListArray f arr = go 0#
+  where
+    go i#
+      | isTrue# (i# ==# sizeofArray# arr) = []
+      | otherwise = case indexArray# arr i# of
+                      (# x #) -> f x : go (i# +# 1#)
 
 data BlockReason
   = BlockedOnMVar

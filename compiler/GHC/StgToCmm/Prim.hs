@@ -1543,6 +1543,7 @@ emitPrimOp dflags primop = case primop of
   MkApUpd0_Op -> alwaysExternal
   NewBCOOp -> alwaysExternal
   UnpackClosureOp -> alwaysExternal
+  ListThreadsOp -> alwaysExternal
   ClosureSizeOp -> alwaysExternal
   GetApStackValOp -> alwaysExternal
   ClearCCSOp -> alwaysExternal
