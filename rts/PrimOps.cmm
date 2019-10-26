@@ -2948,3 +2948,11 @@ stg_setThreadAllocationCounterzh ( I64 counter )
     StgTSO_alloc_limit(CurrentTSO) = counter + TO_I64(offset);
     return ();
 }
+
+stg_listThreadszh ()
+{
+  P_ arr;
+
+  ("ptr" arr) = ccall listThreads(MyCapability() "ptr");
+  return (arr);
+}

@@ -856,6 +856,43 @@ loop:
     return true;
 }
 
+StgMutArrPtrs *listThreads(Capability *cap)
+{
+    ACQUIRE_LOCK(&sched_mutex);
+
+    // First count how many threads we have...
+    StgWord n_threads = 0;
+    for (unsigned g = 0; g < RtsFlags.GcFlags.generations; g++) {
+        for (StgTSO *t = generations[g].threads; t != END_TSO_QUEUE; t = t->global_link) {
+            n_threads++;
+        }
+    }
+
+    // Allocate a suitably-sized array...
+    const StgWord size = n_threads + mutArrPtrsCardTableSize(n_threads);
+    StgMutArrPtrs *arr =
+        (StgMutArrPtrs *)allocate(cap, sizeofW(StgMutArrPtrs) + size);
+    TICK_ALLOC_PRIM(sizeofW(StgMutArrPtrs), n, 0);
+    arr->ptrs = n_threads;
+    arr->size = size;
+
+    // Populate it...
+    StgWord i = 0;
+    for (unsigned g = 0; g < RtsFlags.GcFlags.generations; g++) {
+        for (StgTSO *t = generations[g].threads; t != END_TSO_QUEUE; t = t->global_link) {
+            // It's possible that new threads have been created since we counted.
+            // Ignore them.
+            if (i == n_threads)
+                break;
+            arr->payload[i] = (StgClosure *) t;
+            i++;
+        }
+    }
+    CHECKM(i == n_threads, "listThreads: Found too few threads");
+    RELEASE_LOCK(&sched_mutex);
+    return arr;
+}
+
 /* ----------------------------------------------------------------------------
  * Debugging: why is a thread blocked
  * ------------------------------------------------------------------------- */

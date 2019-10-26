@@ -39,7 +39,7 @@ module GHC.Conc.Sync
         , yield
         , labelThread
         , mkWeakThreadId
-
+        , listThreads
         , ThreadStatus(..), BlockReason(..)
         , threadStatus
         , threadCapability
@@ -531,6 +531,28 @@ runSparks = IO loop
                       then (# s', () #)
                       else p `seq` loop s'
 
+-- | List the Haskell threads of the current process.
+listThreads :: IO [ThreadId]
+listThreads = IO $ \s ->
+    case listThreads# s of
+      (# s', arr #) ->
+        (# s', mapListArray toThreadId arr #)
+  where
+    -- Ideally we would use UnliftedArray# but sadly this doesn't exist.
+    -- Instead listThreads# returns an `ArrayArray#` and we coerce.
+    toThreadId :: Array# a -> ThreadId
+    toThreadId tid = ThreadId (unsafeCoerce# tid)
+
+mapListArray :: (Array# a -> b) -> ArrayArray# -> [b]
+mapListArray f arr = go 0#
+  where
+    sz = sizeofArrayArray# arr
+    go i#
+      | isTrue# (i# ==# sz) = []
+      | otherwise = case indexArrayArrayArray# arr i# of
+                      x -> f (unsafeCoerce# x) : go (i# +# 1#)
+{-# NOINLINE mapListArray #-}
+
 data BlockReason
   = BlockedOnMVar
         -- ^blocked on 'MVar'
@@ -572,6 +594,7 @@ data ThreadStatus
            , Show -- ^ @since 4.3.0.0
            )
 
+-- | Query the current execution status of a thread.
 threadStatus :: ThreadId -> IO ThreadStatus
 threadStatus (ThreadId t) = IO $ \s ->
    case threadStatus# t s of

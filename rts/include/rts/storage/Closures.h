@@ -160,7 +160,7 @@ typedef struct {
     StgWord    payload[];
 } StgArrBytes;
 
-typedef struct {
+typedef struct _StgMutArrPtrs {
     StgHeader   header;
     StgWord     ptrs;
     StgWord     size; // ptrs plus card table

@@ -3017,6 +3017,21 @@ primop  NoDuplicateOp "noDuplicate#" GenPrimOp
 
 primop  ThreadStatusOp "threadStatus#" GenPrimOp
    ThreadId# -> State# RealWorld -> (# State# RealWorld, Int#, Int#, Int# #)
+   {Get the status of the given thread. Result is
+    {\tt (ThreadStatus, Capability, Locked)} where
+    {\tt ThreadStatus} is one of the status constants in
+    {\tt rts/Constants.h}, {\tt Capability} is the number of
+    the capability which currently owns the thread, and
+    {\tt Locked} is a boolean indicating whether the
+    thread is locked to that capability.}
+   with
+   out_of_line = True
+   has_side_effects = True
+
+primop ListThreadsOp "listThreads#" GenPrimOp
+   State# RealWorld -> (# State# RealWorld, ArrayArray# #)
+   { Returns an array of {\tt ThreadId#}s. N.B. the actual type is
+     {\tt State# RealWorld -> (# State# RealWorld, UnliftedArray# ThreadId# #)}. }
    with
    out_of_line = True
    has_side_effects = True
