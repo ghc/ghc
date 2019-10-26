@@ -2938,6 +2938,26 @@ primop  NoDuplicateOp "noDuplicate#" GenPrimOp
 
 primop  ThreadStatusOp "threadStatus#" GenPrimOp
    ThreadId# -> State# RealWorld -> (# State# RealWorld, Int#, Int#, Int# #)
+   {Get the status of the given thread. Result is
+    @(ThreadStatus, Capability, Locked)@ where
+    @ThreadStatus@ is one of the status constants defined in
+    @rts/Constants.h@, @Capability@ is the number of
+    the capability which currently owns the thread, and
+    @Locked@ is a boolean indicating whether the
+    thread is bound to that capability.
+
+    @since 0.9}
+   with
+   out_of_line = True
+   has_side_effects = True
+
+primop ListThreadsOp "listThreads#" GenPrimOp
+   State# RealWorld -> (# State# RealWorld, Array# ThreadId# #)
+   { Returns an array of the threads started by the program. Note that this
+     threads which have finished execution may or may not be present in this
+     list, depending upon whether they have been collected by the garbage collector.
+
+     @since 0.10}
    with
    out_of_line = True
    has_side_effects = True

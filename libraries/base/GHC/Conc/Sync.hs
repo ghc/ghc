@@ -4,6 +4,7 @@
 {-# LANGUAGE RankNTypes #-}
 {-# LANGUAGE UnboxedTuples #-}
 {-# LANGUAGE UnliftedFFITypes #-}
+{-# LANGUAGE KindSignatures #-}
 {-# LANGUAGE Unsafe #-}
 
 {-# OPTIONS_HADDOCK not-home #-}
@@ -39,7 +40,7 @@ module GHC.Conc.Sync
         , yield
         , labelThread
         , mkWeakThreadId
-
+        , listThreads
         , ThreadStatus(..), BlockReason(..)
         , threadStatus
         , threadCapability
@@ -536,6 +537,25 @@ runSparks = IO loop
                       then (# s', () #)
                       else p `seq` loop s'
 
+-- | List the Haskell threads of the current process.
+--
+-- @since 4.18
+listThreads :: IO [ThreadId]
+listThreads = IO $ \s ->
+    case listThreads# s of
+      (# s', arr #) ->
+        (# s', mapListArrayUnlifted ThreadId arr #)
+
+mapListArrayUnlifted :: forall (a :: TYPE UnliftedRep) b. (a -> b) -> Array# a -> [b]
+mapListArrayUnlifted f arr = go 0#
+  where
+    sz = sizeofArray# arr
+    go i#
+      | isTrue# (i# ==# sz) = []
+      | otherwise = case indexArray# arr i# of
+                      (# x #) -> f x : go (i# +# 1#)
+{-# NOINLINE mapListArrayUnlifted #-}
+
 data BlockReason
   = BlockedOnMVar
         -- ^blocked on 'MVar'
@@ -575,6 +595,7 @@ data ThreadStatus
            , Show -- ^ @since 4.3.0.0
            )
 
+-- | Query the current execution status of a thread.
 threadStatus :: ThreadId -> IO ThreadStatus
 threadStatus (ThreadId t) = IO $ \s ->
    case threadStatus# t s of

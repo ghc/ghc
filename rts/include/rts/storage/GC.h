@@ -116,8 +116,9 @@ typedef struct generation_ {
     //
     memcount       max_blocks;
 
-    StgTSO *       threads;             // threads in this gen
-                                        // linked via global_link
+    StgTSO *       threads;             // threads in this generation.
+                                        // linked via global_link.
+                                        // protected by sched_mutex except during GC.
     StgWeak *      weak_ptr_list;       // weak pointers in this gen
 
     struct generation_ *to;             // destination gen for live objects

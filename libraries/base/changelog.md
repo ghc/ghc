@@ -13,6 +13,8 @@
     [Core Libraries proposal](https://github.com/haskell/core-libraries-committee/issues/65).
   * Add default implementation of `(<>)` in terms of `sconcat` and `mempty` in
     terms of `mconcat`.
+  * `GHC.Conc.Sync.listThreads` was added, allowing the user to list the threads
+    (both running and blocked) of the program.
 
 ## 4.17.0.0 *TBA*
 

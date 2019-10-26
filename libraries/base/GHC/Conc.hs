@@ -45,6 +45,7 @@ module GHC.Conc
         , yield
         , labelThread
         , mkWeakThreadId
+        , listThreads
 
         , ThreadStatus(..), BlockReason(..)
         , threadStatus

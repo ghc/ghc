@@ -1,3 +1,13 @@
+## 0.10.0
+
+- Shipped with GHC 9.6.1
+
+- The `listThreads#` primop was added, allowing the user to enumerate all
+  threads (running and blocked) in the program:
+  ```haskell
+  listThreads# :: State# RealWorld -> (# State# RealWorld, Array# ThreadId# #)
+  ```
+
 ## 0.9.0
 
 - Shipped with GHC 9.4.1

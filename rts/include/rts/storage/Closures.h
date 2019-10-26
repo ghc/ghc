@@ -206,7 +206,7 @@ typedef struct {
 // Closure types: MUT_ARR_PTRS_CLEAN, MUT_ARR_PTRS_DIRTY,
 // MUT_ARR_PTRS_FROZEN_DIRTY, MUT_ARR_PTRS_FROZEN_CLEAN, MUT_VAR_CLEAN,
 // MUT_VAR_DIRTY
-typedef struct {
+typedef struct _StgMutArrPtrs {
     StgHeader   header;
     StgWord     ptrs;
     StgWord     size; // ptrs plus card table

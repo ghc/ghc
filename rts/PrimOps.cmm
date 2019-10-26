@@ -1081,6 +1081,14 @@ stg_labelThreadzh ( gcptr threadid, W_ addr )
     return ();
 }
 
+stg_listThreadszh ()
+{
+  P_ arr;
+
+  ("ptr" arr) = ccall listThreads(MyCapability() "ptr");
+  return (arr);
+}
+
 stg_isCurrentThreadBoundzh (/* no args */)
 {
     W_ r;
