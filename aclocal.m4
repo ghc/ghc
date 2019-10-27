@@ -1315,7 +1315,7 @@ AC_DEFUN([FP_PROG_AR_NEEDS_RANLIB],[
 # FP_GCC_VERSION
 # -----------
 # Extra testing of the result AC_PROG_CC, testing the gcc version no. Sets the
-# output variable GccVersion.
+# (unsubstituted) output variable GccVersion.
 AC_DEFUN([FP_GCC_VERSION], [
   AC_REQUIRE([AC_PROG_CC])
   if test -z "$CC"
@@ -1330,7 +1330,7 @@ AC_DEFUN([FP_GCC_VERSION], [
       FP_COMPARE_VERSIONS([$fp_cv_gcc_version], [-lt], [4.6],
                           [AC_MSG_ERROR([Need at least gcc version 4.6 (4.7+ recommended)])])
   ])
-  AC_SUBST([GccVersion], [$fp_cv_gcc_version])
+  GccVersion="$fp_cv_gcc_version"
 ])# FP_GCC_VERSION
 
 dnl Check to see if the C compiler is clang or llvm-gcc

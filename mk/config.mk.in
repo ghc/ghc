@@ -521,8 +521,6 @@ SettingsOptCommand = @SettingsOptCommand@
 # the flag CC=<blah> instead.  The reason is that the configure script
 # needs to know which gcc you're using in order to perform its tests.
 
-GccVersion            = @GccVersion@
-
 # TargetPlatformFull retains the string passed to configure so we have it in
 # the necessary format to pass to libffi's configure.
 TargetPlatformFull    = @TargetPlatformFull@
