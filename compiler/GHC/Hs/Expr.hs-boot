@@ -1,5 +1,6 @@
 {-# LANGUAGE CPP, KindSignatures #-}
 {-# LANGUAGE FlexibleContexts #-}
+{-# LANGUAGE FlexibleInstances #-}
 {-# LANGUAGE UndecidableInstances #-} -- Note [Pass sensitive types]
                                       -- in module GHC.Hs.PlaceHolder
 {-# LANGUAGE ConstraintKinds #-}
@@ -28,24 +29,24 @@ data MatchGroup (a :: *) (body :: *)
 data GRHSs (a :: *) (body :: *)
 data SyntaxExpr (i :: *)
 
-instance (p ~ GhcPass pass, OutputableBndrId p) => Outputable (HsExpr p)
-instance (p ~ GhcPass pass, OutputableBndrId p) => Outputable (HsCmd p)
+instance OutputableBndrId p => Outputable (HsExpr (GhcPass p))
+instance OutputableBndrId p => Outputable (HsCmd (GhcPass p))
 
 type LHsExpr a = Located (HsExpr a)
 
-pprLExpr :: (OutputableBndrId (GhcPass p)) => LHsExpr (GhcPass p) -> SDoc
+pprLExpr :: (OutputableBndrId p) => LHsExpr (GhcPass p) -> SDoc
 
-pprExpr :: (OutputableBndrId (GhcPass p)) => HsExpr (GhcPass p) -> SDoc
+pprExpr :: (OutputableBndrId p) => HsExpr (GhcPass p) -> SDoc
 
-pprSplice :: (OutputableBndrId (GhcPass p)) => HsSplice (GhcPass p) -> SDoc
+pprSplice :: (OutputableBndrId p) => HsSplice (GhcPass p) -> SDoc
 
-pprSpliceDecl ::  (OutputableBndrId (GhcPass p))
+pprSpliceDecl ::  (OutputableBndrId p)
           => HsSplice (GhcPass p) -> SpliceExplicitFlag -> SDoc
 
-pprPatBind :: forall bndr p body. (OutputableBndrId (GhcPass bndr),
-                                   OutputableBndrId (GhcPass p),
+pprPatBind :: forall bndr p body. (OutputableBndrId bndr,
+                                   OutputableBndrId p,
                                    Outputable body)
            => LPat (GhcPass bndr) -> GRHSs (GhcPass p) body -> SDoc
 
-pprFunBind :: (OutputableBndrId (GhcPass idR), Outputable body)
+pprFunBind :: (OutputableBndrId idR, Outputable body)
            => MatchGroup (GhcPass idR) body -> SDoc

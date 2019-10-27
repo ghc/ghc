@@ -1,6 +1,6 @@
 
 T7959.hs:5:1: error:
-    • Cannot derive instances for nullary classes
+    • Can't make a derived instance of ‘A’: Try enabling DeriveAnyClass
     • In the stand-alone deriving instance for ‘A’
 
 T7959.hs:6:17: error:
