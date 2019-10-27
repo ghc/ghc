@@ -22,7 +22,7 @@ CABVERSTR=$("$CABAL" --numeric-version)
 CABVER=( ${CABVERSTR//./ } )
 
 build_failed() {
-    ( ghc --info | grep -s '("Support SMP","YES")' ) \
+    ( ghc --info | grep -s '("Support SMP","YES")' > /dev/null ) \
       || cat <<EOF
 Your compiler does not support the threaded runtime system.
 Please disable the \`threaded\` Cabal flag in project.cabal.local
