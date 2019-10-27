@@ -94,8 +94,8 @@ TARGETS=(
 
     # FreeBSD ARM
     "aarch64-unknown-freebsd"
-    "armv6-unknown-freebsd"
-    "armv7-unknown-freebsd"
+    "armv6-unknown-freebsd-gnueabihf"
+    "armv7-unknown-freebsd-gnueabihf"
 
     #########################
     # Other

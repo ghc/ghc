@@ -1992,6 +1992,10 @@ case "$1" in
 # converts the canonicalized target into someting llvm can understand
 AC_DEFUN([GHC_LLVM_TARGET], [
   case "$2-$3" in
+    *-freebsd*-gnueabihf)
+      llvm_target_vendor="unknown"
+      llvm_target_os="freebsd-gnueabihf"
+      ;;
     hardfloat-*eabi)
       llvm_target_vendor="unknown"
       llvm_target_os="$3""hf"
