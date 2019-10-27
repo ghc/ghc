@@ -104,6 +104,11 @@ Language
   for a ``newtype``. This was proposed in
   `GHC proposal #13 <https://github.com/ghc-proposals/ghc-proposals/blob/master/proposals/0013-unlifted-newtypes.rst>`__.
 
+- A new extension :extension:`ImportQualifiedPost` allows the syntax
+  ``import M qualified``, that is, to annotate a module as qualified by
+  writing ``qualified`` after the module name.
+  This was proposed in `GHC proposal #49 <https://github.com/ghc-proposals/ghc-proposals/blob/master/proposals/0049-module-qualified-syntax.rst>`__.
+
 - New flag :ghc-flag:`-Wderiving-defaults` that controls a warning
   message when both :extension:`DeriveAnyClass` and
   :extension:`GeneralizedNewtypeDeriving` are enabled and no explicit
@@ -167,7 +172,7 @@ Compiler
   The retainer profiling events are emitted using the standard events.
 
 - The eventlog now logs the cost centre stack on each sample. This enables
-  the `.prof` file to be partially reconstructed from the eventlog.
+  the ``.prof`` file to be partially reconstructed from the eventlog.
 
 - Add new flag :ghc-flag:`-fkeep-going` which makes the compiler
   continue as far as it can despite errors.
@@ -194,6 +199,9 @@ GHCi
 - Added new debugger commands :ghci-cmd:`:disable` and :ghci-cmd:`:enable` to
   disable and re-enable breakpoints.
 
+- Improved command name resolution with option ``!``. For example, ``:k!``
+  resolves to ``:kind!``.
+
 Runtime system
 ~~~~~~~~~~~~~~
 
@@ -206,7 +214,7 @@ Template Haskell
   :extension:`DeriveLift` has been simplified to take advantage of expression
   quotations.
 
-- Explicit boxed 1-tuples from `HsSyn` are now treated as actual 1-tuples,
+- Explicit boxed 1-tuples from ``HsSyn`` are now treated as actual 1-tuples,
   without flattening. In most of the cases these will be obtained using
   Template Haskell since it is uncommon to deal with 1-tuples in the source.
 
