@@ -316,7 +316,7 @@ performance.
 .. rts-flag:: -xn
 
     :default: off
-    :since: 8.8.1
+    :since: 8.10.1
 
     .. index::
        single: concurrent mark and sweep
