@@ -10,6 +10,7 @@
 
 #include "Rts.h"
 #include "Hash.h"
+#include "linker/M32Alloc.h"
 
 #if RTS_LINKER_USE_MMAP
 #include <sys/mman.h>
@@ -244,6 +245,11 @@ typedef struct _ObjectCode {
        require extra information.*/
     HashTable *extraInfos;
 
+#if RTS_LINKER_USE_MMAP == 1
+    /* The m32 allocator used for allocating small sections
+     * and symbol extras during loading */
+    m32_allocator *m32;
+#endif
 } ObjectCode;
 
 #define OC_INFORMATIVE_FILENAME(OC)             \
