@@ -53,6 +53,7 @@
 int ocAllocateExtras(ObjectCode* oc, int count, int first, int bssSize)
 {
   void* oldImage = oc->image;
+  const size_t extras_size = sizeof(SymbolExtra) * count;
 
   if (count > 0 || bssSize > 0) {
     if (!RTS_LINKER_USE_MMAP) {
@@ -64,7 +65,7 @@ int ocAllocateExtras(ObjectCode* oc, int count, int first, int bssSize)
       oc->image -= misalignment;
       oc->image = stgReallocBytes( oc->image,
                                misalignment +
-                               aligned + sizeof (SymbolExtra) * count,
+                               aligned + extras_size,
                                "ocAllocateExtras" );
       oc->image += misalignment;
 
@@ -73,7 +74,7 @@ int ocAllocateExtras(ObjectCode* oc, int count, int first, int bssSize)
       /* Keep image, bssExtras and symbol_extras contiguous */
       size_t n = roundUpToPage(oc->fileSize);
       bssSize = roundUpToAlign(bssSize, 8);
-      size_t allocated_size = n + bssSize + (sizeof(SymbolExtra) * count);
+      size_t allocated_size = n + bssSize + extras_size;
       void *new = mmapForLinker(allocated_size, MAP_ANONYMOUS, -1, 0);
       if (new) {
           memcpy(new, oc->image, oc->fileSize);
@@ -92,13 +93,13 @@ int ocAllocateExtras(ObjectCode* oc, int count, int first, int bssSize)
           return 0;
       }
     } else {
-        oc->symbol_extras = m32_alloc(sizeof(SymbolExtra) * count, 8);
+        oc->symbol_extras = m32_alloc(oc->m32, extras_size, 8);
         if (oc->symbol_extras == NULL) return 0;
     }
   }
 
   if (oc->symbol_extras != NULL) {
-      memset( oc->symbol_extras, 0, sizeof (SymbolExtra) * count );
+      memset( oc->symbol_extras, 0, extras_size );
   }
 
   // ObjectCodeFormatInfo contains computed addresses based on offset to
