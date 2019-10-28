@@ -778,7 +778,7 @@ ocGetNames_ELF ( ObjectCode* oc )
           // (i.e. we cannot map the secions separately), or if the section
           // size is small.
           else if (!oc->imageMapped || size < getPageSize() / 3) {
-              start = m32_alloc(size, 8);
+              start = m32_alloc(oc->m32, size, 8);
               if (start == NULL) goto fail;
               memcpy(start, oc->image + offset, size);
               alloc = SECTION_M32;
