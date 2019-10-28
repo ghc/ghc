@@ -2370,8 +2370,10 @@ rewriteEqEvidence old_ev swapped nlhs nrhs lhs_co rhs_co
        ; traceTcS "rewriteEqEvidence" (vcat [ppr old_ev, ppr nlhs, ppr nrhs, ppr co])
        ; return new_ev }
 
+#if __GLASGOW_HASKELL__ <= 810
   | otherwise
   = panic "rewriteEvidence"
+#endif
   where
     new_pred = mkTcEqPredLikeEv old_ev nlhs nrhs
 

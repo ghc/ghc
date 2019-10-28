@@ -1,3 +1,4 @@
+{-# LANGUAGE CPP #-}
 
 -- | Free regs map for SPARC
 module RegAlloc.Linear.SPARC.FreeRegs
@@ -55,7 +56,9 @@ getFreeRegs cls (FreeRegs g f d)
         | RcInteger <- cls = map RealRegSingle                  $ go 1 g 1 0
         | RcFloat   <- cls = map RealRegSingle                  $ go 1 f 1 32
         | RcDouble  <- cls = map (\i -> RealRegPair i (i+1))    $ go 2 d 1 32
+#if __GLASGOW_HASKELL__ <= 810
         | otherwise = pprPanic "RegAllocLinear.getFreeRegs: Bad register class " (ppr cls)
+#endif
         where
                 go _    _      0    _
                         = []
@@ -184,4 +187,3 @@ showFreeRegs regs
         ++ "    integer: " ++ (show $ getFreeRegs RcInteger regs)       ++ "\n"
         ++ "      float: " ++ (show $ getFreeRegs RcFloat   regs)       ++ "\n"
         ++ "     double: " ++ (show $ getFreeRegs RcDouble  regs)       ++ "\n"
-

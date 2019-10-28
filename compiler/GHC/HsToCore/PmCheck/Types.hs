@@ -531,7 +531,7 @@ initDelta :: Delta
 initDelta = MkDelta initTyState initTmState
 
 instance Outputable Delta where
-  ppr delta = vcat [
+  ppr delta = hang (text "Delta") 2 $ vcat [
       -- intentionally formatted this way enable the dev to comment in only
       -- the info she needs
       ppr (delta_tm_st delta),

@@ -700,7 +700,7 @@ cleanEvalProdDmd n = JD { sd = HeadStr, ud = UProd (replicate n useTop) }
 {-
 ************************************************************************
 *                                                                      *
-           Demand: combining strictness and usage
+           Demand: Combining Strictness and Usage
 *                                                                      *
 ************************************************************************
 -}
