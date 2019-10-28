@@ -431,9 +431,9 @@ Historical note: At one stage I tried making the wrapper inlining
 always-active, and that had a very bad effect on nofib/imaginary/x2n1;
 a wrapper was inlined before the specialisation fired.
 
-Note [Wrapper NoUserInline]
-~~~~~~~~~~~~~~~~~~~~~~~~~~~
-The use an inl_inline of NoUserInline on the wrapper distinguishes
+Note [Wrapper NoInlSpec]
+~~~~~~~~~~~~~~~~~~~~~~~~
+The use an inl_inline of NoInlSpec on the wrapper distinguishes
 this pragma from one that was given by the user. In particular, CSE
 will not happen if there is a user-specified pragma, but should happen
 for w/w’ed things (#14186).
@@ -564,8 +564,8 @@ splitFun dflags fam_envs fn_id fn_info wrap_dmds res_info rhs
         work_uniq <- getUniqueM
         let work_rhs = work_fn rhs
             work_act = case fn_inline_spec of  -- See Note [Worker activation]
-                          NoInline -> fn_act
-                          _        -> wrap_act
+                          InlSpecNoInline -> fn_act
+                          _               -> wrap_act
 
             work_prag = InlinePragma { inl_src = SourceText "{-# INLINE"
                                      , inl_inline = fn_inline_spec
@@ -618,12 +618,12 @@ splitFun dflags fam_envs fn_id fn_info wrap_dmds res_info rhs
                            NeverActive    -> activeDuringFinal
                            _              -> activeAfterInitial
             wrap_prag = InlinePragma { inl_src    = SourceText "{-# INLINE"
-                                     , inl_inline = NoUserInline
+                                     , inl_inline = NoInlSpec
                                      , inl_sat    = Nothing
                                      , inl_act    = wrap_act
                                      , inl_rule   = rule_match_info }
                 -- inl_act:    see Note [Wrapper activation]
-                -- inl_inline: see Note [Wrapper NoUserInline]
+                -- inl_inline: see Note [Wrapper NoInlSpec]
                 -- inl_rule:   RuleMatchInfo is (and must be) unaffected
 
             wrap_id   = fn_id `setIdUnfolding`  mkWwInlineRule dflags wrap_rhs arity

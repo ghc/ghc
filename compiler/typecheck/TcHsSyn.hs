@@ -202,10 +202,14 @@ the environment manipulation is tiresome.
 -- | See Note [The ZonkEnv]
 -- Confused by zonking? See Note [What is zonking?] in TcMType.
 data ZonkEnv  -- See Note [The ZonkEnv]
-  = ZonkEnv { ze_flexi  :: ZonkFlexi
-            , ze_tv_env :: TyCoVarEnv TyCoVar
-            , ze_id_env :: IdEnv      Id
-            , ze_meta_tv_env :: TcRef (TyVarEnv Type) }
+  = ZonkEnv { ze_flexi       :: ZonkFlexi
+            , ze_tv_env      :: TyCoVarEnv TyCoVar
+            , ze_id_env      :: IdEnv      Id
+            , ze_meta_tv_env :: TcRef (TyVarEnv Type)
+
+            , ze_check_lev_poly :: Bool
+                 -- True <=> make levity polymophism checks
+    }
 
 {- Note [The ZonkEnv]
 ~~~~~~~~~~~~~~~~~~~~~
@@ -293,10 +297,14 @@ emptyZonkEnv = mkEmptyZonkEnv DefaultFlexi
 mkEmptyZonkEnv :: ZonkFlexi -> TcM ZonkEnv
 mkEmptyZonkEnv flexi
   = do { mtv_env_ref <- newTcRef emptyVarEnv
+       ; no_errs_found <- ifErrsM (return False) (return True)
+             -- Sometimes we end up zonking bogus definitions of type
+             -- forall a. a. See, for example, test ghci/scripts/T9140
        ; return (ZonkEnv { ze_flexi = flexi
                          , ze_tv_env = emptyVarEnv
                          , ze_id_env = emptyVarEnv
-                         , ze_meta_tv_env = mtv_env_ref }) }
+                         , ze_meta_tv_env = mtv_env_ref
+                         , ze_check_lev_poly = no_errs_found }) }
 
 initZonkEnv :: (ZonkEnv -> TcM b) -> TcM b
 initZonkEnv thing_inside = do { ze <- mkEmptyZonkEnv DefaultFlexi
@@ -376,11 +384,12 @@ zonkIdOccs env ids = map (zonkIdOcc env) ids
 -- to its final form.  The TyVarEnv give
 zonkIdBndr :: ZonkEnv -> TcId -> TcM Id
 zonkIdBndr env v
-  = do ty' <- zonkTcTypeToTypeX env (idType v)
-       ensureNotLevPoly ty'
-         (text "In the type of binder" <+> quotes (ppr v))
-
-       return (modifyIdInfo (`setLevityInfoWithType` ty') (setIdType v ty'))
+  = do { ty' <- zonkTcTypeToTypeX env (idType v)
+       ; when (ze_check_lev_poly env) $
+         ensureNotLevPoly doc ty'
+       ; return (modifyIdInfo (`setLevityInfoWithType` ty') (setIdType v ty')) }
+  where
+     doc = text "In the type of binder" <+> quotes (ppr v)
 
 zonkIdBndrs :: ZonkEnv -> [TcId] -> TcM [Id]
 zonkIdBndrs env ids = mapM (zonkIdBndr env) ids
@@ -606,19 +615,26 @@ zonk_bind env (AbsBinds { abs_tvs = tyvars, abs_ev_vars = evs
                           , abs_sig = has_sig }) }
   where
     zonk_val_bind env lbind
-      | has_sig
+      | has_sig   -- See Note [The abs_sig field of AbsBinds] in GHC.Hs.Binds
       , (dL->L loc bind@(FunBind { fun_id      = (dL->L mloc mono_id)
                                  , fun_matches = ms
                                  , fun_co_fn   = co_fn })) <- lbind
       = do { new_mono_id <- updateVarTypeM (zonkTcTypeToTypeX env) mono_id
                             -- Specifically /not/ zonkIdBndr; we do not
                             -- want to complain about a levity-polymorphic binder
-           ; (env', new_co_fn) <- zonkCoFn env co_fn
-           ; new_ms            <- zonkMatchGroup env' zonkLExpr ms
+
+           ; (env1, new_co_fn) <- zonkCoFn env co_fn
+           ; let env2 | [ABE { abe_poly = poly_id }] <- exports
+                      , InlSpecCompulsory <- inlinePragmaSpec (idInlinePragma poly_id)
+                      = env1 { ze_check_lev_poly = False }
+                      | otherwise
+                      = env1
+           ; new_ms <- zonkMatchGroup env2 zonkLExpr ms
            ; return $ cL loc $
              bind { fun_id      = cL mloc new_mono_id
                   , fun_matches = new_ms
                   , fun_co_fn   = new_co_fn } }
+
       | otherwise
       = zonk_lbind env lbind   -- The normal case
 
@@ -1353,8 +1369,8 @@ zonk_pat env (ParPat x p)
 
 zonk_pat env (WildPat ty)
   = do  { ty' <- zonkTcTypeToTypeX env ty
-        ; ensureNotLevPoly ty'
-            (text "In a wildcard pattern")
+        ; when (ze_check_lev_poly env) $
+          ensureNotLevPoly (text "In a wildcard pattern") ty'
         ; return (env, WildPat ty') }
 
 zonk_pat env (VarPat x (dL->L l v))
@@ -1417,7 +1433,8 @@ zonk_pat env p@(ConPatOut { pat_arg_tys = tys
         ; case con of
             RealDataCon dc
               | isUnboxedTupleTyCon (dataConTyCon dc)
-              -> mapM_ (checkForLevPoly doc) (dropRuntimeRepArgs new_tys)
+              -> when (ze_check_lev_poly env) $
+                 mapM_ (ensureNotLevPoly doc) (dropRuntimeRepArgs new_tys)
             _ -> return ()
 
         ; (env0, new_tyvars) <- zonkTyBndrsX env tyvars

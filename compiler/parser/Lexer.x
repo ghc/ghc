@@ -2990,14 +2990,16 @@ ignoredPrags = Map.fromList (map ignored pragmas)
 oneWordPrags = Map.fromList [
      ("rules", rulePrag),
      ("inline",
-         strtoken (\s -> (ITinline_prag (SourceText s) Inline FunLike))),
+         strtoken (\s -> (ITinline_prag (SourceText s) InlSpecInline FunLike))),
+     ("inline_compulsory",
+         strtoken (\s -> (ITinline_prag (SourceText s) InlSpecCompulsory FunLike))),
      ("inlinable",
-         strtoken (\s -> (ITinline_prag (SourceText s) Inlinable FunLike))),
+         strtoken (\s -> (ITinline_prag (SourceText s) InlSpecInlinable FunLike))),
      ("inlineable",
-         strtoken (\s -> (ITinline_prag (SourceText s) Inlinable FunLike))),
+         strtoken (\s -> (ITinline_prag (SourceText s) InlSpecInlinable FunLike))),
                                     -- Spelling variant
      ("notinline",
-         strtoken (\s -> (ITinline_prag (SourceText s) NoInline FunLike))),
+         strtoken (\s -> (ITinline_prag (SourceText s) InlSpecNoInline FunLike))),
      ("specialize", strtoken (\s -> ITspec_prag (SourceText s))),
      ("source", strtoken (\s -> ITsource_prag (SourceText s))),
      ("warning", strtoken (\s -> ITwarning_prag (SourceText s))),
@@ -3020,9 +3022,9 @@ oneWordPrags = Map.fromList [
 
 twoWordPrags = Map.fromList [
      ("inline conlike",
-         strtoken (\s -> (ITinline_prag (SourceText s) Inline ConLike))),
+         strtoken (\s -> (ITinline_prag (SourceText s) InlSpecInline ConLike))),
      ("notinline conlike",
-         strtoken (\s -> (ITinline_prag (SourceText s) NoInline ConLike))),
+         strtoken (\s -> (ITinline_prag (SourceText s) InlSpecNoInline ConLike))),
      ("specialize inline",
          strtoken (\s -> (ITspec_inline_prag (SourceText s) True))),
      ("specialize notinline",

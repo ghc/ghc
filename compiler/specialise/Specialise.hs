@@ -1495,8 +1495,8 @@ specCalls mb_mod env existing_rules calls_for_me fn rhs
                   = (neverInlinePragma, noUnfolding)
                         -- See Note [Specialising imported functions] in OccurAnal
 
-                  | InlinePragma { inl_inline = Inlinable } <- inl_prag
-                  = (inl_prag { inl_inline = NoUserInline }, noUnfolding)
+                  | InlinePragma { inl_inline = InlSpecInlinable } <- inl_prag
+                  = (inl_prag { inl_inline = NoInlSpec }, noUnfolding)
 
                   | otherwise
                   = (inl_prag, specUnfolding dflags unspec_bndrs spec_app n_dicts fn_unf)

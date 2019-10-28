@@ -416,6 +416,9 @@ cpeBind :: TopLevelFlag -> CorePrepEnv -> CoreBind
                    Maybe CoreBind) -- Just bind' <=> returned new bind; no float
                                    -- Nothing <=> added bind' to floats instead
 cpeBind top_lvl env (NonRec bndr rhs)
+  | isCompulsoryUnfolding (idUnfolding bndr)
+  = return (env, emptyFloats, Nothing)
+
   | not (isJoinId bndr)
   = do { (_, bndr1) <- cpCloneBndr env bndr
        ; let dmd         = idDemandInfo bndr

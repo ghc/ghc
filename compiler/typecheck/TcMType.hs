@@ -85,7 +85,7 @@ module TcMType (
 
   ------------------------------
   -- Levity polymorphism
-  ensureNotLevPoly, checkForLevPoly, checkForLevPolyX, formatLevPolyErr
+  ensureNotLevPoly, checkForLevPolyX, formatLevPolyErr
   ) where
 
 #include "HsVersions.h"
@@ -2320,17 +2320,11 @@ See Note [Levity polymorphism checking] in DsMonad
 -- only after all solving is done. And, perhaps most importantly, this
 -- isn't really a compositional property of a type system, so it's
 -- not a terrible surprise that the check has to go in an awkward spot.
-ensureNotLevPoly :: Type  -- its zonked type
-                 -> SDoc  -- where this happened
+-- See Note [Levity polymorphism checking] in DsMonad
+ensureNotLevPoly :: SDoc  -- where this happened
+                 -> Type  -- its zonked type
                  -> TcM ()
-ensureNotLevPoly ty doc
-  = whenNoErrs $   -- sometimes we end up zonking bogus definitions of type
-                   -- forall a. a. See, for example, test ghci/scripts/T9140
-    checkForLevPoly doc ty
-
-  -- See Note [Levity polymorphism checking] in DsMonad
-checkForLevPoly :: SDoc -> Type -> TcM ()
-checkForLevPoly = checkForLevPolyX addErr
+ensureNotLevPoly doc ty = checkForLevPolyX addErr doc ty
 
 checkForLevPolyX :: Monad m
                  => (SDoc -> m ())  -- how to report an error

@@ -1251,17 +1251,19 @@ instance Binary RuleMatchInfo where
                       else return FunLike
 
 instance Binary InlineSpec where
-    put_ bh NoUserInline    = putByte bh 0
-    put_ bh Inline          = putByte bh 1
-    put_ bh Inlinable       = putByte bh 2
-    put_ bh NoInline        = putByte bh 3
+    put_ bh NoInlSpec    = putByte bh 0
+    put_ bh InlSpecInline          = putByte bh 1
+    put_ bh InlSpecInlinable       = putByte bh 2
+    put_ bh InlSpecNoInline        = putByte bh 3
+    put_ bh InlSpecCompulsory      = putByte bh 4
 
     get bh = do h <- getByte bh
                 case h of
-                  0 -> return NoUserInline
-                  1 -> return Inline
-                  2 -> return Inlinable
-                  _ -> return NoInline
+                  0 -> return NoInlSpec
+                  1 -> return InlSpecInline
+                  2 -> return InlSpecInlinable
+                  3 -> return InlSpecNoInline
+                  _ -> return InlSpecCompulsory
 
 instance Binary RecFlag where
     put_ bh Recursive = do

@@ -3519,9 +3519,9 @@ checkValidDataCon dflags existential_ok tc con
           -- If we are dealing with a newtype, we allow levity polymorphism
           -- regardless of whether or not UnliftedNewtypes is enabled. A
           -- later check in checkNewDataCon handles this, producing a
-          -- better error message than checkForLevPoly would.
+          -- better error message than ensureNotLevPoly would.
         ; unless (isNewTyCon tc)
-            (mapM_ (checkForLevPoly empty) (dataConOrigArgTys con))
+            (mapM_ (ensureNotLevPoly empty) (dataConOrigArgTys con))
 
           -- Extra checks for newtype data constructors
         ; when (isNewTyCon tc) (checkNewDataCon con)
@@ -3697,7 +3697,7 @@ checkValidClass cls
            -- example of what this prevents:
            --   class BoundedX (a :: TYPE r) where minBound :: a
            -- See Note [Levity polymorphism checking] in DsMonad
-        ; checkForLevPoly empty tau1
+        ; ensureNotLevPoly empty tau1
 
         ; unless constrained_class_methods $
           mapM_ check_constraint (tail (cls_pred:op_theta))

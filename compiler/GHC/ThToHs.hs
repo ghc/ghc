@@ -734,7 +734,7 @@ cvtPragmaD (SpecialiseP nm ty inline phases)
        ; let (inline', dflt,srcText) = case inline of
                Just inline1 -> (cvtInline inline1, dfltActivation inline1,
                                 src inline1)
-               Nothing      -> (NoUserInline,   AlwaysActive,
+               Nothing      -> (NoInlSpec,   AlwaysActive,
                                 "{-# SPECIALISE")
        ; let ip = InlinePragma { inl_src    = SourceText srcText
                                , inl_inline = inline'
@@ -798,9 +798,9 @@ dfltActivation TH.NoInline = NeverActive
 dfltActivation _           = AlwaysActive
 
 cvtInline :: TH.Inline -> Hs.InlineSpec
-cvtInline TH.NoInline  = Hs.NoInline
-cvtInline TH.Inline    = Hs.Inline
-cvtInline TH.Inlinable = Hs.Inlinable
+cvtInline TH.NoInline  = Hs.InlSpecNoInline
+cvtInline TH.Inline    = Hs.InlSpecInline
+cvtInline TH.Inlinable = Hs.InlSpecInlinable
 
 cvtRuleMatch :: TH.RuleMatch -> RuleMatchInfo
 cvtRuleMatch TH.ConLike = Hs.ConLike

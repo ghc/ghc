@@ -2525,7 +2525,7 @@ sigdecl :: { LHsDecl GhcPs }
         | '{-# SPECIALISE' activation qvar '::' sigtypes1 '#-}'
              {% ams (
                  let inl_prag = mkInlinePragma (getSPEC_PRAGs $1)
-                                             (NoUserInline, FunLike) (snd $2)
+                                             (NoInlSpec, FunLike) (snd $2)
                   in sLL $1 $> $ SigD noExtField (SpecSig noExtField $3 (fromOL $5) inl_prag))
                     (mo $1:mu AnnDcolon $4:mc $6:(fst $2)) }
 
@@ -3809,8 +3809,8 @@ getPRIMDOUBLE   (dL->L _ (ITprimdouble x)) = x
 getTH_ID_SPLICE (dL->L _ (ITidEscape x)) = x
 getTH_ID_TY_SPLICE (dL->L _ (ITidTyEscape x)) = x
 getINLINE       (dL->L _ (ITinline_prag _ inl conl)) = (inl,conl)
-getSPEC_INLINE  (dL->L _ (ITspec_inline_prag _ True))  = (Inline,  FunLike)
-getSPEC_INLINE  (dL->L _ (ITspec_inline_prag _ False)) = (NoInline,FunLike)
+getSPEC_INLINE  (dL->L _ (ITspec_inline_prag _ True))  = (InlSpecInline,  FunLike)
+getSPEC_INLINE  (dL->L _ (ITspec_inline_prag _ False)) = (InlSpecNoInline,FunLike)
 getCOMPLETE_PRAGs (dL->L _ (ITcomplete_prag x)) = x
 
 getDOCNEXT (dL->L _ (ITdocCommentNext x)) = x

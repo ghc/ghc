@@ -584,9 +584,9 @@ quoteTypeName       = qqFun (fsLit "quoteType") quoteTypeKey
 
 -- data Inline = ...
 noInlineDataConName, inlineDataConName, inlinableDataConName :: Name
-noInlineDataConName  = thCon (fsLit "NoInline")  noInlineDataConKey
-inlineDataConName    = thCon (fsLit "Inline")    inlineDataConKey
-inlinableDataConName = thCon (fsLit "Inlinable") inlinableDataConKey
+noInlineDataConName  = thCon (fsLit "InlSpecNoInline")  noInlineDataConKey
+inlineDataConName    = thCon (fsLit "InlSpecInline")    inlineDataConKey
+inlinableDataConName = thCon (fsLit "InlSpecInlinable") inlinableDataConKey
 
 -- data RuleMatch = ...
 conLikeDataConName, funLikeDataConName :: Name

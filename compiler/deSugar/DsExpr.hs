@@ -280,7 +280,10 @@ ds_expr _ (HsWrap _ co_fn e)
        ; dflags <- getDynFlags
        ; let wrapped_e = wrap' e'
              wrapped_ty = exprType wrapped_e
-       ; checkForcedEtaExpansion e wrapped_ty -- See Note [Detecting forced eta expansion]
+       ; env <- getLclEnv
+       ; pprTrace "ds_expr" (ppr e $$ ppr (dsl_lev_poly_check env)) $
+         when (dsl_lev_poly_check env) $
+         checkForcedEtaExpansion e wrapped_ty -- See Note [Detecting forced eta expansion]
        ; warnAboutIdentities dflags e' wrapped_ty
        ; return wrapped_e }
 

@@ -321,7 +321,9 @@ data DsLclEnv = DsLclEnv {
         -- See Note [Note [Type and Term Equality Propagation] in Check.hs
         -- The oracle state Delta is augmented as we walk inwards,
         -- through each pattern match in turn
-        dsl_delta   :: Delta
+        dsl_delta   :: Delta,
+
+        dsl_lev_poly_check :: Bool
      }
 
 -- Inside [| |] brackets, the desugarer looks

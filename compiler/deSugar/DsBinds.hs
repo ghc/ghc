@@ -197,14 +197,14 @@ dsHsBind dflags (AbsBinds { abs_tvs = tyvars, abs_ev_vars = dicts
                                (addTyCsDs (listToBag dicts))
                                (dsLHsBinds binds)
 
-       ; ds_ev_binds <- dsTcEvBinds_s ev_binds
+       ; ds_ev_binds <- switchOffLevPolyCheck has_sig exports $
+                        dsTcEvBinds_s ev_binds
 
        -- dsAbsBinds does the hard work
        ; dsAbsBinds dflags tyvars dicts exports ds_ev_binds ds_binds has_sig }
 
 dsHsBind _ (PatSynBind{}) = panic "dsHsBind: PatSynBind"
 dsHsBind _ (XHsBindsLR nec) = noExtCon nec
-
 
 -----------------------
 dsAbsBinds :: DynFlags
@@ -316,7 +316,7 @@ dsAbsBinds dflags tyvars dicts exports
                 , (poly_tup_id, poly_tup_rhs) :
                    concat export_binds_s) }
   where
-    inline_env :: IdEnv Id -- Maps a monomorphic local Id to one with
+    inline_env :: IdEnv Id   -- Maps a monomorphic local Id to one with
                              -- the inline pragma from the source
                              -- The type checker put the inline pragma
                              -- on the *global* Id, so we need to transfer it
@@ -379,14 +379,16 @@ makeCorePair dflags gbl_id is_default_method dict_arity rhs
 
   | otherwise
   = case inlinePragmaSpec inline_prag of
-          NoUserInline -> (gbl_id, rhs)
-          NoInline     -> (gbl_id, rhs)
-          Inlinable    -> (gbl_id `setIdUnfolding` inlinable_unf, rhs)
-          Inline       -> inline_pair
+          NoInlSpec         -> (gbl_id, rhs)
+          InlSpecNoInline   -> (gbl_id, rhs)
+          InlSpecInlinable  -> (gbl_id `setIdUnfolding` inlinable_unf, rhs)
+          InlSpecCompulsory -> (gbl_id `setIdUnfolding` compulsory_unf, rhs)
+          InlSpecInline     -> inline_pair
 
   where
-    inline_prag   = idInlinePragma gbl_id
-    inlinable_unf = mkInlinableUnfolding dflags rhs
+    inline_prag    = idInlinePragma gbl_id
+    inlinable_unf  = mkInlinableUnfolding dflags rhs
+    compulsory_unf = mkCompulsoryUnfolding rhs
     inline_pair
        | Just arity <- inlinePragmaSat inline_prag
         -- Add an Unfolding for an INLINE (but not for NOINLINE)
@@ -752,8 +754,8 @@ dsSpec mb_poly_rhs (dL->L loc (SpecPrag poly_id spec_co spec_inl))
     -- no_act_spec is True if the user didn't write an explicit
     -- phase specification in the SPECIALISE pragma
     no_act_spec = case inlinePragmaSpec spec_inl of
-                    NoInline -> isNeverActive  spec_prag_act
-                    _        -> isAlwaysActive spec_prag_act
+                    InlSpecNoInline -> isNeverActive  spec_prag_act
+                    _               -> isAlwaysActive spec_prag_act
     rule_act | no_act_spec = inlinePragmaActivation id_inl   -- Inherit
              | otherwise   = spec_prag_act                   -- Specified by user
 

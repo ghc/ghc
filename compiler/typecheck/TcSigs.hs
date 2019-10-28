@@ -437,7 +437,7 @@ tcPatSynSig name sig_ty
        -- arguments become the types of binders. We thus cannot allow
        -- levity polymorphism here
        ; let (arg_tys, _) = tcSplitFunTys body_ty'
-       ; mapM_ (checkForLevPoly empty) arg_tys
+       ; mapM_ (ensureNotLevPoly empty) arg_tys
 
        ; traceTc "tcTySig }" $
          vcat [ text "implicit_tvs" <+> ppr_tvs implicit_tvs'
@@ -565,7 +565,7 @@ mkPragEnv sigs binds
     get_sig _ = Nothing
 
     add_arity n inl_prag   -- Adjust inl_sat field to match visible arity of function
-      | Inline <- inl_inline inl_prag
+      | InlSpecInline <- inl_inline inl_prag
         -- add arity only for real INLINE pragmas, not INLINABLE
       = case lookupNameEnv ar_env n of
           Just ar -> inl_prag { inl_sat = Just ar }

@@ -46,7 +46,7 @@ module DsMonad (
         CanItFail(..), orFail,
 
         -- Levity polymorphism
-        dsNoLevPoly, dsNoLevPolyExpr, dsWhenNoErrs,
+        dsNoLevPoly, dsNoLevPolyExpr, dsWhenNoErrs, switchOffLevPolyCheck,
 
         -- Trace injection
         pprRuntimeTrace
@@ -66,7 +66,7 @@ import PrelNames
 import RdrName
 import HscTypes
 import Bag
-import BasicTypes ( Origin )
+import BasicTypes ( Origin, inlinePragmaSpec, InlineSpec(..) )
 import DataCon
 import ConLike
 import TyCon
@@ -84,6 +84,7 @@ import ErrUtils
 import FastString
 import UniqFM ( lookupWithDefaultUFM )
 import Literal ( mkLitString )
+import Control.Monad( when )
 import CostCentreState
 
 import Data.IORef
@@ -283,6 +284,7 @@ mkDsEnvs dflags mod rdr_env type_env fam_inst_env msg_var cc_st_var
         lcl_env = DsLclEnv { dsl_meta    = emptyNameEnv
                            , dsl_loc     = real_span
                            , dsl_delta   = initDelta
+                           , dsl_lev_poly_check = True
                            }
     in (gbl_env, lcl_env)
 
@@ -545,15 +547,18 @@ discardWarningsDs thing_inside
 -- | Fail with an error message if the type is levity polymorphic.
 dsNoLevPoly :: Type -> SDoc -> DsM ()
 -- See Note [Levity polymorphism checking]
-dsNoLevPoly ty doc = checkForLevPolyX errDs doc ty
+dsNoLevPoly ty doc = do { env <- getLclEnv
+                        ; when (dsl_lev_poly_check env) $
+                          checkForLevPolyX errDs doc ty }
 
 -- | Check an expression for levity polymorphism, failing if it is
 -- levity polymorphic.
 dsNoLevPolyExpr :: CoreExpr -> SDoc -> DsM ()
 -- See Note [Levity polymorphism checking]
 dsNoLevPolyExpr e doc
-  | isExprLevPoly e = errDs (formatLevPolyErr (exprType e) $$ doc)
-  | otherwise       = return ()
+  = do { env <- getLclEnv
+       ; when (dsl_lev_poly_check env && isExprLevPoly e) $
+         errDs (formatLevPolyErr (exprType e) $$ doc) }
 
 -- | Runs the thing_inside. If there are no errors, then returns the expr
 -- given. Otherwise, returns unitExpr. This is useful for doing a bunch
@@ -596,3 +601,15 @@ pprRuntimeTrace str doc expr = do
       message = App (Var unpackCStringId) $
                 Lit $ mkLitString $ showSDoc dflags (hang (text str) 4 doc)
   return $ mkApps (Var traceId) [Type (exprType expr), message, expr]
+
+switchOffLevPolyCheck :: Bool -> [ABExport GhcTc] -> DsM a -> DsM a
+switchOffLevPolyCheck has_sig exports thing_inside
+  | pprTrace "switch" (ppr has_sig $$ ppr exports $$ ppr (map (inlinePragmaSpec . idInlinePragma . abe_poly) exports)) $
+    has_sig
+  , [ABE { abe_poly = poly_id }] <- exports
+  , InlSpecCompulsory <- inlinePragmaSpec (idInlinePragma poly_id)
+  = pprTrace "switch off" (ppr exports) $
+    updLclEnv (\env -> env { dsl_lev_poly_check = False }) thing_inside
+  | otherwise
+  = thing_inside
+

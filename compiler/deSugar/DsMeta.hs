@@ -970,10 +970,10 @@ rep_specialiseInst ty loc
        ; return [(loc, pragma)] }
 
 repInline :: InlineSpec -> DsM (Core TH.Inline)
-repInline NoInline  = dataCon noInlineDataConName
-repInline Inline    = dataCon inlineDataConName
-repInline Inlinable = dataCon inlinableDataConName
-repInline spec      = notHandled "repInline" (ppr spec)
+repInline NoInlSpec        = dataCon noInlineDataConName
+repInline InlSpecInline    = dataCon inlineDataConName
+repInline InlSpecInlinable = dataCon inlinableDataConName
+repInline spec             = notHandled "repInline" (ppr spec)
 
 repRuleMatch :: RuleMatchInfo -> DsM (Core TH.RuleMatch)
 repRuleMatch ConLike = dataCon conLikeDataConName

@@ -1134,7 +1134,7 @@ certainlyWillInline dflags fn_info
 
   where
     loop_breaker = isStrongLoopBreaker (occInfo fn_info)
-    noinline     = inlinePragmaSpec (inlinePragInfo fn_info) == NoInline
+    noinline     = inlinePragmaSpec (inlinePragInfo fn_info) == InlSpecNoInline
     fn_unf       = unfoldingInfo fn_info
 
     do_cunf :: CoreExpr -> UnfoldingGuidance -> Maybe Unfolding

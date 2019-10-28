@@ -1241,11 +1241,12 @@ data InlinePragma            -- Note [InlinePragma]
 
 -- | Inline Specification
 data InlineSpec   -- What the user's INLINE pragma looked like
-  = Inline       -- User wrote INLINE
-  | Inlinable    -- User wrote INLINABLE
-  | NoInline     -- User wrote NOINLINE
-  | NoUserInline -- User did not write any of INLINE/INLINABLE/NOINLINE
-                 -- e.g. in `defaultInlinePragma` or when created by CSE
+  = InlSpecCompulsory
+  | InlSpecInline       -- User wrote INLINE
+  | InlSpecInlinable    -- User wrote INLINABLE
+  | InlSpecNoInline     -- User wrote NOINLINE
+  | NoInlSpec           -- User did not write any of INLINE/INLINABLE/NOINLINE
+                        -- e.g. in `defaultInlinePragma` or when created by CSE
   deriving( Eq, Data, Show )
         -- Show needed for Lexer.x
 
@@ -1255,7 +1256,7 @@ This data type mirrors what you can write in an INLINE or NOINLINE pragma in
 the source program.
 
 If you write nothing at all, you get defaultInlinePragma:
-   inl_inline = NoUserInline
+   inl_inline = NoInlSpec
    inl_act    = AlwaysActive
    inl_rule   = FunLike
 
@@ -1329,18 +1330,18 @@ isFunLike FunLike = True
 isFunLike _       = False
 
 noUserInlineSpec :: InlineSpec -> Bool
-noUserInlineSpec NoUserInline = True
-noUserInlineSpec _            = False
+noUserInlineSpec NoInlSpec = True
+noUserInlineSpec _         = False
 
 defaultInlinePragma, alwaysInlinePragma, neverInlinePragma, dfunInlinePragma
   :: InlinePragma
 defaultInlinePragma = InlinePragma { inl_src = SourceText "{-# INLINE"
                                    , inl_act = AlwaysActive
                                    , inl_rule = FunLike
-                                   , inl_inline = NoUserInline
+                                   , inl_inline = NoInlSpec
                                    , inl_sat = Nothing }
 
-alwaysInlinePragma = defaultInlinePragma { inl_inline = Inline }
+alwaysInlinePragma = defaultInlinePragma { inl_inline = InlSpecInline }
 neverInlinePragma  = defaultInlinePragma { inl_act    = NeverActive }
 
 inlinePragmaSpec :: InlinePragma -> InlineSpec
@@ -1361,20 +1362,21 @@ isDefaultInlinePragma (InlinePragma { inl_act = activation
 
 isInlinePragma :: InlinePragma -> Bool
 isInlinePragma prag = case inl_inline prag of
-                        Inline -> True
-                        _      -> False
+                        InlSpecInline -> True
+                        _             -> False
 
 isInlinablePragma :: InlinePragma -> Bool
 isInlinablePragma prag = case inl_inline prag of
-                           Inlinable -> True
-                           _         -> False
+                           InlSpecInlinable -> True
+                           _                -> False
 
 isAnyInlinePragma :: InlinePragma -> Bool
 -- INLINE or INLINABLE
 isAnyInlinePragma prag = case inl_inline prag of
-                        Inline    -> True
-                        Inlinable -> True
-                        _         -> False
+                        InlSpecInline     -> True
+                        InlSpecInlinable  -> True
+                        InlSpecCompulsory -> True
+                        _                 -> False
 
 inlinePragmaSat :: InlinePragma -> Maybe Arity
 inlinePragmaSat = inl_sat
@@ -1402,10 +1404,11 @@ instance Outputable RuleMatchInfo where
    ppr FunLike = text "FUNLIKE"
 
 instance Outputable InlineSpec where
-   ppr Inline       = text "INLINE"
-   ppr NoInline     = text "NOINLINE"
-   ppr Inlinable    = text "INLINABLE"
-   ppr NoUserInline = text "NOUSERINLINE" -- what is better?
+   ppr InlSpecCompulsory   = text "INLINE_COMPULSORY"
+   ppr InlSpecInline       = text "INLINE"
+   ppr InlSpecNoInline     = text "NOINLINE"
+   ppr InlSpecInlinable    = text "INLINABLE"
+   ppr NoInlSpec           = text "NOUSERINLINE" -- what is better?
 
 instance Outputable InlinePragma where
   ppr = pprInline
@@ -1425,9 +1428,9 @@ pprInline' emptyInline (InlinePragma { inl_inline = inline, inl_act = activation
     where
       pp_inl x = if emptyInline then empty else ppr x
 
-      pp_act Inline   AlwaysActive = empty
-      pp_act NoInline NeverActive  = empty
-      pp_act _        act          = ppr act
+      pp_act InlSpecInline   AlwaysActive = empty
+      pp_act InlSpecNoInline NeverActive  = empty
+      pp_act _               act          = ppr act
 
       pp_sat | Just ar <- mb_arity = parens (text "sat-args=" <> int ar)
              | otherwise           = empty
