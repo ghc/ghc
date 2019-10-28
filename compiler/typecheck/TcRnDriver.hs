@@ -735,7 +735,9 @@ checkHiBootIface tcg_env boot_info
              -- TODO: Maybe setGlobalTypeEnv should be strict.
           setGlobalTypeEnv tcg_env_w_binds type_env' }
 
+#if __GLASGOW_HASKELL__ <= 810
   | otherwise = panic "checkHiBootIface: unreachable code"
+#endif
 
 {- Note [DFun impedance matching]
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
