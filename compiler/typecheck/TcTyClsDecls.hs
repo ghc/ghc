@@ -2174,7 +2174,9 @@ tcFamDecl1 parent (FamilyDecl { fdInfo = fam_info
          -- overlap done by dropDominatedAxioms
        ; return fam_tc } }
 
+#if __GLASGOW_HASKELL__ <= 810
   | otherwise = panic "tcFamInst1"  -- Silence pattern-exhaustiveness checker
+#endif
 tcFamDecl1 _ (XFamilyDecl nec) = noExtCon nec
 
 -- | Maybe return a list of Bools that say whether a type family was declared
