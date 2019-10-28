@@ -857,7 +857,7 @@ of ``-W(no-)*``.
     :type: dynamic
     :category:
 
-    :default: 100
+    :default: 30
 
     The pattern match checker works by assigning symbolic values to each
     pattern. We call each such assignment a 'model'. Now, each pattern match
