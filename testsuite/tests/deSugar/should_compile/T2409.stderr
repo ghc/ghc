@@ -1,0 +1,8 @@
+
+T2409.hs:6:8: warning: [-Woverlapping-patterns (in -Wdefault)]
+    Pattern match is redundant
+    In an equation for ‘f’: f _ | () `seq` False = ...
+
+T2409.hs:10:8: warning: [-Woverlapping-patterns (in -Wdefault)]
+    Pattern match is redundant
+    In an equation for ‘g’: g _ | () `seq` False = ...
