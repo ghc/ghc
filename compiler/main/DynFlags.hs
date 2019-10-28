@@ -1335,12 +1335,16 @@ parseCfgWeights s oldWeights =
             = [s1]
             | (s1,rest) <- break (== ',') s
             = [s1] ++ settings (drop 1 rest)
+-- TODO: This really has to be <= once we bumped GHC master to 8.11
+#if __GLASGOW_HASKELL__ < 810
             | otherwise = panic $ "Invalid cfg parameters." ++ exampleString
+#endif
         assignment as
             | (name, _:val) <- break (== '=') as
             = (name,read val)
             | otherwise
             = panic $ "Invalid cfg parameters." ++ exampleString
+
         exampleString = "Example parameters: uncondWeight=1000," ++
             "condBranchWeight=800,switchWeight=0,callWeight=300" ++
             ",likelyCondWeight=900,unlikelyCondWeight=300" ++
