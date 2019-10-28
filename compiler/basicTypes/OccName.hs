@@ -51,6 +51,7 @@ module OccName (
         mkDFunOcc,
         setOccNameSpace,
         demoteOccName,
+        flipOccName,
         HasOccName(..),
 
         -- ** Derived 'OccName's
@@ -84,6 +85,8 @@ module OccName (
         occEnvElts, foldOccEnv, plusOccEnv, plusOccEnv_C, extendOccEnv_C,
         extendOccEnv_Acc, filterOccEnv, delListFromOccEnv, delFromOccEnv,
         alterOccEnv, pprOccEnv,
+
+        lookupUnifiedOccEnv, extendUnifiedOccEnv, extendUnifiedOccEnvList,
 
         -- * The 'OccSet' type
         OccSet, emptyOccSet, unitOccSet, mkOccSet, extendOccSet,
@@ -213,6 +216,12 @@ demoteNameSpace VarName = Nothing
 demoteNameSpace DataName = Nothing
 demoteNameSpace TvName = Nothing
 demoteNameSpace TcClsName = Just DataName
+
+flipNameSpace :: NameSpace -> NameSpace
+flipNameSpace VarName = TvName
+flipNameSpace DataName = TcClsName
+flipNameSpace TvName = VarName
+flipNameSpace TcClsName = DataName
 
 {-
 ************************************************************************
@@ -345,6 +354,9 @@ demoteOccName (OccName space name) = do
   space' <- demoteNameSpace space
   return $ OccName space' name
 
+flipOccName :: OccName -> OccName
+flipOccName (OccName space name) = OccName (flipNameSpace space) name
+
 -- Name spaces are related if there is a chance to mean the one when one writes
 -- the other, i.e. variables <-> data constructors and type variables <-> type constructors
 nameSpacesRelated :: NameSpace -> NameSpace -> Bool
@@ -433,6 +445,20 @@ delFromOccEnv (A x) y    = A $ delFromUFM x y
 delListFromOccEnv (A x) y  = A $ delListFromUFM x y
 filterOccEnv x (A y)       = A $ filterUFM x y
 alterOccEnv fn (A y) k     = A $ alterUFM fn y k
+
+newtype UnifiedOccName = MkUnifiedOccName OccName
+
+instance Uniquable UnifiedOccName where
+  getUnique (MkUnifiedOccName (OccName _ fs)) = mkUnique 'u' (uniqueOfFS fs)
+
+lookupUnifiedOccEnv :: OccEnv a -> OccName -> Maybe a
+extendUnifiedOccEnv :: OccEnv a -> OccName -> a -> OccEnv a
+extendUnifiedOccEnvList :: OccEnv a -> [(OccName, a)] -> OccEnv a
+
+lookupUnifiedOccEnv (A x) y = lookupUFM x (MkUnifiedOccName y)
+extendUnifiedOccEnv (A x) y z = A $ addToUFM x (MkUnifiedOccName y) z
+extendUnifiedOccEnvList (A x) l = A $ addListToUFM x $ mapFst MkUnifiedOccName l
+
 
 instance Outputable a => Outputable (OccEnv a) where
     ppr x = pprOccEnv ppr x

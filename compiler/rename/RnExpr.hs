@@ -32,8 +32,8 @@ import TcRnMonad
 import Module           ( getModule )
 import RnEnv
 import RnFixity
-import RnUtils          ( HsDocContext(..), bindLocalNamesFV, checkDupNames
-                        , bindLocalNames
+import RnUtils          ( HsDocContext(..), IsImplicitBinding(..), bindLocalNamesFV
+                        , checkDupNames, bindLocalNames
                         , mapMaybeFvRn, mapFvRn
                         , warnUnusedLocalBinds, typeAppErr
                         , checkUnusedRecordWildcard )
@@ -944,7 +944,7 @@ rnParallelStmts ctxt return_op segs thing_inside
     rn_segs _ bndrs_so_far []
       = do { let (bndrs', dups) = removeDups cmpByOcc bndrs_so_far
            ; mapM_ dupErr dups
-           ; (thing, fvs) <- bindLocalNames bndrs' (thing_inside bndrs')
+           ; (thing, fvs) <- bindLocalNames (ImplicitBinding False) bndrs' (thing_inside bndrs')
            ; return (([], thing), fvs) }
 
     rn_segs env bndrs_so_far (ParStmtBlock x stmts _ _ : segs)
