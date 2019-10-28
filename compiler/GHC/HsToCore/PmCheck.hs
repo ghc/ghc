@@ -46,12 +46,14 @@ import TyCon
 import Var (EvVar)
 import Coercion
 import TcEvidence
+import TcType (evVarPred)
 import {-# SOURCE #-} DsExpr (dsExpr, dsLExpr, dsSyntaxExpr)
 import {-# SOURCE #-} DsBinds (dsHsWrapper)
 import DsUtils (selectMatchVar)
 import MatchLit (dsLit, dsOverLit)
 import DsMonad
 import Bag
+import OrdList
 import TyCoRep
 import Type
 import DsUtils       (isTrueLHsExpr)
@@ -61,6 +63,7 @@ import qualified GHC.LanguageExtensions as LangExt
 import Control.Monad (when, forM_, zipWithM)
 import Data.List (elemIndex)
 import qualified Data.Semigroup as Semi
+import Data.Void
 
 {-
 This module checks pattern matches for:
@@ -94,7 +97,6 @@ data PmGrd
     PmCon {
       pm_id          :: !Id,
       pm_con_con     :: !PmAltCon,
-      pm_con_tvs     :: ![TyVar],
       pm_con_dicts   :: ![EvVar],
       pm_con_args    :: ![Id]
     }
@@ -113,7 +115,7 @@ data PmGrd
 
 -- | Should not be user-facing.
 instance Outputable PmGrd where
-  ppr (PmCon x alt _con_tvs _con_dicts con_args)
+  ppr (PmCon x alt _con_dicts con_args)
     = hsep [ppr alt, hsep (map ppr con_args), text "<-", ppr x]
   ppr (PmBang x) = char '!' <> ppr x
   ppr (PmLet x expr) = hsep [text "let", ppr x, text "=", ppr expr]
@@ -124,18 +126,11 @@ type GrdVec = [PmGrd]
 -- covered by a pattern match. E.g. @f Nothing = <rhs>@ might be given an
 -- uncovered set @[x :-> Just y]@ or @[x /= Nothing]@, where @x@ is the variable
 -- matching against @f@'s first argument.
-type Uncovered = [Delta]
+type Uncovered = Deltas
 
--- Instead of keeping the whole sets in memory, we keep a boolean for both the
+-- Instead of keeping the whole sets in memory, we keep a flag for both the
 -- covered and the divergent set (we store the uncovered set though, since we
--- want to print it). For both the covered and the divergent we have:
---
---   True <=> The set is non-empty
---
--- hence:
---  C = True             ==> Useful clause (no warning)
---  C = False, D = True  ==> Clause with inaccessible RHS
---  C = False, D = False ==> Redundant clause
+-- want to print it).
 
 data Covered = Covered | NotCovered
   deriving Show
@@ -143,31 +138,18 @@ data Covered = Covered | NotCovered
 instance Outputable Covered where
   ppr = text . show
 
--- Like the or monoid for booleans
--- Covered = True, Uncovered = False
 instance Semi.Semigroup Covered where
-  Covered <> _ = Covered
-  _ <> Covered = Covered
   NotCovered <> NotCovered = NotCovered
+  _          <> _          = Covered
 
 instance Monoid Covered where
   mempty = NotCovered
-  mappend = (Semi.<>)
 
 data Diverged = Diverged | NotDiverged
   deriving Show
 
 instance Outputable Diverged where
   ppr = text . show
-
-instance Semi.Semigroup Diverged where
-  Diverged <> _ = Diverged
-  _ <> Diverged = Diverged
-  NotDiverged <> NotDiverged = NotDiverged
-
-instance Monoid Diverged where
-  mempty = NotDiverged
-  mappend = (Semi.<>)
 
 data Precision = Approximate | Precise
   deriving (Eq, Show)
@@ -176,49 +158,11 @@ instance Outputable Precision where
   ppr = text . show
 
 instance Semi.Semigroup Precision where
-  Approximate <> _ = Approximate
-  _ <> Approximate = Approximate
   Precise <> Precise = Precise
+  _       <> _       = Approximate
 
 instance Monoid Precision where
   mempty = Precise
-  mappend = (Semi.<>)
-
--- | A triple <C,U,D> of covered, uncovered, and divergent sets.
---
--- Also stores a flag 'presultApprox' denoting whether we ran into the
--- 'maxPmCheckModels' limit for the purpose of hints in warning messages to
--- maybe increase the limit.
-data PartialResult = PartialResult {
-                        presultCovered   :: Covered
-                      , presultUncovered :: Uncovered
-                      , presultDivergent :: Diverged
-                      , presultApprox    :: Precision }
-
-emptyPartialResult :: PartialResult
-emptyPartialResult = PartialResult { presultUncovered = mempty
-                                   , presultCovered   = mempty
-                                   , presultDivergent = mempty
-                                   , presultApprox    = mempty }
-
-combinePartialResults :: PartialResult -> PartialResult -> PartialResult
-combinePartialResults (PartialResult cs1 vsa1 ds1 ap1) (PartialResult cs2 vsa2 ds2 ap2)
-  = PartialResult (cs1 Semi.<> cs2)
-                  (vsa1 Semi.<> vsa2)
-                  (ds1 Semi.<> ds2)
-                  (ap1 Semi.<> ap2) -- the result is approximate if either is
-
-instance Outputable PartialResult where
-  ppr (PartialResult c unc d pc)
-    = hang (text "PartialResult" <+> ppr c <+> ppr d <+> ppr pc) 2 (ppr_unc unc)
-    where
-      ppr_unc = braces . fsep . punctuate comma . map ppr
-
-instance Semi.Semigroup PartialResult where
-  (<>) = combinePartialResults
-
-instance Monoid PartialResult where
-  mempty = emptyPartialResult
   mappend = (Semi.<>)
 
 -- | Pattern check result
@@ -234,20 +178,80 @@ instance Monoid PartialResult where
 --
 --     https://gitlab.haskell.org/ghc/ghc/wikis/pattern-match-check
 --
-data PmResult =
-  PmResult {
-      pmresultRedundant    :: [Located [LPat GhcTc]]
-    , pmresultUncovered    :: [Delta]
-    , pmresultInaccessible :: [Located [LPat GhcTc]]
-    , pmresultApproximate  :: Precision }
+type CheckResult = CheckResult' DigestedTree
+data CheckResult' a
+  = CheckResult
+  { cr_clauses :: a
+  , cr_uncov  :: Uncovered
+  , cr_approx :: Precision
+  }
 
-instance Outputable PmResult where
-  ppr pmr = hang (text "PmResult") 2 $ vcat
-    [ text "pmresultRedundant" <+> ppr (pmresultRedundant pmr)
-    , text "pmresultUncovered" <+> ppr (pmresultUncovered pmr)
-    , text "pmresultInaccessible" <+> ppr (pmresultInaccessible pmr)
-    , text "pmresultApproximate" <+> ppr (pmresultApproximate pmr)
-    ]
+instance Outputable a => Outputable (CheckResult' a) where
+  ppr (CheckResult c unc pc)
+    = hang (text "CheckResult" <+> ppr c <+> ppr pc) 2 (ppr unc)
+
+data ClauseTree many branch rhs
+  = Many   !many           [ClauseTree many branch rhs]
+  | Branch !branch         !(ClauseTree many branch rhs)
+  | AtRhs  !(Located SDoc) !rhs
+  -- ^ SDoc for the equation to show, Located for the location
+
+instance (Outputable m, Outputable b, Outputable r) => Outputable (ClauseTree m b r) where
+  ppr (AtRhs sdoc rhs)     = ppr sdoc <> colon <+> ppr rhs
+  ppr (Many many trees)    = hang (ppr many) 2 (vcat (map ppr trees))
+  ppr (Branch branch tree) = ppr branch <+> ppr tree
+
+--                             many   branch      rhs
+type GrdTree      = ClauseTree GrdVec Void        GrdVec
+type CtTree       = ClauseTree PmCts  BranchPmCts PmCts
+type DigestedTree = ClauseTree ()     Diverged    Covered
+
+-- | The 'Branch' payload for a 'CtTree'. For a 'GrdVec' of
+--   @let x = f y, Nothing <- x@ it will carry the following fields:
+--     * Constraints for the common prefix before branching occurs.
+--       Just @[x ~ f y]@ for the example above.
+--     * A single constraint that possibly leads to divergence. @x ~ ⊥@ in our
+--       example.
+--     * A single constraint that remains uncovered. @x /~ Nothing@ in our
+--       example.
+data BranchPmCts
+  = BranchPmCts
+  { br_common_cts   :: PmCts
+  -- ^ Constraints for the common prefix
+  , br_div_ct :: PmCt
+  -- ^ Constraint for which the match diverges.
+  , br_uncov_ct :: PmCt
+  -- ^ Constraint which the match didn't cover.
+  }
+
+instance Outputable BranchPmCts where
+  ppr (BranchPmCts common_cts div_ct unc_ct)
+    = ppr common_cts <> ppr_ct 'D' div_ct <> ppr_ct 'U' unc_ct
+    where
+      ppr_ct _      PmFalseCt = empty
+      ppr_ct prefix ct        = char '-' <> char prefix <> parens (ppr ct)
+
+newtype Deltas = MkDeltas (Bag Delta)
+
+instance Outputable Deltas where
+  ppr (MkDeltas deltas) = ppr deltas
+
+instance Semigroup Deltas where
+  MkDeltas l <> MkDeltas r = MkDeltas (l `unionBags` r)
+
+liftDeltasM :: Monad m => (Delta -> m (Maybe Delta)) -> Deltas -> m Deltas
+liftDeltasM f (MkDeltas ds) = MkDeltas . catBagMaybes <$> (traverse f ds)
+
+-- | Lift 'addPmCts' over 'Deltas'.
+addPmCtsDeltas :: Deltas -> PmCts -> DsM Deltas
+addPmCtsDeltas deltas cts = liftDeltasM (\d -> addPmCts d cts) deltas
+
+-- | Test if any of the 'Delta's is inhabited. Currently this is pure, because
+-- we preserve the invariant that there are no uninhabited 'Delta's. But that
+-- could change in the future, for example by implementing this function in
+-- terms of @notNull <$> provideEvidence 1 ds@.
+isInhabited :: Deltas -> DsM Bool
+isInhabited (MkDeltas ds) = pure (not (null ds))
 
 {-
 %************************************************************************
@@ -265,24 +269,13 @@ checkSingle dflags ctxt@(DsMatchContext _ locn) var p = do
   dsPmWarn dflags ctxt [var] res
 
 -- | Check a single pattern binding (let)
-checkSingle' :: SrcSpan -> Id -> Pat GhcTc -> DsM PmResult
+checkSingle' :: SrcSpan -> Id -> Pat GhcTc -> DsM CheckResult
 checkSingle' locn var p = do
-  fam_insts <- dsGetFamInstEnvs
-  grds      <- translatePat fam_insts var p
-  missing   <- getPmDelta
+  missing   <- MkDeltas . unitBag <$> getPmDelta
   tracePm "checkSingle': missing" (ppr missing)
-  PartialResult cs us ds pc <- pmCheck grds [] 1 missing
-  dflags <- getDynFlags
-  us' <- getNFirstUncovered [var] (maxUncoveredPatterns dflags + 1) us
-  let plain = PmResult { pmresultRedundant    = []
-                       , pmresultUncovered    = us'
-                       , pmresultInaccessible = []
-                       , pmresultApproximate  = pc }
-  return $ case (cs,ds) of
-    (Covered   , _          ) -> plain                              -- useful
-    (NotCovered, NotDiverged) -> plain { pmresultRedundant = m    } -- redundant
-    (NotCovered, Diverged   ) -> plain { pmresultInaccessible = m } -- inaccessible rhs
-  where m = [cL locn [cL locn p]]
+  fam_insts <- dsGetFamInstEnvs
+  grd_tree  <- AtRhs (L locn $ ppr p) <$> translatePat fam_insts var p
+  checkCtTree (compileGrdTree grd_tree) missing
 
 -- | Exhaustive for guard matches, is used for guards in pattern bindings and
 -- in @MultiIf@ expressions.
@@ -314,62 +307,18 @@ checkMatches dflags ctxt vars matches = do
   dsPmWarn dflags ctxt vars res
 
 -- | Check a matchgroup (case, functions, etc.).
-checkMatches' :: [Id] -> [LMatch GhcTc (LHsExpr GhcTc)] -> DsM PmResult
+checkMatches' :: [Id] -> [LMatch GhcTc (LHsExpr GhcTc)] -> DsM CheckResult
 checkMatches' vars matches = do
-  init_delta <- getPmDelta
+  init_deltas <- MkDeltas . unitBag <$> getPmDelta
   missing <- case matches of
     -- This must be an -XEmptyCase. See Note [Checking EmptyCase]
-    [] | [var] <- vars -> maybeToList <$> addTmCt init_delta (TmVarNonVoid var)
-    _                  -> pure [init_delta]
+    [] | [var] <- vars -> addPmCtsDeltas init_deltas (unitBag (PmNotBotCt var))
+    _                  -> pure init_deltas
   tracePm "checkMatches': missing" (ppr missing)
-  (rs,us,ds,pc) <- go matches missing
-  dflags <- getDynFlags
-  us' <- getNFirstUncovered vars (maxUncoveredPatterns dflags + 1) us
-  return $ PmResult {
-                pmresultRedundant    = map hsLMatchToLPats rs
-              , pmresultUncovered    = us'
-              , pmresultInaccessible = map hsLMatchToLPats ds
-              , pmresultApproximate  = pc }
-  where
-    go :: [LMatch GhcTc (LHsExpr GhcTc)] -> Uncovered
-       -> DsM ( [LMatch GhcTc (LHsExpr GhcTc)]
-              , Uncovered
-              , [LMatch GhcTc (LHsExpr GhcTc)]
-              , Precision)
-    go []     missing = return ([], missing, [], Precise)
-    go (m:ms) missing = do
-      tracePm "checkMatches': go" (ppr m)
-      dflags             <- getDynFlags
-      fam_insts          <- dsGetFamInstEnvs
-      (clause, guards)   <- translateMatch fam_insts vars m
-      let limit                     = maxPmCheckModels dflags
-          n_siblings                = length missing
-          throttled_check delta     =
-            snd <$> throttle limit (pmCheck clause guards) n_siblings delta
+  fam_insts <- dsGetFamInstEnvs
+  grd_tree  <- Many [] <$> mapM (translateMatch fam_insts vars) matches
+  checkCtTree (compileGrdTree grd_tree) missing
 
-      r@(PartialResult cs missing' ds pc1) <- runMany throttled_check missing
-
-      tracePm "checkMatches': go: res" (ppr r)
-      (rs, final_u, is, pc2)  <- go ms missing'
-      return $ case (cs, ds) of
-        -- useful
-        (Covered,  _    )        -> (rs, final_u,    is, pc1 Semi.<> pc2)
-        -- redundant
-        (NotCovered, NotDiverged) -> (m:rs, final_u, is, pc1 Semi.<> pc2)
-        -- inaccessible
-        (NotCovered, Diverged )   -> (rs, final_u, m:is, pc1 Semi.<> pc2)
-
-    hsLMatchToLPats :: LMatch id body -> Located [LPat id]
-    hsLMatchToLPats (dL->L l (Match { m_pats = pats })) = cL l pats
-    hsLMatchToLPats _                                   = panic "checkMatches'"
-
-getNFirstUncovered :: [Id] -> Int -> [Delta] -> DsM [Delta]
-getNFirstUncovered _    0 _              = pure []
-getNFirstUncovered _    _ []             = pure []
-getNFirstUncovered vars n (delta:deltas) = do
-  front <- provideEvidence vars n delta
-  back <- getNFirstUncovered vars (n - length front) deltas
-  pure (front ++ back)
 
 {- Note [Checking EmptyCase]
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~
@@ -409,7 +358,7 @@ mkPmLetVar x y          = [PmLet x (Var y)]
 vanillaConGrd :: Id -> DataCon -> [Id] -> PmGrd
 vanillaConGrd scrut con arg_ids =
   PmCon { pm_id = scrut, pm_con_con = PmAltConLike (RealDataCon con)
-        , pm_con_tvs = [], pm_con_dicts = [], pm_con_args = arg_ids }
+        , pm_con_dicts = [], pm_con_args = arg_ids }
 
 -- | Creates a 'GrdVec' refining a match var of list type to a list,
 -- where list fields are matched against the incoming tagged 'GrdVec's.
@@ -442,7 +391,6 @@ mkPmLitGrds x (PmLit _ (PmLitString s)) = do
 mkPmLitGrds x lit = do
   let grd = PmCon { pm_id = x
                   , pm_con_con = PmAltLit lit
-                  , pm_con_tvs = []
                   , pm_con_dicts = []
                   , pm_con_args = [] }
   pure [grd]
@@ -639,7 +587,7 @@ translateConPatOut fam_insts x con univ_tys ex_tvs dicts = \case
 
       -- 1. the constructor pattern match itself
       arg_ids <- zipWithM get_pat_id [0..] arg_tys
-      let con_grd = PmCon x (PmAltConLike con) ex_tvs dicts arg_ids
+      let con_grd = PmCon x (PmAltConLike con) dicts arg_ids
 
       -- 2. bang strict fields
       let arg_is_banged = map isBanged $ conLikeImplBangs con
@@ -656,28 +604,28 @@ translateConPatOut fam_insts x con univ_tys ex_tvs dicts = \case
 
 -- Translate a single match
 translateMatch :: FamInstEnvs -> [Id] -> LMatch GhcTc (LHsExpr GhcTc)
-               -> DsM (GrdVec, [GrdVec])
-translateMatch fam_insts vars (dL->L _ (Match { m_pats = pats, m_grhss = grhss }))
-  = do
-      pats'   <- concat <$> zipWithM (translateLPat fam_insts) vars pats
-      guards' <- mapM (translateGuards fam_insts) guards
-      -- tracePm "translateMatch" (vcat [ppr pats, ppr pats', ppr guards, ppr guards'])
-      return (pats', guards')
-      where
-        extractGuards :: LGRHS GhcTc (LHsExpr GhcTc) -> [GuardStmt GhcTc]
-        extractGuards (dL->L _ (GRHS _ gs _)) = map unLoc gs
-        extractGuards _                       = panic "translateMatch"
-
-        guards = map extractGuards (grhssGRHSs grhss)
-translateMatch _ _ _ = panic "translateMatch"
+               -> DsM GrdTree
+translateMatch fam_insts vars (L match_loc (Match { m_pats = pats, m_grhss = grhss })) = do
+  pats'   <- concat <$> zipWithM (translateLPat fam_insts) vars pats
+  grhss' <- mapM (translateLGRHS fam_insts match_loc pats) (grhssGRHSs grhss)
+  -- tracePm "translateMatch" (vcat [ppr pats, ppr pats', ppr grhss, ppr grhss'])
+  return (Many pats' grhss')
+translateMatch _ _ (L _ (XMatch _)) = panic "translateMatch"
 
 -- -----------------------------------------------------------------------
 -- * Transform source guards (GuardStmt Id) to simpler PmGrds
 
--- | Translate a list of guard statements to a 'GrdVec'
-translateGuards :: FamInstEnvs -> [GuardStmt GhcTc] -> DsM GrdVec
-translateGuards fam_insts guards =
-  concat <$> mapM (translateGuard fam_insts) guards
+-- | Translate a guarded right-hand side to a single 'GrdTree'
+translateLGRHS :: FamInstEnvs -> SrcSpan -> [LPat GhcTc] -> LGRHS GhcTc (LHsExpr GhcTc) -> DsM GrdTree
+translateLGRHS fam_insts match_loc pats (L _loc (GRHS _ gs _)) =
+  -- _loc apparently points to the match separator that comes after the guards..
+  AtRhs loc_sdoc . concat <$> mapM (translateGuard fam_insts . unLoc) gs
+    where
+      loc_sdoc
+        | null gs   = L match_loc (sep (map ppr pats))
+        | otherwise = L grd_loc   (sep (map ppr pats) <+> vbar <+> interpp'SP gs)
+      L grd_loc _ = head gs
+translateLGRHS _ _ _ (L _ (XGRHS _)) = panic "translateLGRHS"
 
 -- | Translate a guard statement to a 'GrdVec'
 translateGuard :: FamInstEnvs -> GuardStmt GhcTc -> DsM GrdVec
@@ -804,22 +752,10 @@ matches. But soundness means we will never fail to report a missing match.
 
 This mechanism is implemented in the higher-order function 'throttle'.
 
-Note [Combinatorial explosion in guards]
-~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
-Function with many clauses and deeply nested guards like in #11195 tend to
-overwhelm the checker because they lead to exponential splitting behavior.
-See the comments on #11195 on refinement trees. Every guard refines the
-disjunction of Deltas by another split. This no different than the ConVar case,
-but in stark contrast we mostly don't get any useful information out of that
-split! Hence splitting k-fold just means having k-fold more work. The problem
-exacerbates for larger k, because it gets even more unlikely that we can handle
-all of the arising Deltas better than just continue working on the original
-Delta.
-
-We simply apply the same mechanism as in Note [Countering exponential blowup].
-But we don't want to forget about actually useful info from pattern match
-clauses just because we had one clause with many guards. So we set the limit for
-guards much lower.
+Guards are an extreme example in this regard, with #11195 being a particularly
+dreadful example: Since their RHS are often pretty much unique, we split on a
+variable (the one representing the RHS) that doesn't occur anywhere else in the
+program, so we don't actually get useful information out of that split!
 
 Note [Translate CoPats]
 ~~~~~~~~~~~~~~~~~~~~~~~
@@ -938,181 +874,136 @@ brows.
 {-
 %************************************************************************
 %*                                                                      *
-            Heart of the algorithm: Function pmCheck
+            Heart of the algorithm: checkCtTree
 %*                                                                      *
 %************************************************************************
 
 Main functions are:
 
-* pmCheck :: PatVec -> [PatVec] -> ValVec -> Delta -> DsM PartialResult
+* compileGrdTree :: GrdTree -> CtTree
 
-  This function implements functions `covered`, `uncovered` and
-  `divergent` from the paper at once. Calls out to the auxilary function
-  `pmCheckGuards` for handling (possibly multiple) guarded RHSs when the whole
-  clause is checked. Slightly different from the paper because it does not even
-  produce the covered and uncovered sets. Since we only care about whether a
-  clause covers SOMETHING or if it may forces ANY argument, we only store a
-  boolean in both cases, for efficiency.
+  Translates from the scoped, higher-level 'GrdTree' with fall-through semantics
+  to the lower-level 'CtTree'.
 
-* pmCheckGuards :: [PatVec] -> ValVec -> Delta -> DsM PartialResult
+* checkCtTree :: CtTree -> Deltas -> DsM CheckResult
 
-  Processes the guards.
+  Walks down the spine of the 'CtTree', continually collecting and checking
+  constraints for satisfiability, ultimately digesting results into annotations
+  of a 'DigestedTree' and an 'Uncovered' set (see 'CheckResult').
+
 -}
 
--- | @throttle limit f n delta@ executes the pattern match action @f@ but
--- replaces the 'Uncovered' set by @[delta]@ if not doing so would lead to
--- too many Deltas to check.
---
--- See Note [Countering exponential blowup] and
--- Note [Combinatorial explosion in guards]
---
--- How many is "too many"? @throttle@ assumes that the pattern match action
--- will be executed against @n@ similar other Deltas, its "siblings". Now, by
--- observing the branching factor (i.e. the number of children) of executing
--- the action, we can estimate how many Deltas there would be in the next
--- generation. If we find that this number exceeds @limit@, we do
--- "birth control": We simply don't allow a branching factor of more than 1.
--- Otherwise we just return the singleton set of the original @delta@.
--- This amounts to forgetting about the refined facts we got from running the
--- action.
-throttle :: Int -> (Int -> Delta -> DsM PartialResult) -> Int -> Delta -> DsM (Int, PartialResult)
-throttle limit f n_siblings delta = do
-  res <- f n_siblings delta
-  let n_own_children = length (presultUncovered res)
-  let n_next_gen = n_siblings * n_own_children
-  -- Birth control!
-  if n_next_gen <= limit || n_own_children <= 1
-    then pure (n_next_gen, res)
-    else pure (n_siblings, res { presultUncovered = [delta], presultApprox = Approximate })
+-- | @throttle limit old new@ returns @old@ if the number of 'Delta's in @new@
+-- is exceeding the given @limit@. See Note [Countering exponential blowup].
+throttle :: Int -> Deltas -> Deltas -> (Precision, Deltas)
+throttle limit old new@(MkDeltas ds)
+  -- | pprTrace "PmCheck:throttle" (ppr (length ds) <+> ppr limit) False = undefined
+  | length ds > limit = (Approximate, old)
+  | otherwise         = (Precise,     new)
 
--- | Map a pattern matching action processing a single 'Delta' over a
--- 'Uncovered' set and return the combined 'PartialResult's.
-runMany :: (Delta -> DsM PartialResult) -> Uncovered -> DsM PartialResult
-runMany f unc = mconcat <$> traverse f unc
+-- | Translates from a 'GrdTree' to a 'CtTree'. The differences between the two
+-- are as follows:
+--
+--   * 'GrdVec's have inherent scoping, 'PmCts' don't.
+--   * The semantics of 'PmGrd' permit "failure" (of a guard) and "divergence".
+--     'PmCt' doesn't have that notion: It's just a constraint that may or may
+--     not be compatible with a set of other constraints. Consequently, to map
+--     the fall-through semantics of 'PmGrd', 'compileGrdTree' introduces
+--     'Branch'es for 'PmBang' and 'PmCon'.
+compileGrdTree :: GrdTree -> CtTree
+compileGrdTree (AtRhs sdoc grds) =
+  compileGrdVec grds (AtRhs sdoc)
+compileGrdTree (Many grds cs)    =
+  compileGrdVec grds (flip Many (map compileGrdTree cs))
+#if __GLASGOW_HASKELL__ <= 806
+compileGrdTree (Branch void _)   = absurd void
+#endif
 
--- | Print diagnostic info and actually call 'pmCheck''.
-pmCheck :: GrdVec -> [GrdVec] -> Int -> Delta -> DsM PartialResult
-pmCheck ps guards n delta = do
-  tracePm "pmCheck {" $ vcat [ ppr n <> colon
-                           , hang (text "patterns:") 2 (ppr ps)
-                           , hang (text "guards:") 2 (ppr guards)
-                           , ppr delta ]
-  res <- pmCheck' ps guards n delta
+compileGrdVec :: GrdVec -> (PmCts -> CtTree) -> CtTree
+compileGrdVec grds k = go grds emptyBag
+  where
+    go []                        inc_cts = k inc_cts
+    -- let x = e: Add x ~ e to the uncovered set
+    go (PmLet x e : grds)        inc_cts =
+      go grds (inc_cts `snocBag` PmCoreCt x e)
+    -- Bang x: Add x /~ _|_ to the uncovered set
+    go (PmBang x : grds)         inc_cts =
+      Branch b_cts (go grds (unitBag (PmNotBotCt x)))
+        where
+          b_cts = BranchPmCts { br_common_cts = inc_cts
+                              , br_div_ct     = PmBotCt x
+                              , br_uncov_ct   = PmFalseCt }
+    -- Con: Add x ~ K ys to the Covered set and x /~ K to the Uncovered set
+    go (PmCon x con dicts args : grds) inc_cts =
+      Branch b_cts (go grds (ty_cts `snocBag` PmConCt x con args))
+        where
+          ty_cts  = PmTyCt <$> listToBag (map evVarPred dicts)
+          -- Matching on a newtype doesn't diverge. PmFalseCt makes sure nothing
+          -- diverges. See Note [Divergence of Newtype matches] in Oracle.
+          force_ct (PmAltConLike (RealDataCon dc))
+            | isNewTyCon (dataConTyCon dc) = PmFalseCt
+          force_ct _                       = PmBotCt x
+          b_cts = BranchPmCts { br_common_cts = inc_cts
+                              , br_div_ct     = force_ct con
+                              , br_uncov_ct   = PmNotConCt x con }
+
+-- | Print diagnostic info and actually call 'checkCtTree''.
+checkCtTree :: CtTree -> Deltas -> DsM CheckResult
+checkCtTree guards deltas = do
+  tracePm "checkCtTree {" $ vcat [ ppr guards
+                             , ppr deltas ]
+  res <- checkCtTree' guards deltas
   tracePm "}:" (ppr res) -- braces are easier to match by tooling
   return res
 
--- | Lifts 'pmCheck' over a 'DsM (Maybe Delta)'.
-pmCheckM :: GrdVec -> [GrdVec] -> Int -> DsM (Maybe Delta) -> DsM PartialResult
-pmCheckM ps guards n m_mb_delta = m_mb_delta >>= \case
-  Nothing    -> pure mempty
-  Just delta -> pmCheck ps guards n delta
+toCovered :: Bool -> Covered
+toCovered True  = Covered
+toCovered False = NotCovered
 
--- | Check the list of mutually exclusive guards
-pmCheckGuards :: [GrdVec] -> Int -> Delta -> DsM PartialResult
-pmCheckGuards []       _ delta = return (usimple delta)
-pmCheckGuards (gv:gvs) n delta = do
-  dflags <- getDynFlags
-  let limit = maxPmCheckModels dflags `div` 5
-  (n', PartialResult cs unc ds pc) <- throttle limit (pmCheck gv []) n delta
-  (PartialResult css uncs dss pcs) <- runMany (pmCheckGuards gvs n') unc
-  return $ PartialResult (cs `mappend` css)
-                         uncs
-                         (ds `mappend` dss)
-                         (pc `mappend` pcs)
+toDiverged :: Bool -> Diverged
+toDiverged True  = Diverged
+toDiverged False = NotDiverged
 
--- | Matching function: Check simultaneously a clause (takes separately the
--- patterns and the list of guards) for exhaustiveness, redundancy and
--- inaccessibility.
-pmCheck'
-  :: GrdVec   -- ^ Patterns of the clause
-  -> [GrdVec] -- ^ (Possibly multiple) guards of the clause
-  -> Int      -- ^ Estimate on the number of similar 'Delta's to handle.
-              --   See 6. in Note [Countering exponential blowup]
-  -> Delta    -- ^ Oracle state giving meaning to the identifiers in the ValVec
-  -> DsM PartialResult
-pmCheck' [] guards n delta
-  | null guards = return $ mempty { presultCovered = Covered }
-  | otherwise   = pmCheckGuards guards n delta
-
--- let x = e: Add x ~ e to the oracle
-pmCheck' (PmLet { pm_id = x, pm_let_expr = e } : ps) guards n delta = do
-  tracePm "PmLet" (vcat [ppr x, ppr e])
-  -- x is fresh because it's bound by the let
-  delta' <- expectJust "x is fresh" <$> addVarCoreCt delta x e
-  pmCheck ps guards n delta'
-
--- Bang x: Add x /~ _|_ to the oracle
-pmCheck' (PmBang x : ps) guards n delta = do
-  tracePm "PmBang" (ppr x)
-  pr <- pmCheckM ps guards n (addTmCt delta (TmVarNonVoid x))
-  pure (forceIfCanDiverge delta x pr)
-
--- Con: Add x ~ K ys to the Covered set and x /~ K to the Uncovered set
-pmCheck' (p : ps) guards n delta
-  | PmCon{ pm_id = x, pm_con_con = con, pm_con_args = args
-         , pm_con_dicts = dicts } <- p = do
-  -- E.g   f (K p q) = <rhs>
-  --       <next equation>
-  -- Split delta into two refinements:
-  --    * one for <rhs>, binding x to (K p q)
-  --    * one for <next equation>, recording that x is /not/ (K _ _)
-
-  -- Stuff for <rhs>
-  pr_pos <- pmCheckM ps guards n (addPmConCts delta x con dicts args)
-
-  -- The var is forced regardless of whether @con@ was satisfiable
-  -- See Note [Divergence of Newtype matches]
-  let pr_pos' = addConMatchStrictness delta x con pr_pos
-
-  -- Stuff for <next equation>
-  pr_neg <- addRefutableAltCon delta x con >>= \case
-    Nothing     -> pure mempty
-    Just delta' -> pure (usimple delta')
-
-  tracePm "PmCon" (vcat [ppr p, ppr x, ppr pr_pos', ppr pr_neg])
-
-  -- Combine both into a single PartialResult
-  let pr = mkUnion pr_pos' pr_neg
-  pure pr
-
-addPmConCts :: Delta -> Id -> PmAltCon -> [EvVar] -> [Id] -> DsM (Maybe Delta)
-addPmConCts delta x con dicts fields = runMaybeT $ do
-  delta_ty    <- MaybeT $ addTypeEvidence delta (listToBag dicts)
-  delta_tm_ty <- MaybeT $ addTmCt delta_ty (TmVarCon x con fields)
-  pure delta_tm_ty
-
--- ----------------------------------------------------------------------------
--- * Utilities for main checking
-
--- | Initialise with default values for covering and divergent information and
--- a singleton uncovered set.
-usimple :: Delta -> PartialResult
-usimple delta = mempty { presultUncovered = [delta] }
-
--- | Get the union of two covered, uncovered and divergent value set
--- abstractions. Since the covered and divergent sets are represented by a
--- boolean, union means computing the logical or (at least one of the two is
--- non-empty).
-
-mkUnion :: PartialResult -> PartialResult -> PartialResult
-mkUnion = mappend
-
--- | Set the divergent set to not empty
-forces :: PartialResult -> PartialResult
-forces pres = pres { presultDivergent = Diverged }
-
--- | Set the divergent set to non-empty if the variable has not been forced yet
-forceIfCanDiverge :: Delta -> Id -> PartialResult -> PartialResult
-forceIfCanDiverge delta x
-  | canDiverge delta x = forces
-  | otherwise          = id
-
--- | 'forceIfCanDiverge' if the 'PmAltCon' was not a Newtype.
--- See Note [Divergence of Newtype matches].
-addConMatchStrictness :: Delta -> Id -> PmAltCon -> PartialResult -> PartialResult
-addConMatchStrictness _     _ (PmAltConLike (RealDataCon dc)) res
-  | isNewTyCon (dataConTyCon dc) = res
-addConMatchStrictness delta x _ res = forceIfCanDiverge delta x res
+-- | Check a set of incoming values represented by 'Deltas' against a 'CtTree'.
+-- The 'CtTree' conveniently carries all the 'PmCts' we have to add, so we just
+-- walk down the tree and check for inhabitants when we have to. In particular,
+-- we "have to", when:
+--
+--   * We have to come up with a 'Diverged' flag for a 'Branch'
+--   * We have to come up with a 'Covered' flag when we are 'AtRhs'.
+--
+-- The structure of the 'CtTree' is so that we can have the maximum amount of
+-- caching of oracle work without thinking too hard. The only tricky part is
+-- threading around the uncovered set in 'Branch'.
+checkCtTree'
+  :: CtTree -- ^ Equations
+  -> Deltas -- ^ Incoming uncovered values
+  -> DsM CheckResult
+-- RHS: Check that it covers something
+checkCtTree' (AtRhs sdoc cts) deltas = do
+  is_covered <- addPmCtsDeltas deltas cts >>= isInhabited
+  let covered = toCovered is_covered
+  pure $ CheckResult (AtRhs sdoc covered) (MkDeltas emptyBag) Precise
+-- Branch: Compute common prefix, check for divergence and adjoin uncovered values
+checkCtTree' (Branch (BranchPmCts common_cts div_ct unc_ct) ct_tree) deltas = do
+  deltas'      <- addPmCtsDeltas deltas common_cts
+  has_diverged <- addPmCtsDeltas deltas' (unitBag (div_ct)) >>= isInhabited
+  let diverged = toDiverged has_diverged
+  unc_this     <- addPmCtsDeltas deltas' (unitBag (unc_ct))
+  CheckResult dig_tree' unc_inner prec <- checkCtTree' ct_tree deltas'
+  limit <- maxPmCheckModels <$> getDynFlags
+  let (prec', unc') = throttle limit deltas' (unc_this Semi.<> unc_inner)
+  pure $ CheckResult (Branch diverged dig_tree') unc' (prec' Semi.<> prec)
+-- Many: Compute common prefix and thread augmented uncovered sets from equation
+--       to equation
+checkCtTree' (Many common_cts ct_trees) deltas = do
+  deltas' <- addPmCtsDeltas deltas common_cts
+  let init_res = CheckResult [] deltas' Precise
+  let go (CheckResult cs' deltas prec) ct_tree = do
+        CheckResult c' unc prec' <- checkCtTree ct_tree deltas
+        pure $ CheckResult (c':cs') unc (prec Semi.<> prec')
+  res@CheckResult{ cr_clauses = cs' } <- foldlM go init_res ct_trees
+  pure res{ cr_clauses = Many () (reverse cs') }
 
 -- ----------------------------------------------------------------------------
 -- * Propagation of term constraints inwards when checking nested matches
@@ -1158,7 +1049,7 @@ locallyExtendPmDelta ext k = getPmDelta >>= ext >>= \case
 -- | Add in-scope type constraints
 addTyCsDs :: Bag EvVar -> DsM a -> DsM a
 addTyCsDs ev_vars =
-  locallyExtendPmDelta (\delta -> addTypeEvidence delta ev_vars)
+  locallyExtendPmDelta (\delta -> addPmCts delta (PmTyCt . evVarPred <$> ev_vars))
 
 -- | Add equalities for the scrutinee to the local 'DsM' environment when
 -- checking a case expression:
@@ -1169,8 +1060,14 @@ addScrutTmCs :: Maybe (LHsExpr GhcTc) -> [Id] -> DsM a -> DsM a
 addScrutTmCs Nothing    _   k = k
 addScrutTmCs (Just scr) [x] k = do
   scr_e <- dsLExpr scr
-  locallyExtendPmDelta (\delta -> addVarCoreCt delta x scr_e) k
+  locallyExtendPmDelta (\delta -> addPmCts delta (unitBag (PmCoreCt x scr_e))) k
 addScrutTmCs _   _   _ = panic "addScrutTmCs: HsCase with more than one case binder"
+
+addPmConCts :: Delta -> Id -> PmAltCon -> [EvVar] -> [Id] -> DsM (Maybe Delta)
+addPmConCts delta x con dicts fields = runMaybeT $ do
+  delta_ty    <- MaybeT $ addPmCts delta (listToBag (PmTyCt . evVarPred <$> dicts))
+  delta_tm_ty <- MaybeT $ addPmCts delta_ty (unitBag (PmConCt x con fields))
+  pure delta_tm_ty
 
 -- | Add equalities to the local 'DsM' environment when checking the RHS of a
 -- case expression:
@@ -1197,7 +1094,7 @@ computeCovered :: GrdVec -> Delta -> DsM (Maybe Delta)
 -- ConVar case harder to understand.
 computeCovered [] delta = pure (Just delta)
 computeCovered (PmLet { pm_id = x, pm_let_expr = e } : ps) delta = do
-  delta' <- expectJust "x is fresh" <$> addVarCoreCt delta x e
+  delta' <- expectJust "x is fresh" <$> addPmCts delta (unitBag (PmCoreCt x e))
   computeCovered ps delta'
 computeCovered (PmBang{} : ps) delta = do
   computeCovered ps delta
@@ -1235,13 +1132,30 @@ needToRunPmCheck dflags origin
   | otherwise
   = notNull (filter (`wopt` dflags) allPmCheckWarnings)
 
+redundantAndInaccessibleRhss :: DigestedTree -> ([Located SDoc], [Located SDoc])
+redundantAndInaccessibleRhss tree = (fromOL ol_red, fromOL ol_div)
+  where
+    (ol_red, ol_div, _cov) = go tree
+    go (AtRhs _    Covered)    = (nilOL,       nilOL,       Covered)
+    go (AtRhs sdoc NotCovered) = (unitOL sdoc, nilOL,       NotCovered)
+    -- A diverging match makes all the children inaccessible if all of them were
+    -- redundant before. So if there is one child that is reachable, then
+    -- all the others are redundant, because termination doesn't change and it
+    -- doesn't matter where exactly we force ⊥. See #17465.
+    go (Branch Diverged tree) = case go tree of
+      (red, div, NotCovered) -> (nilOL, div `appOL` red, NotCovered)
+      res                    -> res
+    go (Branch _        tree)  = go tree
+    go (Many _          trees) = foldMap go trees
+
 -- | Issue all the warnings (coverage, exhaustiveness, inaccessibility)
-dsPmWarn :: DynFlags -> DsMatchContext -> [Id] -> PmResult -> DsM ()
-dsPmWarn dflags ctx@(DsMatchContext kind loc) vars pm_result
+dsPmWarn :: DynFlags -> DsMatchContext -> [Id] -> CheckResult -> DsM ()
+dsPmWarn dflags ctx@(DsMatchContext kind loc) vars result
   = when (flag_i || flag_u) $ do
+      unc_examples <- getNFirstUncovered vars (maxPatterns + 1) uncovered
       let exists_r = flag_i && notNull redundant
           exists_i = flag_i && notNull inaccessible && not is_rec_upd
-          exists_u = flag_u && notNull uncovered
+          exists_u = flag_u && notNull unc_examples
           approx   = precision == Approximate
 
       when (approx && (exists_u || exists_i)) $
@@ -1253,14 +1167,15 @@ dsPmWarn dflags ctx@(DsMatchContext kind loc) vars pm_result
       when exists_i $ forM_ inaccessible $ \(dL->L l q) -> do
         putSrcSpanDs l (warnDs (Reason Opt_WarnOverlappingPatterns)
                                (pprEqn q "has inaccessible right hand side"))
+
       when exists_u $ putSrcSpanDs loc $ warnDs flag_u_reason $
-        pprEqns vars uncovered
+        pprEqns vars unc_examples
   where
-    PmResult
-      { pmresultRedundant = redundant
-      , pmresultUncovered = uncovered
-      , pmresultInaccessible = inaccessible
-      , pmresultApproximate = precision } = pm_result
+    CheckResult
+      { cr_clauses = clauses
+      , cr_uncov   = uncovered
+      , cr_approx  = precision } = result
+    (redundant, inaccessible) = redundantAndInaccessibleRhss clauses
 
     flag_i = wopt Opt_WarnOverlappingPatterns dflags
     flag_u = exhaustive dflags kind
@@ -1273,7 +1188,7 @@ dsPmWarn dflags ctx@(DsMatchContext kind loc) vars pm_result
 
     -- Print a single clause (for redundant/with-inaccessible-rhs)
     pprEqn q txt = pprContext True ctx (text txt) $ \f ->
-      f (pprPats kind (map unLoc q))
+      f (q <+> matchSeparator kind <+> text "...")
 
     -- Print several clauses (for uncovered clauses)
     pprEqns vars deltas = pprContext False ctx (text "are non-exhaustive") $ \_ ->
@@ -1293,6 +1208,16 @@ dsPmWarn dflags ctx@(DsMatchContext kind loc) vars pm_result
           $$ bullet <+> text "Redundant clauses might be reported as inaccessible"
           $$ bullet <+> text "Patterns reported as unmatched might actually be matched")
       , text "Increase the limit or resolve the warnings to suppress this message." ]
+
+getNFirstUncovered :: [Id] -> Int -> Deltas -> DsM [Delta]
+getNFirstUncovered vars n (MkDeltas deltas) = go n (bagToList deltas)
+  where
+    go 0 _              = pure []
+    go _ []             = pure []
+    go n (delta:deltas) = do
+      front <- provideEvidence vars n delta
+      back <- go (n - length front) deltas
+      pure (front ++ back)
 
 {- Note [Inaccessible warnings for record updates]
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
@@ -1369,7 +1294,3 @@ pprContext singular (DsMatchContext kind _loc) msg rest_of_msg_fun
              FunRhs { mc_fun = (dL->L _ fun) }
                   -> (pprMatchContext kind, \ pp -> ppr fun <+> pp)
              _    -> (pprMatchContext kind, \ pp -> pp)
-
-pprPats :: HsMatchContext Name -> [Pat GhcTc] -> SDoc
-pprPats kind pats
-  = sep [sep (map ppr pats), matchSeparator kind, text "..."]
