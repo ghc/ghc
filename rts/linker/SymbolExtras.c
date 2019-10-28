@@ -57,6 +57,8 @@ int ocAllocateExtras(ObjectCode* oc, int count, int first, int bssSize)
 
   if (count > 0 || bssSize > 0) {
     if (!RTS_LINKER_USE_MMAP) {
+      /* N.B. We currently can't mark symbol extras as non-executable in this
+       * case. */
 
       // round up to the nearest 4
       int aligned = (oc->fileSize + 3) & ~3;
@@ -72,6 +74,8 @@ int ocAllocateExtras(ObjectCode* oc, int count, int first, int bssSize)
       oc->symbol_extras = (SymbolExtra *) (oc->image + aligned);
     } else if (USE_CONTIGUOUS_MMAP || RtsFlags.MiscFlags.linkerAlwaysPic) {
       /* Keep image, bssExtras and symbol_extras contiguous */
+      /* N.B. We currently can't mark symbol extras as non-executable in this
+       * case. */
       size_t n = roundUpToPage(oc->fileSize);
       bssSize = roundUpToAlign(bssSize, 8);
       size_t allocated_size = n + bssSize + extras_size;
@@ -93,7 +97,9 @@ int ocAllocateExtras(ObjectCode* oc, int count, int first, int bssSize)
           return 0;
       }
     } else {
-        oc->symbol_extras = m32_alloc(oc->m32, extras_size, 8);
+        /* m32_allocator_flush ensures that these are marked as executable when
+         * we finish building them. */
+        oc->symbol_extras = m32_alloc(oc->rx_m32, extras_size, 8);
         if (oc->symbol_extras == NULL) return 0;
     }
   }
