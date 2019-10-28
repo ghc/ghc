@@ -1139,7 +1139,8 @@ unload_wkr hsc_env keep_linkables pls@PersistentLinkerState{..}  = do
 
       -- Code unloading currently disabled due to instability.
       -- See #16841.
-      | False -- otherwise
+      -- id False, so that the pattern-match checker doesn't complain
+      | id False -- otherwise
       = mapM_ (unloadObj hsc_env) [f | DotO f <- linkableUnlinked lnk]
                 -- The components of a BCO linkable may contain
                 -- dot-o files.  Which is very confusing.

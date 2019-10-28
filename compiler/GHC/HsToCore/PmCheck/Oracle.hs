@@ -7,21 +7,20 @@ Authors: George Karachalias <george.karachalias@cs.kuleuven.be>
 {-# LANGUAGE CPP, LambdaCase, TupleSections, PatternSynonyms, ViewPatterns, MultiWayIf #-}
 
 -- | The pattern match oracle. The main export of the module are the functions
--- 'addTmCt', 'addVarCoreCt', 'addRefutableAltCon' and 'addTypeEvidence' for
--- adding facts to the oracle, and 'provideEvidence' to turn a
+-- 'addPmCts' for adding facts to the oracle, and 'provideEvidence' to turn a
 -- 'Delta' into a concrete evidence for an equation.
 module GHC.HsToCore.PmCheck.Oracle (
 
         DsM, tracePm, mkPmId,
         Delta, initDelta, lookupRefuts, lookupSolution,
 
-        TmCt(..),
-        addTypeEvidence,    -- Add type equalities
-        addRefutableAltCon, -- Add a negative term equality
-        addTmCt,            -- Add a positive term equality x ~ e
-        addVarCoreCt,       -- Add a positive term equality x ~ core_expr
+        PmCt(PmTyCt), PmCts, pattern PmVarCt, pattern PmCoreCt,
+        pattern PmConCt, pattern PmNotConCt, pattern PmBotCt,
+        pattern PmNotBotCt,
+
+        addPmCts,           -- Add a constraint to the oracle.
         canDiverge,         -- Try to add the term equality x ~ ⊥
-        provideEvidence,
+        provideEvidence
     ) where
 
 #include "HsVersions.h"
@@ -63,7 +62,6 @@ import TysPrim (tYPETyCon)
 import TyCoRep
 import Type
 import TcSimplify    (tcNormalise, tcCheckSatisfiability)
-import TcType        (evVarPred)
 import Unify         (tcMatchTy)
 import TcRnTypes     (completeMatchConLikes)
 import Coercion
@@ -76,7 +74,8 @@ import Control.Monad (guard, mzero)
 import Control.Monad.Trans.Class (lift)
 import Control.Monad.Trans.State.Strict
 import Data.Bifunctor (second)
-import Data.Foldable (foldlM, minimumBy)
+import Data.Either   (partitionEithers)
+import Data.Foldable (foldlM, minimumBy, toList)
 import Data.List     (find)
 import qualified Data.List.NonEmpty as NonEmpty
 import Data.Ord      (comparing)
@@ -150,7 +149,7 @@ mkOneConFull arg_tys con = do
   vars <- mapM mkPmId field_tys'
   -- All constraints bound by the constructor (alpha-renamed), these are added
   -- to the type oracle
-  let ty_cs = map TyCt (substTheta subst (eqSpecPreds eq_spec ++ thetas))
+  let ty_cs = substTheta subst (eqSpecPreds eq_spec ++ thetas)
   -- Figure out the types of strict constructor fields
   let arg_is_strict
         | RealDataCon dc <- con
@@ -233,14 +232,14 @@ instance Monoid SatisfiabilityCheck where
 pmIsSatisfiable
   :: Delta       -- ^ The ambient term and type constraints
                  --   (known to be satisfiable).
-  -> Bag TmCt    -- ^ The new term constraints.
   -> Bag TyCt    -- ^ The new type constraints.
+  -> Bag TmCt    -- ^ The new term constraints.
   -> [Type]      -- ^ The strict argument types.
   -> DsM (Maybe Delta)
                  -- ^ @'Just' delta@ if the constraints (@delta@) are
                  -- satisfiable, and each strict argument type is inhabitable.
                  -- 'Nothing' otherwise.
-pmIsSatisfiable amb_cs new_tm_cs new_ty_cs strict_arg_tys =
+pmIsSatisfiable amb_cs new_ty_cs new_tm_cs strict_arg_tys =
   -- The order is important here! Check the new type constraints before we check
   -- whether strict argument types are inhabited given those constraints.
   runSatisfiabilityCheck amb_cs $ mconcat
@@ -495,16 +494,9 @@ equalities (such as i ~ Int) that may be in scope.
 ----------------
 -- * Type oracle
 
--- | Wraps a 'PredType', which is a constraint type.
-newtype TyCt = TyCt PredType
-
-instance Outputable TyCt where
-  ppr (TyCt pred_ty) = ppr pred_ty
-
--- | Allocates a fresh 'EvVar' name for 'PredTyCt's, or simply returns the
--- wrapped 'EvVar' for 'EvVarTyCt's.
-nameTyCt :: TyCt -> DsM EvVar
-nameTyCt (TyCt pred_ty) = do
+-- | Allocates a fresh 'EvVar' name for 'PredTy's.
+nameTyCt :: PredType -> DsM EvVar
+nameTyCt pred_ty = do
   unique <- getUniqueM
   let occname = mkVarOccFS (fsLit ("pm_"++show unique))
       idname  = mkInternalName unique occname noSrcSpan
@@ -512,15 +504,13 @@ nameTyCt (TyCt pred_ty) = do
 
 -- | Add some extra type constraints to the 'TyState'; return 'Nothing' if we
 -- find a contradiction (e.g. @Int ~ Bool@).
-tyOracle :: TyState -> Bag TyCt -> DsM (Maybe TyState)
+tyOracle :: TyState -> Bag PredType -> DsM (Maybe TyState)
 tyOracle (TySt inert) cts
   = do { evs <- traverse nameTyCt cts
        ; let new_inert = inert `unionBags` evs
        ; tracePm "tyOracle" (ppr cts)
        ; ((_warns, errs), res) <- initTcDsForSolver $ tcCheckSatisfiability new_inert
        ; case res of
-            -- Note how this implicitly gives all former PredTyCts a name, so
-            -- that we don't needlessly re-allocate them every time!
             Just True  -> return (Just (TySt new_inert))
             Just False -> return Nothing
             Nothing    -> pprPanic "tyOracle" (vcat $ pprErrMsgBagWithLoc errs) }
@@ -530,7 +520,7 @@ tyOracle (TySt inert) cts
 -- ones. Doesn't bother calling out to the type oracle if the bag of new type
 -- constraints was empty. Will only recheck 'PossibleMatches' in the term oracle
 -- for emptiness if the first argument is 'True'.
-tyIsSatisfiable :: Bool -> Bag TyCt -> SatisfiabilityCheck
+tyIsSatisfiable :: Bool -> Bag PredType -> SatisfiabilityCheck
 tyIsSatisfiable recheck_complete_sets new_ty_cs = SC $ \delta ->
   if isEmptyBag new_ty_cs
     then pure (Just delta)
@@ -658,9 +648,7 @@ warning messages (which can be alleviated by someone with enough dedication).
 -- Returns a new 'Delta' if the new constraints are compatible with existing
 -- ones.
 tmIsSatisfiable :: Bag TmCt -> SatisfiabilityCheck
-tmIsSatisfiable new_tm_cs = SC $ \delta -> runMaybeT $ foldlM go delta new_tm_cs
-  where
-    go delta ct = MaybeT (addTmCt delta ct)
+tmIsSatisfiable new_tm_cs = SC $ \delta -> runMaybeT $ foldlM addTmCt delta new_tm_cs
 
 -----------------------
 -- * Looking up VarInfo
@@ -789,8 +777,8 @@ This distinction becomes apparent in #17248:
 
 If we treat Newtypes like we treat regular DataCons, we would mark the third
 clause as redundant, which clearly is unsound. The solution:
-1. When checking the PmCon in 'pmCheck', never mark the result as Divergent if
-   it's a Newtype match.
+1. When compiling the PmCon guard in 'pmCompileTree', don't add a @DivergeIf@,
+   because the match will never diverge.
 2. Regard @T2 x@ as 'canDiverge' iff @x@ 'canDiverge'. E.g. @T2 x ~ _|_@ <=>
    @x ~ _|_@. This way, the third clause will still be marked as inaccessible
    RHS instead of redundant.
@@ -823,36 +811,101 @@ lookupSolution delta x = case vi_pos (lookupVarInfo (delta_tm_st delta) x) of
 -------------------------------
 -- * Adding facts to the oracle
 
--- | A term constraint. Either equates two variables or a variable with a
--- 'PmAltCon' application.
+-- | A term constraint.
 data TmCt
-  = TmVarVar     !Id !Id
-  | TmVarCon     !Id !PmAltCon ![Id]
-  | TmVarNonVoid !Id
+  = TmVarCt     !Id !Id
+  -- ^ @TmVarCt x y@ encodes "x ~ y", equating @x@ and @y@.
+  | TmCoreCt    !Id !CoreExpr
+  -- ^ @TmCoreCt x e@ encodes "x ~ e", equating @x@ with the 'CoreExpr' @e@.
+  | TmConCt     !Id !PmAltCon ![Id]
+  -- ^ @TmConCt x K ys@ encodes "x ~ K ys", equating @x@ with the 'PmAltCon'
+  -- application @K ys@.
+  | TmNotConCt  !Id !PmAltCon
+  -- ^ @TmNotConCt x K@ encodes "x /~ K", asserting that @x@ can't be headed
+  -- by @K@.
+  | TmBotCt     !Id
+  -- ^ @TmBotCt x@ encodes "x ~ ⊥", equating @x@ to ⊥.
+  -- by @K@.
+  | TmNotBotCt !Id
+  -- ^ @TmNotBotCt x y@ encodes "x /~ ⊥", asserting that @x@ can't be ⊥.
 
 instance Outputable TmCt where
-  ppr (TmVarVar x y)        = ppr x <+> char '~' <+> ppr y
-  ppr (TmVarCon x con args) = ppr x <+> char '~' <+> hsep (ppr con : map ppr args)
-  ppr (TmVarNonVoid x)      = ppr x <+> text "/~ ⊥"
+  ppr (TmVarCt x y)        = ppr x <+> char '~' <+> ppr y
+  ppr (TmCoreCt x e)       = ppr x <+> char '~' <+> ppr e
+  ppr (TmConCt x con args) = ppr x <+> char '~' <+> hsep (ppr con : map ppr args)
+  ppr (TmNotConCt x con)   = ppr x <+> text "/~" <+> ppr con
+  ppr (TmBotCt x)          = ppr x <+> text "~ ⊥"
+  ppr (TmNotBotCt x)       = ppr x <+> text "/~ ⊥"
 
--- | Add type equalities to 'Delta'.
-addTypeEvidence :: Delta -> Bag EvVar -> DsM (Maybe Delta)
-addTypeEvidence delta dicts
-  = runSatisfiabilityCheck delta (tyIsSatisfiable True (TyCt . evVarPred <$> dicts))
+type TyCt = PredType
 
--- | Tries to equate two representatives in 'Delta'.
+-- | An oracle constraint.
+data PmCt
+  = PmTyCt !TyCt
+  -- ^ @PmTy pred_ty@ carries 'PredType's, for example equality constraints.
+  | PmTmCt !TmCt
+  -- ^ A term constraint.
+
+type PmCts = Bag PmCt
+
+pattern PmVarCt :: Id -> Id -> PmCt
+pattern PmVarCt x y         = PmTmCt (TmVarCt x y)
+pattern PmCoreCt :: Id -> CoreExpr -> PmCt
+pattern PmCoreCt x e        = PmTmCt (TmCoreCt x e)
+pattern PmConCt :: Id -> PmAltCon -> [Id] -> PmCt
+pattern PmConCt x con args  = PmTmCt (TmConCt x con args)
+pattern PmNotConCt :: Id -> PmAltCon -> PmCt
+pattern PmNotConCt x con    = PmTmCt (TmNotConCt x con)
+pattern PmBotCt :: Id -> PmCt
+pattern PmBotCt x           = PmTmCt (TmBotCt x)
+pattern PmNotBotCt :: Id -> PmCt
+pattern PmNotBotCt x        = PmTmCt (TmNotBotCt x)
+{-# COMPLETE PmTyCt, PmVarCt, PmCoreCt, PmConCt, PmNotConCt, PmBotCt, PmNotBotCt #-}
+
+instance Outputable PmCt where
+  ppr (PmTyCt pred_ty) = ppr pred_ty
+  ppr (PmTmCt tm_ct)   = ppr tm_ct
+
+-- | Adds new constraints to 'Delta' and returns 'Nothing' if that leads to a
+-- contradiction.
+addPmCts :: Delta -> PmCts -> DsM (Maybe Delta)
 -- See Note [TmState invariants].
-addTmCt :: Delta -> TmCt -> DsM (Maybe Delta)
-addTmCt delta ct = runMaybeT $ case ct of
-  TmVarVar x y        -> addVarVarCt delta (x, y)
-  TmVarCon x con args -> addVarConCt delta x con args
-  TmVarNonVoid x      -> addVarNonVoidCt delta x
+addPmCts delta cts = do
+  let (ty_cts, tm_cts) = partitionTyTmCts cts
+  runSatisfiabilityCheck delta $ mconcat
+    [ tyIsSatisfiable True (listToBag ty_cts)
+    , tmIsSatisfiable (listToBag tm_cts)
+    ]
+
+partitionTyTmCts :: PmCts -> ([TyCt], [TmCt])
+partitionTyTmCts = partitionEithers . map to_either . toList
+  where
+    to_either (PmTyCt pred_ty) = Left pred_ty
+    to_either (PmTmCt tm_ct)   = Right tm_ct
+
+-- | Adds a single term constraint by dispatching to the various term oracle
+-- functions.
+addTmCt :: Delta -> TmCt -> MaybeT DsM Delta
+addTmCt delta (TmVarCt x y)        = addVarVarCt delta (x, y)
+addTmCt delta (TmCoreCt x e)       = addVarCoreCt delta x e
+addTmCt delta (TmConCt x con args) = addVarConCt delta x con args
+addTmCt delta (TmNotConCt x con)   = addRefutableAltCon delta x con
+addTmCt delta (TmBotCt x)          = addVarBotCt delta x
+addTmCt delta (TmNotBotCt x)       = addVarNonVoidCt delta x
+
+-- | In some future this will actually add a constraint to 'Delta' that we plan
+-- to preserve. But for now, we just check if we can add the constraint to the
+-- current 'Delta'. If so, we return the original 'Delta', if not, we fail.
+addVarBotCt :: Delta -> Id -> MaybeT DsM Delta
+addVarBotCt delta x
+  | canDiverge delta x = pure delta
+  | otherwise          = mzero
 
 -- | Record that a particular 'Id' can't take the shape of a 'PmAltCon' in the
 -- 'Delta' and return @Nothing@ if that leads to a contradiction.
 -- See Note [TmState invariants].
-addRefutableAltCon :: Delta -> Id -> PmAltCon -> DsM (Maybe Delta)
-addRefutableAltCon delta@MkDelta{ delta_tm_st = TmSt env reps } x nalt = runMaybeT $ do
+addRefutableAltCon :: Delta -> Id -> PmAltCon -> MaybeT DsM Delta
+addRefutableAltCon delta@MkDelta{ delta_tm_st = TmSt env reps } x nalt = do
   vi@(VI _ pos neg pm) <- lift (initLookupVarInfo delta x)
   -- 1. Bail out quickly when nalt contradicts a solution
   let contradicts nalt (cl, _args) = eqPmAltCon cl nalt == Equal
@@ -1052,7 +1105,7 @@ equate delta@MkDelta{ delta_tm_st = TmSt env reps } x y
         let add_fact delta (cl, args) = addVarConCt delta y cl args
         delta_pos <- foldlM add_fact delta_refs (vi_pos vi_x)
         -- Do the same for negative info
-        let add_refut delta nalt = MaybeT (addRefutableAltCon delta y nalt)
+        let add_refut delta nalt = addRefutableAltCon delta y nalt
         delta_neg <- foldlM add_refut delta_pos (vi_neg vi_x)
         -- vi_cache will be updated in addRefutableAltCon, so we are good to
         -- go!
@@ -1095,16 +1148,14 @@ addVarConCt delta@MkDelta{ delta_tm_st = TmSt env reps } x alt args = do
 -- See @Note [Strict argument type constraints]@.
 data InhabitationCandidate =
   InhabitationCandidate
-  { ic_tm_cs          :: Bag TmCt
-  , ic_ty_cs          :: Bag TyCt
+  { ic_cs             :: PmCts
   , ic_strict_arg_tys :: [Type]
   }
 
 instance Outputable InhabitationCandidate where
-  ppr (InhabitationCandidate tm_cs ty_cs strict_arg_tys) =
+  ppr (InhabitationCandidate cs strict_arg_tys) =
     text "InhabitationCandidate" <+>
-      vcat [ text "ic_tm_cs          =" <+> ppr tm_cs
-           , text "ic_ty_cs          =" <+> ppr ty_cs
+      vcat [ text "ic_cs             =" <+> ppr cs
            , text "ic_strict_arg_tys =" <+> ppr strict_arg_tys ]
 
 mkInhabitationCandidate :: Id -> DataCon -> DsM InhabitationCandidate
@@ -1114,8 +1165,7 @@ mkInhabitationCandidate x dc = do
   let tc_args = tyConAppArgs (idType x)
   (arg_vars, ty_cs, strict_arg_tys) <- mkOneConFull tc_args cl
   pure InhabitationCandidate
-        { ic_tm_cs = unitBag (TmVarCon x (PmAltConLike cl) arg_vars)
-        , ic_ty_cs = ty_cs
+        { ic_cs = PmTyCt <$> ty_cs `snocBag` PmConCt x (PmAltConLike cl) arg_vars
         , ic_strict_arg_tys = strict_arg_tys
         }
 
@@ -1133,13 +1183,13 @@ inhabitationCandidates MkDelta{ delta_ty_st = ty_st } ty = do
     NormalisedByConstraints ty'   -> alts_to_check ty'    ty'     []
     HadRedexes src_ty dcs core_ty -> alts_to_check src_ty core_ty dcs
   where
-    build_newtype :: (Type, DataCon, Type) -> Id -> DsM (Id, TmCt)
+    build_newtype :: (Type, DataCon, Type) -> Id -> DsM (Id, PmCt)
     build_newtype (ty, dc, _arg_ty) x = do
       -- ty is the type of @dc x@. It's a @dataConTyCon dc@ application.
       y <- mkPmId ty
-      pure (y, TmVarCon y (PmAltConLike (RealDataCon dc)) [x])
+      pure (y, PmConCt y (PmAltConLike (RealDataCon dc)) [x])
 
-    build_newtypes :: Id -> [(Type, DataCon, Type)] -> DsM (Id, [TmCt])
+    build_newtypes :: Id -> [(Type, DataCon, Type)] -> DsM (Id, [PmCt])
     build_newtypes x = foldrM (\dc (x, cts) -> go dc x cts) (x, [])
       where
         go dc x cts = second (:cts) <$> build_newtype dc x
@@ -1155,8 +1205,8 @@ inhabitationCandidates MkDelta{ delta_ty_st = ty_st } ty = do
              (_:_) -> do inner <- mkPmId core_ty
                          (outer, new_tm_cts) <- build_newtypes inner dcs
                          return $ Right (tc, outer, [InhabitationCandidate
-                           { ic_tm_cs = listToBag new_tm_cts
-                           , ic_ty_cs = emptyBag, ic_strict_arg_tys = [] }])
+                           { ic_cs = listToBag new_tm_cts
+                           , ic_strict_arg_tys = [] }])
 
         |  pmIsClosedType core_ty && not (isAbstractTyCon tc)
            -- Don't consider abstract tycons since we don't know what their
@@ -1165,8 +1215,8 @@ inhabitationCandidates MkDelta{ delta_ty_st = ty_st } ty = do
         -> do
              inner <- mkPmId core_ty -- it would be wrong to unify inner
              alts <- mapM (mkInhabitationCandidate inner) (tyConDataCons tc)
-             (outer, new_tm_cts) <- build_newtypes inner dcs
-             let wrap_dcs alt = alt{ ic_tm_cs = listToBag new_tm_cts `unionBags` ic_tm_cs alt}
+             (outer, new_cts) <- build_newtypes inner dcs
+             let wrap_dcs alt = alt{ ic_cs = listToBag new_cts `unionBags` ic_cs alt}
              return $ Right (tc, outer, map wrap_dcs alts)
       -- For other types conservatively assume that they are inhabited.
       _other -> return (Left src_ty)
@@ -1278,12 +1328,12 @@ nonVoid rec_ts amb_cs strict_arg_ty = do
     cand_is_inhabitable :: RecTcChecker -> Delta
                         -> InhabitationCandidate -> DsM Bool
     cand_is_inhabitable rec_ts amb_cs
-      (InhabitationCandidate{ ic_tm_cs          = new_tm_cs
-                            , ic_ty_cs          = new_ty_cs
-                            , ic_strict_arg_tys = new_strict_arg_tys }) =
+      (InhabitationCandidate{ ic_cs             = new_cs
+                            , ic_strict_arg_tys = new_strict_arg_tys }) = do
+        let (new_ty_cs, new_tm_cs) = partitionTyTmCts new_cs
         fmap isJust $ runSatisfiabilityCheck amb_cs $ mconcat
-          [ tyIsSatisfiable False new_ty_cs
-          , tmIsSatisfiable new_tm_cs
+          [ tyIsSatisfiable False (listToBag new_ty_cs)
+          , tmIsSatisfiable (listToBag new_tm_cs)
           , tysAreNonVoid rec_ts new_strict_arg_tys
           ]
 
@@ -1504,9 +1554,9 @@ provideEvidence = go
         Nothing -> pure [delta] -- No idea idea how to refine this one, so just finish off with a wildcard
         Just arg_tys -> do
           (arg_vars, new_ty_cs, strict_arg_tys) <- mkOneConFull arg_tys cl
-          let new_tm_cs = unitBag (TmVarCon x (PmAltConLike cl) arg_vars)
+          let new_tm_cs = unitBag (TmConCt x (PmAltConLike cl) arg_vars)
           -- Now check satifiability
-          mb_delta <- pmIsSatisfiable delta new_tm_cs new_ty_cs strict_arg_tys
+          mb_delta <- pmIsSatisfiable delta new_ty_cs new_tm_cs strict_arg_tys
           tracePm "instantiate_cons" (vcat [ ppr x
                                            , ppr (idType x)
                                            , ppr ty
@@ -1538,14 +1588,11 @@ pickMinimalCompleteSet _ (PM clss) = do
 -- | See if we already encountered a semantically equivalent expression and
 -- return its representative.
 representCoreExpr :: Delta -> CoreExpr -> DsM (Delta, Id)
-representCoreExpr delta@MkDelta{ delta_tm_st = ts@TmSt{ ts_reps = reps } } e = do
-  dflags <- getDynFlags
-  let e' = simpleOptExpr dflags e
-  case lookupCoreMap reps e' of
-    Just rep -> pure (delta, rep)
-    Nothing  -> do
-      rep <- mkPmId (exprType e')
-      let reps'  = extendCoreMap reps e' rep
+representCoreExpr delta@MkDelta{ delta_tm_st = ts@TmSt{ ts_reps = reps } } e
+  | Just rep <- lookupCoreMap reps e = pure (delta, rep)
+  | otherwise = do
+      rep <- mkPmId (exprType e)
+      let reps'  = extendCoreMap reps e rep
       let delta' = delta{ delta_tm_st = ts{ ts_reps = reps' } }
       pure (delta', rep)
 
@@ -1554,8 +1601,12 @@ representCoreExpr delta@MkDelta{ delta_tm_st = ts@TmSt{ ts_reps = reps } } e = d
 -- type PmM a = StateT Delta (MaybeT DsM) a
 
 -- | Records that a variable @x@ is equal to a 'CoreExpr' @e@.
-addVarCoreCt :: Delta -> Id -> CoreExpr -> DsM (Maybe Delta)
-addVarCoreCt delta x e = runMaybeT (execStateT (core_expr x e) delta)
+addVarCoreCt :: Delta -> Id -> CoreExpr -> MaybeT DsM Delta
+addVarCoreCt delta x e = do
+  dflags <- getDynFlags
+  let e' = simpleOptExpr dflags e
+  lift $ tracePm "addVarCoreCt" (ppr x $$ ppr e $$ ppr e')
+  execStateT (core_expr x e') delta
   where
     -- | Takes apart a 'CoreExpr' and tries to extract as much information about
     -- literals and constructor applications as possible.

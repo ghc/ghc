@@ -1,0 +1,21 @@
+
+T17646.hs:11:1: warning: [-Wincomplete-patterns (in -Wextra)]
+    Pattern match(es) are non-exhaustive
+    In an equation for ‘g’: Guards do not cover entire pattern space
+
+T17646.hs:11:5: warning: [-Winaccessible-code (in -Wdefault)]
+    • Couldn't match type ‘'True’ with ‘'False’
+      Inaccessible code in
+        a pattern with constructor: B :: T 'False,
+        in a pattern binding in
+             a pattern guard for
+               an equation for ‘g’
+    • In the pattern: B
+      In a stmt of a pattern guard for
+                     an equation for ‘g’:
+        B <- A
+      In an equation for ‘g’: g | B <- A = ()
+
+T17646.hs:11:5: warning: [-Woverlapping-patterns (in -Wdefault)]
+    Pattern match is redundant
+    In an equation for ‘g’: g | B <- A = ...
