@@ -31,7 +31,8 @@ import GHC.Rename.Types
 import GHC.Rename.Binds
 import GHC.Rename.Env
 import GHC.Rename.Utils ( HsDocContext(..), mapFvRn, bindLocalNames
-                        , checkDupRdrNames, inHsDocContext, bindLocalNamesFV
+                        , IsImplicitBinding(..), checkDupRdrNames
+                        , inHsDocContext, bindLocalNamesFV
                         , checkShadowedRdrNames, warnUnusedTypePatterns
                         , extendTyVarEnvFVRn, newLocalBndrsRn
                         , withHsDocContext )
@@ -1990,7 +1991,7 @@ rnInjectivityAnn tvBndrs (L _ (TyVarSig _ resTv))
  = do
    { (injDecl'@(L _ (InjectivityAnn injFrom' injTo')), noRnErrors)
           <- askNoErrs $
-             bindLocalNames [hsLTyVarName resTv] $
+             bindLocalNames (ImplicitBinding False) [hsLTyVarName resTv] $
              -- The return type variable scopes over the injectivity annotation
              -- e.g.   type family F a = (r::*) | r -> a
              do { injFrom' <- rnLTyVar injFrom

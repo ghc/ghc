@@ -32,13 +32,14 @@ module RdrName (
         nameRdrName, getRdrName,
 
         -- ** Destruction
-        rdrNameOcc, rdrNameSpace, demoteRdrName,
+        rdrNameOcc, rdrNameSpace, demoteRdrName, flipRdrName,
         isRdrDataCon, isRdrTyVar, isRdrTc, isQual, isQual_maybe, isUnqual,
         isOrig, isOrig_maybe, isExact, isExact_maybe, isSrcRdrName,
 
         -- * Local mapping of 'RdrName' to 'Name.Name'
         LocalRdrEnv, emptyLocalRdrEnv, extendLocalRdrEnv, extendLocalRdrEnvList,
-        lookupLocalRdrEnv, lookupLocalRdrOcc,
+        extendLocalRdrUnifiedEnvList, lookupLocalRdrEnv, lookupLocalRdrUnifiedEnv,
+        lookupLocalRdrOcc, lookupLocalRdrUnifiedOcc,
         elemLocalRdrEnv, inLocalRdrEnvScope,
         localRdrEnvElts, delLocalRdrEnvList,
 
@@ -184,6 +185,12 @@ demoteRdrName (Unqual occ) = fmap Unqual (demoteOccName occ)
 demoteRdrName (Qual m occ) = fmap (Qual m) (demoteOccName occ)
 demoteRdrName (Orig _ _) = panic "demoteRdrName"
 demoteRdrName (Exact _) = panic "demoteRdrName"
+
+flipRdrName :: RdrName -> RdrName
+flipRdrName (Unqual occ) = Unqual (flipOccName occ)
+flipRdrName (Qual m occ) = Qual m (flipOccName occ)
+flipRdrName (Orig m n) = Orig m n
+flipRdrName (Exact n) = Exact n
 
         -- These two are the basic constructors
 mkRdrUnqual :: OccName -> RdrName
@@ -346,6 +353,7 @@ instance Ord RdrName where
 -- We keep the current mapping, *and* the set of all Names in scope
 -- Reason: see Note [Splicing Exact names] in GHC.Rename.Env
 data LocalRdrEnv = LRE { lre_env      :: OccEnv Name
+                       , lre_unified_env :: OccEnv Name
                        , lre_in_scope :: NameSet }
 
 instance Outputable LocalRdrEnv where
@@ -361,19 +369,27 @@ instance Outputable LocalRdrEnv where
 
 emptyLocalRdrEnv :: LocalRdrEnv
 emptyLocalRdrEnv = LRE { lre_env = emptyOccEnv
+                       , lre_unified_env = emptyOccEnv
                        , lre_in_scope = emptyNameSet }
 
 extendLocalRdrEnv :: LocalRdrEnv -> Name -> LocalRdrEnv
 -- The Name should be a non-top-level thing
-extendLocalRdrEnv lre@(LRE { lre_env = env, lre_in_scope = ns }) name
+extendLocalRdrEnv lre@(LRE { lre_env = env, lre_unified_env = unified_env, lre_in_scope = ns }) name
   = WARN( isExternalName name, ppr name )
     lre { lre_env      = extendOccEnv env (nameOccName name) name
+        , lre_unified_env = extendUnifiedOccEnv unified_env (nameOccName name) name
         , lre_in_scope = extendNameSet ns name }
 
 extendLocalRdrEnvList :: LocalRdrEnv -> [Name] -> LocalRdrEnv
 extendLocalRdrEnvList lre@(LRE { lre_env = env, lre_in_scope = ns }) names
   = WARN( any isExternalName names, ppr names )
     lre { lre_env = extendOccEnvList env [(nameOccName n, n) | n <- names]
+        , lre_in_scope = extendNameSetList ns names }
+
+extendLocalRdrUnifiedEnvList :: LocalRdrEnv -> [Name] -> LocalRdrEnv
+extendLocalRdrUnifiedEnvList lre@(LRE { lre_unified_env = env, lre_in_scope = ns }) names
+  = WARN( any isExternalName names, ppr names )
+    lre { lre_unified_env = extendUnifiedOccEnvList env [(nameOccName n, n) | n <- names]
         , lre_in_scope = extendNameSetList ns names }
 
 lookupLocalRdrEnv :: LocalRdrEnv -> RdrName -> Maybe Name
@@ -389,8 +405,24 @@ lookupLocalRdrEnv (LRE { lre_env = env, lre_in_scope = ns }) rdr
   | otherwise
   = Nothing
 
+lookupLocalRdrUnifiedEnv :: LocalRdrEnv -> RdrName -> Maybe Name
+lookupLocalRdrUnifiedEnv (LRE { lre_unified_env = unified_env, lre_in_scope = ns }) rdr
+  | Unqual occ <- rdr
+  = lookupUnifiedOccEnv unified_env occ
+
+  -- See Note [Local bindings with Exact Names]
+  | Exact name <- rdr
+  , name `elemNameSet` ns
+  = Just name
+
+  | otherwise
+  = Nothing
+
 lookupLocalRdrOcc :: LocalRdrEnv -> OccName -> Maybe Name
 lookupLocalRdrOcc (LRE { lre_env = env }) occ = lookupOccEnv env occ
+
+lookupLocalRdrUnifiedOcc :: LocalRdrEnv -> OccName -> Maybe Name
+lookupLocalRdrUnifiedOcc (LRE { lre_unified_env = env }) occ = lookupUnifiedOccEnv env occ
 
 elemLocalRdrEnv :: RdrName -> LocalRdrEnv -> Bool
 elemLocalRdrEnv rdr_name (LRE { lre_env = env, lre_in_scope = ns })
