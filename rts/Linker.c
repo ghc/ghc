@@ -1023,15 +1023,14 @@ mmap_again:
        map_addr = mmap_32bit_base;
    }
 
+   const int prot = PROT_READ | PROT_WRITE | PROT_EXEC;
    IF_DEBUG(linker,
-            debugBelch("mmapForLinker: \tprotection %#0x\n",
-                       PROT_EXEC | PROT_READ | PROT_WRITE));
+            debugBelch("mmapForLinker: \tprotection %#0x\n", prot));
    IF_DEBUG(linker,
             debugBelch("mmapForLinker: \tflags      %#0x\n",
                        MAP_PRIVATE | tryMap32Bit | fixed | flags));
 
-   result = mmap(map_addr, size,
-                 PROT_EXEC|PROT_READ|PROT_WRITE,
+   result = mmap(map_addr, size, prot,
                  MAP_PRIVATE|tryMap32Bit|fixed|flags, fd, offset);
 
    if (result == MAP_FAILED) {
