@@ -124,11 +124,13 @@ struct m32_alloc_t {
  * number of pages can be configured with M32_MAX_PAGES.
  */
 typedef struct m32_allocator_t {
+   bool executable;
    struct m32_alloc_t pages[M32_MAX_PAGES];
 } m32_allocator;
 
 // We use a global memory allocator
-static struct m32_allocator_t alloc;
+static struct m32_allocator_t m32_rw_alloc;
+static struct m32_allocator_t m32_rx_alloc;
 
 /**
  * Wrapper for `unmap` that handles error cases.
@@ -138,6 +140,10 @@ static struct m32_allocator_t alloc;
 static void
 munmapForLinker (void * addr, size_t size)
 {
+   IF_DEBUG(linker,
+            debugBelch("m32_alloc: Unmapping %" FMT_Word " bytes at %p\n",
+                       size, addr));
+
    int r = munmap(addr,size);
    if (r == -1) {
       // Should we abort here?
@@ -150,10 +156,10 @@ munmapForLinker (void * addr, size_t size)
  * This is the real implementation. There is another dummy implementation below.
  * See the note titled "Compile Time Trickery" at the top of this file.
  */
-void
-m32_allocator_init(void)
+static void
+m32_allocator_init(struct m32_allocator_t *alloc)
 {
-   memset(&alloc, 0, sizeof(struct m32_allocator_t));
+   memset(alloc, 0, sizeof(struct m32_allocator_t));
    // Preallocate the initial M32_MAX_PAGES to ensure that they don't
    // fragment the memory.
    size_t pgsz = getPageSize();
@@ -163,10 +169,17 @@ m32_allocator_init(void)
 
    int i;
    for (i=0; i<M32_MAX_PAGES; i++) {
-      alloc.pages[i].base_addr = bigchunk + i*pgsz;
-      *((uintptr_t*)alloc.pages[i].base_addr) = 1;
-      alloc.pages[i].current_size = M32_REFCOUNT_BYTES;
+      alloc->pages[i].base_addr = bigchunk + i*pgsz;
+      *((uintptr_t*)alloc->pages[i].base_addr) = 1;
+      alloc->pages[i].current_size = M32_REFCOUNT_BYTES;
    }
+}
+
+void
+m32_init(void)
+{
+    m32_allocator_init(&m32_rx_alloc);
+    m32_allocator_init(&m32_rw_alloc);
 }
 
 /**
@@ -175,11 +188,28 @@ m32_allocator_init(void)
  *
  * You shouldn't have to use this method. Use `m32_free` instead.
  */
-static void
+static bool
 m32_free_internal(void * addr) {
    uintptr_t c = __sync_sub_and_fetch((uintptr_t*)addr, 1);
    if (c == 0) {
       munmapForLinker(addr, getPageSize());
+      return true;
+   }
+   return false;
+}
+
+static void
+m32_allocator_flush(struct m32_allocator_t *alloc) {
+   int i;
+   for (i=0; i<M32_MAX_PAGES; i++) {
+      void * addr =  __sync_fetch_and_and(&alloc->pages[i].base_addr, 0x0);
+      if (addr != 0) {
+         bool freed = m32_free_internal(addr);
+         if (!freed && alloc == &m32_rx_alloc) {
+             debugBelch("flushing %p\n", addr);
+             mmapForLinkerMarkExecutable(addr, getPageSize());
+         }
+      }
    }
 }
 
@@ -193,14 +223,9 @@ m32_free_internal(void * addr) {
  * See the note titled "Compile Time Trickery" at the top of this file.
  */
 void
-m32_allocator_flush(void) {
-   int i;
-   for (i=0; i<M32_MAX_PAGES; i++) {
-      void * addr =  __sync_fetch_and_and(&alloc.pages[i].base_addr, 0x0);
-      if (addr != 0) {
-         m32_free_internal(addr);
-      }
-   }
+m32_flush(void) {
+    m32_allocator_flush(&m32_rx_alloc);
+    m32_allocator_flush(&m32_rw_alloc);
 }
 
 // Return true if the object has its own dedicated set of pages
@@ -236,14 +261,8 @@ m32_free(void *addr, size_t size)
    }
 }
 
-/**
- * Allocate `size` bytes of memory with the given alignment.
- *
- * This is the real implementation. There is another dummy implementation below.
- * See the note titled "Compile Time Trickery" at the top of this file.
- */
-void *
-m32_alloc(size_t size, size_t alignment)
+static void *
+m32_allocator_alloc(struct m32_allocator_t *alloc, size_t size, size_t alignment)
 {
    size_t pgsz = getPageSize();
 
@@ -259,7 +278,7 @@ m32_alloc(size_t size, size_t alignment)
    int i;
    for (i=0; i<M32_MAX_PAGES; i++) {
       // empty page
-      if (alloc.pages[i].base_addr == 0) {
+      if (alloc->pages[i].base_addr == 0) {
          empty = empty == -1 ? i : empty;
          continue;
       }
@@ -268,21 +287,21 @@ m32_alloc(size_t size, size_t alignment)
       // few bytes left to allocate and we don't get to use or free them
       // until we use up all the "filling" pages. This will unnecessarily
       // allocate new pages and fragment the address space.
-      if (*((uintptr_t*)(alloc.pages[i].base_addr)) == 1) {
-         alloc.pages[i].current_size = M32_REFCOUNT_BYTES;
+      if (*((uintptr_t*)(alloc->pages[i].base_addr)) == 1) {
+         alloc->pages[i].current_size = M32_REFCOUNT_BYTES;
       }
       // page can contain the buffer?
-      size_t alsize = ROUND_UP(alloc.pages[i].current_size, alignment);
+      size_t alsize = ROUND_UP(alloc->pages[i].current_size, alignment);
       if (size <= pgsz - alsize) {
-         void * addr = (char*)alloc.pages[i].base_addr + alsize;
-         alloc.pages[i].current_size = alsize + size;
+         void * addr = (char*)alloc->pages[i].base_addr + alsize;
+         alloc->pages[i].current_size = alsize + size;
          // increment the counter atomically
-         __sync_fetch_and_add((uintptr_t*)alloc.pages[i].base_addr, 1);
+         __sync_fetch_and_add((uintptr_t*)alloc->pages[i].base_addr, 1);
          return addr;
       }
       // most filled?
       if (most_filled == -1
-       || alloc.pages[most_filled].current_size < alloc.pages[i].current_size)
+       || alloc->pages[most_filled].current_size < alloc->pages[i].current_size)
       {
          most_filled = i;
       }
@@ -290,9 +309,13 @@ m32_alloc(size_t size, size_t alignment)
 
    // If we haven't found an empty page, flush the most filled one
    if (empty == -1) {
-      m32_free_internal(alloc.pages[most_filled].base_addr);
-      alloc.pages[most_filled].base_addr    = 0;
-      alloc.pages[most_filled].current_size = 0;
+      bool freed = m32_free_internal(alloc->pages[most_filled].base_addr);
+      if (!freed && alloc == &m32_rx_alloc) {
+         debugBelch("finalizing %p\n", alloc->pages[most_filled].base_addr);
+         mmapForLinkerMarkExecutable(alloc->pages[most_filled].base_addr, getPageSize());
+      }
+      alloc->pages[most_filled].base_addr    = 0;
+      alloc->pages[most_filled].current_size = 0;
       empty = most_filled;
    }
 
@@ -301,14 +324,27 @@ m32_alloc(size_t size, size_t alignment)
    if (addr == NULL) {
       return NULL;
    }
-   alloc.pages[empty].base_addr    = addr;
+   alloc->pages[empty].base_addr    = addr;
    // Add M32_REFCOUNT_BYTES bytes for the counter + padding
-   alloc.pages[empty].current_size =
+   alloc->pages[empty].current_size =
        size+ROUND_UP(M32_REFCOUNT_BYTES,alignment);
    // Initialize the counter:
    // 1 for the allocator + 1 for the returned allocated memory
    *((uintptr_t*)addr)            = 2;
    return (char*)addr + ROUND_UP(M32_REFCOUNT_BYTES,alignment);
+}
+
+/**
+ * Allocate `size` bytes of memory with the given alignment.
+ *
+ * This is the real implementation. There is another dummy implementation below.
+ * See the note titled "Compile Time Trickery" at the top of this file.
+ */
+void *
+m32_alloc(size_t size, size_t alignment, bool executable)
+{
+    struct m32_allocator_t *alloc = executable ? &m32_rx_alloc : &m32_rw_alloc;
+    return m32_allocator_alloc(alloc, size, alignment);
 }
 
 #elif RTS_LINKER_USE_MMAP == 0
@@ -318,13 +354,13 @@ m32_alloc(size_t size, size_t alignment)
 // See the note titled "Compile Time Trickery" at the top of this file.
 
 void
-m32_allocator_init(void)
+m32_init(void)
 {
     barf("%s: RTS_LINKER_USE_MMAP is %d", __func__, RTS_LINKER_USE_MMAP);
 }
 
 void
-m32_allocator_flush(void)
+m32_flush(void)
 {
     barf("%s: RTS_LINKER_USE_MMAP is %d", __func__, RTS_LINKER_USE_MMAP);
 }
@@ -336,7 +372,7 @@ m32_free(void *addr STG_UNUSED, size_t size STG_UNUSED)
 }
 
 void *
-m32_alloc(size_t size STG_UNUSED, size_t alignment STG_UNUSED)
+m32_alloc(size_t size STG_UNUSED, size_t alignment STG_UNUSED, bool executable)
 {
     barf("%s: RTS_LINKER_USE_MMAP is %d", __func__, RTS_LINKER_USE_MMAP);
 }

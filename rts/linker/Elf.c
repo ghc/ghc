@@ -778,7 +778,8 @@ ocGetNames_ELF ( ObjectCode* oc )
           // (i.e. we cannot map the secions separately), or if the section
           // size is small.
           else if (!oc->imageMapped || size < getPageSize() / 3) {
-              start = m32_alloc(size, 8);
+              bool executable = kind == SECTIONKIND_CODE_OR_RODATA;
+              start = m32_alloc(size, 8, executable);
               if (start == NULL) goto fail;
               memcpy(start, oc->image + offset, size);
               alloc = SECTION_M32;
@@ -1769,6 +1770,24 @@ do_Elf_Rela_relocations ( ObjectCode* oc, char* ehdrC,
 #endif /* !aarch64_HOST_ARCH */
 
 
+static bool
+ocMprotect_Elf( ObjectCode *oc )
+{
+    for(int i=0; i < oc->n_sections; i++) {
+        Section *section = &oc->sections[i];
+        if(section->size == 0) continue;
+        switch (section->kind) {
+        case SECTIONKIND_CODE_OR_RODATA:
+            mmapForLinkerMarkExecutable(section->start, section->size);
+            break;
+        default:
+            break;
+        }
+    }
+
+    return true;
+}
+
 int
 ocResolve_ELF ( ObjectCode* oc )
 {
@@ -1855,7 +1874,7 @@ ocResolve_ELF ( ObjectCode* oc )
     ocFlushInstructionCache( oc );
 #endif
 
-    return 1;
+    return ocMprotect_Elf(oc);
 }
 
 int ocRunInit_ELF( ObjectCode *oc )

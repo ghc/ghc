@@ -617,7 +617,7 @@ fail:
     }
 
     if (RTS_LINKER_USE_MMAP)
-        m32_allocator_flush();
+        m32_flush();
 
     DEBUG_LOG("done\n");
     return retcode;

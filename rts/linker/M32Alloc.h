@@ -26,12 +26,12 @@
 #define M32_NO_RETURN    GNUC3_ATTRIBUTE(__noreturn__)
 #endif
 
-void m32_allocator_init(void) M32_NO_RETURN;
+void m32_init(void) M32_NO_RETURN;
 
-void m32_allocator_flush(void) M32_NO_RETURN;
+void m32_flush(void) M32_NO_RETURN;
 
 void m32_free(void *addr, size_t size) M32_NO_RETURN;
 
-void * m32_alloc(size_t size, size_t alignment) M32_NO_RETURN;
+void * m32_alloc(size_t size, size_t alignment, bool executable) M32_NO_RETURN;
 
 #include "EndPrivate.h"
