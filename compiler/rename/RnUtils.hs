@@ -22,7 +22,9 @@ module RnUtils (
 
         newLocalBndrRn, newLocalBndrsRn,
 
+        IsImplicitBinding(..),
         bindLocalNames, bindLocalNamesFV,
+        bindImplicitLocalNamesFV,
 
         addNameClashErrRn, extendTyVarEnvFVRn
 
@@ -42,12 +44,12 @@ import Name
 import NameSet
 import NameEnv
 import DataCon
+import DynFlags
 import SrcLoc
 import Outputable
 import Util
 import BasicTypes       ( TopLevelFlag(..) )
 import ListSetOps       ( removeDups )
-import DynFlags
 import FastString
 import Control.Monad
 import Data.List
@@ -79,21 +81,51 @@ newLocalBndrRn (dL->L loc rdr_name)
 newLocalBndrsRn :: [Located RdrName] -> RnM [Name]
 newLocalBndrsRn = mapM newLocalBndrRn
 
-bindLocalNames :: [Name] -> RnM a -> RnM a
-bindLocalNames names enclosed_scope
+-- See Note [Pun Usage]
+newtype IsImplicitBinding = ImplicitBinding Bool
+
+bindLocalNames :: IsImplicitBinding -> [Name] -> RnM a -> RnM a
+bindLocalNames (ImplicitBinding implicit) names enclosed_scope
   = do { lcl_env <- getLclEnv
+       ; unifiedNames <- filterImplicitPuns
        ; let th_level  = thLevel (tcl_th_ctxt lcl_env)
              th_bndrs' = extendNameEnvList (tcl_th_bndrs lcl_env)
                            [ (n, (NotTopLevel, th_level)) | n <- names ]
-             rdr_env'  = extendLocalRdrEnvList (tcl_rdr lcl_env) names
+             rdr_env'  =
+               extendLocalRdrUnifiedEnvList
+               (extendLocalRdrEnvList (tcl_rdr lcl_env) names)
+               unifiedNames
        ; setLclEnv (lcl_env { tcl_th_bndrs = th_bndrs'
                             , tcl_rdr      = rdr_env' })
                     enclosed_scope }
+  where
+    filterImplicitPuns = do
+      wPuns <- woptM Opt_WarnPuns
+      if wPuns && implicit
+      then filterM checkPuns names
+      else return names
+
+    -- See Note [Pun Usage]
+    checkPuns name = do
+      gbl_env <- getGlobalRdrEnv
+      case lookupGlobalRdrEnv gbl_env (flipOccName $ nameOccName name) of
+        [] -> do
+          lcl_env <- getLocalRdrEnv
+          case lookupLocalRdrUnifiedOcc lcl_env (nameOccName name) of
+            Just _ -> return False
+            _ -> return True
+        _ -> return False
+
+bindLocalNamesFV' :: IsImplicitBinding -> [Name] -> RnM (a, FreeVars) -> RnM (a, FreeVars)
+bindLocalNamesFV' implicit names enclosed_scope
+  = do  { (result, fvs) <- bindLocalNames implicit names enclosed_scope
+        ; return (result, delFVs names fvs) }
 
 bindLocalNamesFV :: [Name] -> RnM (a, FreeVars) -> RnM (a, FreeVars)
-bindLocalNamesFV names enclosed_scope
-  = do  { (result, fvs) <- bindLocalNames names enclosed_scope
-        ; return (result, delFVs names fvs) }
+bindLocalNamesFV = bindLocalNamesFV' (ImplicitBinding False)
+
+bindImplicitLocalNamesFV :: [Name] -> RnM (a, FreeVars) -> RnM (a, FreeVars)
+bindImplicitLocalNamesFV = bindLocalNamesFV' (ImplicitBinding True)
 
 -------------------------------------
 

@@ -42,7 +42,7 @@ import GHC.Hs
 import RnHsDoc          ( rnLHsDoc, rnMbLHsDoc )
 import RnEnv
 import RnUtils          ( HsDocContext(..), withHsDocContext, mapFvRn
-                        , pprHsDocContext, bindLocalNamesFV, typeAppErr
+                        , pprHsDocContext, bindLocalNamesFV, bindImplicitLocalNamesFV, typeAppErr
                         , newLocalBndrRn, checkDupRdrNames, checkShadowedRdrNames )
 import RnFixity         ( lookupFieldFixityRn, lookupFixityRn
                         , lookupTyFixityRn )
@@ -338,7 +338,7 @@ rnImplicitBndrs bind_free_tvs
        ; loc <- getSrcSpanM
        ; vars <- mapM (newLocalBndrRn . cL loc . unLoc) real_fvs
 
-       ; bindLocalNamesFV vars $
+       ; bindImplicitLocalNamesFV vars $
          thing_inside vars }
 
 {- ******************************************************
