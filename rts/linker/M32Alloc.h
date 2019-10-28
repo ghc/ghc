@@ -29,13 +29,11 @@
 struct m32_allocator_t;
 typedef struct m32_allocator_t m32_allocator;
 
-m32_allocator *m32_allocator_new(void) M32_NO_RETURN;
+m32_allocator *m32_allocator_new(bool executable) M32_NO_RETURN;
 
 void m32_allocator_free(m32_allocator *alloc) M32_NO_RETURN;
 
 void m32_allocator_flush(m32_allocator *alloc) M32_NO_RETURN;
-
-void m32_free(void *addr, size_t size) M32_NO_RETURN;
 
 void * m32_alloc(m32_allocator *alloc, size_t size, size_t alignment) M32_NO_RETURN;
 

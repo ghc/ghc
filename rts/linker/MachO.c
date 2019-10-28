@@ -2,10 +2,6 @@
 
 #if defined(darwin_HOST_OS) || defined(ios_HOST_OS)
 
-#if defined(ios_HOST_OS) && !RTS_LINKER_USE_MMAP
-#error "ios must use mmap and mprotect!"
-#endif
-
 /* for roundUpToPage */
 #include "sm/OSMem.h"
 
@@ -79,13 +75,6 @@ bool needGotSlot(MachONList * symbol);
 bool makeGot(ObjectCode * oc);
 void freeGot(ObjectCode * oc);
 #endif /* aarch64_HOST_ARCH */
-
-#if defined(ios_HOST_OS)
-/* on iOS we need to ensure we only have r+w or r+x pages hence we need to mmap
- * pages r+w and r+x mprotect them later on.
- */
-bool ocMprotect_MachO( ObjectCode *oc );
-#endif /* ios_HOST_OS */
 
 /*
  * Initialize some common data in the object code so we don't have to
@@ -1016,25 +1005,6 @@ relocateSection(ObjectCode* oc, int curSection)
 }
 #endif /* x86_64_HOST_ARCH */
 
-/* Note [mmap r+w+x]
- * ~~~~~~~~~~~~~~~~~
- *
- * iOS does not permit to mmap r+w+x, hence wo only mmap r+w, and later change
- * to r+x via mprotect.  While this could would be nice to have for all hosts
- * and not just for iOS, it entail that the rest of the linker code supports
- * that, this includes:
- *
- * - mmap and mprotect need to be available.
- * - text and data sections need to be mapped into different pages. Ideally
- *   the text and data sections would be aggregated, to prevent using a single
- *   page for every section, however tiny.
- * - the relocation code for each object file format / architecture, needs to
- *   respect the (now) non-contiguousness of the sections.
- * - with sections being mapped potentially far apart from each other, it must
- *   be made sure that the pages are reachable within the architectures
- *   addressability for relative or absolute access.
- */
-
 SectionKind
 getSectionKind_MachO(MachOSection *section)
 {
@@ -1235,107 +1205,6 @@ ocGetNames_MachO(ObjectCode* oc)
     IF_DEBUG(linker, debugBelch("ocGetNames_MachO: will load %d sections\n",
                                 oc->n_sections));
 
-#if defined(ios_HOST_OS)
-    for(int i=0; i < oc->n_sections; i++)
-    {
-        MachOSection * section = &oc->info->macho_sections[i];
-
-        IF_DEBUG(linker, debugBelch("ocGetNames_MachO: section %d\n", i));
-
-        if (section->size == 0) {
-            IF_DEBUG(linker, debugBelch("ocGetNames_MachO: found a zero length section, skipping\n"));
-            continue;
-        }
-
-        SectionKind kind = getSectionKind_MachO(section);
-
-        switch(section->flags & SECTION_TYPE) {
-            case S_ZEROFILL:
-            case S_GB_ZEROFILL: {
-                // See Note [mmap r+w+x]
-                void * mem = mmap(NULL, section->size,
-                                  PROT_READ | PROT_WRITE,
-                                  MAP_ANON | MAP_PRIVATE,
-                                  -1, 0);
-                if( mem == MAP_FAILED ) {
-                    barf("failed to mmap allocate memory for zerofill section %d of size %d. errno = %d",
-                         i, section->size, errno);
-                }
-                addSection(&secArray[i], kind, SECTION_MMAP, mem, section->size,
-                           0, mem, roundUpToPage(section->size));
-                addProddableBlock(oc, mem, (int)section->size);
-
-                secArray[i].info->nstubs = 0;
-                secArray[i].info->stub_offset = NULL;
-                secArray[i].info->stub_size = 0;
-                secArray[i].info->stubs = NULL;
-
-                secArray[i].info->macho_section = section;
-                secArray[i].info->relocation_info
-                  = (MachORelocationInfo*)(oc->image + section->reloff);
-                break;
-            }
-            default: {
-                // The secion should have a non-zero offset. As the offset is
-                // relativ to the image, and must be somewhere after the header.
-                if(section->offset == 0) barf("section with zero offset!");
-                /* on iOS, we must allocate the code in r+x sections and
-                 * the data in r+w sections, as the system does not allow
-                 * for r+w+x, we must allocate each section in a new page
-                 * range.
-                 *
-                 * copy the sections's memory to some page-aligned place via
-                 * mmap and memcpy. This will later allow us to selectively
-                 * use mprotect on pages with data (r+w) and pages text (r+x).
-                 * We initially start with r+w, so that we can modify the
-                 * pages during relocations, prior to setting it r+x.
-                 */
-
-                /* We also need space for stubs. As pages can be assigned
-                 * randomly in the addressable space, we need to keep the
-                 * stubs close to the section.  The strategy we are going
-                 * to use is to allocate them right after the section. And
-                 * we are going to be generous and allocare a stub slot
-                 * for each relocation to keep it simple.
-                 */
-                size_t n_ext_sec_sym = section->nreloc; /* number of relocations
-                                                         * for this section. Should
-                                                         * be a good upper bound
-                                                         */
-                size_t stub_space = /* eight bytes for the 64 bit address,
-                                     * and another eight bytes for the two
-                                     * instructions (ldr, br) for each relocation.
-                                     */ 16 * n_ext_sec_sym;
-                // See Note [mmap r+w+x]
-                void * mem = mmap(NULL, section->size+stub_space,
-                                  PROT_READ | PROT_WRITE,
-                                  MAP_ANON | MAP_PRIVATE,
-                                  -1, 0);
-                if( mem == MAP_FAILED ) {
-                    barf("failed to mmap allocate memory to load section %d. errno = %d", i, errno );
-                }
-                memcpy( mem, oc->image + section->offset, section->size);
-
-                addSection(&secArray[i], kind, SECTION_MMAP,
-                           mem, section->size,
-                           0, mem, roundUpToPage(section->size+stub_space));
-                addProddableBlock(oc, mem, (int)section->size);
-
-                secArray[i].info->nstubs = 0;
-                secArray[i].info->stub_offset = ((uint8_t*)mem) + section->size;
-                secArray[i].info->stub_size = stub_space;
-                secArray[i].info->stubs = NULL;
-
-                secArray[i].info->macho_section = section;
-                secArray[i].info->relocation_info
-                  = (MachORelocationInfo*)(oc->image + section->reloff);
-                break;
-            }
-        }
-    }
-#else /* !ios_HOST_OS */
-    IF_DEBUG(linker, debugBelch("ocGetNames_MachO: building segments\n"));
-
     CHECKM(ocBuildSegments_MachO(oc), "ocGetNames_MachO: failed to build segments\n");
 
     for (int seg_n = 0; seg_n < oc->n_segments; seg_n++) {
@@ -1399,7 +1268,6 @@ ocGetNames_MachO(ObjectCode* oc)
         }
 
     }
-#endif
 
     /* now, as all sections have been loaded, we can resolve the absolute
      * address of symbols defined in those sections.
@@ -1564,25 +1432,19 @@ ocGetNames_MachO(ObjectCode* oc)
     return 1;
 }
 
-#if defined(ios_HOST_OS)
-bool
-ocMprotect_MachO( ObjectCode *oc ) {
-    for(int i=0; i < oc->n_sections; i++) {
-        Section * section = &oc->sections[i];
-        if(section->size == 0) continue;
-        if(   (section->info->macho_section->flags & SECTION_ATTRIBUTES_USR)
-           == S_ATTR_PURE_INSTRUCTIONS) {
-            if( 0 != mprotect(section->start,
-                              section->size + section->info->stub_size,
-                              PROT_READ | PROT_EXEC) ) {
-                barf("mprotect failed! errno = %d", errno);
-                return false;
-            }
+static bool
+ocMprotect_MachO( ObjectCode *oc )
+{
+    for(int i=0; i < oc->n_segments; i++) {
+        Segment *segment = &oc->segments[i];
+        if(segment->size == 0) continue;
+
+        if(segment->prot == SEGMENT_PROT_RX) {
+            mmapForLinkerMarkExecutable(segment->start, segment->size);
         }
     }
     return true;
 }
-#endif
 
 int
 ocResolve_MachO(ObjectCode* oc)
@@ -1668,10 +1530,8 @@ ocResolve_MachO(ObjectCode* oc)
             return 0;
 #endif
     }
-#if defined(ios_HOST_OS)
     if(!ocMprotect_MachO ( oc ))
         return 0;
-#endif
 
     return 1;
 }
