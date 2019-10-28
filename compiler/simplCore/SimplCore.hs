@@ -743,7 +743,9 @@ simplifyPgmIO pass@(CoreDoSimplify max_iterations mode)
                 -- Loop
            do_iteration us2 (iteration_no + 1) (counts1:counts_so_far) binds2 rules1
            } }
+#if __GLASGOW_HASKELL__ <= 810
       | otherwise = panic "do_iteration"
+#endif
       where
         (us1, us2) = splitUniqSupply us
 
