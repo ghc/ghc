@@ -526,7 +526,7 @@ This too would get <Str, Used>, but this time there really isn't any
 point in w/w since the components of the pair are not used at all.
 
 So the solution is: don't aggressively collapse UProd [Used,Used] to
-Used; intead leave it as-is. In effect we are using the UseDmd to do a
+Used; instead leave it as-is. In effect we are using the UseDmd to do a
 little bit of boxity analysis.  Not very nice.
 
 Note [Used should win]
@@ -700,7 +700,7 @@ cleanEvalProdDmd n = JD { sd = HeadStr, ud = UProd (replicate n useTop) }
 {-
 ************************************************************************
 *                                                                      *
-           Demand: combining stricness and usage
+           Demand: Combining Strictness and Usage
 *                                                                      *
 ************************************************************************
 -}
