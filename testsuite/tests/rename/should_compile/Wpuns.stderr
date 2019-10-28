@@ -1,0 +1,72 @@
+
+Wpuns.hs:12:5: warning: [-Wpuns]
+    The ‘Proxy’ could be referring to:
+    
+     a data constructor bound at <no location info>.
+     a type constructor or class bound at <no location info>.
+
+Wpuns.hs:13:10: warning: [-Wpuns]
+    The ‘Proxy’ could be referring to:
+    
+     a type constructor or class bound at <no location info>.
+     a data constructor bound at <no location info>.
+
+Wpuns.hs:19:17: warning: [-Wpuns]
+    The ‘a’ could be referring to:
+    
+     a type variable bound at Wpuns.hs:18:13.
+     a variable bound at Wpuns.hs:19:6.
+
+Wpuns.hs:24:7: warning: [-Wpuns]
+    The ‘b’ could be referring to:
+    
+     a type variable bound at Wpuns.hs:24:1-12.
+     a variable bound at Wpuns.hs:22:1.
+
+Wpuns.hs:24:12: warning: [-Wpuns]
+    The ‘b’ could be referring to:
+    
+     a type variable bound at Wpuns.hs:24:1-12.
+     a variable bound at Wpuns.hs:22:1.
+
+Wpuns.hs:27:8: warning: [-Wpuns]
+    The ‘a’ could be referring to:
+    
+     a type variable bound at Wpuns.hs:27:1-18.
+     a variable bound at Wpuns.hs:16:1.
+
+Wpuns.hs:27:18: warning: [-Wpuns]
+    The ‘a’ could be referring to:
+    
+     a type variable bound at Wpuns.hs:27:1-18.
+     a variable bound at Wpuns.hs:16:1.
+
+Wpuns.hs:35:6: warning: [-Wpuns]
+    The ‘T’ could be referring to:
+    
+     a type constructor or class bound at Wpuns.hs:8:1-10.
+     a data constructor bound at Wpuns.hs:8:10.
+
+Wpuns.hs:36:5: warning: [-Wpuns]
+    The ‘T’ could be referring to:
+    
+     a data constructor bound at Wpuns.hs:8:10.
+     a type constructor or class bound at Wpuns.hs:8:1-10.
+
+Wpuns.hs:38:11: warning: [-Wpuns]
+    The ‘Just’ could be referring to:
+    
+     a type constructor or class bound at Wpuns.hs:9:1-13.
+     a data constructor bound at <wired into compiler>.
+
+Wpuns.hs:43:10: warning: [-Wpuns]
+    The ‘c’ could be referring to:
+    
+     a type variable bound at Wpuns.hs:43:5-15.
+     a variable bound at Wpuns.hs:41:4.
+
+Wpuns.hs:43:15: warning: [-Wpuns]
+    The ‘c’ could be referring to:
+    
+     a type variable bound at Wpuns.hs:43:5-15.
+     a variable bound at Wpuns.hs:41:4.

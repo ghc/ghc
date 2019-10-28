@@ -923,6 +923,7 @@ data WarningFlag =
    | Opt_WarnInferredSafeImports          -- Since 8.10
    | Opt_WarnMissingSafeHaskellMode       -- Since 8.10
    | Opt_WarnDerivingDefaults
+   | Opt_WarnPuns                         -- Since 8.12
    deriving (Eq, Show, Enum)
 
 data Language = Haskell98 | Haskell2010
@@ -4108,6 +4109,7 @@ wWarningFlagsDeps = [
   flagSpec "type-defaults"               Opt_WarnTypeDefaults,
   flagSpec "typed-holes"                 Opt_WarnTypedHoles,
   flagSpec "partial-type-signatures"     Opt_WarnPartialTypeSignatures,
+  flagSpec "puns"                        Opt_WarnPuns,
   flagSpec "unrecognised-pragmas"        Opt_WarnUnrecognisedPragmas,
   flagSpec' "unsafe"                     Opt_WarnUnsafe setWarnUnsafe,
   flagSpec "unsupported-calling-conventions"

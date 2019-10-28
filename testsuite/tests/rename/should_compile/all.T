@@ -169,3 +169,5 @@ test('T15798b', normal, compile, [''])
 test('T15798c', normal, compile, [''])
 test('T16116a', normal, compile, [''])
 test('T15957', normal, compile, ['-Werror -Wredundant-record-wildcards -Wunused-record-wildcards'])
+
+test('Wpuns', normal, compile, ['-Wpuns'])
