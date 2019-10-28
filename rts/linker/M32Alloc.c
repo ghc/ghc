@@ -8,6 +8,7 @@
 
 #include "Rts.h"
 #include "sm/OSMem.h"
+#include "RtsUtils.h"
 #include "linker/M32Alloc.h"
 #include "LinkerInternals.h"
 
@@ -123,12 +124,9 @@ struct m32_alloc_t {
  * Currently an allocator is just a set of pages being filled. The maximum
  * number of pages can be configured with M32_MAX_PAGES.
  */
-typedef struct m32_allocator_t {
+struct m32_allocator_t {
    struct m32_alloc_t pages[M32_MAX_PAGES];
-} m32_allocator;
-
-// We use a global memory allocator
-static struct m32_allocator_t alloc;
+};
 
 /**
  * Wrapper for `unmap` that handles error cases.
@@ -150,23 +148,37 @@ munmapForLinker (void * addr, size_t size)
  * This is the real implementation. There is another dummy implementation below.
  * See the note titled "Compile Time Trickery" at the top of this file.
  */
-void
-m32_allocator_init(void)
+m32_allocator *
+m32_allocator_new()
 {
-   memset(&alloc, 0, sizeof(struct m32_allocator_t));
-   // Preallocate the initial M32_MAX_PAGES to ensure that they don't
-   // fragment the memory.
-   size_t pgsz = getPageSize();
-   char* bigchunk = mmapForLinker(pgsz * M32_MAX_PAGES,MAP_ANONYMOUS,-1,0);
-   if (bigchunk == NULL)
-       barf("m32_allocator_init: Failed to map");
+  m32_allocator *alloc =
+    stgMallocBytes(sizeof(m32_allocator), "m32_new_allocator");
+  memset(alloc, 0, sizeof(struct m32_allocator_t));
 
-   int i;
-   for (i=0; i<M32_MAX_PAGES; i++) {
-      alloc.pages[i].base_addr = bigchunk + i*pgsz;
-      *((uintptr_t*)alloc.pages[i].base_addr) = 1;
-      alloc.pages[i].current_size = M32_REFCOUNT_BYTES;
-   }
+  // Preallocate the initial M32_MAX_PAGES to ensure that they don't
+  // fragment the memory.
+  size_t pgsz = getPageSize();
+  char* bigchunk = mmapForLinker(pgsz * M32_MAX_PAGES,MAP_ANONYMOUS,-1,0);
+  if (bigchunk == NULL)
+      barf("m32_allocator_init: Failed to map");
+
+  int i;
+  for (i=0; i<M32_MAX_PAGES; i++) {
+     alloc->pages[i].base_addr = bigchunk + i*pgsz;
+     *((uintptr_t*)alloc->pages[i].base_addr) = 1;
+     alloc->pages[i].current_size = M32_REFCOUNT_BYTES;
+  }
+  return alloc;
+}
+
+/**
+ * Free an m32_allocator. Note that this doesn't free the pages
+ * allocated using the allocator. This must be done separately with m32_free.
+ */
+void m32_allocator_free(m32_allocator *alloc)
+{
+  m32_allocator_flush(alloc);
+  stgFree(alloc);
 }
 
 /**
@@ -193,10 +205,10 @@ m32_free_internal(void * addr) {
  * See the note titled "Compile Time Trickery" at the top of this file.
  */
 void
-m32_allocator_flush(void) {
+m32_allocator_flush(m32_allocator *alloc) {
    int i;
    for (i=0; i<M32_MAX_PAGES; i++) {
-      void * addr =  __sync_fetch_and_and(&alloc.pages[i].base_addr, 0x0);
+      void * addr =  __sync_fetch_and_and(&alloc->pages[i].base_addr, 0x0);
       if (addr != 0) {
          m32_free_internal(addr);
       }
@@ -243,7 +255,7 @@ m32_free(void *addr, size_t size)
  * See the note titled "Compile Time Trickery" at the top of this file.
  */
 void *
-m32_alloc(size_t size, size_t alignment)
+m32_alloc(struct m32_allocator_t *alloc, size_t size, size_t alignment)
 {
    size_t pgsz = getPageSize();
 
@@ -259,7 +271,7 @@ m32_alloc(size_t size, size_t alignment)
    int i;
    for (i=0; i<M32_MAX_PAGES; i++) {
       // empty page
-      if (alloc.pages[i].base_addr == 0) {
+      if (alloc->pages[i].base_addr == 0) {
          empty = empty == -1 ? i : empty;
          continue;
       }
@@ -268,21 +280,21 @@ m32_alloc(size_t size, size_t alignment)
       // few bytes left to allocate and we don't get to use or free them
       // until we use up all the "filling" pages. This will unnecessarily
       // allocate new pages and fragment the address space.
-      if (*((uintptr_t*)(alloc.pages[i].base_addr)) == 1) {
-         alloc.pages[i].current_size = M32_REFCOUNT_BYTES;
+      if (*((uintptr_t*)(alloc->pages[i].base_addr)) == 1) {
+         alloc->pages[i].current_size = M32_REFCOUNT_BYTES;
       }
       // page can contain the buffer?
-      size_t alsize = ROUND_UP(alloc.pages[i].current_size, alignment);
+      size_t alsize = ROUND_UP(alloc->pages[i].current_size, alignment);
       if (size <= pgsz - alsize) {
-         void * addr = (char*)alloc.pages[i].base_addr + alsize;
-         alloc.pages[i].current_size = alsize + size;
+         void * addr = (char*)alloc->pages[i].base_addr + alsize;
+         alloc->pages[i].current_size = alsize + size;
          // increment the counter atomically
-         __sync_fetch_and_add((uintptr_t*)alloc.pages[i].base_addr, 1);
+         __sync_fetch_and_add((uintptr_t*)alloc->pages[i].base_addr, 1);
          return addr;
       }
       // most filled?
       if (most_filled == -1
-       || alloc.pages[most_filled].current_size < alloc.pages[i].current_size)
+       || alloc->pages[most_filled].current_size < alloc->pages[i].current_size)
       {
          most_filled = i;
       }
@@ -290,9 +302,9 @@ m32_alloc(size_t size, size_t alignment)
 
    // If we haven't found an empty page, flush the most filled one
    if (empty == -1) {
-      m32_free_internal(alloc.pages[most_filled].base_addr);
-      alloc.pages[most_filled].base_addr    = 0;
-      alloc.pages[most_filled].current_size = 0;
+      m32_free_internal(alloc->pages[most_filled].base_addr);
+      alloc->pages[most_filled].base_addr    = 0;
+      alloc->pages[most_filled].current_size = 0;
       empty = most_filled;
    }
 
@@ -301,9 +313,9 @@ m32_alloc(size_t size, size_t alignment)
    if (addr == NULL) {
       return NULL;
    }
-   alloc.pages[empty].base_addr    = addr;
+   alloc->pages[empty].base_addr    = addr;
    // Add M32_REFCOUNT_BYTES bytes for the counter + padding
-   alloc.pages[empty].current_size =
+   alloc->pages[empty].current_size =
        size+ROUND_UP(M32_REFCOUNT_BYTES,alignment);
    // Initialize the counter:
    // 1 for the allocator + 1 for the returned allocated memory
@@ -317,14 +329,19 @@ m32_alloc(size_t size, size_t alignment)
 // they are, there is a bug at the call site.
 // See the note titled "Compile Time Trickery" at the top of this file.
 
-void
-m32_allocator_init(void)
+m32_allocator *
+m32_allocator_new(void)
+{
+    barf("%s: RTS_LINKER_USE_MMAP is %d", __func__, RTS_LINKER_USE_MMAP);
+}
+
+void m32_allocator_free(m32_allocator *alloc)
 {
     barf("%s: RTS_LINKER_USE_MMAP is %d", __func__, RTS_LINKER_USE_MMAP);
 }
 
 void
-m32_allocator_flush(void)
+m32_flush(void)
 {
     barf("%s: RTS_LINKER_USE_MMAP is %d", __func__, RTS_LINKER_USE_MMAP);
 }
