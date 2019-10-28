@@ -809,7 +809,7 @@ cgAlts _ _ _ _ = panic "cgAlts"
 --   * A tagged pointer to `G6` will end in `110`
 --   * A tagged pointer to `G7` or `G8` or `G9` or `G10`  will end in `111`
 --
--- We employ a mildly clever way of combining pointer and info-table
+-- For big families we employ a mildly clever way of combining pointer and info-table
 -- tagging. We use 1..MAX_PTR_TAG-1 as pointer-resident tags where
 -- the tags in the pointer and the info table are in a one-to-one
 -- relation, whereas tag MAX_PTR_TAG is used as "spill over", signifying
