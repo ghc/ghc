@@ -895,7 +895,34 @@ lookupLocalOccRn_maybe :: RdrName -> RnM (Maybe Name)
 -- Just look in the local environment
 lookupLocalOccRn_maybe rdr_name
   = do { local_env <- getLocalRdrEnv
-       ; return (lookupLocalRdrEnv local_env rdr_name) }
+       ; let m_normal = lookupLocalRdrEnv local_env rdr_name
+       ; whenWOptM Opt_WarnPuns $
+         -- See Note [Pun Usage]
+         case (m_normal, lookupLocalRdrUnifiedEnv local_env rdr_name) of
+           (Just normal, Just unified) ->
+             do { when (nameUnique normal /= nameUnique unified) $
+                    addPunsWarn rdr_name [normal, unified]
+                ; return () }
+           (Just normal, Nothing) ->
+             do { env <- getGlobalRdrEnv
+                ; case lookupGRE_RdrName (flipRdrName rdr_name) env of
+                    [] -> return ()
+                    x -> addPunsWarn rdr_name (normal : map gre_name x)
+                ; return () }
+           _ -> return ()
+       ; return m_normal }
+
+addPunsWarn :: RdrName -> [Name] -> RnM ()
+addPunsWarn name names
+  = addWarn (Reason Opt_WarnPuns) . vcat $
+  [ text "The " <> quotes (ppr name) <> text " could be referring to:"
+  , blankLine
+  ] ++ map formatName names
+  where
+    formatName n =
+      bullet <+> text "a" <+> pprNameSpace (namespace n) <+> text "bound at" <+> loc n <> text "."
+    loc n = ppr . nameSrcSpan $ n
+    namespace n = occNameSpace $ nameOccName n
 
 lookupLocalOccThLvl_maybe :: Name -> RnM (Maybe (TopLevelFlag, ThLevel))
 -- Just look in the local environment
@@ -1161,9 +1188,19 @@ lookupGreRn_helper rdr_name
   = do  { env <- getGlobalRdrEnv
         ; case lookupGRE_RdrName rdr_name env of
             []    -> return GreNotFound
-            [gre] -> do { addUsedGRE True gre
+            [gre] -> do { checkPuns [gre]
+                        ; addUsedGRE True gre
                         ; return (OneNameMatch gre) }
-            gres  -> return (MultipleNames gres) }
+            gres  -> do { checkPuns gres
+                        ; return (MultipleNames gres) } }
+  where
+    -- See Note [Pun Usage]
+    checkPuns gres = whenWOptM Opt_WarnPuns $ do
+      env <- getGlobalRdrEnv
+      case lookupGRE_RdrName (flipRdrName rdr_name) env of
+        [] -> return ()
+        gres' ->
+          addPunsWarn rdr_name (map gre_name $ gres ++ gres')
 
 lookupGreAvailRn :: RdrName -> RnM (Name, AvailInfo)
 -- Used in export lists

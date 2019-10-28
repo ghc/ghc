@@ -52,6 +52,7 @@ module OccName (
         mkDFunOcc,
         setOccNameSpace,
         demoteOccName,
+        flipOccName,
         HasOccName(..),
 
         -- ** Derived 'OccName's
@@ -85,6 +86,8 @@ module OccName (
         occEnvElts, foldOccEnv, plusOccEnv, plusOccEnv_C, extendOccEnv_C,
         extendOccEnv_Acc, filterOccEnv, delListFromOccEnv, delFromOccEnv,
         alterOccEnv, pprOccEnv,
+
+        lookupUnifiedOccEnv, extendUnifiedOccEnv, extendUnifiedOccEnvList,
 
         -- * The 'OccSet' type
         OccSet, emptyOccSet, unitOccSet, mkOccSet, extendOccSet,
@@ -213,6 +216,12 @@ demoteNameSpace VarName = Nothing
 demoteNameSpace DataName = Nothing
 demoteNameSpace TvName = Nothing
 demoteNameSpace TcClsName = Just DataName
+
+flipNameSpace :: NameSpace -> NameSpace
+flipNameSpace VarName = TvName
+flipNameSpace DataName = TcClsName
+flipNameSpace TvName = VarName
+flipNameSpace TcClsName = DataName
 
 {-
 ************************************************************************
@@ -344,6 +353,9 @@ demoteOccName (OccName space name) = do
   space' <- demoteNameSpace space
   return $ OccName space' name
 
+flipOccName :: OccName -> OccName
+flipOccName (OccName space name) = OccName (flipNameSpace space) name
+
 -- Name spaces are related if there is a chance to mean the one when one writes
 -- the other, i.e. variables <-> data constructors and type variables <-> type constructors
 nameSpacesRelated :: NameSpace -> NameSpace -> Bool
@@ -432,6 +444,130 @@ delFromOccEnv (A x) y    = A $ delFromUFM x y
 delListFromOccEnv (A x) y  = A $ delListFromUFM x y
 filterOccEnv x (A y)       = A $ filterUFM x y
 alterOccEnv fn (A y) k     = A $ alterUFM fn y k
+
+-- See Note [Pun Usage]
+newtype UnifiedOccName = MkUnifiedOccName OccName
+
+instance Uniquable UnifiedOccName where
+  getUnique (MkUnifiedOccName (OccName _ fs)) = mkUnique 'u' (uniqueOfFS fs)
+
+lookupUnifiedOccEnv :: OccEnv a -> OccName -> Maybe a
+extendUnifiedOccEnv :: OccEnv a -> OccName -> a -> OccEnv a
+extendUnifiedOccEnvList :: OccEnv a -> [(OccName, a)] -> OccEnv a
+
+lookupUnifiedOccEnv (A x) y = lookupUFM x (MkUnifiedOccName y)
+extendUnifiedOccEnv (A x) y z = A $ addToUFM x (MkUnifiedOccName y) z
+extendUnifiedOccEnvList (A x) l = A $ addListToUFM x $ mapFst MkUnifiedOccName l
+
+{-
+Note [Pun usage]
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+In Haskell we can use names that occur both in the type namespace and the data
+namespace. This is called punning. Here's an example:
+
+  data T = T
+
+  f = T
+
+In this example we have 'T' name in both the type namespace and the data
+namespace. However, the renamer handles this just fine and determines which
+namespace to use based on the context.
+
+To determine whether punning is used in the code, we ask a question: would the
+code still have the same behavior if Haskell had just one namespace that had
+both the terms and the types in it? Let's see some examples:
+
+  data T = T
+
+  f = T
+
+If Haskell had a single namespace, this code wouldn't be valid since there'd be
+a name conflict between type constructor 'T' and data constructor 'T'. Thus
+punning is used.
+
+  module A where { data A = T }
+  module B where { data T = X }
+
+  module C where
+
+  import A
+  import B
+
+  f = T
+
+In this example, if Haskell had a single namespace, this code would result in
+an error of ambiguous name occurence between A.T and B.T. Thus punning is used
+
+  a = 15
+  f :: forall a. a -> a
+
+
+In this example punning is not used, because if Haskell had a single namespace
+type variable binding of 'a' would shadow the top-level 'a'.
+
+  a = 15
+  f :: a -> a
+
+The difference in this example compared to the previous one is that here the
+type variable 'a' is bound implicitly. This difference is significant because
+the top-level 'a' is no longer shadowed if Haskell had a single namespace, and
+all of the occurences in the type signature would refer to the top level 'a'.
+Thus punning is used.
+
+  {-# LANGUAGE ScopedTypeVariables #-}
+
+  a = 15
+  f :: forall a. a -> a
+  f = \a -> (a :: a)
+
+Here if Haskell had a single namespace, the second 'a' in 'a :: a' would refer
+to the variable 'a' that is bound in the lambda instead of the type variable,
+thus punning is used.
+
+Local and global environments in GHC are separated, we have to handle them
+individually.
+
+For local environment we have an extra unified OccEnv. This unified OccEnv
+has a special look up rules: unlike regular OccEnv, it completely ignores
+the namespace of OccName on lookup. Whenever a new local variable is bound, it
+is added to both regular OccEnv and unified OccEnv (unless it is bound
+implicitly, more on that below). Whenever we need to look up a local variable,
+we look it up both normally and in unified environment. If the results of the
+two lookups differ, this means that punning is used.
+
+Implicit variables are tricky to handle. Consider these two examples:
+
+  -- example 1
+  module A where
+  a = 15
+  f :: a -> a
+  -- example 2
+  module B where
+  f :: a -> a
+  -- example 3
+  module C where
+  f a = ()
+    where
+      g :: a -> a
+      g = id
+
+As was shown before, example 1 does indeed use punning. However, example 2 does
+not use punning because 'a' becomes a free variable and is implicitly bound.
+Example 3, the same as example 1, uses punning.  To handle this situation,
+whenever we want to bind an implicit variable, we check if there's a variable
+with the same OccName, but in the opposite namespace bound globally or locally.
+If yes, then we do not add the variable to the unified OccEnv, because it
+wouldn't become a free variable if Haskell had a single namespace.
+
+For global environment we don't really have to go through so much trouble, such
+as keeping a unified version of the environment. Instead, whenever we look up a
+name in the global environment we do a lookup of the same name, but in the
+opposite namespace (it is called flipping a namespace in the code).
+For data constructors the opposite would be type constructors and vice-versa,
+for data variables the opposite would be type variables and vice-versa (see
+'flipNamespace' function).
+
+-}
 
 instance Outputable a => Outputable (OccEnv a) where
     ppr x = pprOccEnv ppr x

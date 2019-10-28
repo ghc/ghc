@@ -41,7 +41,7 @@ import GHC.Hs
 import GHC.Rename.Doc    ( rnLHsDoc, rnMbLHsDoc )
 import GHC.Rename.Env
 import GHC.Rename.Utils  ( HsDocContext(..), withHsDocContext, mapFvRn
-                         , pprHsDocContext, bindLocalNamesFV, typeAppErr
+                         , pprHsDocContext, bindLocalNamesFV, bindImplicitLocalNamesFV, typeAppErr
                          , newLocalBndrRn, checkDupRdrNames, checkShadowedRdrNames )
 import GHC.Rename.Fixity ( lookupFieldFixityRn, lookupFixityRn
                          , lookupTyFixityRn )
@@ -337,7 +337,7 @@ rnImplicitBndrs bind_free_tvs
        ; loc <- getSrcSpanM
        ; vars <- mapM (newLocalBndrRn . L loc . unLoc) real_fvs
 
-       ; bindLocalNamesFV vars $
+       ; bindImplicitLocalNamesFV vars $
          thing_inside vars }
 
 {- ******************************************************

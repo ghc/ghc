@@ -57,7 +57,7 @@ import TcHsSyn             ( hsOverLitName )
 import GHC.Rename.Env
 import GHC.Rename.Fixity
 import GHC.Rename.Utils    ( HsDocContext(..), newLocalBndrRn, bindLocalNames
-                           , warnUnusedMatches, newLocalBndrRn
+                           , IsImplicitBinding(..), warnUnusedMatches, newLocalBndrRn
                            , checkUnusedRecordWildcard
                            , checkDupNames, checkDupAndShadowedNames
                            , checkTupSize , unknownSubordinateErr )
@@ -230,7 +230,7 @@ newPatName :: NameMaker -> Located RdrName -> CpsRn Name
 newPatName (LamMk report_unused) rdr_name
   = CpsRn (\ thing_inside ->
         do { name <- newLocalBndrRn rdr_name
-           ; (res, fvs) <- bindLocalNames [name] (thing_inside name)
+           ; (res, fvs) <- bindLocalNames (ImplicitBinding False) [name] (thing_inside name)
            ; when report_unused $ warnUnusedMatches [name] fvs
            ; return (res, name `delFV` fvs) })
 
@@ -239,7 +239,7 @@ newPatName (LetMk is_top fix_env) rdr_name
         do { name <- case is_top of
                        NotTopLevel -> newLocalBndrRn rdr_name
                        TopLevel    -> newTopSrcBinder rdr_name
-           ; bindLocalNames [name] $       -- Do *not* use bindLocalNameFV here
+           ; bindLocalNames (ImplicitBinding False) [name] $       -- Do *not* use bindLocalNameFV here
                                         -- See Note [View pattern usage]
              addLocalFixities fix_env [name] $
              thing_inside name })
