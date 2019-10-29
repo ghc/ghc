@@ -278,12 +278,16 @@ ds_expr _ (HsWrap _ co_fn e)
                                  -- ds_expr (passing True), rather than dsExpr
        ; wrap' <- dsHsWrapper co_fn
        ; dflags <- getDynFlags
+
+       -- Levity polymorphism check
        ; let wrapped_e = wrap' e'
              wrapped_ty = exprType wrapped_e
-       ; env <- getLclEnv
-       ; pprTrace "ds_expr" (ppr e $$ ppr (dsl_lev_poly_check env)) $
-         when (dsl_lev_poly_check env) $
-         checkForcedEtaExpansion e wrapped_ty -- See Note [Detecting forced eta expansion]
+             check_lev_poly fun = checkLevPolyFun fun wrapped_ty
+       ; case e of
+           HsVar _ (dL->L _ var)           -> check_lev_poly var
+           HsConLikeOut _ (RealDataCon dc) -> check_lev_poly (dataConWrapId dc)
+           _                               -> return ()
+
        ; warnAboutIdentities dflags e' wrapped_ty
        ; return wrapped_e }
 
@@ -1018,17 +1022,10 @@ dsHsVar :: Bool  -- are we directly inside an HsWrap?
                  -- See Wrinkle in Note [Detecting forced eta expansion]
         -> Id -> DsM CoreExpr
 dsHsVar w var
-  | not w
-  , let bad_tys = badUseOfLevPolyPrimop var ty
-  , not (null bad_tys)
-  = do { levPolyPrimopErr var ty bad_tys
-       ; return unitExpr }  -- return something eminently safe
-
-  | otherwise
-  = return (varToCoreExpr var)   -- See Note [Desugaring vars]
-
-  where
-    ty = idType var
+  = do { when (not w) $
+         checkLevPolyFun var (idType var)
+       ; return (varToCoreExpr var)   -- See Note [Desugaring vars]
+    }
 
 dsConLike :: Bool  -- as in dsHsVar
           -> ConLike -> DsM CoreExpr
@@ -1136,33 +1133,22 @@ we're not directly in an HsWrap, reject.
 
 -}
 
--- | Takes an expression and its instantiated type. If the expression is an
+checkLevPolyFun :: Var -> Type -> DsM ()
+-- | Takes a function and its instantiated type. If the expression is an
 -- HsVar with a hasNoBinding primop and the type has levity-polymorphic arguments,
 -- issue an error. See Note [Detecting forced eta expansion]
-checkForcedEtaExpansion :: HsExpr GhcTc -> Type -> DsM ()
-checkForcedEtaExpansion expr ty
-  | Just var <- case expr of
-                  HsVar _ (dL->L _ var)           -> Just var
-                  HsConLikeOut _ (RealDataCon dc) -> Just (dataConWrapId dc)
-                  _                               -> Nothing
-  , let bad_tys = badUseOfLevPolyPrimop var ty
-  , not (null bad_tys)
-  = levPolyPrimopErr var ty bad_tys
-checkForcedEtaExpansion _ _ = return ()
-
--- | Is this a hasNoBinding Id with a levity-polymorphic type?
--- Returns the arguments that are levity polymorphic if they are bad;
--- or an empty list otherwise
 -- See Note [Detecting forced eta expansion]
-badUseOfLevPolyPrimop :: Id -> Type -> [Type]
-badUseOfLevPolyPrimop id ty
-  | hasNoBinding id
-  = filter isTypeLevPoly arg_tys
+checkLevPolyFun var ty
+  | hasNoBinding var
+  = do { env <- getLclEnv
+       ; when (dsl_lev_poly_check env && not (null bad_tys)) $
+         levPolyPrimopErr var ty bad_tys }
   | otherwise
-  = []
+  = return ()
   where
     (binders, _) = splitPiTys ty
     arg_tys      = mapMaybe binderRelevantType_maybe binders
+    bad_tys      = filter isTypeLevPoly arg_tys
 
 levPolyPrimopErr :: Id -> Type -> [Type] -> DsM ()
 levPolyPrimopErr primop ty bad_tys

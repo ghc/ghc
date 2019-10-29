@@ -604,12 +604,10 @@ pprRuntimeTrace str doc expr = do
 
 switchOffLevPolyCheck :: Bool -> [ABExport GhcTc] -> DsM a -> DsM a
 switchOffLevPolyCheck has_sig exports thing_inside
-  | pprTrace "switch" (ppr has_sig $$ ppr exports $$ ppr (map (inlinePragmaSpec . idInlinePragma . abe_poly) exports)) $
-    has_sig
+  | has_sig
   , [ABE { abe_poly = poly_id }] <- exports
   , InlSpecCompulsory <- inlinePragmaSpec (idInlinePragma poly_id)
-  = pprTrace "switch off" (ppr exports) $
-    updLclEnv (\env -> env { dsl_lev_poly_check = False }) thing_inside
+  = updLclEnv (\env -> env { dsl_lev_poly_check = False }) thing_inside
   | otherwise
   = thing_inside
 
