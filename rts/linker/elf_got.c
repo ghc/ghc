@@ -1,5 +1,6 @@
 #include "elf_got.h"
 #include <string.h>
+
 #if defined(OBJFORMAT_ELF)
 /*
  * Check if we need a global offset table slot for a

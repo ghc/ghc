@@ -1,10 +1,8 @@
 #include <stdlib.h>
 #include "elf_compat.h"
-#include "ghcplatform.h"
+#include "elf_plt_aarch64.h"
 
 #if defined(aarch64_HOST_ARCH)
-
-#include "elf_plt_aarch64.h"
 
 #if defined(OBJFORMAT_ELF)
 
