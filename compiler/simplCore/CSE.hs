@@ -15,7 +15,7 @@ import GhcPrelude
 import CoreSubst
 import Var              ( Var )
 import VarEnv           ( elemInScopeSet, mkInScopeSet )
-import Id               ( Id, idType, isDeadBinder
+import Id               ( Id, idType, isDeadBinder, idHasRules
                         , idInlineActivation, setInlineActivation
                         , zapIdOccInfo, zapIdUsageInfo, idInlinePragma
                         , isJoinId, isJoinId_maybe )
@@ -392,9 +392,15 @@ cse_bind toplevel env (in_id, in_rhs) out_id
 
 delayInlining :: TopLevelFlag -> Id -> Id
 -- Add a NOINLINE[2] if the Id doesn't have an INLNE pragma already
+-- See Note [Delay inlining after CSE]
 delayInlining top_lvl bndr
   | isTopLevel top_lvl
   , isAlwaysActive (idInlineActivation bndr)
+  , idHasRules bndr  -- Only if the Id has some RULES,
+                     -- which might otherwise get lost
+       -- These rules are probably auto-generated specialisations,
+       -- since Ids with manual rules usually have manually-inserted
+       -- delayed inlining anyway
   = bndr `setInlineActivation` activeAfterInitial
   | otherwise
   = bndr
@@ -494,13 +500,49 @@ a SPECIALISE pragma.  Then CSE kicks in and notices that the RHSs of
 Now there is terrible danger that, in an importing module, we'll inline
 'g' before we have a chance to run its specialisation!
 
-Solution: during CSE, when adding a top-level
-  g = f
-binding after a "hit" in the CSE cache, add a NOINLINE[2] activation
-to it, to ensure it's not inlined right away.
+Solution: during CSE, afer a "hit" in the CSE cache
+  * when adding a binding
+        g = f
+  * for a top-level function g
+  * and g has specialisation RULES
+add a NOINLINE[2] activation to it, to ensure it's not inlined
+right away.
 
-Why top level only?  Because for nested bindings we are already past
-phase 2 and will never return there.
+Notes:
+* Why top level only?  Because for nested bindings we are already past
+  phase 2 and will never return there.
+
+* Why "only if g has RULES"?  Because there is no point in
+  doing this if there are no RULES; and other things being
+  equal it delays optimisation to delay inlining (#17409)
+
+
+---- Historical note ---
+
+This patch is simpler and more direct than an earlier
+version:
+
+  commit 2110738b280543698407924a16ac92b6d804dc36
+  Author: Simon Peyton Jones <simonpj@microsoft.com>
+  Date:   Mon Jul 30 13:43:56 2018 +0100
+
+  Don't inline functions with RULES too early
+
+We had to revert this patch because it made GHC itself slower.
+
+Why? It delayed inlining of /all/ functions with RULES, and that was
+very bad in TcFlatten.flatten_ty_con_app
+
+* It delayed inlining of liftM
+* That delayed the unravelling of the recursion in some dictionary
+  bindings.
+* That delayed some eta expansion, leaving
+     flatten_ty_con_app = \x y. let <stuff> in \z. blah
+* That allowed the float-out pass to put sguff between
+  the \y and \z.
+* And that permanently stopped eta expasion of the function,
+  even once <stuff> was simplified.
+
 -}
 
 tryForCSE :: CSEnv -> InExpr -> OutExpr
