@@ -213,6 +213,12 @@ typedef struct _MISC_FLAGS {
     bool generate_dump_file;
     bool generate_stack_trace;
     bool machineReadable;
+    bool disableDelayedOsMemoryReturn; /* See Note [MADV_FREE and MADV_DONTNEED].
+                                          It's in `MiscFlags` instead of
+                                          `GcFlags` because if GHC used madvise()
+                                          memory management for non-GC related
+                                          tasks in the future, we'd respect it
+                                          there as well. */
     bool internalCounters;       /* See Note [Internal Counter Stats] */
     bool linkerAlwaysPic;        /* Assume the object code is always PIC */
     StgWord linkerMemBase;       /* address to ask the OS for memory
