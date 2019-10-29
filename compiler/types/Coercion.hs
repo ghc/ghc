@@ -352,11 +352,19 @@ Notes:
 -}
 
 decomposePiCos :: HasDebugCallStack
-               => CoercionN -> Pair Type  -- Coercion and its kind
-               -> [Type]
+               => Kind        -- k1
+               -> CoercionN   -- co
+               -> Kind        -- k2
+               -> [Type]      -- t1 .. tn
                -> ([CoercionN], CoercionN)
+-- We have ((ty :: k1) |> (co :: kx ~ k2)) t1 .. tn
+--   and k1, k2 are the two kinds above
+-- NB: usually k1=kx, but perhaps not during type inference
+--     See Note [The Purely Kinded Type Invariant (PKTI)] in TcHsType
+--
+-- We don't pass in 'ty' at all
 -- See Note [Pushing a coercion into a pi-type]
-decomposePiCos orig_co (Pair orig_k1 orig_k2) orig_args
+decomposePiCos orig_k1 orig_co orig_k2 orig_args
   = go [] (orig_subst,orig_k1) orig_co (orig_subst,orig_k2) orig_args
   where
     orig_subst = mkEmptyTCvSubst $ mkInScopeSet $
@@ -2876,9 +2884,9 @@ simplifyArgsWorker orig_ki_binders orig_inner_ki orig_fvs
       -- See Note [Last case in simplifyArgsWorker]
     go acc_xis acc_cos lc [] inner_ki roles args
       = let co1 = liftCoSubst Nominal lc inner_ki
-            co1_kind              = coercionKind co1
+            Pair flattened_kind orig_kind = coercionKind co1
             unflattened_tys       = map (coercionRKind . snd) args
-            (arg_cos, res_co)     = decomposePiCos co1 co1_kind unflattened_tys
+            (arg_cos, res_co)     = decomposePiCos flattened_kind co1 orig_kind unflattened_tys
             casted_args           = ASSERT2( equalLength args arg_cos
                                            , ppr args $$ ppr arg_cos )
                                     [ (casted_xi, casted_co)
@@ -2892,7 +2900,6 @@ simplifyArgsWorker orig_ki_binders orig_inner_ki orig_fvs
                -- ... -> k, that k will be substituted to perhaps reveal more
                -- binders.
             zapped_lc             = zapLiftingContext lc
-            Pair flattened_kind _ = co1_kind
             (bndrs, new_inner)    = splitPiTys flattened_kind
 
             (xis_out, cos_out, res_co_out)

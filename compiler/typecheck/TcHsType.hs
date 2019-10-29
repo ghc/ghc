@@ -1098,7 +1098,7 @@ tcInferApps_nosat mode orig_hs_ty fun orig_hs_args
         Named (Bndr _ Inferred) -> instantiate ki_binder inner_ki
         Anon InvisArg _         -> instantiate ki_binder inner_ki
 
-        Named (Bndr _ Specified) ->  -- Visible kind application
+        Named (Bndr tv Specified) ->  -- Visible kind application
           do { traceTc "tcInferApps (vis kind app)"
                        (vcat [ ppr ki_binder, ppr hs_ki_arg
                              , ppr (tyBinderType ki_binder)
@@ -1114,7 +1114,9 @@ tcInferApps_nosat mode orig_hs_ty fun orig_hs_args
                          tc_lhs_type (kindLevel mode) hs_ki_arg exp_kind
 
              ; traceTc "tcInferApps (vis kind app)" (ppr exp_kind)
-             ; (subst', fun') <- mkAppTyM subst fun ki_binder ki_arg
+
+             ; let subst' = extendTvSubstAndInScope subst tv ki_arg
+                   fun'   = mk_app_ty fun ki_arg
              ; go (n+1) fun' subst' inner_ki hs_args }
 
         -- Attempted visible kind application (fun @ki), but fun_ki is
@@ -1144,7 +1146,8 @@ tcInferApps_nosat mode orig_hs_ty fun orig_hs_args
                 ; arg' <- addErrCtxt (funAppCtxt orig_hs_ty arg n) $
                           tc_lhs_type mode arg exp_kind
                 ; traceTc "tcInferApps (vis normal app) 2" (ppr exp_kind)
-                ; (subst', fun') <- mkAppTyM subst fun ki_binder arg'
+                ; let subst' = extendTvSubstBinderAndInScope subst ki_binder arg'
+                      fun'   = mk_app_ty fun arg'
                 ; go (n+1) fun' subst' inner_ki args }
 
           -- no binder; try applying the substitution, or infer another arrow in fun kind
@@ -1170,9 +1173,6 @@ tcInferApps_nosat mode orig_hs_ty fun orig_hs_args
                          (vcat [ ppr ki_binder, ppr subst])
                ; (subst', arg') <- tcInstInvisibleTyBinder subst ki_binder
                ; go n (mkAppTy fun arg') subst' inner_ki all_args }
-                 -- Because tcInvisibleTyBinder instantiate ki_binder,
-                 -- the kind of arg' will have the same shape as the kind
-                 -- of ki_binder.  So we don't need mkAppTyM here.
 
         try_again_after_substing_or fallthrough
           | not (isEmptyTCvSubst subst)
@@ -1194,64 +1194,14 @@ tcInferApps_nosat mode orig_hs_ty fun orig_hs_args
       = failWith $ text "Cannot apply function of kind" <+> quotes (ppr ty)
                 $$ text "to visible kind argument" <+> quotes (ppr arg)
 
-
-mkAppTyM :: TCvSubst
-         -> TcType -> TyCoBinder    -- fun, plus its top-level binder
-         -> TcType                  -- arg
-         -> TcM (TCvSubst, TcType)  -- Extended subst, plus (fun arg)
--- Precondition: the application (fun arg) is well-kinded after zonking
---               That is, the application makes sense
---
--- Precondition: for (mkAppTyM subst fun bndr arg)
---       tcTypeKind fun  =  Pi bndr. body
---  That is, fun always has a ForAllTy or FunTy at the top
---           and 'bndr' is fun's pi-binder
---
--- Postcondition: if fun and arg satisfy (PKTI), the purely-kinded type
---                invariant, then so does the result type (fun arg)
---
--- We do not require that
---    tcTypeKind arg = tyVarKind (binderVar bndr)
--- This must be true after zonking (precondition 1), but it's not
--- required for the (PKTI).
-mkAppTyM subst fun ki_binder arg
-  | -- See Note [mkAppTyM]: Nasty case 2
-    TyConApp tc args <- fun
-  , isTypeSynonymTyCon tc
-  , args `lengthIs` (tyConArity tc - 1)
-  , any isTrickyTvBinder (tyConTyVars tc) -- We could cache this in the synonym
-  = do { arg'  <- zonkTcType  arg
-       ; args' <- zonkTcTypes args
-       ; let subst' = case ki_binder of
-                        Anon {}           -> subst
-                        Named (Bndr tv _) -> extendTvSubstAndInScope subst tv arg'
-       ; return (subst', mkTyConApp tc (args' ++ [arg'])) }
-
-
-mkAppTyM subst fun (Anon {}) arg
-   = return (subst, mk_app_ty fun arg)
-
-mkAppTyM subst fun (Named (Bndr tv _)) arg
-  = do { arg' <- if isTrickyTvBinder tv
-                 then -- See Note [mkAppTyM]: Nasty case 1
-                      zonkTcType arg
-                 else return     arg
-       ; return ( extendTvSubstAndInScope subst tv arg'
-                , mk_app_ty fun arg' ) }
-
 mk_app_ty :: TcType -> TcType -> TcType
 -- This function just adds an ASSERT for mkAppTyM's precondition
 mk_app_ty fun arg
   = ASSERT2( isPiTy fun_kind
-           ,  ppr fun <+> dcolon <+> ppr fun_kind $$ ppr arg )
+           , ppr fun <+> dcolon <+> ppr fun_kind $$ ppr arg )
     mkAppTy fun arg
   where
     fun_kind = tcTypeKind fun
-
-isTrickyTvBinder :: TcTyVar -> Bool
--- NB: isTrickyTvBinder is just an optimisation
--- It would be absolutely sound to return True always
-isTrickyTvBinder tv = isPiTy (tyVarKind tv)
 
 {- Note [The Purely Kinded Type Invariant (PKTI)]
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
@@ -1274,48 +1224,28 @@ For example, suppose
     kappa is a unification variable
     We have already unified kappa := Type
       yielding    co :: Refl (Type -> Type)
-    a :: kappa
+    We have a type variable  a :: kappa
 then consider the type
     (a Int)
 If we call tcTypeKind on that, we'll crash, because the (un-zonked)
-kind of 'a' is just kappa, not an arrow kind.  So we must zonk first.
+kind of 'a' is just kappa, not an arrow kind.  So we instead use
+    ((a |> co) Int)
 
-So the type inference engine is very careful when building applications.
-This happens in tcInferApps. Suppose we are kind-checking the type (a Int),
-where (a :: kappa).  Then in tcInferApps we'll run out of binders on
-a's kind, so we'll call matchExpectedFunKind, and unify
-   kappa := kappa1 -> kappa2,  with evidence co :: kappa ~ (kappa1 ~ kappa2)
-At this point we must zonk the function type to expose the arrrow, so
-that (a Int) will satisfy (PKTI).
+For this reason, mkCastTy is very careful about discarding reflexive
+coercions.   Suppose we have
+    (mkCastTy ty co)
+and
+    ty :: k1
+    co :: k2 ~ k3
+After type inference k1=k2 always. But /during/ type inference we
+might have k1 /= k2.  Specifically,
+  * zonk(k1) = zonk(k2)
+  * k2 may be more zonked than k1, but never the other way around
+
+So mkCastTy can discard the coercion when (and only when)
+   kind( ty ) = resultKind( co )
 
 The absence of this caused #14174 and #14520.
-
-The calls to mkAppTyM is the other place we are very careful.
-
-Note [mkAppTyM]
-~~~~~~~~~~~~~~~
-mkAppTyM is trying to guarantee the Purely Kinded Type Invariant
-(PKTI) for its result type (fun arg).  There are two ways it can go wrong:
-
-* Nasty case 1: forall types (polykinds/T14174a)
-    T :: forall (p :: *->*). p Int -> p Bool
-  Now kind-check (T x), where x::kappa.
-  Well, T and x both satisfy the PKTI, but
-     T x :: x Int -> x Bool
-  and (x Int) does /not/ satisfy the PKTI.
-
-* Nasty case 2: type synonyms
-    type S f a = f a
-  Even though (S ff aa) would satisfy the (PKTI) if S was a data type
-  (i.e. nasty case 1 is dealt with), it might still not satisfy (PKTI)
-  if S is a type synonym, because the /expansion/ of (S ff aa) is
-  (ff aa), and /that/ does not satisfy (PKTI).  E.g. perhaps
-  (ff :: kappa), where 'kappa' has already been unified with (*->*).
-
-  We check for nasty case 2 on the final argument of a type synonym.
-
-Notice that in both cases the trickiness only happens if the
-bound variable has a pi-type.  Hence isTrickyTvBinder.
 -}
 
 

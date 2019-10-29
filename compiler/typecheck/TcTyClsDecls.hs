@@ -2962,7 +2962,7 @@ rejigConRes :: [KnotTied TyConBinder] -> KnotTied Type    -- Template for result
         -- the same as the parent tycon, because checkValidDataCon will do it
 -- NB: All arguments may potentially be knot-tied
 rejigConRes tmpl_bndrs res_tmpl dc_inferred_tvs dc_specified_tvs res_ty
-        -- E.g.  data T [a] b c where
+        -- E.g.  data instance T [a] b c where
         --         MkT :: forall x y z. T [(x,y)] z z
         -- The {a,b,c} are the tmpl_tvs, and the {x,y,z} are the dc_tvs
         --     (NB: unlike the H98 case, the dc_tvs are not all existential)
@@ -2994,8 +2994,8 @@ rejigConRes tmpl_bndrs res_tmpl dc_inferred_tvs dc_specified_tvs res_ty
 
         substed_eqs = map (substEqSpec arg_subst) raw_eqs
     in
-    (univ_tvs, substed_ex_tvs, substed_inferred_tvs, substed_specified_tvs,
-     substed_eqs, arg_subst)
+    ( univ_tvs, substed_ex_tvs, substed_inferred_tvs
+    , substed_specified_tvs, substed_eqs, arg_subst)
 
   | otherwise
         -- If the return type of the data constructor doesn't match the parent

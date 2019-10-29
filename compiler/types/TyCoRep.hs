@@ -545,7 +545,7 @@ Accordingly, by eliminating reflexive casts, splitTyConApp need not worry
 about outermost casts to uphold (EQ). Eliminating reflexive casts is done
 in mkCastTy.
 
-Unforunately, that's not the end of the story. Consider comparing
+Unfortunately, that's not the end of the story. Consider comparing
   (T a b c)      =?       (T a b |> (co -> <Type>)) (c |> co)
 These two types have the same kind (Type), but the left type is a TyConApp
 while the right type is not. To handle this case, we say that the right-hand
@@ -567,15 +567,27 @@ our (EQ) property.
 Lastly, in order to detect reflexive casts reliably, we must make sure not
 to have nested casts: we update (t |> co1 |> co2) to (t |> (co1 `TransCo` co2)).
 
-In sum, in order to uphold (EQ), we need the following three invariants:
+In sum, in order to uphold (EQ), we need the following four invariants:
 
-  (EQ1) No decomposable CastTy to the left of an AppTy, where a decomposable
-        cast is one that relates either a FunTy to a FunTy or a
-        ForAllTy to a ForAllTy.
-  (EQ2) No reflexive casts in CastTy.
-  (EQ3) No nested CastTys.
+  (EQ1) No ((fun_ty |> co) arg_ty)
+        where kind(fun_ty) = k1 -> k2    and resultKind(co) = k3 -> k4
+        or    kind(fun_ty) = forall a.k1 and resultKind(co) = forall a.k2
+        In these cases we can push the coercion to give
+             (fun_ty (arg_ty |> co1)) |> co2
+          where co1, co2 are gotten from co
+        Upheld by Type.mkAppTy
+
+  (EQ2) No (ty |> co) where kind(ty) = resultKind(co)
+        In this case we can discard the coercion altogether
+        Upheld by Type.mCastTy
+
+  (EQ3) No nested CastTys, (ty |> co1 |> co2)
+        In this case we can combine the coercions
+        Upheld by Type.mCastTy
+
   (EQ4) No CastTy over (ForAllTy (Bndr tyvar vis) body).
         See Note [Weird typing rule for ForAllTy] in Type.
+        Upheld by Type.mCastTy
 
 These invariants are all documented above, in the declaration for Type.
 

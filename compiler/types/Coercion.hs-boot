@@ -38,7 +38,7 @@ mkAxiomRuleCo :: CoAxiomRule -> [Coercion] -> Coercion
 isGReflCo :: Coercion -> Bool
 isReflCo :: Coercion -> Bool
 isReflexiveCo :: Coercion -> Bool
-decomposePiCos :: HasDebugCallStack => Coercion -> Pair Type -> [Type] -> ([Coercion], Coercion)
+decomposePiCos :: HasDebugCallStack => Kind -> Coercion -> Kind -> [Type] -> ([Coercion], Coercion)
 coVarKindsTypesRole :: HasDebugCallStack => CoVar -> (Kind, Kind, Type, Type, Role)
 coVarRole :: CoVar -> Role
 

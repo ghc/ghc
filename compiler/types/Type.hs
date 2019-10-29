@@ -248,7 +248,7 @@ import {-# SOURCE #-} Coercion( mkNomReflCo, mkGReflCo, mkReflCo
                               , mkKindCo, mkSubCo, mkFunCo, mkAxiomInstCo
                               , decomposePiCos, coercionKind, coercionLKind
                               , coercionRKind, coercionType
-                              , isReflexiveCo, seqCo )
+                              , seqCo )
 
 -- others
 import Util
@@ -764,13 +764,24 @@ the test in repSplitAppTy_maybe, which applies throughout, because
 the other calls to splitAppTy are in Unify, which is also used by
 the type checker (e.g. when matching type-function equations).
 
+Note [mkAppTy subtleties]
+~~~~~~~~~~~~~~~~~~~~~~~~~
+Very important: mkAppTy is responsible for upholding (EQ1) in
+Note [Respecting definitional equality] in TyCoRep.
+
+Specifically, to uphold (EQ1) we have work to do when doing
+   mkAppTy (fun_ty |>co) arg_ty
+Note, crucially, that we pass (typeKind fun_ty) to decomposePiCos
+rather than inputKind( co ); the two may differ during type inference
+See Note [The Purely Kinded Type Invariant (PKTI)] in TcHsType.
 -}
 
 -- | Applies a type to another, as in e.g. @k a@
 mkAppTy :: Type -> Type -> Type
-  -- See Note [Respecting definitional equality], invariant (EQ1).
+-- See Note [mkAppTy subtleties]
 mkAppTy (CastTy fun_ty co) arg_ty
-  | ([arg_co], res_co) <- decomposePiCos co (coercionKind co) [arg_ty]
+  | ([arg_co], res_co) <- decomposePiCos (typeKind fun_ty) co
+                                         (pSnd $ coercionKind co) [arg_ty]
   = (fun_ty `mkAppTy` (arg_ty `mkCastTy` arg_co)) `mkCastTy` res_co
 
 mkAppTy (TyConApp tc tys) ty2 = mkTyConApp tc (tys ++ [ty2])
@@ -789,16 +800,18 @@ mkAppTy ty1               ty2 = AppTy ty1 ty2
         --   (T t1), (T t1 t2), etc
 
 mkAppTys :: Type -> [Type] -> Type
-mkAppTys ty1                []   = ty1
-mkAppTys (CastTy fun_ty co) arg_tys  -- much more efficient then nested mkAppTy
-                                     -- Why do this? See (EQ1) of
-                                     -- Note [Respecting definitional equality]
-                                     -- in TyCoRep
-  = foldl' AppTy ((mkAppTys fun_ty casted_arg_tys) `mkCastTy` res_co) leftovers
+mkAppTys ty1 []   = ty1
+
+mkAppTys (CastTy fun_ty co) arg_tys
+  = -- Much more efficient then nested mkAppTy
+    -- But see Note [mkAppTy subtleties]
+    foldl' AppTy ((mkAppTys fun_ty casted_arg_tys) `mkCastTy` res_co) leftovers
   where
-    (arg_cos, res_co) = decomposePiCos co (coercionKind co) arg_tys
+    (arg_cos, res_co) = decomposePiCos (typeKind fun_ty) co
+                                       (pSnd $ coercionKind co) arg_tys
     (args_to_cast, leftovers) = splitAtList arg_cos arg_tys
     casted_arg_tys = zipWith mkCastTy args_to_cast arg_cos
+
 mkAppTys (TyConApp tc tys1) tys2 = mkTyConApp tc (tys1 ++ tys2)
 mkAppTys ty1                tys2 = foldl' AppTy ty1 tys2
 
@@ -1316,16 +1329,41 @@ splitCastTy_maybe ty | Just ty' <- coreView ty = splitCastTy_maybe ty'
 splitCastTy_maybe (CastTy ty co)               = Just (ty, co)
 splitCastTy_maybe _                            = Nothing
 
--- | Make a 'CastTy'. The Coercion must be nominal. Checks the
--- Coercion for reflexivity, dropping it if it's reflexive.
--- See Note [Respecting definitional equality] in TyCoRep
+
+{- Note [mkCastTy subtleties]
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+Super important: mkCastTy is responsible for maintaining invariants
+(EQ2-4) in Note [Respecting definitional equality] in TyCoRep.
+See also Note [mkAppTy subtleties].
+
+Specifically
+
+* EQ2: we must to a full `eqType` check her. This is important to keep
+  the splitXXX functions working properly. Otherwise we may end up
+  with something like
+      (((->) |> something_reflexive_but_not_obviously_so) biz baz)
+  which fails under splitFunTy_maybe. This happened with the cheaper check
+  in test dependent/should_compile/dynamic-paper.
+  See Note [Respecting definitional equality] in TyCoRep
+
+* EQ2: crucially, note that we do /not/ use isReflexiveCo,
+  because during type inference the kind of 'ty' may be less
+  zonked than the input kind of the coercion.  See
+   Note [The Purely Kinded Type Invariant (PKTI)] in TcHsType
+
+* EQ3 (cast of cast) is easy
+
+* EQ3 (cast of forall) is reasonably easy
+-}
+
+-- | Make a 'CastTy'. The Coercion must be nominal.
+-- Some very important subtleties here: see Note [mkCastTy]
 mkCastTy :: Type -> Coercion -> Type
-mkCastTy ty co | isReflexiveCo co = ty  -- (EQ2) from the Note
--- NB: Do the slow check here. This is important to keep the splitXXX
--- functions working properly. Otherwise, we may end up with something
--- like (((->) |> something_reflexive_but_not_obviously_so) biz baz)
--- fails under splitFunTy_maybe. This happened with the cheaper check
--- in test dependent/should_compile/dynamic-paper.
+mkCastTy ty co
+  | let co_res_kind = pSnd (coercionKind co)
+  , typeKind ty `eqType` co_res_kind     -- (EQ2) from the Note
+    -- Not isReflexiveCo!  See Note [mkCastTy subtleties]
+  = ty
 
 mkCastTy (CastTy ty co1) co2
   -- (EQ3) from the Note

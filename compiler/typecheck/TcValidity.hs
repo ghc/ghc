@@ -206,7 +206,7 @@ so we can take their type variables into account as part of the
 checkAmbiguity :: UserTypeCtxt -> Type -> TcM ()
 checkAmbiguity ctxt ty
   | wantAmbiguityCheck ctxt
-  = do { traceTc "Ambiguity check for" (ppr ty)
+  = do { traceTc "Ambiguity check for {" (ppr ty)
          -- Solve the constraints eagerly because an ambiguous type
          -- can cause a cascade of further errors.  Since the free
          -- tyvars are skolemised, we can safely use tcSimplifyTop
@@ -216,7 +216,7 @@ checkAmbiguity ctxt ty
                             tcSubType_NC ctxt ty ty
        ; simplifyAmbiguityCheck ty wanted
 
-       ; traceTc "Done ambiguity check for" (ppr ty) }
+       ; traceTc "} Done ambiguity check for" (ppr ty) }
 
   | otherwise
   = return ()
