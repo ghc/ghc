@@ -132,3 +132,5 @@ test('encodingerror001', normal, compile_and_run, [''])
 test('T4808', [exit_code(1)], compile_and_run, [''])
 test('T4895', normal, compile_and_run, [''])
 test('T7853', normal, compile_and_run, [''])
+# Tests ability to perform >32-bit IO operations
+test('T17414', [when(wordsize(32), skip), high_memory_usage], compile_and_run, [''])
