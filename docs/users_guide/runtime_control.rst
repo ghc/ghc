@@ -241,6 +241,28 @@ Miscellaneous RTS options
     crashes if exception handling are enabled. In order to get more information
     in compiled executables, C code or DLLs symbols need to be available.
 
+.. rts-flag:: --disable-delayed-os-memory-return
+
+    If given, uses ``MADV_DONTNEED`` instead of ``MADV_FREE`` on platforms where
+    this results in more accurate resident memory usage of the program as shown
+    in memory usage reporting tools (e.g. the ``RSS`` column in ``top`` and ``htop``).
+
+    Using this is expected to make the program slightly slower.
+
+    On Linux, MADV_FREE is newer and faster because it can avoid zeroing
+    pages if they are re-used by the process later (see ``man 2 madvise``),
+    but for the trade-off that memory inspection tools like ``top`` will
+    not immediately reflect the freeing in their display of resident memory
+    (RSS column): Only under memory pressure will Linux actually remove
+    the freed pages from the process and update its RSS statistics.
+    Until then, the pages show up as ``LazyFree`` in ``/proc/PID/smaps``
+    (see ``man 5 proc``).
+
+    The delayed RSS update can confuse programmers debugging memory issues,
+    production memory monitoring tools, and end users who may complain about
+    undue memory usage shown in reporting tools, so with this flag it can
+    be turned off.
+
 
 .. rts-flag:: -xp
 
