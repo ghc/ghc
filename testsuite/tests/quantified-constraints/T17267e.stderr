@@ -1,0 +1,13 @@
+
+T17267e.hs:1:1: error:
+    The IO action ‘main’ is not defined in module ‘Main’
+
+T17267e.hs:16:14: error:
+    • Reduction stack overflow; size = 201
+      When simplifying the following type: Show a
+      Use -freduction-depth=0 to disable this check
+      (any upper bound you could choose might fail unpredictably with
+       minor updates to GHC, so disabling the check is recommended if
+       you're sure that type checking should terminate)
+    • In the expression: show
+      In an equation for ‘pseudoShow’: pseudoShow = show
