@@ -789,28 +789,28 @@ cgAlts _ _ _ _ = panic "cgAlts"
 -- (i.e. 3 on 32 resp. 7 constructors on 64 bit archs).
 --
 -- For example, let's assume a 64-bit architecture, so that all
--- heap objects are 8-byte aligned,  and hence the address of a
+-- heap objects are 8-byte aligned, and hence the address of a
 -- heap object ends in `000` (three zero bits).  Then consider
 -- > data Maybe a = Nothing | Just a
+-- > data Day a = Mon | Tue | Wed | Thu | Fri | Sat | Sun
 -- > data Grade = G1 | G2 | G3 | G4 | G5 | G6 | G7 | G8 | G9 | G10
 --
 -- Since `Grade` has more than 7 constructors, it counts as a
 -- "big data type" (also referred to as "big constructor family" in papers).
--- On the other hand, `Maybe` has 7 constructors or fewer, so it is
+-- On the other hand, `Maybe` and `Day` has 7 constructors or fewer, so it is
 -- a "small data type".
 --
 -- Then
---   * A pointer to an unevaluated thunk of type `Maybe Int` or `Grade` will end in `000`
---   * A tagged pointer to a `Nothing` will end in `001`
---   * A tagged pointer to a `Just` will end in `010`
---   * A tagged pointer to `G1` will end in `001`
---   * A tagged pointer to `G2` will end in `010`
---   * A tagged pointer to `G3` will end in `011`
---   * A tagged pointer to `G6` will end in `110`
---   * A tagged pointer to `G7` or `G8` or `G9` or `G10`  will end in `111`
+--   * A pointer to an unevaluated thunk of type `Maybe Int`, `Day` or `Grade` will end in `000`
+--   * A tagged pointer to a `Nothing`, `Mon` or `G1` will end in `001`
+--   * A tagged pointer to a `Just x`, `Tue` or `G2`  will end in `010`
+--   * A tagged pointer to `Wed` or `G3` will end in `011`
+--       ...
+--   * A tagged pointer to `Sat` or `G6` will end in `110`
+--   * A tagged pointer to `Sun` or `G7` or `G8` or `G9` or `G10` will end in `111`
 --
--- For big families we employ a mildly clever way of combining pointer and info-table
--- tagging. We use 1..MAX_PTR_TAG-1 as pointer-resident tags where
+-- For big families we employ a mildly clever way of combining pointer and
+-- info-table tagging. We use 1..MAX_PTR_TAG-1 as pointer-resident tags where
 -- the tags in the pointer and the info table are in a one-to-one
 -- relation, whereas tag MAX_PTR_TAG is used as "spill over", signifying
 -- we have to fall back and get the precise constructor tag from the
