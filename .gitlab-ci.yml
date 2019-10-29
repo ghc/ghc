@@ -463,7 +463,7 @@ nightly-aarch64-linux-deb9:
   variables:
     TEST_ENV: "armv7-linux-deb9"
     BIN_DIST_PREP_TAR_COMP: "ghc-armv7-linux-deb9.tar.xz"
-    CONFIGURE_ARGS: "--host=arm-linux-gnueabihf --build=arm-linux-gnueabihf --target=arm-linux-gnueabihf"
+    CONFIGURE_ARGS: "--host=armv7-linux-gnueabihf --build=armv7-linux-gnueabihf --target=armv7-linux-gnueabihf"
   cache:
     key: linux-armv7-deb9
   tags:
