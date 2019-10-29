@@ -931,6 +931,11 @@ error = true;
                       printRtsInfo(rtsConfig);
                       stg_exit(0);
                   }
+                  else if (strequal("nonmoving-gc",
+                               &rts_argv[arg][2])) {
+                      OPTION_SAFE;
+                      RtsFlags.GcFlags.useNonmoving = true;
+                  }
 #if defined(THREADED_RTS)
                   else if (!strncmp("numa", &rts_argv[arg][2], 4)) {
                       if (!osBuiltWithNumaSupport()) {

@@ -356,7 +356,7 @@ collection. Hopefully, you won't need any of these in normal operation,
 but there are several things that can be tweaked for maximum
 performance.
 
-.. rts-flag:: -xn
+.. rts-flag:: --nonmoving-gc
 
     :default: off
     :since: 8.10.1
@@ -367,12 +367,20 @@ performance.
     Enable the concurrent mark-and-sweep garbage collector for old generation
     collectors. Typically GHC uses a stop-the-world copying garbage collector
     for all generations. This can cause long pauses in execution during major
-    garbage collections. :rts-flag:`-xn` enables the use of a concurrent
-    mark-and-sweep garbage collector for oldest generation collections.
-    Under this collection strategy oldest-generation garbage collection
-    can proceed concurrently with mutation.
+    garbage collections. :rts-flag:`--nonmoving-gc` enables the use of a
+    concurrent mark-and-sweep garbage collector for oldest generation
+    collections. Under this collection strategy oldest-generation garbage
+    collection can proceed concurrently with mutation.
 
-    Note that :rts-flag:`-xn` cannot be used with ``-G1`` nor :rts-flag:`-c`.
+    Note that :rts-flag:`--nonmoving-gc` cannot be used with ``-G1`` nor
+    :rts-flag:`-c`.
+
+.. rts-flag:: -xn
+
+    :default: off
+    :since: 8.10.1
+
+    An alias for :rts-flag:`--nonmoving-gc`
 
 .. rts-flag:: -A ⟨size⟩
 
