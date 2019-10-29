@@ -1,7 +1,3 @@
-#if defined(aarch64_HOST_ARCH)
-
-#if defined(OBJFORMAT_ELF)
-
 #include <stdlib.h>
 #include <assert.h>
 #include "elf_compat.h"
@@ -9,6 +5,10 @@
 #include "util.h"
 #include "elf_util.h"
 #include "elf_plt.h"
+
+#if defined(aarch64_HOST_ARCH)
+
+#if defined(OBJFORMAT_ELF)
 
 #define Page(x) ((x) & ~0xFFF)
 
