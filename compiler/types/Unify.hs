@@ -876,8 +876,8 @@ constraint Num (Int |> (blah ; sym blah)).  We naturally want to find
 a dictionary for that constraint, which requires dealing with
 coercions in this manner.
 
-Note [Matching in the presence of casts]
-~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+Note [Matching in the presence of casts (1)]
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 When matching, it is crucial that no variables from the template
 end up in the range of the matching substitution (obviously!).
 When unifying, that's not a constraint; instead we take the fixpoint
@@ -909,6 +909,26 @@ Note that
 
 * One better way is to ensure that type patterns (the template
   in the matching process) have no casts.  See #14119.
+
+Note [Matching in the presence of casts (2)]
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+There is another wrinkle (#17395).  Suppose (T :: forall k. k -> Type)
+and we are matching
+   tcMatchTy (T k (a::k))  (T j (b::j))
+
+Then we'll match k :-> j, as expected. But then in unify_tys
+we invoke
+   unify_tys env (a::k) (b::j) (Refl j)
+
+Although we have unified k and j, it's very important that we put
+(Refl j), /not/ (Refl k) as the fourth argument to unify_tys.
+If we put (Refl k) we'd end up with teh substitution
+  a :-> b |> Refl k
+which is bogus because one of the template variables, k,
+appears in the range of the substitution.  Eek.
+
+Similar care is needed in unify_ty_app.
+
 
 Note [Polykinded tycon applications]
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
@@ -1045,7 +1065,9 @@ unify_ty_app env ty1 ty1args ty2 ty2args
              ki2 = typeKind ty2
            -- See Note [Kind coercions in Unify]
        ; unify_ty  env ki1 ki2 (mkNomReflCo liftedTypeKind)
-       ; unify_ty  env ty1 ty2 (mkNomReflCo ki1)
+       ; unify_ty  env ty1 ty2 (mkNomReflCo ki2)
+                 -- Very important: 'ki2' not 'ki1'
+                 -- See Note [Matching in the presence of casts (2)]
        ; unify_tys env ty1args ty2args }
 
 unify_tys :: UMEnv -> [Type] -> [Type] -> UM ()
@@ -1055,7 +1077,9 @@ unify_tys env orig_xs orig_ys
     go []     []     = return ()
     go (x:xs) (y:ys)
       -- See Note [Kind coercions in Unify]
-      = do { unify_ty env x y (mkNomReflCo $ typeKind x)
+      = do { unify_ty env x y (mkNomReflCo $ typeKind y)
+                 -- Very important: 'y' not 'x'
+                 -- See Note [Matching in the presence of casts (2)]
            ; go xs ys }
     go _ _ = surelyApart
       -- Possibly different saturations of a polykinded tycon
