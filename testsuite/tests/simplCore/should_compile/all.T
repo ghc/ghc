@@ -312,3 +312,6 @@ test('T17140',
      [extra_files(['T17140a.hs'])],
      makefile_test,
      ['T17140'])
+test('T17409',
+     normal,
+     makefile_test, ['T17409'])
