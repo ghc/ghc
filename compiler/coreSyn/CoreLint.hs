@@ -672,7 +672,7 @@ lintRhs _bndr rhs = fmap lf_check_static_ptrs getLintFlags >>= go
         )
         -- imitate @lintCoreExpr (App ...)@
         (do fun_ty <- lintCoreExpr fun
-            addLoc (AnExpr rhs') $ lintCoreArgs fun_ty [Type t, info, e]
+            lintCoreArgs fun_ty [Type t, info, e]
         )
         binders0
     go _ = markAllJoinsBad $ lintCoreExpr rhs
@@ -792,8 +792,7 @@ lintCoreExpr e@(Let (Rec pairs) body)
     (_, dups) = removeDups compare bndrs
 
 lintCoreExpr e@(App _ _)
-  = addLoc (AnExpr e) $
-    do { fun_ty <- lintCoreFun fun (length args)
+  = do { fun_ty <- lintCoreFun fun (length args)
        ; lintCoreArgs fun_ty args }
   where
     (fun, args) = collectArgs e
@@ -2264,27 +2263,30 @@ checkWarnL False msg = addWarnL msg
 
 failWithL :: MsgDoc -> LintM a
 failWithL msg = LintM $ \ env (warns,errs) ->
-                (Nothing, (warns, addMsg env errs msg))
+                (Nothing, (warns, addMsg True env errs msg))
 
 addErrL :: MsgDoc -> LintM ()
 addErrL msg = LintM $ \ env (warns,errs) ->
-              (Just (), (warns, addMsg env errs msg))
+              (Just (), (warns, addMsg True env errs msg))
 
 addWarnL :: MsgDoc -> LintM ()
 addWarnL msg = LintM $ \ env (warns,errs) ->
-              (Just (), (addMsg env warns msg, errs))
+              (Just (), (addMsg False env warns msg, errs))
 
-addMsg :: LintEnv ->  Bag MsgDoc -> MsgDoc -> Bag MsgDoc
-addMsg env msgs msg
+addMsg :: Bool -> LintEnv ->  Bag MsgDoc -> MsgDoc -> Bag MsgDoc
+addMsg is_error env msgs msg
   = ASSERT( notNull loc_msgs )
     msgs `snocBag` mk_msg msg
   where
    loc_msgs :: [(SrcLoc, SDoc)]  -- Innermost first
    loc_msgs = map dumpLoc (le_loc env)
 
-   cxt_doc = vcat $ reverse $ map snd loc_msgs
-   context = cxt_doc $$ whenPprDebug extra
-   extra   = text "Substitution:" <+> ppr (le_subst env)
+   cxt_doc = vcat [ vcat $ reverse $ map snd loc_msgs
+                  , text "Substitution:" <+> ppr (le_subst env) ]
+   context | is_error  = cxt_doc
+           | otherwise = whenPprDebug cxt_doc
+     -- Print voluminous info for Lint errors
+     -- but not for warnings
 
    msg_span = case [ span | (loc,_) <- loc_msgs
                           , let span = srcLocSpan loc
