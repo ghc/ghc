@@ -602,6 +602,26 @@ void osCommitMemory(void *at, W_ size)
     }
 }
 
+/* Note [MADV_FREE and MADV_DONTNEED]
+ *
+ * madvise() provides flags with which one can release no longer needed pages
+ * back to the kernel without having to munmap() (which is expensive).
+ *
+ * On Linux, MADV_FREE is newer and faster because it can avoid zeroing
+ * pages if they are re-used by the process later (see `man 2 madvise`),
+ * but for the trade-off that memory inspection tools like `top` will
+ * not immediately reflect the freeing in their display of resident memory
+ * (RSS column): Only under memory pressure will Linux actually remove
+ * the freed pages from the process and update its RSS statistics.
+ * Until then, the pages show up as `LazyFree` in `/proc/PID/smaps`
+ * (see `man 5 proc`).
+ * The delayed RSS update can confuse programmers debugging memory issues,
+ * production memory monitoring tools, and end users who may complain about
+ * undue memory usage shown in reporting tools, so with
+ * `disableDelayedOsMemoryReturn` we provide an RTS flag that allows forcing
+ * usage of MADV_DONTNEED instead of MADV_FREE.
+ */
+
 void osDecommitMemory(void *at, W_ size)
 {
     int r;
@@ -618,21 +638,25 @@ void osDecommitMemory(void *at, W_ size)
 #endif
 
 #if defined(MADV_FREE)
-    // Try MADV_FREE first, FreeBSD has both and MADV_DONTNEED
-    // just swaps memory out. Linux >= 4.5 has both DONTNEED and FREE; either
-    // will work as they both allow the system to free anonymous pages.
-    // It is important that we try both methods as the kernel which we were
-    // built on may differ from the kernel we are now running on.
-    r = madvise(at, size, MADV_FREE);
-    if(r < 0) {
-        if (errno == EINVAL) {
-            // Perhaps the system doesn't support MADV_FREE; fall-through and
-            // try MADV_DONTNEED.
+    // See Note [MADV_FREE and MADV_DONTNEED].
+    // If MADV_FREE is disabled, fall-through to MADV_DONTNEED.
+    if (!RtsFlags.MiscFlags.disableDelayedOsMemoryReturn) {
+        // Try MADV_FREE first, FreeBSD has both and MADV_DONTNEED
+        // just swaps memory out. Linux >= 4.5 has both DONTNEED and FREE; either
+        // will work as they both allow the system to free anonymous pages.
+        // It is important that we try both methods as the kernel which we were
+        // built on may differ from the kernel we are now running on.
+        r = madvise(at, size, MADV_FREE);
+        if(r < 0) {
+            if (errno == EINVAL) {
+                // Perhaps the system doesn't support MADV_FREE; fall-through and
+                // try MADV_DONTNEED.
+            } else {
+                sysErrorBelch("unable to decommit memory");
+            }
         } else {
-            sysErrorBelch("unable to decommit memory");
+            return;
         }
-    } else {
-        return;
     }
 #endif
 

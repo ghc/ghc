@@ -138,6 +138,7 @@ data MiscFlags = MiscFlags
     , generateCrashDumpFile :: Bool
     , generateStackTrace    :: Bool
     , machineReadable       :: Bool
+    , disableDelayedOsMemoryReturn :: Bool
     , internalCounters      :: Bool
     , linkerAlwaysPic       :: Bool
     , linkerMemBase         :: Word
@@ -446,6 +447,8 @@ getMiscFlags = do
                   (#{peek MISC_FLAGS, generate_stack_trace} ptr :: IO CBool))
             <*> (toBool <$>
                   (#{peek MISC_FLAGS, machineReadable} ptr :: IO CBool))
+            <*> (toBool <$>
+                  (#{peek MISC_FLAGS, disableDelayedOsMemoryReturn} ptr :: IO CBool))
             <*> (toBool <$>
                   (#{peek MISC_FLAGS, internalCounters} ptr :: IO CBool))
             <*> (toBool <$>

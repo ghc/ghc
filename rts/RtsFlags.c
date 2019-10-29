@@ -243,6 +243,7 @@ void initRtsFlagsDefaults(void)
     RtsFlags.MiscFlags.generate_stack_trace    = true;
     RtsFlags.MiscFlags.generate_dump_file      = false;
     RtsFlags.MiscFlags.machineReadable         = false;
+    RtsFlags.MiscFlags.disableDelayedOsMemoryReturn = false;
     RtsFlags.MiscFlags.internalCounters        = false;
     RtsFlags.MiscFlags.linkerAlwaysPic         = DEFAULT_LINKER_ALWAYS_PIC;
     RtsFlags.MiscFlags.linkerMemBase           = 0;
@@ -913,6 +914,11 @@ error = true;
                                &rts_argv[arg][2])) {
                       OPTION_UNSAFE;
                       RtsFlags.MiscFlags.machineReadable = true;
+                  }
+                  else if (strequal("disable-delayed-os-memory-return",
+                               &rts_argv[arg][2])) {
+                      OPTION_UNSAFE;
+                      RtsFlags.MiscFlags.disableDelayedOsMemoryReturn = true;
                   }
                   else if (strequal("internal-counters",
                                     &rts_argv[arg][2])) {
