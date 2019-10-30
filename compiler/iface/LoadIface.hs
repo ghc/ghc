@@ -526,7 +526,7 @@ loadInterface doc_str mod from
                                                    (length new_eps_rules) }
 
         ; -- invoke plugins
-          res <- withPlugins dflags interfaceLoadAction final_iface
+          res <- withPlugins dflags (\p -> interfaceLoadAction p) final_iface
         ; return (Succeeded res)
     }}}}
 

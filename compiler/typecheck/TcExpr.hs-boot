@@ -1,7 +1,7 @@
 module TcExpr where
 import Name
 import GHC.Hs    ( HsExpr, LHsExpr, SyntaxExpr )
-import TcType   ( TcRhoType, TcSigmaType, SyntaxOpType, ExpType, ExpRhoType )
+import TcType   ( TcRhoType, TcSigmaType, SyntaxOpType, ExpType, ExpRhoType, ExpSigmaType )
 import TcRnTypes( TcM )
 import TcOrigin ( CtOrigin )
 import GHC.Hs.Extension ( GhcRn, GhcTcId )
@@ -9,6 +9,11 @@ import GHC.Hs.Extension ( GhcRn, GhcTcId )
 tcPolyExpr ::
           LHsExpr GhcRn
        -> TcSigmaType
+       -> TcM (LHsExpr GhcTcId)
+
+tcPolyExprExpected ::
+          LHsExpr GhcRn
+       -> ExpSigmaType
        -> TcM (LHsExpr GhcTcId)
 
 tcMonoExpr, tcMonoExprNC ::

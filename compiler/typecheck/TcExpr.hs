@@ -10,7 +10,7 @@
 {-# LANGUAGE FlexibleContexts #-}
 {-# LANGUAGE TypeFamilies #-}
 
-module TcExpr ( tcPolyExpr, tcMonoExpr, tcMonoExprNC,
+module TcExpr ( tcPolyExpr, tcPolyExprExpected, tcMonoExpr, tcMonoExprNC,
                 tcInferSigma, tcInferSigmaNC, tcInferRho, tcInferRhoNC,
                 tcSyntaxOp, tcSyntaxOpGen, SyntaxOpType(..), synKnownType,
                 tcCheckId,
@@ -106,8 +106,12 @@ tcPolyExpr   expr res_ty = tc_poly_expr expr (mkCheckExpType res_ty)
 tcPolyExprNC expr res_ty = tc_poly_expr_nc expr (mkCheckExpType res_ty)
 
 -- these versions take an ExpType
-tc_poly_expr, tc_poly_expr_nc :: LHsExpr GhcRn -> ExpSigmaType
-                              -> TcM (LHsExpr GhcTcId)
+tcPolyExprExpected, tc_poly_expr, tc_poly_expr_nc
+  :: LHsExpr GhcRn -> ExpSigmaType
+  -> TcM (LHsExpr GhcTcId)
+
+tcPolyExprExpected = tc_poly_expr
+
 tc_poly_expr expr res_ty
   = addExprErrCtxt expr $
     do { traceTc "tcPolyExpr" (ppr res_ty); tc_poly_expr_nc expr res_ty }
@@ -1251,7 +1255,7 @@ tcFunApp m_herald rn_fun tc_fun fun_sigma rn_args res_ty
             -- this is just like tcWrapResult, but the types don't line
             -- up to call that function
        ; wrap_res <- addFunResCtxt True (unLoc rn_fun) actual_res_ty res_ty $
-                     tcSubTypeDS_NC_O orig GenSigCtxt
+                     tcSubType_NC_O orig GenSigCtxt
                        (Just $ unLoc $ wrapHsArgs rn_fun rn_args)
                        actual_res_ty res_ty
 
@@ -2250,7 +2254,7 @@ tcTagToEnum loc fun_name args res_ty
        ; arg <- case filterOut isArgPar args of
            [HsTypeArg _ hs_ty_arg, HsValArg term_arg]
              -> do { ty_arg <- tcHsTypeApp hs_ty_arg liftedTypeKind
-                   ; _ <- tcSubTypeDS (OccurrenceOf fun_name) GenSigCtxt ty_arg res_ty
+                   ; _ <- tcSubType (OccurrenceOf fun_name) GenSigCtxt ty_arg res_ty
                      -- other than influencing res_ty, we just
                      -- don't care about a type arg passed in.
                      -- So drop the evidence.

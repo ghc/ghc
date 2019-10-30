@@ -22,8 +22,9 @@ module TcMatches ( tcMatchesFun, tcGRHS, tcGRHSsPat, tcMatchesCase, tcMatchLambd
 
 import GhcPrelude
 
-import {-# SOURCE #-}   TcExpr( tcSyntaxOp, tcInferRhoNC, tcInferRho
-                              , tcCheckId, tcMonoExpr, tcMonoExprNC, tcPolyExpr )
+import {-# SOURCE #-}   TcExpr( tcSyntaxOp, tcInferSigmaNC, tcInferSigma
+                              , tcCheckId, tcMonoExpr, tcMonoExprNC
+                              , tcPolyExpr, tcPolyExprExpected )
 
 import BasicTypes (LexicalFixity(..))
 import GHC.Hs
@@ -318,10 +319,10 @@ tcDoStmts MonadComp (L l stmts) res_ty
 
 tcDoStmts ctxt _ _ = pprPanic "tcDoStmts" (pprStmtContext ctxt)
 
-tcBody :: LHsExpr GhcRn -> ExpRhoType -> TcM (LHsExpr GhcTcId)
+tcBody :: LHsExpr GhcRn -> ExpSigmaType -> TcM (LHsExpr GhcTcId)
 tcBody body res_ty
   = do  { traceTc "tcBody" (ppr res_ty)
-        ; tcMonoExpr body res_ty
+        ; tcPolyExprExpected body res_ty
         }
 
 {-

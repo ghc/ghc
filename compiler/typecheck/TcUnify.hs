@@ -12,8 +12,9 @@ Type subsumption and unification
 module TcUnify (
   -- Full-blown subsumption
   tcWrapResult, tcWrapResultO, tcSkolemise, tcSkolemiseET,
-  tcSubTypeHR, tcSubTypeO, tcSubType_NC, tcSubTypeDS,
-  tcSubTypeDS_NC_O, tcSubTypeET,
+  tcSubType, tcSubType_NC, tcSubTypeET, tcSubType_NC_O,
+  tcSubTypeHR, tcSubTypeO,
+  -- tcSubTypeDS, tcSubTypeDS_NC_O, 
   checkConstraints, checkTvConstraints,
   buildImplicationFor, emitResidualTvConstraint,
 
@@ -213,7 +214,7 @@ matchExpectedFunTys herald ct_orig arity orig_ty thing_inside
            ; more_arg_tys <- mapM readExpType more_arg_tys
            ; res_ty       <- readExpType res_ty
            ; let unif_fun_ty = mkVisFunTys more_arg_tys res_ty
-           ; wrap <- tcSubTypeDS AppOrigin GenSigCtxt unif_fun_ty fun_ty
+           ; wrap <- tcSubType AppOrigin GenSigCtxt unif_fun_ty fun_ty
                          -- Not a good origin at all :-(
            ; return (result, wrap) }
 
@@ -550,12 +551,11 @@ skolemising the type.
 -}
 
 
--- | Call this variant when you are in a higher-rank situation and
--- you know the right-hand type is deeply skolemised.
+-- | Call this variant when you are in a higher-rank situation
 tcSubTypeHR :: CtOrigin               -- ^ of the actual type
             -> Maybe (HsExpr GhcRn)   -- ^ If present, it has type ty_actual
             -> TcSigmaType -> ExpRhoType -> TcM HsWrapper
-tcSubTypeHR orig = tcSubTypeDS_NC_O orig GenSigCtxt
+tcSubTypeHR orig = tcSubType_NC_O orig GenSigCtxt
 
 ------------------------
 tcSubTypeET :: CtOrigin -> UserTypeCtxt
@@ -593,7 +593,7 @@ tcSubTypeO orig ctxt ty_actual ty_expected
                                        , pprUserTypeCtxt ctxt
                                        , ppr ty_actual
                                        , ppr ty_expected ])
-       ; tcSubTypeDS_NC_O orig ctxt Nothing ty_actual ty_expected }
+       ; tcSubType_NC_O orig ctxt Nothing ty_actual ty_expected }
 
 addSubTypeCtxt :: TcType -> ExpType -> TcM a -> TcM a
 addSubTypeCtxt ty_actual ty_expected thing_inside
@@ -623,6 +623,12 @@ addSubTypeCtxt ty_actual ty_expected thing_inside
 -- The "_NC" variants do not add a typechecker-error context;
 -- the caller is assumed to do that
 
+tcSubType :: CtOrigin -> UserTypeCtxt -> TcSigmaType -> ExpRhoType -> TcM HsWrapper
+tcSubType orig ctxt ty_actual ty_expected
+  = addSubTypeCtxt ty_actual ty_expected $
+    do { traceTc "tcSubTypeDS_NC" (vcat [pprUserTypeCtxt ctxt, ppr ty_actual, ppr ty_expected])
+       ; tcSubType_NC_O orig ctxt Nothing ty_actual ty_expected }
+
 tcSubType_NC :: UserTypeCtxt -> TcSigmaType -> TcSigmaType -> TcM HsWrapper
 -- Checks that actual <= expected
 -- Returns HsWrapper :: actual ~ expected
@@ -635,6 +641,20 @@ tcSubType_NC ctxt ty_actual ty_expected
                           , uo_thing    = Nothing
                           , uo_visible  = True }
 
+tcSubType_NC_O :: CtOrigin   -- origin used for instantiation only
+               -> UserTypeCtxt
+               -> Maybe (HsExpr GhcRn)
+               -> TcSigmaType -> ExpRhoType -> TcM HsWrapper
+tcSubType_NC_O inst_orig ctxt m_thing ty_actual ty_expected
+  = case ty_expected of
+      Infer inf_res -> fillInferResult inst_orig ty_actual inf_res
+      Check ty      -> tc_sub_tc_type eq_orig inst_orig ctxt ty_actual ty
+         where
+           eq_orig = TypeEqOrigin { uo_actual = ty_actual, uo_expected = ty
+                                  , uo_thing  = ppr <$> m_thing
+                                  , uo_visible = True }
+
+{-
 tcSubTypeDS :: CtOrigin -> UserTypeCtxt -> TcSigmaType -> ExpRhoType -> TcM HsWrapper
 -- Just like tcSubType, but with the additional precondition that
 -- ty_expected is deeply skolemised (hence "DS")
@@ -657,6 +677,7 @@ tcSubTypeDS_NC_O inst_orig ctxt m_thing ty_actual ty_expected
            eq_orig = TypeEqOrigin { uo_actual = ty_actual, uo_expected = ty
                                   , uo_thing  = ppr <$> m_thing
                                   , uo_visible = True }
+-}
 
 ---------------
 tc_sub_tc_type :: CtOrigin   -- used when calling uType
@@ -757,9 +778,9 @@ tc_sub_type_ds eq_orig inst_orig ctxt ty_actual ty_expected
       = do { lookup_res <- lookupTcTyVar tv_a
            ; case lookup_res of
                Filled ty_a' ->
-                 do { traceTc "tcSubTypeDS_NC_O following filled act meta-tyvar:"
+                 do { traceTc "tcSubType_NC_O following filled act meta-tyvar:"
                         (ppr tv_a <+> text "-->" <+> ppr ty_a')
-                    ; tc_sub_type_ds eq_orig inst_orig ctxt ty_a' ty_e }
+                    ; tc_sub_tc_type eq_orig inst_orig ctxt ty_a' ty_e }
                Unfilled _   -> unify }
 
     -- Historical note (Sept 16): there was a case here for
@@ -790,7 +811,7 @@ tc_sub_type_ds eq_orig inst_orig ctxt ty_actual ty_expected
       = do { (in_wrap, in_rho) <- topInstantiate inst_orig ty_a
               -- quick look
            ; in_rho' <- getDynFlags >>= quick_look inst_orig in_rho ty_e
-           ; body_wrap <- tc_sub_type_ds
+           ; body_wrap <- tc_sub_tc_type
                             (eq_orig { uo_actual = in_rho'
                                      , uo_expected = ty_expected })
                             inst_orig ctxt in_rho' ty_e
@@ -955,8 +976,8 @@ tcWrapResultO :: CtOrigin -> HsExpr GhcRn -> HsExpr GhcTcId -> TcSigmaType -> Ex
 tcWrapResultO orig rn_expr expr actual_ty res_ty
   = do { traceTc "tcWrapResult" (vcat [ text "Actual:  " <+> ppr actual_ty
                                       , text "Expected:" <+> ppr res_ty ])
-       ; cow <- tcSubTypeDS_NC_O orig GenSigCtxt
-                                 (Just rn_expr) actual_ty res_ty
+       ; cow <- tcSubType_NC_O orig GenSigCtxt
+                               (Just rn_expr) actual_ty res_ty
        ; return (mkHsWrap cow expr) }
 
 

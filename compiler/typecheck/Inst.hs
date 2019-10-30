@@ -181,23 +181,35 @@ topSkolemise :: TcSigmaType
                     , TcRhoType )
 
 topSkolemise ty
-  | not (null tvs && null theta)
-  = do { -- ids1          <- newSysLocalId (fsLit "dk") rho 
-         (subst, tvs1) <- tcInstSkolTyVarsX init_subst tvs
-       ; ev_vars1      <- newEvVars (substTheta subst theta)
-       ; let tv_prs1 = map tyVarName tvs `zip` tvs1
-       ; return ( -- mkWpLams [ids1]
-                  mkWpTyLams tvs1
-                  <.> mkWpLams ev_vars1
-                  -- <.> mkWpEvVarApps [ids1]
-                , tv_prs1
-                , ev_vars1
-                , substTy subst rho ) }
-  | otherwise
-  = return (idHsWrapper, [], [], ty)
+  = go init_subst ty
   where
-    (tvs, theta, rho) = tcSplitSigmaTy ty
     init_subst = mkEmptyTCvSubst (mkInScopeSet (tyCoVarsOfType ty))
+
+    go subst ty
+      | Just ty' <- tcView ty
+      = go subst ty'
+
+    go subst ty
+      | (tvs, theta, ty') <- tcSplitSigmaTy ty
+      , not (null tvs && null theta)
+      = do { -- let arg_tys' = substTys subst arg_tys
+             -- ; ids1           <- newSysLocalIds (fsLit "dk") arg_tys'
+             (subst', tvs1) <- tcInstSkolTyVarsX subst tvs
+           ; ev_vars1       <- newEvVars (substTheta subst' theta)
+           ; (wrap, tvs_prs2, ev_vars2, rho) <- go subst' ty'
+           ; let tv_prs1 = map tyVarName tvs `zip` tvs1
+           ; return ( -- mkWpLams ids1
+                      mkWpTyLams tvs1
+                      <.> mkWpLams ev_vars1
+                      <.> wrap
+                      -- <.> mkWpEvVarApps ids1
+                    , tv_prs1  ++ tvs_prs2
+                    , ev_vars1 ++ ev_vars2
+                    , rho ) }
+
+      | otherwise
+      = return (idHsWrapper, [], [], substTy subst ty)
+        -- substTy is a quick no-op on an empty substitution
 
 -- | Instantiate all outer type variables
 -- and any context. Never looks through arrows.
