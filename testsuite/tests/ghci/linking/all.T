@@ -15,7 +15,7 @@ test('ghcilink003', [unless(doing_ghci, skip)], makefile_test, ['ghcilink003'])
 test('ghcilink004',
      [extra_files(['TestLink.hs', 'f.c']),
       unless(doing_ghci, skip),
-      when(arch('powerpc64') or arch('powerpc64le'), expect_broken(11259))],
+      unless(config.have_RTS_linker, skip)],
      makefile_test, ['ghcilink004'])
 
 test('ghcilink005',
