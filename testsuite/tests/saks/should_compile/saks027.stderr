@@ -1,4 +1,4 @@
-saks027.hs:(8,3)-(10,6): Splicing declarations
+saks027.hs:(8,2)-(10,7): Splicing declarations
     [d| type U :: Type
         
         data U = MkU |]

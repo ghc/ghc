@@ -1,4 +1,4 @@
-T15502.hs:7:19-56: Splicing expression
+T15502.hs:7:17-58: Splicing expression
     lift (toInteger (maxBound :: Int) + 1) ======> 9223372036854775808
-T15502.hs:8:19-40: Splicing expression
+T15502.hs:8:17-42: Splicing expression
     lift (minBound :: Int) ======> (-9223372036854775808)
