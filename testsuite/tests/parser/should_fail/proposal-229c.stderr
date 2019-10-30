@@ -1,4 +1,4 @@
 
-T14588.hs:3:19: error:
+proposal-229c.hs:6:3: error:
     Illegal bang-pattern (use BangPatterns):
     !x
