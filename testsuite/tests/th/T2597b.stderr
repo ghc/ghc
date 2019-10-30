@@ -1,5 +1,5 @@
 
-T2597b.hs:8:8:
-    Empty stmt list in do-block
-    When splicing a TH expression: do
-    In the untyped splice: $mkBug2
+T2597b.hs:8:9: error:
+    • Empty stmt list in do-block
+      When splicing a TH expression: do
+    • In the untyped splice: $mkBug2

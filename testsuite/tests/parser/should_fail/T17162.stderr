@@ -1,0 +1,4 @@
+
+T17162.hs:6:21: error:
+    Illegal bang-pattern (use BangPatterns):
+    !enc

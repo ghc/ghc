@@ -93,7 +93,7 @@ import Util             ( looksLikePackageName, fstOf3, sndOf3, thdOf3 )
 import GhcPrelude
 }
 
-%expect 236 -- shift/reduce conflicts
+%expect 232 -- shift/reduce conflicts
 
 {- Last updated: 04 June 2018
 
@@ -541,18 +541,18 @@ are the most common patterns, rewritten as regular expressions for clarity:
  '|'            { L _ ITvbar }
  '<-'           { L _ (ITlarrow _) }
  '->'           { L _ (ITrarrow _) }
- '@'            { L _ ITat }
- '~'            { L _ ITtilde }
+ TIGHT_INFIX_AT { L _ ITat }
  '=>'           { L _ (ITdarrow _) }
  '-'            { L _ ITminus }
- '!'            { L _ ITbang }
+ PREFIX_TILDE   { L _ ITtilde }
+ PREFIX_BANG    { L _ ITbang }
  '*'            { L _ (ITstar _) }
  '-<'           { L _ (ITlarrowtail _) }            -- for arrow notation
  '>-'           { L _ (ITrarrowtail _) }            -- for arrow notation
  '-<<'          { L _ (ITLarrowtail _) }            -- for arrow notation
  '>>-'          { L _ (ITRarrowtail _) }            -- for arrow notation
  '.'            { L _ ITdot }
- TYPEAPP        { L _ ITtypeApp }
+ PREFIX_AT      { L _ ITtypeApp }
 
  '{'            { L _ ITocurly }                        -- special symbols
  '}'            { L _ ITccurly }
@@ -610,10 +610,8 @@ are the most common patterns, rewritten as regular expressions for clarity:
 '|]'            { L _ (ITcloseQuote _) }
 '[||'           { L _ (ITopenTExpQuote _) }
 '||]'           { L _ ITcloseTExpQuote  }
-TH_ID_SPLICE    { L _ (ITidEscape _)  }     -- $x
-'$('            { L _ ITparenEscape   }     -- $( exp )
-TH_ID_TY_SPLICE { L _ (ITidTyEscape _)  }   -- $$x
-'$$('           { L _ ITparenTyEscape   }   -- $$( exp )
+PREFIX_DOLLAR   { L _ ITdollar }
+PREFIX_DOLLAR_DOLLAR { L _ ITdollardollar }
 TH_TY_QUOTE     { L _ ITtyQuote       }      -- ''T
 TH_QUASIQUOTE   { L _ (ITquasiQuote _) }
 TH_QQUASIQUOTE  { L _ (ITqQuasiQuote _) }
@@ -647,8 +645,6 @@ identifier :: { Located RdrName }
         | qconop                        { $1 }
     | '(' '->' ')'      {% ams (sLL $1 $> $ getRdrName funTyCon)
                                [mop $1,mu AnnRarrow $2,mcp $3] }
-    | '(' '~' ')'       {% ams (sLL $1 $> $ eqTyCon_RDR)
-                               [mop $1,mj AnnTilde $2,mcp $3] }
 
 -----------------------------------------------------------------------------
 -- Backpack stuff
@@ -1681,13 +1677,30 @@ rule_activation :: { ([AddAnn],Maybe Activation) }
         : {- empty -}                           { ([],Nothing) }
         | rule_explicit_activation              { (fst $1,Just (snd $1)) }
 
+-- This production is used to parse the tilde syntax in pragmas such as
+--   * {-# INLINE[~2] ... #-}
+--   * {-# SPECIALISE [~ 001] ... #-}
+--   * {-# RULES ... [~0] ... g #-}
+-- Note that it can be written either
+--   without a space [~1]  (the PREFIX_TILDE case), or
+--   with    a space [~ 1] (the VARSYM case).
+-- See Note [Whitespace-sensitive operator parsing] in Lexer.x
+rule_activation_marker :: { [AddAnn] }
+      : PREFIX_TILDE { [mj AnnTilde $1] }
+      | VARSYM  {% if (getVARSYM $1 == fsLit "~")
+                   then return [mj AnnTilde $1]
+                   else do { addError (getLoc $1) $ text "Invalid rule activation marker"
+                           ; return [] } }
+
 rule_explicit_activation :: { ([AddAnn]
                               ,Activation) }  -- In brackets
         : '[' INTEGER ']'       { ([mos $1,mj AnnVal $2,mcs $3]
                                   ,ActiveAfter  (getINTEGERs $2) (fromInteger (il_value (getINTEGER $2)))) }
-        | '[' '~' INTEGER ']'   { ([mos $1,mj AnnTilde $2,mj AnnVal $3,mcs $4]
+        | '[' rule_activation_marker INTEGER ']'
+                                { ($2++[mos $1,mj AnnVal $3,mcs $4]
                                   ,ActiveBefore (getINTEGERs $3) (fromInteger (il_value (getINTEGER $3)))) }
-        | '[' '~' ']'           { ([mos $1,mj AnnTilde $2,mcs $3]
+        | '[' rule_activation_marker ']'
+                                { ($2++[mos $1,mcs $3]
                                   ,NeverActive) }
 
 rule_foralls :: { ([AddAnn], Maybe [LHsTyVarBndr GhcPs], [LRuleBndr GhcPs]) }
@@ -2026,10 +2039,11 @@ tyapps :: { [Located TyEl] } -- NB: This list is reversed
 
 tyapp :: { Located TyEl }
         : atype                         { sL1 $1 $ TyElOpd (unLoc $1) }
-        | TYPEAPP atype                 { sLL $1 $> $ (TyElKindApp (comb2 $1 $2) $2) }
-        | qtyconop                      { sL1 $1 $ if isBangRdr (unLoc $1) then TyElBang else
-                                                   if isTildeRdr (unLoc $1) then TyElTilde else
-                                                   TyElOpr (unLoc $1) }
+
+        -- See Note [Whitespace-sensitive operator parsing] in Lexer.x
+        | PREFIX_AT atype               { sLL $1 $> $ (TyElKindApp (comb2 $1 $2) $2) }
+
+        | qtyconop                      { sL1 $1 $ TyElOpr (unLoc $1) }
         | tyvarop                       { sL1 $1 $ TyElOpr (unLoc $1) }
         | SIMPLEQUOTE qconop            {% ams (sLL $1 $> $ TyElOpr (unLoc $2))
                                                [mj AnnSimpleQuote $1,mj AnnVal $2] }
@@ -2042,6 +2056,11 @@ atype :: { LHsType GhcPs }
         | tyvar                          { sL1 $1 (HsTyVar noExtField NotPromoted $1) }      -- (See Note [Unit tuples])
         | '*'                            {% do { warnStarIsType (getLoc $1)
                                                ; return $ sL1 $1 (HsStarTy noExtField (isUnicode $1)) } }
+
+        -- See Note [Whitespace-sensitive operator parsing] in Lexer.x
+        | PREFIX_TILDE atype             {% ams (sLL $1 $> (mkBangTy SrcLazy $2)) [mj AnnTilde $1] }
+        | PREFIX_BANG  atype             {% ams (sLL $1 $> (mkBangTy SrcStrict $2)) [mj AnnBang $1] }
+
         | '{' fielddecls '}'             {% amms (checkRecordSyntax
                                                     (sLL $1 $> $ HsRecTy noExtField $2))
                                                         -- Constructor sigs only
@@ -2411,25 +2430,8 @@ docdecld :: { LDocDecl }
 decl_no_th :: { LHsDecl GhcPs }
         : sigdecl               { $1 }
 
-        | '!' aexp rhs          {% runECP_P $2 >>= \ $2 ->
-                                   do { let { e = patBuilderBang (getLoc $1) $2
-                                            ; l = comb2 $1 $> };
-                                        (ann, r) <- checkValDef SrcStrict e Nothing $3 ;
-                                        runPV $ hintBangPat (comb2 $1 $2) (unLoc e) ;
-                                        -- Depending upon what the pattern looks like we might get either
-                                        -- a FunBind or PatBind back from checkValDef. See Note
-                                        -- [FunBind vs PatBind]
-                                        case r of {
-                                          (FunBind _ n _ _ _) ->
-                                                amsL l [mj AnnFunId n] >> return () ;
-                                          (PatBind _ (dL->L l _) _rhs _) ->
-                                                amsL l [] >> return () } ;
-
-                                        _ <- amsL l (ann ++ fst (unLoc $3) ++ [mj AnnBang $1]) ;
-                                        return $! (sL l $ ValD noExtField r) } }
-
         | infixexp_top opt_sig rhs  {% runECP_P $1 >>= \ $1 ->
-                                       do { (ann,r) <- checkValDef NoSrcStrict $1 (snd $2) $3;
+                                       do { (ann,r) <- checkValDef $1 (snd $2) $3;
                                         let { l = comb2 $1 $> };
                                         -- Depending upon what the pattern looks like we might get either
                                         -- a FunBind or PatBind back from checkValDef. See Note
@@ -2551,8 +2553,8 @@ activation :: { ([AddAnn],Maybe Activation) }
 explicit_activation :: { ([AddAnn],Activation) }  -- In brackets
         : '[' INTEGER ']'       { ([mj AnnOpenS $1,mj AnnVal $2,mj AnnCloseS $3]
                                   ,ActiveAfter  (getINTEGERs $2) (fromInteger (il_value (getINTEGER $2)))) }
-        | '[' '~' INTEGER ']'   { ([mj AnnOpenS $1,mj AnnTilde $2,mj AnnVal $3
-                                                 ,mj AnnCloseS $4]
+        | '[' rule_activation_marker INTEGER ']'
+                                { ($2++[mj AnnOpenS $1,mj AnnVal $3,mj AnnCloseS $4]
                                   ,ActiveBefore (getINTEGERs $3) (fromInteger (il_value (getINTEGER $3)))) }
 
 -----------------------------------------------------------------------------
@@ -2694,11 +2696,14 @@ fexp    :: { ECP }
                                           runECP_PV $1 >>= \ $1 ->
                                           runECP_PV $2 >>= \ $2 ->
                                           mkHsAppPV (comb2 $1 $>) $1 $2 }
-        | fexp TYPEAPP atype         {% runECP_P $1 >>= \ $1 ->
+
+        -- See Note [Whitespace-sensitive operator parsing] in Lexer.x
+        | fexp PREFIX_AT atype       {% runECP_P $1 >>= \ $1 ->
                                         runPV (checkExpBlockArguments $1) >>= \_ ->
                                         fmap ecpFromExp $
                                         ams (sLL $1 $> $ HsAppType noExtField $1 (mkHsWildCardBndrs $3))
                                             [mj AnnAt $2] }
+
         | 'static' aexp              {% runECP_P $2 >>= \ $2 ->
                                         fmap ecpFromExp $
                                         ams (sLL $1 $> $ HsStatic noExtField $2)
@@ -2706,15 +2711,19 @@ fexp    :: { ECP }
         | aexp                       { $1 }
 
 aexp    :: { ECP }
-        : qvar '@' aexp         { ECP $
+        -- See Note [Whitespace-sensitive operator parsing] in Lexer.x
+        : qvar TIGHT_INFIX_AT aexp
+                                { ECP $
                                    runECP_PV $3 >>= \ $3 ->
                                    amms (mkHsAsPatPV (comb2 $1 $>) $1 $3) [mj AnnAt $2] }
-            -- If you change the parsing, make sure to understand
-            -- Note [Lexing type applications] in Lexer.x
 
-        | '~' aexp              { ECP $
+        -- See Note [Whitespace-sensitive operator parsing] in Lexer.x
+        | PREFIX_TILDE aexp     { ECP $
                                    runECP_PV $2 >>= \ $2 ->
                                    amms (mkHsLazyPatPV (comb2 $1 $>) $2) [mj AnnTilde $1] }
+        | PREFIX_BANG aexp      { ECP $
+                                   runECP_PV $2 >>= \ $2 ->
+                                   amms (mkHsBangPatPV (comb2 $1 $>) $2) [mj AnnBang $1] }
 
         | '\\' apat apats '->' exp
                    {  ECP $
@@ -2863,22 +2872,17 @@ splice_exp :: { LHsExpr GhcPs }
         | splice_typed   { mapLoc (HsSpliceE noExtField) $1 }
 
 splice_untyped :: { Located (HsSplice GhcPs) }
-        : TH_ID_SPLICE          {% ams (sL1 $1 $ mkUntypedSplice HasDollar
-                                        (sL1 $1 $ HsVar noExtField (sL1 $1 (mkUnqual varName
-                                                           (getTH_ID_SPLICE $1)))))
-                                       [mj AnnThIdSplice $1] }
-        | '$(' exp ')'          {% runECP_P $2 >>= \ $2 ->
-                                   ams (sLL $1 $> $ mkUntypedSplice HasParens $2)
-                                       [mj AnnOpenPE $1,mj AnnCloseP $3] }
+        -- See Note [Whitespace-sensitive operator parsing] in Lexer.x
+        : PREFIX_DOLLAR aexp2   {% runECP_P $2 >>= \ $2 ->
+                                   ams (sLL $1 $> $ mkUntypedSplice DollarSplice $2)
+                                       [mj AnnDollar $1] }
 
 splice_typed :: { Located (HsSplice GhcPs) }
-        : TH_ID_TY_SPLICE       {% ams (sL1 $1 $ mkTypedSplice HasDollar
-                                        (sL1 $1 $ HsVar noExtField (sL1 $1 (mkUnqual varName
-                                                        (getTH_ID_TY_SPLICE $1)))))
-                                       [mj AnnThIdTySplice $1] }
-        | '$$(' exp ')'         {% runECP_P $2 >>= \ $2 ->
-                                    ams (sLL $1 $> $ mkTypedSplice HasParens $2)
-                                       [mj AnnOpenPTE $1,mj AnnCloseP $3] }
+        -- See Note [Whitespace-sensitive operator parsing] in Lexer.x
+        : PREFIX_DOLLAR_DOLLAR aexp2
+                                {% runECP_P $2 >>= \ $2 ->
+                                   ams (sLL $1 $> $ mkTypedSplice DollarSplice $2)
+                                       [mj AnnDollarDollar $1] }
 
 cmdargs :: { [LHsCmdTop GhcPs] }
         : cmdargs acmd                  { $2 : $1 }
@@ -3194,24 +3198,14 @@ gdpat   :: { forall b. DisambECP b => PV (LGRHS GhcPs (Located b)) }
 -- we parse them right when bang-patterns are off
 pat     :: { LPat GhcPs }
 pat     :  exp          {% (checkPattern <=< runECP_P) $1 }
-        | '!' aexp      {% runECP_P $2 >>= \ $2 ->
-                           amms (checkPattern (patBuilderBang (getLoc $1) $2))
-                                [mj AnnBang $1] }
 
 bindpat :: { LPat GhcPs }
 bindpat :  exp            {% -- See Note [Parser-Validator ReaderT SDoc] in RdrHsSyn
                              checkPattern_msg (text "Possibly caused by a missing 'do'?")
                                               (runECP_PV $1) }
-        | '!' aexp        {% -- See Note [Parser-Validator ReaderT SDoc] in RdrHsSyn
-                             amms (checkPattern_msg (text "Possibly caused by a missing 'do'?")
-                                     (patBuilderBang (getLoc $1) `fmap` runECP_PV $2))
-                                  [mj AnnBang $1] }
 
 apat   :: { LPat GhcPs }
 apat    : aexp                  {% (checkPattern <=< runECP_P) $1 }
-        | '!' aexp              {% runECP_P $2 >>= \ $2 ->
-                                   amms (checkPattern (patBuilderBang (getLoc $1) $2))
-                                        [mj AnnBang $1] }
 
 apats  :: { [LPat GhcPs] }
         : apat apats            { $1 : $2 }
@@ -3473,7 +3467,6 @@ oqtycon_no_varcon :: { Located RdrName }  -- Type constructor which cannot be mi
         | '(' ':' ')'        {% let { name :: Located RdrName
                                     ; name = sL1 $2 $! consDataCon_RDR }
                                 in ams (sLL $1 $> (unLoc name)) [mop $1,mj AnnVal name,mcp $3] }
-        | '(' '~' ')'        {% ams (sLL $1 $> $ eqTyCon_RDR) [mop $1,mj AnnTilde $2,mcp $3] }
 
 {- Note [Type constructors in export list]
 ~~~~~~~~~~~~~~~~~~~~~
@@ -3519,12 +3512,14 @@ qtyconsym :: { Located RdrName }
 
 tyconsym :: { Located RdrName }
         : CONSYM                { sL1 $1 $! mkUnqual tcClsName (getCONSYM $1) }
-        | VARSYM                { sL1 $1 $! mkUnqual tcClsName (getVARSYM $1) }
+        | VARSYM                { sL1 $1 $!
+                                    -- See Note [eqTyCon (~) is built-in syntax] in TysWiredIn
+                                    if getVARSYM $1 == fsLit "~"
+                                      then eqTyCon_RDR
+                                      else mkUnqual tcClsName (getVARSYM $1) }
         | ':'                   { sL1 $1 $! consDataCon_RDR }
         | '-'                   { sL1 $1 $! mkUnqual tcClsName (fsLit "-") }
-        | '!'                   { sL1 $1 $! mkUnqual tcClsName (fsLit "!") }
         | '.'                   { sL1 $1 $! mkUnqual tcClsName (fsLit ".") }
-        | '~'                   { sL1 $1 $ eqTyCon_RDR }
 
 
 -----------------------------------------------------------------------------
@@ -3534,7 +3529,6 @@ op      :: { Located RdrName }   -- used in infix decls
         : varop                 { $1 }
         | conop                 { $1 }
         | '->'                  { sL1 $1 $ getRdrName funTyCon }
-        | '~'                   { sL1 $1 $ eqTyCon_RDR }
 
 varop   :: { Located RdrName }
         : varsym                { $1 }
@@ -3597,10 +3591,6 @@ var     :: { Located RdrName }
         | '(' varsym ')'        {% ams (sLL $1 $> (unLoc $2))
                                        [mop $1,mj AnnVal $2,mcp $3] }
 
- -- Lexing type applications depends subtly on what characters can possibly
- -- end a qvar. Currently (June 2015), only $idchars and ")" can end a qvar.
- -- If you're changing this, please see Note [Lexing type applications] in
- -- Lexer.x.
 qvar    :: { Located RdrName }
         : qvarid                { $1 }
         | '(' varsym ')'        {% ams (sLL $1 $> (unLoc $2))
@@ -3677,8 +3667,7 @@ special_id
         | 'signature'           { sL1 $1 (fsLit "signature") }
 
 special_sym :: { Located FastString }
-special_sym : '!'       {% ams (sL1 $1 (fsLit "!")) [mj AnnBang $1] }
-            | '.'       { sL1 $1 (fsLit ".") }
+special_sym : '.'       { sL1 $1 (fsLit ".") }
             | '*'       { sL1 $1 (fsLit (starSym (isUnicode $1))) }
 
 -----------------------------------------------------------------------------
@@ -3805,8 +3794,6 @@ getPRIMINTEGER  (dL->L _ (ITprimint  _ x)) = x
 getPRIMWORD     (dL->L _ (ITprimword _ x)) = x
 getPRIMFLOAT    (dL->L _ (ITprimfloat x)) = x
 getPRIMDOUBLE   (dL->L _ (ITprimdouble x)) = x
-getTH_ID_SPLICE (dL->L _ (ITidEscape x)) = x
-getTH_ID_TY_SPLICE (dL->L _ (ITidTyEscape x)) = x
 getINLINE       (dL->L _ (ITinline_prag _ inl conl)) = (inl,conl)
 getSPEC_INLINE  (dL->L _ (ITspec_inline_prag _ True))  = (Inline,  FunLike)
 getSPEC_INLINE  (dL->L _ (ITspec_inline_prag _ False)) = (NoInline,FunLike)
@@ -4015,10 +4002,6 @@ in ApiAnnotation.hs
 mj :: HasSrcSpan e => AnnKeywordId -> e -> AddAnn
 mj a l = AddAnn a (gl l)
 
-mjL :: AnnKeywordId -> SrcSpan -> AddAnn
-mjL = AddAnn
-
-
 
 -- |Construct an AddAnn from the annotation keyword and the Located Token. If
 -- the token has a unicode equivalent and this has been used, provide the
@@ -4101,12 +4084,12 @@ mcs ll = mj AnnCloseS ll
 -- |Given a list of the locations of commas, provide a [AddAnn] with an AnnComma
 --  entry for each SrcSpan
 mcommas :: [SrcSpan] -> [AddAnn]
-mcommas ss = map (mjL AnnCommaTuple) ss
+mcommas = map (AddAnn AnnCommaTuple)
 
 -- |Given a list of the locations of '|'s, provide a [AddAnn] with an AnnVbar
 --  entry for each SrcSpan
 mvbars :: [SrcSpan] -> [AddAnn]
-mvbars ss = map (mjL AnnVbar) ss
+mvbars = map (AddAnn AnnVbar)
 
 -- |Get the location of the last element of a OrdList, or noSrcSpan
 oll :: HasSrcSpan a => OrdList a -> SrcSpan
