@@ -14,7 +14,7 @@
 ((Test10268.hs:5:1-17,AnnEqual), [Test10268.hs:5:4]),
 ((Test10268.hs:5:1-17,AnnFunId), [Test10268.hs:5:1-2]),
 ((Test10268.hs:5:1-17,AnnSemi), [Test10268.hs:7:1]),
-((Test10268.hs:5:6-17,AnnThIdSplice), [Test10268.hs:5:6-17]),
+((Test10268.hs:5:6-17,AnnDollar), [Test10268.hs:5:6]),
 ((Test10268.hs:7:1-27,AnnDcolon), [Test10268.hs:7:6-7]),
 ((Test10268.hs:7:1-27,AnnSemi), [Test10268.hs:8:1]),
 ((Test10268.hs:7:9,AnnRarrow), [Test10268.hs:7:11-12]),

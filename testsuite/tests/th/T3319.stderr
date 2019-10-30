@@ -1,4 +1,4 @@
-T3319.hs:8:3-93: Splicing declarations
+T3319.hs:8:2-94: Splicing declarations
     return
       [ForeignD
          (ImportF

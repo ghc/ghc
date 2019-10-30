@@ -1,5 +1,5 @@
 
-TH_1tuple.hs:11:7: error:
+TH_1tuple.hs:11:6: error:
     • Expecting one more argument to ‘Unit’
       Expected a type, but ‘Unit’ has kind ‘* -> *’
     • In an expression type signature: Unit
