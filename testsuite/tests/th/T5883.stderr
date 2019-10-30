@@ -1,4 +1,4 @@
-T5883.hs:(7,4)-(12,4): Splicing declarations
+T5883.hs:(7,2)-(12,5): Splicing declarations
     [d| data Unit = Unit
         
         instance Show Unit where
