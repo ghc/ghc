@@ -1,8 +1,8 @@
 
-T7241.hs:7:3: error:
+T7241.hs:7:2: error:
     Same exact name in multiple name-spaces:
-      type constructor or class ‘Foo’, declared at: T7241.hs:7:3
-      data constructor ‘Foo’, declared at: T7241.hs:7:3
+      type constructor or class ‘Foo’, declared at: T7241.hs:7:2
+      data constructor ‘Foo’, declared at: T7241.hs:7:2
       Probable cause: you bound a unique Template Haskell name (NameU),
       perhaps via newName, in different name-spaces.
       If that's it, then -ddump-splices might be useful

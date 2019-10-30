@@ -1,3 +1,3 @@
 
-TH_Promoted1Tuple.hs:7:3: error:
+TH_Promoted1Tuple.hs:7:2: error:
     Illegal type: ‘'Unit Int’ Perhaps you intended to use DataKinds

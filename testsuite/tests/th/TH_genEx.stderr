@@ -1,5 +1,5 @@
-TH_genEx.hs:13:3-30: Splicing declarations
+TH_genEx.hs:13:2-31: Splicing declarations
     genAny (reify ''MyInterface)
   ======>
     data AnyMyInterface1111
-        = forall a. MyInterface a => AnyMyInterface1111 a
+      = forall a. MyInterface a => AnyMyInterface1111 a

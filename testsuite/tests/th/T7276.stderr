@@ -4,5 +4,5 @@ T7276.hs:6:8: error:
                      with ‘Language.Haskell.TH.Syntax.Exp’
       Expected type: Language.Haskell.TH.Lib.Internal.ExpQ
         Actual type: Language.Haskell.TH.Lib.Internal.DecsQ
-    • In the expression: [d| y = 3 |]
+    • In the expression: ([d| y = 3 |])
       In the untyped splice: $([d| y = 3 |])
