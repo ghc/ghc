@@ -556,6 +556,50 @@ def llvm_build ( ) -> bool:
 
 # ---
 
+# Note [Measuring residency]
+# ~~~~~~~~~~~~~~~~~~~~~~~~~~
+#
+# Residency (peak_megabytes_allocated and max_bytes_used) is sensitive
+# to when the major GC runs, which makes it inherently inaccurate.
+# Sometime an innocuous change somewhere can shift things around such
+# that the samples occur at a different time, and the residency
+# appears to change (up or down) when the underlying profile hasn't
+# really changed. To further minimize this effect we run with a single
+# generation (meaning we get a residency sample on every GC) with a small
+# allocation area (as suggested in #17387).
+#
+# However, please don't just ignore changes in residency.  If you see
+# a change in one of these figures, please check whether it is real or
+# not as follows:
+#
+#  * Run the test with old and new compilers, adding +RTS -h -i0.01
+#    (you don't need to compile anything for profiling or enable profiling
+#    libraries to get a heap profile).
+#  * view the heap profiles, read off the maximum residency.  If it has
+#    really changed, then you know there's an issue.
+
+RESIDENCY_OPTS = '+RTS -A256k -i0 -h -RTS'
+
+# See Note [Measuring residency].
+def collect_runtime_residency(tolerance_pct: float):
+    return [
+        collect_compiler_stats(['peak_megabytes_allocated', 'max_bytes_used'], tolerance_pct),
+        extra_run_opts(RESIDENCY_OPTS),
+        # The nonmoving collector does not support -G1
+        omit_ways([WayName(name) for name in ['nonmoving', 'nonmoving_thr', 'nonmoving_thr_ghc']])
+    ]
+
+# See Note [Measuring residency].
+def collect_compiler_residency(tolerance_pct: float):
+    return [
+        collect_compiler_stats(['peak_megabytes_allocated', 'max_bytes_used'], tolerance_pct),
+        extra_hc_opts(RESIDENCY_OPTS),
+        # The nonmoving collector does not support -G1
+        omit_ways([WayName('nonmoving_thr_ghc')])
+    ]
+
+# ---
+
 def high_memory_usage(name, opts):
     opts.alone = True
 
