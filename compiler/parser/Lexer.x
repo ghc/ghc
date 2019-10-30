@@ -44,6 +44,7 @@
 {-# LANGUAGE CPP #-}
 {-# LANGUAGE BangPatterns #-}
 {-# LANGUAGE LambdaCase #-}
+{-# LANGUAGE MultiWayIf #-}
 
 {-# OPTIONS_GHC -funbox-strict-fields #-}
 
@@ -398,14 +399,6 @@ $tab          { warnTab }
     { token (ITcloseQuote UnicodeSyntax) }
 }
 
-  -- See Note [Lexing type applications]
-<0> {
-    [^ $idchar \) ] ^
-  "@"
-    / { ifExtension TypeApplicationsBit `alexAndPred` notFollowedBySymbol }
-    { token ITtypeApp }
-}
-
 <0> {
   "(|"
     / { ifExtension ArrowsBit `alexAndPred`
@@ -471,12 +464,20 @@ $tab          { warnTab }
   @conid "#"+       / { ifExtension MagicHashBit } { idtoken conid }
 }
 
+-- Operators classified into prefix, suffix, tight infix, and loose infix.
+-- See GHC Proposal #229: https://github.com/ghc-proposals/ghc-proposals/blob/master/proposals/0229-whitespace-bang-patterns.rst
+<0> {
+  @varsym / { followedByOpeningToken `alexAndPred` precededByClosingToken } { varsym_tight_infix }
+  @varsym / { followedByOpeningToken }  { varsym_prefix }
+  @varsym / { precededByClosingToken }  { varsym_suffix }
+  @varsym                               { varsym_loose_infix }
+}
+
 -- ToDo: - move `var` and (sym) into lexical syntax?
 --       - remove backquote from $special?
 <0> {
   @qvarsym                                         { idtoken qvarsym }
   @qconsym                                         { idtoken qconsym }
-  @varsym                                          { varsym }
   @consym                                          { consym }
 }
 
@@ -560,13 +561,6 @@ $tab          { warnTab }
 -- This, of course, conflicts with as-patterns. The conflict arises because
 -- expressions and patterns use the same parser, and also because we want
 -- to allow type patterns within expression patterns.
---
--- Disambiguation is accomplished by requiring *something* to appear between
--- type application and the preceding token. This something must end with
--- a character that cannot be the end of the variable bound in an as-pattern.
--- Currently (June 2015), this means that the something cannot end with a
--- $idchar or a close-paren. (The close-paren is necessary if the as-bound
--- identifier is symbolic.)
 --
 -- Note that looking for whitespace before the '@' is insufficient, because
 -- of this pathological case:
@@ -889,11 +883,8 @@ reservedSymsFM = listToUFM $
        ,("|",   ITvbar,                     NormalSyntax,  0 )
        ,("<-",  ITlarrow NormalSyntax,      NormalSyntax,  0 )
        ,("->",  ITrarrow NormalSyntax,      NormalSyntax,  0 )
-       ,("@",   ITat,                       NormalSyntax,  0 )
-       ,("~",   ITtilde,                    NormalSyntax,  0 )
        ,("=>",  ITdarrow NormalSyntax,      NormalSyntax,  0 )
        ,("-",   ITminus,                    NormalSyntax,  0 )
-       ,("!",   ITbang,                     NormalSyntax,  0 )
 
        ,("*",   ITstar NormalSyntax,        NormalSyntax,  xbit StarIsTypeBit)
 
@@ -987,6 +978,30 @@ hopefully_open_brace span buf len
 pop_and :: Action -> Action
 pop_and act span buf len = do _ <- popLexState
                               act span buf len
+
+followedByOpeningToken :: AlexAccPred ExtsBitmap
+followedByOpeningToken _ _ _ (AI _ buf)
+  | atEnd buf = False
+  | otherwise =
+      case nextChar buf of
+        ('{', buf') -> nextCharIsNot buf' (== '-')
+        ('(', _) -> True
+        ('[', _) -> True
+        ('\"', _) -> True
+        ('\'', _) -> True
+        ('_', _) -> True
+        (c, _) -> isLetter c || isDigit c
+
+precededByClosingToken :: AlexAccPred ExtsBitmap
+precededByClosingToken _ (AI _ buf) _ _ =
+  case prevChar buf '\n' of
+    '}' -> decodePrevNChars 1 buf /= "-"
+    ')' -> True
+    ']' -> True
+    '\"' -> True
+    '\'' -> True
+    '_' -> True
+    c -> isLetter c || isDigit c
 
 {-# INLINE nextCharIs #-}
 nextCharIs :: StringBuffer -> (Char -> Bool) -> Bool
@@ -1348,11 +1363,32 @@ qvarsym, qconsym :: StringBuffer -> Int -> Token
 qvarsym buf len = ITqvarsym $! splitQualName buf len False
 qconsym buf len = ITqconsym $! splitQualName buf len False
 
-varsym, consym :: Action
-varsym = sym ITvarsym
-consym = sym ITconsym
+varsym_prefix :: Action
+varsym_prefix = sym $ \exts s ->
+  if | TypeApplicationsBit `xtest` exts,
+       s == fsLit "@"
+     -> ITtypeApp  -- Note [Lexing type applications]
+     | s == fsLit "!" -> ITbang
+     | s == fsLit "~" -> ITtilde
+     | otherwise -> ITvarsym s
 
-sym :: (FastString -> Token) -> Action
+varsym_suffix :: Action
+varsym_suffix = sym $ \_ s ->
+  if | s == fsLit "@" -> ITat
+     | otherwise -> ITvarsym s
+
+varsym_tight_infix :: Action
+varsym_tight_infix = sym $ \_ s ->
+  if | s == fsLit "@" -> ITat
+     | otherwise -> ITvarsym s
+
+varsym_loose_infix :: Action
+varsym_loose_infix = sym (\_ -> ITvarsym)
+
+consym :: Action
+consym = sym (\_exts -> ITconsym)
+
+sym :: (ExtsBitmap -> FastString -> Token) -> Action
 sym con span buf len =
   case lookupUFM reservedSymsFM fs of
     Just (keyword, NormalSyntax, 0) ->
@@ -1360,20 +1396,21 @@ sym con span buf len =
     Just (keyword, NormalSyntax, i) -> do
       exts <- getExts
       if exts .&. i /= 0
-        then return $ L span keyword
-        else return $ L span (con fs)
+        then return (L span keyword)
+        else return (L span $! con exts fs)
     Just (keyword, UnicodeSyntax, 0) -> do
       exts <- getExts
       if xtest UnicodeSyntaxBit exts
-        then return $ L span keyword
-        else return $ L span (con fs)
+        then return (L span keyword)
+        else return (L span $! con exts fs)
     Just (keyword, UnicodeSyntax, i) -> do
       exts <- getExts
       if exts .&. i /= 0 && xtest UnicodeSyntaxBit exts
-        then return $ L span keyword
-        else return $ L span (con fs)
-    Nothing ->
-      return $ L span $! con fs
+        then return (L span keyword)
+        else return (L span $! con exts fs)
+    Nothing -> do
+      exts <- getExts
+      return (L span $! con exts fs)
   where
     !fs = lexemeToFastString buf len
 
@@ -1967,7 +2004,7 @@ data PState = PState {
         messages   :: DynFlags -> Messages,
         tab_first  :: Maybe RealSrcSpan, -- pos of first tab warning in the file
         tab_count  :: !Int,              -- number of tab warnings in the file
-        last_tk    :: Maybe Token,
+        last_tk    :: !(Maybe Token),
         last_loc   :: RealSrcSpan, -- pos of previous token
         last_len   :: !Int,        -- len of previous token
         loc        :: RealSrcLoc,  -- current loc (end of prev token + 1)
@@ -2945,12 +2982,9 @@ lexToken = do
         let bytes = byteDiff buf buf2
         span `seq` setLastToken span bytes
         lt <- t span buf bytes
-        case unRealSrcSpan lt of
-          ITlineComment _  -> return lt
-          ITblockComment _ -> return lt
-          lt' -> do
-            setLastTk lt'
-            return lt
+        let lt' = unRealSrcSpan lt
+        unless (isComment lt') (setLastTk lt')
+        return lt
 
 reportLexError :: RealSrcLoc -> RealSrcLoc -> StringBuffer -> [Char] -> P a
 reportLexError loc1 loc2 buf str
