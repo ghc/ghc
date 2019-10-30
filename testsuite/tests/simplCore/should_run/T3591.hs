@@ -83,7 +83,7 @@ instance Monad Identity where
     m >>= k  = k (runIdentity m)
 
 newtype Trampoline m s r = Trampoline {bounce :: m (TrampolineState m s r)}
-data TrampolineState m s r = Done r | Suspend! (s (Trampoline m s r))
+data TrampolineState m s r = Done r | Suspend !(s (Trampoline m s r))
 
 instance (Monad m, Functor s) => Functor (Trampoline m s) where
   fmap = liftM
@@ -101,11 +101,11 @@ instance (Monad m, Functor s) => Monad (Trampoline m s) where
 instance (Monad m, Functor s) => MonadFail (Trampoline m s) where
   fail = error
 
-data Yield x y = Yield! x y
+data Yield x y = Yield !x y
 instance Functor (Yield x) where
    fmap f (Yield x y) = trace "fmap yield" $ Yield x (f y)
 
-data Await x y = Await! (x -> y)
+data Await x y = Await !(x -> y)
 instance Functor (Await x) where
    fmap f (Await g) = trace "fmap await" $ Await (f . g)
 
