@@ -1,4 +1,4 @@
 
 T12879.hs:4:7: error:
-    Pattern syntax in expression context: x@x
+    @-pattern in expression context: x@x
     Type application syntax requires a space before '@'

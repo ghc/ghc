@@ -204,7 +204,7 @@ haskell :-
 -- Alex "Rules"
 
 -- everywhere: skip whitespace
-$white_no_nl+ ;
+$white_no_nl+ { whitespace }
 $tab          { warnTab }
 
 -- Everywhere: deal with nested comments.  We explicitly rule out
@@ -264,11 +264,11 @@ $tab          { warnTab }
 -- as a nested comment.  We don't bother with this: if the line begins
 -- with {-#, then we'll assume it's a pragma we know about and go for do_bol.
 <bol> {
-  \n                                    ;
+  \n                                    { whitespace }
   ^\# line                              { begin line_prag1 }
   ^\# / { followedByDigit }             { begin line_prag1 }
-  ^\# pragma .* \n                      ; -- GCC 3.3 CPP generated, apparently
-  ^\# \! .* \n                          ; -- #!, for scripts
+  ^\# pragma .* \n                      { whitespace } -- GCC 3.3 CPP generated, apparently
+  ^\# \! .* \n                          { whitespace } -- #!, for scripts
   ()                                    { do_bol }
 }
 
@@ -278,7 +278,7 @@ $tab          { warnTab }
 <layout, layout_do, layout_if> {
   \{ / { notFollowedBy '-' }            { hopefully_open_brace }
         -- we might encounter {-# here, but {- has been handled already
-  \n                                    ;
+  \n                                    { whitespace }
   ^\# (line)?                           { begin line_prag1 }
 }
 
@@ -396,14 +396,6 @@ $tab          { warnTab }
         ifExtension UnicodeSyntaxBit `alexAndPred`
         ifExtension ThQuotesBit }
     { token (ITcloseQuote UnicodeSyntax) }
-}
-
-  -- See Note [Lexing type applications]
-<0> {
-    [^ $idchar \) ] ^
-  "@"
-    / { ifExtension TypeApplicationsBit `alexAndPred` notFollowedBySymbol }
-    { token ITtypeApp }
 }
 
 <0> {
@@ -560,13 +552,6 @@ $tab          { warnTab }
 -- This, of course, conflicts with as-patterns. The conflict arises because
 -- expressions and patterns use the same parser, and also because we want
 -- to allow type patterns within expression patterns.
---
--- Disambiguation is accomplished by requiring *something* to appear between
--- type application and the preceding token. This something must end with
--- a character that cannot be the end of the variable bound in an as-pattern.
--- Currently (June 2015), this means that the something cannot end with a
--- $idchar or a close-paren. (The close-paren is necessary if the as-bound
--- identifier is symbolic.)
 --
 -- Note that looking for whitespace before the '@' is insufficient, because
 -- of this pathological case:
@@ -860,6 +845,94 @@ reservedWordsFM = listToUFM $
          ( "proc",           ITproc,          xbit ArrowsBit)
      ]
 
+data TokenSort =
+  TokenSort {
+    tok_sort_opening :: !Bool,
+    tok_sort_closing :: !Bool
+  } deriving (Show)
+
+opening_token_sort, closing_token_sort,
+  opening_closing_token_sort, default_token_sort :: TokenSort
+default_token_sort = TokenSort False False
+opening_token_sort = default_token_sort { tok_sort_opening = True }
+closing_token_sort = default_token_sort { tok_sort_closing = True }
+opening_closing_token_sort = TokenSort True True
+
+get_token_sort :: Token -> TokenSort
+
+-- Opening tokens:
+--   ( [ { [: (# (| [| [p| [t| [d| [||
+get_token_sort IToparen             = opening_token_sort
+get_token_sort ITobrack             = opening_token_sort
+get_token_sort ITocurly             = opening_token_sort
+get_token_sort ITopabrack           = opening_token_sort
+get_token_sort IToubxparen          = opening_token_sort
+get_token_sort (IToparenbar _)      = opening_token_sort
+get_token_sort (ITopenExpQuote _ _) = opening_token_sort
+get_token_sort ITopenPatQuote       = opening_token_sort
+get_token_sort ITopenTypQuote       = opening_token_sort
+get_token_sort ITopenDecQuote       = opening_token_sort
+get_token_sort (ITopenTExpQuote _)  = opening_token_sort
+
+-- Closing tokens:
+--   ) ] } :] #) |) |] ||]
+--   ?ipvar #lbl
+get_token_sort ITcparen             = closing_token_sort
+get_token_sort ITcbrack             = closing_token_sort
+get_token_sort ITccurly             = closing_token_sort
+get_token_sort ITcpabrack           = closing_token_sort
+get_token_sort ITcubxparen          = closing_token_sort
+get_token_sort (ITcparenbar _)      = closing_token_sort
+get_token_sort (ITcloseQuote _)     = closing_token_sort
+get_token_sort ITcloseTExpQuote     = closing_token_sort
+get_token_sort (ITdupipvarid _)     = closing_token_sort
+get_token_sort (ITlabelvarid _)     = closing_token_sort
+
+-- Opening and closing at the same time:
+--   varid ConId % :% Q.varid Q.ConId Q.% Q.:% _ ' '' `
+--   'x' "str" 55 0.3 'x'# "str"# 5# 5## 0.3# 0.3##
+get_token_sort (ITvarid  _)       = opening_closing_token_sort
+get_token_sort (ITconid  _)       = opening_closing_token_sort
+get_token_sort (ITvarsym _)       = opening_closing_token_sort
+get_token_sort (ITconsym _)       = opening_closing_token_sort
+get_token_sort (ITqvarid _)       = opening_closing_token_sort
+get_token_sort (ITqconid _)       = opening_closing_token_sort
+get_token_sort (ITqvarsym _)      = opening_closing_token_sort
+get_token_sort (ITqconsym _)      = opening_closing_token_sort
+get_token_sort ITunderscore       = opening_closing_token_sort
+get_token_sort ITsimpleQuote      = opening_closing_token_sort
+get_token_sort ITtyQuote          = opening_closing_token_sort
+get_token_sort ITbackquote        = opening_closing_token_sort
+get_token_sort (ITchar _ _)       = opening_closing_token_sort
+get_token_sort (ITstring _ _)     = opening_closing_token_sort
+get_token_sort (ITinteger _)      = opening_closing_token_sort
+get_token_sort (ITrational _)     = opening_closing_token_sort
+get_token_sort (ITprimchar _ _)   = opening_closing_token_sort
+get_token_sort (ITprimstring _ _) = opening_closing_token_sort
+get_token_sort (ITprimint _ _)    = opening_closing_token_sort
+get_token_sort (ITprimword _ _)   = opening_closing_token_sort
+get_token_sort (ITprimfloat _)    = opening_closing_token_sort
+get_token_sort (ITprimdouble _)   = opening_closing_token_sort
+
+-- pseudo-keywords
+get_token_sort ITas         = opening_closing_token_sort
+get_token_sort IThiding     = opening_closing_token_sort
+get_token_sort ITqualified  = opening_closing_token_sort
+get_token_sort ITfamily     = opening_closing_token_sort
+get_token_sort ITrole       = opening_closing_token_sort
+get_token_sort ITstock      = opening_closing_token_sort
+get_token_sort ITanyclass   = opening_closing_token_sort
+get_token_sort ITvia        = opening_closing_token_sort
+get_token_sort ITunit       = opening_closing_token_sort
+get_token_sort ITdependency = opening_closing_token_sort
+get_token_sort ITsignature  = opening_closing_token_sort
+
+-- in patterns, we can write:  forall@(HsForAllTy ...)
+get_token_sort (ITforall NormalSyntax) = opening_closing_token_sort
+
+-- Neither opening nor closing
+get_token_sort _ = default_token_sort
+
 {-----------------------------------
 Note [Lexing type pseudo-keywords]
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
@@ -889,11 +962,8 @@ reservedSymsFM = listToUFM $
        ,("|",   ITvbar,                     NormalSyntax,  0 )
        ,("<-",  ITlarrow NormalSyntax,      NormalSyntax,  0 )
        ,("->",  ITrarrow NormalSyntax,      NormalSyntax,  0 )
-       ,("@",   ITat,                       NormalSyntax,  0 )
-       ,("~",   ITtilde,                    NormalSyntax,  0 )
        ,("=>",  ITdarrow NormalSyntax,      NormalSyntax,  0 )
        ,("-",   ITminus,                    NormalSyntax,  0 )
-       ,("!",   ITbang,                     NormalSyntax,  0 )
 
        ,("*",   ITstar NormalSyntax,        NormalSyntax,  xbit StarIsTypeBit)
 
@@ -1083,9 +1153,12 @@ multiline_doc_comment span buf _len = withLexedDocType (worker "")
           Nothing -> input
 
 lineCommentToken :: Action
-lineCommentToken span buf len = do
-  b <- getBit RawTokenStreamBit
-  if b then strtoken ITlineComment span buf len else lexToken
+lineCommentToken span buf len =
+  lookaheadShortCircuit dummy_tok $ do
+    b <- getBit RawTokenStreamBit
+    if b then strtoken ITlineComment span buf len else lexToken
+  where
+    dummy_tok = L span (ITlineComment "")
 
 {-
   nested comments require traversing by hand, they can't be parsed
@@ -1099,7 +1172,8 @@ nested_comment cont span buf len = do
     go commentAcc 0 input = do
       setInput input
       b <- getBit RawTokenStreamBit
-      if b
+      lookahead <- getBit InLookaheadBit
+      if lookahead || b
         then docCommentEnd input commentAcc ITblockComment buf span
         else cont
     go commentAcc n input = case alexGetChar' input of
@@ -1348,11 +1422,31 @@ qvarsym, qconsym :: StringBuffer -> Int -> Token
 qvarsym buf len = ITqvarsym $! splitQualName buf len False
 qconsym buf len = ITqconsym $! splitQualName buf len False
 
-varsym, consym :: Action
-varsym = sym ITvarsym
-consym = sym ITconsym
+varsym :: Action
+varsym = sym $ \s -> do
+  exts <- getExts
+  ltk_sort <- getLastTokenSort
+  ntk_sort <-
+    P $ \sBeforeLookahead ->
+      case unP (setLookaheadBit *> lexToken) sBeforeLookahead of
+        PFailed sFailed -> PFailed sFailed
+        POk sAfterLookahead _ntk ->
+          POk sBeforeLookahead (last_tk_sort sAfterLookahead)
+  let varsym_occ_sort = varsym_occurrence_sort ltk_sort ntk_sort
+  return (varsym_override exts varsym_occ_sort s)
 
-sym :: (FastString -> Token) -> Action
+setLookaheadBit :: P ()
+setLookaheadBit = setExts (.|. xbit InLookaheadBit)
+
+lookaheadShortCircuit :: RealLocated Token -> P (RealLocated Token) -> P (RealLocated Token)
+lookaheadShortCircuit tok cont = do
+  lookahead <- getBit InLookaheadBit
+  if lookahead then return tok else cont
+
+consym :: Action
+consym = sym (return . ITconsym)
+
+sym :: (FastString -> P Token) -> Action
 sym con span buf len =
   case lookupUFM reservedSymsFM fs of
     Just (keyword, NormalSyntax, 0) ->
@@ -1361,19 +1455,19 @@ sym con span buf len =
       exts <- getExts
       if exts .&. i /= 0
         then return $ L span keyword
-        else return $ L span (con fs)
+        else L span <$> con fs
     Just (keyword, UnicodeSyntax, 0) -> do
       exts <- getExts
       if xtest UnicodeSyntaxBit exts
         then return $ L span keyword
-        else return $ L span (con fs)
+        else L span <$> con fs
     Just (keyword, UnicodeSyntax, i) -> do
       exts <- getExts
       if exts .&. i /= 0 && xtest UnicodeSyntaxBit exts
         then return $ L span keyword
-        else return $ L span (con fs)
+        else L span <$> con fs
     Nothing ->
-      return $ L span $! con fs
+      L span <$!> con fs
   where
     !fs = lexemeToFastString buf len
 
@@ -1610,7 +1704,7 @@ lex_string_prag mkTok span _buf _len
 -- This stuff is horrible.  I hates it.
 
 lex_string_tok :: Action
-lex_string_tok span buf _len = do
+lex_string_tok span buf _len = lookaheadShortCircuit dummy_tok $ do
   tok <- lex_string ""
   (AI end bufEnd) <- getInput
   let
@@ -1620,6 +1714,8 @@ lex_string_tok span buf _len = do
             _ -> panic "lex_string_tok"
     src = lexemeToString buf (cur bufEnd - cur buf)
   return (L (mkRealSrcSpan (realSrcSpanStart span) end) tok')
+  where
+    dummy_tok = L span (ITstring (SourceText "") (mkFastString ""))
 
 lex_string :: String -> P Token
 lex_string s = do
@@ -1869,7 +1965,7 @@ lex_qquasiquote_tok span buf len = do
                            mkRealSrcSpan quoteStart end)))
 
 lex_quasiquote_tok :: Action
-lex_quasiquote_tok span buf len = do
+lex_quasiquote_tok span buf len = lookaheadShortCircuit dummy_tok $ do
   let quoter = tail (lexemeToString buf (len - 1))
                 -- 'tail' drops the initial '[',
                 -- while the -1 drops the trailing '|'
@@ -1880,6 +1976,8 @@ lex_quasiquote_tok span buf len = do
            (ITquasiQuote (mkFastString quoter,
                           mkFastString (reverse quote),
                           mkRealSrcSpan quoteStart end)))
+  where
+    dummy_tok = L span (ITquasiQuote (mkFastString "", mkFastString "", span))
 
 lex_quasiquote :: RealSrcLoc -> String -> P String
 lex_quasiquote start s = do
@@ -1904,12 +2002,29 @@ quasiquote_error start = do
   reportLexError start end buf "unterminated quasiquotation"
 
 -- -----------------------------------------------------------------------------
+-- Whitespace
+
+whitespace :: Action
+whitespace srcspan _buf _len =
+  P $ \s ->
+    if InLookaheadBit `xtest` pExtsBitmap (options s)
+    then POk s{ last_tk_sort = default_token_sort } (L srcspan tok)
+    else unP lexToken s{ last_tk_sort = default_token_sort }
+  where
+    -- We don't have a dedicated token for whitespace,
+    -- but ITeof will do fine. We only care that:
+    --
+    --   get_token_sort tok = default_token_sort
+    --
+    tok = ITeof
+
+-- -----------------------------------------------------------------------------
 -- Warnings
 
 warnTab :: Action
-warnTab srcspan _buf _len = do
+warnTab srcspan buf len = do
     addTabWarning srcspan
-    lexToken
+    whitespace srcspan buf len
 
 warnThen :: WarningFlag -> SDoc -> Action -> Action
 warnThen option warning action srcspan buf len = do
@@ -1967,7 +2082,8 @@ data PState = PState {
         messages   :: DynFlags -> Messages,
         tab_first  :: Maybe RealSrcSpan, -- pos of first tab warning in the file
         tab_count  :: !Int,              -- number of tab warnings in the file
-        last_tk    :: Maybe Token,
+        last_tk    :: !(Maybe Token),
+        last_tk_sort :: !TokenSort,
         last_loc   :: RealSrcSpan, -- pos of previous token
         last_len   :: !Int,        -- len of previous token
         loc        :: RealSrcLoc,  -- current loc (end of prev token + 1)
@@ -2083,11 +2199,11 @@ setLastToken loc len = P $ \s -> POk s {
   last_len=len
   } ()
 
-setLastTk :: Token -> P ()
-setLastTk tk = P $ \s -> POk s { last_tk = Just tk } ()
-
 getLastTk :: P (Maybe Token)
 getLastTk = P $ \s@(PState { last_tk = last_tk }) -> POk s last_tk
+
+getLastTokenSort :: P TokenSort
+getLastTokenSort = P $ \s -> POk s (last_tk_sort s)
 
 data AlexInput = AI RealSrcLoc StringBuffer
 
@@ -2339,6 +2455,7 @@ data ExtBits
   -- Flags that are updated once parsing starts
   | InRulePragBit
   | InNestedCommentBit -- See Note [Nested comment line pragmas]
+  | InLookaheadBit
   | UsePosPragsBit
     -- ^ If this is enabled, '{-# LINE ... -#}' and '{-# COLUMN ... #-}'
     -- update the internal position. Otherwise, those pragmas are lexed as
@@ -2458,6 +2575,7 @@ mkPStatePure options buf loc =
       messages      = const emptyMessages,
       tab_first     = Nothing,
       tab_count     = 0,
+      last_tk_sort  = default_token_sort,
       last_tk       = Nothing,
       last_loc      = mkRealSrcSpan loc loc,
       last_len      = 0,
@@ -2933,24 +3051,56 @@ lexToken = do
     AlexEOF -> do
         let span = mkRealSrcSpan loc1 loc1
         setLastToken span 0
-        return (L span ITeof)
+        P $ \s -> POk s{ last_tk_sort = default_token_sort } (L span ITeof)
     AlexError (AI loc2 buf) ->
         reportLexError loc1 loc2 buf "lexical error"
-    AlexSkip inp2 _ -> do
-        setInput inp2
-        lexToken
+    AlexSkip _ _ ->
+      -- if this happens, check that all rules have an action associated with them
+      panic "lexToken: AlexSkip"
     AlexToken inp2@(AI end buf2) _ t -> do
         setInput inp2
         let span = mkRealSrcSpan loc1 end
         let bytes = byteDiff buf buf2
         span `seq` setLastToken span bytes
         lt <- t span buf bytes
-        case unRealSrcSpan lt of
-          ITlineComment _  -> return lt
-          ITblockComment _ -> return lt
-          lt' -> do
-            setLastTk lt'
-            return lt
+        let lt' = unRealSrcSpan lt
+        P $ \s ->
+          POk s{ last_tk = if isComment lt' then last_tk s else Just lt'
+               , last_tk_sort = get_token_sort lt' }
+              lt
+
+data VarsymOccurrenceSort
+  = VarsymPrefix
+  | VarsymSuffix
+  | VarsymTightInfix
+  | VarsymLooseInfix
+  deriving (Eq, Show)
+
+varsym_occurrence_sort :: TokenSort -> TokenSort -> VarsymOccurrenceSort
+varsym_occurrence_sort prev_tok next_tok =
+    check (tok_sort_closing prev_tok) (tok_sort_opening next_tok)
+  where
+    check False True  = VarsymPrefix
+    check True  False = VarsymSuffix
+    check True  True  = VarsymTightInfix
+    check False False = VarsymLooseInfix
+
+varsym_override :: ExtsBitmap -> VarsymOccurrenceSort -> FastString -> Token
+varsym_override _ occ_sort s | s == fsLit "@" =
+  case occ_sort of
+    VarsymPrefix -> ITtypeApp -- Note [Lexing type applications]
+    VarsymSuffix -> ITat
+    VarsymTightInfix -> ITat
+    VarsymLooseInfix -> ITvarsym s
+varsym_override _ occ_sort s | s == fsLit "!" =
+  case occ_sort of
+    VarsymPrefix -> ITbang
+    _ -> ITvarsym s
+varsym_override _ occ_sort s | s == fsLit "~" =
+  case occ_sort of
+    VarsymPrefix -> ITtilde
+    _ -> ITvarsym s
+varsym_override _ _ s = ITvarsym s
 
 reportLexError :: RealSrcLoc -> RealSrcLoc -> StringBuffer -> [Char] -> P a
 reportLexError loc1 loc2 buf str
