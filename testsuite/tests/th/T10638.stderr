@@ -1,5 +1,5 @@
 
-T10638.hs:26:11:
-    ‘static test2’ is not a valid C identifier
-    When checking declaration:
-      foreign import prim safe "static test2" cmm_test2 :: Int# -> Int#
+T10638.hs:26:10: error:
+    • ‘static test2’ is not a valid C identifier
+    • When checking declaration:
+        foreign import prim safe "static test2" cmm_test2 :: Int# -> Int#

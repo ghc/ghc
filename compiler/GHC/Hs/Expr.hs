@@ -2308,9 +2308,8 @@ type instance XXSplice       (GhcPass _) = NoExtCon
 -- type captures explicitly how it was originally written, for use in the pretty
 -- printer.
 data SpliceDecoration
-  = HasParens -- ^ $( splice ) or $$( splice )
-  | HasDollar -- ^ $splice or $$splice
-  | NoParens  -- ^ bare splice
+  = DollarSplice  -- ^ $splice or $$splice
+  | BareSplice    -- ^ bare splice
   deriving (Data, Eq, Show)
 
 instance Outputable SpliceDecoration where
@@ -2452,12 +2451,12 @@ instance (OutputableBndrId p) => Outputable (HsSplice (GhcPass p)) where
 
 pprPendingSplice :: (OutputableBndrId p)
                  => SplicePointName -> LHsExpr (GhcPass p) -> SDoc
-pprPendingSplice n e = angleBrackets (ppr n <> comma <+> ppr e)
+pprPendingSplice n e = angleBrackets (ppr n <> comma <+> ppr (stripParensHsExpr e))
 
 pprSpliceDecl ::  (OutputableBndrId p)
           => HsSplice (GhcPass p) -> SpliceExplicitFlag -> SDoc
 pprSpliceDecl e@HsQuasiQuote{} _ = pprSplice e
-pprSpliceDecl e ExplicitSplice   = text "$(" <> ppr_splice_decl e <> text ")"
+pprSpliceDecl e ExplicitSplice   = text "$" <> ppr_splice_decl e
 pprSpliceDecl e ImplicitSplice   = ppr_splice_decl e
 
 ppr_splice_decl :: (OutputableBndrId p)
@@ -2466,17 +2465,13 @@ ppr_splice_decl (HsUntypedSplice _ _ n e) = ppr_splice empty n e empty
 ppr_splice_decl e = pprSplice e
 
 pprSplice :: (OutputableBndrId p) => HsSplice (GhcPass p) -> SDoc
-pprSplice (HsTypedSplice _ HasParens  n e)
-  = ppr_splice (text "$$(") n e (text ")")
-pprSplice (HsTypedSplice _ HasDollar n e)
+pprSplice (HsTypedSplice _ DollarSplice n e)
   = ppr_splice (text "$$") n e empty
-pprSplice (HsTypedSplice _ NoParens n e)
-  = ppr_splice empty n e empty
-pprSplice (HsUntypedSplice _ HasParens  n e)
-  = ppr_splice (text "$(") n e (text ")")
-pprSplice (HsUntypedSplice _ HasDollar n e)
+pprSplice (HsTypedSplice _ BareSplice _ _ )
+  = panic "Bare typed splice"  -- impossible
+pprSplice (HsUntypedSplice _ DollarSplice n e)
   = ppr_splice (text "$")  n e empty
-pprSplice (HsUntypedSplice _ NoParens n e)
+pprSplice (HsUntypedSplice _ BareSplice n e)
   = ppr_splice empty  n e empty
 pprSplice (HsQuasiQuote _ n q _ s)      = ppr_quasi n q s
 pprSplice (HsSpliced _ _ thing)         = ppr thing

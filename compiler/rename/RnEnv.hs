@@ -1555,7 +1555,13 @@ dataTcOccs rdr_name
   = [rdr_name]
   where
     occ = rdrNameOcc rdr_name
-    rdr_name_tc = setRdrNameSpace rdr_name tcName
+    rdr_name_tc =
+      case rdr_name of
+        -- The (~) type operator is always in scope, so we need a special case
+        -- for it here, or else  :info (~)  fails in GHCi.
+        -- See Note [eqTyCon (~) is built-in syntax]
+        Unqual occ | occNameFS occ == fsLit "~" -> eqTyCon_RDR
+        _ -> setRdrNameSpace rdr_name tcName
 
 {-
 Note [dataTcOccs and Exact Names]

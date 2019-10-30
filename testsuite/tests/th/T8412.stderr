@@ -1,4 +1,4 @@
 
-T8412.hs:5:12:
-    Illegal literal in type (type literals must not be negative): -1
-    In the untyped splice: $(return $ LitT $ NumTyLit (- 1))
+T8412.hs:5:11: error:
+    • Illegal literal in type (type literals must not be negative): -1
+    • In the untyped splice: $(return $ LitT $ NumTyLit (- 1))

@@ -4137,7 +4137,8 @@ wWarningFlagsDeps = [
   flagSpec "unrecognised-warning-flags"  Opt_WarnUnrecognisedWarningFlags,
   flagSpec "star-binder"                 Opt_WarnStarBinder,
   flagSpec "star-is-type"                Opt_WarnStarIsType,
-  flagSpec "missing-space-after-bang"    Opt_WarnSpaceAfterBang,
+  depFlagSpec "missing-space-after-bang" Opt_WarnSpaceAfterBang
+    "bang patterns can no longer be written with a space",
   flagSpec "partial-fields"              Opt_WarnPartialFields,
   flagSpec "prepositive-qualified-module"
                                          Opt_WarnPrepositiveQualifiedModule,

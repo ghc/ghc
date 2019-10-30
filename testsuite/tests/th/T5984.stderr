@@ -1,8 +1,3 @@
-T5984.hs:7:1-3: Splicing declarations
-    nt
-  ======>
-    newtype Foo = Foo Int
-T5984.hs:8:1-3: Splicing declarations
-    dt
-  ======>
-    data Bar = Bar Int
+T5984.hs:7:2-3: Splicing declarations
+    nt ======> newtype Foo = Foo Int
+T5984.hs:8:2-3: Splicing declarations dt ======> data Bar = Bar Int

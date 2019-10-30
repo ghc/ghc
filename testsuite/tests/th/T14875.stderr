@@ -1,4 +1,4 @@
-T14875.hs:(5,3)-(14,6): Splicing declarations
+T14875.hs:(5,2)-(14,7): Splicing declarations
     [d| f :: Bool -> Bool
         f x
           = case x of

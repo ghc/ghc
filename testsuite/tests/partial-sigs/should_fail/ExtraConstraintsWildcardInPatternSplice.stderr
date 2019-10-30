@@ -1,5 +1,5 @@
 
-ExtraConstraintsWildcardInPatternSplice.hs:5:8: error:
+ExtraConstraintsWildcardInPatternSplice.hs:5:6: error:
     • Found type wildcard ‘_’ standing for ‘_’
       Where: ‘_’ is a rigid type variable bound by
                the inferred type of foo :: _ -> ()

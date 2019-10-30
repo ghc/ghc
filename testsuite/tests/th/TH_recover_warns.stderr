@@ -1,10 +1,10 @@
-TH_recover_warns.hs:(9,19)-(10,63): Splicing expression
+TH_recover_warns.hs:(9,18)-(10,64): Splicing expression
     recover
       (stringE "splice failed") [| let x = "a" in let x = "b" in x |]
   ======>
     let x = "a" in let x = "b" in x
 
-TH_recover_warns.hs:9:19: warning: [-Wunused-local-binds (in -Wextra, -Wunused-binds)]
+TH_recover_warns.hs:9:18: warning: [-Wunused-local-binds (in -Wextra, -Wunused-binds)]
     Defined but not used: ‘x’
 
 TH_recover_warns.hs:10:34: warning: [-Wunused-local-binds (in -Wextra, -Wunused-binds)]

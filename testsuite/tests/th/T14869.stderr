@@ -1,17 +1,17 @@
-T14869.hs:19:3-9: Splicing declarations pure [] ======>
-T14869.hs:22:10-42: Splicing expression
+T14869.hs:19:2-10: Splicing declarations pure [] ======>
+T14869.hs:22:9-43: Splicing expression
     reify ''Foo1 >>= stringE . pprint
   ======>
     "type family T14869.Foo1 :: *"
-T14869.hs:23:10-42: Splicing expression
+T14869.hs:23:9-43: Splicing expression
     reify ''Foo2 >>= stringE . pprint
   ======>
     "type family T14869.Foo2 :: Constraint"
-T14869.hs:24:10-42: Splicing expression
+T14869.hs:24:9-43: Splicing expression
     reify ''Foo3 >>= stringE . pprint
   ======>
     "type family T14869.Foo3 :: T14869.MyConstraint"
-T14869.hs:25:10-42: Splicing expression
+T14869.hs:25:9-43: Splicing expression
     reify ''Foo4 >>= stringE . pprint
   ======>
     "type family T14869.Foo4 :: *"

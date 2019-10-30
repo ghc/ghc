@@ -1,6 +1,6 @@
 
-TH_runIO.hs:12:7:
-    Exception when trying to run compile-time code:
-      user error (hi)
-    Code: runIO (fail "hi")
-    In the untyped splice: $(runIO (fail "hi"))
+TH_runIO.hs:12:7: error:
+    • Exception when trying to run compile-time code:
+        user error (hi)
+      Code: (runIO (fail "hi"))
+    • In the untyped splice: $(runIO (fail "hi"))

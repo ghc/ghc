@@ -1,4 +1,4 @@
 
-TH_implicitParamsErr1.hs:5:3: error:
+TH_implicitParamsErr1.hs:5:2: error:
     Implicit parameter binding only allowed in let or where
     When splicing a TH declaration: ?x = 1

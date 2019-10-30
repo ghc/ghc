@@ -56,8 +56,6 @@ module   RdrHsSyn (
         checkContext,         -- HsType -> P HsContext
         checkPattern,         -- HsExp -> P HsPat
         checkPattern_msg,
-        isBangRdr,
-        isTildeRdr,
         checkMonadComp,       -- P (HsStmtContext RdrName)
         checkValDef,          -- (SrcLoc, HsExp, HsRhs, [HsDecl]) -> P HsDecl
         checkValSigLhs,
@@ -68,6 +66,7 @@ module   RdrHsSyn (
         checkEmptyGADTs,
         addFatalError, hintBangPat,
         TyEl(..), mergeOps, mergeDataCon,
+        mkBangTy,
 
         -- Help with processing exports
         ImpExpSubSpec(..),
@@ -100,7 +99,6 @@ module   RdrHsSyn (
         ecpFromExp,
         ecpFromCmd,
         PatBuilder,
-        patBuilderBang,
 
     ) where
 
@@ -350,7 +348,7 @@ mkSpliceDecl lexpr@(dL->L loc expr)
   = SpliceD noExtField (SpliceDecl noExtField (cL loc splice) ExplicitSplice)
 
   | otherwise
-  = SpliceD noExtField (SpliceDecl noExtField (cL loc (mkUntypedSplice NoParens lexpr))
+  = SpliceD noExtField (SpliceDecl noExtField (cL loc (mkUntypedSplice BareSplice lexpr))
                               ImplicitSplice)
 
 mkRoleAnnotDecl :: SrcSpan
@@ -564,14 +562,13 @@ declarations and types as a reversed list of TyEl:
 
   data TyEl = TyElOpr RdrName
             | TyElOpd (HsType GhcPs)
-            | TyElBang | TyElTilde
             | ...
 
 For example, both occurences of (C ! D) in the following example are parsed
 into equal lists of TyEl:
 
   data T = C ! D => C ! D   results in   [ TyElOpd (HsTyVar "D")
-                                         , TyElBang
+                                         , TyElOpr "!"
                                          , TyElOpd (HsTyVar "C") ]
 
 Note that elements are in reverse order. Also, 'C' is parsed as a type
@@ -1088,12 +1085,6 @@ checkPat loc (dL->L l e@(PatBuilderVar (dL->L _ c))) args
   | not (null args) && patIsRec c =
       localPV_msg (\_ -> text "Perhaps you intended to use RecursiveDo") $
       patFail l (ppr e)
-checkPat loc e args     -- OK to let this happen even if bang-patterns
-                        -- are not enabled, because there is no valid
-                        -- non-bang-pattern parse of (C ! e)
-  | Just (e', args') <- splitBang e
-  = do  { args'' <- mapM checkLPat args'
-        ; checkPat loc e' (args'' ++ args) }
 checkPat loc (dL->L _ (PatBuilderApp f e)) args
   = do p <- checkLPat e
        checkPat loc f (p : args)
@@ -1114,12 +1105,6 @@ checkAPat loc e0 = do
    -- Negation is recorded separately, so that the literal is zero or +ve
    -- NB. Negative *primitive* literals are already handled by the lexer
    PatBuilderOverLit pos_lit -> return (mkNPat (cL loc pos_lit) Nothing)
-
-   PatBuilderBang lb e   -- (! x)
-        -> do { hintBangPat loc e0
-              ; e' <- checkLPat e
-              ; addAnnotation loc AnnBang lb
-              ; return  (BangPat noExtField e') }
 
    -- n+k patterns
    PatBuilderOpApp
@@ -1148,11 +1133,6 @@ plus_RDR, pun_RDR :: RdrName
 plus_RDR = mkUnqual varName (fsLit "+") -- Hack
 pun_RDR  = mkUnqual varName (fsLit "pun-right-hand-side")
 
-isBangRdr, isTildeRdr :: RdrName -> Bool
-isBangRdr (Unqual occ) = occNameFS occ == fsLit "!"
-isBangRdr _ = False
-isTildeRdr = (==eqTyCon_RDR)
-
 checkPatField :: LHsRecField GhcPs (Located (PatBuilder GhcPs))
               -> PV (LHsRecField GhcPs (LPat GhcPs))
 checkPatField (dL->L l fld) = do p <- checkLPat (hsRecFieldArg fld)
@@ -1167,22 +1147,21 @@ patIsRec e = e == mkUnqual varName (fsLit "rec")
 ---------------------------------------------------------------------------
 -- Check Equation Syntax
 
-checkValDef :: SrcStrictness
-            -> Located (PatBuilder GhcPs)
+checkValDef :: Located (PatBuilder GhcPs)
             -> Maybe (LHsType GhcPs)
             -> Located (a,GRHSs GhcPs (LHsExpr GhcPs))
             -> P ([AddAnn],HsBind GhcPs)
 
-checkValDef _strictness lhs (Just sig) grhss
+checkValDef lhs (Just sig) grhss
         -- x :: ty = rhs  parses as a *pattern* binding
   = do lhs' <- runPV $ mkHsTySigPV (combineLocs lhs sig) lhs sig >>= checkLPat
        checkPatBind lhs' grhss
 
-checkValDef strictness lhs Nothing g@(dL->L l (_,grhss))
+checkValDef lhs Nothing g@(dL->L l (_,grhss))
   = do  { mb_fun <- isFunLhs lhs
         ; case mb_fun of
             Just (fun, is_infix, pats, ann) ->
-              checkFunBind strictness ann (getLoc lhs)
+              checkFunBind NoSrcStrict ann (getLoc lhs)
                            fun is_infix pats (cL l grhss)
             Nothing -> do
               lhs' <- checkPattern lhs
@@ -1222,9 +1201,22 @@ makeFunBind fn ms
               fun_co_fn = idHsWrapper,
               fun_tick = [] }
 
+-- See Note [FunBind vs PatBind]
 checkPatBind :: LPat GhcPs
              -> Located (a,GRHSs GhcPs (LHsExpr GhcPs))
              -> P ([AddAnn],HsBind GhcPs)
+checkPatBind lhs (dL->L match_span (_,grhss))
+    | BangPat _ p <- unLoc lhs
+    , VarPat _ v <- unLoc p
+    = return ([], makeFunBind v [cL match_span (m v)])
+  where
+    m v = Match { m_ext = noExtField
+                , m_ctxt = FunRhs { mc_fun    = cL (getLoc lhs) (unLoc v)
+                                  , mc_fixity = Prefix
+                                  , mc_strictness = SrcStrict }
+                , m_pats = []
+                , m_grhss = grhss }
+
 checkPatBind lhs (dL->L _ (_,grhss))
   = return ([],PatBind noExtField lhs grhss ([],[]))
 
@@ -1278,21 +1270,6 @@ checkDoAndIfThenElse guardExpr semiThen thenExpr semiElse elseExpr
                  text "then" <+> ppr thenExpr  <> pprOptSemi semiElse <+>
                  text "else" <+> ppr elseExpr
 
-
-        -- The parser left-associates, so there should
-        -- not be any OpApps inside the e's
-splitBang :: Located (PatBuilder GhcPs) -> Maybe (Located (PatBuilder GhcPs), [Located (PatBuilder GhcPs)])
--- Splits (f ! g a b) into (f, [(! g), a, b])
-splitBang (dL->L _ (PatBuilderOpApp l_arg op r_arg))
-  | isBangRdr (unLoc op)
-  = Just (l_arg, cL l' (PatBuilderBang (getLoc op) arg1) : argns)
-  where
-    l' = combineLocs op arg1
-    (arg1,argns) = split_bang r_arg []
-    split_bang (dL->L _ (PatBuilderApp f e)) es = split_bang f (e:es)
-    split_bang e                       es = (e,es)
-splitBang _ = Nothing
-
 -- See Note [isFunLhs vs mergeDataCon]
 isFunLhs :: Located (PatBuilder GhcPs)
       -> P (Maybe (Located RdrName, LexicalFixity, [Located (PatBuilder GhcPs)],[AddAnn]))
@@ -1314,31 +1291,7 @@ isFunLhs e = go e [] []
        | not (isRdrDataCon f)        = return (Just (cL loc f, Prefix, es, ann))
    go (dL->L _ (PatBuilderApp f e)) es       ann = go f (e:es) ann
    go (dL->L l (PatBuilderPar e))   es@(_:_) ann = go e es (ann ++ mkParensApiAnn l)
-
-        -- Things of the form `!x` are also FunBinds
-        -- See Note [FunBind vs PatBind]
-   go (dL->L _ (PatBuilderBang _ (L _ (PatBuilderVar (dL -> L l var))))) [] ann
-        | not (isRdrDataCon var)     = return (Just (cL l var, Prefix, [], ann))
-
-      -- For infix function defns, there should be only one infix *function*
-      -- (though there may be infix *datacons* involved too).  So we don't
-      -- need fixity info to figure out which function is being defined.
-      --      a `K1` b `op` c `K2` d
-      -- must parse as
-      --      (a `K1` b) `op` (c `K2` d)
-      -- The renamer checks later that the precedences would yield such a parse.
-      --
-      -- There is a complication to deal with bang patterns.
-      --
-      -- ToDo: what about this?
-      --              x + 1 `op` y = ...
-
-   go e@(L loc (PatBuilderOpApp l (dL->L loc' op) r)) es ann
-        | Just (e',es') <- splitBang e
-        = do { bang_on <- getBit BangPatBit
-             ; if bang_on then go e' (es' ++ es) ann
-               else return (Just (cL loc' op, Infix, (l:r:es), ann)) }
-                -- No bangs; behave just like the next case
+   go (dL->L loc (PatBuilderOpApp l (dL->L loc' op) r)) es ann
         | not (isRdrDataCon op)         -- We have found the function!
         = return (Just (cL loc' op, Infix, (l:r:es), ann))
         | otherwise                     -- Infix data con; keep going
@@ -1356,7 +1309,6 @@ isFunLhs e = go e [] []
 data TyEl = TyElOpr RdrName | TyElOpd (HsType GhcPs)
           | TyElKindApp SrcSpan (LHsType GhcPs)
           -- See Note [TyElKindApp SrcSpan interpretation]
-          | TyElTilde | TyElBang
           | TyElUnpackedness ([AddAnn], SourceText, SrcUnpackedness)
           | TyElDocPrev HsDocString
 
@@ -1379,40 +1331,22 @@ instance Outputable TyEl where
   ppr (TyElOpr name) = ppr name
   ppr (TyElOpd ty) = ppr ty
   ppr (TyElKindApp _ ki) = text "@" <> ppr ki
-  ppr TyElTilde = text "~"
-  ppr TyElBang = text "!"
   ppr (TyElUnpackedness (_, _, unpk)) = ppr unpk
   ppr (TyElDocPrev doc) = ppr doc
 
-tyElStrictness :: TyEl -> Maybe (AnnKeywordId, SrcStrictness)
-tyElStrictness TyElTilde = Just (AnnTilde, SrcLazy)
-tyElStrictness TyElBang = Just (AnnBang, SrcStrict)
-tyElStrictness _ = Nothing
-
 -- | Extract a strictness/unpackedness annotation from the front of a reversed
 -- 'TyEl' list.
-pStrictMark
+pUnpackedness
   :: [Located TyEl] -- reversed TyEl
-  -> Maybe ( Located HsSrcBang {- a strictness/upnackedness marker -}
+  -> Maybe ( SrcSpan
            , [AddAnn]
+           , SourceText
+           , SrcUnpackedness
            , [Located TyEl] {- remaining TyEl -})
-pStrictMark ((dL->L l1 x1) : (dL->L l2 x2) : xs)
-  | Just (strAnnId, str) <- tyElStrictness x1
-  , TyElUnpackedness (unpkAnns, prag, unpk) <- x2
-  = Just ( cL (combineSrcSpans l1 l2) (HsSrcBang prag unpk str)
-         , unpkAnns ++ [AddAnn strAnnId l1]
-         , xs )
-pStrictMark ((dL->L l x1) : xs)
-  | Just (strAnnId, str) <- tyElStrictness x1
-  = Just ( cL l (HsSrcBang NoSourceText NoSrcUnpack str)
-         , [AddAnn strAnnId l]
-         , xs )
-pStrictMark ((dL->L l x1) : xs)
+pUnpackedness ((dL->L l x1) : xs)
   | TyElUnpackedness (anns, prag, unpk) <- x1
-  = Just ( cL l (HsSrcBang prag unpk NoSrcStrict)
-         , anns
-         , xs )
-pStrictMark _ = Nothing
+  = Just (l, anns, prag, unpk, xs)
+pUnpackedness _ = Nothing
 
 pBangTy
   :: LHsType GhcPs  -- a type to be wrapped inside HsBangTy
@@ -1422,12 +1356,23 @@ pBangTy
      , P ()           {- add annotations -}
      , [Located TyEl] {- remaining TyEl -})
 pBangTy lt@(dL->L l1 _) xs =
-  case pStrictMark xs of
+  case pUnpackedness xs of
     Nothing -> (False, lt, pure (), xs)
-    Just (dL->L l2 strictMark, anns, xs') ->
+    Just (l2, anns, prag, unpk, xs') ->
       let bl = combineSrcSpans l1 l2
-          bt = HsBangTy noExtField strictMark lt
+          bt = addUnpackedness (prag, unpk) lt
       in (True, cL bl bt, addAnnsAt bl anns, xs')
+
+mkBangTy :: SrcStrictness -> LHsType GhcPs -> HsType GhcPs
+mkBangTy strictness =
+  HsBangTy noExtField (HsSrcBang NoSourceText NoSrcUnpack strictness)
+
+addUnpackedness :: (SourceText, SrcUnpackedness) -> LHsType GhcPs -> HsType GhcPs
+addUnpackedness (prag, unpk) (L _ (HsBangTy x bang t))
+  | HsSrcBang NoSourceText NoSrcUnpack strictness <- bang
+  = HsBangTy x (HsSrcBang prag unpk strictness) t
+addUnpackedness (prag, unpk) t
+  = HsBangTy noExtField (HsSrcBang prag unpk NoSrcStrict) t
 
 -- | Merge a /reversed/ and /non-empty/ soup of operators and operands
 --   into a type.
@@ -1479,26 +1424,6 @@ mergeOps all_xs = go (0 :: Int) [] id all_xs
     go _ _ _ ((dL->L l (TyElDocPrev _)):_) =
       failOpDocPrev l
 
-    -- to improve error messages, we do a bit of guesswork to determine if the
-    -- user intended a '!' or a '~' as a strictness annotation
-    go k acc ops_acc ((dL->L l x) : xs)
-      | Just (_, str) <- tyElStrictness x
-      , let guess [] = True
-            guess ((dL->L _ (TyElOpd _)):_) = False
-            guess ((dL->L _ (TyElOpr _)):_) = True
-            guess ((dL->L _ (TyElKindApp _ _)):_) = False
-            guess ((dL->L _ (TyElTilde)):_) = True
-            guess ((dL->L _ (TyElBang)):_) = True
-            guess ((dL->L _ (TyElUnpackedness _)):_) = True
-            guess ((dL->L _ (TyElDocPrev _)):xs') = guess xs'
-            guess _ = panic "mergeOps.go.guess: Impossible Match"
-                      -- due to #15884
-        in guess xs
-      = if not (null acc) && (k > 1 || length acc > 1)
-        then do { a <- eitherToP (mergeOpsAcc acc)
-                ; failOpStrictnessCompound (cL l str) (ops_acc a) }
-        else failOpStrictnessPosition (cL l str)
-
     -- clause [opr]:
     -- when we encounter an operator, we must have accumulated
     -- something for its rhs, and there must be something left
@@ -1511,16 +1436,6 @@ mergeOps all_xs = go (0 :: Int) [] id all_xs
       where
         isTyElOpd (dL->L _ (TyElOpd _)) = True
         isTyElOpd _ = False
-
-    -- clause [opr.1]: interpret 'TyElTilde' as an operator
-    go k acc ops_acc ((dL->L l TyElTilde):xs) =
-      let op = eqTyCon_RDR
-      in go k acc ops_acc (cL l (TyElOpr op):xs)
-
-    -- clause [opr.2]: interpret 'TyElBang' as an operator
-    go k acc ops_acc ((dL->L l TyElBang):xs) =
-      let op = mkUnqual tcClsName (fsLit "!")
-      in go k acc ops_acc (cL l (TyElOpr op):xs)
 
     -- clause [opd]:
     -- whenever an operand is encountered, it is added to the accumulator
@@ -1700,7 +1615,7 @@ This approach does not suffer from the issues of 'isFunLhs':
 --   into a data constructor.
 --
 -- User input: @C !A B -- ^ doc@
--- Input to 'mergeDataCon': ["doc", B, !, A, C]
+-- Input to 'mergeDataCon': ["doc", B, !A, C]
 -- Output: (C, PrefixCon [!A, B], "doc")
 --
 -- See Note [Parsing data constructors is hard]
@@ -1950,6 +1865,8 @@ class b ~ (Body b) GhcPs => DisambECP b where
   mkHsAsPatPV :: SrcSpan -> Located RdrName -> Located b -> PV (Located b)
   -- | Disambiguate "~a" (lazy pattern)
   mkHsLazyPatPV :: SrcSpan -> Located b -> PV (Located b)
+  -- | Disambiguate "!a" (bang pattern)
+  mkHsBangPatPV :: SrcSpan -> Located b -> PV (Located b)
   -- | Disambiguate tuple sections and unboxed sums
   mkSumOrTuplePV :: SrcSpan -> Boxity -> SumOrTuple b -> PV (Located b)
 
@@ -2039,6 +1956,8 @@ instance p ~ GhcPs => DisambECP (HsCmd p) where
     pprPrefixOcc (unLoc v) <> text "@" <> ppr c
   mkHsLazyPatPV l c = cmdFail l $
     text "~" <> ppr c
+  mkHsBangPatPV l c = cmdFail l $
+    text "!" <> ppr c
   mkSumOrTuplePV l boxity a = cmdFail l (pprSumOrTuple boxity a)
 
 cmdFail :: SrcSpan -> SDoc -> PV a
@@ -2083,21 +2002,20 @@ instance p ~ GhcPs => DisambECP (HsExpr p) where
     checkRecordSyntax (cL l r)
   mkHsNegAppPV l a = return $ cL l (NegApp noExtField a noSyntaxExpr)
   mkHsSectionR_PV l op e = return $ cL l (SectionR noExtField op e)
-  mkHsViewPatPV l a b = patSynErr l (ppr a <+> text "->" <+> ppr b) empty
-  mkHsAsPatPV l v e = do
-    opt_TypeApplications <- getBit TypeApplicationsBit
-    let msg | opt_TypeApplications
-            = "Type application syntax requires a space before '@'"
-            | otherwise
-            = "Did you mean to enable TypeApplications?"
-    patSynErr l (pprPrefixOcc (unLoc v) <> text "@" <> ppr e) (text msg)
-  mkHsLazyPatPV l e = patSynErr l (text "~" <> ppr e) empty
+  mkHsViewPatPV l a b = patSynErr "View pattern" l (ppr a <+> text "->" <+> ppr b) empty
+  mkHsAsPatPV l v e =
+    patSynErr "@-pattern" l (pprPrefixOcc (unLoc v) <> text "@" <> ppr e) $
+    text "Type application syntax requires a space before '@'"
+  mkHsLazyPatPV l e = patSynErr "Lazy pattern" l (text "~" <> ppr e) $
+    text "Did you mean to add a space after the '~'?"
+  mkHsBangPatPV l e = patSynErr "Bang pattern" l (text "!" <> ppr e) $
+    text "Did you mean to add a space after the '!'?"
   mkSumOrTuplePV = mkSumOrTupleExpr
 
-patSynErr :: SrcSpan -> SDoc -> SDoc -> PV (LHsExpr GhcPs)
-patSynErr l e explanation =
+patSynErr :: String -> SrcSpan -> SDoc -> SDoc -> PV (LHsExpr GhcPs)
+patSynErr item l e explanation =
   do { addError l $
-        sep [text "Pattern syntax in expression context:",
+        sep [text item <+> text "in expression context:",
              nest 4 (ppr e)] $$
         explanation
      ; return (cL l hsHoleExpr) }
@@ -2108,21 +2026,14 @@ hsHoleExpr = HsUnboundVar noExtField (mkVarOcc "_")
 -- | See Note [Ambiguous syntactic categories] and Note [PatBuilder]
 data PatBuilder p
   = PatBuilderPat (Pat p)
-  | PatBuilderBang SrcSpan (Located (PatBuilder p))
   | PatBuilderPar (Located (PatBuilder p))
   | PatBuilderApp (Located (PatBuilder p)) (Located (PatBuilder p))
   | PatBuilderOpApp (Located (PatBuilder p)) (Located RdrName) (Located (PatBuilder p))
   | PatBuilderVar (Located RdrName)
   | PatBuilderOverLit (HsOverLit GhcPs)
 
-patBuilderBang :: SrcSpan -> Located (PatBuilder p) -> Located (PatBuilder p)
-patBuilderBang bang p =
-  cL (bang `combineSrcSpans` getLoc p) $
-  PatBuilderBang bang p
-
 instance Outputable (PatBuilder GhcPs) where
   ppr (PatBuilderPat p) = ppr p
-  ppr (PatBuilderBang _ (L _ p)) = text "!" <+> ppr p
   ppr (PatBuilderPar (L _ p)) = parens (ppr p)
   ppr (PatBuilderApp (L _ p1) (L _ p2)) = ppr p1 <+> ppr p2
   ppr (PatBuilderOpApp (L _ p1) op (L _ p2)) = ppr p1 <+> ppr op <+> ppr p2
@@ -2143,9 +2054,7 @@ instance DisambECP (PatBuilder GhcPs) where
   mkHsLetPV l _ _ = addFatalError l $ text "(let ... in ...)-syntax in pattern"
   type InfixOp (PatBuilder GhcPs) = RdrName
   superInfixOp m = m
-  mkHsOpAppPV l p1 op p2 = do
-    warnSpaceAfterBang op (getLoc p2)
-    return $ cL l $ PatBuilderOpApp p1 op p2
+  mkHsOpAppPV l p1 op p2 = return $ cL l $ PatBuilderOpApp p1 op p2
   mkHsCasePV l _ _ = addFatalError l $ text "(case ... of ...)-syntax in pattern"
   type FunArg (PatBuilder GhcPs) = PatBuilder GhcPs
   superFunArg m = m
@@ -2174,9 +2083,7 @@ instance DisambECP (PatBuilder GhcPs) where
       PatBuilderOverLit pos_lit -> return (cL lp pos_lit)
       _ -> patFail l (text "-" <> ppr p)
     return $ cL l (PatBuilderPat (mkNPat lit (Just noSyntaxExpr)))
-  mkHsSectionR_PV l op p
-    | isBangRdr (unLoc op) = return $ cL l $ PatBuilderBang (getLoc op) p
-    | otherwise = patFail l (pprInfixOcc (unLoc op) <> ppr p)
+  mkHsSectionR_PV l op p = patFail l (pprInfixOcc (unLoc op) <> ppr p)
   mkHsViewPatPV l a b = do
     p <- checkLPat b
     return $ cL l (PatBuilderPat (ViewPat noExtField a p))
@@ -2186,6 +2093,11 @@ instance DisambECP (PatBuilder GhcPs) where
   mkHsLazyPatPV l e = do
     p <- checkLPat e
     return $ cL l (PatBuilderPat (LazyPat noExtField p))
+  mkHsBangPatPV l e = do
+    p <- checkLPat e
+    let pb = BangPat noExtField p
+    hintBangPat l pb
+    return $ cL l (PatBuilderPat pb)
   mkSumOrTuplePV = mkSumOrTuplePat
 
 checkUnboxedStringLitPat :: Located (HsLit GhcPs) -> PV ()
@@ -2205,19 +2117,6 @@ mkPatRec (unLoc -> PatBuilderVar c) (HsRecFields fs dd)
        return (PatBuilderPat (ConPatIn c (RecCon (HsRecFields fs dd))))
 mkPatRec p _ =
   addFatalError (getLoc p) $ text "Not a record constructor:" <+> ppr p
-
--- | Warn about missing space after bang
-warnSpaceAfterBang :: Located RdrName -> SrcSpan -> PV ()
-warnSpaceAfterBang (dL->L opLoc op) argLoc = do
-    bang_on <- getBit BangPatBit
-    when (not bang_on && noSpace && isBangRdr op) $
-      addWarning Opt_WarnSpaceAfterBang span msg
-    where
-      span = combineSrcSpans opLoc argLoc
-      noSpace = srcSpanEnd opLoc == srcSpanStart argLoc
-      msg = text "Did you forget to enable BangPatterns?" $$
-            text "If you mean to bind (!) then perhaps you want" $$
-            text "to add a space after the bang for clarity."
 
 {- Note [Ambiguous syntactic categories]
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
@@ -3014,18 +2913,6 @@ failOpDocPrev loc = addFatalError loc msg
   where
     msg = text "Unexpected documentation comment."
 
-failOpStrictnessCompound :: Located SrcStrictness -> LHsType GhcPs -> P a
-failOpStrictnessCompound (dL->L _ str) (dL->L loc ty) = addFatalError loc msg
-  where
-    msg = text "Strictness annotation applied to a compound type." $$
-          text "Did you mean to add parentheses?" $$
-          nest 2 (ppr str <> parens (ppr ty))
-
-failOpStrictnessPosition :: Located SrcStrictness -> P a
-failOpStrictnessPosition (dL->L loc _) = addFatalError loc msg
-  where
-    msg = text "Strictness annotation cannot appear in this position."
-
 -----------------------------------------------------------------------------
 -- Misc utils
 
@@ -3191,11 +3078,11 @@ no effect on the error messages.
 -}
 
 -- | Hint about bang patterns, assuming @BangPatterns@ is off.
-hintBangPat :: SrcSpan -> PatBuilder GhcPs -> PV ()
+hintBangPat :: SrcSpan -> Pat GhcPs -> PV ()
 hintBangPat span e = do
     bang_on <- getBit BangPatBit
     unless bang_on $
-      addFatalError span
+      addError span
         (text "Illegal bang-pattern (use BangPatterns):" $$ ppr e)
 
 data SumOrTuple b
