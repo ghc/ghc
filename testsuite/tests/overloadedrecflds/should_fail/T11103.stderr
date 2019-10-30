@@ -1,6 +1,6 @@
 
-T11103.hs:13:3: error:
+T11103.hs:13:2: error:
     Ambiguous occurrence ‘Main.foo’
-    It could refer to either the field ‘foo’,
-                             defined at T11103.hs:11:16
-                          or the field ‘foo’, defined at T11103.hs:10:16
+    It could refer to
+       either the field ‘foo’, defined at T11103.hs:11:16
+           or the field ‘foo’, defined at T11103.hs:10:16
