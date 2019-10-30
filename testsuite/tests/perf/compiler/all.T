@@ -7,15 +7,24 @@ def no_lint(name, opts):
 
 setTestOpts(no_lint)
 
+# Use `+RTS -G1` for more stable residency measurements. Note [residency].
+residency_opts = [
+    extra_hc_opts('+RTS -G1 -A256k -RTS'),
+    # The nonmoving collector does not support -G1
+    omit_ways(['nonmoving', 'nonmoving_thr', 'nonmoving_thr_ghc'])
+]
 
 # Note [residency]
+# ~~~~~~~~~~~~~~~~
 #
 # Residency (peak_megabytes_allocated and max_bytes_used) is sensitive
 # to when the major GC runs, which makes it inherently inaccurate.
 # Sometime an innocuous change somewhere can shift things around such
 # that the samples occur at a different time, and the residency
 # appears to change (up or down) when the underlying profile hasn't
-# really changed.
+# really changed. To further minimize this effect we run with a single
+# generation (meaning we get a residency sample on every GC) with a small
+# allocation area (as suggested in #17387).
 #
 # However, please don't just ignore changes in residency.  If you see
 # a change in one of these figures, please check whether it is real or
@@ -37,9 +46,8 @@ test('T1969',
           # Leave -dcore-lint on for this one test, so that we have something
           # that will catch a regression in -dcore-lint performance.
 
-      # Use `+RTS -G1` for more stable residency measurements. Note [residency].
-      extra_hc_opts('+RTS -G1 -RTS')
-      ],
+      residency_opts,
+     ],
      compile,
      [''])
 
@@ -60,9 +68,7 @@ test('T3294',
       collect_compiler_stats('max_bytes_used',15),
       collect_compiler_stats('bytes allocated', 1),
       conf_3294,
-
-      # Use `+RTS -G1` for more stable residency measurements. Note [residency].
-      extra_hc_opts('+RTS -G1 -RTS')
+      residency_opts,
       ],
      compile,
      [''])
@@ -76,9 +82,7 @@ test('T4801',
       # collect_compiler_stats('max_bytes_used',5),
       only_ways(['normal']),
       extra_hc_opts('-static'),
-
-      # Use `+RTS -G1` for more stable residency measurements. Note [residency].
-      extra_hc_opts('+RTS -G1 -RTS')
+      residency_opts
       ],
      compile,
      [''])
@@ -90,10 +94,8 @@ test('T3064',
       # deactivated for now, as this metric became too volatile recently
       # collect_compiler_stats('max_bytes_used',20)
 
-       only_ways(['normal']),
-
-       # Use `+RTS -G1` for more stable residency measurements. Note [residency].
-       extra_hc_opts('+RTS -G1 -RTS')
+      only_ways(['normal']),
+      residency_opts
       ],
      compile,
      [''])
@@ -171,9 +173,7 @@ test('T9675',
        # Note [residency]
        collect_compiler_stats(['max_bytes_used','peak_megabytes_allocated'],15),
        collect_compiler_stats('bytes allocated',2),
-
-       # Use `+RTS -G1` for more stable residency measurements. Note [residency].
-       extra_hc_opts('+RTS -G1 -RTS')
+       residency_opts
       ],
      compile,
      [''])
@@ -222,9 +222,7 @@ test('T9233',
 test('T10370',
      [ only_ways(['optasm']),
        collect_compiler_stats(['max_bytes_used','peak_megabytes_allocated'], 15),
-
-       # Use `+RTS -G1` for more stable residency measurements. Note [residency].
-       extra_hc_opts('+RTS -G1 -RTS')
+       residency_opts
      ],
      compile,
      [''])
@@ -383,11 +381,7 @@ test('Naperian',
 test ('T9630',
       [ collect_compiler_stats('max_bytes_used',15), # Note [residency]
       extra_clean(['T9630a.hi', 'T9630a.o']),
-
-      # Use `+RTS -G1` for more stable residency measurements. Note [residency].
-      extra_hc_opts('+RTS -G1 -RTS'),
-      # The nonmoving collector does not support -G1
-      omit_ways(['nonmoving', 'nonmoving_thr', 'nonmoving_thr_ghc'])
+      residency_opts,
       ],
       multimod_compile,
       ['T9630', '-v0 -O'])
