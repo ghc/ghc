@@ -1,4 +1,4 @@
 
 T15527.hs:4:6: error:
-    Pattern syntax in expression context: (.)@Int
-    Did you mean to enable TypeApplications?
+    Illegal visible type application ‘@Int’
+      Perhaps you intended to use TypeApplications

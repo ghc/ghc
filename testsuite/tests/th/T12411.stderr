@@ -1,4 +1,6 @@
 
 T12411.hs:4:1: error:
-    Pattern syntax in expression context: pure@Q
-    Did you mean to enable TypeApplications?
+    Illegal visible type application ‘@Q’
+      Perhaps you intended to use TypeApplications
+
+T12411.hs:4:7: error: Not in scope: type constructor or class ‘Q’

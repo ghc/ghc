@@ -1,4 +1,7 @@
 
+T16270.hs:2:12: warning:
+    -Werror=missing-space-after-bang is deprecated: bang patterns can no longer be written with a space
+
 T16270.hs:7:1: warning: [-Wtabs (in -Wdefault)]
     Tab character found here, and in five further locations.
     Please use spaces instead.
@@ -46,10 +49,9 @@ T16270.hs:23:10: error:
     Perhaps you intended to use GADTs or a similar language
     extension to enable syntax: data T where
 
-T16270.hs:25:12: error: [-Wmissing-space-after-bang (in -Wdefault), -Werror=missing-space-after-bang]
-    Did you forget to enable BangPatterns?
-    If you mean to bind (!) then perhaps you want
-    to add a space after the bang for clarity.
+T16270.hs:25:12: error:
+    Illegal bang-pattern (use BangPatterns):
+    !i
 
 T16270.hs:27:9: error:
     Multi-way if-expressions need MultiWayIf turned on
@@ -57,13 +59,13 @@ T16270.hs:27:9: error:
 T16270.hs:29:9: error:
     Multi-way if-expressions need MultiWayIf turned on
 
-T16270.hs:32:6: Illegal lambda-case (use LambdaCase)
+T16270.hs:32:6: error: Illegal lambda-case (use LambdaCase)
 
-T16270.hs:35:5:
+T16270.hs:35:5: error:
     Use NumericUnderscores to allow underscores in integer literals
 
-T16270.hs:37:5:
-    primitive string literal must contain only characters <= '/xFF'
+T16270.hs:37:5: error:
+    primitive string literal must contain only characters <= '\xFF'
 
 T16270.hs:43:1: error:
     parse error (possibly incorrect indentation or mismatched brackets)

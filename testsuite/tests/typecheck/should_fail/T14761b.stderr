@@ -1,5 +1,2 @@
 
-T14761b.hs:5:21: error:
-    Strictness annotation applied to a compound type.
-    Did you mean to add parentheses?
-      !(Maybe Int)
+T14761b.hs:5:19: error: Operator applied to too few arguments: !
