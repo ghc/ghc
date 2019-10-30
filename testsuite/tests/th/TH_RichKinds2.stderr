@@ -1,5 +1,5 @@
 
-TH_RichKinds2.hs:25:4: warning:
+TH_RichKinds2.hs:25:2: warning:
     data SMaybe_0 :: (k_0 -> *) -> GHC.Maybe.Maybe k_0 -> * where
     SNothing_2 :: SMaybe_0 s_3 'GHC.Maybe.Nothing
     SJust_4 :: (s_5 a_6) -> SMaybe_0 s_5 ('GHC.Maybe.Just a_6)

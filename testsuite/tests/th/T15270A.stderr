@@ -1,5 +1,5 @@
 
-T15270A.hs:8:7:
-     Illegal data constructor name: ‘id’
+T15270A.hs:8:6: error:
+    • Illegal data constructor name: ‘id’
       When splicing a TH expression: GHC.Base.id
-     In the untyped splice: $(conE 'id)
+    • In the untyped splice: $(conE 'id)
