@@ -1,4 +1,8 @@
 
-T15527.hs:4:6: error:
-    Pattern syntax in expression context: (.)@Int
-    Did you mean to enable TypeApplications?
+T15527.hs:4:10: error:
+    Variable not in scope:
+      (@)
+        :: ((b0 -> c0) -> (a0 -> b0) -> a0 -> c0)
+           -> t0 -> (Int -> Int) -> (Int -> Int) -> Int -> Int
+
+T15527.hs:4:11: error: Data constructor not in scope: Int

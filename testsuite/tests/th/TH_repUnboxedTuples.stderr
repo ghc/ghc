@@ -4,10 +4,10 @@ case (# 'b', GHC.Types.False #) of
     (# 'b', GHC.Types.False #) -> (# "Two", 2 #)
     (# _, _ #) -> (# "Three", 3 #)
 
-TH_repUnboxedTuples.hs:18:13: warning: [-Woverlapping-patterns (in -Wdefault)]
+TH_repUnboxedTuples.hs:18:11: warning: [-Woverlapping-patterns (in -Wdefault)]
     Pattern match is redundant
     In a case alternative: (# 'a', True #) -> ...
 
-TH_repUnboxedTuples.hs:18:13: warning: [-Woverlapping-patterns (in -Wdefault)]
+TH_repUnboxedTuples.hs:18:11: warning: [-Woverlapping-patterns (in -Wdefault)]
     Pattern match is redundant
     In a case alternative: (# _, _ #) -> ...

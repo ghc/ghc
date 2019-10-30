@@ -49,6 +49,45 @@ Lexical syntax
    reserving ``forall`` as a keyword has significance. For instance, GHC will
    not parse the type signature ``foo :: forall x``.
 
+-  The ``(!)`` operator, when written in prefix form (preceded by whitespace
+   and not followed by whitespace, as in ``f !x = ...``), is interpreted as a
+   bang pattern, contrary to the Haskell Report, which prescribes to treat ``!``
+   as an operator regardless of surrounding whitespace. Note that this does not
+   imply that GHC always enables :extension:`BangPatterns`. Without the
+   extension, GHC will issue a parse error on ``f !x``, asking to enable the
+   extension.
+
+-  Irrefutable patterns must be written in prefix form::
+
+     f ~a ~b = ...    -- accepted by both GHC and the Haskell Report
+     f ~ a ~ b = ...  -- accepted by the Haskell Report but not GHC
+
+   When written in non-prefix form, ``(~)`` is treated by GHC as a regular
+   infix operator.
+
+   See `GHC Proposal #229 <https://github.com/ghc-proposals/ghc-proposals/blob/master/proposals/0229-whitespace-bang-patterns.rst>`__
+   for the precise rules.
+
+-  Strictness annotations in data declarations must be written in prefix form::
+
+     data T = MkT !Int   -- accepted by both GHC and the Haskell Report
+     data T = MkT ! Int  -- accepted by the Haskell Report but not GHC
+
+   See `GHC Proposal #229 <https://github.com/ghc-proposals/ghc-proposals/blob/master/proposals/0229-whitespace-bang-patterns.rst>`__
+   for the precise rules.
+
+-  As-patterns must not be surrounded by whitespace::
+
+     f p@(x, y, z) = ...    -- accepted by both GHC and the Haskell Report
+     f p @ (x, y, z) = ...  -- accepted by the Haskell Report but not GHC
+
+   When surrounded by whitespace, ``(@)`` is treated by GHC as a regular infix
+   operator.
+
+   See `GHC Proposal #229 <https://github.com/ghc-proposals/ghc-proposals/blob/master/proposals/0229-whitespace-bang-patterns.rst>`__
+   for the precise rules.
+
+
 .. _infelicities-syntax:
 
 Context-free syntax

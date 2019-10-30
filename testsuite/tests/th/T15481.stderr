@@ -1,4 +1,4 @@
-T15481.hs:(7,19)-(10,63): Splicing expression
+T15481.hs:(7,18)-(10,64): Splicing expression
     recover
       (stringE "reifyFixity failed")
       (do foo <- newName "foo"

@@ -52,6 +52,7 @@ typecheckPlugin [name, "typecheck"] _ tc
 typecheckPlugin _ _ tc = return tc
 
 metaPlugin' :: [CommandLineOption] -> LHsExpr GhcTc -> TcM (LHsExpr GhcTc)
+metaPlugin' opts (L l (HsPar x e)) = (\e' -> L l (HsPar x e')) <$> metaPlugin' opts e
 metaPlugin' [name, "meta"] (L _ (HsApp noExt (L l (HsVar _ (L _ id))) e))
   | occNameString (getOccName id) == name
   = return e

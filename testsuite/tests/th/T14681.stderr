@@ -1,6 +1,6 @@
-T14681.hs:7:3-31: Splicing declarations
+T14681.hs:7:2-32: Splicing declarations
     [d| f = \ (Identity x) -> x |] ======> f = \ (Identity x) -> x
-T14681.hs:(8,3)-(9,62): Splicing declarations
+T14681.hs:(8,2)-(9,63): Splicing declarations
     [d| g = $(pure
                 $ VarE '(+) `AppE` LitE (IntegerL (- 1))
                     `AppE` (LitE (IntegerL (- 1)))) |]
