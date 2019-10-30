@@ -418,38 +418,19 @@ gcCostCentreStacks (CostCentreStack *ccs)
     }
 }
 
-#if defined(PROFILING)
-static bool objectContains (ObjectCode *oc, const void *addr)
-{
-    int i;
-
-     if (oc != NULL) {
-        for (i = 0; i < oc->n_sections; i++) {
-            if (oc->sections[i].kind != SECTIONKIND_OTHER) {
-                if ((W_)addr >= (W_)oc->sections[i].start &&
-                    (W_)addr <  (W_)oc->sections[i].start
-                                + oc->sections[i].size) {
-                    return true;
-                }
-            }
-        }
-    }
-
-     return false;
-}
-#endif /* PROFILING */
-
 //
-// Remove all CostCentres which are statically allocated in the given object
-// from the global CC_LIST.
+// Remove from the global CC_LIST all CostCentres which are statically allocated
+// in an unloaded object that we are about to free in this GC cycle.
 //
-static void gcCostCentres(ObjectCode *oc)
+static void gcCostCentres(OCSectionIndices *s_indices)
 {
     CostCentre *cc, *prev, *next;
+    ObjectCode *oc;
     prev = NULL;
     for (cc = CC_LIST; cc != NULL; cc = next) {
         next = cc->link;
-        if (objectContains(oc, cc)) {
+        oc = findOC(s_indices, cc);
+        if (oc != NULL && oc->referenced == 0) {
             if (prev == NULL) {
                 CC_LIST = cc->link;
             } else {
@@ -465,10 +446,22 @@ static void gcCostCentres(ObjectCode *oc)
 // Look through the unloadable objects, and any object that is still
 // marked as unreferenced can be physically unloaded, because we
 // have no references to it.
+#if defined(PROFILING)
+static void pruneUnreferencedObjs (OCSectionIndices *s_indices)
+#else /* PROFILING */
 static void pruneUnreferencedObjs (void)
+#endif /* PROFILING */
 {
   ObjectCode *oc, *prev, *next;
   prev = NULL;
+
+#if defined(PROFILING)
+  // At this point, we know what object should be unloaded based on the
+  // referenced field in its metadata ObjetCode* struct. Thus, we can traverse
+  // CC_LIST to prune CCs that belong to one of the unloaded objects.
+  gcCostCentres(s_indices);
+#endif /* PROFILING */
+
   for (oc = unloaded_objects; oc; oc = next) {
       next = oc->next;
       if (oc->referenced == 0) {
@@ -477,12 +470,6 @@ static void pruneUnreferencedObjs (void)
           } else {
               prev->next = oc->next;
           }
-
-#if defined(PROFILING)
-          // The CCS tree isn't keeping this object alive, and it is unloaded,
-          // so we can prune the global CC_LIST of any CCs from this object.
-          gcCostCentres(oc);
-#endif /* PROFILING */
 
           IF_DEBUG(linker, debugBelch("Unloading object file %" PATH_FMT "\n",
                                       oc->fileName));
@@ -603,10 +590,14 @@ void checkUnload (StgClosure *static_objects)
 
 #endif /* PROFILING */
 
+#if defined(PROFILING)
+  pruneUnreferencedObjs(s_indices);
+#else /* PROFILING */
+  pruneUnreferencedObjs();
+#endif /* PROFILING */
+  pruneUnreferencedNativeObjs();
   freeOCSectionIndices(s_indices);
 
-  pruneUnreferencedObjs();
-  pruneUnreferencedNativeObjs();
   freeHashTable(addrs, NULL);
 
   RELEASE_LOCK(&linker_unloaded_mutex);
