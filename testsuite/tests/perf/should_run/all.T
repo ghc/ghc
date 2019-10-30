@@ -3,15 +3,15 @@
 # See Note [Solving from instances when interacting Dicts]
 
 test('T5835',
-     [collect_stats('max_bytes_used',10),
-       only_ways(['normal'])
-       ],
+     [collect_runtime_residency(10),
+      only_ways(['normal'])
+      ],
      compile_and_run,
      ['-O'])
 
 test('T12791',
-     [collect_stats('max_bytes_used',10),
-       only_ways(['normal'])
+     [collect_runtime_residency(10),
+      only_ways(['normal'])
        ],
      compile_and_run,
      ['-O'])
@@ -35,13 +35,9 @@ test('T14955',
 # fortunately the values here are mostly independent of the wordsize,
 # because the test allocates an unboxed array of doubles.
 test('T3586',
-     [collect_stats('peak_megabytes_allocated',1),
+     [collect_runtime_residency(2),
       collect_stats('bytes allocated', 5),
       only_ways(['normal']),
-
-      # Use `+RTS -G1` for more stable residency measurements. Note [residency].
-      # Only 64-bit as we don't have a good 32-bit test environment at the moment
-      when(wordsize(64), extra_hc_opts('+RTS -G1 -RTS'))
       ],
      compile_and_run,
      ['-O'])
@@ -61,15 +57,11 @@ test('T3245', [when(doing_ghci(), extra_hc_opts('-fobject-code'))],
 #
 test('lazy-bs-alloc',
      [extra_files(['../../numeric/should_run/arith011.stdout']),
-      collect_stats('peak_megabytes_allocated', 1),
       collect_stats('bytes allocated',5),
+      collect_runtime_residency(1),
       only_ways(['normal']),
       extra_run_opts('arith011.stdout'),
       ignore_stdout,
-
-      # Use `+RTS -G1` for more stable residency measurements. Note [residency].
-      # Only 64-bit as we don't have a good 32-bit test environment at the moment
-      when(wordsize(64), extra_hc_opts('+RTS -G1 -RTS'))
       ],
      # use a suitably big file, without bloating the repo with a new one:
      compile_and_run,
