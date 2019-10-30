@@ -395,6 +395,7 @@ test('keep-cafs',
     when(opsys('mingw32'), expect_broken (5987)),
     when(platform('powerpc64le-unknown-linux'), expect_broken(11261)),
     when(opsys('freebsd'), expect_broken(16035)),
+    req_rts_linker
   ],
   makefile_test, ['KeepCafs'])
 

@@ -192,6 +192,10 @@ def req_interp( name, opts ):
     if not config.have_interp:
         opts.expect = 'fail'
 
+def req_rts_linker( name, opts ):
+    if not config.have_RTS_linker:
+        opts.expect = 'fail'
+
 def req_th( name, opts ):
     """
     Mark a test as requiring TemplateHaskell. In addition to having interpreter
