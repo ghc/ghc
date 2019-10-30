@@ -1,5 +1,3 @@
 
-T3811f.hs:4:8: error:
-    Strictness annotation applied to a compound type.
-    Did you mean to add parentheses?
-      !(Foo a)
+T3811f.hs:4:7: error:
+    Malformed head of type or class declaration: !Foo a

@@ -1,6 +1,6 @@
 
-TH_spliceD1.hs:10:3:
-    Conflicting definitions for ‘c’
-    Bound at: TH_spliceD1.hs:10:3-5
-              TH_spliceD1.hs:10:3-5
-    In an equation for ‘f’
+TH_spliceD1.hs:10:2: error:
+    • Conflicting definitions for ‘c’
+      Bound at: TH_spliceD1.hs:10:2-6
+                TH_spliceD1.hs:10:2-6
+    • In an equation for ‘f’

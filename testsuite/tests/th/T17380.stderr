@@ -5,7 +5,7 @@ T17380.hs:9:7: error:
     • In the expression: Just "wat"
       In an equation for ‘foo’: foo = Just "wat"
 
-T17380.hs:12:9: error:
+T17380.hs:12:8: error:
     • Couldn't match expected type ‘Maybe String’
                   with actual type ‘Unit (Maybe [Char])’
     • In the expression: Unit Just "wat"
@@ -17,7 +17,7 @@ T17380.hs:15:6: error:
     • In the pattern: Just "wat"
       In an equation for ‘baz’: baz (Just "wat") = Just "frerf"
 
-T17380.hs:18:8: error:
+T17380.hs:18:7: error:
     • Couldn't match expected type ‘Maybe String’
                   with actual type ‘Unit (Maybe [Char])’
     • In the pattern: Unit(Just "wat")

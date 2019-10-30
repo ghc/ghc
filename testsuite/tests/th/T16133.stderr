@@ -1,8 +1,8 @@
 
-T16133.hs:10:3: error:
+T16133.hs:10:2: error:
     Illegal visible kind application ‘@Type’
       Perhaps you intended to use TypeApplications
 
-T16133.hs:10:3: error:
+T16133.hs:10:2: error:
     Illegal visible type application ‘@Int’
       Perhaps you intended to use TypeApplications
