@@ -3,6 +3,7 @@
 #include <stdlib.h>
 #include "elf_compat.h"
 #include "ghcplatform.h"
+
 #if defined(arm_HOST_ARCH)
 
 #include "Elf.h"
