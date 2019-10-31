@@ -46,16 +46,16 @@ import Text.Read.Lex
 
 default () -- avoid any defaulting shenanigans
 
--- | generalisation of 'div' to any instance of 'Real'
+-- | Generalisation of 'div' to any instance of 'Real'
 div' :: (Real a,Integral b) => a -> a -> b
 div' n d = floor ((toRational n) / (toRational d))
 
--- | generalisation of 'divMod' to any instance of 'Real'
+-- | Generalisation of 'divMod' to any instance of 'Real'
 divMod' :: (Real a,Integral b) => a -> a -> (b,a)
 divMod' n d = (f,n - (fromIntegral f) * d) where
     f = div' n d
 
--- | generalisation of 'mod' to any instance of 'Real'
+-- | Generalisation of 'mod' to any instance of 'Real'
 mod' :: (Real a) => a -> a -> a
 mod' n d = n - (fromInteger f) * d where
     f = div' n d
