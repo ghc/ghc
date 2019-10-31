@@ -600,12 +600,18 @@ cvtConstr (ForallC tvs ctxt con)
 
     add_forall _ _ (XConDecl nec) = noExtCon nec
 
+cvtConstr (GadtC [] _strtys _ty)
+  = failWith (text "GadtC must have at least one constructor name")
+
 cvtConstr (GadtC c strtys ty)
   = do  { c'      <- mapM cNameL c
         ; args    <- mapM cvt_arg strtys
         ; (dL->L _ ty') <- cvtType ty
         ; c_ty    <- mk_arr_apps args ty'
         ; returnL $ fst $ mkGadtDecl c' c_ty}
+
+cvtConstr (RecGadtC [] _varstrtys _ty)
+  = failWith (text "RecGadtC must have at least one constructor name")
 
 cvtConstr (RecGadtC c varstrtys ty)
   = do  { c'       <- mapM cNameL c
