@@ -34,9 +34,16 @@ createBCOs bcos = do
   hvals <- fixIO $ \hvs -> do
      let arr = listArray (0, n_bcos-1) hvs
      mapM (createBCO arr) bcos
-  mapM mkRemoteRef hvals
+  mapM valueToRemoteRef hvals
 
-createBCO :: Array Int HValue -> ResolvedBCO -> IO HValue
+data Value = ValueBCO !BCO
+           | ValueOther HValue
+
+valueToRemoteRef :: Value -> IO HValueRef
+valueToRemoteRef (ValueBCO bco)   = mkRemoteRef (unsafeCoerce# bco)
+valueToRemoteRef (ValueOther val) = mkRemoteRef val
+
+createBCO :: Array Int Value -> ResolvedBCO -> IO Value
 createBCO _   ResolvedBCO{..} | resolvedBCOIsLE /= isLittleEndian
   = throwIO (ErrorCall $
         unlines [ "The endianness of the ResolvedBCO does not match"
@@ -58,15 +65,15 @@ createBCO arr bco
         --       non-zero arity BCOs in an AP thunk.
         --
         if (resolvedBCOArity bco > 0)
-           then return (HValue (unsafeCoerce# bco#))
+           then return (ValueBCO (BCO bco#))
            else case mkApUpd0# bco# of { (# final_bco #) ->
-                  return (HValue final_bco) }
+                  return (ValueOther final_bco) }
 
 
 toWordArray :: UArray Int Word64 -> UArray Int Word
 toWordArray = amap fromIntegral
 
-linkBCO' :: Array Int HValue -> ResolvedBCO -> IO BCO
+linkBCO' :: Array Int Value -> ResolvedBCO -> IO BCO
 linkBCO' arr ResolvedBCO{..} = do
   let
       ptrs   = ssElts resolvedBCOPtrs
@@ -90,12 +97,14 @@ linkBCO' arr ResolvedBCO{..} = do
 
 
 -- we recursively link any sub-BCOs while making the ptrs array
-mkPtrsArray :: Array Int HValue -> Word -> [ResolvedBCOPtr] -> IO PtrsArr
+mkPtrsArray :: Array Int Value -> Word -> [ResolvedBCOPtr] -> IO PtrsArr
 mkPtrsArray arr n_ptrs ptrs = do
   marr <- newPtrsArray (fromIntegral n_ptrs)
   let
     fill (ResolvedBCORef n) i =
-      writePtrsArrayHValue i (arr ! n) marr  -- must be lazy!
+      case arr ! n of
+        ValueBCO (BCO bco) -> writePtrsArrayBCO i bco marr
+        ValueOther ptr -> writePtrsArrayHValue i ptr marr  -- must be lazy!
     fill (ResolvedBCOPtr r) i = do
       hv <- localRef r
       writePtrsArrayHValue i hv marr
@@ -110,6 +119,8 @@ mkPtrsArray arr n_ptrs ptrs = do
   zipWithM_ fill ptrs [0..]
   return marr
 
+-- | An array of pointers to unlifted closures. This is rather delicate; we use
+-- 'ArrayArray#' since we don't have an @UnliftedArray#@ yet.
 data PtrsArr = PtrsArr (MutableArray# RealWorld HValue)
 
 newPtrsArray :: Int -> IO PtrsArr
