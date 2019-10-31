@@ -36,7 +36,6 @@ import VarEnv( mkInScopeSet )
 import VarSet( delVarSetList )
 import OccName ( OccName )
 import Outputable
-import DynFlags( DynFlags )
 import NameSet
 import RdrName
 import GHC.Hs.Types( HsIPName(..) )
@@ -2000,7 +1999,7 @@ canEqTyVarHomo ev eq_rel swapped tv1 ps_xi1 xi2 _
 
        ; new_ev <- rewriteEqEvidence ev swapped new_lhs new_rhs lhs_co rhs_co
 
-       ; canEqTyVar2 new_ev eq_rel IsSwapped tv2 (ps_ty1 `mkCastTy` sym_co2) }
+       ; canEqTyVar2 new_ev eq_rel IsSwapped tv2 (ps_xi1 `mkCastTy` sym_co2) }
 
 canEqTyVarHomo ev eq_rel swapped tv1 _ _ ps_ty2
   = canEqTyVar2 ev eq_rel swapped tv1 ps_ty2

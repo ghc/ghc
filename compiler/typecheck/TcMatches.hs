@@ -22,7 +22,7 @@ module TcMatches ( tcMatchesFun, tcGRHS, tcGRHSsPat, tcMatchesCase, tcMatchLambd
 
 import GhcPrelude
 
-import {-# SOURCE #-}   TcExpr( tcSyntaxOp, tcInferSigmaNC, tcInferSigma
+import {-# SOURCE #-}   TcExpr( tcSyntaxOp, tcInferRho, tcInferRhoNC
                               , tcCheckId, tcMonoExpr, tcMonoExprNC
                               , tcPolyExpr, tcPolyExprExpected )
 
