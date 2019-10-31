@@ -88,15 +88,10 @@ tcMatchesFun fn@(L _ fun_name) matches exp_ty
           traceTc "tcMatchesFun" (ppr fun_name $$ ppr exp_ty)
         ; checkArgs fun_name matches
 
-        ; (wrap_gen, (wrap_fun, group))
-            <- tcSkolemiseET (FunSigCtxt fun_name True) exp_ty $ \ exp_rho ->
-                  -- Note [Polymorphic expected type for tcMatchesFun]
-               do { (matches', wrap_fun)
-                       <- matchExpectedFunTys herald (matchesCtOrigin matches) arity exp_rho $
-                          \ pat_tys rhs_ty ->
-                          tcMatches match_ctxt pat_tys rhs_ty matches
-                  ; return (wrap_fun, matches') }
-        ; return (wrap_gen <.> wrap_fun, group) }
+        ; (groups, wrap) <- matchExpectedFunTys herald (FunSigCtxt fun_name True) arity exp_ty $
+            \ pat_tys rhs_ty -> 
+            tcMatches match_ctxt pat_tys rhs_ty matches
+        ; return (wrap, groups) }
   where
     arity = matchGroupArity matches
     herald = text "The equation(s) for"
@@ -133,7 +128,7 @@ tcMatchLambda :: SDoc -- see Note [Herald for matchExpectedFunTys] in TcUnify
               -> ExpRhoType   -- deeply skolemised
               -> TcM (MatchGroup GhcTcId (LHsExpr GhcTcId), HsWrapper)
 tcMatchLambda herald match_ctxt match res_ty
-  = matchExpectedFunTys herald (matchesCtOrigin match) n_pats res_ty $ \ pat_tys rhs_ty ->
+  = matchExpectedFunTys herald GenSigCtxt n_pats res_ty $ \ pat_tys rhs_ty ->
     tcMatches match_ctxt pat_tys rhs_ty match
   where
     n_pats | isEmptyMatchGroup match = 1   -- must be lambda-case

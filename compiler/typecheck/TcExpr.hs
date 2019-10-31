@@ -379,7 +379,7 @@ tcExpr expr@(OpApp fix arg1 op arg2) res_ty
        ; let doc   = text "The first argument of ($) takes"
              orig1 = lexprCtOrigin arg1
        ; (wrap_arg1, [arg2_sigma], op_res_ty) <-
-           matchActualFunTys doc orig1 (Just (unLoc arg1)) 1 arg1_ty
+           matchActualFunTysPart doc orig1 (Just (unLoc arg1)) 1 arg1_ty [] 1
 
            -- have a quick look
        ; (op_res_ty', res_ty', [arg2_sigma'])
@@ -443,7 +443,7 @@ tcExpr expr@(OpApp fix arg1 op arg2) res_ty
 tcExpr expr@(SectionR x op arg2) res_ty
   = do { (op', op_ty) <- tcInferFun op
        ; (wrap_fun, [arg1_ty, arg2_ty], op_res_ty)
-                  <- matchActualFunTys (mk_op_msg op) fn_orig (Just (unLoc op)) 2 op_ty
+                  <- matchActualFunTysPart (mk_op_msg op) fn_orig (Just (unLoc op)) 2 op_ty [] 2
        ; let fun_ty = mkVisFunTy arg1_ty op_res_ty
        ; (fun_ty', res_ty', [arg2_ty'])
             <- tcPerformQuickLook tcQuickLookExprs fn_orig
@@ -466,8 +466,8 @@ tcExpr expr@(SectionL x arg1 op) res_ty
                          | otherwise                            = 2
 
        ; (wrap_fn, (arg1_ty:arg_tys), op_res_ty)
-           <- matchActualFunTys (mk_op_msg op) fn_orig (Just (unLoc op))
-                                n_reqd_args op_ty
+           <- matchActualFunTysPart (mk_op_msg op) fn_orig (Just (unLoc op))
+                                    n_reqd_args op_ty [] n_reqd_args
        ; let fun_ty = mkVisFunTys arg_tys op_res_ty
        ; (fun_ty', res_ty', [arg1_ty'])
             <- tcPerformQuickLook tcQuickLookExprs fn_orig
@@ -1838,7 +1838,7 @@ tcSynArgE orig sigma_ty syn_ty thing_inside
                  , res_wrapper )                   -- :: res_ty_out "->" res_ty
                , arg_wrapper1, [], arg_wrapper2 )  -- :: arg_ty "->" arg_ty_out
              , match_wrapper )         -- :: (arg_ty -> res_ty) "->" rho_ty
-               <- matchExpectedFunTys herald orig 1 (mkCheckExpType rho_ty) $
+               <- matchExpectedFunTys herald GenSigCtxt 1 (mkCheckExpType rho_ty) $
                   \ [arg_ty] res_ty ->
                   do { arg_tc_ty <- expTypeToType arg_ty
                      ; res_tc_ty <- expTypeToType res_ty
@@ -1884,7 +1884,8 @@ tcSynArgA :: CtOrigin
             -- and a wrapper to be applied to the overall expression
 tcSynArgA orig sigma_ty arg_shapes res_shape thing_inside
   = do { (match_wrapper, arg_tys, res_ty)
-           <- matchActualFunTys herald orig Nothing (length arg_shapes) sigma_ty
+           <- matchActualFunTysPart herald orig Nothing (length arg_shapes)
+                                    sigma_ty [] (length arg_shapes)
               -- match_wrapper :: sigma_ty "->" (arg_tys -> res_ty)
        ; ((result, res_wrapper), arg_wrappers)
            <- tc_syn_args_e arg_tys arg_shapes $ \ arg_results ->

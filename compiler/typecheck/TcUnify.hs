@@ -141,7 +141,7 @@ passed in.
 -- Use this one when you have an "expected" type.
 matchExpectedFunTys :: forall a.
                        SDoc   -- See Note [Herald for matchExpectedFunTys]
-                    -> CtOrigin
+                    -> UserTypeCtxt
                     -> Arity
                     -> ExpRhoType  -- deeply skolemised
                     -> ([ExpSigmaType] -> ExpRhoType -> TcM a)
@@ -150,25 +150,24 @@ matchExpectedFunTys :: forall a.
 -- If    matchExpectedFunTys n ty = (_, wrap)
 -- then  wrap : (t1 -> ... -> tn -> ty_r) ~> ty,
 --   where [t1, ..., tn], ty_r are passed to the thing_inside
-matchExpectedFunTys herald ct_orig arity orig_ty thing_inside
+matchExpectedFunTys herald ctx arity orig_ty thing_inside
   = case orig_ty of
       Check ty -> go [] arity ty
       _        -> defer [] arity orig_ty
   where
+    go acc_arg_tys n ty
+      | Just ty' <- tcView ty = go acc_arg_tys n ty'
+
     go acc_arg_tys 0 ty
       = do { result <- thing_inside (reverse acc_arg_tys) (mkCheckExpType ty)
            ; return (result, idHsWrapper) }
 
     go acc_arg_tys n ty
       | not (null tvs && null theta)
-      = do { (wrap1, rho) <- topInstantiate ct_orig ty
-           ; (result, wrap_res) <- go acc_arg_tys n rho
-           ; return (result, wrap_res <.> wrap1) }
+      = do { (wrap_gen, (result, wrap_res)) <- tcSkolemise ctx ty $ \_ -> go acc_arg_tys n
+           ; return (result, wrap_gen <.> wrap_res) }
       where
         (tvs, theta, _) = tcSplitSigmaTy ty
-
-    go acc_arg_tys n ty
-      | Just ty' <- tcView ty = go acc_arg_tys n ty'
 
     go acc_arg_tys n (FunTy { ft_af = af, ft_arg = arg_ty, ft_res = res_ty })
       = ASSERT( af == VisArg )
@@ -289,15 +288,15 @@ matchActualFunTysPart herald ct_orig mb_thing arity orig_ty
     go 0 _ ty = return (idHsWrapper, [], ty)
 
     go n acc_args ty
+      | Just ty' <- tcView ty = go n acc_args ty'
+
+    go n acc_args ty
       | not (null tvs && null theta)
       = do { (wrap1, rho) <- topInstantiate ct_orig ty
            ; (wrap2, arg_tys, res_ty) <- go n acc_args rho
            ; return (wrap2 <.> wrap1, arg_tys, res_ty) }
       where
         (tvs, theta, _) = tcSplitSigmaTy ty
-
-    go n acc_args ty
-      | Just ty' <- tcView ty = go n acc_args ty'
 
     go n acc_args (FunTy { ft_af = af, ft_arg = arg_ty, ft_res = res_ty })
       = ASSERT( af == VisArg )
