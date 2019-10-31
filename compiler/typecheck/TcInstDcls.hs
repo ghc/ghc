@@ -794,7 +794,7 @@ tcDataFamInstHeader
 -- Here the "header" is the bit before the "where"
 tcDataFamInstHeader mb_clsinfo fam_tc imp_vars mb_bndrs fixity
                     hs_ctxt hs_pats m_ksig hs_cons new_or_data
-  = do { (imp_tvs, (exp_tvs, (stupid_theta, lhs_ty)))
+  = do { (imp_tvs, (exp_tvs, (stupid_theta, lhs_ty, lhs_applied_kind)))
             <- pushTcLevelM_                                $
                solveEqualities                              $
                bindImplicitTKBndrs_Q_Skol imp_vars          $
@@ -813,8 +813,15 @@ tcDataFamInstHeader mb_clsinfo fam_tc imp_vars mb_bndrs fixity
                   ; kcConDecls new_or_data res_kind hs_cons
 
                   -- See Note [Datatype return kinds] in TcTyClsDecls, point (7).
-                  ; lhs_ty <- checkExpectedKind_pp pp_lhs lhs_ty lhs_kind res_kind
-                  ; return (stupid_theta, lhs_ty) }
+                  ; (lhs_extra_args, lhs_applied_kind)
+                      <- tcInstInvisibleTyBinders (invisibleTyBndrCount lhs_kind)
+                                                  lhs_kind
+                  ; let lhs_applied_ty = lhs_ty `mkTcAppTys` lhs_extra_args
+                        hs_lhs         = nlHsTyConApp fixity (getName fam_tc) hs_pats
+                  ; _ <- unifyKind (Just (unLoc hs_lhs)) lhs_applied_kind res_kind
+                  ; return ( stupid_theta
+                           , lhs_applied_ty
+                           , lhs_applied_kind ) }
 
        -- See TcTyClsDecls Note [Generalising in tcFamTyPatsGuts]
        -- This code (and the stuff immediately above) is very similar
@@ -828,8 +835,7 @@ tcDataFamInstHeader mb_clsinfo fam_tc imp_vars mb_bndrs fixity
 
        -- Zonk the patterns etc into the Type world
        ; (ze, qtvs)   <- zonkTyBndrs qtvs
-              -- See Note [Unifying data family kinds] about the discardCast
-       ; lhs_ty       <- zonkTcTypeToTypeX ze (discardCast lhs_ty)
+       ; lhs_ty       <- zonkTcTypeToTypeX ze lhs_ty
        ; stupid_theta <- zonkTcTypesToTypesX ze stupid_theta
 
        -- Check that type patterns match the class instance head
@@ -838,12 +844,10 @@ tcDataFamInstHeader mb_clsinfo fam_tc imp_vars mb_bndrs fixity
        ; pats <- case splitTyConApp_maybe lhs_ty of
            Just (_, pats) -> pure pats
            Nothing -> pprPanic "tcDataFamInstHeader" (ppr lhs_ty)
-       ; return (qtvs, pats, typeKind lhs_ty, stupid_theta) }
-          -- See Note [Unifying data family kinds] about why we need typeKind here
+       ; return (qtvs, pats, lhs_applied_kind, stupid_theta) }
   where
     fam_name  = tyConName fam_tc
     data_ctxt = DataKindCtxt fam_name
-    pp_lhs    = pprHsFamInstLHS fam_name mb_bndrs hs_pats fixity hs_ctxt
     exp_bndrs = mb_bndrs `orElse` []
 
     -- See Note [Implementation of UnliftedNewtypes] in TcTyClsDecls, wrinkle (2).
@@ -875,36 +879,6 @@ But here, we're at the top-level of an instance declaration, so
 we actually have a place to put the regeneralised variables.
 Thus: skolemise away. cf. Inst.deeplySkolemise and TcUnify.tcSkolemise
 Examples in indexed-types/should_compile/T12369
-
-Note [Unifying data family kinds]
-~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
-When we kind-check a newtype instance with -XUnliftedNewtypes, we must
-unify the kind of the data family with any declared kind in the instance
-declaration. For example:
-
-  data Color = Red | Blue
-  type family Interpret (x :: Color) :: RuntimeRep where
-    Interpret 'Red = 'IntRep
-    Interpret 'Blue = 'WordRep
-  data family Foo (x :: Color) :: TYPE (Interpret x)
-  newtype instance Foo 'Red :: TYPE IntRep where
-    FooRedC :: Int# -> Foo 'Red
-
-We end up unifying `TYPE (Interpret 'Red)` (the kind of Foo, instantiated
-with 'Red) and `TYPE IntRep` (the declared kind of the instance). This
-unification succeeds, resulting in a coercion. The big question: what to
-do with this coercion? Answer: nothing! A kind annotation on a newtype instance
-is always redundant (except, perhaps, in that it helps guide unification). We
-have a definitive kind for the data family from the data family declaration,
-and so we learn nothing really new from the kind signature on an instance.
-We still must perform this unification (done in the call to checkExpectedKind
-toward the beginning of tcDataFamInstHeader), but the result is unhelpful. If there
-is a cast, it will wrap the lhs_ty, and so we just drop it before splitting the
-lhs_ty to reveal the underlying patterns. Because of the potential of dropping
-a cast like this, we just use typeKind in the result instead of propagating res_kind
-from above.
-
-This Note is wrinkle (3) in Note [Implementation of UnliftedNewtypes] in TcTyClsDecls.
 
 Note [Eta-reduction for data families]
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
