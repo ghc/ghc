@@ -31,6 +31,7 @@ module GHC.Hs.Pat (
 
         mkPrefixConPat, mkCharLitPat, mkNilPat,
 
+        isSimplePat,
         looksLazyPatBind,
         isBangedLPat,
         patNeedsParens, parenthesizePat,
@@ -273,6 +274,7 @@ data Pat p
   -- | Trees that Grow extension point for new constructors
   | XPat
       (XXPat p)
+
 
 -- ---------------------------------------------------------------------
 
@@ -729,6 +731,23 @@ isIrrefutableHsPat
     go (SplicePat {})      = False
 
     go (XPat {})           = False
+
+-- | Is the pattern any of combination of:
+--
+-- - (pat)
+-- - pat :: Type
+-- - ~pat
+-- - !pat
+-- - x (variable)
+isSimplePat :: LPat (GhcPass x) -> Maybe (IdP (GhcPass x))
+isSimplePat p = case unLoc p of
+  ParPat _ x -> isSimplePat x
+  SigPat _ x _ -> isSimplePat x
+  LazyPat _ x -> isSimplePat x
+  BangPat _ x -> isSimplePat x
+  VarPat _ x -> Just (unLoc x)
+  _ -> Nothing
+
 
 {- Note [Unboxed sum patterns aren't irrefutable]
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
