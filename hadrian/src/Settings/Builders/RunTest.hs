@@ -75,6 +75,8 @@ runTestBuilderArgs = builder RunTest ? do
     (acceptPlatform, acceptOS) <- expr . liftIO $
         (,) <$> (maybe False (=="YES") <$> lookupEnv "PLATFORM")
             <*> (maybe False (=="YES") <$> lookupEnv "OS")
+    (testEnv, testMetricsFile) <- expr . liftIO $
+        (,) <$> lookupEnv "TEST_ENV" <*> lookupEnv "METRICS_FILE"
 
     threads     <- shakeThreads <$> expr getShakeOptions
     os          <- getTestSetting TestHostOS
@@ -137,8 +139,13 @@ runTestBuilderArgs = builder RunTest ? do
             , arg "--config", arg $ "timeout_prog=" ++ show (top -/- timeoutProg)
             , arg "--config", arg $ "stats_files_dir=" ++ statsFilesDir
             , arg $ "--threads=" ++ show threads
+            , emitWhenSet testEnv "--test-env"
+            , emitWhenSet testMetricsFile "--metrics-file"
             , getTestArgs -- User-provided arguments from command line.
             ]
+
+      where emitWhenSet Nothing  _       = mempty
+            emitWhenSet (Just v) argName = arg $ unwords [argName, v]
 
 -- | Command line arguments for running GHC's test script.
 getTestArgs :: Args
