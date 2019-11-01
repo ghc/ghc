@@ -303,7 +303,7 @@ hadrian-ghc-in-ghci:
       git config user.name "GHC GitLab CI"
     - |
       THREADS=`mk/detect-cpu-count.sh`
-      make $TEST_TYPE THREADS=$THREADS JUNIT_FILE=../../junit.xml METRICS_FILE=$METRICS_FILE
+      make $TEST_TYPE THREADS=$THREADS JUNIT_FILE=../../junit.xml METRICS_FILE=$METRICS_FILE || (METRICS_FILE=$METRICS_FILE .gitlab/push-test-metrics.sh && false)
     - |
       # Push git notes.
       METRICS_FILE=$METRICS_FILE .gitlab/push-test-metrics.sh
