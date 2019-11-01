@@ -63,7 +63,7 @@ import qualified ErrUtils as Err
 
 import Control.Monad
 import Data.Function
-import Data.List        ( sortBy )
+import Data.List        ( sortBy, mapAccumL )
 import Data.IORef       ( atomicModifyIORef' )
 
 {-
@@ -1089,12 +1089,7 @@ tidyTopBinds hsc_env this_mod unfold_env init_occ_env binds
 
     init_env = (init_occ_env, emptyVarEnv)
 
-    tidy _           env []     = (env, [])
-    tidy cvt_literal env (b:bs)
-        = let (env1, b')  = tidyTopBind dflags this_mod cvt_literal unfold_env
-                                        env b
-              (env2, bs') = tidy cvt_literal env1 bs
-          in  (env2, b':bs')
+    tidy cvt_literal = mapAccumL (tidyTopBind dflags this_mod cvt_literal unfold_env)
 
 ------------------------
 tidyTopBind  :: DynFlags
