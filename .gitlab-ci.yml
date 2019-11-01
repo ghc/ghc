@@ -202,7 +202,15 @@ lint-release-changelogs:
     - mv _build/bindist/ghc*.tar.xz ghc.tar.xz
     - export TOP=$(pwd)
     - cd _build/bindist/ghc-*/ && ./configure --prefix=$TOP/_build/install && make install && cd ../../../
-    - hadrian/build.cabal.sh --flavour=$FLAVOUR -j`mk/detect-cpu-count.sh` --docs=no-sphinx test --summary-junit=./junit.xml --test-compiler=$TOP/_build/install/bin/ghc
+    - |
+      # Prepare to push git notes.
+      METRICS_FILE=$CI_PROJECT_DIR/performance-metrics.tsv
+      git config user.email "ben+ghc-ci@smart-cactus.org"
+      git config user.name "GHC GitLab CI"
+    - hadrian/build.cabal.sh --flavour=$FLAVOUR -j`mk/detect-cpu-count.sh` --docs=no-sphinx test --summary-junit=./junit.xml --test-compiler=$TOP/_build/install/bin/ghc || (METRICS_FILE=$METRICS_FILE .gitlab/push-test-metrics.sh && false)
+    - |
+      # Push git notes.
+      METRICS_FILE=$METRICS_FILE .gitlab/push-test-metrics.sh
   cache:
     key: hadrian
     paths:
@@ -239,7 +247,7 @@ validate-x86_64-linux-deb9-unreg-hadrian:
   stage: full-build
   variables:
     CONFIGURE_ARGS: --enable-unregisterised
-    TEST_ENV: "x86_64-linux-deb9-unreg"
+    TEST_ENV: "x86_64-linux-deb9-unreg-hadrian"
 
 hadrian-ghc-in-ghci:
   <<: *only-default
@@ -790,7 +798,7 @@ nightly-i386-windows-hadrian:
   extends: .build-windows-hadrian
   variables:
     MSYSTEM: MINGW32
-    TEST_ENV: "x86_64-windows-hadrian"
+    TEST_ENV: "i386-windows-hadrian"
   only:
     variables:
       - $NIGHTLY
