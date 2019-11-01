@@ -49,7 +49,7 @@ import TcEvidence
 import TcType
 import Type
 import Coercion
-import TysWiredIn ( typeNatKind, typeSymbolKind )
+import TysWiredIn ( typeNatKind, typeSymbolKind, unitTy, unitDataConId )
 import Id
 import MkId(proxyHashId)
 import Name
@@ -187,7 +187,8 @@ dsHsBind dflags (AbsBinds { abs_tvs = tyvars, abs_ev_vars = dicts
                           , abs_exports = exports
                           , abs_ev_binds = ev_binds
                           , abs_binds = binds, abs_sig = has_sig })
-  = do { ds_binds <- applyWhen (needToRunPmCheck dflags FromSource)
+  = do { ds_binds <- switchOffLevPolyCheck has_sig exports $
+                     applyWhen (needToRunPmCheck dflags FromSource)
                                -- FromSource might not be accurate, but at worst
                                -- we do superfluous calls to the pattern match
                                -- oracle.
@@ -197,8 +198,7 @@ dsHsBind dflags (AbsBinds { abs_tvs = tyvars, abs_ev_vars = dicts
                                (addTyCsDs (listToBag dicts))
                                (dsLHsBinds binds)
 
-       ; ds_ev_binds <- switchOffLevPolyCheck has_sig exports $
-                        dsTcEvBinds_s ev_binds
+       ; ds_ev_binds <- dsTcEvBinds_s ev_binds
 
        -- dsAbsBinds does the hard work
        ; dsAbsBinds dflags tyvars dicts exports ds_ev_binds ds_binds has_sig }
@@ -382,7 +382,7 @@ makeCorePair dflags gbl_id is_default_method dict_arity rhs
           NoInlSpec         -> (gbl_id, rhs)
           InlSpecNoInline   -> (gbl_id, rhs)
           InlSpecInlinable  -> (gbl_id `setIdUnfolding` inlinable_unf, rhs)
-          InlSpecCompulsory -> (gbl_id `setIdUnfolding` compulsory_unf, rhs)
+          InlSpecCompulsory -> (gbl_id `setIdUnfolding` compulsory_unf, dummy_rhs)
           InlSpecInline     -> inline_pair
 
   where
@@ -401,6 +401,9 @@ makeCorePair dflags gbl_id is_default_method dict_arity rhs
        | otherwise
        = pprTrace "makeCorePair: arity missing" (ppr gbl_id) $
          (gbl_id `setIdUnfolding` mkInlineUnfolding rhs, rhs)
+
+    dummy_rhs = Var unitDataConId `mkCast`
+                mkUnsafeCo Representational unitTy (idType gbl_id)
 
 dictArity :: [Var] -> Arity
 -- Don't count coercion variables in arity

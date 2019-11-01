@@ -1120,11 +1120,12 @@ certainlyWillInline :: DynFlags -> IdInfo -> Maybe Unfolding
 -- ^ Sees if the unfolding is pretty certain to inline.
 -- If so, return a *stable* unfolding for it, that will always inline.
 certainlyWillInline dflags fn_info
-  = case unfoldingInfo fn_info of
-      CoreUnfolding { uf_tmpl = e, uf_guidance = g }
-        | loop_breaker -> Nothing      -- Won't inline, so try w/w
-        | noinline     -> Nothing      -- See Note [Worker-wrapper for NOINLINE functions]
-        | otherwise    -> do_cunf e g  -- Depends on size, so look at that
+  = case fn_unf of
+      CoreUnfolding { uf_tmpl = e, uf_guidance = g, uf_src = src }
+        | loop_breaker   -> Nothing     -- Won't inline, so try w/w
+        | noinline       -> Nothing     -- See Note [Worker-wrapper for NOINLINE functions]
+        | compulsory src -> Just fn_unf
+        | otherwise      -> do_cunf e g -- Depends on size, so look at that
 
       DFunUnfolding {} -> Just fn_unf  -- Don't w/w DFuns; it never makes sense
                                        -- to do so, and even if it is currently a
@@ -1136,6 +1137,9 @@ certainlyWillInline dflags fn_info
     loop_breaker = isStrongLoopBreaker (occInfo fn_info)
     noinline     = inlinePragmaSpec (inlinePragInfo fn_info) == InlSpecNoInline
     fn_unf       = unfoldingInfo fn_info
+
+    compulsory InlineCompulsory = True
+    compulsory _                = False
 
     do_cunf :: CoreExpr -> UnfoldingGuidance -> Maybe Unfolding
     do_cunf _ UnfNever     = Nothing

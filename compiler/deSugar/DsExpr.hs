@@ -1141,7 +1141,8 @@ checkLevPolyFun :: Var -> Type -> DsM ()
 checkLevPolyFun var ty
   | hasNoBinding var
   = do { env <- getLclEnv
-       ; when (dsl_lev_poly_check env && not (null bad_tys)) $
+       ; pprTrace "clpf" (ppr (dsl_lev_poly_check env)) $
+         when (dsl_lev_poly_check env && not (null bad_tys)) $
          levPolyPrimopErr var ty bad_tys }
   | otherwise
   = return ()
