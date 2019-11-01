@@ -962,7 +962,7 @@ unify_ty env ty1 ty2 kco
   | Just ty2' <- tcView ty2   = unify_ty env ty1 ty2' kco
   | CastTy ty1' co <- ty1     = if um_unif env
                                 then unify_ty env ty1' ty2 (co `mkTransCo` kco)
-                                else -- See Note [Matching in the presence of casts]
+                                else -- See Note [Matching in the presence of casts (1)]
                                      do { subst <- getSubst env
                                         ; let co' = substCo subst co
                                         ; unify_ty env ty1' ty2 (co' `mkTransCo` kco) }
@@ -1422,7 +1422,7 @@ ty_co_match menv subst ty co lkco rkco
 
 ty_co_match menv subst ty co lkco rkco
   | CastTy ty' co' <- ty
-     -- See Note [Matching in the presence of casts]
+     -- See Note [Matching in the presence of casts (1)]
   = let empty_subst  = mkEmptyTCvSubst (rnInScopeSet (me_env menv))
         substed_co_l = substCo (liftEnvSubstLeft empty_subst subst)  co'
         substed_co_r = substCo (liftEnvSubstRight empty_subst subst) co'
