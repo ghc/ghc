@@ -333,7 +333,12 @@ addTickLHsBind (dL->L pos (funBind@(FunBind { fun_id = (dL->L _ id)  }))) = do
 -- TODO: Revisit this
 addTickLHsBind (dL->L pos (pat@(PatBind { pat_lhs = lhs
                                         , pat_rhs = rhs }))) = do
-  let name = "(...)"
+
+  let simplePatId = isSimplePat lhs
+
+  -- TODO: better name for rhs's for non-simple patterns?
+  let name = maybe "(...)" getOccString simplePatId
+
   (fvs, rhs') <- getFreeVars $ addPathEntry name $ addTickGRHSs False False rhs
   let pat' = pat { pat_rhs = rhs'}
 
@@ -345,24 +350,42 @@ addTickLHsBind (dL->L pos (pat@(PatBind { pat_lhs = lhs
     then return (cL pos pat')
     else do
 
-    -- Allocate the ticks
-    rhs_tick <- bindTick density name pos fvs
-    let patvars = map getOccString (collectPatBinders lhs)
-    patvar_ticks <- mapM (\v -> bindTick density v pos fvs) patvars
-
-    -- Add to pattern
     let mbCons = maybe id (:)
-        rhs_ticks = rhs_tick `mbCons` fst (pat_ticks pat')
-        patvar_tickss = zipWith mbCons patvar_ticks
-                        (snd (pat_ticks pat') ++ repeat [])
+
+    let (initial_rhs_ticks, initial_patvar_tickss) = pat_ticks pat'
+
+    -- Allocate the ticks
+
+    rhs_tick <- bindTick density name pos fvs
+    let rhs_ticks = rhs_tick `mbCons` initial_rhs_ticks
+
+    patvar_tickss <- case simplePatId of
+      Just{} -> return initial_patvar_tickss
+      Nothing -> do
+        let patvars = map getOccString (collectPatBinders lhs)
+        patvar_ticks <- mapM (\v -> bindTick density v pos fvs) patvars
+        return
+          (zipWith mbCons patvar_ticks
+                          (initial_patvar_tickss ++ repeat []))
+
     return $ cL pos $ pat' { pat_ticks = (rhs_ticks, patvar_tickss) }
+  where
+
+  -- is the pattern just a decorated variable?
+  isSimplePat :: LPat GhcTc -> Maybe (IdP GhcTc)
+  isSimplePat (dL->L _ p) = case p of
+    ParPat _ x -> isSimplePat x
+    SigPat _ x _ -> isSimplePat x
+    LazyPat _ x -> isSimplePat x
+    BangPat _ x -> isSimplePat x
+    VarPat _ (dL->L _ x) -> Just x
+    _ -> Nothing
 
 -- Only internal stuff, not from source, uses VarBind, so we ignore it.
 addTickLHsBind var_bind@(dL->L _ (VarBind {})) = return var_bind
 addTickLHsBind patsyn_bind@(dL->L _ (PatSynBind {})) = return patsyn_bind
 addTickLHsBind bind@(dL->L _ (XHsBindsLR {})) = return bind
 addTickLHsBind _  = panic "addTickLHsBind: Impossible Match" -- due to #15884
-
 
 
 bindTick
