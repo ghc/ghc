@@ -467,6 +467,7 @@ basicKnownKeyNames
         , unsafeReflDataConName
         , unsafeHReflDataConName
         , unsafeCoerceName
+        , unsafeEqualityTyConName
     ]
 
 genericTyConNames :: [Name]
@@ -1324,10 +1325,12 @@ typeErrorShowTypeDataConName =
   dcQual gHC_TYPELITS (fsLit "ShowType") typeErrorShowTypeDataConKey
 
 -- Unsafe coercion proofs
-unsafeEqualityProofName, unsafeReflDataConName, unsafeHReflDataConName :: Name
+unsafeEqualityProofName, unsafeReflDataConName, unsafeHReflDataConName,
+  unsafeEqualityTyConName :: Name
 unsafeEqualityProofName = varQual uNSAFE_COERCE (fsLit "unsafeEqualityProof") unsafeEqualityProofIdKey
 unsafeReflDataConName = dcQual uNSAFE_COERCE (fsLit "UnsafeRefl") unsafeReflDataConKey
 unsafeHReflDataConName = dcQual uNSAFE_COERCE (fsLit "UnsafeHRefl") unsafeHReflDataConKey
+unsafeEqualityTyConName = tcQual uNSAFE_COERCE (fsLit "UnsafeEquality") undefined
 
 -- Unsafe coerce
 unsafeCoerceName :: Name

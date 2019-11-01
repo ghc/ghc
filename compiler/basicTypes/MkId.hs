@@ -24,7 +24,7 @@ module MkId (
 
         -- And some particular Ids; see below for why they are wired in
         wiredInIds, ghcPrimIds,
-        realWorldPrimId,
+        unsafeCoerceId, realWorldPrimId,
         voidPrimId, voidArgId,
         nullAddrId, seqId, lazyId, lazyIdKey,
         coercionTokenId, magicDictId, coerceId,
@@ -48,7 +48,7 @@ import FamInstEnv
 import Coercion
 import TcType
 import MkCore
-import CoreUtils        ( mkCast, mkDefaultCase )
+import CoreUtils        ( mkCast, mkDefaultCase, exprType )
 import CoreUnfold
 import Literal
 import TyCon
@@ -1350,6 +1350,53 @@ proxyHashId
     kv_ty   = mkTyVarTy kv
     tv_ty   = mkTyVarTy tv
     ty      = mkInvForAllTy kv $ mkSpecForAllTy tv $ mkProxyPrimTy kv_ty tv_ty
+
+------------------------------------------------
+{-
+
+unsafeCoerce# :: forall (ra :: RuntimeRep) (rb :: RuntimeRep).
+                 forall (a :: TYPE ra)     (b  :: TYPE rb).
+                 a -> b
+unsafeCoerce#
+  = /\ra rb (a :: TYPE ra) (b :: TYPE rb) (x :: a).
+   case unsafeEqualityProof @r1        @r2 of UhsafeRefl (gr :: r1 ~# r2) ->
+   case unsafeEqualityProof @(a |> gr) @b  of UnsafeRefl (g  :: (a |> gr) ~ b) ->
+   x |> (GRefl a gr `TransCo` g)
+
+-}
+
+unsafeEqualityProofId :: Id
+unsafeEqualityProofId = pcMiscPrelId unsafeEqualityProofName ty info
+  where
+    ty = undefined
+    info = undefined
+
+unsafeCoerceId :: Id
+unsafeCoerceId = pcMiscPrelId unsafeCoerceName ty info
+  where
+    info = noCafIdInfo `setInlinePragInfo` alwaysInlinePragma
+                       `setUnfoldingInfo`  mkCompulsoryUnfolding rhs1
+
+    -- unsafeCoerce# :: forall (r1 :: RuntimeRep) (r2 :: RuntimeRep)
+    --                         (a :: TYPE r1) (b :: TYPE r2).
+    --                         a -> b
+    bndrs = mkTemplateKiTyVars [runtimeRepTy, runtimeRepTy] (map tYPE)
+
+    [k1, k2, a, b] = mkTyVarTys bndrs
+
+    ty  = mkSpecForAllTys bndrs (mkVisFunTy a b)
+
+    [x] = mkTemplateLocals [a]
+
+    scrut1 = mkApps (Var unsafeEqualityProofId) [Type liftedTypeKind, Type k1, Type k2]
+    rhs1 = mkLams (bndrs ++ [x]) $
+           mkWildCase scrut1 (exprType scrut1) b
+             [ (DataAlt unsafeReflDataCon, undefined, rhs2)
+             ]
+
+    scrut2 = mkApps (Var unsafeEqualityProofId) [Type liftedTypeKind, Type a, Type b]
+    rhs2 = mkWildCase scrut2 (exprType scrut2) b
+             [ (DataAlt unsafeReflDataCon, undefined, undefined) ]
 
 ------------------------------------------------
 nullAddrId :: Id
