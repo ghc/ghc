@@ -379,7 +379,7 @@ tcExpr expr@(OpApp fix arg1 op arg2) res_ty
        ; let doc   = text "The first argument of ($) takes"
              orig1 = lexprCtOrigin arg1
        ; (wrap_arg1, [arg2_sigma], op_res_ty) <-
-           matchActualFunTysPart doc orig1 (Just (unLoc arg1)) 1 arg1_ty [] 1
+           matchActualFunTys doc orig1 (Just (unLoc arg1)) 1 arg1_ty
 
            -- have a quick look
        ; (op_res_ty', res_ty', [arg2_sigma'])
@@ -443,7 +443,7 @@ tcExpr expr@(OpApp fix arg1 op arg2) res_ty
 tcExpr expr@(SectionR x op arg2) res_ty
   = do { (op', op_ty) <- tcInferFun op
        ; (wrap_fun, [arg1_ty, arg2_ty], op_res_ty)
-                  <- matchActualFunTysPart (mk_op_msg op) fn_orig (Just (unLoc op)) 2 op_ty [] 2
+                  <- matchActualFunTys (mk_op_msg op) fn_orig (Just (unLoc op)) 2 op_ty
        ; let fun_ty = mkVisFunTy arg1_ty op_res_ty
        ; (fun_ty', res_ty', [arg2_ty'])
             <- tcPerformQuickLook tcQuickLookExprs fn_orig
@@ -466,8 +466,8 @@ tcExpr expr@(SectionL x arg1 op) res_ty
                          | otherwise                            = 2
 
        ; (wrap_fn, (arg1_ty:arg_tys), op_res_ty)
-           <- matchActualFunTysPart (mk_op_msg op) fn_orig (Just (unLoc op))
-                                    n_reqd_args op_ty [] n_reqd_args
+           <- matchActualFunTys (mk_op_msg op) fn_orig (Just (unLoc op))
+                                n_reqd_args op_ty
        ; let fun_ty = mkVisFunTys arg_tys op_res_ty
        ; (fun_ty', res_ty', [arg1_ty'])
             <- tcPerformQuickLook tcQuickLookExprs fn_orig
@@ -1884,8 +1884,7 @@ tcSynArgA :: CtOrigin
             -- and a wrapper to be applied to the overall expression
 tcSynArgA orig sigma_ty arg_shapes res_shape thing_inside
   = do { (match_wrapper, arg_tys, res_ty)
-           <- matchActualFunTysPart herald orig Nothing (length arg_shapes)
-                                    sigma_ty [] (length arg_shapes)
+           <- matchActualFunTys herald orig Nothing (length arg_shapes) sigma_ty
               -- match_wrapper :: sigma_ty "->" (arg_tys -> res_ty)
        ; ((result, res_wrapper), arg_wrappers)
            <- tc_syn_args_e arg_tys arg_shapes $ \ arg_results ->

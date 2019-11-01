@@ -38,7 +38,7 @@ import {-# SOURCE #-}   TcExpr( tcPolyExpr, tcSyntaxOp )
 import {-# SOURCE #-}   TcUnify( unifyType, unifyKind )
 
 import BasicTypes ( IntegralLit(..), SourceText(..) )
-import FastString
+-- import FastString
 import GHC.Hs
 import TcHsSyn
 import TcRnMonad
@@ -142,6 +142,7 @@ ToDo: this eta-abstraction plays fast and loose with termination,
       fix this
 -}
 
+{-
 deeplySkolemise :: TcSigmaType
                 -> TcM ( HsWrapper
                        , [(Name,TyVar)]     -- All skolemised variables
@@ -173,6 +174,7 @@ deeplySkolemise ty
       | otherwise
       = return (idHsWrapper, [], [], substTy subst ty)
         -- substTy is a quick no-op on an empty substitution
+-}
 
 topSkolemise :: TcSigmaType
              -> TcM ( HsWrapper
@@ -277,6 +279,7 @@ top_instantiate inst_all orig ty
       | inst_all  = True
       | otherwise = binderArgFlag bndr == Inferred
 
+{-
 deeplyInstantiate :: CtOrigin -> TcSigmaType -> TcM (HsWrapper, TcRhoType)
 --   Int -> forall a. a -> a  ==>  (\x:Int. [] x alpha) :: Int -> alpha
 -- In general if
@@ -329,7 +332,7 @@ deeply_instantiate orig subst ty
                        , text "new type:" <+> ppr ty'
                        , text "subst:"    <+> ppr subst ])
       ; return (idHsWrapper, ty') }
-
+-}
 
 instTyVarsWith :: CtOrigin -> [TyVar] -> [TcType] -> TcM TCvSubst
 -- Use this when you want to instantiate (forall a b c. ty) with

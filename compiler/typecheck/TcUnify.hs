@@ -139,6 +139,7 @@ passed in.
 -}
 
 -- Use this one when you have an "expected" type.
+-- This function skolemises at each polytype.
 matchExpectedFunTys :: forall a.
                        SDoc   -- See Note [Herald for matchExpectedFunTys]
                     -> UserTypeCtxt
@@ -231,6 +232,7 @@ matchExpectedFunTys herald ctx arity orig_ty thing_inside
 
 -- Like 'matchExpectedFunTys', but used when you have an "actual" type,
 -- for example in function application
+-- This function instantiates at each poltype.
 matchActualFunTys :: SDoc   -- See Note [Herald for matchExpectedFunTys]
                   -> CtOrigin
                   -> Maybe (HsExpr GhcRn)   -- the thing with type TcSigmaType
