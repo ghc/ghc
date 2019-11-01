@@ -330,10 +330,12 @@ addTickLHsBind (dL->L pos (funBind@(FunBind { fun_id = (dL->L _ id)  }))) = do
    isSimplePatBind :: HsBind GhcTc -> Bool
    isSimplePatBind funBind = matchGroupArity (fun_matches funBind) == 0
 
--- TODO: Revisit this
 addTickLHsBind (dL->L pos (pat@(PatBind { pat_lhs = lhs
                                         , pat_rhs = rhs }))) = do
-  let name = "(...)"
+
+  let singleVarPat = isSingleVarPat lhs
+  -- TODO: better name for non-VarPat patterns?
+  let name = maybe "(...)" getOccString singleVarPat
   (fvs, rhs') <- getFreeVars $ addPathEntry name $ addTickGRHSs False False rhs
   let pat' = pat { pat_rhs = rhs'}
 
@@ -345,16 +347,21 @@ addTickLHsBind (dL->L pos (pat@(PatBind { pat_lhs = lhs
     then return (cL pos pat')
     else do
 
+    let mbCons = maybe id (:)
+
     -- Allocate the ticks
     rhs_tick <- bindTick density name pos fvs
-    let patvars = map getOccString (collectPatBinders lhs)
-    patvar_ticks <- mapM (\v -> bindTick density v pos fvs) patvars
+    let rhs_ticks = rhs_tick `mbCons` fst (pat_ticks pat')
 
-    -- Add to pattern
-    let mbCons = maybe id (:)
-        rhs_ticks = rhs_tick `mbCons` fst (pat_ticks pat')
-        patvar_tickss = zipWith mbCons patvar_ticks
-                        (snd (pat_ticks pat') ++ repeat [])
+    patvar_tickss <- case singleVarPat of
+      Just{} -> return (snd (pat_ticks pat'))
+      Nothing -> do
+        let patvars = map getOccString (collectPatBinders lhs)
+        patvar_ticks <- mapM (\v -> bindTick density v pos fvs) patvars
+        return
+          (zipWith mbCons patvar_ticks
+                          (snd (pat_ticks pat') ++ repeat []))
+
     return $ cL pos $ pat' { pat_ticks = (rhs_ticks, patvar_tickss) }
 
 -- Only internal stuff, not from source, uses VarBind, so we ignore it.
@@ -363,6 +370,15 @@ addTickLHsBind patsyn_bind@(dL->L _ (PatSynBind {})) = return patsyn_bind
 addTickLHsBind bind@(dL->L _ (XHsBindsLR {})) = return bind
 addTickLHsBind _  = panic "addTickLHsBind: Impossible Match" -- due to #15884
 
+-- | Is the pattern just a decorated VarPat?
+isSingleVarPat :: LPat p -> Maybe (IdP p)
+isSingleVarPat p = case p of
+  ParPat _ x -> isSingleVarPat x
+  SigPat _ x _ -> isSingleVarPat x
+  LazyPat _ x -> isSingleVarPat x
+  BangPat _ x -> isSingleVarPat x
+  VarPat _ (dL->L _ x) -> Just x
+  _ -> Nothing
 
 
 bindTick
