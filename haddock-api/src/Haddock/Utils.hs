@@ -148,14 +148,14 @@ addClassContext cls tvs0 (L pos (ClassOpSig _ _ lname ltype))
        = L loc (HsQualTy { hst_xqual = noExtField
                          , hst_ctxt = add_ctxt (L loc []), hst_body = L loc ty })
 
-    extra_pred = nlHsTyConApp cls (lHsQTyVarsToTypes tvs0)
+    extra_pred = nlHsTyConApp Prefix cls (lHsQTyVarsToTypes tvs0)
     add_ctxt (L loc preds) = L loc (extra_pred : preds)
 
 addClassContext _ _ sig = sig   -- E.g. a MinimalSig is fine
 
-lHsQTyVarsToTypes :: LHsQTyVars GhcRn -> [LHsType GhcRn]
+lHsQTyVarsToTypes :: LHsQTyVars GhcRn -> [LHsTypeArg GhcRn]
 lHsQTyVarsToTypes tvs
-  = [ noLoc (HsTyVar noExtField NotPromoted (noLoc (hsLTyVarName tv)))
+  = [ HsValArg $ noLoc (HsTyVar noExtField NotPromoted (noLoc (hsLTyVarName tv)))
     | tv <- hsQTvExplicit tvs ]
 
 --------------------------------------------------------------------------------
