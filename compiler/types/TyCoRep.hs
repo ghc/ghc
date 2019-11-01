@@ -579,15 +579,15 @@ In sum, in order to uphold (EQ), we need the following four invariants:
 
   (EQ2) No (ty |> co) where kind(ty) = resultKind(co)
         In this case we can discard the coercion altogether
-        Upheld by Type.mCastTy
+        Upheld by Type.mkCastTy
 
   (EQ3) No nested CastTys, (ty |> co1 |> co2)
         In this case we can combine the coercions
-        Upheld by Type.mCastTy
+        Upheld by Type.mkCastTy
 
   (EQ4) No CastTy over (ForAllTy (Bndr tyvar vis) body).
         See Note [Weird typing rule for ForAllTy] in Type.
-        Upheld by Type.mCastTy
+        Upheld by Type.mkCastTy
 
 These invariants are all documented above, in the declaration for Type.
 

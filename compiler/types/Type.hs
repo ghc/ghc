@@ -1338,7 +1338,7 @@ See also Note [mkAppTy subtleties].
 
 Specifically
 
-* EQ2: we must to a full `eqType` check her. This is important to keep
+* EQ2: we must to a full `eqType` check here. This is important to keep
   the splitXXX functions working properly. Otherwise we may end up
   with something like
       (((->) |> something_reflexive_but_not_obviously_so) biz baz)
@@ -1353,11 +1353,11 @@ Specifically
 
 * EQ3 (cast of cast) is easy
 
-* EQ3 (cast of forall) is reasonably easy
+* EQ4 (cast of forall) is reasonably easy
 -}
 
 -- | Make a 'CastTy'. The Coercion must be nominal.
--- Some very important subtleties here: see Note [mkCastTy]
+-- Some very important subtleties here: see Note [mkCastTy subtleties]
 mkCastTy :: Type -> Coercion -> Type
 mkCastTy ty co
   | let co_res_kind = pSnd (coercionKind co)

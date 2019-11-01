@@ -1205,19 +1205,24 @@ mk_app_ty fun arg
 
 {- Note [The Purely Kinded Type Invariant (PKTI)]
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
-During type inference, we maintain this invariant
+Everywhere in GHC (but it matters most during type inference), we maintain
+these invariants on every type (together called PKTI):
 
- (PKTI) It is legal to call 'tcTypeKind' on any Type ty,
-        on any sub-term of ty, /without/ zonking ty
+  (PKTI1) It is legal to call 'tcTypeKind' on any Type ty
+  (PKTI2) In a 'FunTy _ arg res', it is legal to call 'getRuntimeRep' on 'arg' or 'res'
 
-        Moreover, any such returned kind
-        will itself satisfy (PKTI)
+Because these invariants hold on /every/ type, they are true on all sub-terms
+of a type, and on the results of e.g. tcTypeKind. Critically, it is *not*
+necessary to zonk in order to establish the PKTI.
 
 By "legal to call tcTypeKind" we mean "tcTypeKind will not crash".
 The way in which tcTypeKind can crash is in applications
     (a t1 t2 .. tn)
 if 'a' is a type variable whose kind doesn't have enough arrows
 or foralls.  (The crash is in piResultTys.)
+
+The goal here is to ensure that pure operations succeed, even on
+unzonked types.
 
 The loop in tcInferApps has to be very careful to maintain the (PKTI).
 For example, suppose
