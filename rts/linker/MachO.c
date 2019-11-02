@@ -1443,11 +1443,6 @@ ocMprotect_MachO( ObjectCode *oc )
             mmapForLinkerMarkExecutable(segment->start, segment->size);
         }
     }
-
-#if defined(NEED_SYMBOL_EXTRAS)
-    mmapForLinkerMarkExecutable(oc->symbol_extras, sizeof(SymbolExtra) * oc->n_symbol_extras);
-#endif
-
     return true;
 }
 

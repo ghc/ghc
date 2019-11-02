@@ -126,6 +126,24 @@ int ocAllocateExtras(ObjectCode* oc, int count, int first, int bssSize)
   return 1;
 }
 
+/**
+ * Mark the symbol extras as non-writable.
+ */
+void ocProtectExtras(ObjectCode* oc)
+{
+  if (oc->n_symbol_extras == 0) return;
+
+  if (!RTS_LINKER_USE_MMAP) {
+    barf("Can't protect symbol extras when not using mmap");
+  } else if (USE_CONTIGUOUS_MMAP || RtsFlags.MiscFlags.linkerAlwaysPic) {
+    mmapForLinkerMarkExecutable(oc->symbol_extras, sizeof(SymbolExtra) * oc->n_symbol_extras);
+  } else {
+    /* The symbol extras were allocated via m32. They will be protected when
+     * the m32 allocator is finalized
+     */
+  }
+}
+
 
 #if !defined(arm_HOST_ARCH)
 SymbolExtra* makeSymbolExtra( ObjectCode const* oc,

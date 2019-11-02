@@ -1669,6 +1669,10 @@ int ocTryLoad (ObjectCode* oc) {
 #   endif
     if (!r) { return r; }
 
+#if defined(NEED_SYMBOL_EXTRAS)
+    ocProtectExtras(oc);
+#endif
+
     // We have finished loading and relocating; flush the m32 allocators to
     // setup page protections.
 #if RTS_LINKER_USE_MMAP
