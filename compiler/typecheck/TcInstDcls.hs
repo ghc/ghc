@@ -2133,7 +2133,7 @@ tcSpecInst dfun_id prag@(SpecInstSig _ _ hs_ty)
         ; co_fn <- tcSpecWrapper SpecInstCtxt (idType dfun_id) spec_dfun_ty
         ; return (SpecPrag dfun_id co_fn defaultInlinePragma) }
   where
-    spec_ctxt prag = hang (text "In the SPECIALISE pragma") 2 (ppr prag)
+    spec_ctxt prag = hang (text "In the pragma:") 2 (ppr prag)
 
 tcSpecInst _  _ = panic "tcSpecInst"
 

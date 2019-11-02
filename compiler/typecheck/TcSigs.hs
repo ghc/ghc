@@ -766,7 +766,7 @@ tcSpecPrag poly_id prag@(SpecSig _ fun_name hs_tys inl)
   where
     name      = idName poly_id
     poly_ty   = idType poly_id
-    spec_ctxt prag = hang (text "In the SPECIALISE pragma") 2 (ppr prag)
+    spec_ctxt prag = hang (text "In the pragma:") 2 (ppr prag)
 
     tc_one hs_ty
       = do { spec_ty <- tcHsSigType   (FunSigCtxt name False) hs_ty
