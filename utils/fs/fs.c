@@ -28,12 +28,15 @@
 
 /* This function converts Windows paths between namespaces. More specifically
    It converts an explorer style path into a NT or Win32 namespace.
-   This has several caveats but they are caviats that are native to Windows and
+   This has several caveats but they are caveats that are native to Windows and
    not POSIX. See
    https://msdn.microsoft.com/en-us/library/windows/desktop/aa365247.aspx.
    Anything else such as raw device paths we leave untouched.  The main benefit
    of doing any of this is that we can break the MAX_PATH restriction and also
-   access raw handles that we couldn't before.  */
+   access raw handles that we couldn't before.
+
+   The resulting string is dynamically allocated and so callers are expected to
+   free this string.  */
 wchar_t* FS(create_device_name) (const wchar_t* filename) {
   const wchar_t* win32_dev_namespace  = L"\\\\.\\";
   const wchar_t* win32_file_namespace = L"\\\\?\\";
@@ -64,6 +67,7 @@ wchar_t* FS(create_device_name) (const wchar_t* filename) {
   if (nResult > 1)
     {
       temp = _wcsdup (result);
+      free (result);
       result = malloc (nResult * sizeof (wchar_t));
       if (GetLongPathNameW (temp, result, nResult) == 0)
         {
@@ -77,6 +81,7 @@ wchar_t* FS(create_device_name) (const wchar_t* filename) {
      Win32 will no longer resolve them.  */
   nResult = GetFullPathNameW (result, 0, NULL, NULL) + 1;
   temp = _wcsdup (result);
+  free (result);
   result = malloc (nResult * sizeof (wchar_t));
   if (GetFullPathNameW (temp, nResult, result, NULL) == 0)
     {
@@ -101,6 +106,7 @@ wchar_t* FS(create_device_name) (const wchar_t* filename) {
   /* Create new string.  */
   int bLen = wcslen (result) + wcslen (ns) + 1;
   temp = _wcsdup (result);
+  free (result);
   result = malloc (bLen * sizeof (wchar_t));
   if (swprintf (result, bLen, L"%ls%ls", ns, temp) <= 0)
     {
@@ -117,8 +123,12 @@ cleanup:
   return NULL;
 }
 
+static int setErrNoFromWin32Error (void);
+/* Sets errno to the right error value and returns -1 to indicate the failure.
+   This function should only be called when the creation of the fd actually
+   failed and you want to return -1 for the fd.  */
 static
-int setErrNoFromWin32Error() {
+int setErrNoFromWin32Error () {
   switch (GetLastError()) {
     case ERROR_SUCCESS:
       errno = 0;
@@ -136,13 +146,13 @@ int setErrNoFromWin32Error() {
       break;
     case ERROR_NOT_ENOUGH_MEMORY:
     case ERROR_OUTOFMEMORY:
-      return ENOMEM;
+      errno = ENOMEM;
       break;
     case ERROR_INVALID_HANDLE:
-      return EBADF;
+      errno = EBADF;
       break;
     case ERROR_INVALID_FUNCTION:
-      return EFAULT;
+      errno = EFAULT;
       break;
     default:
       errno = EINVAL;
@@ -152,23 +162,25 @@ int setErrNoFromWin32Error() {
 }
 
 
-#define HAS_FLAG(a,b) ((a & b) == b)
+#define HAS_FLAG(a,b) (((a) & (b)) == (b))
 
 int FS(swopen) (const wchar_t* filename, int oflag, int shflag, int pmode)
 {
   /* Construct access mode.  */
+  /* https://docs.microsoft.com/en-us/windows/win32/fileio/file-access-rights-constants  */
   DWORD dwDesiredAccess = 0;
   if (HAS_FLAG (oflag, _O_RDONLY))
-    dwDesiredAccess |= GENERIC_READ | FILE_READ_DATA | FILE_READ_ATTRIBUTES;
+    dwDesiredAccess |= GENERIC_READ;
   if (HAS_FLAG (oflag, _O_RDWR))
-    dwDesiredAccess |= GENERIC_WRITE | GENERIC_READ | FILE_READ_DATA |
-                       FILE_WRITE_DATA | FILE_READ_ATTRIBUTES |
-                       FILE_WRITE_ATTRIBUTES;
-  if (HAS_FLAG (oflag,  _O_WRONLY))
-    dwDesiredAccess|= GENERIC_WRITE | FILE_WRITE_DATA | FILE_WRITE_ATTRIBUTES;
+    dwDesiredAccess |= GENERIC_WRITE | GENERIC_READ;
+  if (HAS_FLAG (oflag, _O_WRONLY))
+    dwDesiredAccess |= GENERIC_WRITE;
+  if (HAS_FLAG (oflag, _O_APPEND))
+    dwDesiredAccess |= FILE_APPEND_DATA;
 
   /* Construct shared mode.  */
-  DWORD dwShareMode = FILE_SHARE_DELETE | FILE_SHARE_READ | FILE_SHARE_WRITE;
+  /* https://docs.microsoft.com/en-us/windows/win32/fileio/file-attribute-constants */
+  DWORD dwShareMode = FILE_SHARE_READ | FILE_SHARE_WRITE;
   if (HAS_FLAG (shflag, _SH_DENYRW))
     dwShareMode &= ~(FILE_SHARE_READ | FILE_SHARE_WRITE);
   if (HAS_FLAG (shflag, _SH_DENYWR))
@@ -190,21 +202,33 @@ int FS(swopen) (const wchar_t* filename, int oflag, int shflag, int pmode)
     }
 
   /* Create file disposition.  */
-  DWORD dwCreationDisposition = OPEN_EXISTING;
-  if (HAS_FLAG (oflag, _O_CREAT))
-    dwCreationDisposition = OPEN_ALWAYS;
+  /* https://docs.microsoft.com/en-us/windows/win32/api/fileapi/nf-fileapi-createfilea */
+  DWORD dwCreationDisposition = 0;
   if (HAS_FLAG (oflag, (_O_CREAT | _O_EXCL)))
-    dwCreationDisposition = CREATE_NEW;
-  if (HAS_FLAG (oflag, _O_TRUNC) && !HAS_FLAG (oflag, _O_CREAT))
-    dwCreationDisposition = TRUNCATE_EXISTING;
+    dwCreationDisposition |= CREATE_NEW;
+  else if (HAS_FLAG (oflag, _O_TRUNC | _O_CREAT))
+    dwCreationDisposition |= CREATE_ALWAYS;
+  else if (HAS_FLAG (oflag, _O_TRUNC) && !HAS_FLAG (oflag, O_RDONLY))
+    dwCreationDisposition |= TRUNCATE_EXISTING;
+  else if (HAS_FLAG (oflag, _O_APPEND | _O_CREAT))
+    dwCreationDisposition |= OPEN_ALWAYS;
+  else if (HAS_FLAG (oflag, _O_APPEND))
+    dwCreationDisposition |= OPEN_EXISTING;
+  else if (HAS_FLAG (oflag, _O_CREAT))
+    dwCreationDisposition |= OPEN_ALWAYS;
+  else
+    dwCreationDisposition |= OPEN_EXISTING;
 
   /* Set file access attributes.  */
   DWORD dwFlagsAndAttributes = FILE_ATTRIBUTE_NORMAL;
   if (HAS_FLAG (oflag, _O_RDONLY))
     dwFlagsAndAttributes |= 0; /* No special attribute.  */
-  if (HAS_FLAG (oflag, (_O_CREAT | _O_TEMPORARY)))
-    dwFlagsAndAttributes |= FILE_FLAG_DELETE_ON_CLOSE;
-  if (HAS_FLAG (oflag, (_O_CREAT | _O_SHORT_LIVED)))
+  if (HAS_FLAG (oflag, _O_TEMPORARY))
+    {
+      dwFlagsAndAttributes |= FILE_FLAG_DELETE_ON_CLOSE;
+      dwShareMode |= FILE_SHARE_DELETE;
+    }
+  if (HAS_FLAG (oflag, _O_SHORT_LIVED))
     dwFlagsAndAttributes |= FILE_ATTRIBUTE_TEMPORARY;
   if (HAS_FLAG (oflag, _O_RANDOM))
     dwFlagsAndAttributes |= FILE_FLAG_RANDOM_ACCESS;
@@ -213,6 +237,11 @@ int FS(swopen) (const wchar_t* filename, int oflag, int shflag, int pmode)
   /* Flag is only valid on it's own.  */
   if (dwFlagsAndAttributes != FILE_ATTRIBUTE_NORMAL)
     dwFlagsAndAttributes &= ~FILE_ATTRIBUTE_NORMAL;
+
+  /* Ensure we have shared read for files which are opened read-only. */
+  if (HAS_FLAG (dwCreationDisposition, OPEN_EXISTING)
+      && ((dwDesiredAccess & (GENERIC_WRITE|GENERIC_READ)) == GENERIC_READ))
+    dwShareMode |= FILE_SHARE_READ;
 
   /* Set security attributes.  */
   SECURITY_ATTRIBUTES securityAttributes;
@@ -346,6 +375,19 @@ FILE *FS(fopen) (const char* filename, const char* mode)
   return result;
 }
 
+int FS(sopen) (const char* filename, int oflag, int shflag, int pmode)
+{
+  size_t len = mbstowcs (NULL, filename, 0);
+  wchar_t *w_filename = malloc (sizeof (wchar_t) * (len + 1));
+  mbstowcs (w_filename, filename, len);
+  w_filename[len] = L'\0';
+
+  int result = FS(swopen) (w_filename, oflag, shflag, pmode);
+  free (w_filename);
+
+  return result;
+}
+
 int FS(_stat) (const char *path, struct _stat *buffer)
 {
   size_t len = mbstowcs (NULL, path, 0);
@@ -374,18 +416,23 @@ int FS(_stat64) (const char *path, struct __stat64 *buffer)
 
 static __time64_t ftToPosix(FILETIME ft)
 {
-  // takes the last modified date
+  /* takes the last modified date.  */
   LARGE_INTEGER date, adjust;
   date.HighPart = ft.dwHighDateTime;
   date.LowPart = ft.dwLowDateTime;
 
-  // 100-nanoseconds = milliseconds * 10000
+  /* 100-nanoseconds = milliseconds * 10000.  */
+  /* A UNIX timestamp contains the number of seconds from Jan 1, 1970, while the
+     FILETIME documentation says: Contains a 64-bit value representing the
+     number of 100-nanosecond intervals since January 1, 1601 (UTC).
+
+     Between Jan 1, 1601 and Jan 1, 1970 there are 11644473600 seconds */
   adjust.QuadPart = 11644473600000 * 10000;
 
-  // removes the diff between 1970 and 1601
+  /* removes the diff between 1970 and 1601.  */
   date.QuadPart -= adjust.QuadPart;
 
-  // converts back from 100-nanoseconds to seconds
+  /* converts back from 100-nanoseconds to seconds.  */
   return (__time64_t)date.QuadPart / 10000000;
 }
 

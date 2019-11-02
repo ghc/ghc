@@ -1,6 +1,6 @@
 /* -----------------------------------------------------------------------------
  *
- * (c) Tamar Christina 2018
+ * (c) Tamar Christina 2018-2019
  *
  * Windows I/O routines for file opening.
  *
@@ -25,9 +25,12 @@
 
 #if defined(_WIN32)
 #include <wchar.h>
-wchar_t* FS (create_device_name) (const wchar_t* filename);
+wchar_t* FS(create_device_name) (const wchar_t*);
+int FS(translate_mode) (const wchar_t*);
 int FS(swopen) (const wchar_t* filename, int oflag,
                 int shflag, int pmode);
+int FS(sopen) (const char* filename, int oflag,
+               int shflag, int pmode);
 FILE *FS(fwopen) (const wchar_t* filename, const wchar_t* mode);
 FILE *FS(fopen) (const char* filename, const char* mode);
 int FS(_stat) (const char *path, struct _stat *buffer);
