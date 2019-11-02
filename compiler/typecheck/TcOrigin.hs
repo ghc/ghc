@@ -547,7 +547,7 @@ pprCtOrigin (GivenOrigin sk) = ctoHerald <+> ppr sk
 
 pprCtOrigin (SpecPragOrigin ctxt)
   = case ctxt of
-       FunSigCtxt n _ -> text "a SPECIALISE pragma for" <+> quotes (ppr n)
+       FunSigCtxt n _ -> text "for" <+> quotes (ppr n)
        SpecInstCtxt   -> text "a SPECIALISE INSTANCE pragma"
        _              -> text "a SPECIALISE pragma"  -- Never happens I think
 
