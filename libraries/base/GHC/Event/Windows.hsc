@@ -676,6 +676,7 @@ withOverlappedEx mgr fname h offset startCB completionCB = do
                         when (not threaded) $
                           do num_remaining <- outstandingRequests
                              servicedIOEntries num_remaining
+                             completeSynchronousRequest
                         return $ IOFailed Nothing
         let runner = do debugIO $ (dbg ":: waiting ") ++ " | "  ++ show lpol
                         res <- readIOPort signal `catch` cancel
