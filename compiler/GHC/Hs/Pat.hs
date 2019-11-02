@@ -72,7 +72,7 @@ import Data.Data hiding (TyCon,Fixity)
 type InPat p  = LPat p        -- No 'Out' constructors
 type OutPat p = LPat p        -- No 'In' constructors
 
-type LPat p = Pat p
+type LPat p = XRec p Pat
 
 -- | Pattern
 --
@@ -326,34 +326,8 @@ type instance XSigPat GhcRn = NoExtField
 type instance XSigPat GhcTc = Type
 
 type instance XCoPat  (GhcPass _) = NoExtField
-type instance XXPat   (GhcPass p) = Located (Pat (GhcPass p))
 
-
-{-
-************************************************************************
-*                                                                      *
-*              HasSrcSpan Instance
-*                                                                      *
-************************************************************************
--}
-
-type instance SrcSpanLess (LPat (GhcPass p)) = Pat (GhcPass p)
-instance HasSrcSpan (LPat (GhcPass p)) where
-  -- NB: The following chooses the behaviour of the outer location
-  --     wrapper replacing the inner ones.
-  composeSrcSpan (L sp p) =  if sp == noSrcSpan
-                             then p
-                             else XPat (L sp (stripSrcSpanPat p))
-
-  -- NB: The following only returns the top-level location, if any.
-  decomposeSrcSpan (XPat (L sp p)) = L sp (stripSrcSpanPat p)
-  decomposeSrcSpan p               = L noSrcSpan p
-
-stripSrcSpanPat :: LPat (GhcPass p) -> Pat (GhcPass p)
-stripSrcSpanPat (XPat (L _  p)) = stripSrcSpanPat p
-stripSrcSpanPat p               = p
-
-
+type instance XXPat   (GhcPass _) = NoExtCon
 
 -- ---------------------------------------------------------------------
 
@@ -574,7 +548,7 @@ pprPat (ConPatOut { pat_con = con
                          , ppr binds])
           <+> pprConArgs details
     else pprUserCon (unLoc con) details
-pprPat (XPat x)               = ppr x
+pprPat (XPat n)                 = noExtCon n
 
 
 pprUserCon :: (OutputableBndr con, OutputableBndrId p)
