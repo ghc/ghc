@@ -412,7 +412,7 @@ int FS(_stat64) (const char *path, struct __stat64 *buffer)
 
 static __time64_t ftToPosix(FILETIME ft)
 {
-  // takes the last modified date
+  /* takes the last modified date.  */
   LARGE_INTEGER date, adjust;
   date.HighPart = ft.dwHighDateTime;
   date.LowPart = ft.dwLowDateTime;
