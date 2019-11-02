@@ -306,7 +306,7 @@ void awaitAsyncRequests (bool wait)
      not empty but we can't do that here.  Also these locks don't guarantee
      fairness, as such a request may have completed without us seeing a
      timeslice in between.  */
-  if (wait && !outstanding_service_requests)
+  if (wait && outstanding_service_requests)
     SleepConditionVariableSRW (&threadIOWait, &lock, INFINITE, 0);
   ReleaseSRWLockExclusive (&lock);
 }
@@ -400,4 +400,5 @@ DWORD WINAPI runner (LPVOID lpParam STG_UNUSED)
     }
     return 0;
 }
+
 
