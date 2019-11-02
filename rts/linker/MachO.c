@@ -1433,18 +1433,21 @@ ocGetNames_MachO(ObjectCode* oc)
 }
 
 static bool
-ocMprotect_MachO( ObjectCode *oc ) {
-    for(int i=0; i < oc->n_sections; i++) {
-        Section * section = &oc->sections[i];
-        if(section->size == 0) continue;
+ocMprotect_MachO( ObjectCode *oc )
+{
+    for(int i=0; i < oc->n_segments; i++) {
+        Segment *segment = &oc->segments[i];
+        if(segment->size == 0) continue;
 
-        bool isInstructions = (section->info->macho_section->flags & SECTION_ATTRIBUTES_USR)
-          == S_ATTR_PURE_INSTRUCTIONS;
-        if(isInstructions) {
-            size_t size = section->size + section->info->stub_size;
-            mmapForLinkerMarkExecutable(section->start, size);
+        if(segment->prot == SEGMENT_PROT_RX) {
+            mmapForLinkerMarkExecutable(segment->start, segment->size);
         }
     }
+
+#if defined(NEED_SYMBOL_EXTRAS)
+    mmapForLinkerMarkExecutable(oc->symbol_extras, sizeof(SymbolExtra) * oc->n_symbol_extras);
+#endif
+
     return true;
 }
 
