@@ -1151,9 +1151,11 @@ hsSigDoc (ClassOpSig _ is_deflt _ _)
  | is_deflt                     = text "default type signature"
  | otherwise                    = text "class method signature"
 hsSigDoc (IdSig {})             = text "id signature"
-hsSigDoc (SpecSig {})           = text "SPECIALISE pragma"
+hsSigDoc (SpecSig _ _ _ inl)
+                                = ppr inl <+> text "pragma"
 hsSigDoc (InlineSig _ _ prag)   = ppr (inlinePragmaSpec prag) <+> text "pragma"
-hsSigDoc (SpecInstSig {})       = text "SPECIALISE instance pragma"
+hsSigDoc (SpecInstSig _ src _)
+                                = pprWithSourceText src empty <+> text "instance pragma"
 hsSigDoc (FixSig {})            = text "fixity declaration"
 hsSigDoc (MinimalSig {})        = text "MINIMAL pragma"
 hsSigDoc (SCCFunSig {})         = text "SCC pragma"
@@ -1187,7 +1189,7 @@ ppr_sig (InlineSig _ var inl)
   = pragSrcBrackets (inl_src inl) "{-# INLINE"  (pprInline inl
                                    <+> pprPrefixOcc (unLoc var))
 ppr_sig (SpecInstSig _ src ty)
-  = pragSrcBrackets src "{-# SPECIALISE" (text "instance" <+> ppr ty)
+  = pragSrcBrackets src "{-# pragma" (text "instance" <+> ppr ty)
 ppr_sig (MinimalSig _ src bf)
   = pragSrcBrackets src "{-# MINIMAL" (pprMinimalSig bf)
 ppr_sig (PatSynSig _ names sig_ty)
