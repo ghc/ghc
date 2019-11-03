@@ -3567,6 +3567,7 @@ xFlagsDeps = [
   flagSpec "UndecidableSuperClasses"          LangExt.UndecidableSuperClasses,
   flagSpec "UnicodeSyntax"                    LangExt.UnicodeSyntax,
   flagSpec "UnliftedFFITypes"                 LangExt.UnliftedFFITypes,
+  flagSpec "UnliftedDatatypes"                LangExt.UnliftedDatatypes,
   flagSpec "UnliftedNewtypes"                 LangExt.UnliftedNewtypes,
   flagSpec "ViewPatterns"                     LangExt.ViewPatterns
   ]
@@ -3749,6 +3750,10 @@ impliedXFlags
 
     , (LangExt.TemplateHaskell, turnOn, LangExt.TemplateHaskellQuotes)
     , (LangExt.Strict, turnOn, LangExt.StrictData)
+
+    -- The extensions needed to declare an H98 unlifted data type
+    , (LangExt.UnliftedDatatypes, turnOn, LangExt.StandaloneKindSignatures)
+    , (LangExt.UnliftedDatatypes, turnOn, LangExt.DataKinds)
   ]
 
 -- Note [When is StarIsType enabled]
