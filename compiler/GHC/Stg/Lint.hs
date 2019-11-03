@@ -45,7 +45,7 @@ import GHC.Driver.Session
 import GHC.Data.Bag         ( Bag, emptyBag, isEmptyBag, snocBag, bagToList )
 import GHC.Types.Basic      ( TopLevelFlag(..), isTopLevel )
 import GHC.Types.CostCentre ( isCurrentCCS )
-import GHC.Types.Id         ( Id, idType, isJoinId, idName )
+import GHC.Types.Id
 import GHC.Types.Var.Set
 import GHC.Core.DataCon
 import GHC.Core             ( AltCon(..) )
@@ -134,8 +134,10 @@ lint_binds_help top_lvl (binder, rhs)
         lintStgRhs rhs
         opts <- getStgPprOpts
         -- Check binder doesn't have unlifted type or it's a join point
-        checkL (isJoinId binder || not (isUnliftedType (idType binder)))
-               (mkUnliftedTyMsg opts binder rhs)
+        checkL ( isJoinId binder
+              || not (isUnliftedType (idType binder))
+              || isDataConWorkId binder || isDataConWrapId binder) -- until #17521 is fixed
+          (mkUnliftedTyMsg opts binder rhs)
 
 -- | Top-level bindings can't inherit the cost centre stack from their
 -- (static) allocation site.
