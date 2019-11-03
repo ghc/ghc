@@ -56,7 +56,7 @@ import StringBuffer     ( hGetStringBuffer, hPutStringBuffer )
 import BasicTypes       ( SuccessFlag(..) )
 import Maybes           ( expectJust )
 import SrcLoc
-import LlvmCodeGen      ( LlvmVersion (..), llvmFixupAsm )
+import LlvmCodeGen      ( llvmFixupAsm, llvmVersionList )
 import MonadUtils
 import Platform
 import TcRnTypes
@@ -2170,10 +2170,10 @@ doCpp dflags raw input_fn output_fn = do
 getBackendDefs :: DynFlags -> IO [String]
 getBackendDefs dflags | hscTarget dflags == HscLlvm = do
     llvmVer <- figureLlvmVersion dflags
-    return $ case llvmVer of
-               Just (LlvmVersion n) -> [ "-D__GLASGOW_HASKELL_LLVM__=" ++ format (n,0) ]
-               Just (LlvmVersionOld m n) -> [ "-D__GLASGOW_HASKELL_LLVM__=" ++ format (m,n) ]
-               _      -> []
+    return $ case fmap llvmVersionList llvmVer of
+               Just [m] -> [ "-D__GLASGOW_HASKELL_LLVM__=" ++ format (m,0) ]
+               Just (m:n:_) -> [ "-D__GLASGOW_HASKELL_LLVM__=" ++ format (m,n) ]
+               _ -> []
   where
     format (major, minor)
       | minor >= 100 = error "getBackendDefs: Unsupported minor version"

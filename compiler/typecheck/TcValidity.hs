@@ -1360,7 +1360,8 @@ checkValidInstHead ctxt clas cls_args
   = do { dflags   <- getDynFlags
        ; is_boot  <- tcIsHsBootOrSig
        ; is_sig   <- tcIsHsig
-       ; check_valid_inst_head dflags is_boot is_sig ctxt clas cls_args
+       ; check_special_inst_head dflags is_boot is_sig ctxt clas cls_args
+       ; checkValidTypePats (classTyCon clas) cls_args
        }
 
 {-
@@ -1388,10 +1389,10 @@ in hsig files, where `is_sig` is True.
 
 -}
 
-check_valid_inst_head :: DynFlags -> Bool -> Bool
-                      -> UserTypeCtxt -> Class -> [Type] -> TcM ()
+check_special_inst_head :: DynFlags -> Bool -> Bool
+                        -> UserTypeCtxt -> Class -> [Type] -> TcM ()
 -- Wow!  There are a surprising number of ad-hoc special cases here.
-check_valid_inst_head dflags is_boot is_sig ctxt clas cls_args
+check_special_inst_head dflags is_boot is_sig ctxt clas cls_args
 
   -- If not in an hs-boot file, abstract classes cannot have instances
   | isAbstractClass clas
@@ -1441,7 +1442,7 @@ check_valid_inst_head dflags is_boot is_sig ctxt clas cls_args
   = failWithTc (instTypeErr clas cls_args msg)
 
   | otherwise
-  = checkValidTypePats (classTyCon clas) cls_args
+  = pure ()
   where
     clas_nm = getName clas
     ty_args = filterOutInvisibleTypes (classTyCon clas) cls_args

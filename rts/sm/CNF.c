@@ -488,8 +488,7 @@ allocateForCompact (Capability *cap,
     // We know it doesn't fit in the nursery
     // if it is a large object, allocate a new block
     if (sizeW > LARGE_OBJECT_THRESHOLD/sizeof(W_)) {
-        next_size = BLOCK_ROUND_UP(sizeW*sizeof(W_) +
-                                   sizeof(StgCompactNFData));
+        next_size = BLOCK_ROUND_UP(sizeW*sizeof(W_) + sizeof(StgCompactNFDataBlock));
         block = compactAppendBlock(cap, str, next_size);
         bd = Bdescr((P_)block);
         to = bd->free;
@@ -542,9 +541,9 @@ insertCompactHash (Capability *cap,
                    StgClosure *p, StgClosure *to)
 {
     insertHashTable(str->hash, (StgWord)p, (const void*)to);
-    const StgInfoTable *strinfo = str->header.info;
-    if (strinfo == &stg_COMPACT_NFDATA_CLEAN_info) {
-        strinfo = &stg_COMPACT_NFDATA_DIRTY_info;
+    const StgInfoTable **strinfo = &str->header.info;
+    if (*strinfo == &stg_COMPACT_NFDATA_CLEAN_info) {
+        *strinfo = &stg_COMPACT_NFDATA_DIRTY_info;
         recordClosureMutated(cap, (StgClosure*)str);
     }
 }
