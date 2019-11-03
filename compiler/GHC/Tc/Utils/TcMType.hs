@@ -23,6 +23,7 @@ module GHC.Tc.Utils.TcMType (
   newFlexiTyVarTy,              -- Kind -> TcM TcType
   newFlexiTyVarTys,             -- Int -> Kind -> TcM [TcType]
   newOpenFlexiTyVar, newOpenFlexiTyVarTy, newOpenTypeKind,
+  newOpenBoxedTypeKind,
   newMetaKindVar, newMetaKindVars, newMetaTyVarTyAtLevel,
   newAnonMetaTyVar, cloneMetaTyVar,
   newCycleBreakerTyVar,
@@ -1074,6 +1075,12 @@ newOpenFlexiTyVar :: TcM TcTyVar
 newOpenFlexiTyVar
   = do { kind <- newOpenTypeKind
        ; newFlexiTyVar kind }
+
+newOpenBoxedTypeKind :: TcM TcKind
+newOpenBoxedTypeKind
+  = do { lev <- newFlexiTyVarTy (mkTyConTy levityTyCon)
+       ; let rr = mkTyConApp boxedRepDataConTyCon [lev]
+       ; return (tYPE rr) }
 
 newMetaTyVars :: [TyVar] -> TcM (TCvSubst, [TcTyVar])
 -- Instantiate with META type variables

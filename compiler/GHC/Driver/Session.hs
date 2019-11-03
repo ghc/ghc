@@ -3581,6 +3581,7 @@ xFlagsDeps = [
   flagSpec "UnicodeSyntax"                    LangExt.UnicodeSyntax,
   flagSpec "UnliftedFFITypes"                 LangExt.UnliftedFFITypes,
   flagSpec "UnliftedNewtypes"                 LangExt.UnliftedNewtypes,
+  flagSpec "UnliftedDatatypes"                LangExt.UnliftedDatatypes,
   flagSpec "ViewPatterns"                     LangExt.ViewPatterns
   ]
 
@@ -3762,6 +3763,11 @@ impliedXFlags
 
     , (LangExt.TemplateHaskell, turnOn, LangExt.TemplateHaskellQuotes)
     , (LangExt.Strict, turnOn, LangExt.StrictData)
+
+    -- What writing @data T :: GHC.Types.UnliftedType where T :: T@ needs
+    , (LangExt.UnliftedDatatypes, turnOn, LangExt.GADTSyntax)
+    , (LangExt.UnliftedDatatypes, turnOn, LangExt.DataKinds)
+    , (LangExt.UnliftedDatatypes, turnOn, LangExt.KindSignatures)
   ]
 
 -- Note [When is StarIsType enabled]
