@@ -41,7 +41,7 @@ module GHC.Core (
         isId, cmpAltCon, cmpAlt, ltAlt,
 
         -- ** Simple 'Expr' access functions and predicates
-        bindersOf, bindersOfBinds, rhssOfBind, rhssOfAlts,
+        decomposeBind, bindersOf, bindersOfBinds, rhssOfBind, rhssOfAlts,
         collectBinders, collectTyBinders, collectTyAndValBinders,
         collectNBinders,
         collectArgs, stripNArgs, collectArgsTicks, flattenBinds,
@@ -2122,6 +2122,11 @@ exprToCoercion_maybe _             = Nothing
 *                                                                      *
 ************************************************************************
 -}
+
+-- | Turn a binding group into a 'RecFlag' and a list of bindings.
+decomposeBind :: Bind b -> (RecFlag, [(b, Expr b)])
+decomposeBind (NonRec bndr rhs) = (NonRecursive, [(bndr, rhs)])
+decomposeBind (Rec pairs)       = (Recursive,    pairs)
 
 -- | Extract every variable by this group
 bindersOf  :: Bind b -> [b]
