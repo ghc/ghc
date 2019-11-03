@@ -1487,6 +1487,7 @@ runtimeRepTy = mkTyConTy runtimeRepTyCon
 -- and Note [Prefer Type over TYPE 'LiftedRep] in GHC.Core.TyCo.Rep.
 -- type Type = TYPE ('BoxedRep 'Lifted)
 -- type LiftedRep = 'BoxedRep 'Lifted
+-- type UnliftedRep = 'BoxedRep 'Unlifted
 liftedTypeKindTyCon :: TyCon
 liftedTypeKindTyCon =
     buildSynTyCon liftedTypeKindTyConName [] liftedTypeKind [] rhs

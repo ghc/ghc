@@ -635,6 +635,7 @@ lintLetBind top_lvl rec_flag binder rhs rhs_ty
        ; checkL ( isJoinId binder
                || not (isUnliftedType binder_ty)
                || (isNonRec rec_flag && exprOkForSpeculation rhs)
+               || isDataConWorkId binder -- rec_flag is Recursive for those
                || exprIsTickedString rhs)
            (badBndrTyMsg binder (text "unlifted"))
 
