@@ -945,7 +945,7 @@ Each forall'd type variable in a type or kind is one of
   * Specified: the argument can be inferred at call sites, but
     may be instantiated with visible type/kind application
 
-  * Inferred: the must be inferred at call sites; it
+  * Inferred: the argument must be inferred at call sites; it
     is unavailable for use with visible type/kind application.
 
 Why have Inferred at all? Because we just can't make user-facing
@@ -1115,7 +1115,7 @@ We do kind inference as follows:
   All this is very similar at the level of terms: see GHC.Tc.Gen.Bind
   Note [Quantified variables in partial type signatures]
 
-  But there some tricky corners: Note [Tricky scoping in generaliseTcTyCon]
+  But there are some tricky corners: Note [Tricky scoping in generaliseTcTyCon]
 
 * Step 4.  Extend the type environment with a TcTyCon for S and T, now
   with their utterly-final polymorphic kinds (needed for recursive
@@ -1342,10 +1342,11 @@ getInitialKind strategy
                                          , dd_ND = new_or_data } })
   = do  { let flav = newOrDataToFlavour new_or_data
               ctxt = DataKindCtxt name
+        ; dflags <- getDynFlags
         ; tc <- kcDeclHeader strategy name flav ktvs $
                 case m_sig of
                   Just ksig -> TheKind <$> tcLHsKindSig ctxt ksig
-                  Nothing -> return $ dataDeclDefaultResultKind new_or_data
+                  Nothing   -> return $ dataDeclDefaultResultKind dflags strategy new_or_data
         ; return [tc] }
 
 getInitialKind InitialKindInfer (FamDecl { tcdFam = decl })
@@ -1454,10 +1455,16 @@ have before standalone kind signatures:
 -}
 
 -- See Note [Data declaration default result kind]
-dataDeclDefaultResultKind :: NewOrData -> ContextKind
-dataDeclDefaultResultKind NewType  = OpenKind
+dataDeclDefaultResultKind :: DynFlags -> InitialKindStrategy ->  NewOrData -> ContextKind
+dataDeclDefaultResultKind _ _ NewType = OpenKind
   -- See Note [Implementation of UnliftedNewtypes], point <Error Messages>.
-dataDeclDefaultResultKind DataType = TheKind liftedTypeKind
+dataDeclDefaultResultKind dflags strategy DataType
+  | InitialKindCheck (SAKS _) <- strategy
+  , xopt LangExt.UnliftedDatatypes dflags
+  -- See Note [Implementation of UnliftedDatatypes]
+  = OpenBoxedKind
+  | otherwise
+  = TheKind liftedTypeKind
 
 {- Note [Data declaration default result kind]
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
@@ -1486,6 +1493,8 @@ the assumed result kind to (TYPE r):
 
 See Note [Implementation of UnliftedNewtypes], STEP 1 and it's sub-note
 <Error Messages>.
+
+TODO: Update
 -}
 
 ---------------------------------

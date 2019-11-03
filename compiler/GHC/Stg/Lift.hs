@@ -19,7 +19,7 @@ where
 
 import GHC.Prelude
 
-import GHC.Types.Basic
+import GHC.Types.Basic hiding ( isLifted )
 import GHC.Driver.Session
 import GHC.Types.Id
 import GHC.Stg.FVs ( annBindingFreeVars )

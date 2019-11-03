@@ -727,7 +727,7 @@ tcDataFamInstDecl mb_clsinfo tv_skol_env
        ; traceTc "tcDataFamInstDecl" $
          vcat [ text "Fam tycon:" <+> ppr fam_tc
               , text "Pats:" <+> ppr pats
-              , text "visiblities:" <+> ppr (tcbVisibilities fam_tc pats)
+              , text "visibilities:" <+> ppr (tcbVisibilities fam_tc pats)
               , text "all_pats:" <+> ppr all_pats
               , text "ty_binders" <+> ppr ty_binders
               , text "fam_tc_binders:" <+> ppr (tyConBinders fam_tc)
@@ -942,10 +942,12 @@ tcDataFamInstHeader mb_clsinfo fam_tc outer_bndrs fixity
 
     -- See Note [Implementation of UnliftedNewtypes] in GHC.Tc.TyCl, wrinkle (2).
     tc_kind_sig Nothing
-      = do { unlifted_newtypes <- xoptM LangExt.UnliftedNewtypes
-           ; if unlifted_newtypes && new_or_data == NewType
-               then newOpenTypeKind
-               else pure liftedTypeKind
+      = do { unlifted_newtypes  <- xoptM LangExt.UnliftedNewtypes
+           ; unlifted_datatypes <- xoptM LangExt.UnliftedDatatypes
+           ; case new_or_data of
+               NewType  | unlifted_newtypes  -> newOpenTypeKind
+               DataType | unlifted_datatypes -> newOpenBoxedTypeKind -- TODO
+               _                             -> pure liftedTypeKind
            }
 
     -- See Note [Result kind signature for a data family instance]
