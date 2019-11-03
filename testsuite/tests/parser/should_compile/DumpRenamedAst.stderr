@@ -73,6 +73,7 @@
         (HsDataDefn
          (NoExtField)
          (DataType)
+         (Nothing)
          ({ <no location info> }
           [])
          (Nothing)
@@ -488,6 +489,7 @@
         (HsDataDefn
          (NoExtField)
          (DataType)
+         (Nothing)
          ({ <no location info> }
           [])
          (Nothing)

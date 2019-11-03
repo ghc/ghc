@@ -891,6 +891,7 @@ data HsDataDefn pass   -- The payload of a data type defn
     -- @
     HsDataDefn { dd_ext    :: XCHsDataDefn pass,
                  dd_ND     :: NewOrData,
+                 dd_levity :: Maybe Levity,
                  dd_ctxt   :: LHsContext pass,           -- ^ Context
                  dd_cType  :: Maybe (XRec pass CType),
                  dd_kindSig:: Maybe (LHsKind pass),

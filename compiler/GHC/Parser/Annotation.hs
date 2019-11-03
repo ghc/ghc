@@ -336,6 +336,7 @@ data AnnKeywordId
     | AnnTilde -- ^ '~'
     | AnnType
     | AnnUnit -- ^ '()' for types
+    | AnnUnlifted -- ^ @unlifted@ keyword
     | AnnUsing
     | AnnVal  -- ^ e.g. INTEGER
     | AnnValStr  -- ^ String value, will need quotes when output

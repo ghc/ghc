@@ -238,7 +238,9 @@ cvtDec (DataD ctxt tc tvs ksig constrs derivs)
         ; cons' <- mapM cvtConstr constrs
         ; derivs' <- cvtDerivs derivs
         ; let defn = HsDataDefn { dd_ext = noExtField
-                                , dd_ND = DataType, dd_cType = Nothing
+                                , dd_ND = DataType
+                                , dd_levity = Nothing
+                                , dd_cType = Nothing
                                 , dd_ctxt = ctxt'
                                 , dd_kindSig = ksig'
                                 , dd_cons = cons', dd_derivs = derivs' }
@@ -254,7 +256,9 @@ cvtDec (NewtypeD ctxt tc tvs ksig constr derivs)
         ; con' <- cvtConstr constr
         ; derivs' <- cvtDerivs derivs
         ; let defn = HsDataDefn { dd_ext = noExtField
-                                , dd_ND = NewType, dd_cType = Nothing
+                                , dd_ND = NewType
+                                , dd_levity = Nothing
+                                , dd_cType = Nothing
                                 , dd_ctxt = ctxt'
                                 , dd_kindSig = ksig'
                                 , dd_cons = [con']
@@ -324,7 +328,9 @@ cvtDec (DataInstD ctxt bndrs tys ksig constrs derivs)
        ; cons' <- mapM cvtConstr constrs
        ; derivs' <- cvtDerivs derivs
        ; let defn = HsDataDefn { dd_ext = noExtField
-                               , dd_ND = DataType, dd_cType = Nothing
+                               , dd_ND = DataType
+                               , dd_levity = Nothing
+                               , dd_cType = Nothing
                                , dd_ctxt = ctxt'
                                , dd_kindSig = ksig'
                                , dd_cons = cons', dd_derivs = derivs' }
@@ -345,7 +351,9 @@ cvtDec (NewtypeInstD ctxt bndrs tys ksig constr derivs)
        ; con' <- cvtConstr constr
        ; derivs' <- cvtDerivs derivs
        ; let defn = HsDataDefn { dd_ext = noExtField
-                               , dd_ND = NewType, dd_cType = Nothing
+                               , dd_ND = NewType
+                               , dd_levity = Nothing
+                               , dd_cType = Nothing
                                , dd_ctxt = ctxt'
                                , dd_kindSig = ksig'
                                , dd_cons = [con'], dd_derivs = derivs' }

@@ -1337,13 +1337,14 @@ getInitialKind strategy
     (DataDecl { tcdLName = L _ name
               , tcdTyVars = ktvs
               , tcdDataDefn = HsDataDefn { dd_kindSig = m_sig
-                                         , dd_ND = new_or_data } })
+                                         , dd_ND = new_or_data
+                                         , dd_levity = levity } })
   = do  { let flav = newOrDataToFlavour new_or_data
               ctxt = DataKindCtxt name
         ; tc <- kcDeclHeader strategy name flav ktvs $
                 case m_sig of
                   Just ksig -> TheKind <$> tcLHsKindSig ctxt ksig
-                  Nothing -> return $ dataDeclDefaultResultKind new_or_data
+                  Nothing -> return $ dataDeclDefaultResultKind new_or_data levity
         ; return [tc] }
 
 getInitialKind InitialKindInfer (FamDecl { tcdFam = decl })
@@ -1452,10 +1453,12 @@ have before standalone kind signatures:
 -}
 
 -- See Note [Data declaration default result kind]
-dataDeclDefaultResultKind :: NewOrData -> ContextKind
-dataDeclDefaultResultKind NewType  = OpenKind
+dataDeclDefaultResultKind :: NewOrData -> Maybe Levity -> ContextKind
+dataDeclDefaultResultKind NewType  _               = OpenKind
   -- See Note [Implementation of UnliftedNewtypes], point <Error Messages>.
-dataDeclDefaultResultKind DataType = TheKind liftedTypeKind
+dataDeclDefaultResultKind DataType (Just Unlifted) = TheKind unliftedTypeKind
+  -- TODO: Note [Implementation of UnliftedDatatypes]
+dataDeclDefaultResultKind DataType _               = TheKind liftedTypeKind
 
 {- Note [Data declaration default result kind]
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
@@ -2773,7 +2776,9 @@ tcDataDefn :: SDoc -> RolesInfo -> Name
            -> HsDataDefn GhcRn -> TcM (TyCon, [DerivInfo])
   -- NB: not used for newtype/data instances (whether associated or not)
 tcDataDefn err_ctxt roles_info tc_name
-           (HsDataDefn { dd_ND = new_or_data, dd_cType = cType
+           (HsDataDefn { dd_ND = new_or_data
+                       , dd_levity = levity
+                       , dd_cType = cType
                        , dd_ctxt = ctxt
                        , dd_kindSig = mb_ksig  -- Already in tc's kind
                                                -- via inferInitialKinds
@@ -2795,7 +2800,7 @@ tcDataDefn err_ctxt roles_info tc_name
        ; tcg_env <- getGblEnv
        ; let hsc_src = tcg_src tcg_env
        ; unless (mk_permissive_kind hsc_src cons) $
-         checkDataKindSig (DataDeclSort new_or_data) final_res_kind
+         checkDataKindSig (DataDeclSort new_or_data levity) final_res_kind
 
        ; let skol_tvs = binderVars tycon_binders
        ; stupid_tc_theta <- pushLevelAndSolveEqualities skol_info skol_tvs $

@@ -610,24 +610,23 @@ pp_data_defn :: (OutputableBndrId p)
                   => (LHsContext (GhcPass p) -> SDoc)   -- Printing the header
                   -> HsDataDefn (GhcPass p)
                   -> SDoc
-pp_data_defn pp_hdr (HsDataDefn { dd_ND = new_or_data, dd_ctxt = context
+pp_data_defn pp_hdr (HsDataDefn { dd_ND = new_or_data
+                                , dd_levity = lev
+                                , dd_ctxt = context
                                 , dd_cType = mb_ct
                                 , dd_kindSig = mb_sig
                                 , dd_cons = condecls, dd_derivs = derivings })
   | null condecls
-  = ppr new_or_data <+> pp_ct <+> pp_hdr context <+> pp_sig
+  = ppr new_or_data <+> pp_lev <+> pp_ct <+> pp_hdr context <+> pp_sig
     <+> pp_derivings derivings
 
   | otherwise
   = hang (ppr new_or_data <+> pp_ct  <+> pp_hdr context <+> pp_sig)
        2 (pp_condecls condecls $$ pp_derivings derivings)
   where
-    pp_ct = case mb_ct of
-               Nothing   -> empty
-               Just ct -> ppr ct
-    pp_sig = case mb_sig of
-               Nothing   -> empty
-               Just kind -> dcolon <+> ppr kind
+    pp_lev = ppJustWith pprUnlifted lev
+    pp_ct = ppJustWith ppr mb_ct
+    pp_sig = ppJustWith (\kind -> dcolon <+> ppr kind) mb_sig
     pp_derivings (L _ ds) = vcat (map ppr ds)
 
 instance OutputableBndrId p

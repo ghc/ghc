@@ -1894,9 +1894,10 @@ rnTySyn doc rhs = rnLHsType doc rhs
 
 rnDataDefn :: HsDocContext -> HsDataDefn GhcPs
            -> RnM (HsDataDefn GhcRn, FreeVars)
-rnDataDefn doc (HsDataDefn { dd_ND = new_or_data, dd_cType = cType
-                           , dd_ctxt = context, dd_cons = condecls
-                           , dd_kindSig = m_sig, dd_derivs = derivs })
+rnDataDefn doc (HsDataDefn { dd_ND = new_or_data, dd_levity = levity
+                           , dd_cType = cType, dd_ctxt = context
+                           , dd_cons = condecls, dd_kindSig = m_sig
+                           , dd_derivs = derivs })
   = do  { checkTc (h98_style || null (unLoc context))
                   (badGadtStupidTheta doc)
 
@@ -1919,7 +1920,9 @@ rnDataDefn doc (HsDataDefn { dd_ND = new_or_data, dd_cType = cType
         ; let all_fvs = fvs1 `plusFV` fvs3 `plusFV`
                         con_fvs `plusFV` sig_fvs
         ; return ( HsDataDefn { dd_ext = noExtField
-                              , dd_ND = new_or_data, dd_cType = cType
+                              , dd_ND = new_or_data
+                              , dd_levity = levity
+                              , dd_cType = cType
                               , dd_ctxt = context', dd_kindSig = m_sig'
                               , dd_cons = condecls'
                               , dd_derivs = derivs' }

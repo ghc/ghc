@@ -672,6 +672,7 @@ tcDataFamInstDecl mb_clsinfo tv_skol_env
              , feqn_tycon  = lfam_name@(L _ fam_name)
              , feqn_fixity = fixity
              , feqn_rhs    = HsDataDefn { dd_ND      = new_or_data
+                                        , dd_levity  = levity
                                         , dd_cType   = cType
                                         , dd_ctxt    = hs_ctxt
                                         , dd_cons    = hs_cons
@@ -690,7 +691,7 @@ tcDataFamInstDecl mb_clsinfo tv_skol_env
           -- See [Arity of data families] in GHC.Core.FamInstEnv
        ; (qtvs, pats, res_kind, stupid_theta)
              <- tcDataFamInstHeader mb_clsinfo fam_tc outer_bndrs fixity
-                                    hs_ctxt hs_pats m_ksig new_or_data
+                                    hs_ctxt hs_pats m_ksig new_or_data levity
 
        -- Eta-reduce the axiom if possible
        -- Quite tricky: see Note [Implementing eta reduction for data families]
@@ -727,7 +728,7 @@ tcDataFamInstDecl mb_clsinfo tv_skol_env
        ; traceTc "tcDataFamInstDecl" $
          vcat [ text "Fam tycon:" <+> ppr fam_tc
               , text "Pats:" <+> ppr pats
-              , text "visiblities:" <+> ppr (tcbVisibilities fam_tc pats)
+              , text "visibilities:" <+> ppr (tcbVisibilities fam_tc pats)
               , text "all_pats:" <+> ppr all_pats
               , text "ty_binders" <+> ppr ty_binders
               , text "fam_tc_binders:" <+> ppr (tyConBinders fam_tc)
@@ -860,13 +861,14 @@ tcDataFamInstHeader
     -> LexicalFixity -> LHsContext GhcRn
     -> HsTyPats GhcRn -> Maybe (LHsKind GhcRn)
     -> NewOrData
+    -> Maybe Levity
     -> TcM ([TyVar], [Type], Kind, ThetaType)
 -- The "header" of a data family instance is the part other than
 -- the data constructors themselves
 --    e.g.  data instance D [a] :: * -> * where ...
 -- Here the "header" is the bit before the "where"
 tcDataFamInstHeader mb_clsinfo fam_tc outer_bndrs fixity
-                    hs_ctxt hs_pats m_ksig new_or_data
+                    hs_ctxt hs_pats m_ksig new_or_data levity
   = do { traceTc "tcDataFamInstHeader {" (ppr fam_tc <+> ppr hs_pats)
        ; (tclvl, wanted, (scoped_tvs, (stupid_theta, lhs_ty, master_res_kind, instance_res_kind)))
             <- pushLevelAndSolveEqualitiesX "tcDataFamInstHeader" $
@@ -925,8 +927,8 @@ tcDataFamInstHeader mb_clsinfo fam_tc outer_bndrs fixity
        -- it's ok because res_kind can come from a user-written kind signature.
        -- See Note [Datatype return kinds], point (4a)
 
-       ; checkDataKindSig (DataInstanceSort new_or_data) master_res_kind
-       ; checkDataKindSig (DataInstanceSort new_or_data) instance_res_kind
+       ; checkDataKindSig (DataInstanceSort new_or_data levity) master_res_kind
+       ; checkDataKindSig (DataInstanceSort new_or_data levity) instance_res_kind
 
        -- Check that type patterns match the class instance head
        -- The call to splitTyConApp_maybe here is just an inlining of
@@ -941,11 +943,16 @@ tcDataFamInstHeader mb_clsinfo fam_tc outer_bndrs fixity
     data_ctxt = DataKindCtxt fam_name
 
     -- See Note [Implementation of UnliftedNewtypes] in GHC.Tc.TyCl, wrinkle (2).
+    -- See Note [Implementation of UnliftedDatatypes] TODO
     tc_kind_sig Nothing
-      = do { unlifted_newtypes <- xoptM LangExt.UnliftedNewtypes
-           ; if unlifted_newtypes && new_or_data == NewType
-               then newOpenTypeKind
-               else pure liftedTypeKind
+      = do { unlifted_newtypes  <- xoptM LangExt.UnliftedNewtypes
+           ; unlifted_datatypes <- xoptM LangExt.UnliftedDatatypes
+           ; case (new_or_data, levity) of
+              (NewType, _)
+                | unlifted_newtypes  -> newOpenTypeKind
+              (DataType, Just Unlifted)
+                | unlifted_datatypes -> pure unliftedTypeKind
+              _                      -> pure liftedTypeKind
            }
 
     -- See Note [Result kind signature for a data family instance]

@@ -197,36 +197,40 @@ mkClassDecl loc (L _ (mcxt, tycl_hdr)) fds where_cls layoutInfo
 
 mkTyData :: SrcSpan
          -> NewOrData
+         -> Maybe Levity
          -> Maybe (Located CType)
          -> Located (Maybe (LHsContext GhcPs), LHsType GhcPs)
          -> Maybe (LHsKind GhcPs)
          -> [LConDecl GhcPs]
          -> HsDeriving GhcPs
          -> P (LTyClDecl GhcPs)
-mkTyData loc new_or_data cType (L _ (mcxt, tycl_hdr))
+mkTyData loc new_or_data levity cType (L _ (mcxt, tycl_hdr))
          ksig data_cons maybe_deriv
   = do { (tc, tparams, fixity, ann) <- checkTyClHdr False tycl_hdr
        ; addAnnsAt loc ann -- Add any API Annotations to the top SrcSpan
        ; (tyvars, anns) <- checkTyVars (ppr new_or_data) equalsDots tc tparams
        ; addAnnsAt loc anns -- Add any API Annotations to the top SrcSpan
-       ; defn <- mkDataDefn new_or_data cType mcxt ksig data_cons maybe_deriv
+       ; defn <- mkDataDefn new_or_data levity cType mcxt ksig data_cons maybe_deriv
        ; return (L loc (DataDecl { tcdDExt = noExtField,
                                    tcdLName = tc, tcdTyVars = tyvars,
                                    tcdFixity = fixity,
                                    tcdDataDefn = defn })) }
 
 mkDataDefn :: NewOrData
+           -> Maybe Levity
            -> Maybe (Located CType)
            -> Maybe (LHsContext GhcPs)
            -> Maybe (LHsKind GhcPs)
            -> [LConDecl GhcPs]
            -> HsDeriving GhcPs
            -> P (HsDataDefn GhcPs)
-mkDataDefn new_or_data cType mcxt ksig data_cons maybe_deriv
+mkDataDefn new_or_data levity cType mcxt ksig data_cons maybe_deriv
   = do { checkDatatypeContext mcxt
        ; let cxt = fromMaybe (noLoc []) mcxt
        ; return (HsDataDefn { dd_ext = noExtField
-                            , dd_ND = new_or_data, dd_cType = cType
+                            , dd_ND = new_or_data
+                            , dd_levity = levity
+                            , dd_cType = cType
                             , dd_ctxt = cxt
                             , dd_cons = data_cons
                             , dd_kindSig = ksig
@@ -283,6 +287,7 @@ mkTyFamInstEqn bndrs lhs rhs
 
 mkDataFamInst :: SrcSpan
               -> NewOrData
+              -> Maybe Levity
               -> Maybe (Located CType)
               -> (Maybe ( LHsContext GhcPs), HsOuterFamEqnTyVarBndrs GhcPs
                         , LHsType GhcPs)
@@ -290,11 +295,11 @@ mkDataFamInst :: SrcSpan
               -> [LConDecl GhcPs]
               -> HsDeriving GhcPs
               -> P (LInstDecl GhcPs)
-mkDataFamInst loc new_or_data cType (mcxt, bndrs, tycl_hdr)
+mkDataFamInst loc new_or_data levity cType (mcxt, bndrs, tycl_hdr)
               ksig data_cons maybe_deriv
   = do { (tc, tparams, fixity, ann) <- checkTyClHdr False tycl_hdr
        ; addAnnsAt loc ann -- Add any API Annotations to the top SrcSpan
-       ; defn <- mkDataDefn new_or_data cType mcxt ksig data_cons maybe_deriv
+       ; defn <- mkDataDefn new_or_data levity cType mcxt ksig data_cons maybe_deriv
        ; return (L loc (DataFamInstD noExtField (DataFamInstDecl
                   (FamEqn { feqn_ext    = noExtField
                           , feqn_tycon  = tc
