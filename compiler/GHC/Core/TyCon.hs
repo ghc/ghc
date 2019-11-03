@@ -1458,7 +1458,7 @@ data PrimRep
   | FloatRep
   | DoubleRep
   | VecRep Int PrimElemRep  -- ^ A vector
-  deriving( Show )
+  deriving( Eq, Show )
 
 data PrimElemRep
   = Int8ElemRep

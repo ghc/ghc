@@ -33,7 +33,7 @@ module GHC.Types (
         Symbol,
         Any,
         type (~~), Coercible,
-        TYPE, Levity(..), RuntimeRep(..), LiftedRep, Type, Constraint,
+        TYPE, Levity(..), RuntimeRep(..), LiftedRep, Type, UnliftedData, Constraint,
           -- The historical type * should ideally be written as
           -- `type *`, without the parentheses. But that's a true
           -- pain to parse, and for little gain.
@@ -90,6 +90,10 @@ type LiftedRep = 'BoxedRep 'Lifted
 
 -- | The kind of types with lifted values. For example @Int :: Type@.
 type Type = TYPE LiftedRep
+
+-- | The kind of boxed, unlifted values, for example @Array#@ or a user-defined
+-- unlifted data type, using @-XUnliftedDataTypes@.
+type UnliftedData = TYPE ('BoxedRep 'Unlifted)
 
 data Multiplicity = Many | One
 

@@ -43,6 +43,8 @@ module GHC.Types.Basic (
         OverlapFlag(..), OverlapMode(..), setOverlapModeMaybe,
         hasOverlappingFlag, hasOverlappableFlag, hasIncoherentFlag,
 
+        Levity(..), isLifted, pprUnlifted,
+
         Boxity(..), isBoxed,
 
         PprPrec(..), topPrec, sigPrec, opPrec, funPrec, starPrec, appPrec,
@@ -473,6 +475,31 @@ isTopLevel NotTopLevel  = False
 instance Outputable TopLevelFlag where
   ppr TopLevel    = text "<TopLevel>"
   ppr NotTopLevel = text "<NotTopLevel>"
+
+{-
+************************************************************************
+*                                                                      *
+                   Levity
+*                                                                      *
+************************************************************************
+-}
+
+data Levity
+  = Lifted
+  | Unlifted
+  deriving( Eq, Data )
+
+isLifted :: Levity -> Bool
+isLifted Lifted   = True
+isLifted Unlifted = False
+
+instance Outputable Levity where
+  ppr Lifted   = text "Lifted"
+  ppr Unlifted = text "Unlifted"
+
+pprUnlifted :: Levity -> SDoc
+pprUnlifted Unlifted = text "unlifted"
+pprUnlifted Lifted   = empty
 
 {-
 ************************************************************************
