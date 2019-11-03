@@ -531,7 +531,7 @@ type GenStgAlt pass
      GenStgExpr pass) -- ...right-hand side.
 
 data AltType
-  = PolyAlt             -- Polymorphic (a lifted type variable)
+  = PolyAlt             -- Polymorphic (a boxed type variable, lifted or unlifted)
   | MultiValAlt Int     -- Multi value of this arity (unboxed tuple or sum)
                         -- the arity could indeed be 1 for unary unboxed tuple
                         -- or enum-like unboxed sums
