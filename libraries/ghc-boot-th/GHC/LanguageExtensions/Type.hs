@@ -52,6 +52,7 @@ data Extension
    | UnboxedTuples
    | UnboxedSums
    | UnliftedNewtypes
+   | UnliftedDatatypes
    | BangPatterns
    | TypeFamilies
    | TypeFamilyDependencies

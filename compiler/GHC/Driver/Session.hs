@@ -3580,6 +3580,7 @@ xFlagsDeps = [
   flagSpec "UnicodeSyntax"                    LangExt.UnicodeSyntax,
   flagSpec "UnliftedFFITypes"                 LangExt.UnliftedFFITypes,
   flagSpec "UnliftedNewtypes"                 LangExt.UnliftedNewtypes,
+  flagSpec "UnliftedDatatypes"                LangExt.UnliftedDatatypes,
   flagSpec "ViewPatterns"                     LangExt.ViewPatterns
   ]
 
