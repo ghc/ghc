@@ -945,7 +945,7 @@ Each forall'd type variable in a type or kind is one of
   * Specified: the argument can be inferred at call sites, but
     may be instantiated with visible type/kind application
 
-  * Inferred: the must be inferred at call sites; it
+  * Inferred: the argument must be inferred at call sites; it
     is unavailable for use with visible type/kind application.
 
 Why have Inferred at all? Because we just can't make user-facing
@@ -1115,7 +1115,7 @@ We do kind inference as follows:
   All this is very similar at the level of terms: see GHC.Tc.Gen.Bind
   Note [Quantified variables in partial type signatures]
 
-  But there some tricky corners: Note [Tricky scoping in generaliseTcTyCon]
+  But there are some tricky corners: Note [Tricky scoping in generaliseTcTyCon]
 
 * Step 4.  Extend the type environment with a TcTyCon for S and T, now
   with their utterly-final polymorphic kinds (needed for recursive
@@ -1345,7 +1345,7 @@ getInitialKind strategy
         ; tc <- kcDeclHeader strategy name flav ktvs $
                 case m_sig of
                   Just ksig -> TheKind <$> tcLHsKindSig ctxt ksig
-                  Nothing -> return $ dataDeclDefaultResultKind new_or_data
+                  Nothing   -> return $ dataDeclDefaultResultKind strategy new_or_data
         ; return [tc] }
 
 getInitialKind InitialKindInfer (FamDecl { tcdFam = decl })
@@ -1454,14 +1454,18 @@ have before standalone kind signatures:
 -}
 
 -- See Note [Data declaration default result kind]
-dataDeclDefaultResultKind :: NewOrData -> ContextKind
-dataDeclDefaultResultKind NewType  = OpenKind
-  -- See Note [Implementation of UnliftedNewtypes], point <Error Messages>.
-dataDeclDefaultResultKind DataType = TheKind liftedTypeKind
+dataDeclDefaultResultKind :: InitialKindStrategy ->  NewOrData -> ContextKind
+dataDeclDefaultResultKind strategy new_or_data
+  | NewType <- new_or_data
+  = OpenKind -- See Note [Implementation of UnliftedNewtypes], point <Error Messages>.
+  | DataType <- new_or_data
+  , InitialKindCheck (SAKS _) <- strategy
+  = OpenBoxedKind -- See Note [Implementation of UnliftedDatatypes]
+  | otherwise
+  = TheKind liftedTypeKind
 
 {- Note [Data declaration default result kind]
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
-
 When the user has not written an inline result kind annotation on a data
 declaration, we assume it to be 'Type'. That is, the following declarations
 D1 and D2 are considered equivalent:
@@ -1478,14 +1482,25 @@ accept D4:
   data D4 :: Type -> Type where
     MkD4 :: ... -> D4 param
 
-However, there's a twist: for newtypes, we must relax
-the assumed result kind to (TYPE r):
+However, there are two twists:
 
-  newtype D5 where
-    MkD5 :: Int# -> D5
+  * For unlifted newtypes, we must relax the assumed result kind to (TYPE r):
 
-See Note [Implementation of UnliftedNewtypes], STEP 1 and it's sub-note
-<Error Messages>.
+      newtype D5 where
+        MkD5 :: Int# -> D5
+
+    See Note [Implementation of UnliftedNewtypes], STEP 1 and it's sub-note
+    <Error Messages>.
+
+  * For unlifted datatypes, we must relax the assumed result kind to
+    (TYPE (BoxedRep l)) in the presence of a SAKS:
+
+      type D6 :: Type -> TYPE (BoxedRep Unlifted)
+      data D6 a = MkD6 a
+
+    Otherwise, it would be impossible to declare unlifted data types in H98
+    syntax (which doesn't allow specification of a result kind).
+
 -}
 
 ---------------------------------
@@ -2252,6 +2267,41 @@ the validity checker), that will not happen. But I cannot think of a non-contriv
 example that will notice this lack of inference, so it seems better to improve
 error messages than be able to infer this instantiation.
 
+Note [Implementation of UnliftedDatatypes]
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+Expected behavior of UnliftedDatatypes:
+
+* Proposal: https://github.com/ghc-proposals/ghc-proposals/blob/master/proposals/0265-unlifted-datatypes.rst
+* Discussion: https://github.com/ghc-proposals/ghc-proposals/pull/265
+
+The implementation heavily leans on Note [Implemenation of UnliftedNewtypes].
+
+In the frontend, the following tweaks have been made in the typechecker:
+
+* STEP 1: In the inferInitialKinds phase, newExpectedKind gives data type
+  constructors a result kind of `TYPE (BoxedRep l)` with a fresh unification
+  variable `l` when there is a SAKS. (Similar to UnliftedNewtypes.)
+  Not needed with a CUSK, because it can't specify result kinds.
+  If there's a GADTSyntax result kind signature, we keep on using that kind.
+
+  Similarly, for data instances without a kind signature, we use
+  `TYPE (BoxedRep l)` as the result kind, to support the following code:
+
+    data family F a :: UnliftedType
+    data instance F Int = TInt
+
+  The ommission of a kind signature for `F` should not mean a result kind
+  of `Type` (and thus a kind error) here.
+
+* STEP 2: No change to kcTyClDecl.
+
+* STEP 3: In checkDataKindSig, we make sure to account for the new
+  `OpenBoxedKind :: ContextKind` and suggest to to turn on UnliftedDatatypes
+  for data declarations which have non-lifted (but boxed) kind.
+
+The changes to Core, STG and Cmm are of rather comsmetic nature
+The IRs are already well-equipped to handle unlifted types, and unlifted
+datatypes are just a new sub-class thereof.
 -}
 
 tcTyClDecl :: RolesInfo -> LTyClDecl GhcRn -> TcM (TyCon, [DerivInfo])

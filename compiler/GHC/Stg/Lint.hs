@@ -133,8 +133,13 @@ lint_binds_help top_lvl (binder, rhs)
         when (isTopLevel top_lvl) (checkNoCurrentCCS rhs)
         lintStgRhs rhs
         opts <- getStgPprOpts
-        -- Check binder doesn't have unlifted type or it's a join point
-        checkL (isJoinId binder || not (isUnliftedType (idType binder)))
+        let is_data = case rhs of StgRhsCon{} -> True; StgRhsClosure{} -> False
+        -- Check binder doesn't have unlifted type unless
+        --   * it's a join point, or
+        --   * data con app, not in need of any evaluation
+        checkL ( isJoinId binder
+              || is_data
+              || not (isUnliftedType (idType binder)))
                (mkUnliftedTyMsg opts binder rhs)
 
 -- | Top-level bindings can't inherit the cost centre stack from their
