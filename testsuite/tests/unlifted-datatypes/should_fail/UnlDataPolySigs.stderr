@@ -1,0 +1,28 @@
+
+UnlDataPolySigs.hs:13:3: error:
+    • Data constructor ‘MkU1’ has existential type variables, a context, or a specialised result type
+        MkU1 :: forall {k} (a :: k). Int -> U1 a
+        (Enable ExistentialQuantification or GADTs to allow this)
+    • In the definition of data constructor ‘MkU1’
+      In the data type declaration for ‘U1’
+
+UnlDataPolySigs.hs:20:3: error:
+    • Data constructor ‘MkU3’ has existential type variables, a context, or a specialised result type
+        MkU3 :: forall a. Int -> U3 a
+        (Enable ExistentialQuantification or GADTs to allow this)
+    • In the definition of data constructor ‘MkU3’
+      In the data type declaration for ‘U3’
+
+UnlDataPolySigs.hs:24:3: error:
+    • Data constructor ‘MkU4’ has existential type variables, a context, or a specialised result type
+        MkU4 :: forall a. Int -> U4 a
+        (Enable ExistentialQuantification or GADTs to allow this)
+    • In the definition of data constructor ‘MkU4’
+      In the data type declaration for ‘U4’
+
+UnlDataPolySigs.hs:27:3: error:
+    • Data constructor ‘MkU5’ has existential type variables, a context, or a specialised result type
+        MkU5 :: forall {k} (a :: k). Int -> U5 a
+        (Enable ExistentialQuantification or GADTs to allow this)
+    • In the definition of data constructor ‘MkU5’
+      In the data type declaration for ‘U5’
