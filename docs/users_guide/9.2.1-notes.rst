@@ -13,12 +13,31 @@ Language
   <https://www.microsoft.com/en-us/research/publication/a-quick-look-at-impredicativity/>`__
   (Serrano et al, ICFP 2020).  More information here: :ref:`impredicative-polymorphism`.
   This replaces the old (undefined, flaky) behaviour of the :extension:`ImpredicativeTypes` extension.
+
 * The first stage of the `Pointer Rep Proposal`_ has been implemented. All
   boxed types, both lifted and unlifted, now have representation kinds of
   the shape ``BoxedRep r``. Code that references ``LiftedRep`` and ``UnliftedRep``
   will need to be updated.
 
 .. _Pointer Rep Proposal: https://github.com/ghc-proposals/ghc-proposals/blob/master/proposals/0203-pointer-rep.rst
+
+* :extension:`UnliftedDatatypes`: The `Unlifted Datatypes Proposal`_ has been
+  implemented. That means GHC Haskell now offers a way to define algebraic
+  data types with strict semantics like in OCaml or Idris! The distinction to
+  ordinary lifted data types is made in the kind system: Unlifted data types
+  live in kind ``TYPE (BoxedRep Unlifted)``. :extension:`UnliftedDatatypes`
+  allows giving data declarations such result kinds, such as in the following
+  example with the help of :extension:`StandaloneKindSignatures`: ::
+
+    type IntSet :: UnliftedType -- type UnliftedType = TYPE (BoxedRep Unlifted)
+    data IntSet = Branch IntSet !Int IntSet | Leaf
+
+  See :extension:`UnliftedDatatypes` for what other declarations are
+  possible. Slight caveat: Most functions in ``base`` (including ``$``)
+  are not levity-polymorphic (yet) and hence won't work with unlifted
+  data types.
+
+.. _Unlifted Datatypes Proposal: https://github.com/ghc-proposals/ghc-proposals/blob/master/proposals/0265-unlifted-datatypes.rst
 
 * Kind inference for data/newtype instance declarations is slightly
   more restrictive than before.  See the user manual :ref:`kind-inference-data-family-instances`.
