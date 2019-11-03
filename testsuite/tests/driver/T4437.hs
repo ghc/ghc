@@ -43,6 +43,7 @@ expectedGhcOnlyExtensions =
     , "FieldSelectors"
     , "OverloadedRecordDot"
     , "OverloadedRecordUpdate"
+    , "UnliftedDatatypes"
     ]
 
 expectedCabalOnlyExtensions :: [String]

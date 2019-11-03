@@ -120,10 +120,10 @@ module GHC.Core.Type (
 
         -- *** Levity and boxity
         isLiftedType_maybe,
-        isLiftedTypeKind, isUnliftedTypeKind, pickyIsLiftedTypeKind,
-        isLiftedRuntimeRep, isUnliftedRuntimeRep,
+        isLiftedTypeKind, isUnliftedTypeKind, isBoxedTypeKind, pickyIsLiftedTypeKind,
+        isLiftedRuntimeRep, isUnliftedRuntimeRep, isBoxedRuntimeRep,
         isLiftedLevity, isUnliftedLevity,
-        isUnliftedType, mightBeUnliftedType, isUnboxedTupleType, isUnboxedSumType,
+        isUnliftedType, isBoxedType, mightBeUnliftedType, isUnboxedTupleType, isUnboxedSumType,
         isAlgType, isDataFamilyAppType,
         isPrimitiveType, isStrictType,
         isLevityTy, isLevityVar,
@@ -146,10 +146,10 @@ module GHC.Core.Type (
         -- ** Finding the kind of a type
         typeKind, tcTypeKind, isTypeLevPoly, resultIsLevPoly,
         tcIsLiftedTypeKind, tcIsConstraintKind, tcReturnsConstraintKind,
-        tcIsRuntimeTypeKind,
+        tcIsBoxedTypeKind, tcIsRuntimeTypeKind,
 
         -- ** Common Kind
-        liftedTypeKind,
+        liftedTypeKind, unliftedTypeKind,
 
         -- * Type free variables
         tyCoFVsOfType, tyCoFVsBndr, tyCoFVsVarBndr, tyCoFVsVarBndrs,
@@ -294,26 +294,29 @@ import Control.Monad    ( guard )
 -- $type_classification
 -- #type_classification#
 --
--- Types are one of:
+-- Types are any, but at least one, of:
 --
--- [Unboxed]            Iff its representation is other than a pointer
---                      Unboxed types are also unlifted.
+-- [Boxed]              Iff its representation is a pointer to an object on the
+--                      GC'd heap. Operationally, heap objects can be entered as
+--                      a means of evaluation.
 --
--- [Lifted]             Iff it has bottom as an element.
---                      Closures always have lifted types: i.e. any
---                      let-bound identifier in Core must have a lifted
---                      type. Operationally, a lifted object is one that
---                      can be entered.
+-- [Lifted]             Iff it has bottom as an element: An instance of a
+--                      lifted type might diverge when evaluated.
+--                      GHC Haskell's unboxed types are unlifted.
+--                      An unboxed, but lifted type is not very useful.
+--                      (Example: A byte-represented type, where evaluating 0xff
+--                      computes the 12345678th collatz number modulo 0xff.)
 --                      Only lifted types may be unified with a type variable.
 --
 -- [Algebraic]          Iff it is a type with one or more constructors, whether
 --                      declared with @data@ or @newtype@.
 --                      An algebraic type is one that can be deconstructed
---                      with a case expression. This is /not/ the same as
---                      lifted types, because we also include unboxed
---                      tuples in this classification.
+--                      with a case expression. There are algebraic types that
+--                      are not lifted types, like unlifted data types or
+--                      unboxed tuples.
 --
 -- [Data]               Iff it is a type declared with @data@, or a boxed tuple.
+--                      There are also /unlifted/ data types.
 --
 -- [Primitive]          Iff it is a built-in type that can't be expressed in Haskell.
 --
@@ -473,8 +476,8 @@ coreFullView ty@(TyConApp tc _)
 coreFullView ty = ty
 {-# INLINE coreFullView #-}
 
-{- Note [Inlining coreView] in GHC.Core.Type
-~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+{- Note [Inlining coreView]
+~~~~~~~~~~~~~~~~~~~~~~~~~~~
 It is very common to have a function
 
   f :: Type -> ...
@@ -585,6 +588,18 @@ expandTypeSynonyms ty
       -- order of a coercion)
     go_cobndr subst = substForAllCoBndrUsing False (go_co subst) subst
 
+-- | An INLINE helper for function such as 'kindRep_maybe' below.
+--
+-- @isTyConKeyApp_maybe key ty@ returns @Just tys@ iff
+-- the type @ty = T tys@, where T's unique = key
+isTyConKeyApp_maybe :: Unique -> Type -> Maybe [Type]
+isTyConKeyApp_maybe key ty
+  | TyConApp tc args <- coreFullView ty
+  , tc `hasKey` key
+  = Just args
+  | otherwise
+  = Nothing
+{-# INLINE isTyConKeyApp_maybe #-}
 
 -- | Extract the RuntimeRep classifier of a type from its kind. For example,
 -- @kindRep * = LiftedRep@; Panics if this is not possible.
@@ -600,9 +615,18 @@ kindRep k = case kindRep_maybe k of
 -- Treats * and Constraint as the same
 kindRep_maybe :: HasDebugCallStack => Kind -> Maybe Type
 kindRep_maybe kind
-  | TyConApp tc [arg] <- coreFullView kind
-  , tc `hasKey` tYPETyConKey    = Just arg
-  | otherwise                   = Nothing
+  | Just [arg] <- isTyConKeyApp_maybe tYPETyConKey kind = Just arg
+  | otherwise                                           = Nothing
+
+-- | Returns True if the kind classifies types which are allocated on
+-- the GC'd heap and False otherwise. Note that this returns False for
+-- levity-polymorphic kinds, which may be specialized to a kind that
+-- classifies AddrRep or even unboxed kinds.
+isBoxedTypeKind :: Kind -> Bool
+isBoxedTypeKind kind
+  = case kindRep_maybe kind of
+      Just rep -> isBoxedRuntimeRep rep
+      Nothing  -> False
 
 -- | This version considers Constraint to be the same as *. Returns True
 -- if the argument is equivalent to Type/Constraint and False otherwise.
@@ -636,54 +660,49 @@ pickyIsLiftedTypeKind kind
   , tc `hasKey` liftedTypeKindTyConKey = True
   | otherwise                          = False
 
-isLiftedRuntimeRep :: Type -> Bool
--- isLiftedRuntimeRep is true of LiftedRep :: RuntimeRep
--- False of type variables (a :: RuntimeRep)
---   and of other reps e.g. (IntRep :: RuntimeRep)
-isLiftedRuntimeRep rep
-  | Just rep' <- coreView rep
-  = isLiftedRuntimeRep rep'
-  | TyConApp rr_tc [rr_arg] <- rep
-  , rr_tc `hasKey` boxedRepDataConKey
-  = isLiftedLevity rr_arg
-  | otherwise
-  = False
-
-isLiftedLevity :: Type -> Bool
-isLiftedLevity lev
-  | Just lev' <- coreView lev          = isLiftedLevity lev'
-  | TyConApp lev_tc lev_args <- lev
-  , lev_tc `hasKey` liftedDataConKey
-  = ASSERT( null lev_args ) True
-  | otherwise                          = False
-
-isUnliftedLevity :: Type -> Bool
-isUnliftedLevity lev
-  | Just lev' <- coreView lev          = isUnliftedLevity lev'
-  | TyConApp lev_tc lev_args <- lev
-  , lev_tc `hasKey` unliftedDataConKey
-  = ASSERT( null lev_args ) True
-  | otherwise                          = False
-
--- | Returns True if the kind classifies unlifted types and False otherwise.
--- Note that this returns False for levity-polymorphic kinds, which may
--- be specialized to a kind that classifies unlifted types.
+-- | Returns True if the kind classifies unlifted types (like 'Int#') and False
+-- otherwise. Note that this returns False for levity-polymorphic kinds, which
+-- may be specialized to a kind that classifies unlifted types.
 isUnliftedTypeKind :: Kind -> Bool
 isUnliftedTypeKind kind
   = case kindRep_maybe kind of
       Just rep -> isUnliftedRuntimeRep rep
       Nothing  -> False
 
+-- | See 'isBoxedRuntimeRep_maybe'.
+isBoxedRuntimeRep :: Type -> Bool
+isBoxedRuntimeRep rep = isJust (isBoxedRuntimeRep_maybe rep)
+
+-- | `isBoxedRuntimeRep_maybe (rep :: RuntimeRep)` returns `Just lev` if `rep`
+-- expands to `Boxed lev` and returns `Nothing` otherwise.
+--
+-- Types with this runtime rep are represented by pointers on the GC'd heap.
+isBoxedRuntimeRep_maybe :: Type -> Maybe Type
+isBoxedRuntimeRep_maybe rep
+  | Just [lev] <- isTyConKeyApp_maybe boxedRepDataConKey rep
+  = Just lev
+  | otherwise
+  = Nothing
+
+isLiftedRuntimeRep :: Type -> Bool
+-- isLiftedRuntimeRep is true of LiftedRep :: RuntimeRep
+-- False of type variables (a :: RuntimeRep)
+--   and of other reps e.g. (IntRep :: RuntimeRep)
+isLiftedRuntimeRep rep
+  | Just [lev] <- isTyConKeyApp_maybe boxedRepDataConKey rep
+  = isLiftedLevity lev
+  | otherwise
+  = False
+
 isUnliftedRuntimeRep :: Type -> Bool
+-- PRECONDITION: The type has kind RuntimeRep
 -- True of definitely-unlifted RuntimeReps
 -- False of           (LiftedRep :: RuntimeRep)
 --   and of variables (a :: RuntimeRep)
 isUnliftedRuntimeRep rep
-  | Just rep' <- coreView rep   -- NB: args might be non-empty
-                                --     e.g. TupleRep [r1, .., rn]
-  = isUnliftedRuntimeRep rep'
-isUnliftedRuntimeRep (TyConApp rr_tc args)
-  | isPromotedDataCon rr_tc =
+  | TyConApp rr_tc args <- coreFullView rep -- NB: args might be non-empty
+                                            --     e.g. TupleRep [r1, .., rn]
+  , isPromotedDataCon rr_tc =
       -- NB: args might be non-empty e.g. TupleRep [r1, .., rn]
       if (rr_tc `hasKey` boxedRepDataConKey)
         then case args of
@@ -696,21 +715,28 @@ isUnliftedRuntimeRep (TyConApp rr_tc args)
         -- hence the isPromotedDataCon rr_tc
 isUnliftedRuntimeRep _ = False
 
--- | Is this the type 'RuntimeRep'?
-isRuntimeRepTy :: Type -> Bool
-isRuntimeRepTy ty
-  | Just ty' <- coreView ty        = isRuntimeRepTy ty'
-  | TyConApp tc args <- ty
-  , tc `hasKey` runtimeRepTyConKey = ASSERT( null args ) True
-  | otherwise                      = False
+-- | An INLINE helper for function such as 'isLiftedRuntimeRep' below.
+isNullaryTyConKeyApp :: Unique -> Type -> Bool
+isNullaryTyConKeyApp key ty
+  | Just args <- isTyConKeyApp_maybe key ty
+  = ASSERT( null args ) True
+  | otherwise
+  = False
+{-# INLINE isNullaryTyConKeyApp #-}
+
+isLiftedLevity :: Type -> Bool
+isLiftedLevity = isNullaryTyConKeyApp liftedDataConKey
+
+isUnliftedLevity :: Type -> Bool
+isUnliftedLevity = isNullaryTyConKeyApp unliftedDataConKey
 
 -- | Is this the type 'Levity'?
 isLevityTy :: Type -> Bool
-isLevityTy lev
-  | Just lev' <- coreView lev      = isLevityTy lev'
-  | TyConApp tc args <- coreFullView lev
-  , tc `hasKey` levityTyConKey     = ASSERT( null args ) True
-  | otherwise                      = False
+isLevityTy = isNullaryTyConKeyApp levityTyConKey
+
+-- | Is this the type 'RuntimeRep'?
+isRuntimeRepTy :: Type -> Bool
+isRuntimeRepTy = isNullaryTyConKeyApp runtimeRepTyConKey
 
 -- | Is a tyvar of type 'RuntimeRep'?
 isRuntimeRepVar :: TyVar -> Bool
@@ -722,9 +748,7 @@ isLevityVar = isLevityTy . tyVarKind
 
 -- | Is this the type 'Multiplicity'?
 isMultiplicityTy :: Type -> Bool
-isMultiplicityTy ty
-  | TyConApp tc [] <- coreFullView ty = tc `hasKey` multiplicityTyConKey
-  | otherwise                         = False
+isMultiplicityTy  = isNullaryTyConKeyApp multiplicityTyConKey
 
 -- | Is a tyvar of type 'Multiplicity'?
 isMultiplicityVar :: TyVar -> Bool
@@ -2219,6 +2243,13 @@ mightBeUnliftedType ty
       Just is_lifted -> not is_lifted
       Nothing -> True
 
+-- | See "Type#type_classification" for what a boxed type is.
+-- Panics on levity polymorphic types; See 'mightBeUnliftedType' for
+-- a more approximate predicate that behaves better in the presence of
+-- levity polymorphism.
+isBoxedType :: Type -> Bool
+isBoxedType ty = isBoxedRuntimeRep (getRuntimeRep ty)
+
 -- | Is this a type of kind RuntimeRep? (e.g. LiftedRep)
 isRuntimeRepKindedTy :: Type -> Bool
 isRuntimeRepKindedTy = isRuntimeRepTy . typeKind
@@ -2799,28 +2830,40 @@ tcIsConstraintKind ty
   | otherwise
   = False
 
--- | Is this kind equivalent to @*@?
+-- | Like 'kindRep_maybe', but considers 'Constraint' to be distinct
+-- from 'Type'. For a version that treats them as the same type, see
+-- 'kindRep_maybe'.
+tcKindRep_maybe :: HasDebugCallStack => Kind -> Maybe Type
+tcKindRep_maybe kind
+  | Just (tc, [arg]) <- tcSplitTyConApp_maybe kind    -- Note: tcSplit here
+  , tc `hasKey` tYPETyConKey    = Just arg
+  | otherwise                   = Nothing
+
+-- | Is this kind equivalent to 'Type'?
 --
--- This considers 'Constraint' to be distinct from @*@. For a version that
+-- This considers 'Constraint' to be distinct from 'Type'. For a version that
 -- treats them as the same type, see 'isLiftedTypeKind'.
 tcIsLiftedTypeKind :: Kind -> Bool
-tcIsLiftedTypeKind ty
-  | Just (tc, [arg]) <- tcSplitTyConApp_maybe ty    -- Note: tcSplit here
-  , tc `hasKey` tYPETyConKey
-  = isLiftedRuntimeRep arg
-  | otherwise
-  = False
+tcIsLiftedTypeKind kind
+  = case tcKindRep_maybe kind of
+      Just rep -> isLiftedRuntimeRep rep
+      Nothing  -> False
+
+-- | Is this kind equivalent to @TYPE (BoxedRep l)@ for some @l :: Levity@?
+--
+-- This considers 'Constraint' to be distinct from 'Type'. For a version that
+-- treats them as the same type, see 'isLiftedTypeKind'.
+tcIsBoxedTypeKind :: Kind -> Bool
+tcIsBoxedTypeKind kind
+  = case tcKindRep_maybe kind of
+      Just rep -> isBoxedRuntimeRep rep
+      Nothing  -> False
 
 -- | Is this kind equivalent to @TYPE r@ (for some unknown r)?
 --
 -- This considers 'Constraint' to be distinct from @*@.
 tcIsRuntimeTypeKind :: Kind -> Bool
-tcIsRuntimeTypeKind ty
-  | Just (tc, _) <- tcSplitTyConApp_maybe ty    -- Note: tcSplit here
-  , tc `hasKey` tYPETyConKey
-  = True
-  | otherwise
-  = False
+tcIsRuntimeTypeKind kind = isJust (tcKindRep_maybe kind)
 
 tcReturnsConstraintKind :: Kind -> Bool
 -- True <=> the Kind ultimately returns a Constraint
