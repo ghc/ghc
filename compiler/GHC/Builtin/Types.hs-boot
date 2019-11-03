@@ -25,6 +25,8 @@ unliftedTypeKindTyCon :: TyCon
 liftedRepTyCon :: TyCon
 unliftedRepTyCon :: TyCon
 
+unliftedTypeKind :: Kind
+
 constraintKind :: Kind
 
 runtimeRepTyCon, levityTyCon, vecCountTyCon, vecElemTyCon :: TyCon

@@ -540,6 +540,10 @@ liftedRepTyConName, unliftedRepTyConName :: Name
 liftedRepTyConName = mkWiredInTyConName UserSyntax gHC_TYPES (fsLit "LiftedRep") liftedRepTyConKey liftedRepTyCon
 unliftedRepTyConName = mkWiredInTyConName UserSyntax gHC_TYPES (fsLit "UnliftedRep") unliftedRepTyConKey unliftedRepTyCon
 
+unliftedTypeKindTyConName, unliftedRepTyConName :: Name
+unliftedTypeKindTyConName = mkWiredInTyConName UserSyntax gHC_TYPES (fsLit "Type") unliftedTypeKindTyConKey unliftedTypeKindTyCon
+unliftedRepTyConName = mkWiredInTyConName UserSyntax gHC_TYPES (fsLit "UnliftedRep") unliftedRepTyConKey unliftedRepTyCon
+
 multiplicityTyConName :: Name
 multiplicityTyConName = mkWiredInTyConName UserSyntax gHC_TYPES (fsLit "Multiplicity")
                           multiplicityTyConKey multiplicityTyCon
@@ -1486,6 +1490,7 @@ runtimeRepTy = mkTyConTy runtimeRepTyCon
 -- and Note [Prefer Type over TYPE 'LiftedRep] in GHC.Core.TyCo.Rep.
 -- type Type = TYPE ('BoxedRep 'Lifted)
 -- type LiftedRep = 'BoxedRep 'Lifted
+-- type UnliftedRep = 'BoxedRep 'Unlifted
 liftedTypeKindTyCon :: TyCon
 liftedTypeKindTyCon =
     buildSynTyCon liftedTypeKindTyConName [] liftedTypeKind [] rhs

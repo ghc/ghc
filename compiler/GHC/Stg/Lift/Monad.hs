@@ -24,7 +24,7 @@ module GHC.Stg.Lift.Monad (
 
 import GHC.Prelude
 
-import GHC.Types.Basic
+import GHC.Types.Basic hiding ( isLifted )
 import GHC.Types.CostCentre ( isCurrentCCS, dontCareCCS )
 import GHC.Driver.Session
 import GHC.Data.FastString

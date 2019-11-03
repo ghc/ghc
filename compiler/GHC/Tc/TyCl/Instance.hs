@@ -727,7 +727,7 @@ tcDataFamInstDecl mb_clsinfo tv_skol_env
        ; traceTc "tcDataFamInstDecl" $
          vcat [ text "Fam tycon:" <+> ppr fam_tc
               , text "Pats:" <+> ppr pats
-              , text "visiblities:" <+> ppr (tcbVisibilities fam_tc pats)
+              , text "visibilities:" <+> ppr (tcbVisibilities fam_tc pats)
               , text "all_pats:" <+> ppr all_pats
               , text "ty_binders" <+> ppr ty_binders
               , text "fam_tc_binders:" <+> ppr (tyConBinders fam_tc)
