@@ -130,7 +130,7 @@ test('dynHelloWorld',
      [''])
 
 test('T5313',
-     [ when(arch('powerpc64') or arch('powerpc64le'), expect_broken(11259)),
+     [ unless(config.have_RTS_linker, skip),
        extra_run_opts('"' + config.libdir + '"')],
      compile_and_run,
      ['-package ghc'])
