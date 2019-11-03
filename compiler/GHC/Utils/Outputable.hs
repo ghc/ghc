@@ -42,7 +42,7 @@ module GHC.Utils.Outputable (
         ($$), ($+$), vcat,
         sep, cat,
         fsep, fcat,
-        hang, hangNotEmpty, punctuate, ppWhen, ppUnless,
+        hang, hangNotEmpty, punctuate, ppWhen, ppUnless, ppJustWith,
         ppWhenOption, ppUnlessOption,
         speakNth, speakN, speakNOf, plural, isOrAre, doOrDoes, itsOrTheir,
         unicodeSyntax,
@@ -790,6 +790,10 @@ ppUnlessOption :: (SDocContext -> Bool) -> SDoc -> SDoc
 ppUnlessOption f doc = sdocOption f $ \case
    True  -> empty
    False -> doc
+
+ppJustWith :: (a -> SDoc) -> Maybe a -> SDoc
+ppJustWith _ Nothing  = empty
+ppJustWith f (Just a) = f a
 
 -- | Apply the given colour\/style for the argument.
 --

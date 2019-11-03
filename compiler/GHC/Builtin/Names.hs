@@ -1915,17 +1915,20 @@ eitherTyConKey :: Unique
 eitherTyConKey                          = mkPreludeTyConUnique 84
 
 -- Kind constructors
-liftedTypeKindTyConKey, tYPETyConKey, liftedRepTyConKey,
+liftedTypeKindTyConKey, unliftedTypeKindTyConKey, tYPETyConKey,
+  liftedRepTyConKey, unliftedRepTyConKey,
   constraintKindTyConKey, levityTyConKey, runtimeRepTyConKey,
   vecCountTyConKey, vecElemTyConKey :: Unique
 liftedTypeKindTyConKey                  = mkPreludeTyConUnique 87
-tYPETyConKey                            = mkPreludeTyConUnique 88
+unliftedTypeKindTyConKey                = mkPreludeTyConUnique 88
+tYPETyConKey                            = mkPreludeTyConUnique 89
 constraintKindTyConKey                  = mkPreludeTyConUnique 92
 levityTyConKey                          = mkPreludeTyConUnique 94
 runtimeRepTyConKey                      = mkPreludeTyConUnique 95
 vecCountTyConKey                        = mkPreludeTyConUnique 96
 vecElemTyConKey                         = mkPreludeTyConUnique 97
 liftedRepTyConKey                       = mkPreludeTyConUnique 98
+unliftedRepTyConKey                     = mkPreludeTyConUnique 99
 
 pluginTyConKey, frontendPluginTyConKey :: Unique
 pluginTyConKey                          = mkPreludeTyConUnique 102
