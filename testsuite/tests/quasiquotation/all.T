@@ -8,5 +8,6 @@ test('T7918',
 test('T14028',
      [req_interp,
       only_ways([config.ghc_th_way]),
+      unless(config.have_ext_interp, skip),
       when(opsys('linux') and arch('x86_64'), expect_broken_for(17300, ['dyn']))],
      makefile_test, ['T14028'])

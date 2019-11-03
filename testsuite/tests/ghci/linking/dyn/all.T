@@ -48,6 +48,7 @@ test('big-obj', [extra_files(['big-obj-c.c', 'big-obj.hs']),
 test('T3372',
      [unless(doing_ghci, skip),
       extra_run_opts('"' + config.libdir + '"'),
+      unless(config.have_RTS_linker, skip),
       # Concurrent GHC sessions is fragile on Windows since we must lock the
       # package database even for read-only access.
       # See Note [Locking package database on Windows] in GHC.PackageDb
