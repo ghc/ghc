@@ -205,6 +205,11 @@ GHCi
 Runtime system
 ~~~~~~~~~~~~~~
 
+- The runtime system linker now marks loaded code as non-writable (see
+  :ghc-ticket:`14069`) on all tier-1 platforms. This is necesaary for
+  out-of-the-box compatibility with OpenBSD and macOS Catalina (see
+  :ghc-ticket:`17353`)
+
 Template Haskell
 ~~~~~~~~~~~~~~~~
 
