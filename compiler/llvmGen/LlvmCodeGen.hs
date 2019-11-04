@@ -27,6 +27,7 @@ import PprCmm
 
 import BufWrite
 import DynFlags
+import GHC.Platform ( platformArch, Arch(..) )
 import ErrUtils
 import FastString
 import Outputable
@@ -64,6 +65,11 @@ llvmCodeGen dflags h us cmm_stream
            "Currently only " <> text (llvmVersionStr supportedLlvmVersion) <> " is supported." <+>
            "System LLVM version: " <> text (llvmVersionStr ver) $$
            "We will try though..."
+         let isS390X = platformArch (targetPlatform dflags) == ArchS390X
+         let major_ver = head . llvmVersionList $ ver
+         when (isS390X && major_ver < 10 && doWarn) $ putMsg dflags $
+           "Warning: For s390x the GHC calling convention is only supported since LLVM version 10." <+>
+           "You are using LLVM version: " <> text (llvmVersionStr ver)
 
        -- run code generation
        a <- runLlvm dflags (fromMaybe supportedLlvmVersion mb_ver) bufh us $
