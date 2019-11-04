@@ -18,7 +18,7 @@ import GhcPrelude
 import BasicTypes
 import CoreArity
 import CoreSyn
-import CoreUtils        ( exprType, mkCast )
+import CoreUtils        ( exprType, mkCast, mkDefaultCase, mkSingleAltCase )
 import Id
 import IdInfo           ( JoinArity, vanillaIdInfo )
 import DataCon
@@ -32,7 +32,8 @@ import Literal          ( absentLiteralOf )
 import VarEnv           ( mkInScopeSet )
 import VarSet           ( VarSet )
 import Type
-import RepType          ( isVoidTy )
+import Predicate        ( isClassPred )
+import RepType          ( isVoidTy, typePrimRep )
 import Coercion
 import FamInstEnv
 import BasicTypes       ( Boxity(..) )
@@ -141,7 +142,7 @@ mkWwBodies :: DynFlags
 -- wrap_fn_str E        = case x of { (a,b) ->
 --                        case a of { (a1,a2) ->
 --                        E a1 a2 b y }}
--- work_fn_str E        = \a2 a2 b y ->
+-- work_fn_str E        = \a1 a2 b y ->
 --                        let a = (a1,a2) in
 --                        let x = (a,b) in
 --                        E
@@ -153,14 +154,14 @@ mkWwBodies dflags fam_envs rhs_called_arity_map rhs_fvs fun_id demands res_info
         ; (wrap_args, wrap_fn_args, work_fn_args, res_ty)
              <- mkWWargs empty_subst fun_ty demands
 
-        ; (useful1, work_args, wrap_fn_str, work_fn_str)
+        ; (useful_str, work_args, wrap_fn_str, work_fn_str)
              <- mkWWstr dflags fam_envs has_inlineable_prag wrap_args
 
         -- Do CPR w/w.  See Note [Always do CPR w/w]
-        ; (useful2, wrap_fn_cpr, work_fn_cpr, cpr_res_ty)
+        ; (useful_cpr, wrap_fn_cpr, work_fn_cpr, cpr_res_ty)
               <- mkWWcpr (gopt Opt_CprAnal dflags) fam_envs res_ty res_info
 
-        ; (useful3, wrap_fn_eta_arity, work_fn_eta_arity, work_ty)
+        ; (useful_eta, wrap_fn_eta_arity, work_fn_eta_arity, work_ty)
               <- mkWWetaArity do_eta_arity fun_id
 
         ; let (work_lam_args, work_call_args) = mkWorkerArgs dflags work_args cpr_res_ty
@@ -176,10 +177,9 @@ mkWwBodies dflags fam_envs rhs_called_arity_map rhs_fvs fun_id demands res_info
                           . work_fn_cpr
                           . work_fn_eta_arity
                           . work_fn_args
-        ; if (useful3 && do_eta_arity)
-             || (isWorkerSmallEnough dflags work_args
+        ; if isWorkerSmallEnough dflags work_args
              && not (too_many_args_for_join_point wrap_args)
-             && ((useful1 && not only_one_void_argument) || useful2))
+             && ((useful_str && not only_one_void_argument) || useful_cpr || (useful_eta && do_eta_arity))
           then return (Just (worker_args_dmds
                             ,length work_call_args
                             ,wrapper_body

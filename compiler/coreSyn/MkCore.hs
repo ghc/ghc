@@ -160,7 +160,7 @@ mkCoreAppTyped _ (fun, fun_ty) (Type ty)
   = (App fun (Type ty), piResultTy fun_ty ty)
 mkCoreAppTyped _ (fun, fun_ty) (Coercion co)
   = (App fun (Coercion co), funResultTy fun_ty)
-mkCoreAppTyped d (fun, fun_ty) arg
+mkCoreAppTyped _ (fun, fun_ty) arg
   | isFunTy fun_ty
   = (mkValApp fun arg arg_ty res_ty, res_ty)
   where
@@ -169,7 +169,7 @@ mkCoreAppTyped d (fun, fun_ty) arg
   = ASSERT2( isFunTildeTy fun_ty, ppr fun $$ ppr arg $$ d )
     (mkValApp fun arg arg_ty res_ty, res_ty)
   where
-    (arg_ty, res_ty) = splitTildeFunTy fun_ty
+    (arg_ty, res_ty) = splitFunTildeTy fun_ty
 
 mkValApp :: CoreExpr -> CoreExpr -> Type -> Type -> CoreExpr
 -- Build an application (e1 e2),

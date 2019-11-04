@@ -28,7 +28,7 @@ module Type (
 
         mkVisFunTy, mkInvisFunTy, mkVisFunTys, mkInvisFunTys,
         splitFunTy, splitFunTy_maybe,
-        splitFunTys, funResultTy, funArgTy, argTy,
+        splitFunTys, funResultTy, funArgTy,
         splitFunTildeTy, splitFunTildeTy_maybe, funTildeArgTy, funTildeResultTy,
 
         toShallowFunTildeType, toDeepFunTildeType,
@@ -107,7 +107,7 @@ module Type (
         funTyCon, funTildeTyCon,
 
         -- ** Predicates on types
-        isTyVarTy, isFunTy, isFunTildeTy, isDictTy,
+        isTyVarTy, isFunTy, isFunTildeTy,
         isCoercionTy, isCoercionTy_maybe,
         isForAllTy, isForAllTy_ty, isForAllTy_co,
         isPiTy, isTauTy, isFamFreeTy,
@@ -792,8 +792,11 @@ tcRepSplitAppTy_maybe (FunTy { ft_af = af, ft_arg = ty1, ft_res = ty2 })
     rep2 = getRuntimeRep ty2
 
 tcRepSplitAppTy_maybe (FunTildeTy ty1 ty2)
-  | isConstraintKind (typeKind ty1)
-  = Nothing  -- See Note [Decomposing fat arrow c=>t]
+  -- TODO: I don't think we ever call this function on a FunTildeTy. Even if we
+  -- did, there can never be a fat squiggly arrow, syntactically, because tilde
+  -- stuff isn't part of source syntax.
+  -- | False -- isConstraintKind (typeKind ty1)
+  -- = Nothing  -- See Note [Decomposing fat arrow c=>t]
 
   | otherwise
   = Just (TyConApp funTildeTyCon [rep1, rep2, ty1], ty2)
@@ -1014,20 +1017,14 @@ funTildeResultTy ty            = pprPanic "funTildeResultTy" (ppr ty)
 funArgTy :: Type -> Type
 -- ^ Extract the function argument type and panic if that is not possible
 funArgTy ty | Just ty' <- coreView ty = funArgTy ty'
-funArgTy (FunTy { ft_arg = arg })    = arg
+funArgTy (FunTy { ft_arg = arg })     = arg
+funArgTy (FunTildeTy{ ft_arg = arg }) = arg
 funArgTy ty                           = pprPanic "funArgTy" (ppr ty)
 
 funTildeArgTy :: Type -> Type
 funTildeArgTy ty | Just ty' <- coreView ty = funTildeArgTy ty'
 funTildeArgTy (FunTildeTy arg _res) = arg
 funTildeArgTy ty                    = pprPanic "funTildeArgTy" (ppr ty)
-
-argTy :: Type -> Type
-argTy ty | Just ty' <- coreView ty = argTy ty'
-argTy (FunTy arg _res)      = arg
-argTy (FunTildeTy arg _res) = arg
-argTy ty                    = pprPanic "argTy" (ppr ty)
-
 
 piResultTy :: HasDebugCallStack => Type -> Type ->  Type
 piResultTy ty arg = case piResultTy_maybe ty arg of
@@ -1176,8 +1173,10 @@ liftFunTildeTys (TyVarTy v) = TyVarTy v
 liftFunTildeTys (AppTy a b) = AppTy (liftFunTildeTys a) (liftFunTildeTys b)
 liftFunTildeTys (TyConApp k tys) = TyConApp k (map liftFunTildeTys tys)
 liftFunTildeTys (ForAllTy bndr ty) = ForAllTy bndr (liftFunTildeTys ty)
-liftFunTildeTys (FunTy arg res) = FunTy (liftFunTildeTys arg) (liftFunTildeTys res)
-liftFunTildeTys (FunTildeTy arg res) = FunTy (liftFunTildeTys arg) (liftFunTildeTys res)
+liftFunTildeTys ty@(FunTy{ ft_arg = arg, ft_res = res })
+  = ty { ft_arg = liftFunTildeTys arg, ft_res =  liftFunTildeTys res }
+liftFunTildeTys ty@(FunTildeTy{ ft_arg = arg, ft_res = res })
+  = mkVisFunTy (liftFunTildeTys arg) (liftFunTildeTys res)
 liftFunTildeTys (LitTy l) = LitTy l
 liftFunTildeTys (CastTy ty co) = CastTy (liftFunTildeTys ty) co
 liftFunTildeTys (CoercionTy co) = CoercionTy co
@@ -1187,8 +1186,10 @@ liftFunTildeTys (CoercionTy co) = CoercionTy co
 -- e.g.  a -> (b -> c) -> d  ==> a ~> (b -> c) ~> d
 toShallowFunTildeType :: Type -> Type
 toShallowFunTildeType (ForAllTy tv body_ty) = ForAllTy tv (toShallowFunTildeType body_ty)
-toShallowFunTildeType (FunTy arg res)       = FunTy arg (toShallowFunTildeType res)
-toShallowFunTildeType (FunTy arg res)       = FunTildeTy arg (toShallowFunTildeType res)
+toShallowFunTildeType (FunTy{ ft_arg = arg, ft_res = res })
+  = mkFunTildeTy arg (toShallowFunTildeType res)
+toShallowFunTildeType ty@(FunTildeTy{ ft_res = res })
+  = ty{ ft_res = toShallowFunTildeType res }
 toShallowFunTildeType ty                    = ty
 
 -- | Change the top level arrows and higher-order functions into extensional
@@ -1196,8 +1197,10 @@ toShallowFunTildeType ty                    = ty
 -- e.g.  a -> (b -> c) -> d ==> a ~> (b ~> c) ~> d
 toDeepFunTildeType :: Type -> Type
 toDeepFunTildeType (ForAllTy tv body_ty) = ForAllTy tv (toDeepFunTildeType body_ty)
-toDeepFunTildeType (FunTy arg res)       = FunTildeTy (toDeepFunTildeType arg) (toDeepFunTildeType res)
-toDeepFunTildeType (FunTildeTy arg res)  = FunTildeTy (toDeepFunTildeType arg) (toDeepFunTildeType res)
+toDeepFunTildeType (FunTy{ ft_arg = arg, ft_res = res })
+  = mkFunTildeTy (toDeepFunTildeType arg) (toDeepFunTildeType res)
+toDeepFunTildeType (FunTildeTy{ ft_arg = arg, ft_res = res })
+  = mkFunTildeTy (toDeepFunTildeType arg) (toDeepFunTildeType res)
 toDeepFunTildeType ty                    = ty
 
 
@@ -1697,7 +1700,7 @@ splitPiTy_maybe ty = go ty
     go (FunTy { ft_af = af, ft_arg = arg, ft_res = res})
                           = Just (Anon af arg, res)
     go (FunTildeTy { ft_arg = arg, ft_res = res})
-                          = Just (Anon af arg, res)
+                          = Just (Anon VisArg arg, res)
     go _                  = Nothing
 
 -- | Takes a forall type apart, or panics

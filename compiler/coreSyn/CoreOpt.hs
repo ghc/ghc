@@ -1327,7 +1327,7 @@ pushCoValArg co
   | otherwise
   = Nothing
   where
-    arg = argTy tyR
+    arg = funArgTy tyR
     Pair tyL tyR = coercionKind co
 
 pushCoercionIntoLambda
