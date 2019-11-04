@@ -5,6 +5,7 @@ Author: George Karachalias <george.karachalias@cs.kuleuven.be>
 
 {-# LANGUAGE CPP #-}
 {-# LANGUAGE ViewPatterns #-}
+{-# LANGUAGE PatternSynonyms #-}
 {-# LANGUAGE TupleSections #-}
 
 -- | Types used through-out pattern match checking. This module is mostly there
@@ -29,7 +30,9 @@ module GHC.HsToCore.PmCheck.Types (
         setIndirectSDIE, setEntrySDIE, traverseSDIE,
 
         -- * The pattern match oracle
-        VarInfo(..), TmState(..), TyState(..), Delta(..), initDelta
+        VarInfo(..), TmState(..), TyState(..), Delta(..),
+        Theta(EmptyTheta), pattern ConsTheta, emptyTheta, unitTheta, unionTheta,
+        isEmptyTheta, sizeTheta, bindTheta, liftDeltaM, filterThetaM, initTheta
     ) where
 
 #include "HsVersions.h"
@@ -64,6 +67,7 @@ import Numeric (fromRat)
 import Data.Foldable (find)
 import qualified Data.List.NonEmpty as NonEmpty
 import Data.Ratio
+import qualified Data.Semigroup as Semigroup
 
 -- | Literals (simple and overloaded ones) for pattern match checking.
 --
@@ -527,8 +531,8 @@ data Delta = MkDelta { delta_ty_st :: TyState    -- Type oracle; things like a~I
                      , delta_tm_st :: TmState }  -- Term oracle; things like x~Nothing
 
 -- | An initial delta that is always satisfiable
-initDelta :: Delta
-initDelta = MkDelta initTyState initTmState
+trueDelta :: Delta
+trueDelta = MkDelta initTyState initTmState
 
 instance Outputable Delta where
   ppr delta = vcat [
@@ -537,3 +541,76 @@ instance Outputable Delta where
       ppr (delta_tm_st delta),
       ppr (delta_ty_st delta)
     ]
+
+data Theta = EmptyTheta
+           | UnitTheta !Delta
+           | UnionTheta !Theta !Theta
+
+emptyTheta :: Theta
+emptyTheta = EmptyTheta
+
+unitTheta :: Delta -> Theta
+unitTheta = UnitTheta
+
+unionTheta :: Theta -> Theta -> Theta
+unionTheta EmptyTheta t          = t
+unionTheta t          EmptyTheta = t
+unionTheta t1         t2         = UnionTheta t1 t2
+
+unconsTheta :: Theta -> Maybe (Delta, Theta)
+unconsTheta EmptyTheta         = Nothing
+unconsTheta (UnitTheta delta)  = Just (delta, EmptyTheta)
+unconsTheta (UnionTheta t1 t2)
+  | Just (delta, t1') <- unconsTheta t1 = Just (delta, unionTheta t1' t2)
+  | otherwise                           = unconsTheta t2
+
+isEmptyTheta :: Theta -> Bool
+isEmptyTheta EmptyTheta = True
+isEmptyTheta _          = False
+
+thetaDeltas :: Theta -> [Delta]
+thetaDeltas = go []
+  where
+    go acc EmptyTheta         = acc
+    go acc (UnitTheta d)      = d:acc
+    go acc (UnionTheta t1 t2) = go (go acc t2) t1
+
+sizeTheta :: Theta -> Int
+sizeTheta = length . thetaDeltas
+
+pattern ConsTheta :: Delta -> Theta -> Theta
+pattern ConsTheta d th <- (unconsTheta -> Just (d, th))
+  where
+    ConsTheta d th = unitTheta d `unionTheta` th
+
+{-# COMPLETE EmptyTheta, ConsTheta #-}
+
+-- | An initial theta that is always satisfiable
+initTheta :: Theta
+initTheta = unitTheta trueDelta
+
+bindTheta :: Monad m => (Delta -> m Theta) -> Theta -> m Theta
+bindTheta f = go
+  where
+    go EmptyTheta         = pure EmptyTheta
+    go (UnitTheta delta)  = f delta
+    go (UnionTheta t1 t2) = unionTheta <$> go t1 <*> go t2
+
+liftDeltaM :: Monad m => (Delta -> m (Maybe Delta)) -> Theta -> m Theta
+liftDeltaM f = bindTheta (fmap (maybe emptyTheta unitTheta) . f)
+
+filterThetaM :: Monad m => (Delta -> m Bool) -> Theta -> m Theta
+filterThetaM f = bindTheta go
+  where
+    go delta = do
+      b <- f delta
+      pure $ if b then emptyTheta else unitTheta delta
+
+instance Semigroup Theta where
+  (<>) = unionTheta
+
+instance Monoid Theta where
+  mempty = emptyTheta
+
+instance Outputable Theta where
+  ppr = braces . fsep . punctuate comma . map ppr . thetaDeltas

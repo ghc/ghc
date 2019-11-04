@@ -13,13 +13,11 @@ Authors: George Karachalias <george.karachalias@cs.kuleuven.be>
 module GHC.HsToCore.PmCheck.Oracle (
 
         DsM, tracePm, mkPmId,
-        Delta, initDelta, lookupRefuts, lookupSolution,
+        Delta, Theta, initTheta, lookupRefuts, lookupSolution,
 
         TmCt(..),
         addTypeEvidence,    -- Add type equalities
-        addRefutableAltCon, -- Add a negative term equality
-        addTmCt,            -- Add a positive term equality x ~ e
-        addVarCoreCt,       -- Add a positive term equality x ~ core_expr
+        addTmCt,            -- Add a term equality
         canDiverge,         -- Try to add the term equality x ~ ⊥
         provideEvidence,
     ) where
@@ -72,7 +70,7 @@ import DsMonad hiding (foldlM)
 import FamInst
 import FamInstEnv
 
-import Control.Monad (guard, mzero)
+import Control.Monad (guard, mzero, (>=>))
 import Control.Monad.Trans.Class (lift)
 import Control.Monad.Trans.State.Strict
 import Data.Bifunctor (second)
@@ -197,27 +195,23 @@ that we expect.
 --   3. 'tysAreNonVoid', checks if the given types have an inhabitant
 -- Functions like 'pmIsSatisfiable', 'nonVoid' and 'testInhabited' plug these
 -- together as they see fit.
-newtype SatisfiabilityCheck = SC (Delta -> DsM (Maybe Delta))
+newtype SatisfiabilityCheck = SC (Theta -> DsM Theta)
 
 -- | Check the given 'Delta' for satisfiability by the the given
 -- 'SatisfiabilityCheck'. Return 'Just' a new, potentially extended, 'Delta' if
 -- successful, and 'Nothing' otherwise.
-runSatisfiabilityCheck :: Delta -> SatisfiabilityCheck -> DsM (Maybe Delta)
-runSatisfiabilityCheck delta (SC chk) = chk delta
+runSatisfiabilityCheck :: Theta -> SatisfiabilityCheck -> DsM Theta
+runSatisfiabilityCheck theta (SC chk) = chk theta
 
--- | Allowing easy composition of 'SatisfiabilityCheck's.
+-- | Allowing easy composition of 'SatisfiabilityCheck's. Like @EndoM Theta@
+-- from the @foldl@ package.
 instance Semigroup SatisfiabilityCheck where
-  -- This is @a >=> b@ from MaybeT DsM
-  SC a <> SC b = SC c
-    where
-      c delta = a delta >>= \case
-        Nothing     -> pure Nothing
-        Just delta' -> b delta'
+  SC a <> SC b = SC (a >=> b)
 
 instance Monoid SatisfiabilityCheck where
   -- We only need this because of mconcat (which we use in place of sconcat,
   -- which requires NonEmpty lists as argument, making all call sites ugly)
-  mempty = SC (pure . Just)
+  mempty = SC pure
 
 -------------------------------
 -- * Oracle transition function
@@ -231,15 +225,14 @@ instance Monoid SatisfiabilityCheck where
 -- discussed in GADTs Meet Their Match. For an explanation of what role they
 -- serve, see @Note [Strict argument type constraints]@.
 pmIsSatisfiable
-  :: Delta       -- ^ The ambient term and type constraints
+  :: Theta       -- ^ The ambient term and type constraints
                  --   (known to be satisfiable).
   -> Bag TmCt    -- ^ The new term constraints.
   -> Bag TyCt    -- ^ The new type constraints.
   -> [Type]      -- ^ The strict argument types.
-  -> DsM (Maybe Delta)
-                 -- ^ @'Just' delta@ if the constraints (@delta@) are
-                 -- satisfiable, and each strict argument type is inhabitable.
-                 -- 'Nothing' otherwise.
+  -> DsM Theta
+                 -- ^ Keeps only 'Delta's which are satisfiable, and each strict
+                 -- argument type is inhabitable.
 pmIsSatisfiable amb_cs new_tm_cs new_ty_cs strict_arg_tys =
   -- The order is important here! Check the new type constraints before we check
   -- whether strict argument types are inhabited given those constraints.
@@ -531,16 +524,17 @@ tyOracle (TySt inert) cts
 -- constraints was empty. Will only recheck 'PossibleMatches' in the term oracle
 -- for emptiness if the first argument is 'True'.
 tyIsSatisfiable :: Bool -> Bag TyCt -> SatisfiabilityCheck
-tyIsSatisfiable recheck_complete_sets new_ty_cs = SC $ \delta ->
+tyIsSatisfiable recheck_complete_sets new_ty_cs = SC $ \theta ->
   if isEmptyBag new_ty_cs
-    then pure (Just delta)
-    else tyOracle (delta_ty_st delta) new_ty_cs >>= \case
-      Nothing                   -> pure Nothing
-      Just ty_st'               -> do
-        let delta' = delta{ delta_ty_st = ty_st' }
-        if recheck_complete_sets
-          then ensureAllPossibleMatchesInhabited delta'
-          else pure (Just delta')
+    then pure theta
+    else flip liftDeltaM theta $ \delta ->
+      tyOracle (delta_ty_st delta) new_ty_cs >>= \case
+        Nothing                   -> pure Nothing
+        Just ty_st'               -> do
+          let delta' = delta{ delta_ty_st = ty_st' }
+          if recheck_complete_sets
+            then ensureAllPossibleMatchesInhabited delta'
+            else pure (Just delta')
 
 
 {- *********************************************************************
@@ -658,9 +652,7 @@ warning messages (which can be alleviated by someone with enough dedication).
 -- Returns a new 'Delta' if the new constraints are compatible with existing
 -- ones.
 tmIsSatisfiable :: Bag TmCt -> SatisfiabilityCheck
-tmIsSatisfiable new_tm_cs = SC $ \delta -> runMaybeT $ foldlM go delta new_tm_cs
-  where
-    go delta ct = MaybeT (addTmCt delta ct)
+tmIsSatisfiable new_tm_cs = SC $ \theta -> foldlM addTmCt theta new_tm_cs
 
 -----------------------
 -- * Looking up VarInfo
@@ -823,36 +815,46 @@ lookupSolution delta x = case vi_pos (lookupVarInfo (delta_tm_st delta) x) of
 -------------------------------
 -- * Adding facts to the oracle
 
--- | A term constraint. Either equates two variables or a variable with a
--- 'PmAltCon' application.
+-- | A term constraint.
 data TmCt
   = TmVarVar     !Id !Id
+  -- ^ Equates two variables. Prints as @x ~ y@.
   | TmVarCon     !Id !PmAltCon ![Id]
+  -- ^ Equates a variable to a 'PmAltCon' app. Prints as @x ~ Just y@.
   | TmVarNonVoid !Id
+  -- ^ Asserts that a variable is non-void. Prints as @x /~ ⊥@.
+  | TmVarNotCon  !Id !PmAltCon
+  -- ^ Asserts that a variable is /not/ a certain 'PmAltCon' app. Prints as @x /~ Just@.
+  | TmVarCore  !Id !CoreExpr
+  -- ^ Equates a variable with a 'CoreExpr'. Prints as @x ~ f (g 42)@.
 
 instance Outputable TmCt where
   ppr (TmVarVar x y)        = ppr x <+> char '~' <+> ppr y
   ppr (TmVarCon x con args) = ppr x <+> char '~' <+> hsep (ppr con : map ppr args)
   ppr (TmVarNonVoid x)      = ppr x <+> text "/~ ⊥"
+  ppr (TmVarNotCon x con)   = ppr x <+> text "/~" <+> ppr con
+  ppr (TmVarCore x e)       = ppr x <+> char '~' <+> ppr e
 
--- | Add type equalities to 'Delta'.
-addTypeEvidence :: Delta -> Bag EvVar -> DsM (Maybe Delta)
-addTypeEvidence delta dicts
-  = runSatisfiabilityCheck delta (tyIsSatisfiable True (TyCt . evVarPred <$> dicts))
+-- | Add type equalities to 'Theta'.
+addTypeEvidence :: Theta -> Bag EvVar -> DsM Theta
+addTypeEvidence theta dicts =
+  runSatisfiabilityCheck theta (tyIsSatisfiable True (TyCt . evVarPred <$> dicts))
 
 -- | Tries to equate two representatives in 'Delta'.
 -- See Note [TmState invariants].
-addTmCt :: Delta -> TmCt -> DsM (Maybe Delta)
-addTmCt delta ct = runMaybeT $ case ct of
+addTmCt :: Theta -> TmCt -> DsM Theta
+addTmCt theta ct = flip liftDeltaM theta $ \delta -> runMaybeT $ case ct of
   TmVarVar x y        -> addVarVarCt delta (x, y)
   TmVarCon x con args -> addVarConCt delta x con args
   TmVarNonVoid x      -> addVarNonVoidCt delta x
+  TmVarNotCon x con   -> addVarNotConCt delta x con
+  TmVarCore x e       -> addVarCoreCt delta x e
 
 -- | Record that a particular 'Id' can't take the shape of a 'PmAltCon' in the
 -- 'Delta' and return @Nothing@ if that leads to a contradiction.
 -- See Note [TmState invariants].
-addRefutableAltCon :: Delta -> Id -> PmAltCon -> DsM (Maybe Delta)
-addRefutableAltCon delta@MkDelta{ delta_tm_st = TmSt env reps } x nalt = runMaybeT $ do
+addVarNotConCt :: Delta -> Id -> PmAltCon -> MaybeT DsM Delta
+addVarNotConCt delta@MkDelta{ delta_tm_st = TmSt env reps } x nalt = do
   vi@(VI _ pos neg pm) <- lift (initLookupVarInfo delta x)
   -- 1. Bail out quickly when nalt contradicts a solution
   let contradicts nalt (cl, _args) = eqPmAltCon cl nalt == Equal
@@ -987,7 +989,7 @@ ensureInhabited delta vi = fmap (set_cache vi) <$> test (vi_cache vi) -- This wo
           (_vars, ty_cs, strict_arg_tys) <- mkOneConFull arg_tys con
           tracePm "inh_test" (ppr con $$ ppr ty_cs)
           -- No need to run the term oracle compared to pmIsSatisfiable
-          fmap isJust <$> runSatisfiabilityCheck delta $ mconcat
+          fmap isEmptyTheta <$> runSatisfiabilityCheck (unitTheta delta) $ mconcat
             -- Important to pass False to tyIsSatisfiable here, so that we won't
             -- recursively call ensureAllPossibleMatchesInhabited, leading to an
             -- endless recursion.
@@ -1052,7 +1054,7 @@ equate delta@MkDelta{ delta_tm_st = TmSt env reps } x y
         let add_fact delta (cl, args) = addVarConCt delta y cl args
         delta_pos <- foldlM add_fact delta_refs (vi_pos vi_x)
         -- Do the same for negative info
-        let add_refut delta nalt = MaybeT (addRefutableAltCon delta y nalt)
+        let add_refut delta nalt = addVarNotConCt delta y nalt
         delta_neg <- foldlM add_refut delta_pos (vi_neg vi_x)
         -- vi_cache will be updated in addRefutableAltCon, so we are good to
         -- go!
@@ -1223,12 +1225,9 @@ we do the following:
 -- check if the @strict_arg_tys@ are actually all inhabited.
 -- Returns the old 'Delta' if all the types are non-void according to 'Delta'.
 tysAreNonVoid :: RecTcChecker -> [Type] -> SatisfiabilityCheck
-tysAreNonVoid rec_env strict_arg_tys = SC $ \delta -> do
-  all_non_void <- checkAllNonVoid rec_env delta strict_arg_tys
+tysAreNonVoid rec_env strict_arg_tys = SC $ \theta -> do
   -- Check if each strict argument type is inhabitable
-  pure $ if all_non_void
-            then Just delta
-            else Nothing
+  filterThetaM (\delta -> checkAllNonVoid rec_env delta strict_arg_tys) theta
 
 -- | Implements two performance optimizations, as described in
 -- @Note [Strict argument type constraints]@.
@@ -1281,7 +1280,7 @@ nonVoid rec_ts amb_cs strict_arg_ty = do
       (InhabitationCandidate{ ic_tm_cs          = new_tm_cs
                             , ic_ty_cs          = new_ty_cs
                             , ic_strict_arg_tys = new_strict_arg_tys }) =
-        fmap isJust $ runSatisfiabilityCheck amb_cs $ mconcat
+        fmap (not . isEmptyTheta) $ runSatisfiabilityCheck (unitTheta amb_cs) $ mconcat
           [ tyIsSatisfiable False new_ty_cs
           , tmIsSatisfiable new_tm_cs
           , tysAreNonVoid rec_ts new_strict_arg_tys
@@ -1434,14 +1433,20 @@ on a list of strict argument types, we filter out all of the DI ones.
 --------------------------------------------
 -- * Providing positive evidence for a Delta
 
--- | @provideEvidence vs n delta@ returns a list of
--- at most @n@ (but perhaps empty) refinements of @delta@ that instantiate
--- @vs@ to compatible constructor applications or wildcards.
--- Negative information is only retained if literals are involved or when
--- for recursive GADTs.
-provideEvidence :: [Id] -> Int -> Delta -> DsM [Delta]
-provideEvidence = go
+-- | @provideEvidence vs n theta@ returns a list of
+-- at most @n@ (but perhaps empty) concrete refinements of @delta@ that
+-- instantiate @vs@ to compatible constructor applications or wildcards.
+-- Negative information is only retained if literals are involved.
+provideEvidence :: [Id] -> Int -> Theta -> DsM [Delta]
+provideEvidence = go_theta
   where
+    go_theta _  0 _                       = pure []
+    go_theta _  _ EmptyTheta              = pure []
+    go_theta xs n (ConsTheta delta theta) = do
+      ev_front <- go xs n delta
+      ev_back  <- go_theta xs (n - length ev_front) theta
+      pure (ev_front ++ ev_back)
+
     go _      0 _     = pure []
     go []     _ delta = pure [delta]
     go (x:xs) n delta = do
@@ -1506,7 +1511,7 @@ provideEvidence = go
           (arg_vars, new_ty_cs, strict_arg_tys) <- mkOneConFull arg_tys cl
           let new_tm_cs = unitBag (TmVarCon x (PmAltConLike cl) arg_vars)
           -- Now check satifiability
-          mb_delta <- pmIsSatisfiable delta new_tm_cs new_ty_cs strict_arg_tys
+          theta <- pmIsSatisfiable (unitTheta delta) new_tm_cs new_ty_cs strict_arg_tys
           tracePm "instantiate_cons" (vcat [ ppr x
                                            , ppr (idType x)
                                            , ppr ty
@@ -1516,14 +1521,17 @@ provideEvidence = go
                                            , ppr new_ty_cs
                                            , ppr strict_arg_tys
                                            , ppr delta
-                                           , ppr mb_delta
+                                           , ppr theta
                                            , ppr n ])
-          con_deltas <- case mb_delta of
-            Nothing     -> pure []
+          con_deltas <- case theta of
+            EmptyTheta -> pure []
             -- NB: We don't prepend arg_vars as we don't have any evidence on
             -- them and we only want to split once on a data type. They are
             -- inhabited, otherwise pmIsSatisfiable would have refuted.
-            Just delta' -> go xs n delta'
+            ConsTheta delta' EmptyTheta -> go xs n delta'
+            -- pmIsSatisfiable will only thin out Theta. We supplied it a Theta
+            -- of length one, so this case can't happen.
+            _                           -> pprPanic "instantiate_cons" (ppr theta)
           other_cons_deltas <- instantiate_cons x ty xs (n - length con_deltas) delta cls
           pure (con_deltas ++ other_cons_deltas)
 
@@ -1554,8 +1562,8 @@ representCoreExpr delta@MkDelta{ delta_tm_st = ts@TmSt{ ts_reps = reps } } e = d
 -- type PmM a = StateT Delta (MaybeT DsM) a
 
 -- | Records that a variable @x@ is equal to a 'CoreExpr' @e@.
-addVarCoreCt :: Delta -> Id -> CoreExpr -> DsM (Maybe Delta)
-addVarCoreCt delta x e = runMaybeT (execStateT (core_expr x e) delta)
+addVarCoreCt :: Delta -> Id -> CoreExpr -> MaybeT DsM Delta
+addVarCoreCt delta x e = execStateT (core_expr x e) delta
   where
     -- | Takes apart a 'CoreExpr' and tries to extract as much information about
     -- literals and constructor applications as possible.

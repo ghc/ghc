@@ -124,7 +124,7 @@ type GrdVec = [PmGrd]
 -- covered by a pattern match. E.g. @f Nothing = <rhs>@ might be given an
 -- uncovered set @[x :-> Just y]@ or @[x /= Nothing]@, where @x@ is the variable
 -- matching against @f@'s first argument.
-type Uncovered = [Delta]
+type Uncovered = Theta
 
 -- Instead of keeping the whole sets in memory, we keep a boolean for both the
 -- covered and the divergent set (we store the uncovered set though, since we
@@ -210,9 +210,7 @@ combinePartialResults (PartialResult cs1 vsa1 ds1 ap1) (PartialResult cs2 vsa2 d
 
 instance Outputable PartialResult where
   ppr (PartialResult c unc d pc)
-    = hang (text "PartialResult" <+> ppr c <+> ppr d <+> ppr pc) 2 (ppr_unc unc)
-    where
-      ppr_unc = braces . fsep . punctuate comma . map ppr
+    = hang (text "PartialResult" <+> ppr c <+> ppr d <+> ppr pc) 2 (ppr unc)
 
 instance Semi.Semigroup PartialResult where
   (<>) = combinePartialResults
@@ -237,7 +235,7 @@ instance Monoid PartialResult where
 data PmResult =
   PmResult {
       pmresultRedundant    :: [Located [LPat GhcTc]]
-    , pmresultUncovered    :: [Delta]
+    , pmresultUncovered    :: Theta
     , pmresultInaccessible :: [Located [LPat GhcTc]]
     , pmresultApproximate  :: Precision }
 
@@ -269,13 +267,12 @@ checkSingle' :: SrcSpan -> Id -> Pat GhcTc -> DsM PmResult
 checkSingle' locn var p = do
   fam_insts <- dsGetFamInstEnvs
   grds      <- translatePat fam_insts var p
-  missing   <- getPmDelta
+  missing   <- getPmTheta
   tracePm "checkSingle': missing" (ppr missing)
   PartialResult cs us ds pc <- pmCheck grds [] 1 missing
   dflags <- getDynFlags
-  us' <- getNFirstUncovered [var] (maxUncoveredPatterns dflags + 1) us
   let plain = PmResult { pmresultRedundant    = []
-                       , pmresultUncovered    = us'
+                       , pmresultUncovered    = us
                        , pmresultInaccessible = []
                        , pmresultApproximate  = pc }
   return $ case (cs,ds) of
@@ -316,18 +313,17 @@ checkMatches dflags ctxt vars matches = do
 -- | Check a matchgroup (case, functions, etc.).
 checkMatches' :: [Id] -> [LMatch GhcTc (LHsExpr GhcTc)] -> DsM PmResult
 checkMatches' vars matches = do
-  init_delta <- getPmDelta
+  init_theta <- getPmTheta
   missing <- case matches of
     -- This must be an -XEmptyCase. See Note [Checking EmptyCase]
-    [] | [var] <- vars -> maybeToList <$> addTmCt init_delta (TmVarNonVoid var)
-    _                  -> pure [init_delta]
+    [] | [var] <- vars -> addTmCt init_theta (TmVarNonVoid var)
+    _                  -> pure init_theta
   tracePm "checkMatches': missing" (ppr missing)
   (rs,us,ds,pc) <- go matches missing
   dflags <- getDynFlags
-  us' <- getNFirstUncovered vars (maxUncoveredPatterns dflags + 1) us
   return $ PmResult {
                 pmresultRedundant    = map hsLMatchToLPats rs
-              , pmresultUncovered    = us'
+              , pmresultUncovered    = us
               , pmresultInaccessible = map hsLMatchToLPats ds
               , pmresultApproximate  = pc }
   where
@@ -343,9 +339,9 @@ checkMatches' vars matches = do
       fam_insts          <- dsGetFamInstEnvs
       (clause, guards)   <- translateMatch fam_insts vars m
       let limit                     = maxPmCheckModels dflags
-          n_siblings                = length missing
-          throttled_check delta     =
-            snd <$> throttle limit (pmCheck clause guards) n_siblings delta
+          n_siblings                = sizeTheta missing
+          throttled_check theta     =
+            snd <$> throttle limit (pmCheck clause guards) n_siblings theta
 
       r@(PartialResult cs missing' ds pc1) <- runMany throttled_check missing
 
@@ -362,14 +358,6 @@ checkMatches' vars matches = do
     hsLMatchToLPats :: LMatch id body -> Located [LPat id]
     hsLMatchToLPats (dL->L l (Match { m_pats = pats })) = cL l pats
     hsLMatchToLPats _                                   = panic "checkMatches'"
-
-getNFirstUncovered :: [Id] -> Int -> [Delta] -> DsM [Delta]
-getNFirstUncovered _    0 _              = pure []
-getNFirstUncovered _    _ []             = pure []
-getNFirstUncovered vars n (delta:deltas) = do
-  front <- provideEvidence vars n delta
-  back <- getNFirstUncovered vars (n - length front) deltas
-  pure (front ++ back)
 
 {- Note [Checking EmptyCase]
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~
@@ -432,7 +420,7 @@ mkPmLitGrds :: Id -> PmLit -> DsM GrdVec
 mkPmLitGrds x (PmLit _ (PmLitString s)) = do
   -- We translate String literals to list literals for better overlap reasoning.
   -- It's a little unfortunate we do this here rather than in
-  -- 'GHC.HsToCore.PmCheck.Oracle.trySolve' and 'GHC.HsToCore.PmCheck.Oracle.addRefutableAltCon', but it's so much
+  -- Oracle.trySolve and Oracle.addRefutableAltCon, but it's so much
   -- simpler here.
   -- See Note [Representation of Strings in TmState] in GHC.HsToCore.PmCheck.Oracle
   vars <- traverse mkPmId (take (lengthFS s) (repeat charTy))
@@ -969,9 +957,9 @@ Main functions are:
 -- Otherwise we just return the singleton set of the original @delta@.
 -- This amounts to forgetting about the refined facts we got from running the
 -- action.
-throttle :: Int -> (Int -> Delta -> DsM PartialResult) -> Int -> Delta -> DsM (Int, PartialResult)
-throttle limit f n_siblings delta = do
-  res <- f n_siblings delta
+throttle :: Int -> (Theta -> DsM PartialResult) -> Theta -> DsM (Int, PartialResult)
+throttle limit f theta = do
+  res <- f theta
   let n_own_children = length (presultUncovered res)
   let n_next_gen = n_siblings * n_own_children
   -- Birth control!
@@ -985,29 +973,27 @@ runMany :: (Delta -> DsM PartialResult) -> Uncovered -> DsM PartialResult
 runMany f unc = mconcat <$> traverse f unc
 
 -- | Print diagnostic info and actually call 'pmCheck''.
-pmCheck :: GrdVec -> [GrdVec] -> Int -> Delta -> DsM PartialResult
-pmCheck ps guards n delta = do
+pmCheck :: GrdVec -> [GrdVec] -> Int -> Theta -> DsM PartialResult
+pmCheck ps guards n theta = do
   tracePm "pmCheck {" $ vcat [ ppr n <> colon
                            , hang (text "patterns:") 2 (ppr ps)
                            , hang (text "guards:") 2 (ppr guards)
-                           , ppr delta ]
-  res <- pmCheck' ps guards n delta
+                           , ppr theta ]
+  res <- pmCheck' ps guards n theta
   tracePm "}:" (ppr res) -- braces are easier to match by tooling
   return res
 
--- | Lifts 'pmCheck' over a 'DsM (Maybe Delta)'.
-pmCheckM :: GrdVec -> [GrdVec] -> Int -> DsM (Maybe Delta) -> DsM PartialResult
-pmCheckM ps guards n m_mb_delta = m_mb_delta >>= \case
-  Nothing    -> pure mempty
-  Just delta -> pmCheck ps guards n delta
+-- | Lifts 'pmCheck' over a 'DsM Theta'.
+pmCheckM :: GrdVec -> [GrdVec] -> Int -> DsM Theta -> DsM PartialResult
+pmCheckM ps guards n m_theta = m_theta >>= pmCheck ps guards n
 
 -- | Check the list of mutually exclusive guards
-pmCheckGuards :: [GrdVec] -> Int -> Delta -> DsM PartialResult
-pmCheckGuards []       _ delta = return (usimple delta)
-pmCheckGuards (gv:gvs) n delta = do
+pmCheckGuards :: [GrdVec] -> Int -> Theta -> DsM PartialResult
+pmCheckGuards []       _ theta = return (usimple theta)
+pmCheckGuards (gv:gvs) n theta = do
   dflags <- getDynFlags
   let limit = maxPmCheckModels dflags `div` 5
-  (n', PartialResult cs unc ds pc) <- throttle limit (pmCheck gv []) n delta
+  (n', PartialResult cs unc ds pc) <- throttle limit (pmCheck gv []) n theta
   (PartialResult css uncs dss pcs) <- runMany (pmCheckGuards gvs n') unc
   return $ PartialResult (cs `mappend` css)
                          uncs
@@ -1022,18 +1008,17 @@ pmCheck'
   -> [GrdVec] -- ^ (Possibly multiple) guards of the clause
   -> Int      -- ^ Estimate on the number of similar 'Delta's to handle.
               --   See 6. in Note [Countering exponential blowup]
-  -> Delta    -- ^ Oracle state giving meaning to the identifiers in the ValVec
+  -> Theta    -- ^ Oracle state giving meaning to the identifiers in the ValVec
   -> DsM PartialResult
-pmCheck' [] guards n delta
+pmCheck' [] guards n theta
   | null guards = return $ mempty { presultCovered = Covered }
-  | otherwise   = pmCheckGuards guards n delta
+  | otherwise   = pmCheckGuards guards n theta
 
 -- let x = e: Add x ~ e to the oracle
-pmCheck' (PmLet { pm_id = x, pm_let_expr = e } : ps) guards n delta = do
+pmCheck' (PmLet { pm_id = x, pm_let_expr = e } : ps) guards n theta = do
   tracePm "PmLet" (vcat [ppr x, ppr e])
-  -- x is fresh because it's bound by the let
-  delta' <- expectJust "x is fresh" <$> addVarCoreCt delta x e
-  pmCheck ps guards n delta'
+  theta' <- addTmCt theta (TmVarCore x e)
+  pmCheck ps guards n theta'
 
 -- Bang x: Add x /~ _|_ to the oracle
 pmCheck' (PmBang x : ps) guards n delta = do
@@ -1059,7 +1044,7 @@ pmCheck' (p : ps) guards n delta
   let pr_pos' = addConMatchStrictness delta x con pr_pos
 
   -- Stuff for <next equation>
-  pr_neg <- addRefutableAltCon delta x con >>= \case
+  pr_neg <- addTmCt delta (TmVarNotCon x con) >>= \case
     Nothing     -> pure mempty
     Just delta' -> pure (usimple delta')
 
@@ -1069,11 +1054,11 @@ pmCheck' (p : ps) guards n delta
   let pr = mkUnion pr_pos' pr_neg
   pure pr
 
-addPmConCts :: Delta -> Id -> PmAltCon -> [EvVar] -> [Id] -> DsM (Maybe Delta)
-addPmConCts delta x con dicts fields = runMaybeT $ do
-  delta_ty    <- MaybeT $ addTypeEvidence delta (listToBag dicts)
-  delta_tm_ty <- MaybeT $ addTmCt delta_ty (TmVarCon x con fields)
-  pure delta_tm_ty
+addPmConCts :: Theta -> Id -> PmAltCon -> [EvVar] -> [Id] -> DsM Theta
+addPmConCts theta x con dicts fields = do
+  theta_ty    <- addTypeEvidence theta (listToBag dicts)
+  theta_tm_ty <- addTmCt theta_ty (TmVarCon x con fields)
+  pure theta_tm_ty
 
 -- ----------------------------------------------------------------------------
 -- * Utilities for main checking
@@ -1141,18 +1126,18 @@ Functions `addScrutTmCs' and `addPatTmCs' are responsible for generating
 these constraints.
 -}
 
-locallyExtendPmDelta :: (Delta -> DsM (Maybe Delta)) -> DsM a -> DsM a
-locallyExtendPmDelta ext k = getPmDelta >>= ext >>= \case
+locallyExtendPmTheta :: (Theta -> DsM Theta) -> DsM a -> DsM a
+locallyExtendPmTheta ext k = getPmTheta >>= ext >>= \case
   -- If adding a constraint would lead to a contradiction, don't add it.
   -- See @Note [Recovering from unsatisfiable pattern-matching constraints]@
   -- for why this is done.
-  Nothing     -> k
-  Just delta' -> updPmDelta delta' k
+  EmptyTheta  -> k
+  theta'      -> updPmDelta theta' k
 
 -- | Add in-scope type constraints
 addTyCsDs :: Bag EvVar -> DsM a -> DsM a
 addTyCsDs ev_vars =
-  locallyExtendPmDelta (\delta -> addTypeEvidence delta ev_vars)
+  locallyExtendPmTheta (\theta -> addTypeEvidence theta ev_vars)
 
 -- | Add equalities for the scrutinee to the local 'DsM' environment when
 -- checking a case expression:
@@ -1163,7 +1148,7 @@ addScrutTmCs :: Maybe (LHsExpr GhcTc) -> [Id] -> DsM a -> DsM a
 addScrutTmCs Nothing    _   k = k
 addScrutTmCs (Just scr) [x] k = do
   scr_e <- dsLExpr scr
-  locallyExtendPmDelta (\delta -> addVarCoreCt delta x scr_e) k
+  locallyExtendPmTheta (\theta -> addTmCt theta (TmVarCore x scr_e)) k
 addScrutTmCs _   _   _ = panic "addScrutTmCs: HsCase with more than one case binder"
 
 -- | Add equalities to the local 'DsM' environment when checking the RHS of a
@@ -1179,28 +1164,28 @@ addPatTmCs :: [Pat GhcTc]           -- LHS       (should have length 1)
 addPatTmCs ps xs k = do
   fam_insts <- dsGetFamInstEnvs
   grds <- concat <$> zipWithM (translatePat fam_insts) xs ps
-  locallyExtendPmDelta (\delta -> computeCovered grds delta) k
+  locallyExtendPmTheta (\delta -> computeCovered grds delta) k
 
 -- | A dead simple version of 'pmCheck' that only computes the Covered set.
 -- So it only cares about collecting positive info.
 -- We use it to collect info from a pattern when we check its RHS.
 -- See 'addPatTmCs'.
-computeCovered :: GrdVec -> Delta -> DsM (Maybe Delta)
+computeCovered :: GrdVec -> Theta -> DsM Theta
 -- The duplication with 'pmCheck' is really unfortunate, but it's simpler than
 -- separating out the common cases with 'pmCheck', because that would make the
 -- ConVar case harder to understand.
-computeCovered [] delta = pure (Just delta)
-computeCovered (PmLet { pm_id = x, pm_let_expr = e } : ps) delta = do
-  delta' <- expectJust "x is fresh" <$> addVarCoreCt delta x e
-  computeCovered ps delta'
-computeCovered (PmBang{} : ps) delta = do
-  computeCovered ps delta
-computeCovered (p : ps) delta
+computeCovered [] theta = pure (Just theta)
+computeCovered (PmLet { pm_id = x, pm_let_expr = e } : ps) theta = do
+  theta' <- addTmCt theta (TmVarCore x e)
+  computeCovered ps theta'
+computeCovered (PmBang{} : ps) theta = do
+  computeCovered ps theta
+computeCovered (p : ps) theta
   | PmCon{ pm_id = x, pm_con_con = con, pm_con_args = args
          , pm_con_dicts = dicts } <- p
-  = addPmConCts delta x con dicts args >>= \case
+  = addPmConCts theta x con dicts args >>= \case
       Nothing     -> pure Nothing
-      Just delta' -> computeCovered ps delta'
+      Just theta' -> computeCovered ps theta'
 
 {-
 %************************************************************************
@@ -1247,8 +1232,9 @@ dsPmWarn dflags ctx@(DsMatchContext kind loc) vars pm_result
       when exists_i $ forM_ inaccessible $ \(dL->L l q) -> do
         putSrcSpanDs l (warnDs (Reason Opt_WarnOverlappingPatterns)
                                (pprEqn q "has inaccessible right hand side"))
-      when exists_u $ putSrcSpanDs loc $ warnDs flag_u_reason $
-        pprEqns vars uncovered
+      when exists_u $ putSrcSpanDs loc $ warnDs flag_u_reason $ do
+        unc_deltas <- provideEvidence vars (maxPatterns + 1) uncovered
+        pprEqns vars unc_deltas
   where
     PmResult
       { pmresultRedundant = redundant

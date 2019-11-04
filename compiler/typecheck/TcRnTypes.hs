@@ -99,7 +99,7 @@ import TcOrigin
 import Annotations
 import InstEnv
 import FamInstEnv
-import {-# SOURCE #-} GHC.HsToCore.PmCheck.Types (Delta)
+import {-# SOURCE #-} GHC.HsToCore.PmCheck.Types (Theta)
 import IOEnv
 import RdrName
 import Name
@@ -319,9 +319,9 @@ data DsLclEnv = DsLclEnv {
         dsl_loc     :: RealSrcSpan,      -- To put in pattern-matching error msgs
 
         -- See Note [Note [Type and Term Equality Propagation] in Check.hs
-        -- The oracle state Delta is augmented as we walk inwards,
+        -- The oracle state Theta is augmented as we walk inwards,
         -- through each pattern match in turn
-        dsl_delta   :: Delta
+        dsl_theta   :: Theta
      }
 
 -- Inside [| |] brackets, the desugarer looks
