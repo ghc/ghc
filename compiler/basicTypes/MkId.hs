@@ -44,6 +44,7 @@ import TysPrim
 import TysWiredIn
 import PrelRules
 import Type
+import TyCoRep
 import FamInstEnv
 import Coercion
 import TcType
@@ -1353,16 +1354,6 @@ proxyHashId
 
 ------------------------------------------------
 {-
-
-unsafeCoerce# :: forall (ra :: RuntimeRep) (rb :: RuntimeRep).
-                 forall (a :: TYPE ra)     (b  :: TYPE rb).
-                 a -> b
-unsafeCoerce#
-  = /\ra rb (a :: TYPE ra) (b :: TYPE rb) (x :: a).
-   case unsafeEqualityProof @r1        @r2 of UhsafeRefl (gr :: r1 ~# r2) ->
-   case unsafeEqualityProof @(a |> gr) @b  of UnsafeRefl (g  :: (a |> gr) ~ b) ->
-   x |> (GRefl a gr `TransCo` g)
-
 -}
 
 unsafeEqualityProofId :: Id
@@ -1382,21 +1373,35 @@ unsafeCoerceId = pcMiscPrelId unsafeCoerceName ty info
     --                         a -> b
     bndrs = mkTemplateKiTyVars [runtimeRepTy, runtimeRepTy] (map tYPE)
 
-    [k1, k2, a, b] = mkTyVarTys bndrs
+    [r1, r2, a, b] = mkTyVarTys bndrs
 
     ty  = mkSpecForAllTys bndrs (mkVisFunTy a b)
+    -- unsafeCoerce#
+    --   = /\r1 r2 (a :: TYPE r1) (b :: TYPE r2) (x :: a) .
+    --    case unsafeEqualityProof @r1        @r2 of UnsafeRefl (gr :: r1 ~# r2) ->
+    --    case unsafeEqualityProof @(a |> gr) @b  of UnsafeRefl (g  :: (a |> gr) ~ b) ->
+    --    x |> (GRefl a gr `TransCo` g)
 
-    [x] = mkTemplateLocals [a]
+    [x, co_bndr1, co_bndr2] = mkTemplateLocals
+      [ a -- x :: a
+      , mkTyConApp eqPrimTyCon [r1, r2] -- co_bndr1 :: r1 ~# r2
+      , mkTyConApp eqTyCon [mkCastTy a (mkCoVarCo co_bndr1), b] -- co_bndr2 :: (a |> co_bndr1) ~ b
+      ]
 
-    scrut1 = mkApps (Var unsafeEqualityProofId) [Type liftedTypeKind, Type k1, Type k2]
+    -- /\r1 r2 a b x . case unsafeEqualityProof @r1 @r2 of UnsafeRefl (gr :: r1 ~# r2) -> rhs2
+    scrut1 = mkApps (Var unsafeEqualityProofId) [Type liftedTypeKind, Type r1, Type r2]
     rhs1 = mkLams (bndrs ++ [x]) $
            mkWildCase scrut1 (exprType scrut1) b
-             [ (DataAlt unsafeReflDataCon, undefined, rhs2)
+             [ (DataAlt unsafeReflDataCon, [co_bndr1], rhs2)
              ]
 
-    scrut2 = mkApps (Var unsafeEqualityProofId) [Type liftedTypeKind, Type a, Type b]
+    -- case unsafeEqualityProof @(a |> gr) @b of UnsafeRefl (g :: (a |> gr) ~ b) -> rhs3
+    scrut2 = mkApps (Var unsafeEqualityProofId) [Type liftedTypeKind, Type (mkCastTy a (mkCoVarCo co_bndr1)), Type b]
     rhs2 = mkWildCase scrut2 (exprType scrut2) b
-             [ (DataAlt unsafeReflDataCon, undefined, undefined) ]
+             [ (DataAlt unsafeReflDataCon, [co_bndr2], rhs3) ]
+
+    -- x |> (GRefl a gr `TransCo` g)
+    rhs3 = Cast (Var x) (mkTransCo (GRefl Representational a (MCo (mkCoVarCo co_bndr1))) (mkCoVarCo co_bndr2))
 
 ------------------------------------------------
 nullAddrId :: Id
