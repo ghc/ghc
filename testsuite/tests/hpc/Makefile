@@ -12,4 +12,5 @@ T17073:
 	LANG=ASCII "$(TEST_HC)" $(TEST_HC_ARGS) T17073.hs -fhpc
 	./T17073
 	hpc report T17073
+  hpc version
 	LANG=ASCII hpc markup T17073
