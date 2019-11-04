@@ -682,20 +682,18 @@ is not set.
 
 ------------------
 simplifyAmbiguityCheck :: Type -> WantedConstraints -> TcM ()
-simplifyAmbiguityCheck ty wanteds
-  = do { traceTc "simplifyAmbiguityCheck {" (text "type = " <+> ppr ty $$ text "wanted = " <+> ppr wanteds)
+simplifyAmbiguityCheck ty wanteds = do
+  allow_ambiguous <- xoptM LangExt.AllowAmbiguousTypes
+  if allow_ambiguous
+  then traceTc "simplifyAmbiguityCheck skipped" empty
+  else
+    do { traceTc "simplifyAmbiguityCheck {" (text "type = " <+> ppr ty $$ text "wanted = " <+> ppr wanteds)
        ; (final_wc, _) <- runTcS $ solveWantedsAndDrop wanteds
              -- NB: no defaulting!  See Note [No defaulting in the ambiguity check]
-
        ; traceTc "End simplifyAmbiguityCheck }" empty
 
-       -- Normally report all errors; but with -XAllowAmbiguousTypes
-       -- report only insoluble ones, since they represent genuinely
-       -- inaccessible code
-       ; allow_ambiguous <- xoptM LangExt.AllowAmbiguousTypes
        ; traceTc "reportUnsolved(ambig) {" empty
-       ; unless (allow_ambiguous && not (insolubleWC final_wc))
-                (discardResult (reportUnsolved final_wc))
+       ; discardResult $ reportUnsolved final_wc
        ; traceTc "reportUnsolved(ambig) }" empty
 
        ; return () }
