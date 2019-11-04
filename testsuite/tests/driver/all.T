@@ -130,8 +130,7 @@ test('dynHelloWorld',
      [''])
 
 test('T5313',
-     [ unless(config.have_RTS_linker, skip),
-       extra_run_opts('"' + config.libdir + '"')],
+     [ req_rts_linker, extra_run_opts('"' + config.libdir + '"')],
      compile_and_run,
      ['-package ghc'])
 
