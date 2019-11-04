@@ -1353,14 +1353,11 @@ proxyHashId
     ty      = mkInvForAllTy kv $ mkSpecForAllTy tv $ mkProxyPrimTy kv_ty tv_ty
 
 ------------------------------------------------
-{-
--}
-
 unsafeEqualityProofId :: Id
 unsafeEqualityProofId = pcMiscPrelId unsafeEqualityProofName ty info
   where
-    ty = undefined
-    info = undefined
+    ty  = mkSpecForAllTys [alphaTyVar, betaTyVar] (mkTyConApp unsafeEqualityTyCon [alphaTy, betaTy])
+    info = noCafIdInfo
 
 unsafeCoerceId :: Id
 unsafeCoerceId = pcMiscPrelId unsafeCoerceName ty info
@@ -1376,6 +1373,7 @@ unsafeCoerceId = pcMiscPrelId unsafeCoerceName ty info
     [r1, r2, a, b] = mkTyVarTys bndrs
 
     ty  = mkSpecForAllTys bndrs (mkVisFunTy a b)
+
     -- unsafeCoerce#
     --   = /\r1 r2 (a :: TYPE r1) (b :: TYPE r2) (x :: a) .
     --    case unsafeEqualityProof @r1        @r2 of UnsafeRefl (gr :: r1 ~# r2) ->
