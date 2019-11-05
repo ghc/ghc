@@ -8,7 +8,7 @@
 
 #pragma once
 
-#if RTS_LINKER_USE_MMAP
+#if RTS_LINKER_USE_MMAP == 1
 #include <fcntl.h>
 #include <sys/mman.h>
 

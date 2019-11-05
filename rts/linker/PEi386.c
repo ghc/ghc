@@ -1826,6 +1826,8 @@ makeSymbolExtra_PEi386( ObjectCode* oc, uint64_t index, size_t s, char* symbol )
     return (size_t)extra->jumpIsland;
 }
 
+void ocProtectExtras(ObjectCode* oc STG_UNUSED) { }
+
 #endif /* x86_64_HOST_ARCH */
 
 bool
