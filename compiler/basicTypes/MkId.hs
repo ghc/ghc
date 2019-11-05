@@ -1384,8 +1384,8 @@ unsafeCoerceId = pcMiscPrelId unsafeCoerceName ty info
 
     [x, co_bndr1, co_bndr2] = mkTemplateLocals
       [ a -- x :: a
-      , mkTyConApp eqPrimTyCon [r1, r2] -- co_bndr1 :: r1 ~# r2
-      , mkTyConApp eqTyCon [mkCastTy a (mkCoVarCo co_bndr1), b] -- co_bndr2 :: (a |> co_bndr1) ~ b
+      , mkTyConApp eqPrimTyCon [liftedTypeKind, liftedTypeKind, r1, r2] -- co_bndr1 :: r1 ~# r2
+      , mkTyConApp eqTyCon [liftedTypeKind, mkCastTy a (mkCoVarCo co_bndr1), b] -- co_bndr2 :: (a |> co_bndr1) ~ b
       ]
 
     -- /\r1 r2 a b x . case unsafeEqualityProof @r1 @r2 of UnsafeRefl (gr :: r1 ~# r2) -> rhs2
