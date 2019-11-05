@@ -1389,14 +1389,13 @@ unsafeCoerceId = pcMiscPrelId unsafeCoerceName ty info
       ]
 
     -- /\r1 r2 a b x . case unsafeEqualityProof @r1 @r2 of UnsafeRefl (gr :: r1 ~# r2) -> rhs2
-    scrut1 = mkApps (Var unsafeEqualityProofId) [Type liftedTypeKind, Type r1, Type r2]
+    scrut1 = mkApps (Var unsafeEqualityProofId) [Type r1, Type r2]
     rhs1 = mkLams (bndrs ++ [x]) $
            mkWildCase scrut1 (exprType scrut1) b
-             [ (DataAlt unsafeReflDataCon, [co_bndr1], rhs2)
-             ]
+             [ (DataAlt unsafeReflDataCon, [co_bndr1], rhs2) ]
 
     -- case unsafeEqualityProof @(a |> gr) @b of UnsafeRefl (g :: (a |> gr) ~ b) -> rhs3
-    scrut2 = mkApps (Var unsafeEqualityProofId) [Type liftedTypeKind, Type (mkCastTy a (mkCoVarCo co_bndr1)), Type b]
+    scrut2 = mkApps (Var unsafeEqualityProofId) [Type (mkCastTy a (mkCoVarCo co_bndr1)), Type b]
     rhs2 = mkWildCase scrut2 (exprType scrut2) b
              [ (DataAlt unsafeReflDataCon, [co_bndr2], rhs3) ]
 

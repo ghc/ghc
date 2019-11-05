@@ -238,6 +238,7 @@ wiredInTyCons = [ -- Units are not treated like other tuples, because then
                 , vecElemTyCon
                 , constraintKindTyCon
                 , liftedTypeKindTyCon
+                , unsafeEqualityTyCon
                 ]
 
 mkWiredInTyConName :: BuiltInSyntax -> Module -> FastString -> Unique -> TyCon -> Name
@@ -1678,7 +1679,7 @@ unsafeReflDataCon :: DataCon
 (unsafeEqualityTyCon, unsafeReflDataCon) = (tycon, datacon)
   where
     tycon_binders :: [TyConBinder]
-    tycon_binders = mkTemplateTyConBinders [liftedTypeKind, liftedTypeKind] (map tYPE)
+    tycon_binders = mkTemplateAnonTyConBinders [liftedTypeKind, liftedTypeKind]
 
     tycon :: TyCon
     tycon =
