@@ -1,6 +1,8 @@
-#include <stdlib.h>
+#include "Rts.h"
 #include "elf_compat.h"
 #include "elf_plt_aarch64.h"
+
+#include <stdlib.h>
 
 #if defined(aarch64_HOST_ARCH)
 
