@@ -949,7 +949,7 @@ etaExpand n orig_expr
       = -- pprTrace "ee" (vcat [ppr orig_expr, ppr expr, ppr etas]) $
         retick $ etaInfoAbs etas (etaInfoApp subst' sexpr etas)
       where
-          in_scope = mkInScopeSet (exprFreeVars expr)
+          in_scope = mkExprInScopeSet expr
           (in_scope', etas) = mkEtaWW n orig_expr in_scope (exprType expr)
           subst' = mkEmptySubst in_scope'
 
@@ -1174,7 +1174,7 @@ etaBodyForJoinPoint need_args body
       = pprPanic "etaBodyForJoinPoint" $ int need_args $$
                                          ppr body $$ ppr (exprType body)
 
-    init_subst e = mkEmptyTCvSubst (mkInScopeSet (exprFreeVars e))
+    init_subst e = mkEmptyTCvSubst (mkExprInScopeSet e)
 
 --------------
 freshEtaId :: Int -> TCvSubst -> Type -> (TCvSubst, Id)
