@@ -1,8 +1,8 @@
 {-# LANGUAGE CPP, KindSignatures #-}
 {-# LANGUAGE FlexibleContexts #-}
 {-# LANGUAGE FlexibleInstances #-}
-{-# LANGUAGE UndecidableInstances #-} -- Note [Pass sensitive types]
-                                      -- in module GHC.Hs.PlaceHolder
+{-# LANGUAGE UndecidableInstances #-} -- Wrinkle in Note [Trees That Grow]
+                                      -- in module GHC.Hs.Extension
 {-# LANGUAGE ConstraintKinds #-}
 {-# LANGUAGE RoleAnnotations #-}
 {-# LANGUAGE TypeFamilies #-}

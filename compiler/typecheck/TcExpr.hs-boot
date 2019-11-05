@@ -1,6 +1,6 @@
 module TcExpr where
 import Name
-import GHC.Hs    ( HsExpr, LHsExpr, SyntaxExpr )
+import GHC.Hs    ( HsExpr, LHsExpr, SyntaxExprRn, SyntaxExprTc )
 import TcType   ( TcRhoType, TcSigmaType, SyntaxOpType, ExpType, ExpRhoType )
 import TcRnTypes( TcM )
 import TcOrigin ( CtOrigin )
@@ -25,18 +25,18 @@ tcInferRho, tcInferRhoNC ::
        -> TcM (LHsExpr GhcTcId, TcRhoType)
 
 tcSyntaxOp :: CtOrigin
-           -> SyntaxExpr GhcRn
+           -> SyntaxExprRn
            -> [SyntaxOpType]           -- ^ shape of syntax operator arguments
            -> ExpType                  -- ^ overall result type
            -> ([TcSigmaType] -> TcM a) -- ^ Type check any arguments
-           -> TcM (a, SyntaxExpr GhcTcId)
+           -> TcM (a, SyntaxExprTc)
 
 tcSyntaxOpGen :: CtOrigin
-              -> SyntaxExpr GhcRn
+              -> SyntaxExprRn
               -> [SyntaxOpType]
               -> SyntaxOpType
               -> ([TcSigmaType] -> TcM a)
-              -> TcM (a, SyntaxExpr GhcTcId)
+              -> TcM (a, SyntaxExprTc)
 
 
 tcCheckId :: Name -> ExpRhoType -> TcM (HsExpr GhcTcId)
