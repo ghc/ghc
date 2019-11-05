@@ -1,201 +1,290 @@
-{-
-(c) Bartosz Nitka, Facebook 2015
-
-Utilities for efficiently and deterministically computing free variables.
-
--}
-
+{-# OPTIONS_GHC -ddump-to-file -ddump-simpl -ddump-stg -dsuppress-ticks #-}
+{-# LANGUAGE MultiWayIf #-}
 {-# LANGUAGE BangPatterns #-}
+{-# LANGUAGE GeneralizedNewtypeDeriving #-}
+{-# LANGUAGE ScopedTypeVariables #-}
 
-module FV (
-        -- * Deterministic free vars computations
-        FV, InterestingVarFun,
-
-        -- * Running the computations
-        fvVarListVarSet, fvVarList, fvVarSet, fvDVarSet,
-
-        -- ** Manipulating those computations
-        unitFV,
-        emptyFV,
-        mkFVs,
-        unionFV,
-        unionsFV,
-        delFV,
-        delFVs,
-        filterFV,
-        mapUnionFV,
-    ) where
+module FV
+  ( -- | An abstraction over free variable computations
+    FreeVarStrategy(..)
+    -- * Are there any free variables at all?
+  , NoFVs, noFVs
+    -- * Deterministic free variable computation
+  , FV
+  , fvVarListVarSet
+  , fvVarList
+  , fvDVarSet
+  , fvVarSet
+  , filterFV
+  , InterestingVarFun
+  , emptyFV
+  , delFV
+  , delFVs
+  , unionFV, mapUnionFV, mkFVs
+    -- ** Internal
+  , runFV, FVAccum(..), emptyFVAccum
+    -- * Non-deterministic free variable computation
+  , NonDetFV
+  , nonDetFVSet
+    -- * Non-deterministic free coercion variable computation
+  , NonDetCoFV
+  , nonDetCoFVSet
+    -- * Filtered free variable computations
+  , FilteredFV
+    -- ** Filtered to local variables
+  , LocalFV
+  , LocalNonDetFV
+  , localFVs
+  , localFvVarSet
+  ) where
 
 import GhcPrelude
+import GHC.Exts (oneShot)
 
+import FreeVarStrategy
+
+import {-# SOURCE #-} TyCoRep (coHoleCoVar)
+import {-# SOURCE #-} TyCoFVs (typeFVs)
 import Var
 import VarSet
 
--- | Predicate on possible free variables: returns @True@ iff the variable is
--- interesting
+import Data.Proxy
+import Data.Semigroup (Semigroup((<>)))
+
+
+--------------------------------------------------------------------------------
+-- Checking for empty free variable sets
+--------------------------------------------------------------------------------
+
+-- | A free variables traversal that checks whether the free variable set is empty.
+--
+-- Note that this does *not* account for variables free in the type/kind of
+-- variable occurrences.
+newtype NoFVs = NoFVs (VarSet -> Bool)
+
+instance Monoid NoFVs where
+  mempty = NoFVs $ const True
+  {-# INLINE mempty #-}
+
+instance Semigroup NoFVs where
+  NoFVs f <> NoFVs g = NoFVs $ oneShot $ \in_scope -> f in_scope && g in_scope
+  {-# INLINE (<>) #-}
+
+instance FreeVarStrategy NoFVs where
+  coholeFV _hole = mempty
+  unitFV v = NoFVs $ \in_scope -> v `elemVarSet` in_scope
+  bindVar tv (NoFVs f) = NoFVs $ \in_scope -> f $! extendVarSet in_scope tv
+
+  {-# INLINE coholeFV #-}
+  {-# INLINE unitFV #-}
+  {-# INLINE bindVar #-}
+
+noFVs :: NoFVs -> Bool
+noFVs (NoFVs f) = f emptyVarSet
+
+
+--------------------------------------------------------------------------------
+-- Non-deterministic free variable sets
+--------------------------------------------------------------------------------
+
+-- | A free variables traversal that produces a non-deterministic 'TyCoVarSet'.
+--
+-- As described in Note [Closing over free variables kinds] this closes over
+-- the free variables of type variables' kinds.
+newtype NonDetFV = NonDetFV { runNonDetFV :: TyCoVarSet -> TyCoVarSet -> TyCoVarSet }
+
+instance Monoid NonDetFV where
+  mempty = NonDetFV $ \_ acc -> acc
+  {-# INLINE mempty #-}
+  mconcat xs = NonDetFV $ oneShot $ \is -> oneShot $ \acc0 ->
+    foldl' (\acc f -> runNonDetFV f is acc) acc0 xs
+  {-# INLINE mconcat #-}
+
+instance Semigroup NonDetFV where
+  NonDetFV f <> NonDetFV g = NonDetFV $ oneShot $ \is -> oneShot $ \acc -> f is $! (g is $! acc)
+  {-# INLINE (<>) #-}
+
+instance FreeVarStrategy NonDetFV where
+  coholeFV hole = unitFV $ coHoleCoVar hole
+  unitFV v = NonDetFV $ oneShot $ \is -> oneShot $ \acc ->
+    if | v `elemVarSet` is  -> acc
+       | v `elemVarSet` acc -> acc
+       | otherwise          -> runNonDetFV (typeFVs (varType v)) emptyVarSet $! extendVarSet acc v
+  bindVar v (NonDetFV f) = NonDetFV $ oneShot $ \is -> oneShot $ \acc -> (f $! extendVarSet is v) $! acc
+
+  {-# INLINE coholeFV #-}
+  {-# INLINE unitFV #-}
+  {-# INLINE bindVar #-}
+
+nonDetFVSet :: NonDetFV -> TyCoVarSet
+nonDetFVSet (NonDetFV f) = f emptyVarSet emptyVarSet
+
+
+--------------------------------------------------------------------------------
+-- Non-deterministic free coercion variable sets
+--------------------------------------------------------------------------------
+
+-- | A free coercion variables traversal that produces a non-deterministic
+-- 'CoVarSet'.
+newtype NonDetCoFV = NonDetCoFV { runNonDetCoFV :: CoVarSet -> CoVarSet -> CoVarSet }
+
+instance Monoid NonDetCoFV where
+  mempty = NonDetCoFV $ \_ acc -> acc
+  {-# INLINE mempty #-}
+
+instance Semigroup NonDetCoFV where
+  NonDetCoFV f <> NonDetCoFV g = NonDetCoFV $ oneShot $ \is -> oneShot $ \acc -> f is $! (g is $! acc)
+  {-# INLINE (<>) #-}
+
+instance FreeVarStrategy NonDetCoFV where
+  coholeFV hole = unitFV $ coHoleCoVar hole
+  unitFV v = NonDetCoFV $ \is acc ->
+    if | not (isCoVar v)    -> acc
+       | v `elemVarSet` is  -> acc
+       | v `elemVarSet` acc -> acc
+       | otherwise          -> runNonDetCoFV (typeFVs (varType v)) emptyVarSet $! extendVarSet acc v
+  bindVar v (NonDetCoFV f) = NonDetCoFV $ oneShot $ \is -> oneShot $ \acc -> (f $! extendVarSet is v) $! acc
+
+  {-# INLINE coholeFV #-}
+  {-# INLINE unitFV #-}
+  {-# INLINE bindVar #-}
+
+nonDetCoFVSet :: NonDetCoFV -> CoVarSet
+nonDetCoFVSet (NonDetCoFV f) = f emptyVarSet emptyVarSet
+
+
+--------------------------------------------------------------------------------
+-- Deterministic free variable sets
+--------------------------------------------------------------------------------
+
 type InterestingVarFun = Var -> Bool
 
--- Note [Deterministic FV]
--- ~~~~~~~~~~~~~~~~~~~~~~~
--- When computing free variables, the order in which you get them affects
--- the results of floating and specialization. If you use UniqFM to collect
--- them and then turn that into a list, you get them in nondeterministic
--- order as described in Note [Deterministic UniqFM] in UniqDFM.
+data FVAccum = FVAccum ![Var] !VarSet
 
--- A naive algorithm for free variables relies on merging sets of variables.
--- Merging costs O(n+m) for UniqFM and for UniqDFM there's an additional log
--- factor. It's cheaper to incrementally add to a list and use a set to check
--- for duplicates.
-type FV = InterestingVarFun
-             -- Used for filtering sets as we build them
-          -> VarSet
-             -- Locally bound variables
-          -> ([Var], VarSet)
-             -- List to preserve ordering and set to check for membership,
-             -- so that the list doesn't have duplicates
-             -- For explanation of why using `VarSet` is not deterministic see
-             -- Note [Deterministic UniqFM] in UniqDFM.
-          -> ([Var], VarSet)
+emptyFVAccum :: FVAccum
+emptyFVAccum = FVAccum [] emptyVarSet
 
--- Note [FV naming conventions]
--- ~~~~~~~~~~~~~~~~~~~~~~~~~~~~
--- To get the performance and determinism that FV provides, FV computations
--- need to built up from smaller FV computations and then evaluated with
--- one of `fvVarList`, `fvDVarSet`, `fvVarListVarSet`. That means the functions
--- returning FV need to be exported.
+-- | A free variables traversal that produces a deterministic 'DVarSet
 --
--- The conventions are:
---
--- a) non-deterministic functions:
---   * a function that returns VarSet
---       e.g. `tyVarsOfType`
--- b) deterministic functions:
---   * a worker that returns FV
---       e.g. `tyFVsOfType`
---   * a function that returns [Var]
---       e.g. `tyVarsOfTypeList`
---   * a function that returns DVarSet
---       e.g. `tyVarsOfTypeDSet`
---
--- Where tyVarsOfType, tyVarsOfTypeList, tyVarsOfTypeDSet are implemented
--- in terms of the worker evaluated with fvVarSet, fvVarList, fvDVarSet
--- respectively.
+-- As described in Note [Closing over free variables kinds] this closes over
+-- the free variables of type variables' kinds.
+newtype FV = FV { runFV :: InterestingVarFun -> TyCoVarSet -> FVAccum -> FVAccum }
 
--- | Run a free variable computation, returning a list of distinct free
--- variables in deterministic order and a non-deterministic set containing
--- those variables.
-fvVarListVarSet :: FV ->  ([Var], VarSet)
-fvVarListVarSet fv = fv (const True) emptyVarSet ([], emptyVarSet)
+instance Monoid FV where
+  mempty = FV $ \_ _ acc -> acc
+  {-# INLINE mempty #-}
 
--- | Run a free variable computation, returning a list of distinct free
--- variables in deterministic order.
+instance Semigroup FV where
+  f <> g = FV $ oneShot $ \fv_cand -> oneShot $ \in_scope -> oneShot $ \acc ->
+    runFV f fv_cand in_scope $! (runFV g fv_cand in_scope $! acc)
+  {-# INLINE (<>) #-}
+
+whenIsInteresting :: Var -> FV -> FV
+whenIsInteresting var f = FV $ oneShot g
+  where
+    g fv_cand in_scope acc@(FVAccum _have have_set)
+      | not (fv_cand var)          = acc
+      | var `elemVarSet` in_scope  = acc
+      | var `elemVarSet` have_set  = acc
+      | otherwise                  = runFV f fv_cand in_scope acc
+
+instance FreeVarStrategy FV where
+  coholeFV hole = unitFV $ coHoleCoVar hole
+  unitFV var = whenIsInteresting var $ typeFVs (varType var) <> add_fv var
+    where
+      add_fv :: Var -> FV
+      add_fv var = FV $ oneShot $ \_fv_cand -> oneShot $ \_in_scope -> oneShot $ \(FVAccum have have_set) ->
+        let !in_scope' = extendVarSet have_set var
+         in FVAccum (var : have) in_scope'
+  bindVar tv (FV f) = FV $ \fv_cand in_scope acc ->
+    let !in_scope' = extendVarSet in_scope tv
+     in f fv_cand in_scope' acc
+
+  {-# INLINE coholeFV #-}
+  {-# INLINE unitFV #-}
+  {-# INLINE bindVar #-}
+
+fvVarListVarSet :: FV -> ([Var], VarSet)
+fvVarListVarSet (FV fv) =
+  case fv (const True) emptyVarSet (FVAccum [] emptyVarSet) of
+    FVAccum have have_set -> (have, have_set)
+
 fvVarList :: FV -> [Var]
 fvVarList = fst . fvVarListVarSet
 
--- | Run a free variable computation, returning a deterministic set of free
--- variables. Note that this is just a wrapper around the version that
--- returns a deterministic list. If you need a list you should use
--- `fvVarList`.
 fvDVarSet :: FV -> DVarSet
-fvDVarSet = mkDVarSet . fst . fvVarListVarSet
+fvDVarSet fv = mkDVarSet $ fst $ fvVarListVarSet fv
 
--- | Run a free variable computation, returning a non-deterministic set of
--- free variables. Don't use if the set will be later converted to a list
--- and the order of that list will impact the generated code.
 fvVarSet :: FV -> VarSet
 fvVarSet = snd . fvVarListVarSet
 
--- Note [FV eta expansion]
--- ~~~~~~~~~~~~~~~~~~~~~~~
--- Let's consider an eta-reduced implementation of freeVarsOf using FV:
---
--- freeVarsOf (App a b) = freeVarsOf a `unionFV` freeVarsOf b
---
--- If GHC doesn't eta-expand it, after inlining unionFV we end up with
---
--- freeVarsOf = \x ->
---   case x of
---     App a b -> \fv_cand in_scope acc ->
---       freeVarsOf a fv_cand in_scope $! freeVarsOf b fv_cand in_scope $! acc
---
--- which has to create a thunk, resulting in more allocations.
---
--- On the other hand if it is eta-expanded:
---
--- freeVarsOf (App a b) fv_cand in_scope acc =
---   (freeVarsOf a `unionFV` freeVarsOf b) fv_cand in_scope acc
---
--- after inlining unionFV we have:
---
--- freeVarsOf = \x fv_cand in_scope acc ->
---   case x of
---     App a b ->
---       freeVarsOf a fv_cand in_scope $! freeVarsOf b fv_cand in_scope $! acc
---
--- which saves allocations.
---
--- GHC when presented with knowledge about all the call sites, correctly
--- eta-expands in this case. Unfortunately due to the fact that freeVarsOf gets
--- exported to be composed with other functions, GHC doesn't have that
--- information and has to be more conservative here.
---
--- Hence functions that get exported and return FV need to be manually
--- eta-expanded. See also #11146.
-
--- | Add a variable - when free, to the returned free variables.
--- Ignores duplicates and respects the filtering function.
-unitFV :: Id -> FV
-unitFV var fv_cand in_scope acc@(have, haveSet)
-  | var `elemVarSet` in_scope = acc
-  | var `elemVarSet` haveSet = acc
-  | fv_cand var = (var:have, extendVarSet haveSet var)
-  | otherwise = acc
-{-# INLINE unitFV #-}
+-- | Filter a free variable computation.
+filterFV :: InterestingVarFun -> FV -> FV
+filterFV fv_cand2 (FV fv) = FV $ \fv_cand1 in_scope acc ->
+  fv (\v -> fv_cand1 v && fv_cand2 v) in_scope acc
+{-# INLINE filterFV #-}
 
 -- | Return no free variables.
-emptyFV :: FV
-emptyFV _ _ acc = acc
+emptyFV :: FreeVarStrategy fv => fv
+emptyFV = mempty
 {-# INLINE emptyFV #-}
-
--- | Union two free variable computations.
-unionFV :: FV -> FV -> FV
-unionFV fv1 fv2 fv_cand in_scope acc =
-  fv1 fv_cand in_scope $! fv2 fv_cand in_scope $! acc
-{-# INLINE unionFV #-}
 
 -- | Mark the variable as not free by putting it in scope.
 delFV :: Var -> FV -> FV
-delFV var fv fv_cand !in_scope acc =
-  fv fv_cand (extendVarSet in_scope var) acc
+delFV = bindVar
 {-# INLINE delFV #-}
 
 -- | Mark many free variables as not free.
 delFVs :: VarSet -> FV -> FV
-delFVs vars fv fv_cand !in_scope acc =
+delFVs vars (FV fv) = FV $ \fv_cand !in_scope acc ->
   fv fv_cand (in_scope `unionVarSet` vars) acc
 {-# INLINE delFVs #-}
 
--- | Filter a free variable computation.
-filterFV :: InterestingVarFun -> FV -> FV
-filterFV fv_cand2 fv fv_cand1 in_scope acc =
-  fv (\v -> fv_cand1 v && fv_cand2 v) in_scope acc
-{-# INLINE filterFV #-}
-
--- | Map a free variable computation over a list and union the results.
 mapUnionFV :: (a -> FV) -> [a] -> FV
-mapUnionFV _f [] _fv_cand _in_scope acc = acc
-mapUnionFV f (a:as) fv_cand in_scope acc =
-  mapUnionFV f as fv_cand in_scope $! f a fv_cand in_scope $! acc
-{-# INLINABLE mapUnionFV #-}
+mapUnionFV = foldMap
 
--- | Union many free variable computations.
-unionsFV :: [FV] -> FV
-unionsFV fvs fv_cand in_scope acc = mapUnionFV id fvs fv_cand in_scope acc
-{-# INLINE unionsFV #-}
+unionFV :: FreeVarStrategy fv => fv -> fv -> fv
+unionFV = (<>)
 
--- | Add multiple variables - when free, to the returned free variables.
--- Ignores duplicates and respects the filtering function.
 mkFVs :: [Var] -> FV
-mkFVs vars fv_cand in_scope acc =
-  mapUnionFV unitFV vars fv_cand in_scope acc
-{-# INLINE mkFVs #-}
+mkFVs = foldMap unitFV
+
+--------------------------------------------------------------------------------
+-- Filtered free variable sets
+--------------------------------------------------------------------------------
+
+-- | A free variable traversal filtered by a statically known "is interesting"
+-- predicate (namely 'fvIsInteresting').
+newtype FilteredFV pred fv = FilteredFV { runFilteredFV :: fv }
+                          deriving (Monoid, Semigroup)
+
+class FVFilterPred pred where
+  fvIsInteresting :: Proxy pred -> InterestingVarFun
+
+instance (FreeVarStrategy fv, Monoid fv, FVFilterPred pred) => FreeVarStrategy (FilteredFV pred fv) where
+  coholeFV = FilteredFV . coholeFV
+  unitFV v
+    | fvIsInteresting proxy v = FilteredFV (unitFV v)
+    | otherwise = mempty
+    where proxy = Proxy :: Proxy pred
+  bindVar v fv = FilteredFV (bindVar v (runFilteredFV fv))
+
+  {-# INLINE coholeFV #-}
+  {-# INLINE unitFV #-}
+  {-# INLINE bindVar #-}
+
+-- | A 'FVFilterPred' selecting locally defined 'Id's and 'TyVar's.
+data LocalVars
+
+instance FVFilterPred LocalVars where
+  fvIsInteresting _ = isLocalVar
+
+
+type LocalFV = FilteredFV LocalVars FV
+type LocalNonDetFV = FilteredFV LocalVars NonDetFV
+
+localFVs :: FilteredFV LocalVars fv -> fv
+localFVs = runFilteredFV
+
+localFvVarSet :: LocalNonDetFV -> VarSet
+localFvVarSet = nonDetFVSet . runFilteredFV

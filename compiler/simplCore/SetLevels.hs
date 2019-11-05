@@ -100,6 +100,7 @@ import FastString
 import UniqDFM
 import FV
 import Data.Maybe
+import Data.Foldable
 import MonadUtils       ( mapAccumLM )
 
 {-
@@ -1204,8 +1205,8 @@ lvlBind env (AnnRec pairs)
         -- Finding the free vars of the binding group is annoying
     bind_fvs = ((unionDVarSets [ freeVarsOf rhs | (_, rhs) <- pairs])
                 `unionDVarSet`
-                (fvDVarSet $ unionsFV [ idFVs bndr
-                                      | (bndr, (_,_)) <- pairs]))
+                (fvDVarSet $ fold [ idFVs bndr
+                                  | (bndr, (_,_)) <- pairs]))
                `delDVarSetList`
                 bndrs
 
