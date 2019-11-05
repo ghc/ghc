@@ -1,5 +1,7 @@
-#include "elf_got.h"
 #include <string.h>
+
+#include "Rts.h"
+#include "elf_got.h"
 
 #if defined(OBJFORMAT_ELF)
 /*
