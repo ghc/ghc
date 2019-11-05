@@ -45,7 +45,6 @@ import CoreUtils
 import MkCore
 import DsBinds (dsHsWrapper)
 
-import Name
 import Id
 import ConLike
 import TysWiredIn
@@ -169,7 +168,7 @@ do_premap :: DsCmdEnv -> Type -> Type -> Type ->
 do_premap ids b_ty c_ty d_ty f g
    = do_compose ids b_ty c_ty d_ty (do_arr ids b_ty c_ty f) g
 
-mkFailExpr :: HsMatchContext Id -> Type -> DsM CoreExpr
+mkFailExpr :: HsMatchContext GhcRn -> Type -> DsM CoreExpr
 mkFailExpr ctxt ty
   = mkErrorAppDs pAT_ERROR_ID ty (matchContextErrString ctxt)
 
@@ -530,11 +529,11 @@ dsCmd ids local_vars stack_ty res_ty (HsCmdIf _ mb_fun cond then_cmd else_cmd)
                        (buildEnvStack else_ids stack_id)
 
     core_if <- case mb_fun of
-       Just fun -> do { fun_apps <- dsSyntaxExpr fun
+       NoSyntaxExprTc  -> matchEnvStack env_ids stack_id $
+                          mkIfThenElse core_cond core_left core_right
+       _ -> do { fun_apps <- dsSyntaxExpr mb_fun
                                       [core_cond, core_left, core_right]
-                      ; matchEnvStack env_ids stack_id fun_apps }
-       Nothing  -> matchEnvStack env_ids stack_id $
-                   mkIfThenElse core_cond core_left core_right
+               ; matchEnvStack env_ids stack_id fun_apps }
 
     return (do_premap ids in_ty sum_ty res_ty
                 core_if
@@ -690,7 +689,7 @@ dsCmd _ local_vars _stack_ty _res_ty (HsCmdArrForm _ op _ _ args) env_ids = do
     return (mkApps (App core_op (Type env_ty)) core_args,
             unionDVarSets fv_sets)
 
-dsCmd ids local_vars stack_ty res_ty (HsCmdWrap _ wrap cmd) env_ids = do
+dsCmd ids local_vars stack_ty res_ty (XCmd (HsWrap wrap cmd)) env_ids = do
     (core_cmd, env_ids') <- dsCmd ids local_vars stack_ty res_ty cmd env_ids
     core_wrap <- dsHsWrapper wrap
     return (core_wrap core_cmd, env_ids')
@@ -1126,7 +1125,7 @@ dsCmdStmts _ _ _ [] _ = panic "dsCmdStmts []"
 -- Match a list of expressions against a list of patterns, left-to-right.
 
 matchSimplys :: [CoreExpr]              -- Scrutinees
-             -> HsMatchContext Name     -- Match kind
+             -> HsMatchContext GhcRn    -- Match kind
              -> [LPat GhcTc]            -- Patterns they should match
              -> CoreExpr                -- Return this if they all match
              -> CoreExpr                -- Return this if they don't
