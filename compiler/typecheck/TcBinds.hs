@@ -706,8 +706,7 @@ tcPolyCheck prag_fn
        ; tick <- funBindTicks nm_loc mono_id mod prag_sigs
        ; let bind' = FunBind { fun_id      = cL nm_loc mono_id
                              , fun_matches = matches'
-                             , fun_co_fn   = co_fn
-                             , fun_ext     = placeHolderNamesTc
+                             , fun_ext     = co_fn
                              , fun_tick    = tick }
 
              export = ABE { abe_ext   = noExtField
@@ -1243,8 +1242,7 @@ tcMonoBinds :: RecFlag  -- Whether the binding is recursive for typechecking pur
             -> TcM (LHsBinds GhcTcId, [MonoBindInfo])
 tcMonoBinds is_rec sig_fn no_gen
            [ dL->L b_loc (FunBind { fun_id = (dL->L nm_loc name)
-                                  , fun_matches = matches
-                                  , fun_ext = fvs })]
+                                  , fun_matches = matches })]
                              -- Single function binding,
   | NonRecursive <- is_rec   -- ...binder isn't mentioned in RHS
   , Nothing <- sig_fn name   -- ...with no type signature
@@ -1269,8 +1267,8 @@ tcMonoBinds is_rec sig_fn no_gen
         ; mono_id <- newLetBndr no_gen name rhs_ty
         ; return (unitBag $ cL b_loc $
                      FunBind { fun_id = cL nm_loc mono_id,
-                               fun_matches = matches', fun_ext = fvs,
-                               fun_co_fn = co_fn, fun_tick = [] },
+                               fun_matches = matches',
+                               fun_ext = co_fn, fun_tick = [] },
                   [MBI { mbi_poly_name = name
                        , mbi_sig       = Nothing
                        , mbi_mono_id   = mono_id }]) }
@@ -1417,8 +1415,7 @@ tcRhs (TcFunBind info@(MBI { mbi_sig = mb_sig, mbi_mono_id = mono_id })
                                  matches (mkCheckExpType $ idType mono_id)
         ; return ( FunBind { fun_id = cL loc mono_id
                            , fun_matches = matches'
-                           , fun_co_fn = co_fn
-                           , fun_ext = placeHolderNamesTc
+                           , fun_ext = co_fn
                            , fun_tick = [] } ) }
 
 tcRhs (TcPatBind infos pat' grhss pat_ty)
