@@ -12,6 +12,8 @@
                                       -- in module GHC.Hs.PlaceHolder
 {-# LANGUAGE ConstraintKinds #-}
 {-# LANGUAGE TypeFamilies #-}
+{-# LANGUAGE TypeApplications #-}
+{-# LANGUAGE ScopedTypeVariables #-}
 
 -- | Abstract syntax of global declarations.
 --
@@ -2005,7 +2007,10 @@ instance OutputableBndrId p
     ppr StockStrategy    = text "stock"
     ppr AnyclassStrategy = text "anyclass"
     ppr NewtypeStrategy  = text "newtype"
-    ppr (ViaStrategy ty) = text "via" <+> ppr ty
+    ppr (ViaStrategy ty) = text "via" <+> case pass @p of
+                                            GhcPs -> ppr ty
+                                            GhcRn -> ppr ty
+                                            GhcTc -> ppr ty
 
 -- | A short description of a @DerivStrategy'@.
 derivStrategyName :: DerivStrategy a -> SDoc

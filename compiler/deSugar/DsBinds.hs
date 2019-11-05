@@ -145,7 +145,7 @@ dsHsBind dflags (VarBind { var_id = var
 
 dsHsBind dflags b@(FunBind { fun_id = L _ fun
                            , fun_matches = matches
-                           , fun_co_fn = co_fn
+                           , fun_ext = co_fn
                            , fun_tick = tick })
  = do   { (args, body) <- matchWrapper
                            (mkPrefixFunRhs (noLoc $ idName fun))

@@ -201,7 +201,7 @@ rnExpr (OpApp _ e1 op e2)
 
 rnExpr (NegApp _ e _)
   = do { (e', fv_e)         <- rnLExpr e
-       ; (neg_name, fv_neg) <- lookupSyntaxName negateName
+       ; (neg_name, fv_neg) <- lookupSyntax negateName
        ; final_e            <- mkNegAppRn e' neg_name
        ; return (final_e, fv_e `plusFV` fv_neg) }
 
@@ -272,7 +272,7 @@ rnExpr (ExplicitList x _  exps)
         ; (exps', fvs) <- rnExprs exps
         ; if opt_OverloadedLists
            then do {
-            ; (from_list_n_name, fvs') <- lookupSyntaxName fromListNName
+            ; (from_list_n_name, fvs') <- lookupSyntax fromListNName
             ; return (ExplicitList x (Just from_list_n_name) exps'
                      , fvs `plusFV` fvs') }
            else
@@ -321,12 +321,12 @@ rnExpr (ExprWithTySig _ expr pty)
                              rnLExpr expr
         ; return (ExprWithTySig noExtField expr' pty', fvExpr `plusFV` fvTy) }
 
-rnExpr (HsIf x _ p b1 b2)
+rnExpr (HsIf might_use_rebindable_syntax _ p b1 b2)
   = do { (p', fvP) <- rnLExpr p
        ; (b1', fvB1) <- rnLExpr b1
        ; (b2', fvB2) <- rnLExpr b2
-       ; (mb_ite, fvITE) <- lookupIfThenElse
-       ; return (HsIf x mb_ite p' b1' b2', plusFVs [fvITE, fvP, fvB1, fvB2]) }
+       ; (mb_ite, fvITE) <- lookupIfThenElse might_use_rebindable_syntax
+       ; return (HsIf noExtField mb_ite p' b1' b2', plusFVs [fvITE, fvP, fvB1, fvB2]) }
 
 rnExpr (HsMultiIf x alts)
   = do { (alts', fvs) <- mapFvRn (rnGRHS IfAlt rnLExpr) alts
@@ -338,7 +338,7 @@ rnExpr (ArithSeq x _ seq)
        ; (new_seq, fvs) <- rnArithSeq seq
        ; if opt_OverloadedLists
            then do {
-            ; (from_list_name, fvs') <- lookupSyntaxName fromListName
+            ; (from_list_name, fvs') <- lookupSyntax fromListName
             ; return (ArithSeq x (Just from_list_name) new_seq
                      , fvs `plusFV` fvs') }
            else
@@ -500,7 +500,7 @@ rnCmd (HsCmdIf x _ p b1 b2)
   = do { (p', fvP) <- rnLExpr p
        ; (b1', fvB1) <- rnLCmd b1
        ; (b2', fvB2) <- rnLCmd b2
-       ; (mb_ite, fvITE) <- lookupIfThenElse
+       ; (mb_ite, fvITE) <- lookupIfThenElse True
        ; return (HsCmdIf x mb_ite p' b1' b2', plusFVs [fvITE, fvP, fvB1, fvB2])}
 
 rnCmd (HsCmdLet x (L l binds) cmd)
@@ -513,7 +513,6 @@ rnCmd (HsCmdDo x (L l stmts))
             rnStmts ArrowExpr rnLCmd stmts (\ _ -> return ((), emptyFVs))
         ; return ( HsCmdDo x (L l stmts'), fvs ) }
 
-rnCmd cmd@(HsCmdWrap {}) = pprPanic "rnCmd" (ppr cmd)
 rnCmd     (XCmd nec)     = noExtCon nec
 
 ---------------------------------------------------
@@ -531,7 +530,6 @@ methodNamesCmd (HsCmdArrApp _ _arrow _arg HsFirstOrderApp _rtl)
 methodNamesCmd (HsCmdArrApp _ _arrow _arg HsHigherOrderApp _rtl)
   = unitFV appAName
 methodNamesCmd (HsCmdArrForm {}) = emptyFVs
-methodNamesCmd (HsCmdWrap _ _ cmd) = methodNamesCmd cmd
 
 methodNamesCmd (HsCmdPar _ c) = methodNamesLCmd c
 
@@ -963,10 +961,10 @@ rnParallelStmts ctxt return_op segs thing_inside
                     <+> quotes (ppr (NE.head vs)))
 
 lookupStmtName :: HsStmtContext Name -> Name -> RnM (SyntaxExpr GhcRn, FreeVars)
--- Like lookupSyntaxName, but respects contexts
+-- Like lookupSyntax, but respects contexts
 lookupStmtName ctxt n
   | rebindableContext ctxt
-  = lookupSyntaxName n
+  = lookupSyntax n
   | otherwise
   = return (mkRnSyntaxExpr n, emptyFVs)
 
@@ -1155,19 +1153,19 @@ rn_rec_stmt :: (Outputable (body GhcPs)) =>
         -- Turns each stmt into a singleton Stmt
 rn_rec_stmt rnBody _ (L loc (LastStmt _ body noret _), _)
   = do  { (body', fv_expr) <- rnBody body
-        ; (ret_op, fvs1)   <- lookupSyntaxName returnMName
+        ; (ret_op, fvs1)   <- lookupSyntax returnMName
         ; return [(emptyNameSet, fv_expr `plusFV` fvs1, emptyNameSet,
                    L loc (LastStmt noExtField body' noret ret_op))] }
 
 rn_rec_stmt rnBody _ (L loc (BodyStmt _ body _ _), _)
   = do { (body', fvs) <- rnBody body
-       ; (then_op, fvs1) <- lookupSyntaxName thenMName
+       ; (then_op, fvs1) <- lookupSyntax thenMName
        ; return [(emptyNameSet, fvs `plusFV` fvs1, emptyNameSet,
                  L loc (BodyStmt noExtField body' then_op noSyntaxExpr))] }
 
 rn_rec_stmt rnBody _ (L loc (BindStmt _ pat' body _ _), fv_pat)
   = do { (body', fv_expr) <- rnBody body
-       ; (bind_op, fvs1) <- lookupSyntaxName bindMName
+       ; (bind_op, fvs1) <- lookupSyntax bindMName
 
        ; (fail_op, fvs2) <- getMonadFailOp
 
@@ -1544,8 +1542,8 @@ rearrangeForApplicativeDo ctxt stmts0 = do
   let stmt_tree | optimal_ado = mkStmtTreeOptimal stmts
                 | otherwise = mkStmtTreeHeuristic stmts
   traceRn "rearrangeForADo" (ppr stmt_tree)
-  return_name <- lookupSyntaxName' returnMName
-  pure_name   <- lookupSyntaxName' pureAName
+  (return_name, _) <- lookupSyntaxName returnMName
+  (pure_name, _)   <- lookupSyntaxName pureAName
   let monad_names = MonadNames { return_name = return_name
                                , pure_name   = pure_name }
   stmtTreeToStmts monad_names ctxt stmt_tree [last] last_fvs
@@ -1743,8 +1741,8 @@ stmtTreeToStmts monad_names ctxt (StmtTreeApplicative trees) tail tail_fvs = do
         if | L _ ApplicativeStmt{} <- last stmts' ->
              return (unLoc tup, emptyNameSet)
            | otherwise -> do
-             ret <- lookupSyntaxName' returnMName
-             let expr = HsApp noExtField (noLoc (HsVar noExtField (noLoc ret))) tup
+             (ret, _) <- lookupSyntaxExpr returnMName
+             let expr = HsApp noExtField (noLoc ret) tup
              return (expr, emptyFVs)
      return ( ApplicativeArgMany
               { xarg_app_arg_many = noExtField
@@ -2193,18 +2191,17 @@ getMonadFailOp
   where
     reallyGetMonadFailOp rebindableSyntax overloadedStrings
       | rebindableSyntax && overloadedStrings = do
-        (failExpr, failFvs) <- lookupSyntaxName failMName
-        (fromStringExpr, fromStringFvs) <- lookupSyntaxName fromStringName
+        (failExpr, failFvs) <- lookupSyntaxExpr failMName
+        (fromStringExpr, fromStringFvs) <- lookupSyntaxExpr fromStringName
         let arg_lit = fsLit "arg"
             arg_name = mkSystemVarName (mkVarOccUnique arg_lit) arg_lit
-            arg_syn_expr = mkRnSyntaxExpr arg_name
+            arg_syn_expr = nlHsVar arg_name
         let body :: LHsExpr GhcRn =
-              nlHsApp (noLoc $ syn_expr failExpr)
-                      (nlHsApp (noLoc $ syn_expr fromStringExpr)
-                                (noLoc $ syn_expr arg_syn_expr))
+              nlHsApp (noLoc failExpr)
+                      (nlHsApp (noLoc $ fromStringExpr) arg_syn_expr)
         let failAfterFromStringExpr :: HsExpr GhcRn =
               unLoc $ mkHsLam [noLoc $ VarPat noExtField $ noLoc arg_name] body
         let failAfterFromStringSynExpr :: SyntaxExpr GhcRn =
               mkSyntaxExpr failAfterFromStringExpr
         return (failAfterFromStringSynExpr, failFvs `plusFV` fromStringFvs)
-      | otherwise = lookupSyntaxName failMName
+      | otherwise = lookupSyntax failMName

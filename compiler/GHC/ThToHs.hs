@@ -921,7 +921,7 @@ cvtl e = wrapL (cvt e)
                                        ; return $ ExplicitSum noExtField
                                                                    alt arity e'}
     cvt (CondE x y z)  = do { x' <- cvtl x; y' <- cvtl y; z' <- cvtl z;
-                            ; return $ HsIf noExtField (Just noSyntaxExpr) x' y' z' }
+                            ; return $ mkHsIf x' y' z' }
     cvt (MultiIfE alts)
       | null alts      = failWith (text "Multi-way if-expression with no alternatives")
       | otherwise      = do { alts' <- mapM cvtpair alts

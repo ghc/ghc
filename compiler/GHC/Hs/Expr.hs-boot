@@ -21,13 +21,12 @@ type role HsCmd nominal
 type role MatchGroup nominal nominal
 type role GRHSs nominal nominal
 type role HsSplice nominal
-type role SyntaxExpr nominal
 data HsExpr (i :: *)
 data HsCmd  (i :: *)
 data HsSplice (i :: *)
 data MatchGroup (a :: *) (body :: *)
 data GRHSs (a :: *) (body :: *)
-data SyntaxExpr (i :: *)
+type family SyntaxExpr (i :: *)
 
 instance OutputableBndrId p => Outputable (HsExpr (GhcPass p))
 instance OutputableBndrId p => Outputable (HsCmd (GhcPass p))

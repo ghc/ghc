@@ -1011,7 +1011,7 @@ viewLExprEq (e1,_) (e2,_) = lexp e1 e2
     exp e (HsPar _ (L _ e'))   = exp e e'
     -- because the expressions do not necessarily have the same type,
     -- we have to compare the wrappers
-    exp (HsWrap _ h e) (HsWrap _ h' e') = wrap h h' && exp e e'
+    exp (XExpr (HsWrap h e)) (XExpr (HsWrap  h' e')) = wrap h h' && exp e e'
     exp (HsVar _ i) (HsVar _ i') =  i == i'
     exp (HsConLikeOut _ c) (HsConLikeOut _ c') = c == c'
     -- the instance for IPName derives using the id, so this works if the
@@ -1050,15 +1050,17 @@ viewLExprEq (e1,_) (e2,_) = lexp e1 e2
 
     ---------
     syn_exp :: SyntaxExpr GhcTc -> SyntaxExpr GhcTc -> Bool
-    syn_exp (SyntaxExpr { syn_expr      = expr1
-                        , syn_arg_wraps = arg_wraps1
-                        , syn_res_wrap  = res_wrap1 })
-            (SyntaxExpr { syn_expr      = expr2
-                        , syn_arg_wraps = arg_wraps2
-                        , syn_res_wrap  = res_wrap2 })
+    syn_exp (SyntaxExprTc { syn_expr      = expr1
+                          , syn_arg_wraps = arg_wraps1
+                          , syn_res_wrap  = res_wrap1 })
+            (SyntaxExprTc { syn_expr      = expr2
+                          , syn_arg_wraps = arg_wraps2
+                          , syn_res_wrap  = res_wrap2 })
       = exp expr1 expr2 &&
         and (zipWithEqual "viewLExprEq" wrap arg_wraps1 arg_wraps2) &&
         wrap res_wrap1 res_wrap2
+    syn_exp NoSyntaxExprTc NoSyntaxExprTc = True
+    syn_exp _              _              = False
 
     ---------
     tup_arg (L _ (Present _ e1)) (L _ (Present _ e2)) = lexp e1 e2

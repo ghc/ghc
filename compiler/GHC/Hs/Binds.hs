@@ -17,6 +17,8 @@ Datatype for: @BindGroup@, @Bind@, @Sig@, @Bind@.
 {-# LANGUAGE ConstraintKinds #-}
 {-# LANGUAGE BangPatterns #-}
 {-# LANGUAGE TypeFamilies #-}
+{-# LANGUAGE ScopedTypeVariables #-}
+{-# LANGUAGE TypeApplications #-}
 
 module GHC.Hs.Binds where
 
@@ -219,28 +221,28 @@ data HsBindLR idL idR
     -- For details on above see note [Api annotations] in ApiAnnotation
     FunBind {
 
-        fun_ext :: XFunBind idL idR, -- ^ After the renamer, this contains
-                                --  the locally-bound
-                                -- free variables of this defn.
-                                -- See Note [Bind free vars]
+        fun_ext :: XFunBind idL idR,
+
+          -- ^ After the renamer (but before the type-checker), this contains the
+          -- locally-bound free variables of this defn. See Note [Bind free vars]
+          --
+          -- After the type-checker, this contains a coercion from the type of
+          -- the MatchGroup to the type of the Id. Example:
+          --
+          -- @
+          --      f :: Int -> forall a. a -> a
+          --      f x y = y
+          -- @
+          --
+          -- Then the MatchGroup will have type (Int -> a' -> a')
+          -- (with a free type variable a').  The coercion will take
+          -- a CoreExpr of this type and convert it to a CoreExpr of
+          -- type         Int -> forall a'. a' -> a'
+          -- Notice that the coercion captures the free a'.
 
         fun_id :: Located (IdP idL), -- Note [fun_id in Match] in GHC.Hs.Expr
 
         fun_matches :: MatchGroup idR (LHsExpr idR),  -- ^ The payload
-
-        fun_co_fn :: HsWrapper, -- ^ Coercion from the type of the MatchGroup to the type of
-                                -- the Id.  Example:
-                                --
-                                -- @
-                                --      f :: Int -> forall a. a -> a
-                                --      f x y = y
-                                -- @
-                                --
-                                -- Then the MatchGroup will have type (Int -> a' -> a')
-                                -- (with a free type variable a').  The coercion will take
-                                -- a CoreExpr of this type and convert it to a CoreExpr of
-                                -- type         Int -> forall a'. a' -> a'
-                                -- Notice that the coercion captures the free a'.
 
         fun_tick :: [Tickish Id] -- ^ Ticks to put on the rhs, if any
     }
@@ -320,8 +322,8 @@ data NPatBindTc = NPatBindTc {
      } deriving Data
 
 type instance XFunBind    (GhcPass pL) GhcPs = NoExtField
-type instance XFunBind    (GhcPass pL) GhcRn = NameSet -- Free variables
-type instance XFunBind    (GhcPass pL) GhcTc = NameSet -- Free variables
+type instance XFunBind    (GhcPass pL) GhcRn = NameSet    -- Free variables
+type instance XFunBind    (GhcPass pL) GhcTc = HsWrapper  -- See comments on FunBind.fun_ext
 
 type instance XPatBind    GhcPs (GhcPass pR) = NoExtField
 type instance XPatBind    GhcRn (GhcPass pR) = NameSet -- Free variables
@@ -682,19 +684,6 @@ pprDeclList ds = pprDeeperList vcat ds
 emptyLocalBinds :: HsLocalBindsLR (GhcPass a) (GhcPass b)
 emptyLocalBinds = EmptyLocalBinds noExtField
 
--- AZ:These functions do not seem to be used at all?
-isEmptyLocalBindsTc :: HsLocalBindsLR (GhcPass a) GhcTc -> Bool
-isEmptyLocalBindsTc (HsValBinds _ ds)   = isEmptyValBinds ds
-isEmptyLocalBindsTc (HsIPBinds _ ds)    = isEmptyIPBindsTc ds
-isEmptyLocalBindsTc (EmptyLocalBinds _) = True
-isEmptyLocalBindsTc (XHsLocalBindsLR _) = True
-
-isEmptyLocalBindsPR :: HsLocalBindsLR (GhcPass a) (GhcPass b) -> Bool
-isEmptyLocalBindsPR (HsValBinds _ ds)   = isEmptyValBinds ds
-isEmptyLocalBindsPR (HsIPBinds _ ds)    = isEmptyIPBindsPR ds
-isEmptyLocalBindsPR (EmptyLocalBinds _) = True
-isEmptyLocalBindsPR (XHsLocalBindsLR _) = True
-
 eqEmptyLocalBinds :: HsLocalBindsLR a b -> Bool
 eqEmptyLocalBinds (EmptyLocalBinds _) = True
 eqEmptyLocalBinds _                   = False
@@ -728,7 +717,8 @@ instance (OutputableBndrId pl, OutputableBndrId pr)
          => Outputable (HsBindLR (GhcPass pl) (GhcPass pr)) where
     ppr mbind = ppr_monobind mbind
 
-ppr_monobind :: (OutputableBndrId idL, OutputableBndrId idR)
+ppr_monobind :: forall idL idR.
+                (OutputableBndrId idL, OutputableBndrId idR)
              => HsBindLR (GhcPass idL) (GhcPass idR) -> SDoc
 
 ppr_monobind (PatBind { pat_lhs = pat, pat_rhs = grhss })
@@ -736,14 +726,15 @@ ppr_monobind (PatBind { pat_lhs = pat, pat_rhs = grhss })
 ppr_monobind (VarBind { var_id = var, var_rhs = rhs })
   = sep [pprBndr CasePatBind var, nest 2 $ equals <+> pprExpr (unLoc rhs)]
 ppr_monobind (FunBind { fun_id = fun,
-                        fun_co_fn = wrap,
                         fun_matches = matches,
-                        fun_tick = ticks })
+                        fun_tick = ticks,
+                        fun_ext = wrap })
   = pprTicks empty (if null ticks then empty
                     else text "-- ticks = " <> ppr ticks)
     $$  whenPprDebug (pprBndr LetBind (unLoc fun))
     $$  pprFunBind  matches
-    $$  whenPprDebug (ppr wrap)
+    $$  whenPprDebug (pprIfTc @idR $ ppr wrap)
+
 ppr_monobind (PatSynBind _ psb) = ppr psb
 ppr_monobind (AbsBinds { abs_tvs = tyvars, abs_ev_vars = dictvars
                        , abs_exports = exports, abs_binds = val_binds
@@ -759,7 +750,7 @@ ppr_monobind (AbsBinds { abs_tvs = tyvars, abs_ev_vars = dictvars
       , text "Exported types:" <+>
           vcat [pprBndr LetBind (abe_poly ex) | ex <- exports]
       , text "Binds:" <+> pprLHsBinds val_binds
-      , text "Evidence:" <+> ppr ev_binds ]
+      , pprIfTc @idR (text "Evidence:" <+> ppr ev_binds) ]
     else
       pprLHsBinds val_binds
 ppr_monobind (XHsBindsLR x) = ppr x
@@ -768,7 +759,7 @@ instance OutputableBndrId p => Outputable (ABExport (GhcPass p)) where
   ppr (ABE { abe_wrap = wrap, abe_poly = gbl, abe_mono = lcl, abe_prags = prags })
     = vcat [ ppr gbl <+> text "<=" <+> ppr lcl
            , nest 2 (pprTcSpecPrags prags)
-           , nest 2 (text "wrap:" <+> ppr wrap)]
+           , pprIfTc @p $ nest 2 (text "wrap:" <+> ppr wrap) ]
   ppr (XABExport x) = ppr x
 
 instance (OutputableBndrId l, OutputableBndrId r,
@@ -867,7 +858,7 @@ type instance XXIPBind    (GhcPass p) = NoExtCon
 instance OutputableBndrId p
        => Outputable (HsIPBinds (GhcPass p)) where
   ppr (IPBinds ds bs) = pprDeeperList vcat (map ppr bs)
-                        $$ whenPprDebug (ppr ds)
+                        $$ whenPprDebug (pprIfTc @p $ ppr ds)
   ppr (XHsIPBinds x) = ppr x
 
 instance OutputableBndrId p => Outputable (IPBind (GhcPass p)) where
