@@ -1162,7 +1162,7 @@ checkDupMinimalSigs sigs
 ************************************************************************
 -}
 
-rnMatchGroup :: Outputable (body GhcPs) => HsMatchContext Name
+rnMatchGroup :: Outputable (body GhcPs) => HsMatchContext GhcRn
              -> (Located (body GhcPs) -> RnM (Located (body GhcRn), FreeVars))
              -> MatchGroup GhcPs (Located (body GhcPs))
              -> RnM (MatchGroup GhcRn (Located (body GhcRn)), FreeVars)
@@ -1173,13 +1173,13 @@ rnMatchGroup ctxt rnBody (MG { mg_alts = L _ ms, mg_origin = origin })
        ; return (mkMatchGroup origin new_ms, ms_fvs) }
 rnMatchGroup _ _ (XMatchGroup nec) = noExtCon nec
 
-rnMatch :: Outputable (body GhcPs) => HsMatchContext Name
+rnMatch :: Outputable (body GhcPs) => HsMatchContext GhcRn
         -> (Located (body GhcPs) -> RnM (Located (body GhcRn), FreeVars))
         -> LMatch GhcPs (Located (body GhcPs))
         -> RnM (LMatch GhcRn (Located (body GhcRn)), FreeVars)
 rnMatch ctxt rnBody = wrapLocFstM (rnMatch' ctxt rnBody)
 
-rnMatch' :: Outputable (body GhcPs) => HsMatchContext Name
+rnMatch' :: Outputable (body GhcPs) => HsMatchContext GhcRn
          -> (Located (body GhcPs) -> RnM (Located (body GhcRn), FreeVars))
          -> Match GhcPs (Located (body GhcPs))
          -> RnM (Match GhcRn (Located (body GhcRn)), FreeVars)
@@ -1195,7 +1195,7 @@ rnMatch' ctxt rnBody (Match { m_ctxt = mf, m_pats = pats, m_grhss = grhss })
                         , m_grhss = grhss'}, grhss_fvs ) }}
 rnMatch' _ _ (XMatch nec) = noExtCon nec
 
-emptyCaseErr :: HsMatchContext Name -> SDoc
+emptyCaseErr :: HsMatchContext GhcRn -> SDoc
 emptyCaseErr ctxt = hang (text "Empty list of alternatives in" <+> pp_ctxt)
                        2 (text "Use EmptyCase to allow this")
   where
@@ -1212,7 +1212,7 @@ emptyCaseErr ctxt = hang (text "Empty list of alternatives in" <+> pp_ctxt)
 ************************************************************************
 -}
 
-rnGRHSs :: HsMatchContext Name
+rnGRHSs :: HsMatchContext GhcRn
         -> (Located (body GhcPs) -> RnM (Located (body GhcRn), FreeVars))
         -> GRHSs GhcPs (Located (body GhcPs))
         -> RnM (GRHSs GhcRn (Located (body GhcRn)), FreeVars)
@@ -1222,13 +1222,13 @@ rnGRHSs ctxt rnBody (GRHSs _ grhss (L l binds))
     return (GRHSs noExtField grhss' (L l binds'), fvGRHSs)
 rnGRHSs _ _ (XGRHSs nec) = noExtCon nec
 
-rnGRHS :: HsMatchContext Name
+rnGRHS :: HsMatchContext GhcRn
        -> (Located (body GhcPs) -> RnM (Located (body GhcRn), FreeVars))
        -> LGRHS GhcPs (Located (body GhcPs))
        -> RnM (LGRHS GhcRn (Located (body GhcRn)), FreeVars)
 rnGRHS ctxt rnBody = wrapLocFstM (rnGRHS' ctxt rnBody)
 
-rnGRHS' :: HsMatchContext Name
+rnGRHS' :: HsMatchContext GhcRn
         -> (Located (body GhcPs) -> RnM (Located (body GhcRn), FreeVars))
         -> GRHS GhcPs (Located (body GhcPs))
         -> RnM (GRHS GhcRn (Located (body GhcRn)), FreeVars)

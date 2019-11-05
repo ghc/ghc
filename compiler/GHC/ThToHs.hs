@@ -853,7 +853,7 @@ cvtLocalDecs doc ds
       ((_:_), (_:_)) ->
         failWith (text "Implicit parameters mixed with other bindings")
 
-cvtClause :: HsMatchContext RdrName
+cvtClause :: HsMatchContext GhcPs
           -> TH.Clause -> CvtM (Hs.LMatch GhcPs (LHsExpr GhcPs))
 cvtClause ctxt (Clause ps body wheres)
   = do  { ps' <- cvtPats ps
@@ -924,7 +924,7 @@ cvtl e = wrapL (cvt e)
                                        ; return $ ExplicitSum noExtField
                                                                    alt arity e'}
     cvt (CondE x y z)  = do { x' <- cvtl x; y' <- cvtl y; z' <- cvtl z;
-                            ; return $ HsIf noExtField (Just noSyntaxExpr) x' y' z' }
+                            ; return $ mkHsIf x' y' z' }
     cvt (MultiIfE alts)
       | null alts      = failWith (text "Multi-way if-expression with no alternatives")
       | otherwise      = do { alts' <- mapM cvtpair alts
@@ -1126,7 +1126,7 @@ cvtOpApp x op y
 --      Do notation and statements
 -------------------------------------
 
-cvtHsDo :: HsStmtContext Name.Name -> [TH.Stmt] -> CvtM (HsExpr GhcPs)
+cvtHsDo :: HsStmtContext GhcRn -> [TH.Stmt] -> CvtM (HsExpr GhcPs)
 cvtHsDo do_or_lc stmts
   | null stmts = failWith (text "Empty stmt list in do-block")
   | otherwise
@@ -1159,7 +1159,7 @@ cvtStmt (TH.ParS dss)  = do { dss' <- mapM cvt_one dss
                     ; return (ParStmtBlock noExtField ds' undefined noSyntaxExpr) }
 cvtStmt (TH.RecS ss) = do { ss' <- mapM cvtStmt ss; returnL (mkRecStmt ss') }
 
-cvtMatch :: HsMatchContext RdrName
+cvtMatch :: HsMatchContext GhcPs
          -> TH.Match -> CvtM (Hs.LMatch GhcPs (LHsExpr GhcPs))
 cvtMatch ctxt (TH.Match p body decs)
   = do  { p' <- cvtPat p

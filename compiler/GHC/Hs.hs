@@ -12,8 +12,8 @@ therefore, is almost nothing but re-exporting.
 {-# LANGUAGE DeriveDataTypeable #-}
 {-# LANGUAGE StandaloneDeriving #-}
 {-# LANGUAGE FlexibleContexts #-}
-{-# LANGUAGE UndecidableInstances #-} -- Note [Pass sensitive types]
-                                      -- in module GHC.Hs.PlaceHolder
+{-# LANGUAGE UndecidableInstances #-} -- Wrinkle in Note [Trees That Grow]
+                                      -- in module GHC.Hs.Extension
 {-# LANGUAGE ConstraintKinds #-}
 {-# LANGUAGE TypeFamilies #-}
 {-# LANGUAGE FlexibleInstances #-} -- For deriving instance Data
@@ -28,7 +28,6 @@ module GHC.Hs (
         module GHC.Hs.Types,
         module GHC.Hs.Utils,
         module GHC.Hs.Doc,
-        module GHC.Hs.PlaceHolder,
         module GHC.Hs.Extension,
         Fixity,
 
@@ -43,7 +42,6 @@ import GHC.Hs.Binds
 import GHC.Hs.Expr
 import GHC.Hs.ImpExp
 import GHC.Hs.Lit
-import GHC.Hs.PlaceHolder
 import GHC.Hs.Extension
 import GHC.Hs.Pat
 import GHC.Hs.Types

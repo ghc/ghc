@@ -280,7 +280,7 @@ checkSingle dflags ctxt@(DsMatchContext kind locn) var p = do
 
 -- | Exhaustive for guard matches, is used for guards in pattern bindings and
 -- in @MultiIf@ expressions.
-checkGuardMatches :: HsMatchContext Name          -- Match context
+checkGuardMatches :: HsMatchContext GhcRn         -- Match context
                   -> GRHSs GhcTc (LHsExpr GhcTc)  -- Guarded RHSs
                   -> DsM ()
 checkGuardMatches hs_ctx guards@(GRHSs _ grhss _) = do

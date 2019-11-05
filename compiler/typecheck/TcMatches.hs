@@ -206,7 +206,7 @@ tcMatches :: (Outputable (body GhcRn)) => TcMatchCtxt body
           -> TcM (MatchGroup GhcTcId (Located (body GhcTcId)))
 
 data TcMatchCtxt body   -- c.f. TcStmtCtxt, also in this module
-  = MC { mc_what :: HsMatchContext Name,  -- What kind of thing this is
+  = MC { mc_what :: HsMatchContext GhcRn,  -- What kind of thing this is
          mc_body :: Located (body GhcRn)         -- Type checker for a body of
                                                 -- an alternative
                  -> ExpRhoType
@@ -291,7 +291,7 @@ tcGRHS _ _ (XGRHS nec) = noExtCon nec
 ************************************************************************
 -}
 
-tcDoStmts :: HsStmtContext Name
+tcDoStmts :: HsStmtContext GhcRn
           -> Located [LStmt GhcRn (LHsExpr GhcRn)]
           -> ExpRhoType
           -> TcM (HsExpr GhcTcId)          -- Returns a HsDo
@@ -338,13 +338,13 @@ type TcExprStmtChecker = TcStmtChecker HsExpr ExpRhoType
 type TcCmdStmtChecker  = TcStmtChecker HsCmd  TcRhoType
 
 type TcStmtChecker body rho_type
-  =  forall thing. HsStmtContext Name
+  =  forall thing. HsStmtContext GhcRn
                 -> Stmt GhcRn (Located (body GhcRn))
                 -> rho_type                 -- Result type for comprehension
                 -> (rho_type -> TcM thing)  -- Checker for what follows the stmt
                 -> TcM (Stmt GhcTcId (Located (body GhcTcId)), thing)
 
-tcStmts :: (Outputable (body GhcRn)) => HsStmtContext Name
+tcStmts :: (Outputable (body GhcRn)) => HsStmtContext GhcRn
         -> TcStmtChecker body rho_type   -- NB: higher-rank type
         -> [LStmt GhcRn (Located (body GhcRn))]
         -> rho_type
@@ -354,7 +354,7 @@ tcStmts ctxt stmt_chk stmts res_ty
                         const (return ())
        ; return stmts' }
 
-tcStmtsAndThen :: (Outputable (body GhcRn)) => HsStmtContext Name
+tcStmtsAndThen :: (Outputable (body GhcRn)) => HsStmtContext GhcRn
                -> TcStmtChecker body rho_type    -- NB: higher-rank type
                -> [LStmt GhcRn (Located (body GhcRn))]
                -> rho_type
@@ -972,7 +972,7 @@ join :: tn -> res_ty
 -}
 
 tcApplicativeStmts
-  :: HsStmtContext Name
+  :: HsStmtContext GhcRn
   -> [(SyntaxExpr GhcRn, ApplicativeArg GhcRn)]
   -> ExpRhoType                         -- rhs_ty
   -> (TcRhoType -> TcM t)               -- thing_inside
