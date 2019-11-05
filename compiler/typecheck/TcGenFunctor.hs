@@ -224,7 +224,7 @@ gen_Functor_binds loc tycon
                  , ft_co_var = panic "contravariant in ft_replace" }
 
     -- Con a1 a2 ... -> Con (f1 a1) (f2 a2) ...
-    match_for_con :: HsMatchContext RdrName
+    match_for_con :: HsMatchContext GhcPs
                   -> [LPat GhcPs] -> DataCon -> [LHsExpr GhcPs]
                   -> State [RdrName] (LMatch GhcPs (LHsExpr GhcPs))
     match_for_con ctxt = mkSimpleConMatch ctxt $
@@ -463,7 +463,7 @@ mkSimpleLam2 lam =
 -- constructor @con@ and its arguments. The RHS folds (with @fold@) over @con@
 -- and its arguments, applying an expression (from @insides@) to each of the
 -- respective arguments of @con@.
-mkSimpleConMatch :: Monad m => HsMatchContext RdrName
+mkSimpleConMatch :: Monad m => HsMatchContext GhcPs
                  -> (RdrName -> [LHsExpr GhcPs] -> m (LHsExpr GhcPs))
                  -> [LPat GhcPs]
                  -> DataCon
@@ -499,7 +499,7 @@ mkSimpleConMatch ctxt fold extra_pats con insides = do
 --
 -- See Note [Generated code for DeriveFoldable and DeriveTraversable]
 mkSimpleConMatch2 :: Monad m
-                  => HsMatchContext RdrName
+                  => HsMatchContext GhcPs
                   -> (LHsExpr GhcPs -> [LHsExpr GhcPs]
                                       -> m (LHsExpr GhcPs))
                   -> [LPat GhcPs]

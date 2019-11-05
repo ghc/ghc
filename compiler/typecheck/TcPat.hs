@@ -82,7 +82,7 @@ tcLetPat sig_fn no_gen pat pat_ty thing_inside
        ; tc_lpat pat pat_ty penv thing_inside }
 
 -----------------
-tcPats :: HsMatchContext Name
+tcPats :: HsMatchContext GhcRn
        -> [LPat GhcRn]            -- Patterns,
        -> [ExpSigmaType]         --   and their types
        -> TcM a                  --   and the checker for the body
@@ -104,14 +104,14 @@ tcPats ctxt pats pat_tys thing_inside
   where
     penv = PE { pe_lazy = False, pe_ctxt = LamPat ctxt, pe_orig = PatOrigin }
 
-tcPat :: HsMatchContext Name
+tcPat :: HsMatchContext GhcRn
       -> LPat GhcRn -> ExpSigmaType
       -> TcM a                     -- Checker for body
       -> TcM (LPat GhcTcId, a)
 tcPat ctxt = tcPat_O ctxt PatOrigin
 
 -- | A variant of 'tcPat' that takes a custom origin
-tcPat_O :: HsMatchContext Name
+tcPat_O :: HsMatchContext GhcRn
         -> CtOrigin              -- ^ origin to use if the type needs inst'ing
         -> LPat GhcRn -> ExpSigmaType
         -> TcM a                 -- Checker for body
@@ -138,7 +138,7 @@ data PatEnv
 
 data PatCtxt
   = LamPat   -- Used for lambdas, case etc
-       (HsMatchContext Name)
+       (HsMatchContext GhcRn)
 
   | LetPat   -- Used only for let(rec) pattern bindings
              -- See Note [Typing patterns in pattern bindings]

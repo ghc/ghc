@@ -56,7 +56,7 @@ module   RdrHsSyn (
         checkContext,         -- HsType -> P HsContext
         checkPattern,         -- HsExp -> P HsPat
         checkPattern_msg,
-        checkMonadComp,       -- P (HsStmtContext RdrName)
+        checkMonadComp,       -- P (HsStmtContext GhcPs)
         checkValDef,          -- (SrcLoc, HsExp, HsRhs, [HsDecl]) -> P HsDecl
         checkValSigLhs,
         LRuleTyTmVar, RuleTyTmVar(..),
@@ -111,7 +111,6 @@ import CoAxiom          ( Role, fsFromRole )
 import RdrName
 import Name
 import BasicTypes
-import TcEvidence       ( idHsWrapper )
 import Lexer
 import Lexeme           ( isLexCon )
 import Type             ( TyThing(..), funTyCon )
@@ -1194,7 +1193,6 @@ makeFunBind fn ms
   = FunBind { fun_ext = noExtField,
               fun_id = fn,
               fun_matches = mkMatchGroup FromSource ms,
-              fun_co_fn = idHsWrapper,
               fun_tick = [] }
 
 -- See Note [FunBind vs PatBind]
@@ -1675,7 +1673,7 @@ mergeDataCon all_xs =
 -- If the flag MonadComprehensions is set, return a 'MonadComp' context,
 -- otherwise use the usual 'ListComp' context
 
-checkMonadComp :: PV (HsStmtContext Name)
+checkMonadComp :: PV (HsStmtContext GhcRn)
 checkMonadComp = do
     monadComprehensions <- getBit MonadComprehensionsBit
     return $ if monadComprehensions
@@ -2275,7 +2273,7 @@ data Frame
     -- ^ If-expression: if p then x else y
   | FrameCase LFrame [LFrameMatch]
     -- ^ Case-expression: case x of { p1 -> e1; p2 -> e2 }
-  | FrameDo (HsStmtContext Name) [LFrameStmt]
+  | FrameDo (HsStmtContext GhcRn) [LFrameStmt]
     -- ^ Do-expression: do { s1; a <- s2; s3 }
   ...
   | FrameExpr (HsExpr GhcPs)   -- unambiguously an expression

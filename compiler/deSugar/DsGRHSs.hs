@@ -55,7 +55,7 @@ dsGuarded grhss rhs_ty = do
 
 -- In contrast, @dsGRHSs@ produces a @MatchResult@.
 
-dsGRHSs :: HsMatchContext Name
+dsGRHSs :: HsMatchContext GhcRn
         -> GRHSs GhcTc (LHsExpr GhcTc)          -- Guarded RHSs
         -> Type                                 -- Type of RHS
         -> DsM MatchResult
@@ -68,7 +68,7 @@ dsGRHSs hs_ctx (GRHSs _ grhss binds) rhs_ty
        ; return match_result2 }
 dsGRHSs _ (XGRHSs nec) _ = noExtCon nec
 
-dsGRHS :: HsMatchContext Name -> Type -> LGRHS GhcTc (LHsExpr GhcTc)
+dsGRHS :: HsMatchContext GhcRn -> Type -> LGRHS GhcTc (LHsExpr GhcTc)
        -> DsM MatchResult
 dsGRHS hs_ctx rhs_ty (L _ (GRHS _ guards rhs))
   = matchGuards (map unLoc guards) (PatGuard hs_ctx) rhs rhs_ty
@@ -83,7 +83,7 @@ dsGRHS _ _ (L _ (XGRHS nec)) = noExtCon nec
 -}
 
 matchGuards :: [GuardStmt GhcTc]     -- Guard
-            -> HsStmtContext Name    -- Context
+            -> HsStmtContext GhcRn   -- Context
             -> LHsExpr GhcTc         -- RHS
             -> Type                  -- Type of RHS of guard
             -> DsM MatchResult
