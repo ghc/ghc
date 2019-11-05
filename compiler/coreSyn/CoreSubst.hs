@@ -54,6 +54,7 @@ import PrelNames
 import VarSet
 import VarEnv
 import Id
+import FV
 import Name     ( Name )
 import Var
 import IdInfo
@@ -698,11 +699,13 @@ substRule subst subst_ru_fn rule@(Rule { ru_bndrs = bndrs, ru_args = args
 ------------------
 substDVarSet :: Subst -> DVarSet -> DVarSet
 substDVarSet subst fvs
-  = mkDVarSet $ fst $ foldr (subst_fv subst) ([], emptyVarSet) $ dVarSetElems fvs
+  = let FVAccum vars _ = foldr (subst_fv subst) emptyFVAccum $ dVarSetElems fvs
+    in mkDVarSet vars
   where
+  subst_fv :: Subst -> Var -> FVAccum -> FVAccum
   subst_fv subst fv acc
-     | isId fv = expr_fvs (lookupIdSubst (text "substDVarSet") subst fv) isLocalVar emptyVarSet $! acc
-     | otherwise = tyCoFVsOfType (lookupTCvSubst subst fv) (const True) emptyVarSet $! acc
+     | isId fv = (runFV $ exprFVs (lookupIdSubst (text "substDVarSet") subst fv)) isLocalVar emptyVarSet $! acc
+     | otherwise = (runFV $ tyCoFVsOfType (lookupTCvSubst subst fv)) (const True) emptyVarSet $! acc
 
 ------------------
 substTickish :: Subst -> Tickish Id -> Tickish Id
