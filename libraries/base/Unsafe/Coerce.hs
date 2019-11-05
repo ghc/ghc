@@ -16,7 +16,6 @@ module Unsafe.Coerce
 import GHC.Integer () -- See Note [Depend on GHC.Integer] in GHC.Base
 import GHC.Natural () -- See Note [Depend on GHC.Natural] in GHC.Base
 import GHC.Base
-import GHC.Types
 
 {-
 Note [unsafeCoerce magic]
