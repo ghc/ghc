@@ -1,6 +1,8 @@
 #include <stdbool.h>
 #include <stdint.h>
 #include <stdlib.h>
+
+#include "Rts.h"
 #include "elf_plt.h"
 
 #if defined(arm_HOST_ARCH) || defined(aarch64_HOST_ARCH)

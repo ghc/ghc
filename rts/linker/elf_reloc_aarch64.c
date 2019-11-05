@@ -1,5 +1,7 @@
 #include <stdlib.h>
 #include <assert.h>
+
+#include "Rts.h"
 #include "elf_compat.h"
 #include "elf_reloc_aarch64.h"
 #include "util.h"

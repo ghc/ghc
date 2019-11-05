@@ -1,3 +1,4 @@
+#include "Rts.h"
 #include "linker/elf_util.h"
 
 #if defined(OBJFORMAT_ELF)
