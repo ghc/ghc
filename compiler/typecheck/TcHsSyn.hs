@@ -579,13 +579,13 @@ zonk_bind env (VarBind { var_ext = x
 
 zonk_bind env bind@(FunBind { fun_id = L loc var
                             , fun_matches = ms
-                            , fun_co_fn = co_fn })
+                            , fun_ext = co_fn })
   = do { new_var <- zonkIdBndr env var
        ; (env1, new_co_fn) <- zonkCoFn env co_fn
        ; new_ms <- zonkMatchGroup env1 zonkLExpr ms
        ; return (bind { fun_id = L loc new_var
                       , fun_matches = new_ms
-                      , fun_co_fn = new_co_fn }) }
+                      , fun_ext = new_co_fn }) }
 
 zonk_bind env (AbsBinds { abs_tvs = tyvars, abs_ev_vars = evs
                         , abs_ev_binds = ev_binds
@@ -612,7 +612,7 @@ zonk_bind env (AbsBinds { abs_tvs = tyvars, abs_ev_vars = evs
       | has_sig
       , (L loc bind@(FunBind { fun_id      = L mloc mono_id
                              , fun_matches = ms
-                             , fun_co_fn   = co_fn })) <- lbind
+                             , fun_ext     = co_fn })) <- lbind
       = do { new_mono_id <- updateVarTypeM (zonkTcTypeToTypeX env) mono_id
                             -- Specifically /not/ zonkIdBndr; we do not
                             -- want to complain about a levity-polymorphic binder
@@ -621,7 +621,7 @@ zonk_bind env (AbsBinds { abs_tvs = tyvars, abs_ev_vars = evs
            ; return $ L loc $
              bind { fun_id      = L mloc new_mono_id
                   , fun_matches = new_ms
-                  , fun_co_fn   = new_co_fn } }
+                  , fun_ext     = new_co_fn } }
       | otherwise
       = zonk_lbind env lbind   -- The normal case
 
@@ -857,18 +857,12 @@ zonkExpr env (HsCase x expr ms)
        new_ms <- zonkMatchGroup env zonkLExpr ms
        return (HsCase x new_expr new_ms)
 
-zonkExpr env (HsIf x Nothing e1 e2 e3)
-  = do new_e1 <- zonkLExpr env e1
-       new_e2 <- zonkLExpr env e2
-       new_e3 <- zonkLExpr env e3
-       return (HsIf x Nothing new_e1 new_e2 new_e3)
-
-zonkExpr env (HsIf x (Just fun) e1 e2 e3)
+zonkExpr env (HsIf x fun e1 e2 e3)
   = do (env1, new_fun) <- zonkSyntaxExpr env fun
        new_e1 <- zonkLExpr env1 e1
        new_e2 <- zonkLExpr env1 e2
        new_e3 <- zonkLExpr env1 e3
-       return (HsIf x (Just new_fun) new_e1 new_e2 new_e3)
+       return (HsIf x new_fun new_e1 new_e2 new_e3)
 
 zonkExpr env (HsMultiIf ty alts)
   = do { alts' <- mapM (wrapLocM zonk_alt) alts
@@ -946,10 +940,10 @@ zonkExpr env (HsProc x pat body)
 zonkExpr env (HsStatic fvs expr)
   = HsStatic fvs <$> zonkLExpr env expr
 
-zonkExpr env (HsWrap x co_fn expr)
+zonkExpr env (XExpr (HsWrap co_fn expr))
   = do (env1, new_co_fn) <- zonkCoFn env co_fn
        new_expr <- zonkExpr env1 expr
-       return (HsWrap x new_co_fn new_expr)
+       return (XExpr (HsWrap new_co_fn new_expr))
 
 zonkExpr _ e@(HsUnboundVar {})
   = return e
@@ -980,15 +974,16 @@ Now, we can safely just extend one environment.
 -- See Note [Skolems in zonkSyntaxExpr]
 zonkSyntaxExpr :: ZonkEnv -> SyntaxExpr GhcTcId
                -> TcM (ZonkEnv, SyntaxExpr GhcTc)
-zonkSyntaxExpr env (SyntaxExpr { syn_expr      = expr
+zonkSyntaxExpr env (SyntaxExprTc { syn_expr      = expr
                                , syn_arg_wraps = arg_wraps
                                , syn_res_wrap  = res_wrap })
   = do { (env0, res_wrap')  <- zonkCoFn env res_wrap
        ; expr'              <- zonkExpr env0 expr
        ; (env1, arg_wraps') <- mapAccumLM zonkCoFn env0 arg_wraps
-       ; return (env1, SyntaxExpr { syn_expr      = expr'
-                                  , syn_arg_wraps = arg_wraps'
-                                  , syn_res_wrap  = res_wrap' }) }
+       ; return (env1, SyntaxExprTc { syn_expr      = expr'
+                                    , syn_arg_wraps = arg_wraps'
+                                    , syn_res_wrap  = res_wrap' }) }
+zonkSyntaxExpr env NoSyntaxExprTc = return (env, NoSyntaxExprTc)
 
 -------------------------------------------------------------------------
 
@@ -997,10 +992,10 @@ zonkCmd   :: ZonkEnv -> HsCmd GhcTcId    -> TcM (HsCmd GhcTc)
 
 zonkLCmd  env cmd  = wrapLocM (zonkCmd env) cmd
 
-zonkCmd env (HsCmdWrap x w cmd)
+zonkCmd env (XCmd (HsWrap w cmd))
   = do { (env1, w') <- zonkCoFn env w
        ; cmd' <- zonkCmd env1 cmd
-       ; return (HsCmdWrap x w' cmd') }
+       ; return (XCmd (HsWrap w' cmd')) }
 zonkCmd env (HsCmdArrApp ty e1 e2 ho rl)
   = do new_e1 <- zonkLExpr env e1
        new_e2 <- zonkLExpr env e2
@@ -1031,14 +1026,11 @@ zonkCmd env (HsCmdCase x expr ms)
        return (HsCmdCase x new_expr new_ms)
 
 zonkCmd env (HsCmdIf x eCond ePred cThen cElse)
-  = do { (env1, new_eCond) <- zonkWit env eCond
+  = do { (env1, new_eCond) <- zonkSyntaxExpr env eCond
        ; new_ePred <- zonkLExpr env1 ePred
        ; new_cThen <- zonkLCmd env1 cThen
        ; new_cElse <- zonkLCmd env1 cElse
        ; return (HsCmdIf x new_eCond new_ePred new_cThen new_cElse) }
-  where
-    zonkWit env Nothing  = return (env, Nothing)
-    zonkWit env (Just w) = second Just <$> zonkSyntaxExpr env w
 
 zonkCmd env (HsCmdLet x (L l binds) cmd)
   = do (new_env, new_binds) <- zonkLocalBinds env binds
@@ -1049,8 +1041,6 @@ zonkCmd env (HsCmdDo ty (L l stmts))
   = do (_, new_stmts) <- zonkStmts env zonkLCmd stmts
        new_ty <- zonkTcTypeToTypeX env ty
        return (HsCmdDo new_ty (L l new_stmts))
-
-zonkCmd _ (XCmd nec) = noExtCon nec
 
 
 

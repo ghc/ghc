@@ -619,10 +619,10 @@ addTickHsExpr (HsProc x pat cmdtop) =
         liftM2 (HsProc x)
                 (addTickLPat pat)
                 (liftL (addTickHsCmdTop) cmdtop)
-addTickHsExpr (HsWrap x w e) =
-        liftM2 (HsWrap x)
-                (return w)
-                (addTickHsExpr e)       -- Explicitly no tick on inside
+addTickHsExpr (XExpr (HsWrap w e)) =
+        liftM XExpr $
+        liftM (HsWrap w)
+              (addTickHsExpr e)        -- Explicitly no tick on inside
 
 -- Others should never happen in expression content.
 addTickHsExpr e  = pprPanic "addTickHsExpr" (ppr e)
@@ -820,9 +820,11 @@ addTickIPBind (XIPBind x) = return (XIPBind x)
 
 -- There is no location here, so we might need to use a context location??
 addTickSyntaxExpr :: SrcSpan -> SyntaxExpr GhcTc -> TM (SyntaxExpr GhcTc)
-addTickSyntaxExpr pos syn@(SyntaxExpr { syn_expr = x }) = do
+addTickSyntaxExpr pos syn@(SyntaxExprTc { syn_expr = x }) = do
         x' <- fmap unLoc (addTickLHsExpr (L pos x))
         return $ syn { syn_expr = x' }
+addTickSyntaxExpr _ NoSyntaxExprTc = return NoSyntaxExprTc
+
 -- we do not walk into patterns.
 addTickLPat :: LPat GhcTc -> TM (LPat GhcTc)
 addTickLPat pat = return pat
@@ -885,10 +887,9 @@ addTickHsCmd (HsCmdArrForm x e f fix cmdtop) =
                (return fix)
                (mapM (liftL (addTickHsCmdTop)) cmdtop)
 
-addTickHsCmd (HsCmdWrap x w cmd)
-  = liftM2 (HsCmdWrap x) (return w) (addTickHsCmd cmd)
-
-addTickHsCmd (XCmd nec) = noExtCon nec
+addTickHsCmd (XCmd (HsWrap w cmd)) =
+  liftM XCmd $
+  liftM (HsWrap w) (addTickHsCmd cmd)
 
 -- Others should never happen in a command context.
 --addTickHsCmd e  = pprPanic "addTickHsCmd" (ppr e)

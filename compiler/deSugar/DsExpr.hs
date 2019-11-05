@@ -195,7 +195,7 @@ dsUnliftedBind (AbsBinds { abs_tvs = [], abs_ev_vars = []
 
 dsUnliftedBind (FunBind { fun_id = L l fun
                         , fun_matches = matches
-                        , fun_co_fn = co_fn
+                        , fun_ext = co_fn
                         , fun_tick = tick }) body
                -- Can't be a bang pattern (that looks like a PatBind)
                -- so must be simply unboxed
@@ -275,7 +275,7 @@ ds_expr _ (HsOverLit _ lit)
   = do { warnAboutOverflowedOverLit lit
        ; dsOverLit lit }
 
-ds_expr _ (HsWrap _ co_fn e)
+ds_expr _ (XExpr (HsWrap co_fn e))
   = do { e' <- ds_expr True e    -- This is the one place where we recurse to
                                  -- ds_expr (passing True), rather than dsExpr
        ; wrap' <- dsHsWrapper co_fn
@@ -426,13 +426,13 @@ ds_expr _ (HsDo _ GhciStmtCtxt  (L _ stmts)) = dsDo stmts
 ds_expr _ (HsDo _ MDoExpr       (L _ stmts)) = dsDo stmts
 ds_expr _ (HsDo _ MonadComp     (L _ stmts)) = dsMonadComp stmts
 
-ds_expr _ (HsIf _ mb_fun guard_expr then_expr else_expr)
+ds_expr _ (HsIf _ fun guard_expr then_expr else_expr)
   = do { pred <- dsLExpr guard_expr
        ; b1 <- dsLExpr then_expr
        ; b2 <- dsLExpr else_expr
-       ; case mb_fun of
-           Just fun -> dsSyntaxExpr fun [pred, b1, b2]
-           Nothing  -> return $ mkIfThenElse pred b1 b2 }
+       ; case fun of  -- See Note [Rebindable if] in Hs.Expr
+           (SyntaxExprTc {}) -> dsSyntaxExpr fun [pred, b1, b2]
+           NoSyntaxExprTc    -> return $ mkIfThenElse pred b1 b2 }
 
 ds_expr _ (HsMultiIf res_ty alts)
   | null alts
@@ -738,7 +738,6 @@ ds_expr _ (HsBinTick _ ixT ixF e) = do
 ds_expr _ (HsBracket     {})  = panic "dsExpr:HsBracket"
 ds_expr _ (HsDo          {})  = panic "dsExpr:HsDo"
 ds_expr _ (HsRecFld      {})  = panic "dsExpr:HsRecFld"
-ds_expr _ (XExpr nec)         = noExtCon nec
 
 ds_prag_expr :: HsPragE GhcTc -> LHsExpr GhcTc -> DsM CoreExpr
 ds_prag_expr (HsPragSCC _ _ cc) expr = do
@@ -763,9 +762,9 @@ ds_prag_expr (XHsPragE x) _ = noExtCon x
 
 ------------------------------
 dsSyntaxExpr :: SyntaxExpr GhcTc -> [CoreExpr] -> DsM CoreExpr
-dsSyntaxExpr (SyntaxExpr { syn_expr      = expr
-                         , syn_arg_wraps = arg_wraps
-                         , syn_res_wrap  = res_wrap })
+dsSyntaxExpr (SyntaxExprTc { syn_expr      = expr
+                           , syn_arg_wraps = arg_wraps
+                           , syn_res_wrap  = res_wrap })
              arg_exprs
   = do { fun            <- dsExpr expr
        ; core_arg_wraps <- mapM dsHsWrapper arg_wraps
@@ -775,6 +774,7 @@ dsSyntaxExpr (SyntaxExpr { syn_expr      = expr
                       (\_ -> core_res_wrap (mkApps fun wrapped_args)) }
   where
     mk_doc n = text "In the" <+> speakNth n <+> text "argument of" <+> quotes (ppr expr)
+dsSyntaxExpr NoSyntaxExprTc _ = panic "dsSyntaxExpr"
 
 findField :: [LHsRecField GhcTc arg] -> Name -> [arg]
 findField rbinds sel
