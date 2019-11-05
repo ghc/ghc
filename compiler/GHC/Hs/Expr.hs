@@ -14,6 +14,9 @@
 {-# LANGUAGE DeriveFunctor #-}
 {-# LANGUAGE TypeFamilies #-}
 {-# LANGUAGE ViewPatterns #-}
+{-# LANGUAGE TypeApplications #-}
+{-# LANGUAGE DataKinds #-}
+{-# LANGUAGE TypeFamilyDependencies #-}
 
 -- | Abstract Haskell syntax for expressions.
 module GHC.Hs.Expr where
@@ -87,14 +90,57 @@ type PostTcExpr  = HsExpr GhcTc
 type PostTcTable = [(Name, PostTcExpr)]
 
 -------------------------
+{- Note [NoSyntaxExpr]
+~~~~~~~~~~~~~~~~~~~~~~
+Syntax expressions can be missing (NoSyntaxExprRn or NoSyntaxExprTc)
+for several reasons:
+
+ 1. As described in Note [Rebindable if]
+
+ 2. In order to suppress "not in scope: xyz" messages when a bit of
+    rebindable syntax does not apply. For example, when using an irrefutable
+    pattern in a BindStmt, we don't need a `fail` operator.
+
+ 3. Rebindable syntax might just not make sense. For example, a BodyStmt
+    contains the syntax for `guard`, but that's used only in monad comprehensions.
+    If we had more of a whiz-bang type system, we might be able to rule this
+    case out statically.
+-}
+
 -- | Syntax Expression
 --
--- SyntaxExpr is like 'PostTcExpr', but it's filled in a little earlier,
--- by the renamer.  It's used for rebindable syntax.
+-- SyntaxExpr is represents the function used in interpreting rebindable
+-- syntax. In the parser, we have no information to supply; in the renamer,
+-- we have the name of the function (but see
+-- Note [Monad fail : Rebindable syntax, overloaded strings] for a wrinkle)
+-- and in the type-checker we have a more elaborate structure 'SyntaxExprTc'.
+--
+-- In some contexts, rebindable syntax is not implemented, and so we have
+-- constructors to represent that possibility in both the renamer and
+-- typechecker instantiations.
 --
 -- E.g. @(>>=)@ is filled in before the renamer by the appropriate 'Name' for
 --      @(>>=)@, and then instantiated by the type checker with its type args
 --      etc
+type family SyntaxExpr p
+
+-- Defining SyntaxExpr in two stages allows for better type inference, because
+-- we can declare SyntaxExprGhc to be injective (and closed). Without injectivity,
+-- noSyntaxExpr would be ambiguous.
+type instance SyntaxExpr (GhcPass p) = SyntaxExprGhc p
+
+type family SyntaxExprGhc (p :: Pass) = (r :: *) | r -> p where
+  SyntaxExprGhc 'Parsed      = NoExtField
+  SyntaxExprGhc 'Renamed     = SyntaxExprRn
+  SyntaxExprGhc 'Typechecked = SyntaxExprTc
+
+-- | The function to use in rebindable syntax. See Note [NoSyntaxExpr].
+data SyntaxExprRn = SyntaxExprRn (HsExpr GhcRn)
+    -- Why is the payload not just a Name?
+    -- See Note [Monad fail : Rebindable syntax, overloaded strings] in RnExpr
+                  | NoSyntaxExprRn
+
+-- | An expression with wrappers, used for rebindable syntax
 --
 -- This should desugar to
 --
@@ -102,51 +148,51 @@ type PostTcTable = [(Name, PostTcExpr)]
 -- >                         (syn_arg_wraps[1] arg1) ...
 --
 -- where the actual arguments come from elsewhere in the AST.
--- This could be defined using @GhcPass p@ and such, but it's
--- harder to get it all to work out that way. ('noSyntaxExpr' is hard to
--- write, for example.)
-data SyntaxExpr p = SyntaxExpr { syn_expr      :: HsExpr p
-                               , syn_arg_wraps :: [HsWrapper]
-                               , syn_res_wrap  :: HsWrapper }
+data SyntaxExprTc = SyntaxExprTc { syn_expr      :: HsExpr GhcTc
+                                 , syn_arg_wraps :: [HsWrapper]
+                                 , syn_res_wrap  :: HsWrapper }
+                  | NoSyntaxExprTc  -- See Note [NoSyntaxExpr]
 
 -- | This is used for rebindable-syntax pieces that are too polymorphic
 -- for tcSyntaxOp (trS_fmap and the mzip in ParStmt)
 noExpr :: HsExpr (GhcPass p)
 noExpr = HsLit noExtField (HsString (SourceText  "noExpr") (fsLit "noExpr"))
 
-noSyntaxExpr :: SyntaxExpr (GhcPass p)
-                              -- Before renaming, and sometimes after,
-                              -- (if the syntax slot makes no sense)
-noSyntaxExpr = SyntaxExpr { syn_expr      = HsLit noExtField
-                                                  (HsString NoSourceText
-                                                  (fsLit "noSyntaxExpr"))
-                          , syn_arg_wraps = []
-                          , syn_res_wrap  = WpHole }
+noSyntaxExpr :: forall p. IsPass p => SyntaxExpr (GhcPass p)
+                              -- Before renaming, and sometimes after
+                              -- See Note [NoSyntaxExpr]
+noSyntaxExpr = case pass @p of
+  GhcPs -> noExtField
+  GhcRn -> NoSyntaxExprRn
+  GhcTc -> NoSyntaxExprTc
 
--- | Make a 'SyntaxExpr (HsExpr _)', missing its HsWrappers.
-mkSyntaxExpr :: HsExpr (GhcPass p) -> SyntaxExpr (GhcPass p)
-mkSyntaxExpr expr = SyntaxExpr { syn_expr      = expr
-                               , syn_arg_wraps = []
-                               , syn_res_wrap  = WpHole }
+-- | Make a 'SyntaxExpr GhcRn' from an expression
+-- Used only in getMonadFailOp.
+-- See Note [Monad fail : Rebindable syntax, overloaded strings] in RnExpr
+mkSyntaxExpr :: HsExpr GhcRn -> SyntaxExprRn
+mkSyntaxExpr = SyntaxExprRn
 
--- | Make a 'SyntaxExpr Name' (the "rn" is because this is used in the
--- renamer), missing its HsWrappers.
-mkRnSyntaxExpr :: Name -> SyntaxExpr GhcRn
-mkRnSyntaxExpr name = mkSyntaxExpr $ HsVar noExtField $ noLoc name
-  -- don't care about filling in syn_arg_wraps because we're clearly
-  -- not past the typechecker
+-- | Make a 'SyntaxExpr' from a 'Name' (the "rn" is because this is used in the
+-- renamer).
+mkRnSyntaxExpr :: Name -> SyntaxExprRn
+mkRnSyntaxExpr name = SyntaxExprRn $ HsVar noExtField $ noLoc name
 
-instance OutputableBndrId p
-       => Outputable (SyntaxExpr (GhcPass p)) where
-  ppr (SyntaxExpr { syn_expr      = expr
-                  , syn_arg_wraps = arg_wraps
-                  , syn_res_wrap  = res_wrap })
+instance Outputable SyntaxExprRn where
+  ppr (SyntaxExprRn expr) = ppr expr
+  ppr NoSyntaxExprRn      = text "<no syntax expr>"
+
+instance Outputable SyntaxExprTc where
+  ppr (SyntaxExprTc { syn_expr      = expr
+                    , syn_arg_wraps = arg_wraps
+                    , syn_res_wrap  = res_wrap })
     = sdocWithDynFlags $ \ dflags ->
       getPprStyle $ \s ->
       if debugStyle s || gopt Opt_PrintExplicitCoercions dflags
       then ppr expr <> braces (pprWithCommas ppr arg_wraps)
                     <> braces (ppr res_wrap)
       else ppr expr
+
+  ppr NoSyntaxExprTc = text "<no syntax expr>"
 
 -- | Command Syntax Table (for Arrow syntax)
 type CmdSyntaxTable p = [(Name, HsExpr p)]
@@ -328,10 +374,11 @@ data HsExpr p
   --       'ApiAnnotation.AnnElse',
 
   -- For details on above see note [Api annotations] in ApiAnnotation
-  | HsIf        (XIf p)
-                (Maybe (SyntaxExpr p)) -- cond function
-                                        -- Nothing => use the built-in 'if'
-                                        -- See Note [Rebindable if]
+  | HsIf        (XIf p)        -- GhcPs: this is a Bool; False <=> do not use
+                               --  rebindable syntax
+                (SyntaxExpr p) -- cond function
+                                 -- NoSyntaxExpr => use the built-in 'if'
+                                 -- See Note [Rebindable if]
                 (LHsExpr p)    --  predicate
                 (LHsExpr p)    --  then part
                 (LHsExpr p)    --  else part
@@ -502,16 +549,6 @@ data HsExpr p
   -- Expressions annotated with pragmas, written as {-# ... #-}
   | HsPragE (XPragE p) (HsPragE p) (LHsExpr p)
 
-  ---------------------------------------
-  -- Finally, HsWrap appears only in typechecker output
-  -- The contained Expr is *NOT* itself an HsWrap.
-  -- See Note [Detecting forced eta expansion] in DsExpr. This invariant
-  -- is maintained by GHC.Hs.Utils.mkHsWrap.
-
-  |  HsWrap     (XWrap p)
-                HsWrapper    -- TRANSLATION
-                (HsExpr p)
-
   | XExpr       (XXExpr p) -- Note [Trees that Grow] extension constructor
 
 
@@ -528,12 +565,22 @@ data RecordUpdTc = RecordUpdTc
                 -- _non-empty_ list of DataCons that have
                 -- all the upd'd fields
 
-      , rupd_in_tys  :: [Type] -- Argument types of *input* record type
-      , rupd_out_tys :: [Type] --             and  *output* record type
-                               -- The original type can be reconstructed
-                               -- with conLikeResTy
-      , rupd_wrap :: HsWrapper -- See note [Record Update HsWrapper]
-      } deriving Data
+      , rupd_in_tys  :: [Type]  -- Argument types of *input* record type
+      , rupd_out_tys :: [Type]  --             and  *output* record type
+                                -- The original type can be reconstructed
+                                -- with conLikeResTy
+      , rupd_wrap :: HsWrapper  -- See note [Record Update HsWrapper]
+      }
+
+-- | HsWrap appears only in typechecker output
+-- Invariant: The contained Expr is *NOT* itself an HsWrap.
+-- See Note [Detecting forced eta expansion] in DsExpr. This invariant
+-- is maintained by GHC.Hs.Utils.mkHsWrap.
+-- hs_syn is something like HsExpr or HsCmd
+data HsWrap hs_syn = HsWrap HsWrapper      -- the wrapper
+                            (hs_syn GhcTc) -- the thing that is wrapped
+
+deriving instance (Data (hs_syn GhcTc), Typeable hs_syn) => Data (HsWrap hs_syn)
 
 -- ---------------------------------------------------------------------
 
@@ -566,7 +613,10 @@ type instance XExplicitSum   GhcRn = NoExtField
 type instance XExplicitSum   GhcTc = [Type]
 
 type instance XCase          (GhcPass _) = NoExtField
-type instance XIf            (GhcPass _) = NoExtField
+
+type instance XIf            GhcPs = Bool      -- True <=> might use rebindable syntax
+type instance XIf            GhcRn = NoExtField
+type instance XIf            GhcTc = NoExtField
 
 type instance XMultiIf       GhcPs = NoExtField
 type instance XMultiIf       GhcRn = NoExtField
@@ -614,7 +664,10 @@ type instance XBinTick       (GhcPass _) = NoExtField
 type instance XPragE         (GhcPass _) = NoExtField
 
 type instance XWrap          (GhcPass _) = NoExtField
-type instance XXExpr         (GhcPass _) = NoExtCon
+
+type instance XXExpr         GhcPs       = NoExtCon
+type instance XXExpr         GhcRn       = NoExtCon
+type instance XXExpr         GhcTc       = HsWrap HsExpr
 
 -- ---------------------------------------------------------------------
 
@@ -728,7 +781,12 @@ Because we allow an 'if' to return *unboxed* results, thus
 whereas that would not be possible using a all to a polymorphic function
 (because you can't call a polymorphic function at an unboxed type).
 
-So we use Nothing to mean "use the old built-in typing rule".
+So we use NoSyntaxExpr to mean "use the old built-in typing rule".
+
+A further complication is that, in the `deriving` code, we never want
+to use rebindable syntax. So, even in GhcPs, we want to denote whether
+to use rebindable syntax or not. This is done via the type instance
+for XIf GhcPs.
 
 Note [Record Update HsWrapper]
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
@@ -998,16 +1056,12 @@ ppr_expr (ExprWithTySig _ expr sig)
 
 ppr_expr (ArithSeq _ _ info) = brackets (ppr info)
 
-ppr_expr (HsWrap _ co_fn e)
-  = pprHsWrapper co_fn (\parens -> if parens then pprExpr e
-                                             else pprExpr e)
-
 ppr_expr (HsSpliceE _ s)         = pprSplice s
 ppr_expr (HsBracket _ b)         = pprHsBracket b
 ppr_expr (HsRnBracketOut _ e []) = ppr e
 ppr_expr (HsRnBracketOut _ e ps) = ppr e $$ text "pending(rn)" <+> ppr ps
 ppr_expr (HsTcBracketOut _ e []) = ppr e
-ppr_expr (HsTcBracketOut _ e ps) = ppr e $$ text "pending(tc)" <+> ppr ps
+ppr_expr (HsTcBracketOut _ e ps) = ppr e $$ text "pending(tc)" <+> pprIfTc @p (ppr ps)
 
 ppr_expr (HsProc _ pat (L _ (HsCmdTop _ cmd)))
   = hsep [text "proc", ppr pat, ptext (sLit "->"), ppr cmd]
@@ -1030,15 +1084,24 @@ ppr_expr (HsBinTick _ tickIdTrue tickIdFalse exp)
           ppr exp, text ")"]
 
 ppr_expr (HsRecFld _ f) = ppr f
-ppr_expr (XExpr x) = ppr x
+ppr_expr (XExpr x) = case pass @p of
+  GhcPs -> ppr x
+  GhcRn -> ppr x
+  GhcTc -> case x of
+    HsWrap co_fn e ->  pprHsWrapper co_fn (\parens -> if parens then pprExpr e
+                                                      else pprExpr e)
 
-ppr_infix_expr :: (OutputableBndrId p) => HsExpr (GhcPass p) -> Maybe SDoc
+
+ppr_infix_expr :: forall p. (OutputableBndrId p) => HsExpr (GhcPass p) -> Maybe SDoc
 ppr_infix_expr (HsVar _ (L _ v))    = Just (pprInfixOcc v)
 ppr_infix_expr (HsConLikeOut _ c)   = Just (pprInfixOcc (conLikeName c))
 ppr_infix_expr (HsRecFld _ f)       = Just (pprInfixOcc f)
 ppr_infix_expr (HsUnboundVar _ occ) = Just (pprInfixOcc occ)
-ppr_infix_expr (HsWrap _ _ e)       = ppr_infix_expr e
-ppr_infix_expr _                    = Nothing
+ppr_infix_expr (XExpr x)
+  | GhcTc <- pass @p
+  , HsWrap _ e <- x
+  = ppr_infix_expr e
+ppr_infix_expr _ = Nothing
 
 ppr_apps :: (OutputableBndrId p)
          => HsExpr (GhcPass p)
@@ -1093,7 +1156,7 @@ pprParendExpr p expr
 
 -- | @'hsExprNeedsParens' p e@ returns 'True' if the expression @e@ needs
 -- parentheses under precedence @p@.
-hsExprNeedsParens :: PprPrec -> HsExpr p -> Bool
+hsExprNeedsParens :: forall p. IsGhcPass p => PprPrec -> HsExpr p -> Bool
 hsExprNeedsParens p = go
   where
     go (HsVar{})                      = False
@@ -1126,7 +1189,6 @@ hsExprNeedsParens p = go
     go (ExprWithTySig{})              = p >= sigPrec
     go (ArithSeq{})                   = False
     go (HsPragE{})                    = p >= appPrec
-    go (HsWrap _ _ e)                 = go e
     go (HsSpliceE{})                  = False
     go (HsBracket{})                  = False
     go (HsRnBracketOut{})             = False
@@ -1137,11 +1199,18 @@ hsExprNeedsParens p = go
     go (HsBinTick _ _ _ (L _ e))      = go e
     go (RecordCon{})                  = False
     go (HsRecFld{})                   = False
-    go (XExpr{})                      = True
+    go (XExpr x)
+      | GhcTc <- ghcPass @p
+      , HsWrap _ e <- x
+      = go e
+
+      | otherwise
+      = True
+
 
 -- | @'parenthesizeHsExpr' p e@ checks if @'hsExprNeedsParens' p e@ is true,
 -- and if so, surrounds @e@ with an 'HsPar'. Otherwise, it simply returns @e@.
-parenthesizeHsExpr :: PprPrec -> LHsExpr (GhcPass p) -> LHsExpr (GhcPass p)
+parenthesizeHsExpr :: IsPass p => PprPrec -> LHsExpr (GhcPass p) -> LHsExpr (GhcPass p)
 parenthesizeHsExpr p le@(L loc e)
   | hsExprNeedsParens p e = L loc (HsPar noExtField le)
   | otherwise             = le
@@ -1150,7 +1219,7 @@ stripParensHsExpr :: LHsExpr (GhcPass p) -> LHsExpr (GhcPass p)
 stripParensHsExpr (L _ (HsPar _ e)) = stripParensHsExpr e
 stripParensHsExpr e = e
 
-isAtomicHsExpr :: HsExpr id -> Bool
+isAtomicHsExpr :: forall id. IsGhcPass id => HsExpr id -> Bool
 -- True of a single token
 isAtomicHsExpr (HsVar {})        = True
 isAtomicHsExpr (HsConLikeOut {}) = True
@@ -1159,9 +1228,11 @@ isAtomicHsExpr (HsOverLit {})    = True
 isAtomicHsExpr (HsIPVar {})      = True
 isAtomicHsExpr (HsOverLabel {})  = True
 isAtomicHsExpr (HsUnboundVar {}) = True
-isAtomicHsExpr (HsWrap _ _ e)    = isAtomicHsExpr e
 isAtomicHsExpr (HsPar _ e)       = isAtomicHsExpr (unLoc e)
 isAtomicHsExpr (HsRecFld{})      = True
+isAtomicHsExpr (XExpr x)
+  | GhcTc <- ghcPass @id
+  , HsWrap _ e <- x              = isAtomicHsExpr e
 isAtomicHsExpr _                 = False
 
 instance Outputable (HsPragE (GhcPass p)) where
@@ -1254,10 +1325,10 @@ data HsCmd id
     -- For details on above see note [Api annotations] in ApiAnnotation
 
   | HsCmdIf     (XCmdIf id)
-                (Maybe (SyntaxExpr id))         -- cond function
-                (LHsExpr id)                    -- predicate
-                (LHsCmd id)                     -- then part
-                (LHsCmd id)                     -- else part
+                (SyntaxExpr id)         -- cond function
+                (LHsExpr id)            -- predicate
+                (LHsCmd id)             -- then part
+                (LHsCmd id)             -- else part
     -- ^ - 'ApiAnnotation.AnnKeywordId' : 'ApiAnnotation.AnnIf',
     --       'ApiAnnotation.AnnSemi',
     --       'ApiAnnotation.AnnThen','ApiAnnotation.AnnSemi',
@@ -1283,11 +1354,6 @@ data HsCmd id
 
     -- For details on above see note [Api annotations] in ApiAnnotation
 
-  | HsCmdWrap   (XCmdWrap id)
-                HsWrapper
-                (HsCmd id)     -- If   cmd :: arg1 --> res
-                               --      wrap :: arg1 "->" arg2
-                               -- Then (HsCmdWrap wrap cmd) :: arg2 --> res
   | XCmd        (XXCmd id)     -- Note [Trees that Grow] extension point
 
 type instance XCmdArrApp  GhcPs = NoExtField
@@ -1307,7 +1373,13 @@ type instance XCmdDo      GhcRn = NoExtField
 type instance XCmdDo      GhcTc = Type
 
 type instance XCmdWrap    (GhcPass _) = NoExtField
-type instance XXCmd       (GhcPass _) = NoExtCon
+
+type instance XXCmd       GhcPs = NoExtCon
+type instance XXCmd       GhcRn = NoExtCon
+type instance XXCmd       GhcTc = HsWrap HsCmd
+    -- If   cmd :: arg1 --> res
+    --      wrap :: arg1 "->" arg2
+    -- Then (XCmd (HsWrap wrap cmd)) :: arg2 --> res
 
 -- | Haskell Array Application Type
 data HsArrAppType = HsHigherOrderApp | HsFirstOrderApp
@@ -1399,8 +1471,6 @@ ppr_cmd (HsCmdLet _ (L _ binds) cmd)
 
 ppr_cmd (HsCmdDo _ (L _ stmts))  = pprDo ArrowExpr stmts
 
-ppr_cmd (HsCmdWrap _ w cmd)
-  = pprHsWrapper w (\_ -> parens (ppr_cmd cmd))
 ppr_cmd (HsCmdArrApp _ arrow arg HsFirstOrderApp True)
   = hsep [ppr_lexpr arrow, larrowt, ppr_lexpr arg]
 ppr_cmd (HsCmdArrApp _ arrow arg HsFirstOrderApp False)
@@ -1425,7 +1495,11 @@ ppr_cmd (HsCmdArrForm _ (L _ (HsConLikeOut _ c)) Infix _    [arg1, arg2])
 ppr_cmd (HsCmdArrForm _ op _ _ args)
   = hang (text "(|" <+> ppr_lexpr op)
          4 (sep (map (pprCmdArg.unLoc) args) <+> text "|)")
-ppr_cmd (XCmd x) = ppr x
+ppr_cmd (XCmd x) = case pass @p of
+  GhcPs -> ppr x
+  GhcRn -> ppr x
+  GhcTc -> case x of
+    HsWrap w cmd -> pprHsWrapper w (\_ -> parens (ppr_cmd cmd))
 
 pprCmdArg :: (OutputableBndrId p) => HsCmdTop (GhcPass p) -> SDoc
 pprCmdArg (HsCmdTop _ cmd)
@@ -1770,6 +1844,7 @@ data StmtLR idL idR body -- body should always be (LHs**** idR)
              (SyntaxExpr idR) -- The fail operator
              -- The fail operator is noSyntaxExpr
              -- if the pattern match can't fail
+             -- See Note [NoSyntaxExpr] (2)
 
   -- | 'ApplicativeStmt' represents an applicative expression built with
   -- '<$>' and '<*>'.  It is generated by the renamer, and is desugared into the
@@ -1943,6 +2018,7 @@ data ApplicativeArg idL
                          -- match fails.
                          -- The fail operator is noSyntaxExpr
                          -- if the pattern match can't fail
+                         -- See Note [NoSyntaxExpr] (2)
     }
   | ApplicativeArgMany     -- do { stmts; return vars }
     { xarg_app_arg_many :: (XApplicativeArgMany idL)
