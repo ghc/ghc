@@ -1889,6 +1889,15 @@ someTypeRepDataConKey = mkPreludeTyConUnique 189
 typeSymbolAppendFamNameKey :: Unique
 typeSymbolAppendFamNameKey = mkPreludeTyConUnique 190
 
+multiplicityTyConKey :: Unique
+multiplicityTyConKey = mkPreludeTyConUnique 191
+
+unrestrictedFunTyConKey :: Unique
+unrestrictedFunTyConKey = mkPreludeTyConUnique 192
+
+multMulTyConKey :: Unique
+multMulTyConKey = mkPreludeTyConUnique 194
+
 ---------------- Template Haskell -------------------
 --      THNames.hs: USES TyConUniques 200-299
 -----------------------------------------------------
@@ -2057,6 +2066,13 @@ kindRepTypeLitDDataConKey = mkPreludeDataConUnique 111
 typeLitSymbolDataConKey, typeLitNatDataConKey :: Unique
 typeLitSymbolDataConKey   = mkPreludeDataConUnique 112
 typeLitNatDataConKey      = mkPreludeDataConUnique 113
+
+-- Multiplicity
+
+oneDataConKey, omegaDataConKey :: Unique
+oneDataConKey = mkPreludeDataConUnique 115
+omegaDataConKey = mkPreludeDataConUnique 116
+
 
 
 ---------------- Template Haskell -------------------

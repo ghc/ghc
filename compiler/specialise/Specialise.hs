@@ -5,6 +5,7 @@
 -}
 
 {-# LANGUAGE CPP #-}
+{-# LANGUAGE PatternSynonyms #-}
 {-# LANGUAGE DeriveFunctor #-}
 {-# LANGUAGE ViewPatterns #-}
 module Specialise ( specProgram, specUnfolding ) where
@@ -16,6 +17,7 @@ import GhcPrelude
 import Id
 import TcType hiding( substTy )
 import Type   hiding( substTy, extendTvSubstList )
+import Multiplicity ( pattern Omega )
 import Module( Module, HasModule(..) )
 import Coercion( Coercion )
 import CoreMonad
@@ -1160,9 +1162,10 @@ specCase env scrut' case_bndr [(con, args, rhs)]
     sc_args' = filter is_flt_sc_arg args'
 
     clone_me bndr = do { uniq <- getUniqueM
-                       ; return (mkUserLocalOrCoVar occ uniq ty loc) }
+                       ; return (mkUserLocalOrCoVar occ uniq wght ty loc) }
        where
          name = idName bndr
+         wght = idMult bndr
          ty   = idType bndr
          occ  = nameOccName name
          loc  = getSrcSpan name
@@ -2634,7 +2637,7 @@ newDictBndr :: SpecEnv -> CoreBndr -> SpecM CoreBndr
 newDictBndr env b = do { uniq <- getUniqueM
                        ; let n   = idName b
                              ty' = substTy env (idType b)
-                       ; return (mkUserLocalOrCoVar (nameOccName n) uniq ty' (getSrcSpan n)) }
+                       ; return (mkUserLocalOrCoVar (nameOccName n) uniq Omega ty' (getSrcSpan n)) }
 
 newSpecIdSM :: Id -> Type -> Maybe JoinArity -> SpecM Id
     -- Give the new Id a similar occurrence name to the old one
@@ -2642,7 +2645,7 @@ newSpecIdSM old_id new_ty join_arity_maybe
   = do  { uniq <- getUniqueM
         ; let name    = idName old_id
               new_occ = mkSpecOcc (nameOccName name)
-              new_id  = mkUserLocalOrCoVar new_occ uniq new_ty (getSrcSpan name)
+              new_id  = mkUserLocalOrCoVar new_occ uniq Omega new_ty (getSrcSpan name)
                           `asJoinId_maybe` join_arity_maybe
         ; return new_id }
 

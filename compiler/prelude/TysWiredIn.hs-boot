@@ -38,3 +38,12 @@ int8ElemRepDataConTy, int16ElemRepDataConTy, int32ElemRepDataConTy,
 anyTypeOfKind :: Kind -> Type
 unboxedTupleKind :: [Type] -> Type
 mkPromotedListTy :: Type -> [Type] -> Type
+
+multiplicityTyCon :: TyCon
+multiplicityTy :: Type
+oneDataConTy :: Type
+oneDataConTyCon :: TyCon
+omegaDataConTy :: Type
+omegaDataConTyCon :: TyCon
+unrestrictedFunTyCon :: TyCon
+multMulTyCon :: TyCon
