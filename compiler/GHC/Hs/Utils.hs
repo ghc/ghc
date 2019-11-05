@@ -36,7 +36,7 @@ module GHC.Hs.Utils(
   mkLHsPar, mkHsCmdWrap, mkLHsCmdWrap,
   mkHsCmdIf,
 
-  nlHsTyApp, nlHsTyApps, nlHsVar, nlHsDataCon,
+  nlHsTyApp, nlHsTyApps, nlHsVar, nl_HsVar, nlHsDataCon,
   nlHsLit, nlHsApp, nlHsApps, nlHsSyntaxApps,
   nlHsIntLit, nlHsVarApps,
   nlHsDo, nlHsOpApp, nlHsLam, nlHsPar, nlHsIf, nlHsCase, nlList,
@@ -213,18 +213,17 @@ mkHsCaseAlt :: LPat (GhcPass p) -> (Located (body (GhcPass p)))
 mkHsCaseAlt pat expr
   = mkSimpleMatch CaseAlt [pat] expr
 
-nlHsTyApp :: IdP (GhcPass id) -> [Type] -> LHsExpr (GhcPass id)
+nlHsTyApp :: Id -> [Type] -> LHsExpr GhcTc
 nlHsTyApp fun_id tys
   = noLoc (mkHsWrap (mkWpTyApps tys) (HsVar noExtField (noLoc fun_id)))
 
-nlHsTyApps :: IdP (GhcPass id) -> [Type] -> [LHsExpr (GhcPass id)]
-           -> LHsExpr (GhcPass id)
+nlHsTyApps :: Id -> [Type] -> [LHsExpr GhcTc] -> LHsExpr GhcTc
 nlHsTyApps fun_id tys xs = foldl' nlHsApp (nlHsTyApp fun_id tys) xs
 
 --------- Adding parens ---------
 -- | Wrap in parens if @'hsExprNeedsParens' appPrec@ says it needs them
 -- So @f x@ becomes @(f x)@, but @3@ stays as @3@.
-mkLHsPar :: LHsExpr (GhcPass id) -> LHsExpr (GhcPass id)
+mkLHsPar :: IsPass id => LHsExpr (GhcPass id) -> LHsExpr (GhcPass id)
 mkLHsPar le@(L loc e)
   | hsExprNeedsParens appPrec e = L loc (HsPar noExtField le)
   | otherwise                   = le
@@ -239,7 +238,7 @@ nlParPat p = noLoc (ParPat noExtField p)
 
 -------------------------------
 -- These are the bits of syntax that contain rebindable names
--- See GHC.Rename.Env.lookupSyntaxName
+-- See GHC.Rename.Env.lookupSyntax
 
 mkHsIntegral   :: IntegralLit -> HsOverLit GhcPs
 mkHsFractional :: FractionalLit -> HsOverLit GhcPs
@@ -252,11 +251,13 @@ mkNPat      :: Located (HsOverLit GhcPs) -> Maybe (SyntaxExpr GhcPs)
             -> Pat GhcPs
 mkNPlusKPat :: Located RdrName -> Located (HsOverLit GhcPs) -> Pat GhcPs
 
-mkLastStmt :: Located (bodyR (GhcPass idR))
+-- NB: The following functions all use noSyntaxExpr: the generated expressions
+--     will not work with rebindable syntax if used after the renamer
+mkLastStmt :: IsPass idR => Located (bodyR (GhcPass idR))
            -> StmtLR (GhcPass idL) (GhcPass idR) (Located (bodyR (GhcPass idR)))
 mkBodyStmt :: Located (bodyR GhcPs)
            -> StmtLR (GhcPass idL) GhcPs (Located (bodyR GhcPs))
-mkBindStmt :: (XBindStmt (GhcPass idL) (GhcPass idR)
+mkBindStmt :: IsPass idR => (XBindStmt (GhcPass idL) (GhcPass idR)
                          (Located (bodyR (GhcPass idR))) ~ NoExtField)
            => LPat (GhcPass idL) -> Located (bodyR (GhcPass idR))
            -> StmtLR (GhcPass idL) (GhcPass idR) (Located (bodyR (GhcPass idR)))
@@ -279,13 +280,14 @@ mkHsComp ctxt stmts expr = mkHsDo ctxt (stmts ++ [last_stmt])
   where
     last_stmt = L (getLoc expr) $ mkLastStmt expr
 
-mkHsIf :: LHsExpr (GhcPass p) -> LHsExpr (GhcPass p) -> LHsExpr (GhcPass p)
-       -> HsExpr (GhcPass p)
-mkHsIf c a b = HsIf noExtField (Just noSyntaxExpr) c a b
+-- restricted to GhcPs because other phases might need a SyntaxExpr
+mkHsIf :: LHsExpr GhcPs -> LHsExpr GhcPs -> LHsExpr GhcPs -> HsExpr GhcPs
+mkHsIf c a b = HsIf True {- this might use rebindable syntax -} noSyntaxExpr c a b
+  -- see Note [Rebindable if] in Hs.Expr
 
-mkHsCmdIf :: LHsExpr (GhcPass p) -> LHsCmd (GhcPass p) -> LHsCmd (GhcPass p)
-       -> HsCmd (GhcPass p)
-mkHsCmdIf c a b = HsCmdIf noExtField (Just noSyntaxExpr) c a b
+-- restricted to GhcPs because other phases might need a SyntaxExpr
+mkHsCmdIf :: LHsExpr GhcPs -> LHsCmd GhcPs -> LHsCmd GhcPs -> HsCmd GhcPs
+mkHsCmdIf c a b = HsCmdIf noExtField noSyntaxExpr c a b
 
 mkNPat lit neg     = NPat noExtField lit neg noSyntaxExpr
 mkNPlusKPat id lit
@@ -321,8 +323,8 @@ mkBindStmt pat body
 mkTcBindStmt pat body = BindStmt unitTy pat body noSyntaxExpr noSyntaxExpr
   -- don't use placeHolderTypeTc above, because that panics during zonking
 
-emptyRecStmt' :: forall idL idR body.
-                 XRecStmt (GhcPass idL) (GhcPass idR) body
+emptyRecStmt' :: forall idL idR body. IsPass idR
+              => XRecStmt (GhcPass idL) (GhcPass idR) body
               -> StmtLR (GhcPass idL) (GhcPass idR) body
 emptyRecStmt' tyVal =
    RecStmt
@@ -387,6 +389,9 @@ mkHsStringPrimLit fs = HsStringPrim NoSourceText (bytesFS fs)
 nlHsVar :: IdP (GhcPass id) -> LHsExpr (GhcPass id)
 nlHsVar n = noLoc (HsVar noExtField (noLoc n))
 
+nl_HsVar :: IdP (GhcPass id) -> HsExpr (GhcPass id)
+nl_HsVar n = HsVar noExtField (noLoc n)
+
 -- | NB: Only for 'LHsExpr' 'Id'.
 nlHsDataCon :: DataCon -> LHsExpr GhcTc
 nlHsDataCon con = noLoc (HsConLikeOut noExtField (RealDataCon con))
@@ -403,23 +408,21 @@ nlVarPat n = noLoc (VarPat noExtField (noLoc n))
 nlLitPat :: HsLit GhcPs -> LPat GhcPs
 nlLitPat l = noLoc (LitPat noExtField l)
 
-nlHsApp :: LHsExpr (GhcPass id) -> LHsExpr (GhcPass id) -> LHsExpr (GhcPass id)
+nlHsApp :: IsPass id => LHsExpr (GhcPass id) -> LHsExpr (GhcPass id) -> LHsExpr (GhcPass id)
 nlHsApp f x = noLoc (HsApp noExtField f (mkLHsPar x))
 
-nlHsSyntaxApps :: SyntaxExpr (GhcPass id) -> [LHsExpr (GhcPass id)]
-               -> LHsExpr (GhcPass id)
-nlHsSyntaxApps (SyntaxExpr { syn_expr      = fun
-                           , syn_arg_wraps = arg_wraps
-                           , syn_res_wrap  = res_wrap }) args
-  | [] <- arg_wraps   -- in the noSyntaxExpr case
-  = ASSERT( isIdHsWrapper res_wrap )
-    foldl' nlHsApp (noLoc fun) args
-
-  | otherwise
+nlHsSyntaxApps :: SyntaxExprTc -> [LHsExpr GhcTc]
+               -> LHsExpr GhcTc
+nlHsSyntaxApps (SyntaxExprTc { syn_expr      = fun
+                             , syn_arg_wraps = arg_wraps
+                             , syn_res_wrap  = res_wrap }) args
   = mkLHsWrap res_wrap (foldl' nlHsApp (noLoc fun) (zipWithEqual "nlHsSyntaxApps"
                                                      mkLHsWrap arg_wraps args))
+nlHsSyntaxApps NoSyntaxExprTc args = pprPanic "nlHsSyntaxApps" (ppr args)
+  -- this function should never be called in scenarios where there is no
+  -- syntax expr
 
-nlHsApps :: IdP (GhcPass id) -> [LHsExpr (GhcPass id)] -> LHsExpr (GhcPass id)
+nlHsApps :: IsPass id => IdP (GhcPass id) -> [LHsExpr (GhcPass id)] -> LHsExpr (GhcPass id)
 nlHsApps f xs = foldl' nlHsApp (nlHsVar f) xs
 
 nlHsVarApps :: IdP (GhcPass id) -> [IdP (GhcPass id)] -> LHsExpr (GhcPass id)
@@ -472,8 +475,6 @@ nlHsOpApp e1 op e2 = noLoc (mkHsOpApp e1 op e2)
 
 nlHsLam  :: LMatch GhcPs (LHsExpr GhcPs) -> LHsExpr GhcPs
 nlHsPar  :: LHsExpr (GhcPass id) -> LHsExpr (GhcPass id)
-nlHsIf   :: LHsExpr (GhcPass id) -> LHsExpr (GhcPass id) -> LHsExpr (GhcPass id)
-         -> LHsExpr (GhcPass id)
 nlHsCase :: LHsExpr GhcPs -> [LMatch GhcPs (LHsExpr GhcPs)]
          -> LHsExpr GhcPs
 nlList   :: [LHsExpr GhcPs] -> LHsExpr GhcPs
@@ -481,10 +482,11 @@ nlList   :: [LHsExpr GhcPs] -> LHsExpr GhcPs
 nlHsLam match          = noLoc (HsLam noExtField (mkMatchGroup Generated [match]))
 nlHsPar e              = noLoc (HsPar noExtField e)
 
--- | Note [Rebindable nlHsIf]
 -- nlHsIf should generate if-expressions which are NOT subject to
--- RebindableSyntax, so the first field of HsIf is Nothing. (#12080)
-nlHsIf cond true false = noLoc (HsIf noExtField Nothing cond true false)
+-- RebindableSyntax, so the first field of HsIf is False. (#12080)
+-- See Note [Rebindable if] in Hs.Expr
+nlHsIf :: LHsExpr GhcPs -> LHsExpr GhcPs -> LHsExpr GhcPs -> LHsExpr GhcPs
+nlHsIf cond true false = noLoc (HsIf False noSyntaxExpr cond true false)
 
 nlHsCase expr matches
   = noLoc (HsCase noExtField expr (mkMatchGroup Generated matches))
@@ -752,39 +754,39 @@ positions in the kind of the tycon.
 *                                                                      *
 ********************************************************************* -}
 
-mkLHsWrap :: HsWrapper -> LHsExpr (GhcPass id) -> LHsExpr (GhcPass id)
+mkLHsWrap :: HsWrapper -> LHsExpr GhcTc -> LHsExpr GhcTc
 mkLHsWrap co_fn (L loc e) = L loc (mkHsWrap co_fn e)
 
 -- | Avoid @'HsWrap' co1 ('HsWrap' co2 _)@.
 -- See Note [Detecting forced eta expansion] in "DsExpr"
-mkHsWrap :: HsWrapper -> HsExpr (GhcPass id) -> HsExpr (GhcPass id)
-mkHsWrap co_fn e | isIdHsWrapper co_fn = e
-mkHsWrap co_fn (HsWrap _ co_fn' e)     = mkHsWrap (co_fn <.> co_fn') e
-mkHsWrap co_fn e                       = HsWrap noExtField co_fn e
+mkHsWrap :: HsWrapper -> HsExpr GhcTc -> HsExpr GhcTc
+mkHsWrap co_fn e | isIdHsWrapper co_fn   = e
+mkHsWrap co_fn (XExpr (HsWrap co_fn' e)) = mkHsWrap (co_fn <.> co_fn') e
+mkHsWrap co_fn e                         = XExpr (HsWrap co_fn e)
 
 mkHsWrapCo :: TcCoercionN   -- A Nominal coercion  a ~N b
-           -> HsExpr (GhcPass id) -> HsExpr (GhcPass id)
+           -> HsExpr GhcTc -> HsExpr GhcTc
 mkHsWrapCo co e = mkHsWrap (mkWpCastN co) e
 
 mkHsWrapCoR :: TcCoercionR   -- A Representational coercion  a ~R b
-            -> HsExpr (GhcPass id) -> HsExpr (GhcPass id)
+            -> HsExpr GhcTc -> HsExpr GhcTc
 mkHsWrapCoR co e = mkHsWrap (mkWpCastR co) e
 
-mkLHsWrapCo :: TcCoercionN -> LHsExpr (GhcPass id) -> LHsExpr (GhcPass id)
+mkLHsWrapCo :: TcCoercionN -> LHsExpr GhcTc -> LHsExpr GhcTc
 mkLHsWrapCo co (L loc e) = L loc (mkHsWrapCo co e)
 
-mkHsCmdWrap :: HsWrapper -> HsCmd (GhcPass p) -> HsCmd (GhcPass p)
+mkHsCmdWrap :: HsWrapper -> HsCmd GhcTc -> HsCmd GhcTc
 mkHsCmdWrap w cmd | isIdHsWrapper w = cmd
-                  | otherwise       = HsCmdWrap noExtField w cmd
+                  | otherwise       = XCmd (HsWrap w cmd)
 
-mkLHsCmdWrap :: HsWrapper -> LHsCmd (GhcPass p) -> LHsCmd (GhcPass p)
+mkLHsCmdWrap :: HsWrapper -> LHsCmd GhcTc -> LHsCmd GhcTc
 mkLHsCmdWrap w (L loc c) = L loc (mkHsCmdWrap w c)
 
-mkHsWrapPat :: HsWrapper -> Pat (GhcPass id) -> Type -> Pat (GhcPass id)
+mkHsWrapPat :: HsWrapper -> Pat GhcTc -> Type -> Pat GhcTc
 mkHsWrapPat co_fn p ty | isIdHsWrapper co_fn = p
                        | otherwise           = CoPat noExtField co_fn p ty
 
-mkHsWrapPatCo :: TcCoercionN -> Pat (GhcPass id) -> Type -> Pat (GhcPass id)
+mkHsWrapPatCo :: TcCoercionN -> Pat GhcTc -> Type -> Pat GhcTc
 mkHsWrapPatCo co pat ty | isTcReflCo co = pat
                         | otherwise    = CoPat noExtField (mkWpCastN co) pat ty
 
@@ -806,7 +808,6 @@ mkFunBind :: Origin -> Located RdrName -> [LMatch GhcPs (LHsExpr GhcPs)]
 mkFunBind origin fn ms
   = FunBind { fun_id = fn
             , fun_matches = mkMatchGroup origin ms
-            , fun_co_fn = idHsWrapper
             , fun_ext = noExtField
             , fun_tick = [] }
 
@@ -815,7 +816,6 @@ mkTopFunBind :: Origin -> Located Name -> [LMatch GhcRn (LHsExpr GhcRn)]
 -- ^ In Name-land, with empty bind_fvs
 mkTopFunBind origin fn ms = FunBind { fun_id = fn
                                     , fun_matches = mkMatchGroup origin ms
-                                    , fun_co_fn = idHsWrapper
                                     , fun_ext  = emptyNameSet -- NB: closed
                                                               --     binding
                                     , fun_tick = [] }
@@ -841,7 +841,7 @@ mkPatSynBind name details lpat dir = PatSynBind noExtField psb
 -- |If any of the matches in the 'FunBind' are infix, the 'FunBind' is
 -- considered infix.
 isInfixFunBind :: HsBindLR id1 id2 -> Bool
-isInfixFunBind (FunBind _ _ (MG _ matches _) _ _)
+isInfixFunBind (FunBind { fun_matches = MG _ matches _ })
   = any (isInfixMatch . unLoc) (unLoc matches)
 isInfixFunBind _ = False
 

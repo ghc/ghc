@@ -528,11 +528,11 @@ dsCmd ids local_vars stack_ty res_ty (HsCmdIf _ mb_fun cond then_cmd else_cmd)
                        (buildEnvStack else_ids stack_id)
 
     core_if <- case mb_fun of
-       Just fun -> do { fun_apps <- dsSyntaxExpr fun
+       NoSyntaxExprTc  -> matchEnvStack env_ids stack_id $
+                          mkIfThenElse core_cond core_left core_right
+       _ -> do { fun_apps <- dsSyntaxExpr mb_fun
                                       [core_cond, core_left, core_right]
-                      ; matchEnvStack env_ids stack_id fun_apps }
-       Nothing  -> matchEnvStack env_ids stack_id $
-                   mkIfThenElse core_cond core_left core_right
+               ; matchEnvStack env_ids stack_id fun_apps }
 
     return (do_premap ids in_ty sum_ty res_ty
                 core_if
@@ -688,7 +688,7 @@ dsCmd _ local_vars _stack_ty _res_ty (HsCmdArrForm _ op _ _ args) env_ids = do
     return (mkApps (App core_op (Type env_ty)) core_args,
             unionDVarSets fv_sets)
 
-dsCmd ids local_vars stack_ty res_ty (HsCmdWrap _ wrap cmd) env_ids = do
+dsCmd ids local_vars stack_ty res_ty (XCmd (HsWrap wrap cmd)) env_ids = do
     (core_cmd, env_ids') <- dsCmd ids local_vars stack_ty res_ty cmd env_ids
     core_wrap <- dsHsWrapper wrap
     return (core_wrap core_cmd, env_ids')
