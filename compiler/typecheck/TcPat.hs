@@ -82,7 +82,7 @@ tcLetPat sig_fn no_gen pat pat_ty thing_inside
        ; tc_lpat pat pat_ty penv thing_inside }
 
 -----------------
-tcPats :: HsMatchContext Name
+tcPats :: HsMatchContext GhcRn
        -> [LPat GhcRn]            -- Patterns,
        -> [ExpSigmaType]         --   and their types
        -> TcM a                  --   and the checker for the body
@@ -104,14 +104,14 @@ tcPats ctxt pats pat_tys thing_inside
   where
     penv = PE { pe_lazy = False, pe_ctxt = LamPat ctxt, pe_orig = PatOrigin }
 
-tcPat :: HsMatchContext Name
+tcPat :: HsMatchContext GhcRn
       -> LPat GhcRn -> ExpSigmaType
       -> TcM a                     -- Checker for body
       -> TcM (LPat GhcTcId, a)
 tcPat ctxt = tcPat_O ctxt PatOrigin
 
 -- | A variant of 'tcPat' that takes a custom origin
-tcPat_O :: HsMatchContext Name
+tcPat_O :: HsMatchContext GhcRn
         -> CtOrigin              -- ^ origin to use if the type needs inst'ing
         -> LPat GhcRn -> ExpSigmaType
         -> TcM a                 -- Checker for body
@@ -138,7 +138,7 @@ data PatEnv
 
 data PatCtxt
   = LamPat   -- Used for lambdas, case etc
-       (HsMatchContext Name)
+       (HsMatchContext GhcRn)
 
   | LetPat   -- Used only for let(rec) pattern bindings
              -- See Note [Typing patterns in pattern bindings]
@@ -604,8 +604,18 @@ tc_pat penv (NPlusKPat _ (L nm_loc name)
 
         ; res <- tcExtendIdEnv1 name bndr_id thing_inside
 
-        ; let minus'' = minus' { syn_res_wrap =
-                                    minus_wrap <.> syn_res_wrap minus' }
+        ; let minus'' = case minus' of
+                          NoSyntaxExprTc -> pprPanic "tc_pat NoSyntaxExprTc" (ppr minus')
+                                   -- this should be statically avoidable
+                                   -- Case (3) from Note [NoSyntaxExpr] in Hs.Expr
+                          SyntaxExprTc { syn_expr = minus'_expr
+                                       , syn_arg_wraps = minus'_arg_wraps
+                                       , syn_res_wrap = minus'_res_wrap }
+                            -> SyntaxExprTc { syn_expr = minus'_expr
+                                            , syn_arg_wraps = minus'_arg_wraps
+                                            , syn_res_wrap = minus_wrap <.> minus'_res_wrap }
+                             -- Oy. This should really be a record update, but
+                             -- we get warnings if we try. #17783
               pat' = NPlusKPat pat_ty (L nm_loc bndr_id) (L loc lit1') lit2'
                                ge' minus''
         ; return (pat', res) }

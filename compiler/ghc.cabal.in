@@ -347,7 +347,6 @@ Library
         GHC.Hs.Expr
         GHC.Hs.ImpExp
         GHC.Hs.Lit
-        GHC.Hs.PlaceHolder
         GHC.Hs.Extension
         GHC.Hs.Instances
         GHC.Hs.Pat
