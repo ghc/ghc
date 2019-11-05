@@ -221,6 +221,9 @@ infixr 6 <>
 -- @since 4.9.0.0
 class Semigroup a where
         -- | An associative operation.
+        --
+        -- >>> [1,2,3] <> [4,5,6]
+        -- [1,2,3,4,5,6]
         (<>) :: a -> a -> a
 
         -- | Reduce a non-empty list with '<>'
@@ -228,6 +231,9 @@ class Semigroup a where
         -- The default definition should be sufficient, but this can be
         -- overridden for efficiency.
         --
+        -- >>> import Data.List.NonEmpty
+        -- >>> sconcat $ "Hello" :| [" ", "Haskell", "!"]
+        -- "Hello Haskell!"
         sconcat :: NonEmpty a -> a
         sconcat (a :| as) = go a as where
           go b (c:cs) = b <> go c cs
@@ -243,6 +249,9 @@ class Semigroup a where
         -- and monoids can upgrade this to execute in \(\mathcal{O}(1)\) by
         -- picking @stimes = 'Data.Semigroup.stimesIdempotent'@ or @stimes =
         -- 'stimesIdempotentMonoid'@ respectively.
+        --
+        -- >>> stimes 4 [1]
+        -- [1,1,1,1]
         stimes :: Integral b => b -> a -> a
         stimes = stimesDefault
 
@@ -266,6 +275,9 @@ class Semigroup a where
 -- __NOTE__: 'Semigroup' is a superclass of 'Monoid' since /base-4.11.0.0/.
 class Semigroup a => Monoid a where
         -- | Identity of 'mappend'
+        --
+        -- >>> "Hello world" <> mempty
+        -- "Hello world"
         mempty  :: a
 
         -- | An associative operation
@@ -284,6 +296,9 @@ class Semigroup a => Monoid a where
         -- For most types, the default definition for 'mconcat' will be
         -- used, but the function is included in the class definition so
         -- that an optimized version can be provided for specific types.
+        --
+        -- >>> mconcat ["Hello", " ", "Haskell", "!"]
+        -- "Hello Haskell!"
         mconcat :: [a] -> a
         mconcat = foldr mappend mempty
 
