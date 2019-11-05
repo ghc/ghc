@@ -13,6 +13,12 @@
 {-# LANGUAGE PatternSynonyms #-}
 {-# LANGUAGE UndecidableInstances #-} -- Note [Pass sensitive types]
                                       -- in module GHC.Hs.PlaceHolder
+{-# LANGUAGE ScopedTypeVariables #-}
+{-# LANGUAGE TypeApplications #-}
+{-# LANGUAGE GADTs #-}
+{-# LANGUAGE UndecidableSuperClasses #-}  -- for IsGhcPass
+{-# LANGUAGE RankNTypes #-}
+{-# LANGUAGE AllowAmbiguousTypes #-}      -- for pprIfTc, etc.
 
 module GHC.Hs.Extension where
 
@@ -93,6 +99,12 @@ instance Outputable NoExtCon where
 noExtCon :: NoExtCon -> a
 noExtCon x = case x of {}
 
+-- | GHC's L prefixed variants wrap their vanilla variant in this type family,
+-- to add 'SrcLoc' info via 'Located'. Other passes than 'GhcPass' not
+-- interested in location information can define this instance as @f p@.
+type family XRec p (f :: * -> *) = r | r -> p f
+type instance XRec (GhcPass p) f = Located (f (GhcPass p))
+
 {-
 Note [NoExtCon and strict fields]
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
@@ -130,10 +142,19 @@ the strict field changes described above and delete gobs of code involving
 code that consumes unused extension constructors.
 -}
 
--- | Used as a data type index for the hsSyn AST
-data GhcPass (c :: Pass)
-deriving instance Eq (GhcPass c)
-deriving instance Typeable c => Data (GhcPass c)
+-- | Used as a data type index for the hsSyn AST; also serves
+-- as a singleton type for Pass
+data GhcPass (c :: Pass) where
+  GhcPs :: GhcPs
+  GhcRn :: GhcRn
+  GhcTc :: GhcTc
+
+-- This really should never be entered, but the data-deriving machinery
+-- needs the instance to exist.
+instance Typeable p => Data (GhcPass p) where
+  gunfold _ _ _ = panic "instance Data GhcPass"
+  toConstr  _   = panic "instance Data GhcPass"
+  dataTypeOf _  = panic "instance Data GhcPass"
 
 data Pass = Parsed | Renamed | Typechecked
          deriving (Data)
@@ -144,11 +165,37 @@ type GhcRn   = GhcPass 'Renamed     -- Old 'Name' type param
 type GhcTc   = GhcPass 'Typechecked -- Old 'Id' type para,
 type GhcTcId = GhcTc                -- Old 'TcId' type param
 
--- | GHC's L prefixed variants wrap their vanilla variant in this type family,
--- to add 'SrcLoc' info via 'Located'. Other passes than 'GhcPass' not
--- interested in location information can define this instance as @f p@.
-type family XRec p (f :: * -> *) = r | r -> p f
-type instance XRec (GhcPass p) f = Located (f (GhcPass p))
+-- | Allows us to check what phase we're in at GHC's runtime.
+-- For example, this class allows us to write
+-- >  f :: forall p. IsGhcPass p => HsExpr p -> blah
+-- >  f e = case ghcPass @p of
+-- >          GhcPs ->    ... in this RHS we have HsExpr GhcPs...
+-- >          GhcRn ->    ... in this RHS we have HsExpr GhcRn...
+-- >          GhcTc ->    ... in this RHS we have HsExpr GhcTc...
+-- which is very useful, for example, when pretty-printing.
+class ( p ~ GhcPass (GetPass p)
+      , IsGhcPass (NoGhcTc p)
+      , NoGhcTc p ~ NoGhcTc (NoGhcTc p)
+      ) => IsGhcPass p where
+  type GetPass p :: Pass
+  ghcPass :: p
+
+instance IsGhcPass GhcPs where
+  type GetPass GhcPs = 'Parsed
+  ghcPass = GhcPs
+instance IsGhcPass GhcRn where
+  type GetPass GhcRn = 'Renamed
+  ghcPass = GhcRn
+instance IsGhcPass GhcTc where
+  type GetPass GhcTc = 'Typechecked
+  ghcPass = GhcTc
+
+-- | This variant of 'IsGhcPass' is convenient when you have (p :: Pass)
+type IsPass p = IsGhcPass (GhcPass p)
+
+-- | This variant of 'ghcPass' is convenient when you have (p :: Pass)
+pass :: forall p. IsPass p => GhcPass p
+pass = ghcPass @(GhcPass p)
 
 -- | Maps the "normal" id type for a given pass
 type family IdP p
@@ -1137,45 +1184,25 @@ type ConvertIdX a b =
 
 -- ----------------------------------------------------------------------
 
--- Note [OutputableX]
--- ~~~~~~~~~~~~~~~~~~
---
--- is required because the type family resolution
--- process cannot determine that all cases are handled for a `GhcPass p`
--- case where the cases are listed separately.
---
--- So
---
---   type instance XXHsIPBinds    (GhcPass p) = NoExtCon
---
--- will correctly deduce Outputable for (GhcPass p), but
---
---   type instance XIPBinds       GhcPs = NoExt
---   type instance XIPBinds       GhcRn = NoExt
---   type instance XIPBinds       GhcTc = TcEvBinds
---
--- will not.
-
-
--- | Provide a summary constraint that gives all am Outputable constraint to
--- extension points needing one
-type OutputableX p = -- See Note [OutputableX]
-  ( Outputable (XIPBinds    p)
-  , Outputable (XViaStrategy p)
-  , Outputable (XViaStrategy GhcRn)
-  )
--- TODO: Should OutputableX be included in OutputableBndrId?
-
--- ----------------------------------------------------------------------
-
 -- |Constraint type to bundle up the requirement for 'OutputableBndr' on both
--- the @p@ and the 'NameOrRdrName' type for it
+-- the @id@ and the 'NameOrRdrName' type for it
 type OutputableBndrId pass =
   ( OutputableBndr (NameOrRdrName (IdP (GhcPass pass)))
   , OutputableBndr (IdP (GhcPass pass))
   , OutputableBndr (NameOrRdrName (IdP (NoGhcTc (GhcPass pass))))
   , OutputableBndr (IdP (NoGhcTc (GhcPass pass)))
-  , NoGhcTc (GhcPass pass) ~ NoGhcTc (NoGhcTc (GhcPass pass))
-  , OutputableX (GhcPass pass)
-  , OutputableX (NoGhcTc (GhcPass pass))
+  , IsPass pass
   )
+
+-- useful helper functions:
+pprIfPs :: forall p. IsPass p => (p ~ 'Parsed => SDoc) -> SDoc
+pprIfPs pp = case pass @p of GhcPs -> pp
+                             _     -> empty
+
+pprIfRn :: forall p. IsPass p => (p ~ 'Renamed => SDoc) -> SDoc
+pprIfRn pp = case pass @p of GhcRn -> pp
+                             _     -> empty
+
+pprIfTc :: forall p. IsPass p => (p ~ 'Typechecked => SDoc) -> SDoc
+pprIfTc pp = case pass @p of GhcTc -> pp
+                             _     -> empty

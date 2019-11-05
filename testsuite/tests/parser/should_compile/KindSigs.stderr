@@ -361,7 +361,6 @@
              (EmptyLocalBinds
               (NoExtField))))))])
        (FromSource))
-      (WpHole)
       [])))
   ,({ KindSigs.hs:26:1-29 }
     (TyClD
@@ -602,7 +601,6 @@
              (EmptyLocalBinds
               (NoExtField))))))])
        (FromSource))
-      (WpHole)
       [])))]
   (Nothing)
   (Nothing)))

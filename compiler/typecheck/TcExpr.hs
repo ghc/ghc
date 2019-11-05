@@ -1446,11 +1446,11 @@ tcTupArgs args tys
 ---------------------------
 -- See TcType.SyntaxOpType also for commentary
 tcSyntaxOp :: CtOrigin
-           -> SyntaxExpr GhcRn
+           -> SyntaxExprRn
            -> [SyntaxOpType]           -- ^ shape of syntax operator arguments
            -> ExpRhoType               -- ^ overall result type
            -> ([TcSigmaType] -> TcM a) -- ^ Type check any arguments
-           -> TcM (a, SyntaxExpr GhcTcId)
+           -> TcM (a, SyntaxExprTc)
 -- ^ Typecheck a syntax operator
 -- The operator is a variable or a lambda at this stage (i.e. renamer
 -- output)
@@ -1460,21 +1460,22 @@ tcSyntaxOp orig expr arg_tys res_ty
 -- | Slightly more general version of 'tcSyntaxOp' that allows the caller
 -- to specify the shape of the result of the syntax operator
 tcSyntaxOpGen :: CtOrigin
-              -> SyntaxExpr GhcRn
+              -> SyntaxExprRn
               -> [SyntaxOpType]
               -> SyntaxOpType
               -> ([TcSigmaType] -> TcM a)
-              -> TcM (a, SyntaxExpr GhcTcId)
-tcSyntaxOpGen orig op arg_tys res_ty thing_inside
-  = do { (expr, sigma) <- tcInferSigma $ noLoc $ syn_expr op
+              -> TcM (a, SyntaxExprTc)
+tcSyntaxOpGen orig (SyntaxExprRn op) arg_tys res_ty thing_inside
+  = do { (expr, sigma) <- tcInferSigma $ noLoc op
        ; traceTc "tcSyntaxOpGen" (ppr op $$ ppr expr $$ ppr sigma)
        ; (result, expr_wrap, arg_wraps, res_wrap)
            <- tcSynArgA orig sigma arg_tys res_ty $
               thing_inside
        ; traceTc "tcSyntaxOpGen" (ppr op $$ ppr expr $$ ppr sigma )
-       ; return (result, SyntaxExpr { syn_expr = mkHsWrap expr_wrap $ unLoc expr
-                                    , syn_arg_wraps = arg_wraps
-                                    , syn_res_wrap  = res_wrap }) }
+       ; return (result, SyntaxExprTc { syn_expr = mkHsWrap expr_wrap $ unLoc expr
+                                      , syn_arg_wraps = arg_wraps
+                                      , syn_res_wrap  = res_wrap }) }
+tcSyntaxOpGen _ NoSyntaxExprRn _ _ _ = panic "tcSyntaxOpGen"
 
 {-
 Note [tcSynArg]
