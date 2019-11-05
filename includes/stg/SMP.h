@@ -421,6 +421,7 @@ load_load_barrier(void) {
 // Sequentially consistent atomic operations
 #define SEQ_CST_LOAD(ptr) __atomic_load_n(ptr, __ATOMIC_SEQ_CST)
 #define SEQ_CST_STORE(ptr,val) __atomic_store_n(ptr, val, __ATOMIC_SEQ_CST)
+#define SEQ_CST_ADD(ptr,val) __atomic_add_fetch(ptr, val, __ATOMIC_SEQ_CST)
 
 // Non-atomic addition for "approximate" counters that can be lossy
 #define NONATOMIC_ADD(ptr,val) RELAXED_STORE(ptr, RELAXED_LOAD(ptr) + val)
@@ -446,6 +447,7 @@ EXTERN_INLINE void load_load_barrier () {} /* nothing */
 // Sequentially consistent atomic operations
 #define SEQ_CST_LOAD(ptr) *ptr
 #define SEQ_CST_STORE(ptr,val) *ptr = val
+#define SEQ_CST_ADD(ptr,val) *ptr += val
 
 // Non-atomic addition for "approximate" counters that can be lossy
 #define NONATOMIC_ADD(ptr,val) *ptr += val
