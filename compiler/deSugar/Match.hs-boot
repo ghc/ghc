@@ -6,8 +6,7 @@ import TcType   ( Type )
 import DsMonad  ( DsM, EquationInfo, MatchResult )
 import CoreSyn  ( CoreExpr )
 import GHC.Hs   ( LPat, HsMatchContext, MatchGroup, LHsExpr )
-import Name     ( Name )
-import GHC.Hs.Extension ( GhcTc )
+import GHC.Hs.Extension ( GhcRn, GhcTc )
 
 match   :: [Id]
         -> Type
@@ -15,14 +14,14 @@ match   :: [Id]
         -> DsM MatchResult
 
 matchWrapper
-        :: HsMatchContext Name
+        :: HsMatchContext GhcRn
         -> Maybe (LHsExpr GhcTc)
         -> MatchGroup GhcTc (LHsExpr GhcTc)
         -> DsM ([Id], CoreExpr)
 
 matchSimply
         :: CoreExpr
-        -> HsMatchContext Name
+        -> HsMatchContext GhcRn
         -> LPat GhcTc
         -> CoreExpr
         -> CoreExpr
@@ -30,7 +29,7 @@ matchSimply
 
 matchSinglePatVar
         :: Id
-        -> HsMatchContext Name
+        -> HsMatchContext GhcRn
         -> LPat GhcTc
         -> Type
         -> MatchResult
