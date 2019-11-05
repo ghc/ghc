@@ -454,24 +454,26 @@ m32_alloc(struct m32_allocator_t *alloc, size_t size, size_t alignment)
 // See the note titled "Compile Time Trickery" at the top of this file.
 
 m32_allocator *
-m32_allocator_new(bool executable)
+m32_allocator_new(bool executable STG_UNUSED)
 {
     barf("%s: RTS_LINKER_USE_MMAP is %d", __func__, RTS_LINKER_USE_MMAP);
 }
 
-void m32_allocator_free(m32_allocator *alloc)
+void m32_allocator_free(m32_allocator *alloc STG_UNUSED)
 {
     barf("%s: RTS_LINKER_USE_MMAP is %d", __func__, RTS_LINKER_USE_MMAP);
 }
 
 void
-m32_flush(void)
+m32_allocator_flush(m32_allocator *alloc STG_UNUSED)
 {
     barf("%s: RTS_LINKER_USE_MMAP is %d", __func__, RTS_LINKER_USE_MMAP);
 }
 
 void *
-m32_alloc(size_t size STG_UNUSED, size_t alignment STG_UNUSED)
+m32_alloc(m32_allocator *alloc STG_UNUSED,
+          size_t size STG_UNUSED,
+          size_t alignment STG_UNUSED)
 {
     barf("%s: RTS_LINKER_USE_MMAP is %d", __func__, RTS_LINKER_USE_MMAP);
 }
