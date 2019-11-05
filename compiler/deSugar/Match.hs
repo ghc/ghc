@@ -694,7 +694,7 @@ Call @match@ with all of this information!
 -}
 
 matchWrapper
-  :: HsMatchContext Name               -- ^ For shadowing warning messages
+  :: HsMatchContext GhcRn              -- ^ For shadowing warning messages
   -> Maybe (LHsExpr GhcTc)             -- ^ Scrutinee. (Just scrut) for a case expr
                                        --      case scrut of { p1 -> e1 ... }
                                        --   (and in this case the MatchGroup will
@@ -775,7 +775,7 @@ matchWrapper ctxt mb_scr (MG { mg_alts = L _ matches
                      else id
 matchWrapper _ _ (XMatchGroup nec) = noExtCon nec
 
-matchEquations  :: HsMatchContext Name
+matchEquations  :: HsMatchContext GhcRn
                 -> [MatchId] -> [EquationInfo] -> Type
                 -> DsM CoreExpr
 matchEquations ctxt vars eqns_info rhs_ty
@@ -799,7 +799,7 @@ pattern. It returns an expression.
 -}
 
 matchSimply :: CoreExpr                 -- ^ Scrutinee
-            -> HsMatchContext Name      -- ^ Match kind
+            -> HsMatchContext GhcRn     -- ^ Match kind
             -> LPat GhcTc               -- ^ Pattern it should match
             -> CoreExpr                 -- ^ Return this if it matches
             -> CoreExpr                 -- ^ Return this if it doesn't
@@ -813,7 +813,7 @@ matchSimply scrut hs_ctx pat result_expr fail_expr = do
     match_result' <- matchSinglePat scrut hs_ctx pat rhs_ty match_result
     extractMatchResult match_result' fail_expr
 
-matchSinglePat :: CoreExpr -> HsMatchContext Name -> LPat GhcTc
+matchSinglePat :: CoreExpr -> HsMatchContext GhcRn -> LPat GhcTc
                -> Type -> MatchResult -> DsM MatchResult
 -- matchSinglePat ensures that the scrutinee is a variable
 -- and then calls matchSinglePatVar
@@ -832,7 +832,7 @@ matchSinglePat scrut hs_ctx pat ty match_result
        ; return (adjustMatchResult (bindNonRec var scrut) match_result') }
 
 matchSinglePatVar :: Id   -- See Note [Match Ids]
-                  -> HsMatchContext Name -> LPat GhcTc
+                  -> HsMatchContext GhcRn -> LPat GhcTc
                   -> Type -> MatchResult -> DsM MatchResult
 matchSinglePatVar var ctx pat ty match_result
   = ASSERT2( isInternalName (idName var), ppr var )
@@ -1014,7 +1014,7 @@ viewLExprEq (e1,_) (e2,_) = lexp e1 e2
     exp e (HsPar _ (L _ e'))   = exp e e'
     -- because the expressions do not necessarily have the same type,
     -- we have to compare the wrappers
-    exp (HsWrap _ h e) (HsWrap _ h' e') = wrap h h' && exp e e'
+    exp (XExpr (HsWrap h e)) (XExpr (HsWrap  h' e')) = wrap h h' && exp e e'
     exp (HsVar _ i) (HsVar _ i') =  i == i'
     exp (HsConLikeOut _ c) (HsConLikeOut _ c') = c == c'
     -- the instance for IPName derives using the id, so this works if the
@@ -1053,15 +1053,17 @@ viewLExprEq (e1,_) (e2,_) = lexp e1 e2
 
     ---------
     syn_exp :: SyntaxExpr GhcTc -> SyntaxExpr GhcTc -> Bool
-    syn_exp (SyntaxExpr { syn_expr      = expr1
-                        , syn_arg_wraps = arg_wraps1
-                        , syn_res_wrap  = res_wrap1 })
-            (SyntaxExpr { syn_expr      = expr2
-                        , syn_arg_wraps = arg_wraps2
-                        , syn_res_wrap  = res_wrap2 })
+    syn_exp (SyntaxExprTc { syn_expr      = expr1
+                          , syn_arg_wraps = arg_wraps1
+                          , syn_res_wrap  = res_wrap1 })
+            (SyntaxExprTc { syn_expr      = expr2
+                          , syn_arg_wraps = arg_wraps2
+                          , syn_res_wrap  = res_wrap2 })
       = exp expr1 expr2 &&
         and (zipWithEqual "viewLExprEq" wrap arg_wraps1 arg_wraps2) &&
         wrap res_wrap1 res_wrap2
+    syn_exp NoSyntaxExprTc NoSyntaxExprTc = True
+    syn_exp _              _              = False
 
     ---------
     tup_arg (L _ (Present _ e1)) (L _ (Present _ e2)) = lexp e1 e2

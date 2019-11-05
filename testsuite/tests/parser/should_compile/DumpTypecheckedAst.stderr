@@ -552,15 +552,15 @@
            (HsApp
             (NoExtField)
             ({ <no location info> }
-             (HsWrap
-              (NoExtField)
-              (WpTyApp
-               (TyConApp
-                ({abstract:TyCon})
-                []))
-              (HsConLikeOut
-               (NoExtField)
-               ({abstract:ConLike}))))
+             (XExpr
+              (HsWrap
+               (WpTyApp
+                (TyConApp
+                 ({abstract:TyCon})
+                 []))
+               (HsConLikeOut
+                (NoExtField)
+                ({abstract:ConLike})))))
             ({ <no location info> }
              (HsVar
               (NoExtField)
@@ -576,15 +576,15 @@
                (HsApp
                 (NoExtField)
                 ({ <no location info> }
-                 (HsWrap
-                  (NoExtField)
-                  (WpTyApp
-                   (TyConApp
-                    ({abstract:TyCon})
-                    []))
-                  (HsConLikeOut
-                   (NoExtField)
-                   ({abstract:ConLike}))))
+                 (XExpr
+                  (HsWrap
+                   (WpTyApp
+                    (TyConApp
+                     ({abstract:TyCon})
+                     []))
+                   (HsConLikeOut
+                    (NoExtField)
+                    ({abstract:ConLike})))))
                 ({ <no location info> }
                  (HsVar
                   (NoExtField)
@@ -600,30 +600,30 @@
                    (HsApp
                     (NoExtField)
                     ({ <no location info> }
-                     (HsWrap
-                      (NoExtField)
-                      (WpTyApp
-                       (TyConApp
-                        ({abstract:TyCon})
-                        []))
-                      (HsConLikeOut
-                       (NoExtField)
-                       ({abstract:ConLike}))))
+                     (XExpr
+                      (HsWrap
+                       (WpTyApp
+                        (TyConApp
+                         ({abstract:TyCon})
+                         []))
+                       (HsConLikeOut
+                        (NoExtField)
+                        ({abstract:ConLike})))))
                     ({ <no location info> }
                      (HsVar
                       (NoExtField)
                       ({ <no location info> }
                        {Var: $krep})))))
                   ({ <no location info> }
-                   (HsWrap
-                    (NoExtField)
-                    (WpTyApp
-                     (TyConApp
-                      ({abstract:TyCon})
-                      []))
-                    (HsConLikeOut
-                     (NoExtField)
-                     ({abstract:ConLike}))))))))))))))))))
+                   (XExpr
+                    (HsWrap
+                     (WpTyApp
+                      (TyConApp
+                       ({abstract:TyCon})
+                       []))
+                     (HsConLikeOut
+                      (NoExtField)
+                      ({abstract:ConLike})))))))))))))))))))
     (False)))
  ,({ <no location info> }
    (VarBind
@@ -645,15 +645,15 @@
           ({ <no location info> }
            {Var: DumpTypecheckedAst.$tcPeano})))))
       ({ <no location info> }
-       (HsWrap
-        (NoExtField)
-        (WpTyApp
-         (TyConApp
-          ({abstract:TyCon})
-          []))
-        (HsConLikeOut
-         (NoExtField)
-         ({abstract:ConLike}))))))
+       (XExpr
+        (HsWrap
+         (WpTyApp
+          (TyConApp
+           ({abstract:TyCon})
+           []))
+         (HsConLikeOut
+          (NoExtField)
+          ({abstract:ConLike})))))))
     (False)))
  ,({ <no location info> }
    (VarBind
@@ -718,8 +718,7 @@
     {Bag(Located (HsBind Var)):
      [({ DumpTypecheckedAst.hs:18:1-23 }
        (FunBind
-        {NameSet:
-         []}
+        (WpHole)
         ({ DumpTypecheckedAst.hs:18:1-4 }
          {Var: main})
         (MG
@@ -765,7 +764,6 @@
                (EmptyLocalBinds
                 (NoExtField))))))])
          (FromSource))
-        (WpHole)
         []))]}
     (False)))]}
 
