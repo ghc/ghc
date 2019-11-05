@@ -8,3 +8,4 @@ import GHC.Types ()
 class Monoid a
 
 data NonEmpty a = a :| [a]
+

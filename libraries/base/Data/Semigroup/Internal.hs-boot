@@ -23,3 +23,4 @@ class Semigroup a where
         stimes = stimesDefault
 
 instance Semigroup [a]
+
