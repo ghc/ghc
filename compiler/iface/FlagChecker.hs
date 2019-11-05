@@ -57,7 +57,11 @@ fingerprintDynFlags dflags@DynFlags{..} this_mod nameio =
         -- -fprof-auto etc.
         prof = if gopt Opt_SccProfilingOn dflags then fromEnum profAuto else 0
 
-        flags = (mainis, safeHs, lang, cpp, paths, prof)
+        -- Ticky
+        ticky =
+          map (`gopt` dflags) [Opt_Ticky, Opt_Ticky_Allocd, Opt_Ticky_LNE, Opt_Ticky_Dyn_Thunk]
+
+        flags = (mainis, safeHs, lang, cpp, paths, prof, ticky)
 
     in -- pprTrace "flags" (ppr flags) $
        computeFingerprint nameio flags
