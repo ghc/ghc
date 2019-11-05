@@ -1202,7 +1202,7 @@ dirty_MUT_VAR(StgRegTable *reg, StgMutVar *mvar, StgClosure *old)
     // No barrier required here as no other heap object fields are read. See
     // note [Heap memory barriers] in SMP.h.
     if (RELAXED_LOAD(&mvar->header.info) == &stg_MUT_VAR_CLEAN_info) {
-        SET_INFO((StgClosure*) p, &stg_MUT_VAR_DIRTY_info);
+        SET_INFO((StgClosure*) mvar, &stg_MUT_VAR_DIRTY_info);
         recordClosureMutated(cap, (StgClosure *) mvar);
         IF_NONMOVING_WRITE_BARRIER_ENABLED {
             updateRemembSetPushClosure_(reg, old);
