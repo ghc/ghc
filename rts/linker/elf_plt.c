@@ -1,7 +1,9 @@
+#include "Rts.h"
+#include "elf_plt.h"
+
 #include <stdbool.h>
 #include <stdint.h>
 #include <stdlib.h>
-#include "elf_plt.h"
 
 #if defined(arm_HOST_ARCH) || defined(aarch64_HOST_ARCH)
 #if defined(OBJFORMAT_ELF)

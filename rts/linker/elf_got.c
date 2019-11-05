@@ -1,4 +1,6 @@
+#include "Rts.h"
 #include "elf_got.h"
+
 #include <string.h>
 
 #if defined(OBJFORMAT_ELF)
