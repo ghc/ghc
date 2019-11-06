@@ -1679,7 +1679,7 @@ unsafeReflDataCon :: DataCon
 (unsafeEqualityTyCon, unsafeReflDataCon) = (tycon, datacon)
   where
     tycon_binders :: [TyConBinder]
-    tycon_binders = mkTemplateAnonTyConBinders [liftedTypeKind, liftedTypeKind]
+    tycon_binders = mkTemplateTyConBinders [runtimeRepTy] (\[k] -> [tYPE k, tYPE k])
 
     tycon :: TyCon
     tycon =
