@@ -1358,7 +1358,12 @@ proxyHashId
 unsafeEqualityProofId :: Id
 unsafeEqualityProofId = pcMiscPrelId unsafeEqualityProofName ty info
   where
-    ty  = mkSpecForAllTys [alphaTyVar, betaTyVar] (mkTyConApp unsafeEqualityTyCon [alphaTy, betaTy])
+    [kappa, alpha, beta] = mkTemplateKiTyVar liftedTypeKind (\kv -> [kv, kv])
+
+    ty = mkForAllTy kappa Inferred $
+         mkSpecForAllTys [alpha, beta] $
+         mkTyConApp unsafeEqualityTyCon (mkTyVarTys [kappa, alpha, beta])
+
     info = noCafIdInfo
 
 unsafeCoerceId :: Id
