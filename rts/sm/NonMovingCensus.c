@@ -20,7 +20,7 @@
 // all_stopped is whether we can guarantee that all mutators and minor GCs are
 // stopped. In this case is safe to look at active and current segments so we can
 // also collect statistics on live words.
-static inline struct NonmovingAllocCensus
+static struct NonmovingAllocCensus
 nonmovingAllocatorCensus_(struct NonmovingAllocator *alloc, bool collect_live_words)
 {
     struct NonmovingAllocCensus census = {0, 0, 0, 0};
