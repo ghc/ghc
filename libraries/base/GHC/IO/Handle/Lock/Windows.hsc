@@ -9,9 +9,7 @@ module GHC.IO.Handle.Lock.Windows where
 
 #include "HsBaseConfig.h"
 
-#if !defined(mingw32_HOST_OS)
-import GHC.Base () -- Make implicit dependency known to build system
-#else
+#if defined(mingw32_HOST_OS)
 
 #if defined(i386_HOST_ARCH)
 ## define WINDOWS_CCONV stdcall
@@ -29,6 +27,7 @@ import Foreign.C.Error
 import Foreign.C.Types
 import Foreign.Marshal.Alloc
 import Foreign.Marshal.Utils
+import GHC.Base
 import GHC.IO.FD
 import GHC.IO.Handle.FD
 import GHC.Ptr
