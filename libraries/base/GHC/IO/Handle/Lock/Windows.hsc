@@ -29,8 +29,11 @@ import Foreign.C.Error
 import Foreign.C.Types
 import Foreign.Marshal.Alloc
 import Foreign.Marshal.Utils
+import GHC.Base
 import GHC.IO.FD
 import GHC.IO.Handle.FD
+import GHC.IO.Handle.Types (Handle)
+import GHC.IO.Handle.Lock.Common (LockMode(..))
 import GHC.Ptr
 import GHC.Windows
 
