@@ -1567,19 +1567,20 @@ def simple_run(name: TestName, way: WayName, prog: str, extra_run_opts: str) -> 
 
     my_rts_flags = rts_flags(way)
 
-    # Collect stats if necessary:
+    # Collect runtime stats if necessary:
     # isStatsTest and not isCompilerStatsTest():
     #   assume we are running a ghc compiled program. Collect stats.
     # isStatsTest and way == 'ghci':
     #   assume we are running a program via ghci. Collect stats
-    stats_file = name + '.stats'
+    stats_file = None # type: Optional[str]
     if isStatsTest() and (not isCompilerStatsTest() or way == 'ghci'):
+        stats_file = name + '.stats'
         stats_args = ' +RTS -V0 -t' + stats_file + ' --machine-readable -RTS'
     else:
         stats_args = ''
 
     # Put extra_run_opts last: extra_run_opts('+RTS foo') should work.
-    cmd = prog + stats_args + ' ' + my_rts_flags + ' ' + extra_run_opts
+    cmd = ' '.join([prog, stats_args, my_rts_flags, extra_run_opts])
 
     if opts.cmd_wrapper is not None:
         cmd = opts.cmd_wrapper(cmd)
@@ -1615,7 +1616,11 @@ def simple_run(name: TestName, way: WayName, prog: str, extra_run_opts: str) -> 
     if check_prof and not check_prof_ok(name, way):
         return failBecause('bad profile')
 
-    return check_stats(name, way, in_testdir(stats_file), opts.stats_range_fields)
+    # Check runtime stats if desired.
+    if stats_file is not None:
+        return check_stats(name, way, in_testdir(stats_file), opts.stats_range_fields)
+    else:
+        return passed()
 
 def rts_flags(way: WayName) -> str:
     args = config.way_rts_flags.get(way, [])
