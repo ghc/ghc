@@ -6,6 +6,7 @@ import {-# SOURCE #-} DataCon( DataCon )
 import {-# SOURCE #-} PrimOp( PrimOp )
 
 data DataConBoxer
+vanillaDataConBoxer :: DataConBoxer
 
 mkDataConWorkId :: Name -> DataCon -> Id
 mkDictSelId     :: Name -> Class   -> Id

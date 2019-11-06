@@ -53,6 +53,7 @@ module Type (
         piResultTy, piResultTys,
         applyTysX, dropForAlls,
         mkFamilyTyConApp,
+        buildSynTyCon,
 
         mkNumLitTy, isNumLitTy,
         mkStrLitTy, isStrLitTy,
@@ -244,6 +245,7 @@ import TysPrim
 import {-# SOURCE #-} TysWiredIn ( listTyCon, typeNatKind
                                  , typeSymbolKind, liftedTypeKind
                                  , constraintKind )
+import Name( Name )
 import PrelNames
 import CoAxiom
 import {-# SOURCE #-} Coercion( mkNomReflCo, mkGReflCo, mkReflCo
@@ -1881,6 +1883,15 @@ isCoVarType ty
   | otherwise
   = False
 
+buildSynTyCon :: Name -> [KnotTied TyConBinder] -> Kind   -- ^ /result/ kind
+              -> [Role] -> KnotTied Type -> TyCon
+-- This function is here beucase here is where we have
+--   isFamFree and isTauTy
+buildSynTyCon name binders res_kind roles rhs
+  = mkSynonymTyCon name binders res_kind roles rhs is_tau is_fam_free
+  where
+    is_tau      = isTauTy rhs
+    is_fam_free = isFamFreeTy rhs
 
 {-
 ************************************************************************

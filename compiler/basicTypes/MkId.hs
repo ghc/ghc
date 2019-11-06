@@ -20,7 +20,8 @@ module MkId (
         mkPrimOpId, mkFCallId,
 
         unwrapNewTypeBody, wrapFamInstBody,
-        DataConBoxer(..), mkDataConRep, mkDataConWorkId,
+        DataConBoxer(..), vanillaDataConBoxer,
+        mkDataConRep, mkDataConWorkId,
 
         -- And some particular Ids; see below for why they are wired in
         wiredInIds, ghcPrimIds,
@@ -49,7 +50,7 @@ import FamInstEnv
 import Coercion
 import TcType
 import MkCore
-import CoreUtils        ( mkCast, mkDefaultCase, exprType )
+import CoreUtils        ( mkCast, mkDefaultCase )
 import CoreUnfold
 import Literal
 import TyCon
@@ -600,6 +601,10 @@ newtype DataConBoxer = DCB ([Type] -> [Var] -> UniqSM ([Var], [CoreBind]))
                        -- Bind these src-level vars, returning the
                        -- rep-level vars to bind in the pattern
 
+vanillaDataConBoxer :: DataConBoxer
+-- No transformation on arguments needed
+vanillaDataConBoxer = DCB (\_tys args -> return (args, []))
+
 {-
 Note [Inline partially-applied constructor wrappers]
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
@@ -664,7 +669,7 @@ mkDataConRep dflags fam_envs wrap_name mb_bangs data_con
                -- the strictness signature (#14290).
 
              mk_dmd str | isBanged str = evalDmd
-                        | otherwise           = topDmd
+                        | otherwise    = topDmd
 
              wrap_prag = alwaysInlinePragma `setInlinePragmaActivation`
                          activeDuringFinal
@@ -1366,26 +1371,35 @@ unsafeEqualityProofId = pcMiscPrelId unsafeEqualityProofName ty info
 
     info = noCafIdInfo
 
-unsafeCoerceId :: Id
+unsafeCoerceId :: Id   -- This is the wired-in, levity-polymorphic unsafeCorece#
+-- Very dangerous function: it coerces between types with /different/
+--                          runtime representations!
+-- unsafeCoerce# :: forall (r1 :: RuntimeRep) (r2 :: RuntimeRep).
+--                  forall (a :: TYPE r1)     (b :: TYPE r2).
+--                  a -> b
+--
+-- NB: All four forall'd variables are Specified
+--     However r1,r2 could easily be Inferred
 unsafeCoerceId = pcMiscPrelId unsafeCoerceName ty info
   where
     info = noCafIdInfo `setInlinePragInfo` alwaysInlinePragma   -- is this necessary with a compulsory unfolding?
                        `setUnfoldingInfo` mkCompulsoryUnfolding rhs
 
-    ty = mkSpecForAllTys [runtimeRep1TyVar, runtimeRep2TyVar, openAlphaTyVar, openBetaTyVar] $
+    ty = mkSpecForAllTys [ runtimeRep1TyVar, runtimeRep2TyVar
+                         , openAlphaTyVar, openBetaTyVar] $
          mkVisFunTy openAlphaTy openBetaTy
 
-    -- returns (scrutinee, scrutinee type, type of covar in AltCon)
-    unsafe_equality tys@[k, a, b]
-      = ( mkTyApps (Var unsafeEqualityProofId) tys
-        , mkTyConApp unsafeEqualityTyCon tys
+    -- Returns (scrutinee, scrutinee type, type of covar in AltCon)
+    unsafe_equality k a b
+      = ( mkTyApps (Var unsafeEqualityProofId) [k,a,b]
+        , mkTyConApp unsafeEqualityTyCon [k,a,b]
         , mkTyConApp eqPrimTyCon [k, k, a, b]
         )
 
-    (scrut1, scrut1_ty, rr_cv_ty) = unsafe_equality [runtimeRepTy, runtimeRep1Ty, runtimeRep2Ty]
-    (scrut2, scrut2_ty, ab_cv_ty) = unsafe_equality [ tYPE runtimeRep2Ty
-                                                    , openAlphaTy `mkCastTy` alpha_co
-                                                    , openBetaTy ]
+    (scrut1, scrut1_ty, rr_cv_ty) = unsafe_equality runtimeRepTy runtimeRep1Ty runtimeRep2Ty
+    (scrut2, scrut2_ty, ab_cv_ty) = unsafe_equality (tYPE runtimeRep2Ty)
+                                                    (openAlphaTy `mkCastTy` alpha_co)
+                                                    openBetaTy
 
     -- alpha_co :: TYPE r1 ~# TYPE r2
     -- alpha_co = TYPE rr_cv

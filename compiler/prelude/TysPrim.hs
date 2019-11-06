@@ -375,6 +375,8 @@ runtimeRep1Ty = mkTyVarTy runtimeRep1TyVar
 runtimeRep2Ty = mkTyVarTy runtimeRep2TyVar
 
 openAlphaTyVar, openBetaTyVar :: TyVar
+-- alpha :: TYPE r1
+-- beta  :: TYPE r2
 [openAlphaTyVar,openBetaTyVar]
   = mkTemplateTyVars [tYPE runtimeRep1Ty, tYPE runtimeRep2Ty]
 

@@ -64,7 +64,7 @@ module Unique (
         -- *** From TyCon name uniques
         tyConRepNameUnique,
         -- *** From DataCon name uniques
-        dataConWorkerUnique, dataConTyRepNameUnique
+        dataConWrapperUnique, dataConWorkerUnique, dataConTyRepNameUnique
     ) where
 
 #include "HsVersions.h"
@@ -386,25 +386,26 @@ mkPreludeTyConUnique i                = mkUnique '3' (2*i)
 tyConRepNameUnique :: Unique -> Unique
 tyConRepNameUnique  u = incrUnique u
 
--- Data constructor keys occupy *two* slots.  The first is used for the
--- data constructor itself and its wrapper function (the function that
--- evaluates arguments as necessary and calls the worker). The second is
--- used for the worker function (the function that builds the constructor
--- representation).
-
 --------------------------------------------------
--- Wired-in data constructor keys occupy *three* slots:
---    * u: the DataCon itself
---    * u+1: its worker Id
---    * u+2: the TyConRepName of the promoted TyCon
--- Prelude data constructors are too simple to need wrappers.
+-- Wired-in data constructor keys occupy *four* slots:
+--    * u:   the DataCon itself
+--    * u+1: its wrapper Id
+--    * u+2: its worker Id
+--    * u+3: the TyConRepName of the promoted TyCon
+-- The three-slot business is dealt with by
+--     the (4*) in mkPreludeDataConUnique
+--
+-- Reminder: wrapper evaluates and unboxes arguments as necessary
+--                   and calls the worker). The second is
+--           worker  is the Core data constructor itself
 
-mkPreludeDataConUnique i              = mkUnique '6' (3*i)    -- Must be alphabetic
+mkPreludeDataConUnique i = mkUnique '6' (4*i)    -- Must be alphabetic
 
 --------------------------------------------------
 dataConTyRepNameUnique, dataConWorkerUnique :: Unique -> Unique
-dataConWorkerUnique  u = incrUnique u
-dataConTyRepNameUnique u = stepUnique u 2
+dataConWrapperUnique   u = incrUnique u
+dataConWorkerUnique    u = stepUnique u 2
+dataConTyRepNameUnique u = stepUnique u 3
 
 --------------------------------------------------
 mkPrimOpIdUnique op         = mkUnique '9' (2*op)
