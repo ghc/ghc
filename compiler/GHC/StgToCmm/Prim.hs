@@ -82,33 +82,19 @@ cgOpApp (StgFCallOp fcall ty) stg_args res_ty
   = cgForeignCall fcall ty stg_args res_ty
       -- Note [Foreign call results]
 
--- tagToEnum# is special: we need to pull the constructor
--- out of the table, and perform an appropriate return.
-
-cgOpApp (StgPrimOp TagToEnumOp) [arg] res_ty
-  = ASSERT(isEnumerationTyCon tycon)
-    do  { dflags <- getDynFlags
-        ; args' <- getNonVoidArgAmodes [arg]
-        ; let amode = case args' of [amode] -> amode
-                                    _ -> panic "TagToEnumOp had void arg"
-        ; emitReturn [tagToClosure dflags tycon amode] }
-   where
-          -- If you're reading this code in the attempt to figure
-          -- out why the compiler panic'ed here, it is probably because
-          -- you used tagToEnum# in a non-monomorphic setting, e.g.,
-          --         intToTg :: Enum a => Int -> a ; intToTg (I# x#) = tagToEnum# x#
-          -- That won't work.
-        tycon = tyConAppTyCon res_ty
-
 cgOpApp (StgPrimOp primop) args res_ty = do
     dflags <- getDynFlags
     cmm_args <- getNonVoidArgAmodes args
     case emitPrimOp dflags primop cmm_args of
-        Nothing -> do  -- out-of-line
+        PrimopCmmEmit_External -> do  -- out-of-line
           let fun = CmmLit (CmmLabel (mkRtsPrimOpLabel primop))
           emitCall (NativeNodeCall, NativeReturn) fun cmm_args
 
-        Just f  -- inline
+        PrimopCmmEmit_Raw f -> do
+          exprs <- f res_ty
+          emitReturn exprs
+
+        PrimopCmmEmit_IntoRegs f  -- inline
           | ReturnsPrim VoidRep <- result_info
           -> do f []
                 emitReturn []
@@ -158,8 +144,9 @@ cgPrimOp results op args = do
   dflags <- getDynFlags
   arg_exprs <- getNonVoidArgAmodes args
   case emitPrimOp dflags op arg_exprs of
-    Nothing -> panic "External prim op"
-    Just f -> f results
+    PrimopCmmEmit_External -> panic "External prim op"
+    PrimopCmmEmit_Raw _ -> panic "caller should handle TagToEnum themselves"
+    PrimopCmmEmit_IntoRegs f -> f results
 
 
 ------------------------------------------------------------------------
@@ -167,7 +154,10 @@ cgPrimOp results op args = do
 ------------------------------------------------------------------------
 
 shouldInlinePrimOp :: DynFlags -> PrimOp -> [CmmExpr] -> Bool
-shouldInlinePrimOp dflags op args = isJust $ emitPrimOp dflags op args
+shouldInlinePrimOp dflags op args = case emitPrimOp dflags op args of
+  PrimopCmmEmit_External -> False
+  PrimopCmmEmit_IntoRegs _ -> True
+  PrimopCmmEmit_Raw _ -> True
 
 -- TODO: Several primop implementations (e.g. 'doNewByteArrayOp') use
 -- ByteOff (or some other fixed width signed type) to represent
@@ -1442,7 +1432,18 @@ dispatchPrimop dflags = \case
     then Left MO_F64_Fabs
     else Right $ genericFabsOp W64
 
-  TagToEnumOp -> panic "emitPrimOp: handled above in cgOpApp"
+  -- tagToEnum# is special: we need to pull the constructor
+  -- out of the table, and perform an appropriate return.
+  TagToEnumOp -> \[amode] -> OpDest_Raw $ \res_ty -> do
+    -- If you're reading this code in the attempt to figure
+    -- out why the compiler panic'ed here, it is probably because
+    -- you used tagToEnum# in a non-monomorphic setting, e.g.,
+    --         intToTg :: Enum a => Int -> a ; intToTg (I# x#) = tagToEnum# x#
+    -- That won't work.
+    let tycon = tyConAppTyCon res_ty
+    MASSERT(isEnumerationTyCon tycon)
+    dflags <- getDynFlags
+    pure [tagToClosure dflags tycon amode]
 
 -- Out of line primops.
 -- TODO compiler need not know about these
@@ -1586,6 +1587,17 @@ data OpDest
   -- choice of variant never depends on them.
   | OpDest_AllDone ([LocalReg] -- where to put the results
                     -> FCode ())
+  -- | Even more manual than '@OpDest_AllDone@', this is just for the '@TagToEnum@' primop for now.
+  -- It would be nice to remove this special case but that is future work.
+  | OpDest_Raw (Type -- the return type, some primops are specialized to it
+                -> FCode [CmmExpr])
+
+data PrimopCmmEmit
+  = PrimopCmmEmit_External
+  | PrimopCmmEmit_IntoRegs ([LocalReg] -- where to put the results
+                           -> FCode ())
+  | PrimopCmmEmit_Raw (Type -- the return type, some primops are specialized to it
+                       -> FCode [CmmExpr]) -- just for TagToEnum for now
 
 -- | Wrapper around '@dispatchPrimop@' which implements the cases represented
 -- with '@OpDest@'.
@@ -1596,31 +1608,32 @@ data OpDest
 emitPrimOp :: DynFlags
            -> PrimOp            -- the op
            -> [CmmExpr]         -- arguments
-           -> Maybe ([LocalReg]        -- where to put the results
-                      -> FCode ())
+           -> PrimopCmmEmit
 
 -- The rest just translate straightforwardly
 emitPrimOp dflags op args = case dispatchPrimop dflags op args of
-  OpDest_Nop -> Just $ \[res] -> emitAssign (CmmLocal res) arg
+  OpDest_Nop -> PrimopCmmEmit_IntoRegs $ \[res] -> emitAssign (CmmLocal res) arg
     where [arg] = args
 
-  OpDest_Narrow (mop, rep) -> Just $ \[res] -> emitAssign (CmmLocal res) $
+  OpDest_Narrow (mop, rep) -> PrimopCmmEmit_IntoRegs $ \[res] -> emitAssign (CmmLocal res) $
     CmmMachOp (mop rep (wordWidth dflags)) [CmmMachOp (mop (wordWidth dflags) rep) [arg]]
     where [arg] = args
 
-  OpDest_Callish prim -> Just $ \[res] -> emitPrimCall [res] prim args
+  OpDest_Callish prim -> PrimopCmmEmit_IntoRegs $ \[res] -> emitPrimCall [res] prim args
 
-  OpDest_Translate mop -> Just $ \[res] -> do
+  OpDest_Translate mop -> PrimopCmmEmit_IntoRegs $ \[res] -> do
     let stmt = mkAssign (CmmLocal res) (CmmMachOp mop args)
     emit stmt
 
-  OpDest_CallishHandledLater callOrNot -> Just $ \res0 -> case callOrNot of
+  OpDest_CallishHandledLater callOrNot -> PrimopCmmEmit_IntoRegs $ \res0 -> case callOrNot of
           Left op   -> emit $ mkUnsafeCall (PrimTarget op) res0 args
           Right gen -> gen res0 args
 
-  OpDest_AllDone f -> Just $ f
+  OpDest_AllDone f -> PrimopCmmEmit_IntoRegs $ f
 
-  OpDest_External -> Nothing
+  OpDest_External -> PrimopCmmEmit_External
+
+  OpDest_Raw f -> PrimopCmmEmit_Raw f
 
 type GenericOp = [CmmFormal] -> [CmmActual] -> FCode ()
 
@@ -1884,8 +1897,10 @@ genericIntMul2Op [res_c, res_h, res_l] [arg_x, arg_y]
       let t = cmmExprType dflags arg_x
       p   <- newTemp t
       -- 1) compute the multiplication as if numbers were unsigned
-      let wordMul2 = fromMaybe (panic "Unsupported out-of-line WordMul2Op")
-                               (emitPrimOp dflags WordMul2Op [arg_x,arg_y])
+      let wordMul2 = case emitPrimOp dflags WordMul2Op [arg_x,arg_y] of
+            PrimopCmmEmit_External -> panic "Unsupported out-of-line WordMul2Op"
+            PrimopCmmEmit_IntoRegs f -> f
+            PrimopCmmEmit_Raw _ -> panic "Unsupported inline WordMul2Op"
       wordMul2 [p,res_l]
       -- 2) correct the high bits of the unsigned result
       let carryFill x = CmmMachOp (MO_S_Shr ww) [x, wwm1]
