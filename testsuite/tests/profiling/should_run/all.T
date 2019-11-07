@@ -124,8 +124,7 @@ test('T11627a', [ extra_ways(extra_prof_ways),
 test('T11627b', [ extra_run_opts('+RTS -i0 -RTS')  # census after each GC
                 , extra_ways(extra_prof_ways)
                 , when(opsys('darwin'), skip)
-                , when(opsys('mingw32'),
-                       expect_broken_for(12236, ['prof_hc_hb']))
+                , when(opsys('mingw32'), fragile_for(12236, ['prof_hc_hb']))
                 ]
                 , compile_and_run
                 , [''])
