@@ -336,10 +336,10 @@ mkIface_ hsc_env
           mi_arg_docs    = arg_docs,
           mi_final_exts        = () }
   where
-     cmp_rule     = comparing ifRuleName
+     -- cmp_rule     = comparing ifRuleName
      -- Compare these lexicographically by OccName, *not* by unique,
      -- because the latter is not stable across compilations:
-     cmp_inst     = comparing (nameOccName . ifDFun)
+     -- cmp_inst     = comparing (nameOccName . ifDFun)
 
      dflags = hsc_dflags hsc_env
 
@@ -354,7 +354,7 @@ mkIface_ hsc_env
          | targetRetainsAllBindings (hscTarget dflags) = Just rdr_env
          | otherwise                                   = Nothing
 
-     ifFamInstTcName = ifFamInstFam
+     -- ifFamInstTcName = ifFamInstFam
 
 -----------------------------
 writeIfaceFile :: DynFlags -> FilePath -> ModIface -> IO ()
@@ -454,6 +454,7 @@ addFingerprints hsc_env mod_details iface0 = do
    let iface_insts = sortBy cmp_inst (map instanceToIfaceInst (fixSafeInstances (getSafeMode (mi_trust iface0)) insts))
    let iface_rules = sortBy cmp_rule (map coreRuleToIfaceRule rules)
    let iface_anns = map mkIfaceAnnotation anns
+   let iface_complete_sigs = map mkIfaceCompleteSig complete_sigs
 
    let (non_orph_insts, orph_insts) = mkOrphMap ifInstOrph iface_insts
    let (non_orph_rules, orph_rules) = mkOrphMap ifRuleOrph iface_rules
@@ -753,6 +754,7 @@ addFingerprints hsc_env mod_details iface0 = do
       , mi_fam_insts = iface_fam_insts
       , mi_rules = iface_rules
       , mi_anns = iface_anns
+      , mi_complete_sigs = iface_complete_sigs
       }
     final_iface = iface0 { mi_decls = sorted_decls, mi_final_exts = final_iface_exts }
    --

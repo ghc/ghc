@@ -961,6 +961,7 @@ data ModIfaceBackend = ModIfaceBackend
     -- ^ Sorted rules
   , mi_anns :: ![IfaceAnnotation]
     -- ^ Annotations
+  , mi_complete_sigs :: ![IfaceCompleteMatch]
   }
 
 data ModIfacePhase
@@ -1073,7 +1074,8 @@ data ModIface_ (phase :: ModIfacePhase)
                 -- itself) but imports some trustworthy modules from its own
                 -- package (which does require its own package be trusted).
                 -- See Note [RnNames . Trust Own Package]
-        mi_complete_sigs :: [IfaceCompleteMatch],
+
+        -- mi_complete_sigs :: [IfaceCompleteMatch],
 
         mi_doc_hdr :: Maybe HsDocString,
                 -- ^ Module header.
@@ -1149,7 +1151,6 @@ instance Binary ModIface where
                  mi_hpc       = hpc_info,
                  mi_trust     = trust,
                  mi_trust_pkg = trust_pkg,
-                 mi_complete_sigs = complete_sigs,
                  mi_doc_hdr   = doc_hdr,
                  mi_decl_docs = decl_docs,
                  mi_arg_docs  = arg_docs,
@@ -1168,7 +1169,8 @@ instance Binary ModIface where
                    mi_insts = insts,
                    mi_fam_insts = fam_insts,
                    mi_rules = rules,
-                   mi_anns = anns
+                   mi_anns = anns,
+                   mi_complete_sigs = complete_sigs
                  }}) = do
         put_ bh mod
         put_ bh sig_of
@@ -1249,7 +1251,6 @@ instance Binary ModIface where
                  mi_trust       = trust,
                  mi_trust_pkg   = trust_pkg,
                         -- And build the cached values
-                 mi_complete_sigs = complete_sigs,
                  mi_doc_hdr     = doc_hdr,
                  mi_decl_docs   = decl_docs,
                  mi_arg_docs    = arg_docs,
@@ -1271,7 +1272,8 @@ instance Binary ModIface where
                    mi_insts = insts,
                    mi_fam_insts = fam_insts,
                    mi_rules = rules,
-                   mi_anns = anns
+                   mi_anns = anns,
+                   mi_complete_sigs = complete_sigs
                  }})
 
 -- | The original names declared of a certain module that are exported
@@ -1292,7 +1294,6 @@ emptyPartialModIface mod
                mi_hpc         = False,
                mi_trust       = noIfaceTrustInfo,
                mi_trust_pkg   = False,
-               mi_complete_sigs = [],
                mi_doc_hdr     = Nothing,
                mi_decl_docs   = emptyDeclDocMap,
                mi_arg_docs    = emptyArgDocMap,
@@ -1320,7 +1321,8 @@ emptyFullModIface mod =
           mi_insts = [],
           mi_fam_insts = [],
           mi_rules = [],
-          mi_anns = []
+          mi_anns = [],
+          mi_complete_sigs = []
         }
       }
 
@@ -3301,7 +3303,7 @@ phaseForeignLanguage phase = case phase of
 -- avoid major space leaks.
 instance (NFData (IfaceBackendExts (phase :: ModIfacePhase)), NFData (IfaceDeclExts (phase :: ModIfacePhase))) => NFData (ModIface_ phase) where
   rnf (ModIface f1 f2 f3 f4 f5 f7 f8 f9 f11 f12
-                f16 f17 f18 f19 f20 f21 f22 f23) =
+                f16 f17 f18 f20 f21 f22 f23) =
     rnf f1 `seq` rnf f2 `seq` f3 `seq` f4 `seq` f5 `seq` rnf f7 `seq` f8 `seq`
     f9 `seq` rnf f11 `seq` f12 `seq`
-    rnf f16 `seq` f17 `seq` rnf f18 `seq` rnf f19 `seq` f20 `seq` f21 `seq` f22 `seq` rnf f23
+    rnf f16 `seq` f17 `seq` rnf f18 `seq` f20 `seq` f21 `seq` f22 `seq` rnf f23

@@ -471,7 +471,7 @@ loadInterface doc_str mod from
         ; new_eps_fam_insts <- mapM tcIfaceFamInst (mi_fam_insts (mi_final_exts iface))
         ; new_eps_rules     <- tcIfaceRules ignore_prags (mi_rules (mi_final_exts iface))
         ; new_eps_anns      <- tcIfaceAnnotations (mi_anns (mi_final_exts iface))
-        ; new_eps_complete_sigs <- tcIfaceCompleteSigs (mi_complete_sigs iface)
+        ; new_eps_complete_sigs <- tcIfaceCompleteSigs (mi_complete_sigs (mi_final_exts iface))
 
         ; let { final_iface = iface {
                                 mi_decls     = panic "No mi_decls in PIT"
@@ -1152,7 +1152,7 @@ pprModIface iface@ModIface{ mi_final_exts = exts }
         , ppr (mi_warns iface)
         , pprTrustInfo (mi_trust iface)
         , pprTrustPkg (mi_trust_pkg iface)
-        , vcat (map ppr (mi_complete_sigs iface))
+        , vcat (map ppr (mi_complete_sigs (mi_final_exts iface)))
         , text "module header:" $$ nest 2 (ppr (mi_doc_hdr iface))
         , text "declaration docs:" $$ nest 2 (ppr (mi_decl_docs iface))
         , text "arg docs:" $$ nest 2 (ppr (mi_arg_docs iface))
