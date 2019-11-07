@@ -218,19 +218,18 @@ StgIndStatic *debug_caf_list_snapshot = (StgIndStatic*)END_OF_CAF_LIST;
  *         return x
  *
  */
-static Mutex upd_rem_set_lock;
 bdescr *upd_rem_set_block_list = NULL;
-
 #if defined(THREADED_RTS)
+static Mutex upd_rem_set_lock;
+
 /* Used during the mark/sweep phase transition to track how many capabilities
  * have pushed their update remembered sets. Protected by upd_rem_set_lock.
  */
 static volatile StgWord upd_rem_set_flush_count = 0;
-#endif
-
 
 /* Signaled by each capability when it has flushed its update remembered set */
 static Condition upd_rem_set_flushed_cond;
+#endif
 
 /* Indicates to mutators that the write barrier must be respected. Set while
  * concurrent mark is running.
@@ -244,9 +243,9 @@ MarkQueue *current_mark_queue = NULL;
 
 /* Initialise update remembered set data structures */
 void nonmovingMarkInitUpdRemSet() {
+#if defined(THREADED_RTS)
     initMutex(&upd_rem_set_lock);
     initCondition(&upd_rem_set_flushed_cond);
-#if defined(THREADED_RTS)
     initMutex(&nonmoving_large_objects_mutex);
 #endif
 }
