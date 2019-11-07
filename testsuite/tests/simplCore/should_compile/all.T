@@ -159,11 +159,6 @@ test('T7702',
 #       (2) Build the program twice: once with -dynamic, and then
 #           with -prof using -osuf to set a different object file suffix.
 test('T7944', omit_ways(['profasm']), compile, ['-O2'])
-test('T7995',
-     # RULE doesn't seem to fire unless optimizations are turned on.
-     # This seems reasonable, so I've required it for the test. -- EZY 20130720
-     only_ways(['optasm']),
-     makefile_test, ['T7995'])
 
 test('T8196', normal, compile, [''])
 test('T8221b', normal, compile, [''])
