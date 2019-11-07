@@ -895,6 +895,13 @@ conditions hold:
    There are subtleties here. See Note [Coverage condition for injective type families]
    in FamInst.
 
+Check (1) must be done for all family instances (transitively) imported. Other
+checks (2-4) should be done just for locally written equations, as they are checks
+involving just a single equation, not about interactions. Doing the other checks for
+imported equations led to #17405, as the behavior of check (4) depends on
+-XUndecidableInstances (see Note [Coverage condition for injective type families] in
+FamInst), which may vary between modules.
+
 See also Note [Injective type families] in TyCon
 -}
 

@@ -5,60 +5,65 @@
 [5 of 5] Compiling T6018fail        ( T6018fail.hs, T6018fail.o )
 
 T6018Afail.hs:9:15: error:
-    Type family equations violate injectivity annotation:
+    Type family equation right-hand sides overlap; this violates
+    the family's injectivity annotation:
       G Char Bool Int = Int -- Defined at T6018Afail.hs:9:15
       G Bool Int Char = Int -- Defined at T6018fail.hs:17:15
 
 T6018Cfail.hs:8:15: error:
-    Type family equations violate injectivity annotation:
+    Type family equation right-hand sides overlap; this violates
+    the family's injectivity annotation:
       T6018Bfail.H Char Bool Int = Int -- Defined at T6018Cfail.hs:8:15
       T6018Bfail.H Bool Int Char = Int -- Defined at T6018Dfail.hs:7:15
 
 T6018fail.hs:15:15: error:
-    Type family equations violate injectivity annotation:
+    Type family equation right-hand sides overlap; this violates
+    the family's injectivity annotation:
       F Bool Int Char = Int -- Defined at T6018fail.hs:15:15
       F Char Bool Int = Int -- Defined at T6018fail.hs:14:15
 
 T6018fail.hs:21:15: error:
-    Type family equations violate injectivity annotation:
+    Type family equation right-hand sides overlap; this violates
+    the family's injectivity annotation:
       I Int Int Int = Bool -- Defined at T6018fail.hs:21:15
       I Int Char Bool = Bool -- Defined at T6018fail.hs:20:15
 
 T6018fail.hs:30:15: error:
-    Type family equation violates injectivity annotation.
+    Type family equation violates the family's injectivity annotation.
     RHS of injective type family equation cannot be a type family:
       IdProxy a = Id a -- Defined at T6018fail.hs:30:15
 
 T6018fail.hs:38:15: error:
-    Type family equation violates injectivity annotation.
+    Type family equation violates the family's injectivity annotation.
     RHS of injective type family equation is a bare type variable
     but these LHS type and kind patterns are not bare variables: ‘'Z’
       P 'Z m = m -- Defined at T6018fail.hs:38:15
 
 T6018fail.hs:39:15: error:
-    Type family equations violate injectivity annotation:
+    Type family equation right-hand sides overlap; this violates
+    the family's injectivity annotation:
       P ('S n) m = 'S (P n m) -- Defined at T6018fail.hs:39:15
       P 'Z m = m -- Defined at T6018fail.hs:38:15
 
 T6018fail.hs:44:15: error:
-    Type family equation violates injectivity annotation.
+    Type family equation violates the family's injectivity annotation.
     Type variable ‘b’ cannot be inferred from the right-hand side.
     In the type family equation:
       J Int b c = Char -- Defined at T6018fail.hs:44:15
 
 T6018fail.hs:48:15: error:
-    Type family equation violates injectivity annotation.
+    Type family equation violates the family's injectivity annotation.
     Type variable ‘n’ cannot be inferred from the right-hand side.
     In the type family equation:
       K ('S n) m = 'S m -- Defined at T6018fail.hs:48:15
 
 T6018fail.hs:53:15: error:
-    Type family equation violates injectivity annotation.
+    Type family equation violates the family's injectivity annotation.
     RHS of injective type family equation cannot be a type family:
       L a = MaybeSyn a -- Defined at T6018fail.hs:53:15
 
 T6018fail.hs:61:10: error:
-    Type family equation violates injectivity annotation.
+    Type family equation violates the family's injectivity annotation.
     Type/kind variable ‘k1’
     cannot be inferred from the right-hand side.
     In the type family equation:
@@ -66,7 +71,7 @@ T6018fail.hs:61:10: error:
         -- Defined at T6018fail.hs:61:10
 
 T6018fail.hs:64:15: error:
-    Type family equation violates injectivity annotation.
+    Type family equation violates the family's injectivity annotation.
     Type/kind variable ‘k1’
     cannot be inferred from the right-hand side.
     In the type family equation:
@@ -74,14 +79,14 @@ T6018fail.hs:64:15: error:
         -- Defined at T6018fail.hs:64:15
 
 T6018fail.hs:68:15: error:
-    Type family equation violates injectivity annotation.
+    Type family equation violates the family's injectivity annotation.
     Type/kind variable ‘k’ cannot be inferred from the right-hand side.
     In the type family equation:
       forall k (a :: k) (b :: k).
         Fc @k a b = Int -- Defined at T6018fail.hs:68:15
 
 T6018fail.hs:72:15: error:
-    Type family equation violates injectivity annotation.
+    Type family equation violates the family's injectivity annotation.
     Type/kind variables ‘k’, ‘a’, ‘b’
     cannot be inferred from the right-hand side.
     In the type family equation:
@@ -89,55 +94,60 @@ T6018fail.hs:72:15: error:
         Gc @k a b = Int -- Defined at T6018fail.hs:72:15
 
 T6018fail.hs:76:15: error:
-    Type family equations violate injectivity annotation:
+    Type family equation right-hand sides overlap; this violates
+    the family's injectivity annotation:
       F1 [a] = Maybe (GF1 a) -- Defined at T6018fail.hs:76:15
       F1 (Maybe a) = Maybe (GF2 a) -- Defined at T6018fail.hs:77:15
 
 T6018fail.hs:89:15: error:
-    Type family equation violates injectivity annotation.
+    Type family equation violates the family's injectivity annotation.
     RHS of injective type family equation is a bare type variable
     but these LHS type and kind patterns are not bare variables: ‘[a]’
       W1 [a] = a -- Defined at T6018fail.hs:89:15
 
 T6018fail.hs:92:15: error:
-    Type family equation violates injectivity annotation.
+    Type family equation violates the family's injectivity annotation.
     RHS of injective type family equation cannot be a type family:
       W2 [a] = W2 a -- Defined at T6018fail.hs:92:15
 
 T6018fail.hs:97:15: error:
-    Type family equations violate injectivity annotation:
+    Type family equation right-hand sides overlap; this violates
+    the family's injectivity annotation:
       Z1 (Maybe b) = (b, [b]) -- Defined at T6018fail.hs:97:15
       Z1 [a] = (a, a) -- Defined at T6018fail.hs:96:15
 
 T6018fail.hs:101:15: error:
-    Type family equations violate injectivity annotation:
+    Type family equation right-hand sides overlap; this violates
+    the family's injectivity annotation:
       G1 (Maybe b) = [(b, b)] -- Defined at T6018fail.hs:101:15
       G1 [a] = [a] -- Defined at T6018fail.hs:100:15
 
 T6018fail.hs:105:15: error:
-    Type family equations violate injectivity annotation:
+    Type family equation right-hand sides overlap; this violates
+    the family's injectivity annotation:
       G3 a Bool = (Bool, a) -- Defined at T6018fail.hs:105:15
       G3 a Int = (a, Int) -- Defined at T6018fail.hs:104:15
 
 T6018fail.hs:108:15: error:
-    Type family equation violates injectivity annotation.
+    Type family equation violates the family's injectivity annotation.
     Type variable ‘b’ cannot be inferred from the right-hand side.
     In the type family equation:
       G4 a b = [a] -- Defined at T6018fail.hs:108:15
 
 T6018fail.hs:112:15: error:
-    Type family equations violate injectivity annotation:
+    Type family equation right-hand sides overlap; this violates
+    the family's injectivity annotation:
       G5 Int = [Bool] -- Defined at T6018fail.hs:112:15
       G5 [a] = [GF1 a] -- Defined at T6018fail.hs:111:15
 
 T6018fail.hs:115:15: error:
-    Type family equation violates injectivity annotation.
+    Type family equation violates the family's injectivity annotation.
     Type variable ‘a’ cannot be inferred from the right-hand side.
     In the type family equation:
       G6 [a] = [HF1 a] -- Defined at T6018fail.hs:115:15
 
 T6018fail.hs:120:15: error:
-    Type family equation violates injectivity annotation.
+    Type family equation violates the family's injectivity annotation.
     Type/kind variables ‘k’, ‘c’
     cannot be inferred from the right-hand side.
     In the type family equation:
@@ -145,12 +155,13 @@ T6018fail.hs:120:15: error:
         G7 @k a b c = [G7a @k a b c] -- Defined at T6018fail.hs:120:15
 
 T6018fail.hs:131:1: error:
-    Type family equations violate injectivity annotation:
+    Type family equation right-hand sides overlap; this violates
+    the family's injectivity annotation:
       FC Int Bool = Bool -- Defined at T6018fail.hs:131:1
       FC Int Char = Bool -- Defined at T6018fail.hs:127:10
 
 T6018fail.hs:136:1: error:
-    Type family equation violates injectivity annotation.
+    Type family equation violates the family's injectivity annotation.
     RHS of injective type family equation is a bare type variable
     but these LHS type and kind patterns are not bare variables: ‘*’,
                                                                  ‘Char’

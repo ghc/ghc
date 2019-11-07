@@ -1,14 +1,16 @@
 
 T10836.hs:5:5: error:
-    Type family equations violate injectivity annotation:
-      Foo Int = Int -- Defined at T10836.hs:5:5
-      Foo Bool = Int -- Defined at T10836.hs:6:5
-    In the equations for closed type family ‘Foo’
-    In the type family declaration for ‘Foo’
+    • Type family equation right-hand sides overlap; this violates
+      the family's injectivity annotation:
+        Foo Int = Int -- Defined at T10836.hs:5:5
+        Foo Bool = Int -- Defined at T10836.hs:6:5
+    • In the equations for closed type family ‘Foo’
+      In the type family declaration for ‘Foo’
 
 T10836.hs:9:5: error:
-    Type family equations violate injectivity annotation:
-      Bar Int = Int -- Defined at T10836.hs:9:5
-      Bar Bool = Int -- Defined at T10836.hs:10:5
-    In the equations for closed type family ‘Bar’
-    In the type family declaration for ‘Bar’
+    • Type family equation right-hand sides overlap; this violates
+      the family's injectivity annotation:
+        Bar Int = Int -- Defined at T10836.hs:9:5
+        Bar Bool = Int -- Defined at T10836.hs:10:5
+    • In the equations for closed type family ‘Bar’
+      In the type family declaration for ‘Bar’
