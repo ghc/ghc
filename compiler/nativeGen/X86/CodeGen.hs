@@ -1618,7 +1618,7 @@ condIntCode' is32Bit cond x y
  | isOperand is32Bit y = do
     dflags <- getDynFlags
     (x_reg, x_code) <- getNonClobberedReg x
-    (y_op,  y_code) <- getOperand y
+    (y_op,  y_code) <- getNonClobberedOperand y
     let
         code = x_code `appOL` y_code `snocOL`
                   CMP (cmmTypeFormat (cmmExprType dflags x)) y_op (OpReg x_reg)
@@ -1629,7 +1629,7 @@ condIntCode' is32Bit cond x y
  , Just revcond <- maybeFlipCond cond = do
     dflags <- getDynFlags
     (y_reg, y_code) <- getNonClobberedReg y
-    (x_op,  x_code) <- getOperand x
+    (x_op,  x_code) <- getNonClobberedOperand x
     let
         code = y_code `appOL` x_code `snocOL`
                   CMP (cmmTypeFormat (cmmExprType dflags x)) x_op (OpReg y_reg)
@@ -1662,7 +1662,7 @@ condFltCode cond x y
   condFltCode_sse2 = do
     dflags <- getDynFlags
     (x_reg, x_code) <- getNonClobberedReg x
-    (y_op, y_code) <- getOperand y
+    (y_op, y_code) <- getNonClobberedOperand y
     let
         code = x_code `appOL`
                y_code `snocOL`
