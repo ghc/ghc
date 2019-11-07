@@ -293,3 +293,4 @@ test('T16632', normal, compile, ['-Wunused-type-patterns -fdiagnostics-show-care
 test('T16828', normal, compile, [''])
 test('T17008b', normal, compile, [''])
 test('T17056', normal, compile, [''])
+test('T17405', normal, multimod_compile, ['T17405c', '-v0'])

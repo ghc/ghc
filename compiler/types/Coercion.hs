@@ -202,7 +202,7 @@ pprCoAxiom ax@(CoAxiom { co_ax_tc = tc, co_ax_branches = branches })
        2 (vcat (map (pprCoAxBranchUser tc) (fromBranches branches)))
 
 pprCoAxBranchUser :: TyCon -> CoAxBranch -> SDoc
--- Used when printing injectivity errors (FamInst.makeInjectivityErrors)
+-- Used when printing injectivity errors (FamInst.reportInjectivityErrors)
 -- and inaccessible branches (TcValidity.inaccessibleCoAxBranch)
 -- This happens in error messages: don't print the RHS of a data
 --   family axiom, which is meaningless to a user

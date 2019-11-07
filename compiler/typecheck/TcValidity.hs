@@ -50,7 +50,7 @@ import TcEnv       ( tcInitTidyEnv, tcInitOpenTidyEnv )
 import FunDeps
 import FamInstEnv  ( isDominatedBy, injectiveBranches,
                      InjectivityCheckResult(..) )
-import FamInst     ( makeInjectivityErrors )
+import FamInst
 import Name
 import VarEnv
 import VarSet
@@ -2031,8 +2031,8 @@ checkValidCoAxiom ax@(CoAxiom { co_ax_tc = fam_tc, co_ax_branches = branches })
            ; let conflicts =
                      fst $ foldl' (gather_conflicts inj prev_branches cur_branch)
                                  ([], 0) prev_branches
-           ; mapM_ (\(err, span) -> setSrcSpan span $ addErr err)
-                   (makeInjectivityErrors dflags ax cur_branch inj conflicts) }
+           ; reportConflictingInjectivityErrs fam_tc conflicts cur_branch
+           ; reportInjectivityErrors dflags ax cur_branch inj }
       | otherwise
       = return ()
 
