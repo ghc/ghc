@@ -78,7 +78,7 @@ module Util (
         transitiveClosure,
 
         -- * Strictness
-        seqList,
+        seqList, seqListId,
 
         -- * Module names
         looksLikeModuleName,
@@ -1006,6 +1006,8 @@ seqList :: [a] -> b -> b
 seqList [] b = b
 seqList (x:xs) b = x `seq` seqList xs b
 
+seqListId :: [a] -> [a]
+seqListId lst = seqList lst lst
 
 {-
 ************************************************************************
