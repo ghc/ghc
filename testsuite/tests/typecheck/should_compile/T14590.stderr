@@ -13,10 +13,6 @@ T14590.hs:4:13: warning: [-Wtyped-holes (in -Wdefault)]
         f2 :: Int -> Int -> Int (bound at T14590.hs:5:1)
         f3 :: Int -> Int -> Int (bound at T14590.hs:6:1)
         f4 :: Int -> Int -> Int (bound at T14590.hs:7:1)
-        seq :: forall a b. a -> b -> b
-          with seq @Int @Int
-          (imported from ‘Prelude’ at T14590.hs:1:8-13
-           (and originally defined in ‘GHC.Prim’))
         (-) :: forall a. Num a => a -> a -> a
           with (-) @Int
           (imported from ‘Prelude’ at T14590.hs:1:8-13
@@ -77,6 +73,10 @@ T14590.hs:4:13: warning: [-Wtyped-holes (in -Wdefault)]
           with min @Int
           (imported from ‘Prelude’ at T14590.hs:1:8-13
            (and originally defined in ‘GHC.Classes’))
+        seq :: forall a b. a -> b -> b
+          with seq @Int @Int
+          (imported from ‘Prelude’ at T14590.hs:1:8-13
+           (and originally defined in ‘GHC.Prim’))
         return :: forall (m :: * -> *) a. Monad m => a -> m a
           with return @((->) Int) @Int
           (imported from ‘Prelude’ at T14590.hs:1:8-13
@@ -101,10 +101,6 @@ T14590.hs:5:13: warning: [-Wtyped-holes (in -Wdefault)]
         f1 :: Int -> Int -> Int (defined at T14590.hs:4:1)
         f3 :: Int -> Int -> Int (bound at T14590.hs:6:1)
         f4 :: Int -> Int -> Int (bound at T14590.hs:7:1)
-        seq :: forall a b. a -> b -> b
-          with seq @Int @Int
-          (imported from ‘Prelude’ at T14590.hs:1:8-13
-           (and originally defined in ‘GHC.Prim’))
         (-) :: forall a. Num a => a -> a -> a
           with (-) @Int
           (imported from ‘Prelude’ at T14590.hs:1:8-13
@@ -165,6 +161,10 @@ T14590.hs:5:13: warning: [-Wtyped-holes (in -Wdefault)]
           with min @Int
           (imported from ‘Prelude’ at T14590.hs:1:8-13
            (and originally defined in ‘GHC.Classes’))
+        seq :: forall a b. a -> b -> b
+          with seq @Int @Int
+          (imported from ‘Prelude’ at T14590.hs:1:8-13
+           (and originally defined in ‘GHC.Prim’))
         return :: forall (m :: * -> *) a. Monad m => a -> m a
           with return @((->) Int) @Int
           (imported from ‘Prelude’ at T14590.hs:1:8-13
@@ -188,10 +188,6 @@ T14590.hs:6:11: warning: [-Wtyped-holes (in -Wdefault)]
         f1 :: Int -> Int -> Int (defined at T14590.hs:4:1)
         f2 :: Int -> Int -> Int (defined at T14590.hs:5:1)
         f4 :: Int -> Int -> Int (bound at T14590.hs:7:1)
-        seq :: forall a b. a -> b -> b
-          with seq @Int @Int
-          (imported from ‘Prelude’ at T14590.hs:1:8-13
-           (and originally defined in ‘GHC.Prim’))
         (-) :: forall a. Num a => a -> a -> a
           with (-) @Int
           (imported from ‘Prelude’ at T14590.hs:1:8-13
@@ -252,6 +248,10 @@ T14590.hs:6:11: warning: [-Wtyped-holes (in -Wdefault)]
           with min @Int
           (imported from ‘Prelude’ at T14590.hs:1:8-13
            (and originally defined in ‘GHC.Classes’))
+        seq :: forall a b. a -> b -> b
+          with seq @Int @Int
+          (imported from ‘Prelude’ at T14590.hs:1:8-13
+           (and originally defined in ‘GHC.Prim’))
         return :: forall (m :: * -> *) a. Monad m => a -> m a
           with return @((->) Int) @Int
           (imported from ‘Prelude’ at T14590.hs:1:8-13
@@ -276,10 +276,6 @@ T14590.hs:7:11: warning: [-Wtyped-holes (in -Wdefault)]
         f1 :: Int -> Int -> Int (defined at T14590.hs:4:1)
         f2 :: Int -> Int -> Int (defined at T14590.hs:5:1)
         f3 :: Int -> Int -> Int (defined at T14590.hs:6:1)
-        seq :: forall a b. a -> b -> b
-          with seq @Int @Int
-          (imported from ‘Prelude’ at T14590.hs:1:8-13
-           (and originally defined in ‘GHC.Prim’))
         (-) :: forall a. Num a => a -> a -> a
           with (-) @Int
           (imported from ‘Prelude’ at T14590.hs:1:8-13
@@ -340,6 +336,10 @@ T14590.hs:7:11: warning: [-Wtyped-holes (in -Wdefault)]
           with min @Int
           (imported from ‘Prelude’ at T14590.hs:1:8-13
            (and originally defined in ‘GHC.Classes’))
+        seq :: forall a b. a -> b -> b
+          with seq @Int @Int
+          (imported from ‘Prelude’ at T14590.hs:1:8-13
+           (and originally defined in ‘GHC.Prim’))
         return :: forall (m :: * -> *) a. Monad m => a -> m a
           with return @((->) Int) @Int
           (imported from ‘Prelude’ at T14590.hs:1:8-13

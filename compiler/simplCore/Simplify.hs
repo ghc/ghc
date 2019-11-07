@@ -2090,11 +2090,16 @@ trySeqRules in_env scrut rhs cont
     no_cast_scrut = drop_casts scrut
     scrut_ty  = exprType no_cast_scrut
     seq_id_ty = idType seqId
+    res1_ty   = piResultTy seq_id_ty rhs_rep
+    res2_ty   = piResultTy res1_ty   scrut_ty
     rhs_ty    = substTy in_env (exprType rhs)
-    out_args  = [ TyArg { as_arg_ty  = scrut_ty
+    rhs_rep   = getRuntimeRep rhs_ty
+    out_args  = [ TyArg { as_arg_ty  = rhs_rep
                         , as_hole_ty = seq_id_ty }
+                , TyArg { as_arg_ty  = scrut_ty
+                        , as_hole_ty = res1_ty }
                 , TyArg { as_arg_ty  = rhs_ty
-                       , as_hole_ty  = piResultTy seq_id_ty scrut_ty }
+                        , as_hole_ty = res2_ty }
                 , ValArg no_cast_scrut]
     rule_cont = ApplyToVal { sc_dup = NoDup, sc_arg = rhs
                            , sc_env = in_env, sc_cont = cont }
