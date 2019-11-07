@@ -6,10 +6,7 @@
 
 {-# LANGUAGE CPP, DeriveFunctor, ViewPatterns #-}
 
-module TidyPgm (
-       mkBootModDetailsTc, tidyProgram,
-       tidyProgram2,
-   ) where
+module TidyPgm where
 
 #include "HsVersions.h"
 
@@ -401,6 +398,7 @@ tidyProgram2 hsc_env mod_guts = do
       , cg2_type_env = type_env
       , cg2_trimmed_rules = trimmed_rules
       , cg2_tidy_env = tidy_env
+      , cg2_mod_guts = mod_guts
       }
 
 tidyProgram :: HscEnv -> ModGuts -> IO (CgGuts, ModDetails)

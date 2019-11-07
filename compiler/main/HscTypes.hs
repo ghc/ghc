@@ -1512,7 +1512,8 @@ data CgGuts2 = CgGuts2
   -- Stuff for ModDetails generation
   , cg2_type_env :: !TypeEnv
   , cg2_trimmed_rules :: ![CoreRule]
-  , cg2_tidy_env :: TidyEnv
+  , cg2_tidy_env :: !TidyEnv
+  , cg2_mod_guts :: !ModGuts
   }
 
 cgGuts2ToCgGuts :: CgGuts2 -> CgGuts

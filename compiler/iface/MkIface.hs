@@ -111,6 +111,9 @@ import UniqSet
 import Packages
 import ExtractDocs
 
+import TidyPgm
+import CoreTidy
+
 import Control.Monad
 import Data.Function
 import Data.List
@@ -160,8 +163,26 @@ mkPartialIface hsc_env -- mod_details
 
 -- | Fully instantiate a interface
 -- Adds fingerprints and potentially code generator produced information.
-mkFullIface :: HscEnv -> ModDetails -> PartialModIface -> IO ModIface
-mkFullIface hsc_env mod_details partial_iface = do
+mkFullIface :: HscEnv -> CgGuts2 -> PartialModIface -> IO ModIface
+mkFullIface hsc_env cg_guts partial_iface = do
+
+    let mod_guts = cg2_mod_guts cg_guts
+    let type_env = cg2_type_env cg_guts
+    let tidy_patsyns = mkFinalPatSyns type_env (mg_patsyns mod_guts)
+    let tidy_type_env = extendTypeEnvWithPatSyns tidy_patsyns type_env
+    let tidy_rules = tidyRules (cg2_tidy_env cg_guts) (cg2_trimmed_rules cg_guts)
+    let tidy_cls_insts = mkFinalClsInsts type_env (mg_insts (cg2_mod_guts cg_guts))
+
+    let mod_details = ModDetails
+          { md_types = tidy_type_env
+          , md_rules = tidy_rules
+          , md_insts = tidy_cls_insts
+          , md_fam_insts =  mg_fam_insts (cg2_mod_guts cg_guts)
+          , md_exports = mg_exports (cg2_mod_guts cg_guts)
+          , md_anns = mg_anns (cg2_mod_guts cg_guts)
+          , md_complete_sigs = mg_complete_sigs (cg2_mod_guts cg_guts)
+          }
+
     full_iface <-
       {-# SCC "addFingerprints" #-}
       addFingerprints hsc_env mod_details partial_iface
@@ -221,7 +242,7 @@ mkIfaceTc hsc_env safe_mode mod_details
                    doc_hdr' doc_map arg_map
                    -- mod_details
 
-          mkFullIface hsc_env mod_details partial_iface
+          addFingerprints hsc_env mod_details partial_iface
 
 mkIface_ :: HscEnv -> Module -> HscSource
          -> Bool -> Dependencies -> GlobalRdrEnv
