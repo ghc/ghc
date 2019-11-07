@@ -141,6 +141,18 @@ Language
   inferred type is higher-rank. GHC 8.10 will now reject this, as one must now
   enable :ghc-flag:`-XRankNTypes` in ``B`` to accept the inferred type signature.
 
+- Type family dependencies (also known as injective type families)
+  sometimes now need ``-XUndecidableInstances`` in order to be
+  accepted. Here is an example::
+
+    type family F1 a = r | r -> a
+    type family F2 a = r | r -> a
+    type instance F2 [a] = Maybe (F1 a)
+
+  Because GHC needs to look under a type family to see that ``a`` is determined
+  by the right-hand side of ``F2``\'s equation, this now needs ``-XUndecidableInstances``.
+  The problem is very much akin to its need to detect some functional dependencies.
+    
 Compiler
 ~~~~~~~~
 
