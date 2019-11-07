@@ -47,6 +47,8 @@ if ghc_with_threaded_rts:
     if ghc_with_smp:
         config.have_smp = True
         config.run_ways.append('threaded2')
+        if config.speed == 0:
+            config.run_ways.append('nonmoving_thr')
 
 if ghc_with_dynamic_rts:
     config.have_shared_libs = True
