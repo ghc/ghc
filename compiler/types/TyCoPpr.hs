@@ -25,6 +25,8 @@ import {-# SOURCE #-} DataCon( dataConFullSig
                              , dataConUserTyVarBinders
                              , DataCon )
 
+import {-# SOURCE #-} Type( isLiftedTypeKind )
+
 import TyCon
 import TyCoRep
 import TyCoTidy
