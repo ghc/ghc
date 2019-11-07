@@ -3,6 +3,7 @@
 
 module SAKS_028 where
 
+import System.IO
 import Data.Kind
 import Language.Haskell.TH hiding (Type)
 
@@ -10,5 +11,5 @@ type Functor' :: (Type -> Type) -> Constraint
 class Functor' f
 
 do sig <- reifyType ('' Functor')
-   runIO $ putStrLn $ pprint sig
+   runIO $ hPutStrLn stderr $ pprint sig
    return []
