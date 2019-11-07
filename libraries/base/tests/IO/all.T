@@ -133,4 +133,8 @@ test('T4808', [fragile_for(16909, ['threaded2']), exit_code(1)], compile_and_run
 test('T4895', normal, compile_and_run, [''])
 test('T7853', normal, compile_and_run, [''])
 # Tests ability to perform >32-bit IO operations
-test('T17414', [when(wordsize(32), skip), high_memory_usage], compile_and_run, [''])
+test('T17414',
+     [when(wordsize(32), skip),
+      when(opsys('mingw32'), fragile(17453)),
+      high_memory_usage],
+     compile_and_run, [''])
