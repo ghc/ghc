@@ -38,7 +38,6 @@ import PrimOp
 import CoreFVs
 import Type
 import RepType
-import Kind            ( isLiftedTypeKind )
 import DataCon
 import TyCon
 import Util
