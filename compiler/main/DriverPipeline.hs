@@ -224,7 +224,7 @@ compileOne' m_tc_result mHscMessage
                      hscs_iface_dflags = iface_dflags }, HscInterpreted) -> do
             -- In interpreted mode the regular codeGen backend is not run so we
             -- generate a interface without codeGen info.
-            final_iface <- mkFullIface hsc_env'{hsc_dflags=iface_dflags} cgguts partial_iface
+            (final_iface, mod_details) <- mkFullIface hsc_env'{hsc_dflags=iface_dflags} cgguts partial_iface
             liftIO $ hscMaybeWriteIface dflags final_iface mb_old_iface_hash (ms_location summary)
 
             (hasStub, comp_bc, spt_entries) <- hscInteractive hsc_env' (cgGuts2ToCgGuts cgguts) summary
@@ -245,13 +245,13 @@ compileOne' m_tc_result mHscMessage
               -- be out of date.
             let !linkable = LM unlinked_time (ms_mod summary)
                            (hs_unlinked ++ stub_o)
-            return $! HomeModInfo final_iface undefined {- FIXME hmi_details -} (Just linkable)
+            return $! HomeModInfo final_iface mod_details (Just linkable)
         (HscRecomp{}, _) -> do
             output_fn <- getOutputFilename next_phase
                             (Temporary TFL_CurrentModule)
                             basename dflags next_phase (Just location)
             -- We're in --make mode: finish the compilation pipeline.
-            (_, _, Just iface) <- runPipeline StopLn hsc_env'
+            (_, _, Just (iface, mod_details)) <- runPipeline StopLn hsc_env'
                               (output_fn,
                                Nothing,
                                Just (HscOut src_flavour mod_name status))
@@ -262,7 +262,7 @@ compileOne' m_tc_result mHscMessage
                   -- The object filename comes from the ModLocation
             o_time <- getModificationUTCTime object_filename
             let !linkable = LM o_time this_mod [DotO object_filename]
-            return $! HomeModInfo iface undefined {- FIXME hmi_details -} (Just linkable)
+            return $! HomeModInfo iface mod_details (Just linkable)
 
  where dflags0     = ms_hspp_opts summary
        this_mod    = ms_mod summary
@@ -601,7 +601,7 @@ runPipeline
   -> PipelineOutput             -- ^ Output filename
   -> Maybe ModLocation          -- ^ A ModLocation, if this is a Haskell module
   -> [FilePath]                 -- ^ foreign objects
-  -> IO (DynFlags, FilePath, Maybe ModIface)
+  -> IO (DynFlags, FilePath, Maybe (ModIface, ModDetails))
                                 -- ^ (final flags, output filename, interface)
 runPipeline stop_phase hsc_env0 (input_fn, mb_input_buf, mb_phase)
              mb_basename output maybe_loc foreign_os
@@ -696,7 +696,7 @@ runPipeline'
   -> FilePath                   -- ^ Input filename
   -> Maybe ModLocation          -- ^ A ModLocation, if this is a Haskell module
   -> [FilePath]                 -- ^ foreign objects, if we have one
-  -> IO (DynFlags, FilePath, Maybe ModIface)
+  -> IO (DynFlags, FilePath, Maybe (ModIface, ModDetails))
                                 -- ^ (final flags, output filename, interface)
 runPipeline' start_phase hsc_env env input_fn
              maybe_loc foreign_os
@@ -1186,8 +1186,9 @@ runPhase (HscOut src_flavour mod_name result) _ dflags = do
                     (outputFilename, mStub, foreign_files) <- liftIO $
                       hscGenHardCode hsc_env' (cgGuts2ToCgGuts cgguts) mod_summary output_fn
 
-                    final_iface <- liftIO (mkFullIface hsc_env'{hsc_dflags=iface_dflags} cgguts partial_iface)
-                    setIface final_iface
+                    (final_iface, mod_details) <-
+                      liftIO (mkFullIface hsc_env'{hsc_dflags=iface_dflags} cgguts partial_iface)
+                    setIface final_iface mod_details
 
                     -- See Note [Writing interface files]
                     let if_dflags = dflags `gopt_unset` Opt_BuildDynamicToo
