@@ -2312,11 +2312,11 @@ if config.msys:
         testdir = getTestOpts().testdir # type: Path
         max_attempts = 5
         retries = max_attempts
-        def on_error(function, path, excinfo):
+        def on_error(function, path: str, excinfo):
             # At least one test (T11489) removes the write bit from a file it
             # produces. Windows refuses to delete read-only files with a
             # permission error. Try setting the write bit and try again.
-            path.chmod(stat.S_IWRITE)
+            Path(path).chmod(stat.S_IWRITE)
             function(path)
 
         # On Windows we have to retry the delete a couple of times.
