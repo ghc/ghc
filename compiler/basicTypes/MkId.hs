@@ -1402,11 +1402,12 @@ seqId = pcMiscPrelId seqName ty info
                   -- LHS of rules.  That way we can have rules for 'seq';
                   -- see Note [seqId magic]
 
-    ty  = mkSpecForAllTys [alphaTyVar,betaTyVar]
-                          (mkVisFunTy alphaTy (mkVisFunTy betaTy betaTy))
+    ty  = mkSpecForAllTys [alphaTyVar, openBetaTyVar]
+                          (mkVisFunTy alphaTy (mkVisFunTy openBetaTy openBetaTy))
 
     [x,y] = mkTemplateLocals [alphaTy, betaTy]
-    rhs = mkLams [alphaTyVar,betaTyVar,x,y] (Case (Var x) x betaTy [(DEFAULT, [], Var y)])
+    rhs = mkLams [alphaTyVar, runtimeRep2TyVar, openBetaTyVar,x,y]
+                 (Case (Var x) x openBetaTy [(DEFAULT, [], Var y)])
 
 ------------------------------------------------
 lazyId :: Id    -- See Note [lazyId magic]
@@ -1494,10 +1495,10 @@ Note [seqId magic]
 
 a) In source Haskell its second arg can have an unboxed type
       x `seq` (v +# w)
-   But see Note [Typing rule for seq] in TcExpr, which
-   explains why we give seq itself an ordinary type
-         seq :: forall a b. a -> b -> b
-   and treat it as a language construct from a typing point of view.
+   We used to need a special typing rule to support this. However, with levity
+   polymorphism we can now give seq the type
+      seq :: forall a (r :: RuntimeRep) (b :: TYPE r). a -> b -> b
+   which handles this case beautifully.
 
 b) Its fixity is set in LoadIface.ghcPrimIface
 
