@@ -173,7 +173,6 @@ import System.IO (fixIO)
 import qualified Data.Map as M
 import qualified Data.Set as S
 import Data.Set (Set)
-import Control.DeepSeq (force)
 
 import HieAst           ( mkHieFile )
 import HieTypes         ( getAsts, hie_asts, hie_module )
@@ -673,7 +672,7 @@ hscIncrementalFrontend
             -- save the interface that comes back from checkOldIface.
             -- In one-shot mode we don't have the old iface until this
             -- point, when checkOldIface reads it from the disk.
-            let mb_old_hash = fmap (mi_iface_hash . mi_final_exts) mb_checked_iface
+            let mb_old_hash = fmap mi_iface_hash mb_checked_iface
 
             case mb_checked_iface of
                 Just iface | not (recompileRequired recomp_reqd) ->
@@ -828,21 +827,14 @@ finish summary tc_result mb_old_hash = do
           plugins <- liftIO $ readIORef (tcg_th_coreplugins tc_result)
           desugared_guts <- hscSimplify' plugins desugared_guts0
 
-          (cg_guts, details) <- {-# SCC "CoreTidy" #-}
+          cg_guts <- {-# SCC "CoreTidy" #-}
               liftIO $ tidyProgram hsc_env desugared_guts
 
-          let !partial_iface =
-                {-# SCC "HscMain.mkPartialIface" #-}
-                -- This `force` saves 2M residency in test T10370
-                -- See Note [Avoiding space leaks in toIface*] for details.
-                force (mkPartialIface hsc_env details desugared_guts)
-
-          return HscRecomp { hscs_guts = cg_guts,
-                             hscs_mod_location = ms_location summary,
-                             hscs_mod_details = details,
-                             hscs_partial_iface = partial_iface,
-                             hscs_old_iface_hash = mb_old_hash,
-                             hscs_iface_dflags = dflags }
+          return $! HscRecomp{ hscs_guts = cg_guts,
+                               hscs_mod_location = ms_location summary,
+                               hscs_desugared_guts = mkCgModGuts desugared_guts,
+                               hscs_old_iface_hash = mb_old_hash,
+                               hscs_iface_dflags = dflags }
     else mk_simple_iface
 
 
@@ -867,7 +859,7 @@ hscMaybeWriteIface dflags iface old_iface location = do
                             HscNothing      -> False
                             HscInterpreted  -> False
                             _               -> True
-        no_change = old_iface == Just (mi_iface_hash (mi_final_exts iface))
+        no_change = old_iface == Just (mi_iface_hash iface)
 
     when (write_interface || force_write_interface) $
           hscWriteIface dflags iface no_change location
@@ -1702,7 +1694,7 @@ hscParsedDecls hsc_env decls = runInteractiveHsc hsc_env $ do
       hscSimplify hsc_env plugins ds_result
 
     {- Tidy -}
-    (tidy_cg, mod_details) <- liftIO $ tidyProgram hsc_env simpl_mg
+    tidy_cg <- liftIO $ tidyProgram hsc_env simpl_mg
 
     let !CgGuts{ cg_module    = this_mod,
                  cg_binds     = core_binds,
@@ -1710,7 +1702,7 @@ hscParsedDecls hsc_env decls = runInteractiveHsc hsc_env $ do
                  cg_modBreaks = mod_breaks } = tidy_cg
 
         !ModDetails { md_insts     = cls_insts
-                    , md_fam_insts = fam_insts } = mod_details
+                    , md_fam_insts = fam_insts } = mkModDetails hsc_env (mkCgModGuts simpl_mg) tidy_cg
             -- Get the *tidied* cls_insts and fam_insts
 
         data_tycons = filter isDataTyCon tycons
