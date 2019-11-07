@@ -307,9 +307,11 @@ static void freeChain_lock_max(bdescr *bd, int max_dur)
     freeGroup(bd);
     bd = next_bd;
     if (i == max_dur) {
+#if defined(THREADED_RTS)
         RELEASE_SM_LOCK;
         yieldThread();
         ACQUIRE_SM_LOCK;
+#endif
         i = 0;
     }
     i++;
