@@ -160,11 +160,11 @@ mkPartialIface hsc_env -- mod_details
 
 -- | Fully instantiate a interface
 -- Adds fingerprints and potentially code generator produced information.
-mkFullIface :: HscEnv -> PartialModIface -> IO ModIface
-mkFullIface hsc_env partial_iface = do
+mkFullIface :: HscEnv -> ModDetails -> PartialModIface -> IO ModIface
+mkFullIface hsc_env mod_details partial_iface = do
     full_iface <-
       {-# SCC "addFingerprints" #-}
-      addFingerprints hsc_env partial_iface
+      addFingerprints hsc_env mod_details partial_iface
 
     -- Debug printing
     dumpIfSet_dyn (hsc_dflags hsc_env) Opt_D_dump_hi "FINAL INTERFACE" (pprModIface full_iface)
@@ -221,7 +221,7 @@ mkIfaceTc hsc_env safe_mode mod_details
                    doc_hdr' doc_map arg_map
                    -- mod_details
 
-          mkFullIface hsc_env partial_iface
+          mkFullIface hsc_env mod_details partial_iface
 
 mkIface_ :: HscEnv -> Module -> HscSource
          -> Bool -> Dependencies -> GlobalRdrEnv
@@ -319,7 +319,6 @@ mkIface_ hsc_env
      -- Compare these lexicographically by OccName, *not* by unique,
      -- because the latter is not stable across compilations:
      cmp_inst     = comparing (nameOccName . ifDFun)
-     cmp_fam_inst = comparing (nameOccName . ifFamInstTcName)
 
      dflags = hsc_dflags hsc_env
 
@@ -411,10 +410,35 @@ thing that we are currently fingerprinting.
 -- See Note [Fingerprinting IfaceDecls]
 addFingerprints
         :: HscEnv
+        -> ModDetails
         -> PartialModIface
         -> IO ModIface
-addFingerprints hsc_env iface0
- = do
+addFingerprints hsc_env mod_details iface0 = do
+   let ModDetails{  md_insts     = insts,
+                    md_fam_insts = fam_insts,
+                    md_rules     = rules,
+                    md_anns      = anns,
+                    md_types     = type_env,
+                    md_exports   = exports,
+                    md_complete_sigs = complete_sigs } = mod_details
+
+   let cmp_rule     = comparing ifRuleName
+   let cmp_fam_inst = comparing (nameOccName . ifFamInstFam)
+    -- Compare these lexicographically by OccName, *not* by unique,
+    -- because the latter is not stable across compilations:
+   let cmp_inst = comparing (nameOccName . ifDFun)
+
+   let iface_exports = mkIfaceExports exports
+   let iface_fam_insts = sortBy cmp_fam_inst (map famInstToIfaceFamInst fam_insts)
+   let iface_insts = sortBy cmp_inst (map instanceToIfaceInst (fixSafeInstances (getSafeMode (mi_trust iface0)) insts))
+   let iface_rules = sortBy cmp_rule (map coreRuleToIfaceRule rules)
+   let iface_anns = map mkIfaceAnnotation anns
+
+   let (non_orph_insts, orph_insts) = mkOrphMap ifInstOrph iface_insts
+   let (non_orph_rules, orph_rules) = mkOrphMap ifRuleOrph iface_rules
+   let (non_orph_fis,   orph_fis)   = mkOrphMap ifFamInstOrph iface_fam_insts
+   let ann_fn = mkIfaceAnnCache iface_anns
+
    eps <- hscEPS hsc_env
    let
        decls = mi_decls iface0
@@ -606,7 +630,7 @@ addFingerprints hsc_env iface0
    -- the export list hash doesn't depend on the fingerprints of
    -- the Names it mentions, only the Names themselves, hence putNameLiterally.
    export_hash <- computeFingerprint putNameLiterally
-                      (mi_exports iface0,
+                      (iface_exports,
                        orphan_hash,
                        dep_orphan_hashes,
                        dep_pkgs (mi_deps iface0),
@@ -697,17 +721,17 @@ addFingerprints hsc_env iface0
                                    -- See Note [Orphans and auto-generated rules]
                               && null orph_insts
                               && null orph_fis)
-      , mi_finsts      = not (null (mi_fam_insts iface0))
+      , mi_finsts      = not (null iface_fam_insts)
       , mi_exp_hash    = export_hash
       , mi_orphan_hash = orphan_hash
       , mi_warn_fn     = warn_fn
       , mi_fix_fn      = fix_fn
       , mi_hash_fn     = lookupOccEnv local_env
-      , mi_exports = undefined -- TODO
-      , mi_insts = undefined -- TODO
-      , mi_fam_insts = undefined -- TODO
-      , mi_rules = undefined -- TODO
-      , mi_anns = undefined -- TODO
+      , mi_exports = iface_exports
+      , mi_insts = iface_insts
+      , mi_fam_insts = iface_fam_insts
+      , mi_rules = iface_rules
+      , mi_anns = iface_anns
       }
     final_iface = iface0 { mi_decls = sorted_decls, mi_final_exts = final_iface_exts }
    --
@@ -717,10 +741,6 @@ addFingerprints hsc_env iface0
     this_mod = mi_module iface0
     semantic_mod = mi_semantic_module iface0
     dflags = hsc_dflags hsc_env
-    (non_orph_insts, orph_insts) = mkOrphMap ifInstOrph    (mi_insts iface0)
-    (non_orph_rules, orph_rules) = mkOrphMap ifRuleOrph    (mi_rules iface0)
-    (non_orph_fis,   orph_fis)   = mkOrphMap ifFamInstOrph (mi_fam_insts iface0)
-    ann_fn = mkIfaceAnnCache (mi_anns iface0)
 
 -- | Retrieve the orphan hashes 'mi_orphan_hash' for a list of modules
 -- (in particular, the orphan modules which are transitively imported by the

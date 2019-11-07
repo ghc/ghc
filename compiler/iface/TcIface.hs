@@ -167,13 +167,13 @@ typecheckIface iface
         ; let type_env = mkNameEnv names_w_things
 
                 -- Now do those rules, instances and annotations
-        ; insts     <- mapM tcIfaceInst (mi_insts iface)
-        ; fam_insts <- mapM tcIfaceFamInst (mi_fam_insts iface)
-        ; rules     <- tcIfaceRules ignore_prags (mi_rules iface)
-        ; anns      <- tcIfaceAnnotations (mi_anns iface)
+        ; insts     <- mapM tcIfaceInst (mi_insts (mi_final_exts iface))
+        ; fam_insts <- mapM tcIfaceFamInst (mi_fam_insts (mi_final_exts iface))
+        ; rules     <- tcIfaceRules ignore_prags (mi_rules (mi_final_exts iface))
+        ; anns      <- tcIfaceAnnotations (mi_anns (mi_final_exts iface))
 
                 -- Exports
-        ; exports <- ifaceExportNames (mi_exports iface)
+        ; exports <- ifaceExportNames (mi_exports (mi_final_exts iface))
 
                 -- Complete Sigs
         ; complete_sigs <- tcIfaceCompleteSigs (mi_complete_sigs iface)
@@ -384,11 +384,11 @@ typecheckIfacesForMerging mod ifaces tc_env_var =
         -- But note that we use this type_env to typecheck references to DFun
         -- in 'IfaceInst'
         setImplicitEnvM type_env $ do
-        insts     <- mapM tcIfaceInst (mi_insts iface)
-        fam_insts <- mapM tcIfaceFamInst (mi_fam_insts iface)
-        rules     <- tcIfaceRules ignore_prags (mi_rules iface)
-        anns      <- tcIfaceAnnotations (mi_anns iface)
-        exports   <- ifaceExportNames (mi_exports iface)
+        insts     <- mapM tcIfaceInst (mi_insts (mi_final_exts iface))
+        fam_insts <- mapM tcIfaceFamInst (mi_fam_insts (mi_final_exts iface))
+        rules     <- tcIfaceRules ignore_prags (mi_rules (mi_final_exts iface))
+        anns      <- tcIfaceAnnotations (mi_anns (mi_final_exts iface))
+        exports   <- ifaceExportNames (mi_exports (mi_final_exts iface))
         complete_sigs <- tcIfaceCompleteSigs (mi_complete_sigs iface)
         return $ ModDetails { md_types     = type_env
                             , md_insts     = insts
@@ -423,11 +423,11 @@ typecheckIfaceForInstantiate nsubst iface =
             return (mkNameEnv decls)
     -- See Note [rnIfaceNeverExported]
     setImplicitEnvM type_env $ do
-    insts     <- mapM tcIfaceInst (mi_insts iface)
-    fam_insts <- mapM tcIfaceFamInst (mi_fam_insts iface)
-    rules     <- tcIfaceRules ignore_prags (mi_rules iface)
-    anns      <- tcIfaceAnnotations (mi_anns iface)
-    exports   <- ifaceExportNames (mi_exports iface)
+    insts     <- mapM tcIfaceInst (mi_insts (mi_final_exts iface))
+    fam_insts <- mapM tcIfaceFamInst (mi_fam_insts (mi_final_exts iface))
+    rules     <- tcIfaceRules ignore_prags (mi_rules (mi_final_exts iface))
+    anns      <- tcIfaceAnnotations (mi_anns (mi_final_exts iface))
+    exports   <- ifaceExportNames (mi_exports (mi_final_exts iface))
     complete_sigs <- tcIfaceCompleteSigs (mi_complete_sigs iface)
     return $ ModDetails { md_types     = type_env
                         , md_insts     = insts
