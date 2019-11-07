@@ -59,6 +59,7 @@ import TcType
 import TcMType
 import TcEnv   ( tcLookupGlobalOnly )
 import TcEvidence
+import TyCoPpr ( pprTyVar )
 import TysPrim
 import TyCon
 import TysWiredIn

@@ -33,7 +33,7 @@ import RdrName
 import TcEnv
 import TcMType
 import TcValidity( arityErr )
-import Type ( pprTyVars )
+import TyCoPpr ( pprTyVars )
 import TcType
 import TcUnify
 import TcHsType

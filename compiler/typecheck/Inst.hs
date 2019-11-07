@@ -54,6 +54,7 @@ import FunDeps
 import TcMType
 import Type
 import TyCoRep
+import TyCoPpr     ( debugPprType )
 import TcType
 import HscTypes
 import Class( Class )
