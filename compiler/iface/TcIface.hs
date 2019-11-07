@@ -176,7 +176,7 @@ typecheckIface iface
         ; exports <- ifaceExportNames (mi_exports (mi_final_exts iface))
 
                 -- Complete Sigs
-        ; complete_sigs <- tcIfaceCompleteSigs (mi_complete_sigs iface)
+        ; complete_sigs <- tcIfaceCompleteSigs (mi_complete_sigs (mi_final_exts iface))
 
                 -- Finished
         ; traceIf (vcat [text "Finished typechecking interface for" <+> ppr (mi_module iface),
@@ -389,7 +389,7 @@ typecheckIfacesForMerging mod ifaces tc_env_var =
         rules     <- tcIfaceRules ignore_prags (mi_rules (mi_final_exts iface))
         anns      <- tcIfaceAnnotations (mi_anns (mi_final_exts iface))
         exports   <- ifaceExportNames (mi_exports (mi_final_exts iface))
-        complete_sigs <- tcIfaceCompleteSigs (mi_complete_sigs iface)
+        complete_sigs <- tcIfaceCompleteSigs (mi_complete_sigs (mi_final_exts iface))
         return $ ModDetails { md_types     = type_env
                             , md_insts     = insts
                             , md_fam_insts = fam_insts
@@ -428,7 +428,7 @@ typecheckIfaceForInstantiate nsubst iface =
     rules     <- tcIfaceRules ignore_prags (mi_rules (mi_final_exts iface))
     anns      <- tcIfaceAnnotations (mi_anns (mi_final_exts iface))
     exports   <- ifaceExportNames (mi_exports (mi_final_exts iface))
-    complete_sigs <- tcIfaceCompleteSigs (mi_complete_sigs iface)
+    complete_sigs <- tcIfaceCompleteSigs (mi_complete_sigs (mi_final_exts iface))
     return $ ModDetails { md_types     = type_env
                         , md_insts     = insts
                         , md_fam_insts = fam_insts
