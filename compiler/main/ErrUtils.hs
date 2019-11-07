@@ -872,14 +872,14 @@ a label for each pass in the eventlog, where each pass is executed in one go,
 during a continuous time window.
 
 However, from STG onwards, the pipeline uses streams to emit groups of
-STG/Cmm/etc declarations one at a time, and process them until we get to
+STG/Cmm/etc declarations one at a time, and processes them until we get to
 assembly code generation. This means that the execution of those last few passes
 is interleaved and that we cannot measure how long they take by just wrapping
 the whole thing with 'withTiming'. Instead we wrap the processing of each
 individual stream element, all along the codegen pipeline, using the appropriate
 label for the pass to which this processing belongs. That generates a lot more
 data but allows us to get fine-grained timings about all the passes and we can
-easily compute totals withh tools like ghc-events-analyze (see below).
+easily compute totals with tools like ghc-events-analyze (see below).
 
 
 Producing an eventlog for GHC

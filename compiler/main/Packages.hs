@@ -566,7 +566,7 @@ readPackageConfig dflags conf_file = do
                       "can't find a package database at " ++ conf_file
 
   let
-      -- Fix #16360: remove trailing slash from conf_file before calculting pkgroot
+      -- Fix #16360: remove trailing slash from conf_file before calculating pkgroot
       conf_file' = dropTrailingPathSeparator conf_file
       top_dir = topDir dflags
       pkgroot = takeDirectory conf_file'
