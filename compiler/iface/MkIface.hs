@@ -163,7 +163,7 @@ mkPartialIface hsc_env -- mod_details
 
 -- | Fully instantiate a interface
 -- Adds fingerprints and potentially code generator produced information.
-mkFullIface :: HscEnv -> CgGuts2 -> PartialModIface -> IO ModIface
+mkFullIface :: HscEnv -> CgGuts2 -> PartialModIface -> IO (ModIface, ModDetails)
 mkFullIface hsc_env cg_guts partial_iface = do
 
     let mod_guts = cg2_mod_guts cg_guts
@@ -190,7 +190,7 @@ mkFullIface hsc_env cg_guts partial_iface = do
     -- Debug printing
     dumpIfSet_dyn (hsc_dflags hsc_env) Opt_D_dump_hi "FINAL INTERFACE" (pprModIface full_iface)
 
-    return full_iface
+    return (full_iface, mod_details)
 
 -- | Make an interface from the results of typechecking only.  Useful
 -- for non-optimising compilation, or where we aren't generating any
