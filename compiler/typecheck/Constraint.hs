@@ -92,6 +92,7 @@ import TcOrigin
 
 import CoreSyn
 
+import TyCoPpr
 import OccName
 import FV
 import VarSet

@@ -46,6 +46,7 @@ import DynFlags
 import CoreSyn
 import qualified CoreSubst
 import PprCore
+import TyCoPpr          ( pprParendType )
 import CoreFVs
 import CoreUtils
 import CoreArity
