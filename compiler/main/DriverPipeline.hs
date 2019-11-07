@@ -224,7 +224,7 @@ compileOne' m_tc_result mHscMessage
                      hscs_iface_dflags = iface_dflags }, HscInterpreted) -> do
             -- In interpreted mode the regular codeGen backend is not run so we
             -- generate a interface without codeGen info.
-            final_iface <- mkFullIface hsc_env'{hsc_dflags=iface_dflags} undefined {- FIXME -} partial_iface
+            final_iface <- mkFullIface hsc_env'{hsc_dflags=iface_dflags} cgguts partial_iface
             liftIO $ hscMaybeWriteIface dflags final_iface mb_old_iface_hash (ms_location summary)
 
             (hasStub, comp_bc, spt_entries) <- hscInteractive hsc_env' (cgGuts2ToCgGuts cgguts) summary
@@ -1186,7 +1186,7 @@ runPhase (HscOut src_flavour mod_name result) _ dflags = do
                     (outputFilename, mStub, foreign_files) <- liftIO $
                       hscGenHardCode hsc_env' (cgGuts2ToCgGuts cgguts) mod_summary output_fn
 
-                    final_iface <- liftIO (mkFullIface hsc_env'{hsc_dflags=iface_dflags} undefined {- FIXME -} partial_iface)
+                    final_iface <- liftIO (mkFullIface hsc_env'{hsc_dflags=iface_dflags} cgguts partial_iface)
                     setIface final_iface
 
                     -- See Note [Writing interface files]
