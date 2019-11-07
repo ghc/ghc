@@ -34,9 +34,9 @@ import Util
 import RdrName
 import DataCon ( dataConName )
 import Maybes
-import Type
 import TyCoRep
 import TyCoFVs
+import TyCoPpr ( pprWithExplicitKindsWhen )
 import TcMType
 import Name
 import Panic
