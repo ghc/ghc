@@ -152,7 +152,7 @@ test('T5837',
      [ only_ways(['normal']),
       collect_compiler_stats('bytes allocated',2)
       ],
-      compile, ['-freduction-depth=50'])
+      compile, ['-freduction-depth=50 -ddump-timings'])
 
 test('T6048',
      [ only_ways(['optasm']),
