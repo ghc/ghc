@@ -26,6 +26,7 @@ module GHC.Driver.Hooks
    , createIservProcessHook
    , stgToCmmHook
    , cmmToRawCmmHook
+   , findInstalledHomeModuleHook
    )
 where
 
@@ -51,6 +52,7 @@ import GHC.Types.Meta
 import GHC.Types.HpcInfo
 import GHC.Types.ForeignStubs
 
+import GHC.Unit.Finder.Types ( InstalledFindResult )
 import GHC.Unit.Module
 import GHC.Unit.Module.ModSummary
 import GHC.Unit.Module.ModIface
@@ -101,6 +103,7 @@ emptyHooks = Hooks
   , createIservProcessHook = Nothing
   , stgToCmmHook           = Nothing
   , cmmToRawCmmHook        = Nothing
+  , findInstalledHomeModuleHook = Nothing
   }
 
 {- Note [The Decoupling Abstract Data Hack]
@@ -149,6 +152,7 @@ data Hooks = Hooks
                                  -> [CgStgTopBinding] -> HpcInfo -> Stream IO CmmGroup (CStub, ModuleLFInfos)))
   , cmmToRawCmmHook        :: !(forall a . Maybe (DynFlags -> Maybe Module -> Stream IO CmmGroupSRTs a
                                  -> IO (Stream IO RawCmmGroup a)))
+  , findInstalledHomeModuleHook :: Maybe (HscEnv -> ModuleName -> IO InstalledFindResult)
   }
 
 class HasHooks m where
