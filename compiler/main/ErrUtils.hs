@@ -40,7 +40,7 @@ module ErrUtils (
         getCaretDiagnostic,
 
         -- * Dump files
-        dumpIfSet, dumpIfSet_dyn, dumpIfSet_dyn_printer,
+        dumpIfSet, dumpIfSet_dyn, dumpIfSet_any, dumpIfSet_dyn_printer,
         mkDumpDoc, dumpSDoc, dumpSDocForUser,
         dumpSDocWithStyle,
 
@@ -448,6 +448,16 @@ dumpIfSet dflags flag hdr doc
 dumpIfSet_dyn :: DynFlags -> DumpFlag -> String -> SDoc -> IO ()
 dumpIfSet_dyn dflags flag hdr doc
   = when (dopt flag dflags) $ dumpSDoc dflags alwaysQualify flag hdr doc
+
+dumpIfSet_any :: DynFlags -> [DumpFlag] -> String -> SDoc -> IO ()
+dumpIfSet_any dflags flags hdr doc = go flags
+  where
+    go [] = return ()
+    go (f : fs)
+      | dopt f dflags
+      = dumpSDoc dflags alwaysQualify f hdr doc
+      | otherwise
+      = go fs
 
 -- | a wrapper around 'dumpSDoc'.
 -- First check whether the dump flag is set

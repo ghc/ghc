@@ -11,6 +11,7 @@
 -- recompilation is required.
 module MkIface (
         mkPartialIface,
+        mkModDetails,
         mkFullIface,
 
         mkIfaceTc,
@@ -70,6 +71,7 @@ import FlagChecker
 
 import DsUsage ( mkUsageInfo, mkUsedNames, mkDependencies )
 import Id
+import IdInfo
 import Annotations
 import CoreSyn
 import Class
@@ -110,6 +112,10 @@ import Exception
 import UniqSet
 import Packages
 import ExtractDocs
+import PprCore (pprRules)
+
+import TidyPgm
+import CoreTidy
 
 import Control.Monad
 import Data.Function
@@ -123,8 +129,6 @@ import System.FilePath
 import Plugins ( PluginRecompile(..), PluginWithArgs(..), LoadedPlugin(..),
                  pluginRecompile', plugins )
 
---Qualified import so we can define a Semigroup instance
--- but it doesn't clash with Outputable.<>
 import qualified Data.Semigroup
 
 {-
@@ -136,10 +140,9 @@ import qualified Data.Semigroup
 -}
 
 mkPartialIface :: HscEnv
-               -> ModDetails
                -> ModGuts
                -> PartialModIface
-mkPartialIface hsc_env mod_details
+mkPartialIface hsc_env
   ModGuts{ mg_module       = this_mod
          , mg_hsc_src      = hsc_src
          , mg_usages       = usages
@@ -156,20 +159,77 @@ mkPartialIface hsc_env mod_details
          , mg_arg_docs     = arg_docs
          }
   = mkIface_ hsc_env this_mod hsc_src used_th deps rdr_env fix_env warns hpc_info self_trust
-             safe_mode usages doc_hdr decl_docs arg_docs mod_details
+             safe_mode usages doc_hdr decl_docs arg_docs
 
--- | Fully instantiate a interface
--- Adds fingerprints and potentially code generator produced information.
-mkFullIface :: HscEnv -> PartialModIface -> IO ModIface
-mkFullIface hsc_env partial_iface = do
+mkModDetails :: HscEnv -> CgGuts -> ModDetails
+mkModDetails hsc_env cg_guts =
+  let
+    dflags = hsc_dflags hsc_env
+
+    -- The completed type environment is gotten from
+    --      a) the types and classes defined here (plus implicit things)
+    --      b) adding Ids with correct IdInfo, including unfoldings,
+    --              gotten from the bindings
+    -- From (b) we keep only those Ids with External names;
+    --          the CoreTidy pass makes sure these are all and only
+    --          the externally-accessible ones
+    -- This truncates the type environment to include only the
+    -- exported Ids and things needed from them, which saves space
+    --
+    -- See Note [Don't attempt to trim data types]
+    omit_prags = gopt Opt_OmitInterfacePragmas dflags
+
+    trim_id :: Id -> Id
+    trim_id id
+      | not (isImplicitId id)
+      = id `setIdInfo` vanillaIdInfo
+      | otherwise
+      = id
+
+    final_ids  = [ if omit_prags then trim_id id else id
+                 | id <- bindersOfBinds (cg_tidy_binds cg_guts)
+                 , isExternalName (idName id)
+                 , not (isWiredInName (getName id))
+                 ]   -- See Note [Drop wired-in things]
+    final_tcs = filterOut (isWiredInName . getName) (cg_mg_tcs cg_guts)
+    -- See Note [Drop wired-in things]
+    type_env = typeEnvFromEntities final_ids final_tcs (cg_mg_fam_insts cg_guts)
+
+    tidy_patsyns = mkFinalPatSyns type_env (cg_mg_patsyns cg_guts)
+    tidy_type_env = extendTypeEnvWithPatSyns tidy_patsyns type_env
+    tidy_rules = tidyRules (cg_tidy_env cg_guts) (cg_trimmed_rules cg_guts)
+    tidy_cls_insts = mkFinalClsInsts type_env (cg_mg_insts cg_guts)
+  in
+    ModDetails
+      { md_types = tidy_type_env
+      , md_rules = tidy_rules
+      , md_insts = tidy_cls_insts
+      , md_fam_insts =  cg_mg_fam_insts cg_guts
+      , md_exports = cg_mg_exports cg_guts
+      , md_anns = cg_mg_anns cg_guts
+      , md_complete_sigs = cg_mg_complete_sigs cg_guts
+      }
+
+-- | Generate full interface with the code gen info.
+mkFullIface :: HscEnv -> CgGuts -> PartialModIface -> IO (ModIface, ModDetails)
+mkFullIface hsc_env cg_guts partial_iface = do
+    let mod_details = mkModDetails hsc_env cg_guts
+    let dflags = hsc_dflags hsc_env
+
+    let tidy_rules = md_rules mod_details
+    unless (null tidy_rules) $
+      dumpIfSet_any dflags [Opt_D_dump_simpl, Opt_D_dump_rules]
+        (showSDoc dflags (text "Tidy Rules"))
+        (pprRules tidy_rules)
+
     full_iface <-
       {-# SCC "addFingerprints" #-}
-      addFingerprints hsc_env partial_iface
+      addFingerprints hsc_env mod_details partial_iface
 
     -- Debug printing
-    dumpIfSet_dyn (hsc_dflags hsc_env) Opt_D_dump_hi "FINAL INTERFACE" (pprModIface full_iface)
+    dumpIfSet_dyn dflags Opt_D_dump_hi "FINAL INTERFACE" (pprModIface full_iface)
 
-    return full_iface
+    return (full_iface, mod_details)
 
 -- | Make an interface from the results of typechecking only.  Useful
 -- for non-optimising compilation, or where we aren't generating any
@@ -219,9 +279,9 @@ mkIfaceTc hsc_env safe_mode mod_details
                    fix_env warns hpc_info
                    (imp_trust_own_pkg imports) safe_mode usages
                    doc_hdr' doc_map arg_map
-                   mod_details
+                   -- mod_details
 
-          mkFullIface hsc_env partial_iface
+          addFingerprints hsc_env mod_details partial_iface
 
 mkIface_ :: HscEnv -> Module -> HscSource
          -> Bool -> Dependencies -> GlobalRdrEnv
@@ -232,19 +292,11 @@ mkIface_ :: HscEnv -> Module -> HscSource
          -> Maybe HsDocString
          -> DeclDocMap
          -> ArgDocMap
-         -> ModDetails
          -> PartialModIface
 mkIface_ hsc_env
          this_mod hsc_src used_th deps rdr_env fix_env src_warns
          hpc_info pkg_trust_req safe_mode usages
          doc_hdr decl_docs arg_docs
-         ModDetails{  md_insts     = insts,
-                      md_fam_insts = fam_insts,
-                      md_rules     = rules,
-                      md_anns      = anns,
-                      md_types     = type_env,
-                      md_exports   = exports,
-                      md_complete_sigs = complete_sigs }
 -- NB:  notice that mkIface does not look at the bindings
 --      only at the TypeEnv.  The previous Tidy phase has
 --      put exactly the info into the TypeEnv that we want
@@ -252,20 +304,6 @@ mkIface_ hsc_env
 
   = do
     let semantic_mod = canonicalizeHomeModule (hsc_dflags hsc_env) (moduleName this_mod)
-        entities = typeEnvElts type_env
-        decls  = [ tyThingToIfaceDecl entity
-                 | entity <- entities,
-                   let name = getName entity,
-                   not (isImplicitTyThing entity),
-                      -- No implicit Ids and class tycons in the interface file
-                   not (isWiredInName name),
-                      -- Nor wired-in things; the compiler knows about them anyhow
-                   nameIsLocalOrFrom semantic_mod name  ]
-                      -- Sigh: see Note [Root-main Id] in TcRnDriver
-                      -- NB: ABSOLUTELY need to check against semantic_mod,
-                      -- because all of the names in an hsig p[H=<H>]:H
-                      -- are going to be for <H>, not the former id!
-                      -- See Note [Identity versus semantic module]
 
         fixities    = sortBy (comparing fst)
           [(occ,fix) | FixItem occ fix <- nameEnvElts fix_env]
@@ -273,12 +311,7 @@ mkIface_ hsc_env
           -- deterministic, so we sort by OccName to canonicalize it.
           -- See Note [Deterministic UniqFM] in UniqDFM for more details.
         warns       = src_warns
-        iface_rules = map coreRuleToIfaceRule rules
-        iface_insts = map instanceToIfaceInst $ fixSafeInstances safe_mode insts
-        iface_fam_insts = map famInstToIfaceFamInst fam_insts
         trust_info  = setSafeMode safe_mode
-        annotations = map mkIfaceAnnotation anns
-        icomplete_sigs = map mkIfaceCompleteSig complete_sigs
 
     ModIface {
           mi_module      = this_mod,
@@ -290,35 +323,18 @@ mkIface_ hsc_env
           mi_hsc_src     = hsc_src,
           mi_deps        = deps,
           mi_usages      = usages,
-          mi_exports     = mkIfaceExports exports,
-
-          -- Sort these lexicographically, so that
-          -- the result is stable across compilations
-          mi_insts       = sortBy cmp_inst     iface_insts,
-          mi_fam_insts   = sortBy cmp_fam_inst iface_fam_insts,
-          mi_rules       = sortBy cmp_rule     iface_rules,
-
           mi_fixities    = fixities,
           mi_warns       = warns,
-          mi_anns        = annotations,
           mi_globals     = maybeGlobalRdrEnv rdr_env,
           mi_used_th     = used_th,
-          mi_decls       = decls,
           mi_hpc         = isHpcUsed hpc_info,
           mi_trust       = trust_info,
           mi_trust_pkg   = pkg_trust_req,
-          mi_complete_sigs = icomplete_sigs,
           mi_doc_hdr     = doc_hdr,
           mi_decl_docs   = decl_docs,
           mi_arg_docs    = arg_docs,
-          mi_final_exts        = () }
+          mi_final_exts  = () }
   where
-     cmp_rule     = comparing ifRuleName
-     -- Compare these lexicographically by OccName, *not* by unique,
-     -- because the latter is not stable across compilations:
-     cmp_inst     = comparing (nameOccName . ifDFun)
-     cmp_fam_inst = comparing (nameOccName . ifFamInstTcName)
-
      dflags = hsc_dflags hsc_env
 
      -- We only fill in mi_globals if the module was compiled to byte
@@ -331,8 +347,6 @@ mkIface_ hsc_env
      maybeGlobalRdrEnv rdr_env
          | targetRetainsAllBindings (hscTarget dflags) = Just rdr_env
          | otherwise                                   = Nothing
-
-     ifFamInstTcName = ifFamInstFam
 
 -----------------------------
 writeIfaceFile :: DynFlags -> FilePath -> ModIface -> IO ()
@@ -409,13 +423,53 @@ thing that we are currently fingerprinting.
 -- See Note [Fingerprinting IfaceDecls]
 addFingerprints
         :: HscEnv
+        -> ModDetails
         -> PartialModIface
         -> IO ModIface
-addFingerprints hsc_env iface0
- = do
+addFingerprints hsc_env mod_details iface0 = do
+   let ModDetails{  md_insts     = insts,
+                    md_fam_insts = fam_insts,
+                    md_rules     = rules,
+                    md_anns      = anns,
+                    md_types     = type_env,
+                    md_exports   = exports,
+                    md_complete_sigs = complete_sigs } = mod_details
+
+   let cmp_rule     = comparing ifRuleName
+   let cmp_fam_inst = comparing (nameOccName . ifFamInstFam)
+    -- Compare these lexicographically by OccName, *not* by unique,
+    -- because the latter is not stable across compilations:
+   let cmp_inst = comparing (nameOccName . ifDFun)
+
+   let iface_exports = mkIfaceExports exports
+   let iface_fam_insts = sortBy cmp_fam_inst (map famInstToIfaceFamInst fam_insts)
+   let iface_insts = sortBy cmp_inst (map instanceToIfaceInst (fixSafeInstances (getSafeMode (mi_trust iface0)) insts))
+   let iface_rules = sortBy cmp_rule (map coreRuleToIfaceRule rules)
+   let iface_anns = map mkIfaceAnnotation anns
+   let iface_complete_sigs = map mkIfaceCompleteSig complete_sigs
+
+   let (non_orph_insts, orph_insts) = mkOrphMap ifInstOrph iface_insts
+   let (non_orph_rules, orph_rules) = mkOrphMap ifRuleOrph iface_rules
+   let (non_orph_fis,   orph_fis)   = mkOrphMap ifFamInstOrph iface_fam_insts
+   let ann_fn = mkIfaceAnnCache iface_anns
+
    eps <- hscEPS hsc_env
    let
-       decls = mi_decls iface0
+       entities = typeEnvElts type_env
+       decls  = [ tyThingToIfaceDecl entity
+                | entity <- entities,
+                  let name = getName entity,
+                  not (isImplicitTyThing entity),
+                     -- No implicit Ids and class tycons in the interface file
+                  not (isWiredInName name),
+                     -- Nor wired-in things; the compiler knows about them anyhow
+                  nameIsLocalOrFrom semantic_mod name  ]
+                     -- Sigh: see Note [Root-main Id] in TcRnDriver
+                     -- NB: ABSOLUTELY need to check against semantic_mod,
+                     -- because all of the names in an hsig p[H=<H>]:H
+                     -- are going to be for <H>, not the former id!
+                     -- See Note [Identity versus semantic module]
+
        warn_fn = mkIfaceWarnCache (mi_warns iface0)
        fix_fn = mkIfaceFixCache (mi_fixities iface0)
 
@@ -604,7 +658,7 @@ addFingerprints hsc_env iface0
    -- the export list hash doesn't depend on the fingerprints of
    -- the Names it mentions, only the Names themselves, hence putNameLiterally.
    export_hash <- computeFingerprint putNameLiterally
-                      (mi_exports iface0,
+                      (iface_exports,
                        orphan_hash,
                        dep_orphan_hashes,
                        dep_pkgs (mi_deps iface0),
@@ -695,14 +749,21 @@ addFingerprints hsc_env iface0
                                    -- See Note [Orphans and auto-generated rules]
                               && null orph_insts
                               && null orph_fis)
-      , mi_finsts      = not (null (mi_fam_insts iface0))
+      , mi_finsts      = not (null iface_fam_insts)
       , mi_exp_hash    = export_hash
       , mi_orphan_hash = orphan_hash
       , mi_warn_fn     = warn_fn
       , mi_fix_fn      = fix_fn
       , mi_hash_fn     = lookupOccEnv local_env
+      , mi_exports = iface_exports
+      , mi_insts = iface_insts
+      , mi_fam_insts = iface_fam_insts
+      , mi_rules = iface_rules
+      , mi_anns = iface_anns
+      , mi_complete_sigs = iface_complete_sigs
+      , mi_decls = sorted_decls
       }
-    final_iface = iface0 { mi_decls = sorted_decls, mi_final_exts = final_iface_exts }
+    final_iface = iface0 { mi_final_exts = final_iface_exts }
    --
    return final_iface
 
@@ -710,10 +771,6 @@ addFingerprints hsc_env iface0
     this_mod = mi_module iface0
     semantic_mod = mi_semantic_module iface0
     dflags = hsc_dflags hsc_env
-    (non_orph_insts, orph_insts) = mkOrphMap ifInstOrph    (mi_insts iface0)
-    (non_orph_rules, orph_rules) = mkOrphMap ifRuleOrph    (mi_rules iface0)
-    (non_orph_fis,   orph_fis)   = mkOrphMap ifFamInstOrph (mi_fam_insts iface0)
-    ann_fn = mkIfaceAnnCache (mi_anns iface0)
 
 -- | Retrieve the orphan hashes 'mi_orphan_hash' for a list of modules
 -- (in particular, the orphan modules which are transitively imported by the
