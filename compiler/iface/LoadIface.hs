@@ -466,17 +466,12 @@ loadInterface doc_str mod from
         --      explicitly tag each export which seems a bit of a bore)
 
         ; ignore_prags      <- goptM Opt_IgnoreInterfacePragmas
-        ; new_eps_decls     <- loadDecls ignore_prags (mi_decls iface)
+        ; new_eps_decls     <- loadDecls ignore_prags (mi_decls (mi_final_exts iface))
         ; new_eps_insts     <- mapM tcIfaceInst (mi_insts (mi_final_exts iface))
         ; new_eps_fam_insts <- mapM tcIfaceFamInst (mi_fam_insts (mi_final_exts iface))
         ; new_eps_rules     <- tcIfaceRules ignore_prags (mi_rules (mi_final_exts iface))
         ; new_eps_anns      <- tcIfaceAnnotations (mi_anns (mi_final_exts iface))
         ; new_eps_complete_sigs <- tcIfaceCompleteSigs (mi_complete_sigs (mi_final_exts iface))
-
-        ; let { final_iface = iface {
-                                mi_decls     = panic "No mi_decls in PIT"
-                              }
-               }
 
         ; let bad_boot = mi_boot iface && fmap fst (if_rec_types gbl_env) == Just mod
                             -- Warn warn against an EPS-updating import
@@ -493,7 +488,7 @@ loadInterface doc_str mod from
                 then eps { eps_PTE = addDeclsToPTE (eps_PTE eps) new_eps_decls }
            else
                 eps {
-                  eps_PIT          = extendModuleEnv (eps_PIT eps) mod final_iface,
+                  eps_PIT          = extendModuleEnv (eps_PIT eps) mod iface,
                   eps_PTE          = addDeclsToPTE   (eps_PTE eps) new_eps_decls,
                   eps_rule_base    = extendRuleBaseList (eps_rule_base eps)
                                                         new_eps_rules,
@@ -522,7 +517,7 @@ loadInterface doc_str mod from
                                                    (length new_eps_rules) }
 
         ; -- invoke plugins
-          res <- withPlugins dflags interfaceLoadAction final_iface
+          res <- withPlugins dflags interfaceLoadAction iface
         ; return (Succeeded res)
     }}}}
 
@@ -1036,7 +1031,6 @@ initExternalPackageState
 ghcPrimIface :: ModIface
 ghcPrimIface
   = empty_iface {
-        mi_decls    = [],
         mi_fixities = fixities,
         mi_final_exts = (mi_final_exts empty_iface)
           { mi_fix_fn = mkIfaceFixCache fixities
@@ -1145,7 +1139,7 @@ pprModIface iface@ModIface{ mi_final_exts = exts }
         , vcat (map pprUsage (mi_usages iface))
         , vcat (map pprIfaceAnnotation (mi_anns (mi_final_exts iface)))
         , pprFixities (mi_fixities iface)
-        , vcat [ppr ver $$ nest 2 (ppr decl) | (ver,decl) <- mi_decls iface]
+        , vcat [ppr ver $$ nest 2 (ppr decl) | (ver,decl) <- mi_decls (mi_final_exts iface)]
         , vcat (map ppr (mi_insts (mi_final_exts iface)))
         , vcat (map ppr (mi_fam_insts (mi_final_exts iface)))
         , vcat (map ppr (mi_rules (mi_final_exts iface)))

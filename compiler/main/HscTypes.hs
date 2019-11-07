@@ -962,6 +962,12 @@ data ModIfaceBackend = ModIfaceBackend
   , mi_anns :: ![IfaceAnnotation]
     -- ^ Annotations
   , mi_complete_sigs :: ![IfaceCompleteMatch]
+  , mi_decls    :: ![(Fingerprint, IfaceDecl)]
+    -- ^ Type, class and variable declarations
+    -- The hash of an Id changes if its fixity or deprecations change
+    --      (as well as its type of course)
+    -- Ditto data constructors, class operations, except that the hash of the
+    -- parent class/tycon changes
   }
 
 data ModIfacePhase
@@ -1034,12 +1040,14 @@ data ModIface_ (phase :: ModIfacePhase)
         --         -- NOT STRICT!  we read this field lazily from the interface file
 
 
+{-
         mi_decls    :: [IfaceDeclExts phase],
                 -- ^ Type, class and variable declarations
                 -- The hash of an Id changes if its fixity or deprecations change
                 --      (as well as its type of course)
                 -- Ditto data constructors, class operations, except that
                 -- the hash of the parent class/tycon changes
+-}
 
         mi_globals  :: !(Maybe GlobalRdrEnv),
                 -- ^ Binds all the things defined at the top level in
@@ -1147,7 +1155,6 @@ instance Binary ModIface where
                  mi_used_th   = used_th,
                  mi_fixities  = fixities,
                  mi_warns     = warns,
-                 mi_decls     = decls,
                  mi_hpc       = hpc_info,
                  mi_trust     = trust,
                  mi_trust_pkg = trust_pkg,
@@ -1170,7 +1177,8 @@ instance Binary ModIface where
                    mi_fam_insts = fam_insts,
                    mi_rules = rules,
                    mi_anns = anns,
-                   mi_complete_sigs = complete_sigs
+                   mi_complete_sigs = complete_sigs,
+                   mi_decls = decls
                  }}) = do
         put_ bh mod
         put_ bh sig_of
@@ -1245,7 +1253,6 @@ instance Binary ModIface where
                  mi_used_th     = used_th,
                  mi_fixities    = fixities,
                  mi_warns       = warns,
-                 mi_decls       = decls,
                  mi_globals     = Nothing,
                  mi_hpc         = hpc_info,
                  mi_trust       = trust,
@@ -1273,7 +1280,8 @@ instance Binary ModIface where
                    mi_fam_insts = fam_insts,
                    mi_rules = rules,
                    mi_anns = anns,
-                   mi_complete_sigs = complete_sigs
+                   mi_complete_sigs = complete_sigs,
+                   mi_decls = decls
                  }})
 
 -- | The original names declared of a certain module that are exported
@@ -1289,7 +1297,6 @@ emptyPartialModIface mod
                mi_used_th     = False,
                mi_fixities    = [],
                mi_warns       = NoWarnings,
-               mi_decls       = [],
                mi_globals     = Nothing,
                mi_hpc         = False,
                mi_trust       = noIfaceTrustInfo,
@@ -1302,8 +1309,7 @@ emptyPartialModIface mod
 emptyFullModIface :: Module -> ModIface
 emptyFullModIface mod =
     (emptyPartialModIface mod)
-      { mi_decls = []
-      , mi_final_exts = ModIfaceBackend
+      { mi_final_exts = ModIfaceBackend
         { mi_iface_hash = fingerprint0,
           mi_mod_hash = fingerprint0,
           mi_flag_hash = fingerprint0,
@@ -1322,7 +1328,8 @@ emptyFullModIface mod =
           mi_fam_insts = [],
           mi_rules = [],
           mi_anns = [],
-          mi_complete_sigs = []
+          mi_complete_sigs = [],
+          mi_decls = []
         }
       }
 
@@ -3302,8 +3309,8 @@ phaseForeignLanguage phase = case phase of
 -- Take care, this instance only forces to the degree necessary to
 -- avoid major space leaks.
 instance (NFData (IfaceBackendExts (phase :: ModIfacePhase)), NFData (IfaceDeclExts (phase :: ModIfacePhase))) => NFData (ModIface_ phase) where
-  rnf (ModIface f1 f2 f3 f4 f5 f7 f8 f9 f11 f12
+  rnf (ModIface f1 f2 f3 f4 f5 f7 f8 f9 f12
                 f16 f17 f18 f20 f21 f22 f23) =
     rnf f1 `seq` rnf f2 `seq` f3 `seq` f4 `seq` f5 `seq` rnf f7 `seq` f8 `seq`
-    f9 `seq` rnf f11 `seq` f12 `seq`
+    f9 `seq` f12 `seq`
     rnf f16 `seq` f17 `seq` rnf f18 `seq` f20 `seq` f21 `seq` f22 `seq` rnf f23

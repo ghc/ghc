@@ -163,7 +163,7 @@ typecheckIface iface
                 -- Typecheck the decls.  This is done lazily, so that the knot-tying
                 -- within this single module works out right.  It's the callers
                 -- job to make sure the knot is tied.
-        ; names_w_things <- loadDecls ignore_prags (mi_decls iface)
+        ; names_w_things <- loadDecls ignore_prags (mi_decls (mi_final_exts iface))
         ; let type_env = mkNameEnv names_w_things
 
                 -- Now do those rules, instances and annotations
@@ -364,7 +364,7 @@ typecheckIfacesForMerging mod ifaces tc_env_var =
                        , case decl of
                             IfaceId { ifIdDetails = IfDFunId } -> False -- exclude DFuns
                             _ -> True ]
-        decl_envs = map (mk_decl_env . map snd . mi_decls) ifaces
+        decl_envs = map (mk_decl_env . map snd . mi_decls . mi_final_exts) ifaces
                         :: [OccEnv IfaceDecl]
         decl_env = foldl' mergeIfaceDecls emptyOccEnv decl_envs
                         ::  OccEnv IfaceDecl
@@ -379,7 +379,7 @@ typecheckIfacesForMerging mod ifaces tc_env_var =
         -- See Note [Resolving never-exported Names in TcIface]
         type_env <- fixM $ \type_env -> do
             setImplicitEnvM type_env $ do
-                decls <- loadDecls ignore_prags (mi_decls iface)
+                decls <- loadDecls ignore_prags (mi_decls (mi_final_exts iface))
                 return (mkNameEnv decls)
         -- But note that we use this type_env to typecheck references to DFun
         -- in 'IfaceInst'
@@ -419,7 +419,7 @@ typecheckIfaceForInstantiate nsubst iface =
     -- See Note [Resolving never-exported Names in TcIface]
     type_env <- fixM $ \type_env -> do
         setImplicitEnvM type_env $ do
-            decls     <- loadDecls ignore_prags (mi_decls iface)
+            decls     <- loadDecls ignore_prags (mi_decls (mi_final_exts iface))
             return (mkNameEnv decls)
     -- See Note [rnIfaceNeverExported]
     setImplicitEnvM type_env $ do
@@ -559,7 +559,7 @@ mkSelfBootInfo iface mds
        let tcs = map ifName
                  . filter isIfaceTyCon
                  . map snd
-                 $ mi_decls iface
+                 $ mi_decls (mi_final_exts iface)
        return $ SelfBoot { sb_mds = mds
                          , sb_tcs = mkNameSet tcs }
   where
