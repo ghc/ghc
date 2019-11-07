@@ -63,7 +63,7 @@ import GhcPrelude
 
 import {-# SOURCE #-} TysWiredIn ( coercibleTyCon, heqTyCon
                                  , liftedRepDataConTyCon, tupleTyConName )
-import {-# SOURCE #-} TyCoRep    ( isRuntimeRepTy )
+import {-# SOURCE #-} Type       ( isRuntimeRepTy )
 
 import DynFlags
 import TyCon hiding ( pprPromotionQuote )
@@ -964,7 +964,7 @@ defaultRuntimeRepVars ty = go False emptyFsEnv ty
 
     go in_kind _ ty@(IfaceFreeTyVar tv)
       -- See Note [Defaulting RuntimeRep variables], about free vars
-      | in_kind && TyCoRep.isRuntimeRepTy (tyVarKind tv)
+      | in_kind && Type.isRuntimeRepTy (tyVarKind tv)
       = IfaceTyConApp liftedRep IA_Nil
       | otherwise
       = ty

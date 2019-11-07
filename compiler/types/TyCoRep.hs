@@ -14,8 +14,6 @@ Note [The Type-related module hierarchy]
   TyCoSubst imports TyCoRep, TyCoFVs, TyCoPpr
   TyCoTidy imports TyCoRep, TyCoFVs
   TysPrim  imports TyCoRep ( including mkTyConTy )
-  Kind     imports TysPrim ( mainly for primitive kinds )
-  Type     imports Kind
   Coercion imports Type
 -}
 
@@ -52,12 +50,6 @@ module TyCoRep (
         mkForAllTy, mkForAllTys,
         mkPiTy, mkPiTys,
 
-        kindRep_maybe, kindRep,
-        isLiftedTypeKind, isUnliftedTypeKind,
-        isLiftedRuntimeRep, isUnliftedRuntimeRep,
-        isRuntimeRepTy, isRuntimeRepVar,
-        sameVis,
-
         -- * Functions over binders
         TyCoBinder(..), TyCoVarBinder, TyBinder,
         binderVar, binderVars, binderType, binderArgFlag,
@@ -77,7 +69,6 @@ module TyCoRep (
 
 import GhcPrelude
 
-import {-# SOURCE #-} Type( coreView )
 import {-# SOURCE #-} TyCoPpr ( pprType, pprCo, pprTyLit )
 
    -- Transitively pulls in a LOT of stuff, better to break the loop
@@ -94,7 +85,6 @@ import CoAxiom
 
 -- others
 import BasicTypes ( LeftOrRight(..), pickLR )
-import PrelNames
 import Outputable
 import FastString
 import Util
@@ -959,83 +949,6 @@ mkPiTys tbs ty = foldr mkPiTy ty tbs
 -- | Create the plain type constructor type which has been applied to no type arguments at all.
 mkTyConTy :: TyCon -> Type
 mkTyConTy tycon = TyConApp tycon []
-
-{-
-Some basic functions, put here to break loops eg with the pretty printer
--}
-
--- | Extract the RuntimeRep classifier of a type from its kind. For example,
--- @kindRep * = LiftedRep@; Panics if this is not possible.
--- Treats * and Constraint as the same
-kindRep :: HasDebugCallStack => Kind -> Type
-kindRep k = case kindRep_maybe k of
-              Just r  -> r
-              Nothing -> pprPanic "kindRep" (ppr k)
-
--- | Given a kind (TYPE rr), extract its RuntimeRep classifier rr.
--- For example, @kindRep_maybe * = Just LiftedRep@
--- Returns 'Nothing' if the kind is not of form (TYPE rr)
--- Treats * and Constraint as the same
-kindRep_maybe :: HasDebugCallStack => Kind -> Maybe Type
-kindRep_maybe kind
-  | Just kind' <- coreView kind = kindRep_maybe kind'
-  | TyConApp tc [arg] <- kind
-  , tc `hasKey` tYPETyConKey    = Just arg
-  | otherwise                   = Nothing
-
--- | This version considers Constraint to be the same as *. Returns True
--- if the argument is equivalent to Type/Constraint and False otherwise.
--- See Note [Kind Constraint and kind Type]
-isLiftedTypeKind :: Kind -> Bool
-isLiftedTypeKind kind
-  = case kindRep_maybe kind of
-      Just rep -> isLiftedRuntimeRep rep
-      Nothing  -> False
-
--- | Returns True if the kind classifies unlifted types and False otherwise.
--- Note that this returns False for levity-polymorphic kinds, which may
--- be specialized to a kind that classifies unlifted types.
-isUnliftedTypeKind :: Kind -> Bool
-isUnliftedTypeKind kind
-  = case kindRep_maybe kind of
-      Just rep -> isUnliftedRuntimeRep rep
-      Nothing  -> False
-
-isLiftedRuntimeRep :: Type -> Bool
--- isLiftedRuntimeRep is true of LiftedRep :: RuntimeRep
--- False of type variables (a :: RuntimeRep)
---   and of other reps e.g. (IntRep :: RuntimeRep)
-isLiftedRuntimeRep rep
-  | Just rep' <- coreView rep          = isLiftedRuntimeRep rep'
-  | TyConApp rr_tc args <- rep
-  , rr_tc `hasKey` liftedRepDataConKey = ASSERT( null args ) True
-  | otherwise                          = False
-
-isUnliftedRuntimeRep :: Type -> Bool
--- True of definitely-unlifted RuntimeReps
--- False of           (LiftedRep :: RuntimeRep)
---   and of variables (a :: RuntimeRep)
-isUnliftedRuntimeRep rep
-  | Just rep' <- coreView rep = isUnliftedRuntimeRep rep'
-  | TyConApp rr_tc _ <- rep   -- NB: args might be non-empty
-                              --     e.g. TupleRep [r1, .., rn]
-  = isPromotedDataCon rr_tc && not (rr_tc `hasKey` liftedRepDataConKey)
-        -- Avoid searching all the unlifted RuntimeRep type cons
-        -- In the RuntimeRep data type, only LiftedRep is lifted
-        -- But be careful of type families (F tys) :: RuntimeRep
-  | otherwise {- Variables, applications -}
-  = False
-
--- | Is this the type 'RuntimeRep'?
-isRuntimeRepTy :: Type -> Bool
-isRuntimeRepTy ty | Just ty' <- coreView ty = isRuntimeRepTy ty'
-isRuntimeRepTy (TyConApp tc args)
-  | tc `hasKey` runtimeRepTyConKey = ASSERT( null args ) True
-isRuntimeRepTy _ = False
-
--- | Is a tyvar of type 'RuntimeRep'?
-isRuntimeRepVar :: TyVar -> Bool
-isRuntimeRepVar = isRuntimeRepTy . tyVarKind
 
 {-
 %************************************************************************

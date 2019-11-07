@@ -32,6 +32,7 @@ module RnNames (
 import GhcPrelude
 
 import DynFlags
+import TyCoPpr
 import GHC.Hs
 import TcEnv
 import RnEnv

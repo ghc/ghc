@@ -49,6 +49,7 @@ import TcRnMonad
 import TcType
 import THNames (liftClassKey)
 import TyCon
+import TyCoPpr (pprSourceTyCon)
 import Type
 import Util
 import VarSet

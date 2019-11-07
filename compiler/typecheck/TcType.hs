@@ -192,11 +192,10 @@ module TcType (
 -- friends:
 import GhcPrelude
 
-import Kind
 import TyCoRep
 import TyCoSubst ( mkTvSubst, substTyWithCoVars )
 import TyCoFVs
-import TyCoPpr ( pprParendTheta )
+import TyCoPpr
 import Class
 import Var
 import ForeignCall
