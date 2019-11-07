@@ -17,8 +17,6 @@
 
 module GHC.StgToCmm.Prim (
    cgOpApp,
-   cgPrimOp, -- internal(ish), used by cgCase to get code for a
-             -- comparison without also turning it into a Bool.
    shouldInlinePrimOp
  ) where
 
@@ -110,7 +108,7 @@ cgOpApp (StgPrimOp primop) args res_ty = do
                 f regs
                 emitReturn (map (CmmReg . CmmLocal) regs)
 
-          | otherwise -> panic "cgPrimop"
+          | otherwise -> panic "cgOpApp"
           where
              result_info = getPrimOpResultInfo primop
 
@@ -133,21 +131,6 @@ cgOpApp (StgPrimCallOp primcall) args _res_ty
 -- literal.
 asUnsigned :: Width -> Integer -> Integer
 asUnsigned w n = n .&. (bit (widthInBits w) - 1)
-
----------------------------------------------------
-cgPrimOp   :: [LocalReg]        -- where to put the results
-           -> PrimOp            -- the op
-           -> [StgArg]          -- arguments
-           -> FCode ()
-
-cgPrimOp results op args = do
-  dflags <- getDynFlags
-  arg_exprs <- getNonVoidArgAmodes args
-  case emitPrimOp dflags op arg_exprs of
-    PrimopCmmEmit_External -> panic "External prim op"
-    PrimopCmmEmit_Raw _ -> panic "caller should handle TagToEnum themselves"
-    PrimopCmmEmit_IntoRegs f -> f results
-
 
 ------------------------------------------------------------------------
 --      Emitting code for a primop
