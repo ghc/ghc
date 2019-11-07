@@ -334,39 +334,9 @@ rule just for saturated applications of ($).
   * Decompose it; should be of form (arg2_ty -> res_ty),
        where arg2_ty might be a polytype
   * Use arg2_ty to typecheck arg2
-
-Note [Typing rule for seq]
-~~~~~~~~~~~~~~~~~~~~~~~~~~
-We want to allow
-       x `seq` (# p,q #)
-which suggests this type for seq:
-   seq :: forall (a:*) (b:Open). a -> b -> b,
-with (b:Open) meaning that be can be instantiated with an unboxed
-tuple.  The trouble is that this might accept a partially-applied
-'seq', and I'm just not certain that would work.  I'm only sure it's
-only going to work when it's fully applied, so it turns into
-    case x of _ -> (# p,q #)
-
-So it seems more uniform to treat 'seq' as if it was a language
-construct.
-
-See also Note [seqId magic] in MkId
 -}
 
 tcExpr expr@(OpApp fix arg1 op arg2) res_ty
-  | (L loc (HsVar _ (L lv op_name))) <- op
-  , op_name `hasKey` seqIdKey           -- Note [Typing rule for seq]
-  = do { arg1_ty <- newFlexiTyVarTy liftedTypeKind
-       ; let arg2_exp_ty = res_ty
-       ; arg1' <- tcArg op arg1 arg1_ty 1
-       ; arg2' <- addErrCtxt (funAppCtxt op arg2 2) $
-                  tc_poly_expr_nc arg2 arg2_exp_ty
-       ; arg2_ty <- readExpType arg2_exp_ty
-       ; op_id <- tcLookupId op_name
-       ; let op' = L loc (mkHsWrap (mkWpTyApps [arg1_ty, arg2_ty])
-                                   (HsVar noExtField (L lv op_id)))
-       ; return $ OpApp fix arg1' op' arg2' }
-
   | (L loc (HsVar _ (L lv op_name))) <- op
   , op_name `hasKey` dollarIdKey        -- Note [Typing rule for ($)]
   = do { traceTc "Application rule" (ppr op)
