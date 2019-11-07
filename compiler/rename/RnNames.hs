@@ -394,8 +394,8 @@ calculateAvails :: DynFlags
 calculateAvails dflags iface mod_safe' want_boot imported_by =
   let imp_mod    = mi_module iface
       imp_sem_mod= mi_semantic_module iface
-      orph_iface = mi_orphan (mi_final_exts iface)
-      has_finsts = mi_finsts (mi_final_exts iface)
+      orph_iface = mi_orphan iface
+      has_finsts = mi_finsts iface
       deps       = mi_deps iface
       trust      = getSafeMode $ mi_trust iface
       trust_pkg  = mi_trust_pkg iface
