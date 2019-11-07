@@ -321,6 +321,7 @@ import TcType
 import Id
 import TysPrim          ( alphaTyVars )
 import TyCon
+import TyCoPpr          ( pprForAll )
 import Class
 import DataCon
 import Name             hiding ( varName )

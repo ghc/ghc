@@ -27,6 +27,7 @@ module PatSyn (
 import GhcPrelude
 
 import Type
+import TyCoPpr
 import Name
 import Outputable
 import Unique
