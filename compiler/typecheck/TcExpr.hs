@@ -63,9 +63,8 @@ import TyCoSubst (substTyWithInScope)
 import Type
 import TcEvidence
 import VarSet
-import MkId( seqId )
 import TysWiredIn
-import TysPrim( intPrimTy, mkTemplateTyVars, tYPE )
+import TysPrim( intPrimTy )
 import PrimOp( tagToEnumKey )
 import PrelNames
 import DynFlags
@@ -335,39 +334,9 @@ rule just for saturated applications of ($).
   * Decompose it; should be of form (arg2_ty -> res_ty),
        where arg2_ty might be a polytype
   * Use arg2_ty to typecheck arg2
-
-Note [Typing rule for seq]
-~~~~~~~~~~~~~~~~~~~~~~~~~~
-We want to allow
-       x `seq` (# p,q #)
-which suggests this type for seq:
-   seq :: forall (a:*) (b:Open). a -> b -> b,
-with (b:Open) meaning that be can be instantiated with an unboxed
-tuple.  The trouble is that this might accept a partially-applied
-'seq', and I'm just not certain that would work.  I'm only sure it's
-only going to work when it's fully applied, so it turns into
-    case x of _ -> (# p,q #)
-
-So it seems more uniform to treat 'seq' as if it was a language
-construct.
-
-See also Note [seqId magic] in MkId
 -}
 
 tcExpr expr@(OpApp fix arg1 op arg2) res_ty
-  | (L loc (HsVar _ (L lv op_name))) <- op
-  , op_name `hasKey` seqIdKey           -- Note [Typing rule for seq]
-  = do { arg1_ty <- newFlexiTyVarTy liftedTypeKind
-       ; let arg2_exp_ty = res_ty
-       ; arg1' <- tcArg op arg1 arg1_ty 1
-       ; arg2' <- addErrCtxt (funAppCtxt op arg2 2) $
-                  tc_poly_expr_nc arg2 arg2_exp_ty
-       ; arg2_ty <- readExpType arg2_exp_ty
-       ; op_id <- tcLookupId op_name
-       ; let op' = L loc (mkHsWrap (mkWpTyApps [arg1_ty, arg2_ty])
-                                   (HsVar noExtField (L lv op_id)))
-       ; return $ OpApp fix arg1' op' arg2' }
-
   | (L loc (HsVar _ (L lv op_name))) <- op
   , op_name `hasKey` dollarIdKey        -- Note [Typing rule for ($)]
   = do { traceTc "Application rule" (ppr op)
@@ -1161,26 +1130,11 @@ tcApp m_herald fun@(L loc (HsRecFld _ fld_lbl)) args res_ty
        ; (tc_fun, fun_ty) <- tcInferRecSelId (Unambiguous sel_name lbl)
        ; tcFunApp m_herald fun (L loc tc_fun) fun_ty args res_ty }
 
-tcApp m_herald fun@(L loc (HsVar _ (L _ fun_id))) args res_ty
+tcApp _m_herald (L loc (HsVar _ (L _ fun_id))) args res_ty
   -- Special typing rule for tagToEnum#
   | fun_id `hasKey` tagToEnumKey
   , n_val_args == 1
   = tcTagToEnum loc fun_id args res_ty
-
-  -- Special typing rule for 'seq'
-  -- In the saturated case, behave as if seq had type
-  --    forall a (b::TYPE r). a -> b -> b
-  -- for some type r.  See Note [Typing rule for seq]
-  | fun_id `hasKey` seqIdKey
-  , n_val_args == 2
-  = do { rep <- newFlexiTyVarTy runtimeRepTy
-       ; let [alpha, beta] = mkTemplateTyVars [liftedTypeKind, tYPE rep]
-             seq_ty = mkSpecForAllTys [alpha,beta]
-                      (mkTyVarTy alpha `mkVisFunTy` mkTyVarTy beta `mkVisFunTy` mkTyVarTy beta)
-             seq_fun = L loc (HsVar noExtField (L loc seqId))
-             -- seq_ty = forall (a:*) (b:TYPE r). a -> b -> b
-             -- where 'r' is a meta type variable
-        ; tcFunApp m_herald fun seq_fun seq_ty args res_ty }
   where
     n_val_args = count isHsValArg args
 

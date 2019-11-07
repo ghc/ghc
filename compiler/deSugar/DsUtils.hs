@@ -408,82 +408,88 @@ mkErrorAppDs err_id ty msg = do
     return (mkApps (Var err_id) [Type (getRuntimeRep ty), Type ty, core_msg])
 
 {-
-'mkCoreAppDs' and 'mkCoreAppsDs' hand the special-case desugaring of 'seq'.
+'mkCoreAppDs' and 'mkCoreAppsDs' handle the special-case desugaring of 'seq'.
 
-Note [Desugaring seq (1)]  cf #1031
-~~~~~~~~~~~~~~~~~~~~~~~~~
-   f x y = x `seq` (y `seq` (# x,y #))
+Note [Desugaring seq]
+~~~~~~~~~~~~~~~~~~~~~
 
-The [CoreSyn let/app invariant] means that, other things being equal, because
-the argument to the outer 'seq' has an unlifted type, we'll use call-by-value thus:
+There are a few subtleties in the desugaring of `seq`:
 
-   f x y = case (y `seq` (# x,y #)) of v -> x `seq` v
+ 1. (as described in #1031)
 
-But that is bad for two reasons:
-  (a) we now evaluate y before x, and
-  (b) we can't bind v to an unboxed pair
+    Consider,
+       f x y = x `seq` (y `seq` (# x,y #))
 
-Seq is very, very special!  So we recognise it right here, and desugar to
-        case x of _ -> case y of _ -> (# x,y #)
+    The [CoreSyn let/app invariant] means that, other things being equal, because
+    the argument to the outer 'seq' has an unlifted type, we'll use call-by-value thus:
 
-Note [Desugaring seq (2)]  cf #2273
-~~~~~~~~~~~~~~~~~~~~~~~~~
-Consider
-   let chp = case b of { True -> fst x; False -> 0 }
-   in chp `seq` ...chp...
-Here the seq is designed to plug the space leak of retaining (snd x)
-for too long.
+       f x y = case (y `seq` (# x,y #)) of v -> x `seq` v
 
-If we rely on the ordinary inlining of seq, we'll get
-   let chp = case b of { True -> fst x; False -> 0 }
-   case chp of _ { I# -> ...chp... }
+    But that is bad for two reasons:
+      (a) we now evaluate y before x, and
+      (b) we can't bind v to an unboxed pair
 
-But since chp is cheap, and the case is an alluring contet, we'll
-inline chp into the case scrutinee.  Now there is only one use of chp,
-so we'll inline a second copy.  Alas, we've now ruined the purpose of
-the seq, by re-introducing the space leak:
-    case (case b of {True -> fst x; False -> 0}) of
-      I# _ -> ...case b of {True -> fst x; False -> 0}...
+    Seq is very, very special!  So we recognise it right here, and desugar to
+            case x of _ -> case y of _ -> (# x,y #)
 
-We can try to avoid doing this by ensuring that the binder-swap in the
-case happens, so we get his at an early stage:
-   case chp of chp2 { I# -> ...chp2... }
-But this is fragile.  The real culprit is the source program.  Perhaps we
-should have said explicitly
-   let !chp2 = chp in ...chp2...
+ 2. (as described in #2273)
 
-But that's painful.  So the code here does a little hack to make seq
-more robust: a saturated application of 'seq' is turned *directly* into
-the case expression, thus:
-   x  `seq` e2 ==> case x of x -> e2    -- Note shadowing!
-   e1 `seq` e2 ==> case x of _ -> e2
+    Consider
+       let chp = case b of { True -> fst x; False -> 0 }
+       in chp `seq` ...chp...
+    Here the seq is designed to plug the space leak of retaining (snd x)
+    for too long.
 
-So we desugar our example to:
-   let chp = case b of { True -> fst x; False -> 0 }
-   case chp of chp { I# -> ...chp... }
-And now all is well.
+    If we rely on the ordinary inlining of seq, we'll get
+       let chp = case b of { True -> fst x; False -> 0 }
+       case chp of _ { I# -> ...chp... }
 
-The reason it's a hack is because if you define mySeq=seq, the hack
-won't work on mySeq.
+    But since chp is cheap, and the case is an alluring contet, we'll
+    inline chp into the case scrutinee.  Now there is only one use of chp,
+    so we'll inline a second copy.  Alas, we've now ruined the purpose of
+    the seq, by re-introducing the space leak:
+        case (case b of {True -> fst x; False -> 0}) of
+          I# _ -> ...case b of {True -> fst x; False -> 0}...
 
-Note [Desugaring seq (3)] cf #2409
-~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
-The isLocalId ensures that we don't turn
-        True `seq` e
-into
-        case True of True { ... }
-which stupidly tries to bind the datacon 'True'.
+    We can try to avoid doing this by ensuring that the binder-swap in the
+    case happens, so we get his at an early stage:
+       case chp of chp2 { I# -> ...chp2... }
+    But this is fragile.  The real culprit is the source program.  Perhaps we
+    should have said explicitly
+       let !chp2 = chp in ...chp2...
+
+    But that's painful.  So the code here does a little hack to make seq
+    more robust: a saturated application of 'seq' is turned *directly* into
+    the case expression, thus:
+       x  `seq` e2 ==> case x of x -> e2    -- Note shadowing!
+       e1 `seq` e2 ==> case x of _ -> e2
+
+    So we desugar our example to:
+       let chp = case b of { True -> fst x; False -> 0 }
+       case chp of chp { I# -> ...chp... }
+    And now all is well.
+
+    The reason it's a hack is because if you define mySeq=seq, the hack
+    won't work on mySeq.
+
+ 3. (as described in #2409)
+
+    The isLocalId ensures that we don't turn
+            True `seq` e
+    into
+            case True of True { ... }
+    which stupidly tries to bind the datacon 'True'.
 -}
 
 -- NB: Make sure the argument is not levity polymorphic
 mkCoreAppDs  :: SDoc -> CoreExpr -> CoreExpr -> CoreExpr
-mkCoreAppDs _ (Var f `App` Type ty1 `App` Type ty2 `App` arg1) arg2
-  | f `hasKey` seqIdKey            -- Note [Desugaring seq (1), (2)]
+mkCoreAppDs _ (Var f `App` Type _r `App` Type ty1 `App` Type ty2 `App` arg1) arg2
+  | f `hasKey` seqIdKey            -- Note [Desugaring seq], points (1) and (2)
   = Case arg1 case_bndr ty2 [(DEFAULT,[],arg2)]
   where
     case_bndr = case arg1 of
                    Var v1 | isInternalName (idName v1)
-                          -> v1        -- Note [Desugaring seq (2) and (3)]
+                          -> v1        -- Note [Desugaring seq], points (2) and (3)
                    _      -> mkWildValBinder ty1
 
 mkCoreAppDs s fun arg = mkCoreApp s fun arg  -- The rest is done in MkCore

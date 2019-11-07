@@ -1392,7 +1392,6 @@ seqId = pcMiscPrelId seqName ty info
   where
     info = noCafIdInfo `setInlinePragInfo` inline_prag
                        `setUnfoldingInfo`  mkCompulsoryUnfolding rhs
-                       `setNeverLevPoly`   ty
 
     inline_prag
          = alwaysInlinePragma `setInlinePragmaActivation` ActiveAfter
@@ -1402,11 +1401,15 @@ seqId = pcMiscPrelId seqName ty info
                   -- LHS of rules.  That way we can have rules for 'seq';
                   -- see Note [seqId magic]
 
-    ty  = mkSpecForAllTys [alphaTyVar,betaTyVar]
-                          (mkVisFunTy alphaTy (mkVisFunTy betaTy betaTy))
+    -- seq :: forall (r :: RuntimeRep) a (b :: TYPE r). a -> b -> b
+    ty  =
+      mkInvForAllTy runtimeRep2TyVar
+      $ mkSpecForAllTys [alphaTyVar, openBetaTyVar]
+      $ mkVisFunTy alphaTy (mkVisFunTy openBetaTy openBetaTy)
 
-    [x,y] = mkTemplateLocals [alphaTy, betaTy]
-    rhs = mkLams [alphaTyVar,betaTyVar,x,y] (Case (Var x) x betaTy [(DEFAULT, [], Var y)])
+    [x,y] = mkTemplateLocals [alphaTy, openBetaTy]
+    rhs = mkLams ([runtimeRep2TyVar, alphaTyVar, openBetaTyVar, x, y]) $
+          Case (Var x) x openBetaTy [(DEFAULT, [], Var y)]
 
 ------------------------------------------------
 lazyId :: Id    -- See Note [lazyId magic]
@@ -1492,19 +1495,20 @@ Note [seqId magic]
 ~~~~~~~~~~~~~~~~~~
 'GHC.Prim.seq' is special in several ways.
 
-a) In source Haskell its second arg can have an unboxed type
-      x `seq` (v +# w)
-   But see Note [Typing rule for seq] in TcExpr, which
-   explains why we give seq itself an ordinary type
-         seq :: forall a b. a -> b -> b
-   and treat it as a language construct from a typing point of view.
+a) Its fixity is set in LoadIface.ghcPrimIface
 
-b) Its fixity is set in LoadIface.ghcPrimIface
-
-c) It has quite a bit of desugaring magic.
+b) It has quite a bit of desugaring magic.
    See DsUtils.hs Note [Desugaring seq (1)] and (2) and (3)
 
-d) There is some special rule handing: Note [User-defined RULES for seq]
+c) There is some special rule handing: Note [User-defined RULES for seq]
+
+Historical note:
+    In TcExpr we used to need a special typing rule for 'seq', to handle calls
+    whose second argument had an unboxed type, e.g.  x `seq` 3#
+
+    However, with levity polymorphism we can now give seq the type seq ::
+    forall (r :: RuntimeRep) a (b :: TYPE r). a -> b -> b which handles this
+    case without special treatment in the typechecker.
 
 Note [User-defined RULES for seq]
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
@@ -1530,12 +1534,15 @@ If we wrote
   RULE "f/seq" forall n e.  seq (f n) e = seq n e
 with rule arity 2, then two bad things would happen:
 
-  - The magical desugaring done in Note [seqId magic] item (c)
+  - The magical desugaring done in Note [seqId magic] item (b)
     for saturated application of 'seq' would turn the LHS into
     a case expression!
 
   - The code in Simplify.rebuildCase would need to actually supply
     the value argument, which turns out to be awkward.
+
+See also: Note [User-defined RULES for seq] in Simplify.
+
 
 Note [lazyId magic]
 ~~~~~~~~~~~~~~~~~~~
