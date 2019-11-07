@@ -244,9 +244,9 @@ MarkQueue *current_mark_queue = NULL;
 
 /* Initialise update remembered set data structures */
 void nonmovingMarkInitUpdRemSet() {
+#if defined(THREADED_RTS)
     initMutex(&upd_rem_set_lock);
     initCondition(&upd_rem_set_flushed_cond);
-#if defined(THREADED_RTS)
     initMutex(&nonmoving_large_objects_mutex);
 #endif
 }
