@@ -8,7 +8,7 @@
 
 module TidyPgm (
        mkBootModDetailsTc, tidyProgram,
-       tidyProgram2, CgGuts2 (..)
+       tidyProgram2,
    ) where
 
 #include "HsVersions.h"
@@ -322,23 +322,6 @@ Finally, substitute these new top-level binders consistently
 throughout, including in unfoldings.  We also tidy binders in
 RHSs, so that they print nicely in interfaces.
 -}
-
-data CgGuts2 = CgGuts2
-  { cg2_module :: !Module
-  , cg2_tycons :: ![TyCon]
-  , cg2_binds :: !CoreProgram
-  , cg2_foreign :: !ForeignStubs
-  , cg2_foreign_files :: ![(ForeignSrcLang, FilePath)]
-  , cg2_dep_pkgs :: ![InstalledUnitId]
-  , cg2_hpc_info :: !HpcInfo
-  , cg2_modBreaks :: !(Maybe ModBreaks)
-  , cg2_spt_entries :: ![SptEntry]
-
-  -- Stuff for ModDetails generation
-  , cg2_type_env :: !TypeEnv
-  , cg2_trimmed_rules :: ![CoreRule]
-  , cg2_tidy_env :: TidyEnv
-  }
 
 tidyProgram2 :: HscEnv -> ModGuts -> IO CgGuts2
 tidyProgram2 hsc_env mod_guts = do

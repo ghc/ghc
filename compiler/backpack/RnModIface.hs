@@ -101,27 +101,30 @@ rnModIface hsc_env insts nsubst iface = do
         sig_of <- case mi_sig_of iface of
                     Nothing -> return Nothing
                     Just x  -> fmap Just (rnModule x)
-        exports <- mapM rnAvailInfo (mi_exports iface)
+        exports <- mapM rnAvailInfo (mi_exports (mi_final_exts iface))
         decls <- mapM rnIfaceDecl' (mi_decls iface)
-        insts <- mapM rnIfaceClsInst (mi_insts iface)
-        fams <- mapM rnIfaceFamInst (mi_fam_insts iface)
+        insts <- mapM rnIfaceClsInst (mi_insts (mi_final_exts iface))
+        fams <- mapM rnIfaceFamInst (mi_fam_insts (mi_final_exts iface))
         deps <- rnDependencies (mi_deps iface)
         -- TODO:
         -- mi_rules
         return iface { mi_module = mod
                      , mi_sig_of = sig_of
-                     , mi_insts = insts
-                     , mi_fam_insts = fams
-                     , mi_exports = exports
                      , mi_decls = decls
-                     , mi_deps = deps }
+                     , mi_deps = deps
+                     , mi_final_exts = (mi_final_exts iface)
+                         { mi_exports = exports
+                         , mi_insts = insts
+                         , mi_fam_insts = fams
+                         }
+                     }
 
 -- | Rename just the exports of a 'ModIface'.  Useful when we're doing
 -- shaping prior to signature merging.
 rnModExports :: HscEnv -> [(ModuleName, Module)] -> ModIface -> IO (Either ErrorMessages [AvailInfo])
 rnModExports hsc_env insts iface
     = initRnIface hsc_env iface insts Nothing
-    $ mapM rnAvailInfo (mi_exports iface)
+    $ mapM rnAvailInfo (mi_exports (mi_final_exts iface))
 
 rnDependencies :: Rename Dependencies
 rnDependencies deps = do
@@ -343,7 +346,7 @@ rnIfaceGlobal n = do
                         else m'
             iface <- liftIO . initIfaceCheck (text "rnIfaceGlobal") hsc_env
                             $ loadSysInterface (text "rnIfaceGlobal") m''
-            let nsubst = mkNameShape (moduleName m) (mi_exports iface)
+            let nsubst = mkNameShape (moduleName m) (mi_exports (mi_final_exts iface))
             case maybeSubstNameShape nsubst n of
                 Nothing -> failWithRn $ vcat [
                     text "The identifier" <+> ppr (occName n) <+>
