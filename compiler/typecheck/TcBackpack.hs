@@ -362,21 +362,16 @@ tcRnMergeSignatures hsc_env hpm orig_tcg_env iface =
   real_loc = tcg_top_loc orig_tcg_env
 
 thinModIface :: [AvailInfo] -> ModIface -> ModIface
-thinModIface avails iface =
-    iface {
-        mi_exports = avails,
-        -- mi_fixities = ...,
-        -- mi_warns = ...,
-        -- mi_anns = ...,
-        -- TODO: The use of nameOccName here is a bit dodgy, because
-        -- perhaps there might be two IfaceTopBndr that are the same
-        -- OccName but different Name.  Requires better understanding
-        -- of invariants here.
-        mi_decls = exported_decls ++ non_exported_decls ++ dfun_decls
-        -- mi_insts = ...,
-        -- mi_fam_insts = ...,
-    }
+thinModIface avails iface = iface'
   where
+    final_exts = (mi_final_exts iface) { mi_exports = avails }
+    -- TODO: The use of nameOccName here is a bit dodgy, because
+    -- perhaps there might be two IfaceTopBndr that are the same
+    -- OccName but different Name.  Requires better understanding
+    -- of invariants here.
+    iface' = iface{ mi_final_exts = final_exts,
+                    mi_decls = exported_decls ++ non_exported_decls ++ dfun_decls }
+
     decl_pred occs decl = nameOccName (ifName decl) `elemOccSet` occs
     filter_decls occs = filter (decl_pred occs . snd) (mi_decls iface)
 
@@ -656,8 +651,8 @@ mergeSignatures
             case mb_r of
                 Left err -> failWithTc err
                 Right nsubst' -> return (nsubst',oks',(imod, thinned_iface):ifaces)
-        nsubst0 = mkNameShape (moduleName inner_mod) (mi_exports lcl_iface0)
-        ok_to_use0 = mkOccSet (exportOccs (mi_exports lcl_iface0))
+        nsubst0 = mkNameShape (moduleName inner_mod) (mi_exports (mi_final_exts lcl_iface0))
+        ok_to_use0 = mkOccSet (exportOccs (mi_exports (mi_final_exts lcl_iface0)))
     -- Process each interface, getting the thinned interfaces as well as
     -- the final, full set of exports @nsubst@ and the exports which are
     -- "ok to use" (we won't attach 'inheritedSigPvpWarning' to them.)
@@ -912,8 +907,8 @@ checkImplements impl_mod req_mod@(IndefModule uid mod_name) =
     impl_iface <- initIfaceTcRn $
         loadSysInterface (text "checkImplements 1") impl_mod
     let impl_gr = mkGlobalRdrEnv
-                    (gresFromAvails Nothing (mi_exports impl_iface))
-        nsubst = mkNameShape (moduleName impl_mod) (mi_exports impl_iface)
+                    (gresFromAvails Nothing (mi_exports (mi_final_exts impl_iface)))
+        nsubst = mkNameShape (moduleName impl_mod) (mi_exports (mi_final_exts impl_iface))
 
     -- Load all the orphans, so the subsequent 'checkHsigIface' sees
     -- all the instances it needs to
@@ -955,7 +950,7 @@ checkImplements impl_mod req_mod@(IndefModule uid mod_name) =
 
     -- STEP 3: Check that the implementing interface exports everything
     -- we need.  (Notice we IGNORE the Modules in the AvailInfos.)
-    forM_ (exportOccs (mi_exports isig_iface)) $ \occ ->
+    forM_ (exportOccs (mi_exports (mi_final_exts isig_iface))) $ \occ ->
         case lookupGlobalRdrEnv impl_gr occ of
             [] -> addErr $ quotes (ppr occ)
                     <+> text "is exported by the hsig file, but not"
@@ -978,7 +973,7 @@ checkImplements impl_mod req_mod@(IndefModule uid mod_name) =
     -- STEP 7: Return the updated 'TcGblEnv' with the signature exports,
     -- so we write them out.
     return tcg_env {
-        tcg_exports = mi_exports sig_iface
+        tcg_exports = mi_exports (mi_final_exts sig_iface)
         }
 
 -- | Given 'tcg_mod', instantiate a 'ModIface' from the indefinite

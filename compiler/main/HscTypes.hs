@@ -34,7 +34,7 @@ module HscTypes (
 
         -- * Information about modules
         ModDetails(..), emptyModDetails,
-        ModGuts(..), CgGuts(..), CgGuts2(..), ForeignStubs(..), appendStubC,
+        ModGuts(..), CgGuts(..), CgGuts2(..), cgGuts2ToCgGuts, ForeignStubs(..), appendStubC,
         ImportedMods, ImportedBy(..), importedByUser, ImportedModsVal(..), SptEntry(..),
         ForeignSrcLang(..),
         phaseForeignLanguage,
@@ -233,13 +233,13 @@ import Control.DeepSeq
 -- | Status of a compilation to hard-code
 data HscStatus
     -- | Nothing to do.
-    = HscNotGeneratingCode ModIface
+    = HscNotGeneratingCode ModIface ModDetails
     -- | Nothing to do because code already exists.
     | HscUpToDate ModIface ModDetails
     -- | Update boot file result.
-    | HscUpdateBoot ModIface
+    | HscUpdateBoot ModIface ModDetails
     -- | Generate signature file (backpack)
-    | HscUpdateSig ModIface
+    | HscUpdateSig ModIface ModDetails
     -- | Recompile this module.
     | HscRecomp
         { hscs_guts       :: !CgGuts2
@@ -1513,6 +1513,19 @@ data CgGuts2 = CgGuts2
   , cg2_type_env :: !TypeEnv
   , cg2_trimmed_rules :: ![CoreRule]
   , cg2_tidy_env :: TidyEnv
+  }
+
+cgGuts2ToCgGuts :: CgGuts2 -> CgGuts
+cgGuts2ToCgGuts guts2 = CgGuts
+  { cg_module = cg2_module guts2
+  , cg_tycons = cg2_tycons guts2
+  , cg_binds = cg2_binds guts2
+  , cg_foreign = cg2_foreign guts2
+  , cg_foreign_files = cg2_foreign_files guts2
+  , cg_dep_pkgs = cg2_dep_pkgs guts2
+  , cg_hpc_info = cg2_hpc_info guts2
+  , cg_modBreaks = cg2_modBreaks guts2
+  , cg_spt_entries = cg2_spt_entries guts2
   }
 
 -----------------------------------

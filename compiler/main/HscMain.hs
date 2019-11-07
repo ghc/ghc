@@ -809,9 +809,9 @@ finish summary tc_result mb_old_hash = do
         liftIO $ hscMaybeWriteIface dflags iface mb_old_iface_hash (ms_location summary)
 
         return $ case (target, hsc_src) of
-                (HscNothing, _) -> HscNotGeneratingCode iface
-                (_, HsBootFile) -> HscUpdateBoot iface
-                (_, HsigFile) -> HscUpdateSig iface
+                (HscNothing, _) -> HscNotGeneratingCode iface details
+                (_, HsBootFile) -> HscUpdateBoot iface details
+                (_, HsigFile) -> HscUpdateSig iface details
                 _ -> panic "finish"
 
   if should_desugar
@@ -836,7 +836,7 @@ finish summary tc_result mb_old_hash = do
                 {-# SCC "HscMain.mkPartialIface" #-}
                 -- This `force` saves 2M residency in test T10370
                 -- See Note [Avoiding space leaks in toIface*] for details.
-                force (mkPartialIface hsc_env details desugared_guts)
+                force (mkPartialIface hsc_env desugared_guts)
 
           return HscRecomp{ hscs_guts = cg_guts,
                             hscs_summary = summary,
