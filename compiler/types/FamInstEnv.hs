@@ -895,6 +895,10 @@ conditions hold:
    There are subtleties here. See Note [Coverage condition for injective type families]
    in FamInst.
 
+Check (1B1) must be done for all family instances (transitively) imported. Other
+checks can be done just for locally written equations. Doing the other checks for
+imported equations led to #17405.
+
 See also Note [Injective type families] in TyCon
 -}
 
