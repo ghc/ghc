@@ -33,6 +33,7 @@ import InstEnv
 import VarSet
 import VarEnv
 import TyCoFVs
+import TyCoPpr( pprWithExplicitKindsWhen )
 import FV
 import Outputable
 import ErrUtils( Validity(..), allValid )

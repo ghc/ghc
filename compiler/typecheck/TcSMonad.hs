@@ -140,7 +140,6 @@ import qualified ClsInst as TcM( matchGlobalInst, ClsInstResult(..) )
 import qualified TcEnv as TcM
        ( checkWellStaged, tcGetDefaultTys, tcLookupClass, tcLookupId, topIdLvl )
 import ClsInst( InstanceWhat(..), safeOverlap, instanceReturnsDictCon )
-import Kind
 import TcType
 import DynFlags
 import Type

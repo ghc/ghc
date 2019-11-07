@@ -79,7 +79,7 @@ module Type (
 
         modifyJoinResTy, setJoinResTy,
 
-        -- Analyzing types
+        -- ** Analyzing types
         TyCoMapper(..), mapType, mapCoercion,
 
         -- (Newtypes)
@@ -112,8 +112,11 @@ module Type (
         isValidJoinPointType,
         tyConAppNeedsKindSig,
 
-        -- (Lifting and boxity)
-        isLiftedType_maybe, isUnliftedType, mightBeUnliftedType, isUnboxedTupleType, isUnboxedSumType,
+        -- *** Levity and boxity
+        isLiftedType_maybe,
+        isLiftedTypeKind, isUnliftedTypeKind,
+        isLiftedRuntimeRep, isUnliftedRuntimeRep,
+        isUnliftedType, mightBeUnliftedType, isUnboxedTupleType, isUnboxedSumType,
         isAlgType, isDataFamilyAppType,
         isPrimitiveType, isStrictType,
         isRuntimeRepTy, isRuntimeRepVar, isRuntimeRepKindedTy,
@@ -194,17 +197,6 @@ module Type (
         substVarBndr, substVarBndrs,
         cloneTyVarBndr, cloneTyVarBndrs, lookupTyVar,
 
-        -- * Pretty-printing
-        pprType, pprParendType, pprPrecType,
-        pprTypeApp, pprTyThingCategory, pprShortTyThing,
-        pprTCvBndr, pprTCvBndrs, pprForAll, pprUserForAll,
-        pprSigmaType, pprWithExplicitKindsWhen,
-        pprTheta, pprThetaArrowTy, pprClassPred,
-        pprKind, pprParendKind, pprSourceTyCon,
-        PprPrec(..), topPrec, sigPrec, opPrec, funPrec, appPrec, maybeParen,
-        pprTyVar, pprTyVars, debugPprType,
-        pprWithTYPE,
-
         -- * Tidying type related things up for printing
         tidyType,      tidyTypes,
         tidyOpenType,  tidyOpenTypes,
@@ -214,7 +206,12 @@ module Type (
         tidyTyCoVarOcc,
         tidyTopType,
         tidyKind,
-        tidyTyCoVarBinder, tidyTyCoVarBinders
+        tidyTyCoVarBinder, tidyTyCoVarBinders,
+
+        -- * Kinds
+        isConstraintKindCon,
+        classifiesTypeWithValues,
+        isKindLevPoly
     ) where
 
 #include "HsVersions.h"
@@ -226,11 +223,9 @@ import BasicTypes
 -- We import the representation and primitive functions from TyCoRep.
 -- Many things are reexported, but not the representation!
 
-import Kind
 import TyCoRep
 import TyCoSubst
 import TyCoTidy
-import TyCoPpr
 import TyCoFVs
 
 -- friends:
@@ -260,7 +255,6 @@ import FV
 import Outputable
 import FastString
 import Pair
-import DynFlags  ( gopt_set, GeneralFlag(Opt_PrintExplicitRuntimeReps) )
 import ListSetOps
 import Unique ( nonDetCmpUnique )
 
@@ -478,6 +472,81 @@ expandTypeSynonyms ty
       -- handle coercion optimization (which sometimes swaps the
       -- order of a coercion)
     go_cobndr subst = substForAllCoBndrUsing False (go_co subst) subst
+
+
+-- | Extract the RuntimeRep classifier of a type from its kind. For example,
+-- @kindRep * = LiftedRep@; Panics if this is not possible.
+-- Treats * and Constraint as the same
+kindRep :: HasDebugCallStack => Kind -> Type
+kindRep k = case kindRep_maybe k of
+              Just r  -> r
+              Nothing -> pprPanic "kindRep" (ppr k)
+
+-- | Given a kind (TYPE rr), extract its RuntimeRep classifier rr.
+-- For example, @kindRep_maybe * = Just LiftedRep@
+-- Returns 'Nothing' if the kind is not of form (TYPE rr)
+-- Treats * and Constraint as the same
+kindRep_maybe :: HasDebugCallStack => Kind -> Maybe Type
+kindRep_maybe kind
+  | Just kind' <- coreView kind = kindRep_maybe kind'
+  | TyConApp tc [arg] <- kind
+  , tc `hasKey` tYPETyConKey    = Just arg
+  | otherwise                   = Nothing
+
+-- | This version considers Constraint to be the same as *. Returns True
+-- if the argument is equivalent to Type/Constraint and False otherwise.
+-- See Note [Kind Constraint and kind Type]
+isLiftedTypeKind :: Kind -> Bool
+isLiftedTypeKind kind
+  = case kindRep_maybe kind of
+      Just rep -> isLiftedRuntimeRep rep
+      Nothing  -> False
+
+isLiftedRuntimeRep :: Type -> Bool
+-- isLiftedRuntimeRep is true of LiftedRep :: RuntimeRep
+-- False of type variables (a :: RuntimeRep)
+--   and of other reps e.g. (IntRep :: RuntimeRep)
+isLiftedRuntimeRep rep
+  | Just rep' <- coreView rep          = isLiftedRuntimeRep rep'
+  | TyConApp rr_tc args <- rep
+  , rr_tc `hasKey` liftedRepDataConKey = ASSERT( null args ) True
+  | otherwise                          = False
+
+-- | Returns True if the kind classifies unlifted types and False otherwise.
+-- Note that this returns False for levity-polymorphic kinds, which may
+-- be specialized to a kind that classifies unlifted types.
+isUnliftedTypeKind :: Kind -> Bool
+isUnliftedTypeKind kind
+  = case kindRep_maybe kind of
+      Just rep -> isUnliftedRuntimeRep rep
+      Nothing  -> False
+
+isUnliftedRuntimeRep :: Type -> Bool
+-- True of definitely-unlifted RuntimeReps
+-- False of           (LiftedRep :: RuntimeRep)
+--   and of variables (a :: RuntimeRep)
+isUnliftedRuntimeRep rep
+  | Just rep' <- coreView rep = isUnliftedRuntimeRep rep'
+  | TyConApp rr_tc _ <- rep   -- NB: args might be non-empty
+                              --     e.g. TupleRep [r1, .., rn]
+  = isPromotedDataCon rr_tc && not (rr_tc `hasKey` liftedRepDataConKey)
+        -- Avoid searching all the unlifted RuntimeRep type cons
+        -- In the RuntimeRep data type, only LiftedRep is lifted
+        -- But be careful of type families (F tys) :: RuntimeRep
+  | otherwise {- Variables, applications -}
+  = False
+
+-- | Is this the type 'RuntimeRep'?
+isRuntimeRepTy :: Type -> Bool
+isRuntimeRepTy ty | Just ty' <- coreView ty = isRuntimeRepTy ty'
+isRuntimeRepTy (TyConApp tc args)
+  | tc `hasKey` runtimeRepTyConKey = ASSERT( null args ) True
+isRuntimeRepTy _ = False
+
+-- | Is a tyvar of type 'RuntimeRep'?
+isRuntimeRepVar :: TyVar -> Bool
+isRuntimeRepVar = isRuntimeRepTy . tyVarKind
+
 
 {-
 ************************************************************************
@@ -1845,19 +1914,6 @@ coAxNthLHS :: CoAxiom br -> Int -> Type
 coAxNthLHS ax ind =
   mkTyConApp (coAxiomTyCon ax) (coAxBranchLHS (coAxiomNthBranch ax ind))
 
--- | Pretty prints a 'TyCon', using the family instance in case of a
--- representation tycon.  For example:
---
--- > data T [a] = ...
---
--- In that case we want to print @T [a]@, where @T@ is the family 'TyCon'
-pprSourceTyCon :: TyCon -> SDoc
-pprSourceTyCon tycon
-  | Just (fam_tc, tys) <- tyConFamInst_maybe tycon
-  = ppr $ fam_tc `TyConApp` tys        -- can't be FunTyCon
-  | otherwise
-  = ppr tycon
-
 isFamFreeTy :: Type -> Bool
 isFamFreeTy ty | Just ty' <- coreView ty = isFamFreeTy ty'
 isFamFreeTy (TyVarTy _)       = True
@@ -2804,6 +2860,74 @@ setJoinResTy :: Int  -- Number of binders to skip
 setJoinResTy ar new_res_ty ty
   = modifyJoinResTy ar (const new_res_ty) ty
 
+{-
+************************************************************************
+*                                                                      *
+        Functions over Kinds
+*                                                                      *
+************************************************************************
+
+Note [Kind Constraint and kind Type]
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+The kind Constraint is the kind of classes and other type constraints.
+The special thing about types of kind Constraint is that
+ * They are displayed with double arrow:
+     f :: Ord a => a -> a
+ * They are implicitly instantiated at call sites; so the type inference
+   engine inserts an extra argument of type (Ord a) at every call site
+   to f.
+
+However, once type inference is over, there is *no* distinction between
+Constraint and Type. Indeed we can have coercions between the two. Consider
+   class C a where
+     op :: a -> a
+For this single-method class we may generate a newtype, which in turn
+generates an axiom witnessing
+    C a ~ (a -> a)
+so on the left we have Constraint, and on the right we have Type.
+See #7451.
+
+Bottom line: although 'Type' and 'Constraint' are distinct TyCons, with
+distinct uniques, they are treated as equal at all times except
+during type inference.
+-}
+
+isConstraintKindCon :: TyCon -> Bool
+isConstraintKindCon tc = tyConUnique tc == constraintKindTyConKey
+
+-- | Tests whether the given kind (which should look like @TYPE x@)
+-- is something other than a constructor tree (that is, constructors at every node).
+-- E.g.  True of   TYPE k, TYPE (F Int)
+--       False of  TYPE 'LiftedRep
+isKindLevPoly :: Kind -> Bool
+isKindLevPoly k = ASSERT2( isLiftedTypeKind k || _is_type, ppr k )
+                    -- the isLiftedTypeKind check is necessary b/c of Constraint
+                  go k
+  where
+    go ty | Just ty' <- coreView ty = go ty'
+    go TyVarTy{}         = True
+    go AppTy{}           = True  -- it can't be a TyConApp
+    go (TyConApp tc tys) = isFamilyTyCon tc || any go tys
+    go ForAllTy{}        = True
+    go (FunTy _ t1 t2)   = go t1 || go t2
+    go LitTy{}           = False
+    go CastTy{}          = True
+    go CoercionTy{}      = True
+
+    _is_type = classifiesTypeWithValues k
+
+-----------------------------------------
+--              Subkinding
+-- The tc variants are used during type-checking, where ConstraintKind
+-- is distinct from all other kinds
+-- After type-checking (in core), Constraint and liftedTypeKind are
+-- indistinguishable
+
+-- | Does this classify a type allowed to have values? Responds True to things
+-- like *, #, TYPE Lifted, TYPE v, Constraint.
+classifiesTypeWithValues :: Kind -> Bool
+-- ^ True of any sub-kind of OpenTypeKind
+classifiesTypeWithValues k = isJust (kindRep_maybe k)
 
 {-
 %************************************************************************
@@ -2815,13 +2939,6 @@ setJoinResTy ar new_res_ty ty
 Most pretty-printing is either in TyCoRep or IfaceType.
 
 -}
-
--- | This variant preserves any use of TYPE in a type, effectively
--- locally setting -fprint-explicit-runtime-reps.
-pprWithTYPE :: Type -> SDoc
-pprWithTYPE ty = updSDocDynFlags (flip gopt_set Opt_PrintExplicitRuntimeReps) $
-                 ppr ty
-
 
 -- | Does a 'TyCon' (that is applied to some number of arguments) need to be
 -- ascribed with an explicit kind signature to resolve ambiguity if rendered as
