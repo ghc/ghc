@@ -870,7 +870,7 @@ filterImports
     -> RnM (Maybe (Bool, Located [LIE GhcRn]), -- Import spec w/ Names
             [GlobalRdrElt])                   -- Same again, but in GRE form
 filterImports iface decl_spec Nothing
-  = return (Nothing, gresFromAvails (Just imp_spec) (mi_exports iface))
+  = return (Nothing, gresFromAvails (Just imp_spec) (mi_exports (mi_final_exts iface)))
   where
     imp_spec = ImpSpec { is_decl = decl_spec, is_item = ImpAll }
 
@@ -894,7 +894,7 @@ filterImports iface decl_spec (Just (want_hiding, L l import_items))
 
         return (Just (want_hiding, L l (map fst items2)), gres)
   where
-    all_avails = mi_exports iface
+    all_avails = mi_exports (mi_final_exts iface)
 
         -- See Note [Dealing with imports]
     imp_occ_env :: OccEnv (Name,    -- the name
@@ -1541,7 +1541,7 @@ getMinimalImports = mapM mk_minimal
     to_ie _ (AvailTC n [m] [])
        | n==m = [IEThingAbs noExtField (to_ie_post_rn $ noLoc n)]
     to_ie iface (AvailTC n ns fs)
-      = case [(xs,gs) |  AvailTC x xs gs <- mi_exports iface
+      = case [(xs,gs) |  AvailTC x xs gs <- mi_exports (mi_final_exts iface)
                  , x == n
                  , x `elem` xs    -- Note [Partial export]
                  ] of
