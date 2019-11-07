@@ -334,7 +334,7 @@ mkIface_ hsc_env
           mi_doc_hdr     = doc_hdr,
           mi_decl_docs   = decl_docs,
           mi_arg_docs    = arg_docs,
-          mi_final_exts        = () }
+          mi_final_exts  = () }
   where
      -- cmp_rule     = comparing ifRuleName
      -- Compare these lexicographically by OccName, *not* by unique,
@@ -463,7 +463,21 @@ addFingerprints hsc_env mod_details iface0 = do
 
    eps <- hscEPS hsc_env
    let
-       decls = mi_decls iface0
+       entities = typeEnvElts type_env
+       decls  = [ tyThingToIfaceDecl entity
+                | entity <- entities,
+                  let name = getName entity,
+                  not (isImplicitTyThing entity),
+                     -- No implicit Ids and class tycons in the interface file
+                  not (isWiredInName name),
+                     -- Nor wired-in things; the compiler knows about them anyhow
+                  nameIsLocalOrFrom semantic_mod name  ]
+                     -- Sigh: see Note [Root-main Id] in TcRnDriver
+                     -- NB: ABSOLUTELY need to check against semantic_mod,
+                     -- because all of the names in an hsig p[H=<H>]:H
+                     -- are going to be for <H>, not the former id!
+                     -- See Note [Identity versus semantic module]
+
        warn_fn = mkIfaceWarnCache (mi_warns iface0)
        fix_fn = mkIfaceFixCache (mi_fixities iface0)
 
@@ -755,8 +769,9 @@ addFingerprints hsc_env mod_details iface0 = do
       , mi_rules = iface_rules
       , mi_anns = iface_anns
       , mi_complete_sigs = iface_complete_sigs
+      , mi_decls = sorted_decls
       }
-    final_iface = iface0 { mi_decls = sorted_decls, mi_final_exts = final_iface_exts }
+    final_iface = iface0 { mi_final_exts = final_iface_exts }
    --
    return final_iface
 

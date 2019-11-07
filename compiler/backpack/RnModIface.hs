@@ -102,7 +102,7 @@ rnModIface hsc_env insts nsubst iface = do
                     Nothing -> return Nothing
                     Just x  -> fmap Just (rnModule x)
         exports <- mapM rnAvailInfo (mi_exports (mi_final_exts iface))
-        decls <- mapM rnIfaceDecl' (mi_decls iface)
+        decls <- mapM rnIfaceDecl' (mi_decls (mi_final_exts iface))
         insts <- mapM rnIfaceClsInst (mi_insts (mi_final_exts iface))
         fams <- mapM rnIfaceFamInst (mi_fam_insts (mi_final_exts iface))
         deps <- rnDependencies (mi_deps iface)
@@ -110,12 +110,12 @@ rnModIface hsc_env insts nsubst iface = do
         -- mi_rules
         return iface { mi_module = mod
                      , mi_sig_of = sig_of
-                     , mi_decls = decls
                      , mi_deps = deps
                      , mi_final_exts = (mi_final_exts iface)
                          { mi_exports = exports
                          , mi_insts = insts
                          , mi_fam_insts = fams
+                         , mi_decls = decls
                          }
                      }
 
