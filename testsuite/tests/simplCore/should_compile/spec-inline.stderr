@@ -171,11 +171,13 @@ foo
       }
 
 
------- Local rules for imported ids --------
+
+
+==================== Tidy Rules ====================
 "SC:$wgo0" [2]
     forall (sc :: GHC.Prim.Int#) (sc1 :: GHC.Prim.Int#).
-      Roman.$wgo (GHC.Maybe.Just @ Int (GHC.Types.I# sc1))
-                 (GHC.Maybe.Just @ Int (GHC.Types.I# sc))
+      Roman.$wgo (GHC.Maybe.Just @ GHC.Types.Int (GHC.Types.I# sc1))
+                 (GHC.Maybe.Just @ GHC.Types.Int (GHC.Types.I# sc))
       = Roman.foo_$s$wgo sc sc1
 
 
