@@ -602,7 +602,7 @@ def process_print_nodes(app, doctree, fromdocname):
         node.generate_output(app, fromdocname)
 
     # Write out file listing all documented flags
-    with open(os.path.join(app.outdir, 'ghc-flags.txt'), 'w') as f:
+    with open(os.path.join(app.outdir, 'ghc-flags.txt'), 'w', encoding='utf-8') as f:
         flag_names = \
             {name
              for flag in app.env.all_flags
