@@ -66,7 +66,7 @@ import FileCleanup
 import Ar
 import Bag              ( unitBag )
 import FastString       ( mkFastString )
-import MkIface          ( mkFullIface )
+import MkIface          ( mkIface )
 
 import Exception
 import System.Directory
@@ -220,13 +220,13 @@ compileOne' m_tc_result mHscMessage
             return $! HomeModInfo iface hmi_details (Just linkable)
         (HscRecomp { hscs_guts = cgguts,
                      hscs_mod_location = mod_location,
-                     hscs_mod_details = hmi_details,
-                     hscs_partial_iface = partial_iface,
+                     hscs_desugared_guts = desugared_guts,
                      hscs_old_iface_hash = mb_old_iface_hash,
                      hscs_iface_dflags = iface_dflags }, HscInterpreted) -> do
             -- In interpreted mode the regular codeGen backend is not run so we
             -- generate a interface without codeGen info.
-            final_iface <- mkFullIface hsc_env'{hsc_dflags=iface_dflags} partial_iface
+            (final_iface, mod_details) <-
+              mkIface hsc_env'{hsc_dflags=iface_dflags} desugared_guts cgguts
             liftIO $ hscMaybeWriteIface dflags final_iface mb_old_iface_hash mod_location
 
             (hasStub, comp_bc, spt_entries) <- hscInteractive hsc_env' cgguts mod_location
@@ -247,7 +247,7 @@ compileOne' m_tc_result mHscMessage
               -- be out of date.
             let !linkable = LM unlinked_time (ms_mod summary)
                            (hs_unlinked ++ stub_o)
-            return $! HomeModInfo final_iface hmi_details (Just linkable)
+            return $! HomeModInfo final_iface mod_details (Just linkable)
         (HscRecomp{}, _) -> do
             output_fn <- getOutputFilename next_phase
                             (Temporary TFL_CurrentModule)
@@ -1178,8 +1178,7 @@ runPhase (HscOut src_flavour mod_name result) _ dflags = do
                    return (RealPhase StopLn, o_file)
             HscRecomp { hscs_guts = cgguts,
                         hscs_mod_location = mod_location,
-                        hscs_mod_details = mod_details,
-                        hscs_partial_iface = partial_iface,
+                        hscs_desugared_guts = desugared_guts,
                         hscs_old_iface_hash = mb_old_iface_hash,
                         hscs_iface_dflags = iface_dflags }
               -> do output_fn <- phaseOutputFilename next_phase
@@ -1189,11 +1188,8 @@ runPhase (HscOut src_flavour mod_name result) _ dflags = do
                     (outputFilename, mStub, foreign_files) <- liftIO $
                       hscGenHardCode hsc_env' cgguts mod_location output_fn
 
-                    final_iface <- liftIO (mkFullIface hsc_env'{hsc_dflags=iface_dflags} partial_iface)
-                    -- TODO(osa): ModIface and ModDetails need to be in sync,
-                    -- but we only generate ModIface with the backend info. See
-                    -- !2100 for more discussion on this. This will be fixed
-                    -- with !1304 or !2100.
+                    (final_iface, mod_details) <-
+                      liftIO (mkIface hsc_env'{hsc_dflags=iface_dflags} desugared_guts cgguts)
                     setIface final_iface mod_details
 
                     -- See Note [Writing interface files]

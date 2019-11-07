@@ -105,9 +105,13 @@ f = \ (w :: Int) (w1 :: (Int, Int)) ->
       case w of { I# ww1 -> T4908.$wf ww1 w1 }
 
 
------- Local rules for imported ids --------
+
+
+==================== Tidy Rules ====================
 "SC:$wf0" [2]
-    forall (sc :: Int) (sc1 :: Int#) (sc2 :: Int#).
+    forall (sc :: GHC.Types.Int)
+           (sc1 :: GHC.Prim.Int#)
+           (sc2 :: GHC.Prim.Int#).
       T4908.$wf sc2 (sc, GHC.Types.I# sc1)
       = T4908.f_$s$wf sc sc1 sc2
 
