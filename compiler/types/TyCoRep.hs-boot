@@ -22,6 +22,4 @@ type MCoercionN = MCoercion
 mkFunTy   :: AnonArgFlag -> Type -> Type -> Type
 mkForAllTy :: Var -> ArgFlag -> Type -> Type
 
-isRuntimeRepTy :: Type -> Bool
-
 instance Data Type  -- To support Data instances in CoAxiom
