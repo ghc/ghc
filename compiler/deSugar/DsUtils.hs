@@ -477,7 +477,7 @@ which stupidly tries to bind the datacon 'True'.
 
 -- NB: Make sure the argument is not levity polymorphic
 mkCoreAppDs  :: SDoc -> CoreExpr -> CoreExpr -> CoreExpr
-mkCoreAppDs _ (Var f `App` Type ty1 `App` Type ty2 `App` arg1) arg2
+mkCoreAppDs _ (Var f `App` Type _r `App` Type ty1 `App` Type ty2 `App` arg1) arg2
   | f `hasKey` seqIdKey            -- Note [Desugaring seq (1), (2)]
   = Case arg1 case_bndr ty2 [(DEFAULT,[],arg2)]
   where
