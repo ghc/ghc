@@ -34,7 +34,7 @@ module HscTypes (
 
         -- * Information about modules
         ModDetails(..), emptyModDetails,
-        ModGuts(..), CgGuts(..), ForeignStubs(..), appendStubC,
+        ModGuts(..), CgGuts(..), CgGuts2(..), cgGuts2ToCgGuts, ForeignStubs(..), appendStubC,
         ImportedMods, ImportedBy(..), importedByUser, ImportedModsVal(..), SptEntry(..),
         ForeignSrcLang(..),
         phaseForeignLanguage,
@@ -214,6 +214,7 @@ import Util
 import UniqDSet
 import GHC.Serialized   ( Serialized )
 import qualified GHC.LanguageExtensions as LangExt
+import VarEnv (TidyEnv)
 
 import Foreign
 import Control.Monad    ( guard, liftM, ap )
@@ -232,18 +233,18 @@ import Control.DeepSeq
 -- | Status of a compilation to hard-code
 data HscStatus
     -- | Nothing to do.
-    = HscNotGeneratingCode ModIface
+    = HscNotGeneratingCode ModIface ModDetails
     -- | Nothing to do because code already exists.
-    | HscUpToDate ModIface
+    | HscUpToDate ModIface ModDetails
     -- | Update boot file result.
-    | HscUpdateBoot ModIface
+    | HscUpdateBoot ModIface ModDetails
     -- | Generate signature file (backpack)
-    | HscUpdateSig ModIface
+    | HscUpdateSig ModIface ModDetails
     -- | Recompile this module.
     | HscRecomp
-        { hscs_guts       :: CgGuts
+        { hscs_guts       :: !CgGuts2
           -- ^ Information for the code generator.
-        , hscs_summary    :: ModSummary
+        , hscs_summary    :: !ModSummary
           -- ^ Module info
         , hscs_partial_iface  :: !PartialModIface
           -- ^ Partial interface
@@ -947,6 +948,26 @@ data ModIfaceBackend = ModIfaceBackend
     -- the thing isn't in decls. It's useful to know that when seeing if we are
     -- up to date wrt. the old interface. The 'OccName' is the parent of the
     -- name, if it has one.
+  , mi_exports :: ![IfaceExport]
+    -- ^ Exports
+    -- Kept sorted by (mod,occ), to make version comparisons easier.
+    -- Records the modules that are the declaration points for things exported
+    -- by this module, and the 'OccName's of those things.
+  , mi_insts :: ![IfaceClsInst]
+    -- ^ Sorted class instance
+  , mi_fam_insts :: ![IfaceFamInst]
+    -- ^ Sorted family instances
+  , mi_rules :: ![IfaceRule]
+    -- ^ Sorted rules
+  , mi_anns :: ![IfaceAnnotation]
+    -- ^ Annotations
+  , mi_complete_sigs :: ![IfaceCompleteMatch]
+  , mi_decls    :: ![(Fingerprint, IfaceDecl)]
+    -- ^ Type, class and variable declarations
+    -- The hash of an Id changes if its fixity or deprecations change
+    --      (as well as its type of course)
+    -- Ditto data constructors, class operations, except that the hash of the
+    -- parent class/tycon changes
   }
 
 data ModIfacePhase
@@ -964,8 +985,6 @@ type family IfaceDeclExts (phase :: ModIfacePhase) where
 type family IfaceBackendExts (phase :: ModIfacePhase) where
   IfaceBackendExts 'ModIfaceCore = ()
   IfaceBackendExts 'ModIfaceFinal = ModIfaceBackend
-
-
 
 -- | A 'ModIface' plus a 'ModDetails' summarises everything we know
 -- about a compiled module.  The 'ModIface' is the stuff *before* linking,
@@ -995,11 +1014,13 @@ data ModIface_ (phase :: ModIfacePhase)
                 -- NOT STRICT!  we read this field lazily from the interface file
                 -- It is *only* consulted by the recompilation checker
 
+{- TODO: only in final iface
         mi_exports  :: ![IfaceExport],
                 -- ^ Exports
                 -- Kept sorted by (mod,occ), to make version comparisons easier
                 -- Records the modules that are the declaration points for things
                 -- exported by this module, and the 'OccName's of those things
+-}
 
 
         mi_used_th  :: !Bool,
@@ -1014,17 +1035,19 @@ data ModIface_ (phase :: ModIfacePhase)
                 -- ^ Warnings
                 -- NOT STRICT!  we read this field lazily from the interface file
 
-        mi_anns     :: [IfaceAnnotation],
-                -- ^ Annotations
-                -- NOT STRICT!  we read this field lazily from the interface file
+        -- mi_anns     :: [IfaceAnnotation],
+        --         -- ^ Annotations
+        --         -- NOT STRICT!  we read this field lazily from the interface file
 
 
+{-
         mi_decls    :: [IfaceDeclExts phase],
                 -- ^ Type, class and variable declarations
                 -- The hash of an Id changes if its fixity or deprecations change
                 --      (as well as its type of course)
                 -- Ditto data constructors, class operations, except that
                 -- the hash of the parent class/tycon changes
+-}
 
         mi_globals  :: !(Maybe GlobalRdrEnv),
                 -- ^ Binds all the things defined at the top level in
@@ -1042,9 +1065,9 @@ data ModIface_ (phase :: ModIfacePhase)
                 -- 'HomeModInfo', but that leads to more plumbing.
 
                 -- Instance declarations and rules
-        mi_insts       :: [IfaceClsInst],     -- ^ Sorted class instance
-        mi_fam_insts   :: [IfaceFamInst],  -- ^ Sorted family instances
-        mi_rules       :: [IfaceRule],     -- ^ Sorted rules
+        -- mi_insts       :: [IfaceClsInst],     -- ^ Sorted class instance
+        -- mi_fam_insts   :: [IfaceFamInst],  -- ^ Sorted family instances
+        -- mi_rules       :: [IfaceRule],     -- ^ Sorted rules
 
         mi_hpc       :: !AnyHpcUsage,
                 -- ^ True if this program uses Hpc at any point in the program.
@@ -1059,7 +1082,8 @@ data ModIface_ (phase :: ModIfacePhase)
                 -- itself) but imports some trustworthy modules from its own
                 -- package (which does require its own package be trusted).
                 -- See Note [RnNames . Trust Own Package]
-        mi_complete_sigs :: [IfaceCompleteMatch],
+
+        -- mi_complete_sigs :: [IfaceCompleteMatch],
 
         mi_doc_hdr :: Maybe HsDocString,
                 -- ^ Module header.
@@ -1128,19 +1152,12 @@ instance Binary ModIface where
                  mi_hsc_src   = hsc_src,
                  mi_deps      = deps,
                  mi_usages    = usages,
-                 mi_exports   = exports,
                  mi_used_th   = used_th,
                  mi_fixities  = fixities,
                  mi_warns     = warns,
-                 mi_anns      = anns,
-                 mi_decls     = decls,
-                 mi_insts     = insts,
-                 mi_fam_insts = fam_insts,
-                 mi_rules     = rules,
                  mi_hpc       = hpc_info,
                  mi_trust     = trust,
                  mi_trust_pkg = trust_pkg,
-                 mi_complete_sigs = complete_sigs,
                  mi_doc_hdr   = doc_hdr,
                  mi_decl_docs = decl_docs,
                  mi_arg_docs  = arg_docs,
@@ -1154,7 +1171,14 @@ instance Binary ModIface where
                    mi_orphan = orphan,
                    mi_finsts = hasFamInsts,
                    mi_exp_hash = exp_hash,
-                   mi_orphan_hash = orphan_hash
+                   mi_orphan_hash = orphan_hash,
+                   mi_exports = exports,
+                   mi_insts = insts,
+                   mi_fam_insts = fam_insts,
+                   mi_rules = rules,
+                   mi_anns = anns,
+                   mi_complete_sigs = complete_sigs,
+                   mi_decls = decls
                  }}) = do
         put_ bh mod
         put_ bh sig_of
@@ -1226,21 +1250,14 @@ instance Binary ModIface where
                  mi_hsc_src     = hsc_src,
                  mi_deps        = deps,
                  mi_usages      = usages,
-                 mi_exports     = exports,
                  mi_used_th     = used_th,
-                 mi_anns        = anns,
                  mi_fixities    = fixities,
                  mi_warns       = warns,
-                 mi_decls       = decls,
                  mi_globals     = Nothing,
-                 mi_insts       = insts,
-                 mi_fam_insts   = fam_insts,
-                 mi_rules       = rules,
                  mi_hpc         = hpc_info,
                  mi_trust       = trust,
                  mi_trust_pkg   = trust_pkg,
                         -- And build the cached values
-                 mi_complete_sigs = complete_sigs,
                  mi_doc_hdr     = doc_hdr,
                  mi_decl_docs   = decl_docs,
                  mi_arg_docs    = arg_docs,
@@ -1257,7 +1274,14 @@ instance Binary ModIface where
                    mi_orphan_hash = orphan_hash,
                    mi_warn_fn = mkIfaceWarnCache warns,
                    mi_fix_fn = mkIfaceFixCache fixities,
-                   mi_hash_fn = mkIfaceHashCache decls
+                   mi_hash_fn = mkIfaceHashCache decls,
+                   mi_exports = exports,
+                   mi_insts = insts,
+                   mi_fam_insts = fam_insts,
+                   mi_rules = rules,
+                   mi_anns = anns,
+                   mi_complete_sigs = complete_sigs,
+                   mi_decls = decls
                  }})
 
 -- | The original names declared of a certain module that are exported
@@ -1270,30 +1294,22 @@ emptyPartialModIface mod
                mi_hsc_src     = HsSrcFile,
                mi_deps        = noDependencies,
                mi_usages      = [],
-               mi_exports     = [],
                mi_used_th     = False,
                mi_fixities    = [],
                mi_warns       = NoWarnings,
-               mi_anns        = [],
-               mi_insts       = [],
-               mi_fam_insts   = [],
-               mi_rules       = [],
-               mi_decls       = [],
                mi_globals     = Nothing,
                mi_hpc         = False,
                mi_trust       = noIfaceTrustInfo,
                mi_trust_pkg   = False,
-               mi_complete_sigs = [],
                mi_doc_hdr     = Nothing,
                mi_decl_docs   = emptyDeclDocMap,
                mi_arg_docs    = emptyArgDocMap,
-               mi_final_exts        = () }
+               mi_final_exts  = () }
 
 emptyFullModIface :: Module -> ModIface
 emptyFullModIface mod =
     (emptyPartialModIface mod)
-      { mi_decls = []
-      , mi_final_exts = ModIfaceBackend
+      { mi_final_exts = ModIfaceBackend
         { mi_iface_hash = fingerprint0,
           mi_mod_hash = fingerprint0,
           mi_flag_hash = fingerprint0,
@@ -1306,7 +1322,16 @@ emptyFullModIface mod =
           mi_orphan_hash = fingerprint0,
           mi_warn_fn = emptyIfaceWarnCache,
           mi_fix_fn = emptyIfaceFixCache,
-          mi_hash_fn = emptyIfaceHashCache } }
+          mi_hash_fn = emptyIfaceHashCache,
+          mi_exports = [],
+          mi_insts = [],
+          mi_fam_insts = [],
+          mi_rules = [],
+          mi_anns = [],
+          mi_complete_sigs = [],
+          mi_decls = []
+        }
+      }
 
 -- | Constructs cache for the 'mi_hash_fn' field of a 'ModIface'
 mkIfaceHashCache :: [(Fingerprint,IfaceDecl)]
@@ -1481,6 +1506,37 @@ data CgGuts
                 -- the module.
                 -- See Note [Grand plan for static forms] in StaticPtrTable
     }
+
+data CgGuts2 = CgGuts2
+  { cg2_module :: !Module
+  , cg2_tycons :: ![TyCon]
+  , cg2_binds :: !CoreProgram
+  , cg2_foreign :: !ForeignStubs
+  , cg2_foreign_files :: ![(ForeignSrcLang, FilePath)]
+  , cg2_dep_pkgs :: ![InstalledUnitId]
+  , cg2_hpc_info :: !HpcInfo
+  , cg2_modBreaks :: !(Maybe ModBreaks)
+  , cg2_spt_entries :: ![SptEntry]
+
+  -- Stuff for ModDetails generation
+  , cg2_tidy_binds :: !CoreProgram
+  , cg2_trimmed_rules :: ![CoreRule]
+  , cg2_tidy_env :: !TidyEnv
+  , cg2_mod_guts :: !ModGuts
+  }
+
+cgGuts2ToCgGuts :: CgGuts2 -> CgGuts
+cgGuts2ToCgGuts guts2 = CgGuts
+  { cg_module = cg2_module guts2
+  , cg_tycons = cg2_tycons guts2
+  , cg_binds = cg2_binds guts2
+  , cg_foreign = cg2_foreign guts2
+  , cg_foreign_files = cg2_foreign_files guts2
+  , cg_dep_pkgs = cg2_dep_pkgs guts2
+  , cg_hpc_info = cg2_hpc_info guts2
+  , cg_modBreaks = cg2_modBreaks guts2
+  , cg_spt_entries = cg2_spt_entries guts2
+  }
 
 -----------------------------------
 -- | Foreign export stubs
@@ -3253,8 +3309,8 @@ phaseForeignLanguage phase = case phase of
 -- Take care, this instance only forces to the degree necessary to
 -- avoid major space leaks.
 instance (NFData (IfaceBackendExts (phase :: ModIfacePhase)), NFData (IfaceDeclExts (phase :: ModIfacePhase))) => NFData (ModIface_ phase) where
-  rnf (ModIface f1 f2 f3 f4 f5 f6 f7 f8 f9 f10 f11 f12
-                f13 f14 f15 f16 f17 f18 f19 f20 f21 f22 f23) =
-    rnf f1 `seq` rnf f2 `seq` f3 `seq` f4 `seq` f5 `seq` f6 `seq` rnf f7 `seq` f8 `seq`
-    f9 `seq` rnf f10 `seq` rnf f11 `seq` f12 `seq` rnf f13 `seq` rnf f14 `seq` rnf f15 `seq`
-    rnf f16 `seq` f17 `seq` rnf f18 `seq` rnf f19 `seq` f20 `seq` f21 `seq` f22 `seq` rnf f23
+  rnf (ModIface f1 f2 f3 f4 f5 f7 f8 f9 f12
+                f16 f17 f18 f20 f21 f22 f23) =
+    rnf f1 `seq` rnf f2 `seq` f3 `seq` f4 `seq` f5 `seq` rnf f7 `seq` f8 `seq`
+    f9 `seq` f12 `seq`
+    rnf f16 `seq` f17 `seq` rnf f18 `seq` f20 `seq` f21 `seq` f22 `seq` rnf f23

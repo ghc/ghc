@@ -6,9 +6,7 @@
 
 {-# LANGUAGE CPP, DeriveFunctor, ViewPatterns #-}
 
-module TidyPgm (
-       mkBootModDetailsTc, tidyProgram
-   ) where
+module TidyPgm where
 
 #include "HsVersions.h"
 
@@ -321,6 +319,83 @@ Finally, substitute these new top-level binders consistently
 throughout, including in unfoldings.  We also tidy binders in
 RHSs, so that they print nicely in interfaces.
 -}
+
+tidyProgram2 :: HscEnv -> ModGuts -> IO CgGuts2
+tidyProgram2 hsc_env mod_guts =
+  Err.withTiming (hsc_dflags hsc_env) (text "CoreTidy" <+> brackets (ppr (mg_module mod_guts))) (const ()) $ do
+    let ModGuts { mg_module = mod
+                , mg_tcs = tcs
+                , mg_foreign = foreign_stubs
+                , mg_foreign_files = foreign_files
+                , mg_deps = deps
+                , mg_hpc_info = hpc_info
+                , mg_modBreaks = mod_breaks
+                , mg_binds = binds
+                , mg_rules = rules
+                , mg_rdr_env = rdr_env
+                } = mod_guts
+
+    let dflags = hsc_dflags hsc_env
+    let omit_prags = gopt Opt_OmitInterfacePragmas dflags
+    let expose_all = gopt Opt_ExposeAllUnfoldings  dflags
+    let implicit_binds = concatMap getImplicitBinds tcs
+
+    (unfold_env, tidy_occ_env)
+          <- chooseExternalIds hsc_env mod omit_prags expose_all
+                               binds implicit_binds rules
+
+    let (trimmed_binds, trimmed_rules) = findExternalRules omit_prags binds rules unfold_env
+
+    (tidy_env, tidy_binds) <- tidyTopBinds hsc_env mod unfold_env tidy_occ_env trimmed_binds
+
+    -- See Note [Grand plan for static forms] in StaticPtrTable.
+    (spt_entries, tidy_binds') <-
+       sptCreateStaticBinds hsc_env (mg_module mod_guts) tidy_binds
+
+    -- See Note [Injecting implicit bindings]
+    let implicit_binds = concatMap getImplicitBinds tcs
+    let all_tidy_binds = implicit_binds ++ tidy_binds'
+
+    let spt_init_code = sptModuleInitCode mod spt_entries
+        add_spt_init_code =
+          case hscTarget dflags of
+            -- If we are compiling for the interpreter we will insert
+            -- any necessary SPT entries dynamically
+            HscInterpreted -> id
+            -- otherwise add a C stub to do so
+            _              -> (`appendStubC` spt_init_code)
+
+
+    let print_unqual = mkPrintUnqualified dflags rdr_env
+    -- TODO (osa): We can't dump rules here as we tidy them later (after code
+    -- gen). Is this going to be a problem?
+    -- Rules are dumped in mkFullIface
+    endPassIO hsc_env print_unqual CoreTidy all_tidy_binds []
+
+    -- Print one-line size info
+    let cs = coreBindsStats tidy_binds
+    Err.dumpIfSet_dyn dflags Opt_D_dump_core_stats "Core Stats"
+            (text "Tidy size (terms,types,coercions)"
+             <+> ppr (moduleName mod) <> colon
+             <+> int (cs_tm cs)
+             <+> int (cs_ty cs)
+             <+> int (cs_co cs))
+
+    return CgGuts2
+      { cg2_module = mod
+      , cg2_tycons = filter isAlgTyCon tcs
+      , cg2_binds = all_tidy_binds
+      , cg2_foreign = add_spt_init_code foreign_stubs
+      , cg2_foreign_files = foreign_files
+      , cg2_dep_pkgs = map fst (dep_pkgs deps)
+      , cg2_hpc_info = hpc_info
+      , cg2_modBreaks = mod_breaks
+      , cg2_spt_entries = spt_entries
+      , cg2_tidy_binds = tidy_binds
+      , cg2_trimmed_rules = trimmed_rules
+      , cg2_tidy_env = tidy_env
+      , cg2_mod_guts = mod_guts
+      }
 
 tidyProgram :: HscEnv -> ModGuts -> IO (CgGuts, ModDetails)
 tidyProgram hsc_env  (ModGuts { mg_module    = mod

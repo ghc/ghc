@@ -519,13 +519,6 @@ T5198:
 	"$(TEST_HC)" $(TEST_HC_OPTS) -c T5198.hs -dumpdir T5198dump -ddump-to-file -ddump-simpl
 	[ -f T5198dump/T5198.dump-simpl ]
 
-.PHONY: T7060a
-T7060a:
-	$(RM) -rf T7060dump
-	[ ! -d T7060dump ]
-	"$(TEST_HC)" $(TEST_HC_OPTS) -O -c T7060.hs -dumpdir T7060dump -ddump-to-file -ddump-rules
-	[ -f T7060dump/T7060.dump-rules ]
-
 .PHONY: T7060b
 T7060b:
 	$(RM) -rf T7060dump
@@ -541,7 +534,7 @@ T7060c:
 	[ -f T7060dump/T7060.dump-rule-rewrites ]
 
 .PHONY: T7060
-T7060: T7060a T7060b T7060c
+T7060: T7060b T7060c
 
 .PHONY: T7130
 T7130:

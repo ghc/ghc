@@ -1341,7 +1341,7 @@ lookupQualifiedNameGHCi rdr_name
            ; case res of
                 Succeeded iface
                   -> return [ name
-                            | avail <- mi_exports iface
+                            | avail <- mi_exports (mi_final_exts iface)
                             , name  <- availNames avail
                             , nameOccName name == occ ]
 
