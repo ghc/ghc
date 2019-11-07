@@ -19,6 +19,7 @@ before_script:
 
 stages:
   - lint        # Source linting
+  - test
   - quick-build # A very quick smoke-test to weed out broken commits
   - build       # A quick smoke-test to weed out broken commits
   - full-build  # Build all the things
@@ -799,7 +800,7 @@ nightly-i386-windows-hadrian:
 
 .build-windows-make:
   extends: .build-windows
-  stage: full-build
+  stage: test
   variables:
     BUILD_FLAVOUR: "quick"
     GHC_VERSION: "8.6.5"
