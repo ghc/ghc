@@ -49,6 +49,8 @@ module Util (
 
         changeLast,
 
+        whenNonEmpty,
+
         -- * Tuples
         fstOf3, sndOf3, thdOf3,
         firstM, first3M, secondM,
@@ -137,6 +139,7 @@ import Data.Data
 import Data.IORef       ( IORef, newIORef, atomicModifyIORef' )
 import System.IO.Unsafe ( unsafePerformIO )
 import Data.List        hiding (group)
+import Data.List.NonEmpty  ( NonEmpty(..) )
 
 import GHC.Exts
 import GHC.Stack (HasCallStack)
@@ -609,6 +612,10 @@ changeLast :: [a] -> a -> [a]
 changeLast []     _  = panic "changeLast"
 changeLast [_]    x  = [x]
 changeLast (x:xs) x' = x : changeLast xs x'
+
+whenNonEmpty :: Applicative m => [a] -> (NonEmpty a -> m ()) -> m ()
+whenNonEmpty []     _ = pure ()
+whenNonEmpty (x:xs) f = f (x :| xs)
 
 {-
 ************************************************************************
