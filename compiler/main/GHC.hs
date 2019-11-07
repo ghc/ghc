@@ -361,6 +361,7 @@ import TcRnDriver
 import Inst
 import FamInst
 import FileCleanup
+import MkIface          ( mkModDetails )
 
 import Data.Foldable
 import qualified Data.Map.Strict as Map
@@ -1058,7 +1059,8 @@ compileCore simplify fn = do
                plugins <- readIORef (tcg_th_coreplugins tcg)
                hscSimplify hsc_env plugins mod_guts
              tidy_guts <- liftIO $ tidyProgram hsc_env simpl_guts
-             return $ Left tidy_guts
+             let mod_details = mkModDetails hsc_env tidy_guts
+             return $ Left (tidy_guts, mod_details)
           else
              return $ Right mod_guts
 
@@ -1149,7 +1151,7 @@ getPackageModuleInfo hsc_env mdl
   = do  eps <- hscEPS hsc_env
         iface <- hscGetModuleInterface hsc_env mdl
         let
-            avails = mi_exports iface
+            avails = mi_exports (mi_final_exts iface)
             pte    = eps_PTE eps
             tys    = [ ty | name <- concatMap availNames avails,
                             Just ty <- [lookupTypeEnv pte name] ]
