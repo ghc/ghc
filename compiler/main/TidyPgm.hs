@@ -7,7 +7,8 @@
 {-# LANGUAGE CPP, DeriveFunctor, ViewPatterns #-}
 
 module TidyPgm (
-       mkBootModDetailsTc, tidyProgram
+       mkBootModDetailsTc, tidyProgram,
+       tidyProgram2, CgGuts2 (..)
    ) where
 
 #include "HsVersions.h"
@@ -321,6 +322,103 @@ Finally, substitute these new top-level binders consistently
 throughout, including in unfoldings.  We also tidy binders in
 RHSs, so that they print nicely in interfaces.
 -}
+
+data CgGuts2 = CgGuts2
+  { cg2_module :: !Module
+  , cg2_tycons :: ![TyCon]
+  , cg2_binds :: !CoreProgram
+  , cg2_foreign :: !ForeignStubs
+  , cg2_foreign_files :: ![(ForeignSrcLang, FilePath)]
+  , cg2_dep_pkgs :: ![InstalledUnitId]
+  , cg2_hpc_info :: !HpcInfo
+  , cg2_modBreaks :: !(Maybe ModBreaks)
+  , cg2_spt_entries :: ![SptEntry]
+
+  -- Stuff for ModDetails generation
+  , cg2_type_env :: !TypeEnv
+  , cg2_trimmed_rules :: ![CoreRule]
+  , cg2_tidy_env :: TidyEnv
+  }
+
+tidyProgram2 :: HscEnv -> ModGuts -> IO CgGuts2
+tidyProgram2 hsc_env mod_guts = do
+
+    let ModGuts { mg_module = mod
+                , mg_tcs = tcs
+                , mg_foreign = foreign_stubs
+                , mg_foreign_files = foreign_files
+                , mg_deps = deps
+                , mg_hpc_info = hpc_info
+                , mg_modBreaks = mod_breaks
+                , mg_binds = binds
+                , mg_rules = rules
+                , mg_fam_insts = fam_insts
+                } = mod_guts
+
+    let dflags = hsc_dflags hsc_env
+    let omit_prags = gopt Opt_OmitInterfacePragmas dflags
+    let expose_all = gopt Opt_ExposeAllUnfoldings  dflags
+    let implicit_binds = concatMap getImplicitBinds tcs
+
+    (unfold_env, tidy_occ_env)
+          <- chooseExternalIds hsc_env mod omit_prags expose_all
+                               binds implicit_binds rules
+
+    let (trimmed_binds, trimmed_rules) = findExternalRules omit_prags binds rules unfold_env
+
+    (tidy_env, tidy_binds) <- tidyTopBinds hsc_env mod unfold_env tidy_occ_env trimmed_binds
+
+    -- See Note [Grand plan for static forms] in StaticPtrTable.
+    (spt_entries, tidy_binds') <-
+       sptCreateStaticBinds hsc_env (mg_module mod_guts) tidy_binds
+
+    -- See Note [Injecting implicit bindings]
+    let implicit_binds = concatMap getImplicitBinds tcs
+    let all_tidy_binds = implicit_binds ++ tidy_binds'
+
+    let spt_init_code = sptModuleInitCode mod spt_entries
+        add_spt_init_code =
+          case hscTarget dflags of
+            -- If we are compiling for the interpreter we will insert
+            -- any necessary SPT entries dynamically
+            HscInterpreted -> id
+            -- otherwise add a C stub to do so
+            _              -> (`appendStubC` spt_init_code)
+
+    -- The completed type environment is gotten from
+    --      a) the types and classes defined here (plus implicit things)
+    --      b) adding Ids with correct IdInfo, including unfoldings,
+    --              gotten from the bindings
+    -- From (b) we keep only those Ids with External names;
+    --          the CoreTidy pass makes sure these are all and only
+    --          the externally-accessible ones
+    -- This truncates the type environment to include only the
+    -- exported Ids and things needed from them, which saves space
+    --
+    -- See Note [Don't attempt to trim data types]
+    let final_ids  = [ if omit_prags then trimId id else id
+                     | id <- bindersOfBinds tidy_binds
+                     , isExternalName (idName id)
+                     , not (isWiredInName (getName id))
+                     ]   -- See Note [Drop wired-in things]
+    let final_tcs = filterOut (isWiredInName . getName) tcs
+    -- See Note [Drop wired-in things]
+    let type_env = typeEnvFromEntities final_ids final_tcs fam_insts
+
+    return CgGuts2
+      { cg2_module = mod
+      , cg2_tycons = filter isAlgTyCon tcs
+      , cg2_binds = all_tidy_binds
+      , cg2_foreign = add_spt_init_code foreign_stubs
+      , cg2_foreign_files = foreign_files
+      , cg2_dep_pkgs = map fst (dep_pkgs deps)
+      , cg2_hpc_info = hpc_info
+      , cg2_modBreaks = mod_breaks
+      , cg2_spt_entries = spt_entries
+      , cg2_type_env = type_env
+      , cg2_trimmed_rules = trimmed_rules
+      , cg2_tidy_env = tidy_env
+      }
 
 tidyProgram :: HscEnv -> ModGuts -> IO (CgGuts, ModDetails)
 tidyProgram hsc_env  (ModGuts { mg_module    = mod
