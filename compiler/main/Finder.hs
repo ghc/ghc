@@ -22,6 +22,9 @@ module Finder (
     addHomeModuleToFinder,
     uncacheModule,
     mkStubPaths,
+    homeSearchCache,
+    mkHomeInstalledModule,
+    mkHomeModLocationSearched,
 
     findObjectLinkableMaybe,
     findObjectLinkable,
@@ -36,6 +39,7 @@ module Finder (
 import GhcPrelude
 
 import Module
+import Hooks
 import HscTypes
 import Packages
 import FastString
@@ -281,6 +285,10 @@ findHomeModule hsc_env mod_name = do
   dflags = hsc_dflags hsc_env
   uid = thisPackage dflags
 
+findInstalledHomeModule :: HscEnv -> ModuleName -> IO InstalledFindResult
+findInstalledHomeModule hsc_env mod_name =
+  lookupHook findInstalledHomeModuleHook findInstalledHomeModule'
+    (hsc_dflags hsc_env) hsc_env mod_name
 -- | Implements the search for a module name in the home package only.  Calling
 -- this function directly is usually *not* what you want; currently, it's used
 -- as a building block for the following operations:
@@ -297,8 +305,8 @@ findHomeModule hsc_env mod_name = do
 --
 --  4. Some special-case code in GHCi (ToDo: Figure out why that needs to
 --  call this.)
-findInstalledHomeModule :: HscEnv -> ModuleName -> IO InstalledFindResult
-findInstalledHomeModule hsc_env mod_name =
+findInstalledHomeModule' :: HscEnv -> ModuleName -> IO InstalledFindResult
+findInstalledHomeModule' hsc_env mod_name =
    homeSearchCache hsc_env mod_name $
    let
      dflags = hsc_dflags hsc_env

@@ -22,6 +22,7 @@ module Hooks ( Hooks(..)
              , runRnSpliceHook
              , getValueSafelyHook
              , createIservProcessHook
+             , findInstalledHomeModuleHook
              -}
              ) where
 
@@ -46,6 +47,7 @@ import Type
 import System.Process
 import BasicTypes
 import HsExtension
+import Module
 
 import Data.Maybe
 
@@ -75,6 +77,7 @@ emptyHooks = Hooks
   , runRnSpliceHook        = Nothing
   , getValueSafelyHook     = Nothing
   , createIservProcessHook = Nothing
+  , findInstalledHomeModuleHook = Nothing
   }
 
 data Hooks = Hooks
@@ -97,6 +100,7 @@ data Hooks = Hooks
   , getValueSafelyHook     :: Maybe (HscEnv -> Name -> Type
                                                           -> IO (Maybe HValue))
   , createIservProcessHook :: Maybe (CreateProcess -> IO ProcessHandle)
+  , findInstalledHomeModuleHook :: Maybe (HscEnv -> ModuleName -> IO InstalledFindResult)
   }
 
 getHooked :: (Functor f, HasDynFlags f) => (Hooks -> Maybe a) -> a -> f a
