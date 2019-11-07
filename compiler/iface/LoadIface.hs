@@ -466,21 +466,12 @@ loadInterface doc_str mod from
         --      explicitly tag each export which seems a bit of a bore)
 
         ; ignore_prags      <- goptM Opt_IgnoreInterfacePragmas
-        ; new_eps_decls     <- loadDecls ignore_prags (mi_decls iface)
-        ; new_eps_insts     <- mapM tcIfaceInst (mi_insts iface)
-        ; new_eps_fam_insts <- mapM tcIfaceFamInst (mi_fam_insts iface)
-        ; new_eps_rules     <- tcIfaceRules ignore_prags (mi_rules iface)
-        ; new_eps_anns      <- tcIfaceAnnotations (mi_anns iface)
-        ; new_eps_complete_sigs <- tcIfaceCompleteSigs (mi_complete_sigs iface)
-
-        ; let { final_iface = iface {
-                                mi_decls     = panic "No mi_decls in PIT",
-                                mi_insts     = panic "No mi_insts in PIT",
-                                mi_fam_insts = panic "No mi_fam_insts in PIT",
-                                mi_rules     = panic "No mi_rules in PIT",
-                                mi_anns      = panic "No mi_anns in PIT"
-                              }
-               }
+        ; new_eps_decls     <- loadDecls ignore_prags (mi_decls (mi_final_exts iface))
+        ; new_eps_insts     <- mapM tcIfaceInst (mi_insts (mi_final_exts iface))
+        ; new_eps_fam_insts <- mapM tcIfaceFamInst (mi_fam_insts (mi_final_exts iface))
+        ; new_eps_rules     <- tcIfaceRules ignore_prags (mi_rules (mi_final_exts iface))
+        ; new_eps_anns      <- tcIfaceAnnotations (mi_anns (mi_final_exts iface))
+        ; new_eps_complete_sigs <- tcIfaceCompleteSigs (mi_complete_sigs (mi_final_exts iface))
 
         ; let bad_boot = mi_boot iface && fmap fst (if_rec_types gbl_env) == Just mod
                             -- Warn warn against an EPS-updating import
@@ -497,7 +488,7 @@ loadInterface doc_str mod from
                 then eps { eps_PTE = addDeclsToPTE (eps_PTE eps) new_eps_decls }
            else
                 eps {
-                  eps_PIT          = extendModuleEnv (eps_PIT eps) mod final_iface,
+                  eps_PIT          = extendModuleEnv (eps_PIT eps) mod iface,
                   eps_PTE          = addDeclsToPTE   (eps_PTE eps) new_eps_decls,
                   eps_rule_base    = extendRuleBaseList (eps_rule_base eps)
                                                         new_eps_rules,
@@ -526,7 +517,7 @@ loadInterface doc_str mod from
                                                    (length new_eps_rules) }
 
         ; -- invoke plugins
-          res <- withPlugins dflags interfaceLoadAction final_iface
+          res <- withPlugins dflags interfaceLoadAction iface
         ; return (Succeeded res)
     }}}}
 
@@ -1040,10 +1031,11 @@ initExternalPackageState
 ghcPrimIface :: ModIface
 ghcPrimIface
   = empty_iface {
-        mi_exports  = ghcPrimExports,
-        mi_decls    = [],
         mi_fixities = fixities,
-        mi_final_exts = (mi_final_exts empty_iface){ mi_fix_fn = mkIfaceFixCache fixities }
+        mi_final_exts = (mi_final_exts empty_iface)
+          { mi_fix_fn = mkIfaceFixCache fixities
+          , mi_exports = ghcPrimExports
+          }
         }
   where
     empty_iface = emptyFullModIface gHC_PRIM
@@ -1116,7 +1108,10 @@ showIface hsc_env filename = do
 -- Show a ModIface but don't display details; suitable for ModIfaces stored in
 -- the EPT.
 pprModIfaceSimple :: ModIface -> SDoc
-pprModIfaceSimple iface = ppr (mi_module iface) $$ pprDeps (mi_deps iface) $$ nest 2 (vcat (map pprExport (mi_exports iface)))
+pprModIfaceSimple iface =
+    ppr (mi_module iface) $$
+    pprDeps (mi_deps iface) $$
+    nest 2 (vcat (map pprExport (mi_exports (mi_final_exts iface))))
 
 pprModIface :: ModIface -> SDoc
 -- Show a ModIface
@@ -1139,19 +1134,19 @@ pprModIface iface@ModIface{ mi_final_exts = exts }
         , nest 2 (text "used TH splices:" <+> ppr (mi_used_th iface))
         , nest 2 (text "where")
         , text "exports:"
-        , nest 2 (vcat (map pprExport (mi_exports iface)))
+        , nest 2 (vcat (map pprExport (mi_exports (mi_final_exts iface))))
         , pprDeps (mi_deps iface)
         , vcat (map pprUsage (mi_usages iface))
-        , vcat (map pprIfaceAnnotation (mi_anns iface))
+        , vcat (map pprIfaceAnnotation (mi_anns (mi_final_exts iface)))
         , pprFixities (mi_fixities iface)
-        , vcat [ppr ver $$ nest 2 (ppr decl) | (ver,decl) <- mi_decls iface]
-        , vcat (map ppr (mi_insts iface))
-        , vcat (map ppr (mi_fam_insts iface))
-        , vcat (map ppr (mi_rules iface))
+        , vcat [ppr ver $$ nest 2 (ppr decl) | (ver,decl) <- mi_decls (mi_final_exts iface)]
+        , vcat (map ppr (mi_insts (mi_final_exts iface)))
+        , vcat (map ppr (mi_fam_insts (mi_final_exts iface)))
+        , vcat (map ppr (mi_rules (mi_final_exts iface)))
         , ppr (mi_warns iface)
         , pprTrustInfo (mi_trust iface)
         , pprTrustPkg (mi_trust_pkg iface)
-        , vcat (map ppr (mi_complete_sigs iface))
+        , vcat (map ppr (mi_complete_sigs (mi_final_exts iface)))
         , text "module header:" $$ nest 2 (ppr (mi_doc_hdr iface))
         , text "declaration docs:" $$ nest 2 (ppr (mi_decl_docs iface))
         , text "arg docs:" $$ nest 2 (ppr (mi_arg_docs iface))
