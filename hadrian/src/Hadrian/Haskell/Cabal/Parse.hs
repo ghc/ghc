@@ -115,10 +115,14 @@ configurePackage context@Context {..} = do
 
     -- Stage packages are those we have in this stage.
     stagePkgs <- stagePackages stage
+
     -- We'll need those packages in our package database.
+    -- needPackages stage (depPkgs `intersect` stagePkgs)
+-- {-
     deps <- sequence [ pkgConfFile (context { package = pkg })
                      | pkg <- depPkgs, pkg `elem` stagePkgs ]
     need deps
+-- -}
 
     -- Figure out what hooks we need.
     hooks <- case C.buildType (C.flattenPackageDescription gpd) of

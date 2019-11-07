@@ -15,7 +15,7 @@ import Settings.Default
 import Settings.Program (programContext)
 import Target
 import Utilities
-import Rules.Library
+import qualified Rules.PackageTargets as Pkgs
 import Rules.Register
 
 -- | TODO: Drop code duplication
@@ -110,10 +110,9 @@ buildProgram bin ctx@(Context{..}) rs = do
 
 buildBinary :: [(Resource, Int)] -> FilePath -> Context -> Action ()
 buildBinary rs bin context@Context {..} = do
-    needLibrary =<< contextDependencies context
-    when (stage > Stage0) $ do
-        ways <- interpretInContext context (getLibraryWays <> getRtsWays)
-        needLibrary [ (rtsContext stage) { way = w } | w <- ways ]
+    Pkgs.needPackages stage =<< Pkgs.packageDependencies stage package
+    when (stage > Stage0) (Pkgs.needPackage stage rts)
+
     asmSrcs <- interpretInContext context (getContextData asmSrcs)
     asmObjs <- mapM (objectPath context) asmSrcs
     cSrcs   <- interpretInContext context (getContextData cSrcs)

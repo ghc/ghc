@@ -1,4 +1,4 @@
-module Rules.Library (libraryRules, needLibrary, libraryTargets) where
+module Rules.Library (libraryRules) where
 
 import Hadrian.BuildPath
 import Hadrian.Haskell.Cabal
@@ -145,10 +145,6 @@ libraryObjects context@Context{..} = do
     noHsObjs <- nonHsObjects context
     need $ noHsObjs ++ hsObjs
     return (noHsObjs ++ hsObjs)
-
--- | Coarse-grain 'need': make sure all given libraries are fully built.
-needLibrary :: [Context] -> Action ()
-needLibrary cs = need =<< concatMapM (libraryTargets True) cs
 
 -- * Library paths types and parsers
 

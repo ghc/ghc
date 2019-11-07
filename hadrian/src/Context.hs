@@ -8,6 +8,7 @@ module Context (
     -- * Paths
     contextDir, buildPath, buildDir, pkgInplaceConfig, pkgSetupConfigFile,
     pkgHaddockFile, pkgRegisteredLibraryFile, pkgLibraryFile, pkgGhciLibraryFile,
+    pkgRegisteredGhciLibraryFile, pkgRegisteredHiFilesDir,
     pkgConfFile, objectPath, contextPath, getContextPath, libPath, distDir,
     haddockStatsFilesDir
     ) where
@@ -100,6 +101,25 @@ pkgRegisteredLibraryFile context@Context {..} = do
     return $ if Dynamic `wayUnit` way
         then libDir -/- distDir -/- fileName
         else libDir -/- distDir -/- pkgId -/- fileName
+
+-- | Path to the installed GHCi library file of a given 'Context', e.g:
+-- @_build/stage0/lib/x86_64-linux-ghc-8.6.5/transformers-0.5.6.2/HStransformers-0.5.6.2.o@
+pkgRegisteredGhciLibraryFile :: Context -> Action FilePath
+pkgRegisteredGhciLibraryFile context@Context {..} = do
+  libDir   <- libPath context
+  pkgId    <- pkgIdentifier package
+  fileName <- pkgFileName package "HS" ".o"
+  distDir  <- distDir stage
+  return $ if Dynamic `wayUnit` way
+      then libDir -/- distDir -/- fileName
+      else libDir -/- distDir -/- pkgId -/- fileName
+
+pkgRegisteredHiFilesDir :: Stage -> Package -> Action FilePath
+pkgRegisteredHiFilesDir s p = do
+  libDir <- libPath (vanillaContext s p)
+  pkgId  <- pkgIdentifier p
+  distD  <- distDir s
+  return $ libDir -/- distD -/- pkgId
 
 -- | Path to the library file of a given 'Context', e.g.:
 -- @_build/stage1/libraries/array/build/libHSarray-0.5.1.0.a@.

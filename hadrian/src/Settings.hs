@@ -1,7 +1,7 @@
 module Settings (
     getArgs, getLibraryWays, getRtsWays, flavour, knownPackages,
     findPackageByName, unsafeFindPackageByName, unsafeFindPackageByPath,
-    isLibrary, stagePackages, getIntegerPackage, completeSetting
+    isLibrary, isBoot, stagePackages, getIntegerPackage, completeSetting
     ) where
 
 import CommandLine
@@ -39,6 +39,9 @@ stagePackages :: Stage -> Action [Package]
 stagePackages stage = do
     f <- flavour
     packages f stage
+
+isBoot :: Package -> Action Bool
+isBoot pkg = (pkg `notElem`) <$> stagePackages Stage0
 
 hadrianFlavours :: [Flavour]
 hadrianFlavours =

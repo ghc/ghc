@@ -66,6 +66,7 @@ executable hadrian
                        , Rules.BinaryDist
                        , Rules.Clean
                        , Rules.Compile
+                       , Rules.Completion
                        , Rules.Configure
                        , Rules.Dependencies
                        , Rules.Documentation
@@ -74,11 +75,11 @@ executable hadrian
                        , Rules.Libffi
                        , Rules.Library
                        , Rules.Nofib
+                       , Rules.PackageTargets
                        , Rules.Program
                        , Rules.Register
                        , Rules.Rts
                        , Rules.Selftest
-                       , Rules.SimpleTargets
                        , Rules.SourceDist
                        , Rules.Test
                        , Settings

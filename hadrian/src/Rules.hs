@@ -1,4 +1,4 @@
-module Rules (buildRules, oracleRules, packageTargets, topLevelTargets
+module Rules (buildRules, oracleRules, topLevelTargets
              , toolArgsTarget ) where
 
 import qualified Hadrian.Oracles.ArgsHash
@@ -13,6 +13,7 @@ import qualified Oracles.ModuleFiles
 import Packages
 import qualified Rules.BinaryDist
 import qualified Rules.Compile
+import qualified Rules.Completion
 import qualified Rules.Configure
 import qualified Rules.Dependencies
 import qualified Rules.Documentation
@@ -20,12 +21,11 @@ import qualified Rules.Generate
 import qualified Rules.Gmp
 import qualified Rules.Libffi
 import qualified Rules.Library
+import qualified Rules.PackageTargets
 import qualified Rules.Program
 import qualified Rules.Register
 import qualified Rules.Rts
-import qualified Rules.SimpleTargets
 import Settings
-import Settings.Program (programContext)
 import Target
 import UserSettings
 
@@ -70,65 +70,29 @@ allStages = [minBound .. maxBound]
 topLevelTargets :: Rules ()
 topLevelTargets = action $ do
     verbosity <- getVerbosity
-    forM_ [ Stage1 ..] $ \stage -> do
-      when (verbosity >= Loud) $ do
-        (libraries, programs) <- partition isLibrary <$> stagePackages stage
-        libNames <- mapM (name stage) libraries
-        pgmNames <- mapM (name stage) programs
-        let stageHeader t ps =
-              "| Building " ++ show stage ++ " "
-                            ++ t ++ ": " ++ intercalate ", " ps
-        putNormal . unlines $
-            [ stageHeader "libraries" libNames
-            , stageHeader "programs" pgmNames ]
-    let buildStages = [ s | s <- [Stage0 ..], s < finalStage ]
-    targets <- concatForM buildStages $ \stage -> do
-        packages <- stagePackages stage
-        mapM (path stage) packages
+    when (verbosity >= Loud) $ do
+      (libraries, programs) <- partition isLibrary <$> stagePackages finalStage
+      libNames <- mapM (name finalStage) libraries
+      pgmNames <- mapM (name finalStage) programs
+      let stageHeader t ps =
+            "| Building " ++ show finalStage ++ " "
+                          ++ t ++ ": " ++ intercalate ", " ps
+      putNormal . unlines $
+        [ stageHeader "libraries" libNames
+        , stageHeader "programs" pgmNames ]
+    stagePackages finalStage >>= Rules.PackageTargets.needPackages finalStage
 
     -- Why we need wrappers: https://gitlab.haskell.org/ghc/ghc/issues/16534.
     root <- buildRoot
-    let wrappers = [ root -/- ("ghc-" ++ stageString s) | s <- [Stage1 ..]
-                                                        , s < finalStage ]
-    need (targets ++ wrappers)
+    let wrappers =
+          [ root -/- ("ghc-" ++ stageString s)
+          | s <- [Stage1 .. finalStage]
+          ]
+    need wrappers
   where
-    -- either the package database config file for libraries or
-    -- the programPath for programs. However this still does
-    -- not support multiple targets, where a cabal package has
-    -- a library /and/ a program.
-    path :: Stage -> Package -> Action FilePath
-    path stage pkg | isLibrary pkg = pkgConfFile (vanillaContext stage pkg)
-                   | otherwise     = programPath =<< programContext stage pkg
     name :: Stage -> Package -> Action String
     name stage pkg | isLibrary pkg = return (pkgName pkg)
                    | otherwise     = programName (vanillaContext stage pkg)
-
--- TODO: Get rid of the @includeGhciLib@ hack.
--- | Return the list of targets associated with a given 'Stage' and 'Package'.
--- By setting the Boolean parameter to False it is possible to exclude the GHCi
--- library from the targets, and avoid configuring the package to determine
--- whether GHCi library needs to be built for it. We typically want to set
--- this parameter to True, however it is important to set it to False when
--- computing 'topLevelTargets', as otherwise the whole build gets sequentialised
--- because packages are configured in the order respecting their dependencies.
-packageTargets :: Bool -> Stage -> Package -> Action [FilePath]
-packageTargets includeGhciLib stage pkg = do
-    let context = vanillaContext stage pkg
-    activePackages <- stagePackages stage
-    if pkg `notElem` activePackages
-    then return [] -- Skip inactive packages.
-    else if isLibrary pkg
-        then do -- Collect all targets of a library package.
-            let pkgWays = if pkg == rts then getRtsWays else getLibraryWays
-            ways  <- interpretInContext context pkgWays
-            libs  <- mapM (pkgLibraryFile . Context stage pkg) ways
-            more  <- Rules.Library.libraryTargets includeGhciLib context
-            setupConfig <- pkgSetupConfigFile context
-            return $ [setupConfig] ++ libs ++ more
-        else do -- The only target of a program package is the executable.
-            prgContext <- programContext stage pkg
-            prgPath    <- programPath prgContext
-            return [prgPath]
 
 packageRules :: Rules ()
 packageRules = do
@@ -155,8 +119,8 @@ packageRules = do
     let vanillaContexts = liftM2 vanillaContext allStages knownPackages
 
     forM_ vanillaContexts Rules.Generate.generatePackageCode
-    Rules.SimpleTargets.simplePackageTargets
-    Rules.SimpleTargets.completionRule
+    Rules.Completion.completionRule
+    Rules.PackageTargets.simplePackageTargets
 
 buildRules :: Rules ()
 buildRules = do

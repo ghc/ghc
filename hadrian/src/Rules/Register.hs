@@ -1,23 +1,19 @@
 module Rules.Register (
-    configurePackageRules, registerPackageRules, registerPackages,
-    libraryTargets
+    configurePackageRules, registerPackageRules, registerPackages
     ) where
 
 import Base
 import Context
-import Expression ( getContextData )
 import Hadrian.BuildPath
 import Hadrian.Expression
-import Hadrian.Haskell.Cabal
-import Oracles.Setting
 import Packages
 import Rules.Gmp
+import Rules.PackageTargets
 import Rules.Rts
 import Settings
 import Target
 import Utilities
 
-import Hadrian.Haskell.Cabal.Type
 import qualified Text.Parsec      as Parsec
 
 import Distribution.Version (Version)
@@ -70,7 +66,8 @@ parseToBuildSubdirectory root = do
 
 registerPackages :: [Context] -> Action ()
 registerPackages ctxs = do
-    need =<< mapM pkgRegisteredLibraryFile ctxs
+    -- need =<< mapM pkgRegisteredLibraryFile ctxs
+    needPackages (stage $ head ctxs) (map package ctxs)
 
     -- Dynamic RTS library files need symlinks (Rules.Rts.rtsRules).
     forM_ ctxs $ \ ctx -> when (package ctx == rts) $ do
@@ -87,7 +84,7 @@ registerPackageRules rs stage = do
     root -/- relativePackageDbPath stage -/- packageDbStamp %> \stamp ->
         writeFileLines stamp []
 
-    -- Register a package.
+    -- Write a @.conf@ file for a package in a given pkg db
     root -/- relativePackageDbPath stage -/- "*.conf" %> \conf -> do
         historyDisable
 
@@ -96,21 +93,21 @@ registerPackageRules rs stage = do
 
         when (pkg == compiler) $ need =<< ghcLibDeps stage
 
-        isBoot <- (pkg `notElem`) <$> stagePackages Stage0
+        isBootPkg <- isBoot pkg
 
         let ctx = Context stage pkg vanilla
         case stage of
-            Stage0 | isBoot -> copyConf  rs ctx conf
-            _               -> buildConf rs ctx conf
+            Stage0 | isBootPkg -> copyConf  rs ctx conf
+            _                  -> buildConf rs ctx conf
 
 buildConf :: [(Resource, Int)] -> Context -> FilePath -> Action ()
-buildConf _ context@Context {..} conf = do
-    depPkgIds <- cabalDependencies context
+buildConf _ context@Context {..} _conf = do
+    depPkgs <- packageDependencies stage package
     ensureConfigured context
-    need =<< mapM (\pkgId -> packageDbPath stage <&> (-/- pkgId <.> "conf")) depPkgIds
+    -- Make sure we've got .conf files for the dependencies
+    -- of the package we are about to register.
+    needPackages stage depPkgs
 
-    ways <- interpretInContext context (getLibraryWays <> if package == rts then getRtsWays else mempty)
-    need =<< concatMapM (libraryTargets True) [ context { way = w } | w <- ways ]
 
     -- We might need some package-db resource to limit read/write, see packageRules.
     path <- buildPath context
@@ -126,6 +123,9 @@ buildConf _ context@Context {..} conf = do
 
     when (package == integerGmp) $ need [path -/- gmpLibraryH]
 
+    libTargets <- allLibraryTargets True stage package
+    need libTargets
+
     -- Copy and register the package.
     Cabal.copyPackage context
     Cabal.registerPackage context
@@ -134,6 +134,7 @@ buildConf _ context@Context {..} conf = do
     -- of many of the files we have build, e.g. Haskell interface files. We need
     -- to record this side effect so that Shake can cache these files too.
     -- See why we need 'fixWindows': https://gitlab.haskell.org/ghc/ghc/issues/16073
+    {-
     let fixWindows path = do
             version  <- setting GhcVersion
             hostOs   <- cabalOsString <$> setting BuildOs
@@ -143,7 +144,12 @@ buildConf _ context@Context {..} conf = do
     pkgDbPath <- fixWindows =<< packageDbPath stage
     let dir = pkgDbPath -/- takeBaseName conf
     files <- liftIO $ getDirectoryFilesIO "." [dir -/- "**"]
-    produces files
+    -}
+    installedLibTargets <- allInstalledLibraryTargets True stage package
+    pkgDistDir <- pkgRegisteredHiFilesDir stage package
+    hiFiles <- map (pkgDistDir -/-)
+      <$> liftIO (getDirectoryFilesIO pkgDistDir ["**" -/- "*.hi"])
+    produces $ installedLibTargets ++ hiFiles
 
 copyConf :: [(Resource, Int)] -> Context -> FilePath -> Action ()
 copyConf rs context@Context {..} conf = do
@@ -179,25 +185,3 @@ parseCabalName = fmap f . Cabal.eitherParsec
   where
     f :: Cabal.PackageId -> (String, Version)
     f pkg_id = (Cabal.unPackageName $ Cabal.pkgName pkg_id, Cabal.pkgVersion pkg_id)
-
--- | Return extra library targets.
-extraTargets :: Context -> Action [FilePath]
-extraTargets context
-    | package context == rts  = needRtsLibffiTargets (Context.stage context)
-    | otherwise               = return []
-
--- | Given a library 'Package' this action computes all of its targets. Needing
--- all the targets should build the library such that it is ready to be
--- registered into the package database.
--- See 'packageTargets' for the explanation of the @includeGhciLib@ parameter.
-libraryTargets :: Bool -> Context -> Action [FilePath]
-libraryTargets includeGhciLib context@Context {..} = do
-    libFile  <- pkgLibraryFile     context
-    ghciLib  <- pkgGhciLibraryFile context
-    ghci     <- if includeGhciLib && not (wayUnit Dynamic way)
-                then interpretInContext context $ getContextData buildGhciLib
-                else return False
-    extra    <- extraTargets context
-    return $ [ libFile ]
-          ++ [ ghciLib | ghci ]
-          ++ extra
