@@ -13,6 +13,7 @@ module TcFlatten(
 import GhcPrelude
 
 import TcRnTypes
+import TyCoPpr       ( pprTyVar )
 import Constraint
 import Predicate
 import TcType

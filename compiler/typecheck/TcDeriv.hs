@@ -35,6 +35,7 @@ import Inst
 import FamInstEnv
 import TcHsType
 import TyCoRep
+import TyCoPpr    ( pprTyVars )
 
 import RnNames( extendGlobalRdrEnvRn )
 import RnBinds

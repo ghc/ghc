@@ -536,7 +536,6 @@ Library
         InstEnv
         TyCon
         CoAxiom
-        Kind
         Type
         TyCoRep
         TyCoFVs

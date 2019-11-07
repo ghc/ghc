@@ -58,6 +58,7 @@ import NameSet
 import RdrName
 import TyCon
 import TyCoRep
+import TyCoPpr
 import TyCoSubst (substTyWithInScope)
 import Type
 import TcEvidence
