@@ -17,7 +17,7 @@ module GHC.Core.Rules (
         ruleCheckProgram,
 
         -- ** Manipulating 'RuleInfo' rules
-        mkRuleInfo, extendRuleInfo, addRuleInfo,
+        extendRuleInfo, addRuleInfo,
         addIdSpecialisations,
 
         -- * Misc. CoreRule helpers
@@ -278,11 +278,6 @@ pprRulesForUser dflags rules
 *                                                                      *
 ************************************************************************
 -}
-
--- | Make a 'RuleInfo' containing a number of 'CoreRule's, suitable
--- for putting into an 'IdInfo'
-mkRuleInfo :: [CoreRule] -> RuleInfo
-mkRuleInfo rules = RuleInfo rules (rulesFreeVarsDSet rules)
 
 extendRuleInfo :: RuleInfo -> [CoreRule] -> RuleInfo
 extendRuleInfo (RuleInfo rs1 fvs1) rs2
