@@ -2121,7 +2121,7 @@ On systems with ``.dll``-style shared libraries, the actual library
 loaded will be ``lib.dll``, ``liblib.dll``. GHCi also has full support for
 import libraries, either Microsoft style ``.lib``, or GNU GCC style ``.a`` and
 ``.dll.a`` libraries. If you have an import library it is advisable to always
-specify the import libary instead of the ``.dll``. e.g. use ``-lgcc` instead of
+specify the import library instead of the ``.dll``. e.g. use ``-lgcc` instead of
 ``-llibgcc_s_seh-1``. Again, GHCi will signal an error if it can't find the
 library.
 
