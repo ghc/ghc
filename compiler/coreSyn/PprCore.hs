@@ -27,7 +27,7 @@ import IdInfo
 import Demand
 import DataCon
 import TyCon
-import Type
+import TyCoPpr
 import Coercion
 import DynFlags
 import BasicTypes

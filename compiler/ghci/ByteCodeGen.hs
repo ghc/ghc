@@ -43,6 +43,7 @@ import TyCon
 import Util
 import VarSet
 import TysPrim
+import TyCoPpr         ( pprType )
 import ErrUtils
 import Unique
 import FastString

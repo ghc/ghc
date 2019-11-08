@@ -198,14 +198,7 @@ module Type (
         cloneTyVarBndr, cloneTyVarBndrs, lookupTyVar,
 
         -- * Pretty-printing
-        pprType, pprParendType, pprPrecType,
-        pprTypeApp, pprTyThingCategory, pprShortTyThing,
-        pprTCvBndr, pprTCvBndrs, pprForAll, pprUserForAll,
-        pprSigmaType, pprWithExplicitKindsWhen,
-        pprTheta, pprThetaArrowTy, pprClassPred,
-        pprKind, pprParendKind, pprSourceTyCon,
-        PprPrec(..), topPrec, sigPrec, opPrec, funPrec, appPrec, maybeParen,
-        pprTyVar, pprTyVars, debugPprType,
+        pprSourceTyCon,
         pprWithTYPE,
 
         -- * Tidying type related things up for printing
@@ -237,7 +230,7 @@ import BasicTypes
 import TyCoRep
 import TyCoSubst
 import TyCoTidy
-import TyCoPpr
+--import TyCoPpr
 import TyCoFVs
 
 -- friends:
