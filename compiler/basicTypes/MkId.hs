@@ -39,7 +39,6 @@ module MkId (
 
 import GhcPrelude
 
-import Rules
 import TysPrim
 import TysWiredIn
 import PrelRules
@@ -48,6 +47,7 @@ import FamInstEnv
 import Coercion
 import TcType
 import MkCore
+import CoreFVs          ( mkRuleInfo )
 import CoreUtils        ( mkCast, mkDefaultCase )
 import CoreUnfold
 import Literal
