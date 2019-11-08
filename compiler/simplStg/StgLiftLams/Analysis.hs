@@ -412,7 +412,7 @@ goodToLift dflags top_lvl rec_flag expander pairs scope = decide
       is_memoized_rhs StgRhsCon{} = True
       is_memoized_rhs (StgRhsClosure _ _ upd _ _) = isUpdatable upd
 
-      -- Don't lift binders occuring as arguments. This would result in complex
+      -- Don't lift binders occurring as arguments. This would result in complex
       -- argument expressions which would have to be given a name, reintroducing
       -- the very allocation at each call site that we wanted to get rid off in
       -- the first place.

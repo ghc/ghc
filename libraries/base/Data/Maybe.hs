@@ -148,7 +148,7 @@ fromJust          :: HasCallStack => Maybe a -> a
 fromJust Nothing  = error "Maybe.fromJust: Nothing" -- yuck
 fromJust (Just x) = x
 
--- | The 'fromMaybe' function takes a default value and and 'Maybe'
+-- | The 'fromMaybe' function takes a default value and a 'Maybe'
 -- value.  If the 'Maybe' is 'Nothing', it returns the default values;
 -- otherwise, it returns the value contained in the 'Maybe'.
 --
