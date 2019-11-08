@@ -46,7 +46,6 @@ import PprCore
 import ErrUtils
 import Coercion
 import SrcLoc
-import Kind
 import Type
 import RepType
 import TyCoRep       -- checks validity of types/coercions

@@ -14,7 +14,6 @@ Note [The Type-related module hierarchy]
   TyCoSubst imports TyCoRep, TyCoFVs, TyCoPpr
   TyCoTidy imports TyCoRep, TyCoFVs
   TysPrim  imports TyCoRep ( including mkTyConTy )
-  Kind     imports TysPrim ( mainly for primitive kinds ), Type
   Coercion imports Type
 -}
 
