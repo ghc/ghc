@@ -168,7 +168,28 @@ mkFullIface :: HscEnv -> CgGuts2 -> PartialModIface -> IO (ModIface, ModDetails)
 mkFullIface hsc_env cg_guts partial_iface = do
     let dflags = hsc_dflags hsc_env
     let mod_guts = cg2_mod_guts cg_guts
-    let type_env = cg2_type_env cg_guts
+
+    -- The completed type environment is gotten from
+    --      a) the types and classes defined here (plus implicit things)
+    --      b) adding Ids with correct IdInfo, including unfoldings,
+    --              gotten from the bindings
+    -- From (b) we keep only those Ids with External names;
+    --          the CoreTidy pass makes sure these are all and only
+    --          the externally-accessible ones
+    -- This truncates the type environment to include only the
+    -- exported Ids and things needed from them, which saves space
+    --
+    -- See Note [Don't attempt to trim data types]
+    let omit_prags = gopt Opt_OmitInterfacePragmas dflags
+    let final_ids  = [ if omit_prags then trimId id else id
+                     | id <- bindersOfBinds (cg2_tidy_binds cg_guts)
+                     , isExternalName (idName id)
+                     , not (isWiredInName (getName id))
+                     ]   -- See Note [Drop wired-in things]
+    let final_tcs = filterOut (isWiredInName . getName) (mg_tcs mod_guts)
+    -- See Note [Drop wired-in things]
+    let type_env = typeEnvFromEntities final_ids final_tcs (mg_fam_insts mod_guts)
+
     let tidy_patsyns = mkFinalPatSyns type_env (mg_patsyns mod_guts)
     let tidy_type_env = extendTypeEnvWithPatSyns tidy_patsyns type_env
     let tidy_rules = tidyRules (cg2_tidy_env cg_guts) (cg2_trimmed_rules cg_guts)

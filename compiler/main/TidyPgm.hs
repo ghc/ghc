@@ -366,25 +366,6 @@ tidyProgram2 hsc_env mod_guts =
             -- otherwise add a C stub to do so
             _              -> (`appendStubC` spt_init_code)
 
-    -- The completed type environment is gotten from
-    --      a) the types and classes defined here (plus implicit things)
-    --      b) adding Ids with correct IdInfo, including unfoldings,
-    --              gotten from the bindings
-    -- From (b) we keep only those Ids with External names;
-    --          the CoreTidy pass makes sure these are all and only
-    --          the externally-accessible ones
-    -- This truncates the type environment to include only the
-    -- exported Ids and things needed from them, which saves space
-    --
-    -- See Note [Don't attempt to trim data types]
-    let final_ids  = [ if omit_prags then trimId id else id
-                     | id <- bindersOfBinds tidy_binds
-                     , isExternalName (idName id)
-                     , not (isWiredInName (getName id))
-                     ]   -- See Note [Drop wired-in things]
-    let final_tcs = filterOut (isWiredInName . getName) tcs
-    -- See Note [Drop wired-in things]
-    let type_env = typeEnvFromEntities final_ids final_tcs fam_insts
 
     let print_unqual = mkPrintUnqualified dflags rdr_env
     -- TODO (osa): We can't dump rules here as we tidy them later (after code
@@ -411,7 +392,7 @@ tidyProgram2 hsc_env mod_guts =
       , cg2_hpc_info = hpc_info
       , cg2_modBreaks = mod_breaks
       , cg2_spt_entries = spt_entries
-      , cg2_type_env = type_env
+      , cg2_tidy_binds = tidy_binds
       , cg2_trimmed_rules = trimmed_rules
       , cg2_tidy_env = tidy_env
       , cg2_mod_guts = mod_guts

@@ -1519,7 +1519,7 @@ data CgGuts2 = CgGuts2
   , cg2_spt_entries :: ![SptEntry]
 
   -- Stuff for ModDetails generation
-  , cg2_type_env :: !TypeEnv
+  , cg2_tidy_binds :: !CoreProgram
   , cg2_trimmed_rules :: ![CoreRule]
   , cg2_tidy_env :: !TidyEnv
   , cg2_mod_guts :: !ModGuts
