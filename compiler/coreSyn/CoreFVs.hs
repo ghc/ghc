@@ -210,7 +210,7 @@ exprsSomeFreeVarsDSet :: InterestingVarFun -- ^ Says which 'Var's are interestin
 exprsSomeFreeVarsDSet fv_cand e =
   fvDVarSet $ filterFV fv_cand $ mapUnionFV expr_fvs e
 
---      Comment about obselete code
+--      Comment about obsolete code
 -- We used to gather the free variables the RULES at a variable occurrence
 -- with the following cryptic comment:
 --     "At a variable occurrence, add in any free variables of its rule rhss

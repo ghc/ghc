@@ -559,7 +559,7 @@ idIsFrom mod id = nameIsLocalOrFrom mod (idName id)
 
 {- Note [Levity-polymorphic Ids]
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
-Some levity-polymorphic Ids must be applied and and inlined, not left
+Some levity-polymorphic Ids must be applied and inlined, not left
 un-saturated.  Example:
   unsafeCoerceId :: forall r1 r2 (a::TYPE r1) (b::TYPE r2). a -> b
 

@@ -855,7 +855,7 @@ leftIdentityDynFlags id_lit = do
   return e2
 
 -- | Left identity rule for PrimOps like 'IntAddC' and 'WordAddC', where, in
--- addition to the result, we have to indicate that no carry/overflow occured.
+-- addition to the result, we have to indicate that no carry/overflow occurred.
 leftIdentityCDynFlags :: (DynFlags -> Literal) -> RuleM CoreExpr
 leftIdentityCDynFlags id_lit = do
   dflags <- getDynFlags
@@ -872,7 +872,7 @@ rightIdentityDynFlags id_lit = do
   return e1
 
 -- | Right identity rule for PrimOps like 'IntSubC' and 'WordSubC', where, in
--- addition to the result, we have to indicate that no carry/overflow occured.
+-- addition to the result, we have to indicate that no carry/overflow occurred.
 rightIdentityCDynFlags :: (DynFlags -> Literal) -> RuleM CoreExpr
 rightIdentityCDynFlags id_lit = do
   dflags <- getDynFlags
@@ -886,7 +886,7 @@ identityDynFlags lit =
   leftIdentityDynFlags lit `mplus` rightIdentityDynFlags lit
 
 -- | Identity rule for PrimOps like 'IntAddC' and 'WordAddC', where, in addition
--- to the result, we have to indicate that no carry/overflow occured.
+-- to the result, we have to indicate that no carry/overflow occurred.
 identityCDynFlags :: (DynFlags -> Literal) -> RuleM CoreExpr
 identityCDynFlags lit =
   leftIdentityCDynFlags lit `mplus` rightIdentityCDynFlags lit
