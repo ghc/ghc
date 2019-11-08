@@ -714,7 +714,7 @@ other examples where lazy flattening caused problems.
 
 Bottom line: FM_Avoid is unused for now (Nov 14).
 Note: T5321Fun got faster when I disabled FM_Avoid
-      T5837 did too, but it's pathalogical anyway
+      T5837 did too, but it's pathological anyway
 
 Note [Phantoms in the flattener]
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
@@ -1708,7 +1708,7 @@ is an example; all the constraints here are Givens
     inert    fsk ~ ((fsk3, TF Int), TF Int)
 
 Because the incoming given rewrites all the inert givens, we get more and
-more duplication in the inert set.  But this really only happens in pathalogical
+more duplication in the inert set.  But this really only happens in pathological
 casee, so we don't care.
 
 

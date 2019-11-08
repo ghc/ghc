@@ -374,7 +374,7 @@ computeRetainerSet( traverseState *ts )
     // all are guaranteed to be valid, or reachable.
     //
     // The following code assumes that WEAK objects are considered to be roots
-    // for retainer profilng.
+    // for retainer profiling.
     for (n = 0; n < n_capabilities; n++) {
         // NB: after a GC, all nursery weak_ptr_lists have been migrated
         // to the global lists living in the generations

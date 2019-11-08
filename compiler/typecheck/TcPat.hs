@@ -1101,7 +1101,7 @@ So for now I'm just insisting on type *equality* in patterns.  No subsumption.
 
 Old notes about desugaring, at a time when pattern coercions were handled:
 
-A SigPat is a type coercion and must be handled one at at time.  We can't
+A SigPat is a type coercion and must be handled one at a time.  We can't
 combine them unless the type of the pattern inside is identical, and we don't
 bother to check for that.  For example:
 

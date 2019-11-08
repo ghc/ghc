@@ -78,7 +78,7 @@ would implicitly declare
                              (forall b. Ord b => a -> b -> b)
 
 (We could use a record decl, but that means changing more of the existing apparatus.
-One step at at time!)
+One step at a time!)
 
 For classes with just one superclass+method, we use a newtype decl instead:
 

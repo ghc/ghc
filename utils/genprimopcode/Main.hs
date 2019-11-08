@@ -427,7 +427,7 @@ wrapOp :: String -> String
 wrapOp nm | isAlpha (head nm) = nm
           | otherwise         = "(" ++ nm ++ ")"
 
--- | Turn an identifer or operator into its infix form
+-- | Turn an identifier or operator into its infix form
 asInfix :: String -> String
 asInfix nm | isAlpha (head nm) = "`" ++ nm ++ "`"
            | otherwise         = nm

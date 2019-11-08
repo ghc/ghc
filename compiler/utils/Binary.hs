@@ -449,7 +449,7 @@ putSLEB128 bh initial = go initial
         let !val' = val `unsafeShiftR` 7
         let !signBit = testBit byte 6
         let !done =
-                -- Unsigned value, val' == 0 and and last value can
+                -- Unsigned value, val' == 0 and last value can
                 -- be discriminated from a negative number.
                 ((val' == 0 && not signBit) ||
                 -- Signed value,

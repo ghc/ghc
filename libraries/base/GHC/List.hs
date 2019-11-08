@@ -87,7 +87,7 @@ last []                 =  errorEmptyList "last"
 #else
 -- Use foldl to make last a good consumer.
 -- This will compile to good code for the actual GHC.List.last.
--- (At least as long it is eta-expaned, otherwise it does not, #10260.)
+-- (At least as long it is eta-expanded, otherwise it does not, #10260.)
 last xs = foldl (\_ x -> x) lastError xs
 {-# INLINE last #-}
 -- The inline pragma is required to make GHC remember the implementation via

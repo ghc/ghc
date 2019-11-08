@@ -369,7 +369,7 @@ the rest of the instance. The fact that it is suspended is important, because
 right now, we don't have ThetaTypes for the instances that use deriving clauses
 (only the standalone-derived ones).
 
-Now we can can collect the type family instances and extend the local instance
+Now we can collect the type family instances and extend the local instance
 environment. At this point, it is safe to run simplifyInstanceContexts on the
 deriving-clause instance specs, which gives us the ThetaTypes for the
 deriving-clause instances. Now we can feed all the ThetaTypes to the

@@ -7,7 +7,7 @@ module CyclicSubst where
 
 -- | The match is translated to @b | a <- b@, the initial unification variable
 -- is @a@ (for some reason). VarVar will assign @b :-> a@ in the match of @a@
--- against @b@ (vars occuring in a pattern are flexible). The @PmGrd a b@ is
+-- against @b@ (vars occurring in a pattern are flexible). The @PmGrd a b@ is
 -- desugared as a match of @$pm_x@ against @a@, where @$pm_x :-> b@, which is
 -- stored as @$pm_x :-> a@ due to the previous solution. Now, VarVar will
 -- assign @a :-> $pm_x@, causing a cycle.

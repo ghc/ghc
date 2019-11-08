@@ -32,7 +32,7 @@
   for garbage collection because the act of passing them makes a copy
   from the heap, stack or wherever they are onto the C-world stack.
   However, if we were to pass a heap object such as a (Haskell) @String@
-  and a garbage collection occured before we finished using it, we'd run
+  and a garbage collection occurred before we finished using it, we'd run
   into problems since the heap object might have been moved or even
   deleted.
 

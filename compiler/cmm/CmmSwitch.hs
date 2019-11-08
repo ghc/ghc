@@ -195,7 +195,7 @@ switchTargetsToTable (SwitchTargets _ (lo,hi) mbdef branches)
 --             .quad   _c20q
 --             .quad   _c20r
 
--- | The list of all labels occuring in the SwitchTargets value.
+-- | The list of all labels occurring in the SwitchTargets value.
 switchTargetsToList :: SwitchTargets -> [Label]
 switchTargetsToList (SwitchTargets _ _ mbdef branches)
     = maybeToList mbdef ++ M.elems branches

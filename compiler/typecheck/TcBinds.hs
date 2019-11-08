@@ -342,7 +342,7 @@ tcLocalBinds (HsIPBinds x (IPBinds _ ip_binds)) thing_inside
   where
     ips = [ip | (dL->L _ (IPBind _ (Left (dL->L _ ip)) _)) <- ip_binds]
 
-        -- I wonder if we should do these one at at time
+        -- I wonder if we should do these one at a time
         -- Consider     ?x = 4
         --              ?y = ?x + 1
     tc_ip_bind ipClass (IPBind _ (Left (dL->L _ ip)) expr)

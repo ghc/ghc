@@ -51,7 +51,7 @@ default ()
 --
 --   {-# CONSTANT_FOLDED plusInteger #-}
 --
--- which is simply expaned into a
+-- which is simply expanded into a
 --
 --   {-# NOINLINE plusInteger #-}
 --
