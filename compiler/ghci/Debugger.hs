@@ -74,7 +74,8 @@ pprintClosureCommand bindThings force str = do
    -- Do the obtainTerm--bindSuspensions-computeSubstitution dance
    go :: GhcMonad m => TCvSubst -> Id -> m (TCvSubst, Term)
    go subst id = do
-       let id' = id `setIdType` substTy subst (idType id)
+       let id_ty' = substTy subst (idType id)
+           id'    = id `setIdType` id_ty'
        term_    <- GHC.obtainTermFromId maxBound force id'
        term     <- tidyTermTyVars term_
        term'    <- if bindThings
@@ -85,13 +86,14 @@ pprintClosureCommand bindThings force str = do
      --  mapping the old tyvars to the reconstructed types.
        let reconstructed_type = termType term
        hsc_env <- getSession
-       case (improveRTTIType hsc_env (idType id) (reconstructed_type)) of
+       case (improveRTTIType hsc_env id_ty' reconstructed_type) of
          Nothing     -> return (subst, term')
          Just subst' -> do { dflags <- GHC.getSessionDynFlags
                            ; liftIO $
                                dumpIfSet_dyn dflags Opt_D_dump_rtti "RTTI"
                                  (fsep $ [text "RTTI Improvement for", ppr id,
-                                  text "is the substitution:" , ppr subst'])
+                                  text "old substitution:" , ppr subst,
+                                  text "new substitution:" , ppr subst'])
                            ; return (subst `unionTCvSubst` subst', term')}
 
    tidyTermTyVars :: GhcMonad m => Term -> m Term
