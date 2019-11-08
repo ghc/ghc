@@ -192,7 +192,6 @@ module TcType (
 -- friends:
 import GhcPrelude
 
-import Kind
 import TyCoRep
 import TyCoSubst ( mkTvSubst, substTyWithCoVars )
 import TyCoFVs
