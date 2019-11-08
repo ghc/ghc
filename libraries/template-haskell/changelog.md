@@ -22,7 +22,7 @@
   * Introduce `reifyType` to reify the type or kind of a thing referenced by
     `Name`.
 
-## 2.15.0.0 *May 2019
+## 2.15.0.0 *May 2019*
 
   * In `Language.Haskell.TH.Syntax`, `DataInstD`, `NewTypeInstD`, `TySynEqn`,
     and `RuleP` now all have a `Maybe [TyVarBndr]` argument, which contains a
@@ -44,7 +44,7 @@
 
   * `addForeignFilePath` now support assembler sources (#16180).
 
-## 2.14.0.0 *September 2018
+## 2.14.0.0 *September 2018*
 
   * Introduce an `addForeignFilePath` function, as well as a corresponding
     `qAddForeignFile` class method to `Quasi`. Unlike `addForeignFile`, which
