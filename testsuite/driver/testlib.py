@@ -574,7 +574,7 @@ def llvm_build ( ) -> bool:
 #  * view the heap profiles, read off the maximum residency.  If it has
 #    really changed, then you know there's an issue.
 
-RESIDENCY_OPTS = '+RTS -G1 -A256k -i0 -h -RTS'
+RESIDENCY_OPTS = '+RTS -A256k -i0 -h -RTS'
 
 # See Note [Measuring residency].
 def collect_runtime_residency(tolerance_pct: float):
