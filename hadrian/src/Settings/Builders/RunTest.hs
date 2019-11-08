@@ -141,8 +141,7 @@ runTestBuilderArgs = builder RunTest ? do
             , arg "--config", arg $ "stats_files_dir=" ++ statsFilesDir
             , arg $ "--threads=" ++ show threads
             , emitWhenSet testEnv $ \env -> arg ("--test-env=" ++ show env)
-            , emitWhenSet testMetricsFile $ \file -> mconcat
-                [ arg "--metrics-file", arg (show file) ]
+            , emitWhenSet testMetricsFile $ \file -> arg ("--metrics-file=" ++ file)
             , getTestArgs -- User-provided arguments from command line.
             ]
 
