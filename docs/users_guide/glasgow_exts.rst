@@ -12541,13 +12541,13 @@ Partial Type Signatures
     Type checker will allow inferred types for holes.
 
 A partial type signature is a type signature containing special
-placeholders written with a leading underscore (e.g., "``_``",
-"``_foo``", "``_bar``") called *wildcards*. Partial type signatures are
-to type signatures what :ref:`typed-holes` are to expressions. During
-compilation these wildcards or holes will generate an error message that
-describes which type was inferred at the hole's location, and
-information about the origin of any free type variables. GHC reports
-such error messages by default.
+placeholders called *wildcards*. A wildcard is written as an underscore (e.g. "``_``")
+or, if :extension:`NamedWildCards` is enabled, any identifier with a leading
+underscore (e.g. "``_foo``", "``_bar``"). Partial type signatures are to type
+signatures what :ref:`typed-holes` are to expressions. During compilation these
+wildcards or holes will generate an error message that describes which type was
+inferred at the hole's location, and information about the origin of any free
+type variables. GHC reports such error messages by default.
 
 Unlike :ref:`typed-holes`, which make the program incomplete and will
 generate errors when they are evaluated, this needn't be the case for
