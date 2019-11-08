@@ -42,7 +42,6 @@ module MkId (
 
 import GhcPrelude
 
-import GHC.Core.Rules
 import TysPrim
 import TysWiredIn
 import PrelRules
@@ -52,7 +51,8 @@ import FamInstEnv
 import Coercion
 import TcType
 import GHC.Core.Make
-import GHC.Core.Utils  ( mkCast, mkDefaultCase )
+import GHC.Core.FVs     ( mkRuleInfo )
+import GHC.Core.Utils   ( mkCast, mkDefaultCase )
 import GHC.Core.Unfold
 import Literal
 import TyCon
