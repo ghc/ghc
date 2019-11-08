@@ -1,8 +1,9 @@
 
-==================== Tidy Core rules ====================
+==================== Tidy Rules ====================
 "SPEC shared @ []"
-    forall ($dMyFunctor :: MyFunctor []) (irred :: Domain [] Int).
-      shared @ [] $dMyFunctor irred
-      = bar_$sshared
+    forall ($dMyFunctor_s2pC :: Foo.MyFunctor [])
+           (irred_s2pD :: Foo.Domain [] GHC.Types.Int).
+      Foo.shared @ [] $dMyFunctor_s2pC irred_s2pD
+      = Foo.bar_$sshared
 
 

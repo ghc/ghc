@@ -1,9 +1,13 @@
 
-==================== Tidy Core rules ====================
+==================== Tidy Rules ====================
 "SPEC useAbstractMonad"
-    forall (@ s)
-           ($dMonadAbstractIOST :: MonadAbstractIOST (ReaderT Int (ST s))).
-      useAbstractMonad @ (ReaderT Int (ST s)) $dMonadAbstractIOST
-      = useAbstractMonad_$suseAbstractMonad @ s
+    forall (@ s_X2H0)
+           ($dMonadAbstractIOST_a2Fe
+              :: Main.MonadAbstractIOST
+                   (Main.ReaderT GHC.Types.Int (GHC.ST.ST s_X2H0))).
+      Main.useAbstractMonad @ (Main.ReaderT
+                                 GHC.Types.Int (GHC.ST.ST s_X2H0))
+                            $dMonadAbstractIOST_a2Fe
+      = Main.useAbstractMonad_$suseAbstractMonad @ s_X2H0
 
 

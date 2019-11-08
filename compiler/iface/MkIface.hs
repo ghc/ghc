@@ -110,6 +110,8 @@ import Exception
 import UniqSet
 import Packages
 import ExtractDocs
+import Rules (pprRulesForUser)
+import PprCore (pprRules)
 
 import TidyPgm
 import CoreTidy
@@ -165,13 +167,17 @@ mkPartialIface hsc_env -- mod_details
 -- Adds fingerprints and potentially code generator produced information.
 mkFullIface :: HscEnv -> CgGuts2 -> PartialModIface -> IO (ModIface, ModDetails)
 mkFullIface hsc_env cg_guts partial_iface = do
-
+    let dflags = hsc_dflags hsc_env
     let mod_guts = cg2_mod_guts cg_guts
     let type_env = cg2_type_env cg_guts
     let tidy_patsyns = mkFinalPatSyns type_env (mg_patsyns mod_guts)
     let tidy_type_env = extendTypeEnvWithPatSyns tidy_patsyns type_env
     let tidy_rules = tidyRules (cg2_tidy_env cg_guts) (cg2_trimmed_rules cg_guts)
     let tidy_cls_insts = mkFinalClsInsts type_env (mg_insts (cg2_mod_guts cg_guts))
+
+    dumpIfSet_any dflags [Opt_D_dump_simpl, Opt_D_dump_rules]
+      (showSDoc dflags (text "Tidy Rules"))
+      (pprRules tidy_rules)
 
     let mod_details = ModDetails
           { md_types = tidy_type_env
@@ -188,7 +194,7 @@ mkFullIface hsc_env cg_guts partial_iface = do
       addFingerprints hsc_env mod_details partial_iface
 
     -- Debug printing
-    dumpIfSet_dyn (hsc_dflags hsc_env) Opt_D_dump_hi "FINAL INTERFACE" (pprModIface full_iface)
+    dumpIfSet_dyn dflags Opt_D_dump_hi "FINAL INTERFACE" (pprModIface full_iface)
 
     return (full_iface, mod_details)
 
