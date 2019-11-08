@@ -1605,7 +1605,7 @@ editFile str =
 -- XXX: Can we figure out what happened if the depndecy analysis fails
 --      (e.g., because the porgrammeer mistyped the name of a module)?
 -- XXX: Can we figure out the location of an error to pass to the editor?
--- XXX: if we could figure out the list of errors that occured during the
+-- XXX: if we could figure out the list of errors that occurred during the
 -- last load/reaload, then we could start the editor focused on the first
 -- of those.
 chooseEditFile :: GHC.GhcMonad m => m String
