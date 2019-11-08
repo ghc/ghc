@@ -110,7 +110,6 @@ import Exception
 import UniqSet
 import Packages
 import ExtractDocs
-import Rules (pprRulesForUser)
 import PprCore (pprRules)
 
 import TidyPgm
