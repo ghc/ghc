@@ -25,7 +25,7 @@ import TcOrigin
 import RnUnbound ( unknownNameSuggestions )
 import Type
 import TyCoRep
-import TyCoPpr          ( pprTyVars, pprWithExplicitKindsWhen )
+import TyCoPpr          ( pprTyVars, pprWithExplicitKindsWhen, pprSourceTyCon, pprWithTYPE )
 import Unify            ( tcMatchTys )
 import Module
 import FamInst

@@ -197,10 +197,6 @@ module Type (
         substVarBndr, substVarBndrs,
         cloneTyVarBndr, cloneTyVarBndrs, lookupTyVar,
 
-        -- * Pretty-printing
-        pprSourceTyCon,
-        pprWithTYPE,
-
         -- * Tidying type related things up for printing
         tidyType,      tidyTypes,
         tidyOpenType,  tidyOpenTypes,
@@ -230,7 +226,6 @@ import BasicTypes
 import TyCoRep
 import TyCoSubst
 import TyCoTidy
---import TyCoPpr
 import TyCoFVs
 
 -- friends:
@@ -260,7 +255,6 @@ import FV
 import Outputable
 import FastString
 import Pair
-import DynFlags  ( gopt_set, GeneralFlag(Opt_PrintExplicitRuntimeReps) )
 import ListSetOps
 import Unique ( nonDetCmpUnique )
 
@@ -479,9 +473,6 @@ expandTypeSynonyms ty
       -- order of a coercion)
     go_cobndr subst = substForAllCoBndrUsing False (go_co subst) subst
 
-{-
-Some basic functions, put here to break loops eg with the pretty printer
--}
 
 -- | Extract the RuntimeRep classifier of a type from its kind. For example,
 -- @kindRep * = LiftedRep@; Panics if this is not possible.
@@ -1923,19 +1914,6 @@ coAxNthLHS :: CoAxiom br -> Int -> Type
 coAxNthLHS ax ind =
   mkTyConApp (coAxiomTyCon ax) (coAxBranchLHS (coAxiomNthBranch ax ind))
 
--- | Pretty prints a 'TyCon', using the family instance in case of a
--- representation tycon.  For example:
---
--- > data T [a] = ...
---
--- In that case we want to print @T [a]@, where @T@ is the family 'TyCon'
-pprSourceTyCon :: TyCon -> SDoc
-pprSourceTyCon tycon
-  | Just (fam_tc, tys) <- tyConFamInst_maybe tycon
-  = ppr $ fam_tc `TyConApp` tys        -- can't be FunTyCon
-  | otherwise
-  = ppr tycon
-
 isFamFreeTy :: Type -> Bool
 isFamFreeTy ty | Just ty' <- coreView ty = isFamFreeTy ty'
 isFamFreeTy (TyVarTy _)       = True
@@ -2961,13 +2939,6 @@ classifiesTypeWithValues k = isJust (kindRep_maybe k)
 Most pretty-printing is either in TyCoRep or IfaceType.
 
 -}
-
--- | This variant preserves any use of TYPE in a type, effectively
--- locally setting -fprint-explicit-runtime-reps.
-pprWithTYPE :: Type -> SDoc
-pprWithTYPE ty = updSDocDynFlags (flip gopt_set Opt_PrintExplicitRuntimeReps) $
-                 ppr ty
-
 
 -- | Does a 'TyCon' (that is applied to some number of arguments) need to be
 -- ascribed with an explicit kind signature to resolve ambiguity if rendered as

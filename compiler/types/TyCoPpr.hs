@@ -13,6 +13,8 @@ module TyCoPpr
         pprThetaArrowTy, pprClassPred,
         pprKind, pprParendKind, pprTyLit,
         pprDataCons, pprWithExplicitKindsWhen,
+        pprWithTYPE, pprSourceTyCon,
+
 
         -- * Pretty-printing coercions
         pprCo, pprParendCo,
@@ -45,7 +47,8 @@ import IfaceType
 import VarSet
 import VarEnv
 
-import DynFlags   ( gopt_set, GeneralFlag(Opt_PrintExplicitKinds) )
+import DynFlags   ( gopt_set,
+                    GeneralFlag(Opt_PrintExplicitKinds, Opt_PrintExplicitRuntimeReps) )
 import Outputable
 import BasicTypes ( PprPrec(..), topPrec, sigPrec, opPrec
                   , funPrec, appPrec, maybeParen )
@@ -313,3 +316,22 @@ pprWithExplicitKindsWhen b
   = updSDocDynFlags $ \dflags ->
       if b then gopt_set dflags Opt_PrintExplicitKinds
            else dflags
+
+-- | This variant preserves any use of TYPE in a type, effectively
+-- locally setting -fprint-explicit-runtime-reps.
+pprWithTYPE :: Type -> SDoc
+pprWithTYPE ty = updSDocDynFlags (flip gopt_set Opt_PrintExplicitRuntimeReps) $
+                 ppr ty
+
+-- | Pretty prints a 'TyCon', using the family instance in case of a
+-- representation tycon.  For example:
+--
+-- > data T [a] = ...
+--
+-- In that case we want to print @T [a]@, where @T@ is the family 'TyCon'
+pprSourceTyCon :: TyCon -> SDoc
+pprSourceTyCon tycon
+  | Just (fam_tc, tys) <- tyConFamInst_maybe tycon
+  = ppr $ fam_tc `TyConApp` tys        -- can't be FunTyCon
+  | otherwise
+  = ppr tycon
