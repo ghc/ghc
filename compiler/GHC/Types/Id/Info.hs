@@ -86,7 +86,8 @@ module GHC.Types.Id.Info (
 
 import GhcPrelude
 
-import GHC.Core
+import GHC.Core hiding( hasCoreUnfolding )
+import GHC.Core( hasCoreUnfolding )
 
 import GHC.Core.Class
 import {-# SOURCE #-} PrimOp (PrimOp)
@@ -567,8 +568,8 @@ zapFragileInfo info@(IdInfo { occInfo = occ, unfoldingInfo = unf })
 
 zapFragileUnfolding :: Unfolding -> Unfolding
 zapFragileUnfolding unf
- | isFragileUnfolding unf = noUnfolding
- | otherwise              = unf
+ | hasCoreUnfolding unf = noUnfolding
+ | otherwise            = unf
 
 zapUnfolding :: Unfolding -> Unfolding
 -- Squash all unfolding info, preserving only evaluated-ness

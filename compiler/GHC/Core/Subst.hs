@@ -618,7 +618,7 @@ substIdInfo subst new_id info
   where
     old_rules     = ruleInfo info
     old_unf       = unfoldingInfo info
-    nothing_to_do = isEmptyRuleInfo old_rules && not (isFragileUnfolding old_unf)
+    nothing_to_do = isEmptyRuleInfo old_rules && not (hasCoreUnfolding old_unf)
 
 ------------------
 -- | Substitutes for the 'Id's within an unfolding

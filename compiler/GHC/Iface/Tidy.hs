@@ -1239,8 +1239,7 @@ tidyTopIdInfo dflags rhs_tidy_env name orig_rhs tidy_rhs idinfo show_unfold
       | otherwise
       = minimal_unfold_info
     minimal_unfold_info = zapUnfolding unf_info
-    unf_from_rhs = mkTopUnfolding dflags is_bot tidy_rhs
-    is_bot = isBottomingSig final_sig
+    unf_from_rhs = mkFinalUnfolding dflags InlineRhs final_sig tidy_rhs
     -- NB: do *not* expose the worker if show_unfold is off,
     --     because that means this thing is a loop breaker or
     --     marked NOINLINE or something like that

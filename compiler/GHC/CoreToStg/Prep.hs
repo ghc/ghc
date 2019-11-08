@@ -347,10 +347,7 @@ The way we fix this is to:
  * In cloneBndr, drop all unfoldings/rules
 
  * In deFloatTop, run a simple dead code analyser on each top-level
-   RHS to drop the dead local bindings. For that call to OccAnal, we
-   disable the binder swap, else the occurrence analyser sometimes
-   introduces new let bindings for cased binders, which lead to the bug
-   in #5433.
+   RHS to drop the dead local bindings.
 
 The reason we don't just OccAnal the whole output of CorePrep is that
 the tidier ensures that all top-level binders are GlobalIds, so they
@@ -1316,14 +1313,13 @@ deFloatTop :: Floats -> [CoreBind]
 deFloatTop (Floats _ floats)
   = foldrOL get [] floats
   where
-    get (FloatLet b) bs = occurAnalyseRHSs b : bs
-    get (FloatCase body var _ _ _) bs
-      = occurAnalyseRHSs (NonRec var body) : bs
+    get (FloatLet b)               bs = get_bind b                 : bs
+    get (FloatCase body var _ _ _) bs = get_bind (NonRec var body) : bs
     get b _ = pprPanic "corePrepPgm" (ppr b)
 
     -- See Note [Dead code in CorePrep]
-    occurAnalyseRHSs (NonRec x e) = NonRec x (occurAnalyseExpr_NoBinderSwap e)
-    occurAnalyseRHSs (Rec xes)    = Rec [(x, occurAnalyseExpr_NoBinderSwap e) | (x, e) <- xes]
+    get_bind (NonRec x e) = NonRec x (occurAnalyseExpr e)
+    get_bind (Rec xes)    = Rec [(x, occurAnalyseExpr e) | (x, e) <- xes]
 
 ---------------------------------------------------------------------------
 

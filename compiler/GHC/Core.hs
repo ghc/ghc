@@ -69,7 +69,7 @@ module GHC.Core (
         maybeUnfoldingTemplate, otherCons,
         isValueUnfolding, isEvaldUnfolding, isCheapUnfolding,
         isExpandableUnfolding, isConLikeUnfolding, isCompulsoryUnfolding,
-        isStableUnfolding, isFragileUnfolding, hasSomeUnfolding,
+        isStableUnfolding, hasCoreUnfolding, hasSomeUnfolding,
         isBootUnfolding,
         canUnfold, neverUnfoldGuidance, isStableSource,
 
@@ -1739,14 +1739,13 @@ neverUnfoldGuidance :: UnfoldingGuidance -> Bool
 neverUnfoldGuidance UnfNever = True
 neverUnfoldGuidance _        = False
 
-isFragileUnfolding :: Unfolding -> Bool
--- An unfolding is fragile if it mentions free variables or
--- is otherwise subject to change.  A robust one can be kept.
--- See Note [Fragile unfoldings]
-isFragileUnfolding (CoreUnfolding {}) = True
-isFragileUnfolding (DFunUnfolding {}) = True
-isFragileUnfolding _                  = False
-  -- NoUnfolding, BootUnfolding, OtherCon are all non-fragile
+hasCoreUnfolding :: Unfolding -> Bool
+-- An unfolding "has Core" if it contains a Core expression, which
+-- may mention free variables. See Note [Fragile unfoldings]
+hasCoreUnfolding (CoreUnfolding {}) = True
+hasCoreUnfolding (DFunUnfolding {}) = True
+hasCoreUnfolding _                  = False
+  -- NoUnfolding, BootUnfolding, OtherCon have no Core
 
 canUnfold :: Unfolding -> Bool
 canUnfold (CoreUnfolding { uf_guidance = g }) = not (neverUnfoldGuidance g)

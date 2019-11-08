@@ -42,7 +42,6 @@ module GHC.Types.Id.Make (
 
 import GhcPrelude
 
-import GHC.Core.Rules
 import TysPrim
 import TysWiredIn
 import GHC.Core.Op.ConstantFold
@@ -52,7 +51,8 @@ import GHC.Core.FamInstEnv
 import GHC.Core.Coercion
 import TcType
 import GHC.Core.Make
-import GHC.Core.Utils  ( mkCast, mkDefaultCase )
+import GHC.Core.FVs     ( mkRuleInfo )
+import GHC.Core.Utils   ( mkCast, mkDefaultCase )
 import GHC.Core.Unfold
 import GHC.Types.Literal
 import GHC.Core.TyCon
