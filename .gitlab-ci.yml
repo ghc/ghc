@@ -204,13 +204,13 @@ lint-release-changelogs:
     - cd _build/bindist/ghc-*/ && ./configure --prefix=$TOP/_build/install && make install && cd ../../../
     - |
       # Prepare to push git notes.
-      METRICS_FILE=$CI_PROJECT_DIR/performance-metrics.tsv
+      export METRICS_FILE=$CI_PROJECT_DIR/performance-metrics.tsv
       git config user.email "ben+ghc-ci@smart-cactus.org"
       git config user.name "GHC GitLab CI"
-    - hadrian/build.cabal.sh --flavour=$FLAVOUR -j`mk/detect-cpu-count.sh` --docs=no-sphinx test --summary-junit=./junit.xml --test-compiler=$TOP/_build/install/bin/ghc || (METRICS_FILE=$METRICS_FILE .gitlab/push-test-metrics.sh && false)
+    - hadrian/build.cabal.sh --flavour=$FLAVOUR -j`mk/detect-cpu-count.sh` --docs=no-sphinx test --summary-junit=./junit.xml --test-compiler=$TOP/_build/install/bin/ghc || (.gitlab/push-test-metrics.sh && false)
     - |
       # Push git notes.
-      METRICS_FILE=$METRICS_FILE .gitlab/push-test-metrics.sh
+      .gitlab/push-test-metrics.sh
   cache:
     key: hadrian
     paths:
