@@ -1,5 +1,8 @@
 # Changelog for [`base` package](http://hackage.haskell.org/package/base)
 
+## 4.15.0.0 *TBA*
+  * Add `IsList` instances for `ZipList`s.
+
 ## 4.14.0.0 *TBA*
   * Bundled with GHC *TBA*
 

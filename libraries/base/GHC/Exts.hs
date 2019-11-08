@@ -211,11 +211,11 @@ instance IsList [a] where
   fromList = id
   toList = id
 
--- | @since
+-- | @since 4.15.0.0
 instance IsList (ZipList a) where
-  type (Item (ZipList a)) = a
+  type Item (ZipList a) = a
   fromList = ZipList
-  toList (ZipList as) = as
+  toList = getZipList
 
 -- | @since 4.9.0.0
 instance IsList (NonEmpty a) where
