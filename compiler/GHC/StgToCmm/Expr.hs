@@ -643,7 +643,7 @@ cgAlts gc_plan bndr (AlgAlt tycon) alts
                                         if p a
                                         then (if null n then l else a : y, n)
                                         else (y, if null y then l else a : n)
-              (via_ptr, via_info) = partition_ ((< maxpt) . fst) branches'
+              ~(via_ptr, via_info) = partition_ ((< maxpt) . fst) branches'
               small = isSmallFamily dflags fam_sz
 
                 -- Is the constructor tag in the node reg?
