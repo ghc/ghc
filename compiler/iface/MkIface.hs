@@ -174,9 +174,10 @@ mkFullIface hsc_env cg_guts partial_iface = do
     let tidy_rules = tidyRules (cg2_tidy_env cg_guts) (cg2_trimmed_rules cg_guts)
     let tidy_cls_insts = mkFinalClsInsts type_env (mg_insts (cg2_mod_guts cg_guts))
 
-    dumpIfSet_any dflags [Opt_D_dump_simpl, Opt_D_dump_rules]
-      (showSDoc dflags (text "Tidy Rules"))
-      (pprRules tidy_rules)
+    unless (null tidy_rules) $
+      dumpIfSet_any dflags [Opt_D_dump_simpl, Opt_D_dump_rules]
+        (showSDoc dflags (text "Tidy Rules"))
+        (pprRules tidy_rules)
 
     let mod_details = ModDetails
           { md_types = tidy_type_env
