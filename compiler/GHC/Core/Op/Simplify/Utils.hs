@@ -1872,22 +1872,26 @@ Historical note: if you use let-bindings instead of a substitution, beware of th
 
 prepareAlts tries these things:
 
-1.  Eliminate alternatives that cannot match, including the
-    DEFAULT alternative.
+1.  filterAlts: eliminate alternatives that cannot match, including
+    the DEFAULT alternative.  Here "cannot match" includes knowledge
+    from GADTs
 
-2.  If the DEFAULT alternative can match only one possible constructor,
-    then make that constructor explicit.
+2.  refineDefaultAlt: if the DEFAULT alternative can match only one
+    possible constructor, then make that constructor explicit.
     e.g.
         case e of x { DEFAULT -> rhs }
      ===>
         case e of x { (a,b) -> rhs }
     where the type is a single constructor type.  This gives better code
     when rhs also scrutinises x or e.
+    See CoreUtils Note [Refine DEFAULT case alternatives]
 
-3. Returns a list of the constructors that cannot holds in the
+3. combineIdenticalAlts: combine identical alternatives into a DEFAULT.
+   See CoreUtils Note [Combine identical alternatives], which also
+   says why we do this on InAlts not on OutAlts
+
+4. Returns a list of the constructors that cannot holds in the
    DEFAULT alternative (if there is one)
-
-Here "cannot match" includes knowledge from GADTs
 
 It's a good idea to do this stuff before simplifying the alternatives, to
 avoid simplifying alternatives we know can't happen, and to come up with
