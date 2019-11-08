@@ -63,7 +63,6 @@ import GHC.Types.Name
 import GHC.Types.Name.Env
 import GHC.Types.Name.Set
 import GHC.Core.Op.OccurAnal ( occurAnalyseExpr )
-import GHC.Types.Demand
 import GHC.Types.Module
 import GHC.Types.Unique.FM
 import GHC.Types.Unique.Supply
@@ -1506,14 +1505,12 @@ tcUnfolding toplvl name _ info (IfCoreUnfold stable if_expr)
                       | otherwise = InlineRhs
         ; return $ case mb_expr of
             Nothing -> NoUnfolding
-            Just expr -> mkUnfolding dflags unf_src
-                           True {- Top level -}
-                           (isBottomingSig strict_sig)
-                           expr
+            Just expr -> mkFinalUnfolding dflags unf_src strict_sig expr
         }
   where
      -- Strictness should occur before unfolding!
     strict_sig = strictnessInfo info
+
 tcUnfolding toplvl name _ _ (IfCompulsory if_expr)
   = do  { mb_expr <- tcPragExpr True toplvl name if_expr
         ; return (case mb_expr of

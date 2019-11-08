@@ -1,7 +1,7 @@
 
 ==================== Tidy Core ====================
 Result size of Tidy Core
-  = {terms: 114, types: 53, coercions: 0, joins: 0/0}
+  = {terms: 106, types: 47, coercions: 0, joins: 0/0}
 
 -- RHS size: {terms: 6, types: 3, coercions: 0, joins: 0/0}
 T7360.$WFoo3 [InlPrag=INLINE[0]] :: Int -> Foo
@@ -25,21 +25,13 @@ fun1 [InlPrag=NOINLINE] :: Foo -> ()
 fun1 = \ (x :: Foo) -> case x of { __DEFAULT -> GHC.Tuple.() }
 
 -- RHS size: {terms: 2, types: 0, coercions: 0, joins: 0/0}
-T7360.fun5 :: ()
+T7360.fun4 :: ()
 [GblId,
  Unf=Unf{Src=<vanilla>, TopLvl=True, Value=False, ConLike=False,
          WorkFree=False, Expandable=False, Guidance=IF_ARGS [] 20 0}]
-T7360.fun5 = fun1 T7360.Foo1
+T7360.fun4 = fun1 T7360.Foo1
 
--- RHS size: {terms: 2, types: 0, coercions: 0, joins: 0/0}
-T7360.fun4 :: Int
-[GblId,
- Cpr=m1,
- Unf=Unf{Src=<vanilla>, TopLvl=True, Value=True, ConLike=True,
-         WorkFree=True, Expandable=True, Guidance=IF_ARGS [] 10 20}]
-T7360.fun4 = GHC.Types.I# 0#
-
--- RHS size: {terms: 16, types: 13, coercions: 0, joins: 0/0}
+-- RHS size: {terms: 11, types: 8, coercions: 0, joins: 0/0}
 fun2 :: forall {a}. [a] -> ((), Int)
 [GblId,
  Arity=1,
@@ -48,24 +40,18 @@ fun2 :: forall {a}. [a] -> ((), Int)
  Unf=Unf{Src=InlineStable, TopLvl=True, Value=True, ConLike=True,
          WorkFree=True, Expandable=True,
          Guidance=ALWAYS_IF(arity=1,unsat_ok=True,boring_ok=False)
-         Tmpl= \ (@a) (x [Occ=Once!] :: [a]) ->
-                 (T7360.fun5,
-                  case x of wild [Occ=Once] {
-                    [] -> T7360.fun4;
-                    : _ [Occ=Dead] _ [Occ=Dead] ->
-                      case GHC.List.$wlenAcc @a wild 0# of ww2 [Occ=Once] { __DEFAULT ->
-                      GHC.Types.I# ww2
-                      }
+         Tmpl= \ (@a) (x [Occ=Once] :: [a]) ->
+                 (T7360.fun4,
+                  case x of wild [Occ=Once] { __DEFAULT ->
+                  case GHC.List.$wlenAcc @a wild 0# of ww2 [Occ=Once] { __DEFAULT ->
+                  GHC.Types.I# ww2
+                  }
                   })}]
 fun2
   = \ (@a) (x :: [a]) ->
-      (T7360.fun5,
-       case x of wild {
-         [] -> T7360.fun4;
-         : ds ds1 ->
-           case GHC.List.$wlenAcc @a wild 0# of ww2 { __DEFAULT ->
-           GHC.Types.I# ww2
-           }
+      (T7360.fun4,
+       case GHC.List.$wlenAcc @a x 0# of ww2 { __DEFAULT ->
+       GHC.Types.I# ww2
        })
 
 -- RHS size: {terms: 1, types: 0, coercions: 0, joins: 0/0}
