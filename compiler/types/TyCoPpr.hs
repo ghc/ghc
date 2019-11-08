@@ -1,7 +1,10 @@
 -- | Pretty-printing types and coercions.
 module TyCoPpr
   (
-        -- * Pretty-printing
+        -- * Precedence
+        PprPrec(..), topPrec, sigPrec, opPrec, funPrec, appPrec, maybeParen,
+
+        -- * Pretty-printing types
         pprType, pprParendType, pprPrecType, pprPrecTypeX,
         pprTypeApp, pprTCvBndr, pprTCvBndrs,
         pprSigmaType,
@@ -9,12 +12,15 @@ module TyCoPpr
         pprTyVar, pprTyVars,
         pprThetaArrowTy, pprClassPred,
         pprKind, pprParendKind, pprTyLit,
-        PprPrec(..), topPrec, sigPrec, opPrec, funPrec, appPrec, maybeParen,
         pprDataCons, pprWithExplicitKindsWhen,
 
+        -- * Pretty-printing coercions
         pprCo, pprParendCo,
 
         debugPprType,
+
+        -- * Pretty-printing 'TyThing's
+        pprTyThingCategory, pprShortTyThing,
   ) where
 
 import GhcPrelude

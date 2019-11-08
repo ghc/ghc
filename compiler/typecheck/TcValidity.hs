@@ -29,6 +29,7 @@ import TcSimplify ( simplifyAmbiguityCheck )
 import ClsInst    ( matchGlobalInst, ClsInstResult(..), InstanceWhat(..), AssocInstInfo(..) )
 import TyCoFVs
 import TyCoRep
+import TyCoPpr
 import TcType hiding ( sizeType, sizeTypes )
 import TysWiredIn ( heqTyConName, eqTyConName, coercibleTyConName )
 import PrelNames
