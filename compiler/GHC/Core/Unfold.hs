@@ -22,9 +22,9 @@ find, unsurprisingly, a Core expression.
 module GHC.Core.Unfold (
         Unfolding, UnfoldingGuidance,   -- Abstract types
 
-        noUnfolding, mkImplicitUnfolding,
+        noUnfolding,
         mkUnfolding, mkCoreUnfolding,
-        mkTopUnfolding, mkSimpleUnfolding, mkWorkerUnfolding,
+        mkFinalUnfolding, mkSimpleUnfolding, mkWorkerUnfolding,
         mkInlineUnfolding, mkInlineUnfoldingWithArity,
         mkInlinableUnfolding, mkWwInlineRule,
         mkCompulsoryUnfolding, mkDFunUnfolding,
@@ -48,12 +48,12 @@ import GhcPrelude
 
 import GHC.Driver.Session
 import GHC.Core
-import GHC.Core.Op.OccurAnal ( occurAnalyseExpr_NoBinderSwap )
+import GHC.Core.Op.OccurAnal ( occurAnalyseExpr )
 import GHC.Core.SimpleOpt
 import GHC.Core.Arity   ( manifestArity )
 import GHC.Core.Utils
 import GHC.Types.Id
-import GHC.Types.Demand ( isBottomingSig )
+import GHC.Types.Demand ( StrictSig, isBottomingSig )
 import GHC.Core.DataCon
 import GHC.Types.Literal
 import PrimOp
@@ -80,14 +80,22 @@ import Data.List
 ************************************************************************
 -}
 
-mkTopUnfolding :: DynFlags -> Bool -> CoreExpr -> Unfolding
-mkTopUnfolding dflags is_bottoming rhs
-  = mkUnfolding dflags InlineRhs True is_bottoming rhs
+mkFinalUnfolding :: DynFlags -> UnfoldingSource -> StrictSig -> CoreExpr -> Unfolding
+-- "Final" in the sense that this is a GlobalId that will not be further
+-- simplified; so the unfolding should be occurrence-analysed
+mkFinalUnfolding dflags src strict_sig expr
+  = mkUnfolding dflags src
+                True {- Top level -}
+                (isBottomingSig strict_sig)
+                expr
 
-mkImplicitUnfolding :: DynFlags -> CoreExpr -> Unfolding
--- For implicit Ids, do a tiny bit of optimising first
-mkImplicitUnfolding dflags expr
-  = mkTopUnfolding dflags False (simpleOptExpr dflags expr)
+mkCompulsoryUnfolding :: CoreExpr -> Unfolding
+mkCompulsoryUnfolding expr         -- Used for things that absolutely must be unfolded
+  = mkCoreUnfolding InlineCompulsory True
+                    (simpleOptExpr unsafeGlobalDynFlags expr)
+                    (UnfWhen { ug_arity = 0    -- Arity of unfolding doesn't matter
+                             , ug_unsat_ok = unSaturatedOk, ug_boring_ok = boringCxtOk })
+
 
 -- Note [Top-level flag on inline rules]
 -- ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
@@ -103,7 +111,7 @@ mkDFunUnfolding :: [Var] -> DataCon -> [CoreExpr] -> Unfolding
 mkDFunUnfolding bndrs con ops
   = DFunUnfolding { df_bndrs = bndrs
                   , df_con = con
-                  , df_args = map occurAnalyseExpr_NoBinderSwap ops }
+                  , df_args = map occurAnalyseExpr ops }
                   -- See Note [Occurrence analysis of unfoldings]
 
 mkWwInlineRule :: DynFlags -> CoreExpr -> Arity -> Unfolding
@@ -112,13 +120,6 @@ mkWwInlineRule dflags expr arity
                    (simpleOptExpr dflags expr)
                    (UnfWhen { ug_arity = arity, ug_unsat_ok = unSaturatedOk
                             , ug_boring_ok = boringCxtNotOk })
-
-mkCompulsoryUnfolding :: CoreExpr -> Unfolding
-mkCompulsoryUnfolding expr         -- Used for things that absolutely must be unfolded
-  = mkCoreUnfolding InlineCompulsory True
-                    (simpleOptExpr unsafeGlobalDynFlags expr)
-                    (UnfWhen { ug_arity = 0    -- Arity of unfolding doesn't matter
-                             , ug_unsat_ok = unSaturatedOk, ug_boring_ok = boringCxtOk })
 
 mkWorkerUnfolding :: DynFlags -> (CoreExpr -> CoreExpr) -> Unfolding -> Unfolding
 -- See Note [Worker-wrapper for INLINABLE functions] in GHC.Core.Op.WorkWrap
@@ -309,11 +310,27 @@ I'm a bit worried that it's possible for the same kind of problem
 to arise for non-0-ary functions too, but let's wait and see.
 -}
 
+mkUnfolding :: DynFlags -> UnfoldingSource
+            -> Bool       -- Is top-level
+            -> Bool       -- Definitely a bottoming binding
+                          -- (only relevant for top-level bindings)
+            -> CoreExpr
+            -> Unfolding
+-- Calculates unfolding guidance
+-- Occurrence-analyses the expression before capturing it
+mkUnfolding dflags src top_lvl is_bottoming expr
+  = mkCoreUnfolding src top_lvl expr guidance
+  where
+    is_top_bottoming = top_lvl && is_bottoming
+    guidance         = calcUnfoldingGuidance dflags is_top_bottoming expr
+        -- NB: *not* (calcUnfoldingGuidance (occurAnalyseExpr expr))!
+        -- See Note [Calculate unfolding guidance on the non-occ-anal'd expression]
+
 mkCoreUnfolding :: UnfoldingSource -> Bool -> CoreExpr
                 -> UnfoldingGuidance -> Unfolding
 -- Occurrence-analyses the expression before capturing it
 mkCoreUnfolding src top_lvl expr guidance
-  = CoreUnfolding { uf_tmpl         = occurAnalyseExpr_NoBinderSwap expr,
+  = CoreUnfolding { uf_tmpl         = occurAnalyseExpr expr,
                       -- See Note [Occurrence analysis of unfoldings]
                     uf_src          = src,
                     uf_is_top       = top_lvl,
@@ -323,29 +340,6 @@ mkCoreUnfolding src top_lvl expr guidance
                     uf_expandable   = exprIsExpandable expr,
                     uf_guidance     = guidance }
 
-mkUnfolding :: DynFlags -> UnfoldingSource
-            -> Bool       -- Is top-level
-            -> Bool       -- Definitely a bottoming binding
-                          -- (only relevant for top-level bindings)
-            -> CoreExpr
-            -> Unfolding
--- Calculates unfolding guidance
--- Occurrence-analyses the expression before capturing it
-mkUnfolding dflags src is_top_lvl is_bottoming expr
-  = CoreUnfolding { uf_tmpl         = occurAnalyseExpr_NoBinderSwap expr,
-                      -- See Note [Occurrence analysis of unfoldings]
-                    uf_src          = src,
-                    uf_is_top       = is_top_lvl,
-                    uf_is_value     = exprIsHNF        expr,
-                    uf_is_conlike   = exprIsConLike    expr,
-                    uf_expandable   = exprIsExpandable expr,
-                    uf_is_work_free = exprIsWorkFree   expr,
-                    uf_guidance     = guidance }
-  where
-    is_top_bottoming = is_top_lvl && is_bottoming
-    guidance         = calcUnfoldingGuidance dflags is_top_bottoming expr
-        -- NB: *not* (calcUnfoldingGuidance (occurAnalyseExpr_NoBinderSwap expr))!
-        -- See Note [Calculate unfolding guidance on the non-occ-anal'd expression]
 
 {-
 Note [Occurrence analysis of unfoldings]
@@ -365,39 +359,6 @@ the unfolding in question was a DFun unfolding.
 But more generally, the simplifier is designed on the
 basis that it is looking at occurrence-analysed expressions, so better
 ensure that they actually are.
-
-We use occurAnalyseExpr_NoBinderSwap instead of occurAnalyseExpr;
-see Note [No binder swap in unfoldings].
-
-Note [No binder swap in unfoldings]
-~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
-The binder swap can temporarily violate Core Lint, by assigning
-a LocalId binding to a GlobalId. For example, if A.foo{r872}
-is a GlobalId with unique r872, then
-
- case A.foo{r872} of bar {
-   K x -> ...(A.foo{r872})...
- }
-
-gets transformed to
-
-  case A.foo{r872} of bar {
-    K x -> let foo{r872} = bar
-           in ...(A.foo{r872})...
-
-This is usually not a problem, because the simplifier will transform
-this to:
-
-  case A.foo{r872} of bar {
-    K x -> ...(bar)...
-
-However, after occurrence analysis but before simplification, this extra 'let'
-violates the Core Lint invariant that we do not have local 'let' bindings for
-GlobalIds.  That seems (just) tolerable for the occurrence analysis that happens
-just before the Simplifier, but not for unfoldings, which are Linted
-independently.
-As a quick workaround, we disable binder swap in this module.
-See #16288 and #16296 for further plans.
 
 Note [Calculate unfolding guidance on the non-occ-anal'd expression]
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~

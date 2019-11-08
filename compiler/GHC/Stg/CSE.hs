@@ -92,6 +92,7 @@ import GHC.Core.DataCon
 import GHC.Types.Id
 import GHC.Stg.Syntax
 import Outputable
+import GHC.Types.Basic (isWeakLoopBreaker)
 import GHC.Types.Var.Env
 import GHC.Core (AltCon(..))
 import Data.List (mapAccumL)
@@ -391,6 +392,7 @@ stgCsePairs env0 ((b,e):pairs)
 stgCseRhs :: CseEnv -> OutId -> InStgRhs -> (Maybe (OutId, OutStgRhs), CseEnv)
 stgCseRhs env bndr (StgRhsCon ccs dataCon args)
     | Just other_bndr <- envLookup dataCon args' env
+    , not (isWeakLoopBreaker (idOccInfo bndr)) -- See Note [Care with loop breakers]
     = let env' = addSubst bndr other_bndr env
       in (Nothing, env')
     | otherwise
@@ -399,6 +401,7 @@ stgCseRhs env bndr (StgRhsCon ccs dataCon args)
           pair = (bndr, StgRhsCon ccs dataCon args')
       in (Just pair, env')
   where args' = substArgs env args
+
 stgCseRhs env bndr (StgRhsClosure ext ccs upd args body)
     = let (env1, args') = substBndrs env args
           env2 = forgetCse env1 -- See note [Free variables of an StgClosure]
@@ -415,6 +418,21 @@ mkStgCase scrut bndr ty alts | all isBndr alts = scrut
     isBndr (_, _, StgApp f []) = f == bndr
     isBndr _                   = False
 
+
+{- Note [Care with loop breakers]
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+When doing CSE on a letrec we must be careful about loop
+breakers.  Consider
+  rec { y = K z
+      ; z = K z }
+Now if, somehow (and wrongly)), y and z are both marked as
+loop-breakers, we do *not* want to drop the (z = K z) binding
+in favour of a substitution (z :-> y).
+
+I think this bug will only show up if the loop-breaker-ness is done
+wrongly (itself a bug), but it still seems better to do the right
+thing regardless.
+-}
 
 -- Utilities
 

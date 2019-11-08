@@ -35,7 +35,7 @@ module GHC.Core.FVs (
         idFVs,
         idRuleVars, idRuleRhsVars, stableUnfoldingVars,
         ruleRhsFreeVars, ruleFreeVars, rulesFreeVars,
-        rulesFreeVarsDSet,
+        rulesFreeVarsDSet, mkRuleInfo,
         ruleLhsFreeIds, ruleLhsFreeIdsList,
 
         expr_fvs,
@@ -468,6 +468,11 @@ rulesFVs = mapUnionFV ruleFVs
 -- returned as a deterministic set
 rulesFreeVarsDSet :: [CoreRule] -> DVarSet
 rulesFreeVarsDSet rules = fvDVarSet $ rulesFVs rules
+
+-- | Make a 'RuleInfo' containing a number of 'CoreRule's, suitable
+-- for putting into an 'IdInfo'
+mkRuleInfo :: [CoreRule] -> RuleInfo
+mkRuleInfo rules = RuleInfo rules (rulesFreeVarsDSet rules)
 
 idRuleRhsVars :: (Activation -> Bool) -> Id -> VarSet
 -- Just the variables free on the *rhs* of a rule

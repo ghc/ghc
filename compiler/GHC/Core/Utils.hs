@@ -696,7 +696,7 @@ filterAlts _tycon inst_tys imposs_cons alts
     impossible_alt _  _                         = False
 
 -- | Refine the default alternative to a 'DataAlt', if there is a unique way to do so.
--- See Note [Refine Default Alts]
+-- See Note [Refine DEFAULT case alternatives]
 refineDefaultAlt :: [Unique]          -- ^ Uniques for constructing new binders
                  -> TyCon             -- ^ Type constructor of scrutinee's type
                  -> [Type]            -- ^ Type arguments of scrutinee's type
@@ -739,95 +739,62 @@ refineDefaultAlt us tycon tys imposs_deflt_cons all_alts
   | otherwise      -- The common case
   = (False, all_alts)
 
-{- Note [Refine Default Alts]
-
-refineDefaultAlt replaces the DEFAULT alt with a constructor if there is one
-possible value it could be.
+{- Note [Refine DEFAULT case alternatives]
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+refineDefaultAlt replaces the DEFAULT alt with a constructor if there
+is one possible value it could be.
 
 The simplest example being
+    foo :: () -> ()
+    foo x = case x of !_ -> ()
+which rewrites to
+    foo :: () -> ()
+    foo x = case x of () -> ()
 
-foo :: () -> ()
-foo x = case x of !_ -> ()
+There are two reasons in general why replacing a DEFAULT alternative
+with a specific constructor is desirable.
 
-rewrites to
+1. We can simplify inner expressions.  For example
 
-foo :: () -> ()
-foo x = case x of () -> ()
+       data Foo = Foo1 ()
 
-There are two reasons in general why this is desirable.
+       test :: Foo -> ()
+       test x = case x of
+                  DEFAULT -> mid (case x of
+                                    Foo1 x1 -> x1)
 
-1. We can simplify inner expressions
+   refineDefaultAlt fills in the DEFAULT here with `Foo ip1` and then
+   x becomes bound to `Foo ip1` so is inlined into the other case
+   which causes the KnownBranch optimisation to kick in. If we don't
+   refine DEFAULT to `Foo ip1`, we are left with both case expressions.
 
-In this example we can eliminate the inner case by refining the outer case.
-If we don't refine it, we are left with both case expressions.
+2. combineIdenticalAlts does a better job. For exapple (Simon Jacobi)
+       data D = C0 | C1 | C2
 
-```
-{-# LANGUAGE BangPatterns #-}
-module Test where
+       case e of
+         DEFAULT -> e0
+         C0      -> e1
+         C1      -> e1
 
-mid x = x
-{-# NOINLINE mid #-}
+   When we apply combineIdenticalAlts to this expression, it can't
+   combine the alts for C0 and C1, as we already have a default case.
+   But if we apply refineDefaultAlt first, we get
+       case e of
+         C0 -> e1
+         C1 -> e1
+         C2 -> e0
+   and combineIdenticalAlts can turn that into
+       case e of
+         DEFAULT -> e1
+         C2 -> e0
 
-data Foo = Foo1 ()
+   It isn't obvious that refineDefaultAlt does this but if you look
+   at its one call site in GHC.Core.Op.Simplify.Utils then the
+   `imposs_deflt_cons` argument is populated with constructors which
+   are matched elsewhere.
 
-test :: Foo -> ()
-test x =
-  case x of
-    !_ -> mid (case x of
-                Foo1 x1 -> x1)
-
-```
-
-refineDefaultAlt fills in the DEFAULT here with `Foo ip1` and then x
-becomes bound to `Foo ip1` so is inlined into the other case which
-causes the KnownBranch optimisation to kick in.
-
-
-2. combineIdenticalAlts does a better job
-
-Simon Jakobi also points out that that combineIdenticalAlts will do a better job
-if we refine the DEFAULT first.
-
-```
-data D = C0 | C1 | C2
-
-case e of
-   DEFAULT -> e0
-   C0 -> e1
-   C1 -> e1
-```
-
-When we apply combineIdenticalAlts to this expression, it can't
-combine the alts for C0 and C1, as we already have a default case.
-
-If we apply refineDefaultAlt first, we get
-
-```
-case e of
-  C0 -> e1
-  C1 -> e1
-  C2 -> e0
-```
-
-and combineIdenticalAlts can turn that into
-
-```
-case e of
-  DEFAULT -> e1
-  C2 -> e0
-```
-
-It isn't obvious that refineDefaultAlt does this but if you look at its one call
-site in GHC.Core.Op.Simplify.Utils then the `imposs_deflt_cons` argument is
-populated with constructors which are matched elsewhere.
-
--}
-
-
-
-
-{- Note [Combine identical alternatives]
-~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+Note [Combine identical alternatives]
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 If several alternatives are identical, merge them into a single
 DEFAULT alternative.  I've occasionally seen this making a big
 difference:
