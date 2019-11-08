@@ -321,8 +321,8 @@ RHSs, so that they print nicely in interfaces.
 -}
 
 tidyProgram2 :: HscEnv -> ModGuts -> IO CgGuts2
-tidyProgram2 hsc_env mod_guts = do
-
+tidyProgram2 hsc_env mod_guts =
+  Err.withTiming (hsc_dflags hsc_env) (text "CoreTidy" <+> brackets (ppr (mg_module mod_guts))) (const ()) $ do
     let ModGuts { mg_module = mod
                 , mg_tcs = tcs
                 , mg_foreign = foreign_stubs
@@ -333,6 +333,7 @@ tidyProgram2 hsc_env mod_guts = do
                 , mg_binds = binds
                 , mg_rules = rules
                 , mg_fam_insts = fam_insts
+                , mg_rdr_env = rdr_env
                 } = mod_guts
 
     let dflags = hsc_dflags hsc_env
@@ -384,6 +385,21 @@ tidyProgram2 hsc_env mod_guts = do
     let final_tcs = filterOut (isWiredInName . getName) tcs
     -- See Note [Drop wired-in things]
     let type_env = typeEnvFromEntities final_ids final_tcs fam_insts
+
+    let print_unqual = mkPrintUnqualified dflags rdr_env
+    -- TODO (osa): We can't dump rules here as we tidy them later (after code
+    -- gen). Is this going to be a problem?
+    -- Rules are dumped in mkFullIface
+    endPassIO hsc_env print_unqual CoreTidy all_tidy_binds []
+
+    -- Print one-line size info
+    let cs = coreBindsStats tidy_binds
+    Err.dumpIfSet_dyn dflags Opt_D_dump_core_stats "Core Stats"
+            (text "Tidy size (terms,types,coercions)"
+             <+> ppr (moduleName mod) <> colon
+             <+> int (cs_tm cs)
+             <+> int (cs_ty cs)
+             <+> int (cs_co cs))
 
     return CgGuts2
       { cg2_module = mod
