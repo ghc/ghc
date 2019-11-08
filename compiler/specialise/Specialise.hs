@@ -576,7 +576,7 @@ Hence, the invariant is this:
 ************************************************************************
 -}
 
--- | Specialise calls to type-class overloaded functions occuring in a program.
+-- | Specialise calls to type-class overloaded functions occurring in a program.
 specProgram :: ModGuts -> CoreM ModGuts
 specProgram guts@(ModGuts { mg_module = this_mod
                           , mg_rules = local_rules
@@ -2107,7 +2107,7 @@ Consider
 We gather the call info for (f @T $df), and we don't want to drop it
 when we come across the binding for $df.  So we add $df to the floats
 and continue.  But then we have to add $c== to the floats, and so on.
-These all float above the binding for 'f', and and now we can
+These all float above the binding for 'f', and now we can
 successfully specialise 'f'.
 
 So the DictBinds in (ud_binds :: Bag DictBind) may contain
