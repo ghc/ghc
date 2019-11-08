@@ -770,9 +770,8 @@ validate-x86_64-linux-fedora27:
       bash -c './configure --enable-tarballs-autodownload GHC=`pwd`/toolchain/bin/ghc HAPPY=`pwd`/toolchain/bin/happy ALEX=`pwd`/toolchain/bin/alex'
     - bash -c "PATH=`pwd`/toolchain/bin:$PATH hadrian/build.cabal.sh --flavour=$FLAVOUR -j`mk/detect-cpu-count.sh` --flavour=Quick --docs=no-sphinx binary-dist"
     - mv _build/bindist/ghc*.tar.xz ghc.tar.xz
-    - export TOP=$(pwd)
-    - bash -c "cd _build/bindist/ghc-*/ && PATH=`pwd`/toolchain/bin:$PATH ./configure --prefix=$TOP/_build/install && make install && cd ../../../"
-    - bash -c "PATH=`pwd`/toolchain/bin:$PATH hadrian/build.cabal.sh --flavour=$FLAVOUR -j`mk/detect-cpu-count.sh` --flavour=quick test --summary-junit=./junit.xml --skip-perf --test-compiler=$TOP/_build/install/bin/ghc"
+    - bash -c "export TOP=$(pwd); cd _build/bindist/ghc-*/ && PATH=$TOP/toolchain/bin:$PATH ./configure --prefix=$TOP/_build/install && make install && cd ../../../"
+    - bash -c "export TOP=$(pwd); PATH=$TOP/toolchain/bin:$PATH hadrian/build.cabal.sh --flavour=$FLAVOUR -j`mk/detect-cpu-count.sh` --flavour=quick test --summary-junit=./junit.xml --skip-perf --test-compiler=$TOP/_build/install/bin/ghc"
     # skipping perf tests for now since we build a quick-flavoured GHC,
     # which might result in some broken perf tests?
   tags:
