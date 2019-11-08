@@ -33,6 +33,7 @@ import DataCon          ( DataCon, dataConWorkId, dataConRepStrictness
                         , dataConRepArgTys, isUnboxedTupleCon
                         , StrictnessMark (..) )
 import CoreMonad        ( Tick(..), SimplMode(..) )
+import CoreFVs          ( mkRuleInfo )
 import CoreSyn
 import Demand           ( StrictSig(..), dmdTypeDepth, isStrictDmd )
 import PprCore          ( pprCoreExpr )
@@ -40,7 +41,7 @@ import CoreUnfold
 import CoreUtils
 import CoreOpt          ( pushCoTyArg, pushCoValArg
                         , joinPointBinding_maybe, joinPointBindings_maybe )
-import Rules            ( mkRuleInfo, lookupRule, getRules )
+import Rules            ( lookupRule, getRules )
 import Demand           ( mkClosedStrictSig, topDmd, botRes )
 import BasicTypes       ( TopLevelFlag(..), isNotTopLevel, isTopLevel,
                           RecFlag(..), Arity )
@@ -1415,7 +1416,7 @@ simplLamBndr :: SimplEnv -> InBndr -> SimplM (SimplEnv, OutBndr)
 --      fw a b x{=(a,b)} = ...
 -- The "{=(a,b)}" is an unfolding we can't reconstruct otherwise.
 simplLamBndr env bndr
-  | isId bndr && isFragileUnfolding old_unf   -- Special case
+  | isId bndr && hasCoreUnfolding old_unf   -- Special case
   = do { (env1, bndr1) <- simplBinder env bndr
        ; unf'          <- simplStableUnfolding env1 NotTopLevel Nothing bndr
                                                old_unf (idType bndr1)

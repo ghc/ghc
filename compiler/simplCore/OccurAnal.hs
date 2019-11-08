@@ -13,9 +13,7 @@ core expression with (hopefully) improved usage information.
 
 {-# LANGUAGE CPP, BangPatterns, MultiWayIf, ViewPatterns  #-}
 
-module OccurAnal (
-        occurAnalysePgm, occurAnalyseExpr, occurAnalyseExpr_NoBinderSwap
-    ) where
+module OccurAnal ( occurAnalysePgm, occurAnalyseExpr ) where
 
 #include "HsVersions.h"
 
@@ -28,7 +26,6 @@ import CoreUtils        ( exprIsTrivial, isDefaultAlt, isExpandableApp,
 import CoreArity        ( joinRhsArity )
 import Id
 import IdInfo
-import Name( localiseName )
 import BasicTypes
 import Module( Module )
 import Coercion
@@ -45,14 +42,14 @@ import Unique
 import UniqFM
 import UniqSet
 import Util
+import Maybes( orElse )
 import Outputable
 import Data.List
-import Control.Arrow    ( second )
 
 {-
 ************************************************************************
 *                                                                      *
-    occurAnalysePgm, occurAnalyseExpr, occurAnalyseExpr_NoBinderSwap
+    occurAnalysePgm, occurAnalyseExpr
 *                                                                      *
 ************************************************************************
 
@@ -110,17 +107,9 @@ occurAnalysePgm this_mod active_unf active_rule imp_rules binds
                                               bs_usage
 
 occurAnalyseExpr :: CoreExpr -> CoreExpr
-        -- Do occurrence analysis, and discard occurrence info returned
-occurAnalyseExpr = occurAnalyseExpr' True -- do binder swap
-
-occurAnalyseExpr_NoBinderSwap :: CoreExpr -> CoreExpr
-occurAnalyseExpr_NoBinderSwap = occurAnalyseExpr' False -- do not do binder swap
-
-occurAnalyseExpr' :: Bool -> CoreExpr -> CoreExpr
-occurAnalyseExpr' enable_binder_swap expr
-  = snd (occAnal env expr)
-  where
-    env = initOccEnv { occ_binder_swap = enable_binder_swap }
+-- Do occurrence analysis, and discard occurrence info returned
+occurAnalyseExpr expr
+  = snd (occAnal initOccEnv expr)
 
 {- Note [Plugin rules]
 ~~~~~~~~~~~~~~~~~~~~~~
@@ -770,7 +759,11 @@ occAnalNonRecBind env lvl imp_rule_edges binder rhs body_usage
   | otherwise                   -- It's mentioned in the body
   = (body_usage' `andUDs` rhs_usage', [NonRec tagged_binder rhs'])
   where
-    (body_usage', tagged_binder) = tagNonRecBinder lvl body_usage binder
+    (body_usage', tagged_binder)
+       = tagNonRecBinder lvl body_usage $
+         binder `setIdUnfolding` unf'
+                `setIdSpecialisation` mkRuleInfo rules'
+
     mb_join_arity = willBeJoinId_maybe tagged_binder
 
     (bndrs, body) = collectBinders rhs
@@ -782,14 +775,14 @@ occAnalNonRecBind env lvl imp_rule_edges binder rhs body_usage
 
     -- Unfoldings
     -- See Note [Unfoldings and join points]
-    rhs_usage2 = case occAnalUnfolding env NonRecursive binder of
-                   Just unf_usage -> rhs_usage1 `andUDs` unf_usage
-                   Nothing        -> rhs_usage1
+    (unf_usage, unf') = occAnalUnfolding env binder
+    rhs_usage2 = rhs_usage1 `andUDs` unf_usage
 
     -- Rules
     -- See Note [Rules are extra RHSs] and Note [Rule dependency info]
-    rules_w_uds = occAnalRules env mb_join_arity NonRecursive tagged_binder
+    rules_w_uds = occAnalRules env mb_join_arity (idCoreRules binder)
     rule_uds    = map (\(_, l, r) -> l `andUDs` r) rules_w_uds
+    rules'      = map fstOf3 rules_w_uds
     rhs_usage3 = foldr andUDs rhs_usage2 rule_uds
     rhs_usage4 = case lookupVarEnv imp_rule_edges binder of
                    Nothing -> rhs_usage3
@@ -859,8 +852,8 @@ occAnalRec env lvl (CyclicSCC details_s) (body_uds, binds)
 
   | otherwise   -- At this point we always build a single Rec
   = -- pprTrace "occAnalRec" (vcat
-    --  [ text "weak_fvs" <+> ppr weak_fvs
-    --  , text "lb nodes" <+> ppr loop_breaker_nodes])
+    --   [ text "weak_fvs" <+> ppr weak_fvs
+    --   , text "lb nodes" <+> ppr loop_breaker_nodes])
     (final_uds, Rec pairs : binds)
 
   where
@@ -924,10 +917,10 @@ recording inlinings for any Ids which aren't marked as "no-inline" as it goes.
 -- Return the bindings sorted into a plausible order, and marked with loop breakers.
 loopBreakNodes depth bndr_set weak_fvs nodes binds
   = -- pprTrace "loopBreakNodes" (ppr nodes) $
-    go (stronglyConnCompFromEdgedVerticesUniqR nodes) binds
+    go (stronglyConnCompFromEdgedVerticesUniqR nodes)
   where
-    go []         binds = binds
-    go (scc:sccs) binds = loop_break_scc scc (go sccs binds)
+    go []         = binds
+    go (scc:sccs) = loop_break_scc scc (go sccs)
 
     loop_break_scc scc binds
       = case scc of
@@ -942,7 +935,7 @@ reOrderNodes _ _ _ []     _     = panic "reOrderNodes"
 reOrderNodes _ _ _ [node] binds = mk_loop_breaker node : binds
 reOrderNodes depth bndr_set weak_fvs (node : nodes) binds
   = -- pprTrace "reOrderNodes" (vcat [ text "unchosen" <+> ppr unchosen
-    --                              , text "chosen" <+> ppr chosen_nodes ]) $
+    --                               , text "chosen" <+> ppr chosen_nodes ]) $
     loopBreakNodes new_depth bndr_set weak_fvs unchosen $
     (map mk_loop_breaker chosen_nodes ++ binds)
   where
@@ -1198,7 +1191,7 @@ makeNode env imp_rule_edges bndr_set (bndr, rhs)
     -- is still deterministic with edges in nondeterministic order as
     -- explained in Note [Deterministic SCC] in Digraph.
   where
-    details = ND { nd_bndr            = bndr
+    details = ND { nd_bndr            = bndr'
                  , nd_rhs             = rhs'
                  , nd_rhs_bndrs       = bndrs'
                  , nd_uds             = rhs_usage3
@@ -1206,6 +1199,9 @@ makeNode env imp_rule_edges bndr_set (bndr, rhs)
                  , nd_weak            = node_fvs `minusVarSet` inl_fvs
                  , nd_active_rule_fvs = active_rule_fvs
                  , nd_score           = pprPanic "makeNodeDetails" (ppr bndr) }
+
+    bndr' = bndr `setIdUnfolding` unf'
+                 `setIdSpecialisation` mkRuleInfo rules'
 
     -- Constructing the edges for the main Rec computation
     -- See Note [Forming Rec groups]
@@ -1215,16 +1211,16 @@ makeNode env imp_rule_edges bndr_set (bndr, rhs)
     rhs_usage2 = foldr andUDs rhs_usage1 rule_uds
                    -- Note [Rules are extra RHSs]
                    -- Note [Rule dependency info]
-    rhs_usage3 = case mb_unf_uds of
-                   Just unf_uds -> rhs_usage2 `andUDs` unf_uds
-                   Nothing      -> rhs_usage2
-    node_fvs = udFreeVars bndr_set rhs_usage3
+    rhs_usage3 = rhs_usage2 `andUDs` unf_uds
+    node_fvs   = udFreeVars bndr_set rhs_usage3
 
     -- Finding the free variables of the rules
     is_active = occ_rule_act env :: Activation -> Bool
 
     rules_w_uds :: [(CoreRule, UsageDetails, UsageDetails)]
-    rules_w_uds = occAnalRules env (Just (length bndrs)) Recursive bndr
+    rules_w_uds = occAnalRules env (Just (length bndrs)) (idCoreRules bndr)
+
+    rules' = map fstOf3 rules_w_uds
 
     rules_w_rhs_fvs :: [(Activation, VarSet)]    -- Find the RHS fvs
     rules_w_rhs_fvs = maybe id (\ids -> ((AlwaysActive, ids):))
@@ -1237,16 +1233,19 @@ makeNode env imp_rule_edges bndr_set (bndr, rhs)
                                         , is_active a]
 
     -- Finding the usage details of the INLINE pragma (if any)
-    mb_unf_uds = occAnalUnfolding env Recursive bndr
+    (unf_uds, unf') = occAnalUnfolding env bndr
 
     -- Find the "nd_inl" free vars; for the loop-breaker phase
-    inl_fvs = case mb_unf_uds of
-                Nothing -> udFreeVars bndr_set rhs_usage1 -- No INLINE, use RHS
-                Just unf_uds -> udFreeVars bndr_set unf_uds
-                      -- We could check for an *active* INLINE (returning
-                      -- emptyVarSet for an inactive one), but is_active
-                      -- isn't the right thing (it tells about
-                      -- RULE activation), so we'd need more plumbing
+    -- These are the vars that would become free if the function
+    -- was inlinined; usually that means the RHS, unless the
+    -- unfolding is a stable one.
+    -- Note: occAnalUnfolding has discarded all non-stable unfoldings
+    -- Note: We could do this only for functions with an *active* unfolding
+    --       (returning emptyVarSet for an inactive one), but is_active
+    --       isn't the right thing (it tells about RULE activation),
+    --       so we'd need more plumbing
+    inl_fvs | hasCoreUnfolding unf' = udFreeVars bndr_set unf_uds
+            | otherwise             = udFreeVars bndr_set rhs_usage1
 
 mkLoopBreakerNodes :: OccEnv -> TopLevelFlag
                    -> VarSet
@@ -1501,20 +1500,12 @@ Hence the is_lb field of NodeScore
 ************************************************************************
 -}
 
-occAnalRhs :: OccEnv -> RecFlag -> Id -> [CoreBndr] -> CoreExpr
-           -> (UsageDetails, [CoreBndr], CoreExpr)
-              -- Returned usage details covers only the RHS,
-              -- and *not* the RULE or INLINE template for the Id
-occAnalRhs env Recursive _ bndrs body
-  = occAnalRecRhs env bndrs body
-occAnalRhs env NonRecursive id bndrs body
-  = occAnalNonRecRhs env id bndrs body
-
 occAnalRecRhs :: OccEnv -> [CoreBndr] -> CoreExpr    -- Rhs lambdas, body
            -> (UsageDetails, [CoreBndr], CoreExpr)
               -- Returned usage details covers only the RHS,
               -- and *not* the RULE or INLINE template for the Id
-occAnalRecRhs env bndrs body = occAnalLamOrRhs (rhsCtxt env) bndrs body
+occAnalRecRhs env bndrs body
+  = occAnalLamOrRhs (rhsCtxt env) bndrs body
 
 occAnalNonRecRhs :: OccEnv
                  -> Id -> [CoreBndr] -> CoreExpr    -- Binder; rhs lams, body
@@ -1548,61 +1539,61 @@ occAnalNonRecRhs env bndr bndrs body
     not_stable = not (isStableUnfolding (idUnfolding bndr))
 
 occAnalUnfolding :: OccEnv
-                 -> RecFlag
                  -> Id
-                 -> Maybe UsageDetails
-                      -- Just the analysis, not a new unfolding. The unfolding
-                      -- got analysed when it was created and we don't need to
-                      -- update it.
-occAnalUnfolding env rec_flag id
+                 -> (UsageDetails, Unfolding)
+-- Occurrence-analyse a stable unfoding;
+-- discard a non-stable one altogether.
+occAnalUnfolding env id
   = case realIdUnfolding id of -- ignore previous loop-breaker flag
-      CoreUnfolding { uf_tmpl = rhs, uf_src = src }
-        | not (isStableSource src)
-        -> Nothing
-        | otherwise
-        -> Just $ markAllMany usage
-        where
-          (bndrs, body) = collectBinders rhs
-          (usage, _, _) = occAnalRhs env rec_flag id bndrs body
+      unf@(CoreUnfolding { uf_tmpl = rhs, uf_src = src })
+        | isStableSource src -> (usage,        unf { uf_tmpl = rhs' })
+        | otherwise          -> (emptyDetails, NoUnfolding)
+        where  -- Drop non-Stable unfoldings altogether
+          (usage, rhs') = occAnal env rhs
 
-      DFunUnfolding { df_bndrs = bndrs, df_args = args }
-        -> Just $ zapDetails (delDetailsList usage bndrs)
+      unf@(DFunUnfolding { df_bndrs = bndrs, df_args = args })
+        -> ( final_usage, unf { df_args = args' } )
         where
-          usage = andUDsList (map (fst . occAnal env) args)
+          env'            = env `addInScope` bndrs
+          (usage, args')  = occAnalList env' args
+          final_usage     = zapDetails (delDetailsList usage bndrs)
 
-      _ -> Nothing
+      unf -> (emptyDetails, unf)
 
 occAnalRules :: OccEnv
              -> Maybe JoinArity -- If the binder is (or MAY become) a join
                                 -- point, what its join arity is (or WOULD
                                 -- become). See Note [Rules and join points].
-             -> RecFlag
-             -> Id
+             -> [CoreRule]
              -> [(CoreRule,      -- Each (non-built-in) rule
                   UsageDetails,  -- Usage details for LHS
                   UsageDetails)] -- Usage details for RHS
-occAnalRules env mb_expected_join_arity rec_flag id
-  = [ (rule, lhs_uds, rhs_uds) | rule@Rule {} <- idCoreRules id
-                               , let (lhs_uds, rhs_uds) = occ_anal_rule rule ]
+occAnalRules env mb_expected_join_arity rules
+  = map occ_anal_rule rules
   where
-    occ_anal_rule (Rule { ru_bndrs = bndrs, ru_args = args, ru_rhs = rhs })
-      = (lhs_uds, final_rhs_uds)
+    occ_anal_rule rule@(Rule { ru_bndrs = bndrs, ru_args = args, ru_rhs = rhs })
+      = (rule { ru_args = args', ru_rhs = rhs' }, lhs_uds', rhs_uds')
       where
-        lhs_uds = addManyOccsSet emptyDetails $
-                    (exprsFreeVars args `delVarSetList` bndrs)
-        (rhs_bndrs, rhs_body) = collectBinders rhs
-        (rhs_uds, _, _) = occAnalRhs env rec_flag id rhs_bndrs rhs_body
+        env' = env `addInScope` bndrs
+
+        (lhs_uds, args') = occAnalList env' args
+        lhs_uds'         = markAllMany $
+                           lhs_uds `delDetailsList` bndrs
+
+        (rhs_uds, rhs') = occAnal env' rhs
                             -- Note [Rules are extra RHSs]
                             -- Note [Rule dependency info]
-        final_rhs_uds = adjust_tail_info args $ markAllMany $
-                          (rhs_uds `delDetailsList` bndrs)
-    occ_anal_rule _
-      = (emptyDetails, emptyDetails)
+        rhs_uds' = adjust_tail_info args $
+                   markAllMany           $
+                   rhs_uds `delDetailsList` bndrs
+
+    occ_anal_rule rule = (rule, emptyDetails, emptyDetails)
 
     adjust_tail_info args uds -- see Note [Rules and join points]
       = case mb_expected_join_arity of
           Just ar | args `lengthIs` ar -> uds
           _                            -> markAllNonTailCalled uds
+
 {- Note [Join point RHSs]
 ~~~~~~~~~~~~~~~~~~~~~~~~~
 Consider
@@ -1666,6 +1657,12 @@ for the various clauses.
 *                                                                      *
 ************************************************************************
 -}
+
+occAnalList :: OccEnv -> [CoreExpr] -> (UsageDetails, [CoreExpr])
+occAnalList _   []     = (emptyDetails, [])
+occAnalList env (e:es) = case occAnal env e      of { (uds1, e')  ->
+                         case occAnalList env es of { (uds2, es') ->
+                         (uds1 `andUDs` uds2, e' : es') } }
 
 occAnal :: OccEnv
         -> CoreExpr
@@ -1755,21 +1752,24 @@ occAnal env (Lam x body)
 -- Then, the simplifier is careful when partially applying lambdas.
 
 occAnal env expr@(Lam _ _)
-  = case occAnalLamOrRhs env binders body of { (usage, tagged_binders, body') ->
+  = case occAnalLamOrRhs env bndrs body of { (usage, tagged_bndrs, body') ->
     let
-        expr'       = mkLams tagged_binders body'
+        expr'       = mkLams tagged_bndrs body'
         usage1      = markAllNonTailCalled usage
-        one_shot_gp = all isOneShotBndr tagged_binders
+        one_shot_gp = all isOneShotBndr tagged_bndrs
         final_usage | one_shot_gp = usage1
                     | otherwise   = markAllInsideLam usage1
     in
     (final_usage, expr') }
   where
-    (binders, body) = collectBinders expr
+    (bndrs, body) = collectBinders expr
 
 occAnal env (Case scrut bndr ty alts)
-  = case occ_anal_scrut scrut alts     of { (scrut_usage, scrut') ->
-    case mapAndUnzip occ_anal_alt alts of { (alts_usage_s, alts')   ->
+  = case occAnal (scrutCtxt env alts) scrut of { (scrut_usage, scrut') ->
+    let alt_env = addBndrSwap scrut' bndr $
+                  env { occ_encl = OccVanilla } `addInScope` [bndr]
+    in
+    case mapAndUnzip (occAnalAlt alt_env) alts of { (alts_usage_s, alts')   ->
     let
         alts_usage  = foldr orUDs emptyDetails alts_usage_s
         (alts_usage1, tagged_bndr) = tagLamBinder alts_usage bndr
@@ -1778,26 +1778,10 @@ occAnal env (Case scrut bndr ty alts)
     in
     total_usage `seq` (total_usage, Case scrut' tagged_bndr ty alts') }}
   where
-    alt_env = mkAltEnv env scrut bndr
-    occ_anal_alt = occAnalAlt alt_env
-
-    occ_anal_scrut (Var v) (alt1 : other_alts)
-        | not (null other_alts) || not (isDefaultAlt alt1)
-        = (mkOneOcc env v True 0, Var v)
-            -- The 'True' says that the variable occurs in an interesting
-            -- context; the case has at least one non-default alternative
-    occ_anal_scrut (Tick t e) alts
-        | t `tickishScopesLike` SoftScope
-          -- No reason to not look through all ticks here, but only
-          -- for soft-scoped ticks we can do so without having to
-          -- update returned occurance info (see occAnal)
-        = second (Tick t) $ occ_anal_scrut e alts
-
-    occ_anal_scrut scrut _alts
-        = occAnal (vanillaCtxt env) scrut    -- No need for rhsCtxt
 
 occAnal env (Let bind body)
-  = case occAnal env body                of { (body_usage, body') ->
+  = case occAnal (env `addInScope` bindersOf bind)
+                 body                    of { (body_usage, body') ->
     case occAnalBind env NotTopLevel
                      noImpRuleEdges bind
                      body_usage          of { (final_usage, new_binds) ->
@@ -1838,11 +1822,17 @@ Constructors are rather like lambdas in this way.
 occAnalApp :: OccEnv
            -> (Expr CoreBndr, [Arg CoreBndr], [Tickish Id])
            -> (UsageDetails, Expr CoreBndr)
+-- Naked variables (not applied) end up here too
 occAnalApp env (Var fun, args, ticks)
-  | null ticks = (uds, mkApps (Var fun) args')
-  | otherwise  = (uds, mkTicks ticks $ mkApps (Var fun) args')
+  | null ticks = (all_uds, mkApps fun' args')
+  | otherwise  = (all_uds, mkTicks ticks $ mkApps fun' args')
   where
-    uds = fun_uds `andUDs` final_args_uds
+    (fun', fun_id') = lookupVarEnv (occ_bs_env env) fun
+                      `orElse` (Var fun, fun)
+                     -- See Note [The binder-swap substitution]
+
+    fun_uds = mkOneOcc fun_id' int_cxt n_args
+    all_uds = fun_uds `andUDs` final_args_uds
 
     !(args_uds, args') = occAnalArgs env args one_shots
     !final_args_uds
@@ -1861,7 +1851,10 @@ occAnalApp env (Var fun, args, ticks)
 
     n_val_args = valArgCount args
     n_args     = length args
-    fun_uds    = mkOneOcc env fun (n_val_args > 0) n_args
+    int_cxt    = case occ_encl env of
+                   OccScrut -> True
+                   _other   -> n_val_args > 0
+
     is_exp     = isExpandableApp fun n_val_args
         -- See Note [CONLIKE pragma] in BasicTypes
         -- The definition of is_exp should match that in Simplify.prepareRhs
@@ -1983,6 +1976,7 @@ occAnalLamOrRhs :: OccEnv -> [CoreBndr] -> CoreExpr
 occAnalLamOrRhs env [] body
   = case occAnal env body of (body_usage, body') -> (body_usage, [], body')
       -- RHS of thunk or nullary join point
+
 occAnalLamOrRhs env (bndr:bndrs) body
   | isTyVar bndr
   = -- Important: Keep the environment so that we don't inline into an RHS like
@@ -1990,6 +1984,7 @@ occAnalLamOrRhs env (bndr:bndrs) body
     -- (see the beginning of Note [Cascading inlines]).
     case occAnalLamOrRhs env bndrs body of
       (body_usage, bndrs', body') -> (body_usage, bndr:bndrs', body')
+
 occAnalLamOrRhs env binders body
   = case occAnal env_body body of { (body_usage, body') ->
     let
@@ -1998,47 +1993,17 @@ occAnalLamOrRhs env binders body
     in
     (final_usage, tagged_binders, body') }
   where
-    (env_body, binders') = oneShotGroup env binders
+    env1 = env `addInScope` binders
+    (env_body, binders') = oneShotGroup env1 binders
 
-occAnalAlt :: (OccEnv, Maybe (Id, CoreExpr))
-           -> CoreAlt
-           -> (UsageDetails, Alt IdWithOccInfo)
-occAnalAlt (env, scrut_bind) (con, bndrs, rhs)
-  = case occAnal env rhs of { (rhs_usage1, rhs1) ->
+occAnalAlt :: OccEnv -> CoreAlt -> (UsageDetails, Alt IdWithOccInfo)
+occAnalAlt env (con, bndrs, rhs)
+  = case occAnal (env `addInScope` bndrs) rhs of { (rhs_usage1, rhs1) ->
     let
       (alt_usg, tagged_bndrs) = tagLamBinders rhs_usage1 bndrs
-                                -- See Note [Binders in case alternatives]
-      (alt_usg', rhs2) = wrapAltRHS env scrut_bind alt_usg tagged_bndrs rhs1
-    in
-    (alt_usg', (con, tagged_bndrs, rhs2)) }
+    in                          -- See Note [Binders in case alternatives]
+    (alt_usg, (con, tagged_bndrs, rhs1)) }
 
-wrapAltRHS :: OccEnv
-           -> Maybe (Id, CoreExpr)      -- proxy mapping generated by mkAltEnv
-           -> UsageDetails              -- usage for entire alt (p -> rhs)
-           -> [Var]                     -- alt binders
-           -> CoreExpr                  -- alt RHS
-           -> (UsageDetails, CoreExpr)
-wrapAltRHS env (Just (scrut_var, let_rhs)) alt_usg bndrs alt_rhs
-  | occ_binder_swap env
-  , scrut_var `usedIn` alt_usg -- bndrs are not be present in alt_usg so this
-                               -- handles condition (a) in Note [Binder swap]
-  , not captured               -- See condition (b) in Note [Binder swap]
-  = ( alt_usg' `andUDs` let_rhs_usg
-    , Let (NonRec tagged_scrut_var let_rhs') alt_rhs )
-  where
-    captured = any (`usedIn` let_rhs_usg) bndrs  -- Check condition (b)
-
-    -- The rhs of the let may include coercion variables
-    -- if the scrutinee was a cast, so we must gather their
-    -- usage. See Note [Gather occurrences of coercion variables]
-    -- Moreover, the rhs of the let may mention the case-binder, and
-    -- we want to gather its occ-info as well
-    (let_rhs_usg, let_rhs') = occAnal env let_rhs
-
-    (alt_usg', tagged_scrut_var) = tagLamBinder alt_usg scrut_var
-
-wrapAltRHS _ _ alt_usg _ alt_rhs
-  = (alt_usg, alt_rhs)
 
 {-
 ************************************************************************
@@ -2051,18 +2016,17 @@ wrapAltRHS _ _ alt_usg _ alt_rhs
 data OccEnv
   = OccEnv { occ_encl       :: !OccEncl      -- Enclosing context information
            , occ_one_shots  :: !OneShots     -- See Note [OneShots]
-           , occ_gbl_scrut  :: GlobalScruts
-
-           , occ_unf_act   :: Id -> Bool   -- Which Id unfoldings are active
-
-           , occ_rule_act   :: Activation -> Bool   -- Which rules are active
+           , occ_unf_act    :: Id -> Bool          -- Which Id unfoldings are active
+           , occ_rule_act   :: Activation -> Bool  -- Which rules are active
              -- See Note [Finding rule RHS free vars]
 
-           , occ_binder_swap :: !Bool -- enable the binder_swap
-             -- See CorePrep Note [Dead code in CorePrep]
+           -- See Note [The binder-swap substitution]
+           , occ_bs_env  :: VarEnv (OutExpr, OutId)
+           , occ_bs_rng  :: VarSet   -- Vars free in the range of occ_bs_env
+                   -- Domain is Global and Local Ids
+                   -- Range is just Local Ids
     }
 
-type GlobalScruts = IdSet   -- See Note [Binder swap on GlobalId scrutinees]
 
 -----------------------------
 -- OccEncl is used to control whether to inline into constructor arguments
@@ -2072,15 +2036,22 @@ type GlobalScruts = IdSet   -- See Note [Binder swap on GlobalId scrutinees]
 --      z = f (p,q)             -- Do inline p,q; it may make a rule fire
 -- So OccEncl tells enough about the context to know what to do when
 -- we encounter a constructor application or PAP.
+--
+-- OccScrut is used to set the "interesting context" field of OncOcc
 
 data OccEncl
-  = OccRhs              -- RHS of let(rec), albeit perhaps inside a type lambda
-                        -- Don't inline into constructor args here
-  | OccVanilla          -- Argument of function, body of lambda, scruintee of case etc.
-                        -- Do inline into constructor args here
+  = OccRhs         -- RHS of let(rec), albeit perhaps inside a type lambda
+                   -- Don't inline into constructor args here
+
+  | OccScrut       -- Scrutintee of a case
+                   -- Can inline into constructor args
+
+  | OccVanilla     -- Argument of function, body of lambda, etc
+                   -- Do inline into constructor args here
 
 instance Outputable OccEncl where
   ppr OccRhs     = text "occRhs"
+  ppr OccScrut   = text "occScrut"
   ppr OccVanilla = text "occVanilla"
 
 -- See note [OneShots]
@@ -2090,15 +2061,27 @@ initOccEnv :: OccEnv
 initOccEnv
   = OccEnv { occ_encl      = OccVanilla
            , occ_one_shots = []
-           , occ_gbl_scrut = emptyVarSet
+
                  -- To be conservative, we say that all
                  -- inlines and rules are active
            , occ_unf_act   = \_ -> True
            , occ_rule_act  = \_ -> True
-           , occ_binder_swap = True }
 
-vanillaCtxt :: OccEnv -> OccEnv
-vanillaCtxt env = env { occ_encl = OccVanilla, occ_one_shots = [] }
+           , occ_bs_env = emptyVarEnv
+           , occ_bs_rng = emptyVarSet }
+
+scrutCtxt :: OccEnv -> [CoreAlt] -> OccEnv
+scrutCtxt env alts
+  | interesting_alts =  env { occ_encl = OccScrut,   occ_one_shots = [] }
+  | otherwise        =  env { occ_encl = OccVanilla, occ_one_shots = [] }
+  where
+    interesting_alts = case alts of
+                         []    -> False
+                         [alt] -> not (isDefaultAlt alt)
+                         _     -> True
+     -- 'interesting_alts' is True if the case has at least one
+     -- non-default alternative.  That in turn influences
+     -- pre/postInlineUnconditionally.  Grep for "occ_int_cxt"!
 
 rhsCtxt :: OccEnv -> OccEnv
 rhsCtxt env = env { occ_encl = OccRhs, occ_one_shots = [] }
@@ -2110,8 +2093,15 @@ argCtxt env (one_shots:one_shots_s)
   = (env { occ_encl = OccVanilla, occ_one_shots = one_shots }, one_shots_s)
 
 isRhsEnv :: OccEnv -> Bool
-isRhsEnv (OccEnv { occ_encl = OccRhs })     = True
-isRhsEnv (OccEnv { occ_encl = OccVanilla }) = False
+isRhsEnv (OccEnv { occ_encl = cxt }) = case cxt of
+                                          OccRhs -> True
+                                          _      -> False
+
+addInScope :: OccEnv -> [Var] -> OccEnv
+-- See Note [The binder-swap substitution]
+addInScope env@(OccEnv { occ_bs_env = swap_env, occ_bs_rng = rng_vars }) bndrs
+  | any (`elemVarSet` rng_vars) bndrs = env { occ_bs_env = emptyVarEnv, occ_bs_rng = emptyVarSet }
+  | otherwise                         = env { occ_bs_env = swap_env `delVarEnvList` bndrs }
 
 oneShotGroup :: OccEnv -> [CoreBndr]
              -> ( OccEnv
@@ -2215,14 +2205,14 @@ scrutinee of a case for occurrences of the case-binder:
 
  (1)  case x of b { pi -> ri }
          ==>
-      case x of b { pi -> let x=b in ri }
+      case x of b { pi -> ri[b/x] }
 
  (2)  case (x |> co) of b { pi -> ri }
         ==>
-      case (x |> co) of b { pi -> let x = b |> sym co in ri }
+      case (x |> co) of b { pi -> ri[b |> sym co/x] }
 
-In both cases, the trivial 'let' can be eliminated by the
-immediately following simplifier pass.
+The substitution ri[b/x] etc is done by the occurrence analyser.
+See Note [The binder-swap substitution].
 
 There are two reasons for making this swap:
 
@@ -2250,20 +2240,6 @@ There are two reasons for making this swap:
     The same can happen even if the scrutinee is a variable
     with a cast: see Note [Case of cast]
 
-In both cases, in a particular alternative (pi -> ri), we only
-add the binding if
-  (a) x occurs free in (pi -> ri)
-        (ie it occurs in ri, but is not bound in pi)
-  (b) the pi does not bind b (or the free vars of co)
-We need (a) and (b) for the inserted binding to be correct.
-
-For the alternatives where we inject the binding, we can transfer
-all x's OccInfo to b.  And that is the point.
-
-Notice that
-  * The deliberate shadowing of 'x'.
-  * That (a) rapidly becomes false, so no bindings are injected.
-
 The reason for doing these transformations /here in the occurrence
 analyser/ is because it allows us to adjust the OccInfo for 'x' and
 'b' as we go.
@@ -2272,15 +2248,9 @@ analyser/ is because it allows us to adjust the OccInfo for 'x' and
     ri; then this transformation makes it occur just once, and hence
     get inlined right away.
 
-  * If instead we do this in the Simplifier, we don't know whether 'x'
-    is used in ri, so we are forced to pessimistically zap b's OccInfo
-    even though it is typically dead (ie neither it nor x appear in
-    the ri).  There's nothing actually wrong with zapping it, except
-    that it's kind of nice to know which variables are dead.  My nose
-    tells me to keep this information as robustly as possible.
-
-The Maybe (Id,CoreExpr) passed to occAnalAlt is the extra let-binding
-{x=b}; it's Nothing if the binder-swap doesn't happen.
+  * If instead the Simplifier replaces occurrences of x with
+    occurrences of b, that will mess up b's occurrence info. That in
+    turn might have consequences.
 
 There is a danger though.  Consider
       let v = x +# y
@@ -2292,6 +2262,75 @@ same simplifier pass that reduced (f v) to v.
 
 I think this is just too bad.  CSE will recover some of it.
 
+Note [The binder-swap substitution]
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+The binder-swap is implemented by the occ_bs_env field of OccEnv.
+Given    case x |> co of b { alts }
+we add [x :-> (b |> sym co)] to the occ_bs_env environment; this is
+done by addBndrSwap.  Then, at an occurrence of a variable, we look
+up in the occ_bs_env to perform the swap.  See occAnalApp.
+
+Some tricky corners:
+
+* We do the substitution before gathering occurrence info. So in
+  the above example, an occurrence of x turns into an occurrence
+  of b, and that's what we gather in the UsageDetails.  It's as
+  if the binder-swap occurred before occurrence analysis.
+
+* We need care when shadowing.  Suppose [x :-> b] is in occ_bs_env,
+  and we encounter:
+     - \x. blah
+       Here we want to delete the x-binding from occ_bs_env
+
+     - \b. blah
+       This is harder: we really want to delete all bindings that
+       have 'b' free in the range.  That is a bit tiresome to implement,
+       so we compromise.  We keep occ_bs_rng, which is the set of
+       free vars of rng(occc_bs_env).  If a binder shadows any of these
+       variables, we discard all of occ_bs_env.  Safe, if a bit
+       brutal.  NB, however: the simplifer de-shadows the code, so the
+       next time around this won't happen.
+
+  These checks are implemented in addInScope.
+
+* The occurrence analyser itself does /not/ do cloning. It could, in
+  principle, but it'd make it a bit more complicated and there is no
+  great benefit. The simplifer uses cloning to get a no-shadowing
+  situation, the care-when-shadowing behaviour above isn't needed for
+  long.
+
+* The domain of occ_bs_env can include GlobaIds.  Eg
+      case M.foo of b { alts }
+  We extend occ_bs_env with [M.foo :-> b].  That's fine.
+
+* We have to apply the substitution uniformly, including to rules and
+  unfoldings.
+
+Historical note
+---------------
+We used to do the binder-swap transformation by introducing
+a proxy let-binding, thus;
+
+   case x of b { pi -> ri }
+      ==>
+   case x of b { pi -> let x = b in ri }
+
+But that had two problems:
+
+1. If 'x' is an imported GlobalId, we'd end up with a GlobalId
+   on the LHS of a let-binding which isn't allowed.  We worked
+   around this for a while by "localising" x, but it turned
+   out to be very painful #16296,
+
+2. In CorePrep we use the occurrence analyser to do dead-code
+   elimination (see Note [Dead code in CorePrep]).  But that
+   occasionally led to an unlifted let-binding
+       case x of b { DEFAULT -> let x::Int# = b in ... }
+   which disobeys one of CorePrep's output invariants (no unlifted
+   let-bindings) -- see #5433.
+
+Doing a substitution (via occ_bs_env) is much better.
+
 Note [Case of cast]
 ~~~~~~~~~~~~~~~~~~~
 Consider        case (x `cast` co) of b { I# ->
@@ -2300,25 +2339,12 @@ We'd like to eliminate the inner case.  That is the motivation for
 equation (2) in Note [Binder swap].  When we get to the inner case, we
 inline x, cancel the casts, and away we go.
 
-Note [Binder swap on GlobalId scrutinees]
-~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
-When the scrutinee is a GlobalId we must take care in two ways
-
- i) In order to *know* whether 'x' occurs free in the RHS, we need its
-    occurrence info. BUT, we don't gather occurrence info for
-    GlobalIds.  That's the reason for the (small) occ_gbl_scrut env in
-    OccEnv is for: it says "gather occurrence info for these".
-
- ii) We must call localiseId on 'x' first, in case it's a GlobalId, or
-     has an External Name. See, for example, SimplEnv Note [Global Ids in
-     the substitution].
-
 Note [Zap case binders in proxy bindings]
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 From the original
      case x of cb(dead) { p -> ...x... }
 we will get
-     case x of cb(live) { p -> let x = cb in ...x... }
+     case x of cb(live) { p -> ...cb... }
 
 Core Lint never expects to find an *occurrence* of an Id marked
 as Dead, so we must zap the OccInfo on cb before making the
@@ -2389,37 +2415,25 @@ binder-swap unconditionally and still get occurrence analysis
 information right.
 -}
 
-mkAltEnv :: OccEnv -> CoreExpr -> Id -> (OccEnv, Maybe (Id, CoreExpr))
--- Does three things: a) makes the occ_one_shots = OccVanilla
---                    b) extends the GlobalScruts if possible
---                    c) returns a proxy mapping, binding the scrutinee
---                       to the case binder, if possible
-mkAltEnv env@(OccEnv { occ_gbl_scrut = pe }) scrut case_bndr
-  = case stripTicksTopE (const True) scrut of
-      Var v           -> add_scrut v case_bndr'
-      Cast (Var v) co -> add_scrut v (Cast case_bndr' (mkSymCo co))
-                          -- See Note [Case of cast]
-      _               -> (env { occ_encl = OccVanilla }, Nothing)
+addBndrSwap :: OutExpr -> Id -> OccEnv -> OccEnv
+-- See Note [The binder-swap substitution]
+addBndrSwap scrut case_bndr
+            env@(OccEnv { occ_bs_env = swap_env, occ_bs_rng = rng_vars })
+  | Just (v, rhs) <- try_swap (stripTicksTopE (const True) scrut)
+  = env { occ_bs_env = extendVarEnv swap_env v (rhs, case_bndr')
+        , occ_bs_rng = rng_vars `unionVarSet` exprFreeVars rhs }
 
+  | otherwise
+  = env
   where
-    add_scrut v rhs
-      | isGlobalId v = (env { occ_encl = OccVanilla }, Nothing)
-      | otherwise    = ( env { occ_encl = OccVanilla
-                             , occ_gbl_scrut = pe `extendVarSet` v }
-                       , Just (localise v, rhs) )
-      -- ToDO: this isGlobalId stuff is a TEMPORARY FIX
-      --       to avoid the binder-swap for GlobalIds
-      --       See #16346
+    try_swap :: OutExpr -> Maybe (OutVar, OutExpr)
+    try_swap (Var v)           = Just (v, Var case_bndr')
+    try_swap (Cast (Var v) co) = Just (v, Cast (Var case_bndr') (mkSymCo co))
+                        -- See Note [Case of cast]
+    try_swap _ = Nothing
 
-    case_bndr' = Var (zapIdOccInfo case_bndr)
-                   -- See Note [Zap case binders in proxy bindings]
-
-    -- Localise the scrut_var before shadowing it; we're making a
-    -- new binding for it, and it might have an External Name, or
-    -- even be a GlobalId; Note [Binder swap on GlobalId scrutinees]
-    -- Also we don't want any INLINE or NOINLINE pragmas!
-    localise scrut_var = mkLocalIdOrCoVar (localiseName (idName scrut_var))
-                                          (idType scrut_var)
+    case_bndr' = zapIdOccInfo case_bndr
+                 -- See Note [Zap case binders in proxy bindings]
 
 {-
 ************************************************************************
@@ -2430,7 +2444,6 @@ mkAltEnv env@(OccEnv { occ_gbl_scrut = pe }) scrut case_bndr
 
 Note [UsageDetails and zapping]
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
-
 On many occasions, we must modify all gathered occurrence data at once. For
 instance, all occurrences underneath a (non-one-shot) lambda set the
 'occ_in_lam' flag to become 'True'. We could use 'mapVarEnv' to do this, but
@@ -2469,23 +2482,17 @@ andUDs, orUDs
 andUDs = combineUsageDetailsWith addOccInfo
 orUDs  = combineUsageDetailsWith orOccInfo
 
-andUDsList :: [UsageDetails] -> UsageDetails
-andUDsList = foldl' andUDs emptyDetails
-
-mkOneOcc :: OccEnv -> Id -> InterestingCxt -> JoinArity -> UsageDetails
-mkOneOcc env id int_cxt arity
+mkOneOcc ::Id -> InterestingCxt -> JoinArity -> UsageDetails
+mkOneOcc id int_cxt arity
   | isLocalId id
-  = singleton $ OneOcc { occ_in_lam  = False
-                       , occ_one_br  = True
-                       , occ_int_cxt = int_cxt
-                       , occ_tail    = AlwaysTailCalled arity }
-  | id `elemVarSet` occ_gbl_scrut env
-  = singleton noOccInfo
-
+  = emptyDetails { ud_env = unitVarEnv id occ_info }
   | otherwise
   = emptyDetails
   where
-    singleton info = emptyDetails { ud_env = unitVarEnv id info }
+    occ_info = OneOcc { occ_in_lam  = False
+                      , occ_one_br  = True
+                      , occ_int_cxt = int_cxt
+                      , occ_tail    = AlwaysTailCalled arity }
 
 addOneOcc :: UsageDetails -> Id -> OccInfo -> UsageDetails
 addOneOcc ud id info
