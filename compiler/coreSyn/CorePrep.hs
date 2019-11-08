@@ -1315,14 +1315,13 @@ deFloatTop :: Floats -> [CoreBind]
 deFloatTop (Floats _ floats)
   = foldrOL get [] floats
   where
-    get (FloatLet b) bs = occurAnalyseRHSs b : bs
-    get (FloatCase var body _) bs  =
-      occurAnalyseRHSs (NonRec var body) : bs
+    get (FloatLet b)           bs = get_bind b                 : bs
+    get (FloatCase var body _) bs = get_bind (NonRec var body) : bs
     get b _ = pprPanic "corePrepPgm" (ppr b)
 
     -- See Note [Dead code in CorePrep]
-    occurAnalyseRHSs (NonRec x e) = NonRec x (occurAnalyseExpr_NoBinderSwap e)
-    occurAnalyseRHSs (Rec xes)    = Rec [(x, occurAnalyseExpr_NoBinderSwap e) | (x, e) <- xes]
+    get_bind (NonRec x e) = NonRec x (occurAnalyseExpr e)
+    get_bind (Rec xes)    = Rec [(x, occurAnalyseExpr e) | (x, e) <- xes]
 
 ---------------------------------------------------------------------------
 

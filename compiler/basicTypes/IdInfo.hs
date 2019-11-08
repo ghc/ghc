@@ -84,7 +84,8 @@ module IdInfo (
 
 import GhcPrelude
 
-import CoreSyn
+import CoreSyn hiding( hasCoreUnfolding )
+import CoreSyn( hasCoreUnfolding )
 
 import Class
 import {-# SOURCE #-} PrimOp (PrimOp)
@@ -556,8 +557,8 @@ zapFragileInfo info@(IdInfo { occInfo = occ, unfoldingInfo = unf })
 
 zapFragileUnfolding :: Unfolding -> Unfolding
 zapFragileUnfolding unf
- | isFragileUnfolding unf = noUnfolding
- | otherwise              = unf
+ | hasCoreUnfolding unf = noUnfolding
+ | otherwise            = unf
 
 zapUnfolding :: Unfolding -> Unfolding
 -- Squash all unfolding info, preserving only evaluated-ness
