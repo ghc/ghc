@@ -61,7 +61,6 @@ import Name
 import NameEnv
 import NameSet
 import OccurAnal        ( occurAnalyseExpr )
-import Demand
 import Module
 import UniqFM
 import UniqSupply
@@ -1493,14 +1492,12 @@ tcUnfolding toplvl name _ info (IfCoreUnfold stable if_expr)
                       | otherwise = InlineRhs
         ; return $ case mb_expr of
             Nothing -> NoUnfolding
-            Just expr -> mkUnfolding dflags unf_src
-                           True {- Top level -}
-                           (isBottomingSig strict_sig)
-                           expr
+            Just expr -> mkFinalUnfolding dflags unf_src strict_sig expr
         }
   where
      -- Strictness should occur before unfolding!
     strict_sig = strictnessInfo info
+
 tcUnfolding toplvl name _ _ (IfCompulsory if_expr)
   = do  { mb_expr <- tcPragExpr toplvl name if_expr
         ; return (case mb_expr of
