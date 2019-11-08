@@ -638,9 +638,13 @@ cgAlts gc_plan bndr (AlgAlt tycon) alts
               ptag_expr = cmmConstrTag1 dflags (CmmReg bndr_reg)
               branches' = first succ <$> branches
               maxpt = mAX_PTR_TAG dflags
-              (via_ptr, via_info) = if all ((< maxpt) . fst) branches'
-                                    then (branches', [])
-                                    else partition ((< maxpt) . fst) branches'
+              -- space conscious partition
+              partition_ _ [] = ([], [])
+              partition_ p l@(a : as) | (y, n) <- partition_ p as =
+                                        if p a
+                                        then (if null n then l else a : y, n)
+                                        else (y, if null y then l else a : n)
+              (via_ptr, via_info) = partition_ ((< maxpt) . fst) branches'
               small = isSmallFamily dflags fam_sz
 
                 -- Is the constructor tag in the node reg?
