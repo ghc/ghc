@@ -51,7 +51,6 @@ import Outputable
 
 import Control.Monad ( unless, void )
 import Control.Arrow ( first )
-import Data.List     ( partition )
 
 ------------------------------------------------------------------------
 --              cgExpr: the main function
