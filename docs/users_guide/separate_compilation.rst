@@ -597,7 +597,7 @@ The GHC API exposes functions for reading and writing these files.
 
     Runs a series of sanity checks and lints on the extended interface files
     that are being written out. These include testing things properties such as
-    variables not occuring outside of their expected scopes.
+    variables not occurring outside of their expected scopes.
 
 The format in which GHC currently stores its typechecked AST, makes it costly
 to collect the types for some expressions nodes. For the sake of performance,

@@ -509,7 +509,7 @@ isTypeClosedLetBndr = noFreeVarsOfType . idType
 
 tcExtendRecIds :: [(Name, TcId)] -> TcM a -> TcM a
 -- Used for binding the recurive uses of Ids in a binding
--- both top-level value bindings and and nested let/where-bindings
+-- both top-level value bindings and nested let/where-bindings
 -- Does not extend the TcBinderStack
 tcExtendRecIds pairs thing_inside
   = tc_extend_local_env NotTopLevel
@@ -533,7 +533,7 @@ tcExtendSigIds top_lvl sig_ids thing_inside
 
 tcExtendLetEnv :: TopLevelFlag -> TcSigFun -> IsGroupClosed
                   -> [TcId] -> TcM a -> TcM a
--- Used for both top-level value bindings and and nested let/where-bindings
+-- Used for both top-level value bindings and nested let/where-bindings
 -- Adds to the TcBinderStack too
 tcExtendLetEnv top_lvl sig_fn (IsGroupClosed fvs fv_type_closed)
                ids thing_inside

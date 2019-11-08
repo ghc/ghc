@@ -922,7 +922,7 @@ we invoke
 
 Although we have unified k and j, it's very important that we put
 (Refl j), /not/ (Refl k) as the fourth argument to unify_tys.
-If we put (Refl k) we'd end up with teh substitution
+If we put (Refl k) we'd end up with the substitution
   a :-> b |> Refl k
 which is bogus because one of the template variables, k,
 appears in the range of the substitution.  Eek.
