@@ -1,8 +1,9 @@
 #!/usr/bin/env bash
 
+jailbreak_version="0.4"
 tarball_dir='ghc-tarballs'
 missing_files=0
-pkg_variant="phyx"
+pkg_variant="phyx$jailbreak_version"
 
 # see #12502
 if test -z "$FIND"; then FIND="find"; fi
@@ -184,7 +185,7 @@ patch_tarball () {
     local tarball_name="$1"
     local filename=$(basename "$tarball_name")
     local filepath=$(dirname "$tarball_name")
-    local newfile=`echo "$filepath/$filename" | sed -e 's/-any/-phyx/'`
+    local newfile=$(echo "$filepath/$filename" | sed -e "s/-any/-${pkg_variant}/")
     local arch=""
 
     echo "=> ${filename}"
@@ -274,14 +275,15 @@ case $1 in
     patch)
         export -f patch_tarball
         export -f patch_single_file
+        export pkg_variant
 
         echo "Downloading ghc-jailbreak..."
-        curl -f -L https://mistuke.blob.core.windows.net/binaries/ghc-jailbreak-0.3.tar.gz \
+        curl -f -L https://mistuke.blob.core.windows.net/binaries/ghc-jailbreak-${jailbreak_version}.tar.gz \
             -o ghc-tarballs/ghc-jailbreak/ghc-jailbreak.tar.gz --create-dirs -#
         tar -C ghc-tarballs/ghc-jailbreak/ -xf ghc-tarballs/ghc-jailbreak/ghc-jailbreak.tar.gz
 
-        find ghc-tarballs/mingw-w64/ \(   -iname "*binutils*.tar.xz" \
-                                       -o -iname "*gcc*.tar.xz" \) \
+        find ghc-tarballs/mingw-w64/ \(   -iname "*binutils*-any.pkg.tar.xz" \
+                                       -o -iname "*gcc*-any.pkg.tar.xz" \) \
         -exec bash -c 'patch_tarball "$0"' {} \;
 
         rm -rf ghc-tarballs/ghc-jailbreak
