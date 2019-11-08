@@ -1715,7 +1715,7 @@ uUnfilledVar2 origin t_or_k swapped tv1 ty2
       = do { traceTc "uUnfilledVar2 not ok" (ppr tv1 $$ ppr ty2)
                -- Occurs check or an untouchable: just defer
                -- NB: occurs check isn't necessarily fatal:
-               --     eg tv1 occured in type family parameter
+               --     eg tv1 occurred in type family parameter
             ; defer }
 
     ty1 = mkTyVarTy tv1
