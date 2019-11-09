@@ -753,7 +753,7 @@ cgIdApp fun_id args = do
     self_loop_info <- getSelfLoop
     let fun_arg     = StgVarArg fun_id
         fun_name    = idName    fun_id
-        fun         = idInfoToAmode fun_info
+        ~fun        = idInfoToAmode fun_info
         lf_info     = cg_lf         fun_info
         n_args      = length args
         v_args      = length $ filter (isVoidTy . stgArgType) args
