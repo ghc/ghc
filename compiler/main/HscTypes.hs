@@ -34,7 +34,7 @@ module HscTypes (
 
         -- * Information about modules
         ModDetails(..), emptyModDetails,
-        ModGuts(..), CgGuts(..), CgGuts2(..), cgGuts2ToCgGuts, ForeignStubs(..), appendStubC,
+        ModGuts(..), CgGuts(..), ForeignStubs(..), appendStubC,
         ImportedMods, ImportedBy(..), importedByUser, ImportedModsVal(..), SptEntry(..),
         ForeignSrcLang(..),
         phaseForeignLanguage,
@@ -242,7 +242,7 @@ data HscStatus
     | HscUpdateSig ModIface ModDetails
     -- | Recompile this module.
     | HscRecomp
-        { hscs_guts       :: !CgGuts2
+        { hscs_guts       :: !CgGuts
           -- ^ Information for the code generator.
         , hscs_summary    :: !ModSummary
           -- ^ Module info
@@ -1476,66 +1476,35 @@ data ModGuts
 --        and later compilations (ModDetails)
 --      * the other lot goes to code generation (CgGuts)
 
--- | A restricted form of 'ModGuts' for code generation purposes
-data CgGuts
-  = CgGuts {
-        cg_module    :: !Module,
-                -- ^ Module being compiled
+data CgGuts = CgGuts
+  { cg_module :: !Module
+    -- ^ Module being compiled
+  , cg_tycons :: ![TyCon]
+    -- ^ Algebraic data types (including ones that started life as classes);
+    -- generate constructors and info tables.
+  , cg_binds :: !CoreProgram
+    -- ^ The tidied main bindings, including previously-implicit bindings for
+    -- record and class selectors, and data constructor wrappers.  But *not*
+    -- data constructor workers; reason: we regard them as part of the code-gen
+    -- of tycons
+  , cg_foreign :: !ForeignStubs
+    -- ^ Foreign export stubs
+  , cg_foreign_files :: ![(ForeignSrcLang, FilePath)]
+  , cg_dep_pkgs :: ![InstalledUnitId]
+    -- ^ Dependent packages, used to generate #includes for C code gen
+  , cg_hpc_info :: !HpcInfo
+    -- ^ Program coverage tick box information
+  , cg_modBreaks :: !(Maybe ModBreaks)
+    -- ^ Module breakpoints
+  , cg_spt_entries :: ![SptEntry]
+    -- ^ Static pointer table entries for static forms defined in the module.
+    -- See Note [Grand plan for static forms] in StaticPtrTable
 
-        cg_tycons    :: [TyCon],
-                -- ^ Algebraic data types (including ones that started
-                -- life as classes); generate constructors and info
-                -- tables. Includes newtypes, just for the benefit of
-                -- External Core
-
-        cg_binds     :: CoreProgram,
-                -- ^ The tidied main bindings, including
-                -- previously-implicit bindings for record and class
-                -- selectors, and data constructor wrappers.  But *not*
-                -- data constructor workers; reason: we regard them
-                -- as part of the code-gen of tycons
-
-        cg_foreign   :: !ForeignStubs,   -- ^ Foreign export stubs
-        cg_foreign_files :: ![(ForeignSrcLang, FilePath)],
-        cg_dep_pkgs  :: ![InstalledUnitId], -- ^ Dependent packages, used to
-                                            -- generate #includes for C code gen
-        cg_hpc_info  :: !HpcInfo,           -- ^ Program coverage tick box information
-        cg_modBreaks :: !(Maybe ModBreaks), -- ^ Module breakpoints
-        cg_spt_entries :: [SptEntry]
-                -- ^ Static pointer table entries for static forms defined in
-                -- the module.
-                -- See Note [Grand plan for static forms] in StaticPtrTable
-    }
-
-data CgGuts2 = CgGuts2
-  { cg2_module :: !Module
-  , cg2_tycons :: ![TyCon]
-  , cg2_binds :: !CoreProgram
-  , cg2_foreign :: !ForeignStubs
-  , cg2_foreign_files :: ![(ForeignSrcLang, FilePath)]
-  , cg2_dep_pkgs :: ![InstalledUnitId]
-  , cg2_hpc_info :: !HpcInfo
-  , cg2_modBreaks :: !(Maybe ModBreaks)
-  , cg2_spt_entries :: ![SptEntry]
-
-  -- Stuff for ModDetails generation
-  , cg2_tidy_binds :: !CoreProgram
-  , cg2_trimmed_rules :: ![CoreRule]
-  , cg2_tidy_env :: !TidyEnv
-  , cg2_mod_guts :: !ModGuts
-  }
-
-cgGuts2ToCgGuts :: CgGuts2 -> CgGuts
-cgGuts2ToCgGuts guts2 = CgGuts
-  { cg_module = cg2_module guts2
-  , cg_tycons = cg2_tycons guts2
-  , cg_binds = cg2_binds guts2
-  , cg_foreign = cg2_foreign guts2
-  , cg_foreign_files = cg2_foreign_files guts2
-  , cg_dep_pkgs = cg2_dep_pkgs guts2
-  , cg_hpc_info = cg2_hpc_info guts2
-  , cg_modBreaks = cg2_modBreaks guts2
-  , cg_spt_entries = cg2_spt_entries guts2
+    -- Stuff for ModDetails generation
+  , cg_tidy_binds :: !CoreProgram
+  , cg_trimmed_rules :: ![CoreRule]
+  , cg_tidy_env :: !TidyEnv
+  , cg_mod_guts :: !ModGuts
   }
 
 -----------------------------------

@@ -830,7 +830,7 @@ finish summary tc_result mb_old_hash = do
           desugared_guts <- hscSimplify' plugins desugared_guts0
 
           cg_guts <- {-# SCC "CoreTidy" #-}
-              liftIO $ tidyProgram2 hsc_env desugared_guts
+              liftIO $ tidyProgram hsc_env desugared_guts
 
           let !partial_iface =
                 {-# SCC "HscMain.mkPartialIface" #-}
@@ -1704,7 +1704,7 @@ hscParsedDecls hsc_env decls = runInteractiveHsc hsc_env $ do
       hscSimplify hsc_env plugins ds_result
 
     {- Tidy -}
-    (tidy_cg, mod_details) <- liftIO $ tidyProgram hsc_env simpl_mg
+    tidy_cg <- liftIO $ tidyProgram hsc_env simpl_mg
 
     let !CgGuts{ cg_module    = this_mod,
                  cg_binds     = core_binds,
@@ -1712,7 +1712,7 @@ hscParsedDecls hsc_env decls = runInteractiveHsc hsc_env $ do
                  cg_modBreaks = mod_breaks } = tidy_cg
 
         !ModDetails { md_insts     = cls_insts
-                    , md_fam_insts = fam_insts } = mod_details
+                    , md_fam_insts = fam_insts } = mkModDetails hsc_env tidy_cg
             -- Get the *tidied* cls_insts and fam_insts
 
         data_tycons = filter isDataTyCon tycons
