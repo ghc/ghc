@@ -11,6 +11,7 @@
 -- recompilation is required.
 module MkIface (
         mkPartialIface,
+        mkModDetails,
         mkFullIface,
 
         mkIfaceTc,
@@ -70,6 +71,7 @@ import FlagChecker
 
 import DsUsage ( mkUsageInfo, mkUsedNames, mkDependencies )
 import Id
+import IdInfo
 import Annotations
 import CoreSyn
 import Class
@@ -127,8 +129,6 @@ import System.FilePath
 import Plugins ( PluginRecompile(..), PluginWithArgs(..), LoadedPlugin(..),
                  pluginRecompile', plugins )
 
---Qualified import so we can define a Semigroup instance
--- but it doesn't clash with Outputable.<>
 import qualified Data.Semigroup
 
 {-
@@ -140,10 +140,9 @@ import qualified Data.Semigroup
 -}
 
 mkPartialIface :: HscEnv
-               -- -> ModDetails
                -> ModGuts
                -> PartialModIface
-mkPartialIface hsc_env -- mod_details
+mkPartialIface hsc_env
   ModGuts{ mg_module       = this_mod
          , mg_hsc_src      = hsc_src
          , mg_usages       = usages
@@ -160,14 +159,13 @@ mkPartialIface hsc_env -- mod_details
          , mg_arg_docs     = arg_docs
          }
   = mkIface_ hsc_env this_mod hsc_src used_th deps rdr_env fix_env warns hpc_info self_trust
-             safe_mode usages doc_hdr decl_docs arg_docs -- mod_details
+             safe_mode usages doc_hdr decl_docs arg_docs
 
--- | Fully instantiate a interface
--- Adds fingerprints and potentially code generator produced information.
-mkFullIface :: HscEnv -> CgGuts2 -> PartialModIface -> IO (ModIface, ModDetails)
-mkFullIface hsc_env cg_guts partial_iface = do
-    let dflags = hsc_dflags hsc_env
-    let mod_guts = cg2_mod_guts cg_guts
+mkModDetails :: HscEnv -> CgGuts -> ModDetails
+mkModDetails hsc_env cg_guts =
+  let
+    dflags = hsc_dflags hsc_env
+    mod_guts = cg_mod_guts cg_guts
 
     -- The completed type environment is gotten from
     --      a) the types and classes defined here (plus implicit things)
@@ -180,35 +178,50 @@ mkFullIface hsc_env cg_guts partial_iface = do
     -- exported Ids and things needed from them, which saves space
     --
     -- See Note [Don't attempt to trim data types]
-    let omit_prags = gopt Opt_OmitInterfacePragmas dflags
-    let final_ids  = [ if omit_prags then trimId id else id
-                     | id <- bindersOfBinds (cg2_tidy_binds cg_guts)
-                     , isExternalName (idName id)
-                     , not (isWiredInName (getName id))
-                     ]   -- See Note [Drop wired-in things]
-    let final_tcs = filterOut (isWiredInName . getName) (mg_tcs mod_guts)
+    omit_prags = gopt Opt_OmitInterfacePragmas dflags
+
+    trim_id :: Id -> Id
+    trim_id id
+      | not (isImplicitId id)
+      = id `setIdInfo` vanillaIdInfo
+      | otherwise
+      = id
+
+    final_ids  = [ if omit_prags then trim_id id else id
+                 | id <- bindersOfBinds (cg_tidy_binds cg_guts)
+                 , isExternalName (idName id)
+                 , not (isWiredInName (getName id))
+                 ]   -- See Note [Drop wired-in things]
+    final_tcs = filterOut (isWiredInName . getName) (mg_tcs mod_guts)
     -- See Note [Drop wired-in things]
-    let type_env = typeEnvFromEntities final_ids final_tcs (mg_fam_insts mod_guts)
+    type_env = typeEnvFromEntities final_ids final_tcs (mg_fam_insts mod_guts)
 
-    let tidy_patsyns = mkFinalPatSyns type_env (mg_patsyns mod_guts)
-    let tidy_type_env = extendTypeEnvWithPatSyns tidy_patsyns type_env
-    let tidy_rules = tidyRules (cg2_tidy_env cg_guts) (cg2_trimmed_rules cg_guts)
-    let tidy_cls_insts = mkFinalClsInsts type_env (mg_insts (cg2_mod_guts cg_guts))
+    tidy_patsyns = mkFinalPatSyns type_env (mg_patsyns mod_guts)
+    tidy_type_env = extendTypeEnvWithPatSyns tidy_patsyns type_env
+    tidy_rules = tidyRules (cg_tidy_env cg_guts) (cg_trimmed_rules cg_guts)
+    tidy_cls_insts = mkFinalClsInsts type_env (mg_insts (cg_mod_guts cg_guts))
+  in
+    ModDetails
+      { md_types = tidy_type_env
+      , md_rules = tidy_rules
+      , md_insts = tidy_cls_insts
+      , md_fam_insts =  mg_fam_insts (cg_mod_guts cg_guts)
+      , md_exports = mg_exports (cg_mod_guts cg_guts)
+      , md_anns = mg_anns (cg_mod_guts cg_guts)
+      , md_complete_sigs = mg_complete_sigs (cg_mod_guts cg_guts)
+      }
 
+-- | Generate full interface with the code gen info.
+mkFullIface :: HscEnv -> CgGuts -> PartialModIface -> IO (ModIface, ModDetails)
+mkFullIface hsc_env cg_guts partial_iface = do
+    let mod_details = mkModDetails hsc_env cg_guts
+    let dflags = hsc_dflags hsc_env
+
+    let tidy_rules = md_rules mod_details
     unless (null tidy_rules) $
       dumpIfSet_any dflags [Opt_D_dump_simpl, Opt_D_dump_rules]
         (showSDoc dflags (text "Tidy Rules"))
         (pprRules tidy_rules)
-
-    let mod_details = ModDetails
-          { md_types = tidy_type_env
-          , md_rules = tidy_rules
-          , md_insts = tidy_cls_insts
-          , md_fam_insts =  mg_fam_insts (cg2_mod_guts cg_guts)
-          , md_exports = mg_exports (cg2_mod_guts cg_guts)
-          , md_anns = mg_anns (cg2_mod_guts cg_guts)
-          , md_complete_sigs = mg_complete_sigs (cg2_mod_guts cg_guts)
-          }
 
     full_iface <-
       {-# SCC "addFingerprints" #-}
