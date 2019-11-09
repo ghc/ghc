@@ -1073,12 +1073,6 @@ simplOptExpr occurrence-analyses and simplifies the LHS:
        otherwise we don't match when given an argument like
           augment (\a. h a a) (build h)
 
-Note [Matching seqId]
-~~~~~~~~~~~~~~~~~~~
-The desugarer turns (seq e r) into (case e of _ -> r), via a special-case hack
-and this code turns it back into an application of seq!
-See Note [Rules for seq] in MkId for the details.
-
 Note [Unused spec binders]
 ~~~~~~~~~~~~~~~~~~~~~~~~~~
 Consider
