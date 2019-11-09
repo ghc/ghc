@@ -1,4 +1,4 @@
-{-# LANGUAGE CPP #-}
+{-# LANGUAGE CPP, BangPatterns #-}
 
 -----------------------------------------------------------------------------
 --
@@ -637,9 +637,9 @@ cgAlts gc_plan bndr (AlgAlt tycon) alts
               bndr_reg = CmmLocal (idToReg dflags bndr)
               ptag_expr = cmmConstrTag1 dflags (CmmReg bndr_reg)
               branches' = first succ <$> branches
-              maxpt = mAX_PTR_TAG dflags
-              low_tag = (< maxpt) . fst
-              small = isSmallFamily dflags fam_sz
+              !maxpt = mAX_PTR_TAG dflags
+              low_tag br = fst br < maxpt
+              !small = isSmallFamily dflags fam_sz
 
                 -- Is the constructor tag in the node reg?
                 -- See Note [Tagging big families]
