@@ -51,7 +51,6 @@ import Outputable
 
 import Control.Monad ( unless, void )
 import Control.Arrow ( first )
-import Data.List     ( partition )
 
 ------------------------------------------------------------------------
 --              cgExpr: the main function
@@ -651,7 +650,14 @@ cgAlts gc_plan bndr (AlgAlt tycon) alts
            else -- No, the get exact tag from info table when mAX_PTR_TAG
                 -- See Note [Double switching for big families]
               do
-                let (via_ptr, via_info) = partition low_tag branches'
+                let -- space conscious partition
+                    partition_ _ [] = ([], [])
+                    partition_ p l@(a : as)
+                        | (y, n) <- partition_ p as =
+                                    if p a
+                                    then (if null n then l else a : y, n)
+                                    else (y, if null y then l else a : n)
+                    (via_ptr, via_info) = partition_ low_tag branches'
                     untagged_ptr = cmmUntag dflags (CmmReg bndr_reg)
                     itag_expr = getConstrTag dflags untagged_ptr
                     info0 = first pred <$> via_info
