@@ -21,6 +21,7 @@ module CoreFVs (
         exprsFreeVars,
         exprsFreeVarsList,
         bindFreeVars,
+        mkExprInScopeSet,
 
         -- * Selective free variables of expressions
         InterestingVarFun,
@@ -103,6 +104,12 @@ but not those that are free in the type of variable occurrence.
 -- returning a non-deterministic set.
 exprFreeVars :: CoreExpr -> VarSet
 exprFreeVars = fvVarSet . exprFVs
+
+-- | Generates an in-scope set from the free variables in a list of 'CoreExpr's.
+-- Note that this *does* include type variables free in the types of free term
+-- variables (see #15211).
+mkExprInScopeSet :: CoreExpr -> InScopeSet
+mkExprInScopeSet e = mkInScopeSet $ fvVarSet $ exprFVs e
 
 -- | Find all locally-defined free Ids or type variables in an expression
 -- returning a composable FV computation. See Note [FV naming conventions] in FV
