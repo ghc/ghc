@@ -227,7 +227,7 @@ compileOne' m_tc_result mHscMessage
             (final_iface, mod_details) <- mkFullIface hsc_env'{hsc_dflags=iface_dflags} cgguts partial_iface
             liftIO $ hscMaybeWriteIface dflags final_iface mb_old_iface_hash (ms_location summary)
 
-            (hasStub, comp_bc, spt_entries) <- hscInteractive hsc_env' (cgGuts2ToCgGuts cgguts) summary
+            (hasStub, comp_bc, spt_entries) <- hscInteractive hsc_env' cgguts summary
 
             stub_o <- case hasStub of
                       Nothing -> return []
@@ -1184,7 +1184,7 @@ runPhase (HscOut src_flavour mod_name result) _ dflags = do
                     PipeState{hsc_env=hsc_env'} <- getPipeState
 
                     (outputFilename, mStub, foreign_files) <- liftIO $
-                      hscGenHardCode hsc_env' (cgGuts2ToCgGuts cgguts) mod_summary output_fn
+                      hscGenHardCode hsc_env' cgguts mod_summary output_fn
 
                     (final_iface, mod_details) <-
                       liftIO (mkFullIface hsc_env'{hsc_dflags=iface_dflags} cgguts partial_iface)
