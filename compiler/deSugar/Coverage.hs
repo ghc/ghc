@@ -369,17 +369,6 @@ addTickLHsBind (dL->L pos (pat@(PatBind { pat_lhs = lhs
                           (initial_patvar_tickss ++ repeat []))
 
     return $ cL pos $ pat' { pat_ticks = (rhs_ticks, patvar_tickss) }
-  where
-
-  -- is the pattern just a decorated variable?
-  isSimplePat :: LPat GhcTc -> Maybe (IdP GhcTc)
-  isSimplePat (dL->L _ p) = case p of
-    ParPat _ x -> isSimplePat x
-    SigPat _ x _ -> isSimplePat x
-    LazyPat _ x -> isSimplePat x
-    BangPat _ x -> isSimplePat x
-    VarPat _ (dL->L _ x) -> Just x
-    _ -> Nothing
 
 -- Only internal stuff, not from source, uses VarBind, so we ignore it.
 addTickLHsBind var_bind@(dL->L _ (VarBind {})) = return var_bind
