@@ -1,9 +1,10 @@
+#include "Rts.h"
 #include "ghcconfig.h"
+#include "HsFFI.h"
+
 #include <stdio.h>
 #include <stdlib.h>
-#include "Rts.h"
 #include <string.h>
-#include "HsFFI.h"
 
 extern void loadPackages(void);
 
