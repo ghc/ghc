@@ -14,7 +14,7 @@ import GhcPrelude
 
 import CoreSubst
 import Var              ( Var )
-import VarEnv           ( elemInScopeSet, mkInScopeSet )
+import VarEnv           ( elemInScopeSet )
 import Id               ( Id, idType, isDeadBinder, idHasRules
                         , idInlineActivation, setInlineActivation
                         , zapIdOccInfo, zapIdUsageInfo, idInlinePragma
