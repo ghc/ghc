@@ -293,21 +293,11 @@ mkIface_ :: HscEnv -> Module -> HscSource
          -> Maybe HsDocString
          -> DeclDocMap
          -> ArgDocMap
-         -- -> ModDetails
          -> PartialModIface
 mkIface_ hsc_env
          this_mod hsc_src used_th deps rdr_env fix_env src_warns
          hpc_info pkg_trust_req safe_mode usages
          doc_hdr decl_docs arg_docs
-{-
-         ModDetails{  md_insts     = insts,
-                      md_fam_insts = fam_insts,
-                      md_rules     = rules,
-                      md_anns      = anns,
-                      md_types     = type_env,
-                      md_exports   = exports,
-                      md_complete_sigs = complete_sigs }
--}
 -- NB:  notice that mkIface does not look at the bindings
 --      only at the TypeEnv.  The previous Tidy phase has
 --      put exactly the info into the TypeEnv that we want
@@ -315,20 +305,6 @@ mkIface_ hsc_env
 
   = do
     let semantic_mod = canonicalizeHomeModule (hsc_dflags hsc_env) (moduleName this_mod)
-        -- entities = typeEnvElts type_env
-        -- decls  = [ tyThingToIfaceDecl entity
-        --          | entity <- entities,
-        --            let name = getName entity,
-        --            not (isImplicitTyThing entity),
-        --               -- No implicit Ids and class tycons in the interface file
-        --            not (isWiredInName name),
-        --               -- Nor wired-in things; the compiler knows about them anyhow
-        --            nameIsLocalOrFrom semantic_mod name  ]
-        --               -- Sigh: see Note [Root-main Id] in TcRnDriver
-        --               -- NB: ABSOLUTELY need to check against semantic_mod,
-        --               -- because all of the names in an hsig p[H=<H>]:H
-        --               -- are going to be for <H>, not the former id!
-        --               -- See Note [Identity versus semantic module]
 
         fixities    = sortBy (comparing fst)
           [(occ,fix) | FixItem occ fix <- nameEnvElts fix_env]
@@ -336,12 +312,7 @@ mkIface_ hsc_env
           -- deterministic, so we sort by OccName to canonicalize it.
           -- See Note [Deterministic UniqFM] in UniqDFM for more details.
         warns       = src_warns
-        -- iface_rules = map coreRuleToIfaceRule rules
-        -- iface_insts = map instanceToIfaceInst $ fixSafeInstances safe_mode insts
-        -- iface_fam_insts = map famInstToIfaceFamInst fam_insts
         trust_info  = setSafeMode safe_mode
-        -- annotations = map mkIfaceAnnotation anns
-        -- icomplete_sigs = map mkIfaceCompleteSig complete_sigs
 
     ModIface {
           mi_module      = this_mod,
@@ -353,34 +324,18 @@ mkIface_ hsc_env
           mi_hsc_src     = hsc_src,
           mi_deps        = deps,
           mi_usages      = usages,
-          -- mi_exports     = mkIfaceExports exports,
-
-          -- Sort these lexicographically, so that
-          -- the result is stable across compilations
-          -- mi_insts       = sortBy cmp_inst     iface_insts,
-          -- mi_fam_insts   = sortBy cmp_fam_inst iface_fam_insts,
-          -- mi_rules       = sortBy cmp_rule     iface_rules,
-
           mi_fixities    = fixities,
           mi_warns       = warns,
-          -- mi_anns        = annotations,
           mi_globals     = maybeGlobalRdrEnv rdr_env,
           mi_used_th     = used_th,
-          -- mi_decls       = decls,
           mi_hpc         = isHpcUsed hpc_info,
           mi_trust       = trust_info,
           mi_trust_pkg   = pkg_trust_req,
-          -- mi_complete_sigs = icomplete_sigs,
           mi_doc_hdr     = doc_hdr,
           mi_decl_docs   = decl_docs,
           mi_arg_docs    = arg_docs,
           mi_final_exts  = () }
   where
-     -- cmp_rule     = comparing ifRuleName
-     -- Compare these lexicographically by OccName, *not* by unique,
-     -- because the latter is not stable across compilations:
-     -- cmp_inst     = comparing (nameOccName . ifDFun)
-
      dflags = hsc_dflags hsc_env
 
      -- We only fill in mi_globals if the module was compiled to byte
@@ -393,8 +348,6 @@ mkIface_ hsc_env
      maybeGlobalRdrEnv rdr_env
          | targetRetainsAllBindings (hscTarget dflags) = Just rdr_env
          | otherwise                                   = Nothing
-
-     -- ifFamInstTcName = ifFamInstFam
 
 -----------------------------
 writeIfaceFile :: DynFlags -> FilePath -> ModIface -> IO ()
