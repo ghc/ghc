@@ -638,11 +638,12 @@ cgAlts gc_plan bndr (AlgAlt tycon) alts
               ptag_expr = cmmConstrTag1 dflags (CmmReg bndr_reg)
               branches' = first succ <$> branches
               maxpt = mAX_PTR_TAG dflags
+              low_tag = (< maxpt) . fst
               small = isSmallFamily dflags fam_sz
 
                 -- Is the constructor tag in the node reg?
                 -- See Note [Tagging big families]
-        ; if small || all ((< maxpt) . fst) branches'
+        ; if small || all low_tag branches'
            then -- Yes, bndr_reg has constructor tag in ls bits
                emitSwitch ptag_expr branches' mb_deflt 1
                  (if small then fam_sz else maxpt)
@@ -650,7 +651,7 @@ cgAlts gc_plan bndr (AlgAlt tycon) alts
            else -- No, the get exact tag from info table when mAX_PTR_TAG
                 -- See Note [Double switching for big families]
               do
-                let (via_ptr, via_info) = partition ((< maxpt) . fst) branches'
+                let (via_ptr, via_info) = partition low_tag branches'
                     untagged_ptr = cmmUntag dflags (CmmReg bndr_reg)
                     itag_expr = getConstrTag dflags untagged_ptr
                     info0 = first pred <$> via_info
