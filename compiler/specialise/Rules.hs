@@ -34,7 +34,7 @@ import CoreSyn          -- All of it
 import Module           ( Module, ModuleSet, elemModuleSet )
 import CoreSubst
 import CoreOpt          ( exprIsLambda_maybe )
-import CoreFVs          ( exprFreeVars, exprsFreeVars, bindFreeVars
+import CoreFVs          ( mkExprInScopeSet, exprsFreeVars, bindFreeVars
                         , rulesFreeVarsDSet, exprsOrphNames, exprFreeVarsList )
 import CoreUtils        ( exprType, eqExpr, mkTick, mkTicks,
                           stripTicksTopT, stripTicksTopE,
@@ -1247,7 +1247,7 @@ ruleAppCheck_help env fn args rules
           lhs_fvs = exprsFreeVars rule_args     -- Includes template tyvars
           match_fn rule_arg arg = match renv emptyRuleSubst rule_arg arg
                 where
-                  in_scope = mkInScopeSet (lhs_fvs `unionVarSet` exprFreeVars arg)
+                  in_scope = mkInScopeSet lhs_fvs `unionInScope` mkExprInScopeSet arg
                   renv = RV { rv_lcl   = mkRnEnv2 in_scope
                             , rv_tmpls = mkVarSet rule_bndrs
                             , rv_fltR  = mkEmptySubst in_scope
