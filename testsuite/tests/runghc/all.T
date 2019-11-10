@@ -12,6 +12,6 @@ test('T17171b', req_interp, makefile_test, [])
 test('T-signals-child',
      [ when(opsys('mingw32'), skip), req_interp
      , only_ways(['threaded1', 'threaded2'])
-     , fragile_for(17307, ['threaded1', 'threaded2'])
+     , fragile_for(17307, ['threaded1', 'threaded2', 'nonmoving_thr'])
      ],
      makefile_test, [])
