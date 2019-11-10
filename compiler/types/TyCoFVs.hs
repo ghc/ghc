@@ -317,7 +317,7 @@ tyCoFVsOfType :: Type -> FV
 -- See Note [Free variables of types]
 tyCoFVsOfType = typeFVs
 
-typeFVs :: FVM m => Type -> m
+typeFVs :: FreeVarStrategy m => Type -> m
 typeFVs (TyVarTy v)        = unitFV v
 typeFVs (TyConApp _ tys)   = foldMap typeFVs tys
 typeFVs (LitTy {})         = mempty
@@ -333,7 +333,7 @@ typeFVs (CoercionTy co)    = coFVs co
 {-# SPECIALISE typeFVs :: Type -> NoFVs #-}
 
 -- | Free vars of (forall b. <thing with fvs>)
-tyCoFVsBndr :: FVM m => TyCoVarBinder -> m -> m
+tyCoFVsBndr :: FreeVarStrategy m => TyCoVarBinder -> m -> m
 tyCoFVsBndr (Bndr tv _) = tyCoFVsVarBndr tv
 {-# SPECIALISE tyCoFVsBndr :: TyCoVarBinder -> FV -> FV #-}
 {-# SPECIALISE tyCoFVsBndr :: TyCoVarBinder -> NonDetFV -> NonDetFV #-}
@@ -341,7 +341,7 @@ tyCoFVsBndr (Bndr tv _) = tyCoFVsVarBndr tv
 {-# SPECIALISE tyCoFVsBndr :: TyCoVarBinder -> LocalNonDetFV -> LocalNonDetFV #-}
 {-# SPECIALISE tyCoFVsBndr :: TyCoVarBinder -> NoFVs -> NoFVs #-}
 
-tyCoFVsVarBndrs :: FVM m => [Var] -> m -> m
+tyCoFVsVarBndrs :: FreeVarStrategy m => [Var] -> m -> m
 tyCoFVsVarBndrs vars fvs = foldr tyCoFVsVarBndr fvs vars
 {-# SPECIALISE tyCoFVsVarBndrs :: [Var] -> FV -> FV #-}
 {-# SPECIALISE tyCoFVsVarBndrs :: [Var] -> NonDetFV -> NonDetFV #-}
@@ -350,7 +350,7 @@ tyCoFVsVarBndrs vars fvs = foldr tyCoFVsVarBndr fvs vars
 {-# SPECIALISE tyCoFVsVarBndrs :: [Var] -> NoFVs -> NoFVs #-}
 
 
-tyCoFVsVarBndr :: FVM m => Var -> m -> m
+tyCoFVsVarBndr :: FreeVarStrategy m => Var -> m -> m
 tyCoFVsVarBndr var fvs
   = typeFVs (varType var)   -- Free vars of its type/kind
     <> bindVar var fvs       -- Delete it from the thing-inside
@@ -361,7 +361,7 @@ tyCoFVsVarBndr var fvs
 {-# SPECIALISE tyCoFVsVarBndr :: Var -> NoFVs -> NoFVs #-}
 
 
-tyCoFVsOfTypes :: FVM m => [Type] -> m
+tyCoFVsOfTypes :: FreeVarStrategy m => [Type] -> m
 -- See Note [Free variables of types]
 tyCoFVsOfTypes = foldMap typeFVs
 
@@ -387,10 +387,10 @@ tyCoFVsOfCo = coFVs
 tyCoFVsOfCos :: [Coercion] -> FV
 tyCoFVsOfCos = cosFVs
 
-cosFVs :: FVM m => [Coercion] -> m
+cosFVs :: FreeVarStrategy m => [Coercion] -> m
 cosFVs cos = mconcat $ fmap coFVs cos
 
-coFVs :: FVM m => Coercion -> m
+coFVs :: FreeVarStrategy m => Coercion -> m
 coFVs (Refl ty) = typeFVs ty
 coFVs (GRefl _ ty mco) = typeFVs ty <> mcoFVs mco
 coFVs (CoVarCo cv) = unitFV cv
@@ -415,7 +415,7 @@ coFVs (AxiomRuleCo _ cos) = cosFVs cos
 {-# SPECIALISE coFVs :: Coercion -> LocalNonDetFV #-}
 {-# SPECIALISE coFVs :: Coercion -> NoFVs #-}
 
-mcoFVs :: FVM m => MCoercion -> m
+mcoFVs :: FreeVarStrategy m => MCoercion -> m
 mcoFVs MRefl = mempty
 mcoFVs (MCo co) = coFVs co
 {-# SPECIALISE mcoFVs :: MCoercion -> FV #-}
@@ -424,7 +424,7 @@ mcoFVs (MCo co) = coFVs co
 {-# SPECIALISE mcoFVs :: MCoercion -> LocalNonDetFV #-}
 {-# SPECIALISE mcoFVs :: MCoercion -> NoFVs #-}
 
-provFVs :: FVM m => UnivCoProvenance -> m
+provFVs :: FreeVarStrategy m => UnivCoProvenance -> m
 provFVs (PhantomProv co)    = coFVs co
 provFVs (ProofIrrelProv co) = coFVs co
 provFVs UnsafeCoerceProv    = mempty

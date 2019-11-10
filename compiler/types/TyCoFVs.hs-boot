@@ -1,7 +1,7 @@
 module TyCoFVs where
 
 import TyCoRep (Type)
-import FVM
+import FreeVarStrategy
 
-typeFVs :: FVM m => Type -> m
+typeFVs :: FreeVarStrategy m => Type -> m
 

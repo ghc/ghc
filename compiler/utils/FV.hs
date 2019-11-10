@@ -6,7 +6,7 @@
 
 module FV
   ( -- | An abstraction over free variable computations
-    FVM(..)
+    FreeVarStrategy(..)
     -- * Are there any free variables at all?
   , NoFVs, noFVs
     -- * Deterministic free variable computation
@@ -41,7 +41,7 @@ module FV
 import GhcPrelude
 import GHC.Exts (oneShot)
 
-import FVM
+import FreeVarStrategy
 
 import {-# SOURCE #-} TyCoRep (coHoleCoVar)
 import {-# SOURCE #-} TyCoFVs (typeFVs)
@@ -70,7 +70,7 @@ instance Semigroup NoFVs where
   NoFVs f <> NoFVs g = NoFVs $ oneShot $ \in_scope -> f in_scope && g in_scope
   {-# INLINE (<>) #-}
 
-instance FVM NoFVs where
+instance FreeVarStrategy NoFVs where
   coholeFV _hole = mempty
   unitFV v = NoFVs $ \in_scope -> v `elemVarSet` in_scope
   bindVar tv (NoFVs f) = NoFVs $ \in_scope -> f $! extendVarSet in_scope tv
@@ -104,7 +104,7 @@ instance Semigroup NonDetFV where
   NonDetFV f <> NonDetFV g = NonDetFV $ oneShot $ \is -> oneShot $ \acc -> f is $! (g is $! acc)
   {-# INLINE (<>) #-}
 
-instance FVM NonDetFV where
+instance FreeVarStrategy NonDetFV where
   coholeFV hole = unitFV $ coHoleCoVar hole
   unitFV v = NonDetFV $ oneShot $ \is -> oneShot $ \acc ->
     if | v `elemVarSet` is  -> acc
@@ -136,7 +136,7 @@ instance Semigroup NonDetCoFV where
   NonDetCoFV f <> NonDetCoFV g = NonDetCoFV $ oneShot $ \is -> oneShot $ \acc -> f is $! (g is $! acc)
   {-# INLINE (<>) #-}
 
-instance FVM NonDetCoFV where
+instance FreeVarStrategy NonDetCoFV where
   coholeFV hole = unitFV $ coHoleCoVar hole
   unitFV v = NonDetCoFV $ \is acc ->
     if | not (isCoVar v)    -> acc
@@ -188,7 +188,7 @@ whenIsInteresting var f = FV $ oneShot g
       | var `elemVarSet` have_set  = acc
       | otherwise                  = runFV f fv_cand in_scope acc
 
-instance FVM FV where
+instance FreeVarStrategy FV where
   coholeFV hole = unitFV $ coHoleCoVar hole
   unitFV var = whenIsInteresting var $ typeFVs (varType var) <> add_fv var
     where
@@ -225,7 +225,7 @@ filterFV fv_cand2 (FV fv) = FV $ \fv_cand1 in_scope acc ->
 {-# INLINE filterFV #-}
 
 -- | Return no free variables.
-emptyFV :: FVM fv => fv
+emptyFV :: FreeVarStrategy fv => fv
 emptyFV = mempty
 {-# INLINE emptyFV #-}
 
@@ -243,7 +243,7 @@ delFVs vars (FV fv) = FV $ \fv_cand !in_scope acc ->
 mapUnionFV :: (a -> FV) -> [a] -> FV
 mapUnionFV = foldMap
 
-unionFV :: FVM fv => fv -> fv -> fv
+unionFV :: FreeVarStrategy fv => fv -> fv -> fv
 unionFV = (<>)
 
 mkFVs :: [Var] -> FV
@@ -261,7 +261,7 @@ newtype FilteredFV pred fv = FilteredFV { runFilteredFV :: fv }
 class FVFilterPred pred where
   fvIsInteresting :: Proxy pred -> InterestingVarFun
 
-instance (FVM fv, Monoid fv, FVFilterPred pred) => FVM (FilteredFV pred fv) where
+instance (FreeVarStrategy fv, Monoid fv, FVFilterPred pred) => FreeVarStrategy (FilteredFV pred fv) where
   coholeFV = FilteredFV . coholeFV
   unitFV v
     | fvIsInteresting proxy v = FilteredFV (unitFV v)

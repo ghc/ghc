@@ -246,16 +246,16 @@ exprsSomeFreeVarsDSet fv_cand e =
 --                          | otherwise                    = set
 --      SLPJ Feb06
 
-addBndr :: FVM fv => CoreBndr -> fv -> fv
+addBndr :: FreeVarStrategy fv => CoreBndr -> fv -> fv
 addBndr bndr fv
   = typeFVs (varType bndr) `unionFV` bindVar bndr fv
         -- Include type variables in the binder's type
         --      (not just Ids; coercion variables too!)
 
-addBndrs :: FVM fv => [CoreBndr] -> fv -> fv
+addBndrs :: FreeVarStrategy fv => [CoreBndr] -> fv -> fv
 addBndrs bndrs fv = foldr addBndr fv bndrs
 
-expr_fvs :: FVM fv => CoreExpr -> fv
+expr_fvs :: FreeVarStrategy fv => CoreExpr -> fv
 expr_fvs (Type ty) = typeFVs ty
 expr_fvs (Coercion co) = coFVs co
 expr_fvs (Var var) = FV.unitFV var
@@ -283,16 +283,16 @@ expr_fvs (Let (Rec pairs) body)
 {-# SPECIALISE expr_fvs :: CoreExpr -> NoFVs #-}
 
 ---------
-rhs_fvs :: FVM fv => (Id, CoreExpr) -> fv
+rhs_fvs :: FreeVarStrategy fv => (Id, CoreExpr) -> fv
 rhs_fvs (bndr, rhs)
   = expr_fvs rhs `unionFV` bndrRuleAndUnfoldingFVs bndr
     -- Treat any RULES as extra RHSs of the binding
 
 ---------
-exprs_fvs :: FVM fv => [CoreExpr] -> fv
+exprs_fvs :: FreeVarStrategy fv => [CoreExpr] -> fv
 exprs_fvs exprs = foldMap expr_fvs exprs
 
-tickish_fvs :: FVM fv => Tickish Id -> fv
+tickish_fvs :: FreeVarStrategy fv => Tickish Id -> fv
 tickish_fvs (Breakpoint _ ids) = foldMap FV.unitFV ids
 tickish_fvs _ = mempty
 
@@ -502,7 +502,7 @@ ruleLhsFreeIdsList :: CoreRule -> [Var]
 -- and returns them as a determinisitcally ordered list
 ruleLhsFreeIdsList = fvVarList . ruleLhsFVIds
 
-ruleLhsFVIds :: FVM fv => CoreRule -> fv
+ruleLhsFVIds :: FreeVarStrategy fv => CoreRule -> fv
 -- ^ This finds all locally-defined free Ids on the left hand side of a rule
 -- and returns an FV computation
 ruleLhsFVIds (BuiltinRule {}) = emptyFV
@@ -638,7 +638,7 @@ idFVs id = ASSERT( isId id)
 bndrRuleAndUnfoldingVarsDSet :: Id -> DVarSet
 bndrRuleAndUnfoldingVarsDSet id = fvDVarSet $ bndrRuleAndUnfoldingFVs id
 
-bndrRuleAndUnfoldingFVs :: FVM fv => Id -> fv
+bndrRuleAndUnfoldingFVs :: FreeVarStrategy fv => Id -> fv
 bndrRuleAndUnfoldingFVs id
   | isId id   = idRuleFVs id `unionFV` idUnfoldingFVs id
   | otherwise = mempty
@@ -646,7 +646,7 @@ bndrRuleAndUnfoldingFVs id
 idRuleVars ::Id -> VarSet  -- Does *not* include CoreUnfolding vars
 idRuleVars id = fvVarSet $ idRuleFVs id
 
-idRuleFVs :: FVM fv => Id -> fv
+idRuleFVs :: FreeVarStrategy fv => Id -> fv
 idRuleFVs id = ASSERT( isId id)
   foldMap unitFV (dVarSetElems $ ruleInfoFreeVars (idSpecialisation id))
 
@@ -658,13 +658,13 @@ idUnfoldingVars :: Id -> VarSet
 -- we might get out-of-scope variables
 idUnfoldingVars id = fvVarSet $ idUnfoldingFVs id
 
-idUnfoldingFVs :: FVM fv => Id -> fv
+idUnfoldingFVs :: FreeVarStrategy fv => Id -> fv
 idUnfoldingFVs id = stableUnfoldingFVs (realIdUnfolding id) `orElse` mempty
 
 stableUnfoldingVars :: Unfolding -> Maybe VarSet
 stableUnfoldingVars unf = fvVarSet `fmap` stableUnfoldingFVs unf
 
-stableUnfoldingFVs :: FVM fv => Unfolding -> Maybe fv
+stableUnfoldingFVs :: FreeVarStrategy fv => Unfolding -> Maybe fv
 stableUnfoldingFVs unf
   = case unf of
       CoreUnfolding { uf_tmpl = rhs, uf_src = src }
