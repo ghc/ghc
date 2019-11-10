@@ -39,6 +39,7 @@ import Foreign.Marshal.Array
 import Foreign.Ptr
 import Foreign.Storable
 import System.Posix.Internals
+#include <sys/types.h>
 #include <sys/sysctl.h>
 #elif defined(mingw32_HOST_OS)
 import Control.Exception
