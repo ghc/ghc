@@ -2,7 +2,7 @@ variables:
   GIT_SSL_NO_VERIFY: "1"
 
   # Commit of ghc/ci-images repository from which to pull Docker images
-  DOCKER_REV: 69abb3614435999fd0895bc8a231b7494063e20c
+  DOCKER_REV: 5f82c9706f15c717d8bd8ca5eb98619417562dbc
 
   # Sequential version number capturing the versions of all tools fetched by
   # .gitlab/win32-init.sh.
@@ -147,12 +147,16 @@ lint-submods-branch:
   extends: .lint-submods
   script:
     - "echo Linting submodule changes between $CI_COMMIT_BEFORE_SHA..$CI_COMMIT_SHA"
+    - git submodule sync
     - git submodule foreach git remote update
-    - submodchecker .git $(git rev-list $CI_COMMIT_BEFORE_SHA..$CI_COMMIT_SHA)
+    - git -C utils/haddock branch -r --contains $(git -C utils/haddock rev-parse HEAD)
+    - git -C utils/haddock branch -r
+    - submodchecker . $(git rev-parse HEAD^ HEAD)
   only:
     refs:
       - master
       - /ghc-[0-9]+\.[0-9]+/
+      - test
 
 .lint-changelogs:
   <<: *only-default
