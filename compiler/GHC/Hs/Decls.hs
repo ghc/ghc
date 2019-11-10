@@ -1471,7 +1471,8 @@ instance OutputableBndrId p
 
 instance OutputableBndrId p
        => Outputable (StandaloneKindSig (GhcPass p)) where
-  ppr (StandaloneKindSig _ v ki) = text "type" <+> ppr v <+> text "::" <+> ppr ki
+  ppr (StandaloneKindSig _ v ki)
+    = text "type" <+> pprPrefixOcc (unLoc v) <+> text "::" <+> ppr ki
   ppr (XStandaloneKindSig nec) = noExtCon nec
 
 instance Outputable NewOrData where
