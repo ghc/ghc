@@ -695,9 +695,29 @@ cgAlts _ _ _ _ = panic "cgAlts"
 -- Note [Double switching for big families]
 -- ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 --
--- Generally, switching on big family alternatives
+-- An algebraic data type can have a n >= 0 summands
+-- (or alternatives), which are identified (labeled) by
+-- constructors. In memory they are kept apart by tags
+-- (see Note [Data constructor dynamic tags] in GHC.StgToCmm.Closure).
+-- Due to the characteristics of the platform that
+-- contribute to the alignment of memory objects, there
+-- is a natural limit of information about constructors
+-- that can be encoded in the pointer tag. When the mapping
+-- of constructors to the pointer tag range 1..mAX_PTR_TAG
+-- is not injective, then we have a "big data type", also
+-- called a "big (constructor) family" in the literature.
+-- Constructor tags residing in the info table are injective,
+-- but considerably more expensive to obtain, due to additional
+-- memory access(es).
+--
+-- When doing case analysis on a value of a "big data type"
+-- we need two nested switch statements to make up for the lack
+-- of injectivity of pointer tagging, also taking the info
+-- table tag into account. The exact mechanism is described next.
+--
+-- In the general case, switching on big family alternatives
 -- is done by two nested switch statements. According to
--- note [Tagging big families], the outer switch
+-- Note [Tagging big families], the outer switch
 -- looks at the pointer tag and the inner dereferences the
 -- pointer and switches on the info table tag.
 --
