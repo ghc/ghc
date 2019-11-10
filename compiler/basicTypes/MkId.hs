@@ -1392,7 +1392,6 @@ seqId = pcMiscPrelId seqName ty info
   where
     info = noCafIdInfo `setInlinePragInfo` inline_prag
                        `setUnfoldingInfo`  mkCompulsoryUnfolding rhs
-                       `setNeverLevPoly`   ty
 
     inline_prag
          = alwaysInlinePragma `setInlinePragmaActivation` ActiveAfter
