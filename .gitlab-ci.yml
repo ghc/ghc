@@ -148,11 +148,14 @@ lint-submods-branch:
   script:
     - "echo Linting submodule changes between $CI_COMMIT_BEFORE_SHA..$CI_COMMIT_SHA"
     - git submodule foreach git remote update
-    - submodchecker .git $(git rev-list $CI_COMMIT_BEFORE_SHA..$CI_COMMIT_SHA)
+    - git -C utils/haddock branch -r --contains $(git -C utils/haddock rev-parse HEAD)
+    - git -C utils/haddock branch -r
+    - submodchecker .git $(git rev-parse HEAD^ HEAD)
   only:
     refs:
       - master
       - /ghc-[0-9]+\.[0-9]+/
+      - test
 
 .lint-changelogs:
   <<: *only-default
