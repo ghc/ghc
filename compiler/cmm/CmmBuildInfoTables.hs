@@ -1080,9 +1080,10 @@ updInfoSRTs _ _ _ _ (CmmData s (CmmStaticsRaw lbl statics))
   = [CmmData s (RawCmmStatics lbl statics)]
 
 updInfoSRTs dflags _ _ caffy (CmmData s (CmmStatics lbl itbl ccs payload))
-  = [CmmData s (RawCmmStatics lbl (map CmmStaticLit (mkStaticClosureFields dflags itbl ccs caf_info {- FIXME -} payload)))]
+  = [CmmData s (RawCmmStatics lbl (map CmmStaticLit field_lits))]
   where
     caf_info = if caffy then MayHaveCafRefs else NoCafRefs
+    field_lits = mkStaticClosureFields dflags itbl ccs caf_info payload
 
 updInfoSRTs dflags srt_env funSRTEnv caffy (CmmProc top_info top_l live g)
   | Just (_,closure) <- maybeStaticClosure = [ proc, closure ]
