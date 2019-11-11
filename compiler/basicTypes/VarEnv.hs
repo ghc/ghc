@@ -126,7 +126,7 @@ getInScopeVars ::  InScopeSet -> VarSet
 getInScopeVars (InScope vs _) = vs
 
 mkInScopeSet :: VarSet -> InScopeSet
-mkInScopeSet in_scope = InScope in_scope 1
+mkInScopeSet in_scope = InScope in_scope (sizeUniqSet in_scope)
 
 extendInScopeSet :: InScopeSet -> Var -> InScopeSet
 extendInScopeSet (InScope in_scope n) v
