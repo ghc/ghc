@@ -273,7 +273,7 @@ shortcutWeightMap cuts cfg =
 --             \                  \
 --              -> C    =>         -> C
 --
-addImmediateSuccessor :: BlockId -> BlockId -> CFG -> CFG
+addImmediateSuccessor :: HasDebugCallStack => BlockId -> BlockId -> CFG -> CFG
 addImmediateSuccessor node follower cfg
     = updateEdges . addWeightEdge node follower uncondWeight $ cfg
     where
@@ -289,10 +289,15 @@ addImmediateSuccessor node follower cfg
 -- | Adds a new edge, overwrites existing edges if present
 addEdge :: BlockId -> BlockId -> EdgeInfo -> CFG -> CFG
 addEdge from to info cfg =
-    mapAlter addDest from cfg
+    mapAlter addFromToEdge from $
+    mapAlter addDestNode to cfg
     where
-        addDest Nothing = Just $ mapSingleton to info
-        addDest (Just wm) = Just $ mapInsert to info wm
+        -- Simply insert the edge into the edge list.
+        addFromToEdge Nothing = Just $ mapSingleton to info
+        addFromToEdge (Just wm) = Just $ mapInsert to info wm
+        -- We must add the destination node explicitly as well
+        addDestNode Nothing = Just $ mapEmpty
+        addDestNode n@(Just _) = n
 
 
 -- | Adds a edge with the given weight to the cfg
@@ -323,7 +328,7 @@ getSuccessorEdges :: HasDebugCallStack => CFG -> BlockId -> [(BlockId,EdgeInfo)]
 getSuccessorEdges m bid = maybe lookupError mapToList (mapLookup bid m)
   where
     lookupError = pprPanic "getSuccessorEdges: Block does not exist" $
-                    ppr bid <+> pprEdgeWeights m
+                    ppr bid $$ text "CFG:" <+> pprEdgeWeights m
 
 getEdgeInfo :: BlockId -> BlockId -> CFG -> Maybe EdgeInfo
 getEdgeInfo from to m
@@ -586,7 +591,7 @@ findBackEdges root cfg =
       classifyEdges root getSuccs edges :: [((BlockId,BlockId),EdgeType)]
 
 
-optimizeCFG :: D.CfgWeights -> RawCmmDecl -> CFG -> CFG
+optimizeCFG :: HasDebugCallStack => D.CfgWeights -> RawCmmDecl -> CFG -> CFG
 optimizeCFG _ (CmmData {}) cfg = cfg
 optimizeCFG weights (CmmProc info _lab _live graph) cfg =
     favourFewerPreds  .

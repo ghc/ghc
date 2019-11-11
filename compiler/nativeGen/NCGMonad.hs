@@ -20,7 +20,7 @@ module NCGMonad (
         addNodeBetweenNat,
         addImmediateSuccessorNat,
         updateCfgNat,
-        getUniqueNat,
+        getUniqueNat, getCfgNat,
         mapAccumLNat,
         setDeltaNat,
         getDeltaNat,
@@ -67,6 +67,7 @@ import Instruction
 import Outputable (SDoc, pprPanic, ppr)
 import Cmm (RawCmmDecl, CmmStatics)
 import CFG
+import Util
 
 data NcgImpl statics instr jumpDest = NcgImpl {
     cmmTopCodeGen             :: RawCmmDecl -> NatM [NatCmmDecl statics instr],
@@ -211,6 +212,9 @@ updateCfgNat f
         = NatM $ \ st -> let !cfg' = f (natm_cfg st)
                          in ((), st { natm_cfg = cfg'})
 
+getCfgNat :: NatM CFG
+getCfgNat = NatM $ \ st -> (natm_cfg st, st)
+
 -- | Record that we added a block between `from` and `old`.
 addNodeBetweenNat :: BlockId -> BlockId -> BlockId -> NatM ()
 addNodeBetweenNat from between to
@@ -234,7 +238,7 @@ addNodeBetweenNat from between to
 
 -- | Place `succ` after `block` and change any edges
 --   block -> X to `succ` -> X
-addImmediateSuccessorNat :: BlockId -> BlockId -> NatM ()
+addImmediateSuccessorNat :: HasDebugCallStack => BlockId -> BlockId -> NatM ()
 addImmediateSuccessorNat block succ
         = updateCfgNat (addImmediateSuccessor block succ)
 
