@@ -243,7 +243,7 @@ data HscStatus
     | HscRecomp
         { hscs_guts       :: CgGuts
           -- ^ Information for the code generator.
-        , hscs_summary    :: ModSummary
+        , hscs_mod_location :: !ModLocation
           -- ^ Module info
         , hscs_partial_iface  :: !PartialModIface
           -- ^ Partial interface
