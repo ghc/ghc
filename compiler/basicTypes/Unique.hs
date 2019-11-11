@@ -33,8 +33,8 @@ module Unique (
         getKey,                         -- Used in Var, UniqFM, Name only!
         mkUnique, unpkUnique,           -- Used in BinIface only
         eqUnique, ltUnique,
+        incrUnique,
 
-        deriveUnique,                   -- Ditto
         newTagUnique,                   -- Used in CgCase
         initTyVarUnique,
         initExitJoinUnique,
@@ -64,7 +64,12 @@ module Unique (
         -- *** From TyCon name uniques
         tyConRepNameUnique,
         -- *** From DataCon name uniques
-        dataConWorkerUnique, dataConTyRepNameUnique
+        dataConWorkerUnique, dataConTyRepNameUnique,
+
+        -- ** Local uniques
+        -- | These are exposed exclusively for use by 'VarEnv.uniqAway', which
+        -- has rather peculiar needs. See Note [Local uniques].
+        mkLocalUnique, minLocalUnique, maxLocalUnique
     ) where
 
 #include "HsVersions.h"
@@ -119,7 +124,6 @@ getKey          :: Unique -> Int                -- for Var
 
 incrUnique   :: Unique -> Unique
 stepUnique   :: Unique -> Int -> Unique
-deriveUnique :: Unique -> Int -> Unique
 newTagUnique :: Unique -> Char -> Unique
 
 mkUniqueGrimily = MkUnique
@@ -130,10 +134,14 @@ getKey (MkUnique x) = x
 incrUnique (MkUnique i) = MkUnique (i + 1)
 stepUnique (MkUnique i) n = MkUnique (i + n)
 
--- deriveUnique uses an 'X' tag so that it won't clash with
--- any of the uniques produced any other way
--- SPJ says: this looks terribly smelly to me!
-deriveUnique (MkUnique i) delta = mkUnique 'X' (i + delta)
+mkLocalUnique :: Int -> Unique
+mkLocalUnique i = mkUnique 'X' i
+
+minLocalUnique :: Unique
+minLocalUnique = mkLocalUnique 0
+
+maxLocalUnique :: Unique
+maxLocalUnique = mkLocalUnique uniqueMask
 
 -- newTagUnique changes the "domain" of a unique to a different char
 newTagUnique u c = mkUnique c i where (_,i) = unpkUnique u
@@ -344,7 +352,7 @@ Allocation of unique supply characters:
         v,t,u : for renumbering value-, type- and usage- vars.
         B:   builtin
         C-E: pseudo uniques     (used in native-code generator)
-        X:   uniques derived by deriveUnique
+        X:   uniques from mkLocalUnique
         _:   unifiable tyvars   (above)
         0-9: prelude things below
              (no numbers left any more..)
@@ -443,3 +451,4 @@ mkTcOccUnique   fs = mkUnique 'c' (uniqueOfFS fs)
 
 initExitJoinUnique :: Unique
 initExitJoinUnique = mkUnique 's' 0
+
