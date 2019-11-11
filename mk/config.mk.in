@@ -363,6 +363,7 @@ UseSystemLibFFI=@UseSystemLibFFI@
 FFILibDir=@FFILibDir@
 FFIIncludeDir=@FFIIncludeDir@
 
+UseLibdw=@UseLibdw@
 LibdwLibDir=@LibdwLibDir@
 LibdwIncludeDir=@LibdwIncludeDir@
 
