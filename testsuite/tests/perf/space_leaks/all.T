@@ -4,7 +4,7 @@ test('space_leak_001',
      # collect_stats('all',5) to test all 3 with
      # 5% possible deviation.
      [collect_stats(['peak_megabytes_allocated','bytes allocated'],5),
-      collect_stats('max_bytes_used',15),
+      collect_runtime_residency(15),
       omit_ways(['profasm','profthreaded','threaded1','threaded2','nonmoving_thr']),
       reqlib('integer-gmp')
       ],
@@ -32,7 +32,8 @@ test('T4018',
      compile_and_run, ['-fno-state-hack'])
 
 test('T4029',
-     [collect_stats(['peak_megabytes_allocated','max_bytes_used'],10),
+     [collect_stats(['peak_megabytes_allocated'],10),
+      collect_runtime_residency(10),
       extra_hc_opts('+RTS -G1 -RTS' ),
       ],
      ghci_script,
