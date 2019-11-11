@@ -219,16 +219,16 @@ compileOne' m_tc_result mHscMessage
             let !linkable = LM o_time this_mod [DotO object_filename]
             return $! HomeModInfo iface hmi_details (Just linkable)
         (HscRecomp { hscs_guts = cgguts,
-                     hscs_summary = summary,
+                     hscs_mod_location = mod_location,
                      hscs_partial_iface = partial_iface,
                      hscs_old_iface_hash = mb_old_iface_hash,
                      hscs_iface_dflags = iface_dflags }, HscInterpreted) -> do
             -- In interpreted mode the regular codeGen backend is not run so we
             -- generate a interface without codeGen info.
             final_iface <- mkFullIface hsc_env'{hsc_dflags=iface_dflags} partial_iface
-            liftIO $ hscMaybeWriteIface dflags final_iface mb_old_iface_hash (ms_location summary)
+            liftIO $ hscMaybeWriteIface dflags final_iface mb_old_iface_hash mod_location
 
-            (hasStub, comp_bc, spt_entries) <- hscInteractive hsc_env' cgguts summary
+            (hasStub, comp_bc, spt_entries) <- hscInteractive hsc_env' cgguts mod_location
 
             stub_o <- case hasStub of
                       Nothing -> return []
@@ -1176,7 +1176,7 @@ runPhase (HscOut src_flavour mod_name result) _ dflags = do
                    liftIO $ compileEmptyStub dflags hsc_env' basename location mod_name
                    return (RealPhase StopLn, o_file)
             HscRecomp { hscs_guts = cgguts,
-                        hscs_summary = mod_summary,
+                        hscs_mod_location = mod_location,
                         hscs_partial_iface = partial_iface,
                         hscs_old_iface_hash = mb_old_iface_hash,
                         hscs_iface_dflags = iface_dflags }
@@ -1185,15 +1185,14 @@ runPhase (HscOut src_flavour mod_name result) _ dflags = do
                     PipeState{hsc_env=hsc_env'} <- getPipeState
 
                     (outputFilename, mStub, foreign_files) <- liftIO $
-                      hscGenHardCode hsc_env' cgguts mod_summary output_fn
+                      hscGenHardCode hsc_env' cgguts mod_location output_fn
 
                     final_iface <- liftIO (mkFullIface hsc_env'{hsc_dflags=iface_dflags} partial_iface)
                     setIface final_iface
 
                     -- See Note [Writing interface files]
                     let if_dflags = dflags `gopt_unset` Opt_BuildDynamicToo
-                    liftIO $ hscMaybeWriteIface if_dflags final_iface mb_old_iface_hash
-                                                    (ms_location mod_summary)
+                    liftIO $ hscMaybeWriteIface if_dflags final_iface mb_old_iface_hash mod_location
 
                     stub_o <- liftIO (mapM (compileStub hsc_env') mStub)
                     foreign_os <- liftIO $
