@@ -1,13 +1,12 @@
 
 ==================== Tidy Rules ====================
 "SPEC useAbstractMonad"
-    forall (@ s_X2H0)
-           ($dMonadAbstractIOST_a2Fe
+    forall (@ s)
+           ($dMonadAbstractIOST
               :: Main.MonadAbstractIOST
-                   (Main.ReaderT GHC.Types.Int (GHC.ST.ST s_X2H0))).
-      Main.useAbstractMonad @ (Main.ReaderT
-                                 GHC.Types.Int (GHC.ST.ST s_X2H0))
-                            $dMonadAbstractIOST_a2Fe
-      = Main.useAbstractMonad_$suseAbstractMonad @ s_X2H0
+                   (Main.ReaderT GHC.Types.Int (GHC.ST.ST s))).
+      Main.useAbstractMonad @ (Main.ReaderT GHC.Types.Int (GHC.ST.ST s))
+                            $dMonadAbstractIOST
+      = Main.useAbstractMonad_$suseAbstractMonad @ s
 
 
