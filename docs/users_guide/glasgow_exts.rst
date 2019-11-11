@@ -10380,7 +10380,11 @@ is *not* fine in Haskell today; we have no way to solve such a constraint.
 Here, the quantified constraint ``forall b. (Eq b) => Eq (f b)`` behaves
 a bit like a local instance declaration, and makes the instance typeable.
 
-The paper `Quantified class constraints <http://i.cs.hku.hk/~bruno//papers/hs2017.pdf>`_ (by Bottu, Karachalias, Schrijvers, Oliveira, Wadler, Haskell Symposium 2017) describes this feature in technical detail, with examples, and so is a primary reference source for this proposal.
+The paper `Quantified class constraints
+<https://homepages.inf.ed.ac.uk/wadler/papers/quantcc/quantcc.pdf>`_ (by Bottu, Karachalias,
+Schrijvers, Oliveira, Wadler, Haskell Symposium 2017) describes this feature in
+technical detail, with examples, and so is a primary reference source for this
+feature.
 
 Motivation
 ----------------
