@@ -2,11 +2,12 @@
     UnboxedTuples #-}
 {-# OPTIONS_GHC -fno-warn-name-shadowing #-}
 
--- |
--- Execute GHCi messages.
+-- | This module is part of Remote GHCi.
 --
 -- For details on Remote GHCi, see Note [Remote GHCi] in
 -- compiler/ghci/GHCi.hs.
+--
+-- This module receives and processes the GHC messages
 --
 module GHCi.Run
   ( run, redirectInterrupts
@@ -95,7 +96,8 @@ run m = case m of
   GetClosure ref -> do
     clos <- getClosureData =<< localRef ref
     mapM (\(Box x) -> mkRemoteRef (HValue x)) clos
-  Seq ref -> tryEval (void $ evaluate =<< localRef ref)
+  Seq ref -> doSeq ref
+  ResumeSeq ref -> resumeSeq ref
   _other -> error "GHCi.Run.run"
 
 evalStmt :: EvalOpts -> EvalExpr HValueRef -> IO (EvalStatus [HValueRef])
@@ -129,6 +131,35 @@ evalStringToString r str = do
   tryEval $ do
     r <- (unsafeCoerce io :: String -> IO String) str
     evaluate (force r)
+
+-- Process the Seq message to force a value.                       #2950
+-- If during this processing a breakpoint is hit, return
+-- an EvalBreak value in the EvalStatus to the UI process,
+-- otherwise return an EvalComplete.
+-- The UI process has more information about the breakpoint
+-- than the current iserv process.
+doSeq :: RemoteRef a -> IO (EvalStatus ())
+doSeq ref = do
+    sandboxIO evalOptsSeq $ do
+      _ <- (void $ evaluate =<< localRef ref)
+      return ()
+
+-- Resume the processing  resumeSeq message after a breakpoint was hit. #2950
+resumeSeq :: RemoteRef (ResumeContext ()) -> IO (EvalStatus ())
+resumeSeq hvref = do
+    ResumeContext{..} <- localRef hvref
+    withBreakAction evalOptsSeq resumeBreakMVar resumeStatusMVar $
+      mask_ $ do
+        putMVar resumeBreakMVar () -- this awakens the stopped thread...
+        redirectInterrupts resumeThreadId $ takeMVar resumeStatusMVar
+
+evalOptsSeq :: EvalOpts
+evalOptsSeq = EvalOpts
+              { useSandboxThread = True
+              , singleStep = False
+              , breakOnException = False
+              , breakOnError = False
+              }
 
 -- When running a computation, we redirect ^C exceptions to the running
 -- thread.  ToDo: we might want a way to continue even if the target
@@ -265,7 +296,6 @@ withBreakAction opts breakMVar statusMVar act
      takeMVar breakMVar
 
    resetBreakAction stablePtr = do
-     poke breakPointIOAction noBreakStablePtr
      poke exceptionFlag 0
      resetStepFlag
      freeStablePtr stablePtr
@@ -317,13 +347,6 @@ type BreakpointCallback
 
 foreign import ccall "&rts_breakpoint_io_action"
    breakPointIOAction :: Ptr (StablePtr BreakpointCallback)
-
-noBreakStablePtr :: StablePtr BreakpointCallback
-noBreakStablePtr = unsafePerformIO $ newStablePtr noBreakAction
-
-noBreakAction :: BreakpointCallback
-noBreakAction _ _ False _ = putStrLn "*** Ignoring breakpoint"
-noBreakAction _ _ True  _ = return () -- exception: just continue
 
 -- Malloc and copy the bytes.  We don't have any way to monitor the
 -- lifetime of this memory, so it just leaks.

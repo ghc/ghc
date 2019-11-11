@@ -2,11 +2,13 @@
     GeneralizedNewtypeDeriving, ExistentialQuantification, RecordWildCards #-}
 {-# OPTIONS_GHC -fno-warn-name-shadowing -fno-warn-orphans #-}
 
--- |
--- Remote GHCi message types and serialization.
+-- | This module is part of Remote GHCi.
 --
 -- For details on Remote GHCi, see Note [Remote GHCi] in
 -- compiler/ghci/GHCi.hs.
+--
+-- This module contains the data definitions and some
+-- support funcions used in Remote GHCi
 --
 module GHCi.Message
   ( Message(..), Msg(..)
@@ -215,7 +217,12 @@ data Message a where
   -- | Evaluate something. This is used to support :force in GHCi.
   Seq
     :: HValueRef
-    -> Message (EvalResult ())
+    -> Message (EvalStatus ())
+
+  -- | Resume forcing a free variable in a breakpoint (#2950)
+  ResumeSeq
+    :: RemoteRef (ResumeContext ())
+    -> Message (EvalStatus ())
 
 deriving instance Show (Message a)
 
@@ -492,6 +499,7 @@ getMessage = do
       35 -> Msg <$> (GetClosure <$> get)
       36 -> Msg <$> (Seq <$> get)
       37 -> Msg <$> return RtsRevertCAFs
+      38 -> Msg <$> (ResumeSeq <$> get)
       _  -> error $ "Unknown Message code " ++ (show b)
 
 putMessage :: Message a -> Put
@@ -534,6 +542,7 @@ putMessage m = case m of
   GetClosure a                -> putWord8 35 >> put a
   Seq a                       -> putWord8 36 >> put a
   RtsRevertCAFs               -> putWord8 37
+  ResumeSeq a                 -> putWord8 38 >> put a
 
 -- -----------------------------------------------------------------------------
 -- Reading/writing messages
