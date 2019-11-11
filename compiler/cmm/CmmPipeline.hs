@@ -29,6 +29,7 @@ import HscTypes
 import Control.Monad
 import Outputable
 import GHC.Platform
+import Data.Either (partitionEithers)
 
 -----------------------------------------------------------------------------
 -- | Top level driver for C-- pipeline
@@ -46,7 +47,8 @@ cmmPipeline hsc_env srtInfo prog = withTimingSilent dflags (text "Cmm pipeline")
 
      tops <- {-# SCC "tops" #-} mapM (cpsTop hsc_env) prog
 
-     (srtInfo, cmms) <- {-# SCC "doSRTs" #-} doSRTs dflags srtInfo tops
+     let (procs, data_) = partitionEithers tops
+     (srtInfo, cmms) <- {-# SCC "doSRTs" #-} doSRTs dflags srtInfo procs data_
      dumpWith dflags Opt_D_dump_cmm_cps "Post CPS Cmm" (ppr cmms)
 
      return (srtInfo, cmms)

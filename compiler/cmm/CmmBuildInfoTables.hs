@@ -41,7 +41,6 @@ import qualified Data.Set as Set
 import Data.Tuple
 import Control.Monad.Trans.State
 import Control.Monad.Trans.Class
-import Data.Either (partitionEithers)
 import Data.List (unzip4)
 
 import NameSet
@@ -732,19 +731,16 @@ resolveCAF srtMap lbl@(CAFLabel l) =
 doSRTs
   :: DynFlags
   -> ModuleSRTInfo
-  -> [Either (CAFEnv, [CmmDecl]) (CAFSet, CmmDecl)]
+  -> [(CAFEnv, [CmmDecl])]
+  -> [(CAFSet, CmmDecl)]
   -> IO (ModuleSRTInfo, [CmmDeclSRTs])
 
-doSRTs dflags moduleSRTInfo tops = do
+doSRTs dflags moduleSRTInfo procs data_ = do
   us <- mkSplitUniqSupply 'u'
 
   -- Ignore the original grouping of decls, and combine all the
   -- CAFEnvs into a single CAFEnv.
-  let data_ :: [(CAFSet, CmmDecl)]
-      procs :: [(CAFEnv, [CmmDecl])]
-      (procs, data_) = partitionEithers tops
-
-      static_data_env :: Map CLabel CAFSet
+  let static_data_env :: Map CLabel CAFSet
       static_data_env =
         Map.fromList $
         flip mapMaybe data_ $
@@ -774,7 +770,8 @@ doSRTs dflags moduleSRTInfo tops = do
     cafsWithSRTs :: [(Label, CAFLabel, Set CAFLabel)]
     cafsWithSRTs = getCAFs cafEnv decls
 
-  srtTraceM "doSRTs" (text "tops:" <+> ppr tops $$
+  srtTraceM "doSRTs" (text "data:" <+> ppr data_ $$
+                      text "procs:" <+> ppr procs $$
                       text "static_data_env:" <+> ppr static_data_env $$
                       text "sccs:" <+> ppr sccs $$
                       text "cafsWithSRTs:" <+> ppr cafsWithSRTs)
