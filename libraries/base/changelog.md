@@ -4,7 +4,7 @@
   * Add `IsList` instance for `ZipList`.
 
 ## 4.14.0.0 *TBA*
-  * Bundled with GHC *TBA*
+  * Bundled with GHC 8.10.1
 
   * Add a `TestEquality` instance for the `Compose` newtype.
 
