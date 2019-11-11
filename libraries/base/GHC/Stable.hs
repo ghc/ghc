@@ -19,7 +19,6 @@
 --
 -----------------------------------------------------------------------------
 
-{-
 module GHC.Stable (
         StablePtr(..),
         newStablePtr,
@@ -28,18 +27,10 @@ module GHC.Stable (
         castStablePtrToPtr,
         castPtrToStablePtr
     ) where
--}
-module GHC.Stable where
 
 import GHC.Ptr
 import GHC.Base
 
-data StablePtr a = StablePtr (StablePtr# a)
-
-castPtrToStablePtr :: Ptr () -> StablePtr a
-castPtrToStablePtr (Ptr a) = StablePtr (unsafeCoerce# a)
-
-{-
 -----------------------------------------------------------------------------
 -- Stable Pointers
 
@@ -116,4 +107,3 @@ instance Eq (StablePtr a) where
         case eqStablePtr# sp1 sp2 of
            0# -> False
            _  -> True
--}
