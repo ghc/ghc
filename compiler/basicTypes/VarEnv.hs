@@ -3,6 +3,8 @@
 (c) The GRASP/AQUA Project, Glasgow University, 1992-1998
 -}
 
+{-# LANGUAGE BangPatterns #-}
+
 module VarEnv (
         -- * Var, Id and TyVar environments (maps)
         VarEnv, IdEnv, TyVarEnv, CoVarEnv, TyCoVarEnv,
@@ -126,7 +128,7 @@ getInScopeVars ::  InScopeSet -> VarSet
 getInScopeVars (InScope vs _) = vs
 
 mkInScopeSet :: VarSet -> InScopeSet
-mkInScopeSet in_scope = InScope in_scope 1
+mkInScopeSet in_scope = InScope in_scope (sizeUniqSet in_scope)
 
 extendInScopeSet :: InScopeSet -> Var -> InScopeSet
 extendInScopeSet (InScope in_scope n) v
@@ -134,7 +136,7 @@ extendInScopeSet (InScope in_scope n) v
 
 extendInScopeSetList :: InScopeSet -> [Var] -> InScopeSet
 extendInScopeSetList (InScope in_scope n) vs
-   = let f :: (VarSet, Int) -> Var -> (VarSet, Var)
+   = let f :: (VarSet, Int) -> Var -> (VarSet, Int)
          f (accum, n) v = let !accum' = extendVarSet accum v
                               !n' = n + 1
                           in (accum', n')
