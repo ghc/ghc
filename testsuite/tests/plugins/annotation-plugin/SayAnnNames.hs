@@ -29,5 +29,5 @@ pass g = do
 
 annotationsOn :: Data a => ModGuts -> CoreBndr -> CoreM [a]
 annotationsOn guts bndr = do
-  anns <- getAnnotations deserializeWithData guts
+  (_, anns) <- getAnnotations deserializeWithData guts
   return $ lookupWithDefaultUFM anns [] (varUnique bndr)
