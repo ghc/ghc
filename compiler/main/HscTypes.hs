@@ -1500,11 +1500,18 @@ data CgGuts = CgGuts
     -- ^ Static pointer table entries for static forms defined in the module.
     -- See Note [Grand plan for static forms] in StaticPtrTable
 
-    -- Stuff for ModDetails generation
+    -- Pre-tidied stuff for ModDetails generation
   , cg_tidy_binds :: !CoreProgram
   , cg_trimmed_rules :: ![CoreRule]
   , cg_tidy_env :: !TidyEnv
-  , cg_mod_guts :: !ModGuts
+    -- Stuff from ModGuts for ModDetails generation
+  , cg_mg_tcs :: ![TyCon]
+  , cg_mg_fam_insts :: ![FamInst]
+  , cg_mg_patsyns :: ![PatSyn]
+  , cg_mg_insts :: ![ClsInst]
+  , cg_mg_exports :: ![AvailInfo]
+  , cg_mg_anns :: ![Annotation]
+  , cg_mg_complete_sigs :: ![CompleteMatch]
   }
 
 -----------------------------------

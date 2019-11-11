@@ -703,6 +703,9 @@ instance Outputable InstalledUnitId where
             Just str | not (debugStyle sty) -> text str
             _ -> ftext fs
 
+instance NFData InstalledUnitId where
+    rnf (InstalledUnitId fs) = rnf fs
+
 installedUnitIdKey :: InstalledUnitId -> Unique
 installedUnitIdKey = getUnique . installedUnitIdFS
 
