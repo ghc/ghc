@@ -31,7 +31,7 @@ module Unique (
 
         mkUniqueGrimily,                -- Used in UniqSupply only!
         getKey,                         -- Used in Var, UniqFM, Name only!
-        mkUnique, unpkUnique,           -- Used in BinIface only
+        mkUnique, unpkUnique,
         eqUnique, ltUnique,
 
         deriveUnique,                   -- Ditto
