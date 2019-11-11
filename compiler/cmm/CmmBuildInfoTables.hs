@@ -542,7 +542,7 @@ cafTransfers contLbls entry topLbl
               CmmLit (CmmLabelDiffOff c1 c2 _ _) -> addCAF c1 $! addCAF c2 set
               _ -> set
     in
-      srtTrace2 "cafTransfers" (text "block:" <+> ppr block $$
+      srtTrace "cafTransfers" (text "block:" <+> ppr block $$
                                 text "contLbls:" <+> ppr contLbls $$
                                 text "entry:" <+> ppr entry $$
                                 text "topLbl:" <+> ppr topLbl $$
@@ -622,13 +622,6 @@ getBlockLabels = mapMaybe getBlockLabel
 --   - the info label for a continuation or dynamic closure
 --   - the closure label for a top-level function (not a CAF)
 getLabelledBlocks :: CmmDecl -> [(SomeLabel, CAFLabel)]
-{-
-getLabelledBlocks (CmmData _ (RawCmmStatics lbl _))
-  | Just _ <- hasHaskellName lbl -- just to rule out StringLitLabels (TODO find a better way?)
-  = [ (DeclLabel lbl, mkCAFLabel lbl) ]
-  | otherwise
-  = []
--}
 getLabelledBlocks (CmmData _ (CmmStaticsRaw _ _)) =
   []
 getLabelledBlocks (CmmData _ (CmmStatics lbl _ _ _)) =
@@ -651,7 +644,7 @@ depAnalSRTs
   -> [CmmDecl]
   -> [SCC (SomeLabel, CAFLabel, Set CAFLabel)]
 depAnalSRTs cafEnv cafEnv_static decls =
-  srtTrace2 "depAnalSRTs" (text "decls:" <+> ppr decls $$
+  srtTrace "depAnalSRTs" (text "decls:" <+> ppr decls $$
                            text "nodes:" <+> ppr (map node_payload nodes) $$
                            text "graph:" <+> ppr graph) graph
  where
@@ -662,9 +655,10 @@ depAnalSRTs cafEnv cafEnv_static decls =
   nodes = [ DigraphNode (l,lbl,cafs') l
               (mapMaybe (flip Map.lookup labelToBlock) (Set.toList cafs'))
           | (l, lbl) <- labelledBlocks
-          , Just (cafs :: Set CAFLabel) <- [case l of
-                                              BlockLabel l -> mapLookup l cafEnv
-                                              DeclLabel cl -> Map.lookup cl cafEnv_static]
+          , Just (cafs :: Set CAFLabel) <-
+              [case l of
+                 BlockLabel l -> mapLookup l cafEnv
+                 DeclLabel cl -> Map.lookup cl cafEnv_static]
           , let cafs' = Set.delete lbl cafs
           ]
 
@@ -724,7 +718,7 @@ srtMapNonCAFs srtMap = mkNameSet (mapMaybe get_name (Map.toList srtMap))
 -- | resolve a CAFLabel to its SRTEntry using the SRTMap
 resolveCAF :: SRTMap -> CAFLabel -> Maybe SRTEntry
 resolveCAF srtMap lbl@(CAFLabel l) =
-    srtTrace2 "resolveCAF" ("l:" <+> ppr l <+> "resolved:" <+> ppr ret) ret
+    srtTrace "resolveCAF" ("l:" <+> ppr l <+> "resolved:" <+> ppr ret) ret
   where
     ret = Map.findWithDefault (Just (SRTEntry (toClosureLbl l))) lbl srtMap
 
@@ -776,11 +770,10 @@ doSRTs dflags moduleSRTInfo tops = do
     cafsWithSRTs :: [(Label, CAFLabel, Set CAFLabel)]
     cafsWithSRTs = getCAFs cafEnv decls
 
-  srtTrace2 "doSRTs" (text "tops:" <+> ppr tops $$
+  srtTraceM "doSRTs" (text "tops:" <+> ppr tops $$
                       text "static_data_env:" <+> ppr static_data_env $$
                       text "sccs:" <+> ppr sccs $$
-                      text "cafsWithSRTs:" <+> ppr cafsWithSRTs
-                      ) (return ())
+                      text "cafsWithSRTs:" <+> ppr cafsWithSRTs)
 
   -- On each strongly-connected group of decls, construct the SRT
   -- closures and the SRT fields for info tables.
@@ -796,7 +789,8 @@ doSRTs dflags moduleSRTInfo tops = do
         flip runStateT moduleSRTInfo $ do
           nonCAFs <- mapM (doSCC dflags staticFuns static_data) sccs
           cAFs <- forM cafsWithSRTs $ \(l, cafLbl, cafs) ->
-            oneSRT dflags staticFuns [BlockLabel l] [cafLbl] True{-is a CAF-} cafs static_data
+            oneSRT dflags staticFuns [BlockLabel l] [cafLbl]
+                   True{-is a CAF-} cafs static_data
           return (nonCAFs ++ cAFs)
 
       (srt_declss, pairs, funSRTs, caffy) = unzip4 result
@@ -918,7 +912,7 @@ oneSRT dflags staticFuns lbls caf_lbls isCAF cafs static_data = do
     -- Implements the [Filter] optimisation.
     filtered = Set.fromList resolved `Set.difference` allBelow
 
-  srtTrace2 "oneSRT:"
+  srtTraceM "oneSRT:"
      (text "srtMap:" <+> ppr srtMap $$
       text "nonRec:" <+> ppr nonRec $$
       text "lbls:" <+> ppr lbls $$
@@ -927,7 +921,7 @@ oneSRT dflags staticFuns lbls caf_lbls isCAF cafs static_data = do
       text "cafs:" <+> ppr cafs $$
       text "resolved:" <+> ppr resolved $$
       text "allBelow:" <+> ppr allBelow $$
-      text "filtered:" <+> ppr filtered) $ return ()
+      text "filtered:" <+> ppr filtered)
 
   let
     isStaticFun = isJust maybeFunClosure
@@ -938,7 +932,9 @@ oneSRT dflags staticFuns lbls caf_lbls isCAF cafs static_data = do
     -- see Note [Invalid optimisation: shortcutting].
     updateSRTMap :: Maybe SRTEntry -> StateT ModuleSRTInfo UniqSM ()
     updateSRTMap srtEntry =
-      srtTrace2 "updateSRTMap" (ppr srtEntry <+> "isCAF:" <+> ppr isCAF <+> "isStaticFun:" <+> ppr isStaticFun) $
+      srtTrace "updateSRTMap"
+        (ppr srtEntry <+> "isCAF:" <+> ppr isCAF <+>
+         "isStaticFun:" <+> ppr isStaticFun) $
       when (not isCAF && (not isStaticFun || isNothing srtEntry)) $ do
         let newSRTMap = Map.fromList
               [ (cafLbl, srtEntry)
@@ -947,16 +943,18 @@ oneSRT dflags staticFuns lbls caf_lbls isCAF cafs static_data = do
                 -- statics we refer to the static itself instead of a SRT.
               , not (Set.member clbl static_data) || isNothing srtEntry
               ]
-        srtTrace2 "newSRTMap" (ppr newSRTMap) $
-          modify' (\state -> state{ moduleSRTMap = Map.union newSRTMap (moduleSRTMap state) })
+        srtTrace "newSRTMap" (ppr newSRTMap) $
+          modify' (\state -> state{ moduleSRTMap =
+                                    Map.union newSRTMap (moduleSRTMap state) })
 
     this_mod = thisModule topSRT
 
-    allStaticData = all (\(CAFLabel clbl) -> Set.member clbl static_data) caf_lbls
+    allStaticData =
+      all (\(CAFLabel clbl) -> Set.member clbl static_data) caf_lbls
 
   case Set.toList filtered of
     [] -> do
-      srtTrace2 "oneSRT: empty" (ppr caf_lbls) $ return ()
+      srtTraceM "oneSRT: empty" (ppr caf_lbls)
       updateSRTMap Nothing
       return ([], [], [], False)
 
@@ -988,8 +986,8 @@ oneSRT dflags staticFuns lbls caf_lbls isCAF cafs static_data = do
                 [ (b, if b == staticFunBlock then lbl else staticFunLbl)
                 | b <- blockids ]
           Nothing -> do
-            srtTrace2 "oneSRT: one" (text "caf_lbls:" <+> ppr caf_lbls $$
-                                     text "one:" <+> ppr one) $ return ()
+            srtTraceM "oneSRT: one" (text "caf_lbls:" <+> ppr caf_lbls $$
+                                     text "one:" <+> ppr one)
             updateSRTMap (Just one)
             return ([], map (,lbl) blockids, [], True)
 
@@ -1001,7 +999,7 @@ oneSRT dflags staticFuns lbls caf_lbls isCAF cafs static_data = do
       -- Implements the [Common] optimisation.
       case Map.lookup filtered (dedupSRTs topSRT) of
         Just srtEntry@(SRTEntry srtLbl)  -> do
-          srtTrace2 "oneSRT [Common]" (ppr caf_lbls <+> ppr srtLbl) $ return ()
+          srtTraceM "oneSRT [Common]" (ppr caf_lbls <+> ppr srtLbl)
           updateSRTMap (Just srtEntry)
           return ([], map (,srtLbl) blockids, [], True)
         Nothing -> do
@@ -1019,12 +1017,13 @@ oneSRT dflags staticFuns lbls caf_lbls isCAF cafs static_data = do
               -- When all definition in this group are static data we don't
               -- generate any SRTs.
               newDedupSRTs = Map.insert filtered srtEntry (dedupSRTs topSRT)
-          modify' (\state -> state{ dedupSRTs = newDedupSRTs, flatSRTs = newFlatSRTs })
-          srtTrace2 "oneSRT: new" (text "caf_lbls:" <+> ppr caf_lbls $$
-                                   text "filtered:" <+> ppr filtered $$
-                                   text "srtEntry:" <+> ppr srtEntry $$
-                                   text "newDedupSRTs:" <+> ppr newDedupSRTs $$
-                                   text "newFlatSRTs:" <+> ppr newFlatSRTs) $ return ()
+          modify' (\state -> state{ dedupSRTs = newDedupSRTs,
+                                    flatSRTs = newFlatSRTs })
+          srtTraceM "oneSRT: new" (text "caf_lbls:" <+> ppr caf_lbls $$
+                                    text "filtered:" <+> ppr filtered $$
+                                    text "srtEntry:" <+> ppr srtEntry $$
+                                    text "newDedupSRTs:" <+> ppr newDedupSRTs $$
+                                    text "newFlatSRTs:" <+> ppr newFlatSRTs)
           let SRTEntry lbl = srtEntry
           return (decls, map (,lbl) blockids, funSRTs, True)
 
@@ -1129,6 +1128,5 @@ srtTrace :: String -> SDoc -> b -> b
 -- srtTrace = pprTrace
 srtTrace _ _ b = b
 
-srtTrace2 :: String -> SDoc -> a -> a
--- srtTrace2 = pprTrace
-srtTrace2 _ _ a = a
+srtTraceM :: Applicative f => String -> SDoc -> f ()
+srtTraceM str doc = srtTrace str doc (pure ())
