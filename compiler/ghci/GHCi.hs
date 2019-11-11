@@ -22,6 +22,7 @@ module GHCi
   , breakpointStatus
   , getBreakpointVar
   , getClosure
+  , getModBreaks
   , seqHValue
 
   -- * The object-code linker
@@ -69,6 +70,12 @@ import BasicTypes
 import FastString
 import Util
 import Hooks
+import InteractiveEvalTypes(BreakInfo(..))
+import SrcLoc
+import Maybes
+import Module
+import ByteCodeTypes
+import Unique
 
 import Control.Concurrent
 import Control.Monad
@@ -77,12 +84,12 @@ import Data.Binary
 import Data.Binary.Put
 import Data.ByteString (ByteString)
 import qualified Data.ByteString.Lazy as LB
+import Data.Array ((!))
 import Data.IORef
 import Foreign hiding (void)
 import GHC.Exts.Heap
 import GHC.Stack.CCS (CostCentre,CostCentreStack)
 import System.Exit
-import Data.Maybe
 import GHC.IO.Handle.Types (Handle)
 #if defined(mingw32_HOST_OS)
 import Foreign.C
@@ -359,10 +366,41 @@ getClosure hsc_env ref =
     mb <- iservCmd hsc_env (GetClosure hval)
     mapM (mkFinalizedHValue hsc_env) mb
 
-seqHValue :: HscEnv -> ForeignHValue -> IO ()
+seqHValue :: HscEnv -> ForeignHValue -> IO (EvalResult ())
 seqHValue hsc_env ref =
   withForeignRef ref $ \hval ->
-    iservCmd hsc_env (Seq hval) >>= fromEvalResult
+    iservCmd hsc_env (Seq hval) >>= handleSeqHValueStatus hsc_env
+
+handleSeqHValueStatus :: HscEnv -> EvalStatus () -> IO (EvalResult ()) -- #2950
+handleSeqHValueStatus hsc_env eval_status = do
+  case eval_status of
+    (EvalBreak is_exception _ ix mod_uniq resume_ctxt _) -> do
+      resume_ctxt_fhv <- liftIO $ mkFinalizedHValue hsc_env resume_ctxt
+      let hmi = expectJust "handleRunStatus" $
+                  lookupHptDirectly (hsc_HPT hsc_env)
+                    (mkUniqueGrimily mod_uniq)
+          modl = mi_module (hm_iface hmi)
+          bp | is_exception = Nothing
+             | otherwise = Just (BreakInfo modl ix)
+          sdocBpLoc = brackets . ppr . getSeqBpSpan hsc_env
+      putStrLn ("*** Ignoring breakpoint " ++
+            (showSDocUnqual (hsc_dflags hsc_env) $ sdocBpLoc bp))
+      -- continue with the seq (:force) processing in Interpreter
+      withForeignRef resume_ctxt_fhv $ \hval ->
+        iservCmd hsc_env (ResumeSeq hval) >>= handleSeqHValueStatus hsc_env
+    (EvalComplete _ r) -> return r
+
+getSeqBpSpan :: HscEnv -> Maybe BreakInfo -> SrcSpan
+-- Just case: we stopped at a breakpoint, we can extract SrcSpan information
+-- from the breakpoint.
+getSeqBpSpan hsc_env (Just BreakInfo{..}) =
+    (modBreaks_locs breaks) ! breakInfo_number
+  where
+    breaks  = getModBreaks $ expectJust "getSeqBpSpan" $
+                lookupHpt (hsc_HPT hsc_env) (moduleName breakInfo_module)
+-- Nothing case - should not occur!
+-- Reason: Setting of flags in libraries/ghci/GHCi/Run.hs:evalOptsSeq
+getSeqBpSpan _ Nothing = mkGeneralSrcSpan (fsLit "<unknown>")
 
 -- -----------------------------------------------------------------------------
 -- Interface to the object-code linker
@@ -665,3 +703,11 @@ mkEvalOpts dflags step =
 fromEvalResult :: EvalResult a -> IO a
 fromEvalResult (EvalException e) = throwIO (fromSerializableException e)
 fromEvalResult (EvalSuccess a) = return a
+
+getModBreaks :: HomeModInfo -> ModBreaks
+getModBreaks hmi
+  | Just linkable <- hm_linkable hmi,
+    [BCOs cbc _] <- linkableUnlinked linkable
+  = fromMaybe emptyModBreaks (bc_breaks cbc)
+  | otherwise
+  = emptyModBreaks -- probably object code
