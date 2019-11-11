@@ -699,7 +699,7 @@ specConstrProgram guts
   = do
       dflags <- getDynFlags
       us     <- getUniqueSupplyM
-      annos  <- getFirstAnnotations deserializeWithData guts
+      (_, annos) <- getFirstAnnotations deserializeWithData guts
       this_mod <- getModule
       let binds' = reverse $ fst $ initUs us $ do
                     -- Note [Top-level recursive groups]

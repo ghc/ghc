@@ -64,10 +64,12 @@ import FastString
 import qualified ErrUtils as Err
 import ErrUtils( Severity(..) )
 import UniqSupply
-import UniqFM       ( UniqFM, mapUFM, filterUFM )
+import NameEnv         ( mapNameEnv, filterNameEnv )
 import MonadUtils
 import NameCache
+import NameEnv
 import SrcLoc
+import Data.Bifunctor ( bimap )
 import Data.List
 import Data.Ord
 import Data.Dynamic
@@ -733,17 +735,19 @@ getPackageFamInstEnv = do
 -- annotations.
 --
 -- See Note [Annotations]
-getAnnotations :: Typeable a => ([Word8] -> a) -> ModGuts -> CoreM (UniqFM [a])
+getAnnotations :: Typeable a => ([Word8] -> a) -> ModGuts -> CoreM (ModuleEnv [a], NameEnv [a])
 getAnnotations deserialize guts = do
      hsc_env <- getHscEnv
      ann_env <- liftIO $ prepareAnnotations hsc_env (Just guts)
      return (deserializeAnns deserialize ann_env)
 
--- | Get at most one annotation of a given type per Unique.
-getFirstAnnotations :: Typeable a => ([Word8] -> a) -> ModGuts -> CoreM (UniqFM a)
+-- | Get at most one annotation of a given type per annotatable item.
+getFirstAnnotations :: Typeable a => ([Word8] -> a) -> ModGuts -> CoreM (ModuleEnv a, NameEnv a)
 getFirstAnnotations deserialize guts
-  = liftM (mapUFM head . filterUFM (not . null))
-  $ getAnnotations deserialize guts
+  = bimap mod name <$> getAnnotations deserialize guts
+  where
+    mod = mapModuleEnv head . filterModuleEnv (const $ not . null)
+    name = mapNameEnv head . filterNameEnv (not . null)
 
 {-
 Note [Annotations]
