@@ -1112,7 +1112,8 @@ findWiredInPackages dflags prec_map pkgs vis_map = do
 -- what appears in PrelNames.
 
 upd_wired_in_mod :: WiredPackagesMap -> Module -> Module
-upd_wired_in_mod wiredInMap (Module uid m) = Module (upd_wired_in_uid wiredInMap uid) m
+upd_wired_in_mod wiredInMap m =
+  mkModule (upd_wired_in_uid wiredInMap (moduleUnitId m)) (moduleName m)
 
 upd_wired_in_uid :: WiredPackagesMap -> UnitId -> UnitId
 upd_wired_in_uid wiredInMap (DefiniteUnitId def_uid) =
@@ -1709,9 +1710,9 @@ mkModuleToPkgConfAll dflags pkg_db vis_map =
      let (pk', m', origin') =
           case exposedReexport of
            Nothing -> (pk, m, fromExposedModules e)
-           Just (Module pk' m') ->
-            let pkg' = pkg_lookup pk'
-            in (pk', m', fromReexportedModules e pkg')
+           Just mod ->
+            let pkg' = pkg_lookup (moduleUnitId mod)
+            in (pk', moduleName mod, fromReexportedModules e pkg')
      return (m, mkModMap pk' m' origin')
 
     esmap :: UniqFM (Map Module ModuleOrigin)
