@@ -446,8 +446,8 @@ newtype SRTEntry = SRTEntry CLabel
 -- ---------------------------------------------------------------------
 -- CAF analysis
 
-addCAF :: CLabel -> CAFSet -> CAFSet
-addCAF l s
+addCafLabel :: CLabel -> CAFSet -> CAFSet
+addCafLabel l s
   | Just _ <- hasHaskellName l
   , let caf_label = mkCAFLabel l
     -- For imported Ids hasCAF will have accurate CafInfo
@@ -470,9 +470,9 @@ cafAnalData (CmmStatics _lbl _itbl _ccs payload) =
   where
     analyzeStatic s lit =
       case lit of
-        CmmLabel c -> addCAF c s
-        CmmLabelOff c _ -> addCAF c s
-        CmmLabelDiffOff c1 c2 _ _ -> addCAF c1 $! addCAF c2 s
+        CmmLabel c -> addCafLabel c s
+        CmmLabelOff c _ -> addCafLabel c s
+        CmmLabelDiffOff c1 c2 _ _ -> addCafLabel c1 $! addCafLabel c2 s
         _ -> s
 
 -- |
@@ -522,7 +522,7 @@ cafTransfers contLbls entry topLbl
         successorFact s
           -- If this is a loop back to the entry, we can refer to the
           -- entry label.
-          | s == entry = Just (addCAF topLbl Set.empty)
+          | s == entry = Just (addCafLabel topLbl Set.empty)
           -- If this is a continuation, we want to refer to the
           -- SRT for the continuation's info table
           | s `setMember` contLbls
@@ -532,15 +532,19 @@ cafTransfers contLbls entry topLbl
           = lookupFact s fBase
 
         cafsInNode :: CmmNode e x -> CAFSet -> CAFSet
-        cafsInNode node set = foldExpDeep addCaf node set
+        cafsInNode node set = foldExpDeep addCafExpr node set
 
-        addCaf :: CmmExpr -> Set CAFLabel -> Set CAFLabel
-        addCaf expr !set =
+        addCafExpr :: CmmExpr -> Set CAFLabel -> Set CAFLabel
+        addCafExpr expr !set =
           case expr of
-              CmmLit (CmmLabel c) -> addCAF c set
-              CmmLit (CmmLabelOff c _) -> addCAF c set
-              CmmLit (CmmLabelDiffOff c1 c2 _ _) -> addCAF c1 $! addCAF c2 set
-              _ -> set
+            CmmLit (CmmLabel c) ->
+              addCafLabel c set
+            CmmLit (CmmLabelOff c _) ->
+              addCafLabel c set
+            CmmLit (CmmLabelDiffOff c1 c2 _ _) ->
+              addCafLabel c1 $! addCafLabel c2 set
+            _ ->
+              set
     in
       srtTrace "cafTransfers" (text "block:" <+> ppr block $$
                                 text "contLbls:" <+> ppr contLbls $$
