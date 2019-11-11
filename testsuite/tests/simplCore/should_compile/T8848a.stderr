@@ -1,8 +1,8 @@
 
 ==================== Tidy Rules ====================
 "SPEC f"
-    forall (@ b_a27F) ($dOrd_a27I :: GHC.Classes.Ord [GHC.Types.Int]).
-      T8848a.f @ [GHC.Types.Int] @ b_a27F $dOrd_a27I
-      = T8848a.f_$sf @ b_a27F
+    forall (@ b) ($dOrd :: GHC.Classes.Ord [GHC.Types.Int]).
+      T8848a.f @ [GHC.Types.Int] @ b $dOrd
+      = T8848a.f_$sf @ b
 
 
