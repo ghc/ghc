@@ -74,6 +74,7 @@ module VarEnv (
     ) where
 
 import GhcPrelude
+import qualified Data.IntMap.Strict as IntMap -- TODO: Move this to UniqFM
 
 import OccName
 import Var
@@ -97,7 +98,7 @@ import Outputable
 -- | A set of variables that are in scope at some point
 -- "Secrets of the Glasgow Haskell Compiler inliner" Section 3.2 provides
 -- the motivation for this abstraction.
-data InScopeSet = InScope VarSet {-# UNPACK #-} !Int
+newtype InScopeSet = InScope VarSet
         -- Note [Lookups in in-scope set]
         -- ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
         -- We store a VarSet here, but we use this for lookups rather than just
@@ -105,13 +106,9 @@ data InScopeSet = InScope VarSet {-# UNPACK #-} !Int
         -- version of the variable (e.g. with an informative unfolding), so this
         -- lookup is useful (see, for instance, Note [In-scope set as a
         -- substitution]).
-        --
-        -- The Int is a kind of hash-value used by uniqAway
-        -- For example, it might be the size of the set
-        -- INVARIANT: it's not zero; we use it as a multiplier in uniqAway
 
 instance Outputable InScopeSet where
-  ppr (InScope s _) =
+  ppr (InScope s) =
     text "InScope" <+>
     braces (fsep (map (ppr . Var.varName) (nonDetEltsUniqSet s)))
                       -- It's OK to use nonDetEltsUniqSet here because it's
@@ -120,80 +117,64 @@ instance Outputable InScopeSet where
                       -- the output is overwhelming
 
 emptyInScopeSet :: InScopeSet
-emptyInScopeSet = InScope emptyVarSet 1
+emptyInScopeSet = InScope emptyVarSet
 
 getInScopeVars ::  InScopeSet -> VarSet
-getInScopeVars (InScope vs _) = vs
+getInScopeVars (InScope vs) = vs
 
 mkInScopeSet :: VarSet -> InScopeSet
-mkInScopeSet in_scope = InScope in_scope (sizeUniqSet in_scope)
+mkInScopeSet in_scope = InScope in_scope
 
 extendInScopeSet :: InScopeSet -> Var -> InScopeSet
-extendInScopeSet (InScope in_scope n) v
-   = InScope (extendVarSet in_scope v) (n + 1)
+extendInScopeSet (InScope in_scope) v
+   = InScope (extendVarSet in_scope v)
 
 extendInScopeSetList :: InScopeSet -> [Var] -> InScopeSet
-extendInScopeSetList (InScope in_scope n) vs
-   = let f :: (VarSet, Int) -> Var -> (VarSet, Var)
-         f (accum, n) v = let !accum' = extendVarSet accum v
-                              !n' = n + 1
-                          in (accum', n')
-         (varset, n') = foldl' f (in_scope, n) vs
-     in InScope varset n'
+extendInScopeSetList (InScope in_scope) vs
+   = InScope $ foldl' extendVarSet in_scope vs
 
 extendInScopeSetSet :: InScopeSet -> VarSet -> InScopeSet
-extendInScopeSetSet (InScope in_scope n) vs
-   = InScope (in_scope `unionVarSet` vs) (n + sizeUniqSet vs)
+extendInScopeSetSet (InScope in_scope) vs
+   = InScope (in_scope `unionVarSet` vs)
 
 delInScopeSet :: InScopeSet -> Var -> InScopeSet
-delInScopeSet (InScope in_scope n) v = InScope (in_scope `delVarSet` v) n
+delInScopeSet (InScope in_scope) v = InScope (in_scope `delVarSet` v)
 
 elemInScopeSet :: Var -> InScopeSet -> Bool
-elemInScopeSet v (InScope in_scope _) = v `elemVarSet` in_scope
+elemInScopeSet v (InScope in_scope) = v `elemVarSet` in_scope
 
 -- | Look up a variable the 'InScopeSet'.  This lets you map from
 -- the variable's identity (unique) to its full value.
 lookupInScope :: InScopeSet -> Var -> Maybe Var
-lookupInScope (InScope in_scope _) v  = lookupVarSet in_scope v
+lookupInScope (InScope in_scope) v  = lookupVarSet in_scope v
 
 lookupInScope_Directly :: InScopeSet -> Unique -> Maybe Var
-lookupInScope_Directly (InScope in_scope _) uniq
+lookupInScope_Directly (InScope in_scope) uniq
   = lookupVarSet_Directly in_scope uniq
 
 unionInScope :: InScopeSet -> InScopeSet -> InScopeSet
-unionInScope (InScope s1 _) (InScope s2 n2)
-  = InScope (s1 `unionVarSet` s2) n2
+unionInScope (InScope s1) (InScope s2)
+  = InScope (s1 `unionVarSet` s2)
 
 varSetInScope :: VarSet -> InScopeSet -> Bool
-varSetInScope vars (InScope s1 _) = vars `subVarSet` s1
+varSetInScope vars (InScope s1) = vars `subVarSet` s1
 
 -- | @uniqAway in_scope v@ finds a unique that is not used in the
 -- in-scope set, and gives that to v.
 uniqAway :: InScopeSet -> Var -> Var
 -- It starts with v's current unique, of course, in the hope that it won't
--- have to change, and thereafter uses a combination of that and the hash-code
--- found in the in-scope set
+-- have to change, and thereafter uses the successor to the last unique found
+-- in the in-scope set.
 uniqAway in_scope var
   | var `elemInScopeSet` in_scope = uniqAway' in_scope var      -- Make a new one
   | otherwise                     = var                         -- Nothing to do
 
 uniqAway' :: InScopeSet -> Var -> Var
 -- This one *always* makes up a new variable
-uniqAway' (InScope set n) var
-  = try 1
-  where
-    orig_unique = getUnique var
-    try k
-          | debugIsOn && (k > 1000)
-          = pprPanic "uniqAway loop:" msg
-          | uniq `elemVarSetByKey` set = try (k + 1)
-          | k > 3
-          = pprTraceDebug "uniqAway:" msg
-            setVarUnique var uniq
-          | otherwise = setVarUnique var uniq
-          where
-            msg  = ppr k <+> text "tries" <+> ppr var <+> int n
-            uniq = deriveUnique orig_unique (n * k)
+uniqAway' (InScope set) var
+  = case IntMap.lookupMax $ ufmToIntMap $ getUniqSet set of
+      Just (uniq,_) -> setVarUnique var (deriveUnique (getUnique uniq) 1)
+      Nothing -> panic "uniqAway': this cannot happen"
 
 {-
 ************************************************************************
