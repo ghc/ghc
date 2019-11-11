@@ -48,6 +48,9 @@
 #define USE_PTHREAD_FOR_ITIMER
 #endif
 
+#if defined(freebsd_HOST_OS) && defined(THREADED_RTS)
+#define USE_PTHREAD_FOR_ITIMER
+#endif
 
 #if defined(solaris2_HOST_OS)
 /* USE_TIMER_CREATE is usually disabled for Solaris. In fact it is
