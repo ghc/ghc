@@ -1158,16 +1158,16 @@ instance Data a => Data [a] where
 
 ------------------------------------------------------------------------------
 
--- | @since 4.13.0.0
+-- | @since 4.14.0.0
 deriving instance (Typeable (a :: Type -> Type -> Type), Typeable b, Typeable c,
                    Data (a b c))
          => Data (WrappedArrow a b c)
 
--- | @since 4.13.0.0
+-- | @since 4.14.0.0
 deriving instance (Typeable (m :: Type -> Type), Typeable a, Data (m a))
          => Data (WrappedMonad m a)
 
--- | @since 4.13.0.0
+-- | @since 4.14.0.0
 deriving instance Data a => Data (ZipList a)
 
 -- | @since 4.9.0.0
