@@ -134,8 +134,12 @@ extendInScopeSet (InScope in_scope n) v
 
 extendInScopeSetList :: InScopeSet -> [Var] -> InScopeSet
 extendInScopeSetList (InScope in_scope n) vs
-   = InScope (foldl' (\s v -> extendVarSet s v) in_scope vs)
-                    (n + length vs)
+   = let f :: (VarSet, Int) -> Var -> (VarSet, Var)
+         f (accum, n) v = let !accum' = extendVarSet accum v
+                              !n' = n + 1
+                          in (accum', n')
+         (varset, n') = foldl' f (in_scope, n) vs
+     in InScope varset n'
 
 extendInScopeSetSet :: InScopeSet -> VarSet -> InScopeSet
 extendInScopeSetSet (InScope in_scope n) vs
