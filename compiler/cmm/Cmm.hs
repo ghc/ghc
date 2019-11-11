@@ -109,6 +109,8 @@ type CmmBlock = Block CmmNode C C
 --     Info Tables
 -----------------------------------------------------------------------------
 
+-- | CmmTopInfo is attached to each CmmDecl (see defn of CmmGroup), and contains
+-- the extra info (beyond the executable code) that belongs to that CmmDecl.
 data CmmTopInfo   = TopInfo { info_tbls  :: LabelMap CmmInfoTable
                             , stack_info :: CmmStackInfo }
 
