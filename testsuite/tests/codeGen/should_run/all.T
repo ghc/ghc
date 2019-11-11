@@ -109,6 +109,7 @@ test('T5747', when(arch('i386'), extra_hc_opts('-msse2')), compile_and_run, ['-O
 test('T5785', normal, compile_and_run, [''])
 test('setByteArray', normal, compile_and_run, [''])
 test('compareByteArrays', normal, compile_and_run, [''])
+test('eqByteArrayAddr', normal, compile_and_run, [''])
 
 test('T6146', normal, compile_and_run, [''])
 test('T5900', normal, compile_and_run, [''])

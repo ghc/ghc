@@ -795,6 +795,8 @@ dispatchPrimop dflags = \case
 -- Comparing byte arrays
   CompareByteArraysOp -> \[ba1,ba1_off,ba2,ba2_off,n] -> OpDest_AllDone $ \[res] -> do
     doCompareByteArraysOp res ba1 ba1_off ba2 ba2_off n
+  EqByteArrayAddrOp -> \[ba1,ba1_off,addr2,n] -> OpDest_AllDone $ \[res] -> do
+    doEqByteArrayAddrOp res ba1 ba1_off addr2 n
 
   BSwap16Op -> \[w] -> OpDest_AllDone $ \[res] -> do
     emitBSwapCall res w W16
@@ -2348,6 +2350,22 @@ doNewByteArrayOp res_r n = do
 
 -- ----------------------------------------------------------------------------
 -- Comparing byte arrays
+
+doEqByteArrayAddrOp ::
+     LocalReg -> CmmExpr -> CmmExpr -> CmmExpr -> CmmExpr
+  -> FCode ()
+doEqByteArrayAddrOp res ba1 ba1_off addr2 n = do
+    dflags <- getDynFlags
+    addr1 <- assignTempE $ cmmOffsetExpr dflags (cmmOffsetB dflags ba1 (arrWordsHdrSize dflags)) ba1_off
+    emitMemcmpCall res addr1 addr2 n 1
+    (assignResOne, assignResZero) <- forkAltPair
+        (getCode $ emit $
+          mkAssign (CmmLocal res) (CmmLit (CmmInt 1 (wordWidth dflags))))
+        (getCode $ emit $
+          mkAssign (CmmLocal res) (CmmLit (zeroCLit dflags)))
+    emit =<< mkCmmIfThenElse
+        (cmmEqWord dflags (CmmReg (CmmLocal res)) (CmmLit (zeroCLit dflags)))
+        assignResOne assignResZero
 
 doCompareByteArraysOp :: LocalReg -> CmmExpr -> CmmExpr -> CmmExpr -> CmmExpr -> CmmExpr
                      -> FCode ()

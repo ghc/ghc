@@ -1950,6 +1950,18 @@ primop  CompareByteArraysOp "compareByteArrays#" GenPrimOp
    with
    can_fail = True
 
+primop  EqByteArrayAddrOp "eqByteArrayAddr#" GenPrimOp
+   ByteArray# -> Int# -> Addr# -> Int# -> Int#
+   {{\tt compareByteArrayAddr# src1 src1_ofs src2 n} compares
+    {\tt n} bytes starting at offset {\tt src1_ofs} in the first
+    {\tt ByteArray#} {\tt src1} to the range of {\tt n} bytes
+    (i.e. same length) starting at the unmanaged address {\tt src2}.
+    Both arrays must fully contain the specified ranges, but this is
+    not checked.  Returns {\tt 1#} when the arrays are equal and
+    {\tt 0#} otherwise.}
+   with
+   can_fail = True
+
 primop  CopyByteArrayOp "copyByteArray#" GenPrimOp
   ByteArray# -> Int# -> MutableByteArray# s -> Int# -> Int# -> State# s -> State# s
   {{\tt copyByteArray# src src_ofs dst dst_ofs n} copies the range
