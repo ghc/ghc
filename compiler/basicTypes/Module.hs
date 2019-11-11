@@ -413,6 +413,7 @@ moduleNameColons = dots_to_colons . moduleNameString
 -- avoid having to make 'moduleUnitId' a partial operation.)
 --
 data Module = Module {
+   moduleUnique :: !Unique
    moduleUnitId :: !UnitId,  -- pkg-1.0
    moduleName :: !ModuleName  -- A.B.C
   }
@@ -439,7 +440,7 @@ mkHoleModule :: ModuleName -> Module
 mkHoleModule = mkModule holeUnitId
 
 instance Uniquable Module where
-  getUnique (Module p n) = getUnique (unitIdFS p `appendFS` moduleNameFS n)
+  getUnique = moduleUnique
 
 instance Outputable Module where
   ppr = pprModule
@@ -466,7 +467,8 @@ stableModuleCmp (Module p1 n1) (Module p2 n2)
      (n1 `stableModuleNameCmp` n2)
 
 mkModule :: UnitId -> ModuleName -> Module
-mkModule = Module
+mkModule unit_id mod_name = Module
+  where uniq = getUnique (unitIdFS unit_id `appendFS` moduleNameFS mod_name)
 
 pprModule :: Module -> SDoc
 pprModule mod@(Module p n)  = getPprStyle doc
