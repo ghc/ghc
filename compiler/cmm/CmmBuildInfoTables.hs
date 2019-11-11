@@ -755,8 +755,8 @@ doSRTs dflags moduleSRTInfo tops = do
             CmmStatics lbl _ _ _ -> Just (lbl, set)
             CmmStaticsRaw _ _ -> Nothing
 
-      static_data :: [CLabel]
-      static_data = Map.keys static_data_env
+      static_data :: Set CLabel
+      static_data = Map.keysSet static_data_env
 
       (proc_envs, procss) = unzip procs
       cafEnv = mapUnions proc_envs
@@ -818,8 +818,8 @@ doSRTs dflags moduleSRTInfo tops = do
 -- | Build the SRT for a strongly-connected component of blocks
 doSCC
   :: DynFlags
-  -> LabelMap CLabel           -- which blocks are static function entry points
-  -> [CLabel] -- static data
+  -> LabelMap CLabel -- which blocks are static function entry points
+  -> Set CLabel -- static data
   -> SCC (SomeLabel, CAFLabel, Set CAFLabel)
   -> StateT ModuleSRTInfo UniqSM
         ( [CmmDeclSRTs]          -- generated SRTs
@@ -870,7 +870,7 @@ oneSRT
   -> [CAFLabel]                 -- labels for those blocks
   -> Bool                       -- True <=> this SRT is for a CAF
   -> Set CAFLabel               -- SRT for this set
-  -> [CLabel]
+  -> Set CLabel                 -- Static data labels
   -> StateT ModuleSRTInfo UniqSM
        ( [CmmDeclSRTs]                -- SRT objects we built
        , [(Label, CLabel)]            -- SRT fields for these blocks' itbls
@@ -901,7 +901,7 @@ oneSRT dflags staticFuns lbls caf_lbls isCAF cafs static_data = do
     resolve_caf :: CAFLabel -> Maybe SRTEntry
     resolve_caf l@(CAFLabel l')
       -- For static data refer directly to the static object, not to its SRT
-      | elem l' static_data
+      | Set.member l' static_data
       = Just (SRTEntry (toClosureLbl l'))
       | otherwise
       = resolveCAF srtMap l
@@ -945,14 +945,14 @@ oneSRT dflags staticFuns lbls caf_lbls isCAF cafs static_data = do
               | cafLbl@(CAFLabel clbl) <- caf_lbls
                 -- Only map static data to Nothing (== not CAFFY). For CAFFY
                 -- statics we refer to the static itself instead of a SRT.
-              , not (elem clbl static_data) || isNothing srtEntry
+              , not (Set.member clbl static_data) || isNothing srtEntry
               ]
         srtTrace2 "newSRTMap" (ppr newSRTMap) $
           modify' (\state -> state{ moduleSRTMap = Map.union newSRTMap (moduleSRTMap state) })
 
     this_mod = thisModule topSRT
 
-    allStaticData = all (\(CAFLabel clbl) -> elem clbl static_data) caf_lbls
+    allStaticData = all (\(CAFLabel clbl) -> Set.member clbl static_data) caf_lbls
 
   case Set.toList filtered of
     [] -> do
