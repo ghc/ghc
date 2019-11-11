@@ -544,8 +544,10 @@ rts_PACKAGE_CPP_OPTS += '-DFFI_LIB="C$(LIBFFI_NAME)"'
 endif
 
 ifeq "$(UseLibdw)" "YES"
+rts_PACKAGE_CPP_OPTS += -DLIBDW_INCLUDE_DIR=$(LibdwIncludeDir)
 rts_PACKAGE_CPP_OPTS += -DLIBDW_LIB_DIR=$(LibdwLibDir)
 else
+rts_PACKAGE_CPP_OPTS += -DLIBDW_INCLUDE_DIR=
 rts_PACKAGE_CPP_OPTS += -DLIBDW_LIB_DIR=
 endif
 
