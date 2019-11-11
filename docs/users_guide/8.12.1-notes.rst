@@ -38,6 +38,14 @@ Template Haskell
 ``ghc`` library
 ~~~~~~~~~~~~~~~
 
+ - The type of the ``getAnnotations`` function has changed to better reflect
+   the fact that it returns two different kinds of annotations, those on
+   names and those on modules: ::
+
+      getAnnotations :: Typeable a
+                     => ([Word8] -> a) -> ModGuts
+                     -> CoreM (ModuleEnv [a], NameEnv [a])
+
 
 ``base`` library
 ~~~~~~~~~~~~~~~~
