@@ -1,0 +1,6 @@
+:l T2950M.hs
+:br 4 19
+:br 4 26
+:br T2950S 3
+main
+:force _result

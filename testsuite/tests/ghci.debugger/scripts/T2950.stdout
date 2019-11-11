@@ -1,0 +1,9 @@
+Breakpoint 0 activated at T2950M.hs:4:19-35
+Breakpoint 1 activated at T2950M.hs:4:26-35
+Breakpoint 2 activated at T2950S.hs:3:11-12
+Stopped in Main.main, T2950M.hs:4:19-35
+_result :: String = _
+*** Ignoring breakpoint [T2950M.hs:4:19-35]
+*** Ignoring breakpoint [T2950M.hs:4:26-35]
+*** Ignoring breakpoint [T2950S.hs:3:11-12]
+_result = "[2,6]"
