@@ -165,7 +165,6 @@ mkModDetails :: HscEnv -> CgGuts -> ModDetails
 mkModDetails hsc_env cg_guts =
   let
     dflags = hsc_dflags hsc_env
-    mod_guts = cg_mod_guts cg_guts
 
     -- The completed type environment is gotten from
     --      a) the types and classes defined here (plus implicit things)
@@ -192,23 +191,23 @@ mkModDetails hsc_env cg_guts =
                  , isExternalName (idName id)
                  , not (isWiredInName (getName id))
                  ]   -- See Note [Drop wired-in things]
-    final_tcs = filterOut (isWiredInName . getName) (mg_tcs mod_guts)
+    final_tcs = filterOut (isWiredInName . getName) (cg_mg_tcs cg_guts)
     -- See Note [Drop wired-in things]
-    type_env = typeEnvFromEntities final_ids final_tcs (mg_fam_insts mod_guts)
+    type_env = typeEnvFromEntities final_ids final_tcs (cg_mg_fam_insts cg_guts)
 
-    tidy_patsyns = mkFinalPatSyns type_env (mg_patsyns mod_guts)
+    tidy_patsyns = mkFinalPatSyns type_env (cg_mg_patsyns cg_guts)
     tidy_type_env = extendTypeEnvWithPatSyns tidy_patsyns type_env
     tidy_rules = tidyRules (cg_tidy_env cg_guts) (cg_trimmed_rules cg_guts)
-    tidy_cls_insts = mkFinalClsInsts type_env (mg_insts (cg_mod_guts cg_guts))
+    tidy_cls_insts = mkFinalClsInsts type_env (cg_mg_insts cg_guts)
   in
     ModDetails
       { md_types = tidy_type_env
       , md_rules = tidy_rules
       , md_insts = tidy_cls_insts
-      , md_fam_insts =  mg_fam_insts (cg_mod_guts cg_guts)
-      , md_exports = mg_exports (cg_mod_guts cg_guts)
-      , md_anns = mg_anns (cg_mod_guts cg_guts)
-      , md_complete_sigs = mg_complete_sigs (cg_mod_guts cg_guts)
+      , md_fam_insts =  cg_mg_fam_insts cg_guts
+      , md_exports = cg_mg_exports cg_guts
+      , md_anns = cg_mg_anns cg_guts
+      , md_complete_sigs = cg_mg_complete_sigs cg_guts
       }
 
 -- | Generate full interface with the code gen info.

@@ -59,10 +59,11 @@ import HscTypes
 import Maybes
 import UniqSupply
 import Outputable
-import Util( filterOut )
+import Util( filterOut, seqListId )
 import qualified ErrUtils as Err
 
 import Control.Monad
+import Control.DeepSeq
 import Data.Function
 import Data.List        ( sortBy, mapAccumL )
 import Data.IORef       ( atomicModifyIORef' )
@@ -384,20 +385,28 @@ tidyProgram hsc_env mod_guts =
              <+> int (cs_ty cs)
              <+> int (cs_co cs))
 
-    return CgGuts
-      { cg_module = mod
-      , cg_tycons = filter isAlgTyCon tcs
-      , cg_binds = all_tidy_binds
+    let tycons = filter isAlgTyCon tcs
+
+    return $! CgGuts
+      { cg_module = force mod
+      , cg_tycons = seqListId tycons
+      , cg_binds = seqListId all_tidy_binds
       , cg_foreign = add_spt_init_code foreign_stubs
-      , cg_foreign_files = foreign_files
-      , cg_dep_pkgs = map fst (dep_pkgs deps)
+      , cg_foreign_files = seqListId foreign_files
+      , cg_dep_pkgs = force (map fst (dep_pkgs deps))
       , cg_hpc_info = hpc_info
       , cg_modBreaks = mod_breaks
       , cg_spt_entries = spt_entries
-      , cg_tidy_binds = tidy_binds
-      , cg_trimmed_rules = trimmed_rules
+      , cg_tidy_binds = seqListId tidy_binds
+      , cg_trimmed_rules = seqListId trimmed_rules
       , cg_tidy_env = tidy_env
-      , cg_mod_guts = mod_guts
+      , cg_mg_tcs = seqListId (mg_tcs mod_guts)
+      , cg_mg_fam_insts = seqListId (mg_fam_insts mod_guts)
+      , cg_mg_patsyns = seqListId (mg_patsyns mod_guts)
+      , cg_mg_insts = seqListId (mg_insts mod_guts)
+      , cg_mg_exports = seqListId (mg_exports mod_guts)
+      , cg_mg_anns = seqListId (mg_anns mod_guts)
+      , cg_mg_complete_sigs = seqListId (mg_complete_sigs mod_guts)
       }
 
 {- Note [Drop wired-in things]
