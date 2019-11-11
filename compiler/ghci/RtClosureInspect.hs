@@ -29,6 +29,7 @@ import GhcPrelude
 
 import GHCi
 import GHCi.RemoteTypes
+import GHCi.Message ( fromSerializableException )
 import HscTypes
 
 import DataCon
@@ -59,6 +60,7 @@ import Outputable as Ppr
 import GHC.Char
 import GHC.Exts.Heap
 import GHC.Runtime.Layout ( roundUpTo )
+import GHC.IO (throwIO)
 
 import Control.Monad
 import Data.Maybe
@@ -717,8 +719,13 @@ cvObtainTerm hsc_env max_depth force old_ty hval = runTR hsc_env $ do
 -- Thunks we may want to force
       t | isThunk t && force -> do
          traceTR (text "Forcing a " <> text (show (fmap (const ()) t)))
-         liftIO $ GHCi.seqHValue hsc_env a
-         go (pred max_depth) my_ty old_ty a
+         evalRslt <- liftIO $ GHCi.seqHValue hsc_env a
+         case evalRslt of                                            -- #2950
+           EvalSuccess _ -> go (pred max_depth) my_ty old_ty a
+           EvalException ex -> do
+              -- Report the exception to the UI
+              traceTR $ text "Exception occured:" <+> text (show ex)
+              liftIO $ throwIO $ fromSerializableException ex
 -- Blackholes are indirections iff the payload is not TSO or BLOCKING_QUEUE. If
 -- the indirection is a TSO or BLOCKING_QUEUE, we return the BLACKHOLE itself as
 -- the suspension so that entering it in GHCi will enter the BLACKHOLE instead
