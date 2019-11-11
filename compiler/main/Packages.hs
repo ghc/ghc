@@ -1601,8 +1601,8 @@ mkPackageState dflags dbs preload0 = do
       -- (NB: since this is only relevant for base/rts it doesn't matter
       -- that thisUnitIdInsts_ is not wired yet)
       --
-      preload3 = nub $ filter (/= thisPackage dflags)
-                     $ (basicLinkedPackages ++ preload2)
+      preload3 = ordNub $ filter (/= thisPackage dflags)
+                        $ (basicLinkedPackages ++ preload2)
 
   -- Close the preload packages with their dependencies
   dep_preload <- closeDeps dflags pkg_db (zip (map toInstalledUnitId preload3) (repeat Nothing))
@@ -1781,7 +1781,7 @@ getPackageIncludePath dflags pkgs =
   collectIncludeDirs `fmap` getPreloadPackagesAnd dflags pkgs
 
 collectIncludeDirs :: [PackageConfig] -> [FilePath]
-collectIncludeDirs ps = nub (filter notNull (concatMap includeDirs ps))
+collectIncludeDirs ps = ordNub (filter notNull (concatMap includeDirs ps))
 
 -- | Find all the library paths in these and the preload packages
 getPackageLibraryPath :: DynFlags -> [PreloadUnitId] -> IO [String]
@@ -1789,7 +1789,7 @@ getPackageLibraryPath dflags pkgs =
   collectLibraryPaths dflags `fmap` getPreloadPackagesAnd dflags pkgs
 
 collectLibraryPaths :: DynFlags -> [PackageConfig] -> [FilePath]
-collectLibraryPaths dflags = nub . filter notNull
+collectLibraryPaths dflags = ordNub . filter notNull
                            . concatMap (libraryDirsForWay dflags)
 
 -- | Find all the link options in these and the preload packages,
@@ -1810,7 +1810,7 @@ collectArchives dflags pc =
   filterM doesFileExist [ searchPath </> ("lib" ++ lib ++ ".a")
                         | searchPath <- searchPaths
                         , lib <- libs ]
-  where searchPaths = nub . filter notNull . libraryDirsForWay dflags $ pc
+  where searchPaths = ordNub . filter notNull . libraryDirsForWay dflags $ pc
         libs        = packageHsLibs dflags pc ++ extraLibraries pc
 
 getLibs :: DynFlags -> [PreloadUnitId] -> IO [(String,String)]
@@ -1885,7 +1885,7 @@ getPackageExtraCcOpts dflags pkgs = do
 getPackageFrameworkPath  :: DynFlags -> [PreloadUnitId] -> IO [String]
 getPackageFrameworkPath dflags pkgs = do
   ps <- getPreloadPackagesAnd dflags pkgs
-  return (nub (filter notNull (concatMap frameworkDirs ps)))
+  return (ordNub (filter notNull (concatMap frameworkDirs ps)))
 
 -- | Find all the package frameworks in these and the preload packages
 getPackageFrameworks  :: DynFlags -> [PreloadUnitId] -> IO [String]
