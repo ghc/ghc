@@ -15,8 +15,9 @@ test('T4334',
      # Test for a space leak in Data.List.lines (fixed with #4334)
      [extra_run_opts('1000000 2 t'),
       collect_stats('peak_megabytes_allocated',2),
-      # prof ways don't work well with +RTS -V0
-      omit_ways(['profasm','profthreaded'])
+      # prof ways don't work well with +RTS -V0, nonmoving way residency is
+      # highly variable.
+      omit_ways(['profasm','profthreaded','nonmoving_thr'])
       ],
      compile_and_run, [''])
 
