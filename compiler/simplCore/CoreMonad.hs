@@ -64,7 +64,6 @@ import FastString
 import qualified ErrUtils as Err
 import ErrUtils( Severity(..) )
 import UniqSupply
-import NameEnv         ( mapNameEnv, filterNameEnv )
 import MonadUtils
 import NameCache
 import NameEnv
