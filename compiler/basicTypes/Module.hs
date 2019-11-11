@@ -85,7 +85,7 @@ module Module
         wiredInUnitIds,
 
         -- * The Module type
-        Module(Module),
+        Module,
         moduleUnitId, moduleName,
         pprModule,
         mkModule,
@@ -147,7 +147,6 @@ import FastString
 import Binary
 import Util
 import Data.List
-import Data.Ord
 import GHC.PackageDb (BinaryStringRep(..), DbUnitIdModuleRep(..), DbModule(..), DbUnitId(..))
 import Fingerprint
 
@@ -413,10 +412,15 @@ moduleNameColons = dots_to_colons . moduleNameString
 -- avoid having to make 'moduleUnitId' a partial operation.)
 --
 data Module = Module {
+   moduleUnique :: !Unique,  -- Cached unique
    moduleUnitId :: !UnitId,  -- pkg-1.0
    moduleName :: !ModuleName  -- A.B.C
   }
-  deriving (Eq, Ord)
+  deriving (Eq)
+
+-- | Deterministic ordering.
+instance Ord Module where
+  compare = stableModuleCmp
 
 -- | Calculate the free holes of a 'Module'.  If this set is non-empty,
 -- this module was defined in an indefinite library that had required
@@ -439,14 +443,14 @@ mkHoleModule :: ModuleName -> Module
 mkHoleModule = mkModule holeUnitId
 
 instance Uniquable Module where
-  getUnique (Module p n) = getUnique (unitIdFS p `appendFS` moduleNameFS n)
+  getUnique = moduleUnique
 
 instance Outputable Module where
   ppr = pprModule
 
 instance Binary Module where
-  put_ bh (Module p n) = put_ bh p >> put_ bh n
-  get bh = do p <- get bh; n <- get bh; return (Module p n)
+  put_ bh (Module _ p n) = put_ bh p >> put_ bh n
+  get bh = do p <- get bh; n <- get bh; return $ mkModule p n
 
 instance Data Module where
   -- don't traverse?
@@ -457,19 +461,18 @@ instance Data Module where
 instance NFData Module where
   rnf x = x `seq` ()
 
--- | This gives a stable ordering, as opposed to the Ord instance which
--- gives an ordering based on the 'Unique's of the components, which may
--- not be stable from run to run of the compiler.
+-- | This gives a stable ordering on 'Module's.
 stableModuleCmp :: Module -> Module -> Ordering
-stableModuleCmp (Module p1 n1) (Module p2 n2)
+stableModuleCmp (Module _ p1 n1) (Module _ p2 n2)
    = (p1 `stableUnitIdCmp`  p2) `thenCmp`
      (n1 `stableModuleNameCmp` n2)
 
 mkModule :: UnitId -> ModuleName -> Module
-mkModule = Module
+mkModule unit_id mod_name = Module uniq unit_id mod_name
+  where uniq = getUnique (unitIdFS unit_id `appendFS` moduleNameFS mod_name)
 
 pprModule :: Module -> SDoc
-pprModule mod@(Module p n)  = getPprStyle doc
+pprModule mod@(Module _ p n)  = getPprStyle doc
  where
   doc sty
     | codeStyle sty =
@@ -1176,9 +1179,8 @@ newtype NDModule = NDModule { unNDModule :: Module }
   -- Don't export, See [ModuleEnv performance and determinism]
 
 instance Ord NDModule where
-  compare (NDModule (Module p1 n1)) (NDModule (Module p2 n2)) =
-    (getUnique p1 `nonDetCmpUnique` getUnique p2) `thenCmp`
-    (getUnique n1 `nonDetCmpUnique` getUnique n2)
+  compare (NDModule (Module u1 _ _)) (NDModule (Module u2 _ _)) =
+    u1 `nonDetCmpUnique` u2
 
 filterModuleEnv :: (Module -> a -> Bool) -> ModuleEnv a -> ModuleEnv a
 filterModuleEnv f (ModuleEnv e) =
@@ -1235,7 +1237,7 @@ emptyModuleEnv :: ModuleEnv a
 emptyModuleEnv = ModuleEnv Map.empty
 
 moduleEnvKeys :: ModuleEnv a -> [Module]
-moduleEnvKeys (ModuleEnv e) = sort $ map unNDModule $ Map.keys e
+moduleEnvKeys (ModuleEnv e) = sortBy stableModuleCmp $ map unNDModule $ Map.keys e
   -- See Note [ModuleEnv performance and determinism]
 
 moduleEnvElts :: ModuleEnv a -> [a]
@@ -1244,7 +1246,7 @@ moduleEnvElts e = map snd $ moduleEnvToList e
 
 moduleEnvToList :: ModuleEnv a -> [(Module, a)]
 moduleEnvToList (ModuleEnv e) =
-  sortBy (comparing fst) [(m, v) | (NDModule m, v) <- Map.toList e]
+  sortBy (stableModuleCmp `on` fst) [(m, v) | (NDModule m, v) <- Map.toList e]
   -- See Note [ModuleEnv performance and determinism]
 
 unitModuleEnv :: Module -> a -> ModuleEnv a
@@ -1269,7 +1271,7 @@ emptyModuleSet :: ModuleSet
 emptyModuleSet = Set.empty
 
 moduleSetElts :: ModuleSet -> [Module]
-moduleSetElts = sort . coerce . Set.toList
+moduleSetElts = sortBy stableModuleCmp . coerce . Set.toList
 
 elemModuleSet :: Module -> ModuleSet -> Bool
 elemModuleSet = Set.member . coerce
