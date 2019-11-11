@@ -53,9 +53,13 @@ import FastString
 import Outputable
 import Util
 import Data.Maybe
+import Literal
+import GHC.StgToCmm.Closure (NonVoid(NonVoid))
 
 import Data.Bits ((.&.), bit)
 import Control.Monad (liftM, when, unless)
+
+import qualified Data.ByteString as BS
 
 ------------------------------------------------------------------------
 --      Primitive operations and foreign calls
@@ -99,6 +103,9 @@ cgOpApp (StgPrimOp TagToEnumOp) [arg] res_ty
           --         intToTg :: Enum a => Int -> a ; intToTg (I# x#) = tagToEnum# x#
           -- That won't work.
         tycon = tyConAppTyCon res_ty
+
+cgOpApp (StgPrimOp EqByteArrayAddrOp) args _
+    | Just code <- unrollEqByteArrayAddrOp args = code
 
 cgOpApp (StgPrimOp primop) args res_ty = do
     dflags <- getDynFlags
@@ -2356,7 +2363,8 @@ doEqByteArrayAddrOp ::
   -> FCode ()
 doEqByteArrayAddrOp res ba1 ba1_off addr2 n = do
     dflags <- getDynFlags
-    addr1 <- assignTempE $ cmmOffsetExpr dflags (cmmOffsetB dflags ba1 (arrWordsHdrSize dflags)) ba1_off
+    let addr1 = cmmOffsetExpr dflags
+          (cmmOffsetB dflags ba1 (arrWordsHdrSize dflags)) ba1_off
     emitMemcmpCall res addr1 addr2 n 1
     (assignResOne, assignResZero) <- forkAltPair
         (getCode $ emit $
@@ -2512,6 +2520,44 @@ doSetByteArrayOp ba off len c = do
 
     p <- assignTempE $ cmmOffsetExpr dflags (cmmOffsetB dflags ba (arrWordsHdrSize dflags)) off
     emitMemsetCall p c len align
+
+unrollEqByteArrayAddrOp :: [StgArg] -> Maybe (FCode ReturnKind)
+unrollEqByteArrayAddrOp
+    [ba1,ba1_off,StgLitArg (LitString s),StgLitArg (LitNumber _ n _)] | n < 24 =
+      Just $ do
+        dflags <- getDynFlags
+        let w = wordWidth dflags
+            n_i = fromInteger n :: Int
+        ba1' <- getArgAmode (NonVoid ba1)
+        ba1_off' <- getArgAmode (NonVoid ba1_off)
+        res <- newTemp (primRepCmmType dflags IntRep)
+        emit (mkAssign (CmmLocal res) (CmmLit (CmmInt 1 (wordWidth dflags))))
+        ba1_p <- assignTempE $ cmmOffsetExpr dflags
+          (cmmOffsetB dflags ba1' (arrWordsHdrSize dflags)) ba1_off'
+        wrk <- newTemp (bWord dflags)
+        let assignments =
+              [ [ mkAssign (CmmLocal wrk)
+                  (CmmMachOp (mo_u_8ToWord dflags)
+                    [cmmLoadIndexOffExpr dflags 0 b8 ba1_p b8
+                      (CmmLit (CmmInt (fromIntegral off) w))
+                    ]
+                  )
+                , mkAssign (CmmLocal wrk)
+                  (CmmMachOp (mo_wordEq dflags)
+                    [ CmmReg (CmmLocal wrk)
+                    , CmmLit (CmmInt (fromIntegral (BS.index s off)) w)
+                    ]
+                  )
+                , mkAssign (CmmLocal res)
+                  (CmmMachOp (mo_wordAnd dflags)
+                    [CmmReg (CmmLocal wrk), CmmReg (CmmLocal res)]
+                  )
+                ]
+              | off <- [0.. n_i - 1]
+              ]
+        emit (catAGraphs (concat assignments))
+        emitReturn [CmmReg (CmmLocal res)]
+unrollEqByteArrayAddrOp _ = Nothing
 
 -- ----------------------------------------------------------------------------
 -- Allocating arrays
