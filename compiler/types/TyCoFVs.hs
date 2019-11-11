@@ -181,7 +181,7 @@ tyCoVarsOfType ty = nonDetFVSet (typeFVs ty)
 
 
 tyCoVarsOfTypes :: [Type] -> TyCoVarSet
-tyCoVarsOfTypes tys = nonDetFVSet $ mconcat $ fmap typeFVs tys
+tyCoVarsOfTypes tys = nonDetFVSet $ foldMapFVs typeFVs tys
 
 tyCoVarsOfCo :: Coercion -> TyCoVarSet
 -- See Note [Free variables of types]
@@ -196,7 +196,7 @@ tyCoVarsOfCos cos = nonDetFVSet (cosFVs cos)
 -- and a list of coercions
 mkTyCoInScopeSet :: [Type] -> [Coercion] -> InScopeSet
 mkTyCoInScopeSet tys cos
-  = mkInScopeSet (nonDetFVSet $ foldMap typeFVs tys <> cosFVs cos)
+  = mkInScopeSet (nonDetFVSet $ foldMapFVs typeFVs tys <> cosFVs cos)
 
 -- | `tyCoFVsOfType` that returns free variables of a type in a deterministic
 -- set. For explanation of why using `VarSet` is not deterministic see
@@ -217,8 +217,8 @@ tyCoVarsOfTypeList ty = fvVarList $ tyCoFVsOfType ty
 -- synonym.
 tyCoVarsOfTypesSet :: TyVarEnv Type -> TyCoVarSet
 -- See Note [Free variables of types]
-tyCoVarsOfTypesSet tys = tyCoVarsOfTypes $ nonDetEltsUFM tys
-  -- It's OK to use nonDetEltsUFM here because we immediately forget the
+tyCoVarsOfTypesSet tys = nonDetFVSet $ foldMapFVs typeFVs $ NonDetUniqFM tys
+  -- It's OK to use NonDetUniqFM here because we immediately forget the
   -- ordering by returning a set
 
 -- | Returns free variables of types, including kind variables as
@@ -319,7 +319,7 @@ tyCoFVsOfType = typeFVs
 
 typeFVs :: FreeVarStrategy m => Type -> m
 typeFVs (TyVarTy v)        = unitFV v
-typeFVs (TyConApp _ tys)   = foldMap typeFVs tys
+typeFVs (TyConApp _ tys)   = foldMapFVs typeFVs tys
 typeFVs (LitTy {})         = mempty
 typeFVs (AppTy fun arg)    = typeFVs fun <> typeFVs arg
 typeFVs (FunTy _ arg res)  = typeFVs arg <> typeFVs res
@@ -354,16 +354,12 @@ tyCoFVsVarBndr :: FreeVarStrategy m => Var -> m -> m
 tyCoFVsVarBndr var fvs
   = typeFVs (varType var)   -- Free vars of its type/kind
     <> bindVar var fvs       -- Delete it from the thing-inside
-{-# SPECIALISE tyCoFVsVarBndr :: Var -> FV -> FV #-}
-{-# SPECIALISE tyCoFVsVarBndr :: Var -> NonDetFV -> NonDetFV #-}
-{-# SPECIALISE tyCoFVsVarBndr :: Var -> LocalFV -> LocalFV #-}
-{-# SPECIALISE tyCoFVsVarBndr :: Var -> LocalNonDetFV -> LocalNonDetFV #-}
-{-# SPECIALISE tyCoFVsVarBndr :: Var -> NoFVs -> NoFVs #-}
+{-# INLINE tyCoFVsVarBndr #-}
 
 
 tyCoFVsOfTypes :: FreeVarStrategy m => [Type] -> m
 -- See Note [Free variables of types]
-tyCoFVsOfTypes = foldMap typeFVs
+tyCoFVsOfTypes tys = foldMapFVs typeFVs tys
 
 -- | Get a deterministic set of the vars free in a coercion
 tyCoVarsOfCoDSet :: Coercion -> DTyCoVarSet
@@ -375,8 +371,8 @@ tyCoVarsOfCoList :: Coercion -> [TyCoVar]
 tyCoVarsOfCoList co = fvVarList $ tyCoFVsOfCo co
 
 tyCoVarsOfCosSet :: CoVarEnv Coercion -> TyCoVarSet
-tyCoVarsOfCosSet cos = tyCoVarsOfCos $ nonDetEltsUFM cos
-  -- It's OK to use nonDetEltsUFM here because we immediately forget the
+tyCoVarsOfCosSet cos = nonDetFVSet $ foldMapFVs coFVs $ NonDetUniqFM cos
+  -- It's OK to use NonDetUniqFM here because we immediately forget the
   -- ordering by returning a set
 
 tyCoFVsOfCo :: Coercion -> FV
@@ -388,7 +384,7 @@ tyCoFVsOfCos :: [Coercion] -> FV
 tyCoFVsOfCos = cosFVs
 
 cosFVs :: FreeVarStrategy m => [Coercion] -> m
-cosFVs cos = mconcat $ fmap coFVs cos
+cosFVs cos = foldMapFVs coFVs cos
 
 coFVs :: FreeVarStrategy m => Coercion -> m
 coFVs (Refl ty) = typeFVs ty
@@ -460,7 +456,7 @@ coVarsOfType :: Type -> CoVarSet
 coVarsOfType ty = nonDetCoFVSet (typeFVs ty)
 
 coVarsOfTypes :: [Type] -> TyCoVarSet
-coVarsOfTypes tys = nonDetCoFVSet (mconcat $ fmap typeFVs tys)
+coVarsOfTypes tys = nonDetCoFVSet (foldMapFVs typeFVs tys)
 
 coVarsOfCo :: Coercion -> CoVarSet
 coVarsOfCo co = nonDetCoFVSet (coFVs co)
