@@ -50,7 +50,6 @@ import CoAxiom
 import VarSet
 import VarEnv
 import Name
-import PrelNames ( eqPrimTyConKey )
 import UniqDFM
 import Outputable
 import Maybes
@@ -1772,9 +1771,8 @@ coreFlattenCo :: TvSubstEnv -> FlattenEnv
 coreFlattenCo subst env co
   = (env2, mkCoVarCo covar)
   where
-    fresh_name    = mkFlattenFreshCoName
     (env1, kind') = coreFlattenTy subst env (coercionType co)
-    covar         = uniqAway (fe_in_scope env1) (mkCoVar fresh_name kind')
+    covar         = mkFlattenFreshCoVar (fe_in_scope env1) kind'
     -- Add the covar to the FlattenEnv's in-scope set.
     -- See Note [Flattening], wrinkle 2A.
     env2          = updateInScopeSet env1 (flip extendInScopeSet covar)
@@ -1827,6 +1825,8 @@ mkFlattenFreshTyName :: Uniquable a => a -> Name
 mkFlattenFreshTyName unq
   = mkSysTvName (getUnique unq) (fsLit "flt")
 
-mkFlattenFreshCoName :: Name
-mkFlattenFreshCoName
-  = mkSystemVarName (deriveUnique eqPrimTyConKey 71) (fsLit "flc")
+mkFlattenFreshCoVar :: InScopeSet -> Kind -> CoVar
+mkFlattenFreshCoVar in_scope kind
+  = let uniq = unsafeGetFreshLocalUnique in_scope
+        name = mkSystemVarName uniq (fsLit "flc")
+    in mkCoVar name kind
