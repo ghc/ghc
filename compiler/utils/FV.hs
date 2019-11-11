@@ -94,27 +94,34 @@ noFVs (NoFVs f) = f emptyVarSet
 newtype NonDetFV = NonDetFV { runNonDetFV :: TyCoVarSet -> TyCoVarSet -> TyCoVarSet }
 
 instance Monoid NonDetFV where
-  mempty = NonDetFV $ \_ acc -> acc
+  mempty = NonDetFV $ \ !_ acc -> acc
   {-# INLINE mempty #-}
-  mconcat xs = NonDetFV $ oneShot $ \is -> oneShot $ \acc0 ->
-    foldl' (\acc f -> runNonDetFV f is acc) acc0 xs
+  --mconcat xs = NonDetFV $ oneShot $ \is -> oneShot $ \acc0 ->
+  --  is `seq` foldl' (\acc f -> runNonDetFV f is $! acc) acc0 xs
+  mconcat = foldr (<>) mempty
   {-# INLINE mconcat #-}
 
 instance Semigroup NonDetFV where
-  NonDetFV f <> NonDetFV g = NonDetFV $ oneShot $ \is -> oneShot $ \acc -> f is $! (g is $! acc)
+  NonDetFV f <> NonDetFV g =
+    NonDetFV $ oneShot $ \is -> oneShot $ \acc ->
+      is `seq` (f is $! (g is $! acc))
   {-# INLINE (<>) #-}
 
 instance FreeVarStrategy NonDetFV where
-  coholeFV hole = unitFV $ coHoleCoVar hole
+  coholeFV hole = unitFV $! coHoleCoVar hole
   unitFV v = NonDetFV $ oneShot $ \is -> oneShot $ \acc ->
     if | v `elemVarSet` is  -> acc
        | v `elemVarSet` acc -> acc
        | otherwise          -> runNonDetFV (typeFVs (varType v)) emptyVarSet $! extendVarSet acc v
-  bindVar v (NonDetFV f) = NonDetFV $ oneShot $ \is -> oneShot $ \acc -> (f $! extendVarSet is v) $! acc
+  bindVar v (NonDetFV f) = NonDetFV $ oneShot $ \is -> oneShot $ \acc ->
+    is `seq` ((f $! extendVarSet is v) $! acc)
+  foldMapFVs f xs0 = NonDetFV $ oneShot $ \is -> oneShot $ \acc0 ->
+    is `seq` foldl' (\acc x -> runNonDetFV (f x) is acc) acc0 xs0
 
   {-# INLINE coholeFV #-}
   {-# INLINE unitFV #-}
   {-# INLINE bindVar #-}
+  {-# INLINE foldMapFVs #-}
 
 nonDetFVSet :: NonDetFV -> TyCoVarSet
 nonDetFVSet (NonDetFV f) = f emptyVarSet emptyVarSet
@@ -129,21 +136,27 @@ nonDetFVSet (NonDetFV f) = f emptyVarSet emptyVarSet
 newtype NonDetCoFV = NonDetCoFV { runNonDetCoFV :: CoVarSet -> CoVarSet -> CoVarSet }
 
 instance Monoid NonDetCoFV where
-  mempty = NonDetCoFV $ \_ acc -> acc
+  mempty = NonDetCoFV $ \ !_ acc -> acc
   {-# INLINE mempty #-}
+  mconcat = foldl' (<>) mempty
+  {-# INLINE mconcat #-}
 
 instance Semigroup NonDetCoFV where
-  NonDetCoFV f <> NonDetCoFV g = NonDetCoFV $ oneShot $ \is -> oneShot $ \acc -> f is $! (g is $! acc)
+  NonDetCoFV f <> NonDetCoFV g =
+    NonDetCoFV $ oneShot $ \is -> oneShot $ \acc ->
+      is `seq` (f is $! (g is $! acc))
   {-# INLINE (<>) #-}
 
 instance FreeVarStrategy NonDetCoFV where
-  coholeFV hole = unitFV $ coHoleCoVar hole
+  coholeFV hole = unitFV $! coHoleCoVar hole
   unitFV v = NonDetCoFV $ \is acc ->
-    if | not (isCoVar v)    -> acc
+    if | not (isCoVar v)    -> is `seq` acc
        | v `elemVarSet` is  -> acc
        | v `elemVarSet` acc -> acc
-       | otherwise          -> runNonDetCoFV (typeFVs (varType v)) emptyVarSet $! extendVarSet acc v
-  bindVar v (NonDetCoFV f) = NonDetCoFV $ oneShot $ \is -> oneShot $ \acc -> (f $! extendVarSet is v) $! acc
+       | otherwise          -> acc `seq` runNonDetCoFV (typeFVs (varType v)) emptyVarSet $! extendVarSet acc v
+  bindVar v (NonDetCoFV f) =
+    NonDetCoFV $ oneShot $ \is -> oneShot $ \acc ->
+      is `seq` ((f $! extendVarSet is v) $! acc)
 
   {-# INLINE coholeFV #-}
   {-# INLINE unitFV #-}
@@ -171,25 +184,27 @@ emptyFVAccum = FVAccum [] emptyVarSet
 newtype FV = FV { runFV :: InterestingVarFun -> TyCoVarSet -> FVAccum -> FVAccum }
 
 instance Monoid FV where
-  mempty = FV $ \_ _ acc -> acc
+  mempty = FV $ \ !_ !_ acc -> acc
   {-# INLINE mempty #-}
+  mconcat = foldl' (<>) mempty
+  {-# INLINE mconcat #-}
 
 instance Semigroup FV where
-  f <> g = FV $ oneShot $ \fv_cand -> oneShot $ \in_scope -> oneShot $ \acc ->
-    runFV f fv_cand in_scope $! (runFV g fv_cand in_scope $! acc)
+  f <> g = FV $ oneShot $ \fv_cand -> oneShot $ \in_scope -> oneShot $ \ acc ->
+    in_scope `seq` (runFV f fv_cand in_scope $! (runFV g fv_cand in_scope $! acc))
   {-# INLINE (<>) #-}
 
 whenIsInteresting :: Var -> FV -> FV
 whenIsInteresting var f = FV $ oneShot g
   where
     g fv_cand in_scope acc@(FVAccum _have have_set)
-      | not (fv_cand var)          = acc
+      | not (fv_cand var)          = in_scope `seq` acc
       | var `elemVarSet` in_scope  = acc
       | var `elemVarSet` have_set  = acc
       | otherwise                  = runFV f fv_cand in_scope acc
 
 instance FreeVarStrategy FV where
-  coholeFV hole = unitFV $ coHoleCoVar hole
+  coholeFV hole = unitFV $! coHoleCoVar hole
   unitFV var = whenIsInteresting var $ typeFVs (varType var) <> add_fv var
     where
       add_fv :: Var -> FV
