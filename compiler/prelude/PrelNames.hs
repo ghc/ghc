@@ -2092,6 +2092,7 @@ errorIdKey                    = mkPreludeMiscIdUnique  5
 foldrIdKey                    = mkPreludeMiscIdUnique  6
 recSelErrorIdKey              = mkPreludeMiscIdUnique  7
 seqIdKey                      = mkPreludeMiscIdUnique  8
+absentSumFieldErrorIdKey      = mkPreludeMiscIdUnique  9
 eqStringIdKey                 = mkPreludeMiscIdUnique 10
 noMethodBindingErrorIdKey     = mkPreludeMiscIdUnique 11
 nonExhaustiveGuardsErrorIdKey = mkPreludeMiscIdUnique 12
@@ -2107,7 +2108,6 @@ voidPrimIdKey                 = mkPreludeMiscIdUnique 21
 typeErrorIdKey                = mkPreludeMiscIdUnique 22
 divIntIdKey                   = mkPreludeMiscIdUnique 23
 modIntIdKey                   = mkPreludeMiscIdUnique 24
-absentSumFieldErrorIdKey      = mkPreludeMiscIdUnique 9
 
 unsafeCoerceIdKey, concatIdKey, filterIdKey, zipIdKey, bindIOIdKey,
     returnIOIdKey, newStablePtrIdKey,
