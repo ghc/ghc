@@ -95,7 +95,8 @@ run m = case m of
   GetClosure ref -> do
     clos <- getClosureData =<< localRef ref
     mapM (\(Box x) -> mkRemoteRef (HValue x)) clos
-  Seq ref -> tryEval (void $ evaluate =<< localRef ref)
+  Seq ref -> doSeq ref
+  ResumeSeq ref -> resumeSeq ref
   _other -> error "GHCi.Run.run"
 
 evalStmt :: EvalOpts -> EvalExpr HValueRef -> IO (EvalStatus [HValueRef])
@@ -129,6 +130,37 @@ evalStringToString r str = do
   tryEval $ do
     r <- (unsafeCoerce io :: String -> IO String) str
     evaluate (force r)
+
+-- | Process the Seq message to force a value.                       #2950
+-- If during this processing a breakpoint is hit, return
+-- an EvalBreak value in the EvalStatus to the UI process,
+-- otherwise return an EvalComplete.
+-- The UI process has more and therefore also can show more
+-- information about the breakpoint than the current iserv
+-- process.
+doSeq :: RemoteRef a -> IO (EvalStatus ())
+doSeq ref = do
+    sandboxIO evalOptsSeq $ do
+      _ <- (void $ evaluate =<< localRef ref)
+      return ()
+
+-- | Process a ResumeSeq message. Continue the :force processing     #2950
+-- after a breakpoint.
+resumeSeq :: RemoteRef (ResumeContext ()) -> IO (EvalStatus ())
+resumeSeq hvref = do
+    ResumeContext{..} <- localRef hvref
+    withBreakAction evalOptsSeq resumeBreakMVar resumeStatusMVar $
+      mask_ $ do
+        putMVar resumeBreakMVar () -- this awakens the stopped thread...
+        redirectInterrupts resumeThreadId $ takeMVar resumeStatusMVar
+
+evalOptsSeq :: EvalOpts
+evalOptsSeq = EvalOpts
+              { useSandboxThread = True
+              , singleStep = False
+              , breakOnException = False
+              , breakOnError = False
+              }
 
 -- When running a computation, we redirect ^C exceptions to the running
 -- thread.  ToDo: we might want a way to continue even if the target
