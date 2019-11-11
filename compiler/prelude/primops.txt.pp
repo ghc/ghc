@@ -1958,7 +1958,15 @@ primop  EqByteArrayAddrOp "eqByteArrayAddr#" GenPrimOp
     (i.e. same length) starting at the unmanaged address {\tt src2}.
     Both arrays must fully contain the specified ranges, but this is
     not checked.  Returns {\tt 1#} when the arrays are equal and
-    {\tt 0#} otherwise.}
+    {\tt 0#} otherwise.
+
+    This only checks that the ranges are equal rather than
+    lexicographically comparing them like {\tt memcmp} does.
+    That is, its result should be interpreted as {\tt Bool} rather
+    than {\tt Ordering}. It is less powerful than {\tt memcmp} so
+    that the compiler can unroll the loop more effectively when the
+    {\tt Addr#} argument is a constant.
+   }
    with
    can_fail = True
 
