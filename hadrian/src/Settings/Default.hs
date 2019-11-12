@@ -91,6 +91,7 @@ stage1Packages = do
              , containers
              , deepseq
              , directory
+             , exceptions
              , filepath
              , ghc
              , ghcCompact

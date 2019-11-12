@@ -463,6 +463,7 @@ libraries/haskeline_CONFIGURE_OPTS += --flags=-terminfo
 endif
 
 PACKAGES_STAGE1 += stm
+PACKAGES_STAGE1 += exceptions
 PACKAGES_STAGE1 += haskeline
 PACKAGES_STAGE1 += ghci
 PACKAGES_STAGE1 += libiserv
