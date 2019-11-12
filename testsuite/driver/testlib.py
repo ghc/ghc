@@ -583,7 +583,7 @@ RESIDENCY_OPTS = '+RTS -A256k -i0 -h -RTS'
 # See Note [Measuring residency].
 def collect_runtime_residency(tolerance_pct: float):
     return [
-        collect_compiler_stats(['peak_megabytes_allocated', 'max_bytes_used'], tolerance_pct),
+        collect_stats(['peak_megabytes_allocated', 'max_bytes_used'], tolerance_pct),
         extra_run_opts(RESIDENCY_OPTS),
         # The nonmoving collector does not support -G1
         omit_ways([WayName(name) for name in ['nonmoving', 'nonmoving_thr', 'nonmoving_thr_ghc']])
