@@ -1,4 +1,6 @@
 {-# LANGUAGE CPP #-}
+{-# LANGUAGE DeriveFunctor #-}
+{-# LANGUAGE BangPatterns #-}
 
 -- -----------------------------------------------------------------------------
 --
@@ -18,7 +20,7 @@ module NCGMonad (
         addNodeBetweenNat,
         addImmediateSuccessorNat,
         updateCfgNat,
-        getUniqueNat,
+        getUniqueNat, getCfgNat,
         mapAccumLNat,
         setDeltaNat,
         getDeltaNat,
@@ -65,6 +67,7 @@ import Instruction
 import Outputable (SDoc, pprPanic, ppr)
 import Cmm (RawCmmDecl, CmmStatics)
 import CFG
+import Util
 
 data NcgImpl statics instr jumpDest = NcgImpl {
     cmmTopCodeGen             :: RawCmmDecl -> NatM [NatCmmDecl statics instr],
@@ -88,7 +91,7 @@ data NcgImpl statics instr jumpDest = NcgImpl {
     -- the block's 'UnwindPoint's
     -- See Note [What is this unwinding business?] in Debug
     -- and Note [Unwinding information in the NCG] in this module.
-    invertCondBranches        :: CFG -> LabelMap CmmStatics -> [NatBasicBlock instr]
+    invertCondBranches        :: Maybe CFG -> LabelMap CmmStatics -> [NatBasicBlock instr]
                               -> [NatBasicBlock instr]
     -- ^ Turn the sequence of `jcc l1; jmp l2` into `jncc l2; <block_l1>`
     -- when possible.
@@ -206,7 +209,11 @@ addImportNat imp
 
 updateCfgNat :: (CFG -> CFG) -> NatM ()
 updateCfgNat f
-        = NatM $ \ st -> ((), st { natm_cfg = f (natm_cfg st) })
+        = NatM $ \ st -> let !cfg' = f (natm_cfg st)
+                         in ((), st { natm_cfg = cfg'})
+
+getCfgNat :: NatM CFG
+getCfgNat = NatM $ \ st -> (natm_cfg st, st)
 
 -- | Record that we added a block between `from` and `old`.
 addNodeBetweenNat :: BlockId -> BlockId -> BlockId -> NatM ()
@@ -231,7 +238,7 @@ addNodeBetweenNat from between to
 
 -- | Place `succ` after `block` and change any edges
 --   block -> X to `succ` -> X
-addImmediateSuccessorNat :: BlockId -> BlockId -> NatM ()
+addImmediateSuccessorNat :: HasDebugCallStack => BlockId -> BlockId -> NatM ()
 addImmediateSuccessorNat block succ
         = updateCfgNat (addImmediateSuccessor block succ)
 
