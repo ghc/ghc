@@ -50,6 +50,7 @@ cabalBuilderArgs = builder (Cabal Setup) ? do
             , arg $ "${pkgroot}/../../docs/html/libraries/" ++ pkgName pkg
 
             , withStaged $ Ghc CompileHs
+            , withBuilderArgs (Ghc CompileHs stage)
             , withStaged (GhcPkg Update)
             , withBuilderArgs (GhcPkg Update stage)
             , bootPackageDatabaseArgs
@@ -159,6 +160,11 @@ withBuilderKey b = case b of
 -- | Add arguments to builders if needed.
 withBuilderArgs :: Builder -> Args
 withBuilderArgs b = case b of
+    Ghc _ stage -> do
+      top   <- expr topDirectory
+      pkgDb <- expr $ packageDbPath stage
+      notStage0 ? arg ("--ghc-option=-no-global-package-db") <>
+                  arg ("--ghc-option=-package-db=" ++ top -/- pkgDb)
     GhcPkg _ stage -> do
       top   <- expr topDirectory
       pkgDb <- expr $ packageDbPath stage
