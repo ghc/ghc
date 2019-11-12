@@ -782,7 +782,7 @@ doSRTs dflags moduleSRTInfo procs data_ = do
         [ ( [CmmDeclSRTs]          -- generated SRTs
           , [(Label, CLabel)]      -- SRT fields for info tables
           , [(Label, [SRTEntry])]  -- SRTs to attach to static functions
-          , Bool
+          , Bool                   -- Whether the group has CAF references
           ) ]
 
       (result, moduleSRTInfo') =
@@ -794,7 +794,7 @@ doSRTs dflags moduleSRTInfo procs data_ = do
                    True{-is a CAF-} cafs static_data
           return (nonCAFs ++ cAFs)
 
-      (srt_declss, pairs, funSRTs, caffy) = unzip4 result
+      (srt_declss, pairs, funSRTs, has_caf_refs) = unzip4 result
       srt_decls = concat srt_declss
 
   unless (null srt_decls) $
@@ -804,8 +804,9 @@ doSRTs dflags moduleSRTInfo procs data_ = do
   let
     srtFieldMap = mapFromList (concat pairs)
     funSRTMap = mapFromList (concat funSRTs)
-    caffy' = or caffy
-    decls' = concatMap (updInfoSRTs dflags srtFieldMap funSRTMap caffy') decls
+    has_caf_refs' = or has_caf_refs
+    decls' =
+      concatMap (updInfoSRTs dflags srtFieldMap funSRTMap has_caf_refs') decls
 
   return (moduleSRTInfo', srt_decls ++ decls')
 
@@ -820,7 +821,7 @@ doSCC
         ( [CmmDeclSRTs]          -- generated SRTs
         , [(Label, CLabel)]      -- SRT fields for info tables
         , [(Label, [SRTEntry])]  -- SRTs to attach to static functions
-        , Bool
+        , Bool                   -- Whether the group has CAF references
         )
 
 doSCC dflags staticFuns static_data (AcyclicSCC (l, cafLbl, cafs)) =
@@ -870,7 +871,7 @@ oneSRT
        ( [CmmDeclSRTs]                -- SRT objects we built
        , [(Label, CLabel)]            -- SRT fields for these blocks' itbls
        , [(Label, [SRTEntry])]        -- SRTs to attach to static functions
-       , Bool
+       , Bool                         -- Whether the group has CAF references
        )
 
 oneSRT dflags staticFuns lbls caf_lbls isCAF cafs static_data = do
@@ -1072,7 +1073,7 @@ updInfoSRTs
   :: DynFlags
   -> LabelMap CLabel               -- SRT labels for each block
   -> LabelMap [SRTEntry]           -- SRTs to merge into FUN_STATIC closures
-  -> Bool
+  -> Bool                          -- Whether the CmmDecl's group has CAF references
   -> CmmDecl
   -> [CmmDeclSRTs]
 
