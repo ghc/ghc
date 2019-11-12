@@ -123,19 +123,14 @@ module TysWiredIn (
         int8ElemRepDataConTy, int16ElemRepDataConTy, int32ElemRepDataConTy,
         int64ElemRepDataConTy, word8ElemRepDataConTy, word16ElemRepDataConTy,
         word32ElemRepDataConTy, word64ElemRepDataConTy, floatElemRepDataConTy,
-        doubleElemRepDataConTy,
-
-        -- * Unsafe coercion stuff
-        unsafeEqualityTyCon, unsafeReflDataCon
-
+        doubleElemRepDataConTy
     ) where
 
 #include "HsVersions.h"
 
 import GhcPrelude
 
-import {-# SOURCE #-} MkId( mkDataConWorkId, mkDictSelId, vanillaDataConBoxer )
-import {-# SOURCE #-} CoreUnfold       ( mkInlineUnfolding )
+import {-# SOURCE #-} MkId( mkDataConWorkId, mkDictSelId )
 
 -- friends:
 import PrelNames
@@ -145,13 +140,9 @@ import {-# SOURCE #-} KnownUniques
 -- others:
 import CoAxiom
 import Id
-import IdInfo
 import Constants        ( mAX_TUPLE_SIZE, mAX_CTUPLE_SIZE, mAX_SUM_SIZE )
 import Module           ( Module )
 import Type
-import Coercion         ( mkPrimEqPred, mkNomReflCo )
-import CoreSyn
-import Demand           ( nopSig )
 import RepType
 import DataCon
 import {-# SOURCE #-} ConLike
@@ -242,7 +233,6 @@ wiredInTyCons = [ -- Units are not treated like other tuples, because then
                 , vecElemTyCon
                 , constraintKindTyCon
                 , liftedTypeKindTyCon
-                , unsafeEqualityTyCon
                 ]
 
 mkWiredInTyConName :: BuiltInSyntax -> Module -> FastString -> Unique -> TyCon -> Name
@@ -1670,111 +1660,3 @@ extractPromotedList tys = go tys
 
       | otherwise
       = pprPanic "extractPromotedList" (ppr tys)
-
-{-
-** *********************************************************************
-*                                                                      *
-            Unsafe coercion stuff
-*                                                                      *
-************************************************************************
--}
-
-unsafeEqualityTyCon :: TyCon
-unsafeReflDataCon :: DataCon
-
--- We want
---  TyCon:   UnsafeEquality :: forall (k :: Type). k -> k -> Type
---  DataCon: UnsafeRefl
---   user type   :: forall (k :: Type) (a :: k). UnsafeEquality k a a
---   worker type :: forall (k :: Type) (a :: k) (b :: k). (a ~# b) -> UnsafeEquality k a b
-(unsafeEqualityTyCon, unsafeReflDataCon) = (tycon, data_con)
-  where
-    tycon_binders :: [TyConBinder]
-    tycon_binders = mkTemplateTyConBinders [liftedTypeKind] (\[k] -> [k, k])
-
-    univ_tyvars :: [TyVar]
-    univ_tyvars = binderVars tycon_binders
-
-    [k,a,b] = univ_tyvars
-
-    tycon :: TyCon
-    tycon =
-      mkAlgTyCon
-        unsafeEqualityTyConName -- Name
-        tycon_binders  -- [TyConBinder] (binders of the TyCon)
-        liftedTypeKind -- Kind (result kind)
-        (map (const Nominal) tycon_binders) -- [Role]
-        Nothing -- CType
-        []      -- Stupid theta
-        (mkDataTyConRhs [data_con]) -- AlgTyConRhs
-        (VanillaAlgTyCon (mkPrelTyConRepName unsafeEqualityTyConName)) -- AlgTyConFlav
-        True -- Uses GADT syntax
-
-    data_con :: DataCon
-    data_con = mkDataCon unsafeReflDataConName
-                False  -- Not infix
-                (mkPrelTyConRepName unsafeReflDataConName)
-                []     -- No arg tys
-                []     -- No field labels
-                univ_tyvars -- Universals
-                []          -- No existentials
-                (mkTyCoVarBinders Specified univ_tyvars)
-                [mkEqSpec b (mkTyVarTy a)]
-                []    -- No class constraints
-                []    -- No user args
-                (mkTyConApp tycon (mkTyVarTys [k,a,a]))  -- Reusult type
-                NoRRI
-                tycon
-                fIRST_TAG   -- There is only one constructor
-                []          -- No stupid theta
-                work_id
-                data_con_rep
-
-    dc_key    = nameUnique unsafeReflDataConName
-    wrap_name = mkDataConWrapperName data_con $
-                dataConWrapperUnique dc_key
-    work_name = mkDataConWorkerName data_con $
-                dataConWorkerUnique dc_key
-
-    work_id = mkDataConWorkId work_name data_con
-    wrap_id = mkGlobalId (DataConWrapId data_con) wrap_name wrap_ty wrap_info
-    wrap_ty = dataConUserType data_con
-    wrap_info = noCafIdInfo
-                `setInlinePragInfo`    wrap_prag
-                `setUnfoldingInfo`     mkInlineUnfolding wrap_rhs
-                `setStrictnessInfo`    wrap_sig
-                    -- We need to get the CAF info right here because TidyPgm
-                    -- does not tidy the IdInfo of implicit bindings (like the wrapper)
-                    -- so it not make sure that the CAF info is sane
-                `setLevityInfoWithType` wrap_ty
-
-    wrap_sig = nopSig  -- Could do better, perhaps, but this is only UnsafeRefl
-
-    wrap_prag = alwaysInlinePragma `setInlinePragmaActivation`
-                activeDuringFinal
-                -- See Note [Activation for data constructor wrappers]
-
-    wrap_rhs = mkLams [k,a] $
-               Var work_id `mkTyApps` mkTyVarTys [k,a,a]
-                           `mkCoApps` [mkNomReflCo (mkTyVarTy a)]
-
-    data_con_rep :: DataConRep
-    --     wrapUnsafeRefl :: forall k (a :: k). UnsafeEquality k a a
-    --     wrapUnsafeRefl = /\k (a:k). UnsafeRefl k a a (Refl <a>)
-    data_con_rep = DCR { dcr_wrap_id = wrap_id
-                       , dcr_boxer   = vanillaDataConBoxer
-                       , dcr_arg_tys = [mkPrimEqPred (mkTyVarTy b) (mkTyVarTy a)]
-                       , dcr_stricts = [NotMarkedStrict]
-                       , dcr_bangs   = [] }
-
-mkDataConWrapperName :: DataCon -> Unique -> Name
-mkDataConWrapperName data_con wrap_key =
-    mkWiredInName modu wrap_occ wrap_key
-                  (AnId (dataConWorkId data_con)) UserSyntax
-  where
-    modu     = ASSERT( isExternalName dc_name )
-               nameModule dc_name
-    dc_name  = dataConName data_con
-    dc_occ   = nameOccName dc_name
-    wrap_occ = mkDataConWrapperOcc dc_occ
-

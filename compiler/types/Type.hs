@@ -470,7 +470,6 @@ expandTypeSynonyms ty
     go_co _ (HoleCo h)
       = pprPanic "expandTypeSynonyms hit a hole" (ppr h)
 
-    go_prov _     UnsafeCoerceProv    = UnsafeCoerceProv
     go_prov subst (PhantomProv co)    = PhantomProv (go_co subst co)
     go_prov subst (ProofIrrelProv co) = ProofIrrelProv (go_co subst co)
     go_prov _     p@(PluginProv _)    = p
@@ -620,7 +619,6 @@ mapCoercion mapper@(TyCoMapper { tcm_covar = covar
     go (KindCo co)         = mkKindCo <$> go co
     go (SubCo co)          = mkSubCo <$> go co
 
-    go_prov UnsafeCoerceProv    = return UnsafeCoerceProv
     go_prov (PhantomProv co)    = PhantomProv <$> go co
     go_prov (ProofIrrelProv co) = ProofIrrelProv <$> go co
     go_prov p@(PluginProv _)    = return p
@@ -2690,7 +2688,6 @@ occCheckExpand vs_to_avoid ty
                                              ; return (mkAxiomRuleCo ax cs') }
 
     ------------------
-    go_prov _   UnsafeCoerceProv    = return UnsafeCoerceProv
     go_prov cxt (PhantomProv co)    = PhantomProv <$> go_co cxt co
     go_prov cxt (ProofIrrelProv co) = ProofIrrelProv <$> go_co cxt co
     go_prov _   p@(PluginProv _)    = return p
@@ -2744,7 +2741,6 @@ tyConsOfType ty
      go_mco MRefl    = emptyUniqSet
      go_mco (MCo co) = go_co co
 
-     go_prov UnsafeCoerceProv    = emptyUniqSet
      go_prov (PhantomProv co)    = go_co co
      go_prov (ProofIrrelProv co) = go_co co
      go_prov (PluginProv _)      = emptyUniqSet

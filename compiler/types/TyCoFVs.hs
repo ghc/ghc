@@ -257,7 +257,6 @@ tyCoVarsOfProv prov = ty_co_vars_of_prov prov emptyVarSet emptyVarSet
 ty_co_vars_of_prov :: UnivCoProvenance -> TyCoVarSet -> TyCoVarSet -> TyCoVarSet
 ty_co_vars_of_prov (PhantomProv co)    is acc = ty_co_vars_of_co co is acc
 ty_co_vars_of_prov (ProofIrrelProv co) is acc = ty_co_vars_of_co co is acc
-ty_co_vars_of_prov UnsafeCoerceProv    _  acc = acc
 ty_co_vars_of_prov (PluginProv _)      _  acc = acc
 
 -- | Generates an in-scope set from the free variables in a list of types
@@ -363,7 +362,6 @@ exactTyCoVarsOfType ty
 
     goCos cos = foldr (unionVarSet . goCo) emptyVarSet cos
 
-    goProv UnsafeCoerceProv     = emptyVarSet
     goProv (PhantomProv kco)    = goCo kco
     goProv (ProofIrrelProv kco) = goCo kco
     goProv (PluginProv _)       = emptyVarSet
@@ -471,7 +469,6 @@ tyCoFVsOfCoVar v fv_cand in_scope acc
   = (unitFV v `unionFV` tyCoFVsOfType (varType v)) fv_cand in_scope acc
 
 tyCoFVsOfProv :: UnivCoProvenance -> FV
-tyCoFVsOfProv UnsafeCoerceProv    fv_cand in_scope acc = emptyFV fv_cand in_scope acc
 tyCoFVsOfProv (PhantomProv co)    fv_cand in_scope acc = tyCoFVsOfCo co fv_cand in_scope acc
 tyCoFVsOfProv (ProofIrrelProv co) fv_cand in_scope acc = tyCoFVsOfCo co fv_cand in_scope acc
 tyCoFVsOfProv (PluginProv _)      fv_cand in_scope acc = emptyFV fv_cand in_scope acc
@@ -578,7 +575,6 @@ almost_devoid_co_var_of_prov (PhantomProv co) cv
   = almost_devoid_co_var_of_co co cv
 almost_devoid_co_var_of_prov (ProofIrrelProv co) cv
   = almost_devoid_co_var_of_co co cv
-almost_devoid_co_var_of_prov UnsafeCoerceProv _ = True
 almost_devoid_co_var_of_prov (PluginProv _) _ = True
 
 almost_devoid_co_var_of_type :: Type -> CoVar -> Bool
@@ -753,7 +749,6 @@ noFreeVarsOfCo (AxiomRuleCo _ cs)     = all noFreeVarsOfCo cs
 -- | Returns True if this UnivCoProv has no free variables. Should be the same as
 -- isEmptyVarSet . tyCoVarsOfProv, but faster in the non-forall case.
 noFreeVarsOfProv :: UnivCoProvenance -> Bool
-noFreeVarsOfProv UnsafeCoerceProv    = True
 noFreeVarsOfProv (PhantomProv co)    = noFreeVarsOfCo co
 noFreeVarsOfProv (ProofIrrelProv co) = noFreeVarsOfCo co
 noFreeVarsOfProv (PluginProv {})     = True

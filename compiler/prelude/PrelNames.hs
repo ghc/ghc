@@ -464,6 +464,10 @@ basicKnownKeyNames
 
         -- Unsafe coercion proofs
         , unsafeEqualityProofName
+        , unsafeEqualityTyConName
+        , unsafeReflDataConName
+        , unsafeCoercePrimName
+        , unsafeCoerceName
     ]
 
 genericTyConNames :: [Name]
@@ -1321,10 +1325,13 @@ typeErrorShowTypeDataConName =
   dcQual gHC_TYPELITS (fsLit "ShowType") typeErrorShowTypeDataConKey
 
 -- Unsafe coercion proofs
-unsafeEqualityProofName, unsafeReflDataConName, unsafeEqualityTyConName :: Name
+unsafeEqualityProofName, unsafeEqualityTyConName, unsafeCoercePrimName,
+  unsafeCoerceName, unsafeReflDataConName :: Name
 unsafeEqualityProofName = varQual uNSAFE_COERCE (fsLit "unsafeEqualityProof") unsafeEqualityProofIdKey
-unsafeReflDataConName = dcQual uNSAFE_COERCE (fsLit "UnsafeRefl") unsafeReflDataConKey
 unsafeEqualityTyConName = tcQual uNSAFE_COERCE (fsLit "UnsafeEquality") unsafeEqualityTyConKey
+unsafeReflDataConName   = dcQual uNSAFE_COERCE (fsLit "UnsafeRefl")     unsafeReflDataConKey
+unsafeCoercePrimName    = varQual uNSAFE_COERCE (fsLit "unsafeCoerce#") unsafeCoercePrimIdKey
+unsafeCoerceName        = varQual uNSAFE_COERCE (fsLit "unsafeCoerce")  unsafeCoerceIdKey
 
 -- Dynamic
 toDynName :: Name
@@ -1896,6 +1903,11 @@ someTypeRepDataConKey = mkPreludeTyConUnique 189
 typeSymbolAppendFamNameKey :: Unique
 typeSymbolAppendFamNameKey = mkPreludeTyConUnique 190
 
+-- Unsafe equality
+unsafeEqualityTyConKey :: Unique
+unsafeEqualityTyConKey = mkPreludeTyConUnique 191
+
+
 ---------------- Template Haskell -------------------
 --      THNames.hs: USES TyConUniques 200-299
 -----------------------------------------------------
@@ -2065,6 +2077,9 @@ typeLitSymbolDataConKey, typeLitNatDataConKey :: Unique
 typeLitSymbolDataConKey   = mkPreludeDataConUnique 112
 typeLitNatDataConKey      = mkPreludeDataConUnique 113
 
+-- Unsafe equality
+unsafeReflDataConKey :: Unique
+unsafeReflDataConKey      = mkPreludeDataConUnique 114
 
 ---------------- Template Haskell -------------------
 --      THNames.hs: USES DataUniques 200-250
@@ -2099,6 +2114,7 @@ errorIdKey                    = mkPreludeMiscIdUnique  5
 foldrIdKey                    = mkPreludeMiscIdUnique  6
 recSelErrorIdKey              = mkPreludeMiscIdUnique  7
 seqIdKey                      = mkPreludeMiscIdUnique  8
+absentSumFieldErrorIdKey      = mkPreludeMiscIdUnique  9
 eqStringIdKey                 = mkPreludeMiscIdUnique 10
 noMethodBindingErrorIdKey     = mkPreludeMiscIdUnique 11
 nonExhaustiveGuardsErrorIdKey = mkPreludeMiscIdUnique 12
@@ -2114,13 +2130,11 @@ voidPrimIdKey                 = mkPreludeMiscIdUnique 21
 typeErrorIdKey                = mkPreludeMiscIdUnique 22
 divIntIdKey                   = mkPreludeMiscIdUnique 23
 modIntIdKey                   = mkPreludeMiscIdUnique 24
-absentSumFieldErrorIdKey      = mkPreludeMiscIdUnique 9
 
-unsafeCoerceIdKey, concatIdKey, filterIdKey, zipIdKey, bindIOIdKey,
-    returnIOIdKey, newStablePtrIdKey,
+concatIdKey, filterIdKey, zipIdKey,
+    bindIOIdKey, returnIOIdKey, newStablePtrIdKey,
     printIdKey, failIOIdKey, nullAddrIdKey, voidArgIdKey,
     fstIdKey, sndIdKey, otherwiseIdKey, assertIdKey :: Unique
-unsafeCoerceIdKey             = mkPreludeMiscIdUnique 30
 concatIdKey                   = mkPreludeMiscIdUnique 31
 filterIdKey                   = mkPreludeMiscIdUnique 32
 zipIdKey                      = mkPreludeMiscIdUnique 33
@@ -2415,10 +2429,10 @@ naturalSDataConKey      = mkPreludeMiscIdUnique 568
 wordToNaturalIdKey      = mkPreludeMiscIdUnique 569
 
 -- Unsafe coercion proofs
-unsafeEqualityProofIdKey, unsafeReflDataConKey, unsafeEqualityTyConKey :: Unique
+unsafeEqualityProofIdKey, unsafeCoercePrimIdKey, unsafeCoerceIdKey :: Unique
 unsafeEqualityProofIdKey = mkPreludeMiscIdUnique 570
-unsafeReflDataConKey = mkPreludeMiscIdUnique 571
-unsafeEqualityTyConKey = mkPreludeTyConUnique 572
+unsafeCoercePrimIdKey    = mkPreludeMiscIdUnique 571
+unsafeCoerceIdKey        = mkPreludeMiscIdUnique 572
 
 {-
 ************************************************************************
