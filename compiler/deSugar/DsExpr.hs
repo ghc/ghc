@@ -402,20 +402,8 @@ ds_expr _ (ExplicitSum types alt arity expr)
                                       map Type types ++
                                       [core_expr]) ) }
 
-ds_expr _ (HsSCC _ _ cc expr@(dL->L loc _)) = do
-    dflags <- getDynFlags
-    if gopt Opt_SccProfilingOn dflags
-      then do
-        mod_name <- getModule
-        count <- goptM Opt_ProfCountEntries
-        let nm = sl_fs cc
-        flavour <- ExprCC <$> getCCIndexM nm
-        Tick (ProfNote (mkUserCC nm mod_name loc flavour) count True)
-               <$> dsLExpr expr
-      else dsLExpr expr
-
-ds_expr _ (HsCoreAnn _ _ _ expr)
-  = dsLExpr expr
+ds_expr _ (HsPragE _ prag expr) =
+  ds_prag_expr prag expr
 
 ds_expr _ (HsCase _ discrim matches)
   = do { core_discrim <- dsLExpr discrim
@@ -745,18 +733,32 @@ ds_expr _ (HsBinTick _ ixT ixF e) = do
        mkBinaryTickBox ixT ixF e2
      }
 
-ds_expr _ (HsTickPragma _ _ _ _ expr) = do
-  dflags <- getDynFlags
-  if gopt Opt_Hpc dflags
-    then panic "dsExpr:HsTickPragma"
-    else dsLExpr expr
-
 -- HsSyn constructs that just shouldn't be here:
 ds_expr _ (HsBracket     {})  = panic "dsExpr:HsBracket"
 ds_expr _ (HsDo          {})  = panic "dsExpr:HsDo"
 ds_expr _ (HsRecFld      {})  = panic "dsExpr:HsRecFld"
 ds_expr _ (XExpr nec)         = noExtCon nec
 
+ds_prag_expr :: HsPragE GhcTc -> LHsExpr GhcTc -> DsM CoreExpr
+ds_prag_expr (HsPragSCC _ _ cc) expr = do
+    dflags <- getDynFlags
+    if gopt Opt_SccProfilingOn dflags
+      then do
+        mod_name <- getModule
+        count <- goptM Opt_ProfCountEntries
+        let nm = sl_fs cc
+        flavour <- ExprCC <$> getCCIndexM nm
+        Tick (ProfNote (mkUserCC nm mod_name (getLoc expr) flavour) count True)
+               <$> dsLExpr expr
+      else dsLExpr expr
+ds_prag_expr (HsPragCore _ _ _) expr
+  = dsLExpr expr
+ds_prag_expr (HsPragTick _ _ _ _) expr = do
+  dflags <- getDynFlags
+  if gopt Opt_Hpc dflags
+    then panic "dsExpr:HsPragTick"
+    else dsLExpr expr
+ds_prag_expr (XHsPragE x) _ = noExtCon x
 
 ------------------------------
 dsSyntaxExpr :: SyntaxExpr GhcTc -> [CoreExpr] -> DsM CoreExpr

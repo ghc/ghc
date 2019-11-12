@@ -978,10 +978,7 @@ instance ( a ~ GhcPass p
       ArithSeq _ _ info ->
         [ toHie info
         ]
-      HsSCC _ _ _ expr ->
-        [ toHie expr
-        ]
-      HsCoreAnn _ _ _ expr ->
+      HsPragE _ _ expr ->
         [ toHie expr
         ]
       HsProc _ pat cmdtop ->
@@ -995,9 +992,6 @@ instance ( a ~ GhcPass p
         [ toHie expr
         ]
       HsBinTick _ _ _ expr ->
-        [ toHie expr
-        ]
-      HsTickPragma _ _ _ _ expr ->
         [ toHie expr
         ]
       HsWrap _ _ a ->

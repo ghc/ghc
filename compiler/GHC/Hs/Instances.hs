@@ -247,6 +247,11 @@ deriving instance Data (SyntaxExpr GhcPs)
 deriving instance Data (SyntaxExpr GhcRn)
 deriving instance Data (SyntaxExpr GhcTc)
 
+-- deriving instance (DataIdLR p p) => Data (HsPragE p)
+deriving instance Data (HsPragE GhcPs)
+deriving instance Data (HsPragE GhcRn)
+deriving instance Data (HsPragE GhcTc)
+
 -- deriving instance (DataIdLR p p) => Data (HsExpr p)
 deriving instance Data (HsExpr GhcPs)
 deriving instance Data (HsExpr GhcRn)

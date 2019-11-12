@@ -232,16 +232,15 @@ rnExpr expr@(SectionR {})
   = do  { addErr (sectionErr expr); rnSection expr }
 
 ---------------------------------------------
-rnExpr (HsCoreAnn x src ann expr)
+rnExpr (HsPragE x prag expr)
   = do { (expr', fvs_expr) <- rnLExpr expr
-       ; return (HsCoreAnn x src ann expr', fvs_expr) }
-
-rnExpr (HsSCC x src lbl expr)
-  = do { (expr', fvs_expr) <- rnLExpr expr
-       ; return (HsSCC x src lbl expr', fvs_expr) }
-rnExpr (HsTickPragma x src info srcInfo expr)
-  = do { (expr', fvs_expr) <- rnLExpr expr
-       ; return (HsTickPragma x src info srcInfo expr', fvs_expr) }
+       ; return (HsPragE x (rn_prag prag) expr', fvs_expr) }
+  where
+    rn_prag :: HsPragE GhcPs -> HsPragE GhcRn
+    rn_prag (HsPragSCC x1 src ann) = HsPragSCC x1 src ann
+    rn_prag (HsPragCore x1 src lbl) = HsPragCore x1 src lbl
+    rn_prag (HsPragTick x1 src info srcInfo) = HsPragTick x1 src info srcInfo
+    rn_prag (XHsPragE x) = noExtCon x
 
 rnExpr (HsLam x matches)
   = do { (matches', fvMatch) <- rnMatchGroup LambdaExpr rnLExpr matches

@@ -936,18 +936,9 @@ zonkExpr env (ArithSeq expr wit info)
    where zonkWit env Nothing    = return (env, Nothing)
          zonkWit env (Just fln) = second Just <$> zonkSyntaxExpr env fln
 
-zonkExpr env (HsSCC x src lbl expr)
+zonkExpr env (HsPragE x prag expr)
   = do new_expr <- zonkLExpr env expr
-       return (HsSCC x src lbl new_expr)
-
-zonkExpr env (HsTickPragma x src info srcInfo expr)
-  = do new_expr <- zonkLExpr env expr
-       return (HsTickPragma x src info srcInfo new_expr)
-
--- hdaume: core annotations
-zonkExpr env (HsCoreAnn x src lbl expr)
-  = do new_expr <- zonkLExpr env expr
-       return (HsCoreAnn x src lbl new_expr)
+       return (HsPragE x prag new_expr)
 
 -- arrow notation extensions
 zonkExpr env (HsProc x pat body)
