@@ -44,6 +44,8 @@
 
   * Add `resizeSmallMutableArray#` to `GHC.Exts`.
 
+  * Fix the `Ord1` instance for `Data.Ord.Down` to reverse sort order.
+
 ## 4.13.0.0 *July 2019*
   * Bundled with GHC 8.8.1
 
