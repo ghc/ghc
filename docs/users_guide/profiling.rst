@@ -205,10 +205,22 @@ The syntax of a cost centre annotation for expressions is ::
 
 where ``"name"`` is an arbitrary string, that will become the name of
 your cost centre as it appears in the profiling output, and
-``<expression>`` is any Haskell expression. An ``SCC`` annotation
-extends as far to the right as possible when parsing. (SCC stands for
-"Set Cost Centre"). The double quotes can be omitted if ``name`` is a
-Haskell identifier, for example: ::
+``<expression>`` is any Haskell expression. An ``SCC`` annotation extends as
+far to the right as possible when parsing, having the same precedence as lambda
+abstractions, let expressions, and conditionals. Additionally, an annotation
+may not appear in a position where it would change the grouping of
+subexpressions::
+
+  a = 1 / 2 / 2                          -- accepted (a=0.25)
+  b = 1 / {-# SCC "name" #-} / 2 / 2     -- rejected (instead of b=1.0)
+
+This restriction is required to maintain the property that inserting a pragma,
+just like inserting a comment, does not have unintended effects on the
+semantics of the program, in accordance with `GHC Proposal #176
+<https://github.com/ghc-proposals/ghc-proposals/blob/master/proposals/0176-scc-parsing.rst>`__.
+
+SCC stands for "Set Cost Centre". The double quotes can be omitted if ``name``
+is a Haskell identifier, for example: ::
 
     {-# SCC id #-} <expression>
 
@@ -235,9 +247,9 @@ Here is an example of a program with a couple of SCCs: ::
     main = do let xs = [1..1000000]
               let ys = [1..2000000]
               print $ {-# SCC last_xs #-} last xs
-              print $ {-# SCC last_init_xs #-} last $ init xs
+              print $ {-# SCC last_init_xs #-} last (init xs)
               print $ {-# SCC last_ys #-} last ys
-              print $ {-# SCC last_init_ys #-} last $ init ys
+              print $ {-# SCC last_init_ys #-} last (init ys)
 
 which gives this profile when run:
 

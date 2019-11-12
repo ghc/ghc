@@ -1080,7 +1080,7 @@ topdecl :: { LHsDecl GhcPs }
         -- The $(..) form is one possible form of infixexp
         -- but we treat an arbitrary expression just as if
         -- it had a $(..) wrapped around it
-        | infixexp_top                          {% runECP_P $1 >>= \ $1 ->
+        | infixexp                              {% runECP_P $1 >>= \ $1 ->
                                                    return $ sLL $1 $> $ mkSpliceDecl $1 }
 
 -- Type classes
@@ -2430,7 +2430,7 @@ docdecld :: { LDocDecl }
 decl_no_th :: { LHsDecl GhcPs }
         : sigdecl               { $1 }
 
-        | infixexp_top opt_sig rhs  {% runECP_P $1 >>= \ $1 ->
+        | infixexp     opt_sig rhs  {% runECP_P $1 >>= \ $1 ->
                                        do { (ann,r) <- checkValDef $1 (snd $2) $3;
                                         let { l = comb2 $1 $> };
                                         -- Depending upon what the pattern looks like we might get either
@@ -2476,7 +2476,7 @@ gdrh :: { LGRHS GhcPs (LHsExpr GhcPs) }
 sigdecl :: { LHsDecl GhcPs }
         :
         -- See Note [Declaration/signature overlap] for why we need infixexp here
-          infixexp_top '::' sigtypedoc
+          infixexp     '::' sigtypedoc
                         {% do { $1 <- runECP_P $1
                               ; v <- checkValSigLhs $1
                               ; _ <- amsL (comb2 $1 $>) [mu AnnDcolon $2]
@@ -2571,7 +2571,8 @@ quasiquote :: { Located (HsSplice GhcPs) }
                             in sL (getLoc $1) (mkHsQuasiQuote quoterId (RealSrcSpan quoteSpan) quote) }
 
 exp   :: { ECP }
-        : infixexp '::' sigtype { ECP $
+        : infixexp_no_prag '::' sigtype
+                                { ECP $
                                    runECP_PV $1 >>= \ $1 ->
                                    amms (mkHsTySigPV (comb2 $1 $>) $1 $3)
                                        [mu AnnDcolon $2] }
@@ -2600,10 +2601,12 @@ exp   :: { ECP }
                                                       HsHigherOrderApp False)
                                        [mu AnnRarrowtail $2] }
         | infixexp              { $1 }
+        | exp_prag(exp)         { $1 } -- See Note [Pragmas and operator fixity]
 
 infixexp :: { ECP }
-        : exp10 { $1 }
-        | infixexp qop exp10  {  ECP $
+        : infixexp_no_prag    { $1 }
+        | infixexp_no_prag qop exp_prag(last_exp10)    -- See Note [Pragmas and operator fixity]
+                               { ECP $
                                  superInfixOp $
                                  $2 >>= \ $2 ->
                                  runECP_PV $1 >>= \ $1 ->
@@ -2612,49 +2615,98 @@ infixexp :: { ECP }
                                      [mj AnnVal $2] }
                  -- AnnVal annotation for NPlusKPat, which discards the operator
 
-infixexp_top :: { ECP }
-            : exp10_top               { $1 }
-            | infixexp_top qop exp10_top
-                                      { ECP $
-                                         superInfixOp $
-                                         $2 >>= \ $2 ->
-                                         runECP_PV $1 >>= \ $1 ->
-                                         runECP_PV $3 >>= \ $3 ->
-                                         amms (mkHsOpAppPV (comb2 $1 $>) $1 $2 $3)
-                                              [mj AnnVal $2] }
+last_exp10 :: { ECP }
+  : exp10                { $1 }
+  | exp_prag(last_exp10) { $1 } -- See Note [Pragmas and operator fixity]
 
-exp10_top :: { ECP }
+exp_prag(e) :: { ECP }
+  : prag_e e  -- See Note [Pragmas and operator fixity]
+      {% runECP_P $2 >>= \ $2 ->
+         fmap ecpFromExp $
+         ams (sLL $1 $> $ HsPragE noExtField (snd $ unLoc $1) $2)
+             (fst $ unLoc $1) }
+
+infixexp_no_prag :: { ECP }
+        : exp10 { $1 }
+        | infixexp_no_prag qop exp10
+                               { ECP $
+                                 superInfixOp $
+                                 $2 >>= \ $2 ->
+                                 runECP_PV $1 >>= \ $1 ->
+                                 runECP_PV $3 >>= \ $3 ->
+                                 amms (mkHsOpAppPV (comb2 $1 $>) $1 $2 $3)
+                                     [mj AnnVal $2] }
+                 -- AnnVal annotation for NPlusKPat, which discards the operator
+
+exp10 :: { ECP }
         : '-' fexp                      { ECP $
                                            runECP_PV $2 >>= \ $2 ->
                                            amms (mkHsNegAppPV (comb2 $1 $>) $2)
                                                [mj AnnMinus $1] }
-
-        | exp_annot (prag_hpc)         { $1 }
-        | exp_annot (prag_core)        { $1 }
         | fexp                         { $1 }
-
-exp10 :: { ECP }
-        : exp10_top            { $1 }
-        | exp_annot(prag_scc)  { $1 }
 
 optSemi :: { ([Located Token],Bool) }
         : ';'         { ([$1],True) }
         | {- empty -} { ([],False) }
 
-prag_scc :: { Located ([AddAnn], HsPragE GhcPs) }
-        : '{-# SCC' STRING '#-}'      {% do scc <- getSCC $2
-                                            ; return $ sLL $1 $>
-                                               ([mo $1,mj AnnValStr $2,mc $3],
-                                                HsPragSCC noExtField
-                                                  (getSCC_PRAGs $1)
-                                                  (StringLiteral (getSTRINGs $2) scc)) }
-        | '{-# SCC' VARID  '#-}'      { sLL $1 $> ([mo $1,mj AnnVal $2,mc $3],
-                                                    HsPragSCC noExtField
-                                                      (getSCC_PRAGs $1)
-                                                      (StringLiteral NoSourceText (getVARID $2))) }
+{- Note [Pragmas and operator fixity]
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+'prag_e' is an expression pragma, such as {-# SCC ... #-}, {-# CORE ... #-}, or
+{-# GENERATED ... #-}.
 
-prag_hpc :: { Located ([AddAnn], HsPragE GhcPs) }
-      : '{-# GENERATED' STRING INTEGER ':' INTEGER '-' INTEGER ':' INTEGER '#-}'
+It must be used with care, or else #15730 happens. Consider this infix
+expression:
+
+         1 / 2 / 2
+
+There are two ways to parse it:
+
+    1.   (1 / 2) / 2   =  0.25
+    2.   1 / (2 / 2)   =  1.0
+
+Due to the fixity of the (/) operator (assuming it comes from Prelude),
+option 1 is the correct parse. However, in the past GHC's parser used to get
+confused by the SCC annotation when it occurred in the middle of an infix
+expression:
+
+         1 / {-# SCC ann #-} 2 / 2    -- used to get parsed as option 2
+
+There are several ways to address this issue, see GHC Proposal #176 for a
+detailed exposition:
+
+  https://github.com/ghc-proposals/ghc-proposals/blob/master/proposals/0176-scc-parsing.rst
+
+The accepted fix is to disallow pragmas that occur within infix expressions.
+Infix expressions are assembled out of 'exp10', so 'exp10' must not accept
+pragmas. Instead, we accept them in exactly two places:
+
+* at the start of an expression or a parenthesized subexpression:
+
+    f = {-# SCC ann #-} 1 / 2 / 2          -- at the start of the expression
+    g = 5 + ({-# SCC ann #-} 1 / 2 / 2)    -- at the start of a parenthesized subexpression
+
+* immediately after the last operator:
+
+    f = 1 / 2 / {-# SCC ann #-} 2
+
+In both cases, the parse does not depend on operator fixity. The second case
+may sound unnecessary, but it's actually needed to support a common idiom:
+
+    f $ {-# SCC ann $-} ...
+
+-}
+prag_e :: { Located ([AddAnn], HsPragE GhcPs) }
+      : '{-# SCC' STRING '#-}'      {% do scc <- getSCC $2
+                                          ; return $ sLL $1 $>
+                                             ([mo $1,mj AnnValStr $2,mc $3],
+                                              HsPragSCC noExtField
+                                                (getSCC_PRAGs $1)
+                                                (StringLiteral (getSTRINGs $2) scc)) }
+      | '{-# SCC' VARID  '#-}'      { sLL $1 $> ([mo $1,mj AnnVal $2,mc $3],
+                                                  HsPragSCC noExtField
+                                                    (getSCC_PRAGs $1)
+                                                    (StringLiteral NoSourceText (getVARID $2))) }
+      | '{-# GENERATED' STRING INTEGER ':' INTEGER '-' INTEGER ':' INTEGER '#-}'
                                       { let getINT = fromInteger . il_value . getINTEGER in
                                         sLL $1 $> $ ([mo $1,mj AnnVal $2
                                               ,mj AnnVal $3,mj AnnColon $4
@@ -2668,18 +2720,10 @@ prag_hpc :: { Located ([AddAnn], HsPragE GhcPs) }
                                                  (getINT $7, getINT $9))
                                                 ((getINTEGERs $3, getINTEGERs $5),
                                                  (getINTEGERs $7, getINTEGERs $9) )) }
-
-prag_core :: { Located ([AddAnn], HsPragE GhcPs) }
-      : '{-# CORE' STRING '#-}'
+      | '{-# CORE' STRING '#-}'
         { sLL $1 $> $
             ([mo $1,mj AnnVal $2,mc $3],
              HsPragCore noExtField (getCORE_PRAGs $1) (getStringLiteral $2)) }
-
-exp_annot(prag) :: { ECP }
-      : prag exp             {% runECP_P $2 >>= \ $2 ->
-                                fmap ecpFromExp $
-                                ams (sLL $1 $> $ HsPragE noExtField (snd $ unLoc $1) $2)
-                                    (fst $ unLoc $1) }
 
 fexp    :: { ECP }
         : fexp aexp                  { ECP $
@@ -2912,7 +2956,8 @@ texp :: { ECP }
         -- Then when converting expr to pattern we unravel it again
         -- Meanwhile, the renamer checks that real sections appear
         -- inside parens.
-        | infixexp qop       {% runECP_P $1 >>= \ $1 ->
+        | infixexp_no_prag qop
+                             {% runECP_P $1 >>= \ $1 ->
                                 runPV $2 >>= \ $2 ->
                                 return $ ecpFromExp $
                                 sLL $1 $> $ SectionL noExtField $1 $2 }

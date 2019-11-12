@@ -8,7 +8,7 @@
 COST CENTRE  MODULE SRC                       %time %alloc
 
 main.ys      Main   prof-doc-last.hs:3:15-31   39.7   37.5
-last_init_ys Main   prof-doc-last.hs:7:45-58   23.1   29.2
+last_init_ys Main   prof-doc-last.hs:7:46-59   23.1   29.2
 main.xs      Main   prof-doc-last.hs:2:15-31   23.1   18.7
 last_init_xs Main   prof-doc-last.hs:5:46-59   11.6   14.6
 last_xs      Main   prof-doc-last.hs:4:41-47    1.7    0.0
@@ -27,7 +27,7 @@ MAIN           MAIN                  <built-in>                     46          
  CAF           GHC.IO.Encoding.Iconv <entire-module>                65          0    0.0    0.0     0.0    0.0
  main          Main                  prof-doc-last.hs:(2,1)-(7,58)  93          0    0.0    0.0   100.0  100.0
   last_init_xs Main                  prof-doc-last.hs:5:46-59       96          1   11.6   14.6    11.6   14.6
-  last_init_ys Main                  prof-doc-last.hs:7:45-58       99          1   23.1   29.2    23.1   29.2
+  last_init_ys Main                  prof-doc-last.hs:7:46-59       99          1   23.1   29.2    23.1   29.2
   last_xs      Main                  prof-doc-last.hs:4:41-47       94          1    1.7    0.0     1.7    0.0
   last_ys      Main                  prof-doc-last.hs:6:41-47       97          1    0.8    0.0     0.8    0.0
   main.xs      Main                  prof-doc-last.hs:2:15-31       95          1   23.1   18.7    23.1   18.7

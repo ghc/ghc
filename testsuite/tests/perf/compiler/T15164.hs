@@ -252,7 +252,7 @@ instance Rule f Primary => Rule f Factor where
 --          ::= name
 newtype FormalDesignator = MkFormalDesignator (NT Name)
 instance Rule f Name => Rule f FormalDesignator where
-  get = trace "FormalDesignator" $ {-# SCC "get_FormalDesignator" #-} MkFormalDesignator <$> n93
+  get = trace "FormalDesignator" $ {-# SCC "get_FormalDesignator" #-} (MkFormalDesignator <$> n93)
 
 -- formal_part
 --          ::= formal_designator
