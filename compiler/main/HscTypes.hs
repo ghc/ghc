@@ -953,21 +953,31 @@ data ModIfaceBackend = ModIfaceBackend
     -- Kept sorted by (mod,occ), to make version comparisons easier.
     -- Records the modules that are the declaration points for things exported
     -- by this module, and the 'OccName's of those things.
-  , mi_insts :: ![IfaceClsInst]
+  , mi_insts :: [IfaceClsInst]
     -- ^ Sorted class instance
-  , mi_fam_insts :: ![IfaceFamInst]
+    --
+    -- Not strict: this field is initialized as bottom in LoadIface.loadInterface.
+  , mi_fam_insts :: [IfaceFamInst]
     -- ^ Sorted family instances
-  , mi_rules :: ![IfaceRule]
+    --
+    -- Not strict: this field is initialized as bottom in LoadIface.loadInterface.
+  , mi_rules :: [IfaceRule]
     -- ^ Sorted rules
-  , mi_anns :: ![IfaceAnnotation]
+    --
+    -- Not strict: this field is initialized as bottom in LoadIface.loadInterface.
+  , mi_anns :: [IfaceAnnotation]
     -- ^ Annotations
+    --
+    -- Not strict: this field is initialized as bottom in LoadIface.loadInterface.
   , mi_complete_sigs :: ![IfaceCompleteMatch]
-  , mi_decls    :: ![(Fingerprint, IfaceDecl)]
+  , mi_decls    :: [(Fingerprint, IfaceDecl)]
     -- ^ Type, class and variable declarations
     -- The hash of an Id changes if its fixity or deprecations change
     --      (as well as its type of course)
     -- Ditto data constructors, class operations, except that the hash of the
     -- parent class/tycon changes
+    --
+    -- Not strict: this field is initialized as bottom in LoadIface.loadInterface.
   }
 
 data ModIfacePhase
@@ -1014,15 +1024,6 @@ data ModIface_ (phase :: ModIfacePhase)
                 -- NOT STRICT!  we read this field lazily from the interface file
                 -- It is *only* consulted by the recompilation checker
 
-{- TODO: only in final iface
-        mi_exports  :: ![IfaceExport],
-                -- ^ Exports
-                -- Kept sorted by (mod,occ), to make version comparisons easier
-                -- Records the modules that are the declaration points for things
-                -- exported by this module, and the 'OccName's of those things
--}
-
-
         mi_used_th  :: !Bool,
                 -- ^ Module required TH splices when it was compiled.
                 -- This disables recompilation avoidance (see #481).
@@ -1034,20 +1035,6 @@ data ModIface_ (phase :: ModIfacePhase)
         mi_warns    :: Warnings,
                 -- ^ Warnings
                 -- NOT STRICT!  we read this field lazily from the interface file
-
-        -- mi_anns     :: [IfaceAnnotation],
-        --         -- ^ Annotations
-        --         -- NOT STRICT!  we read this field lazily from the interface file
-
-
-{-
-        mi_decls    :: [IfaceDeclExts phase],
-                -- ^ Type, class and variable declarations
-                -- The hash of an Id changes if its fixity or deprecations change
-                --      (as well as its type of course)
-                -- Ditto data constructors, class operations, except that
-                -- the hash of the parent class/tycon changes
--}
 
         mi_globals  :: !(Maybe GlobalRdrEnv),
                 -- ^ Binds all the things defined at the top level in
@@ -1065,9 +1052,6 @@ data ModIface_ (phase :: ModIfacePhase)
                 -- 'HomeModInfo', but that leads to more plumbing.
 
                 -- Instance declarations and rules
-        -- mi_insts       :: [IfaceClsInst],     -- ^ Sorted class instance
-        -- mi_fam_insts   :: [IfaceFamInst],  -- ^ Sorted family instances
-        -- mi_rules       :: [IfaceRule],     -- ^ Sorted rules
 
         mi_hpc       :: !AnyHpcUsage,
                 -- ^ True if this program uses Hpc at any point in the program.
@@ -1082,8 +1066,6 @@ data ModIface_ (phase :: ModIfacePhase)
                 -- itself) but imports some trustworthy modules from its own
                 -- package (which does require its own package be trusted).
                 -- See Note [RnNames . Trust Own Package]
-
-        -- mi_complete_sigs :: [IfaceCompleteMatch],
 
         mi_doc_hdr :: Maybe HsDocString,
                 -- ^ Module header.
