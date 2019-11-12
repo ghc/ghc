@@ -8,6 +8,8 @@
     in order to define instances for `Nat`. Also, different instances for `Nat` and `Natural`
     won't typecheck anymore.
 
+  * Fix the `Ord1` instance for `Data.Ord.Down` to reverse sort order.
+
 ## 4.15.0.0 *TBA*
 
   * `openFile` now calls the `open` system call with an `interruptible` FFI
