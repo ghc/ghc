@@ -162,3 +162,5 @@ test('proposal-229f',
        omit_ways(['profasm', 'profthreaded'])
      ],
      multimod_compile_and_run, ['proposal-229f.hs', ''])
+
+test('T15730a', normal, compile_and_run, [''])
