@@ -385,15 +385,13 @@ tidyProgram hsc_env mod_guts =
              <+> int (cs_ty cs)
              <+> int (cs_co cs))
 
-    let tycons = filter isAlgTyCon tcs
-
     return $! CgGuts
       { cg_module = force mod
-      , cg_tycons = seqListId tycons
+      , cg_tycons = seqListId (filter isAlgTyCon tcs)
       , cg_binds = seqListId all_tidy_binds
       , cg_foreign = add_spt_init_code foreign_stubs
       , cg_foreign_files = seqListId foreign_files
-      , cg_dep_pkgs = force (map fst (dep_pkgs deps))
+      , cg_dep_pkgs = seqListId (map fst (dep_pkgs deps))
       , cg_hpc_info = hpc_info
       , cg_modBreaks = mod_breaks
       , cg_spt_entries = spt_entries

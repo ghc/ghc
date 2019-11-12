@@ -473,6 +473,14 @@ loadInterface doc_str mod from
         ; new_eps_anns      <- tcIfaceAnnotations (mi_anns (mi_final_exts iface))
         ; new_eps_complete_sigs <- tcIfaceCompleteSigs (mi_complete_sigs (mi_final_exts iface))
 
+        ; let final_iface = iface{ mi_final_exts = (mi_final_exts iface) {
+                              mi_decls     = panic "No mi_decls in PIT",
+                              mi_insts     = panic "No mi_insts in PIT",
+                              mi_fam_insts = panic "No mi_fam_insts in PIT",
+                              mi_rules     = panic "No mi_rules in PIT",
+                              mi_anns      = panic "No mi_anns in PIT"
+                            } }
+
         ; let bad_boot = mi_boot iface && fmap fst (if_rec_types gbl_env) == Just mod
                             -- Warn warn against an EPS-updating import
                             -- of one's own boot file! (one-shot only)
@@ -488,7 +496,7 @@ loadInterface doc_str mod from
                 then eps { eps_PTE = addDeclsToPTE (eps_PTE eps) new_eps_decls }
            else
                 eps {
-                  eps_PIT          = extendModuleEnv (eps_PIT eps) mod iface,
+                  eps_PIT          = extendModuleEnv (eps_PIT eps) mod final_iface,
                   eps_PTE          = addDeclsToPTE   (eps_PTE eps) new_eps_decls,
                   eps_rule_base    = extendRuleBaseList (eps_rule_base eps)
                                                         new_eps_rules,
