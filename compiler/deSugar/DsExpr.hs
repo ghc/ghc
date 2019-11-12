@@ -401,7 +401,7 @@ ds_expr _ (ExplicitSum types alt arity expr)
                                       map Type types ++
                                       [core_expr]) ) }
 
-ds_expr _ (HsSCC _ _ cc expr@(dL->L loc _)) = do
+ds_expr _ (HsPragE _ (HsPragSCC _ _ cc) expr@(dL->L loc _)) = do
     dflags <- getDynFlags
     if gopt Opt_SccProfilingOn dflags
       then do
@@ -413,7 +413,7 @@ ds_expr _ (HsSCC _ _ cc expr@(dL->L loc _)) = do
                <$> dsLExpr expr
       else dsLExpr expr
 
-ds_expr _ (HsCoreAnn _ _ _ expr)
+ds_expr _ (HsPragE _ (HsPragCore _ _ _) expr)
   = dsLExpr expr
 
 ds_expr _ (HsCase _ discrim matches)
@@ -744,16 +744,17 @@ ds_expr _ (HsBinTick _ ixT ixF e) = do
        mkBinaryTickBox ixT ixF e2
      }
 
-ds_expr _ (HsTickPragma _ _ _ _ expr) = do
+ds_expr _ (HsPragE _ (HsPragTick _ _ _ _) expr) = do
   dflags <- getDynFlags
   if gopt Opt_Hpc dflags
-    then panic "dsExpr:HsTickPragma"
+    then panic "dsExpr:HsPragTick"
     else dsLExpr expr
 
 -- HsSyn constructs that just shouldn't be here:
 ds_expr _ (HsBracket     {})  = panic "dsExpr:HsBracket"
 ds_expr _ (HsDo          {})  = panic "dsExpr:HsDo"
 ds_expr _ (HsRecFld      {})  = panic "dsExpr:HsRecFld"
+ds_expr _ (HsPragE _ (XHsPragE x) _) = noExtCon x
 ds_expr _ (XExpr nec)         = noExtCon nec
 
 
