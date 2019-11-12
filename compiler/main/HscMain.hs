@@ -840,7 +840,7 @@ finish summary tc_result mb_old_hash = do
                 force (mkPartialIface hsc_env details desugared_guts)
 
           return ( HscRecomp { hscs_guts = cg_guts,
-                               hscs_summary = summary,
+                               hscs_mod_location = ms_location summary,
                                hscs_partial_iface = partial_iface,
                                hscs_old_iface_hash = mb_old_hash,
                                hscs_iface_dflags = dflags },
@@ -1405,10 +1405,10 @@ hscWriteIface dflags iface no_change mod_location = do
         in  addBootSuffix_maybe (mi_boot iface) with_hi
 
 -- | Compile to hard-code.
-hscGenHardCode :: HscEnv -> CgGuts -> ModSummary -> FilePath
+hscGenHardCode :: HscEnv -> CgGuts -> ModLocation -> FilePath
                -> IO (FilePath, Maybe FilePath, [(ForeignSrcLang, FilePath)])
                -- ^ @Just f@ <=> _stub.c is f
-hscGenHardCode hsc_env cgguts mod_summary output_filename = do
+hscGenHardCode hsc_env cgguts location output_filename = do
         let CgGuts{ -- This is the last use of the ModGuts in a compilation.
                     -- From now on, we just use the bits we need.
                     cg_module   = this_mod,
@@ -1419,7 +1419,6 @@ hscGenHardCode hsc_env cgguts mod_summary output_filename = do
                     cg_dep_pkgs = dependencies,
                     cg_hpc_info = hpc_info } = cgguts
             dflags = hsc_dflags hsc_env
-            location = ms_location mod_summary
             data_tycons = filter isDataTyCon tycons
             -- cg_tycons includes newtypes, for the benefit of External Core,
             -- but we don't generate any code for newtypes
@@ -1473,9 +1472,9 @@ hscGenHardCode hsc_env cgguts mod_summary output_filename = do
 
 hscInteractive :: HscEnv
                -> CgGuts
-               -> ModSummary
+               -> ModLocation
                -> IO (Maybe FilePath, CompiledByteCode, [SptEntry])
-hscInteractive hsc_env cgguts mod_summary = do
+hscInteractive hsc_env cgguts location = do
     let dflags = hsc_dflags hsc_env
     let CgGuts{ -- This is the last use of the ModGuts in a compilation.
                 -- From now on, we just use the bits we need.
@@ -1486,7 +1485,6 @@ hscInteractive hsc_env cgguts mod_summary = do
                cg_modBreaks = mod_breaks,
                cg_spt_entries = spt_entries } = cgguts
 
-        location = ms_location mod_summary
         data_tycons = filter isDataTyCon tycons
         -- cg_tycons includes newtypes, for the benefit of External Core,
         -- but we don't generate any code for newtypes

@@ -42,6 +42,7 @@ import GhcPrelude
 
 import GHC.Hs
 import TyCoRep
+import TyCoPpr( debugPprType )
 import TcMType
 import TcRnMonad
 import TcType
