@@ -709,9 +709,9 @@ getStaticFuns decls =
 --     is empty, so we don't need to refer to it from other SRTs.
 type SRTMap = Map CAFLabel (Maybe SRTEntry)
 
--- TODO: Document
--- basically returns non-CAFFY Haskell names in the module. All other names are
--- CAFFY.
+
+-- | Given SRTMap of a module returns the set of non-CAFFY names in the module.
+-- Any Names not in the set are CAFFY.
 srtMapNonCAFs :: SRTMap -> NameSet
 srtMapNonCAFs srtMap = mkNameSet (mapMaybe get_name (Map.toList srtMap))
   where
