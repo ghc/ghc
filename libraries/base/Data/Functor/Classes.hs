@@ -834,7 +834,10 @@ instance Eq1 Down where
 
 -- | @since 4.12.0.0
 instance Ord1 Down where
-    liftCompare comp (Down x) (Down y) = comp x y
+    liftCompare comp (Down x) (Down y) = case comp x y of
+        LT -> GT
+        EQ -> EQ
+        GT -> LT
 
 -- | @since 4.12.0.0
 instance Read1 Down where

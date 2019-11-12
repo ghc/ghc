@@ -33,6 +33,8 @@
     have an HasCallStack constraint. Hopefully providing better error messages in case
     they are used in unexpected ways.
 
+  * Fix the `Ord1` instance for `Data.Ord.Down` to reverse sort order.
+
 ## 4.16.0.0 *Nov 2021*
 
   * The unary tuple type, `Solo`, is now exported by `Data.Tuple`.
