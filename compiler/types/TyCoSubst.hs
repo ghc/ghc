@@ -816,7 +816,6 @@ subst_co subst co
                                 in cs1 `seqList` AxiomRuleCo c cs1
     go (HoleCo h)            = HoleCo $! go_hole h
 
-    go_prov UnsafeCoerceProv     = UnsafeCoerceProv
     go_prov (PhantomProv kco)    = PhantomProv (go kco)
     go_prov (ProofIrrelProv kco) = ProofIrrelProv (go kco)
     go_prov p@(PluginProv _)     = p
@@ -1026,4 +1025,3 @@ cloneTyVarBndrs subst (t:ts)  usupply = (subst'', tv:tvs)
     (uniq, usupply') = takeUniqFromSupply usupply
     (subst' , tv )   = cloneTyVarBndr subst t uniq
     (subst'', tvs)   = cloneTyVarBndrs subst' ts usupply'
-

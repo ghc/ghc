@@ -460,7 +460,7 @@ generator never has to manipulate a value of type 'a :: TYPE rr'.
 * error :: forall (rr:RuntimeRep) (a:TYPE rr). String -> a
   Code generator never has to manipulate the return value.
 
-* unsafeCoerce#, defined in MkId.unsafeCoerceId:
+* unsafeCoerce#, defined in Desugar.mkUnsafeCoercePair:
   Always inlined to be a no-op
      unsafeCoerce# :: forall (r1 :: RuntimeRep) (r2 :: RuntimeRep)
                              (a :: TYPE r1) (b :: TYPE r2).

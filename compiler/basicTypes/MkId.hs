@@ -25,7 +25,7 @@ module MkId (
 
         -- And some particular Ids; see below for why they are wired in
         wiredInIds, ghcPrimIds,
-        unsafeCoerceName, unsafeCoerceId, realWorldPrimId,
+        realWorldPrimId,
         voidPrimId, voidArgId,
         nullAddrId, seqId, lazyId, lazyIdKey,
         coercionTokenId, magicDictId, coerceId,
@@ -151,7 +151,6 @@ ghcPrimIds :: [Id]  -- See Note [ghcPrimIds (aka pseudoops)]
 ghcPrimIds
   = [ realWorldPrimId
     , voidPrimId
-    , unsafeCoerceId
     , nullAddrId
     , seqId
     , magicDictId
@@ -1316,19 +1315,14 @@ no curried identifier for them.  That's what mkCompulsoryUnfolding
 does.  If we had a way to get a compulsory unfolding from an interface
 file, we could do that, but we don't right now.
 
-unsafeCoerce# isn't so much a PrimOp as a phantom identifier, that
-just gets expanded into a type coercion wherever it occurs.  Hence we
-add it as a built-in Id with an unfolding here.
-
 The type variables we use here are "open" type variables: this means
 they can unify with both unlifted and lifted types.  Hence we provide
 another gun with which to shoot yourself in the foot.
 -}
 
-unsafeCoerceName, nullAddrName, seqName,
+nullAddrName, seqName,
    realWorldName, voidPrimIdName, coercionTokenName,
    magicDictName, coerceName, proxyName :: Name
-unsafeCoerceName  = mkWiredInIdName gHC_PRIM  (fsLit "unsafeCoerce#")  unsafeCoerceIdKey  unsafeCoerceId
 nullAddrName      = mkWiredInIdName gHC_PRIM  (fsLit "nullAddr#")      nullAddrIdKey      nullAddrId
 seqName           = mkWiredInIdName gHC_PRIM  (fsLit "seq")            seqIdKey           seqId
 realWorldName     = mkWiredInIdName gHC_PRIM  (fsLit "realWorld#")     realWorldPrimIdKey realWorldPrimId
@@ -1358,72 +1352,6 @@ proxyHashId
     kv_ty   = mkTyVarTy kv
     tv_ty   = mkTyVarTy tv
     ty      = mkInvForAllTy kv $ mkSpecForAllTy tv $ mkProxyPrimTy kv_ty tv_ty
-
-------------------------------------------------
-unsafeEqualityProofId :: Id
-unsafeEqualityProofId = pcMiscPrelId unsafeEqualityProofName ty info
-  where
-    [kappa, alpha, beta] = mkTemplateKiTyVar liftedTypeKind (\kv -> [kv, kv])
-
-    ty = mkForAllTy kappa Inferred $
-         mkSpecForAllTys [alpha, beta] $
-         mkTyConApp unsafeEqualityTyCon (mkTyVarTys [kappa, alpha, beta])
-
-    info = noCafIdInfo
-
-unsafeCoerceId :: Id   -- This is the wired-in, levity-polymorphic unsafeCorece#
--- Very dangerous function: it coerces between types with /different/
---                          runtime representations!
--- unsafeCoerce# :: forall (r1 :: RuntimeRep) (r2 :: RuntimeRep).
---                  forall (a :: TYPE r1)     (b :: TYPE r2).
---                  a -> b
---
--- NB: All four forall'd variables are Specified
---     However r1,r2 could easily be Inferred
-unsafeCoerceId = pcMiscPrelId unsafeCoerceName ty info
-  where
-    info = noCafIdInfo `setInlinePragInfo` alwaysInlinePragma   -- is this necessary with a compulsory unfolding?
-                       `setUnfoldingInfo` mkCompulsoryUnfolding rhs
-
-    ty = mkSpecForAllTys [ runtimeRep1TyVar, runtimeRep2TyVar
-                         , openAlphaTyVar, openBetaTyVar] $
-         mkVisFunTy openAlphaTy openBetaTy
-
-    -- Returns (scrutinee, scrutinee type, type of covar in AltCon)
-    unsafe_equality k a b
-      = ( mkTyApps (Var unsafeEqualityProofId) [k,a,b]
-        , mkTyConApp unsafeEqualityTyCon [k,a,b]
-        , mkTyConApp eqPrimTyCon [k, k, a, b]
-        )
-
-    (scrut1, scrut1_ty, rr_cv_ty) = unsafe_equality runtimeRepTy runtimeRep1Ty runtimeRep2Ty
-    (scrut2, scrut2_ty, ab_cv_ty) = unsafe_equality (tYPE runtimeRep2Ty)
-                                                    (openAlphaTy `mkCastTy` alpha_co)
-                                                    openBetaTy
-
-    -- alpha_co :: TYPE r1 ~# TYPE r2
-    -- alpha_co = TYPE rr_cv
-    alpha_co = mkTyConAppCo Nominal tYPETyCon [mkCoVarCo rr_cv]
-
-    -- x_co :: alpha ~R# beta
-    x_co = mkGReflCo Representational openAlphaTy (MCo alpha_co) `mkTransCo`
-           mkSubCo (mkCoVarCo ab_cv)
-
-    [x, rr_cv, ab_cv] = mkTemplateLocals [ openAlphaTy -- x :: a
-                                         , rr_cv_ty    -- rr_cv :: r1 ~# r2
-                                         , ab_cv_ty    -- ab_cv :: (alpha |> alpha_co ~# beta)
-                                         ]
-
-    rhs = mkLams [runtimeRep1TyVar, runtimeRep2TyVar, openAlphaTyVar, openBetaTyVar, x] $
-          mkSingleAltCase scrut1
-                          (mkWildValBinder scrut1_ty)
-                          (DataAlt unsafeReflDataCon)
-                          [rr_cv] $
-          mkSingleAltCase scrut2
-                          (mkWildValBinder scrut2_ty)
-                          (DataAlt unsafeReflDataCon)
-                          [ab_cv] $
-          Var x `mkCast` x_co
 
 ------------------------------------------------
 nullAddrId :: Id
@@ -1522,22 +1450,6 @@ coerceId = pcMiscPrelId coerceName ty info
           [(DataAlt coercibleDataCon, [eq], Cast (Var x) (mkCoVarCo eq))]
 
 {-
-Note [Unsafe coerce magic]
-~~~~~~~~~~~~~~~~~~~~~~~~~~
-We define a *primitive*
-   GHC.Prim.unsafeCoerce#
-and then in the base library we define the ordinary function
-   Unsafe.Coerce.unsafeCoerce :: forall (a:*) (b:*). a -> b
-   unsafeCoerce x = unsafeCoerce# x
-
-Notice that unsafeCoerce has a civilized (albeit still dangerous)
-polymorphic type, whose type args have kind *.  So you can't use it on
-unboxed values (unsafeCoerce 3#).
-
-In contrast unsafeCoerce# is even more dangerous because you *can* use
-it on unboxed things, (unsafeCoerce# 3#) :: Int. Its type is
-   forall (r1 :: RuntimeRep) (r2 :: RuntimeRep) (a: TYPE r1) (b: TYPE r2). a -> b
-
 Note [seqId magic]
 ~~~~~~~~~~~~~~~~~~
 'GHC.Prim.seq' is special in several ways.
