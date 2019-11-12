@@ -187,6 +187,7 @@
 #include "GetEnv.h"
 #include "linker/PEi386.h"
 #include "linker/PEi386Types.h"
+#include "linker/SymbolExtras.h"
 #include "LinkerInternals.h"
 
 #include <windows.h>
