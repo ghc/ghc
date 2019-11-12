@@ -218,7 +218,11 @@ ghcWrapper stage  = do
     ghcPath <- expr $ (</>) <$> topDirectory
                             <*> programPath (vanillaContext (pred stage) ghc)
     return $ unwords $ map show $ [ ghcPath ]
-                               ++ [ "-package-db " ++ dbPath | stage == Stage1 ]
+                               ++ (if stage == Stage1
+                                     then ["-no-global-package-db"
+                                          , "-package-db " ++ dbPath
+                                          ]
+                                     else [])
                                ++ [ "$@" ]
 
 -- | Given a 'String' replace characters '.' and '-' by underscores ('_') so that
