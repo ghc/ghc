@@ -94,6 +94,7 @@ module TcMType (
 import GhcPrelude
 
 import TyCoRep
+import TyCoPpr
 import TcType
 import Type
 import TyCon

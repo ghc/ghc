@@ -49,6 +49,7 @@ import MkId
 import Module
 import ConLike
 import DataCon
+import TyCoPpr( pprWithTYPE )
 import TysWiredIn
 import PrelNames
 import BasicTypes
