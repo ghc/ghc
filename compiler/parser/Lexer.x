@@ -376,10 +376,6 @@ $tab          { warnTab }
   "[t|"       / { ifExtension ThQuotesBit } { token ITopenTypQuote }
   "|]"        / { ifExtension ThQuotesBit } { token (ITcloseQuote NormalSyntax) }
   "||]"       / { ifExtension ThQuotesBit } { token ITcloseTExpQuote }
-  \$ @varid   / { ifExtension ThBit }       { skip_one_varid ITidEscape }
-  "$$" @varid / { ifExtension ThBit }       { skip_two_varid ITidTyEscape }
-  "$("        / { ifExtension ThBit }       { token ITparenEscape }
-  "$$("       / { ifExtension ThBit }       { token ITparenTyEscape }
 
   "[" @varid "|"  / { ifExtension QqBit }   { lex_quasiquote_tok }
 
@@ -725,10 +721,8 @@ data Token
   | ITcloseQuote IsUnicodeSyntax        --  |]
   | ITopenTExpQuote HasE                --  [|| or [e||
   | ITcloseTExpQuote                    --  ||]
-  | ITidEscape   FastString             --  $x
-  | ITparenEscape                       --  $(
-  | ITidTyEscape   FastString           --  $$x
-  | ITparenTyEscape                     --  $$(
+  | ITdollar                            --  $
+  | ITdollardollar                      --  $$
   | ITtyQuote                           --  ''
   | ITquasiQuote (FastString,FastString,RealSrcSpan)
     -- ITquasiQuote(quoter, quote, loc)
@@ -3007,8 +3001,6 @@ isALRopen ITobrack        = True
 isALRopen ITocurly        = True
 -- GHC Extensions:
 isALRopen IToubxparen     = True
-isALRopen ITparenEscape   = True
-isALRopen ITparenTyEscape = True
 isALRopen _               = False
 
 isALRclose :: Token -> Bool
@@ -3099,6 +3091,14 @@ varsym_override _ occ_sort s | s == fsLit "!" =
 varsym_override _ occ_sort s | s == fsLit "~" =
   case occ_sort of
     VarsymPrefix -> ITtilde
+    _ -> ITvarsym s
+varsym_override exts occ_sort s | ThBit `xtest` exts, s == fsLit "$" =
+  case occ_sort of
+    VarsymPrefix -> ITdollar
+    _ -> ITvarsym s
+varsym_override exts occ_sort s | ThBit `xtest` exts, s == fsLit "$$" =
+  case occ_sort of
+    VarsymPrefix -> ITdollardollar
     _ -> ITvarsym s
 varsym_override _ _ s = ITvarsym s
 
