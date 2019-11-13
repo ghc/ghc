@@ -15,6 +15,7 @@ This is where we do all the grimy bindings' generation.
 {-# LANGUAGE CPP, ScopedTypeVariables #-}
 {-# LANGUAGE FlexibleContexts #-}
 {-# LANGUAGE TypeFamilies #-}
+{-# LANGUAGE DataKinds #-}
 
 {-# OPTIONS_GHC -Wno-incomplete-uni-patterns #-}
 
@@ -127,10 +128,10 @@ possibly zero of them).  Here's an example, with both \tr{N}ullary and
        case (a1 `eqFloat#` a2) of r -> r
   for that particular test.
 
-* If there are a lot of (more than ten) nullary constructors, we emit a
+* For nullary constructors, we emit a
   catch-all clause of the form:
 
-      (==) a b  = case (con2tag_Foo a) of { a# ->
+      (==) a b  = case (dataToTag a) of { a# ->
                   case (con2tag_Foo b) of { b# ->
                   case (a# ==# b#)     of {
                     r -> r }}}
@@ -167,15 +168,13 @@ gen_Eq_binds loc tycon = do
     all_cons = tyConDataCons tycon
     (nullary_cons, non_nullary_cons) = partition isNullarySrcDataCon all_cons
 
-    -- If there are ten or more (arbitrary number) nullary constructors,
-    -- use the con2tag stuff.  For small types it's better to use
-    -- ordinary pattern matching.
-    (tag_match_cons, pat_match_cons)
-       | nullary_cons `lengthExceeds` 10 = (nullary_cons, non_nullary_cons)
-       | otherwise                       = ([],           all_cons)
-
+    -- For nullary constructors, use the getTag stuff.
+    (tag_match_cons, pat_match_cons) = (nullary_cons, non_nullary_cons)
     no_tag_match_cons = null tag_match_cons
 
+    -- (LHS patterns, result)
+    fall_through_eqn :: DynFlags
+                     -> [([Located (Pat (GhcPass 'Parsed))] , LHsExpr GhcPs)]
     fall_through_eqn dflags
       | no_tag_match_cons   -- All constructors have arguments
       = case pat_match_cons of
@@ -186,13 +185,16 @@ gen_Eq_binds loc tycon = do
                  [([nlWildPat, nlWildPat], false_Expr)]
 
       | otherwise -- One or more tag_match cons; add fall-through of
-                  -- extract tags compare for equality
+                  -- extract tags compare for equality,
+                  -- The case `(C1 x) == (C1 y)` can no longer happen
+                  -- at this point as it's matched earlier.
       = [([a_Pat, b_Pat],
          untag_Expr dflags tycon [(a_RDR,ah_RDR), (b_RDR,bh_RDR)]
                     (genPrimOpApp (nlHsVar ah_RDR) eqInt_RDR (nlHsVar bh_RDR)))]
 
     aux_binds | no_tag_match_cons = emptyBag
-              | otherwise         = unitBag $ DerivAuxBind $ DerivCon2Tag tycon
+              | otherwise         = emptyBag
+              --unitBag $ DerivAuxBind $ DerivCon2Tag tycon
 
     method_binds dflags = unitBag (eq_bind dflags)
     eq_bind dflags = mkFunBindEC 2 loc eq_RDR (const true_Expr)
@@ -2254,13 +2256,26 @@ eq_Expr ty a b
  where
    (_, _, prim_eq, _, _) = primOrdOps "Eq" ty
 
-untag_Expr :: DynFlags -> TyCon -> [( RdrName,  RdrName)]
-              -> LHsExpr GhcPs -> LHsExpr GhcPs
+-- | Take an expression and a list of pairs @(exprName1,tagName1)@.
+-- Wraps the given expression in cases which bind tagName1 to the
+-- tag of exprName1 and so forth for all pairs and returns the
+-- resulting expression.
+untag_Expr :: DynFlags
+           -> TyCon
+           -> [( RdrName,  RdrName)] -- (expr, expr's tag bound to this)
+           -> LHsExpr GhcPs -- Final RHS
+           -> LHsExpr GhcPs -- Result expr
 untag_Expr _ _ [] expr = expr
 untag_Expr dflags tycon ((untag_this, put_tag_here) : more) expr
-  = nlHsCase (nlHsPar (nlHsVarApps (con2tag_RDR dflags tycon)
-                                   [untag_this])) {-of-}
+  {- case (getTag untag_this) of
+        put_tag_here -> .... <recursive on more>
+          _ -> result
+         -}
+  = pprTrace "untagStuff" (ppr untag_this) $
+    nlHsCase (nlHsPar (nlHsApp (nlHsVar getTag_RDR) (nlHsVar untag_this))) {-of-}
       [mkHsCaseAlt (nlVarPat put_tag_here) (untag_Expr dflags tycon more expr)]
+
+
 
 enum_from_to_Expr
         :: LHsExpr GhcPs -> LHsExpr GhcPs
