@@ -1,5 +1,5 @@
 {-# LANGUAGE RecordWildCards, PatternGuards #-}
-{-# OPTIONS_GHC -Wunused-binds #-}
+{-# OPTIONS_GHC -Wno-unused-binds #-}
 
 module Text.HTML.TagSoup.Specification
     (dat, Out(..) )
