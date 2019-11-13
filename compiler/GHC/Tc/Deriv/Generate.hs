@@ -8,6 +8,7 @@
 {-# LANGUAGE CPP, ScopedTypeVariables #-}
 {-# LANGUAGE FlexibleContexts #-}
 {-# LANGUAGE TypeFamilies #-}
+{-# LANGUAGE DataKinds #-}
 
 {-# OPTIONS_GHC -Wno-incomplete-uni-patterns #-}
 
@@ -94,14 +95,8 @@ data AuxBindSpec
   -- All these generate ZERO-BASED tag operations
   -- I.e first constructor has tag 0
 
-    -- | @$con2tag@: Computes the tag for a given constructor
-  = DerivCon2Tag
-      TyCon   -- The type constructor of the data type to which the
-              -- constructors belong
-      RdrName -- The to-be-generated $con2tag binding's RdrName
-
     -- | @$tag2con@: Given a tag, computes the corresponding data constructor
-  | DerivTag2Con
+  = DerivTag2Con
       TyCon   -- The type constructor of the data type to which the
               -- constructors belong
       RdrName -- The to-be-generated $tag2con binding's RdrName
@@ -185,10 +180,10 @@ possibly zero of them).  Here's an example, with both \tr{N}ullary and
        case (a1 `eqFloat#` a2) of r -> r
   for that particular test.
 
-* If there are a lot of (more than ten) nullary constructors, we emit a
+* For nullary constructors, we emit a
   catch-all clause of the form:
 
-      (==) a b  = case (con2tag_Foo a) of { a# ->
+      (==) a b  = case (dataToTag a) of { a# ->
                   case (con2tag_Foo b) of { b# ->
                   case (a# ==# b#)     of {
                     r -> r }}}
@@ -219,24 +214,18 @@ produced don't get through the typechecker.
 
 gen_Eq_binds :: SrcSpan -> TyCon -> [Type] -> TcM (LHsBinds GhcPs, BagDerivStuff)
 gen_Eq_binds loc tycon tycon_args = do
-    -- See Note [Auxiliary binders]
-    con2tag_RDR <- new_con2tag_rdr_name loc tycon
-
-    return (method_binds con2tag_RDR, aux_binds con2tag_RDR)
+    return (method_binds, emptyBag)
   where
     all_cons = getPossibleDataCons tycon tycon_args
     (nullary_cons, non_nullary_cons) = partition isNullarySrcDataCon all_cons
 
-    -- If there are ten or more (arbitrary number) nullary constructors,
-    -- use the con2tag stuff.  For small types it's better to use
-    -- ordinary pattern matching.
-    (tag_match_cons, pat_match_cons)
-       | nullary_cons `lengthExceeds` 10 = (nullary_cons, non_nullary_cons)
-       | otherwise                       = ([],           all_cons)
-
+    -- For nullary constructors, use the getTag stuff.
+    (tag_match_cons, pat_match_cons) = (nullary_cons, non_nullary_cons)
     no_tag_match_cons = null tag_match_cons
 
-    fall_through_eqn con2tag_RDR
+    -- (LHS patterns, result)
+    fall_through_eqn :: [([Located (Pat (GhcPass 'Parsed))] , LHsExpr GhcPs)]
+    fall_through_eqn
       | no_tag_match_cons   -- All constructors have arguments
       = case pat_match_cons of
           []  -> []   -- No constructors; no fall-though case
@@ -246,20 +235,18 @@ gen_Eq_binds loc tycon tycon_args = do
                  [([nlWildPat, nlWildPat], false_Expr)]
 
       | otherwise -- One or more tag_match cons; add fall-through of
-                  -- extract tags compare for equality
+                  -- extract tags compare for equality,
+                  -- The case `(C1 x) == (C1 y)` can no longer happen
+                  -- at this point as it's matched earlier.
       = [([a_Pat, b_Pat],
-         untag_Expr con2tag_RDR [(a_RDR,ah_RDR), (b_RDR,bh_RDR)]
+         untag_Expr [(a_RDR,ah_RDR), (b_RDR,bh_RDR)]
                     (genPrimOpApp (nlHsVar ah_RDR) eqInt_RDR (nlHsVar bh_RDR)))]
 
-    aux_binds con2tag_RDR
-      | no_tag_match_cons = emptyBag
-      | otherwise         = unitBag $ DerivAuxBind $ DerivCon2Tag tycon con2tag_RDR
-
-    method_binds con2tag_RDR = unitBag (eq_bind con2tag_RDR)
-    eq_bind con2tag_RDR
+    method_binds = unitBag eq_bind
+    eq_bind
       = mkFunBindEC 2 loc eq_RDR (const true_Expr)
                     (map pats_etc pat_match_cons
-                      ++ fall_through_eqn con2tag_RDR)
+                      ++ fall_through_eqn)
 
     ------------------------------------------------------------------
     pats_etc data_con
@@ -403,25 +390,20 @@ gtResult OrdGT      = true_Expr
 ------------
 gen_Ord_binds :: SrcSpan -> TyCon -> [Type] -> TcM (LHsBinds GhcPs, BagDerivStuff)
 gen_Ord_binds loc tycon tycon_args = do
-    -- See Note [Auxiliary binders]
-    con2tag_RDR <- new_con2tag_rdr_name loc tycon
-
     return $ if null tycon_data_cons -- No data-cons => invoke bale-out case
       then ( unitBag $ mkFunBindEC 2 loc compare_RDR (const eqTag_Expr) []
            , emptyBag)
-      else ( unitBag (mkOrdOp con2tag_RDR OrdCompare)
-             `unionBags` other_ops con2tag_RDR
-           , aux_binds con2tag_RDR)
+      else ( unitBag (mkOrdOp OrdCompare)
+             `unionBags` other_ops
+           , aux_binds)
   where
-    aux_binds con2tag_RDR
-      | single_con_type = emptyBag
-      | otherwise       = unitBag $ DerivAuxBind $ DerivCon2Tag tycon con2tag_RDR
+    aux_binds = emptyBag
 
         -- Note [Game plan for deriving Ord]
-    other_ops con2tag_RDR
+    other_ops
       | (last_tag - first_tag) <= 2     -- 1-3 constructors
         || null non_nullary_cons        -- Or it's an enumeration
-      = listToBag [mkOrdOp con2tag_RDR OrdLT, lE, gT, gE]
+      = listToBag [mkOrdOp OrdLT, lE, gT, gE]
       | otherwise
       = emptyBag
 
@@ -447,40 +429,40 @@ gen_Ord_binds loc tycon tycon_args = do
     (nullary_cons, non_nullary_cons) = partition isNullarySrcDataCon tycon_data_cons
 
 
-    mkOrdOp :: RdrName -> OrdOp -> LHsBind GhcPs
+    mkOrdOp :: OrdOp -> LHsBind GhcPs
     -- Returns a binding   op a b = ... compares a and b according to op ....
-    mkOrdOp con2tag_RDR op
+    mkOrdOp op
       = mkSimpleGeneratedFunBind loc (ordMethRdr op) [a_Pat, b_Pat]
-                        (mkOrdOpRhs con2tag_RDR op)
+                        (mkOrdOpRhs op)
 
-    mkOrdOpRhs :: RdrName -> OrdOp -> LHsExpr GhcPs
-    mkOrdOpRhs con2tag_RDR op -- RHS for comparing 'a' and 'b' according to op
+    mkOrdOpRhs :: OrdOp -> LHsExpr GhcPs
+    mkOrdOpRhs op -- RHS for comparing 'a' and 'b' according to op
       | nullary_cons `lengthAtMost` 2 -- Two nullary or fewer, so use cases
       = nlHsCase (nlHsVar a_RDR) $
-        map (mkOrdOpAlt con2tag_RDR op) tycon_data_cons
+        map (mkOrdOpAlt op) tycon_data_cons
         -- i.e.  case a of { C1 x y -> case b of C1 x y -> ....compare x,y...
         --                   C2 x   -> case b of C2 x -> ....comopare x.... }
 
       | null non_nullary_cons    -- All nullary, so go straight to comparing tags
-      = mkTagCmp con2tag_RDR op
+      = mkTagCmp op
 
       | otherwise                -- Mixed nullary and non-nullary
       = nlHsCase (nlHsVar a_RDR) $
-        (map (mkOrdOpAlt con2tag_RDR op) non_nullary_cons
-         ++ [mkHsCaseAlt nlWildPat (mkTagCmp con2tag_RDR op)])
+        (map (mkOrdOpAlt op) non_nullary_cons
+         ++ [mkHsCaseAlt nlWildPat (mkTagCmp op)])
 
 
-    mkOrdOpAlt :: RdrName -> OrdOp -> DataCon
+    mkOrdOpAlt :: OrdOp -> DataCon
                -> LMatch GhcPs (LHsExpr GhcPs)
     -- Make the alternative  (Ki a1 a2 .. av ->
-    mkOrdOpAlt con2tag_RDR op data_con
+    mkOrdOpAlt op data_con
       = mkHsCaseAlt (nlConVarPat data_con_RDR as_needed)
-                    (mkInnerRhs con2tag_RDR op data_con)
+                    (mkInnerRhs op data_con)
       where
         as_needed    = take (dataConSourceArity data_con) as_RDRs
         data_con_RDR = getRdrName data_con
 
-    mkInnerRhs con2tag_RDR op data_con
+    mkInnerRhs op data_con
       | single_con_type
       = nlHsCase (nlHsVar b_RDR) [ mkInnerEqAlt op data_con ]
 
@@ -503,14 +485,14 @@ gen_Ord_binds loc tycon tycon_args = do
                                  , mkHsCaseAlt nlWildPat (gtResult op) ]
 
       | tag > last_tag `div` 2  -- lower range is larger
-      = untag_Expr con2tag_RDR [(b_RDR, bh_RDR)] $
+      = untag_Expr [(b_RDR, bh_RDR)] $
         nlHsIf (genPrimOpApp (nlHsVar bh_RDR) ltInt_RDR tag_lit)
                (gtResult op) $  -- Definitely GT
         nlHsCase (nlHsVar b_RDR) [ mkInnerEqAlt op data_con
                                  , mkHsCaseAlt nlWildPat (ltResult op) ]
 
       | otherwise               -- upper range is larger
-      = untag_Expr con2tag_RDR [(b_RDR, bh_RDR)] $
+      = untag_Expr [(b_RDR, bh_RDR)] $
         nlHsIf (genPrimOpApp (nlHsVar bh_RDR) gtInt_RDR tag_lit)
                (ltResult op) $  -- Definitely LT
         nlHsCase (nlHsVar b_RDR) [ mkInnerEqAlt op data_con
@@ -529,11 +511,11 @@ gen_Ord_binds loc tycon tycon_args = do
         data_con_RDR = getRdrName data_con
         bs_needed    = take (dataConSourceArity data_con) bs_RDRs
 
-    mkTagCmp :: RdrName -> OrdOp -> LHsExpr GhcPs
+    mkTagCmp :: OrdOp -> LHsExpr GhcPs
     -- Both constructors known to be nullary
     -- generates (case data2Tag a of a# -> case data2Tag b of b# -> a# `op` b#
-    mkTagCmp con2tag_RDR op =
-      untag_Expr con2tag_RDR [(a_RDR, ah_RDR),(b_RDR, bh_RDR)] $
+    mkTagCmp op =
+      untag_Expr [(a_RDR, ah_RDR),(b_RDR, bh_RDR)] $
         unliftedOrdOp intPrimTy op ah_RDR bh_RDR
 
 mkCompareFields :: OrdOp -> [Type] -> LHsExpr GhcPs
@@ -656,7 +638,6 @@ For @enumFromTo@ and @enumFromThenTo@, we use the default methods.
 gen_Enum_binds :: SrcSpan -> TyCon -> [Type] -> TcM (LHsBinds GhcPs, BagDerivStuff)
 gen_Enum_binds loc tycon _ = do
     -- See Note [Auxiliary binders]
-    con2tag_RDR <- new_con2tag_rdr_name loc tycon
     tag2con_RDR <- new_tag2con_rdr_name loc tycon
     maxtag_RDR  <- new_maxtag_rdr_name  loc tycon
 
@@ -664,24 +645,23 @@ gen_Enum_binds loc tycon _ = do
            , aux_binds    con2tag_RDR tag2con_RDR maxtag_RDR )
   where
     method_binds con2tag_RDR tag2con_RDR maxtag_RDR = listToBag
-      [ succ_enum      con2tag_RDR tag2con_RDR maxtag_RDR
-      , pred_enum      con2tag_RDR tag2con_RDR
-      , to_enum                    tag2con_RDR maxtag_RDR
-      , enum_from      con2tag_RDR tag2con_RDR maxtag_RDR -- [0 ..]
-      , enum_from_then con2tag_RDR tag2con_RDR maxtag_RDR -- [0, 1 ..]
-      , from_enum      con2tag_RDR
+      [ succ_enum      tag2con_RDR maxtag_RDR
+      , pred_enum      tag2con_RDR
+      , to_enum        tag2con_RDR maxtag_RDR
+      , enum_from      tag2con_RDR maxtag_RDR -- [0 ..]
+      , enum_from_then tag2con_RDR maxtag_RDR -- [0, 1 ..]
+      , from_enum
       ]
-    aux_binds con2tag_RDR tag2con_RDR maxtag_RDR = listToBag $ map DerivAuxBind
-      [ DerivCon2Tag tycon con2tag_RDR
-      , DerivTag2Con tycon tag2con_RDR
+    aux_binds tag2con_RDR maxtag_RDR = listToBag $ map DerivAuxBind
+      [ DerivTag2Con tycon tag2con_RDR
       , DerivMaxTag  tycon maxtag_RDR
       ]
 
     occ_nm = getOccString tycon
 
-    succ_enum con2tag_RDR tag2con_RDR maxtag_RDR
+    succ_enum tag2con_RDR maxtag_RDR
       = mkSimpleGeneratedFunBind loc succ_RDR [a_Pat] $
-        untag_Expr con2tag_RDR [(a_RDR, ah_RDR)] $
+        untag_Expr [(a_RDR, ah_RDR)] $
         nlHsIf (nlHsApps eq_RDR [nlHsVar maxtag_RDR,
                                nlHsVarApps intDataCon_RDR [ah_RDR]])
              (illegal_Expr "succ" occ_nm "tried to take `succ' of last tag in enumeration")
@@ -689,9 +669,9 @@ gen_Enum_binds loc tycon _ = do
                     (nlHsApps plus_RDR [nlHsVarApps intDataCon_RDR [ah_RDR],
                                         nlHsIntLit 1]))
 
-    pred_enum con2tag_RDR tag2con_RDR
+    pred_enum tag2con_RDR
       = mkSimpleGeneratedFunBind loc pred_RDR [a_Pat] $
-        untag_Expr con2tag_RDR [(a_RDR, ah_RDR)] $
+        untag_Expr [(a_RDR, ah_RDR)] $
         nlHsIf (nlHsApps eq_RDR [nlHsIntLit 0,
                                nlHsVarApps intDataCon_RDR [ah_RDR]])
              (illegal_Expr "pred" occ_nm "tried to take `pred' of first tag in enumeration")
@@ -710,18 +690,18 @@ gen_Enum_binds loc tycon _ = do
              (nlHsVarApps tag2con_RDR [a_RDR])
              (illegal_toEnum_tag occ_nm maxtag_RDR)
 
-    enum_from con2tag_RDR tag2con_RDR maxtag_RDR
+    enum_from tag2con_RDR maxtag_RDR
       = mkSimpleGeneratedFunBind loc enumFrom_RDR [a_Pat] $
-          untag_Expr con2tag_RDR [(a_RDR, ah_RDR)] $
+          untag_Expr [(a_RDR, ah_RDR)] $
           nlHsApps map_RDR
                 [nlHsVar tag2con_RDR,
                  nlHsPar (enum_from_to_Expr
                             (nlHsVarApps intDataCon_RDR [ah_RDR])
                             (nlHsVar maxtag_RDR))]
 
-    enum_from_then con2tag_RDR tag2con_RDR maxtag_RDR
+    enum_from_then tag2con_RDR maxtag_RDR
       = mkSimpleGeneratedFunBind loc enumFromThen_RDR [a_Pat, b_Pat] $
-          untag_Expr con2tag_RDR [(a_RDR, ah_RDR), (b_RDR, bh_RDR)] $
+          untag_Expr [(a_RDR, ah_RDR), (b_RDR, bh_RDR)] $
           nlHsApp (nlHsVarApps map_RDR [tag2con_RDR]) $
             nlHsPar (enum_from_then_to_Expr
                     (nlHsVarApps intDataCon_RDR [ah_RDR])
@@ -732,9 +712,9 @@ gen_Enum_binds loc tycon _ = do
                            (nlHsVar maxtag_RDR)
                            ))
 
-    from_enum con2tag_RDR
+    from_enum
       = mkSimpleGeneratedFunBind loc fromEnum_RDR [a_Pat] $
-          untag_Expr con2tag_RDR [(a_RDR, ah_RDR)] $
+          untag_Expr [(a_RDR, ah_RDR)] $
           (nlHsVarApps intDataCon_RDR [ah_RDR])
 
 {-
@@ -836,39 +816,37 @@ gen_Ix_binds :: SrcSpan -> TyCon -> [Type] -> TcM (LHsBinds GhcPs, BagDerivStuff
 
 gen_Ix_binds loc tycon _ = do
     -- See Note [Auxiliary binders]
-    con2tag_RDR <- new_con2tag_rdr_name loc tycon
     tag2con_RDR <- new_tag2con_rdr_name loc tycon
 
     return $ if isEnumerationTyCon tycon
-      then (enum_ixes con2tag_RDR tag2con_RDR, listToBag $ map DerivAuxBind
-                   [ DerivCon2Tag tycon con2tag_RDR
-                   , DerivTag2Con tycon tag2con_RDR
+      then (enum_ixes tag2con_RDR, listToBag $ map DerivAuxBind
+                   [ DerivTag2Con tycon tag2con_RDR
                    ])
-      else (single_con_ixes, unitBag (DerivAuxBind (DerivCon2Tag tycon con2tag_RDR)))
+      else (single_con_ixes))
   where
     --------------------------------------------------------------
-    enum_ixes con2tag_RDR tag2con_RDR = listToBag
-      [ enum_range   con2tag_RDR tag2con_RDR
-      , enum_index   con2tag_RDR
-      , enum_inRange con2tag_RDR
+    enum_ixes tag2con_RDR = listToBag
+      [ enum_range   tag2con_RDR
+      , enum_index
+      , enum_inRange
       ]
 
-    enum_range con2tag_RDR tag2con_RDR
+    enum_range tag2con_RDR
       = mkSimpleGeneratedFunBind loc range_RDR [nlTuplePat [a_Pat, b_Pat] Boxed] $
-          untag_Expr con2tag_RDR [(a_RDR, ah_RDR)] $
-          untag_Expr con2tag_RDR [(b_RDR, bh_RDR)] $
+          untag_Expr [(a_RDR, ah_RDR)] $
+          untag_Expr [(b_RDR, bh_RDR)] $
           nlHsApp (nlHsVarApps map_RDR [tag2con_RDR]) $
               nlHsPar (enum_from_to_Expr
                         (nlHsVarApps intDataCon_RDR [ah_RDR])
                         (nlHsVarApps intDataCon_RDR [bh_RDR]))
 
-    enum_index con2tag_RDR
+    enum_index
       = mkSimpleGeneratedFunBind loc unsafeIndex_RDR
                 [noLoc (AsPat noExtField (noLoc c_RDR)
                            (nlTuplePat [a_Pat, nlWildPat] Boxed)),
                                 d_Pat] (
-           untag_Expr con2tag_RDR [(a_RDR, ah_RDR)] (
-           untag_Expr con2tag_RDR [(d_RDR, dh_RDR)] (
+           untag_Expr [(a_RDR, ah_RDR)] (
+           untag_Expr [(d_RDR, dh_RDR)] (
            let
                 rhs = nlHsVarApps intDataCon_RDR [c_RDR]
            in
@@ -879,11 +857,11 @@ gen_Ix_binds loc tycon _ = do
         )
 
     -- This produces something like `(ch >= ah) && (ch <= bh)`
-    enum_inRange con2tag_RDR
+    enum_inRange
       = mkSimpleGeneratedFunBind loc inRange_RDR [nlTuplePat [a_Pat, b_Pat] Boxed, c_Pat] $
-          untag_Expr con2tag_RDR [(a_RDR, ah_RDR)] (
-          untag_Expr con2tag_RDR [(b_RDR, bh_RDR)] (
-          untag_Expr con2tag_RDR [(c_RDR, ch_RDR)] (
+          untag_Expr [(a_RDR, ah_RDR)] (
+          untag_Expr [(b_RDR, bh_RDR)] (
+          untag_Expr [(c_RDR, ch_RDR)] (
           -- This used to use `if`, which interacts badly with RebindableSyntax.
           -- See #11396.
           nlHsApps and_RDR
@@ -2128,23 +2106,6 @@ genAuxBindSpecOriginal dflags loc spec
            (genAuxBindSpecSig loc spec)))
   where
     gen_bind :: AuxBindSpec -> LHsBind GhcPs
-    gen_bind (DerivCon2Tag tycon con2tag_RDR)
-      = mkFunBindSE 0 loc con2tag_RDR eqns
-      where
-        lots_of_constructors = tyConFamilySize tycon > 8
-                            -- was: mAX_FAMILY_SIZE_FOR_VEC_RETURNS
-                            -- but we don't do vectored returns any more.
-
-        eqns | lots_of_constructors = [get_tag_eqn]
-             | otherwise = map mk_eqn (tyConDataCons tycon)
-
-        get_tag_eqn = ([nlVarPat a_RDR], nlHsApp (nlHsVar getTag_RDR) a_Expr)
-
-        mk_eqn :: DataCon -> ([LPat GhcPs], LHsExpr GhcPs)
-        mk_eqn con = ([nlWildConPat con],
-                      nlHsLit (HsIntPrim NoSourceText
-                                        (toInteger ((dataConTag con) - fIRST_TAG))))
-
     gen_bind (DerivTag2Con _ tag2con_RDR)
       = mkFunBindSE 0 loc tag2con_RDR
            [([nlConVarPat intDataCon_RDR [a_RDR]],
@@ -2201,10 +2162,6 @@ genAuxBindSpecDup loc original_rdr_name dup_spec
 -- See @Note [Auxiliary binders]@.
 genAuxBindSpecSig :: SrcSpan -> AuxBindSpec -> LHsSigWcType GhcPs
 genAuxBindSpecSig loc spec = case spec of
-  DerivCon2Tag tycon _
-    -> mk_sig $ L loc $ XHsType $
-       mkSpecSigmaTy (tyConTyVars tycon) (tyConStupidTheta tycon) $
-       mkParentType tycon `mkVisFunTyMany` intPrimTy
   DerivTag2Con tycon _
     -> mk_sig $ L loc $
        XHsType $ mkSpecForAllTys (tyConTyVars tycon) $
@@ -2504,12 +2461,12 @@ eq_Expr ty a b
  where
    (_, _, prim_eq, _, _) = primOrdOps "Eq" ty
 
-untag_Expr :: RdrName -> [(RdrName, RdrName)]
+untag_Expr :: (RdrName, RdrName)]
            -> LHsExpr GhcPs -> LHsExpr GhcPs
-untag_Expr _ [] expr = expr
-untag_Expr con2tag_RDR ((untag_this, put_tag_here) : more) expr
-  = nlHsCase (nlHsPar (nlHsVarApps con2tag_RDR [untag_this])) {-of-}
-      [mkHsCaseAlt (nlVarPat put_tag_here) (untag_Expr con2tag_RDR more expr)]
+untag_Expr [] expr = expr
+untag_Expr ((untag_this, put_tag_here) : more) expr
+  = nlHsCase (nlHsPar (nlHsVarApps dataToTag_RDR [untag_this])) {-of-}
+      [mkHsCaseAlt (nlVarPat put_tag_here) (untag_Expr more expr)]
 
 enum_from_to_Expr
         :: LHsExpr GhcPs -> LHsExpr GhcPs
@@ -2622,10 +2579,9 @@ minusInt_RDR, tagToEnum_RDR :: RdrName
 minusInt_RDR  = getRdrName (primOpId IntSubOp   )
 tagToEnum_RDR = getRdrName (primOpId TagToEnumOp)
 
-new_con2tag_rdr_name, new_tag2con_rdr_name, new_maxtag_rdr_name
+new_tag2con_rdr_name, new_maxtag_rdr_name
   :: SrcSpan -> TyCon -> TcM RdrName
 -- Generates Exact RdrNames, for the binding positions
-new_con2tag_rdr_name dflags tycon = new_tc_deriv_rdr_name dflags tycon mkCon2TagOcc
 new_tag2con_rdr_name dflags tycon = new_tc_deriv_rdr_name dflags tycon mkTag2ConOcc
 new_maxtag_rdr_name  dflags tycon = new_tc_deriv_rdr_name dflags tycon mkMaxTagOcc
 
