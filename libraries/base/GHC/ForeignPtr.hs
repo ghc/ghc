@@ -91,6 +91,11 @@ data Finalizers
 
 data ForeignPtrContents
   = PlainForeignPtr !(IORef Finalizers)
+  | LiteralPtr
+    -- ^ Used when the pointer is an @Addr#@ literal. These are never
+    -- garbage collected and consequently cannot be finalized.
+    --
+    -- @since 4.14
   | MallocPtr      (MutableByteArray# RealWorld) !(IORef Finalizers)
   | PlainPtr       (MutableByteArray# RealWorld)
 
@@ -257,7 +262,7 @@ addForeignPtrFinalizer :: FinalizerPtr a -> ForeignPtr a -> IO ()
 addForeignPtrFinalizer (FunPtr fp) (ForeignPtr p c) = case c of
   PlainForeignPtr r -> insertCFinalizer r fp 0# nullAddr# p ()
   MallocPtr     _ r -> insertCFinalizer r fp 0# nullAddr# p c
-  _ -> errorWithoutStackTrace "GHC.ForeignPtr: attempt to add a finalizer to a plain pointer"
+  _ -> errorWithoutStackTrace "GHC.ForeignPtr: attempt to add a finalizer to a plain pointer or a literal"
 
 -- Note [MallocPtr finalizers] (#10904)
 --
@@ -275,7 +280,7 @@ addForeignPtrFinalizerEnv ::
 addForeignPtrFinalizerEnv (FunPtr fp) (Ptr ep) (ForeignPtr p c) = case c of
   PlainForeignPtr r -> insertCFinalizer r fp 1# ep p ()
   MallocPtr     _ r -> insertCFinalizer r fp 1# ep p c
-  _ -> errorWithoutStackTrace "GHC.ForeignPtr: attempt to add a finalizer to a plain pointer"
+  _ -> errorWithoutStackTrace "GHC.ForeignPtr: attempt to add a finalizer to a plain pointer or a literal"
 
 addForeignPtrConcFinalizer :: ForeignPtr a -> IO () -> IO ()
 -- ^This function adds a finalizer to the given @ForeignPtr@.  The
@@ -317,7 +322,7 @@ addForeignPtrConcFinalizer_ f@(MallocPtr fo r) finalizer = do
     finalizer' = unIO (foreignPtrFinalizer r >> touch f)
 
 addForeignPtrConcFinalizer_ _ _ =
-  errorWithoutStackTrace "GHC.ForeignPtr: attempt to add a finalizer to plain pointer"
+  errorWithoutStackTrace "GHC.ForeignPtr: attempt to add a finalizer to plain pointer or a literal"
 
 insertHaskellFinalizer :: IORef Finalizers -> IO () -> IO Bool
 insertHaskellFinalizer r f = do
@@ -455,12 +460,8 @@ plusForeignPtr (ForeignPtr addr c) (I# d) = ForeignPtr (plusAddr# addr d) c
 -- | Causes the finalizers associated with a foreign pointer to be run
 -- immediately.
 finalizeForeignPtr :: ForeignPtr a -> IO ()
-finalizeForeignPtr (ForeignPtr _ (PlainPtr _)) = return () -- no effect
-finalizeForeignPtr (ForeignPtr _ foreignPtr) = foreignPtrFinalizer refFinalizers
-        where
-                refFinalizers = case foreignPtr of
-                        (PlainForeignPtr ref) -> ref
-                        (MallocPtr     _ ref) -> ref
-                        PlainPtr _            ->
-                            errorWithoutStackTrace "finalizeForeignPtr PlainPtr"
-
+finalizeForeignPtr (ForeignPtr _ c) = case c of
+  PlainPtr _ -> pure ()
+  LiteralPtr -> pure ()
+  PlainForeignPtr ref -> foreignPtrFinalizer ref
+  MallocPtr _ ref -> foreignPtrFinalizer ref

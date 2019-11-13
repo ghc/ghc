@@ -361,7 +361,6 @@ basicKnownKeyNames
         -- Others
         otherwiseIdName, inlineIdName,
         eqStringName, assertName, breakpointName, breakpointCondName,
-        cstringLengthName,
         opaqueTyConName,
         assertErrorName, traceName,
         printName, fstName, sndName,
