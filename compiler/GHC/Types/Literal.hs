@@ -114,7 +114,7 @@ data Literal
                                 -- See Note [Types of LitNumbers] below for the
                                 -- Type field.
 
-  | LitString  ByteString       -- ^ A string-literal: stored and emitted
+  | LitString !ByteString       -- ^ A string-literal: stored and emitted
                                 -- UTF-8 encoded, we'll arrange to decode it
                                 -- at runtime.  Also emitted with a @\'\\0\'@
                                 -- terminator. Create with 'mkLitString'

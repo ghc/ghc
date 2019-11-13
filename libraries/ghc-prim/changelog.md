@@ -1,3 +1,11 @@
+## 0.6.2 (edit as necessary)
+
+- Shipped with GHC 8.12.1
+
+- Add known-key `cstringLength#` to `GHC.CString`. This is just the
+  C function `strlen`, but a built-in rewrite rule allows GHC to
+  compute the result at compile time when the argument is known.
+
 ## 0.6.1 (edit as necessary)
 
 - Shipped with GHC 8.10.1

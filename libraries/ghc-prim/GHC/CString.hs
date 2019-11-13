@@ -1,5 +1,4 @@
-{-# LANGUAGE MagicHash, NoImplicitPrelude, BangPatterns #-}
-
+{-# LANGUAGE MagicHash, NoImplicitPrelude, BangPatterns, UnliftedFFITypes #-}
 -----------------------------------------------------------------------------
 -- |
 -- Module      :  GHC.CString
@@ -18,7 +17,7 @@
 
 module GHC.CString (
         unpackCString#, unpackAppendCString#, unpackFoldrCString#,
-        unpackCStringUtf8#, unpackNBytes#
+        unpackCStringUtf8#, unpackNBytes#, cstringLength#
     ) where
 
 import GHC.Types
@@ -174,3 +173,17 @@ unpackNBytes#  addr len# = unpack [] (len# -# 1#)
          case indexCharOffAddr# addr i# of
             ch -> unpack (C# ch : acc) (i# -# 1#)
 
+-- The return type is not correct here. We really want CSize,
+-- but that type is defined in base. However, CSize should always
+-- match the size of a machine word (I hope), so this is probably
+-- alright on all platforms that GHC supports.
+foreign import ccall unsafe "strlen" c_strlen :: Addr# -> Int#
+
+-- | Compute the length of a NUL-terminated string. This address
+-- must refer to immutable memory. GHC includes a built-in rule for
+-- constant folding when the argument is a statically-known literal.
+-- That is, a core-to-core pass reduces the expression
+-- @cstringLength# "hello"#@ to the constant @5#@.
+cstringLength# :: Addr# -> Int#
+{-# INLINE[0] cstringLength# #-}
+cstringLength# = c_strlen

@@ -53,7 +53,7 @@ data HsLit x
       -- ^ Unboxed character
   | HsString (XHsString x) {- SourceText -} FastString
       -- ^ String
-  | HsStringPrim (XHsStringPrim x) {- SourceText -} ByteString
+  | HsStringPrim (XHsStringPrim x) {- SourceText -} !ByteString
       -- ^ Packed bytes
   | HsInt (XHsInt x)  IntegralLit
       -- ^ Genuinely an Int; arises from

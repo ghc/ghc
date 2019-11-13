@@ -128,8 +128,9 @@ import Foreign
 import GHC.Conc.Sync    (sharedCAF)
 #endif
 
-import GHC.Base         ( unpackCString#, unpackNBytes# )
-
+#if __GLASGOW_HASKELL__ < 811
+import GHC.Base (unpackCString#,unpackNBytes#)
+#endif
 
 -- | Gives the UTF-8 encoded bytes corresponding to a 'FastString'
 bytesFS :: FastString -> ByteString
