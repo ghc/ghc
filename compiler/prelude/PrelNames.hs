@@ -342,6 +342,7 @@ basicKnownKeyNames
         -- Strings and lists
         unpackCStringName,
         unpackCStringFoldrName, unpackCStringUtf8Name,
+        cstringLengthName,
 
         -- Overloaded lists
         isListClassName,
@@ -1006,10 +1007,11 @@ modIntName = varQual gHC_CLASSES (fsLit "modInt#") modIntIdKey
 
 -- Base strings Strings
 unpackCStringName, unpackCStringFoldrName,
-    unpackCStringUtf8Name, eqStringName :: Name
+    unpackCStringUtf8Name, eqStringName, cstringLengthName :: Name
 unpackCStringName       = varQual gHC_CSTRING (fsLit "unpackCString#") unpackCStringIdKey
 unpackCStringFoldrName  = varQual gHC_CSTRING (fsLit "unpackFoldrCString#") unpackCStringFoldrIdKey
 unpackCStringUtf8Name   = varQual gHC_CSTRING (fsLit "unpackCStringUtf8#") unpackCStringUtf8IdKey
+cstringLengthName       = varQual gHC_CSTRING (fsLit "cstringLength#") cstringLengthIdKey
 eqStringName            = varQual gHC_BASE (fsLit "eqString")  eqStringIdKey
 
 -- The 'inline' function
@@ -2089,7 +2091,7 @@ wildCardKey, absentErrorIdKey, augmentIdKey, appendIdKey,
     unpackCStringUtf8IdKey, unpackCStringAppendIdKey,
     unpackCStringFoldrIdKey, unpackCStringIdKey,
     typeErrorIdKey, divIntIdKey, modIntIdKey,
-    absentSumFieldErrorIdKey :: Unique
+    absentSumFieldErrorIdKey, cstringLengthIdKey :: Unique
 
 wildCardKey                   = mkPreludeMiscIdUnique  0  -- See Note [WildCard binders]
 absentErrorIdKey              = mkPreludeMiscIdUnique  1
@@ -2116,6 +2118,7 @@ voidPrimIdKey                 = mkPreludeMiscIdUnique 21
 typeErrorIdKey                = mkPreludeMiscIdUnique 22
 divIntIdKey                   = mkPreludeMiscIdUnique 23
 modIntIdKey                   = mkPreludeMiscIdUnique 24
+cstringLengthIdKey            = mkPreludeMiscIdUnique 25
 
 concatIdKey, filterIdKey, zipIdKey,
     bindIOIdKey, returnIOIdKey, newStablePtrIdKey,

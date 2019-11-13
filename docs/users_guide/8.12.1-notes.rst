@@ -69,6 +69,9 @@ Template Haskell
 ``ghc-prim`` library
 ~~~~~~~~~~~~~~~~~~~~
 
+- Add a known-key ``cstringLength#`` to ``GHC.CString`` that is eligible
+  for constant folding by a built-in rule.
+
 ``ghc`` library
 ~~~~~~~~~~~~~~~
 
@@ -97,6 +100,12 @@ Template Haskell
 
 ``base`` library
 ~~~~~~~~~~~~~~~~
+
+- ``ForeignPtrContents`` has a additional data constructor, ``LiteralPtr``,
+  used in ``bytestring`` to improve the performance of ``ByteString`` literals
+  created by ``OverloadedStrings``. This unlocks some important Core-to-Core
+  optimizations, reduces runtime overhead of ``ByteString`` literals, and
+  reduces the size of compiled binaries.
 
 Build system
 ~~~~~~~~~~~~

@@ -67,6 +67,7 @@ import qualified Data.ByteString as BS
 import Data.Int
 import Data.Ratio
 import Data.Word
+import Data.Maybe (fromMaybe)
 
 {-
 Note [Constant folding]
@@ -1262,6 +1263,8 @@ builtinRules
                    ru_nargs = 4, ru_try = match_append_lit },
      BuiltinRule { ru_name = fsLit "EqString", ru_fn = eqStringName,
                    ru_nargs = 2, ru_try = match_eq_string },
+     BuiltinRule { ru_name = fsLit "CStringLength", ru_fn = cstringLengthName,
+                   ru_nargs = 1, ru_try = match_cstring_length },
      BuiltinRule { ru_name = fsLit "Inline", ru_fn = inlineIdName,
                    ru_nargs = 2, ru_try = \_ _ _ -> match_inline },
      BuiltinRule { ru_name = fsLit "MagicDict", ru_fn = idName magicDictId,
@@ -1482,6 +1485,21 @@ match_eq_string _ id_unf _
 
 match_eq_string _ _ _ _ = Nothing
 
+-----------------------------------------------------------------------
+-- Explanation of this rule: If C function strlen() and is applied to
+-- an Addr# literal, we can perform constant folding. There are two
+-- cases to consider: either the literal has a NUL byte or it doesn't.
+-- If the literal has a NUL byte, Data.ByteString.elemIndex calculates
+-- the result of strlen(). If the literal does not have a NUL byte,
+-- the result of strlen() is still well defined since all Addr# literals
+-- are suffixed by NUL when compiling cmm-to-asm in GHC.CmmToAsm.Ppr.pprBytes.
+-- In that case, strlen() is just the length of the literal.
+match_cstring_length :: RuleFun
+match_cstring_length _ id_unf _ [lit1]
+  | Just (LitString str) <- exprIsLiteral_maybe id_unf lit1
+  = let len = fromMaybe (BS.length str) (BS.elemIndex 0 str)
+     in Just (Lit (LitNumber LitNumInt (fromIntegral len) intPrimTy))
+match_cstring_length _ _ _ _ = Nothing
 
 ---------------------------------------------------
 -- The rule is this:

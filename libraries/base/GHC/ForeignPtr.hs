@@ -93,8 +93,70 @@ data Finalizers
 
 data ForeignPtrContents
   = PlainForeignPtr !(IORef Finalizers)
-  | MallocPtr      (MutableByteArray# RealWorld) !(IORef Finalizers)
-  | PlainPtr       (MutableByteArray# RealWorld)
+    -- ^ The pointer refers to memory that was allocated by a foreign
+    -- function (typically using @malloc@). The finalizer frequently
+    -- call the C function @free@ or some variant of it.
+  | FinalPtr
+    -- ^ The pointer must be an @Addr#@ literal. These are never
+    -- garbage collected and consequently cannot be finalized.
+    -- See Note [Why FinalPtr].
+    --
+    -- @since 4.15
+  | MallocPtr (MutableByteArray# RealWorld) !(IORef Finalizers)
+    -- ^ The pointer refers to a byte array. Finalization is supported.
+    -- However, unlike with @PlainForeignPtr@, the finalizer is not
+    -- responsible for freeing the memory since the GHC runtime tracks
+    -- the liveliness of byte arrays.
+  | PlainPtr (MutableByteArray# RealWorld)
+    -- ^ The pointer refers to a byte array. Finalization is not
+    -- supported. This optimizates @MallocPtr@ by avoiding the allocation
+    -- of a @MutVar#@ when it is known that no one will add finalizers to
+    -- the @ForeignPtr@.
+
+-- Note [Why FinalPtr]
+--
+-- FinalPtr exists as an optimization for foreign pointers created
+-- from Addr# literals. Most commonly, this happens in the bytestring
+-- library, where the combination of OverloadedStrings and a rewrite
+-- rule overloads String literals as ByteString literals. Prior to the
+-- introduction of FinalPtr, bytestring used PlainForeignPtr (in
+-- Data.ByteString.Internal.unsafePackAddress) to handle such literals.
+-- With O2 optimization, the resulting Core from a GHC patched with a
+-- known-key cstringLength# function but without FinalPtr looked like:
+--
+--   RHS size: {terms: 1, types: 0, coercions: 0, joins: 0/0}
+--   stringOne1 = "hello beautiful world"#
+--   RHS size: {terms: 11, types: 17, coercions: 0, joins: 0/0}
+--   stringOne
+--     = case newMutVar# NoFinalizers realWorld# of
+--       { (# ipv_i7b6, ipv1_i7b7 #) ->
+--       PS stringOne1 (PlainForeignPtr ipv1_i7b7) 0# 21#
+--       }
+--
+-- After the introduction of FinalPtr, the bytestring library was modified
+-- so that the resulting Core was instead:
+--
+--   RHS size: {terms: 1, types: 0, coercions: 0, joins: 0/0}
+--   stringOne1 = "hello beautiful world"#
+--   RHS size: {terms: 5, types: 0, coercions: 0, joins: 0/0}
+--   stringOne = PS stringOne1 FinalPtr 0# 21#
+--
+-- This improves performance in three ways:
+--
+-- 1. More optimization opportunities. GHC is willing to inline the FinalPtr
+--    variant of stringOne into its use sites. This means the offset and length
+--    are eligible for case-of-known-literal. Previously, this never happened.
+-- 2. Smaller binaries. Setting up the thunk to call newMutVar# required
+--    machine instruction in the generated code. On x86_64, FinalPtr reduces
+--    the size of binaries by about 450 bytes per ByteString literal.
+-- 3. Smaller memory footprint. Previously, every ByteString literal resulted
+--    in the allocation of a MutVar# and a PlainForeignPtr data constructor.
+--    These both hang around until the ByteString goes out of scope. FinalPtr
+--    eliminates both of these sources of allocations. The MutVar# is not
+--    allocated because FinalPtr does not allow it, and the data constructor
+--    is not allocated because FinalPtr is a nullary data constructor.
+--
+-- For more discussion of FinalPtr, see GHC MR #2165 and bytestring PR #191.
 
 -- | @since 2.01
 instance Eq (ForeignPtr a) where
@@ -259,7 +321,7 @@ addForeignPtrFinalizer :: FinalizerPtr a -> ForeignPtr a -> IO ()
 addForeignPtrFinalizer (FunPtr fp) (ForeignPtr p c) = case c of
   PlainForeignPtr r -> insertCFinalizer r fp 0# nullAddr# p ()
   MallocPtr     _ r -> insertCFinalizer r fp 0# nullAddr# p c
-  _ -> errorWithoutStackTrace "GHC.ForeignPtr: attempt to add a finalizer to a plain pointer"
+  _ -> errorWithoutStackTrace "GHC.ForeignPtr: attempt to add a finalizer to a plain pointer or a literal"
 
 -- Note [MallocPtr finalizers] (#10904)
 --
@@ -277,7 +339,7 @@ addForeignPtrFinalizerEnv ::
 addForeignPtrFinalizerEnv (FunPtr fp) (Ptr ep) (ForeignPtr p c) = case c of
   PlainForeignPtr r -> insertCFinalizer r fp 1# ep p ()
   MallocPtr     _ r -> insertCFinalizer r fp 1# ep p c
-  _ -> errorWithoutStackTrace "GHC.ForeignPtr: attempt to add a finalizer to a plain pointer"
+  _ -> errorWithoutStackTrace "GHC.ForeignPtr: attempt to add a finalizer to a plain pointer or a literal"
 
 addForeignPtrConcFinalizer :: ForeignPtr a -> IO () -> IO ()
 -- ^This function adds a finalizer to the given @ForeignPtr@.  The
@@ -319,7 +381,7 @@ addForeignPtrConcFinalizer_ f@(MallocPtr fo r) finalizer = do
     finalizer' = unIO (foreignPtrFinalizer r >> touch f)
 
 addForeignPtrConcFinalizer_ _ _ =
-  errorWithoutStackTrace "GHC.ForeignPtr: attempt to add a finalizer to plain pointer"
+  errorWithoutStackTrace "GHC.ForeignPtr: attempt to add a finalizer to plain pointer or a literal"
 
 insertHaskellFinalizer :: IORef Finalizers -> IO () -> IO Bool
 insertHaskellFinalizer r f = do
@@ -457,11 +519,7 @@ plusForeignPtr (ForeignPtr addr c) (I# d) = ForeignPtr (plusAddr# addr d) c
 -- | Causes the finalizers associated with a foreign pointer to be run
 -- immediately.
 finalizeForeignPtr :: ForeignPtr a -> IO ()
-finalizeForeignPtr (ForeignPtr _ (PlainPtr _)) = return () -- no effect
-finalizeForeignPtr (ForeignPtr _ foreignPtr) = foreignPtrFinalizer refFinalizers
-        where
-                refFinalizers = case foreignPtr of
-                        (PlainForeignPtr ref) -> ref
-                        (MallocPtr     _ ref) -> ref
-                        PlainPtr _            ->
-                            errorWithoutStackTrace "finalizeForeignPtr PlainPtr"
+finalizeForeignPtr (ForeignPtr _ c) = case c of
+  PlainForeignPtr ref -> foreignPtrFinalizer ref
+  MallocPtr _ ref -> foreignPtrFinalizer ref
+  _ -> errorWithoutStackTrace "finalizeForeignPtr PlainPtr"
