@@ -435,6 +435,7 @@ render logger dflags unit_state flags sinceQual qual ifaces packages extSrcMap =
       _ <- {-# SCC ppHtmlIndex #-}
            ppHtmlIndex odir title pkgStr
                   themes opt_mathjax opt_contents_url sourceUrls' opt_wiki_urls
+                  withQuickjump
                   (concatMap piInstalledInterfaces allVisiblePackages) pretty
       return ()
 
@@ -446,6 +447,7 @@ render logger dflags unit_state flags sinceQual qual ifaces packages extSrcMap =
       _ <- {-# SCC ppHtmlContents #-}
            ppHtmlContents unit_state odir title pkgStr
                      themes opt_mathjax opt_index_url sourceUrls' opt_wiki_urls
+                     withQuickjump
                      allVisiblePackages True prologue pretty
                      sincePkg (makeContentsQual qual)
       return ()
@@ -778,4 +780,3 @@ getPrologue dflags flags =
 rightOrThrowE :: Either String b -> IO b
 rightOrThrowE (Left msg) = throwE msg
 rightOrThrowE (Right x) = pure x
-
