@@ -13,8 +13,8 @@ which deal with the instantiated versions are located elsewhere:
    GhcRn/Name                rename/RnHsSyn
    GhcTc/Id                  typecheck/TcHsSyn
 
-The mk* functions attempt to construct a not-completely-useless SrcSpan
-from their components, compared with the nl* functions which
+The @mk*@ functions attempt to construct a not-completely-useless SrcSpan
+from their components, compared with the @nl*@ functions which
 just attach noSrcSpan to everything.
 
 -}
@@ -141,7 +141,7 @@ import Data.List
 ************************************************************************
 
 These functions attempt to construct a not-completely-useless SrcSpan
-from their components, compared with the nl* functions below which
+from their components, compared with the @nl*@ functions below which
 just attach noSrcSpan to everything.
 -}
 
