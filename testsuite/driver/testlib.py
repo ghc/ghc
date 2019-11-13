@@ -1344,6 +1344,26 @@ def compile_grep_asm(name: TestName,
     # no problems found, this test passed
     return passed()
 
+def compile_grep_core(name: TestName,
+                      way: WayName,
+                      extra_hc_opts: str
+                      ) -> PassFail:
+    print('Compile only, extra args = ', extra_hc_opts)
+    result = simple_build(name + '.hs', way, '-ddump-to-file -dsuppress-all -ddump-simpl -O ' + extra_hc_opts, False, None, False, False)
+
+    if badResult(result):
+        return result
+
+    expected_pat_file = find_expected_file(name, 'substr-simpl')
+    actual_core_file = add_suffix(name, 'dump-simpl')
+
+    if not grep_output(join_normalisers(normalise_errmsg),
+                       expected_pat_file, actual_core_file):
+        return failBecause('simplified core mismatch')
+
+    # no problems found, this test passed
+    return passed()
+
 # -----------------------------------------------------------------------------
 # Compile-and-run tests
 
