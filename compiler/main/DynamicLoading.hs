@@ -39,7 +39,8 @@ import PrelNames        ( pluginTyConName, frontendPluginTyConName )
 
 import HscTypes
 import GHCi.RemoteTypes ( HValue )
-import Type             ( Type, eqType, mkTyConTy, pprTyThingCategory )
+import Type             ( Type, eqType, mkTyConTy )
+import TyCoPpr          ( pprTyThingCategory )
 import TyCon            ( TyCon )
 import Name             ( Name, nameModule_maybe )
 import Id               ( idType )
