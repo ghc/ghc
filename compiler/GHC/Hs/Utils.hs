@@ -140,9 +140,9 @@ import Data.List
 *                                                                      *
 ************************************************************************
 
-These functions attempt to construct a not-completely-useless SrcSpan
+These functions attempt to construct a not-completely-useless 'SrcSpan'
 from their components, compared with the @nl*@ functions below which
-just attach noSrcSpan to everything.
+just attach 'noSrcSpan' to everything.
 -}
 
 -- | e => (e)
