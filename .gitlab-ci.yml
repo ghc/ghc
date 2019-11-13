@@ -118,7 +118,7 @@ typecheck-testsuite:
     - "echo Linting submodule changes between $base..$CI_COMMIT_SHA"
     - git submodule foreach git remote update
       # TODO: Fix submodule linter
-    - submodchecker .git $(git rev-list $base..$CI_COMMIT_SHA) || true
+    - submodchecker . $(git rev-list $base..$CI_COMMIT_SHA) || true
   dependencies: []
   tags:
     - lint
@@ -148,7 +148,7 @@ lint-submods-branch:
   script:
     - "echo Linting submodule changes between $CI_COMMIT_BEFORE_SHA..$CI_COMMIT_SHA"
     - git submodule foreach git remote update
-    - submodchecker .git $(git rev-list $CI_COMMIT_BEFORE_SHA..$CI_COMMIT_SHA)
+    - submodchecker . $(git rev-list $CI_COMMIT_BEFORE_SHA..$CI_COMMIT_SHA)
   only:
     refs:
       - master
