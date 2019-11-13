@@ -91,8 +91,24 @@ data Finalizers
 
 data ForeignPtrContents
   = PlainForeignPtr !(IORef Finalizers)
-  | MallocPtr      (MutableByteArray# RealWorld) !(IORef Finalizers)
-  | PlainPtr       (MutableByteArray# RealWorld)
+    -- ^ The pointer refers to memory that was allocated by a foreign
+    -- function (typically using @malloc@). The finalizer frequently
+    -- call the C function @free@ or some variant of it.
+  | FinalPtr
+    -- ^ The pointer must be an @Addr#@ literal. These are never
+    -- garbage collected and consequently cannot be finalized.
+    --
+    -- @since 4.15
+  | MallocPtr (MutableByteArray# RealWorld) !(IORef Finalizers)
+    -- ^ The pointer refers to a byte array. Finalization is supported.
+    -- However, unlike with @PlainForeignPtr@, the finalizer is not
+    -- responsible for freeing the memory since the GHC runtime tracks
+    -- the liveliness of byte arrays.
+  | PlainPtr (MutableByteArray# RealWorld)
+    -- ^ The pointer refers to a byte array. Finalization is not
+    -- supported. This optimizates @MallocPtr@ by avoiding the allocation
+    -- of a @MutVar#@ when it is known that no one will add finalizers to
+    -- the @ForeignPtr@.
 
 -- | @since 2.01
 instance Eq (ForeignPtr a) where
@@ -257,7 +273,7 @@ addForeignPtrFinalizer :: FinalizerPtr a -> ForeignPtr a -> IO ()
 addForeignPtrFinalizer (FunPtr fp) (ForeignPtr p c) = case c of
   PlainForeignPtr r -> insertCFinalizer r fp 0# nullAddr# p ()
   MallocPtr     _ r -> insertCFinalizer r fp 0# nullAddr# p c
-  _ -> errorWithoutStackTrace "GHC.ForeignPtr: attempt to add a finalizer to a plain pointer"
+  _ -> errorWithoutStackTrace "GHC.ForeignPtr: attempt to add a finalizer to a plain pointer or a literal"
 
 -- Note [MallocPtr finalizers] (#10904)
 --
@@ -275,7 +291,7 @@ addForeignPtrFinalizerEnv ::
 addForeignPtrFinalizerEnv (FunPtr fp) (Ptr ep) (ForeignPtr p c) = case c of
   PlainForeignPtr r -> insertCFinalizer r fp 1# ep p ()
   MallocPtr     _ r -> insertCFinalizer r fp 1# ep p c
-  _ -> errorWithoutStackTrace "GHC.ForeignPtr: attempt to add a finalizer to a plain pointer"
+  _ -> errorWithoutStackTrace "GHC.ForeignPtr: attempt to add a finalizer to a plain pointer or a literal"
 
 addForeignPtrConcFinalizer :: ForeignPtr a -> IO () -> IO ()
 -- ^This function adds a finalizer to the given @ForeignPtr@.  The
@@ -317,7 +333,7 @@ addForeignPtrConcFinalizer_ f@(MallocPtr fo r) finalizer = do
     finalizer' = unIO (foreignPtrFinalizer r >> touch f)
 
 addForeignPtrConcFinalizer_ _ _ =
-  errorWithoutStackTrace "GHC.ForeignPtr: attempt to add a finalizer to plain pointer"
+  errorWithoutStackTrace "GHC.ForeignPtr: attempt to add a finalizer to plain pointer or a literal"
 
 insertHaskellFinalizer :: IORef Finalizers -> IO () -> IO Bool
 insertHaskellFinalizer r f = do
@@ -455,12 +471,8 @@ plusForeignPtr (ForeignPtr addr c) (I# d) = ForeignPtr (plusAddr# addr d) c
 -- | Causes the finalizers associated with a foreign pointer to be run
 -- immediately.
 finalizeForeignPtr :: ForeignPtr a -> IO ()
-finalizeForeignPtr (ForeignPtr _ (PlainPtr _)) = return () -- no effect
-finalizeForeignPtr (ForeignPtr _ foreignPtr) = foreignPtrFinalizer refFinalizers
-        where
-                refFinalizers = case foreignPtr of
-                        (PlainForeignPtr ref) -> ref
-                        (MallocPtr     _ ref) -> ref
-                        PlainPtr _            ->
-                            errorWithoutStackTrace "finalizeForeignPtr PlainPtr"
-
+finalizeForeignPtr (ForeignPtr _ c) = case c of
+  PlainPtr _ -> pure ()
+  FinalPtr -> pure ()
+  PlainForeignPtr ref -> foreignPtrFinalizer ref
+  MallocPtr _ ref -> foreignPtrFinalizer ref
