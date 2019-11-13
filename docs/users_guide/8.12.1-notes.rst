@@ -144,6 +144,9 @@ Arrow notation
 ``ghc-prim`` library
 ~~~~~~~~~~~~~~~~~~~~
 
+- Add a known-key ``cstringLength#`` to ``GHC.CString`` that is eligible
+  for constant folding by a built-in rule.
+
 ``ghc`` library
 ~~~~~~~~~~~~~~~
 
@@ -180,6 +183,15 @@ Arrow notation
 
 ``base`` library
 ~~~~~~~~~~~~~~~~
+
+- ``ForeignPtrContents`` has a new nullary data constructor ``FinalPtr``.
+  ``FinalPtr`` is intended for turning a primitive string literal into a
+  ``ForeignPtr``.  Unlike ``PlainForeignPtr``, ``FinalPtr`` does not have
+  a finalizer. Replacing ``PlainForeignPtr`` that has ``NoFinalizers`` with
+  ``FinalPtr`` reduces allocations, reduces the size of compiled binaries,
+  and unlocks important Core-to-Core optimizations. ``FinalPtr`` will be used
+  in an upcoming ``bytestring`` release to improve the performance of
+  ``ByteString`` literals created with ``OverloadedStrings``.
 
 Build system
 ~~~~~~~~~~~~

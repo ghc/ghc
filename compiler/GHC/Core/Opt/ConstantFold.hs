@@ -66,6 +66,7 @@ import qualified Data.ByteString as BS
 import Data.Int
 import Data.Ratio
 import Data.Word
+import Data.Maybe (fromMaybe)
 
 {-
 Note [Constant folding]
@@ -1257,6 +1258,8 @@ builtinRules
                    ru_nargs = 4, ru_try = match_append_lit },
      BuiltinRule { ru_name = fsLit "EqString", ru_fn = eqStringName,
                    ru_nargs = 2, ru_try = match_eq_string },
+     BuiltinRule { ru_name = fsLit "CStringLength", ru_fn = cstringLengthName,
+                   ru_nargs = 1, ru_try = match_cstring_length },
      BuiltinRule { ru_name = fsLit "Inline", ru_fn = inlineIdName,
                    ru_nargs = 2, ru_try = \_ _ _ -> match_inline },
      BuiltinRule { ru_name = fsLit "MagicDict", ru_fn = idName magicDictId,
@@ -1477,6 +1480,30 @@ match_eq_string _ id_unf _
 
 match_eq_string _ _ _ _ = Nothing
 
+-----------------------------------------------------------------------
+-- Illustration of this rule:
+--
+-- cstringLength# "foobar"# --> 6
+-- cstringLength# "fizz\NULzz"# --> 4
+--
+-- Nota bene: Addr# literals are suffixed by a NUL byte when they are
+-- compiled to read-only data sections. That's why cstringLength# is
+-- well defined on Addr# literals that do not explicitly have an embedded
+-- NUL byte.
+--
+-- See GHC issue #5218, MR 2165, and bytestring PR 191. This is particularly
+-- helpful when using OverloadedStrings to create a ByteString since the
+-- function computing the length of such ByteStrings can often be constant
+-- folded.
+match_cstring_length :: RuleFun
+match_cstring_length env id_unf _ [lit1]
+  | Just (LitString str) <- exprIsLiteral_maybe id_unf lit1
+    -- If elemIndex returns Just, it has the index of the first embedded NUL
+    -- in the string. If no NUL bytes are present (the common case) then use
+    -- full length of the byte string.
+  = let len = fromMaybe (BS.length str) (BS.elemIndex 0 str)
+     in Just (Lit (mkLitInt (roPlatform env) (fromIntegral len)))
+match_cstring_length _ _ _ _ = Nothing
 
 ---------------------------------------------------
 -- The rule is this:
