@@ -1,0 +1,52 @@
+.. _release-8-12-1:
+
+Release notes for version 8.12.1
+================================
+
+The significant changes to the various parts of the compiler are listed in the
+following sections.
+
+
+Highlights
+----------
+
+Full details
+------------
+
+Language
+~~~~~~~~
+
+Compiler
+~~~~~~~~
+
+GHCi
+~~~~
+
+Runtime system
+~~~~~~~~~~~~~~
+
+Template Haskell
+~~~~~~~~~~~~~~~~
+``ghc-prim`` library
+~~~~~~~~~~~~~~~~~~~~
+
+- Add a known-key ``cstringLength#`` to ``GHC.CString`` that is eligible
+  for constant folding by a built-in rule.
+
+``ghc`` library
+~~~~~~~~~~~~~~~
+
+``base`` library
+~~~~~~~~~~~~~~~~
+
+- ``ForeignPtrContents`` has a additional data constructor, ``LiteralPtr``,
+  used in ``bytestring`` to improve the performance of ``ByteString`` literals
+  created by ``OverloadedStrings``. This unlocks some important Core-to-Core
+  optimizations, reduces runtime overhead of ``ByteString`` literals, and
+  reduces the size of compiled binaries.
+
+Build system
+~~~~~~~~~~~~
+
+Included libraries
+------------------
