@@ -127,10 +127,9 @@ runCc mLanguage dflags args = traceToolCommand dflags "cc" $ do
     Nothing -> ([], userOpts_c)
     Just language -> ([Option "-x", Option languageName], opts)
       where
-        s = settings dflags
         (languageName, opts) = case language of
-          LangC      -> ("c",             sOpt_c s ++ userOpts_c)
-          LangCxx    -> ("c++",           sOpt_cxx s ++ userOpts_cxx)
+          LangC      -> ("c",             userOpts_c)
+          LangCxx    -> ("c++",           userOpts_cxx)
           LangObjc   -> ("objective-c",   userOpts_c)
           LangObjcxx -> ("objective-c++", userOpts_cxx)
           LangAsm    -> ("assembler",     [])
