@@ -1,4 +1,4 @@
-{-# LANGUAGE CPP, BangPatterns #-}
+{-# LANGUAGE CPP #-}
 
 -----------------------------------------------------------------------------
 --
@@ -51,6 +51,7 @@ import Outputable
 
 import Control.Monad ( unless, void )
 import Control.Arrow ( first )
+import Data.List     ( partition )
 
 ------------------------------------------------------------------------
 --              cgExpr: the main function
@@ -601,15 +602,6 @@ chooseReturnBndrs bndr PolyAlt _alts
 chooseReturnBndrs _ _ _ = panic "chooseReturnBndrs"
                              -- MultiValAlt has only one alternative
 
--- space conscious partition
-partition_ :: (a -> Bool) -> [a] -> ([a], [a])
-partition_ _ [] = ([], [])
-partition_ p l@(a : as)
-    | (y, n) <- partition_ p as =
-                if p a
-                then (if null n then l else a : y, n)
-                else (y, if null y then l else a : n)
-
 -------------------------------------
 cgAlts :: (GcPlan,ReturnKind) -> NonVoid Id -> AltType -> [CgStgAlt]
        -> FCode ReturnKind
@@ -645,13 +637,13 @@ cgAlts gc_plan bndr (AlgAlt tycon) alts
               bndr_reg = CmmLocal (idToReg dflags bndr)
               ptag_expr = cmmConstrTag1 dflags (CmmReg bndr_reg)
               branches' = first succ <$> branches
-              !maxpt = mAX_PTR_TAG dflags
-              low_tag br = fst br < maxpt
-              !small = isSmallFamily dflags fam_sz
+              maxpt = mAX_PTR_TAG dflags
+              (via_ptr, via_info) = partition ((< maxpt) . fst) branches'
+              small = isSmallFamily dflags fam_sz
 
                 -- Is the constructor tag in the node reg?
                 -- See Note [Tagging big families]
-        ; if small || all low_tag branches'
+        ; if small || null via_info
            then -- Yes, bndr_reg has constructor tag in ls bits
                emitSwitch ptag_expr branches' mb_deflt 1
                  (if small then fam_sz else maxpt)
@@ -659,8 +651,7 @@ cgAlts gc_plan bndr (AlgAlt tycon) alts
            else -- No, the get exact tag from info table when mAX_PTR_TAG
                 -- See Note [Double switching for big families]
               do
-                let (via_ptr, via_info) = partition_ low_tag branches'
-                    untagged_ptr = cmmUntag dflags (CmmReg bndr_reg)
+                let untagged_ptr = cmmUntag dflags (CmmReg bndr_reg)
                     itag_expr = getConstrTag dflags untagged_ptr
                     info0 = first pred <$> via_info
                 if null via_ptr then
