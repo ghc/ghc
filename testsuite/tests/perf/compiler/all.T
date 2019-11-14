@@ -42,7 +42,7 @@ test('T3294',
 
 test('T4801',
      [collect_compiler_stats('bytes allocated',2),
-      collect_compiler_residency(2),
+      collect_compiler_residency(5),
       only_ways(['normal']),
       extra_hc_opts('-static'),
       ],
