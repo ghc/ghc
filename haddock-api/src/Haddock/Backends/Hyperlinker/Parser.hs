@@ -320,10 +320,8 @@ classify tok =
     ITcloseQuote        {} -> TkSpecial
     ITopenTExpQuote     {} -> TkSpecial
     ITcloseTExpQuote       -> TkSpecial
-    ITidEscape          {} -> TkUnknown
-    ITparenEscape          -> TkSpecial
-    ITidTyEscape        {} -> TkUnknown
-    ITparenTyEscape        -> TkSpecial
+    ITdollar               -> TkSpecial
+    ITdollardollar         -> TkSpecial
     ITtyQuote              -> TkSpecial
     ITquasiQuote        {} -> TkUnknown
     ITqQuasiQuote       {} -> TkUnknown
