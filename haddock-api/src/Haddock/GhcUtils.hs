@@ -38,7 +38,8 @@ import Var       ( VarBndr(..), TyVarBinder, tyVarKind, updateTyVarKind,
                    isInvisibleArgFlag )
 import VarSet    ( VarSet, emptyVarSet )
 import VarEnv    ( TyVarEnv, extendVarEnv, elemVarEnv, emptyVarEnv )
-import TyCoRep   ( Type(..), isRuntimeRepVar )
+import TyCoRep   ( Type(..) )
+import Type      ( isRuntimeRepVar )
 import TysWiredIn( liftedRepDataConTyCon )
 
 import           StringBuffer ( StringBuffer )
