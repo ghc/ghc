@@ -1,4 +1,4 @@
-{-# LANGUAGE CPP #-}
+{-# LANGUAGE CPP, BangPatterns #-}
 
 -----------------------------------------------------------------------------
 --
@@ -633,13 +633,13 @@ cgAlts gc_plan bndr (AlgAlt tycon) alts
 
         ; (mb_deflt, branches) <- cgAlgAltRhss gc_plan bndr alts
 
-        ; let fam_sz   = tyConFamilySize tycon
-              bndr_reg = CmmLocal (idToReg dflags bndr)
-              ptag_expr = cmmConstrTag1 dflags (CmmReg bndr_reg)
-              branches' = first succ <$> branches
-              maxpt = mAX_PTR_TAG dflags
-              (via_ptr, via_info) = partition ((< maxpt) . fst) branches'
-              small = isSmallFamily dflags fam_sz
+        ; let !fam_sz   = tyConFamilySize tycon
+              !bndr_reg = CmmLocal (idToReg dflags bndr)
+              !ptag_expr = cmmConstrTag1 dflags (CmmReg bndr_reg)
+              !branches' = first succ <$> branches
+              !maxpt = mAX_PTR_TAG dflags
+              (!via_ptr, !via_info) = partition ((< maxpt) . fst) branches'
+              !small = isSmallFamily dflags fam_sz
 
                 -- Is the constructor tag in the node reg?
                 -- See Note [Tagging big families]
@@ -651,9 +651,9 @@ cgAlts gc_plan bndr (AlgAlt tycon) alts
            else -- No, the get exact tag from info table when mAX_PTR_TAG
                 -- See Note [Double switching for big families]
               do
-                let untagged_ptr = cmmUntag dflags (CmmReg bndr_reg)
-                    itag_expr = getConstrTag dflags untagged_ptr
-                    info0 = first pred <$> via_info
+                let !untagged_ptr = cmmUntag dflags (CmmReg bndr_reg)
+                    !itag_expr = getConstrTag dflags untagged_ptr
+                    !info0 = first pred <$> via_info
                 if null via_ptr then
                   emitSwitch itag_expr info0 mb_deflt 0 (fam_sz - 1)
                 else do
