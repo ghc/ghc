@@ -2271,8 +2271,7 @@ untag_Expr dflags tycon ((untag_this, put_tag_here) : more) expr
         put_tag_here -> .... <recursive on more>
           _ -> result
          -}
-  = pprTrace "untagStuff" (ppr untag_this) $
-    nlHsCase (nlHsPar (nlHsApp (nlHsVar getTag_RDR) (nlHsVar untag_this))) {-of-}
+  = nlHsCase (nlHsPar (nlHsApp (nlHsVar dataToTag_RDR) (nlHsVar untag_this))) {-of-}
       [mkHsCaseAlt (nlVarPat put_tag_here) (untag_Expr dflags tycon more expr)]
 
 
