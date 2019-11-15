@@ -107,3 +107,6 @@
 [submodule "gmp-tarballs"]
 	path = libraries/integer-gmp/gmp/gmp-tarballs
 	url = https://gitlab.haskell.org/ghc/gmp-tarballs.git
+[submodule "libraries/exceptions"]
+	path = libraries/exceptions
+	url = https://gitlab.haskell.org/ghc/packages/exceptions
