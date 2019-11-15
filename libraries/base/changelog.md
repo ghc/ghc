@@ -44,6 +44,8 @@
 
   * Add `resizeSmallMutableArray#` to `GHC.Exts`.
 
+  * Add a `Data` instance to `WrappedArrow`, `WrappedMonad`, and `ZipList`.
+
 ## 4.13.0.0 *July 2019*
   * Bundled with GHC 8.8.1
 
