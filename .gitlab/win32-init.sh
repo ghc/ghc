@@ -45,3 +45,4 @@ if [ ! -e $toolchain/bin/alex ]; then
     cp $APPDATA/cabal/bin/alex $toolchain/bin
 fi
 
+cabal install libraries/process
