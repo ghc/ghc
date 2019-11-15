@@ -150,5 +150,15 @@ test('proposal-229a', normal, compile, [''])
 test('proposal-229b', normal, compile, [''])
 test('proposal-229d', normal, compile, [''])
 test('proposal-229e', normal, compile, [''])
-test('proposal-229f', extra_files(['proposal-229f.hs', 'Proposal229f_instances.hs']),
+
+# We omit 'profasm' because it fails with:
+# Cannot load -prof objects when GHC is built with -dynamic
+#     To fix this, either:
+#       (1) Use -fexternal-interpreter, or
+#       (2) Build the program twice: once with -dynamic, and then
+#           with -prof using -osuf to set a different object file suffix.
+test('proposal-229f',
+     [ extra_files(['proposal-229f.hs', 'Proposal229f_instances.hs']),
+       omit_ways(['profasm'])
+     ],
      multimod_compile_and_run, ['proposal-229f.hs', ''])
