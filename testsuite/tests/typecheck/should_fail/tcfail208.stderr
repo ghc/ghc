@@ -5,5 +5,5 @@ tcfail208.hs:4:10: error:
         bound by the type signature for:
                    f :: forall (m :: * -> *) a. (Monad m, Eq a) => a -> m a -> Bool
         at tcfail208.hs:3:1-40
-    • In the expression: (return x == y)
+    • In the expression: return x == y
       In an equation for ‘f’: f x y = (return x == y)

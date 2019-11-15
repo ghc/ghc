@@ -1154,6 +1154,10 @@ parenthesizeHsExpr p le@(L loc e)
   | hsExprNeedsParens p e = L loc (HsPar noExtField le)
   | otherwise             = le
 
+stripParensHsExpr :: LHsExpr (GhcPass p) -> LHsExpr (GhcPass p)
+stripParensHsExpr (L _ (HsPar _ e)) = stripParensHsExpr e
+stripParensHsExpr e = e
+
 isAtomicHsExpr :: HsExpr id -> Bool
 -- True of a single token
 isAtomicHsExpr (HsVar {})        = True

@@ -6,7 +6,7 @@ ExprSigLocal.hs:9:35: warning: [-Wpartial-type-signatures (in -Wdefault)]
                at ExprSigLocal.hs:9:20-35
     • In the type ‘a -> _’
       In an expression type signature: forall a. a -> _
-      In the expression: ((\ x -> x) :: forall a. a -> _)
+      In the expression: (\ x -> x) :: forall a. a -> _
     • Relevant bindings include
         y :: b -> b (bound at ExprSigLocal.hs:9:1)
 

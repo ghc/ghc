@@ -8,7 +8,7 @@ T17380.hs:9:7: error:
 T17380.hs:12:9: error:
     • Couldn't match expected type ‘Maybe String’
                   with actual type ‘Unit (Maybe [Char])’
-    • In the expression: (Unit Just "wat")
+    • In the expression: Unit Just "wat"
       In an equation for ‘bar’: bar = (Unit Just "wat")
 
 T17380.hs:15:6: error:

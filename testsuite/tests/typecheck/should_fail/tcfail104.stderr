@@ -3,7 +3,7 @@ tcfail104.hs:14:12: error:
     • Couldn't match type ‘forall a. a -> a’ with ‘Char -> Char’
       Expected type: (Char -> Char) -> Char -> Char
         Actual type: (forall a. a -> a) -> Char -> Char
-    • In the expression: (\ (x :: forall a. a -> a) -> x)
+    • In the expression: \ (x :: forall a. a -> a) -> x
       In the expression:
         if v then (\ (x :: forall a. a -> a) -> x) else (\ x -> x)
       In the expression:
@@ -15,4 +15,4 @@ tcfail104.hs:22:15: error:
     • When checking that the pattern signature: forall a. a -> a
         fits the type of its context: Char -> Char
       In the pattern: x :: forall a. a -> a
-      In the expression: (\ (x :: forall a. a -> a) -> x)
+      In the expression: \ (x :: forall a. a -> a) -> x

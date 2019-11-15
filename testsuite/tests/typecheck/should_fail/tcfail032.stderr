@@ -6,7 +6,7 @@ tcfail032.hs:14:8: error:
         an expression type signature:
           forall a1. Eq a1 => a1 -> Int
         at tcfail032.hs:14:13-30
-    • In the expression: (x :: (Eq a) => a -> Int)
+    • In the expression: x :: (Eq a) => a -> Int
       In an equation for ‘f’: f x = (x :: (Eq a) => a -> Int)
     • Relevant bindings include
         x :: p (bound at tcfail032.hs:14:3)

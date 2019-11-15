@@ -4,7 +4,7 @@ T10619.hs:9:15: error:
       Expected type: (b -> b) -> b -> b
         Actual type: (forall a. a -> a) -> b -> b
     • In the expression:
-        ((\ x -> x) :: (forall a. a -> a) -> forall b. b -> b)
+          (\ x -> x) :: (forall a. a -> a) -> forall b. b -> b
       In the expression:
         if True then
             ((\ x -> x) :: (forall a. a -> a) -> forall b. b -> b)
@@ -24,7 +24,7 @@ T10619.hs:14:15: error:
       Expected type: (b -> b) -> b -> b
         Actual type: (forall a. a -> a) -> b -> b
     • In the expression:
-        ((\ x -> x) :: (forall a. a -> a) -> forall b. b -> b)
+          (\ x -> x) :: (forall a. a -> a) -> forall b. b -> b
       In the expression:
         if True then
             \ y -> y

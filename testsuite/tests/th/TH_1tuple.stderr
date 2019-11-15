@@ -3,5 +3,5 @@ TH_1tuple.hs:11:7: error:
     • Expecting one more argument to ‘Unit’
       Expected a type, but ‘Unit’ has kind ‘* -> *’
     • In an expression type signature: Unit
-      In the expression: (1 :: Unit)
+      In the expression: 1 :: Unit
       In an equation for ‘y’: y = (1 :: Unit)
