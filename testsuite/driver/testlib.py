@@ -556,6 +556,50 @@ def llvm_build ( ) -> bool:
 
 # ---
 
+# Note [Measuring residency]
+# ~~~~~~~~~~~~~~~~~~~~~~~~~~
+#
+# Residency (peak_megabytes_allocated and max_bytes_used) is sensitive
+# to when the major GC runs, which makes it inherently inaccurate.
+# Sometime an innocuous change somewhere can shift things around such
+# that the samples occur at a different time, and the residency
+# appears to change (up or down) when the underlying profile hasn't
+# really changed. To further minimize this effect we run with a single
+# generation (meaning we get a residency sample on every GC) with a small
+# allocation area (as suggested in #17387).
+#
+# However, please don't just ignore changes in residency.  If you see
+# a change in one of these figures, please check whether it is real or
+# not as follows:
+#
+#  * Run the test with old and new compilers, adding +RTS -h -i0.01
+#    (you don't need to compile anything for profiling or enable profiling
+#    libraries to get a heap profile).
+#  * view the heap profiles, read off the maximum residency.  If it has
+#    really changed, then you know there's an issue.
+
+RESIDENCY_OPTS = '+RTS -A256k -i0 -h -RTS'
+
+# See Note [Measuring residency].
+def collect_runtime_residency(tolerance_pct: float):
+    return [
+        collect_stats(['peak_megabytes_allocated', 'max_bytes_used'], tolerance_pct),
+        extra_run_opts(RESIDENCY_OPTS),
+        # The nonmoving collector does not support -G1
+        omit_ways([WayName(name) for name in ['nonmoving', 'nonmoving_thr', 'nonmoving_thr_ghc']])
+    ]
+
+# See Note [Measuring residency].
+def collect_compiler_residency(tolerance_pct: float):
+    return [
+        collect_compiler_stats(['peak_megabytes_allocated', 'max_bytes_used'], tolerance_pct),
+        extra_hc_opts(RESIDENCY_OPTS),
+        # The nonmoving collector does not support -G1
+        omit_ways([WayName('nonmoving_thr_ghc')])
+    ]
+
+# ---
+
 def high_memory_usage(name, opts):
     opts.alone = True
 
@@ -1523,19 +1567,20 @@ def simple_run(name: TestName, way: WayName, prog: str, extra_run_opts: str) -> 
 
     my_rts_flags = rts_flags(way)
 
-    # Collect stats if necessary:
+    # Collect runtime stats if necessary:
     # isStatsTest and not isCompilerStatsTest():
     #   assume we are running a ghc compiled program. Collect stats.
     # isStatsTest and way == 'ghci':
     #   assume we are running a program via ghci. Collect stats
-    stats_file = name + '.stats'
+    stats_file = None # type: Optional[str]
     if isStatsTest() and (not isCompilerStatsTest() or way == 'ghci'):
+        stats_file = name + '.stats'
         stats_args = ' +RTS -V0 -t' + stats_file + ' --machine-readable -RTS'
     else:
         stats_args = ''
 
     # Put extra_run_opts last: extra_run_opts('+RTS foo') should work.
-    cmd = prog + stats_args + ' ' + my_rts_flags + ' ' + extra_run_opts
+    cmd = ' '.join([prog, stats_args, my_rts_flags, extra_run_opts])
 
     if opts.cmd_wrapper is not None:
         cmd = opts.cmd_wrapper(cmd)
@@ -1571,7 +1616,11 @@ def simple_run(name: TestName, way: WayName, prog: str, extra_run_opts: str) -> 
     if check_prof and not check_prof_ok(name, way):
         return failBecause('bad profile')
 
-    return check_stats(name, way, in_testdir(stats_file), opts.stats_range_fields)
+    # Check runtime stats if desired.
+    if stats_file is not None:
+        return check_stats(name, way, in_testdir(stats_file), opts.stats_range_fields)
+    else:
+        return passed()
 
 def rts_flags(way: WayName) -> str:
     args = config.way_rts_flags.get(way, [])
