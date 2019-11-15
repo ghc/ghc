@@ -2290,7 +2290,7 @@ tcGhciStmts stmts
                 -- checkNoErrs ensures that the plan fails if context redn fails
 
       ; traceTc "TcRnDriver.tcGhciStmts: done" empty
-      ; AnId unsafe_coerce_id <- tcLookupGlobal unsafeCoerceName
+      ; AnId unsafe_coerce_id <- tcLookupGlobal unsafeCoercePrimName
       ; let     -- mk_return builds the expression
                 --      returnIO @ [()] [coerce () x, ..,  coerce () z]
                 --
@@ -2305,7 +2305,7 @@ tcGhciStmts stmts
             ret_expr = nlHsApp (nlHsTyApp ret_id [ret_ty])
                        (noLoc $ ExplicitList unitTy Nothing
                                                             (map mk_item ids))
-            mk_item id = unsafe_coerce_id `nlHsTyApp` [idType id, unitTy]
+            mk_item id = unsafe_coerce_id `nlHsTyApp` [typeKind (idType id), typeKind unitTy, idType id, unitTy]
                                           `nlHsApp` nlHsVar id
             stmts = tc_stmts ++ [noLoc (mkLastStmt ret_expr)]
 
