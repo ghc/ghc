@@ -342,6 +342,7 @@ processAllTypeCheckedModule tcm = do
         mid | HsVar _ (L _ i) <- unwrapVar (unLoc e) = Just i
             | otherwise                              = Nothing
 
+        unwrapVar :: HsExpr GhcTc -> HsExpr GhcTc
         unwrapVar (XExpr (WrapExpr (HsWrap _ var))) = var
         unwrapVar e'                                = e'
 

@@ -330,6 +330,7 @@ Library
         GHC.Hs.Decls
         GHC.Hs.Doc
         GHC.Hs.Expr
+        GHC.Hs.ExprType
         GHC.Hs.ImpExp
         GHC.Hs.Lit
         GHC.Hs.Extension

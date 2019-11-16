@@ -307,7 +307,7 @@ type instance XSigPat GhcTc = Type
 
 type instance XXPat GhcPs = NoExtCon
 type instance XXPat GhcRn = NoExtCon
-type instance XXPat GhcTc = CoPat
+type instance XXPat GhcTc = CoPat GhcTc
   -- After typechecking, we add one extra constructor: CoPat
 
 type family ConLikeP x
@@ -359,7 +359,7 @@ data ConPatTc
 --
 -- During desugaring a (CoPat co pat) turns into a cast with 'co' on the
 -- scrutinee, followed by a match on 'pat'.
-data CoPat
+data CoPat pass
   = CoPat
     { -- | Coercion Pattern
       -- If co :: t1 ~ t2, p :: t2,
@@ -367,7 +367,7 @@ data CoPat
       co_cpt_wrap :: HsWrapper
 
     , -- | Why not LPat?  Ans: existing locn will do
-      co_pat_inner :: Pat GhcTc
+      co_pat_inner :: Pat pass
 
     , -- | Type of whole pattern, t1
       co_pat_ty :: Type

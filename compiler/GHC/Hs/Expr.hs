@@ -585,10 +585,10 @@ data RecordUpdTc = RecordUpdTc
 -- See Note [Detecting forced eta expansion] in "GHC.HsToCore.Expr".
 -- This invariant is maintained by 'GHC.Hs.Utils.mkHsWrap'.
 -- hs_syn is something like HsExpr or HsCmd
-data HsWrap hs_syn = HsWrap HsWrapper      -- the wrapper
-                            (hs_syn GhcTc) -- the thing that is wrapped
+data HsWrap hs_syn pass = HsWrap HsWrapper      -- the wrapper
+                            (hs_syn pass) -- the thing that is wrapped
 
-deriving instance (Data (hs_syn GhcTc), Typeable hs_syn) => Data (HsWrap hs_syn)
+deriving instance (Data (hs_syn pass), Typeable hs_syn, Typeable pass) => Data (HsWrap hs_syn pass)
 
 -- ---------------------------------------------------------------------
 
@@ -676,11 +676,11 @@ type instance XXExpr         GhcPs       = NoExtCon
 -- See Note [Rebindable syntax and HsExpansion] below
 type instance XXExpr         GhcRn       = HsExpansion (HsExpr GhcRn)
                                                        (HsExpr GhcRn)
-type instance XXExpr         GhcTc       = XXExprGhcTc
+type instance XXExpr         GhcTc       = XXExprGhcTc GhcTc
 
-data XXExprGhcTc
-  = WrapExpr {-# UNPACK #-} !(HsWrap HsExpr)
-  | ExpansionExpr {-# UNPACK #-} !(HsExpansion (HsExpr GhcRn) (HsExpr GhcTc))
+data XXExprGhcTc pass
+  = WrapExpr {-# UNPACK #-} !(HsWrap HsExpr pass)
+  | ExpansionExpr {-# UNPACK #-} !(HsExpansion (HsExpr GhcRn) (HsExpr pass))
 
 
 {-
@@ -1536,7 +1536,7 @@ type instance XCmdWrap    (GhcPass _) = NoExtField
 
 type instance XXCmd       GhcPs = NoExtCon
 type instance XXCmd       GhcRn = NoExtCon
-type instance XXCmd       GhcTc = HsWrap HsCmd
+type instance XXCmd       GhcTc = HsWrap HsCmd GhcTc
     -- If   cmd :: arg1 --> res
     --      wrap :: arg1 "->" arg2
     -- Then (XCmd (HsWrap wrap cmd)) :: arg2 --> res
