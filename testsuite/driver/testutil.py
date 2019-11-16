@@ -2,11 +2,31 @@ import os
 import platform
 import subprocess
 import shutil
-from pathlib import Path, PurePath
+from pathlib import PurePath
+import pathlib
 
 import threading
 
 from my_typing import *
+
+class Path(pathlib.Path):
+    """
+    Workaround for #17483. msys2 Python's wrapper for stat (called by
+    Path.exists()) appears to fail randomly with errno=0. Work around this by
+    retrying 10 times in the event that this happens.
+    """
+    def stat(self):
+        if config.msys:
+            for i in range(10):
+                try:
+                    result = pathlib.Path.stat(self)
+                    return result
+                except OSError as e:
+                    if e.errno != 0:
+                        raise e
+        else:
+            return pathlib.Path.stat(self)
+
 
 PassFail = NamedTuple('PassFail',
                       [('passFail', str),
