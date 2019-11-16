@@ -5,6 +5,7 @@
 -}
 
 {-# LANGUAGE CPP, ScopedTypeVariables #-}
+{-# LANGUAGE DeriveFunctor #-}
 {-# LANGUAGE RecordWildCards #-}
 {-# LANGUAGE ViewPatterns #-}
 
@@ -32,7 +33,8 @@ module HscTypes (
         ForeignSrcLang(..),
         phaseForeignLanguage,
 
-        ModSummary(..), ms_imps, ms_installed_mod, ms_mod_name, showModMsg, isBootSummary,
+        ModSummary(..), ms_imps, ms_installed_mod, ms_mod_name, ms_home_imps,
+        home_imps, ms_home_allimps, ms_home_srcimps, showModMsg, isBootSummary,
         msHsFilePath, msHiFilePath, msObjFilePath,
         SourceModified(..), isTemplateHaskellOrQQNonBoot,
 
@@ -200,7 +202,7 @@ import Bag
 import Binary
 import ErrUtils
 import NameCache
-import Platform
+import GHC.Platform
 import Util
 import UniqDSet
 import GHC.Serialized   ( Serialized )
@@ -231,9 +233,7 @@ data HscStatus
 -- The Hsc monad: Passing an environment and warning state
 
 newtype Hsc a = Hsc (HscEnv -> WarningMessages -> IO (a, WarningMessages))
-
-instance Functor Hsc where
-    fmap = liftM
+    deriving (Functor)
 
 instance Applicative Hsc where
     pure a = Hsc $ \_ w -> return (a, w)
@@ -443,7 +443,7 @@ data HscEnv
                 -- time it is needed.
 
         , hsc_dynLinker :: DynLinker
-                -- ^ dynamic linker. 
+                -- ^ dynamic linker.
 
  }
 
@@ -2801,6 +2801,28 @@ ms_imps ms =
   where
     mk_additional_import mod_nm = (Nothing, noLoc mod_nm)
 
+home_imps :: [(Maybe FastString, Located ModuleName)] -> [Located ModuleName]
+home_imps imps = [ lmodname |  (mb_pkg, lmodname) <- imps,
+                                  isLocal mb_pkg ]
+  where isLocal Nothing = True
+        isLocal (Just pkg) | pkg == fsLit "this" = True -- "this" is special
+        isLocal _ = False
+
+ms_home_allimps :: ModSummary -> [ModuleName]
+ms_home_allimps ms = map unLoc (ms_home_srcimps ms ++ ms_home_imps ms)
+
+-- | Like 'ms_home_imps', but for SOURCE imports.
+ms_home_srcimps :: ModSummary -> [Located ModuleName]
+ms_home_srcimps = home_imps . ms_srcimps
+
+-- | All of the (possibly) home module imports from a
+-- 'ModSummary'; that is to say, each of these module names
+-- could be a home import if an appropriately named file
+-- existed.  (This is in contrast to package qualified
+-- imports, which are guaranteed not to be home imports.)
+ms_home_imps :: ModSummary -> [Located ModuleName]
+ms_home_imps = home_imps . ms_imps
+
 -- The ModLocation contains both the original source filename and the
 -- filename of the cleaned-up source file after all preprocessing has been
 -- done.  The point is that the summariser will have to cpp/unlit/whatever
@@ -2949,6 +2971,7 @@ trustInfoToNum it
             Sf_Unsafe       -> 1
             Sf_Trustworthy  -> 2
             Sf_Safe         -> 3
+            Sf_SafeInferred -> 4
             Sf_Ignore       -> 0
 
 numToTrustInfo :: Word8 -> IfaceTrustInfo
@@ -2956,9 +2979,7 @@ numToTrustInfo 0 = setSafeMode Sf_None
 numToTrustInfo 1 = setSafeMode Sf_Unsafe
 numToTrustInfo 2 = setSafeMode Sf_Trustworthy
 numToTrustInfo 3 = setSafeMode Sf_Safe
-numToTrustInfo 4 = setSafeMode Sf_Safe -- retained for backwards compat, used
-                                       -- to be Sf_SafeInfered but we no longer
-                                       -- differentiate.
+numToTrustInfo 4 = setSafeMode Sf_SafeInferred
 numToTrustInfo n = error $ "numToTrustInfo: bad input number! (" ++ show n ++ ")"
 
 instance Outputable IfaceTrustInfo where
@@ -2967,6 +2988,7 @@ instance Outputable IfaceTrustInfo where
     ppr (TrustInfo Sf_Unsafe)        = text "unsafe"
     ppr (TrustInfo Sf_Trustworthy)   = text "trustworthy"
     ppr (TrustInfo Sf_Safe)          = text "safe"
+    ppr (TrustInfo Sf_SafeInferred)  = text "safe-inferred"
 
 instance Binary IfaceTrustInfo where
     put_ bh iftrust = putByte bh $ trustInfoToNum iftrust

@@ -41,7 +41,7 @@ import Format
 import RegClass
 import Reg
 import TargetReg
-import Platform
+import GHC.Platform
 
 -- Our intermediate code:
 import BlockId
@@ -1123,6 +1123,8 @@ genCCall :: ForeignTarget      -- function to call
          -> [CmmFormal]        -- where to put the result
          -> [CmmActual]        -- arguments (of mixed type)
          -> NatM InstrBlock
+genCCall (PrimTarget MO_ReadBarrier) _ _
+ = return $ unitOL LWSYNC
 genCCall (PrimTarget MO_WriteBarrier) _ _
  = return $ unitOL LWSYNC
 
@@ -1955,7 +1957,9 @@ genCCall' dflags gcp target dest_regs args
             where
                 (functionName, reduce) = case mop of
                     MO_F32_Exp   -> (fsLit "exp", True)
+                    MO_F32_ExpM1 -> (fsLit "expm1", True)
                     MO_F32_Log   -> (fsLit "log", True)
+                    MO_F32_Log1P -> (fsLit "log1p", True)
                     MO_F32_Sqrt  -> (fsLit "sqrt", True)
                     MO_F32_Fabs  -> unsupported
 
@@ -1977,7 +1981,9 @@ genCCall' dflags gcp target dest_regs args
                     MO_F32_Atanh -> (fsLit "atanh", True)
 
                     MO_F64_Exp   -> (fsLit "exp", False)
+                    MO_F64_ExpM1 -> (fsLit "expm1", False)
                     MO_F64_Log   -> (fsLit "log", False)
+                    MO_F64_Log1P -> (fsLit "log1p", False)
                     MO_F64_Sqrt  -> (fsLit "sqrt", False)
                     MO_F64_Fabs  -> unsupported
 
@@ -2027,6 +2033,7 @@ genCCall' dflags gcp target dest_regs args
                     MO_AddIntC {}    -> unsupported
                     MO_SubIntC {}    -> unsupported
                     MO_U_Mul2 {}     -> unsupported
+                    MO_ReadBarrier   -> unsupported
                     MO_WriteBarrier  -> unsupported
                     MO_Touch         -> unsupported
                     MO_Prefetch_Data _ -> unsupported

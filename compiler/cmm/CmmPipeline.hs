@@ -26,7 +26,7 @@ import ErrUtils
 import HscTypes
 import Control.Monad
 import Outputable
-import Platform
+import GHC.Platform
 
 -----------------------------------------------------------------------------
 -- | Top level driver for C-- pipeline
@@ -39,7 +39,7 @@ cmmPipeline
  -> CmmGroup             -- Input C-- with Procedures
  -> IO (ModuleSRTInfo, CmmGroup) -- Output CPS transformed C--
 
-cmmPipeline hsc_env srtInfo prog =
+cmmPipeline hsc_env srtInfo prog = withTiming (return dflags) (text "Cmm pipeline") forceRes $
   do let dflags = hsc_dflags hsc_env
 
      tops <- {-# SCC "tops" #-} mapM (cpsTop hsc_env) prog
@@ -49,6 +49,10 @@ cmmPipeline hsc_env srtInfo prog =
 
      return (srtInfo, cmms)
 
+  where forceRes (info, group) =
+          info `seq` foldr (\decl r -> decl `seq` r) () group
+
+        dflags = hsc_dflags hsc_env
 
 cpsTop :: HscEnv -> CmmDecl -> IO (CAFEnv, [CmmDecl])
 cpsTop _ p@(CmmData {}) = return (mapEmpty, [p])
@@ -75,6 +79,7 @@ cpsTop hsc_env proc =
        -- Any work storing block Labels must be performed _after_
        -- elimCommonBlocks
 
+       ----------- Implement switches ------------------------------------------
        g <- {-# SCC "createSwitchPlans" #-}
             runUniqSM $ cmmImplementSwitchPlans dflags g
        dump Opt_D_dump_cmm_switch "Post switch plan" g
@@ -352,9 +357,10 @@ dumpGraph dflags flag name g = do
 
 dumpWith :: DynFlags -> DumpFlag -> String -> SDoc -> IO ()
 dumpWith dflags flag txt sdoc = do
-         -- ToDo: No easy way of say "dump all the cmm, *and* split
-         -- them into files."  Also, -ddump-cmm-verbose doesn't play
-         -- nicely with -ddump-to-file, since the headers get omitted.
-   dumpIfSet_dyn dflags flag txt sdoc
-   when (not (dopt flag dflags)) $
-      dumpIfSet_dyn dflags Opt_D_dump_cmm_verbose txt sdoc
+  dumpIfSet_dyn dflags flag txt sdoc
+  when (not (dopt flag dflags)) $
+    -- If `-ddump-cmm-verbose -ddump-to-file` is specified,
+    -- dump each Cmm pipeline stage output to a separate file.  #16930
+    when (dopt Opt_D_dump_cmm_verbose dflags)
+      $ dumpSDoc dflags alwaysQualify flag txt sdoc
+  dumpIfSet_dyn dflags Opt_D_dump_cmm_verbose_by_proc txt sdoc

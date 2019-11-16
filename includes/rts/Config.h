@@ -26,11 +26,15 @@
 #define USING_LIBBFD 1
 #endif
 
-/* DEBUG implies TRACING and TICKY_TICKY  */
-#if defined(DEBUG)
+/* DEBUG and PROFILING both imply TRACING */
+#if defined(DEBUG) || defined(PROFILING)
 #if !defined(TRACING)
 #define TRACING
 #endif
+#endif
+
+/* DEBUG implies TICKY_TICKY */
+#if defined(DEBUG)
 #if !defined(TICKY_TICKY)
 #define TICKY_TICKY
 #endif

@@ -20,6 +20,7 @@ import SrcLoc
 import TcRnTypes
 
 import Control.Applicative
+import Data.Bifunctor (first)
 import Data.List
 import Data.Map (Map)
 import qualified Data.Map as M
@@ -136,7 +137,7 @@ sigNameNoLoc _                             = []
 -- Extract the source location where an instance is defined. This is used
 -- to correlate InstDecls with their Instance/CoAxiom Names, via the
 -- instanceMap.
-getInstLoc :: InstDecl name -> SrcSpan
+getInstLoc :: InstDecl (GhcPass p) -> SrcSpan
 getInstLoc = \case
   ClsInstD _ (ClsInstDecl { cid_poly_ty = ty }) -> getLoc (hsSigType ty)
   DataFamInstD _ (DataFamInstDecl
@@ -214,9 +215,10 @@ conArgDocs con = case getConArgs con of
                    InfixCon arg1 arg2 -> go 0 ([unLoc arg1, unLoc arg2] ++ ret)
                    RecCon _ -> go 1 ret
   where
-    go n (HsDocTy _ _ (dL->L _ ds) : tys) = M.insert n ds $ go (n+1) tys
-    go n (_ : tys) = go (n+1) tys
-    go _ [] = M.empty
+    go n = M.fromList . catMaybes . zipWith f [n..]
+      where
+        f n (HsDocTy _ _ lds) = Just (n, unLoc lds)
+        f _ _ = Nothing
 
     ret = case con of
             ConDeclGADT { con_res_ty = res_ty } -> [ unLoc res_ty ]
@@ -232,10 +234,10 @@ classDecls :: TyClDecl GhcRn -> [(LHsDecl GhcRn, [HsDocString])]
 classDecls class_ = filterDecls . collectDocs . sortByLoc $ decls
   where
     decls = docs ++ defs ++ sigs ++ ats
-    docs  = mkDecls tcdDocs (DocD noExt) class_
-    defs  = mkDecls (bagToList . tcdMeths) (ValD noExt) class_
-    sigs  = mkDecls tcdSigs (SigD noExt) class_
-    ats   = mkDecls tcdATs (TyClD noExt . FamDecl noExt) class_
+    docs  = mkDecls tcdDocs (DocD noExtField) class_
+    defs  = mkDecls (bagToList . tcdMeths) (ValD noExtField) class_
+    sigs  = mkDecls tcdSigs (SigD noExtField) class_
+    ats   = mkDecls tcdATs (TyClD noExtField . FamDecl noExtField) class_
 
 -- | Extract function argument docs from inside top-level decls.
 declTypeDocs :: HsDecl GhcRn -> Map Int (HsDocString)
@@ -262,14 +264,13 @@ nubByName f ns = go emptyNameSet ns
 typeDocs :: HsType GhcRn -> Map Int (HsDocString)
 typeDocs = go 0
   where
-    go n (HsForAllTy { hst_body = ty }) = go n (unLoc ty)
-    go n (HsQualTy   { hst_body = ty }) = go n (unLoc ty)
-    go n (HsFunTy _ (dL->L _
-                      (HsDocTy _ _ (dL->L _ x))) (dL->L _ ty)) =
-       M.insert n x $ go (n+1) ty
-    go n (HsFunTy _ _ ty) = go (n+1) (unLoc ty)
-    go n (HsDocTy _ _ (dL->L _ doc)) = M.singleton n doc
-    go _ _ = M.empty
+    go n = \case
+      HsForAllTy { hst_body = ty }        -> go n (unLoc ty)
+      HsQualTy   { hst_body = ty }        -> go n (unLoc ty)
+      HsFunTy _ (unLoc->HsDocTy _ _ x) ty -> M.insert n (unLoc x) $ go (n+1) (unLoc ty)
+      HsFunTy _ _ ty                      -> go (n+1) (unLoc ty)
+      HsDocTy _ _ doc                     -> M.singleton n (unLoc doc)
+      _                                   -> M.empty
 
 -- | The top-level declarations of a module that we care about,
 -- ordered by source location, with documentation attached if it exists.
@@ -279,21 +280,21 @@ topDecls = filterClasses . filterDecls . collectDocs . sortByLoc . ungroup
 -- | Take all declarations except pragmas, infix decls, rules from an 'HsGroup'.
 ungroup :: HsGroup GhcRn -> [LHsDecl GhcRn]
 ungroup group_ =
-  mkDecls (tyClGroupTyClDecls . hs_tyclds) (TyClD noExt)  group_ ++
-  mkDecls hs_derivds             (DerivD noExt) group_ ++
-  mkDecls hs_defds               (DefD noExt)   group_ ++
-  mkDecls hs_fords               (ForD noExt)   group_ ++
-  mkDecls hs_docs                (DocD noExt)   group_ ++
-  mkDecls (tyClGroupInstDecls . hs_tyclds) (InstD noExt)  group_ ++
-  mkDecls (typesigs . hs_valds)  (SigD noExt)   group_ ++
-  mkDecls (valbinds . hs_valds)  (ValD noExt)   group_
+  mkDecls (tyClGroupTyClDecls . hs_tyclds) (TyClD noExtField)  group_ ++
+  mkDecls hs_derivds             (DerivD noExtField) group_ ++
+  mkDecls hs_defds               (DefD noExtField)   group_ ++
+  mkDecls hs_fords               (ForD noExtField)   group_ ++
+  mkDecls hs_docs                (DocD noExtField)   group_ ++
+  mkDecls (tyClGroupInstDecls . hs_tyclds) (InstD noExtField)  group_ ++
+  mkDecls (typesigs . hs_valds)  (SigD noExtField)   group_ ++
+  mkDecls (valbinds . hs_valds)  (ValD noExtField)   group_
   where
     typesigs (XValBindsLR (NValBinds _ sigs)) = filter (isUserSig . unLoc) sigs
-    typesigs _ = error "expected ValBindsOut"
+    typesigs ValBinds{} = error "expected XValBindsLR"
 
     valbinds (XValBindsLR (NValBinds binds _)) =
       concatMap bagToList . snd . unzip $ binds
-    valbinds _ = error "expected ValBindsOut"
+    valbinds ValBinds{} = error "expected XValBindsLR"
 
 -- | Sort by source location
 sortByLoc :: [Located a] -> [Located a]
@@ -304,17 +305,16 @@ sortByLoc = sortOn getLoc
 -- A declaration may have multiple doc strings attached to it.
 collectDocs :: [LHsDecl pass] -> [(LHsDecl pass, [HsDocString])]
 -- ^ This is an example.
-collectDocs = go Nothing []
+collectDocs = go [] Nothing
   where
-    go Nothing _ [] = []
-    go (Just prev) docs [] = finished prev docs []
-    go prev docs ((dL->L _ (DocD _ (DocCommentNext str))) : ds)
-      | Nothing <- prev = go Nothing (str:docs) ds
-      | Just decl <- prev = finished decl docs (go Nothing [str] ds)
-    go prev docs ((dL->L _ (DocD _ (DocCommentPrev str))) : ds) =
-      go prev (str:docs) ds
-    go Nothing docs (d:ds) = go (Just d) docs ds
-    go (Just prev) docs (d:ds) = finished prev docs (go (Just d) [] ds)
+    go docs mprev decls = case (decls, mprev) of
+      ((unLoc->DocD _ (DocCommentNext s)) : ds, Nothing)   -> go (s:docs) Nothing ds
+      ((unLoc->DocD _ (DocCommentNext s)) : ds, Just prev) -> finished prev docs $ go [s] Nothing ds
+      ((unLoc->DocD _ (DocCommentPrev s)) : ds, mprev)     -> go (s:docs) mprev ds
+      (d                                  : ds, Nothing)   -> go docs (Just d) ds
+      (d                                  : ds, Just prev) -> finished prev docs $ go [] (Just d) ds
+      ([]                                     , Nothing)   -> []
+      ([]                                     , Just prev) -> finished prev docs []
 
     finished decl docs rest = (decl, reverse docs) : rest
 
@@ -335,13 +335,12 @@ filterDecls = filter (isHandled . unLoc . fst)
 
 -- | Go through all class declarations and filter their sub-declarations
 filterClasses :: [(LHsDecl a, doc)] -> [(LHsDecl a, doc)]
-filterClasses decls = [ if isClassD d then (cL loc (filterClass d), doc) else x
-                      | x@(dL->L loc d, doc) <- decls ]
+filterClasses = map (first (mapLoc filterClass))
   where
-    filterClass (TyClD x c) =
+    filterClass (TyClD x c@(ClassDecl {})) =
       TyClD x $ c { tcdSigs =
         filter (liftA2 (||) (isUserSig . unLoc) isMinimalLSig) (tcdSigs c) }
-    filterClass _ = error "expected TyClD"
+    filterClass d = d
 
 -- | Was this signature given by the user?
 isUserSig :: Sig name -> Bool
@@ -350,12 +349,10 @@ isUserSig ClassOpSig {} = True
 isUserSig PatSynSig {}  = True
 isUserSig _             = False
 
-isClassD :: HsDecl a -> Bool
-isClassD (TyClD _ d) = isClassDecl d
-isClassD _ = False
-
 -- | Take a field of declarations from a data structure and create HsDecls
 -- using the given constructor
-mkDecls :: (a -> [Located b]) -> (b -> c) -> a -> [Located c]
-mkDecls field con struct = [ cL loc (con decl)
-                           | (dL->L loc decl) <- field struct ]
+mkDecls :: (struct -> [Located decl])
+        -> (decl -> hsDecl)
+        -> struct
+        -> [Located hsDecl]
+mkDecls field con = map (mapLoc con) . field

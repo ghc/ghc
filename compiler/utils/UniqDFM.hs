@@ -17,6 +17,7 @@ is not deterministic.
 {-# LANGUAGE DeriveDataTypeable #-}
 {-# LANGUAGE DeriveFunctor #-}
 {-# LANGUAGE FlexibleContexts #-}
+{-# LANGUAGE TupleSections #-}
 {-# OPTIONS_GHC -Wall #-}
 
 module UniqDFM (
@@ -116,7 +117,7 @@ data TaggedVal val =
   TaggedVal
     val
     {-# UNPACK #-} !Int -- ^ insertion time
-  deriving Data
+  deriving (Data, Functor)
 
 taggedFst :: TaggedVal val -> val
 taggedFst (TaggedVal v _) = v
@@ -126,9 +127,6 @@ taggedSnd (TaggedVal _ i) = i
 
 instance Eq val => Eq (TaggedVal val) where
   (TaggedVal v1 _) == (TaggedVal v2 _) = v1 == v2
-
-instance Functor TaggedVal where
-  fmap f (TaggedVal val i) = TaggedVal (f val) i
 
 -- | Type of unique deterministic finite maps
 data UniqDFM ele =
@@ -140,6 +138,16 @@ data UniqDFM ele =
     {-# UNPACK #-} !Int         -- Upper bound on the values' insertion
                                 -- time. See Note [Overflow on plusUDFM]
   deriving (Data, Functor)
+
+-- | Deterministic, in O(n log n).
+instance Foldable UniqDFM where
+  foldr = foldUDFM
+
+-- | Deterministic, in O(n log n).
+instance Traversable UniqDFM where
+  traverse f = fmap listToUDFM_Directly
+             . traverse (\(u,a) -> (u,) <$> f a)
+             . udfmToList
 
 emptyUDFM :: UniqDFM elt
 emptyUDFM = UDFM M.empty 0

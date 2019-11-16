@@ -1,0 +1,28 @@
+
+T15862.hs:17:7: error:
+    • No instance for (Typeable 'MkFoo) arising from a use of ‘typeRep’
+        GHC can't yet do polykinded
+          Typeable ('MkFoo :: (forall a. a) -> Foo)
+    • In the expression: typeRep @MkFoo
+      In an equation for ‘foo’: foo = typeRep @MkFoo
+
+T15862.hs:25:7: error:
+    • No instance for (Typeable 'MkBar) arising from a use of ‘typeRep’
+        GHC can't yet do polykinded Typeable ('MkBar :: Bool -> Bar)
+    • In the expression: typeRep
+      In an equation for ‘bar’: bar = typeRep
+
+T15862.hs:30:8: error:
+    • No instance for (Typeable 'MkQuux)
+        arising from a use of ‘typeRep’
+        GHC can't yet do polykinded
+          Typeable ('MkQuux :: (# Bool | Int #) -> Quux)
+    • In the expression: typeRep
+      In an equation for ‘quux’: quux = typeRep
+
+T15862.hs:36:8: error:
+    • No instance for (Typeable 'MkQuuz)
+        arising from a use of ‘typeRep’
+        GHC can't yet do polykinded Typeable ('MkQuuz :: Quuz)
+    • In the expression: typeRep
+      In an equation for ‘quuz’: quuz = typeRep

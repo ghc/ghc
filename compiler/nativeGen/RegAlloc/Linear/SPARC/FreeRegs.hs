@@ -11,7 +11,7 @@ import Reg
 
 import CodeGen.Platform
 import Outputable
-import Platform
+import GHC.Platform
 
 import Data.Word
 import Data.Bits

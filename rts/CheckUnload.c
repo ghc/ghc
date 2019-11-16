@@ -335,7 +335,7 @@ static void searchHeapBlocks (HashTable *addrs, bdescr *bd,
                 break;
 
             default:
-                barf("heapCensus, unknown object: %d", info->type);
+                barf("searchHeapBlocks, unknown object: %d", info->type);
             }
 
             if (!prim) {
@@ -404,6 +404,7 @@ void checkUnload (StgClosure *static_objects)
       p = UNTAG_STATIC_LIST_PTR(p);
       checkAddress(addrs, p, s_indices);
       info = get_itbl(p);
+      checkAddress(addrs, info, s_indices);
       link = *STATIC_LINK(info, p);
   }
 

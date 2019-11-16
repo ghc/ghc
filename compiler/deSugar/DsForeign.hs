@@ -49,7 +49,7 @@ import SrcLoc
 import Outputable
 import FastString
 import DynFlags
-import Platform
+import GHC.Platform
 import OrdList
 import Pair
 import Util
@@ -112,7 +112,7 @@ dsForeigns' fos = do
                               (dL->L _ (CExportStatic _ ext_nm cconv)) _ }) = do
       (h, c, _, _) <- dsFExport id co ext_nm cconv False
       return (h, c, [id], [])
-   do_decl (XForeignDecl _) = panic "dsForeigns'"
+   do_decl (XForeignDecl nec) = noExtCon nec
 
 {-
 ************************************************************************

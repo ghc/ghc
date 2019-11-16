@@ -498,7 +498,8 @@ pRELUDE :: Module
 pRELUDE         = mkBaseModule_ pRELUDE_NAME
 
 gHC_PRIM, gHC_TYPES, gHC_GENERICS, gHC_MAGIC,
-    gHC_CLASSES, gHC_BASE, gHC_ENUM, gHC_GHCI, gHC_CSTRING,
+    gHC_CLASSES, gHC_PRIMOPWRAPPERS, gHC_BASE, gHC_ENUM,
+    gHC_GHCI, gHC_GHCI_HELPERS, gHC_CSTRING,
     gHC_SHOW, gHC_READ, gHC_NUM, gHC_MAYBE, gHC_INTEGER_TYPE, gHC_NATURAL,
     gHC_LIST, gHC_TUPLE, dATA_TUPLE, dATA_EITHER, dATA_STRING,
     dATA_FOLDABLE, dATA_TRAVERSABLE,
@@ -516,10 +517,12 @@ gHC_TYPES       = mkPrimModule (fsLit "GHC.Types")
 gHC_MAGIC       = mkPrimModule (fsLit "GHC.Magic")
 gHC_CSTRING     = mkPrimModule (fsLit "GHC.CString")
 gHC_CLASSES     = mkPrimModule (fsLit "GHC.Classes")
+gHC_PRIMOPWRAPPERS = mkPrimModule (fsLit "GHC.PrimopWrappers")
 
 gHC_BASE        = mkBaseModule (fsLit "GHC.Base")
 gHC_ENUM        = mkBaseModule (fsLit "GHC.Enum")
 gHC_GHCI        = mkBaseModule (fsLit "GHC.GHCi")
+gHC_GHCI_HELPERS= mkBaseModule (fsLit "GHC.GHCi.Helpers")
 gHC_SHOW        = mkBaseModule (fsLit "GHC.Show")
 gHC_READ        = mkBaseModule (fsLit "GHC.Read")
 gHC_NUM         = mkBaseModule (fsLit "GHC.Num")
@@ -2022,7 +2025,7 @@ sumRepDataConKey                        = mkPreludeDataConUnique 73
 runtimeRepSimpleDataConKeys, unliftedSimpleRepDataConKeys, unliftedRepDataConKeys :: [Unique]
 liftedRepDataConKey :: Unique
 runtimeRepSimpleDataConKeys@(liftedRepDataConKey : unliftedSimpleRepDataConKeys)
-  = map mkPreludeDataConUnique [74..86]
+  = map mkPreludeDataConUnique [74..88]
 
 unliftedRepDataConKeys = vecRepDataConKey :
                          tupleRepDataConKey :
@@ -2032,29 +2035,29 @@ unliftedRepDataConKeys = vecRepDataConKey :
 -- See Note [Wiring in RuntimeRep] in TysWiredIn
 -- VecCount
 vecCountDataConKeys :: [Unique]
-vecCountDataConKeys = map mkPreludeDataConUnique [87..92]
+vecCountDataConKeys = map mkPreludeDataConUnique [89..94]
 
 -- See Note [Wiring in RuntimeRep] in TysWiredIn
 -- VecElem
 vecElemDataConKeys :: [Unique]
-vecElemDataConKeys = map mkPreludeDataConUnique [93..102]
+vecElemDataConKeys = map mkPreludeDataConUnique [95..104]
 
 -- Typeable things
 kindRepTyConAppDataConKey, kindRepVarDataConKey, kindRepAppDataConKey,
     kindRepFunDataConKey, kindRepTYPEDataConKey,
     kindRepTypeLitSDataConKey, kindRepTypeLitDDataConKey
     :: Unique
-kindRepTyConAppDataConKey = mkPreludeDataConUnique 103
-kindRepVarDataConKey      = mkPreludeDataConUnique 104
-kindRepAppDataConKey      = mkPreludeDataConUnique 105
-kindRepFunDataConKey      = mkPreludeDataConUnique 106
-kindRepTYPEDataConKey     = mkPreludeDataConUnique 107
-kindRepTypeLitSDataConKey = mkPreludeDataConUnique 108
-kindRepTypeLitDDataConKey = mkPreludeDataConUnique 109
+kindRepTyConAppDataConKey = mkPreludeDataConUnique 105
+kindRepVarDataConKey      = mkPreludeDataConUnique 106
+kindRepAppDataConKey      = mkPreludeDataConUnique 107
+kindRepFunDataConKey      = mkPreludeDataConUnique 108
+kindRepTYPEDataConKey     = mkPreludeDataConUnique 109
+kindRepTypeLitSDataConKey = mkPreludeDataConUnique 110
+kindRepTypeLitDDataConKey = mkPreludeDataConUnique 111
 
 typeLitSymbolDataConKey, typeLitNatDataConKey :: Unique
-typeLitSymbolDataConKey   = mkPreludeDataConUnique 110
-typeLitNatDataConKey      = mkPreludeDataConUnique 111
+typeLitSymbolDataConKey   = mkPreludeDataConUnique 112
+typeLitNatDataConKey      = mkPreludeDataConUnique 113
 
 
 ---------------- Template Haskell -------------------

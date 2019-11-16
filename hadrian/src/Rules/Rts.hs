@@ -13,11 +13,11 @@ rtsRules = priority 3 $ do
     -- This is for backwards compatibility (the old make build system omitted the
     -- dummy version number).
     root <- buildRootRules
-    [ root -/- "//libHSrts_*-ghc*.so",
-      root -/- "//libHSrts_*-ghc*.dylib",
-      root -/- "//libHSrts-ghc*.so",
-      root -/- "//libHSrts-ghc*.dylib"]
-      |%> \ rtsLibFilePath' -> createFileLinkUntracked
+    [ root -/- "**/libHSrts_*-ghc*.so",
+      root -/- "**/libHSrts_*-ghc*.dylib",
+      root -/- "**/libHSrts-ghc*.so",
+      root -/- "**/libHSrts-ghc*.dylib"]
+      |%> \ rtsLibFilePath' -> createFileLink
             (addRtsDummyVersion $ takeFileName rtsLibFilePath')
             rtsLibFilePath'
 
@@ -83,8 +83,7 @@ copyLibffiDynamicUnix stage libSuf target = do
         copyFile' versionlessSourceFilePath target
 
         -- On OSX the dylib's id must be updated to a relative path.
-        osx <- osxHost
-        when osx $ cmd
+        when osxHost $ cmd
             [ "install_name_tool"
             , "-id", "@rpath/" ++ takeFileName target
             , target

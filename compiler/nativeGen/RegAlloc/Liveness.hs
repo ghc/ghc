@@ -45,13 +45,12 @@ import CFG
 import Hoopl.Collections
 import Hoopl.Label
 import Cmm hiding (RegSet, emptyRegSet)
-import PprCmm()
 
 import Digraph
 import DynFlags
 import MonadUtils
 import Outputable
-import Platform
+import GHC.Platform
 import UniqSet
 import UniqFM
 import UniqSupply

@@ -45,9 +45,10 @@ import Stream (Stream)
 import qualified Stream
 import Hoopl.Collections
 
-import Platform
+import GHC.Platform
 import Maybes
 import DynFlags
+import ErrUtils (withTiming)
 import Panic
 import UniqSupply
 import MonadUtils
@@ -70,12 +71,16 @@ cmmToRawCmm :: DynFlags -> Stream IO CmmGroup ()
             -> IO (Stream IO RawCmmGroup ())
 cmmToRawCmm dflags cmms
   = do { uniqs <- mkSplitUniqSupply 'i'
-       ; let do_one uniqs cmm = do
-                case initUs uniqs $ concatMapM (mkInfoTable dflags) cmm of
-                  (b,uniqs') -> return (uniqs',b)
-                  -- NB. strictness fixes a space leak.  DO NOT REMOVE.
+       ; let do_one uniqs cmm =
+               -- NB. strictness fixes a space leak.  DO NOT REMOVE.
+               withTiming (return dflags) (text "Cmm -> Raw Cmm") forceRes $
+                 case initUs uniqs $ concatMapM (mkInfoTable dflags) cmm of
+                   (b,uniqs') -> return (uniqs',b)
        ; return (Stream.mapAccumL do_one uniqs cmms >> return ())
        }
+
+    where forceRes (uniqs, rawcmms) =
+            uniqs `seq` foldr (\decl r -> decl `seq` r) () rawcmms
 
 -- Make a concrete info table, represented as a list of CmmStatic
 -- (it can't be simply a list of Word, because the SRT field is
@@ -572,7 +577,7 @@ stdInfoTableSizeB dflags = stdInfoTableSizeW dflags * wORD_SIZE dflags
 stdSrtBitmapOffset :: DynFlags -> ByteOff
 -- Byte offset of the SRT bitmap half-word which is
 -- in the *higher-addressed* part of the type_lit
-stdSrtBitmapOffset dflags = stdInfoTableSizeB dflags - hALF_WORD_SIZE dflags
+stdSrtBitmapOffset dflags = stdInfoTableSizeB dflags - halfWordSize dflags
 
 stdClosureTypeOffset :: DynFlags -> ByteOff
 -- Byte offset of the closure type half-word
@@ -580,7 +585,7 @@ stdClosureTypeOffset dflags = stdInfoTableSizeB dflags - wORD_SIZE dflags
 
 stdPtrsOffset, stdNonPtrsOffset :: DynFlags -> ByteOff
 stdPtrsOffset    dflags = stdInfoTableSizeB dflags - 2 * wORD_SIZE dflags
-stdNonPtrsOffset dflags = stdInfoTableSizeB dflags - 2 * wORD_SIZE dflags + hALF_WORD_SIZE dflags
+stdNonPtrsOffset dflags = stdInfoTableSizeB dflags - 2 * wORD_SIZE dflags + halfWordSize dflags
 
 conInfoTableSizeB :: DynFlags -> Int
 conInfoTableSizeB dflags = stdInfoTableSizeB dflags + wORD_SIZE dflags

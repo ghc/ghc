@@ -3,7 +3,7 @@
 -- -----------------------------------------------------------------------------
 -- | This is the top-level module in the LLVM code generator.
 --
-module LlvmCodeGen ( llvmCodeGen, llvmFixupAsm ) where
+module LlvmCodeGen ( LlvmVersion (..), llvmCodeGen, llvmFixupAsm ) where
 
 #include "HsVersions.h"
 
@@ -79,8 +79,7 @@ llvmCodeGen' cmm_stream
         cmmMetaLlvmPrelude
 
         -- Procedures
-        let llvmStream = Stream.mapM llvmGroupLlvmGens cmm_stream
-        _ <- Stream.collect llvmStream
+        () <- Stream.consume cmm_stream llvmGroupLlvmGens
 
         -- Declare aliases for forward references
         renderLlvm . pprLlvmData =<< generateExternDecls
@@ -90,7 +89,7 @@ llvmCodeGen' cmm_stream
   where
     header :: SDoc
     header = sdocWithDynFlags $ \dflags ->
-      let target = LLVM_TARGET
+      let target = platformMisc_llvmTarget $ platformMisc dflags
           layout = case lookup target (llvmTargets dflags) of
             Just (LlvmTarget dl _ _) -> dl
             Nothing -> error $ "Failed to lookup the datalayout for " ++ target ++ "; available targets: " ++ show (map fst $ llvmTargets dflags)

@@ -1,0 +1,5 @@
+UnliftedNewtypesNotEnabled.hs:9:15:
+     A newtype cannot have an unlifted argument type
+      Perhaps you intended to use UnliftedNewtypes
+     In the definition of data constructor ‘Baz’
+      In the newtype declaration for ‘Baz’

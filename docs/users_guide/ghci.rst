@@ -1556,17 +1556,32 @@ breakpoint on a let expression, but there will always be a breakpoint on
 its body, because we are usually interested in inspecting the values of
 the variables bound by the let.
 
-Listing and deleting breakpoints
-^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+Managing breakpoints
+^^^^^^^^^^^^^^^^^^^^
 
-The list of breakpoints currently enabled can be displayed using
+The list of breakpoints currently defined can be displayed using
 :ghci-cmd:`:show breaks`:
 
 .. code-block:: none
 
     *Main> :show breaks
-    [0] Main qsort.hs:1:11-12
-    [1] Main qsort.hs:2:15-46
+    [0] Main qsort.hs:1:11-12 enabled
+    [1] Main qsort.hs:2:15-46 enabled
+
+To disable one or several defined breakpoint, use the :ghci-cmd:`:disable` command with
+one or several blank separated numbers
+given in the output from :ghci-cmd:`:show breaks`:.
+To disable all breakpoints at once, use ``:disable *``.
+
+.. code-block:: none
+
+    *Main> :disable 0
+    *Main> :show breaks
+    [0] Main qsort.hs:1:11-12 disabled
+    [1] Main qsort.hs:2:15-46 enabled
+
+Disabled breakpoints can be (re-)enabled with the :ghci-cmd:`:enable` command.
+The parameters of the :ghci-cmd:`:disable` and :ghci-cmd:`:enable` commands are identical.
 
 To delete a breakpoint, use the :ghci-cmd:`:delete` command with the number
 given in the output from :ghci-cmd:`:show breaks`:
@@ -1575,7 +1590,7 @@ given in the output from :ghci-cmd:`:show breaks`:
 
     *Main> :delete 0
     *Main> :show breaks
-    [1] Main qsort.hs:2:15-46
+    [1] Main qsort.hs:2:15-46 disabled
 
 To delete all breakpoints at once, use ``:delete *``.
 
@@ -2377,6 +2392,12 @@ commonly used commands.
     see the number of each breakpoint). The ``*`` form deletes all the
     breakpoints.
 
+.. ghci-cmd:: :disable; * | ⟨num⟩ ...
+
+    Disable one or more breakpoints by number (use :ghci-cmd:`:show breaks` to
+    see the number and state of each breakpoint). The ``*`` form disables all the
+    breakpoints.
+
 .. ghci-cmd:: :doc; ⟨name⟩
 
     (Experimental: This command will likely change significantly in GHC 8.8.)
@@ -2393,6 +2414,12 @@ commonly used commands.
     error. The editor to invoke is taken from the :envvar:`EDITOR` environment
     variable, or a default editor on your system if :envvar:`EDITOR` is not
     set. You can change the editor using :ghci-cmd:`:set editor`.
+
+.. ghci-cmd:: :enable; * | ⟨num⟩ ...
+
+    Enable one or more disabled breakpoints by number (use :ghci-cmd:`:show breaks` to
+    see the number and state of each breakpoint). The ``*`` form enables all the
+    disabled breakpoints.
 
 .. ghci-cmd:: :etags
 
@@ -2538,6 +2565,39 @@ commonly used commands.
     IDEs for providing a goto-definition facility.
 
     The ``:loc-at`` command requires :ghci-cmd:`:set +c` to be set.
+
+.. ghci-cmd:: :instances ⟨type⟩
+
+    Displays all the class instances available to the argument ⟨type⟩.
+    The command will match ⟨type⟩ with the first parameter of every
+    instance and then check that all constraints are satisfiable.
+
+    When combined with ``-XPartialTypeSignatures``, a user can insert
+    wildcards into a query and learn the constraints required of each
+    wildcard for ⟨type⟩ match with an instance.
+
+    The output is a listing of all matching instances, simplified and
+    instantiated as much as possible.
+
+    For example:
+
+    .. code-block:: none
+
+         > :instances Maybe (Maybe Int)
+         instance Eq (Maybe (Maybe Int)) -- Defined in ‘GHC.Maybe’
+         instance Ord (Maybe (Maybe Int)) -- Defined in ‘GHC.Maybe’
+         instance Show (Maybe (Maybe Int)) -- Defined in ‘GHC.Show’
+         instance Read (Maybe (Maybe Int)) -- Defined in ‘GHC.Read’
+
+         > :set -XPartialTypeSignatures -fno-warn-partial-type-signatures
+
+         > :instances Maybe _
+         instance Eq _ => Eq (Maybe _) -- Defined in ‘GHC.Maybe’
+         instance Semigroup _ => Monoid (Maybe _) -- Defined in ‘GHC.Base’
+         instance Ord _ => Ord (Maybe _) -- Defined in ‘GHC.Maybe’
+         instance Semigroup _ => Semigroup (Maybe _) -- Defined in ‘GHC.Base’
+         instance Show _ => Show (Maybe _) -- Defined in ‘GHC.Show’
+         instance Read _ => Read (Maybe _) -- Defined in ‘GHC.Read’
 
 .. ghci-cmd:: :main; ⟨arg1⟩ ... ⟨argn⟩
 
@@ -2732,8 +2792,10 @@ commonly used commands.
     If a number is given before the command, then the commands are run
     when the specified breakpoint (only) is hit. This can be quite
     useful: for example, ``:set stop 1 :continue`` effectively disables
-    breakpoint 1, by running :ghci-cmd:`:continue` whenever it is hit (although
-    GHCi will still emit a message to say the breakpoint was hit). What's more,
+    breakpoint 1, by running :ghci-cmd:`:continue` whenever it is hit
+    In this case GHCi will still emit a message to say the breakpoint was hit.
+    If you don't want such a message, you can use the :ghci-cmd:`:disable`
+    command. What's more,
     with cunning use of :ghci-cmd:`:def` and :ghci-cmd:`:cmd` you can use
     :ghci-cmd:`:set stop` to implement conditional breakpoints:
 
@@ -2875,7 +2937,7 @@ commonly used commands.
 	*X> :type +d length
 	length :: [a] -> Int
 
-.. ghci-cmd:: :type-at; ⟨module⟩ ⟨line⟩ ⟨col⟩ ⟨end-line⟩ ⟨end-col⟩ [⟨name⟩]
+.. ghci-cmd:: :type-at; ⟨path⟩ ⟨line⟩ ⟨col⟩ ⟨end-line⟩ ⟨end-col⟩ [⟨name⟩]
 
     Reports the inferred type at the given span/position in the module, e.g.:
 
@@ -2886,6 +2948,13 @@ commonly used commands.
 
     This command is useful when integrating GHCi with text editors and
     IDEs for providing a show-type-under-point facility.
+
+    The first parameter (path) must be a file path and not a module name.
+    The type of this path is dependent on how the module was loaded into GHCi:
+    If the module was loaded by name, then the path name calculated by GHCi
+    as described in :ref:`ghci-modules-filenames` must be used.
+    If the module was loaded with an absolute or a relative path,
+    then the same path must be specified.
 
     The last string parameter is useful for when the span is out of
     date, i.e. the file changed and the code has moved. In which case

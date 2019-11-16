@@ -1,7 +1,6 @@
 
 tcfail140.hs:10:7: error:
-    • Couldn't match expected type ‘Integer -> t’
-                  with actual type ‘Int’
+    • Couldn't match expected type ‘t0 -> t’ with actual type ‘Int’
     • The function ‘f’ is applied to two arguments,
       but its type ‘Int -> Int’ has only one
       In the expression: f 3 9
@@ -9,8 +8,7 @@ tcfail140.hs:10:7: error:
     • Relevant bindings include bar :: t (bound at tcfail140.hs:10:1)
 
 tcfail140.hs:12:10: error:
-    • Couldn't match expected type ‘Integer -> t’
-                  with actual type ‘Int’
+    • Couldn't match expected type ‘t1 -> t’ with actual type ‘Int’
     • The operator ‘f’ takes two arguments,
       but its type ‘Int -> Int’ has only one
       In the expression: 3 `f` 4

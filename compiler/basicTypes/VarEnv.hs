@@ -98,10 +98,13 @@ import Outputable
 -- "Secrets of the Glasgow Haskell Compiler inliner" Section 3.2 provides
 -- the motivation for this abstraction.
 data InScopeSet = InScope VarSet {-# UNPACK #-} !Int
-        -- We store a VarSet here, but we use this for lookups rather than
-        -- just membership tests. Typically the InScopeSet contains the
-        -- canonical version of the variable (e.g. with an informative
-        -- unfolding), so this lookup is useful.
+        -- Note [Lookups in in-scope set]
+        -- ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+        -- We store a VarSet here, but we use this for lookups rather than just
+        -- membership tests. Typically the InScopeSet contains the canonical
+        -- version of the variable (e.g. with an informative unfolding), so this
+        -- lookup is useful (see, for instance, Note [In-scope set as a
+        -- substitution]).
         --
         -- The Int is a kind of hash-value used by uniqAway
         -- For example, it might be the size of the set

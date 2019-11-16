@@ -178,6 +178,10 @@ There are some restrictions on the use of primitive types:
 
          newtype A = MkA Int#
 
+   However, this restriction can be relaxed by enabling
+   :extension:`UnliftedNewtypes`.  The `section on unlifted newtypes
+   <#unlifted-newtypes>`__ details the behavior of such types.
+
 -  You cannot bind a variable with an unboxed type in a *top-level*
    binding.
 
@@ -358,6 +362,81 @@ layout for a sum type works like this:
   In the degenerate case where all the alternatives have zero width, such
   as the ``Bool``-like ``(# (# #) | (# #) #)``, the unboxed sum layout only
   has an ``Int32`` tag field (i.e., the whole thing is represented by an integer).
+
+.. _unlifted-newtypes:
+
+Unlifted Newtypes
+-----------------
+
+.. extension:: UnliftedNewtypes
+    :shortdesc: Enable unlifted newtypes.
+
+    :since: 8.10.1
+
+    Enable the use of newtypes over types with non-lifted runtime representations.
+
+GHC implements an :extension:`UnliftedNewtypes` extension as specified in
+`this GHC proposal <https://github.com/ghc-proposals/ghc-proposals/blob/master/proposals/0013-unlifted-newtypes.rst>`_.
+:extension:`UnliftedNewtypes` relaxes the restrictions around what types can appear inside
+of a `newtype`. For example, the type ::
+
+    newtype A = MkA Int#
+
+is accepted when this extension is enabled. This creates a type
+``A :: TYPE 'IntRep`` and a data constructor ``MkA :: Int# -> A``.
+Although the kind of ``A`` is inferred by GHC, there is nothing visually
+distictive about this type that indicated that is it not of kind ``Type``
+like newtypes typically are. `GADTSyntax <#gadt-style>`__ can be used to
+provide a kind signature for additional clarity ::
+
+    newtype A :: TYPE 'IntRep where
+      MkA :: Int# -> A
+
+The ``Coercible`` machinery works with unlifted newtypes just like it does with
+lifted types. In either of the equivalent formulations of ``A`` given above,
+users would additionally have access to a coercion between ``A`` and ``Int#``.
+
+As a consequence of the
+`levity-polymorphic binder restriction <#levity-polymorphic-restrictions>`__,
+levity-polymorphic fields are disallowed in data constructors
+of data types declared using ``data``. However, since ``newtype`` data
+constructor application is implemented as a coercion instead of as function
+application, this restriction does not apply to the field inside a ``newtype``
+data constructor. Thus, the type checker accepts ::
+
+    newtype Identity# :: forall (r :: RuntimeRep). TYPE r -> TYPE r where
+      MkIdentity# :: forall (r :: RuntimeRep) (a :: TYPE r). a -> Identity# a
+
+And with `UnboxedSums <#unboxed-sums>`__ enabled ::
+
+    newtype Maybe# :: forall (r :: RuntimeRep). TYPE r -> TYPE (SumRep '[r, TupleRep '[]]) where
+      MkMaybe# :: forall (r :: RuntimeRep) (a :: TYPE r). (# a | (# #) #) -> Maybe# a
+
+This extension also relaxes some of the restrictions around data family
+instances. In particular, :extension:`UnliftedNewtypes` permits a
+``newtype instance`` to be given a return kind of ``TYPE r``, not just
+``Type``. For example, the following ``newtype instance`` declarations would be
+permitted: ::
+
+     class Foo a where
+       data FooKey a :: TYPE 'IntRep
+     class Bar (r :: RuntimeRep) where
+       data BarType r :: TYPE r
+
+     instance Foo Bool where
+       newtype FooKey Bool = FooKeyBoolC Int#
+     instance Bar 'WordRep where
+       newtype BarType 'WordRep = BarTypeWordRepC Word#
+
+It is worth noting that :extension:`UnliftedNewtypes` is *not* required to give
+the data families themselves return kinds involving ``TYPE``, such as the
+``FooKey`` and ``BarType`` examples above. The extension is
+only required for ``newtype instance`` declarations, such as ``FooKeyBoolC``
+and ``BarTypeWorkRepC`` above.
+
+This extension impacts the determination of whether or not a newtype has
+a Complete User-Specified Kind Signature (CUSK). The exact impact is specified
+`the section on CUSKs <#complete-kind-signatures>`__.
 
 .. _syntax-extns:
 
@@ -5343,6 +5422,12 @@ as in the following example: ::
 
 Here we make use of the ``Monoid ((->) a)`` instance.
 
+When used in combination with :extension:`StandaloneDeriving` we swap the order
+for the instance we base our derivation on and the instance we define e.g.: ::
+
+  deriving via (a -> App m b) instance Monoid (Kleisli m a b)
+
+
 .. _pattern-synonyms:
 
 Pattern synonyms
@@ -7573,9 +7658,26 @@ entirely optional, so that we can declare ``Array`` alternatively with ::
     data family Array :: Type -> Type
 
 Unlike with ordinary data definitions, the result kind of a data family
-does not need to be ``Type``: it can alternatively be a kind variable
-(with :extension:`PolyKinds`). Data instances' kinds must end in
-``Type``, however.
+does not need to be ``Type``. It can alternatively be:
+
+* Of the form ``TYPE r`` for some ``r`` (see :ref:`runtime-rep`).
+  For example: ::
+
+    data family DF1 :: TYPE IntRep
+    data family DF2 (r :: RuntimeRep)  :: TYPE r
+    data family DF3 :: Type -> TYPE WordRep
+
+* A bare kind variable (with :extension:`PolyKinds` enabled).
+  For example: ::
+
+    data family DF4 :: k
+    data family DF5 (a :: k) :: k
+    data family DF6 :: (k -> Type) -> k
+
+Data instances' kinds must end in ``Type``, however. This restriction is
+slightly relaxed when the :extension:`UnliftedNewtypes` extension is enabled,
+as it permits a ``newtype instance``'s kind to end in ``TYPE r`` for some
+``r``.
 
 .. _data-instance-declarations:
 
@@ -7944,6 +8046,9 @@ type such as ``F Double`` will simplify to ``Char``. In ``G``, on the
 other hand, the two equations are compatible. Thus, GHC can ignore the
 first equation when looking at the second. So, ``G a`` will simplify to
 ``a``.
+
+Incompatibilities between closed type family equations can be displayed
+in :ghci-cmd:`:info` when :ghc-flag:`-fprint-axiom-incomps` is enabled.
 
 However see :ref:`ghci-decls` for the overlap rules in GHCi.
 
@@ -9097,6 +9202,20 @@ signature" for a type constructor? These are the forms:
      data T2 :: forall k. k -> Type  -- CUSK: `k` is bound explicitly
      data T3 :: forall (k :: Type). k -> Type   -- still a CUSK
 
+-  For a newtype, the rules are the same as they are for a data type
+   unless `UnliftedNewtypes <#unboxed-newtypes>`__ is enabled.
+   With `UnliftedNewtypes <#unboxed-newtypes>`__, the type constructor
+   only has a CUSK if a kind signature is present. As with a datatype
+   with a top-level ``::``, all kind variables must introduced after
+   the ``::`` must be explicitly quantified ::
+
+       {-# LANGUAGE UnliftedNewtypes #-}
+       newtype N1 where                 -- No; missing kind signature
+       newtype N2 :: TYPE 'IntRep where -- Yes; kind signature present
+       newtype N3 (a :: Type) where     -- No; missing kind signature
+       newtype N4 :: k -> Type where    -- No; `k` is not explicitly quantified
+       newtype N5 :: forall (k :: Type). k -> Type where -- Yes; good signature
+
 -  For a class, every type variable must be annotated with a kind.
 
 -  For a type synonym, every type variable and the result type must all
@@ -9616,6 +9735,8 @@ and ``Bool :: TYPE 'LiftedRep``. Anything with a type of the form
 thus say that ``->`` has type
 ``TYPE r1 -> TYPE r2 -> TYPE 'LiftedRep``. The result is always lifted
 because all functions are lifted in GHC.
+
+.. _levity-polymorphic-restrictions:
 
 No levity-polymorphic variables or arguments
 --------------------------------------------

@@ -6,13 +6,13 @@ deriving-via-fail4.hs:14:12: error:
     • When deriving the instance for (Eq F1)
 
 deriving-via-fail4.hs:17:13: error:
-    • Couldn't match representation of type ‘a1’ with that of ‘a’
+    • Couldn't match representation of type ‘a’ with that of ‘a1’
         arising from the coercion of the method ‘c’
           from type ‘a -> a -> Bool’ to type ‘a -> F2 a1 -> Bool’
-      ‘a1’ is a rigid type variable bound by
+      ‘a’ is a rigid type variable bound by
         the deriving clause for ‘C a (F2 a1)’
         at deriving-via-fail4.hs:17:13-15
-      ‘a’ is a rigid type variable bound by
+      ‘a1’ is a rigid type variable bound by
         the deriving clause for ‘C a (F2 a1)’
         at deriving-via-fail4.hs:17:13-15
     • When deriving the instance for (C a (F2 a1))

@@ -106,7 +106,7 @@ test('ghci062', [extra_files(['ghci062/', 'ghci062/Test.hs']),
                  when(config.have_ext_interp, extra_ways(['ghci-ext']))],
 		ghci_script, ['ghci062.script'])
 test('ghci063', normal, ghci_script, ['ghci063.script'])
-
+test('ghci064', normal, ghci_script, ['ghci064.script'])
 test('T2452', [extra_hc_opts("-fno-implicit-import-qualified")],
     ghci_script, ['T2452.script'])
 test('T2766', normal, ghci_script, ['T2766.script'])
@@ -155,7 +155,8 @@ test('T6106', [extra_files(['../shell.hs']),
 test('T6105', normal, ghci_script, ['T6105.script'])
 test('T7117', normal, ghci_script, ['T7117.script'])
 test('ghci058', [extra_files(['../shell.hs']),
-                 cmd_prefix('ghciWayFlags=' + config.ghci_way_flags)],
+                 cmd_prefix('ghciWayFlags=' + config.ghci_way_flags),
+                 when(opsys('mingw32'), expect_broken(16858))],
      ghci_script, ['ghci058.script'])
 test('T7587', normal, ghci_script, ['T7587.script'])
 test('T7688', normal, ghci_script, ['T7688.script'])
@@ -296,4 +297,10 @@ test('T16089', normal, ghci_script, ['T16089.script'])
 test('T14828', normal, ghci_script, ['T14828.script'])
 test('T16376', normal, ghci_script, ['T16376.script'])
 test('T16527', normal, ghci_script, ['T16527.script'])
+test('T16563', extra_hc_opts("-clear-package-db -global-package-db"), ghci_script, ['T16563.script'])
 test('T16569', normal, ghci_script, ['T16569.script'])
+test('T16767', normal, ghci_script, ['T16767.script'])
+test('T16575', normal, ghci_script, ['T16575.script'])
+test('T16509', normal, ghci_script, ['T16509.script'])
+test('T16804', extra_files(['T16804a.hs', 'T16804b.hs']), ghci_script, ['T16804.script'])
+test('T15546', normal, ghci_script, ['T15546.script'])

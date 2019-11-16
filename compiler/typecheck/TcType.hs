@@ -196,6 +196,9 @@ import GhcPrelude
 
 import Kind
 import TyCoRep
+import TyCoSubst ( mkTvSubst, substTyWithCoVars )
+import TyCoFVs
+import TyCoPpr ( pprParendTheta )
 import Class
 import Var
 import ForeignCall
@@ -522,6 +525,17 @@ superSkolemTv   = SkolemTv topTcLevel True   -- Treat this as a completely disti
                   -- The choice of level number here is a bit dodgy, but
                   -- topTcLevel works in the places that vanillaSkolemTv is used
 
+instance Outputable TcTyVarDetails where
+  ppr = pprTcTyVarDetails
+
+pprTcTyVarDetails :: TcTyVarDetails -> SDoc
+-- For debugging
+pprTcTyVarDetails (RuntimeUnk {})      = text "rt"
+pprTcTyVarDetails (SkolemTv lvl True)  = text "ssk" <> colon <> ppr lvl
+pprTcTyVarDetails (SkolemTv lvl False) = text "sk"  <> colon <> ppr lvl
+pprTcTyVarDetails (MetaTv { mtv_info = info, mtv_tclvl = tclvl })
+  = ppr info <> colon <> ppr tclvl
+
 -----------------------------
 data MetaDetails
   = Flexi  -- Flexi type variables unify to become Indirects
@@ -550,20 +564,11 @@ instance Outputable MetaDetails where
   ppr Flexi         = text "Flexi"
   ppr (Indirect ty) = text "Indirect" <+> ppr ty
 
-pprTcTyVarDetails :: TcTyVarDetails -> SDoc
--- For debugging
-pprTcTyVarDetails (RuntimeUnk {})      = text "rt"
-pprTcTyVarDetails (SkolemTv lvl True)  = text "ssk" <> colon <> ppr lvl
-pprTcTyVarDetails (SkolemTv lvl False) = text "sk"  <> colon <> ppr lvl
-pprTcTyVarDetails (MetaTv { mtv_info = info, mtv_tclvl = tclvl })
-  = pp_info <> colon <> ppr tclvl
-  where
-    pp_info = case info of
-                TauTv      -> text "tau"
-                TyVarTv    -> text "tyv"
-                FlatMetaTv -> text "fmv"
-                FlatSkolTv -> text "fsk"
-
+instance Outputable MetaInfo where
+  ppr TauTv         = text "tau"
+  ppr TyVarTv       = text "tyv"
+  ppr FlatMetaTv    = text "fmv"
+  ppr FlatSkolTv    = text "fsk"
 
 {- *********************************************************************
 *                                                                      *
@@ -801,10 +806,10 @@ checkTcLevelInvariant :: TcLevel -> TcLevel -> Bool
 checkTcLevelInvariant (TcLevel ctxt_tclvl) (TcLevel tv_tclvl)
   = ctxt_tclvl >= tv_tclvl
 
+-- Returns topTcLevel for non-TcTyVars
 tcTyVarLevel :: TcTyVar -> TcLevel
 tcTyVarLevel tv
-  = ASSERT2( tcIsTcTyVar tv, ppr tv )
-    case tcTyVarDetails tv of
+  = case tcTyVarDetails tv of
           MetaTv { mtv_tclvl = tv_lvl } -> tv_lvl
           SkolemTv tv_lvl _             -> tv_lvl
           RuntimeUnk                    -> topTcLevel
@@ -951,78 +956,6 @@ tcTyConAppTyFamInstsAndVisX is_invis_arg tc tys =
 isTyFamFree :: Type -> Bool
 -- ^ Check that a type does not contain any type family applications.
 isTyFamFree = null . tcTyFamInsts
-
-{-
-************************************************************************
-*                                                                      *
-          The "exact" free variables of a type
-*                                                                      *
-************************************************************************
-
-Note [Silly type synonym]
-~~~~~~~~~~~~~~~~~~~~~~~~~
-Consider
-  type T a = Int
-What are the free tyvars of (T x)?  Empty, of course!
-
-exactTyCoVarsOfType is used by the type checker to figure out exactly
-which type variables are mentioned in a type.  It only matters
-occasionally -- see the calls to exactTyCoVarsOfType.
-
-Historical note: years and years ago this function was used during
-generalisation -- see #1813.  But that code has long since died.
--}
-
-exactTyCoVarsOfType :: Type -> TyCoVarSet
--- Find the free type variables (of any kind)
--- but *expand* type synonyms.  See Note [Silly type synonym] above.
-exactTyCoVarsOfType ty
-  = go ty
-  where
-    go ty | Just ty' <- tcView ty = go ty'  -- This is the key line
-    go (TyVarTy tv)         = goVar tv
-    go (TyConApp _ tys)     = exactTyCoVarsOfTypes tys
-    go (LitTy {})           = emptyVarSet
-    go (AppTy fun arg)      = go fun `unionVarSet` go arg
-    go (FunTy _ arg res)    = go arg `unionVarSet` go res
-    go (ForAllTy bndr ty)   = delBinderVar (go ty) bndr `unionVarSet` go (binderType bndr)
-    go (CastTy ty co)       = go ty `unionVarSet` goCo co
-    go (CoercionTy co)      = goCo co
-
-    goMCo MRefl    = emptyVarSet
-    goMCo (MCo co) = goCo co
-
-    goCo (Refl ty)            = go ty
-    goCo (GRefl _ ty mco)     = go ty `unionVarSet` goMCo mco
-    goCo (TyConAppCo _ _ args)= goCos args
-    goCo (AppCo co arg)     = goCo co `unionVarSet` goCo arg
-    goCo (ForAllCo tv k_co co)
-      = goCo co `delVarSet` tv `unionVarSet` goCo k_co
-    goCo (FunCo _ co1 co2)   = goCo co1 `unionVarSet` goCo co2
-    goCo (CoVarCo v)         = goVar v
-    goCo (HoleCo h)          = goVar (coHoleCoVar h)
-    goCo (AxiomInstCo _ _ args) = goCos args
-    goCo (UnivCo p _ t1 t2)  = goProv p `unionVarSet` go t1 `unionVarSet` go t2
-    goCo (SymCo co)          = goCo co
-    goCo (TransCo co1 co2)   = goCo co1 `unionVarSet` goCo co2
-    goCo (NthCo _ _ co)      = goCo co
-    goCo (LRCo _ co)         = goCo co
-    goCo (InstCo co arg)     = goCo co `unionVarSet` goCo arg
-    goCo (KindCo co)         = goCo co
-    goCo (SubCo co)          = goCo co
-    goCo (AxiomRuleCo _ c)   = goCos c
-
-    goCos cos = foldr (unionVarSet . goCo) emptyVarSet cos
-
-    goProv UnsafeCoerceProv     = emptyVarSet
-    goProv (PhantomProv kco)    = goCo kco
-    goProv (ProofIrrelProv kco) = goCo kco
-    goProv (PluginProv _)       = emptyVarSet
-
-    goVar v = unitVarSet v `unionVarSet` go (varType v)
-
-exactTyCoVarsOfTypes :: [Type] -> TyVarSet
-exactTyCoVarsOfTypes tys = mapUnionVarSet exactTyCoVarsOfType tys
 
 anyRewritableTyVar :: Bool    -- Ignore casts and coercions
                    -> EqRel   -- Ambient role
@@ -1793,11 +1726,14 @@ hasTyVarHead ty                 -- Haskell 98 allows predicates of form
        Nothing      -> False
 
 evVarPred :: EvVar -> PredType
-evVarPred var
-  = ASSERT2( isEvVarType var_ty, ppr var <+> dcolon <+> ppr var_ty )
-    var_ty
- where
-    var_ty = varType var
+evVarPred var = varType var
+  -- Historical note: I used to have an ASSERT here,
+  -- checking (isEvVarType (varType var)).  But with something like
+  --   f :: c => _ -> _
+  -- we end up with (c :: kappa), and (kappa ~ Constraint).  Until
+  -- we solve and zonk (which there is no particular reason to do for
+  -- partial signatures, (isEvVarType kappa) will return False. But
+  -- nothing is wrong.  So I just removed the ASSERT.
 
 ------------------
 -- | When inferring types, should we quantify over a given predicate?

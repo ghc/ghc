@@ -4,6 +4,7 @@
 \section[SimplMonad]{The simplifier Monad}
 -}
 
+{-# LANGUAGE DeriveFunctor #-}
 module SimplMonad (
         -- The monad
         SimplM,
@@ -37,7 +38,7 @@ import MonadUtils
 import ErrUtils as Err
 import Panic (throwGhcExceptionIO, GhcException (..))
 import BasicTypes          ( IntWithInf, treatZeroAsInf, mkIntWithInf )
-import Control.Monad       ( liftM, ap )
+import Control.Monad       ( ap )
 
 {-
 ************************************************************************
@@ -57,6 +58,7 @@ newtype SimplM result
                 -> SimplCount
                 -> IO (result, UniqSupply, SimplCount)}
   -- we only need IO here for dump output
+    deriving (Functor)
 
 data SimplTopEnv
   = STE { st_flags     :: DynFlags
@@ -103,9 +105,6 @@ computeMaxTicks dflags size
 {-# INLINE thenSmpl_ #-}
 {-# INLINE returnSmpl #-}
 
-
-instance Functor SimplM where
-    fmap = liftM
 
 instance Applicative SimplM where
     pure  = returnSmpl

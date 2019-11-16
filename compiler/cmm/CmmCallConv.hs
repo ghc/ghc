@@ -10,10 +10,10 @@ import GhcPrelude
 import CmmExpr
 import SMRep
 import Cmm (Convention(..))
-import PprCmm ()
+import PprCmm () -- For Outputable instances
 
 import DynFlags
-import Platform
+import GHC.Platform
 import Outputable
 
 -- Calculate the 'GlobalReg' or stack locations for function call

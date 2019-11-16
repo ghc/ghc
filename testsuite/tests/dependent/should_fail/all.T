@@ -1,5 +1,5 @@
 test('DepFail1', normal, compile_fail, [''])
-test('RAE_T32a', normal, compile_fail, [''])
+test('RAE_T32a', req_th, compile_fail, [''])
 test('TypeSkolEscape', normal, compile_fail, ['-fprint-explicit-runtime-reps'])
 test('BadTelescope', normal, compile_fail, [''])
 test('BadTelescope2', normal, compile_fail, [''])

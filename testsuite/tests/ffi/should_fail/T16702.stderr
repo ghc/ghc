@@ -1,0 +1,29 @@
+
+T16702.hs:12:1: error:
+    • Unacceptable result type in foreign declaration:
+        Unexpected nested forall
+    • When checking declaration:
+        foreign import ccall safe "math.h pow" c_pow
+          :: CDouble
+             -> forall (a :: Type). CDouble -> forall (b :: Type). CDouble
+
+T16702.hs:17:1: error:
+    • Unacceptable result type in foreign declaration:
+        Unexpected nested forall
+    • When checking declaration:
+        foreign import ccall safe "malloc" malloc1
+          :: CSize -> forall a. IO (Ptr a)
+
+T16702.hs:20:1: error:
+    • Unacceptable argument type in foreign declaration:
+        ‘Show a’ cannot be marshalled in a foreign call
+    • When checking declaration:
+        foreign import ccall safe "malloc" malloc2
+          :: Show a => CSize -> IO (Ptr a)
+
+T16702.hs:23:1: error:
+    • Unacceptable argument type in foreign declaration:
+        ‘Show a’ cannot be marshalled in a foreign call
+    • When checking declaration:
+        foreign import ccall safe "malloc" malloc3
+          :: CSize -> Show a => IO (Ptr a)

@@ -56,7 +56,7 @@ import Outputable
 --import Debug
 --import OrdList
 --import Debug.Trace
-import PprCmm ()
+import PprCmm () -- For Outputable instances
 import qualified DynFlags as D
 
 import Data.List

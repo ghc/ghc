@@ -1,7 +1,7 @@
 
 tcfail004.hs:3:9: error:
     • Couldn't match expected type ‘(a, b)’
-                  with actual type ‘(Integer, Integer, Integer)’
+                  with actual type ‘(a0, b0, c0)’
     • In the expression: (1, 2, 3)
       In a pattern binding: (f, g) = (1, 2, 3)
     • Relevant bindings include

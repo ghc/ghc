@@ -288,6 +288,7 @@ void traceTaskDelete_ (Task       *task);
 
 void traceHeapProfBegin(StgWord8 profile_id);
 void traceHeapProfSampleBegin(StgInt era);
+void traceHeapProfSampleEnd(StgInt era);
 void traceHeapProfSampleString(StgWord8 profile_id,
                                const char *label, StgWord residency);
 #if defined(PROFILING)
@@ -335,6 +336,7 @@ void flushTrace(void);
 #define traceHeapProfBegin(profile_id) /* nothing */
 #define traceHeapProfCostCentre(ccID, label, module, srcloc, is_caf) /* nothing */
 #define traceHeapProfSampleBegin(era) /* nothing */
+#define traceHeapProfSampleEnd(era) /* nothing */
 #define traceHeapProfSampleCostCentre(profile_id, stack, residency) /* nothing */
 #define traceHeapProfSampleString(profile_id, label, residency) /* nothing */
 

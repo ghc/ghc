@@ -609,7 +609,7 @@ by saying ``-fno-wombat``.
     :shortdesc: *default: 6.* Set the maximum number of bindings to display in
         type error messages.
     :type: dynamic
-    :reverse: -fno-max-relevant-bindings
+    :reverse: -fno-max-relevant-binds
     :category: verbosity
 
     :default: 6
@@ -617,9 +617,9 @@ by saying ``-fno-wombat``.
     The type checker sometimes displays a fragment of the type
     environment in error messages, but only up to some maximum number,
     set by this flag. Turning it off with
-    ``-fno-max-relevant-bindings`` gives an unlimited number.
+    ``-fno-max-relevant-binds`` gives an unlimited number.
     Syntactically top-level bindings are also usually excluded (since
-    they may be numerous), but ``-fno-max-relevant-bindings`` includes
+    they may be numerous), but ``-fno-max-relevant-binds`` includes
     them too.
 
 .. ghc-flag:: -fmax-uncovered-patterns=⟨n⟩

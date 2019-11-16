@@ -37,7 +37,6 @@ import Maybes
 --import Debug
 --import Debug.Trace
 import ListSetOps (removeDups)
-import PprCmm ()
 
 import OrdList
 import Data.List

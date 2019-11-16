@@ -4,7 +4,9 @@
 -}
 
 {-# LANGUAGE CPP #-}
+{-# LANGUAGE DeriveFunctor #-}
 {-# LANGUAGE PatternSynonyms #-}
+{-# LANGUAGE BangPatterns #-}
 
 #if !defined(GHC_LOADED_INTO_GHCI)
 {-# LANGUAGE UnboxedTuples #-}
@@ -20,15 +22,12 @@ module UniqSupply (
 
         mkSplitUniqSupply,
         splitUniqSupply, listSplitUniqSupply,
-        splitUniqSupply3, splitUniqSupply4,
 
         -- * Unique supply monad and its abstraction
-        UniqSM, MonadUnique(..), liftUs,
+        UniqSM, MonadUnique(..),
 
         -- ** Operations on the monad
         initUs, initUs_,
-        lazyThenUs, lazyMapUs,
-        getUniqueSupplyM3,
 
         -- * Set supply strategy
         initUniqSupply
@@ -87,7 +86,7 @@ takeUniqFromSupply :: UniqSupply -> (Unique, UniqSupply)
 
 mkSplitUniqSupply c
   = case ord c `shiftL` uNIQUE_BITS of
-     mask -> let
+     !mask -> let
         -- here comes THE MAGIC:
 
         -- This is one of the most hammered bits in the whole compiler
@@ -112,22 +111,6 @@ uniqFromSupply  (MkSplitUniqSupply n _ _)  = mkUniqueGrimily n
 uniqsFromSupply (MkSplitUniqSupply n _ s2) = mkUniqueGrimily n : uniqsFromSupply s2
 takeUniqFromSupply (MkSplitUniqSupply n s1 _) = (mkUniqueGrimily n, s1)
 
--- | Build three 'UniqSupply' from a single one,
--- each of which can supply its own unique
-splitUniqSupply3 :: UniqSupply -> (UniqSupply, UniqSupply, UniqSupply)
-splitUniqSupply3 us = (us1, us2, us3)
-  where
-    (us1, us') = splitUniqSupply us
-    (us2, us3) = splitUniqSupply us'
-
--- | Build four 'UniqSupply' from a single one,
--- each of which can supply its own unique
-splitUniqSupply4 :: UniqSupply -> (UniqSupply, UniqSupply, UniqSupply, UniqSupply)
-splitUniqSupply4 us = (us1, us2, us3, us4)
-  where
-    (us1, us2, us') = splitUniqSupply3 us
-    (us3, us4)      = splitUniqSupply us'
-
 {-
 ************************************************************************
 *                                                                      *
@@ -148,19 +131,17 @@ pattern UniqResult x y = (# x, y #)
 #else
 
 data UniqResult result = UniqResult !result {-# UNPACK #-} !UniqSupply
+  deriving (Functor)
 
 #endif
 
 -- | A monad which just gives the ability to obtain 'Unique's
 newtype UniqSM result = USM { unUSM :: UniqSupply -> UniqResult result }
+    deriving (Functor)
 
 instance Monad UniqSM where
   (>>=) = thenUs
   (>>)  = (*>)
-
-instance Functor UniqSM where
-    fmap f (USM x) = USM (\us0 -> case x us0 of
-                                 UniqResult r us1 -> UniqResult (f r) us1)
 
 instance Applicative UniqSM where
     pure = returnUs
@@ -182,7 +163,6 @@ initUs_ :: UniqSupply -> UniqSM a -> a
 initUs_ init_us m = case unUSM m init_us of { UniqResult r _ -> r }
 
 {-# INLINE thenUs #-}
-{-# INLINE lazyThenUs #-}
 {-# INLINE returnUs #-}
 {-# INLINE splitUniqSupply #-}
 
@@ -198,10 +178,6 @@ thenUs :: UniqSM a -> (a -> UniqSM b) -> UniqSM b
 thenUs (USM expr) cont
   = USM (\us0 -> case (expr us0) of
                    UniqResult result us1 -> unUSM (cont result) us1)
-
-lazyThenUs :: UniqSM a -> (a -> UniqSM b) -> UniqSM b
-lazyThenUs expr cont
-  = USM (\us0 -> let (result, us1) = liftUSM expr us0 in unUSM (cont result) us1)
 
 thenUs_ :: UniqSM a -> UniqSM b -> UniqSM b
 thenUs_ (USM expr) (USM cont)
@@ -234,12 +210,6 @@ instance MonadUnique UniqSM where
     getUniqueM  = getUniqueUs
     getUniquesM = getUniquesUs
 
-getUniqueSupplyM3 :: MonadUnique m => m (UniqSupply, UniqSupply, UniqSupply)
-getUniqueSupplyM3 = liftM3 (,,) getUniqueSupplyM getUniqueSupplyM getUniqueSupplyM
-
-liftUs :: MonadUnique m => UniqSM a -> m a
-liftUs m = getUniqueSupplyM >>= return . flip initUs_ m
-
 getUniqueUs :: UniqSM Unique
 getUniqueUs = USM (\us0 -> case takeUniqFromSupply us0 of
                            (u,us1) -> UniqResult u us1)
@@ -247,14 +217,3 @@ getUniqueUs = USM (\us0 -> case takeUniqFromSupply us0 of
 getUniquesUs :: UniqSM [Unique]
 getUniquesUs = USM (\us0 -> case splitUniqSupply us0 of
                             (us1,us2) -> UniqResult (uniqsFromSupply us1) us2)
-
--- {-# SPECIALIZE mapM          :: (a -> UniqSM b) -> [a] -> UniqSM [b] #-}
--- {-# SPECIALIZE mapAndUnzipM  :: (a -> UniqSM (b,c))   -> [a] -> UniqSM ([b],[c]) #-}
--- {-# SPECIALIZE mapAndUnzip3M :: (a -> UniqSM (b,c,d)) -> [a] -> UniqSM ([b],[c],[d]) #-}
-
-lazyMapUs :: (a -> UniqSM b) -> [a] -> UniqSM [b]
-lazyMapUs _ []     = returnUs []
-lazyMapUs f (x:xs)
-  = f x             `lazyThenUs` \ r  ->
-    lazyMapUs f xs  `lazyThenUs` \ rs ->
-    returnUs (r:rs)

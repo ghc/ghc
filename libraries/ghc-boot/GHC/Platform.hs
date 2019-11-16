@@ -1,0 +1,287 @@
+{-# LANGUAGE LambdaCase, ScopedTypeVariables #-}
+
+-- | A description of the platform we're compiling for.
+--
+module GHC.Platform (
+        Platform(..),
+        PlatformWordSize(..),
+        Arch(..),
+        OS(..),
+        ArmISA(..),
+        ArmISAExt(..),
+        ArmABI(..),
+        PPC_64ABI(..),
+
+        target32Bit,
+        isARM,
+        osElfTarget,
+        osMachOTarget,
+        osSubsectionsViaSymbols,
+        platformUsesFrameworks,
+        platformWordSizeInBytes,
+        platformWordSizeInBits,
+
+        PlatformMisc(..),
+        IntegerLibrary(..),
+
+        stringEncodeArch,
+        stringEncodeOS,
+)
+
+where
+
+import Prelude -- See Note [Why do we import Prelude here?]
+import GHC.Read
+
+-- | Contains enough information for the native code generator to emit
+--      code for this platform.
+data Platform
+        = Platform {
+              platformArch                     :: Arch,
+              platformOS                       :: OS,
+              -- Word size in bytes (i.e. normally 4 or 8,
+              -- for 32bit and 64bit platforms respectively)
+              platformWordSize                 :: PlatformWordSize,
+              platformUnregisterised           :: Bool,
+              platformHasGnuNonexecStack       :: Bool,
+              platformHasIdentDirective        :: Bool,
+              platformHasSubsectionsViaSymbols :: Bool,
+              platformIsCrossCompiling         :: Bool
+          }
+        deriving (Read, Show, Eq)
+
+data PlatformWordSize
+  = PW4 -- ^ A 32-bit platform
+  | PW8 -- ^ A 64-bit platform
+  deriving (Eq)
+
+instance Show PlatformWordSize where
+  show PW4 = "4"
+  show PW8 = "8"
+
+instance Read PlatformWordSize where
+  readPrec = do
+    i :: Int <- readPrec
+    case i of
+      4 -> return PW4
+      8 -> return PW8
+      other -> fail ("Invalid PlatformWordSize: " ++ show other)
+
+platformWordSizeInBytes :: Platform -> Int
+platformWordSizeInBytes p =
+    case platformWordSize p of
+      PW4 -> 4
+      PW8 -> 8
+
+platformWordSizeInBits :: Platform -> Int
+platformWordSizeInBits p = platformWordSizeInBytes p * 8
+
+-- | Architectures that the native code generator knows about.
+--      TODO: It might be nice to extend these constructors with information
+--      about what instruction set extensions an architecture might support.
+--
+data Arch
+        = ArchUnknown
+        | ArchX86
+        | ArchX86_64
+        | ArchPPC
+        | ArchPPC_64
+          { ppc_64ABI :: PPC_64ABI
+          }
+        | ArchSPARC
+        | ArchSPARC64
+        | ArchARM
+          { armISA    :: ArmISA
+          , armISAExt :: [ArmISAExt]
+          , armABI    :: ArmABI
+          }
+        | ArchARM64
+        | ArchAlpha
+        | ArchMipseb
+        | ArchMipsel
+        | ArchJavaScript
+        deriving (Read, Show, Eq)
+
+-- Note [Platform Syntax]
+-- ~~~~~~~~~~~~~~~~~~~~~~
+-- There is a very loose encoding of platforms shared by many tools we are
+-- encoding to here. GNU Config (http://git.savannah.gnu.org/cgit/config.git),
+-- and LLVM's http://llvm.org/doxygen/classllvm_1_1Triple.html are perhaps the
+-- most definitional parsers. The basic syntax is a list of of '-'-separated
+-- components. The Unix 'uname' command syntax is related but briefer.
+--
+-- Those two parsers are quite forgiving, and even the 'config.sub'
+-- normalization is forgiving too. The "best" way to encode a platform is
+-- therefore somewhat a matter of taste.
+--
+-- The 'stringEncode*' functions here convert each part of GHC's structured
+-- notion of a platform into one dash-separated component.
+
+-- | See Note [Platform Syntax].
+stringEncodeArch :: Arch -> String
+stringEncodeArch = \case
+  ArchUnknown -> "unknown"
+  ArchX86 -> "i386"
+  ArchX86_64 -> "x86_64"
+  ArchPPC -> "powerpc"
+  ArchPPC_64 { ppc_64ABI = abi } -> case abi of
+    ELF_V1 -> "powerpc64"
+    ELF_V2 -> "powerpc64le"
+  ArchSPARC -> "sparc"
+  ArchSPARC64 -> "sparc64"
+  ArchARM { armISA = isa, armISAExt = _, armABI = _ } -> "arm" ++ vsuf
+    where
+      vsuf = case isa of
+        ARMv5 -> "v5"
+        ARMv6 -> "v6"
+        ARMv7 -> "v7"
+  ArchARM64 -> "aarch64"
+  ArchAlpha -> "alpha"
+  ArchMipseb -> "mipseb"
+  ArchMipsel -> "mipsel"
+  ArchJavaScript -> "js"
+
+isARM :: Arch -> Bool
+isARM (ArchARM {}) = True
+isARM ArchARM64    = True
+isARM _ = False
+
+-- | Operating systems that the native code generator knows about.
+--      Having OSUnknown should produce a sensible default, but no promises.
+data OS
+        = OSUnknown
+        | OSLinux
+        | OSDarwin
+        | OSSolaris2
+        | OSMinGW32
+        | OSFreeBSD
+        | OSDragonFly
+        | OSOpenBSD
+        | OSNetBSD
+        | OSKFreeBSD
+        | OSHaiku
+        | OSQNXNTO
+        | OSAIX
+        | OSHurd
+        deriving (Read, Show, Eq)
+
+-- | See Note [Platform Syntax].
+stringEncodeOS :: OS -> String
+stringEncodeOS = \case
+  OSUnknown -> "unknown"
+  OSLinux -> "linux"
+  OSDarwin -> "darwin"
+  OSSolaris2 -> "solaris2"
+  OSMinGW32 -> "mingw32"
+  OSFreeBSD -> "freebsd"
+  OSDragonFly -> "dragonfly"
+  OSOpenBSD -> "openbsd"
+  OSNetBSD -> "netbsd"
+  OSKFreeBSD -> "kfreebsdgnu"
+  OSHaiku -> "haiku"
+  OSQNXNTO -> "nto-qnx"
+  OSAIX -> "aix"
+  OSHurd -> "hurd"
+
+-- | ARM Instruction Set Architecture, Extensions and ABI
+--
+data ArmISA
+    = ARMv5
+    | ARMv6
+    | ARMv7
+    deriving (Read, Show, Eq)
+
+data ArmISAExt
+    = VFPv2
+    | VFPv3
+    | VFPv3D16
+    | NEON
+    | IWMMX2
+    deriving (Read, Show, Eq)
+
+data ArmABI
+    = SOFT
+    | SOFTFP
+    | HARD
+    deriving (Read, Show, Eq)
+
+-- | PowerPC 64-bit ABI
+--
+data PPC_64ABI
+    = ELF_V1
+    | ELF_V2
+    deriving (Read, Show, Eq)
+
+-- | This predicate tells us whether the platform is 32-bit.
+target32Bit :: Platform -> Bool
+target32Bit p =
+    case platformWordSize p of
+      PW4 -> True
+      PW8 -> False
+
+-- | This predicate tells us whether the OS supports ELF-like shared libraries.
+osElfTarget :: OS -> Bool
+osElfTarget OSLinux     = True
+osElfTarget OSFreeBSD   = True
+osElfTarget OSDragonFly = True
+osElfTarget OSOpenBSD   = True
+osElfTarget OSNetBSD    = True
+osElfTarget OSSolaris2  = True
+osElfTarget OSDarwin    = False
+osElfTarget OSMinGW32   = False
+osElfTarget OSKFreeBSD  = True
+osElfTarget OSHaiku     = True
+osElfTarget OSQNXNTO    = False
+osElfTarget OSAIX       = False
+osElfTarget OSHurd      = True
+osElfTarget OSUnknown   = False
+ -- Defaulting to False is safe; it means don't rely on any
+ -- ELF-specific functionality.  It is important to have a default for
+ -- portability, otherwise we have to answer this question for every
+ -- new platform we compile on (even unreg).
+
+-- | This predicate tells us whether the OS support Mach-O shared libraries.
+osMachOTarget :: OS -> Bool
+osMachOTarget OSDarwin = True
+osMachOTarget _ = False
+
+osUsesFrameworks :: OS -> Bool
+osUsesFrameworks OSDarwin = True
+osUsesFrameworks _        = False
+
+platformUsesFrameworks :: Platform -> Bool
+platformUsesFrameworks = osUsesFrameworks . platformOS
+
+osSubsectionsViaSymbols :: OS -> Bool
+osSubsectionsViaSymbols OSDarwin = True
+osSubsectionsViaSymbols _        = False
+
+-- | Platform-specific settings formerly hard-coded in Config.hs.
+--
+-- These should probably be all be triaged whether they can be computed from
+-- other settings or belong in another another place (like 'Platform' above).
+data PlatformMisc = PlatformMisc
+  { -- TODO Recalculate string from richer info?
+    platformMisc_targetPlatformString :: String
+  , platformMisc_integerLibrary       :: String
+  , platformMisc_integerLibraryType   :: IntegerLibrary
+  , platformMisc_ghcWithInterpreter   :: Bool
+  , platformMisc_ghcWithNativeCodeGen :: Bool
+  , platformMisc_ghcWithSMP           :: Bool
+  , platformMisc_ghcRTSWays           :: String
+  -- | Determines whether we will be compiling info tables that reside just
+  --   before the entry code, or with an indirection to the entry code. See
+  --   TABLES_NEXT_TO_CODE in includes/rts/storage/InfoTables.h.
+  , platformMisc_tablesNextToCode     :: Bool
+  , platformMisc_leadingUnderscore    :: Bool
+  , platformMisc_libFFI               :: Bool
+  , platformMisc_ghcThreaded          :: Bool
+  , platformMisc_ghcDebugged          :: Bool
+  , platformMisc_ghcRtsWithLibdw      :: Bool
+  , platformMisc_llvmTarget           :: String
+  }
+
+data IntegerLibrary
+    = IntegerGMP
+    | IntegerSimple
+    deriving (Read, Show, Eq)

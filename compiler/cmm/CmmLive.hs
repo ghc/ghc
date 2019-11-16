@@ -17,7 +17,7 @@ import GhcPrelude
 import DynFlags
 import BlockId
 import Cmm
-import PprCmmExpr ()
+import PprCmmExpr () -- For Outputable instances
 import Hoopl.Block
 import Hoopl.Collections
 import Hoopl.Dataflow

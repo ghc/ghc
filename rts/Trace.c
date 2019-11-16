@@ -459,7 +459,7 @@ void traceOSProcessInfo_(void) {
                         CAPSET_OSPROCESS_DEFAULT,
                         getpid());
 
-#if !defined (mingw32_HOST_OS)
+#if !defined(mingw32_HOST_OS)
 /* Windows has no strong concept of process hierarchy, so no getppid().
  * In any case, this trace event is mainly useful for tracing programs
  * that use 'forkProcess' which Windows doesn't support anyway.
@@ -621,6 +621,13 @@ void traceHeapProfSampleBegin(StgInt era)
 {
     if (eventlog_enabled) {
         postHeapProfSampleBegin(era);
+    }
+}
+
+void traceHeapProfSampleEnd(StgInt era)
+{
+    if (eventlog_enabled) {
+        postHeapProfSampleEnd(era);
     }
 }
 

@@ -7,6 +7,7 @@ A ``lint'' pass to check for Core correctness
 -}
 
 {-# LANGUAGE CPP #-}
+{-# LANGUAGE DeriveFunctor #-}
 
 module CoreLint (
     lintCoreBindings, lintUnfolding,
@@ -48,6 +49,8 @@ import Kind
 import Type
 import RepType
 import TyCoRep       -- checks validity of types/coercions
+import TyCoSubst
+import TyCoFVs
 import TyCon
 import CoAxiom
 import BasicTypes
@@ -785,8 +788,10 @@ lintCoreExpr (Lam var expr)
 
 lintCoreExpr e@(Case scrut var alt_ty alts) =
        -- Check the scrutinee
-  do { let scrut_diverges = exprIsBottom scrut
-     ; scrut_ty <- markAllJoinsBad $ lintCoreExpr scrut
+  do { scrut_ty <- markAllJoinsBad $ lintCoreExpr scrut
+          -- See Note [Join points are less general than the paper]
+          -- in CoreSyn
+
      ; (alt_ty, _) <- lintInTy alt_ty
      ; (var_ty, _) <- lintInTy (idType var)
 
@@ -809,7 +814,7 @@ lintCoreExpr e@(Case scrut var alt_ty alts) =
               , isAlgTyCon tycon
               , not (isAbstractTyCon tycon)
               , null (tyConDataCons tycon)
-              , not scrut_diverges
+              , not (exprIsBottom scrut)
               -> pprTrace "Lint warning: case binder's type has no constructors" (ppr var <+> ppr (idType var))
                         -- This can legitimately happen for type families
                       $ return ()
@@ -879,6 +884,7 @@ lintCoreFun (Lam var body) nargs
 
 lintCoreFun expr nargs
   = markAllJoinsBadIf (nargs /= 0) $
+      -- See Note [Join points are less general than the paper]
     lintCoreExpr expr
 
 ------------------
@@ -1047,7 +1053,7 @@ lintTyApp fun_ty arg_ty
         ; in_scope <- getInScope
         -- substTy needs the set of tyvars in scope to avoid generating
         -- uniques that are already in scope.
-        -- See Note [The substitution invariant] in TyCoRep
+        -- See Note [The substitution invariant] in TyCoSubst
         ; return (substTyWithInScope in_scope [tv] [arg_ty] body_ty) }
 
   | otherwise
@@ -1491,7 +1497,7 @@ lint_app :: SDoc -> LintedKind -> [(LintedType,LintedKind)] -> LintM Kind
 lint_app doc kfn kas
     = do { in_scope <- getInScope
          -- We need the in_scope set to satisfy the invariant in
-         -- Note [The substitution invariant] in TyCoRep
+         -- Note [The substitution invariant] in TyCoSubst
          ; foldlM (go_app in_scope) kfn kas }
   where
     fail_msg extra = vcat [ hang (text "Kind application error in") 2 doc
@@ -1713,7 +1719,7 @@ lintCoercion (ForAllCo tv1 kind_co co)
                      -- scope. All the free vars of `t2` and `kind_co` should
                      -- already be in `in_scope`, because they've been
                      -- linted and `tv2` has the same unique as `tv1`.
-                     -- See Note [The substitution invariant]
+                     -- See Note [The substitution invariant] in TyCoSubst.
                      unitVarEnv tv1 (TyVarTy tv2 `mkCastTy` mkSymCo kind_co)
              tyr = mkInvForAllTy tv2 $
                    substTy subst t2
@@ -1744,7 +1750,7 @@ lintCoercion (ForAllCo cv1 kind_co co)
                      -- scope. All the free vars of `t2` and `kind_co` should
                      -- already be in `in_scope`, because they've been
                      -- linted and `cv2` has the same unique as `cv1`.
-                     -- See Note [The substitution invariant]
+                     -- See Note [The substitution invariant] in TyCoSubst.
                      unitVarEnv cv1 (eta1 `mkTransCo` (mkCoVarCo cv2)
                                           `mkTransCo` (mkSymCo eta2))
              tyr = mkTyCoInvForAllTy cv2 $
@@ -2076,6 +2082,7 @@ newtype LintM a =
             LintEnv ->
             WarnsAndErrs ->           -- Warning and error messages so far
             (Maybe a, WarnsAndErrs) } -- Result and messages (if any)
+   deriving (Functor)
 
 type WarnsAndErrs = (Bag MsgDoc, Bag MsgDoc)
 
@@ -2145,9 +2152,6 @@ we behave as follows (#15057, #T15664):
   lint the result.  Reason: want to check that synonyms are saturated
   when the type is expanded.
 -}
-
-instance Functor LintM where
-      fmap = liftM
 
 instance Applicative LintM where
       pure x = LintM $ \ _ errs -> (Just x, errs)
@@ -2282,9 +2286,6 @@ markAllJoinsBadIf False m = m
 
 addGoodJoins :: [Var] -> LintM a -> LintM a
 addGoodJoins vars thing_inside
-  | null join_ids
-  = thing_inside
-  | otherwise
   = LintM $ \ env errs -> unLintM thing_inside (add_joins env) errs
   where
     add_joins env = env { le_joins = le_joins env `extendVarSetList` join_ids }

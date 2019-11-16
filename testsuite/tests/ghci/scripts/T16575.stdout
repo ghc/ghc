@@ -1,0 +1,26 @@
+Collecting type info for 1 module(s) ... 
+T16575.hs:(4,15)-(4,18): GHC.Types.Int -> Ghost.X -> GHC.Show.ShowS
+T16575.hs:(7,7)-(7,8): Ghost.X -> Ghost.X -> GHC.Types.Bool
+T16575.hs:(4,15)-(4,18): GHC.Show.Show Ghost.X
+T16575.hs:(4,15)-(4,18): ([Ghost.X] -> GHC.Show.ShowS) -> GHC.Show.Show Ghost.X
+T16575.hs:(4,15)-(4,18): (Ghost.X -> GHC.Base.String) -> ([Ghost.X] -> GHC.Show.ShowS) -> GHC.Show.Show Ghost.X
+T16575.hs:(4,15)-(4,18): (GHC.Types.Int -> Ghost.X -> GHC.Show.ShowS) -> (Ghost.X -> GHC.Base.String) -> ([Ghost.X] -> GHC.Show.ShowS) -> GHC.Show.Show Ghost.X
+T16575.hs:(4,15)-(4,18): GHC.Types.Int -> Ghost.X -> GHC.Show.ShowS
+T16575.hs:(4,15)-(4,18): Ghost.X -> GHC.Base.String
+T16575.hs:(4,15)-(4,18): [Ghost.X] -> GHC.Show.ShowS
+T16575.hs:(6,10)-(6,13): GHC.Classes.Eq Ghost.X
+T16575.hs:(6,10)-(6,13): (Ghost.X -> Ghost.X -> GHC.Types.Bool) -> GHC.Classes.Eq Ghost.X
+T16575.hs:(6,10)-(6,13): (Ghost.X -> Ghost.X -> GHC.Types.Bool) -> (Ghost.X -> Ghost.X -> GHC.Types.Bool) -> GHC.Classes.Eq Ghost.X
+T16575.hs:(6,10)-(6,13): Ghost.X -> Ghost.X -> GHC.Types.Bool
+T16575.hs:(6,10)-(6,13): Ghost.X -> Ghost.X -> GHC.Types.Bool
+T16575.hs:(7,14)-(7,17): GHC.Types.Bool
+T16575.hs:(8,14)-(8,17): GHC.Types.Bool
+T16575.hs:(9,14)-(9,18): GHC.Types.Bool
+T16575.hs:(7,5)-(7,5): Ghost.X
+T16575.hs:(7,10)-(7,10): Ghost.X
+T16575.hs:(8,5)-(8,5): Ghost.X
+T16575.hs:(8,10)-(8,10): Ghost.X
+T16575.hs:(9,5)-(9,5): Ghost.X
+T16575.hs:(9,10)-(9,10): Ghost.X
+ :: [X] -> ShowS
+ :: X -> X -> Bool

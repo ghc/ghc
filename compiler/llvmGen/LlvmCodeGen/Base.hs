@@ -1,4 +1,5 @@
 {-# LANGUAGE CPP #-}
+{-# LANGUAGE DeriveFunctor #-}
 
 -- ----------------------------------------------------------------------------
 -- | Base LLVM Code Generation module
@@ -12,7 +13,7 @@ module LlvmCodeGen.Base (
         LiveGlobalRegs,
         LlvmUnresData, LlvmData, UnresLabel, UnresStatic,
 
-        LlvmVersion, supportedLlvmVersion, llvmVersionStr,
+        LlvmVersion (..), supportedLlvmVersion, llvmVersionStr,
 
         LlvmM,
         runLlvm, liftStream, withClearVars, varLookup, varInsert,
@@ -48,7 +49,7 @@ import DynFlags
 import FastString
 import Cmm              hiding ( succ )
 import Outputable as Outp
-import Platform
+import GHC.Platform
 import UniqFM
 import Unique
 import BufWrite   ( BufHandle )
@@ -176,14 +177,25 @@ llvmPtrBits dflags = widthInBits $ typeWidth $ gcWord dflags
 --
 
 -- | LLVM Version Number
-type LlvmVersion = (Int, Int)
+data LlvmVersion
+    = LlvmVersion Int
+    | LlvmVersionOld Int Int
+    deriving Eq
+
+-- Custom show instance for backwards compatibility.
+instance Show LlvmVersion where
+  show (LlvmVersion maj) = show maj
+  show (LlvmVersionOld maj min) = show maj ++ "." ++ show min
 
 -- | The LLVM Version that is currently supported.
 supportedLlvmVersion :: LlvmVersion
-supportedLlvmVersion = sUPPORTED_LLVM_VERSION
+supportedLlvmVersion = LlvmVersion sUPPORTED_LLVM_VERSION
 
 llvmVersionStr :: LlvmVersion -> String
-llvmVersionStr (major, minor) = show major ++ "." ++ show minor
+llvmVersionStr v =
+  case v of
+    LlvmVersion maj -> show maj
+    LlvmVersionOld maj min -> show maj ++ "." ++ show min
 
 -- ----------------------------------------------------------------------------
 -- * Environment Handling
@@ -209,10 +221,7 @@ type LlvmEnvMap = UniqFM LlvmType
 
 -- | The Llvm monad. Wraps @LlvmEnv@ state as well as the @IO@ monad
 newtype LlvmM a = LlvmM { runLlvmM :: LlvmEnv -> IO (a, LlvmEnv) }
-
-instance Functor LlvmM where
-    fmap f m = LlvmM $ \env -> do (x, env') <- runLlvmM m env
-                                  return (f x, env')
+    deriving (Functor)
 
 instance Applicative LlvmM where
     pure x = LlvmM $ \env -> return (x, env)

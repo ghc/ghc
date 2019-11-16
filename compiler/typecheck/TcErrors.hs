@@ -158,14 +158,22 @@ reportUnsolved wanted
 -- | Report *all* unsolved goals as errors, even if -fdefer-type-errors is on
 -- However, do not make any evidence bindings, because we don't
 -- have any convenient place to put them.
+-- NB: Type-level holes are OK, because there are no bindings.
 -- See Note [Deferring coercion errors to runtime]
 -- Used by solveEqualities for kind equalities
---      (see Note [Fail fast on kind errors] in TcSimplify]
+--      (see Note [Fail fast on kind errors] in TcSimplify)
 -- and for simplifyDefault.
 reportAllUnsolved :: WantedConstraints -> TcM ()
 reportAllUnsolved wanted
   = do { ev_binds <- newNoTcEvBinds
-       ; report_unsolved TypeError HoleError HoleError HoleError
+
+       ; partial_sigs      <- xoptM LangExt.PartialTypeSignatures
+       ; warn_partial_sigs <- woptM Opt_WarnPartialTypeSignatures
+       ; let type_holes | not partial_sigs  = HoleError
+                        | warn_partial_sigs = HoleWarn
+                        | otherwise         = HoleDefer
+
+       ; report_unsolved TypeError HoleError type_holes HoleError
                          ev_binds wanted }
 
 -- | Report all unsolved goals as warnings (but without deferring any errors to
@@ -2007,11 +2015,11 @@ mkExpectedActualMsg ty1 ty2 ct@(TypeEqOrigin { uo_actual = act
     level = m_level `orElse` TypeLevel
 
     occurs_check_error
-      | Just act_tv <- tcGetTyVar_maybe act
-      , act_tv `elemVarSet` tyCoVarsOfType exp
+      | Just tv <- tcGetTyVar_maybe ty1
+      , tv `elemVarSet` tyCoVarsOfType ty2
       = True
-      | Just exp_tv <- tcGetTyVar_maybe exp
-      , exp_tv `elemVarSet` tyCoVarsOfType act
+      | Just tv <- tcGetTyVar_maybe ty2
+      , tv `elemVarSet` tyCoVarsOfType ty1
       = True
       | otherwise
       = False
@@ -2035,13 +2043,17 @@ mkExpectedActualMsg ty1 ty2 ct@(TypeEqOrigin { uo_actual = act
         -> empty
 
     thing_msg = case maybe_thing of
-                  Just thing -> \_ -> quotes thing <+> text "is"
-                  Nothing    -> \vowel -> text "got a" <>
-                                          if vowel then char 'n' else empty
+                  Just thing -> \_ levity ->
+                    quotes thing <+> text "is" <+> levity
+                  Nothing    -> \vowel levity ->
+                    text "got a" <>
+                    (if vowel then char 'n' else empty) <+>
+                    levity <+>
+                    text "type"
     msg2 = sep [ text "Expecting a lifted type, but"
-               , thing_msg True, text "unlifted" ]
+               , thing_msg True (text "unlifted") ]
     msg3 = sep [ text "Expecting an unlifted type, but"
-               , thing_msg False, text "lifted" ]
+               , thing_msg False (text "lifted") ]
     msg4 = maybe_num_args_msg $$
            sep [ text "Expected a type, but"
                , maybe (text "found something with kind")

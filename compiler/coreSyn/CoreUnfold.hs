@@ -46,7 +46,6 @@ import GhcPrelude
 
 import DynFlags
 import CoreSyn
-import PprCore          ()      -- Instances
 import OccurAnal        ( occurAnalyseExpr_NoBinderSwap )
 import CoreOpt
 import CoreArity       ( manifestArity )
@@ -483,7 +482,7 @@ calcUnfoldingGuidance dflags is_top_bottoming expr
     n_val_bndrs = length val_bndrs
 
     mk_discount :: Bag (Id,Int) -> Id -> Int
-    mk_discount cbs bndr = foldlBag combine 0 cbs
+    mk_discount cbs bndr = foldl' combine 0 cbs
            where
              combine acc (bndr', disc)
                | bndr == bndr' = acc `plus_disc` disc

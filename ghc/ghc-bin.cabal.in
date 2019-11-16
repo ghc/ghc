@@ -24,6 +24,11 @@ Flag ghci
     Default: False
     Manual: True
 
+Flag ext-interp
+    Description: Build external interpreter support
+    Default: True
+    Manual: True
+
 Flag threaded
     Description: Link the ghc executable against the threaded RTS
     Default: True
@@ -63,7 +68,7 @@ Executable ghc
             haskeline      == 0.7.*,
             time           >= 1.8 && < 1.10,
             transformers   == 0.5.*
-        CPP-Options: -DGHCI
+        CPP-Options: -DHAVE_INTERNAL_INTERPRETER
         GHC-Options: -fno-warn-name-shadowing
         Other-Modules:
             GHCi.Leak
@@ -91,6 +96,12 @@ Executable ghc
     -- disabling this flag.
     if flag(threaded)
       ghc-options: -threaded
+
+    if flag(ext-interp)
+      cpp-options: -DHAVE_EXTERNAL_INTERPRETER
+
+    if flag(ghci) || flag(ext-interp)
+      cpp-options: -DHAVE_INTERPRETER
 
     Other-Extensions:
         CPP

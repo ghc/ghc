@@ -6,7 +6,8 @@
 --
 -- -----------------------------------------------------------------------------
 
-{-# LANGUAGE BangPatterns, CPP, GADTs, ScopedTypeVariables, PatternSynonyms #-}
+{-# LANGUAGE BangPatterns, CPP, GADTs, ScopedTypeVariables, PatternSynonyms,
+    DeriveFunctor #-}
 
 #if !defined(GHC_LOADED_INTO_GHCI)
 {-# LANGUAGE UnboxedTuples #-}
@@ -59,7 +60,7 @@ import qualified RegAlloc.Graph.TrivColorable   as Color
 
 import AsmUtils
 import TargetReg
-import Platform
+import GHC.Platform
 import BlockLayout
 import Config
 import Instruction
@@ -334,7 +335,7 @@ finishNativeGen :: Instruction instr
                 -> NativeGenAcc statics instr
                 -> IO UniqSupply
 finishNativeGen dflags modLoc bufh@(BufHandle _ _ h) us ngs
- = do
+ = withTiming (return dflags) (text "NCG") (`seq` ()) $ do
         -- Write debug data and finish
         let emitDw = debugLevel dflags > 0
         us' <- if not emitDw then return us else do
@@ -400,28 +401,33 @@ cmmNativeGenStream dflags this_mod modLoc ncgImpl h us cmm_stream ngs
                       },
                   us)
         Right (cmms, cmm_stream') -> do
+          (us', ngs'') <-
+            withTiming (return dflags)
+                       ncglabel (\(a, b) -> a `seq` b `seq` ()) $ do
+              -- Generate debug information
+              let debugFlag = debugLevel dflags > 0
+                  !ndbgs | debugFlag = cmmDebugGen modLoc cmms
+                         | otherwise = []
+                  dbgMap = debugToMap ndbgs
 
-          -- Generate debug information
-          let debugFlag = debugLevel dflags > 0
-              !ndbgs | debugFlag = cmmDebugGen modLoc cmms
-                     | otherwise = []
-              dbgMap = debugToMap ndbgs
+              -- Generate native code
+              (ngs',us') <- cmmNativeGens dflags this_mod modLoc ncgImpl h
+                                               dbgMap us cmms ngs 0
 
-          -- Generate native code
-          (ngs',us') <- cmmNativeGens dflags this_mod modLoc ncgImpl h
-                                             dbgMap us cmms ngs 0
+              -- Link native code information into debug blocks
+              -- See Note [What is this unwinding business?] in Debug.
+              let !ldbgs = cmmDebugLink (ngs_labels ngs') (ngs_unwinds ngs') ndbgs
+              dumpIfSet_dyn dflags Opt_D_dump_debug "Debug Infos"
+                (vcat $ map ppr ldbgs)
 
-          -- Link native code information into debug blocks
-          -- See Note [What is this unwinding business?] in Debug.
-          let !ldbgs = cmmDebugLink (ngs_labels ngs') (ngs_unwinds ngs') ndbgs
-          dumpIfSet_dyn dflags Opt_D_dump_debug "Debug Infos"
-            (vcat $ map ppr ldbgs)
-
-          -- Accumulate debug information for emission in finishNativeGen.
-          let ngs'' = ngs' { ngs_debug = ngs_debug ngs' ++ ldbgs, ngs_labels = [] }
+              -- Accumulate debug information for emission in finishNativeGen.
+              let ngs'' = ngs' { ngs_debug = ngs_debug ngs' ++ ldbgs, ngs_labels = [] }
+              return (us', ngs'')
 
           cmmNativeGenStream dflags this_mod modLoc ncgImpl h us'
               cmm_stream' ngs''
+
+    where ncglabel = text "NCG"
 
 -- | Do native code generation on all these cmms.
 --
@@ -1038,13 +1044,11 @@ pattern OptMResult x y = (# x, y #)
 {-# COMPLETE OptMResult #-}
 #else
 
-data OptMResult a = OptMResult !a ![CLabel]
+data OptMResult a = OptMResult !a ![CLabel] deriving (Functor)
 #endif
 
 newtype CmmOptM a = CmmOptM (DynFlags -> Module -> [CLabel] -> OptMResult a)
-
-instance Functor CmmOptM where
-    fmap = liftM
+    deriving (Functor)
 
 instance Applicative CmmOptM where
     pure x = CmmOptM $ \_ _ imports -> OptMResult x imports

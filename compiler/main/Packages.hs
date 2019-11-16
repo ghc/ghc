@@ -77,18 +77,21 @@ import UniqSet
 import Module
 import Util
 import Panic
-import Platform
+import GHC.Platform
 import Outputable
 import Maybes
+import CmdLineParser
 
 import System.Environment ( getEnv )
 import FastString
-import ErrUtils         ( debugTraceMsg, MsgDoc, dumpIfSet_dyn )
+import ErrUtils         ( debugTraceMsg, MsgDoc, dumpIfSet_dyn, compilationProgressMsg,
+                          withTiming )
 import Exception
 
 import System.Directory
 import System.FilePath as FilePath
 import qualified System.FilePath.Posix as FilePath.Posix
+import System.IO.Error  ( isDoesNotExistError )
 import Control.Monad
 import Data.Graph (stronglyConnComp, SCC(..))
 import Data.Char ( toUpper )
@@ -466,7 +469,9 @@ listPackageConfigMap dflags = eltsUDFM pkg_map
 -- 'pkgState' in 'DynFlags' and return a list of packages to
 -- link in.
 initPackages :: DynFlags -> IO (DynFlags, [PreloadUnitId])
-initPackages dflags0 = do
+initPackages dflags0 = withTiming (return dflags0)
+                                  (text "initializing package database")
+                                  forcePkgDb $ do
   dflags <- interpretPackageEnv dflags0
   pkg_db <-
     case pkgDatabase dflags of
@@ -479,6 +484,8 @@ initPackages dflags0 = do
                   pkgState = pkg_state,
                   thisUnitIdInsts_ = insts },
           preload)
+  where
+    forcePkgDb (dflags, _) = pkgIdMap (pkgState dflags) `seq` ()
 
 -- -----------------------------------------------------------------------------
 -- Reading the package database(s)
@@ -559,13 +566,15 @@ readPackageConfig dflags conf_file = do
                       "can't find a package database at " ++ conf_file
 
   let
+      -- Fix #16360: remove trailing slash from conf_file before calculting pkgroot
+      conf_file' = dropTrailingPathSeparator conf_file
       top_dir = topDir dflags
-      pkgroot = takeDirectory conf_file
+      pkgroot = takeDirectory conf_file'
       pkg_configs1 = map (mungePackageConfig top_dir pkgroot)
                          proto_pkg_configs
       pkg_configs2 = setBatchPackageFlags dflags pkg_configs1
   --
-  return (conf_file, pkg_configs2)
+  return (conf_file', pkg_configs2)
   where
     readDirStylePackageConfig conf_dir = do
       let filename = conf_dir </> "package.cache"
@@ -1470,8 +1479,8 @@ mkPackageState dflags dbs preload0 = do
             _  -> unit'
       addIfMorePreferable m unit = addToUDFM_C preferLater m (fsPackageName unit) unit
       -- This is the set of maximally preferable packages. In fact, it is a set of
-      -- most preferable *units* keyed by package name, which act as stand-ins in 
-      -- for "a package in a database". We use units here because we don't have 
+      -- most preferable *units* keyed by package name, which act as stand-ins in
+      -- for "a package in a database". We use units here because we don't have
       -- "a package in a database" as a type currently.
       mostPreferablePackageReps = if gopt Opt_HideAllPackages dflags
                     then emptyUDFM
@@ -1481,7 +1490,7 @@ mkPackageState dflags dbs preload0 = do
       -- with the most preferable unit for package. Being equi-preferable means that
       -- they must be in the same database, with the same version, and the same pacakge name.
       --
-      -- We must take care to consider all these units and not just the most 
+      -- We must take care to consider all these units and not just the most
       -- preferable one, otherwise we can end up with problems like #16228.
       mostPreferable u =
         case lookupUDFM mostPreferablePackageReps (fsPackageName u) of
@@ -2191,3 +2200,138 @@ improveUnitId pkg_map uid =
 -- in the @hs-boot@ loop-breaker.
 getPackageConfigMap :: DynFlags -> PackageConfigMap
 getPackageConfigMap = pkgIdMap . pkgState
+
+-- -----------------------------------------------------------------------------
+-- | Find the package environment (if one exists)
+--
+-- We interpret the package environment as a set of package flags; to be
+-- specific, if we find a package environment file like
+--
+-- > clear-package-db
+-- > global-package-db
+-- > package-db blah/package.conf.d
+-- > package-id id1
+-- > package-id id2
+--
+-- we interpret this as
+--
+-- > [ -hide-all-packages
+-- > , -clear-package-db
+-- > , -global-package-db
+-- > , -package-db blah/package.conf.d
+-- > , -package-id id1
+-- > , -package-id id2
+-- > ]
+--
+-- There's also an older syntax alias for package-id, which is just an
+-- unadorned package id
+--
+-- > id1
+-- > id2
+--
+interpretPackageEnv :: DynFlags -> IO DynFlags
+interpretPackageEnv dflags = do
+    mPkgEnv <- runMaybeT $ msum $ [
+                   getCmdLineArg >>= \env -> msum [
+                       probeNullEnv env
+                     , probeEnvFile env
+                     , probeEnvName env
+                     , cmdLineError env
+                     ]
+                 , getEnvVar >>= \env -> msum [
+                       probeNullEnv env
+                     , probeEnvFile env
+                     , probeEnvName env
+                     , envError     env
+                     ]
+                 , notIfHideAllPackages >> msum [
+                       findLocalEnvFile >>= probeEnvFile
+                     , probeEnvName defaultEnvName
+                     ]
+                 ]
+    case mPkgEnv of
+      Nothing ->
+        -- No environment found. Leave DynFlags unchanged.
+        return dflags
+      Just "-" -> do
+        -- Explicitly disabled environment file. Leave DynFlags unchanged.
+        return dflags
+      Just envfile -> do
+        content <- readFile envfile
+        compilationProgressMsg dflags ("Loaded package environment from " ++ envfile)
+        let (_, dflags') = runCmdLine (runEwM (setFlagsFromEnvFile envfile content)) dflags
+
+        return dflags'
+  where
+    -- Loading environments (by name or by location)
+
+    namedEnvPath :: String -> MaybeT IO FilePath
+    namedEnvPath name = do
+     appdir <- versionedAppDir dflags
+     return $ appdir </> "environments" </> name
+
+    probeEnvName :: String -> MaybeT IO FilePath
+    probeEnvName name = probeEnvFile =<< namedEnvPath name
+
+    probeEnvFile :: FilePath -> MaybeT IO FilePath
+    probeEnvFile path = do
+      guard =<< liftMaybeT (doesFileExist path)
+      return path
+
+    probeNullEnv :: FilePath -> MaybeT IO FilePath
+    probeNullEnv "-" = return "-"
+    probeNullEnv _   = mzero
+
+    -- Various ways to define which environment to use
+
+    getCmdLineArg :: MaybeT IO String
+    getCmdLineArg = MaybeT $ return $ packageEnv dflags
+
+    getEnvVar :: MaybeT IO String
+    getEnvVar = do
+      mvar <- liftMaybeT $ try $ getEnv "GHC_ENVIRONMENT"
+      case mvar of
+        Right var -> return var
+        Left err  -> if isDoesNotExistError err then mzero
+                                                else liftMaybeT $ throwIO err
+
+    notIfHideAllPackages :: MaybeT IO ()
+    notIfHideAllPackages =
+      guard (not (gopt Opt_HideAllPackages dflags))
+
+    defaultEnvName :: String
+    defaultEnvName = "default"
+
+    -- e.g. .ghc.environment.x86_64-linux-7.6.3
+    localEnvFileName :: FilePath
+    localEnvFileName = ".ghc.environment" <.> versionedFilePath dflags
+
+    -- Search for an env file, starting in the current dir and looking upwards.
+    -- Fail if we get to the users home dir or the filesystem root. That is,
+    -- we don't look for an env file in the user's home dir. The user-wide
+    -- env lives in ghc's versionedAppDir/environments/default
+    findLocalEnvFile :: MaybeT IO FilePath
+    findLocalEnvFile = do
+        curdir  <- liftMaybeT getCurrentDirectory
+        homedir <- tryMaybeT getHomeDirectory
+        let probe dir | isDrive dir || dir == homedir
+                      = mzero
+            probe dir = do
+              let file = dir </> localEnvFileName
+              exists <- liftMaybeT (doesFileExist file)
+              if exists
+                then return file
+                else probe (takeDirectory dir)
+        probe curdir
+
+    -- Error reporting
+
+    cmdLineError :: String -> MaybeT IO a
+    cmdLineError env = liftMaybeT . throwGhcExceptionIO . CmdLineError $
+      "Package environment " ++ show env ++ " not found"
+
+    envError :: String -> MaybeT IO a
+    envError env = liftMaybeT . throwGhcExceptionIO . CmdLineError $
+         "Package environment "
+      ++ show env
+      ++ " (specified in GHC_ENVIRONMENT) not found"

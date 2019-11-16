@@ -170,6 +170,7 @@ test( 'T4114d', [fobject_code, expect_broken_for(4114, ['ghci'])], compile_and_r
 test('T5584', [], makefile_test, [])
 test('T5198', [], makefile_test, [])
 test('T7060', [], makefile_test, [])
+# N.B. The typo in the argument below is intentional.
 test('T7130', normal, compile_fail, ['-fflul-laziness'])
 test('T7563', when(unregisterised(), skip), makefile_test, [])
 test('T6037',
@@ -226,8 +227,8 @@ test('T365',
      [pre_cmd('touch test_preprocessor.txt'), unless(opsys('mingw32'), skip)],
      compile_fail, [''])
 
-test('T9360a', normal, run_command, ['{compiler} --interactive -e "" -ignore-dot-ghci'])
-test('T9360b', normal, run_command, ['{compiler} -e "" --interactive -ignore-dot-ghci'])
+test('T9360a', req_interp, run_command, ['{compiler} --interactive -e "" -ignore-dot-ghci'])
+test('T9360b', req_interp, run_command, ['{compiler} -e "" --interactive -ignore-dot-ghci'])
 
 test('T10970', normal, compile_and_run, [''])
 test('T4931', normal, compile_and_run, [''])
@@ -270,3 +271,8 @@ test('inline-check', omit_ways(['hpc', 'profasm'])
 
 test('T14452', [], makefile_test, [])
 test('T15396', normal, compile_and_run, ['-package ghc'])
+test('T16737',
+     [extra_files(['T16737include/']),
+      req_th,
+      expect_broken_for(16541, ['ghci'])],
+     compile_and_run, ['-optP=-isystem -optP=T16737include'])

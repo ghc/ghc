@@ -8,7 +8,8 @@ module TcEvidence (
   HsWrapper(..),
   (<.>), mkWpTyApps, mkWpEvApps, mkWpEvVarApps, mkWpTyLams,
   mkWpLams, mkWpLet, mkWpCastN, mkWpCastR, collectHsWrapBinders,
-  mkWpFun, mkWpFuns, idHsWrapper, isIdHsWrapper, pprHsWrapper,
+  mkWpFun, idHsWrapper, isIdHsWrapper, isErasableHsWrapper,
+  pprHsWrapper,
 
   -- Evidence bindings
   TcEvBinds(..), EvBindsVar(..),
@@ -29,6 +30,7 @@ module TcEvidence (
 
   -- TcCoercion
   TcCoercion, TcCoercionR, TcCoercionN, TcCoercionP, CoercionHole,
+  TcMCoercion,
   Role(..), LeftOrRight(..), pickLR,
   mkTcReflCo, mkTcNomReflCo, mkTcRepReflCo,
   mkTcTyConAppCo, mkTcAppCo, mkTcFunCo,
@@ -41,7 +43,7 @@ module TcEvidence (
   mkTcKindCo,
   tcCoercionKind, coVarsOfTcCo,
   mkTcCoVarCo,
-  isTcReflCo, isTcReflexiveCo,
+  isTcReflCo, isTcReflexiveCo, isTcGReflMCo, tcCoToMCo,
   tcCoercionRole,
   unwrapIP, wrapIP
   ) where
@@ -97,6 +99,7 @@ type TcCoercion  = Coercion
 type TcCoercionN = CoercionN    -- A Nominal          coercion ~N
 type TcCoercionR = CoercionR    -- A Representational coercion ~R
 type TcCoercionP = CoercionP    -- a phantom coercion
+type TcMCoercion = MCoercion
 
 mkTcReflCo             :: Role -> TcType -> TcCoercion
 mkTcSymCo              :: TcCoercion -> TcCoercion
@@ -132,6 +135,7 @@ tcCoercionKind         :: TcCoercion -> Pair TcType
 tcCoercionRole         :: TcCoercion -> Role
 coVarsOfTcCo           :: TcCoercion -> TcTyCoVarSet
 isTcReflCo             :: TcCoercion -> Bool
+isTcGReflMCo           :: TcMCoercion -> Bool
 
 -- | This version does a slow check, calculating the related types and seeing
 -- if they are equal.
@@ -167,7 +171,11 @@ tcCoercionKind         = coercionKind
 tcCoercionRole         = coercionRole
 coVarsOfTcCo           = coVarsOfCo
 isTcReflCo             = isReflCo
+isTcGReflMCo           = isGReflMCo
 isTcReflexiveCo        = isReflexiveCo
+
+tcCoToMCo :: TcCoercion -> TcMCoercion
+tcCoToMCo = coToMCo
 
 {-
 %************************************************************************
@@ -292,21 +300,6 @@ mkWpFun (WpCast co1) WpHole       _  t2 _ = WpCast (mkTcFunCo Representational (
 mkWpFun (WpCast co1) (WpCast co2) _  _  _ = WpCast (mkTcFunCo Representational (mkTcSymCo co1) co2)
 mkWpFun co1          co2          t1 _  d = WpFun co1 co2 t1 d
 
--- | @mkWpFuns [(ty1, wrap1), (ty2, wrap2)] ty_res wrap_res@,
--- where @wrap1 :: ty1 "->" ty1'@ and @wrap2 :: ty2 "->" ty2'@,
--- @wrap3 :: ty3 "->" ty3'@ and @ty_res@ is /either/ @ty3@ or @ty3'@,
--- gives a wrapper @(ty1' -> ty2' -> ty3) "->" (ty1 -> ty2 -> ty3')@.
--- Notice that the result wrapper goes the other way round to all
--- the others. This is a result of sub-typing contravariance.
--- The SDoc is a description of what you were doing when you called mkWpFuns.
-mkWpFuns :: [(TcType, HsWrapper)] -> TcType -> HsWrapper -> SDoc -> HsWrapper
-mkWpFuns args res_ty res_wrap doc = snd $ go args res_ty res_wrap
-  where
-    go [] res_ty res_wrap = (res_ty, res_wrap)
-    go ((arg_ty, arg_wrap) : args) res_ty res_wrap
-      = let (tail_ty, tail_wrap) = go args res_ty res_wrap in
-        (arg_ty `mkVisFunTy` tail_ty, mkWpFun arg_wrap tail_wrap arg_ty tail_ty doc)
-
 mkWpCastR :: TcCoercionR -> HsWrapper
 mkWpCastR co
   | isTcReflCo co = WpHole
@@ -354,6 +347,21 @@ idHsWrapper = WpHole
 isIdHsWrapper :: HsWrapper -> Bool
 isIdHsWrapper WpHole = True
 isIdHsWrapper _      = False
+
+-- | Is the wrapper erasable, i.e., will not affect runtime semantics?
+isErasableHsWrapper :: HsWrapper -> Bool
+isErasableHsWrapper = go
+  where
+    go WpHole                  = True
+    go (WpCompose wrap1 wrap2) = go wrap1 && go wrap2
+    -- not so sure about WpFun. But it eta-expands, so...
+    go WpFun{}                 = False
+    go WpCast{}                = True
+    go WpEvLam{}               = False -- case in point
+    go WpEvApp{}               = False
+    go WpTyLam{}               = True
+    go WpTyApp{}               = True
+    go WpLet{}                 = False
 
 collectHsWrapBinders :: HsWrapper -> ([Var], HsWrapper)
 -- Collect the outer lambda binders of a HsWrapper,

@@ -9,7 +9,7 @@
 // under which it is distrubuted.
 //
 
-#ifndef RTS_ELF_COMPAT_H
+#if !defined(RTS_ELF_COMPAT_H)
 #define RTS_ELF_COMPAT_H
 
 #define PASTE(x,y) x ## y

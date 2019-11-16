@@ -1,0 +1,5 @@
+UnliftedNewtypesFail.hs:6:20:
+     Expected a type, but ‘Show Int’ has kind ‘Constraint’
+     In the type ‘(Show Int)’
+      In the definition of data constructor ‘Baz’
+      In the newtype declaration for ‘Baz’

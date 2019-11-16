@@ -1,4 +1,5 @@
 #include "elf_got.h"
+#include <string.h>
 #if defined(OBJFORMAT_ELF)
 /*
  * Check if we need a global offset table slot for a
@@ -52,18 +53,18 @@ makeGot(ObjectCode * oc) {
             errorBelch("MAP_FAILED. errno=%d", errno);
             return EXIT_FAILURE;
         }
+
         oc->info->got_start = (void*)mem;
         /* update got_addr */
         size_t slot = 0;
         for(ElfSymbolTable *symTab = oc->info->symbolTables;
-            symTab != NULL; symTab = symTab->next)
+            symTab != NULL; symTab = symTab->next) {
+
             for(size_t i=0; i < symTab->n_symbols; i++)
                 if(needGotSlot(symTab->symbols[i].elf_sym))
                     symTab->symbols[i].got_addr
                             = (uint8_t *)oc->info->got_start
                               + (slot++ * sizeof(void*));
-        if(mprotect(mem, oc->info->got_size, PROT_READ) != 0) {
-            sysErrorBelch("unable to protect memory");
         }
     }
     return EXIT_SUCCESS;
@@ -74,18 +75,25 @@ fillGot(ObjectCode * oc) {
     /* fill the GOT table */
     for(ElfSymbolTable *symTab = oc->info->symbolTables;
         symTab != NULL; symTab = symTab->next) {
+
         for(size_t i=0; i < symTab->n_symbols; i++) {
             ElfSymbol * symbol = &symTab->symbols[i];
+
             if(needGotSlot(symbol->elf_sym)) {
+
                 /* no type are undefined symbols */
                 if(   STT_NOTYPE == ELF_ST_TYPE(symbol->elf_sym->st_info)
                    || STB_WEAK   == ELF_ST_BIND(symbol->elf_sym->st_info)) {
                     if(0x0 == symbol->addr) {
                         symbol->addr = lookupSymbol_(symbol->name);
                         if(0x0 == symbol->addr) {
-                            errorBelch("Failed to lookup symbol: %s\n",
-                                       symbol->name);
-                            return EXIT_FAILURE;
+                            if(0 == strncmp(symbol->name,"_GLOBAL_OFFSET_TABLE_",21)) {
+                                symbol->addr = oc->info->got_start;
+                            } else {
+                                errorBelch("Failed to lookup symbol: %s\n",
+                                           symbol->name);
+                                return EXIT_FAILURE;
+                            }
                         }
                     } else {
                         // we already have the address.
@@ -93,22 +101,31 @@ fillGot(ObjectCode * oc) {
                 } /* else it was defined somewhere in the same object, and
                   * we should have the address already.
                   */
+
                 if(0x0 == symbol->addr) {
                     errorBelch(
                         "Something went wrong! Symbol %s has null address.\n",
                             symbol->name);
                     return EXIT_FAILURE;
                 }
+
                 if(0x0 == symbol->got_addr) {
                     errorBelch("Not good either!");
                     return EXIT_FAILURE;
                 }
+
                 *(void**)symbol->got_addr = symbol->addr;
             }
         }
     }
+
+    // We are done initializing the GOT; freeze it.
+    if(mprotect(oc->info->got_start, oc->info->got_size, PROT_READ) != 0) {
+        sysErrorBelch("unable to protect memory");
+    }
     return EXIT_SUCCESS;
 }
+
 bool
 verifyGot(ObjectCode * oc) {
     for(ElfSymbolTable *symTab = oc->info->symbolTables;

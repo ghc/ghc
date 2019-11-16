@@ -130,7 +130,7 @@ import UniqSet
 import UniqFM
 import UniqSupply
 import Outputable
-import Platform
+import GHC.Platform
 
 import Data.Maybe
 import Data.List

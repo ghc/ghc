@@ -1,4 +1,4 @@
-{-# LANGUAGE CPP #-}
+{-# LANGUAGE CPP, DeriveFunctor #-}
 
 --
 -- (c) The GRASP/AQUA Project, Glasgow University, 1993-1998
@@ -45,12 +45,12 @@ import Util
 import DynFlags
 import ForeignCall
 import Demand           ( isUsedOnce )
-import PrimOp           ( PrimCall(..) )
+import PrimOp           ( PrimCall(..), primOpWrapperId )
 import SrcLoc           ( mkGeneralSrcSpan )
 
 import Data.List.NonEmpty (nonEmpty, toList)
 import Data.Maybe    (fromMaybe)
-import Control.Monad (liftM, ap)
+import Control.Monad (ap)
 
 -- Note [Live vs free]
 -- ~~~~~~~~~~~~~~~~~~~
@@ -268,7 +268,7 @@ coreTopBindToStg dflags this_mod env ccs (NonRec id rhs)
 
         bind = StgTopLifted $ StgNonRec id stg_rhs
     in
-    ASSERT2(consistentCafInfo id bind, ppr id )
+    assertConsistentCafInfo dflags id bind (ppr bind)
       -- NB: previously the assertion printed 'rhs' and 'bind'
       --     as well as 'id', but that led to a black hole
       --     where printing the assertion error tripped the
@@ -296,9 +296,18 @@ coreTopBindToStg dflags this_mod env ccs (Rec pairs)
 
         bind = StgTopLifted $ StgRec (zip binders stg_rhss)
     in
-    ASSERT2(consistentCafInfo (head binders) bind, ppr binders)
+    assertConsistentCafInfo dflags (head binders) bind (ppr binders)
     (env', ccs', bind)
 
+-- | CAF consistency issues will generally result in segfaults and are quite
+-- difficult to debug (see #16846). We enable checking of the
+-- 'consistentCafInfo' invariant with @-dstg-lint@ to increase the chance that
+-- we catch these issues.
+assertConsistentCafInfo :: DynFlags -> Id -> StgTopBinding -> SDoc -> a -> a
+assertConsistentCafInfo dflags id bind err_doc result
+  | gopt Opt_DoStgLinting dflags || debugIsOn
+  , not $ consistentCafInfo id bind = pprPanic "assertConsistentCafInfo" err_doc
+  | otherwise = result
 
 -- Assertion helper: this checks that the CafInfo on the Id matches
 -- what CoreToStg has figured out about the binding's SRT.  The
@@ -375,11 +384,11 @@ coreToStgExpr (App (Lit LitRubbish) _some_unlifted_type)
   -- We lower 'LitRubbish' to @()@ here, which is much easier than doing it in
   -- a STG to Cmm pass.
   = coreToStgExpr (Var unitDataConId)
-coreToStgExpr (Var v)      = coreToStgApp Nothing v               [] []
-coreToStgExpr (Coercion _) = coreToStgApp Nothing coercionTokenId [] []
+coreToStgExpr (Var v)      = coreToStgApp v               [] []
+coreToStgExpr (Coercion _) = coreToStgApp coercionTokenId [] []
 
 coreToStgExpr expr@(App _ _)
-  = coreToStgApp Nothing f args ticks
+  = coreToStgApp f args ticks
   where
     (f, args, ticks) = myCollectArgs expr
 
@@ -493,18 +502,11 @@ mkStgAltType bndr alts
 -- Applications
 -- ---------------------------------------------------------------------------
 
-coreToStgApp
-         :: Maybe UpdateFlag            -- Just upd <=> this application is
-                                        -- the rhs of a thunk binding
-                                        --      x = [...] \upd [] -> the_app
-                                        -- with specified update flag
-        -> Id                           -- Function
-        -> [CoreArg]                    -- Arguments
-        -> [Tickish Id]                 -- Debug ticks
-        -> CtsM StgExpr
-
-
-coreToStgApp _ f args ticks = do
+coreToStgApp :: Id            -- Function
+             -> [CoreArg]     -- Arguments
+             -> [Tickish Id]  -- Debug ticks
+             -> CtsM StgExpr
+coreToStgApp f args ticks = do
     (args', ticks') <- coreToStgArgs args
     how_bound <- lookupVarCts f
 
@@ -528,8 +530,12 @@ coreToStgApp _ f args ticks = do
                                       (dropRuntimeRepArgs (fromMaybe [] (tyConAppArgs_maybe res_ty)))
 
                 -- Some primitive operator that might be implemented as a library call.
-                PrimOpId op      -> ASSERT( saturated )
-                                    StgOpApp (StgPrimOp op) args' res_ty
+                -- As described in Note [Primop wrappers] in PrimOp.hs, here we
+                -- turn unsaturated primop applications into applications of
+                -- the primop's wrapper.
+                PrimOpId op
+                  | saturated    -> StgOpApp (StgPrimOp op) args' res_ty
+                  | otherwise    -> StgApp (primOpWrapperId op) args'
 
                 -- A call to some primitive Cmm function.
                 FCallId (CCall (CCallSpec (StaticTarget _ lbl (Just pkgId) True)
@@ -539,7 +545,7 @@ coreToStgApp _ f args ticks = do
 
                 -- A regular foreign call.
                 FCallId call     -> ASSERT( saturated )
-                                    StgOpApp (StgFCallOp call (idUnique f)) args' res_ty
+                                    StgOpApp (StgFCallOp call (idType f)) args' res_ty
 
                 TickBoxOpId {}   -> pprPanic "coreToStg TickBox" $ ppr (f,args')
                 _other           -> StgApp f args'
@@ -631,8 +637,8 @@ coreToStgLet bind body = do
 
         -- Compute the new let-expression
     let
-        new_let | isJoinBind bind = StgLetNoEscape noExtSilent bind2 body2
-                | otherwise       = StgLet noExtSilent bind2 body2
+        new_let | isJoinBind bind = StgLetNoEscape noExtFieldSilent bind2 body2
+                | otherwise       = StgLet noExtFieldSilent bind2 body2
 
     return new_let
   where
@@ -675,7 +681,7 @@ mkTopStgRhs :: DynFlags -> Module -> CollectedCCs
 mkTopStgRhs dflags this_mod ccs bndr rhs
   | StgLam bndrs body <- rhs
   = -- StgLam can't have empty arguments, so not CAF
-    ( StgRhsClosure noExtSilent
+    ( StgRhsClosure noExtFieldSilent
                     dontCareCCS
                     ReEntrant
                     (toList bndrs) body
@@ -691,19 +697,19 @@ mkTopStgRhs dflags this_mod ccs bndr rhs
 
   -- Otherwise it's a CAF, see Note [Cost-centre initialization plan].
   | gopt Opt_AutoSccsOnIndividualCafs dflags
-  = ( StgRhsClosure noExtSilent
+  = ( StgRhsClosure noExtFieldSilent
                     caf_ccs
                     upd_flag [] rhs
     , collectCC caf_cc caf_ccs ccs )
 
   | otherwise
-  = ( StgRhsClosure noExtSilent
+  = ( StgRhsClosure noExtFieldSilent
                     all_cafs_ccs
                     upd_flag [] rhs
     , ccs )
 
   where
-    (_, unticked_rhs) = stripStgTicksTop (not . tickishIsCode) rhs
+    unticked_rhs = stripStgTicksTopE (not . tickishIsCode) rhs
 
     upd_flag | isUsedOnce (idDemandInfo bndr) = SingleEntry
              | otherwise                      = Updatable
@@ -725,14 +731,14 @@ mkTopStgRhs dflags this_mod ccs bndr rhs
 mkStgRhs :: Id -> StgExpr -> StgRhs
 mkStgRhs bndr rhs
   | StgLam bndrs body <- rhs
-  = StgRhsClosure noExtSilent
+  = StgRhsClosure noExtFieldSilent
                   currentCCS
                   ReEntrant
                   (toList bndrs) body
 
   | isJoinId bndr -- must be a nullary join point
   = ASSERT(idJoinArity bndr == 0)
-    StgRhsClosure noExtSilent
+    StgRhsClosure noExtFieldSilent
                   currentCCS
                   ReEntrant -- ignored for LNE
                   [] rhs
@@ -741,11 +747,11 @@ mkStgRhs bndr rhs
   = StgRhsCon currentCCS con args
 
   | otherwise
-  = StgRhsClosure noExtSilent
+  = StgRhsClosure noExtFieldSilent
                   currentCCS
                   upd_flag [] rhs
   where
-    (_, unticked_rhs) = stripStgTicksTop (not . tickishIsCode) rhs
+    unticked_rhs = stripStgTicksTopE (not . tickishIsCode) rhs
 
     upd_flag | isUsedOnce (idDemandInfo bndr) = SingleEntry
              | otherwise                      = Updatable
@@ -813,6 +819,7 @@ newtype CtsM a = CtsM
     { unCtsM :: IdEnv HowBound
              -> a
     }
+    deriving (Functor)
 
 data HowBound
   = ImportBound         -- Used only as a response to lookupBinding; never
@@ -860,9 +867,6 @@ returnCts e = CtsM $ \_ -> e
 thenCts :: CtsM a -> (a -> CtsM b) -> CtsM b
 thenCts m k = CtsM $ \env
   -> unCtsM (k (unCtsM m env)) env
-
-instance Functor CtsM where
-    fmap = liftM
 
 instance Applicative CtsM where
     pure = returnCts

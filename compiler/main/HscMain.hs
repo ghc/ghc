@@ -67,6 +67,7 @@ module HscMain
     , hscDecls, hscParseDeclsWithLocation, hscDeclsWithLocation, hscParsedDecls
     , hscTcExpr, TcRnExprMode(..), hscImport, hscKcType
     , hscParseExpr
+    , hscParseType
     , hscCompileCoreExpr
     -- * Low-level exports for hooks
     , hscCompileCoreExpr'
@@ -113,6 +114,7 @@ import SrcLoc
 import TcRnDriver
 import TcIface          ( typecheckIface )
 import TcRnMonad
+import TcHsSyn          ( ZonkFlexi (DefaultFlexi) )
 import NameCache        ( initNameCache )
 import LoadIface        ( ifaceStats, initExternalPackageState )
 import PrelInfo
@@ -147,7 +149,6 @@ import DynamicLoading   ( initializePlugins )
 
 import DynFlags
 import ErrUtils
-import Platform ( platformOS, osSubsectionsViaSymbols )
 
 import Outputable
 import NameEnv
@@ -173,8 +174,8 @@ import qualified Data.Set as S
 import Data.Set (Set)
 
 import HieAst           ( mkHieFile )
-import HieTypes         ( getAsts, hie_asts )
-import HieBin           ( readHieFile, writeHieFile )
+import HieTypes         ( getAsts, hie_asts, hie_module )
+import HieBin           ( readHieFile, writeHieFile , hie_file_result)
 import HieDebug         ( diffFile, validateScopes )
 
 #include "HsVersions.h"
@@ -426,7 +427,8 @@ extract_renamed_stuff mod_summary tc_result = do
             hs_env <- Hsc $ \e w -> return (e, w)
             liftIO $ do
               -- Validate Scopes
-              case validateScopes $ getAsts $ hie_asts hieFile of
+              let mdl = hie_module hieFile
+              case validateScopes mdl $ getAsts $ hie_asts hieFile of
                   [] -> putMsg dflags $ text "Got valid scopes"
                   xs -> do
                     putMsg dflags $ text "Got invalid scopes"
@@ -434,7 +436,7 @@ extract_renamed_stuff mod_summary tc_result = do
               -- Roundtrip testing
               nc <- readIORef $ hsc_NC hs_env
               (file', _) <- readHieFile nc out_file
-              case diffFile hieFile file' of
+              case diffFile hieFile (hie_file_result file') of
                 [] ->
                   putMsg dflags $ text "Got no roundtrip errors"
                 xs -> do
@@ -496,6 +498,14 @@ tcRnModule' sum save_rn_syntax mod = do
     hsc_env <- getHscEnv
     dflags   <- getDynFlags
 
+    -- -Wmissing-safe-haskell-mode
+    when (not (safeHaskellModeEnabled dflags)
+          && wopt Opt_WarnMissingSafeHaskellMode dflags) $
+        logWarnings $ unitBag $
+        makeIntoWarning (Reason Opt_WarnMissingSafeHaskellMode) $
+        mkPlainWarnMsg dflags (getLoc (hpm_module mod)) $
+        warnMissingSafeHaskellMode
+
     tcg_res <- {-# SCC "Typecheck-Rename" #-}
                ioMsgMaybe $
                    tcRnModule hsc_env sum
@@ -518,7 +528,9 @@ tcRnModule' sum save_rn_syntax mod = do
                  safe <- liftIO $ fst <$> readIORef (tcg_safeInfer tcg_res')
                  when safe $ do
                    case wopt Opt_WarnSafe dflags of
-                     True -> (logWarnings $ unitBag $
+                     True
+                       | safeHaskell dflags == Sf_Safe -> return ()
+                       | otherwise -> (logWarnings $ unitBag $
                               makeIntoWarning (Reason Opt_WarnSafe) $
                               mkPlainWarnMsg dflags (warnSafeOnLoc dflags) $
                               errSafe tcg_res')
@@ -540,6 +552,8 @@ tcRnModule' sum save_rn_syntax mod = do
     errSafe t = quotes (pprMod t) <+> text "has been inferred as safe!"
     errTwthySafe t = quotes (pprMod t)
       <+> text "is marked as Trustworthy but has been inferred as safe!"
+    warnMissingSafeHaskellMode = ppr (moduleName (ms_mod sum))
+      <+> text "is missing Safe Haskell mode"
 
 -- | Convert a typechecked module to Core
 hscDesugar :: HscEnv -> ModSummary -> TcGblEnv -> IO ModGuts
@@ -951,11 +965,13 @@ hscCheckSafeImports tcg_env = do
               -> return tcg_env'
 
     warns dflags rules = listToBag $ map (warnRules dflags) rules
+
+    warnRules :: DynFlags -> GenLocated SrcSpan (RuleDecl GhcTc) -> ErrMsg
     warnRules dflags (L loc (HsRule { rd_name = n })) =
         mkPlainWarnMsg dflags loc $
             text "Rule \"" <> ftext (snd $ unLoc n) <> text "\" ignored" $+$
             text "User defined rules are disabled under Safe Haskell"
-    warnRules _ (L _ (XRuleDecl _)) = panic "hscCheckSafeImports"
+    warnRules _ (L _ (XRuleDecl nec)) = noExtCon nec
 
 -- | Validate that safe imported modules are actually safe.  For modules in the
 -- HomePackage (the package the module we are compiling in resides) this just
@@ -1105,21 +1121,36 @@ hscCheckSafe' m l = do
                 let trust = getSafeMode $ mi_trust iface'
                     trust_own_pkg = mi_trust_pkg iface'
                     -- check module is trusted
-                    safeM = trust `elem` [Sf_Safe, Sf_Trustworthy]
+                    safeM = trust `elem` [Sf_Safe, Sf_SafeInferred, Sf_Trustworthy]
                     -- check package is trusted
                     safeP = packageTrusted dflags trust trust_own_pkg m
                     -- pkg trust reqs
                     pkgRs = S.fromList . map fst $ filter snd $ dep_pkgs $ mi_deps iface'
+                    -- warn if Safe module imports Safe-Inferred module.
+                    warns = if wopt Opt_WarnInferredSafeImports dflags
+                                && safeLanguageOn dflags
+                                && trust == Sf_SafeInferred
+                                then inferredImportWarn
+                                else emptyBag
                     -- General errors we throw but Safe errors we log
                     errs = case (safeM, safeP) of
                         (True, True ) -> emptyBag
                         (True, False) -> pkgTrustErr
                         (False, _   ) -> modTrustErr
                 in do
+                    logWarnings warns
                     logWarnings errs
                     return (trust == Sf_Trustworthy, pkgRs)
 
                 where
+                    inferredImportWarn = unitBag
+                        $ makeIntoWarning (Reason Opt_WarnInferredSafeImports)
+                        $ mkErrMsg dflags l (pkgQual dflags)
+                        $ sep
+                            [ text "Importing Safe-Inferred module "
+                                <> ppr (moduleName m)
+                                <> text " from explicitly Safe module"
+                            ]
                     pkgTrustErr = unitBag $ mkErrMsg dflags l (pkgQual dflags) $
                         sep [ ppr (moduleName m)
                                 <> text ": Can't be safely imported!"
@@ -1142,6 +1173,7 @@ hscCheckSafe' m l = do
     packageTrusted dflags _ _ _
         | not (packageTrustOn dflags) = True
     packageTrusted _ Sf_Safe  False _ = True
+    packageTrusted _ Sf_SafeInferred False _ = True
     packageTrusted dflags _ _ m
         | isHomePkg dflags m = True
         | otherwise = trusted $ getPackageDetails dflags (moduleUnitId m)
@@ -1440,7 +1472,7 @@ hscCompileCmmFile hsc_env filename output_filename = runHsc hsc_env $ do
     let dflags = hsc_dflags hsc_env
     cmm <- ioMsgMaybe $ parseCmmFile dflags filename
     liftIO $ do
-        dumpIfSet_dyn dflags Opt_D_dump_cmm_verbose "Parsed Cmm" (ppr cmm)
+        dumpIfSet_dyn dflags Opt_D_dump_cmm_verbose_by_proc "Parsed Cmm" (ppr cmm)
         let -- Make up a module name to give the NCG. We can't pass bottom here
             -- lest we reproduce #11784.
             mod_name = mkModuleName $ "Cmm$" ++ FilePath.takeFileName filename
@@ -1490,31 +1522,11 @@ doCodeGen hsc_env this_mod data_tycons
 
         ppr_stream1 = Stream.mapM dump1 cmm_stream
 
-    -- We are building a single SRT for the entire module, so
-    -- we must thread it through all the procedures as we cps-convert them.
-    us <- mkSplitUniqSupply 'S'
+        pipeline_stream
+           = {-# SCC "cmmPipeline" #-}
+             let run_pipeline = cmmPipeline hsc_env
+             in void $ Stream.mapAccumL run_pipeline (emptySRT this_mod) ppr_stream1
 
-    -- When splitting, we generate one SRT per split chunk, otherwise
-    -- we generate one SRT for the whole module.
-    let
-     pipeline_stream
-      | gopt Opt_SplitSections dflags ||
-        osSubsectionsViaSymbols (platformOS (targetPlatform dflags))
-        = {-# SCC "cmmPipeline" #-}
-          let run_pipeline us cmmgroup = do
-                (_topSRT, cmmgroup) <-
-                  cmmPipeline hsc_env (emptySRT this_mod) cmmgroup
-                return (us, cmmgroup)
-
-          in do _ <- Stream.mapAccumL run_pipeline us ppr_stream1
-                return ()
-
-      | otherwise
-        = {-# SCC "cmmPipeline" #-}
-          let run_pipeline = cmmPipeline hsc_env
-          in void $ Stream.mapAccumL run_pipeline (emptySRT this_mod) ppr_stream1
-
-    let
         dump2 a = do dumpIfSet_dyn dflags Opt_D_dump_cmm
                         "Output Cmm" (ppr a)
                      return a
@@ -1761,7 +1773,7 @@ hscKcType
 hscKcType hsc_env0 normalise str = runInteractiveHsc hsc_env0 $ do
     hsc_env <- getHscEnv
     ty <- hscParseType str
-    ioMsgMaybe $ tcRnType hsc_env normalise ty
+    ioMsgMaybe $ tcRnType hsc_env DefaultFlexi normalise ty
 
 hscParseExpr :: String -> Hsc (LHsExpr GhcPs)
 hscParseExpr expr = do

@@ -10,7 +10,7 @@ haskellFun c = putStrLn ("Haskell: " ++ show c)
 foreign export ccall "hFun"  haskellFun :: Int -> IO ()
 foreign import ccall safe "hFun"  hFun :: Int -> IO ()
 
-#ifdef mingw32_HOST_OS
+#if defined(mingw32_HOST_OS)
 foreign import stdcall safe "Sleep" _sleepBlock :: Int -> IO ()
 sleepBlock n = _sleepBlock (n*1000)
 #else

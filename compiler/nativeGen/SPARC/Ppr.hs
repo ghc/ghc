@@ -39,7 +39,7 @@ import Format
 import PprBase
 
 import Cmm hiding (topInfoTable)
-import PprCmm()
+import PprCmm() -- For Outputable instances
 import BlockId
 import CLabel
 import Hoopl.Label
@@ -47,7 +47,7 @@ import Hoopl.Collections
 
 import Unique           ( pprUniqueAlways )
 import Outputable
-import Platform
+import GHC.Platform
 import FastString
 
 -- -----------------------------------------------------------------------------

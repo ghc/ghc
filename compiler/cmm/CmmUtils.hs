@@ -1,4 +1,5 @@
 {-# LANGUAGE GADTs, RankNTypes #-}
+{-# LANGUAGE BangPatterns #-}
 
 -----------------------------------------------------------------------------
 --
@@ -34,6 +35,8 @@ module CmmUtils(
         cmmOrWord, cmmAndWord,
         cmmSubWord, cmmAddWord, cmmMulWord, cmmQuotWord,
         cmmToWord,
+
+        cmmMkAssign,
 
         isTrivialCmmExpr, hasNoGlobalRegs, isLit, isComparisonExpr,
 
@@ -76,6 +79,7 @@ import BlockId
 import CLabel
 import Outputable
 import DynFlags
+import Unique
 import CodeGen.Platform
 
 import Data.ByteString (ByteString)
@@ -102,6 +106,8 @@ primRepCmmType _      Int8Rep          = b8
 primRepCmmType _      Word8Rep         = b8
 primRepCmmType _      Int16Rep         = b16
 primRepCmmType _      Word16Rep        = b16
+primRepCmmType _      Int32Rep         = b32
+primRepCmmType _      Word32Rep        = b32
 primRepCmmType _      Int64Rep         = b64
 primRepCmmType _      Word64Rep        = b64
 primRepCmmType dflags AddrRep          = bWord dflags
@@ -138,10 +144,12 @@ primRepForeignHint UnliftedRep  = AddrHint
 primRepForeignHint IntRep       = SignedHint
 primRepForeignHint Int8Rep      = SignedHint
 primRepForeignHint Int16Rep     = SignedHint
+primRepForeignHint Int32Rep     = SignedHint
 primRepForeignHint Int64Rep     = SignedHint
 primRepForeignHint WordRep      = NoHint
 primRepForeignHint Word8Rep     = NoHint
 primRepForeignHint Word16Rep    = NoHint
+primRepForeignHint Word32Rep    = NoHint
 primRepForeignHint Word64Rep    = NoHint
 primRepForeignHint AddrRep      = AddrHint -- NB! AddrHint, but NonPtrArg
 primRepForeignHint FloatRep     = NoHint
@@ -219,8 +227,8 @@ packHalfWordsCLit :: DynFlags -> StgHalfWord -> StgHalfWord -> CmmLit
 --       but be careful: that's vulnerable when reversed
 packHalfWordsCLit dflags lower_half_word upper_half_word
    = if wORDS_BIGENDIAN dflags
-     then mkWordCLit dflags ((l `shiftL` hALF_WORD_SIZE_IN_BITS dflags) .|. u)
-     else mkWordCLit dflags (l .|. (u `shiftL` hALF_WORD_SIZE_IN_BITS dflags))
+     then mkWordCLit dflags ((l `shiftL` halfWordSizeInBits dflags) .|. u)
+     else mkWordCLit dflags (l .|. (u `shiftL` halfWordSizeInBits dflags))
     where l = fromStgHalfWord lower_half_word
           u = fromStgHalfWord upper_half_word
 
@@ -371,6 +379,13 @@ cmmToWord dflags e
   where
     w = cmmExprWidth dflags e
     word = wordWidth dflags
+
+cmmMkAssign :: DynFlags -> CmmExpr -> Unique -> (CmmNode O O, CmmExpr)
+cmmMkAssign dflags expr uq =
+  let !ty = cmmExprType dflags expr
+      reg = (CmmLocal (LocalReg uq ty))
+  in  (CmmAssign reg expr, CmmReg reg)
+
 
 ---------------------------------------------------
 --

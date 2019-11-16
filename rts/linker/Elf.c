@@ -745,12 +745,8 @@ ocGetNames_ELF ( ObjectCode* oc )
           unsigned nstubs = numberOfStubsForSection(oc, i);
           unsigned stub_space = STUB_SIZE * nstubs;
 
-          void * mem = mmap(NULL, size+stub_space,
-                            PROT_READ | PROT_WRITE | PROT_EXEC,
-                            MAP_ANON | MAP_PRIVATE,
-                            -1, 0);
-
-          if( mem == MAP_FAILED ) {
+          void * mem = mmapForLinker(size+stub_space, MAP_ANON, -1, 0);
+          if( mem == NULL ) {
               barf("failed to mmap allocated memory to load section %d. "
                    "errno = %d", i, errno);
           }
@@ -1023,6 +1019,22 @@ do_Elf_Rel_relocations ( ObjectCode* oc, char* ehdrC,
        return 1;
    }
 
+   /* The following nomenclature is used for the operation:
+    * - S -- (when used on its own) is the address of the symbol.
+    * - A -- is the addend for the relocation.
+    * - P -- is the address of the place being relocated (derived from r_offset).
+    * - Pa - is the adjusted address of the place being relocated, defined as (P & 0xFFFFFFFC).
+    * - T -- is 1 if the target symbol S has type STT_FUNC and the symbol addresses a Thumb instruction; it is 0 otherwise.
+    * - B(S) is the addressing origin of the output segment defining the symbol S. The origin is not required to be the
+    *        base address of the segment. This value must always be word-aligned.
+    * - GOT_ORG is the addressing origin of the Global Offset Table (the indirection table for imported data addresses).
+    *        This value must always be word-aligned.  See §4.6.1.8, Proxy generating relocations.
+    * - GOT(S) is the address of the GOT entry for the symbol S.
+    *
+    * See the ELF for "ARM Specification" for details:
+    * https://developer.arm.com/architectures/system-architectures/software-standards/abi
+    */
+
    for (j = 0; j < nent; j++) {
        Elf_Addr offset = rtab[j].r_offset;
        Elf_Addr info   = rtab[j].r_info;
@@ -1051,7 +1063,7 @@ do_Elf_Rel_relocations ( ObjectCode* oc, char* ehdrC,
        } else {
            symbol = &stab->symbols[ELF_R_SYM(info)];
            /* First see if it is a local symbol. */
-           if (ELF_ST_BIND(symbol->elf_sym->st_info) == STB_LOCAL) {
+           if (ELF_ST_BIND(symbol->elf_sym->st_info) == STB_LOCAL || strncmp(symbol->name, "_GLOBAL_OFFSET_TABLE_", 21) == 0) {
                S = (Elf_Addr)symbol->addr;
            } else {
                S_tmp = lookupSymbol_( symbol->name );
@@ -1110,25 +1122,41 @@ do_Elf_Rel_relocations ( ObjectCode* oc, char* ehdrC,
 #endif
 
        switch (reloc_type) {
-#        ifdef i386_HOST_ARCH
+#        if defined(i386_HOST_ARCH)
        case COMPAT_R_386_NONE:                  break;
        case COMPAT_R_386_32:   *pP = value;     break;
        case COMPAT_R_386_PC32: *pP = value - P; break;
 #        endif
 
-#        ifdef arm_HOST_ARCH
-       case COMPAT_R_ARM_ABS32:
+#        if defined(arm_HOST_ARCH)
+       case COMPAT_R_ARM_ABS32:     /* (S + A) | T */
            // Specified by Linux ARM ABI to be equivalent to ABS32
        case COMPAT_R_ARM_TARGET1:
            *(Elf32_Word *)P += S;
            *(Elf32_Word *)P |= T;
            break;
 
-       case COMPAT_R_ARM_REL32:
+       case COMPAT_R_ARM_REL32:     /* ((S + A) | T) – P */
            *(Elf32_Word *)P += S;
            *(Elf32_Word *)P |= T;
            *(Elf32_Word *)P -= P;
            break;
+
+       case COMPAT_R_ARM_BASE_PREL: /* B(S) + A – P */
+       {
+           int32_t A = *pP;
+           // bfd used to encode sb (B(S)) as 0.
+           *(uint32_t *)P += 0 + A - P;
+           break;
+       }
+
+       case COMPAT_R_ARM_GOT_BREL: /* GOT(S) + A – GOT_ORG */
+       {
+           int32_t A = *pP;
+           void* GOT_S = symbol->got_addr;
+           *(uint32_t *)P = (uint32_t) GOT_S + A - (uint32_t) oc->info->got_start;
+           break;
+       }
 
        case COMPAT_R_ARM_CALL:
        case COMPAT_R_ARM_JUMP24:

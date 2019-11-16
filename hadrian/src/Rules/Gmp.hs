@@ -61,9 +61,8 @@ gmpRules = do
     -- Copy appropriate GMP header and object files
     gmpPath <- gmpBuildPathRules
     gmpPath -/- gmpLibraryH %> \header -> do
-        windows  <- windowsHost
         configMk <- readFile' =<< (buildPath gmpContext <&> (-/- "config.mk"))
-        if not windows && -- TODO: We don't use system GMP on Windows. Fix?
+        if not windowsHost && -- TODO: We don't use system GMP on Windows. Fix?
            any (`isInfixOf` configMk) [ "HaveFrameworkGMP = YES", "HaveLibGmp = YES" ]
         then do
             putBuild "| GMP library/framework detected and will be used"

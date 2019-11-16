@@ -50,7 +50,7 @@ import SrcLoc
 import qualified Maybes
 import UniqDSet
 import FastString
-import Platform
+import GHC.Platform
 import SysTools
 import FileCleanup
 
@@ -115,7 +115,7 @@ readPLS dl =
 
 modifyMbPLS_
   :: DynLinker -> (Maybe PersistentLinkerState -> IO (Maybe PersistentLinkerState)) -> IO ()
-modifyMbPLS_ dl f = modifyMVar_ (dl_mpls dl) f 
+modifyMbPLS_ dl f = modifyMVar_ (dl_mpls dl) f
 
 emptyPLS :: DynFlags -> PersistentLinkerState
 emptyPLS _ = PersistentLinkerState {
@@ -343,7 +343,7 @@ linkCmdLineLibs' hsc_env pls =
 
       -- Add directories to library search paths, this only has an effect
       -- on Windows. On Unix OSes this function is a NOP.
-      let all_paths = let paths = takeDirectory (fst $ pgm_c dflags)
+      let all_paths = let paths = takeDirectory (pgm_c dflags)
                                 : framework_paths
                                ++ lib_paths_base
                                ++ [ takeDirectory dll | DLLPath dll <- libspecs ]
@@ -352,8 +352,10 @@ linkCmdLineLibs' hsc_env pls =
       all_paths_env <- addEnvPaths "LD_LIBRARY_PATH" all_paths
       pathCache <- mapM (addLibrarySearchPath hsc_env) all_paths_env
 
+      let merged_specs = mergeStaticObjects cmdline_lib_specs
       pls1 <- foldM (preloadLib hsc_env lib_paths framework_paths) pls
-                    cmdline_lib_specs
+                    merged_specs
+
       maybePutStr dflags "final link ... "
       ok <- resolveObjs hsc_env
 
@@ -364,6 +366,19 @@ linkCmdLineLibs' hsc_env pls =
       else throwGhcExceptionIO (ProgramError "linking extra libraries/objects failed")
 
       return pls1
+
+-- | Merge runs of consecutive of 'Objects'. This allows for resolution of
+-- cyclic symbol references when dynamically linking. Specifically, we link
+-- together all of the static objects into a single shared object, avoiding
+-- the issue we saw in #13786.
+mergeStaticObjects :: [LibrarySpec] -> [LibrarySpec]
+mergeStaticObjects specs = go [] specs
+  where
+    go :: [FilePath] -> [LibrarySpec] -> [LibrarySpec]
+    go accum (Objects objs : rest) = go (objs ++ accum) rest
+    go accum@(_:_) rest = Objects (reverse accum) : go [] rest
+    go [] (spec:rest) = spec : go [] rest
+    go [] [] = []
 
 {- Note [preload packages]
 
@@ -392,7 +407,7 @@ users?
 
 classifyLdInput :: DynFlags -> FilePath -> IO (Maybe LibrarySpec)
 classifyLdInput dflags f
-  | isObjectFilename platform f = return (Just (Object f))
+  | isObjectFilename platform f = return (Just (Objects [f]))
   | isDynLibFilename platform f = return (Just (DLLPath f))
   | otherwise          = do
         putLogMsg dflags NoReason SevInfo noSrcSpan
@@ -407,8 +422,8 @@ preloadLib
 preloadLib hsc_env lib_paths framework_paths pls lib_spec = do
   maybePutStr dflags ("Loading object " ++ showLS lib_spec ++ " ... ")
   case lib_spec of
-    Object static_ish -> do
-      (b, pls1) <- preload_static lib_paths static_ish
+    Objects static_ishs -> do
+      (b, pls1) <- preload_statics lib_paths static_ishs
       maybePutStrLn dflags (if b  then "done" else "not found")
       return pls1
 
@@ -467,13 +482,13 @@ preloadLib hsc_env lib_paths framework_paths pls lib_spec = do
                         intercalate "\n" (map ("   "++) paths)))
 
     -- Not interested in the paths in the static case.
-    preload_static _paths name
-       = do b <- doesFileExist name
+    preload_statics _paths names
+       = do b <- or <$> mapM doesFileExist names
             if not b then return (False, pls)
                      else if dynamicGhc
-                             then  do pls1 <- dynLoadObjs hsc_env pls [name]
+                             then  do pls1 <- dynLoadObjs hsc_env pls names
                                       return (True, pls1)
-                             else  do loadObj hsc_env name
+                             else  do mapM_ (loadObj hsc_env) names
                                       return (True, pls)
 
     preload_static_archive _paths name
@@ -881,8 +896,8 @@ dynLinkObjs hsc_env pls objs = do
 
 dynLoadObjs :: HscEnv -> PersistentLinkerState -> [FilePath]
             -> IO PersistentLinkerState
-dynLoadObjs _       pls []   = return pls
-dynLoadObjs hsc_env pls objs = do
+dynLoadObjs _       pls                           []   = return pls
+dynLoadObjs hsc_env pls@PersistentLinkerState{..} objs = do
     let dflags = hsc_dflags hsc_env
     let platform = targetPlatform dflags
     let minus_ls = [ lib | Option ('-':'l':lib) <- ldInputs dflags ]
@@ -899,13 +914,13 @@ dynLoadObjs hsc_env pls objs = do
                       -- library.
                       ldInputs =
                            concatMap (\l -> [ Option ("-l" ++ l) ])
-                                     (nub $ snd <$> temp_sos pls)
+                                     (nub $ snd <$> temp_sos)
                         ++ concatMap (\lp -> [ Option ("-L" ++ lp)
                                                     , Option "-Xlinker"
                                                     , Option "-rpath"
                                                     , Option "-Xlinker"
                                                     , Option lp ])
-                                     (nub $ fst <$> temp_sos pls)
+                                     (nub $ fst <$> temp_sos)
                         ++ concatMap
                              (\lp ->
                                  [ Option ("-L" ++ lp)
@@ -933,13 +948,13 @@ dynLoadObjs hsc_env pls objs = do
     -- link all "loaded packages" so symbols in those can be resolved
     -- Note: We are loading packages with local scope, so to see the
     -- symbols in this link we must link all loaded packages again.
-    linkDynLib dflags2 objs (pkgs_loaded pls)
+    linkDynLib dflags2 objs pkgs_loaded
 
     -- if we got this far, extend the lifetime of the library file
     changeTempFilesLifetime dflags TFL_GhcSession [soFile]
     m <- loadDLL hsc_env soFile
     case m of
-        Nothing -> return pls { temp_sos = (libPath, libName) : temp_sos pls }
+        Nothing -> return $! pls { temp_sos = (libPath, libName) : temp_sos }
         Just err -> panic ("Loading temp shared object failed: " ++ err)
 
 rmDupLinkables :: [Linkable]    -- Already loaded
@@ -1123,7 +1138,10 @@ unload_wkr hsc_env keep_linkables pls@PersistentLinkerState{..}  = do
         -- We don't do any cleanup when linking objects with the
         -- dynamic linker.  Doing so introduces extra complexity for
         -- not much benefit.
-      | otherwise
+
+      -- Code unloading currently disabled due to instability.
+      -- See #16841.
+      | False -- otherwise
       = mapM_ (unloadObj hsc_env) [f | DotO f <- linkableUnlinked lnk]
                 -- The components of a BCO linkable may contain
                 -- dot-o files.  Which is very confusing.
@@ -1131,6 +1149,7 @@ unload_wkr hsc_env keep_linkables pls@PersistentLinkerState{..}  = do
                 -- But the BCO parts can be unlinked just by
                 -- letting go of them (plus of course depopulating
                 -- the symbol table which is done in the main body)
+      | otherwise = return () -- see #16841
 
 {- **********************************************************************
 
@@ -1139,7 +1158,9 @@ unload_wkr hsc_env keep_linkables pls@PersistentLinkerState{..}  = do
   ********************************************************************* -}
 
 data LibrarySpec
-   = Object FilePath    -- Full path name of a .o file, including trailing .o
+   = Objects [FilePath] -- Full path names of set of .o files, including trailing .o
+                        -- We allow batched loading to ensure that cyclic symbol
+                        -- references can be resolved (see #13786).
                         -- For dynamic objects only, try to find the object
                         -- file in all the directories specified in
                         -- v_Library_paths before giving up.
@@ -1173,7 +1194,7 @@ partOfGHCi
                    ["base", "template-haskell", "editline"]
 
 showLS :: LibrarySpec -> String
-showLS (Object nm)    = "(static) " ++ nm
+showLS (Objects nms)  = "(static) [" ++ intercalate ", " nms ++ "]"
 showLS (Archive nm)   = "(static archive) " ++ nm
 showLS (DLL nm)       = "(dynamic) " ++ nm
 showLS (DLLPath nm)   = "(dynamic) " ++ nm
@@ -1270,7 +1291,8 @@ linkPackage hsc_env pkg
         -- Complication: all the .so's must be loaded before any of the .o's.
         let known_dlls = [ dll  | DLLPath dll    <- classifieds ]
             dlls       = [ dll  | DLL dll        <- classifieds ]
-            objs       = [ obj  | Object obj     <- classifieds ]
+            objs       = [ obj  | Objects objs    <- classifieds
+                                , obj <- objs ]
             archs      = [ arch | Archive arch   <- classifieds ]
 
         -- Add directories to library search paths
@@ -1478,8 +1500,8 @@ locateLib hsc_env is_hs lib_dirs gcc_dirs lib
                              (ArchX86_64, OSSolaris2) -> "64" </> so_name
                              _ -> so_name
 
-     findObject    = liftM (fmap Object)  $ findFile dirs obj_file
-     findDynObject = liftM (fmap Object)  $ findFile dirs dyn_obj_file
+     findObject    = liftM (fmap $ Objects . (:[]))  $ findFile dirs obj_file
+     findDynObject = liftM (fmap $ Objects . (:[]))  $ findFile dirs dyn_obj_file
      findArchive   = let local name = liftM (fmap Archive) $ findFile dirs name
                      in  apply (map local arch_files)
      findHSDll     = liftM (fmap DLLPath) $ findFile dirs hs_dyn_lib_file

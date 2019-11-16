@@ -38,9 +38,6 @@ import X86.Cond
 import X86.Regs
 import X86.RegInfo
 
---TODO: Remove - Just for development/debugging
-import X86.Ppr()
-
 import CodeGen.Platform
 import CPrim
 import Debug            ( DebugBlock(..), UnwindPoint(..), UnwindTable
@@ -54,13 +51,12 @@ import NCGMonad   ( NatM, getNewRegNat, getNewLabelNat, setDeltaNat
 import CFG
 import Format
 import Reg
-import Platform
+import GHC.Platform
 
 -- Our intermediate code:
 import BasicTypes
 import BlockId
 import Module           ( primUnitId )
-import PprCmm           ()
 import CmmUtils
 import CmmSwitch
 import Cmm
@@ -1891,8 +1887,9 @@ genCCall dflags _ (PrimTarget (MO_Memset align)) _
         possibleWidth = minimum [left, sizeBytes]
         dst_addr = AddrBaseIndex (EABaseReg dst) EAIndexNone (ImmInteger (n - left))
 
+genCCall _ _ (PrimTarget MO_ReadBarrier) _ _ _  = return nilOL
 genCCall _ _ (PrimTarget MO_WriteBarrier) _ _ _ = return nilOL
-        -- write barrier compiles to no code on x86/x86-64;
+        -- barriers compile to no code on x86/x86-64;
         -- we keep it this long in order to prevent earlier optimisations.
 
 genCCall _ _ (PrimTarget MO_Touch) _ _ _ = return nilOL
@@ -2892,7 +2889,9 @@ outOfLineCmmOp bid mop res args
               MO_F32_Cos   -> fsLit "cosf"
               MO_F32_Tan   -> fsLit "tanf"
               MO_F32_Exp   -> fsLit "expf"
+              MO_F32_ExpM1 -> fsLit "expm1f"
               MO_F32_Log   -> fsLit "logf"
+              MO_F32_Log1P -> fsLit "log1pf"
 
               MO_F32_Asin  -> fsLit "asinf"
               MO_F32_Acos  -> fsLit "acosf"
@@ -2913,7 +2912,9 @@ outOfLineCmmOp bid mop res args
               MO_F64_Cos   -> fsLit "cos"
               MO_F64_Tan   -> fsLit "tan"
               MO_F64_Exp   -> fsLit "exp"
+              MO_F64_ExpM1 -> fsLit "expm1"
               MO_F64_Log   -> fsLit "log"
+              MO_F64_Log1P -> fsLit "log1p"
 
               MO_F64_Asin  -> fsLit "asin"
               MO_F64_Acos  -> fsLit "acos"
@@ -2962,6 +2963,7 @@ outOfLineCmmOp bid mop res args
               MO_AddWordC {}   -> unsupported
               MO_SubWordC {}   -> unsupported
               MO_U_Mul2 {}     -> unsupported
+              MO_ReadBarrier   -> unsupported
               MO_WriteBarrier  -> unsupported
               MO_Touch         -> unsupported
               (MO_Prefetch_Data _ ) -> unsupported

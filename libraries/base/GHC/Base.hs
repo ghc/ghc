@@ -116,7 +116,7 @@ module GHC.Base
         module GHC.Magic,
         module GHC.Types,
         module GHC.Prim,        -- Re-export GHC.Prim and [boot] GHC.Err,
-                                -- to avoid lots of people having to
+        module GHC.Prim.Ext,    -- to avoid lots of people having to
         module GHC.Err,         -- import it explicitly
         module GHC.Maybe
   )
@@ -127,6 +127,7 @@ import GHC.Classes
 import GHC.CString
 import GHC.Magic
 import GHC.Prim
+import GHC.Prim.Ext
 import GHC.Err
 import GHC.Maybe
 import {-# SOURCE #-} GHC.IO (failIO,mplusIO)
@@ -271,6 +272,9 @@ class Semigroup a => Monoid a where
         --
         -- __NOTE__: This method is redundant and has the default
         -- implementation @'mappend' = ('<>')@ since /base-4.11.0.0/.
+        -- Should it be implemented manually, since 'mappend' is a synonym for
+        -- ('<>'), it is expected that the two functions are defined the same
+        -- way. In a future GHC release 'mappend' will be removed from 'Monoid'.
         mappend :: a -> a -> a
         mappend = (<>)
         {-# INLINE mappend #-}
@@ -453,11 +457,30 @@ the first law, so you need only check that the former condition holds.
 -}
 
 class  Functor f  where
+    -- | Using @ApplicativeDo@: \'@'fmap' f as@\' can be understood as
+    -- the @do@ expression
+    --
+    -- @
+    -- do a <- as
+    --    pure (f a)
+    -- @
+    --
+    -- with an inferred @Functor@ constraint.
     fmap        :: (a -> b) -> f a -> f b
 
     -- | Replace all locations in the input with the same value.
     -- The default definition is @'fmap' . 'const'@, but this may be
     -- overridden with a more efficient version.
+    --
+    -- Using @ApplicativeDo@: \'@a '<$' bs@\' can be understood as the
+    -- @do@ expression
+    --
+    -- @
+    -- do bs
+    --    pure a
+    -- @
+    --
+    -- with an inferred @Functor@ constraint.
     (<$)        :: a -> f b -> f a
     (<$)        =  fmap . const
 
@@ -534,6 +557,15 @@ class Functor f => Applicative f where
     --
     -- A few functors support an implementation of '<*>' that is more
     -- efficient than the default one.
+    --
+    -- Using @ApplicativeDo@: \'@fs '<*>' as@\' can be understood as
+    -- the @do@ expression
+    --
+    -- @
+    -- do f <- fs
+    --    a <- as
+    --    pure (f a)
+    -- @
     (<*>) :: f (a -> b) -> f a -> f b
     (<*>) = liftA2 id
 
@@ -546,10 +578,37 @@ class Functor f => Applicative f where
     --
     -- This became a typeclass method in 4.10.0.0. Prior to that, it was
     -- a function defined in terms of '<*>' and 'fmap'.
+    --
+    -- Using @ApplicativeDo@: \'@'liftA2' f as bs@\' can be understood
+    -- as the @do@ expression
+    --
+    -- @
+    -- do a <- as
+    --    b <- bs
+    --    pure (f a b)
+    -- @
+
     liftA2 :: (a -> b -> c) -> f a -> f b -> f c
     liftA2 f x = (<*>) (fmap f x)
 
     -- | Sequence actions, discarding the value of the first argument.
+    --
+    -- \'@as '*>' bs@\' can be understood as the @do@ expression
+    --
+    -- @
+    -- do as
+    --    bs
+    -- @
+    --
+    -- This is a tad complicated for our @ApplicativeDo@ extension
+    -- which will give it a @Monad@ constraint. For an @Applicative@
+    -- constraint we write it of the form
+    --
+    -- @
+    -- do _ <- as
+    --    b <- bs
+    --    pure b
+    -- @
     (*>) :: f a -> f b -> f b
     a1 *> a2 = (id <$ a1) <*> a2
     -- This is essentially the same as liftA2 (flip const), but if the
@@ -562,22 +621,61 @@ class Functor f => Applicative f where
     -- liftA2, it would likely be better to define (*>) using liftA2.
 
     -- | Sequence actions, discarding the value of the second argument.
+    --
+    -- Using @ApplicativeDo@: \'@as '<*' bs@\' can be understood as
+    -- the @do@ expression
+    --
+    -- @
+    -- do a <- as
+    --    bs
+    --    pure a
+    -- @
     (<*) :: f a -> f b -> f a
     (<*) = liftA2 const
 
 -- | A variant of '<*>' with the arguments reversed.
+--
+-- Using @ApplicativeDo@: \'@as '<**>' fs@\' can be understood as the
+-- @do@ expression
+--
+-- @
+-- do a <- as
+--    f <- fs
+--    pure (f a)
+-- @
 (<**>) :: Applicative f => f a -> f (a -> b) -> f b
 (<**>) = liftA2 (\a f -> f a)
 -- Don't use $ here, see the note at the top of the page
 
 -- | Lift a function to actions.
 -- This function may be used as a value for `fmap` in a `Functor` instance.
+--
+-- | Using @ApplicativeDo@: \'@'liftA' f as@\' can be understood as the
+-- @do@ expression
+--
+--
+-- @
+-- do a <- as
+--    pure (f a)
+-- @
+--
+-- with an inferred @Functor@ constraint, weaker than @Applicative@.
 liftA :: Applicative f => (a -> b) -> f a -> f b
 liftA f a = pure f <*> a
 -- Caution: since this may be used for `fmap`, we can't use the obvious
 -- definition of liftA = fmap.
 
 -- | Lift a ternary function to actions.
+--
+-- Using @ApplicativeDo@: \'@'liftA3' f as bs cs@\' can be understood
+-- as the @do@ expression
+--
+-- @
+-- do a <- as
+--    b <- bs
+--    c <- cs
+--    pure (f a b c)
+-- @
 liftA3 :: Applicative f => (a -> b -> c -> d) -> f a -> f b -> f c -> f d
 liftA3 f a b c = liftA2 f a b <*> c
 
@@ -593,6 +691,14 @@ liftA3 f a b c = liftA2 f a b <*> c
 -- | The 'join' function is the conventional monad join operator. It
 -- is used to remove one level of monadic structure, projecting its
 -- bound argument into the outer level.
+--
+--
+-- \'@'join' bss@\' can be understood as the @do@ expression
+--
+-- @
+-- do bs <- bss
+--    bs
+-- @
 --
 -- ==== __Examples__
 --
@@ -654,11 +760,25 @@ defined in the "Prelude" satisfy these laws.
 class Applicative m => Monad m where
     -- | Sequentially compose two actions, passing any value produced
     -- by the first as an argument to the second.
+    --
+    -- \'@as '>>=' bs@\' can be understood as the @do@ expression
+    --
+    -- @
+    -- do a <- as
+    --    bs a
+    -- @
     (>>=)       :: forall a b. m a -> (a -> m b) -> m b
 
     -- | Sequentially compose two actions, discarding any value produced
     -- by the first, like sequencing operators (such as the semicolon)
     -- in imperative languages.
+    --
+    -- \'@as '>>' bs@\' can be understood as the @do@ expression
+    --
+    -- @
+    -- do as
+    --    bs
+    -- @
     (>>)        :: forall a b. m a -> m b -> m b
     m >> k = m >>= \_ -> k -- See Note [Recursive bindings for Applicative/Monad]
     {-# INLINE (>>) #-}
@@ -809,7 +929,7 @@ instance Functor ((->) r) where
     fmap = (.)
 
 -- | @since 2.01
-instance Applicative ((->) a) where
+instance Applicative ((->) r) where
     pure = const
     (<*>) f g x = f x (g x)
     liftA2 q f g x = q (f x) (g x)
@@ -1152,7 +1272,6 @@ The rules for map work like this.
 --   http://research.microsoft.com/en-us/um/people/simonpj/papers/ext-f/coercible.pdf
 
 {-# RULES "map/coerce" [1] map coerce = coerce #-}
-
 
 ----------------------------------------------
 --              append

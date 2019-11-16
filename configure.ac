@@ -283,6 +283,55 @@ AC_ARG_ENABLE(unregisterised,
 )
 AC_SUBST(Unregisterised)
 
+dnl ** Do a build with tables next to code?
+dnl
+dnl Whether the target architecture supports placing info tables
+dnl directly before the entry code (see TABLES_NEXT_TO_CODE in the RTS).
+dnl Whether we actually compile for TABLES_NEXT_TO_CODE depends on
+dnl whether we're building unregisterised code or not, which may be
+dnl decided by options to the compiler later.
+dnl
+dnl See https://gitlab.haskell.org/ghc/ghc/wikis/commentary/rts/storage/heap-objects#tables_next_to_code
+dnl --------------------------------------------------------------
+case "$Unregisterised" in
+    NO)
+        case "$TargetArch" in
+            ia64|powerpc64|powerpc64le)
+                TablesNextToCodeDefault=NO
+                ;;
+            *)
+                TablesNextToCodeDefault=YES
+                ;;
+        esac
+        ;;
+    YES)
+        TablesNextToCodeDefault=NO
+        ;;
+esac
+AC_ARG_ENABLE(tables-next-to-code,
+[AC_HELP_STRING([--enable-tables-next-to-code],
+[Build an tables-next-to-code compiler (enabled by default on platforms without registerised support) [default="$TablesNextToCodeDefault"]])],
+[ if test x"$enableval" = x"yes"; then
+        TablesNextToCode=YES
+  else
+        TablesNextToCode=NO
+  fi
+],
+[TablesNextToCode="$TablesNextToCodeDefault"]
+)
+
+fail() {
+    echo >&2
+    echo "$1" >&2
+    exit 1
+}
+
+if test "$TablesNextToCodeDefault" = "NO" && test "$TablesNextToCode" = "YES"; then
+    fail "Error: tables next to code was requested but is not supported"
+fi
+
+AC_SUBST(TablesNextToCode)
+
 dnl ** Does target have runtime linker support?
 dnl --------------------------------------------------------------
 case "$target" in
@@ -297,12 +346,6 @@ AC_SUBST(HaskellHaveRTSLinker)
 
 # Requires FPTOOLS_SET_PLATFORM_VARS to be run first.
 FP_FIND_ROOT
-
-fail() {
-    echo >&2
-    echo "$1" >&2
-    exit 1
-}
 
 
 if test "$HostOS" = "mingw32"
@@ -519,7 +562,7 @@ AC_ARG_WITH([clang],
 
 dnl detect compiler (prefer gcc over clang) and set $CC (unless CC already set),
 dnl later CC is copied to CC_STAGE{1,2,3}
-AC_PROG_CC([gcc clang])
+AC_PROG_CC([cc gcc clang])
 
 MAYBE_OVERRIDE_STAGE0([ar],[AR_STAGE0])
 
@@ -640,7 +683,7 @@ AC_SUBST([LibtoolCmd])
 # tools we are looking for. In the past, GHC supported a number of
 # versions of LLVM simultaneously, but that stopped working around
 # 3.5/3.6 release of LLVM.
-LlvmVersion=7.0
+LlvmVersion=7
 AC_SUBST([LlvmVersion])
 sUPPORTED_LLVM_VERSION=$(echo \($LlvmVersion\) | sed 's/\./,/')
 AC_DEFINE_UNQUOTED([sUPPORTED_LLVM_VERSION], ${sUPPORTED_LLVM_VERSION}, [The supported LLVM version number])
@@ -1215,12 +1258,13 @@ UseLibdw=NO
 USE_LIBDW=0
 AC_ARG_ENABLE(dwarf-unwind,
     [AC_HELP_STRING([--enable-dwarf-unwind],
-        [Enable DWARF unwinding support in the runtime system via elfutils' libdw [default=no]])],
-    [AC_CHECK_LIB(dw, dwfl_attach_state,
+        [Enable DWARF unwinding support in the runtime system via elfutils' libdw [default=no]])])
+if test "$enable_dwarf_unwind" = "yes" ; then
+  AC_CHECK_LIB(dw, dwfl_attach_state,
       [UseLibdw=YES],
-      [AC_MSG_ERROR([Cannot find system libdw (required by --enable-dwarf-unwind)])])],
-    [UseLibdw=NO]
-)
+      [AC_MSG_ERROR([Cannot find system libdw (required by --enable-dwarf-unwind)])])
+fi
+
 AC_SUBST(UseLibdw)
 if test $UseLibdw = "YES" ; then
 	USE_LIBDW=1
@@ -1347,6 +1391,7 @@ echo "\
       which is version       : $GccVersion
    Building a cross compiler : $CrossCompiling
    Unregisterised            : $Unregisterised
+   TablesNextToCode          : $TablesNextToCode
    hs-cpp       : $HaskellCPPCmd
    hs-cpp-flags : $HaskellCPPArgs
    ar           : $ArCmd

@@ -23,7 +23,7 @@ module Control.Category where
 import qualified GHC.Base (id,(.))
 import Data.Type.Coercion
 import Data.Type.Equality
-import GHC.Prim (coerce)
+import Data.Coerce (coerce)
 
 infixr 9 .
 infixr 1 >>>, <<<

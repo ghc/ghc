@@ -1,3 +1,6 @@
+{-
+Main functions for .hie file generation
+-}
 {-# LANGUAGE OverloadedStrings #-}
 {-# LANGUAGE FlexibleInstances #-}
 {-# LANGUAGE UndecidableInstances #-}
@@ -20,7 +23,6 @@ import BooleanFormula
 import Class                      ( FunDep )
 import CoreUtils                  ( exprType )
 import ConLike                    ( conLikeName )
-import Config                     ( cProjectVersion )
 import Desugar                    ( deSugarExpr )
 import FieldLabel
 import HsSyn
@@ -36,13 +38,13 @@ import TysWiredIn                 ( mkListTy, mkSumTy )
 import Var                        ( Id, Var, setVarName, varName, varType )
 import TcRnTypes
 import MkIface                    ( mkIfaceExports )
+import Panic
 
 import HieTypes
 import HieUtils
 
 import qualified Data.Array as A
 import qualified Data.ByteString as BS
-import qualified Data.ByteString.Char8 as BSC
 import qualified Data.Map as M
 import qualified Data.Set as S
 import Data.Data                  ( Data, Typeable )
@@ -98,9 +100,7 @@ mkHieFile ms ts rs = do
   let Just src_file = ml_hs_file $ ms_location ms
   src <- liftIO $ BS.readFile src_file
   return $ HieFile
-      { hie_version = curHieVersion
-      , hie_ghc_version = BSC.pack cProjectVersion
-      , hie_hs_file = src_file
+      { hie_hs_file = src_file
       , hie_module = ms_mod ms
       , hie_types = arr
       , hie_asts = asts'
@@ -162,7 +162,7 @@ getRealSpan _ = Nothing
 
 grhss_span :: GRHSs p body -> SrcSpan
 grhss_span (GRHSs _ xs bs) = foldl' combineSrcSpans (getLoc bs) (map getLoc xs)
-grhss_span (XGRHSs _) = error "XGRHS has no span"
+grhss_span (XGRHSs _) = panic "XGRHS has no span"
 
 bindingsOnly :: [Context Name] -> [HieAST a]
 bindingsOnly [] = []
@@ -246,7 +246,7 @@ patScopes
   -> [LPat (GhcPass p)]
   -> [PScoped (LPat (GhcPass p))]
 patScopes rsp useScope patScope xs =
-  map (\(RS sc a) -> PS rsp useScope sc (unLoc a)) $
+  map (\(RS sc a) -> PS rsp useScope sc (composeSrcSpan a)) $
     listScopes patScope (map dL xs)
 
 -- | 'listScopes' specialised to 'TVScoped' things
@@ -284,7 +284,7 @@ type family ProtectedSig a where
   ProtectedSig GhcRn = HsWildCardBndrs GhcRn (HsImplicitBndrs
                                                 GhcRn
                                                 (Shielded (LHsType GhcRn)))
-  ProtectedSig GhcTc = NoExt
+  ProtectedSig GhcTc = NoExtField
 
 class ProtectSig a where
   protectSig :: Scope -> LHsSigWcType (NoGhcTc a) -> ProtectedSig a
@@ -296,12 +296,13 @@ instance (ToHie (TScoped a)) => ToHie (TScoped (Shielded a)) where
   toHie (TS _ (SH sc a)) = toHie (TS (ResolvedScopes [sc]) a)
 
 instance ProtectSig GhcTc where
-  protectSig _ _ = NoExt
+  protectSig _ _ = noExtField
 
 instance ProtectSig GhcRn where
   protectSig sc (HsWC a (HsIB b sig)) =
     HsWC a (HsIB b (SH sc sig))
-  protectSig _ _ = error "protectSig not given HsWC (HsIB)"
+  protectSig _ (HsWC _ (XHsImplicitBndrs nec)) = noExtCon nec
+  protectSig _ (XHsWildCardBndrs nec) = noExtCon nec
 
 class HasLoc a where
   -- ^ defined so that HsImplicitBndrs and HsWildCardBndrs can
@@ -352,6 +353,21 @@ instance HasLoc (HsDataDefn GhcRn) where
 instance HasLoc (Pat (GhcPass a)) where
   loc (dL -> L l _) = l
 
+{- Note [Real DataCon Name]
+The typechecker subtitutes the conLikeWrapId for the name, but we don't want
+this showing up in the hieFile, so we replace the name in the Id with the
+original datacon name
+See also Note [Data Constructor Naming]
+-}
+class HasRealDataConName p where
+  getRealDataCon :: XRecordCon p -> Located (IdP p) -> Located (IdP p)
+
+instance HasRealDataConName GhcRn where
+  getRealDataCon _ n = n
+instance HasRealDataConName GhcTc where
+  getRealDataCon RecordConTc{rcon_con_like = con} (L sp var) =
+    L sp (setVarName var (conLikeName con))
+
 -- | The main worker class
 class ToHie a where
   toHie :: a -> HieM [HieAST Type]
@@ -369,10 +385,10 @@ instance (ToHie a) => ToHie (Bag a) where
 instance (ToHie a) => ToHie (Maybe a) where
   toHie = maybe (pure []) toHie
 
-instance ToHie (Context (Located NoExt)) where
+instance ToHie (Context (Located NoExtField)) where
   toHie _ = pure []
 
-instance ToHie (TScoped NoExt) where
+instance ToHie (TScoped NoExtField) where
   toHie _ = pure []
 
 instance ToHie (IEContext (Located ModuleName)) where
@@ -738,6 +754,7 @@ instance ( a ~ GhcPass p
          , Data (HsSplice a)
          , Data (HsTupArg a)
          , Data (AmbiguousFieldOcc a)
+         , (HasRealDataConName a)
          ) => ToHie (LHsExpr (GhcPass p)) where
   toHie e@(L mspan oexpr) = concatM $ getTypeNode e : case oexpr of
       HsVar _ (L _ var) ->
@@ -818,8 +835,9 @@ instance ( a ~ GhcPass p
       ExplicitList _ _ exprs ->
         [ toHie exprs
         ]
-      RecordCon {rcon_con_name = name, rcon_flds = binds}->
-        [ toHie $ C Use name
+      RecordCon {rcon_ext = mrealcon, rcon_con_name = name, rcon_flds = binds} ->
+        [ toHie $ C Use (getRealDataCon @a mrealcon name)
+            -- See Note [Real DataCon Name]
         , toHie $ RC RecFieldAssign $ binds
         ]
       RecordUpd {rupd_expr = expr, rupd_flds = upds}->

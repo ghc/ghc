@@ -4,6 +4,8 @@ T15365.hs:(9,3)-(31,6): Splicing declarations
         pattern (:!!!) :: Bool
         pattern (:!!!) = True
         
+        type role (***)
+        
         type (|||) = Either
         data (***)
         class (???)

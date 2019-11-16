@@ -27,7 +27,7 @@ configureRules = do
                 ++ "automatically by passing the flag --configure."
         else do
             -- We cannot use windowsHost here due to a cyclic dependency.
-            when System.isWindows $ do
+            when windowsHost $ do
                 putBuild "| Checking for Windows tarballs..."
                 quietly $ cmd ["bash", "mk/get-win32-tarballs.sh", "download", System.arch]
             let srcs    = map (<.> "in") outs
@@ -39,7 +39,7 @@ configureRules = do
             -- We need to copy the directory with unpacked Windows tarball to
             -- the build directory, so that the built GHC has access to it.
             -- See https://github.com/snowleopard/hadrian/issues/564.
-            when System.isWindows $ do
+            when windowsHost $ do
                 root <- buildRoot
                 copyDirectory "inplace/mingw" (root -/- "mingw")
                 mingwFiles <- liftIO $ getDirectoryFilesIO "." [root -/- "mingw/**"]

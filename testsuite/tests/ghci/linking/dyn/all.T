@@ -45,5 +45,11 @@ test('big-obj', [extra_files(['big-obj-c.c', 'big-obj.hs']),
                     unless(doing_ghci, skip), unless(opsys('mingw32'), skip)],
      makefile_test, ['big-obj'])
 
-test('T3372', [unless(doing_ghci, skip), extra_run_opts('"' + config.libdir + '"')],
+test('T3372',
+     [unless(doing_ghci, skip),
+      extra_run_opts('"' + config.libdir + '"'),
+      # Concurrent GHC sessions is fragile on Windows since we must lock the
+      # package database even for read-only access.
+      # See Note [Locking package database on Windows] in GHC.PackageDb
+      when(opsys('mingw32'), fragile(16773))],
      compile_and_run, ['-package ghc'])

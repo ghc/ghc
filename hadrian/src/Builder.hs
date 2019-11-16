@@ -28,7 +28,6 @@ import Hadrian.Utilities
 import Base
 import Context
 import Oracles.Flag
-import Oracles.Setting
 import Packages
 
 -- | C compiler can be used in two different modes:
@@ -179,20 +178,19 @@ instance H.Builder Builder where
         Ghc _ Stage0 -> generatedGhcDependencies Stage0
         Ghc _ stage -> do
             root <- buildRoot
-            win <- windowsHost
             touchyPath <- programPath (vanillaContext Stage0 touchy)
             unlitPath  <- builderPath Unlit
             ghcgens <- generatedGhcDependencies stage
 
             -- GHC from the previous stage is used to build artifacts in the
             -- current stage. Need the previous stage's GHC deps.
-            ghcdeps <- ghcDeps (pred stage)
+            ghcdeps <- ghcBinDeps (pred stage)
 
             return $ [ unlitPath ]
                   ++ ghcdeps
                   ++ ghcgens
-                  ++ [ touchyPath | win ]
-                  ++ [ root -/- mingwStamp | win ]
+                  ++ [ touchyPath          | windowsHost ]
+                  ++ [ root -/- mingwStamp | windowsHost ]
                      -- proxy for the entire mingw toolchain that
                      -- we have in inplace/mingw initially, and then at
                      -- root -/- mingw.
@@ -331,9 +329,8 @@ systemBuilderPath builder = case builder of
                 ++ quote key ++ " is not specified" ++ inCfg
             return "" -- TODO: Use a safe interface.
         else do
-            win <- windowsHost
             fullPath <- lookupInPath path
-            case (win, hasExtension fullPath) of
+            case (windowsHost, hasExtension fullPath) of
                 (False, _    ) -> return fullPath
                 (True , True ) -> fixAbsolutePathOnWindows fullPath
                 (True , False) -> fixAbsolutePathOnWindows fullPath <&> (<.> exe)

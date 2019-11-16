@@ -20,7 +20,7 @@ test('tempfiles', normal, compile_and_run, [''])
 test('fixed', normal, compile_and_run, [''])
 test('quotOverflow', normal, compile_and_run, [''])
 test('assert', exit_code(1), compile_and_run, ['-fno-ignore-asserts'])
-test('CPUTime001', normal, compile_and_run, [''])
+test('CPUTime001', fragile(16224), compile_and_run, [''])
 test('readLitChar',   normal, compile_and_run, [''])
 test('unicode001',
      when(platform('i386-unknown-openbsd'), expect_fail),
@@ -40,6 +40,7 @@ test('take001', extra_run_opts('1'), compile_and_run, [''])
 test('inits', normal, compile_and_run, [''])
 test('genericNegative001', extra_run_opts('-1'), compile_and_run, [''])
 test('ix001', normal, compile_and_run, [''])
+test('isValidNatural', reqlib('integer-gmp'), compile_and_run, [''])
 
 # need to add -K64m to the compiler opts, so that GHCi gets it too
 test('ioref001',
@@ -93,13 +94,27 @@ test('dynamic004',      omit_ways(['normal', 'threaded1', 'ghci']), compile_and_
 test('dynamic005',      normal, compile_and_run, [''])
 
 enum_setups = [when(fast(), skip)]
-test('enum01',          [extra_files(['enum_processor.bat', 'enum_processor.py']),
-                         enum_setups], compile_and_run, [''])
-test('enum02',          [extra_files(['enum_processor.bat', 'enum_processor.py']),
-                         enum_setups], compile_and_run, [''])
-test('enum03',          [extra_files(['enum_processor.bat', 'enum_processor.py']),
-                         enum_setups], compile_and_run, [''])
-test('enum04',          normal, compile_and_run, [''])
+def enum_test(name):
+    """
+    These tests have a funky Python preprocessor which require some headstands
+    to run on Windows.
+    """
+    if opsys('mingw32'):
+        test(name,
+             [when(opsys('mingw32'), extra_files(['enum_processor.bat'])),
+              extra_files(['enum_processor.py'])],
+             compile_and_run,
+             ['-F -pgmF ./enum_processor.bat'])
+    else:
+        test(name,
+             [extra_files(['enum_processor.py'])],
+             compile_and_run,
+             ['-F -pgmF ./enum_processor.py'])
+
+enum_test('enum01')
+enum_test('enum02')
+enum_test('enum03')
+test('enum04', normal, compile_and_run, [''])
 
 test('exceptionsrun001',        normal, compile_and_run, [''])
 test('exceptionsrun002', 	normal, compile_and_run, [''])
@@ -202,7 +217,7 @@ test('T8089',
      compile_and_run, [''])
 test('hWaitForInput-accurate-socket', reqlib('unix'), compile_and_run, [''])
 test('T8684', expect_broken(8684), compile_and_run, [''])
-test('hWaitForInput-accurate-stdin', normal, compile_and_run, [''])
+test('hWaitForInput-accurate-stdin', [expect_broken_for(16535, threaded_ways), omit_ways(['ghci'])], compile_and_run, [''])
 test('hWaitForInput-accurate-pipe', reqlib('unix'), compile_and_run, [''])
 test('T9826',normal, compile_and_run,[''])
 test('T9848',
@@ -233,6 +248,8 @@ test('T3474',
 test('T14425', normal, compile_and_run, [''])
 test('T10412', normal, compile_and_run, [''])
 test('T13896', normal, compile_and_run, [''])
-test('T13167', normal, compile_and_run, [''])
-test('T15349', [exit_code(1), expect_broken_for(15349, 'ghci')], compile_and_run, [''])
+test('T13167', fragile_for(16536, ['threaded2']), compile_and_run, [''])
+test('T15349', [exit_code(1), expect_broken_for(15349, ['ghci'])], compile_and_run, [''])
 test('T16111', exit_code(1), compile_and_run, [''])
+test('T16943a', normal, compile_and_run, [''])
+test('T16943b', normal, compile_and_run, [''])

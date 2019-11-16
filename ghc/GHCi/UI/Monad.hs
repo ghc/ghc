@@ -1,4 +1,4 @@
-{-# LANGUAGE CPP, FlexibleInstances #-}
+{-# LANGUAGE CPP, FlexibleInstances, DeriveFunctor #-}
 {-# OPTIONS_GHC -fno-cse -fno-warn-orphans #-}
 -- -fno-cse is needed for GLOBAL_VAR's to behave properly
 
@@ -41,14 +41,18 @@ import qualified GHC
 import GhcMonad         hiding (liftIO)
 import Outputable       hiding (printForUser, printForUserPartWay)
 import qualified Outputable
+import OccName
 import DynFlags
 import FastString
 import HscTypes
 import SrcLoc
 import Module
+import RdrName (mkOrig)
+import PrelNames (gHC_GHCI_HELPERS)
 import GHCi
 import GHCi.RemoteTypes
 import HsSyn (ImportDecl, GhcPs, GhciLStmt, LHsDecl)
+import HsUtils
 import Util
 
 import Exception
@@ -66,6 +70,7 @@ import qualified System.Console.Haskeline as Haskeline
 import Control.Monad.Trans.Class
 import Control.Monad.IO.Class
 import Data.Map.Strict (Map)
+import qualified Data.IntMap.Strict as IntMap
 import qualified GHC.LanguageExtensions as LangExt
 
 -----------------------------------------------------------------------------
@@ -84,7 +89,7 @@ data GHCiState = GHCiState
         options        :: [GHCiOption],
         line_number    :: !Int,         -- ^ input line
         break_ctr      :: !Int,
-        breaks         :: ![(Int, BreakLocation)],
+        breaks         :: !(IntMap.IntMap BreakLocation),
         tickarrays     :: ModuleEnv TickArray,
             -- ^ 'tickarrays' caches the 'TickArray' for loaded modules,
             -- so that we don't rebuild it each time the user sets
@@ -213,6 +218,7 @@ data BreakLocation
    { breakModule :: !GHC.Module
    , breakLoc    :: !SrcSpan
    , breakTick   :: {-# UNPACK #-} !Int
+   , breakEnabled:: !Bool
    , onBreakCmd  :: String
    }
 
@@ -220,21 +226,27 @@ instance Eq BreakLocation where
   loc1 == loc2 = breakModule loc1 == breakModule loc2 &&
                  breakTick loc1   == breakTick loc2
 
-prettyLocations :: [(Int, BreakLocation)] -> SDoc
-prettyLocations []   = text "No active breakpoints."
-prettyLocations locs = vcat $ map (\(i, loc) -> brackets (int i) <+> ppr loc) $ reverse $ locs
+prettyLocations :: IntMap.IntMap BreakLocation -> SDoc
+prettyLocations  locs =
+    case  IntMap.null locs of
+      True  -> text "No active breakpoints."
+      False -> vcat $ map (\(i, loc) -> brackets (int i) <+> ppr loc) $ IntMap.toAscList locs
 
 instance Outputable BreakLocation where
-   ppr loc = (ppr $ breakModule loc) <+> ppr (breakLoc loc) <+>
+   ppr loc = (ppr $ breakModule loc) <+> ppr (breakLoc loc) <+> pprEnaDisa <+>
                 if null (onBreakCmd loc)
                    then Outputable.empty
                    else doubleQuotes (text (onBreakCmd loc))
+      where pprEnaDisa = case breakEnabled loc of
+                True  -> text "enabled"
+                False -> text "disabled"
 
 recordBreak
   :: GhciMonad m => BreakLocation -> m (Bool{- was already present -}, Int)
 recordBreak brkLoc = do
    st <- getGHCiState
-   let oldActiveBreaks = breaks st
+   let oldmap = breaks st
+       oldActiveBreaks = IntMap.assocs oldmap
    -- don't store the same break point twice
    case [ nm | (nm, loc) <- oldActiveBreaks, loc == brkLoc ] of
      (nm:_) -> return (True, nm)
@@ -242,20 +254,18 @@ recordBreak brkLoc = do
       let oldCounter = break_ctr st
           newCounter = oldCounter + 1
       setGHCiState $ st { break_ctr = newCounter,
-                          breaks = (oldCounter, brkLoc) : oldActiveBreaks
+                          breaks = IntMap.insert oldCounter brkLoc oldmap
                         }
       return (False, oldCounter)
 
 newtype GHCi a = GHCi { unGHCi :: IORef GHCiState -> Ghc a }
+    deriving (Functor)
 
 reflectGHCi :: (Session, IORef GHCiState) -> GHCi a -> IO a
 reflectGHCi (s, gs) m = unGhc (unGHCi m gs) s
 
 startGHCi :: GHCi a -> GHCiState -> Ghc a
 startGHCi g state = do ref <- liftIO $ newIORef state; unGHCi g ref
-
-instance Functor GHCi where
-    fmap = liftM
 
 instance Applicative GHCi where
     pure a = GHCi $ \_ -> pure a
@@ -482,13 +492,12 @@ revertCAFs = do
 -- | Compile "hFlush stdout; hFlush stderr" once, so we can use it repeatedly
 initInterpBuffering :: Ghc (ForeignHValue, ForeignHValue)
 initInterpBuffering = do
-  nobuf <- compileGHCiExpr $
-   "do { System.IO.hSetBuffering System.IO.stdin System.IO.NoBuffering; " ++
-       " System.IO.hSetBuffering System.IO.stdout System.IO.NoBuffering; " ++
-       " System.IO.hSetBuffering System.IO.stderr System.IO.NoBuffering }"
-  flush <- compileGHCiExpr $
-   "do { System.IO.hFlush System.IO.stdout; " ++
-       " System.IO.hFlush System.IO.stderr }"
+  let mkHelperExpr :: OccName -> Ghc ForeignHValue
+      mkHelperExpr occ =
+        GHC.compileParsedExprRemote
+        $ GHC.nlHsVar $ RdrName.mkOrig gHC_GHCI_HELPERS occ
+  nobuf <- mkHelperExpr $ mkVarOcc "disableBuffering"
+  flush <- mkHelperExpr $ mkVarOcc "flushAll"
   return (nobuf, flush)
 
 -- | Invoke "hFlush stdout; hFlush stderr" in the interpreter
@@ -511,13 +520,18 @@ turnOffBuffering_ fhv = do
 
 mkEvalWrapper :: GhcMonad m => String -> [String] ->  m ForeignHValue
 mkEvalWrapper progname args =
-  compileGHCiExpr $
-    "\\m -> System.Environment.withProgName " ++ show progname ++
-    "(System.Environment.withArgs " ++ show args ++ " m)"
+  runInternal $ GHC.compileParsedExprRemote
+  $ evalWrapper `GHC.mkHsApp` nlHsString progname
+                `GHC.mkHsApp` nlList (map nlHsString args)
+  where
+    nlHsString = nlHsLit . mkHsString
+    evalWrapper =
+      GHC.nlHsVar $ RdrName.mkOrig gHC_GHCI_HELPERS (mkVarOcc "evalWrapper")
 
-compileGHCiExpr :: GhcMonad m => String -> m ForeignHValue
-compileGHCiExpr expr =
-  withTempSession mkTempSession $ GHC.compileExprRemote expr
+-- | Run a 'GhcMonad' action to compile an expression for internal usage.
+runInternal :: GhcMonad m => m a -> m a
+runInternal =
+    withTempSession mkTempSession
   where
     mkTempSession hsc_env = hsc_env
       { hsc_dflags = (hsc_dflags hsc_env) {
@@ -534,3 +548,6 @@ compileGHCiExpr expr =
           -- with fully qualified names without imports.
           `gopt_set` Opt_ImplicitImportQualified
       }
+
+compileGHCiExpr :: GhcMonad m => String -> m ForeignHValue
+compileGHCiExpr expr = runInternal $ GHC.compileExprRemote expr

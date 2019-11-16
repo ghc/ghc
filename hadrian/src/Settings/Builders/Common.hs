@@ -53,7 +53,7 @@ cWarnings :: Args
 cWarnings = mconcat
     [ arg "-Wall"
     , flag GccIsClang ? arg "-Wno-unknown-pragmas"
-    , notM (flag GccIsClang) ? notM windowsHost ? arg "-Werror=unused-but-set-variable"
+    , notM (flag GccIsClang) ? not windowsHost ? arg "-Werror=unused-but-set-variable"
     , notM (flag GccIsClang) ? arg "-Wno-error=inline" ]
 
 packageDatabaseArgs :: Args

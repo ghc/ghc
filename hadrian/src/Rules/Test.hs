@@ -122,7 +122,7 @@ testRules = do
             -- This lets us bypass the need to generate a config
             -- through Make, which happens in testsuite/mk/boilerplate.mk
             -- which is in turn included by all test 'Makefile's.
-            setEnv "ghc-config-mk" (top -/- root -/- ghcConfigPath)
+            setEnv "ghc_config_mk" (top -/- root -/- ghcConfigPath)
 
         -- Execute the test target.
         -- We override the verbosity setting to make sure the user can see
@@ -135,8 +135,7 @@ testRules = do
 timeoutProgBuilder :: Action ()
 timeoutProgBuilder = do
     root    <- buildRoot
-    windows <- windowsHost
-    if windows
+    if windowsHost
         then do
             prog <- programPath =<< programContext Stage1 timeout
             copyFile prog (root -/- timeoutPath)
@@ -163,9 +162,10 @@ needTestsuitePackages = do
         allpkgs   <- packages <$> flavour
         stgpkgs   <- allpkgs (succ stg)
         testpkgs  <- testsuitePackages
-        targets <- mapM (needFile stg) (stgpkgs ++ testpkgs)
+        let pkgs = filter (\p -> not $ "iserv" `isInfixOf` pkgName p)
+                          (stgpkgs ++ testpkgs)
+        need =<< mapM (pkgFile stg) pkgs
         needIservBins
-        need targets
 
 -- stage 1 ghc lives under stage0/bin,
 -- stage 2 ghc lives under stage1/bin, etc
@@ -178,8 +178,7 @@ stageOf _ = error "unexpected stage argument"
 needIservBins :: Action ()
 needIservBins = do
     -- iserv is not supported under Windows
-    windows <- windowsHost
-    when (not windows) $ do
+    when (not windowsHost) $ do
         testGhc <- testCompiler <$> userSetting defaultTestArgs
         let stg = stageOf testGhc
         rtsways <- interpretInContext (vanillaContext stg ghc) getRtsWays
@@ -189,7 +188,7 @@ needIservBins = do
             , w `elem` rtsways
             ]
 
-needFile :: Stage -> Package -> Action FilePath
-needFile stage pkg
+pkgFile :: Stage -> Package -> Action FilePath
+pkgFile stage pkg
     | isLibrary pkg = pkgConfFile (Context stage pkg profilingDynamic)
     | otherwise     = programPath =<< programContext stage pkg

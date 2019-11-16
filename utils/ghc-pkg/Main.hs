@@ -17,6 +17,9 @@
 #endif
 #endif
 
+-- Fine if this comes from make/Hadrian or the pre-built base.
+#include <ghcplatform.h>
+
 -----------------------------------------------------------------------------
 --
 -- (c) The University of Glasgow 2004-2009.
@@ -27,10 +30,19 @@
 
 module Main (main) where
 
-import Version ( version, targetOS, targetARCH )
 import qualified GHC.PackageDb as GhcPkg
 import GHC.PackageDb (BinaryStringRep(..))
 import GHC.HandleEncoding
+import GHC.BaseDir (getBaseDir)
+import GHC.Settings (getTargetPlatform, maybeReadFuzzy)
+import GHC.Platform
+  ( platformArch, platformOS
+  , stringEncodeArch, stringEncodeOS
+  )
+import GHC.UniqueSubdir
+  ( uniqueSubdir0
+  )
+import GHC.Version ( cProjectVersion )
 import qualified Distribution.Simple.PackageIndex as PackageIndex
 import qualified Data.Graph as Graph
 import qualified Distribution.ModuleName as ModuleName
@@ -66,9 +78,6 @@ import System.Directory ( doesDirectoryExist, getDirectoryContents,
                           getCurrentDirectory )
 import System.Exit ( exitWith, ExitCode(..) )
 import System.Environment ( getArgs, getProgName, getEnv )
-#if defined(darwin_HOST_OS) || defined(linux_HOST_OS) || defined(mingw32_HOST_OS)
-import System.Environment ( getExecutablePath )
-#endif
 import System.IO
 import System.IO.Error
 import GHC.IO.Exception (IOErrorType(InappropriateType))
@@ -223,7 +232,7 @@ deprecFlags = [
   ]
 
 ourCopyright :: String
-ourCopyright = "GHC package manager version " ++ Version.version ++ "\n"
+ourCopyright = "GHC package manager version " ++ GHC.Version.cProjectVersion ++ "\n"
 
 shortUsage :: String -> String
 shortUsage prog = "For usage information see '" ++ prog ++ " --help'."
@@ -594,14 +603,15 @@ getPkgDatabases :: Verbosity
                           -- commands that just read the DB, such as 'list'.
 
 getPkgDatabases verbosity mode use_user use_cache expand_vars my_flags = do
-  -- first we determine the location of the global package config.  On Windows,
+  -- Second we determine the location of the global package config.  On Windows,
   -- this is found relative to the ghc-pkg.exe binary, whereas on Unix the
   -- location is passed to the binary using the --global-package-db flag by the
   -- wrapper script.
   let err_msg = "missing --global-package-db option, location of global package database unknown\n"
   global_conf <-
      case [ f | FlagGlobalConfig f <- my_flags ] of
-        [] -> do mb_dir <- getLibDir
+        -- See Note [Base Dir] for more information on the base dir / top dir.
+        [] -> do mb_dir <- getBaseDir
                  case mb_dir of
                    Nothing  -> die err_msg
                    Just dir -> do
@@ -629,7 +639,25 @@ getPkgDatabases verbosity mode use_user use_cache expand_vars my_flags = do
       [] -> case e_appdir of
         Left _    -> return Nothing
         Right appdir -> do
-          let subdir = targetARCH ++ '-':targetOS ++ '-':Version.version
+          -- See Note [Settings File] about this file, and why we need GHC to share it with us.
+          let settingsFile = top_dir </> "settings"
+          exists_settings_file <- doesFileExist settingsFile
+          (arch, os) <- case exists_settings_file of
+            False -> do
+              warn $ "WARNING: settings file doesn't exist " ++ show settingsFile
+              warn "cannot know target platform so guessing target == host (native compiler)."
+              pure (HOST_ARCH, HOST_OS)
+            True -> do
+              settingsStr <- readFile settingsFile
+              mySettings <- case maybeReadFuzzy settingsStr of
+                Just s -> pure $ Map.fromList s
+                -- It's excusable to not have a settings file (for now at
+                -- least) but completely inexcusable to have a malformed one.
+                Nothing -> die $ "Can't parse settings file " ++ show settingsFile
+              case getTargetPlatform settingsFile mySettings of
+                Right platform -> pure (stringEncodeArch $ platformArch platform, stringEncodeOS $ platformOS platform)
+                Left e -> die e
+          let subdir = uniqueSubdir0 arch os
               dir = appdir </> subdir
           r <- lookForPackageDBIn dir
           case r of
@@ -1991,9 +2019,9 @@ checkHSLib :: Verbosity -> [String] -> String -> Validate ()
 checkHSLib _verbosity dirs lib = do
   let filenames = ["lib" ++ lib ++ ".a",
                    "lib" ++ lib ++ "_p.a",
-                   "lib" ++ lib ++ "-ghc" ++ Version.version ++ ".so",
-                   "lib" ++ lib ++ "-ghc" ++ Version.version ++ ".dylib",
-                            lib ++ "-ghc" ++ Version.version ++ ".dll"]
+                   "lib" ++ lib ++ "-ghc" ++ GHC.Version.cProjectVersion ++ ".so",
+                   "lib" ++ lib ++ "-ghc" ++ GHC.Version.cProjectVersion ++ ".dylib",
+                            lib ++ "-ghc" ++ GHC.Version.cProjectVersion ++ ".dll"]
   b <- liftIO $ doesFileExistOnPath filenames dirs
   when (not b) $
     verror ForceFiles ("cannot find any of " ++ show filenames ++
@@ -2176,17 +2204,6 @@ reportError s = do hFlush stdout; hPutStrLn stderr s
 
 dieForcible :: String -> IO ()
 dieForcible s = die (s ++ " (use --force to override)")
-
------------------------------------------
--- Cut and pasted from ghc/compiler/main/SysTools
-
-getLibDir :: IO (Maybe String)
-
-#if defined(mingw32_HOST_OS) || defined(darwin_HOST_OS) || defined(linux_HOST_OS)
-getLibDir = Just . (\p -> p </> "lib") . takeDirectory . takeDirectory <$> getExecutablePath
-#else
-getLibDir = return Nothing
-#endif
 
 -----------------------------------------
 -- Adapted from ghc/compiler/utils/Panic

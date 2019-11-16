@@ -13,7 +13,7 @@ import ErrUtils
 import HscTypes
 import DynFlags
 import Outputable
-import Platform
+import GHC.Platform
 import Util
 
 import Data.Char
@@ -23,7 +23,7 @@ import System.IO
 import System.Process
 import GhcPrelude
 
-import LlvmCodeGen.Base (llvmVersionStr, supportedLlvmVersion)
+import LlvmCodeGen.Base (LlvmVersion (..), llvmVersionStr, supportedLlvmVersion)
 
 import SysTools.Process
 import SysTools.Info
@@ -37,14 +37,14 @@ import SysTools.Info
 -}
 
 runUnlit :: DynFlags -> [Option] -> IO ()
-runUnlit dflags args = do
+runUnlit dflags args = traceToolCommand dflags "unlit" $ do
   let prog = pgm_L dflags
       opts = getOpts dflags opt_L
   runSomething dflags "Literate pre-processor" prog
                (map Option opts ++ args)
 
 runCpp :: DynFlags -> [Option] -> IO ()
-runCpp dflags args =   do
+runCpp dflags args = traceToolCommand dflags "cpp" $ do
   let (p,args0) = pgm_P dflags
       args1 = map Option (getOpts dflags opt_P)
       args2 = [Option "-Werror" | gopt Opt_WarnIsError dflags]
@@ -54,17 +54,17 @@ runCpp dflags args =   do
                        (args0 ++ args1 ++ args2 ++ args) Nothing mb_env
 
 runPp :: DynFlags -> [Option] -> IO ()
-runPp dflags args =   do
+runPp dflags args = traceToolCommand dflags "pp" $ do
   let prog = pgm_F dflags
       opts = map Option (getOpts dflags opt_F)
   runSomething dflags "Haskell pre-processor" prog (args ++ opts)
 
 -- | Run compiler of C-like languages and raw objects (such as gcc or clang).
 runCc :: Maybe ForeignSrcLang -> DynFlags -> [Option] -> IO ()
-runCc mLanguage dflags args =   do
-  let (p,args0) = pgm_c dflags
+runCc mLanguage dflags args = traceToolCommand dflags "cc" $ do
+  let p = pgm_c dflags
       args1 = map Option userOpts
-      args2 = args0 ++ languageOptions ++ args ++ args1
+      args2 = languageOptions ++ args ++ args1
       -- We take care to pass -optc flags in args1 last to ensure that the
       -- user can override flags passed by GHC. See #14452.
   mb_env <- getGccEnv args2
@@ -126,12 +126,16 @@ runCc mLanguage dflags args =   do
   -- -x c option.
   (languageOptions, userOpts) = case mLanguage of
     Nothing -> ([], userOpts_c)
-    Just language -> ([Option "-x", Option languageName], opts) where
-      (languageName, opts) = case language of
-        LangCxx    -> ("c++",           userOpts_cxx)
-        LangObjc   -> ("objective-c",   userOpts_c)
-        LangObjcxx -> ("objective-c++", userOpts_cxx)
-        _          -> ("c",             userOpts_c)
+    Just language -> ([Option "-x", Option languageName], opts)
+      where
+        s = settings dflags
+        (languageName, opts) = case language of
+          LangC      -> ("c",             sOpt_c s ++ userOpts_c)
+          LangCxx    -> ("c++",           sOpt_cxx s ++ userOpts_cxx)
+          LangObjc   -> ("objective-c",   userOpts_c)
+          LangObjcxx -> ("objective-c++", userOpts_cxx)
+          LangAsm    -> ("assembler",     [])
+          RawObject  -> ("c",             []) -- claim C for lack of a better idea
   userOpts_c   = getOpts dflags opt_c
   userOpts_cxx = getOpts dflags opt_cxx
 
@@ -140,7 +144,7 @@ xs `isContainedIn` ys = any (xs `isPrefixOf`) (tails ys)
 
 -- | Run the linker with some arguments and return the output
 askLd :: DynFlags -> [Option] -> IO String
-askLd dflags args = do
+askLd dflags args = traceToolCommand dflags "linker" $ do
   let (p,args0) = pgm_l dflags
       args1     = map Option (getOpts dflags opt_l)
       args2     = args0 ++ args1 ++ args
@@ -149,7 +153,7 @@ askLd dflags args = do
     readCreateProcessWithExitCode' (proc p real_args){ env = mb_env }
 
 runAs :: DynFlags -> [Option] -> IO ()
-runAs dflags args = do
+runAs dflags args = traceToolCommand dflags "as" $ do
   let (p,args0) = pgm_a dflags
       args1 = map Option (getOpts dflags opt_a)
       args2 = args0 ++ args1 ++ args
@@ -158,7 +162,7 @@ runAs dflags args = do
 
 -- | Run the LLVM Optimiser
 runLlvmOpt :: DynFlags -> [Option] -> IO ()
-runLlvmOpt dflags args = do
+runLlvmOpt dflags args = traceToolCommand dflags "opt" $ do
   let (p,args0) = pgm_lo dflags
       args1 = map Option (getOpts dflags opt_lo)
       -- We take care to pass -optlo flags (e.g. args0) last to ensure that the
@@ -167,7 +171,7 @@ runLlvmOpt dflags args = do
 
 -- | Run the LLVM Compiler
 runLlvmLlc :: DynFlags -> [Option] -> IO ()
-runLlvmLlc dflags args = do
+runLlvmLlc dflags args = traceToolCommand dflags "llc" $ do
   let (p,args0) = pgm_lc dflags
       args1 = map Option (getOpts dflags opt_lc)
   runSomething dflags "LLVM Compiler" p (args0 ++ args1 ++ args)
@@ -176,7 +180,7 @@ runLlvmLlc dflags args = do
 -- backend on OS X as LLVM doesn't support the OS X system
 -- assembler)
 runClang :: DynFlags -> [Option] -> IO ()
-runClang dflags args = do
+runClang dflags args = traceToolCommand dflags "clang" $ do
   let (clang,_) = pgm_lcc dflags
       -- be careful what options we call clang with
       -- see #5903 and #7617 for bugs caused by this.
@@ -196,8 +200,8 @@ runClang dflags args = do
     )
 
 -- | Figure out which version of LLVM we are running this session
-figureLlvmVersion :: DynFlags -> IO (Maybe (Int, Int))
-figureLlvmVersion dflags = do
+figureLlvmVersion :: DynFlags -> IO (Maybe LlvmVersion)
+figureLlvmVersion dflags = traceToolCommand dflags "llc" $ do
   let (pgm,opts) = pgm_lc dflags
       args = filter notNull (map showOpt opts)
       -- we grab the args even though they should be useless just in
@@ -218,8 +222,10 @@ figureLlvmVersion dflags = do
               vline <- dropWhile (not . isDigit) `fmap` hGetLine pout
               v     <- case span (/= '.') vline of
                         ("",_)  -> fail "no digits!"
-                        (x,y) -> return (read x
-                                        , read $ takeWhile isDigit $ drop 1 y)
+                        (x,"") -> return $ LlvmVersion (read x)
+                        (x,y) -> return $ LlvmVersionOld
+                                            (read x)
+                                            (read $ takeWhile isDigit $ drop 1 y)
 
               hClose pin
               hClose pout
@@ -240,7 +246,7 @@ figureLlvmVersion dflags = do
 
 
 runLink :: DynFlags -> [Option] -> IO ()
-runLink dflags args = do
+runLink dflags args = traceToolCommand dflags "linker" $ do
   -- See Note [Run-time linker info]
   linkargs <- neededLinkArgs `fmap` getLinkerInfo dflags
   let (p,args0) = pgm_l dflags
@@ -300,7 +306,7 @@ ld: warning: symbol referencing errors
 
 
 runLibtool :: DynFlags -> [Option] -> IO ()
-runLibtool dflags args = do
+runLibtool dflags args = traceToolCommand dflags "libtool" $ do
   linkargs <- neededLinkArgs `fmap` getLinkerInfo dflags
   let args1      = map Option (getOpts dflags opt_l)
       args2      = [Option "-static"] ++ args1 ++ args ++ linkargs
@@ -309,31 +315,32 @@ runLibtool dflags args = do
   runSomethingFiltered dflags id "Linker" libtool args2 Nothing mb_env
 
 runAr :: DynFlags -> Maybe FilePath -> [Option] -> IO ()
-runAr dflags cwd args = do
+runAr dflags cwd args = traceToolCommand dflags "ar" $ do
   let ar = pgm_ar dflags
   runSomethingFiltered dflags id "Ar" ar args cwd Nothing
 
 askAr :: DynFlags -> Maybe FilePath -> [Option] -> IO String
-askAr dflags mb_cwd args = do
+askAr dflags mb_cwd args = traceToolCommand dflags "ar" $ do
   let ar = pgm_ar dflags
   runSomethingWith dflags "Ar" ar args $ \real_args ->
     readCreateProcessWithExitCode' (proc ar real_args){ cwd = mb_cwd }
 
 runRanlib :: DynFlags -> [Option] -> IO ()
-runRanlib dflags args = do
+runRanlib dflags args = traceToolCommand dflags "ranlib" $ do
   let ranlib = pgm_ranlib dflags
   runSomethingFiltered dflags id "Ranlib" ranlib args Nothing Nothing
 
 runMkDLL :: DynFlags -> [Option] -> IO ()
-runMkDLL dflags args = do
+runMkDLL dflags args = traceToolCommand dflags "mkdll" $ do
   let (p,args0) = pgm_dll dflags
       args1 = args0 ++ args
   mb_env <- getGccEnv (args0++args)
   runSomethingFiltered dflags id "Make DLL" p args1 Nothing mb_env
 
 runWindres :: DynFlags -> [Option] -> IO ()
-runWindres dflags args = do
-  let (gcc, gcc_args) = pgm_c dflags
+runWindres dflags args = traceToolCommand dflags "windres" $ do
+  let cc = pgm_c dflags
+      cc_args = map Option (sOpt_c (settings dflags))
       windres = pgm_windres dflags
       opts = map Option (getOpts dflags opt_windres)
       quote x = "\"" ++ x ++ "\""
@@ -341,8 +348,7 @@ runWindres dflags args = do
               -- spaces then windres fails to run gcc. We therefore need
               -- to tell it what command to use...
               Option ("--preprocessor=" ++
-                      unwords (map quote (gcc :
-                                          map showOpt gcc_args ++
+                      unwords (map quote (cc :
                                           map showOpt opts ++
                                           ["-E", "-xc", "-DRC_INVOKED"])))
               -- ...but if we do that then if windres calls popen then
@@ -351,9 +357,22 @@ runWindres dflags args = do
               -- See #1828.
             : Option "--use-temp-file"
             : args
-  mb_env <- getGccEnv gcc_args
+  mb_env <- getGccEnv cc_args
   runSomethingFiltered dflags id "Windres" windres args' Nothing mb_env
 
 touch :: DynFlags -> String -> String -> IO ()
-touch dflags purpose arg =
+touch dflags purpose arg = traceToolCommand dflags "touch" $
   runSomething dflags purpose (pgm_T dflags) [FileOption "" arg]
+
+-- * Tracing utility
+
+-- | Record in the eventlog when the given tool command starts
+--   and finishes, prepending the given 'String' with
+--   \"systool:\", to easily be able to collect and process
+--   all the systool events.
+--
+--   For those events to show up in the eventlog, you need
+--   to run GHC with @-v2@ or @-ddump-timings@.
+traceToolCommand :: DynFlags -> String -> IO a -> IO a
+traceToolCommand dflags tool = withTiming
+  (return dflags) (text $ "systool:" ++ tool) (const ())

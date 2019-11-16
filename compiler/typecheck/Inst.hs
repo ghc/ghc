@@ -103,7 +103,7 @@ newMethodFromName origin name ty_args
        ; wrap <- ASSERT( not (isForAllTy ty) && isSingleton theta )
                  instCall origin ty_args theta
 
-       ; return (mkHsWrap wrap (HsVar noExt (noLoc id))) }
+       ; return (mkHsWrap wrap (HsVar noExtField (noLoc id))) }
 
 {-
 ************************************************************************
@@ -297,23 +297,22 @@ instTyVarsWith :: CtOrigin -> [TyVar] -> [TcType] -> TcM TCvSubst
 -- If they don't match, emit a kind-equality to promise that they will
 -- eventually do so, and thus make a kind-homongeneous substitution.
 instTyVarsWith orig tvs tys
-  = go empty_subst tvs tys
+  = go emptyTCvSubst tvs tys
   where
-    empty_subst = mkEmptyTCvSubst (mkInScopeSet (tyCoVarsOfTypes tys))
-
     go subst [] []
       = return subst
     go subst (tv:tvs) (ty:tys)
       | tv_kind `tcEqType` ty_kind
-      = go (extendTCvSubst subst tv ty) tvs tys
+      = go (extendTvSubstAndInScope subst tv ty) tvs tys
       | otherwise
       = do { co <- emitWantedEq orig KindLevel Nominal ty_kind tv_kind
-           ; go (extendTCvSubst subst tv (ty `mkCastTy` co)) tvs tys }
+           ; go (extendTvSubstAndInScope subst tv (ty `mkCastTy` co)) tvs tys }
       where
         tv_kind = substTy subst (tyVarKind tv)
         ty_kind = tcTypeKind ty
 
     go _ _ _ = pprPanic "instTysWith" (ppr tvs $$ ppr tys)
+
 
 {-
 ************************************************************************
@@ -535,7 +534,7 @@ newOverloadedLit
   = newNonTrivialOverloadedLit orig lit res_ty
   where
     orig = LiteralOrigin lit
-newOverloadedLit XOverLit{} _ = panic "newOverloadedLit"
+newOverloadedLit (XOverLit nec) _ = noExtCon nec
 
 -- Does not handle things that 'shortCutLit' can handle. See also
 -- newOverloadedLit in TcUnify
@@ -567,7 +566,7 @@ mkOverLit (HsIntegral i)
 
 mkOverLit (HsFractional r)
   = do  { rat_ty <- tcMetaTy rationalTyConName
-        ; return (HsRat noExt r rat_ty) }
+        ; return (HsRat noExtField r rat_ty) }
 
 mkOverLit (HsIsString src s) = return (HsString src s)
 

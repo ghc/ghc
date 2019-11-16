@@ -267,7 +267,75 @@ data LoadHowMuch
 load :: GhcMonad m => LoadHowMuch -> m SuccessFlag
 load how_much = do
     mod_graph <- depanal [] False
-    load' how_much (Just batchMsg) mod_graph
+    success <- load' how_much (Just batchMsg) mod_graph
+    warnUnusedPackages
+    pure success
+
+-- Note [Unused packages]
+--
+-- Cabal passes `--package-id` flag for each direct dependency. But GHC
+-- loads them lazily, so when compilation is done, we have a list of all
+-- actually loaded packages. All the packages, specified on command line,
+-- but never loaded, are probably unused dependencies.
+
+warnUnusedPackages :: GhcMonad m => m ()
+warnUnusedPackages = do
+    hsc_env <- getSession
+    eps <- liftIO $ hscEPS hsc_env
+
+    let dflags = hsc_dflags hsc_env
+        pit = eps_PIT eps
+
+    let loadedPackages
+          = map (getPackageDetails dflags)
+          . nub . sort
+          . map moduleUnitId
+          . moduleEnvKeys
+          $ pit
+
+        requestedArgs = mapMaybe packageArg (packageFlags dflags)
+
+        unusedArgs
+          = filter (\arg -> not $ any (matching dflags arg) loadedPackages)
+                   requestedArgs
+
+    let warn = makeIntoWarning
+          (Reason Opt_WarnUnusedPackages)
+          (mkPlainErrMsg dflags noSrcSpan msg)
+        msg = vcat [ text "The following packages were specified" <+>
+                     text "via -package or -package-id flags,"
+                   , text "but were not needed for compilation:"
+                   , nest 2 (vcat (map (withDash . pprUnusedArg) unusedArgs)) ]
+
+    when (wopt Opt_WarnUnusedPackages dflags && not (null unusedArgs)) $
+      logWarnings (listToBag [warn])
+
+    where
+        packageArg (ExposePackage _ arg _) = Just arg
+        packageArg _ = Nothing
+
+        pprUnusedArg (PackageArg str) = text str
+        pprUnusedArg (UnitIdArg uid) = ppr uid
+
+        withDash = (<+>) (text "-")
+
+        matchingStr :: String -> PackageConfig -> Bool
+        matchingStr str p
+                =  str == sourcePackageIdString p
+                || str == packageNameString p
+
+        matching :: DynFlags -> PackageArg -> PackageConfig -> Bool
+        matching _ (PackageArg str) p = matchingStr str p
+        matching dflags (UnitIdArg uid) p = uid == realUnitId dflags p
+
+        -- For wired-in packages, we have to unwire their id,
+        -- otherwise they won't match package flags
+        realUnitId :: DynFlags -> PackageConfig -> UnitId
+        realUnitId dflags
+          = unwireUnitId dflags
+          . DefiniteUnitId
+          . DefUnitId
+          . installedPackageConfigId
 
 -- | Generalized version of 'load' which also supports a custom
 -- 'Messager' (for reporting progress) and 'ModuleGraph' (generally
@@ -2130,15 +2198,17 @@ enableCodeGenWhen condition should_modify staticLife dynLife target nodemap =
           -- to by the user. But we need them, so we patch their locations in
           -- the ModSummary with temporary files.
           --
-        hi_file <-
+        (hi_file, o_file) <-
+          -- If ``-fwrite-interface` is specified, then the .o and .hi files
+          -- are written into `-odir` and `-hidir` respectively.  #16670
           if gopt Opt_WriteInterface dflags
-            then return $ ml_hi_file ms_location
-            else new_temp_file (hiSuf dflags) (dynHiSuf dflags)
-        o_temp_file <- new_temp_file (objectSuf dflags) (dynObjectSuf dflags)
+            then return (ml_hi_file ms_location, ml_obj_file ms_location)
+            else (,) <$> (new_temp_file (hiSuf dflags) (dynHiSuf dflags))
+                     <*> (new_temp_file (objectSuf dflags) (dynObjectSuf dflags))
         return $
           ms
           { ms_location =
-              ms_location {ml_hi_file = hi_file, ml_obj_file = o_temp_file}
+              ms_location {ml_hi_file = hi_file, ml_obj_file = o_file}
           , ms_hspp_opts = updOptLevel 0 $ dflags {hscTarget = target}
           }
       | otherwise = return ms
@@ -2186,28 +2256,6 @@ msDeps :: ModSummary -> [(Located ModuleName, IsBoot)]
 msDeps s =
     concat [ [(m,IsBoot), (m,NotBoot)] | m <- ms_home_srcimps s ]
         ++ [ (m,NotBoot) | m <- ms_home_imps s ]
-
-home_imps :: [(Maybe FastString, Located ModuleName)] -> [Located ModuleName]
-home_imps imps = [ lmodname |  (mb_pkg, lmodname) <- imps,
-                                  isLocal mb_pkg ]
-  where isLocal Nothing = True
-        isLocal (Just pkg) | pkg == fsLit "this" = True -- "this" is special
-        isLocal _ = False
-
-ms_home_allimps :: ModSummary -> [ModuleName]
-ms_home_allimps ms = map unLoc (ms_home_srcimps ms ++ ms_home_imps ms)
-
--- | Like 'ms_home_imps', but for SOURCE imports.
-ms_home_srcimps :: ModSummary -> [Located ModuleName]
-ms_home_srcimps = home_imps . ms_srcimps
-
--- | All of the (possibly) home module imports from a
--- 'ModSummary'; that is to say, each of these module names
--- could be a home import if an appropriately named file
--- existed.  (This is in contrast to package qualified
--- imports, which are guaranteed not to be home imports.)
-ms_home_imps :: ModSummary -> [Located ModuleName]
-ms_home_imps = home_imps . ms_imps
 
 -----------------------------------------------------------------------------
 -- Summarising modules

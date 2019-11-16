@@ -1,4 +1,4 @@
-{-# LANGUAGE CPP, TypeFamilies #-}
+{-# LANGUAGE CPP, DeriveFunctor, TypeFamilies #-}
 
 -- Type definitions for the constraint solver
 module TcSMonad (
@@ -33,8 +33,10 @@ module TcSMonad (
     MaybeNew(..), freshGoals, isFresh, getEvExpr,
 
     newTcEvBinds, newNoTcEvBinds,
-    newWantedEq, emitNewWantedEq,
-    newWanted, newWantedEvVar, newWantedNC, newWantedEvVarNC, newDerivedNC,
+    newWantedEq, newWantedEq_SI, emitNewWantedEq,
+    newWanted, newWanted_SI, newWantedEvVar,
+    newWantedNC, newWantedEvVarNC,
+    newDerivedNC,
     newBoundEvVarId,
     unifyTyVar, unflattenFmv, reportUnifications,
     setEvBind, setWantedEq,
@@ -1666,7 +1668,7 @@ kick_out_rewritable new_fr new_tv
     -- constraints, which perhaps may have become soluble after new_tv
     -- is substituted; ditto the dictionaries, which may include (a~b)
     -- or (a~~b) constraints.
-    kicked_out = foldrBag extendWorkListCt
+    kicked_out = foldr extendWorkListCt
                           (emptyWorkList { wl_eqs    = tv_eqs_out
                                          , wl_funeqs = feqs_out })
                           ((dicts_out `andCts` irs_out)
@@ -2052,7 +2054,7 @@ getNoGivenEqs :: TcLevel          -- TcLevel of this implication
 getNoGivenEqs tclvl skol_tvs
   = do { inerts@(IC { inert_eqs = ieqs, inert_irreds = irreds })
               <- getInertCans
-       ; let has_given_eqs = foldrBag ((||) . ct_given_here) False irreds
+       ; let has_given_eqs = foldr ((||) . ct_given_here) False irreds
                           || anyDVarEnv eqs_given_here ieqs
              insols = filterBag insolubleEqCt irreds
                       -- Specifically includes ones that originated in some
@@ -2315,7 +2317,7 @@ lookupSolvedDict (IS { inert_solved_dicts = solved }) loc cls tys
 ********************************************************************* -}
 
 foldIrreds :: (Ct -> b -> b) -> Cts -> b -> b
-foldIrreds k irreds z = foldrBag k z irreds
+foldIrreds k irreds z = foldr k z irreds
 
 
 {- *********************************************************************
@@ -2465,7 +2467,7 @@ addDict m cls tys item = insertTcApp m (getUnique cls) tys item
 
 addDictsByClass :: DictMap Ct -> Class -> Bag Ct -> DictMap Ct
 addDictsByClass m cls items
-  = addToUDFM m cls (foldrBag add emptyTM items)
+  = addToUDFM m cls (foldr add emptyTM items)
   where
     add ct@(CDictCan { cc_tyargs = tys }) tm = insertTM tys ct tm
     add ct _ = pprPanic "addDictsByClass" (ppr ct)
@@ -2599,10 +2601,7 @@ data TcSEnv
     }
 
 ---------------
-newtype TcS a = TcS { unTcS :: TcSEnv -> TcM a }
-
-instance Functor TcS where
-  fmap f m = TcS $ fmap f . unTcS m
+newtype TcS a = TcS { unTcS :: TcSEnv -> TcM a } deriving (Functor)
 
 instance Applicative TcS where
   pure x = TcS (\_ -> return x)
@@ -3404,12 +3403,18 @@ emitNewWantedEq loc role ty1 ty2
        ; return co }
 
 -- | Make a new equality CtEvidence
-newWantedEq :: CtLoc -> Role -> TcType -> TcType -> TcS (CtEvidence, Coercion)
-newWantedEq loc role ty1 ty2
+newWantedEq :: CtLoc -> Role -> TcType -> TcType
+            -> TcS (CtEvidence, Coercion)
+newWantedEq = newWantedEq_SI WDeriv
+
+newWantedEq_SI :: ShadowInfo -> CtLoc -> Role
+               -> TcType -> TcType
+               -> TcS (CtEvidence, Coercion)
+newWantedEq_SI si loc role ty1 ty2
   = do { hole <- wrapTcS $ TcM.newCoercionHole pty
        ; traceTcS "Emitting new coercion hole" (ppr hole <+> dcolon <+> ppr pty)
        ; return ( CtWanted { ctev_pred = pty, ctev_dest = HoleDest hole
-                           , ctev_nosh = WDeriv
+                           , ctev_nosh = si
                            , ctev_loc = loc}
                 , mkHoleCo hole ) }
   where
@@ -3417,35 +3422,44 @@ newWantedEq loc role ty1 ty2
 
 -- no equalities here. Use newWantedEq instead
 newWantedEvVarNC :: CtLoc -> TcPredType -> TcS CtEvidence
+newWantedEvVarNC = newWantedEvVarNC_SI WDeriv
+
+newWantedEvVarNC_SI :: ShadowInfo -> CtLoc -> TcPredType -> TcS CtEvidence
 -- Don't look up in the solved/inerts; we know it's not there
-newWantedEvVarNC loc pty
+newWantedEvVarNC_SI si loc pty
   = do { new_ev <- newEvVar pty
        ; traceTcS "Emitting new wanted" (ppr new_ev <+> dcolon <+> ppr pty $$
                                          pprCtLoc loc)
        ; return (CtWanted { ctev_pred = pty, ctev_dest = EvVarDest new_ev
-                          , ctev_nosh = WDeriv
+                          , ctev_nosh = si
                           , ctev_loc = loc })}
 
 newWantedEvVar :: CtLoc -> TcPredType -> TcS MaybeNew
+newWantedEvVar = newWantedEvVar_SI WDeriv
+
+newWantedEvVar_SI :: ShadowInfo -> CtLoc -> TcPredType -> TcS MaybeNew
 -- For anything except ClassPred, this is the same as newWantedEvVarNC
-newWantedEvVar loc pty
+newWantedEvVar_SI si loc pty
   = do { mb_ct <- lookupInInerts loc pty
        ; case mb_ct of
             Just ctev
               | not (isDerived ctev)
               -> do { traceTcS "newWantedEvVar/cache hit" $ ppr ctev
                     ; return $ Cached (ctEvExpr ctev) }
-            _ -> do { ctev <- newWantedEvVarNC loc pty
+            _ -> do { ctev <- newWantedEvVarNC_SI si loc pty
                     ; return (Fresh ctev) } }
 
--- deals with both equalities and non equalities. Tries to look
--- up non-equalities in the cache
 newWanted :: CtLoc -> PredType -> TcS MaybeNew
-newWanted loc pty
+-- Deals with both equalities and non equalities. Tries to look
+-- up non-equalities in the cache
+newWanted = newWanted_SI WDeriv
+
+newWanted_SI :: ShadowInfo -> CtLoc -> PredType -> TcS MaybeNew
+newWanted_SI si loc pty
   | Just (role, ty1, ty2) <- getEqPredTys_maybe pty
-  = Fresh . fst <$> newWantedEq loc role ty1 ty2
+  = Fresh . fst <$> newWantedEq_SI si loc role ty1 ty2
   | otherwise
-  = newWantedEvVar loc pty
+  = newWantedEvVar_SI si loc pty
 
 -- deals with both equalities and non equalities. Doesn't do any cache lookups.
 newWantedNC :: CtLoc -> PredType -> TcS CtEvidence

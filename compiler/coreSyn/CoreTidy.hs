@@ -9,7 +9,7 @@ The code for *top-level* bindings is in TidyPgm.
 
 {-# LANGUAGE CPP #-}
 module CoreTidy (
-        tidyExpr, tidyVarOcc, tidyRule, tidyRules, tidyUnfolding
+        tidyExpr, tidyRule, tidyRules, tidyUnfolding
     ) where
 
 #include "HsVersions.h"

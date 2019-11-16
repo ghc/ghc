@@ -426,7 +426,7 @@ PACKAGES_STAGE1 += filepath
 PACKAGES_STAGE1 += array
 PACKAGES_STAGE1 += deepseq
 PACKAGES_STAGE1 += bytestring
-PACKAGES_STAGE1 += containers
+PACKAGES_STAGE1 += containers/containers
 
 ifeq "$(Windows_Target)" "YES"
 PACKAGES_STAGE1 += Win32
@@ -1021,6 +1021,7 @@ $(eval $(call bindist-list,.,\
     $(BINDIST_LIBS) \
     $(BINDIST_HI) \
     $(BINDIST_EXTRAS) \
+    includes/Makefile \
     $(includes_H_FILES) \
     $(includes_DERIVEDCONSTANTS) \
     $(includes_GHCCONSTANTS) \
@@ -1037,7 +1038,7 @@ $(eval $(call bindist-list,.,\
     $(wildcard compiler/stage2/doc) \
     $(wildcard libraries/*/dist-install/doc/) \
     $(wildcard libraries/*/*/dist-install/doc/) \
-    $(filter-out settings llvm-targets llvm-passes,$(INSTALL_LIBS)) \
+    $(filter-out llvm-targets llvm-passes,$(INSTALL_LIBS)) \
     $(RTS_INSTALL_LIBS) \
     $(filter-out %/project.mk mk/config.mk %/mk/install.mk,$(MAKEFILE_LIST)) \
     mk/project.mk \
@@ -1304,6 +1305,7 @@ CLEAN_FILES += includes/DerivedConstants.h
 CLEAN_FILES += includes/ghcautoconf.h
 CLEAN_FILES += includes/ghcplatform.h
 CLEAN_FILES += includes/ghcversion.h
+CLEAN_FILES += $(includes_SETTINGS)
 CLEAN_FILES += utils/ghc-pkg/Version.hs
 CLEAN_FILES += compiler/prelude/primops.txt
 CLEAN_FILES += $(wildcard compiler/primop*incl)
@@ -1416,12 +1418,16 @@ distclean : clean
 	$(call removeFiles,libraries/base/include/fs.h)
 	$(call removeFiles,libraries/base/cbits/fs.c)
 
+CLEAN_LIBRARY_GHC_MK_FILES += $(patsubst %, libraries/%/ghc.mk, $(PACKAGES_STAGE1) $(PACKAGES_STAGE2))
+# Don't clean `libraries/ghc-boot/ghc.mk`, since it's intended to be version-controlled (#16953)
+CLEAN_LIBRARY_GHC_MK_FILES := $(filter-out libraries/ghc-boot/ghc.mk,$(CLEAN_LIBRARY_GHC_MK_FILES))
+
 maintainer-clean : distclean
 	$(call removeFiles,configure mk/config.h.in)
 	$(call removeTrees,autom4te.cache $(wildcard libraries/*/autom4te.cache))
 	$(call removeFiles,$(patsubst %, libraries/%/GNUmakefile, \
 	        $(PACKAGES_STAGE1) $(PACKAGES_STAGE2)))
-	$(call removeFiles,$(patsubst %, libraries/%/ghc.mk, $(PACKAGES_STAGE1) $(PACKAGES_STAGE2)))
+	$(call removeFiles,$(CLEAN_LIBRARY_GHC_MK_FILES))
 	$(call removeFiles,$(patsubst %, libraries/%/configure, \
 	        $(PACKAGES_STAGE1) $(PACKAGES_STAGE2)))
 	$(call removeFiles,libraries/base/include/HsBaseConfig.h.in)

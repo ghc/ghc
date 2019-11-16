@@ -108,9 +108,11 @@ module TysWiredIn (
 
         vecRepDataConTyCon, tupleRepDataConTyCon, sumRepDataConTyCon,
 
-        liftedRepDataConTy, unliftedRepDataConTy, intRepDataConTy, int8RepDataConTy,
-        int16RepDataConTy, word16RepDataConTy,
-        wordRepDataConTy, int64RepDataConTy, word8RepDataConTy, word64RepDataConTy,
+        liftedRepDataConTy, unliftedRepDataConTy,
+        intRepDataConTy,
+        int8RepDataConTy, int16RepDataConTy, int32RepDataConTy, int64RepDataConTy,
+        wordRepDataConTy,
+        word8RepDataConTy, word16RepDataConTy, word32RepDataConTy, word64RepDataConTy,
         addrRepDataConTy,
         floatRepDataConTy, doubleRepDataConTy,
 
@@ -181,6 +183,8 @@ the different bits, like Uniques, Names, DataCons. These lists must be
 kept in sync with each other. The rule is this: use the order as declared
 in GHC.Types. All places where such lists exist should contain a reference
 to this Note, so a search for this Note's name should find all the lists.
+
+See also Note [Getting from RuntimeRep to PrimRep] in RepType.
 
 ************************************************************************
 *                                                                      *
@@ -440,19 +444,13 @@ sumRepDataConName = mkWiredInDataConName UserSyntax gHC_TYPES (fsLit "SumRep") s
 runtimeRepSimpleDataConNames :: [Name]
 runtimeRepSimpleDataConNames
   = zipWith3Lazy mk_special_dc_name
-      [ fsLit "LiftedRep"
-      , fsLit "UnliftedRep"
+      [ fsLit "LiftedRep", fsLit "UnliftedRep"
       , fsLit "IntRep"
+      , fsLit "Int8Rep", fsLit "Int16Rep", fsLit "Int32Rep", fsLit "Int64Rep"
       , fsLit "WordRep"
-      , fsLit "Int8Rep"
-      , fsLit "Int16Rep"
-      , fsLit "Int64Rep"
-      , fsLit "Word8Rep"
-      , fsLit "Word16Rep"
-      , fsLit "Word64Rep"
+      , fsLit "Word8Rep", fsLit "Word16Rep", fsLit "Word32Rep", fsLit "Word64Rep"
       , fsLit "AddrRep"
-      , fsLit "FloatRep"
-      , fsLit "DoubleRep"
+      , fsLit "FloatRep", fsLit "DoubleRep"
       ]
       runtimeRepSimpleDataConKeys
       runtimeRepSimpleDataCons
@@ -1152,6 +1150,7 @@ vecRepDataCon = pcSpecialDataCon vecRepDataConName [ mkTyConTy vecCountTyCon
                                  runtimeRepTyCon
                                  (RuntimeRep prim_rep_fun)
   where
+    -- See Note [Getting from RuntimeRep to PrimRep] in RepType
     prim_rep_fun [count, elem]
       | VecCount n <- tyConRuntimeRepInfo (tyConAppTyCon count)
       , VecElem  e <- tyConRuntimeRepInfo (tyConAppTyCon elem)
@@ -1166,6 +1165,7 @@ tupleRepDataCon :: DataCon
 tupleRepDataCon = pcSpecialDataCon tupleRepDataConName [ mkListTy runtimeRepTy ]
                                    runtimeRepTyCon (RuntimeRep prim_rep_fun)
   where
+    -- See Note [Getting from RuntimeRep to PrimRep] in RepType
     prim_rep_fun [rr_ty_list]
       = concatMap (runtimeRepPrimRep doc) rr_tys
       where
@@ -1181,6 +1181,7 @@ sumRepDataCon :: DataCon
 sumRepDataCon = pcSpecialDataCon sumRepDataConName [ mkListTy runtimeRepTy ]
                                  runtimeRepTyCon (RuntimeRep prim_rep_fun)
   where
+    -- See Note [Getting from RuntimeRep to PrimRep] in RepType
     prim_rep_fun [rr_ty_list]
       = map slotPrimRep (ubxSumRepType prim_repss)
       where
@@ -1194,12 +1195,19 @@ sumRepDataConTyCon :: TyCon
 sumRepDataConTyCon = promoteDataCon sumRepDataCon
 
 -- See Note [Wiring in RuntimeRep]
+-- See Note [Getting from RuntimeRep to PrimRep] in RepType
 runtimeRepSimpleDataCons :: [DataCon]
 liftedRepDataCon :: DataCon
 runtimeRepSimpleDataCons@(liftedRepDataCon : _)
   = zipWithLazy mk_runtime_rep_dc
-    [ LiftedRep, UnliftedRep, IntRep, WordRep, Int8Rep, Int16Rep, Int64Rep
-    , Word8Rep, Word16Rep, Word64Rep, AddrRep, FloatRep, DoubleRep ]
+    [ LiftedRep, UnliftedRep
+    , IntRep
+    , Int8Rep, Int16Rep, Int32Rep, Int64Rep
+    , WordRep
+    , Word8Rep, Word16Rep, Word32Rep, Word64Rep
+    , AddrRep
+    , FloatRep, DoubleRep
+    ]
     runtimeRepSimpleDataConNames
   where
     mk_runtime_rep_dc primrep name
@@ -1207,13 +1215,20 @@ runtimeRepSimpleDataCons@(liftedRepDataCon : _)
 
 -- See Note [Wiring in RuntimeRep]
 liftedRepDataConTy, unliftedRepDataConTy,
-  intRepDataConTy, int8RepDataConTy, int16RepDataConTy, wordRepDataConTy, int64RepDataConTy,
-  word8RepDataConTy, word16RepDataConTy, word64RepDataConTy, addrRepDataConTy,
+  intRepDataConTy,
+  int8RepDataConTy, int16RepDataConTy, int32RepDataConTy, int64RepDataConTy,
+  wordRepDataConTy,
+  word8RepDataConTy, word16RepDataConTy, word32RepDataConTy, word64RepDataConTy,
+  addrRepDataConTy,
   floatRepDataConTy, doubleRepDataConTy :: Type
 [liftedRepDataConTy, unliftedRepDataConTy,
-   intRepDataConTy, wordRepDataConTy, int8RepDataConTy, int16RepDataConTy, int64RepDataConTy,
-   word8RepDataConTy, word16RepDataConTy, word64RepDataConTy,
-   addrRepDataConTy, floatRepDataConTy, doubleRepDataConTy]
+   intRepDataConTy,
+   int8RepDataConTy, int16RepDataConTy, int32RepDataConTy, int64RepDataConTy,
+   wordRepDataConTy,
+   word8RepDataConTy, word16RepDataConTy, word32RepDataConTy, word64RepDataConTy,
+   addrRepDataConTy,
+   floatRepDataConTy, doubleRepDataConTy
+   ]
   = map (mkTyConTy . promoteDataCon) runtimeRepSimpleDataCons
 
 vecCountTyCon :: TyCon

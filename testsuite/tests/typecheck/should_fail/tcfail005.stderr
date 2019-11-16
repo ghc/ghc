@@ -1,7 +1,6 @@
 
 tcfail005.hs:3:9: error:
-    • Couldn't match expected type ‘[a]’
-                  with actual type ‘(Integer, Char)’
+    • Couldn't match expected type ‘[a]’ with actual type ‘(a0, Char)’
     • In the expression: (1, 'a')
       In a pattern binding: (h : i) = (1, 'a')
     • Relevant bindings include

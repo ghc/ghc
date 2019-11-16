@@ -51,9 +51,6 @@ static unsigned int CCS_ID = 1;
 static char *prof_filename; /* prof report file name = <program>.prof */
 FILE *prof_file;
 
-static char *hp_filename;       /* heap profile (hp2ps style) log file */
-FILE *hp_file;
-
 // List of all cost centres. Used for reporting.
 CostCentre      *CC_LIST  = NULL;
 // All cost centre stacks temporarily appear here, to be able to make CCS_MAIN a
@@ -185,21 +182,17 @@ void initProfiling (void)
     CCS_MAIN->root = CCS_MAIN;
     ccsSetSelected(CCS_MAIN);
 
-    initProfiling2();
+    refreshProfilingCCSs();
 
     if (RtsFlags.CcFlags.doCostCentres) {
         initTimeProfiling();
-    }
-
-    if (RtsFlags.ProfFlags.doHeapProfile) {
-        initHeapProfiling();
     }
 }
 
 //
 // Should be called after loading any new Haskell code.
 //
-void initProfiling2 (void)
+void refreshProfilingCCSs (void)
 {
     // make CCS_MAIN the parent of all the pre-defined CCSs.
     CostCentreStack *next;
@@ -270,7 +263,7 @@ initProfilingLogFile(void)
         sprintf(prof_filename, "%s.prof", stem);
 
         /* open the log file */
-        if ((prof_file = __rts_fopen(prof_filename, "w")) == NULL) {
+        if ((prof_file = __rts_fopen(prof_filename, "w+")) == NULL) {
             debugBelch("Can't open profiling report file %s\n", prof_filename);
             RtsFlags.CcFlags.doCostCentres = 0;
             // Retainer profiling (`-hr` or `-hr<cc> -h<x>`) writes to
@@ -278,19 +271,6 @@ initProfilingLogFile(void)
             if (doingRetainerProfiling()) {
                 RtsFlags.ProfFlags.doHeapProfile = 0;
             }
-        }
-    }
-
-    if (RtsFlags.ProfFlags.doHeapProfile) {
-        /* Initialise the log file name */
-        hp_filename = arenaAlloc(prof_arena, strlen(stem) + 6);
-        sprintf(hp_filename, "%s.hp", stem);
-
-        /* open the log file */
-        if ((hp_file = __rts_fopen(hp_filename, "w")) == NULL) {
-            debugBelch("Can't open profiling report file %s\n",
-                       hp_filename);
-            RtsFlags.ProfFlags.doHeapProfile = 0;
         }
     }
 }
@@ -307,9 +287,6 @@ endProfiling ( void )
 {
     if (RtsFlags.CcFlags.doCostCentres) {
         stopProfTimer();
-    }
-    if (RtsFlags.ProfFlags.doHeapProfile) {
-        endHeapProfiling();
     }
 }
 

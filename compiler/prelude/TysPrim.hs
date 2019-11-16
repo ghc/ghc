@@ -13,7 +13,7 @@ module TysPrim(
         mkPrimTyConName, -- For implicit parameters in TysWiredIn only
 
         mkTemplateKindVars, mkTemplateTyVars, mkTemplateTyVarsFrom,
-        mkTemplateKiTyVars,
+        mkTemplateKiTyVars, mkTemplateKiTyVar,
 
         mkTemplateTyConBinders, mkTemplateKindTyConBinders,
         mkTemplateAnonTyConBinders,
@@ -94,9 +94,11 @@ import GhcPrelude
 import {-# SOURCE #-} TysWiredIn
   ( runtimeRepTy, unboxedTupleKind, liftedTypeKind
   , vecRepDataConTyCon, tupleRepDataConTyCon
-  , liftedRepDataConTy, unliftedRepDataConTy, intRepDataConTy, int8RepDataConTy
-  , int16RepDataConTy, word16RepDataConTy
-  , wordRepDataConTy, int64RepDataConTy, word8RepDataConTy, word64RepDataConTy
+  , liftedRepDataConTy, unliftedRepDataConTy
+  , intRepDataConTy
+  , int8RepDataConTy, int16RepDataConTy, int32RepDataConTy, int64RepDataConTy
+  , wordRepDataConTy
+  , word16RepDataConTy, word8RepDataConTy, word32RepDataConTy, word64RepDataConTy
   , addrRepDataConTy
   , floatRepDataConTy, doubleRepDataConTy
   , vec2DataConTy, vec4DataConTy, vec8DataConTy, vec16DataConTy, vec32DataConTy
@@ -254,14 +256,15 @@ alphaTyVars is a list of type variables for use in templates:
         ["a", "b", ..., "z", "t1", "t2", ... ]
 -}
 
+mkTemplateKindVar :: Kind -> TyVar
+mkTemplateKindVar = mkTyVar (mk_tv_name 0 "k")
+
 mkTemplateKindVars :: [Kind] -> [TyVar]
 -- k0  with unique (mkAlphaTyVarUnique 0)
 -- k1  with unique (mkAlphaTyVarUnique 1)
 -- ... etc
-mkTemplateKindVars [kind]
-  = [mkTyVar (mk_tv_name 0 "k") kind]
-    -- Special case for one kind: just "k"
-
+mkTemplateKindVars [kind] = [mkTemplateKindVar kind]
+  -- Special case for one kind: just "k"
 mkTemplateKindVars kinds
   = [ mkTyVar (mk_tv_name u ('k' : show u)) kind
     | (kind, u) <- kinds `zip` [0..] ]
@@ -310,13 +313,28 @@ mkTemplateKiTyVars
     -> [TyVar]   -- [kv1:k1, ..., kvn:kn, av1:ak1, ..., avm:akm]
 -- Example: if you want the tyvars for
 --   forall (r:RuntimeRep) (a:TYPE r) (b:*). blah
--- call mkTemplateKiTyVars [RuntimeRep] (\[r]. [TYPE r, *)
+-- call mkTemplateKiTyVars [RuntimeRep] (\[r] -> [TYPE r, *])
 mkTemplateKiTyVars kind_var_kinds mk_arg_kinds
   = kv_bndrs ++ tv_bndrs
   where
     kv_bndrs   = mkTemplateKindVars kind_var_kinds
     anon_kinds = mk_arg_kinds (mkTyVarTys kv_bndrs)
     tv_bndrs   = mkTemplateTyVarsFrom (length kv_bndrs) anon_kinds
+
+mkTemplateKiTyVar
+    :: Kind                  -- [k1, .., kn]   Kind of kind-forall'd var
+    -> (Kind -> [Kind])      -- Arg is kv1:k1
+                             -- Result is anon arg kinds [ak1, .., akm]
+    -> [TyVar]   -- [kv1:k1, ..., kvn:kn, av1:ak1, ..., avm:akm]
+-- Example: if you want the tyvars for
+--   forall (r:RuntimeRep) (a:TYPE r) (b:*). blah
+-- call mkTemplateKiTyVar RuntimeRep (\r -> [TYPE r, *])
+mkTemplateKiTyVar kind mk_arg_kinds
+  = kv_bndr : tv_bndrs
+  where
+    kv_bndr    = mkTemplateKindVar kind
+    anon_kinds = mk_arg_kinds (mkTyVarTy kv_bndr)
+    tv_bndrs   = mkTemplateTyVarsFrom 1 anon_kinds
 
 mkTemplateKindTyConBinders :: [Kind] -> [TyConBinder]
 -- Makes named, Specified binders
@@ -536,10 +554,12 @@ primRepToRuntimeRep rep = case rep of
   IntRep        -> intRepDataConTy
   Int8Rep       -> int8RepDataConTy
   Int16Rep      -> int16RepDataConTy
-  WordRep       -> wordRepDataConTy
+  Int32Rep      -> int32RepDataConTy
   Int64Rep      -> int64RepDataConTy
+  WordRep       -> wordRepDataConTy
   Word8Rep      -> word8RepDataConTy
   Word16Rep     -> word16RepDataConTy
+  Word32Rep     -> word32RepDataConTy
   Word64Rep     -> word64RepDataConTy
   AddrRep       -> addrRepDataConTy
   FloatRep      -> floatRepDataConTy
@@ -594,7 +614,7 @@ int16PrimTyCon = pcPrimTyCon0 int16PrimTyConName Int16Rep
 int32PrimTy :: Type
 int32PrimTy     = mkTyConTy int32PrimTyCon
 int32PrimTyCon :: TyCon
-int32PrimTyCon  = pcPrimTyCon0 int32PrimTyConName IntRep
+int32PrimTyCon  = pcPrimTyCon0 int32PrimTyConName Int32Rep
 
 int64PrimTy :: Type
 int64PrimTy     = mkTyConTy int64PrimTyCon
@@ -619,7 +639,7 @@ word16PrimTyCon = pcPrimTyCon0 word16PrimTyConName Word16Rep
 word32PrimTy :: Type
 word32PrimTy    = mkTyConTy word32PrimTyCon
 word32PrimTyCon :: TyCon
-word32PrimTyCon = pcPrimTyCon0 word32PrimTyConName WordRep
+word32PrimTyCon = pcPrimTyCon0 word32PrimTyConName Word32Rep
 
 word64PrimTy :: Type
 word64PrimTy    = mkTyConTy word64PrimTyCon

@@ -30,6 +30,8 @@ module InteractiveEval (
         exprType,
         typeKind,
         parseName,
+        parseInstanceHead,
+        getInstancesForType,
         getDocs,
         GetDocsFailure(..),
         showModule,
@@ -101,6 +103,19 @@ import Control.Monad
 import GHC.Exts
 import Data.Array
 import Exception
+
+import TcRnDriver ( runTcInteractive, tcRnType, loadUnqualIfaces )
+import TcHsSyn          ( ZonkFlexi (SkolemiseFlexi) )
+
+import TcEnv (tcGetInstEnvs)
+
+import Inst (instDFunType)
+import TcSimplify (solveWanteds)
+import TcRnMonad
+import TcEvidence
+import Data.Bifunctor (second)
+
+import TcSMonad (runTcS)
 
 -- -----------------------------------------------------------------------------
 -- running a statement interactively
@@ -506,20 +521,17 @@ bindLocalsAtBreakpoint hsc_env apStack_fhv (Just BreakInfo{..}) = do
        breaks    = getModBreaks hmi
        info      = expectJust "bindLocalsAtBreakpoint2" $
                      IntMap.lookup breakInfo_number (modBreaks_breakInfo breaks)
-       vars      = cgb_vars info
+       mbVars    = cgb_vars info
        result_ty = cgb_resty info
        occs      = modBreaks_vars breaks ! breakInfo_number
        span      = modBreaks_locs breaks ! breakInfo_number
        decl      = intercalate "." $ modBreaks_decls breaks ! breakInfo_number
 
-           -- Filter out any unboxed ids;
+           -- Filter out any unboxed ids by changing them to Nothings;
            -- we can't bind these at the prompt
-       pointers = filter (\(id,_) -> isPointer id) vars
-       isPointer id | [rep] <- typePrimRep (idType id)
-                    , isGcPtrRep rep                   = True
-                    | otherwise                        = False
+       mbPointers = nullUnboxed <$> mbVars
 
-       (ids, offsets) = unzip pointers
+       (ids, offsets, occs') = syncOccs mbPointers occs
 
        free_tvs = tyCoVarsOfTypesList (result_ty:map idType ids)
 
@@ -535,11 +547,12 @@ bindLocalsAtBreakpoint hsc_env apStack_fhv (Just BreakInfo{..}) = do
 
    us <- mkSplitUniqSupply 'I'   -- Dodgy; will give the same uniques every time
    let tv_subst     = newTyVars us free_tvs
-       filtered_ids = [ id | (id, Just _hv) <- zip ids mb_hValues ]
+       (filtered_ids, occs'') = unzip         -- again, sync the occ-names
+          [ (id, occ) | (id, Just _hv, occ) <- zip3 ids mb_hValues occs' ]
        (_,tidy_tys) = tidyOpenTypes emptyTidyEnv $
                       map (substTy tv_subst . idType) filtered_ids
 
-   new_ids     <- zipWith3M mkNewId occs tidy_tys filtered_ids
+   new_ids     <- zipWith3M mkNewId occs'' tidy_tys filtered_ids
    result_name <- newInteractiveBinder hsc_env (mkVarOccFS result_fs) span
 
    let result_id = Id.mkVanillaGlobal result_name
@@ -575,6 +588,24 @@ bindLocalsAtBreakpoint hsc_env apStack_fhv (Just BreakInfo{..}) = do
      = mkTvSubstPrs [ (tv, mkTyVarTy (mkRuntimeUnkTyVar name (tyVarKind tv)))
                     | (tv, uniq) <- tvs `zip` uniqsFromSupply us
                     , let name = setNameUnique (tyVarName tv) uniq ]
+
+   isPointer id | [rep] <- typePrimRep (idType id)
+                , isGcPtrRep rep                   = True
+                | otherwise                        = False
+
+   -- Convert unboxed Id's to Nothings
+   nullUnboxed (Just (fv@(id, _)))
+     | isPointer id          = Just fv
+     | otherwise             = Nothing
+   nullUnboxed Nothing       = Nothing
+
+   -- See Note [Syncing breakpoint info]
+   syncOccs :: [Maybe (a,b)] -> [c] -> ([a], [b], [c])
+   syncOccs mbVs ocs = unzip3 $ catMaybes $ joinOccs mbVs ocs
+     where
+       joinOccs :: [Maybe (a,b)] -> [c] -> [Maybe (a,b,c)]
+       joinOccs = zipWith joinOcc
+       joinOcc mbV oc = (\(a,b) c -> (a,b,c)) <$> mbV <*> pure oc
 
 rttiEnvironment :: HscEnv -> IO HscEnv
 rttiEnvironment hsc_env@HscEnv{hsc_IC=ic} = do
@@ -616,6 +647,35 @@ pushResume hsc_env resume = hsc_env { hsc_IC = ictxt1 }
   where
         ictxt0 = hsc_IC hsc_env
         ictxt1 = ictxt0 { ic_resume = resume : ic_resume ictxt0 }
+
+
+  {-
+  Note [Syncing breakpoint info]
+
+  To display the values of the free variables for a single breakpoint, the
+  function `compiler/main/InteractiveEval.hs:bindLocalsAtBreakpoint` pulls
+  out the information from the fields `modBreaks_breakInfo` and
+  `modBreaks_vars` of the `ModBreaks` data structure.
+  For a specific breakpoint this gives 2 lists of type `Id` (or `Var`)
+  and `OccName`.
+  They are used to create the Id's for the free variables and must be kept
+  in sync!
+
+  There are 3 situations where items are removed from the Id list
+  (or replaced with `Nothing`):
+  1.) If function `compiler/ghci/ByteCodeGen.hs:schemeER_wrk` (which creates
+      the Id list) doesn't find an Id in the ByteCode environement.
+  2.) If function `compiler/main/InteractiveEval.hs:bindLocalsAtBreakpoint`
+      filters out unboxed elements from the Id list, because GHCi cannot
+      yet handle them.
+  3.) If the GHCi interpreter doesn't find the reference to a free variable
+      of our breakpoint. This also happens in the function
+      bindLocalsAtBreakpoint.
+
+  If an element is removed from the Id list, then the corresponding element
+  must also be removed from the Occ list. Otherwise GHCi will confuse
+  variable names as in #8487.
+  -}
 
 -- -----------------------------------------------------------------------------
 -- Abandoning a resume context
@@ -937,6 +997,163 @@ typeKind  :: GhcMonad m => Bool -> String -> m (Type, Kind)
 typeKind normalise str = withSession $ \hsc_env -> do
    liftIO $ hscKcType hsc_env normalise str
 
+-- ----------------------------------------------------------------------------
+-- Getting the class instances for a type
+
+{-
+  Note [Querying instances for a type]
+
+  Here is the implementation of GHC proposal 41.
+  (https://github.com/ghc-proposals/ghc-proposals/blob/master/proposals/0041-ghci-instances.rst)
+
+  The objective is to take a query string representing a (partial) type, and
+  report all the class single-parameter class instances available to that type.
+  Extending this feature to multi-parameter typeclasses is left as future work.
+
+  The general outline of how we solve this is:
+
+  1. Parse the type, leaving skolems in the place of type-holes.
+  2. For every class, get a list of all instances that match with the query type.
+  3. For every matching instance, ask GHC for the context the instance dictionary needs.
+  4. Format and present the results, substituting our query into the instance
+     and simplifying the context.
+
+  For example, given the query "Maybe Int", we want to return:
+
+  instance Show (Maybe Int)
+  instance Read (Maybe Int)
+  instance Eq   (Maybe Int)
+  ....
+
+  [Holes in queries]
+
+  Often times we want to know what instances are available for a polymorphic type,
+  like `Maybe a`, and we'd like to return instances such as:
+
+  instance Show a => Show (Maybe a)
+  ....
+
+  These queries are expressed using type holes, so instead of `Maybe a` the user writes
+  `Maybe _`, we parse the type and during zonking, we skolemise it, replacing the holes
+  with (un-named) type variables.
+
+  When zonking the type holes we have two real choices: replace them with Any or replace
+  them with skolem typevars. Using skolem type variables ensures that the output is more
+  intuitive to end users, and there is no difference in the results between Any and skolems.
+
+-}
+
+-- Find all instances that match a provided type
+getInstancesForType :: GhcMonad m => Type -> m [ClsInst]
+getInstancesForType ty = withSession $ \hsc_env -> do
+  liftIO $ runInteractiveHsc hsc_env $ do
+    ioMsgMaybe $ runTcInteractive hsc_env $ do
+      -- Bring class and instances from unqualified modules into scope, this fixes #16793.
+      loadUnqualIfaces hsc_env (hsc_IC hsc_env)
+      matches <- findMatchingInstances ty
+      fmap catMaybes . forM matches $ uncurry checkForExistence
+
+-- Parse a type string and turn any holes into skolems
+parseInstanceHead :: GhcMonad m => String -> m Type
+parseInstanceHead str = withSession $ \hsc_env0 -> do
+  (ty, _) <- liftIO $ runInteractiveHsc hsc_env0 $ do
+    hsc_env <- getHscEnv
+    ty <- hscParseType str
+    ioMsgMaybe $ tcRnType hsc_env SkolemiseFlexi True ty
+
+  return ty
+
+-- Get all the constraints required of a dictionary binding
+getDictionaryBindings :: PredType -> TcM WantedConstraints
+getDictionaryBindings theta = do
+  dictName <- newName (mkDictOcc (mkVarOcc "magic"))
+  let dict_var = mkVanillaGlobal dictName theta
+  loc <- getCtLocM (GivenOrigin UnkSkol) Nothing
+  let wCs = mkSimpleWC [CtDerived
+          { ctev_pred = varType dict_var
+          , ctev_loc = loc
+          }]
+
+  return wCs
+
+{-
+  When we've found an instance that a query matches against, we still need to
+  check that all the instance's constraints are satisfiable. checkForExistence
+  creates an instance dictionary and verifies that any unsolved constraints
+  mention a type-hole, meaning it is blocked on an unknown.
+
+  If the instance satisfies this condition, then we return it with the query
+  substituted into the instance and all constraints simplified, for example given:
+
+  instance D a => C (MyType a b) where
+
+  and the query `MyType _ String`
+
+  the unsolved constraints will be [D _] so we apply the substitution:
+
+  { a -> _; b -> String}
+
+  and return the instance:
+
+  instance D _ => C (MyType _ String)
+
+-}
+
+checkForExistence :: ClsInst -> [DFunInstType] -> TcM (Maybe ClsInst)
+checkForExistence res mb_inst_tys = do
+  (tys, thetas) <- instDFunType (is_dfun res) mb_inst_tys
+
+  wanteds <- forM thetas getDictionaryBindings
+  (residuals, _) <- second evBindMapBinds <$> runTcS (solveWanteds (unionsWC wanteds))
+
+  let all_residual_constraints = bagToList $ wc_simple residuals
+  let preds = map ctPred all_residual_constraints
+  if all isSatisfiablePred preds && (null $ wc_impl residuals)
+  then return . Just $ substInstArgs tys preds res
+  else return Nothing
+
+  where
+
+  -- Stricter version of isTyVarClassPred that requires all TyConApps to have at least
+  -- one argument or for the head to be a TyVar. The reason is that we want to ensure
+  -- that all residual constraints mention a type-hole somewhere in the constraint,
+  -- meaning that with the correct choice of a concrete type it could be possible for
+  -- the constraint to be discharged.
+  isSatisfiablePred :: PredType -> Bool
+  isSatisfiablePred ty = case getClassPredTys_maybe ty of
+      Just (_, tys@(_:_)) -> all isTyVarTy tys
+      _                   -> isTyVarTy ty
+
+  empty_subst = mkEmptyTCvSubst (mkInScopeSet (tyCoVarsOfType (idType $ is_dfun res)))
+
+  {- Create a ClsInst with instantiated arguments and constraints.
+
+     The thetas are the list of constraints that couldn't be solved because
+     they mention a type-hole.
+  -}
+  substInstArgs ::  [Type] -> [PredType] -> ClsInst -> ClsInst
+  substInstArgs tys thetas inst = let
+      subst = foldl' (\a b -> uncurry (extendTvSubstAndInScope a) b) empty_subst (zip dfun_tvs tys)
+      -- Build instance head with arguments substituted in
+      tau   = mkClassPred cls (substTheta subst args)
+      -- Constrain the instance with any residual constraints
+      phi   = mkPhiTy thetas tau
+      sigma = mkForAllTys (map (\v -> Bndr v Inferred) dfun_tvs) phi
+
+    in inst { is_dfun = (is_dfun inst) { varType = sigma }}
+    where
+    (dfun_tvs, _, cls, args) = instanceSig inst
+
+-- Find instances where the head unifies with the provided type
+findMatchingInstances :: Type -> TcM [(ClsInst, [DFunInstType])]
+findMatchingInstances ty = do
+  ies@(InstEnvs {ie_global = ie_global, ie_local = ie_local}) <- tcGetInstEnvs
+  let allClasses = instEnvClasses ie_global ++ instEnvClasses ie_local
+
+  concat <$> mapM (\cls -> do
+    let (matches, _, _) = lookupInstEnv True ies cls [ty]
+    return matches) allClasses
+
 -----------------------------------------------------------------------------
 -- Compile an expression, run it, and deliver the result
 
@@ -968,8 +1185,8 @@ compileParsedExprRemote expr@(L loc _) = withSession $ \hsc_env -> do
   -- create a new binding.
   let expr_fs = fsLit "_compileParsedExpr"
       expr_name = mkInternalName (getUnique expr_fs) (mkTyVarOccFS expr_fs) loc
-      let_stmt = L loc . LetStmt noExt . L loc . (HsValBinds noExt) $
-        ValBinds noExt
+      let_stmt = L loc . LetStmt noExtField . L loc . (HsValBinds noExtField) $
+        ValBinds noExtField
                      (unitBag $ mkHsVarBind loc (getRdrName expr_name) expr) []
 
   pstmt <- liftIO $ hscParsedStmt hsc_env let_stmt
@@ -997,7 +1214,7 @@ dynCompileExpr expr = do
   parsed_expr <- parseExpr expr
   -- > Data.Dynamic.toDyn expr
   let loc = getLoc parsed_expr
-      to_dyn_expr = mkHsApp (L loc . HsVar noExt . L loc $ getRdrName toDynName)
+      to_dyn_expr = mkHsApp (L loc . HsVar noExtField . L loc $ getRdrName toDynName)
                             parsed_expr
   hval <- compileParsedExpr to_dyn_expr
   return (unsafeCoerce# hval :: Dynamic)

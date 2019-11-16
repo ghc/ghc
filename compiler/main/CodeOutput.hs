@@ -12,19 +12,19 @@ module CodeOutput( codeOutput, outputForeignStubs ) where
 
 import GhcPrelude
 
-import AsmCodeGen ( nativeCodeGen )
-import LlvmCodeGen ( llvmCodeGen )
+import AsmCodeGen       ( nativeCodeGen )
+import LlvmCodeGen      ( llvmCodeGen )
 
 import UniqSupply       ( mkSplitUniqSupply )
 
 import Finder           ( mkStubPaths )
-import PprC             ( writeCs )
+import PprC             ( writeC )
 import CmmLint          ( cmmLint )
 import Packages
 import Cmm              ( RawCmmGroup )
 import HscTypes
 import DynFlags
-import Stream           (Stream)
+import Stream           ( Stream )
 import qualified Stream
 import FileCleanup
 
@@ -117,31 +117,29 @@ outputC :: DynFlags
 
 outputC dflags filenm cmm_stream packages
   = do
-       -- ToDo: make the C backend consume the C-- incrementally, by
-       -- pushing the cmm_stream inside (c.f. nativeCodeGen)
-       rawcmms <- Stream.collect cmm_stream
+       withTiming (return dflags) (text "C codegen") id $ do
 
-       -- figure out which header files to #include in the generated .hc file:
-       --
-       --   * extra_includes from packages
-       --   * -#include options from the cmdline and OPTIONS pragmas
-       --   * the _stub.h file, if there is one.
-       --
-       let rts = getPackageDetails dflags rtsUnitId
+         -- figure out which header files to #include in the generated .hc file:
+         --
+         --   * extra_includes from packages
+         --   * -#include options from the cmdline and OPTIONS pragmas
+         --   * the _stub.h file, if there is one.
+         --
+         let rts = getPackageDetails dflags rtsUnitId
 
-       let cc_injects = unlines (map mk_include (includes rts))
-           mk_include h_file =
-            case h_file of
-               '"':_{-"-} -> "#include "++h_file
-               '<':_      -> "#include "++h_file
-               _          -> "#include \""++h_file++"\""
+         let cc_injects = unlines (map mk_include (includes rts))
+             mk_include h_file =
+              case h_file of
+                 '"':_{-"-} -> "#include "++h_file
+                 '<':_      -> "#include "++h_file
+                 _          -> "#include \""++h_file++"\""
 
-       let pkg_names = map installedUnitIdString packages
+         let pkg_names = map installedUnitIdString packages
 
-       doOutput filenm $ \ h -> do
-          hPutStr h ("/* GHC_PACKAGES " ++ unwords pkg_names ++ "\n*/\n")
-          hPutStr h cc_injects
-          writeCs dflags h rawcmms
+         doOutput filenm $ \ h -> do
+            hPutStr h ("/* GHC_PACKAGES " ++ unwords pkg_names ++ "\n*/\n")
+            hPutStr h cc_injects
+            Stream.consume cmm_stream (writeC dflags h)
 
 {-
 ************************************************************************
@@ -252,8 +250,8 @@ outputForeignStubs dflags mod location stubs
                                        then Just stub_c
                                        else Nothing )
  where
-   cplusplus_hdr = "#ifdef __cplusplus\nextern \"C\" {\n#endif\n"
-   cplusplus_ftr = "#ifdef __cplusplus\n}\n#endif\n"
+   cplusplus_hdr = "#if defined(__cplusplus)\nextern \"C\" {\n#endif\n"
+   cplusplus_ftr = "#if defined(__cplusplus)\n}\n#endif\n"
 
 
 -- Don't use doOutput for dumping the f. export stubs

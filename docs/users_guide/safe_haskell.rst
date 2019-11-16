@@ -255,28 +255,29 @@ normally would.
 To achieve these properties, in the safe language dialect we disable
 completely the following features:
 
-- ``TemplateHaskell`` — Can be used to gain access to constructors and abstract
-  data types that weren't exported by a module, subverting module boundaries.
+- :extension:`TemplateHaskell` — Can be used to gain access to constructors and
+  abstract data types that weren't exported by a module, subverting module
+  boundaries.
 
 Furthermore, we restrict the following features:
 
-- ``ForeignFunctionInterface`` — Foreign import declarations that import a
-  function with a non-``IO`` type are disallowed.
+- :extension:`ForeignFunctionInterface` — Foreign import declarations that
+  import a function with a non-``IO`` type are disallowed.
 
-- ``RULES`` — Rewrite rules defined in a module M compiled with :extension:`Safe` are
-  dropped. Rules defined in Trustworthy modules that ``M`` imports are still
-  valid and will fire as usual.
+- ``RULES`` — Rewrite rules defined in a module M compiled with
+  :extension:`Safe` are dropped. Rules defined in Trustworthy modules that
+  ``M`` imports are still valid and will fire as usual.
 
-- ``OverlappingInstances`` — There is no restriction on the creation of
-  overlapping instances, but we do restrict their use at a particular call
+- :extension:`OverlappingInstances` — There is no restriction on the creation
+  of overlapping instances, but we do restrict their use at a particular call
   site. This is a detailed restriction, please refer to :ref:`Safe Overlapping
   Instances <safe-overlapping-instances>` for details.
 
-- ``GeneralisedNewtypeDeriving`` — GND is not allowed in the safe language. This
-  is due to the ability of it to violate module boundaries when module authors
-  forget to put nominal role annotations on their types as appropriate. For
-  this reason, the ``Data.Coerce`` module is also considered unsafe. We are
-  hoping to find a better solution here in the future.
+- :extension:`GeneralisedNewtypeDeriving` — GND is not allowed in the safe
+  language. This is due to the ability of it to violate module boundaries when
+  module authors forget to put nominal role annotations on their types as
+  appropriate. For this reason, the ``Data.Coerce`` module is also considered
+  unsafe. We are hoping to find a better solution here in the future.
 
 - ``GHC.Generics`` — Hand crafted instances of the ``Generic`` type class are
   not allowed in Safe Haskell. Such instances aren't strictly unsafe, but
@@ -739,7 +740,7 @@ And one general flag:
     requiring the package that ``M`` resides in be considered trusted, for ``M``
     to be considered trusted.
 
-And three warning flags:
+And five warning flags:
 
 .. ghc-flag:: -Wunsafe
     :shortdesc: warn if the module being compiled is regarded to be unsafe.
@@ -760,7 +761,8 @@ And three warning flags:
 
     Issue a warning if the module being compiled is regarded to be safe.
     Should be used to check the safety type of modules when using safe
-    inference.
+    inference. If the module is explicitly marked as safe then no warning will
+    be issued.
 
 .. ghc-flag:: -Wtrustworthy-safe
     :shortdesc: warn if the module being compiled is marked as
@@ -774,6 +776,55 @@ And three warning flags:
     -XTrustworthy but it could instead be marked as
     -XSafe , a more informative bound. Can be used to detect once a Safe Haskell
     bound can be improved as dependencies are updated.
+
+.. ghc-flag:: -Winferred-safe-imports
+    :shortdesc: warn when an explicitly Safe Haskell module imports a Safe-Inferred one
+    :type: dynamic
+    :reverse: -Wno-inferred-safe-imports
+    :category:
+
+    :since: 8.10.1
+
+    .. index::
+       single: safe haskell imports, warning
+
+    The module ``A`` below is annotated to be explictly ``Safe``, but it imports
+    ``Safe-Inferred`` module.
+
+        {-# LANGUAGE Safe #-}
+        module A where
+
+        import B (double)
+
+        quad :: Int -> Int
+        quad = double . double
+
+    
+        module B where
+
+        double :: Int -> Int
+        double n = n + n
+
+    The inferred status is volatile: if an unsafe import is added to the module
+    ``B``, it will cause compilation error of ``A``.  When
+    :ghc-flag:`-Winferred-safe-imports` is enabled, the compiler will emit a
+    warning about this.
+    This option is off by default.
+
+.. ghc-flag:: -Wmissing-safe-haskell-mode
+    :shortdesc: warn when the Safe Haskell mode is not explicitly specified.
+    :type: dynamic
+    :reverse: -Wno-missing-safe-haskell-mode
+    :category:
+
+    :since: 8.10.1
+
+    .. index::
+       single: safe haskell mode, missing
+
+    The compiler will warn when none of  :extension:`Safe`,
+    :extension:`Trustworthy` or :extension:`Unsafe` is specified.
+    This option is off by default.
 
 .. _safe-compilation:
 

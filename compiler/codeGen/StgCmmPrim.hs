@@ -31,7 +31,7 @@ import StgCmmHeap
 import StgCmmProf ( costCentreFrom )
 
 import DynFlags
-import Platform
+import GHC.Platform
 import BasicTypes
 import BlockId
 import MkGraph
@@ -46,6 +46,7 @@ import SMRep
 import FastString
 import Outputable
 import Util
+import Data.Maybe
 
 import Data.Bits ((.&.), bit)
 import Control.Monad (liftM, when, unless)
@@ -71,8 +72,8 @@ cgOpApp :: StgOp        -- The op
         -> FCode ReturnKind
 
 -- Foreign calls
-cgOpApp (StgFCallOp fcall _) stg_args res_ty
-  = cgForeignCall fcall stg_args res_ty
+cgOpApp (StgFCallOp fcall ty) stg_args res_ty
+  = cgForeignCall fcall ty stg_args res_ty
       -- Note [Foreign call results]
 
 -- tagToEnum# is special: we need to pull the constructor
@@ -876,43 +877,65 @@ emitPrimOp dflags r@[res] op args
      emit stmt
 
 emitPrimOp dflags results op args
-   = case callishPrimOpSupported dflags op of
+   = case callishPrimOpSupported dflags op args of
           Left op   -> emit $ mkUnsafeCall (PrimTarget op) results args
           Right gen -> gen results args
 
+-- Note [QuotRem optimization]
+-- ~~~~~~~~~~~~~~~~~~~~~~~~~~~
+--
+-- `quot` and `rem` with constant divisor can be implemented with fast bit-ops
+-- (shift, .&.).
+--
+-- Currently we only support optimization (performed in CmmOpt) when the
+-- constant is a power of 2. #9041 tracks the implementation of the general
+-- optimization.
+--
+-- `quotRem` can be optimized in the same way. However as it returns two values,
+-- it is implemented as a "callish" primop which is harder to match and
+-- to transform later on. For simplicity, the current implementation detects cases
+-- that can be optimized (see `quotRemCanBeOptimized`) and converts STG quotRem
+-- primop into two CMM quot and rem primops.
+
 type GenericOp = [CmmFormal] -> [CmmActual] -> FCode ()
 
-callishPrimOpSupported :: DynFlags -> PrimOp -> Either CallishMachOp GenericOp
-callishPrimOpSupported dflags op
+callishPrimOpSupported :: DynFlags -> PrimOp -> [CmmExpr] -> Either CallishMachOp GenericOp
+callishPrimOpSupported dflags op args
   = case op of
-      IntQuotRemOp   | ncg && (x86ish || ppc) ->
-                         Left (MO_S_QuotRem  (wordWidth dflags))
-                     | otherwise              ->
-                         Right (genericIntQuotRemOp (wordWidth dflags))
+      IntQuotRemOp   | ncg && (x86ish || ppc)
+                     , not quotRemCanBeOptimized
+                         -> Left (MO_S_QuotRem  (wordWidth dflags))
+                     | otherwise
+                         -> Right (genericIntQuotRemOp (wordWidth dflags))
 
       Int8QuotRemOp  | ncg && (x86ish || ppc)
+                     , not quotRemCanBeOptimized
                                      -> Left (MO_S_QuotRem W8)
                      | otherwise     -> Right (genericIntQuotRemOp W8)
 
       Int16QuotRemOp | ncg && (x86ish || ppc)
+                     , not quotRemCanBeOptimized
                                      -> Left (MO_S_QuotRem W16)
                      | otherwise     -> Right (genericIntQuotRemOp W16)
 
 
-      WordQuotRemOp  | ncg && (x86ish || ppc) ->
-                         Left (MO_U_QuotRem  (wordWidth dflags))
-                     | otherwise      ->
-                         Right (genericWordQuotRemOp (wordWidth dflags))
+      WordQuotRemOp  | ncg && (x86ish || ppc)
+                     , not quotRemCanBeOptimized
+                         -> Left (MO_U_QuotRem  (wordWidth dflags))
+                     | otherwise
+                         -> Right (genericWordQuotRemOp (wordWidth dflags))
 
       WordQuotRem2Op | (ncg && (x86ish || ppc))
                           || llvm     -> Left (MO_U_QuotRem2 (wordWidth dflags))
                      | otherwise      -> Right (genericWordQuotRem2Op dflags)
 
       Word8QuotRemOp | ncg && (x86ish || ppc)
+                     , not quotRemCanBeOptimized
                                       -> Left (MO_U_QuotRem W8)
                      | otherwise      -> Right (genericWordQuotRemOp W8)
 
       Word16QuotRemOp| ncg && (x86ish || ppc)
+                     , not quotRemCanBeOptimized
                                      -> Left (MO_U_QuotRem W16)
                      | otherwise     -> Right (genericWordQuotRemOp W16)
 
@@ -948,6 +971,11 @@ callishPrimOpSupported dflags op
 
       _ -> pprPanic "emitPrimOp: can't translate PrimOp " (ppr op)
  where
+  -- See Note [QuotRem optimization]
+  quotRemCanBeOptimized = case args of
+    [_, CmmLit (CmmInt n _) ] -> isJust (exactLog2 n)
+    _                         -> False
+
   ncg = case hscTarget dflags of
            HscAsm -> True
            _      -> False
@@ -1518,7 +1546,9 @@ callishOp DoubleAsinhOp  = Just MO_F64_Asinh
 callishOp DoubleAcoshOp  = Just MO_F64_Acosh
 callishOp DoubleAtanhOp  = Just MO_F64_Atanh
 callishOp DoubleLogOp    = Just MO_F64_Log
+callishOp DoubleLog1POp  = Just MO_F64_Log1P
 callishOp DoubleExpOp    = Just MO_F64_Exp
+callishOp DoubleExpM1Op  = Just MO_F64_ExpM1
 callishOp DoubleSqrtOp   = Just MO_F64_Sqrt
 
 callishOp FloatPowerOp  = Just MO_F32_Pwr
@@ -1535,7 +1565,9 @@ callishOp FloatAsinhOp  = Just MO_F32_Asinh
 callishOp FloatAcoshOp  = Just MO_F32_Acosh
 callishOp FloatAtanhOp  = Just MO_F32_Atanh
 callishOp FloatLogOp    = Just MO_F32_Log
+callishOp FloatLog1POp  = Just MO_F32_Log1P
 callishOp FloatExpOp    = Just MO_F32_Exp
+callishOp FloatExpM1Op  = Just MO_F32_ExpM1
 callishOp FloatSqrtOp   = Just MO_F32_Sqrt
 
 callishOp _ = Nothing

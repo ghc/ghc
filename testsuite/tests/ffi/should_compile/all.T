@@ -23,6 +23,7 @@ test('cc011', normal, compile, [''])
 test('cc012', normal, compile, [''])
 test('cc013', normal, compile, [''])
 test('cc014', normal, compile, [''])
+test('ReducingFfiSignature', normal, compile, [''])
 test('ffi-deriv1', normal, compile, [''])
 test('T1357', normal, compile, [''])
 test('T3624', normal, compile, [''])
@@ -34,7 +35,8 @@ test('T11983', [omit_ways(['ghci'])], compile, ['T11983.c'])
 test('T14125', normal, compile, [''])
 test(
     'cc017',
-    normal,
+    # We need TH but can't load profiled dynamic objects
+    when(ghc_dynamic(), omit_ways(['profasm'])),
     compile,
     [
         '-optc=-DC -optcxx=-DCXX -optcxx=-std=c++11'

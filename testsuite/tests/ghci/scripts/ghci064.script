@@ -1,0 +1,21 @@
+-- Test :instances
+:instances Maybe
+
+:set -XPartialTypeSignatures -fno-warn-partial-type-signatures
+-- Test queries with holes
+:instances Maybe _
+
+:load ghci064
+
+-- Test that overlapping instances are all reported in the results
+:instances [_]
+:instances [T]
+
+-- Test that we can find instances for type families
+
+:instances F Int
+
+-- Test to make sure that the constraints of returned instances are all properly verified
+-- We don't want the command to return an Applicative or Monad instance for tuple because
+-- there is no Int Monoid instance.
+:instances (,) Int

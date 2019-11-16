@@ -2,6 +2,11 @@
 # (c) Simon Marlow 2002
 #
 
+from my_typing import *
+from pathlib import Path
+from perf_notes import MetricChange, PerfStat
+from datetime import datetime
+
 # -----------------------------------------------------------------------------
 # Configuration info
 
@@ -36,6 +41,27 @@ class TestConfig:
 
         # File in which to save the summary
         self.summary_file = ''
+
+        # Path to Ghostscript
+        self.gs = ''
+
+        # Run tests requiring Haddock
+        self.haddock = False
+
+        # Compiler has native code generator?
+        self.have_ncg = False
+
+        # Is compiler unregisterised?
+        self.unregisterised = False
+
+        # Was the compiler executable compiled with profiling?
+        self.compiler_profiled = False
+
+        # Was the compiler compiled with DEBUG?
+        self.compiler_debugged = False
+
+        # Was the compiler compiled with LLVM?
+        self.ghc_built_by_llvm = False
 
         # Should we print the summary?
         # Disabling this is useful for Phabricator/Harbormaster
@@ -78,16 +104,16 @@ class TestConfig:
         # Which ways to run tests (when compiling and running respectively)
         # Other ways are added from the command line if we have the appropriate
         # libraries.
-        self.compile_ways = []
-        self.run_ways     = []
-        self.other_ways   = []
+        self.compile_ways = [] # type: List[WayName]
+        self.run_ways     = [] # type: List[WayName]
+        self.other_ways   = [] # type: List[WayName]
 
         # The ways selected via the command line.
-        self.cmdline_ways = []
+        self.cmdline_ways = [] # type: List[WayName]
 
         # Lists of flags for each way
-        self.way_flags = {}
-        self.way_rts_flags = {}
+        self.way_flags = {}  # type: Dict[WayName, List[str]]
+        self.way_rts_flags = {}  # type: Dict[WayName, List[str]]
 
         # Do we have vanilla libraries?
         self.have_vanilla = False
@@ -116,6 +142,9 @@ class TestConfig:
         # Are we testing an in-tree compiler?
         self.in_tree_compiler = True
 
+        # Is the compiler dynamically linked?
+        self.ghc_dynamic = False
+
         # the timeout program
         self.timeout_prog = ''
         self.timeout = 300
@@ -142,7 +171,14 @@ class TestConfig:
         # Where to look up runtime stats produced by haddock, needed for
         # the haddock perf tests in testsuite/tests/perf/haddock/.
         # See Note [Haddock runtime stats files] at the bottom of this file.
-        self.stats_files_dir = '/please_set_stats_files_dir'
+        self.stats_files_dir = Path('/please_set_stats_files_dir')
+
+        # Should we cleanup after test runs?
+        self.cleanup = True
+
+        # I have no idea what this does
+        self.package_conf_cache_file = None # type: Optional[Path]
+
 
 global config
 config = TestConfig()
@@ -165,17 +201,24 @@ class TestResult:
     framework_failures, framework_warnings, unexpected_passes,
     unexpected_failures, unexpected_stat_failures lists of TestRun.
     """
-    __slots__ = 'directory', 'testname', 'reason', 'way', 'stderr'
-    def __init__(self, directory, testname, reason, way, stderr=None):
+    __slots__ = 'directory', 'testname', 'reason', 'way', 'stdout', 'stderr'
+    def __init__(self,
+                 directory: str,
+                 testname: TestName,
+                 reason: str,
+                 way: WayName,
+                 stdout: Optional[str]=None,
+                 stderr: Optional[str]=None) -> None:
         self.directory = directory
         self.testname = testname
         self.reason = reason
         self.way = way
+        self.stdout = stdout
         self.stderr = stderr
 
 class TestRun:
-   def __init__(self):
-       self.start_time = None
+   def __init__(self) -> None:
+       self.start_time = None # type: Optional[datetime]
        self.total_tests = 0
        self.total_test_cases = 0
 
@@ -183,56 +226,65 @@ class TestRun:
        self.n_expected_passes = 0
        self.n_expected_failures = 0
 
-       # type: List[TestResult]
-       self.missing_libs = []
-       self.framework_failures = []
-       self.framework_warnings = []
+       self.missing_libs = [] # type: List[TestResult]
+       self.framework_failures = [] # type: List[TestResult]
+       self.framework_warnings = [] # type: List[TestResult]
 
-       self.expected_passes = []
-       self.unexpected_passes = []
-       self.unexpected_failures = []
-       self.unexpected_stat_failures = []
+       self.expected_passes = [] # type: List[TestResult]
+       self.unexpected_passes = [] # type: List[TestResult]
+       self.unexpected_failures = [] # type: List[TestResult]
+       self.unexpected_stat_failures = [] # type: List[TestResult]
+
+       # Results from tests that have been marked as fragile
+       self.fragile_passes = [] # type: List[TestResult]
+       self.fragile_failures = [] # type: List[TestResult]
 
        # List of all metrics measured in this test run.
        # [(change, PerfStat)] where change is one of the  MetricChange
        # constants: NewMetric, NoChange, Increase, Decrease.
        # NewMetric happens when the previous git commit has no metric recorded.
-       self.metrics = []
+       self.metrics = [] # type: List[Tuple[MetricChange, PerfStat]]
 
 global t
 t = TestRun()
 
-def getTestRun():
+def getTestRun() -> TestRun:
     return t
 
 # -----------------------------------------------------------------------------
 # Information about the current test
 
 class TestOptions:
-   def __init__(self):
+   def __init__(self) -> None:
        # skip this test?
        self.skip = False
 
+       # the test is known to be fragile in these ways
+       self.fragile_ways = [] # type: List[WayName]
+
        # skip these ways
-       self.omit_ways = []
+       self.omit_ways = [] # type: List[WayName]
 
        # skip all ways except these (None == do all ways)
-       self.only_ways = None
+       self.only_ways = None # type: Optional[List[WayName]]
 
        # add these ways to the default set
-       self.extra_ways = []
+       self.extra_ways = [] # type: List[WayName]
 
        # the result we normally expect for this test
        self.expect = 'pass'
 
        # override the expected result for certain ways
-       self.expect_fail_for = []
+       self.expect_fail_for = [] # type: List[WayName]
 
-       # the stdin file that this test will use (empty for <name>.stdin)
-       self.stdin = ''
+       # the stdin file that this test will use (None for <name>.stdin)
+       self.srcdir = None # type: Optional[Path]
+
+       # the stdin file that this test will use (None for <name>.stdin)
+       self.stdin = None # type: Optional[Path]
 
        # Set the expected stderr/stdout. '' means infer from test name.
-       self.use_specs = {}
+       self.use_specs = {} # type: Dict[str, Path]
 
        # don't compare output
        self.ignore_stdout = False
@@ -244,7 +296,7 @@ class TestOptions:
        # We sometimes want to modify the compiler_always_flags, so
        # they are copied from config.compiler_always_flags when we
        # make a new instance of TestOptions.
-       self.compiler_always_flags = []
+       self.compiler_always_flags = [] # type: List[str]
 
        # extra compiler opts for this test
        self.extra_hc_opts = ''
@@ -253,13 +305,13 @@ class TestOptions:
        self.extra_run_opts = ''
 
        # expected exit code
-       self.exit_code = 0
+       self.exit_code = 0 # type: int
 
        # extra files to clean afterward
-       self.clean_files = []
+       self.clean_files = [] # type: List[str]
 
        # extra files to copy to the testdir
-       self.extra_files = []
+       self.extra_files = [] # type: List[str]
 
        # Map from metric to (function from way and commit to baseline value, allowed percentage deviation) e.g.
        #     { 'bytes allocated': (
@@ -271,7 +323,7 @@ class TestOptions:
        #              , 10) }
        # This means no baseline is available for way1. For way 2, allow a 10%
        # deviation from 9300000000.
-       self.stats_range_fields = {}
+       self.stats_range_fields = {} # type: Dict[MetricName, MetricOracles]
 
        # Is the test testing performance?
        self.is_stats_test = False
@@ -307,12 +359,12 @@ class TestOptions:
        self.compile_cmd_prefix = ''
 
        # Extra output normalisation
-       self.extra_normaliser = lambda x: x
+       self.extra_normaliser = lambda x: x # type: OutputNormalizer
 
        # Custom output checker, otherwise do a comparison with expected
        # stdout file.  Accepts two arguments: filename of actual stdout
        # output, and a normaliser function given other test options
-       self.check_stdout = None
+       self.check_stdout = None # type: Optional[Callable[[Path, OutputNormalizer], bool]]
 
        # Check .hp file when profiling libraries are available?
        self.check_hp = True
@@ -324,7 +376,7 @@ class TestOptions:
        self.keep_prof_callstacks = False
 
        # The directory the test is in
-       self.testdir = '.'
+       self.testdir = Path('.')
 
        # Should we redirect stdout and stderr to a single file?
        self.combined_output = False
@@ -333,9 +385,7 @@ class TestOptions:
        self.compile_timeout_multiplier = 1.0
        self.run_timeout_multiplier = 1.0
 
-       self.cleanup = True
-
-       # Sould we run tests in a local subdirectory (<testname>-run) or
+       # Should we run tests in a local subdirectory (<testname>-run) or
        # in temporary directory in /tmp? See Note [Running tests in /tmp].
        self.local = True
 
@@ -345,4 +395,4 @@ default_testopts = TestOptions()
 
 # (bug, directory, name) of tests marked broken
 global brokens
-brokens = []
+brokens = []  # type: List[Tuple[IssueNumber, str, str]]

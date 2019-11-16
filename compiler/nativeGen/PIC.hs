@@ -54,7 +54,7 @@ import qualified PPC.Regs       as PPC
 
 import qualified X86.Instr      as X86
 
-import Platform
+import GHC.Platform
 import Instruction
 import Reg
 import NCGMonad

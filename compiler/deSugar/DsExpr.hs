@@ -98,7 +98,7 @@ dsIPBinds (IPBinds ev_binds ip_binds) body
       = do e' <- dsLExpr e
            return (Let (NonRec n e') body)
     ds_ip_bind _ _ = panic "dsIPBinds"
-dsIPBinds (XHsIPBinds _) _ = panic "dsIPBinds"
+dsIPBinds (XHsIPBinds nec) _ = noExtCon nec
 
 -------------------------
 -- caller sets location
@@ -187,7 +187,7 @@ dsUnliftedBind (AbsBinds { abs_tvs = [], abs_ev_vars = []
                , abs_binds = lbinds }) body
   = do { let body1 = foldr bind_export body exports
              bind_export export b = bindNonRec (abe_poly export) (Var (abe_mono export)) b
-       ; body2 <- foldlBagM (\body lbind -> dsUnliftedBind (unLoc lbind) body)
+       ; body2 <- foldlM (\body lbind -> dsUnliftedBind (unLoc lbind) body)
                             body1 lbinds
        ; ds_binds <- dsTcEvBinds_s ev_binds
        ; return (mkCoreLets ds_binds body2) }
@@ -451,7 +451,7 @@ ds_expr _ (HsMultiIf res_ty alts)
   | otherwise
   = do { match_result <- liftM (foldr1 combineMatchResults)
                                (mapM (dsGRHS IfAlt res_ty) alts)
-       ; checkGuardMatches IfAlt (GRHSs noExt alts (noLoc emptyLocalBinds))
+       ; checkGuardMatches IfAlt (GRHSs noExtField alts (noLoc emptyLocalBinds))
        ; error_expr   <- mkErrorExpr
        ; extractMatchResult match_result error_expr }
   where
@@ -663,7 +663,7 @@ ds_expr _ expr@(RecordUpd { rupd_expr = record_expr, rupd_flds = fields
                  mk_val_arg fl pat_arg_id
                      = nlHsVar (lookupNameEnv upd_fld_env (flSelector fl) `orElse` pat_arg_id)
 
-                 inst_con = noLoc $ mkHsWrap wrap (HsConLikeOut noExt con)
+                 inst_con = noLoc $ mkHsWrap wrap (HsConLikeOut noExtField con)
                         -- Reconstruct with the WrapId so that unpacking happens
                  wrap = mkWpEvVarApps theta_vars                                <.>
                         dict_req_wrap                                           <.>
@@ -754,7 +754,7 @@ ds_expr _ (HsTickPragma _ _ _ _ expr) = do
 ds_expr _ (HsBracket     {})  = panic "dsExpr:HsBracket"
 ds_expr _ (HsDo          {})  = panic "dsExpr:HsDo"
 ds_expr _ (HsRecFld      {})  = panic "dsExpr:HsRecFld"
-ds_expr _ (XExpr         {})  = panic "dsExpr: XExpr"
+ds_expr _ (XExpr nec)         = noExtCon nec
 
 
 ------------------------------
@@ -927,7 +927,7 @@ dsDo stmts
                  (pat, dsLExpr expr)
                do_arg (ApplicativeArgMany _ stmts ret pat) =
                  (pat, dsDo (stmts ++ [noLoc $ mkLastStmt (noLoc ret)]))
-               do_arg (XApplicativeArg _) = panic "dsDo"
+               do_arg (XApplicativeArg nec) = noExtCon nec
 
                arg_tys = map hsLPatType pats
 
@@ -935,7 +935,7 @@ dsDo stmts
 
            ; let body' = noLoc $ HsDo body_ty DoExpr (noLoc stmts)
 
-           ; let fun = cL noSrcSpan $ HsLam noExt $
+           ; let fun = cL noSrcSpan $ HsLam noExtField $
                    MG { mg_alts = noLoc [mkSimpleMatch LambdaExpr pats
                                                        body']
                       , mg_ext = MatchGroupTc arg_tys body_ty
@@ -967,13 +967,13 @@ dsDo stmts
         later_pats   = rec_tup_pats
         rets         = map noLoc rec_rets
         mfix_app     = nlHsSyntaxApps mfix_op [mfix_arg]
-        mfix_arg     = noLoc $ HsLam noExt
+        mfix_arg     = noLoc $ HsLam noExtField
                            (MG { mg_alts = noLoc [mkSimpleMatch
                                                     LambdaExpr
                                                     [mfix_pat] body]
                                , mg_ext = MatchGroupTc [tup_ty] body_ty
                                , mg_origin = Generated })
-        mfix_pat     = noLoc $ LazyPat noExt $ mkBigLHsPatTupId rec_tup_pats
+        mfix_pat     = noLoc $ LazyPat noExtField $ mkBigLHsPatTupId rec_tup_pats
         body         = noLoc $ HsDo body_ty
                                 DoExpr (noLoc (rec_stmts ++ [ret_stmt]))
         ret_app      = nlHsSyntaxApps return_op [mkBigLHsTupId rets]
@@ -984,7 +984,7 @@ dsDo stmts
 
     go _ (ParStmt   {}) _ = panic "dsDo ParStmt"
     go _ (TransStmt {}) _ = panic "dsDo TransStmt"
-    go _ (XStmtLR   {}) _ = panic "dsDo XStmtLR"
+    go _ (XStmtLR nec)  _ = noExtCon nec
 
 handle_failure :: LPat GhcTc -> MatchResult -> SyntaxExpr GhcTc -> DsM CoreExpr
     -- In a do expression, pattern-match failure just calls
@@ -1091,7 +1091,7 @@ Note [Detecting forced eta expansion]
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 We cannot have levity polymorphic function arguments. See
 Note [Levity polymorphism invariants] in CoreSyn. But we *can* have
-functions that take levity polymorphism arguments, as long as these
+functions that take levity polymorphic arguments, as long as these
 functions are eta-reduced. (See #12708 for an example.)
 
 However, we absolutely cannot do this for functions that have no
@@ -1162,7 +1162,11 @@ badUseOfLevPolyPrimop id ty
 
 levPolyPrimopErr :: Id -> Type -> [Type] -> DsM ()
 levPolyPrimopErr primop ty bad_tys
-  = errDs $ vcat [ hang (text "Cannot use primitive with levity-polymorphic arguments:")
-                      2 (ppr primop <+> dcolon <+> pprWithTYPE ty)
-                 , hang (text "Levity-polymorphic arguments:")
-                      2 (vcat (map (\t -> pprWithTYPE t <+> dcolon <+> pprWithTYPE (typeKind t)) bad_tys)) ]
+  = errDs $ vcat
+    [ hang (text "Cannot use function with levity-polymorphic arguments:")
+         2 (ppr primop <+> dcolon <+> pprWithTYPE ty)
+    , hang (text "Levity-polymorphic arguments:")
+         2 $ vcat $ map
+           (\t -> pprWithTYPE t <+> dcolon <+> pprWithTYPE (typeKind t))
+           bad_tys
+    ]

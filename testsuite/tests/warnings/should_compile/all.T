@@ -26,4 +26,7 @@ test('T16551', [extra_files(['T16551/'])], multimod_compile, ['T16551/A.hs T1655
 
 test('StarBinder', normal, compile, [''])
 
-test('Overflow', normal, compile, [''])
+test('Overflow', expect_broken_for(16543, ['hpc']), compile, [''])
+
+test('UnusedPackages', normal, multimod_compile,
+    ['UnusedPackages.hs', '-package=bytestring -package=base -package=process -package=ghc -Wunused-packages'])

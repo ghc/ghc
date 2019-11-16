@@ -1,0 +1,5 @@
+UnliftedNewtypesMultiFieldGadt.hs:19:3:
+     The constructor of a newtype must have exactly one field
+        but ‘FooC’ has two
+     In the definition of data constructor ‘FooC’
+      In the newtype declaration for ‘Foo’

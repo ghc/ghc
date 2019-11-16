@@ -268,7 +268,7 @@ for further change information.
     libraries/binary/binary.cabal:           Dependency of ``ghc`` library
     libraries/bytestring/bytestring.cabal:   Dependency of ``ghc`` library
     libraries/Cabal/Cabal/Cabal.cabal:       Dependency of ``ghc-pkg`` utility
-    libraries/containers/containers.cabal:   Dependency of ``ghc`` library
+    libraries/containers/containers/containers.cabal:   Dependency of ``ghc`` library
     libraries/deepseq/deepseq.cabal:         Dependency of ``ghc`` library
     libraries/directory/directory.cabal:     Dependency of ``ghc`` library
     libraries/filepath/filepath.cabal:       Dependency of ``ghc`` library

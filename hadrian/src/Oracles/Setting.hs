@@ -1,11 +1,9 @@
 module Oracles.Setting (
     configFile, Setting (..), SettingList (..), setting, settingList, getSetting,
     getSettingList,  anyTargetPlatform, anyTargetOs, anyTargetArch, anyHostOs,
-    ghcWithInterpreter, ghcEnableTablesNextToCode, useLibFFIForAdjustors,
-    ghcCanonVersion, cmdLineLengthLimit, iosHost, osxHost, windowsHost,
-    hostSupportsRPaths, topDirectory, libsuf, ghcVersionStage,
-    SettingsFileSetting (..),
-    settingsFileSetting
+    ghcWithInterpreter, useLibFFIForAdjustors,
+    ghcCanonVersion, cmdLineLengthLimit, hostSupportsRPaths, topDirectory,
+    libsuf, ghcVersionStage, SettingsFileSetting (..), settingsFileSetting
     ) where
 
 import Hadrian.Expression
@@ -88,6 +86,7 @@ data SettingsFileSetting
     | SettingsFileSetting_HaskellCPPCommand
     | SettingsFileSetting_HaskellCPPFlags
     | SettingsFileSetting_CCompilerFlags
+    | SettingsFileSetting_CxxCompilerFlags
     | SettingsFileSetting_CCompilerLinkFlags
     | SettingsFileSetting_CCompilerSupportsNoPie
     | SettingsFileSetting_LdCommand
@@ -162,6 +161,7 @@ settingsFileSetting key = lookupValueOrError configFile $ case key of
     SettingsFileSetting_HaskellCPPCommand -> "settings-haskell-cpp-command"
     SettingsFileSetting_HaskellCPPFlags -> "settings-haskell-cpp-flags"
     SettingsFileSetting_CCompilerFlags -> "settings-c-compiler-flags"
+    SettingsFileSetting_CxxCompilerFlags -> "settings-cxx-compiler-flags"
     SettingsFileSetting_CCompilerLinkFlags -> "settings-c-compiler-link-flags"
     SettingsFileSetting_CCompilerSupportsNoPie -> "settings-c-compiler-supports-no-pie"
     SettingsFileSetting_LdCommand -> "settings-ld-command"
@@ -207,14 +207,6 @@ anyTargetArch = matchSetting TargetArch
 anyHostOs :: [String] -> Action Bool
 anyHostOs = matchSetting HostOs
 
--- | Check whether the host OS setting is set to @"ios"@.
-iosHost :: Action Bool
-iosHost = anyHostOs ["ios"]
-
--- | Check whether the host OS setting is set to @"darwin"@.
-osxHost :: Action Bool
-osxHost = anyHostOs ["darwin"]
-
 -- | Check whether the host OS supports the @-rpath@ linker option when
 -- using dynamic linking.
 --
@@ -222,10 +214,6 @@ osxHost = anyHostOs ["darwin"]
 --       dynamic way on Windows anyways).
 hostSupportsRPaths :: Action Bool
 hostSupportsRPaths = anyHostOs ["linux", "darwin", "freebsd"]
-
--- | Check whether the host OS setting is set to @"mingw32"@ or @"cygwin32"@.
-windowsHost :: Action Bool
-windowsHost = anyHostOs ["mingw32", "cygwin32"]
 
 -- | Check whether the target supports GHCi.
 ghcWithInterpreter :: Action Bool
@@ -236,11 +224,6 @@ ghcWithInterpreter = do
     goodArch <- anyTargetArch [ "i386", "x86_64", "powerpc", "sparc"
                               , "sparc64", "arm" ]
     return $ goodOs && goodArch
-
--- | Check whether the target architecture supports placing info tables next to
--- code. See: https://gitlab.haskell.org/ghc/ghc/wikis/commentary/rts/storage/heap-objects#tables_next_to_code.
-ghcEnableTablesNextToCode :: Action Bool
-ghcEnableTablesNextToCode = notM $ anyTargetArch ["ia64", "powerpc64", "powerpc64le"]
 
 -- | Check to use @libffi@ for adjustors.
 useLibFFIForAdjustors :: Action Bool

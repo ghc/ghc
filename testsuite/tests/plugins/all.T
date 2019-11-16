@@ -182,6 +182,7 @@ test('plugin-recomp-change-prof',
 test('static-plugins',
      [extra_files(['simple-plugin/']),
       unless(config.have_ext_interp, skip),
+      expect_broken_for(16803, prof_ways),
       extra_run_opts('"' + config.libdir + '"')],
      compile_and_run,
      ['-package ghc -isimple-plugin/'])
@@ -200,8 +201,17 @@ test('T16104',
       ],
      makefile_test, [])
 
+
 test('T16260',
      [extra_files(['simple-plugin/']),
       pre_cmd('$MAKE -s --no-print-directory -C simple-plugin package.T16260 TOP={top}')
       ],
      makefile_test, [])
+
+test('test-hole-plugin',
+     [extra_files(['hole-fit-plugin/']),
+      pre_cmd('$MAKE -s --no-print-directory -C hole-fit-plugin package.hole-fit-plugin TOP={top}'),
+      extra_hc_opts('-package-db hole-fit-plugin/pkg.hole-fit-plugin/local.package.conf '+ config.plugin_way_flags),
+      req_th
+      ],
+     compile, ['-fdefer-typed-holes'])

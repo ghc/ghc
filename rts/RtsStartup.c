@@ -31,6 +31,7 @@
 #include "StaticPtrTable.h"
 #include "Hash.h"
 #include "Profiling.h"
+#include "ProfHeap.h"
 #include "Timer.h"
 #include "Globals.h"
 #include "FileLock.h"
@@ -326,7 +327,10 @@ hs_init_ghc(int *argc, char **argv[], RtsConfig rts_config)
     initThreadLabelTable();
 #endif
 
+#if defined(PROFILING)
     initProfiling();
+#endif
+    initHeapProfiling();
 
     /* start the virtual timer 'subsystem'. */
     initTimer();
@@ -498,8 +502,13 @@ hs_exit_(bool wait_foreign)
     reportCCSProfiling();
 #endif
 
+    endHeapProfiling();
+    freeHeapProfiling();
+
+#if defined(PROFILING)
     endProfiling();
     freeProfiling();
+#endif
 
 #if defined(PROFILING)
     // Originally, this was in report_ccs_profiling().  Now, retainer

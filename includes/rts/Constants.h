@@ -59,7 +59,7 @@
  *   NB. This corresponds with the number of actual INTLIKE/CHARLIKE
  *   closures defined in rts/StgMiscClosures.cmm.
  */
-#define MAX_INTLIKE             16
+#define MAX_INTLIKE             255
 #define MIN_INTLIKE             (-16)
 
 #define MAX_CHARLIKE            255

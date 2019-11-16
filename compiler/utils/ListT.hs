@@ -1,4 +1,5 @@
 {-# LANGUAGE CPP #-}
+{-# LANGUAGE DeriveFunctor #-}
 {-# LANGUAGE UndecidableInstances #-}
 {-# LANGUAGE Rank2Types #-}
 {-# LANGUAGE FlexibleInstances #-}
@@ -42,6 +43,7 @@ import Control.Monad.Fail as MonadFail
 -- layered over another monad 'm'
 newtype ListT m a =
     ListT { unListT :: forall r. (a -> m r -> m r) -> m r -> m r }
+    deriving (Functor)
 
 select :: Monad m => [a] -> ListT m a
 select xs = foldr (<|>) mzero (map pure xs)
@@ -54,9 +56,6 @@ fold = runListT
 -- failure continuations.
 runListT :: ListT m a -> (a -> m r -> m r) -> m r -> m r
 runListT = unListT
-
-instance Functor (ListT f) where
-    fmap f lt = ListT $ \sk fk -> unListT lt (sk . f) fk
 
 instance Applicative (ListT f) where
     pure a = ListT $ \sk fk -> sk a fk

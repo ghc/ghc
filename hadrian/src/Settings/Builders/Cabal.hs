@@ -8,6 +8,7 @@ import Context
 import Flavour
 import Packages
 import Settings.Builders.Common
+import qualified Settings.Builders.Common as S
 
 cabalBuilderArgs :: Args
 cabalBuilderArgs = builder (Cabal Setup) ? do
@@ -16,8 +17,7 @@ cabalBuilderArgs = builder (Cabal Setup) ? do
     pkg       <- getPackage
     path      <- getContextPath
     stage     <- getStage
-    windows   <- expr windowsHost
-    let prefix = "${pkgroot}" ++ (if windows then "" else "/..")
+    let prefix = "${pkgroot}" ++ (if windowsHost then "" else "/..")
     mconcat [ arg "configure"
             -- Don't strip libraries when cross compiling.
             -- TODO: We need to set @--with-strip=(stripCmdPath :: Action FilePath)@,
@@ -27,6 +27,9 @@ cabalBuilderArgs = builder (Cabal Setup) ? do
             -- TODO: See https://github.com/snowleopard/hadrian/issues/549.
             , flag CrossCompiling ? pure [ "--disable-executable-stripping"
                                          , "--disable-library-stripping" ]
+            -- We don't want to strip the debug RTS
+            , S.package rts ? pure [ "--disable-executable-stripping"
+                                  , "--disable-library-stripping" ]
             , arg "--cabal-file"
             , arg $ pkgCabalFile pkg
             , arg "--distdir"

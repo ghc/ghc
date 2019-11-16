@@ -14,7 +14,7 @@ module ListSetOps (
         Assoc, assoc, assocMaybe, assocUsing, assocDefault, assocDefaultUsing,
 
         -- Duplicate handling
-        hasNoDups, removeDups, findDupsEq,
+        hasNoDups, removeDups, findDupsEq, insertNoDup,
         equivClasses,
 
         -- Indexing
@@ -52,8 +52,17 @@ deleteBys eq xs ys = foldl' (flip (deleteBy eq)) xs ys
 -}
 
 
-unionLists :: (Outputable a, Eq a) => [a] -> [a] -> [a]
--- Assumes that the arguments contain no duplicates
+-- | Assumes that the arguments contain no duplicates
+unionLists :: (HasDebugCallStack, Outputable a, Eq a) => [a] -> [a] -> [a]
+-- We special case some reasonable common patterns.
+unionLists xs [] = xs
+unionLists [] ys = ys
+unionLists [x] ys
+  | isIn "unionLists" x ys = ys
+  | otherwise = x:ys
+unionLists xs [y]
+  | isIn "unionLists" y xs = xs
+  | otherwise = y:xs
 unionLists xs ys
   = WARN(lengthExceeds xs 100 || lengthExceeds ys 100, ppr xs $$ ppr ys)
     [x | x <- xs, isn'tIn "unionLists" x ys] ++ ys
@@ -169,3 +178,10 @@ findDupsEq _  [] = []
 findDupsEq eq (x:xs) | null eq_xs  = findDupsEq eq xs
                      | otherwise   = (x :| eq_xs) : findDupsEq eq neq_xs
     where (eq_xs, neq_xs) = partition (eq x) xs
+
+-- | \( O(n) \). @'insertNoDup' x xs@ treats @xs@ as a set, inserting @x@ only
+-- when an equal element couldn't be found in @xs@.
+insertNoDup :: (Eq a) => a -> [a] -> [a]
+insertNoDup x set
+  | elem x set = set
+  | otherwise  = x:set

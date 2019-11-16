@@ -8,7 +8,7 @@ test('barton-mangler-bug',
                    'Plot.hi',              'Plot.o',
                    'PlotExample.hi',       'PlotExample.o',
                    'TypesettingTricks.hi', 'TypesettingTricks.o']),
-      omit_ways('debug') # Fails for debug way due to annotation linting timeout
+      omit_ways(['debug']) # Fails for debug way due to annotation linting timeout
       ],
      multimod_compile_and_run, ['Main', ''])
 

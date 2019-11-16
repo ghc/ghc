@@ -629,7 +629,7 @@ flattenTopFloats (FB tops ceils defs)
 
 addTopFloatPairs :: Bag CoreBind -> [(Id,CoreExpr)] -> [(Id,CoreExpr)]
 addTopFloatPairs float_bag prs
-  = foldrBag add prs float_bag
+  = foldr add prs float_bag
   where
     add (NonRec b r) prs  = (b,r):prs
     add (Rec prs1)   prs2 = prs1 ++ prs2
@@ -673,7 +673,7 @@ plusMinor = M.unionWith unionBags
 
 install :: Bag FloatBind -> CoreExpr -> CoreExpr
 install defn_groups expr
-  = foldrBag wrapFloat expr defn_groups
+  = foldr wrapFloat expr defn_groups
 
 partitionByLevel
         :: Level                -- Partitioning level

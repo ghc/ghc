@@ -61,7 +61,6 @@ import RnExpr
 import RnUtils ( HsDocContext(..) )
 import RnFixity ( lookupFixityRn )
 import MkId
-import TidyPgm    ( globaliseAndTidyId )
 import TysWiredIn ( unitTy, mkListTy )
 import Plugins
 import DynFlags
@@ -141,6 +140,9 @@ import qualified Data.Set as S
 import Control.DeepSeq
 import Control.Monad
 
+import TcHoleFitTypes ( HoleFitPluginR (..) )
+
+
 #include "HsVersions.h"
 
 {-
@@ -165,7 +167,7 @@ tcRnModule hsc_env mod_sum save_rn_syntax
               (text "Renamer/typechecker"<+>brackets (ppr this_mod))
               (const ()) $
    initTc hsc_env hsc_src save_rn_syntax this_mod real_loc $
-          withTcPlugins hsc_env $
+          withTcPlugins hsc_env $ withHoleFitPlugins hsc_env $
 
           tcRnModuleTcRnM hsc_env mod_sum parsedModule pair
 
@@ -552,7 +554,7 @@ tc_rn_src_decls ds
                                 ("Declaration splices are not "
                                   ++ "permitted inside top-level "
                                   ++ "declarations added with addTopDecls"))
-                        ; Just (XSpliceDecl _, _) -> panic "tc_rn_src_decls"
+                        ; Just (XSpliceDecl nec, _) -> noExtCon nec
                         }
                       -- Rename TH-generated top-level declarations
                     ; (tcg_env, th_rn_decls) <- setGblEnv tcg_env
@@ -595,7 +597,7 @@ tc_rn_src_decls ds
 
                ; return (tcg_env, tcl_env, lie1 `andWC` lie2)
                }
-          ; Just (XSpliceDecl _, _) -> panic "tc_rn_src_decls"
+          ; Just (XSpliceDecl nec, _) -> noExtCon nec
           }
       }
 
@@ -632,8 +634,8 @@ tcRnHsBootDecls hsc_src decls
                 -- Check for illegal declarations
         ; case group_tail of
              Just (SpliceDecl _ d _, _) -> badBootDecl hsc_src "splice" d
-             Just (XSpliceDecl _, _) -> panic "tcRnHsBootDecls"
-             Nothing                  -> return ()
+             Just (XSpliceDecl nec, _)  -> noExtCon nec
+             Nothing                    -> return ()
         ; mapM_ (badBootDecl hsc_src "foreign") for_decls
         ; mapM_ (badBootDecl hsc_src "default") def_decls
         ; mapM_ (badBootDecl hsc_src "rule")    rule_decls
@@ -1456,7 +1458,7 @@ tcTopSrcDecls (HsGroup { hs_tyclds = tycl_decls,
                           foe_binds
 
             ; fo_gres = fi_gres `unionBags` foe_gres
-            ; fo_fvs = foldrBag (\gre fvs -> fvs `addOneFV` gre_name gre)
+            ; fo_fvs = foldr (\gre fvs -> fvs `addOneFV` gre_name gre)
                                 emptyFVs fo_gres
 
             ; sig_names = mkNameSet (collectHsValBinders hs_val_binds)
@@ -1680,7 +1682,7 @@ tcTyClsInstDecls :: [TyClGroup GhcRn]
 tcTyClsInstDecls tycl_decls deriv_decls binds
  = tcAddDataFamConPlaceholders (tycl_decls >>= group_instds) $
    tcAddPatSynPlaceholders (getPatSynBinds binds) $
-   do { (tcg_env, inst_info, datafam_deriv_info)
+   do { (tcg_env, inst_info, deriv_info)
           <- tcTyAndClassDecls tycl_decls ;
       ; setGblEnv tcg_env $ do {
           -- With the @TyClDecl@s and @InstDecl@s checked we're ready to
@@ -1690,9 +1692,8 @@ tcTyClsInstDecls tycl_decls deriv_decls binds
           -- Careful to quit now in case there were instance errors, so that
           -- the deriving errors don't pile up as well.
           ; failIfErrsM
-          ; let tyclds = tycl_decls >>= group_tyclds
           ; (tcg_env', inst_info', val_binds)
-              <- tcInstDeclsDeriv datafam_deriv_info tyclds deriv_decls
+              <- tcInstDeclsDeriv deriv_info deriv_decls
           ; setGblEnv tcg_env' $ do {
                 failIfErrsM
               ; pure (tcg_env', inst_info' ++ inst_info, val_binds)
@@ -1738,7 +1739,7 @@ check_main dflags tcg_env explicit_mod_hdr
         ; (ev_binds, main_expr)
                <- checkConstraints skol_info [] [] $
                   addErrCtxt mainCtxt    $
-                  tcMonoExpr (cL loc (HsVar noExt (cL loc main_name)))
+                  tcMonoExpr (cL loc (HsVar noExtField (cL loc main_name)))
                              (mkCheckExpType io_ty)
 
                 -- See Note [Root-main Id]
@@ -1841,7 +1842,7 @@ runTcInteractive :: HscEnv -> TcRn a -> IO (Messages, Maybe a)
 -- Initialise the tcg_inst_env with instances from all home modules.
 -- This mimics the more selective call to hptInstances in tcRnImports
 runTcInteractive hsc_env thing_inside
-  = initTcInteractive hsc_env $ withTcPlugins hsc_env $
+  = initTcInteractive hsc_env $ withTcPlugins hsc_env $ withHoleFitPlugins hsc_env $
     do { traceTc "setInteractiveContext" $
             vcat [ text "ic_tythings:" <+> vcat (map ppr (ic_tythings icxt))
                  , text "ic_insts:" <+> vcat (map (pprBndr LetBind . instanceDFunId) ic_insts)
@@ -2067,35 +2068,35 @@ tcUserStmt (dL->L loc (BodyStmt _ expr _ _))
               -- (if we are at a breakpoint, say).  We must put those free vars
 
               -- [let it = expr]
-              let_stmt  = cL loc $ LetStmt noExt $ noLoc $ HsValBinds noExt
+              let_stmt  = cL loc $ LetStmt noExtField $ noLoc $ HsValBinds noExtField
                            $ XValBindsLR
                                (NValBinds [(NonRecursive,unitBag the_bind)] [])
 
               -- [it <- e]
-              bind_stmt = cL loc $ BindStmt noExt
-                                       (cL loc (VarPat noExt (cL loc fresh_it)))
+              bind_stmt = cL loc $ BindStmt noExtField
+                                       (cL loc (VarPat noExtField (cL loc fresh_it)))
                                        (nlHsApp ghciStep rn_expr)
                                        (mkRnSyntaxExpr bindIOName)
                                        noSyntaxExpr
 
               -- [; print it]
-              print_it  = cL loc $ BodyStmt noExt
+              print_it  = cL loc $ BodyStmt noExtField
                                            (nlHsApp (nlHsVar interPrintName)
                                            (nlHsVar fresh_it))
                                            (mkRnSyntaxExpr thenIOName)
                                                   noSyntaxExpr
 
               -- NewA
-              no_it_a = cL loc $ BodyStmt noExt (nlHsApps bindIOName
+              no_it_a = cL loc $ BodyStmt noExtField (nlHsApps bindIOName
                                        [rn_expr , nlHsVar interPrintName])
                                        (mkRnSyntaxExpr thenIOName)
                                        noSyntaxExpr
 
-              no_it_b = cL loc $ BodyStmt noExt (rn_expr)
+              no_it_b = cL loc $ BodyStmt noExtField (rn_expr)
                                        (mkRnSyntaxExpr thenIOName)
                                        noSyntaxExpr
 
-              no_it_c = cL loc $ BodyStmt noExt
+              no_it_c = cL loc $ BodyStmt noExtField
                                       (nlHsApp (nlHsVar interPrintName) rn_expr)
                                       (mkRnSyntaxExpr thenIOName)
                                       noSyntaxExpr
@@ -2229,7 +2230,7 @@ tcUserStmt rdr_stmt@(dL->L loc _)
            ; when (isUnitTy v_ty || not (isTauTy v_ty)) failM
            ; return stuff }
       where
-        print_v  = cL loc $ BodyStmt noExt (nlHsApp (nlHsVar printName)
+        print_v  = cL loc $ BodyStmt noExtField (nlHsApp (nlHsVar printName)
                                     (nlHsVar v))
                                     (mkRnSyntaxExpr thenIOName) noSyntaxExpr
 
@@ -2316,14 +2317,14 @@ getGhciStepIO = do
 
         step_ty = noLoc $ HsForAllTy
                      { hst_fvf = ForallInvis
-                     , hst_bndrs = [noLoc $ UserTyVar noExt (noLoc a_tv)]
-                     , hst_xforall = noExt
+                     , hst_bndrs = [noLoc $ UserTyVar noExtField (noLoc a_tv)]
+                     , hst_xforall = noExtField
                      , hst_body  = nlHsFunTy ghciM ioM }
 
         stepTy :: LHsSigWcType GhcRn
         stepTy = mkEmptyWildCardBndrs (mkEmptyImplicitBndrs step_ty)
 
-    return (noLoc $ ExprWithTySig noExt (nlHsVar ghciStepIoMName) stepTy)
+    return (noLoc $ ExprWithTySig noExtField (nlHsVar ghciStepIoMName) stepTy)
 
 isGHCiMonad :: HscEnv -> String -> IO (Messages, Maybe Name)
 isGHCiMonad hsc_env ty
@@ -2418,10 +2419,11 @@ tcRnImportDecls hsc_env import_decls
 
 -- tcRnType just finds the kind of a type
 tcRnType :: HscEnv
+         -> ZonkFlexi
          -> Bool        -- Normalise the returned type
          -> LHsType GhcPs
          -> IO (Messages, Maybe (Type, Kind))
-tcRnType hsc_env normalise rdr_type
+tcRnType hsc_env flexi normalise rdr_type
   = runTcInteractive hsc_env $
     setXOptM LangExt.PolyKinds $   -- See Note [Kind-generalise in tcRnType]
     do { (HsWC { hswc_ext = wcs, hswc_body = rn_type }, _fvs)
@@ -2434,17 +2436,20 @@ tcRnType hsc_env normalise rdr_type
         -- It can have any rank or kind
         -- First bring into scope any wildcards
        ; traceTc "tcRnType" (vcat [ppr wcs, ppr rn_type])
-       ; ((ty, kind), lie)  <-
-                       captureTopConstraints $
-                       tcWildCardBinders wcs $ \ wcs' ->
-                       do { emitWildCardHoleConstraints wcs'
+       ; (ty, kind) <- pushTcLevelM_         $
+                        -- must push level to satisfy level precondition of
+                        -- kindGeneralize, below
+                       solveEqualities       $
+                       tcNamedWildCardBinders wcs $ \ wcs' ->
+                       do { emitNamedWildCardHoleConstraints wcs'
                           ; tcLHsTypeUnsaturated rn_type }
-       ; _ <- checkNoErrs (simplifyInteractive lie)
 
        -- Do kind generalisation; see Note [Kind-generalise in tcRnType]
        ; kind <- zonkTcType kind
        ; kvs <- kindGeneralize kind
-       ; ty  <- zonkTcTypeToType ty
+       ; e <- mkEmptyZonkEnv flexi
+
+       ; ty  <- zonkTcTypeToTypeX e ty
 
        -- Do validity checking on type
        ; checkValidType (GhciCtxt True) ty
@@ -2556,7 +2561,9 @@ tcRnDeclsi hsc_env local_decls
 externaliseAndTidyId :: Module -> Id -> TcM Id
 externaliseAndTidyId this_mod id
   = do { name' <- externaliseName this_mod (idName id)
-       ; return (globaliseAndTidyId (setIdName id name')) }
+       ; return $ globaliseId id
+                     `setIdName` name'
+                     `setIdType` tidyTopType (idType id) }
 
 
 {-
@@ -2874,6 +2881,30 @@ withTcPlugins hsc_env m =
 
 getTcPlugins :: DynFlags -> [TcRnMonad.TcPlugin]
 getTcPlugins dflags = catMaybes $ mapPlugins dflags (\p args -> tcPlugin p args)
+
+
+withHoleFitPlugins :: HscEnv -> TcM a -> TcM a
+withHoleFitPlugins hsc_env m =
+  case (getHfPlugins (hsc_dflags hsc_env)) of
+    [] -> m  -- Common fast case
+    plugins -> do (plugins,stops) <- unzip `fmap` mapM startPlugin plugins
+                  -- This ensures that hfPluginStop is called even if a type
+                  -- error occurs during compilation.
+                  eitherRes <- tryM $ do
+                    updGblEnv (\e -> e { tcg_hf_plugins = plugins }) m
+                  sequence_ stops
+                  case eitherRes of
+                    Left _ -> failM
+                    Right res -> return res
+  where
+    startPlugin (HoleFitPluginR init plugin stop) =
+      do ref <- init
+         return (plugin ref, stop ref)
+
+getHfPlugins :: DynFlags -> [HoleFitPluginR]
+getHfPlugins dflags =
+  catMaybes $ mapPlugins dflags (\p args -> holeFitPlugin p args)
+
 
 runRenamerPlugin :: TcGblEnv
                  -> HsGroup GhcRn

@@ -182,6 +182,7 @@ pruneSparkQueue (Capability *cap)
           traceEventSparkFizzle(cap);
       } else {
           info = spark->header.info;
+          load_load_barrier();
           if (IS_FORWARDING_PTR(info)) {
               tmp = (StgClosure*)UN_FORWARDING_PTR(info);
               /* if valuable work: shift inside the pool */

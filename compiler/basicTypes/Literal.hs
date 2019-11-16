@@ -61,7 +61,7 @@ import BasicTypes
 import Binary
 import Constants
 import DynFlags
-import Platform
+import GHC.Platform
 import UniqFM
 import Util
 
@@ -110,7 +110,9 @@ data Literal
 
   | LitNumber !LitNumType !Integer Type
                                 -- ^ Any numeric literal that can be
-                                -- internally represented with an Integer
+                                -- internally represented with an Integer.
+                                -- See Note [Types of LitNumbers] below for the
+                                -- Type field.
 
   | LitString  ByteString       -- ^ A string-literal: stored and emitted
                                 -- UTF-8 encoded, we'll arrange to decode it
@@ -251,6 +253,7 @@ instance Binary Literal where
               6 -> do
                     nt <- get bh
                     i  <- get bh
+                    -- Note [Types of LitNumbers]
                     let t = case nt of
                             LitNumInt     -> intPrimTy
                             LitNumInt64   -> int64PrimTy
@@ -267,20 +270,15 @@ instance Binary Literal where
                     return (LitRubbish)
 
 instance Outputable Literal where
-    ppr lit = pprLiteral (\d -> d) lit
+    ppr = pprLiteral id
 
 instance Eq Literal where
-    a == b = case (a `compare` b) of { EQ -> True;   _ -> False }
-    a /= b = case (a `compare` b) of { EQ -> False;  _ -> True  }
+    a == b = compare a b == EQ
 
 -- | Needed for the @Ord@ instance of 'AltCon', which in turn is needed in
 -- 'TrieMap.CoreMap'.
 instance Ord Literal where
-    a <= b = case (a `compare` b) of { LT -> True;  EQ -> True;  GT -> False }
-    a <  b = case (a `compare` b) of { LT -> True;  EQ -> False; GT -> False }
-    a >= b = case (a `compare` b) of { LT -> False; EQ -> True;  GT -> True  }
-    a >  b = case (a `compare` b) of { LT -> False; EQ -> False; GT -> True  }
-    compare a b = cmpLit a b
+    compare = cmpLit
 
 {-
         Construction
@@ -309,13 +307,11 @@ Int/Word range.
 wrapLitNumber :: DynFlags -> Literal -> Literal
 wrapLitNumber dflags v@(LitNumber nt i t) = case nt of
   LitNumInt -> case platformWordSize (targetPlatform dflags) of
-    4 -> LitNumber nt (toInteger (fromIntegral i :: Int32)) t
-    8 -> LitNumber nt (toInteger (fromIntegral i :: Int64)) t
-    w -> panic ("wrapLitNumber: Unknown platformWordSize: " ++ show w)
+    PW4 -> LitNumber nt (toInteger (fromIntegral i :: Int32)) t
+    PW8 -> LitNumber nt (toInteger (fromIntegral i :: Int64)) t
   LitNumWord -> case platformWordSize (targetPlatform dflags) of
-    4 -> LitNumber nt (toInteger (fromIntegral i :: Word32)) t
-    8 -> LitNumber nt (toInteger (fromIntegral i :: Word64)) t
-    w -> panic ("wrapLitNumber: Unknown platformWordSize: " ++ show w)
+    PW4 -> LitNumber nt (toInteger (fromIntegral i :: Word32)) t
+    PW8 -> LitNumber nt (toInteger (fromIntegral i :: Word64)) t
   LitNumInt64   -> LitNumber nt (toInteger (fromIntegral i :: Int64)) t
   LitNumWord64  -> LitNumber nt (toInteger (fromIntegral i :: Word64)) t
   LitNumInteger -> v
@@ -644,6 +640,26 @@ litIsLifted _                  = False
 {-
         Types
         ~~~~~
+
+Note [Types of LitNumbers]
+~~~~~~~~~~~~~~~~~~~~~~~~~~
+
+A LitNumber's type is always known from its LitNumType:
+
+  LitNumInteger -> Integer
+  LitNumNatural -> Natural
+  LitNumInt     -> Int# (intPrimTy)
+  LitNumInt64   -> Int64# (int64PrimTy)
+  LitNumWord    -> Word# (wordPrimTy)
+  LitNumWord64  -> Word64# (word64PrimTy)
+
+The reason why we have a Type field is because Integer and Natural types live
+outside of GHC (in the libraries), so we have to get the actual Type via
+lookupTyCon, tcIfaceTyConByName etc. that's too inconvenient in the call sites
+of literalType, so we do that when creating these literals, and literalType
+simply reads the field.
+
+(But see also Note [Integer literals] and Note [Natural literals])
 -}
 
 -- | Find the Haskell 'Type' the literal occupies
@@ -654,7 +670,7 @@ literalType (LitString  _)    = addrPrimTy
 literalType (LitFloat _)      = floatPrimTy
 literalType (LitDouble _)     = doublePrimTy
 literalType (LitLabel _ _ _)  = addrPrimTy
-literalType (LitNumber _ _ t) = t
+literalType (LitNumber _ _ t) = t -- Note [Types of LitNumbers]
 literalType (LitRubbish)      = mkForAllTy a Inferred (mkTyVarTy a)
   where
     a = alphaTyVarUnliftedRep

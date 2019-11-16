@@ -1,0 +1,7 @@
+
+T495.hs:4:12: error:
+    The INLINE pragma for ‘blarg’ lacks an accompanying binding
+
+T495.hs:7:12: error:
+    The INLINE pragma for ‘lookup’ lacks an accompanying binding
+      (The INLINE pragma must be given where ‘lookup’ is declared)

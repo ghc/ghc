@@ -27,10 +27,10 @@ import Hoopl.Label
 
 import BlockId
 import CLabel
-import PprCmmExpr ()
+import PprCmmExpr () -- For Outputable instances
 
 import Unique                ( pprUniqueAlways, getUnique )
-import Platform
+import GHC.Platform
 import FastString
 import Outputable
 import DynFlags

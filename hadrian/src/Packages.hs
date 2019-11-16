@@ -54,7 +54,7 @@ checkApiAnnotations = util "check-api-annotations"
 checkPpr            = util "check-ppr"
 compareSizes        = util "compareSizes"    `setPath` "utils/compare_sizes"
 compiler            = top  "ghc"             `setPath` "compiler"
-containers          = lib  "containers"
+containers          = lib  "containers"      `setPath` "libraries/containers/containers"
 deepseq             = lib  "deepseq"
 deriveConstants     = util "deriveConstants"
 directory           = lib  "directory"
@@ -212,8 +212,7 @@ libffiBuildPath stage = buildPath $ Context
 libffiLibraryName :: Action FilePath
 libffiLibraryName = do
     useSystemFfi <- flag UseSystemFfi
-    windows      <- windowsHost
-    return $ case (useSystemFfi, windows) of
+    return $ case (useSystemFfi, windowsHost) of
         (True , False) -> "ffi"
         (False, False) -> "Cffi"
         (_    , True ) -> "Cffi-6"

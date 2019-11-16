@@ -13,7 +13,7 @@ import GHC.Ptr (Ptr (..))
 import GHCi.Util
 import HscTypes
 import Outputable
-import Platform (target32Bit)
+import GHC.Platform (target32Bit)
 import Prelude
 import System.Mem
 import System.Mem.Weak

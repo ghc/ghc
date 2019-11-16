@@ -49,7 +49,10 @@
 
 module Lexer (
    Token(..), lexer, pragState, mkPState, mkPStatePure, PState(..),
-   P(..), ParseResult(..), mkParserFlags, mkParserFlags', ParserFlags,
+   P(..), ParseResult(..), mkParserFlags, mkParserFlags', ParserFlags(..),
+   appendWarning,
+   appendError,
+   allocateComments,
    MonadP(..),
    getRealSrcLoc, getPState, withThisPackage,
    failLocMsgP, srcParseFail,
@@ -58,8 +61,10 @@ module Lexer (
    activeContext, nextIsEOF,
    getLexState, popLexState, pushLexState,
    ExtBits(..),
+   xtest,
    lexTokenStream,
-   AddAnn,mkParensApiAnn,
+   AddAnn(..),mkParensApiAnn,
+   addAnnsAt,
    commentToAnnotation
   ) where
 
@@ -2503,40 +2508,55 @@ class Monad m => MonadP m where
   -- | Check if a given flag is currently set in the bitmap.
   getBit :: ExtBits -> m Bool
   -- | Given a location and a list of AddAnn, apply them all to the location.
-  addAnnsAt :: SrcSpan -> [AddAnn] -> m ()
   addAnnotation :: SrcSpan          -- SrcSpan of enclosing AST construct
                 -> AnnKeywordId     -- The first two parameters are the key
                 -> SrcSpan          -- The location of the keyword itself
                 -> m ()
 
+appendError
+  :: SrcSpan
+  -> SDoc
+  -> (DynFlags -> Messages)
+  -> (DynFlags -> Messages)
+appendError srcspan msg m =
+  \d ->
+    let (ws, es) = m d
+        errormsg = mkErrMsg d srcspan alwaysQualify msg
+        es' = es `snocBag` errormsg
+    in (ws, es')
+
+appendWarning
+  :: ParserFlags
+  -> WarningFlag
+  -> SrcSpan
+  -> SDoc
+  -> (DynFlags -> Messages)
+  -> (DynFlags -> Messages)
+appendWarning o option srcspan warning m =
+  \d ->
+    let (ws, es) = m d
+        warning' = makeIntoWarning (Reason option) $
+           mkWarnMsg d srcspan alwaysQualify warning
+        ws' = if warnopt option o then ws `snocBag` warning' else ws
+    in (ws', es)
+
 instance MonadP P where
   addError srcspan msg
    = P $ \s@PState{messages=m} ->
-         let
-             m' d =
-                 let (ws, es) = m d
-                     errormsg = mkErrMsg d srcspan alwaysQualify msg
-                     es' = es `snocBag` errormsg
-                 in (ws, es')
-         in POk s{messages=m'} ()
+             POk s{messages=appendError srcspan msg m} ()
   addWarning option srcspan warning
    = P $ \s@PState{messages=m, options=o} ->
-         let
-             m' d =
-                 let (ws, es) = m d
-                     warning' = makeIntoWarning (Reason option) $
-                        mkWarnMsg d srcspan alwaysQualify warning
-                     ws' = if warnopt option o then ws `snocBag` warning' else ws
-                 in (ws', es)
-         in POk s{messages=m'} ()
+             POk s{messages=appendWarning o option srcspan warning m} ()
   addFatalError span msg =
     addError span msg >> P PFailed
   getBit ext = P $ \s -> let b =  ext `xtest` pExtsBitmap (options s)
                          in b `seq` POk s b
-  addAnnsAt loc anns = mapM_ (\a -> a loc) anns
   addAnnotation l a v = do
     addAnnotationOnly l a v
-    allocateComments l
+    allocateCommentsP l
+
+addAnnsAt :: MonadP m => SrcSpan -> [AddAnn] -> m ()
+addAnnsAt l = mapM_ (\(AddAnn a v) -> addAnnotation l a v)
 
 addTabWarning :: RealSrcSpan -> P ()
 addTabWarning srcspan
@@ -3061,7 +3081,7 @@ clean_pragma prag = canon_ws (map toLower (unprefix prag))
 --
 --   The usual way an 'AddAnn' is created is using the 'mj' ("make jump")
 --   function, and then it can be discharged using the 'ams' function.
-type AddAnn = SrcSpan -> P ()
+data AddAnn = AddAnn AnnKeywordId SrcSpan
 
 addAnnotationOnly :: SrcSpan -> AnnKeywordId -> SrcSpan -> P ()
 addAnnotationOnly l a v = P $ \s -> POk s {
@@ -3073,9 +3093,8 @@ addAnnotationOnly l a v = P $ \s -> POk s {
 -- and end of the span
 mkParensApiAnn :: SrcSpan -> [AddAnn]
 mkParensApiAnn (UnhelpfulSpan _)  = []
-mkParensApiAnn s@(RealSrcSpan ss) = [mj AnnOpenP lo,mj AnnCloseP lc]
+mkParensApiAnn s@(RealSrcSpan ss) = [AddAnn AnnOpenP lo,AddAnn AnnCloseP lc]
   where
-    mj a l = (\s -> addAnnotation s a l)
     f = srcSpanFile ss
     sl = srcSpanStartLine ss
     sc = srcSpanStartCol ss
@@ -3091,19 +3110,28 @@ queueComment c = P $ \s -> POk s {
 
 -- | Go through the @comment_q@ in @PState@ and remove all comments
 -- that belong within the given span
-allocateComments :: SrcSpan -> P ()
-allocateComments ss = P $ \s ->
+allocateCommentsP :: SrcSpan -> P ()
+allocateCommentsP ss = P $ \s ->
+  let (comment_q', newAnns) = allocateComments ss (comment_q s) in
+    POk s {
+       comment_q = comment_q'
+     , annotations_comments = newAnns ++ (annotations_comments s)
+     } ()
+
+allocateComments
+  :: SrcSpan
+  -> [Located AnnotationComment]
+  -> ([Located AnnotationComment], [(SrcSpan,[Located AnnotationComment])])
+allocateComments ss comment_q =
   let
-    (before,rest)  = break (\(L l _) -> isSubspanOf l ss) (comment_q s)
+    (before,rest)  = break (\(L l _) -> isSubspanOf l ss) comment_q
     (middle,after) = break (\(L l _) -> not (isSubspanOf l ss)) rest
     comment_q' = before ++ after
     newAnns = if null middle then []
                              else [(ss,middle)]
   in
-    POk s {
-       comment_q = comment_q'
-     , annotations_comments = newAnns ++ (annotations_comments s)
-     } ()
+    (comment_q', newAnns)
+
 
 commentToAnnotation :: Located Token -> Located AnnotationComment
 commentToAnnotation (L l (ITdocCommentNext s))  = L l (AnnDocCommentNext s)

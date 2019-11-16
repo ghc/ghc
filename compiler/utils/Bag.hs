@@ -6,7 +6,7 @@
 Bag: an unordered collection with duplicates
 -}
 
-{-# LANGUAGE ScopedTypeVariables, CPP #-}
+{-# LANGUAGE ScopedTypeVariables, CPP, DeriveFunctor #-}
 
 module Bag (
         Bag, -- abstract type
@@ -15,11 +15,11 @@ module Bag (
         mapBag,
         elemBag, lengthBag,
         filterBag, partitionBag, partitionBagWith,
-        concatBag, catBagMaybes, foldBag, foldrBag, foldlBag,
+        concatBag, catBagMaybes, foldBag,
         isEmptyBag, isSingletonBag, consBag, snocBag, anyBag, allBag,
         listToBag, bagToList, mapAccumBagL,
         concatMapBag, concatMapBagPair, mapMaybeBag,
-        foldrBagM, foldlBagM, mapBagM, mapBagM_,
+        mapBagM, mapBagM_,
         flatMapBagM, flatMapBagPairM,
         mapAndUnzipBagM, mapAccumBagLM,
         anyBagM, filterBagM
@@ -45,6 +45,7 @@ data Bag a
   | UnitBag a
   | TwoBags (Bag a) (Bag a) -- INVARIANT: neither branch is empty
   | ListBag [a]             -- INVARIANT: the list is non-empty
+  deriving (Functor)
 
 emptyBag :: Bag a
 emptyBag = EmptyBag
@@ -133,12 +134,12 @@ anyBagM p (TwoBags b1 b2) = do flag <- anyBagM p b1
 anyBagM p (ListBag xs)    = anyM p xs
 
 concatBag :: Bag (Bag a) -> Bag a
-concatBag bss = foldrBag add emptyBag bss
+concatBag bss = foldr add emptyBag bss
   where
     add bs rs = bs `unionBags` rs
 
 catBagMaybes :: Bag (Maybe a) -> Bag a
-catBagMaybes bs = foldrBag add emptyBag bs
+catBagMaybes bs = foldr add emptyBag bs
   where
     add Nothing rs = rs
     add (Just x) rs = x `consBag` rs
@@ -190,41 +191,8 @@ foldBag t u e (UnitBag x)     = u x `t` e
 foldBag t u e (TwoBags b1 b2) = foldBag t u (foldBag t u e b2) b1
 foldBag t u e (ListBag xs)    = foldr (t.u) e xs
 
-foldrBag :: (a -> r -> r) -> r
-         -> Bag a
-         -> r
-
-foldrBag _ z EmptyBag        = z
-foldrBag k z (UnitBag x)     = k x z
-foldrBag k z (TwoBags b1 b2) = foldrBag k (foldrBag k z b2) b1
-foldrBag k z (ListBag xs)    = foldr k z xs
-
-foldlBag :: (r -> a -> r) -> r
-         -> Bag a
-         -> r
-
-foldlBag _ z EmptyBag        = z
-foldlBag k z (UnitBag x)     = k z x
-foldlBag k z (TwoBags b1 b2) = foldlBag k (foldlBag k z b1) b2
-foldlBag k z (ListBag xs)    = foldl k z xs
-
-foldrBagM :: (Monad m) => (a -> b -> m b) -> b -> Bag a -> m b
-foldrBagM _ z EmptyBag        = return z
-foldrBagM k z (UnitBag x)     = k x z
-foldrBagM k z (TwoBags b1 b2) = do { z' <- foldrBagM k z b2; foldrBagM k z' b1 }
-foldrBagM k z (ListBag xs)    = foldrM k z xs
-
-foldlBagM :: (Monad m) => (b -> a -> m b) -> b -> Bag a -> m b
-foldlBagM _ z EmptyBag        = return z
-foldlBagM k z (UnitBag x)     = k z x
-foldlBagM k z (TwoBags b1 b2) = do { z' <- foldlBagM k z b1; foldlBagM k z' b2 }
-foldlBagM k z (ListBag xs)    = foldlM k z xs
-
 mapBag :: (a -> b) -> Bag a -> Bag b
-mapBag _ EmptyBag        = EmptyBag
-mapBag f (UnitBag x)     = UnitBag (f x)
-mapBag f (TwoBags b1 b2) = TwoBags (mapBag f b1) (mapBag f b2)
-mapBag f (ListBag xs)    = ListBag (map f xs)
+mapBag = fmap
 
 concatMapBag :: (a -> Bag b) -> Bag a -> Bag b
 concatMapBag _ EmptyBag        = EmptyBag
@@ -332,7 +300,7 @@ listToBag [x] = UnitBag x
 listToBag vs = ListBag vs
 
 bagToList :: Bag a -> [a]
-bagToList b = foldrBag (:) [] b
+bagToList b = foldr (:) [] b
 
 instance (Outputable a) => Outputable (Bag a) where
     ppr bag = braces (pprWithCommas ppr (bagToList bag))
@@ -344,8 +312,18 @@ instance Data a => Data (Bag a) where
   dataTypeOf _ = mkNoRepType "Bag"
   dataCast1 x  = gcast1 x
 
-instance Functor Bag where
-    fmap = mapBag
-
 instance Foldable.Foldable Bag where
-    foldr = foldrBag
+  foldr _ z EmptyBag        = z
+  foldr k z (UnitBag x)     = k x z
+  foldr k z (TwoBags b1 b2) = foldr k (foldr k z b2) b1
+  foldr k z (ListBag xs)    = foldr k z xs
+
+  foldl _ z EmptyBag        = z
+  foldl k z (UnitBag x)     = k z x
+  foldl k z (TwoBags b1 b2) = foldl k (foldl k z b1) b2
+  foldl k z (ListBag xs)    = foldl k z xs
+
+  foldl' _ z EmptyBag        = z
+  foldl' k z (UnitBag x)     = k z x
+  foldl' k z (TwoBags b1 b2) = let r1 = foldl' k z b1 in seq r1 $ foldl' k r1 b2
+  foldl' k z (ListBag xs)    = foldl' k z xs

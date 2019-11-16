@@ -1778,6 +1778,8 @@ foreign import ccall unsafe "gmp.h __gmpn_popcount"
 -- BigNat-wrapped ByteArray#-primops
 
 -- | Return number of limbs contained in 'BigNat'.
+--
+-- The result is always @>= 1@ since even zero is encoded with 1 limb.
 sizeofBigNat# :: BigNat -> GmpSize#
 sizeofBigNat# (BN# x#)
     = sizeofByteArray# x# `uncheckedIShiftRL#` GMP_LIMB_SHIFT#

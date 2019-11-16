@@ -3,6 +3,7 @@
 # A linter to warn for ASSERT macros which are separated from their argument
 # list by a space, which Clang's CPP barfs on
 
+from pathlib import Path
 from linter import run_linters, RegexpLinter
 
 linters = [
@@ -19,6 +20,12 @@ linters = [
     RegexpLinter(r'#ifndef\s+',
                  message='`#if !defined(x)` is preferred to `#ifndef x`'),
 ]
+
+for l in linters:
+    # Need do document rules!
+    l.add_path_filter(lambda path: path != Path('docs', 'coding-style.html'))
+    # Don't lint vendored code
+    l.add_path_filter(lambda path: not path.name == 'config.guess')
 
 if __name__ == '__main__':
     run_linters(linters)

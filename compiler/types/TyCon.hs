@@ -132,7 +132,8 @@ module TyCon(
 
 import GhcPrelude
 
-import {-# SOURCE #-} TyCoRep    ( Kind, Type, PredType, pprType, mkForAllTy, mkFunTy )
+import {-# SOURCE #-} TyCoRep    ( Kind, Type, PredType, mkForAllTy, mkFunTy )
+import {-# SOURCE #-} TyCoPpr    ( pprType )
 import {-# SOURCE #-} TysWiredIn ( runtimeRepTyCon, constraintKind
                                  , vecCountTyCon, vecElemTyCon, liftedTypeKind )
 import {-# SOURCE #-} DataCon    ( DataCon, dataConExTyCoVars, dataConFieldLabels
@@ -1019,6 +1020,7 @@ mkDataTyConRhs cons
 -- constructor of 'PrimRep'. This data structure allows us to store this
 -- information right in the 'TyCon'. The other approach would be to look
 -- up things like @RuntimeRep@'s @PrimRep@ by known-key every time.
+-- See also Note [Getting from RuntimeRep to PrimRep] in RepType
 data RuntimeRepInfo
   = NoRRI       -- ^ an ordinary promoted data con
   | RuntimeRep ([Type] -> [PrimRep])
@@ -1392,23 +1394,30 @@ This means to turn an ArgRep/PrimRep into a CmmType requires DynFlags.
 
 On the other hand, CmmType includes some "nonsense" values, such as
 CmmType GcPtrCat W32 on a 64-bit machine.
+
+The PrimRep type is closely related to the user-visible RuntimeRep type.
+See Note [RuntimeRep and PrimRep] in RepType.
+
 -}
 
 -- | A 'PrimRep' is an abstraction of a type.  It contains information that
 -- the code generator needs in order to pass arguments, return results,
--- and store values of this type.
+-- and store values of this type. See also Note [RuntimeRep and PrimRep] in RepType
+-- and Note [VoidRep] in RepType.
 data PrimRep
   = VoidRep
   | LiftedRep
   | UnliftedRep   -- ^ Unlifted pointer
   | Int8Rep       -- ^ Signed, 8-bit value
   | Int16Rep      -- ^ Signed, 16-bit value
-  | IntRep        -- ^ Signed, word-sized value
-  | WordRep       -- ^ Unsigned, word-sized value
+  | Int32Rep      -- ^ Signed, 32-bit value
   | Int64Rep      -- ^ Signed, 64 bit value (with 32-bit words only)
+  | IntRep        -- ^ Signed, word-sized value
   | Word8Rep      -- ^ Unsigned, 8 bit value
-  | Word16Rep      -- ^ Unsigned, 16 bit value
+  | Word16Rep     -- ^ Unsigned, 16 bit value
+  | Word32Rep     -- ^ Unsigned, 32 bit value
   | Word64Rep     -- ^ Unsigned, 64 bit value (with 32-bit words only)
+  | WordRep       -- ^ Unsigned, word-sized value
   | AddrRep       -- ^ A pointer, but /not/ to a Haskell value (use '(Un)liftedRep')
   | FloatRep
   | DoubleRep
@@ -1455,9 +1464,11 @@ primRepSizeB dflags IntRep           = wORD_SIZE dflags
 primRepSizeB dflags WordRep          = wORD_SIZE dflags
 primRepSizeB _      Int8Rep          = 1
 primRepSizeB _      Int16Rep         = 2
+primRepSizeB _      Int32Rep         = 4
 primRepSizeB _      Int64Rep         = wORD64_SIZE
 primRepSizeB _      Word8Rep         = 1
 primRepSizeB _      Word16Rep        = 2
+primRepSizeB _      Word32Rep        = 4
 primRepSizeB _      Word64Rep        = wORD64_SIZE
 primRepSizeB _      FloatRep         = fLOAT_SIZE
 primRepSizeB dflags DoubleRep        = dOUBLE_SIZE dflags

@@ -1,6 +1,6 @@
 test('T14854',
      [only_ways(threaded_ways),
-      omit_ways('ghci'),
+      omit_ways(['ghci']),
       reqlib('random'),
       ignore_stderr],
      compile_and_run,

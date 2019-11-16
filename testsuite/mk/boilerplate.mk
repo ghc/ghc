@@ -240,17 +240,17 @@ $(TOP)/mk/ghc-config : $(TOP)/mk/ghc-config.hs
 
 empty=
 space=$(empty) $(empty)
-ifeq "$(ghc-config-mk)" ""
-ghc-config-mk = $(TOP)/mk/ghcconfig$(subst $(space),_,$(subst :,_,$(subst /,_,$(subst \,_,$(TEST_HC))))).mk
+ifeq "$(ghc_config_mk)" ""
+ghc_config_mk = $(TOP)/mk/ghcconfig$(subst $(space),_,$(subst :,_,$(subst /,_,$(subst \,_,$(TEST_HC))))).mk
 
-$(ghc-config-mk) : $(TOP)/mk/ghc-config
+$(ghc_config_mk) : $(TOP)/mk/ghc-config
 	$(TOP)/mk/ghc-config "$(TEST_HC)" >"$@"; if [ $$? != 0 ]; then $(RM) "$@"; exit 1; fi
 # If the ghc-config fails, remove $@, and fail
 endif
 
 # Note: $(CLEANING) is not defined in the testsuite.
 ifeq "$(findstring clean,$(MAKECMDGOALS))" ""
--include $(ghc-config-mk)
+-include $(ghc_config_mk)
 endif
 
 # Note [WayFlags]

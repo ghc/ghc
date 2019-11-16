@@ -96,7 +96,7 @@ generatePackageCode :: Context -> Rules ()
 generatePackageCode context@(Context stage pkg _) = do
     root <- buildRootRules
     let dir         = buildDir context
-        generated f = (root -/- dir ++ "//*.hs") ?== f && not ("//autogen/*" ?== f)
+        generated f = (root -/- dir -/- "**/*.hs") ?== f && not ("**/autogen/*" ?== f)
         go gen file = generate file context gen
     generated ?> \file -> do
         let unpack = fromMaybe . error $ "No generator for " ++ file ++ "."
@@ -111,13 +111,13 @@ generatePackageCode context@(Context stage pkg _) = do
 
     priority 2.0 $ do
         when (pkg == compiler) $ do
-            root <//> dir -/- "Config.hs" %> go generateConfigHs
-            root <//> dir -/- "*.hs-incl" %> genPrimopCode context
+            root -/- "**" -/- dir -/- "Config.hs" %> go generateConfigHs
+            root -/- "**" -/- dir -/- "*.hs-incl" %> genPrimopCode context
         when (pkg == ghcPrim) $ do
-            root <//> dir -/- "GHC/Prim.hs" %> genPrimopCode context
-            root <//> dir -/- "GHC/PrimopWrappers.hs" %> genPrimopCode context
-        when (pkg == ghcPkg) $
-            root <//> dir -/- "Version.hs" %> go generateVersionHs
+            root -/- "**" -/- dir -/- "GHC/Prim.hs" %> genPrimopCode context
+            root -/- "**" -/- dir -/- "GHC/PrimopWrappers.hs" %> genPrimopCode context
+        when (pkg == ghcBoot) $
+            root -/- "**" -/- dir -/- "GHC/Version.hs" %> go generateVersionHs
 
     when (pkg == compiler) $ do
         root -/- primopsTxt stage %> \file -> do
@@ -125,17 +125,17 @@ generatePackageCode context@(Context stage pkg _) = do
             need $ [primopsSource] ++ includes
             build $ target context HsCpp [primopsSource] [file]
 
-        root -/- stageString stage <//> "ghc_boot_platform.h" %>
+        root -/- stageString stage -/- "**" -/- "ghc_boot_platform.h" %>
             go generateGhcBootPlatformH
 
     when (pkg == rts) $ do
-        root <//> dir -/- "cmm/AutoApply.cmm" %> \file ->
+        root -/- "**" -/- dir -/- "cmm/AutoApply.cmm" %> \file ->
             build $ target context GenApply [] [file]
         -- TODO: This should be fixed properly, e.g. generated here on demand.
-        (root <//> dir -/- "DerivedConstants.h") <~ (buildRoot <&> (-/- generatedDir))
-        (root <//> dir -/- "ghcautoconf.h") <~ (buildRoot <&> (-/- generatedDir))
-        (root <//> dir -/- "ghcplatform.h") <~ (buildRoot <&> (-/- generatedDir))
-        (root <//> dir -/- "ghcversion.h") <~ (buildRoot <&> (-/- generatedDir))
+        (root -/- "**" -/- dir -/- "DerivedConstants.h") <~ (buildRoot <&> (-/- generatedDir))
+        (root -/- "**" -/- dir -/- "ghcautoconf.h") <~ (buildRoot <&> (-/- generatedDir))
+        (root -/- "**" -/- dir -/- "ghcplatform.h") <~ (buildRoot <&> (-/- generatedDir))
+        (root -/- "**" -/- dir -/- "ghcversion.h") <~ (buildRoot <&> (-/- generatedDir))
  where
     pattern <~ mdir = pattern %> \file -> do
         dir <- mdir
@@ -165,15 +165,15 @@ copyRules = do
         prefix -/- "platformConstants" <~ (buildRoot <&> (-/- generatedDir))
         prefix -/- "template-hsc.h"    <~ return (pkgPath hsc2hs)
 
-        prefix -/- "html//*"           <~ return "utils/haddock/haddock-api/resources"
-        prefix -/- "latex//*"          <~ return "utils/haddock/haddock-api/resources"
+        prefix -/- "html/**"           <~ return "utils/haddock/haddock-api/resources"
+        prefix -/- "latex/**"          <~ return "utils/haddock/haddock-api/resources"
 
 generateRules :: Rules ()
 generateRules = do
     root <- buildRootRules
 
-    (root -/- "ghc-stage1") <~ ghcWrapper Stage1
-    (root -/- "ghc-stage2") <~ ghcWrapper Stage2
+    (root -/- "ghc-stage1") <~+ ghcWrapper Stage1
+    (root -/- "ghc-stage2") <~+ ghcWrapper Stage2
 
     priority 2.0 $ (root -/- generatedDir -/- "ghcautoconf.h") <~ generateGhcAutoconfH
     priority 2.0 $ (root -/- generatedDir -/- "ghcplatform.h") <~ generateGhcPlatformH
@@ -184,11 +184,12 @@ generateRules = do
         priority 2.0 $ (prefix -/- "settings") %> go generateSettings
 
     -- TODO: simplify, get rid of fake rts context
-    root -/- generatedDir ++ "//*" %> \file -> do
+    root -/- generatedDir -/- "**" %> \file -> do
         withTempDir $ \dir -> build $
             target (rtsContext Stage1) DeriveConstants [] [file, dir]
   where
-    file <~ gen = file %> \out -> generate out emptyTarget gen
+    file <~  gen = file %> \out -> generate out emptyTarget gen
+    file <~+ gen = file %> \out -> generate out emptyTarget gen >> makeExecutable out
 
 -- TODO: Use the Types, Luke! (drop partial function)
 -- We sometimes need to evaluate expressions that do not require knowing all
@@ -233,7 +234,7 @@ generateGhcPlatformH = do
     targetVendor   <- getSetting TargetVendor
     ghcUnreg       <- getFlag    GhcUnregisterised
     return . unlines $
-        [ "#ifndef __GHCPLATFORM_H__"
+        [ "#if !defined(__GHCPLATFORM_H__)"
         , "#define __GHCPLATFORM_H__"
         , ""
         , "#define BuildPlatform_TYPE  " ++ cppify hostPlatform
@@ -257,18 +258,13 @@ generateGhcPlatformH = do
         , "#define BUILD_VENDOR " ++ show hostVendor
         , "#define HOST_VENDOR "  ++ show targetVendor
         , ""
-        , "/* These TARGET macros are for backwards compatibility... DO NOT USE! */"
-        , "#define TargetPlatform_TYPE " ++ cppify targetPlatform
-        , "#define " ++ cppify targetPlatform ++ "_TARGET 1"
-        , "#define " ++ targetArch ++ "_TARGET_ARCH 1"
-        , "#define TARGET_ARCH " ++ show targetArch
-        , "#define " ++ targetOs ++ "_TARGET_OS 1"
-        , "#define TARGET_OS " ++ show targetOs
-        , "#define " ++ targetVendor ++ "_TARGET_VENDOR 1" ]
+        ]
         ++
         [ "#define UnregisterisedCompiler 1" | ghcUnreg ]
         ++
-        [ "\n#endif /* __GHCPLATFORM_H__ */" ]
+        [ ""
+        , "#endif /* __GHCPLATFORM_H__ */"
+        ]
 
 generateSettings :: Expr String
 generateSettings = do
@@ -277,6 +273,7 @@ generateSettings = do
         [ ("GCC extra via C opts", expr $ lookupValueOrError configFile "gcc-extra-via-c-opts")
         , ("C compiler command", expr $ settingsFileSetting SettingsFileSetting_CCompilerCommand)
         , ("C compiler flags", expr $ settingsFileSetting SettingsFileSetting_CCompilerFlags)
+        , ("C++ compiler flags", expr $ settingsFileSetting SettingsFileSetting_CxxCompilerFlags)
         , ("C compiler link flags", expr $ settingsFileSetting SettingsFileSetting_CCompilerLinkFlags)
         , ("C compiler supports -no-pie", expr $ settingsFileSetting SettingsFileSetting_CCompilerSupportsNoPie)
         , ("Haskell CPP command", expr $ settingsFileSetting SettingsFileSetting_HaskellCPPCommand)
@@ -306,6 +303,7 @@ generateSettings = do
         , ("target has subsections via symbols", expr $ lookupValueOrError configFile "haskell-have-subsections-via-symbols")
         , ("target has RTS linker", expr $ lookupValueOrError configFile "haskell-have-rts-linker")
         , ("Unregisterised", expr $ yesNo <$> flag GhcUnregisterised)
+        , ("LLVM target", getSetting LlvmTarget)
         , ("LLVM llc command", expr $ settingsFileSetting SettingsFileSetting_LlcCommand)
         , ("LLVM opt command", expr $ settingsFileSetting SettingsFileSetting_OptCommand)
         , ("LLVM clang command", expr $ settingsFileSetting SettingsFileSetting_ClangCommand)
@@ -315,7 +313,7 @@ generateSettings = do
         , ("Use native code generator", expr $ yesNo <$> ghcWithNativeCodeGen)
         , ("Support SMP", expr $ yesNo <$> ghcWithSMP)
         , ("RTS ways", unwords . map show <$> getRtsWays)
-        , ("Tables next to code", expr $ yesNo <$> ghcEnableTablesNextToCode)
+        , ("Tables next to code", expr $ yesNo <$> flag TablesNextToCode)
         , ("Leading underscore", expr $ yesNo <$> flag LeadingUnderscore)
         , ("Use LibFFI", expr $ yesNo <$> useLibFFIForAdjustors)
         , ("Use Threads", yesNo . any (wayUnit Threaded) <$> getRtsWays)
@@ -336,42 +334,36 @@ generateConfigHs :: Expr String
 generateConfigHs = do
     trackGenerateHs
     cProjectName        <- getSetting ProjectName
-    cProjectGitCommitId <- getSetting ProjectGitCommitId
-    cProjectVersion     <- getSetting ProjectVersion
-    cProjectVersionInt  <- getSetting ProjectVersionInt
-    cProjectPatchLevel  <- getSetting ProjectPatchLevel
-    cProjectPatchLevel1 <- getSetting ProjectPatchLevel1
-    cProjectPatchLevel2 <- getSetting ProjectPatchLevel2
     cBooterVersion      <- getSetting GhcVersion
     return $ unlines
         [ "{-# LANGUAGE CPP #-}"
-        , "module Config where"
+        , "module Config"
+        , "  ( module GHC.Version"
+        , "  , cBuildPlatformString"
+        , "  , cHostPlatformString"
+        , "  , cProjectName"
+        , "  , cBooterVersion"
+        , "  , cStage"
+        , "  ) where"
         , ""
         , "import GhcPrelude"
+        , ""
+        , "import GHC.Version"
         , ""
         , "#include \"ghc_boot_platform.h\""
         , ""
         , "cBuildPlatformString :: String"
         , "cBuildPlatformString = BuildPlatform_NAME"
+        , ""
         , "cHostPlatformString :: String"
         , "cHostPlatformString = HostPlatform_NAME"
         , ""
         , "cProjectName          :: String"
         , "cProjectName          = " ++ show cProjectName
-        , "cProjectGitCommitId   :: String"
-        , "cProjectGitCommitId   = " ++ show cProjectGitCommitId
-        , "cProjectVersion       :: String"
-        , "cProjectVersion       = " ++ show cProjectVersion
-        , "cProjectVersionInt    :: String"
-        , "cProjectVersionInt    = " ++ show cProjectVersionInt
-        , "cProjectPatchLevel    :: String"
-        , "cProjectPatchLevel    = " ++ show cProjectPatchLevel
-        , "cProjectPatchLevel1   :: String"
-        , "cProjectPatchLevel1   = " ++ show cProjectPatchLevel1
-        , "cProjectPatchLevel2   :: String"
-        , "cProjectPatchLevel2   = " ++ show cProjectPatchLevel2
+        , ""
         , "cBooterVersion        :: String"
         , "cBooterVersion        = " ++ show cBooterVersion
+        , ""
         , "cStage                :: String"
         , "cStage                = show (STAGE :: Int)"
         ]
@@ -381,12 +373,12 @@ generateGhcAutoconfH :: Expr String
 generateGhcAutoconfH = do
     trackGenerateHs
     configHContents  <- expr $ map undefinePackage <$> readFileLines configH
-    tablesNextToCode <- expr ghcEnableTablesNextToCode
+    tablesNextToCode <- getFlag    TablesNextToCode
     ghcUnreg         <- getFlag    GhcUnregisterised
     ccLlvmBackend    <- getSetting CcLlvmBackend
     ccClangBackend   <- getSetting CcClangBackend
     return . unlines $
-        [ "#ifndef __GHCAUTOCONF_H__"
+        [ "#if !defined(__GHCAUTOCONF_H__)"
         , "#define __GHCAUTOCONF_H__" ]
         ++ configHContents ++
         [ "\n#define TABLES_NEXT_TO_CODE 1" | tablesNextToCode && not ghcUnreg ]
@@ -416,13 +408,8 @@ generateGhcBootPlatformH = do
     hostArch       <- chooseSetting HostArch      TargetArch
     hostOs         <- chooseSetting HostOs        TargetOs
     hostVendor     <- chooseSetting HostVendor    TargetVendor
-    targetPlatform <- getSetting TargetPlatform
-    targetArch     <- getSetting TargetArch
-    llvmTarget     <- getSetting LlvmTarget
-    targetOs       <- getSetting TargetOs
-    targetVendor   <- getSetting TargetVendor
     return $ unlines
-        [ "#ifndef __PLATFORM_H__"
+        [ "#if !defined(__PLATFORM_H__)"
         , "#define __PLATFORM_H__"
         , ""
         , "#define BuildPlatform_NAME  " ++ show buildPlatform
@@ -430,29 +417,21 @@ generateGhcBootPlatformH = do
         , ""
         , "#define " ++ cppify buildPlatform  ++ "_BUILD 1"
         , "#define " ++ cppify hostPlatform   ++ "_HOST 1"
-        , "#define " ++ cppify targetPlatform ++ "_TARGET 1"
         , ""
         , "#define " ++ buildArch  ++ "_BUILD_ARCH 1"
         , "#define " ++ hostArch   ++ "_HOST_ARCH 1"
-        , "#define " ++ targetArch ++ "_TARGET_ARCH 1"
         , "#define BUILD_ARCH "  ++ show buildArch
         , "#define HOST_ARCH "   ++ show hostArch
-        , "#define TARGET_ARCH " ++ show targetArch
-        , "#define LLVM_TARGET " ++ show llvmTarget
         , ""
         , "#define " ++ buildOs  ++ "_BUILD_OS 1"
         , "#define " ++ hostOs   ++ "_HOST_OS 1"
-        , "#define " ++ targetOs ++ "_TARGET_OS 1"
         , "#define BUILD_OS "  ++ show buildOs
         , "#define HOST_OS "   ++ show hostOs
-        , "#define TARGET_OS " ++ show targetOs
         , ""
         , "#define " ++ buildVendor  ++ "_BUILD_VENDOR 1"
         , "#define " ++ hostVendor   ++ "_HOST_VENDOR 1"
-        , "#define " ++ targetVendor ++ "_TARGET_VENDOR  1"
         , "#define BUILD_VENDOR "  ++ show buildVendor
         , "#define HOST_VENDOR "   ++ show hostVendor
-        , "#define TARGET_VENDOR " ++ show targetVendor
         , ""
         , "#endif /* __PLATFORM_H__ */" ]
 
@@ -464,10 +443,10 @@ generateGhcVersionH = do
     patchLevel1 <- getSetting ProjectPatchLevel1
     patchLevel2 <- getSetting ProjectPatchLevel2
     return . unlines $
-        [ "#ifndef __GHCVERSION_H__"
+        [ "#if !defined(__GHCVERSION_H__)"
         , "#define __GHCVERSION_H__"
         , ""
-        , "#ifndef __GLASGOW_HASKELL__"
+        , "#if !defined(__GLASGOW_HASKELL__)"
         , "# define __GLASGOW_HASKELL__ " ++ version
         , "#endif"
         , ""]
@@ -491,12 +470,32 @@ generateGhcVersionH = do
 generateVersionHs :: Expr String
 generateVersionHs = do
     trackGenerateHs
-    projectVersion <- getSetting ProjectVersion
-    targetOs       <- getSetting TargetOs
-    targetArch     <- getSetting TargetArch
+    cProjectGitCommitId <- getSetting ProjectGitCommitId
+    cProjectVersion     <- getSetting ProjectVersion
+    cProjectVersionInt  <- getSetting ProjectVersionInt
+    cProjectPatchLevel  <- getSetting ProjectPatchLevel
+    cProjectPatchLevel1 <- getSetting ProjectPatchLevel1
+    cProjectPatchLevel2 <- getSetting ProjectPatchLevel2
     return $ unlines
-        [ "module Version where"
-        , "version, targetOS, targetARCH :: String"
-        , "version    = " ++ show projectVersion
-        , "targetOS   = " ++ show targetOs
-        , "targetARCH = " ++ show targetArch ]
+        [ "module GHC.Version where"
+        , ""
+        , "import Prelude -- See Note [Why do we import Prelude here?]"
+        , ""
+        , "cProjectGitCommitId   :: String"
+        , "cProjectGitCommitId   = " ++ show cProjectGitCommitId
+        , ""
+        , "cProjectVersion       :: String"
+        , "cProjectVersion       = " ++ show cProjectVersion
+        , ""
+        , "cProjectVersionInt    :: String"
+        , "cProjectVersionInt    = " ++ show cProjectVersionInt
+        , ""
+        , "cProjectPatchLevel    :: String"
+        , "cProjectPatchLevel    = " ++ show cProjectPatchLevel
+        , ""
+        , "cProjectPatchLevel1   :: String"
+        , "cProjectPatchLevel1   = " ++ show cProjectPatchLevel1
+        , ""
+        , "cProjectPatchLevel2   :: String"
+        , "cProjectPatchLevel2   = " ++ show cProjectPatchLevel2
+        ]

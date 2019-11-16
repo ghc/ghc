@@ -1,6 +1,6 @@
 module ToIface where
 
-import {-# SOURCE #-} TyCoRep
+import {-# SOURCE #-} TyCoRep ( Type, TyLit, Coercion )
 import {-# SOURCE #-} IfaceType( IfaceType, IfaceTyCon, IfaceForAllBndr
                                , IfaceCoercion, IfaceTyLit, IfaceAppArgs )
 import Var ( TyCoVarBinder )

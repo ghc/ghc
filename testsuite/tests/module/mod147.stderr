@@ -1,3 +1,2 @@
 
-mod147.hs:6:5: error:
-    Data constructor not in scope: D :: Integer -> t
+mod147.hs:6:5: error: Data constructor not in scope: D :: t0 -> t

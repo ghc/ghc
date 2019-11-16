@@ -14,7 +14,7 @@ import Development.Shake
 import Development.Shake.Classes
 import GHC.Generics
 import Hadrian.Expression
-import Oracles.Setting
+import Hadrian.Utilities
 
 -- | Tar can be used to 'Create' an archive or 'Extract' from it.
 data TarMode = Create | Extract deriving (Eq, Generic, Show)
@@ -28,9 +28,9 @@ instance NFData   TarMode
 args :: (ShakeValue c, ShakeValue b) => TarMode -> Args c b
 args Create = mconcat
     [ arg "-c"
-    , output "//*.gz"  ? arg "--gzip"
-    , output "//*.bz2" ? arg "--bzip2"
-    , output "//*.xz"  ? arg "--xz"
+    , output "**/*.gz"  ? arg "--gzip"
+    , output "**/*.bz2" ? arg "--bzip2"
+    , output "**/*.xz"  ? arg "--xz"
     , arg "-f", arg =<< getOutput
     , getInputs ]
 args Extract = mconcat

@@ -35,7 +35,6 @@ import DynFlags
 import ErrUtils
 import Util
 import Outputable
-import Pretty           ()
 import Maybes
 import Bag              ( emptyBag, listToBag, unitBag )
 import MonadUtils
@@ -127,7 +126,7 @@ mkPrelImports this_mod loc implicit_prelude import_decls
 
       preludeImportDecl :: LImportDecl GhcPs
       preludeImportDecl
-        = cL loc $ ImportDecl { ideclExt       = noExt,
+        = cL loc $ ImportDecl { ideclExt       = noExtField,
                                 ideclSourceSrc = NoSourceText,
                                 ideclName      = cL loc pRELUDE_NAME,
                                 ideclPkgQual   = Nothing,

@@ -2,7 +2,8 @@
 --
 -- FamInstEnv: Type checked family instance declarations
 
-{-# LANGUAGE CPP, GADTs, ScopedTypeVariables, BangPatterns, TupleSections #-}
+{-# LANGUAGE CPP, GADTs, ScopedTypeVariables, BangPatterns, TupleSections,
+    DeriveFunctor #-}
 
 module FamInstEnv (
         FamInst(..), FamFlavor(..), famInstAxiom, famInstTyCon, famInstRHS,
@@ -1501,6 +1502,7 @@ normalise_var_bndr tcvar
 -- a 'LiftingContext', and a 'Role'.
 newtype NormM a = NormM { runNormM ::
                             FamInstEnvs -> LiftingContext -> Role -> a }
+    deriving (Functor)
 
 initNormM :: FamInstEnvs -> Role
           -> TyCoVarSet   -- the in-scope variables
@@ -1531,8 +1533,6 @@ instance Monad NormM where
                let a = runNormM ma env lc r in
                runNormM (fmb a) env lc r
 
-instance Functor NormM where
-  fmap = liftM
 instance Applicative NormM where
   pure x = NormM $ \ _ _ _ -> x
   (<*>)  = ap

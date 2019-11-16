@@ -25,16 +25,19 @@ import HscMain          ( newHscEnv )
 import DriverPipeline   ( oneShot, compileFile )
 import DriverMkDepend   ( doMkDependHS )
 import DriverBkp   ( doBackpack )
-#if defined(GHCI)
+#if defined(HAVE_INTERNAL_INTERPRETER)
 import GHCi.UI          ( interactiveUI, ghciWelcomeMsg, defaultGhciSettings )
 #endif
 
 -- Frontend plugins
-#if defined(GHCI)
-import DynamicLoading   ( loadFrontendPlugin, initializePlugins  )
+#if defined(HAVE_INTERPRETER)
+import DynamicLoading   ( loadFrontendPlugin )
 import Plugins
 #else
 import DynamicLoading   ( pluginError )
+#endif
+#if defined(HAVE_INTERNAL_INTERPRETER)
+import DynamicLoading   ( initializePlugins )
 #endif
 import Module           ( ModuleName )
 
@@ -271,7 +274,7 @@ main' postLoadMode dflags0 args flagWarnings = do
 
 ghciUI :: HscEnv -> DynFlags -> [(FilePath, Maybe Phase)] -> Maybe [String]
        -> Ghc ()
-#if !defined(GHCI)
+#if !defined(HAVE_INTERNAL_INTERPRETER)
 ghciUI _ _ _ _ =
   throwGhcException (CmdLineError "not built for interactive use")
 #else
@@ -521,7 +524,7 @@ isDoEvalMode :: Mode -> Bool
 isDoEvalMode (Right (Right (DoEval _))) = True
 isDoEvalMode _ = False
 
-#if defined(GHCI)
+#if defined(HAVE_INTERNAL_INTERPRETER)
 isInteractiveMode :: PostLoadMode -> Bool
 isInteractiveMode DoInteractive = True
 isInteractiveMode _             = False
@@ -752,7 +755,7 @@ showBanner :: PostLoadMode -> DynFlags -> IO ()
 showBanner _postLoadMode dflags = do
    let verb = verbosity dflags
 
-#if defined(GHCI)
+#if defined(HAVE_INTERNAL_INTERPRETER)
    -- Show the GHCi banner
    when (isInteractiveMode _postLoadMode && verb >= 1) $ putStrLn ghciWelcomeMsg
 #endif
@@ -844,7 +847,7 @@ dumpPackagesSimple dflags = putMsg dflags (pprPackagesSimple dflags)
 -- Frontend plugin support
 
 doFrontend :: ModuleName -> [(String, Maybe Phase)] -> Ghc ()
-#if !defined(GHCI)
+#if !defined(HAVE_INTERPRETER)
 doFrontend modname _ = pluginError [modname]
 #else
 doFrontend modname srcs = do

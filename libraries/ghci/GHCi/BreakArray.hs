@@ -19,7 +19,7 @@
 module GHCi.BreakArray
     (
       BreakArray
-#ifdef GHCI
+#if defined(HAVE_INTERPRETER)
           (BA) -- constructor is exported only for ByteCodeGen
     , newBreakArray
     , getBreak
@@ -29,7 +29,7 @@ module GHCi.BreakArray
 #endif
     ) where
 
-#ifdef GHCI
+#if defined(HAVE_INTERPRETER)
 import Prelude -- See note [Why do we import Prelude here?]
 import Control.Monad
 import Data.Word

@@ -75,7 +75,6 @@ module TcRnMonad(
   askNoErrs, discardErrs, tryTcDiscardingErrs,
   checkNoErrs, whenNoErrs,
   ifErrsM, failIfErrsM,
-  checkTH, failTH,
 
   -- * Context management for the type checker
   getErrCtxt, setErrCtxt, addErrCtxt, addErrCtxtM, addLandmarkErrCtxt,
@@ -104,7 +103,8 @@ module TcRnMonad(
   pushTcLevelM_, pushTcLevelM, pushTcLevelsM,
   getTcLevel, setTcLevel, isTouchableTcM,
   getLclTypeEnv, setLclTypeEnv,
-  traceTcConstraints, emitWildCardHoleConstraints,
+  traceTcConstraints,
+  emitNamedWildCardHoleConstraints, emitAnonWildCardHoleConstraint,
 
   -- * Template Haskell context
   recordThUse, recordThSpliceUse, recordTopLevelSpliceLoc,
@@ -312,6 +312,7 @@ initTc hsc_env hsc_src keep_rn_syntax mod loc do_this
                 tcg_safeInfer      = infer_var,
                 tcg_dependent_files = dependent_files_var,
                 tcg_tc_plugins     = [],
+                tcg_hf_plugins     = [],
                 tcg_top_loc        = loc,
                 tcg_static_wc      = static_wc_var,
                 tcg_complete_matches = [],
@@ -1021,17 +1022,6 @@ failIfErrsM :: TcRn ()
 -- Useful to avoid error cascades
 failIfErrsM = ifErrsM failM (return ())
 
-checkTH :: a -> String -> TcRn ()
-checkTH _ _ = return () -- OK
-
-failTH :: Outputable a => a -> String -> TcRn x
-failTH e what  -- Raise an error in a stage-1 compiler
-  = failWithTc (vcat [ hang (char 'A' <+> text what
-                             <+> text "requires GHC with interpreter support:")
-                          2 (ppr e)
-                     , text "Perhaps you are using a stage-1 compiler?" ])
-
-
 {- *********************************************************************
 *                                                                      *
         Context management for the type checker
@@ -1688,8 +1678,16 @@ traceTcConstraints msg
          hang (text (msg ++ ": LIE:")) 2 (ppr lie)
        }
 
-emitWildCardHoleConstraints :: [(Name, TcTyVar)] -> TcM ()
-emitWildCardHoleConstraints wcs
+emitAnonWildCardHoleConstraint :: TcTyVar -> TcM ()
+emitAnonWildCardHoleConstraint tv
+  = do { ct_loc <- getCtLocM HoleOrigin Nothing
+       ; emitInsolubles $ unitBag $
+         CHoleCan { cc_ev = CtDerived { ctev_pred = mkTyVarTy tv
+                                      , ctev_loc  = ct_loc }
+                  , cc_hole = TypeHole (mkTyVarOcc "_") } }
+
+emitNamedWildCardHoleConstraints :: [(Name, TcTyVar)] -> TcM ()
+emitNamedWildCardHoleConstraints wcs
   = do { ct_loc <- getCtLocM HoleOrigin Nothing
        ; emitInsolubles $ listToBag $
          map (do_one ct_loc) wcs }
@@ -1702,7 +1700,7 @@ emitWildCardHoleConstraints wcs
        where
          real_span = case nameSrcSpan name of
                            RealSrcSpan span  -> span
-                           UnhelpfulSpan str -> pprPanic "emitWildCardHoleConstraints"
+                           UnhelpfulSpan str -> pprPanic "emitNamedWildCardHoleConstraints"
                                                       (ppr name <+> quotes (ftext str))
                -- Wildcards are defined locally, and so have RealSrcSpans
          ct_loc' = setCtLocSpan ct_loc real_span
@@ -1837,13 +1835,13 @@ finalSafeMode :: DynFlags -> TcGblEnv -> IO SafeHaskellMode
 finalSafeMode dflags tcg_env = do
     safeInf <- fst <$> readIORef (tcg_safeInfer tcg_env)
     return $ case safeHaskell dflags of
-        Sf_None | safeInferOn dflags && safeInf -> Sf_Safe
+        Sf_None | safeInferOn dflags && safeInf -> Sf_SafeInferred
                 | otherwise                     -> Sf_None
         s -> s
 
 -- | Switch instances to safe instances if we're in Safe mode.
 fixSafeInstances :: SafeHaskellMode -> [ClsInst] -> [ClsInst]
-fixSafeInstances sfMode | sfMode /= Sf_Safe = id
+fixSafeInstances sfMode | sfMode /= Sf_Safe && sfMode /= Sf_SafeInferred = id
 fixSafeInstances _ = map fixSafe
   where fixSafe inst = let new_flag = (is_flag inst) { isSafeOverlap = True }
                        in inst { is_flag = new_flag }

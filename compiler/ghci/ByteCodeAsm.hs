@@ -1,4 +1,4 @@
-{-# LANGUAGE BangPatterns, CPP, MagicHash, RecordWildCards #-}
+{-# LANGUAGE BangPatterns, CPP, DeriveFunctor, MagicHash, RecordWildCards #-}
 {-# OPTIONS_GHC -optc-DNON_POSIX_SOURCE #-}
 --
 --  (c) The University of Glasgow 2002-2006
@@ -33,7 +33,7 @@ import StgCmmLayout     ( ArgRep(..) )
 import SMRep
 import DynFlags
 import Outputable
-import Platform
+import GHC.Platform
 import Util
 import Unique
 import UniqDSet
@@ -156,7 +156,11 @@ assembleOneBCO hsc_env pbco = do
   return ubco'
 
 assembleBCO :: DynFlags -> ProtoBCO Name -> IO UnlinkedBCO
-assembleBCO dflags (ProtoBCO nm instrs bitmap bsize arity _origin _malloced) = do
+assembleBCO dflags (ProtoBCO { protoBCOName       = nm
+                             , protoBCOInstrs     = instrs
+                             , protoBCOBitmap     = bitmap
+                             , protoBCOBitmapSize = bsize
+                             , protoBCOArity      = arity }) = do
   -- pass 1: collect up the offsets of the local labels.
   let asm = mapM_ (assembleI dflags) instrs
 
@@ -224,9 +228,7 @@ data Assembler a
   | AllocLabel Word16 (Assembler a)
   | Emit Word16 [Operand] (Assembler a)
   | NullAsm a
-
-instance Functor Assembler where
-    fmap = liftM
+  deriving (Functor)
 
 instance Applicative Assembler where
     pure = NullAsm

@@ -1,4 +1,2 @@
-bkprun05: Prelude.undefined
-CallStack (from HasCallStack):
-  error, called at libraries/base/GHC/Err.hs:78:14 in base:GHC.Err
-  undefined, called at bkprun05.bkp:136:30 in app+app-18HBpsO5TPxCVSTvBQxSrq:App
+bkprun05: this is an error
+

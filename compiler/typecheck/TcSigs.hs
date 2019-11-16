@@ -45,7 +45,6 @@ import Var      ( TyVar, tyVarKind )
 import Id       ( Id, idName, idType, idInlinePragma, setInlinePragma, mkLocalId )
 import PrelNames( mkUnboundName )
 import BasicTypes
-import Bag( foldrBag )
 import Module( getModule )
 import Name
 import NameEnv
@@ -258,8 +257,8 @@ isCompleteHsSig :: LHsSigWcType GhcRn -> Bool
 isCompleteHsSig (HsWC { hswc_ext  = wcs
                       , hswc_body = HsIB { hsib_body = hs_ty } })
    = null wcs && no_anon_wc hs_ty
-isCompleteHsSig (HsWC _ (XHsImplicitBndrs _)) = panic "isCompleteHsSig"
-isCompleteHsSig (XHsWildCardBndrs _) = panic "isCompleteHsSig"
+isCompleteHsSig (HsWC _ (XHsImplicitBndrs nec)) = noExtCon nec
+isCompleteHsSig (XHsWildCardBndrs nec) = noExtCon nec
 
 no_anon_wc :: LHsType GhcRn -> Bool
 no_anon_wc lty = go lty
@@ -300,7 +299,7 @@ no_anon_wc_bndrs ltvs = all (go . unLoc) ltvs
   where
     go (UserTyVar _ _)      = True
     go (KindedTyVar _ _ ki) = no_anon_wc ki
-    go (XTyVarBndr{})       = panic "no_anon_wc_bndrs"
+    go (XTyVarBndr nec)     = noExtCon nec
 
 {- Note [Fail eagerly on bad signatures]
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
@@ -465,7 +464,7 @@ tcPatSynSig name sig_ty
         mkSpecForAllTys ex $
         mkPhiTy prov $
         body
-tcPatSynSig _ (XHsImplicitBndrs _) = panic "tcPatSynSig"
+tcPatSynSig _ (XHsImplicitBndrs nec) = noExtCon nec
 
 ppr_tvs :: [TyVar] -> SDoc
 ppr_tvs tvs = braces (vcat [ ppr tv <+> dcolon <+> ppr (tyVarKind tv)
@@ -498,25 +497,14 @@ tcInstSig hs_sig@(PartialSig { psig_hs_ty = hs_ty
                              , sig_loc = loc })
   = setSrcSpan loc $  -- Set the binding site of the tyvars
     do { traceTc "Staring partial sig {" (ppr hs_sig)
-       ; (wcs, wcx, tv_names, tvs, theta, tau) <- tcHsPartialSigType ctxt hs_ty
-
-        -- Clone the quantified tyvars
-        -- Reason: we might have    f, g :: forall a. a -> _ -> a
-        --         and we want it to behave exactly as if there were
-        --         two separate signatures.  Cloning here seems like
-        --         the easiest way to do so, and is very similar to
-        --         the tcInstType in the CompleteSig case
-        -- See #14643
-       ; (subst, tvs') <- newMetaTyVarTyVars tvs
-                         -- Why newMetaTyVarTyVars?  See TcBinds
-                         -- Note [Quantified variables in partial type signatures]
-       ; let tv_prs = tv_names `zip` tvs'
-             inst_sig = TISI { sig_inst_sig   = hs_sig
+       ; (wcs, wcx, tv_prs, theta, tau) <- tcHsPartialSigType ctxt hs_ty
+         -- See Note [Checking partial type signatures] in TcHsType
+       ; let inst_sig = TISI { sig_inst_sig   = hs_sig
                              , sig_inst_skols = tv_prs
                              , sig_inst_wcs   = wcs
                              , sig_inst_wcx   = wcx
-                             , sig_inst_theta = substTysUnchecked subst theta
-                             , sig_inst_tau   = substTyUnchecked  subst tau }
+                             , sig_inst_theta = theta
+                             , sig_inst_tau   = tau }
        ; traceTc "End partial sig }" (ppr inst_sig)
        ; return inst_sig }
 
@@ -588,7 +576,7 @@ mkPragEnv sigs binds
 
     -- ar_env maps a local to the arity of its definition
     ar_env :: NameEnv Arity
-    ar_env = foldrBag lhsBindArity emptyNameEnv binds
+    ar_env = foldr lhsBindArity emptyNameEnv binds
 
 lhsBindArity :: LHsBind GhcRn -> NameEnv Arity -> NameEnv Arity
 lhsBindArity (L _ (FunBind { fun_id = id, fun_matches = ms })) env

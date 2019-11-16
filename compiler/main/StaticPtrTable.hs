@@ -135,7 +135,7 @@ import MkCore (mkStringExprFSWith)
 import Module
 import Name
 import Outputable
-import Platform
+import GHC.Platform
 import PrelNames
 import TcEnv (lookupGlobal)
 import Type
@@ -233,9 +233,10 @@ sptCreateStaticBinds hsc_env this_mod binds
 
     -- Choose either 'Word64#' or 'Word#' to represent the arguments of the
     -- 'Fingerprint' data constructor.
-    mkWord64LitWordRep dflags
-      | platformWordSize (targetPlatform dflags) < 8 = mkWord64LitWord64
-      | otherwise = mkWordLit dflags . toInteger
+    mkWord64LitWordRep dflags =
+      case platformWordSize (targetPlatform dflags) of
+        PW4 -> mkWord64LitWord64
+        PW8 -> mkWordLit dflags . toInteger
 
     lookupIdHscEnv :: Name -> IO Id
     lookupIdHscEnv n = lookupTypeHscEnv hsc_env n >>=

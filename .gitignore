@@ -31,6 +31,7 @@ Thumbs.db
 *.dyn_o
 *.dyn_hi
 __pycache__
+.mypy_cache
 *.SYMDEF*
 
 log
@@ -50,6 +51,9 @@ stage0
 stage1
 stage2
 _build
+*/generated/
+*/ghc-stage1
+.shake.*
 .hadrian_ghci
 
 # -----------------------------------------------------------------------------
@@ -142,7 +146,6 @@ _darcs/
 /libraries/frames.html
 /libraries/ghc-boot/GNUmakefile
 /libraries/ghc-boot/ghc-boot.cabal
-/libraries/ghc-boot/ghc.mk
 /libraries/ghc-boot-th/GNUmakefile
 /libraries/ghc-boot-th/ghc-boot-th.cabal
 /libraries/ghc-boot-th/ghc.mk
@@ -221,5 +224,12 @@ GIT_COMMIT_ID
 # ghc.nix
 ghc.nix/
 
-
+# gdb
 .gdb_history
+.gdbinit
+
+# Tooling - direnv
+.envrc 
+
+# Tooling - vscode
+.vscode

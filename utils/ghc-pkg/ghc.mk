@@ -13,15 +13,6 @@
 # -----------------------------------------------------------------------------
 # Bootstrapping ghc-pkg
 
-utils/ghc-pkg/dist/build/Version.hs \
-utils/ghc-pkg/dist-install/build/Version.hs: mk/project.mk | $$(dir $$@)/.
-	$(call removeFiles,$@)
-	echo "module Version where"                    >> $@
-	echo "version, targetOS, targetARCH :: String" >> $@
-	echo "version    = \"$(ProjectVersion)\""      >> $@
-	echo "targetOS   = \"$(TargetOS_CPP)\""        >> $@
-	echo "targetARCH = \"$(TargetArch_CPP)\""      >> $@
-
 utils/ghc-pkg_PACKAGE = ghc-pkg
 
 # Note [Why build certain utils twice?]
@@ -69,10 +60,10 @@ endif
 
 $(eval $(call build-prog,utils/ghc-pkg,dist,0))
 
-$(ghc-pkg_INPLACE) : | $(INPLACE_PACKAGE_CONF)/.
-
-utils/ghc-pkg/dist/package-data.mk: \
-    utils/ghc-pkg/dist/build/Version.hs
+# ghc-pkg uses `settings` to figure out the target platform to figure out a
+# subdirectory for the user pkg db. So make sure `settings` exists (alterative
+# is to specify global package db only.
+$(ghc-pkg_INPLACE) : | $(INPLACE_PACKAGE_CONF)/. $(INPLACE_LIB)/settings
 
 # -----------------------------------------------------------------------------
 # Build another copy of ghc-pkg with the stage1 compiler in the dist-install
@@ -91,9 +82,6 @@ utils/ghc-pkg_dist-install_INSTALL = YES
 utils/ghc-pkg_dist-install_INSTALL_SHELL_WRAPPER_NAME = ghc-pkg-$(ProjectVersion)
 
 $(eval $(call build-prog,utils/ghc-pkg,dist-install,1))
-
-utils/ghc-pkg/dist-install/package-data.mk: \
-    utils/ghc-pkg/dist-install/build/Version.hs
 endif
 
 # -----------------------------------------------------------------------------

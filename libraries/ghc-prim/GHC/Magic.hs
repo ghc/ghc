@@ -39,7 +39,6 @@ module GHC.Magic ( inline, noinline, lazy, oneShot, runRW# ) where
 import GHC.Prim (realWorld#)
 #endif
 import GHC.Prim (State#, RealWorld)
-import GHC.CString ()
 import GHC.Types (RuntimeRep, TYPE)
 
 -- | The call @inline f@ arranges that @f@ is inlined, regardless of

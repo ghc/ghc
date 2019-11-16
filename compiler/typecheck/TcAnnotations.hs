@@ -28,7 +28,7 @@ import Outputable
 -- Some platforms don't support the external interpreter, and
 -- compilation on those platforms shouldn't fail just due to
 -- annotations
-#ifndef GHCI
+#if !defined(HAVE_INTERNAL_INTERPRETER)
 tcAnnotations :: [LAnnDecl GhcRn] -> TcM [Annotation]
 tcAnnotations anns = do
   dflags <- getDynFlags
@@ -66,7 +66,7 @@ tcAnnotation (L loc ann@(HsAnnotation _ _ provenance expr)) = do
     where
       safeHsErr = vcat [ text "Annotations are not compatible with Safe Haskell."
                   , text "See https://gitlab.haskell.org/ghc/ghc/issues/10826" ]
-tcAnnotation (L _ (XAnnDecl _)) = panic "tcAnnotation"
+tcAnnotation (L _ (XAnnDecl nec)) = noExtCon nec
 
 annProvenanceToTarget :: Module -> AnnProvenance Name
                       -> AnnTarget Name

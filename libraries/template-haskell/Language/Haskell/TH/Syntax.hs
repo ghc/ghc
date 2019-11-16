@@ -76,6 +76,7 @@ class (MonadIO m, Fail.MonadFail m) => Quasi m where
        -- True <=> type namespace, False <=> value namespace
   qReify          :: Name -> m Info
   qReifyFixity    :: Name -> m (Maybe Fixity)
+  qReifyType      :: Name -> m Type
   qReifyInstances :: Name -> [Type] -> m [Dec]
        -- Is (n tys) an instance?
        -- Returns list of matching instance Decs
@@ -132,6 +133,7 @@ instance Quasi IO where
   qLookupName _ _       = badIO "lookupName"
   qReify _              = badIO "reify"
   qReifyFixity _        = badIO "reifyFixity"
+  qReifyType _          = badIO "reifyFixity"
   qReifyInstances _ _   = badIO "reifyInstances"
   qReifyRoles _         = badIO "reifyRoles"
   qReifyAnnotations _   = badIO "reifyAnnotations"
@@ -429,6 +431,14 @@ example, if the function @foo@ has the fixity declaration @infixr 7 foo@, then
 reifyFixity :: Name -> Q (Maybe Fixity)
 reifyFixity nm = Q (qReifyFixity nm)
 
+{- | @reifyType nm@ attempts to find the type or kind of @nm@. For example,
+@reifyType 'not@   returns @Bool -> Bool@, and
+@reifyType ''Bool@ returns @Type@.
+This works even if there's no explicit signature and the type or kind is inferred.
+-}
+reifyType :: Name -> Q Type
+reifyType nm = Q (qReifyType nm)
+
 {- | @reifyInstances nm tys@ returns a list of visible instances of @nm tys@. That is,
 if @nm@ is the name of a type class, then all instances of this class at the types @tys@
 are returned. Alternatively, if @nm@ is the name of a data family or type family,
@@ -620,6 +630,7 @@ instance Quasi Q where
   qRecover            = recover
   qReify              = reify
   qReifyFixity        = reifyFixity
+  qReifyType          = reifyType
   qReifyInstances     = reifyInstances
   qReifyRoles         = reifyRoles
   qReifyAnnotations   = reifyAnnotations
@@ -846,35 +857,38 @@ instance Lift () where
 instance (Lift a, Lift b) => Lift (a, b) where
   liftTyped x = unsafeTExpCoerce (lift x)
   lift (a, b)
-    = liftM TupE $ sequence [lift a, lift b]
+    = liftM TupE $ sequence $ map (fmap Just) [lift a, lift b]
 
 instance (Lift a, Lift b, Lift c) => Lift (a, b, c) where
   liftTyped x = unsafeTExpCoerce (lift x)
   lift (a, b, c)
-    = liftM TupE $ sequence [lift a, lift b, lift c]
+    = liftM TupE $ sequence $ map (fmap Just) [lift a, lift b, lift c]
 
 instance (Lift a, Lift b, Lift c, Lift d) => Lift (a, b, c, d) where
   liftTyped x = unsafeTExpCoerce (lift x)
   lift (a, b, c, d)
-    = liftM TupE $ sequence [lift a, lift b, lift c, lift d]
+    = liftM TupE $ sequence $ map (fmap Just) [lift a, lift b, lift c, lift d]
 
 instance (Lift a, Lift b, Lift c, Lift d, Lift e)
       => Lift (a, b, c, d, e) where
   liftTyped x = unsafeTExpCoerce (lift x)
   lift (a, b, c, d, e)
-    = liftM TupE $ sequence [lift a, lift b, lift c, lift d, lift e]
+    = liftM TupE $ sequence $ map (fmap Just) [ lift a, lift b
+                                              , lift c, lift d, lift e ]
 
 instance (Lift a, Lift b, Lift c, Lift d, Lift e, Lift f)
       => Lift (a, b, c, d, e, f) where
   liftTyped x = unsafeTExpCoerce (lift x)
   lift (a, b, c, d, e, f)
-    = liftM TupE $ sequence [lift a, lift b, lift c, lift d, lift e, lift f]
+    = liftM TupE $ sequence $ map (fmap Just) [ lift a, lift b, lift c
+                                              , lift d, lift e, lift f ]
 
 instance (Lift a, Lift b, Lift c, Lift d, Lift e, Lift f, Lift g)
       => Lift (a, b, c, d, e, f, g) where
   liftTyped x = unsafeTExpCoerce (lift x)
   lift (a, b, c, d, e, f, g)
-    = liftM TupE $ sequence [lift a, lift b, lift c, lift d, lift e, lift f, lift g]
+    = liftM TupE $ sequence $ map (fmap Just) [ lift a, lift b, lift c
+                                              , lift d, lift e, lift f, lift g ]
 
 -- | @since 2.16.0.0
 instance Lift (# #) where
@@ -885,48 +899,53 @@ instance Lift (# #) where
 instance (Lift a) => Lift (# a #) where
   liftTyped x = unsafeTExpCoerce (lift x)
   lift (# a #)
-    = liftM UnboxedTupE $ sequence [lift a]
+    = liftM UnboxedTupE $ sequence $ map (fmap Just) [lift a]
 
 -- | @since 2.16.0.0
 instance (Lift a, Lift b) => Lift (# a, b #) where
   liftTyped x = unsafeTExpCoerce (lift x)
   lift (# a, b #)
-    = liftM UnboxedTupE $ sequence [lift a, lift b]
+    = liftM UnboxedTupE $ sequence $ map (fmap Just) [lift a, lift b]
 
 -- | @since 2.16.0.0
 instance (Lift a, Lift b, Lift c)
       => Lift (# a, b, c #) where
   liftTyped x = unsafeTExpCoerce (lift x)
   lift (# a, b, c #)
-    = liftM UnboxedTupE $ sequence [lift a, lift b, lift c]
+    = liftM UnboxedTupE $ sequence $ map (fmap Just) [lift a, lift b, lift c]
 
 -- | @since 2.16.0.0
 instance (Lift a, Lift b, Lift c, Lift d)
       => Lift (# a, b, c, d #) where
   liftTyped x = unsafeTExpCoerce (lift x)
   lift (# a, b, c, d #)
-    = liftM UnboxedTupE $ sequence [lift a, lift b, lift c, lift d]
+    = liftM UnboxedTupE $ sequence $ map (fmap Just) [ lift a, lift b
+                                                     , lift c, lift d ]
 
 -- | @since 2.16.0.0
 instance (Lift a, Lift b, Lift c, Lift d, Lift e)
       => Lift (# a, b, c, d, e #) where
   liftTyped x = unsafeTExpCoerce (lift x)
   lift (# a, b, c, d, e #)
-    = liftM UnboxedTupE $ sequence [lift a, lift b, lift c, lift d, lift e]
+    = liftM UnboxedTupE $ sequence $ map (fmap Just) [ lift a, lift b
+                                                     , lift c, lift d, lift e ]
 
 -- | @since 2.16.0.0
 instance (Lift a, Lift b, Lift c, Lift d, Lift e, Lift f)
       => Lift (# a, b, c, d, e, f #) where
   liftTyped x = unsafeTExpCoerce (lift x)
   lift (# a, b, c, d, e, f #)
-    = liftM UnboxedTupE $ sequence [lift a, lift b, lift c, lift d, lift e, lift f]
+    = liftM UnboxedTupE $ sequence $ map (fmap Just) [ lift a, lift b, lift c
+                                                     , lift d, lift e, lift f ]
 
 -- | @since 2.16.0.0
 instance (Lift a, Lift b, Lift c, Lift d, Lift e, Lift f, Lift g)
       => Lift (# a, b, c, d, e, f, g #) where
   liftTyped x = unsafeTExpCoerce (lift x)
   lift (# a, b, c, d, e, f, g #)
-    = liftM UnboxedTupE $ sequence [lift a, lift b, lift c, lift d, lift e, lift f, lift g]
+    = liftM UnboxedTupE $ sequence $ map (fmap Just) [ lift a, lift b, lift c
+                                                     , lift d, lift e, lift f
+                                                     , lift g ]
 
 -- | @since 2.16.0.0
 instance (Lift a, Lift b) => Lift (# a | b #) where
@@ -1887,11 +1906,15 @@ data Exp
 
   | InfixE (Maybe Exp) Exp (Maybe Exp) -- ^ @{x + y} or {(x+)} or {(+ x)} or {(+)}@
 
-    -- It's a bit gruesome to use an Exp as the
-    -- operator, but how else can we distinguish
-    -- constructors from non-constructors?
-    -- Maybe there should be a var-or-con type?
-    -- Or maybe we should leave it to the String itself?
+    -- It's a bit gruesome to use an Exp as the operator when a Name
+    -- would suffice. Historically, Exp was used to make it easier to
+    -- distinguish between infix constructors and non-constructors.
+    -- This is a bit overkill, since one could just as well call
+    -- `startsConId` or `startsConSym` (from `GHC.Lexeme`) on a Name.
+    -- Unfortunately, changing this design now would involve lots of
+    -- code churn for consumers of the TH API, so we continue to use
+    -- an Exp as the operator and perform an extra check during conversion
+    -- to ensure that the Exp is a constructor or a variable (#16895).
 
   | UInfixE Exp Exp Exp                -- ^ @{x + y}@
                                        --
@@ -1901,8 +1924,28 @@ data Exp
                                        -- See "Language.Haskell.TH.Syntax#infix"
   | LamE [Pat] Exp                     -- ^ @{ \\ p1 p2 -> e }@
   | LamCaseE [Match]                   -- ^ @{ \\case m1; m2 }@
-  | TupE [Exp]                         -- ^ @{ (e1,e2) }  @
-  | UnboxedTupE [Exp]                  -- ^ @{ (\# e1,e2 \#) }  @
+  | TupE [Maybe Exp]                   -- ^ @{ (e1,e2) }  @
+                                       --
+                                       -- The 'Maybe' is necessary for handling
+                                       -- tuple sections.
+                                       --
+                                       -- > (1,)
+                                       --
+                                       -- translates to
+                                       --
+                                       -- > TupE [Just (LitE (IntegerL 1)),Nothing]
+
+  | UnboxedTupE [Maybe Exp]            -- ^ @{ (\# e1,e2 \#) }  @
+                                       --
+                                       -- The 'Maybe' is necessary for handling
+                                       -- tuple sections.
+                                       --
+                                       -- > (# 'c', #)
+                                       --
+                                       -- translates to
+                                       --
+                                       -- > UnboxedTupE [Just (LitE (CharL 'c')),Nothing]
+
   | UnboxedSumE Exp SumAlt SumArity    -- ^ @{ (\#|e|\#) }@
   | CondE Exp Exp Exp                  -- ^ @{ if e1 then e2 else e3 }@
   | MultiIfE [(Guard, Exp)]            -- ^ @{ if | g1 -> e1 | g2 -> e2 }@

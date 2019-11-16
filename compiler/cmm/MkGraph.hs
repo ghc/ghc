@@ -335,8 +335,8 @@ copyIn dflags conv area formals extra_stk
           local = CmmLocal reg
           width = cmmRegWidth dflags local
           expr  = CmmMachOp (MO_XX_Conv (wordWidth dflags) width) [stack_slot]
-        in CmmAssign local expr 
-         
+        in CmmAssign local expr
+
       | otherwise =
          CmmAssign (CmmLocal reg) (CmmLoad (CmmStackSlot area off) ty)
          where ty = localRegType reg

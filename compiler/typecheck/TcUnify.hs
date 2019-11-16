@@ -6,7 +6,8 @@
 Type subsumption and unification
 -}
 
-{-# LANGUAGE CPP, MultiWayIf, TupleSections, ScopedTypeVariables #-}
+{-# LANGUAGE CPP, DeriveFunctor, MultiWayIf, TupleSections,
+    ScopedTypeVariables #-}
 
 module TcUnify (
   -- Full-blown subsumption
@@ -63,6 +64,7 @@ import Util
 import qualified GHC.LanguageExtensions as LangExt
 import Outputable
 
+import Data.Maybe( isNothing )
 import Control.Monad
 import Control.Arrow ( second )
 
@@ -1175,7 +1177,13 @@ emitResidualTvConstraint :: SkolemInfo -> Maybe SDoc -> [TcTyVar]
                          -> TcLevel -> WantedConstraints -> TcM ()
 emitResidualTvConstraint skol_info m_telescope skol_tvs tclvl wanted
   | isEmptyWC wanted
+  , isNothing m_telescope || skol_tvs `lengthAtMost` 1
+    -- If m_telescope is (Just d), we must do the bad-telescope check,
+    -- so we must /not/ discard the implication even if there are no
+    -- wanted constraints. See Note [Checking telescopes] in TcRnTypes.
+    -- Lacking this check led to #16247
   = return ()
+
   | otherwise
   = do { ev_binds <- newNoTcEvBinds
        ; implic   <- newImplication
@@ -1387,7 +1395,7 @@ uType t_or_k origin orig_ty1 orig_ty2
       = do { co_tys <- uType t_or_k origin t1 t2
            ; return (mkCoherenceRightCo Nominal t2 co2 co_tys) }
 
-        -- Variables; go for uVar
+        -- Variables; go for uUnfilledVar
         -- Note that we pass in *original* (before synonym expansion),
         -- so that type variables tend to get filled in with
         -- the most informative version of the type
@@ -1575,11 +1583,11 @@ improve error messages.
 
 ************************************************************************
 *                                                                      *
-                 uVar and friends
+                 uUnfilledVar and friends
 *                                                                      *
 ************************************************************************
 
-@uVar@ is called when at least one of the types being unified is a
+@uunfilledVar@ is called when at least one of the types being unified is a
 variable.  It does {\em not} assume that the variable is a fixed point
 of the substitution; rather, notice that @uVar@ (defined below) nips
 back into @uTys@ if it turns out that the variable is already bound.
@@ -1589,7 +1597,8 @@ back into @uTys@ if it turns out that the variable is already bound.
 uUnfilledVar :: CtOrigin
              -> TypeOrKind
              -> SwapFlag
-             -> TcTyVar        -- Tyvar 1
+             -> TcTyVar        -- Tyvar 1: not necessarily a meta-tyvar
+                               --    definitely not a /filled/ meta-tyvar
              -> TcTauType      -- Type 2
              -> TcM Coercion
 -- "Unfilled" means that the variable is definitely not a filled-in meta tyvar
@@ -1607,7 +1616,8 @@ uUnfilledVar origin t_or_k swapped tv1 ty2
 uUnfilledVar1 :: CtOrigin
               -> TypeOrKind
               -> SwapFlag
-              -> TcTyVar        -- Tyvar 1
+              -> TcTyVar        -- Tyvar 1: not necessarily a meta-tyvar
+                                --    definitely not a /filled/ meta-tyvar
               -> TcTauType      -- Type 2, zonked
               -> TcM Coercion
 uUnfilledVar1 origin t_or_k swapped tv1 ty2
@@ -1620,12 +1630,19 @@ uUnfilledVar1 origin t_or_k swapped tv1 ty2
   where
     -- 'go' handles the case where both are
     -- tyvars so we might want to swap
+    -- E.g. maybe tv2 is a meta-tyvar and tv1 is not
     go tv2 | tv1 == tv2  -- Same type variable => no-op
            = return (mkNomReflCo (mkTyVarTy tv1))
 
            | swapOverTyVars tv1 tv2   -- Distinct type variables
-           = uUnfilledVar2 origin t_or_k (flipSwap swapped)
-                           tv2 (mkTyVarTy tv1)
+               -- Swap meta tyvar to the left if poss
+           = do { tv1 <- zonkTyCoVarKind tv1
+                     -- We must zonk tv1's kind because that might
+                     -- not have happened yet, and it's an invariant of
+                     -- uUnfilledTyVar2 that ty2 is fully zonked
+                     -- Omitting this caused #16902
+                ; uUnfilledVar2 origin t_or_k (flipSwap swapped)
+                           tv2 (mkTyVarTy tv1) }
 
            | otherwise
            = uUnfilledVar2 origin t_or_k swapped tv1 ty2
@@ -1634,7 +1651,8 @@ uUnfilledVar1 origin t_or_k swapped tv1 ty2
 uUnfilledVar2 :: CtOrigin
               -> TypeOrKind
               -> SwapFlag
-              -> TcTyVar        -- Tyvar 1
+              -> TcTyVar        -- Tyvar 1: not necessarily a meta-tyvar
+                                --    definitely not a /filled/ meta-tyvar
               -> TcTauType      -- Type 2, zonked
               -> TcM Coercion
 uUnfilledVar2 origin t_or_k swapped tv1 ty2
@@ -1651,8 +1669,10 @@ uUnfilledVar2 origin t_or_k swapped tv1 ty2
                   , ppr ty2 <+> dcolon <+> ppr (tcTypeKind  ty2)
                   , ppr (isTcReflCo co_k), ppr co_k ]
 
-           ; if isTcReflCo co_k  -- only proceed if the kinds matched.
-
+           ; if isTcReflCo co_k
+               -- Only proceed if the kinds match
+               -- NB: tv1 should still be unfilled, despite the kind unification
+               --     because tv1 is not free in ty2 (or, hence, in its kind)
              then do { writeMetaTyVar tv1 ty2'
                      ; return (mkTcNomReflCo ty2') }
 
@@ -2119,9 +2139,7 @@ data MetaTyVarUpdateResult a
   = MTVU_OK a
   | MTVU_Bad     -- Forall, predicate, or type family
   | MTVU_Occurs
-
-instance Functor MetaTyVarUpdateResult where
-      fmap = liftM
+    deriving (Functor)
 
 instance Applicative MetaTyVarUpdateResult where
       pure = MTVU_OK

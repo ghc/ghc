@@ -7,7 +7,7 @@ import GhcPrelude
 
 import AsmUtils
 import FastString
-import Platform
+import GHC.Platform
 import Outputable
 
 import Reg

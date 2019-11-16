@@ -46,7 +46,7 @@ import DynFlags
 import Cmm
 import FastString
 import Outputable
-import Platform
+import GHC.Platform
 
 
 -- | Register or immediate

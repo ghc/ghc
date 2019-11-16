@@ -1,0 +1,4 @@
+UnliftedNewtypesLevityBinder.hs:16:7:
+    Cannot use function with levity-polymorphic arguments:
+      UnliftedNewtypesLevityBinder.IdentC :: a -> Ident a
+    Levity-polymorphic arguments: a :: TYPE r

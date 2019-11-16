@@ -1,7 +1,8 @@
 {-
 (c) The GRASP/AQUA Project, Glasgow University, 1992-1998
 
-\section[StgSyn]{Shared term graph (STG) syntax for spineless-tagless code generation}
+Shared term graph (STG) syntax for spineless-tagless code generation
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
 This data type represents programs just before code generation (conversion to
 @Cmm@): basically, what we have is a stylised form of @CoreSyntax@, the style
@@ -25,7 +26,7 @@ module StgSyn (
         GenStgAlt, AltType(..),
 
         StgPass(..), BinderP, XRhsClosure, XLet, XLetNoEscape,
-        NoExtSilent, noExtSilent,
+        NoExtFieldSilent, noExtFieldSilent,
         OutputablePass,
 
         UpdateFlag(..), isUpdatable,
@@ -50,7 +51,7 @@ module StgSyn (
         topStgBindHasCafRefs, stgArgHasCafRefs, stgRhsArity,
         isDllConApp,
         stgArgType,
-        stripStgTicksTop,
+        stripStgTicksTop, stripStgTicksTopE,
         stgCaseBndrInScope,
 
         pprStgBinding, pprGenStgTopBindings, pprStgTopBindings
@@ -76,13 +77,12 @@ import Literal     ( Literal, literalType )
 import Module      ( Module )
 import Outputable
 import Packages    ( isDllName )
-import Platform
+import GHC.Platform
 import PprCore     ( {- instances -} )
 import PrimOp      ( PrimOp, PrimCall )
 import TyCon       ( PrimRep(..), TyCon )
 import Type        ( Type )
 import RepType     ( typePrimRep1 )
-import Unique      ( Unique )
 import Util
 
 import Data.List.NonEmpty ( NonEmpty, toList )
@@ -90,14 +90,13 @@ import Data.List.NonEmpty ( NonEmpty, toList )
 {-
 ************************************************************************
 *                                                                      *
-\subsection{@GenStgBinding@}
+GenStgBinding
 *                                                                      *
 ************************************************************************
 
-As usual, expressions are interesting; other things are boring. Here
-are the boring things [except note the @GenStgRhs@], parameterised
-with respect to binder and occurrence information (just as in
-@CoreSyn@):
+As usual, expressions are interesting; other things are boring. Here are the
+boring things (except note the @GenStgRhs@), parameterised with respect to
+binder and occurrence information (just as in @CoreSyn@):
 -}
 
 -- | A top-level binding.
@@ -113,7 +112,7 @@ data GenStgBinding pass
 {-
 ************************************************************************
 *                                                                      *
-\subsection{@StgArg@}
+StgArg
 *                                                                      *
 ************************************************************************
 -}
@@ -122,8 +121,8 @@ data StgArg
   = StgVarArg  Id
   | StgLitArg  Literal
 
--- | Does this constructor application refer to
--- anything in a different *Windows* DLL?
+-- | Does this constructor application refer to anything in a different
+-- *Windows* DLL?
 -- If so, we can't allocate it statically
 isDllConApp :: DynFlags -> Module -> DataCon -> [StgArg] -> Bool
 isDllConApp dflags this_mod con args
@@ -138,17 +137,22 @@ isDllConApp dflags this_mod con args
                              && isDllName dflags this_mod (idName v)
     is_dll_arg _             = False
 
--- True of machine addresses; these are the things that don't
--- work across DLLs. The key point here is that VoidRep comes
--- out False, so that a top level nullary GADT constructor is
--- False for isDllConApp
+-- True of machine addresses; these are the things that don't work across DLLs.
+-- The key point here is that VoidRep comes out False, so that a top level
+-- nullary GADT constructor is False for isDllConApp
+--
 --    data T a where
 --      T1 :: T Int
+--
 -- gives
+--
 --    T1 :: forall a. (a~Int) -> T a
+--
 -- and hence the top-level binding
+--
 --    $WT1 :: T Int
 --    $WT1 = T1 Int (Coercion (Refl Int))
+--
 -- The coercion argument here gets VoidRep
 isAddrRep :: PrimRep -> Bool
 isAddrRep AddrRep     = True
@@ -164,11 +168,17 @@ stgArgType (StgVarArg v)   = idType v
 stgArgType (StgLitArg lit) = literalType lit
 
 
--- | Strip ticks of a given type from an STG expression
+-- | Strip ticks of a given type from an STG expression.
 stripStgTicksTop :: (Tickish Id -> Bool) -> GenStgExpr p -> ([Tickish Id], GenStgExpr p)
 stripStgTicksTop p = go []
    where go ts (StgTick t e) | p t = go (t:ts) e
          go ts other               = (reverse ts, other)
+
+-- | Strip ticks of a given type from an STG expression returning only the expression.
+stripStgTicksTopE :: (Tickish Id -> Bool) -> GenStgExpr p -> GenStgExpr p
+stripStgTicksTopE p = go
+   where go (StgTick t e) | p t = go e
+         go other               = other
 
 -- | Given an alt type and whether the program is unarised, return whether the
 -- case binder is in scope.
@@ -186,26 +196,25 @@ stgCaseBndrInScope alt_ty unarised =
 {-
 ************************************************************************
 *                                                                      *
-\subsection{STG expressions}
+STG expressions
 *                                                                      *
 ************************************************************************
 
-The @GenStgExpr@ data type is parameterised on binder and occurrence
-info, as before.
+The @GenStgExpr@ data type is parameterised on binder and occurrence info, as
+before.
 
 ************************************************************************
 *                                                                      *
-\subsubsection{@GenStgExpr@ application}
+GenStgExpr
 *                                                                      *
 ************************************************************************
 
-An application is of a function to a list of atoms [not expressions].
-Operationally, we want to push the arguments on the stack and call the
-function. (If the arguments were expressions, we would have to build
-their closures first.)
+An application is of a function to a list of atoms (not expressions).
+Operationally, we want to push the arguments on the stack and call the function.
+(If the arguments were expressions, we would have to build their closures
+first.)
 
-There is no constructor for a lone variable; it would appear as
-@StgApp var []@.
+There is no constructor for a lone variable; it would appear as @StgApp var []@.
 -}
 
 data GenStgExpr pass
@@ -216,18 +225,18 @@ data GenStgExpr pass
 {-
 ************************************************************************
 *                                                                      *
-\subsubsection{@StgConApp@ and @StgPrimApp@---saturated applications}
+StgConApp and StgPrimApp --- saturated applications
 *                                                                      *
 ************************************************************************
 
-There are specialised forms of application, for constructors,
-primitives, and literals.
+There are specialised forms of application, for constructors, primitives, and
+literals.
 -}
 
   | StgLit      Literal
 
         -- StgConApp is vital for returning unboxed tuples or sums
-        -- which can't be let-bound first
+        -- which can't be let-bound
   | StgConApp   DataCon
                 [StgArg] -- Saturated
                 [Type]   -- See Note [Types in StgConApp] in UnariseStg
@@ -241,13 +250,13 @@ primitives, and literals.
 {-
 ************************************************************************
 *                                                                      *
-\subsubsection{@StgLam@}
+StgLam
 *                                                                      *
 ************************************************************************
 
-StgLam is used *only* during CoreToStg's work. Before CoreToStg has
-finished it encodes (\x -> e) as (let f = \x -> e in f)
-TODO: Encode this via an extension to GenStgExpr à la TTG.
+StgLam is used *only* during CoreToStg's work. Before CoreToStg has finished it
+encodes (\x -> e) as (let f = \x -> e in f) TODO: Encode this via an extension
+to GenStgExpr à la TTG.
 -}
 
   | StgLam
@@ -257,7 +266,7 @@ TODO: Encode this via an extension to GenStgExpr à la TTG.
 {-
 ************************************************************************
 *                                                                      *
-\subsubsection{@GenStgExpr@: case-expressions}
+GenStgExpr: case-expressions
 *                                                                      *
 ************************************************************************
 
@@ -275,93 +284,74 @@ This has the same boxed/unboxed business as Core case expressions.
 {-
 ************************************************************************
 *                                                                      *
-\subsubsection{@GenStgExpr@: @let(rec)@-expressions}
+GenStgExpr: let(rec)-expressions
 *                                                                      *
 ************************************************************************
 
-The various forms of let(rec)-expression encode most of the
-interesting things we want to do.
-\begin{enumerate}
-\item
-\begin{verbatim}
-let-closure x = [free-vars] [args] expr
-in e
-\end{verbatim}
-is equivalent to
-\begin{verbatim}
-let x = (\free-vars -> \args -> expr) free-vars
-\end{verbatim}
-\tr{args} may be empty (and is for most closures).  It isn't under
-circumstances like this:
-\begin{verbatim}
-let x = (\y -> y+z)
-\end{verbatim}
-This gets mangled to
-\begin{verbatim}
-let-closure x = [z] [y] (y+z)
-\end{verbatim}
-The idea is that we compile code for @(y+z)@ in an environment in which
-@z@ is bound to an offset from \tr{Node}, and @y@ is bound to an
-offset from the stack pointer.
+The various forms of let(rec)-expression encode most of the interesting things
+we want to do.
 
-(A let-closure is an @StgLet@ with a @StgRhsClosure@ RHS.)
+-   let-closure x = [free-vars] [args] expr in e
 
-\item
-\begin{verbatim}
-let-constructor x = Constructor [args]
-in e
-\end{verbatim}
+  is equivalent to
 
-(A let-constructor is an @StgLet@ with a @StgRhsCon@ RHS.)
+    let x = (\free-vars -> \args -> expr) free-vars
 
-\item
-Letrec-expressions are essentially the same deal as
-let-closure/let-constructor, so we use a common structure and
-distinguish between them with an @is_recursive@ boolean flag.
+  @args@ may be empty (and is for most closures). It isn't under circumstances
+  like this:
 
-\item
-\begin{verbatim}
-let-unboxed u = an arbitrary arithmetic expression in unboxed values
-in e
-\end{verbatim}
-All the stuff on the RHS must be fully evaluated.
-No function calls either!
+    let x = (\y -> y+z)
 
-(We've backed away from this toward case-expressions with
-suitably-magical alts ...)
+  This gets mangled to
 
-\item
-~[Advanced stuff here! Not to start with, but makes pattern matching
-generate more efficient code.]
+    let-closure x = [z] [y] (y+z)
 
-\begin{verbatim}
-let-escapes-not fail = expr
-in e'
-\end{verbatim}
-Here the idea is that @e'@ guarantees not to put @fail@ in a data structure,
-or pass it to another function. All @e'@ will ever do is tail-call @fail@.
-Rather than build a closure for @fail@, all we need do is to record the stack
-level at the moment of the @let-escapes-not@; then entering @fail@ is just
-a matter of adjusting the stack pointer back down to that point and entering
-the code for it.
+  The idea is that we compile code for @(y+z)@ in an environment in which @z@ is
+  bound to an offset from Node, and `y` is bound to an offset from the stack
+  pointer.
 
-Another example:
-\begin{verbatim}
-f x y = let z = huge-expression in
-        if y==1 then z else
-        if y==2 then z else
-        1
-\end{verbatim}
+  (A let-closure is an @StgLet@ with a @StgRhsClosure@ RHS.)
 
-(A let-escapes-not is an @StgLetNoEscape@.)
+-   let-constructor x = Constructor [args] in e
 
-\item
-We may eventually want:
-\begin{verbatim}
-let-literal x = Literal
-in e
-\end{verbatim}
-\end{enumerate}
+  (A let-constructor is an @StgLet@ with a @StgRhsCon@ RHS.)
+
+- Letrec-expressions are essentially the same deal as let-closure/
+  let-constructor, so we use a common structure and distinguish between them
+  with an @is_recursive@ boolean flag.
+
+-   let-unboxed u = <an arbitrary arithmetic expression in unboxed values> in e
+
+  All the stuff on the RHS must be fully evaluated. No function calls either!
+
+  (We've backed away from this toward case-expressions with suitably-magical
+  alts ...)
+
+- Advanced stuff here! Not to start with, but makes pattern matching generate
+  more efficient code.
+
+    let-escapes-not fail = expr
+    in e'
+
+  Here the idea is that @e'@ guarantees not to put @fail@ in a data structure,
+  or pass it to another function. All @e'@ will ever do is tail-call @fail@.
+  Rather than build a closure for @fail@, all we need do is to record the stack
+  level at the moment of the @let-escapes-not@; then entering @fail@ is just a
+  matter of adjusting the stack pointer back down to that point and entering the
+  code for it.
+
+  Another example:
+
+    f x y = let z = huge-expression in
+            if y==1 then z else
+            if y==2 then z else
+            1
+
+  (A let-escapes-not is an @StgLetNoEscape@.)
+
+- We may eventually want:
+
+    let-literal x = Literal in e
 
 And so the code for let(rec)-things:
 -}
@@ -377,11 +367,11 @@ And so the code for let(rec)-things:
         (GenStgExpr pass)       -- body
 
 {-
-%************************************************************************
-%*                                                                      *
-\subsubsection{@GenStgExpr@: @hpc@, @scc@ and other debug annotations}
-%*                                                                      *
-%************************************************************************
+*************************************************************************
+*                                                                      *
+GenStgExpr: hpc, scc and other debug annotations
+*                                                                      *
+*************************************************************************
 
 Finally for @hpc@ expressions we introduce a new STG construct.
 -}
@@ -395,12 +385,12 @@ Finally for @hpc@ expressions we introduce a new STG construct.
 {-
 ************************************************************************
 *                                                                      *
-\subsection{STG right-hand sides}
+STG right-hand sides
 *                                                                      *
 ************************************************************************
 
-Here's the rest of the interesting stuff for @StgLet@s; the first
-flavour is for closures:
+Here's the rest of the interesting stuff for @StgLet@s; the first flavour is for
+closures:
 -}
 
 data GenStgRhs pass
@@ -415,18 +405,19 @@ data GenStgRhs pass
 
 {-
 An example may be in order.  Consider:
-\begin{verbatim}
-let t = \x -> \y -> ... x ... y ... p ... q in e
-\end{verbatim}
-Pulling out the free vars and stylising somewhat, we get the equivalent:
-\begin{verbatim}
-let t = (\[p,q] -> \[x,y] -> ... x ... y ... p ...q) p q
-\end{verbatim}
-Stg-operationally, the @[x,y]@ are on the stack, the @[p,q]@ are
-offsets from @Node@ into the closure, and the code ptr for the closure
-will be exactly that in parentheses above.
 
-The second flavour of right-hand-side is for constructors (simple but important):
+  let t = \x -> \y -> ... x ... y ... p ... q in e
+
+Pulling out the free vars and stylising somewhat, we get the equivalent:
+
+  let t = (\[p,q] -> \[x,y] -> ... x ... y ... p ...q) p q
+
+Stg-operationally, the @[x,y]@ are on the stack, the @[p,q]@ are offsets from
+@Node@ into the closure, and the code ptr for the closure will be exactly that
+in parentheses above.
+
+The second flavour of right-hand-side is for constructors (simple but
+important):
 -}
 
   | StgRhsCon
@@ -445,19 +436,19 @@ data StgPass
   | LiftLams
   | CodeGen
 
--- | Like 'HsExpression.NoExt', but with an 'Outputable' instance that returns
--- 'empty'.
-data NoExtSilent = NoExtSilent
+-- | Like 'HsExtension.NoExtField', but with an 'Outputable' instance that
+-- returns 'empty'.
+data NoExtFieldSilent = NoExtFieldSilent
   deriving (Data, Eq, Ord)
 
-instance Outputable NoExtSilent where
+instance Outputable NoExtFieldSilent where
   ppr _ = empty
 
 -- | Used when constructing a term with an unused extension point that should
 -- not appear in pretty-printed output at all.
-noExtSilent :: NoExtSilent
-noExtSilent = NoExtSilent
--- TODO: Maybe move this to HsExtensions? I'm not sure about the implications
+noExtFieldSilent :: NoExtFieldSilent
+noExtFieldSilent = NoExtFieldSilent
+-- TODO: Maybe move this to HsExtension? I'm not sure about the implications
 -- on build time...
 
 -- TODO: Do we really want to the extension point type families to have a closed
@@ -467,17 +458,17 @@ type instance BinderP 'Vanilla = Id
 type instance BinderP 'CodeGen = Id
 
 type family XRhsClosure (pass :: StgPass)
-type instance XRhsClosure 'Vanilla = NoExtSilent
+type instance XRhsClosure 'Vanilla = NoExtFieldSilent
 -- | Code gen needs to track non-global free vars
 type instance XRhsClosure 'CodeGen = DIdSet
 
 type family XLet (pass :: StgPass)
-type instance XLet 'Vanilla = NoExtSilent
-type instance XLet 'CodeGen = NoExtSilent
+type instance XLet 'Vanilla = NoExtFieldSilent
+type instance XLet 'CodeGen = NoExtFieldSilent
 
 type family XLetNoEscape (pass :: StgPass)
-type instance XLetNoEscape 'Vanilla = NoExtSilent
-type instance XLetNoEscape 'CodeGen = NoExtSilent
+type instance XLetNoEscape 'Vanilla = NoExtFieldSilent
+type instance XLetNoEscape 'CodeGen = NoExtFieldSilent
 
 stgRhsArity :: StgRhs -> Int
 stgRhsArity (StgRhsClosure _ _ _ bndrs _)
@@ -564,20 +555,19 @@ stgIdHasCafRefs id =
 {-
 ************************************************************************
 *                                                                      *
-\subsection[Stg-case-alternatives]{STG case alternatives}
+STG case alternatives
 *                                                                      *
 ************************************************************************
 
 Very like in @CoreSyntax@ (except no type-world stuff).
 
-The type constructor is guaranteed not to be abstract; that is, we can
-see its representation. This is important because the code generator
-uses it to determine return conventions etc. But it's not trivial
-where there's a module loop involved, because some versions of a type
-constructor might not have all the constructors visible. So
-mkStgAlgAlts (in CoreToStg) ensures that it gets the TyCon from the
-constructors or literals (which are guaranteed to have the Real McCoy)
-rather than from the scrutinee type.
+The type constructor is guaranteed not to be abstract; that is, we can see its
+representation. This is important because the code generator uses it to
+determine return conventions etc. But it's not trivial where there's a module
+loop involved, because some versions of a type constructor might not have all
+the constructors visible. So mkStgAlgAlts (in CoreToStg) ensures that it gets
+the TyCon from the constructors or literals (which are guaranteed to have the
+Real McCoy) rather than from the scrutinee type.
 -}
 
 type GenStgAlt pass
@@ -596,7 +586,7 @@ data AltType
 {-
 ************************************************************************
 *                                                                      *
-\subsection[Stg]{The Plain STG parameterisation}
+The Plain STG parameterisation
 *                                                                      *
 ************************************************************************
 
@@ -643,17 +633,16 @@ type OutStgAlt        = StgAlt
 
 ************************************************************************
 *                                                                      *
-\subsubsection[UpdateFlag-datatype]{@UpdateFlag@}
+UpdateFlag
 *                                                                      *
 ************************************************************************
 
 This is also used in @LambdaFormInfo@ in the @ClosureInfo@ module.
 
-A @ReEntrant@ closure may be entered multiple times, but should not be
-updated or blackholed. An @Updatable@ closure should be updated after
-evaluation (and may be blackholed during evaluation). A @SingleEntry@
-closure will only be entered once, and so need not be updated but may
-safely be blackholed.
+A @ReEntrant@ closure may be entered multiple times, but should not be updated
+or blackholed. An @Updatable@ closure should be updated after evaluation (and
+may be blackholed during evaluation). A @SingleEntry@ closure will only be
+entered once, and so need not be updated but may safely be blackholed.
 -}
 
 data UpdateFlag = ReEntrant | Updatable | SingleEntry
@@ -672,13 +661,12 @@ isUpdatable Updatable   = True
 {-
 ************************************************************************
 *                                                                      *
-\subsubsection{StgOp}
+StgOp
 *                                                                      *
 ************************************************************************
 
-An StgOp allows us to group together PrimOps and ForeignCalls.
-It's quite useful to move these around together, notably
-in StgOpApp and COpStmt.
+An StgOp allows us to group together PrimOps and ForeignCalls. It's quite useful
+to move these around together, notably in StgOpApp and COpStmt.
 -}
 
 data StgOp
@@ -686,20 +674,21 @@ data StgOp
 
   | StgPrimCallOp PrimCall
 
-  | StgFCallOp ForeignCall Unique
-        -- The Unique is occasionally needed by the C pretty-printer
-        -- (which lacks a unique supply), notably when generating a
-        -- typedef for foreign-export-dynamic
+  | StgFCallOp ForeignCall Type
+        -- The Type, which is obtained from the foreign import declaration
+        -- itself, is needed by the stg-to-cmm pass to determine the offset to
+        -- apply to unlifted boxed arguments in StgCmmForeign. See Note
+        -- [Unlifted boxed arguments to foreign calls]
 
 {-
 ************************************************************************
 *                                                                      *
-\subsection[Stg-pretty-printing]{Pretty-printing}
+Pretty-printing
 *                                                                      *
 ************************************************************************
 
-Robin Popplestone asked for semi-colon separators on STG binds; here's
-hoping he likes terminators instead...  Ditto for case alternatives.
+Robin Popplestone asked for semi-colon separators on STG binds; here's hoping he
+likes terminators instead...  Ditto for case alternatives.
 -}
 
 type OutputablePass pass =
@@ -726,7 +715,7 @@ pprGenStgBinding (StgNonRec bndr rhs)
 
 pprGenStgBinding (StgRec pairs)
   = vcat [ text "Rec {"
-         , vcat (map ppr_bind pairs)
+         , vcat (intersperse blankLine (map ppr_bind pairs))
          , text "end Rec }" ]
   where
     ppr_bind (bndr, expr)

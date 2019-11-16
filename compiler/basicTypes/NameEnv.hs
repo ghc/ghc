@@ -25,6 +25,7 @@ module NameEnv (
 
         emptyDNameEnv,
         lookupDNameEnv,
+        delFromDNameEnv,
         mapDNameEnv,
         alterDNameEnv,
         -- ** Dependency analysis
@@ -146,6 +147,9 @@ emptyDNameEnv = emptyUDFM
 
 lookupDNameEnv :: DNameEnv a -> Name -> Maybe a
 lookupDNameEnv = lookupUDFM
+
+delFromDNameEnv :: DNameEnv a -> Name -> DNameEnv a
+delFromDNameEnv = delFromUDFM
 
 mapDNameEnv :: (a -> b) -> DNameEnv a -> DNameEnv b
 mapDNameEnv = mapUDFM

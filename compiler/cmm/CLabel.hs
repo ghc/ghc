@@ -124,7 +124,7 @@ import CostCentre
 import Outputable
 import FastString
 import DynFlags
-import Platform
+import GHC.Platform
 import UniqSet
 import Util
 import PprCore ( {- instances -} )
@@ -579,8 +579,7 @@ mkForeignLabel
         -> FunctionOrData
         -> CLabel
 
-mkForeignLabel str mb_sz src fod
-    = ForeignLabel str mb_sz src  fod
+mkForeignLabel = ForeignLabel
 
 
 -- | Update the label size field in a ForeignLabel

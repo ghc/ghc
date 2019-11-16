@@ -849,7 +849,7 @@ pop( StgClosure **c, StgClosure **cp, retainer *r )
             if (entry_no == ((StgTRecChunk *)se->c)->next_entry_idx) {
                 *c = NULL;
                 popOff();
-                return;
+                break;
             }
             entry = &((StgTRecChunk *)se->c)->entries[entry_no];
             if (field_no == 0) {

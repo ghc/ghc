@@ -1,0 +1,12 @@
+:! rm B.hs 2> /dev/null
+:! rm *.o 2> /dev/null
+:! rm *.hi 2> /dev/null
+:! cp B1.hs B.hs
+:load D.hs
+main
+:! cp B2.hs B.hs
+:reload
+main
+:! cp B1.hs B.hs
+:reload
+main

@@ -1,16 +1,28 @@
 
 deriving-via-fail.hs:9:34: error:
-    Type variable ‘b’ is bound in the ‘via’ type ‘(Identity b)’
-    but is not mentioned in the derived class ‘Show’, which is illegal
+    • Couldn't match representation of type ‘a’ with that of ‘b’
+        arising from the coercion of the method ‘showsPrec’
+          from type ‘Int -> Identity b -> ShowS’
+            to type ‘Int -> Foo1 a -> ShowS’
+      ‘a’ is a rigid type variable bound by
+        the deriving clause for ‘Show (Foo1 a)’
+        at deriving-via-fail.hs:9:34-37
+      ‘b’ is a rigid type variable bound by
+        the deriving clause for ‘Show (Foo1 a)’
+        at deriving-via-fail.hs:9:34-37
+    • When deriving the instance for (Show (Foo1 a))
 
 deriving-via-fail.hs:12:12: error:
-    Type variable ‘fooo’ is bound in the ‘via’ type ‘fooo’
-    but is not mentioned in the derived class ‘Category’, which is illegal
+    • Cannot derive instance via ‘fooo’
+        Class ‘Category’ expects an argument of kind ‘* -> * -> *’,
+        but ‘fooo’ has kind ‘*’
+    • In the newtype declaration for ‘Foo2’
 
 deriving-via-fail.hs:15:20: error:
-    Type variable ‘a’ is bound in the ‘via’ type ‘(forall a. a)’
-    but is not mentioned in the derived class ‘Eq’, which is illegal
-
-deriving-via-fail.hs:19:12: error:
-    Type variable ‘b’ is bound in the ‘via’ type ‘(Identity b)’
-    but is not mentioned in the derived instance ‘Show (Foo4 a)’, which is illegal
+    • Couldn't match representation of type ‘a’ with that of ‘Foo3’
+        arising from the coercion of the method ‘==’
+          from type ‘a -> a -> Bool’ to type ‘Foo3 -> Foo3 -> Bool’
+      ‘a’ is a rigid type variable bound by
+        the deriving clause for ‘Eq Foo3’
+        at deriving-via-fail.hs:15:20-21
+    • When deriving the instance for (Eq Foo3)

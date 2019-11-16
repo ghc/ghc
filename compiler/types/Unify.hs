@@ -35,7 +35,9 @@ import Name( Name )
 import Type hiding ( getTvSubstEnv )
 import Coercion hiding ( getCvSubstEnv )
 import TyCon
-import TyCoRep hiding ( getTvSubstEnv, getCvSubstEnv )
+import TyCoRep
+import TyCoFVs ( tyCoVarsOfCoList, tyCoFVsOfTypes )
+import TyCoSubst ( mkTvSubst )
 import FV( FV, fvVarSet, fvVarList )
 import Util
 import Pair
@@ -1206,9 +1208,7 @@ data UMState = UMState
                    , um_cv_env   :: CvSubstEnv }
 
 newtype UM a = UM { unUM :: UMState -> UnifyResultM (UMState, a) }
-
-instance Functor UM where
-      fmap = liftM
+    deriving (Functor)
 
 instance Applicative UM where
       pure a = UM (\s -> pure (s, a))

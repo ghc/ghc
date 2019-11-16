@@ -60,6 +60,7 @@ test('rnfail056', normal, compile_fail, [''])
 test('rnfail057', normal, compile_fail, [''])
 
 test('rn_dup', normal, compile_fail, [''])
+test('T495', normal, compile_fail, [''])
 test('T2490', normal, compile_fail, [''])
 test('T2901', normal, compile_fail, [''])
 test('T2723', normal, compile, [''])  # Warnings only
@@ -150,3 +151,4 @@ test('T15957_Fail', normal, compile_fail, ['-Werror -Wall -Wno-missing-signature
 test('T16385', normal, compile_fail, [''])
 test('T16504', normal, compile_fail, [''])
 test('T14548', normal, compile_fail, [''])
+test('T16610', normal, compile_fail, [''])

@@ -8,10 +8,11 @@
 {-# LANGUAGE CPP, TupleSections, MultiWayIf, RankNTypes #-}
 {-# LANGUAGE ScopedTypeVariables #-}
 {-# LANGUAGE TypeFamilies #-}
+{-# LANGUAGE ViewPatterns #-}
 
 module TcHsType (
         -- Type signatures
-        kcHsSigType, tcClassSigType,
+        kcClassSigType, tcClassSigType,
         tcHsSigType, tcHsSigWcType,
         tcHsPartialSigType,
         funsSigCtxt, addSigCtxt, pprSigCtxt,
@@ -36,7 +37,7 @@ module TcHsType (
         -- Kind-checking types
         -- No kind generalisation, no checkValidType
         kcLHsQTyVars,
-        tcWildCardBinders,
+        tcNamedWildCardBinders,
         tcHsLiftedType,   tcHsOpenType,
         tcHsLiftedTypeNC, tcHsOpenTypeNC,
         tcLHsType, tcLHsTypeUnsaturated, tcCheckLHsType,
@@ -49,7 +50,7 @@ module TcHsType (
         kindGeneralize, checkExpectedKind_pp,
 
         -- Sort-checking kinds
-        tcLHsKindSig, badKindSig,
+        tcLHsKindSig, checkDataKindSig, DataSort(..),
 
         -- Zonking and promoting
         zonkPromoteType,
@@ -105,7 +106,7 @@ import UniqSupply
 import Outputable
 import FastString
 import PrelNames hiding ( wildCardName )
-import DynFlags ( WarningFlag (Opt_WarnPartialTypeSignatures) )
+import DynFlags
 import qualified GHC.LanguageExtensions as LangExt
 
 import Maybes
@@ -187,24 +188,40 @@ tcHsSigWcType :: UserTypeCtxt -> LHsSigWcType GhcRn -> TcM Type
 -- already checked this, so we can simply ignore it.
 tcHsSigWcType ctxt sig_ty = tcHsSigType ctxt (dropWildCards sig_ty)
 
-kcHsSigType :: [Located Name] -> LHsSigType GhcRn -> TcM ()
-kcHsSigType names (HsIB { hsib_body = hs_ty
-                                  , hsib_ext = sig_vars })
-  = discardResult                        $
-    addSigCtxt (funsSigCtxt names) hs_ty $
-    bindImplicitTKBndrs_Skol sig_vars    $
-    tc_lhs_type typeLevelMode hs_ty liftedTypeKind
-
-kcHsSigType _ (XHsImplicitBndrs _) = panic "kcHsSigType"
+kcClassSigType :: SkolemInfo -> [Located Name] -> LHsSigType GhcRn -> TcM ()
+kcClassSigType skol_info names sig_ty
+  = discardResult $
+    tcClassSigType skol_info names sig_ty
+  -- tcClassSigType does a fair amount of extra work that we don't need,
+  -- such as ordering quantified variables. But we absolutely do need
+  -- to push the level when checking method types and solve local equalities,
+  -- and so it seems easier just to call tcClassSigType than selectively
+  -- extract the lines of code from tc_hs_sig_type that we really need.
+  -- If we don't push the level, we get #16517, where GHC accepts
+  --   class C a where
+  --     meth :: forall k. Proxy (a :: k) -> ()
+  -- Note that k is local to meth -- this is hogwash.
 
 tcClassSigType :: SkolemInfo -> [Located Name] -> LHsSigType GhcRn -> TcM Type
 -- Does not do validity checking
 tcClassSigType skol_info names sig_ty
   = addSigCtxt (funsSigCtxt names) (hsSigType sig_ty) $
-    tc_hs_sig_type skol_info sig_ty (TheKind liftedTypeKind)
+    snd <$> tc_hs_sig_type skol_info sig_ty (TheKind liftedTypeKind)
        -- Do not zonk-to-Type, nor perform a validity check
        -- We are in a knot with the class and associated types
        -- Zonking and validity checking is done by tcClassDecl
+       -- No need to fail here if the type has an error:
+       --   If we're in the kind-checking phase, the solveEqualities
+       --     in kcTyClGroup catches the error
+       --   If we're in the type-checking phase, the solveEqualities
+       --     in tcClassDecl1 gets it
+       -- Failing fast here degrades the error message in, e.g., tcfail135:
+       --   class Foo f where
+       --     baa :: f a -> f
+       -- If we fail fast, we're told that f has kind `k1` when we wanted `*`.
+       -- It should be that f has kind `k2 -> *`, but we never get a chance
+       -- to run the solver where the kind of f is touchable. This is
+       -- painfully delicate.
 
 tcHsSigType :: UserTypeCtxt -> LHsSigType GhcRn -> TcM Type
 -- Does validity checking
@@ -214,9 +231,12 @@ tcHsSigType ctxt sig_ty
     do { traceTc "tcHsSigType {" (ppr sig_ty)
 
           -- Generalise here: see Note [Kind generalisation]
-       ; ty <- tc_hs_sig_type skol_info sig_ty
-                                      (expectedKindInCtxt ctxt)
+       ; (insol, ty) <- tc_hs_sig_type skol_info sig_ty
+                                       (expectedKindInCtxt ctxt)
        ; ty <- zonkTcType ty
+
+       ; when insol failM
+       -- See Note [Fail fast if there are insoluble kind equalities] in TcSimplify
 
        ; checkValidType ctxt ty
        ; traceTc "end tcHsSigType }" (ppr ty)
@@ -225,12 +245,14 @@ tcHsSigType ctxt sig_ty
     skol_info = SigTypeSkol ctxt
 
 tc_hs_sig_type :: SkolemInfo -> LHsSigType GhcRn
-               -> ContextKind -> TcM Type
+               -> ContextKind -> TcM (Bool, TcType)
 -- Kind-checks/desugars an 'LHsSigType',
 --   solve equalities,
 --   and then kind-generalizes.
 -- This will never emit constraints, as it uses solveEqualities interally.
 -- No validity checking or zonking
+-- Returns also a Bool indicating whether the type induced an insoluble constraint;
+-- True <=> constraint is insoluble
 tc_hs_sig_type skol_info hs_sig_type ctxt_kind
   | HsIB { hsib_ext = sig_vars, hsib_body = hs_ty } <- hs_sig_type
   = do { (tc_lvl, (wanted, (spec_tkvs, ty)))
@@ -248,13 +270,9 @@ tc_hs_sig_type skol_info hs_sig_type ctxt_kind
        ; emitResidualTvConstraint skol_info Nothing (kvs ++ spec_tkvs)
                                   tc_lvl wanted
 
-       -- See Note [Fail fast if there are insoluble kind equalities]
-       --     in TcSimplify
-       ; when (insolubleWC wanted) failM
+       ; return (insolubleWC wanted, mkInvForAllTys kvs ty1) }
 
-       ; return (mkInvForAllTys kvs ty1) }
-
-tc_hs_sig_type _ (XHsImplicitBndrs _) _ = panic "tc_hs_sig_type"
+tc_hs_sig_type _ (XHsImplicitBndrs nec) _ = noExtCon nec
 
 tcTopLHsType :: LHsSigType GhcRn -> ContextKind -> TcM Type
 -- tcTopLHsType is used for kind-checking top-level HsType where
@@ -279,10 +297,10 @@ tcTopLHsType hs_sig_type ctxt_kind
        ; traceTc "End tcTopLHsType }" (vcat [ppr hs_ty, ppr final_ty])
        ; return final_ty}
 
-tcTopLHsType (XHsImplicitBndrs _) _ = panic "tcTopLHsType"
+tcTopLHsType (XHsImplicitBndrs nec) _ = noExtCon nec
 
 -----------------
-tcHsDeriv :: LHsSigType GhcRn -> TcM ([TyVar], (Class, [Type], [Kind]))
+tcHsDeriv :: LHsSigType GhcRn -> TcM ([TyVar], Class, [Type], [Kind])
 -- Like tcHsSigType, but for the ...deriving( C t1 ty2 ) clause
 -- Returns the C, [ty1, ty2, and the kinds of C's remaining arguments
 -- E.g.    class C (a::*) (b::k->k)
@@ -296,52 +314,37 @@ tcHsDeriv hs_ty
        ; let (tvs, pred)    = splitForAllTys ty
              (kind_args, _) = splitFunTys (tcTypeKind pred)
        ; case getClassPredTys_maybe pred of
-           Just (cls, tys) -> return (tvs, (cls, tys, kind_args))
+           Just (cls, tys) -> return (tvs, cls, tys, kind_args)
            Nothing -> failWithTc (text "Illegal deriving item" <+> quotes (ppr hs_ty)) }
 
--- | Typecheck something within the context of a deriving strategy.
--- This is of particular importance when the deriving strategy is @via@.
--- For instance:
---
--- @
--- deriving via (S a) instance C (T a)
--- @
---
--- We need to typecheck @S a@, and moreover, we need to extend the tyvar
--- environment with @a@ before typechecking @C (T a)@, since @S a@ quantified
--- the type variable @a@.
-tcDerivStrategy
-  :: forall a.
-     Maybe (DerivStrategy GhcRn) -- ^ The deriving strategy
-  -> TcM ([TyVar], a) -- ^ The thing to typecheck within the context of the
-                      -- deriving strategy, which might quantify some type
-                      -- variables of its own.
-  -> TcM (Maybe (DerivStrategy GhcTc), [TyVar], a)
-     -- ^ The typechecked deriving strategy, all quantified tyvars, and
-     -- the payload of the typechecked thing.
-tcDerivStrategy mds thing_inside
-  = case mds of
+-- | Typecheck a deriving strategy. For most deriving strategies, this is a
+-- no-op, but for the @via@ strategy, this requires typechecking the @via@ type.
+tcDerivStrategy ::
+     Maybe (LDerivStrategy GhcRn)
+     -- ^ The deriving strategy
+  -> TcM (Maybe (LDerivStrategy GhcTc), [TyVar])
+     -- ^ The typechecked deriving strategy and the tyvars that it binds
+     -- (if using 'ViaStrategy').
+tcDerivStrategy mb_lds
+  = case mb_lds of
       Nothing -> boring_case Nothing
-      Just ds -> do (ds', tvs, thing) <- tc_deriv_strategy ds
-                    pure (Just ds', tvs, thing)
+      Just (dL->L loc ds) ->
+        setSrcSpan loc $ do
+          (ds', tvs) <- tc_deriv_strategy ds
+          pure (Just (cL loc ds'), tvs)
   where
     tc_deriv_strategy :: DerivStrategy GhcRn
-                      -> TcM (DerivStrategy GhcTc, [TyVar], a)
+                      -> TcM (DerivStrategy GhcTc, [TyVar])
     tc_deriv_strategy StockStrategy    = boring_case StockStrategy
     tc_deriv_strategy AnyclassStrategy = boring_case AnyclassStrategy
     tc_deriv_strategy NewtypeStrategy  = boring_case NewtypeStrategy
     tc_deriv_strategy (ViaStrategy ty) = do
-      ty' <- checkNoErrs $
-             tcTopLHsType ty AnyKind
+      ty' <- checkNoErrs $ tcTopLHsType ty AnyKind
       let (via_tvs, via_pred) = splitForAllTys ty'
-      tcExtendTyVarEnv via_tvs $ do
-        (thing_tvs, thing) <- thing_inside
-        pure (ViaStrategy via_pred, via_tvs ++ thing_tvs, thing)
+      pure (ViaStrategy via_pred, via_tvs)
 
-    boring_case :: mds -> TcM (mds, [TyVar], a)
-    boring_case mds = do
-      (thing_tvs, thing) <- thing_inside
-      pure (mds, thing_tvs, thing)
+    boring_case :: ds -> TcM (ds, [TyVar])
+    boring_case ds = pure (ds, [])
 
 tcHsClsInstType :: UserTypeCtxt    -- InstDeclCtxt or SpecInstCtxt
                 -> LHsSigType GhcRn
@@ -370,7 +373,7 @@ tcHsTypeApp wc_ty kind
                unsetWOptM Opt_WarnPartialTypeSignatures $
                setXOptM LangExt.PartialTypeSignatures $
                -- See Note [Wildcards in visible type application]
-               tcWildCardBinders sig_wcs $ \ _ ->
+               tcNamedWildCardBinders sig_wcs $ \ _ ->
                tcCheckLHsType hs_ty kind
        -- We must promote here. Ex:
        --   f :: forall a. a
@@ -381,22 +384,23 @@ tcHsTypeApp wc_ty kind
        ; ty <- zonkPromoteType ty
        ; checkValidType TypeAppCtxt ty
        ; return ty }
-tcHsTypeApp (XHsWildCardBndrs _) _ = panic "tcHsTypeApp"
+tcHsTypeApp (XHsWildCardBndrs nec) _ = noExtCon nec
 
 {- Note [Wildcards in visible type application]
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+A HsWildCardBndrs's hswc_ext now only includes /named/ wildcards, so
+any unnamed wildcards stay unchanged in hswc_body.  When called in
+tcHsTypeApp, tcCheckLHsType will call emitAnonWildCardHoleConstraint
+on these anonymous wildcards. However, this would trigger
+error/warning when an anonymous wildcard is passed in as a visible type
+argument, which we do not want because users should be able to write
+@_ to skip a instantiating a type variable variable without fuss. The
+solution is to switch the PartialTypeSignatures flags here to let the
+typechecker know that it's checking a '@_' and do not emit hole
+constraints on it.  See related Note [Wildcards in visible kind
+application] and Note [The wildcard story for types] in HsTypes.hs
 
-A HsWildCardBndrs's hswc_ext now only includes named wildcards, so any unnamed
-wildcards stay unchanged in hswc_body and when called in tcHsTypeApp, tcCheckLHsType
-will call emitWildCardHoleConstraints on them. However, this would trigger
-error/warning when an unnamed wildcard is passed in as a visible type argument,
-which we do not want because users should be able to write @_ to skip a instantiating
-a type variable variable without fuss. The solution is to switch the
-PartialTypeSignatures flags here to let the typechecker know that it's checking
-a '@_' and do not emit hole constraints on it.
-See related Note [Wildcards in visible kind application]
-and Note [The wildcard story for types] in HsTypes.hs
-
+Ugh!
 -}
 
 {-
@@ -812,7 +816,7 @@ tc_hs_type mode ty@(HsAppKindTy{})         ek = tc_infer_hs_type_ek mode ty ek
 tc_hs_type mode ty@(HsOpTy {})             ek = tc_infer_hs_type_ek mode ty ek
 tc_hs_type mode ty@(HsKindSig {})          ek = tc_infer_hs_type_ek mode ty ek
 tc_hs_type mode ty@(XHsType (NHsCoreTy{})) ek = tc_infer_hs_type_ek mode ty ek
-tc_hs_type _    wc@(HsWildCardTy _)        ek = tcWildCardOcc wc ek
+tc_hs_type _    wc@(HsWildCardTy _)        ek = tcAnonWildCardOcc wc ek
 
 ------------------------------------------
 tc_fun_type :: TcTyMode -> LHsType GhcRn -> LHsType GhcRn -> TcKind
@@ -823,27 +827,27 @@ tc_fun_type mode ty1 ty2 exp_kind = case mode_level mode of
        ; res_k <- newOpenTypeKind
        ; ty1' <- tc_lhs_type mode ty1 arg_k
        ; ty2' <- tc_lhs_type mode ty2 res_k
-       ; checkExpectedKind (HsFunTy noExt ty1 ty2) (mkVisFunTy ty1' ty2')
+       ; checkExpectedKind (HsFunTy noExtField ty1 ty2) (mkVisFunTy ty1' ty2')
                            liftedTypeKind exp_kind }
   KindLevel ->  -- no representation polymorphism in kinds. yet.
     do { ty1' <- tc_lhs_type mode ty1 liftedTypeKind
        ; ty2' <- tc_lhs_type mode ty2 liftedTypeKind
-       ; checkExpectedKind (HsFunTy noExt ty1 ty2) (mkVisFunTy ty1' ty2')
+       ; checkExpectedKind (HsFunTy noExtField ty1 ty2) (mkVisFunTy ty1' ty2')
                            liftedTypeKind exp_kind }
 
 ---------------------------
-tcWildCardOcc :: HsType GhcRn -> Kind -> TcM TcType
-tcWildCardOcc wc exp_kind
-  = do { wc_tv <- newWildTyVar
-          -- The wildcard's kind should be an un-filled-in meta tyvar
-       ; loc <- getSrcSpanM
-       ; uniq <- newUnique
-       ; let name = mkInternalName uniq (mkTyVarOcc "_") loc
+tcAnonWildCardOcc :: HsType GhcRn -> Kind -> TcM TcType
+tcAnonWildCardOcc wc exp_kind
+  = do { wc_tv <- newWildTyVar  -- The wildcard's kind will be an un-filled-in meta tyvar
+
        ; part_tysig <- xoptM LangExt.PartialTypeSignatures
        ; warning <- woptM Opt_WarnPartialTypeSignatures
-       -- See Note [Wildcards in visible kind application]
-       ; unless (part_tysig && not warning)
-             (emitWildCardHoleConstraints [(name,wc_tv)])
+
+       ; unless (part_tysig && not warning) $
+         emitAnonWildCardHoleConstraint wc_tv
+         -- Why the 'unless' guard?
+         -- See Note [Wildcards in visible kind application]
+
        ; checkExpectedKind wc (mkTyVarTy wc_tv)
                            (tyVarKind wc_tv) exp_kind }
 
@@ -860,11 +864,11 @@ x = MkT
 So we should allow '@_' without emitting any hole constraints, and
 regardless of whether PartialTypeSignatures is enabled or not. But how would
 the typechecker know which '_' is being used in VKA and which is not when it
-calls emitWildCardHoleConstraints in tcHsPartialSigType on all HsWildCardBndrs?
+calls emitNamedWildCardHoleConstraints in tcHsPartialSigType on all HsWildCardBndrs?
 The solution then is to neither rename nor include unnamed wildcards in HsWildCardBndrs,
-but instead give every unnamed wildcard a fresh wild tyvar in tcWildCardOcc.
+but instead give every anonymous wildcard a fresh wild tyvar in tcAnonWildCardOcc.
 And whenever we see a '@', we automatically turn on PartialTypeSignatures and
-turn off hole constraint warnings, and never call emitWildCardHoleConstraints
+turn off hole constraint warnings, and do not call emitAnonWildCardHoleConstraint
 under these conditions.
 See related Note [Wildcards in visible type application] here and
 Note [The wildcard story for types] in HsTypes.hs
@@ -962,7 +966,7 @@ splitHsAppTys hs_ty
     go (L _  (HsAppKindTy l ty k)) as = go ty (HsTypeArg l k : as)
     go (L sp (HsParTy _ f))        as = go f (HsArgPar sp : as)
     go (L _  (HsOpTy _ l op@(L sp _) r)) as
-      = ( L sp (HsTyVar noExt NotPromoted op)
+      = ( L sp (HsTyVar noExtField NotPromoted op)
         , HsValArg l : HsValArg r : as )
     go f as = (f, as)
 
@@ -1634,6 +1638,8 @@ is correct, choosing ImplicationStatus IC_BadTelescope if they aren't.
 Then, in TcErrors, we report if there is a bad telescope. This way,
 we can report a suggested ordering to the user if there is a problem.
 
+See also Note [Checking telescopes] in TcRnTypes
+
 Note [Keeping scoped variables in order: Implicit]
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 When the user implicitly quantifies over variables (say, in a type
@@ -1705,23 +1711,26 @@ To avoid the double-zonk, we do two things:
     gathers free variables. So this way effectively sidesteps step 3.
 -}
 
-tcWildCardBinders :: [Name]
-                  -> ([(Name, TcTyVar)] -> TcM a)
-                  -> TcM a
-tcWildCardBinders wc_names thing_inside
+tcNamedWildCardBinders :: [Name]
+                       -> ([(Name, TcTyVar)] -> TcM a)
+                       -> TcM a
+-- Bring into scope the /named/ wildcard binders.  Remember that
+-- plain wildcards _ are anonymous and dealt with by HsWildCardTy
+-- Soe Note [The wildcard story for types] in HsTypes
+tcNamedWildCardBinders wc_names thing_inside
   = do { wcs <- mapM (const newWildTyVar) wc_names
        ; let wc_prs = wc_names `zip` wcs
        ; tcExtendNameTyVarEnv wc_prs $
          thing_inside wc_prs }
 
 newWildTyVar :: TcM TcTyVar
--- ^ New unification variable for a wildcard
+-- ^ New unification variable '_' for a wildcard
 newWildTyVar
   = do { kind <- newMetaKindVar
        ; uniq <- newUnique
        ; details <- newMetaDetails TauTv
-       ; let name = mkSysTvName uniq (fsLit "_")
-             tyvar = (mkTcTyVar name kind details)
+       ; let name  = mkSysTvName uniq (fsLit "_")
+             tyvar = mkTcTyVar name kind details
        ; traceTc "newWildTyVar" (ppr tyvar)
        ; return tyvar }
 
@@ -1847,7 +1856,7 @@ kcLHsQTyVars_Cusk name flav
     ctxt_kind | tcFlavourIsOpen flav = TheKind liftedTypeKind
               | otherwise            = AnyKind
 
-kcLHsQTyVars_Cusk _ _ (XLHsQTyVars _) _ = panic "kcLHsQTyVars"
+kcLHsQTyVars_Cusk _ _ (XLHsQTyVars nec) _ = noExtCon nec
 
 ------------------------------
 kcLHsQTyVars_NonCusk name flav
@@ -1895,7 +1904,7 @@ kcLHsQTyVars_NonCusk name flav
     ctxt_kind | tcFlavourIsOpen flav = TheKind liftedTypeKind
               | otherwise            = AnyKind
 
-kcLHsQTyVars_NonCusk _ _ (XLHsQTyVars _) _ = panic "kcLHsQTyVars"
+kcLHsQTyVars_NonCusk _ _ (XLHsQTyVars nec) _ = noExtCon nec
 
 
 {- Note [No polymorphic recursion]
@@ -2105,8 +2114,6 @@ bindExplicitTKBndrs_Q_Skol, bindExplicitTKBndrs_Q_Tv
 bindExplicitTKBndrs_Q_Skol ctxt_kind = bindExplicitTKBndrsX (tcHsQTyVarBndr ctxt_kind newSkolemTyVar)
 bindExplicitTKBndrs_Q_Tv   ctxt_kind = bindExplicitTKBndrsX (tcHsQTyVarBndr ctxt_kind newTyVarTyVar)
 
--- | Used during the "kind-checking" pass in TcTyClsDecls only,
--- and even then only for data-con declarations.
 bindExplicitTKBndrsX
     :: (HsTyVarBndr GhcRn -> TcM TcTyVar)
     -> [LHsTyVarBndr GhcRn]
@@ -2140,7 +2147,7 @@ tcHsTyVarBndr new_tv (UserTyVar _ (L _ tv_nm))
 tcHsTyVarBndr new_tv (KindedTyVar _ (L _ tv_nm) lhs_kind)
   = do { kind <- tcLHsKindSig (TyVarBndrKindCtxt tv_nm) lhs_kind
        ; new_tv tv_nm kind }
-tcHsTyVarBndr _ (XTyVarBndr _) = panic "tcHsTyVarBndr"
+tcHsTyVarBndr _ (XTyVarBndr nec) = noExtCon nec
 
 -----------------
 tcHsQTyVarBndr :: ContextKind
@@ -2170,10 +2177,10 @@ tcHsQTyVarBndr _ new_tv (KindedTyVar _ (L _ tv_nm) lhs_kind)
 
            _ -> new_tv tv_nm kind }
   where
-    hs_tv = HsTyVar noExt NotPromoted (noLoc tv_nm)
+    hs_tv = HsTyVar noExtField NotPromoted (noLoc tv_nm)
             -- Used for error messages only
 
-tcHsQTyVarBndr _ _ (XTyVarBndr _) = panic "tcHsTyVarBndr"
+tcHsQTyVarBndr _ _ (XTyVarBndr nec) = noExtCon nec
 
 
 --------------------------------------
@@ -2225,7 +2232,8 @@ kindGeneralize :: TcType -> TcM [KindVar]
 -- Quantify the free kind variables of a kind or type
 -- In the latter case the type is closed, so it has no free
 -- type variables.  So in both cases, all the free vars are kind vars
--- Input needn't be zonked.
+-- Input needn't be zonked. All variables to be quantified must
+-- have a TcLevel higher than the ambient TcLevel.
 -- NB: You must call solveEqualities or solveLocalEqualities before
 -- kind generalization
 --
@@ -2243,7 +2251,8 @@ kindGeneralize kind_or_type
 
 -- | This variant of 'kindGeneralize' refuses to generalize over any
 -- variables free in the given WantedConstraints. Instead, it promotes
--- these variables into an outer TcLevel. See also
+-- these variables into an outer TcLevel. All variables to be quantified must
+-- have a TcLevel higher than the ambient TcLevel. See also
 -- Note [Promoting unification variables] in TcSimplify
 kindGeneralizeLocal :: WantedConstraints -> TcType -> TcM [KindVar]
 kindGeneralizeLocal wanted kind_or_type
@@ -2384,12 +2393,101 @@ etaExpandAlgTyCon tc_bndrs kind
               (subst', tv') = substTyVarBndr subst tv
               tcb = Bndr tv' (NamedTCB vis)
 
-badKindSig :: Bool -> Kind -> SDoc
-badKindSig check_for_type kind
- = hang (sep [ text "Kind signature on data type declaration has non-*"
-             , (if check_for_type then empty else text "and non-variable") <+>
-               text "return kind" ])
-        2 (ppr kind)
+-- | A description of whether something is a
+--
+-- * @data@ or @newtype@ ('DataDeclSort')
+--
+-- * @data instance@ or @newtype instance@ ('DataInstanceSort')
+--
+-- * @data family@ ('DataFamilySort')
+--
+-- At present, this data type is only consumed by 'checkDataKindSig'.
+data DataSort
+  = DataDeclSort     NewOrData
+  | DataInstanceSort NewOrData
+  | DataFamilySort
+
+-- | Checks that the return kind in a data declaration's kind signature is
+-- permissible. There are three cases:
+--
+-- If dealing with a @data@, @newtype@, @data instance@, or @newtype instance@
+-- declaration, check that the return kind is @Type@.
+--
+-- If the declaration is a @newtype@ or @newtype instance@ and the
+-- @UnliftedNewtypes@ extension is enabled, this check is slightly relaxed so
+-- that a return kind of the form @TYPE r@ (for some @r@) is permitted.
+-- See @Note [Implementation of UnliftedNewtypes]@ in "TcTyClsDecls".
+--
+-- If dealing with a @data family@ declaration, check that the return kind is
+-- either of the form:
+--
+-- 1. @TYPE r@ (for some @r@), or
+--
+-- 2. @k@ (where @k@ is a bare kind variable; see #12369)
+checkDataKindSig :: DataSort -> Kind -> TcM ()
+checkDataKindSig data_sort kind = do
+  dflags <- getDynFlags
+  checkTc (is_TYPE_or_Type dflags || is_kind_var) (err_msg dflags)
+  where
+    pp_dec :: SDoc
+    pp_dec = text $
+      case data_sort of
+        DataDeclSort     DataType -> "data type"
+        DataDeclSort     NewType  -> "newtype"
+        DataInstanceSort DataType -> "data instance"
+        DataInstanceSort NewType  -> "newtype instance"
+        DataFamilySort            -> "data family"
+
+    is_newtype :: Bool
+    is_newtype =
+      case data_sort of
+        DataDeclSort     new_or_data -> new_or_data == NewType
+        DataInstanceSort new_or_data -> new_or_data == NewType
+        DataFamilySort               -> False
+
+    is_data_family :: Bool
+    is_data_family =
+      case data_sort of
+        DataDeclSort{}     -> False
+        DataInstanceSort{} -> False
+        DataFamilySort     -> True
+
+    tYPE_ok :: DynFlags -> Bool
+    tYPE_ok dflags =
+         (is_newtype && xopt LangExt.UnliftedNewtypes dflags)
+           -- With UnliftedNewtypes, we allow kinds other than Type, but they
+           -- must still be of the form `TYPE r` since we don't want to accept
+           -- Constraint or Nat.
+           -- See Note [Implementation of UnliftedNewtypes] in TcTyClsDecls.
+      || is_data_family
+           -- If this is a `data family` declaration, we don't need to check if
+           -- UnliftedNewtypes is enabled, since data family declarations can
+           -- have return kind `TYPE r` unconditionally (#16827).
+
+    is_TYPE :: Bool
+    is_TYPE = tcIsRuntimeTypeKind kind
+
+    is_TYPE_or_Type :: DynFlags -> Bool
+    is_TYPE_or_Type dflags | tYPE_ok dflags = is_TYPE
+                           | otherwise      = tcIsLiftedTypeKind kind
+
+    -- In the particular case of a data family, permit a return kind of the
+    -- form `:: k` (where `k` is a bare kind variable).
+    is_kind_var :: Bool
+    is_kind_var | is_data_family = isJust (tcGetCastedTyVar_maybe kind)
+                | otherwise      = False
+
+    err_msg :: DynFlags -> SDoc
+    err_msg dflags =
+      sep [ (sep [ text "Kind signature on" <+> pp_dec <+>
+                   text "declaration has non-" <>
+                   (if tYPE_ok dflags then text "TYPE" else ppr liftedTypeKind)
+                 , (if is_data_family then text "and non-variable" else empty) <+>
+                   text "return kind" <+> quotes (ppr kind) ])
+          , if not (tYPE_ok dflags) && is_TYPE && is_newtype &&
+               not (xopt LangExt.UnliftedNewtypes dflags)
+            then text "Perhaps you intended to use UnliftedNewtypes"
+            else empty ]
 
 tcbVisibilities :: TyCon -> [Type] -> [TyConBndrVis]
 -- Result is in 1-1 correpondence with orig_args
@@ -2473,11 +2571,11 @@ tcHsPartialSigType
   -> LHsSigWcType GhcRn       -- The type signature
   -> TcM ( [(Name, TcTyVar)]  -- Wildcards
          , Maybe TcType       -- Extra-constraints wildcard
-         , [Name]             -- Original tyvar names, in correspondence with ...
-         , [TcTyVar]          -- ... Implicitly and explicitly bound type variables
+         , [(Name,TcTyVar)]   -- Original tyvar names, in correspondence with
+                              --   the implicitly and explicitly bound type variables
          , TcThetaType        -- Theta part
          , TcType )           -- Tau part
--- See Note [Recipe for checking a signature]
+-- See Note [Checking partial type signatures]
 tcHsPartialSigType ctxt sig_ty
   | HsWC { hswc_ext  = sig_wcs, hswc_body = ib_ty } <- sig_ty
   , HsIB { hsib_ext = implicit_hs_tvs
@@ -2485,8 +2583,11 @@ tcHsPartialSigType ctxt sig_ty
   , (explicit_hs_tvs, L _ hs_ctxt, hs_tau) <- splitLHsSigmaTy hs_ty
   = addSigCtxt ctxt hs_ty $
     do { (implicit_tvs, (explicit_tvs, (wcs, wcx, theta, tau)))
-            <- solveLocalEqualities "tcHsPatSigTypes"      $
-               tcWildCardBinders sig_wcs $ \ wcs ->
+            <- solveLocalEqualities "tcHsPartialSigType"    $
+                 -- This solveLocalEqualiltes fails fast if there are
+                 -- insoluble equalities. See TcSimplify
+                 -- Note [Fail fast if there are insoluble kind equalities]
+               tcNamedWildCardBinders sig_wcs $ \ wcs ->
                bindImplicitTKBndrs_Tv implicit_hs_tvs       $
                bindExplicitTKBndrs_Tv explicit_hs_tvs       $
                do {   -- Instantiate the type-class context; but if there
@@ -2497,55 +2598,69 @@ tcHsPartialSigType ctxt sig_ty
 
                   ; return (wcs, wcx, theta, tau) }
 
-         -- We must return these separately, because all the zonking below
-         -- might change the name of a TyVarTv. This, in turn, causes trouble
-         -- in partial type signatures that bind scoped type variables, as
-         -- we bring the wrong name into scope in the function body.
-         -- Test case: partial-sigs/should_compile/LocalDefinitionBug
-       ; let tv_names = implicit_hs_tvs ++ hsLTyVarNames explicit_hs_tvs
-
        -- Spit out the wildcards (including the extra-constraints one)
        -- as "hole" constraints, so that they'll be reported if necessary
        -- See Note [Extra-constraint holes in partial type signatures]
-       ; emitWildCardHoleConstraints wcs
+       ; emitNamedWildCardHoleConstraints wcs
 
-         -- The TyVarTvs created above will sometimes have too high a TcLevel
-         -- (note that they are generated *after* bumping the level in
-         -- the tc{Im,Ex}plicitTKBndrsSig functions. Bumping the level
-         -- is still important here, because the kinds of these variables
-         -- do indeed need to have the higher level, so they can unify
-         -- with other local type variables. But, now that we've type-checked
-         -- everything (and solved equalities in the tcImplicit call)
-         -- we need to promote the TyVarTvs so we don't violate the TcLevel
-         -- invariant
-       ; implicit_tvs <- zonkAndScopedSort implicit_tvs
-       ; explicit_tvs <- mapM zonkAndSkolemise explicit_tvs
-       ; theta        <- mapM zonkTcType theta
-       ; tau          <- zonkTcType tau
+         -- We return a proper (Name,TyVar) environment, to be sure that
+         -- we bring the right name into scope in the function body.
+         -- Test case: partial-sigs/should_compile/LocalDefinitionBug
+       ; let tv_prs = (implicit_hs_tvs                  `zip` implicit_tvs)
+                      ++ (hsLTyVarNames explicit_hs_tvs `zip` explicit_tvs)
 
-       ; let all_tvs = implicit_tvs ++ explicit_tvs
+      -- NB: checkValidType on the final inferred type will be
+      --     done later by checkInferredPolyId.  We can't do it
+      --     here because we don't have a complete tuype to check
 
-       ; checkValidType ctxt (mkSpecForAllTys all_tvs $ mkPhiTy theta tau)
+       ; traceTc "tcHsPartialSigType" (ppr tv_prs)
+       ; return (wcs, wcx, tv_prs, theta, tau) }
 
-       ; traceTc "tcHsPartialSigType" (ppr all_tvs)
-       ; return (wcs, wcx, tv_names, all_tvs, theta, tau) }
-
-tcHsPartialSigType _ (HsWC _ (XHsImplicitBndrs _)) = panic "tcHsPartialSigType"
-tcHsPartialSigType _ (XHsWildCardBndrs _) = panic "tcHsPartialSigType"
+tcHsPartialSigType _ (HsWC _ (XHsImplicitBndrs nec)) = noExtCon nec
+tcHsPartialSigType _ (XHsWildCardBndrs nec) = noExtCon nec
 
 tcPartialContext :: HsContext GhcRn -> TcM (TcThetaType, Maybe TcType)
 tcPartialContext hs_theta
   | Just (hs_theta1, hs_ctxt_last) <- snocView hs_theta
   , L wc_loc wc@(HsWildCardTy _) <- ignoreParens hs_ctxt_last
   = do { wc_tv_ty <- setSrcSpan wc_loc $
-                     tcWildCardOcc wc constraintKind
+                     tcAnonWildCardOcc wc constraintKind
        ; theta <- mapM tcLHsPredType hs_theta1
        ; return (theta, Just wc_tv_ty) }
   | otherwise
   = do { theta <- mapM tcLHsPredType hs_theta
        ; return (theta, Nothing) }
 
-{- Note [Extra-constraint holes in partial type signatures]
+{- Note [Checking partial type signatures]
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+See also Note [Recipe for checking a signature]
+
+When we have a parital signature like
+   f,g :: forall a. a -> _
+we do the following
+
+* In TcSigs.tcUserSigType we return a PartialSig, which (unlike
+  the companion CompleteSig) contains the original, as-yet-unchecked
+  source-code LHsSigWcType
+
+* Then, for f and g /separately/, we call tcInstSig, which in turn
+  call tchsPartialSig (defined near this Note).  It kind-checks the
+  LHsSigWcType, creating fresh unification variables for each "_"
+  wildcard.  It's important that the wildcards for f and g are distinct
+  becase they migh get instantiated completely differently.  E.g.
+     f,g :: forall a. a -> _
+     f x = a
+     g x = True
+  It's really as if we'd written two distinct signatures.
+
+* Note that we don't make quantified type (forall a. blah) and then
+  instantiate it -- it makes no sense to instantiate a type with
+  wildcards in it.  Rather, tcHsPartialSigType just returns the
+  'a' and the 'blah' separately.
+
+  Nor, for the same reason, do we push a level in tcHsPartialSigType.
+
+Note [Extra-constraint holes in partial type signatures]
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 Consider
   f :: (_) => a -> a
@@ -2614,12 +2729,12 @@ tcHsPatSigType ctxt sig_ty
                  -- Always solve local equalities if possible,
                  -- else casts get in the way of deep skolemisation
                  -- (#16033)
-               tcWildCardBinders sig_wcs        $ \ wcs ->
+               tcNamedWildCardBinders sig_wcs        $ \ wcs ->
                tcExtendNameTyVarEnv sig_tkv_prs $
                do { sig_ty <- tcHsOpenType hs_ty
                   ; return (wcs, sig_ty) }
 
-        ; emitWildCardHoleConstraints wcs
+        ; emitNamedWildCardHoleConstraints wcs
 
           -- sig_ty might have tyvars that are at a higher TcLevel (if hs_ty
           -- contains a forall). Promote these.
@@ -2641,8 +2756,8 @@ tcHsPatSigType ctxt sig_ty
              -- NB: tv's Name may be fresh (in the case of newPatSigTyVar)
            ; return (name, tv) }
 
-tcHsPatSigType _ (HsWC _ (XHsImplicitBndrs _)) = panic "tcHsPatSigType"
-tcHsPatSigType _ (XHsWildCardBndrs _)          = panic "tcHsPatSigType"
+tcHsPatSigType _ (HsWC _ (XHsImplicitBndrs nec)) = noExtCon nec
+tcHsPatSigType _ (XHsWildCardBndrs nec)          = noExtCon nec
 
 tcPatSig :: Bool                    -- True <=> pattern binding
          -> LHsSigWcType GhcRn
@@ -2671,17 +2786,6 @@ tcPatSig in_pat_bind sig res_ty
                 -- It is more convenient to make the test here
                 -- than in the renamer
         { when in_pat_bind (addErr (patBindSigErr sig_tvs))
-
-                -- Check that all newly-in-scope tyvars are in fact
-                -- constrained by the pattern.  This catches tiresome
-                -- cases like
-                --      type T a = Int
-                --      f :: Int -> Int
-                --      f (x :: T a) = ...
-                -- Here 'a' doesn't get a binding.  Sigh
-        ; let bad_tvs = filterOut (`elemVarSet` exactTyCoVarsOfType sig_ty)
-                                  (tyCoVarsOfTypeList sig_ty)
-        ; checkTc (null bad_tvs) (badPatTyVarTvs sig_ty bad_tvs)
 
         -- Now do a subsumption check of the pattern signature against res_ty
         ; wrap <- addErrCtxtM (mk_msg sig_ty) $
@@ -2884,23 +2988,6 @@ promotionErr name err
                NoDataKindsDC  -> text "perhaps you intended to use DataKinds"
                PatSynPE       -> text "pattern synonyms cannot be promoted"
                _ -> text "it is defined and used in the same recursive group"
-
-{-
-************************************************************************
-*                                                                      *
-                Scoped type variables
-*                                                                      *
-************************************************************************
--}
-
-badPatTyVarTvs :: TcType -> [TyVar] -> SDoc
-badPatTyVarTvs sig_ty bad_tvs
-  = vcat [ fsep [text "The type variable" <> plural bad_tvs,
-                 quotes (pprWithCommas ppr bad_tvs),
-                 text "should be bound by the pattern signature" <+> quotes (ppr sig_ty),
-                 text "but are actually discarded by a type synonym" ]
-         , text "To fix this, expand the type synonym"
-         , text "[Note: I hope to lift this restriction in due course]" ]
 
 {-
 ************************************************************************

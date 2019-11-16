@@ -68,8 +68,8 @@
 
 defaults
    has_side_effects = False
-   out_of_line      = False   -- See Note Note [PrimOp can_fail and has_side_effects] in PrimOp
-   can_fail         = False   -- See Note Note [PrimOp can_fail and has_side_effects] in PrimOp
+   out_of_line      = False   -- See Note [When do out-of-line primops go in primops.txt.pp]
+   can_fail         = False   -- See Note [PrimOp can_fail and has_side_effects] in PrimOp
    commutable       = False
    code_size        = { primOpCodeSizeDefault }
    strictness       = { \ arity -> mkClosedStrictSig (replicate arity topDmd) topRes }
@@ -78,14 +78,47 @@ defaults
    vector           = []
    deprecated_msg   = {}      -- A non-empty message indicates deprecation
 
+
+-- Note [When do out-of-line primops go in primops.txt.pp]
+-- ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+--
+-- Out of line primops are those with a C-- implementation. But that
+-- doesn't mean they *just* have an C-- implementation. As mentioned in
+-- Note [Inlining out-of-line primops and heap checks], some out-of-line
+-- primops also have additional internal implementations under certain
+-- conditions. Now that `foreign import prim` exists, only those primops
+-- which have both internal and external implementations ought to be
+-- this file. The rest aren't really primops, since they don't need
+-- bespoke compiler support but just a general way to interface with
+-- C--. They are just foreign calls.
+--
+-- Unfortunately, for the time being most of the primops which should be
+-- moved according to the previous paragraph can't yet. There are some
+-- superficial restrictions in `foreign import prim` which mus be fixed
+-- first. Specifically, `foreign import prim` always requires:
+--
+--   - No polymorphism in type
+--   - `strictness       = <default>`
+--   - `can_fail         = False`
+--   - `has_side_effects = True`
+--
+-- https://gitlab.haskell.org/ghc/ghc/issues/16929 tracks this issue,
+-- and has a table of which external-only primops are blocked by which
+-- of these. Hopefully those restrictions are relaxed so the rest of
+-- those can be moved over.
+--
+-- 'module GHC.Prim.Ext is a temporarily "holding ground" for primops
+-- that were formally in here, until they can be given a better home.
+-- Likewise, their underlying C-- implementation need not live in the
+-- RTS either. Best case (in my view), both the C-- and `foreign import
+-- prim` can be moved to a small library tailured to the features being
+-- implemented and dependencies of those features.
+
 -- Currently, documentation is produced using latex, so contents of
 -- description fields should be legal latex. Descriptions can contain
 -- matched pairs of embedded curly brackets.
 
 #include "MachDeps.h"
-
--- We need platform defines (tests for mingw32 below).
-#include "ghc_boot_platform.h"
 
 section "The word size story."
         {Haskell98 specifies that signed integers (type {\tt Int})
@@ -557,10 +590,10 @@ primop   WordQuotRemOp "quotRemWord#" GenPrimOp
    Word# -> Word# -> (# Word#, Word# #)
    with can_fail = True
 
--- Takes high word of dividend, then low word of dividend, then divisor.
--- Requires that high word is not divisible by divisor.
 primop   WordQuotRem2Op "quotRemWord2#" GenPrimOp
    Word# -> Word# -> Word# -> (# Word#, Word# #)
+         { Takes high word of dividend, then low word of dividend, then divisor.
+           Requires that high word < divisor.}
    with can_fail = True
 
 primop   AndOp   "and#"   Dyadic   Word# -> Word# -> Word#
@@ -763,7 +796,18 @@ primop   DoubleExpOp   "expDouble#"      Monadic
    with
    code_size = { primOpCodeSizeForeignCall }
 
+primop   DoubleExpM1Op "expm1Double#"    Monadic
+   Double# -> Double#
+   with
+   code_size = { primOpCodeSizeForeignCall }
+
 primop   DoubleLogOp   "logDouble#"      Monadic
+   Double# -> Double#
+   with
+   code_size = { primOpCodeSizeForeignCall }
+   can_fail = True
+
+primop   DoubleLog1POp   "log1pDouble#"      Monadic
    Double# -> Double#
    with
    code_size = { primOpCodeSizeForeignCall }
@@ -904,7 +948,18 @@ primop   FloatExpOp   "expFloat#"      Monadic
    with
    code_size = { primOpCodeSizeForeignCall }
 
+primop   FloatExpM1Op   "expm1Float#"      Monadic
+   Float# -> Float#
+   with
+   code_size = { primOpCodeSizeForeignCall }
+
 primop   FloatLogOp   "logFloat#"      Monadic
+   Float# -> Float#
+   with
+   code_size = { primOpCodeSizeForeignCall }
+   can_fail = True
+
+primop   FloatLog1POp  "log1pFloat#"     Monadic
    Float# -> Float#
    with
    code_size = { primOpCodeSizeForeignCall }
@@ -1375,7 +1430,7 @@ primop  ShrinkMutableByteArrayOp_Char "shrinkMutableByteArray#" GenPrimOp
    MutableByteArray# s -> Int# -> State# s -> State# s
    {Shrink mutable byte array to new specified size (in bytes), in
     the specified state thread. The new size argument must be less than or
-    equal to the current size as reported by {\tt sizeofMutableArray\#}.}
+    equal to the current size as reported by {\tt sizeofMutableByteArray\#}.}
    with out_of_line = True
         has_side_effects = True
 
@@ -2153,7 +2208,6 @@ primop   AddrSubOp "minusAddr#" GenPrimOp Addr# -> Addr# -> Int#
 primop   AddrRemOp "remAddr#" GenPrimOp Addr# -> Int# -> Int#
          {Return the remainder when the {\tt Addr\#} arg, treated like an {\tt Int\#},
           is divided by the {\tt Int\#} arg.}
-#if (WORD_SIZE_IN_BITS == 32 || WORD_SIZE_IN_BITS == 64)
 primop   Addr2IntOp  "addr2Int#"     GenPrimOp   Addr# -> Int#
         {Coerce directly from address to int.}
    with code_size = 0
@@ -2162,7 +2216,6 @@ primop   Int2AddrOp   "int2Addr#"    GenPrimOp  Int# -> Addr#
         {Coerce directly from int to address.}
    with code_size = 0
         deprecated_msg = { This operation is strongly deprecated. }
-#endif
 
 primop   AddrGtOp  "gtAddr#"   Compare   Addr# -> Addr# -> Int#
 primop   AddrGeOp  "geAddr#"   Compare   Addr# -> Addr# -> Int#
@@ -2822,30 +2875,6 @@ primop  WaitWriteOp "waitWrite#" GenPrimOp
    has_side_effects = True
    out_of_line      = True
 
-#if defined(mingw32_TARGET_OS)
-primop  AsyncReadOp "asyncRead#" GenPrimOp
-   Int# -> Int# -> Int# -> Addr# -> State# RealWorld-> (# State# RealWorld, Int#, Int# #)
-   {Asynchronously read bytes from specified file descriptor.}
-   with
-   has_side_effects = True
-   out_of_line      = True
-
-primop  AsyncWriteOp "asyncWrite#" GenPrimOp
-   Int# -> Int# -> Int# -> Addr# -> State# RealWorld-> (# State# RealWorld, Int#, Int# #)
-   {Asynchronously write bytes from specified file descriptor.}
-   with
-   has_side_effects = True
-   out_of_line      = True
-
-primop  AsyncDoProcOp "asyncDoProc#" GenPrimOp
-   Addr# -> Addr# -> State# RealWorld-> (# State# RealWorld, Int#, Int# #)
-   {Asynchronously perform procedure (first arg), passing it 2nd arg.}
-   with
-   has_side_effects = True
-   out_of_line      = True
-
-#endif
-
 ------------------------------------------------------------------------
 section "Concurrency primitives"
 ------------------------------------------------------------------------
@@ -3022,15 +3051,29 @@ primop  StableNameToIntOp "stableNameToInt#" GenPrimOp
 
 ------------------------------------------------------------------------
 section "Compact normal form"
+
+        {Primitives for working with compact regions. The {\tt ghc\-compact}
+         library and the {\tt compact} library demonstrate how to use these
+         primitives. The documentation below draws a distinction between
+         a CNF and a compact block. A CNF contains one or more compact
+         blocks. The source file {\tt rts\/sm\/CNF.c}
+         diagrams this relationship. When discussing a compact
+         block, an additional distinction is drawn between capacity and
+         utilized bytes. The capacity is the maximum number of bytes that
+         the compact block can hold. The utilized bytes is the number of
+         bytes that are actually used by the compact block.
+        }
+
 ------------------------------------------------------------------------
 
 primtype Compact#
 
 primop  CompactNewOp "compactNew#" GenPrimOp
    Word# -> State# RealWorld -> (# State# RealWorld, Compact# #)
-   { Create a new Compact with the given size (in bytes, not words).
-     The size is rounded up to a multiple of the allocator block size,
-     and capped to one mega block. }
+   { Create a new CNF with a single compact block. The argument is
+     the capacity of the compact block (in bytes, not words).
+     The capacity is rounded up to a multiple of the allocator block size
+     and is capped to one mega block. }
    with
    has_side_effects = True
    out_of_line      = True
@@ -3038,44 +3081,46 @@ primop  CompactNewOp "compactNew#" GenPrimOp
 primop  CompactResizeOp "compactResize#" GenPrimOp
    Compact# -> Word# -> State# RealWorld ->
    State# RealWorld
-   { Set the new allocation size of the compact. This value (in bytes)
-     determines the size of each block in the compact chain. }
+   { Set the new allocation size of the CNF. This value (in bytes)
+     determines the capacity of each compact block in the CNF. It
+     does not retroactively affect existing compact blocks in the CNF. }
    with
    has_side_effects = True
    out_of_line      = True
 
 primop  CompactContainsOp "compactContains#" GenPrimOp
    Compact# -> a -> State# RealWorld -> (# State# RealWorld, Int# #)
-   { Returns 1\# if the object is contained in the compact, 0\# otherwise. }
+   { Returns 1\# if the object is contained in the CNF, 0\# otherwise. }
    with
    out_of_line      = True
 
 primop  CompactContainsAnyOp "compactContainsAny#" GenPrimOp
    a -> State# RealWorld -> (# State# RealWorld, Int# #)
-   { Returns 1\# if the object is in any compact at all, 0\# otherwise. }
+   { Returns 1\# if the object is in any CNF at all, 0\# otherwise. }
    with
    out_of_line      = True
 
 primop  CompactGetFirstBlockOp "compactGetFirstBlock#" GenPrimOp
    Compact# -> State# RealWorld -> (# State# RealWorld, Addr#, Word# #)
-   { Returns the address and the size (in bytes) of the first block of
-     a compact. }
+   { Returns the address and the utilized size (in bytes) of the
+     first compact block of a CNF.}
    with
    out_of_line      = True
 
 primop  CompactGetNextBlockOp "compactGetNextBlock#" GenPrimOp
    Compact# -> Addr# -> State# RealWorld -> (# State# RealWorld, Addr#, Word# #)
-   { Given a compact and the address of one its blocks, returns the
-     next block and its size, or #nullAddr if the argument was the
-     last block in the compact. }
+   { Given a CNF and the address of one its compact blocks, returns the
+     next compact block and its utilized size, or {\tt nullAddr\#} if the
+     argument was the last compact block in the CNF. }
    with
    out_of_line      = True
 
 primop  CompactAllocateBlockOp "compactAllocateBlock#" GenPrimOp
    Word# -> Addr# -> State# RealWorld -> (# State# RealWorld, Addr# #)
-   { Attempt to allocate a compact block with the given size (in
-     bytes, given by the first argument). The {\texttt Addr\#} is a pointer to
-     previous block of the compact or {\texttt nullAddr\#} to create a new compact.
+   { Attempt to allocate a compact block with the capacity (in
+     bytes) given by the first argument. The {\texttt Addr\#} is a pointer
+     to previous compact block of the CNF or {\texttt nullAddr\#} to create a
+     new CNF with a single compact block.
 
      The resulting block is not known to the GC until
      {\texttt compactFixupPointers\#} is called on it, and care must be taken
@@ -3087,13 +3132,13 @@ primop  CompactAllocateBlockOp "compactAllocateBlock#" GenPrimOp
 
 primop  CompactFixupPointersOp "compactFixupPointers#" GenPrimOp
    Addr# -> Addr# -> State# RealWorld -> (# State# RealWorld, Compact#, Addr# #)
-   { Given the pointer to the first block of a compact, and the
+   { Given the pointer to the first block of a CNF and the
      address of the root object in the old address space, fix up
-     the internal pointers inside the compact to account for
+     the internal pointers inside the CNF to account for
      a different position in memory than when it was serialized.
      This method must be called exactly once after importing
-     a serialized compact, and returns the new compact and
-     the new adjusted root address. }
+     a serialized CNF. It returns the new CNF and the new adjusted
+     root address. }
    with
    has_side_effects = True
    out_of_line      = True
@@ -3101,10 +3146,10 @@ primop  CompactFixupPointersOp "compactFixupPointers#" GenPrimOp
 primop CompactAdd "compactAdd#" GenPrimOp
    Compact# -> a -> State# RealWorld -> (# State# RealWorld, a #)
    { Recursively add a closure and its transitive closure to a
-     {\texttt Compact\#}, evaluating any unevaluated components at the
-     same time.  Note: {\texttt compactAdd\#} is not thread-safe, so
+     {\texttt Compact\#} (a CNF), evaluating any unevaluated components
+     at the same time. Note: {\texttt compactAdd\#} is not thread-safe, so
      only one thread may call {\texttt compactAdd\#} with a particular
-     {\texttt Compact#} at any given time.  The primop does not
+     {\texttt Compact\#} at any given time. The primop does not
      enforce any mutual exclusion; the caller is expected to
      arrange this. }
    with
@@ -3121,7 +3166,8 @@ primop CompactAddWithSharing "compactAddWithSharing#" GenPrimOp
 
 primop CompactSize "compactSize#" GenPrimOp
    Compact# -> State# RealWorld -> (# State# RealWorld, Word# #)
-   { Return the size (in bytes) of the total amount of data in the Compact# }
+   { Return the total capacity (in bytes) of all the compact blocks
+     in the CNF. }
    with
    has_side_effects = True
    out_of_line      = True
@@ -3421,13 +3467,6 @@ primop  TraceMarkerOp "traceMarker#" GenPrimOp
    has_side_effects = True
    out_of_line      = True
 
-primop  GetThreadAllocationCounter "getThreadAllocationCounter#" GenPrimOp
-   State# RealWorld -> (# State# RealWorld, INT64 #)
-   { Retrieves the allocation counter for the current thread. }
-   with
-   has_side_effects = True
-   out_of_line      = True
-
 primop  SetThreadAllocationCounter "setThreadAllocationCounter#" GenPrimOp
    INT64 -> State# RealWorld -> State# RealWorld
    { Sets the allocation counter for the current thread to the given value. }
@@ -3447,6 +3486,11 @@ pseudoop   "coerce"
      the newtype's concrete type to the abstract type. But it also works in
      more complicated settings, e.g. converting a list of newtypes to a list of
      concrete types.
+
+     This function is runtime-representation polymorphic, but the
+     {\tt RuntimeRep} type argument is marked as {\tt Inferred}, meaning
+     that it is not available for visible type application. This means
+     the typechecker will accept {\tt coerce @Int @Age 42}.
    }
 
 ------------------------------------------------------------------------

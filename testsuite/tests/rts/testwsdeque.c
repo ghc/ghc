@@ -18,7 +18,7 @@ OSThreadId ids[THREADS];
 // -----------------------------------------------------------------------------
 // version of stealWSDeque() that logs its actions, for debugging
 
-#ifdef DEBUG
+#if defined(DEBUG)
 
 #define BUF 128
 
@@ -128,7 +128,7 @@ void OSThreadProcAttr thief(void *info)
     n = (StgWord)info;
 
     while (!done) {
-#ifdef DEBUG
+#if defined(DEBUG)
         p = myStealWSDeque(q,n);
 #else
         p = stealWSDeque(q);
@@ -163,7 +163,7 @@ int main(int argc, char*argv[])
         pushWSDeque(q,&scratch[n]);
     }
 
-#ifdef DEBUG
+#if defined(DEBUG)
     debugBelch("main thread finished, popped %d", count);
 #endif
     exit(0);

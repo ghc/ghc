@@ -84,15 +84,13 @@ libffiContext stage = do
 -- | The name of the (locally built) library
 libffiName :: Expr String
 libffiName = do
-    windows <- expr windowsHost
     way <- getWay
-    return $ libffiName' windows (Dynamic `wayUnit` way)
+    return $ libffiName' (Dynamic `wayUnit` way)
 
 -- | The name of the (locally built) library
-libffiName' :: Bool -> Bool -> String
-libffiName' windows dynamic
-    = (if dynamic then "" else "C")
-    ++ (if windows then "ffi-6" else "ffi")
+libffiName' :: Bool -> String
+libffiName' dynamic = (if dynamic     then ""      else "C")
+                   ++ (if windowsHost then "ffi-6" else "ffi")
 
 libffiLibrary :: FilePath
 libffiLibrary = "inst/lib/libffi.a"
@@ -142,7 +140,7 @@ needLibfffiArchive buildPath = do
                 . fromSingleton "Exactly one LibFFI tarball is expected"
                 <$> getDirectoryFiles top ["libffi-tarballs/libffi*.tar.gz"]
     need [top -/- tarball]
-    trackAllow [buildPath -/- "//*"]
+    trackAllow [buildPath -/- "**"]
     return tarball
 
 libffiRules :: Rules ()
@@ -169,16 +167,14 @@ libffiRules = do
 
         -- Find dynamic libraries.
         dynLibFiles <- do
-            windows <- windowsHost
-            osx     <- osxHost
             let libfilesDir = libffiPath -/-
-                    (if windows then "inst" -/- "bin" else "inst" -/- "lib")
-                libffiName'' = libffiName' windows True
+                    (if windowsHost then "inst" -/- "bin" else "inst" -/- "lib")
+                libffiName'' = libffiName' True
                 dynlibext
-                    | windows   = "dll"
-                    | osx       = "dylib"
-                    | otherwise = "so"
-                filepat = "lib" ++ libffiName'' ++ "*." ++ dynlibext ++ "*"
+                    | windowsHost = "dll"
+                    | osxHost     = "dylib"
+                    | otherwise   = "so"
+                filepat = "lib" ++ libffiName'' ++ "." ++ dynlibext ++ "*"
             liftIO $ getDirectoryFilesIO "." [libfilesDir -/- filepat]
 
         writeFileLines dynLibMan dynLibFiles
@@ -199,12 +195,12 @@ libffiRules = do
             build $ target context (Tar Extract) [tarball] [path]
             moveDirectory (path -/- libname) libffiPath) $
             -- And finally:
-            removeFiles (path) [libname <//> "*"]
+            removeFiles (path) [libname -/- "**"]
 
         top <- topDirectory
         fixFile mkIn (fixLibffiMakefile top)
 
-        files <- liftIO $ getDirectoryFilesIO "." [libffiPath <//> "*"]
+        files <- liftIO $ getDirectoryFilesIO "." [libffiPath -/- "**"]
         produces files
 
     fmap (libffiPath -/-) ["Makefile", "config.guess", "config.sub"] &%> \[mk, _, _] -> do
@@ -222,5 +218,5 @@ libffiRules = do
             target context (Configure libffiPath) [mk <.> "in"] [mk]
 
         dir   <- setting BuildPlatform
-        files <- liftIO $ getDirectoryFilesIO "." [libffiPath -/- dir <//> "*"]
+        files <- liftIO $ getDirectoryFilesIO "." [libffiPath -/- dir -/- "**"]
         produces files

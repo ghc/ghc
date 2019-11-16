@@ -8,7 +8,7 @@ module AsmUtils
 
 import GhcPrelude
 
-import Platform
+import GHC.Platform
 import Outputable
 
 -- | Generate a section type (e.g. @\@progbits@). See #13937.

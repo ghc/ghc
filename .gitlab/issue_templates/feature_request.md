@@ -1,9 +1,9 @@
-# Motivation
+## Motivation
 
 Briefly describe the problem your proposal solves and why this problem should
 be solved.
 
-# Proposal
+## Proposal
 
 Describe your proposed feature here.
 

@@ -29,7 +29,7 @@ import FastString
 import ForeignCall
 import Outputable hiding (panic, pprPanic)
 import qualified Outputable
-import Platform
+import GHC.Platform
 import OrdList
 import UniqSupply
 import Unique
@@ -169,17 +169,25 @@ barrier = do
     let s = Fence False SyncSeqCst
     return (unitOL s, [])
 
+-- | Insert a 'barrier', unless the target platform is in the provided list of
+--   exceptions (where no code will be emitted instead).
+barrierUnless :: [Arch] -> LlvmM StmtData
+barrierUnless exs = do
+    platform <- getLlvmPlatform
+    if platformArch platform `elem` exs
+        then return (nilOL, [])
+        else barrier
+
 -- | Foreign Calls
 genCall :: ForeignTarget -> [CmmFormal] -> [CmmActual]
               -> LlvmM StmtData
 
--- Write barrier needs to be handled specially as it is implemented as an LLVM
--- intrinsic function.
+-- Barriers need to be handled specially as they are implemented as LLVM
+-- intrinsic functions.
+genCall (PrimTarget MO_ReadBarrier) _ _ =
+    barrierUnless [ArchX86, ArchX86_64, ArchSPARC]
 genCall (PrimTarget MO_WriteBarrier) _ _ = do
-    platform <- getLlvmPlatform
-    if platformArch platform `elem` [ArchX86, ArchX86_64, ArchSPARC]
-       then return (nilOL, [])
-       else barrier
+    barrierUnless [ArchX86, ArchX86_64, ArchSPARC]
 
 genCall (PrimTarget MO_Touch) _ _
  = return (nilOL, [])
@@ -753,7 +761,9 @@ cmmPrimOpFunctions mop = do
 
   return $ case mop of
     MO_F32_Exp    -> fsLit "expf"
+    MO_F32_ExpM1  -> fsLit "expm1f"
     MO_F32_Log    -> fsLit "logf"
+    MO_F32_Log1P  -> fsLit "log1pf"
     MO_F32_Sqrt   -> fsLit "llvm.sqrt.f32"
     MO_F32_Fabs   -> fsLit "llvm.fabs.f32"
     MO_F32_Pwr    -> fsLit "llvm.pow.f32"
@@ -775,7 +785,9 @@ cmmPrimOpFunctions mop = do
     MO_F32_Atanh  -> fsLit "atanhf"
 
     MO_F64_Exp    -> fsLit "exp"
+    MO_F64_ExpM1  -> fsLit "expm1"
     MO_F64_Log    -> fsLit "log"
+    MO_F64_Log1P  -> fsLit "log1p"
     MO_F64_Sqrt   -> fsLit "llvm.sqrt.f64"
     MO_F64_Fabs   -> fsLit "llvm.fabs.f64"
     MO_F64_Pwr    -> fsLit "llvm.pow.f64"
@@ -835,6 +847,7 @@ cmmPrimOpFunctions mop = do
     -- We support MO_U_Mul2 through ordinary LLVM mul instruction, see the
     -- appropriate case of genCall.
     MO_U_Mul2 {}     -> unsupported
+    MO_ReadBarrier   -> unsupported
     MO_WriteBarrier  -> unsupported
     MO_Touch         -> unsupported
     MO_UF_Conv _     -> unsupported

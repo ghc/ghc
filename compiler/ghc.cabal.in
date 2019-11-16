@@ -25,6 +25,11 @@ Flag ghci
     Default: False
     Manual: True
 
+Flag ext-interp
+    Description: Support external interpreter
+    Default: True
+    Manual: True
+
 Flag stage1
     Description: Is this stage 1?
     Default: False
@@ -69,7 +74,7 @@ Library
                    containers >= 0.5 && < 0.7,
                    array      >= 0.1 && < 0.6,
                    filepath   >= 1   && < 1.5,
-                   template-haskell == 2.15.*,
+                   template-haskell == 2.16.*,
                    hpc        == 0.6.*,
                    transformers == 0.5.*,
                    ghc-boot   == @ProjectVersionMunged@,
@@ -90,8 +95,14 @@ Library
                  -Wnoncanonical-monoid-instances
 
     if flag(ghci)
-        CPP-Options: -DGHCI
+        CPP-Options: -DHAVE_INTERNAL_INTERPRETER
         Include-Dirs: ../rts/dist/build @FFIIncludeDir@
+
+    if flag(ext-interp)
+        CPP-Options: -DHAVE_EXTERNAL_INTERPRETER
+
+    if flag(ghci) || flag(ext-interp)
+        CPP-Options: -DHAVE_INTERPRETER
 
     -- sanity-check to ensure not more than one integer flag is set
     if flag(integer-gmp) && flag(integer-simple)
@@ -188,9 +199,6 @@ Library
     -- we use an explicit Prelude
     Default-Extensions:
         NoImplicitPrelude
-
-    Other-Modules:
-        GhcPrelude
 
     Exposed-Modules:
         HieTypes
@@ -327,6 +335,7 @@ Library
         MkCore
         PprCore
         PmExpr
+        PmPpr
         TmOracle
         Check
         Coverage
@@ -385,6 +394,7 @@ Library
         GHC
         GhcMake
         GhcPlugins
+        GhcPrelude
         DynamicLoading
         HeaderInfo
         HscMain
@@ -509,10 +519,12 @@ Library
         TcRules
         TcSimplify
         TcHoleErrors
+        TcHoleFitTypes
         TcErrors
         TcTyClsDecls
         TcTyDecls
         TcTypeable
+        TcTypeableValidity
         TcType
         TcEvidence
         TcEvTerm
@@ -535,6 +547,10 @@ Library
         Kind
         Type
         TyCoRep
+        TyCoFVs
+        TyCoSubst
+        TyCoPpr
+        TyCoTidy
         Unify
         Bag
         Binary
@@ -594,7 +610,6 @@ Library
             Reg
             RegClass
             PIC
-            Platform
             CPrim
             X86.Regs
             X86.RegInfo

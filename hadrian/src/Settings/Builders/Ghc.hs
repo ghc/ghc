@@ -1,4 +1,8 @@
+{-# LANGUAGE ScopedTypeVariables #-}
+
 module Settings.Builders.Ghc (ghcBuilderArgs, haddockGhcArgs) where
+
+import Data.List.Extra (splitOn)
 
 import Hadrian.Haskell.Cabal
 import Hadrian.Haskell.Cabal.Type
@@ -57,7 +61,6 @@ ghcLinkArgs = builder (Ghc LinkHs) ? do
     libs    <- getContextData extraLibs
     libDirs <- getContextData extraLibDirs
     fmwks   <- getContextData frameworks
-    darwin  <- expr osxHost
     way     <- getWay
 
     -- Relative path from the output (rpath $ORIGIN).
@@ -83,7 +86,7 @@ ghcLinkArgs = builder (Ghc LinkHs) ? do
             -- libraries will all end up in the lib dir, so just use $ORIGIN
             | otherwise     = metaOrigin
             where
-                metaOrigin | darwin    = "@loader_path"
+                metaOrigin | osxHost   = "@loader_path"
                            | otherwise = "$ORIGIN"
 
         -- TODO: an alternative would be to generalize by linking with extra
@@ -113,7 +116,7 @@ ghcLinkArgs = builder (Ghc LinkHs) ? do
                       [ arg ("-optl-Wl,-rpath," ++ rpath)
                       , isProgram pkg ? arg ("-optl-Wl,-rpath," ++ bindistRpath)
                       -- The darwin linker doesn't support/require the -zorigin option
-                      , not darwin ? arg "-optl-Wl,-zorigin"
+                      , not osxHost ? arg "-optl-Wl,-zorigin"
                       ]
                 ]
             , arg "-no-auto-link-packages"
@@ -122,7 +125,7 @@ ghcLinkArgs = builder (Ghc LinkHs) ? do
             , pure [ "-l" ++ lib    | lib    <- libs    ]
             , pure [ "-L" ++ libDir | libDir <- libDirs ]
             , rtsFfiArg
-            , darwin ? pure (concat [ ["-framework", fmwk] | fmwk <- fmwks ])
+            , osxHost ? pure (concat [ ["-framework", fmwk] | fmwk <- fmwks ])
             , debugged ? packageOneOf [ghc, iservProxy, iserv, remoteIserv] ?
               arg "-debug"
 
@@ -131,7 +134,16 @@ ghcLinkArgs = builder (Ghc LinkHs) ? do
 findHsDependencies :: Args
 findHsDependencies = builder (Ghc FindHsDependencies) ? do
     ways <- getLibraryWays
+    stage <- getStage
+    ghcVersion :: [Int] <- fmap read . splitOn "." <$> expr (ghcVersionStage stage)
     mconcat [ arg "-M"
+
+            -- "-include-cpp-deps" is a new ish feature so is version gated.
+            -- Without this feature some dependencies will be missing in stage0.
+            -- TODO Remove version gate when minimum supported Stage0 compiler
+            -- is >= 8.9.0.
+            , ghcVersion > [8,9,0] ? arg "-include-cpp-deps"
+
             , commonGhcArgs
             , arg "-include-pkg-deps"
             , arg "-dep-makefile", arg =<< getOutput
@@ -176,9 +188,11 @@ wayGhcArgs = do
             , (Threaded  `wayUnit` way) ? arg "-optc-DTHREADED_RTS"
             , (Debug     `wayUnit` way) ? arg "-optc-DDEBUG"
             , (Profiling `wayUnit` way) ? arg "-prof"
-            , (Logging   `wayUnit` way) ? arg "-eventlog"
+            , supportsEventlog way ? arg "-eventlog"
             , (way == debug || way == debugDynamic) ?
               pure ["-ticky", "-DTICKY_TICKY"] ]
+
+  where supportsEventlog w = any (`wayUnit` w) [Logging, Profiling, Debug]
 
 packageGhcArgs :: Args
 packageGhcArgs = do

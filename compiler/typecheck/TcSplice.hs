@@ -185,7 +185,7 @@ tcTypedBracket rn_expr brack@(TExpBr _ expr) res_ty
        ; tcWrapResultO (Shouldn'tHappenOrigin "TExpBr")
                        rn_expr
                        (unLoc (mkHsApp (nlHsTyApp texpco [rep, expr_ty])
-                                      (noLoc (HsTcBracketOut noExt brack ps'))))
+                                      (noLoc (HsTcBracketOut noExtField brack ps'))))
                        meta_ty res_ty }
 tcTypedBracket _ other_brack _
   = pprPanic "tcTypedBracket" (ppr other_brack)
@@ -197,7 +197,7 @@ tcUntypedBracket rn_expr brack ps res_ty
        ; meta_ty <- tcBrackTy brack
        ; traceTc "tc_bracket done untyped" (ppr meta_ty)
        ; tcWrapResultO (Shouldn'tHappenOrigin "untyped bracket")
-                       rn_expr (HsTcBracketOut noExt brack ps') meta_ty res_ty }
+                       rn_expr (HsTcBracketOut noExtField brack ps') meta_ty res_ty }
 
 ---------------
 tcBrackTy :: HsBracket GhcRn -> TcM TcType
@@ -207,9 +207,9 @@ tcBrackTy (ExpBr {})  = tcMetaTy expQTyConName  -- Result type is ExpQ (= Q Exp)
 tcBrackTy (TypBr {})  = tcMetaTy typeQTyConName -- Result type is Type (= Q Typ)
 tcBrackTy (DecBrG {}) = tcMetaTy decsQTyConName -- Result type is Q [Dec]
 tcBrackTy (PatBr {})  = tcMetaTy patQTyConName  -- Result type is PatQ (= Q Pat)
-tcBrackTy (DecBrL {})   = panic "tcBrackTy: Unexpected DecBrL"
-tcBrackTy (TExpBr {})   = panic "tcUntypedBracket: Unexpected TExpBr"
-tcBrackTy (XBracket {}) = panic "tcUntypedBracket: Unexpected XBracket"
+tcBrackTy (DecBrL {}) = panic "tcBrackTy: Unexpected DecBrL"
+tcBrackTy (TExpBr {}) = panic "tcUntypedBracket: Unexpected TExpBr"
+tcBrackTy (XBracket nec) = noExtCon nec
 
 ---------------
 tcPendingSplice :: PendingRnSplice -> TcM PendingTcSplice
@@ -498,7 +498,7 @@ tcTopSplice expr res_ty
        ; lcl_env <- getLclEnv
        ; let delayed_splice
               = DelayedSplice lcl_env expr res_ty q_expr
-       ; return (HsSpliceE noExt (HsSplicedT delayed_splice))
+       ; return (HsSpliceE noExtField (HsSplicedT delayed_splice))
 
        }
 
@@ -610,8 +610,8 @@ runAnnotation target expr = do
               ; wrapper <- instCall AnnOrigin [expr_ty] [mkClassPred data_class [expr_ty]]
               ; let specialised_to_annotation_wrapper_expr
                       = L loc (mkHsWrap wrapper
-                                 (HsVar noExt (L loc to_annotation_wrapper_id)))
-              ; return (L loc (HsApp noExt
+                                 (HsVar noExtField (L loc to_annotation_wrapper_id)))
+              ; return (L loc (HsApp noExtField
                                 specialised_to_annotation_wrapper_expr expr'))
                                 })
 
@@ -945,6 +945,7 @@ instance TH.Quasi TcM where
   qLookupName       = lookupName
   qReify            = reify
   qReifyFixity nm   = lookupThName nm >>= reifyFixity
+  qReifyType        = reifyTypeOfThing
   qReifyInstances   = reifyInstances
   qReifyRoles       = reifyRoles
   qReifyAnnotations = reifyAnnotations
@@ -1210,6 +1211,7 @@ handleTHMessage msg = case msg of
   LookupName b str -> wrapTHResult $ TH.qLookupName b str
   Reify n -> wrapTHResult $ TH.qReify n
   ReifyFixity n -> wrapTHResult $ TH.qReifyFixity n
+  ReifyType n -> wrapTHResult $ TH.qReifyType n
   ReifyInstances n ts -> wrapTHResult $ TH.qReifyInstances n ts
   ReifyRoles n -> wrapTHResult $ TH.qReifyRoles n
   ReifyAnnotations lookup tyrep ->
@@ -2014,6 +2016,23 @@ reifyDecidedStrictness :: DataCon.HsImplBang -> TH.DecidedStrictness
 reifyDecidedStrictness HsLazy     = TH.DecidedLazy
 reifyDecidedStrictness HsStrict   = TH.DecidedStrict
 reifyDecidedStrictness HsUnpack{} = TH.DecidedUnpack
+
+reifyTypeOfThing :: TH.Name -> TcM TH.Type
+reifyTypeOfThing th_name = do
+  thing <- getThing th_name
+  case thing of
+    AGlobal (AnId id) -> reifyType (idType id)
+    AGlobal (ATyCon tc) -> reifyKind (tyConKind tc)
+    AGlobal (AConLike (RealDataCon dc)) ->
+      reifyType (idType (dataConWrapId dc))
+    AGlobal (AConLike (PatSynCon ps)) ->
+      reifyPatSynType (patSynSig ps)
+    ATcId{tct_id = id} -> zonkTcType (idType id) >>= reifyType
+    ATyVar _ tctv -> zonkTcTyVar tctv >>= reifyType
+    -- Impossible cases, supposedly:
+    AGlobal (ACoAxiom _) -> panic "reifyTypeOfThing: ACoAxiom"
+    ATcTyCon _ -> panic "reifyTypeOfThing: ATcTyCon"
+    APromotionErr _ -> panic "reifyTypeOfThing: APromotionErr"
 
 ------------------------------
 lookupThAnnLookup :: TH.AnnLookup -> TcM CoreAnnTarget

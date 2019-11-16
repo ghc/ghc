@@ -59,12 +59,12 @@ module DynFlags (
         fFlags, fLangFlags, xFlags,
         wWarningFlags,
         dynFlagDependencies,
-        tablesNextToCode,
         makeDynFlagsConsistent,
         shouldUseColor,
         shouldUseHexWordLiterals,
         positionIndependent,
         optimisationFlags,
+        setFlagsFromEnvFile,
 
         Way(..), mkBuildTag, wayRTSOnly, addWay', updateWays,
         wayGeneralFlags, wayUnsetGeneralFlags,
@@ -150,7 +150,7 @@ module DynFlags (
         settings,
         programName, projectVersion,
         ghcUsagePath, ghciUsagePath, topDir, tmpDir,
-        versionedAppDir,
+        versionedAppDir, versionedFilePath,
         extraGccViaCFlags, systemPackageConfig,
         pgm_L, pgm_P, pgm_F, pgm_c, pgm_a, pgm_l, pgm_dll, pgm_T,
         pgm_windres, pgm_libtool, pgm_ar, pgm_ranlib, pgm_lo, pgm_lc,
@@ -158,6 +158,7 @@ module DynFlags (
         opt_L, opt_P, opt_F, opt_c, opt_cxx, opt_a, opt_l, opt_i,
         opt_P_signature,
         opt_windres, opt_lo, opt_lc, opt_lcc,
+        tablesNextToCode,
 
         -- ** Manipulating DynFlags
         addPluginModuleName,
@@ -178,7 +179,6 @@ module DynFlags (
         updOptLevel,
         setTmpDir,
         setUnitId,
-        interpretPackageEnv,
         canonicalizeHomeModule,
         canonicalizeModuleIfHome,
 
@@ -248,7 +248,8 @@ module DynFlags (
 
 import GhcPrelude
 
-import Platform
+import GHC.Platform
+import GHC.UniqueSubdir (uniqueSubdir)
 import PlatformConstants
 import Module
 import PackageConfig
@@ -294,7 +295,6 @@ import Control.Monad.Trans.Class
 import Control.Monad.Trans.Writer
 import Control.Monad.Trans.Reader
 import Control.Monad.Trans.Except
-import Control.Exception (throwIO)
 
 import Data.Ord
 import Data.Bits
@@ -308,7 +308,7 @@ import qualified Data.Set as Set
 import Data.Word
 import System.FilePath
 import System.Directory
-import System.Environment (getEnv, lookupEnv)
+import System.Environment (lookupEnv)
 import System.IO
 import System.IO.Error
 import Text.ParserCombinators.ReadP hiding (char)
@@ -320,8 +320,9 @@ import qualified EnumSet
 import GHC.Foreign (withCString, peekCString)
 import qualified GHC.LanguageExtensions as LangExt
 
-#if defined(GHCI)
-import Foreign (Ptr) -- needed for 2nd stage
+#if STAGE >= 2
+-- used by SHARED_GLOBAL_VAR
+import Foreign (Ptr)
 #endif
 
 -- Note [Updating flag description in the User's Guide]
@@ -406,10 +407,13 @@ data DumpFlag
    = Opt_D_dump_cmm
    | Opt_D_dump_cmm_from_stg
    | Opt_D_dump_cmm_raw
-   | Opt_D_dump_cmm_verbose
+   | Opt_D_dump_cmm_verbose_by_proc
    -- All of the cmm subflags (there are a lot!) automatically
-   -- enabled if you run -ddump-cmm-verbose
+   -- enabled if you run -ddump-cmm-verbose-by-proc
    -- Each flag corresponds to exact stage of Cmm pipeline.
+   | Opt_D_dump_cmm_verbose
+   -- same as -ddump-cmm-verbose-by-proc but writes each stage
+   -- to a separate file (if used with -ddump-to-file)
    | Opt_D_dump_cmm_cfg
    | Opt_D_dump_cmm_cbe
    | Opt_D_dump_cmm_switch
@@ -517,6 +521,7 @@ data GeneralFlag
    | Opt_PrintExplicitCoercions
    | Opt_PrintExplicitRuntimeReps
    | Opt_PrintEqualityRelations
+   | Opt_PrintAxiomIncomps
    | Opt_PrintUnicodeSyntax
    | Opt_PrintExpandedSynonyms
    | Opt_PrintPotentialInstances
@@ -911,6 +916,9 @@ data WarningFlag =
    | Opt_WarnSpaceAfterBang
    | Opt_WarnMissingDerivingStrategies    -- Since 8.8
    | Opt_WarnPrepositiveQualifiedModule   -- Since TBD
+   | Opt_WarnUnusedPackages               -- Since 8.10
+   | Opt_WarnInferredSafeImports          -- Since 8.10
+   | Opt_WarnMissingSafeHaskellMode       -- Since 8.10
    deriving (Eq, Show, Enum)
 
 data Language = Haskell98 | Haskell2010
@@ -921,11 +929,12 @@ instance Outputable Language where
 
 -- | The various Safe Haskell modes
 data SafeHaskellMode
-   = Sf_None
-   | Sf_Unsafe
-   | Sf_Trustworthy
-   | Sf_Safe
-   | Sf_Ignore
+   = Sf_None          -- ^ inferred unsafe
+   | Sf_Unsafe        -- ^ declared and checked
+   | Sf_Trustworthy   -- ^ declared and checked
+   | Sf_Safe          -- ^ declared and checked
+   | Sf_SafeInferred  -- ^ inferred as safe
+   | Sf_Ignore        -- ^ @-fno-safe-haskell@ state
    deriving (Eq)
 
 instance Show SafeHaskellMode where
@@ -933,6 +942,7 @@ instance Show SafeHaskellMode where
     show Sf_Unsafe       = "Unsafe"
     show Sf_Trustworthy  = "Trustworthy"
     show Sf_Safe         = "Safe"
+    show Sf_SafeInferred = "Safe-Inferred"
     show Sf_Ignore       = "Ignore"
 
 instance Outputable SafeHaskellMode where
@@ -1420,7 +1430,7 @@ pgm_P                 :: DynFlags -> (String,[Option])
 pgm_P dflags = toolSettings_pgm_P $ toolSettings dflags
 pgm_F                 :: DynFlags -> String
 pgm_F dflags = toolSettings_pgm_F $ toolSettings dflags
-pgm_c                 :: DynFlags -> (String,[Option])
+pgm_c                 :: DynFlags -> String
 pgm_c dflags = toolSettings_pgm_c $ toolSettings dflags
 pgm_a                 :: DynFlags -> (String,[Option])
 pgm_a dflags = toolSettings_pgm_a $ toolSettings dflags
@@ -1483,6 +1493,9 @@ opt_lc dflags= toolSettings_opt_lc $ toolSettings dflags
 opt_i                 :: DynFlags -> [String]
 opt_i dflags= toolSettings_opt_i $ toolSettings dflags
 
+tablesNextToCode :: DynFlags -> Bool
+tablesNextToCode = platformMisc_tablesNextToCode . platformMisc
+
 -- | The directory for this version of ghc in the user's app directory
 -- (typically something like @~/.ghc/x86_64-linux-7.6.3@)
 --
@@ -1492,15 +1505,8 @@ versionedAppDir dflags = do
   appdir <- tryMaybeT $ getAppUserDataDirectory (programName dflags)
   return $ appdir </> versionedFilePath dflags
 
--- | A filepath like @x86_64-linux-7.6.3@ with the platform string to use when
--- constructing platform-version-dependent files that need to co-exist.
---
 versionedFilePath :: DynFlags -> FilePath
-versionedFilePath dflags =     TARGET_ARCH
-                        ++ '-':TARGET_OS
-                        ++ '-':projectVersion dflags
-  -- NB: This functionality is reimplemented in Cabal, so if you
-  -- change it, be sure to update Cabal.
+versionedFilePath dflags = uniqueSubdir $ targetPlatform dflags
 
 -- | The target code type of the compilation (if any).
 --
@@ -1660,15 +1666,6 @@ defaultObjectTarget :: DynFlags -> HscTarget
 defaultObjectTarget dflags = defaultHscTarget
   (targetPlatform dflags)
   (platformMisc dflags)
-
--- Determines whether we will be compiling
--- info tables that reside just before the entry code, or with an
--- indirection to the entry code.  See TABLES_NEXT_TO_CODE in
--- includes/rts/storage/InfoTables.h.
-tablesNextToCode :: DynFlags -> Bool
-tablesNextToCode dflags =
-    not (platformUnregisterised $ targetPlatform dflags) &&
-    platformMisc_tablesNextToCode (platformMisc dflags)
 
 data DynLibLoader
   = Deployable
@@ -2760,7 +2757,7 @@ updOptLevel n dfs
 -- Parsing the dynamic flags.
 
 
--- | Parse dynamic flags from a list of command line arguments.  Returns the
+-- | Parse dynamic flags from a list of command line arguments.  Returns
 -- the parsed 'DynFlags', the left-over arguments, and a list of warnings.
 -- Throws a 'UsageError' if errors occurred during parsing (such as unknown
 -- flags or missing arguments).
@@ -3019,7 +3016,7 @@ dynamic_flags_deps = [
   , make_ord_flag defGhcFlag "rdynamic" $ noArg $
 #if defined(linux_HOST_OS)
                               addOptl "-rdynamic"
-#elif defined (mingw32_HOST_OS)
+#elif defined(mingw32_HOST_OS)
                               addOptl "-Wl,--export-all-symbols"
 #else
     -- ignored for compat w/ gcc:
@@ -3048,7 +3045,7 @@ dynamic_flags_deps = [
       $ hasArg $ \f -> alterToolSettings $ \s -> s { toolSettings_pgm_F   = f }
   , make_ord_flag defFlag "pgmc"
       $ hasArg $ \f -> alterToolSettings $ \s -> s
-         { toolSettings_pgm_c   = (f,[])
+         { toolSettings_pgm_c   = f
          , -- Don't pass -no-pie with -pgmc
            -- (see #15319)
            toolSettings_ccSupportsNoPie = False
@@ -3303,6 +3300,8 @@ dynamic_flags_deps = [
         (setDumpFlag Opt_D_dump_cmm_raw)
   , make_ord_flag defGhcFlag "ddump-cmm-verbose"
         (setDumpFlag Opt_D_dump_cmm_verbose)
+  , make_ord_flag defGhcFlag "ddump-cmm-verbose-by-proc"
+        (setDumpFlag Opt_D_dump_cmm_verbose_by_proc)
   , make_ord_flag defGhcFlag "ddump-cmm-cfg"
         (setDumpFlag Opt_D_dump_cmm_cfg)
   , make_ord_flag defGhcFlag "ddump-cmm-cbe"
@@ -3757,6 +3756,8 @@ dynamic_flags_deps = [
   , make_ord_flag defFlag "fno-safe-infer"   (noArg (\d ->
                                                     d { safeInfer = False }))
   , make_ord_flag defFlag "fno-safe-haskell" (NoArg (setSafeHaskell Sf_Ignore))
+
+        ------ position independent flags  ----------------------------------
   , make_ord_flag defGhcFlag "fPIC"          (NoArg (setGeneralFlag Opt_PIC))
   , make_ord_flag defGhcFlag "fno-PIC"       (NoArg (unSetGeneralFlag Opt_PIC))
   , make_ord_flag defGhcFlag "fPIE"          (NoArg (setGeneralFlag Opt_PIC))
@@ -4075,6 +4076,8 @@ wWarningFlagsDeps = [
   flagSpec "all-missed-specializations"  Opt_WarnAllMissedSpecs,
   flagSpec' "safe"                       Opt_WarnSafe setWarnSafe,
   flagSpec "trustworthy-safe"            Opt_WarnTrustworthySafe,
+  flagSpec "inferred-safe-imports"       Opt_WarnInferredSafeImports,
+  flagSpec "missing-safe-haskell-mode"   Opt_WarnMissingSafeHaskellMode,
   flagSpec "tabs"                        Opt_WarnTabs,
   flagSpec "type-defaults"               Opt_WarnTypeDefaults,
   flagSpec "typed-holes"                 Opt_WarnTypedHoles,
@@ -4110,7 +4113,8 @@ wWarningFlagsDeps = [
   flagSpec "missing-space-after-bang"    Opt_WarnSpaceAfterBang,
   flagSpec "partial-fields"              Opt_WarnPartialFields,
   flagSpec "prepositive-qualified-module"
-                                         Opt_WarnPrepositiveQualifiedModule
+                                         Opt_WarnPrepositiveQualifiedModule,
+  flagSpec "unused-packages"             Opt_WarnUnusedPackages
  ]
 
 -- | These @-\<blah\>@ flags can all be reversed with @-no-\<blah\>@
@@ -4226,6 +4230,7 @@ fFlagsDeps = [
   flagSpec "print-explicit-coercions"         Opt_PrintExplicitCoercions,
   flagSpec "print-explicit-runtime-reps"      Opt_PrintExplicitRuntimeReps,
   flagSpec "print-equality-relations"         Opt_PrintEqualityRelations,
+  flagSpec "print-axiom-incomps"              Opt_PrintAxiomIncomps,
   flagSpec "print-unicode-syntax"             Opt_PrintUnicodeSyntax,
   flagSpec "print-expanded-synonyms"          Opt_PrintExpandedSynonyms,
   flagSpec "print-potential-instances"        Opt_PrintPotentialInstances,
@@ -4340,7 +4345,7 @@ supportedExtensions :: [String]
 supportedExtensions = concatMap toFlagSpecNamePair xFlags
   where
     toFlagSpecNamePair flg
-#if !defined(GHCI)
+#if !defined(HAVE_INTERPRETER)
       -- IMPORTANT! Make sure that `ghc --supported-extensions` omits
       -- "TemplateHaskell"/"QuasiQuotes" when it's known not to work out of the
       -- box. See also GHC #11102 and #16331 for more details about
@@ -4525,6 +4530,7 @@ xFlagsDeps = [
   flagSpec "UndecidableSuperClasses"          LangExt.UndecidableSuperClasses,
   flagSpec "UnicodeSyntax"                    LangExt.UnicodeSyntax,
   flagSpec "UnliftedFFITypes"                 LangExt.UnliftedFFITypes,
+  flagSpec "UnliftedNewtypes"                 LangExt.UnliftedNewtypes,
   flagSpec "ViewPatterns"                     LangExt.ViewPatterns
   ]
 
@@ -5259,170 +5265,6 @@ canonicalizeModuleIfHome dflags mod
                       then canonicalizeHomeModule dflags (moduleName mod)
                       else mod
 
-
--- -----------------------------------------------------------------------------
--- | Find the package environment (if one exists)
---
--- We interpret the package environment as a set of package flags; to be
--- specific, if we find a package environment file like
---
--- > clear-package-db
--- > global-package-db
--- > package-db blah/package.conf.d
--- > package-id id1
--- > package-id id2
---
--- we interpret this as
---
--- > [ -hide-all-packages
--- > , -clear-package-db
--- > , -global-package-db
--- > , -package-db blah/package.conf.d
--- > , -package-id id1
--- > , -package-id id2
--- > ]
---
--- There's also an older syntax alias for package-id, which is just an
--- unadorned package id
---
--- > id1
--- > id2
---
-interpretPackageEnv :: DynFlags -> IO DynFlags
-interpretPackageEnv dflags = do
-    mPkgEnv <- runMaybeT $ msum $ [
-                   getCmdLineArg >>= \env -> msum [
-                       probeNullEnv env
-                     , probeEnvFile env
-                     , probeEnvName env
-                     , cmdLineError env
-                     ]
-                 , getEnvVar >>= \env -> msum [
-                       probeNullEnv env
-                     , probeEnvFile env
-                     , probeEnvName env
-                     , envError     env
-                     ]
-                 , notIfHideAllPackages >> msum [
-                       findLocalEnvFile >>= probeEnvFile
-                     , probeEnvName defaultEnvName
-                     ]
-                 ]
-    case mPkgEnv of
-      Nothing ->
-        -- No environment found. Leave DynFlags unchanged.
-        return dflags
-      Just "-" -> do
-        -- Explicitly disabled environment file. Leave DynFlags unchanged.
-        return dflags
-      Just envfile -> do
-        content <- readFile envfile
-        putLogMsg dflags NoReason SevInfo noSrcSpan
-             (defaultUserStyle dflags)
-             (text ("Loaded package environment from " ++ envfile))
-        let setFlags :: DynP ()
-            setFlags = do
-              setGeneralFlag Opt_HideAllPackages
-              parseEnvFile envfile content
-
-            (_, dflags') = runCmdLine (runEwM setFlags) dflags
-
-        return dflags'
-  where
-    -- Loading environments (by name or by location)
-
-    namedEnvPath :: String -> MaybeT IO FilePath
-    namedEnvPath name = do
-     appdir <- versionedAppDir dflags
-     return $ appdir </> "environments" </> name
-
-    probeEnvName :: String -> MaybeT IO FilePath
-    probeEnvName name = probeEnvFile =<< namedEnvPath name
-
-    probeEnvFile :: FilePath -> MaybeT IO FilePath
-    probeEnvFile path = do
-      guard =<< liftMaybeT (doesFileExist path)
-      return path
-
-    probeNullEnv :: FilePath -> MaybeT IO FilePath
-    probeNullEnv "-" = return "-"
-    probeNullEnv _   = mzero
-
-    parseEnvFile :: FilePath -> String -> DynP ()
-    parseEnvFile envfile = mapM_ parseEntry . lines
-      where
-        parseEntry str = case words str of
-          ("package-db": _)     -> addPkgConfRef (PkgConfFile (envdir </> db))
-            -- relative package dbs are interpreted relative to the env file
-            where envdir = takeDirectory envfile
-                  db     = drop 11 str
-          ["clear-package-db"]  -> clearPkgConf
-          ["global-package-db"] -> addPkgConfRef GlobalPkgConf
-          ["user-package-db"]   -> addPkgConfRef UserPkgConf
-          ["package-id", pkgid] -> exposePackageId pkgid
-          (('-':'-':_):_)       -> return () -- comments
-          -- and the original syntax introduced in 7.10:
-          [pkgid]               -> exposePackageId pkgid
-          []                    -> return ()
-          _                     -> throwGhcException $ CmdLineError $
-                                        "Can't parse environment file entry: "
-                                     ++ envfile ++ ": " ++ str
-
-    -- Various ways to define which environment to use
-
-    getCmdLineArg :: MaybeT IO String
-    getCmdLineArg = MaybeT $ return $ packageEnv dflags
-
-    getEnvVar :: MaybeT IO String
-    getEnvVar = do
-      mvar <- liftMaybeT $ try $ getEnv "GHC_ENVIRONMENT"
-      case mvar of
-        Right var -> return var
-        Left err  -> if isDoesNotExistError err then mzero
-                                                else liftMaybeT $ throwIO err
-
-    notIfHideAllPackages :: MaybeT IO ()
-    notIfHideAllPackages =
-      guard (not (gopt Opt_HideAllPackages dflags))
-
-    defaultEnvName :: String
-    defaultEnvName = "default"
-
-    -- e.g. .ghc.environment.x86_64-linux-7.6.3
-    localEnvFileName :: FilePath
-    localEnvFileName = ".ghc.environment" <.> versionedFilePath dflags
-
-    -- Search for an env file, starting in the current dir and looking upwards.
-    -- Fail if we get to the users home dir or the filesystem root. That is,
-    -- we don't look for an env file in the user's home dir. The user-wide
-    -- env lives in ghc's versionedAppDir/environments/default
-    findLocalEnvFile :: MaybeT IO FilePath
-    findLocalEnvFile = do
-        curdir  <- liftMaybeT getCurrentDirectory
-        homedir <- tryMaybeT getHomeDirectory
-        let probe dir | isDrive dir || dir == homedir
-                      = mzero
-            probe dir = do
-              let file = dir </> localEnvFileName
-              exists <- liftMaybeT (doesFileExist file)
-              if exists
-                then return file
-                else probe (takeDirectory dir)
-        probe curdir
-
-    -- Error reporting
-
-    cmdLineError :: String -> MaybeT IO a
-    cmdLineError env = liftMaybeT . throwGhcExceptionIO . CmdLineError $
-      "Package environment " ++ show env ++ " not found"
-
-    envError :: String -> MaybeT IO a
-    envError env = liftMaybeT . throwGhcExceptionIO . CmdLineError $
-         "Package environment "
-      ++ show env
-      ++ " (specified in GHC_ENVIRONMENT) not found"
-
-
 -- If we're linking a binary, then only targets that produce object
 -- code are allowed (requests for other target types are ignored).
 setTarget :: HscTarget -> DynP ()
@@ -5471,6 +5313,35 @@ setMainIs arg
 addLdInputs :: Option -> DynFlags -> DynFlags
 addLdInputs p dflags = dflags{ldInputs = ldInputs dflags ++ [p]}
 
+-- -----------------------------------------------------------------------------
+-- Load dynflags from environment files.
+
+setFlagsFromEnvFile :: FilePath -> String -> DynP ()
+setFlagsFromEnvFile envfile content = do
+  setGeneralFlag Opt_HideAllPackages
+  parseEnvFile envfile content
+
+parseEnvFile :: FilePath -> String -> DynP ()
+parseEnvFile envfile = mapM_ parseEntry . lines
+  where
+    parseEntry str = case words str of
+      ("package-db": _)     -> addPkgConfRef (PkgConfFile (envdir </> db))
+        -- relative package dbs are interpreted relative to the env file
+        where envdir = takeDirectory envfile
+              db     = drop 11 str
+      ["clear-package-db"]  -> clearPkgConf
+      ["global-package-db"] -> addPkgConfRef GlobalPkgConf
+      ["user-package-db"]   -> addPkgConfRef UserPkgConf
+      ["package-id", pkgid] -> exposePackageId pkgid
+      (('-':'-':_):_)       -> return () -- comments
+      -- and the original syntax introduced in 7.10:
+      [pkgid]               -> exposePackageId pkgid
+      []                    -> return ()
+      _                     -> throwGhcException $ CmdLineError $
+                                    "Can't parse environment file entry: "
+                                 ++ envfile ++ ": " ++ str
+
+
 -----------------------------------------------------------------------------
 -- Paths & Libraries
 
@@ -5490,7 +5361,7 @@ addIncludePath p =
 addFrameworkPath p =
   upd (\s -> s{frameworkPaths = frameworkPaths s ++ splitPathList p})
 
-#if !defined(mingw32_TARGET_OS)
+#if !defined(mingw32_HOST_OS)
 split_marker :: Char
 split_marker = ':'   -- not configurable (ToDo)
 #endif
@@ -5502,7 +5373,7 @@ splitPathList s = filter notNull (splitUp s)
                 -- cause confusion when they are translated into -I options
                 -- for passing to gcc.
   where
-#if !defined(mingw32_TARGET_OS)
+#if !defined(mingw32_HOST_OS)
     splitUp xs = split split_marker xs
 #else
      -- Windows: 'hybrid' support for DOS-style paths in directory lists.
@@ -5661,10 +5532,6 @@ compilerInfo dflags
        ("Have interpreter",            showBool $ platformMisc_ghcWithInterpreter $ platformMisc dflags),
        ("Object splitting supported",  showBool False),
        ("Have native code generator",  showBool $ platformMisc_ghcWithNativeCodeGen $ platformMisc dflags),
-       ("Support SMP",                 showBool $ platformMisc_ghcWithSMP $ platformMisc dflags),
-       ("Tables next to code",         showBool $ platformMisc_tablesNextToCode $ platformMisc dflags),
-       ("RTS ways",                    platformMisc_ghcRTSWays $ platformMisc dflags),
-       ("RTS expects libdw",           showBool $ platformMisc_ghcRtsWithLibdw $ platformMisc dflags),
        -- Whether or not we support @-dynamic-too@
        ("Support dynamic-too",         showBool $ not isWindows),
        -- Whether or not we support the @-j@ flag with @--make@.
@@ -5691,8 +5558,7 @@ compilerInfo dflags
        ("GHC Dynamic",                 showBool dynamicGhc),
        -- Whether or not GHC was compiled using -prof
        ("GHC Profiled",                showBool rtsIsProfiled),
-       ("Leading underscore",          showBool $ platformMisc_leadingUnderscore $ platformMisc dflags),
-       ("Debug on",                    show debugIsOn),
+       ("Debug on",                    showBool debugIsOn),
        ("LibDir",                      topDir dflags),
        -- The path of the global package database used by GHC
        ("Global Package DB",           systemPackageConfig dflags)
@@ -5726,19 +5592,16 @@ mAX_PTR_TAG = tAG_MASK
 tARGET_MIN_INT, tARGET_MAX_INT, tARGET_MAX_WORD :: DynFlags -> Integer
 tARGET_MIN_INT dflags
     = case platformWordSize (targetPlatform dflags) of
-      4 -> toInteger (minBound :: Int32)
-      8 -> toInteger (minBound :: Int64)
-      w -> panic ("tARGET_MIN_INT: Unknown platformWordSize: " ++ show w)
+      PW4 -> toInteger (minBound :: Int32)
+      PW8 -> toInteger (minBound :: Int64)
 tARGET_MAX_INT dflags
     = case platformWordSize (targetPlatform dflags) of
-      4 -> toInteger (maxBound :: Int32)
-      8 -> toInteger (maxBound :: Int64)
-      w -> panic ("tARGET_MAX_INT: Unknown platformWordSize: " ++ show w)
+      PW4 -> toInteger (maxBound :: Int32)
+      PW8 -> toInteger (maxBound :: Int64)
 tARGET_MAX_WORD dflags
     = case platformWordSize (targetPlatform dflags) of
-      4 -> toInteger (maxBound :: Word32)
-      8 -> toInteger (maxBound :: Word64)
-      w -> panic ("tARGET_MAX_WORD: Unknown platformWordSize: " ++ show w)
+      PW4 -> toInteger (maxBound :: Word32)
+      PW8 -> toInteger (maxBound :: Word64)
 
 
 {- -----------------------------------------------------------------------------

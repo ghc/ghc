@@ -7,7 +7,6 @@ import Test.QuickCheck
 import Base
 import Context
 import Oracles.ModuleFiles
-import Oracles.Setting
 import Packages
 import Settings
 import Target
@@ -102,12 +101,11 @@ testModuleName = do
 testPackages :: Action ()
 testPackages = do
     putBuild "==== Check system configuration"
-    win <- windowsHost -- This depends on the @boot@ and @configure@ scripts.
     putBuild "==== Packages, interpretInContext, configuration flags"
     forM_ [Stage0 ..] $ \stage -> do
         pkgs <- stagePackages stage
-        when (win32 `elem` pkgs) . test $ win
-        when (unix  `elem` pkgs) . test $ not win
+        when (win32 `elem` pkgs) . test $ windowsHost
+        when (unix  `elem` pkgs) . test $ not windowsHost
         test $ pkgs == nubOrd pkgs
 
 testWay :: Action ()

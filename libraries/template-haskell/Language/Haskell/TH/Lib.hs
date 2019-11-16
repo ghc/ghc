@@ -151,6 +151,9 @@ import Language.Haskell.TH.Lib.Internal hiding
   , derivClause
   , standaloneDerivWithStrategyD
 
+  , tupE
+  , unboxedTupE
+
   , Role
   , InjectivityAnn
   )
@@ -319,3 +322,12 @@ mkBytes
    -> Word             -- ^ Number of bytes
    -> Bytes
 mkBytes = Bytes
+
+-------------------------------------------------------------------------------
+-- * Tuple expressions
+
+tupE :: [ExpQ] -> ExpQ
+tupE es = do { es1 <- sequence es; return (TupE $ map Just es1)}
+
+unboxedTupE :: [ExpQ] -> ExpQ
+unboxedTupE es = do { es1 <- sequence es; return (UnboxedTupE $ map Just es1)}

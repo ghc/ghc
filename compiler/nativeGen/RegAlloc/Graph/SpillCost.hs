@@ -28,7 +28,7 @@ import UniqFM
 import UniqSet
 import Digraph          (flattenSCCs)
 import Outputable
-import Platform
+import GHC.Platform
 import State
 import CFG
 

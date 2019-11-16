@@ -131,6 +131,7 @@ knownKeyNames
 
              , map idName wiredInIds
              , map (idName . primOpId) allThePrimOps
+             , map (idName . primOpWrapperId) allThePrimOps
              , basicKnownKeyNames
              , templateHaskellNames
              ]
@@ -214,7 +215,8 @@ knownNamesInfo :: NameEnv SDoc
 knownNamesInfo = unitNameEnv coercibleTyConName $
     vcat [ text "Coercible is a special constraint with custom solving rules."
          , text "It is not a class."
-         , text "Please see section 9.14.4 of the user's guide for details." ]
+         , text "Please see section `The Coercible constraint`"
+         , text "of the user's guide for details." ]
 
 {-
 We let a lot of "non-standard" values be visible, so that we can make

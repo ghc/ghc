@@ -10,6 +10,8 @@ following sections.
 Highlights
 ----------
 
+- The `UnliftedNewtypes` extension.
+
 Full details
 ------------
 
@@ -83,6 +85,11 @@ Language
         type forall a (f :: forall k. k -> Type).
              T a f = f Int
 
+- A new extension :extension:`UnliftedNewtypes` that relaxes restrictions
+  around what kinds of types can appear inside of the data constructor
+  for a `newtype`. This was proposed in
+  `GHC proposal #13 <https://github.com/ghc-proposals/ghc-proposals/blob/master/proposals/0013-unlifted-newtypes.rst>`__.
+             
 Compiler
 ~~~~~~~~
 
@@ -96,7 +103,7 @@ Compiler
   `copyByteArray#` calls that were not optimized before, now will
   be. See :ghc-ticket:`16052`.
 - GHC's runtime linker no longer uses global state. This allows programs
-  that use the GHC API to safely use multiple GHC sessions in a single 
+  that use the GHC API to safely use multiple GHC sessions in a single
   process, as long as there are no native dependencies that rely on
   global state.
 
@@ -106,6 +113,14 @@ Compiler
   load these modules into the interpreter would just fail, and the
   only convenient workaround was to enable `-fobject-code` for all
   modules.
+
+GHCi
+~~~~
+
+- Added a command `:instances` to show the class instances available for a type.
+
+- Added new debugger commands :ghci-cmd:`:disable` and :ghci-cmd:`:enable` to
+  disable and re-enable breakpoints.
 
 Runtime system
 ~~~~~~~~~~~~~~
@@ -149,7 +164,7 @@ for further change information.
     libraries/binary/binary.cabal:           Dependency of ``ghc`` library
     libraries/bytestring/bytestring.cabal:   Dependency of ``ghc`` library
     libraries/Cabal/Cabal/Cabal.cabal:       Dependency of ``ghc-pkg`` utility
-    libraries/containers/containers.cabal:   Dependency of ``ghc`` library
+    libraries/containers/containers/containers.cabal:   Dependency of ``ghc`` library
     libraries/deepseq/deepseq.cabal:         Dependency of ``ghc`` library
     libraries/directory/directory.cabal:     Dependency of ``ghc`` library
     libraries/filepath/filepath.cabal:       Dependency of ``ghc`` library

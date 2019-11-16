@@ -5,6 +5,29 @@
 
   * Add a `TestEquality` instance for the `Compose` newtype.
 
+  * `Data.Ord.Down` now has a field name, `getDown`
+
+  * Add `Bits`, `Bounded`, `Enum`, `FiniteBits`, `Floating`, `Fractional`,
+    `Integral`, `Ix`, `Real`, `RealFrac`, `RealFloat` and `Storable` instances
+    to `Data.Ord.Down`.
+
+  * Fix the `integer-gmp` variant of `isValidNatural`: Previously it would fail
+    to detect values `<= maxBound::Word` that were incorrectly encoded using
+    the `NatJ#` constructor.
+
+  * The type of `coerce` has been generalized. It is now runtime-representation
+    polymorphic:
+    `forall {r :: RuntimeRep} (a :: TYPE r) (b :: TYPE r). Coercible a b => a -> b`.
+    The type argument `r` is marked as `Inferred` to prevent it from
+    interfering with visible type application.
+
+  * Make `Fixed` and `HasResolution` poly-kinded.
+
+  * Add `HasResolution` instances for `Nat`s.
+
+  * Add `Functor`, `Applicative`, `Monad`, `Alternative`, `MonadPlus`,
+    `Generic` and `Generic1` instances to `Kleisli`
+
 ## 4.13.0.0 *TBA*
   * Bundled with GHC *TBA*
 
@@ -33,6 +56,8 @@
   * The `shiftL` and `shiftR` methods in the `Bits` instances of `Int`, `IntN`,
     `Word`, and `WordN` now throw an overflow exception for negative shift
     values (instead of being undefined behaviour).
+
+  * `scanr` no longer crashes when passed a fusable, infinite list. (#16943)
 
 ## 4.12.0.0 *21 September 2018*
   * Bundled with GHC 8.6.1

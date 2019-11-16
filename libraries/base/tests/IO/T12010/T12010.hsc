@@ -7,7 +7,7 @@ import Foreign.Marshal.Alloc
 import GHC.IO.FD
 import System.Exit
 
-#ifdef _WIN32
+#if defined(_WIN32)
 #include <winsock.h>
 #else
 #include <sys/socket.h>
@@ -21,7 +21,7 @@ sOCK_STREAM = #const SOCK_STREAM
 
 main :: IO ()
 main = do
-#ifdef _WIN32
+#if defined(_WIN32)
   void $ initWinSock
 #endif
   sock <- c_socket aF_INET sOCK_STREAM 0
@@ -34,6 +34,6 @@ main = do
 foreign import stdcall unsafe "socket"
   c_socket :: CInt -> CInt -> CInt -> IO CInt
 
-#ifdef _WIN32
+#if defined(_WIN32)
 foreign import ccall unsafe "initWinSock" initWinSock :: IO Int
 #endif

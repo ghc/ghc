@@ -8,8 +8,6 @@ module MonadUtils
         , MonadFix(..)
         , MonadIO(..)
 
-        , liftIO1, liftIO2, liftIO3, liftIO4
-
         , zipWith3M, zipWith3M_, zipWith4M, zipWithAndUnzipM
         , mapAndUnzipM, mapAndUnzip3M, mapAndUnzip4M, mapAndUnzip5M
         , mapAccumLM
@@ -34,29 +32,8 @@ import Control.Applicative
 import Control.Monad
 import Control.Monad.Fix
 import Control.Monad.IO.Class
-import Data.Foldable (sequenceA_)
+import Data.Foldable (sequenceA_, foldlM, foldrM)
 import Data.List (unzip4, unzip5, zipWith4)
-
--------------------------------------------------------------------------------
--- Lift combinators
---  These are used throughout the compiler
--------------------------------------------------------------------------------
-
--- | Lift an 'IO' operation with 1 argument into another monad
-liftIO1 :: MonadIO m => (a -> IO b) -> a -> m b
-liftIO1 = (.) liftIO
-
--- | Lift an 'IO' operation with 2 arguments into another monad
-liftIO2 :: MonadIO m => (a -> b -> IO c) -> a -> b -> m c
-liftIO2 = ((.).(.)) liftIO
-
--- | Lift an 'IO' operation with 3 arguments into another monad
-liftIO3 :: MonadIO m => (a -> b -> c -> IO d) -> a -> b -> c -> m d
-liftIO3 = ((.).((.).(.))) liftIO
-
--- | Lift an 'IO' operation with 4 arguments into another monad
-liftIO4 :: MonadIO m => (a -> b -> c -> d -> IO e) -> a -> b -> c -> d -> m e
-liftIO4 = (((.).(.)).((.).(.))) liftIO
 
 -------------------------------------------------------------------------------
 -- Common functions
@@ -213,18 +190,9 @@ allM f (b:bs) = (f b) >>= (\bv -> if bv then allM f bs else return False)
 orM :: Monad m => m Bool -> m Bool -> m Bool
 orM m1 m2 = m1 >>= \x -> if x then return True else m2
 
--- | Monadic version of foldl
-foldlM :: (Monad m) => (a -> b -> m a) -> a -> [b] -> m a
-foldlM = foldM
-
 -- | Monadic version of foldl that discards its result
-foldlM_ :: (Monad m) => (a -> b -> m a) -> a -> [b] -> m ()
+foldlM_ :: (Monad m, Foldable t) => (a -> b -> m a) -> a -> t b -> m ()
 foldlM_ = foldM_
-
--- | Monadic version of foldr
-foldrM        :: (Monad m) => (b -> a -> m a) -> a -> [b] -> m a
-foldrM _ z []     = return z
-foldrM k z (x:xs) = do { r <- foldrM k z xs; k x r }
 
 -- | Monadic version of fmap specialised for Maybe
 maybeMapM :: Monad m => (a -> m b) -> (Maybe a -> m (Maybe b))

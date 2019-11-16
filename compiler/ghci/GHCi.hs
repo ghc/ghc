@@ -51,7 +51,7 @@ module GHCi
 import GhcPrelude
 
 import GHCi.Message
-#if defined(GHCI)
+#if defined(HAVE_INTERNAL_INTERPRETER)
 import GHCi.Run
 #endif
 import GHCi.RemoteTypes
@@ -157,7 +157,7 @@ Other Notes on Remote GHCi
   * Note [Remote Template Haskell] in libraries/ghci/GHCi/TH.hs
 -}
 
-#if !defined(GHCI)
+#if !defined(HAVE_INTERNAL_INTERPRETER)
 needExtInt :: IO a
 needExtInt = throwIO
   (InstallationError "this operation requires -fexternal-interpreter")
@@ -175,7 +175,7 @@ iservCmd hsc_env@HscEnv{..} msg
        uninterruptibleMask_ $ do -- Note [uninterruptibleMask_]
          iservCall iserv msg
  | otherwise = -- Just run it directly
-#if defined(GHCI)
+#if defined(HAVE_INTERNAL_INTERPRETER)
    run msg
 #else
    needExtInt
@@ -391,7 +391,7 @@ lookupSymbol hsc_env@HscEnv{..} str
                writeIORef iservLookupSymbolCache $! addToUFM cache str p
                return (Just p)
  | otherwise =
-#if defined(GHCI)
+#if defined(HAVE_INTERNAL_INTERPRETER)
    fmap fromRemotePtr <$> run (LookupSymbol (unpackFS str))
 #else
    needExtInt
@@ -642,7 +642,7 @@ wormholeRef dflags _r
   | gopt Opt_ExternalInterpreter dflags
   = throwIO (InstallationError
       "this operation requires -fno-external-interpreter")
-#if defined(GHCI)
+#if defined(HAVE_INTERNAL_INTERPRETER)
   | otherwise
   = localRef _r
 #else

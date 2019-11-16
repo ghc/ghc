@@ -83,6 +83,7 @@ test('cgrun072', normal, compile_and_run, [''])
 test('cgrun075', normal, compile_and_run, [''])
 test('cgrun076', normal, compile_and_run, [''])
 test('cgrun077', [when(have_cpu_feature('bmi2'), extra_hc_opts('-mbmi2'))], compile_and_run, [''])
+test('cgrun078', omit_ways(['ghci']), compile_and_run, [''])
 
 test('T1852', normal, compile_and_run, [''])
 test('T1861', extra_run_opts('0'), compile_and_run, [''])
@@ -195,3 +196,5 @@ test('T15892',
         extra_run_opts('+RTS -G1 -A32k -RTS') ],
      compile_and_run, ['-O'])
 test('T16617', normal, compile_and_run, [''])
+test('T16449_2', exit_code(0), compile_and_run, [''])
+test('T16846', [only_ways(['optasm']), exit_code(1)], compile_and_run, [''])

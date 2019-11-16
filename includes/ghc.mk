@@ -57,7 +57,7 @@ endif
 
 $(includes_H_VERSION) : mk/project.mk | $$(dir $$@)/.
 	@echo "Creating $@..."
-	@echo "#ifndef __GHCVERSION_H__"  > $@
+	@echo "#if !defined(__GHCVERSION_H__)"  > $@
 	@echo "#define __GHCVERSION_H__" >> $@
 	@echo >> $@
 	@echo "#define __GLASGOW_HASKELL__ $(ProjectVersionInt)" >> $@
@@ -92,7 +92,7 @@ else
 
 $(includes_H_CONFIG) : mk/config.h mk/config.mk includes/ghc.mk | $$(dir $$@)/.
 	@echo "Creating $@..."
-	@echo "#ifndef __GHCAUTOCONF_H__"  >$@
+	@echo "#if !defined(__GHCAUTOCONF_H__)"  >$@
 	@echo "#define __GHCAUTOCONF_H__" >>$@
 #
 #	Copy the contents of mk/config.h, turning '#define PACKAGE_FOO
@@ -102,7 +102,7 @@ $(includes_H_CONFIG) : mk/config.h mk/config.mk includes/ghc.mk | $$(dir $$@)/.
 #
 #	Tack on some extra config information from the build system
 #
-ifeq "$(GhcEnableTablesNextToCode) $(GhcUnregisterised)" "YES NO"
+ifeq "$(TablesNextToCode)" "YES"
 	@echo >> $@
 	@echo "#define TABLES_NEXT_TO_CODE 1" >> $@
 endif
@@ -125,7 +125,7 @@ endif
 $(includes_H_PLATFORM) : includes/Makefile | $$(dir $$@)/.
 	$(call removeFiles,$@)
 	@echo "Creating $@..."
-	@echo "#ifndef __GHCPLATFORM_H__"  >$@
+	@echo "#if !defined(__GHCPLATFORM_H__)"  >$@
 	@echo "#define __GHCPLATFORM_H__" >>$@
 	@echo >> $@
 	@echo "#define BuildPlatform_TYPE  $(HostPlatform_CPP)" >> $@
@@ -149,14 +149,6 @@ $(includes_H_PLATFORM) : includes/Makefile | $$(dir $$@)/.
 	@echo "#define BUILD_VENDOR  \"$(HostVendor_CPP)\"" >> $@
 	@echo "#define HOST_VENDOR  \"$(TargetVendor_CPP)\"" >> $@
 	@echo >> $@
-	@echo "/* These TARGET macros are for backwards compatibility... DO NOT USE! */" >> $@
-	@echo "#define TargetPlatform_TYPE $(TargetPlatform_CPP)" >> $@
-	@echo "#define $(TargetPlatform_CPP)_TARGET  1" >> $@
-	@echo "#define $(TargetArch_CPP)_TARGET_ARCH  1" >> $@
-	@echo "#define TARGET_ARCH  \"$(TargetArch_CPP)\"" >> $@
-	@echo "#define $(TargetOS_CPP)_TARGET_OS  1" >> $@  
-	@echo "#define TARGET_OS  \"$(TargetOS_CPP)\"" >> $@
-	@echo "#define $(TargetVendor_CPP)_TARGET_VENDOR  1" >> $@
 ifeq "$(GhcUnregisterised)" "YES"
 	@echo "#define UnregisterisedCompiler 1" >> $@
 endif
@@ -179,6 +171,7 @@ $(includes_SETTINGS) : includes/Makefile | $$(dir $$@)/.
 	@echo '[("GCC extra via C opts", "$(GccExtraViaCOpts)")' >> $@
 	@echo ',("C compiler command", "$(SettingsCCompilerCommand)")' >> $@
 	@echo ',("C compiler flags", "$(SettingsCCompilerFlags)")' >> $@
+	@echo ',("C++ compiler flags", "$(SettingsCxxCompilerFlags)")' >> $@
 	@echo ',("C compiler link flags", "$(SettingsCCompilerLinkFlags)")' >> $@
 	@echo ',("C compiler supports -no-pie", "$(SettingsCCompilerSupportsNoPie)")' >> $@
 	@echo ',("Haskell CPP command", "$(SettingsHaskellCPPCommand)")' >> $@
@@ -208,6 +201,7 @@ $(includes_SETTINGS) : includes/Makefile | $$(dir $$@)/.
 	@echo ',("target has subsections via symbols", "$(HaskellHaveSubsectionsViaSymbols)")' >> $@
 	@echo ',("target has RTS linker", "$(HaskellHaveRTSLinker)")' >> $@
 	@echo ',("Unregisterised", "$(Unregisterised)")' >> $@
+	@echo ',("LLVM target", "$(LLVMTarget_CPP)")' >> $@
 	@echo ',("LLVM llc command", "$(SettingsLlcCommand)")' >> $@
 	@echo ',("LLVM opt command", "$(SettingsOptCommand)")' >> $@
 	@echo ',("LLVM clang command", "$(SettingsClangCommand)")' >> $@
@@ -217,7 +211,7 @@ $(includes_SETTINGS) : includes/Makefile | $$(dir $$@)/.
 	@echo ',("Use native code generator", "$(GhcWithNativeCodeGen)")' >> $@
 	@echo ',("Support SMP", "$(GhcWithSMP)")' >> $@
 	@echo ',("RTS ways", "$(GhcRTSWays)")' >> $@
-	@echo ',("Tables next to code", "$(GhcEnableTablesNextToCode)")' >> $@
+	@echo ',("Tables next to code", "$(TablesNextToCode)")' >> $@
 	@echo ',("Leading underscore", "$(LeadingUnderscore)")' >> $@
 	@echo ',("Use LibFFI", "$(UseLibFFIForAdjustors)")' >> $@
 # Note that GhcThreaded just reflects the Makefile variable setting. In

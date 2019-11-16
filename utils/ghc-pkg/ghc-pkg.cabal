@@ -23,7 +23,6 @@ Flag terminfo
 Executable ghc-pkg
     Default-Language: Haskell2010
     Main-Is: Main.hs
-    Other-Modules: Version
     Other-Extensions: CPP
 
     Build-Depends: base       >= 4   && < 5,

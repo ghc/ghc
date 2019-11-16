@@ -14,9 +14,10 @@ Foreign function interface (FFI)
 
     Allow use of the Haskell foreign function interface.
 
-GHC (mostly) conforms to the Haskell Foreign Function Interface, whose
-definition is part of the Haskell Report on
-`http://www.haskell.org/ <http://www.haskell.org/>`__.
+GHC (mostly) conforms to the Haskell Foreign Function Interface as specified
+in the Haskell Report. Refer to the `relevant chapter
+<https://www.haskell.org/onlinereport/haskell2010/haskellch8.html>_`
+of the Haskell Report for more details.
 
 FFI support is enabled by default, but can be enabled or disabled
 explicitly with the :extension:`ForeignFunctionInterface` flag.
@@ -86,7 +87,7 @@ Newtype wrapping of the IO monad
 The FFI spec requires the IO monad to appear in various places, but it
 can sometimes be convenient to wrap the IO monad in a ``newtype``, thus: ::
 
-      newtype MyIO a = MIO (IO a)
+       newtype MyIO a = MIO (IO a)
 
 (A reason for doing so might be to prevent the programmer from calling
 arbitrary IO procedures in some part of the program.)
@@ -101,6 +102,25 @@ OK: ::
 
        foreign import foo :: Int -> MyIO Int
        foreign import "dynamic" baz :: (Int -> MyIO Int) -> CInt -> MyIO Int
+
+.. _ffi-foralls:
+
+Explicit ``forall``s in foreign types
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+
+The type variables in the type of a foreign declaration may be quantified with
+an explicit ``forall`` by using the :extension:`ExplicitForAll` language
+extension, as in the following example: ::
+
+       {-# LANGUAGE ExplicitForAll #-}
+       foreign import ccall "mmap" c_mmap :: forall a. CSize -> IO (Ptr a)
+
+Note that an explicit ``forall`` must appear at the front of the type signature
+and is not permitted to appear nested within the type, as in the following
+(erroneous) examples: ::
+
+       foreign import ccall "mmap" c_mmap' :: CSize -> forall a. IO (Ptr a)
+       foreign import ccall quux :: (forall a. Ptr a) -> IO ()
 
 .. _ffi-prim:
 
@@ -352,7 +372,7 @@ program. Here's the C code:
     #include <stdio.h>
     #include "HsFFI.h"
 
-    #ifdef __GLASGOW_HASKELL__
+    #if defined(__GLASGOW_HASKELL__)
     #include "Foo_stub.h"
     #endif
 
@@ -371,7 +391,7 @@ program. Here's the C code:
     }
 
 We've surrounded the GHC-specific bits with
-``#ifdef __GLASGOW_HASKELL__``; the rest of the code should be portable
+``#if defined(__GLASGOW_HASKELL__)``; the rest of the code should be portable
 across Haskell implementations that support the FFI standard.
 
 The call to ``hs_init()`` initializes GHC's runtime system. Do NOT try
@@ -415,7 +435,7 @@ GHC-specific API instead of ``hs_init()``:
     #include <stdio.h>
     #include "HsFFI.h"
 
-    #ifdef __GLASGOW_HASKELL__
+    #if defined(__GLASGOW_HASKELL__)
     #include "Foo_stub.h"
     #include "Rts.h"
     #endif

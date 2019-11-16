@@ -1,7 +1,11 @@
-module Rules.Register (configurePackageRules, registerPackageRules) where
+module Rules.Register (
+    configurePackageRules, registerPackageRules, registerPackages,
+    libraryTargets
+    ) where
 
 import Base
 import Context
+import Expression ( getContextData )
 import Hadrian.BuildPath
 import Hadrian.Expression
 import Hadrian.Haskell.Cabal
@@ -12,7 +16,9 @@ import Rules.Rts
 import Settings
 import Target
 import Utilities
-import Rules.Library
+
+import Hadrian.Haskell.Cabal.Type
+import qualified Text.Parsec      as Parsec
 
 import Distribution.Version (Version)
 import qualified Distribution.Parsec as Cabal
@@ -21,7 +27,6 @@ import qualified Distribution.Types.PackageId as Cabal
 
 import qualified Hadrian.Haskell.Cabal.Parse as Cabal
 import qualified System.Directory            as IO
-import qualified Text.Parsec                 as Parsec
 
 -- * Configuring
 
@@ -63,6 +68,15 @@ parseToBuildSubdirectory root = do
 
 -- * Registering
 
+registerPackages :: [Context] -> Action ()
+registerPackages ctxs = do
+    need =<< mapM pkgRegisteredLibraryFile ctxs
+
+    -- Dynamic RTS library files need symlinks (Rules.Rts.rtsRules).
+    forM_ ctxs $ \ ctx -> when (package ctx == rts) $ do
+        ways <- interpretInContext ctx (getLibraryWays <> getRtsWays)
+        needRtsSymLinks (stage ctx) ways
+
 -- | Register a package and initialise the corresponding package database if
 -- need be. Note that we only register packages in 'Stage0' and 'Stage1'.
 registerPackageRules :: [(Resource, Int)] -> Stage -> Rules ()
@@ -76,14 +90,12 @@ registerPackageRules rs stage = do
     -- Register a package.
     root -/- relativePackageDbPath stage -/- "*.conf" %> \conf -> do
         historyDisable
-        let libpath = takeDirectory (takeDirectory conf)
-            settings = libpath -/- "settings"
-            platformConstants = libpath -/- "platformConstants"
-
-        need [settings, platformConstants]
 
         pkgName <- getPackageNameFromConfFile conf
         let pkg = unsafeFindPackageByName pkgName
+
+        when (pkg == compiler) $ need =<< ghcLibDeps stage
+
         isBoot <- (pkg `notElem`) <$> stagePackages Stage0
 
         let ctx = Context stage pkg vanilla
@@ -118,20 +130,16 @@ buildConf _ context@Context {..} conf = do
     Cabal.copyPackage context
     Cabal.registerPackage context
 
-    -- | Dynamic RTS library files need symlinks (Rules.Rts.rtsRules).
-    when (package == rts) (needRtsSymLinks stage ways)
-
     -- The above two steps produce an entry in the package database, with copies
     -- of many of the files we have build, e.g. Haskell interface files. We need
     -- to record this side effect so that Shake can cache these files too.
     -- See why we need 'fixWindows': https://gitlab.haskell.org/ghc/ghc/issues/16073
     let fixWindows path = do
-            win <- windowsHost
             version  <- setting GhcVersion
             hostOs   <- cabalOsString <$> setting BuildOs
             hostArch <- cabalArchString <$> setting BuildArch
             let dir = hostArch ++ "-" ++ hostOs ++ "-ghc-" ++ version
-            return $ if win then path -/- "../.." -/- dir else path
+            return $ if windowsHost then path -/- "../.." -/- dir else path
     pkgDbPath <- fixWindows =<< packageDbPath stage
     let dir = pkgDbPath -/- takeBaseName conf
     files <- liftIO $ getDirectoryFilesIO "." [dir -/- "**"]
@@ -171,3 +179,25 @@ parseCabalName = fmap f . Cabal.eitherParsec
   where
     f :: Cabal.PackageId -> (String, Version)
     f pkg_id = (Cabal.unPackageName $ Cabal.pkgName pkg_id, Cabal.pkgVersion pkg_id)
+
+-- | Return extra library targets.
+extraTargets :: Context -> Action [FilePath]
+extraTargets context
+    | package context == rts  = needRtsLibffiTargets (Context.stage context)
+    | otherwise               = return []
+
+-- | Given a library 'Package' this action computes all of its targets. Needing
+-- all the targets should build the library such that it is ready to be
+-- registered into the package database.
+-- See 'packageTargets' for the explanation of the @includeGhciLib@ parameter.
+libraryTargets :: Bool -> Context -> Action [FilePath]
+libraryTargets includeGhciLib context@Context {..} = do
+    libFile  <- pkgLibraryFile     context
+    ghciLib  <- pkgGhciLibraryFile context
+    ghci     <- if includeGhciLib && not (wayUnit Dynamic way)
+                then interpretInContext context $ getContextData buildGhciLib
+                else return False
+    extra    <- extraTargets context
+    return $ [ libFile ]
+          ++ [ ghciLib | ghci ]
+          ++ extra

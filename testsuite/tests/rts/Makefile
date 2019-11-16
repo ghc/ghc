@@ -37,7 +37,8 @@ T5423:
 	$(RM) T5423_cmm.o T5423.o T5423.hi T5423$(exeext)
 	"$(TEST_HC)" $(TEST_HC_OPTS) -v0 -c T5423_cmm.cmm
 	"$(TEST_HC)" $(TEST_HC_OPTS) -v0 -c T5423.hs
-	"$(TEST_HC)" $(TEST_HC_OPTS) -v0 T5423.o T5423_cmm.o -o T5423$(exeext)
+	"$(TEST_HC)" $(TEST_HC_OPTS) -v0 -c T5423_c.c
+	"$(TEST_HC)" $(TEST_HC_OPTS) -v0 T5423.o T5423_cmm.o T5423_c.o -o T5423$(exeext)
 	./T5423
 
 .PHONY: T9405

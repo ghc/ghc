@@ -6,7 +6,7 @@ module CodeGen.Platform
 import GhcPrelude
 
 import CmmExpr
-import Platform
+import GHC.Platform
 import Reg
 
 import qualified CodeGen.Platform.ARM        as ARM

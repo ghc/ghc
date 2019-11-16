@@ -445,6 +445,9 @@ which will generate a @case@ if necessary
 The let/app invariant is initially enforced by mkCoreLet and mkCoreApp in
 coreSyn/MkCore.
 
+For discussion of some implications of the let/app invariant primops see
+Note [Checking versus non-checking primops] in PrimOp.
+
 Note [CoreSyn type and coercion invariant]
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 We allow a /non-recursive/, /non-top-level/ let to bind type and
@@ -605,6 +608,8 @@ Join points must follow these invariants:
      same number of arguments, counting both types and values; we call this the
      "join arity" (to distinguish from regular arity, which only counts values).
 
+     See Note [Join points are less general than the paper]
+
   2. For join arity n, the right-hand side must begin with at least n lambdas.
      No ticks, no casts, just lambdas!  C.f. CoreUtils.joinRhsArity.
 
@@ -650,9 +655,39 @@ invariant 3 does still need to be checked.) For the rigorous definition of
 
 Invariant 4 is subtle; see Note [The polymorphism rule of join points].
 
+Invariant 6 is to enable code like this:
+
+  f = \(r :: RuntimeRep) (a :: TYPE r) (x :: T).
+      join j :: a
+           j = error @r @a "bloop"
+      in case x of
+           A -> j
+           B -> j
+           C -> error @r @a "blurp"
+
 Core Lint will check these invariants, anticipating that any binder whose
 OccInfo is marked AlwaysTailCalled will become a join point as soon as the
 simplifier (or simpleOptPgm) runs.
+
+Note [Join points are less general than the paper]
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+In the paper "Compiling without continuations", this expression is
+perfectly valid:
+
+    join { j = \_ -> e }
+    in (case blah of       )
+       (  True  -> j void# ) arg
+       (  False -> blah    )
+
+assuming 'j' has arity 1.   Here the call to 'j' does not look like a
+tail call, but actually everything is fine. See Section 3, "Managing \Delta"
+in the paper.
+
+In GHC, however, we adopt a slightly more restrictive subset, in which
+join point calls must be tail calls.  I think we /could/ loosen it up, but
+in fact the simplifier ensures that we always get tail calls, and it makes
+the back end a bit easier I think.  Generally, just less to think about;
+nothing deeper than that.
 
 Note [The type of a join point]
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~

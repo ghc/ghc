@@ -10,23 +10,23 @@
   []
   [({ T15323.hs:(5,1)-(6,56) }
     (TyClD
-     (NoExt)
+     (NoExtField)
      (DataDecl
-      (NoExt)
+      (NoExtField)
       ({ T15323.hs:5:6-17 }
        (Unqual
         {OccName: MaybeDefault}))
       (HsQTvs
-       (NoExt)
+       (NoExtField)
        [({ T15323.hs:5:19 }
          (UserTyVar
-          (NoExt)
+          (NoExtField)
           ({ T15323.hs:5:19 }
            (Unqual
             {OccName: v}))))])
       (Prefix)
       (HsDataDefn
-       (NoExt)
+       (NoExtField)
        (DataType)
        ({ <no location info> }
         [])
@@ -34,17 +34,17 @@
        (Nothing)
        [({ T15323.hs:6:5-56 }
          (ConDeclGADT
-          (NoExt)
+          (NoExtField)
           [({ T15323.hs:6:5-14 }
             (Unqual
              {OccName: TestParens}))]
           ({ T15323.hs:6:21-55 }
            (True))
           (HsQTvs
-           (NoExt)
+           (NoExtField)
            [({ T15323.hs:6:28 }
              (UserTyVar
-              (NoExt)
+              (NoExtField)
               ({ T15323.hs:6:28 }
                (Unqual
                 {OccName: v}))))])
@@ -52,20 +52,20 @@
            ({ T15323.hs:6:32-37 }
             [({ T15323.hs:6:32-37 }
               (HsParTy
-               (NoExt)
+               (NoExtField)
                ({ T15323.hs:6:33-36 }
                 (HsAppTy
-                 (NoExt)
+                 (NoExtField)
                  ({ T15323.hs:6:33-34 }
                   (HsTyVar
-                   (NoExt)
+                   (NoExtField)
                    (NotPromoted)
                    ({ T15323.hs:6:33-34 }
                     (Unqual
                      {OccName: Eq}))))
                  ({ T15323.hs:6:36 }
                   (HsTyVar
-                   (NoExt)
+                   (NoExtField)
                    (NotPromoted)
                    ({ T15323.hs:6:36 }
                     (Unqual
@@ -74,17 +74,17 @@
            [])
           ({ T15323.hs:6:42-55 }
            (HsAppTy
-            (NoExt)
+            (NoExtField)
             ({ T15323.hs:6:42-53 }
              (HsTyVar
-              (NoExt)
+              (NoExtField)
               (NotPromoted)
               ({ T15323.hs:6:42-53 }
                (Unqual
                 {OccName: MaybeDefault}))))
             ({ T15323.hs:6:55 }
              (HsTyVar
-              (NoExt)
+              (NoExtField)
               (NotPromoted)
               ({ T15323.hs:6:55 }
                (Unqual
@@ -94,3 +94,5 @@
         [])))))]
   (Nothing)
   (Nothing)))
+
+

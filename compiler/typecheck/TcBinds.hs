@@ -67,6 +67,7 @@ import qualified GHC.LanguageExtensions as LangExt
 import ConLike
 
 import Control.Monad
+import Data.Foldable (find)
 
 #include "HsVersions.h"
 
@@ -359,17 +360,17 @@ tcLocalBinds (HsIPBinds x (IPBinds _ ip_binds)) thing_inside
             ; ip_id <- newDict ipClass [ p, ty ]
             ; expr' <- tcMonoExpr expr (mkCheckExpType ty)
             ; let d = toDict ipClass p ty `fmap` expr'
-            ; return (ip_id, (IPBind noExt (Right ip_id) d)) }
+            ; return (ip_id, (IPBind noExtField (Right ip_id) d)) }
     tc_ip_bind _ (IPBind _ (Right {}) _) = panic "tc_ip_bind"
-    tc_ip_bind _ (XIPBind _) = panic "tc_ip_bind"
+    tc_ip_bind _ (XIPBind nec) = noExtCon nec
 
     -- Coerces a `t` into a dictionry for `IP "x" t`.
     -- co : t -> IP "x" t
     toDict ipClass x ty = mkHsWrap $ mkWpCastR $
                           wrapIP $ mkClassPred ipClass [x,ty]
 
-tcLocalBinds (HsIPBinds _ (XHsIPBinds _ )) _ = panic "tcLocalBinds"
-tcLocalBinds (XHsLocalBindsLR _)           _ = panic "tcLocalBinds"
+tcLocalBinds (HsIPBinds _ (XHsIPBinds nec)) _ = noExtCon nec
+tcLocalBinds (XHsLocalBindsLR nec)          _ = noExtCon nec
 
 {- Note [Implicit parameter untouchables]
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
@@ -485,12 +486,13 @@ tc_group top_lvl sig_fn prag_fn (Recursive, binds) closed thing_inside
         -- (This used to be optional, but isn't now.)
         -- See Note [Polymorphic recursion] in HsBinds.
     do  { traceTc "tc_group rec" (pprLHsBinds binds)
-        ; when hasPatSyn $ recursivePatSynErr binds
+        ; whenIsJust mbFirstPatSyn $ \lpat_syn ->
+            recursivePatSynErr (getLoc lpat_syn) binds
         ; (binds1, thing) <- go sccs
         ; return ([(Recursive, binds1)], thing) }
                 -- Rec them all together
   where
-    hasPatSyn = anyBag (isPatSyn . unLoc) binds
+    mbFirstPatSyn = find (isPatSyn . unLoc) binds
     isPatSyn PatSynBind{} = True
     isPatSyn _ = False
 
@@ -511,10 +513,14 @@ tc_group top_lvl sig_fn prag_fn (Recursive, binds) closed thing_inside
     tc_sub_group rec_tc binds =
       tcPolyBinds sig_fn prag_fn Recursive rec_tc closed binds
 
-recursivePatSynErr :: OutputableBndrId (GhcPass p) =>
-                      LHsBinds (GhcPass p) -> TcM a
-recursivePatSynErr binds
-  = failWithTc $
+recursivePatSynErr ::
+     OutputableBndrId (GhcPass p) =>
+     SrcSpan -- ^ The location of the first pattern synonym binding
+             --   (for error reporting)
+  -> LHsBinds (GhcPass p)
+  -> TcM a
+recursivePatSynErr loc binds
+  = failAt loc $
     hang (text "Recursive pattern synonym definition with following bindings:")
        2 (vcat $ map pprLBind . bagToList $ binds)
   where
@@ -720,14 +726,14 @@ tcPolyCheck prag_fn
                              , fun_ext     = placeHolderNamesTc
                              , fun_tick    = tick }
 
-             export = ABE { abe_ext = noExt
-                          , abe_wrap = idHsWrapper
+             export = ABE { abe_ext   = noExtField
+                          , abe_wrap  = idHsWrapper
                           , abe_poly  = poly_id
                           , abe_mono  = mono_id
                           , abe_prags = SpecPrags spec_prags }
 
              abs_bind = cL loc $
-                        AbsBinds { abs_ext = noExt
+                        AbsBinds { abs_ext      = noExtField
                                  , abs_tvs      = skol_tvs
                                  , abs_ev_vars  = ev_vars
                                  , abs_ev_binds = [ev_binds]
@@ -810,7 +816,7 @@ tcPolyInfer rec_tc prag_fn tc_sig_fn mono bind_list
        ; loc <- getSrcSpanM
        ; let poly_ids = map abe_poly exports
              abs_bind = cL loc $
-                        AbsBinds { abs_ext = noExt
+                        AbsBinds { abs_ext = noExtField
                                  , abs_tvs = qtvs
                                  , abs_ev_vars = givens, abs_ev_binds = [ev_binds]
                                  , abs_exports = exports, abs_binds = binds'
@@ -871,7 +877,7 @@ mkExport prag_fn insoluble qtvs theta
         ; when warn_missing_sigs $
               localSigWarn Opt_WarnMissingLocalSignatures poly_id mb_sig
 
-        ; return (ABE { abe_ext = noExt
+        ; return (ABE { abe_ext = noExtField
                       , abe_wrap = wrap
                         -- abe_wrap :: idType poly_id ~ (forall qtvs. theta => mono_ty)
                       , abe_poly  = poly_id
@@ -1020,7 +1026,7 @@ chooseInferredQuantifiers inferred_theta tau_tvs qtvs
 
            ; case tcGetCastedTyVar_maybe wc_var_ty of
                -- We know that wc_co must have type kind(wc_var) ~ Constraint, as it
-               -- comes from the checkExpectedKind in TcHsType.tcWildCardOcc. So, to
+               -- comes from the checkExpectedKind in TcHsType.tcAnonWildCardOcc. So, to
                -- make the kinds work out, we reverse the cast here.
                Just (wc_var, wc_co) -> writeMetaTyVar wc_var (ctuple `mkCastTy` mkTcSymCo wc_co)
                Nothing              -> pprPanic "chooseInferredQuantifiers 1" (ppr wc_var_ty)

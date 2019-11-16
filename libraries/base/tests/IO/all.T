@@ -84,7 +84,8 @@ test('hGetBuf001',
       expect_fail_if_windows],
      compile_and_run, ['-package unix'])
 
-test('hDuplicateTo001', [when(opsys('mingw32'), skip)], compile_and_run, [''])
+# As discussed in #16819, this test is racy in a threaded environment.
+test('hDuplicateTo001', [when(opsys('mingw32'), skip), omit_ways(concurrent_ways)], compile_and_run, [''])
 
 test('countReaders001', [], compile_and_run, [''])
 
@@ -128,6 +129,6 @@ test('T4144', normal, compile_and_run, [''])
 
 test('encodingerror001', normal, compile_and_run, [''])
 
-test('T4808', [exit_code(1)], compile_and_run, [''])
+test('T4808', [fragile_for(16909, ['threaded2']), exit_code(1)], compile_and_run, [''])
 test('T4895', normal, compile_and_run, [''])
 test('T7853', normal, compile_and_run, [''])
