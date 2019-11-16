@@ -27,7 +27,7 @@ idleCpuUsage :: IO Double
 idleCpuUsage = do
   startTime <- getMonotonicTime
   startCPUTime <- getCPUTime
-  threadDelay 1000000
+  threadDelay 5000000
   endCPUTime <- getCPUTime
   endTime <- getMonotonicTime
   return $ fromIntegral (endCPUTime - startCPUTime) / (endTime - startTime)
@@ -46,4 +46,4 @@ main = do
 
   -- CPU consumption should roughly be the same when just idling vs
   -- when idling after the event been triggered
-  print $ eventTriggeredUsage / noEventUsage < 2.0
+  print $ eventTriggeredUsage / noEventUsage < 10.0
