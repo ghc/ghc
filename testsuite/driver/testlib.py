@@ -14,7 +14,8 @@ import copy
 import glob
 import sys
 from math import ceil, trunc
-from pathlib import Path, PurePath
+from pathlib import PurePath
+import pathlib
 import collections
 import subprocess
 
@@ -38,6 +39,22 @@ if config.use_threads:
 
 global wantToStop
 wantToStop = False
+
+if not config.msys:
+    Path = pathlib.Path
+else:
+    # Workaround for #17483. msys2 Python's wrapper for stat (called by
+    # Path.exists()) appears to fail randomly with errno=0. Work around this by
+    # retrying 10 times in the event that this happens.
+    class Path(pathlib.Path):
+        def stat(self):
+            for i in range(10):
+                try:
+                    result = pathlib.Path.stat(self)
+                    return result
+                except OSError as e:
+                    if e.errno != 0:
+                        raise e
 
 # I have no idea what the type of this is
 global thisdir_settings
