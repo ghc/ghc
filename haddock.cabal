@@ -80,7 +80,7 @@ executable haddock
       Cabal >= 1.10,
       ghc-boot,
       ghc-boot-th,
-      ghc == 8.10.*,
+      ghc == 8.11.*,
       bytestring,
       parsec,
       text,
