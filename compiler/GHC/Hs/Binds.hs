@@ -359,6 +359,11 @@ data ABExport p
 type instance XABE       (GhcPass p) = NoExtField
 type instance XXABExport (GhcPass p) = NoExtCon
 
+convertABExport :: (XABE p ~ XABE p', IdP p ~ IdP p')
+                => ABExport p
+                -> ABExport p'
+convertABExport (ABE ext poly mono wrap prags) =
+    ABE ext poly mono wrap prags
 
 -- | - 'ApiAnnotation.AnnKeywordId' : 'ApiAnnotation.AnnPattern',
 --             'ApiAnnotation.AnnEqual','ApiAnnotation.AnnLarrow'
@@ -1143,6 +1148,16 @@ isSCCFunSig _                    = False
 isCompleteMatchSig :: LSig name -> Bool
 isCompleteMatchSig (L _ (CompleteMatchSig {} )) = True
 isCompleteMatchSig _                            = False
+
+convertLSig :: (IdP p ~ IdP p') => LSig p -> LSig p'
+convertLSig = fmap convertSig
+
+convertSig :: (IdP p ~ IdP p') => Sig p -> Sig p'
+convertSig = undefined
+--convertSig (TypeSig ext bndrs sig) = TypeSig ext (coerce bndrs) (coerce sig)
+--convertSig (PatSynSig ext bndrs sig) = PatSynSig ext bndrs sig
+--convertSig (ClassOpSig ext b bndrs sig) = ClassOpSig ext b bndrs sig
+--convertSig (IdSig ext id) = IdSig ext id
 
 hsSigDoc :: Sig name -> SDoc
 hsSigDoc (TypeSig {})           = text "type signature"
