@@ -3,7 +3,7 @@
 #
 
 from my_typing import *
-from pathlib import Path
+from testutil import Path
 from perf_notes import MetricChange, PerfStat, Baseline, MetricOracles
 from datetime import datetime
 
