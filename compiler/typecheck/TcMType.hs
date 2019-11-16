@@ -1790,7 +1790,7 @@ For example, when we see a call `reverse (f xs)`, we know that we calling
     reverse :: forall a. [a] -> [a]
 So we know that the argument `f xs` must be a "list of something". But what is
 the "something"? We don't know until we explore the `f xs` a bit more. So we set
-out what we do know at the call of `reverse` by instantiate its type with a fresh
+out what we do know at the call of `reverse` by instantiating its type with a fresh
 meta tyvar, `alpha` say. So now the type of the argument `f xs`, and of the
 result, is `[alpha]`. The unification variable `alpha` stands for the
 as-yet-unknown type of the elements of the list.

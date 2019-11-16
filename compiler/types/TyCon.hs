@@ -2214,7 +2214,7 @@ isLiftedTypeKindTyConName = (`hasKey` liftedTypeKindTyConKey)
 --   (similar to a @dfun@ does that for a class instance).
 --
 -- * Tuples are implicit iff they have a wired-in name
---   (namely: boxed and unboxed tupeles are wired-in and implicit,
+--   (namely: boxed and unboxed tuples are wired-in and implicit,
 --            but constraint tuples are not)
 isImplicitTyCon :: TyCon -> Bool
 isImplicitTyCon (FunTyCon {})        = True
