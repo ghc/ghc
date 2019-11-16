@@ -40,8 +40,8 @@ module GHC.Hs.Types (
 
         HsConDetails(..),
 
-        FieldOcc(..), LFieldOcc, mkFieldOcc,
-        AmbiguousFieldOcc(..), mkAmbiguousFieldOcc,
+        FieldOcc(..), LFieldOcc, mkFieldOcc, convertFieldOcc,
+        AmbiguousFieldOcc(..), mkAmbiguousFieldOcc, convertAmbiguousFieldOcc,
         rdrNameAmbiguousFieldOcc, selectorAmbiguousFieldOcc,
         unambiguousFieldOcc, ambiguousFieldOcc,
 
@@ -1393,6 +1393,10 @@ instance Outputable (FieldOcc pass) where
 mkFieldOcc :: Located RdrName -> FieldOcc GhcPs
 mkFieldOcc rdr = FieldOcc noExtField rdr
 
+convertFieldOcc :: (XCFieldOcc pass ~ XCFieldOcc pass', XXFieldOcc pass ~ XXFieldOcc pass')
+                => FieldOcc pass -> FieldOcc pass'
+convertFieldOcc (FieldOcc a b) = FieldOcc a b
+convertFieldOcc (XFieldOcc ext) = XFieldOcc ext
 
 -- | Ambiguous Field Occurrence
 --
@@ -1451,6 +1455,11 @@ unambiguousFieldOcc (XAmbiguousFieldOcc nec) = noExtCon nec
 ambiguousFieldOcc :: FieldOcc GhcTc -> AmbiguousFieldOcc GhcTc
 ambiguousFieldOcc (FieldOcc sel rdr) = Unambiguous sel rdr
 ambiguousFieldOcc (XFieldOcc nec) = noExtCon nec
+
+convertAmbiguousFieldOcc :: (XUnambiguous p ~ XUnambiguous p', XAmbiguous p ~ XAmbiguous p')
+                         => AmbiguousFieldOcc p -> AmbiguousFieldOcc p'
+convertAmbiguousFieldOcc (Unambiguous ext rdr) = Unambiguous ext rdr
+convertAmbiguousFieldOcc (Ambiguous ext rdr) = Ambiguous ext rdr
 
 {-
 ************************************************************************
