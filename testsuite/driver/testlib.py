@@ -14,7 +14,8 @@ import copy
 import glob
 import sys
 from math import ceil, trunc
-from pathlib import Path, PurePath
+from pathlib import PurePath
+from testutil import Path
 import collections
 import subprocess
 
@@ -38,6 +39,7 @@ if config.use_threads:
 
 global wantToStop
 wantToStop = False
+
 
 # I have no idea what the type of this is
 global thisdir_settings
