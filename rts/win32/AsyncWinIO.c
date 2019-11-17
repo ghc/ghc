@@ -308,6 +308,9 @@ void awaitAsyncRequests (bool wait)
      timeslice in between.  */
   if (wait && outstanding_service_requests)
     SleepConditionVariableSRW (&threadIOWait, &lock, INFINITE, 0);
+  else if (wait && !outstanding_service_requests)
+    barf ("asked to wait for I/O but no I/O action is pending.");
+
   ReleaseSRWLockExclusive (&lock);
 }
 
