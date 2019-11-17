@@ -461,7 +461,7 @@ markQueuePushClosureGC (MarkQueue *q, StgClosure *p)
 
     MarkQueueEnt ent = {
         .mark_closure = {
-            .p = UNTAG_CLOSURE(p),
+            .p = TAG_CLOSURE(UNTAG_CLOSURE(p), MARK_CLOSURE),
             .origin = NULL,
         }
     };
@@ -492,7 +492,7 @@ void push_closure (MarkQueue *q,
 
     MarkQueueEnt ent = {
         .mark_closure = {
-            .p = p,
+            .p = TAG_CLOSURE(UNTAG_CLOSURE(p), MARK_CLOSURE),
             .origin = origin,
         }
     };
@@ -510,8 +510,8 @@ void push_array (MarkQueue *q,
 
     MarkQueueEnt ent = {
         .mark_array = {
-            .array = array,
-            .start_index = (start_index << 16) | 0x3,
+            .array = (StgMutArrPtrs *) TAG_CLOSURE(UNTAG_CONST_CLOSURE((StgClosure *) array), MARK_ARRAY),
+            .start_index = start_index,
         }
     };
     push(q, &ent);
@@ -1676,14 +1676,15 @@ nonmovingMark (MarkQueue *queue)
 
         switch (nonmovingMarkQueueEntryType(&ent)) {
         case MARK_CLOSURE:
-            mark_closure(queue, ent.mark_closure.p, ent.mark_closure.origin);
+            mark_closure(queue, UNTAG_CLOSURE(ent.mark_closure.p), ent.mark_closure.origin);
             break;
         case MARK_ARRAY: {
-            const StgMutArrPtrs *arr = ent.mark_array.array;
-            StgWord start = ent.mark_array.start_index >> 16;
+            const StgMutArrPtrs *arr = UNTAG_CLOSURE(ent.mark_array.array);
+            StgWord start = ent.mark_array.start_index;
             StgWord end = start + MARK_ARRAY_CHUNK_LENGTH;
             if (end < arr->ptrs) {
-                markQueuePushArray(queue, ent.mark_array.array, end);
+                // There is more to be marked after this chunk.
+                markQueuePushArray(queue, arr, end);
             } else {
                 end = arr->ptrs;
             }
