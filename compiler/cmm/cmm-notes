@@ -138,7 +138,7 @@ a dominator analysis, using the Dataflow Engine.
 * The CLabel for the entry-point/closure reveals whether g is 
   a CAF (or refers to CAFs).  See the IdLabel constructor of CLabel.
 
-* The CAF-ness of the original top-level defininions is figured out
+* The CAF-ness of the original top-level definitions is figured out
   (by TidyPgm) before we generate C--.  This CafInfo is only set for
   top-level Ids; nested bindings stay with MayHaveCafRefs.
 
