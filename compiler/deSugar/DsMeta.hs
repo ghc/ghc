@@ -1790,7 +1790,7 @@ repLambda (dL->L _ (Match { m_pats = ps
                 do { xs <- repLPs ps; body <- repLE e; repLam xs body })
       ; wrapGenSyms ss lam }
 
-repLambda (dL->L _ m) = notHandled "Guarded labmdas" (pprMatch m)
+repLambda (dL->L _ m) = notHandled "Guarded lambdas" (pprMatch m)
 
 
 -----------------------------------------------------------------------------
@@ -2117,7 +2117,7 @@ repMultiIf (MkC alts) = rep2 multiIfEName [alts]
 repLetE :: Core [TH.DecQ] -> Core TH.ExpQ -> DsM (Core TH.ExpQ)
 repLetE (MkC ds) (MkC e) = rep2 letEName [ds, e]
 
-repCaseE :: Core TH.ExpQ -> Core [TH.MatchQ] -> DsM( Core TH.ExpQ)
+repCaseE :: Core TH.ExpQ -> Core [TH.MatchQ] -> DsM (Core TH.ExpQ)
 repCaseE (MkC e) (MkC ms) = rep2 caseEName [e, ms]
 
 repDoE :: Core [TH.StmtQ] -> DsM (Core TH.ExpQ)

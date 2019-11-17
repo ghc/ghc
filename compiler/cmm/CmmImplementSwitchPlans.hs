@@ -67,7 +67,7 @@ visitSwitches dflags block
 -- This is important as the expression could contain expensive code like
 -- memory loads or divisions which we REALLY don't want to duplicate.
 
--- This happend in parts of the handwritten RTS Cmm code. See also #16933
+-- This happened in parts of the handwritten RTS Cmm code. See also #16933
 
 -- See Note [Floating switch expressions]
 floatSwitchExpr :: DynFlags -> CmmExpr -> UniqSM (Block CmmNode O O, CmmExpr)

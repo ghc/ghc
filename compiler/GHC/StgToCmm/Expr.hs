@@ -414,7 +414,7 @@ cgCase (StgApp v []) _ (PrimAlt _) alts
 Consider
     case (x :: HValue) |> co of (y :: MutVar# Int)
         DEFAULT -> ...
-We want to gnerate an assignment
+We want to generate an assignment
      y := x
 We want to allow this assignment to be generated in the case when the
 types are compatible, because this allows some slightly-dodgy but
