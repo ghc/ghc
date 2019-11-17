@@ -478,7 +478,7 @@ interruptSystemManager = do
 
 -- | The initial number of I/O requests we can service at the same time.
 -- Must be power of 2.  This number is used as the starting point to scale
--- the number of concurrent requests.  It will be doubled everytime we are
+-- the number of concurrent requests.  It will be doubled every time we are
 -- saturated.
 callbackArraySize :: Int
 callbackArraySize = 32
@@ -728,10 +728,24 @@ withOverlappedEx mgr fname h offset startCB completionCB = do
                   return $ CbDone res
                         | otherwise ->
                   do m <- newEmptyIOPort
-                     let secs = 100 / 1000000.0
-                     reg <- registerTimeout mgr secs $
-                              writeIOPort m () >> return ()
-                     readIOPort m `onException` unregisterTimeout mgr reg
+                     -- We will complete quite soon, in the threaded RTS we
+                     -- probably don't really want to wait for it while we could
+                     -- have done something else.  In particular this is because
+                     -- of sockets which make take slightly longer.  However for
+                     -- the non-threaded RTS, using the timer manage is a waste
+                     -- since there's only one capability anyway.
+                     -- There's a trade-off.  Using the timer would allow it do
+                     -- to continue running other Haskell threads, but also
+                     -- means it may take longer to complete the wait.  For now
+                     -- I'll not use it and enter a busy wait and see if there
+                     -- are any complaints.
+                     -- OTOH any of the two should be a massive improvement over
+                     -- The old I/O Manager.
+                     when threaded $ do
+                       let secs = 100 / 1000000.0
+                       reg <- registerTimeout mgr secs $
+                                writeIOPort m () >> return ()
+                       readIOPort m `onException` unregisterTimeout mgr reg
                      spinWaitComplete fhndl lpol
                 _       -> do
                    when (not threaded) completeSynchronousRequest
@@ -786,6 +800,7 @@ registerTimeout mgr@Manager{..} relTime cb = do
       now <- getTime mgrClock
       let !expTime = secondsToNanoSeconds $ now + relTime
       editTimeouts mgr (Q.unsafeInsertNew key expTime cb)
+      wakeupIOManager
     return $ TK key
 
 -- | Update an active timeout to fire in the given number of seconds (from the
