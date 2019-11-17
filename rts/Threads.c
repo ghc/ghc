@@ -723,16 +723,6 @@ threadStackUnderflow (Capability *cap, StgTSO *tso)
             barf("threadStackUnderflow: not enough space for return values");
         }
 
-        IF_NONMOVING_WRITE_BARRIER_ENABLED {
-            // ensure that values that we copy into the new stack are marked
-            // for the nonmoving collector. Note that these values won't
-            // necessarily form a full closure so we need to handle them
-            // specially.
-            for (unsigned int i = 0; i < retvals; i++) {
-                updateRemembSetPushClosure(cap, (StgClosure *) old_stack->sp[i]);
-            }
-        }
-
         memcpy(/* dest */ new_stack->sp - retvals,
                /* src  */ old_stack->sp,
                /* size */ retvals * sizeof(W_));
