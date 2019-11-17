@@ -143,6 +143,7 @@ configurePackage context@Context {..} = do
     argList     <- interpret (target context (Cabal Setup stage) [] []) flavourArgs
     verbosity   <- getVerbosity
     let v = if verbosity >= Loud then "-v3" else "-v0"
+    putLoud $ "| Package " ++ quote (pkgName package) ++ " flags: " ++ unwords flagList
     traced "cabal-configure" $
         C.defaultMainWithHooksNoReadArgs hooks gpd
             (argList ++ ["--flags=" ++ unwords flagList, v])
