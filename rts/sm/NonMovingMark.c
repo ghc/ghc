@@ -567,9 +567,11 @@ inline void updateRemembSetPushThunk(Capability *cap, StgThunk *thunk)
 {
     const StgInfoTable *info;
     do {
-        info = get_volatile_itbl((StgClosure *) thunk);
-    } while (info->type == WHITEHOLE);
-    updateRemembSetPushThunkEager(cap, (StgThunkInfoTable *) info, thunk);
+        info = *(StgInfoTable* volatile*) &thunk->header.info;
+    } while (info == &stg_WHITEHOLE_info);
+
+    const StgThunkInfoTable *thunk_info = THUNK_INFO_PTR_TO_STRUCT(info);
+    updateRemembSetPushThunkEager(cap, thunk_info, thunk);
 }
 
 /* Push the free variables of a thunk to the update remembered set.
@@ -1229,7 +1231,7 @@ mark_closure (MarkQueue *queue, const StgClosure *p0, StgClosure **origin)
             goto done;
 
         case WHITEHOLE:
-            while (get_volatile_itbl(p)->type == WHITEHOLE);
+            while (*(StgInfoTable* volatile*) &p->header.info == &stg_WHITEHOLE_info);
                 // busy_wait_nop(); // FIXME
             goto try_again;
 
@@ -1588,7 +1590,7 @@ mark_closure (MarkQueue *queue, const StgClosure *p0, StgClosure **origin)
     }
 
     case WHITEHOLE:
-        while (get_volatile_itbl(p)->type == WHITEHOLE);
+        while (*(StgInfoTable* volatile*) &p->header.info == &stg_WHITEHOLE_info);
         goto try_again;
 
     case COMPACT_NFDATA:
