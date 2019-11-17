@@ -18,8 +18,8 @@
 
 enum EntryType {
     NULL_ENTRY = 0,
-    MARK_CLOSURE,
-    MARK_ARRAY
+    MARK_CLOSURE = 1,
+    MARK_ARRAY = 2
 };
 
 /* Note [Origin references in the nonmoving collector]
@@ -43,13 +43,10 @@ enum EntryType {
  */
 
 typedef struct {
-    // Which kind of mark queue entry we have is determined by the low bits of
-    // the second word: they must be zero in the case of a mark_closure entry
-    // (since the second word of a mark_closure entry points to a pointer and
-    // pointers must be word-aligned).  In the case of a mark_array we set them
-    // to 0x3 (the value of start_index is shifted to the left to accomodate
-    // this). null_entry where p==NULL is used to indicate the end of the queue.
+    // Which kind of mark queue entry we have is determined by the tag bits of
+    // the first word (using the tags defined by the EntryType enum).
     union {
+        // A null_entry indicates the end of the queue.
         struct {
             void *p;              // must be NULL
         } null_entry;
@@ -67,14 +64,9 @@ typedef struct {
 
 INLINE_HEADER enum EntryType nonmovingMarkQueueEntryType(MarkQueueEnt *ent)
 {
-    if (ent->null_entry.p == NULL) {
-        return NULL_ENTRY;
-    } else if (((uintptr_t) ent->mark_closure.origin & TAG_MASK) == 0) {
-        return MARK_CLOSURE;
-    } else {
-        ASSERT((ent->mark_array.start_index & TAG_MASK) == 0x3);
-        return MARK_ARRAY;
-    }
+    uintptr_t tag = (uintptr_t) ent->null_entry.p & TAG_MASK;
+    ASSERT(tag <= MARK_ARRAY);
+    return tag;
 }
 
 typedef struct {
