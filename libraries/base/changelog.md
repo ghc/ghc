@@ -1,7 +1,7 @@
 # Changelog for [`base` package](http://hackage.haskell.org/package/base)
 
 ## 4.15.0.0 *TBA*
-  * Add `IsList` instance for `ZipList`.
+  * TODO
 
 ## 4.14.0.0 *TBA*
   * Bundled with GHC 8.10.1
@@ -43,6 +43,8 @@
     and `(,,,) a b c`.
 
   * Add `resizeSmallMutableArray#` to `GHC.Exts`.
+
+  * Add `IsList` instance for `ZipList`.
 
 ## 4.13.0.0 *July 2019*
   * Bundled with GHC 8.8.1
