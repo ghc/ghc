@@ -86,6 +86,7 @@ library
     if flag(thread-sanitizer)
       cc-options: -fsanitize=thread
       ld-options: -fsanitize=thread
+      extra-libraries: tsan
 
     exposed: True
     exposed-modules:
