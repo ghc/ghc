@@ -632,7 +632,7 @@ consoleRead hwnd ptr _offset bytes
                if eventType == #{const KEY_EVENT} && btnDown
                   then do debugIO $ "cobble: read-char."
                           char <- peekByteOff p_inputs char_offset
-                          let w_ptr'      = w_ptr `plusPtr` 1
+                          let w_ptr' = w_ptr `plusPtr` 1
                           debugIO $ "cobble: offset - " ++ show char_offset
                           debugIO $ "cobble: show > " ++ show char
                           debugIO $ "cobble: repeat: " ++ show repeated
