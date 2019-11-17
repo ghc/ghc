@@ -62,7 +62,13 @@ static void mark_PAP_payload (MarkQueue *queue,
  * collector and moved to nonmoving_large_objects during the next major GC.
  * When this happens the block gets its BF_NONMOVING_SWEEPING flag set to
  * indicate that it is part of the snapshot and consequently should be marked by
- * the nonmoving mark phase..
+ * the nonmoving mark phase.
+ *
+ * Note that pinned object blocks are treated as large objects containing only
+ * a single object. That is, the block has a single mark flag (BF_MARKED) and we
+ * consequently will trace the pointers of only one object per block. However,
+ * this is okay since the only type of pinned object supported by GHC is the
+ * pinned ByteArray#, which has no pointers.
  */
 
 bdescr *nonmoving_large_objects = NULL;
@@ -1281,9 +1287,6 @@ mark_closure (MarkQueue *queue, const StgClosure *p0, StgClosure **origin)
             if (bd->flags & BF_MARKED) {
                 goto done;
             }
-
-            // Mark contents
-            p = (StgClosure*)bd->start;
         } else {
             struct NonmovingSegment *seg = nonmovingGetSegment((StgPtr) p);
             nonmoving_block_idx block_idx = nonmovingGetBlockIdx((StgPtr) p);
