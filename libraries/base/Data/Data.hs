@@ -131,6 +131,8 @@ import GHC.Show
 import Text.Read( reads )
 
 -- Imports for the instances
+import Control.Applicative (WrappedArrow(..), WrappedMonad(..), ZipList(..))
+       -- So we can give them Data instances
 import Data.Functor.Identity -- So we can give Data instance for Identity
 import Data.Int              -- So we can give Data instance for Int8, ...
 import Data.Type.Coercion
@@ -1155,6 +1157,18 @@ instance Data a => Data [a] where
 
 
 ------------------------------------------------------------------------------
+
+-- | @since 4.14.0.0
+deriving instance (Typeable (a :: Type -> Type -> Type), Typeable b, Typeable c,
+                   Data (a b c))
+         => Data (WrappedArrow a b c)
+
+-- | @since 4.14.0.0
+deriving instance (Typeable (m :: Type -> Type), Typeable a, Data (m a))
+         => Data (WrappedMonad m a)
+
+-- | @since 4.14.0.0
+deriving instance Data a => Data (ZipList a)
 
 -- | @since 4.9.0.0
 deriving instance Data a => Data (NonEmpty a)
