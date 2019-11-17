@@ -69,10 +69,10 @@ INLINE_HEADER enum EntryType nonmovingMarkQueueEntryType(MarkQueueEnt *ent)
 {
     if (ent->null_entry.p == NULL) {
         return NULL_ENTRY;
-    } else if (((uintptr_t) ent->mark_closure.origin & TAG_BITS) == 0) {
+    } else if (((uintptr_t) ent->mark_closure.origin & TAG_MASK) == 0) {
         return MARK_CLOSURE;
     } else {
-        ASSERT((ent->mark_array.start_index & TAG_BITS) == 0x3);
+        ASSERT((ent->mark_array.start_index & TAG_MASK) == 0x3);
         return MARK_ARRAY;
     }
 }
