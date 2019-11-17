@@ -1455,7 +1455,7 @@ patterns in each equation.
 -}
 
 data MatchGroup p body
-  = MG { mg_ext     :: XMG p body -- Posr typechecker, types of args and result
+  = MG { mg_ext     :: XMG p body -- Post-typechecker, types of args and result
        , mg_alts    :: Located [LMatch p body]  -- The alternatives
        , mg_origin  :: Origin }
      -- The type is the type of the entire group
