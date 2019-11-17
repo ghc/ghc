@@ -107,6 +107,10 @@ latex_elements = {
 \setromanfont{DejaVu Serif}
 \setmonofont{DejaVu Sans Mono}
 \setlength{\\tymin}{45pt}
+
+% Avoid a torrent of over-full \hbox warnings
+\usepackage{microtype}
+\hbadness=99999
 ''',
 }
 
