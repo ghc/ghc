@@ -2508,4 +2508,15 @@ AC_DEFUN([FIND_LD],[
     CHECK_LD_COPY_BUG([$1])
 ])
 
+# FIND_PYTHON
+# -----------
+# Find the version of `python` to use (for the testsuite driver)
+#
+AC_DEFUN([FIND_PYTHON],[
+    dnl Prefer the mingw64 distribution on Windows due to #17483.
+    AC_CHECK_TOOL([PYTHON], [/mingw64/bin/python3 python3 python])
+    PythonCmd="$PYTHON"
+    AC_SUBST([PythonCmd])
+])
+
 # LocalWords:  fi
