@@ -18,6 +18,7 @@ before_script:
   - "git fetch https://gitlab.haskell.org/ghc/ghc-performance-notes.git refs/notes/perf:refs/notes/perf || true"
 
 stages:
+  - hello
   - lint        # Source linting
   - quick-build # A very quick smoke-test to weed out broken commits
   - build       # A quick smoke-test to weed out broken commits
@@ -758,7 +759,7 @@ validate-x86_64-linux-fedora27:
 
 .build-windows-hadrian:
   extends: .build-windows
-  stage: full-build
+  stage: hello
   variables:
     GHC_VERSION: "8.6.5"
     FLAVOUR: "validate"
@@ -806,7 +807,7 @@ nightly-i386-windows-hadrian:
 
 .build-windows-make:
   extends: .build-windows
-  stage: full-build
+  stage: hello
   allow_failure: true
   variables:
     BUILD_FLAVOUR: "quick"
