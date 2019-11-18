@@ -217,7 +217,7 @@ $(eval $(call canonicalise,TOP_ABS))
 GS = gs
 CP = cp
 RM = rm -f
-PYTHON = python3
+PYTHON ?= python3
 
 ifeq "$(CHECK_API_ANNOTATIONS)" ""
 CHECK_API_ANNOTATIONS := $(abspath $(TOP)/../inplace/bin/check-api-annotations)
