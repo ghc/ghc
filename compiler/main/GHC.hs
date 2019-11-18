@@ -85,7 +85,7 @@ module GHC (
         lookupGlobalName,
         findGlobalAnns,
         mkPrintUnqualifiedForModule,
-        ModIface, ModIface_(..),
+        ModIface(..),
         SafeHaskellMode(..),
 
         -- * Querying the environment
@@ -1152,7 +1152,7 @@ getPackageModuleInfo hsc_env mdl
   = do  eps <- hscEPS hsc_env
         iface <- hscGetModuleInterface hsc_env mdl
         let
-            avails = mi_exports (mi_final_exts iface)
+            avails = mi_exports iface
             pte    = eps_PTE eps
             tys    = [ ty | name <- concatMap availNames avails,
                             Just ty <- [lookupTypeEnv pte name] ]

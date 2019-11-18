@@ -394,8 +394,8 @@ calculateAvails :: DynFlags
 calculateAvails dflags iface mod_safe' want_boot imported_by =
   let imp_mod    = mi_module iface
       imp_sem_mod= mi_semantic_module iface
-      orph_iface = mi_orphan (mi_final_exts iface)
-      has_finsts = mi_finsts (mi_final_exts iface)
+      orph_iface = mi_orphan iface
+      has_finsts = mi_finsts iface
       deps       = mi_deps iface
       trust      = getSafeMode $ mi_trust iface
       trust_pkg  = mi_trust_pkg iface
@@ -870,7 +870,7 @@ filterImports
     -> RnM (Maybe (Bool, Located [LIE GhcRn]), -- Import spec w/ Names
             [GlobalRdrElt])                   -- Same again, but in GRE form
 filterImports iface decl_spec Nothing
-  = return (Nothing, gresFromAvails (Just imp_spec) (mi_exports (mi_final_exts iface)))
+  = return (Nothing, gresFromAvails (Just imp_spec) (mi_exports iface))
   where
     imp_spec = ImpSpec { is_decl = decl_spec, is_item = ImpAll }
 
@@ -894,7 +894,7 @@ filterImports iface decl_spec (Just (want_hiding, L l import_items))
 
         return (Just (want_hiding, L l (map fst items2)), gres)
   where
-    all_avails = mi_exports (mi_final_exts iface)
+    all_avails = mi_exports iface
 
         -- See Note [Dealing with imports]
     imp_occ_env :: OccEnv (Name,    -- the name
@@ -1541,7 +1541,7 @@ getMinimalImports = mapM mk_minimal
     to_ie _ (AvailTC n [m] [])
        | n==m = [IEThingAbs noExtField (to_ie_post_rn $ noLoc n)]
     to_ie iface (AvailTC n ns fs)
-      = case [(xs,gs) |  AvailTC x xs gs <- mi_exports (mi_final_exts iface)
+      = case [(xs,gs) |  AvailTC x xs gs <- mi_exports iface
                  , x == n
                  , x `elem` xs    -- Note [Partial export]
                  ] of

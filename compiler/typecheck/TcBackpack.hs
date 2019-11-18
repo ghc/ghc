@@ -93,7 +93,7 @@ checkHsigDeclM sig_iface sig_thing real_thing = do
     -- implementation cases.
     checkBootDeclM False sig_thing real_thing
     real_fixity <- lookupFixityRn name
-    let sig_fixity = case mi_fix_fn (mi_final_exts sig_iface) (occName name) of
+    let sig_fixity = case mi_fix_fn sig_iface (occName name) of
                         Nothing -> defaultFixity
                         Just f -> f
     when (real_fixity /= sig_fixity) $
@@ -362,17 +362,23 @@ tcRnMergeSignatures hsc_env hpm orig_tcg_env iface =
   real_loc = tcg_top_loc orig_tcg_env
 
 thinModIface :: [AvailInfo] -> ModIface -> ModIface
-thinModIface avails iface = iface'
+thinModIface avails iface =
+    iface {
+        mi_exports = avails,
+        -- mi_fixities = ...,
+        -- mi_warns = ...,
+        -- mi_anns = ...,
+        -- TODO: The use of nameOccName here is a bit dodgy, because
+        -- perhaps there might be two IfaceTopBndr that are the same
+        -- OccName but different Name.  Requires better understanding
+        -- of invariants here.
+        mi_decls = exported_decls ++ non_exported_decls ++ dfun_decls
+        -- mi_insts = ...,
+        -- mi_fam_insts = ...,
+    }
   where
-    final_exts = (mi_final_exts iface) { mi_exports = avails }
-    -- TODO: The use of nameOccName here is a bit dodgy, because
-    -- perhaps there might be two IfaceTopBndr that are the same
-    -- OccName but different Name.  Requires better understanding
-    -- of invariants here.
-    iface' = iface{ mi_final_exts = final_exts{ mi_decls = exported_decls ++ non_exported_decls ++ dfun_decls } }
-
     decl_pred occs decl = nameOccName (ifName decl) `elemOccSet` occs
-    filter_decls occs = filter (decl_pred occs . snd) (mi_decls (mi_final_exts iface))
+    filter_decls occs = filter (decl_pred occs . snd) (mi_decls iface)
 
     exported_occs = mkOccSet [ occName n
                              | a <- avails
@@ -386,7 +392,7 @@ thinModIface avails iface = iface'
 
     dfun_pred IfaceId{ ifIdDetails = IfDFunId } = True
     dfun_pred _ = False
-    dfun_decls = filter (dfun_pred . snd) (mi_decls (mi_final_exts iface))
+    dfun_decls = filter (dfun_pred . snd) (mi_decls iface)
 
 -- | The list of 'Name's of *non-exported* 'IfaceDecl's which this
 -- 'IfaceDecl' may refer to.  A non-exported 'IfaceDecl' should be kept
@@ -650,8 +656,8 @@ mergeSignatures
             case mb_r of
                 Left err -> failWithTc err
                 Right nsubst' -> return (nsubst',oks',(imod, thinned_iface):ifaces)
-        nsubst0 = mkNameShape (moduleName inner_mod) (mi_exports (mi_final_exts lcl_iface0))
-        ok_to_use0 = mkOccSet (exportOccs (mi_exports (mi_final_exts lcl_iface0)))
+        nsubst0 = mkNameShape (moduleName inner_mod) (mi_exports lcl_iface0)
+        ok_to_use0 = mkOccSet (exportOccs (mi_exports lcl_iface0))
     -- Process each interface, getting the thinned interfaces as well as
     -- the final, full set of exports @nsubst@ and the exports which are
     -- "ok to use" (we won't attach 'inheritedSigPvpWarning' to them.)
@@ -827,7 +833,7 @@ mergeSignatures
             -- This is a HACK to prevent calculateAvails from including imp_mod
             -- in the listing.  We don't want it because a module is NOT
             -- supposed to include itself in its dep_orphs/dep_finsts.  See #13214
-            iface' = iface { mi_final_exts = (mi_final_exts iface){ mi_orphan = False, mi_finsts = False } }
+            iface' = iface { mi_orphan = False, mi_finsts = False }
             avails = plusImportAvails (tcg_imports tcg_env) $
                         calculateAvails dflags iface' False False ImportedBySystem
         return tcg_env {
@@ -838,7 +844,7 @@ mergeSignatures
                 if outer_mod == mi_module iface
                     -- Don't add ourselves!
                     then tcg_merged tcg_env
-                    else (mi_module iface, mi_mod_hash (mi_final_exts iface)) : tcg_merged tcg_env
+                    else (mi_module iface, mi_mod_hash iface) : tcg_merged tcg_env
             }
 
     -- Note [Signature merging DFuns]
@@ -906,8 +912,8 @@ checkImplements impl_mod req_mod@(IndefModule uid mod_name) =
     impl_iface <- initIfaceTcRn $
         loadSysInterface (text "checkImplements 1") impl_mod
     let impl_gr = mkGlobalRdrEnv
-                    (gresFromAvails Nothing (mi_exports (mi_final_exts impl_iface)))
-        nsubst = mkNameShape (moduleName impl_mod) (mi_exports (mi_final_exts impl_iface))
+                    (gresFromAvails Nothing (mi_exports impl_iface))
+        nsubst = mkNameShape (moduleName impl_mod) (mi_exports impl_iface)
 
     -- Load all the orphans, so the subsequent 'checkHsigIface' sees
     -- all the instances it needs to
@@ -949,7 +955,7 @@ checkImplements impl_mod req_mod@(IndefModule uid mod_name) =
 
     -- STEP 3: Check that the implementing interface exports everything
     -- we need.  (Notice we IGNORE the Modules in the AvailInfos.)
-    forM_ (exportOccs (mi_exports (mi_final_exts isig_iface))) $ \occ ->
+    forM_ (exportOccs (mi_exports isig_iface)) $ \occ ->
         case lookupGlobalRdrEnv impl_gr occ of
             [] -> addErr $ quotes (ppr occ)
                     <+> text "is exported by the hsig file, but not"
@@ -972,7 +978,7 @@ checkImplements impl_mod req_mod@(IndefModule uid mod_name) =
     -- STEP 7: Return the updated 'TcGblEnv' with the signature exports,
     -- so we write them out.
     return tcg_env {
-        tcg_exports = mi_exports (mi_final_exts sig_iface)
+        tcg_exports = mi_exports sig_iface
         }
 
 -- | Given 'tcg_mod', instantiate a 'ModIface' from the indefinite

@@ -59,9 +59,8 @@ metaPlugin' _ meta = return meta
 
 interfaceLoadPlugin' :: [CommandLineOption] -> ModIface -> IfM lcl ModIface
 interfaceLoadPlugin' [name, "interface"] iface = do
-  let iface_exts = mi_final_exts iface
-  let exports = mi_exports iface_exts
-  return iface{ mi_final_exts = iface_exts{ mi_exports = filter (availNotNamedAs name) exports } }
+  let exports = mi_exports iface
+  return iface{ mi_exports = filter (availNotNamedAs name) exports }
 interfaceLoadPlugin' _ iface = return iface
 
 availNotNamedAs :: String -> AvailInfo -> Bool

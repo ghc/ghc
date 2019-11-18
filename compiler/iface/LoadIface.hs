@@ -423,7 +423,7 @@ loadInterface doc_str mod from
                            Succeeded hi_boot_file -> computeInterface doc_str hi_boot_file mod
         ; case read_result of {
             Failed err -> do
-                { let fake_iface = emptyFullModIface mod
+                { let fake_iface = emptyModIface mod
 
                 ; updateEps_ $ \eps ->
                         eps { eps_PIT = extendModuleEnv (eps_PIT eps) (mi_module fake_iface) fake_iface }
@@ -466,20 +466,20 @@ loadInterface doc_str mod from
         --      explicitly tag each export which seems a bit of a bore)
 
         ; ignore_prags      <- goptM Opt_IgnoreInterfacePragmas
-        ; new_eps_decls     <- loadDecls ignore_prags (mi_decls (mi_final_exts iface))
-        ; new_eps_insts     <- mapM tcIfaceInst (mi_insts (mi_final_exts iface))
-        ; new_eps_fam_insts <- mapM tcIfaceFamInst (mi_fam_insts (mi_final_exts iface))
-        ; new_eps_rules     <- tcIfaceRules ignore_prags (mi_rules (mi_final_exts iface))
-        ; new_eps_anns      <- tcIfaceAnnotations (mi_anns (mi_final_exts iface))
-        ; new_eps_complete_sigs <- tcIfaceCompleteSigs (mi_complete_sigs (mi_final_exts iface))
+        ; new_eps_decls     <- loadDecls ignore_prags (mi_decls iface)
+        ; new_eps_insts     <- mapM tcIfaceInst (mi_insts iface)
+        ; new_eps_fam_insts <- mapM tcIfaceFamInst (mi_fam_insts iface)
+        ; new_eps_rules     <- tcIfaceRules ignore_prags (mi_rules iface)
+        ; new_eps_anns      <- tcIfaceAnnotations (mi_anns iface)
+        ; new_eps_complete_sigs <- tcIfaceCompleteSigs (mi_complete_sigs iface)
 
-        ; let final_iface = iface{ mi_final_exts = (mi_final_exts iface) {
+        ; let final_iface = iface{
                               mi_decls     = panic "No mi_decls in PIT",
                               mi_insts     = panic "No mi_insts in PIT",
                               mi_fam_insts = panic "No mi_fam_insts in PIT",
                               mi_rules     = panic "No mi_rules in PIT",
                               mi_anns      = panic "No mi_anns in PIT"
-                            } }
+                            }
 
         ; let bad_boot = mi_boot iface && fmap fst (if_rec_types gbl_env) == Just mod
                             -- Warn warn against an EPS-updating import
@@ -964,7 +964,7 @@ findAndReadIface doc_str mod wanted_mod_with_insts hi_boot_file
                   r <- read_file dynFilePath
                   case r of
                       Succeeded (dynIface, _)
-                       | mi_mod_hash (mi_final_exts iface) == mi_mod_hash (mi_final_exts dynIface) ->
+                       | mi_mod_hash iface == mi_mod_hash dynIface ->
                           return ()
                        | otherwise ->
                           do traceIf (text "Dynamic hash doesn't match")
@@ -1040,13 +1040,11 @@ ghcPrimIface :: ModIface
 ghcPrimIface
   = empty_iface {
         mi_fixities = fixities,
-        mi_final_exts = (mi_final_exts empty_iface)
-          { mi_fix_fn = mkIfaceFixCache fixities
-          , mi_exports = ghcPrimExports
-          }
+        mi_fix_fn = mkIfaceFixCache fixities,
+        mi_exports = ghcPrimExports
         }
   where
-    empty_iface = emptyFullModIface gHC_PRIM
+    empty_iface = emptyModIface gHC_PRIM
 
     -- The fixities listed here for @`seq`@ or @->@ should match
     -- those in primops.txt.pp (from which Haddock docs are generated).
@@ -1119,42 +1117,42 @@ pprModIfaceSimple :: ModIface -> SDoc
 pprModIfaceSimple iface =
     ppr (mi_module iface) $$
     pprDeps (mi_deps iface) $$
-    nest 2 (vcat (map pprExport (mi_exports (mi_final_exts iface))))
+    nest 2 (vcat (map pprExport (mi_exports iface)))
 
 pprModIface :: ModIface -> SDoc
 -- Show a ModIface
-pprModIface iface@ModIface{ mi_final_exts = exts }
+pprModIface iface
  = vcat [ text "interface"
                 <+> ppr (mi_module iface) <+> pp_hsc_src (mi_hsc_src iface)
-                <+> (if mi_orphan exts then text "[orphan module]" else Outputable.empty)
-                <+> (if mi_finsts exts then text "[family instance module]" else Outputable.empty)
+                <+> (if mi_orphan iface then text "[orphan module]" else Outputable.empty)
+                <+> (if mi_finsts iface then text "[family instance module]" else Outputable.empty)
                 <+> (if mi_hpc iface then text "[hpc]" else Outputable.empty)
                 <+> integer hiVersion
-        , nest 2 (text "interface hash:" <+> ppr (mi_iface_hash exts))
-        , nest 2 (text "ABI hash:" <+> ppr (mi_mod_hash exts))
-        , nest 2 (text "export-list hash:" <+> ppr (mi_exp_hash exts))
-        , nest 2 (text "orphan hash:" <+> ppr (mi_orphan_hash exts))
-        , nest 2 (text "flag hash:" <+> ppr (mi_flag_hash exts))
-        , nest 2 (text "opt_hash:" <+> ppr (mi_opt_hash exts))
-        , nest 2 (text "hpc_hash:" <+> ppr (mi_hpc_hash exts))
-        , nest 2 (text "plugin_hash:" <+> ppr (mi_plugin_hash exts))
+        , nest 2 (text "interface hash:" <+> ppr (mi_iface_hash iface))
+        , nest 2 (text "ABI hash:" <+> ppr (mi_mod_hash iface))
+        , nest 2 (text "export-list hash:" <+> ppr (mi_exp_hash iface))
+        , nest 2 (text "orphan hash:" <+> ppr (mi_orphan_hash iface))
+        , nest 2 (text "flag hash:" <+> ppr (mi_flag_hash iface))
+        , nest 2 (text "opt_hash:" <+> ppr (mi_opt_hash iface))
+        , nest 2 (text "hpc_hash:" <+> ppr (mi_hpc_hash iface))
+        , nest 2 (text "plugin_hash:" <+> ppr (mi_plugin_hash iface))
         , nest 2 (text "sig of:" <+> ppr (mi_sig_of iface))
         , nest 2 (text "used TH splices:" <+> ppr (mi_used_th iface))
         , nest 2 (text "where")
         , text "exports:"
-        , nest 2 (vcat (map pprExport (mi_exports (mi_final_exts iface))))
+        , nest 2 (vcat (map pprExport (mi_exports iface)))
         , pprDeps (mi_deps iface)
         , vcat (map pprUsage (mi_usages iface))
-        , vcat (map pprIfaceAnnotation (mi_anns (mi_final_exts iface)))
+        , vcat (map pprIfaceAnnotation (mi_anns iface))
         , pprFixities (mi_fixities iface)
-        , vcat [ppr ver $$ nest 2 (ppr decl) | (ver,decl) <- mi_decls (mi_final_exts iface)]
-        , vcat (map ppr (mi_insts (mi_final_exts iface)))
-        , vcat (map ppr (mi_fam_insts (mi_final_exts iface)))
-        , vcat (map ppr (mi_rules (mi_final_exts iface)))
+        , vcat [ppr ver $$ nest 2 (ppr decl) | (ver,decl) <- mi_decls iface]
+        , vcat (map ppr (mi_insts iface))
+        , vcat (map ppr (mi_fam_insts iface))
+        , vcat (map ppr (mi_rules iface))
         , ppr (mi_warns iface)
         , pprTrustInfo (mi_trust iface)
         , pprTrustPkg (mi_trust_pkg iface)
-        , vcat (map ppr (mi_complete_sigs (mi_final_exts iface)))
+        , vcat (map ppr (mi_complete_sigs iface))
         , text "module header:" $$ nest 2 (ppr (mi_doc_hdr iface))
         , text "declaration docs:" $$ nest 2 (ppr (mi_decl_docs iface))
         , text "arg docs:" $$ nest 2 (ppr (mi_arg_docs iface))

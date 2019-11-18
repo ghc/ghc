@@ -258,7 +258,7 @@ lookupRdrNameInModuleForPlugins hsc_env mod_name rdr_name = do
                     let decl_spec = ImpDeclSpec { is_mod = mod_name, is_as = mod_name
                                                 , is_qual = False, is_dloc = noSrcSpan }
                         imp_spec = ImpSpec decl_spec ImpAll
-                        env = mkGlobalRdrEnv (gresFromAvails (Just imp_spec) (mi_exports (mi_final_exts iface)))
+                        env = mkGlobalRdrEnv (gresFromAvails (Just imp_spec) (mi_exports iface))
                     case lookupGRE_RdrName rdr_name env of
                         [gre] -> return (Just (gre_name gre, iface))
                         []    -> return Nothing

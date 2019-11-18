@@ -66,7 +66,7 @@ import FileCleanup
 import Ar
 import Bag              ( unitBag )
 import FastString       ( mkFastString )
-import MkIface          ( mkFullIface )
+import MkIface          ( mkIface )
 
 import Exception
 import System.Directory
@@ -219,13 +219,13 @@ compileOne' m_tc_result mHscMessage
             return $! HomeModInfo iface mod_details (Just linkable)
         (HscRecomp { hscs_guts = cgguts,
                      hscs_mod_location = mod_location,
-                     hscs_partial_iface = partial_iface,
+                     hscs_desugared_guts = desugared_guts,
                      hscs_old_iface_hash = mb_old_iface_hash,
                      hscs_iface_dflags = iface_dflags }, HscInterpreted) -> do
             -- In interpreted mode the regular codeGen backend is not run so we
             -- generate a interface without codeGen info.
             (final_iface, mod_details) <-
-              mkFullIface hsc_env'{hsc_dflags=iface_dflags} cgguts partial_iface
+              mkIface hsc_env'{hsc_dflags=iface_dflags} desugared_guts cgguts
             liftIO $ hscMaybeWriteIface dflags final_iface mb_old_iface_hash mod_location
 
             (hasStub, comp_bc, spt_entries) <- hscInteractive hsc_env' cgguts mod_location
@@ -1177,7 +1177,7 @@ runPhase (HscOut src_flavour mod_name result) _ dflags = do
                    return (RealPhase StopLn, o_file)
             HscRecomp { hscs_guts = cgguts,
                         hscs_mod_location = mod_location,
-                        hscs_partial_iface = partial_iface,
+                        hscs_desugared_guts = desugared_guts,
                         hscs_old_iface_hash = mb_old_iface_hash,
                         hscs_iface_dflags = iface_dflags }
               -> do output_fn <- phaseOutputFilename next_phase
@@ -1188,7 +1188,7 @@ runPhase (HscOut src_flavour mod_name result) _ dflags = do
                       hscGenHardCode hsc_env' cgguts mod_location output_fn
 
                     (final_iface, mod_details) <-
-                      liftIO (mkFullIface hsc_env'{hsc_dflags=iface_dflags} cgguts partial_iface)
+                      liftIO (mkIface hsc_env'{hsc_dflags=iface_dflags} desugared_guts cgguts)
                     setIface final_iface mod_details
 
                     -- See Note [Writing interface files]
