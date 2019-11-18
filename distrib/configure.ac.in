@@ -77,6 +77,9 @@ dnl ** Find the path to sed **
 #
 AC_PATH_PROG(SedCmd,gsed sed,sed)
 
+dnl ** check for Python for testsuite driver
+FIND_PYTHON
+
 XCODE_VERSION()
 
 dnl ** Which gcc to use?
