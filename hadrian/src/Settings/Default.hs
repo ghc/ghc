@@ -67,7 +67,11 @@ stage0Packages = do
              , ghcHeap
              , ghci
              , ghcPkg
-             , hsc2hs
+             ]
+          -- Build fresh new process on Windows to ensure that hsc2hs
+          -- isn't afflicted with #17480.
+          ++ [ process | windowsHost ]
+          ++ [ hsc2hs
              , hpc
              , mtl
              , parsec

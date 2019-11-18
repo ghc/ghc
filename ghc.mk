@@ -419,6 +419,11 @@ ifeq "$(Windows_Host)" "NO"
 PACKAGES_STAGE0 += terminfo
 endif
 
+# Install process on Windows to ensure that hsc2hs isn't afflicted by #17480.
+ifeq "$(Windows_Host)" "YES"
+PACKAGES_STAGE0 += process
+endif
+
 PACKAGES_STAGE1 += ghc-prim
 PACKAGES_STAGE1 += $(INTEGER_LIBRARY)
 PACKAGES_STAGE1 += base
