@@ -47,4 +47,4 @@ fi
 
 # Install new process to mitigate #17480.
 ( cd libraries/process; autoreconf )
-cabal install libraries/process
+cabal install --global libraries/process
