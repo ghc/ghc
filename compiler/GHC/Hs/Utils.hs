@@ -145,7 +145,7 @@ from their components, compared with the @nl*@ functions below which
 just attach 'noSrcSpan' to everything.
 -}
 
--- | e => (e)
+-- | @e => (e)@
 mkHsPar :: LHsExpr (GhcPass id) -> LHsExpr (GhcPass id)
 mkHsPar e = L (getLoc e) (HsPar noExtField e)
 
@@ -222,8 +222,8 @@ nlHsTyApps :: IdP (GhcPass id) -> [Type] -> [LHsExpr (GhcPass id)]
 nlHsTyApps fun_id tys xs = foldl' nlHsApp (nlHsTyApp fun_id tys) xs
 
 --------- Adding parens ---------
--- | Wrap in parens if (hsExprNeedsParens appPrec) says it needs them
--- So   'f x'  becomes '(f x)', but '3' stays as '3'
+-- | Wrap in parens if @'hsExprNeedsParens' appPrec@ says it needs them
+-- So @f x@ becomes @(f x)@, but @3@ stays as @3@.
 mkLHsPar :: LHsExpr (GhcPass id) -> LHsExpr (GhcPass id)
 mkLHsPar le@(L loc e)
   | hsExprNeedsParens appPrec e = L loc (HsPar noExtField le)
@@ -387,7 +387,7 @@ mkHsStringPrimLit fs = HsStringPrim NoSourceText (bytesFS fs)
 nlHsVar :: IdP (GhcPass id) -> LHsExpr (GhcPass id)
 nlHsVar n = noLoc (HsVar noExtField (noLoc n))
 
--- | NB: Only for LHsExpr **Id**
+-- | NB: Only for 'LHsExpr' 'Id'.
 nlHsDataCon :: DataCon -> LHsExpr GhcTc
 nlHsDataCon con = noLoc (HsConLikeOut noExtField (RealDataCon con))
 
@@ -628,7 +628,7 @@ mkHsSigEnv get_info sigs
                             , L _ n <- ns ]
 
 mkClassOpSigs :: [LSig GhcPs] -> [LSig GhcPs]
--- ^ Convert TypeSig to ClassOpSig
+-- ^ Convert 'TypeSig' to 'ClassOpSig'.
 -- The former is what is parsed, but the latter is
 -- what we need in class/instance declarations
 mkClassOpSigs sigs
@@ -755,8 +755,8 @@ positions in the kind of the tycon.
 mkLHsWrap :: HsWrapper -> LHsExpr (GhcPass id) -> LHsExpr (GhcPass id)
 mkLHsWrap co_fn (L loc e) = L loc (mkHsWrap co_fn e)
 
--- | Avoid (HsWrap co (HsWrap co' _)).
--- See Note [Detecting forced eta expansion] in DsExpr
+-- | Avoid @'HsWrap' co1 ('HsWrap' co2 _)@.
+-- See Note [Detecting forced eta expansion] in "DsExpr"
 mkHsWrap :: HsWrapper -> HsExpr (GhcPass id) -> HsExpr (GhcPass id)
 mkHsWrap co_fn e | isIdHsWrapper co_fn = e
 mkHsWrap co_fn (HsWrap _ co_fn' e)     = mkHsWrap (co_fn <.> co_fn') e
@@ -972,20 +972,20 @@ collectLocalBinders (XHsLocalBindsLR _) = []
 
 collectHsIdBinders, collectHsValBinders
   :: HsValBindsLR (GhcPass idL) (GhcPass idR) -> [IdP (GhcPass idL)]
--- ^ Collect Id binders only, or Ids + pattern synonyms, respectively
+-- ^ Collect 'Id' binders only, or 'Id's + pattern synonyms, respectively
 collectHsIdBinders  = collect_hs_val_binders True
 collectHsValBinders = collect_hs_val_binders False
 
 collectHsBindBinders :: XRec pass Pat ~ Located (Pat pass) =>
                         HsBindLR pass idR -> [IdP pass]
--- ^ Collect both Ids and pattern-synonym binders
+-- ^ Collect both 'Id's and pattern-synonym binders
 collectHsBindBinders b = collect_bind False b []
 
 collectHsBindsBinders :: LHsBindsLR (GhcPass p) idR -> [IdP (GhcPass p)]
 collectHsBindsBinders binds = collect_binds False binds []
 
 collectHsBindListBinders :: [LHsBindLR (GhcPass p) idR] -> [IdP (GhcPass p)]
--- ^ Same as collectHsBindsBinders, but works over a list of bindings
+-- ^ Same as 'collectHsBindsBinders', but works over a list of bindings
 collectHsBindListBinders = foldr (collect_bind False . unLoc) []
 
 collect_hs_val_binders :: Bool -> HsValBindsLR (GhcPass idL) (GhcPass idR)
@@ -1000,7 +1000,7 @@ collect_out_binds ps = foldr (collect_binds ps . snd) []
 
 collect_binds :: Bool -> LHsBindsLR (GhcPass p) idR ->
                  [IdP (GhcPass p)] -> [IdP (GhcPass p)]
--- ^ Collect Ids, or Ids + pattern synonyms, depending on boolean flag
+-- ^ Collect 'Id's, or 'Id's + pattern synonyms, depending on boolean flag
 collect_binds ps binds acc = foldr (collect_bind ps . unLoc) acc binds
 
 collect_bind :: XRec pass Pat ~ Located (Pat pass) =>
@@ -1020,7 +1020,8 @@ collect_bind _ (PatSynBind _ (XPatSynBind _)) acc = acc
 collect_bind _ (XHsBindsLR _) acc = acc
 
 collectMethodBinders :: LHsBindsLR idL idR -> [Located (IdP idL)]
--- ^ Used exclusively for the bindings of an instance decl which are all FunBinds
+-- ^ Used exclusively for the bindings of an instance decl which are all
+-- 'FunBinds'
 collectMethodBinders binds = foldr (get . unLoc) [] binds
   where
     get (FunBind { fun_id = f }) fs = f : fs
@@ -1198,7 +1199,7 @@ hsForeignDeclsBinders foreign_decls
 -------------------
 hsPatSynSelectors :: HsValBinds (GhcPass p) -> [IdP (GhcPass p)]
 -- ^ Collects record pattern-synonym selectors only; the pattern synonym
--- names are collected by collectHsValBinders.
+-- names are collected by 'collectHsValBinders'.
 hsPatSynSelectors (ValBinds _ _ _) = panic "hsPatSynSelectors"
 hsPatSynSelectors (XValBindsLR (NValBinds binds _))
   = foldr addPatSynSelector [] . unionManyBags $ map snd binds
@@ -1230,7 +1231,7 @@ hsLInstDeclBinders (L _ (XInstDecl nec))
   = noExtCon nec
 
 -------------------
--- | the SrcLoc returned are for the whole declarations, not just the names
+-- | the 'SrcLoc' returned are for the whole declarations, not just the names
 hsDataFamInstBinders :: DataFamInstDecl (GhcPass p)
                      -> ([Located (IdP (GhcPass p))], [LFieldOcc (GhcPass p)])
 hsDataFamInstBinders (DataFamInstDecl { dfid_eqn = HsIB { hsib_body =
@@ -1244,7 +1245,7 @@ hsDataFamInstBinders (DataFamInstDecl (XHsImplicitBndrs nec))
   = noExtCon nec
 
 -------------------
--- | the SrcLoc returned are for the whole declarations, not just the names
+-- | the 'SrcLoc' returned are for the whole declarations, not just the names
 hsDataDefnBinders :: HsDataDefn (GhcPass p)
                   -> ([Located (IdP (GhcPass p))], [LFieldOcc (GhcPass p)])
 hsDataDefnBinders (HsDataDefn { dd_cons = cons })
