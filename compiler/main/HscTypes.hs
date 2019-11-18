@@ -34,7 +34,7 @@ module HscTypes (
 
         -- * Information about modules
         ModDetails(..), emptyModDetails,
-        ModGuts(..), CgGuts(..), ForeignStubs(..), appendStubC,
+        ModGuts(..), CgModGuts(..), mkCgModGuts, CgGuts(..), ForeignStubs(..), appendStubC,
         ImportedMods, ImportedBy(..), importedByUser, ImportedModsVal(..), SptEntry(..),
         ForeignSrcLang(..),
         phaseForeignLanguage,
@@ -245,7 +245,7 @@ data HscStatus
           -- ^ Information for the code generator.
         , hscs_mod_location :: !ModLocation
           -- ^ Module info
-        , hscs_desugared_guts :: !ModGuts
+        , hscs_desugared_guts :: !CgModGuts
         , hscs_old_iface_hash :: !(Maybe Fingerprint)
           -- ^ Old interface hash for this compilation, if an old interface file
           -- exists. Pass to `hscMaybeWriteIface` when writing the interface to
@@ -1374,6 +1374,43 @@ data ModGuts
         mg_decl_docs     :: !DeclDocMap,     -- ^ Docs on declarations.
         mg_arg_docs      :: !ArgDocMap       -- ^ Docs on arguments.
     }
+
+-- | Like `ModGuts`, but only includes stuff that we need for interface
+-- file generation (see `MKIface.mkIface`).
+data CgModGuts = CgModGuts
+  { cg_mg_module :: !Module
+  , cg_mg_hsc_src :: !HscSource
+  , cg_mg_usages :: ![Usage]
+  , cg_mg_used_th :: !Bool
+  , cg_mg_deps :: !Dependencies
+  , cg_mg_rdr_env :: !GlobalRdrEnv
+  , cg_mg_fix_env :: !FixityEnv
+  , cg_mg_warns :: !Warnings
+  , cg_mg_hpc_info :: !HpcInfo
+  , cg_mg_safe_haskell :: !SafeHaskellMode
+  , cg_mg_trust_pkg :: !Bool
+  , cg_mg_doc_hdr :: !(Maybe HsDocString)
+  , cg_mg_decl_docs :: !DeclDocMap
+  , cg_mg_arg_docs :: !ArgDocMap
+  }
+
+mkCgModGuts :: ModGuts -> CgModGuts
+mkCgModGuts mod_guts = CgModGuts
+  { cg_mg_module = mg_module mod_guts
+  , cg_mg_hsc_src = mg_hsc_src mod_guts
+  , cg_mg_usages = mg_usages mod_guts
+  , cg_mg_used_th = mg_used_th mod_guts
+  , cg_mg_deps = mg_deps mod_guts
+  , cg_mg_rdr_env = mg_rdr_env mod_guts
+  , cg_mg_fix_env = mg_fix_env mod_guts
+  , cg_mg_warns = mg_warns mod_guts
+  , cg_mg_hpc_info = mg_hpc_info mod_guts
+  , cg_mg_safe_haskell = mg_safe_haskell mod_guts
+  , cg_mg_trust_pkg = mg_trust_pkg mod_guts
+  , cg_mg_doc_hdr = mg_doc_hdr mod_guts
+  , cg_mg_decl_docs = mg_decl_docs mod_guts
+  , cg_mg_arg_docs = mg_arg_docs mod_guts
+  }
 
 -- The ModGuts takes on several slightly different forms:
 --

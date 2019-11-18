@@ -186,24 +186,25 @@ mkModDetails hsc_env cg_guts =
       , md_complete_sigs = cg_mg_complete_sigs cg_guts
       }
 
-mkIface :: HscEnv -> ModGuts -> CgGuts -> IO (ModIface, ModDetails)
+mkIface :: HscEnv -> CgModGuts -> CgGuts -> IO (ModIface, ModDetails)
 mkIface hsc_env desugared_guts cg_guts = do
 
-    let ModGuts{ mg_module       = this_mod
-               , mg_hsc_src      = hsc_src
-               , mg_usages       = usages
-               , mg_used_th      = used_th
-               , mg_deps         = deps
-               , mg_rdr_env      = rdr_env
-               , mg_fix_env      = fix_env
-               , mg_warns        = warns
-               , mg_hpc_info     = hpc_info
-               , mg_safe_haskell = safe_mode
-               , mg_trust_pkg    = self_trust
-               , mg_doc_hdr      = doc_hdr
-               , mg_decl_docs    = decl_docs
-               , mg_arg_docs     = arg_docs
-               } = desugared_guts
+    let CgModGuts
+          { cg_mg_module = this_mod
+          , cg_mg_hsc_src = hsc_src
+          , cg_mg_usages = usages
+          , cg_mg_used_th = used_th
+          , cg_mg_deps = deps
+          , cg_mg_rdr_env = rdr_env
+          , cg_mg_fix_env = fix_env
+          , cg_mg_warns = warns
+          , cg_mg_hpc_info = hpc_info
+          , cg_mg_safe_haskell = safe_mode
+          , cg_mg_trust_pkg = self_trust
+          , cg_mg_doc_hdr = doc_hdr
+          , cg_mg_decl_docs = decl_docs
+          , cg_mg_arg_docs = arg_docs
+          } = desugared_guts
 
     let mod_details = mkModDetails hsc_env cg_guts
     let dflags = hsc_dflags hsc_env
