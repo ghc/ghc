@@ -187,14 +187,16 @@ mkStaticClosureFields dflags info_tbl ccs caf_refs payload
     -- same place.  So we use isThunkRep rather than closureUpdReqd
     -- here:
 
-    is_caf = isThunkRep (cit_rep info_tbl)
+    smrep = cit_rep info_tbl
+    is_caf = isThunkRep smrep
+    is_con = isConRep smrep
 
     padding
         | is_caf && null payload = [mkIntCLit dflags 0]
         | otherwise = []
 
     static_link_field
-        | is_caf || staticClosureNeedsLink (mayHaveCafRefs caf_refs) info_tbl
+        | is_caf || needs_link
         = [static_link_value]
         | otherwise
         = []
@@ -203,14 +205,25 @@ mkStaticClosureFields dflags info_tbl ccs caf_refs payload
         | is_caf     = [mkIntCLit dflags 0]
         | otherwise  = []
 
+    has_srt = mayHaveCafRefs caf_refs
+
+    -- A static closure needs a link field to aid the GC when traversing
+    -- the static closure graph.  But it only needs such a field if either
+    --        a) it has an SRT
+    --        b) it's a constructor with one or more pointer fields
+    -- In case (b), the constructor's fields themselves play the role
+    -- of the SRT.
+    needs_link
+        | is_con = not (isStaticNoCafCon smrep)
+        | otherwise = has_srt
+
         -- For a static constructor which has NoCafRefs, we set the
         -- static link field to a non-zero value so the garbage
         -- collector will ignore it.
+        -- See Note [STATIC_LINK fields] in rts/sm/Storage.h
     static_link_value
-        | mayHaveCafRefs caf_refs  = mkIntCLit dflags 0
-        | otherwise                = mkIntCLit dflags 3  -- No CAF refs
-                                      -- See Note [STATIC_LINK fields]
-                                      -- in rts/sm/Storage.h
+        | has_srt   = mkIntCLit dflags 0
+        | otherwise = mkIntCLit dflags 3  -- No CAF refs
 
 mkStaticClosure :: DynFlags -> CLabel -> CostCentreStack -> [CmmLit]
   -> [CmmLit] -> [CmmLit] -> [CmmLit] -> [CmmLit]

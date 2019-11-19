@@ -58,8 +58,7 @@ module GHC.StgToCmm.Closure (
         -- * InfoTables
         mkDataConInfoTable,
         cafBlackHoleInfoTable,
-        indStaticInfoTable,
-        staticClosureNeedsLink,
+        indStaticInfoTable
     ) where
 
 #include "HsVersions.h"
@@ -993,14 +992,3 @@ indStaticInfoTable
                  , cit_prof = NoProfilingInfo
                  , cit_srt  = Nothing
                  , cit_clo  = Nothing }
-
-staticClosureNeedsLink :: Bool -> CmmInfoTable -> Bool
--- A static closure needs a link field to aid the GC when traversing
--- the static closure graph.  But it only needs such a field if either
---        a) it has an SRT
---        b) it's a constructor with one or more pointer fields
--- In case (b), the constructor's fields themselves play the role
--- of the SRT.
-staticClosureNeedsLink has_srt CmmInfoTable{ cit_rep = smrep }
-  | isConRep smrep         = not (isStaticNoCafCon smrep)
-  | otherwise              = has_srt
