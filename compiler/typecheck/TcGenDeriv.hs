@@ -82,9 +82,8 @@ import Data.List  ( find, partition, intersperse )
 type BagDerivStuff = Bag DerivStuff
 
 data AuxBindSpec
-  = DerivCon2Tag TyCon  -- The con2Tag for given TyCon
-  | DerivTag2Con TyCon  -- ...ditto tag2Con
-  | DerivMaxTag  TyCon  -- ...and maxTag
+  = DerivTag2Con TyCon  -- The tag2Con for given TyCon
+  | DerivMaxTag  TyCon  -- ...and ditto maxTag
   deriving( Eq )
   -- All these generate ZERO-BASED tag operations
   -- I.e first constructor has tag 0
@@ -129,14 +128,14 @@ possibly zero of them).  Here's an example, with both \tr{N}ullary and
 * For nullary constructors, we emit a
   catch-all clause of the form:
 
-      (==) a b  = case (dataToTag a) of { a# ->
-                  case (con2tag_Foo b) of { b# ->
+      (==) a b  = case (dataToTag# a) of { a# ->
+                  case (dataToTag# b) of { b# ->
                   case (a# ==# b#)     of {
                     r -> r }}}
 
-  If con2tag gets inlined this leads to join point stuff, so
-  it's better to use regular pattern matching if there aren't too
-  many nullary constructors.  "Ten" is arbitrary, of course
+  An older approach preferred regular pattern matches in some cases
+  but with dataToTag# forcing it's argument, and work on improving
+  join points this seems no longer necessary.
 
 * If there aren't any nullary constructors, we emit a simpler
   catch-all:
@@ -161,7 +160,7 @@ produced don't get through the typechecker.
 gen_Eq_binds :: SrcSpan -> TyCon -> TcM (LHsBinds GhcPs, BagDerivStuff)
 gen_Eq_binds loc tycon = do
     dflags <- getDynFlags
-    return (method_binds dflags, aux_binds)
+    return (method_binds dflags, emptyBag)
   where
     all_cons = tyConDataCons tycon
     (nullary_cons, non_nullary_cons) = partition isNullarySrcDataCon all_cons
@@ -189,10 +188,6 @@ gen_Eq_binds loc tycon = do
       = [([a_Pat, b_Pat],
          untag_Expr dflags tycon [(a_RDR,ah_RDR), (b_RDR,bh_RDR)]
                     (genPrimOpApp (nlHsVar ah_RDR) eqInt_RDR (nlHsVar bh_RDR)))]
-
-    aux_binds | no_tag_match_cons = emptyBag
-              | otherwise         = emptyBag
-              --unitBag $ DerivAuxBind $ DerivCon2Tag tycon
 
     method_binds dflags = unitBag (eq_bind dflags)
     eq_bind dflags = mkFunBindEC 2 loc eq_RDR (const true_Expr)
@@ -346,11 +341,8 @@ gen_Ord_binds loc tycon = do
       then ( unitBag $ mkFunBindEC 2 loc compare_RDR (const eqTag_Expr) []
            , emptyBag)
       else ( unitBag (mkOrdOp dflags OrdCompare) `unionBags` other_ops dflags
-           , aux_binds)
+           , emptyBag)
   where
-    aux_binds | single_con_type = emptyBag
-              | otherwise       = unitBag $ DerivAuxBind $ DerivCon2Tag tycon
-
         -- Note [Game plan for deriving Ord]
     other_ops dflags
       | (last_tag - first_tag) <= 2     -- 1-3 constructors
@@ -594,7 +586,7 @@ gen_Enum_binds loc tycon = do
       , from_enum      dflags
       ]
     aux_binds = listToBag $ map DerivAuxBind
-                  [DerivCon2Tag tycon, DerivTag2Con tycon, DerivMaxTag tycon]
+                  [DerivTag2Con tycon, DerivMaxTag tycon]
 
     occ_nm = getOccString tycon
 
@@ -604,7 +596,7 @@ gen_Enum_binds loc tycon = do
         nlHsIf (nlHsApps eq_RDR [nlHsVar (maxtag_RDR dflags tycon),
                                nlHsVarApps intDataCon_RDR [ah_RDR]])
              (illegal_Expr "succ" occ_nm "tried to take `succ' of last tag in enumeration")
-             (nlHsApp (nlHsVar (tag2con_RDR dflags tycon))
+             (nlHsApp (nlHsVar (dataToTag_RDR))
                     (nlHsApps plus_RDR [nlHsVarApps intDataCon_RDR [ah_RDR],
                                         nlHsIntLit 1]))
 
@@ -614,7 +606,7 @@ gen_Enum_binds loc tycon = do
         nlHsIf (nlHsApps eq_RDR [nlHsIntLit 0,
                                nlHsVarApps intDataCon_RDR [ah_RDR]])
              (illegal_Expr "pred" occ_nm "tried to take `pred' of first tag in enumeration")
-             (nlHsApp (nlHsVar (tag2con_RDR dflags tycon))
+             (nlHsApp (nlHsVar (dataToTag_RDR))
                       (nlHsApps plus_RDR
                             [ nlHsVarApps intDataCon_RDR [ah_RDR]
                             , nlHsLit (HsInt noExtField
@@ -626,14 +618,14 @@ gen_Enum_binds loc tycon = do
                 [nlHsApps ge_RDR [nlHsVar a_RDR, nlHsIntLit 0],
                  nlHsApps le_RDR [ nlHsVar a_RDR
                                  , nlHsVar (maxtag_RDR dflags tycon)]])
-             (nlHsVarApps (tag2con_RDR dflags tycon) [a_RDR])
+             (nlHsVarApps (dataToTag_RDR) [a_RDR])
              (illegal_toEnum_tag occ_nm (maxtag_RDR dflags tycon))
 
     enum_from dflags
       = mk_easy_FunBind loc enumFrom_RDR [a_Pat] $
           untag_Expr dflags tycon [(a_RDR, ah_RDR)] $
           nlHsApps map_RDR
-                [nlHsVar (tag2con_RDR dflags tycon),
+                [nlHsVar (dataToTag_RDR),
                  nlHsPar (enum_from_to_Expr
                             (nlHsVarApps intDataCon_RDR [ah_RDR])
                             (nlHsVar (maxtag_RDR dflags tycon)))]
@@ -641,7 +633,7 @@ gen_Enum_binds loc tycon = do
     enum_from_then dflags
       = mk_easy_FunBind loc enumFromThen_RDR [a_Pat, b_Pat] $
           untag_Expr dflags tycon [(a_RDR, ah_RDR), (b_RDR, bh_RDR)] $
-          nlHsApp (nlHsVarApps map_RDR [tag2con_RDR dflags tycon]) $
+          nlHsApp (nlHsVarApps map_RDR [dataToTag_RDR]) $
             nlHsPar (enum_from_then_to_Expr
                     (nlHsVarApps intDataCon_RDR [ah_RDR])
                     (nlHsVarApps intDataCon_RDR [bh_RDR])
@@ -757,8 +749,8 @@ gen_Ix_binds loc tycon = do
     dflags <- getDynFlags
     return $ if isEnumerationTyCon tycon
       then (enum_ixes dflags, listToBag $ map DerivAuxBind
-                   [DerivCon2Tag tycon, DerivTag2Con tycon, DerivMaxTag tycon])
-      else (single_con_ixes, unitBag (DerivAuxBind (DerivCon2Tag tycon)))
+                   [DerivTag2Con tycon, DerivMaxTag tycon])
+      else (single_con_ixes, emptyBag)
   where
     --------------------------------------------------------------
     enum_ixes dflags = listToBag
@@ -771,7 +763,7 @@ gen_Ix_binds loc tycon = do
       = mk_easy_FunBind loc range_RDR [nlTuplePat [a_Pat, b_Pat] Boxed] $
           untag_Expr dflags tycon [(a_RDR, ah_RDR)] $
           untag_Expr dflags tycon [(b_RDR, bh_RDR)] $
-          nlHsApp (nlHsVarApps map_RDR [tag2con_RDR dflags tycon]) $
+          nlHsApp (nlHsVarApps map_RDR [dataToTag_RDR]) $
               nlHsPar (enum_from_to_Expr
                         (nlHsVarApps intDataCon_RDR [ah_RDR])
                         (nlHsVarApps intDataCon_RDR [bh_RDR]))
@@ -1916,30 +1908,6 @@ fiddling around.
 
 genAuxBindSpec :: DynFlags -> SrcSpan -> AuxBindSpec
                   -> (LHsBind GhcPs, LSig GhcPs)
-genAuxBindSpec dflags loc (DerivCon2Tag tycon)
-  = (mkFunBindSE 0 loc rdr_name eqns,
-     L loc (TypeSig noExtField [L loc rdr_name] sig_ty))
-  where
-    rdr_name = con2tag_RDR dflags tycon
-
-    sig_ty = mkLHsSigWcType $ L loc $ XHsType $ NHsCoreTy $
-             mkSpecSigmaTy (tyConTyVars tycon) (tyConStupidTheta tycon) $
-             mkParentType tycon `mkVisFunTy` intPrimTy
-
-    lots_of_constructors = tyConFamilySize tycon > 8
-                        -- was: mAX_FAMILY_SIZE_FOR_VEC_RETURNS
-                        -- but we don't do vectored returns any more.
-
-    eqns | lots_of_constructors = [get_tag_eqn]
-         | otherwise = map mk_eqn (tyConDataCons tycon)
-
-    get_tag_eqn = ([nlVarPat a_RDR], nlHsApp (nlHsVar getTag_RDR) a_Expr)
-
-    mk_eqn :: DataCon -> ([LPat GhcPs], LHsExpr GhcPs)
-    mk_eqn con = ([nlWildConPat con],
-                  nlHsLit (HsIntPrim NoSourceText
-                                    (toInteger ((dataConTag con) - fIRST_TAG))))
-
 genAuxBindSpec dflags loc (DerivTag2Con tycon)
   = (mkFunBindSE 0 loc rdr_name
         [([nlConVarPat intDataCon_RDR [a_RDR]],
@@ -2233,7 +2201,7 @@ untag_Expr :: DynFlags
            -> LHsExpr GhcPs -- Result expr
 untag_Expr _ _ [] expr = expr
 untag_Expr dflags tycon ((untag_this, put_tag_here) : more) expr
-  {- case (getTag untag_this) of
+  {- case (dataToTag# untag_this) of
         put_tag_here -> .... <recursive on more>
           _ -> result
          -}
