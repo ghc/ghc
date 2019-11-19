@@ -1052,10 +1052,13 @@ compactPrimTy = mkTyConTy compactPrimTyCon
 ************************************************************************
 -}
 
+-- Unlike most other primitive types, BCO# is lifted. This is because in
+-- general a BCO# may be a thunk for the reasons given in Note [Updatable CAF
+-- BCOs] in GHCi.CreateBCO.
 bcoPrimTy    :: Type
 bcoPrimTy    = mkTyConTy bcoPrimTyCon
 bcoPrimTyCon :: TyCon
-bcoPrimTyCon = pcPrimTyCon0 bcoPrimTyConName UnliftedRep
+bcoPrimTyCon = pcPrimTyCon0 bcoPrimTyConName LiftedRep
 
 {-
 ************************************************************************
