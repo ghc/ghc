@@ -2379,6 +2379,8 @@ But the simplifier pushes those casts outwards, so we don't
 need to address that here.
 -}
 
+-- When updating this function, make sure to update
+-- CorePrep.tryEtaReducePrep as well!
 tryEtaReduce :: [Var] -> CoreExpr -> Maybe CoreExpr
 tryEtaReduce bndrs body
   = go (reverse bndrs) body (mkRepReflCo (exprType body))
