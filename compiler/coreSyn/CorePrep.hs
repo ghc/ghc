@@ -1184,11 +1184,7 @@ tryEtaReducePrep bndrs expr@(App _ _)
     ok _    _         = False
 
     -- We can't eta reduce something which must be saturated.
-    -- This includes binds which have no binding (respond True to
-    -- hasNoBinding) and join points (responds True to isJoinId)
-    -- Eta-reducing join points led to #17429.
-    ok_to_eta_reduce (Var f) =
-      not (isJoinId f) && not (hasNoBinding f)
+    ok_to_eta_reduce (Var f) = not (hasNoBinding f)
     ok_to_eta_reduce _       = False -- Safe. ToDo: generalise
 
 
