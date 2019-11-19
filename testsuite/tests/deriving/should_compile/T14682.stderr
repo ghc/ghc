@@ -71,9 +71,6 @@ Derived class instances:
       = (GHC.Ix.inRange (a1, b1) c1
            GHC.Classes.&& GHC.Ix.inRange (a2, b2) c2)
   
-  T14682.$con2tag_B4iUvrAY4wB3YczpMJQUOX ::
-    T14682.Foo -> GHC.Prim.Int#
-  T14682.$con2tag_B4iUvrAY4wB3YczpMJQUOX (T14682.Foo _ _) = 0#
   T14682.$tFoo :: Data.Data.DataType
   T14682.$cFoo :: Data.Data.Constr
   T14682.$tFoo = Data.Data.mkDataType "Foo" [T14682.$cFoo]
