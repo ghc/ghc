@@ -1172,11 +1172,34 @@ flatten_one (TyConApp tc tys)
   = flatten_ty_con_app tc tys
 
 flatten_one ty@(FunTy _ ty1 ty2)
-  = do { (xi1,co1) <- flatten_one ty1
-       ; (xi2,co2) <- flatten_one ty2
+  = do { (xi1, co1) <- flatten_one ty1
+       ; (_,  kco1) <- noBogusCoercions $ flatten_one (typeKind xi1)
+       ; (xi2, co2) <- flatten_one ty2
+       ; (_,  kco2) <- noBogusCoercions $ flatten_one (typeKind xi2)
        ; role <- getRole
-       ; return (ty { ft_arg = xi1, ft_res = xi2 }
-                , mkFunCo role co1 co2) }
+       ; let sym_kco1 = mkTcSymCo kco1
+             sym_kco2 = mkTcSymCo kco2
+             co1' = co1 `mkTcTransCo` mkGReflRightCo role xi1 sym_kco1
+       ; let co2' = co2 `mkTcTransCo` mkGReflRightCo role xi2 sym_kco2
+       ; return (ty { ft_arg = xi1 `mkTcCastTy` sym_kco1
+                    , ft_res = xi2 `mkTcCastTy` sym_kco2 }
+                , mkSymCo (mkFunCo role co1' co2')) }
+  -- This is a specialised version of the cleverness in flatten_ty_con_app
+  -- Input: (ty1 -> ty2)
+  -- co1 :: xi1 ~ ty1
+  -- co2 :: xi2 ~ ty2
+  -- kco1 :: kxi1 ~ kind(xi1)
+  -- kco2 :: kxi2 ~ kind(xi2)
+  -- res_ty = (xi1 |> sym kco1) -> (xi2 |> sym kco2)
+  -- res_co :: ty ~ res_ty = mkFunCo co1' co2'
+  -- co1' :: ty1 ~ (xi1 |> sym kco1)
+  --      = co1 ; grefl1
+  -- grefl1 :: xi1 ~ (xi1 |> sym kco1)
+  --        =  Grefl xi1 (MCo kco1)
+  -- co2' :: ty2 ~ (xi2 |> sym kco2)
+  -- grefl2 :: xi2 ~ (xi1 |> sym kco2)
+  --        =  Grefl xi2 (MCo kco2)
+  -- Result: (res_ty, sym res_co)
 
 flatten_one ty@(ForAllTy {})
 -- TODO (RAE): This is inadequate, as it doesn't flatten the kind of
@@ -1194,7 +1217,7 @@ flatten_one ty@(ForAllTy {})
 
 flatten_one (CastTy ty g)
   = do { (xi, co) <- flatten_one ty
-       ; (g', _)   <- flatten_co g
+       ; (g', _)  <- flatten_co g
 
        ; role <- getRole
        ; return (mkCastTy xi g', castCoercionKind co role xi ty g' g) }
@@ -1592,7 +1615,8 @@ flattenTyVar tv
 
            FTRNotFollowed   -- Done, but make sure the kind is zonked
                             -- Note [Flattening] invariant (F0) and (F1)
-             -> do { tv' <- liftTcS $ updateTyVarKindM zonkTcType tv
+             -> do { -- tv' <- liftTcS $ updateTyVarKindM zonkTcType tv
+                     let tv' = tv
                    ; role <- getRole
                    ; let ty' = mkTyVarTy tv'
                    ; return (ty', mkTcReflCo role ty') } }
