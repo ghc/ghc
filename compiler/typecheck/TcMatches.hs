@@ -12,6 +12,7 @@ TcMatches: Typecheck some @Matches@
 {-# LANGUAGE TupleSections #-}
 {-# LANGUAGE FlexibleContexts #-}
 {-# LANGUAGE TypeFamilies #-}
+{-# LANGUAGE RecordWildCards #-}
 
 module TcMatches ( tcMatchesFun, tcGRHS, tcGRHSsPat, tcMatchesCase, tcMatchLambda,
                    TcMatchCtxt(..), TcStmtChecker, TcExprStmtChecker, TcCmdStmtChecker,
@@ -21,11 +22,11 @@ module TcMatches ( tcMatchesFun, tcGRHS, tcGRHSsPat, tcMatchesCase, tcMatchLambd
 
 import GhcPrelude
 
-import {-# SOURCE #-}   TcExpr( tcSyntaxOp, tcInferSigmaNC, tcInferSigma
+import {-# SOURCE #-}   TcExpr( tcSyntaxOp, tcInferRhoNC, tcInferRho
                               , tcCheckId, tcMonoExpr, tcMonoExprNC, tcPolyExpr )
 
 import BasicTypes (LexicalFixity(..))
-import HsSyn
+import GHC.Hs
 import TcRnMonad
 import TcEnv
 import TcPat
@@ -33,6 +34,7 @@ import TcMType
 import TcType
 import TcBinds
 import TcUnify
+import TcOrigin
 import Name
 import TysWiredIn
 import Id
@@ -404,7 +406,7 @@ tcGuardStmt _ (BodyStmt _ guard _ _) res_ty thing_inside
         ; return (BodyStmt boolTy guard' noSyntaxExpr noSyntaxExpr, thing) }
 
 tcGuardStmt ctxt (BindStmt _ pat rhs _ _) res_ty thing_inside
-  = do  { (rhs', rhs_ty) <- tcInferSigmaNC rhs
+  = do  { (rhs', rhs_ty) <- tcInferRhoNC rhs
                                    -- Stmt has a context already
         ; (pat', thing)  <- tcPat_O (StmtCtxt ctxt) (lexprCtOrigin rhs)
                                     pat (mkCheckExpType rhs_ty) $
@@ -478,7 +480,7 @@ tcLcStmt m_tc ctxt (TransStmt { trS_form = form, trS_stmts = stmts
              --  passed in to tcStmtsAndThen is never looked at
        ; (stmts', (bndr_ids, by'))
             <- tcStmtsAndThen (TransStmtCtxt ctxt) (tcLcStmt m_tc) stmts unused_ty $ \_ -> do
-               { by' <- traverse tcInferSigma by
+               { by' <- traverse tcInferRho by
                ; bndr_ids <- tcLookupLocalIds bndr_names
                ; return (bndr_ids, by') }
 
@@ -516,7 +518,7 @@ tcLcStmt m_tc ctxt (TransStmt { trS_form = form, trS_stmts = stmts
 
              -- Ensure that every old binder of type `b` is linked up with its
              -- new binder which should have type `n b`
-             -- See Note [GroupStmt binder map] in HsExpr
+             -- See Note [GroupStmt binder map] in GHC.Hs.Expr
              n_bndr_ids  = zipWith mk_n_bndr n_bndr_names bndr_ids
              bindersMap' = bndr_ids `zip` n_bndr_ids
 
@@ -616,16 +618,15 @@ tcMcStmt ctxt (TransStmt { trS_stmts = stmts, trS_bndrs = bindersMap
                          , trS_by = by, trS_using = using, trS_form = form
                          , trS_ret = return_op, trS_bind = bind_op
                          , trS_fmap = fmap_op }) res_ty thing_inside
-  = do { let star_star_kind = liftedTypeKind `mkVisFunTy` liftedTypeKind
-       ; m1_ty   <- newFlexiTyVarTy star_star_kind
-       ; m2_ty   <- newFlexiTyVarTy star_star_kind
+  = do { m1_ty   <- newFlexiTyVarTy typeToTypeKind
+       ; m2_ty   <- newFlexiTyVarTy typeToTypeKind
        ; tup_ty  <- newFlexiTyVarTy liftedTypeKind
        ; by_e_ty <- newFlexiTyVarTy liftedTypeKind  -- The type of the 'by' expression (if any)
 
          -- n_app :: Type -> Type   -- Wraps a 'ty' into '(n ty)' for GroupForm
        ; n_app <- case form of
                     ThenForm -> return (\ty -> ty)
-                    _        -> do { n_ty <- newFlexiTyVarTy star_star_kind
+                    _        -> do { n_ty <- newFlexiTyVarTy typeToTypeKind
                                    ; return (n_ty `mkAppTy`) }
        ; let by_arrow :: Type -> Type
              -- (by_arrow res) produces ((alpha->e_ty) -> res)     ('by' present)
@@ -696,7 +697,7 @@ tcMcStmt ctxt (TransStmt { trS_stmts = stmts, trS_bndrs = bindersMap
 
              -- Ensure that every old binder of type `b` is linked up with its
              -- new binder which should have type `n b`
-             -- See Note [GroupStmt binder map] in HsExpr
+             -- See Note [GroupStmt binder map] in GHC.Hs.Expr
              n_bndr_ids = zipWith mk_n_bndr n_bndr_names bndr_ids
              bindersMap' = bndr_ids `zip` n_bndr_ids
 
@@ -741,8 +742,7 @@ tcMcStmt ctxt (TransStmt { trS_stmts = stmts, trS_bndrs = bindersMap
 --        -> m (st1, (st2, st3))
 --
 tcMcStmt ctxt (ParStmt _ bndr_stmts_s mzip_op bind_op) res_ty thing_inside
-  = do { let star_star_kind = liftedTypeKind `mkVisFunTy` liftedTypeKind
-       ; m_ty   <- newFlexiTyVarTy star_star_kind
+  = do { m_ty   <- newFlexiTyVarTy typeToTypeKind
 
        ; let mzip_ty  = mkInvForAllTys [alphaTyVar, betaTyVar] $
                         (m_ty `mkAppTy` alphaTy)
@@ -992,7 +992,7 @@ tcApplicativeStmts ctxt pairs rhs_ty thing_inside
 
       -- Typecheck each ApplicativeArg separately
       -- See Note [ApplicativeDo and constraints]
-      ; args' <- mapM goArg (zip3 args pat_tys exp_tys)
+      ; args' <- mapM (goArg body_ty) (zip3 args pat_tys exp_tys)
 
       -- Bring into scope all the things bound by the args,
       -- and typecheck the thing_inside
@@ -1012,18 +1012,30 @@ tcApplicativeStmts ctxt pairs rhs_ty thing_inside
            ; ops' <- goOps t_i ops
            ; return (op' : ops') }
 
-    goArg :: (ApplicativeArg GhcRn, Type, Type)
+    goArg :: Type -> (ApplicativeArg GhcRn, Type, Type)
           -> TcM (ApplicativeArg GhcTcId)
 
-    goArg (ApplicativeArgOne x pat rhs isBody, pat_ty, exp_ty)
+    goArg body_ty (ApplicativeArgOne
+                    { app_arg_pattern = pat
+                    , arg_expr        = rhs
+                    , fail_operator   = fail_op
+                    , ..
+                    }, pat_ty, exp_ty)
       = setSrcSpan (combineSrcSpans (getLoc pat) (getLoc rhs)) $
         addErrCtxt (pprStmtInCtxt ctxt (mkBindStmt pat rhs))   $
         do { rhs' <- tcMonoExprNC rhs (mkCheckExpType exp_ty)
            ; (pat', _) <- tcPat (StmtCtxt ctxt) pat (mkCheckExpType pat_ty) $
                           return ()
-           ; return (ApplicativeArgOne x pat' rhs' isBody) }
+           ; fail_op' <- tcMonadFailOp (DoPatOrigin pat) pat' fail_op body_ty
 
-    goArg (ApplicativeArgMany x stmts ret pat, pat_ty, exp_ty)
+           ; return (ApplicativeArgOne
+                      { app_arg_pattern = pat'
+                      , arg_expr        = rhs'
+                      , fail_operator   = fail_op'
+                      , .. }
+                    ) }
+
+    goArg _body_ty (ApplicativeArgMany x stmts ret pat, pat_ty, exp_ty)
       = do { (stmts', (ret',pat')) <-
                 tcStmtsAndThen ctxt tcDoStmt stmts (mkCheckExpType exp_ty) $
                 \res_ty  -> do
@@ -1034,13 +1046,12 @@ tcApplicativeStmts ctxt pairs rhs_ty thing_inside
                   }
            ; return (ApplicativeArgMany x stmts' ret' pat') }
 
-    goArg (XApplicativeArg nec, _, _) = noExtCon nec
+    goArg _body_ty (XApplicativeArg nec, _, _) = noExtCon nec
 
     get_arg_bndrs :: ApplicativeArg GhcTcId -> [Id]
-    get_arg_bndrs (ApplicativeArgOne _ pat _ _)  = collectPatBinders pat
-    get_arg_bndrs (ApplicativeArgMany _ _ _ pat) = collectPatBinders pat
+    get_arg_bndrs (ApplicativeArgOne { app_arg_pattern = pat }) = collectPatBinders pat
+    get_arg_bndrs (ApplicativeArgMany { bv_pattern =  pat }) = collectPatBinders pat
     get_arg_bndrs (XApplicativeArg nec)          = noExtCon nec
-
 
 {- Note [ApplicativeDo and constraints]
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~

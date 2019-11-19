@@ -22,7 +22,7 @@ module TcClassDcl ( tcClassSigs, tcClassDecl2,
 
 import GhcPrelude
 
-import HsSyn
+import GHC.Hs
 import TcEnv
 import TcSigs
 import TcEvidence ( idHsWrapper )
@@ -30,7 +30,9 @@ import TcBinds
 import TcUnify
 import TcHsType
 import TcMType
-import Type     ( getClassPredTys_maybe, piResultTys )
+import Type     ( piResultTys )
+import Predicate
+import TcOrigin
 import TcType
 import TcRnMonad
 import DriverPhases (HscSource(..))

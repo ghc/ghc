@@ -28,9 +28,9 @@ import DynFlags
 import Id
 import SMRep ( WordOff )
 import StgSyn
-import qualified StgCmmArgRep
-import qualified StgCmmClosure
-import qualified StgCmmLayout
+import qualified GHC.StgToCmm.ArgRep  as StgToCmm.ArgRep
+import qualified GHC.StgToCmm.Closure as StgToCmm.Closure
+import qualified GHC.StgToCmm.Layout  as StgToCmm.Layout
 import Outputable
 import Util
 import VarSet
@@ -447,7 +447,7 @@ goodToLift dflags top_lvl rec_flag expander pairs scope = decide
       -- to lift it
       n_args
         = length
-        . StgCmmClosure.nonVoidIds -- void parameters don't appear in Cmm
+        . StgToCmm.Closure.nonVoidIds -- void parameters don't appear in Cmm
         . (dVarSetElems abs_ids ++)
         . rhsLambdaBndrs
       max_n_args
@@ -490,19 +490,19 @@ closureSize dflags ids = words + sTD_HDR_SIZE dflags
   where
     (words, _, _)
       -- Functions have a StdHeader (as opposed to ThunkHeader).
-      = StgCmmLayout.mkVirtHeapOffsets dflags StgCmmLayout.StdHeader
-      . StgCmmClosure.addIdReps
-      . StgCmmClosure.nonVoidIds
+      = StgToCmm.Layout.mkVirtHeapOffsets dflags StgToCmm.Layout.StdHeader
+      . StgToCmm.Closure.addIdReps
+      . StgToCmm.Closure.nonVoidIds
       $ ids
 
 -- | The number of words a single 'Id' adds to a closure's size.
 -- Note that this can't handle unboxed tuples (which may still be present in
 -- let-no-escapes, even after Unarise), in which case
--- @'StgCmmClosure.idPrimRep'@ will crash.
+-- @'GHC.StgToCmm.Closure.idPrimRep'@ will crash.
 idClosureFootprint:: DynFlags -> Id -> WordOff
 idClosureFootprint dflags
-  = StgCmmArgRep.argRepSizeW dflags
-  . StgCmmArgRep.idArgRep
+  = StgToCmm.ArgRep.argRepSizeW dflags
+  . StgToCmm.ArgRep.idArgRep
 
 -- | @closureGrowth expander sizer f fvs@ computes the closure growth in words
 -- as a result of lifting @f@ to top-level. If there was any growing closure

@@ -169,4 +169,4 @@ with the ``--version`` flag (see :ref:`options-help`).
 
 The compiler version can be tested within compiled code with the
 ``MIN_VERSION_GLASGOW_HASKELL`` CPP macro (defined only when
-:ghc-flag:`-XCPP` is used). See :ref:`standard-cpp-macros` for details. 
+:extension:`CPP` is used). See :ref:`standard-cpp-macros` for details.

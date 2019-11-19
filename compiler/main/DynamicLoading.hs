@@ -3,7 +3,6 @@
 -- | Dynamically lookup up values from modules and loading them.
 module DynamicLoading (
         initializePlugins,
-#if defined(HAVE_INTERPRETER)
         -- * Loading plugins
         loadFrontendPlugin,
 
@@ -19,15 +18,11 @@ module DynamicLoading (
         getValueSafely,
         getHValueSafely,
         lessUnsafeCoerce
-#else
-        pluginError
-#endif
     ) where
 
 import GhcPrelude
 import DynFlags
 
-#if defined(HAVE_INTERPRETER)
 import Linker           ( linkModule, getHValue )
 import GHCi             ( wormhole )
 import SrcLoc           ( noSrcSpan )
@@ -44,7 +39,8 @@ import PrelNames        ( pluginTyConName, frontendPluginTyConName )
 
 import HscTypes
 import GHCi.RemoteTypes ( HValue )
-import Type             ( Type, eqType, mkTyConTy, pprTyThingCategory )
+import Type             ( Type, eqType, mkTyConTy )
+import TyCoPpr          ( pprTyThingCategory )
 import TyCon            ( TyCon )
 import Name             ( Name, nameModule_maybe )
 import Id               ( idType )
@@ -60,28 +56,11 @@ import Control.Monad     ( when, unless )
 import Data.Maybe        ( mapMaybe )
 import GHC.Exts          ( unsafeCoerce# )
 
-#else
-
-import HscTypes         ( HscEnv )
-import Module           ( ModuleName, moduleNameString )
-import Panic
-
-import Data.List        ( intercalate )
-import Control.Monad    ( unless )
-
-#endif
-
 -- | Loads the plugins specified in the pluginModNames field of the dynamic
 -- flags. Should be called after command line arguments are parsed, but before
 -- actual compilation starts. Idempotent operation. Should be re-called if
 -- pluginModNames or pluginModNameOpts changes.
 initializePlugins :: HscEnv -> DynFlags -> IO DynFlags
-#if !defined(HAVE_INTERPRETER)
-initializePlugins _ df
-  = do let pluginMods = pluginModNames df
-       unless (null pluginMods) (pluginError pluginMods)
-       return df
-#else
 initializePlugins hsc_env df
   | map lpModuleName (cachedPlugins df)
          == pluginModNames df -- plugins not changed
@@ -91,12 +70,12 @@ initializePlugins hsc_env df
   = return df -- no need to reload plugins
   | otherwise
   = do loadedPlugins <- loadPlugins (hsc_env { hsc_dflags = df })
-       return $ df { cachedPlugins = loadedPlugins }
+       let df' = df { cachedPlugins = loadedPlugins }
+       df'' <- withPlugins df' runDflagsPlugin df'
+       return df''
+
   where argumentsForPlugin p = map snd . filter ((== lpModuleName p) . fst)
-#endif
-
-
-#if defined(HAVE_INTERPRETER)
+        runDflagsPlugin p opts dynflags = dynflagsPlugin p opts dynflags
 
 loadPlugins :: HscEnv -> IO [LoadedPlugin]
 loadPlugins hsc_env
@@ -302,15 +281,3 @@ throwCmdLineErrorS dflags = throwCmdLineError . showSDoc dflags
 
 throwCmdLineError :: String -> IO a
 throwCmdLineError = throwGhcExceptionIO . CmdLineError
-
-#else
-
-pluginError :: [ModuleName] -> a
-pluginError modnames = throwGhcException (CmdLineError msg)
-  where
-    msg = "not built for interactive use - can't load plugins ("
-            -- module names are not z-encoded
-          ++ intercalate ", " (map moduleNameString modnames)
-          ++ ")"
-
-#endif

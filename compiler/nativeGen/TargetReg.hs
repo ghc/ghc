@@ -44,6 +44,7 @@ targetVirtualRegSqueeze platform
       ArchX86       -> X86.virtualRegSqueeze
       ArchX86_64    -> X86.virtualRegSqueeze
       ArchPPC       -> PPC.virtualRegSqueeze
+      ArchS390X     -> panic "targetVirtualRegSqueeze ArchS390X"
       ArchSPARC     -> SPARC.virtualRegSqueeze
       ArchSPARC64   -> panic "targetVirtualRegSqueeze ArchSPARC64"
       ArchPPC_64 _  -> PPC.virtualRegSqueeze
@@ -62,6 +63,7 @@ targetRealRegSqueeze platform
       ArchX86       -> X86.realRegSqueeze
       ArchX86_64    -> X86.realRegSqueeze
       ArchPPC       -> PPC.realRegSqueeze
+      ArchS390X     -> panic "targetRealRegSqueeze ArchS390X"
       ArchSPARC     -> SPARC.realRegSqueeze
       ArchSPARC64   -> panic "targetRealRegSqueeze ArchSPARC64"
       ArchPPC_64 _  -> PPC.realRegSqueeze
@@ -79,6 +81,7 @@ targetClassOfRealReg platform
       ArchX86       -> X86.classOfRealReg platform
       ArchX86_64    -> X86.classOfRealReg platform
       ArchPPC       -> PPC.classOfRealReg
+      ArchS390X     -> panic "targetClassOfRealReg ArchS390X"
       ArchSPARC     -> SPARC.classOfRealReg
       ArchSPARC64   -> panic "targetClassOfRealReg ArchSPARC64"
       ArchPPC_64 _  -> PPC.classOfRealReg
@@ -96,6 +99,7 @@ targetMkVirtualReg platform
       ArchX86       -> X86.mkVirtualReg
       ArchX86_64    -> X86.mkVirtualReg
       ArchPPC       -> PPC.mkVirtualReg
+      ArchS390X     -> panic "targetMkVirtualReg ArchS390X"
       ArchSPARC     -> SPARC.mkVirtualReg
       ArchSPARC64   -> panic "targetMkVirtualReg ArchSPARC64"
       ArchPPC_64 _  -> PPC.mkVirtualReg
@@ -113,6 +117,7 @@ targetRegDotColor platform
       ArchX86       -> X86.regDotColor platform
       ArchX86_64    -> X86.regDotColor platform
       ArchPPC       -> PPC.regDotColor
+      ArchS390X     -> panic "targetRegDotColor ArchS390X"
       ArchSPARC     -> SPARC.regDotColor
       ArchSPARC64   -> panic "targetRegDotColor ArchSPARC64"
       ArchPPC_64 _  -> PPC.regDotColor

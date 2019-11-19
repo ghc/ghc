@@ -18,7 +18,7 @@ import Data.Array
 import ByteCodeTypes
 import GHC.Stack.CCS
 import Type
-import HsSyn
+import GHC.Hs
 import Module
 import Outputable
 import DynFlags
@@ -769,11 +769,12 @@ addTickApplicativeArg
 addTickApplicativeArg isGuard (op, arg) =
   liftM2 (,) (addTickSyntaxExpr hpcSrcSpan op) (addTickArg arg)
  where
-  addTickArg (ApplicativeArgOne x pat expr isBody) =
+  addTickArg (ApplicativeArgOne x pat expr isBody fail) =
     (ApplicativeArgOne x)
       <$> addTickLPat pat
       <*> addTickLHsExpr expr
       <*> pure isBody
+      <*> addTickSyntaxExpr hpcSrcSpan fail
   addTickArg (ApplicativeArgMany x stmts ret pat) =
     (ApplicativeArgMany x)
       <$> addTickLStmts isGuard stmts
@@ -1071,7 +1072,7 @@ noFVs = emptyOccEnv
 --   to filter additions to the latter.  This gives us complete control
 --   over what free variables we track.
 
-data TM a = TM { unTM :: TickTransEnv -> TickTransState -> (a,FreeVars,TickTransState) }
+newtype TM a = TM { unTM :: TickTransEnv -> TickTransState -> (a,FreeVars,TickTransState) }
     deriving (Functor)
         -- a combination of a state monad (TickTransState) and a writer
         -- monad (FreeVars).

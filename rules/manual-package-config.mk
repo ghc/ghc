@@ -11,15 +11,20 @@
 # -----------------------------------------------------------------------------
 
 
-define manual-package-config # args: $1 = dir
-$(call trace, manual-package-config($1))
-$(call profStart, manual-package-config($1))
+define manual-package-config
+# args:
+# $1 = dir
+# $2 = stage
+$(call trace, manual-package-config($1, $2))
+$(call profStart, manual-package-config($1, $2))
 
 $1/dist/package.conf.inplace : $1/package.conf.in $$$$(ghc-pkg_INPLACE) | $$$$(dir $$$$@)/.
 	$$(HS_CPP) -P \
 		-DTOP='"$$(TOP)"' \
 		$$($1_PACKAGE_CPP_OPTS) \
-		-x c $$(addprefix -I,$$(GHC_INCLUDE_DIRS)) $$< -o $$@.raw
+		$$(addprefix -I,$$(GHC_INCLUDE_DIRS)) \
+		-I$$(BUILD_$2_INCLUDE_DIR) \
+		-x c $$< -o $$@.raw
 	grep -v '^#pragma GCC' $$@.raw | \
 	    sed -e 's/""//g' -e 's/:[ 	]*,/: /g' > $$@
 
@@ -34,9 +39,11 @@ $1/dist/package.conf.install: | $$$$(dir $$$$@)/.
 		-DLIB_DIR='"$$(if $$(filter YES,$$(RelocatableBuild)),$$$$topdir,$$(ghclibdir))"' \
 		-DINCLUDE_DIR='"$$(if $$(filter YES,$$(RelocatableBuild)),$$$$topdir,$$(ghclibdir))/include"' \
 		$$($1_PACKAGE_CPP_OPTS) \
-		-x c $$(addprefix -I,$$(GHC_INCLUDE_DIRS)) $1/package.conf.in -o $$@.raw
+		$$(addprefix -I,$$(GHC_INCLUDE_DIRS)) \
+		-I$$(BUILD_$2_INCLUDE_DIR) \
+		-x c $1/package.conf.in -o $$@.raw
 	grep -v '^#pragma GCC' $$@.raw | \
 	    sed -e 's/""//g' -e 's/:[ 	]*,/: /g' >$$@
 
-$(call profEnd, manual-package-config($1))
+$(call profEnd, manual-package-config($1, $2))
 endef

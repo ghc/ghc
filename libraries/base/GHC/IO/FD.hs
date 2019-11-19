@@ -68,6 +68,17 @@ import System.Posix.Types
 c_DEBUG_DUMP :: Bool
 c_DEBUG_DUMP = False
 
+-- Darwin limits the length of writes to 2GB. See
+-- #17414.
+clampWriteSize, clampReadSize :: Int -> Int
+#if defined(darwin_HOST_OS)
+clampWriteSize = min 0x7fffffff
+clampReadSize  = min 0x7fffffff
+#else
+clampWriteSize = id
+clampReadSize  = id
+#endif
+
 -- -----------------------------------------------------------------------------
 -- The file-descriptor IO device
 
@@ -432,13 +443,14 @@ setRaw fd raw = System.Posix.Internals.setCooked (fdFD fd) (not raw)
 
 fdRead :: FD -> Ptr Word8 -> Word64 -> Int -> IO Int
 fdRead fd ptr _offset bytes
-  = do { r <- readRawBufferPtr "GHC.IO.FD.fdRead" fd ptr 0 (fromIntegral bytes)
+  = do { r <- readRawBufferPtr "GHC.IO.FD.fdRead" fd ptr 0
+                (fromIntegral $ clampReadSize bytes)
        ; return (fromIntegral r) }
 
 fdReadNonBlocking :: FD -> Ptr Word8 -> Word64 -> Int -> IO (Maybe Int)
 fdReadNonBlocking fd ptr _offset bytes = do
   r <- readRawBufferPtrNoBlock "GHC.IO.FD.fdReadNonBlocking" fd ptr
-           0 (fromIntegral bytes)
+           0 (fromIntegral $ clampReadSize bytes)
   case fromIntegral r of
     (-1) -> return (Nothing)
     n    -> return (Just n)
@@ -446,7 +458,8 @@ fdReadNonBlocking fd ptr _offset bytes = do
 
 fdWrite :: FD -> Ptr Word8 -> Word64 -> Int -> IO ()
 fdWrite fd ptr _offset bytes = do
-  res <- writeRawBufferPtr "GHC.IO.FD.fdWrite" fd ptr 0 (fromIntegral bytes)
+  res <- writeRawBufferPtr "GHC.IO.FD.fdWrite" fd ptr 0
+          (fromIntegral $ clampWriteSize bytes)
   let res' = fromIntegral res
   if res' < bytes
      then fdWrite fd (ptr `plusPtr` res') (_offset + fromIntegral res') (bytes - res')
@@ -456,7 +469,7 @@ fdWrite fd ptr _offset bytes = do
 fdWriteNonBlocking :: FD -> Ptr Word8 -> Word64 -> Int -> IO Int
 fdWriteNonBlocking fd ptr _offset bytes = do
   res <- writeRawBufferPtrNoBlock "GHC.IO.FD.fdWriteNonBlocking" fd ptr 0
-            (fromIntegral bytes)
+            (fromIntegral $ clampWriteSize bytes)
   return (fromIntegral res)
 
 -- -----------------------------------------------------------------------------

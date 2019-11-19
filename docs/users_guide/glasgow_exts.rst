@@ -67,6 +67,45 @@ a large swath of the extensions supported by GHC at once.
     to move away from this portmanteau flag, and towards enabling features
     individually.
 
+
+.. extension:: Haskell2010
+    :shortdesc: Use the Haskell 2010 language variant.
+
+    Compile Haskell 2010 language variant. Enables the
+    following language extensions:
+
+    .. hlist::
+
+     * :extension:`ImplicitPrelude`
+     * :extension:`StarIsType`
+     * :extension:`CUSKs`
+     * :extension:`MonomorphismRestriction`
+     * :extension:`DatatypeContexts`
+     * :extension:`TraditionalRecordSyntax`
+     * :extension:`EmptyDataDecls`
+     * :extension:`ForeignFunctionInterface`
+     * :extension:`PatternGuards`
+     * :extension:`DoAndIfThenElse`
+     * :extension:`RelaxedPolyRec`
+
+
+.. extension:: Haskell98
+    :shortdesc: Use the Haskell 2010 language variant.
+
+    Compile using Haskell 98 language variant. Enables the
+    following language extensions:
+
+    .. hlist::
+
+     * :extension:`ImplicitPrelude`
+     * :extension:`StarIsType`
+     * :extension:`CUSKs`
+     * :extension:`MonomorphismRestriction`
+     * :extension:`NPlusKPatterns`
+     * :extension:`DatatypeContexts`
+     * :extension:`TraditionalRecordSyntax`
+     * :extension:`NondecreasingIndentation`
+
 .. _primitives:
 
 Unboxed types and primitive operations
@@ -2268,7 +2307,9 @@ Changes to the grammar
 
 The Haskell report `defines
 <https://www.haskell.org/onlinereport/haskell2010/haskellch3.html#x8-220003>`_
-the ``lexp`` nonterminal thus (``*`` indicates a rule of interest)::
+the ``lexp`` nonterminal thus (``*`` indicates a rule of interest)
+
+.. code-block:: none
 
     lexp  →  \ apat1 … apatn -> exp            (lambda abstraction, n ≥ 1)  *
           |  let decls in exp                  (let expression)             *
@@ -2288,7 +2329,9 @@ the ``lexp`` nonterminal thus (``*`` indicates a rule of interest)::
           |  …
 
 The :extension:`BlockArguments` extension moves these production rules under
-``aexp``::
+``aexp``
+
+.. code-block:: none
 
     lexp  →  fexp
 
@@ -2450,7 +2493,7 @@ explicit kind annotation must be used (see :ref:`kinding`).
 Such data types have only one value, namely bottom. Nevertheless, they
 can be useful when defining "phantom types".
 
-In conjunction with the :ghc-flag:`-XEmptyDataDeriving` extension, empty data
+In conjunction with the :extension:`EmptyDataDeriving` extension, empty data
 declarations can also derive instances of standard type classes
 (see :ref:`empty-data-deriving`).
 
@@ -3923,22 +3966,19 @@ GHC extends this mechanism along several axes:
 Deriving instances for empty data types
 ---------------------------------------
 
-.. ghc-flag:: -XEmptyDataDeriving
+.. extension:: EmptyDataDeriving
     :shortdesc: Allow deriving instances of standard type classes for
                 empty data types.
-    :type: dynamic
-    :reverse: -XNoEmptyDataDeriving
-    :category:
 
     :since: 8.4.1
 
     Allow deriving instances of standard type classes for empty data types.
 
 One can write data types with no constructors using the
-:ghc-flag:`-XEmptyDataDecls` flag (see :ref:`nullary-types`), which is on by
+:extension:`EmptyDataDecls` flag (see :ref:`nullary-types`), which is on by
 default in Haskell 2010. What is not on by default is the ability to derive
 type class instances for these types. This ability is enabled through use of
-the :ghc-flag:`-XEmptyDataDeriving` flag. For instance, this lets one write: ::
+the :extension:`EmptyDataDeriving` flag. For instance, this lets one write: ::
 
     data Empty deriving (Eq, Ord, Read, Show)
 
@@ -3956,16 +3996,16 @@ This would generate the following instances: ::
     instance Show Empty where
       showsPrec _ x = case x of {}
 
-The :ghc-flag:`-XEmptyDataDeriving` flag is only required to enable deriving
+The :extension:`EmptyDataDeriving` flag is only required to enable deriving
 of these four "standard" type classes (which are mentioned in the Haskell
 Report). Other extensions to the ``deriving`` mechanism, which are explained
-below in greater detail, do not require :ghc-flag:`-XEmptyDataDeriving` to be
+below in greater detail, do not require :extension:`EmptyDataDeriving` to be
 used in conjunction with empty data types. These include:
 
-* :ghc-flag:`-XStandaloneDeriving` (see :ref:`stand-alone-deriving`)
+* :extension:`StandaloneDeriving` (see :ref:`stand-alone-deriving`)
 * Type classes which require their own extensions to be enabled to be derived,
-  such as :ghc-flag:`-XDeriveFunctor` (see :ref:`deriving-extra`)
-* :ghc-flag:`-XDeriveAnyClass` (see :ref:`derive-any-class`)
+  such as :extension:`DeriveFunctor` (see :ref:`deriving-extra`)
+* :extension:`DeriveAnyClass` (see :ref:`derive-any-class`)
 
 .. _deriving-inferred:
 
@@ -4039,7 +4079,7 @@ number of important ways:
 
          deriving instance _ => Eq (Foo a)
 
-   This is essentially the same as if you had written ``deriving Foo`` after
+   This is essentially the same as if you had written ``deriving Eq`` after
    the declaration for ``data Foo a``. Using this feature requires the use of
    :extension:`PartialTypeSignatures` (:ref:`partial-type-signatures`).
 
@@ -4578,8 +4618,8 @@ Deriving ``Data`` instances
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
 .. extension:: DeriveDataTypeable
-    :shortdesc: Enable deriving for the Data class.
-       Implied by (deprecated) :extension:`AutoDeriveTypeable`.
+    :shortdesc: Enable deriving for the ``Data`` class.
+       Implied by (deprecated) ``AutoDeriveTypeable``.
 
     :since: 6.8.1
 
@@ -4603,7 +4643,7 @@ The class ``Typeable`` is very special:
    :extension:`DeriveDataTypeable` extension is enabled, but they are ignored,
    and they may be reported as an error in a later version of the compiler.
 
--  The rules for solving \`Typeable\` constraints are as follows:
+-  The rules for solving ``Typeable`` constraints are as follows:
 
    -  A concrete type constructor applied to some types. ::
 
@@ -5300,10 +5340,10 @@ In that case, GHC chooses the strategy as follows:
 
 2. For other any type class:
 
-   1. When ``DeriveAnyClass`` is enabled, use ``anyclass``.
+   1. When :extension:`DeriveAnyClass` is enabled, use ``anyclass``.
 
-   2. When ``GeneralizedNewtypeDeriving`` is enabled and we are deriving for a
-      newtype, then use ``newytype``.
+   2. When :extension:`GeneralizedNewtypeDeriving` is enabled and we are
+      deriving for a newtype, then use ``newtype``.
 
    If both rules apply to a deriving clause, then ``anyclass`` is used and the
    user is warned about the ambiguity. The warning can be avoided by explicitly
@@ -7856,6 +7896,42 @@ using a parameter in the kind annotation: ::
 In this case the kind parameter ``k`` is actually an implicit parameter
 of the type family.
 
+At definition site, the arity determines what inputs can be matched on: ::
+
+    data PT (a :: Type)
+
+    type family F1 :: k -> Type
+    type instance F1 = PT
+      -- OK, 'k' can be matched on.
+
+    type family F0 :: forall k. k -> Type
+    type instance F0 = PT
+      -- Error:
+      --   • Expected kind ‘forall k. k -> Type’,
+      --       but ‘PT’ has kind ‘Type -> Type’
+      --   • In the type ‘PT’
+      --     In the type instance declaration for ‘F0’
+
+Both ``F1`` and ``F0`` have kind ``forall k. k -> Type``, but their arity
+differs.
+
+At use sites, the arity determines if the definition can be used in a
+higher-rank scenario: ::
+
+    type HRK (f :: forall k. k -> Type) = (f Int, f Maybe, f True)
+
+    type H1 = HRK F0  -- OK
+    type H2 = HRK F1
+      -- Error:
+      --   • Expected kind ‘forall k. k -> Type’,
+      --       but ‘F1’ has kind ‘k0 -> Type’
+      --   • In the first argument of ‘HRK’, namely ‘F1’
+      --     In the type ‘HRK F1’
+      --     In the type declaration for ‘H2’
+
+This is a consequence of the requirement that all applications of a type family
+must be fully saturated with respect to their arity.
+
 .. _type-instance-declarations:
 
 Type instance declarations
@@ -8637,16 +8713,16 @@ Haskell <http://ics.p.lodz.pl/~stolarek/_media/pl:research:stolarek_peyton-jones
 Syntax of injectivity annotation
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
-Injectivity annotation is added after type family head and consists of
+The injectivity annotation is added after the type family head and consists of
 two parts:
 
 -  a type variable that names the result of a type family. Syntax:
-   ``= tyvar`` or ``= (tyvar :: kind)``. Type variable must be fresh.
+   ``= tyvar`` or ``= (tyvar :: kind)``. The type variable must be fresh.
 
 -  an injectivity annotation of the form ``| A -> B``, where ``A`` is the
    result type variable (see previous bullet) and ``B`` is a list of
    argument type and kind variables in which type family is injective.
-   It is possible to omit some variables if type family is not injective
+   It is possible to omit some variables if the type family is not injective
    in them.
 
 Examples: ::
@@ -8662,15 +8738,15 @@ interpreted as associated type synonym default.
 
 .. _injective-ty-fams-typecheck:
 
-Verifying injectivity annotation against type family equations
-~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+Verifying the injectivity annotation against type family equations
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
 Once the user declares type family to be injective GHC must verify that
-this declaration is correct, ie. type family equations don't violate the
+this declaration is correct, i.e., that type family equations don't violate the
 injectivity annotation. A general idea is that if at least one equation
 (bullets (1), (2) and (3) below) or a pair of equations (bullets (4) and
 (5) below) violates the injectivity annotation then a type family is not
-injective in a way user claims and an error is reported. In the bullets
+injective in a way the user claims and an error is reported. In the bullets
 below *RHS* refers to the right-hand side of the type family equation
 being checked for injectivity. *LHS* refers to the arguments of that
 type family equation. Below are the rules followed when checking
@@ -8689,7 +8765,10 @@ injectivity of a type family:
    on injective position
    in the RHS GHC reports that the type family is not injective.
    Injective position means either argument to a type constructor or
-   injective argument to a type family.
+   injective argument to a type family. Type inference can potentially
+   loop when looking under injective type families in the RHS, so this
+   requires :extension:`UndecidableInstances`; GHC suggests enabling
+   the flag when it is necessary.
 
 4. *Open type families* Open type families are typechecked
    incrementally. This means that when a module is imported type family
@@ -9148,6 +9227,9 @@ Complete user-supplied kind signatures and polymorphic recursion
 
     :since: 8.10.1
 
+NB! This is a legacy feature, see :extension:`StandaloneKindSignatures` for the
+modern replacement.
+
 Just as in type inference, kind inference for recursive types can only
 use *monomorphic* recursion. Consider this (contrived) example: ::
 
@@ -9203,8 +9285,8 @@ signature" for a type constructor? These are the forms:
      data T3 :: forall (k :: Type). k -> Type   -- still a CUSK
 
 -  For a newtype, the rules are the same as they are for a data type
-   unless `UnliftedNewtypes <#unboxed-newtypes>`__ is enabled.
-   With `UnliftedNewtypes <#unboxed-newtypes>`__, the type constructor
+   unless :extension:`UnliftedNewtypes` is enabled.
+   With :extension:`UnliftedNewtypes`, the type constructor
    only has a CUSK if a kind signature is present. As with a datatype
    with a top-level ``::``, all kind variables must introduced after
    the ``::`` must be explicitly quantified ::
@@ -9261,11 +9343,164 @@ According to the rules above ``X`` has a CUSK. Yet, the kind of ``k`` is undeter
 It is thus quantified over, giving ``X`` the kind ``forall k1 (k :: k1). Proxy k -> Type``.
 
 The detection of CUSKs is enabled by the :extension:`CUSKs` flag, which is
-switched on by default. When :extension:`CUSKs` is switched off, there is
-currently no way to enable polymorphic recursion in types. In the future, the
-notion of a CUSK will be replaced by top-level kind signatures
-(`GHC Proposal #36 <https://github.com/ghc-proposals/ghc-proposals/blob/master/proposals/0036-kind-signatures.rst>`__),
-then, after a transition period, this extension will be turned off by default, and eventually removed.
+switched on by default. This extension is scheduled for deprecation to be
+replaced with :extension:`StandaloneKindSignatures`.
+
+.. index::
+   single: standalone kind signature
+
+.. _standalone-kind-signatures:
+
+Standalone kind signatures and polymorphic recursion
+----------------------------------------------------
+
+.. extension:: StandaloneKindSignatures
+    :shortdesc: Allow the use of standalone kind signatures.
+
+    :implies: :extension:`NoCUSKs`
+    :since: 8.10.1
+
+Just as in type inference, kind inference for recursive types can only
+use *monomorphic* recursion. Consider this (contrived) example: ::
+
+    data T m a = MkT (m a) (T Maybe (m a))
+    -- GHC infers kind  T :: (Type -> Type) -> Type -> Type
+
+The recursive use of ``T`` forced the second argument to have kind
+``Type``. However, just as in type inference, you can achieve polymorphic
+recursion by giving a *standalone kind signature* for ``T``: ::
+
+    type T :: (k -> Type) -> k -> Type
+    data T m a = MkT (m a) (T Maybe (m a))
+
+The standalone kind signature specifies the polymorphic kind
+for ``T``, and this signature is used for all the calls to ``T``
+including the recursive ones. In particular, the recursive use of ``T``
+is at kind ``Type``.
+
+While a standalone kind signature determines the kind of a type constructor, it
+does not determine its arity. This is of particular importance for type
+families and type synonyms, as they cannot be partially applied. See
+:ref:`type-family-declarations` for more information about arity.
+
+The arity can be specified using explicit binders and inline kind annotations::
+
+    -- arity F0 = 0
+    type F0 :: forall k. k -> Type
+    type family F0 :: forall k. k -> Type
+
+    -- arity F1 = 1
+    type F1 :: forall k. k -> Type
+    type family F1 :: k -> Type
+
+    -- arity F2 = 2
+    type F2 :: forall k. k -> Type
+    type family F2 a :: Type
+
+In absence of an inline kind annotation, the inferred arity includes all
+explicitly bound parameters and all immediately following invisible
+parameters::
+
+    -- arity FD1 = 1
+    type FD1 :: forall k. k -> Type
+    type FD1
+
+    -- arity FD2 = 2
+    type FD2 :: forall k. k -> Type
+    type FD2 a
+
+Note that ``F0``, ``F1``, ``F2``, ``FD1``, and ``FD2`` all have identical
+standalone kind signatures. The arity is inferred from the type family header.
+
+Standalone kind signatures and declaration headers
+--------------------------------------------------
+
+GHC requires that in the presence of a standalone kind signature, data
+declarations must bind all their inputs. For example: ::
+
+    type Prox1 :: k -> Type
+    data Prox1 a = MkProx1
+      -- OK.
+
+    type Prox2 :: k -> Type
+    data Prox2 = MkProx2
+      -- Error:
+      --   • Expected a type, but found something with kind ‘k -> Type’
+      --   • In the data type declaration for ‘Prox2’
+
+
+GADT-style data declarations may either bind their inputs or use an inline
+signature in addition to the standalone kind signature: ::
+
+    type GProx1 :: k -> Type
+    data GProx1 a where MkGProx1 :: GProx1 a
+      -- OK.
+
+    type GProx2 :: k -> Type
+    data GProx2 where MkGProx2 :: GProx2 a
+      -- Error:
+      --   • Expected a type, but found something with kind ‘k -> Type’
+      --   • In the data type declaration for ‘GProx2’
+
+    type GProx3 :: k -> Type
+    data GProx3 :: k -> Type where MkGProx3 :: GProx3 a
+      -- OK.
+
+    type GProx4 :: k -> Type
+    data GProx4 :: w where MkGProx4 :: GProx4 a
+      -- OK, w ~ (k -> Type)
+
+Classes are subject to the same rules: ::
+
+    type C1 :: Type -> Constraint
+    class C1 a
+      -- OK.
+
+    type C2 :: Type -> Constraint
+    class C2
+      -- Error:
+      --   • Couldn't match expected kind ‘Constraint’
+      --                 with actual kind ‘Type -> Constraint’
+      --   • In the class declaration for ‘C2’
+
+On the other hand, type families are exempt from this rule: ::
+
+    type F :: Type -> Type
+    type family F
+      -- OK.
+
+Data families are tricky territory. Their headers are exempt from this rule,
+but their instances are not: ::
+
+    type T :: k -> Type
+    data family T
+      -- OK.
+
+    data instance T Int = MkT1
+      -- OK.
+
+    data instance T = MkT3
+      -- Error:
+      --   • Expecting one more argument to ‘T’
+      --     Expected a type, but ‘T’ has kind ‘k0 -> Type’
+      --   • In the data instance declaration for ‘T’
+
+This also applies to GADT-style data instances: ::
+
+    data instance T (a :: Nat) where MkN4 :: T 4
+                                     MKN9 :: T 9
+      -- OK.
+
+    data instance T :: Symbol -> Type where MkSN :: T "Neptune"
+                                            MkSJ :: T "Jupiter"
+      -- OK.
+
+    data instance T where MkT4 :: T x
+      -- Error:
+      --   • Expecting one more argument to ‘T’
+      --     Expected a type, but ‘T’ has kind ‘k0 -> Type’
+      --   • In the data instance declaration for ‘T’
+
 
 Kind inference in closed type families
 --------------------------------------
@@ -10145,7 +10380,11 @@ is *not* fine in Haskell today; we have no way to solve such a constraint.
 Here, the quantified constraint ``forall b. (Eq b) => Eq (f b)`` behaves
 a bit like a local instance declaration, and makes the instance typeable.
 
-The paper `Quantified class constraints <http://i.cs.hku.hk/~bruno//papers/hs2017.pdf>`_ (by Bottu, Karachalias, Schrijvers, Oliveira, Wadler, Haskell Symposium 2017) describes this feature in technical detail, with examples, and so is a primary reference source for this proposal.
+The paper `Quantified class constraints
+<https://homepages.inf.ed.ac.uk/wadler/papers/quantcc/quantcc.pdf>`_ (by Bottu, Karachalias,
+Schrijvers, Oliveira, Wadler, Haskell Symposium 2017) describes this feature in
+technical detail, with examples, and so is a primary reference source for this
+feature.
 
 Motivation
 ----------------
@@ -10215,7 +10454,7 @@ The ``context =>`` part is optional.  That is the only syntactic change to the l
 
 Notes:
 
-- Where GHC allows extensions instance declarations we allow exactly the same extensions to this new form of ``class``.  Specifically, with :extension:`ExplicitForAll` and :extension:`MultiParameterTypeClasses` the syntax becomes
+- Where GHC allows extensions instance declarations we allow exactly the same extensions to this new form of ``class``.  Specifically, with :extension:`ExplicitForAll` and :extension:`MultiParamTypeClasses` the syntax becomes
 
   .. code-block:: none
 
@@ -11010,11 +11249,12 @@ of bindings that mention it.
 The rationale for this more conservative strategy is given in `the
 papers <https://www.microsoft.com/en-us/research/wp-content/uploads/2016/02/jfp-outsidein.pdf>`__
 "Let should not be generalised" and "Modular type inference with local
-assumptions", and a related `blog post <http://ghc.haskell.org/trac/ghc/blog/LetGeneralisationInGhc7>`__.
+assumptions", and a related `blog post
+<https://www.haskell.org/ghc/blog/20100930-LetGeneralisationInGhc7.html>`__.
 
 The extension :extension:`MonoLocalBinds` is implied by :extension:`TypeFamilies`
 and :extension:`GADTs`. You can switch it off again with
-:extension:`NoMonoLocalBinds <-XMonoLocalBinds>` but type inference becomes
+:extension:`NoMonoLocalBinds <MonoLocalBinds>` but type inference becomes
 less predictable if you do so. (Read the papers!)
 
 .. _visible-type-application:
@@ -11472,11 +11712,9 @@ monomorphic. This is important because by default GHC will not
 instantiate type variables to a polymorphic type
 (:ref:`impredicative-polymorphism`).
 
-The obsolete language options :extension:`PolymorphicComponents` and
-:extension:`Rank2Types` are synonyms for :extension:`RankNTypes`. They used to
-specify finer distinctions that GHC no longer makes. (They should really elicit
-a deprecation warning, but they don't, purely to avoid the need to library
-authors to change their old flags specifications.)
+The obsolete language option :extension:`Rank2Types` is a synonym for
+:extension:`RankNTypes`. They used to specify finer distinctions that GHC no
+longer makes.
 
 .. _univ:
 
@@ -12261,6 +12499,7 @@ Sorting can be toggled with :ghc-flag:`-fsort-valid-hole-fits`
     :shortdesc: Disables the sorting of the list of valid hole fits for typed holes
         in type error messages.
     :type: dynamic
+    :reverse: -fsort-valid-hole-fits
     :category: verbosity
 
     :default: off
@@ -12306,13 +12545,13 @@ Partial Type Signatures
     Type checker will allow inferred types for holes.
 
 A partial type signature is a type signature containing special
-placeholders written with a leading underscore (e.g., "``_``",
-"``_foo``", "``_bar``") called *wildcards*. Partial type signatures are
-to type signatures what :ref:`typed-holes` are to expressions. During
-compilation these wildcards or holes will generate an error message that
-describes which type was inferred at the hole's location, and
-information about the origin of any free type variables. GHC reports
-such error messages by default.
+placeholders called *wildcards*. A wildcard is written as an underscore (e.g. "``_``")
+or, if :extension:`NamedWildCards` is enabled, any identifier with a leading
+underscore (e.g. "``_foo``", "``_bar``"). Partial type signatures are to type
+signatures what :ref:`typed-holes` are to expressions. During compilation these
+wildcards or holes will generate an error message that describes which type was
+inferred at the hole's location, and information about the origin of any free
+type variables. GHC reports such error messages by default.
 
 Unlike :ref:`typed-holes`, which make the program incomplete and will
 generate errors when they are evaluated, this needn't be the case for
@@ -12725,8 +12964,8 @@ Enabling deferring of type errors
 
 The flag :ghc-flag:`-fdefer-type-errors` controls whether type errors are
 deferred to runtime. Type errors will still be emitted as warnings, but
-will not prevent compilation. You can use :ghc-flag:`-Wno-type-errors
-<-Wtype-errors>` to suppress these warnings.
+will not prevent compilation. You can use :ghc-flag:`-Wno-deferred-type-errors`
+to suppress these warnings.
 
 This flag implies the :ghc-flag:`-fdefer-typed-holes` and
 :ghc-flag:`-fdefer-out-of-scope-variables` flags, which enables this behaviour
@@ -15025,14 +15264,14 @@ used if you want your code to be portable).
 ``CONLIKE`` modifier
 ~~~~~~~~~~~~~~~~~~~~
 
-.. pragma:: CONLINE
+.. pragma:: CONLIKE
 
     :where: modifies :pragma:`INLINE` or :pragma:`NOINLINE` pragma
 
     Instructs GHC to consider a value to be especially cheap to inline.
 
 An :pragma:`INLINE` or :pragma:`NOINLINE` pragma may have a :pragma:`CONLIKE` modifier, which affects
-matching in :pragma:`RULE`\s (only). See :ref:`conlike`.
+matching in :pragma:`RULE <RULES>`\s (only). See :ref:`conlike`.
 
 .. _phase-control:
 
@@ -15084,7 +15323,7 @@ arguments etc). Another way to understand the semantics is this:
    body look small, so that when inlining is allowed it is very likely
    to happen.
 
-The same phase-numbering control is available for :pragma:`RULE`\s
+The same phase-numbering control is available for :pragma:`RULE <RULES>`\s
 (:ref:`rewrite-rules`).
 
 .. _line-pragma:
@@ -15289,9 +15528,9 @@ fire the first specialisation, whose body is also inlined. The result is
 a type-based unrolling of the indexing function.
 
 You can add explicit phase control (:ref:`phase-control`) to
-``SPECIALISE INLINE`` pragma, just like on an :pragma:`INLINE` pragma; if you do
-so, the same phase is used for the rewrite rule and the INLINE control of the
-specialised function.
+``SPECIALISE INLINE`` pragma, just like on an :pragma:`INLINE` pragma; if
+you do so, the same phase is used for the rewrite rule and the INLINE control
+of the specialised function.
 
 .. warning:: You can make GHC diverge by using ``SPECIALISE INLINE`` on an
              ordinarily-recursive function.
@@ -15541,49 +15780,6 @@ the user must provide a type signature. ::
     foo :: [a] -> Int
     foo T = 5
 
-.. _multiple-complete-pragmas:
-
-Disambiguating between multiple ``COMPLETE`` pragmas
-----------------------------------------------------
-
-What should happen if there are multiple ``COMPLETE`` sets that apply to a
-single set of patterns? Consider this example: ::
-
-  data T = MkT1 | MkT2 | MkT2Internal
-  {-# COMPLETE MkT1, MkT2 #-}
-  {-# COMPLETE MkT1, MkT2Internal #-}
-
-  f :: T -> Bool
-  f MkT1 = True
-  f MkT2 = False
-
-Which ``COMPLETE`` pragma should be used when checking the coverage of the
-patterns in ``f``? If we pick the ``COMPLETE`` set that covers ``MkT1`` and
-``MkT2``, then ``f`` is exhaustive, but if we pick the other ``COMPLETE`` set
-that covers ``MkT1`` and ``MkT2Internal``, then ``f`` is *not* exhaustive,
-since it fails to match ``MkT2Internal``. An intuitive way to solve this
-dilemma is to recognize that picking the former ``COMPLETE`` set produces the
-fewest number of uncovered pattern clauses, and thus is the better choice.
-
-GHC disambiguates between multiple ``COMPLETE`` sets based on this rationale.
-To make things more formal, when the pattern-match checker requests a set of
-constructors for some data type constructor ``T``, the checker returns:
-
-* The original set of data constructors for ``T``
-* Any ``COMPLETE`` sets of type ``T``
-
-GHC then checks for pattern coverage using each of these sets. If any of these
-sets passes the pattern coverage checker with no warnings, then we are done. If
-each set produces at least one warning, then GHC must pick one of the sets of
-warnings depending on how good the results are. The results are prioritized in
-this order:
-
-1. Fewest uncovered clauses
-2. Fewest redundant clauses
-3. Fewest inaccessible clauses
-4. Whether the match comes from the original set of data constructors or from a
-   ``COMPLETE`` pragma (prioritizing the former over the latter)
-
 .. _overlap-pragma:
 
 ``OVERLAPPING``, ``OVERLAPPABLE``, ``OVERLAPS``, and ``INCOHERENT`` pragmas
@@ -15746,12 +15942,12 @@ From a syntactic point of view:
    then C's rules are in force when compiling A.) The situation is very
    similar to that for instance declarations.
 
--  Inside a :pragma:`RULE` "``forall``" is treated as a keyword, regardless of any
-   other flag settings. Furthermore, inside a RULE, the language
+-  Inside a :pragma:`RULES` "``forall``" is treated as a keyword, regardless of any
+   other flag settings. Furthermore, inside a :pragma:`RULES`, the language
    extension :extension:`ScopedTypeVariables` is automatically enabled; see
    :ref:`scoped-type-variables`.
 
--  Like other pragmas, :pragma:`RULE` pragmas are always checked for scope errors,
+-  Like other pragmas, :pragma:`RULES` pragmas are always checked for scope errors,
    and are typechecked. Typechecking means that the LHS and RHS of a
    rule are typechecked, and must have the same type. However, rules are
    only *enabled* if the :ghc-flag:`-fenable-rewrite-rules` flag is on (see
@@ -15840,13 +16036,13 @@ give ::
 
     g y = y
 
-Now ``g`` is inlined into ``h``, but ``f``\'s :pragma:`RULE` has no chance to
+Now ``g`` is inlined into ``h``, but ``f``\'s RULE has no chance to
 fire. If instead GHC had first inlined ``g`` into ``h`` then there would have
-been a better chance that ``f``\'s :pragma:`RULE` might fire.
+been a better chance that ``f``\'s :pragma:`RULES` might fire.
 
 The way to get predictable behaviour is to use a :pragma:`NOINLINE` pragma, or an
-INLINE[⟨phase⟩] pragma, on ``f``, to ensure that it is not inlined until
-its RULEs have had a chance to fire. The warning flag
+``INLINE[⟨phase⟩]`` pragma, on ``f``, to ensure that it is not inlined until
+its :pragma:`RULES` have had a chance to fire. The warning flag
 :ghc-flag:`-Winline-rule-shadowing` (see :ref:`options-sanity`) warns about
 this situation.
 

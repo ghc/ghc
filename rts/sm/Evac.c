@@ -27,6 +27,7 @@
 #include "LdvProfile.h"
 #include "CNF.h"
 #include "Scav.h"
+#include "NonMoving.h"
 
 #if defined(THREADED_RTS) && !defined(PARALLEL_GC)
 #define evacuate(p) evacuate1(p)
@@ -39,7 +40,19 @@
         copy_tag(p, info, src, size, stp, tag)
 #endif
 
-/* Used to avoid long recursion due to selector thunks
+/* Note [Selector optimisation depth limit]
+ * ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+ *
+ * MAX_THUNK_SELECTOR_DEPTH is used to avoid long recursion of
+ * eval_thunk_selector due to nested selector thunks. Note that this *only*
+ * counts nested selector thunks, e.g. `fst (fst (... (fst x)))`. The collector
+ * will traverse interleaved selector-constructor pairs without limit, e.g.
+ *
+ *     a = (fst b, _)
+ *     b = (fst c, _)
+ *     c = (fst d, _)
+ *     d = (x, _)
+ *
  */
 #define MAX_THUNK_SELECTOR_DEPTH 16
 
@@ -50,9 +63,12 @@ STATIC_INLINE void evacuate_large(StgPtr p);
    Allocate some space in which to copy an object.
    -------------------------------------------------------------------------- */
 
+/* size is in words */
 STATIC_INLINE StgPtr
 alloc_for_copy (uint32_t size, uint32_t gen_no)
 {
+    ASSERT(gen_no < RtsFlags.GcFlags.generations);
+
     StgPtr to;
     gen_workspace *ws;
 
@@ -66,6 +82,36 @@ alloc_for_copy (uint32_t size, uint32_t gen_no)
             gen_no = gct->evac_gen_no;
         } else {
             gct->failed_to_evac = true;
+        }
+    }
+
+    if (RTS_UNLIKELY(RtsFlags.GcFlags.useNonmoving)) {
+        /* See Note [Deadlock detection under nonmoving collector]. */
+        if (deadlock_detect_gc)
+            gen_no = oldest_gen->no;
+
+        if (gen_no == oldest_gen->no) {
+            gct->copied += size;
+            to = nonmovingAllocate(gct->cap, size);
+
+            // Add segment to the todo list unless it's already there
+            // current->todo_link == NULL means not in todo list
+            struct NonmovingSegment *seg = nonmovingGetSegment(to);
+            if (!seg->todo_link) {
+                gen_workspace *ws = &gct->gens[oldest_gen->no];
+                seg->todo_link = ws->todo_seg;
+                ws->todo_seg = seg;
+            }
+
+            // The object which refers to this closure may have been aged (i.e.
+            // retained in a younger generation). Consequently, we must add the
+            // closure to the mark queue to ensure that it will be marked.
+            //
+            // However, if we are in a deadlock detection GC then we disable aging
+            // so there is no need.
+            if (major_gc && !deadlock_detect_gc)
+                markQueuePushClosureGC(&gct->cap->upd_rem_set.queue, (StgClosure *) to);
+            return to;
         }
     }
 
@@ -88,6 +134,7 @@ alloc_for_copy (uint32_t size, uint32_t gen_no)
    The evacuate() code
    -------------------------------------------------------------------------- */
 
+/* size is in words */
 STATIC_INLINE GNUC_ATTR_HOT void
 copy_tag(StgClosure **p, const StgInfoTable *info,
          StgClosure *src, uint32_t size, uint32_t gen_no, StgWord tag)
@@ -284,7 +331,10 @@ evacuate_large(StgPtr p)
    */
   new_gen_no = bd->dest_no;
 
-  if (new_gen_no < gct->evac_gen_no) {
+  if (RTS_UNLIKELY(deadlock_detect_gc)) {
+      /* See Note [Deadlock detection under nonmoving collector]. */
+      new_gen_no = oldest_gen->no;
+  } else if (new_gen_no < gct->evac_gen_no) {
       if (gct->eager_promotion) {
           new_gen_no = gct->evac_gen_no;
       } else {
@@ -296,6 +346,9 @@ evacuate_large(StgPtr p)
   new_gen = &generations[new_gen_no];
 
   bd->flags |= BF_EVACUATED;
+  if (RTS_UNLIKELY(RtsFlags.GcFlags.useNonmoving && new_gen == oldest_gen)) {
+      bd->flags |= BF_NONMOVING;
+  }
   initBdescr(bd, new_gen, new_gen->to);
 
   // If this is a block of pinned or compact objects, we don't have to scan
@@ -330,6 +383,13 @@ evacuate_large(StgPtr p)
 STATIC_INLINE void
 evacuate_static_object (StgClosure **link_field, StgClosure *q)
 {
+    if (RTS_UNLIKELY(RtsFlags.GcFlags.useNonmoving)) {
+        // See Note [Static objects under the nonmoving collector] in Storage.c.
+        if (major_gc && !deadlock_detect_gc)
+            markQueuePushClosureGC(&gct->cap->upd_rem_set.queue, q);
+        return;
+    }
+
     StgWord link = (StgWord)*link_field;
 
     // See Note [STATIC_LINK fields] for how the link field bits work
@@ -376,12 +436,22 @@ evacuate_compact (StgPtr p)
     bd = Bdescr((StgPtr)str);
     gen_no = bd->gen_no;
 
+    if (bd->flags & BF_NONMOVING) {
+        // We may have evacuated the block to the nonmoving generation. If so
+        // we need to make sure it is added to the mark queue since the only
+        // reference to it may be from the moving heap.
+        if (major_gc && !deadlock_detect_gc)
+            markQueuePushClosureGC(&gct->cap->upd_rem_set.queue, (StgClosure *) str);
+        return;
+    }
+
     // already evacuated? (we're about to do the same check,
     // but we avoid taking the spin-lock)
     if (bd->flags & BF_EVACUATED) {
         /* Don't forget to set the gct->failed_to_evac flag if we didn't get
          * the desired destination (see comments in evacuate()).
          */
+        debugTrace(DEBUG_compact, "Compact %p already evacuated", str);
         if (gen_no < gct->evac_gen_no) {
             gct->failed_to_evac = true;
             TICK_GC_FAILED_PROMOTION();
@@ -430,9 +500,15 @@ evacuate_compact (StgPtr p)
     // for that - the only code touching the generation of the block is
     // in the GC, and that should never see blocks other than the first)
     bd->flags |= BF_EVACUATED;
+    if (RTS_UNLIKELY(RtsFlags.GcFlags.useNonmoving && new_gen == oldest_gen)) {
+        bd->flags |= BF_NONMOVING;
+    }
     initBdescr(bd, new_gen, new_gen->to);
 
     if (str->hash) {
+        // If there is a hash-table for sharing preservation then we need to add
+        // the compact to the scavenging work list to ensure that the hashtable
+        // is scavenged.
         gen_workspace *ws = &gct->gens[new_gen_no];
         bd->link = ws->todo_large_objects;
         ws->todo_large_objects = bd;
@@ -563,7 +639,18 @@ loop:
 
   bd = Bdescr((P_)q);
 
-  if ((bd->flags & (BF_LARGE | BF_MARKED | BF_EVACUATED | BF_COMPACT)) != 0) {
+  if ((bd->flags & (BF_LARGE | BF_MARKED | BF_EVACUATED | BF_COMPACT | BF_NONMOVING)) != 0) {
+      // Pointer to non-moving heap. Non-moving heap is collected using
+      // mark-sweep so this object should be marked and then retained in sweep.
+      if (RTS_UNLIKELY(bd->flags & BF_NONMOVING)) {
+          // NOTE: large objects in nonmoving heap are also marked with
+          // BF_NONMOVING. Those are moved to scavenged_large_objects list in
+          // mark phase.
+          if (major_gc && !deadlock_detect_gc)
+              markQueuePushClosureGC(&gct->cap->upd_rem_set.queue, q);
+          return;
+      }
+
       // pointer into to-space: just return it.  It might be a pointer
       // into a generation that we aren't collecting (> N), or it
       // might just be a pointer into to-space.  The latter doesn't
@@ -594,6 +681,13 @@ loop:
        */
       if (bd->flags & BF_LARGE) {
           evacuate_large((P_)q);
+
+          // We may have evacuated the block to the nonmoving generation. If so
+          // we need to make sure it is added to the mark queue since the only
+          // reference to it may be from the moving heap.
+          if (major_gc && bd->flags & BF_NONMOVING && !deadlock_detect_gc) {
+              markQueuePushClosureGC(&gct->cap->upd_rem_set.queue, q);
+          }
           return;
       }
 
@@ -894,6 +988,12 @@ evacuate_BLACKHOLE(StgClosure **p)
     // blackholes can't be in a compact
     ASSERT((bd->flags & BF_COMPACT) == 0);
 
+    if (RTS_UNLIKELY(bd->flags & BF_NONMOVING)) {
+        if (major_gc && !deadlock_detect_gc)
+            markQueuePushClosureGC(&gct->cap->upd_rem_set.queue, q);
+        return;
+    }
+
     // blackholes *can* be in a large object: when raiseAsync() creates an
     // AP_STACK the payload might be large enough to create a large object.
     // See #14497.
@@ -1044,7 +1144,7 @@ selector_chain:
         // save any space in any case, and updating with an indirection is
         // trickier in a non-collected gen: we would have to update the
         // mutable list.
-        if (bd->flags & BF_EVACUATED) {
+        if (bd->flags & (BF_EVACUATED | BF_NONMOVING)) {
             unchain_thunk_selectors(prev_thunk_selector, (StgClosure *)p);
             *q = (StgClosure *)p;
             // shortcut, behave as for:  if (evac) evacuate(q);
@@ -1257,6 +1357,7 @@ selector_loop:
 
           // recursively evaluate this selector.  We don't want to
           // recurse indefinitely, so we impose a depth bound.
+          // See Note [Selector optimisation depth limit].
           if (gct->thunk_selector_depth >= MAX_THUNK_SELECTOR_DEPTH) {
               goto bale_out;
           }

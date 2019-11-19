@@ -73,6 +73,7 @@ _darcs/
 /driver/ghc/dist/
 /driver/haddock/dist/
 /driver/ghci/dist/
+/includes/dist/
 /includes/dist-*/
 /libffi/dist-install/
 /libraries/*/dist-boot/
@@ -106,6 +107,7 @@ _darcs/
 /distrib/ghc.iss
 /docs/man
 /docs/index.html
+/docs/users_guide/.log
 /docs/users_guide/users_guide
 /docs/users_guide/ghc.1
 /docs/users_guide/flags.pyc
@@ -128,9 +130,6 @@ _darcs/
 /ghc.spec
 /ghc/ghc-bin.cabal
 /includes/dist/
-/includes/ghcautoconf.h
-/includes/ghcplatform.h
-/includes/ghcversion.h
 /index.html
 /inplace/
 /libffi/build/
@@ -229,7 +228,7 @@ ghc.nix/
 .gdbinit
 
 # Tooling - direnv
-.envrc 
+.envrc
 
 # Tooling - vscode
 .vscode

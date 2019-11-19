@@ -68,7 +68,7 @@ module TysWiredIn (
         justDataCon, justDataConName, promotedJustDataCon,
 
         -- * Tuples
-        mkTupleTy, mkBoxedTupleTy,
+        mkTupleTy, mkTupleTy1, mkBoxedTupleTy, mkTupleStr,
         tupleTyCon, tupleDataCon, tupleTyConName,
         promotedTupleDataCon,
         unitTyCon, unitDataCon, unitDataConId, unitTy, unitTyConKey,
@@ -92,8 +92,9 @@ module TysWiredIn (
 
         -- * Kinds
         typeNatKindCon, typeNatKind, typeSymbolKindCon, typeSymbolKind,
-        isLiftedTypeKindTyConName, liftedTypeKind, constraintKind,
-        liftedTypeKindTyCon, constraintKindTyCon,
+        isLiftedTypeKindTyConName, liftedTypeKind,
+        typeToTypeKind, constraintKind,
+        liftedTypeKindTyCon, constraintKindTyCon,  constraintKindTyConName,
         liftedTypeKindTyConName,
 
         -- * Equality predicates
@@ -127,7 +128,6 @@ module TysWiredIn (
     ) where
 
 #include "HsVersions.h"
-#include "MachDeps.h"
 
 import GhcPrelude
 
@@ -208,7 +208,7 @@ names in PrelNames, so they use wTcQual, wDataQual, etc
 -- See also Note [Known-key names]
 wiredInTyCons :: [TyCon]
 
-wiredInTyCons = [ -- Units are not treated like other tuples, because then
+wiredInTyCons = [ -- Units are not treated like other tuples, because they
                   -- are defined in GHC.Base, and there's only a few of them. We
                   -- put them in wiredInTyCons so that they will pre-populate
                   -- the name cache, so the parser in isBuiltInOcc_maybe doesn't
@@ -406,7 +406,7 @@ makeRecoveryTyCon :: TyCon -> TyCon
 makeRecoveryTyCon tc
   = mkTcTyCon (tyConName tc)
               bndrs res_kind
-              []               -- No scoped vars
+              noTcTyConScopedTyVars
               True             -- Fully generalised
               flavour          -- Keep old flavour
   where
@@ -613,8 +613,9 @@ typeSymbolKind = mkTyConTy typeSymbolKindCon
 constraintKindTyCon :: TyCon
 constraintKindTyCon = pcTyCon constraintKindTyConName Nothing [] []
 
-liftedTypeKind, constraintKind :: Kind
+liftedTypeKind, typeToTypeKind, constraintKind :: Kind
 liftedTypeKind   = tYPE liftedRepTy
+typeToTypeKind   = liftedTypeKind `mkVisFunTy` liftedTypeKind
 constraintKind   = mkTyConApp constraintKindTyCon []
 
 {-
@@ -695,9 +696,18 @@ for one-tuples.  So in ghc-prim:GHC.Tuple we see the declarations:
   data Unit a = Unit a
   data (a,b)  = (a,b)
 
+There is no way to write a boxed one-tuple in Haskell, but it can be
+created in Template Haskell or in, e.g., `deriving` code. There is
+nothing special about one-tuples in Core; in particular, they have no
+custom pretty-printing, just using `Unit`.
+
 NB (Feb 16): for /constraint/ one-tuples I have 'Unit%' but no class
 decl in GHC.Classes, so I think this part may not work properly. But
 it's unused I think.
+
+See also Note [Flattening one-tuples] in MkCore and
+Note [Don't flatten tuples from HsSyn] in MkCore.
+
 -}
 
 -- | Built-in syntax isn't "in scope" so these OccNames map to wired-in Names
@@ -772,6 +782,10 @@ mkTupleOcc ns Unboxed ar = mkOccName ns (mkUnboxedTupleStr ar)
 
 mkCTupleOcc :: NameSpace -> Arity -> OccName
 mkCTupleOcc ns ar = mkOccName ns (mkConstraintTupleStr ar)
+
+mkTupleStr :: Boxity -> Arity -> String
+mkTupleStr Boxed   = mkBoxedTupleStr
+mkTupleStr Unboxed = mkUnboxedTupleStr
 
 mkBoxedTupleStr :: Arity -> String
 mkBoxedTupleStr 0  = "()"
@@ -1483,6 +1497,7 @@ listTyCon =
                 False
                 (VanillaAlgTyCon $ mkPrelTyConRepName listTyConName)
 
+-- See also Note [Empty lists] in GHC.Hs.Expr.
 nilDataCon :: DataCon
 nilDataCon  = pcDataCon nilDataConName alpha_tyvar [] listTyCon
 
@@ -1556,15 +1571,24 @@ done by enumeration\srcloc{lib/prelude/InTup?.hs}.
 -}
 
 -- | Make a tuple type. The list of types should /not/ include any
--- RuntimeRep specifications.
+-- RuntimeRep specifications. Boxed 1-tuples are flattened.
+-- See Note [One-tuples]
 mkTupleTy :: Boxity -> [Type] -> Type
 -- Special case for *boxed* 1-tuples, which are represented by the type itself
 mkTupleTy Boxed   [ty] = ty
-mkTupleTy Boxed   tys  = mkTyConApp (tupleTyCon Boxed (length tys)) tys
-mkTupleTy Unboxed tys  = mkTyConApp (tupleTyCon Unboxed (length tys))
-                                        (map getRuntimeRep tys ++ tys)
+mkTupleTy boxity  tys  = mkTupleTy1 boxity tys
+
+-- | Make a tuple type. The list of types should /not/ include any
+-- RuntimeRep specifications. Boxed 1-tuples are *not* flattened.
+-- See Note [One-tuples] and Note [Don't flatten tuples from HsSyn]
+-- in MkCore
+mkTupleTy1 :: Boxity -> [Type] -> Type
+mkTupleTy1 Boxed   tys  = mkTyConApp (tupleTyCon Boxed (length tys)) tys
+mkTupleTy1 Unboxed tys  = mkTyConApp (tupleTyCon Unboxed (length tys))
+                                         (map getRuntimeRep tys ++ tys)
 
 -- | Build the type of a small tuple that holds the specified type of thing
+-- Flattens 1-tuples. See Note [One-tuples].
 mkBoxedTupleTy :: [Type] -> Type
 mkBoxedTupleTy tys = mkTupleTy Boxed tys
 

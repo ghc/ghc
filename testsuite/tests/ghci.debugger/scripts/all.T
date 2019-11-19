@@ -45,8 +45,8 @@ test('print033', normal, ghci_script, ['print033.script'])
 test('print034', extra_files(['../GADT.hs', '../Test.hs']), ghci_script, ['print034.script'])
 test('print035', extra_files(['../Unboxed.hs']), ghci_script, ['print035.script'])
 test('print036', expect_broken(9046), ghci_script, ['print036.script'])
-test('print037', when(llvm_build() and integer_gmp()
-                     , expect_broken_for(16205, ['ghci-ext']))
+test('print037', when(llvm_build() and integer_gmp(),
+                      fragile_for(16205, ['ghci-ext']))
                , ghci_script
                , ['print037.script'])
 
@@ -111,6 +111,7 @@ test('T8557', normal, ghci_script, ['T8557.script'])
 test('T12458', normal, ghci_script, ['T12458.script'])
 test('T13825-debugger', when(arch('powerpc64'), expect_broken(14455)),
       ghci_script, ['T13825-debugger.script'])
+test('T14690', normal, ghci_script, ['T14690.script'])
 test('T16700', normal, ghci_script, ['T16700.script'])
 
 test('break029', extra_files(['break029.hs']), ghci_script, ['break029.script'])

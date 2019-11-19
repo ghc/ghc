@@ -38,6 +38,14 @@ module GHC.Exts
         -- * Compat wrapper
         atomicModifyMutVar#,
 
+        -- * Resize functions
+        --
+        -- | Resizing arrays of boxed elements is currently handled in
+        -- library space (rather than being a primop) since there is not
+        -- an efficient way to grow arrays. However, resize operations
+        -- may become primops in a future release of GHC.
+        resizeSmallMutableArray#,
+
         -- * Fusion
         build, augment,
 
@@ -104,6 +112,8 @@ import Data.Data
 import Data.Ord
 import Data.Version ( Version(..), makeVersion )
 import qualified Debug.Trace
+
+import Control.Applicative (ZipList(..))
 
 -- XXX This should really be in Data.Tuple, where the definitions are
 maxTupleSize :: Int
@@ -201,6 +211,12 @@ instance IsList [a] where
   fromList = id
   toList = id
 
+-- | @since 4.15.0.0
+instance IsList (ZipList a) where
+  type Item (ZipList a) = a
+  fromList = ZipList
+  toList = getZipList
+
 -- | @since 4.9.0.0
 instance IsList (NonEmpty a) where
   type Item (NonEmpty a) = a
@@ -248,3 +264,34 @@ atomicModifyMutVar#
 atomicModifyMutVar# mv f s =
   case unsafeCoerce# (atomicModifyMutVar2# mv f s) of
     (# s', _, ~(_, res) #) -> (# s', res #)
+
+-- | Resize a mutable array to new specified size. The returned
+-- 'SmallMutableArray#' is either the original 'SmallMutableArray#'
+-- resized in-place or, if not possible, a newly allocated
+-- 'SmallMutableArray#' with the original content copied over.
+--
+-- To avoid undefined behaviour, the original 'SmallMutableArray#' shall
+-- not be accessed anymore after a 'resizeSmallMutableArray#' has been
+-- performed. Moreover, no reference to the old one should be kept in order
+-- to allow garbage collection of the original 'SmallMutableArray#'  in
+-- case a new 'SmallMutableArray#' had to be allocated.
+--
+-- @since 4.14.0.0
+resizeSmallMutableArray#
+  :: SmallMutableArray# s a -- ^ Array to resize
+  -> Int# -- ^ New size of array
+  -> a
+     -- ^ Newly created slots initialized to this element.
+     -- Only used when array is grown.
+  -> State# s
+  -> (# State# s, SmallMutableArray# s a #)
+resizeSmallMutableArray# arr0 szNew a s0 =
+  case getSizeofSmallMutableArray# arr0 s0 of
+    (# s1, szOld #) -> if isTrue# (szNew <# szOld)
+      then case shrinkSmallMutableArray# arr0 szNew s1 of
+        s2 -> (# s2, arr0 #)
+      else if isTrue# (szNew ># szOld)
+        then case newSmallArray# szNew a s1 of
+          (# s2, arr1 #) -> case copySmallMutableArray# arr0 0# arr1 0# szOld s2 of
+            s3 -> (# s3, arr1 #)
+        else (# s1, arr0 #)

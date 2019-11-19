@@ -3,15 +3,9 @@ These utility routines are used various
 places in the GHC library.
 */
 
-#include "Rts.h"
+#include <Rts.h>
 
-#include "HsFFI.h"
-
-#include <string.h>
-
-#if defined(HAVE_UNISTD_H)
-#include <unistd.h>
-#endif
+#include <HsFFI.h>
 
 void
 enableTimingStats( void )       /* called from the driver */

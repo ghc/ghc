@@ -95,6 +95,12 @@ module System.Posix.Types (
 #if defined(HTYPE_TIMER_T)
   CTimer(..),
 #endif
+#if defined(HTYPE_SOCKLEN_T)
+  CSocklen(..),
+#endif
+#if defined(HTYPE_NFDS_T)
+  CNfds(..),
+#endif
 
   Fd(..),
 
@@ -212,6 +218,15 @@ INTEGRAL_TYPE_WITH_CTYPE(CKey,key_t,HTYPE_KEY_T)
 #if defined(HTYPE_TIMER_T)
 -- | @since 4.10.0.0
 OPAQUE_TYPE_WITH_CTYPE(CTimer,timer_t,HTYPE_TIMER_T)
+#endif
+
+#if defined(HTYPE_SOCKLEN_T)
+-- | @since 4.14.0.0
+INTEGRAL_TYPE(CSocklen,HTYPE_SOCKLEN_T)
+#endif
+#if defined(HTYPE_NFDS_T)
+-- | @since 4.14.0.0
+INTEGRAL_TYPE(CNfds,HTYPE_NFDS_T)
 #endif
 
 -- Make an Fd type rather than using CInt everywhere

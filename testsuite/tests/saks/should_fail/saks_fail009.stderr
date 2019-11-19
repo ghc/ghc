@@ -1,0 +1,4 @@
+
+saks_fail009.hs:9:1: error:
+    • Expected kind ‘* -> *’, but ‘k’ has kind ‘*’
+    • In the data type declaration for ‘T’

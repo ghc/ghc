@@ -29,6 +29,7 @@ import TcSimplify ( simplifyAmbiguityCheck )
 import ClsInst    ( matchGlobalInst, ClsInstResult(..), InstanceWhat(..), AssocInstInfo(..) )
 import TyCoFVs
 import TyCoRep
+import TyCoPpr
 import TcType hiding ( sizeType, sizeTypes )
 import TysWiredIn ( heqTyConName, eqTyConName, coercibleTyConName )
 import PrelNames
@@ -38,22 +39,23 @@ import Coercion
 import CoAxiom
 import Class
 import TyCon
+import Predicate
+import TcOrigin
 
 -- others:
 import IfaceType( pprIfaceType, pprIfaceTypeApp )
 import ToIface  ( toIfaceTyCon, toIfaceTcArgs, toIfaceType )
-import HsSyn            -- HsType
+import GHC.Hs           -- HsType
 import TcRnMonad        -- TcType, amongst others
 import TcEnv       ( tcInitTidyEnv, tcInitOpenTidyEnv )
 import FunDeps
 import FamInstEnv  ( isDominatedBy, injectiveBranches,
                      InjectivityCheckResult(..) )
-import FamInst     ( makeInjectivityErrors )
+import FamInst
 import Name
 import VarEnv
 import VarSet
 import Var         ( VarBndr(..), mkTyVar )
-import Id          ( idType, idName )
 import FV
 import ErrUtils
 import DynFlags
@@ -232,6 +234,7 @@ wantAmbiguityCheck ctxt
       GhciCtxt {}  -> False
       TySynCtxt {} -> False
       TypeAppCtxt  -> False
+      StandaloneKindSigCtxt{} -> False
       _            -> True
 
 checkUserTypeError :: Type -> TcM ()
@@ -280,6 +283,10 @@ In a few places we do not want to check a user-specified type for ambiguity
      f @ty
   No need to check ty for ambiguity
 
+* StandaloneKindSigCtxt: type T :: ksig
+  Kinds need a different ambiguity check than types, and the currently
+  implemented check is only good for types. See #14419, in particular
+  https://gitlab.haskell.org/ghc/ghc/issues/14419#note_160844
 
 ************************************************************************
 *                                                                      *
@@ -343,6 +350,7 @@ checkValidType ctxt ty
 
                  ExprSigCtxt    -> rank1
                  KindSigCtxt    -> rank1
+                 StandaloneKindSigCtxt{} -> rank1
                  TypeAppCtxt | impred_flag -> ArbitraryRank
                              | otherwise   -> tyConArgMonoType
                     -- Normally, ImpredicativeTypes is handled in check_arg_type,
@@ -350,7 +358,9 @@ checkValidType ctxt ty
                     -- So we do this check here.
 
                  FunSigCtxt {}  -> rank1
-                 InfSigCtxt _   -> ArbitraryRank        -- Inferred type
+                 InfSigCtxt {}  -> rank1 -- Inferred types should obey the
+                                         -- same rules as declared ones
+
                  ConArgCtxt _   -> rank1 -- We are given the type of the entire
                                          -- constructor, hence rank 1
                  PatSynCtxt _   -> rank1
@@ -463,6 +473,7 @@ allConstraintsAllowed (TyVarBndrKindCtxt {}) = False
 allConstraintsAllowed (DataKindCtxt {})      = False
 allConstraintsAllowed (TySynKindCtxt {})     = False
 allConstraintsAllowed (TyFamResKindCtxt {})  = False
+allConstraintsAllowed (StandaloneKindSigCtxt {}) = False
 allConstraintsAllowed _ = True
 
 -- | Returns 'True' if the supplied 'UserTypeCtxt' is unambiguously not the
@@ -482,6 +493,7 @@ allConstraintsAllowed _ = True
 vdqAllowed :: UserTypeCtxt -> Bool
 -- Currently allowed in the kinds of types...
 vdqAllowed (KindSigCtxt {}) = True
+vdqAllowed (StandaloneKindSigCtxt {}) = True
 vdqAllowed (TySynCtxt {}) = True
 vdqAllowed (ThBrackCtxt {}) = True
 vdqAllowed (GhciCtxt {}) = True
@@ -668,7 +680,7 @@ check_type ve (CastTy ty _) = check_type ve ty
 check_type ve@(ValidityEnv{ ve_tidy_env = env, ve_ctxt = ctxt
                           , ve_rank = rank, ve_expand = expand }) ty
   | not (null tvbs && null theta)
-  = do  { traceTc "check_type" (ppr ty $$ ppr (forAllAllowed rank))
+  = do  { traceTc "check_type" (ppr ty $$ ppr rank)
         ; checkTcM (forAllAllowed rank) (forAllTyErr env rank ty)
                 -- Reject e.g. (Maybe (?x::Int => Int)),
                 -- with a decent error message
@@ -1262,16 +1274,9 @@ checkSimplifiableClassConstraint env dflags ctxt cls tys
     simplifiable_constraint_warn what
      = vcat [ hang (text "The constraint" <+> quotes (ppr (tidyType env pred))
                     <+> text "matches")
-                 2 (ppr_what what)
+                 2 (ppr what)
             , hang (text "This makes type inference for inner bindings fragile;")
                  2 (text "either use MonoLocalBinds, or simplify it using the instance") ]
-
-    ppr_what BuiltinInstance = text "a built-in instance"
-    ppr_what LocalInstance   = text "a locally-quantified instance"
-    ppr_what (TopLevInstance { iw_dfun_id = dfun })
-      = hang (text "instance" <+> pprSigmaType (idType dfun))
-           2 (text "--" <+> pprDefinedAt (idName dfun))
-
 
 {- Note [Simplifiable given constraints]
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
@@ -1329,6 +1334,7 @@ okIPCtxt (TySynCtxt {})         = True   -- e.g.   type Blah = ?x::Int
                                          -- #11466
 
 okIPCtxt (KindSigCtxt {})       = False
+okIPCtxt (StandaloneKindSigCtxt {}) = False
 okIPCtxt (ClassSCCtxt {})       = False
 okIPCtxt (InstDeclCtxt {})      = False
 okIPCtxt (SpecInstCtxt {})      = False
@@ -1465,7 +1471,8 @@ checkValidInstHead ctxt clas cls_args
   = do { dflags   <- getDynFlags
        ; is_boot  <- tcIsHsBootOrSig
        ; is_sig   <- tcIsHsig
-       ; check_valid_inst_head dflags is_boot is_sig ctxt clas cls_args
+       ; check_special_inst_head dflags is_boot is_sig ctxt clas cls_args
+       ; checkValidTypePats (classTyCon clas) cls_args
        }
 
 {-
@@ -1493,10 +1500,10 @@ in hsig files, where `is_sig` is True.
 
 -}
 
-check_valid_inst_head :: DynFlags -> Bool -> Bool
-                      -> UserTypeCtxt -> Class -> [Type] -> TcM ()
+check_special_inst_head :: DynFlags -> Bool -> Bool
+                        -> UserTypeCtxt -> Class -> [Type] -> TcM ()
 -- Wow!  There are a surprising number of ad-hoc special cases here.
-check_valid_inst_head dflags is_boot is_sig ctxt clas cls_args
+check_special_inst_head dflags is_boot is_sig ctxt clas cls_args
 
   -- If not in an hs-boot file, abstract classes cannot have instances
   | isAbstractClass clas
@@ -1546,7 +1553,7 @@ check_valid_inst_head dflags is_boot is_sig ctxt clas cls_args
   = failWithTc (instTypeErr clas cls_args msg)
 
   | otherwise
-  = checkValidTypePats (classTyCon clas) cls_args
+  = pure ()
   where
     clas_nm = getName clas
     ty_args = filterOutInvisibleTypes (classTyCon clas) cls_args
@@ -2021,11 +2028,12 @@ checkValidCoAxiom ax@(CoAxiom { co_ax_tc = fam_tc, co_ax_branches = branches })
      -- See Note [Verifying injectivity annotation] in FamInstEnv
     check_injectivity prev_branches cur_branch
       | Injective inj <- injectivity
-      = do { let conflicts =
+      = do { dflags <- getDynFlags
+           ; let conflicts =
                      fst $ foldl' (gather_conflicts inj prev_branches cur_branch)
                                  ([], 0) prev_branches
-           ; mapM_ (\(err, span) -> setSrcSpan span $ addErr err)
-                   (makeInjectivityErrors ax cur_branch inj conflicts) }
+           ; reportConflictingInjectivityErrs fam_tc conflicts cur_branch
+           ; reportInjectivityErrors dflags ax cur_branch inj }
       | otherwise
       = return ()
 
@@ -2149,7 +2157,7 @@ checkFamPatBinders fam_tc qtvs pats rhs
          --    data T            = MkT (forall (a::k). blah)
          --    data family D Int = MkD (forall (a::k). blah)
          -- In both cases, 'k' is not bound on the LHS, but is used on the RHS
-         -- We catch the former in kcLHsQTyVars, and the latter right here
+         -- We catch the former in kcDeclHeader, and the latter right here
          -- See Note [Check type-family instance binders]
        ; check_tvs bad_rhs_tvs (text "mentioned in the RHS")
                                (text "bound on the LHS of")
@@ -2163,9 +2171,11 @@ checkFamPatBinders fam_tc qtvs pats rhs
        }
   where
     pat_tvs     = tyCoVarsOfTypes pats
-    inj_pat_tvs = fvVarSet $ injectiveVarsOfTypes pats
+    inj_pat_tvs = fvVarSet $ injectiveVarsOfTypes False pats
       -- The type variables that are in injective positions.
       -- See Note [Dodgy binding sites in type family instances]
+      -- NB: The False above is irrelevant, as we never have type families in
+      -- patterns.
       --
       -- NB: It's OK to use the nondeterministic `fvVarSet` function here,
       -- since the order of `inj_pat_tvs` is never revealed in an error

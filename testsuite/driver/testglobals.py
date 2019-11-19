@@ -4,7 +4,7 @@
 
 from my_typing import *
 from pathlib import Path
-from perf_notes import MetricChange, PerfStat
+from perf_notes import MetricChange, PerfStat, Baseline, MetricOracles
 from datetime import datetime
 
 # -----------------------------------------------------------------------------
@@ -243,7 +243,7 @@ class TestRun:
        # [(change, PerfStat)] where change is one of the  MetricChange
        # constants: NewMetric, NoChange, Increase, Decrease.
        # NewMetric happens when the previous git commit has no metric recorded.
-       self.metrics = [] # type: List[Tuple[MetricChange, PerfStat]]
+       self.metrics = [] # type: List[Tuple[MetricChange, PerfStat, Optional[Baseline]]]
 
 global t
 t = TestRun()

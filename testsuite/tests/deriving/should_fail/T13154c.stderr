@@ -1,0 +1,35 @@
+
+T13154c.hs:16:1: error:
+    • Can't make a derived instance of
+        ‘Foo1 a’ with the stock strategy:
+        The last argument of the instance must be a data or newtype application
+    • In the stand-alone deriving instance for ‘Foo1 a’
+
+T13154c.hs:17:1: error:
+    • Can't make a derived instance of
+        ‘Foo1 (# #)’ with the stock strategy:
+        ‘Foo1’ is not a stock derivable class (Eq, Show, etc.)
+    • In the stand-alone deriving instance for ‘Foo1 (# #)’
+
+T13154c.hs:18:1: error:
+    • Can't make a derived instance of
+        ‘Foo1 a’ with the newtype strategy:
+        The last argument of the instance must be a data or newtype application
+    • In the stand-alone deriving instance for ‘Foo1 a’
+
+T13154c.hs:19:1: error:
+    • Can't make a derived instance of
+        ‘Foo1 (# #)’ with the newtype strategy:
+        GeneralizedNewtypeDeriving cannot be used on non-newtypes
+    • In the stand-alone deriving instance for ‘Foo1 (# #)’
+
+T13154c.hs:22:1: error:
+    • Can't make a derived instance of ‘Foo2’ with the stock strategy:
+        Cannot derive instances for nullary classes
+    • In the stand-alone deriving instance for ‘Foo2’
+
+T13154c.hs:23:1: error:
+    • Can't make a derived instance of
+        ‘Foo2’ with the newtype strategy:
+        Cannot derive instances for nullary classes
+    • In the stand-alone deriving instance for ‘Foo2’

@@ -46,6 +46,7 @@ import DynFlags
 import CoreSyn
 import qualified CoreSubst
 import PprCore
+import TyCoPpr          ( pprParendType )
 import CoreFVs
 import CoreUtils
 import CoreArity
@@ -1517,7 +1518,7 @@ tryEtaExpandRhs mode bndr rhs
          -- Note [Do not eta-expand join points]
          -- But do return the correct arity and bottom-ness, because
          -- these are used to set the bndr's IdInfo (#15517)
-         -- Note [idArity for join points]
+         -- Note [Invariants on join points] invariant 2b, in CoreSyn
 
   | otherwise
   = do { (new_arity, is_bot, new_rhs) <- try_expand
@@ -1610,13 +1611,6 @@ CorePrep comes around, the code is very likely to look more like this:
              $j2 :: Int -> State# RealWorld -> (# State# RealWorld, ())
              $j2 = if n > 0 then $j1
                             else (...) eta
-
-Note [idArity for join points]
-~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
-Because of Note [Do not eta-expand join points] we have it that the idArity
-of a join point is always (less than or) equal to the join arity.
-Essentially, for join points we set `idArity $j = count isId join_lam_bndrs`.
-It really can be less if there are type-level binders in join_lam_bndrs.
 
 Note [Do not eta-expand PAPs]
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
@@ -2212,8 +2206,10 @@ mkCase2 dflags scrut bndr alts_ty alts
            ; return (ex_tvs ++ arg_ids) }
     mk_new_bndrs _ _ = return []
 
-    re_sort :: [CoreAlt] -> [CoreAlt]  -- Re-sort the alternatives to
-    re_sort alts = sortBy cmpAlt alts  -- preserve the #case_invariants#
+    re_sort :: [CoreAlt] -> [CoreAlt]
+    -- Sort the alternatives to re-establish
+    -- CoreSyn Note [Case expression invariants]
+    re_sort alts = sortBy cmpAlt alts
 
     add_default :: [CoreAlt] -> [CoreAlt]
     -- See Note [Literal cases]

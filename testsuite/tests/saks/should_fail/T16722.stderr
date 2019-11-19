@@ -1,0 +1,5 @@
+
+T16722.hs:8:11: error:
+    Unexpected kind variable ‘k’
+    Perhaps you intended to use PolyKinds
+    In the standalone kind signature for D

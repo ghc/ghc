@@ -25,7 +25,7 @@ import subprocess
 
 from testutil import getStdout, Watcher, str_warn, str_info
 from testglobals import getConfig, ghc_env, getTestRun, TestConfig, TestOptions, brokens
-from perf_notes import MetricChange, inside_git_repo, is_worktree_dirty
+from perf_notes import MetricChange, inside_git_repo, is_worktree_dirty, format_perf_stat
 from junit import junit
 import cpu_features
 
@@ -392,6 +392,22 @@ else:
     # flush everything before we continue
     sys.stdout.flush()
 
+    # Dump metrics data.
+    if any(t.metrics):
+        print("\nPerformance Metrics:\n")
+        for (change, stat, baseline) in t.metrics:
+            if baseline is None:
+                print("{stat} [{direction}]".format(
+                    stat = format_perf_stat(stat),
+                    direction = str(change)))
+            else:
+                print("{stat} [{direction} from ({baselineStat}) @ HEAD~{depth}]".format(
+                    stat = format_perf_stat(stat),
+                    baselineStat = format_perf_stat(baseline.perfStat, ", "),
+                    direction = str(change),
+                    depth = baseline.commitDepth))
+        print("")
+
     # Warn if had to force skip perf tests (see Note force skip perf tests).
     spacing = "       "
     if forceSkipPerfTests and not args.skip_perf_tests:
@@ -401,7 +417,7 @@ else:
         print(spacing + 'You can still run the tests without git by specifying an output file with --metrics-file FILE.')
 
     # Warn of new metrics.
-    new_metrics = [metric for (change, metric) in t.metrics if change == MetricChange.NewMetric]
+    new_metrics = [metric for (change, metric, baseline) in t.metrics if change == MetricChange.NewMetric]
     if any(new_metrics):
         if inside_git_repo():
             reason = 'a baseline (expected value) cannot be recovered from' + \
@@ -441,7 +457,7 @@ else:
     summary(t, sys.stdout, config.no_print_summary, config.supports_colors)
 
     # Write perf stats if any exist or if a metrics file is specified.
-    stats = [stat for (_, stat) in t.metrics]
+    stats = [stat for (_, stat, __) in t.metrics]
     if hasMetricsFile:
         print('Appending ' + str(len(stats)) + ' stats to file: ' + config.metrics_file)
         with open(config.metrics_file, 'a') as f:

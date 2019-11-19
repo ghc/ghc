@@ -120,11 +120,6 @@ ghc/stage2/build/tmp/$(ghc_stage2_PROG) : $(compiler_stage2_p_LIB)
 ghc/stage2/build/tmp/$(ghc_stage2_PROG) : $(foreach lib,$(PACKAGES_STAGE1),$(libraries/$(lib)_dist-install_p_LIB))
 endif
 
-# Modules here import HsVersions.h, so we need ghc_boot_platform.h
-$(ghc_stage1_depfile_haskell) : compiler/stage1/$(PLATFORM_H)
-$(ghc_stage2_depfile_haskell) : compiler/stage2/$(PLATFORM_H)
-$(ghc_stage3_depfile_haskell) : compiler/stage3/$(PLATFORM_H)
-
 all_ghc_stage1 : $(GHC_STAGE1)
 all_ghc_stage2 : $(GHC_STAGE2)
 all_ghc_stage3 : $(GHC_STAGE3)

@@ -53,7 +53,7 @@ import GHCi.Message
 import GHCi.RemoteTypes
 import GhcMonad
 import HscMain
-import HsSyn
+import GHC.Hs
 import HscTypes
 import InstEnv
 import IfaceEnv   ( newInteractiveBinder )
@@ -63,6 +63,9 @@ import TyCon
 import Type             hiding( typeKind )
 import RepType
 import TcType
+import Constraint
+import TcOrigin
+import Predicate
 import Var
 import Id
 import Name             hiding ( varName )

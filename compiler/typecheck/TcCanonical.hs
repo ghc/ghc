@@ -13,7 +13,9 @@ module TcCanonical(
 
 import GhcPrelude
 
-import TcRnTypes
+import Constraint
+import Predicate
+import TcOrigin
 import TcUnify( swapOverTyVars, metaTyVarUpdateOK )
 import TcType
 import Type
@@ -32,11 +34,12 @@ import FamInst ( tcTopNormaliseNewTypeTF_maybe )
 import Var
 import VarEnv( mkInScopeSet )
 import VarSet( delVarSetList )
+import OccName ( OccName )
 import Outputable
 import DynFlags( DynFlags )
 import NameSet
 import RdrName
-import HsTypes( HsIPName(..) )
+import GHC.Hs.Types( HsIPName(..) )
 
 import Pair
 import Util
@@ -48,6 +51,7 @@ import Data.List  ( zip4 )
 import BasicTypes
 
 import Data.Bifunctor ( bimap )
+import Data.Foldable ( traverse_ )
 
 {-
 ************************************************************************
@@ -133,8 +137,8 @@ canonicalize (CFunEqCan { cc_ev = ev
   = {-# SCC "canEqLeafFunEq" #-}
     canCFunEqCan ev fn xis1 fsk
 
-canonicalize (CHoleCan { cc_ev = ev, cc_hole = hole })
-  = canHole ev hole
+canonicalize (CHoleCan { cc_ev = ev, cc_occ = occ, cc_hole = hole })
+  = canHole ev occ hole
 
 {-
 ************************************************************************
@@ -282,7 +286,7 @@ So here's the plan:
    Note [Eagerly expand given superclasses].
 
 3. If we have any remaining unsolved wanteds
-        (see Note [When superclasses help] in TcRnTypes)
+        (see Note [When superclasses help] in Constraint)
    try harder: take both the Givens and Wanteds, and expand
    superclasses again.  See the calls to expandSuperClasses in
    TcSimplify.simpl_loop and solveWanteds.
@@ -615,7 +619,7 @@ case.  Instead we have a special case in TcInteract.doTopReactOther,
 which looks for primitive equalities specially in the quantified
 constraints.
 
-See also Note [Evidence for quantified constraints] in Type.
+See also Note [Evidence for quantified constraints] in Predicate.
 
 
 ************************************************************************
@@ -639,13 +643,14 @@ canIrred ev
            _                     -> continueWith $
                                     mkIrredCt new_ev } }
 
-canHole :: CtEvidence -> Hole -> TcS (StopOrContinue Ct)
-canHole ev hole
+canHole :: CtEvidence -> OccName -> HoleSort -> TcS (StopOrContinue Ct)
+canHole ev occ hole_sort
   = do { let pred = ctEvPred ev
        ; (xi,co) <- flatten FM_SubstOnly ev pred -- co :: xi ~ pred
        ; rewriteEvidence ev xi co `andWhenContinue` \ new_ev ->
     do { updInertIrreds (`snocCts` (CHoleCan { cc_ev = new_ev
-                                             , cc_hole = hole }))
+                                             , cc_occ = occ
+                                             , cc_hole = hole_sort }))
        ; stopWith new_ev "Emit insoluble hole" } }
 
 
@@ -699,7 +704,7 @@ Here are the moving parts
   * checkValidType gets some changes to accept forall-constraints
     only in the right places.
 
-  * Type.PredTree gets a new constructor ForAllPred, and
+  * Predicate.Pred gets a new constructor ForAllPred, and
     and classifyPredType analyses a PredType to decompose
     the new forall-constraints
 
@@ -1267,13 +1272,22 @@ can_eq_newtype_nc ev swapped ty1 ((gres, co), ty1') ty2 ps_ty2
          -- check for blowing our stack:
          -- See Note [Newtypes can blow the stack]
        ; checkReductionDepth (ctEvLoc ev) ty1
-       ; addUsedGREs (bagToList gres)
-           -- we have actually used the newtype constructor here, so
-           -- make sure we don't warn about importing it!
+
+         -- Next, we record uses of newtype constructors, since coercing
+         -- through newtypes is tantamount to using their constructors.
+       ; addUsedGREs gre_list
+         -- If a newtype constructor was imported, don't warn about not
+         -- importing it...
+       ; traverse_ keepAlive $ map gre_name gre_list
+         -- ...and similarly, if a newtype constructor was defined in the same
+         -- module, don't warn about it being unused.
+         -- See Note [Tracking unused binding and imports] in TcRnTypes.
 
        ; new_ev <- rewriteEqEvidence ev swapped ty1' ps_ty2
                                      (mkTcSymCo co) (mkTcReflCo Representational ps_ty2)
        ; can_eq_nc False new_ev ReprEq ty1' ty1' ty2 ps_ty2 }
+  where
+    gre_list = bagToList gres
 
 ---------
 -- ^ Decompose a type application.
@@ -1288,10 +1302,10 @@ can_eq_app :: CtEvidence       -- :: s1 t1 ~N s2 t2
 -- to an irreducible constraint; see typecheck/should_compile/T10494
 -- See Note [Decomposing equality], note {4}
 can_eq_app ev s1 t1 s2 t2
-  | CtDerived { ctev_loc = loc } <- ev
+  | CtDerived {} <- ev
   = do { unifyDeriveds loc [Nominal, Nominal] [s1, t1] [s2, t2]
        ; stopWith ev "Decomposed [D] AppTy" }
-  | CtWanted { ctev_dest = dest, ctev_loc = loc } <- ev
+  | CtWanted { ctev_dest = dest } <- ev
   = do { co_s <- unifyWanted loc Nominal s1 s2
        ; let arg_loc
                | isNextArgVisible s1 = loc
@@ -1309,7 +1323,7 @@ can_eq_app ev s1 t1 s2 t2
   | s1k `mismatches` s2k
   = canEqHardFailure ev (s1 `mkAppTy` t1) (s2 `mkAppTy` t2)
 
-  | CtGiven { ctev_evar = evar, ctev_loc = loc } <- ev
+  | CtGiven { ctev_evar = evar } <- ev
   = do { let co   = mkTcCoVarCo evar
              co_s = mkTcLRCo CLeft  co
              co_t = mkTcLRCo CRight co
@@ -1321,6 +1335,8 @@ can_eq_app ev s1 t1 s2 t2
        ; canEqNC evar_s NomEq s1 s2 }
 
   where
+    loc = ctEvLoc ev
+
     s1k = tcTypeKind s1
     s2k = tcTypeKind s2
 
@@ -1571,6 +1587,7 @@ constraints: see Note [Instance and Given overlap] in TcInteract.
 Conclusion:
   * Decompose [W] N s ~R N t  iff there no given constraint that could
     later solve it.
+
 -}
 
 canDecomposableTyConAppOK :: CtEvidence -> EqRel
@@ -1834,9 +1851,9 @@ canEqTyVar :: CtEvidence          -- ev :: lhs ~ rhs
            -> TcType                -- lhs: pretty lhs, already flat
            -> TcType -> TcType      -- rhs: already flat
            -> TcS (StopOrContinue Ct)
-canEqTyVar ev eq_rel swapped tv1 ps_ty1 xi2 ps_xi2
+canEqTyVar ev eq_rel swapped tv1 ps_xi1 xi2 ps_xi2
   | k1 `tcEqType` k2
-  = canEqTyVarHomo ev eq_rel swapped tv1 ps_ty1 xi2 ps_xi2
+  = canEqTyVarHomo ev eq_rel swapped tv1 ps_xi1 xi2 ps_xi2
 
   -- So the LHS and RHS don't have equal kinds
   -- Note [Flattening] in TcFlatten gives us (F2), which says that
@@ -1875,7 +1892,7 @@ canEqTyVar ev eq_rel swapped tv1 ps_ty1 xi2 ps_xi2
                                                (mkTcReflCo role xi1) rhs_co
                        -- NB: rewriteEqEvidence executes a swap, if any, so we're
                        -- NotSwapped now.
-                 ; canEqTyVarHomo new_ev eq_rel NotSwapped tv1 ps_ty1 new_rhs ps_rhs }
+                 ; canEqTyVarHomo new_ev eq_rel NotSwapped tv1 ps_xi1 new_rhs ps_rhs }
          else
     do { let sym_k1_co = mkTcSymCo k1_co  -- :: kind(xi1) ~N flat_k1
              sym_k2_co = mkTcSymCo k2_co  -- :: kind(xi2) ~N flat_k2
@@ -1891,7 +1908,7 @@ canEqTyVar ev eq_rel swapped tv1 ps_ty1 xi2 ps_xi2
 
        ; new_ev <- rewriteEqEvidence ev swapped new_lhs new_rhs lhs_co rhs_co
          -- no longer swapped, due to rewriteEqEvidence
-       ; canEqTyVarHetero new_ev eq_rel tv1 sym_k1_co flat_k1 ps_ty1
+       ; canEqTyVarHetero new_ev eq_rel tv1 sym_k1_co flat_k1 ps_xi1
                                         new_rhs flat_k2 ps_rhs } }
   where
     xi1 = mkTyVarTy tv1
@@ -1955,16 +1972,16 @@ canEqTyVarHetero ev eq_rel tv1 co1 ki1 ps_tv1 xi2 ki2 ps_xi2
 canEqTyVarHomo :: CtEvidence
                -> EqRel -> SwapFlag
                -> TcTyVar                -- lhs: tv1
-               -> TcType                 -- pretty lhs
-               -> TcType -> TcType       -- rhs (might not be flat)
+               -> TcType                 -- pretty lhs, flat
+               -> TcType -> TcType       -- rhs, flat
                -> TcS (StopOrContinue Ct)
-canEqTyVarHomo ev eq_rel swapped tv1 ps_ty1 ty2 _
-  | Just (tv2, _) <- tcGetCastedTyVar_maybe ty2
+canEqTyVarHomo ev eq_rel swapped tv1 ps_xi1 xi2 _
+  | Just (tv2, _) <- tcGetCastedTyVar_maybe xi2
   , tv1 == tv2
   = canEqReflexive ev eq_rel (mkTyVarTy tv1)
     -- we don't need to check co because it must be reflexive
 
-  | Just (tv2, co2) <- tcGetCastedTyVar_maybe ty2
+  | Just (tv2, co2) <- tcGetCastedTyVar_maybe xi2
   , swapOverTyVars tv1 tv2
   = do { traceTcS "canEqTyVar swapOver" (ppr tv1 $$ ppr tv2 $$ ppr swapped)
          -- FM_Avoid commented out: see Note [Lazy flattening] in TcFlatten
@@ -1984,11 +2001,11 @@ canEqTyVarHomo ev eq_rel swapped tv1 ps_ty1 ty2 _
        ; new_ev <- rewriteEqEvidence ev swapped new_lhs new_rhs lhs_co rhs_co
 
        ; dflags <- getDynFlags
-       ; canEqTyVar2 dflags new_ev eq_rel IsSwapped tv2 (ps_ty1 `mkCastTy` sym_co2) }
+       ; canEqTyVar2 dflags new_ev eq_rel IsSwapped tv2 (ps_xi1 `mkCastTy` sym_co2) }
 
-canEqTyVarHomo ev eq_rel swapped tv1 _ _ ps_ty2
+canEqTyVarHomo ev eq_rel swapped tv1 _ _ ps_xi2
   = do { dflags <- getDynFlags
-       ; canEqTyVar2 dflags ev eq_rel swapped tv1 ps_ty2 }
+       ; canEqTyVar2 dflags ev eq_rel swapped tv1 ps_xi2 }
 
 -- The RHS here is either not a casted tyvar, or it's a tyvar but we want
 -- to rewrite the LHS to the RHS (as per swapOverTyVars)
@@ -1997,7 +2014,7 @@ canEqTyVar2 :: DynFlags
             -> EqRel
             -> SwapFlag
             -> TcTyVar                  -- lhs = tv, flat
-            -> TcType                   -- rhs
+            -> TcType                   -- rhs, flat
             -> TcS (StopOrContinue Ct)
 -- LHS is an inert type variable,
 -- and RHS is fully rewritten, but with type synonyms
@@ -2102,7 +2119,7 @@ Int ~ Int. The user thus sees that GHC can't solve Int ~ Int, which
 is embarrassing. See #11198 for more tales of destruction.
 
 The reason for this odd behavior is much the same as
-Note [Wanteds do not rewrite Wanteds] in TcRnTypes: note that the
+Note [Wanteds do not rewrite Wanteds] in Constraint: note that the
 new `co` is a Wanted.
 
 The solution is then not to use `co` to "rewrite" -- that is, cast -- `w`, but
@@ -2172,7 +2189,7 @@ However, if we encounter an equality constraint with a type synonym
 application on one side and a variable on the other side, we should
 NOT (necessarily) expand the type synonym, since for the purpose of
 good error messages we want to leave type synonyms unexpanded as much
-as possible.  Hence the ps_ty1, ps_ty2 argument passed to canEqTyVar.
+as possible.  Hence the ps_xi1, ps_xi2 argument passed to canEqTyVar.
 
 -}
 

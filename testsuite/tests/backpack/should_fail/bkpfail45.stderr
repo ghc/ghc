@@ -14,8 +14,10 @@ bkpfail45.bkp:13:9: error:
     • Type constructor ‘T’ has conflicting definitions in the module
       and its hsig file
       Main module: type role T phantom
+                   type T :: * -> *
                    data T a = T
       Hsig file:  type role T nominal
+                  type T :: * -> *
                   data T a = T
       The roles do not match.
       Roles on abstract types default to ‘representational’ in boot files.

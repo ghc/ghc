@@ -9,7 +9,7 @@ module TcRnExports (tcRnExports, exports_from_avail) where
 
 import GhcPrelude
 
-import HsSyn
+import GHC.Hs
 import PrelNames
 import RdrName
 import TcRnMonad
@@ -269,7 +269,7 @@ exports_from_avail (Just (dL->L _ rdr_items)) rdr_env imports this_mod
 
     -- See Note [Avails of associated data families]
     expand_tyty_gre :: GlobalRdrElt -> [GlobalRdrElt]
-    expand_tyty_gre (gre @ GRE { gre_name = me, gre_par = ParentIs p })
+    expand_tyty_gre (gre@GRE { gre_name = me, gre_par = ParentIs p })
       | isTyConName p, isTyConName me = [gre, gre{ gre_par = NoParent }]
     expand_tyty_gre gre = [gre]
 
@@ -778,7 +778,7 @@ exportErrCtxt herald exp =
   text "In the" <+> text (herald ++ ":") <+> ppr exp
 
 
-addExportErrCtxt :: (OutputableBndrId (GhcPass p))
+addExportErrCtxt :: (OutputableBndrId p)
                  => IE (GhcPass p) -> TcM a -> TcM a
 addExportErrCtxt ie = addErrCtxt exportCtxt
   where

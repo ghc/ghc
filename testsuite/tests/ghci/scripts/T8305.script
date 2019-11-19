@@ -1,0 +1,39 @@
+-- Testing the current algorithm of command name resolution
+
+-- The current algorithm of command name resolution is:
+--   1. First, look up an exact match on the name from the defined macros.
+--   2. Look for the exact match on the name in the built-in command list.
+--   3. Do a prefix lookup on the list of built-in commands
+--      - if a built-in command matches, but a macro is defined
+--      with the same name as the built-in defined, pick the macro.
+--   4. Do a prefix lookup on the list of built-in commands.
+--   5. Do a prefix lookup on the list of defined macros.
+--
+-- For the current algorithm, see https://downloads.haskell.org/ghc/latest/docs/html/users_guide/ghci.html#the-ghci-files
+
+
+----- Defineing macros for test
+:def! ty    (\e -> putStrLn "called :ty macro" >> return "")
+:def! type  (\e -> putStrLn "called :type macro" >> return "")
+:def  type2 (\e -> putStrLn "called :type2 macro" >> return "")
+:def  time  (\e -> putStrLn "called :time macro" >> return "")
+
+:def! ki    (\e -> putStrLn "called :ki macro" >> return "")
+:def  kind2 (\e -> putStrLn "called :kind2 macro" >> return "")
+
+
+----- Testing
+-- 1.
+:type ()
+
+-- 2.
+:kind ()
+
+-- 3.
+:t ()
+
+-- 4.
+:k ()
+
+-- 5.
+:ti ()

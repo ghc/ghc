@@ -10,15 +10,11 @@
 test('ghci001', combined_output, ghci_script, ['ghci001.script'])
 test('ghci002', combined_output, ghci_script, ['ghci002.script'])
 test('ghci003', combined_output, ghci_script, ['ghci003.script'])
-test('ghci004', [ combined_output,
-		  when(arch('powerpc64') or arch('powerpc64le'),
-                       expect_broken_for(11259,['ghci-ext'])),
+test('ghci004', [ combined_output, req_rts_linker,
                   unless(opsys('mingw32'),extra_ways(['ghci-ext'])) ],
                 ghci_script, ['ghci004.script'])
 test('ghci005', combined_output, ghci_script, ['ghci005.script'])
-test('ghci006', [ combined_output,
-                  when(arch('powerpc64') or arch('powerpc64le'),
-                       expect_broken_for(11259,['ghci-ext'])),
+test('ghci006', [ combined_output, req_rts_linker,
                   unless(opsys('mingw32'),extra_ways(['ghci-ext'])) ],
                 ghci_script, ['ghci006.script'])
 test('ghci007', combined_output, ghci_script, ['ghci007.script'])
@@ -107,6 +103,7 @@ test('ghci062', [extra_files(['ghci062/', 'ghci062/Test.hs']),
 		ghci_script, ['ghci062.script'])
 test('ghci063', normal, ghci_script, ['ghci063.script'])
 test('ghci064', normal, ghci_script, ['ghci064.script'])
+test('ghci065', [extra_hc_opts("-haddock")], ghci_script, ['ghci065.script'])
 test('T2452', [extra_hc_opts("-fno-implicit-import-qualified")],
     ghci_script, ['T2452.script'])
 test('T2766', normal, ghci_script, ['T2766.script'])
@@ -177,6 +174,7 @@ test('T8113', normal, ghci_script, ['T8113.script'])
 test('T8172', when(opsys('mingw32'), normalise_drive_letter),
      ghci_script, ['T8172.script'])
 test('T8215', normal, ghci_script, ['T8215.script'])
+test('T8305', normal, ghci_script, ['T8305.script'])
 test('T8353', extra_files(['Defer03.hs']), ghci_script, ['T8353.script'])
 test('T8357', normal, ghci_script, ['T8357.script'])
 test('T8383', normal, ghci_script, ['T8383.script'])
@@ -302,5 +300,14 @@ test('T16569', normal, ghci_script, ['T16569.script'])
 test('T16767', normal, ghci_script, ['T16767.script'])
 test('T16575', normal, ghci_script, ['T16575.script'])
 test('T16509', normal, ghci_script, ['T16509.script'])
-test('T16804', extra_files(['T16804a.hs', 'T16804b.hs']), ghci_script, ['T16804.script'])
+# Tests :type-at and :uses
+# historical note: introduced to see the changes in the behaviour
+#   when the implementation of :type-at and :uses will be/was changed
+#   to use hie files
+test('T16804', extra_files(['T16804a.hs', 'T16804b.hs', 'T16804c.hs']), ghci_script, ['T16804.script'])
 test('T15546', normal, ghci_script, ['T15546.script'])
+test('T16876', normal, ghci_script, ['T16876.script'])
+test('T17345', normal, ghci_script, ['T17345.script'])
+test('T17384', normal, ghci_script, ['T17384.script'])
+test('T17403', normal, ghci_script, ['T17403.script'])
+test('T17431', normal, ghci_script, ['T17431.script'])

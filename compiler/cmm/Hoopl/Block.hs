@@ -1,12 +1,15 @@
+{-# LANGUAGE DataKinds #-}
 {-# LANGUAGE DeriveFunctor #-}
 {-# LANGUAGE GADTs #-}
+{-# LANGUAGE PolyKinds #-}
 {-# LANGUAGE RankNTypes #-}
 {-# LANGUAGE ScopedTypeVariables #-}
-{-# LANGUAGE TypeFamilies #-}
 {-# LANGUAGE StandaloneDeriving #-}
+{-# LANGUAGE TypeFamilies #-}
 module Hoopl.Block
-    ( C
+    ( Extensibility (..)
     , O
+    , C
     , MaybeO(..)
     , IndexedCO
     , Block(..)
@@ -40,19 +43,21 @@ import GhcPrelude
 -- -----------------------------------------------------------------------------
 -- Shapes: Open and Closed
 
--- | Used at the type level to indicate an "open" structure with
--- a unique, unnamed control-flow edge flowing in or out.
--- "Fallthrough" and concatenation are permitted at an open point.
-data O
+-- | Used at the type level to indicate "open" vs "closed" structure.
+data Extensibility
+  -- | An "open" structure with a unique, unnamed control-flow edge flowing in
+  -- or out. "Fallthrough" and concatenation are permitted at an open point.
+  = Open
+  -- | A "closed" structure which supports control transfer only through the use
+  -- of named labels---no "fallthrough" is permitted. The number of control-flow
+  -- edges is unconstrained.
+  | Closed
 
--- | Used at the type level to indicate a "closed" structure which
--- supports control transfer only through the use of named
--- labels---no "fallthrough" is permitted.  The number of control-flow
--- edges is unconstrained.
-data C
+type O = 'Open
+type C = 'Closed
 
 -- | Either type indexed by closed/open using type families
-type family IndexedCO ex a b :: *
+type family IndexedCO (ex :: Extensibility) (a :: k) (b :: k) :: k
 type instance IndexedCO C a _b = a
 type instance IndexedCO O _a b = b
 

@@ -9,7 +9,6 @@
 -----------------------------------------------------------------------------
 
 #include "HsVersions.h"
-#include "nativeGen/NCG.h"
 
 module PPC.Instr (
     archWordFormat,
@@ -33,7 +32,7 @@ import TargetReg
 import RegClass
 import Reg
 
-import CodeGen.Platform
+import GHC.Platform.Regs
 import BlockId
 import Hoopl.Collections
 import Hoopl.Label

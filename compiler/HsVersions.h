@@ -1,5 +1,8 @@
 #pragma once
 
+-- For GHC_STAGE
+#include "ghcplatform.h"
+
 #if 0
 
 IMPORTANT!  If you put extra tabs/spaces in these macro definitions,
@@ -8,18 +11,6 @@ you will screw up the layout where they are used in case expressions!
 (This is cpp-dependent, of course)
 
 #endif
-
-/* Useful in the headers that we share with the RTS */
-#define COMPILING_GHC 1
-
-/* Pull in all the platform defines for this build (foo_HOST_ARCH etc.) */
-#include "ghc_boot_platform.h"
-
-/* Pull in the autoconf defines (HAVE_FOO), but don't include
- * ghcconfig.h, because that will include ghcplatform.h which has the
- * wrong platform settings for the compiler (it has the platform
- * settings for the target plat instead). */
-#include "ghcautoconf.h"
 
 #define GLOBAL_VAR(name,value,ty)  \
 {-# NOINLINE name #-};             \

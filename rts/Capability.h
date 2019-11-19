@@ -23,6 +23,7 @@
 #include "sm/GC.h" // for evac_fn
 #include "Task.h"
 #include "Sparks.h"
+#include "sm/NonMovingMark.h" // for MarkQueue
 
 #include "BeginPrivate.h"
 
@@ -83,6 +84,9 @@ struct Capability_ {
     // unnecessarily moving the data from one cache to another.
     bdescr **mut_lists;
     bdescr **saved_mut_lists; // tmp use during GC
+
+    // The update remembered set for the non-moving collector
+    UpdRemSet upd_rem_set;
 
     // block for allocating pinned objects into
     bdescr *pinned_object_block;
@@ -160,7 +164,9 @@ struct Capability_ {
 } // typedef Capability is defined in RtsAPI.h
   // We never want a Capability to overlap a cache line with anything
   // else, so round it up to a cache line size:
-#if !defined(mingw32_HOST_OS)
+#if defined(s390x_HOST_ARCH)
+  ATTRIBUTE_ALIGNED(256)
+#elif !defined(mingw32_HOST_OS)
   ATTRIBUTE_ALIGNED(64)
 #endif
   ;
@@ -256,7 +262,8 @@ extern Capability **capabilities;
 typedef enum {
     SYNC_OTHER,
     SYNC_GC_SEQ,
-    SYNC_GC_PAR
+    SYNC_GC_PAR,
+    SYNC_FLUSH_UPD_REM_SET
 } SyncType;
 
 //

@@ -333,10 +333,7 @@ io_hack_reqd scrut con bndrs
   | (bndr:_) <- bndrs
   , con == tupleDataCon Unboxed 2
   , idType bndr `eqType` realWorldStatePrimTy
-  , (fun, _) <- collectArgs scrut
-  = case fun of
-      Var f -> not (isPrimOpId f)
-      _     -> True
+  = not (exprOkForSpeculation scrut)
   | otherwise
   = False
 
@@ -387,15 +384,18 @@ getMaskingState# is not going to diverge or throw an exception!  This
 situation actually arises in GHC.IO.Handle.Internals.wantReadableHandle
 (on an MVar not an Int), and made a material difference.
 
-So if the scrutinee is a primop call, we *don't* apply the
-state hack:
+So if the scrutinee is ok-for-speculation, we *don't* apply the state hack,
+because we are free to push evaluation of the scrutinee after evaluation of
+expressions from the (single) case alternative.
+
+A few examples for different scrutinees:
   - If it is a simple, terminating one like getMaskingState,
-    applying the hack is over-conservative.
-  - If the primop is raise# then it returns bottom, so
-    the case alternatives are already discarded.
+    applying the hack would be over-conservative.
+  - If the primop is raise# then it returns bottom (so not ok-for-speculation),
+    but the result from the case alternatives are discarded anyway.
   - If the primop can raise a non-IO exception, like
-    divide by zero or seg-fault (eg writing an array
-    out of bounds) then we don't mind evaluating 'x' first.
+    divide by zero (so not ok-for-speculation), then we are also bottoming out
+    anyway and don't mind evaluating 'x' first.
 
 Note [Demand on the scrutinee of a product case]
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
@@ -603,8 +603,8 @@ dmdAnalRhsLetDown top_lvl rec_flag env let_dmd id rhs
     rhs_arity      = idArity id
     rhs_dmd
       -- See Note [Demand analysis for join points]
-      -- See Note [idArity for join points] in SimplUtils
-      -- rhs_arity matches the join arity of the join point
+      -- See Note [Invariants on join points] invariant 2b, in CoreSyn
+      --     rhs_arity matches the join arity of the join point
       | isJoinId id
       = mkCallDmds rhs_arity let_dmd
       | otherwise
@@ -726,6 +726,21 @@ analyse its body with the demand from the entire join-binding (written
 let_dmd here).
 
 Another win for join points!  #13543.
+
+However, note that the strictness signature for a join point can
+look a little puzzling.  E.g.
+
+    (join j x = \y. error "urk")
+    (in case v of              )
+    (     A -> j 3             )  x
+    (     B -> j 4             )
+    (     C -> \y. blah        )
+
+The entire thing is in a C(S) context, so j's strictness signature
+will be    [A]b
+meaning one absent argument, returns bottom.  That seems odd because
+there's a \y inside.  But it's right because when consumed in a C(1)
+context the RHS of the join point is indeed bottom.
 
 Note [Demand signatures are computed for a threshold demand based on idArity]
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~

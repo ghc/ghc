@@ -1,6 +1,6 @@
 
 T12430.hs:6:3: error:
-    • Type family equation violates injectivity annotation.
+    • Type family equation violates the family's injectivity annotation.
       Type variable ‘x’ cannot be inferred from the right-hand side.
       In the type family equation:
         F x = C x -- Defined at T12430.hs:6:3

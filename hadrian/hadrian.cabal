@@ -12,7 +12,16 @@ cabal-version:       >=1.10
 
 source-repository head
     type:     git
-    location: https://github.com/snowleopard/hadrian
+    location: https://gitlab.haskell.org/ghc/ghc
+
+-- To accomodate #16873
+flag threaded
+    manual:              True
+    default:             True
+    description:         Build with the threaded runtime for improved
+                         performance. Users with bootstrap compilers
+                         which don't support the threaded runtime should
+                         disable this flag.
 
 executable hadrian
     main-is:             Main.hs
@@ -48,6 +57,7 @@ executable hadrian
                        , Hadrian.Target
                        , Hadrian.Utilities
                        , Oracles.Flag
+                       , Oracles.Flavour
                        , Oracles.Setting
                        , Oracles.ModuleFiles
                        , Oracles.TestSettings
@@ -100,8 +110,10 @@ executable hadrian
                        , Settings.Flavours.QuickCross
                        , Settings.Flavours.Quickest
                        , Settings.Flavours.GhcInGhci
+                       , Settings.Flavours.Validate
                        , Settings.Packages
                        , Settings.Parser
+                       , Settings.Program
                        , Settings.Warnings
                        , Stage
                        , Target
@@ -128,7 +140,7 @@ executable hadrian
                        , filepath
                        , mtl                  == 2.2.*
                        , parsec               >= 3.1     && < 3.2
-                       , QuickCheck           >= 2.6     && < 2.13
+                       , QuickCheck           >= 2.6     && < 2.14
                        , shake                >= 0.18.3
                        , transformers         >= 0.4     && < 0.6
                        , unordered-containers >= 0.2.1   && < 0.3
@@ -139,6 +151,9 @@ executable hadrian
                        -Wredundant-constraints
                        -fno-warn-name-shadowing
                        -rtsopts
+
+    if flag(threaded)
+      ghc-options:
                        -- * -I0: Disable idle GC to avoid redundant GCs while
                        --        waiting for external processes
                        -- * -qg: Don't use parallel GC as the synchronization

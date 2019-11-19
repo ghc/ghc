@@ -1,0 +1,31 @@
+
+TooManyDeltas.hs:14:1: warning:
+    Pattern match checker ran into -fmax-pmcheck-models=0 limit, so
+      • Redundant clauses might not be reported at all
+      • Redundant clauses might be reported as inaccessible
+      • Patterns reported as unmatched might actually be matched
+    Increase the limit or resolve the warnings to suppress this message.
+
+TooManyDeltas.hs:14:1: warning: [-Wincomplete-patterns (in -Wextra)]
+    Pattern match(es) are non-exhaustive
+    In an equation for ‘f’:
+        Patterns not matched:
+            A A
+            A B
+            B A
+            B B
+
+TooManyDeltas.hs:19:1: warning:
+    Pattern match checker ran into -fmax-pmcheck-models=0 limit, so
+      • Redundant clauses might not be reported at all
+      • Redundant clauses might be reported as inaccessible
+      • Patterns reported as unmatched might actually be matched
+    Increase the limit or resolve the warnings to suppress this message.
+
+TooManyDeltas.hs:20:1: warning: [-Woverlapping-patterns (in -Wdefault)]
+    Pattern match has inaccessible right hand side
+    In an equation for ‘g’: g A A = ...
+
+TooManyDeltas.hs:21:1: warning: [-Woverlapping-patterns (in -Wdefault)]
+    Pattern match has inaccessible right hand side
+    In an equation for ‘g’: g A A = ...

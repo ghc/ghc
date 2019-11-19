@@ -83,7 +83,7 @@ module DynFlags (
         unsafeFlags, unsafeFlagsForInfer,
 
         -- ** LLVM Targets
-        LlvmTarget(..), LlvmTargets, LlvmPasses, LlvmConfig,
+        LlvmTarget(..), LlvmConfig(..),
 
         -- ** System tool settings and locations
         Settings(..),
@@ -320,7 +320,7 @@ import qualified EnumSet
 import GHC.Foreign (withCString, peekCString)
 import qualified GHC.LanguageExtensions as LangExt
 
-#if STAGE >= 2
+#if GHC_STAGE >= 2
 -- used by SHARED_GLOBAL_VAR
 import Foreign (Ptr)
 #endif
@@ -450,13 +450,13 @@ data DumpFlag
    | Opt_D_dump_parsed_ast
    | Opt_D_dump_rn
    | Opt_D_dump_rn_ast
-   | Opt_D_dump_shape
    | Opt_D_dump_simpl
    | Opt_D_dump_simpl_iterations
    | Opt_D_dump_spec
    | Opt_D_dump_prep
-   | Opt_D_dump_stg
-   | Opt_D_dump_stg_final
+   | Opt_D_dump_stg -- CoreToStg output
+   | Opt_D_dump_stg_unarised -- STG after unarise
+   | Opt_D_dump_stg_final -- STG after stg2stg
    | Opt_D_dump_call_arity
    | Opt_D_dump_exitify
    | Opt_D_dump_stranal
@@ -509,8 +509,9 @@ data GeneralFlag
    | Opt_DoCmmLinting
    | Opt_DoAsmLinting
    | Opt_DoAnnotationLinting
-   | Opt_NoLlvmMangler                 -- hidden flag
-   | Opt_FastLlvm                      -- hidden flag
+   | Opt_NoLlvmMangler                  -- hidden flag
+   | Opt_FastLlvm                       -- hidden flag
+   | Opt_NoTypeableBinds
 
    | Opt_WarnIsError                    -- -Werror; makes warnings fatal
    | Opt_ShowWarnGroups                 -- Show the group a warning belongs to
@@ -653,6 +654,8 @@ data GeneralFlag
    -- response file and as such breaking apart.
    | Opt_SingleLibFolder
    | Opt_KeepCAFs
+   | Opt_KeepGoing
+   | Opt_ByteCode
 
    -- output style opts
    | Opt_ErrorSpans -- Include full span info in error messages,
@@ -919,6 +922,7 @@ data WarningFlag =
    | Opt_WarnUnusedPackages               -- Since 8.10
    | Opt_WarnInferredSafeImports          -- Since 8.10
    | Opt_WarnMissingSafeHaskellMode       -- Since 8.10
+   | Opt_WarnDerivingDefaults
    deriving (Eq, Show, Enum)
 
 data Language = Haskell98 | Haskell2010
@@ -967,14 +971,14 @@ data DynFlags = DynFlags {
   integerLibrary        :: IntegerLibrary,
     -- ^ IntegerGMP or IntegerSimple. Set at configure time, but may be overriden
     --   by GHC-API users. See Note [The integer library] in PrelNames
-  llvmTargets           :: LlvmTargets,
-  llvmPasses            :: LlvmPasses,
+  llvmConfig            :: LlvmConfig,
+    -- ^ N.B. It's important that this field is lazy since we load the LLVM
+    -- configuration lazily. See Note [LLVM Configuration] in SysTools.
   verbosity             :: Int,         -- ^ Verbosity level: see Note [Verbosity levels]
   optLevel              :: Int,         -- ^ Optimisation level
   debugLevel            :: Int,         -- ^ How much debug information to produce
   simplPhases           :: Int,         -- ^ Number of simplifier phases
   maxSimplIterations    :: Int,         -- ^ Max simplifier iterations
-  maxPmCheckIterations  :: Int,         -- ^ Max no iterations for pm checking
   ruleCheck             :: Maybe String,
   inlineCheck           :: Maybe String, -- ^ A prefix to report inlining decisions about
   strictnessBefore      :: [Int],       -- ^ Additional demand analysis
@@ -998,6 +1002,10 @@ data DynFlags = DynFlags {
                                         --   error messages
   maxUncoveredPatterns  :: Int,         -- ^ Maximum number of unmatched patterns to show
                                         --   in non-exhaustiveness warnings
+  maxPmCheckModels      :: Int,         -- ^ Soft limit on the number of models
+                                        --   the pattern match checker checks
+                                        --   a pattern against. A safe guard
+                                        --   against exponential blow-up.
   simplTickFactor       :: Int,         -- ^ Multiplier for simplifier ticks
   specConstrThreshold   :: Maybe Int,   -- ^ Threshold for SpecConstr
   specConstrCount       :: Maybe Int,   -- ^ Max number of specialisations for any one function
@@ -1385,9 +1393,10 @@ data LlvmTarget = LlvmTarget
   , lAttributes :: [String]
   }
 
-type LlvmTargets = [(String, LlvmTarget)]
-type LlvmPasses = [(Int, String)]
-type LlvmConfig = (LlvmTargets, LlvmPasses)
+-- | See Note [LLVM Configuration] in SysTools.
+data LlvmConfig = LlvmConfig { llvmTargets :: [(String, LlvmTarget)]
+                             , llvmPasses  :: [(Int, String)]
+                             }
 
 -----------------------------------------------------------------------------
 -- Accessessors from 'DynFlags'
@@ -1506,7 +1515,7 @@ versionedAppDir dflags = do
   return $ appdir </> versionedFilePath dflags
 
 versionedFilePath :: DynFlags -> FilePath
-versionedFilePath dflags = uniqueSubdir $ targetPlatform dflags
+versionedFilePath dflags = uniqueSubdir $ platformMini $ targetPlatform dflags
 
 -- | The target code type of the compilation (if any).
 --
@@ -1888,6 +1897,10 @@ initDynFlags dflags = do
                           do str' <- peekCString enc cstr
                              return (str == str'))
                          `catchIOError` \_ -> return False
+ maybeGhcNoUnicodeEnv <- lookupEnv "GHC_NO_UNICODE"
+ let adjustNoUnicode (Just _) = False
+     adjustNoUnicode Nothing = True
+ let useUnicode' = (adjustNoUnicode maybeGhcNoUnicodeEnv) && canUseUnicode
  canUseColor <- stderrSupportsAnsiColors
  maybeGhcColorsEnv  <- lookupEnv "GHC_COLORS"
  maybeGhcColoursEnv <- lookupEnv "GHC_COLOURS"
@@ -1903,7 +1916,7 @@ initDynFlags dflags = do
         dirsToClean    = refDirsToClean,
         generatedDumps = refGeneratedDumps,
         nextWrapperNum = wrapperNum,
-        useUnicode    = canUseUnicode,
+        useUnicode    = useUnicode',
         useColor      = useColor',
         canUseColor   = canUseColor,
         colScheme     = colScheme',
@@ -1914,7 +1927,7 @@ initDynFlags dflags = do
 -- | The normal 'DynFlags'. Note that they are not suitable for use in this form
 -- and must be fully initialized by 'GHC.runGhc' first.
 defaultDynFlags :: Settings -> LlvmConfig -> DynFlags
-defaultDynFlags mySettings (myLlvmTargets, myLlvmPasses) =
+defaultDynFlags mySettings llvmConfig =
 -- See Note [Updating flag description in the User's Guide]
      DynFlags {
         ghcMode                 = CompManager,
@@ -1926,7 +1939,6 @@ defaultDynFlags mySettings (myLlvmTargets, myLlvmPasses) =
         debugLevel              = 0,
         simplPhases             = 2,
         maxSimplIterations      = 4,
-        maxPmCheckIterations    = 2000000,
         ruleCheck               = Nothing,
         inlineCheck             = Nothing,
         binBlobThreshold        = 500000, -- 500K is a good default (see #16190)
@@ -1935,6 +1947,7 @@ defaultDynFlags mySettings (myLlvmTargets, myLlvmPasses) =
         maxRefHoleFits     = Just 6,
         refLevelHoleFits   = Nothing,
         maxUncoveredPatterns    = 4,
+        maxPmCheckModels        = 100,
         simplTickFactor         = 100,
         specConstrThreshold     = Just 2000,
         specConstrCount         = Just 3,
@@ -2025,8 +2038,8 @@ defaultDynFlags mySettings (myLlvmTargets, myLlvmPasses) =
         platformConstants = sPlatformConstants mySettings,
         rawSettings = sRawSettings mySettings,
 
-        llvmTargets             = myLlvmTargets,
-        llvmPasses              = myLlvmPasses,
+        -- See Note [LLVM configuration].
+        llvmConfig              = llvmConfig,
 
         -- ghc -M values
         depMakefile       = "Makefile",
@@ -2284,6 +2297,9 @@ flattenExtensionFlags ml = foldr f defaultExtensionFlags
           f (Off f) flags = EnumSet.delete f flags
           defaultExtensionFlags = EnumSet.fromList (languageExtensions ml)
 
+-- | The language extensions implied by the various language variants.
+-- When updating this be sure to update the flag documentation in
+-- @docs/users-guide/glasgow_exts.rst@.
 languageExtensions :: Maybe Language -> [LangExt.Extension]
 
 languageExtensions Nothing
@@ -2352,7 +2368,6 @@ dopt f dflags = (f `EnumSet.member` dumpFlags dflags)
           enableIfVerbose Opt_D_dump_vt_trace               = False
           enableIfVerbose Opt_D_dump_tc                     = False
           enableIfVerbose Opt_D_dump_rn                     = False
-          enableIfVerbose Opt_D_dump_shape                  = False
           enableIfVerbose Opt_D_dump_rn_stats               = False
           enableIfVerbose Opt_D_dump_hi_diffs               = False
           enableIfVerbose Opt_D_verbose_core2core           = False
@@ -3099,9 +3114,9 @@ dynamic_flags_deps = [
   , make_ord_flag defGhcFlag "split-sections"
       (noArgM (\dflags -> do
         if platformHasSubsectionsViaSymbols (targetPlatform dflags)
-          then do addErr $
+          then do addWarn $
                     "-split-sections is not useful on this platform " ++
-                    "since it always uses subsections via symbols."
+                    "since it always uses subsections via symbols. Ignoring."
                   return dflags
           else return (gopt_set dflags Opt_SplitSections)))
 
@@ -3382,6 +3397,8 @@ dynamic_flags_deps = [
         (setDumpFlag Opt_D_dump_prep)
   , make_ord_flag defGhcFlag "ddump-stg"
         (setDumpFlag Opt_D_dump_stg)
+  , make_ord_flag defGhcFlag "ddump-stg-unarised"
+        (setDumpFlag Opt_D_dump_stg_unarised)
   , make_ord_flag defGhcFlag "ddump-stg-final"
         (setDumpFlag Opt_D_dump_stg_final)
   , make_ord_flag defGhcFlag "ddump-call-arity"
@@ -3406,8 +3423,6 @@ dynamic_flags_deps = [
         (setDumpFlag Opt_D_dump_worker_wrapper)
   , make_ord_flag defGhcFlag "ddump-rn-trace"
         (setDumpFlag Opt_D_dump_rn_trace)
-  , make_ord_flag defGhcFlag "ddump-shape"
-        (setDumpFlag Opt_D_dump_shape)
   , make_ord_flag defGhcFlag "ddump-if-trace"
         (setDumpFlag Opt_D_dump_if_trace)
   , make_ord_flag defGhcFlag "ddump-cs-trace"
@@ -3478,6 +3493,8 @@ dynamic_flags_deps = [
         (NoArg (setGeneralFlag Opt_NoLlvmMangler)) -- hidden flag
   , make_ord_flag defGhcFlag "fast-llvm"
         (NoArg (setGeneralFlag Opt_FastLlvm)) -- hidden flag
+  , make_ord_flag defGhcFlag "dno-typeable-binds"
+        (NoArg (setGeneralFlag Opt_NoTypeableBinds))
   , make_ord_flag defGhcFlag "ddump-debug"
         (setDumpFlag Opt_D_dump_debug)
   , make_ord_flag defGhcFlag "ddump-json"
@@ -3600,12 +3617,16 @@ dynamic_flags_deps = [
             "vectors registers are now passed in registers by default."
   , make_ord_flag defFlag "fmax-uncovered-patterns"
       (intSuffix (\n d -> d { maxUncoveredPatterns = n }))
+  , make_ord_flag defFlag "fmax-pmcheck-models"
+      (intSuffix (\n d -> d { maxPmCheckModels = n }))
   , make_ord_flag defFlag "fsimplifier-phases"
       (intSuffix (\n d -> d { simplPhases = n }))
   , make_ord_flag defFlag "fmax-simplifier-iterations"
       (intSuffix (\n d -> d { maxSimplIterations = n }))
-  , make_ord_flag defFlag "fmax-pmcheck-iterations"
-      (intSuffix (\n d -> d{ maxPmCheckIterations = n }))
+  , (Deprecated, defFlag "fmax-pmcheck-iterations"
+      (intSuffixM (\_ d ->
+       do { deprecate $ "use -fmax-pmcheck-models instead"
+          ; return d })))
   , make_ord_flag defFlag "fsimpl-tick-factor"
       (intSuffix (\n d -> d { simplTickFactor = n }))
   , make_ord_flag defFlag "fspec-constr-threshold"
@@ -3736,7 +3757,10 @@ dynamic_flags_deps = [
 
   , make_ord_flag defFlag "fno-code"         (NoArg ((upd $ \d ->
                   d { ghcLink=NoLink }) >> setTarget HscNothing))
-  , make_ord_flag defFlag "fbyte-code"       (NoArg (setTarget HscInterpreted))
+  , make_ord_flag defFlag "fbyte-code"
+      (noArgM $ \dflags -> do
+        setTarget HscInterpreted
+        pure $ gopt_set dflags Opt_ByteCode)
   , make_ord_flag defFlag "fobject-code"     $ NoArg $ do
       dflags <- liftEwM getCmdLineState
       setTarget $ defaultObjectTarget dflags
@@ -4026,6 +4050,7 @@ wWarningFlagsDeps = [
                                          Opt_WarnDeferredOutOfScopeVariables,
   flagSpec "deprecations"                Opt_WarnWarningsDeprecations,
   flagSpec "deprecated-flags"            Opt_WarnDeprecatedFlags,
+  flagSpec "deriving-defaults"           Opt_WarnDerivingDefaults,
   flagSpec "deriving-typeable"           Opt_WarnDerivingTypeable,
   flagSpec "dodgy-exports"               Opt_WarnDodgyExports,
   flagSpec "dodgy-foreign-imports"       Opt_WarnDodgyForeignImports,
@@ -4035,7 +4060,8 @@ wWarningFlagsDeps = [
     "it is subsumed by -Wredundant-constraints",
   flagSpec "redundant-constraints"       Opt_WarnRedundantConstraints,
   flagSpec "duplicate-exports"           Opt_WarnDuplicateExports,
-  flagSpec "hi-shadowing"                Opt_WarnHiShadows,
+  depFlagSpec "hi-shadowing"                Opt_WarnHiShadows
+    "it is not used, and was never implemented",
   flagSpec "inaccessible-code"           Opt_WarnInaccessibleCode,
   flagSpec "implicit-prelude"            Opt_WarnImplicitPrelude,
   depFlagSpec "implicit-kind-vars"       Opt_WarnImplicitKindVars
@@ -4207,6 +4233,7 @@ fFlagsDeps = [
   flagSpec "ignore-interface-pragmas"         Opt_IgnoreInterfacePragmas,
   flagGhciSpec "implicit-import-qualified"    Opt_ImplicitImportQualified,
   flagSpec "irrefutable-tuples"               Opt_IrrefutableTuples,
+  flagSpec "keep-going"                       Opt_KeepGoing,
   flagSpec "kill-absence"                     Opt_KillAbsence,
   flagSpec "kill-one-shot"                    Opt_KillOneShot,
   flagSpec "late-dmd-anal"                    Opt_LateDmdAnal,
@@ -4341,26 +4368,25 @@ supportedLanguages = map (flagSpecName . snd) languageFlagsDeps
 supportedLanguageOverlays :: [String]
 supportedLanguageOverlays = map (flagSpecName . snd) safeHaskellFlagsDeps
 
-supportedExtensions :: [String]
-supportedExtensions = concatMap toFlagSpecNamePair xFlags
+supportedExtensions :: PlatformMini -> [String]
+supportedExtensions targetPlatformMini = concatMap toFlagSpecNamePair xFlags
   where
     toFlagSpecNamePair flg
-#if !defined(HAVE_INTERPRETER)
       -- IMPORTANT! Make sure that `ghc --supported-extensions` omits
       -- "TemplateHaskell"/"QuasiQuotes" when it's known not to work out of the
       -- box. See also GHC #11102 and #16331 for more details about
       -- the rationale
-      | flagSpecFlag flg == LangExt.TemplateHaskell  = [noName]
-      | flagSpecFlag flg == LangExt.QuasiQuotes      = [noName]
-#endif
+      | isAIX, flagSpecFlag flg == LangExt.TemplateHaskell  = [noName]
+      | isAIX, flagSpecFlag flg == LangExt.QuasiQuotes      = [noName]
       | otherwise = [name, noName]
       where
+        isAIX = platformMini_os targetPlatformMini == OSAIX
         noName = "No" ++ name
         name = flagSpecName flg
 
-supportedLanguagesAndExtensions :: [String]
-supportedLanguagesAndExtensions =
-    supportedLanguages ++ supportedLanguageOverlays ++ supportedExtensions
+supportedLanguagesAndExtensions :: PlatformMini -> [String]
+supportedLanguagesAndExtensions targetPlatformMini =
+    supportedLanguages ++ supportedLanguageOverlays ++ supportedExtensions targetPlatformMini
 
 -- | These -X<blah> flags cannot be reversed with -XNo<blah>
 languageFlagsDeps :: [(Deprecation, FlagSpec Language)]
@@ -4516,6 +4542,7 @@ xFlagsDeps = [
   flagSpec' "TemplateHaskell"                 LangExt.TemplateHaskell
                                               checkTemplateHaskellOk,
   flagSpec "TemplateHaskellQuotes"            LangExt.TemplateHaskellQuotes,
+  flagSpec "StandaloneKindSignatures"         LangExt.StandaloneKindSignatures,
   flagSpec "TraditionalRecordSyntax"          LangExt.TraditionalRecordSyntax,
   flagSpec "TransformListComp"                LangExt.TransformListComp,
   flagSpec "TupleSections"                    LangExt.TupleSections,
@@ -4642,6 +4669,9 @@ impliedXFlags
     , (LangExt.TypeInType,       turnOn, LangExt.DataKinds)
     , (LangExt.TypeInType,       turnOn, LangExt.PolyKinds)
     , (LangExt.TypeInType,       turnOn, LangExt.KindSignatures)
+
+    -- Standalone kind signatures are a replacement for CUSKs.
+    , (LangExt.StandaloneKindSignatures, turnOff, LangExt.CUSKs)
 
     -- AutoDeriveTypeable is not very useful without DeriveDataTypeable
     , (LangExt.AutoDeriveTypeable, turnOn, LangExt.DeriveDataTypeable)
@@ -4823,6 +4853,7 @@ standardWarnings -- see Note [Documenting warning flags]
         Opt_WarnPartialTypeSignatures,
         Opt_WarnUnrecognisedPragmas,
         Opt_WarnDuplicateExports,
+        Opt_WarnDerivingDefaults,
         Opt_WarnOverflowedLiterals,
         Opt_WarnEmptyEnumerations,
         Opt_WarnMissingFields,
@@ -5708,13 +5739,12 @@ makeDynFlagsConsistent dflags
 -- initialized.
 defaultGlobalDynFlags :: DynFlags
 defaultGlobalDynFlags =
-    (defaultDynFlags settings (llvmTargets, llvmPasses)) { verbosity = 2 }
+    (defaultDynFlags settings llvmConfig) { verbosity = 2 }
   where
     settings = panic "v_unsafeGlobalDynFlags: settings not initialised"
-    llvmTargets = panic "v_unsafeGlobalDynFlags: llvmTargets not initialised"
-    llvmPasses = panic "v_unsafeGlobalDynFlags: llvmPasses not initialised"
+    llvmConfig = panic "v_unsafeGlobalDynFlags: llvmConfig not initialised"
 
-#if STAGE < 2
+#if GHC_STAGE < 2
 GLOBAL_VAR(v_unsafeGlobalDynFlags, defaultGlobalDynFlags, DynFlags)
 #else
 SHARED_GLOBAL_VAR( v_unsafeGlobalDynFlags

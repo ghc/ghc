@@ -3,7 +3,6 @@
 -- access select functions of the 'TcM', principally those to do with
 -- reading parts of the state.
 module TcPluginM (
-#if defined(HAVE_INTERPRETER)
         -- * Basic TcPluginM functionality
         TcPluginM,
         tcPluginIO,
@@ -49,10 +48,8 @@ module TcPluginM (
         newEvVar,
         setEvBind,
         getEvBindsTcPluginM
-#endif
     ) where
 
-#if defined(HAVE_INTERPRETER)
 import GhcPrelude
 
 import qualified TcRnMonad as TcM
@@ -64,14 +61,14 @@ import qualified IfaceEnv
 import qualified Finder
 
 import FamInstEnv ( FamInstEnv )
-import TcRnMonad  ( TcGblEnv, TcLclEnv, Ct, CtLoc, TcPluginM
+import TcRnMonad  ( TcGblEnv, TcLclEnv, TcPluginM
                   , unsafeTcPluginTcM, getEvBindsTcPluginM
                   , liftIO, traceTc )
+import Constraint ( Ct, CtLoc, CtEvidence(..), ctLocOrigin )
 import TcMType    ( TcTyVar, TcType )
 import TcEnv      ( TcTyThing )
 import TcEvidence ( TcCoercion, CoercionHole, EvTerm(..)
                   , EvExpr, EvBind, mkGivenEvBind )
-import TcRnTypes  ( CtEvidence(..) )
 import Var        ( EvVar )
 
 import Module
@@ -161,7 +158,7 @@ zonkCt = unsafeTcPluginTcM . TcM.zonkCt
 -- | Create a new wanted constraint.
 newWanted  :: CtLoc -> PredType -> TcPluginM CtEvidence
 newWanted loc pty
-  = unsafeTcPluginTcM (TcM.newWanted (TcM.ctLocOrigin loc) Nothing pty)
+  = unsafeTcPluginTcM (TcM.newWanted (ctLocOrigin loc) Nothing pty)
 
 -- | Create a new derived constraint.
 newDerived :: CtLoc -> PredType -> TcPluginM CtEvidence
@@ -190,7 +187,3 @@ setEvBind :: EvBind -> TcPluginM ()
 setEvBind ev_bind = do
     tc_evbinds <- getEvBindsTcPluginM
     unsafeTcPluginTcM $ TcM.addTcEvBind tc_evbinds ev_bind
-#else
--- this dummy import is needed as a consequence of NoImplicitPrelude
-import GhcPrelude ()
-#endif

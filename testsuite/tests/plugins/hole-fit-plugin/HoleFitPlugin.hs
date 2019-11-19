@@ -7,7 +7,7 @@ import TcHoleErrors
 
 import Data.List (stripPrefix, sortOn)
 
-import TcRnTypes
+import Constraint
 
 import TcRnMonad
 
@@ -34,8 +34,8 @@ fromModule (GreHFCand gre) =
 fromModule _ = []
 
 toHoleFitCommand :: TypedHole -> String -> Maybe String
-toHoleFitCommand TyH{tyHCt = Just (CHoleCan _ h)} str
-    = stripPrefix ("_" <> str) $ occNameString $ holeOcc h
+toHoleFitCommand TyH{tyHCt = Just (CHoleCan _ h _)} str
+    = stripPrefix ("_" <> str) $ occNameString h
 toHoleFitCommand _ _ = Nothing
 
 

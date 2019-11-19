@@ -1205,7 +1205,7 @@ pprTraceM str doc = pprTrace str doc (pure ())
 -- | @pprTraceWith desc f x@ is equivalent to @pprTrace desc (f x) x@.
 -- This allows you to print details from the returned value as well as from
 -- ambient variables.
-pprTraceWith :: Outputable a => String -> (a -> SDoc) -> a -> a
+pprTraceWith :: String -> (a -> SDoc) -> a -> a
 pprTraceWith desc f x = pprTrace desc (f x) x
 
 -- | @pprTraceIt desc x@ is equivalent to @pprTrace desc (ppr x) x@

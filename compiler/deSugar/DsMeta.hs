@@ -30,7 +30,7 @@ import DsMonad
 
 import qualified Language.Haskell.TH as TH
 
-import HsSyn
+import GHC.Hs
 import PrelNames
 -- To avoid clashes with DsMeta.varName we must make a local alias for
 -- OccName.varName we do this by removing varName from the import of
@@ -140,6 +140,7 @@ repTopDs group@(HsGroup { hs_valds   = valds
                      ; _        <- mapM no_splice splcds
                      ; tycl_ds  <- mapM repTyClD (tyClGroupTyClDecls tyclds)
                      ; role_ds  <- mapM repRoleD (concatMap group_roles tyclds)
+                     ; kisig_ds <- mapM repKiSigD (concatMap group_kisigs tyclds)
                      ; inst_ds  <- mapM repInstD instds
                      ; deriv_ds <- mapM repStandaloneDerivD derivds
                      ; fix_ds   <- mapM repFixD fixds
@@ -155,6 +156,7 @@ repTopDs group@(HsGroup { hs_valds   = valds
                         -- more needed
                      ;  return (de_loc $ sort_by_loc $
                                 val_ds ++ catMaybes tycl_ds ++ role_ds
+                                       ++ kisig_ds
                                        ++ (concat fix_ds)
                                        ++ inst_ds ++ rule_ds ++ for_ds
                                        ++ ann_ds ++ deriv_ds) }) ;
@@ -346,6 +348,13 @@ repRoleD (dL->L loc (RoleAnnotDecl _ tycon roles))
        ; dec <- repRoleAnnotD tycon1 roles2
        ; return (loc, dec) }
 repRoleD _ = panic "repRoleD"
+
+-------------------------
+repKiSigD :: LStandaloneKindSig GhcRn -> DsM (SrcSpan, Core TH.DecQ)
+repKiSigD (dL->L loc kisig) =
+  case kisig of
+    StandaloneKindSig _ v ki -> rep_ty_sig kiSigDName loc ki v
+    XStandaloneKindSig nec -> noExtCon nec
 
 -------------------------
 repDataDefn :: Core TH.Name
@@ -870,7 +879,7 @@ rep_ty_sig :: Name -> SrcSpan -> LHsSigType GhcRn -> Located Name
 -- and Note [Don't quantify implicit type variables in quotes]
 rep_ty_sig mk_sig loc sig_ty nm
   | HsIB { hsib_body = hs_ty } <- sig_ty
-  , (explicit_tvs, ctxt, ty) <- splitLHsSigmaTy hs_ty
+  , (explicit_tvs, ctxt, ty) <- splitLHsSigmaTyInvis hs_ty
   = do { nm1 <- lookupLOcc nm
        ; let rep_in_scope_tv tv = do { name <- lookupBinder (hsLTyVarName tv)
                                      ; repTyVarBndrWithKind tv name }
@@ -1385,7 +1394,7 @@ repE (ArithSeq _ _ aseq) =
 repE (HsSpliceE _ splice)  = repSplice splice
 repE (HsStatic _ e)        = repLE e >>= rep2 staticEName . (:[]) . unC
 repE (HsUnboundVar _ uv)   = do
-                               occ   <- occNameLit (unboundVarOcc uv)
+                               occ   <- occNameLit uv
                                sname <- repNameS occ
                                repUnboundVar sname
 
@@ -1781,7 +1790,7 @@ repLambda (dL->L _ (Match { m_pats = ps
                 do { xs <- repLPs ps; body <- repLE e; repLam xs body })
       ; wrapGenSyms ss lam }
 
-repLambda (dL->L _ m) = notHandled "Guarded labmdas" (pprMatch m)
+repLambda (dL->L _ m) = notHandled "Guarded lambdas" (pprMatch m)
 
 
 -----------------------------------------------------------------------------
@@ -2108,7 +2117,7 @@ repMultiIf (MkC alts) = rep2 multiIfEName [alts]
 repLetE :: Core [TH.DecQ] -> Core TH.ExpQ -> DsM (Core TH.ExpQ)
 repLetE (MkC ds) (MkC e) = rep2 letEName [ds, e]
 
-repCaseE :: Core TH.ExpQ -> Core [TH.MatchQ] -> DsM( Core TH.ExpQ)
+repCaseE :: Core TH.ExpQ -> Core [TH.MatchQ] -> DsM (Core TH.ExpQ)
 repCaseE (MkC e) (MkC ms) = rep2 caseEName [e, ms]
 
 repDoE :: Core [TH.StmtQ] -> DsM (Core TH.ExpQ)

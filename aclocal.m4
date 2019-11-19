@@ -195,6 +195,9 @@ AC_DEFUN([FPTOOLS_SET_HASKELL_PLATFORM_VARS],
         powerpc64le)
             test -z "[$]2" || eval "[$]2=\"ArchPPC_64 {ppc_64ABI = ELF_V2}\""
             ;;
+        s390x)
+            test -z "[$]2" || eval "[$]2=ArchS390X"
+            ;;
         sparc)
             test -z "[$]2" || eval "[$]2=ArchSPARC"
             ;;
@@ -217,7 +220,7 @@ AC_DEFUN([FPTOOLS_SET_HASKELL_PLATFORM_VARS],
         mipsel)
             test -z "[$]2" || eval "[$]2=ArchMipsel"
             ;;
-        hppa|hppa1_1|ia64|m68k|nios2|riscv32|riscv64|rs6000|s390|s390x|sh4|vax)
+        hppa|hppa1_1|ia64|m68k|nios2|riscv32|riscv64|rs6000|s390|sh4|vax)
             test -z "[$]2" || eval "[$]2=ArchUnknown"
             ;;
         *)
@@ -315,11 +318,11 @@ AC_DEFUN([FPTOOLS_SET_HASKELL_PLATFORM_VARS],
     AC_LINK_IFELSE(
         [AC_LANG_PROGRAM([], [__asm__ (".subsections_via_symbols");])],
         [AC_MSG_RESULT(yes)
-         HaskellHaveSubsectionsViaSymbols=True
+         TargetHasSubsectionsViaSymbols=YES
          AC_DEFINE([HAVE_SUBSECTIONS_VIA_SYMBOLS],[1],
                    [Define to 1 if Apple-style dead-stripping is supported.])
         ],
-        [HaskellHaveSubsectionsViaSymbols=False
+        [TargetHasSubsectionsViaSymbols=NO
          AC_MSG_RESULT(no)])
 
     dnl ** check for .ident assembler directive
@@ -329,9 +332,9 @@ AC_DEFUN([FPTOOLS_SET_HASKELL_PLATFORM_VARS],
     AC_LINK_IFELSE(
         [AC_LANG_PROGRAM([__asm__ (".ident \"GHC x.y.z\"");], [])],
         [AC_MSG_RESULT(yes)
-         HaskellHaveIdentDirective=True],
+         TargetHasIdentDirective=YES],
         [AC_MSG_RESULT(no)
-         HaskellHaveIdentDirective=False])
+         TargetHasIdentDirective=NO])
 
     dnl *** check for GNU non-executable stack note support (ELF only)
     dnl     (.section .note.GNU-stack,"",@progbits)
@@ -361,9 +364,9 @@ AC_DEFUN([FPTOOLS_SET_HASKELL_PLATFORM_VARS],
            __asm__ (".section .text");
          ], [0])],
         [AC_MSG_RESULT(yes)
-         HaskellHaveGnuNonexecStack=True],
+         TargetHasGnuNonexecStack=YES],
         [AC_MSG_RESULT(no)
-         HaskellHaveGnuNonexecStack=False])
+         TargetHasGnuNonexecStack=NO])
     CFLAGS="$CFLAGS2"
 
     checkArch "$BuildArch" "HaskellBuildArch"
@@ -372,17 +375,19 @@ AC_DEFUN([FPTOOLS_SET_HASKELL_PLATFORM_VARS],
 
     checkArch "$HostArch" "HaskellHostArch"
     checkVendor "$HostVendor"
-    checkOS "$HostOS" ""
+    checkOS "$HostOS" "HaskellHostOs"
 
     checkArch "$TargetArch" "HaskellTargetArch"
     checkVendor "$TargetVendor"
     checkOS "$TargetOS" "HaskellTargetOs"
 
+    AC_SUBST(HaskellHostArch)
+    AC_SUBST(HaskellHostOs)
     AC_SUBST(HaskellTargetArch)
     AC_SUBST(HaskellTargetOs)
-    AC_SUBST(HaskellHaveSubsectionsViaSymbols)
-    AC_SUBST(HaskellHaveIdentDirective)
-    AC_SUBST(HaskellHaveGnuNonexecStack)
+    AC_SUBST(TargetHasSubsectionsViaSymbols)
+    AC_SUBST(TargetHasIdentDirective)
+    AC_SUBST(TargetHasGnuNonexecStack)
 ])
 
 
@@ -840,6 +845,48 @@ AC_DEFUN([FP_CHECK_SIZEOF_AND_ALIGNMENT],
 FP_CHECK_ALIGNMENT([$1])
 ])# FP_CHECK_SIZEOF_AND_ALIGNMENT
 
+# FP_DEFAULT_CHOICE_OVERRIDE_CHECK(
+#   flag, name, anti name, var name, help string,
+#   [var true val], [var false val], [flag true val])
+# ---------------------------------------------------
+# Helper for when there is a automatic detection and an explicit flag for the
+# user to override disable a feature, but not override enable a feature.
+#
+# $1 = flag of feature
+# $2 = name of feature
+# $3 = name of anti feature
+# $4 = name of variable
+# $5 = help string
+# $6 = when true
+# $7 = when false
+# $8 = default explicit case (yes/no). Used for handle "backwards" legacy
+#      options where enabling makes fewer assumptions than disabling.
+AC_DEFUN(
+    [FP_DEFAULT_CHOICE_OVERRIDE_CHECK],
+    [AC_ARG_ENABLE(
+        [$1],
+        [AC_HELP_STRING(
+            [--enable-$1],
+            [$5])],
+        [AS_IF(
+           [test x"$enableval" = x"m4_default([$8],yes)"],
+           [AS_CASE(
+               [x"$$4Default"],
+               [x"m4_default([$6],YES)"],
+                 [AC_MSG_NOTICE([user chose $2 matching default for platform])],
+               [x"m4_default([$7],NO)"],
+                 [AC_MSG_ERROR([user chose $2 overriding only supported option for platform])],
+               [AC_MSG_ERROR([invalid default])])
+            $4=m4_default([$6],YES)],
+           [AS_CASE(
+               [x"$$4Default"],
+               [x"m4_default([$6],YES)"],
+                 [AC_MSG_NOTICE([user chose $3 overriding for platform])],
+               [x"m4_default([$7],NO)"],
+                 [AC_MSG_NOTICE([user chose $3 matching default for platform])],
+               [AC_MSG_ERROR([invalid default])])
+            $4=m4_default([$7],NO)])],
+        [$4="$$4Default"])])
 
 # FP_LEADING_UNDERSCORE
 # ---------------------
@@ -984,8 +1031,11 @@ else
 fi;
 changequote([, ])dnl
 ])
-FP_COMPARE_VERSIONS([$fptools_cv_alex_version],[-lt],[3.1.7],
-  [AC_MSG_ERROR([Alex version 3.1.7 or later is required to compile GHC.])])[]
+if test ! -f compiler/parser/Lexer.hs
+then
+    FP_COMPARE_VERSIONS([$fptools_cv_alex_version],[-lt],[3.1.7],
+      [AC_MSG_ERROR([Alex version 3.1.7 or later is required to compile GHC.])])[]
+fi
 AlexVersion=$fptools_cv_alex_version;
 AC_SUBST(AlexVersion)
 ])
@@ -1265,55 +1315,41 @@ AC_DEFUN([FP_PROG_AR_NEEDS_RANLIB],[
 # FP_GCC_VERSION
 # -----------
 # Extra testing of the result AC_PROG_CC, testing the gcc version no. Sets the
-# output variable GccVersion.
-AC_DEFUN([FP_GCC_VERSION],
-[AC_REQUIRE([AC_PROG_CC])
-if test -z "$CC"
-then
-  AC_MSG_ERROR([gcc is required])
-fi
-GccLT46=NO
-AC_CACHE_CHECK([version of gcc], [fp_cv_gcc_version],
-[
-    # Be sure only to look at the first occurrence of the "version " string;
-    # Some Apple compilers emit multiple messages containing this string.
-    fp_cv_gcc_version="`$CC -v 2>&1 | sed -n -e '1,/version /s/.*version [[^0-9]]*\([[0-9.]]*\).*/\1/p'`"
-    FP_COMPARE_VERSIONS([$fp_cv_gcc_version], [-lt], [4.4],
-                        [AC_MSG_ERROR([Need at least gcc version 4.4 (4.7+ recommended)])])
-    FP_COMPARE_VERSIONS([$fp_cv_gcc_version], [-lt], [4.6], GccLT46=YES)
-])
-AC_SUBST([GccVersion], [$fp_cv_gcc_version])
-AC_SUBST(GccLT46)
+# (unsubstituted) output variable GccVersion.
+AC_DEFUN([FP_GCC_VERSION], [
+  AC_REQUIRE([AC_PROG_CC])
+  if test -z "$CC"
+  then
+    AC_MSG_ERROR([gcc is required])
+  fi
+  AC_CACHE_CHECK([version of gcc], [fp_cv_gcc_version],
+  [
+      # Be sure only to look at the first occurrence of the "version " string;
+      # Some Apple compilers emit multiple messages containing this string.
+      fp_cv_gcc_version="`$CC -v 2>&1 | sed -n -e '1,/version /s/.*version [[^0-9]]*\([[0-9.]]*\).*/\1/p'`"
+      FP_COMPARE_VERSIONS([$fp_cv_gcc_version], [-lt], [4.6],
+                          [AC_MSG_ERROR([Need at least gcc version 4.6 (4.7+ recommended)])])
+  ])
+  GccVersion="$fp_cv_gcc_version"
 ])# FP_GCC_VERSION
 
 dnl Check to see if the C compiler is clang or llvm-gcc
 dnl
-GccIsClang=NO
 AC_DEFUN([FP_CC_LLVM_BACKEND],
-[AC_REQUIRE([AC_PROG_CC])
-AC_MSG_CHECKING([whether C compiler is clang])
-$CC -x c /dev/null -dM -E > conftest.txt 2>&1
-if grep "__clang__" conftest.txt >/dev/null 2>&1; then
-  AC_SUBST([CC_CLANG_BACKEND], [1])
-  AC_SUBST([CC_LLVM_BACKEND], [1])
-  GccIsClang=YES
-  AC_MSG_RESULT([yes])
-else
-  AC_MSG_RESULT([no])
-  AC_MSG_CHECKING([whether C compiler has an LLVM back end])
-  if grep "__llvm__" conftest.txt >/dev/null 2>&1; then
-    AC_SUBST([CC_CLANG_BACKEND], [0])
-    AC_SUBST([CC_LLVM_BACKEND], [1])
-    AC_MSG_RESULT([yes])
-  else
-    AC_SUBST([CC_CLANG_BACKEND], [0])
-    AC_SUBST([CC_LLVM_BACKEND], [0])
-    AC_MSG_RESULT([no])
-  fi
-fi
-AC_SUBST(GccIsClang)
+  [AC_REQUIRE([AC_PROG_CC])
+   AC_MSG_CHECKING([whether C compiler has an LLVM back end])
+   $CC -x c /dev/null -dM -E > conftest.txt 2>&1
+   if grep "__llvm__" conftest.txt >/dev/null 2>&1; then
+     AC_DEFINE([CC_LLVM_BACKEND], [1], [Define (to 1) if C compiler has an LLVM back end])
+     CcLlvmBackend=YES
+     AC_MSG_RESULT([yes])
+   else
+     CcLlvmBackend=NO
+     AC_MSG_RESULT([no])
+   fi
+   AC_SUBST(CcLlvmBackend)
 
-rm -f conftest.txt
+   rm -f conftest.txt
 ])
 
 # FP_GCC_SUPPORTS__ATOMICS
@@ -1972,7 +2008,7 @@ AC_DEFUN([GHC_LLVM_TARGET], [
     # for the LLVM Target. Otherwise these would be
     # turned into just `-linux` and fail to be found
     # in the `llvm-targets` file.
-    *-android*|*-gnueabi*)
+    *-android*|*-gnueabi*|*-musleabi*)
       GHC_CONVERT_VENDOR([$2],[llvm_target_vendor])
       llvm_target_os="$3"
       ;;

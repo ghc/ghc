@@ -54,10 +54,11 @@ codeOutput :: DynFlags
            -> [(ForeignSrcLang, FilePath)]
            -- ^ additional files to be compiled with with the C compiler
            -> [InstalledUnitId]
-           -> Stream IO RawCmmGroup ()                       -- Compiled C--
+           -> Stream IO RawCmmGroup a                       -- Compiled C--
            -> IO (FilePath,
                   (Bool{-stub_h_exists-}, Maybe FilePath{-stub_c_exists-}),
-                  [(ForeignSrcLang, FilePath)]{-foreign_fps-})
+                  [(ForeignSrcLang, FilePath)]{-foreign_fps-},
+                  a)
 
 codeOutput dflags this_mod filenm location foreign_stubs foreign_fps pkg_deps
   cmm_stream
@@ -69,9 +70,10 @@ codeOutput dflags this_mod filenm location foreign_stubs foreign_fps pkg_deps
                     then Stream.mapM do_lint cmm_stream
                     else cmm_stream
 
-              do_lint cmm = withTiming (pure dflags)
-                                       (text "CmmLint"<+>brackets (ppr this_mod))
-                                       (const ()) $ do
+              do_lint cmm = withTimingSilent
+                  dflags
+                  (text "CmmLint"<+>brackets (ppr this_mod))
+                  (const ()) $ do
                 { case cmmLint dflags cmm of
                         Just err -> do { log_action dflags
                                                    dflags
@@ -87,15 +89,14 @@ codeOutput dflags this_mod filenm location foreign_stubs foreign_fps pkg_deps
                 }
 
         ; stubs_exist <- outputForeignStubs dflags this_mod location foreign_stubs
-        ; case hscTarget dflags of {
-             HscAsm         -> outputAsm dflags this_mod location filenm
-                                         linted_cmm_stream;
-             HscC           -> outputC dflags filenm linted_cmm_stream pkg_deps;
-             HscLlvm        -> outputLlvm dflags filenm linted_cmm_stream;
-             HscInterpreted -> panic "codeOutput: HscInterpreted";
-             HscNothing     -> panic "codeOutput: HscNothing"
-          }
-        ; return (filenm, stubs_exist, foreign_fps)
+        ; a <- case hscTarget dflags of
+                 HscAsm         -> outputAsm dflags this_mod location filenm
+                                             linted_cmm_stream
+                 HscC           -> outputC dflags filenm linted_cmm_stream pkg_deps
+                 HscLlvm        -> outputLlvm dflags filenm linted_cmm_stream
+                 HscInterpreted -> panic "codeOutput: HscInterpreted"
+                 HscNothing     -> panic "codeOutput: HscNothing"
+        ; return (filenm, stubs_exist, foreign_fps, a)
         }
 
 doOutput :: String -> (Handle -> IO a) -> IO a
@@ -111,13 +112,13 @@ doOutput filenm io_action = bracket (openFile filenm WriteMode) hClose io_action
 
 outputC :: DynFlags
         -> FilePath
-        -> Stream IO RawCmmGroup ()
+        -> Stream IO RawCmmGroup a
         -> [InstalledUnitId]
-        -> IO ()
+        -> IO a
 
 outputC dflags filenm cmm_stream packages
   = do
-       withTiming (return dflags) (text "C codegen") id $ do
+       withTiming dflags (text "C codegen") (\a -> seq a () {- FIXME -}) $ do
 
          -- figure out which header files to #include in the generated .hc file:
          --
@@ -150,18 +151,17 @@ outputC dflags filenm cmm_stream packages
 -}
 
 outputAsm :: DynFlags -> Module -> ModLocation -> FilePath
-          -> Stream IO RawCmmGroup ()
-          -> IO ()
+          -> Stream IO RawCmmGroup a
+          -> IO a
 outputAsm dflags this_mod location filenm cmm_stream
  | platformMisc_ghcWithNativeCodeGen $ platformMisc dflags
   = do ncg_uniqs <- mkSplitUniqSupply 'n'
 
        debugTraceMsg dflags 4 (text "Outputing asm to" <+> text filenm)
 
-       _ <- {-# SCC "OutputAsm" #-} doOutput filenm $
+       {-# SCC "OutputAsm" #-} doOutput filenm $
            \h -> {-# SCC "NativeCodeGen" #-}
                  nativeCodeGen dflags this_mod location h ncg_uniqs cmm_stream
-       return ()
 
  | otherwise
   = panic "This compiler was built without a native code generator"
@@ -174,7 +174,7 @@ outputAsm dflags this_mod location filenm cmm_stream
 ************************************************************************
 -}
 
-outputLlvm :: DynFlags -> FilePath -> Stream IO RawCmmGroup () -> IO ()
+outputLlvm :: DynFlags -> FilePath -> Stream IO RawCmmGroup a -> IO a
 outputLlvm dflags filenm cmm_stream
   = do ncg_uniqs <- mkSplitUniqSupply 'n'
 
@@ -224,12 +224,12 @@ outputForeignStubs dflags mod location stubs
 
             -- wrapper code mentions the ffi_arg type, which comes from ffi.h
             ffi_includes
-              | platformMisc_libFFI $ platformMisc dflags = "#include \"ffi.h\"\n"
+              | platformMisc_libFFI $ platformMisc dflags = "#include <ffi.h>\n"
               | otherwise = ""
 
         stub_h_file_exists
            <- outputForeignStubs_help stub_h stub_h_output_w
-                ("#include \"HsFFI.h\"\n" ++ cplusplus_hdr) cplusplus_ftr
+                ("#include <HsFFI.h>\n" ++ cplusplus_hdr) cplusplus_ftr
 
         dumpIfSet_dyn dflags Opt_D_dump_foreign
                       "Foreign export stubs" stub_c_output_d
@@ -237,7 +237,7 @@ outputForeignStubs dflags mod location stubs
         stub_c_file_exists
            <- outputForeignStubs_help stub_c stub_c_output_w
                 ("#define IN_STG_CODE 0\n" ++
-                 "#include \"Rts.h\"\n" ++
+                 "#include <Rts.h>\n" ++
                  rts_includes ++
                  ffi_includes ++
                  cplusplus_hdr)

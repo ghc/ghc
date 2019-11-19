@@ -15,13 +15,17 @@ import GhcPrelude
 
 import TcRnTypes
 import TcRnMonad
+import Constraint
+import Predicate
 import TcMType
 import TcUnify( occCheckForErrors, MetaTyVarUpdateResult(..) )
 import TcEnv( tcInitTidyEnv )
 import TcType
+import TcOrigin
 import RnUnbound ( unknownNameSuggestions )
 import Type
 import TyCoRep
+import TyCoPpr          ( pprTyVars, pprWithExplicitKindsWhen, pprSourceTyCon, pprWithTYPE )
 import Unify            ( tcMatchTys )
 import Module
 import FamInst
@@ -33,11 +37,9 @@ import Class
 import DataCon
 import TcEvidence
 import TcEvTerm
-import HsExpr  ( UnboundVar(..) )
-import HsBinds ( PatSynBind(..) )
+import GHC.Hs.Binds ( PatSynBind(..) )
 import Name
-import RdrName ( lookupGlobalRdrEnv, lookupGRE_Name, GlobalRdrEnv
-               , mkRdrUnqual, isLocalGRE, greSrcSpan )
+import RdrName ( lookupGRE_Name, GlobalRdrEnv, mkRdrUnqual )
 import PrelNames ( typeableClassName )
 import Id
 import Var
@@ -62,7 +64,6 @@ import FV ( fvVarList, unionFV )
 import Control.Monad    ( when )
 import Data.Foldable    ( toList )
 import Data.List        ( partition, mapAccumL, nub, sortBy, unfoldr )
-import qualified Data.Set as Set
 
 import {-# SOURCE #-} TcHoleErrors ( findValidHoleFits )
 
@@ -418,7 +419,7 @@ reportImplic ctxt implic@(Implic { ic_skols = tvs, ic_telescope = m_telescope
          warnRedundantConstraints ctxt' tcl_env info' dead_givens
        ; when bad_telescope $ reportBadTelescope ctxt tcl_env m_telescope tvs }
   where
-    tcl_env      = implicLclEnv implic
+    tcl_env      = ic_env implic
     insoluble    = isInsolubleStatus status
     (env1, tvs') = mapAccumL tidyVarBndr (cec_tidy ctxt) tvs
     info'        = tidySkolemInfo env1 info
@@ -583,7 +584,7 @@ reportWanteds ctxt tc_lvl (WC { wc_simple = simples, wc_impl = implics })
 
     -- rigid_nom_eq, rigid_nom_tv_eq,
     is_hole, is_dict,
-      is_equality, is_ip, is_irred :: Ct -> PredTree -> Bool
+      is_equality, is_ip, is_irred :: Ct -> Pred -> Bool
 
     is_given_eq ct pred
        | EqPred {} <- pred = arisesFromGivens ct
@@ -642,7 +643,7 @@ reportWanteds ctxt tc_lvl (WC { wc_simple = simples, wc_impl = implics })
     has_gadt_match (implic : implics)
       | PatSkol {} <- ic_info implic
       , not (ic_no_eqs implic)
-      , wopt Opt_WarnInaccessibleCode (implicDynFlags implic)
+      , ic_warn_inaccessible implic
           -- Don't bother doing this if -Winaccessible-code isn't enabled.
           -- See Note [Avoid -Winaccessible-code when deriving] in TcInstDcls.
       = True
@@ -675,7 +676,7 @@ type Reporter
   = ReportErrCtxt -> [Ct] -> TcM ()
 type ReporterSpec
   = ( String                     -- Name
-    , Ct -> PredTree -> Bool     -- Pick these ones
+    , Ct -> Pred -> Bool         -- Pick these ones
     , Bool                       -- True <=> suppress subsequent reporters
     , Reporter)                  -- The reporter itself
 
@@ -723,7 +724,7 @@ mkGivenErrorReporter ctxt cts
        ; dflags <- getDynFlags
        ; let (implic:_) = cec_encl ctxt
                  -- Always non-empty when mkGivenErrorReporter is called
-             ct' = setCtLoc ct (setCtLocEnv (ctLoc ct) (implicLclEnv implic))
+             ct' = setCtLoc ct (setCtLocEnv (ctLoc ct) (ic_env implic))
                    -- For given constraints we overwrite the env (and hence src-loc)
                    -- with one from the immediately-enclosing implication.
                    -- See Note [Inaccessible code]
@@ -1098,105 +1099,63 @@ mkIrredErr ctxt cts
 
 ----------------
 mkHoleError :: [Ct] -> ReportErrCtxt -> Ct -> TcM ErrMsg
-mkHoleError _ _ ct@(CHoleCan { cc_hole = ExprHole (OutOfScope occ rdr_env0) })
-  -- Out-of-scope variables, like 'a', where 'a' isn't bound; suggest possible
-  -- in-scope variables in the message, and note inaccessible exact matches
-  = do { dflags   <- getDynFlags
+mkHoleError tidy_simples ctxt ct@(CHoleCan { cc_occ = occ, cc_hole = hole_sort })
+  | isOutOfScopeCt ct  -- Out of scope variables, like 'a', where 'a' isn't bound
+                       -- Suggest possible in-scope variables in the message
+  = do { dflags  <- getDynFlags
+       ; rdr_env <- getGlobalRdrEnv
        ; imp_info <- getImports
        ; curr_mod <- getModule
        ; hpt <- getHpt
-       ; let suggs_msg = unknownNameSuggestions dflags hpt curr_mod rdr_env0
-                                                (tcl_rdr lcl_env) imp_info rdr
-       ; rdr_env     <- getGlobalRdrEnv
-       ; splice_locs <- getTopLevelSpliceLocs
-       ; let match_msgs = mk_match_msgs rdr_env splice_locs
-       ; mkErrDocAt (RealSrcSpan err_loc) $
-                    errDoc [out_of_scope_msg] [] (match_msgs ++ [suggs_msg]) }
+       ; mkErrDocAt (RealSrcSpan (tcl_loc lcl_env)) $
+                    errDoc [out_of_scope_msg] []
+                           [unknownNameSuggestions dflags hpt curr_mod rdr_env
+                            (tcl_rdr lcl_env) imp_info (mkRdrUnqual occ)] }
 
-  where
-    rdr         = mkRdrUnqual occ
-    ct_loc      = ctLoc ct
-    lcl_env     = ctLocEnv ct_loc
-    err_loc     = tcl_loc lcl_env
-    hole_ty     = ctEvPred (ctEvidence ct)
-    boring_type = isTyVarTy hole_ty
-
-    out_of_scope_msg -- Print v :: ty only if the type has structure
-      | boring_type = hang herald 2 (ppr occ)
-      | otherwise   = hang herald 2 (pp_with_type occ hole_ty)
-
-    herald | isDataOcc occ = text "Data constructor not in scope:"
-           | otherwise     = text "Variable not in scope:"
-
-    -- Indicate if the out-of-scope variable exactly (and unambiguously) matches
-    -- a top-level binding in a later inter-splice group; see Note [OutOfScope
-    -- exact matches]
-    mk_match_msgs rdr_env splice_locs
-      = let gres = filter isLocalGRE (lookupGlobalRdrEnv rdr_env occ)
-        in case gres of
-             [gre]
-               |  RealSrcSpan bind_loc <- greSrcSpan gre
-                  -- Find splice between the unbound variable and the match; use
-                  -- lookupLE, not lookupLT, since match could be in the splice
-               ,  Just th_loc <- Set.lookupLE bind_loc splice_locs
-               ,  err_loc < th_loc
-               -> [mk_bind_scope_msg bind_loc th_loc]
-             _ -> []
-
-    mk_bind_scope_msg bind_loc th_loc
-      | is_th_bind
-      = hang (quotes (ppr occ) <+> parens (text "splice on" <+> th_rng))
-           2 (text "is not in scope before line" <+> int th_start_ln)
-      | otherwise
-      = hang (quotes (ppr occ) <+> bind_rng <+> text "is not in scope")
-           2 (text "before the splice on" <+> th_rng)
-      where
-        bind_rng = parens (text "line" <+> int bind_ln)
-        th_rng
-          | th_start_ln == th_end_ln = single
-          | otherwise                = multi
-        single = text "line"  <+> int th_start_ln
-        multi  = text "lines" <+> int th_start_ln <> text "-" <> int th_end_ln
-        bind_ln     = srcSpanStartLine bind_loc
-        th_start_ln = srcSpanStartLine th_loc
-        th_end_ln   = srcSpanEndLine   th_loc
-        is_th_bind = th_loc `containsSpan` bind_loc
-
-mkHoleError tidy_simples ctxt ct@(CHoleCan { cc_hole = hole })
-  -- Explicit holes, like "_" or "_f"
+  | otherwise  -- Explicit holes, like "_" or "_f"
   = do { (ctxt, binds_msg, ct) <- relevantBindings False ctxt ct
-               -- The 'False' means "don't filter the bindings"; see #8191
+               -- The 'False' means "don't filter the bindings"; see Trac #8191
 
        ; show_hole_constraints <- goptM Opt_ShowHoleConstraints
        ; let constraints_msg
                | isExprHoleCt ct, show_hole_constraints
-                  = givenConstraintsMsg ctxt
-               | otherwise = empty
+               = givenConstraintsMsg ctxt
+               | otherwise
+               = empty
 
        ; show_valid_hole_fits <- goptM Opt_ShowValidHoleFits
        ; (ctxt, sub_msg) <- if show_valid_hole_fits
                             then validHoleFits ctxt tidy_simples ct
                             else return (ctxt, empty)
+
        ; mkErrorMsgFromCt ctxt ct $
             important hole_msg `mappend`
             relevant_bindings (binds_msg $$ constraints_msg) `mappend`
-            valid_hole_fits sub_msg}
+            valid_hole_fits sub_msg }
 
   where
-    occ       = holeOcc hole
-    hole_ty   = ctEvPred (ctEvidence ct)
-    hole_kind = tcTypeKind hole_ty
-    tyvars    = tyCoVarsOfTypeList hole_ty
+    ct_loc      = ctLoc ct
+    lcl_env     = ctLocEnv ct_loc
+    hole_ty     = ctEvPred (ctEvidence ct)
+    hole_kind   = tcTypeKind hole_ty
+    tyvars      = tyCoVarsOfTypeList hole_ty
+    boring_type = isTyVarTy hole_ty
 
-    hole_msg = case hole of
-      ExprHole {} -> vcat [ hang (text "Found hole:")
-                               2 (pp_with_type occ hole_ty)
-                          , tyvars_msg, expr_hole_hint ]
-      TypeHole {} -> vcat [ hang (text "Found type wildcard" <+>
-                                  quotes (ppr occ))
-                               2 (text "standing for" <+>
-                                  quotes pp_hole_type_with_kind)
-                          , tyvars_msg, type_hole_hint ]
+    out_of_scope_msg -- Print v :: ty only if the type has structure
+      | boring_type = hang herald 2 (ppr occ)
+      | otherwise   = hang herald 2 pp_with_type
+
+    pp_with_type = hang (pprPrefixOcc occ) 2 (dcolon <+> pprType hole_ty)
+    herald | isDataOcc occ = text "Data constructor not in scope:"
+           | otherwise     = text "Variable not in scope:"
+
+    hole_msg = case hole_sort of
+      ExprHole -> vcat [ hang (text "Found hole:")
+                            2 pp_with_type
+                       , tyvars_msg, expr_hole_hint ]
+      TypeHole -> vcat [ hang (text "Found type wildcard" <+> quotes (ppr occ))
+                            2 (text "standing for" <+> quotes pp_hole_type_with_kind)
+                       , tyvars_msg, type_hole_hint ]
 
     pp_hole_type_with_kind
       | isLiftedTypeKind hole_kind
@@ -1263,7 +1222,7 @@ givenConstraintsMsg ctxt =
         constraints =
           do { implic@Implic{ ic_given = given } <- cec_encl ctxt
              ; constraint <- given
-             ; return (varType constraint, tcl_loc (implicLclEnv implic)) }
+             ; return (varType constraint, tcl_loc (ic_env implic)) }
 
         pprConstraint (constraint, loc) =
           ppr constraint <+> nest 2 (parens (text "from" <+> ppr loc))
@@ -1271,9 +1230,6 @@ givenConstraintsMsg ctxt =
     in ppUnless (null constraints) $
          hang (text "Constraints include")
             2 (vcat $ map pprConstraint constraints)
-
-pp_with_type :: OccName -> Type -> SDoc
-pp_with_type occ ty = hang (pprPrefixOcc occ) 2 (dcolon <+> pprType ty)
 
 ----------------
 mkIPErr :: ReportErrCtxt -> [Ct] -> TcM ErrMsg
@@ -1295,7 +1251,6 @@ mkIPErr ctxt cts
     (ct1:_) = cts
 
 {-
-
 Note [Constraints include ...]
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 'givenConstraintsMsg' returns the "Constraints include ..." message enabled by
@@ -1313,112 +1268,6 @@ would generate the message:
 Constraints are displayed in order from innermost (closest to the hole) to
 outermost. There's currently no filtering or elimination of duplicates.
 
-
-Note [OutOfScope exact matches]
-~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
-When constructing an out-of-scope error message, we not only generate a list of
-possible in-scope alternatives but also search for an exact, unambiguous match
-in a later inter-splice group.  If we find such a match, we report its presence
-(and indirectly, its scope) in the message.  For example, if a module A contains
-the following declarations,
-
-   foo :: Int
-   foo = x
-
-   $(return [])  -- Empty top-level splice
-
-   x :: Int
-   x = 23
-
-we will issue an error similar to
-
-   A.hs:6:7: error:
-       • Variable not in scope: x :: Int
-       • ‘x’ (line 11) is not in scope before the splice on line 8
-
-By providing information about the match, we hope to clarify why declaring a
-variable after a top-level splice but using it before the splice generates an
-out-of-scope error (a situation which is often confusing to Haskell newcomers).
-
-Note that if we find multiple exact matches to the out-of-scope variable
-(hereafter referred to as x), we report nothing.  Such matches can only be
-duplicate record fields, as the presence of any other duplicate top-level
-declarations would have already halted compilation.  But if these record fields
-are declared in a later inter-splice group, then so too are their corresponding
-types.  Thus, these types must not occur in the inter-splice group containing x
-(any unknown types would have already been reported), and so the matches to the
-record fields are most likely coincidental.
-
-One oddity of the exact match portion of the error message is that we specify
-where the match to x is NOT in scope.  Why not simply state where the match IS
-in scope?  It most cases, this would be just as easy and perhaps a little
-clearer for the user.  But now consider the following example:
-
-    {-# LANGUAGE TemplateHaskell #-}
-
-    module A where
-
-    import Language.Haskell.TH
-    import Language.Haskell.TH.Syntax
-
-    foo = x
-
-    $(do -------------------------------------------------
-        ds <- [d| ok1 = x
-                |]
-        addTopDecls ds
-        return [])
-
-    bar = $(do
-            ds <- [d| x = 23
-                      ok2 = x
-                    |]
-            addTopDecls ds
-            litE $ stringL "hello")
-
-    $(return []) -----------------------------------------
-
-    ok3 = x
-
-Here, x is out-of-scope in the declaration of foo, and so we report
-
-    A.hs:8:7: error:
-        • Variable not in scope: x
-        • ‘x’ (line 16) is not in scope before the splice on lines 10-14
-
-If we instead reported where x IS in scope, we would have to state that it is in
-scope after the second top-level splice as well as among all the top-level
-declarations added by both calls to addTopDecls.  But doing so would not only
-add complexity to the code but also overwhelm the user with unneeded
-information.
-
-The logic which determines where x is not in scope is straightforward: it simply
-finds the last top-level splice which occurs after x but before (or at) the
-match to x (assuming such a splice exists).  In most cases, the check that the
-splice occurs after x acts only as a sanity check.  For example, when the match
-to x is a non-TH top-level declaration and a splice S occurs before the match,
-then x must precede S; otherwise, it would be in scope.  But when dealing with
-addTopDecls, this check serves a practical purpose.  Consider the following
-declarations:
-
-    $(do
-        ds <- [d| ok = x
-                  x = 23
-                |]
-        addTopDecls ds
-        return [])
-
-    foo = x
-
-In this case, x is not in scope in the declaration for foo.  Since x occurs
-AFTER the splice containing the match, the logic does not find any splices after
-x but before or at its match, and so we report nothing about x's scope.  If we
-had not checked whether x occurs before the splice, we would have instead
-reported that x is not in scope before the splice.  While correct, such an error
-message is more likely to confuse than to enlighten.
--}
-
-{-
 ************************************************************************
 *                                                                      *
                 Equality errors
@@ -1726,7 +1575,7 @@ mkTyVarEqErr' dflags ctxt report ct oriented tv1 co1 ty2
                                <+> text "bound by"
                              , nest 2 $ ppr skol_info
                              , nest 2 $ text "at" <+>
-                               ppr (tcl_loc (implicLclEnv implic)) ] ]
+                               ppr (tcl_loc (ic_env implic)) ] ]
        ; mkErrorMsgFromCt ctxt ct (mconcat [msg, tv_extra, report]) }
 
   -- Nastiest case: attempt to unify an untouchable variable
@@ -1745,7 +1594,7 @@ mkTyVarEqErr' dflags ctxt report ct oriented tv1 co1 ty2
                       , nest 2 $ text "inside the constraints:" <+> pprEvVarTheta given
                       , nest 2 $ text "bound by" <+> ppr skol_info
                       , nest 2 $ text "at" <+>
-                        ppr (tcl_loc (implicLclEnv implic)) ]
+                        ppr (tcl_loc (ic_env implic)) ]
              tv_extra = important $ extraTyVarEqInfo ctxt tv1 ty2
              add_sig  = important $ suggestAddSig ctxt ty1 ty2
        ; mkErrorMsgFromCt ctxt ct $ mconcat
@@ -1840,7 +1689,7 @@ pp_givens givens
              -- See Note [Suppress redundant givens during error reporting]
              -- for why we use mkMinimalBySCs above.
                 2 (sep [ text "bound by" <+> ppr skol_info
-                       , text "at" <+> ppr (tcl_loc (implicLclEnv implic)) ])
+                       , text "at" <+> ppr (tcl_loc (ic_env implic)) ])
 
 {-
 Note [Suppress redundant givens during error reporting]
@@ -2588,7 +2437,7 @@ mk_dict_err ctxt@(CEC {cec_encl = implics}) (ct, (matches, unifiers, unsafe_over
              _  -> Just $ hang (pprTheta ev_vars_matching)
                             2 (sep [ text "bound by" <+> ppr skol_info
                                    , text "at" <+>
-                                     ppr (tcl_loc (implicLclEnv implic)) ])
+                                     ppr (tcl_loc (ic_env implic)) ])
         where ev_vars_matching = [ pred
                                  | ev_var <- evvars
                                  , let pred = evVarPred ev_var

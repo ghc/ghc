@@ -47,12 +47,11 @@ module X86.Regs (
 
 where
 
-#include "nativeGen/NCG.h"
 #include "HsVersions.h"
 
 import GhcPrelude
 
-import CodeGen.Platform
+import GHC.Platform.Regs
 import Reg
 import RegClass
 

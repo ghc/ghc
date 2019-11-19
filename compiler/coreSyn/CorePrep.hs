@@ -178,7 +178,7 @@ type CpeRhs  = CoreExpr    -- Non-terminal 'rhs'
 corePrepPgm :: HscEnv -> Module -> ModLocation -> CoreProgram -> [TyCon]
             -> IO (CoreProgram, S.Set CostCentre)
 corePrepPgm hsc_env this_mod mod_loc binds data_tycons =
-    withTiming (pure dflags)
+    withTiming dflags
                (text "CorePrep"<+>brackets (ppr this_mod))
                (const ()) $ do
     us <- mkSplitUniqSupply 's'
@@ -206,7 +206,7 @@ corePrepPgm hsc_env this_mod mod_loc binds data_tycons =
 
 corePrepExpr :: DynFlags -> HscEnv -> CoreExpr -> IO CoreExpr
 corePrepExpr dflags hsc_env expr =
-    withTiming (pure dflags) (text "CorePrep [expr]") (const ()) $ do
+    withTiming dflags (text "CorePrep [expr]") (const ()) $ do
     us <- mkSplitUniqSupply 's'
     initialCorePrepEnv <- mkInitialCorePrepEnv dflags hsc_env
     let new_expr = initUs_ us (cpeBodyNF initialCorePrepEnv expr)
@@ -560,6 +560,7 @@ it seems good for CorePrep to be robust.
 cpeJoinPair :: CorePrepEnv -> JoinId -> CoreExpr
             -> UniqSM (JoinId, CpeRhs)
 -- Used for all join bindings
+-- No eta-expansion: see Note [Do not eta-expand join points] in SimplUtils
 cpeJoinPair env bndr rhs
   = ASSERT(isJoinId bndr)
     do { let Just join_arity = isJoinId_maybe bndr
@@ -1274,7 +1275,7 @@ wrapBinds :: Floats -> CpeBody -> CpeBody
 wrapBinds (Floats _ binds) body
   = foldrOL mk_bind body binds
   where
-    mk_bind (FloatCase bndr rhs _) body = Case rhs bndr (exprType body) [(DEFAULT, [], body)]
+    mk_bind (FloatCase bndr rhs _) body = mkDefaultCase rhs bndr body
     mk_bind (FloatLet bind)        body = Let bind body
     mk_bind (FloatTick tickish)    body = mkTick tickish body
 

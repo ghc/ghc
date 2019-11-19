@@ -48,7 +48,7 @@ createOSThread (OSThreadId* pId, char *name STG_UNUSED,
     HANDLE h;
     h = CreateThread ( NULL,  /* default security attributes */
                        0,
-                       (LPTHREAD_START_ROUTINE)startProc,
+                       (LPTHREAD_START_ROUTINE)(void*)startProc,
                        param,
                        0,
                        pId);

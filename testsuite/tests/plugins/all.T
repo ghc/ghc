@@ -167,6 +167,7 @@ test('plugin-recomp-flags',
 test('plugin-recomp-change',
      [extra_files(['plugin-recomp/', 'plugin-recomp-test.hs']),
       only_ways([config.ghc_plugin_way]),
+      when(compiler_debugged(), expect_broken_for(17308, ['dyn'])),
       pre_cmd('$MAKE -s --no-print-directory -C plugin-recomp package.plugins01 TOP={top}')
       ],
      makefile_test, [])
@@ -174,6 +175,7 @@ test('plugin-recomp-change',
 test('plugin-recomp-change-prof',
      [extra_files(['plugin-recomp/', 'plugin-recomp-test.hs']),
       only_ways([config.ghc_plugin_way]),
+      when(compiler_debugged(), expect_broken_for(17308, ['dyn'])),
       pre_cmd('$MAKE -s --no-print-directory -C plugin-recomp package.plugins01 TOP={top}'),
       when(not config.have_profiling,skip)
       ],
@@ -181,7 +183,7 @@ test('plugin-recomp-change-prof',
 
 test('static-plugins',
      [extra_files(['simple-plugin/']),
-      unless(config.have_ext_interp, skip),
+      unless(config.have_RTS_linker, skip),
       expect_broken_for(16803, prof_ways),
       extra_run_opts('"' + config.libdir + '"')],
      compile_and_run,
@@ -215,3 +217,13 @@ test('test-hole-plugin',
       req_th
       ],
      compile, ['-fdefer-typed-holes'])
+test('test-hooks-plugin',
+     [extra_files(['hooks-plugin/']),
+      pre_cmd('$MAKE -s --no-print-directory -C hooks-plugin package.hooks-plugin TOP={top}'),
+      # The following doesn't seem to work, even though it
+      # seems identical to the previous test...?
+      # extra_hc_opts('-package-db hooks-plugin/pkg.hooks-plugin/local.package.conf '+ config.plugin_way_flags),
+      req_th
+      ],
+     compile_and_run,
+     ['-package-db hooks-plugin/pkg.hooks-plugin/local.package.conf '+ config.plugin_way_flags])

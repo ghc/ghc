@@ -1,0 +1,5 @@
+
+T16980a.hs:10:5: error:
+    • Couldn't match expected type ‘Int’ with actual type ‘Integer’
+    • In the expression: x
+      In an equation for ‘y’: y = x

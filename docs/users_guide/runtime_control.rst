@@ -50,9 +50,9 @@ Setting RTS options on the command line
    single: -RTS
    single: --RTS
 
-If you set the :ghc-flag:`-rtsopts[=⟨none|some|all⟩]` flag appropriately when
-linking (see :ref:`options-linker`), you can give RTS options on the command
-line when running your program.
+If you set the :ghc-flag:`-rtsopts[=⟨none|some|all|ignore|ignoreAll⟩]` flag
+appropriately when linking (see :ref:`options-linker`), you can give RTS
+options on the command line when running your program.
 
 When your Haskell program starts up, the RTS extracts command-line
 arguments bracketed between ``+RTS`` and ``-RTS`` as its own. For example:
@@ -177,8 +177,8 @@ e.g., on stack overflow. The hooks for these are as follows:
 Event log output
 ################
 
-Furthermore GHC lets you specify the way event log data (see :rts-flag:`-l`) is
-written through a custom :c:type:`EventLogWriter`:
+Furthermore GHC lets you specify the way event log data (see :rts-flag:`-l
+⟨flags⟩`) is written through a custom :c:type:`EventLogWriter`:
 
 .. c:type:: EventLogWriter
 
@@ -233,13 +233,35 @@ Miscellaneous RTS options
     If yes (the default), the RTS on Windows will generate a core dump on
     any crash. These dumps can be inspected using debuggers such as WinDBG.
     The dumps record all code, registers and threading information at the time
-    of the crash. Note that this implies `--install-seh-handlers=yes`.
+    of the crash. Note that this implies ``--install-seh-handlers=yes``.
 
 .. rts-flag:: --generate-stack-traces=<yes|no>
 
     If yes (the default), the RTS on Windows will generate a stack trace on
     crashes if exception handling are enabled. In order to get more information
     in compiled executables, C code or DLLs symbols need to be available.
+
+.. rts-flag:: --disable-delayed-os-memory-return
+
+    If given, uses ``MADV_DONTNEED`` instead of ``MADV_FREE`` on platforms where
+    this results in more accurate resident memory usage of the program as shown
+    in memory usage reporting tools (e.g. the ``RSS`` column in ``top`` and ``htop``).
+
+    Using this is expected to make the program slightly slower.
+
+    On Linux, MADV_FREE is newer and faster because it can avoid zeroing
+    pages if they are re-used by the process later (see ``man 2 madvise``),
+    but for the trade-off that memory inspection tools like ``top`` will
+    not immediately reflect the freeing in their display of resident memory
+    (RSS column): Only under memory pressure will Linux actually remove
+    the freed pages from the process and update its RSS statistics.
+    Until then, the pages show up as ``LazyFree`` in ``/proc/PID/smaps``
+    (see ``man 5 proc``).
+
+    The delayed RSS update can confuse programmers debugging memory issues,
+    production memory monitoring tools, and end users who may complain about
+    undue memory usage shown in reporting tools, so with this flag it can
+    be turned off.
 
 
 .. rts-flag:: -xp
@@ -312,6 +334,24 @@ There are several options to give you precise control over garbage
 collection. Hopefully, you won't need any of these in normal operation,
 but there are several things that can be tweaked for maximum
 performance.
+
+.. rts-flag:: -xn
+
+    :default: off
+    :since: 8.10.1
+
+    .. index::
+       single: concurrent mark and sweep
+
+    Enable the concurrent mark-and-sweep garbage collector for old generation
+    collectors. Typically GHC uses a stop-the-world copying garbage collector
+    for all generations. This can cause long pauses in execution during major
+    garbage collections. :rts-flag:`-xn` enables the use of a concurrent
+    mark-and-sweep garbage collector for oldest generation collections.
+    Under this collection strategy oldest-generation garbage collection
+    can proceed concurrently with mutation.
+
+    Note that :rts-flag:`-xn` cannot be used with ``-G1`` nor :rts-flag:`-c`.
 
 .. rts-flag:: -A ⟨size⟩
 
@@ -415,10 +455,10 @@ performance.
     The compaction algorithm is slower than the copying algorithm, but
     the savings in memory use can be considerable.
 
-    For a given heap size (using the :ghc-flag:`-H ⟨size⟩` option), compaction
-    can in fact reduce the GC cost by allowing fewer GCs to be performed. This
-    is more likely when the ratio of live data to heap size is high, say
-    greater than 30%.
+    For a given heap size (using the :rts-flag:`-H [⟨size⟩]` option),
+    compaction can in fact reduce the GC cost by allowing fewer GCs to be
+    performed. This is more likely when the ratio of live data to heap size is
+    high, say greater than 30%.
 
     .. note::
        Compaction doesn't currently work when a single generation is
@@ -1104,7 +1144,8 @@ When the program is linked with the :ghc-flag:`-eventlog` option
     :default: :file:`<program>.eventlog`
     :since: 8.8
 
-    Sets the destination for the eventlog produced with the :rts-flag:`-l` flag.
+    Sets the destination for the eventlog produced with the
+    :rts-flag:`-l ⟨flags⟩` flag.
 
 .. rts-flag:: -v [⟨flags⟩]
 
@@ -1152,9 +1193,32 @@ recommended for everyday use!
     messages from the scheduler. Use ``+RTS -?`` to find out which debug
     flags are supported.
 
+    Full list of currently supported flags:
+
+.. rts-flag::  -Ds  DEBUG: scheduler
+.. rts-flag::  -Di  DEBUG: interpreter
+.. rts-flag::  -Dw  DEBUG: weak
+.. rts-flag::  -DG  DEBUG: gccafs
+.. rts-flag::  -Dg  DEBUG: gc
+.. rts-flag::  -Db  DEBUG: block
+.. rts-flag::  -DS  DEBUG: sanity
+.. rts-flag::  -DZ  DEBUG: zero freed memory on GC
+.. rts-flag::  -Dt  DEBUG: stable
+.. rts-flag::  -Dp  DEBUG: prof
+.. rts-flag::  -Da  DEBUG: apply
+.. rts-flag::  -Dl  DEBUG: linker
+.. rts-flag::  -Dm  DEBUG: stm
+.. rts-flag::  -Dz  DEBUG: stack squeezing
+.. rts-flag::  -Dc  DEBUG: program coverage
+.. rts-flag::  -Dr  DEBUG: sparks
+.. rts-flag::  -DC  DEBUG: compact
+
     Debug messages will be sent to the binary event log file instead of
-    stdout if the :rts-flag:`-l` option is added. This might be useful for
-    reducing the overhead of debug tracing.
+    stdout if the :rts-flag:`-l ⟨flags⟩` option is added. This might be useful
+    for reducing the overhead of debug tracing.
+
+    To figure out what exactly they do, the least bad way is to grep the rts/ directory in
+    the ghc code for macros like ``DEBUG(scheduler`` or ``DEBUG_scheduler``.
 
 .. rts-flag:: -r ⟨file⟩
 

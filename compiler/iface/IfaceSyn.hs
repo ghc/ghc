@@ -4,6 +4,7 @@
 -}
 
 {-# LANGUAGE CPP #-}
+{-# LANGUAGE LambdaCase #-}
 
 module IfaceSyn (
         module IfaceType,
@@ -69,9 +70,12 @@ import TyCon ( Role (..), Injectivity(..), tyConBndrVisArgFlag )
 import Util( dropList, filterByList, notNull, unzipWith )
 import DataCon (SrcStrictness(..), SrcUnpackedness(..))
 import Lexeme (isLexSym)
+import TysWiredIn ( constraintKindTyConName )
+import Util (seqList)
 
 import Control.Monad
 import System.IO.Unsafe
+import Control.DeepSeq
 
 infixl 3 &&&
 
@@ -730,6 +734,14 @@ pprClassRoles ss clas binders roles =
              binders
              roles
 
+pprClassStandaloneKindSig :: ShowSub -> IfaceTopBndr -> IfaceKind -> SDoc
+pprClassStandaloneKindSig ss clas =
+  pprStandaloneKindSig (pprPrefixIfDeclBndr (ss_how_much ss) (occName clas))
+
+constraintIfaceKind :: IfaceKind
+constraintIfaceKind =
+  IfaceTyConApp (IfaceTyCon constraintKindTyConName (IfaceTyConInfo NotPromoted IfaceNormalTyCon)) IA_Nil
+
 pprIfaceDecl :: ShowSub -> IfaceDecl -> SDoc
 -- NB: pprIfaceDecl is also used for pretty-printing TyThings in GHCi
 --     See Note [Pretty-printing TyThings] in PprTyThing
@@ -741,10 +753,12 @@ pprIfaceDecl ss (IfaceData { ifName = tycon, ifCType = ctype,
                              ifBinders = binders })
 
   | gadt      = vcat [ pp_roles
+                     , pp_ki_sig
                      , pp_nd <+> pp_lhs <+> pp_kind <+> pp_where
                      , nest 2 (vcat pp_cons)
                      , nest 2 $ ppShowIface ss pp_extra ]
   | otherwise = vcat [ pp_roles
+                     , pp_ki_sig
                      , hang (pp_nd <+> pp_lhs) 2 (add_bars pp_cons)
                      , nest 2 $ ppShowIface ss pp_extra ]
   where
@@ -759,25 +773,44 @@ pprIfaceDecl ss (IfaceData { ifName = tycon, ifCType = ctype,
     cons       = visibleIfConDecls condecls
     pp_where   = ppWhen (gadt && not (null cons)) $ text "where"
     pp_cons    = ppr_trim (map show_con cons) :: [SDoc]
-    pp_kind
-      | isIfaceLiftedTypeKind kind = empty
-      | otherwise = dcolon <+> ppr kind
+    pp_kind    = ppUnless (if ki_sig_printable
+                              then isIfaceTauType kind
+                                      -- Even in the presence of a standalone kind signature, a non-tau
+                                      -- result kind annotation cannot be discarded as it determines the arity.
+                                      -- See Note [Arity inference in kcDeclHeader_sig] in TcHsType
+                              else isIfaceLiftedTypeKind kind)
+                          (dcolon <+> ppr kind)
 
     pp_lhs = case parent of
-               IfNoParent -> pprIfaceDeclHead context ss tycon binders Nothing
+               IfNoParent -> pprIfaceDeclHead suppress_bndr_sig context ss tycon binders
                IfDataInstance{}
                           -> text "instance" <+> pp_data_inst_forall
                                              <+> pprIfaceTyConParent parent
 
     pp_roles
       | is_data_instance = empty
-      | otherwise        = pprRoles (== Representational)
-                                    (pprPrefixIfDeclBndr
-                                        (ss_how_much ss)
-                                        (occName tycon))
-                                    binders roles
+      | otherwise        = pprRoles (== Representational) name_doc binders roles
             -- Don't display roles for data family instances (yet)
             -- See discussion on #8672.
+
+    ki_sig_printable =
+      -- If we print a standalone kind signature for a data instance, we leak
+      -- the internal constructor name:
+      --
+      --    type T15827.R:Dka :: forall k. k -> *
+      --    data instance forall k (a :: k). D a = MkD (Proxy a)
+      --
+      -- This T15827.R:Dka is a compiler-generated type constructor for the
+      -- data instance.
+      not is_data_instance
+
+    pp_ki_sig = ppWhen ki_sig_printable $
+                pprStandaloneKindSig name_doc (mkIfaceTyConKind binders kind)
+
+    -- See Note [Suppressing binder signatures] in IfaceType
+    suppress_bndr_sig = SuppressBndrSig ki_sig_printable
+
+    name_doc = pprPrefixIfDeclBndr (ss_how_much ss) (occName tycon)
 
     add_bars []     = Outputable.empty
     add_bars (c:cs) = sep ((equals <+> c) : map (vbar <+>) cs)
@@ -801,8 +834,11 @@ pprIfaceDecl ss (IfaceClass { ifName  = clas
                             , ifBinders = binders
                             , ifBody = IfAbstractClass })
   = vcat [ pprClassRoles ss clas binders roles
-         , text "class" <+> pprIfaceDeclHead [] ss clas binders Nothing
-                                <+> pprFundeps fds ]
+         , pprClassStandaloneKindSig ss clas (mkIfaceTyConKind binders constraintIfaceKind)
+         , text "class" <+> pprIfaceDeclHead suppress_bndr_sig [] ss clas binders <+> pprFundeps fds ]
+  where
+    -- See Note [Suppressing binder signatures] in IfaceType
+    suppress_bndr_sig = SuppressBndrSig True
 
 pprIfaceDecl ss (IfaceClass { ifName  = clas
                             , ifRoles = roles
@@ -815,8 +851,8 @@ pprIfaceDecl ss (IfaceClass { ifName  = clas
                                 ifMinDef = minDef
                               }})
   = vcat [ pprClassRoles ss clas binders roles
-         , text "class" <+> pprIfaceDeclHead context ss clas binders Nothing
-                                <+> pprFundeps fds <+> pp_where
+         , pprClassStandaloneKindSig ss clas (mkIfaceTyConKind binders constraintIfaceKind)
+         , text "class" <+> pprIfaceDeclHead suppress_bndr_sig context ss clas binders <+> pprFundeps fds <+> pp_where
          , nest 2 (vcat [ vcat asocs, vcat dsigs
                         , ppShowAllSubs ss (pprMinDef minDef)])]
     where
@@ -842,31 +878,46 @@ pprIfaceDecl ss (IfaceClass { ifName  = clas
           (\_ def -> cparen (isLexSym def) (ppr def)) 0 minDef <+>
         text "#-}"
 
+      -- See Note [Suppressing binder signatures] in IfaceType
+      suppress_bndr_sig = SuppressBndrSig True
+
 pprIfaceDecl ss (IfaceSynonym { ifName    = tc
                               , ifBinders = binders
                               , ifSynRhs  = mono_ty
                               , ifResKind = res_kind})
-  = hang (text "type" <+> pprIfaceDeclHead [] ss tc binders Nothing <+> equals)
-       2 (sep [ pprIfaceForAll tvs, pprIfaceContextArr theta, ppr tau
-              , ppUnless (isIfaceLiftedTypeKind res_kind) (dcolon <+> ppr res_kind) ])
+  = vcat [ pprStandaloneKindSig name_doc (mkIfaceTyConKind binders res_kind)
+         , hang (text "type" <+> pprIfaceDeclHead suppress_bndr_sig [] ss tc binders <+> equals)
+           2 (sep [ pprIfaceForAll tvs, pprIfaceContextArr theta, ppr tau
+                  , ppUnless (isIfaceLiftedTypeKind res_kind) (dcolon <+> ppr res_kind) ])
+         ]
   where
     (tvs, theta, tau) = splitIfaceSigmaTy mono_ty
+    name_doc = pprPrefixIfDeclBndr (ss_how_much ss) (occName tc)
+
+    -- See Note [Suppressing binder signatures] in IfaceType
+    suppress_bndr_sig = SuppressBndrSig True
 
 pprIfaceDecl ss (IfaceFamily { ifName = tycon
                              , ifFamFlav = rhs, ifBinders = binders
                              , ifResKind = res_kind
                              , ifResVar = res_var, ifFamInj = inj })
   | IfaceDataFamilyTyCon <- rhs
-  = text "data family" <+> pprIfaceDeclHead [] ss tycon binders Nothing
+  = vcat [ pprStandaloneKindSig name_doc (mkIfaceTyConKind binders res_kind)
+         , text "data family" <+> pprIfaceDeclHead suppress_bndr_sig [] ss tycon binders
+         ]
 
   | otherwise
-  = hang (text "type family"
-            <+> pprIfaceDeclHead [] ss tycon binders (Just res_kind)
-            <+> ppShowRhs ss (pp_where rhs))
-       2 (pp_inj res_var inj <+> ppShowRhs ss (pp_rhs rhs))
-    $$
-    nest 2 (ppShowRhs ss (pp_branches rhs))
+  = vcat [ pprStandaloneKindSig name_doc (mkIfaceTyConKind binders res_kind)
+         , hang (text "type family"
+                   <+> pprIfaceDeclHead suppress_bndr_sig [] ss tycon binders
+                   <+> ppShowRhs ss (pp_where rhs))
+              2 (pp_inj res_var inj <+> ppShowRhs ss (pp_rhs rhs))
+           $$
+           nest 2 (ppShowRhs ss (pp_branches rhs))
+         ]
   where
+    name_doc = pprPrefixIfDeclBndr (ss_how_much ss) (occName tycon)
+
     pp_where (IfaceClosedSynFamilyTyCon {}) = text "where"
     pp_where _                              = empty
 
@@ -899,6 +950,9 @@ pprIfaceDecl ss (IfaceFamily { ifName = tycon
                   ) $ zip [0..] brs)
         $$ ppShowIface ss (text "axiom" <+> ppr ax)
     pp_branches _ = Outputable.empty
+
+    -- See Note [Suppressing binder signatures] in IfaceType
+    suppress_bndr_sig = SuppressBndrSig True
 
 pprIfaceDecl _ (IfacePatSyn { ifName = name,
                               ifPatUnivBndrs = univ_bndrs, ifPatExBndrs = ex_bndrs,
@@ -947,6 +1001,9 @@ pprRoles suppress_if tyCon bndrs roles
       let froles = suppressIfaceInvisibles dflags bndrs roles
       in ppUnless (all suppress_if froles || null froles) $
          text "type role" <+> tyCon <+> hsep (map ppr froles)
+
+pprStandaloneKindSig :: SDoc -> IfaceType -> SDoc
+pprStandaloneKindSig tyCon ty = text "type" <+> tyCon <+> text "::" <+> ppr ty
 
 pprInfixIfDeclBndr :: ShowHowMuch -> OccName -> SDoc
 pprInfixIfDeclBndr (ShowSome _ (AltPpr (Just ppr_bndr))) name
@@ -998,16 +1055,16 @@ pprIfaceTyConParent IfNoParent
 pprIfaceTyConParent (IfDataInstance _ tc tys)
   = pprIfaceTypeApp topPrec tc tys
 
-pprIfaceDeclHead :: IfaceContext -> ShowSub -> Name
+pprIfaceDeclHead :: SuppressBndrSig
+                 -> IfaceContext -> ShowSub -> Name
                  -> [IfaceTyConBinder]   -- of the tycon, for invisible-suppression
-                 -> Maybe IfaceKind
                  -> SDoc
-pprIfaceDeclHead context ss tc_occ bndrs m_res_kind
+pprIfaceDeclHead suppress_sig context ss tc_occ bndrs
   = sdocWithDynFlags $ \ dflags ->
     sep [ pprIfaceContextArr context
         , pprPrefixIfDeclBndr (ss_how_much ss) (occName tc_occ)
-          <+> pprIfaceTyConBinders (suppressIfaceInvisibles dflags bndrs bndrs)
-        , maybe empty (\res_kind -> dcolon <+> pprIfaceType res_kind) m_res_kind ]
+          <+> pprIfaceTyConBinders suppress_sig
+                (suppressIfaceInvisibles dflags bndrs bndrs) ]
 
 pprIfaceConDecl :: ShowSub -> Bool
                 -> IfaceTopBndr
@@ -1146,7 +1203,7 @@ pprIfaceConDecl ss gadt_style tycon tc_binders parent
     --    [VarBndrs, TyCoVarBinders, TyConBinders, and visibility] in TyCoRep.)
     ppr_tc_app gadt_subst =
       pprPrefixIfDeclBndr how_much (occName tycon)
-      <+> pprIfaceAppArgs
+      <+> pprParendIfaceAppArgs
             (substIfaceAppArgs gadt_subst (mk_tc_app_args tc_binders))
 
     mk_tc_app_args :: [IfaceTyConBinder] -> IfaceAppArgs
@@ -2360,3 +2417,177 @@ instance Binary IfaceTyConParent where
 instance Binary IfaceCompleteMatch where
   put_ bh (IfaceCompleteMatch cs ts) = put_ bh cs >> put_ bh ts
   get bh = IfaceCompleteMatch <$> get bh <*> get bh
+
+
+{-
+************************************************************************
+*                                                                      *
+                NFData instances
+   See Note [Avoiding space leaks in toIface*] in ToIface
+*                                                                      *
+************************************************************************
+-}
+
+instance NFData IfaceDecl where
+  rnf = \case
+    IfaceId f1 f2 f3 f4 ->
+      rnf f1 `seq` rnf f2 `seq` rnf f3 `seq` rnf f4
+
+    IfaceData f1 f2 f3 f4 f5 f6 f7 f8 f9 ->
+      f1 `seq` seqList f2 `seq` f3 `seq` f4 `seq` f5 `seq`
+      rnf f6 `seq` rnf f7 `seq` rnf f8 `seq` rnf f9
+
+    IfaceSynonym f1 f2 f3 f4 f5 ->
+      rnf f1 `seq` f2 `seq` seqList f3 `seq` rnf f4 `seq` rnf f5
+
+    IfaceFamily f1 f2 f3 f4 f5 f6 ->
+      rnf f1 `seq` rnf f2 `seq` seqList f3 `seq` rnf f4 `seq` rnf f5 `seq` f6 `seq` ()
+
+    IfaceClass f1 f2 f3 f4 f5 ->
+      rnf f1 `seq` f2 `seq` seqList f3 `seq` rnf f4 `seq` rnf f5
+
+    IfaceAxiom nm tycon role ax ->
+      rnf nm `seq`
+      rnf tycon `seq`
+      role `seq`
+      rnf ax
+
+    IfacePatSyn f1 f2 f3 f4 f5 f6 f7 f8 f9 f10 f11 ->
+      rnf f1 `seq` rnf f2 `seq` rnf f3 `seq` rnf f4 `seq` f5 `seq` f6 `seq`
+      rnf f7 `seq` rnf f8 `seq` rnf f9 `seq` rnf f10 `seq` f11 `seq` ()
+
+instance NFData IfaceAxBranch where
+  rnf (IfaceAxBranch f1 f2 f3 f4 f5 f6 f7) =
+    rnf f1 `seq` rnf f2 `seq` rnf f3 `seq` rnf f4 `seq` f5 `seq` rnf f6 `seq` rnf f7
+
+instance NFData IfaceClassBody where
+  rnf = \case
+    IfAbstractClass -> ()
+    IfConcreteClass f1 f2 f3 f4 -> rnf f1 `seq` rnf f2 `seq` rnf f3 `seq` f4 `seq` ()
+
+instance NFData IfaceAT where
+  rnf (IfaceAT f1 f2) = rnf f1 `seq` rnf f2
+
+instance NFData IfaceClassOp where
+  rnf (IfaceClassOp f1 f2 f3) = rnf f1 `seq` rnf f2 `seq` f3 `seq` ()
+
+instance NFData IfaceTyConParent where
+  rnf = \case
+    IfNoParent -> ()
+    IfDataInstance f1 f2 f3 -> rnf f1 `seq` rnf f2 `seq` rnf f3
+
+instance NFData IfaceConDecls where
+  rnf = \case
+    IfAbstractTyCon -> ()
+    IfDataTyCon f1 -> rnf f1
+    IfNewTyCon f1 -> rnf f1
+
+instance NFData IfaceConDecl where
+  rnf (IfCon f1 f2 f3 f4 f5 f6 f7 f8 f9 f10 f11) =
+    rnf f1 `seq` rnf f2 `seq` rnf f3 `seq` rnf f4 `seq` f5 `seq` rnf f6 `seq`
+    rnf f7 `seq` rnf f8 `seq` f9 `seq` rnf f10 `seq` rnf f11
+
+instance NFData IfaceSrcBang where
+  rnf (IfSrcBang f1 f2) = f1 `seq` f2 `seq` ()
+
+instance NFData IfaceBang where
+  rnf x = x `seq` ()
+
+instance NFData IfaceIdDetails where
+  rnf = \case
+    IfVanillaId -> ()
+    IfRecSelId (Left tycon) b -> rnf tycon `seq` rnf b
+    IfRecSelId (Right decl) b -> rnf decl `seq` rnf b
+    IfDFunId -> ()
+
+instance NFData IfaceIdInfo where
+  rnf = \case
+    NoInfo -> ()
+    HasInfo f1 -> rnf f1
+
+instance NFData IfaceInfoItem where
+  rnf = \case
+    HsArity a -> rnf a
+    HsStrictness str -> seqStrictSig str
+    HsInline p -> p `seq` () -- TODO: seq further?
+    HsUnfold b unf -> rnf b `seq` rnf unf
+    HsNoCafRefs -> ()
+    HsLevity -> ()
+
+instance NFData IfaceUnfolding where
+  rnf = \case
+    IfCoreUnfold inlinable expr ->
+      rnf inlinable `seq` rnf expr
+    IfCompulsory expr ->
+      rnf expr
+    IfInlineRule arity b1 b2 e ->
+      rnf arity `seq` rnf b1 `seq` rnf b2 `seq` rnf e
+    IfDFunUnfold bndrs exprs ->
+      rnf bndrs `seq` rnf exprs
+
+instance NFData IfaceExpr where
+  rnf = \case
+    IfaceLcl nm -> rnf nm
+    IfaceExt nm -> rnf nm
+    IfaceType ty -> rnf ty
+    IfaceCo co -> rnf co
+    IfaceTuple sort exprs -> sort `seq` rnf exprs
+    IfaceLam bndr expr -> rnf bndr `seq` rnf expr
+    IfaceApp e1 e2 -> rnf e1 `seq` rnf e2
+    IfaceCase e nm alts -> rnf e `seq` nm `seq` rnf alts
+    IfaceECase e ty -> rnf e `seq` rnf ty
+    IfaceLet bind e -> rnf bind `seq` rnf e
+    IfaceCast e co -> rnf e `seq` rnf co
+    IfaceLit l -> l `seq` () -- FIXME
+    IfaceFCall fc ty -> fc `seq` rnf ty
+    IfaceTick tick e -> rnf tick `seq` rnf e
+
+instance NFData IfaceBinding where
+  rnf = \case
+    IfaceNonRec bndr e -> rnf bndr `seq` rnf e
+    IfaceRec binds -> rnf binds
+
+instance NFData IfaceLetBndr where
+  rnf (IfLetBndr nm ty id_info join_info) =
+    rnf nm `seq` rnf ty `seq` rnf id_info `seq` rnf join_info
+
+instance NFData IfaceFamTyConFlav where
+  rnf = \case
+    IfaceDataFamilyTyCon -> ()
+    IfaceOpenSynFamilyTyCon -> ()
+    IfaceClosedSynFamilyTyCon f1 -> rnf f1
+    IfaceAbstractClosedSynFamilyTyCon -> ()
+    IfaceBuiltInSynFamTyCon -> ()
+
+instance NFData IfaceJoinInfo where
+  rnf x = x `seq` ()
+
+instance NFData IfaceTickish where
+  rnf = \case
+    IfaceHpcTick m i -> rnf m `seq` rnf i
+    IfaceSCC cc b1 b2 -> cc `seq` rnf b1 `seq` rnf b2
+    IfaceSource src str -> src `seq` rnf str
+
+instance NFData IfaceConAlt where
+  rnf = \case
+    IfaceDefault -> ()
+    IfaceDataAlt nm -> rnf nm
+    IfaceLitAlt lit -> lit `seq` ()
+
+instance NFData IfaceCompleteMatch where
+  rnf (IfaceCompleteMatch f1 f2) = rnf f1 `seq` rnf f2
+
+instance NFData IfaceRule where
+  rnf (IfaceRule f1 f2 f3 f4 f5 f6 f7 f8) =
+    rnf f1 `seq` f2 `seq` rnf f3 `seq` rnf f4 `seq` rnf f5 `seq` rnf f6 `seq` rnf f7 `seq` f8 `seq` ()
+
+instance NFData IfaceFamInst where
+  rnf (IfaceFamInst f1 f2 f3 f4) =
+    rnf f1 `seq` rnf f2 `seq` rnf f3 `seq` f4 `seq` ()
+
+instance NFData IfaceClsInst where
+  rnf (IfaceClsInst f1 f2 f3 f4 f5) =
+    f1 `seq` rnf f2 `seq` rnf f3 `seq` f4 `seq` f5 `seq` ()
+
+instance NFData IfaceAnnotation where
+  rnf (IfaceAnnotation f1 f2) = f1 `seq` f2 `seq` ()

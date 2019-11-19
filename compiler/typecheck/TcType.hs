@@ -36,7 +36,6 @@ module TcType (
   promoteSkolem, promoteSkolemX, promoteSkolemsX,
   --------------------------------
   -- MetaDetails
-  UserTypeCtxt(..), pprUserTypeCtxt, isSigMaybe,
   TcTyVarDetails(..), pprTcTyVarDetails, vanillaSkolemTv, superSkolemTv,
   MetaDetails(Flexi, Indirect), MetaInfo(..),
   isImmutableTyVar, isSkolemTyVar, isMetaTyVar,  isMetaTyVarTy, isTyVarTy,
@@ -82,7 +81,7 @@ module TcType (
   hasIPPred, isTauTy, isTauTyCon, tcIsTyVarTy, tcIsForAllTy,
   isPredTy, isTyVarClassPred, isTyVarHead, isInsolubleOccursCheck,
   checkValidClsArgs, hasTyVarHead,
-  isRigidTy,
+  isRigidTy, isAlmostFunctionFree,
 
   ---------------------------------
   -- Misc type manipulators
@@ -141,7 +140,6 @@ module TcType (
 
   isClassPred, isEqPrimPred, isIPPred, isEqPred, isEqPredClass,
   mkClassPred,
-  isDictLikeTy,
   tcSplitDFunTy, tcSplitDFunHead, tcSplitMethodTy,
   isRuntimeRepVar, isKindLevPoly,
   isVisibleBinder, isInvisibleBinder,
@@ -194,17 +192,17 @@ module TcType (
 -- friends:
 import GhcPrelude
 
-import Kind
 import TyCoRep
 import TyCoSubst ( mkTvSubst, substTyWithCoVars )
 import TyCoFVs
-import TyCoPpr ( pprParendTheta )
+import TyCoPpr
 import Class
 import Var
 import ForeignCall
 import VarSet
 import Coercion
 import Type
+import Predicate
 import RepType
 import TyCon
 
@@ -569,120 +567,6 @@ instance Outputable MetaInfo where
   ppr TyVarTv       = text "tyv"
   ppr FlatMetaTv    = text "fmv"
   ppr FlatSkolTv    = text "fsk"
-
-{- *********************************************************************
-*                                                                      *
-          UserTypeCtxt
-*                                                                      *
-********************************************************************* -}
-
--------------------------------------
--- UserTypeCtxt describes the origin of the polymorphic type
--- in the places where we need an expression to have that type
-
-data UserTypeCtxt
-  = FunSigCtxt      -- Function type signature, when checking the type
-                    -- Also used for types in SPECIALISE pragmas
-       Name              -- Name of the function
-       Bool              -- True <=> report redundant constraints
-                            -- This is usually True, but False for
-                            --   * Record selectors (not important here)
-                            --   * Class and instance methods.  Here
-                            --     the code may legitimately be more
-                            --     polymorphic than the signature
-                            --     generated from the class
-                            --     declaration
-
-  | InfSigCtxt Name     -- Inferred type for function
-  | ExprSigCtxt         -- Expression type signature
-  | KindSigCtxt         -- Kind signature
-  | TypeAppCtxt         -- Visible type application
-  | ConArgCtxt Name     -- Data constructor argument
-  | TySynCtxt Name      -- RHS of a type synonym decl
-  | PatSynCtxt Name     -- Type sig for a pattern synonym
-  | PatSigCtxt          -- Type sig in pattern
-                        --   eg  f (x::t) = ...
-                        --   or  (x::t, y) = e
-  | RuleSigCtxt Name    -- LHS of a RULE forall
-                        --    RULE "foo" forall (x :: a -> a). f (Just x) = ...
-  | ResSigCtxt          -- Result type sig
-                        --      f x :: t = ....
-  | ForSigCtxt Name     -- Foreign import or export signature
-  | DefaultDeclCtxt     -- Types in a default declaration
-  | InstDeclCtxt Bool   -- An instance declaration
-                        --    True:  stand-alone deriving
-                        --    False: vanilla instance declaration
-  | SpecInstCtxt        -- SPECIALISE instance pragma
-  | ThBrackCtxt         -- Template Haskell type brackets [t| ... |]
-  | GenSigCtxt          -- Higher-rank or impredicative situations
-                        -- e.g. (f e) where f has a higher-rank type
-                        -- We might want to elaborate this
-  | GhciCtxt Bool       -- GHCi command :kind <type>
-                        -- The Bool indicates if we are checking the outermost
-                        -- type application.
-                        -- See Note [Unsaturated type synonyms in GHCi] in
-                        -- TcValidity.
-
-  | ClassSCCtxt Name    -- Superclasses of a class
-  | SigmaCtxt           -- Theta part of a normal for-all type
-                        --      f :: <S> => a -> a
-  | DataTyCtxt Name     -- The "stupid theta" part of a data decl
-                        --      data <S> => T a = MkT a
-  | DerivClauseCtxt     -- A 'deriving' clause
-  | TyVarBndrKindCtxt Name  -- The kind of a type variable being bound
-  | DataKindCtxt Name   -- The kind of a data/newtype (instance)
-  | TySynKindCtxt Name  -- The kind of the RHS of a type synonym
-  | TyFamResKindCtxt Name   -- The result kind of a type family
-
-{-
--- Notes re TySynCtxt
--- We allow type synonyms that aren't types; e.g.  type List = []
---
--- If the RHS mentions tyvars that aren't in scope, we'll
--- quantify over them:
---      e.g.    type T = a->a
--- will become  type T = forall a. a->a
---
--- With gla-exts that's right, but for H98 we should complain.
--}
-
-
-pprUserTypeCtxt :: UserTypeCtxt -> SDoc
-pprUserTypeCtxt (FunSigCtxt n _)  = text "the type signature for" <+> quotes (ppr n)
-pprUserTypeCtxt (InfSigCtxt n)    = text "the inferred type for" <+> quotes (ppr n)
-pprUserTypeCtxt (RuleSigCtxt n)   = text "a RULE for" <+> quotes (ppr n)
-pprUserTypeCtxt ExprSigCtxt       = text "an expression type signature"
-pprUserTypeCtxt KindSigCtxt       = text "a kind signature"
-pprUserTypeCtxt TypeAppCtxt       = text "a type argument"
-pprUserTypeCtxt (ConArgCtxt c)    = text "the type of the constructor" <+> quotes (ppr c)
-pprUserTypeCtxt (TySynCtxt c)     = text "the RHS of the type synonym" <+> quotes (ppr c)
-pprUserTypeCtxt ThBrackCtxt       = text "a Template Haskell quotation [t|...|]"
-pprUserTypeCtxt PatSigCtxt        = text "a pattern type signature"
-pprUserTypeCtxt ResSigCtxt        = text "a result type signature"
-pprUserTypeCtxt (ForSigCtxt n)    = text "the foreign declaration for" <+> quotes (ppr n)
-pprUserTypeCtxt DefaultDeclCtxt   = text "a type in a `default' declaration"
-pprUserTypeCtxt (InstDeclCtxt False) = text "an instance declaration"
-pprUserTypeCtxt (InstDeclCtxt True)  = text "a stand-alone deriving instance declaration"
-pprUserTypeCtxt SpecInstCtxt      = text "a SPECIALISE instance pragma"
-pprUserTypeCtxt GenSigCtxt        = text "a type expected by the context"
-pprUserTypeCtxt (GhciCtxt {})     = text "a type in a GHCi command"
-pprUserTypeCtxt (ClassSCCtxt c)   = text "the super-classes of class" <+> quotes (ppr c)
-pprUserTypeCtxt SigmaCtxt         = text "the context of a polymorphic type"
-pprUserTypeCtxt (DataTyCtxt tc)   = text "the context of the data type declaration for" <+> quotes (ppr tc)
-pprUserTypeCtxt (PatSynCtxt n)    = text "the signature for pattern synonym" <+> quotes (ppr n)
-pprUserTypeCtxt (DerivClauseCtxt) = text "a `deriving' clause"
-pprUserTypeCtxt (TyVarBndrKindCtxt n) = text "the kind annotation on the type variable" <+> quotes (ppr n)
-pprUserTypeCtxt (DataKindCtxt n)  = text "the kind annotation on the declaration for" <+> quotes (ppr n)
-pprUserTypeCtxt (TySynKindCtxt n) = text "the kind annotation on the declaration for" <+> quotes (ppr n)
-pprUserTypeCtxt (TyFamResKindCtxt n) = text "the result kind for" <+> quotes (ppr n)
-
-isSigMaybe :: UserTypeCtxt -> Maybe Name
-isSigMaybe (FunSigCtxt n _) = Just n
-isSigMaybe (ConArgCtxt n)   = Just n
-isSigMaybe (ForSigCtxt n)   = Just n
-isSigMaybe (PatSynCtxt n)   = Just n
-isSigMaybe _                = Nothing
-
 
 {- *********************************************************************
 *                                                                      *
@@ -1995,7 +1879,7 @@ Note [Lift equality constaints when quantifying]
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 We can't quantify over a constraint (t1 ~# t2) because that isn't a
 predicate type; see Note [Types for coercions, predicates, and evidence]
-in Type.hs.
+in TyCoRep.
 
 So we have to 'lift' it to (t1 ~ t2).  Similarly (~R#) must be lifted
 to Coercible.
@@ -2134,14 +2018,6 @@ isCallStackPred cls tys
   | otherwise
   = Nothing
 
-hasIPPred :: PredType -> Bool
-hasIPPred pred
-  = case classifyPredType pred of
-      ClassPred cls tys
-        | isIPClass     cls -> True
-        | isCTupleClass cls -> any hasIPPred tys
-      _other -> False
-
 is_tc :: Unique -> Type -> Bool
 -- Newtypes are opaque to this
 is_tc uniq ty = case tcSplitTyConApp_maybe ty of
@@ -2180,6 +2056,23 @@ isRigidTy ty
   | isForAllTy ty                           = True
   | otherwise                               = False
 
+
+-- | Is this type *almost function-free*? See Note [Almost function-free]
+-- in TcRnTypes
+isAlmostFunctionFree :: TcType -> Bool
+isAlmostFunctionFree ty | Just ty' <- tcView ty = isAlmostFunctionFree ty'
+isAlmostFunctionFree (TyVarTy {})    = True
+isAlmostFunctionFree (AppTy ty1 ty2) = isAlmostFunctionFree ty1 &&
+                                       isAlmostFunctionFree ty2
+isAlmostFunctionFree (TyConApp tc args)
+  | isTypeFamilyTyCon tc = False
+  | otherwise            = all isAlmostFunctionFree args
+isAlmostFunctionFree (ForAllTy bndr _) = isAlmostFunctionFree (binderType bndr)
+isAlmostFunctionFree (FunTy _ ty1 ty2) = isAlmostFunctionFree ty1 &&
+                                         isAlmostFunctionFree ty2
+isAlmostFunctionFree (LitTy {})        = True
+isAlmostFunctionFree (CastTy ty _)     = isAlmostFunctionFree ty
+isAlmostFunctionFree (CoercionTy {})   = True
 
 {-
 ************************************************************************

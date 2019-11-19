@@ -12,7 +12,6 @@
 
 module TcBinds ( tcLocalBinds, tcTopBinds, tcValBinds,
                  tcHsBootSigs, tcPolyCheck,
-                 addTypecheckedBinds,
                  chooseInferredQuantifiers,
                  badBootDeclErr ) where
 
@@ -25,10 +24,10 @@ import CoreSyn (Tickish (..))
 import CostCentre (mkUserCC, CCFlavour(DeclCC))
 import DynFlags
 import FastString
-import HsSyn
-import HscTypes( isHsBootOrSig )
+import GHC.Hs
 import TcSigs
 import TcRnMonad
+import TcOrigin
 import TcEnv
 import TcUnify
 import TcSimplify
@@ -70,21 +69,6 @@ import Control.Monad
 import Data.Foldable (find)
 
 #include "HsVersions.h"
-
-{- *********************************************************************
-*                                                                      *
-               A useful helper function
-*                                                                      *
-********************************************************************* -}
-
-addTypecheckedBinds :: TcGblEnv -> [LHsBinds GhcTc] -> TcGblEnv
-addTypecheckedBinds tcg_env binds
-  | isHsBootOrSig (tcg_src tcg_env) = tcg_env
-    -- Do not add the code for record-selector bindings
-    -- when compiling hs-boot files
-  | otherwise = tcg_env { tcg_binds = foldr unionBags
-                                            (tcg_binds tcg_env)
-                                            binds }
 
 {-
 ************************************************************************
@@ -257,7 +241,11 @@ tcCompleteSigs sigs =
 
           mkMatch :: [ConLike] -> TyCon -> CompleteMatch
           mkMatch cls ty_con = CompleteMatch {
-            completeMatchConLikes = map conLikeName cls,
+            -- foldM is a left-fold and will have accumulated the ConLikes in
+            -- the reverse order. foldrM would accumulate in the correct order,
+            -- but would type-check the last ConLike first, which might also be
+            -- confusing from the user's perspective. Hence reverse here.
+            completeMatchConLikes = reverse (map conLikeName cls),
             completeMatchTyCon = tyConName ty_con
             }
       doOne _ = return Nothing
@@ -303,7 +291,10 @@ tcCompleteSigs sigs =
                   <+> parens (quotes (ppr tc)
                                <+> text "resp."
                                <+> quotes (ppr tc'))
-  in  mapMaybeM (addLocM doOne) sigs
+  -- For some reason I haven't investigated further, the signatures come in
+  -- backwards wrt. declaration order. So we reverse them here, because it makes
+  -- a difference for incomplete match suggestions.
+  in  mapMaybeM (addLocM doOne) (reverse sigs) -- process in declaration order
 
 tcHsBootSigs :: [(RecFlag, LHsBinds GhcRn)] -> [LSig GhcRn] -> TcM [Id]
 -- A hs-boot file has only one BindGroup, and it only has type
@@ -514,7 +505,7 @@ tc_group top_lvl sig_fn prag_fn (Recursive, binds) closed thing_inside
       tcPolyBinds sig_fn prag_fn Recursive rec_tc closed binds
 
 recursivePatSynErr ::
-     OutputableBndrId (GhcPass p) =>
+     OutputableBndrId p =>
      SrcSpan -- ^ The location of the first pattern synonym binding
              --   (for error reporting)
   -> LHsBinds (GhcPass p)
@@ -1738,7 +1729,7 @@ isClosedBndrGroup type_env binds
 
 -- This one is called on LHS, when pat and grhss are both Name
 -- and on RHS, when pat is TcId and grhss is still Name
-patMonoBindsCtxt :: (OutputableBndrId (GhcPass p), Outputable body)
+patMonoBindsCtxt :: (OutputableBndrId p, Outputable body)
                  => LPat (GhcPass p) -> GRHSs GhcRn body -> SDoc
 patMonoBindsCtxt pat grhss
   = hang (text "In a pattern binding:") 2 (pprPatBind pat grhss)

@@ -11,10 +11,8 @@ import Settings
 defaultGhcWarningsArgs :: Args
 defaultGhcWarningsArgs = mconcat
     [ notStage0 ? arg "-Wnoncanonical-monad-instances"
-    , (not <$> flag GccIsClang) ? mconcat
-      [ not windowsHost ? arg "-optc-Werror=unused-but-set-variable"
-      , arg "-optc-Wno-error=inline" ]
-    , flag GccIsClang ? arg "-optc-Wno-unknown-pragmas" ]
+    , notM (flag CcLlvmBackend) ? arg "-optc-Wno-error=inline"
+    , flag CcLlvmBackend ? arg "-optc-Wno-unknown-pragmas" ]
 
 -- | Package-specific warnings-related arguments, mostly suppressing various warnings.
 ghcWarningsArgs :: Args

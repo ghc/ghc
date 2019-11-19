@@ -72,12 +72,24 @@ Sample event types
 A sample (consisting of a list of break-down classes, e.g. cost centres, and
 heap residency sizes), is to be encoded in the body of one or more events.
 
-We mark the beginning of a new sample with an ``EVENT_HEAP_PROF_SAMPLE_BEGIN``
+We normally mark the beginning of a new sample with an ``EVENT_HEAP_PROF_SAMPLE_BEGIN``
 event,
 
  * ``EVENT_HEAP_PROF_SAMPLE_BEGIN``
 
    * ``Word64``: sample number
+
+Biographical profiling samples start with the ``EVENT_HEAP_BIO_PROF_SAMPLE_BEGIN``
+event. These events also include a timestamp which indicates when the sample
+was taken. This is because all these samples will appear at the end of
+the eventlog due to how the biographical profiling mode works. You can
+use the timestamp to reorder the samples relative to the other events.
+
+ * ``EVENT_HEAP_BIO_PROF_SAMPLE_BEGIN``
+
+   * ``Word64``: sample number
+   * ``Word64``: eventlog timestamp in ns
+
 
 A heap residency census will follow. Since events may only be up to 2^16^ bytes
 in length a single sample may need to be split among multiple
@@ -122,3 +134,33 @@ A variable-length event encoding a heap sample broken down by,
    * ``Word8``: Profile ID
    * ``Word64``: heap residency in bytes
    * ``String``: type or closure description, or module name
+
+.. _time-profiler-events:
+
+Time profiler event log output
+------------------------------
+
+The time profiling mode enabled by ``-p`` also emits sample events to the eventlog.
+At the start of profiling the tick interval is emitted to the eventlog and then
+on each tick the current cost centre stack is emitted. Together these enable
+a user to construct an approximate track of the executation of their program.
+
+Profile begin event
+~~~~~~~~~~~~~~~~~~~
+
+ * ``EVENT_PROF_BEGIN``
+
+   * ``Word64``: Tick interval, in nanoseconds
+
+
+Tick sample event
+~~~~~~~~~~~~~~~~~
+
+A variable-length packet encoding a profile sample.
+
+  * ``EVENT_PROF_SAMPLE_COST_CENTRE``
+
+    * ``Word32``: Capability
+    * ``Word64``: Current profiling tick
+    * ``Word8``: stack depth
+    * ``Word32[]``: cost centre stack starting with inner-most (cost centre numbers)

@@ -49,6 +49,7 @@ EXTERN_INLINE StgWord xchg(StgPtr p, StgWord w);
  * }
  */
 EXTERN_INLINE StgWord cas(StgVolatilePtr p, StgWord o, StgWord n);
+EXTERN_INLINE StgWord8 cas_word8(StgWord8 *volatile p, StgWord8 o, StgWord8 n);
 
 /*
  * Atomic addition by the provided quantity
@@ -166,7 +167,7 @@ EXTERN_INLINE void load_load_barrier(void);
  *
  *  - Eager blackholing a THUNK:
  *    This is protected by an explicit write barrier in the eager blackholing
- *    code produced by the codegen. See StgCmmBind.emitBlackHoleCode.
+ *    code produced by the codegen. See GHC.StgToCmm.Bind.emitBlackHoleCode.
  *
  *  - Lazy blackholing a THUNK:
  *    This is is protected by an explicit write barrier in the thread suspension
@@ -189,8 +190,8 @@ EXTERN_INLINE void load_load_barrier(void);
  *
  *  - Write to an Array#, ArrayArray#, or SmallArray#:
  *    This case is protected by an explicit write barrier in the code produced
- *    for this primop by the codegen. See StgCmmPrim.doWritePtrArrayOp and
- *    StgCmmPrim.doWriteSmallPtrArrayOp. Relevant issue: #12469.
+ *    for this primop by the codegen. See GHC.StgToCmm.Prim.doWritePtrArrayOp and
+ *    GHC.StgToCmm.Prim.doWriteSmallPtrArrayOp. Relevant issue: #12469.
  *
  *  - Write to MutVar# via writeMutVar#:
  *    This case is protected by an explicit write barrier in the code produced
@@ -283,6 +284,12 @@ cas(StgVolatilePtr p, StgWord o, StgWord n)
     return __sync_val_compare_and_swap(p, o, n);
 }
 
+EXTERN_INLINE StgWord8
+cas_word8(StgWord8 *volatile p, StgWord8 o, StgWord8 n)
+{
+    return __sync_val_compare_and_swap(p, o, n);
+}
+
 // RRN: Generalized to arbitrary increments to enable fetch-and-add in
 // Haskell code (fetchAddIntArray#).
 // PT: add-and-fetch, returns new value
@@ -336,6 +343,8 @@ write_barrier(void) {
 #elif defined(powerpc_HOST_ARCH) || defined(powerpc64_HOST_ARCH) \
     || defined(powerpc64le_HOST_ARCH)
     __asm__ __volatile__ ("lwsync" : : : "memory");
+#elif defined(s390x_HOST_ARCH)
+    __asm__ __volatile__ ("" : : : "memory");
 #elif defined(sparc_HOST_ARCH)
     /* Sparc in TSO mode does not require store/store barriers. */
     __asm__ __volatile__ ("" : : : "memory");
@@ -357,6 +366,8 @@ store_load_barrier(void) {
 #elif defined(powerpc_HOST_ARCH) || defined(powerpc64_HOST_ARCH) \
     || defined(powerpc64le_HOST_ARCH)
     __asm__ __volatile__ ("sync" : : : "memory");
+#elif defined(s390x_HOST_ARCH)
+    __asm__ __volatile__ ("bcr 14,0" : : : "memory");
 #elif defined(sparc_HOST_ARCH)
     __asm__ __volatile__ ("membar #StoreLoad" : : : "memory");
 #elif defined(arm_HOST_ARCH)
@@ -379,6 +390,8 @@ load_load_barrier(void) {
 #elif defined(powerpc_HOST_ARCH) || defined(powerpc64_HOST_ARCH) \
     || defined(powerpc64le_HOST_ARCH)
     __asm__ __volatile__ ("lwsync" : : : "memory");
+#elif defined(s390x_HOST_ARCH)
+    __asm__ __volatile__ ("" : : : "memory");
 #elif defined(sparc_HOST_ARCH)
     /* Sparc in TSO mode does not require load/load barriers. */
     __asm__ __volatile__ ("" : : : "memory");
@@ -421,6 +434,18 @@ EXTERN_INLINE StgWord
 cas(StgVolatilePtr p, StgWord o, StgWord n)
 {
     StgWord result;
+    result = *p;
+    if (result == o) {
+        *p = n;
+    }
+    return result;
+}
+
+EXTERN_INLINE StgWord8 cas_word8(StgWord8 *volatile p, StgWord8 o, StgWord8 n);
+EXTERN_INLINE StgWord8
+cas_word8(StgWord8 *volatile p, StgWord8 o, StgWord8 n)
+{
+    StgWord8 result;
     result = *p;
     if (result == o) {
         *p = n;

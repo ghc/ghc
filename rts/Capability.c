@@ -27,6 +27,7 @@
 #include "STM.h"
 #include "RtsUtils.h"
 #include "sm/OSMem.h"
+#include "sm/BlockAlloc.h" // for countBlocks()
 
 #if !defined(mingw32_HOST_OS)
 #include "rts/IOManager.h" // for setIOManagerControlFd()
@@ -290,6 +291,11 @@ initCapability (Capability *cap, uint32_t i)
     cap->saved_mut_lists = stgMallocBytes(sizeof(bdescr *) *
                                           RtsFlags.GcFlags.generations,
                                           "initCapability");
+
+
+    // At this point storage manager is not initialized yet, so this will be
+    // initialized in initStorage().
+    cap->upd_rem_set.queue.blocks = NULL;
 
     for (g = 0; g < RtsFlags.GcFlags.generations; g++) {
         cap->mut_lists[g] = NULL;
@@ -748,6 +754,8 @@ static Capability * waitForReturnCapability (Task *task)
  * result of the external call back to the Haskell thread that
  * made it.
  *
+ * pCap is strictly an output.
+ *
  * ------------------------------------------------------------------------- */
 
 void waitForCapability (Capability **pCap, Task *task)
@@ -840,6 +848,9 @@ void waitForCapability (Capability **pCap, Task *task)
  *      SYNC_GC_PAR), either to do a sequential GC, forkProcess, or
  *      setNumCapabilities.  We should give up the Capability temporarily.
  *
+ * When yieldCapability returns *pCap will have been updated to the new
+ * capability held by the caller.
+ *
  * ------------------------------------------------------------------------- */
 
 #if defined(THREADED_RTS)
@@ -855,16 +866,27 @@ yieldCapability (Capability** pCap, Task *task, bool gcAllowed)
     {
         PendingSync *sync = pending_sync;
 
-        if (sync && sync->type == SYNC_GC_PAR) {
-            if (! sync->idle[cap->no]) {
-                traceEventGcStart(cap);
-                gcWorkerThread(cap);
-                traceEventGcEnd(cap);
-                traceSparkCounters(cap);
-                // See Note [migrated bound threads 2]
-                if (task->cap == cap) {
-                    return true;
+        if (sync) {
+            switch (sync->type) {
+            case SYNC_GC_PAR:
+                if (! sync->idle[cap->no]) {
+                    traceEventGcStart(cap);
+                    gcWorkerThread(cap);
+                    traceEventGcEnd(cap);
+                    traceSparkCounters(cap);
+                    // See Note [migrated bound threads 2]
+                    if (task->cap == cap) {
+                        return true;
+                    }
                 }
+                break;
+
+            case SYNC_FLUSH_UPD_REM_SET:
+                debugTrace(DEBUG_nonmoving_gc, "Flushing update remembered set blocks...");
+                break;
+
+            default:
+                break;
             }
         }
     }

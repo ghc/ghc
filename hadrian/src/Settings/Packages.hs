@@ -58,12 +58,11 @@ packageArgs = do
               pure ["-O0"] ]
 
           , builder (Cabal Setup) ? mconcat
-            [ arg $ "--ghc-option=-DSTAGE=" ++ show (fromEnum stage + 1)
-            , arg "--disable-library-for-ghci"
+            [ arg "--disable-library-for-ghci"
             , anyTargetOs ["openbsd"] ? arg "--ld-options=-E"
             , flag GhcUnregisterised ? arg "--ghc-option=-DNO_REGS"
-            , notM ghcWithSMP ? arg "--ghc-option=-DNOSMP"
-            , notM ghcWithSMP ? arg "--ghc-option=-optc-DNOSMP"
+            , notM targetSupportsSMP ? arg "--ghc-option=-DNOSMP"
+            , notM targetSupportsSMP ? arg "--ghc-option=-optc-DNOSMP"
             , (any (wayUnit Threaded) rtsWays) ?
               notStage0 ? arg "--ghc-option=-optc-DTHREADED_RTS"
             , ghcWithInterpreter ?
@@ -79,7 +78,6 @@ packageArgs = do
           , builder (Cabal Flags) ? mconcat
             [ ghcWithNativeCodeGen ? arg "ncg"
             , ghcWithInterpreter ? notStage0 ? arg "ghci"
-            , notStage0 ? not windowsHost ? notM cross ? arg "ext-interp"
             , cross ? arg "-terminfo"
             , notStage0 ? intLib == integerGmp ?
               arg "integer-gmp"
@@ -94,7 +92,6 @@ packageArgs = do
 
           , builder (Cabal Flags) ? mconcat
             [ ghcWithInterpreter ? notStage0 ? arg "ghci"
-            , notStage0 ? not windowsHost ? notM cross ? arg "ext-interp"
             , cross ? arg "-terminfo"
             -- the 'threaded' flag is True by default, but
             -- let's record explicitly that we link all ghc
@@ -109,7 +106,7 @@ packageArgs = do
         , package ghcPrim ? mconcat
           [ builder (Cabal Flags) ? arg "include-ghc-prim"
 
-          , builder (Cc CompileC) ? (not <$> flag GccIsClang) ?
+          , builder (Cc CompileC) ? (not <$> flag CcLlvmBackend) ?
             input "**/cbits/atomic.c"  ? arg "-Wno-sync-nand" ]
 
         --------------------------------- ghci ---------------------------------
@@ -128,8 +125,6 @@ packageArgs = do
         -- behind the @-fghci@ flag.
         , package ghci ? mconcat
           [ notStage0 ? builder (Cabal Flags) ? arg "ghci"
-          , notStage0 ? builder (Cabal Flags) ? not windowsHost ? notM cross
-                      ? arg "ext-interp"
           , cross ? stage0 ? builder (Cabal Flags) ? arg "ghci" ]
 
         -------------------------------- haddock -------------------------------
@@ -204,15 +199,30 @@ rtsPackageArgs = package rts ? do
     libffiName     <- expr libffiLibraryName
     ffiIncludeDir  <- getSetting FfiIncludeDir
     ffiLibraryDir  <- getSetting FfiLibDir
-    let cArgs = mconcat
+    libdwIncludeDir   <- getSetting LibdwIncludeDir
+    libdwLibraryDir   <- getSetting LibdwLibDir
+
+    -- Arguments passed to GHC when compiling C and .cmm sources.
+    let ghcArgs = mconcat
           [ arg "-Irts"
-          , rtsWarnings
           , arg $ "-I" ++ path
-          , flag UseSystemFfi ? arg ("-I" ++ ffiIncludeDir)
+          , flag WithLibdw ? if not (null libdwIncludeDir) then arg ("-I" ++ libdwIncludeDir) else mempty
           , arg $ "-DRtsWay=\"rts_" ++ show way ++ "\""
           -- Set the namespace for the rts fs functions
           , arg $ "-DFS_NAMESPACE=rts"
           , arg $ "-DCOMPILING_RTS"
+          , notM targetSupportsSMP           ? arg "-DNOSMP"
+          , way `elem` [debug, debugDynamic] ? arg "-DTICKY_TICKY"
+          , Profiling `wayUnit` way          ? arg "-DPROFILING"
+          , Threaded  `wayUnit` way          ? arg "-DTHREADED_RTS"
+          , notM targetSupportsSMP           ? pure [ "-DNOSMP"
+                                                    , "-optc-DNOSMP" ]
+          ]
+
+    let cArgs = mconcat
+          [ rtsWarnings
+          , flag UseSystemFfi ? arg ("-I" ++ ffiIncludeDir)
+          , arg "-fomit-frame-pointer"
           -- RTS *must* be compiled with optimisations. The INLINE_HEADER macro
           -- requires that functions are inlined to work as expected. Inlining
           -- only happens for optimised builds. Otherwise we can assume that
@@ -220,16 +230,17 @@ rtsPackageArgs = package rts ? do
           -- provide non-inlined alternatives and hence needs the function to
           -- be inlined. See https://github.com/snowleopard/hadrian/issues/90.
           , arg "-O2"
-          , arg "-fomit-frame-pointer"
           , arg "-g"
+
+          , arg "-Irts"
+          , arg $ "-I" ++ path
 
           , Debug     `wayUnit` way          ? pure [ "-DDEBUG"
                                                     , "-fno-omit-frame-pointer"
                                                     , "-g3"
                                                     , "-O0" ]
-          , way `elem` [debug, debugDynamic] ? arg "-DTICKY_TICKY"
-          , Profiling `wayUnit` way          ? arg "-DPROFILING"
-          , Threaded  `wayUnit` way          ? arg "-DTHREADED_RTS"
+
+          , useLibFFIForAdjustors            ? arg "-DUSE_LIBFFI_FOR_ADJUSTORS"
 
           , inputs ["**/RtsMessages.c", "**/Trace.c"] ?
             arg ("-DProjectVersion=" ++ show projectVersion)
@@ -276,17 +287,17 @@ rtsPackageArgs = package rts ? do
             , inputs ["**/Compact.c"] ? arg "-Wno-inline"
 
             -- emits warnings about call-clobbered registers on x86_64
-            , inputs [ "**/RetainerProfile.c", "**/StgCRun.c"
+            , inputs [ "**/StgCRun.c"
                      , "**/win32/ConsoleHandler.c", "**/win32/ThrIOManager.c"] ? arg "-w"
             -- The above warning suppression flags are a temporary kludge.
             -- While working on this module you are encouraged to remove it and fix
             -- any warnings in the module. See:
             -- https://gitlab.haskell.org/ghc/ghc/wikis/working-conventions#Warnings
 
-            , (not <$> flag GccIsClang) ?
+            , (not <$> flag CcLlvmBackend) ?
               inputs ["**/Compact.c"] ? arg "-finline-limit=2500"
 
-            , input "**/RetainerProfile.c" ? flag GccIsClang ?
+            , input "**/RetainerProfile.c" ? flag CcLlvmBackend ?
               arg "-Wno-incompatible-pointer-types"
 
             -- libffi's ffi.h triggers various warnings
@@ -305,13 +316,14 @@ rtsPackageArgs = package rts ? do
           ]
         , builder (Cc FindCDependencies) ? cArgs
         , builder (Ghc CompileCWithGhc) ? map ("-optc" ++) <$> cArgs
-        , builder Ghc ? arg "-Irts"
+        , builder Ghc ? ghcArgs
 
           , builder HsCpp ? pure
           [ "-DTOP="             ++ show top
           , "-DFFI_INCLUDE_DIR=" ++ show ffiIncludeDir
           , "-DFFI_LIB_DIR="     ++ show ffiLibraryDir
-          , "-DFFI_LIB="         ++ show libffiName ]
+          , "-DFFI_LIB="         ++ show libffiName
+          , "-DLIBDW_LIB_DIR="     ++ show libdwLibraryDir ]
 
         , builder HsCpp ? flag HaveLibMingwEx ? arg "-DHAVE_LIBMINGWEX" ]
 

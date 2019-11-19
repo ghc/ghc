@@ -1,0 +1,6 @@
+:set -fbreak-on-error
+error "abc"
+:steplocal
+:l T14690.hs
+foo
+:steplocal

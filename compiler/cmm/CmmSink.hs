@@ -13,7 +13,7 @@ import Hoopl.Block
 import Hoopl.Label
 import Hoopl.Collections
 import Hoopl.Graph
-import CodeGen.Platform
+import GHC.Platform.Regs
 import GHC.Platform (isARM, platformArch)
 
 import DynFlags
@@ -565,7 +565,7 @@ regsUsedIn ls e = wrapRecExpf f e False
 -- clashing with C argument-passing registers, really the back-end
 -- ought to be able to handle it properly, but currently neither PprC
 -- nor the NCG can do it.  See Note [Register parameter passing]
--- See also StgCmmForeign:load_args_into_temps.
+-- See also GHC.StgToCmm.Foreign.load_args_into_temps.
 okToInline :: DynFlags -> CmmExpr -> CmmNode e x -> Bool
 okToInline dflags expr node@(CmmUnsafeForeignCall{}) =
     not (globalRegistersConflict dflags expr node)

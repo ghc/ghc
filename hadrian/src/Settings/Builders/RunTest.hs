@@ -75,6 +75,8 @@ runTestBuilderArgs = builder RunTest ? do
     (acceptPlatform, acceptOS) <- expr . liftIO $
         (,) <$> (maybe False (=="YES") <$> lookupEnv "PLATFORM")
             <*> (maybe False (=="YES") <$> lookupEnv "OS")
+    (testEnv, testMetricsFile) <- expr . liftIO $
+        (,) <$> lookupEnv "TEST_ENV" <*> lookupEnv "METRICS_FILE"
 
     threads     <- shakeThreads <$> expr getShakeOptions
     os          <- getTestSetting TestHostOS
@@ -94,7 +96,8 @@ runTestBuilderArgs = builder RunTest ? do
     -- See #16087
     let ghcBuiltByLlvm = False -- TODO: Implement this check
 
-    let asZeroOne s b = s ++ zeroOne b
+    let asBool :: String -> Bool -> String
+        asBool s b = s ++ show b
 
     -- TODO: set CABAL_MINIMAL_BUILD/CABAL_PLUGIN_BUILD
     mconcat [ arg $ "testsuite/driver/runtests.py"
@@ -109,18 +112,18 @@ runTestBuilderArgs = builder RunTest ? do
             , arg "-e", arg $ "config.exeext=" ++ quote exe
             , arg "-e", arg $ "config.compiler_debugged=" ++
               show debugged
-            , arg "-e", arg $ asZeroOne "ghc_with_native_codegen=" withNativeCodeGen
+            , arg "-e", arg $ asBool "ghc_with_native_codegen=" withNativeCodeGen
 
             , arg "-e", arg $ "config.have_interp=" ++ show withInterpreter
             , arg "-e", arg $ "config.unregisterised=" ++ show unregisterised
 
             , arg "-e", arg $ "ghc_compiler_always_flags=" ++ quote ghcFlags
-            , arg "-e", arg $ asZeroOne "ghc_with_dynamic_rts="  (hasRtsWay "dyn")
-            , arg "-e", arg $ asZeroOne "ghc_with_threaded_rts=" (hasRtsWay "thr")
-            , arg "-e", arg $ asZeroOne "config.have_vanilla="   (hasLibWay vanilla)
-            , arg "-e", arg $ asZeroOne "config.have_dynamic="   (hasLibWay dynamic)
-            , arg "-e", arg $ asZeroOne "config.have_profiling=" (hasLibWay profiling)
-            , arg "-e", arg $ asZeroOne "ghc_with_smp=" withSMP
+            , arg "-e", arg $ asBool "ghc_with_dynamic_rts="  (hasRtsWay "dyn")
+            , arg "-e", arg $ asBool "ghc_with_threaded_rts=" (hasRtsWay "thr")
+            , arg "-e", arg $ asBool "config.have_vanilla="   (hasLibWay vanilla)
+            , arg "-e", arg $ asBool "config.have_dynamic="   (hasLibWay dynamic)
+            , arg "-e", arg $ asBool "config.have_profiling=" (hasLibWay profiling)
+            , arg "-e", arg $ asBool "ghc_with_smp=" withSMP
             , arg "-e", arg $ "ghc_with_llvm=0" -- TODO: support LLVM
 
             , arg "-e", arg $ "config.ghc_dynamic_by_default=" ++ show hasDynamicByDefault
@@ -137,8 +140,13 @@ runTestBuilderArgs = builder RunTest ? do
             , arg "--config", arg $ "timeout_prog=" ++ show (top -/- timeoutProg)
             , arg "--config", arg $ "stats_files_dir=" ++ statsFilesDir
             , arg $ "--threads=" ++ show threads
+            , emitWhenSet testEnv $ \env -> arg ("--test-env=" ++ show env)
+            , emitWhenSet testMetricsFile $ \file -> arg ("--metrics-file=" ++ file)
             , getTestArgs -- User-provided arguments from command line.
             ]
+
+      where emitWhenSet Nothing  _ = mempty
+            emitWhenSet (Just v) f = f v
 
 -- | Command line arguments for running GHC's test script.
 getTestArgs :: Args

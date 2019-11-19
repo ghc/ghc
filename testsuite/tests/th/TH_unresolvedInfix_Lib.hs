@@ -11,8 +11,8 @@ infixl 6 :+
 infixl 7 :*
 
 data Tree = N
-  | Tree :+ Tree 
-  | Tree :* Tree 
+  | Tree :+ Tree
+  | Tree :* Tree
 
 -- custom instance, including redundant parentheses
 instance Show Tree where
@@ -73,8 +73,6 @@ p12 = mkQQ ( (p ^+? p) ^*! (p ^+? p) )
 p13 = mkQQ ( ((parensP ((p ^+? p) ^*? p)) ^+? p) ^*? p )
 p14 = mkQQ ( (parensP (p ^+? p)) ^*? (parensP (p ^+? p)) )
 p15 = mkQQ ( parensP ((p ^+? p) ^*? (p ^+? p)) )
--------------- Dropping constructors
-p16 = mkQQ ( p ^*? (tupP [p ^+? p]) )
 
 --------------------------------------------------------------------------------
 --                                  Types                                     --

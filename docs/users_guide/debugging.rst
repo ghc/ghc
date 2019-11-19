@@ -369,16 +369,22 @@ STG representation
 These flags dump various phases of GHC's STG pipeline.
 
 .. ghc-flag:: -ddump-stg
-    :shortdesc: Dump final STG
+    :shortdesc: Show CoreToStg output
     :type: dynamic
 
-    Dump output of STG-to-STG passes
+    Show the output of CoreToStg pass.
 
 .. ghc-flag:: -dverbose-stg2stg
     :shortdesc: Show output from each STG-to-STG pass
     :type: dynamic
 
     Show the output of the intermediate STG-to-STG pass. (*lots* of output!)
+
+.. ghc-flag:: -ddump-stg-unarised
+    :shortdesc: Show unarised STG
+    :type: dynamic
+
+    Show the output of the unarise pass.
 
 .. ghc-flag:: -ddump-stg-final
     :shortdesc: Show output of last STG pass.
@@ -408,7 +414,7 @@ These flags dump various phases of GHC's C-\\- pipeline.
     :shortdesc: Write output from main C-\\- pipeline passes to files
     :type: dynamic
 
-    If used in conjunction with `-ddump-to-file`, writes dump
+    If used in conjunction with :ghc-flag:`-ddump-to-file`, writes dump
     output from main C-\\- pipeline stages to files (each stage per file).
 
 .. ghc-flag:: -ddump-cmm-from-stg
@@ -885,3 +891,15 @@ Checking for determinism
       generates in decreasing order
     * ``-dinitial-unique=1 -dunique-increment=PRIME`` - where PRIME big enough
       to overflow often - nonsequential order
+
+Other
+-----
+
+.. ghc-flag:: -dno-typeable-binds
+    :shortdesc: Don't generate bindings for Typeable methods
+    :type: dynamic
+
+    This avoid generating Typeable-related bindings for modules and types. This
+    is useful when debugging because it gives smaller modules and dumps, but the
+    compiler will panic if you try to use Typeable instances of things that you
+    built with this flag.

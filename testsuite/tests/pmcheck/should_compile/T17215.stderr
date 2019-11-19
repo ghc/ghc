@@ -1,0 +1,8 @@
+
+T17215.hs:12:5: warning: [-Wincomplete-patterns (in -Wextra)]
+    Pattern match(es) are non-exhaustive
+    In an equation for ‘bir’: Patterns not matched: True
+
+T17215.hs:34:7: warning: [-Wincomplete-patterns (in -Wextra)]
+    Pattern match(es) are non-exhaustive
+    In an equation for ‘boz’: Patterns not matched: True

@@ -165,3 +165,7 @@ StarBinderAnns:
 .PHONY: T16279
 T16279:
 	$(CHECK_API_ANNOTATIONS) "`'$(TEST_HC)' $(TEST_HC_OPTS) --print-libdir | tr -d '\r'`" Test16279.hs
+
+.PHONY: T17388
+T17388:
+	$(CHECK_API_ANNOTATIONS) "`'$(TEST_HC)' $(TEST_HC_OPTS) --print-libdir | tr -d '\r'`" Test17388.hs

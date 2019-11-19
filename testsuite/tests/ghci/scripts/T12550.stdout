@@ -11,12 +11,14 @@ f ∷ ∀ {a ∷ ★ → ★} {b}. C a ⇒ a b
 f ∷ ∀ {a ∷ ★ → ★} {b}. C a ⇒ a b
 f ∷ ∀ {a ∷ ★ → ★} {b}. C a ⇒ a b
 fmap ∷ ∀ {f ∷ ★ → ★} {a} {b}. Functor f ⇒ (a → b) → f a → f b
-class Functor (f ∷ ★ → ★) where
+type Functor :: (★ → ★) → Constraint
+class Functor f where
   fmap ∷ ∀ a b. (a → b) → f a → f b
   ...
   	-- Defined in ‘GHC.Base’
 Functor ∷ (★ → ★) → Constraint
-class Functor (f ∷ ★ → ★) where
+type Functor :: (★ → ★) → Constraint
+class Functor f where
   fmap ∷ ∀ a b. (a → b) → f a → f b
   (<$) ∷ ∀ a b. a → f b → f a
   {-# MINIMAL fmap #-}
@@ -51,12 +53,15 @@ instance Functor [] -- Defined in ‘GHC.Base’
 instance Functor Maybe -- Defined in ‘GHC.Base’
 instance Functor IO -- Defined in ‘GHC.Base’
 instance ∀ r. Functor ((->) r) -- Defined in ‘GHC.Base’
+instance ∀ a b c. Functor ((,,,) a b c) -- Defined in ‘GHC.Base’
+instance ∀ a b. Functor ((,,) a b) -- Defined in ‘GHC.Base’
 instance ∀ a. Functor ((,) a) -- Defined in ‘GHC.Base’
 datatypeName
   ∷ ∀ {d} {t ∷ ★ → (★ → ★) → ★ → ★} {f ∷ ★ → ★} {a}.
     Datatype d ⇒
     t d f a → [Char]
-class Datatype (d ∷ k) where
+type Datatype :: ∀ {k}. k → Constraint
+class Datatype d where
   datatypeName ∷ ∀ k1 (t ∷ k → (k1 → ★) → k1 → ★) (f ∷ k1 → ★)
                    (a ∷ k1).
                  t d f a → [Char]

@@ -8,7 +8,6 @@
 --
 -----------------------------------------------------------------------------
 #include "HsVersions.h"
-#include "nativeGen/NCG.h"
 
 module SPARC.Instr (
         RI(..),
@@ -40,7 +39,7 @@ import Reg
 import Format
 
 import CLabel
-import CodeGen.Platform
+import GHC.Platform.Regs
 import BlockId
 import DynFlags
 import Cmm

@@ -33,7 +33,7 @@ where
 
 import GhcPrelude
 
-import HsSyn
+import GHC.Hs
 import RdrName
 import HscTypes
 import TcEnv
@@ -458,6 +458,7 @@ checkTupSize tup_size
 --          Merge TcType.UserTypeContext in to it.
 data HsDocContext
   = TypeSigCtx SDoc
+  | StandaloneKindSigCtx SDoc
   | PatCtx
   | SpecInstSigCtx
   | DefaultDeclCtx
@@ -487,6 +488,7 @@ inHsDocContext ctxt = text "In" <+> pprHsDocContext ctxt
 pprHsDocContext :: HsDocContext -> SDoc
 pprHsDocContext (GenericCtx doc)      = doc
 pprHsDocContext (TypeSigCtx doc)      = text "the type signature for" <+> doc
+pprHsDocContext (StandaloneKindSigCtx doc) = text "the standalone kind signature for" <+> doc
 pprHsDocContext PatCtx                = text "a pattern type-signature"
 pprHsDocContext SpecInstSigCtx        = text "a SPECIALISE instance pragma"
 pprHsDocContext DefaultDeclCtx        = text "a `default' declaration"

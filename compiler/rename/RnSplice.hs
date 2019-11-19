@@ -16,7 +16,7 @@ import GhcPrelude
 
 import Name
 import NameSet
-import HsSyn
+import GHC.Hs
 import RdrName
 import TcRnMonad
 

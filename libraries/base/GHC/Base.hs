@@ -130,7 +130,7 @@ import GHC.Prim
 import GHC.Prim.Ext
 import GHC.Err
 import GHC.Maybe
-import {-# SOURCE #-} GHC.IO (failIO,mplusIO)
+import {-# SOURCE #-} GHC.IO (mkUserError, mplusIO)
 
 import GHC.Tuple ()              -- Note [Depend on GHC.Tuple]
 import GHC.Integer ()            -- Note [Depend on GHC.Integer]
@@ -221,6 +221,9 @@ infixr 6 <>
 -- @since 4.9.0.0
 class Semigroup a where
         -- | An associative operation.
+        --
+        -- >>> [1,2,3] <> [4,5,6]
+        -- [1,2,3,4,5,6]
         (<>) :: a -> a -> a
 
         -- | Reduce a non-empty list with '<>'
@@ -228,6 +231,9 @@ class Semigroup a where
         -- The default definition should be sufficient, but this can be
         -- overridden for efficiency.
         --
+        -- >>> import Data.List.NonEmpty
+        -- >>> sconcat $ "Hello" :| [" ", "Haskell", "!"]
+        -- "Hello Haskell!"
         sconcat :: NonEmpty a -> a
         sconcat (a :| as) = go a as where
           go b (c:cs) = b <> go c cs
@@ -243,6 +249,9 @@ class Semigroup a where
         -- and monoids can upgrade this to execute in \(\mathcal{O}(1)\) by
         -- picking @stimes = 'Data.Semigroup.stimesIdempotent'@ or @stimes =
         -- 'stimesIdempotentMonoid'@ respectively.
+        --
+        -- >>> stimes 4 [1]
+        -- [1,1,1,1]
         stimes :: Integral b => b -> a -> a
         stimes = stimesDefault
 
@@ -266,6 +275,9 @@ class Semigroup a where
 -- __NOTE__: 'Semigroup' is a superclass of 'Monoid' since /base-4.11.0.0/.
 class Semigroup a => Monoid a where
         -- | Identity of 'mappend'
+        --
+        -- >>> "Hello world" <> mempty
+        -- "Hello world"
         mempty  :: a
 
         -- | An associative operation
@@ -284,6 +296,9 @@ class Semigroup a => Monoid a where
         -- For most types, the default definition for 'mconcat' will be
         -- used, but the function is included in the class definition so
         -- that an optimized version can be provided for specific types.
+        --
+        -- >>> mconcat ["Hello", " ", "Haskell", "!"]
+        -- "Hello Haskell!"
         mconcat :: [a] -> a
         mconcat = foldr mappend mempty
 
@@ -436,6 +451,32 @@ instance Monoid a => Applicative ((,) a) where
 -- | @since 4.9.0.0
 instance Monoid a => Monad ((,) a) where
     (u, a) >>= k = case k a of (v, b) -> (u <> v, b)
+
+-- | @since 4.14.0.0
+instance Functor ((,,) a b) where
+    fmap f (a, b, c) = (a, b, f c)
+
+-- | @since 4.14.0.0
+instance (Monoid a, Monoid b) => Applicative ((,,) a b) where
+    pure x = (mempty, mempty, x)
+    (a, b, f) <*> (a', b', x) = (a <> a', b <> b', f x)
+
+-- | @since 4.14.0.0
+instance (Monoid a, Monoid b) => Monad ((,,) a b) where
+    (u, v, a) >>= k = case k a of (u', v', b) -> (u <> u', v <> v', b)
+
+-- | @since 4.14.0.0
+instance Functor ((,,,) a b c) where
+    fmap f (a, b, c, d) = (a, b, c, f d)
+
+-- | @since 4.14.0.0
+instance (Monoid a, Monoid b, Monoid c) => Applicative ((,,,) a b c) where
+    pure x = (mempty, mempty, mempty, x)
+    (a, b, c, f) <*> (a', b', c', x) = (a <> a', b <> b', c <> c', f x)
+
+-- | @since 4.14.0.0
+instance (Monoid a, Monoid b, Monoid c) => Monad ((,,,) a b c) where
+    (u, v, w, a) >>= k = case k a of (u', v', w', b) -> (u <> u', v <> v', w <> w', b)
 
 -- | @since 4.10.0.0
 instance Semigroup a => Semigroup (IO a) where
@@ -1311,6 +1352,7 @@ otherwise               =  True
 -- | A 'String' is a list of characters.  String constants in Haskell are values
 -- of type 'String'.
 --
+-- See "Data.List" for operations on lists.
 type String = [Char]
 
 unsafeChr :: Int -> Char
@@ -1489,6 +1531,13 @@ bindIO (IO m) k = IO (\ s -> case m s of (# new_s, a #) -> unIO (k a) new_s)
 
 thenIO :: IO a -> IO b -> IO b
 thenIO (IO m) k = IO (\ s -> case m s of (# new_s, _ #) -> unIO k new_s)
+
+-- Note that it is import that we do not SOURCE import this as
+-- its demand signature encodes knowledge of its bottoming
+-- behavior, which can expose useful simplifications. See
+-- #16588.
+failIO :: String -> IO a
+failIO s = IO (raiseIO# (mkUserError s))
 
 unIO :: IO a -> (State# RealWorld -> (# State# RealWorld, a #))
 unIO (IO a) = a

@@ -18,14 +18,18 @@ FP_GMP
 dnl Various things from the source distribution configure
 bootstrap_target=@TargetPlatform@
 
-HaskellHaveRTSLinker=@HaskellHaveRTSLinker@
-AC_SUBST(HaskellHaveRTSLinker)
+TargetHasRTSLinker=@TargetHasRTSLinker@
+AC_SUBST(TargetHasRTSLinker)
 
 FFIIncludeDir=@FFIIncludeDir@
 FFILibDir=@FFILibDir@
 AC_SUBST(FFILibDir)
 AC_SUBST(FFIIncludeDir)
 
+LibdwIncludeDir=@LibdwIncludeDir@
+LibdwLibDir=@LibdwLibDir@
+AC_SUBST(LibdwLibDir)
+AC_SUBST(LibdwIncludeDir)
 
 # We have to run these unconditionally as FPTOOLS_SET_PLATFORM_VARS wants the
 # values it computes.
@@ -42,10 +46,12 @@ FP_FIND_ROOT
 CrossCompiling=NO
 CrossCompilePrefix=""
 TargetPlatformFull="${target}"
+TablesNextToCode="@TablesNextToCode@"
 
 AC_SUBST(CrossCompiling)
 AC_SUBST(CrossCompilePrefix)
 AC_SUBST(TargetPlatformFull)
+AC_SUBST(TablesNextToCode)
 
 Unregisterised="@Unregisterised@"
 AC_SUBST(Unregisterised)

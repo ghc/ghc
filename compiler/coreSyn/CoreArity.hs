@@ -30,6 +30,7 @@ import VarEnv
 import Id
 import Type
 import TyCon    ( initRecTc, checkRecTc )
+import Predicate ( isDictTy )
 import Coercion
 import BasicTypes
 import Unique
@@ -517,7 +518,7 @@ mk_cheap_fn dflags cheap_app
   = \e mb_ty -> exprIsCheapX cheap_app e
              || case mb_ty of
                   Nothing -> False
-                  Just ty -> isDictLikeTy ty
+                  Just ty -> isDictTy ty
 
 
 ----------------------
@@ -623,9 +624,6 @@ The (foo DInt) is floated out, and makes ineffective a RULE
 
 One could go further and make exprIsCheap reply True to any
 dictionary-typed expression, but that's more work.
-
-See Note [Dictionary-like types] in TcType.hs for why we use
-isDictLikeTy here rather than isDictTy
 
 Note [Eta expanding thunks]
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~
@@ -883,7 +881,7 @@ inside the RHS of the join as well as into the body.  AND if j
 has an unfolding we have to push it into there too.  AND j might
 be recursive...
 
-So for now I'm abandonig the no-crap rule in this case. I think
+So for now I'm abandoning the no-crap rule in this case. I think
 that for the use in CorePrep it really doesn't matter; and if
 it does, then CoreToStg.myCollectArgs will fall over.
 

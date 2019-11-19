@@ -27,10 +27,11 @@ module TcSigs(
 
 import GhcPrelude
 
-import HsSyn
+import GHC.Hs
 import TcHsType
 import TcRnTypes
 import TcRnMonad
+import TcOrigin
 import TcType
 import TcMType
 import TcValidity ( checkValidType )
@@ -396,7 +397,7 @@ tcPatSynSig name sig_ty
                                                  req ex_tvs prov body_ty
 
        -- Kind generalisation
-       ; kvs <- kindGeneralize ungen_patsyn_ty
+       ; kvs <- kindGeneralizeAll ungen_patsyn_ty
        ; traceTc "tcPatSynSig" (ppr ungen_patsyn_ty)
 
        -- These are /signatures/ so we zonk to squeeze out any kind
@@ -765,7 +766,7 @@ tcSpecPrag poly_id prag@(SpecSig _ fun_name hs_tys inl)
   where
     name      = idName poly_id
     poly_ty   = idType poly_id
-    spec_ctxt prag = hang (text "In the SPECIALISE pragma") 2 (ppr prag)
+    spec_ctxt prag = hang (text "In the pragma:") 2 (ppr prag)
 
     tc_one hs_ty
       = do { spec_ty <- tcHsSigType   (FunSigCtxt name False) hs_ty

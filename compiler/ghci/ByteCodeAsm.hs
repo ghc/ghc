@@ -29,7 +29,7 @@ import NameSet
 import Literal
 import TyCon
 import FastString
-import StgCmmLayout     ( ArgRep(..) )
+import GHC.StgToCmm.Layout     ( ArgRep(..) )
 import SMRep
 import DynFlags
 import Outputable

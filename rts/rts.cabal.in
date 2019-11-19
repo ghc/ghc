@@ -1,4 +1,4 @@
-cabal-version: 2.5
+cabal-version: 3.0
 name: rts
 version: 1.0
 license: BSD-3-Clause
@@ -124,6 +124,7 @@ library
 
     include-dirs: build ../includes includes
                   includes/dist-derivedconstants/header @FFIIncludeDir@
+                  @LibdwIncludeDir@
     includes: Stg.h
     install-includes: Cmm.h HsFFI.h MachDeps.h Rts.h RtsAPI.h Stg.h
                       ghcautoconf.h ghcconfig.h ghcplatform.h ghcversion.h
@@ -148,6 +149,7 @@ library
                       rts/Linker.h
                       rts/Main.h
                       rts/Messages.h
+                      rts/NonMoving.h
                       rts/OSThreads.h
                       rts/Parallel.h
                       rts/PrimFloat.h
@@ -177,12 +179,11 @@ library
                       rts/storage/MBlock.h
                       rts/storage/TSO.h
                       stg/DLL.h
-                      stg/HaskellMachRegs.h
                       stg/MachRegs.h
+                      stg/MachRegsForHost.h
                       stg/MiscClosures.h
                       stg/Prim.h
                       stg/Regs.h
-                      stg/RtsMachRegs.h
                       stg/SMP.h
                       stg/Ticky.h
                       stg/Types.h
@@ -395,7 +396,7 @@ library
 
     if arch(i386) || arch(powerpc) || arch(powerpc64)
        asm-sources: AdjustorAsm.S
-    if arch(powerpc) || arch(powerpc64) || arch(powerpc64le)
+    if arch(powerpc) || arch(powerpc64) || arch(powerpc64le) || arch(s390x)
        asm-sources: StgCRunAsm.S
 
     c-sources: Adjustor.c
@@ -455,6 +456,7 @@ library
                Timer.c
                TopHandler.c
                Trace.c
+               TraverseHeap.c
                WSDeque.c
                Weak.c
                eventlog/EventLog.c
@@ -489,6 +491,12 @@ library
                sm/GCUtils.c
                sm/MBlock.c
                sm/MarkWeak.c
+               sm/NonMoving.c
+               sm/NonMovingCensus.c
+               sm/NonMovingMark.c
+               sm/NonMovingScav.c
+               sm/NonMovingShortcut.c
+               sm/NonMovingSweep.c
                sm/Sanity.c
                sm/Scav.c
                sm/Scav_thr.c

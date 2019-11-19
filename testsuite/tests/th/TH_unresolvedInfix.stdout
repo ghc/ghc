@@ -19,8 +19,6 @@
 ((N :+ (N :* N)) :+ N)
 ((N :+ N) :+ N)
 (N :+ (N :+ N))
-(N :* (N :+ N))
-True
 True
 True
 True

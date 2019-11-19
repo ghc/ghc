@@ -16,7 +16,7 @@ checker.
 
 module TcHsSyn (
         -- * Extracting types from HsSyn
-        hsLitType, hsLPatType, hsPatType,
+        hsLitType, hsPatType, hsLPatType,
 
         -- * Other HsSyn functions
         mkHsDictLet, mkHsApp,
@@ -48,9 +48,10 @@ module TcHsSyn (
 
 import GhcPrelude
 
-import HsSyn
+import GHC.Hs
 import Id
 import IdInfo
+import Predicate
 import TcRnMonad
 import PrelNames
 import BuildTyCl ( TcMethInfo, MethInfo )
@@ -58,6 +59,7 @@ import TcType
 import TcMType
 import TcEnv   ( tcLookupGlobalOnly )
 import TcEvidence
+import TyCoPpr ( pprTyVar )
 import TysPrim
 import TyCon
 import TysWiredIn
@@ -96,8 +98,8 @@ import Control.Arrow ( second )
 
 -}
 
-hsLPatType :: OutPat GhcTc -> Type
-hsLPatType lpat = hsPatType (unLoc lpat)
+hsLPatType :: LPat GhcTc -> Type
+hsLPatType (dL->L _ p) = hsPatType p
 
 hsPatType :: Pat GhcTc -> Type
 hsPatType (ParPat _ pat)                = hsLPatType pat
@@ -110,7 +112,8 @@ hsPatType (AsPat _ var _)               = idType (unLoc var)
 hsPatType (ViewPat ty _ _)              = ty
 hsPatType (ListPat (ListPatTc ty Nothing) _)      = mkListTy ty
 hsPatType (ListPat (ListPatTc _ (Just (ty,_))) _) = ty
-hsPatType (TuplePat tys _ bx)           = mkTupleTy bx tys
+hsPatType (TuplePat tys _ bx)           = mkTupleTy1 bx tys
+                  -- See Note [Don't flatten tuples from HsSyn] in MkCore
 hsPatType (SumPat tys _ _ _ )           = mkSumTy tys
 hsPatType (ConPatOut { pat_con = lcon
                      , pat_arg_tys = tys })
@@ -119,7 +122,9 @@ hsPatType (SigPat ty _ _)               = ty
 hsPatType (NPat ty _ _ _)               = ty
 hsPatType (NPlusKPat ty _ _ _ _ _)      = ty
 hsPatType (CoPat _ _ _ ty)              = ty
-hsPatType p                             = pprPanic "hsPatType" (ppr p)
+hsPatType (XPat n)                      = noExtCon n
+hsPatType ConPatIn{}                    = panic "hsPatType: ConPatIn"
+hsPatType SplicePat{}                   = panic "hsPatType: SplicePat"
 
 hsLitType :: HsLit (GhcPass p) -> TcType
 hsLitType (HsChar _ _)       = charTy
@@ -959,7 +964,8 @@ zonkExpr env (HsWrap x co_fn expr)
        new_expr <- zonkExpr env1 expr
        return (HsWrap x new_co_fn new_expr)
 
-zonkExpr _ e@(HsUnboundVar {}) = return e
+zonkExpr _ e@(HsUnboundVar {})
+  = return e
 
 zonkExpr _ expr = pprPanic "zonkExpr" (ppr expr)
 
@@ -1257,17 +1263,18 @@ zonkStmt env _zBody (ApplicativeStmt body_ty args mb_join)
   = do  { (env1, new_mb_join)   <- zonk_join env mb_join
         ; (env2, new_args)      <- zonk_args env1 args
         ; new_body_ty           <- zonkTcTypeToTypeX env2 body_ty
-        ; return (env2, ApplicativeStmt new_body_ty new_args new_mb_join) }
+        ; return ( env2
+                 , ApplicativeStmt new_body_ty new_args new_mb_join) }
   where
     zonk_join env Nothing  = return (env, Nothing)
     zonk_join env (Just j) = second Just <$> zonkSyntaxExpr env j
 
-    get_pat (_, ApplicativeArgOne _ pat _ _) = pat
+    get_pat (_, ApplicativeArgOne _ pat _ _ _) = pat
     get_pat (_, ApplicativeArgMany _ _ _ pat) = pat
     get_pat (_, XApplicativeArg nec) = noExtCon nec
 
-    replace_pat pat (op, ApplicativeArgOne x _ a isBody)
-      = (op, ApplicativeArgOne x pat a isBody)
+    replace_pat pat (op, ApplicativeArgOne x _ a isBody fail_op)
+      = (op, ApplicativeArgOne x pat a isBody fail_op)
     replace_pat pat (op, ApplicativeArgMany x a b _)
       = (op, ApplicativeArgMany x a b pat)
     replace_pat _ (_, XApplicativeArg nec) = noExtCon nec
@@ -1287,9 +1294,10 @@ zonkStmt env _zBody (ApplicativeStmt body_ty args mb_join)
            ; return (env2, (new_op, new_arg) : new_args) }
     zonk_args_rev env [] = return (env, [])
 
-    zonk_arg env (ApplicativeArgOne x pat expr isBody)
+    zonk_arg env (ApplicativeArgOne x pat expr isBody fail_op)
       = do { new_expr <- zonkLExpr env expr
-           ; return (ApplicativeArgOne x pat new_expr isBody) }
+           ; (_, new_fail) <- zonkSyntaxExpr env fail_op
+           ; return (ApplicativeArgOne x pat new_expr isBody new_fail) }
     zonk_arg env (ApplicativeArgMany x stmts ret pat)
       = do { (env1, new_stmts) <- zonkStmts env zonkLExpr stmts
            ; new_ret           <- zonkExpr env1 ret

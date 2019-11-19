@@ -18,7 +18,7 @@ import Hadrian.Utilities
 
 -- | Sphinx can be used in three different modes to convert reStructuredText
 -- documents into HTML, LaTeX or Man pages.
-data SphinxMode = Html | Latex | Man deriving (Eq, Generic, Show)
+data SphinxMode = Info | Html | Latex | Man deriving (Eq, Generic, Show)
 
 instance Binary   SphinxMode
 instance Hashable SphinxMode
@@ -30,10 +30,13 @@ args mode = do
     outPath <- getOutput
     mconcat [ arg "-b", arg modeString
             , arg "-d", arg $ outPath -/- (".doctrees-" ++ modeString)
+            , arg "-n" -- nit-picky mode to ensure missing references are caught
+            , arg "-w", arg $ outPath -/- ".log" -- dump warnings to log file
             , arg =<< getInput
             , arg outPath ]
   where
     modeString = case mode of
+        Info  -> "texinfo"
         Html  -> "html"
         Latex -> "latex"
         Man   -> "man"

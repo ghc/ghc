@@ -10,16 +10,11 @@ setTestOpts(f)
 setTestOpts(req_interp)
 # TH should work with -fexternal-interpreter too
 if config.have_ext_interp :
-       setTestOpts(extra_ways(['ext-interp']))
-       setTestOpts(only_ways(['normal','ghci','ext-interp']))
+     setTestOpts(extra_ways(['ext-interp']))
+     setTestOpts(only_ways(['normal','ghci','ext-interp']))
 
-broken_tests = ["ClosedFam1TH","T10620","T10828","T11721_TH","T11797","T12045TH2","T12478_1","T12646","T13642","T14060","T15502","T15738","T15792","T15845","T16180","T1835","T3920","T4135","T4188","T5037","T5362","T7477","T7910","T8761","T8884","T8953","T9262","T9692","T9738","TH_Lift","TH_RichKinds","TH_RichKinds2","TH_Roles3","TH_TyInstWhere2","TH_implicitParams","TH_recursiveDo","TH_reifyDecl1","TH_reifyExplicitForAllFams","TH_reifyInstances","TH_reifyMkName","TH_repE2","TH_repGuard","TH_repPrim","TH_repPrim2","TH_repUnboxedTuples","TH_spliceE6","T16326_TH"]
-# ext-interp, integer-gmp and llvm is broken see #16087
-def broken_ext_interp(name, opts):
-	if name in broken_tests and config.ghc_built_by_llvm:
-		expect_broken_for(16087, ['ext-interp'])(name, opts)
-
-setTestOpts(broken_ext_interp)
+     if llvm_build():
+         setTestOpts(fragile_for(16087, ['ext-interp']))
 
 test('TH_mkName', normal, compile, ['-v0'])
 test('TH_overloadedlabels', normal, compile, ['-v0'])
@@ -107,7 +102,8 @@ test('TH_spliceE3', normal, compile, ['-v0'])
 test('TH_spliceE4', normal, compile_and_run, [''])
 
 test('TH_class1', normal, compile, ['-v0'])
-test('TH_tuple1', normal, compile, ['-v0'])
+test('TH_tuple1', [], multimod_compile_and_run,
+    ['TH_tuple1', '-v0 ' + config.ghc_th_way_flags])
 test('TH_genEx', [], multimod_compile,
      ['TH_genEx', '-v0 ' + config.ghc_th_way_flags])
 
@@ -155,8 +151,7 @@ test('T3177a', normal, compile_fail, ['-v0'])
 
 test('T3319', normal, compile, ['-ddump-splices -v0'])
 test('TH_foreignInterruptible',
-     # Fragile when unregisterised; see #16085
-     when(unregisterised(), skip),
+     when(unregisterised(), fragile(16085)),
      compile, ['-ddump-splices -v0'])
 test('TH_foreignCallingConventions', normal,
                                      compile,
@@ -480,6 +475,7 @@ test('T16293b', normal, compile, [''])
 test('T16326_TH', normal, compile, ['-v0 -ddump-splices -dsuppress-uniques'])
 test('T14741', normal, compile_and_run, [''])
 test('T16666', normal, compile, ['-v0 -ddump-splices -dsuppress-uniques'])
+test('T16881', normal, compile_and_run, [''])
 test('T16895a', normal, compile_fail, [''])
 test('T16895b', normal, compile_fail, [''])
 test('T16895c', normal, compile_fail, [''])
@@ -488,3 +484,11 @@ test('T16895e', normal, compile_fail, [''])
 test('T16976', normal, compile, [''])
 test('T16976f', normal, compile_fail, [''])
 test('T16976z', normal, compile_fail, [''])
+test('T16980', normal, compile, [''])
+test('T16980a', normal, compile_fail, [''])
+test('T17296', normal, compile, ['-v0'])
+test('T17380', normal, compile_fail, [''])
+test('T17394', normal, compile, ['-v0 -ddump-splices -dsuppress-uniques'])
+test('T17379a', normal, compile_fail, [''])
+test('T17379b', normal, compile_fail, [''])
+test('T17461', normal, compile, ['-v0 -ddump-splices -dsuppress-uniques'])

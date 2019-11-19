@@ -15,6 +15,7 @@
 #include "RaiseAsync.h"
 #include "Trace.h"
 #include "Threads.h"
+#include "sm/NonMovingMark.h"
 
 #include <string.h> // for memmove()
 
@@ -243,6 +244,9 @@ threadPaused(Capability *cap, StgTSO *tso)
 
             bh = ((StgUpdateFrame *)frame)->updatee;
             bh_info = bh->header.info;
+            IF_NONMOVING_WRITE_BARRIER_ENABLED {
+                updateRemembSetPushClosure(cap, (StgClosure *) bh);
+            }
 
 #if defined(THREADED_RTS)
         retry:
@@ -333,6 +337,18 @@ threadPaused(Capability *cap, StgTSO *tso)
                 goto retry;
             }
 #endif
+
+            IF_NONMOVING_WRITE_BARRIER_ENABLED {
+                if (ip_THUNK(INFO_PTR_TO_STRUCT(bh_info))) {
+                    // We are about to replace a thunk with a blackhole.
+                    // Add the free variables of the closure we are about to
+                    // overwrite to the update remembered set.
+                    // N.B. We caught the WHITEHOLE case above.
+                    updateRemembSetPushThunkEager(cap,
+                                                 THUNK_INFO_PTR_TO_STRUCT(bh_info),
+                                                 (StgThunk *) bh);
+                }
+            }
 
             // The payload of the BLACKHOLE points to the TSO
             ((StgInd *)bh)->indirectee = (StgClosure *)tso;

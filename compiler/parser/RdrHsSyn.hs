@@ -6,6 +6,7 @@
 
 {-# LANGUAGE CPP #-}
 {-# LANGUAGE FlexibleContexts #-}
+{-# LANGUAGE FlexibleInstances #-}
 {-# LANGUAGE TypeFamilies #-}
 {-# LANGUAGE MagicHash #-}
 {-# LANGUAGE ViewPatterns #-}
@@ -23,6 +24,7 @@ module   RdrHsSyn (
         mkClassDecl,
         mkTyData, mkDataFamInst,
         mkTySynonym, mkTyFamInstEqn,
+        mkStandaloneKindSig,
         mkTyFamInst,
         mkFamDecl, mkLHsSigType,
         mkInlinePragma,
@@ -103,7 +105,7 @@ module   RdrHsSyn (
     ) where
 
 import GhcPrelude
-import HsSyn            -- Lots of it
+import GHC.Hs           -- Lots of it
 import TyCon            ( TyCon, isTupleTyCon, tyConSingleDataCon_maybe )
 import DataCon          ( DataCon, dataConTyCon )
 import ConLike          ( ConLike(..) )
@@ -157,7 +159,7 @@ import Data.Data       ( dataTypeOf, fromConstr, dataTypeConstrs )
 
 -- Similarly for mkConDecl, mkClassOpSig and default-method names.
 
---         *** See Note [The Naming story] in HsDecls ****
+--         *** See Note [The Naming story] in GHC.Hs.Decls ****
 
 mkTyClD :: LTyClDecl (GhcPass p) -> LHsDecl (GhcPass p)
 mkTyClD (dL->L loc d) = cL loc (TyClD noExtField d)
@@ -238,6 +240,30 @@ mkTySynonym loc lhs rhs
                                  , tcdLName = tc, tcdTyVars = tyvars
                                  , tcdFixity = fixity
                                  , tcdRhs = rhs })) }
+
+mkStandaloneKindSig
+  :: SrcSpan
+  -> Located [Located RdrName] -- LHS
+  -> LHsKind GhcPs             -- RHS
+  -> P (LStandaloneKindSig GhcPs)
+mkStandaloneKindSig loc lhs rhs =
+  do { vs <- mapM check_lhs_name (unLoc lhs)
+     ; v <- check_singular_lhs (reverse vs)
+     ; return $ cL loc $ StandaloneKindSig noExtField v (mkLHsSigType rhs) }
+  where
+    check_lhs_name v@(unLoc->name) =
+      if isUnqual name && isTcOcc (rdrNameOcc name)
+      then return v
+      else addFatalError (getLoc v) $
+           hang (text "Expected an unqualified type constructor:") 2 (ppr v)
+    check_singular_lhs vs =
+      case vs of
+        [] -> panic "mkStandaloneKindSig: empty left-hand side"
+        [v] -> return v
+        _ -> addFatalError (getLoc lhs) $
+             vcat [ hang (text "Standalone kind signatures do not support multiple names at the moment:")
+                       2 (pprWithCommas ppr vs)
+                  , text "See https://gitlab.haskell.org/ghc/ghc/issues/16754 for details." ]
 
 mkTyFamInstEqn :: Maybe [LHsTyVarBndr GhcPs]
                -> LHsType GhcPs
@@ -670,7 +696,7 @@ mkGadtDecl names ty
 
     (args, res_ty) = split_tau tau
 
-    -- See Note [GADT abstract syntax] in HsDecls
+    -- See Note [GADT abstract syntax] in GHC.Hs.Decls
     split_tau (dL->L _ (HsFunTy _ (dL->L loc (HsRecTy _ rf)) res_ty))
       = (RecCon (cL loc rf), res_ty)
     split_tau tau
@@ -932,7 +958,7 @@ checkTyClHdr is_cls ty
         arity = length ts
         tup_name | is_cls    = cTupleTyConName arity
                  | otherwise = getName (tupleTyCon Boxed arity)
-          -- See Note [Unit tuples] in HsTypes  (TODO: is this still relevant?)
+          -- See Note [Unit tuples] in GHC.Hs.Types  (TODO: is this still relevant?)
     go l _ _ _ _
       = addFatalError l (text "Malformed head of type or class declaration:"
                           <+> ppr ty)
@@ -1188,7 +1214,7 @@ checkFunBind strictness ann lhs_loc fun is_infix pats (dL->L rhs_span grhss)
 
 makeFunBind :: Located RdrName -> [LMatch GhcPs (LHsExpr GhcPs)]
             -> HsBind GhcPs
--- Like HsUtils.mkFunBind, but we need to be able to set the fixity too
+-- Like GHC.Hs.Utils.mkFunBind, but we need to be able to set the fixity too
 makeFunBind fn ms
   = FunBind { fun_ext = noExtField,
               fun_id = fn,
@@ -2077,7 +2103,7 @@ patSynErr l e explanation =
      ; return (cL l hsHoleExpr) }
 
 hsHoleExpr :: HsExpr (GhcPass id)
-hsHoleExpr = HsUnboundVar noExtField (TrueExprHole (mkVarOcc "_"))
+hsHoleExpr = HsUnboundVar noExtField (mkVarOcc "_")
 
 -- | See Note [Ambiguous syntactic categories] and Note [PatBuilder]
 data PatBuilder p
@@ -2094,7 +2120,7 @@ patBuilderBang bang p =
   cL (bang `combineSrcSpans` getLoc p) $
   PatBuilderBang bang p
 
-instance p ~ GhcPs => Outputable (PatBuilder p) where
+instance Outputable (PatBuilder GhcPs) where
   ppr (PatBuilderPat p) = ppr p
   ppr (PatBuilderBang _ (L _ p)) = text "!" <+> ppr p
   ppr (PatBuilderPar (L _ p)) = parens (ppr p)
@@ -2103,8 +2129,8 @@ instance p ~ GhcPs => Outputable (PatBuilder p) where
   ppr (PatBuilderVar v) = ppr v
   ppr (PatBuilderOverLit l) = ppr l
 
-instance p ~ GhcPs => DisambECP (PatBuilder p) where
-  type Body (PatBuilder p) = PatBuilder
+instance DisambECP (PatBuilder GhcPs) where
+  type Body (PatBuilder GhcPs) = PatBuilder
   ecpFromCmd' (dL-> L l c) =
     addFatalError l $
       text "Command syntax in pattern:" <+> ppr c
@@ -2115,13 +2141,13 @@ instance p ~ GhcPs => DisambECP (PatBuilder p) where
     text "Lambda-syntax in pattern." $$
     text "Pattern matching on functions is not possible."
   mkHsLetPV l _ _ = addFatalError l $ text "(let ... in ...)-syntax in pattern"
-  type InfixOp (PatBuilder p) = RdrName
+  type InfixOp (PatBuilder GhcPs) = RdrName
   superInfixOp m = m
   mkHsOpAppPV l p1 op p2 = do
     warnSpaceAfterBang op (getLoc p2)
     return $ cL l $ PatBuilderOpApp p1 op p2
   mkHsCasePV l _ _ = addFatalError l $ text "(case ... of ...)-syntax in pattern"
-  type FunArg (PatBuilder p) = PatBuilder p
+  type FunArg (PatBuilder GhcPs) = PatBuilder GhcPs
   superFunArg m = m
   mkHsAppPV l p1 p2 = return $ cL l (PatBuilderApp p1 p2)
   mkHsIfPV l _ _ _ _ _ = addFatalError l $ text "(if ... then ... else ...)-syntax in pattern"
@@ -2290,8 +2316,8 @@ rule, so this approach scales well to large parser productions.
 {- Note [Resolving parsing ambiguities: non-taken alternatives]
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
-Alternative I, extra constructors in HsExpr
--------------------------------------------
+Alternative I, extra constructors in GHC.Hs.Expr
+------------------------------------------------
 We could add extra constructors to HsExpr to represent command-specific and
 pattern-specific syntactic constructs. Under this scheme, we parse patterns
 and commands as expressions and rejig later.  This is what GHC used to do, and
@@ -2326,15 +2352,15 @@ There are several issues with this:
       (f ! a b) ! c = ...
 
 
-Alternative II, extra constructors in HsExpr for GhcPs
-------------------------------------------------------
+Alternative II, extra constructors in GHC.Hs.Expr for GhcPs
+-----------------------------------------------------------
 We could address some of the problems with Alternative I by using Trees That
 Grow and extending HsExpr only in the GhcPs pass. However, GhcPs corresponds to
 the output of parsing, not to its intermediate results, so we wouldn't want
 them there either.
 
-Alternative III, extra constructors in HsExpr for GhcPrePs
-----------------------------------------------------------
+Alternative III, extra constructors in GHC.Hs.Expr for GhcPrePs
+---------------------------------------------------------------
 We could introduce a new pass, GhcPrePs, to keep GhcPs pristine.
 Unfortunately, creating a new pass would significantly bloat conversion code
 and slow down the compiler by adding another linear-time pass over the entire

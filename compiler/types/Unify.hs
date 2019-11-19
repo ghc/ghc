@@ -389,13 +389,18 @@ tcUnifyTyWithTFs twoWay t1 t2
   = case tc_unify_tys (const BindMe) twoWay True False
                        rn_env emptyTvSubstEnv emptyCvSubstEnv
                        [t1] [t2] of
-      Unifiable  (subst, _) -> Just $ niFixTCvSubst subst
-      MaybeApart (subst, _) -> Just $ niFixTCvSubst subst
+      Unifiable  (subst, _) -> Just $ maybe_fix subst
+      MaybeApart (subst, _) -> Just $ maybe_fix subst
       -- we want to *succeed* in questionable cases. This is a
       -- pre-unification algorithm.
       SurelyApart      -> Nothing
   where
-    rn_env = mkRnEnv2 $ mkInScopeSet $ tyCoVarsOfTypes [t1, t2]
+    in_scope = mkInScopeSet $ tyCoVarsOfTypes [t1, t2]
+    rn_env   = mkRnEnv2 in_scope
+
+    maybe_fix | twoWay    = niFixTCvSubst
+              | otherwise = mkTvSubst in_scope -- when matching, don't confuse
+                                               -- domain with range
 
 -----------------
 tcUnifyTys :: (TyCoVar -> BindFlag)
@@ -871,8 +876,8 @@ constraint Num (Int |> (blah ; sym blah)).  We naturally want to find
 a dictionary for that constraint, which requires dealing with
 coercions in this manner.
 
-Note [Matching in the presence of casts]
-~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+Note [Matching in the presence of casts (1)]
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 When matching, it is crucial that no variables from the template
 end up in the range of the matching substitution (obviously!).
 When unifying, that's not a constraint; instead we take the fixpoint
@@ -904,6 +909,26 @@ Note that
 
 * One better way is to ensure that type patterns (the template
   in the matching process) have no casts.  See #14119.
+
+Note [Matching in the presence of casts (2)]
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+There is another wrinkle (#17395).  Suppose (T :: forall k. k -> Type)
+and we are matching
+   tcMatchTy (T k (a::k))  (T j (b::j))
+
+Then we'll match k :-> j, as expected. But then in unify_tys
+we invoke
+   unify_tys env (a::k) (b::j) (Refl j)
+
+Although we have unified k and j, it's very important that we put
+(Refl j), /not/ (Refl k) as the fourth argument to unify_tys.
+If we put (Refl k) we'd end up with teh substitution
+  a :-> b |> Refl k
+which is bogus because one of the template variables, k,
+appears in the range of the substitution.  Eek.
+
+Similar care is needed in unify_ty_app.
+
 
 Note [Polykinded tycon applications]
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
@@ -937,7 +962,7 @@ unify_ty env ty1 ty2 kco
   | Just ty2' <- tcView ty2   = unify_ty env ty1 ty2' kco
   | CastTy ty1' co <- ty1     = if um_unif env
                                 then unify_ty env ty1' ty2 (co `mkTransCo` kco)
-                                else -- See Note [Matching in the presence of casts]
+                                else -- See Note [Matching in the presence of casts (1)]
                                      do { subst <- getSubst env
                                         ; let co' = substCo subst co
                                         ; unify_ty env ty1' ty2 (co' `mkTransCo` kco) }
@@ -1040,7 +1065,9 @@ unify_ty_app env ty1 ty1args ty2 ty2args
              ki2 = typeKind ty2
            -- See Note [Kind coercions in Unify]
        ; unify_ty  env ki1 ki2 (mkNomReflCo liftedTypeKind)
-       ; unify_ty  env ty1 ty2 (mkNomReflCo ki1)
+       ; unify_ty  env ty1 ty2 (mkNomReflCo ki2)
+                 -- Very important: 'ki2' not 'ki1'
+                 -- See Note [Matching in the presence of casts (2)]
        ; unify_tys env ty1args ty2args }
 
 unify_tys :: UMEnv -> [Type] -> [Type] -> UM ()
@@ -1050,7 +1077,9 @@ unify_tys env orig_xs orig_ys
     go []     []     = return ()
     go (x:xs) (y:ys)
       -- See Note [Kind coercions in Unify]
-      = do { unify_ty env x y (mkNomReflCo $ typeKind x)
+      = do { unify_ty env x y (mkNomReflCo $ typeKind y)
+                 -- Very important: 'y' not 'x'
+                 -- See Note [Matching in the presence of casts (2)]
            ; go xs ys }
     go _ _ = surelyApart
       -- Possibly different saturations of a polykinded tycon
@@ -1393,7 +1422,7 @@ ty_co_match menv subst ty co lkco rkco
 
 ty_co_match menv subst ty co lkco rkco
   | CastTy ty' co' <- ty
-     -- See Note [Matching in the presence of casts]
+     -- See Note [Matching in the presence of casts (1)]
   = let empty_subst  = mkEmptyTCvSubst (rnInScopeSet (me_env menv))
         substed_co_l = substCo (liftEnvSubstLeft empty_subst subst)  co'
         substed_co_r = substCo (liftEnvSubstRight empty_subst subst) co'

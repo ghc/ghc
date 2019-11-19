@@ -7,6 +7,7 @@ Handles @deriving@ clauses on @data@ declarations.
 -}
 
 {-# LANGUAGE CPP #-}
+{-# LANGUAGE MultiWayIf #-}
 {-# LANGUAGE TypeFamilies #-}
 
 module TcDeriv ( tcDeriving, DerivInfo(..) ) where
@@ -15,11 +16,13 @@ module TcDeriv ( tcDeriving, DerivInfo(..) ) where
 
 import GhcPrelude
 
-import HsSyn
+import GHC.Hs
 import DynFlags
 
 import TcRnMonad
 import FamInst
+import TcOrigin
+import Predicate
 import TcDerivInfer
 import TcDerivUtils
 import TcValidity( allDistinctTyVars )
@@ -32,6 +35,7 @@ import Inst
 import FamInstEnv
 import TcHsType
 import TyCoRep
+import TyCoPpr    ( pprTyVars )
 
 import RnNames( extendGlobalRdrEnvRn )
 import RnBinds
@@ -60,7 +64,6 @@ import Util
 import Outputable
 import FastString
 import Bag
-import Pair
 import FV (fvVarList, unionFV, mkFVs)
 import qualified GHC.LanguageExtensions as LangExt
 
@@ -98,10 +101,6 @@ data EarlyDerivSpec = InferTheta (DerivSpec [ThetaOrigin])
         -- GivenTheta ds => the exact context for the instance is supplied
         --                  by the programmer; it is ds_theta
         -- See Note [Inferring the instance context] in TcDerivInfer
-
-earlyDSLoc :: EarlyDerivSpec -> SrcSpan
-earlyDSLoc (InferTheta spec) = ds_loc spec
-earlyDSLoc (GivenTheta spec) = ds_loc spec
 
 splitEarlyDerivSpec :: [EarlyDerivSpec]
                     -> ([DerivSpec [ThetaOrigin]], [DerivSpec ThetaType])
@@ -157,31 +156,6 @@ Notice the free 'a' in the deriving.  We have to fill this out to
 And then translate it to:
     instance C [a] Char => C [a] T where ...
 
-
-Note [Newtype deriving superclasses]
-~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
-(See also #1220 for an interesting exchange on newtype
-deriving and superclasses.)
-
-The 'tys' here come from the partial application in the deriving
-clause. The last arg is the new instance type.
-
-We must pass the superclasses; the newtype might be an instance
-of them in a different way than the representation type
-E.g.            newtype Foo a = Foo a deriving( Show, Num, Eq )
-Then the Show instance is not done via Coercible; it shows
-        Foo 3 as "Foo 3"
-The Num instance is derived via Coercible, but the Show superclass
-dictionary must the Show instance for Foo, *not* the Show dictionary
-gotten from the Num dictionary. So we must build a whole new dictionary
-not just use the Num one.  The instance we want is something like:
-     instance (Num a, Show (Foo a), Eq (Foo a)) => Num (Foo a) where
-        (+) = ((+)@a)
-        ...etc...
-There may be a coercion needed which we get from the tycon for the newtype
-when the dict is constructed in TcInstDcls.tcInstDecl2
-
-
 Note [Unused constructors and deriving clauses]
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 See #3221.  Consider
@@ -195,6 +169,8 @@ both of them.  So we gather defs/uses from deriving just like anything else.
 data DerivInfo = DerivInfo { di_rep_tc  :: TyCon
                              -- ^ The data tycon for normal datatypes,
                              -- or the *representation* tycon for data families
+                           , di_scoped_tvs :: ![(Name,TyVar)]
+                             -- ^ Variables that scope over the deriving clause.
                            , di_clauses :: [LHsDerivingClause GhcRn]
                            , di_ctxt    :: SDoc -- ^ error context
                            }
@@ -214,13 +190,10 @@ tcDeriving  :: [DerivInfo]       -- All `deriving` clauses
 tcDeriving deriv_infos deriv_decls
   = recoverM (do { g <- getGblEnv
                  ; return (g, emptyBag, emptyValBindsOut)}) $
-    do  {       -- Fish the "deriving"-related information out of the TcEnv
-                -- And make the necessary "equations".
-          is_boot <- tcIsHsBootOrSig
-        ; traceTc "tcDeriving" (ppr is_boot)
-
-        ; early_specs <- makeDerivSpecs is_boot deriv_infos deriv_decls
-        ; traceTc "tcDeriving 1" (ppr early_specs)
+    do  { -- Fish the "deriving"-related information out of the TcEnv
+          -- And make the necessary "equations".
+          early_specs <- makeDerivSpecs deriv_infos deriv_decls
+        ; traceTc "tcDeriving" (ppr early_specs)
 
         ; let (infer_specs, given_specs) = splitEarlyDerivSpec early_specs
         ; insts1 <- mapM genInst given_specs
@@ -258,8 +231,7 @@ tcDeriving deriv_infos deriv_decls
         ; inst_infos2 <- apply_inst_infos mk_inst_infos2 final_specs
         ; let inst_infos = inst_infos1 ++ inst_infos2
 
-        ; (inst_info, rn_binds, rn_dus) <-
-            renameDeriv is_boot inst_infos binds
+        ; (inst_info, rn_binds, rn_dus) <- renameDeriv inst_infos binds
 
         ; unless (isEmptyBag inst_info) $
              liftIO (dumpIfSet_dyn dflags Opt_D_dump_deriv "Derived instances"
@@ -295,19 +267,10 @@ pprRepTy fi@(FamInst { fi_tys = lhs })
       equals <+> ppr rhs
   where rhs = famInstRHS fi
 
-renameDeriv :: Bool
-            -> [InstInfo GhcPs]
+renameDeriv :: [InstInfo GhcPs]
             -> Bag (LHsBind GhcPs, LSig GhcPs)
             -> TcM (Bag (InstInfo GhcRn), HsValBinds GhcRn, DefUses)
-renameDeriv is_boot inst_infos bagBinds
-  | is_boot     -- If we are compiling a hs-boot file, don't generate any derived bindings
-                -- The inst-info bindings will all be empty, but it's easier to
-                -- just use rn_inst_info to change the type appropriately
-  = do  { (rn_inst_infos, fvs) <- mapAndUnzipM rn_inst_info inst_infos
-        ; return ( listToBag rn_inst_infos
-                 , emptyValBindsOut, usesOnly (plusFVs fvs)) }
-
-  | otherwise
+renameDeriv inst_infos bagBinds
   = discardWarnings $
     -- Discard warnings about unused bindings etc
     setXOptM LangExt.EmptyCase $
@@ -360,25 +323,6 @@ renameDeriv is_boot inst_infos bagBinds
               ; return (inst_info { iBinds = binds' }, fvs) }
 
 {-
-Note [Newtype deriving and unused constructors]
-~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
-Consider this (see #1954):
-
-  module Bug(P) where
-  newtype P a = MkP (IO a) deriving Monad
-
-If you compile with -Wunused-binds you do not expect the warning
-"Defined but not used: data constructor MkP". Yet the newtype deriving
-code does not explicitly mention MkP, but it should behave as if you
-had written
-  instance Monad P where
-     return x = MkP (return x)
-     ...etc...
-
-So we want to signal a user of the data constructor 'MkP'.
-This is the reason behind the [Name] part of the return type
-of genInst.
-
 Note [Staging of tcDeriving]
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 Here's a tricky corner case for deriving (adapted from #2721):
@@ -441,9 +385,9 @@ continuation-returning style, so we opt for that route.
 
 Note [Why we don't pass rep_tc into deriveTyData]
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
-Down in the bowels of mkEqnHelp, we need to convert the fam_tc back into
-the rep_tc by means of a lookup. And yet we have the rep_tc right here!
-Why look it up again? Answer: it's just easier this way.
+Down in the bowels of mk_deriv_inst_tys_maybe, we need to convert the fam_tc
+back into the rep_tc by means of a lookup. And yet we have the rep_tc right
+here! Why look it up again? Answer: it's just easier this way.
 We drop some number of arguments from the end of the datatype definition
 in deriveTyData. The arguments are dropped from the fam_tc.
 This action may drop a *different* number of arguments
@@ -487,45 +431,40 @@ in derived code.
 @makeDerivSpecs@ fishes around to find the info about needed derived instances.
 -}
 
-makeDerivSpecs :: Bool
-               -> [DerivInfo]
+makeDerivSpecs :: [DerivInfo]
                -> [LDerivDecl GhcRn]
                -> TcM [EarlyDerivSpec]
-makeDerivSpecs is_boot deriv_infos deriv_decls
+makeDerivSpecs deriv_infos deriv_decls
   = do  { eqns1 <- sequenceA
-                     [ deriveClause rep_tc dcs preds err_ctxt
-                     | DerivInfo { di_rep_tc = rep_tc, di_clauses = clauses
+                     [ deriveClause rep_tc scoped_tvs dcs preds err_ctxt
+                     | DerivInfo { di_rep_tc = rep_tc
+                                 , di_scoped_tvs = scoped_tvs
+                                 , di_clauses = clauses
                                  , di_ctxt = err_ctxt } <- deriv_infos
                      , L _ (HsDerivingClause { deriv_clause_strategy = dcs
                                              , deriv_clause_tys = L _ preds })
                          <- clauses
                      ]
         ; eqns2 <- mapM (recoverM (pure Nothing) . deriveStandalone) deriv_decls
-        ; let eqns = concat eqns1 ++ catMaybes eqns2
-
-        ; if is_boot then   -- No 'deriving' at all in hs-boot files
-              do { unless (null eqns) (add_deriv_err (head eqns))
-                 ; return [] }
-          else return eqns }
-  where
-    add_deriv_err eqn
-       = setSrcSpan (earlyDSLoc eqn) $
-         addErr (hang (text "Deriving not permitted in hs-boot file")
-                    2 (text "Use an instance declaration instead"))
+        ; return $ concat eqns1 ++ catMaybes eqns2 }
 
 ------------------------------------------------------------------
 -- | Process the derived classes in a single @deriving@ clause.
-deriveClause :: TyCon -> Maybe (LDerivStrategy GhcRn)
+deriveClause :: TyCon
+             -> [(Name, TcTyVar)]  -- Scoped type variables taken from tcTyConScopedTyVars
+                                   -- See Note [Scoped tyvars in a TcTyCon] in types/TyCon
+             -> Maybe (LDerivStrategy GhcRn)
              -> [LHsSigType GhcRn] -> SDoc
              -> TcM [EarlyDerivSpec]
-deriveClause rep_tc mb_lderiv_strat deriv_preds err_ctxt
+deriveClause rep_tc scoped_tvs mb_lderiv_strat deriv_preds err_ctxt
   = addErrCtxt err_ctxt $ do
       traceTc "deriveClause" $ vcat
         [ text "tvs"             <+> ppr tvs
+        , text "scoped_tvs"      <+> ppr scoped_tvs
         , text "tc"              <+> ppr tc
         , text "tys"             <+> ppr tys
         , text "mb_lderiv_strat" <+> ppr mb_lderiv_strat ]
-      tcExtendTyVarEnv tvs $ do
+      tcExtendNameTyVarEnv scoped_tvs $ do
         (mb_lderiv_strat', via_tvs) <- tcDerivStrategy mb_lderiv_strat
         tcExtendTyVarEnv via_tvs $
         -- Moreover, when using DerivingVia one can bind type variables in
@@ -682,23 +621,29 @@ deriveStandalone (L loc (DerivDecl _ deriv_ty mb_lderiv_strat overlap_mode))
   = setSrcSpan loc                   $
     addErrCtxt (standaloneCtxt deriv_ty)  $
     do { traceTc "Standalone deriving decl for" (ppr deriv_ty)
-       ; let ctxt = TcType.InstDeclCtxt True
+       ; let ctxt = TcOrigin.InstDeclCtxt True
        ; traceTc "Deriving strategy (standalone deriving)" $
            vcat [ppr mb_lderiv_strat, ppr deriv_ty]
        ; (mb_lderiv_strat, via_tvs) <- tcDerivStrategy mb_lderiv_strat
        ; (cls_tvs, deriv_ctxt, cls, inst_tys)
            <- tcExtendTyVarEnv via_tvs $
               tcStandaloneDerivInstType ctxt deriv_ty
-       ; checkTc (not (null inst_tys)) derivingNullaryErr
        ; let mb_deriv_strat = fmap unLoc mb_lderiv_strat
              tvs            = via_tvs ++ cls_tvs
-             inst_ty        = last inst_tys
          -- See Note [Unify kinds in deriving]
        ; (tvs', deriv_ctxt', inst_tys', mb_deriv_strat') <-
            case mb_deriv_strat of
              -- Perform an additional unification with the kind of the `via`
              -- type and the result of the previous kind unification.
-             Just (ViaStrategy via_ty) -> do
+             Just (ViaStrategy via_ty)
+                  -- This unification must be performed on the last element of
+                  -- inst_tys, but we have not yet checked for this property.
+                  -- (This is done later in expectNonNullaryClsArgs). For now,
+                  -- simply do nothing if inst_tys is empty, since
+                  -- expectNonNullaryClsArgs will error later if this
+                  -- is the case.
+               |  Just inst_ty <- lastMaybe inst_tys
+               -> do
                let via_kind     = tcTypeKind via_ty
                    inst_ty_kind = tcTypeKind inst_ty
                    mb_match     = tcUnifyTy inst_ty_kind via_kind
@@ -730,8 +675,6 @@ deriveStandalone (L loc (DerivDecl _ deriv_ty mb_lderiv_strat overlap_mode))
                     , Just (ViaStrategy final_via_ty) )
 
              _ -> pure (tvs, deriv_ctxt, inst_tys, mb_deriv_strat)
-       ; let cls_tys' = take (length inst_tys' - 1) inst_tys'
-             inst_ty' = last inst_tys'
        ; traceTc "Standalone deriving;" $ vcat
               [ text "tvs':" <+> ppr tvs'
               , text "mb_deriv_strat':" <+> ppr mb_deriv_strat'
@@ -739,29 +682,13 @@ deriveStandalone (L loc (DerivDecl _ deriv_ty mb_lderiv_strat overlap_mode))
               , text "cls:" <+> ppr cls
               , text "inst_tys':" <+> ppr inst_tys' ]
                 -- C.f. TcInstDcls.tcLocalInstDecl1
-       ; traceTc "Standalone deriving:" $ vcat
-              [ text "class:" <+> ppr cls
-              , text "class types:" <+> ppr cls_tys'
-              , text "type:" <+> ppr inst_ty' ]
 
-       ; let bale_out msg = failWithTc (derivingThingErr False cls cls_tys'
-                              inst_ty' mb_deriv_strat' msg)
-
-       ; case tcSplitTyConApp_maybe inst_ty' of
-           Just (tc, tc_args)
-              | className cls == typeableClassName
-              -> do warnUselessTypeable
-                    return Nothing
-
-              | otherwise
-              -> Just <$> mkEqnHelp (fmap unLoc overlap_mode)
-                                    tvs' cls cls_tys' tc tc_args
-                                    deriv_ctxt' mb_deriv_strat'
-
-           _  -> -- Complain about functions, primitive types, etc,
-                 bale_out $
-                 text "The last argument of the instance must be a data or newtype application"
-        }
+       ; if className cls == typeableClassName
+         then do warnUselessTypeable
+                 return Nothing
+         else Just <$> mkEqnHelp (fmap unLoc overlap_mode)
+                                 tvs' cls inst_tys'
+                                 deriv_ctxt' mb_deriv_strat' }
 deriveStandalone (L _ (XDerivDecl nec)) = noExtCon nec
 
 -- Typecheck the type in a standalone deriving declaration.
@@ -916,7 +843,8 @@ deriveTyData tc tc_args mb_deriv_strat deriv_tvs cls cls_tys cls_arg_kind
         ; traceTc "deriveTyData 2" $ vcat
             [ ppr final_tkvs ]
 
-        ; let final_tc_app = mkTyConApp tc final_tc_args
+        ; let final_tc_app   = mkTyConApp tc final_tc_args
+              final_cls_args = final_cls_tys ++ [final_tc_app]
         ; checkTc (allDistinctTyVars (mkVarSet final_tkvs) args_to_drop) -- (a, b, c)
                   (derivingEtaErr cls final_cls_tys final_tc_app)
                 -- Check that
@@ -934,13 +862,11 @@ deriveTyData tc tc_args mb_deriv_strat deriv_tvs cls cls_tys cls_arg_kind
                 -- expand any type synonyms.
                 -- See Note [Eta-reducing type synonyms]
 
-        ; checkValidInstHead DerivClauseCtxt cls $
-                             final_cls_tys ++ [final_tc_app]
+        ; checkValidInstHead DerivClauseCtxt cls final_cls_args
                 -- Check that we aren't deriving an instance of a magical
                 -- type like (~) or Coercible (#14916).
 
-        ; spec <- mkEqnHelp Nothing final_tkvs
-                            cls final_cls_tys tc final_tc_args
+        ; spec <- mkEqnHelp Nothing final_tkvs cls final_cls_args
                             (InferContext Nothing) final_mb_deriv_strat
         ; traceTc "deriveTyData 3" (ppr spec)
         ; return spec }
@@ -1216,7 +1142,6 @@ required to obtain the latter instance just isn't worth it.
 mkEqnHelp :: Maybe OverlapMode
           -> [TyVar]
           -> Class -> [Type]
-          -> TyCon -> [Type]
           -> DerivContext
                -- SupplyContext => context supplied (standalone deriving)
                -- InferContext  => context inferred (deriving on data decl, or
@@ -1228,35 +1153,106 @@ mkEqnHelp :: Maybe OverlapMode
 -- where the 'theta' is optional (that's the Maybe part)
 -- Assumes that this declaration is well-kinded
 
-mkEqnHelp overlap_mode tvs cls cls_tys tycon tc_args deriv_ctxt deriv_strat
-  = do {      -- Find the instance of a data family
-              -- Note [Looking up family instances for deriving]
-         fam_envs <- tcGetFamInstEnvs
-       ; let (rep_tc, rep_tc_args, _co) = tcLookupDataFamInst fam_envs tycon tc_args
-              -- If it's still a data family, the lookup failed; i.e no instance exists
-       ; when (isDataFamilyTyCon rep_tc)
-              (bale_out (text "No family instance for" <+> quotes (pprTypeApp tycon tc_args)))
-       ; is_boot <- tcIsHsBootOrSig
-       ; when is_boot $
-              bale_out (text "Cannot derive instances in hs-boot files"
-                    $+$ text "Write an instance declaration instead")
-
-       ; let deriv_env = DerivEnv
-                         { denv_overlap_mode = overlap_mode
+mkEqnHelp overlap_mode tvs cls cls_args deriv_ctxt deriv_strat = do
+  is_boot <- tcIsHsBootOrSig
+  when is_boot $
+       bale_out (text "Cannot derive instances in hs-boot files"
+             $+$ text "Write an instance declaration instead")
+  runReaderT mk_eqn deriv_env
+  where
+    deriv_env = DerivEnv { denv_overlap_mode = overlap_mode
                          , denv_tvs          = tvs
                          , denv_cls          = cls
-                         , denv_cls_tys      = cls_tys
-                         , denv_tc           = tycon
-                         , denv_tc_args      = tc_args
-                         , denv_rep_tc       = rep_tc
-                         , denv_rep_tc_args  = rep_tc_args
+                         , denv_inst_tys     = cls_args
                          , denv_ctxt         = deriv_ctxt
                          , denv_strat        = deriv_strat }
-       ; flip runReaderT deriv_env $
-         if isNewTyCon rep_tc then mkNewTypeEqn else mkDataTypeEqn }
+
+    bale_out msg = failWithTc $ derivingThingErr False cls cls_args deriv_strat msg
+
+    mk_eqn :: DerivM EarlyDerivSpec
+    mk_eqn = do
+      DerivEnv { denv_inst_tys = cls_args
+               , denv_strat    = mb_strat } <- ask
+      case mb_strat of
+        Just StockStrategy -> do
+          (cls_tys, inst_ty) <- expectNonNullaryClsArgs cls_args
+          dit                <- expectAlgTyConApp cls_tys inst_ty
+          mk_eqn_stock dit
+
+        Just AnyclassStrategy -> mk_eqn_anyclass
+
+        Just (ViaStrategy via_ty) -> do
+          (cls_tys, inst_ty) <- expectNonNullaryClsArgs cls_args
+          mk_eqn_via cls_tys inst_ty via_ty
+
+        Just NewtypeStrategy -> do
+          (cls_tys, inst_ty) <- expectNonNullaryClsArgs cls_args
+          dit                <- expectAlgTyConApp cls_tys inst_ty
+          unless (isNewTyCon (dit_rep_tc dit)) $
+            derivingThingFailWith False gndNonNewtypeErr
+          mkNewTypeEqn True dit
+
+        Nothing -> mk_eqn_no_strategy
+
+-- @expectNonNullaryClsArgs inst_tys@ checks if @inst_tys@ is non-empty.
+-- If so, return @(init inst_tys, last inst_tys)@.
+-- Otherwise, throw an error message.
+-- See @Note [DerivEnv and DerivSpecMechanism]@ in "TcDerivUtils" for why this
+-- property is important.
+expectNonNullaryClsArgs :: [Type] -> DerivM ([Type], Type)
+expectNonNullaryClsArgs inst_tys =
+  maybe (derivingThingFailWith False derivingNullaryErr) pure $
+  snocView inst_tys
+
+-- @expectAlgTyConApp cls_tys inst_ty@ checks if @inst_ty@ is an application
+-- of an algebraic type constructor. If so, return a 'DerivInstTys' consisting
+-- of @cls_tys@ and the constituent pars of @inst_ty@.
+-- Otherwise, throw an error message.
+-- See @Note [DerivEnv and DerivSpecMechanism]@ in "TcDerivUtils" for why this
+-- property is important.
+expectAlgTyConApp :: [Type] -- All but the last argument to the class in a
+                            -- derived instance
+                  -> Type   -- The last argument to the class in a
+                            -- derived instance
+                  -> DerivM DerivInstTys
+expectAlgTyConApp cls_tys inst_ty = do
+  fam_envs <- lift tcGetFamInstEnvs
+  case mk_deriv_inst_tys_maybe fam_envs cls_tys inst_ty of
+    Nothing -> derivingThingFailWith False $
+                   text "The last argument of the instance must be a"
+               <+> text "data or newtype application"
+    Just dit -> do expectNonDataFamTyCon dit
+                   pure dit
+
+-- @expectNonDataFamTyCon dit@ checks if @dit_rep_tc dit@ is a representation
+-- type constructor for a data family instance, and if not,
+-- throws an error message.
+-- See @Note [DerivEnv and DerivSpecMechanism]@ in "TcDerivUtils" for why this
+-- property is important.
+expectNonDataFamTyCon :: DerivInstTys -> DerivM ()
+expectNonDataFamTyCon (DerivInstTys { dit_tc      = tc
+                                    , dit_tc_args = tc_args
+                                    , dit_rep_tc  = rep_tc }) =
+  -- If it's still a data family, the lookup failed; i.e no instance exists
+  when (isDataFamilyTyCon rep_tc) $
+    derivingThingFailWith False $
+    text "No family instance for" <+> quotes (pprTypeApp tc tc_args)
+
+mk_deriv_inst_tys_maybe :: FamInstEnvs
+                        -> [Type] -> Type -> Maybe DerivInstTys
+mk_deriv_inst_tys_maybe fam_envs cls_tys inst_ty =
+  fmap lookup $ tcSplitTyConApp_maybe inst_ty
   where
-     bale_out msg = failWithTc (derivingThingErr False cls cls_tys
-                      (mkTyConApp tycon tc_args) deriv_strat msg)
+    lookup :: (TyCon, [Type]) -> DerivInstTys
+    lookup (tc, tc_args) =
+      -- Find the instance of a data family
+      -- Note [Looking up family instances for deriving]
+      let (rep_tc, rep_tc_args, _co) = tcLookupDataFamInst fam_envs tc tc_args
+      in DerivInstTys { dit_cls_tys     = cls_tys
+                      , dit_tc          = tc
+                      , dit_tc_args     = tc_args
+                      , dit_rep_tc      = rep_tc
+                      , dit_rep_tc_args = rep_tc_args }
 
 {-
 Note [Looking up family instances for deriving]
@@ -1324,44 +1320,18 @@ See Note [Eta reduction for data families] in FamInstEnv
 ************************************************************************
 -}
 
--- | Derive an instance for a data type (i.e., non-newtype).
-mkDataTypeEqn :: DerivM EarlyDerivSpec
-mkDataTypeEqn
-  = do mb_strat <- asks denv_strat
-       let bale_out msg = do err <- derivingThingErrM False msg
-                             lift $ failWithTc err
-       case mb_strat of
-         Just StockStrategy    -> mk_eqn_stock    mk_originative_eqn bale_out
-         Just AnyclassStrategy -> mk_eqn_anyclass mk_originative_eqn bale_out
-         Just (ViaStrategy ty) -> mk_eqn_via ty
-         -- GeneralizedNewtypeDeriving makes no sense for non-newtypes
-         Just NewtypeStrategy  -> bale_out gndNonNewtypeErr
-         -- Lacking a user-requested deriving strategy, we will try to pick
-         -- between the stock or anyclass strategies
-         Nothing -> mk_eqn_no_mechanism mk_originative_eqn bale_out
-
--- Derive an instance by way of an originative deriving strategy
--- (stock or anyclass).
---
--- See Note [Deriving strategies]
-mk_originative_eqn
-  :: DerivSpecMechanism -- Invariant: This will be DerivSpecStock or
-                        -- DerivSpecAnyclass
-  -> DerivM EarlyDerivSpec
-mk_originative_eqn mechanism
+-- Once the DerivSpecMechanism is known, we can finally produce an
+-- EarlyDerivSpec from it.
+mk_eqn_from_mechanism :: DerivSpecMechanism -> DerivM EarlyDerivSpec
+mk_eqn_from_mechanism mechanism
   = do DerivEnv { denv_overlap_mode = overlap_mode
                 , denv_tvs          = tvs
-                , denv_tc           = tc
-                , denv_tc_args      = tc_args
-                , denv_rep_tc       = rep_tc
                 , denv_cls          = cls
-                , denv_cls_tys      = cls_tys
+                , denv_inst_tys     = inst_tys
                 , denv_ctxt         = deriv_ctxt } <- ask
-       let inst_ty  = mkTyConApp tc tc_args
-           inst_tys = cls_tys ++ [inst_ty]
        doDerivInstErrorChecks1 mechanism
        loc       <- lift getSrcSpanM
-       dfun_name <- lift $ newDFunName' cls tc
+       dfun_name <- lift $ newDFunName cls inst_tys loc
        case deriv_ctxt of
         InferContext wildcard ->
           do { (inferred_constraints, tvs', inst_tys')
@@ -1370,7 +1340,6 @@ mk_originative_eqn mechanism
                    { ds_loc = loc
                    , ds_name = dfun_name, ds_tvs = tvs'
                    , ds_cls = cls, ds_tys = inst_tys'
-                   , ds_tc = rep_tc
                    , ds_theta = inferred_constraints
                    , ds_overlap = overlap_mode
                    , ds_standalone_wildcard = wildcard
@@ -1381,245 +1350,140 @@ mk_originative_eqn mechanism
                    { ds_loc = loc
                    , ds_name = dfun_name, ds_tvs = tvs
                    , ds_cls = cls, ds_tys = inst_tys
-                   , ds_tc = rep_tc
                    , ds_theta = theta
                    , ds_overlap = overlap_mode
                    , ds_standalone_wildcard = Nothing
                    , ds_mechanism = mechanism }
 
--- Derive an instance by way of a coerce-based deriving strategy
--- (newtype or via).
---
--- See Note [Deriving strategies]
-mk_coerce_based_eqn
-  :: (Type -> DerivSpecMechanism) -- Invariant: This will be DerivSpecNewtype
-                                  -- or DerivSpecVia
-  -> Type -- The type to coerce
-  -> DerivM EarlyDerivSpec
-mk_coerce_based_eqn mk_mechanism coerced_ty
-  = do DerivEnv { denv_overlap_mode = overlap_mode
-                , denv_tvs          = tvs
-                , denv_tc           = tycon
-                , denv_tc_args      = tc_args
-                , denv_rep_tc       = rep_tycon
-                , denv_cls          = cls
-                , denv_cls_tys      = cls_tys
-                , denv_ctxt         = deriv_ctxt } <- ask
-       sa_wildcard <- isStandaloneWildcardDeriv
-       let -- The following functions are polymorphic over the representation
-           -- type, since we might either give it the underlying type of a
-           -- newtype (for GeneralizedNewtypeDeriving) or a @via@ type
-           -- (for DerivingVia).
-           rep_tys ty  = cls_tys ++ [ty]
-           rep_pred ty = mkClassPred cls (rep_tys ty)
-           rep_pred_o ty = mkPredOrigin deriv_origin TypeLevel (rep_pred ty)
-                   -- rep_pred is the representation dictionary, from where
-                   -- we are going to get all the methods for the final
-                   -- dictionary
-
-           -- Next we figure out what superclass dictionaries to use
-           -- See Note [Newtype deriving superclasses] above
-           sc_preds   :: [PredOrigin]
-           cls_tyvars = classTyVars cls
-           inst_ty    = mkTyConApp tycon tc_args
-           inst_tys   = cls_tys ++ [inst_ty]
-           sc_preds   = map (mkPredOrigin deriv_origin TypeLevel) $
-                        substTheta (zipTvSubst cls_tyvars inst_tys) $
-                        classSCTheta cls
-           deriv_origin = mkDerivOrigin sa_wildcard
-
-           -- Next we collect constraints for the class methods
-           -- If there are no methods, we don't need any constraints
-           -- Otherwise we need (C rep_ty), for the representation methods,
-           -- and constraints to coerce each individual method
-           meth_preds :: Type -> [PredOrigin]
-           meths = classMethods cls
-           meth_preds ty
-             | null meths = [] -- No methods => no constraints
-                               -- (#12814)
-             | otherwise = rep_pred_o ty : coercible_constraints ty
-           coercible_constraints ty
-             = [ mkPredOrigin (DerivOriginCoerce meth t1 t2 sa_wildcard)
-                              TypeLevel (mkReprPrimEqPred t1 t2)
-               | meth <- meths
-               , let (Pair t1 t2) = mkCoerceClassMethEqn cls tvs
-                                            inst_tys ty meth ]
-
-           all_thetas :: Type -> [ThetaOrigin]
-           all_thetas ty = [mkThetaOriginFromPreds $ meth_preds ty ++ sc_preds]
-
-           inferred_thetas = all_thetas coerced_ty
-       lift $ traceTc "newtype deriving:" $
-         ppr tycon <+> ppr (rep_tys coerced_ty) <+> ppr inferred_thetas
-       let mechanism = mk_mechanism coerced_ty
-           bale_out msg = do err <- derivingThingErrMechanism mechanism msg
-                             lift $ failWithTc err
-       atf_coerce_based_error_checks cls bale_out
-       doDerivInstErrorChecks1 mechanism
-       dfun_name <- lift $ newDFunName' cls tycon
-       loc       <- lift getSrcSpanM
-       case deriv_ctxt of
-        SupplyContext theta -> return $ GivenTheta $ DS
-            { ds_loc = loc
-            , ds_name = dfun_name, ds_tvs = tvs
-            , ds_cls = cls, ds_tys = inst_tys
-            , ds_tc = rep_tycon
-            , ds_theta = theta
-            , ds_overlap = overlap_mode
-            , ds_standalone_wildcard = Nothing
-            , ds_mechanism = mechanism }
-        InferContext wildcard -> return $ InferTheta $ DS
-            { ds_loc = loc
-            , ds_name = dfun_name, ds_tvs = tvs
-            , ds_cls = cls, ds_tys = inst_tys
-            , ds_tc = rep_tycon
-            , ds_theta = inferred_thetas
-            , ds_overlap = overlap_mode
-            , ds_standalone_wildcard = wildcard
-            , ds_mechanism = mechanism }
-
--- Ensure that a class's associated type variables are suitable for
--- GeneralizedNewtypeDeriving or DerivingVia.
---
--- See Note [GND and associated type families]
-atf_coerce_based_error_checks
-  :: Class
-  -> (SDoc -> DerivM ())
-  -> DerivM ()
-atf_coerce_based_error_checks cls bale_out
-  = let cls_tyvars = classTyVars cls
-
-        ats_look_sensible
-           =  -- Check (a) from Note [GND and associated type families]
-              no_adfs
-              -- Check (b) from Note [GND and associated type families]
-           && isNothing at_without_last_cls_tv
-              -- Check (d) from Note [GND and associated type families]
-           && isNothing at_last_cls_tv_in_kinds
-
-        (adf_tcs, atf_tcs) = partition isDataFamilyTyCon at_tcs
-        no_adfs            = null adf_tcs
-               -- We cannot newtype-derive data family instances
-
-        at_without_last_cls_tv
-          = find (\tc -> last_cls_tv `notElem` tyConTyVars tc) atf_tcs
-        at_last_cls_tv_in_kinds
-          = find (\tc -> any (at_last_cls_tv_in_kind . tyVarKind)
-                             (tyConTyVars tc)
-                      || at_last_cls_tv_in_kind (tyConResKind tc)) atf_tcs
-        at_last_cls_tv_in_kind kind
-          = last_cls_tv `elemVarSet` exactTyCoVarsOfType kind
-        at_tcs = classATs cls
-        last_cls_tv = ASSERT( notNull cls_tyvars )
-                      last cls_tyvars
-
-        cant_derive_err
-           = vcat [ ppUnless no_adfs adfs_msg
-                  , maybe empty at_without_last_cls_tv_msg
-                          at_without_last_cls_tv
-                  , maybe empty at_last_cls_tv_in_kinds_msg
-                          at_last_cls_tv_in_kinds
-                  ]
-        adfs_msg  = text "the class has associated data types"
-        at_without_last_cls_tv_msg at_tc = hang
-          (text "the associated type" <+> quotes (ppr at_tc)
-           <+> text "is not parameterized over the last type variable")
-          2 (text "of the class" <+> quotes (ppr cls))
-        at_last_cls_tv_in_kinds_msg at_tc = hang
-          (text "the associated type" <+> quotes (ppr at_tc)
-           <+> text "contains the last type variable")
-         2 (text "of the class" <+> quotes (ppr cls)
-           <+> text "in a kind, which is not (yet) allowed")
-    in unless ats_look_sensible $ bale_out cant_derive_err
-
-mk_eqn_stock :: (DerivSpecMechanism -> DerivM EarlyDerivSpec)
-             -> (SDoc -> DerivM EarlyDerivSpec)
+mk_eqn_stock :: DerivInstTys -- Information about the arguments to the class
              -> DerivM EarlyDerivSpec
-mk_eqn_stock go_for_it bale_out
-  = do DerivEnv { denv_tc      = tc
-                , denv_rep_tc  = rep_tc
-                , denv_cls     = cls
-                , denv_cls_tys = cls_tys
-                , denv_ctxt    = deriv_ctxt } <- ask
+mk_eqn_stock dit@(DerivInstTys { dit_cls_tys = cls_tys
+                               , dit_tc      = tc
+                               , dit_rep_tc  = rep_tc })
+  = do DerivEnv { denv_cls  = cls
+                , denv_ctxt = deriv_ctxt } <- ask
        dflags <- getDynFlags
        case checkOriginativeSideConditions dflags deriv_ctxt cls cls_tys
                                            tc rep_tc of
-         CanDeriveStock gen_fn -> go_for_it $ DerivSpecStock gen_fn
-         StockClassError msg   -> bale_out msg
-         _                     -> bale_out (nonStdErr cls)
+         CanDeriveStock gen_fn -> mk_eqn_from_mechanism $
+                                  DerivSpecStock { dsm_stock_dit    = dit
+                                                 , dsm_stock_gen_fn = gen_fn }
+         StockClassError msg   -> derivingThingFailWith False msg
+         _                     -> derivingThingFailWith False (nonStdErr cls)
 
-mk_eqn_anyclass :: (DerivSpecMechanism -> DerivM EarlyDerivSpec)
-                -> (SDoc -> DerivM EarlyDerivSpec)
-                -> DerivM EarlyDerivSpec
-mk_eqn_anyclass go_for_it bale_out
+mk_eqn_anyclass :: DerivM EarlyDerivSpec
+mk_eqn_anyclass
   = do dflags <- getDynFlags
        case canDeriveAnyClass dflags of
-         IsValid      -> go_for_it DerivSpecAnyClass
-         NotValid msg -> bale_out msg
+         IsValid      -> mk_eqn_from_mechanism DerivSpecAnyClass
+         NotValid msg -> derivingThingFailWith False msg
 
-mk_eqn_newtype :: Type -- The newtype's representation type
+mk_eqn_newtype :: DerivInstTys -- Information about the arguments to the class
+               -> Type         -- The newtype's representation type
                -> DerivM EarlyDerivSpec
-mk_eqn_newtype = mk_coerce_based_eqn DerivSpecNewtype
+mk_eqn_newtype dit rep_ty =
+  mk_eqn_from_mechanism $ DerivSpecNewtype { dsm_newtype_dit    = dit
+                                           , dsm_newtype_rep_ty = rep_ty }
 
-mk_eqn_via :: Type -- The @via@ type
+mk_eqn_via :: [Type] -- All arguments to the class besides the last
+           -> Type   -- The last argument to the class
+           -> Type   -- The @via@ type
            -> DerivM EarlyDerivSpec
-mk_eqn_via = mk_coerce_based_eqn DerivSpecVia
+mk_eqn_via cls_tys inst_ty via_ty =
+  mk_eqn_from_mechanism $ DerivSpecVia { dsm_via_cls_tys = cls_tys
+                                       , dsm_via_inst_ty = inst_ty
+                                       , dsm_via_ty      = via_ty }
 
-mk_eqn_no_mechanism :: (DerivSpecMechanism -> DerivM EarlyDerivSpec)
-                    -> (SDoc -> DerivM EarlyDerivSpec)
-                    -> DerivM EarlyDerivSpec
-mk_eqn_no_mechanism go_for_it bale_out
-  = do DerivEnv { denv_tc      = tc
-                , denv_rep_tc  = rep_tc
-                , denv_cls     = cls
-                , denv_cls_tys = cls_tys
-                , denv_ctxt    = deriv_ctxt } <- ask
-       dflags <- getDynFlags
+-- Derive an instance without a user-requested deriving strategy. This uses
+-- heuristics to determine which deriving strategy to use.
+-- See Note [Deriving strategies].
+mk_eqn_no_strategy :: DerivM EarlyDerivSpec
+mk_eqn_no_strategy = do
+  DerivEnv { denv_cls      = cls
+           , denv_inst_tys = cls_args } <- ask
+  fam_envs <- lift tcGetFamInstEnvs
 
-           -- See Note [Deriving instances for classes themselves]
-       let dac_error msg
-             | isClassTyCon rep_tc
-             = quotes (ppr tc) <+> text "is a type class,"
-                               <+> text "and can only have a derived instance"
-                               $+$ text "if DeriveAnyClass is enabled"
-             | otherwise
-             = nonStdErr cls $$ msg
+  -- First, check if the last argument is an application of a type constructor.
+  -- If not, fall back to DeriveAnyClass.
+  if |  Just (cls_tys, inst_ty) <- snocView cls_args
+     ,  Just dit <- mk_deriv_inst_tys_maybe fam_envs cls_tys inst_ty
+     -> if |  isNewTyCon (dit_rep_tc dit)
+              -- We have a dedicated code path for newtypes (see the
+              -- documentation for mkNewTypeEqn as to why this is the case)
+           -> mkNewTypeEqn False dit
 
-       case checkOriginativeSideConditions dflags deriv_ctxt cls cls_tys
-                                           tc rep_tc of
-           -- NB: pass the *representation* tycon to
-           -- checkOriginativeSideConditions
-           NonDerivableClass   msg -> bale_out (dac_error msg)
-           StockClassError msg     -> bale_out msg
-           CanDeriveStock gen_fn   -> go_for_it $ DerivSpecStock gen_fn
-           CanDeriveAnyClass       -> go_for_it DerivSpecAnyClass
+           |  otherwise
+           -> do -- Otherwise, our only other options are stock or anyclass.
+                 -- If it is stock, we must confirm that the last argument's
+                 -- type constructor is algebraic.
+                 -- See Note [DerivEnv and DerivSpecMechanism] in TcDerivUtils
+                 whenIsJust (hasStockDeriving cls) $ \_ ->
+                   expectNonDataFamTyCon dit
+                 mk_eqn_originative dit
+
+     |  otherwise
+     -> mk_eqn_anyclass
+  where
+    -- Use heuristics (checkOriginativeSideConditions) to determine whether
+    -- stock or anyclass deriving should be used.
+    mk_eqn_originative :: DerivInstTys -> DerivM EarlyDerivSpec
+    mk_eqn_originative dit@(DerivInstTys { dit_cls_tys = cls_tys
+                                         , dit_tc      = tc
+                                         , dit_rep_tc  = rep_tc }) = do
+      DerivEnv { denv_cls  = cls
+               , denv_ctxt = deriv_ctxt } <- ask
+      dflags <- getDynFlags
+
+      -- See Note [Deriving instances for classes themselves]
+      let dac_error msg
+            | isClassTyCon rep_tc
+            = quotes (ppr tc) <+> text "is a type class,"
+                              <+> text "and can only have a derived instance"
+                              $+$ text "if DeriveAnyClass is enabled"
+            | otherwise
+            = nonStdErr cls $$ msg
+
+      case checkOriginativeSideConditions dflags deriv_ctxt cls
+             cls_tys tc rep_tc of
+        NonDerivableClass   msg -> derivingThingFailWith False (dac_error msg)
+        StockClassError msg     -> derivingThingFailWith False msg
+        CanDeriveStock gen_fn   -> mk_eqn_from_mechanism $
+                                   DerivSpecStock { dsm_stock_dit    = dit
+                                                  , dsm_stock_gen_fn = gen_fn }
+        CanDeriveAnyClass       -> mk_eqn_from_mechanism DerivSpecAnyClass
 
 {-
 ************************************************************************
 *                                                                      *
-            GeneralizedNewtypeDeriving and DerivingVia
+            Deriving instances for newtypes
 *                                                                      *
 ************************************************************************
 -}
 
--- | Derive an instance for a newtype.
-mkNewTypeEqn :: DerivM EarlyDerivSpec
-mkNewTypeEqn
+-- Derive an instance for a newtype. We put this logic into its own function
+-- because
+--
+-- (a) When no explicit deriving strategy is requested, we have special
+--     heuristics for newtypes to determine which deriving strategy should
+--     actually be used. See Note [Deriving strategies].
+-- (b) We make an effort to give error messages specifically tailored to
+--     newtypes.
+mkNewTypeEqn :: Bool -- Was this instance derived using an explicit @newtype@
+                     -- deriving strategy?
+             -> DerivInstTys -> DerivM EarlyDerivSpec
+mkNewTypeEqn newtype_strat dit@(DerivInstTys { dit_cls_tys     = cls_tys
+                                             , dit_tc          = tycon
+                                             , dit_rep_tc      = rep_tycon
+                                             , dit_rep_tc_args = rep_tc_args })
 -- Want: instance (...) => cls (cls_tys ++ [tycon tc_args]) where ...
-  = do DerivEnv { denv_tc           = tycon
-                , denv_rep_tc       = rep_tycon
-                , denv_rep_tc_args  = rep_tc_args
-                , denv_cls          = cls
-                , denv_cls_tys      = cls_tys
-                , denv_ctxt         = deriv_ctxt
-                , denv_strat        = mb_strat } <- ask
+  = do DerivEnv { denv_cls   = cls
+                , denv_ctxt  = deriv_ctxt } <- ask
        dflags <- getDynFlags
 
        let newtype_deriving  = xopt LangExt.GeneralizedNewtypeDeriving dflags
            deriveAnyClass    = xopt LangExt.DeriveAnyClass             dflags
-           bale_out        = bale_out' newtype_deriving
-           bale_out' b msg = do err <- derivingThingErrM b msg
-                                lift $ failWithTc err
+
+           bale_out = derivingThingFailWith newtype_deriving
 
            non_std     = nonStdErr cls
            suggest_gnd = text "Try GeneralizedNewtypeDeriving for GHC's"
@@ -1696,10 +1560,8 @@ mkNewTypeEqn
            eta_msg = text "cannot eta-reduce the representation type enough"
 
        MASSERT( cls_tys `lengthIs` (classArity cls - 1) )
-       case mb_strat of
-         Just StockStrategy    -> mk_eqn_stock    mk_originative_eqn bale_out
-         Just AnyclassStrategy -> mk_eqn_anyclass mk_originative_eqn bale_out
-         Just NewtypeStrategy  ->
+       if newtype_strat
+       then
            -- Since the user explicitly asked for GeneralizedNewtypeDeriving,
            -- we don't need to perform all of the checks we normally would,
            -- such as if the class being derived is known to produce ill-roled
@@ -1707,20 +1569,15 @@ mkNewTypeEqn
            -- instance and let it error if need be.
            -- See Note [Determining whether newtype-deriving is appropriate]
            if eta_ok && newtype_deriving
-             then mk_eqn_newtype rep_inst_ty
+             then mk_eqn_newtype dit rep_inst_ty
              else bale_out (cant_derive_err $$
                             if newtype_deriving then empty else suggest_gnd)
-         Just (ViaStrategy via_ty) ->
-           -- NB: For DerivingVia, we don't need to any eta-reduction checking,
-           -- since the @via@ type is already "eta-reduced".
-           mk_eqn_via via_ty
-         Nothing
-           | might_be_newtype_derivable
+       else
+         if might_be_newtype_derivable
              && ((newtype_deriving && not deriveAnyClass)
                   || std_class_via_coercible cls)
-          -> mk_eqn_newtype rep_inst_ty
-           | otherwise
-          -> case checkOriginativeSideConditions dflags deriv_ctxt cls cls_tys
+         then mk_eqn_newtype dit rep_inst_ty
+         else case checkOriginativeSideConditions dflags deriv_ctxt cls cls_tys
                                                  tycon rep_tycon of
                StockClassError msg
                  -- There's a particular corner case where
@@ -1733,7 +1590,7 @@ mkNewTypeEqn
                  -- and the previous cases won't catch it. This fixes the bug
                  -- reported in #10598.
                  | might_be_newtype_derivable && newtype_deriving
-                -> mk_eqn_newtype rep_inst_ty
+                -> mk_eqn_newtype dit rep_inst_ty
                  -- Otherwise, throw an error for a stock class
                  | might_be_newtype_derivable && not newtype_deriving
                 -> bale_out (msg $$ suggest_gnd)
@@ -1756,7 +1613,8 @@ mkNewTypeEqn
                  -- DeriveAnyClass, but emitting a warning about the choice.
                  -- See Note [Deriving strategies]
                  when (newtype_deriving && deriveAnyClass) $
-                   lift $ addWarnTc NoReason $ sep
+                   lift $ whenWOptM Opt_WarnDerivingDefaults $
+                     addWarnTc (Reason Opt_WarnDerivingDefaults) $ sep
                      [ text "Both DeriveAnyClass and"
                        <+> text "GeneralizedNewtypeDeriving are enabled"
                      , text "Defaulting to the DeriveAnyClass strategy"
@@ -1764,10 +1622,11 @@ mkNewTypeEqn
                      , text "Use DerivingStrategies to pick"
                        <+> text "a different strategy"
                       ]
-                 mk_originative_eqn DerivSpecAnyClass
+                 mk_eqn_from_mechanism DerivSpecAnyClass
                -- CanDeriveStock
-               CanDeriveStock gen_fn -> mk_originative_eqn $
-                                        DerivSpecStock gen_fn
+               CanDeriveStock gen_fn -> mk_eqn_from_mechanism $
+                                        DerivSpecStock { dsm_stock_dit    = dit
+                                                       , dsm_stock_gen_fn = gen_fn }
 
 {-
 Note [Recursive newtypes]
@@ -1974,25 +1833,19 @@ the renamer.  What a great hack!
 \end{itemize}
 -}
 
--- Generate the InstInfo for the required instance paired with the
---   *representation* tycon for that instance,
+-- Generate the InstInfo for the required instance
 -- plus any auxiliary bindings required
---
--- Representation tycons differ from the tycon in the instance signature in
--- case of instances for indexed families.
---
 genInst :: DerivSpec theta
         -> TcM (ThetaType -> TcM (InstInfo GhcPs), BagDerivStuff, [Name])
 -- We must use continuation-returning style here to get the order in which we
 -- typecheck family instances and derived instances right.
 -- See Note [Staging of tcDeriving]
-genInst spec@(DS { ds_tvs = tvs, ds_tc = rep_tycon
-                 , ds_mechanism = mechanism, ds_tys = tys
-                 , ds_cls = clas, ds_loc = loc
+genInst spec@(DS { ds_tvs = tvs, ds_mechanism = mechanism
+                 , ds_tys = tys, ds_cls = clas, ds_loc = loc
                  , ds_standalone_wildcard = wildcard })
   = do (meth_binds, deriv_stuff, unusedNames)
          <- set_span_and_ctxt $
-            genDerivStuff mechanism loc clas rep_tycon tys tvs
+            genDerivStuff mechanism loc clas tys tvs
        let mk_inst_info theta = set_span_and_ctxt $ do
              inst_spec <- newDerivClsInst theta spec
              doDerivInstErrorChecks2 clas inst_spec theta wildcard mechanism
@@ -2019,34 +1872,116 @@ genInst spec@(DS { ds_tvs = tvs, ds_tc = rep_tycon
     set_span_and_ctxt :: TcM a -> TcM a
     set_span_and_ctxt = setSrcSpan loc . addErrCtxt (instDeclCtxt3 clas tys)
 
+-- Checks:
+--
+-- * All of the data constructors for a data type are in scope for a
+--   standalone-derived instance (for `stock` and `newtype` deriving).
+--
+-- * All of the associated type families of a class are suitable for
+--   GeneralizedNewtypeDeriving or DerivingVia (for `newtype` and `via`
+--   deriving).
 doDerivInstErrorChecks1 :: DerivSpecMechanism -> DerivM ()
-doDerivInstErrorChecks1 mechanism = do
-    DerivEnv { denv_tc      = tc
-             , denv_rep_tc  = rep_tc } <- ask
-    standalone <- isStandaloneDeriv
-    let anyclass_strategy = isDerivSpecAnyClass mechanism
-        via_strategy      = isDerivSpecVia mechanism
-        bale_out msg = do err <- derivingThingErrMechanism mechanism msg
-                          lift $ failWithTc err
+doDerivInstErrorChecks1 mechanism =
+  case mechanism of
+    DerivSpecStock{dsm_stock_dit = dit}
+      -> data_cons_in_scope_check dit
+    DerivSpecNewtype{dsm_newtype_dit = dit}
+      -> do atf_coerce_based_error_checks
+            data_cons_in_scope_check dit
+    DerivSpecAnyClass{}
+      -> pure ()
+    DerivSpecVia{}
+      -> atf_coerce_based_error_checks
+  where
+    -- When processing a standalone deriving declaration, check that all of the
+    -- constructors for the data type are in scope. For instance:
+    --
+    --   import M (T)
+    --   deriving stock instance Eq T
+    --
+    -- This should be rejected, as the derived Eq instance would need to refer
+    -- to the constructors for T, which are not in scope.
+    --
+    -- Note that the only strategies that require this check are `stock` and
+    -- `newtype`. Neither `anyclass` nor `via` require it as the code that they
+    -- generate does not require using data constructors.
+    data_cons_in_scope_check :: DerivInstTys -> DerivM ()
+    data_cons_in_scope_check (DerivInstTys { dit_tc     = tc
+                                           , dit_rep_tc = rep_tc }) = do
+      standalone <- isStandaloneDeriv
+      when standalone $ do
+        let bale_out msg = do err <- derivingThingErrMechanism mechanism msg
+                              lift $ failWithTc err
 
-    -- For standalone deriving, check that all the data constructors are in
-    -- scope...
-    rdr_env <- lift getGlobalRdrEnv
-    let data_con_names = map dataConName (tyConDataCons rep_tc)
-        hidden_data_cons = not (isWiredInName (tyConName rep_tc)) &&
-                           (isAbstractTyCon rep_tc ||
-                            any not_in_scope data_con_names)
-        not_in_scope dc  = isNothing (lookupGRE_Name rdr_env dc)
+        rdr_env <- lift getGlobalRdrEnv
+        let data_con_names = map dataConName (tyConDataCons rep_tc)
+            hidden_data_cons = not (isWiredInName (tyConName rep_tc)) &&
+                               (isAbstractTyCon rep_tc ||
+                                any not_in_scope data_con_names)
+            not_in_scope dc  = isNothing (lookupGRE_Name rdr_env dc)
 
-    lift $ addUsedDataCons rdr_env rep_tc
+        -- Make sure to also mark the data constructors as used so that GHC won't
+        -- mistakenly emit -Wunused-imports warnings about them.
+        lift $ addUsedDataCons rdr_env rep_tc
 
-    -- ...however, we don't perform this check if we're using DeriveAnyClass,
-    -- since it doesn't generate any code that requires use of a data
-    -- constructor. Nor do we perform this check with @deriving via@, as it
-    -- doesn't explicitly require the constructors to be in scope.
-    unless (anyclass_strategy || via_strategy
-            || not standalone || not hidden_data_cons) $
-           bale_out $ derivingHiddenErr tc
+        unless (not hidden_data_cons) $
+          bale_out $ derivingHiddenErr tc
+
+    -- Ensure that a class's associated type variables are suitable for
+    -- GeneralizedNewtypeDeriving or DerivingVia. Unsurprisingly, this check is
+    -- only required for the `newtype` and `via` strategies.
+    --
+    -- See Note [GND and associated type families]
+    atf_coerce_based_error_checks :: DerivM ()
+    atf_coerce_based_error_checks = do
+      cls <- asks denv_cls
+      let bale_out msg = do err <- derivingThingErrMechanism mechanism msg
+                            lift $ failWithTc err
+
+          cls_tyvars = classTyVars cls
+
+          ats_look_sensible
+             =  -- Check (a) from Note [GND and associated type families]
+                no_adfs
+                -- Check (b) from Note [GND and associated type families]
+             && isNothing at_without_last_cls_tv
+                -- Check (d) from Note [GND and associated type families]
+             && isNothing at_last_cls_tv_in_kinds
+
+          (adf_tcs, atf_tcs) = partition isDataFamilyTyCon at_tcs
+          no_adfs            = null adf_tcs
+                 -- We cannot newtype-derive data family instances
+
+          at_without_last_cls_tv
+            = find (\tc -> last_cls_tv `notElem` tyConTyVars tc) atf_tcs
+          at_last_cls_tv_in_kinds
+            = find (\tc -> any (at_last_cls_tv_in_kind . tyVarKind)
+                               (tyConTyVars tc)
+                        || at_last_cls_tv_in_kind (tyConResKind tc)) atf_tcs
+          at_last_cls_tv_in_kind kind
+            = last_cls_tv `elemVarSet` exactTyCoVarsOfType kind
+          at_tcs = classATs cls
+          last_cls_tv = ASSERT( notNull cls_tyvars )
+                        last cls_tyvars
+
+          cant_derive_err
+             = vcat [ ppUnless no_adfs adfs_msg
+                    , maybe empty at_without_last_cls_tv_msg
+                            at_without_last_cls_tv
+                    , maybe empty at_last_cls_tv_in_kinds_msg
+                            at_last_cls_tv_in_kinds
+                    ]
+          adfs_msg  = text "the class has associated data types"
+          at_without_last_cls_tv_msg at_tc = hang
+            (text "the associated type" <+> quotes (ppr at_tc)
+             <+> text "is not parameterized over the last type variable")
+            2 (text "of the class" <+> quotes (ppr cls))
+          at_last_cls_tv_in_kinds_msg at_tc = hang
+            (text "the associated type" <+> quotes (ppr at_tc)
+             <+> text "contains the last type variable")
+           2 (text "of the class" <+> quotes (ppr cls)
+             <+> text "in a kind, which is not (yet) allowed")
+      unless ats_look_sensible $ bale_out cant_derive_err
 
 doDerivInstErrorChecks2 :: Class -> ClsInst -> ThetaType -> Maybe SrcSpan
                         -> DerivSpecMechanism -> TcM ()
@@ -2085,16 +2020,29 @@ doDerivInstErrorChecks2 clas clas_inst theta wildcard mechanism
     gen_inst_err = text "Generic instances can only be derived in"
                <+> text "Safe Haskell using the stock strategy."
 
+derivingThingFailWith :: Bool -- If True, add a snippet about how not even
+                              -- GeneralizedNewtypeDeriving would make this
+                              -- declaration work. This only kicks in when
+                              -- an explicit deriving strategy is not given.
+                      -> SDoc -- The error message
+                      -> DerivM a
+derivingThingFailWith newtype_deriving msg = do
+  err <- derivingThingErrM newtype_deriving msg
+  lift $ failWithTc err
+
 genDerivStuff :: DerivSpecMechanism -> SrcSpan -> Class
-              -> TyCon -> [Type] -> [TyVar]
+              -> [Type] -> [TyVar]
               -> TcM (LHsBinds GhcPs, BagDerivStuff, [Name])
-genDerivStuff mechanism loc clas tycon inst_tys tyvars
+genDerivStuff mechanism loc clas inst_tys tyvars
   = case mechanism of
       -- See Note [Bindings for Generalised Newtype Deriving]
-      DerivSpecNewtype rhs_ty -> gen_newtype_or_via rhs_ty
+      DerivSpecNewtype { dsm_newtype_rep_ty = rhs_ty}
+        -> gen_newtype_or_via rhs_ty
 
       -- Try a stock deriver
-      DerivSpecStock gen_fn -> gen_fn loc tycon inst_tys
+      DerivSpecStock { dsm_stock_dit    = DerivInstTys{dit_rep_tc = rep_tc}
+                     , dsm_stock_gen_fn = gen_fn }
+        -> gen_fn loc rep_tc inst_tys
 
       -- Try DeriveAnyClass
       DerivSpecAnyClass -> do
@@ -2116,19 +2064,12 @@ genDerivStuff mechanism loc clas tycon inst_tys tyvars
                , [] )
 
       -- Try DerivingVia
-      DerivSpecVia via_ty -> gen_newtype_or_via via_ty
+      DerivSpecVia{dsm_via_ty = via_ty}
+        -> gen_newtype_or_via via_ty
   where
     gen_newtype_or_via ty = do
       (binds, faminsts) <- gen_Newtype_binds loc clas tyvars inst_tys ty
-      return (binds, faminsts, maybeToList unusedConName)
-
-    unusedConName :: Maybe Name
-    unusedConName
-      | isDerivSpecNewtype mechanism
-        -- See Note [Newtype deriving and unused constructors]
-      = Just $ getName $ head $ tyConDataCons tycon
-      | otherwise
-      = Nothing
+      return (binds, faminsts, [])
 
 {-
 Note [Bindings for Generalised Newtype Deriving]
@@ -2217,9 +2158,12 @@ Currently, the deriving strategies are:
 
 The latter two strategies (newtype and via) are referred to as the
 "coerce-based" strategies, since they generate code that relies on the `coerce`
-function. The former two strategies (stock and anyclass), in contrast, are
+function. See, for instance, TcDerivInfer.inferConstraintsCoerceBased.
+
+The former two strategies (stock and anyclass), in contrast, are
 referred to as the "originative" strategies, since they create "original"
 instances instead of "reusing" old instances (by way of `coerce`).
+See, for instance, TcDerivUtils.checkOriginativeSideConditions.
 
 If an explicit deriving strategy is not given, GHC has an algorithm it uses to
 determine which strategy it will actually use. The algorithm is quite long,
@@ -2305,37 +2249,30 @@ derivingEtaErr cls cls_tys inst_ty
          nest 2 (text "instance (...) =>"
                 <+> pprClassPred cls (cls_tys ++ [inst_ty]))]
 
-derivingThingErr :: Bool -> Class -> [Type] -> Type
+derivingThingErr :: Bool -> Class -> [Type]
                  -> Maybe (DerivStrategy GhcTc) -> MsgDoc -> MsgDoc
-derivingThingErr newtype_deriving cls cls_tys inst_ty mb_strat why
-  = derivingThingErr' newtype_deriving cls cls_tys inst_ty mb_strat
+derivingThingErr newtype_deriving cls cls_args mb_strat why
+  = derivingThingErr' newtype_deriving cls cls_args mb_strat
                       (maybe empty derivStrategyName mb_strat) why
 
 derivingThingErrM :: Bool -> MsgDoc -> DerivM MsgDoc
 derivingThingErrM newtype_deriving why
-  = do DerivEnv { denv_tc      = tc
-                , denv_tc_args = tc_args
-                , denv_cls     = cls
-                , denv_cls_tys = cls_tys
-                , denv_strat   = mb_strat } <- ask
-       pure $ derivingThingErr newtype_deriving cls cls_tys
-                               (mkTyConApp tc tc_args) mb_strat why
+  = do DerivEnv { denv_cls      = cls
+                , denv_inst_tys = cls_args
+                , denv_strat    = mb_strat } <- ask
+       pure $ derivingThingErr newtype_deriving cls cls_args mb_strat why
 
 derivingThingErrMechanism :: DerivSpecMechanism -> MsgDoc -> DerivM MsgDoc
 derivingThingErrMechanism mechanism why
-  = do DerivEnv { denv_tc      = tc
-                , denv_tc_args = tc_args
-                , denv_cls     = cls
-                , denv_cls_tys = cls_tys
-                , denv_strat   = mb_strat } <- ask
-       pure $ derivingThingErr' (isDerivSpecNewtype mechanism) cls cls_tys
-                (mkTyConApp tc tc_args) mb_strat
-                (derivStrategyName $ derivSpecMechanismToStrategy mechanism)
-                why
+  = do DerivEnv { denv_cls      = cls
+                , denv_inst_tys = cls_args
+                , denv_strat    = mb_strat } <- ask
+       pure $ derivingThingErr' (isDerivSpecNewtype mechanism) cls cls_args mb_strat
+                (derivStrategyName $ derivSpecMechanismToStrategy mechanism) why
 
-derivingThingErr' :: Bool -> Class -> [Type] -> Type
+derivingThingErr' :: Bool -> Class -> [Type]
                   -> Maybe (DerivStrategy GhcTc) -> MsgDoc -> MsgDoc -> MsgDoc
-derivingThingErr' newtype_deriving cls cls_tys inst_ty mb_strat strat_msg why
+derivingThingErr' newtype_deriving cls cls_args mb_strat strat_msg why
   = sep [(hang (text "Can't make a derived instance of")
              2 (quotes (ppr pred) <+> via_mechanism)
           $$ nest 2 extra) <> colon,
@@ -2345,7 +2282,7 @@ derivingThingErr' newtype_deriving cls cls_tys inst_ty mb_strat strat_msg why
     extra | not strat_used, newtype_deriving
           = text "(even with cunning GeneralizedNewtypeDeriving)"
           | otherwise = empty
-    pred = mkClassPred cls (cls_tys ++ [inst_ty])
+    pred = mkClassPred cls cls_args
     via_mechanism | strat_used
                   = text "with the" <+> strat_msg <+> text "strategy"
                   | otherwise

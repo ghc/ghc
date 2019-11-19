@@ -1,0 +1,4 @@
+
+saks_fail003.hs:6:11: error:
+    Wildcard ‘_’ not allowed
+      in the standalone kind signature for T

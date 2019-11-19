@@ -23,7 +23,7 @@ import GhcPrelude
 import Bag
 import DataCon
 import FastString
-import HsSyn
+import GHC.Hs
 import Panic
 import PrelNames
 import RdrName

@@ -17,7 +17,7 @@ Description
 
 This manual page documents briefly the ``ghc`` and ``ghci`` commands. Note that
 ``ghci`` is not yet available on all architectures. Extensive documentation is
-available in various other formats including PDF and HTML; see below.
+available in various other formats including `PDF <https://downloads.haskell.org/ghc/latest/docs/users_guide.pdf>`_ and `HTML <https://downloads.haskell.org/ghc/latest/docs/html/>`_.
 
 Each of GHC's command line options is classified as either *static* or
 *dynamic*. A static flag may only be specified on the command line, whereas a

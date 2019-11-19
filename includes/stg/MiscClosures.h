@@ -243,7 +243,7 @@ RTS_THUNK(stg_ap_6_upd);
 RTS_THUNK(stg_ap_7_upd);
 
 /* standard application routines (see also utils/genapply,
- * and compiler/codeGen/StgCmmArgRep.hs).
+ * and GHC.StgToCmm.ArgRep).
  */
 RTS_RET(stg_ap_v);
 RTS_RET(stg_ap_f);
@@ -371,6 +371,7 @@ RTS_FUN_DECL(stg_isByteArrayPinnedzh);
 RTS_FUN_DECL(stg_isMutableByteArrayPinnedzh);
 RTS_FUN_DECL(stg_shrinkMutableByteArrayzh);
 RTS_FUN_DECL(stg_resizzeMutableByteArrayzh);
+RTS_FUN_DECL(stg_shrinkSmallMutableArrayzh);
 RTS_FUN_DECL(stg_casIntArrayzh);
 RTS_FUN_DECL(stg_newArrayzh);
 RTS_FUN_DECL(stg_newArrayArrayzh);
@@ -532,13 +533,13 @@ extern StgWord      CCS_OVERHEAD[];
 extern StgWord      CCS_SYSTEM[];
 
 // Calls to these rts functions are generated directly
-// by codegen (see compiler/codeGen/StgCmmProf.hs)
+// by codegen (see GHC.StgToCmm.Prof)
 // and don't require (don't emit) forward declarations.
 //
 // In unregisterised mode (when building via .hc files)
 // the calls are ordinary C calls. Functions must be in
 // scope and must match prototype assumed by
-//    'compiler/codeGen/StgCmmProf.hs'
+//    'GHC.StgToCmm.Prof'
 // as opposed to real prototype declared in
 //    'includes/rts/prof/CCS.h'
 void enterFunCCS (void *reg, void *ccsfn);
@@ -546,5 +547,12 @@ void * pushCostCentre (void *ccs, void *cc);
 
 // Capability.c
 extern unsigned int n_capabilities;
+
+/* -----------------------------------------------------------------------------
+   Nonmoving GC write barrier
+   -------------------------------------------------------------------------- */
+
+#include <rts/NonMoving.h>
+
 
 #endif

@@ -1,18 +1,15 @@
 /* MD5 message digest */
 #pragma once
 
-#include "HsFFI.h"
-
-typedef HsWord32 word32;
-typedef HsWord8  byte;
+#include <stdint.h>
 
 struct MD5Context {
-	word32 buf[4];
-	word32 bytes[2];
-	word32 in[16];
+	uint32_t buf[4];
+	uint32_t bytes[2];
+	uint32_t in[16];
 };
 
 void __hsbase_MD5Init(struct MD5Context *context);
-void __hsbase_MD5Update(struct MD5Context *context, byte const *buf, int len);
-void __hsbase_MD5Final(byte digest[16], struct MD5Context *context);
-void __hsbase_MD5Transform(word32 buf[4], word32 const in[16]);
+void __hsbase_MD5Update(struct MD5Context *context, uint8_t const *buf, int len);
+void __hsbase_MD5Final(uint8_t digest[16], struct MD5Context *context);
+void __hsbase_MD5Transform(uint32_t buf[4], uint32_t const in[16]);

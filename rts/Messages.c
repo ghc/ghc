@@ -244,8 +244,8 @@ loop:
         // a barrier is necessary to ensure that all writes are visible.
         // See Note [Heap memory barriers] in SMP.h.
         write_barrier();
+        dirty_TSO(cap, owner); // we will modify owner->bq
         owner->bq = bq;
-        dirty_TSO(cap, owner); // we modified owner->bq
 
         // If the owner of the blackhole is currently runnable, then
         // bump it to the front of the run queue.  This gives the
@@ -262,6 +262,9 @@ loop:
 
         // point to the BLOCKING_QUEUE from the BLACKHOLE
         write_barrier(); // make the BQ visible, see Note [Heap memory barriers].
+        IF_NONMOVING_WRITE_BARRIER_ENABLED {
+            updateRemembSetPushClosure(cap, (StgClosure*)p);
+        }
         ((StgInd*)bh)->indirectee = (StgClosure *)bq;
         recordClosureMutated(cap,bh); // bh was mutated
 
@@ -290,6 +293,11 @@ loop:
         }
 #endif
 
+        IF_NONMOVING_WRITE_BARRIER_ENABLED {
+            // We are about to overwrite bq->queue; make sure its current value
+            // makes it into the update remembered set
+            updateRemembSetPushClosure(cap, (StgClosure*)bq->queue);
+        }
         msg->link = bq->queue;
         bq->queue = msg;
         // No barrier is necessary here: we are only exposing the

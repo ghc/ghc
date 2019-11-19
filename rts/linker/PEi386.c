@@ -275,6 +275,12 @@ const int default_alignment = 8;
 const int initHeapSizeMB    = 15;
 static HANDLE code_heap     = NULL;
 
+/* See Note [_iob_func symbol]
+   In order to emulate __iob_func the memory location needs to point the
+   location of the I/O structures in memory.  As such we need RODATA to contain
+   the pointer as a redirect.  Essentially it's a DATA DLL reference.  */
+const void* __rts_iob_func = (void*)&__acrt_iob_func;
+
 /* Low Fragmentation Heap, try to prevent heap from increasing in size when
    space can simply be reclaimed.  These are enums missing from mingw-w64's
    headers.  */
@@ -758,7 +764,7 @@ pathchar* findSystemLibrary_PEi386( pathchar* dll_name )
 HsPtr addLibrarySearchPath_PEi386(pathchar* dll_path)
 {
     HINSTANCE hDLL = LoadLibraryW(L"Kernel32.DLL");
-    LPAddDLLDirectory AddDllDirectory = (LPAddDLLDirectory)GetProcAddress((HMODULE)hDLL, "AddDllDirectory");
+    LPAddDLLDirectory AddDllDirectory = (LPAddDLLDirectory)(void*)GetProcAddress((HMODULE)hDLL, "AddDllDirectory");
 
     HsPtr result = NULL;
 
@@ -828,7 +834,7 @@ bool removeLibrarySearchPath_PEi386(HsPtr dll_path_index)
 
     if (dll_path_index != NULL) {
         HINSTANCE hDLL = LoadLibraryW(L"Kernel32.DLL");
-        LPRemoveDLLDirectory RemoveDllDirectory = (LPRemoveDLLDirectory)GetProcAddress((HMODULE)hDLL, "RemoveDllDirectory");
+        LPRemoveDLLDirectory RemoveDllDirectory = (LPRemoveDLLDirectory)(void*)GetProcAddress((HMODULE)hDLL, "RemoveDllDirectory");
 
         if (RemoveDllDirectory) {
             result = RemoveDllDirectory(dll_path_index);
@@ -1820,6 +1826,8 @@ makeSymbolExtra_PEi386( ObjectCode* oc, uint64_t index, size_t s, char* symbol )
     return (size_t)extra->jumpIsland;
 }
 
+void ocProtectExtras(ObjectCode* oc STG_UNUSED) { }
+
 #endif /* x86_64_HOST_ARCH */
 
 bool
@@ -1961,14 +1969,14 @@ ocResolve_PEi386 ( ObjectCode* oc )
                {
                    intptr_t v;
                    v = S + (int32_t)A - ((intptr_t)pP) - 4;
-                   if ((v >> 32) && ((-v) >> 32)) {
+                   if ((v > (intptr_t) INT32_MAX) || (v < (intptr_t) INT32_MIN)) {
                        /* Make the trampoline then */
                        copyName (getSymShortName (info, sym),
                                  oc, symbol, sizeof(symbol)-1);
                        S = makeSymbolExtra_PEi386(oc, symIndex, S, (char *)symbol);
                        /* And retry */
                        v = S + (int32_t)A - ((intptr_t)pP) - 4;
-                       if ((v >> 32) && ((-v) >> 32)) {
+                       if ((v > (intptr_t) INT32_MAX) || (v < (intptr_t) INT32_MIN)) {
                            barf("IMAGE_REL_AMD64_REL32: High bits are set in %zx for %s",
                                 v, (char *)symbol);
                        }

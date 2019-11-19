@@ -129,6 +129,16 @@ test('T4144', normal, compile_and_run, [''])
 
 test('encodingerror001', normal, compile_and_run, [''])
 
-test('T4808', [fragile_for(16909, ['threaded2']), exit_code(1)], compile_and_run, [''])
+test('T4808', [fragile_for(16909, concurrent_ways), exit_code(1)], compile_and_run, [''])
 test('T4895', normal, compile_and_run, [''])
 test('T7853', normal, compile_and_run, [''])
+# Tests ability to perform >32-bit IO operations
+test('T17414',
+     [when(wordsize(32), skip),
+      when(opsys('mingw32'), fragile(17453)),
+      # It is common for tmpfs to be mounted to a small tmpfs on modern Linux
+      # distributions. This test needs to create a large file which will exceed the
+      # size of this filesystem onsequently we must skip it (see #17459).
+      when(opsys('linux'), skip),
+      high_memory_usage],
+     compile_and_run, [''])

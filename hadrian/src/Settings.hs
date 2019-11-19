@@ -1,8 +1,7 @@
 module Settings (
     getArgs, getLibraryWays, getRtsWays, flavour, knownPackages,
     findPackageByName, unsafeFindPackageByName, unsafeFindPackageByPath,
-    isLibrary, stagePackages, programContext, getIntegerPackage,
-    completeSetting
+    isLibrary, stagePackages, getIntegerPackage, completeSetting
     ) where
 
 import CommandLine
@@ -22,6 +21,7 @@ import Settings.Flavours.Quick
 import Settings.Flavours.Quickest
 import Settings.Flavours.QuickCross
 import Settings.Flavours.GhcInGhci
+import Settings.Flavours.Validate
 
 import Control.Monad.Except
 import Data.Either
@@ -46,7 +46,7 @@ hadrianFlavours =
     , developmentFlavour Stage2, performanceFlavour, profiledFlavour
     , quickFlavour, quickestFlavour, quickCrossFlavour, benchmarkLlvmFlavour
     , performanceLlvmFlavour, profiledLlvmFlavour, quickLlvmFlavour
-    , ghcInGhciFlavour ]
+    , ghcInGhciFlavour, validateFlavour, slowValidateFlavour ]
 
 -- | This action looks up a flavour with the name given on the
 --   command line with @--flavour@, defaulting to 'userDefaultFlavour'
@@ -67,22 +67,6 @@ flavour = do
 
 getIntegerPackage :: Expr Package
 getIntegerPackage = expr (integerLibrary =<< flavour)
-
--- TODO: there is duplication and inconsistency between this and
--- Rules.Program.getProgramContexts. There should only be one way to get a
--- context / contexts for a given stage and package.
-programContext :: Stage -> Package -> Action Context
-programContext stage pkg = do
-    profiled <- ghcProfiled <$> flavour
-    dynGhcProgs <- dynamicGhcPrograms =<< flavour
-    return $ Context stage pkg (wayFor profiled dynGhcProgs)
-
-    where wayFor prof dyn
-            | prof && dyn                          =
-                error "programContext: profiling+dynamic not supported"
-            | pkg == ghc && prof && stage > Stage0 = profiling
-            | dyn && stage > Stage0                = dynamic
-            | otherwise                            = vanilla
 
 -- TODO: switch to Set Package as the order of packages should not matter?
 -- Otherwise we have to keep remembering to sort packages from time to time.

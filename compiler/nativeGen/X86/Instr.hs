@@ -15,7 +15,6 @@ module X86.Instr (Instr(..), Operand(..), PrefetchVariant(..), JumpDest(..),
 where
 
 #include "HsVersions.h"
-#include "nativeGen/NCG.h"
 
 import GhcPrelude
 
@@ -30,7 +29,7 @@ import TargetReg
 import BlockId
 import Hoopl.Collections
 import Hoopl.Label
-import CodeGen.Platform
+import GHC.Platform.Regs
 import Cmm
 import FastString
 import Outputable
@@ -293,7 +292,9 @@ data Instr
                       [Maybe JumpDest] -- Targets of the jump table
                       Section   -- Data section jump table should be put in
                       CLabel    -- Label of jump table
-        | CALL        (Either Imm Reg) [Reg]
+        -- | X86 call instruction
+        | CALL        (Either Imm Reg) -- ^ Jump target
+                      [Reg]            -- ^ Arguments (required for register allocation)
 
         -- Other things.
         | CLTD Format            -- sign extend %eax into %edx:%eax

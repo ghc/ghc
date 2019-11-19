@@ -63,7 +63,7 @@ import qualified ErrUtils as Err
 
 import Control.Monad
 import Data.Function
-import Data.List        ( sortBy )
+import Data.List        ( sortBy, mapAccumL )
 import Data.IORef       ( atomicModifyIORef' )
 
 {-
@@ -145,7 +145,7 @@ mkBootModDetailsTc hsc_env
                 }
   = -- This timing isn't terribly useful since the result isn't forced, but
     -- the message is useful to locating oneself in the compilation process.
-    Err.withTiming (pure dflags)
+    Err.withTiming dflags
                    (text "CoreTidy"<+>brackets (ppr this_mod))
                    (const ()) $
     return (ModDetails { md_types         = type_env'
@@ -341,7 +341,7 @@ tidyProgram hsc_env  (ModGuts { mg_module    = mod
                               , mg_modBreaks = modBreaks
                               })
 
-  = Err.withTiming (pure dflags)
+  = Err.withTiming dflags
                    (text "CoreTidy"<+>brackets (ppr mod))
                    (const ()) $
     do  { let { omit_prags = gopt Opt_OmitInterfacePragmas dflags
@@ -1089,12 +1089,7 @@ tidyTopBinds hsc_env this_mod unfold_env init_occ_env binds
 
     init_env = (init_occ_env, emptyVarEnv)
 
-    tidy _           env []     = (env, [])
-    tidy cvt_literal env (b:bs)
-        = let (env1, b')  = tidyTopBind dflags this_mod cvt_literal unfold_env
-                                        env b
-              (env2, bs') = tidy cvt_literal env1 bs
-          in  (env2, b':bs')
+    tidy cvt_literal = mapAccumL (tidyTopBind dflags this_mod cvt_literal unfold_env)
 
 ------------------------
 tidyTopBind  :: DynFlags

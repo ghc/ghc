@@ -11,6 +11,7 @@
 #include "rts/EventLogFormat.h"
 #include "rts/EventLogWriter.h"
 #include "Capability.h"
+#include "sm/NonMovingCensus.h"
 
 #include "BeginPrivate.h"
 
@@ -39,6 +40,7 @@ void postSchedEvent(Capability *cap, EventTypeNum tag,
  * Post a nullary event.
  */
 void postEvent(Capability *cap, EventTypeNum tag);
+void postEventNoCap(EventTypeNum tag);
 
 void postEventAtTimestamp (Capability *cap, EventTimestamp ts,
                            EventTypeNum tag);
@@ -140,6 +142,7 @@ void postTaskDeleteEvent (EventTaskId taskId);
 void postHeapProfBegin(StgWord8 profile_id);
 
 void postHeapProfSampleBegin(StgInt era);
+void postHeapBioProfSampleBegin(StgInt era, StgWord64 time_ns);
 void postHeapProfSampleEnd(StgInt era);
 
 void postHeapProfSampleString(StgWord8 profile_id,
@@ -156,7 +159,17 @@ void postHeapProfCostCentre(StgWord32 ccID,
 void postHeapProfSampleCostCentre(StgWord8 profile_id,
                                   CostCentreStack *stack,
                                   StgWord64 residency);
+
+void postProfSampleCostCentre(Capability *cap,
+                              CostCentreStack *stack,
+                              StgWord64 ticks);
+void postProfBegin(void);
 #endif /* PROFILING */
+
+void postConcUpdRemSetFlush(Capability *cap);
+void postConcMarkEnd(StgWord32 marked_obj_count);
+void postNonmovingHeapCensus(int log_blk_size,
+                             const struct NonmovingAllocCensus *census);
 
 #else /* !TRACING */
 
@@ -169,6 +182,9 @@ INLINE_HEADER void postSchedEvent (Capability *cap  STG_UNUSED,
 
 INLINE_HEADER void postEvent (Capability *cap  STG_UNUSED,
                               EventTypeNum tag STG_UNUSED)
+{ /* nothing */ }
+
+INLINE_HEADER void postEventNoCap (EventTypeNum tag STG_UNUSED)
 { /* nothing */ }
 
 INLINE_HEADER void postMsg (char *msg STG_UNUSED,

@@ -1,4 +1,7 @@
-{-# LANGUAGE CPP, NondecreasingIndentation, TupleSections #-}
+{-# LANGUAGE CPP #-}
+{-# LANGUAGE LambdaCase #-}
+{-# LANGUAGE NondecreasingIndentation #-}
+{-# LANGUAGE TupleSections #-}
 {-# OPTIONS -fno-warn-incomplete-patterns -optc-DNON_POSIX_SOURCE #-}
 
 -----------------------------------------------------------------------------
@@ -30,12 +33,8 @@ import GHCi.UI          ( interactiveUI, ghciWelcomeMsg, defaultGhciSettings )
 #endif
 
 -- Frontend plugins
-#if defined(HAVE_INTERPRETER)
 import DynamicLoading   ( loadFrontendPlugin )
 import Plugins
-#else
-import DynamicLoading   ( pluginError )
-#endif
 #if defined(HAVE_INTERNAL_INTERPRETER)
 import DynamicLoading   ( initializePlugins )
 #endif
@@ -44,6 +43,8 @@ import Module           ( ModuleName )
 
 -- Various other random stuff that we need
 import GHC.HandleEncoding
+import GHC.Platform
+import GHC.Platform.Host
 import Config
 import Constants
 import HscTypes
@@ -54,6 +55,8 @@ import DynFlags hiding (WarnReason(..))
 import ErrUtils
 import FastString
 import Outputable
+import SysTools.BaseDir
+import SysTools.Settings
 import SrcLoc
 import Util
 import Panic
@@ -74,6 +77,8 @@ import System.Environment
 import System.Exit
 import System.FilePath
 import Control.Monad
+import Control.Monad.Trans.Class
+import Control.Monad.Trans.Except (throwE, runExceptT)
 import Data.Char
 import Data.List
 import Data.Maybe
@@ -122,7 +127,7 @@ main = do
     case mode of
         Left preStartupMode ->
             do case preStartupMode of
-                   ShowSupportedExtensions   -> showSupportedExtensions
+                   ShowSupportedExtensions   -> showSupportedExtensions mbMinusB
                    ShowVersion               -> showVersion
                    ShowNumVersion            -> putStrLn cProjectVersion
                    ShowOptions isInteractive -> showOptions isInteractive
@@ -380,6 +385,10 @@ checkOptions mode dflags srcs objs = do
       StopBefore HCc | hscTarget dflags /= HscC
         -> throwGhcException $ UsageError $
            "the option -C is only available with an unregisterised GHC"
+      StopBefore (As False) | ghcLink dflags == NoLink
+        -> throwGhcException $ UsageError $
+           "the options -S and -fno-code are incompatible. Please omit -S"
+
       _ -> return ()
 
      -- Verify that output files point somewhere sensible.
@@ -776,8 +785,24 @@ showInfo dflags = do
         let sq x = " [" ++ x ++ "\n ]"
         putStrLn $ sq $ intercalate "\n ," $ map show $ compilerInfo dflags
 
-showSupportedExtensions :: IO ()
-showSupportedExtensions = mapM_ putStrLn supportedLanguagesAndExtensions
+-- TODO use ErrUtils once that is disentangled from all the other GhcMonad stuff?
+showSupportedExtensions :: Maybe String -> IO ()
+showSupportedExtensions m_top_dir = do
+  res <- runExceptT $ do
+    top_dir <- lift (tryFindTopDir m_top_dir) >>= \case
+      Nothing -> throwE $ SettingsError_MissingData "Could not find the top directory, missing -B flag"
+      Just dir -> pure dir
+    initSettings top_dir
+  targetPlatformMini <- case res of
+    Right s -> pure $ platformMini $ sTargetPlatform s
+    Left (SettingsError_MissingData msg) -> do
+      hPutStrLn stderr $ "WARNING: " ++ show msg
+      hPutStrLn stderr $ "cannot know target platform so guessing target == host (native compiler)."
+      pure cHostPlatformMini
+    Left (SettingsError_BadData msg) -> do
+      hPutStrLn stderr msg
+      exitWith $ ExitFailure 1
+  mapM_ putStrLn $ supportedLanguagesAndExtensions targetPlatformMini
 
 showVersion :: IO ()
 showVersion = putStrLn (cProjectName ++ ", version " ++ cProjectVersion)
@@ -815,11 +840,11 @@ dumpFinalStats dflags =
 dumpFastStringStats :: DynFlags -> IO ()
 dumpFastStringStats dflags = do
   segments <- getFastStringTable
+  hasZ <- getFastStringZEncCounter
   let buckets = concat segments
       bucketsPerSegment = map length segments
       entriesPerBucket = map length buckets
       entries = sum entriesPerBucket
-      hasZ = sum $ map (length . filter hasZEncoding) buckets
       msg = text "FastString stats:" $$ nest 4 (vcat
         [ text "segments:         " <+> int (length segments)
         , text "buckets:          " <+> int (sum bucketsPerSegment)
@@ -847,15 +872,11 @@ dumpPackagesSimple dflags = putMsg dflags (pprPackagesSimple dflags)
 -- Frontend plugin support
 
 doFrontend :: ModuleName -> [(String, Maybe Phase)] -> Ghc ()
-#if !defined(HAVE_INTERPRETER)
-doFrontend modname _ = pluginError [modname]
-#else
 doFrontend modname srcs = do
     hsc_env <- getSession
     frontend_plugin <- liftIO $ loadFrontendPlugin hsc_env modname
     frontend frontend_plugin
       (reverse $ frontendPluginOpts (hsc_dflags hsc_env)) srcs
-#endif
 
 -- -----------------------------------------------------------------------------
 -- ABI hash support
@@ -903,7 +924,7 @@ abiHash strs = do
   put_ bh hiVersion
     -- package hashes change when the compiler version changes (for now)
     -- see #5328
-  mapM_ (put_ bh . mi_mod_hash) ifaces
+  mapM_ (put_ bh . mi_mod_hash . mi_final_exts) ifaces
   f <- fingerprintBinMem bh
 
   putStrLn (showPpr dflags f)

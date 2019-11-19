@@ -10,9 +10,6 @@
 {-# LANGUAGE TupleSections #-}
 {-# LANGUAGE ViewPatterns #-}
 
-{-# OPTIONS -fno-cse #-}
--- -fno-cse is needed for GLOBAL_VAR's to behave properly
-
 -----------------------------------------------------------------------------
 --
 -- GHC Interactive User Interface
@@ -52,8 +49,8 @@ import GHC ( LoadHowMuch(..), Target(..),  TargetId(..), InteractiveImport(..),
              GetDocsFailure(..),
              getModuleGraph, handleSourceError )
 import HscMain (hscParseDeclsWithLocation, hscParseStmtWithLocation)
-import HsImpExp
-import HsSyn
+import GHC.Hs.ImpExp
+import GHC.Hs
 import HscTypes ( tyThingParent_maybe, handleFlagWarnings, getSafeMode, hsc_IC,
                   setInteractivePrintName, hsc_dflags, msObjFilePath, runInteractiveHsc,
                   hsc_dynLinker )
@@ -102,8 +99,8 @@ import qualified Data.ByteString.Char8 as BS
 import Data.Char
 import Data.Function
 import Data.IORef ( IORef, modifyIORef, newIORef, readIORef, writeIORef )
-import Data.List ( find, group, intercalate, intersperse, isPrefixOf, nub,
-                   partition, sort, sortBy, (\\) )
+import Data.List ( find, group, intercalate, intersperse, isPrefixOf,
+                   isSuffixOf, nub, partition, sort, sortBy, (\\) )
 import qualified Data.Set as S
 import Data.Maybe
 import Data.Map (Map)
@@ -299,8 +296,9 @@ defFullHelpText =
   "   :complete <dom> [<rng>] <s> list completions for partial input string\n" ++
   "   :ctags[!] [<file>]          create tags file <file> for Vi (default: \"tags\")\n" ++
   "                               (!: use regex instead of line number)\n" ++
-  "   :def <cmd> <expr>           define command :<cmd> (later defined command has\n" ++
+  "   :def[!] <cmd> <expr>        define command :<cmd> (later defined command has\n" ++
   "                               precedence, ::<cmd> is always a builtin command)\n" ++
+  "                               (!: redefine an existing command name)\n" ++
   "   :doc <name>                 display docs for the given name (experimental)\n" ++
   "   :edit <file>                edit file\n" ++
   "   :edit                       edit last module\n" ++
@@ -308,6 +306,7 @@ defFullHelpText =
   "   :help, :?                   display this list of commands\n" ++
   "   :info[!] [<name> ...]       display information about the given names\n" ++
   "                               (!: do not filter instances)\n" ++
+  "   :instances <type>           display the class instances available for <type>\n" ++
   "   :issafe [<mod>]             display safe haskell information of module <mod>\n" ++
   "   :kind[!] <type>             show the kind of <type>\n" ++
   "                               (!: also print the normalised type)\n" ++
@@ -325,6 +324,7 @@ defFullHelpText =
   "   :type +v <expr>             show the type of <expr>, with its specified tyvars\n" ++
   "   :unadd <module> ...         remove module(s) from the current target set\n" ++
   "   :undef <cmd>                undefine user-defined command :<cmd>\n" ++
+  "   ::<cmd>                     run the builtin command\n" ++
   "   :!<command>                 run the shell command <command>\n" ++
   "\n" ++
   " -- Commands for debugging:\n" ++
@@ -1384,8 +1384,8 @@ lookupCommand' str' = do
           ':' : rest -> (rest, [])     -- "::" selects a builtin command
           _          -> (str', macros) -- otherwise include macros in lookup
 
-      lookupExact  s = find $ (s ==)           . cmdName
-      lookupPrefix s = find $ (s `isPrefixOf`) . cmdName
+      lookupExact  s = find $ (s ==)              . cmdName
+      lookupPrefix s = find $ (s `isPrefixOptOf`) . cmdName
 
       -- hidden commands can only be matched exact
       builtinPfxMatch = lookupPrefix str ghci_cmds_nohide
@@ -1398,6 +1398,15 @@ lookupCommand' str' = do
            (builtinPfxMatch >>= \c -> lookupExact (cmdName c) xcmds) <|>
            builtinPfxMatch <|>
            lookupPrefix str xcmds
+
+-- This predicate is for prefix match with a command-body and
+-- suffix match with an option, such as `!`.
+-- The current implementation assumes only the `!` character
+-- as the option delimiter.
+-- See also #17345
+isPrefixOptOf :: String -> String -> Bool
+isPrefixOptOf s x = let (body, opt) = break (== '!') s
+                    in  (body `isPrefixOf` x) && (opt `isSuffixOf` x)
 
 getCurrentBreakSpan :: GHC.GhcMonad m => m (Maybe SrcSpan)
 getCurrentBreakSpan = do
@@ -2774,9 +2783,7 @@ showDynFlags show_all dflags = do
                 is_on = test f dflags
                 quiet = not show_all && test f default_dflags == is_on
 
-        llvmConfig = (llvmTargets dflags, llvmPasses dflags)
-
-        default_dflags = defaultDynFlags (settings dflags) llvmConfig
+        default_dflags = defaultDynFlags (settings dflags) (llvmConfig dflags)
 
         (ghciFlags,others)  = partition (\f -> flagSpecFlag f `elem` flgs)
                                         DynFlags.fFlags
@@ -3228,10 +3235,8 @@ showLanguages' show_all dflags =
                 is_on = test f dflags
                 quiet = not show_all && test f default_dflags == is_on
 
-   llvmConfig = (llvmTargets dflags, llvmPasses dflags)
-
    default_dflags =
-       defaultDynFlags (settings dflags) llvmConfig `lang_set`
+       defaultDynFlags (settings dflags) (llvmConfig dflags) `lang_set`
          case language dflags of
            Nothing -> Just Haskell2010
            other   -> other
@@ -3330,7 +3335,7 @@ completeGhciCommand = wrapCompleter " " $ \w -> do
   let{ candidates = case w of
       ':' : ':' : _ -> map (':':) command_names
       _ -> nub $ macro_names ++ command_names }
-  return $ filter (w `isPrefixOf`) candidates
+  return $ filter (w `isPrefixOptOf`) candidates
 
 completeMacro = wrapIdentCompleter $ \w -> do
   cmds <- ghci_macros <$> getGHCiState
@@ -3452,6 +3457,10 @@ stepLocalCmd arg = withSandboxOnly ":steplocal" $ step arg
       mb_span <- getCurrentBreakSpan
       case mb_span of
         Nothing  -> stepCmd []
+        Just (UnhelpfulSpan _) -> liftIO $ putStrLn (            -- #14690
+           ":steplocal is not possible." ++
+           "\nCannot determine current top-level binding after " ++
+           "a break on error / exception.\nUse :stepmodule.")
         Just loc -> do
            md <- fromMaybe (panic "stepLocalCmd") <$> getCurrentBreakModule
            current_toplevel_decl <- enclosingTickSpan md loc

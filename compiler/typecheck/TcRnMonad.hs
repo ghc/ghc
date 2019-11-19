@@ -107,8 +107,8 @@ module TcRnMonad(
   emitNamedWildCardHoleConstraints, emitAnonWildCardHoleConstraint,
 
   -- * Template Haskell context
-  recordThUse, recordThSpliceUse, recordTopLevelSpliceLoc,
-  getTopLevelSpliceLocs, keepAlive, getStage, getStageAndBindLevel, setStage,
+  recordThUse, recordThSpliceUse,
+  keepAlive, getStage, getStageAndBindLevel, setStage,
   addModFinalizersWithLclEnv,
 
   -- * Safe Haskell context
@@ -146,9 +146,11 @@ import GhcPrelude
 
 import TcRnTypes        -- Re-export all
 import IOEnv            -- Re-export all
+import Constraint
 import TcEvidence
+import TcOrigin
 
-import HsSyn hiding (LIE)
+import GHC.Hs hiding (LIE)
 import HscTypes
 import Module
 import RdrName
@@ -175,7 +177,7 @@ import FastString
 import Panic
 import Util
 import Annotations
-import BasicTypes( TopLevelFlag )
+import BasicTypes( TopLevelFlag, TypeOrKind(..) )
 import Maybes
 import CostCentreState
 
@@ -183,8 +185,6 @@ import qualified GHC.LanguageExtensions as LangExt
 
 import Data.IORef
 import Control.Monad
-import Data.Set ( Set )
-import qualified Data.Set as Set
 
 import {-# SOURCE #-} TcEnv    ( tcInitTidyEnv )
 
@@ -214,7 +214,6 @@ initTc hsc_env hsc_src keep_rn_syntax mod loc do_this
         used_gre_var <- newIORef [] ;
         th_var       <- newIORef False ;
         th_splice_var<- newIORef False ;
-        th_locs_var  <- newIORef Set.empty ;
         infer_var    <- newIORef (True, emptyBag) ;
         dfun_n_var   <- newIORef emptyOccSet ;
         type_env_var <- case hsc_type_env_var hsc_env of {
@@ -274,8 +273,6 @@ initTc hsc_env hsc_src keep_rn_syntax mod loc do_this
                 tcg_ann_env        = emptyAnnEnv,
                 tcg_th_used        = th_var,
                 tcg_th_splice_used = th_splice_var,
-                tcg_th_top_level_locs
-                                   = th_locs_var,
                 tcg_exports        = [],
                 tcg_imports        = emptyImportAvails,
                 tcg_used_gres     = used_gre_var,
@@ -331,8 +328,7 @@ initTcWithGbl :: HscEnv
               -> TcM r
               -> IO (Messages, Maybe r)
 initTcWithGbl hsc_env gbl_env loc do_this
- = do { tvs_var      <- newIORef emptyVarSet
-      ; lie_var      <- newIORef emptyWC
+ = do { lie_var      <- newIORef emptyWC
       ; errs_var     <- newIORef (emptyBag, emptyBag)
       ; let lcl_env = TcLclEnv {
                 tcl_errs       = errs_var,
@@ -344,7 +340,6 @@ initTcWithGbl hsc_env gbl_env loc do_this
                 tcl_arrow_ctxt = NoArrowCtxt,
                 tcl_env        = emptyNameEnv,
                 tcl_bndrs      = [],
-                tcl_tyvars     = tvs_var,
                 tcl_lie        = lie_var,
                 tcl_tclvl      = topTcLevel
                 }
@@ -1667,8 +1662,7 @@ setLclTypeEnv :: TcLclEnv -> TcM a -> TcM a
 setLclTypeEnv lcl_env thing_inside
   = updLclEnv upd thing_inside
   where
-    upd env = env { tcl_env = tcl_env lcl_env,
-                    tcl_tyvars = tcl_tyvars lcl_env }
+    upd env = env { tcl_env = tcl_env lcl_env }
 
 traceTcConstraints :: String -> TcM ()
 traceTcConstraints msg
@@ -1684,7 +1678,8 @@ emitAnonWildCardHoleConstraint tv
        ; emitInsolubles $ unitBag $
          CHoleCan { cc_ev = CtDerived { ctev_pred = mkTyVarTy tv
                                       , ctev_loc  = ct_loc }
-                  , cc_hole = TypeHole (mkTyVarOcc "_") } }
+                  , cc_occ = mkTyVarOcc "_"
+                  , cc_hole = TypeHole } }
 
 emitNamedWildCardHoleConstraints :: [(Name, TcTyVar)] -> TcM ()
 emitNamedWildCardHoleConstraints wcs
@@ -1696,7 +1691,8 @@ emitNamedWildCardHoleConstraints wcs
     do_one ct_loc (name, tv)
        = CHoleCan { cc_ev = CtDerived { ctev_pred = mkTyVarTy tv
                                       , ctev_loc  = ct_loc' }
-                  , cc_hole = TypeHole (occName name) }
+                  , cc_occ = occName name
+                  , cc_hole = TypeHole }
        where
          real_span = case nameSrcSpan name of
                            RealSrcSpan span  -> span
@@ -1770,22 +1766,6 @@ recordThUse = do { env <- getGblEnv; writeTcRef (tcg_th_used env) True }
 
 recordThSpliceUse :: TcM ()
 recordThSpliceUse = do { env <- getGblEnv; writeTcRef (tcg_th_splice_used env) True }
-
--- | When generating an out-of-scope error message for a variable matching a
--- binding in a later inter-splice group, the typechecker uses the splice
--- locations to provide details in the message about the scope of that binding.
-recordTopLevelSpliceLoc :: SrcSpan -> TcM ()
-recordTopLevelSpliceLoc (RealSrcSpan real_loc)
-  = do { env <- getGblEnv
-       ; let locs_var = tcg_th_top_level_locs env
-       ; locs0 <- readTcRef locs_var
-       ; writeTcRef locs_var (Set.insert real_loc locs0) }
-recordTopLevelSpliceLoc (UnhelpfulSpan _) = return ()
-
-getTopLevelSpliceLocs :: TcM (Set RealSrcSpan)
-getTopLevelSpliceLocs
-  = do { env <- getGblEnv
-       ; readTcRef (tcg_th_top_level_locs env) }
 
 keepAlive :: Name -> TcRn ()     -- Record the name in the keep-alive set
 keepAlive name

@@ -96,7 +96,7 @@ else:
         os.symlink(str(src), str(dst))
 
 class Watcher(object):
-    def __init__(self, count: int):
+    def __init__(self, count: int) -> None:
         self.pool = count
         self.evt = threading.Event()
         self.sync_lock = threading.Lock()

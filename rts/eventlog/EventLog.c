@@ -103,10 +103,21 @@ char *EventDesc[] = {
   [EVENT_HEAP_PROF_BEGIN]     = "Start of heap profile",
   [EVENT_HEAP_PROF_COST_CENTRE]   = "Cost center definition",
   [EVENT_HEAP_PROF_SAMPLE_BEGIN]  = "Start of heap profile sample",
+  [EVENT_HEAP_BIO_PROF_SAMPLE_BEGIN]  = "Start of heap profile (biographical) sample",
   [EVENT_HEAP_PROF_SAMPLE_END]    = "End of heap profile sample",
   [EVENT_HEAP_PROF_SAMPLE_STRING] = "Heap profile string sample",
   [EVENT_HEAP_PROF_SAMPLE_COST_CENTRE] = "Heap profile cost-centre sample",
-  [EVENT_USER_BINARY_MSG]     = "User binary message"
+  [EVENT_PROF_SAMPLE_COST_CENTRE] = "Time profile cost-centre stack",
+  [EVENT_PROF_BEGIN] = "Start of a time profile",
+  [EVENT_USER_BINARY_MSG]     = "User binary message",
+  [EVENT_CONC_MARK_BEGIN]        = "Begin concurrent mark phase",
+  [EVENT_CONC_MARK_END]          = "End concurrent mark phase",
+  [EVENT_CONC_SYNC_BEGIN]        = "Begin concurrent GC synchronisation",
+  [EVENT_CONC_SYNC_END]          = "End concurrent GC synchronisation",
+  [EVENT_CONC_SWEEP_BEGIN]       = "Begin concurrent sweep",
+  [EVENT_CONC_SWEEP_END]         = "End concurrent sweep",
+  [EVENT_CONC_UPD_REM_SET_FLUSH] = "Update remembered set flushed",
+  [EVENT_NONMOVING_HEAP_CENSUS]  = "Nonmoving heap census"
 };
 
 // Event type.
@@ -425,6 +436,10 @@ init_event_types(void)
             eventTypes[t].size = 8;
             break;
 
+        case EVENT_HEAP_BIO_PROF_SAMPLE_BEGIN:
+            eventTypes[t].size = 16;
+            break;
+
         case EVENT_HEAP_PROF_SAMPLE_END:
             eventTypes[t].size = 8;
             break;
@@ -437,8 +452,37 @@ init_event_types(void)
             eventTypes[t].size = EVENT_SIZE_DYNAMIC;
             break;
 
+        case EVENT_PROF_SAMPLE_COST_CENTRE:
+            eventTypes[t].size = EVENT_SIZE_DYNAMIC;
+            break;
+
+        case EVENT_PROF_BEGIN:
+            eventTypes[t].size = 8;
+            break;
+
         case EVENT_USER_BINARY_MSG:
             eventTypes[t].size = EVENT_SIZE_DYNAMIC;
+            break;
+
+        case EVENT_CONC_MARK_BEGIN:
+        case EVENT_CONC_SYNC_BEGIN:
+        case EVENT_CONC_SYNC_END:
+        case EVENT_CONC_SWEEP_BEGIN:
+        case EVENT_CONC_SWEEP_END:
+            eventTypes[t].size = 0;
+            break;
+
+        case EVENT_CONC_MARK_END:
+            eventTypes[t].size = 4;
+            break;
+
+        case EVENT_CONC_UPD_REM_SET_FLUSH: // (cap)
+            eventTypes[t].size =
+                sizeof(EventCapNo);
+            break;
+
+        case EVENT_NONMOVING_HEAP_CENSUS: // (cap, blk_size, active_segs, filled_segs, live_blks)
+            eventTypes[t].size = 13;
             break;
 
         default:
@@ -482,8 +526,10 @@ initEventLogging(const EventLogWriter *ev_writer)
     event_log_writer = ev_writer;
     initEventLogWriter();
 
-    if (sizeof(EventDesc) / sizeof(char*) != NUM_GHC_EVENT_TAGS) {
-        barf("EventDesc array has the wrong number of elements");
+    int num_descs = sizeof(EventDesc) / sizeof(char*);
+    if (num_descs != NUM_GHC_EVENT_TAGS) {
+        barf("EventDesc array has the wrong number of elements (%d, NUM_GHC_EVENT_TAGS=%d)",
+             num_descs, NUM_GHC_EVENT_TAGS);
     }
 
     /*
@@ -1000,6 +1046,15 @@ void postTaskDeleteEvent (EventTaskId taskId)
 }
 
 void
+postEventNoCap (EventTypeNum tag)
+{
+    ACQUIRE_LOCK(&eventBufMutex);
+    ensureRoomForEvent(&eventBuf, tag);
+    postEventHeader(&eventBuf, tag);
+    RELEASE_LOCK(&eventBufMutex);
+}
+
+void
 postEvent (Capability *cap, EventTypeNum tag)
 {
     EventsBuf *eb = &capEventBuf[cap->no];
@@ -1125,6 +1180,35 @@ void postThreadLabel(Capability    *cap,
     postBuf(eb, (StgWord8*) label, strsize);
 }
 
+void postConcUpdRemSetFlush(Capability *cap)
+{
+    EventsBuf *eb = &capEventBuf[cap->no];
+    ensureRoomForEvent(eb, EVENT_CONC_UPD_REM_SET_FLUSH);
+    postEventHeader(eb, EVENT_CONC_UPD_REM_SET_FLUSH);
+    postCapNo(eb, cap->no);
+}
+
+void postConcMarkEnd(StgWord32 marked_obj_count)
+{
+    ACQUIRE_LOCK(&eventBufMutex);
+    ensureRoomForEvent(&eventBuf, EVENT_CONC_MARK_END);
+    postEventHeader(&eventBuf, EVENT_CONC_MARK_END);
+    postWord32(&eventBuf, marked_obj_count);
+    RELEASE_LOCK(&eventBufMutex);
+}
+
+void postNonmovingHeapCensus(int log_blk_size,
+                             const struct NonmovingAllocCensus *census)
+{
+    ACQUIRE_LOCK(&eventBufMutex);
+    postEventHeader(&eventBuf, EVENT_NONMOVING_HEAP_CENSUS);
+    postWord8(&eventBuf, log_blk_size);
+    postWord32(&eventBuf, census->n_active_segs);
+    postWord32(&eventBuf, census->n_filled_segs);
+    postWord32(&eventBuf, census->n_live_blocks);
+    RELEASE_LOCK(&eventBufMutex);
+}
+
 void closeBlockMarker (EventsBuf *ebuf)
 {
     if (ebuf->marker)
@@ -1224,6 +1308,17 @@ void postHeapProfSampleBegin(StgInt era)
     RELEASE_LOCK(&eventBufMutex);
 }
 
+
+void postHeapBioProfSampleBegin(StgInt era, StgWord64 time)
+{
+    ACQUIRE_LOCK(&eventBufMutex);
+    ensureRoomForEvent(&eventBuf, EVENT_HEAP_BIO_PROF_SAMPLE_BEGIN);
+    postEventHeader(&eventBuf, EVENT_HEAP_BIO_PROF_SAMPLE_BEGIN);
+    postWord64(&eventBuf, era);
+    postWord64(&eventBuf, time);
+    RELEASE_LOCK(&eventBufMutex);
+}
+
 void postHeapProfSampleEnd(StgInt era)
 {
     ACQUIRE_LOCK(&eventBufMutex);
@@ -1294,6 +1389,44 @@ void postHeapProfSampleCostCentre(StgWord8 profile_id,
          depth>0 && ccs != NULL && ccs != CCS_MAIN;
          ccs = ccs->prevStack, depth--)
         postWord32(&eventBuf, ccs->cc->ccID);
+    RELEASE_LOCK(&eventBufMutex);
+}
+
+
+void postProfSampleCostCentre(Capability *cap,
+                              CostCentreStack *stack,
+                              StgWord64 tick)
+{
+    ACQUIRE_LOCK(&eventBufMutex);
+    StgWord depth = 0;
+    CostCentreStack *ccs;
+    for (ccs = stack; ccs != NULL && ccs != CCS_MAIN; ccs = ccs->prevStack)
+        depth++;
+    if (depth > 0xff) depth = 0xff;
+
+    StgWord len = 4+8+1+depth*4;
+    ensureRoomForVariableEvent(&eventBuf, len);
+    postEventHeader(&eventBuf, EVENT_PROF_SAMPLE_COST_CENTRE);
+    postPayloadSize(&eventBuf, len);
+    postWord32(&eventBuf, cap->no);
+    postWord64(&eventBuf, tick);
+    postWord8(&eventBuf, depth);
+    for (ccs = stack;
+         depth>0 && ccs != NULL && ccs != CCS_MAIN;
+         ccs = ccs->prevStack, depth--)
+        postWord32(&eventBuf, ccs->cc->ccID);
+    RELEASE_LOCK(&eventBufMutex);
+}
+
+// This event is output at the start of profiling so the tick interval can
+// be reported. Once the tick interval is reported the total executation time
+// can be calculuated from how many samples there are.
+void postProfBegin(void)
+{
+    ACQUIRE_LOCK(&eventBufMutex);
+    postEventHeader(&eventBuf, EVENT_PROF_BEGIN);
+    // The interval that each tick was sampled, in nanoseconds
+    postWord64(&eventBuf, TimeToNS(RtsFlags.MiscFlags.tickInterval));
     RELEASE_LOCK(&eventBufMutex);
 }
 #endif /* PROFILING */

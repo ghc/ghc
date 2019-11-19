@@ -1,7 +1,10 @@
 # Changelog for [`base` package](http://hackage.haskell.org/package/base)
 
+## 4.15.0.0 *TBA*
+  * Add `IsList` instance for `ZipList`.
+
 ## 4.14.0.0 *TBA*
-  * Bundled with GHC *TBA*
+  * Bundled with GHC 8.10.1
 
   * Add a `TestEquality` instance for the `Compose` newtype.
 
@@ -28,8 +31,23 @@
   * Add `Functor`, `Applicative`, `Monad`, `Alternative`, `MonadPlus`,
     `Generic` and `Generic1` instances to `Kleisli`
 
-## 4.13.0.0 *TBA*
-  * Bundled with GHC *TBA*
+  * `openTempFile` is now fully atomic and thread-safe on Windows.
+
+  * Add `isResourceVanishedError`, `resourceVanishedErrorType`, and
+    `isResourceVanishedErrorType` to `System.IO.Error`.
+
+  * Add newtypes for `CSocklen` (`socklen_t`) and `CNfds` (`nfds_t`) to
+    `System.Posix.Types`.
+
+  * Add `Functor`, `Applicative` and `Monad` instances to `(,,) a b`
+    and `(,,,) a b c`.
+
+  * Add `resizeSmallMutableArray#` to `GHC.Exts`.
+
+  * Add a `Data` instance to `WrappedArrow`, `WrappedMonad`, and `ZipList`.
+
+## 4.13.0.0 *July 2019*
+  * Bundled with GHC 8.8.1
 
   * The final phase of the `MonadFail` proposal has been implemented:
 

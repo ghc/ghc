@@ -2,6 +2,7 @@
 
 tarball_dir='ghc-tarballs'
 missing_files=0
+pkg_variant="phyx"
 
 # see #12502
 if test -z "$FIND"; then FIND="find"; fi
@@ -37,7 +38,7 @@ download_file() {
             return
         else
             echo "Downloading ${description} to ${dest_dir}..."
-            $curl_cmd || echo "Checking repo.msys2.org instead of Haskell.org..." && $curl_cmd_bnk || {
+            $curl_cmd || (echo "Checking repo.msys2.org instead of Haskell.org..." && $curl_cmd_bnk) || {
                 rm -f "${dest_file}"
                 fail "ERROR: Download failed."
                 exit 1
@@ -51,11 +52,11 @@ download_file() {
         echo "Downloading ${description} (signature) to ${dest_dir}..."
         local curl_cmd="curl -f -L ${file_url}.sig -o ${sig_file} --create-dirs -# ${extra_curl_opts}"
         if test -n "${backup_url}"; then
-            local curl_cmd_bnk="curl -f -L ${backup_url} -o ${sig_file} --create-dirs -# ${extra_curl_opts}"
+            local curl_cmd_bnk="curl -f -L "${backup_url}.sig" -o ${sig_file} --create-dirs -# ${extra_curl_opts}"
         else
             local curl_cmd_bnk="true"
         fi
-        $curl_cmd || echo "Checking repo.msys2.org instead of Haskell.org..." && $curl_cmd_bnk || {
+        $curl_cmd || (echo "Checking repo.msys2.org instead of Haskell.org..." && $curl_cmd_bnk) || {
                 rm -f "${dest_file}.sig"
                 fail "ERROR: Download failed."
                 exit 1
@@ -101,26 +102,23 @@ download_tarballs() {
     local package_prefix="mingw-w64"
     local format_url="/${mingw_arch}/${package_prefix}-${mingw_arch}"
 
-    download_mingw "${format_url}-crt-git-5.0.0.4795.e3d96cb1-1-any.pkg.tar.xz"
-    download_mingw "${format_url}-winpthreads-git-5.0.0.4850.d1662dc7-1-any.pkg.tar.xz"
-    download_mingw "${format_url}-headers-git-5.0.0.4966.1eee2140-1-any.pkg.tar.xz"
-    download_mingw "${format_url}-libwinpthread-git-5.0.0.4850.d1662dc7-1-any.pkg.tar.xz"
+    download_mingw "${format_url}-crt-git-7.0.0.5491.fe45801e-1-any.pkg.tar.xz"
+    download_mingw "${format_url}-winpthreads-git-7.0.0.5480.e14d23be-1-any.pkg.tar.xz"
+    download_mingw "${format_url}-headers-git-7.0.0.5490.9ec54ed1-1-any.pkg.tar.xz"
+    download_mingw "${format_url}-libwinpthread-git-7.0.0.5480.e14d23be-1-any.pkg.tar.xz"
     download_mingw "${format_url}-zlib-1.2.8-9-any.pkg.tar.xz"
-    download_mingw "${format_url}-isl-0.18-1-any.pkg.tar.xz"
-    download_mingw "${format_url}-mpfr-3.1.6-1-any.pkg.tar.xz"
+    download_mingw "${format_url}-isl-0.21-1-any.pkg.tar.xz"
+    download_mingw "${format_url}-mpfr-4.0.2-2-any.pkg.tar.xz"
     download_mingw "${format_url}-gmp-6.1.2-1-any.pkg.tar.xz"
-    download_mingw "${format_url}-binutils-2.29.1-1-any.pkg.tar.xz"
-    download_mingw "${format_url}-libidn2-2.0.4-1-any.pkg.tar.xz"
-    download_mingw "${format_url}-gcc-7.2.0-1-any.pkg.tar.xz"
+    download_mingw "${format_url}-binutils-2.32-3-$pkg_variant.pkg.tar.xz"
+    download_mingw "${format_url}-libidn2-2.2.0-1-any.pkg.tar.xz"
+    download_mingw "${format_url}-gcc-9.2.0-1-$pkg_variant.pkg.tar.xz"
+    download_mingw "${format_url}-mpc-1.1.0-1-any.pkg.tar.xz"
+    download_mingw "${format_url}-windows-default-manifest-6.4-3-any.pkg.tar.xz"
 
     # Upstream is unfortunately quite inconsistent in naming
     if test "$mingw_arch" != "sources"; then
-        download_mingw "${format_url}-mpc-1.0.3-2-any.pkg.tar.xz"
-        download_mingw "${format_url}-gcc-libs-7.2.0-1-any.pkg.tar.xz"
-    else
-        local format_url="${mingw_base_url}/${mingw_arch}/${package_prefix}"
-        download_mingw "${format_url}-i686-mpc-1.0.3-2.src.tar.gz"
-        download_mingw "${format_url}-x86_64-mpc-1.0.3-2.src.tar.gz"
+        download_mingw "${format_url}-gcc-libs-9.2.0-1-$pkg_variant.pkg.tar.xz"
     fi
 
     if ! test "$missing_files" = "0"
@@ -131,7 +129,7 @@ download_tarballs() {
 
 download_i386() {
     mingw_arch="i686"
-    tarball_dest_dir="mingw-w64/x86"
+    tarball_dest_dir="mingw-w64/i686"
     download_tarballs
 }
 
@@ -171,6 +169,54 @@ sync_binaries_and_sources() {
     done
 }
 
+patch_single_file () {
+    local patcher_base="$1"
+    local filename=$(readlink -f "$2")
+    local filepath=$(dirname "$filename")
+    local patcher="$patcher_base/iat-patcher.exe"
+    $patcher install "$filename" > /dev/null
+    rm -f "$filename.bak"
+    for file in $patcher_base/*.dll; do cp -f "$file" "${filepath}"; done
+    echo "Patched '$filename'"
+}
+
+patch_tarball () {
+    local tarball_name="$1"
+    local filename=$(basename "$tarball_name")
+    local filepath=$(dirname "$tarball_name")
+    local newfile=`echo "$filepath/$filename" | sed -e 's/-any/-phyx/'`
+    local arch=""
+
+    echo "=> ${filename}"
+
+    case $1 in
+        *x86_64*)
+            arch="x86_64"
+            ;;
+        *i686*)
+            arch="i686"
+            ;;
+        *)
+        echo "unknown architecture detected.  Stopping."
+        exit 1
+        ;;
+    esac
+
+    local base="$(pwd)"
+    local patcher_base="$(pwd)/ghc-tarballs/ghc-jailbreak/$arch"
+    local tmpdir="ghc-tarballs/tmpdir"
+    mkdir -p $tmpdir
+    cd $tmpdir
+    tar xJf "$base/$tarball_name"
+    find . -iname "*.exe" -exec bash -c \
+      'patch_single_file "'"${patcher_base}"'" "$0"' {} \;
+    tar cJf "$base/$newfile" .
+    cd "$base"
+    rm -rf $tmpdir
+    gpg --output "$base/${newfile}.sig" --detach-sig "$base/$newfile"
+    rm -f "$base/$tarball_name"
+}
+
 show_hashes_for_binaries() {
     $FIND ghc-tarballs/ -iname "*.*" | xargs md5sum | grep -v "\.sig" | sed -s "s/\*//"
 }
@@ -182,11 +228,13 @@ usage() {
     echo
     echo "Where <action> is one of,"
     echo ""
-    echo "    download     download the necessary tarballs for the given architecture"
-    echo "    fetch        download the necessary tarballs for the given architecture but doesn't verify their md5."
-    echo "    verify       verify the existence and correctness of the necessary tarballs"
-    echo "    hash         generate md5 hashes for inclusion in win32-tarballs.md5sum"
-    echo "    sync         upload packages downloaded with 'fetch mirror' to haskell.org"
+    echo "    download   download the necessary tarballs for the given architecture"
+    echo "    fetch      download the necessary tarballs for the given architecture but doesn't verify their md5."
+    echo "    grab       download the necessary tarballs using patched toolchains for the given architecture but doesn't verify their md5."
+    echo "    verify     verify the existence and correctness of the necessary tarballs"
+    echo "    patch      jailbreak the binaries in the tarballs and remove MAX_PATH limitations."
+    echo "    hash       generate md5 hashes for inclusion in win32-tarballs.md5sum"
+    echo "    sync       upload packages downloaded with 'fetch mirror' to haskell.org"
     echo ""
     echo "and <arch> is one of i386, x86_64,all or mirror (which includes sources)"
 }
@@ -199,7 +247,12 @@ case $1 in
         ;;
     fetch)
         download=1
+        verify=
+        ;;
+    grab)
+        download=1
         verify=0
+        pkg_variant="any"
         ;;
     verify)
         download=0
@@ -213,6 +266,28 @@ case $1 in
     hash)
         show_hashes_for_binaries
         exit 1
+        ;;
+    # This routine will download the latest ghc-jailbreak and unpack binutils and
+    # the ghc tarballs and patches every .exe in each.  Along with this is copies
+    # two dlls in every folder that it patches a .exe in.  Afterwards it re-creates
+    # the tarballs and generates a new signature file.
+    patch)
+        export -f patch_tarball
+        export -f patch_single_file
+
+        echo "Downloading ghc-jailbreak..."
+        curl -f -L https://mistuke.blob.core.windows.net/binaries/ghc-jailbreak-0.3.tar.gz \
+            -o ghc-tarballs/ghc-jailbreak/ghc-jailbreak.tar.gz --create-dirs -#
+        tar -C ghc-tarballs/ghc-jailbreak/ -xf ghc-tarballs/ghc-jailbreak/ghc-jailbreak.tar.gz
+
+        find ghc-tarballs/mingw-w64/ \(   -iname "*binutils*.tar.xz" \
+                                       -o -iname "*gcc*.tar.xz" \) \
+        -exec bash -c 'patch_tarball "$0"' {} \;
+
+        rm -rf ghc-tarballs/ghc-jailbreak
+
+        echo "Finished tarball generation, toolchain has been pre-patched."
+        exit 0
         ;;
     *)
         usage
@@ -236,6 +311,7 @@ case $2 in
         download_i386
         download_x86_64
         verify=0
+        sigs=0
         download_sources
         show_hashes_for_binaries
         ;;

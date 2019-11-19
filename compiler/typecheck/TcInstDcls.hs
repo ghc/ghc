@@ -16,7 +16,7 @@ module TcInstDcls ( tcInstDecls1, tcInstDeclsDeriv, tcInstDecls2 ) where
 
 import GhcPrelude
 
-import HsSyn
+import GHC.Hs
 import TcBinds
 import TcTyClsDecls
 import TcTyDecls ( addTyConsToGblEnv )
@@ -29,6 +29,8 @@ import TcValidity
 import TcHsSyn
 import TcMType
 import TcType
+import Constraint
+import TcOrigin
 import BuildTyCl
 import Inst
 import ClsInst( AssocInstInfo(..), isNotAssociated )
@@ -746,6 +748,7 @@ tcDataFamInstDecl mb_clsinfo
                L _ []    -> Nothing
                L _ preds ->
                  Just $ DerivInfo { di_rep_tc  = rep_tc
+                                  , di_scoped_tvs = mkTyVarNamePairs (tyConTyVars rep_tc)
                                   , di_clauses = preds
                                   , di_ctxt    = tcMkDataFamInstCtxt decl }
 
@@ -820,7 +823,7 @@ tcDataFamInstHeader mb_clsinfo fam_tc imp_vars mb_bndrs fixity
        -- check there too!
        ; let scoped_tvs = imp_tvs ++ exp_tvs
        ; dvs  <- candidateQTyVarsOfTypes (lhs_ty : mkTyVarTys scoped_tvs)
-       ; qtvs <- quantifyTyVars emptyVarSet dvs
+       ; qtvs <- quantifyTyVars dvs
 
        -- Zonk the patterns etc into the Type world
        ; (ze, qtvs)   <- zonkTyBndrs qtvs
@@ -1659,10 +1662,8 @@ Instead, we take the much simpler approach of always disabling
 
 1. In tcMethods (which typechecks method bindings), disable
    -Winaccessible-code.
-2. When creating Implications during typechecking, record the Env
-   (through ic_env) at the time of creation. Since the Env also stores
-   DynFlags, this will remember that -Winaccessible-code was disabled over
-   the scope of that implication.
+2. When creating Implications during typechecking, record this flag
+   (in ic_warn_inaccessible) at the time of creation.
 3. After typechecking comes error reporting, where GHC must decide how to
    report inaccessible code to the user, on an Implication-by-Implication
    basis. If an Implication's DynFlags indicate that -Winaccessible-code was
@@ -2132,7 +2133,7 @@ tcSpecInst dfun_id prag@(SpecInstSig _ _ hs_ty)
         ; co_fn <- tcSpecWrapper SpecInstCtxt (idType dfun_id) spec_dfun_ty
         ; return (SpecPrag dfun_id co_fn defaultInlinePragma) }
   where
-    spec_ctxt prag = hang (text "In the SPECIALISE pragma") 2 (ppr prag)
+    spec_ctxt prag = hang (text "In the pragma:") 2 (ppr prag)
 
 tcSpecInst _  _ = panic "tcSpecInst"
 

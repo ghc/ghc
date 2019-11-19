@@ -1,6 +1,9 @@
 True
-data S = MkS {Ghci1.foo :: Int} 	-- Defined at <interactive>:3:16
+type S :: *
+data S = MkS {Ghci1.foo :: Int}
+  	-- Defined at <interactive>:3:16
 
+type T :: * -> *
 data T a = MkT {Ghci2.foo :: Bool, ...}
   	-- Defined at <interactive>:4:18
 

@@ -16,14 +16,13 @@ import Outputable
 import GHC.Platform
 import Util
 
-import Data.Char
 import Data.List
 
 import System.IO
 import System.Process
 import GhcPrelude
 
-import LlvmCodeGen.Base (LlvmVersion (..), llvmVersionStr, supportedLlvmVersion)
+import LlvmCodeGen.Base (LlvmVersion, llvmVersionStr, supportedLlvmVersion, parseLlvmVersion)
 
 import SysTools.Process
 import SysTools.Info
@@ -209,7 +208,7 @@ figureLlvmVersion dflags = traceToolCommand dflags "llc" $ do
       -- of the options they've specified. llc doesn't care what other
       -- options are specified when '-version' is used.
       args' = args ++ ["-version"]
-  ver <- catchIO (do
+  catchIO (do
               (pin, pout, perr, _) <- runInteractiveProcess pgm args'
                                               Nothing Nothing
               {- > llc -version
@@ -219,18 +218,12 @@ figureLlvmVersion dflags = traceToolCommand dflags "llc" $ do
               -}
               hSetBinaryMode pout False
               _     <- hGetLine pout
-              vline <- dropWhile (not . isDigit) `fmap` hGetLine pout
-              v     <- case span (/= '.') vline of
-                        ("",_)  -> fail "no digits!"
-                        (x,"") -> return $ LlvmVersion (read x)
-                        (x,y) -> return $ LlvmVersionOld
-                                            (read x)
-                                            (read $ takeWhile isDigit $ drop 1 y)
-
+              vline <- hGetLine pout
+              let mb_ver = parseLlvmVersion vline
               hClose pin
               hClose pout
               hClose perr
-              return $ Just v
+              return mb_ver
             )
             (\err -> do
                 debugTraceMsg dflags 2
@@ -242,16 +235,19 @@ figureLlvmVersion dflags = traceToolCommand dflags "llc" $ do
                           text ("Make sure you have installed LLVM " ++
                                 llvmVersionStr supportedLlvmVersion) ]
                 return Nothing)
-  return ver
 
 
 runLink :: DynFlags -> [Option] -> IO ()
 runLink dflags args = traceToolCommand dflags "linker" $ do
   -- See Note [Run-time linker info]
+  --
+  -- `-optl` args come at the end, so that later `-l` options
+  -- given there manually can fill in symbols needed by
+  -- Haskell libaries coming in via `args`.
   linkargs <- neededLinkArgs `fmap` getLinkerInfo dflags
   let (p,args0) = pgm_l dflags
-      args1     = map Option (getOpts dflags opt_l)
-      args2     = args0 ++ linkargs ++ args1 ++ args
+      optl_args = map Option (getOpts dflags opt_l)
+      args2     = args0 ++ linkargs ++ args ++ optl_args
   mb_env <- getGccEnv args2
   runSomethingResponseFile dflags ld_filter "Linker" p args2 mb_env
   where
@@ -375,4 +371,4 @@ touch dflags purpose arg = traceToolCommand dflags "touch" $
 --   to run GHC with @-v2@ or @-ddump-timings@.
 traceToolCommand :: DynFlags -> String -> IO a -> IO a
 traceToolCommand dflags tool = withTiming
-  (return dflags) (text $ "systool:" ++ tool) (const ())
+  dflags (text $ "systool:" ++ tool) (const ())

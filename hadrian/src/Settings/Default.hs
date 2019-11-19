@@ -91,6 +91,7 @@ stage1Packages = do
              , containers
              , deepseq
              , directory
+             , exceptions
              , filepath
              , ghc
              , ghcCompact
@@ -195,7 +196,7 @@ defaultSourceArgs = SourceArgs
     { hsDefault  = mconcat [ stage0    ? arg "-O"
                            , notStage0 ? arg "-O2"
                            , arg "-H32m" ]
-    , hsLibrary  = mempty
+    , hsLibrary  = notStage0 ? arg "-haddock"
     , hsCompiler = mempty
     , hsGhc      = mempty }
 
@@ -253,6 +254,7 @@ defaultBuilderArgs = mconcat
     , builder (Sphinx Html ) ? Hadrian.Builder.Sphinx.args Html
     , builder (Sphinx Latex) ? Hadrian.Builder.Sphinx.args Latex
     , builder (Sphinx Man  ) ? Hadrian.Builder.Sphinx.args Man
+    , builder (Sphinx Info ) ? Hadrian.Builder.Sphinx.args Info
     , builder (Tar Create  ) ? Hadrian.Builder.Tar.args Create
     , builder (Tar Extract ) ? Hadrian.Builder.Tar.args Extract ]
 

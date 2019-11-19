@@ -142,7 +142,7 @@ These data types are the heart of the compiler
 -- We get from Haskell source to this Core language in a number of stages:
 --
 -- 1. The source code is parsed into an abstract syntax tree, which is represented
---    by the data type 'HsExpr.HsExpr' with the names being 'RdrName.RdrNames'
+--    by the data type 'GHC.Hs.Expr.HsExpr' with the names being 'RdrName.RdrNames'
 --
 -- 2. This syntax tree is /renamed/, which attaches a 'Unique.Unique' to every 'RdrName.RdrName'
 --    (yielding a 'Name.Name') to disambiguate identifiers which are lexically identical.
@@ -162,9 +162,9 @@ These data types are the heart of the compiler
 --    But see Note [Shadowing] below.
 --
 -- 3. The resulting syntax tree undergoes type checking (which also deals with instantiating
---    type class arguments) to yield a 'HsExpr.HsExpr' type that has 'Id.Id' as it's names.
+--    type class arguments) to yield a 'GHC.Hs.Expr.HsExpr' type that has 'Id.Id' as it's names.
 --
--- 4. Finally the syntax tree is /desugared/ from the expressive 'HsExpr.HsExpr' type into
+-- 4. Finally the syntax tree is /desugared/ from the expressive 'GHC.Hs.Expr.HsExpr' type into
 --    this 'Expr' type, which has far fewer constructors and hence is easier to perform
 --    optimization, analysis and code generation on.
 --
@@ -201,40 +201,7 @@ These data types are the heart of the compiler
 --    The binder gets bound to the value of the scrutinee,
 --    and the 'Type' must be that of all the case alternatives
 --
---    #case_invariants#
---    This is one of the more complicated elements of the Core language,
---    and comes with a number of restrictions:
---
---    1. The list of alternatives may be empty;
---       See Note [Empty case alternatives]
---
---    2. The 'DEFAULT' case alternative must be first in the list,
---       if it occurs at all.
---
---    3. The remaining cases are in order of increasing
---         tag  (for 'DataAlts') or
---         lit  (for 'LitAlts').
---       This makes finding the relevant constructor easy,
---       and makes comparison easier too.
---
---    4. The list of alternatives must be exhaustive. An /exhaustive/ case
---       does not necessarily mention all constructors:
---
---       @
---            data Foo = Red | Green | Blue
---       ... case x of
---            Red   -> True
---            other -> f (case x of
---                            Green -> ...
---                            Blue  -> ... ) ...
---       @
---
---       The inner case does not need a @Red@ alternative, because @x@
---       can't be @Red@ at that program point.
---
---    5. Floating-point values must not be scrutinised against literals.
---       See #9238 and Note [Rules for floating-point comparisons]
---       in PrelRules for rationale.
+--    IMPORTANT: see Note [Case expression invariants]
 --
 -- *  Cast an expression to a particular type.
 --    This is used to implement @newtype@s (a @newtype@ constructor or
@@ -247,6 +214,41 @@ These data types are the heart of the compiler
 --
 -- *  A coercion
 
+{- Note [Why does Case have a 'Type' field?]
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+The obvious alternative is
+   exprType (Case scrut bndr alts)
+     | (_,_,rhs1):_ <- alts
+     = exprType rhs1
+
+But caching the type in the Case constructor
+  exprType (Case scrut bndr ty alts) = ty
+is better for at least three reasons:
+
+* It works when there are no alternatives (see case invarant 1 above)
+
+* It might be faster in deeply-nested situations.
+
+* It might not be quite the same as (exprType rhs) for one
+  of the RHSs in alts. Consider a phantom type synonym
+       type S a = Int
+   and we want to form the case expression
+        case x of { K (a::*) -> (e :: S a) }
+   Then exprType of the RHS is (S a), but we cannot make that be
+   the 'ty' in the Case constructor because 'a' is simply not in
+   scope there. Instead we must expand the synonym to Int before
+   putting it in the Case constructor.  See CoreUtils.mkSingleAltCase.
+
+   So we'd have to do synonym expansion in exprType which would
+   be inefficient.
+
+* The type stored in the case is checked with lintInTy. This checks
+  (among other things) that it does not mention any variables that are
+  not in scope. If we did not have the type there, it would be a bit
+  harder for Core Lint to reject case blah of Ex x -> x where
+      data Ex = forall a. Ex a.
+-}
+
 -- If you edit this type, you may need to update the GHC formalism
 -- See Note [GHC Formalism] in coreSyn/CoreLint.hs
 data Expr b
@@ -255,7 +257,8 @@ data Expr b
   | App   (Expr b) (Arg b)
   | Lam   b (Expr b)
   | Let   (Bind b) (Expr b)
-  | Case  (Expr b) b Type [Alt b]       -- See #case_invariants#
+  | Case  (Expr b) b Type [Alt b]   -- See Note [Case expression invariants]
+                                    -- and Note [Why does Case have a 'Type' field?]
   | Cast  (Expr b) Coercion
   | Tick  (Tickish Id) (Expr b)
   | Type  Type
@@ -448,6 +451,71 @@ coreSyn/MkCore.
 For discussion of some implications of the let/app invariant primops see
 Note [Checking versus non-checking primops] in PrimOp.
 
+Note [Case expression invariants]
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+Case expressions are one of the more complicated elements of the Core
+language, and come with a number of invariants.  All of them should be
+checked by Core Lint.
+
+1. The list of alternatives may be empty;
+   See Note [Empty case alternatives]
+
+2. The 'DEFAULT' case alternative must be first in the list,
+   if it occurs at all.  Checked in CoreLint.checkCaseAlts.
+
+3. The remaining cases are in order of (strictly) increasing
+     tag  (for 'DataAlts') or
+     lit  (for 'LitAlts').
+   This makes finding the relevant constructor easy, and makes
+   comparison easier too.   Checked in CoreLint.checkCaseAlts.
+
+4. The list of alternatives must be exhaustive. An /exhaustive/ case
+   does not necessarily mention all constructors:
+
+   @
+        data Foo = Red | Green | Blue
+        ... case x of
+              Red   -> True
+              other -> f (case x of
+                              Green -> ...
+                              Blue  -> ... ) ...
+   @
+
+   The inner case does not need a @Red@ alternative, because @x@
+   can't be @Red@ at that program point.
+
+   This is not checked by Core Lint -- it's very hard to do so.
+   E.g. suppose that inner case was floated out, thus:
+         let a = case x of
+                   Green -> ...
+                   Blue  -> ... )
+         case x of
+           Red   -> True
+           other -> f a
+   Now it's really hard to see that the Green/Blue case is
+   exhaustive.  But it is.
+
+   If you have a case-expression that really /isn't/ exhaustive,
+   we may generate seg-faults.  Consider the Green/Blue case
+   above.  Since there are only two branches we may generate
+   code that tests for Green, and if not Green simply /assumes/
+   Blue (since, if the case is exhaustive, that's all that
+   remains).  Of course, if it's not Blue and we start fetching
+   fields that should be in a Blue constructor, we may die
+   horribly. See also Note [Core Lint guarantee] in CoreLint.
+
+5. Floating-point values must not be scrutinised against literals.
+   See #9238 and Note [Rules for floating-point comparisons]
+   in PrelRules for rationale.  Checked in lintCaseExpr;
+   see the call to isFloatingTy.
+
+6. The 'ty' field of (Case scrut bndr ty alts) is the type of the
+   /entire/ case expression.  Checked in lintAltExpr.
+   See also Note [Why does Case have a 'Type' field?].
+
+7. The type of the scrutinee must be the same as the type
+   of the case binder, obviously.  Checked in lintCaseExpr.
+
 Note [CoreSyn type and coercion invariant]
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 We allow a /non-recursive/, /non-top-level/ let to bind type and
@@ -613,9 +681,21 @@ Join points must follow these invariants:
   2. For join arity n, the right-hand side must begin with at least n lambdas.
      No ticks, no casts, just lambdas!  C.f. CoreUtils.joinRhsArity.
 
-  2a. Moreover, this same constraint applies to any unfolding of the binder.
-     Reason: if we want to push a continuation into the RHS we must push it
-     into the unfolding as well.
+     2a. Moreover, this same constraint applies to any unfolding of
+         the binder.  Reason: if we want to push a continuation into
+         the RHS we must push it into the unfolding as well.
+
+     2b. The Arity (in the IdInfo) of a join point is the number of value
+         binders in the top n lambdas, where n is the join arity.
+
+         So arity <= join arity; the former counts only value binders
+         while the latter counts all binders.
+         e.g. Suppose $j has join arity 1
+               let j = \x y. e in case x of { A -> j 1; B -> j 2 }
+         Then its ordinary arity is also 1, not 2.
+
+         The arity of a join point isn't very important; but short of setting
+         it to zero, it is helpful to have an invariant.  E.g. #17294.
 
   3. If the binding is recursive, then all other bindings in the recursive group
      must also be join points.
@@ -1748,8 +1828,8 @@ ltAlt a1 a2 = (a1 `cmpAlt` a2) == LT
 
 cmpAltCon :: AltCon -> AltCon -> Ordering
 -- ^ Compares 'AltCon's within a single list of alternatives
--- DEFAULT comes out smallest, so that sorting by AltCon
--- puts alternatives in the order required by #case_invariants#
+-- DEFAULT comes out smallest, so that sorting by AltCon puts
+-- alternatives in the order required: see Note [Case expression invariants]
 cmpAltCon DEFAULT      DEFAULT     = EQ
 cmpAltCon DEFAULT      _           = LT
 

@@ -48,7 +48,7 @@ import FamInstEnv
 import Coercion
 import TcType
 import MkCore
-import CoreUtils        ( exprType, mkCast )
+import CoreUtils        ( mkCast, mkDefaultCase )
 import CoreUnfold
 import Literal
 import TyCon
@@ -463,8 +463,8 @@ mkDictSelRhs clas val_index
 
     rhs_body | new_tycon = unwrapNewTypeBody tycon (mkTyVarTys tyvars)
                                                    (Var dict_id)
-             | otherwise = Case (Var dict_id) dict_id (idType the_arg_id)
-                                [(DataAlt data_con, arg_ids, varToCoreExpr the_arg_id)]
+             | otherwise = mkSingleAltCase (Var dict_id) dict_id (DataAlt data_con)
+                                           arg_ids (varToCoreExpr the_arg_id)
                                 -- varToCoreExpr needed for equality superclass selectors
                                 --   sel a b d = case x of { MkC _ (g:a~b) _ -> CO g }
 
@@ -987,7 +987,7 @@ wrapCo co rep_ty (unbox_rep, box_rep)  -- co :: arg_ty ~ rep_ty
 
 ------------------------
 seqUnboxer :: Unboxer
-seqUnboxer v = return ([v], \e -> Case (Var v) v (exprType e) [(DEFAULT, [], e)])
+seqUnboxer v = return ([v], mkDefaultCase (Var v) v)
 
 unitUnboxer :: Unboxer
 unitUnboxer v = return ([v], \e -> e)
@@ -1014,8 +1014,8 @@ dataConArgUnpack arg_ty
     ,( \ arg_id ->
        do { rep_ids <- mapM newLocal rep_tys
           ; let unbox_fn body
-                  = Case (Var arg_id) arg_id (exprType body)
-                         [(DataAlt con, rep_ids, body)]
+                  = mkSingleAltCase (Var arg_id) arg_id
+                             (DataAlt con) rep_ids body
           ; return (rep_ids, unbox_fn) }
      , Boxer $ \ subst ->
        do { rep_ids <- mapM (newLocal . TcType.substTyUnchecked subst) rep_tys
@@ -1594,6 +1594,14 @@ running the simplifier.
 'noinline' needs to be wired-in because it gets inserted automatically
 when we serialize an expression to the interface format. See
 Note [Inlining and hs-boot files] in ToIface
+
+Note that noinline as currently implemented can hide some simplifications since
+it hides strictness from the demand analyser. Specifically, the demand analyser
+will treat 'noinline f x' as lazy in 'x', even if the demand signature of 'f'
+specifies that it is strict in its argument. We considered fixing this this by adding a
+special case to the demand analyser to address #16588. However, the special
+case seemed like a large and expensive hammer to address a rare case and
+consequently we rather opted to use a more minimal solution.
 
 Note [The oneShot function]
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~

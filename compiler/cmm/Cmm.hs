@@ -109,6 +109,8 @@ type CmmBlock = Block CmmNode C C
 --     Info Tables
 -----------------------------------------------------------------------------
 
+-- | CmmTopInfo is attached to each CmmDecl (see defn of CmmGroup), and contains
+-- the extra info (beyond the executable code) that belongs to that CmmDecl.
 data CmmTopInfo   = TopInfo { info_tbls  :: LabelMap CmmInfoTable
                             , stack_info :: CmmStackInfo }
 
@@ -120,8 +122,8 @@ data CmmStackInfo
    = StackInfo {
        arg_space :: ByteOff,
                -- number of bytes of arguments on the stack on entry to the
-               -- the proc.  This is filled in by StgCmm.codeGen, and used
-               -- by the stack allocator later.
+               -- the proc.  This is filled in by GHC.StgToCmm.codeGen, and
+               -- used by the stack allocator later.
        updfr_space :: Maybe ByteOff,
                -- XXX: this never contains anything useful, but it should.
                -- See comment in CmmLayoutStack.

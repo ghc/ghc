@@ -44,9 +44,10 @@ import Control.Monad    ( mplus )
 import Control.Applicative ((<$))
 
 -- compiler/hsSyn
-import HsSyn
+import GHC.Hs
 
 -- compiler/main
+import DriverPhases     ( HscSource(..) )
 import HscTypes         ( IsBootInterface, WarningTxt(..) )
 import DynFlags
 import BkpSyn
@@ -69,7 +70,6 @@ import BasicTypes
 
 -- compiler/types
 import Type             ( funTyCon )
-import Kind             ( Kind )
 import Class            ( FunDep )
 
 -- compiler/parser
@@ -257,6 +257,8 @@ A tuple section with NO free variables '(,,)' is indistinguishable
 from the Haskell98 data constructor for a tuple.  Shift resolves in
 favor of sysdcon, which is good because a tuple section will get rejected
 if -XTupleSections is not specified.
+
+See also Note [ExplicitTuple] in GHC.Hs.Expr.
 
 -------------------------------------------------------------------------------
 
@@ -719,17 +721,27 @@ unitdecls :: { OrdList (LHsUnitDecl PackageName) }
         | unitdecl              { unitOL $1 }
 
 unitdecl :: { LHsUnitDecl PackageName }
-        : maybedocheader 'module' modid maybemodwarning maybeexports 'where' body
+        : maybedocheader 'module' maybe_src  modid maybemodwarning maybeexports 'where' body
              -- XXX not accurate
-             { sL1 $2 $ DeclD ModuleD $3 (Just (sL1 $2 (HsModule (Just $3) $5 (fst $ snd $7) (snd $ snd $7) $4 $1))) }
+             { sL1 $2 $ DeclD
+                 (case snd $3 of
+                   False -> HsSrcFile
+                   True  -> HsBootFile)
+                 $4
+                 (Just $ sL1 $2 (HsModule (Just $4) $6 (fst $ snd $8) (snd $ snd $8) $5 $1)) }
         | maybedocheader 'signature' modid maybemodwarning maybeexports 'where' body
-             { sL1 $2 $ DeclD SignatureD $3 (Just (sL1 $2 (HsModule (Just $3) $5 (fst $ snd $7) (snd $ snd $7) $4 $1))) }
+             { sL1 $2 $ DeclD
+                 HsigFile
+                 $3
+                 (Just $ sL1 $2 (HsModule (Just $3) $5 (fst $ snd $7) (snd $ snd $7) $4 $1)) }
         -- NB: MUST have maybedocheader here, otherwise shift-reduce conflict
         -- will prevent us from parsing both forms.
-        | maybedocheader 'module' modid
-             { sL1 $2 $ DeclD ModuleD $3 Nothing }
+        | maybedocheader 'module' maybe_src modid
+             { sL1 $2 $ DeclD (case snd $3 of
+                   False -> HsSrcFile
+                   True  -> HsBootFile) $4 Nothing }
         | maybedocheader 'signature' modid
-             { sL1 $2 $ DeclD SignatureD $3 Nothing }
+             { sL1 $2 $ DeclD HsigFile $3 Nothing }
         | 'dependency' unitid mayberns
              { sL1 $1 $ IncludeD (IncludeDecl { idUnitId = $2
                                               , idModRenaming = $3
@@ -782,10 +794,10 @@ implicit_top :: { () }
 
 maybemodwarning :: { Maybe (Located WarningTxt) }
     : '{-# DEPRECATED' strings '#-}'
-                      {% ajs (Just (sLL $1 $> $ DeprecatedTxt (sL1 $1 (getDEPRECATED_PRAGs $1)) (snd $ unLoc $2)))
+                      {% ajs (sLL $1 $> $ DeprecatedTxt (sL1 $1 (getDEPRECATED_PRAGs $1)) (snd $ unLoc $2))
                              (mo $1:mc $3: (fst $ unLoc $2)) }
     | '{-# WARNING' strings '#-}'
-                         {% ajs (Just (sLL $1 $> $ WarningTxt (sL1 $1 (getWARNING_PRAGs $1)) (snd $ unLoc $2)))
+                         {% ajs (sLL $1 $> $ WarningTxt (sL1 $1 (getWARNING_PRAGs $1)) (snd $ unLoc $2))
                                 (mo $1:mc $3 : (fst $ unLoc $2)) }
     |  {- empty -}                  { Nothing }
 
@@ -968,14 +980,15 @@ importdecl :: { LImportDecl GhcPs }
                                   , ideclImplicit = False
                                   , ideclAs = unLoc (snd $8)
                                   , ideclHiding = unLoc $9 })
-                         ((mj AnnImport $1 : fst (fst $2) ++ fst $3 ++ fmap (mj AnnQualified) (maybeToList $4)
-                                          ++ fst $5 ++ fmap (mj AnnQualified) (maybeToList $7) ++ fst $8))
+                         (mj AnnImport $1 : fst (fst $2) ++ fst $3 ++ fmap (mj AnnQualified) (maybeToList $4)
+                                          ++ fst $5 ++ fmap (mj AnnQualified) (maybeToList $7) ++ fst $8)
                   }
                 }
 
+
 maybe_src :: { (([AddAnn],SourceText),IsBootInterface) }
         : '{-# SOURCE' '#-}'        { (([mo $1,mc $2],getSOURCE_PRAGs $1)
-                                      ,True) }
+                                      , True) }
         | {- empty -}               { (([],NoSourceText),False) }
 
 maybe_safe :: { ([AddAnn],Bool) }
@@ -1049,6 +1062,7 @@ topdecls_semi :: { OrdList (LHsDecl GhcPs) }
 topdecl :: { LHsDecl GhcPs }
         : cl_decl                               { sL1 $1 (TyClD noExtField (unLoc $1)) }
         | ty_decl                               { sL1 $1 (TyClD noExtField (unLoc $1)) }
+        | standalone_kind_sig                   { sL1 $1 (KindSigD noExtField (unLoc $1)) }
         | inst_decl                             { sL1 $1 (InstD noExtField (unLoc $1)) }
         | stand_alone_deriving                  { sLL $1 $> (DerivD noExtField (unLoc $1)) }
         | role_annot                            { sL1 $1 (RoleAnnotD noExtField (unLoc $1)) }
@@ -1131,6 +1145,19 @@ ty_decl :: { LTyClDecl GhcPs }
                                    (snd $ unLoc $4) Nothing)
                         (mj AnnData $1:mj AnnFamily $2:(fst $ unLoc $4)) }
 
+-- standalone kind signature
+standalone_kind_sig :: { LStandaloneKindSig GhcPs }
+  : 'type' sks_vars '::' ktypedoc
+      {% amms (mkStandaloneKindSig (comb2 $1 $4) $2 $4)
+              [mj AnnType $1,mu AnnDcolon $3] }
+
+-- See also: sig_vars
+sks_vars :: { Located [Located RdrName] }  -- Returned in reverse order
+  : sks_vars ',' oqtycon
+      {% addAnnotation (gl $ head $ unLoc $1) AnnComma (gl $2) >>
+         return (sLL $1 $> ($3 : unLoc $1)) }
+  | oqtycon { sL1 $1 [$1] }
+
 inst_decl :: { LInstDecl GhcPs }
         : 'instance' overlap_pragma inst_type where_inst
        {% do { (binds, sigs, _, ats, adts, _) <- cvBindsAndSigs (snd $ unLoc $4)
@@ -1168,13 +1195,13 @@ inst_decl :: { LInstDecl GhcPs }
                        :(fst $ unLoc $4)++(fst $ unLoc $5)++(fst $ unLoc $6)) }
 
 overlap_pragma :: { Maybe (Located OverlapMode) }
-  : '{-# OVERLAPPABLE'    '#-}' {% ajs (Just (sLL $1 $> (Overlappable (getOVERLAPPABLE_PRAGs $1))))
+  : '{-# OVERLAPPABLE'    '#-}' {% ajs (sLL $1 $> (Overlappable (getOVERLAPPABLE_PRAGs $1)))
                                        [mo $1,mc $2] }
-  | '{-# OVERLAPPING'     '#-}' {% ajs (Just (sLL $1 $> (Overlapping (getOVERLAPPING_PRAGs $1))))
+  | '{-# OVERLAPPING'     '#-}' {% ajs (sLL $1 $> (Overlapping (getOVERLAPPING_PRAGs $1)))
                                        [mo $1,mc $2] }
-  | '{-# OVERLAPS'        '#-}' {% ajs (Just (sLL $1 $> (Overlaps (getOVERLAPS_PRAGs $1))))
+  | '{-# OVERLAPS'        '#-}' {% ajs (sLL $1 $> (Overlaps (getOVERLAPS_PRAGs $1)))
                                        [mo $1,mc $2] }
-  | '{-# INCOHERENT'      '#-}' {% ajs (Just (sLL $1 $> (Incoherent (getINCOHERENT_PRAGs $1))))
+  | '{-# INCOHERENT'      '#-}' {% ajs (sLL $1 $> (Incoherent (getINCOHERENT_PRAGs $1)))
                                        [mo $1,mc $2] }
   | {- empty -}                 { Nothing }
 
@@ -1191,11 +1218,11 @@ deriv_strategy_via :: { LDerivStrategy GhcPs }
                                             [mj AnnVia $1] }
 
 deriv_standalone_strategy :: { Maybe (LDerivStrategy GhcPs) }
-  : 'stock'                     {% ajs (Just (sL1 $1 StockStrategy))
+  : 'stock'                     {% ajs (sL1 $1 StockStrategy)
                                        [mj AnnStock $1] }
-  | 'anyclass'                  {% ajs (Just (sL1 $1 AnyclassStrategy))
+  | 'anyclass'                  {% ajs (sL1 $1 AnyclassStrategy)
                                        [mj AnnAnyclass $1] }
-  | 'newtype'                   {% ajs (Just (sL1 $1 NewtypeStrategy))
+  | 'newtype'                   {% ajs (sL1 $1 NewtypeStrategy)
                                        [mj AnnNewtype $1] }
   | deriv_strategy_via          { Just $1 }
   | {- empty -}                 { Nothing }
@@ -1320,36 +1347,20 @@ at_decl_inst :: { LInstDecl GhcPs }
                         (mj AnnType $1:$2++(fst $ unLoc $3)) }
 
         -- data/newtype instance declaration, with optional 'instance' keyword
-        -- (can't use opt_instance because you get reduce/reduce errors)
-        | data_or_newtype capi_ctype tycl_hdr_inst constrs maybe_derivings
-               {% amms (mkDataFamInst (comb4 $1 $3 $4 $5) (snd $ unLoc $1) $2 (snd $ unLoc $3)
-                                    Nothing (reverse (snd $ unLoc $4))
-                                            (fmap reverse $5))
-                       ((fst $ unLoc $1):(fst $ unLoc $3) ++ (fst $ unLoc $4)) }
-
-        | data_or_newtype 'instance' capi_ctype tycl_hdr_inst constrs maybe_derivings
+        | data_or_newtype opt_instance capi_ctype tycl_hdr_inst constrs maybe_derivings
                {% amms (mkDataFamInst (comb4 $1 $4 $5 $6) (snd $ unLoc $1) $3 (snd $ unLoc $4)
                                     Nothing (reverse (snd $ unLoc $5))
                                             (fmap reverse $6))
-                       ((fst $ unLoc $1):mj AnnInstance $2:(fst $ unLoc $4)++(fst $ unLoc $5)) }
+                       ((fst $ unLoc $1):$2++(fst $ unLoc $4)++(fst $ unLoc $5)) }
 
         -- GADT instance declaration, with optional 'instance' keyword
-        -- (can't use opt_instance because you get reduce/reduce errors)
-        | data_or_newtype capi_ctype tycl_hdr_inst opt_kind_sig
-                 gadt_constrlist
-                 maybe_derivings
-                {% amms (mkDataFamInst (comb4 $1 $3 $5 $6) (snd $ unLoc $1) $2
-                                (snd $ unLoc $3) (snd $ unLoc $4) (snd $ unLoc $5)
-                                (fmap reverse $6))
-                        ((fst $ unLoc $1):(fst $ unLoc $3)++(fst $ unLoc $4)++(fst $ unLoc $5)) }
-
-        | data_or_newtype 'instance' capi_ctype tycl_hdr_inst opt_kind_sig
+        | data_or_newtype opt_instance capi_ctype tycl_hdr_inst opt_kind_sig
                  gadt_constrlist
                  maybe_derivings
                 {% amms (mkDataFamInst (comb4 $1 $4 $6 $7) (snd $ unLoc $1) $3
                                 (snd $ unLoc $4) (snd $ unLoc $5) (snd $ unLoc $6)
                                 (fmap reverse $7))
-                        ((fst $ unLoc $1):mj AnnInstance $2:(fst $ unLoc $4)++(fst $ unLoc $5)++(fst $ unLoc $6)) }
+                        ((fst $ unLoc $1):$2++(fst $ unLoc $4)++(fst $ unLoc $5)++(fst $ unLoc $6)) }
 
 data_or_newtype :: { Located (AddAnn, NewOrData) }
         : 'data'        { sL1 $1 (mj AnnData    $1,DataType) }
@@ -1411,12 +1422,12 @@ tycl_hdr_inst :: { Located ([AddAnn],(Maybe (LHsContext GhcPs), Maybe [LHsTyVarB
 
 capi_ctype :: { Maybe (Located CType) }
 capi_ctype : '{-# CTYPE' STRING STRING '#-}'
-                       {% ajs (Just (sLL $1 $> (CType (getCTYPEs $1) (Just (Header (getSTRINGs $2) (getSTRING $2)))
-                                        (getSTRINGs $3,getSTRING $3))))
+                       {% ajs (sLL $1 $> (CType (getCTYPEs $1) (Just (Header (getSTRINGs $2) (getSTRING $2)))
+                                        (getSTRINGs $3,getSTRING $3)))
                               [mo $1,mj AnnHeader $2,mj AnnVal $3,mc $4] }
 
            | '{-# CTYPE'        STRING '#-}'
-                       {% ajs (Just (sLL $1 $> (CType (getCTYPEs $1) Nothing  (getSTRINGs $2, getSTRING $2))))
+                       {% ajs (sLL $1 $> (CType (getCTYPEs $1) Nothing (getSTRINGs $2, getSTRING $2)))
                               [mo $1,mj AnnVal $2,mc $3] }
 
            |           { Nothing }
@@ -2923,6 +2934,9 @@ texp :: { ECP }
                              amms (mkHsViewPatPV (comb2 $1 $>) $1 $3) [mu AnnRarrow $2] }
 
 -- Always at least one comma or bar.
+-- Though this can parse just commas (without any expressions), it won't
+-- in practice, because (,,,) is parsed as a name. See Note [ExplicitTuple]
+-- in GHC.Hs.Expr.
 tup_exprs :: { forall b. DisambECP b => PV ([AddAnn],SumOrTuple b) }
            : texp commas_tup_tail
                            { runECP_PV $1 >>= \ $1 ->
@@ -2967,6 +2981,7 @@ tup_tail :: { forall b. DisambECP b => PV [Located (Maybe (Located b))] }
 
 -- The rules below are little bit contorted to keep lexps left-recursive while
 -- avoiding another shift/reduce-conflict.
+-- Never empty.
 list :: { forall b. DisambECP b => SrcSpan -> PV (Located b) }
         : texp    { \loc -> runECP_PV $1 >>= \ $1 ->
                             mkHsExplicitListPV loc [$1] }
@@ -3388,6 +3403,7 @@ con_list : con                  { sL1 $1 [$1] }
          | con ',' con_list     {% addAnnotation (gl $1) AnnComma (gl $2) >>
                                    return (sLL $1 $> ($1 : unLoc $3)) }
 
+-- See Note [ExplicitTuple] in GHC.Hs.Expr
 sysdcon_nolist :: { Located DataCon }  -- Wired in data constructors
         : '(' ')'               {% ams (sLL $1 $> unitDataCon) [mop $1,mcp $2] }
         | '(' commas ')'        {% ams (sLL $1 $> $ tupleDataCon Boxed (snd $2 + 1))
@@ -3396,6 +3412,7 @@ sysdcon_nolist :: { Located DataCon }  -- Wired in data constructors
         | '(#' commas '#)'      {% ams (sLL $1 $> $ tupleDataCon Unboxed (snd $2 + 1))
                                        (mo $1:mc $3:(mcommas (fst $2))) }
 
+-- See Note [Empty lists] in GHC.Hs.Expr
 sysdcon :: { Located DataCon }
         : sysdcon_nolist                 { $1 }
         | '[' ']'               {% ams (sLL $1 $> nilDataCon) [mos $1,mcs $2] }
@@ -3416,7 +3433,7 @@ qconop :: { Located RdrName }
 -- Type constructors
 
 
--- See Note [Unit tuples] in HsTypes for the distinction
+-- See Note [Unit tuples] in GHC.Hs.Types for the distinction
 -- between gtycon and ntgtycon
 gtycon :: { Located RdrName }  -- A "general" qualified tycon, including unit tuples
         : ntgtycon                     { $1 }
@@ -4042,14 +4059,15 @@ am a (b,s) = do
 -- as any annotations that may arise in the binds. This will include open
 -- and closing braces if they are used to delimit the let expressions.
 --
-ams :: MonadP m => Located a -> [AddAnn] -> m (Located a)
+ams :: (MonadP m, HasSrcSpan a) => a -> [AddAnn] -> m a
 ams a@(dL->L l _) bs = addAnnsAt l bs >> return a
 
 amsL :: SrcSpan -> [AddAnn] -> P ()
 amsL sp bs = addAnnsAt sp bs >> return ()
 
--- |Add all [AddAnn] to an AST element wrapped in a Just
-ajs a@(Just (dL->L l _)) bs = addAnnsAt l bs >> return a
+-- |Add all [AddAnn] to an AST element, and wrap it in a 'Just'
+ajs :: (MonadP m, HasSrcSpan a) => a -> [AddAnn] -> m (Maybe a)
+ajs a bs = Just <$> ams a bs
 
 -- |Add a list of AddAnns to the given AST element, where the AST element is the
 --  result of a monadic action

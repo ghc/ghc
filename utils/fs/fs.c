@@ -257,6 +257,7 @@ int FS(swopen) (const wchar_t* filename, int oflag, int shflag, int pmode)
   HANDLE hResult
     = CreateFileW (_filename, dwDesiredAccess, dwShareMode, &securityAttributes,
                    dwCreationDisposition, dwFlagsAndAttributes, NULL);
+
   free (_filename);
   if (INVALID_HANDLE_VALUE == hResult)
     return setErrNoFromWin32Error ();

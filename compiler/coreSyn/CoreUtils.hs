@@ -14,7 +14,7 @@ module CoreUtils (
         mkCast,
         mkTick, mkTicks, mkTickNoHNF, tickHNFArgs,
         bindNonRec, needsCaseBinding,
-        mkAltExpr,
+        mkAltExpr, mkDefaultCase, mkSingleAltCase,
 
         -- * Taking expressions apart
         findDefault, addDefault, findAlt, isDefaultAlt,
@@ -77,6 +77,7 @@ import Id
 import IdInfo
 import PrelNames( absentErrorIdKey )
 import Type
+import Predicate
 import TyCoRep( TyCoBinder(..), TyBinder )
 import Coercion
 import TyCon
@@ -488,7 +489,7 @@ bindNonRec bndr rhs body
   | needsCaseBinding (idType bndr) rhs = case_bind
   | otherwise                          = let_bind
   where
-    case_bind = Case rhs bndr (exprType body) [(DEFAULT, [], body)]
+    case_bind = mkDefaultCase rhs bndr body
     let_bind  = Let (NonRec bndr rhs) body
 
 -- | Tests whether we have to use a @case@ rather than @let@ binding for this expression
@@ -512,8 +513,45 @@ mkAltExpr (LitAlt lit) [] []
 mkAltExpr (LitAlt _) _ _ = panic "mkAltExpr LitAlt"
 mkAltExpr DEFAULT _ _ = panic "mkAltExpr DEFAULT"
 
-{- Note [Binding coercions]
-~~~~~~~~~~~~~~~~~~~~~~~~~~~
+mkDefaultCase :: CoreExpr -> Id -> CoreExpr -> CoreExpr
+-- Make (case x of y { DEFAULT -> e }
+mkDefaultCase scrut case_bndr body
+  = Case scrut case_bndr (exprType body) [(DEFAULT, [], body)]
+
+mkSingleAltCase :: CoreExpr -> Id -> AltCon -> [Var] -> CoreExpr -> CoreExpr
+-- Use this function if possible, when building a case,
+-- because it ensures that the type on the Case itself
+-- doesn't mention variables bound by the case
+-- See Note [Care with the type of a case expression]
+mkSingleAltCase scrut case_bndr con bndrs body
+  = Case scrut case_bndr case_ty [(con,bndrs,body)]
+  where
+    body_ty = exprType body
+
+    case_ty -- See Note [Care with the type of a case expression]
+      | Just body_ty' <- occCheckExpand bndrs body_ty
+      = body_ty'
+
+      | otherwise
+      = pprPanic "mkSingleAltCase" (ppr scrut $$ ppr bndrs $$ ppr body_ty)
+
+{- Note [Care with the type of a case expression]
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+Consider a phantom type synonym
+   type S a = Int
+and we want to form the case expression
+   case x of K (a::*) -> (e :: S a)
+
+We must not make the type field of the case-expression (S a) because
+'a' isn't in scope.  Hence the call to occCheckExpand.  This caused
+issue #17056.
+
+NB: this situation can only arise with type synonyms, which can
+falsely "mention" type variables that aren't "really there", and which
+can be eliminated by expanding the synonym.
+
+Note [Binding coercions]
+~~~~~~~~~~~~~~~~~~~~~~~~
 Consider binding a CoVar, c = e.  Then, we must atisfy
 Note [CoreSyn type and coercion invariant] in CoreSyn,
 which allows only (Coercion co) on the RHS.
@@ -1880,7 +1918,9 @@ exprIsTopLevelBindable :: CoreExpr -> Type -> Bool
 -- Top-level literal strings can't even be wrapped in ticks
 --   see Note [CoreSyn top-level string literals] in CoreSyn
 exprIsTopLevelBindable expr ty
-  = not (isUnliftedType ty)
+  = not (mightBeUnliftedType ty)
+    -- Note that 'expr' may be levity polymorphic here consequently we must use
+    -- 'mightBeUnliftedType' rather than 'isUnliftedType' as the latter would panic.
   || exprIsTickedString expr
 
 -- | Check if the expression is zero or more Ticks wrapped around a literal

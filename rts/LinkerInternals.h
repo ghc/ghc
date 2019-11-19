@@ -10,6 +10,7 @@
 
 #include "Rts.h"
 #include "Hash.h"
+#include "linker/M32Alloc.h"
 
 #if RTS_LINKER_USE_MMAP
 #include <sys/mman.h>
@@ -129,7 +130,7 @@ typedef struct _Segment {
     SegmentProt prot;           /* mem protection to set after all symbols were
                                  * resolved */
 
-    int *sections_idx;       /* an array of section indexes assigned to this segment */
+    int *sections_idx;          /* an array of section indexes assigned to this segment */
     int n_sections;
 } Segment;
 
@@ -244,6 +245,12 @@ typedef struct _ObjectCode {
        require extra information.*/
     HashTable *extraInfos;
 
+#if RTS_LINKER_USE_MMAP == 1
+    /* The m32 allocators used for allocating small sections and symbol extras
+     * during loading. We have two: one for (writeable) data and one for
+     * (read-only/executable) code. */
+    m32_allocator *rw_m32, *rx_m32;
+#endif
 } ObjectCode;
 
 #define OC_INFORMATIVE_FILENAME(OC)             \
@@ -287,6 +294,7 @@ void freeObjectCode (ObjectCode *oc);
 SymbolAddr* loadSymbol(SymbolName *lbl, RtsSymbolInfo *pinfo);
 
 void *mmapForLinker (size_t bytes, uint32_t flags, int fd, int offset);
+void mmapForLinkerMarkExecutable (void *start, size_t len);
 
 void addProddableBlock ( ObjectCode* oc, void* start, int size );
 void checkProddableBlock (ObjectCode *oc, void *addr, size_t size );

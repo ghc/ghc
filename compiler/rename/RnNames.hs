@@ -32,7 +32,8 @@ module RnNames (
 import GhcPrelude
 
 import DynFlags
-import HsSyn
+import TyCoPpr
+import GHC.Hs
 import TcEnv
 import RnEnv
 import RnFixity
@@ -393,8 +394,8 @@ calculateAvails :: DynFlags
 calculateAvails dflags iface mod_safe' want_boot imported_by =
   let imp_mod    = mi_module iface
       imp_sem_mod= mi_semantic_module iface
-      orph_iface = mi_orphan iface
-      has_finsts = mi_finsts iface
+      orph_iface = mi_orphan (mi_final_exts iface)
+      has_finsts = mi_finsts (mi_final_exts iface)
       deps       = mi_deps iface
       trust      = getSafeMode $ mi_trust iface
       trust_pkg  = mi_trust_pkg iface
@@ -607,7 +608,7 @@ extendGlobalRdrEnvRn avails new_fixities
     getLocalDeclBindersd@ returns the names for an HsDecl
              It's used for source code.
 
-        *** See Note [The Naming story] in HsDecls ****
+        *** See Note [The Naming story] in GHC.Hs.Decls ****
 *                                                                      *
 ********************************************************************* -}
 
@@ -1190,29 +1191,22 @@ lookupChildren all_kids rdr_items
 *********************************************************
 -}
 
-reportUnusedNames :: Maybe (Located [LIE GhcPs])  -- Export list
-                  -> TcGblEnv -> RnM ()
-reportUnusedNames _export_decls gbl_env
-  = do  { traceRn "RUN" (ppr (tcg_dus gbl_env))
+reportUnusedNames :: TcGblEnv -> RnM ()
+reportUnusedNames gbl_env
+  = do  { keep <- readTcRef (tcg_keep gbl_env)
+        ; traceRn "RUN" (ppr (tcg_dus gbl_env))
         ; warnUnusedImportDecls gbl_env
-        ; warnUnusedTopBinds unused_locals
+        ; warnUnusedTopBinds $ unused_locals keep
         ; warnMissingSignatures gbl_env }
   where
-    used_names :: NameSet
-    used_names = findUses (tcg_dus gbl_env) emptyNameSet
+    used_names :: NameSet -> NameSet
+    used_names keep = findUses (tcg_dus gbl_env) emptyNameSet `unionNameSet` keep
     -- NB: currently, if f x = g, we only treat 'g' as used if 'f' is used
     -- Hence findUses
 
     -- Collect the defined names from the in-scope environment
     defined_names :: [GlobalRdrElt]
     defined_names = globalRdrEnvElts (tcg_rdr_env gbl_env)
-
-    -- Note that defined_and_used, defined_but_not_used
-    -- are both [GRE]; that's why we need defined_and_used
-    -- rather than just used_names
-    _defined_and_used, defined_but_not_used :: [GlobalRdrElt]
-    (_defined_and_used, defined_but_not_used)
-        = partition (gre_is_used used_names) defined_names
 
     kids_env = mkChildEnv defined_names
     -- This is done in mkExports too; duplicated work
@@ -1228,8 +1222,16 @@ reportUnusedNames _export_decls gbl_env
     --  (a) defined in this module, and
     --  (b) not defined by a 'deriving' clause
     -- The latter have an Internal Name, so we can filter them out easily
-    unused_locals :: [GlobalRdrElt]
-    unused_locals = filter is_unused_local defined_but_not_used
+    unused_locals :: NameSet -> [GlobalRdrElt]
+    unused_locals keep =
+      let -- Note that defined_and_used, defined_but_not_used
+          -- are both [GRE]; that's why we need defined_and_used
+          -- rather than just used_names
+          _defined_and_used, defined_but_not_used :: [GlobalRdrElt]
+          (_defined_and_used, defined_but_not_used)
+              = partition (gre_is_used (used_names keep)) defined_names
+
+      in filter is_unused_local defined_but_not_used
     is_unused_local :: GlobalRdrElt -> Bool
     is_unused_local gre = isLocalGRE gre && isExternalName (gre_name gre)
 

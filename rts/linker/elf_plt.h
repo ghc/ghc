@@ -1,12 +1,11 @@
 #pragma once
 
-#include "ghcplatform.h"
 #include <LinkerInternals.h>
-
-#if defined(arm_HOST_ARCH) || defined(aarch64_HOST_ARCH)
 
 #include "elf_plt_arm.h"
 #include "elf_plt_aarch64.h"
+
+#if defined(arm_HOST_ARCH) || defined(aarch64_HOST_ARCH)
 
 #if defined(OBJFORMAT_ELF)
 

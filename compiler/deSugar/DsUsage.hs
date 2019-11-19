@@ -314,15 +314,15 @@ mk_mod_usage_info pit hsc_env this_mod direct_imports used_names
                       usg_entities = Map.toList ent_hashs,
                       usg_safe     = imp_safe }
       where
-        maybe_iface  = lookupIfaceByModule dflags hpt pit mod
+        maybe_iface  = lookupIfaceByModule hpt pit mod
                 -- In one-shot mode, the interfaces for home-package
                 -- modules accumulate in the PIT not HPT.  Sigh.
 
         Just iface   = maybe_iface
-        finsts_mod   = mi_finsts    iface
-        hash_env     = mi_hash_fn   iface
-        mod_hash     = mi_mod_hash  iface
-        export_hash | depend_on_exports = Just (mi_exp_hash iface)
+        finsts_mod   = mi_finsts (mi_final_exts iface)
+        hash_env     = mi_hash_fn (mi_final_exts iface)
+        mod_hash     = mi_mod_hash (mi_final_exts iface)
+        export_hash | depend_on_exports = Just (mi_exp_hash (mi_final_exts iface))
                     | otherwise         = Nothing
 
         by_is_safe (ImportedByUser imv) = imv_is_safe imv

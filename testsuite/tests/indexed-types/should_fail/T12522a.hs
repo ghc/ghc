@@ -2,6 +2,7 @@
 {-# LANGUAGE KindSignatures #-}
 {-# LANGUAGE TypeFamilyDependencies #-}
 {-# LANGUAGE TypeOperators #-}
+{-# LANGUAGE UndecidableInstances #-}
 
 module T12522a where
 
@@ -20,4 +21,3 @@ def = undefined
 
 -- test :: Uncurried [Int, String] String
 test = def $ \n s -> I $ show n ++ s
-

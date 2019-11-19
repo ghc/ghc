@@ -21,7 +21,7 @@ main = do
 
 runParent :: FilePath -> IO ()
 runParent runghc = do
-    (Just inH, Just outH, Nothing, ph@(ProcessHandle mvar _)) <-
+    (Just inH, Just outH, Nothing, ph@(ProcessHandle mvar _ _)) <-
         createProcess (proc runghc ["T-signals-child.hs", "child"])
             { std_in = CreatePipe
             , std_out = CreatePipe

@@ -1,0 +1,17 @@
+This utility is intended to be used by $(TOP)/configure to check
+sphinx's python version.
+
+We need python3-sphinx instead of python2-sphinx to build documentation,
+such as GHC user's guide.
+However, it can't be confirmed with the command line option of sphinx-build.
+This utility performs a version check via conf.py invoked from sphinx-build.
+
+Usage:
+
+  $SPHINXBUILD -b text . dist > /dev/null 2>&1
+  echo $?
+
+If your python for sphinx is python2, it returns error status code 1.
+
+
+See description in $(TOP)/configure.ac.

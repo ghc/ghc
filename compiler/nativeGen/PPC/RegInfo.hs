@@ -17,7 +17,6 @@ module PPC.RegInfo (
 
 where
 
-#include "nativeGen/NCG.h"
 #include "HsVersions.h"
 
 import GhcPrelude

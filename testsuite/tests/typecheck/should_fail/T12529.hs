@@ -2,4 +2,4 @@
 
 module T12529 where
 
-f = p @ Int
+f = p @Int

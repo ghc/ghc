@@ -10,9 +10,12 @@
 --
 module Util (
         -- * Flags dependent on the compiler build
-        ghciSupported, debugIsOn, ncgDebugIsOn,
+        ghciSupported, debugIsOn,
         ghciTablesNextToCode,
         isWindowsHost, isDarwinHost,
+
+        -- * Miscellaneous higher-order functions
+        applyWhen, nTimes,
 
         -- * General list processing
         zipEqual, zipWithEqual, zipWith3Equal, zipWith4Equal,
@@ -46,6 +49,8 @@ module Util (
 
         changeLast,
 
+        whenNonEmpty,
+
         -- * Tuples
         fstOf3, sndOf3, thdOf3,
         firstM, first3M, secondM,
@@ -56,9 +61,6 @@ module Util (
         -- * List operations controlled by another list
         takeList, dropList, splitAtList, split,
         dropTail, capitalise,
-
-        -- * For loop
-        nTimes,
 
         -- * Sorting
         sortWith, minWith, nubSort, ordNub,
@@ -137,6 +139,7 @@ import Data.Data
 import Data.IORef       ( IORef, newIORef, atomicModifyIORef' )
 import System.IO.Unsafe ( unsafePerformIO )
 import Data.List        hiding (group)
+import Data.List.NonEmpty  ( NonEmpty(..) )
 
 import GHC.Exts
 import GHC.Stack (HasCallStack)
@@ -198,13 +201,6 @@ debugIsOn = True
 debugIsOn = False
 #endif
 
-ncgDebugIsOn :: Bool
-#if defined(NCG_DEBUG)
-ncgDebugIsOn = True
-#else
-ncgDebugIsOn = False
-#endif
-
 ghciTablesNextToCode :: Bool
 #if defined(GHCI_TABLES_NEXT_TO_CODE)
 ghciTablesNextToCode = True
@@ -229,12 +225,17 @@ isDarwinHost = False
 {-
 ************************************************************************
 *                                                                      *
-\subsection{A for loop}
+\subsection{Miscellaneous higher-order functions}
 *                                                                      *
 ************************************************************************
 -}
 
--- | Compose a function with itself n times.  (nth rather than twice)
+-- | Apply a function iff some condition is met.
+applyWhen :: Bool -> (a -> a) -> a -> a
+applyWhen True f x = f x
+applyWhen _    _ x = x
+
+-- | A for loop: Compose a function with itself n times.  (nth rather than twice)
 nTimes :: Int -> (a -> a) -> (a -> a)
 nTimes 0 _ = id
 nTimes 1 f = f
@@ -389,7 +390,7 @@ filterByLists _          _      _      = []
 -- to 'True' go to the left; elements corresponding to 'False' go to the right.
 -- For example, @partitionByList [True, False, True] [1,2,3] == ([1,3], [2])@
 -- This function does not check whether the lists have equal
--- length.
+-- length; when one list runs out, the function stops.
 partitionByList :: [Bool] -> [a] -> ([a], [a])
 partitionByList = go [] []
   where
@@ -611,6 +612,10 @@ changeLast :: [a] -> a -> [a]
 changeLast []     _  = panic "changeLast"
 changeLast [_]    x  = [x]
 changeLast (x:xs) x' = x : changeLast xs x'
+
+whenNonEmpty :: Applicative m => [a] -> (NonEmpty a -> m ()) -> m ()
+whenNonEmpty []     _ = pure ()
+whenNonEmpty (x:xs) f = f (x :| xs)
 
 {-
 ************************************************************************

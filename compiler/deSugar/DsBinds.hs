@@ -29,9 +29,9 @@ import {-# SOURCE #-}   Match( matchWrapper )
 import DsMonad
 import DsGRHSs
 import DsUtils
-import Check ( checkGuardMatches )
+import GHC.HsToCore.PmCheck ( needToRunPmCheck, addTyCsDs, checkGuardMatches )
 
-import HsSyn            -- lots of things
+import GHC.Hs           -- lots of things
 import CoreSyn          -- lots of things
 import CoreOpt          ( simpleOptExpr )
 import OccurAnal        ( occurAnalyseExpr )
@@ -41,6 +41,7 @@ import CoreArity ( etaExpand )
 import CoreUnfold
 import CoreFVs
 import Digraph
+import Predicate
 
 import PrelNames
 import TyCon
@@ -186,11 +187,15 @@ dsHsBind dflags (AbsBinds { abs_tvs = tyvars, abs_ev_vars = dicts
                           , abs_exports = exports
                           , abs_ev_binds = ev_binds
                           , abs_binds = binds, abs_sig = has_sig })
-  = do { ds_binds <- addDictsDs (listToBag dicts) $
-                     dsLHsBinds binds
-                         -- addDictsDs: push type constraints deeper
-                         --             for inner pattern match check
-                         -- See Check, Note [Type and Term Equality Propagation]
+  = do { ds_binds <- applyWhen (needToRunPmCheck dflags FromSource)
+                               -- FromSource might not be accurate, but at worst
+                               -- we do superfluous calls to the pattern match
+                               -- oracle.
+                               -- addTyCsDs: push type constraints deeper
+                               --            for inner pattern match check
+                               -- See Check, Note [Type and Term Equality Propagation]
+                               (addTyCsDs (listToBag dicts))
+                               (dsLHsBinds binds)
 
        ; ds_ev_binds <- dsTcEvBinds_s ev_binds
 
@@ -614,9 +619,9 @@ We define an "unlifted bind" to be any bind that binds an unlifted id. Note that
   x :: Char
   (# True, x #) = blah
 
-is *not* an unlifted bind. Unlifted binds are detected by HsUtils.isUnliftedHsBind.
+is *not* an unlifted bind. Unlifted binds are detected by GHC.Hs.Utils.isUnliftedHsBind.
 
-Define a "banged bind" to have a top-level bang. Detected by HsPat.isBangedHsBind.
+Define a "banged bind" to have a top-level bang. Detected by GHC.Hs.Pat.isBangedHsBind.
 Define a "strict bind" to be either an unlifted bind or a banged bind.
 
 The restrictions are:

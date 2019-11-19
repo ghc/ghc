@@ -107,6 +107,20 @@ INLINE_HEADER const StgConInfoTable *get_con_itbl(const StgClosure *c)
    return CON_INFO_PTR_TO_STRUCT((c)->header.info);
 }
 
+/* Used when we expect another thread to be mutating the info table pointer of
+ * a closure (e.g. when busy-waiting on a WHITEHOLE).
+ */
+INLINE_HEADER const StgInfoTable *get_volatile_itbl(StgClosure *c) {
+    // The volatile here is import to ensure that the compiler does not
+    // optimise away multiple loads, e.g. in a busy-wait loop. Note that
+    // we can't use VOLATILE_LOAD here as the casts result in strict aliasing
+    // rule violations and this header may be compiled outside of the RTS
+    // (where we use -fno-strict-aliasing).
+    StgInfoTable * *volatile p = (StgInfoTable * *volatile) &c->header.info;
+    return INFO_PTR_TO_STRUCT(*p);
+}
+
+
 INLINE_HEADER StgHalfWord GET_TAG(const StgClosure *con)
 {
     return get_itbl(con)->srt;
@@ -117,36 +131,22 @@ INLINE_HEADER StgHalfWord GET_TAG(const StgClosure *con)
    -------------------------------------------------------------------------- */
 
 #if defined(PROFILING)
-#if defined(DEBUG_RETAINER)
 /*
-  For the sake of debugging, we take the safest way for the moment. Actually, this
-  is useful to check the sanity of heap before beginning retainer profiling.
-  flip is defined in RetainerProfile.c, and declared as extern in RetainerProfile.h.
-  Note: change those functions building Haskell objects from C datatypes, i.e.,
-  all rts_mk???() functions in RtsAPI.c, as well.
- */
-#define SET_PROF_HDR(c,ccs_)            \
-        ((c)->header.prof.ccs = ccs_, (c)->header.prof.hp.rs = (retainerSet *)((StgWord)NULL | flip))
-#else
-/*
-  For retainer profiling only: we do not have to set (c)->header.prof.hp.rs to
-  NULL | flip (flip is defined in RetainerProfile.c) because even when flip
-  is 1, rs is invalid and will be initialized to NULL | flip later when
-  the closure *c is visited.
- */
-/*
-#define SET_PROF_HDR(c,ccs_)            \
-        ((c)->header.prof.ccs = ccs_, (c)->header.prof.hp.rs = NULL)
- */
-/*
-  The following macro works for both retainer profiling and LDV profiling:
-  for retainer profiling, ldvTime remains 0, so rs fields are initialized to 0.
-  See the invariants on ldvTime.
+  The following macro works for both retainer profiling and LDV profiling. For
+ retainer profiling, 'era' remains 0, so by setting the 'ldvw' field we also set
+ 'rs' to zero.
+
+ Note that we don't have to bother handling the 'flip' bit properly[1] since the
+ retainer profiling code will just set 'rs' to NULL upon visiting a closure with
+ an invalid 'flip' bit anyways.
+
+ See Note [Profiling heap traversal visited bit] for details.
+
+ [1]: Technically we should set 'rs' to `NULL | flip`.
  */
 #define SET_PROF_HDR(c,ccs_)            \
         ((c)->header.prof.ccs = ccs_,   \
         LDV_RECORD_CREATE((c)))
-#endif /* DEBUG_RETAINER */
 #else
 #define SET_PROF_HDR(c,ccs)
 #endif
@@ -573,13 +573,20 @@ EXTERN_INLINE void overwritingClosure (StgClosure *p)
 // be less than or equal to closure_sizeW(p), and usually at least as
 // large as the respective thunk header.
 //
-// Note: As this calls LDV_recordDead() you have to call LDV_RECORD()
+// Note: As this calls LDV_recordDead() you have to call LDV_RECORD_CREATE()
 //       on the final state of the closure at the call-site
 EXTERN_INLINE void overwritingClosureOfs (StgClosure *p, uint32_t offset);
 EXTERN_INLINE void overwritingClosureOfs (StgClosure *p, uint32_t offset)
 {
-    // Set prim = true because only called on ARR_WORDS with the
-    // shrinkMutableByteArray# primop
+    // Set prim = true because overwritingClosureOfs is only
+    // ever called by
+    //   shrinkMutableByteArray# (ARR_WORDS)
+    //   shrinkSmallMutableArray# (SMALL_MUT_ARR_PTRS)
+    // This causes LDV_recordDead to be invoked. We want this
+    // to happen because the implementations of the above
+    // primops both call LDV_RECORD_CREATE after calling this,
+    // effectively replacing the LDV closure biography.
+    // See Note [LDV Profiling when Shrinking Arrays]
     overwritingClosure_(p, offset, closure_sizeW(p), true);
 }
 

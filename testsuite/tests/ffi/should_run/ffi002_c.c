@@ -1,7 +1,7 @@
-#include <stdio.h>
 #include "ffi002_stub.h"
-
 #include "HsFFI.h"
+
+#include <stdio.h>
 
 int main(int argc, char *argv[])
 {

@@ -26,7 +26,7 @@ from testutil import strip_quotes, lndir, link_or_copy_file, passed, \
 import testutil
 from cpu_features import have_cpu_feature
 import perf_notes as Perf
-from perf_notes import MetricChange
+from perf_notes import MetricChange, PerfStat, MetricOracles
 extra_src_files = {'T4198': ['exitminus1.c']} # TODO: See #12223
 
 from my_typing import *
@@ -50,6 +50,13 @@ def stopNow() -> None:
 def stopping() -> bool:
     return wantToStop
 
+_all_ways = None
+
+def get_all_ways() -> Set[WayName]:
+    global _all_ways
+    if _all_ways is None:
+        _all_ways = set(config.way_flags.keys())
+    return _all_ways
 
 # Options valid for the current test only (these get reset to
 # testdir_testopts after each test).
@@ -185,6 +192,10 @@ def req_interp( name, opts ):
     if not config.have_interp:
         opts.expect = 'fail'
 
+def req_rts_linker( name, opts ):
+    if not config.have_RTS_linker:
+        opts.expect = 'fail'
+
 def req_th( name, opts ):
     """
     Mark a test as requiring TemplateHaskell. In addition to having interpreter
@@ -234,29 +245,42 @@ def _use_specs( name, opts, specs ):
 
 # -----
 
-def expect_fail_for( ways: List[WayName] ):
-    assert isinstance(ways, list)
-    return lambda name, opts, w=ways: _expect_fail_for( name, opts, w )
+def _lint_ways(name: TestName, ways: List[WayName]) -> None:
+    """ Check that all of the ways in a list are valid. """
+    unknown_ways = [way
+                    for way in get_all_ways()
+                    if way not in get_all_ways()
+                    ]
+    if len(unknown_ways) > 0:
+        framework_fail(name, None, 'Unknown ways: %s' % (unknown_ways,))
 
-def _expect_fail_for( name, opts, ways ):
-    opts.expect_fail_for = ways
+def expect_fail_for( ways: List[WayName] ):
+    def helper( name: TestName, opts ):
+        _lint_ways(name, ways)
+        opts.expect_fail_for = ways
+
+    return helper
+
 
 def expect_broken( bug: IssueNumber ):
-    # This test is a expected not to work due to the indicated trac bug
-    # number.
-    return lambda name, opts, b=bug: _expect_broken (name, opts, b )
+    """
+    This test is a expected not to work due to the indicated issue number.
+    """
+    def helper( name: TestName, opts ):
+        record_broken(name, opts, bug)
+        opts.expect = 'fail';
 
-def _expect_broken( name: TestName, opts, bug: IssueNumber ):
-    record_broken(name, opts, bug)
-    opts.expect = 'fail';
+    return helper
+
 
 def expect_broken_for( bug: IssueNumber, ways: List[WayName] ):
-    assert isinstance(ways, list)
-    return lambda name, opts, b=bug, w=ways: _expect_broken_for( name, opts, b, w )
+    def helper( name: TestName, opts ):
+        _lint_ways(name, ways)
+        record_broken(name, opts, bug)
+        opts.expect_fail_for = ways
 
-def _expect_broken_for( name: TestName, opts, bug: IssueNumber, ways ):
-    record_broken(name, opts, bug)
-    opts.expect_fail_for = ways
+    return helper
+
 
 def record_broken(name: TestName, opts, bug: IssueNumber):
     me = (bug, opts.testdir, name)
@@ -286,7 +310,8 @@ def fragile_for( bug: IssueNumber, ways: List[WayName] ):
     Indicates that failures of this test should be ignored due to fragility in
     the given test ways as documented in the given ticket.
     """
-    def helper( name, opts, bug=bug, ways=ways ):
+    def helper( name: TestName, opts ):
+        _lint_ways(name, ways)
         record_broken(name, opts, bug)
         opts.fragile_ways += ways
 
@@ -295,30 +320,30 @@ def fragile_for( bug: IssueNumber, ways: List[WayName] ):
 # -----
 
 def omit_ways( ways: List[WayName] ):
-    assert isinstance(ways, list)
-    return lambda name, opts, w=ways: _omit_ways( name, opts, w )
+    return lambda name, opts: _omit_ways(name, opts, ways)
 
-def _omit_ways( name, opts, ways ):
-    assert ways.__class__ is list
+def _omit_ways( name: TestName, opts, ways: List[WayName] ):
+    _lint_ways(name, ways)
     opts.omit_ways += ways
 
 # -----
 
 def only_ways( ways: List[WayName] ):
-    assert isinstance(ways, list)
-    return lambda name, opts, w=ways: _only_ways( name, opts, w )
+    def helper( name: TestName, opts ):
+        _lint_ways(name, ways)
+        opts.only_ways = ways
 
-def _only_ways( name, opts, ways ):
-    opts.only_ways = ways
+    return helper
 
 # -----
 
 def extra_ways( ways: List[WayName] ):
-    assert isinstance(ways, list)
-    return lambda name, opts, w=ways: _extra_ways( name, opts, w )
+    def helper( name: TestName, opts ):
+        _lint_ways(name, ways)
+        opts.extra_ways = ways
 
-def _extra_ways( name, opts, ways ):
-    opts.extra_ways = ways
+    return helper
+
 
 # -----
 
@@ -528,6 +553,50 @@ def integer_simple( ) -> bool:
 
 def llvm_build ( ) -> bool:
     return config.ghc_built_by_llvm
+
+# ---
+
+# Note [Measuring residency]
+# ~~~~~~~~~~~~~~~~~~~~~~~~~~
+#
+# Residency (peak_megabytes_allocated and max_bytes_used) is sensitive
+# to when the major GC runs, which makes it inherently inaccurate.
+# Sometime an innocuous change somewhere can shift things around such
+# that the samples occur at a different time, and the residency
+# appears to change (up or down) when the underlying profile hasn't
+# really changed. To further minimize this effect we run with a single
+# generation (meaning we get a residency sample on every GC) with a small
+# allocation area (as suggested in #17387).
+#
+# However, please don't just ignore changes in residency.  If you see
+# a change in one of these figures, please check whether it is real or
+# not as follows:
+#
+#  * Run the test with old and new compilers, adding +RTS -h -i0.01
+#    (you don't need to compile anything for profiling or enable profiling
+#    libraries to get a heap profile).
+#  * view the heap profiles, read off the maximum residency.  If it has
+#    really changed, then you know there's an issue.
+
+RESIDENCY_OPTS = '+RTS -A256k -i0 -h -RTS'
+
+# See Note [Measuring residency].
+def collect_runtime_residency(tolerance_pct: float):
+    return [
+        collect_stats(['peak_megabytes_allocated', 'max_bytes_used'], tolerance_pct),
+        extra_run_opts(RESIDENCY_OPTS),
+        # The nonmoving collector does not support -G1
+        omit_ways([WayName(name) for name in ['nonmoving', 'nonmoving_thr', 'nonmoving_thr_ghc']])
+    ]
+
+# See Note [Measuring residency].
+def collect_compiler_residency(tolerance_pct: float):
+    return [
+        collect_compiler_stats(['peak_megabytes_allocated', 'max_bytes_used'], tolerance_pct),
+        extra_hc_opts(RESIDENCY_OPTS),
+        # The nonmoving collector does not support -G1
+        omit_ways([WayName('nonmoving_thr_ghc')])
+    ]
 
 # ---
 
@@ -829,6 +898,11 @@ def test_common_work(watcher: testutil.Watcher,
                 all_ways = [WayName('ghci')]
             else:
                 all_ways = []
+        elif func in [makefile_test, run_command]:
+            # makefile tests aren't necessarily runtime or compile-time
+            # specific. Assume we can run them in all ways. See #16042 for what
+            # happened previously.
+            all_ways = config.compile_ways + config.run_ways
         else:
             all_ways = [WayName('normal')]
 
@@ -1291,7 +1365,7 @@ def static_stats( name, way, stats_file ):
     opts = getTestOpts()
     return check_stats(name, way, in_statsdir(stats_file), opts.stats_range_fields)
 
-def metric_dict(name, way, metric, value):
+def metric_dict(name, way, metric, value) -> PerfStat:
     return Perf.PerfStat(
         test_env = config.test_env,
         test     = name,
@@ -1354,7 +1428,7 @@ def check_stats(name: TestName,
                         tolerance_dev,
                         config.allowed_perf_changes,
                         config.verbose >= 4)
-                t.metrics.append((change, perf_stat))
+                t.metrics.append((change, perf_stat, baseline))
 
             # If any metric fails then the test fails.
             # Note, the remaining metrics are still run so that
@@ -1493,19 +1567,20 @@ def simple_run(name: TestName, way: WayName, prog: str, extra_run_opts: str) -> 
 
     my_rts_flags = rts_flags(way)
 
-    # Collect stats if necessary:
+    # Collect runtime stats if necessary:
     # isStatsTest and not isCompilerStatsTest():
     #   assume we are running a ghc compiled program. Collect stats.
     # isStatsTest and way == 'ghci':
     #   assume we are running a program via ghci. Collect stats
-    stats_file = name + '.stats'
+    stats_file = None # type: Optional[str]
     if isStatsTest() and (not isCompilerStatsTest() or way == 'ghci'):
+        stats_file = name + '.stats'
         stats_args = ' +RTS -V0 -t' + stats_file + ' --machine-readable -RTS'
     else:
         stats_args = ''
 
     # Put extra_run_opts last: extra_run_opts('+RTS foo') should work.
-    cmd = prog + stats_args + ' ' + my_rts_flags + ' ' + extra_run_opts
+    cmd = ' '.join([prog, stats_args, my_rts_flags, extra_run_opts])
 
     if opts.cmd_wrapper is not None:
         cmd = opts.cmd_wrapper(cmd)
@@ -1541,7 +1616,11 @@ def simple_run(name: TestName, way: WayName, prog: str, extra_run_opts: str) -> 
     if check_prof and not check_prof_ok(name, way):
         return failBecause('bad profile')
 
-    return check_stats(name, way, in_testdir(stats_file), opts.stats_range_fields)
+    # Check runtime stats if desired.
+    if stats_file is not None:
+        return check_stats(name, way, in_testdir(stats_file), opts.stats_range_fields)
+    else:
+        return passed()
 
 def rts_flags(way: WayName) -> str:
     args = config.way_rts_flags.get(way, [])
@@ -2282,11 +2361,11 @@ if config.msys:
         testdir = getTestOpts().testdir # type: Path
         max_attempts = 5
         retries = max_attempts
-        def on_error(function, path, excinfo):
+        def on_error(function, path: str, excinfo):
             # At least one test (T11489) removes the write bit from a file it
             # produces. Windows refuses to delete read-only files with a
             # permission error. Try setting the write bit and try again.
-            path.chmod(stat.S_IWRITE)
+            Path(path).chmod(stat.S_IWRITE)
             function(path)
 
         # On Windows we have to retry the delete a couple of times.

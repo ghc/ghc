@@ -18,6 +18,8 @@ import GhcPrelude
 
 import TcRnTypes
 import TcRnMonad
+import Constraint
+import TcOrigin
 import TcMType
 import TcEvidence
 import TcType
@@ -50,8 +52,8 @@ import TcUnify       ( tcSubType_NC )
 
 import ExtractDocs ( extractDocs )
 import qualified Data.Map as Map
-import HsDoc           ( unpackHDS, DeclDocMap(..) )
-import HscTypes        ( ModIface(..) )
+import GHC.Hs.Doc      ( unpackHDS, DeclDocMap(..) )
+import HscTypes        ( ModIface_(..) )
 import LoadIface       ( loadInterfaceForNameMaybe )
 
 import PrelInfo (knownKeyNames)

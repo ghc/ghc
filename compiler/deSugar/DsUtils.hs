@@ -32,7 +32,7 @@ module DsUtils (
         seqVar,
 
         -- LHs tuples
-        mkLHsVarPatTup, mkLHsPatTup, mkVanillaTuplePat,
+        mkLHsPatTup, mkVanillaTuplePat,
         mkBigLHsVarTupId, mkBigLHsTupId, mkBigLHsVarPatTupId, mkBigLHsPatTupId,
 
         mkSelectorBinds,
@@ -49,7 +49,7 @@ import GhcPrelude
 import {-# SOURCE #-} Match  ( matchSimply )
 import {-# SOURCE #-} DsExpr ( dsLExpr )
 
-import HsSyn
+import GHC.Hs
 import TcHsSyn
 import TcType( tcSplitTyConApp )
 import CoreSyn
@@ -243,8 +243,7 @@ wrapBind new old body   -- NB: this function must deal with term
   | otherwise   = Let (NonRec new (varToCoreExpr old)) body
 
 seqVar :: Var -> CoreExpr -> CoreExpr
-seqVar var body = Case (Var var) var (exprType body)
-                        [(DEFAULT, [], body)]
+seqVar var body = mkDefaultCase (Var var) var body
 
 mkCoLetMatchResult :: CoreBind -> MatchResult -> MatchResult
 mkCoLetMatchResult bind = adjustMatchResult (mkCoreLet bind)
@@ -747,7 +746,7 @@ is_triv_pat _            = False
 *                                                                      *
   Creating big tuples and their types for full Haskell expressions.
   They work over *Ids*, and create tuples replete with their types,
-  which is whey they are not in HsUtils.
+  which is whey they are not in GHC.Hs.Utils.
 *                                                                      *
 ********************************************************************* -}
 
@@ -756,9 +755,6 @@ mkLHsPatTup []     = noLoc $ mkVanillaTuplePat [] Boxed
 mkLHsPatTup [lpat] = lpat
 mkLHsPatTup lpats  = cL (getLoc (head lpats)) $
                      mkVanillaTuplePat lpats Boxed
-
-mkLHsVarPatTup :: [Id] -> LPat GhcTc
-mkLHsVarPatTup bs  = mkLHsPatTup (map nlVarPat bs)
 
 mkVanillaTuplePat :: [OutPat GhcTc] -> Boxity -> Pat GhcTc
 -- A vanilla tuple pattern simply gets its type from its sub-patterns

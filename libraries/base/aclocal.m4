@@ -106,6 +106,14 @@ AC_DEFUN([FPTOOLS_HTYPE_INCLUDES],
 # include <sys/resource.h>
 #endif
 
+#if HAVE_POLL_H
+# include <poll.h>
+#endif
+
+#if HAVE_SYS_SOCKET_H
+# include <sys/socket.h>
+#endif
+
 #include <stdlib.h>
 ])
 

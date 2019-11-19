@@ -1,5 +1,6 @@
 {-# LANGUAGE CPP #-}
 {-# LANGUAGE DeriveFunctor #-}
+{-# LANGUAGE BangPatterns #-}
 
 -- -----------------------------------------------------------------------------
 --
@@ -88,7 +89,7 @@ data NcgImpl statics instr jumpDest = NcgImpl {
     -- the block's 'UnwindPoint's
     -- See Note [What is this unwinding business?] in Debug
     -- and Note [Unwinding information in the NCG] in this module.
-    invertCondBranches        :: CFG -> LabelMap CmmStatics -> [NatBasicBlock instr]
+    invertCondBranches        :: Maybe CFG -> LabelMap CmmStatics -> [NatBasicBlock instr]
                               -> [NatBasicBlock instr]
     -- ^ Turn the sequence of `jcc l1; jmp l2` into `jncc l2; <block_l1>`
     -- when possible.
@@ -204,7 +205,8 @@ addImportNat imp
 
 updateCfgNat :: (CFG -> CFG) -> NatM ()
 updateCfgNat f
-        = NatM $ \ st -> ((), st { natm_cfg = f (natm_cfg st) })
+        = NatM $ \ st -> let !cfg' = f (natm_cfg st)
+                         in ((), st { natm_cfg = cfg'})
 
 -- | Record that we added a block between `from` and `old`.
 addNodeBetweenNat :: BlockId -> BlockId -> BlockId -> NatM ()

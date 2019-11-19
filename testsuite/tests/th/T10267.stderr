@@ -27,58 +27,7 @@ T10267.hs:8:1: error:
         j :: forall a0. a0 -> a0
           with j @a
           (bound at T10267.hs:8:1)
-        k :: forall a. a -> a
-          with k @a
-          (defined at T10267.hs:14:3)
-        l :: forall a. a -> a
-          with l @a
-          (defined at T10267.hs:23:3)
-        foo :: forall a. a -> a
-          with foo @a
-          (defined at T10267.hs:33:1)
         id :: forall a. a -> a
           with id @a
           (imported from ‘Prelude’ at T10267.hs:3:8-13
            (and originally defined in ‘GHC.Base’))
-
-T10267.hs:14:3: error:
-    • Found hole: _foo :: a -> a
-      Where: ‘a’ is a rigid type variable bound by
-               the type signature for:
-                 k :: forall a. a -> a
-               at T10267.hs:(14,3)-(21,2)
-      Or perhaps ‘_foo’ is mis-spelled, or not in scope
-    • In the expression: _foo
-      In an equation for ‘k’: k = _foo
-    • Relevant bindings include k :: a -> a (bound at T10267.hs:14:3)
-      Valid hole fits include
-        k :: a -> a (bound at T10267.hs:14:3)
-        j :: forall a0. a0 -> a0
-          with j @a
-          (bound at T10267.hs:8:1)
-        i :: forall a0. a0 -> a0
-          with i @a
-          (bound at T10267.hs:8:1)
-        l :: forall a. a -> a
-          with l @a
-          (defined at T10267.hs:23:3)
-        foo :: forall a. a -> a
-          with foo @a
-          (defined at T10267.hs:33:1)
-        id :: forall a. a -> a
-          with id @a
-          (imported from ‘Prelude’ at T10267.hs:3:8-13
-           (and originally defined in ‘GHC.Base’))
-
-T10267.hs:23:3: error:
-    • Found hole: _ :: a
-      Where: ‘a’ is a rigid type variable bound by
-               the type signature for:
-                 l :: forall a. a -> a
-               at T10267.hs:(23,3)-(30,2)
-    • In the expression: _
-      In an equation for ‘l’: l x = _
-    • Relevant bindings include
-        x :: a (bound at T10267.hs:23:3)
-        l :: a -> a (bound at T10267.hs:23:3)
-      Valid hole fits include x :: a (bound at T10267.hs:23:3)

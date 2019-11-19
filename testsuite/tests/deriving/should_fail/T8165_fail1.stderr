@@ -7,11 +7,12 @@ T8165_fail1.hs:17:12: error:
     • In the newtype declaration for ‘MyInt’
 
 T8165_fail1.hs:25:8: error:
-    Type family equations violate injectivity annotation:
+    Type family equation right-hand sides overlap; this violates
+    the family's injectivity annotation:
       S Int = Char -- Defined at T8165_fail1.hs:25:8
       S WrappedInt = S Int -- Defined at T8165_fail1.hs:28:12
 
 T8165_fail1.hs:28:12: error:
-    Type family equation violates injectivity annotation.
+    Type family equation violates the family's injectivity annotation.
     RHS of injective type family equation cannot be a type family:
       S WrappedInt = S Int -- Defined at T8165_fail1.hs:28:12

@@ -16,12 +16,12 @@ import Context
 import Expression (getContextData, interpretInContext, (?), package)
 import Flavour
 import Oracles.ModuleFiles
+import Oracles.Setting (topDirectory)
 import Packages
 import Settings
 import Target
 import Utilities
 
-import Data.List (union)
 import qualified Data.Set    as Set
 import qualified Text.Parsec as Parsec
 
@@ -33,6 +33,9 @@ htmlRoot = docRoot -/- "html"
 
 pdfRoot :: FilePath
 pdfRoot = docRoot -/- "pdfs"
+
+infoRoot :: FilePath
+infoRoot = docRoot -/- "info"
 
 archiveRoot :: FilePath
 archiveRoot = docRoot -/- "archives"
@@ -58,6 +61,7 @@ pathArchive path = archiveRoot -/- path <.> "html.tar.xz"
 
 -- TODO: Get rid of this hack.
 pathPath :: FilePath -> FilePath
+pathPath "GHCUsersGuide" = "docs/users_guide"
 pathPath "users_guide" = "docs/users_guide"
 pathPath "Haddock" = "utils/haddock/doc"
 pathPath _ = ""
@@ -69,6 +73,7 @@ documentationRules = do
     buildHtmlDocumentation
     buildManPage
     buildPdfDocumentation
+    buildSphinxInfoGuide
 
     -- a phony rule that runs Haddock for "Haskell Hierarchical Libraries" and
     -- the "GHC-API"
@@ -106,8 +111,34 @@ documentationRules = do
 
         need $ map (root -/-) targets
 
+        when (SphinxPDFs `Set.member` doctargets)
+          $ checkUserGuideFlags $ pdfRoot -/- "users_guide" -/- "ghc-flags.txt"
+        when (SphinxHTML `Set.member` doctargets)
+          $ checkUserGuideFlags $ root -/- htmlRoot -/- "users_guide" -/- "ghc-flags.txt"
+
     where archiveTarget "libraries"   = Haddocks
           archiveTarget _             = SphinxHTML
+
+-- | Check Sphinx log for undefined reference target errors. Ideally we would
+-- use sphinx's @-W@ flag here but unfortunately it also turns syntax
+-- highlighting warnings into errors which is undesirable.
+checkSphinxWarnings :: FilePath  -- ^ output directory
+                    -> Action ()
+checkSphinxWarnings out = do
+    log <- liftIO $ readFile (out -/- ".log")
+    when ("reference target not found" `isInfixOf` log)
+      $ fail "Undefined reference targets found in Sphinx log."
+
+-- | Check that all GHC flags are documented in the users guide.
+checkUserGuideFlags :: FilePath -> Action ()
+checkUserGuideFlags documentedFlagList = do
+    scriptPath <- (</> "docs/users_guide/compare-flags.py") <$> topDirectory
+    ghcPath <- (</>) <$> topDirectory <*> programPath (vanillaContext Stage1 ghc)
+    runBuilder Python
+      [ scriptPath
+      , "--doc-flags", documentedFlagList
+      , "--ghc", ghcPath
+      ] [documentedFlagList] []
 
 
 ------------------------------------- HTML -------------------------------------
@@ -142,6 +173,7 @@ buildSphinxHtml path = do
         rstFiles <- getDirectoryFiles rstFilesDir ["**/*.rst"]
         need (map (rstFilesDir -/-) rstFiles)
         build $ target docContext (Sphinx Html) [pathPath path] [dest]
+        checkSphinxWarnings dest
 
 ------------------------------------ Haddock -----------------------------------
 
@@ -254,8 +286,31 @@ buildSphinxPdf path = do
             rstFiles <- getDirectoryFiles rstFilesDir ["**/*.rst"]
             need (map (rstFilesDir -/-) rstFiles)
             build $ target docContext (Sphinx Latex) [pathPath path] [dir]
+            checkSphinxWarnings dir
             build $ target docContext Xelatex [path <.> "tex"] [dir]
             copyFileUntracked (dir -/- path <.> "pdf") file
+
+------------------------------------ Info --------------------------------------
+
+-- | Build the user guide as an Info hypertext
+buildSphinxInfoGuide :: Rules ()
+buildSphinxInfoGuide = do
+  root <- buildRootRules
+  let path = "GHCUsersGuide"
+  root -/- infoRoot -/- path <.> "info" %> \ file -> do
+        withTempDir $ \dir -> do
+            let rstFilesDir = pathPath path
+            rstFiles <- getDirectoryFiles rstFilesDir ["**/*.rst"]
+            need (map (rstFilesDir -/-) rstFiles)
+            build $ target docContext (Sphinx Info) [pathPath path] [dir]
+            checkSphinxWarnings dir
+            -- Sphinx outputs texinfo source and a makefile, the
+            -- default target of which actually produces the target
+            -- for this build rule.
+            let p = dir -/- path
+            let [texipath, infopath] = map (p <.>) ["texi", "info"]
+            build $ target docContext (Makeinfo) [texipath] [infopath]
+            copyFileUntracked infopath file
 
 ------------------------------------ Archive -----------------------------------
 
@@ -280,6 +335,7 @@ buildManPage = do
         need ["docs/users_guide/ghc.rst"]
         withTempDir $ \dir -> do
             build $ target docContext (Sphinx Man) ["docs/users_guide"] [dir]
+            checkSphinxWarnings dir
             copyFileUntracked (dir -/- "ghc.1") file
 
 -- | Find the Haddock files for the dependencies of the current library.
