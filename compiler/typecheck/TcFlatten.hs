@@ -732,11 +732,21 @@ yields a better error message anyway.)
 
 Note [No derived kind equalities]
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
-A kind-level coercion can appear in types, via mkCastTy. So, whenever
-we are generating a coercion in a dependent context (in other words,
-in a kind) we need to make sure that our flavour is never Derived
-(as Derived constraints have no evidence). The noBogusCoercions function
-changes the flavour from Derived just for this purpose.
+A kind-level coercion can appear in types, via mkCastTy. For example
+   [D] Proxy ki ty ~ Proxy alpha beta
+We flatten both sides.  (Well, we'd decompose, but perhaps the RHS
+wasn't yet (Proxy alpha beta).) Flattening the LHS gives
+   [D] Proxy flat_ki (flat_ty |> ki_co)  ~  Proxy alpha beta
+where ki_co :: ki ~ flat_ki.
+
+Now we'll *unify* beta := flat_ty |> ki_co.  So ki_co must jolly well
+exist, even though the original equality is Derived.
+
+So, whenever we are generating a coercion in a dependent context (in
+other words, in a kind) we need to make sure that our flavour is never
+Derived (as Derived constraints have no evidence). The
+noBogusCoercions function changes the flavour from Derived just for
+this purpose.
 
 -}
 
