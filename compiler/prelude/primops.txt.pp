@@ -3249,7 +3249,7 @@ section "Bytecode operations"
         contain a list of instructions and data needed by these instructions.}
 ------------------------------------------------------------------------
 
-primtype BCO#
+primtype BCO
    { Primitive bytecode type. }
 
 primop   AddrToAnyOp "addrToAny#" GenPrimOp
@@ -3274,14 +3274,14 @@ primop   AnyToAddrOp "anyToAddr#" GenPrimOp
    code_size = 0
 
 primop   MkApUpd0_Op "mkApUpd0#" GenPrimOp
-   BCO# -> (# a #)
+   BCO -> (# a #)
    { Wrap a BCO in a {\tt AP_UPD} thunk which will be updated with the value of
      the BCO when evaluated. }
    with
    out_of_line = True
 
 primop  NewBCOOp "newBCO#" GenPrimOp
-   ByteArray# -> ByteArray# -> Array# a -> Int# -> ByteArray# -> State# s -> (# State# s, BCO# #)
+   ByteArray# -> ByteArray# -> Array# a -> Int# -> ByteArray# -> State# s -> (# State# s, BCO #)
    { {\tt newBCO\# instrs lits ptrs arity bitmap} creates a new bytecode object. The
      resulting object encodes a function of the given arity with the instructions
      encoded in {\tt instrs}, and a static reference table usage bitmap given by
