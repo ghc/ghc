@@ -23,6 +23,7 @@ import System.IO (fixIO)
 import Control.Monad
 import Data.Array.Base
 import Foreign hiding (newArray)
+import Unsafe.Coerce (unsafeCoerce)
 import GHC.Arr          ( Array(..) )
 import GHC.Exts
 import GHC.IO
@@ -45,6 +46,8 @@ createBCO _   ResolvedBCO{..} | resolvedBCOIsLE /= isLittleEndian
                 ])
 createBCO arr bco
    = do BCO bco# <- linkBCO' arr bco
+        -- Note [Updatable CAF BCOs]
+        -- ~~~~~~~~~~~~~~~~~~~~~~~~~
         -- Why do we need mkApUpd0 here?  Otherwise top-level
         -- interpreted CAFs don't get updated after evaluation.  A
         -- top-level BCO will evaluate itself and return its value
@@ -57,8 +60,9 @@ createBCO arr bco
         --   (c) An AP is always fully saturated, so we *can't* wrap
         --       non-zero arity BCOs in an AP thunk.
         --
+        -- See #17424.
         if (resolvedBCOArity bco > 0)
-           then return (HValue (unsafeCoerce# bco#))
+           then return (HValue (unsafeCoerce bco#))
            else case mkApUpd0# bco# of { (# final_bco #) ->
                   return (HValue final_bco) }
 
@@ -102,8 +106,8 @@ mkPtrsArray arr n_ptrs ptrs = do
     fill (ResolvedBCOStaticPtr r) i = do
       writePtrsArrayPtr i (fromRemotePtr r)  marr
     fill (ResolvedBCOPtrBCO bco) i = do
-      BCO bco# <- linkBCO' arr bco
-      writePtrsArrayBCO i bco# marr
+      bco <- linkBCO' arr bco
+      writePtrsArrayBCO i bco marr
     fill (ResolvedBCOPtrBreakArray r) i = do
       BA mba <- localRef r
       writePtrsArrayMBA i mba marr
@@ -130,11 +134,9 @@ writePtrsArrayPtr (I# i) (Ptr a#) (PtrsArr arr) = IO $ \s ->
 writeArrayAddr# :: MutableArray# s a -> Int# -> Addr# -> State# s -> State# s
 writeArrayAddr# marr i addr s = unsafeCoerce# writeArray# marr i addr s
 
-writePtrsArrayBCO :: Int -> BCO# -> PtrsArr -> IO ()
+writePtrsArrayBCO :: Int -> BCO -> PtrsArr -> IO ()
 writePtrsArrayBCO (I# i) bco (PtrsArr arr) = IO $ \s ->
   case (unsafeCoerce# writeArray#) arr i bco s of s' -> (# s', () #)
-
-data BCO = BCO BCO#
 
 writePtrsArrayMBA :: Int -> MutableByteArray# s -> PtrsArr -> IO ()
 writePtrsArrayMBA (I# i) mba (PtrsArr arr) = IO $ \s ->
