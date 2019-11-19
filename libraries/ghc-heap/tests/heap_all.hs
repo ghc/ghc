@@ -197,7 +197,6 @@ data A = A (Array# Int)
 data MA = MA (MutableArray# RealWorld Int)
 data BA = BA ByteArray#
 data MBA = MBA (MutableByteArray# RealWorld)
-data B = B BCO#
 data APC a = APC a
 
 main :: IO ()
@@ -220,7 +219,7 @@ main = do
             (# s1, x #) ->
                 case unsafeFreezeByteArray# x s1 of
                     (# s2, y #) -> (# s2, BA y #)
-    B bco <- IO $ \s ->
+    bco <- IO $ \s ->
         case newBCO# ba ba a 0# ba s of
             (# s1, x #) -> (# s1, B x #)
     APC apc <- IO $ \s ->
