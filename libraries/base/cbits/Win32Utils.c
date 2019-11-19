@@ -16,6 +16,8 @@
 #include <wchar.h>
 #include <windows.h>
 #include <io.h>
+#include <objbase.h>
+#include "fs.h"
 
 /* This is the error table that defines the mapping between OS error
    codes and errno values */
@@ -160,6 +162,12 @@ BOOL file_exists(LPCTSTR path)
 {
     DWORD r = GetFileAttributes(path);
     return r != INVALID_FILE_ATTRIBUTES;
+}
+
+bool __createUUIDTempFileErrNo (wchar_t* pathName, wchar_t* prefix,
+                                wchar_t* suffix, wchar_t* tempFileName)
+{
+
 }
 
 bool getTempFileNameErrorNo (wchar_t* pathName, wchar_t* prefix,
