@@ -1154,19 +1154,18 @@ tcInferApps_nosat mode orig_hs_ty fun orig_hs_args
       (HsValArg _ : _, Nothing)
         -> try_again_after_substing_or $
            do { let arrows_needed = n_initial_val_args all_args
-              ; co <- matchExpectedFunKind hs_ty arrows_needed substed_fun_ki
+              ; (co, co_res_kind) <- matchExpectedFunKind hs_ty arrows_needed substed_fun_ki
 
-              ; fun' <- zonkTcType (fun `mkTcCastTy` co)
-                     -- This zonk is essential, to expose the fruits
-                     -- of matchExpectedFunKind to the 'go' loop
+              ; let fun' = fun `mkTcCastTy` co
+                    -- NB:  typeKind fun' = co_res_kind
 
               ; traceTc "tcInferApps (no binder)" $
                    vcat [ ppr fun <+> dcolon <+> ppr fun_ki
                         , ppr arrows_needed
                         , ppr co
                         , ppr fun' <+> dcolon <+> ppr (tcTypeKind fun')]
-              ; go_init n fun' all_args }
-                -- Use go_init to establish go's INVARIANT
+              ; go n fun' subst co_res_kind all_args }
+                -- NB: subst is empty but we need its in-scope set
       where
         instantiate ki_binder inner_ki
           = do { traceTc "tcInferApps (need to instantiate)"

@@ -1685,7 +1685,7 @@ uUnfilledVar2 :: CtOrigin
               -> SwapFlag
               -> TcTyVar        -- Tyvar 1: not necessarily a meta-tyvar
                                 --    definitely not a /filled/ meta-tyvar
-              -> TcTauType      -- Type 2, zonked
+              -> TcTauType      -- Type 2, zonked, to make occurs check easy
               -> TcM Coercion
 uUnfilledVar2 origin t_or_k swapped tv1 ty2
   = do { dflags  <- getDynFlags
@@ -2082,11 +2082,13 @@ matchExpectedFunKind
   => fun             -- ^ type, only for errors
   -> Arity           -- ^ n: number of desired arrows
   -> TcKind          -- ^ fun_ kind
-  -> TcM Coercion    -- ^ co :: fun_kind ~ (arg1 -> ... -> argn -> res)
+  -> TcM (Coercion, TcKind)
+                     -- ^ co :: fun_kind ~ fun_kind'
+                     -- ^ fun_kind' = arg1 -> ... -> argn -> res
 
 matchExpectedFunKind hs_ty n k = go n k
   where
-    go 0 k = return (mkNomReflCo k)
+    go 0 k = return (mkNomReflCo k, k)
 
     go n k | Just k' <- tcView k = go n k'
 
@@ -2097,9 +2099,10 @@ matchExpectedFunKind hs_ty n k = go n k
                 Indirect fun_kind -> go n fun_kind
                 Flexi ->             defer n k }
 
-    go n (FunTy _ arg res)
-      = do { co <- go (n-1) res
-           ; return (mkTcFunCo Nominal (mkTcNomReflCo arg) co) }
+    go n (FunTy af arg res)
+      = do { (co, k') <- go (n-1) res
+           ; return (mkTcFunCo Nominal (mkTcNomReflCo arg) co
+                    , mkFunTy af arg  k') }
 
     go n other
      = defer n other
@@ -2113,7 +2116,8 @@ matchExpectedFunKind hs_ty n k = go n k
                                         , uo_thing    = Just (ppr hs_ty)
                                         , uo_visible  = True
                                         }
-           ; uType KindLevel origin k new_fun }
+           ; co <- uType KindLevel origin k new_fun
+           ; return (co, new_fun) }
 
 {- *********************************************************************
 *                                                                      *
