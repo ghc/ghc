@@ -4,5 +4,5 @@ T10279.hs:10:10: error:
       no unit id matching ‘rts-1.0’ was found
       (This unit ID looks like the source package ID;
        the real unit ID is ‘rts’)
-    • In the expression: (rts-1.0:A.Foo)
+    • In the expression: rts-1.0:A.Foo
       In an equation for ‘blah’: blah = (rts-1.0:A.Foo)

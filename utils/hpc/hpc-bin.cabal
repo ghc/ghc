@@ -1,14 +1,13 @@
 Name: hpc-bin
 -- XXX version number:
-Version: 0.67
+Version: 0.68
 Copyright: XXX
 License: BSD3
 -- XXX License-File: LICENSE
 Author: XXX
 Maintainer: XXX
 Synopsis: XXX
-Description:
-	XXX
+Description: XXX
 Category: Development
 build-type: Simple
 cabal-version: >=1.10
@@ -33,5 +32,5 @@ Executable hpc
                    filepath   >= 1   && < 1.5,
                    containers >= 0.1 && < 0.7,
                    array      >= 0.1 && < 0.6,
-                   hpc
+                   hpc        >= 0.6.1 && < 0.7
 
