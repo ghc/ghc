@@ -69,6 +69,10 @@ case "$(uname)" in
     ln -s $HOME/.cabal/bin/HsColour /usr/local/bin/HsColour || true
     echo "libraries/integer-gmp_CONFIGURE_OPTS += --configure-option=--with-intree-gmp" >> mk/build.mk
     ;;
+
+  FreeBSD)
+    pkg install -y python36
+    pkg install -y ghc gmp
   *)
     fail "uname=$(uname) not supported"
 esac
