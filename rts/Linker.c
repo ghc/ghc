@@ -190,9 +190,10 @@ int ocTryLoad( ObjectCode* oc );
  * small memory model on this architecture (see gcc docs,
  * -mcmodel=small).
  *
- * MAP_32BIT not available on OpenBSD/amd64
+ * MAP_32BIT not available on OpenBSD/amd64.
+ * Also, MAP_32BIT does not permit W|X mappings on Darwin (see #17353).
  */
-#if defined(x86_64_HOST_ARCH) && defined(MAP_32BIT)
+#if defined(x86_64_HOST_ARCH) && !defined(darwin_HOST_OS) && defined(MAP_32BIT)
 #define TRY_MAP_32BIT MAP_32BIT
 #else
 #define TRY_MAP_32BIT 0
