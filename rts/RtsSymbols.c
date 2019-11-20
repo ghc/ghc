@@ -144,6 +144,8 @@
       /* see Note [Symbols for MinGW's printf] */        \
       SymI_HasProto(_lock_file)                          \
       SymI_HasProto(_unlock_file)                        \
+      SymI_HasProto(__mingw_vsnwprintf)                  \
+      /* ^^ Need to figure out why this is needed.  */   \
       /* See Note [_iob_func symbol] */                  \
       RTS_WIN64_ONLY(SymI_HasProto_redirect(             \
          __imp___acrt_iob_func, __rts_iob_func, true))   \

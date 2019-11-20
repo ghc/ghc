@@ -552,7 +552,7 @@ void osBindMBlocksToNode(
                On windows also -xb is broken, it does nothing so that can't
                be used to tweak it (see #12577). So for now, just let the OS decide.
             */
-            temp = _VirtualAllocExNuma(
+            temp = VirtualAllocExNuma(
                           GetCurrentProcess(),
                           NULL, // addr? See base memory
                           size,
