@@ -27,6 +27,7 @@ import GHC.Event.Windows (LPOVERLAPPED, withOverlapped)
 import GHC.IO.FD
 import GHC.IO.Handle.FD
 import GHC.IO.Handle.Windows (handleToHANDLE)
+import GHC.IO.Handle.Lock.Common (LockMode(..), FileLockingNotSupported(..))
 import GHC.IO.SubSystem
 import GHC.Windows
 

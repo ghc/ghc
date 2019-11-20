@@ -1487,6 +1487,9 @@ dispatchPrimop dflags = \case
   ReadMVarOp -> alwaysExternal
   TryReadMVarOp -> alwaysExternal
   IsEmptyMVarOp -> alwaysExternal
+  NewIOPortrOp -> alwaysExternal
+  ReadIOPortOp -> alwaysExternal
+  WriteIOPortOp -> alwaysExternal
   DelayOp -> alwaysExternal
   WaitReadOp -> alwaysExternal
   WaitWriteOp -> alwaysExternal
