@@ -55,8 +55,8 @@ moduleString = moduleNameString . moduleName
 isNameSym :: Name -> Bool
 isNameSym = isSymOcc . nameOccName
 
-getMainDeclBinder :: (SrcSpanLess (LPat p) ~ Pat p , HasSrcSpan (LPat p)) =>
-                     HsDecl p -> [IdP p]
+getMainDeclBinder :: XRec pass Pat ~ Located (Pat pass) =>
+                     HsDecl pass -> [IdP pass]
 getMainDeclBinder (TyClD _ d) = [tcdName d]
 getMainDeclBinder (ValD _ d) =
   case collectHsBindBinders d of

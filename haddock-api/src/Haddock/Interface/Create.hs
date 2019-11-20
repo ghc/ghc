@@ -474,15 +474,15 @@ subordinates instMap decl = case decl of
                   , Just instName <- [M.lookup l instMap] ]
 
         extract_deriv_ty :: LHsType GhcRn -> Maybe (SrcSpan, LHsDocString)
-        extract_deriv_ty ty =
-          case dL ty of
+        extract_deriv_ty (L l ty) =
+          case ty of
             -- deriving (forall a. C a {- ^ Doc comment -})
-            L l (HsForAllTy{ hst_fvf = ForallInvis
-                           , hst_body = dL->L _ (HsDocTy _ _ doc) })
-                                  -> Just (l, doc)
+            HsForAllTy{ hst_fvf = ForallInvis
+                      , hst_body = L _ (HsDocTy _ _ doc) }
+                            -> Just (l, doc)
             -- deriving (C a {- ^ Doc comment -})
-            L l (HsDocTy _ _ doc) -> Just (l, doc)
-            _                     -> Nothing
+            HsDocTy _ _ doc -> Just (l, doc)
+            _               -> Nothing
 
 -- | Extract constructor argument docs from inside constructor decls.
 conArgDocs :: ConDecl GhcRn -> Map Int HsDocString
