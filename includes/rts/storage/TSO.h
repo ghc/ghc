@@ -20,9 +20,9 @@ typedef struct {
  */
 
 /*
- * Thread IDs are 32 bits.
+ * Thread IDs are 64 bits.
  */
-typedef StgWord32 StgThreadID;
+typedef StgWord64 StgThreadID;
 
 #define tsoLocked(tso) ((tso)->flags & TSO_LOCKED)
 
