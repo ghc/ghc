@@ -225,7 +225,7 @@ checkSynCycles this_uid tcs tyclds = do
         mod = nameModule n
         ppr_decl tc =
           case lookupNameEnv lcl_decls n of
-            Just (dL->L loc decl) -> ppr loc <> colon <+> ppr decl
+            Just (L loc decl) -> ppr loc <> colon <+> ppr decl
             Nothing -> ppr (getSrcSpan n) <> colon <+> ppr n
                        <+> text "from external module"
          where
@@ -486,7 +486,7 @@ initialRoleEnv1 hsc_src annots_env tc
           -- is wrong, just ignore it. We check this in the validity check.
         role_annots
           = case lookupRoleAnnot annots_env name of
-              Just (dL->L _ (RoleAnnotDecl _ _ annots))
+              Just (L _ (RoleAnnotDecl _ _ annots))
                 | annots `lengthIs` num_exps -> map unLoc annots
               _                              -> replicate num_exps Nothing
         default_roles = build_default_roles argflags role_annots
@@ -828,13 +828,13 @@ when typechecking the [d| .. |] quote, and typecheck them later.
 
 tcRecSelBinds :: [(Id, LHsBind GhcRn)] -> TcM TcGblEnv
 tcRecSelBinds sel_bind_prs
-  = tcExtendGlobalValEnv [sel_id | (dL->L _ (IdSig _ sel_id)) <- sigs] $
+  = tcExtendGlobalValEnv [sel_id | (L _ (IdSig _ sel_id)) <- sigs] $
     do { (rec_sel_binds, tcg_env) <- discardWarnings $
                                      tcValBinds TopLevel binds sigs getGblEnv
        ; return (tcg_env `addTypecheckedBinds` map snd rec_sel_binds) }
   where
-    sigs = [ cL loc (IdSig noExtField sel_id) | (sel_id, _) <- sel_bind_prs
-                                              , let loc = getSrcSpan sel_id ]
+    sigs = [ L loc (IdSig noExtField sel_id) | (sel_id, _) <- sel_bind_prs
+                                             , let loc = getSrcSpan sel_id ]
     binds = [(NonRecursive, unitBag bind) | (_, bind) <- sel_bind_prs]
 
 mkRecSelBinds :: [TyCon] -> [(Id, LHsBind GhcRn)]
@@ -854,7 +854,7 @@ mkRecSelBind (tycon, fl)
 mkOneRecordSelector :: [ConLike] -> RecSelParent -> FieldLabel
                     -> (Id, LHsBind GhcRn)
 mkOneRecordSelector all_cons idDetails fl
-  = (sel_id, cL loc sel_bind)
+  = (sel_id, L loc sel_bind)
   where
     loc      = getSrcSpan sel_name
     lbl      = flLabel fl
@@ -892,18 +892,18 @@ mkOneRecordSelector all_cons idDetails fl
                                            [] unit_rhs]
              | otherwise =  map mk_match cons_w_field ++ deflt
     mk_match con = mkSimpleMatch (mkPrefixFunRhs sel_lname)
-                                 [cL loc (mk_sel_pat con)]
-                                 (cL loc (HsVar noExtField (cL loc field_var)))
-    mk_sel_pat con = ConPatIn (cL loc (getName con)) (RecCon rec_fields)
+                                 [L loc (mk_sel_pat con)]
+                                 (L loc (HsVar noExtField (L loc field_var)))
+    mk_sel_pat con = ConPatIn (L loc (getName con)) (RecCon rec_fields)
     rec_fields = HsRecFields { rec_flds = [rec_field], rec_dotdot = Nothing }
     rec_field  = noLoc (HsRecField
                         { hsRecFieldLbl
-                           = cL loc (FieldOcc sel_name
-                                     (cL loc $ mkVarUnqual lbl))
+                           = L loc (FieldOcc sel_name
+                                     (L loc $ mkVarUnqual lbl))
                         , hsRecFieldArg
-                           = cL loc (VarPat noExtField (cL loc field_var))
+                           = L loc (VarPat noExtField (L loc field_var))
                         , hsRecPun = False })
-    sel_lname = cL loc sel_name
+    sel_lname = L loc sel_name
     field_var = mkInternalName (mkBuiltinUnique 1) (getOccName sel_name) loc
 
     -- Add catch-all default case unless the case is exhaustive
@@ -911,10 +911,10 @@ mkOneRecordSelector all_cons idDetails fl
     -- mentions this particular record selector
     deflt | all dealt_with all_cons = []
           | otherwise = [mkSimpleMatch CaseAlt
-                            [cL loc (WildPat noExtField)]
-                            (mkHsApp (cL loc (HsVar noExtField
-                                         (cL loc (getName rEC_SEL_ERROR_ID))))
-                                     (cL loc (HsLit noExtField msg_lit)))]
+                            [L loc (WildPat noExtField)]
+                            (mkHsApp (L loc (HsVar noExtField
+                                         (L loc (getName rEC_SEL_ERROR_ID))))
+                                     (L loc (HsLit noExtField msg_lit)))]
 
         -- Do not add a default case unless there are unmatched
         -- constructors.  We must take account of GADTs, else we
