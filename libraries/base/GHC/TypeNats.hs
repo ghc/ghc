@@ -223,7 +223,7 @@ type family Log2 (m :: Nat) :: Nat
 --
 -- @since 4.7.0.0
 sameNat :: (KnownNat a, KnownNat b) =>
-           Proxy a -> Proxy b -> Maybe (a :~: b)
+           proxy1 a -> proxy2 b -> Maybe (a :~: b)
 sameNat x y
   | natVal x == natVal y = Just (unsafeCoerce Refl)
   | otherwise            = Nothing

@@ -32,8 +32,7 @@ GHC.TypeLits.natVal' ::
   GHC.TypeNats.KnownNat n => GHC.Prim.Proxy# n -> Integer
 GHC.TypeLits.sameSymbol ::
   (GHC.TypeLits.KnownSymbol a, GHC.TypeLits.KnownSymbol b) =>
-  Data.Proxy.Proxy a
-  -> Data.Proxy.Proxy b -> Maybe (a Data.Type.Equality.:~: b)
+  proxy1 a -> proxy2 b -> Maybe (a Data.Type.Equality.:~: b)
 GHC.TypeLits.someNatVal :: Integer -> Maybe GHC.TypeNats.SomeNat
 GHC.TypeLits.someSymbolVal :: String -> GHC.TypeLits.SomeSymbol
 GHC.TypeLits.symbolVal ::
@@ -84,5 +83,4 @@ type (GHC.TypeNats.^) :: GHC.Types.Nat
 type family (GHC.TypeNats.^) a b
 GHC.TypeNats.sameNat ::
   (GHC.TypeNats.KnownNat a, GHC.TypeNats.KnownNat b) =>
-  Data.Proxy.Proxy a
-  -> Data.Proxy.Proxy b -> Maybe (a Data.Type.Equality.:~: b)
+  proxy1 a -> proxy2 b -> Maybe (a Data.Type.Equality.:~: b)

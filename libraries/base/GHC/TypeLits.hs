@@ -203,7 +203,7 @@ type family TypeError (a :: ErrorMessage) :: b where
 --
 -- @since 4.7.0.0
 sameSymbol :: (KnownSymbol a, KnownSymbol b) =>
-              Proxy a -> Proxy b -> Maybe (a :~: b)
+              proxy1 a -> proxy2 b -> Maybe (a :~: b)
 sameSymbol x y
   | symbolVal x == symbolVal y  = Just (unsafeCoerce Refl)
   | otherwise                   = Nothing
