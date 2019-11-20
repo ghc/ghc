@@ -370,6 +370,19 @@ int64_t __get_file_pointer (HANDLE hFile)
 
 int64_t __get_file_size (HANDLE hFile)
 {
+    /* Broken handle can't do stat.  */
+    if (hFile == INVALID_HANDLE_VALUE)
+        return false;
+
+    switch (GetFileType (hFile))
+    {
+      case FILE_TYPE_CHAR:
+      case FILE_TYPE_DISK:
+        break;
+      default:
+        return -1;
+    }
+
     LARGE_INTEGER ret;
     if (!GetFileSizeEx(hFile, &ret))
       return -1;
