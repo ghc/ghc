@@ -72,11 +72,11 @@ import Control.Monad
 -}
 
 dsLocalBinds :: LHsLocalBinds GhcTc -> CoreExpr -> DsM CoreExpr
-dsLocalBinds (dL->L _   (EmptyLocalBinds _))  body = return body
-dsLocalBinds (dL->L loc (HsValBinds _ binds)) body = putSrcSpanDs loc $
-                                                   dsValBinds binds body
-dsLocalBinds (dL->L _ (HsIPBinds _ binds))    body = dsIPBinds  binds body
-dsLocalBinds _                                _    = panic "dsLocalBinds"
+dsLocalBinds (L _   (EmptyLocalBinds _))  body = return body
+dsLocalBinds (L loc (HsValBinds _ binds)) body = putSrcSpanDs loc $
+                                                 dsValBinds binds body
+dsLocalBinds (L _ (HsIPBinds _ binds))    body = dsIPBinds  binds body
+dsLocalBinds _                            _    = panic "dsLocalBinds"
 
 -------------------------
 -- caller sets location
@@ -94,7 +94,7 @@ dsIPBinds (IPBinds ev_binds ip_binds) body
                 -- dependency order; hence Rec
         ; foldrM ds_ip_bind inner ip_binds }
   where
-    ds_ip_bind (dL->L _ (IPBind _ ~(Right n) e)) body
+    ds_ip_bind (L _ (IPBind _ ~(Right n) e)) body
       = do e' <- dsLExpr e
            return (Let (NonRec n e') body)
     ds_ip_bind _ _ = panic "dsIPBinds"
@@ -108,7 +108,7 @@ ds_val_bind :: (RecFlag, LHsBinds GhcTc) -> CoreExpr -> DsM CoreExpr
 -- a tuple and doing selections.
 -- Silently ignore INLINE and SPECIALISE pragmas...
 ds_val_bind (NonRecursive, hsbinds) body
-  | [dL->L loc bind] <- bagToList hsbinds
+  | [L loc bind] <- bagToList hsbinds
         -- Non-recursive, non-overloaded bindings only come in ones
         -- ToDo: in some bizarre case it's conceivable that there
         --       could be dict binds in the 'binds'.  (See the notes
@@ -192,13 +192,13 @@ dsUnliftedBind (AbsBinds { abs_tvs = [], abs_ev_vars = []
        ; ds_binds <- dsTcEvBinds_s ev_binds
        ; return (mkCoreLets ds_binds body2) }
 
-dsUnliftedBind (FunBind { fun_id = (dL->L l fun)
+dsUnliftedBind (FunBind { fun_id = L l fun
                         , fun_matches = matches
                         , fun_co_fn = co_fn
                         , fun_tick = tick }) body
                -- Can't be a bang pattern (that looks like a PatBind)
                -- so must be simply unboxed
-  = do { (args, rhs) <- matchWrapper (mkPrefixFunRhs (cL l $ idName fun))
+  = do { (args, rhs) <- matchWrapper (mkPrefixFunRhs (L l $ idName fun))
                                      Nothing matches
        ; MASSERT( null args ) -- Functions aren't lifted
        ; MASSERT( isIdHsWrapper co_fn )
@@ -231,7 +231,7 @@ dsUnliftedBind bind body = pprPanic "dsLet: unlifted" (ppr bind $$ ppr body)
 
 dsLExpr :: LHsExpr GhcTc -> DsM CoreExpr
 
-dsLExpr (dL->L loc e)
+dsLExpr (L loc e)
   = putSrcSpanDs loc $
     do { core_expr <- dsExpr e
    -- uncomment this check to test the hsExprType function in TcHsSyn
@@ -246,7 +246,7 @@ dsLExpr (dL->L loc e)
 -- See Note [Levity polymorphism checking] in DsMonad
 -- See Note [Levity polymorphism invariants] in CoreSyn
 dsLExprNoLP :: LHsExpr GhcTc -> DsM CoreExpr
-dsLExprNoLP (dL->L loc e)
+dsLExprNoLP (L loc e)
   = putSrcSpanDs loc $
     do { e' <- dsExpr e
        ; dsNoLevPolyExpr e' (text "In the type of expression:" <+> ppr e)
@@ -260,7 +260,7 @@ ds_expr :: Bool   -- are we directly inside an HsWrap?
         -> HsExpr GhcTc -> DsM CoreExpr
 ds_expr _ (HsPar _ e)            = dsLExpr e
 ds_expr _ (ExprWithTySig _ e _)  = dsLExpr e
-ds_expr w (HsVar _ (dL->L _ var)) = dsHsVar w var
+ds_expr w (HsVar _ (L _ var))    = dsHsVar w var
 ds_expr _ (HsUnboundVar {})      = panic "dsExpr: HsUnboundVar" -- Typechecker eliminates them
 ds_expr w (HsConLikeOut _ con)   = dsConLike w con
 ds_expr _ (HsIPVar {})           = panic "dsExpr: HsIPVar"
@@ -285,7 +285,7 @@ ds_expr _ (HsWrap _ co_fn e)
        ; warnAboutIdentities dflags e' wrapped_ty
        ; return wrapped_e }
 
-ds_expr _ (NegApp _ (dL->L loc
+ds_expr _ (NegApp _ (L loc
                       (HsOverLit _ lit@(OverLit { ol_val = HsIntegral i})))
                   neg_expr)
   = do { expr' <- putSrcSpanDs loc $ do
@@ -377,12 +377,12 @@ ds_expr _ e@(SectionR _ op expr) = do
                                                           core_op [Var x_id, Var y_id]))
 
 ds_expr _ (ExplicitTuple _ tup_args boxity)
-  = do { let go (lam_vars, args) (dL->L _ (Missing ty))
+  = do { let go (lam_vars, args) (L _ (Missing ty))
                     -- For every missing expression, we need
                     -- another lambda in the desugaring.
                = do { lam_var <- newSysLocalDsNoLP ty
                     ; return (lam_var : lam_vars, Var lam_var : args) }
-             go (lam_vars, args) (dL->L _ (Present _ expr))
+             go (lam_vars, args) (L _ (Present _ expr))
                     -- Expressions that are present don't generate
                     -- lambdas, just arguments.
                = do { core_expr <- dsLExprNoLP expr
@@ -419,11 +419,11 @@ ds_expr _ (HsLet _ binds body) = do
 -- We need the `ListComp' form to use `deListComp' (rather than the "do" form)
 -- because the interpretation of `stmts' depends on what sort of thing it is.
 --
-ds_expr _ (HsDo res_ty ListComp (dL->L _ stmts)) = dsListComp stmts res_ty
-ds_expr _ (HsDo _ DoExpr        (dL->L _ stmts)) = dsDo stmts
-ds_expr _ (HsDo _ GhciStmtCtxt  (dL->L _ stmts)) = dsDo stmts
-ds_expr _ (HsDo _ MDoExpr       (dL->L _ stmts)) = dsDo stmts
-ds_expr _ (HsDo _ MonadComp     (dL->L _ stmts)) = dsMonadComp stmts
+ds_expr _ (HsDo res_ty ListComp (L _ stmts)) = dsListComp stmts res_ty
+ds_expr _ (HsDo _ DoExpr        (L _ stmts)) = dsDo stmts
+ds_expr _ (HsDo _ GhciStmtCtxt  (L _ stmts)) = dsDo stmts
+ds_expr _ (HsDo _ MDoExpr       (L _ stmts)) = dsDo stmts
+ds_expr _ (HsDo _ MonadComp     (L _ stmts)) = dsMonadComp stmts
 
 ds_expr _ (HsIf _ mb_fun guard_expr then_expr else_expr)
   = do { pred <- dsLExpr guard_expr
@@ -473,7 +473,7 @@ See Note [Grand plan for static forms] in StaticPtrTable for an overview.
     g = ... makeStatic loc f ...
 -}
 
-ds_expr _ (HsStatic _ expr@(dL->L loc _)) = do
+ds_expr _ (HsStatic _ expr@(L loc _)) = do
     expr_ds <- dsLExprNoLP expr
     let ty = exprType expr_ds
     makeStaticId <- dsLookupGlobalId makeStaticName
@@ -612,7 +612,7 @@ ds_expr _ expr@(RecordUpd { rupd_expr = record_expr, rupd_flds = fields
       -- of the record selector, and we must not make that a local binder
       -- else we shadow other uses of the record selector
       -- Hence 'lcl_id'.  Cf #2735
-    ds_field (dL->L _ rec_field)
+    ds_field (L _ rec_field)
       = do { rhs <- dsLExpr (hsRecFieldArg rec_field)
            ; let fld_id = unLoc (hsRecUpdFieldId rec_field)
            ; lcl_id <- newSysLocalDs (idType fld_id)
@@ -777,7 +777,7 @@ dsSyntaxExpr (SyntaxExpr { syn_expr      = expr
 
 findField :: [LHsRecField GhcTc arg] -> Name -> [arg]
 findField rbinds sel
-  = [hsRecFieldArg fld | (dL->L _ fld) <- rbinds
+  = [hsRecFieldArg fld | L _ fld <- rbinds
                        , sel == idName (unLoc $ hsRecFieldId fld) ]
 
 {-
@@ -896,7 +896,7 @@ dsDo stmts
   = goL stmts
   where
     goL [] = panic "dsDo"
-    goL ((dL->L loc stmt):lstmts) = putSrcSpanDs loc (go loc stmt lstmts)
+    goL ((L loc stmt):lstmts) = putSrcSpanDs loc (go loc stmt lstmts)
 
     go _ (LastStmt _ body _ _) stmts
       = ASSERT( null stmts ) dsLExpr body
@@ -961,7 +961,7 @@ dsDo stmts
                         , recS_ret_ty = body_ty} }) stmts
       = goL (new_bind_stmt : stmts)  -- rec_ids can be empty; eg  rec { print 'x' }
       where
-        new_bind_stmt = cL loc $ BindStmt bind_ty (mkBigLHsPatTupId later_pats)
+        new_bind_stmt = L loc $ BindStmt bind_ty (mkBigLHsPatTupId later_pats)
                                          mfix_app bind_op
                                          noSyntaxExpr  -- Tuple cannot fail
 
@@ -1002,7 +1002,7 @@ handle_failure pat match fail_op
   | otherwise
   = extractMatchResult match (error "It can't fail")
 
-mk_fail_msg :: HasSrcSpan e => DynFlags -> e -> String
+mk_fail_msg :: DynFlags -> Located e -> String
 mk_fail_msg dflags pat = "Pattern match failure in do expression at " ++
                          showPpr dflags (getLoc pat)
 
@@ -1142,7 +1142,7 @@ we're not directly in an HsWrap, reject.
 checkForcedEtaExpansion :: HsExpr GhcTc -> Type -> DsM ()
 checkForcedEtaExpansion expr ty
   | Just var <- case expr of
-                  HsVar _ (dL->L _ var)           -> Just var
+                  HsVar _ (L _ var)               -> Just var
                   HsConLikeOut _ (RealDataCon dc) -> Just (dataConWrapId dc)
                   _                               -> Nothing
   , let bad_tys = badUseOfLevPolyPrimop var ty

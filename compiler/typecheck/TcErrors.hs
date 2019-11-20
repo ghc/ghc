@@ -2359,7 +2359,7 @@ mk_dict_err ctxt@(CEC {cec_encl = implics}) (ct, (matches, unifiers, unsafe_over
         mb_patsyn_prov :: Maybe SDoc
         mb_patsyn_prov
           | not lead_with_ambig
-          , ProvCtxtOrigin PSB{ psb_def = (dL->L _ pat) } <- orig
+          , ProvCtxtOrigin PSB{ psb_def = L _ pat } <- orig
           = Just (vcat [ text "In other words, a successful match on the pattern"
                        , nest 2 $ ppr pat
                        , text "does not provide the constraint" <+> pprParendType pred ])
@@ -2488,7 +2488,7 @@ ctxtFixes has_ambig_tvs pred implics
 
 discardProvCtxtGivens :: CtOrigin -> [UserGiven] -> [UserGiven]
 discardProvCtxtGivens orig givens  -- See Note [discardProvCtxtGivens]
-  | ProvCtxtOrigin (PSB {psb_id = (dL->L _ name)}) <- orig
+  | ProvCtxtOrigin (PSB {psb_id = L _ name}) <- orig
   = filterOut (discard name) givens
   | otherwise
   = givens
