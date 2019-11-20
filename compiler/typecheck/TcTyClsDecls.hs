@@ -1984,6 +1984,9 @@ tcDefaultAssocDecl fam_tc
     suggestion = text "The arguments to" <+> quotes (ppr fam_tc)
              <+> text "must all be distinct type variables"
 
+tcDefaultAssocDecl _ [L _ (TyFamInstDecl (HsIB _ (XFamEqn x)))] = noExtCon x
+tcDefaultAssocDecl _ [L _ (TyFamInstDecl (XHsImplicitBndrs x))] = noExtCon x
+
 
 {- Note [Type-checking default assoc decls]
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
