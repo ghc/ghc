@@ -386,7 +386,7 @@ handleFlagWarnings dflags warns = do
       -- It would be nicer if warns :: [Located MsgDoc], but that
       -- has circular import problems.
       bag = listToBag [ mkPlainWarnMsg dflags loc (text warn)
-                      | Warn _ (dL->L loc warn) <- warns' ]
+                      | Warn _ (L loc warn) <- warns' ]
 
   printOrThrowWarnings dflags bag
 

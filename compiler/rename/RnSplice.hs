@@ -361,13 +361,13 @@ mkQuasiQuoteExpr :: UntypedSpliceFlavour -> Name -> SrcSpan -> FastString
 -- Return the expression (quoter "...quote...")
 -- which is what we must run in a quasi-quote
 mkQuasiQuoteExpr flavour quoter q_span quote
-  = cL q_span $ HsApp noExtField (cL q_span
-              $ HsApp noExtField (cL q_span (HsVar noExtField (cL q_span quote_selector)))
-                                 quoterExpr)
-                     quoteExpr
+  = L q_span $ HsApp noExtField (L q_span
+             $ HsApp noExtField (L q_span (HsVar noExtField (L q_span quote_selector)))
+                                quoterExpr)
+                    quoteExpr
   where
-    quoterExpr = cL q_span $! HsVar noExtField $! (cL q_span quoter)
-    quoteExpr  = cL q_span $! HsLit noExtField $! HsString NoSourceText quote
+    quoterExpr = L q_span $! HsVar noExtField $! (L q_span quoter)
+    quoteExpr  = L q_span $! HsLit noExtField $! HsString NoSourceText quote
     quote_selector = case flavour of
                        UntypedExpSplice  -> quoteExpName
                        UntypedPatSplice  -> quotePatName
@@ -379,19 +379,19 @@ rnSplice :: HsSplice GhcPs -> RnM (HsSplice GhcRn, FreeVars)
 -- Not exported...used for all
 rnSplice (HsTypedSplice x hasParen splice_name expr)
   = do  { loc  <- getSrcSpanM
-        ; n' <- newLocalBndrRn (cL loc splice_name)
+        ; n' <- newLocalBndrRn (L loc splice_name)
         ; (expr', fvs) <- rnLExpr expr
         ; return (HsTypedSplice x hasParen n' expr', fvs) }
 
 rnSplice (HsUntypedSplice x hasParen splice_name expr)
   = do  { loc  <- getSrcSpanM
-        ; n' <- newLocalBndrRn (cL loc splice_name)
+        ; n' <- newLocalBndrRn (L loc splice_name)
         ; (expr', fvs) <- rnLExpr expr
         ; return (HsUntypedSplice x hasParen n' expr', fvs) }
 
 rnSplice (HsQuasiQuote x splice_name quoter q_loc quote)
   = do  { loc  <- getSrcSpanM
-        ; splice_name' <- newLocalBndrRn (cL loc splice_name)
+        ; splice_name' <- newLocalBndrRn (L loc splice_name)
 
           -- Rename the quoter; akin to the HsVar case of rnExpr
         ; quoter' <- lookupOccRn quoter
@@ -620,7 +620,7 @@ rnSplicePat splice
              -- See Note [Delaying modFinalizers in untyped splices].
            ; return ( Left $ ParPat noExtField $ ((SplicePat noExtField)
                               . HsSpliced noExtField (ThModFinalizers mod_finalizers)
-                              . HsSplicedPat)  `onHasSrcSpan`
+                              . HsSplicedPat)  `mapLoc`
                               pat
                     , emptyFVs
                     ) }
@@ -629,12 +629,12 @@ rnSplicePat splice
 
 ----------------------
 rnSpliceDecl :: SpliceDecl GhcPs -> RnM (SpliceDecl GhcRn, FreeVars)
-rnSpliceDecl (SpliceDecl _ (dL->L loc splice) flg)
+rnSpliceDecl (SpliceDecl _ (L loc splice) flg)
   = rnSpliceGen run_decl_splice pend_decl_splice splice
   where
     pend_decl_splice rn_splice
        = ( makePending UntypedDeclSplice rn_splice
-         , SpliceDecl noExtField (cL loc rn_splice) flg)
+         , SpliceDecl noExtField (L loc rn_splice) flg)
 
     run_decl_splice rn_splice  = pprPanic "rnSpliceDecl" (ppr rn_splice)
 rnSpliceDecl (XSpliceDecl nec) = noExtCon nec
@@ -739,8 +739,8 @@ traceSplice :: SpliceInfo -> TcM ()
 traceSplice (SpliceInfo { spliceDescription = sd, spliceSource = mb_src
                         , spliceGenerated = gen, spliceIsDecl = is_decl })
   = do { loc <- case mb_src of
-                   Nothing           -> getSrcSpanM
-                   Just (dL->L loc _) -> return loc
+                   Nothing        -> getSrcSpanM
+                   Just (L loc _) -> return loc
        ; traceOptTcRn Opt_D_dump_splices (spliceDebugDoc loc)
 
        ; when is_decl $  -- Raw material for -dth-dec-file

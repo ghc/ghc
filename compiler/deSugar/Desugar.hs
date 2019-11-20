@@ -369,13 +369,13 @@ Reason
 -}
 
 dsRule :: LRuleDecl GhcTc -> DsM (Maybe CoreRule)
-dsRule (dL->L loc (HsRule { rd_name = name
-                          , rd_act  = rule_act
-                          , rd_tmvs = vars
-                          , rd_lhs  = lhs
-                          , rd_rhs  = rhs }))
+dsRule (L loc (HsRule { rd_name = name
+                      , rd_act  = rule_act
+                      , rd_tmvs = vars
+                      , rd_lhs  = lhs
+                      , rd_rhs  = rhs }))
   = putSrcSpanDs loc $
-    do  { let bndrs' = [var | (dL->L _ (RuleBndr _ (dL->L _ var))) <- vars]
+    do  { let bndrs' = [var | L _ (RuleBndr _ (L _ var)) <- vars]
 
         ; lhs' <- unsetGOptM Opt_EnableRewriteRules $
                   unsetWOptM Opt_WarnIdentities $
@@ -412,8 +412,7 @@ dsRule (dL->L loc (HsRule { rd_name = name
 
         ; return (Just rule)
         } } }
-dsRule (dL->L _ (XRuleDecl nec)) = noExtCon nec
-dsRule _ = panic "dsRule: Impossible Match" -- due to #15884
+dsRule (L _ (XRuleDecl nec)) = noExtCon nec
 
 warnRuleShadowing :: RuleName -> Activation -> Id -> [Id] -> DsM ()
 -- See Note [Rules and inlining/other rules]

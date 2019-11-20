@@ -352,10 +352,10 @@ tcDerivStrategy ::
 tcDerivStrategy mb_lds
   = case mb_lds of
       Nothing -> boring_case Nothing
-      Just (dL->L loc ds) ->
+      Just (L loc ds) ->
         setSrcSpan loc $ do
           (ds', tvs) <- tc_deriv_strategy ds
-          pure (Just (cL loc ds'), tvs)
+          pure (Just (L loc ds'), tvs)
   where
     tc_deriv_strategy :: DerivStrategy GhcRn
                       -> TcM (DerivStrategy GhcTc, [TyVar])

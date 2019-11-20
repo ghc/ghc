@@ -840,31 +840,28 @@ setSrcSpan (RealSrcSpan real_loc) thing_inside
 -- Don't overwrite useful info with useless:
 setSrcSpan (UnhelpfulSpan _) thing_inside = thing_inside
 
-addLocM :: HasSrcSpan a => (SrcSpanLess a -> TcM b) -> a -> TcM b
-addLocM fn (dL->L loc a) = setSrcSpan loc $ fn a
+addLocM :: (a -> TcM b) -> Located a -> TcM b
+addLocM fn (L loc a) = setSrcSpan loc $ fn a
 
-wrapLocM :: (HasSrcSpan a, HasSrcSpan b) =>
-            (SrcSpanLess a -> TcM (SrcSpanLess b)) -> a -> TcM b
+wrapLocM :: (a -> TcM b) -> Located a -> TcM (Located b)
 -- wrapLocM :: (a -> TcM b) -> Located a -> TcM (Located b)
-wrapLocM fn (dL->L loc a) = setSrcSpan loc $ do { b <- fn a
-                                                ; return (cL loc b) }
-wrapLocFstM :: (HasSrcSpan a, HasSrcSpan b) =>
-               (SrcSpanLess a -> TcM (SrcSpanLess b,c)) -> a -> TcM (b, c)
-wrapLocFstM fn (dL->L loc a) =
+wrapLocM fn (L loc a) = setSrcSpan loc $ do { b <- fn a
+                                                ; return (L loc b) }
+
+wrapLocFstM :: (a -> TcM (b,c)) -> Located a -> TcM (Located b, c)
+wrapLocFstM fn (L loc a) =
   setSrcSpan loc $ do
     (b,c) <- fn a
-    return (cL loc b, c)
+    return (L loc b, c)
 
-wrapLocSndM :: (HasSrcSpan a, HasSrcSpan c) =>
-               (SrcSpanLess a -> TcM (b, SrcSpanLess c)) -> a -> TcM (b, c)
-wrapLocSndM fn (dL->L loc a) =
+wrapLocSndM :: (a -> TcM (b, c)) -> Located a -> TcM (b, Located c)
+wrapLocSndM fn (L loc a) =
   setSrcSpan loc $ do
     (b,c) <- fn a
-    return (b, cL loc c)
+    return (b, L loc c)
 
-wrapLocM_ :: HasSrcSpan a =>
-             (SrcSpanLess a -> TcM ()) -> a -> TcM ()
-wrapLocM_ fn (dL->L loc a) = setSrcSpan loc (fn a)
+wrapLocM_ :: (a -> TcM ()) -> Located a -> TcM ()
+wrapLocM_ fn (L loc a) = setSrcSpan loc (fn a)
 
 -- Reporting errors
 

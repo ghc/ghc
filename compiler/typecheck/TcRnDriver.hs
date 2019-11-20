@@ -163,7 +163,7 @@ tcRnModule :: HscEnv
            -> IO (Messages, Maybe TcGblEnv)
 
 tcRnModule hsc_env mod_sum save_rn_syntax
-   parsedModule@HsParsedModule {hpm_module= (dL->L loc this_module)}
+   parsedModule@HsParsedModule {hpm_module= L loc this_module}
  | RealSrcSpan real_loc <- loc
  = withTiming dflags
               (text "Renamer/typechecker"<+>brackets (ppr this_mod))
@@ -186,7 +186,7 @@ tcRnModule hsc_env mod_sum save_rn_syntax
 
     pair :: (Module, SrcSpan)
     pair@(this_mod,_)
-      | Just (dL->L mod_loc mod) <- hsmodName this_module
+      | Just (L mod_loc mod) <- hsmodName this_module
       = (mkModule this_pkg mod, mod_loc)
 
       | otherwise   -- 'module M where' is omitted
@@ -205,7 +205,7 @@ tcRnModuleTcRnM :: HscEnv
 tcRnModuleTcRnM hsc_env mod_sum
                 (HsParsedModule {
                    hpm_module =
-                      (dL->L loc (HsModule maybe_mod export_ies
+                      (L loc (HsModule maybe_mod export_ies
                                        import_decls local_decls mod_deprec
                                        maybe_doc_hdr)),
                    hpm_src_files = src_files
@@ -232,7 +232,7 @@ tcRnModuleTcRnM hsc_env mod_sum
                 addWarn (Reason Opt_WarnImplicitPrelude) (implicitPreludeWarn)
 
         ; -- TODO This is a little skeevy; maybe handle a bit more directly
-          let { simplifyImport (dL->L _ idecl) =
+          let { simplifyImport (L _ idecl) =
                   ( fmap sl_fs (ideclPkgQual idecl) , ideclName idecl)
               }
         ; raw_sig_imports <- liftIO
@@ -242,7 +242,7 @@ tcRnModuleTcRnM hsc_env mod_sum
                              $ implicitRequirements hsc_env
                                 (map simplifyImport (prel_imports
                                                      ++ import_decls))
-        ; let { mkImport (Nothing, dL->L _ mod_name) = noLoc
+        ; let { mkImport (Nothing, L _ mod_name) = noLoc
                 $ (simpleImportDecl mod_name)
                   { ideclHiding = Just (False, noLoc [])}
               ; mkImport _ = panic "mkImport" }
@@ -256,7 +256,7 @@ tcRnModuleTcRnM hsc_env mod_sum
           -- (via mod_deprec) record that in tcg_warns. If we do thereby add
           -- a WarnAll, it will override any subsequent deprecations added to tcg_warns
           let { tcg_env1 = case mod_deprec of
-                             Just (dL->L _ txt) ->
+                             Just (L _ txt) ->
                                tcg_env {tcg_warns = WarnAll txt}
                              Nothing            -> tcg_env
               }
@@ -552,7 +552,7 @@ tc_rn_src_decls ds
             else do { (th_group, th_group_tail) <- findSplice th_ds
                     ; case th_group_tail of
                         { Nothing -> return ()
-                        ; Just (SpliceDecl _ (dL->L loc _) _, _) ->
+                        ; Just (SpliceDecl _ (L loc _) _, _) ->
                             setSrcSpan loc
                             $ addErr (text
                                 ("Declaration splices are not "
@@ -588,7 +588,7 @@ tc_rn_src_decls ds
           { Nothing -> return (tcg_env, tcl_env, lie1)
 
             -- If there's a splice, we must carry on
-          ; Just (SpliceDecl _ (dL->L _ splice) _, rest_ds) ->
+          ; Just (SpliceDecl _ (L _ splice) _, rest_ds) ->
             do {
                  -- We need to simplify any constraints from the previous declaration
                  -- group, or else we might reify metavariables, as in #16980.
@@ -681,7 +681,7 @@ tcRnHsBootDecls hsc_src decls
    ; traceTc "boot" (ppr lie); return gbl_env }
 
 badBootDecl :: HscSource -> String -> Located decl -> TcM ()
-badBootDecl hsc_src what (dL->L loc _)
+badBootDecl hsc_src what (L loc _)
   = addErrAt loc (char 'A' <+> text what
       <+> text "declaration is not (currently) allowed in a"
       <+> (case hsc_src of
@@ -874,7 +874,7 @@ checkHiBootIface'
           --    that modifying boot_dfun, to make local_boot_fun.
 
       | otherwise
-      = setSrcSpan (getLoc (getName boot_dfun)) $
+      = setSrcSpan (nameSrcSpan (getName boot_dfun)) $
         do { traceTc "check_cls_inst" $ vcat
                 [ text "local_insts"  <+>
                      vcat (map (ppr . idType . instanceDFunId) local_insts)
@@ -1747,7 +1747,7 @@ check_main dflags tcg_env explicit_mod_hdr
         ; (ev_binds, main_expr)
                <- checkConstraints skol_info [] [] $
                   addErrCtxt mainCtxt    $
-                  tcMonoExpr (cL loc (HsVar noExtField (cL loc main_name)))
+                  tcMonoExpr (L loc (HsVar noExtField (L loc main_name)))
                              (mkCheckExpType io_ty)
 
                 -- See Note [Root-main Id]
@@ -2057,53 +2057,53 @@ runPlans (p:ps) = tryTcDiscardingErrs (runPlans ps) p
 tcUserStmt :: GhciLStmt GhcPs -> TcM (PlanResult, FixityEnv)
 
 -- An expression typed at the prompt is treated very specially
-tcUserStmt (dL->L loc (BodyStmt _ expr _ _))
+tcUserStmt (L loc (BodyStmt _ expr _ _))
   = do  { (rn_expr, fvs) <- checkNoErrs (rnLExpr expr)
                -- Don't try to typecheck if the renamer fails!
         ; ghciStep <- getGhciStepIO
         ; uniq <- newUnique
         ; interPrintName <- getInteractivePrintName
         ; let fresh_it  = itName uniq loc
-              matches   = [mkMatch (mkPrefixFunRhs (cL loc fresh_it)) [] rn_expr
+              matches   = [mkMatch (mkPrefixFunRhs (L loc fresh_it)) [] rn_expr
                                    (noLoc emptyLocalBinds)]
               -- [it = expr]
-              the_bind  = cL loc $ (mkTopFunBind FromSource
-                                     (cL loc fresh_it) matches)
+              the_bind  = L loc $ (mkTopFunBind FromSource
+                                     (L loc fresh_it) matches)
                                          { fun_ext = fvs }
               -- Care here!  In GHCi the expression might have
               -- free variables, and they in turn may have free type variables
               -- (if we are at a breakpoint, say).  We must put those free vars
 
               -- [let it = expr]
-              let_stmt  = cL loc $ LetStmt noExtField $ noLoc $ HsValBinds noExtField
+              let_stmt  = L loc $ LetStmt noExtField $ noLoc $ HsValBinds noExtField
                            $ XValBindsLR
                                (NValBinds [(NonRecursive,unitBag the_bind)] [])
 
               -- [it <- e]
-              bind_stmt = cL loc $ BindStmt noExtField
-                                       (cL loc (VarPat noExtField (cL loc fresh_it)))
+              bind_stmt = L loc $ BindStmt noExtField
+                                       (L loc (VarPat noExtField (L loc fresh_it)))
                                        (nlHsApp ghciStep rn_expr)
                                        (mkRnSyntaxExpr bindIOName)
                                        noSyntaxExpr
 
               -- [; print it]
-              print_it  = cL loc $ BodyStmt noExtField
+              print_it  = L loc $ BodyStmt noExtField
                                            (nlHsApp (nlHsVar interPrintName)
                                            (nlHsVar fresh_it))
                                            (mkRnSyntaxExpr thenIOName)
                                                   noSyntaxExpr
 
               -- NewA
-              no_it_a = cL loc $ BodyStmt noExtField (nlHsApps bindIOName
+              no_it_a = L loc $ BodyStmt noExtField (nlHsApps bindIOName
                                        [rn_expr , nlHsVar interPrintName])
                                        (mkRnSyntaxExpr thenIOName)
                                        noSyntaxExpr
 
-              no_it_b = cL loc $ BodyStmt noExtField (rn_expr)
+              no_it_b = L loc $ BodyStmt noExtField (rn_expr)
                                        (mkRnSyntaxExpr thenIOName)
                                        noSyntaxExpr
 
-              no_it_c = cL loc $ BodyStmt noExtField
+              no_it_c = L loc $ BodyStmt noExtField
                                       (nlHsApp (nlHsVar interPrintName) rn_expr)
                                       (mkRnSyntaxExpr thenIOName)
                                       noSyntaxExpr
@@ -2203,7 +2203,7 @@ But for naked expressions, you will have
           In an equation for ‘x’: x = putStrLn True
 -}
 
-tcUserStmt rdr_stmt@(dL->L loc _)
+tcUserStmt rdr_stmt@(L loc _)
   = do { (([rn_stmt], fix_env), fvs) <- checkNoErrs $
            rnStmts GhciStmtCtxt rnLExpr [rdr_stmt] $ \_ -> do
              fix_env <- getFixityEnv
@@ -2214,8 +2214,8 @@ tcUserStmt rdr_stmt@(dL->L loc _)
 
        ; ghciStep <- getGhciStepIO
        ; let gi_stmt
-               | (dL->L loc (BindStmt ty pat expr op1 op2)) <- rn_stmt
-                     = cL loc $ BindStmt ty pat (nlHsApp ghciStep expr) op1 op2
+               | (L loc (BindStmt ty pat expr op1 op2)) <- rn_stmt
+                     = L loc $ BindStmt ty pat (nlHsApp ghciStep expr) op1 op2
                | otherwise = rn_stmt
 
        ; opt_pr_flag <- goptM Opt_PrintBindResult
@@ -2237,7 +2237,7 @@ tcUserStmt rdr_stmt@(dL->L loc _)
            ; when (isUnitTy v_ty || not (isTauTy v_ty)) failM
            ; return stuff }
       where
-        print_v  = cL loc $ BodyStmt noExtField (nlHsApp (nlHsVar printName)
+        print_v  = L loc $ BodyStmt noExtField (nlHsApp (nlHsVar printName)
                                     (nlHsVar v))
                                     (mkRnSyntaxExpr thenIOName) noSyntaxExpr
 
@@ -2594,7 +2594,7 @@ getModuleInterface hsc_env mod
 tcRnLookupRdrName :: HscEnv -> Located RdrName
                   -> IO (Messages, Maybe [Name])
 -- ^ Find all the Names that this RdrName could mean, in GHCi
-tcRnLookupRdrName hsc_env (dL->L loc rdr_name)
+tcRnLookupRdrName hsc_env (L loc rdr_name)
   = runTcInteractive hsc_env $
     setSrcSpan loc           $
     do {   -- If the identifier is a constructor (begins with an

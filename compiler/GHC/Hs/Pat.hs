@@ -710,7 +710,7 @@ isIrrefutableHsPat
 
     go (ConPatIn {})       = False     -- Conservative
     go (ConPatOut
-        { pat_con  = (dL->L _ (RealDataCon con))
+        { pat_con  = L _ (RealDataCon con)
         , pat_args = details })
                            =
       isJust (tyConSingleDataCon_maybe (dataConTyCon con))
@@ -718,9 +718,8 @@ isIrrefutableHsPat
       -- the latter is false of existentials. See #4439
       && all goL (hsConPatArgs details)
     go (ConPatOut
-        { pat_con = (dL->L _ (PatSynCon _pat)) })
+        { pat_con = L _ (PatSynCon _pat) })
                            = False -- Conservative
-    go (ConPatOut{})       = panic "ConPatOut:Impossible Match" -- due to #15884
     go (LitPat {})         = False
     go (NPat {})           = False
     go (NPlusKPat {})      = False
@@ -790,8 +789,8 @@ conPatNeedsParens p = go
 -- | @'parenthesizePat' p pat@ checks if @'patNeedsParens' p pat@ is true, and
 -- if so, surrounds @pat@ with a 'ParPat'. Otherwise, it simply returns @pat@.
 parenthesizePat :: PprPrec -> LPat (GhcPass p) -> LPat (GhcPass p)
-parenthesizePat p lpat@(dL->L loc pat)
-  | patNeedsParens p pat = cL loc (ParPat noExtField lpat)
+parenthesizePat p lpat@(L loc pat)
+  | patNeedsParens p pat = L loc (ParPat noExtField lpat)
   | otherwise            = lpat
 
 {-
