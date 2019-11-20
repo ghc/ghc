@@ -26,6 +26,7 @@ module Data.OldList
    , tail
    , init
    , uncons
+   , singleton
    , null
    , length
 
@@ -1268,6 +1269,16 @@ rqpart cmp x (y:ys) rle rgt r =
 sortOn :: Ord b => (a -> b) -> [a] -> [a]
 sortOn f =
   map snd . sortBy (comparing fst) . map (\x -> let y = f x in y `seq` (y, x))
+
+-- | Produce singleton list.
+--
+-- >>> singleton True
+-- [True]
+--
+-- @since 4.14.0.0
+--
+singleton :: a -> [a]
+singleton x = [x]
 
 -- | The 'unfoldr' function is a \`dual\' to 'foldr': while 'foldr'
 -- reduces a list to a summary value, 'unfoldr' builds a list from
