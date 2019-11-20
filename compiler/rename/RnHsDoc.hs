@@ -17,9 +17,9 @@ rnMbLHsDoc mb_doc = case mb_doc of
   Nothing -> return Nothing
 
 rnLHsDoc :: LHsDocString -> RnM LHsDocString
-rnLHsDoc (dL->L pos doc) = do
+rnLHsDoc (L pos doc) = do
   doc' <- rnHsDoc doc
-  return (cL pos doc')
+  return (L pos doc')
 
 rnHsDoc :: HsDocString -> RnM HsDocString
 rnHsDoc = pure

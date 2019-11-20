@@ -282,7 +282,7 @@ checkSingle' locn var p = do
     (Covered   , _          ) -> plain                              -- useful
     (NotCovered, NotDiverged) -> plain { pmresultRedundant = m    } -- redundant
     (NotCovered, Diverged   ) -> plain { pmresultInaccessible = m } -- inaccessible rhs
-  where m = [cL locn [cL locn p]]
+  where m = [L locn [L locn p]]
 
 -- | Exhaustive for guard matches, is used for guards in pattern bindings and
 -- in @MultiIf@ expressions.
@@ -293,7 +293,7 @@ checkGuardMatches hs_ctx guards@(GRHSs _ grhss _) = do
     dflags <- getDynFlags
     let combinedLoc = foldl1 combineSrcSpans (map getLoc grhss)
         dsMatchContext = DsMatchContext hs_ctx combinedLoc
-        match = cL combinedLoc $
+        match = L combinedLoc $
                   Match { m_ext = noExtField
                         , m_ctxt = hs_ctx
                         , m_pats = []
@@ -360,8 +360,8 @@ checkMatches' vars matches = do
         (NotCovered, Diverged )   -> (rs, final_u, m:is, pc1 Semi.<> pc2)
 
     hsLMatchToLPats :: LMatch id body -> Located [LPat id]
-    hsLMatchToLPats (dL->L l (Match { m_pats = pats })) = cL l pats
-    hsLMatchToLPats _                                   = panic "checkMatches'"
+    hsLMatchToLPats (L l (Match { m_pats = pats })) = L l pats
+    hsLMatchToLPats _                               = panic "checkMatches'"
 
 getNFirstUncovered :: [Id] -> Int -> [Delta] -> DsM [Delta]
 getNFirstUncovered _    0 _              = pure []
@@ -465,7 +465,7 @@ translatePat fam_insts x pat = case pat of
 
   -- (x@pat)   ==>   Translate pat with x as match var and handle impedance
   --                 mismatch with incoming match var
-  AsPat _ (dL->L _ y) p -> (mkPmLetVar y x ++) <$> translateLPat fam_insts y p
+  AsPat _ (L _ y) p -> (mkPmLetVar y x ++) <$> translateLPat fam_insts y p
 
   SigPat _ p _ty -> translateLPat fam_insts x p
 
@@ -481,7 +481,7 @@ translatePat fam_insts x pat = case pat of
         pure (PmLet y (wrap_rhs_y (Var x)) : grds)
 
   -- (n + k)  ===>   let b = x >= k, True <- b, let n = x-k
-  NPlusKPat _pat_ty (dL->L _ n) k1 k2 ge minus -> do
+  NPlusKPat _pat_ty (L _ n) k1 k2 ge minus -> do
     b <- mkPmId boolTy
     let grd_b = vanillaConGrd b trueDataCon []
     [ke1, ke2] <- traverse dsOverLit [unLoc k1, k2]
@@ -527,14 +527,14 @@ translatePat fam_insts x pat = case pat of
     --
     -- See #14547, especially comment#9 and comment#10.
 
-  ConPatOut { pat_con     = (dL->L _ con)
+  ConPatOut { pat_con     = L _ con
             , pat_arg_tys = arg_tys
             , pat_tvs     = ex_tvs
             , pat_dicts   = dicts
             , pat_args    = ps } -> do
     translateConPatOut fam_insts x con arg_tys ex_tvs dicts ps
 
-  NPat ty (dL->L _ olit) mb_neg _ -> do
+  NPat ty (L _ olit) mb_neg _ -> do
     -- See Note [Literal short cut] in MatchLit.hs
     -- We inline the Literal short cut for @ty@ here, because @ty@ is more
     -- precise than the field of OverLitTc, which is all that dsOverLit (which
@@ -657,7 +657,7 @@ translateConPatOut fam_insts x con univ_tys ex_tvs dicts = \case
 -- Translate a single match
 translateMatch :: FamInstEnvs -> [Id] -> LMatch GhcTc (LHsExpr GhcTc)
                -> DsM (GrdVec, [GrdVec])
-translateMatch fam_insts vars (dL->L _ (Match { m_pats = pats, m_grhss = grhss }))
+translateMatch fam_insts vars (L _ (Match { m_pats = pats, m_grhss = grhss }))
   = do
       pats'   <- concat <$> zipWithM (translateLPat fam_insts) vars pats
       guards' <- mapM (translateGuards fam_insts) guards
@@ -665,8 +665,8 @@ translateMatch fam_insts vars (dL->L _ (Match { m_pats = pats, m_grhss = grhss }
       return (pats', guards')
       where
         extractGuards :: LGRHS GhcTc (LHsExpr GhcTc) -> [GuardStmt GhcTc]
-        extractGuards (dL->L _ (GRHS _ gs _)) = map unLoc gs
-        extractGuards _                       = panic "translateMatch"
+        extractGuards (L _ (GRHS _ gs _)) = map unLoc gs
+        extractGuards _                   = panic "translateMatch"
 
         guards = map extractGuards (grhssGRHSs grhss)
 translateMatch _ _ _ = panic "translateMatch"
@@ -1247,10 +1247,10 @@ dsPmWarn dflags ctx@(DsMatchContext kind loc) vars pm_result
       when (approx && (exists_u || exists_i)) $
         putSrcSpanDs loc (warnDs NoReason approx_msg)
 
-      when exists_r $ forM_ redundant $ \(dL->L l q) -> do
+      when exists_r $ forM_ redundant $ \(L l q) -> do
         putSrcSpanDs l (warnDs (Reason Opt_WarnOverlappingPatterns)
                                (pprEqn q "is redundant"))
-      when exists_i $ forM_ inaccessible $ \(dL->L l q) -> do
+      when exists_i $ forM_ inaccessible $ \(L l q) -> do
         putSrcSpanDs l (warnDs (Reason Opt_WarnOverlappingPatterns)
                                (pprEqn q "has inaccessible right hand side"))
       when exists_u $ putSrcSpanDs loc $ warnDs flag_u_reason $
@@ -1366,7 +1366,7 @@ pprContext singular (DsMatchContext kind _loc) msg rest_of_msg_fun
 
     (ppr_match, pref)
         = case kind of
-             FunRhs { mc_fun = (dL->L _ fun) }
+             FunRhs { mc_fun = L _ fun }
                   -> (pprMatchContext kind, \ pp -> ppr fun <+> pp)
              _    -> (pprMatchContext kind, \ pp -> pp)
 
