@@ -147,13 +147,13 @@ just attach 'noSrcSpan' to everything.
 
 -- | e => (e)
 mkHsPar :: LHsExpr (GhcPass id) -> LHsExpr (GhcPass id)
-mkHsPar e = cL (getLoc e) (HsPar noExtField e)
+mkHsPar e = L (getLoc e) (HsPar noExtField e)
 
 mkSimpleMatch :: HsMatchContext (NameOrRdrName (IdP (GhcPass p)))
               -> [LPat (GhcPass p)] -> Located (body (GhcPass p))
               -> LMatch (GhcPass p) (Located (body (GhcPass p)))
 mkSimpleMatch ctxt pats rhs
-  = cL loc $
+  = L loc $
     Match { m_ext = noExtField, m_ctxt = ctxt, m_pats = pats
           , m_grhss = unguardedGRHSs rhs }
   where
@@ -163,12 +163,12 @@ mkSimpleMatch ctxt pats rhs
 
 unguardedGRHSs :: Located (body (GhcPass p))
                -> GRHSs (GhcPass p) (Located (body (GhcPass p)))
-unguardedGRHSs rhs@(dL->L loc _)
+unguardedGRHSs rhs@(L loc _)
   = GRHSs noExtField (unguardedRHS loc rhs) (noLoc emptyLocalBinds)
 
 unguardedRHS :: SrcSpan -> Located (body (GhcPass p))
              -> [LGRHS (GhcPass p) (Located (body (GhcPass p)))]
-unguardedRHS loc rhs = [cL loc (GRHS noExtField [] rhs)]
+unguardedRHS loc rhs = [L loc (GRHS noExtField [] rhs)]
 
 mkMatchGroup :: (XMG name (Located (body name)) ~ NoExtField)
              => Origin -> [LMatch name (Located (body name))]
@@ -179,7 +179,7 @@ mkMatchGroup origin matches = MG { mg_ext = noExtField
 
 mkLocatedList ::  [Located a] -> Located [Located a]
 mkLocatedList [] = noLoc []
-mkLocatedList ms = cL (combineLocs (head ms) (last ms)) ms
+mkLocatedList ms = L (combineLocs (head ms) (last ms)) ms
 
 mkHsApp :: LHsExpr (GhcPass id) -> LHsExpr (GhcPass id) -> LHsExpr (GhcPass id)
 mkHsApp e1 e2 = addCLoc e1 e2 (HsApp noExtField e1 e2)
@@ -196,7 +196,7 @@ mkHsAppTypes = foldl' mkHsAppType
 
 mkHsLam :: (XMG (GhcPass p) (LHsExpr (GhcPass p)) ~ NoExtField) =>
   [LPat (GhcPass p)] -> LHsExpr (GhcPass p) -> LHsExpr (GhcPass p)
-mkHsLam pats body = mkHsPar (cL (getLoc body) (HsLam noExtField matches))
+mkHsLam pats body = mkHsPar (L (getLoc body) (HsLam noExtField matches))
   where
     matches = mkMatchGroup Generated
                            [mkSimpleMatch LambdaExpr pats' body]
@@ -225,13 +225,13 @@ nlHsTyApps fun_id tys xs = foldl' nlHsApp (nlHsTyApp fun_id tys) xs
 -- | Wrap in parens if (hsExprNeedsParens appPrec) says it needs them
 -- So   'f x'  becomes '(f x)', but '3' stays as '3'
 mkLHsPar :: LHsExpr (GhcPass id) -> LHsExpr (GhcPass id)
-mkLHsPar le@(dL->L loc e)
-  | hsExprNeedsParens appPrec e = cL loc (HsPar noExtField le)
+mkLHsPar le@(L loc e)
+  | hsExprNeedsParens appPrec e = L loc (HsPar noExtField le)
   | otherwise                   = le
 
 mkParPat :: LPat (GhcPass name) -> LPat (GhcPass name)
-mkParPat lp@(dL->L loc p)
-  | patNeedsParens appPrec p = cL loc (ParPat noExtField lp)
+mkParPat lp@(L loc p)
+  | patNeedsParens appPrec p = L loc (ParPat noExtField lp)
   | otherwise                = lp
 
 nlParPat :: LPat (GhcPass name) -> LPat (GhcPass name)
@@ -277,7 +277,7 @@ mkHsIsString src s  = OverLit noExtField (HsIsString   src s) noExpr
 mkHsDo ctxt stmts = HsDo noExtField ctxt (mkLocatedList stmts)
 mkHsComp ctxt stmts expr = mkHsDo ctxt (stmts ++ [last_stmt])
   where
-    last_stmt = cL (getLoc expr) $ mkLastStmt expr
+    last_stmt = L (getLoc expr) $ mkLastStmt expr
 
 mkHsIf :: LHsExpr (GhcPass p) -> LHsExpr (GhcPass p) -> LHsExpr (GhcPass p)
        -> HsExpr (GhcPass p)
@@ -531,7 +531,7 @@ missingTupArg = Missing noExtField
 mkLHsPatTup :: [LPat GhcRn] -> LPat GhcRn
 mkLHsPatTup []     = noLoc $ TuplePat noExtField [] Boxed
 mkLHsPatTup [lpat] = lpat
-mkLHsPatTup lpats  = cL (getLoc (head lpats)) $ TuplePat noExtField lpats Boxed
+mkLHsPatTup lpats  = L (getLoc (head lpats)) $ TuplePat noExtField lpats Boxed
 
 -- | The Big equivalents for the source tuple expressions
 mkBigLHsVarTup :: [IdP (GhcPass id)] -> LHsExpr (GhcPass id)
@@ -620,12 +620,12 @@ mkHsSigEnv get_info sigs
    -- of which use this function
   where
     (gen_dm_sigs, ordinary_sigs) = partition is_gen_dm_sig sigs
-    is_gen_dm_sig (dL->L _ (ClassOpSig _ True _ _)) = True
-    is_gen_dm_sig _                                 = False
+    is_gen_dm_sig (L _ (ClassOpSig _ True _ _)) = True
+    is_gen_dm_sig _                             = False
 
     mk_pairs :: [LSig GhcRn] -> [(Name, a)]
     mk_pairs sigs = [ (n,a) | Just (ns,a) <- map get_info sigs
-                            , (dL->L _ n) <- ns ]
+                            , L _ n <- ns ]
 
 mkClassOpSigs :: [LSig GhcPs] -> [LSig GhcPs]
 -- ^ Convert TypeSig to ClassOpSig
@@ -634,8 +634,8 @@ mkClassOpSigs :: [LSig GhcPs] -> [LSig GhcPs]
 mkClassOpSigs sigs
   = map fiddle sigs
   where
-    fiddle (dL->L loc (TypeSig _ nms ty))
-      = cL loc (ClassOpSig noExtField False nms (dropWildCards ty))
+    fiddle (L loc (TypeSig _ nms ty))
+      = L loc (ClassOpSig noExtField False nms (dropWildCards ty))
     fiddle sig = sig
 
 typeToLHsType :: Type -> LHsType GhcPs
@@ -753,7 +753,7 @@ positions in the kind of the tycon.
 ********************************************************************* -}
 
 mkLHsWrap :: HsWrapper -> LHsExpr (GhcPass id) -> LHsExpr (GhcPass id)
-mkLHsWrap co_fn (dL->L loc e) = cL loc (mkHsWrap co_fn e)
+mkLHsWrap co_fn (L loc e) = L loc (mkHsWrap co_fn e)
 
 -- | Avoid (HsWrap co (HsWrap co' _)).
 -- See Note [Detecting forced eta expansion] in DsExpr
@@ -771,14 +771,14 @@ mkHsWrapCoR :: TcCoercionR   -- A Representational coercion  a ~R b
 mkHsWrapCoR co e = mkHsWrap (mkWpCastR co) e
 
 mkLHsWrapCo :: TcCoercionN -> LHsExpr (GhcPass id) -> LHsExpr (GhcPass id)
-mkLHsWrapCo co (dL->L loc e) = cL loc (mkHsWrapCo co e)
+mkLHsWrapCo co (L loc e) = L loc (mkHsWrapCo co e)
 
 mkHsCmdWrap :: HsWrapper -> HsCmd (GhcPass p) -> HsCmd (GhcPass p)
 mkHsCmdWrap w cmd | isIdHsWrapper w = cmd
                   | otherwise       = HsCmdWrap noExtField w cmd
 
 mkLHsCmdWrap :: HsWrapper -> LHsCmd (GhcPass p) -> LHsCmd (GhcPass p)
-mkLHsCmdWrap w (dL->L loc c) = cL loc (mkHsCmdWrap w c)
+mkLHsCmdWrap w (L loc c) = L loc (mkHsCmdWrap w c)
 
 mkHsWrapPat :: HsWrapper -> Pat (GhcPass id) -> Type -> Pat (GhcPass id)
 mkHsWrapPat co_fn p ty | isIdHsWrapper co_fn = p
@@ -824,7 +824,7 @@ mkHsVarBind :: SrcSpan -> RdrName -> LHsExpr GhcPs -> LHsBind GhcPs
 mkHsVarBind loc var rhs = mkSimpleGeneratedFunBind loc var [] rhs
 
 mkVarBind :: IdP (GhcPass p) -> LHsExpr (GhcPass p) -> LHsBind (GhcPass p)
-mkVarBind var rhs = cL (getLoc rhs) $
+mkVarBind var rhs = L (getLoc rhs) $
                     VarBind { var_ext = noExtField,
                               var_id = var, var_rhs = rhs, var_inline = False }
 
@@ -852,8 +852,8 @@ isInfixFunBind _ = False
 mkSimpleGeneratedFunBind :: SrcSpan -> RdrName -> [LPat GhcPs]
                 -> LHsExpr GhcPs -> LHsBind GhcPs
 mkSimpleGeneratedFunBind loc fun pats expr
-  = cL loc $ mkFunBind Generated (cL loc fun)
-              [mkMatch (mkPrefixFunRhs (cL loc fun)) pats expr
+  = L loc $ mkFunBind Generated (L loc fun)
+              [mkMatch (mkPrefixFunRhs (L loc fun)) pats expr
                        (noLoc emptyLocalBinds)]
 
 -- | Make a prefix, non-strict function 'HsMatchContext'
@@ -873,8 +873,8 @@ mkMatch ctxt pats expr lbinds
                  , m_pats  = map paren pats
                  , m_grhss = GRHSs noExtField (unguardedRHS noSrcSpan expr) lbinds })
   where
-    paren lp@(dL->L l p)
-      | patNeedsParens appPrec p = cL l (ParPat noExtField lp)
+    paren lp@(L l p)
+      | patNeedsParens appPrec p = L l (ParPat noExtField lp)
       | otherwise                = lp
 
 {-
@@ -954,7 +954,7 @@ isBangedHsBind :: HsBind GhcTc -> Bool
 isBangedHsBind (AbsBinds { abs_binds = binds })
   = anyBag (isBangedHsBind . unLoc) binds
 isBangedHsBind (FunBind {fun_matches = matches})
-  | [dL->L _ match] <- unLoc $ mg_alts matches
+  | [L _ match] <- unLoc $ mg_alts matches
   , FunRhs{mc_strictness = SrcStrict} <- m_ctxt match
   = True
 isBangedHsBind (PatBind {pat_lhs = pat})
@@ -976,8 +976,8 @@ collectHsIdBinders, collectHsValBinders
 collectHsIdBinders  = collect_hs_val_binders True
 collectHsValBinders = collect_hs_val_binders False
 
-collectHsBindBinders :: (SrcSpanLess (LPat p) ~ Pat p, HasSrcSpan (LPat p))=>
-                        HsBindLR p idR -> [IdP p]
+collectHsBindBinders :: XRec pass Pat ~ Located (Pat pass) =>
+                        HsBindLR pass idR -> [IdP pass]
 -- ^ Collect both Ids and pattern-synonym binders
 collectHsBindBinders b = collect_bind False b []
 
@@ -1003,16 +1003,17 @@ collect_binds :: Bool -> LHsBindsLR (GhcPass p) idR ->
 -- ^ Collect Ids, or Ids + pattern synonyms, depending on boolean flag
 collect_binds ps binds acc = foldr (collect_bind ps . unLoc) acc binds
 
-collect_bind :: (SrcSpanLess (LPat p) ~ Pat p , HasSrcSpan (LPat p)) =>
-                Bool -> HsBindLR p idR -> [IdP p] -> [IdP p]
+collect_bind :: XRec pass Pat ~ Located (Pat pass) =>
+                Bool -> HsBindLR pass idR ->
+                [IdP pass] -> [IdP pass]
 collect_bind _ (PatBind { pat_lhs = p })           acc = collect_lpat p acc
-collect_bind _ (FunBind { fun_id = (dL->L _ f) })  acc = f : acc
+collect_bind _ (FunBind { fun_id = L _ f })        acc = f : acc
 collect_bind _ (VarBind { var_id = f })            acc = f : acc
 collect_bind _ (AbsBinds { abs_exports = dbinds }) acc = map abe_poly dbinds ++ acc
         -- I don't think we want the binders from the abe_binds
 
         -- binding (hence see AbsBinds) is in zonking in TcHsSyn
-collect_bind omitPatSyn (PatSynBind _ (PSB { psb_id = (dL->L _ ps) })) acc
+collect_bind omitPatSyn (PatSynBind _ (PSB { psb_id = L _ ps })) acc
   | omitPatSyn                  = acc
   | otherwise                   = ps : acc
 collect_bind _ (PatSynBind _ (XPatSynBind _)) acc = acc
@@ -1066,8 +1067,8 @@ collectPatsBinders :: [LPat (GhcPass p)] -> [IdP (GhcPass p)]
 collectPatsBinders pats = foldr collect_lpat [] pats
 
 -------------
-collect_lpat :: (SrcSpanLess (LPat p) ~ Pat p , HasSrcSpan (LPat p)) =>
-                 LPat p -> [IdP p] -> [IdP p]
+collect_lpat :: XRec pass Pat ~ Located (Pat pass) =>
+                LPat pass -> [IdP pass] -> [IdP pass]
 collect_lpat p bndrs
   = go (unLoc p)
   where
@@ -1160,39 +1161,37 @@ hsLTyClDeclBinders :: Located (TyClDecl (GhcPass p))
 -- Each returned (Located name) has a SrcSpan for the /whole/ declaration.
 -- See Note [SrcSpan for binders]
 
-hsLTyClDeclBinders (dL->L loc (FamDecl { tcdFam = FamilyDecl
-                                            { fdLName = (dL->L _ name) } }))
-  = ([cL loc name], [])
-hsLTyClDeclBinders (dL->L _ (FamDecl { tcdFam = XFamilyDecl nec }))
+hsLTyClDeclBinders (L loc (FamDecl { tcdFam = FamilyDecl
+                                            { fdLName = (L _ name) } }))
+  = ([L loc name], [])
+hsLTyClDeclBinders (L _ (FamDecl { tcdFam = XFamilyDecl nec }))
   = noExtCon nec
-hsLTyClDeclBinders (dL->L loc (SynDecl
-                               { tcdLName = (dL->L _ name) }))
-  = ([cL loc name], [])
-hsLTyClDeclBinders (dL->L loc (ClassDecl
-                               { tcdLName = (dL->L _ cls_name)
+hsLTyClDeclBinders (L loc (SynDecl
+                               { tcdLName = (L _ name) }))
+  = ([L loc name], [])
+hsLTyClDeclBinders (L loc (ClassDecl
+                               { tcdLName = (L _ cls_name)
                                , tcdSigs  = sigs
                                , tcdATs   = ats }))
-  = (cL loc cls_name :
-     [ cL fam_loc fam_name | (dL->L fam_loc (FamilyDecl
+  = (L loc cls_name :
+     [ L fam_loc fam_name | (L fam_loc (FamilyDecl
                                         { fdLName = L _ fam_name })) <- ats ]
      ++
-     [ cL mem_loc mem_name | (dL->L mem_loc (ClassOpSig _ False ns _)) <- sigs
-                           , (dL->L _ mem_name) <- ns ]
+     [ L mem_loc mem_name | (L mem_loc (ClassOpSig _ False ns _)) <- sigs
+                          , (L _ mem_name) <- ns ]
     , [])
-hsLTyClDeclBinders (dL->L loc (DataDecl    { tcdLName = (dL->L _ name)
-                                           , tcdDataDefn = defn }))
-  = (\ (xs, ys) -> (cL loc name : xs, ys)) $ hsDataDefnBinders defn
-hsLTyClDeclBinders (dL->L _ (XTyClDecl nec)) = noExtCon nec
-hsLTyClDeclBinders _ = panic "hsLTyClDeclBinders: Impossible Match"
-                             -- due to #15884
+hsLTyClDeclBinders (L loc (DataDecl    { tcdLName = (L _ name)
+                                       , tcdDataDefn = defn }))
+  = (\ (xs, ys) -> (L loc name : xs, ys)) $ hsDataDefnBinders defn
+hsLTyClDeclBinders (L _ (XTyClDecl nec)) = noExtCon nec
 
 
 -------------------
 hsForeignDeclsBinders :: [LForeignDecl pass] -> [Located (IdP pass)]
 -- ^ See Note [SrcSpan for binders]
 hsForeignDeclsBinders foreign_decls
-  = [ cL decl_loc n
-    | (dL->L decl_loc (ForeignImport { fd_name = (dL->L _ n) }))
+  = [ L decl_loc n
+    | L decl_loc (ForeignImport { fd_name = L _ n })
         <- foreign_decls]
 
 
@@ -1213,24 +1212,22 @@ addPatSynSelector bind sels
 getPatSynBinds :: [(RecFlag, LHsBinds id)] -> [PatSynBind id id]
 getPatSynBinds binds
   = [ psb | (_, lbinds) <- binds
-          , (dL->L _ (PatSynBind _ psb)) <- bagToList lbinds ]
+          , L _ (PatSynBind _ psb) <- bagToList lbinds ]
 
 -------------------
 hsLInstDeclBinders :: LInstDecl (GhcPass p)
                    -> ([Located (IdP (GhcPass p))], [LFieldOcc (GhcPass p)])
-hsLInstDeclBinders (dL->L _ (ClsInstD
+hsLInstDeclBinders (L _ (ClsInstD
                              { cid_inst = ClsInstDecl
                                           { cid_datafam_insts = dfis }}))
   = foldMap (hsDataFamInstBinders . unLoc) dfis
-hsLInstDeclBinders (dL->L _ (DataFamInstD { dfid_inst = fi }))
+hsLInstDeclBinders (L _ (DataFamInstD { dfid_inst = fi }))
   = hsDataFamInstBinders fi
-hsLInstDeclBinders (dL->L _ (TyFamInstD {})) = mempty
-hsLInstDeclBinders (dL->L _ (ClsInstD _ (XClsInstDecl nec)))
+hsLInstDeclBinders (L _ (TyFamInstD {})) = mempty
+hsLInstDeclBinders (L _ (ClsInstD _ (XClsInstDecl nec)))
   = noExtCon nec
-hsLInstDeclBinders (dL->L _ (XInstDecl nec))
+hsLInstDeclBinders (L _ (XInstDecl nec))
   = noExtCon nec
-hsLInstDeclBinders _ = panic "hsLInstDeclBinders: Impossible Match"
-                             -- due to #15884
 
 -------------------
 -- | the SrcLoc returned are for the whole declarations, not just the names
@@ -1278,13 +1275,13 @@ hsConDeclsBinders cons
            -- remove only the first occurrence of any seen field in order to
            -- avoid circumventing detection of duplicate fields (#9156)
            ConDeclGADT { con_names = names, con_args = args }
-             -> (map (cL loc . unLoc) names ++ ns, flds ++ fs)
+             -> (map (L loc . unLoc) names ++ ns, flds ++ fs)
              where
                 (remSeen', flds) = get_flds remSeen args
                 (ns, fs) = go remSeen' rs
 
            ConDeclH98 { con_name = name, con_args = args }
-             -> ([cL loc (unLoc name)] ++ ns, flds ++ fs)
+             -> ([L loc (unLoc name)] ++ ns, flds ++ fs)
              where
                 (remSeen', flds) = get_flds remSeen args
                 (ns, fs) = go remSeen' rs
