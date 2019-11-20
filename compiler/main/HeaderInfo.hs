@@ -85,7 +85,7 @@ getImports dflags buf filename source_filename = do
                 imps = hsmodImports hsmod
                 main_loc = srcLocSpan (mkSrcLoc (mkFastString source_filename)
                                        1 1)
-                mod = mb_mod `orElse` cL main_loc mAIN_NAME
+                mod = mb_mod `orElse` L main_loc mAIN_NAME
                 (src_idecls, ord_idecls) = partition (ideclSource.unLoc) imps
 
                -- GHC.Prim doesn't exist physically, so don't go looking for it.
@@ -96,8 +96,7 @@ getImports dflags buf filename source_filename = do
                 implicit_prelude = xopt LangExt.ImplicitPrelude dflags
                 implicit_imports = mkPrelImports (unLoc mod) main_loc
                                                  implicit_prelude imps
-                convImport (dL->L _ i) = (fmap sl_fs (ideclPkgQual i)
-                                         , ideclName i)
+                convImport (L _ i) = (fmap sl_fs (ideclPkgQual i), ideclName i)
               in
               return (map convImport src_idecls,
                       map convImport (implicit_imports ++ ordinary_imps),
@@ -120,23 +119,23 @@ mkPrelImports this_mod loc implicit_prelude import_decls
   | otherwise = [preludeImportDecl]
   where
       explicit_prelude_import
-       = notNull [ () | (dL->L _ (ImportDecl { ideclName = mod
-                                        , ideclPkgQual = Nothing }))
+       = notNull [ () | L _ (ImportDecl { ideclName = mod
+                                        , ideclPkgQual = Nothing })
                           <- import_decls
                       , unLoc mod == pRELUDE_NAME ]
 
       preludeImportDecl :: LImportDecl GhcPs
       preludeImportDecl
-        = cL loc $ ImportDecl { ideclExt       = noExtField,
-                                ideclSourceSrc = NoSourceText,
-                                ideclName      = cL loc pRELUDE_NAME,
-                                ideclPkgQual   = Nothing,
-                                ideclSource    = False,
-                                ideclSafe      = False,  -- Not a safe import
-                                ideclQualified = NotQualified,
-                                ideclImplicit  = True,   -- Implicit!
-                                ideclAs        = Nothing,
-                                ideclHiding    = Nothing  }
+        = L loc $ ImportDecl { ideclExt       = noExtField,
+                               ideclSourceSrc = NoSourceText,
+                               ideclName      = L loc pRELUDE_NAME,
+                               ideclPkgQual   = Nothing,
+                               ideclSource    = False,
+                               ideclSafe      = False,  -- Not a safe import
+                               ideclQualified = NotQualified,
+                               ideclImplicit  = True,   -- Implicit!
+                               ideclAs        = Nothing,
+                               ideclHiding    = Nothing  }
 
 --------------------------------------------------------------
 -- Get options
@@ -192,7 +191,7 @@ lazyGetToks dflags filename handle = do
                   _other -> do rest <- lazyLexBuf handle state' eof size
                                return (t : rest)
       _ | not eof   -> getMore handle state size
-        | otherwise -> return [cL (RealSrcSpan (last_loc state)) ITeof]
+        | otherwise -> return [L (RealSrcSpan (last_loc state)) ITeof]
                          -- parser assumes an ITeof sentinel at the end
 
   getMore :: Handle -> PState -> Int -> IO [Located Token]
@@ -214,9 +213,9 @@ getToks dflags filename buf = lexAll (pragState dflags buf loc)
   loc  = mkRealSrcLoc (mkFastString filename) 1 1
 
   lexAll state = case unP (lexer False return) state of
-                   POk _      t@(dL->L _ ITeof) -> [t]
+                   POk _      t@(L _ ITeof) -> [t]
                    POk state' t -> t : lexAll state'
-                   _ -> [cL (RealSrcSpan (last_loc state)) ITeof]
+                   _ -> [L (RealSrcSpan (last_loc state)) ITeof]
 
 
 -- | Parse OPTIONS and LANGUAGE pragmas of the source file.
@@ -245,16 +244,16 @@ getOptions' dflags toks
               = case toArgs str of
                   Left _err -> optionsParseError str dflags $   -- #15053
                                  combineSrcSpans (getLoc open) (getLoc close)
-                  Right args -> map (cL (getLoc open)) args ++ parseToks xs
+                  Right args -> map (L (getLoc open)) args ++ parseToks xs
           parseToks (open:close:xs)
               | ITinclude_prag str <- unLoc open
               , ITclose_prag       <- unLoc close
-              = map (cL (getLoc open)) ["-#include",removeSpaces str] ++
+              = map (L (getLoc open)) ["-#include",removeSpaces str] ++
                 parseToks xs
           parseToks (open:close:xs)
               | ITdocOptions str <- unLoc open
               , ITclose_prag     <- unLoc close
-              = map (cL (getLoc open)) ["-haddock-opts", removeSpaces str]
+              = map (L (getLoc open)) ["-haddock-opts", removeSpaces str]
                 ++ parseToks xs
           parseToks (open:xs)
               | ITlanguage_prag <- unLoc open
@@ -263,12 +262,12 @@ getOptions' dflags toks
               | isComment (unLoc comment)
               = parseToks xs
           parseToks _ = []
-          parseLanguage ((dL->L loc (ITconid fs)):rest)
-              = checkExtension dflags (cL loc fs) :
+          parseLanguage ((L loc (ITconid fs)):rest)
+              = checkExtension dflags (L loc fs) :
                 case rest of
-                  (dL->L _loc ITcomma):more -> parseLanguage more
-                  (dL->L _loc ITclose_prag):more -> parseToks more
-                  (dL->L loc _):_ -> languagePragParseError dflags loc
+                  (L _loc ITcomma):more -> parseLanguage more
+                  (L _loc ITclose_prag):more -> parseToks more
+                  (L loc _):_ -> languagePragParseError dflags loc
                   [] -> panic "getOptions'.parseLanguage(1) went past eof token"
           parseLanguage (tok:_)
               = languagePragParseError dflags (getLoc tok)
@@ -296,7 +295,7 @@ checkProcessArgsResult :: MonadIO m => DynFlags -> [Located String] -> m ()
 checkProcessArgsResult dflags flags
   = when (notNull flags) $
       liftIO $ throwIO $ mkSrcErr $ listToBag $ map mkMsg flags
-    where mkMsg (dL->L loc flag)
+    where mkMsg (L loc flag)
               = mkPlainErrMsg dflags loc $
                   (text "unknown flag in  {-# OPTIONS_GHC #-} pragma:" <+>
                    text flag)
@@ -304,11 +303,11 @@ checkProcessArgsResult dflags flags
 -----------------------------------------------------------------------------
 
 checkExtension :: DynFlags -> Located FastString -> Located String
-checkExtension dflags (dL->L l ext)
+checkExtension dflags (L l ext)
 -- Checks if a given extension is valid, and if so returns
 -- its corresponding flag. Otherwise it throws an exception.
   = if ext' `elem` supported
-    then cL l ("-X"++ext')
+    then L l ("-X"++ext')
     else unsupportedExtnError dflags l ext'
   where
     ext' = unpackFS ext
@@ -336,11 +335,11 @@ optionsErrorMsgs :: DynFlags -> [String] -> [Located String] -> FilePath -> Mess
 optionsErrorMsgs dflags unhandled_flags flags_lines _filename
   = (emptyBag, listToBag (map mkMsg unhandled_flags_lines))
   where unhandled_flags_lines :: [Located String]
-        unhandled_flags_lines = [ cL l f
+        unhandled_flags_lines = [ L l f
                                 | f <- unhandled_flags
-                                , (dL->L l f') <- flags_lines
+                                , L l f' <- flags_lines
                                 , f == f' ]
-        mkMsg (dL->L flagSpan flag) =
+        mkMsg (L flagSpan flag) =
             ErrUtils.mkPlainErrMsg dflags flagSpan $
                     text "unknown flag in  {-# OPTIONS_GHC #-} pragma:" <+> text flag
 
