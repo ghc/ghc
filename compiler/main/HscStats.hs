@@ -22,7 +22,7 @@ import Data.Char
 
 -- | Source Statistics
 ppSourceStats :: Bool -> Located (HsModule GhcPs) -> SDoc
-ppSourceStats short (dL->L _ (HsModule _ exports imports ldecls _ _))
+ppSourceStats short (L _ (HsModule _ exports imports ldecls _ _))
   = (if short then hcat else vcat)
         (map pp_val
             [("ExportAll        ", export_all), -- 1 if no export list
@@ -84,7 +84,7 @@ ppSourceStats short (dL->L _ (HsModule _ exports imports ldecls _ _))
     default_ds = count (\ x -> case x of { DefD{} -> True; _ -> False}) decls
     val_decls  = [d | ValD _ d <- decls]
 
-    real_exports = case exports of { Nothing -> []; Just (dL->L _ es) -> es }
+    real_exports = case exports of { Nothing -> []; Just (L _ es) -> es }
     n_exports    = length real_exports
     export_ms    = count (\ e -> case unLoc e of { IEModuleContents{} -> True
                                                  ; _ -> False})
@@ -104,7 +104,7 @@ ppSourceStats short (dL->L _ (HsModule _ exports imports ldecls _ _))
     (inst_method_ds, method_specs, method_inlines, inst_type_ds, inst_data_ds)
         = sum5 (map inst_info inst_decls)
 
-    count_bind (PatBind { pat_lhs = (dL->L _ (VarPat{})) }) = (1,0,0)
+    count_bind (PatBind { pat_lhs = L _ (VarPat{}) }) = (1,0,0)
     count_bind (PatBind {})                           = (0,1,0)
     count_bind (FunBind {})                           = (0,1,0)
     count_bind (PatSynBind {})                        = (0,0,1)
@@ -119,12 +119,10 @@ ppSourceStats short (dL->L _ (HsModule _ exports imports ldecls _ _))
     sig_info (ClassOpSig {}) = (0,0,0,0,1)
     sig_info _               = (0,0,0,0,0)
 
-    import_info (dL->L _ (ImportDecl { ideclSafe = safe, ideclQualified = qual
-                                     , ideclAs = as, ideclHiding = spec }))
+    import_info (L _ (ImportDecl { ideclSafe = safe, ideclQualified = qual
+                                 , ideclAs = as, ideclHiding = spec }))
         = add7 (1, safe_info safe, qual_info qual, as_info as, 0,0,0) (spec_info spec)
-    import_info (dL->L _ (XImportDecl nec)) = noExtCon nec
-    import_info _ = panic " import_info: Impossible Match"
-                             -- due to #15884
+    import_info (L _ (XImportDecl nec)) = noExtCon nec
 
     safe_info False = 0
     safe_info True = 1
@@ -138,7 +136,7 @@ ppSourceStats short (dL->L _ (HsModule _ exports imports ldecls _ _))
 
     data_info (DataDecl { tcdDataDefn = HsDataDefn
                                           { dd_cons = cs
-                                          , dd_derivs = (dL->L _ derivs)}})
+                                          , dd_derivs = L _ derivs}})
         = ( length cs
           , foldl' (\s dc -> length (deriv_clause_tys $ unLoc dc) + s)
                    0 derivs )
