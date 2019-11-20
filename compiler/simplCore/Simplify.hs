@@ -2789,8 +2789,8 @@ addEvals _scrut con vs = go vs the_strs
         where
           ppr_with_length list
             = ppr list <+> parens (text "length =" <+> ppr (length list))
-          strdisp MarkedStrict = "MarkedStrict"
-          strdisp NotMarkedStrict = "NotMarkedStrict"
+          strdisp MarkedStrict = text "MarkedStrict"
+          strdisp NotMarkedStrict = text "NotMarkedStrict"
 
 zapIdOccInfoAndSetEvald :: StrictnessMark -> Id -> Id
 zapIdOccInfoAndSetEvald str v =
