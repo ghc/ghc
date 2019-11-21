@@ -12,8 +12,8 @@ module GHC.IO.Handle.Lock.LinuxOFD where
 import GHC.Base () -- Make implicit dependency known to build system
 #else
 
-#include <sys/unistd.h>
-#include <sys/fcntl.h>
+#include <unistd.h>
+#include <fcntl.h>
 
 import Data.Function
 import Data.Functor
