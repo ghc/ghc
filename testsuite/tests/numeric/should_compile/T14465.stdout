@@ -72,7 +72,7 @@ minusOne
       NatS# ds1 ->
         case ds1 of {
           __DEFAULT -> GHC.Natural.underflowError @ Natural;
-          0## -> GHC.Natural.lcmNatural1
+          0## -> GHC.Natural.zero
         };
       NatJ# ipv -> GHC.Natural.underflowError @ Natural
     }
