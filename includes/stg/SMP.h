@@ -257,6 +257,9 @@ EXTERN_INLINE void load_load_barrier(void);
 EXTERN_INLINE StgWord
 xchg(StgPtr p, StgWord w)
 {
+#if defined(HAVE_C11_ATOMICS)
+    return __atomic_exchange_n(p, w, __ATOMIC_SEQ_CST);
+#else
     // When porting GHC to a new platform check that
     // __sync_lock_test_and_set() actually stores w in *p.
     // Use test rts/atomicxchg to verify that the correct value is stored.
@@ -272,6 +275,7 @@ xchg(StgPtr p, StgWord w)
     // only valid value to store is the immediate constant 1. The
     // exact value actually stored in *ptr is implementation defined.
     return __sync_lock_test_and_set(p, w);
+#endif
 }
 
 /*
@@ -281,13 +285,23 @@ xchg(StgPtr p, StgWord w)
 EXTERN_INLINE StgWord
 cas(StgVolatilePtr p, StgWord o, StgWord n)
 {
+#if defined(HAVE_C11_ATOMICS)
+    __atomic_compare_exchange_n(p, &o, n, 0, __ATOMIC_SEQ_CST, __ATOMIC_SEQ_CST);
+    return o;
+#else
     return __sync_val_compare_and_swap(p, o, n);
+#endif
 }
 
 EXTERN_INLINE StgWord8
 cas_word8(StgWord8 *volatile p, StgWord8 o, StgWord8 n)
 {
+#if defined(HAVE_C11_ATOMICS)
+    __atomic_compare_exchange_n(p, &o, n, 0, __ATOMIC_SEQ_CST, __ATOMIC_SEQ_CST);
+    return o;
+#else
     return __sync_val_compare_and_swap(p, o, n);
+#endif
 }
 
 // RRN: Generalized to arbitrary increments to enable fetch-and-add in
@@ -296,13 +310,21 @@ cas_word8(StgWord8 *volatile p, StgWord8 o, StgWord8 n)
 EXTERN_INLINE StgWord
 atomic_inc(StgVolatilePtr p, StgWord incr)
 {
+#if defined(HAVE_C11_ATOMICS)
+    return __atomic_add_fetch(p, incr, __ATOMIC_SEQ_CST);
+#else
     return __sync_add_and_fetch(p, incr);
+#endif
 }
 
 EXTERN_INLINE StgWord
 atomic_dec(StgVolatilePtr p)
 {
+#if defined(HAVE_C11_ATOMICS)
+    return __atomic_sub_fetch(p, 1, __ATOMIC_SEQ_CST);
+#else
     return __sync_sub_and_fetch(p, (StgWord) 1);
+#endif
 }
 
 /*
