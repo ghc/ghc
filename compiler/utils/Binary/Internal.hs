@@ -177,16 +177,16 @@ putInt16 = putSLEB128
 getInt16 :: Get Int16
 getInt16 = getSLEB128
 
-putInt32 :: Int16 -> Put ()
+putInt32 :: Int32 -> Put ()
 putInt32 = putSLEB128
 
-getInt32 :: Get Int16
+getInt32 :: Get Int32
 getInt32 = getSLEB128
 
-putInt64 :: Int16 -> Put ()
+putInt64 :: Int64 -> Put ()
 putInt64 = putSLEB128
 
-getInt64 :: Get Int16
+getInt64 :: Get Int64
 getInt64 = getSLEB128
 
 -- -----------------------------------------------------------------------------

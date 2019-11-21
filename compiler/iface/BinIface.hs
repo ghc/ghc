@@ -131,7 +131,7 @@ readBinIface_ dflags checkHiWay traceBinIFaceReading hi_path ncu = do
           else do _ <- Binary.get :: Get Word64; return ()
 
       -- Check the interface file version and ways.
-      check_ver  <- get
+      check_ver <- get
       let our_ver = show hiVersion
       wantedGot "Version" our_ver check_ver text
       errorOnMismatch "mismatched interface file versions" our_ver check_ver
