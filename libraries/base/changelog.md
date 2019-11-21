@@ -1,9 +1,6 @@
 # Changelog for [`base` package](http://hackage.haskell.org/package/base)
 
-## 4.15.0.0 *TBA*
-  * TODO
-
-## 4.14.0.0 *TBA*
+## 4.14.0.0 *Jan 2020
   * Bundled with GHC 8.10.1
 
   * Add a `TestEquality` instance for the `Compose` newtype.
