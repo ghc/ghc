@@ -54,8 +54,7 @@ module IdInfo (
         isDeadOcc, isStrongLoopBreaker, isWeakLoopBreaker,
         occInfo, setOccInfo,
 
-        InsideLam, OneBranch,
-        insideLam, notInsideLam, oneBranch, notOneBranch,
+        InsideLam(..), OneBranch(..),
 
         TailCallInfo(..),
         tailCallInfo, isAlwaysTailCalled,
@@ -508,12 +507,12 @@ zapLamInfo info@(IdInfo {occInfo = occ, demandInfo = demand})
   where
         -- The "unsafe" occ info is the ones that say I'm not in a lambda
         -- because that might not be true for an unsaturated lambda
-    is_safe_occ occ | isAlwaysTailCalled occ     = False
-    is_safe_occ (OneOcc { occ_in_lam = in_lam }) = in_lam
-    is_safe_occ _other                           = True
+    is_safe_occ occ | isAlwaysTailCalled occ           = False
+    is_safe_occ (OneOcc { occ_in_lam = NotInsideLam }) = False
+    is_safe_occ _other                                 = True
 
     safe_occ = case occ of
-                 OneOcc{} -> occ { occ_in_lam = True
+                 OneOcc{} -> occ { occ_in_lam = IsInsideLam
                                  , occ_tail   = NoTailCallInfo }
                  IAmALoopBreaker{}
                           -> occ { occ_tail   = NoTailCallInfo }

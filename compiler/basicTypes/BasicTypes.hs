@@ -67,9 +67,9 @@ module BasicTypes(
         isDeadOcc, isStrongLoopBreaker, isWeakLoopBreaker, isManyOccs,
         strongLoopBreaker, weakLoopBreaker,
 
-        InsideLam, insideLam, notInsideLam,
-        OneBranch, oneBranch, notOneBranch,
-        InterestingCxt,
+        InsideLam(..),
+        OneBranch(..),
+        InterestingCxt(..),
         TailCallInfo(..), tailCallInfo, zapOccTailCallInfo,
         isAlwaysTailCalled,
 
@@ -119,6 +119,7 @@ import SrcLoc ( Located,unLoc )
 import Data.Data hiding (Fixity, Prefix, Infix)
 import Data.Function (on)
 import Data.Bits
+import qualified Data.Semigroup as Semi
 
 {-
 ************************************************************************
@@ -897,7 +898,6 @@ data OccInfo
   | IAmALoopBreaker { occ_rules_only :: !RulesOnly
                     , occ_tail       :: !TailCallInfo }
                         -- Note [LoopBreaker OccInfo]
-
   deriving (Eq)
 
 type RulesOnly = Bool
@@ -926,25 +926,52 @@ seqOccInfo occ = occ `seq` ()
 
 -----------------
 -- | Interesting Context
-type InterestingCxt = Bool      -- True <=> Function: is applied
-                                --          Data value: scrutinised by a case with
-                                --                      at least one non-DEFAULT branch
+data InterestingCxt
+  = IsInteresting
+    -- ^ Function: is applied
+    --   Data value: scrutinised by a case with at least one non-DEFAULT branch
+  | NotInteresting
+  deriving (Eq)
+
+-- | If there is any 'interesting' identifier occurance, then the
+-- aggregated occurance info of that identifier is considered interesting.
+instance Semi.Semigroup InterestingCxt where
+  IsInteresting <> _ = IsInteresting
+  _ <> IsInteresting = IsInteresting
+  _ <> _             = NotInteresting
+
+instance Monoid InterestingCxt where
+  mempty = NotInteresting
+  mappend = (Semi.<>)
 
 -----------------
 -- | Inside Lambda
-type InsideLam = Bool   -- True <=> Occurs inside a non-linear lambda
-                        -- Substituting a redex for this occurrence is
-                        -- dangerous because it might duplicate work.
-insideLam, notInsideLam :: InsideLam
-insideLam    = True
-notInsideLam = False
+data InsideLam
+  = IsInsideLam
+    -- ^ Occurs inside a non-linear lambda
+    -- Substituting a redex for this occurrence is
+    -- dangerous because it might duplicate work.
+  | NotInsideLam
+  deriving (Eq)
+
+-- | If any occurance of an identifier is inside a lambda, then the
+-- occurance info of that identifier marks it as occuring inside a lambda
+instance Semi.Semigroup InsideLam where
+  IsInsideLam <> _ = IsInsideLam
+  _ <> IsInsideLam = IsInsideLam
+  _ <> _           = NotInsideLam
+
+instance Monoid InsideLam where
+  mempty = NotInsideLam
+  mappend = (Semi.<>)
 
 -----------------
-type OneBranch = Bool   -- True <=> Occurs in only one case branch
-                        --      so no code-duplication issue to worry about
-oneBranch, notOneBranch :: OneBranch
-oneBranch    = True
-notOneBranch = False
+data OneBranch
+  = InOneBranch
+    -- ^ One syntactic occurance: Occurs in only one case branch
+    -- so no code-duplication issue to worry about
+  | MultipleBranches
+  deriving (Eq)
 
 -----------------
 data TailCallInfo = AlwaysTailCalled JoinArity -- See Note [TailCallInfo]
@@ -1005,15 +1032,15 @@ instance Outputable OccInfo where
           pp_ro | rule_only = char '!'
                 | otherwise = empty
   ppr (OneOcc inside_lam one_branch int_cxt tail_info)
-        = text "Once" <> pp_lam <> pp_br <> pp_args <> pp_tail
+        = text "Once" <> pp_lam inside_lam <> pp_br one_branch <> pp_args int_cxt <> pp_tail
         where
-          pp_lam | inside_lam = char 'L'
-                 | otherwise  = empty
-          pp_br  | one_branch = empty
-                 | otherwise  = char '*'
-          pp_args | int_cxt   = char '!'
-                  | otherwise = empty
-          pp_tail             = pprShortTailCallInfo tail_info
+          pp_lam IsInsideLam     = char 'L'
+          pp_lam NotInsideLam    = empty
+          pp_br MultipleBranches = char '*'
+          pp_br InOneBranch      = empty
+          pp_args IsInteresting  = char '!'
+          pp_args NotInteresting = empty
+          pp_tail                = pprShortTailCallInfo tail_info
 
 pprShortTailCallInfo :: TailCallInfo -> SDoc
 pprShortTailCallInfo (AlwaysTailCalled ar) = char 'T' <> brackets (int ar)

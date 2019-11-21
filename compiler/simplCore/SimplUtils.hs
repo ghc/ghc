@@ -1158,12 +1158,12 @@ preInlineUnconditionally env top_lvl bndr rhs rhs_env
     extend_subst_with inl_rhs = extendIdSubst env bndr (mkContEx rhs_env inl_rhs)
 
     one_occ IAmDead = True -- Happens in ((\x.1) v)
-    one_occ (OneOcc { occ_one_br = True      -- One textual occurrence
-                    , occ_in_lam = in_lam
-                    , occ_int_cxt = int_cxt })
-        | not in_lam = isNotTopLevel top_lvl || early_phase
-        | otherwise  = int_cxt && canInlineInLam rhs
-    one_occ _        = False
+    one_occ OneOcc{ occ_one_br = InOneBranch
+                  , occ_in_lam = NotInsideLam }   = isNotTopLevel top_lvl || early_phase
+    one_occ OneOcc{ occ_one_br = InOneBranch
+                  , occ_in_lam = IsInsideLam
+                  , occ_int_cxt = IsInteresting } = canInlineInLam rhs
+    one_occ _                                     = False
 
     pre_inline_unconditionally = gopt Opt_SimplPreInlining (seDynFlags env)
     mode   = getMode env
@@ -1297,7 +1297,7 @@ postInlineUnconditionally env top_lvl bndr occ_info rhs
                         -- PRINCIPLE: when we've already simplified an expression once,
                         -- make sure that we only inline it if it's reasonably small.
 
-           && (not in_lam ||
+           && (in_lam == NotInsideLam ||
                         -- Outside a lambda, we want to be reasonably aggressive
                         -- about inlining into multiple branches of case
                         -- e.g. let x = <non-value>
@@ -1306,7 +1306,7 @@ postInlineUnconditionally env top_lvl bndr occ_info rhs
                         -- the uses in C1, C2 are not 'interesting'
                         -- An example that gets worse if you add int_cxt here is 'clausify'
 
-                (isCheapUnfolding unfolding && int_cxt))
+                (isCheapUnfolding unfolding && int_cxt == IsInteresting))
                         -- isCheap => acceptable work duplication; in_lam may be true
                         -- int_cxt to prevent us inlining inside a lambda without some
                         -- good reason.  See the notes on int_cxt in preInlineUnconditionally
@@ -2251,7 +2251,10 @@ mkCase3 _dflags scrut bndr alts_ty alts
 -- InIds, so it's crucial that isExitJoinId is only called on freshly
 -- occ-analysed code. It's not a generic function you can call anywhere.
 isExitJoinId :: Var -> Bool
-isExitJoinId id = isJoinId id && isOneOcc (idOccInfo id) && occ_in_lam (idOccInfo id)
+isExitJoinId id
+  = isJoinId id
+  && isOneOcc (idOccInfo id)
+  && occ_in_lam (idOccInfo id) == IsInsideLam
 
 {-
 Note [Dead binders]
