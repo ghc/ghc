@@ -34,7 +34,9 @@
 
   * The argument to `TExpQ` can now be levity polymorphic.
 
-## 2.16.0.0 *TBA*
+## 2.16.0.0 *Jan 2020*
+
+  * Bundled with GHC 8.10.1
 
   * Add support for tuple sections. (#15843) The type signatures of `TupE` and
     `UnboxedTupE` have changed from `[Exp] -> Exp` to `[Maybe Exp] -> Exp`.
@@ -58,6 +60,8 @@
 
 ## 2.15.0.0 *May 2019*
 
+  * Bundled with GHC 8.8.1
+
   * In `Language.Haskell.TH.Syntax`, `DataInstD`, `NewTypeInstD`, `TySynEqn`,
     and `RuleP` now all have a `Maybe [TyVarBndr]` argument, which contains a
     list of quantified type variables if an explicit `forall` is present, and
@@ -79,6 +83,8 @@
   * `addForeignFilePath` now support assembler sources (#16180).
 
 ## 2.14.0.0 *September 2018*
+
+  * Bundled with GHC 8.6.1
 
   * Introduce an `addForeignFilePath` function, as well as a corresponding
     `qAddForeignFile` class method to `Quasi`. Unlike `addForeignFile`, which
