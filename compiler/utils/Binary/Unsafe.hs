@@ -98,7 +98,7 @@ runBuffer :: Int -> Put () -> IO BinData
 runBuffer initialSize (Put m) = do
   bin <- runReaderT (m >> ask) =<< allocate initialSize
   off <- readFastMutInt (put_offset bin)
-  BinData (off + 1) <$> readIORef (put_arr bin)
+  BinData off <$> readIORef (put_arr bin)
 
 runPutIO :: Put () -> IO BinData
 runPutIO = runBuffer (1024 * 1024)
@@ -127,16 +127,13 @@ putPrim :: Int -> (Ptr Word8 -> IO ()) -> Put ()
 putPrim n f = do
   ix <- putOffset
   sz <- putSize
-  when (ix + n >= sz) reallocate
+  when (ix + n > sz) reallocate
   arr <- putArr
-  go ix arr
-  where
-    go ix arr =
-      Put $ do
-        ixr <- put_offset <$> ask
-        liftIO $ do
-          withForeignPtr arr $ \op -> f (op `plusPtr` ix)
-          writeFastMutInt ixr (ix + n)
+  Put $ do
+    ixr <- put_offset <$> ask
+    liftIO $ do
+      withForeignPtr arr $ \op -> f (op `plusPtr` ix)
+      writeFastMutInt ixr (ix + n)
 
 ioP :: IO a -> Put a
 ioP m = Put (liftIO m)
