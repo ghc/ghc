@@ -638,6 +638,12 @@ release-x86_64-linux-deb8:
   variables:
     TEST_ENV: "x86_64-linux-deb8"
     BIN_DIST_PREP_TAR_COMP: "ghc-x86_64-deb8-linux.tar.xz"
+    # Debian 8's Sphinx is too old to support the table directive's :widths:
+    # option: https://sourceforge.net/p/docutils/patches/120/
+    BUILD_SPHINX_HTML: "NO"
+    BUILD_SPHINX_INFO: "NO"
+    BUILD_SPHINX_PDF: "NO"
+    BUILD_SPHINX_MAN: "NO"
   only:
     - tags
   cache:
