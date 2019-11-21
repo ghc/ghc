@@ -286,6 +286,13 @@ Template Haskell
 Build system
 ~~~~~~~~~~~~
 
+- Countless bug fixes in the new Hadrian build system
+
+- Hadrian now supports a simple key-value configuration language, eliminating
+  the need for users to use Haskell to define build configuration. This should
+  simplify life for packagers and users alike. See :ghc-ticket:`16769` and the
+  documentation in ``hadrian/doc/user-settings.md``.
+
 Included libraries
 ------------------
 
