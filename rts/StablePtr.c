@@ -191,9 +191,10 @@ enlargeStablePtrTable(void)
 
     /* When using the threaded RTS, the update of stable_ptr_table is assumed to
      * be atomic, so that another thread simultaneously dereferencing a stable
-     * pointer will always read a valid address.
+     * pointer will always read a valid address. Release ordering to ensure
+     * that the new table is visible to others.
      */
-    stable_ptr_table = new_stable_ptr_table;
+    RELEASE_STORE(&stable_ptr_table, new_stable_ptr_table);
 
     initSpEntryFreeList(stable_ptr_table + old_SPT_size, old_SPT_size, NULL);
 }
