@@ -163,7 +163,7 @@ lint-submods-branch:
     - lint
   script:
     - |
-      grep TBA libraries/*/changelog.md && (
+      grep -v TBA libraries/*/changelog.md || (
           echo "Error: Found \"TBA\"s in changelogs."
           exit 1
       )
