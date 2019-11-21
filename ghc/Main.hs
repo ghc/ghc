@@ -68,7 +68,8 @@ import LoadIface           ( loadUserInterface )
 import Module              ( mkModuleName )
 import Finder              ( findImportedModule, cannotFindModule )
 import TcRnMonad           ( initIfaceCheck )
-import Binary              ( openBinMem, put_ )
+import Binary              ( put )
+import Binary.Unsafe       ( runBuffer )
 import BinFingerprint      ( fingerprintBinMem )
 
 -- Standard Haskell libraries
@@ -920,12 +921,12 @@ abiHash strs = do
   let get_iface modl = loadUserInterface False (text "abiHash") modl
   ifaces <- initIfaceCheck (text "abiHash") hsc_env $ mapM get_iface mods
 
-  bh <- openBinMem (3*1024) -- just less than a block
-  put_ bh hiVersion
+  bd <- runBuffer (3*1024) $ do -- just less than a block
+    put hiVersion
     -- package hashes change when the compiler version changes (for now)
     -- see #5328
-  mapM_ (put_ bh . mi_mod_hash . mi_final_exts) ifaces
-  f <- fingerprintBinMem bh
+    mapM_ (put . mi_mod_hash . mi_final_exts) ifaces
+  f <- fingerprintBinMem bd
 
   putStrLn (showPpr dflags f)
 

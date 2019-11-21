@@ -75,7 +75,8 @@ Library
                    ghc-boot   == @ProjectVersionMunged@,
                    ghc-boot-th == @ProjectVersionMunged@,
                    ghc-heap   == @ProjectVersionMunged@,
-                   ghci == @ProjectVersionMunged@
+                   ghci == @ProjectVersionMunged@,
+                   mtl        >= 2.0 && < 3.0
 
     if os(windows)
         Build-Depends: Win32  >= 2.3 && < 2.7
@@ -545,6 +546,8 @@ Library
         Unify
         Bag
         Binary
+        Binary.Internal
+        Binary.Unsafe
         BooleanFormula
         BufWrite
         Digraph

@@ -1122,7 +1122,7 @@ renameFreeHoles fhs insts =
         | otherwise                           = emptyUniqDSet
 
 instance Binary ModIface where
-   put_ bh (ModIface {
+   put (ModIface {
                  mi_module    = mod,
                  mi_sig_of    = sig_of,
                  mi_hsc_src   = hsc_src,
@@ -1156,70 +1156,70 @@ instance Binary ModIface where
                    mi_exp_hash = exp_hash,
                    mi_orphan_hash = orphan_hash
                  }}) = do
-        put_ bh mod
-        put_ bh sig_of
-        put_ bh hsc_src
-        put_ bh iface_hash
-        put_ bh mod_hash
-        put_ bh flag_hash
-        put_ bh opt_hash
-        put_ bh hpc_hash
-        put_ bh plugin_hash
-        put_ bh orphan
-        put_ bh hasFamInsts
-        lazyPut bh deps
-        lazyPut bh usages
-        put_ bh exports
-        put_ bh exp_hash
-        put_ bh used_th
-        put_ bh fixities
-        lazyPut bh warns
-        lazyPut bh anns
-        put_ bh decls
-        put_ bh insts
-        put_ bh fam_insts
-        lazyPut bh rules
-        put_ bh orphan_hash
-        put_ bh hpc_info
-        put_ bh trust
-        put_ bh trust_pkg
-        put_ bh complete_sigs
-        lazyPut bh doc_hdr
-        lazyPut bh decl_docs
-        lazyPut bh arg_docs
+        put mod
+        put sig_of
+        put hsc_src
+        put iface_hash
+        put mod_hash
+        put flag_hash
+        put opt_hash
+        put hpc_hash
+        put plugin_hash
+        put orphan
+        put hasFamInsts
+        lazyPut deps
+        lazyPut usages
+        put exports
+        put exp_hash
+        put used_th
+        put fixities
+        lazyPut warns
+        lazyPut anns
+        put decls
+        put insts
+        put fam_insts
+        lazyPut rules
+        put orphan_hash
+        put hpc_info
+        put trust
+        put trust_pkg
+        put complete_sigs
+        lazyPut doc_hdr
+        lazyPut decl_docs
+        lazyPut arg_docs
 
-   get bh = do
-        mod         <- get bh
-        sig_of      <- get bh
-        hsc_src     <- get bh
-        iface_hash  <- get bh
-        mod_hash    <- get bh
-        flag_hash   <- get bh
-        opt_hash    <- get bh
-        hpc_hash    <- get bh
-        plugin_hash <- get bh
-        orphan      <- get bh
-        hasFamInsts <- get bh
-        deps        <- lazyGet bh
-        usages      <- {-# SCC "bin_usages" #-} lazyGet bh
-        exports     <- {-# SCC "bin_exports" #-} get bh
-        exp_hash    <- get bh
-        used_th     <- get bh
-        fixities    <- {-# SCC "bin_fixities" #-} get bh
-        warns       <- {-# SCC "bin_warns" #-} lazyGet bh
-        anns        <- {-# SCC "bin_anns" #-} lazyGet bh
-        decls       <- {-# SCC "bin_tycldecls" #-} get bh
-        insts       <- {-# SCC "bin_insts" #-} get bh
-        fam_insts   <- {-# SCC "bin_fam_insts" #-} get bh
-        rules       <- {-# SCC "bin_rules" #-} lazyGet bh
-        orphan_hash <- get bh
-        hpc_info    <- get bh
-        trust       <- get bh
-        trust_pkg   <- get bh
-        complete_sigs <- get bh
-        doc_hdr     <- lazyGet bh
-        decl_docs   <- lazyGet bh
-        arg_docs    <- lazyGet bh
+   get = do
+        mod         <- get
+        sig_of      <- get
+        hsc_src     <- get
+        iface_hash  <- get
+        mod_hash    <- get
+        flag_hash   <- get
+        opt_hash    <- get
+        hpc_hash    <- get
+        plugin_hash <- get
+        orphan      <- get
+        hasFamInsts <- get
+        deps        <- lazyGet
+        usages      <- {-# SCC "bin_usages" #-} lazyGet
+        exports     <- {-# SCC "bin_exports" #-} get
+        exp_hash    <- get
+        used_th     <- get
+        fixities    <- {-# SCC "bin_fixities" #-} get
+        warns       <- {-# SCC "bin_warns" #-} lazyGet
+        anns        <- {-# SCC "bin_anns" #-} lazyGet
+        decls       <- {-# SCC "bin_tycldecls" #-} get
+        insts       <- {-# SCC "bin_insts" #-} get
+        fam_insts   <- {-# SCC "bin_fam_insts" #-} get
+        rules       <- {-# SCC "bin_rules" #-} lazyGet
+        orphan_hash <- get
+        hpc_info    <- get
+        trust       <- get
+        trust_pkg   <- get
+        complete_sigs <- get
+        doc_hdr     <- lazyGet
+        decl_docs   <- lazyGet
+        arg_docs    <- lazyGet
         return (ModIface {
                  mi_module      = mod,
                  mi_sig_of      = sig_of,
@@ -2363,21 +2363,21 @@ data Warnings
   deriving( Eq )
 
 instance Binary Warnings where
-    put_ bh NoWarnings     = putByte bh 0
-    put_ bh (WarnAll t) = do
-            putByte bh 1
-            put_ bh t
-    put_ bh (WarnSome ts) = do
-            putByte bh 2
-            put_ bh ts
+    put NoWarnings    = putByte 0
+    put (WarnAll t)   = do
+        putByte 1
+        put t
+    put (WarnSome ts) = do
+            putByte 2
+            put ts
 
-    get bh = do
-            h <- getByte bh
+    get = do
+            h <- getByte
             case h of
               0 -> return NoWarnings
-              1 -> do aa <- get bh
+              1 -> do aa <- get
                       return (WarnAll aa)
-              _ -> do aa <- get bh
+              _ -> do aa <- get
                       return (WarnSome aa)
 
 -- | Constructs the cache for the 'mi_warn_fn' field of a 'ModIface'
@@ -2493,19 +2493,19 @@ data Dependencies
         -- See 'TcRnTypes.ImportAvails' for details on dependencies.
 
 instance Binary Dependencies where
-    put_ bh deps = do put_ bh (dep_mods deps)
-                      put_ bh (dep_pkgs deps)
-                      put_ bh (dep_orphs deps)
-                      put_ bh (dep_finsts deps)
-                      put_ bh (dep_plgins deps)
+    put deps = do put (dep_mods deps)
+                  put (dep_pkgs deps)
+                  put (dep_orphs deps)
+                  put (dep_finsts deps)
+                  put (dep_plgins deps)
 
-    get bh = do ms <- get bh
-                ps <- get bh
-                os <- get bh
-                fis <- get bh
-                pl <- get bh
-                return (Deps { dep_mods = ms, dep_pkgs = ps, dep_orphs = os,
-                               dep_finsts = fis, dep_plgins = pl })
+    get = do ms  <- get
+             ps  <- get
+             os  <- get
+             fis <- get
+             pl  <- get
+             return (Deps { dep_mods = ms, dep_pkgs = ps, dep_orphs = os,
+                            dep_finsts = fis, dep_plgins = pl })
 
 noDependencies :: Dependencies
 noDependencies = Deps [] [] [] [] []
@@ -2576,53 +2576,53 @@ data Usage
         -- depend on their export lists
 
 instance Binary Usage where
-    put_ bh usg@UsagePackageModule{} = do
-        putByte bh 0
-        put_ bh (usg_mod usg)
-        put_ bh (usg_mod_hash usg)
-        put_ bh (usg_safe     usg)
+    put usg@UsagePackageModule{} = do
+        putByte 0
+        put (usg_mod usg)
+        put (usg_mod_hash usg)
+        put (usg_safe     usg)
 
-    put_ bh usg@UsageHomeModule{} = do
-        putByte bh 1
-        put_ bh (usg_mod_name usg)
-        put_ bh (usg_mod_hash usg)
-        put_ bh (usg_exports  usg)
-        put_ bh (usg_entities usg)
-        put_ bh (usg_safe     usg)
+    put usg@UsageHomeModule{} = do
+        putByte 1
+        put (usg_mod_name usg)
+        put (usg_mod_hash usg)
+        put (usg_exports  usg)
+        put (usg_entities usg)
+        put (usg_safe     usg)
 
-    put_ bh usg@UsageFile{} = do
-        putByte bh 2
-        put_ bh (usg_file_path usg)
-        put_ bh (usg_file_hash usg)
+    put usg@UsageFile{} = do
+        putByte 2
+        put (usg_file_path usg)
+        put (usg_file_hash usg)
 
-    put_ bh usg@UsageMergedRequirement{} = do
-        putByte bh 3
-        put_ bh (usg_mod      usg)
-        put_ bh (usg_mod_hash usg)
+    put usg@UsageMergedRequirement{} = do
+        putByte 3
+        put (usg_mod      usg)
+        put (usg_mod_hash usg)
 
-    get bh = do
-        h <- getByte bh
+    get = do
+        h <- getByte
         case h of
           0 -> do
-            nm    <- get bh
-            mod   <- get bh
-            safe  <- get bh
+            nm    <- get
+            mod   <- get
+            safe  <- get
             return UsagePackageModule { usg_mod = nm, usg_mod_hash = mod, usg_safe = safe }
           1 -> do
-            nm    <- get bh
-            mod   <- get bh
-            exps  <- get bh
-            ents  <- get bh
-            safe  <- get bh
+            nm    <- get
+            mod   <- get
+            exps  <- get
+            ents  <- get
+            safe  <- get
             return UsageHomeModule { usg_mod_name = nm, usg_mod_hash = mod,
                      usg_exports = exps, usg_entities = ents, usg_safe = safe }
           2 -> do
-            fp   <- get bh
-            hash <- get bh
+            fp   <- get
+            hash <- get
             return UsageFile { usg_file_path = fp, usg_file_hash = hash }
           3 -> do
-            mod <- get bh
-            hash <- get bh
+            mod <- get
+            hash <- get
             return UsageMergedRequirement { usg_mod = mod, usg_mod_hash = hash }
           i -> error ("Binary.get(Usage): " ++ show i)
 
@@ -3085,8 +3085,8 @@ instance Outputable IfaceTrustInfo where
     ppr (TrustInfo Sf_SafeInferred)  = text "safe-inferred"
 
 instance Binary IfaceTrustInfo where
-    put_ bh iftrust = putByte bh $ trustInfoToNum iftrust
-    get bh = getByte bh >>= (return . numToTrustInfo)
+    put iftrust = putByte $ trustInfoToNum iftrust
+    get = getByte >>= (return . numToTrustInfo)
 
 {-
 ************************************************************************

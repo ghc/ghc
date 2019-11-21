@@ -14,11 +14,12 @@ import GhcPrelude
 
 import Fingerprint
 import Binary
+import Binary.Unsafe (runBuffer)
 import Name
 import PlainPanic
 import Util
 
-fingerprintBinMem :: BinHandle -> IO Fingerprint
+fingerprintBinMem :: BinData -> IO Fingerprint
 fingerprintBinMem bh = withBinBuffer bh f
   where
     f bs =
@@ -29,21 +30,19 @@ fingerprintBinMem bh = withBinBuffer bh f
         in fp `seq` return fp
 
 computeFingerprint :: (Binary a)
-                   => (BinHandle -> Name -> IO ())
+                   => (Name -> Put ())
                    -> a
                    -> IO Fingerprint
 computeFingerprint put_nonbinding_name a = do
-    bh <- fmap set_user_data $ openBinMem (3*1024) -- just less than a block
-    put_ bh a
-    fp <- fingerprintBinMem bh
-    return fp
+  bd <- runBuffer (3 * 1024) (setUserData (put a)) -- just less than a block
+  fingerprintBinMem bd
   where
-    set_user_data bh =
-      setUserData bh $ newWriteState put_nonbinding_name putNameLiterally putFS
+    setUserData =
+      writeState put_nonbinding_name putNameLiterally putFS
 
 -- | Used when we want to fingerprint a structure without depending on the
 -- fingerprints of external Names that it refers to.
-putNameLiterally :: BinHandle -> Name -> IO ()
-putNameLiterally bh name = ASSERT( isExternalName name ) do
-    put_ bh $! nameModule name
-    put_ bh $! nameOccName name
+putNameLiterally :: Name -> Put ()
+putNameLiterally name = ASSERT( isExternalName name ) do
+    put $! nameModule name
+    put $! nameOccName name

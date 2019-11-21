@@ -248,15 +248,15 @@ pprBooleanFormulaNormal = go
 ----------------------------------------------------------------------
 
 instance Binary a => Binary (BooleanFormula a) where
-  put_ bh (Var x)    = putByte bh 0 >> put_ bh x
-  put_ bh (And xs)   = putByte bh 1 >> put_ bh xs
-  put_ bh (Or  xs)   = putByte bh 2 >> put_ bh xs
-  put_ bh (Parens x) = putByte bh 3 >> put_ bh x
+  put (Var x)    = putByte 0 >> put x
+  put (And xs)   = putByte 1 >> put xs
+  put (Or  xs)   = putByte 2 >> put xs
+  put (Parens x) = putByte 3 >> put x
 
-  get bh = do
-    h <- getByte bh
+  get = do
+    h <- getByte
     case h of
-      0 -> Var    <$> get bh
-      1 -> And    <$> get bh
-      2 -> Or     <$> get bh
-      _ -> Parens <$> get bh
+      0 -> Var    <$> get
+      1 -> And    <$> get
+      2 -> Or     <$> get
+      _ -> Parens <$> get

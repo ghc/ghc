@@ -1978,126 +1978,124 @@ out how deeply we can unpack x, or that we do not have to pass y.
 -}
 
 instance Binary StrDmd where
-  put_ bh HyperStr     = do putByte bh 0
-  put_ bh HeadStr      = do putByte bh 1
-  put_ bh (SCall s)    = do putByte bh 2
-                            put_ bh s
-  put_ bh (SProd sx)   = do putByte bh 3
-                            put_ bh sx
-  get bh = do
-         h <- getByte bh
+  put HyperStr     = do putByte 0
+  put HeadStr      = do putByte 1
+  put (SCall s)    = do putByte 2
+                        put s
+  put (SProd sx)   = do putByte 3
+                        put sx
+  get = do
+         h <- getByte
          case h of
            0 -> do return HyperStr
            1 -> do return HeadStr
-           2 -> do s  <- get bh
+           2 -> do s  <- get
                    return (SCall s)
-           _ -> do sx <- get bh
+           _ -> do sx <- get
                    return (SProd sx)
 
 instance Binary ArgStr where
-    put_ bh Lazy         = do
-            putByte bh 0
-    put_ bh (Str s)    = do
-            putByte bh 1
-            put_ bh s
+    put Lazy         = do
+        putByte 0
+    put (Str s)    = do
+        putByte 1
+        put s
 
-    get  bh = do
-            h <- getByte bh
+    get = do
+            h <- getByte
             case h of
               0 -> return Lazy
-              _ -> do s  <- get bh
+              _ -> do s  <- get
                       return $ Str s
 
 instance Binary Count where
-    put_ bh One  = do putByte bh 0
-    put_ bh Many = do putByte bh 1
+    put One  = do putByte 0
+    put Many = do putByte 1
 
-    get  bh = do h <- getByte bh
-                 case h of
-                   0 -> return One
-                   _ -> return Many
+    get = do h <- getByte
+             case h of
+               0 -> return One
+               _ -> return Many
 
 instance Binary ArgUse where
-    put_ bh Abs          = do
-            putByte bh 0
-    put_ bh (Use c u)    = do
-            putByte bh 1
-            put_ bh c
-            put_ bh u
+    put Abs       = putByte 0
+    put (Use c u) = do
+            putByte 1
+            put c
+            put u
 
-    get  bh = do
-            h <- getByte bh
+    get = do
+            h <- getByte
             case h of
               0 -> return Abs
-              _ -> do c  <- get bh
-                      u  <- get bh
+              _ -> do c  <- get
+                      u  <- get
                       return $ Use c u
 
 instance Binary UseDmd where
-    put_ bh Used         = do
-            putByte bh 0
-    put_ bh UHead        = do
-            putByte bh 1
-    put_ bh (UCall c u)    = do
-            putByte bh 2
-            put_ bh c
-            put_ bh u
-    put_ bh (UProd ux)   = do
-            putByte bh 3
-            put_ bh ux
+    put Used         = do
+        putByte 0
+    put UHead        = do
+        putByte 1
+    put (UCall c u)  = do
+        putByte 2
+        put c
+        put u
+    put (UProd ux)   = do
+        putByte 3
+        put ux
 
-    get  bh = do
-            h <- getByte bh
+    get = do
+            h <- getByte
             case h of
               0 -> return $ Used
               1 -> return $ UHead
-              2 -> do c <- get bh
-                      u <- get bh
+              2 -> do c <- get
+                      u <- get
                       return (UCall c u)
-              _ -> do ux <- get bh
+              _ -> do ux <- get
                       return (UProd ux)
 
 instance (Binary s, Binary u) => Binary (JointDmd s u) where
-    put_ bh (JD { sd = x, ud = y }) = do put_ bh x; put_ bh y
-    get  bh = do
-              x <- get bh
-              y <- get bh
+    put (JD { sd = x, ud = y }) = do put x; put y
+    get = do
+              x <- get
+              y <- get
               return $ JD { sd = x, ud = y }
 
 instance Binary StrictSig where
-    put_ bh (StrictSig aa) = do
-            put_ bh aa
-    get bh = do
-          aa <- get bh
+    put (StrictSig aa) = do
+          put aa
+    get = do
+          aa <- get
           return (StrictSig aa)
 
 instance Binary DmdType where
   -- Ignore DmdEnv when spitting out the DmdType
-  put_ bh (DmdType _ ds dr)
-       = do put_ bh ds
-            put_ bh dr
-  get bh
-      = do ds <- get bh
-           dr <- get bh
+  put (DmdType _ ds dr)
+       = do put ds
+            put dr
+  get = do ds <- get
+           dr <- get
            return (DmdType emptyDmdEnv ds dr)
 
 instance Binary DmdResult where
-  put_ bh (Dunno c)     = do { putByte bh 0; put_ bh c }
-  put_ bh Diverges      = putByte bh 1
+  put (Dunno c)     = do { putByte 0; put c }
+  put Diverges      = putByte 1
 
-  get bh = do { h <- getByte bh
-              ; case h of
-                  0 -> do { c <- get bh; return (Dunno c) }
-                  _ -> return Diverges }
+  get = do { h <- getByte
+           ; case h of
+               0 -> do { c <- get; return (Dunno c) }
+               _ -> return Diverges }
 
 instance Binary CPRResult where
-    put_ bh (RetSum n)   = do { putByte bh 0; put_ bh n }
-    put_ bh RetProd      = putByte bh 1
-    put_ bh NoCPR        = putByte bh 2
+    put (RetSum n)   = do { putByte 0; put n }
+    put RetProd      = putByte 1
+    put NoCPR        = putByte 2
 
-    get  bh = do
-            h <- getByte bh
+    get = do
+            h <- getByte
             case h of
-              0 -> do { n <- get bh; return (RetSum n) }
+              0 -> do { n <- get; return (RetSum n) }
               1 -> return RetProd
               _ -> return NoCPR

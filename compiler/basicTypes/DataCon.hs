@@ -828,24 +828,24 @@ instance Outputable StrictnessMark where
     ppr NotMarkedStrict = empty
 
 instance Binary SrcStrictness where
-    put_ bh SrcLazy     = putByte bh 0
-    put_ bh SrcStrict   = putByte bh 1
-    put_ bh NoSrcStrict = putByte bh 2
+    put SrcLazy     = putByte 0
+    put SrcStrict   = putByte 1
+    put NoSrcStrict = putByte 2
 
-    get bh =
-      do h <- getByte bh
+    get =
+      do h <- getByte
          case h of
            0 -> return SrcLazy
            1 -> return SrcStrict
            _ -> return NoSrcStrict
 
 instance Binary SrcUnpackedness where
-    put_ bh SrcNoUnpack = putByte bh 0
-    put_ bh SrcUnpack   = putByte bh 1
-    put_ bh NoSrcUnpack = putByte bh 2
+    put SrcNoUnpack = putByte 0
+    put SrcUnpack   = putByte 1
+    put NoSrcUnpack = putByte 2
 
-    get bh =
-      do h <- getByte bh
+    get =
+      do h <- getByte
          case h of
            0 -> return SrcNoUnpack
            1 -> return SrcUnpack
