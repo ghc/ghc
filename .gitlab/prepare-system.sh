@@ -14,6 +14,18 @@ if [[ -z ${BUILD_SPHINX_PDF:-} ]]; then BUILD_SPHINX_PDF=YES; fi
 if [[ -z ${INTEGER_LIBRARY:-} ]]; then INTEGER_LIBRARY=integer-gmp; fi
 if [[ -z ${BUILD_FLAVOUR:-} ]]; then BUILD_FLAVOUR=perf; fi
 
+if [[ -z ${XZ:-} ]]; then
+  if which pxz; then
+    XZ=pxz
+  elif which xz; then
+    XZ=xz
+  else
+    echo "error: pxz nor xz were found"
+    exit 1
+  fi
+fi
+
+
 cat > mk/build.mk <<EOF
 V=1
 HADDOCK_DOCS=YES
@@ -23,7 +35,7 @@ BUILD_SPHINX_HTML=$BUILD_SPHINX_HTML
 BUILD_SPHINX_PDF=$BUILD_SPHINX_PDF
 BeConservative=YES
 INTEGER_LIBRARY=$INTEGER_LIBRARY
-XZ_CMD=pxz
+XZ_CMD=$XZ
 EOF
 
 cat <<EOF >> mk/build.mk
