@@ -147,6 +147,9 @@ data Natural = NatS#                 GmpLimb# -- ^ in @[0, maxBound::Word]@
                       , Ord -- ^ @since 4.8.0.0
                       )
 
+zero, one :: Natural
+zero = NatS# 0##
+one  = NatS# 1##
 
 -- | Test whether all internal invariants are satisfied by 'Natural' value
 --
@@ -162,12 +165,12 @@ isValidNatural (NatJ# bn) = isTrue# (isValidBigNat# bn)
                             && isTrue# (sizeofBigNat# bn ># 1#)
 
 signumNatural :: Natural -> Natural
-signumNatural (NatS# 0##) = NatS# 0##
-signumNatural _           = NatS# 1##
+signumNatural (NatS# 0##) = zero
+signumNatural _           = one
 -- {-# CONSTANT_FOLDED signumNatural #-}
 
 negateNatural :: Natural -> Natural
-negateNatural (NatS# 0##) = NatS# 0##
+negateNatural (NatS# 0##) = zero
 negateNatural _           = underflowError
 -- {-# CONSTANT_FOLDED negateNatural #-}
 
@@ -183,8 +186,8 @@ naturalFromInteger _        = underflowError
 gcdNatural :: Natural -> Natural -> Natural
 gcdNatural (NatS# 0##) y       = y
 gcdNatural x       (NatS# 0##) = x
-gcdNatural (NatS# 1##) _       = NatS# 1##
-gcdNatural _       (NatS# 1##) = NatS# 1##
+gcdNatural (NatS# 1##) _       = one
+gcdNatural _     (NatS# 1##)   = one
 gcdNatural (NatJ# x) (NatJ# y) = bigNatToNatural (gcdBigNat x y)
 gcdNatural (NatJ# x) (NatS# y) = NatS# (gcdBigNatWord x y)
 gcdNatural (NatS# x) (NatJ# y) = NatS# (gcdBigNatWord y x)
@@ -192,18 +195,20 @@ gcdNatural (NatS# x) (NatS# y) = NatS# (gcdWord x y)
 
 -- | Compute least common multiple.
 lcmNatural :: Natural -> Natural -> Natural
-lcmNatural (NatS# 0##) _ = NatS# 0##
-lcmNatural _ (NatS# 0##) = NatS# 0##
-lcmNatural (NatS# 1##) y = y
-lcmNatural x (NatS# 1##) = x
-lcmNatural x y           = (x `quotNatural` (gcdNatural x y)) `timesNatural` y
+-- Make sure we are strict in all arguments (#17499)
+lcmNatural (NatS# 0##) !_ = zero
+lcmNatural _ (NatS# 0##)  = zero
+lcmNatural (NatS# 1##) y  = y
+lcmNatural x (NatS# 1##)  = x
+lcmNatural x y            = (x `quotNatural` (gcdNatural x y)) `timesNatural` y
 
 ----------------------------------------------------------------------------
 
 quotRemNatural :: Natural -> Natural -> (Natural, Natural)
-quotRemNatural _ (NatS# 0##) = divZeroError
-quotRemNatural n (NatS# 1##) = (n,NatS# 0##)
-quotRemNatural n@(NatS# _) (NatJ# _) = (NatS# 0##, n)
+-- Make sure we are strict in all arguments (#17499)
+quotRemNatural !_ (NatS# 0##) = divZeroError
+quotRemNatural n  (NatS# 1##) = (n,zero)
+quotRemNatural n@(NatS# _) (NatJ# _) = (zero, n)
 quotRemNatural (NatS# n) (NatS# d) = case quotRemWord# n d of
     (# q, r #) -> (NatS# q, NatS# r)
 quotRemNatural (NatJ# n) (NatS# d) = case quotRemBigNatWord n d of
@@ -213,21 +218,23 @@ quotRemNatural (NatJ# n) (NatJ# d) = case quotRemBigNat n d of
 -- {-# CONSTANT_FOLDED quotRemNatural #-}
 
 quotNatural :: Natural -> Natural -> Natural
-quotNatural _       (NatS# 0##) = divZeroError
-quotNatural n       (NatS# 1##) = n
-quotNatural (NatS# _) (NatJ# _) = NatS# 0##
-quotNatural (NatS# n) (NatS# d) = NatS# (quotWord# n d)
-quotNatural (NatJ# n) (NatS# d) = bigNatToNatural (quotBigNatWord n d)
-quotNatural (NatJ# n) (NatJ# d) = bigNatToNatural (quotBigNat n d)
+-- Make sure we are strict in all arguments (#17499)
+quotNatural !_        (NatS# 0##) = divZeroError
+quotNatural n         (NatS# 1##) = n
+quotNatural (NatS# _) (NatJ# _)   = zero
+quotNatural (NatS# n) (NatS# d)   = NatS# (quotWord# n d)
+quotNatural (NatJ# n) (NatS# d)   = bigNatToNatural (quotBigNatWord n d)
+quotNatural (NatJ# n) (NatJ# d)   = bigNatToNatural (quotBigNat n d)
 -- {-# CONSTANT_FOLDED quotNatural #-}
 
 remNatural :: Natural -> Natural -> Natural
-remNatural _         (NatS# 0##) = divZeroError
-remNatural _         (NatS# 1##) = NatS# 0##
-remNatural n@(NatS# _) (NatJ# _) = n
-remNatural   (NatS# n) (NatS# d) = NatS# (remWord# n d)
-remNatural   (NatJ# n) (NatS# d) = NatS# (remBigNatWord n d)
-remNatural   (NatJ# n) (NatJ# d) = bigNatToNatural (remBigNat n d)
+-- Make sure we are strict in all arguments (#17499)
+remNatural !_          (NatS# 0##) = divZeroError
+remNatural _           (NatS# 1##) = zero
+remNatural n@(NatS# _) (NatJ# _)   = n
+remNatural   (NatS# n) (NatS# d)   = NatS# (remWord# n d)
+remNatural   (NatJ# n) (NatS# d)   = NatS# (remBigNatWord n d)
+remNatural   (NatJ# n) (NatJ# d)   = bigNatToNatural (remBigNat n d)
 -- {-# CONSTANT_FOLDED remNatural #-}
 
 -- | @since 4.X.0.0
@@ -278,7 +285,7 @@ popCountNatural (NatJ# bn) = I# (popCountBigNat bn)
 
 shiftLNatural :: Natural -> Int -> Natural
 shiftLNatural n           (I# 0#) = n
-shiftLNatural (NatS# 0##) _       = NatS# 0##
+shiftLNatural (NatS# 0##) _       = zero
 shiftLNatural (NatS# 1##) (I# i#) = bitNatural i#
 shiftLNatural (NatS# w) (I# i#)
     = bigNatToNatural (shiftLBigNat (wordToBigNat w) i#)
@@ -289,7 +296,7 @@ shiftLNatural (NatJ# bn) (I# i#)
 shiftRNatural :: Natural -> Int -> Natural
 shiftRNatural n          (I# 0#) = n
 shiftRNatural (NatS# w)  (I# i#)
-      | isTrue# (i# >=# WORD_SIZE_IN_BITS#) = NatS# 0##
+      | isTrue# (i# >=# WORD_SIZE_IN_BITS#) = zero
       | True = NatS# (w `uncheckedShiftRL#` i#)
 shiftRNatural (NatJ# bn) (I# i#) = bigNatToNatural (shiftRBigNat bn i#)
 -- {-# CONSTANT_FOLDED shiftRNatural #-}
@@ -311,8 +318,9 @@ plusNatural (NatJ# x) (NatJ# y) = NatJ# (plusBigNat     x y)
 
 -- | 'Natural' multiplication
 timesNatural :: Natural -> Natural -> Natural
-timesNatural _         (NatS# 0##) = NatS# 0##
-timesNatural (NatS# 0##) _         = NatS# 0##
+-- Make sure we are strict in all arguments (#17499)
+timesNatural !_        (NatS# 0##) = zero
+timesNatural (NatS# 0##) _         = zero
 timesNatural x         (NatS# 1##) = x
 timesNatural (NatS# 1##) y         = y
 timesNatural (NatS# x) (NatS# y) = case timesWord2# x y of
@@ -342,7 +350,8 @@ minusNatural (NatJ# x) (NatJ# y)
 --
 -- @since 4.8.0.0
 minusNaturalMaybe :: Natural -> Natural -> Maybe Natural
-minusNaturalMaybe x         (NatS# 0##) = Just x
+-- Make sure we are strict in all arguments (#17499)
+minusNaturalMaybe !x        (NatS# 0##) = Just x
 minusNaturalMaybe (NatS# x) (NatS# y) = case subWordC# x y of
     (# l, 0# #) -> Just (NatS# l)
     _           -> Nothing
@@ -575,11 +584,12 @@ naturalToWordMaybe (Natural i)
 -- @since 4.8.0.0
 powModNatural :: Natural -> Natural -> Natural -> Natural
 #if defined(MIN_VERSION_integer_gmp)
-powModNatural _           _           (NatS# 0##) = divZeroError
-powModNatural _           _           (NatS# 1##) = NatS# 0##
-powModNatural _           (NatS# 0##) _           = NatS# 1##
-powModNatural (NatS# 0##) _           _           = NatS# 0##
-powModNatural (NatS# 1##) _           _           = NatS# 1##
+-- Make sure we are strict in all arguments (#17499)
+powModNatural !_          !_          (NatS# 0##) = divZeroError
+powModNatural _           _           (NatS# 1##) = zero
+powModNatural _           (NatS# 0##) _           = one
+powModNatural (NatS# 0##) _           _           = zero
+powModNatural (NatS# 1##) _           _           = one
 powModNatural (NatS# b)   (NatS# e)   (NatS# m)   = NatS# (powModWord b e m)
 powModNatural b           e           (NatS# m)
   = NatS# (powModBigNatWord (naturalToBigNat b) (naturalToBigNat e) m)
