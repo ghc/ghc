@@ -241,19 +241,19 @@ pprIdDetails other     = brackets (pp other)
 -- too big.
 data IdInfo
   = IdInfo {
-        ruleInfo        :: RuleInfo,
+        ruleInfo        :: !RuleInfo,
         -- ^ Specialisations of the 'Id's function which exist.
         -- See Note [Specialisations and RULES in IdInfo]
-        unfoldingInfo   :: Unfolding,
+        unfoldingInfo   :: !Unfolding,
         -- ^ The 'Id's unfolding
-        inlinePragInfo  :: InlinePragma,
+        inlinePragInfo  :: !InlinePragma,
         -- ^ Any inline pragma atached to the 'Id'
-        occInfo         :: OccInfo,
+        occInfo         :: !OccInfo,
         -- ^ How the 'Id' occurs in the program
-        strictnessInfo  :: StrictSig,
+        strictnessInfo  :: !StrictSig,
         -- ^ A strictness signature. Digests how a function uses its arguments
         -- if applied to at least 'arityInfo' arguments.
-        demandInfo      :: Demand,
+        demandInfo      :: !Demand,
         -- ^ ID demand information
         bitfield        :: {-# UNPACK #-} !BitField
         -- ^ Bitfield packs CafInfo, OneShotInfo, arity info, LevityInfo, and
