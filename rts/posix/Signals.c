@@ -144,7 +144,7 @@ setIOManagerWakeupFd (int fd)
 {
     // only called when THREADED_RTS, but unconditionally
     // compiled here because GHC.Event.Control depends on it.
-    RELAXED_STORE(&io_manager_wakeup_fd, fd);
+    SEQ_CST_STORE(&io_manager_wakeup_fd, fd);
 }
 
 /* -----------------------------------------------------------------------------
@@ -154,7 +154,7 @@ void
 ioManagerWakeup (void)
 {
     int r;
-    const int wakeup_fd = RELAXED_LOAD(&io_manager_wakeup_fd);
+    const int wakeup_fd = SEQ_CST_LOAD(&io_manager_wakeup_fd);
     // Wake up the IO Manager thread by sending a byte down its pipe
     if (wakeup_fd >= 0) {
 #if defined(HAVE_EVENTFD)
@@ -223,7 +223,7 @@ ioManagerStart (void)
 {
     // Make sure the IO manager thread is running
     Capability *cap;
-    if (RELAXED_LOAD(&timer_manager_control_wr_fd) < 0 || RELAXED_LOAD(&io_manager_wakeup_fd) < 0) {
+    if (SEQ_CST_LOAD(&timer_manager_control_wr_fd) < 0 || SEQ_CST_LOAD(&io_manager_wakeup_fd) < 0) {
         cap = rts_lock();
         ioManagerStartCap(&cap);
         rts_unlock(cap);
