@@ -45,5 +45,3 @@ if [ ! -e $toolchain/bin/alex ]; then
     cp $APPDATA/cabal/bin/alex $toolchain/bin
 fi
 
-# Install new process to mitigate #17480.
-cabal install libraries/process
