@@ -418,11 +418,12 @@ simple_bind_pair env@(SOE { soe_inl = inl_env, soe_subst = subst })
 
         -- Unconditionally safe to inline
     safe_to_inline :: OccInfo -> Bool
-    safe_to_inline (IAmALoopBreaker {}) = False
-    safe_to_inline IAmDead              = True
-    safe_to_inline occ@(OneOcc {})      =  not (occ_in_lam occ)
-                                        && occ_one_br occ
-    safe_to_inline (ManyOccs {})        = False
+    safe_to_inline IAmALoopBreaker{}                  = False
+    safe_to_inline IAmDead                            = True
+    safe_to_inline OneOcc{ occ_in_lam = NotInsideLam
+                         , occ_one_br = InOneBranch } = True
+    safe_to_inline OneOcc{}                           = False
+    safe_to_inline ManyOccs{}                         = False
 
 -------------------
 simple_out_bind :: TopLevelFlag
