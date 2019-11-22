@@ -919,7 +919,7 @@ mkInferredPolyId insoluble qtvs inferred_theta poly_name mb_sig_inst mono_ty
          -- do this check; otherwise (#14000) we may report an ambiguity
          -- error for a rather bogus type.
 
-       ; return (mkLocalIdOrCoVar poly_name inferred_poly_ty) }
+       ; return (mkLocalId poly_name inferred_poly_ty) }
 
 
 chooseInferredQuantifiers :: TcThetaType   -- inferred

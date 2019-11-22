@@ -1720,8 +1720,8 @@ spec_one env fn arg_bndrs body (call_pat@(qvars, pats), rule_number)
 
               spec_join_arity | isJoinId fn = Just (length spec_lam_args)
                               | otherwise   = Nothing
-              spec_id    = mkLocalIdOrCoVar spec_name
-                                            (mkLamTypes spec_lam_args body_ty)
+              spec_id    = mkLocalId spec_name
+                                     (mkLamTypes spec_lam_args body_ty)
                              -- See Note [Transfer strictness]
                              `setIdStrictness` spec_str
                              `setIdArity` count isId spec_lam_args

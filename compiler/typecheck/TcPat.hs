@@ -211,7 +211,8 @@ tcPatBndr penv@(PE { pe_ctxt = LetPat { pc_lvl    = bind_lvl
 tcPatBndr _ bndr_name pat_ty
   = do { pat_ty <- expTypeToType pat_ty
        ; traceTc "tcPatBndr(not let)" (ppr bndr_name $$ ppr pat_ty)
-       ; return (idHsWrapper, mkLocalId bndr_name pat_ty) }
+       ; return (idHsWrapper, mkLocalIdOrCoVar bndr_name pat_ty) }
+               -- We should not have "OrCoVar" here, this is a bug (#17545)
                -- Whether or not there is a sig is irrelevant,
                -- as this is local
 
