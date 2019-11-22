@@ -1321,6 +1321,8 @@ tcIfaceExpr (IfaceCase scrut case_bndr alts)  = do
     let
         scrut_ty   = exprType scrut'
         case_bndr' = mkLocalIdOrCoVar case_bndr_name scrut_ty
+     -- "OrCoVar" since a coercion can be a scrutinee with -fdefer-type-errors
+     -- (e.g. see test T15695). Ticket #17291 covers fixing this problem.
         tc_app     = splitTyConApp scrut_ty
                 -- NB: Won't always succeed (polymorphic case)
                 --     but won't be demanded in those cases
@@ -1337,7 +1339,7 @@ tcIfaceExpr (IfaceLet (IfaceNonRec (IfLetBndr fs ty info ji) rhs) body)
         ; ty'     <- tcIfaceType ty
         ; id_info <- tcIdInfo False {- Don't ignore prags; we are inside one! -}
                               NotTopLevel name ty' info
-        ; let id = mkLocalIdOrCoVarWithInfo name ty' id_info
+        ; let id = mkLocalIdWithInfo name ty' id_info
                      `asJoinId_maybe` tcJoinInfo ji
         ; rhs' <- tcIfaceExpr rhs
         ; body' <- extendIfaceIdEnv [id] (tcIfaceExpr body)
@@ -1353,7 +1355,7 @@ tcIfaceExpr (IfaceLet (IfaceRec pairs) body)
    tc_rec_bndr (IfLetBndr fs ty _ ji)
      = do { name <- newIfaceName (mkVarOccFS fs)
           ; ty'  <- tcIfaceType ty
-          ; return (mkLocalIdOrCoVar name ty' `asJoinId_maybe` tcJoinInfo ji) }
+          ; return (mkLocalId name ty' `asJoinId_maybe` tcJoinInfo ji) }
    tc_pair (IfLetBndr _ _ info _, rhs) id
      = do { rhs' <- tcIfaceExpr rhs
           ; id_info <- tcIdInfo False {- Don't ignore prags; we are inside one! -}
@@ -1733,6 +1735,7 @@ bindIfaceId (fs, ty) thing_inside
   = do  { name <- newIfaceName (mkVarOccFS fs)
         ; ty' <- tcIfaceType ty
         ; let id = mkLocalIdOrCoVar name ty'
+          -- We should not have "OrCoVar" here, this is a bug (#17545)
         ; extendIfaceIdEnv [id] (thing_inside id) }
 
 bindIfaceIds :: [IfaceIdBndr] -> ([Id] -> IfL a) -> IfL a
