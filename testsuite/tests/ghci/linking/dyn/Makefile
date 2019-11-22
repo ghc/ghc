@@ -94,7 +94,7 @@ compile_libAS_impl_msvc:
 
 .PHONY: T1407
 T1407:
-	cat T1407.script | LD_LIBRARY_PATH=. "$(TEST_HC)" $(TEST_HC_OPTS_INTERACTIVE) -L"T1407dir"
+	cat T1407.script | LD_LIBRARY_PATH=".:$(LD_LIBRARY_PATH)" "$(TEST_HC)" $(TEST_HC_OPTS_INTERACTIVE) -L"T1407dir"
 
 .PHONY: T3242
 	echo ":q" | '$(TEST_HC)' $(TEST_HC_OPTS_INTERACTIVE) -lm
