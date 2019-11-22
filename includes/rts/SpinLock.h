@@ -23,34 +23,33 @@
 
 #if defined(THREADED_RTS)
 
-#if defined(PROF_SPIN)
 typedef struct SpinLock_
 {
     StgWord   lock;
+#if defined(PROF_SPIN)
     StgWord64 spin;  // incremented every time we spin in ACQUIRE_SPIN_LOCK
     StgWord64 yield; // incremented every time we yield in ACQUIRE_SPIN_LOCK
-} SpinLock;
-#else
-typedef StgWord SpinLock;
 #endif
-
-#if defined(PROF_SPIN)
+} SpinLock;
 
 // PROF_SPIN enables counting the number of times we spin on a lock
+#if defined(PROF_SPIN)
+#define IF_PROF_SPIN(x) x
+#else
+#define IF_PROF_SPIN(x)
+#endif
 
 // acquire spin lock
 INLINE_HEADER void ACQUIRE_SPIN_LOCK(SpinLock * p)
 {
-    StgWord32 r = 0;
-    uint32_t i;
     do {
-        for (i = 0; i < SPIN_COUNT; i++) {
-            r = cas((StgVolatilePtr)&(p->lock), 1, 0);
+        for (uint32_t i = 0; i < SPIN_COUNT; i++) {
+            StgWord32 r = cas((StgVolatilePtr)&(p->lock), 1, 0);
             if (r != 0) return;
-            p->spin++;
+            IF_PROF_SPIN(p->spin++);
             busy_wait_nop();
         }
-        p->yield++;
+        IF_PROF_SPIN(p->yield++);
         yieldThread();
     } while (1);
 }
@@ -67,42 +66,9 @@ INLINE_HEADER void initSpinLock(SpinLock * p)
 {
     write_barrier();
     p->lock = 1;
-    p->spin = 0;
-    p->yield = 0;
+    IF_PROF_SPIN(p->spin = 0);
+    IF_PROF_SPIN(p->yield = 0);
 }
-
-#else
-
-// acquire spin lock
-INLINE_HEADER void ACQUIRE_SPIN_LOCK(SpinLock * p)
-{
-    StgWord32 r = 0;
-    uint32_t i;
-    do {
-        for (i = 0; i < SPIN_COUNT; i++) {
-            r = cas((StgVolatilePtr)p, 1, 0);
-            if (r != 0) return;
-            busy_wait_nop();
-        }
-        yieldThread();
-    } while (1);
-}
-
-// release spin lock
-INLINE_HEADER void RELEASE_SPIN_LOCK(SpinLock * p)
-{
-    write_barrier();
-    (*p) = 1;
-}
-
-// init spin lock
-INLINE_HEADER void initSpinLock(SpinLock * p)
-{
-    write_barrier();
-    (*p) = 1;
-}
-
-#endif /* PROF_SPIN */
 
 #else /* !THREADED_RTS */
 
