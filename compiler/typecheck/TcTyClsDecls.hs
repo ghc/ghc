@@ -3467,7 +3467,7 @@ checkValidTyCon tc
                 -- NB: this check assumes that all the constructors of a given
                 -- data type use the same type variables
         where
-        (_, _, _, res1) = dataConSig con1
+        res1 = dataConOrigResTy con1
         fty1 = dataConFieldType con1 lbl
         lbl = flLabel label
 
@@ -3475,7 +3475,7 @@ checkValidTyCon tc
             = do { checkFieldCompat lbl con1 con2 res1 res2 fty1 fty2
                  ; checkFieldCompat lbl con2 con1 res2 res1 fty2 fty1 }
             where
-                (_, _, _, res2) = dataConSig con2
+                res2 = dataConOrigResTy con2
                 fty2 = dataConFieldType con2 lbl
 
 checkPartialRecordField :: [DataCon] -> FieldLabel -> TcM ()
