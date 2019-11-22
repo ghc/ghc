@@ -2305,7 +2305,9 @@ tcGhciStmts stmts
             ret_expr = nlHsApp (nlHsTyApp ret_id [ret_ty])
                        (noLoc $ ExplicitList unitTy Nothing
                                                             (map mk_item ids))
-            mk_item id = unsafe_coerce_id `nlHsTyApp` [typeKind (idType id), typeKind unitTy, idType id, unitTy]
+            mk_item id = unsafe_coerce_id `nlHsTyApp` [ getRuntimeRep (idType id)
+                                                      , getRuntimeRep unitTy
+                                                      , idType id, unitTy]
                                           `nlHsApp` nlHsVar id
             stmts = tc_stmts ++ [noLoc (mkLastStmt ret_expr)]
 
