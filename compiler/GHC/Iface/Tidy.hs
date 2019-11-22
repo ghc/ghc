@@ -457,8 +457,15 @@ trimId :: Id -> Id
 trimId id
   | not (isImplicitId id)
   = id `setIdInfo` vanillaIdInfo
+       `setIdUnfolding` unfolding
   | otherwise
   = id
+  where
+    unfolding
+      | isCompulsoryUnfolding (idUnfolding id)
+      = idUnfolding id
+      | otherwise
+      = noUnfolding
 
 {- Note [Drop wired-in things]
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
@@ -1223,8 +1230,11 @@ tidyTopIdInfo dflags rhs_tidy_env name orig_rhs tidy_rhs idinfo show_unfold caf_
 
     --------- Unfolding ------------
     unf_info = unfoldingInfo idinfo
-    unfold_info | show_unfold = tidyUnfolding rhs_tidy_env unf_info unf_from_rhs
-                | otherwise   = minimal_unfold_info
+    unfold_info
+      | isCompulsoryUnfolding unf_info || show_unfold
+      = tidyUnfolding rhs_tidy_env unf_info unf_from_rhs
+      | otherwise
+      = minimal_unfold_info
     minimal_unfold_info = zapUnfolding unf_info
     unf_from_rhs = mkTopUnfolding dflags is_bot tidy_rhs
     is_bot = isBottomingSig final_sig
