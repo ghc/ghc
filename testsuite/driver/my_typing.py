@@ -24,9 +24,7 @@ except:
 # is taken. We exploit this below.
 
 # TextIO is missing on some older Pythons.
-if 'TextIO' in globals():
-    TextIO = typing.TextIO
-else:
+if 'TextIO' not in globals():
     TextIO = None # type: ignore
 
 
