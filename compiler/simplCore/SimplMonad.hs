@@ -24,7 +24,7 @@ import GhcPrelude
 
 import Var              ( Var, isId, mkLocalVar )
 import Name             ( mkSystemVarName )
-import Id               ( Id, mkSysLocalOrCoVar )
+import Id               ( Id, mkSysLocal )
 import IdInfo           ( IdDetails(..), vanillaIdInfo, setArityInfo )
 import Type             ( Type, mkLamTypes )
 import FamInstEnv       ( FamInstEnv )
@@ -180,7 +180,7 @@ getFamEnvs = SM (\st_env us sc -> return (st_fams st_env, us, sc))
 
 newId :: FastString -> Type -> SimplM Id
 newId fs ty = do uniq <- getUniqueM
-                 return (mkSysLocalOrCoVar fs uniq ty)
+                 return (mkSysLocal fs uniq ty)
 
 newJoinId :: [Var] -> Type -> SimplM Id
 newJoinId bndrs body_ty

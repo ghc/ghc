@@ -35,10 +35,10 @@ module Id (
         -- ** Simple construction
         mkGlobalId, mkVanillaGlobal, mkVanillaGlobalWithInfo,
         mkLocalId, mkLocalCoVar, mkLocalIdOrCoVar,
-        mkLocalIdOrCoVarWithInfo,
+        mkLocalIdUnchecked,
         mkLocalIdWithInfo, mkExportedLocalId, mkExportedVanillaId,
         mkSysLocal, mkSysLocalM, mkSysLocalOrCoVar, mkSysLocalOrCoVarM,
-        mkUserLocal, mkUserLocalOrCoVar,
+        mkUserLocal,
         mkTemplateLocals, mkTemplateLocalsNum, mkTemplateLocal,
         mkWorkerId,
 
@@ -265,10 +265,15 @@ mkVanillaGlobalWithInfo = mkGlobalId VanillaId
 
 
 -- | For an explanation of global vs. local 'Id's, see "Var#globalvslocal"
-mkLocalId :: Name -> Type -> Id
-mkLocalId name ty = mkLocalIdWithInfo name ty vanillaIdInfo
- -- It's tempting to ASSERT( not (isCoVarType ty) ), but don't. Sometimes,
- -- the type is a panic. (Search invented_id)
+mkLocalId :: HasDebugCallStack => Name -> Type -> Id
+mkLocalId name ty = ASSERT( not (isCoVarType ty) )
+                    mkLocalIdWithInfo name ty vanillaIdInfo
+
+-- | Same as 'mkLocalId' but without the assertion. It is used
+-- 1) In one case, the type is a panic (search for invented_id).
+-- 2) All other occurrences are incorrect uses that should be removed.
+mkLocalIdUnchecked :: Name -> Type -> Id
+mkLocalIdUnchecked name ty = mkLocalIdWithInfoUnchecked name ty vanillaIdInfo
 
 -- | Make a local CoVar
 mkLocalCoVar :: Name -> Type -> CoVar
@@ -282,18 +287,14 @@ mkLocalIdOrCoVar name ty
   | isCoVarType ty = mkLocalCoVar name ty
   | otherwise      = mkLocalId    name ty
 
--- | Make a local id, with the IdDetails set to CoVarId if the type indicates
--- so.
-mkLocalIdOrCoVarWithInfo :: Name -> Type -> IdInfo -> Id
-mkLocalIdOrCoVarWithInfo name ty info
-  = Var.mkLocalVar details name ty info
-  where
-    details | isCoVarType ty = CoVarId
-            | otherwise      = VanillaId
-
     -- proper ids only; no covars!
-mkLocalIdWithInfo :: Name -> Type -> IdInfo -> Id
-mkLocalIdWithInfo name ty info = Var.mkLocalVar VanillaId name ty info
+mkLocalIdWithInfo :: HasDebugCallStack => Name -> Type -> IdInfo -> Id
+mkLocalIdWithInfo name ty info = ASSERT( not (isCoVarType ty) )
+                                 Var.mkLocalVar VanillaId name ty info
+        -- Note [Free type variables]
+
+mkLocalIdWithInfoUnchecked :: Name -> Type -> IdInfo -> Id
+mkLocalIdWithInfoUnchecked name ty info = Var.mkLocalVar VanillaId name ty info
         -- Note [Free type variables]
 
 -- | Create a local 'Id' that is marked as exported.
@@ -331,11 +332,6 @@ mkUserLocal :: OccName -> Unique -> Type -> SrcSpan -> Id
 mkUserLocal occ uniq ty loc = ASSERT( not (isCoVarType ty) )
                               mkLocalId (mkInternalName uniq occ loc) ty
 
--- | Like 'mkUserLocal', but checks if we have a coercion type
-mkUserLocalOrCoVar :: OccName -> Unique -> Type -> SrcSpan -> Id
-mkUserLocalOrCoVar occ uniq ty loc
-  = mkLocalIdOrCoVar (mkInternalName uniq occ loc) ty
-
 {-
 Make some local @Ids@ for a template @CoreExpr@.  These have bogus
 @Uniques@, but that's OK because the templates are supposed to be
@@ -345,7 +341,7 @@ instantiated before use.
 -- | Workers get local names. "CoreTidy" will externalise these if necessary
 mkWorkerId :: Unique -> Id -> Type -> Id
 mkWorkerId uniq unwrkr ty
-  = mkLocalIdOrCoVar (mkDerivedInternalName mkWorkerOcc uniq (getName unwrkr)) ty
+  = mkLocalId (mkDerivedInternalName mkWorkerOcc uniq (getName unwrkr)) ty
 
 -- | Create a /template local/: a family of system local 'Id's in bijection with @Int@s, typically used in unfoldings
 mkTemplateLocal :: Int -> Type -> Id

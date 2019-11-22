@@ -97,7 +97,7 @@ mkPmId :: Type -> DsM Id
 mkPmId ty = getUniqueM >>= \unique ->
   let occname = mkVarOccFS $ fsLit "pm"
       name    = mkInternalName unique occname noSrcSpan
-  in  return (mkLocalId name ty)
+  in  return (mkLocalIdUnchecked name ty)  -- Unchecked because T11142 fails otherwise
 
 -----------------------------------------------
 -- * Caching possible matches of a COMPLETE set
@@ -508,7 +508,7 @@ nameTyCt (TyCt pred_ty) = do
   unique <- getUniqueM
   let occname = mkVarOccFS (fsLit ("pm_"++show unique))
       idname  = mkInternalName unique occname noSrcSpan
-  return (mkLocalId idname pred_ty)
+  return (mkLocalIdUnchecked idname pred_ty)  -- Unchecked because many tests in pmcheck/ fail
 
 -- | Add some extra type constraints to the 'TyState'; return 'Nothing' if we
 -- find a contradiction (e.g. @Int ~ Bool@).

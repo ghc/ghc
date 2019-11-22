@@ -211,7 +211,8 @@ tcPatBndr penv@(PE { pe_ctxt = LetPat { pc_lvl    = bind_lvl
 tcPatBndr _ bndr_name pat_ty
   = do { pat_ty <- expTypeToType pat_ty
        ; traceTc "tcPatBndr(not let)" (ppr bndr_name $$ ppr pat_ty)
-       ; return (idHsWrapper, mkLocalId bndr_name pat_ty) }
+       ; return (idHsWrapper, mkLocalIdUnchecked bndr_name pat_ty) }
+               -- Unchecked because T15648 fails otherwise
                -- Whether or not there is a sig is irrelevant,
                -- as this is local
 

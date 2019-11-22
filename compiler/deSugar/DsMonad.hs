@@ -359,7 +359,7 @@ newSysLocalDsNoLP  = mk_local (fsLit "ds")
 -- is not levity-polymorphic. It is necessary when the type is knot-tied because
 -- of the fixM used in DsArrows. See Note [Levity polymorphism checking]
 newSysLocalDs = mkSysLocalOrCoVarM (fsLit "ds")
-newFailLocalDs = mkSysLocalOrCoVarM (fsLit "fail")
+newFailLocalDs = mkSysLocalM (fsLit "fail")
   -- the fail variable is used only in a situation where we can tell that
   -- levity-polymorphism is impossible.
 
@@ -371,7 +371,7 @@ mk_local :: FastString -> Type -> DsM Id
 mk_local fs ty = do { dsNoLevPoly ty (text "When trying to create a variable of type:" <+>
                                       ppr ty)  -- could improve the msg with another
                                                -- parameter indicating context
-                    ; mkSysLocalOrCoVarM fs ty }
+                    ; mkSysLocalM fs ty }
 
 {-
 We can also reach out and either set/grab location information from
