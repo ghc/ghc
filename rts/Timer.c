@@ -102,7 +102,7 @@ handle_tick(int unused STG_UNUSED)
 {
   handleProfTick();
   if (RtsFlags.ConcFlags.ctxtSwitchTicks > 0
-      && RELAXED_LOAD(&timer_disabled) == 0)
+      && SEQ_CST_LOAD(&timer_disabled) == 0)
   {
       ticks_to_ctxt_switch--;
       if (ticks_to_ctxt_switch <= 0) {
@@ -166,7 +166,7 @@ initTimer(void)
     if (RtsFlags.MiscFlags.tickInterval != 0) {
         initTicker(RtsFlags.MiscFlags.tickInterval, handle_tick);
     }
-    RELAXED_STORE(&timer_disabled, 1);
+    SEQ_CST_STORE(&timer_disabled, 1);
 }
 
 void
