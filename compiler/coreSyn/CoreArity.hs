@@ -1191,4 +1191,6 @@ freshEtaId n subst ty
         ty'     = Type.substTyUnchecked subst ty
         eta_id' = uniqAway (getTCvInScope subst) $
                   mkSysLocalOrCoVar (fsLit "eta") (mkBuiltinUnique n) ty'
+                  -- "OrCoVar" since this can be used to eta-expand
+                  -- coercion abstractions
         subst'  = extendTCvInScope subst eta_id'
