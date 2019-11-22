@@ -349,8 +349,8 @@ duplicateLocalDs old_local
         ; return (setIdUnique old_local uniq) }
 
 newPredVarDs :: PredType -> DsM Var
-newPredVarDs pred
- = newSysLocalDs pred
+newPredVarDs
+ = mkSysLocalOrCoVarM (fsLit "ds")  -- like newSysLocalDs, but we allow covars
 
 newSysLocalDsNoLP, newSysLocalDs, newFailLocalDs :: Type -> DsM Id
 newSysLocalDsNoLP  = mk_local (fsLit "ds")
@@ -358,8 +358,8 @@ newSysLocalDsNoLP  = mk_local (fsLit "ds")
 -- this variant should be used when the caller can be sure that the variable type
 -- is not levity-polymorphic. It is necessary when the type is knot-tied because
 -- of the fixM used in DsArrows. See Note [Levity polymorphism checking]
-newSysLocalDs = mkSysLocalOrCoVarM (fsLit "ds")
-newFailLocalDs = mkSysLocalOrCoVarM (fsLit "fail")
+newSysLocalDs = mkSysLocalM (fsLit "ds")
+newFailLocalDs = mkSysLocalM (fsLit "fail")
   -- the fail variable is used only in a situation where we can tell that
   -- levity-polymorphism is impossible.
 
