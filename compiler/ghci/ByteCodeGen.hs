@@ -164,14 +164,13 @@ coreExprToBCOs hsc_env this_mod expr
       -- create a totally bogus name for the top-level BCO; this
       -- should be harmless, since it's never used for anything
       let invented_name  = mkSystemVarName (mkPseudoUniqueE 0) (fsLit "ExprTopLevel")
-          invented_id    = Id.mkLocalId invented_name (panic "invented_id's type")
 
       -- the uniques are needed to generate fresh variables when we introduce new
       -- let bindings for ticked expressions
       us <- mkSplitUniqSupply 'y'
       (BcM_State _dflags _us _this_mod _final_ctr mallocd _ _ _, proto_bco)
          <- runBc hsc_env us this_mod Nothing emptyVarEnv $
-              schemeTopBind (invented_id, simpleFreeVars expr)
+              schemeR [] (invented_name, simpleFreeVars expr)
 
       when (notNull mallocd)
            (panic "ByteCodeGen.coreExprToBCOs: missing final emitBc?")
@@ -321,7 +320,7 @@ schemeTopBind (id, rhs)
                        (Right rhs) 0 0 [{-no bitmap-}] False{-not alts-})
 
   | otherwise
-  = schemeR [{- No free variables -}] (id, rhs)
+  = schemeR [{- No free variables -}] (getName id, rhs)
 
 
 -- -----------------------------------------------------------------------------
@@ -333,13 +332,13 @@ schemeTopBind (id, rhs)
 -- removing the free variables and arguments.
 --
 -- Park the resulting BCO in the monad.  Also requires the
--- variable to which this value was bound, so as to give the
--- resulting BCO a name.
+-- name of the variable to which this value was bound,
+-- so as to give the resulting BCO a name.
 
 schemeR :: [Id]                 -- Free vars of the RHS, ordered as they
                                 -- will appear in the thunk.  Empty for
                                 -- top-level things, which have no free vars.
-        -> (Id, AnnExpr Id DVarSet)
+        -> (Name, AnnExpr Id DVarSet)
         -> BcM (ProtoBCO Name)
 schemeR fvs (nm, rhs)
 {-
@@ -370,7 +369,7 @@ collect (_, e) = go [] e
 
 schemeR_wrk
     :: [Id]
-    -> Id
+    -> Name
     -> AnnExpr Id DVarSet             -- expression e, for debugging only
     -> ([Var], AnnExpr' Var DVarSet)  -- result of collect on e
     -> BcM (ProtoBCO Name)
@@ -396,7 +395,7 @@ schemeR_wrk fvs nm original_body (args, body)
          bitmap = mkBitmap dflags bits
      body_code <- schemeER_wrk sum_szsb_args p_init body
 
-     emitBc (mkProtoBCO dflags (getName nm) body_code (Right original_body)
+     emitBc (mkProtoBCO dflags nm body_code (Right original_body)
                  arity bitmap_size bitmap False{-not alts-})
 
 -- introduce break instructions for ticked expressions
@@ -575,7 +574,7 @@ schemeE d s p (AnnLet binds (_,body)) = do
                      _other -> False
 
          compile_bind d' fvs x rhs size arity off = do
-                bco <- schemeR fvs (x,rhs)
+                bco <- schemeR fvs (getName x,rhs)
                 build_thunk d' fvs size bco off arity
 
          compile_binds =
