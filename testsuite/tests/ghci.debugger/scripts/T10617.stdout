@@ -1,0 +1,5 @@
+Breakpoint 0 activated at T10617.hs:11:21-32
+Stopped in Main.f, T10617.hs:11:21-32
+_result :: Bool = _
+c :: AppTreeT a1 = Con
+True
