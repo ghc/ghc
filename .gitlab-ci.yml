@@ -701,6 +701,8 @@ release-x86_64-linux-centos7:
     BIN_DIST_PREP_TAR_COMP: "ghc-x86_64-centos7-linux.tar.xz"
     # pxz is not available on centos7 for reasons I can't understand
     XZ: "xz"
+    # CentOS seems to default to ascii
+    LANG: "en_US.UTF-8"
   only:
     - tags
   cache:
