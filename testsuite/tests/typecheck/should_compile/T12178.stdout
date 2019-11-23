@@ -1,5 +1,3 @@
-rm -f -f T12178.o T12178.hi
-'/home/glon/Programs/ghc/_build/stage1/bin/ghc' -dcore-lint -dstg-lint -dcmm-lint -no-user-package-db -rtsopts  -fno-warn-missed-specialisations -fshow-warning-groups -fdiagnostics-color=never -fno-diagnostics-show-caret -Werror=compat -dno-debug-output -c T12178.hs  -O -dsuppress-all -ddump-simpl | grep -e '^test' -e 'Pattern' -e '^$'
 
 
 $bInlineablePattern
@@ -50,10 +48,3 @@ testMatcherofExplicitBuilder
 
 
 
-# There are three types of lines of interest in this test:
-# '^test' - Beginning of a function definition
-# 'Pattern' - Non-inlined occurrence of a pattern synonym
-# empty line - End of a function definition (among other possible meanings)
-#
-# Grepping for those allows to recognize which pattern synonym builders or
-# matchers are called (as opposed to being inlined) in which functions
