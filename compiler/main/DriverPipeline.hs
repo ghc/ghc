@@ -66,7 +66,7 @@ import FileCleanup
 import Ar
 import Bag              ( unitBag )
 import FastString       ( mkFastString )
-import MkIface          ( mkIface )
+import MkIface          ( mkIface, mkModDetails )
 
 import Exception
 import System.Directory
@@ -217,18 +217,19 @@ compileOne' m_tc_result mHscMessage
             o_time <- getModificationUTCTime object_filename
             let !linkable = LM o_time this_mod [DotO object_filename]
             return $! HomeModInfo iface mod_details (Just linkable)
-        (HscRecomp { hscs_guts = cgguts,
+        (HscRecomp { hscs_guts = cg_guts,
                      hscs_mod_location = mod_location,
                      hscs_desugared_guts = desugared_guts,
                      hscs_old_iface_hash = mb_old_iface_hash,
                      hscs_iface_dflags = iface_dflags }, HscInterpreted) -> do
             -- In interpreted mode the regular codeGen backend is not run so we
             -- generate a interface without codeGen info.
-            (final_iface, mod_details) <-
-              mkIface hsc_env'{hsc_dflags=iface_dflags} desugared_guts cgguts
-            liftIO $ hscMaybeWriteIface dflags final_iface mb_old_iface_hash mod_location
+            let iface_hsc_env = hsc_env'{hsc_dflags=iface_dflags}
+            let mod_details = mkModDetails iface_hsc_env desugared_guts cg_guts
+            iface <- mkIface iface_hsc_env desugared_guts mod_details
+            liftIO $ hscMaybeWriteIface dflags iface mb_old_iface_hash mod_location
 
-            (hasStub, comp_bc, spt_entries) <- hscInteractive hsc_env' cgguts mod_location
+            (hasStub, comp_bc, spt_entries) <- hscInteractive hsc_env' cg_guts mod_location
 
             stub_o <- case hasStub of
                       Nothing -> return []
@@ -246,7 +247,7 @@ compileOne' m_tc_result mHscMessage
               -- be out of date.
             let !linkable = LM unlinked_time (ms_mod summary)
                            (hs_unlinked ++ stub_o)
-            return $! HomeModInfo final_iface mod_details (Just linkable)
+            return $! HomeModInfo iface mod_details (Just linkable)
         (HscRecomp{}, _) -> do
             output_fn <- getOutputFilename next_phase
                             (Temporary TFL_CurrentModule)
@@ -1175,7 +1176,7 @@ runPhase (HscOut src_flavour mod_name result) _ dflags = do
                        basename = dropExtension input_fn
                    liftIO $ compileEmptyStub dflags hsc_env' basename location mod_name
                    return (RealPhase StopLn, o_file)
-            HscRecomp { hscs_guts = cgguts,
+            HscRecomp { hscs_guts = cg_guts,
                         hscs_mod_location = mod_location,
                         hscs_desugared_guts = desugared_guts,
                         hscs_old_iface_hash = mb_old_iface_hash,
@@ -1185,15 +1186,16 @@ runPhase (HscOut src_flavour mod_name result) _ dflags = do
                     PipeState{hsc_env=hsc_env'} <- getPipeState
 
                     (outputFilename, mStub, foreign_files) <- liftIO $
-                      hscGenHardCode hsc_env' cgguts mod_location output_fn
+                      hscGenHardCode hsc_env' cg_guts mod_location output_fn
 
-                    (final_iface, mod_details) <-
-                      liftIO (mkIface hsc_env'{hsc_dflags=iface_dflags} desugared_guts cgguts)
-                    setIface final_iface mod_details
+                    let iface_hsc_env = hsc_env'{hsc_dflags=iface_dflags}
+                    let mod_details = mkModDetails iface_hsc_env desugared_guts cg_guts
+                    iface <- liftIO (mkIface iface_hsc_env desugared_guts mod_details)
+                    setIface iface mod_details
 
                     -- See Note [Writing interface files]
                     let if_dflags = dflags `gopt_unset` Opt_BuildDynamicToo
-                    liftIO $ hscMaybeWriteIface if_dflags final_iface mb_old_iface_hash mod_location
+                    liftIO $ hscMaybeWriteIface if_dflags iface mb_old_iface_hash mod_location
 
                     stub_o <- liftIO (mapM (compileStub hsc_env') mStub)
                     foreign_os <- liftIO $
