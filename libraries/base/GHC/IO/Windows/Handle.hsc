@@ -42,6 +42,7 @@ module GHC.IO.Windows.Handle
 
    -- * File utilities
    openFile,
+   openFileAsTemp,
    release
  ) where
 
@@ -858,13 +859,83 @@ openFile filepath iomode non_blocking =
                                       file_create_flags
                                       nullPtr
 
-          -- Tell the OS that we support skipping the request Queue if the
-          -- IRQ can be handled immediately, e.g. if the data is in the cache.
-          optimizeFileAccess handle =
-              failIfFalse_ "SetFileCompletionNotificationModes"  $
-                c_SetFileCompletionNotificationModes handle
-                    (    #{const FILE_SKIP_COMPLETION_PORT_ON_SUCCESS}
-                     .|. #{const FILE_SKIP_SET_EVENT_ON_HANDLE})
+-- | Open a file as a temporary file and make an 'NativeHandle' for it.
+-- Truncates the file to zero size when the `IOMode` is `WriteMode`.
+openFileAsTemp
+  :: FilePath -- ^ file to open
+  -> Bool     -- ^ open the file in non-blocking mode?
+  -> Bool     -- ^ Exclusive mode
+  -> IO (Io NativeHandle, IODeviceType)
+openFileAsTemp filepath non_blocking excl =
+   do devicepath <- getDevicePath filepath
+      h <- createFile devicepath
+      -- Attach the handle to the I/O manager's CompletionPort.  This allows the
+      -- I/O manager to service requests for this Handle.
+      Mgr.associateHandle' h
+      let hwnd = fromHANDLE h
+      _type <- devType hwnd
+
+      -- Use the rts to enforce any file locking we may need.
+      let write_lock = True
+
+      case _type of
+        -- Regular files need to be locked.
+        RegularFile -> do
+          optimizeFileAccess h -- Set a few optimization flags on file handles.
+          (unique_dev, unique_ino) <- getUniqueFileInfo hwnd
+          r <- lockFile (fromIntegral $ ptrToWordPtr h) unique_dev unique_ino
+                        (fromBool write_lock)
+          when (r == -1)  $
+               ioException (IOError Nothing ResourceBusy "openFile"
+                                  "file is locked" Nothing Nothing)
+
+        _ -> return ()
+
+      return (hwnd, _type)
+        where
+          -- We have to use in-process locking (e.g. use the locking mechanism
+          -- in the rts) so we're consistent with the linux behavior and the
+          -- rts knows about the lock.  See #4363 for more.
+          file_share_mode =  #{const FILE_SHARE_READ}
+                         .|. #{const FILE_SHARE_DELETE}
+
+          file_access_mode =  #{const GENERIC_READ}
+                            .|. #{const GENERIC_WRITE}
+
+          file_open_mode =
+            case excl of
+              True      -> #{const CREATE_NEW}    -- O_CREAT | O_RDWR | O_EXCL
+              False     -> #{const CREATE_ALWAYS} -- O_CREAT | O_RDWR
+
+          file_create_flags =
+            if non_blocking
+               then #{const FILE_FLAG_OVERLAPPED}
+                    -- Open temp files sequentially
+                    .|. #{const FILE_FLAG_SEQUENTIAL_SCAN}
+                    -- Hold data in cache for as long as possible
+                    .|. #{const FILE_ATTRIBUTE_TEMPORARY}
+               else #{const FILE_ATTRIBUTE_NORMAL}
+                    -- Hold data in cache for as long as possible
+                    .|. #{const FILE_ATTRIBUTE_TEMPORARY}
+
+          createFile devicepath =
+            withCWString devicepath $ \fp ->
+                failIf (== iNVALID_HANDLE_VALUE) "CreateFile" $
+                      c_CreateFile fp file_access_mode
+                                      file_share_mode
+                                      nullPtr
+                                      file_open_mode
+                                      file_create_flags
+                                      nullPtr
+
+-- Tell the OS that we support skipping the request Queue if the
+-- IRQ can be handled immediately, e.g. if the data is in the cache.
+optimizeFileAccess :: HANDLE -> IO ()
+optimizeFileAccess handle =
+    failIfFalse_ "SetFileCompletionNotificationModes"  $
+      c_SetFileCompletionNotificationModes handle
+          (    #{const FILE_SKIP_COMPLETION_PORT_ON_SUCCESS}
+            .|. #{const FILE_SKIP_SET_EVENT_ON_HANDLE})
 
 release :: RawHandle a => a -> IO ()
 release h = if isLockable h
