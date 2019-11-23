@@ -111,6 +111,8 @@ import UniqSet
 import Packages
 import ExtractDocs
 import PprCore (pprRules)
+import CoreUnfold (mkTopUnfolding)
+import Demand (isBottomingSig)
 
 import TidyPgm
 import CoreTidy
@@ -176,11 +178,22 @@ mkModDetails hsc_env desugared_guts cg_guts =
       | otherwise
       = id
 
-    final_ids  = [ if omit_prags then trim_id id else id
-                 | id <- bindersOfBinds tidy_binds
-                 , isExternalName (idName id)
-                 , not (isWiredInName (getName id))
-                 ]   -- See Note [Drop wired-in things]
+    -- See Note [Drop wired-in things]
+    keep_top_bind bndr =
+      isExternalName (getName bndr) && not (isWiredInName (getName bndr))
+
+    tidy_id_unfolding id tidy_rhs =
+      id `setIdUnfolding` tidyUnfolding tidy_env unf_info unf_from_rhs
+      where
+        unf_info = idUnfolding id
+        unf_from_rhs = mkTopUnfolding dflags is_bot tidy_rhs
+        is_bot = isBottomingSig final_sig
+        final_sig = idStrictness id -- set by tidyTopIdInfo
+
+    final_ids  = [ tidy_id_unfolding (if omit_prags then trim_id id else id) rhs
+                 | (id, rhs) <- flattenBinds tidy_binds
+                 , keep_top_bind id
+                 ]
     final_tcs = filterOut (isWiredInName . getName) mg_tcs
     -- See Note [Drop wired-in things]
     type_env = typeEnvFromEntities final_ids final_tcs mg_fam_insts
