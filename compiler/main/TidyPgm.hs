@@ -19,7 +19,7 @@ import GhcPrelude
 import TcRnTypes
 import DynFlags
 import CoreSyn
-import CoreUnfold
+-- import CoreUnfold
 import CoreFVs
 import CoreTidy
 import CoreMonad
@@ -1050,8 +1050,7 @@ tidyTopBind dflags this_mod cvt_literal unfold_env
     caf_info      = hasCafRefs dflags this_mod
                                (subst1, cvt_literal)
                                (idArity bndr) rhs
-    (bndr', rhs') = tidyTopPair dflags show_unfold tidy_env2 caf_info name'
-                                (bndr, rhs)
+    (bndr', rhs') = tidyTopPair show_unfold tidy_env2 caf_info name' (bndr, rhs)
     subst2        = extendVarEnv subst1 bndr bndr'
     tidy_env2     = (occ_env, subst2)
 
@@ -1059,7 +1058,7 @@ tidyTopBind dflags this_mod cvt_literal unfold_env
             (occ_env, subst1) (Rec prs)
   = (tidy_env2, Rec prs')
   where
-    prs' = [ tidyTopPair dflags show_unfold tidy_env2 caf_info name' (id,rhs)
+    prs' = [ tidyTopPair show_unfold tidy_env2 caf_info name' (id,rhs)
            | (id,rhs) <- prs,
              let (name',show_unfold) =
                     expectJust "tidyTopBind" $ lookupVarEnv unfold_env id
@@ -1080,8 +1079,7 @@ tidyTopBind dflags this_mod cvt_literal unfold_env
         | otherwise                = NoCafRefs
 
 -----------------------------------------------------------
-tidyTopPair :: DynFlags
-            -> Bool  -- show unfolding
+tidyTopPair :: Bool  -- show unfolding
             -> TidyEnv  -- The TidyEnv is used to tidy the IdInfo
                         -- It is knot-tied: don't look at it!
             -> CafInfo
@@ -1094,15 +1092,14 @@ tidyTopPair :: DynFlags
         -- group, a variable late in the group might be mentioned
         -- in the IdInfo of one early in the group
 
-tidyTopPair dflags show_unfold rhs_tidy_env caf_info name' (bndr, rhs)
+tidyTopPair show_unfold rhs_tidy_env caf_info name' (bndr, rhs)
   = (bndr1, rhs1)
   where
     bndr1    = mkGlobalId details name' ty' idinfo'
     details  = idDetails bndr   -- Preserve the IdDetails
     ty'      = tidyTopType (idType bndr)
     rhs1     = tidyExpr rhs_tidy_env rhs
-    idinfo'  = tidyTopIdInfo dflags rhs_tidy_env name' rhs rhs1 (idInfo bndr)
-                             show_unfold caf_info
+    idinfo'  = tidyTopIdInfo name' rhs (idInfo bndr) show_unfold caf_info
 
 -- tidyTopIdInfo creates the final IdInfo for top-level
 -- binders.  There are two delicate pieces:
@@ -1116,9 +1113,9 @@ tidyTopPair dflags show_unfold rhs_tidy_env caf_info name' (bndr, rhs)
 --      occurrences of the binders in RHSs, and hence to occurrences in
 --      unfoldings, which are inside Ids imported by GHCi. Ditto RULES.
 --      CoreToStg makes use of this when constructing SRTs.
-tidyTopIdInfo :: DynFlags -> TidyEnv -> Name -> CoreExpr -> CoreExpr
+tidyTopIdInfo :: Name -> CoreExpr
               -> IdInfo -> Bool -> CafInfo -> IdInfo
-tidyTopIdInfo dflags rhs_tidy_env name orig_rhs tidy_rhs idinfo show_unfold caf_info
+tidyTopIdInfo name orig_rhs idinfo show_unfold caf_info
   | not is_external     -- For internal Ids (not externally visible)
   = vanillaIdInfo       -- we only need enough info for code generation
                         -- Arity and strictness info are enough;
@@ -1163,11 +1160,12 @@ tidyTopIdInfo dflags rhs_tidy_env name orig_rhs tidy_rhs idinfo show_unfold caf_
 
     --------- Unfolding ------------
     unf_info = unfoldingInfo idinfo
-    unfold_info | show_unfold = tidyUnfolding rhs_tidy_env unf_info unf_from_rhs
+    unfold_info | show_unfold = unf_info -- Will be tidied after code gen, in mkModDetails
+                                -- tidyUnfolding rhs_tidy_env unf_info unf_from_rhs
                 | otherwise   = minimal_unfold_info
     minimal_unfold_info = zapUnfolding unf_info
-    unf_from_rhs = mkTopUnfolding dflags is_bot tidy_rhs
-    is_bot = isBottomingSig final_sig
+    -- unf_from_rhs = mkTopUnfolding dflags is_bot tidy_rhs
+    -- is_bot = isBottomingSig final_sig
     -- NB: do *not* expose the worker if show_unfold is off,
     --     because that means this thing is a loop breaker or
     --     marked NOINLINE or something like that
