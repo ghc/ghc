@@ -699,6 +699,8 @@ release-x86_64-linux-centos7:
     BUILD_SPHINX_PDF: "NO"
     TEST_ENV: "x86_64-linux-centos7"
     BIN_DIST_PREP_TAR_COMP: "ghc-x86_64-centos7-linux.tar.xz"
+    # pxz is not available on centos7 for reasons I can't understand
+    XZ: "xz"
   only:
     - tags
   cache:
