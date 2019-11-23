@@ -13,6 +13,7 @@ if [[ -z ${BUILD_SPHINX_HTML:-} ]]; then BUILD_SPHINX_HTML=YES; fi
 if [[ -z ${BUILD_SPHINX_PDF:-} ]]; then BUILD_SPHINX_PDF=YES; fi
 if [[ -z ${INTEGER_LIBRARY:-} ]]; then INTEGER_LIBRARY=integer-gmp; fi
 if [[ -z ${BUILD_FLAVOUR:-} ]]; then BUILD_FLAVOUR=perf; fi
+if [[ -z ${XZ:-} ]]; then XZ=pxz; fi
 
 if [[ -z ${XZ:-} ]]; then
   if which pxz; then
