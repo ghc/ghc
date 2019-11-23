@@ -18,7 +18,7 @@
 module GHC.IO.Handle.Windows (
   stdin, stdout, stderr,
   openFile, openBinaryFile, openFileBlocking,
-  handleToHANDLE
+  handleToHANDLE, mkHandleFromHANDLE
  ) where
 
 import Data.Maybe
