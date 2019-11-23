@@ -26,7 +26,9 @@
 #include <unistd.h>
 #endif
 
-static const EventLogWriter *event_log_writer;
+bool eventlog_enabled;
+
+static const EventLogWriter *event_log_writer = NULL;
 
 #define EVENT_LOG_SIZE 2 * (1024 * 1024) // 2MB
 
@@ -516,15 +518,21 @@ postHeaderEvents(void)
     postInt32(&eventBuf, EVENT_DATA_BEGIN);
 }
 
-void
-initEventLogging(const EventLogWriter *ev_writer)
+static uint32_t
+get_n_capabilities(void)
 {
-    uint32_t n_caps;
+#if defined(THREADED_RTS)
+    // XXX n_capabilities may not have been initialized yet
+    return (n_capabilities != 0) ? n_capabilities : RtsFlags.ParFlags.nCapabilities;
+#else
+    return 1;
+#endif
+}
 
+void
+initEventLogging()
+{
     init_event_types();
-
-    event_log_writer = ev_writer;
-    initEventLogWriter();
 
     int num_descs = sizeof(EventDesc) / sizeof(char*);
     if (num_descs != NUM_GHC_EVENT_TAGS) {
@@ -542,18 +550,28 @@ initEventLogging(const EventLogWriter *ev_writer)
      * Use a single buffer to store the header with event types, then flush
      * the buffer so all buffers are empty for writing events.
      */
-#if defined(THREADED_RTS)
-    // XXX n_capabilities hasn't been initialized yet
-    n_caps = RtsFlags.ParFlags.nCapabilities;
-#else
-    n_caps = 1;
-#endif
-    moreCapEventBufs(0, n_caps);
+    moreCapEventBufs(0, get_n_capabilities());
 
     initEventsBuf(&eventBuf, EVENT_LOG_SIZE, (EventCapNo)(-1));
 #if defined(THREADED_RTS)
     initMutex(&eventBufMutex);
 #endif
+}
+
+enum EventLogStatus
+eventLogStatus(void)
+{
+    if (eventlog_enabled) {
+        return EVENTLOG_RUNNING;
+    } else {
+        return EVENTLOG_NOT_CONFIGURED;
+    }
+}
+
+static bool
+startEventLogging_(void)
+{
+    initEventLogWriter();
 
     postHeaderEvents();
 
@@ -564,14 +582,42 @@ initEventLogging(const EventLogWriter *ev_writer)
      */
     printAndClearEventBuf(&eventBuf);
 
-    for (uint32_t c = 0; c < n_caps; ++c) {
+    for (uint32_t c = 0; c < get_n_capabilities(); ++c) {
         postBlockMarker(&capEventBuf[c]);
+    }
+    return true;
+}
+
+bool
+startEventLogging(const EventLogWriter *ev_writer)
+{
+    if (eventlog_enabled || event_log_writer) {
+        return false;
+    }
+
+    eventlog_enabled = true;
+    event_log_writer = ev_writer;
+    return startEventLogging_();
+}
+
+// Called during forkProcess in the child to restart the eventlog writer.
+void
+restartEventLogging(void)
+{
+    freeEventLogging();
+    stopEventLogWriter();
+    initEventLogging();  // allocate new per-capability buffers
+    if (event_log_writer != NULL) {
+        startEventLogging_(); // child starts its own eventlog
     }
 }
 
 void
 endEventLogging(void)
 {
+    if (!eventlog_enabled)
+        return;
+
     // Flush all events remaining in the buffers.
     for (uint32_t c = 0; c < n_capabilities; ++c) {
         printAndClearEventBuf(&capEventBuf[c]);
@@ -586,6 +632,8 @@ endEventLogging(void)
     printAndClearEventBuf(&eventBuf);
 
     stopEventLogWriter();
+    event_log_writer = NULL;
+    eventlog_enabled = false;
 }
 
 void
@@ -624,13 +672,6 @@ freeEventLogging(void)
     if (capEventBuf != NULL)  {
         stgFree(capEventBuf);
     }
-}
-
-void
-abortEventLogging(void)
-{
-    freeEventLogging();
-    stopEventLogWriter();
 }
 
 /*
@@ -1440,7 +1481,7 @@ void printAndClearEventBuf (EventsBuf *ebuf)
         size_t elog_size = ebuf->pos - ebuf->begin;
         if (!writeEventLog(ebuf->begin, elog_size)) {
             debugBelch(
-                    "printAndClearEventLog: could not flush event log"
+                    "printAndClearEventLog: could not flush event log\n"
                 );
             resetEventsBuf(ebuf);
             return;
@@ -1523,5 +1564,18 @@ void postEventType(EventsBuf *eb, EventType *et)
     postWord32(eb, 0); // no extensions yet
     postInt32(eb, EVENT_ET_END);
 }
+
+#else
+
+enum EventLogStatus eventLogStatus(void)
+{
+    return EVENTLOG_NOT_SUPPORTED;
+}
+
+bool startEventLogging(const EventLogWriter *writer STG_UNUSED) {
+    return false;
+}
+
+void endEventLogging(void) {}
 
 #endif /* TRACING */
