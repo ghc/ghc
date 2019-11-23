@@ -164,10 +164,50 @@ BOOL file_exists(LPCTSTR path)
     return r != INVALID_FILE_ATTRIBUTES;
 }
 
+/* If true then caller needs to free tempFileName.  */
 bool __createUUIDTempFileErrNo (wchar_t* pathName, wchar_t* prefix,
-                                wchar_t* suffix, wchar_t* tempFileName)
+                                wchar_t* suffix, wchar_t** tempFileName)
 {
+  int retry = 5;
+  bool success = false;
+  while (retry-- > 0 && !success)
+    {
+      GUID guid;
+      ZeroMemory (&guid, sizeof (guid));
+      if (CoCreateGuid (&guid) != S_OK)
+        goto fail;
 
+      RPC_WSTR guidStr;
+      if (UuidToStringW ((UUID*)&guid, &guidStr) != S_OK)
+        goto fail;
+
+      wchar_t* devName = FS(create_device_name) ((wchar_t*)pathName);
+      int len = wcslen (devName) + wcslen (suffix) + wcslen (prefix)
+              + wcslen (guidStr) + 3;
+      *tempFileName = malloc (len * sizeof (wchar_t));
+      if (*tempFileName == NULL)
+        goto fail;
+
+      if (-1 == swprintf_s (*tempFileName, len, L"%ls\\%ls-%ls%ls",
+                            devName, prefix, guidStr, suffix))
+        goto fail;
+
+      free (devName);
+      RpcStringFreeW (&guidStr);
+      /* This should never happen because GUIDs are unique.  But in case hell
+         froze over let's check anyway.  */
+      DWORD dwAttrib = GetFileAttributesW (*tempFileName);
+      success = (dwAttrib == INVALID_FILE_ATTRIBUTES
+                 || (dwAttrib & FILE_ATTRIBUTE_DIRECTORY));
+      if (!success)
+        free (*tempFileName);
+    }
+
+  return success;
+
+fail:
+  maperrno();
+  return false;
 }
 
 bool getTempFileNameErrorNo (wchar_t* pathName, wchar_t* prefix,
