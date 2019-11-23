@@ -1039,6 +1039,7 @@ source-tarball:
   tags:
     - x86_64-linux
   image: "registry.gitlab.haskell.org/ghc/ci-images/x86_64-linux-deb9:$DOCKER_REV"
+  when: always
   dependencies: []
   only:
     - tags
