@@ -127,7 +127,7 @@ putPrim :: Int -> (Ptr Word8 -> IO ()) -> Put ()
 putPrim n f = do
   ix <- putOffset
   sz <- putSize
-  when (ix + n > sz) reallocate
+  when (ix + n > sz) (expand (ix + n))
   arr <- putArr
   Put $ do
     ixr <- put_offset <$> ask
