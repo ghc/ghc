@@ -200,8 +200,8 @@ mkModDetails hsc_env desugared_guts cg_guts =
       , md_complete_sigs = mg_complete_sigs
       }
 
-mkIface :: HscEnv -> CgModGuts -> CgGuts -> IO (ModIface, ModDetails)
-mkIface hsc_env desugared_guts cg_guts = do
+mkIface :: HscEnv -> CgModGuts -> ModDetails -> IO ModIface
+mkIface hsc_env desugared_guts mod_details = do
 
     let CgModGuts
           { cg_mg_module = this_mod
@@ -220,7 +220,6 @@ mkIface hsc_env desugared_guts cg_guts = do
           , cg_mg_arg_docs = arg_docs
           } = desugared_guts
 
-    let mod_details = mkModDetails hsc_env desugared_guts cg_guts
     let dflags = hsc_dflags hsc_env
 
     let tidy_rules = md_rules mod_details
@@ -238,7 +237,7 @@ mkIface hsc_env desugared_guts cg_guts = do
     -- Debug printing
     dumpIfSet_dyn dflags Opt_D_dump_hi "FINAL INTERFACE" (pprModIface iface)
 
-    return (iface, mod_details)
+    return iface
 
 -- | Make an interface from the results of typechecking only.  Useful
 -- for non-optimising compilation, or where we aren't generating any
