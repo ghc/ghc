@@ -1141,6 +1141,7 @@ and now we do NOT want eta expansion to give
 
 Instead CoreArity.etaExpand gives
                 f = /\a -> \y -> let s = h 3 in g s y
+
 -}
 
 cpeEtaExpand :: Arity -> CpeRhs -> CpeRhs
@@ -1161,6 +1162,8 @@ get to a partial application:
     ==> case x of { p -> map f }
 -}
 
+-- When updating this function, make sure it lines up with
+-- CoreUtils.tryEtaReduce!
 tryEtaReducePrep :: [CoreBndr] -> CoreExpr -> Maybe CoreExpr
 tryEtaReducePrep bndrs expr@(App _ _)
   | ok_to_eta_reduce f
@@ -1180,25 +1183,14 @@ tryEtaReducePrep bndrs expr@(App _ _)
     ok bndr (Var arg) = bndr == arg
     ok _    _         = False
 
-          -- We can't eta reduce something which must be saturated.
+    -- We can't eta reduce something which must be saturated.
     ok_to_eta_reduce (Var f) = not (hasNoBinding f)
     ok_to_eta_reduce _       = False -- Safe. ToDo: generalise
 
-tryEtaReducePrep bndrs (Let bind@(NonRec _ r) body)
-  | not (any (`elemVarSet` fvs) bndrs)
-  = case tryEtaReducePrep bndrs body of
-        Just e -> Just (Let bind e)
-        Nothing -> Nothing
-  where
-    fvs = exprFreeVars r
 
--- NB: do not attempt to eta-reduce across ticks
--- Otherwise we risk reducing
---       \x. (Tick (Breakpoint {x}) f x)
---   ==> Tick (breakpoint {x}) f
--- which is bogus (#17228)
--- tryEtaReducePrep bndrs (Tick tickish e)
---   = fmap (mkTick tickish) $ tryEtaReducePrep bndrs e
+tryEtaReducePrep bndrs (Tick tickish e)
+  | tickishFloatable tickish
+  = fmap (mkTick tickish) $ tryEtaReducePrep bndrs e
 
 tryEtaReducePrep _ _ = Nothing
 

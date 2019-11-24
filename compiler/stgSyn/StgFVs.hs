@@ -70,12 +70,12 @@ args env = mkFreeVarSet env . mapMaybe f
 binding :: Env -> DIdSet -> StgBinding -> (CgStgBinding, DIdSet)
 binding env body_fv (StgNonRec bndr r) = (StgNonRec bndr r', fvs)
   where
-    -- See Note [Tacking local binders]
+    -- See Note [Tracking local binders]
     (r', rhs_fvs) = rhs env r
     fvs = delDVarSet body_fv bndr `unionDVarSet` rhs_fvs
 binding env body_fv (StgRec pairs) = (StgRec pairs', fvs)
   where
-    -- See Note [Tacking local binders]
+    -- See Note [Tracking local binders]
     bndrs = map fst pairs
     (rhss, rhs_fvss) = mapAndUnzip (rhs env . snd) pairs
     pairs' = zip bndrs rhss
@@ -93,7 +93,7 @@ expr env = go
     go (StgCase scrut bndr ty alts) = (StgCase scrut' bndr ty alts', fvs)
       where
         (scrut', scrut_fvs) = go scrut
-        -- See Note [Tacking local binders]
+        -- See Note [Tracking local binders]
         (alts', alt_fvss) = mapAndUnzip (alt (addLocals [bndr] env)) alts
         alt_fvs = unionDVarSets alt_fvss
         fvs = delDVarSet (unionDVarSet scrut_fvs alt_fvs) bndr
@@ -108,7 +108,7 @@ expr env = go
 
     go_bind dc bind body = (dc bind' body', fvs)
       where
-        -- See Note [Tacking local binders]
+        -- See Note [Tracking local binders]
         env' = addLocals (boundIds bind) env
         (body', body_fvs) = expr env' body
         (bind', fvs) = binding env' body_fvs bind
@@ -117,7 +117,7 @@ rhs :: Env -> StgRhs -> (CgStgRhs, DIdSet)
 rhs env (StgRhsClosure _ ccs uf bndrs body)
   = (StgRhsClosure fvs ccs uf bndrs body', fvs)
   where
-    -- See Note [Tacking local binders]
+    -- See Note [Tracking local binders]
     (body', body_fvs) = expr (addLocals bndrs env) body
     fvs = delDVarSetList body_fvs bndrs
 rhs env (StgRhsCon ccs dc as) = (StgRhsCon ccs dc as, args env as)
@@ -125,6 +125,6 @@ rhs env (StgRhsCon ccs dc as) = (StgRhsCon ccs dc as, args env as)
 alt :: Env -> StgAlt -> (CgStgAlt, DIdSet)
 alt env (con, bndrs, e) = ((con, bndrs, e'), fvs)
   where
-    -- See Note [Tacking local binders]
+    -- See Note [Tracking local binders]
     (e', rhs_fvs) = expr (addLocals bndrs env) e
     fvs = delDVarSetList rhs_fvs bndrs
