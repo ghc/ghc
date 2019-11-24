@@ -407,7 +407,7 @@ where 'BIND' binds the monomorphic Ids 'fm' and 'gm', means
 
         gp = ...same again, with gm instead of fm
 
-The 'fwrap' is an impedence-matcher that typically does nothing; see
+The 'fwrap' is an impedance-matcher that typically does nothing; see
 Note [ABExport wrapper].
 
 This is a pretty bad translation, because it duplicates all the bindings.

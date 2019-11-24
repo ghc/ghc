@@ -402,7 +402,7 @@ bar (x :: forall a. a -> a) = ... -- a is not in scope here
 bax (x :: a) = ... -- a is in scope here
 Because of HsWC and HsIB pass on their scope to their children
 we must wrap the LHsType in pattern signatures in a
-Shielded explictly, so that the HsWC/HsIB scope is not passed
+Shielded explicitly, so that the HsWC/HsIB scope is not passed
 on the the LHsType
 -}
 
