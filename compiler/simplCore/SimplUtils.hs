@@ -558,7 +558,7 @@ discarding the arguments to zip.  Usually this is fine, but on the
 LHS of a rule it's not, because 'as' and 'bs' are now not bound on
 the LHS.
 
-This is a pretty pathalogical example, so I'm not losing sleep over
+This is a pretty pathological example, so I'm not losing sleep over
 it, but the simplest solution was to check sm_inline; if it is False,
 which it is on the LHS of a rule (see updModeForRules), then don't
 make use of the strictness info for the function.

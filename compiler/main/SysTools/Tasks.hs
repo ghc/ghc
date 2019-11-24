@@ -242,7 +242,7 @@ runLink dflags args = traceToolCommand dflags "linker" $ do
   --
   -- `-optl` args come at the end, so that later `-l` options
   -- given there manually can fill in symbols needed by
-  -- Haskell libaries coming in via `args`.
+  -- Haskell libraries coming in via `args`.
   linkargs <- neededLinkArgs `fmap` getLinkerInfo dflags
   let (p,args0) = pgm_l dflags
       optl_args = map Option (getOpts dflags opt_l)
