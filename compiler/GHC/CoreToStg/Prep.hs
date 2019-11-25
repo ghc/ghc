@@ -423,7 +423,7 @@ cpeBind top_lvl env (NonRec bndr rhs)
                                    dmd is_unlifted
                                    env bndr1 rhs
        -- See Note [Inlining in CorePrep]
-       ; if exprIsTrivial rhs1 && isNotTopLevel top_lvl
+       ; if cpExprIsTrivial rhs1 && isNotTopLevel top_lvl
             then return (extendCorePrepEnvExpr env bndr rhs1, floats, Nothing)
             else do {
 
@@ -1022,7 +1022,15 @@ okCpeArg :: CoreExpr -> Bool
 -- Don't float literals. See Note [ANF-ising literal string arguments].
 okCpeArg (Lit _) = False
 -- Do not eta expand a trivial argument
-okCpeArg expr    = not (exprIsTrivial expr)
+okCpeArg expr    = not (cpExprIsTrivial expr)
+
+cpExprIsTrivial :: CoreExpr -> Bool
+cpExprIsTrivial e0@(Case e _ _ [(DataAlt k,_,rhs)])
+  | getName k == unsafeReflDataConName
+  = let ret = cpExprIsTrivial e && cpExprIsTrivial rhs
+    in pprTrace "unsafeEqualityProof found:" (ppr e0 $$ ppr ret) ret
+
+cpExprIsTrivial e = pprTrace "cpExprIsTrivial" (ppr e) $exprIsTrivial e
 
 -- This is where we arrange that a non-trivial argument is let-bound
 cpeArg :: CorePrepEnv -> Demand
