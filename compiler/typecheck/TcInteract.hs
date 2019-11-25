@@ -604,7 +604,7 @@ we keep?  More subtle than you might think!
         and can be reported as redundant.  See Note [Tracking redundant constraints]
         in TcSimplify.
 
-        It transpires that using the outermost one is reponsible for an
+        It transpires that using the outermost one is responsible for an
         8% performance improvement in nofib cryptarithm2, compared to
         just rolling the dice.  I didn't investigate why.
 
@@ -1582,7 +1582,7 @@ inertsCanDischarge inerts tv rhs fr
     keep_deriv ev_i
       | Wanted WOnly  <- ctEvFlavour ev_i  -- inert is [W]
       , (Wanted WDeriv, _) <- fr           -- work item is [WD]
-      = True   -- Keep a derived verison of the work item
+      = True   -- Keep a derived version of the work item
       | otherwise
       = False  -- Work item is fully discharged
 

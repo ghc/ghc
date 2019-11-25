@@ -133,7 +133,7 @@ class TestConfig:
         # Do we have SMP support?
         self.have_smp = False
 
-        # Is gdb avaliable?
+        # Is gdb available?
         self.have_gdb = False
 
         # Is readelf available?

@@ -397,7 +397,7 @@ instance Monoid (UniqDFM a) where
   mempty = emptyUDFM
   mappend = (Semi.<>)
 
--- This should not be used in commited code, provided for convenience to
+-- This should not be used in committed code, provided for convenience to
 -- make ad-hoc conversions when developing
 alwaysUnsafeUfmToUdfm :: UniqFM elt -> UniqDFM elt
 alwaysUnsafeUfmToUdfm = listToUDFM_Directly . nonDetUFMToList

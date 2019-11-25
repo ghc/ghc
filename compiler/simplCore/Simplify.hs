@@ -1623,7 +1623,7 @@ wrapJoinCont env cont thing_inside
   = thing_inside env cont
 
   | not (sm_case_case (getMode env))
-    -- See Note [Join points wih -fno-case-of-case]
+    -- See Note [Join points with -fno-case-of-case]
   = do { (floats1, expr1) <- thing_inside env (mkBoringStop (contHoleType cont))
        ; let (floats2, expr2) = wrapJoinFloatsX floats1 expr1
        ; (floats3, expr3) <- rebuild (env `setInScopeFromF` floats2) expr2 cont
@@ -1691,7 +1691,7 @@ We need do make the continuation E duplicable (since we are duplicating it)
 with mkDuableCont.
 
 
-Note [Join points wih -fno-case-of-case]
+Note [Join points with -fno-case-of-case]
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 Supose case-of-case is switched off, and we are simplifying
 
@@ -2965,7 +2965,7 @@ knownCon env scrut dc_floats dc dc_ty_args dc_args bndr bs rhs cont
       | exprIsTrivial scrut = return (emptyFloats env
                                      , extendIdSubst env bndr (DoneEx scrut Nothing))
       | otherwise           = do { dc_args <- mapM (simplVar env) bs
-                                         -- dc_ty_args are aready OutTypes,
+                                         -- dc_ty_args are already OutTypes,
                                          -- but bs are InBndrs
                                  ; let con_app = Var (dataConWorkId dc)
                                                  `mkTyApps` dc_ty_args

@@ -33,7 +33,7 @@ expandTopDir = expandPathVar "topdir"
 
 -- | @expandPathVar var value str@
 --
---   replaces occurences of variable @$var@ with @value@ in str.
+--   replaces occurrences of variable @$var@ with @value@ in str.
 expandPathVar :: String -> FilePath -> String -> String
 expandPathVar var value str
   | Just str' <- stripPrefix ('$':var) str
