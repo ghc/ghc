@@ -1025,12 +1025,12 @@ okCpeArg (Lit _) = False
 okCpeArg expr    = not (cpExprIsTrivial expr)
 
 cpExprIsTrivial :: CoreExpr -> Bool
-cpExprIsTrivial e0@(Case e _ _ [(DataAlt k,_,rhs)])
-  | getName k == unsafeReflDataConName
-  = let ret = cpExprIsTrivial e && cpExprIsTrivial rhs
-    in pprTrace "unsafeEqualityProof found:" (ppr e0 $$ ppr ret) ret
-
-cpExprIsTrivial e = pprTrace "cpExprIsTrivial" (ppr e) $exprIsTrivial e
+cpExprIsTrivial e
+  | Case scrut _ _ [(DataAlt k,_,rhs)] <- e
+  , getName k == unsafeReflDataConName
+  = cpExprIsTrivial scrut && cpExprIsTrivial rhs
+  | otherwise
+  = exprIsTrivial e
 
 -- This is where we arrange that a non-trivial argument is let-bound
 cpeArg :: CorePrepEnv -> Demand
