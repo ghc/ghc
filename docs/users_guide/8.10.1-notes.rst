@@ -152,7 +152,7 @@ Language
   Because GHC needs to look under a type family to see that ``a`` is determined
   by the right-hand side of ``F2``\'s equation, this now needs ``-XUndecidableInstances``.
   The problem is very much akin to its need to detect some functional dependencies.
-    
+
 Compiler
 ~~~~~~~~
 
@@ -202,6 +202,9 @@ Compiler
   They can be used for applying tiny configuration changes, registering hooks
   and much more. See the :ref:`user guide <dynflags_plugins>` for
   more details as well as an example.
+
+- Deprecated flag :ghc-flag:`-fmax-pmcheck-iterations` in favor of
+  :ghc-flag:`-fmax-pmcheck-models`, which uses a completely different mechanism.
 
 GHCi
 ~~~~
@@ -273,6 +276,14 @@ Template Haskell
 
     tStr :: String
     tStr = show MkT
+
+- TH splices by default don't generate warnings anymore. For example,
+  ``$([d| f :: Int -> void; f x = case x of {} |])`` used to generate a
+  pattern-match exhaustivity warning, which now it doesn't. The user can
+  activate warnings for TH splices with :ghc-flag:`-fenable-th-splice-warnings`.
+  The reason for opt-in is that the offending code might not have been generated
+  by code the user has control over, for example the ``singletons`` or ``lens``
+  library.
 
 ``ghc-prim`` library
 ~~~~~~~~~~~~~~~~~~~~
