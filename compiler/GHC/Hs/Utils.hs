@@ -48,7 +48,7 @@ module GHC.Hs.Utils(
   mkChunkified, chunkify,
 
   -- * Bindings
-  mkFunBind, mkVarBind, mkHsVarBind, mk_easy_FunBind, mkTopFunBind,
+  mkFunBind, mkVarBind, mkHsVarBind, mkSimpleGeneratedFunBind, mkTopFunBind,
   mkPatSynBind,
   isInfixFunBind,
 
@@ -800,14 +800,15 @@ l
 ************************************************************************
 -}
 
-mkFunBind :: Located RdrName -> [LMatch GhcPs (LHsExpr GhcPs)]
+mkFunBind :: Origin -> Located RdrName -> [LMatch GhcPs (LHsExpr GhcPs)]
           -> HsBind GhcPs
 -- ^ Not infix, with place holders for coercion and free vars
-mkFunBind fn ms = FunBind { fun_id = fn
-                          , fun_matches = mkMatchGroup Generated ms
-                          , fun_co_fn = idHsWrapper
-                          , fun_ext = noExtField
-                          , fun_tick = [] }
+mkFunBind origin fn ms
+  = FunBind { fun_id = fn
+            , fun_matches = mkMatchGroup origin ms
+            , fun_co_fn = idHsWrapper
+            , fun_ext = noExtField
+            , fun_tick = [] }
 
 mkTopFunBind :: Origin -> Located Name -> [LMatch GhcRn (LHsExpr GhcRn)]
              -> HsBind GhcRn
@@ -820,7 +821,7 @@ mkTopFunBind origin fn ms = FunBind { fun_id = fn
                                     , fun_tick = [] }
 
 mkHsVarBind :: SrcSpan -> RdrName -> LHsExpr GhcPs -> LHsBind GhcPs
-mkHsVarBind loc var rhs = mk_easy_FunBind loc var [] rhs
+mkHsVarBind loc var rhs = mkSimpleGeneratedFunBind loc var [] rhs
 
 mkVarBind :: IdP (GhcPass p) -> LHsExpr (GhcPass p) -> LHsBind (GhcPass p)
 mkVarBind var rhs = cL (getLoc rhs) $
@@ -846,10 +847,12 @@ isInfixFunBind _ = False
 
 
 ------------
-mk_easy_FunBind :: SrcSpan -> RdrName -> [LPat GhcPs]
+-- | Convenience function using 'mkFunBind'.
+-- This is for generated bindings only, do not use for user-written code.
+mkSimpleGeneratedFunBind :: SrcSpan -> RdrName -> [LPat GhcPs]
                 -> LHsExpr GhcPs -> LHsBind GhcPs
-mk_easy_FunBind loc fun pats expr
-  = cL loc $ mkFunBind (cL loc fun)
+mkSimpleGeneratedFunBind loc fun pats expr
+  = cL loc $ mkFunBind Generated (cL loc fun)
               [mkMatch (mkPrefixFunRhs (cL loc fun)) pats expr
                        (noLoc emptyLocalBinds)]
 

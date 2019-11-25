@@ -13404,6 +13404,17 @@ The syntax for a declaration splice uses "``$``" not "``splice``". The type of
 the enclosed expression must be ``Q [Dec]``, not ``[Q Dec]``. Typed expression
 splices and quotations are supported.)
 
+.. ghc-flag:: -fenable-th-splice-warnings
+    :shortdesc: Generate warnings for Template Haskell splices
+    :type: dynamic
+    :reverse: -fno-enable-th-splices
+    :category: warnings
+
+    Template Haskell splices won't be checked for warnings, because the code
+    causing the warning might originate from a third-party library and possibly
+    was not written by the user. If you want to have warnings for splices
+    anyway, pass :ghc-flag:`-fenable-th-splice-warnings`.
+
 .. _th-usage:
 
 Using Template Haskell
