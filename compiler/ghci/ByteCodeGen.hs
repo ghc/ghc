@@ -987,12 +987,6 @@ doCase d s p (_,scrut) bndr alts is_unboxed_tuple
   | typePrimRep (idType bndr) `lengthExceeds` 1
   = multiValException
 
-  -- Handle unsafe equality proof
-  | AnnVar id <- bcViewLoop scrut
-  , idName id == unsafeEqualityProofName
-  , [(_, _, (_, rhs))] <- alts
-  = schemeE d s p rhs
-
   | otherwise
   = do
      dflags <- getDynFlags
@@ -1893,6 +1887,7 @@ bcView :: AnnExpr' Var ann -> Maybe (AnnExpr' Var ann)
 --  b) type applications
 --  c) casts
 --  d) ticks (but not breakpoints)
+--  e) case unsafeEqualityProof of UnsafeRefl -> e  ==> e
 -- Type lambdas *can* occur in random expressions,
 -- whereas value lambdas cannot; that is why they are nuked here
 bcView (AnnCast (_,e) _)             = Just e
@@ -1900,6 +1895,11 @@ bcView (AnnLam v (_,e)) | isTyVar v  = Just e
 bcView (AnnApp (_,e) (_, AnnType _)) = Just e
 bcView (AnnTick Breakpoint{} _)      = Nothing
 bcView (AnnTick _other_tick (_,e))   = Just e
+bcView (AnnCase (_,e) _ _ alts)  -- Handle unsafe equality proof
+  | AnnVar id <- bcViewLoop e
+  , idName id == unsafeEqualityProofName
+  , [(_, _, (_, rhs))] <- alts
+  = Just rhs
 bcView _                             = Nothing
 
 bcViewLoop :: AnnExpr' Var ann -> AnnExpr' Var ann
