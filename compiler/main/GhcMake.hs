@@ -51,6 +51,7 @@ import HscTypes
 import Module
 import TcIface          ( typecheckIface )
 import TcRnMonad        ( initIfaceCheck )
+import MkIface          ( RecompileRequired ( MustCompile ) )
 import HscMain
 
 import Bag              ( unitBag, listToBag, unionManyBags, isEmptyBag )
@@ -1482,6 +1483,9 @@ upsweep mHscMessage old_hpt stable_mods cleanup sccs = do
   upsweep' old_hpt done
      (AcyclicSCC (InstantiationNode iuid) : mods) mod_index nmods
    = do hsc_env <- getSession
+        liftIO $ case mHscMessage of
+                   Just hscMessage -> hscMessage hsc_env (mod_index, nmods) MustCompile (InstantiationNode iuid)
+                   Nothing -> return ()
         liftIO $ runHsc hsc_env $ ioMsgMaybe $ tcRnCheckUnitId hsc_env $ IndefiniteUnitId iuid
         upsweep' old_hpt done mods (mod_index+1) nmods
         -- TODO(@Ericson2314) keep going hoop

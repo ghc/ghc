@@ -11,3 +11,4 @@
     [1 of 2] Compiling A[sig]           ( p/A.hsig, T13323.out/p/p-HVmFlcYSefiK5n1aDP1v7x/A.o )
     [2 of 2] Compiling P                ( p/P.hs, T13323.out/p/p-HVmFlcYSefiK5n1aDP1v7x/P.o )
   [1 of 2] Compiling R                ( r/R.hs, T13323.out/r/R.o )
+  [2 of 2] Instantiating Instantiation Node

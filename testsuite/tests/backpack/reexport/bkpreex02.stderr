@@ -8,6 +8,7 @@
   [1 of 4] Compiling T[sig]           ( q/T.hsig, nothing )
   [2 of 4] Compiling H[sig]           ( q/H.hsig, nothing )
   [3 of 4] Compiling A                ( q/A.hs, nothing )
+  [4 of 4] Instantiating Instantiation Node
 [4 of 5] Processing r-impl
   Instantiating r-impl
   [1 of 1] Including timpl
@@ -25,3 +26,5 @@
     [1 of 4] Compiling T[sig]           ( q/T.hsig, nothing )
     [2 of 4] Compiling H[sig]           ( q/H.hsig, nothing )
     [3 of 4] Compiling A                ( q/A.hs, nothing )
+    [4 of 4] Instantiating Instantiation Node
+  [1 of 1] Instantiating Instantiation Node

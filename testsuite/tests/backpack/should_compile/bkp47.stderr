@@ -10,3 +10,5 @@ bkp47.bkp:19:18: warning: [-Wmissing-methods (in -Wdefault)]
     • No explicit implementation for
         either ‘f’ or ‘g’
     • In the instance declaration for ‘C Int’
+  [3 of 4] Instantiating Instantiation Node
+  [4 of 4] Instantiating Instantiation Node

@@ -5,3 +5,5 @@
 [3 of 3] Processing r
   [1 of 4] Compiling A[sig]           ( r/A.hsig, nothing )
   [2 of 4] Compiling B                ( r/B.hs, nothing )
+  [3 of 4] Instantiating Instantiation Node
+  [4 of 4] Instantiating Instantiation Node
