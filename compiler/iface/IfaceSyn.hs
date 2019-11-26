@@ -67,7 +67,7 @@ import Binary
 import BooleanFormula ( BooleanFormula, pprBooleanFormula, isTrue )
 import Var( VarBndr(..), binderVar )
 import TyCon ( Role (..), Injectivity(..), tyConBndrVisArgFlag )
-import Util( dropList, filterByList, notNull, unzipWith )
+import Util( dropList, filterByList, notNull, unzipWith, debugIsOn )
 import DataCon (SrcStrictness(..), SrcUnpackedness(..))
 import Lexeme (isLexSym)
 import TysWiredIn ( constraintKindTyConName )
@@ -594,7 +594,7 @@ pprAxBranch pp_tc idx (IfaceAxBranch { ifaxbTyVars = tvs
                                      , ifaxbLHS = pat_tys
                                      , ifaxbRHS = rhs
                                      , ifaxbIncomps = incomps })
-  = WARN( not (null _cvs), pp_tc $$ ppr _cvs )
+  = ASSERT2( null _cvs, pp_tc $$ ppr _cvs )
     hang ppr_binders 2 (hang pp_lhs 2 (equals <+> ppr rhs))
     $+$
     nest 4 maybe_incomps
