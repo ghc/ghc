@@ -3,7 +3,7 @@
 --
 --      TODO:   Signed vs unsigned?
 --
---      TODO:   This module is currenly shared by all architectures because
+--      TODO:   This module is currently shared by all architectures because
 --              NCGMonad need to know about it to make a VReg. It would be better
 --              to have architecture specific formats, and do the overloading
 --              properly. eg SPARC doesn't care about FF80.

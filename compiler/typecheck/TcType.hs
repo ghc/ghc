@@ -277,7 +277,7 @@ Note, though, that a /bound/ type variable can (and probably should)
 be a TyVar.  E.g
     forall a. a -> a
 Here 'a' is really just a deBruijn-number; it certainly does not have
-a signficant TcLevel (as every TcTyVar does).  So a forall-bound type
+a significant TcLevel (as every TcTyVar does).  So a forall-bound type
 variable should be TyVars; and hence a TyVar can appear free in a TcType.
 
 The type checker and constraint solver can also encounter /free/ type
@@ -1657,7 +1657,7 @@ pickQuantifiablePreds qtvs theta
           EqPred eq_rel ty1 ty2
             | quantify_equality eq_rel ty1 ty2
             , Just (cls, tys) <- boxEqPred eq_rel ty1 ty2
-              -- boxEqPred: See Note [Lift equality constaints when quantifying]
+              -- boxEqPred: See Note [Lift equality constraints when quantifying]
             , pick_cls_pred flex_ctxt cls tys
             -> Just (mkClassPred cls tys)
 
@@ -1875,7 +1875,7 @@ Notice that
 
 See also TcTyDecls.checkClassCycles.
 
-Note [Lift equality constaints when quantifying]
+Note [Lift equality constraints when quantifying]
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 We can't quantify over a constraint (t1 ~# t2) because that isn't a
 predicate type; see Note [Types for coercions, predicates, and evidence]

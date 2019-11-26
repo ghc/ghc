@@ -41,7 +41,7 @@ test('Check04', normal, multi_compile, ['Check04', [
 # Check -fpackage-trust with no safe haskell flag is an error
 test('Check05', normal, compile, [''])
 
-# Check safe-infered modules have correct pkg trust requirements
+# Check safe-inferred modules have correct pkg trust requirements
 test('Check06', [], multimod_compile_fail, ['Check06', ''])
 
 # Check selective safe imports bring in correct pkg trust requirements

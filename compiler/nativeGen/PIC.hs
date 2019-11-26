@@ -420,7 +420,7 @@ picRelative dflags arch OSDarwin lbl
 
 -- On AIX we use an indirect local TOC anchored by 'gotLabel'.
 -- This way we use up only one global TOC entry per compilation-unit
--- (this is quite similiar to GCC's @-mminimal-toc@ compilation mode)
+-- (this is quite similar to GCC's @-mminimal-toc@ compilation mode)
 picRelative dflags _ OSAIX lbl
         = CmmLabelDiffOff lbl gotLabel 0 (wordWidth dflags)
 
@@ -623,7 +623,7 @@ pprImportedSymbol _ (Platform { platformMini = PlatformMini { platformMini_os = 
 
 -- XCOFF / AIX
 --
--- Similiar to PPC64 ELF v1, there's dedicated TOC register (r2). To
+-- Similar to PPC64 ELF v1, there's dedicated TOC register (r2). To
 -- workaround the limitation of a global TOC we use an indirect TOC
 -- with the label `ghc_toc_table`.
 --

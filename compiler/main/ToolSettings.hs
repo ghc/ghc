@@ -9,7 +9,7 @@ import Fingerprint
 
 -- | Settings for other executables GHC calls.
 --
--- Probably should futher split down by phase, or split between
+-- Probably should further split down by phase, or split between
 -- platform-specific and platform-agnostic.
 data ToolSettings = ToolSettings
   { toolSettings_ldSupportsCompactUnwind :: Bool

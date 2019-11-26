@@ -2057,7 +2057,7 @@ primop FetchAddByteArrayOp_Int "fetchAddIntArray#" GenPrimOp
 primop FetchSubByteArrayOp_Int "fetchSubIntArray#" GenPrimOp
    MutableByteArray# s -> Int# -> Int# -> State# s -> (# State# s, Int# #)
    {Given an array, and offset in machine words, and a value to subtract,
-    atomically substract the value to the element. Returns the value of
+    atomically subtract the value to the element. Returns the value of
     the element before the operation. Implies a full memory barrier.}
    with has_side_effects = True
         can_fail = True

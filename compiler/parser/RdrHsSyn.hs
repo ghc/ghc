@@ -567,7 +567,7 @@ declarations and types as a reversed list of TyEl:
             | TyElBang | TyElTilde
             | ...
 
-For example, both occurences of (C ! D) in the following example are parsed
+For example, both occurrences of (C ! D) in the following example are parsed
 into equal lists of TyEl:
 
   data T = C ! D => C ! D   results in   [ TyElOpd (HsTyVar "D")
@@ -2979,7 +2979,7 @@ failOpNotEnabledImportQualifiedPost loc = addError loc msg
 failOpImportQualifiedTwice :: SrcSpan -> P ()
 failOpImportQualifiedTwice loc = addError loc msg
   where
-    msg = text "Multiple occurences of 'qualified'"
+    msg = text "Multiple occurrences of 'qualified'"
 
 warnStarIsType :: SrcSpan -> P ()
 warnStarIsType span = addWarning Opt_WarnStarIsType span msg

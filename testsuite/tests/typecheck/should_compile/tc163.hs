@@ -24,7 +24,7 @@ flop = \m' k -> mkM3' m' (\bm k1 -> error "urk")
 
 -- But if we give mkM3' the type 
 --     forall a r. M3' a -> (forall b. ...) -> r
--- everthing works fine.  Very very delicate.
+-- everything works fine.  Very very delicate.
 
 ---------------- A more complex case -------------
 bind :: M3 a -> (a -> M3 b) -> M3 b

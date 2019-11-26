@@ -885,7 +885,7 @@ ppr_ty ctxt_prec (IfaceCoercionTy co)
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 RuntimeRep variables are considered by many (most?) users to be little
 more than syntactic noise. When the notion was introduced there was a
-signficant and understandable push-back from those with pedagogy in
+significant and understandable push-back from those with pedagogy in
 mind, which argued that RuntimeRep variables would throw a wrench into
 nearly any teach approach since they appear in even the lowly ($)
 function's type,

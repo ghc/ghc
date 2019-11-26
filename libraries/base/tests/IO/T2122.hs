@@ -34,7 +34,7 @@ main = do
    writeFile fp "test"
    test True
 
--- fails everytime when causeFailure is True in GHCi, with runhaskell,
+-- fails every time when causeFailure is True in GHCi, with runhaskell,
 -- or when compiled.
 test :: Bool -> IO ()
 test causeFailure =

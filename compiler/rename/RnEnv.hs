@@ -1137,7 +1137,7 @@ constructor namespace before looking in the data constructor namespace to
 deal with `DataKinds`.
 
 There is however, as always, one exception to this scheme. If we find
-an ambiguous occurence of a record selector and DuplicateRecordFields
+an ambiguous occurrence of a record selector and DuplicateRecordFields
 is enabled then we defer the selection until the typechecker.
 
 -}

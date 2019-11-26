@@ -816,7 +816,7 @@ x86_mkJumpInstr id
 --                         |                   |
 --                         +-------------------+
 --
---   In essense each allocation larger than a page size needs to be chunked and
+--   In essence each allocation larger than a page size needs to be chunked and
 --   a probe emitted after each page allocation.  You have to hit the guard
 --   page so the kernel can map in the next page, otherwise you'll segfault.
 --
