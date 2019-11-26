@@ -113,7 +113,11 @@ import qualified Data.ByteString.Char8    as BSC
 import qualified Data.ByteString.Internal as BS
 import qualified Data.ByteString.Unsafe   as BS
 import Foreign.C
-import GHC.Exts
+import GHC.Exts (Int(I#),Ptr(Ptr),Addr#,Int#,MutableArray#,RealWorld,andI#)
+import GHC.Exts (Array#,IsString(fromString),isTrue#,readArray#,writeArray#)
+import GHC.Exts (xorI#,ord#,indexCharOffAddr#,newArray#,unsafeFreezeArray#)
+import GHC.Exts (sizeofMutableArray#,indexArray#,(+#),(*#),(<#),(==#),remInt#)
+import GHC.Exts (uncheckedIShiftRL#)
 import System.IO
 import Data.Data
 import Data.IORef
@@ -128,7 +132,7 @@ import Foreign
 import GHC.Conc.Sync    (sharedCAF)
 #endif
 
-import GHC.Base         ( unpackCString#, unpackNBytes# )
+import GHC.Base ( unpackCString#, unpackNBytes# )
 
 
 -- | Gives the UTF-8 encoded bytes corresponding to a 'FastString'
