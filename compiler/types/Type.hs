@@ -62,7 +62,7 @@ module Type (
 
         getRuntimeRep_maybe, kindRep_maybe, kindRep,
 
-        mkCastTy, mkCoercionTy, splitCastTy_maybe,
+        mkCastTy, mkCastTyK, mkCoercionTy, splitCastTy_maybe,
         discardCast,
 
         userTypeError_maybe, pprUserTypeErrorTy,
@@ -779,10 +779,23 @@ See Note [The Purely Kinded Type Invariant (PKTI)] in TcHsType.
 -- | Applies a type to another, as in e.g. @k a@
 mkAppTy :: Type -> Type -> Type
 -- See Note [mkAppTy subtleties]
+
 mkAppTy (CastTy fun_ty co) arg_ty
-  | ([arg_co], res_co) <- decomposePiCos (typeKind fun_ty) co
-                                         (pSnd $ coercionKind co) [arg_ty]
-  = (fun_ty `mkAppTy` (arg_ty `mkCastTy` arg_co)) `mkCastTy` res_co
+  -- For this equation to succeed we have
+  --     (fak -> frk) = typeKind fun_ty
+  --     ak = typeKind arg_ty
+  --     (ak -> rk) = pSnd (coercionKind co)
+  --     co :: (fak -> frk) ~ (ak -> rk)
+  --     arg_co :: ak ~ fak
+  --     res_co :: frk ~ rk
+  | ([arg_co], res_co) <- decomposePiCos fun_kind co co_res_kind [arg_ty]
+  = mkCastTyK (fun_ty `mkAppTy` arg_ty') frk res_co rk
+  where
+    fun_kind    = typeKind fun_ty
+    (fak,frk)   = splitFunTy fun_kind
+    co_res_kind = pSnd $ coercionKind co
+    (ak, rk)    = splitFunTy co_res_kind
+    arg_ty'     = mkCastTyK arg_ty ak arg_co fak
 
 mkAppTy (TyConApp tc tys) ty2 = mkTyConApp tc (tys ++ [ty2])
 mkAppTy ty1               ty2 = AppTy ty1 ty2
@@ -803,12 +816,20 @@ mkAppTys :: Type -> [Type] -> Type
 mkAppTys ty1 []   = ty1
 
 mkAppTys (CastTy fun_ty co) arg_tys
+  -- For this equation to succeed we have
+  --     (faks -> frk) = typeKind fun_ty
+  --     aks = map typeKind arg_tys
+  --     (aks -> rk) = pSnd (coercionKind co)
+  --     co :: (faks -> frk) ~ (aks -> rk)
+  --     arg_co_i :: ak_i ~ fak_i
+  --     res_co   :: frk ~ rk
   = -- Much more efficient then nested mkAppTy
     -- But see Note [mkAppTy subtleties]
     foldl' AppTy ((mkAppTys fun_ty casted_arg_tys) `mkCastTy` res_co) leftovers
   where
-    (arg_cos, res_co) = decomposePiCos (typeKind fun_ty) co
-                                       (pSnd $ coercionKind co) arg_tys
+    fun_kind = typeKind fun_ty
+    co_res_kind = pSnd $ coercionKind co
+    (arg_cos, res_co) = decomposePiCos fun_kind co co_res_kind arg_tys
     (args_to_cast, leftovers) = splitAtList arg_cos arg_tys
     casted_arg_tys = zipWith mkCastTy args_to_cast arg_cos
 
@@ -1027,15 +1048,15 @@ See #11714.
 splitFunTy :: Type -> (Type, Type)
 -- ^ Attempts to extract the argument and result types from a type, and
 -- panics if that is not possible. See also 'splitFunTy_maybe'
-splitFunTy ty | Just ty' <- coreView ty = splitFunTy ty'
-splitFunTy (FunTy _ arg res) = (arg, res)
-splitFunTy other             = pprPanic "splitFunTy" (ppr other)
+splitFunTy ty | Just ty' <- coreView ty          = splitFunTy ty'
+splitFunTy (FunTy { ft_arg = arg, ft_res = res}) = (arg, res)
+splitFunTy other = pprPanic "splitFunTy" (ppr other)
 
 splitFunTy_maybe :: Type -> Maybe (Type, Type)
 -- ^ Attempts to extract the argument and result types from a type
-splitFunTy_maybe ty | Just ty' <- coreView ty = splitFunTy_maybe ty'
-splitFunTy_maybe (FunTy _ arg res) = Just (arg, res)
-splitFunTy_maybe _                 = Nothing
+splitFunTy_maybe ty | Just ty' <- coreView ty           = splitFunTy_maybe ty'
+splitFunTy_maybe (FunTy { ft_arg = arg, ft_res = res }) = Just (arg, res)
+splitFunTy_maybe _ = Nothing
 
 splitFunTys :: Type -> ([Type], Type)
 splitFunTys ty = split [] ty ty
@@ -1360,27 +1381,47 @@ Specifically
 -- Some very important subtleties here: see Note [mkCastTy subtleties]
 mkCastTy :: Type -> Coercion -> Type
 mkCastTy ty co
-  | typeKind ty `eqType` coercionRKind co     -- (EQ2) from the Note
+  = mkCastTyK ty (typeKind ty) co (coercionRKind co)
+
+mkCastTyK :: HasDebugCallStack => Type -> Kind -> Coercion -> Kind -> Type
+mkCastTyK ty ty_kind co co_res_kind
+  = mk_cast_ty_k ty ty ty_kind co co_res_kind
+
+mk_cast_ty_k ty ps_ty ty_kind co co_res_kind
+  | ASSERT2( typeKind ty `eqType` ty_kind
+           , ppr ty <+> dcolon <+> ppr (typeKind ty) $$ ppr ty_kind )
+    ASSERT2( pSnd (coercionKind co) `eqType` co_res_kind
+           , ppr co <+> dcolon <+> ppr (coercionKind co) $$ ppr co_res_kind )
+    ty_kind `eqType` co_res_kind     -- (EQ2) from the Note
     -- Not isReflexiveCo!  See Note [mkCastTy subtleties]
-  = ty
+  = ps_ty
 
-mkCastTy (CastTy ty co1) co2
-  -- (EQ3) from the Note
-  = mkCastTy ty (co1 `mkTransCo` co2)
-      -- call mkCastTy again for the reflexivity check
+mk_cast_ty_k ty ps_ty ty_kind co co_res_kind
+  | ty' <- coreView ty
+  = mk_cast_ty_k ty' ps_ty ty_kind co co_res_kind
 
-mkCastTy (ForAllTy (Bndr tv vis) inner_ty) co
-  -- (EQ4) from the Note
-  | isTyVar tv
-  , let fvs = tyCoVarsOfCo co
-  = -- have to make sure that pushing the co in doesn't capture the bound var!
-    if tv `elemVarSet` fvs
-    then let empty_subst = mkEmptyTCvSubst (mkInScopeSet fvs)
-             (subst, tv') = substVarBndr empty_subst tv
-         in ForAllTy (Bndr tv' vis) (substTy subst inner_ty `mkCastTy` co)
-    else ForAllTy (Bndr tv vis) (inner_ty `mkCastTy` co)
+  | CastTy inner_ty inner_co <- ty    -- (EQ3) from the Note
+  = mkCastTyK ty (typeKind inner_ty)
+              (inner_co `mkTransCo` co) co_res_kind
+      -- Call mkCastTyK again for the reflexivity check
 
-mkCastTy ty co = CastTy ty co
+  | ForallTy (Bndr tv vis) inner_ty <- ty   -- (EQ4) from the Note
+  , isTyVar tv
+  , let ty_fvs = tyCoVarsOfType ty
+        co_fvs = tyCoVarsOfCo co  -- ToDo: for nested foralls it'd be
+                                  -- better not to recompute co_fvs
+                                  -- or re-check reflexivity
+        empty_subst  = mkEmptyTCvSubst (mkInScopeSet (co_fvs `unionVarSet` ty_fvs)
+        (subst, tv') = substVarBndr empty_subst tv
+        inner_ty'    = substTy subst inner_ty
+  = if tv `elemVarSet` co_fvs
+    then -- Very uncommon case: (forall a.ty) |> co, with 'a' free in 'co'
+         -- Want to push 'co' inside the forall a, so we must clone 'a'
+         ForAllTy (Bndr tv' vis) (mkCastTyK inner_ty' ty_kind co co_res_kind)
+    else ForAllTy (Bndr tv  vis) (mkCastTyK inner_ty  ty_kind co co_res_kind)
+
+  | otherwise
+  = CastTy ps_ty co
 
 tyConBindersTyCoBinders :: [TyConBinder] -> [TyCoBinder]
 -- Return the tyConBinders in TyCoBinder form
@@ -2703,7 +2744,10 @@ occCheckExpand vs_to_avoid ty
 
     go cxt (CastTy ty co) =  do { ty' <- go cxt ty
                                 ; co' <- go_co cxt co
-                                ; return (mkCastTy ty' co') }
+                                ; return (mkCastTyNoCheck ty' co') }
+        -- mkCastTyNoCheck: all 'go' does is to expand type synonyms
+        -- so if the CastTy was ok before, it'll be ok afterwards
+
     go cxt (CoercionTy co) = do { co' <- go_co cxt co
                                 ; return (mkCoercionTy co') }
 
