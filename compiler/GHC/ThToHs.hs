@@ -1059,7 +1059,7 @@ cvt_tup es boxity = do { let cvtl_maybe Nothing  = return missingTupArg
                                     (map noLoc es')
                                     boxity }
 
-{- Note [Operator assocation]
+{- Note [Operator association]
 We must be quite careful about adding parens:
   * Infix (UInfix ...) op arg      Needs parens round the first arg
   * Infix (Infix ...) op arg       Needs parens round the first arg

@@ -1,7 +1,7 @@
 -- | The fusion helper for @enumFromThenTo \@Int@ had multiple
--- occurences of @c@, which made the simplifier refuse to inline it.
+-- occurrences of @c@, which made the simplifier refuse to inline it.
 -- The new implementation for @efdtInt{Up,Dn}FB@ only have a single
--- occurence of @c@ which the simplifier inlines unconditionally.
+-- occurrence of @c@ which the simplifier inlines unconditionally.
 module Main  (main) where
 
 import Control.Monad (when, forM_)
@@ -12,7 +12,7 @@ nop _ = return ()
 {-# NOINLINE nop #-}
 
 -- This is the baseline, using @enumFromTo@ which already had only a
--- single occurence of @c@.
+-- single occurrence of @c@.
 f :: Int -> ST s ()
 f n =
     do

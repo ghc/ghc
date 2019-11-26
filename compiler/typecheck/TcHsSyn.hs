@@ -265,7 +265,7 @@ There are three possibilities:
   So we default it to 'Any' of the right kind.
 
   All this works for both type and kind variables (indeed
-  the two are the same thign).
+  the two are the same thing).
 
 * SkolemiseFlexi: is a special case for the LHS of RULES.
   See Note [Zonking the LHS of a RULE]

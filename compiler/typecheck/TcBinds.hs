@@ -1098,7 +1098,7 @@ checkOverloadedSig monomorphism_restriction_applies sig
 
 {- Note [Partial type signatures and generalisation]
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
-If /any/ of the signatures in the gropu is a partial type signature
+If /any/ of the signatures in the group is a partial type signature
    f :: _ -> Int
 then we *always* use the InferGen plan, and hence tcPolyInfer.
 We do this even for a local binding with -XMonoLocalBinds, when

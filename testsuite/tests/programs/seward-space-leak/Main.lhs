@@ -97,7 +97,7 @@ parameter numbering starts at 1).
 @Call@.
 Calls to other functions are done with @Call@, which expects
 the callee to return @Zero@ or @One@, and selects the relevant
-branch.  The @Tag@s identify calls in the dependancy list.
+branch.  The @Tag@s identify calls in the dependency list.
 Although a @Call@ is a glorified @Case@ statement, the only allowed
 return values are @Zero@ and @One@.  Hence the @CDS CDS@ continuations
 rather than the more comprehensive @(AList Return CDS)@.
@@ -166,7 +166,7 @@ as necessary.  ToDo: Need to rename call sites?  I don't think so.
 Main CDS evaluator takes
 \begin{itemize}
 \item the code store
-\item the dependancy list, a list of @Tag@s of calls which are
+\item the dependency list, a list of @Tag@s of calls which are
       currently in progress
 \item the current arguments
 \item the CDS fragment currently being worked on

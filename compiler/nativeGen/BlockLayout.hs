@@ -79,7 +79,7 @@ import Control.Monad (foldM)
   Edge weights not only represent likelyhood of control transfer between blocks
   but also how much a block would benefit from being placed sequentially after
   it's predecessor.
-  For example blocks which are preceeded by an info table are more likely to end
+  For example blocks which are preceded by an info table are more likely to end
   up in a different cache line than their predecessor and we can't eliminate the jump
   so there is less benefit to placing them sequentially.
 

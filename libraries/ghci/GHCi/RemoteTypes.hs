@@ -33,7 +33,7 @@ import GHC.ForeignPtr
 -- Static pointers only; don't use this for heap-resident pointers.
 -- Instead use HValueRef. We will fix the remote pointer to be 64 bits. This
 -- should cover 64 and 32bit systems, and permits the exchange of remote ptrs
--- between machines of different word size. For exmaple, when connecting to
+-- between machines of different word size. For example, when connecting to
 -- an iserv instance on a different architecture with different word size via
 -- -fexternal-interpreter.
 newtype RemotePtr a = RemotePtr Word64

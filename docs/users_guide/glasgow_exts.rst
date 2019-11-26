@@ -6956,7 +6956,7 @@ like this:
       client to deliberately override an instance from a library,
       without requiring a change to the library.)
 
--  If all the remaining candidates are incoherent, the search suceeds, returning
+-  If all the remaining candidates are incoherent, the search succeeds, returning
    an arbitrary surviving candidate.
 
 -  If more than one non-incoherent candidate remains, the search fails.
@@ -8784,7 +8784,7 @@ injectivity of a type family:
 
 5. In a *closed type family* all equations are ordered and in one place.
    Equations are also checked pair-wise but this time an equation has to
-   be paired with all the preceeding equations. Of course a
+   be paired with all the preceding equations. Of course a
    single-equation closed type family is trivially injective (unless
    (1), (2) or (3) above holds).
 

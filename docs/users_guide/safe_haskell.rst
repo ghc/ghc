@@ -788,7 +788,7 @@ And five warning flags:
     .. index::
        single: safe haskell imports, warning
 
-    The module ``A`` below is annotated to be explictly ``Safe``, but it imports
+    The module ``A`` below is annotated to be explicitly ``Safe``, but it imports
     ``Safe-Inferred`` module. ::
 
         {-# LANGUAGE Safe #-}

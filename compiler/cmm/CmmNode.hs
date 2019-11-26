@@ -669,7 +669,7 @@ scopeUniques (SubScope u _)        = [u]
 scopeUniques (CombinedScope s1 s2) = scopeUniques s1 ++ scopeUniques s2
 
 -- Equality and order is based on the head uniques defined above. We
--- take care to short-cut the (extremly) common cases.
+-- take care to short-cut the (extremely) common cases.
 instance Eq CmmTickScope where
   GlobalScope    == GlobalScope     = True
   GlobalScope    == _               = False

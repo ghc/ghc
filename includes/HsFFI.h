@@ -3,7 +3,7 @@
  * (c) The GHC Team, 2000
  *
  * A mapping for Haskell types to C types, including the corresponding bounds.
- * Intended to be used in conjuction with the FFI.
+ * Intended to be used in conjunction with the FFI.
  *
  * WARNING: Keep this file and StgTypes.h in synch!
  *

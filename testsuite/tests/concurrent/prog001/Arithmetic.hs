@@ -32,7 +32,7 @@ plusOne (0:xs) = 1:fl xs
 
 
 
--- Substraction by 1, the input must be in (0,1)
+-- Subtraction by 1, the input must be in (0,1)
 minusOne :: Gray -> Gray
 minusOne (1:xs) = 0:fl xs
 

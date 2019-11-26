@@ -2387,7 +2387,7 @@ commonly used commands.
     Attempting to redefine an existing command name results in an error
     unless the ``:def!`` form is used, in which case the old command
     with that name is silently overwritten. However for builtin commands
-    the old command can still be used by preceeding the command name with
+    the old command can still be used by preceding the command name with
     a double colon (eg ``::load``).
     It's not possible to redefine the commands ``:{``, ``:}`` and ``:!``.
 

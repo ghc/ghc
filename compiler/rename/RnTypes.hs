@@ -1653,7 +1653,7 @@ extractHsTysRdrTyVarsDups :: [LHsType GhcPs] -> FreeKiTyVarsWithDups
 extractHsTysRdrTyVarsDups tys
   = extract_ltys tys []
 
--- Returns the free kind variables of any explictly-kinded binders, returning
+-- Returns the free kind variables of any explicitly-kinded binders, returning
 -- variable occurrences in left-to-right order.
 -- See Note [Ordering of implicit variables].
 -- NB: Does /not/ delete the binders themselves.
@@ -1758,7 +1758,7 @@ extract_hs_tv_bndrs tv_bndrs acc_vars body_vars
     tv_bndr_rdrs = map hsLTyVarLocName tv_bndrs
 
 extract_hs_tv_bndrs_kvs :: [LHsTyVarBndr GhcPs] -> [Located RdrName]
--- Returns the free kind variables of any explictly-kinded binders, returning
+-- Returns the free kind variables of any explicitly-kinded binders, returning
 -- variable occurrences in left-to-right order.
 -- See Note [Ordering of implicit variables].
 -- NB: Does /not/ delete the binders themselves.

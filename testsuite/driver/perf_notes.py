@@ -517,7 +517,7 @@ def get_commit_metric(gitNoteRef,
 # tolerance_dev: allowed deviation of the actual value from the expected value.
 # allowed_perf_changes: allowed changes in stats. This is a dictionary as returned by get_allowed_perf_changes().
 # force_print: Print stats even if the test stat was in the tolerance range.
-# Returns a (MetricChange, pass/fail object) tuple. Passes if the stats are withing the expected value ranges.
+# Returns a (MetricChange, pass/fail object) tuple. Passes if the stats are within the expected value ranges.
 def check_stats_change(actual: PerfStat,
                        baseline: Baseline,
                        tolerance_dev,

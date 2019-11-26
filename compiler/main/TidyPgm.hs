@@ -1280,7 +1280,7 @@ So we have to *predict* the result here, which is revolting.
 
 In particular CorePrep expands Integer and Natural literals. So in the
 prediction code here we resort to applying the same expansion (cvt_literal).
-There are also numberous other ways in which we can introduce inconsistencies
+There are also numerous other ways in which we can introduce inconsistencies
 between CorePrep and TidyPgm. See Note [CAFfyness inconsistencies due to eta
 expansion in TidyPgm] for one such example.
 

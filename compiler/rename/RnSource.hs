@@ -686,7 +686,7 @@ rnFamInstEqn doc atfi rhs_kvars
        ; tycon'   <- lookupFamInstName mb_cls tycon
        ; let pat_kity_vars_with_dups = extractHsTyArgRdrKiTyVarsDup pats
              -- Use the "...Dups" form because it's needed
-             -- below to report unsed binder on the LHS
+             -- below to report unused binder on the LHS
 
          -- Implicitly bound variables, empty if we have an explicit 'forall' according
          -- to the "forall-or-nothing" rule.

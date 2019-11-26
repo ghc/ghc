@@ -2856,7 +2856,7 @@ simplifyArgsWorker orig_ki_binders orig_inner_ki orig_fvs
         "simplifyArgsWorker wandered into deeper water than usual"
            -- This debug information is commented out because leaving it in
            -- causes a ~2% increase in allocations in T9872d.
-           -- That's independent of the analagous case in flatten_args_fast
+           -- That's independent of the analogous case in flatten_args_fast
            -- in TcFlatten:
            -- each of these causes a 2% increase on its own, so commenting them
            -- both out gives a 4% decrease in T9872d.

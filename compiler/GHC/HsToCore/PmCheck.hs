@@ -947,7 +947,7 @@ Main functions are:
 * pmCheck :: PatVec -> [PatVec] -> ValVec -> Delta -> DsM PartialResult
 
   This function implements functions `covered`, `uncovered` and
-  `divergent` from the paper at once. Calls out to the auxilary function
+  `divergent` from the paper at once. Calls out to the auxiliary function
   `pmCheckGuards` for handling (possibly multiple) guarded RHSs when the whole
   clause is checked. Slightly different from the paper because it does not even
   produce the covered and uncovered sets. Since we only care about whether a

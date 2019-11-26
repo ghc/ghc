@@ -454,9 +454,9 @@ We do the following steps:
             B :-> TcTyCon <initial kind>
         (thereby overriding the B :-> TyConPE binding)
         and do kcLTyClDecl on each decl to get equality constraints on
-        all those inital kinds
+        all those initial kinds
 
-      - Generalise the inital kind, making a poly-kinded TcTyCon
+      - Generalise the initial kind, making a poly-kinded TcTyCon
 
   3. Back in tcTyDecls, extend the envt with bindings of the poly-kinded
      TcTyCons, again overriding the promotion-error bindings.
@@ -1692,7 +1692,7 @@ There's also a change in the renamer:
   inside the data constructor to determine the result kind.
   See Note [Unlifted Newtypes and CUSKs] for more detail.
 
-For completeness, it was also neccessary to make coerce work on
+For completeness, it was also necessary to make coerce work on
 unlifted types, resolving #13595.
 
 -}

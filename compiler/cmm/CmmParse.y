@@ -574,7 +574,7 @@ importName
         :: { (FastString,  CLabel) }
 
         -- A label imported without an explicit packageId.
-        --      These are taken to come frome some foreign, unnamed package.
+        --      These are taken to come from some foreign, unnamed package.
         : NAME
         { ($1, mkForeignLabel $1 Nothing ForeignLabelInExternalPackage IsFunction) }
 

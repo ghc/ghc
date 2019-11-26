@@ -153,7 +153,7 @@ tcInferPatSynDecl (PSB { psb_id = lname@(dL->L _ name), psb_args = details
              mk_named_tau arg
                = (getName arg, mkSpecForAllTys ex_tvs (varType arg))
                -- The mkSpecForAllTys is important (#14552), albeit
-               -- slightly artifical (there is no variable with this funny type).
+               -- slightly artificial (there is no variable with this funny type).
                -- We do not want to quantify over variable (alpha::k)
                -- that mention the existentially-bound type variables
                -- ex_tvs in its kind k.
@@ -307,7 +307,7 @@ and is not implicitly instantiated.
 So in mkProvEvidence we lift (a ~# b) to (a ~ b).  Tiresome, and
 marginally less efficient, if the builder/martcher are not inlined.
 
-See also Note [Lift equality constaints when quantifying] in TcType
+See also Note [Lift equality constraints when quantifying] in TcType
 
 Note [Coercions that escape]
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~

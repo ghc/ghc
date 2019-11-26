@@ -618,7 +618,7 @@ useCount _           = Many
 *                                                                      *
 ************************************************************************
 
-This domain differst from JointDemand in the sence that pure absence
+This domain differst from JointDemand in the sense that pure absence
 is taken away, i.e., we deal *only* with non-absent demands.
 
 Note [Strict demands]

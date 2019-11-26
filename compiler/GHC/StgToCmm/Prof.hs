@@ -328,14 +328,14 @@ ldvEnterClosure :: ClosureInfo -> CmmReg -> FCode ()
 ldvEnterClosure closure_info node_reg = do
     dflags <- getDynFlags
     let tag = funTag dflags closure_info
-    -- don't forget to substract node's tag
+    -- don't forget to subtract node's tag
     ldvEnter (cmmOffsetB dflags (CmmReg node_reg) (-tag))
 
 ldvEnter :: CmmExpr -> FCode ()
 -- Argument is a closure pointer
 ldvEnter cl_ptr = do
     dflags <- getDynFlags
-    let -- don't forget to substract node's tag
+    let -- don't forget to subtract node's tag
         ldv_wd = ldvWord dflags cl_ptr
         new_ldv_wd = cmmOrWord dflags (cmmAndWord dflags (CmmLoad ldv_wd (bWord dflags))
                                                          (CmmLit (mkWordCLit dflags (iLDV_CREATE_MASK dflags))))

@@ -1690,7 +1690,7 @@ genCCall' dflags gcp target dest_regs args
                        `appOL`  codeAfter)
                      GCPAIX          -> return ( dynCode
                        -- AIX/XCOFF follows the PowerOPEN ABI
-                       -- which is quite similiar to LinuxPPC64/ELFv1
+                       -- which is quite similar to LinuxPPC64/ELFv1
                        `appOL`  codeBefore
                        `snocOL` ST spFormat toc (AddrRegImm sp (ImmInt 20))
                        `snocOL` LD II32 r11 (AddrRegImm dynReg (ImmInt 0))

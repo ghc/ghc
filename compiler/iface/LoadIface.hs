@@ -549,7 +549,7 @@ But there is a HORRIBLE HACK here.
 * And that means we end up loading M.hi-boot, because those
   data types are not yet in the type environment.
 
-But in this wierd case, /all/ we need is the types. We don't need
+But in this weird case, /all/ we need is the types. We don't need
 instances, rules etc.  And if we put the instances in the EPS
 we get "duplicate instance" warnings when we compile the "real"
 instance in M itself.  Hence the strange business of just updateing

@@ -427,7 +427,7 @@ isGotLoad(struct relocation_info * ri) {
 
 /* This is very similar to makeSymbolExtra
  * However, as we load sections into different
- * pages, that may be further appart than
+ * pages, that may be further apart than
  * branching allows, we'll use some extra
  * space at the end of each section allocated
  * for stubs.

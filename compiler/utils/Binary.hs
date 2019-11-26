@@ -693,7 +693,7 @@ The new scheme also does not depend in any way on
 architecture specific details.
 
 We still use this scheme even with LEB128 available,
-as it has less overhead for truely large numbers. (> maxBound :: Int64)
+as it has less overhead for truly large numbers. (> maxBound :: Int64)
 
 The instance is used for in Binary Integer and Binary Rational in basicTypes/Literal.hs
 -}
