@@ -160,7 +160,7 @@ compileOne' m_tc_result mHscMessage
    debugTraceMsg dflags1 2 (text "compile: input file" <+> text input_fnpp)
 
    -- Run the pipeline up to codeGen (so everything up to, but not including, STG)
-   (status, hmi_details, plugin_dflags) <- hscIncrementalCompile
+   (status, plugin_dflags) <- hscIncrementalCompile
                         always_do_basic_recompilation_check
                         m_tc_result mHscMessage
                         hsc_env summary source_modified mb_old_iface (mod_index, nmods)
@@ -178,27 +178,27 @@ compileOne' m_tc_result mHscMessage
    let hsc_env' = hsc_env{ hsc_dflags = plugin_dflags }
 
    case (status, hsc_lang) of
-        (HscUpToDate iface, _) ->
+        (HscUpToDate iface hmi_details, _) ->
             -- TODO recomp014 triggers this assert. What's going on?!
             -- ASSERT( isJust mb_old_linkable || isNoLink (ghcLink dflags) )
             return $! HomeModInfo iface hmi_details mb_old_linkable
-        (HscNotGeneratingCode iface, HscNothing) ->
+        (HscNotGeneratingCode iface hmi_details, HscNothing) ->
             let mb_linkable = if isHsBootOrSig src_flavour
                                 then Nothing
                                 -- TODO: Questionable.
                                 else Just (LM (ms_hs_date summary) this_mod [])
             in return $! HomeModInfo iface hmi_details mb_linkable
-        (HscNotGeneratingCode _, _) -> panic "compileOne HscNotGeneratingCode"
+        (HscNotGeneratingCode _ _, _) -> panic "compileOne HscNotGeneratingCode"
         (_, HscNothing) -> panic "compileOne HscNothing"
-        (HscUpdateBoot iface, HscInterpreted) -> do
+        (HscUpdateBoot iface hmi_details, HscInterpreted) -> do
             return $! HomeModInfo iface hmi_details Nothing
-        (HscUpdateBoot iface, _) -> do
+        (HscUpdateBoot iface hmi_details, _) -> do
             touchObjectFile dflags object_filename
             return $! HomeModInfo iface hmi_details Nothing
-        (HscUpdateSig iface, HscInterpreted) -> do
+        (HscUpdateSig iface hmi_details, HscInterpreted) -> do
             let !linkable = LM (ms_hs_date summary) this_mod []
             return $! HomeModInfo iface hmi_details (Just linkable)
-        (HscUpdateSig iface, _) -> do
+        (HscUpdateSig iface hmi_details, _) -> do
             output_fn <- getOutputFilename next_phase
                             (Temporary TFL_CurrentModule) basename dflags
                             next_phase (Just location)
@@ -210,7 +210,7 @@ compileOne' m_tc_result mHscMessage
                               (output_fn,
                                Nothing,
                                Just (HscOut src_flavour
-                                            mod_name (HscUpdateSig iface)))
+                                            mod_name (HscUpdateSig iface hmi_details)))
                               (Just basename)
                               Persistent
                               (Just location)
@@ -220,6 +220,7 @@ compileOne' m_tc_result mHscMessage
             return $! HomeModInfo iface hmi_details (Just linkable)
         (HscRecomp { hscs_guts = cgguts,
                      hscs_mod_location = mod_location,
+                     hscs_mod_details = hmi_details,
                      hscs_partial_iface = partial_iface,
                      hscs_old_iface_hash = mb_old_iface_hash,
                      hscs_iface_dflags = iface_dflags }, HscInterpreted) -> do
@@ -252,7 +253,7 @@ compileOne' m_tc_result mHscMessage
                             (Temporary TFL_CurrentModule)
                             basename dflags next_phase (Just location)
             -- We're in --make mode: finish the compilation pipeline.
-            (_, _, Just iface) <- runPipeline StopLn hsc_env'
+            (_, _, Just (iface, details)) <- runPipeline StopLn hsc_env'
                               (output_fn,
                                Nothing,
                                Just (HscOut src_flavour mod_name status))
@@ -263,7 +264,7 @@ compileOne' m_tc_result mHscMessage
                   -- The object filename comes from the ModLocation
             o_time <- getModificationUTCTime object_filename
             let !linkable = LM o_time this_mod [DotO object_filename]
-            return $! HomeModInfo iface hmi_details (Just linkable)
+            return $! HomeModInfo iface details (Just linkable)
 
  where dflags0     = ms_hspp_opts summary
        this_mod    = ms_mod summary
@@ -602,7 +603,7 @@ runPipeline
   -> PipelineOutput             -- ^ Output filename
   -> Maybe ModLocation          -- ^ A ModLocation, if this is a Haskell module
   -> [FilePath]                 -- ^ foreign objects
-  -> IO (DynFlags, FilePath, Maybe ModIface)
+  -> IO (DynFlags, FilePath, Maybe (ModIface, ModDetails))
                                 -- ^ (final flags, output filename, interface)
 runPipeline stop_phase hsc_env0 (input_fn, mb_input_buf, mb_phase)
              mb_basename output maybe_loc foreign_os
@@ -697,7 +698,7 @@ runPipeline'
   -> FilePath                   -- ^ Input filename
   -> Maybe ModLocation          -- ^ A ModLocation, if this is a Haskell module
   -> [FilePath]                 -- ^ foreign objects, if we have one
-  -> IO (DynFlags, FilePath, Maybe ModIface)
+  -> IO (DynFlags, FilePath, Maybe (ModIface, ModDetails))
                                 -- ^ (final flags, output filename, interface)
 runPipeline' start_phase hsc_env env input_fn
              maybe_loc foreign_os
@@ -1134,7 +1135,7 @@ runPhase (RealPhase (Hsc src_flavour)) input_fn dflags0
 
   -- run the compiler!
         let msg hsc_env _ what _ = oneShotMsg hsc_env what
-        (result, _mod_details, plugin_dflags) <-
+        (result, plugin_dflags) <-
           liftIO $ hscIncrementalCompile True Nothing (Just msg) hsc_env'
                             mod_summary source_unchanged Nothing (1,1)
 
@@ -1153,21 +1154,21 @@ runPhase (HscOut src_flavour mod_name result) _ dflags = do
             next_phase = hscPostBackendPhase src_flavour hsc_lang
 
         case result of
-            HscNotGeneratingCode _ ->
+            HscNotGeneratingCode _ _ ->
                 return (RealPhase StopLn,
                         panic "No output filename from Hsc when no-code")
-            HscUpToDate _ ->
+            HscUpToDate _ _ ->
                 do liftIO $ touchObjectFile dflags o_file
                    -- The .o file must have a later modification date
                    -- than the source file (else we wouldn't get Nothing)
                    -- but we touch it anyway, to keep 'make' happy (we think).
                    return (RealPhase StopLn, o_file)
-            HscUpdateBoot _ ->
+            HscUpdateBoot _ _ ->
                 do -- In the case of hs-boot files, generate a dummy .o-boot
                    -- stamp file for the benefit of Make
                    liftIO $ touchObjectFile dflags o_file
                    return (RealPhase StopLn, o_file)
-            HscUpdateSig _ ->
+            HscUpdateSig _ _ ->
                 do -- We need to create a REAL but empty .o file
                    -- because we are going to attempt to put it in a library
                    PipeState{hsc_env=hsc_env'} <- getPipeState
@@ -1177,6 +1178,7 @@ runPhase (HscOut src_flavour mod_name result) _ dflags = do
                    return (RealPhase StopLn, o_file)
             HscRecomp { hscs_guts = cgguts,
                         hscs_mod_location = mod_location,
+                        hscs_mod_details = mod_details,
                         hscs_partial_iface = partial_iface,
                         hscs_old_iface_hash = mb_old_iface_hash,
                         hscs_iface_dflags = iface_dflags }
@@ -1188,7 +1190,11 @@ runPhase (HscOut src_flavour mod_name result) _ dflags = do
                       hscGenHardCode hsc_env' cgguts mod_location output_fn
 
                     final_iface <- liftIO (mkFullIface hsc_env'{hsc_dflags=iface_dflags} partial_iface)
-                    setIface final_iface
+                    -- TODO(osa): ModIface and ModDetails need to be in sync,
+                    -- but we only generate ModIface with the backend info. See
+                    -- !2100 for more discussion on this. This will be fixed
+                    -- with !1304 or !2100.
+                    setIface final_iface mod_details
 
                     -- See Note [Writing interface files]
                     let if_dflags = dflags `gopt_unset` Opt_BuildDynamicToo
