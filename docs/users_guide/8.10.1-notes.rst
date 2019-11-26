@@ -277,9 +277,6 @@ Template Haskell
   reverse the order of its bits e.g. ``0b110001`` becomes ``0b100011``.
   These primitives use optimized machine instructions when available.
 
-- Add a known-key ``cstringLength#`` to ``GHC.CString`` that is eligible
-  for constant folding by a built-in rule.
-
 ``ghc`` library
 ~~~~~~~~~~~~~~~
 

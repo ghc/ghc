@@ -98,7 +98,7 @@ data ForeignPtrContents
     -- ^ The pointer must be an @Addr#@ literal. These are never
     -- garbage collected and consequently cannot be finalized.
     --
-    -- @since 4.14
+    -- @since 4.15
   | MallocPtr (MutableByteArray# RealWorld) !(IORef Finalizers)
     -- ^ The pointer refers to a byte array. Finalization is supported.
     -- However, unlike with @PlainForeignPtr@, the finalizer is not
