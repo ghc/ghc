@@ -91,13 +91,24 @@ data Finalizers
 
 data ForeignPtrContents
   = PlainForeignPtr !(IORef Finalizers)
-  | LiteralPtr
-    -- ^ Used when the pointer is an @Addr#@ literal. These are never
+    -- ^ The pointer refers to memory that was allocated by a foreign
+    -- function (typically using @malloc@). The finalizer frequently
+    -- call the C function @free@ or some variant of it.
+  | FinalPtr
+    -- ^ The pointer must be an @Addr#@ literal. These are never
     -- garbage collected and consequently cannot be finalized.
     --
     -- @since 4.14
-  | MallocPtr      (MutableByteArray# RealWorld) !(IORef Finalizers)
-  | PlainPtr       (MutableByteArray# RealWorld)
+  | MallocPtr (MutableByteArray# RealWorld) !(IORef Finalizers)
+    -- ^ The pointer refers to a byte array. Finalization is supported.
+    -- However, unlike with @PlainForeignPtr@, the finalizer is not
+    -- responsible for freeing the memory since the GHC runtime tracks
+    -- the liveliness of byte arrays.
+  | PlainPtr (MutableByteArray# RealWorld)
+    -- ^ The pointer refers to a byte array. Finalization is not
+    -- supported. This optimizates @MallocPtr@ by avoiding the allocation
+    -- of a @MutVar#@ when it is known that no one will add finalizers to
+    -- the @ForeignPtr@.
 
 -- | @since 2.01
 instance Eq (ForeignPtr a) where
@@ -462,6 +473,6 @@ plusForeignPtr (ForeignPtr addr c) (I# d) = ForeignPtr (plusAddr# addr d) c
 finalizeForeignPtr :: ForeignPtr a -> IO ()
 finalizeForeignPtr (ForeignPtr _ c) = case c of
   PlainPtr _ -> pure ()
-  LiteralPtr -> pure ()
+  FinalPtr -> pure ()
   PlainForeignPtr ref -> foreignPtrFinalizer ref
   MallocPtr _ ref -> foreignPtrFinalizer ref
