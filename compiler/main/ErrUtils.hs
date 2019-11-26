@@ -879,7 +879,7 @@ the whole thing with 'withTiming'. Instead we wrap the processing of each
 individual stream element, all along the codegen pipeline, using the appropriate
 label for the pass to which this processing belongs. That generates a lot more
 data but allows us to get fine-grained timings about all the passes and we can
-easily compute totals withh tools like ghc-events-analyze (see below).
+easily compute totals with tools like ghc-events-analyze (see below).
 
 
 Producing an eventlog for GHC

@@ -1,4 +1,4 @@
-// Verify jumping to the begining of the current continuation
+// Verify jumping to the beginning of the current continuation
 // is done with a branch and not a jump
 
 foo() {

@@ -528,7 +528,7 @@ In the above example, suppose we had
   {-# RULES "rule-for-g" forally. g [y] = ... #-}
 Then "rule-for-f" and "rule-for-g" would compete.  Better to add phase
 control, so "rule-for-f" has a chance to fire before "rule-for-g" becomes
-active; or perhpas after "rule-for-g" has become inactive. This is checked
+active; or perhaps after "rule-for-g" has become inactive. This is checked
 by 'competesWith'
 
 Class methods have a built-in RULE to select the method from the dictionary,

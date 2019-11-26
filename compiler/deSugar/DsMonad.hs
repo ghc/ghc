@@ -530,7 +530,7 @@ dsExtendMetaEnv menv thing_inside
 
 discardWarningsDs :: DsM a -> DsM a
 -- Ignore warnings inside the thing inside;
--- used to ignore inaccessable cases etc. inside generated code
+-- used to ignore inaccessible cases etc. inside generated code
 discardWarningsDs thing_inside
   = do  { env <- getGblEnv
         ; old_msgs <- readTcRef (ds_msgs env)

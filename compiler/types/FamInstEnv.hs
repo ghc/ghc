@@ -1253,7 +1253,7 @@ because type families are saturated.
 
 But if S has a type family on its RHS we expand /before/ normalising
 the args t1, t2.  If we normalise t1, t2 first, we'll re-normalise them
-after expansion, and that can lead to /exponential/ behavour; see #13035.
+after expansion, and that can lead to /exponential/ behaviour; see #13035.
 
 Notice, though, that expanding first can in principle duplicate t1,t2,
 which might contain redexes. I'm sure you could conjure up an exponential

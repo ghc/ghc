@@ -180,7 +180,7 @@ cgBind (StgRec pairs)
      3. emit all the inits, and then all the bodies
 
    We'd rather not have separate functions to do steps 1 and 2 for
-   each binding, since in pratice they share a lot of code.  So we
+   each binding, since in practice they share a lot of code.  So we
    have just one function, cgRhs, that returns a pair of the CgIdInfo
    for step 1, and a monadic computation to generate the code in step
    2.

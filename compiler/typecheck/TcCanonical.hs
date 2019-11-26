@@ -609,7 +609,7 @@ makeSuperClasses, giving us a a second quantified constrait
        (forall a. a ~# b)
 BUT this is an unboxed value!  And nothing has prepared us for
 dictionary "functions" that are unboxed.  Actually it does just
-about work, but the simplier ends up with stuff like
+about work, but the simplifier ends up with stuff like
    case (/\a. eq_sel d) of df -> ...(df @Int)...
 and fails to simplify that any further.  And it doesn't satisfy
 isPredTy any more.

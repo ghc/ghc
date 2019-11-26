@@ -371,7 +371,7 @@ That's why we compute
 
     So we must *not* postInlineUnconditionally 'g', even though
     its RHS turns out to be trivial.  (I'm assuming that 'g' is
-    not choosen as a loop breaker.)  Why not?  Because then we
+    not chosen as a loop breaker.)  Why not?  Because then we
     drop the binding for 'g', which leaves it out of scope in the
     RULE!
 
@@ -1790,7 +1790,7 @@ occAnal env (Case scrut bndr ty alts)
         | t `tickishScopesLike` SoftScope
           -- No reason to not look through all ticks here, but only
           -- for soft-scoped ticks we can do so without having to
-          -- update returned occurance info (see occAnal)
+          -- update returned occurrence info (see occAnal)
         = second (Tick t) $ occ_anal_scrut e alts
 
     occ_anal_scrut scrut _alts
@@ -2210,7 +2210,7 @@ extendFvs env s
 
 Note [Binder swap]
 ~~~~~~~~~~~~~~~~~~
-The "binder swap" tranformation swaps occurence of the
+The "binder swap" tranformation swaps occurrence of the
 scrutinee of a case for occurrences of the case-binder:
 
  (1)  case x of b { pi -> ri }
@@ -2325,7 +2325,7 @@ as Dead, so we must zap the OccInfo on cb before making the
 binding x = cb.  See #5028.
 
 NB: the OccInfo on /occurrences/ really doesn't matter much; the simplifier
-doesn't use it. So this is only to satisfy the perhpas-over-picky Lint.
+doesn't use it. So this is only to satisfy the perhaps-over-picky Lint.
 
 Historical note [no-case-of-case]
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
@@ -2535,7 +2535,7 @@ zapDetails = markAllMany . markAllNonTailCalled -- effectively sets to noOccInfo
 
 lookupDetails :: UsageDetails -> Id -> OccInfo
 lookupDetails ud id
-  | isCoVar id  -- We do not currenly gather occurrence info (from types)
+  | isCoVar id  -- We do not currently gather occurrence info (from types)
   = noOccInfo   -- for CoVars, so we must conservatively mark them as used
                 -- See Note [DoO not mark CoVars as dead]
   | otherwise

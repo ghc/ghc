@@ -297,7 +297,7 @@ patchInstr
 patchInstr reg instr
  = do   nUnique         <- newUnique
 
-        -- The register we're rewriting is suppoed to be virtual.
+        -- The register we're rewriting is supposed to be virtual.
         -- If it's not then something has gone horribly wrong.
         let nReg
              = case reg of

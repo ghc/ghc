@@ -640,7 +640,7 @@ only requires one argument so it leaves the second argument as a
 until @f@ calls @g@ which requires two arguments: the argument passed
 to it by @f@ and the pending argument which was passed to @f@.
 
-Unboxed pending arguments are always preceeded by a ``tag'' which says
+Unboxed pending arguments are always preceded by a ``tag'' which says
 how large the argument is.  This allows the garbage collector to
 locate pointers within the stack.
 
@@ -3250,7 +3250,7 @@ entered a @AP@ by switching worlds, entering the @AP@, pushing the
 arguments and function onto the stack, and entering the function
 which, likely as not, will be a byte-code object which we will enter
 by \emph{returning} to the byte-code interpreter.  To avoid such
-gratuitious world switching, we choose to recognise certain closure
+gratuitous world switching, we choose to recognise certain closure
 types as being ``standard'' --- and duplicate the entry code for the
 ``standard closures'' in the bytecode interpreter.
 

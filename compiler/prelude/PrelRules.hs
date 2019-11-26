@@ -734,7 +734,7 @@ There are two cases:
   and match_Integer_shift_op.
 
   Here we could in principle shift by any amount, but we arbitary
-  limit the shift to 4 bits; in particualr we do not want shift by a
+  limit the shift to 4 bits; in particular we do not want shift by a
   huge amount, which can happen in code like that above.
 
 The two cases are more different in their code paths that is comfortable,
