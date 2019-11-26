@@ -31,7 +31,7 @@ instance (AdditiveGroup (poly a), Num a) => AdditiveGroup (IntOfLog poly a) wher
     IntOfLog k p ^+^ IntOfLog k' p' = IntOfLog (k + k') (p ^+^ p')
     negateV (IntOfLog k p) = IntOfLog (negate k) (negateV p)
     {-# SPECIALISE instance Num a => AdditiveGroup (IntOfLog Poly1 a) #-}
-        -- This pragmas casued the crash
+        -- This pragmas caused the crash
 
 instance (VectorSpace (poly a), Scalar (poly a) ~ a, Num a) => VectorSpace (IntOfLog poly a) where
     type Scalar (IntOfLog poly a) = a

@@ -19,7 +19,7 @@ instance Convert (SAFE a) where
 newtype IS_NO_LONGER a = IS_NO_LONGER a deriving Convert
 type instance Result (IS_NO_LONGER a) b = b
 
---infered type is 
+--inferred type is 
 unsafeCoerce :: forall a b. a -> b
 unsafeCoerce = coerce (Proxy :: Proxy b) . IS_NO_LONGER . SAFE
 

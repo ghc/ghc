@@ -788,7 +788,7 @@ instance Ppr Type where
     ppr (ForallT tvars ctxt ty) = sep [pprForall tvars ctxt, ppr ty]
     ppr (ForallVisT tvars ty)   = sep [pprForallVis tvars [], ppr ty]
     ppr ty = pprTyApp (split ty)
-       -- Works, in a degnerate way, for SigT, and puts parens round (ty :: kind)
+       -- Works, in a degenerate way, for SigT, and puts parens round (ty :: kind)
        -- See Note [Pretty-printing kind signatures]
 instance Ppr TypeArg where
     ppr (TANormal ty) = ppr ty

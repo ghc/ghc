@@ -474,7 +474,7 @@ creating a new EvVar when we have a new goal that we have solved in
 the past.
 
 But in particular, we can use it to create *recursive* dictionaries.
-The simplest, degnerate case is
+The simplest, degenerate case is
     instance C [a] => C [a] where ...
 If we have
     [W] d1 :: C [x]
@@ -2859,7 +2859,7 @@ implications.  Consider
    a ~ F b, forall c. b~Int => blah
 If we have F b ~ fsk in the flat-cache, and we push that into the
 nested implication, we might miss that F b can be rewritten to F Int,
-and hence perhpas solve it.  Moreover, the fsk from outside is
+and hence perhaps solve it.  Moreover, the fsk from outside is
 flattened out after solving the outer level, but and we don't
 do that flattening recursively.
 -}
@@ -2881,7 +2881,7 @@ nestTcS (TcS thing_inside)
 
        ; new_inerts <- TcM.readTcRef new_inert_var
 
-       -- we want to propogate the safe haskell failures
+       -- we want to propagate the safe haskell failures
        ; let old_ic = inert_cans inerts
              new_ic = inert_cans new_inerts
              nxt_ic = old_ic { inert_safehask = inert_safehask new_ic }
@@ -2978,7 +2978,7 @@ Consider
    forall b. empty =>  Eq [a]
 We solve the simple (Eq [a]), under nestTcS, and then turn our attention to
 the implications.  It's definitely fine to use the solved dictionaries on
-the inner implications, and it can make a signficant performance difference
+the inner implications, and it can make a significant performance difference
 if you do so.
 -}
 

@@ -2247,7 +2247,7 @@ with constructor names (see Note [Parsing data constructors is hard]).
 
 Due to simplified syntax, GADT constructor names (left-hand side of '::')
 use simpler grammar production than usual data constructor names. As a
-consequence, GADT constructor names are resticted (names like '(*)' are
+consequence, GADT constructor names are restricted (names like '(*)' are
 allowed in usual data constructors, but not in GADTs).
 -}
 

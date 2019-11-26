@@ -2574,7 +2574,7 @@ Notice that:
     positions where the class header has no influence over the
     parameter.  Hence the fancy footwork in pp_expected_ty
 
-  - Although the binders in the axiom are aready tidy, we must
+  - Although the binders in the axiom are already tidy, we must
     re-tidy them to get a fresh variable name when we shadow
 
   - The (ax_tvs \\ inst_tvs) is to avoid tidying one of the

@@ -297,7 +297,7 @@ nodeDegree classOfVirtualReg graph reg
 
 
 -- | Show a spill cost record, including the degree from the graph
---   and final calulated spill cost.
+--   and final calculated spill cost.
 pprSpillCostRecord
         :: (VirtualReg -> RegClass)
         -> (Reg -> SDoc)

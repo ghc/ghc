@@ -361,7 +361,7 @@ void freeSegments(ObjectCode *oc);
 #define MAP_ANONYMOUS MAP_ANON
 #endif
 
-/* Which object file format are we targetting? */
+/* Which object file format are we targeting? */
 #if defined(linux_HOST_OS) || defined(solaris2_HOST_OS) \
 || defined(linux_android_HOST_OS) \
 || defined(freebsd_HOST_OS) || defined(kfreebsdgnu_HOST_OS) \

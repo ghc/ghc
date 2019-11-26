@@ -373,7 +373,7 @@ freeHpcModuleInfo (HpcModuleInfo *mod)
 }
 
 /* Called at the end of execution, to write out the Hpc *.tix file
- * for this exection. Safe to call, even if coverage is not used.
+ * for this execution. Safe to call, even if coverage is not used.
  */
 void
 exitHpc(void) {

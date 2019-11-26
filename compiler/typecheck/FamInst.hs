@@ -881,7 +881,7 @@ To do the injectivity check:
 
 1. We build VarUsages that represent the LHS (rather, the portion of the LHS
 that is flagged as injective); each usage on the LHS is NotPresent, because we
-hvae not yet looked at the RHS.
+have not yet looked at the RHS.
 
 2. We also build a VarUsage for the RHS, done by injTyVarUsages.
 

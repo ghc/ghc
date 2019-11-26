@@ -730,7 +730,7 @@ findPartiallyCompletedCycles modsDone theGraph
 --
 -- | Unloading
 unload :: HscEnv -> [Linkable] -> IO ()
-unload hsc_env stable_linkables -- Unload everthing *except* 'stable_linkables'
+unload hsc_env stable_linkables -- Unload everything *except* 'stable_linkables'
   = case ghcLink (hsc_dflags hsc_env) of
         LinkInMemory -> Linker.unload hsc_env stable_linkables
         _other -> return ()

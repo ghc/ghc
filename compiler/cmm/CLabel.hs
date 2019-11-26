@@ -348,7 +348,7 @@ data ForeignLabelSource
    --   external packages. It is safe to treat the RTS package as "external".
    | ForeignLabelInExternalPackage
 
-   -- | Label is in the package currenly being compiled.
+   -- | Label is in the package currently being compiled.
    --   This is only used for creating hacky tmp labels during code generation.
    --   Don't use it in any code that might be inlined across a package boundary
    --   (ie, core code) else the information will be wrong relative to the

@@ -35,7 +35,7 @@ data BuildInfo = BuildInfo {
     buildOutputs :: [FilePath],
     -- | Options to be passed to Shake's 'cmd' function.
     buildOptions :: [CmdOption],
-    -- | Resources to be aquired.
+    -- | Resources to be acquired.
     buildResources :: [(Resource, Int)] }
 
 class ShakeValue b => Builder b where
@@ -48,7 +48,7 @@ class ShakeValue b => Builder b where
     askBuilderWith :: b -> BuildInfo -> Action String
 
     -- | Runtime dependencies of a builder. For example, on Windows GHC requires
-    -- the utility @touchy.exe@ to be avilable on a specific path.
+    -- the utility @touchy.exe@ to be available on a specific path.
     runtimeDependencies :: b -> Action [FilePath]
     runtimeDependencies _ = return []
 

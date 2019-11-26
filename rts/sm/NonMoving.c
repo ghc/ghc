@@ -890,7 +890,7 @@ void nonmovingCollect(StgWeak **dead_weaks, StgTSO **resurrected_threads)
     // If we're interrupting or shutting down, do not let this capability go and
     // run a STW collection. Reason: we won't be able to acquire this capability
     // again for the sync if we let it go, because it'll immediately start doing
-    // a major GC, becuase that's what we do when exiting scheduler (see
+    // a major GC, because that's what we do when exiting scheduler (see
     // exitScheduler()).
     if (sched_state == SCHED_RUNNING) {
         concurrent_coll_running = true;

@@ -571,7 +571,7 @@ being carried out by TSO 2 and attempt to suspend it.
 
 The suspension process proceeds by invoking raiseAsync, which walks the stack
 from the top looking for update frames. For each update frame we take any stack
-frames preceeding it and construct an AP_STACK heap object from them. We then
+frames preceding it and construct an AP_STACK heap object from them. We then
 replace the updatee of the frame with an indirection pointing to the AP_STACK.
 So, after suspending the first update frame we have,
 

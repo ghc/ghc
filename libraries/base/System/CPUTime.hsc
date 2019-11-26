@@ -40,7 +40,7 @@ import qualified System.CPUTime.Posix.ClockGetTime as I
 #elif defined(HAVE_GETRUSAGE) && ! solaris2_HOST_OS
 import qualified System.CPUTime.Posix.RUsage as I
 
--- @getrusage()@ is right royal pain to deal with when targetting multiple
+-- @getrusage()@ is right royal pain to deal with when targeting multiple
 -- versions of Solaris, since some versions supply it in libc (2.3 and 2.5),
 -- while 2.4 has got it in libucb (I wouldn't be too surprised if it was back
 -- again in libucb in 2.6..)
