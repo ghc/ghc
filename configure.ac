@@ -465,7 +465,7 @@ dnl ** Building a cross compiler?
 dnl --------------------------------------------------------------
 CrossCompiling=NO
 # If 'host' and 'target' differ, then this means we are building a cross-compiler.
-if test "$TargetPlatform" != "$HostPlatform" ; then
+if test "$target" != "$host" ; then
     CrossCompiling=YES
     cross_compiling=yes   # This tells configure that it can accept just 'target',
                           # otherwise you get
