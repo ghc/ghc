@@ -1104,6 +1104,9 @@ parUpsweep n_jobs mHscMessage old_hpt stable_mods cleanup sccs = do
                   case mod of
                     InstantiationNode iuid -> do
                       hsc_env <- readMVar hsc_env_var
+                      liftIO $ case mHscMessage of
+                                 Just hscMessage -> hscMessage hsc_env (mod_idx, (length sccs)) MustCompile (InstantiationNode iuid)
+                                 Nothing -> return ()
                       liftIO $ runHsc hsc_env $ ioMsgMaybe $
                         tcRnCheckUnitId hsc_env $ IndefiniteUnitId iuid
                       pure Succeeded
