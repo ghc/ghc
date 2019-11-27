@@ -36,6 +36,13 @@ stages:
     - tags
     - web
 
+.release: &release
+  artifacts:
+    when: always
+    expire_in: 1 year
+  only:
+    - tags
+
 ############################################################
 # Runner Tags
 ############################################################
@@ -530,7 +537,6 @@ nightly-i386-linux-deb9:
 
 .build-x86_64-linux-deb9:
   extends: .validate-linux
-  stage: full-build
   image: "registry.gitlab.haskell.org/ghc/ci-images/x86_64-linux-deb9:$DOCKER_REV"
   variables:
     TEST_ENV: "x86_64-linux-deb9"
@@ -541,12 +547,14 @@ nightly-i386-linux-deb9:
 # Disabled to reduce CI load
 .validate-x86_64-linux-deb9:
   extends: .build-x86_64-linux-deb9
+  stage: full-build
   artifacts:
     when: always
     expire_in: 2 week
 
 nightly-x86_64-linux-deb9:
   extends: .build-x86_64-linux-deb9
+  stage: full-build
   artifacts:
     expire_in: 2 year
   variables:
@@ -611,27 +619,20 @@ nightly-x86_64-linux-deb9-integer-simple:
     variables:
       - $NIGHTLY
 
-release-x86_64-linux-deb9-dwarf:
-  extends: .validate-linux
+validate-x86_64-linux-deb9-dwarf:
+  extends: .build-x86_64-linux-deb9
   stage: build
-  image: "registry.gitlab.haskell.org/ghc/ci-images/x86_64-linux-deb9:$DOCKER_REV"
   variables:
     CONFIGURE_ARGS: "--enable-dwarf-unwind"
     BUILD_FLAVOUR: dwarf
     TEST_ENV: "x86_64-linux-deb9-dwarf"
     BIN_DIST_PREP_TAR_COMP: "ghc-x86_64-deb9-linux-dwarf.tar.xz"
-  artifacts:
-    when: always
-    expire_in: 2 week
-  cache:
-    key: linux-x86_64-deb9
-
 
 #################################
 # x86_64-linux-deb8
 #################################
 
-release-x86_64-linux-deb8:
+.build-x86_64-linux-deb8:
   extends: .validate-linux
   stage: full-build
   image: "registry.gitlab.haskell.org/ghc/ci-images/x86_64-linux-deb8:$DOCKER_REV"
@@ -644,10 +645,12 @@ release-x86_64-linux-deb8:
     BUILD_SPHINX_INFO: "NO"
     BUILD_SPHINX_PDF: "NO"
     BUILD_SPHINX_MAN: "NO"
-  only:
-    - tags
   cache:
     key: linux-x86_64-deb8
+
+release-x86_64-linux-deb8:
+  <<: *release
+  extends: .build-x86_64-linux-deb8
   artifacts:
     when: always
     expire_in: 2 week
@@ -675,9 +678,8 @@ release-x86_64-linux-deb8:
     expire_in: 2 week
 
 release-x86_64-linux-alpine:
+  <<: *release
   extends: .build-x86_64-linux-alpine
-  only:
-    - tags
 
 nightly-x86_64-linux-alpine:
   extends: .build-x86_64-linux-alpine
@@ -689,7 +691,7 @@ nightly-x86_64-linux-alpine:
 # x86_64-linux-centos7
 #################################
 
-release-x86_64-linux-centos7:
+.build-x86_64-linux-centos7:
   extends: .validate-linux
   stage: full-build
   image: "registry.gitlab.haskell.org/ghc/ci-images/x86_64-linux-centos7:$DOCKER_REV"
@@ -703,10 +705,12 @@ release-x86_64-linux-centos7:
     XZ: "xz"
     # CentOS seems to default to ascii
     LANG: "en_US.UTF-8"
-  only:
-    - tags
   cache:
     key: linux-x86_64-centos7
+
+release-x86_64-linux-centos7:
+  <<: *release
+  extends: .build-x86_64-linux-centos7
   artifacts:
     when: always
     expire_in: 2 week
@@ -867,19 +871,17 @@ nightly-x86_64-windows:
 
 # Normal Windows validate builds are profiled; that won't do for releases.
 release-x86_64-windows:
+  <<: *release
   extends: validate-x86_64-windows
   variables:
     MSYSTEM: MINGW64
     BUILD_FLAVOUR: "perf"
     CONFIGURE_ARGS: "--target=x86_64-unknown-mingw32"
     TEST_ENV: "x86_64-windows"
-  only:
-    - tags
 
 release-i386-windows:
+  <<: *release
   extends: .build-windows-make
-  only:
-    - tags
   variables:
     MSYSTEM: MINGW32
     BUILD_FLAVOUR: "perf"
@@ -1052,7 +1054,7 @@ nightly-hackage:
 perf-nofib:
   stage: testing
   dependencies:
-    - release-x86_64-linux-deb9-dwarf
+    - validate-x86_64-linux-deb9-dwarf
   image: "registry.gitlab.haskell.org/ghc/ci-images/x86_64-linux-deb9:$DOCKER_REV"
   only:
     refs:
