@@ -1,5 +1,5 @@
 
-T3177a.hs:8:8: error:
+T3177a.hs:8:7: error:
     • Expected kind ‘* -> *’, but ‘Int’ has kind ‘*’
     • In the type signature: f :: (Int Int)
 

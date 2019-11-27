@@ -1,5 +1,5 @@
 
-T13837.hs:9:5: error:
+T13837.hs:9:4: error:
     • The exact Name ‘Fam’ is not in scope
         Probable cause: you used a unique Template Haskell name (NameU), 
         perhaps via newName, but did not bind it

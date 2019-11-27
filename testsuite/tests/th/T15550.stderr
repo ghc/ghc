@@ -1,4 +1,4 @@
-T15550.hs:(4,3)-(8,6): Splicing declarations
+T15550.hs:(4,2)-(8,7): Splicing declarations
     [d| {-# RULES "myId" forall x. myId x = x #-}
         
         myId :: a -> a

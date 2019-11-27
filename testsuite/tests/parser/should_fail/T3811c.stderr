@@ -1,5 +1,6 @@
 
-T3811c.hs:6:11: error:
-    Strictness annotation applied to a compound type.
-    Did you mean to add parentheses?
-      !(Show D)
+T3811c.hs:6:10: error:
+    Illegal class instance: ‘!Show D’
+      Class instances must be of the form
+        context => C ty_1 ... ty_n
+      where ‘C’ is a class

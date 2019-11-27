@@ -13,7 +13,7 @@ interfacePlugin: GHC.Natural
 parsePlugin(a)
 typeCheckPlugin (rn)
 interfacePlugin: Language.Haskell.TH.Lib.Internal
-metaPlugin: return []
+metaPlugin: (return [])
 metaPlugin: quoteExp stringify "x"
 interfacePlugin: GHC.CString
 typeCheckPlugin (rn)

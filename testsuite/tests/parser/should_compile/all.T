@@ -145,3 +145,20 @@ test('T16339', normal, compile, [''])
 test('T16619', req_th, multimod_compile, ['T16619', '-v0'])
 test('T504', normal, compile, [''])
 test('T515', literate, compile, ['-Wall'])
+test('T1087', normal, compile, [''])
+test('proposal-229a', normal, compile, [''])
+test('proposal-229b', normal, compile, [''])
+test('proposal-229d', normal, compile, [''])
+test('proposal-229e', normal, compile, [''])
+
+# We omit 'profasm' because it fails with:
+# Cannot load -prof objects when GHC is built with -dynamic
+#     To fix this, either:
+#       (1) Use -fexternal-interpreter, or
+#       (2) Build the program twice: once with -dynamic, and then
+#           with -prof using -osuf to set a different object file suffix.
+test('proposal-229f',
+     [ extra_files(['proposal-229f.hs', 'Proposal229f_instances.hs']),
+       omit_ways(['profasm', 'profthreaded'])
+     ],
+     multimod_compile_and_run, ['proposal-229f.hs', ''])
