@@ -93,7 +93,7 @@ import CoAxiom
 import PatSyn
 import ConLike
 import DataCon
-import TcEvidence( TcEvBinds(..) )
+import TcEvidence( TcEvBinds(..), idHsWrapper )
 import Id
 import IdInfo
 import DsExpr
@@ -186,7 +186,7 @@ tcTypedBracket rn_expr brack@(TExpBr _ expr) res_ty
        ; tcWrapResultO (Shouldn'tHappenOrigin "TExpBr")
                        rn_expr
                        (unLoc (mkHsApp (nlHsTyApp texpco [rep, expr_ty])
-                                      (noLoc (HsTcBracketOut noExtField brack ps'))))
+                                      (noLoc (HsTcBracketOut noExtField idHsWrapper brack ps'))))
                        meta_ty res_ty }
 tcTypedBracket _ other_brack _
   = pprPanic "tcTypedBracket" (ppr other_brack)
@@ -198,7 +198,7 @@ tcUntypedBracket rn_expr brack ps res_ty
        ; meta_ty <- tcBrackTy brack
        ; traceTc "tc_bracket done untyped" (ppr meta_ty)
        ; tcWrapResultO (Shouldn'tHappenOrigin "untyped bracket")
-                       rn_expr (HsTcBracketOut noExtField brack ps') meta_ty res_ty }
+                       rn_expr (HsTcBracketOut noExtField idHsWrapper brack ps') meta_ty res_ty }
 
 ---------------
 tcBrackTy :: HsBracket GhcRn -> TcM TcType
