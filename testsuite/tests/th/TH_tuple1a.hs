@@ -4,6 +4,7 @@ module TH_tuple1a where
 
 import Language.Haskell.TH
 
+tp2, tp1, tp2u, tp1u :: Q Exp
 tp2 = sigE (appsE [conE (tupleDataName 2),
                   litE (integerL 1),
                   litE (integerL 2)])

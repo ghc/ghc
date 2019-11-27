@@ -1,0 +1,6 @@
+InfixE (Just (LitE (IntegerL 1))) (VarE GHC.Num.+) (Just (LitE (IntegerL 2)))
+LamE [VarP x] (InfixE (Just (LitE (IntegerL 1))) (VarE GHC.Num.+) (Just (LitE (IntegerL 2))))
+[DataD [] Foo [] Nothing [NormalC Foo []] []]
+ConP GHC.Tuple.() []
+AppT ListT (ConT GHC.Types.Int)
+InfixE Nothing (VarE GHC.Num.+) (Just (LitE (IntegerL 1)))
