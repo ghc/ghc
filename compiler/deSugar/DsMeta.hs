@@ -60,18 +60,19 @@ import ForeignCall
 import Util
 import Maybes
 import MonadUtils
+import TcEvidence
 
 import Data.ByteString ( unpack )
 import Control.Monad
 import Data.List
 
 -----------------------------------------------------------------------------
-dsBracket :: HsBracket GhcRn -> [PendingTcSplice] -> DsM CoreExpr
+dsBracket :: HsWrapper -> HsBracket GhcRn -> [PendingTcSplice] -> DsM CoreExpr
 -- Returns a CoreExpr of type TH.ExpQ
 -- The quoted thing is parameterised over Name, even though it has
 -- been type checked.  We don't want all those type decorations!
 
-dsBracket brack splices
+dsBracket wrapper brack splices
   = dsExtendMetaEnv new_bit (do_brack brack)
   where
     new_bit = mkNameEnv [(n, DsSplice (unLoc e))
