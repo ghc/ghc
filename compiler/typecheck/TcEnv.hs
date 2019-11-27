@@ -110,6 +110,9 @@ import ErrUtils
 import Maybes( MaybeErr(..), orElse )
 import qualified GHC.LanguageExtensions as LangExt
 import Util ( HasDebugCallStack )
+import Data.Char ( ord )
+import TysPrim
+import THNames
 
 import Data.IORef
 import Data.List
@@ -830,7 +833,14 @@ tcMetaTy :: Name -> TcM Type
 -- E.g. given the name "Expr" return the type "Expr"
 tcMetaTy tc_name = do
     t <- tcLookupTyCon tc_name
-    return (mkTyConApp t [])
+    quote_con <- tcLookupTyCon quoteClassName
+
+    let m_var = mkTemplateTyVars (repeat (mkVisFunTy liftedTypeKind liftedTypeKind))
+                     !! (ord 'm' - ord 'a')
+        m_ty = mkTyVarTy m_var
+        theta = [mkTyConApp quote_con [m_ty]]
+        meta_ty = mkInfSigmaTy [m_var] theta (mkAppTy m_ty (mkTyConApp t []))
+    return meta_ty
 
 isBrackStage :: ThStage -> Bool
 isBrackStage (Brack {}) = True
