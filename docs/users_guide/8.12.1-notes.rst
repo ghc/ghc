@@ -32,6 +32,10 @@ Runtime system
 Template Haskell
 ~~~~~~~~~~~~~~~~
 
+ - Implement the Overloaded Quotations proposal (#246). The type of all quotation
+   forms have now been generalised in terms of a minimal interface necessary for the
+   implementation rather than the overapproximation of the ``Q`` monad.
+
 ``ghc-prim`` library
 ~~~~~~~~~~~~~~~~~~~~
 
