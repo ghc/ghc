@@ -204,6 +204,18 @@ instance Applicative Q where
 
 -----------------------------------------------------
 --
+--              The Quote class
+--
+-----------------------------------------------------
+
+class Applicative m => Quote m where
+  newName :: String -> m Name
+
+instance Quote Q where
+  newName s = Q (qNewName s)
+
+-----------------------------------------------------
+--
 --              The TExp type
 --
 -----------------------------------------------------
@@ -314,8 +326,6 @@ will produce the splice
 since the occurrence @VarE nm2@ is captured by the innermost binding
 of @x@, namely @VarP nm1@.
 -}
-newName :: String -> Q Name
-newName s = Q (qNewName s)
 
 -- | Report an error (True) or warning (False),
 -- but carry on; use 'fail' to stop.
