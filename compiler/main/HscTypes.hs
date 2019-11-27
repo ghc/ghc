@@ -224,6 +224,8 @@ import System.FilePath
 import Control.Concurrent
 import System.Process   ( ProcessHandle )
 import Control.DeepSeq
+import Control.Monad.Trans.Reader
+import Control.Monad.Trans.Class
 
 -- -----------------------------------------------------------------------------
 -- Compilation state
@@ -2322,6 +2324,10 @@ class Monad m => MonadThings m where
 
         lookupTyCon :: Name -> m TyCon
         lookupTyCon = liftM tyThingTyCon . lookupThing
+
+-- Instance used in DsMeta
+instance MonadThings m => MonadThings (ReaderT s m) where
+  lookupThing = lift . lookupThing
 
 {-
 ************************************************************************

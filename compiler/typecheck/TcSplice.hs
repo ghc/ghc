@@ -15,6 +15,7 @@ TcSplice: Template Haskell splices
 {-# LANGUAGE RecordWildCards #-}
 {-# LANGUAGE MultiWayIf #-}
 {-# LANGUAGE TypeFamilies #-}
+{-# LANGUAGE TupleSections #-}
 {-# OPTIONS_GHC -fno-warn-orphans #-}
 
 module TcSplice(
@@ -93,7 +94,7 @@ import CoAxiom
 import PatSyn
 import ConLike
 import DataCon
-import TcEvidence( TcEvBinds(..) )
+import TcEvidence
 import Id
 import IdInfo
 import DsExpr
@@ -172,68 +173,132 @@ tcTypedBracket rn_expr brack@(TExpBr _ expr) res_ty
                                        -- should get thrown into the constraint set
                                        -- from outside the bracket
 
+       -- Make a new type variable for the type of the overall quote
+       ; m_var <- mkTyVarTy <$> mkMetaTyVar
+       -- Make sure the type variable satisfies Quote
+       ; ev_var <- emitQuoteWanted m_var
+       -- Bundle them together so they can be used in DsMeta for desugaring
+       -- brackets.
+       ; let wrapper = QuoteWrapper ev_var m_var
        -- Typecheck expr to make sure it is valid,
        -- Throw away the typechecked expression but return its type.
        -- We'll typecheck it again when we splice it in somewhere
-       ; (_tc_expr, expr_ty) <- setStage (Brack cur_stage (TcPending ps_ref lie_var)) $
+       ; (_tc_expr, expr_ty) <- setStage (Brack cur_stage (TcPending ps_ref lie_var wrapper)) $
                                 tcInferRhoNC expr
                                 -- NC for no context; tcBracket does that
        ; let rep = getRuntimeRep expr_ty
-
-       ; meta_ty <- tcTExpTy expr_ty
+       ; meta_ty <- tcTExpTy m_var expr_ty
        ; ps' <- readMutVar ps_ref
        ; texpco <- tcLookupId unsafeTExpCoerceName
        ; tcWrapResultO (Shouldn'tHappenOrigin "TExpBr")
                        rn_expr
-                       (unLoc (mkHsApp (nlHsTyApp texpco [rep, expr_ty])
-                                      (noLoc (HsTcBracketOut noExtField brack ps'))))
+                       (unLoc (mkHsApp (mkLHsWrap (applyQuoteWrapper wrapper)
+                                                  (nlHsTyApp texpco [rep, expr_ty]))
+                                      (noLoc (HsTcBracketOut noExtField (Just wrapper) brack ps'))))
                        meta_ty res_ty }
 tcTypedBracket _ other_brack _
   = pprPanic "tcTypedBracket" (ppr other_brack)
 
 -- tcUntypedBracket :: HsBracket Name -> [PendingRnSplice] -> ExpRhoType -> TcM (HsExpr TcId)
+-- See Note [Typechecking Overloaded Quotes]
 tcUntypedBracket rn_expr brack ps res_ty
   = do { traceTc "tc_bracket untyped" (ppr brack $$ ppr ps)
-       ; ps' <- mapM tcPendingSplice ps
-       ; meta_ty <- tcBrackTy brack
-       ; traceTc "tc_bracket done untyped" (ppr meta_ty)
-       ; tcWrapResultO (Shouldn'tHappenOrigin "untyped bracket")
-                       rn_expr (HsTcBracketOut noExtField brack ps') meta_ty res_ty }
+
+
+       -- Create the type m Exp for expression bracket, m Type for a type
+       -- bracket and so on. The brack_info is a Maybe because the
+       -- VarBracket ('a) isn't overloaded, but also shouldn't contain any
+       -- splices.
+       ; (brack_info, expected_type) <- brackTy brack
+
+       -- Match the expected type with the type of all the internal
+       -- splices. They might have further constrained types and if they do
+       -- we want to reflect that in the overall type of the bracket.
+       ; ps' <- case quoteWrapperTyVarTy <$> brack_info of
+                  Just m_var -> mapM (tcPendingSplice m_var) ps
+                  Nothing -> ASSERT(null ps) return []
+
+       ; traceTc "tc_bracket done untyped" (ppr expected_type)
+
+       -- Unify the overall type of the bracket with the expected result
+       -- type
+       ; tcWrapResultO BracketOrigin rn_expr
+            (HsTcBracketOut noExtField brack_info brack ps')
+            expected_type res_ty
+
+       }
+
+-- | A type variable with kind * -> * named "m"
+mkMetaTyVar :: TcM TyVar
+mkMetaTyVar =
+  newNamedFlexiTyVar (fsLit "m") (mkVisFunTy liftedTypeKind liftedTypeKind)
+
+
+-- | For a type 'm', emit the constraint 'Quote m'.
+emitQuoteWanted :: Type -> TcM EvVar
+emitQuoteWanted m_var =  do
+        quote_con <- tcLookupTyCon quoteClassName
+        emitWantedEvVar BracketOrigin $
+          mkTyConApp quote_con [m_var]
 
 ---------------
-tcBrackTy :: HsBracket GhcRn -> TcM TcType
-tcBrackTy (VarBr {})  = tcMetaTy nameTyConName
-                                           -- Result type is Var (not Q-monadic)
-tcBrackTy (ExpBr {})  = tcMetaTy expQTyConName  -- Result type is ExpQ (= Q Exp)
-tcBrackTy (TypBr {})  = tcMetaTy typeQTyConName -- Result type is Type (= Q Typ)
-tcBrackTy (DecBrG {}) = tcMetaTy decsQTyConName -- Result type is Q [Dec]
-tcBrackTy (PatBr {})  = tcMetaTy patQTyConName  -- Result type is PatQ (= Q Pat)
-tcBrackTy (DecBrL {}) = panic "tcBrackTy: Unexpected DecBrL"
-tcBrackTy (TExpBr {}) = panic "tcUntypedBracket: Unexpected TExpBr"
-tcBrackTy (XBracket nec) = noExtCon nec
+-- | Compute the expected type of a quotation, and also the QuoteWrapper in
+-- the case where it is an overloaded quotation. All quotation forms are
+-- overloaded aprt from Variable quotations ('foo)
+brackTy :: HsBracket GhcRn -> TcM (Maybe QuoteWrapper, Type)
+brackTy b =
+  let mkTy n = do
+        -- New polymorphic type variable for the bracket
+        m_var <- mkTyVarTy <$> mkMetaTyVar
+        -- Emit a Quote constraint for the bracket
+        ev_var <- emitQuoteWanted m_var
+        -- Construct the final expected type of the quote, for example
+        -- m Exp or m Type
+        final_ty <- mkAppTy m_var <$> tcMetaTy n
+        -- Return the evidence variable and metavariable to be used during
+        -- desugaring.
+        let wrapper = QuoteWrapper ev_var m_var
+        return (Just wrapper, final_ty)
+  in
+  case b of
+    (VarBr {}) -> (Nothing,) <$> tcMetaTy nameTyConName
+                                           -- Result type is Var (not Quote-monadic)
+    (ExpBr {})  -> mkTy expTyConName  -- Result type is m Exp
+    (TypBr {})  -> mkTy typeTyConName -- Result type is m Type
+    (DecBrG {}) -> mkTy decsTyConName -- Result type is m [Dec]
+    (PatBr {})  -> mkTy patTyConName  -- Result type is m Pat
+    (DecBrL {}) -> panic "tcBrackTy: Unexpected DecBrL"
+    (TExpBr {}) -> panic "tcUntypedBracket: Unexpected TExpBr"
+    (XBracket nec) -> noExtCon nec
 
 ---------------
-tcPendingSplice :: PendingRnSplice -> TcM PendingTcSplice
-tcPendingSplice (PendingRnSplice flavour splice_name expr)
-  = do { res_ty <- tcMetaTy meta_ty_name
-       ; expr' <- tcMonoExpr expr (mkCheckExpType res_ty)
+-- | Typechecking a pending splice from a untyped bracket
+tcPendingSplice :: TcType -- Metavariable for the expected overall type of the
+                          -- quotation.
+                -> PendingRnSplice
+                -> TcM PendingTcSplice
+tcPendingSplice m_var (PendingRnSplice flavour splice_name expr)
+  -- See Note [Typechecking Overloaded Quotes]
+  = do { meta_ty <- tcMetaTy meta_ty_name
+         -- Expected type of splice, e.g. m Exp
+       ; let expected_type = mkAppTy m_var meta_ty
+       ; expr' <- tcPolyExpr expr expected_type
        ; return (PendingTcSplice splice_name expr') }
   where
      meta_ty_name = case flavour of
-                       UntypedExpSplice  -> expQTyConName
-                       UntypedPatSplice  -> patQTyConName
-                       UntypedTypeSplice -> typeQTyConName
-                       UntypedDeclSplice -> decsQTyConName
+                       UntypedExpSplice  -> expTyConName
+                       UntypedPatSplice  -> patTyConName
+                       UntypedTypeSplice -> typeTyConName
+                       UntypedDeclSplice -> decsTyConName
 
 ---------------
--- Takes a tau and returns the type Q (TExp tau)
-tcTExpTy :: TcType -> TcM TcType
-tcTExpTy exp_ty
+-- Takes a m and tau and returns the type m (TExp tau)
+tcTExpTy :: TcType -> TcType -> TcM TcType
+tcTExpTy m_ty exp_ty
   = do { unless (isTauTy exp_ty) $ addErr (err_msg exp_ty)
-       ; q    <- tcLookupTyCon qTyConName
        ; texp <- tcLookupTyCon tExpTyConName
        ; let rep = getRuntimeRep exp_ty
-       ; return (mkTyConApp q [mkTyConApp texp [rep, exp_ty]]) }
+       ; return (mkAppTy m_ty (mkTyConApp texp [rep, exp_ty])) }
   where
     err_msg ty
       = vcat [ text "Illegal polytype:" <+> ppr ty
@@ -429,6 +494,44 @@ When a variable is used, we compare
            g1 = $(map ...)         is OK
            g2 = $(f ...)           is not OK; because we havn't compiled f yet
 
+Note [Typechecking Overloaded Quotes]
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+
+The main function for typechecking untyped quotations is `tcUntypedBracket`.
+
+Consider an expression quote, `[| e |]`, its type is `forall m . Quote m => m Exp`.
+When we typecheck it we therefore create a template of a metavariable `m` applied to `Exp` and
+emit a constraint `Quote m`. All this is done in the `brackTy` function.
+`brackTy` also selects the correct contents type for the quotation (Exp, Type, Decs etc).
+
+The meta variable and the constraint evidence variable are
+returned together in a `QuoteWrapper` and then passed along to two further places
+during compilation:
+
+1. Typechecking nested splices (immediately in tcPendingSplice)
+2. Desugaring quotations (see DsMeta)
+
+`tcPendingSplice` takes the `m` type variable as an argument and checks
+each nested splice against this variable `m`. During this
+process the variable `m` can either be fixed to a specific value or further constrained by the
+nested splices.
+
+Once we have checked all the nested splices, the quote type is checked against
+the expected return type.
+
+The process is very simple and like typechecking a list where the quotation is
+like the container and the splices are the elements of the list which must have
+a specific type.
+
+After the typechecking process is completed, the evidence variable for `Quote m`
+and the type `m` is stored in a `QuoteWrapper` which is passed through the pipeline
+and used when desugaring quotations.
+
+Typechecking typed quotations is a similar idea but the `QuoteWrapper` is stored
+in the `PendingStuff` as the nested splices are gathered up in a different way
+to untyped splices. Untyped splices are found in the renamer but typed splices are
+not typechecked and extracted until during typechecking.
+
 -}
 
 -- | We only want to produce warnings for TH-splices if the user requests so.
@@ -503,15 +606,17 @@ tcNestedSplice :: ThStage -> PendingStuff -> Name
                 -> LHsExpr GhcRn -> ExpRhoType -> TcM (HsExpr GhcTc)
     -- See Note [How brackets and nested splices are handled]
     -- A splice inside brackets
-tcNestedSplice pop_stage (TcPending ps_var lie_var) splice_name expr res_ty
+tcNestedSplice pop_stage (TcPending ps_var lie_var q@(QuoteWrapper _ m_var)) splice_name expr res_ty
   = do { res_ty <- expTypeToType res_ty
        ; let rep = getRuntimeRep res_ty
-       ; meta_exp_ty <- tcTExpTy res_ty
+       ; meta_exp_ty <- tcTExpTy m_var res_ty
        ; expr' <- setStage pop_stage $
                   setConstraintVar lie_var $
                   tcMonoExpr expr (mkCheckExpType meta_exp_ty)
        ; untypeq <- tcLookupId unTypeQName
-       ; let expr'' = mkHsApp (nlHsTyApp untypeq [rep, res_ty]) expr'
+       ; let expr'' = mkHsApp
+                        (mkLHsWrap (applyQuoteWrapper q)
+                          (nlHsTyApp untypeq [rep, res_ty])) expr'
        ; ps <- readMutVar ps_var
        ; writeMutVar ps_var (PendingTcSplice splice_name expr'' : ps)
 
@@ -526,7 +631,9 @@ tcTopSplice expr res_ty
   = do { -- Typecheck the expression,
          -- making sure it has type Q (T res_ty)
          res_ty <- expTypeToType res_ty
-       ; meta_exp_ty <- tcTExpTy res_ty
+       ; q_type <- tcMetaTy qTyConName
+       -- Top level splices must still be of type Q (TExp a)
+       ; meta_exp_ty <- tcTExpTy q_type res_ty
        ; q_expr <- tcTopSpliceExpr Typed $
                           tcMonoExpr expr (mkCheckExpType meta_exp_ty)
        ; lcl_env <- getLclEnv
