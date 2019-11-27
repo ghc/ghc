@@ -1,4 +1,5 @@
 {-# LANGUAGE TemplateHaskell #-}
+{-# LANGUAGE NoMonomorphismRestriction #-}
 
 module T2386_Lib(ExportedAbstract, makeOne) where
 

@@ -159,7 +159,7 @@ import Language.Haskell.TH.Lib.Internal hiding
   )
 import Language.Haskell.TH.Syntax
 
-import Control.Monad (liftM2)
+import Control.Applicative ( liftA2 )
 import Foreign.ForeignPtr
 import Data.Word
 import Prelude
@@ -172,97 +172,97 @@ import Prelude
 -------------------------------------------------------------------------------
 -- *   Dec
 
-tySynD :: Name -> [TyVarBndr] -> TypeQ -> DecQ
+tySynD :: Quote m => Name -> [TyVarBndr] -> m Type -> m Dec
 tySynD tc tvs rhs = do { rhs1 <- rhs; return (TySynD tc tvs rhs1) }
 
-dataD :: CxtQ -> Name -> [TyVarBndr] -> Maybe Kind -> [ConQ] -> [DerivClauseQ]
-      -> DecQ
+dataD :: Quote m => m Cxt -> Name -> [TyVarBndr] -> Maybe Kind -> [m Con] -> [m DerivClause]
+      -> m Dec
 dataD ctxt tc tvs ksig cons derivs =
   do
     ctxt1 <- ctxt
-    cons1 <- sequence cons
-    derivs1 <- sequence derivs
+    cons1 <- sequenceA cons
+    derivs1 <- sequenceA derivs
     return (DataD ctxt1 tc tvs ksig cons1 derivs1)
 
-newtypeD :: CxtQ -> Name -> [TyVarBndr] -> Maybe Kind -> ConQ -> [DerivClauseQ]
-         -> DecQ
+newtypeD :: Quote m => m Cxt -> Name -> [TyVarBndr] -> Maybe Kind -> m Con -> [m DerivClause]
+         -> m Dec
 newtypeD ctxt tc tvs ksig con derivs =
   do
     ctxt1 <- ctxt
     con1 <- con
-    derivs1 <- sequence derivs
+    derivs1 <- sequenceA derivs
     return (NewtypeD ctxt1 tc tvs ksig con1 derivs1)
 
-classD :: CxtQ -> Name -> [TyVarBndr] -> [FunDep] -> [DecQ] -> DecQ
+classD :: Quote m => m Cxt -> Name -> [TyVarBndr] -> [FunDep] -> [m Dec] -> m Dec
 classD ctxt cls tvs fds decs =
   do
-    decs1 <- sequence decs
+    decs1 <- sequenceA decs
     ctxt1 <- ctxt
     return $ ClassD ctxt1 cls tvs fds decs1
 
-pragRuleD :: String -> [RuleBndrQ] -> ExpQ -> ExpQ -> Phases -> DecQ
+pragRuleD :: Quote m => String -> [m RuleBndr] -> m Exp -> m Exp -> Phases -> m Dec
 pragRuleD n bndrs lhs rhs phases
   = do
-      bndrs1 <- sequence bndrs
+      bndrs1 <- sequenceA bndrs
       lhs1   <- lhs
       rhs1   <- rhs
       return $ PragmaD $ RuleP n Nothing bndrs1 lhs1 rhs1 phases
 
-dataInstD :: CxtQ -> Name -> [TypeQ] -> Maybe Kind -> [ConQ] -> [DerivClauseQ]
-          -> DecQ
+dataInstD :: Quote m => m Cxt -> Name -> [m Type] -> Maybe Kind -> [m Con] -> [m DerivClause]
+          -> m Dec
 dataInstD ctxt tc tys ksig cons derivs =
   do
     ctxt1 <- ctxt
     ty1 <- foldl appT (conT tc) tys
-    cons1 <- sequence cons
-    derivs1 <- sequence derivs
+    cons1 <- sequenceA cons
+    derivs1 <- sequenceA derivs
     return (DataInstD ctxt1 Nothing ty1 ksig cons1 derivs1)
 
-newtypeInstD :: CxtQ -> Name -> [TypeQ] -> Maybe Kind -> ConQ -> [DerivClauseQ]
-             -> DecQ
+newtypeInstD :: Quote m => m Cxt -> Name -> [m Type] -> Maybe Kind -> m Con -> [m DerivClause]
+             -> m Dec
 newtypeInstD ctxt tc tys ksig con derivs =
   do
     ctxt1 <- ctxt
     ty1 <- foldl appT (conT tc) tys
     con1  <- con
-    derivs1 <- sequence derivs
+    derivs1 <- sequenceA derivs
     return (NewtypeInstD ctxt1 Nothing ty1 ksig con1 derivs1)
 
-dataFamilyD :: Name -> [TyVarBndr] -> Maybe Kind -> DecQ
+dataFamilyD :: Quote m => Name -> [TyVarBndr] -> Maybe Kind -> m Dec
 dataFamilyD tc tvs kind
-    = return $ DataFamilyD tc tvs kind
+    = pure $ DataFamilyD tc tvs kind
 
-openTypeFamilyD :: Name -> [TyVarBndr] -> FamilyResultSig
-                -> Maybe InjectivityAnn -> DecQ
+openTypeFamilyD :: Quote m => Name -> [TyVarBndr] -> FamilyResultSig
+                -> Maybe InjectivityAnn -> m Dec
 openTypeFamilyD tc tvs res inj
-    = return $ OpenTypeFamilyD (TypeFamilyHead tc tvs res inj)
+    = pure $ OpenTypeFamilyD (TypeFamilyHead tc tvs res inj)
 
-closedTypeFamilyD :: Name -> [TyVarBndr] -> FamilyResultSig
-                  -> Maybe InjectivityAnn -> [TySynEqnQ] -> DecQ
+closedTypeFamilyD :: Quote m => Name -> [TyVarBndr] -> FamilyResultSig
+                  -> Maybe InjectivityAnn -> [m TySynEqn] -> m Dec
 closedTypeFamilyD tc tvs result injectivity eqns =
-  do eqns1 <- sequence eqns
+  do eqns1 <- sequenceA eqns
      return (ClosedTypeFamilyD (TypeFamilyHead tc tvs result injectivity) eqns1)
 
-tySynEqn :: (Maybe [TyVarBndr]) -> TypeQ -> TypeQ -> TySynEqnQ
+tySynEqn :: Quote m => (Maybe [TyVarBndr]) -> m Type -> m Type -> m TySynEqn
 tySynEqn tvs lhs rhs =
   do
     lhs1 <- lhs
     rhs1 <- rhs
     return (TySynEqn tvs lhs1 rhs1)
 
-forallC :: [TyVarBndr] -> CxtQ -> ConQ -> ConQ
-forallC ns ctxt con = liftM2 (ForallC ns) ctxt con
+forallC :: Quote m => [TyVarBndr] -> m Cxt -> m Con -> m Con
+forallC ns ctxt con = liftA2 (ForallC ns) ctxt con
 
 -------------------------------------------------------------------------------
 -- *   Type
 
-forallT :: [TyVarBndr] -> CxtQ -> TypeQ -> TypeQ
+forallT :: Quote m => [TyVarBndr] -> m Cxt -> m Type -> m Type
 forallT tvars ctxt ty = do
     ctxt1 <- ctxt
     ty1   <- ty
     return $ ForallT tvars ctxt1 ty1
 
-sigT :: TypeQ -> Kind -> TypeQ
+sigT :: Quote m => m Type -> Kind -> m Type
 sigT t k
   = do
       t' <- t
@@ -298,12 +298,12 @@ tyVarSig = TyVarSig
 -------------------------------------------------------------------------------
 -- * Top Level Declarations
 
-derivClause :: Maybe DerivStrategy -> [PredQ] -> DerivClauseQ
+derivClause :: Quote m => Maybe DerivStrategy -> [m Pred] -> m DerivClause
 derivClause mds p = do
   p' <- cxt p
   return $ DerivClause mds p'
 
-standaloneDerivWithStrategyD :: Maybe DerivStrategy -> CxtQ -> TypeQ -> DecQ
+standaloneDerivWithStrategyD :: Quote m => Maybe DerivStrategy -> m Cxt -> m Type -> m Dec
 standaloneDerivWithStrategyD mds ctxt ty = do
   ctxt' <- ctxt
   ty'   <- ty
@@ -326,8 +326,8 @@ mkBytes = Bytes
 -------------------------------------------------------------------------------
 -- * Tuple expressions
 
-tupE :: [ExpQ] -> ExpQ
-tupE es = do { es1 <- sequence es; return (TupE $ map Just es1)}
+tupE :: Quote m => [m Exp] -> m Exp
+tupE es = do { es1 <- sequenceA es; return (TupE $ map Just es1)}
 
-unboxedTupE :: [ExpQ] -> ExpQ
-unboxedTupE es = do { es1 <- sequence es; return (UnboxedTupE $ map Just es1)}
+unboxedTupE :: Quote m => [m Exp] -> m Exp
+unboxedTupE es = do { es1 <- sequenceA es; return (UnboxedTupE $ map Just es1)}

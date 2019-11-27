@@ -1,6 +1,6 @@
 -- Check that declarations in a bracket shadow the top-level
 -- declarations, rather than clashing with them.
-
+{-# LANGUAGE NoMonomorphismRestriction #-}
 module TH_bracket1 where
 
 foo = 1

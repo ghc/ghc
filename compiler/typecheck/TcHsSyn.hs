@@ -798,12 +798,18 @@ zonkExpr env (HsAppType x e t)
 zonkExpr _ e@(HsRnBracketOut _ _ _)
   = pprPanic "zonkExpr: HsRnBracketOut" (ppr e)
 
-zonkExpr env (HsTcBracketOut x body bs)
-  = do bs' <- mapM zonk_b bs
-       return (HsTcBracketOut x body bs')
+zonkExpr env (HsTcBracketOut x wrap body bs)
+  = do wrap' <- traverse zonkQuoteWrap wrap
+       bs' <- mapM (zonk_b env) bs
+       return (HsTcBracketOut x wrap' body bs')
   where
-    zonk_b (PendingTcSplice n e) = do e' <- zonkLExpr env e
-                                      return (PendingTcSplice n e')
+    zonkQuoteWrap (QuoteWrapper ev ty) = do
+        let ev' = zonkIdOcc env ev
+        ty' <- zonkTcTypeToTypeX env ty
+        return (QuoteWrapper ev' ty')
+
+    zonk_b env' (PendingTcSplice n e) = do e' <- zonkLExpr env' e
+                                           return (PendingTcSplice n e')
 
 zonkExpr env (HsSpliceE _ (HsSplicedT s)) =
   runTopSplice s >>= zonkExpr env

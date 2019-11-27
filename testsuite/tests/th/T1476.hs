@@ -1,4 +1,5 @@
 {-# LANGUAGE TemplateHaskell #-}
+{-# LANGUAGE NoMonomorphismRestriction #-}
 
 module T1476 where
 

@@ -1,6 +1,7 @@
 {-# LANGUAGE TemplateHaskell #-}
 {-# LANGUAGE TupleSections #-}
 {-# LANGUAGE UnboxedTuples #-}
+{-# LANGUAGE NoMonomorphismRestriction #-}
 module T15843a where
 
 import Language.Haskell.TH

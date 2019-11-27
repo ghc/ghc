@@ -17,6 +17,7 @@ module TcMType (
   --------------------------------
   -- Creating new mutable type variables
   newFlexiTyVar,
+  newNamedFlexiTyVar,
   newFlexiTyVarTy,              -- Kind -> TcM TcType
   newFlexiTyVarTys,             -- Int -> Kind -> TcM [TcType]
   newOpenFlexiTyVarTy, newOpenTypeKind,
@@ -730,15 +731,22 @@ And there no reason /not/ to clone the Name when making a
 unification variable.  So that's what we do.
 -}
 
+metaInfoToTyVarName :: MetaInfo -> FastString
+metaInfoToTyVarName  meta_info =
+  case meta_info of
+       TauTv       -> fsLit "t"
+       FlatMetaTv  -> fsLit "fmv"
+       FlatSkolTv  -> fsLit "fsk"
+       TyVarTv     -> fsLit "a"
+
 newAnonMetaTyVar :: MetaInfo -> Kind -> TcM TcTyVar
+newAnonMetaTyVar mi = newNamedAnonMetaTyVar (metaInfoToTyVarName mi) mi
+
+newNamedAnonMetaTyVar :: FastString -> MetaInfo -> Kind -> TcM TcTyVar
 -- Make a new meta tyvar out of thin air
-newAnonMetaTyVar meta_info kind
-  = do  { let s = case meta_info of
-                        TauTv       -> fsLit "t"
-                        FlatMetaTv  -> fsLit "fmv"
-                        FlatSkolTv  -> fsLit "fsk"
-                        TyVarTv      -> fsLit "a"
-        ; name    <- newMetaTyVarName s
+newNamedAnonMetaTyVar tyvar_name meta_info kind
+
+  = do  { name    <- newMetaTyVarName tyvar_name
         ; details <- newMetaDetails meta_info
         ; let tyvar = mkTcTyVar name kind details
         ; traceTc "newAnonMetaTyVar" (ppr tyvar)
@@ -962,6 +970,10 @@ that can't ever appear in user code, so we're safe!
 
 newFlexiTyVar :: Kind -> TcM TcTyVar
 newFlexiTyVar kind = newAnonMetaTyVar TauTv kind
+
+-- | Create a new flexi ty var with a specific name
+newNamedFlexiTyVar :: FastString -> Kind -> TcM TcTyVar
+newNamedFlexiTyVar fs kind = newNamedAnonMetaTyVar fs TauTv kind
 
 newFlexiTyVarTy :: Kind -> TcM TcType
 newFlexiTyVarTy kind = do

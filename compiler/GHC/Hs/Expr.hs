@@ -451,6 +451,8 @@ data HsExpr p
 
   | HsTcBracketOut
       (XTcBracketOut p)
+      (Maybe QuoteWrapper) -- The wrapper to apply type and dictionary argument
+                           -- to the quote.
       (HsBracket GhcRn)    -- Output of the type checker is the *original*
                            -- renamed expression, plus
       [PendingTcSplice]    -- _typechecked_ splices to be
@@ -1006,8 +1008,8 @@ ppr_expr (HsSpliceE _ s)         = pprSplice s
 ppr_expr (HsBracket _ b)         = pprHsBracket b
 ppr_expr (HsRnBracketOut _ e []) = ppr e
 ppr_expr (HsRnBracketOut _ e ps) = ppr e $$ text "pending(rn)" <+> ppr ps
-ppr_expr (HsTcBracketOut _ e []) = ppr e
-ppr_expr (HsTcBracketOut _ e ps) = ppr e $$ text "pending(tc)" <+> ppr ps
+ppr_expr (HsTcBracketOut _ _wrap e []) = ppr e
+ppr_expr (HsTcBracketOut _ _wrap e ps) = ppr e $$ text "pending(tc)" <+> ppr ps
 
 ppr_expr (HsProc _ pat (L _ (HsCmdTop _ cmd)))
   = hsep [text "proc", ppr pat, ptext (sLit "->"), ppr cmd]

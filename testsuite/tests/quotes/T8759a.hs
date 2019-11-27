@@ -1,4 +1,5 @@
 {-# LANGUAGE PatternSynonyms #-}
+{-# LANGUAGE NoMonomorphismRestriction #-}
 
 module T8759a where
 
