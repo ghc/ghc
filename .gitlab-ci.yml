@@ -2,7 +2,7 @@ variables:
   GIT_SSL_NO_VERIFY: "1"
 
   # Commit of ghc/ci-images repository from which to pull Docker images
-  DOCKER_REV: dea5cafb3693a771ff42cebd73d0c89f280beef0
+  DOCKER_REV: 408eff66aef6ca2b44446c694c5a56d6ca0460cc
 
   # Sequential version number capturing the versions of all tools fetched by
   # .gitlab/win32-init.sh.
@@ -627,6 +627,40 @@ validate-x86_64-linux-deb9-dwarf:
     BUILD_FLAVOUR: dwarf
     TEST_ENV: "x86_64-linux-deb9-dwarf"
     BIN_DIST_PREP_TAR_COMP: "ghc-x86_64-deb9-linux-dwarf.tar.xz"
+
+#################################
+# x86_64-linux-deb10
+#################################
+
+.build-x86_64-linux-deb10:
+  extends: .validate-linux
+  stage: full-build
+  image: "registry.gitlab.haskell.org/ghc/ci-images/x86_64-linux-deb10:$DOCKER_REV"
+  variables:
+    TEST_ENV: "x86_64-linux-deb10"
+    BIN_DIST_PREP_TAR_COMP: "./ghc-x86_64-deb10-linux.tar.xz"
+    XZ: "xz -T0"
+  cache:
+    key: linux-x86_64-deb10
+
+# Disabled to alleviate CI load
+.validate-x86_64-linux-deb10:
+  extends: .build-x86_64-linux-deb10
+  stage: full-build
+
+nightly-x86_64-linux-deb10:
+  extends: .build-x86_64-linux-deb10
+  artifacts:
+    expire_in: 2 weeks
+  variables:
+    TEST_TYPE: slowtest
+  only:
+    variables:
+      - $NIGHTLY
+
+release-x86_64-linux-deb10:
+  <<: *release
+  extends: .build-x86_64-linux-deb10
 
 #################################
 # x86_64-linux-deb8
