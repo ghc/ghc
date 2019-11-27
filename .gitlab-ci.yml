@@ -643,10 +643,9 @@ release-x86_64-linux-deb9-dwarf:
   cache:
     key: linux-x86_64-deb10
 
-# Disabled to alleviate CI load
-.validate-x86_64-linux-deb10:
+validate-x86_64-linux-deb10:
   extends: .build-x86_64-linux-deb10
-  stage: full-build
+  stage: build
 
 nightly-x86_64-linux-deb10:
   extends: .build-x86_64-linux-deb10
