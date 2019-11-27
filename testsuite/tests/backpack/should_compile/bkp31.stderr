@@ -6,4 +6,4 @@
   [2 of 5] Compiling B[sig]           ( abcd-holes/B.hsig, nothing )
   [3 of 5] Compiling A[sig]           ( abcd-holes/A.hsig, nothing )
   [4 of 5] Compiling D                ( abcd-holes/D.hs, nothing )
-  [5 of 5] Instantiating Instantiation Node
+  [5 of 5] Instantiating ab-sigs

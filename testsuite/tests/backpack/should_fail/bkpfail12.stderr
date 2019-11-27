@@ -7,7 +7,7 @@
 [3 of 3] Processing r
   [1 of 3] Compiling H[sig]           ( r/H.hsig, nothing )
   [2 of 3] Compiling R                ( r/R.hs, nothing )
-  [3 of 3] Instantiating Instantiation Node
+  [3 of 3] Instantiating p
 
 bkpfail12.bkp:8:9: error:
     • Identifier ‘f’ has conflicting definitions in the module
