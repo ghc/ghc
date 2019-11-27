@@ -27,6 +27,7 @@ import {-# SOURCE #-}   DsExpr ( dsExpr )
 
 import MatchLit
 import DsMonad
+import TysPrim
 
 import qualified Language.Haskell.TH as TH
 
@@ -63,12 +64,17 @@ import MonadUtils
 import TcEvidence
 import Control.Monad.Trans.Reader
 import Control.Monad.Trans.Class
+--import DsBinds
+--import TyCoRep
 
 import Data.ByteString ( unpack )
 import Control.Monad
 import Data.List
 
-type MetaM a = ReaderT () DsM a
+
+-- The local state is always the same, calculated from the passed in
+-- wrapper
+type MetaM a = ReaderT (CoreExpr -> CoreExpr) DsM a
 
 -----------------------------------------------------------------------------
 dsBracket :: HsWrapper -> HsBracket GhcRn -> [PendingTcSplice] -> DsM CoreExpr
@@ -76,8 +82,15 @@ dsBracket :: HsWrapper -> HsBracket GhcRn -> [PendingTcSplice] -> DsM CoreExpr
 -- The quoted thing is parameterised over Name, even though it has
 -- been type checked.  We don't want all those type decorations!
 
-dsBracket wrapper brack splices
-  = runReaderT (mapReaderT (dsExtendMetaEnv new_bit) (do_brack brack)) ()
+dsBracket _ brack splices
+  = do
+      let (m_var:_) = mkTemplateTyVars (repeat (mkVisFunTy liftedTypeKind liftedTypeKind))
+      quote_tc <- dsLookupTyCon quoteClassName
+      quote_var <- newSysLocalDs (mkTyConApp quote_tc [mkTyVarTy m_var])
+      let wrapper e = mkCoreApps e [Type (mkTyVarTy m_var), Var quote_var]
+      res <- runReaderT (mapReaderT (dsExtendMetaEnv new_bit) (do_brack brack)) wrapper
+      return $ mkCoreLams [m_var, quote_var] res
+
   where
     new_bit = mkNameEnv [(n, DsSplice (unLoc e))
                         | PendingTcSplice n e <- splices]
@@ -1932,7 +1945,7 @@ globalVar name
   = do  { MkC mod <- coreStringLit name_mod
         ; MkC pkg <- coreStringLit name_pkg
         ; MkC occ <- nameLit name
-        ; rep2 mk_varg [pkg,mod,occ] }
+        ; rep2_nw mk_varg [pkg,mod,occ] }
   | otherwise
   = do  { MkC occ <- nameLit name
         ; MkC uni <- coreIntegerLit (toInteger $ getKey (getUnique name))
@@ -1997,9 +2010,14 @@ newtype Core a = MkC CoreExpr
 unC :: Core a -> CoreExpr
 unC (MkC x) = x
 
-rep2 :: Name -> [ CoreExpr ] -> MetaM (Core a)
-rep2 n xs = do { id <- lift $ dsLookupGlobalId n
-               ; return (MkC (foldl' App (Var id) xs)) }
+rep2 = rep2X True
+rep2_nw = rep2X False
+
+rep2X :: Bool -> Name -> [ CoreExpr ] -> MetaM (Core a)
+rep2X do_wrap n xs = do { rep_id <- lift $ dsLookupGlobalId n
+               ; wrap <- (if do_wrap then id else const id) <$> ask
+               ; return (MkC (foldl' App (wrap (Var rep_id)) xs)) }
+
 
 dataCon' :: Name -> [CoreExpr] -> MetaM (Core a)
 dataCon' n args = do { id <- lift $ dsLookupDataCon n
@@ -2582,7 +2600,7 @@ repLiteral lit
                    _ -> return lit
        lit_expr <- lift $ dsLit lit'
        case mb_lit_name of
-          Just lit_name -> rep2 lit_name [lit_expr]
+          Just lit_name -> rep2_nw lit_name [lit_expr]
           Nothing -> notHandled "Exotic literal" (ppr lit)
   where
     mb_lit_name = case lit of
@@ -2625,7 +2643,7 @@ mk_lit (HsFractional f)   = mk_rational f
 mk_lit (HsIsString _ s)   = mk_string   s
 
 repNameS :: Core String -> MetaM (Core TH.Name)
-repNameS (MkC name) = rep2 mkNameSName [name]
+repNameS (MkC name) = rep2_nw mkNameSName [name]
 
 --------------- Miscellaneous -------------------
 
