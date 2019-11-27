@@ -204,10 +204,10 @@ tcUntypedBracket rn_expr brack ps res_ty
 tcBrackTy :: HsBracket GhcRn -> TcM TcType
 tcBrackTy (VarBr {})  = tcMetaTy nameTyConName
                                            -- Result type is Var (not Q-monadic)
-tcBrackTy (ExpBr {})  = tcMetaTy expQTyConName  -- Result type is ExpQ (= Q Exp)
-tcBrackTy (TypBr {})  = tcMetaTy typeQTyConName -- Result type is Type (= Q Typ)
-tcBrackTy (DecBrG {}) = tcMetaTy decsQTyConName -- Result type is Q [Dec]
-tcBrackTy (PatBr {})  = tcMetaTy patQTyConName  -- Result type is PatQ (= Q Pat)
+tcBrackTy (ExpBr {})  = tcMetaTy expTyConName  -- Result type is m Exp
+tcBrackTy (TypBr {})  = tcMetaTy typeTyConName -- Result type is m Type
+tcBrackTy (DecBrG {}) = tcMetaTy decTyConName -- Result type is m [Dec]
+tcBrackTy (PatBr {})  = tcMetaTy patTyConName  -- Result type is m Pat
 tcBrackTy (DecBrL {}) = panic "tcBrackTy: Unexpected DecBrL"
 tcBrackTy (TExpBr {}) = panic "tcUntypedBracket: Unexpected TExpBr"
 tcBrackTy (XBracket nec) = noExtCon nec
