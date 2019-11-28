@@ -1885,7 +1885,7 @@ unpackedness :: { Located ([AddAnn], SourceText, SrcUnpackedness) }
 
 forall_vis_flag :: { (AddAnn, ForallVisFlag) }
         : '.'  { (mj AnnDot $1,    ForallInvis) }
-        | '->' { (mj AnnRarrow $1, ForallVis)   }
+        | '->' { (mu AnnRarrow $1, ForallVis)   }
 
 -- A ktype/ktypedoc is a ctype/ctypedoc, possibly with a kind annotation
 ktype :: { LHsType GhcPs }
