@@ -238,7 +238,7 @@ test('T12707',
 
 test('T12150',
      [ only_ways(['optasm']),
-       collect_compiler_stats('bytes allocated', 1)
+       collect_compiler_stats('bytes allocated', 0.5)
      ],
     compile,
      [''])
