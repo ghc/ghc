@@ -538,7 +538,7 @@ closureGrowth expander sizer group abs_ids = go
       -- the closure growth of its RHS.
       | otherwise   = mkIntWithInf cost + go rhs
       where
-        n_occs = sizeDVarSet (clo_fvs' `dVarSetIntersectVarSet` group)
+        n_occs = sizeDVarSet (clo_fvs' `dVarSetIntersectVarSet` group) -- TODO: Try disjoint
         -- What we close over considering prior lifting decisions
         clo_fvs' = expander clo_fvs
         -- Variables that would additionally occur free in the closure body if

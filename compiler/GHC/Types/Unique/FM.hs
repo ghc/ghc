@@ -241,7 +241,7 @@ intersectUFM_C
 intersectUFM_C f (UFM x) (UFM y) = UFM (M.intersectionWith f x y)
 
 disjointUFM :: UniqFM elt1 -> UniqFM elt2 -> Bool
-disjointUFM (UFM x) (UFM y) = M.null (M.intersection x y)
+disjointUFM (UFM x) (UFM y) = M.disjoint x y
 
 foldUFM :: (elt -> a -> a) -> a -> UniqFM elt -> a
 foldUFM k z (UFM m) = M.foldr k z m
