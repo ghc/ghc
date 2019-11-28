@@ -34,7 +34,7 @@ module GHC.Types.Var.Set (
         elemDVarSet, dVarSetElems, subDVarSet,
         unionDVarSet, unionDVarSets, mapUnionDVarSet,
         intersectDVarSet, dVarSetIntersectVarSet,
-        intersectsDVarSet, disjointDVarSet,
+        intersectsDVarSet, disjointDVarSet, varSetDisjointDVarSet,
         isEmptyDVarSet, delDVarSet, delDVarSetList,
         minusDVarSet, foldDVarSet, filterDVarSet, mapDVarSet,
         dVarSetMinusVarSet, anyDVarSet, allDVarSet,
@@ -273,6 +273,9 @@ dVarSetIntersectVarSet = uniqDSetIntersectUniqSet
 -- | True if empty intersection
 disjointDVarSet :: DVarSet -> DVarSet -> Bool
 disjointDVarSet s1 s2 = disjointUDFM (getUniqDSet s1) (getUniqDSet s2)
+
+varSetDisjointDVarSet :: VarSet -> DVarSet -> Bool
+varSetDisjointDVarSet vs dvs = uniqDSetDisjointUniqSet dvs vs
 
 -- | True if non-empty intersection
 intersectsDVarSet :: DVarSet -> DVarSet -> Bool

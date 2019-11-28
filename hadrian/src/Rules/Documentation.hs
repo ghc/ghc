@@ -103,9 +103,8 @@ documentationRules = do
 
                       -- include toplevel html target unless we neither want
                       -- haddocks nor html pages produced by sphinx.
-                   ++ [ html | Set.size (doctargets `Set.intersection`
-                                         Set.fromList [Haddocks, SphinxHTML]
-                                        ) > 0 ]
+                   ++ [ html |    Haddocks   `Set.member` doctargets
+                               || SphinxHTML `Set.member` doctargets ]
 
                       -- include archives for whatever targets remain from
                       -- the --docs arguments we got.
