@@ -936,9 +936,8 @@ data InterestingCxt
 -- | If there is any 'interesting' identifier occurance, then the
 -- aggregated occurance info of that identifier is considered interesting.
 instance Semi.Semigroup InterestingCxt where
-  IsInteresting <> _ = IsInteresting
-  _ <> IsInteresting = IsInteresting
-  _ <> _             = NotInteresting
+  NotInteresting <> x = x
+  IsInteresting  <> _ = IsInteresting
 
 instance Monoid InterestingCxt where
   mempty = NotInteresting
@@ -957,9 +956,8 @@ data InsideLam
 -- | If any occurance of an identifier is inside a lambda, then the
 -- occurance info of that identifier marks it as occuring inside a lambda
 instance Semi.Semigroup InsideLam where
-  IsInsideLam <> _ = IsInsideLam
-  _ <> IsInsideLam = IsInsideLam
-  _ <> _           = NotInsideLam
+  NotInsideLam <> x = x
+  IsInsideLam  <> _ = IsInsideLam
 
 instance Monoid InsideLam where
   mempty = NotInsideLam
