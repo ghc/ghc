@@ -195,32 +195,54 @@ tcTypedBracket _ other_brack _
 tcUntypedBracket rn_expr brack ps res_ty
   = do { res_ty <- expTypeToType res_ty
        ; traceTc "tc_bracket untyped" (ppr brack $$ ppr ps)
+
+       -- New polymorphic type variable for the bracket
        ; m_var <- newFlexiTyVarTy (mkVisFunTy liftedTypeKind liftedTypeKind)
-       ; exp_ty_con <- tcLookupTyCon expTyConName
-       ; let expected_type = mkAppTy m_var (mkTyConApp exp_ty_con [])
+
+       -- Create the type m Exp for expression bracket, m Type for a type
+       -- bracket and so on.
+       ; expected_type <- brackTy m_var brack
+
+       -- Unify the overall type of the bracket with the expected result
+       -- type
        ; co <- unifyType (Just rn_expr) expected_type res_ty
+
+       -- Match the expected type with the type of all the internal
+       -- splices. They might have further constrained types and if they do
+       -- we want to
        ; ps' <- mapM (tcPendingSplice expected_type) ps
+
+       -- Emit a Quote constraint for the bracket
        ; quote_con <- tcLookupTyCon quoteClassName
        ; ev_var <- emitWantedEvVar StaticOrigin $
                   mkTyConApp (quote_con)
                              [m_var]
---       ; meta_ty <- tcBrackTy brack expected_type
+       --
        ; traceTc "tc_bracket done untyped" (ppr expected_type)
+       -- Apply the type variable and quote evidence to the bracket, we
+       -- need to apply it to all the combinators manually as the core is
+       -- constructed by hand.
        ; let final_co = mkWpCastR co <.> mkWpEvVarApps [ev_var] <.> mkWpTyApps [m_var]
        ; return $ mkHsWrap final_co $ HsTcBracketOut noExtField idHsWrapper brack ps'
        }
 
+
 ---------------
-tcBrackTy :: HsBracket GhcRn -> TcM TcType
-tcBrackTy (VarBr {})  = tcMetaTy nameTyConName
+brackTy :: TcType -> HsBracket GhcRn -> TcM Type
+brackTy m_var b =
+  let mkTyX k n = mkAppTy m_var . k . flip mkTyConApp [] <$> tcLookupTyCon n
+      mkTy = mkTyX id
+  in
+  case b of
+    (VarBr {}) -> flip mkTyConApp [] <$> tcLookupTyCon nameTyConName
                                            -- Result type is Var (not Q-monadic)
-tcBrackTy (ExpBr {})  = tcMetaTy expTyConName  -- Result type is m Exp
-tcBrackTy (TypBr {})  = tcMetaTy typeTyConName -- Result type is m Type
-tcBrackTy (DecBrG {}) = tcMetaTy decTyConName -- Result type is m [Dec]
-tcBrackTy (PatBr {})  = tcMetaTy patTyConName  -- Result type is m Pat
-tcBrackTy (DecBrL {}) = panic "tcBrackTy: Unexpected DecBrL"
-tcBrackTy (TExpBr {}) = panic "tcUntypedBracket: Unexpected TExpBr"
-tcBrackTy (XBracket nec) = noExtCon nec
+    (ExpBr {})  -> mkTy expTyConName  -- Result type is m Exp
+    (TypBr {})  -> mkTy typeTyConName -- Result type is m Type
+    (DecBrG {}) -> mkTyX mkListTy decTyConName -- Result type is m [Dec]
+    (PatBr {})  -> mkTy patTyConName  -- Result type is m Pat
+    (DecBrL {}) -> panic "tcBrackTy: Unexpected DecBrL"
+    (TExpBr {}) -> panic "tcUntypedBracket: Unexpected TExpBr"
+    (XBracket nec) -> noExtCon nec
 
 ---------------
 tcPendingSplice :: TcType -> PendingRnSplice -> TcM PendingTcSplice
