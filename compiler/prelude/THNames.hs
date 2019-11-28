@@ -197,6 +197,7 @@ patTyConName           = thTc (fsLit "Pat")            patTyConKey
 fieldPatTyConName      = thTc (fsLit "FieldPat")       fieldPatTyConKey
 expTyConName           = thTc (fsLit "Exp")            expTyConKey
 decTyConName           = thTc (fsLit "Dec")            decTyConKey
+decsTyConName          = thTc (fsLit "Dec")            decTyConKey
 typeTyConName          = thTc (fsLit "Type")           typeTyConKey
 matchTyConName         = thTc (fsLit "Match")          matchTyConKey
 clauseTyConName        = thTc (fsLit "Clause")         clauseTyConKey
