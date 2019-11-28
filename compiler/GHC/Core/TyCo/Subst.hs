@@ -383,8 +383,8 @@ extendTCvSubstList subst tvs tys
 unionTCvSubst :: TCvSubst -> TCvSubst -> TCvSubst
 -- Works when the ranges are disjoint
 unionTCvSubst (TCvSubst in_scope1 tenv1 cenv1) (TCvSubst in_scope2 tenv2 cenv2)
-  = ASSERT( not (tenv1 `intersectsVarEnv` tenv2)
-         && not (cenv1 `intersectsVarEnv` cenv2) )
+  = ASSERT( tenv1 `disjointVarEnv` tenv2
+         && cenv1 `disjointVarEnv` cenv2 )
     TCvSubst (in_scope1 `unionInScope` in_scope2)
              (tenv1     `plusVarEnv`   tenv2)
              (cenv1     `plusVarEnv`   cenv2)

@@ -27,6 +27,7 @@ module GHC.Types.Unique.Set (
         unionUniqSets, unionManyUniqSets,
         minusUniqSet, uniqSetMinusUFM,
         intersectUniqSets,
+        disjointUniqSets,
         restrictUniqSetToUFM,
         uniqSetAny, uniqSetAll,
         elementOfUniqSet,
@@ -104,6 +105,9 @@ minusUniqSet (UniqSet s) (UniqSet t) = UniqSet (minusUFM s t)
 
 intersectUniqSets :: UniqSet a -> UniqSet a -> UniqSet a
 intersectUniqSets (UniqSet s) (UniqSet t) = UniqSet (intersectUFM s t)
+
+disjointUniqSets :: UniqSet a -> UniqSet a -> Bool
+disjointUniqSets (UniqSet s) (UniqSet t) = disjointUFM s t
 
 restrictUniqSetToUFM :: UniqSet a -> UniqFM b -> UniqSet a
 restrictUniqSetToUFM (UniqSet s) m = UniqSet (intersectUFM s m)
