@@ -11,7 +11,7 @@ https://gitlab.haskell.org/ghc/ghc/wikis/testing-patches for more
 information.
 
 Flags:
-  --no-clean        don't make clean first, just carry on from
+  --no-clean        don't clean first, just carry on from
                     a previous interrupted validation run
   --testsuite-only  don't build the compiler, just run the test suite
   --build-only      don't test the compiler, just build it
@@ -25,8 +25,10 @@ Flags:
                     2008-07-01: 14% slower than the default.
   --quiet           More pretty build log.
                     See Note [Default build system verbosity].
-  --hadrian         Build the compiler and run the tests through hadrian.
-  --stack           Use Stack to build Hadrian and the Stage 1 compiler.
+  --legacy          Build the compiler and run the tests through the legacy
+                    make-based build system.
+  --stack           Use Stack to build Hadrian and to provide the bootstrap
+                    compiler.
   --help            shows this usage help.
 
   validate runs 'make -j\$THREADS', where by default THREADS is the number of
@@ -56,8 +58,9 @@ be_quiet=0
 # heavy cost of xz, which is the typical default. The options are defined in
 # mk/config.mk.in
 tar_comp=gzip
-use_hadrian=NO
+use_hadrian=YES
 use_stack=NO
+hadrian_build_root=_validatebuild
 
 while [ $# -gt 0 ]
 do
@@ -86,9 +89,8 @@ do
     --quiet)
         be_quiet=1
         ;;
-    --hadrian)
-	use_hadrian=YES
-	hadrian_build_root=_validatebuild
+    --legacy)
+	use_hadrian=NO
 	;;
     --stack)
 	use_stack=YES
