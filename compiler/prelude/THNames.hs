@@ -151,11 +151,11 @@ templateHaskellNames = [
     -- And the tycons
     qTyConName, nameTyConName, patTyConName, fieldPatTyConName, matchQTyConName,
     clauseQTyConName, expQTyConName, fieldExpTyConName, predTyConName,
-    stmtQTyConName, decQTyConName, conQTyConName, bangTypeQTyConName,
-    varBangTypeQTyConName, typeQTyConName, expTyConName, decTyConName,
+    stmtTyConName, decQTyConName, decsTyConName, conTyConName, bangTypeQTyConName,
+    varBangTypeTyConName, typeQTyConName, expTyConName, decTyConName,
     typeTyConName, tyVarBndrQTyConName, matchTyConName, clauseTyConName,
     patQTyConName, fieldPatQTyConName, fieldExpQTyConName, funDepTyConName,
-    predQTyConName, decsQTyConName, ruleBndrQTyConName, tySynEqnQTyConName,
+    predQTyConName, decsQTyConName, ruleBndrQTyConName, tySynEqnTyConName,
     roleTyConName, tExpTyConName, injAnnTyConName, kindQTyConName,
     overlapTyConName, derivClauseQTyConName, derivStrategyQTyConName,
 
@@ -189,7 +189,7 @@ quoteClassName = thCls (fsLit "Quote") quoteClassKey
 qTyConName, nameTyConName, fieldExpTyConName, patTyConName,
     fieldPatTyConName, expTyConName, decTyConName, typeTyConName,
     matchTyConName, clauseTyConName, funDepTyConName, predTyConName,
-    tExpTyConName, injAnnTyConName, overlapTyConName :: Name
+    tExpTyConName, injAnnTyConName, overlapTyConName, decsTyConName :: Name
 qTyConName             = thTc (fsLit "Q")              qTyConKey
 nameTyConName          = thTc (fsLit "Name")           nameTyConKey
 fieldExpTyConName      = thTc (fsLit "FieldExp")       fieldExpTyConKey
@@ -197,7 +197,7 @@ patTyConName           = thTc (fsLit "Pat")            patTyConKey
 fieldPatTyConName      = thTc (fsLit "FieldPat")       fieldPatTyConKey
 expTyConName           = thTc (fsLit "Exp")            expTyConKey
 decTyConName           = thTc (fsLit "Dec")            decTyConKey
-decsTyConName          = thTc (fsLit "Dec")            decTyConKey
+decsTyConName          = libTc (fsLit "Decs")           decsTyConKey
 typeTyConName          = thTc (fsLit "Type")           typeTyConKey
 matchTyConName         = thTc (fsLit "Match")          matchTyConKey
 clauseTyConName        = thTc (fsLit "Clause")         clauseTyConKey
@@ -550,29 +550,29 @@ anyclassStrategyName = libFun (fsLit "anyclassStrategy") anyclassStrategyIdKey
 newtypeStrategyName  = libFun (fsLit "newtypeStrategy")  newtypeStrategyIdKey
 viaStrategyName      = libFun (fsLit "viaStrategy")      viaStrategyIdKey
 
-matchQTyConName, clauseQTyConName, expQTyConName, stmtQTyConName,
-    decQTyConName, conQTyConName, bangTypeQTyConName,
-    varBangTypeQTyConName, typeQTyConName, fieldExpQTyConName,
+matchQTyConName, clauseQTyConName, expQTyConName, stmtTyConName,
+    decQTyConName, conTyConName, bangTypeQTyConName,
+    varBangTypeTyConName, typeQTyConName, fieldExpQTyConName,
     patQTyConName, fieldPatQTyConName, predQTyConName, decsQTyConName,
-    ruleBndrQTyConName, tySynEqnQTyConName, roleTyConName,
+    ruleBndrQTyConName, tySynEqnTyConName, roleTyConName,
     derivClauseQTyConName, kindQTyConName, tyVarBndrQTyConName,
     derivStrategyQTyConName :: Name
 matchQTyConName         = libTc (fsLit "MatchQ")         matchQTyConKey
 clauseQTyConName        = libTc (fsLit "ClauseQ")        clauseQTyConKey
 expQTyConName           = libTc (fsLit "ExpQ")           expQTyConKey
-stmtQTyConName          = libTc (fsLit "StmtQ")          stmtQTyConKey
+stmtTyConName           = thTc (fsLit "Stmt")            stmtTyConKey
 decQTyConName           = libTc (fsLit "DecQ")           decQTyConKey
 decsQTyConName          = libTc (fsLit "DecsQ")          decsQTyConKey  -- Q [Dec]
-conQTyConName           = libTc (fsLit "ConQ")           conQTyConKey
+conTyConName            = thTc (fsLit "Con")             conTyConKey
 bangTypeQTyConName      = libTc (fsLit "BangTypeQ")      bangTypeQTyConKey
-varBangTypeQTyConName   = libTc (fsLit "VarBangTypeQ")   varBangTypeQTyConKey
+varBangTypeTyConName    = thTc (fsLit "VarBangType")     varBangTypeTyConKey
 typeQTyConName          = libTc (fsLit "TypeQ")          typeQTyConKey
 fieldExpQTyConName      = libTc (fsLit "FieldExpQ")      fieldExpQTyConKey
 patQTyConName           = libTc (fsLit "PatQ")           patQTyConKey
 fieldPatQTyConName      = libTc (fsLit "FieldPatQ")      fieldPatQTyConKey
 predQTyConName          = libTc (fsLit "PredQ")          predQTyConKey
 ruleBndrQTyConName      = libTc (fsLit "RuleBndrQ")      ruleBndrQTyConKey
-tySynEqnQTyConName      = libTc (fsLit "TySynEqnQ")      tySynEqnQTyConKey
+tySynEqnTyConName       = thTc  (fsLit "TySynEqn")       tySynEqnTyConKey
 roleTyConName           = libTc (fsLit "Role")           roleTyConKey
 derivClauseQTyConName   = libTc (fsLit "DerivClauseQ")   derivClauseQTyConKey
 kindQTyConName          = libTc (fsLit "KindQ")          kindQTyConKey
@@ -639,13 +639,14 @@ quoteClassKey = mkPreludeClassUnique 201
 
 expTyConKey, matchTyConKey, clauseTyConKey, qTyConKey, expQTyConKey,
     decQTyConKey, patTyConKey, matchQTyConKey, clauseQTyConKey,
-    stmtQTyConKey, conQTyConKey, typeQTyConKey, typeTyConKey,
-    tyVarBndrQTyConKey, decTyConKey, bangTypeQTyConKey, varBangTypeQTyConKey,
+    stmtTyConKey, conTyConKey, typeQTyConKey, typeTyConKey,
+    tyVarBndrQTyConKey, decTyConKey, bangTypeQTyConKey, varBangTypeTyConKey,
     fieldExpTyConKey, fieldPatTyConKey, nameTyConKey, patQTyConKey,
     fieldPatQTyConKey, fieldExpQTyConKey, funDepTyConKey, predTyConKey,
-    predQTyConKey, decsQTyConKey, ruleBndrQTyConKey, tySynEqnQTyConKey,
+    predQTyConKey, decsQTyConKey, ruleBndrQTyConKey, tySynEqnTyConKey,
     roleTyConKey, tExpTyConKey, injAnnTyConKey, kindQTyConKey,
-    overlapTyConKey, derivClauseQTyConKey, derivStrategyQTyConKey :: Unique
+    overlapTyConKey, derivClauseQTyConKey, derivStrategyQTyConKey, decsTyConKey
+      :: Unique
 expTyConKey             = mkPreludeTyConUnique 200
 matchTyConKey           = mkPreludeTyConUnique 201
 clauseTyConKey          = mkPreludeTyConUnique 202
@@ -655,13 +656,13 @@ decQTyConKey            = mkPreludeTyConUnique 205
 patTyConKey             = mkPreludeTyConUnique 206
 matchQTyConKey          = mkPreludeTyConUnique 207
 clauseQTyConKey         = mkPreludeTyConUnique 208
-stmtQTyConKey           = mkPreludeTyConUnique 209
-conQTyConKey            = mkPreludeTyConUnique 210
+stmtTyConKey            = mkPreludeTyConUnique 209
+conTyConKey             = mkPreludeTyConUnique 210
 typeQTyConKey           = mkPreludeTyConUnique 211
 typeTyConKey            = mkPreludeTyConUnique 212
 decTyConKey             = mkPreludeTyConUnique 213
 bangTypeQTyConKey       = mkPreludeTyConUnique 214
-varBangTypeQTyConKey    = mkPreludeTyConUnique 215
+varBangTypeTyConKey     = mkPreludeTyConUnique 215
 fieldExpTyConKey        = mkPreludeTyConUnique 216
 fieldPatTyConKey        = mkPreludeTyConUnique 217
 nameTyConKey            = mkPreludeTyConUnique 218
@@ -674,7 +675,7 @@ predQTyConKey           = mkPreludeTyConUnique 224
 tyVarBndrQTyConKey      = mkPreludeTyConUnique 225
 decsQTyConKey           = mkPreludeTyConUnique 226
 ruleBndrQTyConKey       = mkPreludeTyConUnique 227
-tySynEqnQTyConKey       = mkPreludeTyConUnique 228
+tySynEqnTyConKey        = mkPreludeTyConUnique 228
 roleTyConKey            = mkPreludeTyConUnique 229
 tExpTyConKey            = mkPreludeTyConUnique 230
 injAnnTyConKey          = mkPreludeTyConUnique 231
@@ -682,6 +683,7 @@ kindQTyConKey           = mkPreludeTyConUnique 232
 overlapTyConKey         = mkPreludeTyConUnique 233
 derivClauseQTyConKey    = mkPreludeTyConUnique 234
 derivStrategyQTyConKey  = mkPreludeTyConUnique 235
+decsTyConKey            = mkPreludeTyConUnique 236
 
 {- *********************************************************************
 *                                                                      *
