@@ -181,17 +181,15 @@ tcExpr e@(HsLit x lit) res_ty
 tcExpr (HsPar x expr) res_ty = do { expr' <- tcMonoExprNC expr res_ty
                                   ; return (HsPar x expr') }
 
-tcExpr (HsSCC x src lbl expr) res_ty
+tcExpr (HsPragE x prag expr) res_ty
   = do { expr' <- tcMonoExpr expr res_ty
-       ; return (HsSCC x src lbl expr') }
-
-tcExpr (HsTickPragma x src info srcInfo expr) res_ty
-  = do { expr' <- tcMonoExpr expr res_ty
-       ; return (HsTickPragma x src info srcInfo expr') }
-
-tcExpr (HsCoreAnn x src lbl expr) res_ty
-  = do  { expr' <- tcMonoExpr expr res_ty
-        ; return (HsCoreAnn x src lbl expr') }
+       ; return (HsPragE x (tc_prag prag) expr') }
+  where
+    tc_prag :: HsPragE GhcRn -> HsPragE GhcTc
+    tc_prag (HsPragSCC x1 src ann) = HsPragSCC x1 src ann
+    tc_prag (HsPragCore x1 src lbl) = HsPragCore x1 src lbl
+    tc_prag (HsPragTick x1 src info srcInfo) = HsPragTick x1 src info srcInfo
+    tc_prag (XHsPragE x) = noExtCon x
 
 tcExpr (HsOverLit x lit) res_ty
   = do  { lit' <- newOverloadedLit lit res_ty

@@ -1398,9 +1398,9 @@ repE (HsUnboundVar _ uv)   = do
                                sname <- repNameS occ
                                repUnboundVar sname
 
-repE e@(HsCoreAnn {})      = notHandled "Core annotations" (ppr e)
-repE e@(HsSCC {})          = notHandled "Cost centres" (ppr e)
-repE e@(HsTickPragma {})   = notHandled "Tick Pragma" (ppr e)
+repE e@(HsPragE _ HsPragCore {} _)   = notHandled "Core annotations" (ppr e)
+repE e@(HsPragE _ HsPragSCC  {} _)   = notHandled "Cost centres" (ppr e)
+repE e@(HsPragE _ HsPragTick {} _)   = notHandled "Tick Pragma" (ppr e)
 repE e                     = notHandled "Expression form" (ppr e)
 
 -----------------------------------------------------------------------------

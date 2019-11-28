@@ -2629,66 +2629,57 @@ exp10_top :: { ECP }
                                            amms (mkHsNegAppPV (comb2 $1 $>) $2)
                                                [mj AnnMinus $1] }
 
-
-        | hpc_annot exp        {% runECP_P $2 >>= \ $2 ->
-                                  fmap ecpFromExp $
-                                  ams (sLL $1 $> $ HsTickPragma noExtField (snd $ fst $ fst $ unLoc $1)
-                                                                (snd $ fst $ unLoc $1) (snd $ unLoc $1) $2)
-                                      (fst $ fst $ fst $ unLoc $1) }
-
-        | '{-# CORE' STRING '#-}' exp  {% runECP_P $4 >>= \ $4 ->
-                                          fmap ecpFromExp $
-                                          ams (sLL $1 $> $ HsCoreAnn noExtField (getCORE_PRAGs $1) (getStringLiteral $2) $4)
-                                              [mo $1,mj AnnVal $2
-                                              ,mc $3] }
-                                          -- hdaume: core annotation
+        | exp_annot (prag_hpc)         { $1 }
+        | exp_annot (prag_core)        { $1 }
         | fexp                         { $1 }
 
 exp10 :: { ECP }
         : exp10_top            { $1 }
-        | scc_annot exp        {% runECP_P $2 >>= \ $2 ->
-                                  fmap ecpFromExp $
-                                  ams (sLL $1 $> $ HsSCC noExtField (snd $ fst $ unLoc $1) (snd $ unLoc $1) $2)
-                                      (fst $ fst $ unLoc $1) }
+        | exp_annot(prag_scc)  { $1 }
 
 optSemi :: { ([Located Token],Bool) }
         : ';'         { ([$1],True) }
         | {- empty -} { ([],False) }
 
-scc_annot :: { Located (([AddAnn],SourceText),StringLiteral) }
+prag_scc :: { Located ([AddAnn], HsPragE GhcPs) }
         : '{-# SCC' STRING '#-}'      {% do scc <- getSCC $2
                                             ; return $ sLL $1 $>
-                                               (([mo $1,mj AnnValStr $2
-                                                ,mc $3],getSCC_PRAGs $1),(StringLiteral (getSTRINGs $2) scc)) }
-        | '{-# SCC' VARID  '#-}'      { sLL $1 $> (([mo $1,mj AnnVal $2
-                                         ,mc $3],getSCC_PRAGs $1)
-                                        ,(StringLiteral NoSourceText (getVARID $2))) }
+                                               ([mo $1,mj AnnValStr $2,mc $3],
+                                                HsPragSCC noExtField
+                                                  (getSCC_PRAGs $1)
+                                                  (StringLiteral (getSTRINGs $2) scc)) }
+        | '{-# SCC' VARID  '#-}'      { sLL $1 $> ([mo $1,mj AnnVal $2,mc $3],
+                                                    HsPragSCC noExtField
+                                                      (getSCC_PRAGs $1)
+                                                      (StringLiteral NoSourceText (getVARID $2))) }
 
-hpc_annot :: { Located ( (([AddAnn],SourceText),(StringLiteral,(Int,Int),(Int,Int))),
-                         ((SourceText,SourceText),(SourceText,SourceText))
-                       ) }
+prag_hpc :: { Located ([AddAnn], HsPragE GhcPs) }
       : '{-# GENERATED' STRING INTEGER ':' INTEGER '-' INTEGER ':' INTEGER '#-}'
-                                      { sLL $1 $> $ ((([mo $1,mj AnnVal $2
+                                      { let getINT = fromInteger . il_value . getINTEGER in
+                                        sLL $1 $> $ ([mo $1,mj AnnVal $2
                                               ,mj AnnVal $3,mj AnnColon $4
                                               ,mj AnnVal $5,mj AnnMinus $6
                                               ,mj AnnVal $7,mj AnnColon $8
                                               ,mj AnnVal $9,mc $10],
-                                                getGENERATED_PRAGs $1)
-                                              ,((getStringLiteral $2)
-                                               ,( fromInteger $ il_value $ getINTEGER $3
-                                                , fromInteger $ il_value $ getINTEGER $5
-                                                )
-                                               ,( fromInteger $ il_value $ getINTEGER $7
-                                                , fromInteger $ il_value $ getINTEGER $9
-                                                )
-                                               ))
-                                             , (( getINTEGERs $3
-                                                , getINTEGERs $5
-                                                )
-                                               ,( getINTEGERs $7
-                                                , getINTEGERs $9
-                                                )))
-                                         }
+                                              HsPragTick noExtField
+                                                (getGENERATED_PRAGs $1)
+                                                (getStringLiteral $2,
+                                                 (getINT $3, getINT $5),
+                                                 (getINT $7, getINT $9))
+                                                ((getINTEGERs $3, getINTEGERs $5),
+                                                 (getINTEGERs $7, getINTEGERs $9) )) }
+
+prag_core :: { Located ([AddAnn], HsPragE GhcPs) }
+      : '{-# CORE' STRING '#-}'
+        { sLL $1 $> $
+            ([mo $1,mj AnnVal $2,mc $3],
+             HsPragCore noExtField (getCORE_PRAGs $1) (getStringLiteral $2)) }
+
+exp_annot(prag) :: { ECP }
+      : prag exp             {% runECP_P $2 >>= \ $2 ->
+                                fmap ecpFromExp $
+                                ams (sLL $1 $> $ HsPragE noExtField (snd $ unLoc $1) $2)
+                                    (fst $ unLoc $1) }
 
 fexp    :: { ECP }
         : fexp aexp                  { ECP $
