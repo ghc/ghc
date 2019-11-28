@@ -208,7 +208,7 @@ instance Applicative Q where
 --
 -----------------------------------------------------
 
-class Applicative m => Quote m where
+class Monad m => Quote m where
   newName :: String -> m Name
 
 instance Quote Q where
@@ -670,7 +670,7 @@ returnQ = return
 bindQ :: Q a -> (a -> Q b) -> Q b
 bindQ = (>>=)
 
-sequenceQ :: [Q a] -> Q [a]
+sequenceQ :: forall m . Monad m => forall a . [m a] -> m [a]
 sequenceQ = sequence
 
 
