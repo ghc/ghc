@@ -1350,7 +1350,7 @@ glomSegments ctxt ((defs,uses,fwds,stmt) : segs)
         = (reverse yeses, reverse noes)
         where
           (noes, yeses)           = span not_needed (reverse dus)
-          not_needed (defs,_,_,_) = not (intersectsNameSet defs uses)
+          not_needed (defs,_,_,_) = disjointNameSet defs uses
 
 ----------------------------------------------------
 segsToStmts :: Stmt GhcRn body
@@ -1908,7 +1908,7 @@ slurpIndependentStmts stmts = go [] [] emptyNameSet stmts
   -- then we have actually done some splitting. Otherwise it will go into
   -- an infinite loop (#14163).
   go lets indep bndrs ((L loc (BindStmt _ pat body bind_op fail_op), fvs): rest)
-    | isEmptyNameSet (bndrs `intersectNameSet` fvs) && not (isStrictPattern pat)
+    | disjointNameSet bndrs fvs && not (isStrictPattern pat)
     = go lets ((L loc (BindStmt noExtField pat body bind_op fail_op), fvs) : indep)
          bndrs' rest
     where bndrs' = bndrs `unionNameSet` mkNameSet (collectPatBinders pat)
@@ -1918,7 +1918,7 @@ slurpIndependentStmts stmts = go [] [] emptyNameSet stmts
   -- TODO: perhaps we shouldn't do this if there are any strict bindings,
   -- because we might be moving evaluation earlier.
   go lets indep bndrs ((L loc (LetStmt noExtField binds), fvs) : rest)
-    | isEmptyNameSet (bndrs `intersectNameSet` fvs)
+    | disjointNameSet bndrs fvs
     = go ((L loc (LetStmt noExtField binds), fvs) : lets) indep bndrs rest
   go _ []  _ _ = Nothing
   go _ [_] _ _ = Nothing
