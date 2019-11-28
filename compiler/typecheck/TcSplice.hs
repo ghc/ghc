@@ -93,7 +93,7 @@ import CoAxiom
 import PatSyn
 import ConLike
 import DataCon
-import TcEvidence( TcEvBinds(..), idHsWrapper )
+import TcEvidence
 import Id
 import IdInfo
 import DsExpr
@@ -193,12 +193,22 @@ tcTypedBracket _ other_brack _
 
 -- tcUntypedBracket :: HsBracket Name -> [PendingRnSplice] -> ExpRhoType -> TcM (HsExpr TcId)
 tcUntypedBracket rn_expr brack ps res_ty
-  = do { traceTc "tc_bracket untyped" (ppr brack $$ ppr ps)
-       ; ps' <- mapM tcPendingSplice ps
-       ; meta_ty <- tcBrackTy brack
-       ; traceTc "tc_bracket done untyped" (ppr meta_ty)
-       ; tcWrapResultO (Shouldn'tHappenOrigin "untyped bracket")
-                       rn_expr (HsTcBracketOut noExtField idHsWrapper brack ps') meta_ty res_ty }
+  = do { res_ty <- expTypeToType res_ty
+       ; traceTc "tc_bracket untyped" (ppr brack $$ ppr ps)
+       ; m_var <- newFlexiTyVarTy (mkVisFunTy liftedTypeKind liftedTypeKind)
+       ; exp_ty_con <- tcLookupTyCon expTyConName
+       ; let expected_type = mkAppTy m_var (mkTyConApp exp_ty_con [])
+       ; co <- unifyType (Just rn_expr) expected_type res_ty
+       ; ps' <- mapM (tcPendingSplice expected_type) ps
+       ; quote_con <- tcLookupTyCon quoteClassName
+       ; ev_var <- emitWantedEvVar StaticOrigin $
+                  mkTyConApp (quote_con)
+                             [m_var]
+--       ; meta_ty <- tcBrackTy brack expected_type
+       ; traceTc "tc_bracket done untyped" (ppr expected_type)
+       ; let final_co = mkWpCastR co <.> mkWpEvVarApps [ev_var] <.> mkWpTyApps [m_var]
+       ; return $ mkHsWrap final_co $ HsTcBracketOut noExtField idHsWrapper brack ps'
+       }
 
 ---------------
 tcBrackTy :: HsBracket GhcRn -> TcM TcType
@@ -213,10 +223,10 @@ tcBrackTy (TExpBr {}) = panic "tcUntypedBracket: Unexpected TExpBr"
 tcBrackTy (XBracket nec) = noExtCon nec
 
 ---------------
-tcPendingSplice :: PendingRnSplice -> TcM PendingTcSplice
-tcPendingSplice (PendingRnSplice flavour splice_name expr)
-  = do { res_ty <- tcMetaTy meta_ty_name
-       ; expr' <- tcMonoExpr expr (mkCheckExpType res_ty)
+tcPendingSplice :: TcType -> PendingRnSplice -> TcM PendingTcSplice
+tcPendingSplice expected_type (PendingRnSplice flavour splice_name expr)
+  = do { -- res_ty <- tcMetaTy meta_ty_name
+       ; expr' <- tcPolyExpr expr expected_type
        ; return (PendingTcSplice splice_name expr') }
   where
      meta_ty_name = case flavour of
