@@ -33,6 +33,7 @@ type ExpQ                = Q Exp
 type TExpQ a             = Q (TExp a)
 type DecQ                = Q Dec
 type DecsQ               = Q [Dec]
+type Decs                = [Dec] -- Defined as it is more convenient to wire-in
 type ConQ                = Q Con
 type TypeQ               = Q Type
 type KindQ               = Q Kind

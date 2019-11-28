@@ -15,6 +15,7 @@ TcSplice: Template Haskell splices
 {-# LANGUAGE RecordWildCards #-}
 {-# LANGUAGE MultiWayIf #-}
 {-# LANGUAGE TypeFamilies #-}
+{-# LANGUAGE TupleSections #-}
 {-# OPTIONS_GHC -fno-warn-orphans #-}
 
 module TcSplice(
@@ -196,12 +197,12 @@ tcUntypedBracket rn_expr brack ps res_ty
   = do { res_ty <- expTypeToType res_ty
        ; traceTc "tc_bracket untyped" (ppr brack $$ ppr ps)
 
-       -- New polymorphic type variable for the bracket
-       ; m_var <- newFlexiTyVarTy (mkVisFunTy liftedTypeKind liftedTypeKind)
 
        -- Create the type m Exp for expression bracket, m Type for a type
-       -- bracket and so on.
-       ; expected_type <- brackTy m_var brack
+       -- bracket and so on. The brack_info is a Maybe because the
+       -- VarBracket ('a) isn't overloaded, but also shouldn't contain any
+       -- splices.
+       ; (brack_info, expected_type) <- brackTy brack
 
        -- Unify the overall type of the bracket with the expected result
        -- type
@@ -209,32 +210,42 @@ tcUntypedBracket rn_expr brack ps res_ty
 
        -- Match the expected type with the type of all the internal
        -- splices. They might have further constrained types and if they do
-       -- we want to
-       ; ps' <- mapM (tcPendingSplice expected_type) ps
+       -- we want to reflect that in the overall type of the bracket.
+       ; ps' <- case brack_info of
+                  Just (_, m_var) -> mapM (tcPendingSplice m_var) ps
+                  Nothing -> ASSERT (null ps) return []
 
-       -- Emit a Quote constraint for the bracket
-       ; quote_con <- tcLookupTyCon quoteClassName
-       ; ev_var <- emitWantedEvVar StaticOrigin $
-                  mkTyConApp (quote_con)
-                             [m_var]
        --
        ; traceTc "tc_bracket done untyped" (ppr expected_type)
        -- Apply the type variable and quote evidence to the bracket, we
        -- need to apply it to all the combinators manually as the core is
        -- constructed by hand.
-       ; let final_co = mkWpCastR co <.> mkWpEvVarApps [ev_var] <.> mkWpTyApps [m_var]
-       ; return $ mkHsWrap final_co $ HsTcBracketOut noExtField idHsWrapper brack ps'
+       ; let final_co = mkWpCastR co
+             -- TODO: Make into Maybe
+             wrapper = fromMaybe idHsWrapper (fst <$> brack_info)
+       ; return $ mkHsWrap final_co $ HsTcBracketOut noExtField wrapper brack ps'
        }
 
 
 ---------------
-brackTy :: TcType -> HsBracket GhcRn -> TcM Type
-brackTy m_var b =
-  let mkTyX k n = mkAppTy m_var . k . flip mkTyConApp [] <$> tcLookupTyCon n
+brackTy :: HsBracket GhcRn -> TcM (Maybe (HsWrapper, TcType), Type)
+brackTy b =
+  let mkTyX k n = do
+        -- New polymorphic type variable for the bracket
+        m_var <- newFlexiTyVarTy (mkVisFunTy liftedTypeKind liftedTypeKind)
+        -- Emit a Quote constraint for the bracket
+        quote_con <- tcLookupTyCon quoteClassName
+        ev_var <- emitWantedEvVar StaticOrigin $
+                  mkTyConApp (quote_con)
+                             [m_var]
+        final_ty <- mkAppTy m_var . k . flip mkTyConApp [] <$> tcLookupTyCon n
+        let wrapper = mkWpEvVarApps [ev_var] <.> mkWpTyApps [m_var]
+        return (Just (wrapper, m_var), final_ty)
       mkTy = mkTyX id
   in
   case b of
-    (VarBr {}) -> flip mkTyConApp [] <$> tcLookupTyCon nameTyConName
+    -- These fields are never used
+    (VarBr {}) -> (Nothing,) . flip mkTyConApp [] <$> tcLookupTyCon nameTyConName
                                            -- Result type is Var (not Q-monadic)
     (ExpBr {})  -> mkTy expTyConName  -- Result type is m Exp
     (TypBr {})  -> mkTy typeTyConName -- Result type is m Type
@@ -246,16 +257,17 @@ brackTy m_var b =
 
 ---------------
 tcPendingSplice :: TcType -> PendingRnSplice -> TcM PendingTcSplice
-tcPendingSplice expected_type (PendingRnSplice flavour splice_name expr)
-  = do { -- res_ty <- tcMetaTy meta_ty_name
+tcPendingSplice m_var (PendingRnSplice flavour splice_name expr)
+  = do { meta_ty <- tcMetaTy meta_ty_name
+       ; let expected_type = mkAppTy m_var meta_ty
        ; expr' <- tcPolyExpr expr expected_type
        ; return (PendingTcSplice splice_name expr') }
   where
      meta_ty_name = case flavour of
-                       UntypedExpSplice  -> expQTyConName
-                       UntypedPatSplice  -> patQTyConName
-                       UntypedTypeSplice -> typeQTyConName
-                       UntypedDeclSplice -> decsQTyConName
+                       UntypedExpSplice  -> expTyConName
+                       UntypedPatSplice  -> patTyConName
+                       UntypedTypeSplice -> typeTyConName
+                       UntypedDeclSplice -> decsTyConName
 
 ---------------
 -- Takes a tau and returns the type Q (TExp tau)
