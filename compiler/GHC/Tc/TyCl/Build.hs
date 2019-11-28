@@ -164,8 +164,7 @@ mkDataConStupidTheta tycon arg_tys univ_tvs
         -- stupid theta, taken from the TyCon
 
     arg_tyvars      = tyCoVarsOfTypes arg_tys
-    in_arg_tys pred = not $ isEmptyVarSet $
-                      tyCoVarsOfType pred `intersectVarSet` arg_tyvars
+    in_arg_tys pred = tyCoVarsOfType pred `intersectsVarSet` arg_tyvars
 
 
 ------------------------------------------------------
