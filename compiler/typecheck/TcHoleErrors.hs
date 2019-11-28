@@ -674,8 +674,7 @@ findValidHoleFits tidy_env implics simples ct | isExprHoleCt ct =
             ctFreeVarSet = fvVarSet . tyCoFVsOfType . ctPred
             hole_fv_set = fvVarSet hole_fvs
             anyFVMentioned :: Ct -> Bool
-            anyFVMentioned ct = not $ isEmptyVarSet $
-                                  ctFreeVarSet ct `intersectVarSet` hole_fv_set
+            anyFVMentioned ct = ctFreeVarSet ct `intersectsVarSet` hole_fv_set
             -- We filter out those constraints that have no variables (since
             -- they won't be solved by finding a type for the type variable
             -- representing the hole) and also other holes, since we're not

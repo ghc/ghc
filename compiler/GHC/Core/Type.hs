@@ -2112,7 +2112,7 @@ isValidJoinPointType arity ty
   where
     valid_under tvs arity ty
       | arity == 0
-      = isEmptyVarSet (tvs `intersectVarSet` tyCoVarsOfType ty)
+      = tvs `disjointVarSet` tyCoVarsOfType ty
       | Just (t, ty') <- splitForAllTy_maybe ty
       = valid_under (tvs `extendVarSet` t) (arity-1) ty'
       | Just (_, res_ty) <- splitFunTy_maybe ty

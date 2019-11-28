@@ -2415,7 +2415,7 @@ floatEqualities skols given_ids ev_binds_var no_given_eqs
 
     is_floatable :: VarSet -> Ct -> Bool
     is_floatable skols ct
-      | isDerivedCt ct = not (tyCoVarsOfCt ct `intersectsVarSet` skols)
+      | isDerivedCt ct = tyCoVarsOfCt ct `disjointVarSet` skols
       | otherwise      = not (ctEvId ct `elemVarSet` skols)
 
     add_captured_ev_ids :: Cts -> VarSet -> VarSet
