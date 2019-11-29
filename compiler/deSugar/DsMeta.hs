@@ -2409,7 +2409,7 @@ repRoleAnnotD :: Core TH.Name -> Core [TH.Role] -> MetaM (Core TH.DecQ)
 repRoleAnnotD (MkC n) (MkC roles) = rep2 roleAnnotDName [n, roles]
 
 repFunDep :: Core [TH.Name] -> Core [TH.Name] -> MetaM (Core TH.FunDep)
-repFunDep (MkC xs) (MkC ys) = rep2 funDepName [xs, ys]
+repFunDep (MkC xs) (MkC ys) = rep2_nw funDepName [xs, ys]
 
 repProto :: Name -> Core TH.Name -> Core TH.TypeQ -> MetaM (Core TH.DecQ)
 repProto mk_sig (MkC s) (MkC ty) = rep2 mk_sig [s, ty]
