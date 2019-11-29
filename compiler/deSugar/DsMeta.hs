@@ -2094,8 +2094,7 @@ rep2_nw = rep2X (const id)
 rep2X :: (MetaWrappers -> CoreExpr -> CoreExpr) -> Name -> [ CoreExpr ] -> MetaM (Core a)
 rep2X do_wrap n xs = do { rep_id <- lift $ dsLookupGlobalId n
                ; wrap <- do_wrap <$> ask
-               ; return (MkC $ pprTraceIt "rep2" ((foldl' App (wrap (Var rep_id)) xs))) }
---               ; return (MkC $ (foldl' App (wrap (Var rep_id)) xs)) }
+               ; return (MkC $ (foldl' App (wrap (Var rep_id)) xs)) }
 
 
 dataCon' :: Name -> [CoreExpr] -> MetaM (Core a)
