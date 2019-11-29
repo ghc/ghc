@@ -78,6 +78,10 @@ data MetaWrappers = MetaWrappers {
     , metaTy :: Type -> Type
     }
 
+-- Turn A into m A
+wrapName :: Name -> MetaM Type
+wrapName n = (\t -> asks (($ t) . metaTy)) =<< lookupType n
+
 -- The local state is always the same, calculated from the passed in
 -- wrapper
 type MetaM a = ReaderT MetaWrappers DsM a
@@ -476,10 +480,9 @@ repFamilyResultSig (XFamilyResultSig nec) = noExtCon nec
 repFamilyResultSigToMaybeKind :: FamilyResultSig GhcRn
                               -> MetaM (Core (Maybe TH.KindQ))
 repFamilyResultSigToMaybeKind (NoSig _) =
-    do { coreNothing kindQTyConName }
+    do { coreNothing' <$> wrapName kindTyConName }
 repFamilyResultSigToMaybeKind (KindSig _ ki) =
-    do { ki' <- repLTy ki
-       ; coreJust kindQTyConName ki' }
+    do { coreJust' <$> wrapName (kindTyConName) <*> repLTy ki }
 repFamilyResultSigToMaybeKind _ = panic "repFamilyResultSigToMaybeKind"
 
 -- | Represent injectivity annotation of a type family
@@ -585,7 +588,7 @@ repTyFamEqn (HsIB { hsib_ext = var_names
        ; let hs_tvs = HsQTvs { hsq_ext = var_names
                              , hsq_explicit = fromMaybe [] mb_bndrs }
        ; addTyClTyVarBinds hs_tvs $ \ _ ->
-         do { mb_bndrs1 <- repMaybeList tyVarBndrQTyConName
+         do { mb_bndrs1 <- repMaybeListM tyVarBndrTyConName
                                         repTyVarBndr
                                         mb_bndrs
             ; tys1 <- case fixity of
@@ -624,7 +627,7 @@ repDataFamInstD (DataFamInstDecl { dfid_eqn =
        ; let hs_tvs = HsQTvs { hsq_ext = var_names
                              , hsq_explicit = fromMaybe [] mb_bndrs }
        ; addTyClTyVarBinds hs_tvs $ \ _ ->
-         do { mb_bndrs1 <- repMaybeList tyVarBndrQTyConName
+         do { mb_bndrs1 <- repMaybeListM tyVarBndrTyConName
                                         repTyVarBndr
                                         mb_bndrs
             ; tys1 <- case fixity of
@@ -712,11 +715,11 @@ repRuleD (L loc (HsRule { rd_name = n
          do { let tm_bndr_names = concatMap ruleBndrNames tm_bndrs
             ; ss <- mkGenSyms tm_bndr_names
             ; rule <- addBinds ss $
-                      do { ty_bndrs' <- case ty_bndrs of
-                             Nothing -> coreNothingList tyVarBndrQTyConName
-                             Just _  -> coreJustList tyVarBndrQTyConName
-                                          ex_bndrs
-                         ; tm_bndrs' <- repList ruleBndrQTyConName
+                      do { elt_ty <- wrapName tyVarBndrTyConName
+                         ; ty_bndrs' <- return $ case ty_bndrs of
+                             Nothing -> coreNothing' (mkListTy elt_ty)
+                             Just _  -> coreJust' (mkListTy elt_ty) ex_bndrs
+                         ; tm_bndrs' <- repListM ruleBndrTyConName
                                                 repRuleBndr
                                                 tm_bndrs
                          ; n'   <- coreStringLit $ unpackFS $ snd $ unLoc n
@@ -846,7 +849,7 @@ repBangTy ty = do
 
 repDerivs :: HsDeriving GhcRn -> MetaM (Core [TH.DerivClauseQ])
 repDerivs (L _ clauses)
-  = repList derivClauseQTyConName repDerivClause clauses
+  = repListM derivClauseTyConName repDerivClause clauses
 
 repDerivClause :: LHsDerivingClause GhcRn
                -> MetaM (Core TH.DerivClauseQ)
@@ -854,7 +857,7 @@ repDerivClause (L _ (HsDerivingClause
                           { deriv_clause_strategy = dcs
                           , deriv_clause_tys      = L _ dct }))
   = do MkC dcs' <- repDerivStrategy dcs
-       MkC dct' <- repList typeQTyConName (rep_deriv_ty . hsSigType) dct
+       MkC dct' <- repListM typeTyConName (rep_deriv_ty . hsSigType) dct
        rep2 derivClauseName [dcs',dct']
   where
     rep_deriv_ty :: LHsType GhcRn -> MetaM (Core TH.TypeQ)
@@ -916,7 +919,7 @@ rep_ty_sig mk_sig loc sig_ty nm
   = do { nm1 <- lookupLOcc nm
        ; let rep_in_scope_tv tv = do { name <- lookupBinder (hsLTyVarName tv)
                                      ; repTyVarBndrWithKind tv name }
-       ; th_explicit_tvs <- repList tyVarBndrQTyConName rep_in_scope_tv
+       ; th_explicit_tvs <- repListM tyVarBndrTyConName rep_in_scope_tv
                                     explicit_tvs
 
          -- NB: Don't pass any implicit type variables to repList above
@@ -945,8 +948,8 @@ rep_patsyn_ty_sig loc sig_ty nm
   = do { nm1 <- lookupLOcc nm
        ; let rep_in_scope_tv tv = do { name <- lookupBinder (hsLTyVarName tv)
                                      ; repTyVarBndrWithKind tv name }
-       ; th_univs <- repList tyVarBndrQTyConName rep_in_scope_tv univs
-       ; th_exis  <- repList tyVarBndrQTyConName rep_in_scope_tv exis
+       ; th_univs <- repListM tyVarBndrTyConName rep_in_scope_tv univs
+       ; th_exis  <- repListM tyVarBndrTyConName rep_in_scope_tv exis
 
          -- NB: Don't pass any implicit type variables to repList above
          -- See Note [Don't quantify implicit type variables in quotes]
@@ -1047,7 +1050,7 @@ addHsTyVarBinds :: [LHsTyVarBndr GhcRn]  -- the binders to be added
 addHsTyVarBinds exp_tvs thing_inside
   = do { fresh_exp_names <- mkGenSyms (hsLTyVarNames exp_tvs)
        ; term <- addBinds fresh_exp_names $
-                 do { kbs <- repList tyVarBndrQTyConName mk_tv_bndr
+                 do { kbs <- repListM tyVarBndrTyConName mk_tv_bndr
                                      (exp_tvs `zip` fresh_exp_names)
                     ; thing_inside kbs }
        ; wrapGenSyms fresh_exp_names term }
@@ -1085,7 +1088,7 @@ addTyClTyVarBinds tvs m
             -- This makes things work for family declarations
 
        ; term <- addBinds freshNames $
-                 do { kbs <- repList tyVarBndrQTyConName mk_tv_bndr
+                 do { kbs <- repListM tyVarBndrTyConName mk_tv_bndr
                                      (hsQTvExplicit tvs)
                     ; m kbs }
 
@@ -1122,7 +1125,7 @@ repLContext :: LHsContext GhcRn -> MetaM (Core TH.CxtQ)
 repLContext ctxt = repContext (unLoc ctxt)
 
 repContext :: HsContext GhcRn -> MetaM (Core TH.CxtQ)
-repContext ctxt = do preds <- repList typeQTyConName repLTy ctxt
+repContext ctxt = do preds <- repListM typeTyConName repLTy ctxt
                      repCtxt preds
 
 repHsSigType :: LHsSigType GhcRn -> MetaM (Core TH.TypeQ)
@@ -1246,7 +1249,9 @@ repTyLit (HsStrTy _ s) = do { s' <- mkStringExprFS s
 -- | Represent a type wrapped in a Maybe
 repMaybeLTy :: Maybe (LHsKind GhcRn)
             -> MetaM (Core (Maybe TH.TypeQ))
-repMaybeLTy = repMaybe kindQTyConName repLTy
+repMaybeLTy m = do
+  k_ty <- wrapName kindTyConName
+  repMaybeT k_ty repLTy m
 
 repRole :: Located (Maybe Role) -> MetaM (Core TH.Role)
 repRole (L _ (Just Nominal))          = rep2 nominalRName []
@@ -1283,7 +1288,7 @@ rep_splice splice_name
 -----------------------------------------------------------------------------
 
 repLEs :: [LHsExpr GhcRn] -> MetaM (Core [TH.ExpQ])
-repLEs es = repList expQTyConName repLE es
+repLEs es = repListM expTyConName repLE es
 
 -- FIXME: some of these panics should be converted into proper error messages
 --        unless we can make sure that constructs, which are plainly not
@@ -1382,9 +1387,8 @@ repE (ExplicitTuple _ es boxity) =
         | otherwise = coreNothing expQTyConName
 
   in do { args <- mapM tupArgToCoreExp es
-        ; expTy <- lookupType expTyConName
-        ; m_var <- metaTy <$> ask
-        ; let maybeExpQTy = mkTyConApp maybeTyCon [m_var expTy]
+        ; expTy <- wrapName  expTyConName
+        ; let maybeExpQTy = mkTyConApp maybeTyCon [expTy]
               listArg = coreList' maybeExpQTy args
         ; if isBoxed boxity
           then repTup listArg
@@ -1490,7 +1494,7 @@ repLGRHS _ = panic "repLGRHS"
 
 repFields :: HsRecordBinds GhcRn -> MetaM (Core [TH.Q TH.FieldExp])
 repFields (HsRecFields { rec_flds = flds })
-  = repList fieldExpQTyConName rep_fld flds
+  = repListM fieldExpTyConName rep_fld flds
   where
     rep_fld :: LHsRecField GhcRn (LHsExpr GhcRn)
             -> MetaM (Core (TH.Q TH.FieldExp))
@@ -1499,7 +1503,7 @@ repFields (HsRecFields { rec_flds = flds })
                            ; repFieldExp fn e }
 
 repUpdFields :: [LHsRecUpdField GhcRn] -> MetaM (Core [TH.Q TH.FieldExp])
-repUpdFields = repList fieldExpQTyConName rep_fld
+repUpdFields = repListM fieldExpTyConName rep_fld
   where
     rep_fld :: LHsRecUpdField GhcRn -> MetaM (Core (TH.Q TH.FieldExp))
     rep_fld (L l fld) = case unLoc (hsRecFieldLbl fld) of
@@ -1857,7 +1861,7 @@ repP (ConPatIn dc details)
  = do { con_str <- lookupLOcc dc
       ; case details of
          PrefixCon ps -> do { qs <- repLPs ps; repPcon con_str qs }
-         RecCon rec   -> do { fps <- repList fieldPatQTyConName rep_fld (rec_flds rec)
+         RecCon rec   -> do { fps <- repListM fieldPatTyConName rep_fld (rec_flds rec)
                             ; repPrec con_str fps }
          InfixCon p1 p2 -> do { p1' <- repLP p1;
                                 p2' <- repLP p2;
@@ -2301,8 +2305,8 @@ repDerivStrategy mds =
                                via_strat <- repViaStrategy ty'
                                just via_strat
   where
-  nothing = coreNothing derivStrategyQTyConName
-  just    = coreJust    derivStrategyQTyConName
+  nothing = coreNothingM derivStrategyTyConName
+  just    = coreJustM    derivStrategyTyConName
 
 repStockStrategy :: MetaM (Core TH.DerivStrategyQ)
 repStockStrategy = rep2 stockStrategyName []
@@ -2445,11 +2449,11 @@ repConstr :: HsConDeclDetails GhcRn
           -> [Core TH.Name]
           -> MetaM (Core TH.ConQ)
 repConstr (PrefixCon ps) Nothing [con]
-    = do arg_tys  <- repList bangTypeQTyConName repBangTy ps
+    = do arg_tys  <- repListM bangTypeTyConName repBangTy ps
          rep2 normalCName [unC con, unC arg_tys]
 
 repConstr (PrefixCon ps) (Just res_ty) cons
-    = do arg_tys     <- repList bangTypeQTyConName repBangTy ps
+    = do arg_tys     <- repListM bangTypeTyConName repBangTy ps
          res_ty' <- repLTy res_ty
          rep2 gadtCName [ unC (nonEmptyCoreList cons), unC arg_tys, unC res_ty']
 
@@ -2700,10 +2704,9 @@ repList tc_name f args
 repListM :: Name -> (a  -> MetaM (Core b))
                     -> [a] -> MetaM (Core [b])
 repListM tc_name f args
-  = do { wrap <- metaTy <$> ask
-       ; ty <- lookupType tc_name
+  = do { ty <- wrapName tc_name
        ; args1 <- mapM f args
-       ; return $ coreList' (wrap ty) args1 }
+       ; return $ coreList' ty args1 }
 
 coreListM :: Name -> [Core a] -> MetaM (Core [a])
 coreListM tc as = repListM tc return as
@@ -2730,14 +2733,24 @@ coreStringLit s = do { z <- mkStringExpr s; return(MkC z) }
 
 repMaybe :: Name -> (a -> MetaM (Core b))
                     -> Maybe a -> MetaM (Core (Maybe b))
-repMaybe tc_name _ Nothing   = coreNothing tc_name
-repMaybe tc_name f (Just es) = coreJust tc_name =<< f es
+repMaybe tc_name f m = do
+  t <- lookupType tc_name
+  repMaybeT t f m
+
+repMaybeT :: Type -> (a -> MetaM (Core b))
+                    -> Maybe a -> MetaM (Core (Maybe b))
+repMaybeT ty _ Nothing   = return $ coreNothing' ty
+repMaybeT ty f (Just es) = coreJust' ty <$> f es
 
 -- | Construct Core expression for Nothing of a given type name
 coreNothing :: Name        -- ^ Name of the TyCon of the element type
             -> MetaM (Core (Maybe a))
 coreNothing tc_name =
     do { elt_ty <- lookupType tc_name; return (coreNothing' elt_ty) }
+
+coreNothingM :: Name -> MetaM (Core (Maybe a))
+coreNothingM tc_name =
+    do { elt_ty <- wrapName tc_name; return (coreNothing' elt_ty) }
 
 -- | Construct Core expression for Nothing of a given type
 coreNothing' :: Type       -- ^ The element type
@@ -2750,6 +2763,9 @@ coreJust :: Name        -- ^ Name of the TyCon of the element type
 coreJust tc_name es
   = do { elt_ty <- lookupType tc_name; return (coreJust' elt_ty es) }
 
+coreJustM :: Name -> Core a -> MetaM (Core (Maybe a))
+coreJustM tc_name es = do { elt_ty <- wrapName tc_name; return (coreJust' elt_ty es) }
+
 -- | Store given Core expression in a Just of a given type
 coreJust' :: Type       -- ^ The element type
           -> Core a -> Core (Maybe a)
@@ -2759,16 +2775,27 @@ coreJust' elt_ty es = MkC (mkJustExpr elt_ty (unC es))
 
 repMaybeList :: Name -> (a -> MetaM (Core b))
                         -> Maybe [a] -> MetaM (Core (Maybe [b]))
-repMaybeList tc_name _ Nothing = coreNothingList tc_name
-repMaybeList tc_name f (Just args)
-  = do { elt_ty <- lookupType tc_name
-       ; args1 <- mapM f args
+repMaybeList tc_name f xs = do
+  elt_ty <- lookupType tc_name
+  repMaybeListT elt_ty f xs
+
+-- Lookup the name and wrap it with the m variable
+repMaybeListM :: Name -> (a -> MetaM (Core b))
+                        -> Maybe [a] -> MetaM (Core (Maybe [b]))
+repMaybeListM tc_name f xs = do
+  elt_ty <- wrapName tc_name
+  repMaybeListT elt_ty f xs
+
+
+repMaybeListT :: Type -> (a -> MetaM (Core b))
+                        -> Maybe [a] -> MetaM (Core (Maybe [b]))
+repMaybeListT elt_ty _ Nothing = coreNothingList elt_ty
+repMaybeListT elt_ty f (Just args)
+  = do { args1 <- mapM f args
        ; return $ coreJust' (mkListTy elt_ty) (coreList' elt_ty args1) }
 
-coreNothingList :: Name -> MetaM (Core (Maybe [a]))
-coreNothingList tc_name
-  = do { elt_ty <- lookupType tc_name
-       ; return $ coreNothing' (mkListTy elt_ty) }
+coreNothingList :: Type -> MetaM (Core (Maybe [a]))
+coreNothingList elt_ty = return $ coreNothing' (mkListTy elt_ty)
 
 coreJustList :: Name -> Core [a] -> MetaM (Core (Maybe [a]))
 coreJustList tc_name args
