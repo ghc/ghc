@@ -175,21 +175,23 @@ tcTypedBracket rn_expr brack@(TExpBr _ expr) res_ty
                                        -- should get thrown into the constraint set
                                        -- from outside the bracket
 
+       ; [m_var] <- map mkTyVarTy . snd <$> newMetaTyVars [m_ty_var]
+       ; ev_var <- emitQuoteWanted m_var
        -- Typecheck expr to make sure it is valid,
        -- Throw away the typechecked expression but return its type.
        -- We'll typecheck it again when we splice it in somewhere
-       ; (_tc_expr, expr_ty) <- setStage (Brack cur_stage (TcPending ps_ref lie_var)) $
+       ; (_tc_expr, expr_ty) <- setStage (Brack cur_stage (TcPending ps_ref lie_var m_var)) $
                                 tcInferRhoNC expr
                                 -- NC for no context; tcBracket does that
        ; let rep = getRuntimeRep expr_ty
-
-       ; meta_ty <- tcTExpTy expr_ty
+       ; meta_ty <- tcTExpTy m_var expr_ty
        ; ps' <- readMutVar ps_ref
        ; texpco <- tcLookupId unsafeTExpCoerceName
+       ; let wrapper = mkWpEvVarApps [ev_var] <.> mkWpTyApps [m_var]
        ; tcWrapResultO (Shouldn'tHappenOrigin "TExpBr")
                        rn_expr
                        (unLoc (mkHsApp (nlHsTyApp texpco [rep, expr_ty])
-                                      (noLoc (HsTcBracketOut noExtField idHsWrapper brack ps'))))
+                                      (noLoc (HsTcBracketOut noExtField wrapper brack ps'))))
                        meta_ty res_ty }
 tcTypedBracket _ other_brack _
   = pprPanic "tcTypedBracket" (ppr other_brack)
@@ -228,11 +230,18 @@ tcUntypedBracket rn_expr brack ps res_ty
        ; return $ mkHsWrap final_co $ HsTcBracketOut noExtField wrapper brack ps'
        }
 
-
+-- | A type variable with kind * -> * named "m"
 m_ty_var :: TyVar
 m_ty_var = mkTemplateTyVars
             (repeat (mkVisFunTy liftedTypeKind liftedTypeKind))
             !! (ord 'm' - ord 'a')
+
+-- | For a type 't', emit the constraint 'Quote t'.
+emitQuoteWanted :: Type -> TcM EvVar
+emitQuoteWanted m_var =  do
+        quote_con <- tcLookupTyCon quoteClassName
+        emitWantedEvVar StaticOrigin $
+          mkTyConApp (quote_con) [m_var]
 
 ---------------
 brackTy :: HsBracket GhcRn -> TcM (Maybe (HsWrapper, TcType), Type)
@@ -241,10 +250,7 @@ brackTy b =
         -- New polymorphic type variable for the bracket
         [m_var] <- map mkTyVarTy . snd <$> newMetaTyVars [m_ty_var]
         -- Emit a Quote constraint for the bracket
-        quote_con <- tcLookupTyCon quoteClassName
-        ev_var <- emitWantedEvVar StaticOrigin $
-                  mkTyConApp (quote_con)
-                             [m_var]
+        ev_var <- emitQuoteWanted m_var
         final_ty <- mkAppTy m_var . k . flip mkTyConApp [] <$> tcLookupTyCon n
         let wrapper = mkWpEvVarApps [ev_var] <.> mkWpTyApps [m_var]
         return (Just (wrapper, m_var), final_ty)
@@ -278,13 +284,12 @@ tcPendingSplice m_var (PendingRnSplice flavour splice_name expr)
 
 ---------------
 -- Takes a tau and returns the type Q (TExp tau)
-tcTExpTy :: TcType -> TcM TcType
-tcTExpTy exp_ty
+tcTExpTy :: TcType -> TcType -> TcM TcType
+tcTExpTy m_ty exp_ty
   = do { unless (isTauTy exp_ty) $ addErr (err_msg exp_ty)
-       ; q    <- tcLookupTyCon qTyConName
        ; texp <- tcLookupTyCon tExpTyConName
        ; let rep = getRuntimeRep exp_ty
-       ; return (mkTyConApp q [mkTyConApp texp [rep, exp_ty]]) }
+       ; return (mkAppTy m_ty (mkTyConApp texp [rep, exp_ty])) }
   where
     err_msg ty
       = vcat [ text "Illegal polytype:" <+> ppr ty
@@ -554,10 +559,10 @@ tcNestedSplice :: ThStage -> PendingStuff -> Name
                 -> LHsExpr GhcRn -> ExpRhoType -> TcM (HsExpr GhcTc)
     -- See Note [How brackets and nested splices are handled]
     -- A splice inside brackets
-tcNestedSplice pop_stage (TcPending ps_var lie_var) splice_name expr res_ty
+tcNestedSplice pop_stage (TcPending ps_var lie_var m_var) splice_name expr res_ty
   = do { res_ty <- expTypeToType res_ty
        ; let rep = getRuntimeRep res_ty
-       ; meta_exp_ty <- tcTExpTy res_ty
+       ; meta_exp_ty <- tcTExpTy m_var res_ty
        ; expr' <- setStage pop_stage $
                   setConstraintVar lie_var $
                   tcMonoExpr expr (mkCheckExpType meta_exp_ty)
@@ -577,7 +582,8 @@ tcTopSplice expr res_ty
   = do { -- Typecheck the expression,
          -- making sure it has type Q (T res_ty)
          res_ty <- expTypeToType res_ty
-       ; meta_exp_ty <- tcTExpTy res_ty
+       ; q_type <- flip mkTyConApp [] <$> tcLookupTyCon qTyConName
+       ; meta_exp_ty <- tcTExpTy q_type res_ty
        ; q_expr <- tcTopSpliceExpr Typed $
                           tcMonoExpr expr (mkCheckExpType meta_exp_ty)
        ; lcl_env <- getLclEnv
