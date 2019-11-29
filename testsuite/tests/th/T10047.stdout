@@ -1,2 +1,2 @@
-[| $(dyn "foo") |] :: Language.Haskell.TH.Syntax.Quote m => m Exp
+[| $(dyn "foo") |] :: Quote m => m Exp
 [| [n|foo|] |] :: Q Exp
