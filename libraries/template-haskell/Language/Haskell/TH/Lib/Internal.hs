@@ -17,7 +17,8 @@ module Language.Haskell.TH.Lib.Internal where
 
 import Language.Haskell.TH.Syntax hiding (Role, InjectivityAnn)
 import qualified Language.Haskell.TH.Syntax as TH
-import qualified Control.Monad.Fail as F
+-- Was imported for numTyLit
+--import qualified Control.Monad.Fail as F
 import Control.Applicative(liftA, liftA2)
 import Data.Word( Word8 )
 import Prelude
@@ -801,9 +802,10 @@ varStrictType = varBangType
 
 -- * Type Literals
 
-numTyLit :: (F.MonadFail m, Quote m) => Integer -> m TyLit
+-- MonadFail here complicates things (a lot)
+numTyLit :: (Quote m) => Integer -> m TyLit
 numTyLit n = if n >= 0 then pure (NumTyLit n)
-                       else fail ("Negative type-level number: " ++ show n)
+                       else error ("Negative type-level number: " ++ show n)
 
 strTyLit :: Quote m => String -> m TyLit
 strTyLit s = pure (StrTyLit s)
