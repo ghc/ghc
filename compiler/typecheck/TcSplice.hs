@@ -187,11 +187,12 @@ tcTypedBracket rn_expr brack@(TExpBr _ expr) res_ty
        ; meta_ty <- tcTExpTy m_var expr_ty
        ; ps' <- readMutVar ps_ref
        ; texpco <- tcLookupId unsafeTExpCoerceName
-       ; let wrapper = mkWpEvVarApps [ev_var] <.> mkWpTyApps [m_var]
+       ; let wrapper = QuoteWrapper ev_var m_var
        ; tcWrapResultO (Shouldn'tHappenOrigin "TExpBr")
                        rn_expr
-                       (unLoc (mkHsApp (mkLHsWrap wrapper (nlHsTyApp texpco [rep, expr_ty]))
-                                      (noLoc (HsTcBracketOut noExtField wrapper brack ps'))))
+                       (unLoc (mkHsApp (mkLHsWrap (applyQuoteWrapper wrapper)
+                                                  (nlHsTyApp texpco [rep, expr_ty]))
+                                      (noLoc (HsTcBracketOut noExtField (Just wrapper) brack ps'))))
                        meta_ty res_ty }
 tcTypedBracket _ other_brack _
   = pprPanic "tcTypedBracket" (ppr other_brack)
@@ -225,8 +226,7 @@ tcUntypedBracket rn_expr brack ps res_ty
        -- need to apply it to all the combinators manually as the core is
        -- constructed by hand.
        ; let final_co = mkWpCastR co
-             -- TODO: Make into Maybe
-             wrapper = fromMaybe idHsWrapper (fst <$> brack_info)
+             wrapper = fst <$> brack_info
        ; return $ mkHsWrap final_co $ HsTcBracketOut noExtField wrapper brack ps'
        }
 
@@ -244,7 +244,7 @@ emitQuoteWanted m_var =  do
           mkTyConApp (quote_con) [m_var]
 
 ---------------
-brackTy :: HsBracket GhcRn -> TcM (Maybe (HsWrapper, TcType), Type)
+brackTy :: HsBracket GhcRn -> TcM (Maybe (QuoteWrapper, TcType), Type)
 brackTy b =
   let mkTyX k n = do
         -- New polymorphic type variable for the bracket
@@ -252,7 +252,7 @@ brackTy b =
         -- Emit a Quote constraint for the bracket
         ev_var <- emitQuoteWanted m_var
         final_ty <- mkAppTy m_var . k . flip mkTyConApp [] <$> tcLookupTyCon n
-        let wrapper = mkWpEvVarApps [ev_var] <.> mkWpTyApps [m_var]
+        let wrapper = QuoteWrapper ev_var m_var
         return (Just (wrapper, m_var), final_ty)
       mkTy = mkTyX id
   in
