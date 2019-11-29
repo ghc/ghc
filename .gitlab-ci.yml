@@ -106,7 +106,7 @@ typecheck-testsuite:
     - lint
 
 # We allow the submodule checker to fail when run on merge requests (to
-# accomodate, e.g., haddock changes not yet upstream) but not on `master` or
+# accommodate, e.g., haddock changes not yet upstream) but not on `master` or
 # Marge jobs.
 .lint-submods:
   <<: *only-default

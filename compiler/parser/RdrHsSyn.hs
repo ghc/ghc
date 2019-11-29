@@ -2428,7 +2428,7 @@ tagless final encoding, and there's no need for this complexity.
 
 {- Note [PatBuilder]
 ~~~~~~~~~~~~~~~~~~~~
-Unlike HsExpr or HsCmd, the Pat type cannot accomodate all intermediate forms,
+Unlike HsExpr or HsCmd, the Pat type cannot accommodate all intermediate forms,
 so we introduce the notion of a PatBuilder.
 
 Consider a pattern like this:

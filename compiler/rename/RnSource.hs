@@ -1231,7 +1231,7 @@ Why do the instance declarations participate?  At least two reasons
   the type synonym S. While we know that S depends upon 'Q depends upon Closed,
   we have no idea that Closed depends upon Open!
 
-  To accomodate for these situations, we ensure that an instance is checked
+  To accommodate for these situations, we ensure that an instance is checked
   before every @TyClDecl@ on which it does not depend. That's to say, instances
   are checked as early as possible in @tcTyAndClassDecls@.
 

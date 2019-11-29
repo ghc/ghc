@@ -477,7 +477,7 @@ instance Monoid ModuleSummary where
   mappend = (<>)
 
 ------------------------------------------------------------------------------
--- global color pallete
+-- global color palette
 
 red,green,yellow :: String
 red    = "#f20913"

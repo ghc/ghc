@@ -131,7 +131,7 @@ acts as a pointer to the value on the heap.
 
 \gram{\ottheap}
 
-Execution procedes until a return value (a literal or a variable, i.e.
+Execution proceeds until a return value (a literal or a variable, i.e.
 pointer to the heap) is produced.  To accommodate for let-no-escape
 bindings, we also allow execution to terminate with a jump to a function
 application of a let-no-escape variable.
