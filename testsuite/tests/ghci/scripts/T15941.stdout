@@ -1,4 +1,7 @@
 type T :: * -> * -> *
 type T =
-  (->) @{'GHC.Types.LiftedRep} @{'GHC.Types.LiftedRep} :: * -> * -> *
+  (->)
+    @{'GHC.Types.BoxedRep 'GHC.Types.Lifted}
+    @{'GHC.Types.BoxedRep 'GHC.Types.Lifted}
+  :: * -> * -> *
   	-- Defined at <interactive>:2:1
