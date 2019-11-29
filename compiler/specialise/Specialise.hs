@@ -2378,7 +2378,7 @@ pair_fvs (bndr, rhs) = exprSomeFreeVars interesting rhs
     interesting :: InterestingVarFun
     interesting v = isLocalVar v || (isId v && isDFunId v)
         -- Very important: include DFunIds /even/ if it is imported
-        -- Reason: See Note [Avoiding loops], the second exmaple
+        -- Reason: See Note [Avoiding loops], the second example
         --         involving an imported dfun.  We must know whether
         --         a dictionary binding depends on an imported dfun,
         --         in case we try to specialise that imported dfun

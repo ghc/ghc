@@ -441,7 +441,7 @@ mkPrimCon dt str cr = Constr
                         { datatype  = dt
                         , conrep    = cr
                         , constring = str
-                        , confields = error $ concat ["constrFields : ", (tycon dt), " is primative"]
+                        , confields = error $ concat ["constrFields : ", (tycon dt), " is primitive"]
                         , confixity = error "constrFixity"
                         }
 

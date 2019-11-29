@@ -96,7 +96,7 @@ life-cycle it is in:
       allocation)
 
 Allocation (in the case of a small request) consists of walking the nursery to
-find a page that will accomodate the request. If none exists then we allocate a
+find a page that will accommodate the request. If none exists then we allocate a
 new nursery page (flushing an existing one to the filled list if the nursery is
 full).
 

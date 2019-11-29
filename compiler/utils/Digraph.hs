@@ -158,7 +158,7 @@ type ReduceFn key payload =
 Note [reduceNodesIntoVertices implementations]
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 reduceNodesIntoVertices is parameterized by the container type.
-This is to accomodate key types that don't have an Ord instance
+This is to accommodate key types that don't have an Ord instance
 and hence preclude the use of Data.Map. An example of such type
 would be Unique, there's no way to implement Ord Unique
 deterministically.

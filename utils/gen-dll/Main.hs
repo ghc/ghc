@@ -152,7 +152,7 @@ ar = AR_TOOL_BIN
 -- dll is 2^16-1, however Microsoft's lib.exe for some reason refuses to link
 -- up to this amount. The reason is likely that it adds some extra symbols in
 -- the generated dll, such as dllmain etc. So we reserve some space in the
--- symbol table to accomodate this. This number is just purely randomly chosen.
+-- symbol table to accommodate this. This number is just purely randomly chosen.
 #define SYMBOL_PADDING 10
 
 usage :: IO ()
