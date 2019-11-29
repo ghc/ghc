@@ -19,18 +19,18 @@ T14884.hs:4:5: error:
           with foldMap @[] @(IO ()) @Char
           (imported from ‘Prelude’ at T14884.hs:1:8-13
            (and originally defined in ‘Data.Foldable’))
-        ($) :: forall a b. (a -> b) -> a -> b
-          with ($) @'GHC.Types.LiftedRep @[Char] @(IO ())
-          (imported from ‘Prelude’ at T14884.hs:1:8-13
-           (and originally defined in ‘GHC.Base’))
-        ($!) :: forall a b. (a -> b) -> a -> b
-          with ($!) @'GHC.Types.LiftedRep @[Char] @(IO ())
-          (imported from ‘Prelude’ at T14884.hs:1:8-13
-           (and originally defined in ‘GHC.Base’))
         id :: forall a. a -> a
           with id @([Char] -> IO ())
-          (imported from ‘Prelude’ at T14884.hs:1:8-13
-           (and originally defined in ‘GHC.Base’))
+           (imported from ‘Prelude’ at T14884.hs:1:8-13
+            (and originally defined in ‘GHC.Base’))
+        ($) :: forall a b. (a -> b) -> a -> b
+          with ($) @('GHC.Types.BoxedRep 'GHC.Types.Lifted) @[Char] @(IO ())
+           (imported from ‘Prelude’ at T14884.hs:1:8-13
+            (and originally defined in ‘GHC.Base’))
+        ($!) :: forall a b. (a -> b) -> a -> b
+          with ($!) @('GHC.Types.BoxedRep 'GHC.Types.Lifted) @[Char] @(IO ())
+           (imported from ‘Prelude’ at T14884.hs:1:8-13
+            (and originally defined in ‘GHC.Base’))
 
 T14884.hs:4:7: error:
     • Ambiguous type variable ‘a0’ arising from a use of ‘print’

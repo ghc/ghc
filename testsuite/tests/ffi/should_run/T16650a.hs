@@ -27,7 +27,7 @@ foreign import ccall unsafe "head_bytearray"
   c_head_bytearray :: MutableByteArray# RealWorld -> IO Word8
 
 data Box :: Type where
-  Box :: (Any :: TYPE 'UnliftedRep) -> Box
+  Box :: (Any :: TYPE ('BoxedRep 'Unlifted)) -> Box
 
 data MutableByteArray :: Type where
   MutableByteArray :: MutableByteArray# RealWorld -> MutableByteArray

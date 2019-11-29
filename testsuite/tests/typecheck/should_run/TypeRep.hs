@@ -53,10 +53,10 @@ main = do
   print $ rep @(Proxy [1,2,3])
   print $ rep @(Proxy 'EQ)
   print $ rep @(Proxy TYPE)
-  print $ rep @(Proxy (TYPE 'LiftedRep))
+  print $ rep @(Proxy (TYPE ('BoxedRep 'Lifted)))
   print $ rep @(Proxy *)
   print $ rep @(Proxy ★)
-  print $ rep @(Proxy 'LiftedRep)
+  print $ rep @(Proxy ('BoxedRep 'Lifted))
 
   -- Something lifted and primitive
   print $ rep @RealWorld  -- #12132

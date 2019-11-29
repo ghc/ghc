@@ -26,7 +26,7 @@ foreign import ccall unsafe "is_doubleton_homogenous"
     SmallMutableArray# RealWorld a -> IO Word8
 
 data Box :: Type where
-  Box :: (Any :: TYPE 'UnliftedRep) -> Box
+  Box :: (Any :: TYPE ('BoxedRep 'Unlifted)) -> Box
 
 -- An array of unary integer functions
 data SmallMutableArray :: Type where

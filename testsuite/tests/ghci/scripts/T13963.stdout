@@ -1,8 +1,8 @@
 Pair :: * -> * -> RuntimeRep -> *
 Pair Int :: * -> RuntimeRep -> *
 Pair Int Float :: RuntimeRep -> *
-Pair Int Float LiftedRep :: *
+Pair Int Float ('BoxedRep 'Lifted) :: *
 Pair :: TYPE rep -> TYPE rep' -> RuntimeRep -> *
 Pair Int :: * -> RuntimeRep -> *
 Pair Int Float :: RuntimeRep -> *
-Pair Int Float LiftedRep :: *
+Pair Int Float ('BoxedRep 'Lifted) :: *

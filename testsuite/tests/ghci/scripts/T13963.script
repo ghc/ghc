@@ -1,13 +1,13 @@
 :set -XPolyKinds -XDataKinds -XRankNTypes
-import GHC.Exts (TYPE, RuntimeRep(LiftedRep))
+import GHC.Exts (TYPE, RuntimeRep(BoxedRep), Levity(Lifted))
 type Pair (a :: TYPE rep) (b :: TYPE rep') rep'' = forall (r :: TYPE rep''). (a -> b -> r)
 :kind Pair
 :kind Pair Int
 :kind Pair Int Float
-:kind Pair Int Float LiftedRep
+:kind Pair Int Float ('BoxedRep 'Lifted)
 
 :set -fprint-explicit-runtime-reps
 :kind Pair
 :kind Pair Int
 :kind Pair Int Float
-:kind Pair Int Float LiftedRep
+:kind Pair Int Float ('BoxedRep 'Lifted)
