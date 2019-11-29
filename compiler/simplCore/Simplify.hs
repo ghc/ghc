@@ -50,7 +50,6 @@ import Maybes           (  orElse )
 import Control.Monad
 import Outputable
 import FastString
-import Pair
 import Util
 import ErrUtils
 import Module          ( moduleName, pprModuleName )
@@ -440,7 +439,7 @@ prepareRhs :: SimplMode -> TopLevelFlag
 --            x = Just a
 -- See Note [prepareRhs]
 prepareRhs mode top_lvl occ info (Cast rhs co)  -- Note [Float coercions]
-  | Pair ty1 _ty2 <- coercionKind co         -- Do *not* do this if rhs has an unlifted type
+  | let ty1 = coercionLKind co         -- Do *not* do this if rhs has an unlifted type
   , not (isUnliftedType ty1)                 -- see Note [Float coercions (unlifted)]
   = do  { (floats, rhs') <- makeTrivialWithInfo mode top_lvl occ sanitised_info rhs
         ; return (floats, Cast rhs' co) }
@@ -1308,7 +1307,7 @@ simplCast env body co0 cont0
             -- only needed by `sc_hole_ty` which is often not forced.
             -- Consequently it is worthwhile using a lazy pattern match here to
             -- avoid unnecessary coercionKind evaluations.
-          , ~(Pair hole_ty _) <- coercionKind co
+          , let hole_ty = coercionLKind co
           = {-#SCC "addCoerce-pushCoTyArg" #-}
             do { tail' <- addCoerceM m_co' tail
                ; return (cont { sc_arg_ty  = arg_ty'
@@ -1319,7 +1318,7 @@ simplCast env body co0 cont0
         addCoerce co cont@(ApplyToVal { sc_arg = arg, sc_env = arg_se
                                       , sc_dup = dup, sc_cont = tail })
           | Just (co1, m_co2) <- pushCoValArg co
-          , Pair _ new_ty <- coercionKind co1
+          , let new_ty = coercionRKind co1
           , not (isTypeLevPoly new_ty)  -- Without this check, we get a lev-poly arg
                                         -- See Note [Levity polymorphism invariants] in CoreSyn
                                         -- test: typecheck/should_run/EtaExpandLevPoly
