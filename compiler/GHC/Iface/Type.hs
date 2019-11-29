@@ -62,9 +62,11 @@ module GHC.Iface.Type (
 
 import GhcPrelude
 
-import {-# SOURCE #-} TysWiredIn ( coercibleTyCon, heqTyCon
-                                 , liftedRepDataConTyCon, tupleTyConName )
-import {-# SOURCE #-} GHC.Core.Type ( isRuntimeRepTy )
+import {-# SOURCE #-} TysWiredIn
+  ( coercibleTyCon, heqTyCon, boxedRepDataConTyCon, liftedDataConTyCon
+  , tupleTyConName )
+import {-# SOURCE #-} GHC.Core.Type
+  ( isRuntimeRepTy )
 
 import GHC.Core.TyCon hiding ( pprPromotionQuote )
 import GHC.Core.Coercion.Axiom
@@ -381,15 +383,35 @@ IfaceHoleCo to ensure that they don't end up in an interface file.
 ifaceTyConHasKey :: IfaceTyCon -> Unique -> Bool
 ifaceTyConHasKey tc key = ifaceTyConName tc `hasKey` key
 
+-- | Given a kind K, is K of the form (TYPE ('BoxedRep 'LiftedRep))?
 isIfaceLiftedTypeKind :: IfaceKind -> Bool
 isIfaceLiftedTypeKind (IfaceTyConApp tc IA_Nil)
   = isLiftedTypeKindTyConName (ifaceTyConName tc)
-isIfaceLiftedTypeKind (IfaceTyConApp tc
-                       (IA_Arg (IfaceTyConApp ptr_rep_lifted IA_Nil)
-                               Required IA_Nil))
-  =  tc `ifaceTyConHasKey` tYPETyConKey
-  && ptr_rep_lifted `ifaceTyConHasKey` liftedRepDataConKey
+isIfaceLiftedTypeKind (IfaceTyConApp tc1 args1)
+  = isIfaceTyConAppLiftedTypeKind tc1 args1
 isIfaceLiftedTypeKind _ = False
+
+-- | Given a kind constructor K and arguments A, returns true if
+-- both of the following statements are true:
+--
+-- * K is TYPE
+-- * A is a singleton IfaceAppArgs of the form ('BoxedRep 'LiftedRep)
+--
+-- For the second condition, we must also check for the type
+-- synonym LiftedRep.
+isIfaceTyConAppLiftedTypeKind :: IfaceTyCon -> IfaceAppArgs -> Bool
+isIfaceTyConAppLiftedTypeKind tc1 args1
+  | tc1 `ifaceTyConHasKey` tYPETyConKey
+  , IA_Arg soleArg1 Required IA_Nil <- args1
+  , IfaceTyConApp rep args2 <- soleArg1 =
+    if | rep `ifaceTyConHasKey` boxedRepDataConKey
+       , IA_Arg soleArg2 Required IA_Nil <- args2
+       , IfaceTyConApp lev IA_Nil <- soleArg2
+       , lev `ifaceTyConHasKey` liftedDataConKey -> True
+       | rep `ifaceTyConHasKey` liftedRepTyConKey
+       , IA_Nil <- args2 -> True
+       | otherwise -> False
+  | otherwise = False
 
 splitIfaceSigmaTy :: IfaceType -> ([IfaceForAllBndr], [IfacePredType], IfaceType)
 -- Mainly for printing purposes
@@ -961,14 +983,14 @@ defaultRuntimeRepVars ty = go False emptyFsEnv ty
 
     go _ subs ty@(IfaceTyVar tv)
       | tv `elemFsEnv` subs
-      = IfaceTyConApp liftedRep IA_Nil
+      = ifaceLiftedRep
       | otherwise
       = ty
 
     go in_kind _ ty@(IfaceFreeTyVar tv)
       -- See Note [Defaulting RuntimeRep variables], about free vars
       | in_kind && GHC.Core.Type.isRuntimeRepTy (tyVarKind tv)
-      = IfaceTyConApp liftedRep IA_Nil
+      = ifaceLiftedRep
       | otherwise
       = ty
 
@@ -1001,10 +1023,6 @@ defaultRuntimeRepVars ty = go False emptyFsEnv ty
     go_args ink subs (IA_Arg ty argf args)
       = IA_Arg (go ink subs ty) argf (go_args ink subs args)
 
-    liftedRep :: IfaceTyCon
-    liftedRep = IfaceTyCon dc_name (IfaceTyConInfo IsPromoted IfaceNormalTyCon)
-      where dc_name = getName liftedRepDataConTyCon
-
     isRuntimeRep :: IfaceType -> Bool
     isRuntimeRep (IfaceTyConApp tc _) =
         tc `ifaceTyConHasKey` runtimeRepTyConKey
@@ -1017,6 +1035,18 @@ eliminateRuntimeRep f ty
     if userStyle sty && not printExplicitRuntimeReps
       then f (defaultRuntimeRepVars ty)
       else f ty
+
+-- The type ('BoxedRep 'LiftedRep)
+ifaceLiftedRep :: IfaceType
+ifaceLiftedRep =
+  IfaceTyConApp boxedRep (IA_Arg (IfaceTyConApp lifted IA_Nil) Required IA_Nil)
+  where
+    boxedRep :: IfaceTyCon
+    boxedRep = IfaceTyCon dc_name (IfaceTyConInfo IsPromoted IfaceNormalTyCon)
+      where dc_name = getName boxedRepDataConTyCon
+    lifted :: IfaceTyCon
+    lifted = IfaceTyCon dc_name (IfaceTyConInfo IsPromoted IfaceNormalTyCon)
+      where dc_name = getName liftedDataConTyCon
 
 instance Outputable IfaceAppArgs where
   ppr tca = pprIfaceAppArgs tca
@@ -1311,9 +1341,7 @@ pprTyTcApp' ctxt_prec tc tys printExplicitKinds style
   , isInvisibleArgFlag argf
   = pprIfaceTyList ctxt_prec ty1 ty2
 
-  | tc `ifaceTyConHasKey` tYPETyConKey
-  , IA_Arg (IfaceTyConApp rep IA_Nil) Required IA_Nil <- tys
-  , rep `ifaceTyConHasKey` liftedRepDataConKey
+  | isIfaceTyConAppLiftedTypeKind tc tys
   = ppr_kind_type ctxt_prec
 
   | otherwise

@@ -1785,7 +1785,13 @@ misMatchMsg ct oriented ty1 ty2
   | isLiftedRuntimeRep ty1
   = lifted_vs_unlifted
 
+  | isLiftedLevity ty1
+  = lifted_vs_unlifted
+
   | isLiftedRuntimeRep ty2
+  = lifted_vs_unlifted
+
+  | isLiftedLevity ty2
   = lifted_vs_unlifted
 
   | otherwise  -- So now we have Nothing or (Just IsSwapped)

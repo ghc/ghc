@@ -119,6 +119,7 @@ module GHC.Core.Type (
         isLiftedType_maybe,
         isLiftedTypeKind, isUnliftedTypeKind,
         isLiftedRuntimeRep, isUnliftedRuntimeRep,
+        isLiftedLevity,
         isUnliftedType, mightBeUnliftedType, isUnboxedTupleType, isUnboxedSumType,
         isAlgType, isDataFamilyAppType,
         isPrimitiveType, isStrictType,
@@ -516,8 +517,19 @@ isLiftedRuntimeRep :: Type -> Bool
 --   and of other reps e.g. (IntRep :: RuntimeRep)
 isLiftedRuntimeRep rep
   | Just rep' <- coreView rep          = isLiftedRuntimeRep rep'
-  | TyConApp rr_tc args <- rep
-  , rr_tc `hasKey` liftedRepDataConKey = ASSERT( null args ) True
+  | TyConApp rr_tc rr_args <- rep
+  , rr_tc `hasKey` boxedRepDataConKey
+  = case rr_args of
+      [rr_arg] -> isLiftedLevity rr_arg
+      _ -> ASSERT( False ) True -- this should probably just panic
+  | otherwise                          = False
+
+isLiftedLevity :: Type -> Bool
+isLiftedLevity lev
+  | Just lev' <- coreView lev          = isLiftedLevity lev'
+  | TyConApp lev_tc lev_args <- lev
+  , lev_tc `hasKey` liftedDataConKey
+  = ASSERT( null lev_args ) True
   | otherwise                          = False
 
 -- | Returns True if the kind classifies unlifted types and False otherwise.
@@ -535,9 +547,14 @@ isUnliftedRuntimeRep :: Type -> Bool
 --   and of variables (a :: RuntimeRep)
 isUnliftedRuntimeRep rep
   | Just rep' <- coreView rep = isUnliftedRuntimeRep rep'
-  | TyConApp rr_tc _ <- rep   -- NB: args might be non-empty
-                              --     e.g. TupleRep [r1, .., rn]
-  = isPromotedDataCon rr_tc && not (rr_tc `hasKey` liftedRepDataConKey)
+  | TyConApp rr_tc args <- rep
+  , isPromotedDataCon rr_tc =
+      -- NB: args might be non-empty e.g. TupleRep [r1, .., rn]
+      if (rr_tc `hasKey` boxedRepDataConKey)
+        then case args of
+          [TyConApp lev_tc []] -> lev_tc `hasKey` unliftedDataConKey
+          _ -> False
+        else True
         -- Avoid searching all the unlifted RuntimeRep type cons
         -- In the RuntimeRep data type, only LiftedRep is lifted
         -- But be careful of type families (F tys) :: RuntimeRep

@@ -5,7 +5,7 @@ good: Maybe
 good: TYPE
 good: RuntimeRep
 good: 'IntRep
-good: (->) 'LiftedRep 'LiftedRep
+good: (->) ('BoxedRep 'Lifted) ('BoxedRep 'Lifted)
 good: Proxy * Int
 good: Proxy (TYPE 'IntRep) Int#
 good: *

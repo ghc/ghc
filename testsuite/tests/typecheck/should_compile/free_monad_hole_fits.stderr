@@ -29,10 +29,10 @@ free_monad_hole_fits.hs:14:28: warning: [-Wtyped-holes (in -Wdefault)]
                  Functor f =>
                  (a -> b) -> f a -> f b
       Valid refinement hole fits include
-        ($) (_ :: (Free f a -> Free f b) -> f (Free f a) -> f (Free f b))
-          where ($) :: forall a b. (a -> b) -> a -> b
         pure (_ :: f (Free f a) -> f (Free f b))
           where pure :: forall (f :: * -> *) a. Applicative f => a -> f a
+        ($) (_ :: (Free f a -> Free f b) -> f (Free f a) -> f (Free f b))
+          where ($) :: forall a b. (a -> b) -> a -> b
 
 free_monad_hole_fits.hs:25:31: warning: [-Wtyped-holes (in -Wdefault)]
     • Found hole: _a :: Free f a -> Free f b
@@ -71,7 +71,7 @@ free_monad_hole_fits.hs:25:31: warning: [-Wtyped-holes (in -Wdefault)]
           where (=<<) :: forall (m :: * -> *) a b.
                          Monad m =>
                          (a -> m b) -> m a -> m b
-        ($) (_ :: Free f a -> Free f b)
-          where ($) :: forall a b. (a -> b) -> a -> b
         pure (_ :: Free f b)
           where pure :: forall (f :: * -> *) a. Applicative f => a -> f a
+        ($) (_ :: Free f a -> Free f b)
+          where ($) :: forall a b. (a -> b) -> a -> b

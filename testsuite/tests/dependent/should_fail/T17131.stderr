@@ -1,7 +1,7 @@
 
 T17131.hs:12:34: error:
     • Expected kind ‘TYPE ('TupleRep (TypeReps xs))’,
-        but ‘(# a #)’ has kind ‘TYPE ('TupleRep '[ 'LiftedRep])’
+        but ‘(# a #)’ has kind ‘TYPE ('TupleRep '[ 'BoxedRep 'Lifted])’
     • In the type ‘(# a #)’
       In the type family declaration for ‘Tuple#’
       NB: Type ‘Tuple#’ was inferred to use visible dependent quantification.
