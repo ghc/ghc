@@ -54,7 +54,6 @@ module Language.Haskell.TH(
         Name, NameSpace,        -- Abstract
         -- ** Constructing names
         mkName,         -- :: String -> Name
-        newName,        -- :: String -> Q Name
         -- ** Deconstructing names
         nameBase,       -- :: Name -> String
         nameModule,     -- :: Name -> Maybe String
