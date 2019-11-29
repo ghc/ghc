@@ -1761,11 +1761,12 @@ eitherTyConKey                          = mkPreludeTyConUnique 84
 
 -- Kind constructors
 liftedTypeKindTyConKey, tYPETyConKey,
-  constraintKindTyConKey, runtimeRepTyConKey,
+  constraintKindTyConKey, levityTyConKey, runtimeRepTyConKey,
   vecCountTyConKey, vecElemTyConKey :: Unique
 liftedTypeKindTyConKey                  = mkPreludeTyConUnique 87
 tYPETyConKey                            = mkPreludeTyConUnique 88
 constraintKindTyConKey                  = mkPreludeTyConUnique 92
+levityTyConKey                          = mkPreludeTyConUnique 94
 runtimeRepTyConKey                      = mkPreludeTyConUnique 95
 vecCountTyConKey                        = mkPreludeTyConUnique 96
 vecElemTyConKey                         = mkPreludeTyConUnique 97
@@ -2021,42 +2022,46 @@ tupleRepDataConKey                      = mkPreludeDataConUnique 72
 sumRepDataConKey                        = mkPreludeDataConUnique 73
 
 -- See Note [Wiring in RuntimeRep] in TysWiredIn
-runtimeRepSimpleDataConKeys, unliftedSimpleRepDataConKeys, unliftedRepDataConKeys :: [Unique]
-liftedRepDataConKey :: Unique
-runtimeRepSimpleDataConKeys@(liftedRepDataConKey : unliftedSimpleRepDataConKeys)
-  = map mkPreludeDataConUnique [74..88]
 
-unliftedRepDataConKeys = vecRepDataConKey :
-                         tupleRepDataConKey :
-                         sumRepDataConKey :
-                         unliftedSimpleRepDataConKeys
+-- Includes all nullary-data-constructor reps. Does not
+-- include BoxedRep, VecRep, SumRep, TupleRep.
+runtimeRepSimpleDataConKeys :: [Unique]
+runtimeRepSimpleDataConKeys
+  = map mkPreludeDataConUnique [74..86]
+
+boxedRepDataConKey :: Unique
+boxedRepDataConKey = mkPreludeDataConUnique 87
+
+liftedDataConKey,unliftedDataConKey :: Unique
+liftedDataConKey = mkPreludeDataConUnique 88
+unliftedDataConKey = mkPreludeDataConUnique 89
 
 -- See Note [Wiring in RuntimeRep] in TysWiredIn
 -- VecCount
 vecCountDataConKeys :: [Unique]
-vecCountDataConKeys = map mkPreludeDataConUnique [89..94]
+vecCountDataConKeys = map mkPreludeDataConUnique [90..95]
 
 -- See Note [Wiring in RuntimeRep] in TysWiredIn
 -- VecElem
 vecElemDataConKeys :: [Unique]
-vecElemDataConKeys = map mkPreludeDataConUnique [95..104]
+vecElemDataConKeys = map mkPreludeDataConUnique [96..105]
 
 -- Typeable things
 kindRepTyConAppDataConKey, kindRepVarDataConKey, kindRepAppDataConKey,
     kindRepFunDataConKey, kindRepTYPEDataConKey,
     kindRepTypeLitSDataConKey, kindRepTypeLitDDataConKey
     :: Unique
-kindRepTyConAppDataConKey = mkPreludeDataConUnique 105
-kindRepVarDataConKey      = mkPreludeDataConUnique 106
-kindRepAppDataConKey      = mkPreludeDataConUnique 107
-kindRepFunDataConKey      = mkPreludeDataConUnique 108
-kindRepTYPEDataConKey     = mkPreludeDataConUnique 109
-kindRepTypeLitSDataConKey = mkPreludeDataConUnique 110
-kindRepTypeLitDDataConKey = mkPreludeDataConUnique 111
+kindRepTyConAppDataConKey = mkPreludeDataConUnique 106
+kindRepVarDataConKey      = mkPreludeDataConUnique 107
+kindRepAppDataConKey      = mkPreludeDataConUnique 108
+kindRepFunDataConKey      = mkPreludeDataConUnique 109
+kindRepTYPEDataConKey     = mkPreludeDataConUnique 110
+kindRepTypeLitSDataConKey = mkPreludeDataConUnique 111
+kindRepTypeLitDDataConKey = mkPreludeDataConUnique 112
 
 typeLitSymbolDataConKey, typeLitNatDataConKey :: Unique
-typeLitSymbolDataConKey   = mkPreludeDataConUnique 112
-typeLitNatDataConKey      = mkPreludeDataConUnique 113
+typeLitSymbolDataConKey   = mkPreludeDataConUnique 113
+typeLitNatDataConKey      = mkPreludeDataConUnique 114
 
 
 ---------------- Template Haskell -------------------
@@ -2485,4 +2490,4 @@ pretendNameIsInScope :: Name -> Bool
 pretendNameIsInScope n
   = any (n `hasKey`)
     [ liftedTypeKindTyConKey, tYPETyConKey
-    , runtimeRepTyConKey, liftedRepDataConKey ]
+    , runtimeRepTyConKey, boxedRepDataConKey ]

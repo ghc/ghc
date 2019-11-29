@@ -380,7 +380,7 @@ fpTYPELiftedRep = fingerprintFingerprints
 trTYPE :: TypeRep TYPE
 trTYPE = typeRep
 
-trLiftedRep :: TypeRep 'LiftedRep
+trLiftedRep :: TypeRep ('BoxedRep 'Lifted)
 trLiftedRep = typeRep
 
 -- | Construct a representation for a type application that is
@@ -617,7 +617,7 @@ instantiateKindRep vars = go
       = SomeTypeRep $ mkTrApp (unsafeCoerceRep $ go f) (unsafeCoerceRep $ go a)
     go (KindRepFun a b)
       = SomeTypeRep $ mkTrFun (unsafeCoerceRep $ go a) (unsafeCoerceRep $ go b)
-    go (KindRepTYPE LiftedRep) = SomeTypeRep TrType
+    go (KindRepTYPE (BoxedRep Lifted)) = SomeTypeRep TrType
     go (KindRepTYPE r) = unkindedTypeRep $ tYPE `kApp` runtimeRepTypeRep r
     go (KindRepTypeLitS sort s)
       = mkTypeLitFromString sort (unpackCStringUtf8# s)
@@ -656,8 +656,8 @@ buildList = foldr cons nil
 runtimeRepTypeRep :: RuntimeRep -> SomeKindedTypeRep RuntimeRep
 runtimeRepTypeRep r =
     case r of
-      LiftedRep   -> rep @'LiftedRep
-      UnliftedRep -> rep @'UnliftedRep
+      BoxedRep v  -> kindedTypeRep @_ @'BoxedRep
+                     `kApp` levityTypeRep v
       VecRep c e  -> kindedTypeRep @_ @'VecRep
                      `kApp` vecCountTypeRep c
                      `kApp` vecElemTypeRep e
@@ -681,6 +681,15 @@ runtimeRepTypeRep r =
   where
     rep :: forall (a :: RuntimeRep). Typeable a => SomeKindedTypeRep RuntimeRep
     rep = kindedTypeRep @RuntimeRep @a
+
+levityTypeRep :: Levity -> SomeKindedTypeRep Levity
+levityTypeRep c =
+    case c of
+      Lifted   -> rep @'Lifted
+      Unlifted -> rep @'Unlifted
+  where
+    rep :: forall (a :: Levity). Typeable a => SomeKindedTypeRep Levity
+    rep = kindedTypeRep @Levity @a
 
 vecCountTypeRep :: VecCount -> SomeKindedTypeRep VecCount
 vecCountTypeRep c =
@@ -837,7 +846,7 @@ splitApps = go []
 -- #14480.
 tyConTYPE :: TyCon
 tyConTYPE = mkTyCon (tyConPackage liftedRepTyCon) "GHC.Prim" "TYPE" 0
-       (KindRepFun (KindRepTyConApp liftedRepTyCon []) (KindRepTYPE LiftedRep))
+       (KindRepFun (KindRepTyConApp liftedRepTyCon []) (KindRepTYPE (BoxedRep Lifted)))
   where
     liftedRepTyCon = typeRepTyCon (typeRep @RuntimeRep)
 

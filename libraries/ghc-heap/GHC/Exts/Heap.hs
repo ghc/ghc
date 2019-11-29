@@ -68,10 +68,18 @@ import GHC.Word
 class HasHeapRep (a :: TYPE rep) where
     getClosureData :: a -> IO Closure
 
+#if MIN_VERSION_base(4,14,0)
+instance HasHeapRep (a :: TYPE ('BoxedRep 'Lifted)) where
+#else
 instance HasHeapRep (a :: TYPE 'LiftedRep) where
+#endif
     getClosureData = getClosure
 
+#if MIN_VERSION_base(4,14,0)
+instance HasHeapRep (a :: TYPE ('BoxedRep 'Unlifted)) where
+#else
 instance HasHeapRep (a :: TYPE 'UnliftedRep) where
+#endif
     getClosureData x = getClosure (unsafeCoerce# x)
 
 instance Int# ~ a => HasHeapRep (a :: TYPE 'IntRep) where

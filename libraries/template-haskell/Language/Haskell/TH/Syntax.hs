@@ -54,6 +54,10 @@ import Foreign.ForeignPtr
 
 import qualified Control.Monad.Fail as Fail
 
+#if MIN_VERSION_base(4,14,0)
+import GHC.Types ( Levity(..) )
+#endif
+
 -----------------------------------------------------
 --
 --              The Quasi class
@@ -701,7 +705,11 @@ class Lift (t :: TYPE r) where
   -- | Turn a value into a Template Haskell expression, suitable for use in
   -- a splice.
   lift :: t -> Q Exp
+#if MIN_VERSION_base(4,14,0)
+  default lift :: (r ~ ('BoxedRep 'Lifted)) => t -> Q Exp
+#else
   default lift :: (r ~ 'LiftedRep) => t -> Q Exp
+#endif
   lift = unTypeQ . liftTyped
 
   -- | Turn a value into a Template Haskell typed expression, suitable for use
