@@ -262,7 +262,7 @@ newtype TExp (a :: TYPE (r :: RuntimeRep)) = TExp
 -- expression
 --
 -- Levity-polymorphic since /template-haskell-2.16.0.0/.
-unTypeQ :: forall (r :: RuntimeRep) (a :: TYPE r). Q (TExp a) -> Q Exp
+unTypeQ :: forall (r :: RuntimeRep) (a :: TYPE r) m . Quote m => m (TExp a) -> m Exp
 unTypeQ m = do { TExp e <- m
                ; return e }
 
@@ -272,7 +272,8 @@ unTypeQ m = do { TExp e <- m
 -- really does have the type you claim it has.
 --
 -- Levity-polymorphic since /template-haskell-2.16.0.0/.
-unsafeTExpCoerce :: forall (r :: RuntimeRep) (a :: TYPE r). Q Exp -> Q (TExp a)
+unsafeTExpCoerce :: forall (r :: RuntimeRep) (a :: TYPE r) m .
+                      Quote m => m Exp -> m (TExp a)
 unsafeTExpCoerce m = do { e <- m
                         ; return (TExp e) }
 
