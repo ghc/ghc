@@ -225,7 +225,7 @@ tcUntypedBracket rn_expr brack ps res_ty
        -- Apply the type variable and quote evidence to the bracket, we
        -- need to apply it to all the combinators manually as the core is
        -- constructed by hand.
-       ; let final_co = mkWpCastR co
+       ; let final_co = mkWpCastN co
              wrapper = fst <$> brack_info
        ; return $ mkHsWrap final_co $ HsTcBracketOut noExtField wrapper brack ps'
        }
