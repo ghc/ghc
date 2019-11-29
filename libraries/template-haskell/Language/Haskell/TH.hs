@@ -8,6 +8,7 @@ module Language.Haskell.TH(
         -- * The monad and its operations
         Q,
         runQ,
+        Quote(..),
         -- ** Administration: errors, locations and IO
         reportError,              -- :: String -> Q ()
         reportWarning,            -- :: String -> Q ()
