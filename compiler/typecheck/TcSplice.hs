@@ -190,7 +190,7 @@ tcTypedBracket rn_expr brack@(TExpBr _ expr) res_ty
        ; let wrapper = mkWpEvVarApps [ev_var] <.> mkWpTyApps [m_var]
        ; tcWrapResultO (Shouldn'tHappenOrigin "TExpBr")
                        rn_expr
-                       (unLoc (mkHsApp (nlHsTyApp texpco [rep, expr_ty])
+                       (unLoc (mkHsApp (mkLHsWrap wrapper (nlHsTyApp texpco [rep, expr_ty]))
                                       (noLoc (HsTcBracketOut noExtField wrapper brack ps'))))
                        meta_ty res_ty }
 tcTypedBracket _ other_brack _
