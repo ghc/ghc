@@ -36,7 +36,7 @@ module GHC.Types (
           -- The historical type * should ideally be written as
           -- `type *`, without the parentheses. But that's a true
           -- pain to parse, and for little gain.
-        VecCount(..), VecElem(..),
+        Levity(..), VecCount(..), VecElem(..),
 
         -- * Runtime type representation
         Module(..), TrName(..), TyCon(..), TypeLitSort(..),
@@ -57,7 +57,7 @@ infixr 5 :
 data Constraint
 
 -- | The kind of types with lifted values. For example @Int :: Type@.
-type Type = TYPE 'LiftedRep
+type Type = TYPE ('BoxedRep 'Lifted)
 
 {- *********************************************************************
 *                                                                      *
@@ -376,7 +376,6 @@ data SPEC = SPEC | SPEC2
 *                                                                      *
 ********************************************************************* -}
 
-
 -- | GHC maintains a property that the kind of all inhabited types
 -- (as distinct from type constructors or type-level data) tells us
 -- the runtime representation of values of that type. This datatype
@@ -391,8 +390,7 @@ data SPEC = SPEC | SPEC2
 data RuntimeRep = VecRep VecCount VecElem   -- ^ a SIMD vector type
                 | TupleRep [RuntimeRep]     -- ^ An unboxed tuple of the given reps
                 | SumRep [RuntimeRep]       -- ^ An unboxed sum of the given reps
-                | LiftedRep       -- ^ lifted; represented by a pointer
-                | UnliftedRep     -- ^ unlifted; represented by a pointer
+                | BoxedRep Levity    -- ^ represented by a pointer
                 | IntRep          -- ^ signed, word-sized value
                 | Int8Rep         -- ^ signed,  8-bit value
                 | Int16Rep        -- ^ signed, 16-bit value
@@ -410,6 +408,9 @@ data RuntimeRep = VecRep VecCount VecElem   -- ^ a SIMD vector type
 -- RuntimeRep is intimately tied to TyCon.RuntimeRep (in GHC proper). See
 -- Note [RuntimeRep and PrimRep] in RepType.
 -- See also Note [Wiring in RuntimeRep] in TysWiredIn
+
+-- | Whether a boxed type is lifted or unlifted.
+data Levity = Lifted | Unlifted
 
 -- | Length of a SIMD vector type
 data VecCount = Vec2

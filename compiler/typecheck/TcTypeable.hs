@@ -25,7 +25,7 @@ import HscTypes ( lookupId )
 import PrelNames
 import TysPrim ( primTyCons )
 import TysWiredIn ( tupleTyCon, sumTyCon, runtimeRepTyCon
-                  , vecCountTyCon, vecElemTyCon
+                  , levityTyCon, vecCountTyCon, vecElemTyCon
                   , nilDataCon, consDataCon )
 import Name
 import Id
@@ -347,7 +347,7 @@ mkPrimTypeableTodos
 -- Note [Built-in syntax and the OrigNameCache] in IfaceEnv for more.
 ghcPrimTypeableTyCons :: [TyCon]
 ghcPrimTypeableTyCons = concat
-    [ [ runtimeRepTyCon, vecCountTyCon, vecElemTyCon, funTyCon ]
+    [ [ runtimeRepTyCon, levityTyCon, vecCountTyCon, vecElemTyCon, funTyCon ]
     , map (tupleTyCon Unboxed) [0..mAX_TUPLE_SIZE]
     , map sumTyCon [2..mAX_SUM_SIZE]
     , primTyCons

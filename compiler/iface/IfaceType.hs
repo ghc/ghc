@@ -62,7 +62,8 @@ module IfaceType (
 import GhcPrelude
 
 import {-# SOURCE #-} TysWiredIn ( coercibleTyCon, heqTyCon
-                                 , liftedRepDataConTyCon, tupleTyConName )
+                                 , boxedRepDataConTyCon, tupleTyConName
+                                 , liftedDataConTyCon )
 import {-# SOURCE #-} Type       ( isRuntimeRepTy )
 
 import DynFlags
@@ -379,11 +380,13 @@ ifaceTyConHasKey tc key = ifaceTyConName tc `hasKey` key
 isIfaceLiftedTypeKind :: IfaceKind -> Bool
 isIfaceLiftedTypeKind (IfaceTyConApp tc IA_Nil)
   = isLiftedTypeKindTyConName (ifaceTyConName tc)
-isIfaceLiftedTypeKind (IfaceTyConApp tc
-                       (IA_Arg (IfaceTyConApp ptr_rep_lifted IA_Nil)
-                               Required IA_Nil))
-  =  tc `ifaceTyConHasKey` tYPETyConKey
-  && ptr_rep_lifted `ifaceTyConHasKey` liftedRepDataConKey
+isIfaceLiftedTypeKind (IfaceTyConApp tc1
+                       (IA_Arg (IfaceTyConApp tc2
+                       (IA_Arg (IfaceTyConApp lev IA_Nil)
+                               Required IA_Nil)) Required IA_Nil))
+  =  tc1 `ifaceTyConHasKey` tYPETyConKey
+  && tc2 `ifaceTyConHasKey` boxedRepDataConKey
+  && lev `ifaceTyConHasKey` liftedDataConKey
 isIfaceLiftedTypeKind _ = False
 
 splitIfaceSigmaTy :: IfaceType -> ([IfaceForAllBndr], [IfacePredType], IfaceType)
@@ -958,14 +961,14 @@ defaultRuntimeRepVars ty = go False emptyFsEnv ty
 
     go _ subs ty@(IfaceTyVar tv)
       | tv `elemFsEnv` subs
-      = IfaceTyConApp liftedRep IA_Nil
+      = IfaceTyConApp boxedRep (IA_Arg (IfaceTyConApp lifted IA_Nil) Required IA_Nil)
       | otherwise
       = ty
 
     go in_kind _ ty@(IfaceFreeTyVar tv)
       -- See Note [Defaulting RuntimeRep variables], about free vars
       | in_kind && Type.isRuntimeRepTy (tyVarKind tv)
-      = IfaceTyConApp liftedRep IA_Nil
+      = IfaceTyConApp boxedRep (IA_Arg (IfaceTyConApp lifted IA_Nil) Required IA_Nil)
       | otherwise
       = ty
 
@@ -998,9 +1001,13 @@ defaultRuntimeRepVars ty = go False emptyFsEnv ty
     go_args ink subs (IA_Arg ty argf args)
       = IA_Arg (go ink subs ty) argf (go_args ink subs args)
 
-    liftedRep :: IfaceTyCon
-    liftedRep = IfaceTyCon dc_name (IfaceTyConInfo IsPromoted IfaceNormalTyCon)
-      where dc_name = getName liftedRepDataConTyCon
+    lifted :: IfaceTyCon
+    lifted = IfaceTyCon dc_name (IfaceTyConInfo IsPromoted IfaceNormalTyCon)
+      where dc_name = getName liftedDataConTyCon
+
+    boxedRep :: IfaceTyCon
+    boxedRep = IfaceTyCon dc_name (IfaceTyConInfo IsPromoted IfaceNormalTyCon)
+      where dc_name = getName boxedRepDataConTyCon
 
     isRuntimeRep :: IfaceType -> Bool
     isRuntimeRep (IfaceTyConApp tc _) =
@@ -1313,8 +1320,10 @@ pprTyTcApp' ctxt_prec tc tys dflags style
   = pprIfaceTyList ctxt_prec ty1 ty2
 
   | tc `ifaceTyConHasKey` tYPETyConKey
-  , IA_Arg (IfaceTyConApp rep IA_Nil) Required IA_Nil <- tys
-  , rep `ifaceTyConHasKey` liftedRepDataConKey
+  , IA_Arg (IfaceTyConApp rep args) Required IA_Nil <- tys
+  , rep `ifaceTyConHasKey` boxedRepDataConKey
+  , IA_Arg (IfaceTyConApp lev IA_Nil) Required IA_Nil <- args
+  , lev `ifaceTyConHasKey` liftedDataConKey
   = kindType
 
   | otherwise
