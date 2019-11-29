@@ -509,7 +509,12 @@ mkBackpackMsg = do
                     ++ reason
       in case node of
            InstantiationNode _ ->
-             showMsg "Instantiating " ""
+             case recomp of
+                 MustCompile -> showMsg "Instantiating " ""
+                 UpToDate
+                     | verbosity (hsc_dflags hsc_env) >= 2 -> showMsg "Skipping  " ""
+                     | otherwise -> return ()
+                 RecompBecause reason -> showMsg "Instantiating " (" [" ++ reason ++ "]")
            ModuleNode _ ->
              case recomp of
                MustCompile -> showMsg "Compiling " ""
