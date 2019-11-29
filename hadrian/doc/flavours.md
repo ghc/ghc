@@ -132,7 +132,7 @@ when compiling the `compiler` library, and `hsGhc` when compiling/linking the GH
     <td>-O</td>
   </tr>
   <tr>
-    <th>validate</td>
+    <th>slow-validate</td>
     <td>-O0<br>-H64m</td>
     <td>-fllvm-fill-undef-with-garbage</td>
     <td></td>
