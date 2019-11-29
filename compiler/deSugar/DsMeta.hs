@@ -72,8 +72,11 @@ import Control.Monad
 import Data.List
 
 data MetaWrappers = MetaWrappers {
+      -- Apply arguments to a function of type `forall m . Quote m =>`
       quoteWrapper :: CoreExpr -> CoreExpr
+      -- Apply arguments to a function of type `forall m . Monad m =>`
     , monadWrapper :: CoreExpr -> CoreExpr
+      -- Convert tau into m tau for the container type m
     , metaTy :: Type -> Type
     }
 
@@ -96,18 +99,21 @@ dsBracket wrap brack splices
 
   where
     runOverloaded act = do
-      -- In the overloaded case we have to get given a bracket
+      -- In the overloaded case we have to get given a wrapper
       let Just (QuoteWrapper quote_var_raw m_var)  = wrap
           quote_var = Var quote_var_raw
---      let (m_var:_) = mkTemplateTyVars (repeat (mkVisFunTy liftedTypeKind liftedTypeKind))
+      -- Get the superclass selector to select the Monad dictionary, going
+      -- to be used to construct the monadWrapper.
       quote_tc <- dsLookupTyCon quoteClassName
       let Just cls = tyConClass_maybe quote_tc
           monad_sel = classSCSelId cls 0
---      quote_var <- newSysLocalDs (mkTyConApp quote_tc [mkTyVarTy m_var])
+
       let m_ty = Type m_var
+          -- Construct the contents of MetaWrappers
           quoteWrapper e = mkCoreApps e [m_ty, quote_var]
           monadWrapper e = mkCoreApps e [m_ty, mkCoreApps (Var monad_sel) [m_ty, quote_var]]
           tyWrapper t = mkAppTy m_var t
+
       res <- runReaderT (mapReaderT (dsExtendMetaEnv new_bit) act)
                         (MetaWrappers quoteWrapper monadWrapper tyWrapper)
       return $ res
@@ -126,6 +132,52 @@ dsBracket wrap brack splices
     do_brack (DecBrL {})   = panic "dsBracket: unexpected DecBrL"
     do_brack (TExpBr _ e)  = runOverloaded $ do { MkC e1  <- repLE e     ; return e1 }
     do_brack (XBracket nec) = noExtCon nec
+
+{- Note [Desugaring Brackets]
+
+In the old days (pre Dec 2019) quotation brackets used to be monomorphic, ie
+an expression bracket was of type Q Exp. This made the desugaring process simple
+as there were no complicated type variables to keep consistent throughout the
+whole AST. Due to the overloaded quotations proposal a quotation bracket is now
+of type `Quote m => m Exp` and all the combinators defined in TH.Lib have been
+generalised to work with any monad implementing a minimal interface.
+
+User's rejoice at the flexibility but now there is some additional complexity in
+how brackets are desugared as all these polymorphic combinators need their arguments
+instantiated.
+
+> IF YOU ARE MODIFYING THIS MODULE DO NOT USE ANYTHING SPECIFIC TO Q. INSTEAD
+> USE THE `wrapName` FUNCTION TO apply the `m` type variable to a type constructor.
+
+What the arguments should be instantiated to is supplied by the `QuoteWrapper`
+datatype which is produced by `TcSplice`. It is a pair of an evidence variable
+for `Quote m` and a type variable `m`. All the polymorphic combinators in desugaring
+need to be applied to these two type variables.
+
+There are three important functions which do the application.
+
+1. The default is `rep2` which takes a function name of type `Quote m =>` as an argument.
+2. `rep2M` takes a function of type `Monad m =>` as an argument
+2. `rep2_nw` takes a function without any constraints as an argument.
+
+These functions then use the information in QuoteWrapper to apply the correct
+arguments to the functions as the representation is constructed.
+
+The `MetaM` monad carries around an environment of three functions which are
+used in order to wrap the polymorphic combinators and instantiate the arguments
+to the correct things.
+
+1. quoteWrapper wraps functions of type `forall m . Quote m =>`
+2. monadWrapper wraps functions of type `forall m . Monad m =>`
+3. metaTy wraps a tau in the polymorphic `m` variable of the whole representation.
+
+Note it is is important to directly applie the arguments to the combinators as
+the types of the combinators has to match up with the types of the splice.
+My first implementation just created a lambda and applied a wrapper to the whole
+quotation but this meant that if the splices were of a more specific type
+then there would be type errors.
+
+- }
 
 {- -------------- Examples --------------------
 
