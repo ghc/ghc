@@ -19,4 +19,4 @@ if config.have_ext_interp :
 test('TH_overloaded_extract', normal, compile_and_run, [''])
 test('TH_overloaded_constraints', normal, compile, ['-v0'])
 test('TH_overloaded_constraints_fail', normal, compile_fail, ['-v0'])
-test('TH_overloaded_csp', normal, compile, ['-v0'])
+test('TH_overloaded_csp', normal, compile_and_run, ['-v0'])
