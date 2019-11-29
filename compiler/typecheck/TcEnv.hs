@@ -110,9 +110,6 @@ import ErrUtils
 import Maybes( MaybeErr(..), orElse )
 import qualified GHC.LanguageExtensions as LangExt
 import Util ( HasDebugCallStack )
-import Data.Char ( ord )
-import TysPrim
-import THNames
 
 import Data.IORef
 import Data.List
