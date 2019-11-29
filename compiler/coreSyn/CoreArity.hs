@@ -37,7 +37,6 @@ import Unique
 import DynFlags ( DynFlags, GeneralFlag(..), gopt )
 import Outputable
 import FastString
-import Pair
 import Util     ( debugIsOn )
 
 {-
@@ -98,7 +97,7 @@ exprArity e = go e
     go (Lam x e) | isId x          = go e + 1
                  | otherwise       = go e
     go (Tick t e) | not (tickishIsCode t) = go e
-    go (Cast e co)                 = trim_arity (go e) (pSnd (coercionKind co))
+    go (Cast e co)                 = trim_arity (go e) (coercionRKind co)
                                         -- Note [exprArity invariant]
     go (App e (Type _))            = go e
     go (App f a) | exprIsTrivial a = (go f - 1) `max` 0
@@ -744,7 +743,7 @@ arityType env (Cast e co)
       ABot n | co_arity < n -> ATop (replicate co_arity noOneShotInfo)
              | otherwise    -> ABot n
   where
-    co_arity = length (typeArity (pSnd (coercionKind co)))
+    co_arity = length (typeArity (coercionRKind co))
     -- See Note [exprArity invariant] (2); must be true of
     -- arityType too, since that is how we compute the arity
     -- of variables, and they in turn affect result of exprArity
@@ -1038,7 +1037,7 @@ etaInfoAppTy :: Type -> [EtaInfo] -> Type
 -- then   etaInfoApp e eis :: etaInfoApp ty eis
 etaInfoAppTy ty []               = ty
 etaInfoAppTy ty (EtaVar v : eis) = etaInfoAppTy (applyTypeToArg ty (varToCoreExpr v)) eis
-etaInfoAppTy _  (EtaCo co : eis) = etaInfoAppTy (pSnd (coercionKind co)) eis
+etaInfoAppTy _  (EtaCo co : eis) = etaInfoAppTy (coercionRKind co) eis
 
 --------------
 mkEtaWW :: Arity -> CoreExpr -> InScopeSet -> Type

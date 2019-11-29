@@ -51,7 +51,6 @@ import OrdList
 import ErrUtils
 import DynFlags
 import Util
-import Pair
 import Outputable
 import GHC.Platform
 import FastString
@@ -932,7 +931,7 @@ cpeApp top_env expr
         (fs, arg') <- cpeArg top_env ss1 arg arg_ty
         rebuild_app as (App fun' arg') res_ty (fs `appendFloats` floats) ss_rest
       CpeCast co ->
-        let Pair _ty1 ty2 = coercionKind co
+        let ty2 = coercionRKind co
         in rebuild_app as (Cast fun' co) ty2 floats ss
       CpeTick tickish ->
         -- See [Floating Ticks in CorePrep]

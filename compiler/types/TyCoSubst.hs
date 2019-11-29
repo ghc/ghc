@@ -61,7 +61,7 @@ import {-# SOURCE #-} Coercion ( mkCoVarCo, mkKindCo, mkNthCo, mkTransCo
                                , mkAxiomInstCo, mkAppCo, mkGReflCo
                                , mkInstCo, mkLRCo, mkTyConAppCo
                                , mkCoercionType
-                               , coercionKind, coVarKindsTypesRole )
+                               , coercionKind, coercionLKind, coVarKindsTypesRole )
 
 import TyCoRep
 import TyCoFVs
@@ -869,7 +869,7 @@ substForAllCoTyVarBndrUsing sym sco (TCvSubst in_scope tenv cenv) old_var old_ki
     new_kind_co | no_kind_change = old_kind_co
                 | otherwise      = sco old_kind_co
 
-    Pair new_ki1 _ = coercionKind new_kind_co
+    new_ki1 = coercionLKind new_kind_co
     -- We could do substitution to (tyVarKind old_var). We don't do so because
     -- we already substituted new_kind_co, which contains the kind information
     -- we want. We don't want to do substitution once more. Also, in most cases,

@@ -66,7 +66,6 @@ import Util
 import OrdList          ( isNilOL )
 import MonadUtils
 import Outputable
-import Pair
 import PrelRules
 import FastString       ( fsLit )
 
@@ -297,7 +296,7 @@ addTyArgTo ai arg_ty = ai { ai_args = arg_spec : ai_args ai
 
 addCastTo :: ArgInfo -> OutCoercion -> ArgInfo
 addCastTo ai co = ai { ai_args = CastBy co : ai_args ai
-                     , ai_type = pSnd (coercionKind co) }
+                     , ai_type = coercionRKind co }
 
 argInfoAppArgs :: [ArgSpec] -> [OutExpr]
 argInfoAppArgs []                              = []
@@ -407,7 +406,7 @@ contResultType (TickIt _ k)                 = contResultType k
 contHoleType :: SimplCont -> OutType
 contHoleType (Stop ty _)                      = ty
 contHoleType (TickIt _ k)                     = contHoleType k
-contHoleType (CastIt co _)                    = pFst (coercionKind co)
+contHoleType (CastIt co _)                    = coercionLKind co
 contHoleType (StrictBind { sc_bndr = b, sc_dup = dup, sc_env = se })
   = perhapsSubstTy dup se (idType b)
 contHoleType (StrictArg { sc_fun = ai })      = funArgTy (ai_type ai)

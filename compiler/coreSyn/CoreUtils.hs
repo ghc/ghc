@@ -177,7 +177,7 @@ isExprLevPoly = go
    go_app (Lam _ e)       = go_app e
    go_app (Let _ e)       = go_app e
    go_app (Case _ _ ty _) = resultIsLevPoly ty
-   go_app (Cast _ co)     = resultIsLevPoly (pSnd $ coercionKind co)
+   go_app (Cast _ co)     = resultIsLevPoly (coercionRKind co)
    go_app (Tick _ e)      = go_app e
    go_app e@(Type {})     = pprPanic "isExprLevPoly app ty" (ppr e)
    go_app e@(Coercion {}) = pprPanic "isExprLevPoly app co" (ppr e)
@@ -267,15 +267,15 @@ mkCast e co
   = e
 
 mkCast (Coercion e_co) co
-  | isCoVarType (pSnd (coercionKind co))
+  | isCoVarType (coercionRKind co)
        -- The guard here checks that g has a (~#) on both sides,
        -- otherwise decomposeCo fails.  Can in principle happen
        -- with unsafeCoerce
   = Coercion (mkCoCast e_co co)
 
 mkCast (Cast expr co2) co
-  = WARN(let { Pair  from_ty  _to_ty  = coercionKind co;
-               Pair _from_ty2  to_ty2 = coercionKind co2} in
+  = WARN(let { from_ty = coercionLKind co;
+               to_ty2  = coercionRKind co2 } in
             not (from_ty `eqType` to_ty2),
              vcat ([ text "expr:" <+> ppr expr
                    , text "co2:" <+> ppr co2
@@ -286,7 +286,7 @@ mkCast (Tick t expr) co
    = Tick t (mkCast expr co)
 
 mkCast expr co
-  = let Pair from_ty _to_ty = coercionKind co in
+  = let from_ty = coercionLKind co in
     WARN( not (from_ty `eqType` exprType expr),
           text "Trying to coerce" <+> text "(" <> ppr expr
           $$ text "::" <+> ppr (exprType expr) <> text ")"

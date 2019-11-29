@@ -19,8 +19,8 @@ module Coercion (
 
         -- ** Functions over coercions
         coVarTypes, coVarKind, coVarKindsTypesRole, coVarRole,
-        coercionType, coercionKind, coercionKinds,
-        mkCoercionType,
+        coercionType, mkCoercionType,
+        coercionKind, coercionLKind, coercionRKind,coercionKinds,
         coercionRole, coercionKindRole,
 
         -- ** Constructing coercions
@@ -1109,7 +1109,8 @@ nthCoRole n co
   = pprPanic "nthCoRole" (ppr co)
 
   where
-    (Pair lty _, r) = coercionKindRole co
+    lty = coercionLKind co
+    r   = coercionRole co
 
 mkLRCo :: LeftOrRight -> Coercion -> Coercion
 mkLRCo lr co
@@ -1532,7 +1533,7 @@ mkCoCast c g
     -- g  :: (s1 ~# t1) ~# (s2 ~# t2)
     -- g1 :: s1 ~# s2
     -- g2 :: t1 ~# t2
-    (tc, _) = splitTyConApp (pFst $ coercionKind g)
+    (tc, _) = splitTyConApp (coercionLKind g)
     co_list = decomposeCo (tyConArity tc) g (tyConRolesRepresentational tc)
 
 {-
@@ -2005,7 +2006,7 @@ liftCoSubstTyVarBndrUsing fun lc@(LC subst cenv) old_var
   where
     old_kind     = tyVarKind old_var
     (eta, stuff) = fun lc old_kind
-    Pair k1 _    = coercionKind eta
+    k1           = coercionLKind eta
     new_var      = uniqAway (getTCvInScope subst) (setVarType old_var k1)
 
     lifted   = mkGReflRightCo Nominal (TyVarTy new_var) eta
@@ -2023,7 +2024,7 @@ liftCoSubstCoVarBndrUsing fun lc@(LC subst cenv) old_var
   where
     old_kind     = coVarKind old_var
     (eta, stuff) = fun lc old_kind
-    Pair k1 _    = coercionKind eta
+    k1           = coercionLKind eta
     new_var      = uniqAway (getTCvInScope subst) (setVarType old_var k1)
 
     -- old_var :: s1  ~r s2
@@ -2876,7 +2877,7 @@ simplifyArgsWorker orig_ki_binders orig_inner_ki orig_fvs
     go acc_xis acc_cos lc [] inner_ki roles args
       = let co1 = liftCoSubst Nominal lc inner_ki
             co1_kind              = coercionKind co1
-            unflattened_tys       = map (pSnd . coercionKind . snd) args
+            unflattened_tys       = map (coercionRKind . snd) args
             (arg_cos, res_co)     = decomposePiCos co1 co1_kind unflattened_tys
             casted_args           = ASSERT2( equalLength args arg_cos
                                            , ppr args $$ ppr arg_cos )
