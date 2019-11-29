@@ -86,7 +86,7 @@ wrapName n = (\t -> asks (($ t) . metaTy)) =<< lookupType n
 type MetaM a = ReaderT MetaWrappers DsM a
 
 -----------------------------------------------------------------------------
-dsBracket :: HsWrapper -> HsBracket GhcRn -> [PendingTcSplice] -> DsM CoreExpr
+dsBracket :: Maybe QuoteWrapper -> HsBracket GhcRn -> [PendingTcSplice] -> DsM CoreExpr
 -- Returns a CoreExpr of type TH.ExpQ
 -- The quoted thing is parameterised over Name, even though it has
 -- been type checked.  We don't want all those type decorations!
@@ -95,8 +95,10 @@ dsBracket wrap brack splices
   = do_brack brack
 
   where
-    WpCompose (WpEvApp (EvExpr quote_var)) (WpTyApp m_var)  = wrap
     runOverloaded act = do
+      -- In the overloaded case we have to get given a bracket
+      let Just (QuoteWrapper quote_var_raw m_var)  = wrap
+          quote_var = Var quote_var_raw
 --      let (m_var:_) = mkTemplateTyVars (repeat (mkVisFunTy liftedTypeKind liftedTypeKind))
       quote_tc <- dsLookupTyCon quoteClassName
       let Just cls = tyConClass_maybe quote_tc
@@ -110,6 +112,7 @@ dsBracket wrap brack splices
                         (MetaWrappers quoteWrapper monadWrapper tyWrapper)
       return $ res
 
+    -- VarBr is not overloaded so the wrappers are never used.
     run act = runReaderT (mapReaderT (dsExtendMetaEnv new_bit) act) (MetaWrappers id id id)
 
     new_bit = mkNameEnv [(n, DsSplice (unLoc e))

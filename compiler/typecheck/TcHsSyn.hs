@@ -799,10 +799,15 @@ zonkExpr _ e@(HsRnBracketOut _ _ _)
   = pprPanic "zonkExpr: HsRnBracketOut" (ppr e)
 
 zonkExpr env (HsTcBracketOut x wrap body bs)
-  = do (env', wrap') <- zonkCoFn env wrap
-       bs' <- mapM (zonk_b env') bs
+  = do wrap' <- traverse zonkQuoteWrap wrap
+       bs' <- mapM (zonk_b env) bs
        return (HsTcBracketOut x wrap' body bs')
   where
+    zonkQuoteWrap (QuoteWrapper ev ty) = do
+        let ev' = zonkIdOcc env ev
+        ty' <- zonkTcTypeToTypeX env ty
+        return (QuoteWrapper ev' ty')
+
     zonk_b env' (PendingTcSplice n e) = do e' <- zonkLExpr env' e
                                            return (PendingTcSplice n e')
 
