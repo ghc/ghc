@@ -12,5 +12,7 @@ instance Quote Identity where
   -- Not the correct implementation, just for testing
   newName s = Identity (Name (mkOccName s) NameS)
 
-main = print $ runIdentity ((\x -> [| x |]) ())
+main = do
+  print $ runIdentity ((\x -> [| x |]) ())
+  print $ unType $ runIdentity ((\x -> [|| x ||]) ())
 
