@@ -711,15 +711,15 @@ sequenceQ = sequence
 class Lift (t :: TYPE r) where
   -- | Turn a value into a Template Haskell expression, suitable for use in
   -- a splice.
-  lift :: t -> Q Exp
-  default lift :: (r ~ 'LiftedRep) => t -> Q Exp
+  lift :: Quote m => t -> m Exp
+  default lift :: (r ~ 'LiftedRep, Quote m) => t -> m Exp
   lift = unTypeQ . liftTyped
 
   -- | Turn a value into a Template Haskell typed expression, suitable for use
   -- in a typed splice.
   --
   -- @since 2.16.0.0
-  liftTyped :: t -> Q (TExp t)
+  liftTyped :: Quote m => t -> m (TExp t)
 
 
 -- If you add any instances here, consider updating test th/TH_Lift
