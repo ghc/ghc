@@ -57,7 +57,6 @@ import CoreMap
 import Unique
 import Util
 import Var
-import Pair
 import SrcLoc
 import FastString
 import Control.Monad
@@ -1118,13 +1117,13 @@ reduceTyFamApp_maybe envs role tc tys
       -- NB: Allow multiple matches because of compatible overlap
 
   = let co = mkUnbranchedAxInstCo role ax inst_tys inst_cos
-        ty = pSnd (coercionKind co)
+        ty = coercionRKind co
     in Just (co, ty)
 
   | Just ax <- isClosedSynFamilyTyConWithAxiom_maybe tc
   , Just (ind, inst_tys, inst_cos) <- chooseBranch ax tys
   = let co = mkAxInstCo role ax ind inst_tys inst_cos
-        ty = pSnd (coercionKind co)
+        ty = coercionRKind co
     in Just (co, ty)
 
   | Just ax           <- isBuiltInSynFamTyCon_maybe tc
@@ -1493,7 +1492,7 @@ normalise_tyvar tv
     do { lc <- getLC
        ; r  <- getRole
        ; return $ case liftCoSubstTyVar lc r tv of
-           Just co -> (co, pSnd $ coercionKind co)
+           Just co -> (co, coercionRKind co)
            Nothing -> (mkReflCo r ty, ty) }
   where ty = mkTyVarTy tv
 
