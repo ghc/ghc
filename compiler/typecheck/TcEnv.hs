@@ -830,13 +830,6 @@ tcMetaTy :: Name -> TcM Type
 -- E.g. given the name "Expr" return the type "Expr"
 tcMetaTy tc_name = do
     t <- tcLookupTyCon tc_name
---    quote_con <- tcLookupTyCon quoteClassName
---
---    let m_var = mkTemplateTyVars (repeat (mkVisFunTy liftedTypeKind liftedTypeKind))
---                     !! (ord 'm' - ord 'a')
---        m_ty = mkTyVarTy m_var
---        theta = [mkTyConApp quote_con [m_ty]]
---        meta_ty = mkInfSigmaTy [m_var] theta (mkAppTy m_ty (mkTyConApp t []))
     return (mkTyConApp t [])
 
 isBrackStage :: ThStage -> Bool
