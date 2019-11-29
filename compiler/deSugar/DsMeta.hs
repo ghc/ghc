@@ -494,7 +494,7 @@ repInjectivityAnn (Just (L _ (InjectivityAnn lhs rhs))) =
     do { lhs'   <- lookupBinder (unLoc lhs)
        ; rhs1   <- mapM (lookupBinder . unLoc) rhs
        ; rhs2   <- coreList nameTyConName rhs1
-       ; injAnn <- rep2 injectivityAnnName [unC lhs', unC rhs2]
+       ; injAnn <- rep2_nw injectivityAnnName [unC lhs', unC rhs2]
        ; coreJust injAnnTyConName injAnn }
 
 repFamilyDecls :: [LFamilyDecl GhcRn] -> MetaM [Core TH.DecQ]
@@ -679,16 +679,16 @@ repForD (L loc (ForeignImport { fd_name = name, fd_sig_ty = typ
 repForD decl = notHandled "Foreign declaration" (ppr decl)
 
 repCCallConv :: CCallConv -> MetaM (Core TH.Callconv)
-repCCallConv CCallConv          = rep2 cCallName []
-repCCallConv StdCallConv        = rep2 stdCallName []
-repCCallConv CApiConv           = rep2 cApiCallName []
-repCCallConv PrimCallConv       = rep2 primCallName []
-repCCallConv JavaScriptCallConv = rep2 javaScriptCallName []
+repCCallConv CCallConv          = rep2_nw cCallName []
+repCCallConv StdCallConv        = rep2_nw stdCallName []
+repCCallConv CApiConv           = rep2_nw cApiCallName []
+repCCallConv PrimCallConv       = rep2_nw primCallName []
+repCCallConv JavaScriptCallConv = rep2_nw javaScriptCallName []
 
 repSafety :: Safety -> MetaM (Core TH.Safety)
-repSafety PlayRisky = rep2 unsafeName []
-repSafety PlayInterruptible = rep2 interruptibleName []
-repSafety PlaySafe = rep2 safeName []
+repSafety PlayRisky = rep2_nw unsafeName []
+repSafety PlayInterruptible = rep2_nw interruptibleName []
+repSafety PlaySafe = rep2_nw safeName []
 
 repFixD :: LFixitySig GhcRn -> MetaM [(SrcSpan, Core TH.DecQ)]
 repFixD (L loc (FixitySig _ names (Fixity _ prec dir)))
@@ -763,12 +763,12 @@ repAnnD _ = panic "repAnnD"
 repAnnProv :: AnnProvenance Name -> MetaM (Core TH.AnnTarget)
 repAnnProv (ValueAnnProvenance (L _ n))
   = do { MkC n' <- globalVar n  -- ANNs are allowed only at top-level
-       ; rep2 valueAnnotationName [ n' ] }
+       ; rep2_nw valueAnnotationName [ n' ] }
 repAnnProv (TypeAnnProvenance (L _ n))
   = do { MkC n' <- globalVar n
-       ; rep2 typeAnnotationName [ n' ] }
+       ; rep2_nw typeAnnotationName [ n' ] }
 repAnnProv ModuleAnnProvenance
-  = rep2 moduleAnnotationName []
+  = rep2_nw moduleAnnotationName []
 
 -------------------------------------------------------
 --                      Constructors
@@ -1241,6 +1241,7 @@ repTy ty                      = notHandled "Exotic form of type" (ppr ty)
 
 repTyLit :: HsTyLit -> MetaM (Core TH.TyLitQ)
 repTyLit (HsNumTy _ i) = do iExpr <- mkIntegerExpr i
+                            -- TODO: this is wrong, needs MonadFail
                             rep2 numTyLitName [iExpr]
 repTyLit (HsStrTy _ s) = do { s' <- mkStringExprFS s
                             ; rep2 strTyLitName [s']
@@ -1254,10 +1255,10 @@ repMaybeLTy m = do
   repMaybeT k_ty repLTy m
 
 repRole :: Located (Maybe Role) -> MetaM (Core TH.Role)
-repRole (L _ (Just Nominal))          = rep2 nominalRName []
-repRole (L _ (Just Representational)) = rep2 representationalRName []
-repRole (L _ (Just Phantom))          = rep2 phantomRName []
-repRole (L _ Nothing)                 = rep2 inferRName []
+repRole (L _ (Just Nominal))          = rep2_nw nominalRName []
+repRole (L _ (Just Representational)) = rep2_nw representationalRName []
+repRole (L _ (Just Phantom))          = rep2_nw phantomRName []
+repRole (L _ Nothing)                 = rep2_nw inferRName []
 repRole _ = panic "repRole: Impossible Match" -- due to #15884
 
 -----------------------------------------------------------------------------

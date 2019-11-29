@@ -154,7 +154,7 @@ templateHaskellNames = [
     stmtTyConName,  decsTyConName, conTyConName, bangTypeTyConName,
     varBangTypeTyConName, typeQTyConName, expTyConName, decTyConName,
     typeTyConName, tyVarBndrTyConName, clauseTyConName,
-    patQTyConName, funDepTyConName,
+    patQTyConName, funDepTyConName, decsQTyConName,
     ruleBndrTyConName, tySynEqnTyConName,
     roleTyConName, tExpTyConName, injAnnTyConName, kindTyConName,
     overlapTyConName, derivClauseTyConName, derivStrategyTyConName,
@@ -573,7 +573,7 @@ roleTyConName           = libTc (fsLit "Role")           roleTyConKey
 derivClauseTyConName   = thTc (fsLit "DerivClause")   derivClauseTyConKey
 kindTyConName          = thTc (fsLit "Kind")          kindTyConKey
 tyVarBndrTyConName      = thTc (fsLit "TyVarBndr")     tyVarBndrTyConKey
-derivStrategyTyConName = libTc (fsLit "DerivStrategy") derivStrategyTyConKey
+derivStrategyTyConName = thTc (fsLit "DerivStrategy") derivStrategyTyConKey
 
 -- quasiquoting
 quoteExpName, quotePatName, quoteDecName, quoteTypeName :: Name
