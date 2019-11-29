@@ -559,7 +559,7 @@ tcNestedSplice :: ThStage -> PendingStuff -> Name
                 -> LHsExpr GhcRn -> ExpRhoType -> TcM (HsExpr GhcTc)
     -- See Note [How brackets and nested splices are handled]
     -- A splice inside brackets
-tcNestedSplice pop_stage (TcPending ps_var lie_var (QuoteWrapper _ m_var)) splice_name expr res_ty
+tcNestedSplice pop_stage (TcPending ps_var lie_var q@(QuoteWrapper _ m_var)) splice_name expr res_ty
   = do { res_ty <- expTypeToType res_ty
        ; let rep = getRuntimeRep res_ty
        ; meta_exp_ty <- tcTExpTy m_var res_ty
@@ -567,7 +567,9 @@ tcNestedSplice pop_stage (TcPending ps_var lie_var (QuoteWrapper _ m_var)) splic
                   setConstraintVar lie_var $
                   tcMonoExpr expr (mkCheckExpType meta_exp_ty)
        ; untypeq <- tcLookupId unTypeQName
-       ; let expr'' = mkHsApp (nlHsTyApp untypeq [rep, res_ty]) expr'
+       ; let expr'' = mkHsApp
+                        (mkLHsWrap (applyQuoteWrapper q)
+                          (nlHsTyApp untypeq [rep, res_ty])) expr'
        ; ps <- readMutVar ps_var
        ; writeMutVar ps_var (PendingTcSplice splice_name expr'' : ps)
 
