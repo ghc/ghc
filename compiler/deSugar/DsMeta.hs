@@ -171,13 +171,13 @@ to the correct things.
 2. monadWrapper wraps functions of type `forall m . Monad m =>`
 3. metaTy wraps a tau in the polymorphic `m` variable of the whole representation.
 
-Note it is is important to directly applie the arguments to the combinators as
-the types of the combinators has to match up with the types of the splice.
+Note it is is important to directly applied the arguments to the combinators as
+the types of the combinators has to match up with the types of the splices.
 My first implementation just created a lambda and applied a wrapper to the whole
 quotation but this meant that if the splices were of a more specific type
 then there would be type errors.
 
-- }
+-}
 
 {- -------------- Examples --------------------
 
