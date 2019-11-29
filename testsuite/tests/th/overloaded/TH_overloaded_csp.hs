@@ -12,5 +12,5 @@ instance Quote Identity where
   -- Not the correct implementation, just for testing
   newName s = Identity (Name (mkOccName s) NameS)
 
-csp = runIdentity ((\x -> [| x + 2 |]) 5)
+main = print $ runIdentity ((\x -> [| x |]) ())
 
