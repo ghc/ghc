@@ -1978,7 +1978,7 @@ checkCrossStageLifting :: TopLevelFlag -> Id -> ThStage -> TcM ()
 -- This is similar to checkCrossStageLifting in RnSplice, but
 -- this code is applied to *typed* brackets.
 
-checkCrossStageLifting top_lvl id (Brack _ (TcPending ps_var lie_var _))
+checkCrossStageLifting top_lvl id (Brack _ (TcPending ps_var lie_var q))
   | isTopLevel top_lvl
   = when (isExternalName id_name) (keepAlive id_name)
     -- See Note [Keeping things alive for Template Haskell] in RnSplice
@@ -2015,7 +2015,8 @@ checkCrossStageLifting top_lvl id (Brack _ (TcPending ps_var lie_var _))
                    -- Update the pending splices
         ; ps <- readMutVar ps_var
         ; let pending_splice = PendingTcSplice id_name
-                                 (nlHsApp (noLoc lift) (nlHsVar id))
+                                 (nlHsApp (mkLHsWrap (applyQuoteWrapper q) (noLoc lift))
+                                          (nlHsVar id))
         ; writeMutVar ps_var (pending_splice : ps)
 
         ; return () }
