@@ -17,6 +17,7 @@ import OccName
 import RdrName
 import Name
 import Avail
+import GHC.Hs.Dump
 
 plugin :: Plugin
 plugin = defaultPlugin { parsedResultAction = parsedPlugin
@@ -52,10 +53,13 @@ typecheckPlugin [name, "typecheck"] _ tc
 typecheckPlugin _ _ tc = return tc
 
 metaPlugin' :: [CommandLineOption] -> LHsExpr GhcTc -> TcM (LHsExpr GhcTc)
-metaPlugin' [name, "meta"] (L _ (HsApp noExt (L l (HsVar _ (L _ id))) e))
+metaPlugin' [name, "meta"] (L l (HsWrap ne w (HsApp noExt (L _ (HsVar _ (L _ id))) e)))
   | occNameString (getOccName id) == name
-  = return e
-metaPlugin' _ meta = return meta
+  = return (L l (HsWrap ne w (unLoc e)))
+-- The test should always match this first case. If the desugaring changes
+-- again in the future then the panic is more useful than the previous
+-- inscrutable failure.
+metaPlugin' _ meta = pprPanic "meta" (showAstData BlankSrcSpan meta)
 
 interfaceLoadPlugin' :: [CommandLineOption] -> ModIface -> IfM lcl ModIface
 interfaceLoadPlugin' [name, "interface"] iface
