@@ -15,7 +15,6 @@ TcSplice: Template Haskell splices
 {-# LANGUAGE RecordWildCards #-}
 {-# LANGUAGE MultiWayIf #-}
 {-# LANGUAGE TypeFamilies #-}
-{-# LANGUAGE TupleSections #-}
 {-# OPTIONS_GHC -fno-warn-orphans #-}
 
 module TcSplice(
@@ -175,8 +174,12 @@ tcTypedBracket rn_expr brack@(TExpBr _ expr) res_ty
                                        -- should get thrown into the constraint set
                                        -- from outside the bracket
 
+       -- Make a new type variable for the type of the overall quote
        ; [m_var] <- map mkTyVarTy . snd <$> newMetaTyVars [m_ty_var]
+       -- Make sure the type variable satisfies Quote
        ; ev_var <- emitQuoteWanted m_var
+       -- Bundle them together so they can be used in DsMeta for desugaring
+       -- brackets.
        ; let wrapper = QuoteWrapper ev_var m_var
        -- Typecheck expr to make sure it is valid,
        -- Throw away the typechecked expression but return its type.
@@ -262,16 +265,18 @@ brackTy b =
                                            -- Result type is Var (not Q-monadic)
     (ExpBr {})  -> mkTy expTyConName  -- Result type is m Exp
     (TypBr {})  -> mkTy typeTyConName -- Result type is m Type
-    (DecBrG {}) -> mkTyX mkListTy decTyConName -- Result type is m [Dec]
+    (DecBrG {}) -> mkTy mkListTy decTyConName -- Result type is m [Dec]
     (PatBr {})  -> mkTy patTyConName  -- Result type is m Pat
     (DecBrL {}) -> panic "tcBrackTy: Unexpected DecBrL"
     (TExpBr {}) -> panic "tcUntypedBracket: Unexpected TExpBr"
     (XBracket nec) -> noExtCon nec
 
 ---------------
+-- | Typechecking a pending splice from a untyped bracket
 tcPendingSplice :: TcType -> PendingRnSplice -> TcM PendingTcSplice
 tcPendingSplice m_var (PendingRnSplice flavour splice_name expr)
   = do { meta_ty <- tcMetaTy meta_ty_name
+         -- Expected type of splice, e.g. m Exp
        ; let expected_type = mkAppTy m_var meta_ty
        ; expr' <- tcPolyExpr expr expected_type
        ; return (PendingTcSplice splice_name expr') }
@@ -283,7 +288,7 @@ tcPendingSplice m_var (PendingRnSplice flavour splice_name expr)
                        UntypedDeclSplice -> decsTyConName
 
 ---------------
--- Takes a tau and returns the type Q (TExp tau)
+-- Takes a m and tau and returns the type m (TExp tau)
 tcTExpTy :: TcType -> TcType -> TcM TcType
 tcTExpTy m_ty exp_ty
   = do { unless (isTauTy exp_ty) $ addErr (err_msg exp_ty)
@@ -485,6 +490,23 @@ When a variable is used, we compare
            g1 = $(map ...)         is OK
            g2 = $(f ...)           is not OK; because we havn't compiled f yet
 
+Note [Typechecking Overloaded Quotes]
+-------------------------------------
+
+Consider an expression quote, [| e |], its type is forall m . Quote m => m Exp.
+When we typecheck it we therefore create a template of a metavariable m applied to Exp.
+
+Then, each nested splice to checked against this template type. During this
+process the variable `m` can either be fixed or further constrained by the
+nested splices containing additional quotes.
+
+Once we have checked all the nested splices, the quote type is checked against
+the expected return type.
+
+The process is very simple and like typechecking a list where the quotation is
+like the container and the splices are the elements of the list which must have
+a specific type.
+
 -}
 
 -- | We only want to produce warnings for TH-splices if the user requests so.
@@ -584,7 +606,8 @@ tcTopSplice expr res_ty
   = do { -- Typecheck the expression,
          -- making sure it has type Q (T res_ty)
          res_ty <- expTypeToType res_ty
-       ; q_type <- flip mkTyConApp [] <$> tcLookupTyCon qTyConName
+       ; q_type <- tcMetaTy qTyConName
+       -- Top level splices must still be of type Q (TExp a)
        ; meta_exp_ty <- tcTExpTy q_type res_ty
        ; q_expr <- tcTopSpliceExpr Typed $
                           tcMonoExpr expr (mkCheckExpType meta_exp_ty)
