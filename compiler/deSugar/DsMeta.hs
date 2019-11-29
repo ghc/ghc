@@ -1384,8 +1384,8 @@ repE (ExplicitTuple _ es boxity) =
   let tupArgToCoreExp :: LHsTupArg GhcRn -> MetaM (Core (Maybe TH.ExpQ))
       tupArgToCoreExp a
         | L _ (Present _ e) <- dL a = do { e' <- repLE e
-                                         ; coreJust expQTyConName e' }
-        | otherwise = coreNothing expQTyConName
+                                         ; coreJustM expTyConName e' }
+        | otherwise = coreNothingM expTyConName
 
   in do { args <- mapM tupArgToCoreExp es
         ; expTy <- wrapName  expTyConName
