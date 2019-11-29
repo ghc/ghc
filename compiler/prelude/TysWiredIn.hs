@@ -96,8 +96,9 @@ module TysWiredIn (
         typeNatKindCon, typeNatKind, typeSymbolKindCon, typeSymbolKind,
         isLiftedTypeKindTyConName, liftedTypeKind,
         typeToTypeKind, constraintKind,
+        liftedRepTyCon,
         liftedTypeKindTyCon, constraintKindTyCon,  constraintKindTyConName,
-        liftedTypeKindTyConName,
+        liftedTypeKindTyConName, liftedRepTyConName,
 
         -- * Equality predicates
         heqTyCon, heqTyConName, heqClass, heqDataCon,
@@ -105,13 +106,15 @@ module TysWiredIn (
         coercibleTyCon, coercibleTyConName, coercibleDataCon, coercibleClass,
 
         -- * RuntimeRep and friends
-        runtimeRepTyCon, vecCountTyCon, vecElemTyCon,
+        runtimeRepTyCon, levityTyCon, vecCountTyCon, vecElemTyCon,
 
-        runtimeRepTy, liftedRepTy, liftedRepDataCon, liftedRepDataConTyCon,
+        boxedRepDataConTyCon,
+        runtimeRepTy, liftedRepTy, unliftedRepTy,
 
         vecRepDataConTyCon, tupleRepDataConTyCon, sumRepDataConTyCon,
 
-        liftedRepDataConTy, unliftedRepDataConTy,
+        liftedDataConTyCon, unliftedDataConTyCon,
+
         intRepDataConTy,
         int8RepDataConTy, int16RepDataConTy, int32RepDataConTy, int64RepDataConTy,
         wordRepDataConTy,
@@ -231,10 +234,12 @@ wiredInTyCons = [ -- Units are not treated like other tuples, because they
                 , typeNatKindCon
                 , typeSymbolKindCon
                 , runtimeRepTyCon
+                , levityTyCon
                 , vecCountTyCon
                 , vecElemTyCon
                 , constraintKindTyCon
                 , liftedTypeKindTyCon
+                , liftedRepTyCon
                 ]
 
 mkWiredInTyConName :: BuiltInSyntax -> Module -> FastString -> Unique -> TyCon -> Name
@@ -452,21 +457,27 @@ typeSymbolKindConName = mkWiredInTyConName UserSyntax gHC_TYPES (fsLit "Symbol")
 constraintKindTyConName :: Name
 constraintKindTyConName = mkWiredInTyConName UserSyntax gHC_TYPES (fsLit "Constraint") constraintKindTyConKey   constraintKindTyCon
 
-liftedTypeKindTyConName :: Name
+liftedTypeKindTyConName,liftedRepTyConName :: Name
 liftedTypeKindTyConName = mkWiredInTyConName UserSyntax gHC_TYPES (fsLit "Type") liftedTypeKindTyConKey liftedTypeKindTyCon
+liftedRepTyConName = mkWiredInTyConName UserSyntax gHC_TYPES (fsLit "LiftedRep") liftedRepTyConKey liftedRepTyCon
 
-runtimeRepTyConName, vecRepDataConName, tupleRepDataConName, sumRepDataConName :: Name
+runtimeRepTyConName, vecRepDataConName, tupleRepDataConName, sumRepDataConName, boxedRepDataConName :: Name
 runtimeRepTyConName = mkWiredInTyConName UserSyntax gHC_TYPES (fsLit "RuntimeRep") runtimeRepTyConKey runtimeRepTyCon
 vecRepDataConName = mkWiredInDataConName UserSyntax gHC_TYPES (fsLit "VecRep") vecRepDataConKey vecRepDataCon
 tupleRepDataConName = mkWiredInDataConName UserSyntax gHC_TYPES (fsLit "TupleRep") tupleRepDataConKey tupleRepDataCon
 sumRepDataConName = mkWiredInDataConName UserSyntax gHC_TYPES (fsLit "SumRep") sumRepDataConKey sumRepDataCon
+boxedRepDataConName = mkWiredInDataConName UserSyntax gHC_TYPES (fsLit "BoxedRep") boxedRepDataConKey boxedRepDataCon
+
+levityTyConName, liftedDataConName, unliftedDataConName :: Name
+levityTyConName = mkWiredInTyConName UserSyntax gHC_TYPES (fsLit "Levity") levityTyConKey levityTyCon
+liftedDataConName = mkWiredInDataConName UserSyntax gHC_TYPES (fsLit "Lifted") liftedDataConKey liftedDataCon
+unliftedDataConName = mkWiredInDataConName UserSyntax gHC_TYPES (fsLit "Unlifted") unliftedDataConKey unliftedDataCon
 
 -- See Note [Wiring in RuntimeRep]
 runtimeRepSimpleDataConNames :: [Name]
 runtimeRepSimpleDataConNames
   = zipWith3Lazy mk_special_dc_name
-      [ fsLit "LiftedRep", fsLit "UnliftedRep"
-      , fsLit "IntRep"
+      [ fsLit "IntRep"
       , fsLit "Int8Rep", fsLit "Int16Rep", fsLit "Int32Rep", fsLit "Int64Rep"
       , fsLit "WordRep"
       , fsLit "Word8Rep", fsLit "Word16Rep", fsLit "Word32Rep", fsLit "Word64Rep"
@@ -642,7 +653,7 @@ constraintKindTyCon :: TyCon
 constraintKindTyCon = pcTyCon constraintKindTyConName Nothing [] []
 
 liftedTypeKind, typeToTypeKind, constraintKind :: Kind
-liftedTypeKind   = tYPE liftedRepTy
+liftedTypeKind   = tYPE (mkTyConApp liftedRepTyCon [])
 typeToTypeKind   = liftedTypeKind `mkVisFunTy` liftedTypeKind
 constraintKind   = mkTyConApp constraintKindTyCon []
 
@@ -1175,16 +1186,40 @@ runtimeRepTy :: Type
 runtimeRepTy = mkTyConTy runtimeRepTyCon
 
 -- Type synonyms; see Note [TYPE and RuntimeRep] in TysPrim
--- type Type = tYPE 'LiftedRep
-liftedTypeKindTyCon :: TyCon
-liftedTypeKindTyCon   = buildSynTyCon liftedTypeKindTyConName
-                                       [] liftedTypeKind []
-                                       (tYPE liftedRepTy)
+-- type Type = TYPE ('BoxedRep 'Lifted)
+-- type LiftedRep = 'BoxedRep 'Lifted
+liftedTypeKindTyCon,liftedRepTyCon :: TyCon
+liftedTypeKindTyCon = buildSynTyCon
+  liftedTypeKindTyConName [] liftedTypeKind [] (tYPE (mkTyConApp liftedRepTyCon []))
+liftedRepTyCon = buildSynTyCon
+  liftedRepTyConName [] runtimeRepTy [] liftedRepTy
 
 runtimeRepTyCon :: TyCon
 runtimeRepTyCon = pcTyCon runtimeRepTyConName Nothing []
-                          (vecRepDataCon : tupleRepDataCon :
-                           sumRepDataCon : runtimeRepSimpleDataCons)
+    (vecRepDataCon : tupleRepDataCon :
+     sumRepDataCon : boxedRepDataCon : runtimeRepSimpleDataCons)
+
+levityTyCon :: TyCon
+levityTyCon = pcTyCon levityTyConName Nothing [] [liftedDataCon,unliftedDataCon]
+
+liftedDataCon, unliftedDataCon :: DataCon
+liftedDataCon = pcSpecialDataCon liftedDataConName
+    [] levityTyCon LiftedInfo
+unliftedDataCon = pcSpecialDataCon unliftedDataConName
+    [] levityTyCon UnliftedInfo
+
+boxedRepDataCon :: DataCon
+boxedRepDataCon = pcSpecialDataCon boxedRepDataConName
+  [ mkTyConTy levityTyCon ] runtimeRepTyCon (RuntimeRep prim_rep_fun)
+  where
+    -- See Note [Getting from RuntimeRep to PrimRep] in RepType
+    prim_rep_fun [lev]
+      = case tyConRuntimeRepInfo (tyConAppTyCon lev) of
+          LiftedInfo -> [LiftedRep]
+          UnliftedInfo -> [UnliftedRep]
+          _ -> pprPanic "boxedRepDataCon" (ppr lev)
+    prim_rep_fun args
+      = pprPanic "boxedRepDataCon" (ppr args)
 
 vecRepDataCon :: DataCon
 vecRepDataCon = pcSpecialDataCon vecRepDataConName [ mkTyConTy vecCountTyCon
@@ -1239,11 +1274,9 @@ sumRepDataConTyCon = promoteDataCon sumRepDataCon
 -- See Note [Wiring in RuntimeRep]
 -- See Note [Getting from RuntimeRep to PrimRep] in GHC.Types.RepType
 runtimeRepSimpleDataCons :: [DataCon]
-liftedRepDataCon :: DataCon
-runtimeRepSimpleDataCons@(liftedRepDataCon : _)
+runtimeRepSimpleDataCons
   = zipWithLazy mk_runtime_rep_dc
-    [ LiftedRep, UnliftedRep
-    , IntRep
+    [ IntRep
     , Int8Rep, Int16Rep, Int32Rep, Int64Rep
     , WordRep
     , Word8Rep, Word16Rep, Word32Rep, Word64Rep
@@ -1256,15 +1289,13 @@ runtimeRepSimpleDataCons@(liftedRepDataCon : _)
       = pcSpecialDataCon name [] runtimeRepTyCon (RuntimeRep (\_ -> [primrep]))
 
 -- See Note [Wiring in RuntimeRep]
-liftedRepDataConTy, unliftedRepDataConTy,
-  intRepDataConTy,
+intRepDataConTy,
   int8RepDataConTy, int16RepDataConTy, int32RepDataConTy, int64RepDataConTy,
   wordRepDataConTy,
   word8RepDataConTy, word16RepDataConTy, word32RepDataConTy, word64RepDataConTy,
   addrRepDataConTy,
   floatRepDataConTy, doubleRepDataConTy :: Type
-[liftedRepDataConTy, unliftedRepDataConTy,
-   intRepDataConTy,
+[intRepDataConTy,
    int8RepDataConTy, int16RepDataConTy, int32RepDataConTy, int64RepDataConTy,
    wordRepDataConTy,
    word8RepDataConTy, word16RepDataConTy, word32RepDataConTy, word64RepDataConTy,
@@ -1316,12 +1347,28 @@ int8ElemRepDataConTy, int16ElemRepDataConTy, int32ElemRepDataConTy,
   doubleElemRepDataConTy] = map (mkTyConTy . promoteDataCon)
                                 vecElemDataCons
 
-liftedRepDataConTyCon :: TyCon
-liftedRepDataConTyCon = promoteDataCon liftedRepDataCon
+liftedDataConTyCon :: TyCon
+liftedDataConTyCon = promoteDataCon liftedDataCon
 
--- The type ('LiftedRep)
+unliftedDataConTyCon :: TyCon
+unliftedDataConTyCon = promoteDataCon unliftedDataCon
+
+liftedDataConTy :: Type
+liftedDataConTy = mkTyConTy liftedDataConTyCon
+
+unliftedDataConTy :: Type
+unliftedDataConTy = mkTyConTy unliftedDataConTyCon
+
+boxedRepDataConTyCon :: TyCon
+boxedRepDataConTyCon = promoteDataCon boxedRepDataCon
+
+-- The type ('BoxedRep 'LiftedRep)
 liftedRepTy :: Type
-liftedRepTy = liftedRepDataConTy
+liftedRepTy = mkTyConApp boxedRepDataConTyCon [liftedDataConTy]
+
+-- The type ('BoxedRep 'UnliftedRep)
+unliftedRepTy :: Type
+unliftedRepTy = mkTyConApp boxedRepDataConTyCon [unliftedDataConTy]
 
 {- *********************************************************************
 *                                                                      *
