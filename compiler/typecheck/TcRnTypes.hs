@@ -948,6 +948,10 @@ data PendingStuff
   | TcPending                     -- Typechecking the inside of a typed bracket
       (TcRef [PendingTcSplice])   --   Accumulate pending splices here
       (TcRef WantedConstraints)   --     and type constraints here
+      Type                        -- A type variable for the overall monad of
+                                  -- the bracket. Splices are checked
+                                  -- against this monad.
+
 
 topStage, topAnnStage, topSpliceStage :: ThStage
 topStage       = Comp
