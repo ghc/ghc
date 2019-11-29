@@ -177,17 +177,17 @@ tcTypedBracket rn_expr brack@(TExpBr _ expr) res_ty
 
        ; [m_var] <- map mkTyVarTy . snd <$> newMetaTyVars [m_ty_var]
        ; ev_var <- emitQuoteWanted m_var
+       ; let wrapper = QuoteWrapper ev_var m_var
        -- Typecheck expr to make sure it is valid,
        -- Throw away the typechecked expression but return its type.
        -- We'll typecheck it again when we splice it in somewhere
-       ; (_tc_expr, expr_ty) <- setStage (Brack cur_stage (TcPending ps_ref lie_var m_var)) $
+       ; (_tc_expr, expr_ty) <- setStage (Brack cur_stage (TcPending ps_ref lie_var wrapper)) $
                                 tcInferRhoNC expr
                                 -- NC for no context; tcBracket does that
        ; let rep = getRuntimeRep expr_ty
        ; meta_ty <- tcTExpTy m_var expr_ty
        ; ps' <- readMutVar ps_ref
        ; texpco <- tcLookupId unsafeTExpCoerceName
-       ; let wrapper = QuoteWrapper ev_var m_var
        ; tcWrapResultO (Shouldn'tHappenOrigin "TExpBr")
                        rn_expr
                        (unLoc (mkHsApp (mkLHsWrap (applyQuoteWrapper wrapper)
@@ -559,7 +559,7 @@ tcNestedSplice :: ThStage -> PendingStuff -> Name
                 -> LHsExpr GhcRn -> ExpRhoType -> TcM (HsExpr GhcTc)
     -- See Note [How brackets and nested splices are handled]
     -- A splice inside brackets
-tcNestedSplice pop_stage (TcPending ps_var lie_var m_var) splice_name expr res_ty
+tcNestedSplice pop_stage (TcPending ps_var lie_var (QuoteWrapper _ m_var)) splice_name expr res_ty
   = do { res_ty <- expTypeToType res_ty
        ; let rep = getRuntimeRep res_ty
        ; meta_exp_ty <- tcTExpTy m_var res_ty
