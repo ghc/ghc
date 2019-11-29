@@ -115,6 +115,8 @@ import Lexeme
 import qualified EnumSet
 import Plugins
 import Bag
+import Data.Char
+import TysPrim
 
 import qualified Language.Haskell.TH as TH
 -- THSyntax gives access to internal functions and data types
@@ -227,12 +229,17 @@ tcUntypedBracket rn_expr brack ps res_ty
        }
 
 
+m_ty_var :: TyVar
+m_ty_var = mkTemplateTyVars
+            (repeat (mkVisFunTy liftedTypeKind liftedTypeKind))
+            !! (ord 'm' - ord 'a')
+
 ---------------
 brackTy :: HsBracket GhcRn -> TcM (Maybe (HsWrapper, TcType), Type)
 brackTy b =
   let mkTyX k n = do
         -- New polymorphic type variable for the bracket
-        m_var <- newFlexiTyVarTy (mkVisFunTy liftedTypeKind liftedTypeKind)
+        [m_var] <- map mkTyVarTy . snd <$> newMetaTyVars [m_ty_var]
         -- Emit a Quote constraint for the bracket
         quote_con <- tcLookupTyCon quoteClassName
         ev_var <- emitWantedEvVar StaticOrigin $
