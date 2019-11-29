@@ -215,7 +215,7 @@ tcUntypedBracket rn_expr brack ps res_ty
        -- we want to reflect that in the overall type of the bracket.
        ; ps' <- case brack_info of
                   Just (_, m_var) -> mapM (tcPendingSplice m_var) ps
-                  Nothing -> ASSERT (null ps) return []
+                  Nothing -> ASSERT(null ps) return []
 
        --
        ; traceTc "tc_bracket done untyped" (ppr expected_type)
