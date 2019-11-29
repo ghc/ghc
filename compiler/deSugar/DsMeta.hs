@@ -27,7 +27,6 @@ import {-# SOURCE #-}   DsExpr ( dsExpr )
 
 import MatchLit
 import DsMonad
-import TysPrim
 
 import qualified Language.Haskell.TH as TH
 
@@ -2032,6 +2031,7 @@ newtype Core a = MkC CoreExpr
 unC :: Core a -> CoreExpr
 unC (MkC x) = x
 
+rep2, rep2M, rep2_nw :: Name -> [CoreExpr] -> MetaM (Core a)
 rep2 = rep2X quoteWrapper
 rep2M = rep2X monadWrapper
 rep2_nw = rep2X (const id)
@@ -2774,12 +2774,6 @@ coreJust' elt_ty es = MkC (mkJustExpr elt_ty (unC es))
 
 ------------------- Maybe Lists ------------------
 
-repMaybeList :: Name -> (a -> MetaM (Core b))
-                        -> Maybe [a] -> MetaM (Core (Maybe [b]))
-repMaybeList tc_name f xs = do
-  elt_ty <- lookupType tc_name
-  repMaybeListT elt_ty f xs
-
 -- Lookup the name and wrap it with the m variable
 repMaybeListM :: Name -> (a -> MetaM (Core b))
                         -> Maybe [a] -> MetaM (Core (Maybe [b]))
@@ -2797,11 +2791,6 @@ repMaybeListT elt_ty f (Just args)
 
 coreNothingList :: Type -> MetaM (Core (Maybe [a]))
 coreNothingList elt_ty = return $ coreNothing' (mkListTy elt_ty)
-
-coreJustList :: Name -> Core [a] -> MetaM (Core (Maybe [a]))
-coreJustList tc_name args
-  = do { elt_ty <- lookupType tc_name
-       ; return $ coreJust' (mkListTy elt_ty) args }
 
 ------------ Literals & Variables -------------------
 
