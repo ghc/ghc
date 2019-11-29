@@ -14,7 +14,7 @@ source-repository head
     type:     git
     location: https://gitlab.haskell.org/ghc/ghc
 
--- To accomodate #16873
+-- To accommodate #16873
 flag threaded
     manual:              True
     default:             True

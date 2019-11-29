@@ -147,7 +147,7 @@ this point in the program,
 
     For this reason we should be cautious when interpreting the source locations
     provided by GDB. While these locations will usually be in some sense
-    "correct", they aren't always useful. This is why profiling tools targetting
+    "correct", they aren't always useful. This is why profiling tools targeting
     Haskell should supplement the standard source location information with
     GHC-specific annotations (emitted with ``-g2``) when assigning costs.
 

@@ -29,7 +29,7 @@ NOT_THESE += jeff-bug lennart_array
 #       compiles but doesn't run
 
 NOT_THESE += dmgob_native1 dmgob_native2
-#	Native library doens't exist
+#	Native library doesn't exist
 
 ifneq "$(HWL_NOFIB_HACK)" ""
 NOT_THESE += callback zhang_ccall

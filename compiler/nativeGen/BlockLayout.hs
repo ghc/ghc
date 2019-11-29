@@ -76,7 +76,7 @@ import Control.Monad (foldM)
   We have a CFG with edge weights based on which we try to place blocks next to
   each other.
 
-  Edge weights not only represent likelyhood of control transfer between blocks
+  Edge weights not only represent likelihood of control transfer between blocks
   but also how much a block would benefit from being placed sequentially after
   it's predecessor.
   For example blocks which are preceded by an info table are more likely to end

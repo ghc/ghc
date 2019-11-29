@@ -194,7 +194,7 @@ immediate subterms.  In the definition of gmapQr, extra effort is
 needed. We use a higher-order accumulation trick to mediate between
 left-associative constructor application vs. right-associative binary
 operation (e.g., @(:)@).  When the query is meant to compute a value
-of type @r@, then the result type withing generic folding is @r -> r@.
+of type @r@, then the result type within generic folding is @r -> r@.
 So the result of folding is a function to which we finally pass the
 right unit.
 

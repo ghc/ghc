@@ -2369,7 +2369,7 @@ mkAuxBinderName dflags parent occ_fun
 {-
 Note [Auxiliary binders]
 ~~~~~~~~~~~~~~~~~~~~~~~~
-We often want to make a top-level auxiliary binding.  E.g. for comparison we haev
+We often want to make a top-level auxiliary binding.  E.g. for comparison we have
 
   instance Ord T where
     compare a b = $con2tag a `compare` $con2tag b

@@ -558,7 +558,7 @@ $tab          { warnTab }
 --     a! b    -- a suffix occurrence
 --
 -- The rules are a bit more elaborate than simply checking for whitespace, in
--- order to accomodate the following use cases:
+-- order to accommodate the following use cases:
 --
 --     f (!a) = ...    -- prefix occurrence
 --     g (a !)         -- loose infix occurrence

@@ -733,7 +733,7 @@ There are two cases:
   from the 'integer' library.   These are handled by rule_shift_op,
   and match_Integer_shift_op.
 
-  Here we could in principle shift by any amount, but we arbitary
+  Here we could in principle shift by any amount, but we arbitrary
   limit the shift to 4 bits; in particular we do not want shift by a
   huge amount, which can happen in code like that above.
 

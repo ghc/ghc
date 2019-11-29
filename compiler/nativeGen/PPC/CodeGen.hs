@@ -602,7 +602,7 @@ getRegister' _ (CmmMachOp mop [x, y]) -- dyadic PrimOps
           _ -> case x of
                  CmmLit (CmmInt imm _)
                    | Just _ <- makeImmediate rep True imm
-                   -- subfi ('substract from' with immediate) doesn't exist
+                   -- subfi ('subtract from' with immediate) doesn't exist
                    -> trivialCode rep True SUBFC y x
                  _ -> trivialCodeNoImm' (intFormat rep) SUBF y x
 

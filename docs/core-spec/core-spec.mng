@@ -121,7 +121,7 @@ to be built with \texttt{CoercionTy}.
 laid out in \verb|Note [Invariants on join points]| in
 \ghcfile{coreSyn/CoreSyn.hs}:
 \begin{enumerate}
-    \item All occurences must be tail calls. This is enforced in our typing
+    \item All occurrences must be tail calls. This is enforced in our typing
     rules using the label environment $[[D]]$.
     \item Each join point has a \emph{join arity}. In this document, we write
     each label as $[[p/I_t]]$ for the name $[[p]]$, the type $[[t]]$, and the

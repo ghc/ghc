@@ -200,7 +200,7 @@ Mutex concurrent_coll_finished_lock;
  *    generation.
  *
  *  - Note [Aging under the non-moving collector] (NonMoving.c) describes how
- *    we accomodate aging
+ *    we accommodate aging
  *
  *  - Note [Large objects in the non-moving collector] (NonMovingMark.c)
  *    describes how we track large objects.
