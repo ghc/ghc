@@ -15,6 +15,7 @@ TcSplice: Template Haskell splices
 {-# LANGUAGE RecordWildCards #-}
 {-# LANGUAGE MultiWayIf #-}
 {-# LANGUAGE TypeFamilies #-}
+{-# LANGUAGE TupleSections #-}
 {-# OPTIONS_GHC -fno-warn-orphans #-}
 
 module TcSplice(
@@ -265,7 +266,7 @@ brackTy b =
                                            -- Result type is Var (not Q-monadic)
     (ExpBr {})  -> mkTy expTyConName  -- Result type is m Exp
     (TypBr {})  -> mkTy typeTyConName -- Result type is m Type
-    (DecBrG {}) -> mkTy mkListTy decTyConName -- Result type is m [Dec]
+    (DecBrG {}) -> mkTyX mkListTy decTyConName -- Result type is m [Dec]
     (PatBr {})  -> mkTy patTyConName  -- Result type is m Pat
     (DecBrL {}) -> panic "tcBrackTy: Unexpected DecBrL"
     (TExpBr {}) -> panic "tcUntypedBracket: Unexpected TExpBr"
