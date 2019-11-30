@@ -376,9 +376,6 @@ data SPEC = SPEC | SPEC2
 *                                                                      *
 ********************************************************************* -}
 
--- | Whether a boxed type is lifted or unlifted.
-data Levity = Lifted | Unlifted
-
 -- | GHC maintains a property that the kind of all inhabited types
 -- (as distinct from type constructors or type-level data) tells us
 -- the runtime representation of values of that type. This datatype
@@ -411,6 +408,9 @@ data RuntimeRep = VecRep VecCount VecElem   -- ^ a SIMD vector type
 -- RuntimeRep is intimately tied to TyCon.RuntimeRep (in GHC proper). See
 -- Note [RuntimeRep and PrimRep] in RepType.
 -- See also Note [Wiring in RuntimeRep] in TysWiredIn
+
+-- | Whether a boxed type is lifted or unlifted.
+data Levity = Lifted | Unlifted
 
 -- | Length of a SIMD vector type
 data VecCount = Vec2
