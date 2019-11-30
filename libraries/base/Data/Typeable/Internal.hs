@@ -846,7 +846,13 @@ splitApps = go []
 -- #14480.
 tyConTYPE :: TyCon
 tyConTYPE = mkTyCon (tyConPackage liftedRepTyCon) "GHC.Prim" "TYPE" 0
-       (KindRepFun (KindRepTyConApp liftedRepTyCon []) (KindRepTYPE (BoxedRep Lifted)))
+    (KindRepFun
+      (KindRepTyConApp liftedRepTyCon [])
+      (KindRepApp
+        (KindRepTYPE BoxedRep)
+        (KindRepTYPE Lifted)
+      )
+    )
   where
     liftedRepTyCon = typeRepTyCon (typeRep @RuntimeRep)
 
