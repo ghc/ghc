@@ -94,7 +94,7 @@ import Util             ( looksLikePackageName, fstOf3, sndOf3, thdOf3 )
 import GhcPrelude
 }
 
-%expect 232 -- shift/reduce conflicts
+%expect 231 -- shift/reduce conflicts
 
 {- Last updated: 04 June 2018
 
@@ -1966,7 +1966,8 @@ context :: { LHsContext GhcPs }
 
 -- See Note [Constr variations of non-terminals]
 constr_context :: { LHsContext GhcPs }
-        :  constr_btype                 {% do { (anns,ctx) <- checkContext $1
+        :  constr_btype                 {% runPV $1 >>= \ $1 ->
+                                           do { (anns,ctx) <- checkContext $1
                                                 ; if null (unLoc ctx)
                                                    then addAnnotation (gl $1) AnnUnit (gl $1)
                                                    else return ()
@@ -2016,41 +2017,56 @@ typedoc :: { LHsType GhcPs }
                                                             (HsDocTy noExtField $2 $1))
                                                          $4)
                                                 [mu AnnRarrow $3] }
+-- See Note [Constr variations of non-terminals]
+constr_btype :: { forall b. DisambInfixTD b => PV (Located b) }
+       : constr_ftype { superInfixTyHead resultOfM $
+                        $1 >>= \ $1 ->
+                        mkInfixTyHeadPV $1 }
+       | constr_ftype tyop maybe_docprev constr_btype
+                      { superInfixTyArg resultOfM $
+                        $1 >>= \ $1 ->
+                        $4 >>= \ $4 ->
+                        mkInfixTyAppPV $1 $2 $3 $4 }
+       | unpackedness constr_btype
+                      { $2 >>= \ $2 ->
+                        mkInfixTyUnpackednessPV (Just $1) $2 }
 
 -- See Note [Constr variations of non-terminals]
-constr_btype :: { LHsType GhcPs }
-        : constr_tyapps                 {% mergeOps (unLoc $1) }
-
--- See Note [Constr variations of non-terminals]
-constr_tyapps :: { Located [Located TyEl] } -- NB: This list is reversed
-        : constr_tyapp                  { sL1 $1 [$1] }
-        | constr_tyapps constr_tyapp    { sLL $1 $> $ $2 : (unLoc $1) }
-
--- See Note [Constr variations of non-terminals]
-constr_tyapp :: { Located TyEl }
-        : tyapp                         { $1 }
-        | docprev                       { sL1 $1 $ TyElDocPrev (unLoc $1) }
+constr_ftype :: { forall b. DisambPrefixTD b => PV (Located b) }
+       : atype maybe_docprev          { mkAppTyHeadPV $1 $2 }
+       | tyop                         { failOpFewArgs $1 }
+       | constr_ftype atype maybe_docprev
+                                      { $1 >>= \ $1 ->
+                                        mkAppTyAppPV $1 Nothing $2 $3 }
+       | constr_ftype unpackedness atype maybe_docprev
+                                      { $1 >>= \ $1 ->
+                                        mkAppTyAppPV $1 (Just $2) $3 $4 }
+       | constr_ftype PREFIX_AT atype
+                                      { $1 >>= \ $1 ->
+                                        mkAppTyKindAppPV $1 (gl $2) $3 }
 
 btype :: { LHsType GhcPs }
-        : tyapps                        {% mergeOps $1 }
+       : ftype                { $1 }
+       | ftype tyop btype     { mkLHsOpTy $1 $2 $3 }
+       | unpackedness btype   {% addUnpackednessP $1 $2 }
 
-tyapps :: { [Located TyEl] } -- NB: This list is reversed
-        : tyapp                         { [$1] }
-        | tyapps tyapp                  { $2 : $1 }
+ftype :: { LHsType GhcPs }
+       : atype                    { $1 }
+       | ftype atype              { mkHsAppTy $1 $2 }
+       | ftype PREFIX_AT atype    { mkHsAppKindTy (comb2 $2 $3) $1 $3 }
 
-tyapp :: { Located TyEl }
-        : atype                         { sL1 $1 $ TyElOpd (unLoc $1) }
+       -- failure cases (for better error messages)
+       | tyop                     {% failOpFewArgs $1 }
+       | ftype unpackedness atype {% runPV $ mkAppTyAppPV $1 (Just $2) $3 Nothing }
 
-        -- See Note [Whitespace-sensitive operator parsing] in Lexer.x
-        | PREFIX_AT atype               { sLL $1 $> $ (TyElKindApp (comb2 $1 $2) $2) }
-
-        | qtyconop                      { sL1 $1 $ TyElOpr (unLoc $1) }
-        | tyvarop                       { sL1 $1 $ TyElOpr (unLoc $1) }
-        | SIMPLEQUOTE qconop            {% ams (sLL $1 $> $ TyElOpr (unLoc $2))
+tyop :: { Located RdrName }
+        : qtyconop                      { $1 }
+        | tyvarop                       { $1 }
+        | SIMPLEQUOTE qconop            {% ams (sLL $1 $> $ unLoc $2)
                                                [mj AnnSimpleQuote $1,mj AnnVal $2] }
-        | SIMPLEQUOTE varop             {% ams (sLL $1 $> $ TyElOpr (unLoc $2))
+        | SIMPLEQUOTE varop             {% ams (sLL $1 $> $ unLoc $2)
                                                [mj AnnSimpleQuote $1,mj AnnVal $2] }
-        | unpackedness                  { sL1 $1 $ TyElUnpackedness (unLoc $1) }
+
 
 atype :: { LHsType GhcPs }
         : ntgtycon                       { sL1 $1 (HsTyVar noExtField NotPromoted $1) }      -- Not including unit tuples
@@ -2315,17 +2331,19 @@ They must be kept identical except for their treatment of 'docprev'.
 -}
 
 constr :: { LConDecl GhcPs }
-        : maybe_docnext forall constr_context '=>' constr_stuff
-                {% ams (let (con,details,doc_prev) = unLoc $5 in
-                  addConDoc (L (comb4 $2 $3 $4 $5) (mkConDeclH98 con
+        : maybe_docnext forall constr_context '=>' constr_btype
+              {% runPV $5 >>= \ $5 ->
+                 let ConstrDef con details doc_prev = unLoc $5 in
+                 ams (addConDoc (L (comb4 $2 $3 $4 $5) (mkConDeclH98 con
                                                        (snd $ unLoc $2)
                                                        (Just $3)
                                                        details))
                             ($1 `mplus` doc_prev))
                         (mu AnnDarrow $4:(fst $ unLoc $2)) }
-        | maybe_docnext forall constr_stuff
-                {% ams ( let (con,details,doc_prev) = unLoc $3 in
-                  addConDoc (L (comb2 $2 $3) (mkConDeclH98 con
+        | maybe_docnext forall constr_btype
+              {% runPV $3 >>= \ $3 ->
+                 let ConstrDef con details doc_prev = unLoc $3 in
+                 ams (addConDoc (L (comb2 $2 $3) (mkConDeclH98 con
                                                       (snd $ unLoc $2)
                                                       Nothing   -- No context
                                                       details))
@@ -2335,10 +2353,6 @@ constr :: { LConDecl GhcPs }
 forall :: { Located ([AddAnn], Maybe [LHsTyVarBndr GhcPs]) }
         : 'forall' tv_bndrs '.'       { sLL $1 $> ([mu AnnForall $1,mj AnnDot $3], Just $2) }
         | {- empty -}                 { noLoc ([], Nothing) }
-
-constr_stuff :: { Located (Located RdrName, HsConDeclDetails GhcPs, Maybe LHsDocString) }
-        : constr_tyapps                    {% do { c <- mergeDataCon (unLoc $1)
-                                                 ; return $ sL1 $1 c } }
 
 fielddecls :: { [LConDeclField GhcPs] }
         : {- empty -}     { [] }
@@ -2609,7 +2623,7 @@ infixexp :: { ECP }
         : exp10 { $1 }
         | infixexp qop exp10p    -- See Note [Pragmas and operator fixity]
                                { ECP $
-                                 superInfixOp $
+                                 superInfixOp resultOfM $
                                  $2 >>= \ $2 ->
                                  runECP_PV $1 >>= \ $1 ->
                                  runECP_PV $3 >>= \ $3 ->
@@ -2718,7 +2732,7 @@ prag_e :: { Located ([AddAnn], HsPragE GhcPs) }
 
 fexp    :: { ECP }
         : fexp aexp                  { ECP $
-                                          superFunArg $
+                                          superFunArg resultOfM $
                                           runECP_PV $1 >>= \ $1 ->
                                           runECP_PV $2 >>= \ $2 ->
                                           mkHsAppPV (comb2 $1 $>) $1 $2 }
@@ -2954,7 +2968,7 @@ texp :: { ECP }
                                 return $ ecpFromExp $
                                 sLL $1 $> $ SectionL noExtField $1 $2 }
         | qopm infixexp      { ECP $
-                                superInfixOp $
+                                superInfixOp resultOfM $
                                 runECP_PV $2 >>= \ $2 ->
                                 $1 >>= \ $1 ->
                                 mkHsSectionR_PV (comb2 $1 $>) $1 $2 }

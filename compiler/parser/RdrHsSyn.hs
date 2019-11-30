@@ -15,6 +15,7 @@
 {-# LANGUAGE LambdaCase #-}
 {-# LANGUAGE TypeApplications #-}
 {-# LANGUAGE GeneralizedNewtypeDeriving #-}
+{-# LANGUAGE TypeOperators #-}
 
 module   RdrHsSyn (
         mkHsOpApp,
@@ -65,8 +66,15 @@ module   RdrHsSyn (
         checkRecordSyntax,
         checkEmptyGADTs,
         addFatalError, hintBangPat,
-        TyEl(..), mergeOps, mergeDataCon,
         mkBangTy,
+        mkLHsOpTy,
+        addUnpackednessP,
+
+        -- Type/data constructor ambiguity resolution
+        DisambPrefixTD(..),
+        DisambInfixTD(..),
+        ConstrDef(..),
+        resultOfM,
 
         -- Help with processing exports
         ImpExpSubSpec(..),
@@ -136,7 +144,6 @@ import ErrUtils ( Messages )
 import Control.Monad
 import Text.ParserCombinators.ReadP as ReadP
 import Data.Char
-import qualified Data.Monoid as Monoid
 import Data.Data       ( dataTypeOf, fromConstr, dataTypeConstrs )
 
 #include "HsVersions.h"
@@ -792,7 +799,7 @@ to make setRdrNameSpace partial, so we just make an Unqual name instead. It
 really doesn't matter!
 -}
 
-eitherToP :: Either (SrcSpan, SDoc) a -> P a
+eitherToP :: MonadP m => Either (SrcSpan, SDoc) a -> m a
 -- Adapts the Either monad to the P monad
 eitherToP (Left (loc, doc)) = addFatalError loc doc
 eitherToP (Right thing)     = return thing
@@ -1288,384 +1295,39 @@ isFunLhs e = go e [] []
                  _ -> return Nothing }
    go _ _ _ = return Nothing
 
--- | Either an operator or an operand.
-data TyEl = TyElOpr RdrName | TyElOpd (HsType GhcPs)
-          | TyElKindApp SrcSpan (LHsType GhcPs)
-          -- See Note [TyElKindApp SrcSpan interpretation]
-          | TyElUnpackedness ([AddAnn], SourceText, SrcUnpackedness)
-          | TyElDocPrev HsDocString
-
-
-{- Note [TyElKindApp SrcSpan interpretation]
-~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
-
-A TyElKindApp captures type application written in haskell as
-
-    @ Foo
-
-where Foo is some type.
-
-The SrcSpan reflects both elements, and there are AnnAt and AnnVal API
-Annotations attached to this SrcSpan for the specific locations of
-each within it.
--}
-
-instance Outputable TyEl where
-  ppr (TyElOpr name) = ppr name
-  ppr (TyElOpd ty) = ppr ty
-  ppr (TyElKindApp _ ki) = text "@" <> ppr ki
-  ppr (TyElUnpackedness (_, _, unpk)) = ppr unpk
-  ppr (TyElDocPrev doc) = ppr doc
-
--- | Extract a strictness/unpackedness annotation from the front of a reversed
--- 'TyEl' list.
-pUnpackedness
-  :: [Located TyEl] -- reversed TyEl
-  -> Maybe ( SrcSpan
-           , [AddAnn]
-           , SourceText
-           , SrcUnpackedness
-           , [Located TyEl] {- remaining TyEl -})
-pUnpackedness (L l x1 : xs)
-  | TyElUnpackedness (anns, prag, unpk) <- x1
-  = Just (l, anns, prag, unpk, xs)
-pUnpackedness _ = Nothing
-
-pBangTy
-  :: LHsType GhcPs  -- a type to be wrapped inside HsBangTy
-  -> [Located TyEl] -- reversed TyEl
-  -> ( Bool           {- has a strict mark been consumed? -}
-     , LHsType GhcPs  {- the resulting BangTy -}
-     , P ()           {- add annotations -}
-     , [Located TyEl] {- remaining TyEl -})
-pBangTy lt@(L l1 _) xs =
-  case pUnpackedness xs of
-    Nothing -> (False, lt, pure (), xs)
-    Just (l2, anns, prag, unpk, xs') ->
-      let bl = combineSrcSpans l1 l2
-          bt = addUnpackedness (prag, unpk) lt
-      in (True, L bl bt, addAnnsAt bl anns, xs')
-
 mkBangTy :: SrcStrictness -> LHsType GhcPs -> HsType GhcPs
 mkBangTy strictness =
   HsBangTy noExtField (HsSrcBang NoSourceText NoSrcUnpack strictness)
 
-addUnpackedness :: (SourceText, SrcUnpackedness) -> LHsType GhcPs -> HsType GhcPs
-addUnpackedness (prag, unpk) (L _ (HsBangTy x bang t))
+addUnpackedness :: Located (SourceText, SrcUnpackedness) -> LHsType GhcPs -> LHsType GhcPs
+addUnpackedness u (L l2 (HsDocTy _ t doc))
+  = L (combineSrcSpans (getLoc u) l2)
+      (HsDocTy noExtField (addUnpackedness u t) doc)
+addUnpackedness (L l1 (prag, unpk)) (L l2 (HsBangTy x bang t))
   | HsSrcBang NoSourceText NoSrcUnpack strictness <- bang
-  = HsBangTy x (HsSrcBang prag unpk strictness) t
-addUnpackedness (prag, unpk) t
-  = HsBangTy noExtField (HsSrcBang prag unpk NoSrcStrict) t
+  = L (combineSrcSpans l1 l2)
+      (HsBangTy x (HsSrcBang prag unpk strictness) t)
+addUnpackedness (L l1 (prag, unpk)) t
+  = L (combineSrcSpans l1 (getLoc t))
+      (HsBangTy noExtField (HsSrcBang prag unpk NoSrcStrict) t)
 
--- | Merge a /reversed/ and /non-empty/ soup of operators and operands
---   into a type.
---
--- User input: @F x y + G a b * X@
--- Input to 'mergeOps': [X, *, b, a, G, +, y, x, F]
--- Output corresponds to what the user wrote assuming all operators are of the
--- same fixity and right-associative.
---
--- It's a bit silly that we're doing it at all, as the renamer will have to
--- rearrange this, and it'd be easier to keep things separate.
---
--- See Note [Parsing data constructors is hard]
-mergeOps :: [Located TyEl] -> P (LHsType GhcPs)
-mergeOps ((L l1 (TyElOpd t)) : xs)
-  | (_, t', addAnns, xs') <- pBangTy (L l1 t) xs
-  , null xs' -- We accept a BangTy only when there are no preceding TyEl.
-  = addAnns >> return t'
-mergeOps all_xs = go (0 :: Int) [] id all_xs
-  where
-    -- NB. When modifying clauses in 'go', make sure that the reasoning in
-    -- Note [Non-empty 'acc' in mergeOps clause [end]] is still correct.
+addUnpackednessP
+  :: MonadP m
+  => Located ([AddAnn], SourceText, SrcUnpackedness)
+  -> LHsType GhcPs
+  -> m (LHsType GhcPs)
+addUnpackednessP (L lprag (anns, prag, unpk)) t = do
+  let t' = addUnpackedness (L lprag (prag, unpk)) t
+  addAnnsAt (getLoc t') anns
+  return t'
 
-    -- clause [unpk]:
-    -- handle (NO)UNPACK pragmas
-    go k acc ops_acc ((L l (TyElUnpackedness (anns, unpkSrc, unpk))):xs) =
-      if not (null acc) && null xs
-      then do { acc' <- eitherToP $ mergeOpsAcc acc
-              ; let a = ops_acc acc'
-                    strictMark = HsSrcBang unpkSrc unpk NoSrcStrict
-                    bl = combineSrcSpans l (getLoc a)
-                    bt = HsBangTy noExtField strictMark a
-              ; addAnnsAt bl anns
-              ; return (L bl bt) }
-      else addFatalError l unpkError
-      where
-        unpkSDoc = case unpkSrc of
-          NoSourceText -> ppr unpk
-          SourceText str -> text str <> text " #-}"
-        unpkError
-          | not (null xs) = unpkSDoc <+> text "cannot appear inside a type."
-          | null acc && k == 0 = unpkSDoc <+> text "must be applied to a type."
-          | otherwise =
-              -- See Note [Impossible case in mergeOps clause [unpk]]
-              panic "mergeOps.UNPACK: impossible position"
-
-    -- clause [doc]:
-    -- we do not expect to encounter any docs
-    go _ _ _ ((L l (TyElDocPrev _)):_) =
-      failOpDocPrev l
-
-    -- clause [opr]:
-    -- when we encounter an operator, we must have accumulated
-    -- something for its rhs, and there must be something left
-    -- to build its lhs.
-    go k acc ops_acc ((L l (TyElOpr op)):xs) =
-      if null acc || null (filter isTyElOpd xs)
-        then failOpFewArgs (L l op)
-        else do { acc' <- eitherToP (mergeOpsAcc acc)
-                ; go (k + 1) [] (\c -> mkLHsOpTy c (L l op) (ops_acc acc')) xs }
-      where
-        isTyElOpd (L _ (TyElOpd _)) = True
-        isTyElOpd _ = False
-
-    -- clause [opd]:
-    -- whenever an operand is encountered, it is added to the accumulator
-    go k acc ops_acc ((L l (TyElOpd a)):xs) = go k (HsValArg (L l a):acc) ops_acc xs
-
-    -- clause [tyapp]:
-    -- whenever a type application is encountered, it is added to the accumulator
-    go k acc ops_acc ((L _ (TyElKindApp l a)):xs) = go k (HsTypeArg l a:acc) ops_acc xs
-
-    -- clause [end]
-    -- See Note [Non-empty 'acc' in mergeOps clause [end]]
-    go _ acc ops_acc [] = do { acc' <- eitherToP (mergeOpsAcc acc)
-                             ; return (ops_acc acc') }
-
-mergeOpsAcc :: [HsArg (LHsType GhcPs) (LHsKind GhcPs)]
-         -> Either (SrcSpan, SDoc) (LHsType GhcPs)
-mergeOpsAcc [] = panic "mergeOpsAcc: empty input"
-mergeOpsAcc (HsTypeArg _ (L loc ki):_)
-  = Left (loc, text "Unexpected type application:" <+> ppr ki)
-mergeOpsAcc (HsValArg ty : xs) = go1 ty xs
-  where
-    go1 :: LHsType GhcPs
-        -> [HsArg (LHsType GhcPs) (LHsKind GhcPs)]
-        -> Either (SrcSpan, SDoc) (LHsType GhcPs)
-    go1 lhs []     = Right lhs
-    go1 lhs (x:xs) = case x of
-        HsValArg ty -> go1 (mkHsAppTy lhs ty) xs
-        HsTypeArg loc ki -> let ty = mkHsAppKindTy loc lhs ki
-                            in go1 ty xs
-        HsArgPar _ -> go1 lhs xs
-mergeOpsAcc (HsArgPar _: xs) = mergeOpsAcc xs
-
-{- Note [Impossible case in mergeOps clause [unpk]]
-~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
-This case should never occur. Let us consider all possible
-variations of 'acc', 'xs', and 'k':
-
-  acc          xs        k
-==============================
-  null   |    null       0      -- "must be applied to a type"
-  null   |  not null     0      -- "must be applied to a type"
-not null |    null       0      -- successful parse
-not null |  not null     0      -- "cannot appear inside a type"
-  null   |    null      >0      -- handled in clause [opr]
-  null   |  not null    >0      -- "cannot appear inside a type"
-not null |    null      >0      -- successful parse
-not null |  not null    >0      -- "cannot appear inside a type"
-
-The (null acc && null xs && k>0) case is handled in clause [opr]
-by the following check:
-
-    if ... || null (filter isTyElOpd xs)
-     then failOpFewArgs (L l op)
-
-We know that this check has been performed because k>0, and by
-the time we reach the end of the list (null xs), the only way
-for (null acc) to hold is that there was not a single TyElOpd
-between the operator and the end of the list. But this case is
-caught by the check and reported as 'failOpFewArgs'.
--}
-
-{- Note [Non-empty 'acc' in mergeOps clause [end]]
-~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
-In clause [end] we need to know that 'acc' is non-empty to call 'mergeAcc'
-without a check.
-
-Running 'mergeOps' with an empty input list is forbidden, so we do not consider
-this possibility. This means we'll hit at least one other clause before we
-reach clause [end].
-
-* Clauses [unpk] and [doc] do not call 'go' recursively, so we cannot hit
-  clause [end] from there.
-* Clause [opd] makes 'acc' non-empty, so if we hit clause [end] after it, 'acc'
-  will be non-empty.
-* Clause [opr] checks that (filter isTyElOpd xs) is not null - so we are going
-  to hit clause [opd] at least once before we reach clause [end], making 'acc'
-  non-empty.
-* There are no other clauses.
-
-Therefore, it is safe to omit a check for non-emptiness of 'acc' in clause
-[end].
-
--}
-
-pInfixSide :: [Located TyEl] -> Maybe (LHsType GhcPs, P (), [Located TyEl])
-pInfixSide ((L l (TyElOpd t)):xs)
-  | (True, t', addAnns, xs') <- pBangTy (L l t) xs
-  = Just (t', addAnns, xs')
-pInfixSide (el:xs1)
-  | Just t1 <- pLHsTypeArg el
-  = go [t1] xs1
-   where
-     go :: [HsArg (LHsType GhcPs) (LHsKind GhcPs)]
-        -> [Located TyEl] -> Maybe (LHsType GhcPs, P (), [Located TyEl])
-     go acc (el:xs)
-       | Just t <- pLHsTypeArg el
-       = go (t:acc) xs
-     go acc xs = case mergeOpsAcc acc of
-       Left _ -> Nothing
-       Right acc' -> Just (acc', pure (), xs)
-pInfixSide _ = Nothing
-
-pLHsTypeArg :: Located TyEl -> Maybe (HsArg (LHsType GhcPs) (LHsKind GhcPs))
-pLHsTypeArg (L l (TyElOpd a)) = Just (HsValArg (L l a))
-pLHsTypeArg (L _ (TyElKindApp l a)) = Just (HsTypeArg l a)
-pLHsTypeArg _ = Nothing
-
-pDocPrev :: [Located TyEl] -> (Maybe LHsDocString, [Located TyEl])
-pDocPrev = go Nothing
-  where
-    go mTrailingDoc ((L l (TyElDocPrev doc)):xs) =
-      go (mTrailingDoc `mplus` Just (L l doc)) xs
-    go mTrailingDoc xs = (mTrailingDoc, xs)
-
-orErr :: Maybe a -> b -> Either b a
-orErr (Just a) _ = Right a
-orErr Nothing b = Left b
-
--- | Merge a /reversed/ and /non-empty/ soup of operators and operands
---   into a data constructor.
---
--- User input: @C !A B -- ^ doc@
--- Input to 'mergeDataCon': ["doc", B, !A, C]
--- Output: (C, PrefixCon [!A, B], "doc")
---
--- See Note [Parsing data constructors is hard]
-mergeDataCon
-      :: [Located TyEl]
-      -> P ( Located RdrName         -- constructor name
-           , HsConDeclDetails GhcPs  -- constructor field information
-           , Maybe LHsDocString      -- docstring to go on the constructor
-           )
-mergeDataCon all_xs =
-  do { (addAnns, a) <- eitherToP res
-     ; addAnns
-     ; return a }
-  where
-    -- We start by splitting off the trailing documentation comment,
-    -- if any exists.
-    (mTrailingDoc, all_xs') = pDocPrev all_xs
-
-    -- Determine whether the trailing documentation comment exists and is the
-    -- only docstring in this constructor declaration.
-    --
-    -- When true, it means that it applies to the constructor itself:
-    --    data T = C
-    --             A
-    --             B -- ^ Comment on C (singleDoc == True)
-    --
-    -- When false, it means that it applies to the last field:
-    --    data T = C -- ^ Comment on C
-    --             A -- ^ Comment on A
-    --             B -- ^ Comment on B (singleDoc == False)
-    singleDoc = isJust mTrailingDoc &&
-                null [ () | (L _ (TyElDocPrev _)) <- all_xs' ]
-
-    -- The result of merging the list of reversed TyEl into a
-    -- data constructor, along with [AddAnn].
-    res = goFirst all_xs'
-
-    -- Take the trailing docstring into account when interpreting
-    -- the docstring near the constructor.
-    --
-    --    data T = C -- ^ docstring right after C
-    --             A
-    --             B -- ^ trailing docstring
-    --
-    -- 'mkConDoc' must be applied to the docstring right after C, so that it
-    -- falls back to the trailing docstring when appropriate (see singleDoc).
-    mkConDoc mDoc | singleDoc = mDoc `mplus` mTrailingDoc
-                  | otherwise = mDoc
-
-    -- The docstring for the last field of a data constructor.
-    trailingFieldDoc | singleDoc = Nothing
-                     | otherwise = mTrailingDoc
-
-    goFirst [ L l (TyElOpd (HsTyVar _ _ (L _ tc))) ]
-      = do { data_con <- tyConToDataCon l tc
-           ; return (pure (), (data_con, PrefixCon [], mTrailingDoc)) }
-    goFirst ((L l (TyElOpd (HsRecTy _ fields))):xs)
-      | (mConDoc, xs') <- pDocPrev xs
-      , [ L l' (TyElOpd (HsTyVar _ _ (L _ tc))) ] <- xs'
-      = do { data_con <- tyConToDataCon l' tc
-           ; let mDoc = mTrailingDoc `mplus` mConDoc
-           ; return (pure (), (data_con, RecCon (L l fields), mDoc)) }
-    goFirst [L l (TyElOpd (HsTupleTy _ HsBoxedOrConstraintTuple ts))]
-      = return ( pure ()
-               , ( L l (getRdrName (tupleDataCon Boxed (length ts)))
-                 , PrefixCon ts
-                 , mTrailingDoc ) )
-    goFirst ((L l (TyElOpd t)):xs)
-      | (_, t', addAnns, xs') <- pBangTy (L l t) xs
-      = go addAnns Nothing [mkLHsDocTyMaybe t' trailingFieldDoc] xs'
-    goFirst (L l (TyElKindApp _ _):_)
-      = goInfix Monoid.<> Left (l, kindAppErr)
-    goFirst xs
-      = go (pure ()) mTrailingDoc [] xs
-
-    go addAnns mLastDoc ts [ L l (TyElOpd (HsTyVar _ _ (L _ tc))) ]
-      = do { data_con <- tyConToDataCon l tc
-           ; return (addAnns, (data_con, PrefixCon ts, mkConDoc mLastDoc)) }
-    go addAnns mLastDoc ts ((L l (TyElDocPrev doc)):xs) =
-      go addAnns (mLastDoc `mplus` Just (L l doc)) ts xs
-    go addAnns mLastDoc ts ((L l (TyElOpd t)):xs)
-      | (_, t', addAnns', xs') <- pBangTy (L l t) xs
-      , t'' <- mkLHsDocTyMaybe t' mLastDoc
-      = go (addAnns >> addAnns') Nothing (t'':ts) xs'
-    go _ _ _ ((L _ (TyElOpr _)):_) =
-      -- Encountered an operator: backtrack to the beginning and attempt
-      -- to parse as an infix definition.
-      goInfix
-    go _ _ _ (L l (TyElKindApp _ _):_) =  goInfix Monoid.<> Left (l, kindAppErr)
-    go _ _ _ _ = Left malformedErr
-      where
-        malformedErr =
-          ( foldr combineSrcSpans noSrcSpan (map getLoc all_xs')
-          , text "Cannot parse data constructor" <+>
-            text "in a data/newtype declaration:" $$
-            nest 2 (hsep . reverse $ map ppr all_xs'))
-
-    goInfix =
-      do { let xs0 = all_xs'
-         ; (rhs_t, rhs_addAnns, xs1) <- pInfixSide xs0 `orErr` malformedErr
-         ; let (mOpDoc, xs2) = pDocPrev xs1
-         ; (op, xs3) <- case xs2 of
-              (L l (TyElOpr op)) : xs3 ->
-                do { data_con <- tyConToDataCon l op
-                   ; return (data_con, xs3) }
-              _ -> Left malformedErr
-         ; let (mLhsDoc, xs4) = pDocPrev xs3
-         ; (lhs_t, lhs_addAnns, xs5) <- pInfixSide xs4 `orErr` malformedErr
-         ; unless (null xs5) (Left malformedErr)
-         ; let rhs = mkLHsDocTyMaybe rhs_t trailingFieldDoc
-               lhs = mkLHsDocTyMaybe lhs_t mLhsDoc
-               addAnns = lhs_addAnns >> rhs_addAnns
-         ; return (addAnns, (op, InfixCon lhs rhs, mkConDoc mOpDoc)) }
-      where
-        malformedErr =
-          ( foldr combineSrcSpans noSrcSpan (map getLoc all_xs')
-          , text "Cannot parse an infix data constructor" <+>
-            text "in a data/newtype declaration:" $$
-            nest 2 (hsep . reverse $ map ppr all_xs'))
-
-    kindAppErr =
-      text "Unexpected kind application" <+>
-      text "in a data/newtype declaration:" $$
-      nest 2 (hsep . reverse $ map ppr all_xs')
+addUnpackednessMaybeP
+  :: MonadP m
+  => Maybe (Located ([AddAnn], SourceText, SrcUnpackedness))
+  -> LHsType GhcPs
+  -> m (LHsType GhcPs)
+addUnpackednessMaybeP Nothing t = return t
+addUnpackednessMaybeP (Just unpk) t = addUnpackednessP unpk t
 
 ---------------------------------------------------------------------------
 -- | Check for monad comprehensions
@@ -1728,6 +1390,17 @@ instance DisambInfixOp RdrName where
   mkHsInfixHolePV l =
     addFatalError l $ text "Invalid infix hole, expected an infix operator"
 
+-- | Establish a relation between two types. Like Proxy, it holds no data, but
+-- can be used to drive type inference.
+--
+-- You can read  (a :?-> b)  as "infer b from a".
+data a :?-> b = TypeRelation
+
+-- | A relation between the type of a value and the type of a monadic action
+-- producing such value with location information.
+resultOfM :: m (Located b) :?-> b
+resultOfM = TypeRelation
+
 -- | Disambiguate constructs that may appear when we do not know ahead of time whether we are
 -- parsing an expression, a command, or a pattern.
 -- See Note [Ambiguous syntactic categories]
@@ -1746,7 +1419,7 @@ class b ~ (Body b) GhcPs => DisambECP b where
   type InfixOp b
   -- | Bring superclass constraints on InfixOp into scope.
   -- See Note [UndecidableSuperClasses for associated types]
-  superInfixOp :: (DisambInfixOp (InfixOp b) => PV (Located b )) -> PV (Located b)
+  superInfixOp :: (r :?-> b) -> (DisambInfixOp (InfixOp b) => r) -> r
   -- | Disambiguate "f # x" (infix operator)
   mkHsOpAppPV :: SrcSpan -> Located b -> Located (InfixOp b) -> Located b -> PV (Located b)
   -- | Disambiguate "case ... of ..."
@@ -1755,7 +1428,7 @@ class b ~ (Body b) GhcPs => DisambECP b where
   type FunArg b
   -- | Bring superclass constraints on FunArg into scope.
   -- See Note [UndecidableSuperClasses for associated types]
-  superFunArg :: (DisambECP (FunArg b) => PV (Located b)) -> PV (Located b)
+  superFunArg :: (r :?-> b) -> (DisambECP (FunArg b) => r) -> r
   -- | Disambiguate "f x" (function application)
   mkHsAppPV :: SrcSpan -> Located b -> Located (FunArg b) -> PV (Located b)
   -- | Disambiguate "if ... then ... else ..."
@@ -1832,9 +1505,9 @@ manually with a helper method:
 
   class C a where
     type T a
-    superT :: (C (T a) => r) -> r
+    superT :: (a :?-> r) -> (C (T a) => r) -> r
 
-In order to avoid ambiguous types, 'r' must mention 'a'.
+In order to avoid ambiguous types and aid type inference, we pass (a :?-> r).
 
 For consistency, we use this approach for all constraints on associated types,
 even when -XUndecidableSuperClasses are not required.
@@ -1860,13 +1533,13 @@ instance DisambECP (HsCmd GhcPs) where
   mkHsLamPV l mg = return $ L l (HsCmdLam noExtField mg)
   mkHsLetPV l bs e = return $ L l (HsCmdLet noExtField bs e)
   type InfixOp (HsCmd GhcPs) = HsExpr GhcPs
-  superInfixOp m = m
+  superInfixOp _ a = a
   mkHsOpAppPV l c1 op c2 = do
     let cmdArg c = L (getLoc c) $ HsCmdTop noExtField c
     return $ L l $ HsCmdArrForm noExtField op Infix Nothing [cmdArg c1, cmdArg c2]
   mkHsCasePV l c mg = return $ L l (HsCmdCase noExtField c mg)
   type FunArg (HsCmd GhcPs) = HsExpr GhcPs
-  superFunArg m = m
+  superFunArg _ a = a
   mkHsAppPV l c e = do
     checkCmdBlockArguments c
     checkExpBlockArguments e
@@ -1917,12 +1590,12 @@ instance DisambECP (HsExpr GhcPs) where
   mkHsLamPV l mg = return $ L l (HsLam noExtField mg)
   mkHsLetPV l bs c = return $ L l (HsLet noExtField bs c)
   type InfixOp (HsExpr GhcPs) = HsExpr GhcPs
-  superInfixOp m = m
+  superInfixOp _ a = a
   mkHsOpAppPV l e1 op e2 = do
     return $ L l $ OpApp noExtField e1 op e2
   mkHsCasePV l e mg = return $ L l (HsCase noExtField e mg)
   type FunArg (HsExpr GhcPs) = HsExpr GhcPs
-  superFunArg m = m
+  superFunArg _ a = a
   mkHsAppPV l e1 e2 = do
     checkExpBlockArguments e1
     checkExpBlockArguments e2
@@ -2002,11 +1675,11 @@ instance DisambECP (PatBuilder GhcPs) where
     text "Pattern matching on functions is not possible."
   mkHsLetPV l _ _ = addFatalError l $ text "(let ... in ...)-syntax in pattern"
   type InfixOp (PatBuilder GhcPs) = RdrName
-  superInfixOp m = m
+  superInfixOp _ a = a
   mkHsOpAppPV l p1 op p2 = return $ L l $ PatBuilderOpApp p1 op p2
   mkHsCasePV l _ _ = addFatalError l $ text "(case ... of ...)-syntax in pattern"
   type FunArg (PatBuilder GhcPs) = PatBuilder GhcPs
-  superFunArg m = m
+  superFunArg _ a = a
   mkHsAppPV l p1 p2 = return $ L l (PatBuilderApp p1 p2)
   mkHsIfPV l _ _ _ _ _ = addFatalError l $ text "(if ... then ... else ...)-syntax in pattern"
   mkHsDoPV l _ = addFatalError l $ text "do-notation in pattern"
@@ -2067,6 +1740,243 @@ mkPatRec (unLoc -> PatBuilderVar c) (HsRecFields fs dd)
        return (PatBuilderPat (ConPatIn c (RecCon (HsRecFields fs dd))))
 mkPatRec p _ =
   addFatalError (getLoc p) $ text "Not a record constructor:" <+> ppr p
+
+-- | Disambiguate non-infix constructs that may appear when we do not know
+-- ahead of time whether we are parsing a type or a newtype/data constructor.
+-- See Note [Ambiguous syntactic categories]
+class DisambPrefixTD b where
+  mkAppTyHeadPV
+    :: LHsType GhcPs
+    -> Maybe LHsDocString
+    -> PV (Located b)
+  mkAppTyAppPV
+    :: Located b
+    -> Maybe (Located ([AddAnn], SourceText, SrcUnpackedness))
+    -> LHsType GhcPs
+    -> Maybe LHsDocString
+    -> PV (Located b)
+  mkAppTyKindAppPV
+    :: Located b
+    -> SrcSpan
+    -> LHsType GhcPs
+    -> PV (Located b)
+
+-- | Disambiguate infix constructs that may appear when we do not know ahead of
+-- time whether we are parsing a type or a newtype/data constructor.
+-- See Note [Ambiguous syntactic categories]
+class DisambInfixTD b where
+  type InfixTyHead b
+  -- | Bring superclass constraints on InfixTyHead into scope.
+  -- See Note [UndecidableSuperClasses for associated types]
+  superInfixTyHead
+    :: (r :?-> b)
+    -> (DisambPrefixTD (InfixTyHead b) => r) -> r
+  mkInfixTyHeadPV :: Located (InfixTyHead b) -> PV (Located b)
+
+  type InfixTyArg b
+  -- | Bring superclass constraints on InfixTyArg into scope.
+  -- See Note [UndecidableSuperClasses for associated types]
+  superInfixTyArg
+    :: (r :?-> b)
+    -> ((DisambInfixTD (InfixTyArg b), DisambPrefixTD (InfixTyArg b)) => r) -> r
+  mkInfixTyAppPV
+    :: Located (InfixTyArg b)
+    -> Located RdrName
+    -> Maybe LHsDocString
+    -> Located (InfixTyArg b)
+    -> PV (Located b)
+  mkInfixTyUnpackednessPV
+    :: Maybe (Located ([AddAnn], SourceText, SrcUnpackedness))
+    -> Located b
+    -> PV (Located b)
+
+-- | An accumulator to build a prefix data constructor,
+--   e.g. when parsing MkT A B C, the accumulator will evolve as follows:
+--
+--      1. PrefixDataConBuilder []        MkT
+--      2. PrefixDataConBuilder [A]       MkT
+--      3. PrefixDataConBuilder [B, A]    MkT
+--      4. PrefixDataConBuilder [C, B, A] MkT
+--
+--   Then it will be finalized into a ConstrDef.
+data PrefixDataConBuilder =
+  PrefixDataConBuilder
+    [(LHsType GhcPs, Maybe LHsDocString)]  -- Data constructor fields, reversed
+    (Located RdrName)                      -- Data constructor name
+    (Maybe LHsDocString)                   -- Haddock comment on the constructor
+
+instance Outputable PrefixDataConBuilder where
+  ppr (PrefixDataConBuilder flds data_con _) =
+    hang (ppr data_con) 2 (sep (map ppr (reverse (map fst flds))))
+
+instance DisambPrefixTD PrefixDataConBuilder where
+  mkAppTyHeadPV (L l (HsTyVar _ NotPromoted (L _ v))) mDoc = do
+    data_con <- eitherToP $ tyConToDataCon l v
+    return $ L l (PrefixDataConBuilder [] data_con mDoc)
+  mkAppTyHeadPV (L l (HsTupleTy _ HsBoxedOrConstraintTuple ts)) mDoc = do
+    let data_con = L l (getRdrName (tupleDataCon Boxed (length ts)))
+        flds = map (\t -> (t, Nothing)) (reverse ts)
+    return $ L l (PrefixDataConBuilder flds data_con mDoc)
+  mkAppTyHeadPV t _ =
+    addFatalError (getLoc t) $
+      hang (text "Cannot parse data constructor in a data/newtype declaration:")
+      2 (ppr t)
+  mkAppTyAppPV (L l (PrefixDataConBuilder flds fn mConDoc)) mUnpk t mDoc = do
+    t' <- addUnpackednessMaybeP mUnpk t
+    let fld = (t', mDoc)
+    return $ L (combineSrcSpans l (getLoc t')) (PrefixDataConBuilder (fld:flds) fn mConDoc)
+  mkAppTyKindAppPV lhs l_at ki =
+    addFatalError l_at $
+    hang (text "Unexpected kind application in a data/newtype declaration:") 2
+      (ppr lhs <+> text "@" <> ppr ki)
+
+instance DisambPrefixTD (HsType GhcPs) where
+  mkAppTyHeadPV t mDoc = do
+    whenIsJust mDoc failOpDocPrev
+    return t
+  mkAppTyAppPV t1 mUnpk t2 mDoc = do
+    whenIsJust mUnpk $ \(L l _) ->
+      addError l $ text "{-# UNPACK #-} cannot appear inside a type."
+    whenIsJust mDoc failOpDocPrev
+    return (mkHsAppTy t1 t2)
+  mkAppTyKindAppPV t l_at ki = return (mkHsAppKindTy l' t ki)
+    where l' = combineSrcSpans l_at (getLoc ki)
+
+instance DisambInfixTD (HsType GhcPs) where
+  type InfixTyHead (HsType GhcPs) = HsType GhcPs
+  superInfixTyHead _ a = a
+  mkInfixTyHeadPV = return
+  type InfixTyArg (HsType GhcPs) = HsType GhcPs
+  superInfixTyArg _ a = a
+  mkInfixTyAppPV t1 op mDoc t2 = do
+    whenIsJust mDoc failOpDocPrev
+    return (mkLHsOpTy t1 op t2)
+  mkInfixTyUnpackednessPV = addUnpackednessMaybeP
+
+-- | Something with a trailing docstring,
+--   e.g.  Maybe Int  -- ^ docstring
+--         A + B  -- ^ docstring
+data TrailingDocString a =
+  TDoc a (Maybe LHsDocString)
+
+instance DisambPrefixTD a => DisambPrefixTD (TrailingDocString a) where
+  mkAppTyHeadPV t mDoc = do
+    L l' t' <- mkAppTyHeadPV t Nothing
+    return (L l' (TDoc t' mDoc))
+  mkAppTyAppPV (L l1 (TDoc t1 mLhsDoc)) mUnpk t2 mDoc = do
+    whenIsJust mLhsDoc failOpDocPrev
+    L l t <- mkAppTyAppPV (L l1 t1) mUnpk t2 Nothing
+    return (L l (TDoc t mDoc))
+  mkAppTyKindAppPV (L l_t (TDoc t mLhsDoc)) l_at ki = do
+    whenIsJust mLhsDoc failOpDocPrev
+    L l t' <- mkAppTyKindAppPV (L l_t t) l_at ki
+    return (L l (TDoc t' Nothing))
+
+stripDocTag :: (r :?-> TrailingDocString a) -> (r :?-> a)
+stripDocTag _ = TypeRelation
+
+instance DisambInfixTD a => DisambInfixTD (TrailingDocString a) where
+  type InfixTyHead (TrailingDocString a) = TrailingDocString (InfixTyHead a)
+  superInfixTyHead p = superInfixTyHead (stripDocTag p)
+  mkInfixTyHeadPV (L l (TDoc t mDoc)) = do
+    L l' t' <- mkInfixTyHeadPV (L l t)
+    return (L l' (TDoc t' mDoc))
+  type InfixTyArg (TrailingDocString a) = TrailingDocString (InfixTyArg a)
+  superInfixTyArg p = superInfixTyArg (stripDocTag p)
+  mkInfixTyAppPV (L l_lhs (TDoc lhs mLhsDoc)) op mOpDoc (L l_rhs (TDoc rhs mRhsDoc)) = do
+    whenIsJust mLhsDoc failOpDocPrev
+    L l t <- mkInfixTyAppPV (L l_lhs lhs) op mOpDoc (L l_rhs rhs)
+    return (L l (TDoc t mRhsDoc))
+  mkInfixTyUnpackednessPV Nothing a = return a
+  mkInfixTyUnpackednessPV (Just unpk) (L l (TDoc t mDoc)) = do
+    L l t' <- mkInfixTyUnpackednessPV (Just unpk) (L l t)
+    return (L l (TDoc t' mDoc))
+
+-- | A newtype/data constructor definition,
+--   e.g.  MkT Int Bool        -- PrefixCon
+--         MkT { foo :: Int }  -- RecCon
+--         Int :! Bool         -- InfixCon
+data ConstrDef =
+  ConstrDef
+    (Located RdrName)         -- ^ Constructor name
+    (HsConDeclDetails GhcPs)  -- ^ Constructor field information
+    (Maybe LHsDocString)      -- ^ Docstring to go on the constructor
+
+instance DisambInfixTD ConstrDef where
+  type InfixTyHead ConstrDef = PrefixDataConBuilder
+  superInfixTyHead _ a = a
+
+  -- Detect when the trailing documentation comment exists and is the
+  -- only docstring in this constructor declaration.
+  --
+  -- When true, it means that it applies to the constructor itself:
+  --    data T = C
+  --             A
+  --             B -- ^ Comment on C (pattern match succeeds)
+  --
+  -- When false, it means that it applies to the last field:
+  --    data T = C -- ^ Comment on C
+  --             A -- ^ Comment on A
+  --             B -- ^ Comment on B (pattern match fails)
+  mkInfixTyHeadPV (L l (PrefixDataConBuilder ((t, Just lastDoc) : flds) data_con Nothing))
+    | all (isNothing . snd) flds
+    = let fld = (t, Nothing) in
+      mkInfixTyHeadPV (L l (PrefixDataConBuilder (fld:flds) data_con (Just lastDoc)))
+
+  -- Detect when the record syntax is used:
+  --   data T = MkT { ... }
+  mkInfixTyHeadPV (L l (PrefixDataConBuilder [(L l_t (HsRecTy _ fields), mDoc)] data_con mConDoc)) = do
+    MASSERT( isNothing mDoc )   -- the previous case should move it to mConDoc
+    return $ L l (ConstrDef data_con (RecCon (L l_t fields)) mConDoc)
+
+  -- Normal prefix constructor, e.g.  data T = MkT A B C
+  mkInfixTyHeadPV (L l (PrefixDataConBuilder flds data_con mConDoc)) = do
+    let flds' = map (\(t, mDoc) -> mkLHsDocTyMaybe t mDoc) (reverse flds)
+    return $ L l (ConstrDef data_con (PrefixCon flds') mConDoc)
+
+  type InfixTyArg ConstrDef = TrailingDocString (HsType GhcPs)
+  superInfixTyArg _ a = a
+
+  -- Detect when the trailing documentation comment exists and is the
+  -- only docstring in this constructor declaration.
+  --
+  -- When true, it means that it applies to the constructor itself:
+  --    data T = Int :+ String   -- ^ Comment on :+ (pattern match succeeds)
+  --
+  -- When false, it means that it applies to the last field:
+  --    data T = Int             -- ^ Comment on Int
+  --              :+             -- ^ Comment on :+
+  --             String          -- ^ Comment on String (pattern match fails)
+  mkInfixTyAppPV (L l_lhs (TDoc lhs mLhsDoc)) tc Nothing (L l_rhs (TDoc rhs (Just rhsDoc))) =
+    mkInfixTyAppPV (L l_lhs (TDoc lhs mLhsDoc)) tc (Just rhsDoc) (L l_rhs (TDoc rhs Nothing))
+
+  mkInfixTyAppPV (L l_lhs (TDoc lhs mLhsDoc)) (L l_tc tc) mConDoc (L l_rhs (TDoc rhs mRhsDoc)) = do
+      check_no_ops rhs  -- check the RHS because parsing type operators is right-associative
+      data_con <- eitherToP $ tyConToDataCon l_tc tc
+      let lhs' = mkLHsDocTyMaybe (L l_lhs lhs) mLhsDoc
+          rhs' = mkLHsDocTyMaybe (L l_rhs rhs) mRhsDoc
+      return $ L l (ConstrDef data_con (InfixCon lhs' rhs') mConDoc)
+    where
+      l = combineSrcSpans l_lhs l_rhs
+      check_no_ops (HsDocTy _ t _) = check_no_ops (unLoc t)
+      check_no_ops (HsBangTy _ _ t) = check_no_ops (unLoc t)
+      check_no_ops (HsOpTy{}) =
+        addError l $
+          hang (text "Cannot parse an infix data constructor in a data/newtype declaration:")
+            2 (ppr lhs <+> ppr tc <+> ppr rhs)
+      check_no_ops _ = return ()
+  mkInfixTyUnpackednessPV Nothing constr_stuff = return constr_stuff
+  mkInfixTyUnpackednessPV (Just unpk) constr_stuff
+    | L _ (ConstrDef data_con (InfixCon lhs rhs) con_doc) <- constr_stuff
+    = -- When the user writes  data T = {-# UNPACK #-} Int :+ Bool
+      --   we apply {-# UNPACK #-} to the LHS
+      do lhs' <- addUnpackednessP unpk lhs
+         let l = combineLocs unpk constr_stuff
+         return $ L l (ConstrDef data_con (InfixCon lhs' rhs) con_doc)
+    | otherwise =
+      do addError (getLoc unpk) $
+           text "{-# UNPACK #-} cannot be applied to a data constructor."
+         return constr_stuff
 
 {- Note [Ambiguous syntactic categories]
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
@@ -2825,7 +2735,7 @@ warnStarBndr span = addWarning Opt_WarnStarBinder span msg
            <+> text "modules with StarIsType,"
         $$ text "    including the definition module, you must qualify it."
 
-failOpFewArgs :: Located RdrName -> P a
+failOpFewArgs :: MonadP m => Located RdrName -> m a
 failOpFewArgs (L loc op) =
   do { star_is_type <- getBit StarIsTypeBit
      ; let msg = too_few $$ starInfo star_is_type op
@@ -2833,8 +2743,8 @@ failOpFewArgs (L loc op) =
   where
     too_few = text "Operator applied to too few arguments:" <+> ppr op
 
-failOpDocPrev :: SrcSpan -> P a
-failOpDocPrev loc = addFatalError loc msg
+failOpDocPrev :: MonadP m => Located a -> m ()
+failOpDocPrev (L loc _) = addError loc msg
   where
     msg = text "Unexpected documentation comment."
 
