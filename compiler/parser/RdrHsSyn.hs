@@ -1266,21 +1266,10 @@ checkDoAndIfThenElse guardExpr semiThen thenExpr semiElse elseExpr
                  text "then" <+> ppr thenExpr  <> pprOptSemi semiElse <+>
                  text "else" <+> ppr elseExpr
 
--- See Note [isFunLhs vs mergeDataCon]
 isFunLhs :: Located (PatBuilder GhcPs)
       -> P (Maybe (Located RdrName, LexicalFixity, [Located (PatBuilder GhcPs)],[AddAnn]))
 -- A variable binding is parsed as a FunBind.
 -- Just (fun, is_infix, arg_pats) if e is a function LHS
---
--- The whole LHS is parsed as a single expression.
--- Any infix operators on the LHS will parse left-associatively
--- E.g.         f !x y !z
---      will parse (rather strangely) as
---              (f ! x y) ! z
---      It's up to isFunLhs to sort out the mess
---
--- a .!. !b
-
 isFunLhs e = go e [] []
  where
    go (L loc (PatBuilderVar (L _ f))) es ann
@@ -1550,60 +1539,6 @@ orErr :: Maybe a -> b -> Either b a
 orErr (Just a) _ = Right a
 orErr Nothing b = Left b
 
-{- Note [isFunLhs vs mergeDataCon]
-~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
-
-When parsing a function LHS, we do not know whether to treat (!) as
-a strictness annotation or an infix operator:
-
-  f ! a = ...
-
-Without -XBangPatterns, this parses as   (!) f a = ...
-   with -XBangPatterns, this parses as   f (!a) = ...
-
-So in function declarations we opted to always parse as if -XBangPatterns
-were off, and then rejig in 'isFunLhs'.
-
-There are two downsides to this approach:
-
-1. It is not particularly elegant, as there's a point in our pipeline where
-   the representation is awfully incorrect. For instance,
-      f !a b !c = ...
-   will be first parsed as
-      (f ! a b) ! c = ...
-
-2. There are cases that it fails to cover, for instance infix declarations:
-      !a + !b = ...
-   will trigger an error.
-
-Unfortunately, we cannot define different productions in the 'happy' grammar
-depending on whether -XBangPatterns are enabled.
-
-When parsing data constructors, we face a similar issue:
-  (a) data T1 = C ! D
-  (b) data T2 = C ! D => ...
-
-In (a) the first bang is a strictness annotation, but in (b) it is a type
-operator. A 'happy'-based parser does not have unlimited lookahead to check for
-=>, so we must first parse (C ! D) into a common representation.
-
-If we tried to mirror the approach used in functions, we would parse both sides
-of => as types, and then rejig. However, we take a different route and use an
-intermediate data structure, a reversed list of 'TyEl'.
-See Note [Parsing data constructors is hard] for details.
-
-This approach does not suffer from the issues of 'isFunLhs':
-
-1. A sequence of 'TyEl' is a dedicated intermediate representation, not an
-   incorrectly parsed type. Therefore, we do not have confusing states in our
-   pipeline. (Except for representing data constructors as type variables).
-
-2. We can handle infix data constructors with strictness annotations:
-    data T a b = !a :+ !b
-
--}
-
-
 -- | Merge a /reversed/ and /non-empty/ soup of operators and operands
 --   into a data constructor.
 --
@@ -1612,7 +1547,6 @@ This approach does not suffer from the issues of 'isFunLhs':
 -- Output: (C, PrefixCon [!A, B], "doc")
 --
 -- See Note [Parsing data constructors is hard]
--- See Note [isFunLhs vs mergeDataCon]
 mergeDataCon
       :: [Located TyEl]
       -> P ( Located RdrName         -- constructor name
@@ -1755,6 +1689,17 @@ checkMonadComp = do
 
 -- See Note [Parser-Validator]
 -- See Note [Ambiguous syntactic categories]
+--
+-- This newtype is required to avoid impredicative types in monadic
+-- productions. That is, in a production that looks like
+--
+--    | ... {% return (ECP ...) }
+--
+-- we are dealing with
+--    P ECP
+-- whereas without a newtype we would be dealing with
+--    P (forall b. DisambECP b => PV (Located b))
+--
 newtype ECP =
   ECP { runECP_PV :: forall b. DisambECP b => PV (Located b) }
 
@@ -1774,7 +1719,7 @@ class DisambInfixOp b where
   mkHsConOpPV :: Located RdrName -> PV (Located b)
   mkHsInfixHolePV :: SrcSpan -> PV (Located b)
 
-instance p ~ GhcPs => DisambInfixOp (HsExpr p) where
+instance DisambInfixOp (HsExpr GhcPs) where
   mkHsVarOpPV v = return $ L (getLoc v) (HsVar noExtField v)
   mkHsConOpPV v = return $ L (getLoc v) (HsVar noExtField v)
   mkHsInfixHolePV l = return $ L l hsHoleExpr
@@ -1801,7 +1746,7 @@ class b ~ (Body b) GhcPs => DisambECP b where
   mkHsLetPV :: SrcSpan -> LHsLocalBinds GhcPs -> Located b -> PV (Located b)
   -- | Infix operator representation
   type InfixOp b
-  -- | Bring superclass constraints on FunArg into scope.
+  -- | Bring superclass constraints on InfixOp into scope.
   -- See Note [UndecidableSuperClasses for associated types]
   superInfixOp :: (DisambInfixOp (InfixOp b) => PV (Located b )) -> PV (Located b)
   -- | Disambiguate "f # x" (infix operator)
@@ -1865,6 +1810,8 @@ class b ~ (Body b) GhcPs => DisambECP b where
 
 {- Note [UndecidableSuperClasses for associated types]
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+(This Note is about the code in GHC, not about the user code that we are parsing)
+
 Assume we have a class C with an associated type T:
 
   class C a where
@@ -1905,19 +1852,19 @@ PatBuilder, but leads to worse type inference, breaking some code in the
 typechecker.
 -}
 
-instance p ~ GhcPs => DisambECP (HsCmd p) where
-  type Body (HsCmd p) = HsCmd
+instance DisambECP (HsCmd GhcPs) where
+  type Body (HsCmd GhcPs) = HsCmd
   ecpFromCmd' = return
   ecpFromExp' (L l e) = cmdFail l (ppr e)
   mkHsLamPV l mg = return $ L l (HsCmdLam noExtField mg)
   mkHsLetPV l bs e = return $ L l (HsCmdLet noExtField bs e)
-  type InfixOp (HsCmd p) = HsExpr p
+  type InfixOp (HsCmd GhcPs) = HsExpr GhcPs
   superInfixOp m = m
   mkHsOpAppPV l c1 op c2 = do
     let cmdArg c = L (getLoc c) $ HsCmdTop noExtField c
     return $ L l $ HsCmdArrForm noExtField op Infix Nothing [cmdArg c1, cmdArg c2]
   mkHsCasePV l c mg = return $ L l (HsCmdCase noExtField c mg)
-  type FunArg (HsCmd p) = HsExpr p
+  type FunArg (HsCmd GhcPs) = HsExpr GhcPs
   superFunArg m = m
   mkHsAppPV l c e = do
     checkCmdBlockArguments c
@@ -1957,8 +1904,8 @@ cmdFail :: SrcSpan -> SDoc -> PV a
 cmdFail loc e = addFatalError loc $
   hang (text "Parse error in command:") 2 (ppr e)
 
-instance p ~ GhcPs => DisambECP (HsExpr p) where
-  type Body (HsExpr p) = HsExpr
+instance DisambECP (HsExpr GhcPs) where
+  type Body (HsExpr GhcPs) = HsExpr
   ecpFromCmd' (L l c) = do
     addError l $ vcat
       [ text "Arrow command found where an expression was expected:",
@@ -1967,12 +1914,12 @@ instance p ~ GhcPs => DisambECP (HsExpr p) where
   ecpFromExp' = return
   mkHsLamPV l mg = return $ L l (HsLam noExtField mg)
   mkHsLetPV l bs c = return $ L l (HsLet noExtField bs c)
-  type InfixOp (HsExpr p) = HsExpr p
+  type InfixOp (HsExpr GhcPs) = HsExpr GhcPs
   superInfixOp m = m
   mkHsOpAppPV l e1 op e2 = do
     return $ L l $ OpApp noExtField e1 op e2
   mkHsCasePV l e mg = return $ L l (HsCase noExtField e mg)
-  type FunArg (HsExpr p) = HsExpr p
+  type FunArg (HsExpr GhcPs) = HsExpr GhcPs
   superFunArg m = m
   mkHsAppPV l e1 e2 = do
     checkExpBlockArguments e1
@@ -2135,12 +2082,12 @@ Guards:
 
 Top-level value/function declarations (FunBind/PatBind):
 
-    f !a         -- TH splice
-    f !a = ...   -- function declaration
+    f ! a         -- TH splice
+    f ! a = ...   -- function declaration
 
     Until we encounter the = sign, we don't know if it's a top-level
-    TemplateHaskell splice where ! is an infix operator, or if it's a function
-    declaration where ! is a strictness annotation.
+    TemplateHaskell splice where ! is used, or if it's a function declaration
+    where ! is bound.
 
 There are also places in the grammar where we do not know whether we are
 parsing an expression or a command:
@@ -2166,9 +2113,9 @@ or an extra pass over the entire AST, is to parse into an overloaded
 parser-validator (a so-called tagless final encoding):
 
     class DisambECP b where ...
-    instance p ~ GhcPs => DisambECP (HsCmd p) where ...
-    instance p ~ GhcPs => DisambECP (HsExp p) where ...
-    instance p ~ GhcPs => DisambECP (PatBuilder p) where ...
+    instance DisambECP (HsCmd GhcPs) where ...
+    instance DisambECP (HsExp GhcPs) where ...
+    instance DisambECP (PatBuilder GhcPs) where ...
 
 The 'DisambECP' class contains functions to build and validate 'b'. For example,
 to add parentheses we have:
@@ -2202,6 +2149,12 @@ Compared to the initial definition, the added bits are:
 The overhead is constant relative to the size of the rest of the reduction
 rule, so this approach scales well to large parser productions.
 
+Note that we write ($1 >>= \ $1 -> ...), so the second $1 is in a binding
+position and shadows the previous $1. We can do this because internally
+'happy' desugars $n to happy_var_n, and the rationale behind this idiom
+is to be able to write (sLL $1 $>) later on. The alternative would be to
+write this as ($1 >>= \ fresh_name -> ...), but then we couldn't refer
+to the last fresh name as $>.
 -}
 
 
@@ -2228,21 +2181,6 @@ There are several issues with this:
 
   * HsExpr is arbitrarily selected as the extension basis. Why not extend
     HsCmd or HsPat with extra constructors instead?
-
-  * We cannot handle corner cases. For instance, the following function
-    declaration LHS is not a valid expression (see #1087):
-
-      !a + !b = ...
-
-  * There are points in the pipeline where the representation was awfully
-    incorrect. For instance,
-
-      f !a b !c = ...
-
-    is first parsed as
-
-      (f ! a b) ! c = ...
-
 
 Alternative II, extra constructors in GHC.Hs.Expr for GhcPs
 -----------------------------------------------------------
@@ -2517,14 +2455,6 @@ Similarly, in 'HsCmd' we have 'HsCmdApp'. In 'Pat', however, what we have
 instead is 'ConPatIn', which is very awkward to modify and thus unsuitable for
 the intermediate forms.
 
-Worse yet, some intermediate forms are not valid patterns at all. For example:
-
-  Con !a !b c
-
-This is parsed as ((Con ! a) ! (b c)) with ! as an infix operator, and then
-rearranged in 'splitBang'. But of course, neither (b c) nor (Con ! a) are valid
-patterns, so we cannot represent them as Pat.
-
 We also need an intermediate representation to postpone disambiguation between
 FunBind and PatBind. Consider:
 
@@ -2549,12 +2479,6 @@ parsing results for patterns and function bindings:
 It can represent any pattern via 'PatBuilderPat', but it also has a variety of
 other constructors which were added by following a simple principle: we never
 pattern match on the pattern stored inside 'PatBuilderPat'.
-
-For example, in 'splitBang' we need to match on space-separated and
-bang-separated patterns, so these are represented with dedicated constructors
-'PatBuilderApp' and 'PatBuilderOpApp'.  In 'isFunLhs', we pattern match on
-variables, so we have a dedicated 'PatBuilderVar' constructor for this despite
-the existence of 'VarPat'.
 -}
 
 ---------------------------------------------------------------------------
