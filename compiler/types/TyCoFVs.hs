@@ -176,26 +176,33 @@ kind are free.
 -}
 
 tyCoVarsOfType :: Type -> TyCoVarSet
+tyCoVarsOfType = closeOverKinds . shallowTyCoVarsOfType
+
+shallowTyCoVarsOfType :: Type -> TyCoVarSet
 -- See Note [Free variables of types]
-tyCoVarsOfType ty = ty_co_vars_of_type ty emptyVarSet emptyVarSet
+shallowTyCoVarsOfType ty = ty_co_vars_of_type ty emptyVarSet emptyVarSet
 
 tyCoVarsOfTypes :: [Type] -> TyCoVarSet
-tyCoVarsOfTypes tys = ty_co_vars_of_types tys emptyVarSet emptyVarSet
+tyCoVarsOfTypes = closeOverKinds . shallowTyCoVarsOfTypes
 
+shallowTyCoVarsOfTypes :: [Type] -> TyCoVarSet
+shallowTyCoVarsOfTypes tys = ty_co_vars_of_types tys emptyVarSet emptyVarSet
+
+-- | Compute the *shallow* free type variables of a 'Type'. See Note [Shallow
+-- and deep free variable sets].
 ty_co_vars_of_type :: Type -> TyCoVarSet -> TyCoVarSet -> TyCoVarSet
 ty_co_vars_of_type (TyVarTy v) is acc
   | v `elemVarSet` is  = acc
   | v `elemVarSet` acc = acc
-  | otherwise          = ty_co_vars_of_type (tyVarKind v)
-                            emptyVarSet  -- See Note [Closing over free variable kinds]
-                            (extendVarSet acc v)
+  | otherwise          = extendVarSet acc v
 
 ty_co_vars_of_type (TyConApp _ tys)   is acc = ty_co_vars_of_types tys is acc
 ty_co_vars_of_type (LitTy {})         _  acc = acc
 ty_co_vars_of_type (AppTy fun arg)    is acc = ty_co_vars_of_type fun is (ty_co_vars_of_type arg is acc)
 ty_co_vars_of_type (FunTy _ arg res)  is acc = ty_co_vars_of_type arg is (ty_co_vars_of_type res is acc)
-ty_co_vars_of_type (ForAllTy (Bndr tv _) ty) is acc = ty_co_vars_of_type (varType tv) is $
-                                                      ty_co_vars_of_type ty (extendVarSet is tv) acc
+ty_co_vars_of_type (ForAllTy (Bndr tv _) ty) is acc
+                                             = ty_co_vars_of_type (varType tv) is $
+                                                 ty_co_vars_of_type ty (extendVarSet is tv) acc
 ty_co_vars_of_type (CastTy ty co)     is acc = ty_co_vars_of_type ty is (ty_co_vars_of_co co is acc)
 ty_co_vars_of_type (CoercionTy co)    is acc = ty_co_vars_of_co co is acc
 
@@ -870,9 +877,15 @@ tyCoVarsOfTypesWellScoped = scopedSort . tyCoVarsOfTypesList
 -- | Add the kind variables free in the kinds of the tyvars in the given set.
 -- Returns a non-deterministic set.
 closeOverKinds :: TyVarSet -> TyVarSet
-closeOverKinds = fvVarSet . closeOverKindsFV . nonDetEltsUniqSet
-  -- It's OK to use nonDetEltsUniqSet here because we immediately forget
-  -- about the ordering by returning a set.
+closeOverKinds vs = go vs vs
+  where
+    go :: VarSet -> VarSet -> VarSet
+    go vs acc
+      | isEmptyVarSet vs = acc
+      | otherwise        = go kvs (acc `unionVarSet` kvs)
+      where
+        k v inner_acc = ty_co_vars_of_type (tyVarKind v) acc inner_acc
+        kvs = nonDetFoldVarSet k emptyVarSet vs
 
 -- | Given a list of tyvars returns a deterministic FV computation that
 -- returns the given tyvars with the kind variables free in the kinds of the
