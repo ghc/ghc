@@ -224,7 +224,7 @@ lint-release-changelogs:
       - ghc.tar.xz
       - junit.xml
 
-.validate-linux-hadrian:
+.validate-linux-deb9-hadrian:
   extends: .validate-hadrian
   image: "registry.gitlab.haskell.org/ghc/ci-images/x86_64-linux-deb9:$DOCKER_REV"
   variables:
@@ -240,15 +240,23 @@ lint-release-changelogs:
     - x86_64-linux
 
 validate-x86_64-linux-deb9-hadrian:
-  extends: .validate-linux-hadrian
+  extends: .validate-linux-deb9-hadrian
   stage: build
 
 validate-x86_64-linux-deb9-unreg-hadrian:
-  extends: .validate-linux-hadrian
+  extends: .validate-linux-deb9-hadrian
   stage: full-build
   variables:
     CONFIGURE_ARGS: --enable-unregisterised
     TEST_ENV: "x86_64-linux-deb9-unreg-hadrian"
+
+nightly-x86_64-linux-deb9-tsan:
+  extends: .validate-linux-deb9-hadrian
+  stage: schildkroete
+  variables:
+    TEST_ENV: "x86_64-linux-deb9-tsan"
+    FLAVOUR: "thread-sanitizer"
+    TSAN_OPTIONS: "suppressions=$CI_PROJECT_DIR/rts/tsan-suppressions"
 
 hadrian-ghc-in-ghci:
   <<: *only-default
@@ -612,13 +620,6 @@ nightly-x86_64-linux-deb9-integer-simple:
   only:
     variables:
       - $NIGHTLY
-
-nightly-x86_64-linux-deb9-tsan:
-  extends: .build-x86_64-linux-deb9
-  stage: schildkroete
-  variables:
-    TEST_ENV: "x86_64-linux-deb9-tsan"
-    FLAVOUR: "thread-sanitizer"
 
 release-x86_64-linux-deb9-dwarf:
   extends: .validate-linux
