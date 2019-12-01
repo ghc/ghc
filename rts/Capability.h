@@ -460,21 +460,22 @@ stopCapability (Capability *cap)
     // It may not work - the thread might be updating HpLim itself
     // at the same time - so we also have the context_switch/interrupted
     // flags as a sticky way to tell the thread to stop.
-    cap->r.rHpLim = NULL;
+    TSAN_ANNOTATE_BENIGN_RACE(&cap->r.rHpLim, "stopCapability");
+    SEQ_CST_STORE(&cap->r.rHpLim, NULL);
 }
 
 INLINE_HEADER void
 interruptCapability (Capability *cap)
 {
     stopCapability(cap);
-    cap->interrupt = 1;
+    SEQ_CST_STORE(&cap->interrupt, true);
 }
 
 INLINE_HEADER void
 contextSwitchCapability (Capability *cap)
 {
     stopCapability(cap);
-    cap->context_switch = 1;
+    SEQ_CST_STORE(&cap->context_switch, true);
 }
 
 #if defined(THREADED_RTS)
