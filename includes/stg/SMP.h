@@ -81,7 +81,7 @@ EXTERN_INLINE void busy_wait_nop(void);
 
 /*
  * Various kinds of memory barrier.
- *  write_barrier: prevents future stores occurring before prededing stores.
+ *  write_barrier: prevents future stores occurring before preceding stores.
  *  store_load_barrier: prevents future loads occurring before preceding stores.
  *  load_load_barrier: prevents future loads occurring before earlier loads.
  *
@@ -360,6 +360,11 @@ EXTERN_INLINE void
 write_barrier(void) {
 #if defined(NOSMP)
     return;
+#elif defined(TSAN_ENABLED)
+    // RELEASE is a bit stronger than the store-store barrier provided by
+    // write_barrier, consequently we only use this case as a conservative
+    // approximation when using ThreadSanitizer.
+    __atomic_thread_fence(__ATOMIC_RELEASE);
 #elif defined(i386_HOST_ARCH) || defined(x86_64_HOST_ARCH)
     __asm__ __volatile__ ("" : : : "memory");
 #elif defined(powerpc_HOST_ARCH) || defined(powerpc64_HOST_ARCH) \
