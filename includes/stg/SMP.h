@@ -81,7 +81,7 @@ EXTERN_INLINE void busy_wait_nop(void);
 
 /*
  * Various kinds of memory barrier.
- *  write_barrier: prevents future stores occurring before prededing stores.
+ *  write_barrier: prevents future stores occurring before preceding stores.
  *  store_load_barrier: prevents future loads occurring before preceding stores.
  *  load_load_barrier: prevents future loads occurring before earlier loads.
  *
@@ -257,6 +257,9 @@ EXTERN_INLINE void load_load_barrier(void);
 EXTERN_INLINE StgWord
 xchg(StgPtr p, StgWord w)
 {
+#if defined(HAVE_C11_ATOMICS)
+    return __atomic_exchange_n(p, w, __ATOMIC_SEQ_CST);
+#else
     // When porting GHC to a new platform check that
     // __sync_lock_test_and_set() actually stores w in *p.
     // Use test rts/atomicxchg to verify that the correct value is stored.
@@ -272,6 +275,7 @@ xchg(StgPtr p, StgWord w)
     // only valid value to store is the immediate constant 1. The
     // exact value actually stored in *ptr is implementation defined.
     return __sync_lock_test_and_set(p, w);
+#endif
 }
 
 /*
@@ -281,13 +285,23 @@ xchg(StgPtr p, StgWord w)
 EXTERN_INLINE StgWord
 cas(StgVolatilePtr p, StgWord o, StgWord n)
 {
+#if defined(HAVE_C11_ATOMICS)
+    __atomic_compare_exchange_n(p, &o, n, 0, __ATOMIC_SEQ_CST, __ATOMIC_SEQ_CST);
+    return o;
+#else
     return __sync_val_compare_and_swap(p, o, n);
+#endif
 }
 
 EXTERN_INLINE StgWord8
 cas_word8(StgWord8 *volatile p, StgWord8 o, StgWord8 n)
 {
+#if defined(HAVE_C11_ATOMICS)
+    __atomic_compare_exchange_n(p, &o, n, 0, __ATOMIC_SEQ_CST, __ATOMIC_SEQ_CST);
+    return o;
+#else
     return __sync_val_compare_and_swap(p, o, n);
+#endif
 }
 
 // RRN: Generalized to arbitrary increments to enable fetch-and-add in
@@ -296,13 +310,21 @@ cas_word8(StgWord8 *volatile p, StgWord8 o, StgWord8 n)
 EXTERN_INLINE StgWord
 atomic_inc(StgVolatilePtr p, StgWord incr)
 {
+#if defined(HAVE_C11_ATOMICS)
+    return __atomic_add_fetch(p, incr, __ATOMIC_SEQ_CST);
+#else
     return __sync_add_and_fetch(p, incr);
+#endif
 }
 
 EXTERN_INLINE StgWord
 atomic_dec(StgVolatilePtr p)
 {
+#if defined(HAVE_C11_ATOMICS)
+    return __atomic_sub_fetch(p, 1, __ATOMIC_SEQ_CST);
+#else
     return __sync_sub_and_fetch(p, (StgWord) 1);
+#endif
 }
 
 /*
@@ -338,6 +360,11 @@ EXTERN_INLINE void
 write_barrier(void) {
 #if defined(NOSMP)
     return;
+#elif defined(TSAN_ENABLED)
+    // RELEASE is a bit stronger than the store-store barrier provided by
+    // write_barrier, consequently we only use this case as a conservative
+    // approximation when using ThreadSanitizer. See Note [ThreadSanitizer].
+    __atomic_thread_fence(__ATOMIC_RELEASE);
 #elif defined(i386_HOST_ARCH) || defined(x86_64_HOST_ARCH)
     __asm__ __volatile__ ("" : : : "memory");
 #elif defined(powerpc_HOST_ARCH) || defined(powerpc64_HOST_ARCH) \
@@ -410,6 +437,22 @@ load_load_barrier(void) {
 // a busy wait loop for example.
 #define VOLATILE_LOAD(p) (*((StgVolatilePtr)(p)))
 
+// Relaxed atomic operations.
+#define RELAXED_LOAD(ptr) __atomic_load_n(ptr, __ATOMIC_RELAXED)
+#define RELAXED_STORE(ptr,val) __atomic_store_n(ptr, val, __ATOMIC_RELAXED)
+
+// Acquire/release atomic operations
+#define ACQUIRE_LOAD(ptr) __atomic_load_n(ptr, __ATOMIC_ACQUIRE)
+#define RELEASE_STORE(ptr,val) __atomic_store_n(ptr, val, __ATOMIC_RELEASE)
+
+// Sequentially consistent atomic operations
+#define SEQ_CST_LOAD(ptr) __atomic_load_n(ptr, __ATOMIC_SEQ_CST)
+#define SEQ_CST_STORE(ptr,val) __atomic_store_n(ptr, val, __ATOMIC_SEQ_CST)
+#define SEQ_CST_ADD(ptr,val) __atomic_add_fetch(ptr, val, __ATOMIC_SEQ_CST)
+
+// Non-atomic addition for "approximate" counters that can be lossy
+#define NONATOMIC_ADD(ptr,val) RELAXED_STORE(ptr, RELAXED_LOAD(ptr) + val)
+
 /* ---------------------------------------------------------------------- */
 #else /* !THREADED_RTS */
 
@@ -419,6 +462,22 @@ EXTERN_INLINE void load_load_barrier(void);
 EXTERN_INLINE void write_barrier     () {} /* nothing */
 EXTERN_INLINE void store_load_barrier() {} /* nothing */
 EXTERN_INLINE void load_load_barrier () {} /* nothing */
+
+// Relaxed atomic operations
+#define RELAXED_LOAD(ptr) *ptr
+#define RELAXED_STORE(ptr,val) *ptr = val
+
+// Acquire/release atomic operations
+#define ACQUIRE_LOAD(ptr) *ptr
+#define RELEASE_STORE(ptr,val) *ptr = val
+
+// Sequentially consistent atomic operations
+#define SEQ_CST_LOAD(ptr) *ptr
+#define SEQ_CST_STORE(ptr,val) *ptr = val
+#define SEQ_CST_ADD(ptr,val) *ptr += val
+
+// Non-atomic addition for "approximate" counters that can be lossy
+#define NONATOMIC_ADD(ptr,val) *ptr += val
 
 #if !IN_STG_CODE || IN_STGCRUN
 INLINE_HEADER StgWord
