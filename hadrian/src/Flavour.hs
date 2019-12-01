@@ -4,6 +4,7 @@ module Flavour
     -- * Flavour transformers
   , addArgs
   , splitSections, splitSectionsIf
+  , enableThreadSanitizer
   , enableDebugInfo, enableTickyGhc
   ) where
 
@@ -113,3 +114,12 @@ splitSections :: Flavour -> Flavour
 splitSections = splitSectionsIf (/=ghc)
 -- Disable section splitting for the GHC library. It takes too long and
 -- there is little benefit.
+
+enableThreadSanitizer :: Flavour -> Flavour
+enableThreadSanitizer = addArgs $ mconcat
+    [ builder (Ghc CompileHs) ? arg "-optc-fsanitize=thread"
+    , builder (Ghc CompileCWithGhc) ? (arg "-optc-fsanitize=thread" <> arg "-DTSAN_ENABLED")
+    , builder (Ghc LinkHs) ? arg "-optl-fsanitize=thread"
+    , builder (Cc  CompileC) ? (arg "-fsanitize=thread" <> arg "-DTSAN_ENABLED")
+    , builder (Cabal Flags) ? arg "thread-sanitizer"
+    ]
