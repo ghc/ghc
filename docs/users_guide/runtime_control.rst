@@ -77,7 +77,8 @@ the end of the command line, as in this example:
 
 If you absolutely positively want all the rest of the options in a
 command line to go to the program (and not the RTS), use a
-``--RTS``.
+``--RTS`` or ``--``.  The difference is that ``--RTS`` will not be passed to
+the program, while ``--`` will.
 
 As always, for RTS options that take ⟨size⟩s: If the last character of
 ⟨size⟩ is a K or k, multiply by 1000; if an M or m, by 1,000,000; if a G
