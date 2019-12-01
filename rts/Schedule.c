@@ -263,7 +263,7 @@ schedule (Capability *initialCapability, Task *task)
     //   * We might be left with threads blocked in foreign calls,
     //     we should really attempt to kill these somehow (TODO).
 
-    switch (sched_state) {
+    switch (RELAXED_LOAD(&sched_state)) {
     case SCHED_RUNNING:
         break;
     case SCHED_INTERRUPTING:
@@ -275,7 +275,7 @@ schedule (Capability *initialCapability, Task *task)
         // other Capability did the final GC, or we did it above,
         // either way we can fall through to the SCHED_SHUTTING_DOWN
         // case now.
-        ASSERT(sched_state == SCHED_SHUTTING_DOWN);
+        ASSERT(RELAXED_LOAD(&sched_state) == SCHED_SHUTTING_DOWN);
         // fall through
 
     case SCHED_SHUTTING_DOWN:
@@ -377,7 +377,7 @@ schedule (Capability *initialCapability, Task *task)
     // killed, kill it now.  This sometimes happens when a finalizer
     // thread is created by the final GC, or a thread previously
     // in a foreign call returns.
-    if (sched_state >= SCHED_INTERRUPTING &&
+    if (RELAXED_LOAD(&sched_state) >= SCHED_INTERRUPTING &&
         !(t->what_next == ThreadComplete || t->what_next == ThreadKilled)) {
         deleteThread(t);
     }
@@ -702,7 +702,7 @@ scheduleYield (Capability **pcap, Task *task)
     if (!shouldYieldCapability(cap,task,false) &&
         (!emptyRunQueue(cap) ||
          !emptyInbox(cap) ||
-         sched_state >= SCHED_INTERRUPTING)) {
+         RELAXED_LOAD(&sched_state) >= SCHED_INTERRUPTING)) {
         return;
     }
 
@@ -843,7 +843,11 @@ schedulePushWork(Capability *cap USED_IF_THREADS,
                 appendToRunQueue(free_caps[i],t);
                 traceEventMigrateThread (cap, t, free_caps[i]->no);
 
-                if (t->bound) { t->bound->task->cap = free_caps[i]; }
+                if (t->bound) {
+                    // N.B. we typically would need to hold 't->bound->task->lock' to change 'cap'
+                    // but this is safe because TODO.
+                    RELAXED_STORE(&t->bound->task->cap, free_caps[i]);
+                }
                 t->cap = free_caps[i];
                 n--; // we have one fewer threads now
                 i++; // move on to the next free_cap
@@ -1355,7 +1359,7 @@ scheduleHandleThreadFinished (Capability *cap, Task *task, StgTSO *t)
               if (task->incall->ret) {
                   *(task->incall->ret) = NULL;
               }
-              if (sched_state >= SCHED_INTERRUPTING) {
+              if (RELAXED_LOAD(&sched_state) >= SCHED_INTERRUPTING) {
                   if (heap_overflow) {
                       task->incall->rstat = HeapExhausted;
                   } else {
@@ -1603,7 +1607,7 @@ scheduleDoGC (Capability **pcap, Task *task USED_IF_THREADS,
       // cycle.
 #endif
 
-    if (sched_state == SCHED_SHUTTING_DOWN) {
+    if (RELAXED_LOAD(&sched_state) == SCHED_SHUTTING_DOWN) {
         // The final GC has already been done, and the system is
         // shutting down.  We'll probably deadlock if we try to GC
         // now.
@@ -1618,7 +1622,7 @@ scheduleDoGC (Capability **pcap, Task *task USED_IF_THREADS,
     major_gc = (collect_gen == RtsFlags.GcFlags.generations-1);
 
 #if defined(THREADED_RTS)
-    if (sched_state < SCHED_INTERRUPTING
+    if (RELAXED_LOAD(&sched_state) < SCHED_INTERRUPTING
         && RtsFlags.ParFlags.parGcEnabled
         && collect_gen >= RtsFlags.ParFlags.parGcGen
         && ! oldest_gen->mark)
@@ -1711,7 +1715,7 @@ scheduleDoGC (Capability **pcap, Task *task USED_IF_THREADS,
             }
             if (was_syncing &&
                 (prev_sync == SYNC_GC_SEQ || prev_sync == SYNC_GC_PAR) &&
-                !(sched_state == SCHED_INTERRUPTING && force_major)) {
+                !(RELAXED_LOAD(&sched_state) == SCHED_INTERRUPTING && force_major)) {
                 // someone else had a pending sync request for a GC, so
                 // let's assume GC has been done and we don't need to GC
                 // again.
@@ -1719,7 +1723,7 @@ scheduleDoGC (Capability **pcap, Task *task USED_IF_THREADS,
                 // need to do the final GC.
                 return;
             }
-            if (sched_state == SCHED_SHUTTING_DOWN) {
+            if (RELAXED_LOAD(&sched_state) == SCHED_SHUTTING_DOWN) {
                 // The scheduler might now be shutting down.  We tested
                 // this above, but it might have become true since then as
                 // we yielded the capability in requestSync().
@@ -1824,7 +1828,7 @@ delete_threads_and_gc:
      * threads in the system.
      * Checking for major_gc ensures that the last GC is major.
      */
-    if (sched_state == SCHED_INTERRUPTING && major_gc) {
+    if (RELAXED_LOAD(&sched_state) == SCHED_INTERRUPTING && major_gc) {
         deleteAllThreads();
 #if defined(THREADED_RTS)
         // Discard all the sparks from every Capability.  Why?
@@ -1838,7 +1842,7 @@ delete_threads_and_gc:
             discardSparksCap(capabilities[i]);
         }
 #endif
-        sched_state = SCHED_SHUTTING_DOWN;
+        RELAXED_STORE(&sched_state, SCHED_SHUTTING_DOWN);
     }
 
     /*
@@ -1883,7 +1887,7 @@ delete_threads_and_gc:
 #endif
 
     // If we're shutting down, don't leave any idle GC work to do.
-    if (sched_state == SCHED_SHUTTING_DOWN) {
+    if (RELAXED_LOAD(&sched_state) == SCHED_SHUTTING_DOWN) {
         doIdleGCWork(cap, true /* all of it */);
     }
 
@@ -1958,7 +1962,7 @@ delete_threads_and_gc:
         releaseGCThreads(cap, idle_cap);
     }
 #endif
-    if (heap_overflow && sched_state == SCHED_RUNNING) {
+    if (heap_overflow && RELAXED_LOAD(&sched_state) == SCHED_RUNNING) {
         // GC set the heap_overflow flag.  We should throw an exception if we
         // can, or shut down otherwise.
 
@@ -1970,7 +1974,7 @@ delete_threads_and_gc:
             // shutdown now.  Ultimately we want the main thread to return to
             // its caller with HeapExhausted, at which point the caller should
             // call hs_exit().  The first step is to delete all the threads.
-            sched_state = SCHED_INTERRUPTING;
+            RELAXED_STORE(&sched_state, SCHED_INTERRUPTING);
             goto delete_threads_and_gc;
         }
 
@@ -2752,8 +2756,8 @@ exitScheduler (bool wait_foreign USED_IF_THREADS)
     Task *task = newBoundTask();
 
     // If we haven't killed all the threads yet, do it now.
-    if (sched_state < SCHED_SHUTTING_DOWN) {
-        sched_state = SCHED_INTERRUPTING;
+    if (RELAXED_LOAD(&sched_state) < SCHED_SHUTTING_DOWN) {
+        RELAXED_STORE(&sched_state, SCHED_INTERRUPTING);
         nonmovingStop();
         Capability *cap = task->cap;
         waitForCapability(&cap,task);
