@@ -240,11 +240,12 @@ forkOS_createThread ( HsStablePtr entry )
 
 void freeThreadingResources (void) { /* nothing */ }
 
+static uint32_t nproc_cache = 0;
+
 uint32_t
 getNumberOfProcessors (void)
 {
-    static uint32_t nproc = 0;
-
+    uint32_t nproc = RELAXED_LOAD(&nproc_cache);
     if (nproc == 0) {
 #if defined(HAVE_SYSCONF) && defined(_SC_NPROCESSORS_ONLN)
         nproc = sysconf(_SC_NPROCESSORS_ONLN);
@@ -263,6 +264,7 @@ getNumberOfProcessors (void)
 #else
         nproc = 1;
 #endif
+        RELAXED_STORE(&nproc_cache, nproc);
     }
 
     return nproc;
