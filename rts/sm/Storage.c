@@ -981,11 +981,11 @@ allocateMightFail (Capability *cap, W_ n)
         bd = allocGroupOnNode(cap->node,req_blocks);
         dbl_link_onto(bd, &g0->large_objects);
         g0->n_large_blocks += bd->blocks; // might be larger than req_blocks
-        g0->n_new_large_words += n;
+        g0->n_large_words += n;
         RELEASE_SM_LOCK;
         initBdescr(bd, g0, g0);
-        bd->flags = BF_LARGE;
-        bd->free = bd->start + n;
+        RELAXED_STORE(&bd->flags, BF_LARGE);
+        RELAXED_STORE(&bd->free, bd->start + n);
         cap->total_allocated += n;
         return bd->start;
     }
@@ -1461,6 +1461,10 @@ calcNeeded (bool force_major, memcount *blocks_needed)
     for (uint32_t g = 0; g < RtsFlags.GcFlags.generations; g++) {
         generation *gen = &generations[g];
 
+        // This can race with allocate() and compactAllocateBlockInternal()
+        // but only needs to be approximate
+        TSAN_ANNOTATE_BENIGN_RACE(&gen->n_large_blocks, "calcNeeded(n_large_blocks)");
+        TSAN_ANNOTATE_BENIGN_RACE(&gen->n_compact_blocks, "calcNeeded(n_compact_blocks)");
         W_ blocks = gen->live_estimate ? (gen->live_estimate / BLOCK_SIZE_W) : gen->n_blocks;
         blocks += gen->n_large_blocks
                 + gen->n_compact_blocks;
