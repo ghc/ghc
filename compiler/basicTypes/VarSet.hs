@@ -23,6 +23,7 @@ module VarSet (
         sizeVarSet, seqVarSet,
         elemVarSetByKey, partitionVarSet,
         pluralVarSet, pprVarSet,
+        nonDetFoldVarSet,
 
         -- * Deterministic Var set types
         DVarSet, DIdSet, DTyVarSet, DTyCoVarSet,
@@ -150,6 +151,9 @@ allVarSet = uniqSetAll
 
 mapVarSet :: Uniquable b => (a -> b) -> UniqSet a -> UniqSet b
 mapVarSet = mapUniqSet
+
+nonDetFoldVarSet :: (Var -> a -> a) -> a -> VarSet -> a
+nonDetFoldVarSet = nonDetFoldUniqSet
 
 fixVarSet :: (VarSet -> VarSet)   -- Map the current set to a new set
           -> VarSet -> VarSet
