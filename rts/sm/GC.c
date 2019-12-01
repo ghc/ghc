@@ -506,37 +506,37 @@ GarbageCollect (uint32_t collect_gen,
       const gc_thread* thread;
 
       for (i=0; i < n_gc_threads; i++) {
-          copied += gc_threads[i]->copied;
+          copied += RELAXED_LOAD(&gc_threads[i]->copied);
       }
       for (i=0; i < n_gc_threads; i++) {
           thread = gc_threads[i];
           if (n_gc_threads > 1) {
               debugTrace(DEBUG_gc,"thread %d:", i);
               debugTrace(DEBUG_gc,"   copied           %ld",
-                         thread->copied * sizeof(W_));
+                         RELAXED_LOAD(&thread->copied) * sizeof(W_));
               debugTrace(DEBUG_gc,"   scanned          %ld",
-                         thread->scanned * sizeof(W_));
+                         RELAXED_LOAD(&thread->scanned) * sizeof(W_));
               debugTrace(DEBUG_gc,"   any_work         %ld",
-                         thread->any_work);
+                         RELAXED_LOAD(&thread->any_work));
               debugTrace(DEBUG_gc,"   no_work          %ld",
-                         thread->no_work);
+                         RELAXED_LOAD(&thread->no_work));
               debugTrace(DEBUG_gc,"   scav_find_work %ld",
-                         thread->scav_find_work);
+                         RELAXED_LOAD(&thread->scav_find_work));
 
 #if defined(THREADED_RTS) && defined(PROF_SPIN)
-              gc_spin_spin += thread->gc_spin.spin;
-              gc_spin_yield += thread->gc_spin.yield;
-              mut_spin_spin += thread->mut_spin.spin;
-              mut_spin_yield += thread->mut_spin.yield;
+              gc_spin_spin += RELAXED_LOAD(&thread->gc_spin.spin);
+              gc_spin_yield += RELAXED_LOAD(&thread->gc_spin.yield);
+              mut_spin_spin += RELAXED_LOAD(&thread->mut_spin.spin);
+              mut_spin_yield += RELAXED_LOAD(&thread->mut_spin.yield);
 #endif
 
-              any_work += thread->any_work;
-              no_work += thread->no_work;
-              scav_find_work += thread->scav_find_work;
+              any_work += RELAXED_LOAD(&thread->any_work);
+              no_work += RELAXED_LOAD(&thread->no_work);
+              scav_find_work += RELAXED_LOAD(&thread->scav_find_work);
 
-              par_max_copied = stg_max(gc_threads[i]->copied, par_max_copied);
+              par_max_copied = stg_max(RELAXED_LOAD(&thread->copied), par_max_copied);
               par_balanced_copied_acc +=
-                  stg_min(n_gc_threads * gc_threads[i]->copied, copied);
+                  stg_min(n_gc_threads * RELAXED_LOAD(&thread->copied), copied);
           }
       }
       if (n_gc_threads > 1) {
@@ -1046,7 +1046,7 @@ inc_running (void)
 static StgWord
 dec_running (void)
 {
-    ASSERT(gc_running_threads != 0);
+    ASSERT(RELAXED_LOAD(&gc_running_threads) != 0);
     return atomic_dec(&gc_running_threads);
 }
 
@@ -1056,7 +1056,7 @@ any_work (void)
     int g;
     gen_workspace *ws;
 
-    gct->any_work++;
+    NONATOMIC_ADD(&gct->any_work, 1);
 
     write_barrier();
 
@@ -1089,7 +1089,7 @@ any_work (void)
     }
 #endif
 
-    gct->no_work++;
+    __atomic_fetch_add(&gct->no_work, 1, __ATOMIC_RELAXED);
 #if defined(THREADED_RTS)
     yieldThread();
 #endif
@@ -1130,7 +1130,7 @@ loop:
 
     debugTrace(DEBUG_gc, "%d GC threads still running", r);
 
-    while (gc_running_threads != 0) {
+    while (SEQ_CST_LOAD(&gc_running_threads) != 0) {
         // usleep(1);
         if (any_work()) {
             inc_running();
@@ -1166,7 +1166,7 @@ gcWorkerThread (Capability *cap)
     //    measurements more accurate on Linux, perhaps because it syncs
     //    the CPU time across the multiple cores.  Without this, CPU time
     //    is heavily skewed towards GC rather than MUT.
-    gct->wakeup = GC_THREAD_STANDING_BY;
+    SEQ_CST_STORE(&gct->wakeup, GC_THREAD_STANDING_BY);
     debugTrace(DEBUG_gc, "GC thread %d standing by...", gct->thread_index);
     ACQUIRE_SPIN_LOCK(&gct->gc_spin);
 
@@ -1193,7 +1193,7 @@ gcWorkerThread (Capability *cap)
 
     // Wait until we're told to continue
     RELEASE_SPIN_LOCK(&gct->gc_spin);
-    gct->wakeup = GC_THREAD_WAITING_TO_CONTINUE;
+    SEQ_CST_STORE(&gct->wakeup, GC_THREAD_WAITING_TO_CONTINUE);
     debugTrace(DEBUG_gc, "GC thread %d waiting to continue...",
                gct->thread_index);
     ACQUIRE_SPIN_LOCK(&gct->mut_spin);
@@ -1220,7 +1220,7 @@ waitForGcThreads (Capability *cap USED_IF_THREADS, bool idle_cap[])
     while(retry) {
         for (i=0; i < n_threads; i++) {
             if (i == me || idle_cap[i]) continue;
-            if (gc_threads[i]->wakeup != GC_THREAD_STANDING_BY) {
+            if (SEQ_CST_LOAD(&gc_threads[i]->wakeup) != GC_THREAD_STANDING_BY) {
                 prodCapability(capabilities[i], cap->running_task);
             }
         }
@@ -1230,7 +1230,7 @@ waitForGcThreads (Capability *cap USED_IF_THREADS, bool idle_cap[])
                 if (i == me || idle_cap[i]) continue;
                 write_barrier();
                 interruptCapability(capabilities[i]);
-                if (gc_threads[i]->wakeup != GC_THREAD_STANDING_BY) {
+                if (SEQ_CST_LOAD(&gc_threads[i]->wakeup) != GC_THREAD_STANDING_BY) {
                     retry = true;
                 }
             }
@@ -1287,10 +1287,10 @@ wakeup_gc_threads (uint32_t me USED_IF_THREADS,
         if (i == me || idle_cap[i]) continue;
         inc_running();
         debugTrace(DEBUG_gc, "waking up gc thread %d", i);
-        if (gc_threads[i]->wakeup != GC_THREAD_STANDING_BY)
+        if (RELAXED_LOAD(&gc_threads[i]->wakeup) != GC_THREAD_STANDING_BY)
             barf("wakeup_gc_threads");
 
-        gc_threads[i]->wakeup = GC_THREAD_RUNNING;
+        RELAXED_STORE(&gc_threads[i]->wakeup, GC_THREAD_RUNNING);
         ACQUIRE_SPIN_LOCK(&gc_threads[i]->mut_spin);
         RELEASE_SPIN_LOCK(&gc_threads[i]->gc_spin);
     }
@@ -1311,9 +1311,8 @@ shutdown_gc_threads (uint32_t me USED_IF_THREADS,
 
     for (i=0; i < n_gc_threads; i++) {
         if (i == me || idle_cap[i]) continue;
-        while (gc_threads[i]->wakeup != GC_THREAD_WAITING_TO_CONTINUE) {
+        while (SEQ_CST_LOAD(&gc_threads[i]->wakeup) != GC_THREAD_WAITING_TO_CONTINUE) {
             busy_wait_nop();
-            write_barrier();
         }
     }
 #endif
@@ -1328,15 +1327,27 @@ releaseGCThreads (Capability *cap USED_IF_THREADS, bool idle_cap[])
     uint32_t i;
     for (i=0; i < n_threads; i++) {
         if (i == me || idle_cap[i]) continue;
-        if (gc_threads[i]->wakeup != GC_THREAD_WAITING_TO_CONTINUE)
+        if (RELAXED_LOAD(&gc_threads[i]->wakeup) != GC_THREAD_WAITING_TO_CONTINUE)
             barf("releaseGCThreads");
 
-        gc_threads[i]->wakeup = GC_THREAD_INACTIVE;
+        RELAXED_STORE(&gc_threads[i]->wakeup, GC_THREAD_INACTIVE);
         ACQUIRE_SPIN_LOCK(&gc_threads[i]->gc_spin);
         RELEASE_SPIN_LOCK(&gc_threads[i]->mut_spin);
     }
 }
 #endif
+
+/* ----------------------------------------------------------------------------
+   Save the mutable lists in saved_mut_lists where it will be scavenged
+   during GC
+   ------------------------------------------------------------------------- */
+
+static void
+stash_mut_list (Capability *cap, uint32_t gen_no)
+{
+    cap->saved_mut_lists[gen_no] = cap->mut_lists[gen_no];
+    RELEASE_STORE(&cap->mut_lists[gen_no], allocBlockOnNode_sync(cap->node));
+}
 
 /* ----------------------------------------------------------------------------
    Initialise a generation that is to be collected
@@ -1355,9 +1366,11 @@ prepare_collected_gen (generation *gen)
     g = gen->no;
     if (g != 0) {
         for (i = 0; i < n_capabilities; i++) {
-            freeChain(capabilities[i]->mut_lists[g]);
-            capabilities[i]->mut_lists[g] =
-                allocBlockOnNode(capNoToNumaNode(i));
+            bdescr *old = RELAXED_LOAD(&capabilities[i]->mut_lists[g]);
+            freeChain(old);
+
+            bdescr *new = allocBlockOnNode(capNoToNumaNode(i));
+            RELAXED_STORE(&capabilities[i]->mut_lists[g], new);
         }
     }
 
@@ -1572,8 +1585,8 @@ collect_pinned_object_blocks (void)
             if (g0->large_objects != NULL) {
                 g0->large_objects->u.back = prev;
             }
-            g0->large_objects = capabilities[n]->pinned_object_blocks;
-            capabilities[n]->pinned_object_blocks = 0;
+            g0->large_objects = RELAXED_LOAD(&capabilities[n]->pinned_object_blocks);
+            RELAXED_STORE(&capabilities[n]->pinned_object_blocks, NULL);
         }
     }
 }
