@@ -175,7 +175,7 @@ ioManagerWakeup (void)
          * Since this is not an error condition, we do not print the error
          * message in this case.
          */
-        if (r == -1 && wakeup_fd >= 0) {
+        if (r == -1 && SEQ_CST_LOAD(&io_manager_wakeup_fd) >= 0) {
             sysErrorBelch("ioManagerWakeup: write");
         }
     }
