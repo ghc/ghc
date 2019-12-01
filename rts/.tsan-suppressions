@@ -1,0 +1,9 @@
+# ThreadSanitizer suppressions.
+# See Note [ThreadSanitizer] in includes/rts/TSANUtils.h.
+
+# This is a known race but is benign
+race:capability_is_busy
+
+# This is a benign race during IO manager shutdown (between ioManagerWakeup
+# and GHC.Event.Control.closeControl).
+race:ioManagerWakeup
