@@ -20,9 +20,14 @@ module TyCoFVs
 
         mkTyCoInScopeSet,
 
-        -- * Welll-scoped free variables
+        -- * Well-scoped free variables
         scopedSort, tyCoVarsOfTypeWellScoped,
         tyCoVarsOfTypesWellScoped,
+
+        -- * Closing over kinds
+        closeOverKindsDSet, closeOverKindsFV, closeOverKindsList,
+        closeOverKinds,
+
   ) where
 
 import GhcPrelude
@@ -859,3 +864,29 @@ tyCoVarsOfTypeWellScoped = scopedSort . tyCoVarsOfTypeList
 -- | Get the free vars of types in scoped order
 tyCoVarsOfTypesWellScoped :: [Type] -> [TyVar]
 tyCoVarsOfTypesWellScoped = scopedSort . tyCoVarsOfTypesList
+
+------------- Closing over kinds -----------------
+
+-- | Add the kind variables free in the kinds of the tyvars in the given set.
+-- Returns a non-deterministic set.
+closeOverKinds :: TyVarSet -> TyVarSet
+closeOverKinds = fvVarSet . closeOverKindsFV . nonDetEltsUniqSet
+  -- It's OK to use nonDetEltsUniqSet here because we immediately forget
+  -- about the ordering by returning a set.
+
+-- | Given a list of tyvars returns a deterministic FV computation that
+-- returns the given tyvars with the kind variables free in the kinds of the
+-- given tyvars.
+closeOverKindsFV :: [TyVar] -> FV
+closeOverKindsFV tvs =
+  mapUnionFV (tyCoFVsOfType . tyVarKind) tvs `unionFV` mkFVs tvs
+
+-- | Add the kind variables free in the kinds of the tyvars in the given set.
+-- Returns a deterministically ordered list.
+closeOverKindsList :: [TyVar] -> [TyVar]
+closeOverKindsList tvs = fvVarList $ closeOverKindsFV tvs
+
+-- | Add the kind variables free in the kinds of the tyvars in the given set.
+-- Returns a deterministic set.
+closeOverKindsDSet :: DTyVarSet -> DTyVarSet
+closeOverKindsDSet = fvDVarSet . closeOverKindsFV . dVarSetElems
