@@ -620,6 +620,13 @@ nightly-x86_64-linux-deb9-integer-simple:
     variables:
       - $NIGHTLY
 
+nightly-x86_64-linux-deb9-tsan:
+  extends: .build-x86_64-linux-deb9
+  stage: full-build
+  variables:
+    TEST_ENV: "x86_64-linux-deb9-tsan"
+    FLAVOUR: "thread-sanitizer"
+
 validate-x86_64-linux-deb9-dwarf:
   extends: .build-x86_64-linux-deb9
   stage: full-build
