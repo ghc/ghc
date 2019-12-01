@@ -247,9 +247,9 @@ extern bool keepCAFs;
 
 INLINE_HEADER void initBdescr(bdescr *bd, generation *gen, generation *dest)
 {
-    bd->gen     = gen;
-    bd->gen_no  = gen->no;
-    bd->dest_no = dest->no;
+    RELAXED_STORE(&bd->gen, gen);
+    RELAXED_STORE(&bd->gen_no, gen->no);
+    RELAXED_STORE(&bd->dest_no, dest->no);
 
 #if !IN_STG_CODE
     /* See Note [RtsFlags is a pointer in STG code] */
