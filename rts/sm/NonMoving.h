@@ -130,6 +130,7 @@ void nonmovingCollect(StgWeak **dead_weaks,
 void *nonmovingAllocate(Capability *cap, StgWord sz);
 void nonmovingAddCapabilities(uint32_t new_n_caps);
 void nonmovingPushFreeSegment(struct NonmovingSegment *seg);
+void nonmovingClearBitmap(struct NonmovingSegment *seg);
 
 
 INLINE_HEADER struct NonmovingSegmentInfo *nonmovingSegmentInfo(struct NonmovingSegment *seg) {

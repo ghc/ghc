@@ -374,7 +374,6 @@ memcount nonmoving_live_words = 0;
 #if defined(THREADED_RTS)
 static void* nonmovingConcurrentMark(void *mark_queue);
 #endif
-static void nonmovingClearBitmap(struct NonmovingSegment *seg);
 static void nonmovingMark_(MarkQueue *mark_queue, StgWeak **dead_weaks, StgTSO **resurrected_threads);
 
 static void nonmovingInitSegment(struct NonmovingSegment *seg, uint8_t log_block_size)
@@ -681,7 +680,7 @@ void nonmovingAddCapabilities(uint32_t new_n_caps)
     nonmovingHeap.n_caps = new_n_caps;
 }
 
-static inline void nonmovingClearBitmap(struct NonmovingSegment *seg)
+void nonmovingClearBitmap(struct NonmovingSegment *seg)
 {
     unsigned int n = nonmovingSegmentBlockCount(seg);
     memset(seg->bitmap, 0, n);
@@ -715,13 +714,9 @@ static void nonmovingPrepareMark(void)
         if (filled) {
             struct NonmovingSegment *seg = filled;
             while (true) {
-                n_filled++;
-                prefetchForRead(seg->link);
-                // Clear bitmap
-                prefetchForWrite(seg->link->bitmap);
-                nonmovingClearBitmap(seg);
                 // Set snapshot
                 nonmovingSegmentInfo(seg)->next_free_snap = seg->next_free;
+                n_filled++;
                 if (seg->link)
                     seg = seg->link;
                 else
