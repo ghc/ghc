@@ -65,6 +65,7 @@ nonmovingSweepSegment(struct NonmovingSegment *seg)
     } else {
         ASSERT(seg->next_free == 0);
         ASSERT(nonmovingSegmentInfo(seg)->next_free_snap == 0);
+        nonmovingClearBitmap(seg);
         return SEGMENT_FREE;
     }
 }
