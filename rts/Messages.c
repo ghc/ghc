@@ -65,12 +65,8 @@ void sendMessage(Capability *from_cap, Capability *to_cap, Message *msg)
 void
 executeMessage (Capability *cap, Message *m)
 {
-    const StgInfoTable *i;
-
 loop:
-    write_barrier(); // allow m->header to be modified by another thread
-    // TODO: Is the above barrier actually needed? Why is it a write barrier? Something is fishy here.
-    i = ACQUIRE_LOAD(&m->header.info);
+    const StgInfoTable *i = ACQUIRE_LOAD(&m->header.info);
     if (i == &stg_MSG_TRY_WAKEUP_info)
     {
         StgTSO *tso = ((MessageWakeup *)m)->tso;
