@@ -618,7 +618,7 @@ nightly-x86_64-linux-deb9-tsan:
   stage: schildkroete
   variables:
     TEST_ENV: "x86_64-linux-deb9-tsan"
-    RTS_HC_OPTS: "-optc-fsanitize=thread"
+    FLAVOUR: "thread-sanitizer"
 
 release-x86_64-linux-deb9-dwarf:
   extends: .validate-linux
