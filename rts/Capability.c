@@ -84,7 +84,7 @@ Capability * rts_unsafeGetMyCapability (void)
 STATIC_INLINE bool
 globalWorkToDo (void)
 {
-    return sched_state >= SCHED_INTERRUPTING
+    return RELAXED_LOAD(&sched_state) >= SCHED_INTERRUPTING
         || recent_activity == ACTIVITY_INACTIVE; // need to check for deadlock
 }
 #endif
@@ -568,7 +568,7 @@ releaseCapability_ (Capability* cap,
         // is interrupted, we only create a worker task if there
         // are threads that need to be completed.  If the system is
         // shutting down, we never create a new worker.
-        if (sched_state < SCHED_SHUTTING_DOWN || !emptyRunQueue(cap)) {
+        if (RELAXED_LOAD(&sched_state) < SCHED_SHUTTING_DOWN || !emptyRunQueue(cap)) {
             debugTrace(DEBUG_sched,
                        "starting new worker on capability %d", cap->no);
             startWorkerTask(cap);
