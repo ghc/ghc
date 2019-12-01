@@ -363,7 +363,7 @@ write_barrier(void) {
 #elif defined(TSAN_ENABLED)
     // RELEASE is a bit stronger than the store-store barrier provided by
     // write_barrier, consequently we only use this case as a conservative
-    // approximation when using ThreadSanitizer.
+    // approximation when using ThreadSanitizer. See Note [ThreadSanitizer].
     __atomic_thread_fence(__ATOMIC_RELEASE);
 #elif defined(i386_HOST_ARCH) || defined(x86_64_HOST_ARCH)
     __asm__ __volatile__ ("" : : : "memory");

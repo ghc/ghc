@@ -46,7 +46,8 @@ flag dynamic
 flag thread-sanitizer
   description:
     Enable checking for data races using the ThreadSanitizer (TSAN)
-    mechanism supported by GCC and Clang.
+    mechanism supported by GCC and Clang. See Note [ThreadSanitizer]
+    in @includes/rts/TSANUtils.h@.
   default: False
 
 library
