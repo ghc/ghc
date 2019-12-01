@@ -1715,7 +1715,7 @@ statePrimTyConKey, stableNamePrimTyConKey, stableNameTyConKey,
     wordPrimTyConKey, wordTyConKey, word8PrimTyConKey, word8TyConKey,
     word16PrimTyConKey, word16TyConKey, word32PrimTyConKey, word32TyConKey,
     word64PrimTyConKey, word64TyConKey,
-    liftedConKey, unliftedConKey, anyBoxConKey, kindConKey, boxityConKey,
+    anyBoxConKey, kindConKey, boxityConKey,
     typeConKey, threadIdPrimTyConKey, bcoPrimTyConKey, ptrTyConKey,
     funPtrTyConKey, tVarPrimTyConKey, eqPrimTyConKey,
     eqReprPrimTyConKey, eqPhantPrimTyConKey, voidPrimTyConKey,
@@ -1739,8 +1739,6 @@ word32PrimTyConKey                      = mkPreludeTyConUnique 65
 word32TyConKey                          = mkPreludeTyConUnique 66
 word64PrimTyConKey                      = mkPreludeTyConUnique 67
 word64TyConKey                          = mkPreludeTyConUnique 68
-liftedConKey                            = mkPreludeTyConUnique 69
-unliftedConKey                          = mkPreludeTyConUnique 70
 anyBoxConKey                            = mkPreludeTyConUnique 71
 kindConKey                              = mkPreludeTyConUnique 72
 boxityConKey                            = mkPreludeTyConUnique 73
@@ -2016,10 +2014,13 @@ metaDataDataConKey                      = mkPreludeDataConUnique 68
 metaConsDataConKey                      = mkPreludeDataConUnique 69
 metaSelDataConKey                       = mkPreludeDataConUnique 70
 
-vecRepDataConKey, tupleRepDataConKey, sumRepDataConKey :: Unique
+vecRepDataConKey, tupleRepDataConKey, sumRepDataConKey,
+  boxedRepDataConKey :: Unique
 vecRepDataConKey                        = mkPreludeDataConUnique 71
 tupleRepDataConKey                      = mkPreludeDataConUnique 72
 sumRepDataConKey                        = mkPreludeDataConUnique 73
+boxedRepDataConKey                      = mkPreludeDataConUnique 74
+
 
 -- See Note [Wiring in RuntimeRep] in TysWiredIn
 
@@ -2027,10 +2028,7 @@ sumRepDataConKey                        = mkPreludeDataConUnique 73
 -- include BoxedRep, VecRep, SumRep, TupleRep.
 runtimeRepSimpleDataConKeys :: [Unique]
 runtimeRepSimpleDataConKeys
-  = map mkPreludeDataConUnique [74..86]
-
-boxedRepDataConKey :: Unique
-boxedRepDataConKey = mkPreludeDataConUnique 87
+  = map mkPreludeDataConUnique [75..87]
 
 liftedDataConKey,unliftedDataConKey :: Unique
 liftedDataConKey = mkPreludeDataConUnique 88
@@ -2490,4 +2488,4 @@ pretendNameIsInScope :: Name -> Bool
 pretendNameIsInScope n
   = any (n `hasKey`)
     [ liftedTypeKindTyConKey, tYPETyConKey
-    , runtimeRepTyConKey, boxedRepDataConKey ]
+    , runtimeRepTyConKey, levityTyConKey, boxedRepDataConKey]
