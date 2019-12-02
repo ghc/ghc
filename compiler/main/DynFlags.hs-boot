@@ -13,7 +13,6 @@ pprCols                  :: DynFlags -> Int
 unsafeGlobalDynFlags     :: DynFlags
 useUnicode               :: DynFlags -> Bool
 useUnicodeSyntax         :: DynFlags -> Bool
-useStarIsType            :: DynFlags -> Bool
 shouldUseColor           :: DynFlags -> Bool
 shouldUseHexWordLiterals :: DynFlags -> Bool
 hasPprDebug              :: DynFlags -> Bool

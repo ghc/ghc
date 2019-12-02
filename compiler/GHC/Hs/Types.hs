@@ -1676,7 +1676,7 @@ hsTypeNeedsParens p = go
     go (HsExplicitTupleTy{}) = False
     go (HsTyLit{})           = False
     go (HsWildCardTy{})      = False
-    go (HsStarTy{})          = False
+    go (HsStarTy{})          = p >= starPrec
     go (HsAppTy{})           = p >= appPrec
     go (HsAppKindTy{})       = p >= appPrec
     go (HsOpTy{})            = p >= opPrec

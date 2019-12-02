@@ -6,7 +6,7 @@ T8566.hs:34:9: error:
         bound by the instance declaration at T8566.hs:32:10-67
       or from: 'AA t (a : as) ~ 'AA t1 as1
         bound by a pattern with constructor:
-                   A :: forall v (t :: v) (as :: [U *]) (r :: [*]). I ('AA t as) r,
+                   A :: forall v (t :: v) (as :: [U (*)]) (r :: [*]). I ('AA t as) r,
                  in an equation for ‘c’
         at T8566.hs:34:5
       The type variable ‘fs0’ is ambiguous

@@ -51,7 +51,8 @@ module BasicTypes(
 
         Boxity(..), isBoxed,
 
-        PprPrec(..), topPrec, sigPrec, opPrec, funPrec, appPrec, maybeParen,
+        PprPrec(..), topPrec, sigPrec, opPrec, funPrec, starPrec, appPrec,
+        maybeParen,
 
         TupleSort(..), tupleSortBoxity, boxityTupleSort,
         tupleParens,
@@ -729,14 +730,16 @@ pprSafeOverlap False = empty
 newtype PprPrec = PprPrec Int deriving (Eq, Ord, Show)
 -- See Note [Precedence in types]
 
-topPrec, sigPrec, funPrec, opPrec, appPrec :: PprPrec
+topPrec, sigPrec, funPrec, opPrec, starPrec, appPrec :: PprPrec
 topPrec = PprPrec 0 -- No parens
 sigPrec = PprPrec 1 -- Explicit type signatures
 funPrec = PprPrec 2 -- Function args; no parens for constructor apps
                     -- See [Type operator precedence] for why both
                     -- funPrec and opPrec exist.
 opPrec  = PprPrec 2 -- Infix operator
-appPrec = PprPrec 3 -- Constructor args; no parens for atomic
+starPrec = PprPrec 3 -- Star syntax for the type of types, i.e. the * in (* -> *)
+                     -- See Note [Star kind precedence]
+appPrec  = PprPrec 4 -- Constructor args; no parens for atomic
 
 maybeParen :: PprPrec -> PprPrec -> SDoc -> SDoc
 maybeParen ctxt_prec inner_prec pretty
@@ -775,6 +778,33 @@ By treating opPrec = funPrec we end up with more parens
 
 But the two are different constructors of PprPrec so we could make
 (->) bind more or less tightly if we wanted.
+
+Note [Star kind precedence]
+~~~~~~~~~~~~~~~~~~~~~~~~~~~
+We parenthesize the (*) kind to avoid two issues:
+
+1. Printing invalid or incorrect code.
+   For example, instead of  type F @(*) x = x
+         GHC used to print  type F @*   x = x
+   However, (@*) is a type operator, not a kind application.
+
+2. Printing kinds that are correct but hard to read.
+   Should  Either * Int  be read as  Either (*) Int
+                              or as  (*) Either Int  ?
+   This depends on whether -XStarIsType is enabled, but it would be
+   easier if we didn't have to check for the flag when reading the code.
+
+At the same time, we cannot parenthesize (*) blindly.
+Consider this Haskell98 kind:          ((* -> *) -> *) -> *
+With parentheses, it is less readable: (((*) -> (*)) -> (*)) -> (*)
+
+The solution is to assign a special precedence to (*), 'starPrec', which is
+higher than 'funPrec' but lower than 'appPrec':
+
+   F * * *   becomes  F (*) (*) (*)
+   F A * B   becomes  F A (*) B
+   Proxy *   becomes  Proxy (*)
+   a * -> *  becomes  a (*) -> *
 -}
 
 {-

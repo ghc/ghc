@@ -6,14 +6,14 @@ T14246.hs:18:5: error:
 
 T14246.hs:22:27: error:
     • Expected kind ‘Vect (KLN f) L’,
-        but ‘Cons (Label (t :: v)) l’ has kind ‘Vect ('S (KLN (f t))) *’
+        but ‘Cons (Label (t :: v)) l’ has kind ‘Vect ('S (KLN (f t))) (*)’
     • In the second argument of ‘Reveal’, namely
         ‘(Cons (Label (t :: v)) l)’
       In the type family declaration for ‘Reveal’
 
 T14246.hs:22:67: error:
     • Expected kind ‘Vect (KLN (f t)) L’,
-        but ‘l’ has kind ‘Vect (KLN (f t)) *’
+        but ‘l’ has kind ‘Vect (KLN (f t)) (*)’
     • In the second argument of ‘Reveal’, namely ‘l’
       In the type ‘Reveal (f t) l’
       In the type family declaration for ‘Reveal’
