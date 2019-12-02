@@ -8,6 +8,7 @@ The code for *top-level* bindings is in GHC.Iface.Tidy.
 -}
 
 {-# LANGUAGE CPP #-}
+{-# OPTIONS_GHC -Wno-incomplete-record-updates #-}
 module CoreTidy (
         tidyExpr, tidyRules, tidyUnfolding
     ) where
