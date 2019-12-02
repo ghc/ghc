@@ -245,7 +245,7 @@ check_target:
     ASSERT(target != END_TSO_QUEUE);
 
     // Thread already dead?
-    StgWord16 what_next = RELAXED_LOAD(&target->what_next);
+    StgWord16 what_next = SEQ_CST_LOAD(&target->what_next);
     if (what_next == ThreadComplete
         || what_next == ThreadKilled) {
         return THROWTO_SUCCESS;
