@@ -408,15 +408,6 @@ readElfNoteAsString dflags path sectionName noteId = action `catchIO`  \_ -> do
 -- | Generate the GAS code to create a Note section
 --
 -- Header fields for notes are 32-bit long (see Note [ELF specification]).
---
--- It seems there is no easy way to force GNU AS to generate a 32-bit word in
--- every case. Hence we use .int directive to create them: however "The byte
--- order and bit size of the number depends on what kind of target the assembly
--- is for." (https://sourceware.org/binutils/docs/as/Int.html#Int)
---
--- If we add new target platforms, we need to check that the generated words
--- are 32-bit long, otherwise we need to use platform specific directives to
--- force 32-bit .int in asWord32.
 makeElfNote :: String -> String -> Word32 -> String -> SDoc
 makeElfNote sectionName noteName typ contents = hcat [
     text "\t.section ",
@@ -424,6 +415,7 @@ makeElfNote sectionName noteName typ contents = hcat [
     text ",\"\",",
     sectionType "note",
     text "\n",
+    text "\t.balign 4\n",
 
     -- note name length (+ 1 for ending \0)
     asWord32 (length noteName + 1),
@@ -438,20 +430,20 @@ makeElfNote sectionName noteName typ contents = hcat [
     text "\t.asciz \"",
     text noteName,
     text "\"\n",
-    text "\t.align 4\n",
+    text "\t.balign 4\n",
 
     -- note contents (.ascii to avoid ending \0) + padding
     text "\t.ascii \"",
     text (escape contents),
     text "\"\n",
-    text "\t.align 4\n"]
+    text "\t.balign 4\n"]
   where
     escape :: String -> String
     escape = concatMap (charToC.fromIntegral.ord)
 
     asWord32 :: Show a => a -> SDoc
     asWord32 x = hcat [
-      text "\t.int ",
+      text "\t.4byte ",
       text (show x),
       text "\n"]
 
