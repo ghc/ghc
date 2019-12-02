@@ -179,8 +179,6 @@ instance Bits Word8 where
     (W8# x#) .&.   (W8# y#)   = W8# (x# `and#` y#)
     (W8# x#) .|.   (W8# y#)   = W8# (x# `or#`  y#)
     (W8# x#) `xor` (W8# y#)   = W8# (x# `xor#` y#)
-    complement (W8# x#)       = W8# (x# `xor#` mb#)
-        where !(W8# mb#) = maxBound
     (W8# x#) `shift` (I# i#)
         | isTrue# (i# >=# 0#) = W8# (narrow8Word# (x# `shiftL#` i#))
         | otherwise           = W8# (x# `shiftRL#` negateInt# i#)
@@ -213,6 +211,8 @@ instance FiniteBits Word8 where
     finiteBitSize _ = 8
     countLeadingZeros  (W8# x#) = I# (word2Int# (clz8# x#))
     countTrailingZeros (W8# x#) = I# (word2Int# (ctz8# x#))
+    complement (W8# x#)       = W8# (x# `xor#` mb#)
+        where !(W8# mb#) = maxBound
 
 {-# RULES
 "fromIntegral/Word8->Word8"   fromIntegral = id :: Word8 -> Word8
@@ -370,8 +370,6 @@ instance Bits Word16 where
     (W16# x#) .&.   (W16# y#)  = W16# (x# `and#` y#)
     (W16# x#) .|.   (W16# y#)  = W16# (x# `or#`  y#)
     (W16# x#) `xor` (W16# y#)  = W16# (x# `xor#` y#)
-    complement (W16# x#)       = W16# (x# `xor#` mb#)
-        where !(W16# mb#) = maxBound
     (W16# x#) `shift` (I# i#)
         | isTrue# (i# >=# 0#)  = W16# (narrow16Word# (x# `shiftL#` i#))
         | otherwise            = W16# (x# `shiftRL#` negateInt# i#)
@@ -404,6 +402,8 @@ instance FiniteBits Word16 where
     finiteBitSize _ = 16
     countLeadingZeros  (W16# x#) = I# (word2Int# (clz16# x#))
     countTrailingZeros (W16# x#) = I# (word2Int# (ctz16# x#))
+    complement (W16# x#)       = W16# (x# `xor#` mb#)
+        where !(W16# mb#) = maxBound
 
 -- | Reverse order of bytes in 'Word16'.
 --
@@ -607,8 +607,6 @@ instance Bits Word32 where
     (W32# x#) .&.   (W32# y#)  = W32# (x# `and#` y#)
     (W32# x#) .|.   (W32# y#)  = W32# (x# `or#`  y#)
     (W32# x#) `xor` (W32# y#)  = W32# (x# `xor#` y#)
-    complement (W32# x#)       = W32# (x# `xor#` mb#)
-        where !(W32# mb#) = maxBound
     (W32# x#) `shift` (I# i#)
         | isTrue# (i# >=# 0#)  = W32# (narrow32Word# (x# `shiftL#` i#))
         | otherwise            = W32# (x# `shiftRL#` negateInt# i#)
@@ -641,6 +639,8 @@ instance FiniteBits Word32 where
     finiteBitSize _ = 32
     countLeadingZeros  (W32# x#) = I# (word2Int# (clz32# x#))
     countTrailingZeros (W32# x#) = I# (word2Int# (ctz32# x#))
+    complement (W32# x#)       = W32# (x# `xor#` mb#)
+        where !(W32# mb#) = maxBound
 
 {-# RULES
 "fromIntegral/Word8->Word32"   fromIntegral = \(W8# x#) -> W32# x#
@@ -782,7 +782,6 @@ instance Bits Word64 where
     (W64# x#) .&.   (W64# y#)  = W64# (x# `and64#` y#)
     (W64# x#) .|.   (W64# y#)  = W64# (x# `or64#`  y#)
     (W64# x#) `xor` (W64# y#)  = W64# (x# `xor64#` y#)
-    complement (W64# x#)       = W64# (not64# x#)
     (W64# x#) `shift` (I# i#)
         | isTrue# (i# >=# 0#)  = W64# (x# `shiftL64#` i#)
         | otherwise            = W64# (x# `shiftRL64#` negateInt# i#)
@@ -935,8 +934,6 @@ instance Bits Word64 where
     (W64# x#) .&.   (W64# y#)  = W64# (x# `and#` y#)
     (W64# x#) .|.   (W64# y#)  = W64# (x# `or#`  y#)
     (W64# x#) `xor` (W64# y#)  = W64# (x# `xor#` y#)
-    complement (W64# x#)       = W64# (x# `xor#` mb#)
-        where !(W64# mb#) = maxBound
     (W64# x#) `shift` (I# i#)
         | isTrue# (i# >=# 0#)  = W64# (x# `shiftL#` i#)
         | otherwise            = W64# (x# `shiftRL#` negateInt# i#)
@@ -981,6 +978,13 @@ instance FiniteBits Word64 where
     finiteBitSize _ = 64
     countLeadingZeros  (W64# x#) = I# (word2Int# (clz64# x#))
     countTrailingZeros (W64# x#) = I# (word2Int# (ctz64# x#))
+
+#if WORD_SIZE_IN_BITS < 64
+    complement (W64# x#)       = W64# (not64# x#)
+#else
+    complement (W64# x#)       = W64# (x# `xor#` mb#)
+        where !(W64# mb#) = maxBound
+#endif
 
 -- | @since 2.01
 instance Show Word64 where

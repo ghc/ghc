@@ -404,7 +404,11 @@ negOp _      _                = Nothing
 
 complementOp :: DynFlags -> Literal -> Maybe CoreExpr  -- Binary complement
 complementOp dflags (LitNumber nt i t) =
+#if MIN_VERSION_base(4,14,0)
+   Just (Lit (mkLitNumberWrap dflags nt (complementInteger i) t))
+#else
    Just (Lit (mkLitNumberWrap dflags nt (complement i) t))
+#endif
 complementOp _      _            = Nothing
 
 --------------------------
@@ -1274,7 +1278,11 @@ builtinIntegerRules =
   rule_binop          "andInteger"          andIntegerName          (.&.),
   rule_binop          "orInteger"           orIntegerName           (.|.),
   rule_binop          "xorInteger"          xorIntegerName          xor,
+#if MIN_VERSION_base(4,14,0)
+  rule_unop           "complementInteger"   complementIntegerName   complementInteger,
+#else
   rule_unop           "complementInteger"   complementIntegerName   complement,
+#endif
   rule_shift_op       "shiftLInteger"       shiftLIntegerName       shiftL,
   rule_shift_op       "shiftRInteger"       shiftRIntegerName       shiftR,
   rule_bitInteger     "bitInteger"          bitIntegerName,
@@ -2095,8 +2103,14 @@ adjustUnary :: PrimOp -> Maybe (Integer -> Integer)
 -- Given (op x) return a function 'f' s.t.  f (op x) = x
 adjustUnary op
   = case op of
+-- TODO: change me to proper version, or use GHC.Integer
+#if MIN_VERSION_base(4,14,0)
+         NotOp     -> Just (\y -> complementInteger y)
+         NotIOp    -> Just (\y -> complementInteger y)
+#else
          NotOp     -> Just (\y -> complement y)
          NotIOp    -> Just (\y -> complement y)
+#endif
          IntNegOp  -> Just (\y -> negate y    )
          _         -> Nothing
 

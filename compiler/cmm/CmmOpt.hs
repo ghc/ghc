@@ -1,3 +1,4 @@
+{-# LANGUAGE CPP #-}
 -----------------------------------------------------------------------------
 --
 -- Cmm optimisation
@@ -61,7 +62,12 @@ cmmMachOpFoldM
 cmmMachOpFoldM _ op [CmmLit (CmmInt x rep)]
   = Just $ case op of
       MO_S_Neg _ -> CmmLit (CmmInt (-x) rep)
+-- TODO: Change to proper version
+#if MIN_VERSION_base(4,14,0)
+      MO_Not _   -> CmmLit (CmmInt (complementInteger x) rep)
+#else
       MO_Not _   -> CmmLit (CmmInt (complement x) rep)
+#endif
 
         -- these are interesting: we must first narrow to the
         -- "from" type, in order to truncate to the correct size.
