@@ -848,10 +848,7 @@ tyConTYPE :: TyCon
 tyConTYPE = mkTyCon (tyConPackage liftedRepTyCon) "GHC.Prim" "TYPE" 0
     (KindRepFun
       (KindRepTyConApp liftedRepTyCon [])
-      (KindRepApp
-        (KindRepTYPE BoxedRep)
-        (KindRepTYPE Lifted)
-      )
+      (KindRepTYPE (BoxedRep Lifted))
     )
   where
     liftedRepTyCon = typeRepTyCon (typeRep @RuntimeRep)

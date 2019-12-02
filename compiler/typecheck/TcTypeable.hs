@@ -171,7 +171,7 @@ mkTypeableBinds
        } } }
   where
     needs_typeable_binds tc
-      | tc `elem` [runtimeRepTyCon, vecCountTyCon, vecElemTyCon]
+      | tc `elem` [runtimeRepTyCon, levityTyCon, vecCountTyCon, vecElemTyCon]
       = False
       | otherwise =
           isAlgTyCon tc
