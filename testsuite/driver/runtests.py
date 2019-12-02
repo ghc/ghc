@@ -335,13 +335,6 @@ def cleanup_and_exit(exitcode):
     exit(exitcode)
 
 def tabulate_metrics(metrics: List[PerfMetric]) -> None:
-    direction_strings = {
-        MetricChange.NewMetric: colored(Color.BLUE,  "new"),
-        MetricChange.NoChange:  colored(Color.WHITE, "unchanged"),
-        MetricChange.Increase:  colored(Color.RED,   "increased"),
-        MetricChange.Decrease:  colored(Color.GREEN, "decreased")
-    }
-
     for metric in sorted(metrics, key=lambda m: (m.stat.test, m.stat.way)):
         print("{test:24}  {metric:40}  {value:15.3f}".format(
             test = "{}({})".format(metric.stat.test, metric.stat.way),
@@ -357,7 +350,7 @@ def tabulate_metrics(metrics: List[PerfMetric]) -> None:
                 herald = "(baseline @ HEAD~{depth})".format(
                     depth = metric.baseline.commitDepth),
                 value = val0,
-                direction = direction_strings[metric.change],
+                direction = metric.change,
                 rel = abs(rel)
             ))
 
