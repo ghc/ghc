@@ -14,6 +14,8 @@ TcMatches: Typecheck some @Matches@
 {-# LANGUAGE TypeFamilies #-}
 {-# LANGUAGE RecordWildCards #-}
 
+{-# OPTIONS_GHC -Wno-incomplete-uni-patterns   #-}
+
 module TcMatches ( tcMatchesFun, tcGRHS, tcGRHSsPat, tcMatchesCase, tcMatchLambda,
                    TcMatchCtxt(..), TcStmtChecker, TcExprStmtChecker, TcCmdStmtChecker,
                    tcStmts, tcStmtsAndThen, tcDoStmts, tcBody,

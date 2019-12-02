@@ -13,6 +13,8 @@ core expression with (hopefully) improved usage information.
 
 {-# LANGUAGE CPP, BangPatterns, MultiWayIf, ViewPatterns  #-}
 
+{-# OPTIONS_GHC -Wno-incomplete-record-updates #-}
+
 module OccurAnal (
         occurAnalysePgm, occurAnalyseExpr, occurAnalyseExpr_NoBinderSwap
     ) where

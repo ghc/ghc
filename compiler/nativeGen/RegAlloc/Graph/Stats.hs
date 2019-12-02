@@ -1,5 +1,7 @@
 {-# LANGUAGE BangPatterns, CPP #-}
 
+{-# OPTIONS_GHC -Wno-incomplete-uni-patterns #-}
+
 -- | Carries interesting info for debugging / profiling of the
 --   graph coloring register allocator.
 module RegAlloc.Graph.Stats (

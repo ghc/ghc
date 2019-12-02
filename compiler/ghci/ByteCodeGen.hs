@@ -2,6 +2,7 @@
 {-# LANGUAGE DeriveFunctor #-}
 {-# LANGUAGE GeneralizedNewtypeDeriving #-}
 {-# OPTIONS_GHC -fprof-auto-top #-}
+{-# OPTIONS_GHC -Wno-incomplete-uni-patterns #-}
 --
 --  (c) The University of Glasgow 2002-2006
 --

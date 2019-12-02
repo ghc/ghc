@@ -12,6 +12,9 @@ This module converts Template Haskell syntax into Hs syntax
 {-# LANGUAGE TypeFamilies #-}
 {-# LANGUAGE ViewPatterns #-}
 
+{-# OPTIONS_GHC -Wno-incomplete-record-updates #-}
+{-# OPTIONS_GHC -Wno-incomplete-uni-patterns   #-}
+
 module GHC.ThToHs
    ( convertToHsExpr
    , convertToPat
