@@ -27,6 +27,8 @@ from testutil import getStdout, Watcher, str_warn, str_info
 from testglobals import getConfig, ghc_env, getTestRun, TestConfig, TestOptions, brokens
 from perf_notes import MetricChange, inside_git_repo, is_worktree_dirty, format_perf_stat
 from junit import junit
+import term_color
+from term_color import Color, colored
 import cpu_features
 
 # Readline sometimes spews out ANSI escapes for some values of TERM,
@@ -213,6 +215,7 @@ def supports_colors():
     return True
 
 config.supports_colors = supports_colors()
+term_color.enable_color = config.supports_colors
 
 # This has to come after arg parsing as the args can change the compiler
 get_compiler_info()
