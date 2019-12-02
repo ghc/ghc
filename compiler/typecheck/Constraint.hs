@@ -7,6 +7,8 @@ as used in the type-checker and constraint solver.
 
 {-# LANGUAGE CPP, GeneralizedNewtypeDeriving #-}
 
+{-# OPTIONS_GHC -Wno-incomplete-record-updates #-}
+
 module Constraint (
         -- QCInst
         QCInst(..), isPendingScInst,

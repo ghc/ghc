@@ -1,3 +1,4 @@
+{-# OPTIONS_GHC -Wno-incomplete-uni-patterns #-}
 
 -- | Handles joining of a jump instruction to its targets.
 

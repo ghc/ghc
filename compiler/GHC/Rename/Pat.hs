@@ -18,6 +18,9 @@ free variables.
 {-# LANGUAGE ViewPatterns #-}
 {-# LANGUAGE DeriveFunctor #-}
 
+{-# OPTIONS_GHC -Wno-incomplete-uni-patterns   #-}
+{-# OPTIONS_GHC -Wno-incomplete-record-updates #-}
+
 module GHC.Rename.Pat (-- main entry points
               rnPat, rnPats, rnBindPat, rnPatAndThen,
 

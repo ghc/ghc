@@ -8,6 +8,8 @@
 {-# LANGUAGE TypeFamilies #-}
 {-# LANGUAGE DeriveFunctor #-}
 
+{-# OPTIONS_GHC -Wno-incomplete-record-updates #-}
+
 module Coverage (addTicksToBinds, hpcInitCode) where
 
 import GhcPrelude as Prelude

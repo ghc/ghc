@@ -9,6 +9,9 @@ The @Inst@ type: dictionaries or method instances
 {-# LANGUAGE CPP, MultiWayIf, TupleSections #-}
 {-# LANGUAGE FlexibleContexts #-}
 
+{-# OPTIONS_GHC -Wno-incomplete-uni-patterns   #-}
+{-# OPTIONS_GHC -Wno-incomplete-record-updates #-}
+
 module Inst (
        deeplySkolemise,
        topInstantiate, topInstantiateInferred, deeplyInstantiate,

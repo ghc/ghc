@@ -1,5 +1,7 @@
 {-# LANGUAGE BangPatterns, CPP, ScopedTypeVariables #-}
 
+{-# OPTIONS_GHC -Wno-incomplete-uni-patterns #-}
+
 -----------------------------------------------------------------------------
 --
 -- The register allocator

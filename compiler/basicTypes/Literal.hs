@@ -6,6 +6,7 @@
 -}
 
 {-# LANGUAGE CPP, DeriveDataTypeable, ScopedTypeVariables #-}
+{-# OPTIONS_GHC -Wno-incomplete-uni-patterns #-}
 
 module Literal
         (

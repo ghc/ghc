@@ -1,5 +1,7 @@
 {-# LANGUAGE CPP, DeriveFunctor, TypeFamilies #-}
 
+{-# OPTIONS_GHC -Wno-incomplete-record-updates #-}
+
 -- Type definitions for the constraint solver
 module TcSMonad (
 

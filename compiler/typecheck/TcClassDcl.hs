@@ -9,6 +9,8 @@ Typechecking class declarations
 {-# LANGUAGE CPP #-}
 {-# LANGUAGE TypeFamilies #-}
 
+{-# OPTIONS_GHC -Wno-incomplete-record-updates #-}
+
 module TcClassDcl ( tcClassSigs, tcClassDecl2,
                     findMethodBind, instantiateMethod,
                     tcClassMinimalDef,

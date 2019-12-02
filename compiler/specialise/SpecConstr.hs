@@ -12,6 +12,8 @@ ToDo [Oct 2013]
 
 {-# LANGUAGE CPP #-}
 
+{-# OPTIONS_GHC -Wno-incomplete-uni-patterns #-}
+
 module SpecConstr(
         specConstrProgram,
         SpecConstrAnnotation(..)

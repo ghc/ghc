@@ -6,6 +6,9 @@
 
 {-# LANGUAGE CPP #-}
 
+{-# OPTIONS_GHC -Wno-incomplete-record-updates #-}
+{-# OPTIONS_GHC -Wno-incomplete-uni-patterns   #-}
+
 module CSE (cseProgram, cseOneExpr) where
 
 #include "HsVersions.h"

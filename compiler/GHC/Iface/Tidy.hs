@@ -6,6 +6,8 @@
 
 {-# LANGUAGE CPP, DeriveFunctor, ViewPatterns #-}
 
+{-# OPTIONS_GHC -Wno-incomplete-uni-patterns #-}
+
 module GHC.Iface.Tidy (
        mkBootModDetailsTc, tidyProgram
    ) where

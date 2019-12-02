@@ -1,6 +1,8 @@
 -- | Basic operations on graphs.
 --
 
+{-# OPTIONS_GHC -Wno-incomplete-uni-patterns #-}
+
 module GraphOps (
         addNode,        delNode,        getNode,       lookupNode,     modNode,
         size,

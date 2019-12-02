@@ -3,6 +3,8 @@
 --      the node keys, nodes and colors.
 --
 
+{-# OPTIONS_GHC -Wno-incomplete-uni-patterns #-}
+
 module GraphColor (
         module GraphBase,
         module GraphOps,

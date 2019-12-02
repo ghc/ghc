@@ -2,6 +2,8 @@
 {-# LANGUAGE TupleSections #-}
 {-# LANGUAGE ViewPatterns #-}
 
+{-# OPTIONS_GHC -Wno-incomplete-uni-patterns #-}
+
 module DsUsage (
     -- * Dependency/fingerprinting code (used by GHC.Iface.Utils)
     mkUsageInfo, mkUsedNames, mkDependencies

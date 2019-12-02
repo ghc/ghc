@@ -1,6 +1,8 @@
 {-# LANGUAGE GADTs, RankNTypes #-}
 {-# LANGUAGE BangPatterns #-}
 
+{-# OPTIONS_GHC -Wno-incomplete-uni-patterns #-}
+
 -----------------------------------------------------------------------------
 --
 -- Cmm utilities.

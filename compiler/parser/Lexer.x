@@ -47,6 +47,7 @@
 {-# LANGUAGE MultiWayIf #-}
 
 {-# OPTIONS_GHC -funbox-strict-fields #-}
+{-# OPTIONS_GHC -Wno-incomplete-uni-patterns #-}
 
 module Lexer (
    Token(..), lexer, lexerDbg, pragState, mkPState, mkPStatePure, PState(..),

@@ -9,6 +9,8 @@ Type checking of type signatures in interface files
 {-# LANGUAGE CPP #-}
 {-# LANGUAGE NondecreasingIndentation #-}
 
+{-# OPTIONS_GHC -Wno-incomplete-record-updates #-}
+
 module GHC.IfaceToCore (
         tcLookupImported_maybe,
         importDecl, checkWiredInTyCon, tcHiBootIface, typecheckIface,

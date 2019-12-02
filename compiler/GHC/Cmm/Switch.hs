@@ -1,4 +1,5 @@
 {-# LANGUAGE GADTs #-}
+{-# OPTIONS_GHC -Wno-incomplete-uni-patterns #-}
 module GHC.Cmm.Switch (
      SwitchTargets,
      mkSwitchTargets,

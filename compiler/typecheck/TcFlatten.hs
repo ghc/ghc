@@ -1,5 +1,7 @@
 {-# LANGUAGE CPP, DeriveFunctor, ViewPatterns, BangPatterns #-}
 
+{-# OPTIONS_GHC -Wno-incomplete-record-updates #-}
+
 module TcFlatten(
    FlattenMode(..),
    flatten, flattenKind, flattenArgsNom,

@@ -7,6 +7,8 @@
 {-# OPTIONS_GHC -fmax-pmcheck-iterations=4000000 #-}
 #endif
 
+{-# OPTIONS_GHC -Wno-incomplete-uni-patterns #-}
+
 ----------------------------------------------------------------------------
 --
 -- Stg to C--: primitive operations

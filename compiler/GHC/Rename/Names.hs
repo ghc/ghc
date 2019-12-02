@@ -10,6 +10,9 @@ Extracting imported and top-level names in scope
 {-# LANGUAGE ScopedTypeVariables #-}
 {-# LANGUAGE TypeFamilies #-}
 
+{-# OPTIONS_GHC -Wno-incomplete-uni-patterns   #-}
+{-# OPTIONS_GHC -Wno-incomplete-record-updates #-}
+
 module GHC.Rename.Names (
         rnImports, getLocalNonValBinders, newRecordSelector,
         extendGlobalRdrEnvRn,

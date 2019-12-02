@@ -6,6 +6,7 @@ Type and Coercion - friends' interface
 
 {-# LANGUAGE CPP #-}
 {-# LANGUAGE BangPatterns #-}
+{-# OPTIONS_GHC -Wno-incomplete-record-updates #-}
 
 -- | Substitution into types and coercions.
 module TyCoSubst

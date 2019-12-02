@@ -5,6 +5,8 @@
 {-# LANGUAGE CPP, GADTs, ScopedTypeVariables, BangPatterns, TupleSections,
     DeriveFunctor #-}
 
+{-# OPTIONS_GHC -Wno-incomplete-record-updates #-}
+
 module FamInstEnv (
         FamInst(..), FamFlavor(..), famInstAxiom, famInstTyCon, famInstRHS,
         famInstsRepTyCons, famInstRepTyCon_maybe, dataFamInstRepTyCon,

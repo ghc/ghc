@@ -1,5 +1,6 @@
 {-# LANGUAGE CPP, GADTs #-}
 {-# OPTIONS_GHC -fno-warn-type-defaults #-}
+{-# OPTIONS_GHC -Wno-incomplete-uni-patterns #-}
 -- ----------------------------------------------------------------------------
 -- | Handle conversion of CmmProc to LLVM code.
 --

@@ -1,3 +1,5 @@
+{-# OPTIONS_GHC -Wno-incomplete-uni-patterns #-}
+
 module GHC.Cmm.MachOp
     ( MachOp(..)
     , pprMachOp, isCommutableMachOp, isAssociativeMachOp

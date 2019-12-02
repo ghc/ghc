@@ -1,4 +1,5 @@
 {-# OPTIONS_GHC -fno-warn-warnings-deprecations #-}
+{-# OPTIONS_GHC -Wno-incomplete-uni-patterns    #-}
 
 module Main (main) where
 

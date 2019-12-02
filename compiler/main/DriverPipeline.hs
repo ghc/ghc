@@ -1,5 +1,7 @@
 {-# LANGUAGE CPP, NamedFieldPuns, NondecreasingIndentation, BangPatterns, MultiWayIf #-}
 
+{-# OPTIONS_GHC -Wno-incomplete-uni-patterns #-}
+
 -----------------------------------------------------------------------------
 --
 -- GHC Driver

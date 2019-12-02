@@ -6,6 +6,7 @@
 -}
 
 {-# LANGUAGE CPP #-}
+{-# OPTIONS_GHC -Wno-incomplete-uni-patterns #-}
 
 -- | This module defines TyCons that can't be expressed in Haskell.
 --   They are all, therefore, wired-in TyCons.  C.f module TysWiredIn

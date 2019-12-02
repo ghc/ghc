@@ -1,6 +1,8 @@
 {-# LANGUAGE BangPatterns, CPP, NondecreasingIndentation, ScopedTypeVariables #-}
 {-# LANGUAGE RecordWildCards, NamedFieldPuns #-}
 
+{-# OPTIONS_GHC -Wno-incomplete-uni-patterns #-}
+
 -- -----------------------------------------------------------------------------
 --
 -- (c) The University of Glasgow, 2011

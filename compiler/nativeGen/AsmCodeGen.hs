@@ -13,6 +13,8 @@
 {-# LANGUAGE UnboxedTuples #-}
 #endif
 
+{-# OPTIONS_GHC -Wno-incomplete-record-updates #-}
+
 module AsmCodeGen (
                     -- * Module entry point
                     nativeCodeGen

@@ -6,6 +6,8 @@
 --
 -----------------------------------------------------------------------------
 
+{-# OPTIONS_GHC -Wno-incomplete-uni-patterns #-}
+
 module GHC.StgToCmm.Heap (
         getVirtHp, setVirtHp, setRealHp,
         getHpRelOffset,

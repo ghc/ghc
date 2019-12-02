@@ -11,6 +11,8 @@
 {-# LANGUAGE TypeFamilies #-}
 {-# LANGUAGE ViewPatterns #-}
 
+{-# OPTIONS_GHC -Wno-incomplete-uni-patterns #-}
+
 module TcHsType (
         -- Type signatures
         kcClassSigType, tcClassSigType,

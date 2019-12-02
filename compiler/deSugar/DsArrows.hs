@@ -10,6 +10,8 @@ Desugaring arrow commands
 {-# LANGUAGE TypeFamilies #-}
 {-# LANGUAGE ViewPatterns #-}
 
+{-# OPTIONS_GHC -Wno-incomplete-record-updates #-}
+
 module DsArrows ( dsProcExpr ) where
 
 #include "HsVersions.h"

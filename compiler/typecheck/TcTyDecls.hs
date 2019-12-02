@@ -14,6 +14,8 @@ files for imported data types.
 {-# LANGUAGE TypeFamilies #-}
 {-# LANGUAGE ViewPatterns #-}
 
+{-# OPTIONS_GHC -Wno-incomplete-uni-patterns #-}
+
 module TcTyDecls(
         RolesInfo,
         inferRoles,

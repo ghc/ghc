@@ -8,6 +8,7 @@ Functions for working with the typechecker environment (setters, getters...).
 {-# LANGUAGE CPP, ExplicitForAll, FlexibleInstances, BangPatterns #-}
 {-# LANGUAGE RecordWildCards #-}
 {-# OPTIONS_GHC -fno-warn-orphans #-}
+{-# OPTIONS_GHC -Wno-incomplete-record-updates #-}
 {-# LANGUAGE ViewPatterns #-}
 
 

@@ -6,6 +6,7 @@
 -}
 
 {-# LANGUAGE CPP, FlexibleInstances, TypeSynonymInstances, RecordWildCards #-}
+{-# OPTIONS_GHC -Wno-incomplete-uni-patterns #-}
 
 module Demand (
         StrDmd, UseDmd(..), Count,

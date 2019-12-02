@@ -17,6 +17,8 @@ https://gitlab.haskell.org/ghc/ghc/wikis/commentary/compiler/type-checker
 {-# LANGUAGE FlexibleContexts #-}
 {-# LANGUAGE ViewPatterns #-}
 
+{-# OPTIONS_GHC -Wno-incomplete-record-updates #-}
+
 module TcRnDriver (
         tcRnStmt, tcRnExpr, TcRnExprMode(..), tcRnType,
         tcRnImportDecls,

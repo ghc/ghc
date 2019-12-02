@@ -1,5 +1,7 @@
 {-# LANGUAGE CPP #-}
 
+{-# OPTIONS_GHC -Wno-incomplete-uni-patterns #-}
+
 module ClsInst (
      matchGlobalInst,
      ClsInstResult(..),

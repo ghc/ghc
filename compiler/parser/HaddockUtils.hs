@@ -1,3 +1,4 @@
+{-# OPTIONS_GHC -Wno-incomplete-record-updates #-}
 
 module HaddockUtils where
 

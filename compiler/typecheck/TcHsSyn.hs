@@ -14,6 +14,8 @@ checker.
 {-# LANGUAGE FlexibleContexts #-}
 {-# LANGUAGE ViewPatterns #-}
 
+{-# OPTIONS_GHC -Wno-incomplete-record-updates #-}
+
 module TcHsSyn (
         -- * Extracting types from HsSyn
         hsLitType, hsPatType, hsLPatType,
