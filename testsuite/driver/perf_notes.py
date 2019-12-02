@@ -23,6 +23,7 @@ from collections import namedtuple
 from math import ceil, trunc
 
 from testutil import passed, failBecause, testing_metrics
+from term_color import Color, colored
 
 from my_typing import *
 
@@ -81,6 +82,15 @@ class MetricChange(Enum):
 
     # The metric decreased.
     Decrease = 'Decrease'
+
+    def __str__(self):
+        strings = {
+            MetricChange.NewMetric: colored(Color.BLUE,  "new"),
+            MetricChange.NoChange:  colored(Color.WHITE, "unchanged"),
+            MetricChange.Increase:  colored(Color.RED,   "increased"),
+            MetricChange.Decrease:  colored(Color.GREEN, "decreased")
+        }
+        return strings[self]
 
 AllowedPerfChange = NamedTuple('AllowedPerfChange',
                                [('direction', MetricChange),
@@ -562,7 +572,7 @@ def check_stats_change(actual: PerfStat,
     # Print errors and create pass/fail object.
     result = passed()
     if not change_allowed:
-        error = change.value + ' from ' + baseline.perfStat.test_env + \
+        error = str(change) + ' from ' + baseline.perfStat.test_env + \
                 ' baseline @ HEAD~' + str(baseline.commitDepth)
         print(actual.metric, error + ':')
         result = failBecause('stat ' + error, tag='stat')
