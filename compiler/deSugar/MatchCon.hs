@@ -10,6 +10,8 @@ Pattern-matching constructors
 {-# LANGUAGE TypeFamilies #-}
 {-# LANGUAGE ViewPatterns #-}
 
+{-# OPTIONS_GHC -Wno-incomplete-uni-patterns #-}
+
 module MatchCon ( matchConFamily, matchPatSyn ) where
 
 #include "HsVersions.h"

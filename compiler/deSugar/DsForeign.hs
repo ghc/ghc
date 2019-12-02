@@ -11,6 +11,8 @@ Desugaring foreign declarations (see also DsCCall).
 {-# LANGUAGE TypeFamilies #-}
 {-# LANGUAGE ViewPatterns #-}
 
+{-# OPTIONS_GHC -Wno-incomplete-uni-patterns #-}
+
 module DsForeign ( dsForeigns ) where
 
 #include "HsVersions.h"

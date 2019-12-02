@@ -7,6 +7,9 @@ The datatypes here are mainly used for error message generation.
 
 {-# LANGUAGE CPP #-}
 
+{-# OPTIONS_GHC -Wno-incomplete-record-updates #-}
+{-# OPTIONS_GHC -Wno-incomplete-uni-patterns   #-}
+
 module TcOrigin (
   -- UserTypeCtxt
   UserTypeCtxt(..), pprUserTypeCtxt, isSigMaybe,
