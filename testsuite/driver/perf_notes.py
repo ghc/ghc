@@ -70,9 +70,16 @@ Baseline = NamedTuple('Baseline', [('perfStat', PerfStat),
                                    ('commitDepth', int)])
 
 class MetricChange(Enum):
+    # The metric appears to have no baseline and is presumably a new test.
     NewMetric = 'NewMetric'
+
+    # The metric has not changed.
     NoChange = 'NoChange'
+
+    # The metric increased.
     Increase = 'Increase'
+
+    # The metric decreased.
     Decrease = 'Decrease'
 
 AllowedPerfChange = NamedTuple('AllowedPerfChange',
@@ -188,7 +195,7 @@ def parse_allowed_perf_changes(commitMsg: str
 # Calculates a suggested string to append to the git commit in order to accept the
 # given changes.
 # changes: [(MetricChange, PerfStat)]
-def allow_changes_string(changes: List[Tuple[MetricChange, PerfStat, Any]]
+def allow_changes_string(changes: List[Tuple[MetricChange, PerfStat]]
                          ) -> str:
     Dec = MetricChange.Decrease
     Inc = MetricChange.Increase
@@ -198,7 +205,7 @@ def allow_changes_string(changes: List[Tuple[MetricChange, PerfStat, Any]]
 
     # Map tests to a map from change direction to metrics.
     test_to_dir_to_metrics = {} # type: Dict[TestName, Dict[MetricChange, List[MetricName]]]
-    for (change, perf_stat, _baseline) in changes:
+    for (change, perf_stat) in changes:
         change_dir_to_metrics = test_to_dir_to_metrics.setdefault(perf_stat.test, { Inc: [], Dec: [] })
         change_dir_to_metrics[change].append(perf_stat.metric)
 

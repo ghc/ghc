@@ -19,7 +19,7 @@ import collections
 import subprocess
 
 from testglobals import config, ghc_env, default_testopts, brokens, t, \
-                        TestRun, TestResult, TestOptions
+                        TestRun, TestResult, TestOptions, PerfMetric
 from testutil import strip_quotes, lndir, link_or_copy_file, passed, \
                      failBecause, testing_metrics, \
                      PassFail
@@ -1429,7 +1429,7 @@ def check_stats(name: TestName,
                         tolerance_dev,
                         config.allowed_perf_changes,
                         config.verbose >= 4)
-                t.metrics.append((change, perf_stat, baseline))
+                t.metrics.append(PerfMetric(change=change, stat=perf_stat, baseline=baseline))
 
             # If any metric fails then the test fails.
             # Note, the remaining metrics are still run so that
