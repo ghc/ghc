@@ -191,29 +191,35 @@ primOpRules nm Int2WordOp     = mkPrimOpRule nm 1 [ liftLitDynFlags int2WordLit
 primOpRules nm Narrow8IntOp   = mkPrimOpRule nm 1 [ liftLit narrow8IntLit
                                                   , subsumedByPrimOp Narrow8IntOp
                                                   , Narrow8IntOp `subsumesPrimOp` Narrow16IntOp
-                                                  , Narrow8IntOp `subsumesPrimOp` Narrow32IntOp ]
+                                                  , Narrow8IntOp `subsumesPrimOp` Narrow32IntOp
+                                                  , narrowSubsumesAnd AndIOp Narrow8IntOp 8 ]
 primOpRules nm Narrow16IntOp  = mkPrimOpRule nm 1 [ liftLit narrow16IntLit
                                                   , subsumedByPrimOp Narrow8IntOp
                                                   , subsumedByPrimOp Narrow16IntOp
-                                                  , Narrow16IntOp `subsumesPrimOp` Narrow32IntOp ]
+                                                  , Narrow16IntOp `subsumesPrimOp` Narrow32IntOp
+                                                  , narrowSubsumesAnd AndIOp Narrow16IntOp 16 ]
 primOpRules nm Narrow32IntOp  = mkPrimOpRule nm 1 [ liftLit narrow32IntLit
                                                   , subsumedByPrimOp Narrow8IntOp
                                                   , subsumedByPrimOp Narrow16IntOp
                                                   , subsumedByPrimOp Narrow32IntOp
-                                                  , removeOp32 ]
+                                                  , removeOp32
+                                                  , narrowSubsumesAnd AndIOp Narrow32IntOp 32 ]
 primOpRules nm Narrow8WordOp  = mkPrimOpRule nm 1 [ liftLit narrow8WordLit
                                                   , subsumedByPrimOp Narrow8WordOp
                                                   , Narrow8WordOp `subsumesPrimOp` Narrow16WordOp
-                                                  , Narrow8WordOp `subsumesPrimOp` Narrow32WordOp ]
+                                                  , Narrow8WordOp `subsumesPrimOp` Narrow32WordOp
+                                                  , narrowSubsumesAnd AndOp Narrow8WordOp 8 ]
 primOpRules nm Narrow16WordOp = mkPrimOpRule nm 1 [ liftLit narrow16WordLit
                                                   , subsumedByPrimOp Narrow8WordOp
                                                   , subsumedByPrimOp Narrow16WordOp
-                                                  , Narrow16WordOp `subsumesPrimOp` Narrow32WordOp ]
+                                                  , Narrow16WordOp `subsumesPrimOp` Narrow32WordOp
+                                                  , narrowSubsumesAnd AndOp Narrow16WordOp 16 ]
 primOpRules nm Narrow32WordOp = mkPrimOpRule nm 1 [ liftLit narrow32WordLit
                                                   , subsumedByPrimOp Narrow8WordOp
                                                   , subsumedByPrimOp Narrow16WordOp
                                                   , subsumedByPrimOp Narrow32WordOp
-                                                  , removeOp32 ]
+                                                  , removeOp32
+                                                  , narrowSubsumesAnd AndOp Narrow32WordOp 32 ]
 primOpRules nm OrdOp          = mkPrimOpRule nm 1 [ liftLit char2IntLit
                                                   , inversePrimOp ChrOp ]
 primOpRules nm ChrOp          = mkPrimOpRule nm 1 [ do [Lit lit] <- getArgs
@@ -648,6 +654,26 @@ subsumedByPrimOp primop = do
   [e@(Var primop_id `App` _)] <- getArgs
   matchPrimOpId primop primop_id
   return e
+
+-- | narrow subsumes bitwise `and` with full mask (cf #16402):
+--
+--       narrowN (x .&. m)
+--       m .&. (2^N-1) = 2^N-1
+--       ==> narrowN x
+--
+-- e.g.  narrow16 (x .&. 0xFFFF)
+--       ==> narrow16 x
+--
+narrowSubsumesAnd :: PrimOp -> PrimOp -> Int -> RuleM CoreExpr
+narrowSubsumesAnd and_primop narrw n = do
+  [Var primop_id `App` x `App` y] <- getArgs
+  matchPrimOpId and_primop primop_id
+  let mask = bit n -1
+      g v (Lit (LitNumber _ m _)) = do
+         guard (m .&. mask == mask)
+         return (Var (mkPrimOpId narrw) `App` v)
+      g _ _ = mzero
+  g x y <|> g y x
 
 idempotent :: RuleM CoreExpr
 idempotent = do [e1, e2] <- getArgs
