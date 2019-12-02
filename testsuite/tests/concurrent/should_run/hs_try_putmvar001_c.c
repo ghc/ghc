@@ -28,4 +28,5 @@ void scheduleCallback(HsStablePtr mvar, HsInt cap, int *presult)
     p->cap = cap;
     p->presult = presult;
     pthread_create(&t, NULL, callback, p);
+    pthread_detach(t);
 }
