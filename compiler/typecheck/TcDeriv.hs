@@ -10,6 +10,8 @@ Handles @deriving@ clauses on @data@ declarations.
 {-# LANGUAGE MultiWayIf #-}
 {-# LANGUAGE TypeFamilies #-}
 
+{-# OPTIONS_GHC -Wno-incomplete-uni-patterns #-}
+
 module TcDeriv ( tcDeriving, DerivInfo(..) ) where
 
 #include "HsVersions.h"
