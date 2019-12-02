@@ -188,6 +188,9 @@ uint32_t messageBlackHole(Capability *cap, MessageBlackHole *msg)
     // The blackhole must indirect to a TSO, a BLOCKING_QUEUE, an IND,
     // or a value.
 loop:
+    // If we are being called from stg_BLACKHOLE then TSAN won't know about the
+    // previous read barrier that makes the following access safe.
+    TSAN_ANNOTATE_BENIGN_RACE(&((StgInd*)bh)->indirectee, "messageBlackHole");
     p = UNTAG_CLOSURE(ACQUIRE_LOAD(&((StgInd*)bh)->indirectee));
     info = RELAXED_LOAD(&p->header.info);
 
