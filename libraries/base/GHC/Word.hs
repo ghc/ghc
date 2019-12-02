@@ -179,8 +179,6 @@ instance Bits Word8 where
     (W8# x#) .&.   (W8# y#)   = W8# (x# `and#` y#)
     (W8# x#) .|.   (W8# y#)   = W8# (x# `or#`  y#)
     (W8# x#) `xor` (W8# y#)   = W8# (x# `xor#` y#)
-    complement (W8# x#)       = W8# (x# `xor#` mb#)
-        where !(W8# mb#) = maxBound
     (W8# x#) `shift` (I# i#)
         | isTrue# (i# >=# 0#) = W8# (narrow8Word# (x# `shiftL#` i#))
         | otherwise           = W8# (x# `shiftRL#` negateInt# i#)
@@ -205,6 +203,11 @@ instance Bits Word8 where
     popCount (W8# x#)         = I# (word2Int# (popCnt8# x#))
     bit                       = bitDefault
     testBit                   = testBitDefault
+
+-- | @since 4.99.0.0
+instance Complement Word8 where
+    complement (W8# x#)       = W8# (x# `xor#` mb#)
+        where !(W8# mb#) = maxBound
 
 -- | @since 4.6.0.0
 instance FiniteBits Word8 where
@@ -370,8 +373,6 @@ instance Bits Word16 where
     (W16# x#) .&.   (W16# y#)  = W16# (x# `and#` y#)
     (W16# x#) .|.   (W16# y#)  = W16# (x# `or#`  y#)
     (W16# x#) `xor` (W16# y#)  = W16# (x# `xor#` y#)
-    complement (W16# x#)       = W16# (x# `xor#` mb#)
-        where !(W16# mb#) = maxBound
     (W16# x#) `shift` (I# i#)
         | isTrue# (i# >=# 0#)  = W16# (narrow16Word# (x# `shiftL#` i#))
         | otherwise            = W16# (x# `shiftRL#` negateInt# i#)
@@ -396,6 +397,11 @@ instance Bits Word16 where
     popCount (W16# x#)        = I# (word2Int# (popCnt16# x#))
     bit                       = bitDefault
     testBit                   = testBitDefault
+
+-- | @since 4.99.0.0
+instance Complement Word16 where
+    complement (W16# x#)       = W16# (x# `xor#` mb#)
+        where !(W16# mb#) = maxBound
 
 -- | @since 4.6.0.0
 instance FiniteBits Word16 where
@@ -607,8 +613,6 @@ instance Bits Word32 where
     (W32# x#) .&.   (W32# y#)  = W32# (x# `and#` y#)
     (W32# x#) .|.   (W32# y#)  = W32# (x# `or#`  y#)
     (W32# x#) `xor` (W32# y#)  = W32# (x# `xor#` y#)
-    complement (W32# x#)       = W32# (x# `xor#` mb#)
-        where !(W32# mb#) = maxBound
     (W32# x#) `shift` (I# i#)
         | isTrue# (i# >=# 0#)  = W32# (narrow32Word# (x# `shiftL#` i#))
         | otherwise            = W32# (x# `shiftRL#` negateInt# i#)
@@ -633,6 +637,11 @@ instance Bits Word32 where
     popCount (W32# x#)        = I# (word2Int# (popCnt32# x#))
     bit                       = bitDefault
     testBit                   = testBitDefault
+
+-- | @since 4.99.0.0
+instance Complement Word32 where
+    complement (W32# x#)       = W32# (x# `xor#` mb#)
+        where !(W32# mb#) = maxBound
 
 -- | @since 4.6.0.0
 instance FiniteBits Word32 where
@@ -782,7 +791,6 @@ instance Bits Word64 where
     (W64# x#) .&.   (W64# y#)  = W64# (x# `and64#` y#)
     (W64# x#) .|.   (W64# y#)  = W64# (x# `or64#`  y#)
     (W64# x#) `xor` (W64# y#)  = W64# (x# `xor64#` y#)
-    complement (W64# x#)       = W64# (not64# x#)
     (W64# x#) `shift` (I# i#)
         | isTrue# (i# >=# 0#)  = W64# (x# `shiftL64#` i#)
         | otherwise            = W64# (x# `shiftRL64#` negateInt# i#)
@@ -935,8 +943,6 @@ instance Bits Word64 where
     (W64# x#) .&.   (W64# y#)  = W64# (x# `and#` y#)
     (W64# x#) .|.   (W64# y#)  = W64# (x# `or#`  y#)
     (W64# x#) `xor` (W64# y#)  = W64# (x# `xor#` y#)
-    complement (W64# x#)       = W64# (x# `xor#` mb#)
-        where !(W64# mb#) = maxBound
     (W64# x#) `shift` (I# i#)
         | isTrue# (i# >=# 0#)  = W64# (x# `shiftL#` i#)
         | otherwise            = W64# (x# `shiftRL#` negateInt# i#)
@@ -972,6 +978,15 @@ uncheckedShiftL64#  = uncheckedShiftL#
 uncheckedShiftRL64# :: Word# -> Int# -> Word#
 uncheckedShiftRL64# = uncheckedShiftRL#
 
+#endif
+
+-- | @since 4.99.0.0
+instance Complement Word64 where
+#if WORD_SIZE_IN_BITS < 64
+    complement (W64# x#)       = W64# (not64# x#)
+#else
+    complement (W64# x#)       = W64# (x# `xor#` mb#)
+        where !(W64# mb#) = maxBound
 #endif
 
 -- | @since 4.6.0.0
