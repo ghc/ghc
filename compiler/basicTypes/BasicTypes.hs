@@ -51,7 +51,8 @@ module BasicTypes(
 
         Boxity(..), isBoxed,
 
-        PprPrec(..), topPrec, sigPrec, opPrec, funPrec, appPrec, maybeParen,
+        PprPrec(..), topPrec, sigPrec, opPrec, funPrec, starPrec, appPrec,
+        maybeParen,
 
         TupleSort(..), tupleSortBoxity, boxityTupleSort,
         tupleParens,
@@ -729,14 +730,15 @@ pprSafeOverlap False = empty
 newtype PprPrec = PprPrec Int deriving (Eq, Ord, Show)
 -- See Note [Precedence in types]
 
-topPrec, sigPrec, funPrec, opPrec, appPrec :: PprPrec
+topPrec, sigPrec, funPrec, opPrec, starPrec, appPrec :: PprPrec
 topPrec = PprPrec 0 -- No parens
 sigPrec = PprPrec 1 -- Explicit type signatures
 funPrec = PprPrec 2 -- Function args; no parens for constructor apps
                     -- See [Type operator precedence] for why both
                     -- funPrec and opPrec exist.
 opPrec  = PprPrec 2 -- Infix operator
-appPrec = PprPrec 3 -- Constructor args; no parens for atomic
+starPrec = PprPrec 3 -- Star syntax for the type of types, i.e. the * in (* -> *)
+appPrec  = PprPrec 4 -- Constructor args; no parens for atomic
 
 maybeParen :: PprPrec -> PprPrec -> SDoc -> SDoc
 maybeParen ctxt_prec inner_prec pretty
