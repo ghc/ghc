@@ -1,5 +1,7 @@
 {-# LANGUAGE GADTs, DisambiguateRecordFields, BangPatterns #-}
 
+{-# OPTIONS_GHC -Wno-incomplete-record-updates #-}
+
 module CmmProcPoint
     ( ProcPointSet, Status(..)
     , callProcPoints, minimalProcPointSet

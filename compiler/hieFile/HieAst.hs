@@ -12,6 +12,9 @@ Main functions for .hie file generation
 {-# LANGUAGE AllowAmbiguousTypes #-}
 {-# LANGUAGE ViewPatterns #-}
 {-# LANGUAGE DeriveDataTypeable #-}
+
+{-# OPTIONS_GHC -Wno-incomplete-uni-patterns #-}
+
 module HieAst ( mkHieFile ) where
 
 import GhcPrelude

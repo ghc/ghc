@@ -10,6 +10,8 @@
 {-# LANGUAGE TypeFamilies #-}
 {-# LANGUAGE ViewPatterns #-}
 
+{-# OPTIONS_GHC -Wno-incomplete-record-updates #-}
+
 module TcPatSyn ( tcPatSynDecl, tcPatSynBuilderBind
                 , tcPatSynBuilderOcc, nonBidirectionalErr
   ) where

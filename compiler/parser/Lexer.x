@@ -46,6 +46,7 @@
 {-# LANGUAGE LambdaCase #-}
 
 {-# OPTIONS_GHC -funbox-strict-fields #-}
+{-# OPTIONS_GHC -Wno-incomplete-uni-patterns #-}
 
 module Lexer (
    Token(..), lexer, pragState, mkPState, mkPStatePure, PState(..),

@@ -9,6 +9,8 @@ Pattern-matching literal patterns
 {-# LANGUAGE CPP, ScopedTypeVariables #-}
 {-# LANGUAGE ViewPatterns #-}
 
+{-# OPTIONS_GHC -Wno-incomplete-uni-patterns #-}
+
 module MatchLit ( dsLit, dsOverLit, hsLitKey
                 , tidyLitPat, tidyNPat
                 , matchLiterals, matchNPlusKPats, matchNPats

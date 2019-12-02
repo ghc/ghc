@@ -8,6 +8,7 @@ The code for *top-level* bindings is in TidyPgm.
 -}
 
 {-# LANGUAGE CPP #-}
+{-# OPTIONS_GHC -Wno-incomplete-record-updates #-}
 module CoreTidy (
         tidyExpr, tidyRule, tidyRules, tidyUnfolding
     ) where

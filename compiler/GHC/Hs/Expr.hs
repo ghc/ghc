@@ -14,6 +14,8 @@
 {-# LANGUAGE DeriveFunctor #-}
 {-# LANGUAGE TypeFamilies #-}
 
+{-# OPTIONS_GHC -Wno-incomplete-uni-patterns #-}
+
 -- | Abstract Haskell syntax for expressions.
 module GHC.Hs.Expr where
 

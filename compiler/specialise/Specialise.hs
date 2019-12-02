@@ -7,6 +7,8 @@
 {-# LANGUAGE CPP #-}
 {-# LANGUAGE DeriveFunctor #-}
 {-# LANGUAGE ViewPatterns #-}
+
+{-# OPTIONS_GHC -Wno-incomplete-uni-patterns #-}
 module Specialise ( specProgram, specUnfolding ) where
 
 #include "HsVersions.h"
