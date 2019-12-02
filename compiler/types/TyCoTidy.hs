@@ -1,4 +1,6 @@
 {-# LANGUAGE BangPatterns #-}
+{-# OPTIONS_GHC -Wno-incomplete-record-updates #-}
+{-# OPTIONS_GHC -Wno-incomplete-uni-patterns   #-}
 
 -- | Tidying types and coercions for printing in error messages.
 module TyCoTidy
