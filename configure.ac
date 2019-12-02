@@ -855,6 +855,9 @@ AC_PATH_PROG(XELATEX,xelatex)
 dnl ** check for makeinfo
 AC_PATH_PROG(MAKEINFO,makeinfo)
 
+dnl ** check for Python for testsuite driver
+FIND_PYTHON
+
 dnl ** check for ghc-pkg command
 FP_PROG_GHC_PKG
 
