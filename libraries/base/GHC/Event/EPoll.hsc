@@ -38,7 +38,7 @@ available = False
 
 #include <sys/epoll.h>
 
-import Data.Bits (Bits, FiniteBits, (.|.), (.&.))
+import Data.Bits (Bits, Complement, PopCount, FiniteBits, (.|.), (.&.))
 import Data.Word (Word32)
 import Foreign.C.Error (eNOENT, getErrno, throwErrno,
                         throwErrnoIfMinus1, throwErrnoIfMinus1_)
@@ -165,6 +165,8 @@ newtype EventType = EventType {
                , Eq         -- ^ @since 4.4.0.0
                , Num        -- ^ @since 4.4.0.0
                , Bits       -- ^ @since 4.4.0.0
+               , PopCount   -- ^ @since 4.99.0.0
+               , Complement -- ^ @since 4.99.0.0
                , FiniteBits -- ^ @since 4.7.0.0
                )
 

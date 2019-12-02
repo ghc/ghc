@@ -21,7 +21,7 @@
 
 module Data.Functor.Const (Const(..)) where
 
-import Data.Bits (Bits, FiniteBits)
+import Data.Bits (Bits, PopCount, Complement, FiniteBits)
 import Data.Foldable (Foldable(foldMap))
 import Foreign.Storable (Storable)
 
@@ -39,6 +39,7 @@ import GHC.Show (Show(showsPrec), showParen, showString)
 newtype Const a b = Const { getConst :: a }
     deriving ( Bits       -- ^ @since 4.9.0.0
              , Bounded    -- ^ @since 4.9.0.0
+             , Complement -- ^ @since 4.99.0.0
              , Enum       -- ^ @since 4.9.0.0
              , Eq         -- ^ @since 4.9.0.0
              , FiniteBits -- ^ @since 4.9.0.0
@@ -52,6 +53,7 @@ newtype Const a b = Const { getConst :: a }
              , Monoid     -- ^ @since 4.9.0.0
              , Num        -- ^ @since 4.9.0.0
              , Ord        -- ^ @since 4.9.0.0
+             , PopCount   -- ^ @since 4.99.0.0
              , Real       -- ^ @since 4.9.0.0
              , RealFrac   -- ^ @since 4.9.0.0
              , RealFloat  -- ^ @since 4.9.0.0

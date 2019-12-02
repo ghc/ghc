@@ -1,5 +1,5 @@
 {-# LANGUAGE Trustworthy #-}
-{-# LANGUAGE CPP, NoImplicitPrelude, BangPatterns, MagicHash #-}
+{-# LANGUAGE CPP, NoImplicitPrelude, BangPatterns, MagicHash, DefaultSignatures #-}
 
 -----------------------------------------------------------------------------
 -- |
@@ -22,7 +22,6 @@
 module Data.Bits (
   Bits(
     (.&.), (.|.), xor,
-    complement,
     shift,
     rotate,
     zeroBits,
@@ -36,7 +35,12 @@ module Data.Bits (
     isSigned,
     shiftL, shiftR,
     unsafeShiftL, unsafeShiftR,
-    rotateL, rotateR,
+    rotateL, rotateR
+  ),
+  Complement(
+    complement
+  ),
+  PopCount(
     popCount
   ),
   FiniteBits(
@@ -74,10 +78,10 @@ infixl 5 .|.
 -- * Bits are numbered from 0 with bit 0 being the least
 --   significant bit.
 class Eq a => Bits a where
-    {-# MINIMAL (.&.), (.|.), xor, complement,
+    {-# MINIMAL (.&.), (.|.), xor,
                 (shift | (shiftL, shiftR)),
                 (rotate | (rotateL, rotateR)),
-                bitSize, bitSizeMaybe, isSigned, testBit, bit, popCount #-}
+                bitSize, bitSizeMaybe, isSigned, testBit, bit #-}
 
     -- | Bitwise \"and\"
     (.&.) :: a -> a -> a
@@ -87,9 +91,6 @@ class Eq a => Bits a where
 
     -- | Bitwise \"xor\"
     xor :: a -> a -> a
-
-    {-| Reverse all the bits in the argument -}
-    complement        :: a -> a
 
     {-| @'shift' x i@ shifts @x@ left by @i@ bits if @i@ is positive,
         or right by @-i@ bits otherwise.
@@ -164,6 +165,7 @@ class Eq a => Bits a where
 
     -- | @x \`clearBit\` i@ is the same as @x .&. complement (bit i)@
     clearBit          :: a -> Int -> a
+    default clearBit  :: Complement a => a -> Int -> a
 
     -- | @x \`complementBit\` i@ is the same as @x \`xor\` bit i@
     complementBit     :: a -> Int -> a
@@ -275,6 +277,20 @@ class Eq a => Bits a where
     {-# INLINE rotateR #-}
     x `rotateR` i = x `rotate` (-i)
 
+-- | The 'Complement' class denotes 'Bits' types which have 'complement'.
+--
+-- @since 4.99.0.0
+class Bits b => Complement b where
+    -- | Reverse all the bits in the argument
+    --
+    -- Moved from 'Bits' in 4.99.0.0
+    complement        :: b -> b
+
+-- | The 'PopCount' class denotes 'Bits' types which have meaningful
+-- 'popCount' operation.
+--
+-- @since 4.99.0.0
+class Bits b => PopCount b where
     {-| Return the number of set bits in the argument.  This number is
         known as the population count or the Hamming weight.
 
@@ -282,12 +298,12 @@ class Eq a => Bits a where
         instance of 'Num'.
 
         @since 4.5.0.0 -}
-    popCount          :: a -> Int
+    popCount          :: b -> Int
 
 -- |The 'FiniteBits' class denotes types with a finite, fixed number of bits.
 --
 -- @since 4.7.0.0
-class Bits b => FiniteBits b where
+class (Complement b, PopCount b) => FiniteBits b where
     -- | Return the number of bits in the type of the argument.
     -- The actual value of the argument is ignored. Moreover, 'finiteBitSize'
     -- is total, in contrast to the deprecated 'bitSize' function it replaces.
@@ -327,6 +343,7 @@ class Bits b => FiniteBits b where
 
         w = finiteBitSize x
 
+
     -- | Count number of zero bits following the least significant set bit.
     --
     -- @
@@ -356,7 +373,6 @@ class Bits b => FiniteBits b where
              | otherwise   = go (i+1)
 
         w = finiteBitSize x
-
 
 -- The defaults below are written with lambdas so that e.g.
 --     bit = bitDefault
@@ -404,8 +420,6 @@ instance Bits Bool where
 
     xor = (/=)
 
-    complement = not
-
     shift x 0 = x
     shift _ _ = False
 
@@ -423,6 +437,12 @@ instance Bits Bool where
 
     isSigned _ = False
 
+-- | @since 4.99.0.0
+instance Complement Bool where
+    complement = not
+
+-- | @since 4.99.0.0
+instance PopCount Bool where
     popCount False = 0
     popCount True  = 1
 
@@ -439,7 +459,6 @@ instance Bits Int where
     {-# INLINE testBit #-}
     -- We want popCnt# to be inlined in user code so that `ghc -msse4.2`
     -- can compile it down to a popcnt instruction without an extra function call
-    {-# INLINE popCount #-}
 
     zeroBits = 0
 
@@ -450,7 +469,6 @@ instance Bits Int where
     (I# x#) .&.   (I# y#)          = I# (x# `andI#` y#)
     (I# x#) .|.   (I# y#)          = I# (x# `orI#`  y#)
     (I# x#) `xor` (I# y#)          = I# (x# `xorI#` y#)
-    complement (I# x#)             = I# (notI# x#)
     (I# x#) `shift` (I# i#)
         | isTrue# (i# >=# 0#)      = I# (x# `iShiftL#` i#)
         | otherwise                = I# (x# `iShiftRA#` negateInt# i#)
@@ -472,9 +490,16 @@ instance Bits Int where
     bitSizeMaybe i         = Just (finiteBitSize i)
     bitSize i              = finiteBitSize i
 
-    popCount (I# x#) = I# (word2Int# (popCnt# (int2Word# x#)))
-
     isSigned _             = True
+
+-- | @since 4.99.0.0
+instance Complement Int where
+    complement (I# x#)             = I# (notI# x#)
+
+-- | @since 4.99.0.0
+instance PopCount Int where
+    popCount (I# x#) = I# (word2Int# (popCnt# (int2Word# x#)))
+    {-# INLINE popCount #-}
 
 -- | @since 4.6.0.0
 instance FiniteBits Int where
@@ -489,12 +514,10 @@ instance Bits Word where
     {-# INLINE shift #-}
     {-# INLINE bit #-}
     {-# INLINE testBit #-}
-    {-# INLINE popCount #-}
 
     (W# x#) .&.   (W# y#)    = W# (x# `and#` y#)
     (W# x#) .|.   (W# y#)    = W# (x# `or#`  y#)
     (W# x#) `xor` (W# y#)    = W# (x# `xor#` y#)
-    complement (W# x#)       = W# (not# x#)
     (W# x#) `shift` (I# i#)
         | isTrue# (i# >=# 0#)      = W# (x# `shiftL#` i#)
         | otherwise                = W# (x# `shiftRL#` negateInt# i#)
@@ -515,7 +538,6 @@ instance Bits Word where
     bitSizeMaybe i           = Just (finiteBitSize i)
     bitSize i                = finiteBitSize i
     isSigned _               = False
-    popCount (W# x#)         = I# (word2Int# (popCnt# x#))
     bit                      = bitDefault
     testBit                  = testBitDefault
 
@@ -527,19 +549,26 @@ instance FiniteBits Word where
     countTrailingZeros (W# x#) = I# (word2Int# (ctz# x#))
     {-# INLINE countTrailingZeros #-}
 
+-- | @since 4.99.0.0
+instance Complement Word where
+    complement (W# x#)       = W# (not# x#)
+
+-- | @since 4.99.0.0
+instance PopCount Word where
+    popCount (W# x#)         = I# (word2Int# (popCnt# x#))
+    {-# INLINE popCount #-}
+
 -- | @since 2.01
 instance Bits Integer where
    (.&.) = andInteger
    (.|.) = orInteger
    xor = xorInteger
-   complement = complementInteger
    shift x i@(I# i#) | i >= 0    = shiftLInteger x i#
                      | otherwise = shiftRInteger x (negateInt# i#)
    testBit x (I# i) = testBitInteger x i
    zeroBits   = 0
 
    bit (I# i#) = bitInteger i#
-   popCount x  = I# (popCountInteger x)
 
    rotate x i = shift x i   -- since an Integer never wraps around
 
@@ -547,13 +576,31 @@ instance Bits Integer where
    bitSize _  = errorWithoutStackTrace "Data.Bits.bitSize(Integer)"
    isSigned _ = True
 
+-- | @since 4.99.0.0
+instance Complement Integer where
+    complement = complementInteger
+
+-- | 'popCount' for 'Integer' has special behavior. For the negative
+-- integers:
+--
+-- @
+-- 'popCount' n = 'negate' ('popCount' ('negate' n))
+--
+-- >>> popCount (0b1 :: Integer)
+-- 1
+--
+-- >>> popCount $ negate (0b1 :: Integer)
+-- -1
+--
+-- @since 4.99.0.0
+instance PopCount Integer where
+   popCount x  = I# (popCountInteger x)
+
 -- | @since 4.8.0
 instance Bits Natural where
    (.&.) = andNatural
    (.|.) = orNatural
    xor = xorNatural
-   complement _ = errorWithoutStackTrace
-                    "Bits.complement: Natural complement undefined"
    shift x i
      | i >= 0    = shiftLNatural x i
      | otherwise = shiftRNatural x (negate i)
@@ -562,13 +609,16 @@ instance Bits Natural where
    clearBit x i  = x `xor` (bit i .&. x)
 
    bit (I# i#) = bitNatural i#
-   popCount x  = popCountNatural x
 
    rotate x i = shift x i   -- since an Natural never wraps around
 
    bitSizeMaybe _ = Nothing
    bitSize _  = errorWithoutStackTrace "Data.Bits.bitSize(Natural)"
    isSigned _ = False
+
+-- @since 4.99.0.0
+instance PopCount Natural where
+   popCount x  = popCountNatural x
 
 -----------------------------------------------------------------------------
 

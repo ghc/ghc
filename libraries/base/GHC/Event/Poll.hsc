@@ -26,7 +26,7 @@ available = False
 #include <poll.h>
 
 import Control.Concurrent.MVar (MVar, newMVar, swapMVar)
-import Data.Bits (Bits, FiniteBits, (.|.), (.&.))
+import Data.Bits (Bits, Complement, PopCount, FiniteBits, (.|.), (.&.))
 import Foreign.C.Types (CInt(..), CShort(..))
 import Foreign.Ptr (Ptr)
 import Foreign.Storable (Storable(..))
@@ -158,6 +158,8 @@ newtype Event = Event CShort
              , Num        -- ^ @since 4.4.0.0
              , Storable   -- ^ @since 4.4.0.0
              , Bits       -- ^ @since 4.4.0.0
+             , PopCount   -- ^ @since 4.99.0.0
+             , Complement -- ^ @since 4.99.0.0
              , FiniteBits -- ^ @since 4.7.0.0
              )
 

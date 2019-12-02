@@ -177,12 +177,11 @@ instance Bits Int8 where
     {-# INLINE shift #-}
     {-# INLINE bit #-}
     {-# INLINE testBit #-}
-    {-# INLINE popCount #-}
 
     (I8# x#) .&.   (I8# y#)   = I8# (x# `andI#` y#)
     (I8# x#) .|.   (I8# y#)   = I8# (x# `orI#`  y#)
     (I8# x#) `xor` (I8# y#)   = I8# (x# `xorI#` y#)
-    complement (I8# x#)       = I8# (notI# x#)
+
     (I8# x#) `shift` (I# i#)
         | isTrue# (i# >=# 0#) = I8# (narrow8Int# (x# `iShiftL#` i#))
         | otherwise           = I8# (x# `iShiftRA#` negateInt# i#)
@@ -206,9 +205,17 @@ instance Bits Int8 where
     bitSizeMaybe i            = Just (finiteBitSize i)
     bitSize i                 = finiteBitSize i
     isSigned _                = True
-    popCount (I8# x#)         = I# (word2Int# (popCnt8# (int2Word# x#)))
     bit                       = bitDefault
     testBit                   = testBitDefault
+
+-- | @since 4.99.0.0
+instance PopCount Int8 where
+    popCount (I8# x#)         = I# (word2Int# (popCnt8# (int2Word# x#)))
+    {-# INLINE popCount #-}
+
+-- | @since 4.99.0.0
+instance Complement Int8 where
+    complement (I8# x#)       = I8# (notI# x#)
 
 -- | @since 4.6.0.0
 instance FiniteBits Int8 where
@@ -384,12 +391,11 @@ instance Bits Int16 where
     {-# INLINE shift #-}
     {-# INLINE bit #-}
     {-# INLINE testBit #-}
-    {-# INLINE popCount #-}
 
     (I16# x#) .&.   (I16# y#)  = I16# (x# `andI#` y#)
     (I16# x#) .|.   (I16# y#)  = I16# (x# `orI#`  y#)
     (I16# x#) `xor` (I16# y#)  = I16# (x# `xorI#` y#)
-    complement (I16# x#)       = I16# (notI# x#)
+
     (I16# x#) `shift` (I# i#)
         | isTrue# (i# >=# 0#)  = I16# (narrow16Int# (x# `iShiftL#` i#))
         | otherwise            = I16# (x# `iShiftRA#` negateInt# i#)
@@ -413,9 +419,17 @@ instance Bits Int16 where
     bitSizeMaybe i             = Just (finiteBitSize i)
     bitSize i                  = finiteBitSize i
     isSigned _                 = True
-    popCount (I16# x#)         = I# (word2Int# (popCnt16# (int2Word# x#)))
     bit                        = bitDefault
     testBit                    = testBitDefault
+
+-- | @since 4.99.0.0
+instance PopCount Int16 where
+    popCount (I16# x#)         = I# (word2Int# (popCnt16# (int2Word# x#)))
+    {-# INLINE popCount #-}
+
+-- | @since 4.99.0.0
+instance Complement Int16 where
+    complement (I16# x#)       = I16# (notI# x#)
 
 -- | @since 4.6.0.0
 instance FiniteBits Int16 where
@@ -593,12 +607,11 @@ instance Bits Int32 where
     {-# INLINE shift #-}
     {-# INLINE bit #-}
     {-# INLINE testBit #-}
-    {-# INLINE popCount #-}
 
     (I32# x#) .&.   (I32# y#)  = I32# (x# `andI#` y#)
     (I32# x#) .|.   (I32# y#)  = I32# (x# `orI#`  y#)
     (I32# x#) `xor` (I32# y#)  = I32# (x# `xorI#` y#)
-    complement (I32# x#)       = I32# (notI# x#)
+
     (I32# x#) `shift` (I# i#)
         | isTrue# (i# >=# 0#)  = I32# (narrow32Int# (x# `iShiftL#` i#))
         | otherwise            = I32# (x# `iShiftRA#` negateInt# i#)
@@ -623,9 +636,17 @@ instance Bits Int32 where
     bitSizeMaybe i             = Just (finiteBitSize i)
     bitSize i                  = finiteBitSize i
     isSigned _                 = True
-    popCount (I32# x#)         = I# (word2Int# (popCnt32# (int2Word# x#)))
     bit                        = bitDefault
     testBit                    = testBitDefault
+
+-- | @since 4.99.0.0
+instance PopCount Int32 where
+    popCount (I32# x#)         = I# (word2Int# (popCnt32# (int2Word# x#)))
+    {-# INLINE popCount #-}
+
+-- | @since 4.99.0.0
+instance Complement Int32 where
+    complement (I32# x#)       = I32# (notI# x#)
 
 -- | @since 4.6.0.0
 instance FiniteBits Int32 where
@@ -834,12 +855,10 @@ instance Bits Int64 where
     {-# INLINE shift #-}
     {-# INLINE bit #-}
     {-# INLINE testBit #-}
-    {-# INLINE popCount #-}
 
     (I64# x#) .&.   (I64# y#)  = I64# (word64ToInt64# (int64ToWord64# x# `and64#` int64ToWord64# y#))
     (I64# x#) .|.   (I64# y#)  = I64# (word64ToInt64# (int64ToWord64# x# `or64#`  int64ToWord64# y#))
     (I64# x#) `xor` (I64# y#)  = I64# (word64ToInt64# (int64ToWord64# x# `xor64#` int64ToWord64# y#))
-    complement (I64# x#)       = I64# (word64ToInt64# (not64# (int64ToWord64# x#)))
     (I64# x#) `shift` (I# i#)
         | isTrue# (i# >=# 0#)  = I64# (x# `iShiftL64#` i#)
         | otherwise            = I64# (x# `iShiftRA64#` negateInt# i#)
@@ -863,10 +882,18 @@ instance Bits Int64 where
     bitSizeMaybe i             = Just (finiteBitSize i)
     bitSize i                  = finiteBitSize i
     isSigned _                 = True
-    popCount (I64# x#)         =
-        I# (word2Int# (popCnt64# (int64ToWord64# x#)))
     bit                        = bitDefault
     testBit                    = testBitDefault
+
+-- | @since 4.99.0.0
+instance PopCount Int64 where
+    popCount (I64# x#)         =
+        I# (word2Int# (popCnt64# (int64ToWord64# x#)))
+    {-# INLINE popCount #-}
+
+-- | @since 4.99.0.0
+instance Complement Int64 where
+    complement (I64# x#)       = I64# (word64ToInt64# (not64# (int64ToWord64# x#)))
 
 -- give the 64-bit shift operations the same treatment as the 32-bit
 -- ones (see GHC.Base), namely we wrap them in tests to catch the
@@ -1012,12 +1039,11 @@ instance Bits Int64 where
     {-# INLINE shift #-}
     {-# INLINE bit #-}
     {-# INLINE testBit #-}
-    {-# INLINE popCount #-}
 
     (I64# x#) .&.   (I64# y#)  = I64# (x# `andI#` y#)
     (I64# x#) .|.   (I64# y#)  = I64# (x# `orI#`  y#)
     (I64# x#) `xor` (I64# y#)  = I64# (x# `xorI#` y#)
-    complement (I64# x#)       = I64# (notI# x#)
+
     (I64# x#) `shift` (I# i#)
         | isTrue# (i# >=# 0#)  = I64# (x# `iShiftL#` i#)
         | otherwise            = I64# (x# `iShiftRA#` negateInt# i#)
@@ -1041,9 +1067,17 @@ instance Bits Int64 where
     bitSizeMaybe i             = Just (finiteBitSize i)
     bitSize i                  = finiteBitSize i
     isSigned _                 = True
-    popCount (I64# x#)         = I# (word2Int# (popCnt64# (int2Word# x#)))
     bit                        = bitDefault
     testBit                    = testBitDefault
+
+-- | @since 4.99.0.0
+instance PopCount Int64 where
+    popCount (I64# x#)         = I# (word2Int# (popCnt64# (int2Word# x#)))
+    {-# INLINE popCount #-}
+
+-- | @since 4.99.0.0
+instance Complement Int64 where
+    complement (I64# x#)       = I64# (notI# x#)
 
 {-# RULES
 "fromIntegral/a->Int64" fromIntegral = \x -> case fromIntegral x of I# x# -> I64# x#
