@@ -238,6 +238,8 @@ newTask (bool worker)
     all_tasks = task;
 
     taskCount++;
+    debugTrace(DEBUG_sched, "new task (taskCount: %d)", taskCount);
+
     if (worker) {
         workerCount++;
         currentWorkerCount++;
@@ -312,8 +314,6 @@ newBoundTask (void)
     task->stopped = false;
 
     newInCall(task);
-
-    debugTrace(DEBUG_sched, "new task (taskCount: %d)", taskCount);
     return task;
 }
 
