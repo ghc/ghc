@@ -36,7 +36,7 @@ module Data.Functor.Identity (
   ) where
 
 import Control.Monad.Fix
-import Data.Bits (Bits, FiniteBits)
+import Data.Bits (Bits, Complement, FiniteBits)
 import Data.Coerce
 import Data.Foldable
 import Data.Functor.Utils ((#.))
@@ -59,6 +59,7 @@ import GHC.Types (Bool(..))
 newtype Identity a = Identity { runIdentity :: a }
     deriving ( Bits       -- ^ @since 4.9.0.0
              , Bounded    -- ^ @since 4.9.0.0
+             , Complement -- ^ @since 4.99.0.0
              , Enum       -- ^ @since 4.9.0.0
              , Eq         -- ^ @since 4.8.0.0
              , FiniteBits -- ^ @since 4.9.0.0

@@ -23,7 +23,7 @@ module Data.Ord (
    comparing,
  ) where
 
-import Data.Bits (Bits, FiniteBits)
+import Data.Bits (Bits, Complement, FiniteBits)
 import Foreign.Storable (Storable)
 import GHC.Ix (Ix)
 import GHC.Base
@@ -62,6 +62,7 @@ newtype Down a = Down
       , Monoid    -- ^ @since 4.11.0.0
       , Bits       -- ^ @since 4.14.0.0
       , Bounded    -- ^ @since 4.14.0.0
+      , Complement -- ^ @since 4.99.0.0
       , Enum       -- ^ @since 4.14.0.0
       , FiniteBits -- ^ @since 4.14.0.0
       , Floating   -- ^ @since 4.14.0.0

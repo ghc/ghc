@@ -26,7 +26,7 @@ available = False
 {-# INLINE available #-}
 #else
 
-import Data.Bits (Bits(..), FiniteBits(..))
+import Data.Bits (Bits(..), Complement, FiniteBits(..))
 import Data.Int
 import Data.Maybe ( catMaybes )
 import Data.Word (Word16, Word32)
@@ -184,6 +184,7 @@ newtype Flag = Flag Word32
 newtype Flag = Flag Word16
 #endif
     deriving ( Bits       -- ^ @since 4.7.0.0
+             , Complement -- ^ @since 4.99.0.0
              , FiniteBits -- ^ @since 4.7.0.0
              , Eq         -- ^ @since 4.4.0.0
              , Num        -- ^ @since 4.7.0.0
