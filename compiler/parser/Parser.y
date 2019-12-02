@@ -94,7 +94,7 @@ import Util             ( looksLikePackageName, fstOf3, sndOf3, thdOf3 )
 import GhcPrelude
 }
 
-%expect 231 -- shift/reduce conflicts
+%expect 232 -- shift/reduce conflicts
 
 {- Last updated: 04 June 2018
 
@@ -1095,15 +1095,16 @@ cl_decl :: { LTyClDecl GhcPs }
 --
 ty_decl :: { LTyClDecl GhcPs }
            -- ordinary type synonyms
-        : 'type' type '=' ktypedoc
-                -- Note ktypedoc, not sigtype, on the right of '='
+        : 'type' type '=' ktype
+                -- Note ktype, not sigtype, on the right of '='
                 -- We allow an explicit for-all but we don't insert one
                 -- in   type Foo a = (b,b)
                 -- Instead we just say b is out of scope
                 --
                 -- Note the use of type for the head; this allows
                 -- infix type constructors to be declared
-                {% amms (mkTySynonym (comb2 $1 $4) $2 $4)
+                {% runPV $2 >>= \ $2 ->
+                   amms (mkTySynonym (comb2 $1 $4) $2 $4)
                         [mj AnnType $1,mj AnnEqual $3] }
 
            -- type family declarations
@@ -1111,7 +1112,8 @@ ty_decl :: { LTyClDecl GhcPs }
                           where_type_family
                 -- Note the use of type for the head; this allows
                 -- infix type constructors to be declared
-                {% amms (mkFamDecl (comb4 $1 $3 $4 $5) (snd $ unLoc $6) $3
+                {% runPV $3 >>= \ $3 ->
+                   amms (mkFamDecl (comb4 $1 $3 $4 $5) (snd $ unLoc $6) $3
                                    (snd $ unLoc $4) (snd $ unLoc $5))
                         (mj AnnType $1:mj AnnFamily $2:(fst $ unLoc $4)
                            ++ (fst $ unLoc $5) ++ (fst $ unLoc $6)) }
@@ -1138,13 +1140,14 @@ ty_decl :: { LTyClDecl GhcPs }
 
           -- data/newtype family
         | 'data' 'family' type opt_datafam_kind_sig
-                {% amms (mkFamDecl (comb3 $1 $2 $4) DataFamily $3
+                {% runPV $3 >>= \ $3 ->
+                   amms (mkFamDecl (comb3 $1 $2 $4) DataFamily $3
                                    (snd $ unLoc $4) Nothing)
                         (mj AnnData $1:mj AnnFamily $2:(fst $ unLoc $4)) }
 
 -- standalone kind signature
 standalone_kind_sig :: { LStandaloneKindSig GhcPs }
-  : 'type' sks_vars '::' ktypedoc
+  : 'type' sks_vars '::' ktype
       {% amms (mkStandaloneKindSig (comb2 $1 $4) $2 $4)
               [mj AnnType $1,mu AnnDcolon $3] }
 
@@ -1211,7 +1214,8 @@ deriv_strategy_no_via :: { LDerivStrategy GhcPs }
                                        [mj AnnNewtype $1] }
 
 deriv_strategy_via :: { LDerivStrategy GhcPs }
-  : 'via' type              {% ams (sLL $1 $> (ViaStrategy (mkLHsSigType $2)))
+  : 'via' type              {% runPV $2 >>= \ $2 ->
+                               ams (sLL $1 $> (ViaStrategy (mkLHsSigType $2)))
                                             [mj AnnVia $1] }
 
 deriv_standalone_strategy :: { Maybe (LDerivStrategy GhcPs) }
@@ -1273,12 +1277,14 @@ ty_fam_inst_eqns :: { Located [LTyFamInstEqn GhcPs] }
 
 ty_fam_inst_eqn :: { Located ([AddAnn],TyFamInstEqn GhcPs) }
         : 'forall' tv_bndrs '.' type '=' ktype
-              {% do { hintExplicitForall $1
+              {% runPV $4 >>= \ $4 ->
+                 do { hintExplicitForall $1
                     ; (eqn,ann) <- mkTyFamInstEqn (Just $2) $4 $6
                     ; return (sLL $1 $>
                                (mu AnnForall $1:mj AnnDot $3:mj AnnEqual $5:ann,eqn)) } }
         | type '=' ktype
-              {% do { (eqn,ann) <- mkTyFamInstEqn Nothing $1 $3
+              {% runPV $1 >>= \ $1 ->
+                 do { (eqn,ann) <- mkTyFamInstEqn Nothing $1 $3
                     ; return (sLL $1 $> (mj AnnEqual $2:ann, eqn))  } }
               -- Note the use of type for the head; this allows
               -- infix type constructors and type patterns
@@ -1295,20 +1301,23 @@ ty_fam_inst_eqn :: { Located ([AddAnn],TyFamInstEqn GhcPs) }
 at_decl_cls :: { LHsDecl GhcPs }
         :  -- data family declarations, with optional 'family' keyword
           'data' opt_family type opt_datafam_kind_sig
-                {% amms (liftM mkTyClD (mkFamDecl (comb3 $1 $3 $4) DataFamily $3
+                {% runPV $3 >>= \ $3 ->
+                   amms (liftM mkTyClD (mkFamDecl (comb3 $1 $3 $4) DataFamily $3
                                                   (snd $ unLoc $4) Nothing))
                         (mj AnnData $1:$2++(fst $ unLoc $4)) }
 
            -- type family declarations, with optional 'family' keyword
            -- (can't use opt_instance because you get shift/reduce errors
         | 'type' type opt_at_kind_inj_sig
-               {% amms (liftM mkTyClD
+               {% runPV $2 >>= \ $2 ->
+                  amms (liftM mkTyClD
                         (mkFamDecl (comb3 $1 $2 $3) OpenTypeFamily $2
                                    (fst . snd $ unLoc $3)
                                    (snd . snd $ unLoc $3)))
                        (mj AnnType $1:(fst $ unLoc $3)) }
         | 'type' 'family' type opt_at_kind_inj_sig
-               {% amms (liftM mkTyClD
+               {% runPV $3 >>= \ $3 ->
+                  amms (liftM mkTyClD
                         (mkFamDecl (comb3 $1 $3 $4) OpenTypeFamily $3
                                    (fst . snd $ unLoc $4)
                                    (snd . snd $ unLoc $4)))
@@ -1395,26 +1404,32 @@ opt_at_kind_inj_sig :: { Located ([AddAnn], ( LFamilyResultSig GhcPs
 --      T Int [a]                       -- for associated types
 -- Rather a lot of inlining here, else we get reduce/reduce errors
 tycl_hdr :: { Located (Maybe (LHsContext GhcPs), LHsType GhcPs) }
-        : context '=>' type         {% addAnnotation (gl $1) (toUnicodeAnn AnnDarrow $2) (gl $2)
+        : context '=>' type         {% runPV $3 >>= \ $3 ->
+                                       addAnnotation (gl $1) (toUnicodeAnn AnnDarrow $2) (gl $2)
                                        >> (return (sLL $1 $> (Just $1, $3)))
                                     }
-        | type                      { sL1 $1 (Nothing, $1) }
+        | type                      {% runPV $1 >>= \ $1 ->
+                                       return $ sL1 $1 (Nothing, $1) }
 
 tycl_hdr_inst :: { Located ([AddAnn],(Maybe (LHsContext GhcPs), Maybe [LHsTyVarBndr GhcPs], LHsType GhcPs)) }
-        : 'forall' tv_bndrs '.' context '=>' type   {% hintExplicitForall $1
+        : 'forall' tv_bndrs '.' context '=>' type   {% runPV $6 >>= \ $6 ->
+                                                       hintExplicitForall $1
                                                        >> (addAnnotation (gl $4) (toUnicodeAnn AnnDarrow $5) (gl $5)
                                                            >> return (sLL $1 $> ([mu AnnForall $1, mj AnnDot $3]
                                                                                 , (Just $4, Just $2, $6)))
                                                           )
                                                     }
-        | 'forall' tv_bndrs '.' type   {% hintExplicitForall $1
+        | 'forall' tv_bndrs '.' type   {% runPV $4 >>= \ $4 ->
+                                          hintExplicitForall $1
                                           >> return (sLL $1 $> ([mu AnnForall $1, mj AnnDot $3]
                                                                , (Nothing, Just $2, $4)))
                                        }
-        | context '=>' type         {% addAnnotation (gl $1) (toUnicodeAnn AnnDarrow $2) (gl $2)
+        | context '=>' type         {% runPV $3 >>= \ $3 ->
+                                       addAnnotation (gl $1) (toUnicodeAnn AnnDarrow $2) (gl $2)
                                        >> (return (sLL $1 $>([], (Just $1, Nothing, $3))))
                                     }
-        | type                      { sL1 $1 ([], (Nothing, Nothing, $1)) }
+        | type                      {% runPV $1 >>= \ $1 ->
+                                       return $ sL1 $1 ([], (Nothing, Nothing, $1)) }
 
 
 capi_ctype :: { Maybe (Located CType) }
@@ -1509,7 +1524,7 @@ where_decls :: { Located ([AddAnn]
                                           ,sL1 $3 (snd $ unLoc $3)) }
 
 pattern_synonym_sig :: { LSig GhcPs }
-        : 'pattern' con_list '::' sigtypedoc
+        : 'pattern' con_list '::' sigtype
                    {% ams (sLL $1 $> $ PatSynSig noExtField (unLoc $2) (mkLHsSigType $4))
                           [mj AnnPattern $1, mu AnnDcolon $3] }
 
@@ -1523,7 +1538,7 @@ decl_cls  : at_decl_cls                 { $1 }
           | decl                        { $1 }
 
           -- A 'default' signature used with the generic-programming extension
-          | 'default' infixexp '::' sigtypedoc
+          | 'default' infixexp '::' sigtype
                     {% runECP_P $2 >>= \ $2 ->
                        do { v <- checkValSigLhs $2
                           ; let err = text "in default signature" <> colon <+>
@@ -1721,7 +1736,8 @@ rule_vars :: { [LRuleTyTmVar] }
 
 rule_var :: { LRuleTyTmVar }
         : varid                         { sLL $1 $> (RuleTyTmVar $1 Nothing) }
-        | '(' varid '::' ctype ')'      {% ams (sLL $1 $> (RuleTyTmVar $2 (Just $4)))
+        | '(' varid '::' ctype ')'      {% runPV $4 >>= \ $4 ->
+                                           ams (sLL $1 $> (RuleTyTmVar $2 (Just $4)))
                                                [mop $1,mu AnnDcolon $3,mcp $5] }
 
 {- Note [Parsing explicit foralls in Rules]
@@ -1839,10 +1855,10 @@ safety :: { Located Safety }
 
 fspec :: { Located ([AddAnn]
                     ,(Located StringLiteral, Located RdrName, LHsSigType GhcPs)) }
-       : STRING var '::' sigtypedoc     { sLL $1 $> ([mu AnnDcolon $3]
+       : STRING var '::' sigtype        { sLL $1 $> ([mu AnnDcolon $3]
                                              ,(L (getLoc $1)
                                                     (getStringLiteral $1), $2, mkLHsSigType $4)) }
-       |        var '::' sigtypedoc     { sLL $1 $> ([mu AnnDcolon $2]
+       |        var '::' sigtype        { sLL $1 $> ([mu AnnDcolon $2]
                                              ,(noLoc (StringLiteral NoSourceText nilFS), $1, mkLHsSigType $3)) }
          -- if the entity string is missing, it defaults to the empty string;
          -- the meaning of an empty entity string depends on the calling
@@ -1860,11 +1876,7 @@ opt_tyconsig :: { ([AddAnn], Maybe (Located RdrName)) }
              | '::' gtycon              { ([mu AnnDcolon $1], Just $2) }
 
 sigtype :: { LHsType GhcPs }
-        : ctype                            { $1 }
-
-sigtypedoc :: { LHsType GhcPs }
-        : ctypedoc                         { $1 }
-
+        : ctype                         {% runPV $1 }
 
 sig_vars :: { Located [Located RdrName] }    -- Returned in reversed order
          : sig_vars ',' var           {% addAnnotation (gl $ head $ unLoc $1)
@@ -1873,8 +1885,8 @@ sig_vars :: { Located [Located RdrName] }    -- Returned in reversed order
          | var                        { sL1 $1 [$1] }
 
 sigtypes1 :: { (OrdList (LHsSigType GhcPs)) }
-   : sigtype                 { unitOL (mkLHsSigType $1) }
-   | sigtype ',' sigtypes1   {% addAnnotation (gl $1) AnnComma (gl $2)
+   : sigtype               { unitOL (mkLHsSigType $1) }
+   | sigtype ',' sigtypes1 {% addAnnotation (gl $1) AnnComma (gl $2)
                                 >> return (unitOL (mkLHsSigType $1) `appOL` $3) }
 
 -----------------------------------------------------------------------------
@@ -1888,66 +1900,27 @@ forall_vis_flag :: { (AddAnn, ForallVisFlag) }
         : '.'  { (mj AnnDot $1,    ForallInvis) }
         | '->' { (mu AnnRarrow $1, ForallVis)   }
 
--- A ktype/ktypedoc is a ctype/ctypedoc, possibly with a kind annotation
 ktype :: { LHsType GhcPs }
-        : ctype                { $1 }
-        | ctype '::' kind      {% ams (sLL $1 $> $ HsKindSig noExtField $1 $3)
-                                      [mu AnnDcolon $2] }
-
-ktypedoc :: { LHsType GhcPs }
-         : ctypedoc            { $1 }
-         | ctypedoc '::' kind  {% ams (sLL $1 $> $ HsKindSig noExtField $1 $3)
-                                      [mu AnnDcolon $2] }
+         : ctype            {% runPV $1 }
+         | ctype '::' kind  {% runPV $1 >>= \ $1 ->
+                               ams (sLL $1 $> $ HsKindSig noExtField $1 $3)
+                                   [mu AnnDcolon $2] }
 
 -- A ctype is a for-all type
-ctype   :: { LHsType GhcPs }
+ctype :: { forall b. DisambT b => PV (Located b) }
         : 'forall' tv_bndrs forall_vis_flag ctype
-                                        {% let (fv_ann, fv_flag) = $3 in
-                                           hintExplicitForall $1 *>
-                                           ams (sLL $1 $> $
-                                                HsForAllTy { hst_fvf = fv_flag
-                                                           , hst_bndrs = $2
-                                                           , hst_xforall = noExtField
-                                                           , hst_body = $4 })
-                                               [mu AnnForall $1,fv_ann] }
-        | context '=>' ctype          {% addAnnotation (gl $1) (toUnicodeAnn AnnDarrow $2) (gl $2)
-                                         >> return (sLL $1 $> $
-                                            HsQualTy { hst_ctxt = $1
-                                                     , hst_xqual = noExtField
-                                                     , hst_body = $3 }) }
-        | ipvar '::' type             {% ams (sLL $1 $> (HsIParamTy noExtField $1 $3))
-                                             [mu AnnDcolon $2] }
-        | type                        { $1 }
-
--- Note [ctype and ctypedoc]
--- ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
--- It would have been nice to simplify the grammar by unifying `ctype` and
--- ctypedoc` into one production, allowing comments on types everywhere (and
--- rejecting them after parsing, where necessary).  This is however not possible
--- since it leads to ambiguity. The reason is the support for comments on record
--- fields:
---         data R = R { field :: Int -- ^ comment on the field }
--- If we allow comments on types here, it's not clear if the comment applies
--- to 'field' or to 'Int'. So we must use `ctype` to describe the type.
-
-ctypedoc :: { LHsType GhcPs }
-        : 'forall' tv_bndrs forall_vis_flag ctypedoc
-                                         {% let (fv_ann, fv_flag) = $3 in
-                                            hintExplicitForall $1 *>
-                                            ams (sLL $1 $> $
-                                                 HsForAllTy { hst_fvf = fv_flag
-                                                            , hst_bndrs = $2
-                                                            , hst_xforall = noExtField
-                                                            , hst_body = $4 })
-                                                [mu AnnForall $1,fv_ann] }
-        | context '=>' ctypedoc       {% addAnnotation (gl $1) (toUnicodeAnn AnnDarrow $2) (gl $2)
-                                         >> return (sLL $1 $> $
-                                            HsQualTy { hst_ctxt = $1
-                                                     , hst_xqual = noExtField
-                                                     , hst_body = $3 }) }
-        | ipvar '::' type             {% ams (sLL $1 $> (HsIParamTy noExtField $1 $3))
-                                             [mu AnnDcolon $2] }
-        | typedoc                     { $1 }
+                              { $4 >>= \ $4 ->
+                                let (fv_ann, fv_flag) = $3 in
+                                hintExplicitForall $1 *>
+                                amms (mkTForAllPV (comb2 $1 $>) fv_flag $2 $4)
+                                     [mu AnnForall $1,fv_ann] }
+        | context '=>' ctype  { $3 >>= \ $3 ->
+                                addAnnotation (gl $1) (toUnicodeAnn AnnDarrow $2) (gl $2)
+                                >> mkTQualPV $1 $3 }
+        | ipvar '::' type     { $3 >>= \ $3 ->
+                                amms (mkTIParamPV $1 $3)
+                                     [mu AnnDcolon $2] }
+        | type                { $1 }
 
 ----------------------
 -- Notes for 'context'
@@ -1957,29 +1930,20 @@ ctypedoc :: { LHsType GhcPs }
 -- looks so much like a tuple type.  We can't tell until we find the =>
 
 context :: { LHsContext GhcPs }
-        :  btype                        {% do { (anns,ctx) <- checkContext $1
-                                                ; if null (unLoc ctx)
-                                                   then addAnnotation (gl $1) AnnUnit (gl $1)
-                                                   else return ()
-                                                ; ams ctx anns
-                                                } }
-
--- See Note [Constr variations of non-terminals]
-constr_context :: { LHsContext GhcPs }
-        :  constr_btype                 {% runPV $1 >>= \ $1 ->
-                                           do { (anns,ctx) <- checkContext $1
-                                                ; if null (unLoc ctx)
-                                                   then addAnnotation (gl $1) AnnUnit (gl $1)
-                                                   else return ()
-                                                ; ams ctx anns
-                                                } }
+        :  btype  {% runPV $1 >>= \ $1 ->
+                     do { (anns,ctx) <- checkContext $1
+                          ; if null (unLoc ctx)
+                             then addAnnotation (gl $1) AnnUnit (gl $1)
+                             else return ()
+                          ; ams ctx anns
+                          } }
 
 {- Note [GADT decl discards annotations]
 ~~~~~~~~~~~~~~~~~~~~~
 The type production for
 
-    btype `->`         ctypedoc
-    btype docprev `->` ctypedoc
+    btype `->`         ctype
+    btype docprev `->` ctype
 
 add the AnnRarrow annotation twice, in different places.
 
@@ -1991,73 +1955,42 @@ the top-level annotation will be disconnected. Hence for this specific case it
 is connected to the first type too.
 -}
 
-type :: { LHsType GhcPs }
-        : btype                        { $1 }
-        | btype '->' ctype             {% ams $1 [mu AnnRarrow $2] -- See note [GADT decl discards annotations]
-                                       >> ams (sLL $1 $> $ HsFunTy noExtField $1 $3)
-                                              [mu AnnRarrow $2] }
-
-
-typedoc :: { LHsType GhcPs }
-        : btype                          { $1 }
-        | btype docprev                  { sLL $1 $> $ HsDocTy noExtField $1 $2 }
-        | docnext btype                  { sLL $1 $> $ HsDocTy noExtField $2 $1 }
-        | btype '->'     ctypedoc        {% ams $1 [mu AnnRarrow $2] -- See note [GADT decl discards annotations]
-                                         >> ams (sLL $1 $> $ HsFunTy noExtField $1 $3)
-                                                [mu AnnRarrow $2] }
-        | btype docprev '->' ctypedoc    {% ams $1 [mu AnnRarrow $3] -- See note [GADT decl discards annotations]
-                                         >> ams (sLL $1 $> $
-                                                 HsFunTy noExtField (L (comb2 $1 $2)
-                                                            (HsDocTy noExtField $1 $2))
-                                                         $4)
+type :: { forall b. DisambT b => PV (Located b) }
+        : btype                          { $1 >>= \ $1 -> mkTHeadPV Nothing $1 }
+        | docnext btype                  { $2 >>= \ $2 -> mkTHeadPV (Just $1) $2 }
+        | btype '->' ctype               { $1 >>= \ $1 ->
+                                           $3 >>= \ $3 ->
+                                           ams $1 [mu AnnRarrow $2] -- See note [GADT decl discards annotations]
+                                        >> amms (mkTArrowPV Nothing $1 $3) [mu AnnRarrow $2] }
+        | docnext btype '->' ctype       { $2 >>= \ $2 ->
+                                           $4 >>= \ $4 ->
+                                           ams $2 [mu AnnRarrow $3] -- See note [GADT decl discards annotations]
+                                        >> amms (mkTArrowPV (Just $1) $2 $4)
                                                 [mu AnnRarrow $3] }
-        | docnext btype '->' ctypedoc    {% ams $2 [mu AnnRarrow $3] -- See note [GADT decl discards annotations]
-                                         >> ams (sLL $1 $> $
-                                                 HsFunTy noExtField (L (comb2 $1 $2)
-                                                            (HsDocTy noExtField $2 $1))
-                                                         $4)
-                                                [mu AnnRarrow $3] }
--- See Note [Constr variations of non-terminals]
-constr_btype :: { forall b. DisambInfixTD b => PV (Located b) }
-       : constr_ftype { superInfixTyHead resultOfM $
-                        $1 >>= \ $1 ->
-                        mkInfixTyHeadPV $1 }
-       | constr_ftype tyop maybe_docprev constr_btype
-                      { superInfixTyArg resultOfM $
-                        $1 >>= \ $1 ->
-                        $4 >>= \ $4 ->
-                        mkInfixTyAppPV $1 $2 $3 $4 }
-       | unpackedness constr_btype
-                      { $2 >>= \ $2 ->
-                        mkInfixTyUnpackednessPV (Just $1) $2 }
 
--- See Note [Constr variations of non-terminals]
-constr_ftype :: { forall b. DisambPrefixTD b => PV (Located b) }
+btype :: { forall b. DisambInfixTD b => PV (Located b) }
+       : ftype { superInfixTyHead resultOfM $
+                 $1 >>= \ $1 ->
+                 mkInfixTyHeadPV $1 }
+       | ftype tyop maybe_docprev btype
+               { superInfixTyArg resultOfM $
+                 $1 >>= \ $1 ->
+                 $4 >>= \ $4 ->
+                 mkInfixTyAppPV $1 $2 $3 $4 }
+       | unpackedness btype
+               { $2 >>= \ $2 ->
+                 mkInfixTyUnpackednessPV (Just $1) $2 }
+
+ftype :: { forall b. DisambPrefixTD b => PV (Located b) }
        : atype maybe_docprev          { mkAppTyHeadPV $1 $2 }
        | tyop                         { failOpFewArgs $1 }
-       | constr_ftype atype maybe_docprev
-                                      { $1 >>= \ $1 ->
+       | ftype atype maybe_docprev    { $1 >>= \ $1 ->
                                         mkAppTyAppPV $1 Nothing $2 $3 }
-       | constr_ftype unpackedness atype maybe_docprev
+       | ftype unpackedness atype maybe_docprev
                                       { $1 >>= \ $1 ->
                                         mkAppTyAppPV $1 (Just $2) $3 $4 }
-       | constr_ftype PREFIX_AT atype
-                                      { $1 >>= \ $1 ->
+       | ftype PREFIX_AT atype        { $1 >>= \ $1 ->
                                         mkAppTyKindAppPV $1 (gl $2) $3 }
-
-btype :: { LHsType GhcPs }
-       : ftype                { $1 }
-       | ftype tyop btype     { mkLHsOpTy $1 $2 $3 }
-       | unpackedness btype   {% addUnpackednessP $1 $2 }
-
-ftype :: { LHsType GhcPs }
-       : atype                    { $1 }
-       | ftype atype              { mkHsAppTy $1 $2 }
-       | ftype PREFIX_AT atype    { mkHsAppKindTy (comb2 $2 $3) $1 $3 }
-
-       -- failure cases (for better error messages)
-       | tyop                     {% failOpFewArgs $1 }
-       | ftype unpackedness atype {% runPV $ mkAppTyAppPV $1 (Just $2) $3 Nothing }
 
 tyop :: { Located RdrName }
         : qtyconop                      { $1 }
@@ -2130,12 +2063,12 @@ atype :: { LHsType GhcPs }
 --      e.g.  (Foo a, Gaz b) => Wibble a b
 -- It's kept as a single type for convenience.
 inst_type :: { LHsSigType GhcPs }
-        : sigtype                       { mkLHsSigType $1 }
+        : sigtype                    { mkLHsSigType $1 }
 
 deriv_types :: { [LHsSigType GhcPs] }
-        : ktypedoc                      { [mkLHsSigType $1] }
+        : ktype                      { [mkLHsSigType $1] }
 
-        | ktypedoc ',' deriv_types      {% addAnnotation (gl $1) AnnComma (gl $2)
+        | ktype ',' deriv_types      {% addAnnotation (gl $1) AnnComma (gl $2)
                                            >> return (mkLHsSigType $1 : $3) }
 
 comma_types0  :: { [LHsType GhcPs] }  -- Zero or more:  ty,ty,ty
@@ -2143,14 +2076,14 @@ comma_types0  :: { [LHsType GhcPs] }  -- Zero or more:  ty,ty,ty
         | {- empty -}                   { [] }
 
 comma_types1    :: { [LHsType GhcPs] }  -- One or more:  ty,ty,ty
-        : ktype                        { [$1] }
-        | ktype  ',' comma_types1      {% addAnnotation (gl $1) AnnComma (gl $2)
+        : ktype                       { [$1] }
+        | ktype ',' comma_types1      {% addAnnotation (gl $1) AnnComma (gl $2)
                                           >> return ($1 : $3) }
 
 bar_types2    :: { [LHsType GhcPs] }  -- Two or more:  ty|ty|ty
-        : ktype  '|' ktype             {% addAnnotation (gl $1) AnnVbar (gl $2)
-                                          >> return [$1,$3] }
-        | ktype  '|' bar_types2        {% addAnnotation (gl $1) AnnVbar (gl $2)
+        : ktype '|' ktype             {% addAnnotation (gl $1) AnnVbar (gl $2)
+                                      >> return [$1,$3] }
+        | ktype '|' bar_types2        {% addAnnotation (gl $1) AnnVbar (gl $2)
                                           >> return ($1 : $3) }
 
 tv_bndrs :: { [LHsTyVarBndr GhcPs] }
@@ -2186,7 +2119,7 @@ varids0 :: { Located [Located RdrName] }
 -- Kinds
 
 kind :: { LHsKind GhcPs }
-        : ctype                  { $1 }
+        : ctype               {% runPV $1 }
 
 {- Note [Promotion]
    ~~~~~~~~~~~~~~~~
@@ -2251,7 +2184,7 @@ gadt_constr_with_doc
 gadt_constr :: { LConDecl GhcPs }
     -- see Note [Difference in parsing GADT and data constructors]
     -- Returns a list because of:   C,D :: ty
-        : con_list '::' sigtypedoc
+        : con_list '::' sigtype
                 {% let (gadt,anns) = mkGadtDecl (unLoc $1) $3
                    in ams (sLL $1 $> gadt)
                        (mu AnnDcolon $2:anns) }
@@ -2278,60 +2211,8 @@ constrs1 :: { Located [LConDecl GhcPs] }
                >> return (sLL $1 $> (addConDoc $5 $2 : addConDocFirst (unLoc $1) $4)) }
         | constr                                          { sL1 $1 [$1] }
 
-{- Note [Constr variations of non-terminals]
-~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
-
-In record declarations we assume that 'ctype' used to parse the type will not
-consume the trailing docprev:
-
-  data R = R { field :: Int -- ^ comment on the field }
-
-In 'R' we expect the comment to apply to the entire field, not to 'Int'. The
-same issue is detailed in Note [ctype and ctypedoc].
-
-So, we do not want 'ctype'  to consume 'docprev', therefore
-    we do not want 'btype'  to consume 'docprev', therefore
-    we do not want 'tyapps' to consume 'docprev'.
-
-At the same time, when parsing a 'constr', we do want to consume 'docprev':
-
-  data T = C Int  -- ^ comment on Int
-             Bool -- ^ comment on Bool
-
-So, we do want 'constr_stuff' to consume 'docprev'.
-
-The problem arises because the clauses in 'constr' have the following
-structure:
-
-  (a)  context '=>' constr_stuff   (e.g.  data T a = Ord a => C a)
-  (b)               constr_stuff   (e.g.  data T a =          C a)
-
-and to avoid a reduce/reduce conflict, 'context' and 'constr_stuff' must be
-compatible. And for 'context' to be compatible with 'constr_stuff', it must
-consume 'docprev'.
-
-So, we want 'context'  to consume 'docprev', therefore
-    we want 'btype'    to consume 'docprev', therefore
-    we want 'tyapps'   to consume 'docprev'.
-
-Our requirements end up conflicting: for parsing record types, we want 'tyapps'
-to leave 'docprev' alone, but for parsing constructors, we want it to consume
-'docprev'.
-
-As the result, we maintain two parallel hierarchies of non-terminals that
-either consume 'docprev' or not:
-
-  tyapps      constr_tyapps
-  btype       constr_btype
-  context     constr_context
-  ...
-
-They must be kept identical except for their treatment of 'docprev'.
-
--}
-
 constr :: { LConDecl GhcPs }
-        : maybe_docnext forall constr_context '=>' constr_btype
+        : maybe_docnext forall context '=>' btype
               {% runPV $5 >>= \ $5 ->
                  let ConstrDef con details doc_prev = unLoc $5 in
                  ams (addConDoc (L (comb4 $2 $3 $4 $5) (mkConDeclH98 con
@@ -2340,7 +2221,7 @@ constr :: { LConDecl GhcPs }
                                                        details))
                             ($1 `mplus` doc_prev))
                         (mu AnnDarrow $4:(fst $ unLoc $2)) }
-        | maybe_docnext forall constr_btype
+        | maybe_docnext forall btype
               {% runPV $3 >>= \ $3 ->
                  let ConstrDef con details doc_prev = unLoc $3 in
                  ams (addConDoc (L (comb2 $2 $3) (mkConDeclH98 con
@@ -2366,9 +2247,10 @@ fielddecls1 :: { [LConDeclField GhcPs] }
 
 fielddecl :: { LConDeclField GhcPs }
                                               -- A list because of   f,g :: Int
-        : maybe_docnext sig_vars '::' ctype maybe_docprev
-            {% ams (L (comb2 $2 $4)
-                      (ConDeclField noExtField (reverse (map (\ln@(L l n) -> L l $ FieldOcc noExtField ln) (unLoc $2))) $4 ($1 `mplus` $5)))
+        : maybe_docnext sig_vars '::' ctype
+            {% runPV $4 >>= \(L lt (TDoc t doc)) ->
+               ams (L (combineSrcSpans (gl $2) lt)
+                      (ConDeclField noExtField (reverse (map (\ln@(L l n) -> L l $ FieldOcc noExtField ln) (unLoc $2))) (L lt t) ($1 `mplus` doc)))
                    [mu AnnDcolon $3] }
 
 -- Reversed!
@@ -2491,14 +2373,14 @@ gdrh :: { LGRHS GhcPs (LHsExpr GhcPs) }
 sigdecl :: { LHsDecl GhcPs }
         :
         -- See Note [Declaration/signature overlap] for why we need infixexp here
-          infixexp     '::' sigtypedoc
+          infixexp '::' sigtype
                         {% do { $1 <- runECP_P $1
                               ; v <- checkValSigLhs $1
                               ; _ <- amsL (comb2 $1 $>) [mu AnnDcolon $2]
                               ; return (sLL $1 $> $ SigD noExtField $
                                   TypeSig noExtField [v] (mkLHsSigWcType $3))} }
 
-        | var ',' sig_vars '::' sigtypedoc
+        | var ',' sig_vars '::' sigtype
            {% do { let sig = TypeSig noExtField ($1 : reverse (unLoc $3))
                                      (mkLHsSigWcType $5)
                  ; addAnnotation (gl $1) AnnComma (gl $2)
@@ -3993,7 +3875,7 @@ hintMultiWayIf span = do
     text "Multi-way if-expressions need MultiWayIf turned on"
 
 -- Hint about explicit-forall
-hintExplicitForall :: Located Token -> P ()
+hintExplicitForall :: MonadP m => Located Token -> m ()
 hintExplicitForall tok = do
     forall   <- getBit ExplicitForallBit
     rulePrag <- getBit InRulePragBit
