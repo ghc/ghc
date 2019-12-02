@@ -24,7 +24,8 @@ import traceback
 import subprocess
 
 from testutil import getStdout, Watcher, str_warn, str_info
-from testglobals import getConfig, ghc_env, getTestRun, TestConfig, TestOptions, brokens
+from testglobals import getConfig, ghc_env, getTestRun, TestConfig, \
+                        TestOptions, brokens, PerfMetric
 from perf_notes import MetricChange, inside_git_repo, is_worktree_dirty, format_perf_stat
 from junit import junit
 import term_color
@@ -333,6 +334,33 @@ def cleanup_and_exit(exitcode):
         shutil.rmtree(tempdir, ignore_errors=True)
     exit(exitcode)
 
+def tabulate_metrics(metrics: List[PerfMetric]) -> None:
+    direction_strings = {
+        MetricChange.NewMetric: colored(Color.BLUE,  "new"),
+        MetricChange.NoChange:  colored(Color.WHITE, "unchanged"),
+        MetricChange.Increase:  colored(Color.RED,   "increased"),
+        MetricChange.Decrease:  colored(Color.GREEN, "decreased")
+    }
+
+    for metric in sorted(metrics, key=lambda m: (m.stat.test, m.stat.way)):
+        print("{test:24}  {metric:40}  {value:15.3f}".format(
+            test = "{}({})".format(metric.stat.test, metric.stat.way),
+            metric = metric.stat.metric,
+            value = metric.stat.value
+        ))
+        if metric.baseline is not None:
+            val0 = metric.baseline.perfStat.value
+            val1 = metric.stat.value
+            rel = 100 * (val1 - val0) / val0
+            print("{space:24}  {herald:40}  {value:15.3f}  [{direction} {rel:2.1f}%]".format(
+                space = "",
+                herald = "(baseline @ HEAD~{depth})".format(
+                    depth = metric.baseline.commitDepth),
+                value = val0,
+                direction = direction_strings[metric.change],
+                rel = abs(rel)
+            ))
+
 # First collect all the tests to be run
 t_files_ok = True
 for file in t_files:
@@ -396,20 +424,12 @@ else:
     sys.stdout.flush()
 
     # Dump metrics data.
+    print("\nPerformance Metrics (test environment: {}):\n".format(config.test_env))
     if any(t.metrics):
-        print("\nPerformance Metrics:\n")
-        for (change, stat, baseline) in t.metrics:
-            if baseline is None:
-                print("{stat} [{direction}]".format(
-                    stat = format_perf_stat(stat),
-                    direction = str(change)))
-            else:
-                print("{stat} [{direction} from ({baselineStat}) @ HEAD~{depth}]".format(
-                    stat = format_perf_stat(stat),
-                    baselineStat = format_perf_stat(baseline.perfStat, ", "),
-                    direction = str(change),
-                    depth = baseline.commitDepth))
-        print("")
+        tabulate_metrics(t.metrics)
+    else:
+        print("\nNone collected.")
+    print("")
 
     # Warn if had to force skip perf tests (see Note force skip perf tests).
     spacing = "       "
@@ -454,7 +474,7 @@ else:
         print(str_info("Some stats have changed") + " If this is expected, " + \
             "allow changes by appending the git commit message with this:")
         print('-' * 25)
-        print(Perf.allow_changes_string(t.metrics))
+        print(Perf.allow_changes_string([(m.change, m.stat) for m in t.metrics]))
         print('-' * 25)
 
     summary(t, sys.stdout, config.no_print_summary, config.supports_colors)
