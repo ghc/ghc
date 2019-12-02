@@ -65,8 +65,10 @@ void sendMessage(Capability *from_cap, Capability *to_cap, Message *msg)
 void
 executeMessage (Capability *cap, Message *m)
 {
+    const StgInfoTable *i;
+
 loop:
-    const StgInfoTable *i = ACQUIRE_LOAD(&m->header.info);
+    i = ACQUIRE_LOAD(&m->header.info);
     if (i == &stg_MSG_TRY_WAKEUP_info)
     {
         StgTSO *tso = ((MessageWakeup *)m)->tso;
