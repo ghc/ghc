@@ -46,6 +46,10 @@ test('derefnull',
 test('divbyzero',
      [# SIGFPE on Linux
       exit_code(136),
+      # The LLVM backend in particular does not guarantee any particular
+      # behavior on division-by-zero (#10332).
+      omit_ways(llvm_ways),
+      when(not(have_ncg()), skip),
       # Apparently the output can be different on different
       # Linux setups, so just ignore it. As long as we get
       # the right exit code we're OK.
