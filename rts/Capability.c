@@ -671,7 +671,7 @@ static Capability * waitForWorkerCapability (Task *task)
         // The happens-after matches the happens-before in
         // schedulePushWork, which does owns 'task' when it sets 'task->cap'.
         TSAN_ANNOTATE_HAPPENS_AFTER(&task->cap);
-        cap = task->cap;
+        cap = SEQ_CST_LOAD(&task->cap);
         task->wakeup = false;
         RELEASE_LOCK(&task->lock);
 
