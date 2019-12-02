@@ -68,6 +68,7 @@ module   RdrHsSyn (
         addFatalError, hintBangPat,
         mkBangTy,
         mkLHsOpTy,
+        mkLHsDocTy,
         addUnpackednessP,
 
         -- Type/data constructor ambiguity resolution
@@ -75,6 +76,10 @@ module   RdrHsSyn (
         DisambInfixTD(..),
         ConstrDef(..),
         resultOfM,
+
+        -- Trailing doc comment extraction
+        DisambT(..),
+        TrailingDocString(..),
 
         -- Help with processing exports
         ImpExpSubSpec(..),
@@ -1832,12 +1837,12 @@ instance DisambPrefixTD PrefixDataConBuilder where
 
 instance DisambPrefixTD (HsType GhcPs) where
   mkAppTyHeadPV t mDoc = do
-    whenIsJust mDoc failOpDocPrev
+    whenIsJust mDoc failOpDoc
     return t
   mkAppTyAppPV t1 mUnpk t2 mDoc = do
     whenIsJust mUnpk $ \(L l _) ->
       addError l $ text "{-# UNPACK #-} cannot appear inside a type."
-    whenIsJust mDoc failOpDocPrev
+    whenIsJust mDoc failOpDoc
     return (mkHsAppTy t1 t2)
   mkAppTyKindAppPV t l_at ki = return (mkHsAppKindTy l' t ki)
     where l' = combineSrcSpans l_at (getLoc ki)
@@ -1849,7 +1854,7 @@ instance DisambInfixTD (HsType GhcPs) where
   type InfixTyArg (HsType GhcPs) = HsType GhcPs
   superInfixTyArg _ a = a
   mkInfixTyAppPV t1 op mDoc t2 = do
-    whenIsJust mDoc failOpDocPrev
+    whenIsJust mDoc failOpDoc
     return (mkLHsOpTy t1 op t2)
   mkInfixTyUnpackednessPV = addUnpackednessMaybeP
 
@@ -1864,11 +1869,11 @@ instance DisambPrefixTD a => DisambPrefixTD (TrailingDocString a) where
     L l' t' <- mkAppTyHeadPV t Nothing
     return (L l' (TDoc t' mDoc))
   mkAppTyAppPV (L l1 (TDoc t1 mLhsDoc)) mUnpk t2 mDoc = do
-    whenIsJust mLhsDoc failOpDocPrev
+    whenIsJust mLhsDoc failOpDoc
     L l t <- mkAppTyAppPV (L l1 t1) mUnpk t2 Nothing
     return (L l (TDoc t mDoc))
   mkAppTyKindAppPV (L l_t (TDoc t mLhsDoc)) l_at ki = do
-    whenIsJust mLhsDoc failOpDocPrev
+    whenIsJust mLhsDoc failOpDoc
     L l t' <- mkAppTyKindAppPV (L l_t t) l_at ki
     return (L l (TDoc t' Nothing))
 
@@ -1884,7 +1889,7 @@ instance DisambInfixTD a => DisambInfixTD (TrailingDocString a) where
   type InfixTyArg (TrailingDocString a) = TrailingDocString (InfixTyArg a)
   superInfixTyArg p = superInfixTyArg (stripDocTag p)
   mkInfixTyAppPV (L l_lhs (TDoc lhs mLhsDoc)) op mOpDoc (L l_rhs (TDoc rhs mRhsDoc)) = do
-    whenIsJust mLhsDoc failOpDocPrev
+    whenIsJust mLhsDoc failOpDoc
     L l t <- mkInfixTyAppPV (L l_lhs lhs) op mOpDoc (L l_rhs rhs)
     return (L l (TDoc t mRhsDoc))
   mkInfixTyUnpackednessPV Nothing a = return a
@@ -1977,6 +1982,70 @@ instance DisambInfixTD ConstrDef where
       do addError (getLoc unpk) $
            text "{-# UNPACK #-} cannot be applied to a data constructor."
          return constr_stuff
+
+-- | Disambiguate type-level syntactic constructs, such as forall, a->b, a=>b.
+-- Useful to get the trailing documentation comment.
+-- See Note [Ambiguous syntactic categories]
+class DisambInfixTD b => DisambT b where
+  mkTHeadPV
+    :: Maybe LHsDocString
+    -> Located (TrailingDocString (HsType GhcPs))
+    -> PV (Located b)
+  mkTArrowPV
+    :: Maybe LHsDocString
+    -> Located (TrailingDocString (HsType GhcPs))
+    -> Located b
+    -> PV (Located b)
+  mkTQualPV
+    :: LHsContext GhcPs
+    -> Located b
+    -> PV (Located b)
+  mkTForAllPV
+    :: SrcSpan
+    -> ForallVisFlag
+    -> [LHsTyVarBndr GhcPs]
+    -> Located b
+    -> PV (Located b)
+  mkTIParamPV
+    :: Located HsIPName
+    -> Located b
+    -> PV (Located b)
+
+instance DisambT (HsType GhcPs) where
+  mkTHeadPV mDocNext (L l (TDoc t mDocPrev)) =
+    return $ mkLHsDocTyMaybe (L l t) (mplus mDocNext mDocPrev)
+  mkTArrowPV mDocNext (L l_lhs (TDoc lhs mDocPrev)) rhs = do
+    let lhs' = mkLHsDocTyMaybe (L l_lhs lhs) (mplus mDocNext mDocPrev)
+    return $ L (combineLocs lhs' rhs) (HsFunTy noExtField lhs' rhs)
+  mkTQualPV lhs rhs =
+    return $ L (combineLocs lhs rhs) (HsQualTy noExtField lhs rhs)
+  mkTForAllPV l fvf tvbs t =
+    return $ L l (HsForAllTy { hst_xforall = noExtField
+                             , hst_fvf = fvf
+                             , hst_bndrs = tvbs
+                             , hst_body = t })
+  mkTIParamPV ipvar t =
+    return $ L (combineLocs ipvar t) (HsIParamTy noExtField ipvar t)
+
+instance DisambT a => DisambT (TrailingDocString a) where
+  mkTHeadPV mDocNext (L l (TDoc t mDoc)) = do
+    whenIsJust mDocNext failOpDoc
+    L l' t' <- mkTHeadPV Nothing (L l (TDoc t Nothing))
+    return (L l' (TDoc t' mDoc))
+  mkTArrowPV mDocNext (L l_lhs (TDoc lhs mLhsDoc)) (L l_rhs (TDoc rhs mRhsDoc)) = do
+    whenIsJust mDocNext failOpDoc
+    whenIsJust mLhsDoc failOpDoc
+    L l t <- mkTArrowPV Nothing (L l_lhs (TDoc lhs Nothing)) (L l_rhs rhs)
+    return (L l (TDoc t mRhsDoc))
+  mkTQualPV ctx (L l_rhs (TDoc rhs mRhsDoc)) = do
+    L l t <- mkTQualPV ctx (L l_rhs rhs)
+    return (L l (TDoc t mRhsDoc))
+  mkTForAllPV l fvf tvbs (L l_t (TDoc t mDoc)) = do
+    L l' t' <- mkTForAllPV l fvf tvbs (L l_t t)
+    return (L l' (TDoc t' mDoc))
+  mkTIParamPV ipvar (L l (TDoc t mDoc)) = do
+    L l' t' <- mkTIParamPV ipvar (L l t)
+    return (L l' (TDoc t' mDoc))
 
 {- Note [Ambiguous syntactic categories]
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
@@ -2743,8 +2812,8 @@ failOpFewArgs (L loc op) =
   where
     too_few = text "Operator applied to too few arguments:" <+> ppr op
 
-failOpDocPrev :: MonadP m => Located a -> m ()
-failOpDocPrev (L loc _) = addError loc msg
+failOpDoc :: MonadP m => Located a -> m ()
+failOpDoc (L loc _) = addError loc msg
   where
     msg = text "Unexpected documentation comment."
 
