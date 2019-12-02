@@ -126,31 +126,28 @@ popWSDeque (WSDeque *q)
 
     ASSERT_WSDEQUE_INVARIANTS(q);
 
-    b = RELAXED_LOAD(&q->bottom);
+    b = ACQUIRE_LOAD(&q->bottom);
 
     // "decrement b as a test, see what happens"
     b--;
-    RELAXED_STORE(&q->bottom, b);
-
     // very important that the following read of q->top does not occur
-    // before the earlier write to q->bottom.
-    //store_load_barrier();
+    // before the earlier write to q->bottom, hence release.
+    RELEASE_STORE(&q->bottom, b);
 
     t = ACQUIRE_LOAD(&q->top);
-    //t = q->top;
        /* using topBound would give an *upper* bound, we
           need a lower bound. We use the real top here, but
           can update the topBound value */
-    q->topBound = t;
+    RELEASE_STORE(&q->topBound, t);
     currSize = (long)b - (long)t;
     if (currSize < 0) { /* was empty before decrementing b, set b
                            consistently and abort */
-        RELAXED_STORE(&q->bottom, t);
+        RELEASE_STORE(&q->bottom, t);
         return NULL;
     }
 
     // read the element at b
-    removed = q->elements[b & q->moduloSize];
+    removed = RELAXED_LOAD(&q->elements[b & q->moduloSize]);
 
     if (currSize > 0) { /* no danger, still elements in buffer after b-- */
         // debugBelch("popWSDeque: t=%ld b=%ld = %ld\n", t, b, removed);
@@ -161,8 +158,8 @@ popWSDeque (WSDeque *q)
     if ( !(CASTOP(&(q->top),t,t+1)) ) {
         removed = NULL; /* no success, but continue adjusting bottom */
     }
-    RELAXED_STORE(&q->bottom, t+1); /* anyway, empty now. Adjust bottom consistently. */
-    q->topBound = t+1; /* ...and cached top value as well */
+    RELEASE_STORE(&q->bottom, t+1); /* anyway, empty now. Adjust bottom consistently. */
+    RELEASE_STORE(&q->topBound, t+1); /* ...and cached top value as well */
 
     ASSERT_WSDEQUE_INVARIANTS(q);
     ASSERT(RELAXED_LOAD(&q->bottom) >= RELAXED_LOAD(&q->top));
@@ -189,9 +186,6 @@ stealWSDeque_ (WSDeque *q)
     // between steal and pop.
     t = SEQ_CST_LOAD(&q->top);
     b = SEQ_CST_LOAD(&q->bottom);
-    //t = q->top;
-    //load_load_barrier();
-    //b = q->bottom;
 
     // NB. b and t are unsigned; we need a signed value for the test
     // below, because it is possible that t > b during a
@@ -254,15 +248,15 @@ pushWSDeque (WSDeque* q, void * elem)
        q->topBound (accessed only by writer) instead.
        This is why we do not just call empty(q) here.
     */
-    b = RELAXED_LOAD(&q->bottom);
-    t = q->topBound;
+    b = ACQUIRE_LOAD(&q->bottom);
+    t = ACQUIRE_LOAD(&q->topBound);
     if ( (StgInt)b - (StgInt)t >= (StgInt)sz ) {
         /* NB. 1. sz == q->size - 1, thus ">="
            2. signed comparison, it is possible that t > b
         */
         /* could be full, check the real top value in this case */
-        t = RELAXED_LOAD(&q->top);
-        q->topBound = t;
+        t = ACQUIRE_LOAD(&q->top);
+        RELEASE_STORE(&q->topBound, t);
         if (b - t >= sz) { /* really no space left :-( */
             /* reallocate the array, copying the values. Concurrent steal()s
                will in the meantime use the old one and modify only top.
