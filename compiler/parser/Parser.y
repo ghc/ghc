@@ -2571,9 +2571,10 @@ quasiquote :: { Located (HsSplice GhcPs) }
                             in sL (getLoc $1) (mkHsQuasiQuote quoterId (RealSrcSpan quoteSpan) quote) }
 
 exp   :: { ECP }
-        : infixexp_no_prag '::' sigtype
+        : infixexp '::' sigtype
                                 { ECP $
                                    runECP_PV $1 >>= \ $1 ->
+                                   rejectPragmaPV $1 >>
                                    amms (mkHsTySigPV (comb2 $1 $>) $1 $3)
                                        [mu AnnDcolon $2] }
         | infixexp '-<' exp     {% runECP_P $1 >>= \ $1 ->
@@ -2604,20 +2605,21 @@ exp   :: { ECP }
         | exp_prag(exp)         { $1 } -- See Note [Pragmas and operator fixity]
 
 infixexp :: { ECP }
-        : infixexp_no_prag    { $1 }
-        | infixexp_no_prag qop exp_prag(last_exp10)    -- See Note [Pragmas and operator fixity]
+        : exp10 { $1 }
+        | infixexp qop exp10p    -- See Note [Pragmas and operator fixity]
                                { ECP $
                                  superInfixOp $
                                  $2 >>= \ $2 ->
                                  runECP_PV $1 >>= \ $1 ->
                                  runECP_PV $3 >>= \ $3 ->
+                                 rejectPragmaPV $1 >>
                                  amms (mkHsOpAppPV (comb2 $1 $>) $1 $2 $3)
                                      [mj AnnVal $2] }
                  -- AnnVal annotation for NPlusKPat, which discards the operator
 
-last_exp10 :: { ECP }
-  : exp10                { $1 }
-  | exp_prag(last_exp10) { $1 } -- See Note [Pragmas and operator fixity]
+exp10p :: { ECP }
+  : exp10            { $1 }
+  | exp_prag(exp10p) { $1 } -- See Note [Pragmas and operator fixity]
 
 exp_prag(e) :: { ECP }
   : prag_e e  -- See Note [Pragmas and operator fixity]
@@ -2625,18 +2627,6 @@ exp_prag(e) :: { ECP }
          fmap ecpFromExp $
          ams (sLL $1 $> $ HsPragE noExtField (snd $ unLoc $1) $2)
              (fst $ unLoc $1) }
-
-infixexp_no_prag :: { ECP }
-        : exp10 { $1 }
-        | infixexp_no_prag qop exp10
-                               { ECP $
-                                 superInfixOp $
-                                 $2 >>= \ $2 ->
-                                 runECP_PV $1 >>= \ $1 ->
-                                 runECP_PV $3 >>= \ $3 ->
-                                 amms (mkHsOpAppPV (comb2 $1 $>) $1 $2 $3)
-                                     [mj AnnVal $2] }
-                 -- AnnVal annotation for NPlusKPat, which discards the operator
 
 exp10 :: { ECP }
         : '-' fexp                      { ECP $
@@ -2956,8 +2946,9 @@ texp :: { ECP }
         -- Then when converting expr to pattern we unravel it again
         -- Meanwhile, the renamer checks that real sections appear
         -- inside parens.
-        | infixexp_no_prag qop
+        | infixexp qop
                              {% runECP_P $1 >>= \ $1 ->
+                                runPV (rejectPragmaPV $1) >>
                                 runPV $2 >>= \ $2 ->
                                 return $ ecpFromExp $
                                 sLL $1 $> $ SectionL noExtField $1 $2 }

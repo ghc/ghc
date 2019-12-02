@@ -1807,6 +1807,9 @@ class b ~ (Body b) GhcPs => DisambECP b where
   mkHsBangPatPV :: SrcSpan -> Located b -> PV (Located b)
   -- | Disambiguate tuple sections and unboxed sums
   mkSumOrTuplePV :: SrcSpan -> Boxity -> SumOrTuple b -> PV (Located b)
+  -- | Validate infixexp LHS to reject unwanted {-# SCC ... #-} pragmas
+  rejectPragmaPV :: Located b -> PV ()
+
 
 {- Note [UndecidableSuperClasses for associated types]
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
@@ -1899,6 +1902,7 @@ instance DisambECP (HsCmd GhcPs) where
   mkHsBangPatPV l c = cmdFail l $
     text "!" <> ppr c
   mkSumOrTuplePV l boxity a = cmdFail l (pprSumOrTuple boxity a)
+  rejectPragmaPV _ = return ()
 
 cmdFail :: SrcSpan -> SDoc -> PV a
 cmdFail loc e = addFatalError loc $
@@ -1951,6 +1955,13 @@ instance DisambECP (HsExpr GhcPs) where
   mkHsBangPatPV l e = patSynErr "Bang pattern" l (text "!" <> ppr e) $
     text "Did you mean to add a space after the '!'?"
   mkSumOrTuplePV = mkSumOrTupleExpr
+  rejectPragmaPV (L _ (OpApp _ _ _ e)) =
+    -- assuming left-associative parsing of operators
+    rejectPragmaPV e
+  rejectPragmaPV (L l (HsPragE _ prag _)) =
+    addError l $
+      hang (text "A pragma is not allowed in this position:") 2 (ppr prag)
+  rejectPragmaPV _ = return ()
 
 patSynErr :: String -> SrcSpan -> SDoc -> SDoc -> PV (LHsExpr GhcPs)
 patSynErr item l e explanation =
@@ -2039,6 +2050,7 @@ instance DisambECP (PatBuilder GhcPs) where
     hintBangPat l pb
     return $ L l (PatBuilderPat pb)
   mkSumOrTuplePV = mkSumOrTuplePat
+  rejectPragmaPV _ = return ()
 
 checkUnboxedStringLitPat :: Located (HsLit GhcPs) -> PV ()
 checkUnboxedStringLitPat (L loc lit) =
