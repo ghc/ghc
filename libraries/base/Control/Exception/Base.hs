@@ -166,7 +166,7 @@ mapException f v = unsafePerformIO (catch (evaluate v)
 -- | Similar to 'catch', but returns an 'Either' result which is
 -- @('Right' a)@ if no exception of type @e@ was raised, or @('Left' ex)@
 -- if an exception of type @e@ was raised and its value is @ex@.
--- If any other type of exception is raised than it will be propogated
+-- If any other type of exception is raised then it will be propagated
 -- up to the next enclosing exception handler.
 --
 -- >  try a = catch (Right `liftM` a) (return . Left)
