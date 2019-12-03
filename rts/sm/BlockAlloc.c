@@ -344,6 +344,7 @@ split_free_block (bdescr *bd, uint32_t node, W_ n, uint32_t ln /* log_2_ceil(n) 
 }
 
 // Take N blocks off the end, free the rest.
+WARD_NEED(may_call_sm)
 static bdescr *
 split_block_high (bdescr *bd, W_ n)
 {
@@ -365,6 +366,7 @@ split_block_high (bdescr *bd, W_ n)
 
 // Like `split_block_high`, but takes n blocks off the beginning rather
 // than the end.
+WARD_NEED(may_call_sm)
 static bdescr *
 split_block_low (bdescr *bd, W_ n)
 {

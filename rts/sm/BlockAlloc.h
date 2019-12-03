@@ -10,8 +10,10 @@
 
 #include "BeginPrivate.h"
 
-bdescr *allocLargeChunk (W_ min, W_ max);
-bdescr *allocLargeChunkOnNode (uint32_t node, W_ min, W_ max);
+bdescr *allocLargeChunk (W_ min, W_ max)
+  WARD_NEED(may_call_sm);
+bdescr *allocLargeChunkOnNode (uint32_t node, W_ min, W_ max)
+  WARD_NEED(may_call_sm);
 
 void deferMBlockFreeing(void);
 void commitMBlockFreeing(void);

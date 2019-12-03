@@ -390,26 +390,26 @@ void traverseSparkQueues (evac_fn evac, void *user);
 
 WARD_GRANT(capability_lock_held)
 INLINE_HEADER void
-acquire_capability_lock(Capability *cap) {
-    ACQUIRE_MUTEX(&cap->lock);
+acquire_capability_lock(Capability *cap STG_UNUSED) {
+    ACQUIRE_LOCK(&cap->lock);
 }
 
 WARD_NEED(capability_lock_held)
 WARD_REVOKE(capability_lock_held)
 INLINE_HEADER void
-release_capability_lock(Capability *cap) {
-    RELEASE_MUTEX(&cap->lock);
+release_capability_lock(Capability *cap STG_UNUSED) {
+    RELEASE_LOCK(&cap->lock);
 }
 
 WARD_NEED(capability_lock_held)
 INLINE_HEADER Task *
 get_running_task(Capability *cap) {
-    return capability->running_task;
+    return cap->running_task;
 }
 WARD_NEED(capability_lock_held)
 INLINE_HEADER void
-set_running_task(Capability *cap, const Task *task) {
-    capability->running_task = task;
+set_running_task(Capability *cap, Task *task) {
+    cap->running_task = task;
 }
 
 /* -----------------------------------------------------------------------------

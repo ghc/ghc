@@ -18,6 +18,7 @@
 #include "Sweep.h"
 #include "Trace.h"
 
+WARD_NEED(may_call_sm)
 void
 sweep(generation *gen)
 {

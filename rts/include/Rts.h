@@ -93,6 +93,9 @@ extern "C" {
 #define WARD_REVOKE(perm) WARD_ANN(revoke(perm))
 #define WARD_WAIVE(perm) WARD_ANN(waive(perm))
 
+// A common pattern: require a permission and revoke it.
+#define WARD_NEED_REVOKE(perm) WARD_NEED(perm) WARD_REVOKE(perm)
+
 /* __builtin_unreachable is supported since GNU C 4.5 */
 #if __GNUC__ > 4 || (__GNUC__ == 4 && __GNUC_MINOR__ >= 5)
 #define RTS_UNREACHABLE __builtin_unreachable()

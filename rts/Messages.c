@@ -64,6 +64,7 @@ void sendMessage(Capability *from_cap, Capability *to_cap, Message *msg)
 
 #if defined(THREADED_RTS)
 
+WARD_NEED(may_take_sm_lock)
 void
 executeMessage (Capability *cap, Message *m)
 {
@@ -163,6 +164,7 @@ loop:
 
    ------------------------------------------------------------------------- */
 
+WARD_NEED(may_take_sm_lock)
 uint32_t messageBlackHole(Capability *cap, MessageBlackHole *msg)
 {
     const StgInfoTable *info;

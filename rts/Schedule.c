@@ -587,7 +587,6 @@ run_thread:
  * -------------------------------------------------------------------------- */
 
 WARD_NEED(may_take_sm_lock)
-WARD_NEED(may_call_sm)
 static void
 removeFromRunQueue (Capability *cap, StgTSO *tso)
 {
@@ -610,7 +609,6 @@ removeFromRunQueue (Capability *cap, StgTSO *tso)
 }
 
 WARD_NEED(may_take_sm_lock)
-WARD_NEED(may_call_sm)
 void
 promoteInRunQueue (Capability *cap, StgTSO *tso)
 {
@@ -2224,6 +2222,7 @@ forkProcess(HsStablePtr *entry
  *
  * ------------------------------------------------------------------------- */
 
+WARD_NEED(may_call_sm)
 void
 setNumCapabilities (uint32_t new_n_capabilities USED_IF_THREADS)
 {

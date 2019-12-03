@@ -318,7 +318,8 @@ bdescr *allocGroupOnNode(uint32_t node, W_ n)
 //
 //     bdescr->start % BLOCK_SIZE*n == 0
 //
-bdescr *allocAlignedGroupOnNode(uint32_t node, W_ n);
+bdescr *allocAlignedGroupOnNode(uint32_t node, W_ n)
+    WARD_NEED(may_call_sm);
 
 EXTERN_INLINE bdescr* allocBlockOnNode(uint32_t node)
     WARD_NEED(may_call_sm);

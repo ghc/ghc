@@ -264,6 +264,7 @@ firstBlockGetCompact(StgCompactNFDataBlock *block)
     return (StgCompactNFData*) ((W_)block + sizeof(StgCompactNFDataBlock));
 }
 
+WARD_NEED(may_call_sm)
 void
 compactFree(StgCompactNFData *str)
 {

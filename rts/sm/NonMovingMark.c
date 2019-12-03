@@ -23,6 +23,9 @@
 #include "Weak.h"
 #include "Stats.h"
 #include "STM.h"
+#include "GCThread.h"
+#include "GCTDecl.h"
+#include "GCUtils.h"
 #include "MarkWeak.h"
 #include "sm/Storage.h"
 #include "CNF.h"
@@ -427,13 +430,11 @@ push (MarkQueue *q, const MarkQueueEnt *ent)
             nonmovingAddUpdRemSetBlocks(q);
         } else {
             // allocate a fresh block.
-            ACQUIRE_SM_LOCK;
-            bdescr *bd = allocGroup(MARK_QUEUE_BLOCKS);
+            bdescr *bd = allocGroup_lock(MARK_QUEUE_BLOCKS);
             bd->link = q->blocks;
-            q->blocks = bd;
             q->top = (MarkQueueBlock *) bd->start;
             q->top->head = 0;
-            RELEASE_SM_LOCK;
+            q->blocks = bd;
         }
     }
 
@@ -446,6 +447,7 @@ push (MarkQueue *q, const MarkQueueEnt *ent)
  * operations this uses the gc_alloc_block_sync spinlock instead of the
  * SM_LOCK to allocate new blocks in the event that the mark queue is full.
  */
+WARD_NEED(sharing_sm_lock)
 void
 markQueuePushClosureGC (MarkQueue *q, StgClosure *p)
 {
@@ -465,13 +467,11 @@ markQueuePushClosureGC (MarkQueue *q, StgClosure *p)
     if (q->top->head == MARK_QUEUE_BLOCK_ENTRIES) {
         // Yes, this block is full.
         // allocate a fresh block.
-        ACQUIRE_SPIN_LOCK(&gc_alloc_block_sync);
-        bdescr *bd = allocGroup(MARK_QUEUE_BLOCKS);
+        bdescr *bd = allocGroup_sync(MARK_QUEUE_BLOCKS);
         bd->link = q->blocks;
-        q->blocks = bd;
         q->top = (MarkQueueBlock *) bd->start;
         q->top->head = 0;
-        RELEASE_SPIN_LOCK(&gc_alloc_block_sync);
+        q->blocks = bd;
     }
 
     MarkQueueEnt ent = {
@@ -887,7 +887,7 @@ static MarkQueueEnt markQueuePop (MarkQueue *q)
  * Creating and destroying MarkQueues and UpdRemSets
  *********************************************************/
 
-/* Must hold sm_mutex. */
+WARD_NEED(may_call_sm)
 static void init_mark_queue_ (MarkQueue *queue)
 {
     bdescr *bd = allocGroup(MARK_QUEUE_BLOCKS);
@@ -900,14 +900,14 @@ static void init_mark_queue_ (MarkQueue *queue)
 #endif
 }
 
-/* Must hold sm_mutex. */
+WARD_NEED(may_call_sm)
 void initMarkQueue (MarkQueue *queue)
 {
     init_mark_queue_(queue);
     queue->is_upd_rem_set = false;
 }
 
-/* Must hold sm_mutex. */
+WARD_NEED(may_call_sm)
 void init_upd_rem_set (UpdRemSet *rset)
 {
     init_mark_queue_(&rset->queue);
@@ -922,6 +922,7 @@ void reset_upd_rem_set (UpdRemSet *rset)
     rset->queue.top->head = 0;
 }
 
+WARD_NEED(may_take_sm_lock)
 void freeMarkQueue (MarkQueue *queue)
 {
     freeChain_lock(queue->blocks);

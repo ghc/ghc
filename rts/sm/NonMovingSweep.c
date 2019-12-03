@@ -277,6 +277,7 @@ dirty_BLOCKING_QUEUE:
 }
 
 /* N.B. This happens during the pause so we own all capabilities. */
+WARD_NEED(may_take_sm_lock)
 void nonmovingSweepMutLists()
 {
     for (uint32_t n = 0; n < n_capabilities; n++) {
@@ -299,6 +300,7 @@ void nonmovingSweepMutLists()
  * freed blocks to ensure that we don't starve other lock users (e.g. the
  * mutator).
  */
+WARD_NEED(may_take_sm_lock)
 static void freeChain_lock_max(bdescr *bd, int max_dur)
 {
   ACQUIRE_SM_LOCK;
@@ -321,6 +323,7 @@ static void freeChain_lock_max(bdescr *bd, int max_dur)
   RELEASE_SM_LOCK;
 }
 
+WARD_NEED(may_take_sm_lock)
 void nonmovingSweepLargeObjects()
 {
     freeChain_lock_max(nonmoving_large_objects, 10000);
@@ -330,6 +333,7 @@ void nonmovingSweepLargeObjects()
     n_nonmoving_marked_large_blocks = 0;
 }
 
+WARD_NEED(may_take_sm_lock)
 void nonmovingSweepCompactObjects()
 {
     bdescr *next;

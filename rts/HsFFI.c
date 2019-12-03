@@ -29,24 +29,28 @@ hs_perform_gc(void)
 }
 
 // Lock the stable pointer table
+WARD_GRANT(stable_ptr_lock_held)
 void hs_lock_stable_ptr_table (void)
 {
     stablePtrLock();
 }
 
 // Deprecated version of hs_lock_stable_ptr_table
+WARD_GRANT(stable_ptr_lock_held)
 void hs_lock_stable_tables (void)
 {
     stablePtrLock();
 }
 
 // Unlock the stable pointer table
+WARD_NEED_REVOKE(stable_ptr_lock_held)
 void hs_unlock_stable_ptr_table (void)
 {
     stablePtrUnlock();
 }
 
 // Deprecated version of hs_unlock_stable_ptr_table
+WARD_NEED_REVOKE(stable_ptr_lock_held)
 void hs_unlock_stable_tables (void)
 {
     stablePtrUnlock();

@@ -239,59 +239,29 @@ bdescr *mark_stack_top_bd; // topmost block in the mark stack
 bdescr *mark_stack_bd;     // current block in the mark stack
 StgPtr mark_sp;            // pointer to the next unallocated mark stack entry
 
-WARD_NEED(may_take_sm_lock)
-WARD_REVOKE(may_take_sm_lock)
+/* -----------------------------------------------------------------------------
+   Storage manager locking
+   -------------------------------------------------------------------------- */
+
+/* N.B. We don't use ACQUIRE_SM_LOCK/RELEASE_SM_LOCK here to ensure that we
+ * don't grant the may_call_sm Ward permission.
+ */
+
+WARD_NEED_REVOKE(may_call_sm)
+WARD_NEED_REVOKE(sm_lock_held)
 WARD_GRANT(sharing_sm_lock)
 WARD_GRANT(may_call_sm) // TODO: This shouldn't be available with taking spinlock
 WARD_GRANT(sm_lock_held)
 static void
 SHARE_SM_LOCK(void)
-{
-  ACQUIRE_SM_LOCK;
-}
+{ }
 
-WARD_GRANT(may_take_sm_lock)
-WARD_WAIVE(may_take_sm_lock)
-WARD_NEED(sharing_sm_lock)
-WARD_REVOKE(sharing_sm_lock)
-WARD_NEED(sm_lock_held)
-WARD_REVOKE(sm_lock_held)
-WARD_NEED(may_call_sm) // TODO: This shouldn't be available with taking spinlock
-WARD_REVOKE(may_call_sm) // TODO: This shouldn't be available with taking spinlock
+WARD_NEED_REVOKE(sharing_sm_lock)
+WARD_GRANT(sm_lock_held)
+WARD_GRANT(may_call_sm)
 static void
 UNSHARE_SM_LOCK(void)
-{
-  RELEASE_SM_LOCK;
-}
-
-/* -----------------------------------------------------------------------------
-   Statistics from mut_list scavenging
-   -------------------------------------------------------------------------- */
-
-#if defined(DEBUG)
-void
-zeroMutListScavStats(MutListScavStats *src)
-{
-    memset(src, 0, sizeof(MutListScavStats));
-}
-
-void
-addMutListScavStats(const MutListScavStats *src,
-                    MutListScavStats *dest)
-{
-#define ADD_STATS(field) dest->field += src->field;
-    ADD_STATS(n_MUTVAR);
-    ADD_STATS(n_MUTARR);
-    ADD_STATS(n_MVAR);
-    ADD_STATS(n_TVAR);
-    ADD_STATS(n_TREC_CHUNK);
-    ADD_STATS(n_TVAR_WATCH_QUEUE);
-    ADD_STATS(n_TREC_HEADER);
-    ADD_STATS(n_OTHERS);
-#undef ADD_STATS
-}
-#endif /* DEBUG */
-
+{ }
 
 /* -----------------------------------------------------------------------------
    GarbageCollect: the main entry point to the garbage collector.
@@ -1209,6 +1179,7 @@ new_gc_thread (uint32_t n, gc_thread *t)
 }
 
 
+WARD_NEED(may_call_sm)
 void
 initGcThreads (uint32_t from USED_IF_THREADS, uint32_t to USED_IF_THREADS)
 {
@@ -1347,7 +1318,6 @@ void notifyTodoBlock(void) {
 
 
 WARD_NEED(sharing_sm_lock)
-WARD_NEED(may_call_sm)
 static void
 scavenge_until_all_done (void)
 {
@@ -1412,7 +1382,6 @@ scavenge_until_all_done (void)
 
 #if defined(THREADED_RTS)
 
-WARD_GRANT(may_call_sm)
 WARD_GRANT(sharing_sm_lock)
 static void enter_gc_thread(void) {}
 
@@ -1651,7 +1620,6 @@ releaseGCThreads (Capability *cap USED_IF_THREADS, bool idle_cap[])
    ------------------------------------------------------------------------- */
 
 WARD_NEED(may_call_sm)
-WARD_NEED(sharing_sm_lock)
 static void
 stash_mut_list (Capability *cap, uint32_t gen_no)
 {
@@ -1664,7 +1632,7 @@ stash_mut_list (Capability *cap, uint32_t gen_no)
    ------------------------------------------------------------------------- */
 
 WARD_NEED(may_call_sm)
-WARD_NEED(sharing_sm_lock)
+WARD_NEED(sm_lock_held)
 static void
 prepare_collected_gen (generation *gen)
 {
@@ -1809,7 +1777,6 @@ prepare_collected_gen (generation *gen)
    ------------------------------------------------------------------------- */
 
 WARD_NEED(may_call_sm)
-WARD_NEED(sharing_sm_lock)
 static void
 prepare_uncollected_gen (generation *gen)
 {

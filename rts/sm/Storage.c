@@ -268,6 +268,7 @@ initStorage (void)
 
 }
 
+WARD_NEED(may_call_sm)
 void storageAddCapabilities (uint32_t from, uint32_t to)
 {
     uint32_t n, g, i, new_n_nurseries;
@@ -902,6 +903,7 @@ resizeNurseriesEach (W_ blocks)
     }
 }
 
+WARD_NEED(may_call_sm)
 void
 resizeNurseriesFixed (void)
 {
@@ -919,6 +921,7 @@ resizeNurseriesFixed (void)
 //
 // Resize the nurseries to the total specified size.
 //
+WARD_NEED(may_call_sm)
 void
 resizeNurseries (W_ blocks)
 {

@@ -17,6 +17,7 @@
 
 #include "BeginPrivate.h"
 
+WARD_NEED(sharing_sm_lock)
 INLINE_HEADER void
 push_mark_stack(StgPtr p)
 {

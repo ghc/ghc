@@ -452,6 +452,7 @@ checkBlockingQueues (Capability *cap, StgTSO *tso)
    awaken any threads that are blocked on it.
    ------------------------------------------------------------------------- */
 
+WARD_NEED(may_take_sm_lock)
 void
 updateThunk (Capability *cap, StgTSO *tso, StgClosure *thunk, StgClosure *val)
 {
@@ -537,6 +538,7 @@ isThreadBound(StgTSO* tso USED_IF_THREADS)
    size appropriately.
    -------------------------------------------------------------------------- */
 
+WARD_NEED(may_take_sm_lock)
 void
 threadStackOverflow (Capability *cap, StgTSO *tso)
 {
@@ -776,6 +778,7 @@ threadStackUnderflow (Capability *cap, StgTSO *tso)
    NOTE: this should be kept in sync with stg_tryPutMVarzh in PrimOps.cmm
    ------------------------------------------------------------------------- */
 
+WARD_NEED(may_take_sm_lock)
 bool performTryPutMVar(Capability *cap, StgMVar *mvar, StgClosure *value)
 {
     const StgInfoTable *info;

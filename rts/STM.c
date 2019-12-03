@@ -1084,6 +1084,7 @@ static TRecEntry *get_entry_for(StgTRecHeader *trec, StgTVar *tvar, StgTRecHeade
 
 /*......................................................................*/
 
+WARD_NEED(may_take_sm_lock)
 StgBool stmCommitTransaction(Capability *cap, StgTRecHeader *trec) {
   StgInt64 max_commits_at_start = getMaxCommits();
 
