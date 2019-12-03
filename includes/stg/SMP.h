@@ -453,6 +453,14 @@ load_load_barrier(void) {
 // Non-atomic addition for "approximate" counters that can be lossy
 #define NONATOMIC_ADD(ptr,val) RELAXED_STORE(ptr, RELAXED_LOAD(ptr) + val)
 
+// Explicit fences
+//
+// These are typically necessary only in very specific cases (e.g. WSDeque)
+// where the ordered operations aren't expressive enough to capture the desired
+// ordering.
+#define RELEASE_FENCE() __atomic_thread_fence(__ATOMIC_RELEASE)
+#define SEQ_CST_FENCE() __atomic_thread_fence(__ATOMIC_SEQ_CST)
+
 /* ---------------------------------------------------------------------- */
 #else /* !THREADED_RTS */
 
@@ -478,6 +486,10 @@ EXTERN_INLINE void load_load_barrier () {} /* nothing */
 
 // Non-atomic addition for "approximate" counters that can be lossy
 #define NONATOMIC_ADD(ptr,val) *ptr += val
+
+// Fences
+#define RELEASE_FENCE()
+#define SEQ_CST_FENCE()
 
 #if !IN_STG_CODE || IN_STGCRUN
 INLINE_HEADER StgWord
@@ -526,6 +538,9 @@ atomic_dec(StgVolatilePtr p)
     return --(*p);
 }
 #endif
+
+/* An alias for the C11 declspec */
+#define ATOMIC
 
 #define VOLATILE_LOAD(p) ((StgWord)*((StgWord*)(p)))
 
