@@ -110,7 +110,6 @@ pruneSparkQueue (Capability *cap)
     // stealing is happening during GC.
     pool->bottom  -= pool->top & ~pool->moduloSize;
     pool->top     &= pool->moduloSize;
-    pool->topBound = pool->top;
 
     debugTrace(DEBUG_sparks,
                "markSparkQueue: current spark queue len=%ld; (hd=%ld; tl=%ld)",
@@ -239,7 +238,6 @@ pruneSparkQueue (Capability *cap)
     ASSERT(currInd == oldBotInd);
 
     pool->top = oldBotInd; // where we started writing
-    pool->topBound = pool->top;
 
     pool->bottom = (oldBotInd <= botInd) ? botInd : (botInd + pool->size);
     // first free place we did not use (corrected by wraparound)
