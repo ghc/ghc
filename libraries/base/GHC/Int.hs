@@ -182,7 +182,6 @@ instance Bits Int8 where
     (I8# x#) .&.   (I8# y#)   = I8# (word2Int# (int2Word# x# `and#` int2Word# y#))
     (I8# x#) .|.   (I8# y#)   = I8# (word2Int# (int2Word# x# `or#`  int2Word# y#))
     (I8# x#) `xor` (I8# y#)   = I8# (word2Int# (int2Word# x# `xor#` int2Word# y#))
-    complement (I8# x#)       = I8# (word2Int# (not# (int2Word# x#)))
     (I8# x#) `shift` (I# i#)
         | isTrue# (i# >=# 0#) = I8# (narrow8Int# (x# `iShiftL#` i#))
         | otherwise           = I8# (x# `iShiftRA#` negateInt# i#)
@@ -209,6 +208,10 @@ instance Bits Int8 where
     popCount (I8# x#)         = I# (word2Int# (popCnt8# (int2Word# x#)))
     bit                       = bitDefault
     testBit                   = testBitDefault
+
+-- | @since 4.99.0.0
+instance Complement Int8 where
+    complement (I8# x#)       = I8# (word2Int# (not# (int2Word# x#)))
 
 -- | @since 4.6.0.0
 instance FiniteBits Int8 where
@@ -389,7 +392,6 @@ instance Bits Int16 where
     (I16# x#) .&.   (I16# y#)  = I16# (word2Int# (int2Word# x# `and#` int2Word# y#))
     (I16# x#) .|.   (I16# y#)  = I16# (word2Int# (int2Word# x# `or#`  int2Word# y#))
     (I16# x#) `xor` (I16# y#)  = I16# (word2Int# (int2Word# x# `xor#` int2Word# y#))
-    complement (I16# x#)       = I16# (word2Int# (not# (int2Word# x#)))
     (I16# x#) `shift` (I# i#)
         | isTrue# (i# >=# 0#)  = I16# (narrow16Int# (x# `iShiftL#` i#))
         | otherwise            = I16# (x# `iShiftRA#` negateInt# i#)
@@ -416,6 +418,10 @@ instance Bits Int16 where
     popCount (I16# x#)         = I# (word2Int# (popCnt16# (int2Word# x#)))
     bit                        = bitDefault
     testBit                    = testBitDefault
+
+-- | @since 4.99.0.0
+instance Complement Int16 where
+    complement (I16# x#)       = I16# (word2Int# (not# (int2Word# x#)))
 
 -- | @since 4.6.0.0
 instance FiniteBits Int16 where
@@ -598,7 +604,6 @@ instance Bits Int32 where
     (I32# x#) .&.   (I32# y#)  = I32# (word2Int# (int2Word# x# `and#` int2Word# y#))
     (I32# x#) .|.   (I32# y#)  = I32# (word2Int# (int2Word# x# `or#`  int2Word# y#))
     (I32# x#) `xor` (I32# y#)  = I32# (word2Int# (int2Word# x# `xor#` int2Word# y#))
-    complement (I32# x#)       = I32# (word2Int# (not# (int2Word# x#)))
     (I32# x#) `shift` (I# i#)
         | isTrue# (i# >=# 0#)  = I32# (narrow32Int# (x# `iShiftL#` i#))
         | otherwise            = I32# (x# `iShiftRA#` negateInt# i#)
@@ -626,6 +631,10 @@ instance Bits Int32 where
     popCount (I32# x#)         = I# (word2Int# (popCnt32# (int2Word# x#)))
     bit                        = bitDefault
     testBit                    = testBitDefault
+
+-- | @since 4.99.0.0
+instance Complement Int32 where
+    complement (I32# x#)       = I32# (word2Int# (not# (int2Word# x#)))
 
 -- | @since 4.6.0.0
 instance FiniteBits Int32 where
@@ -839,7 +848,6 @@ instance Bits Int64 where
     (I64# x#) .&.   (I64# y#)  = I64# (word64ToInt64# (int64ToWord64# x# `and64#` int64ToWord64# y#))
     (I64# x#) .|.   (I64# y#)  = I64# (word64ToInt64# (int64ToWord64# x# `or64#`  int64ToWord64# y#))
     (I64# x#) `xor` (I64# y#)  = I64# (word64ToInt64# (int64ToWord64# x# `xor64#` int64ToWord64# y#))
-    complement (I64# x#)       = I64# (word64ToInt64# (not64# (int64ToWord64# x#)))
     (I64# x#) `shift` (I# i#)
         | isTrue# (i# >=# 0#)  = I64# (x# `iShiftL64#` i#)
         | otherwise            = I64# (x# `iShiftRA64#` negateInt# i#)
@@ -1017,7 +1025,6 @@ instance Bits Int64 where
     (I64# x#) .&.   (I64# y#)  = I64# (word2Int# (int2Word# x# `and#` int2Word# y#))
     (I64# x#) .|.   (I64# y#)  = I64# (word2Int# (int2Word# x# `or#`  int2Word# y#))
     (I64# x#) `xor` (I64# y#)  = I64# (word2Int# (int2Word# x# `xor#` int2Word# y#))
-    complement (I64# x#)       = I64# (word2Int# (int2Word# x# `xor#` int2Word# (-1#)))
     (I64# x#) `shift` (I# i#)
         | isTrue# (i# >=# 0#)  = I64# (x# `iShiftL#` i#)
         | otherwise            = I64# (x# `iShiftRA#` negateInt# i#)
@@ -1085,6 +1092,14 @@ uncheckedIShiftL64#  = uncheckedIShiftL#
 
 uncheckedIShiftRA64# :: Int# -> Int# -> Int#
 uncheckedIShiftRA64# = uncheckedIShiftRA#
+#endif
+
+-- | @since 4.99.0.0
+instance Complement Int64 where
+#if WORD_SIZE_IN_BITS < 64
+    complement (I64# x#)       = I64# (word64ToInt64# (not64# (int64ToWord64# x#)))
+#else
+    complement (I64# x#)       = I64# (word2Int# (int2Word# x# `xor#` int2Word# (-1#)))
 #endif
 
 -- | @since 4.6.0.0

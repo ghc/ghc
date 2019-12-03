@@ -1,5 +1,5 @@
 {-# LANGUAGE Trustworthy #-}
-{-# LANGUAGE CPP, NoImplicitPrelude, BangPatterns, MagicHash #-}
+{-# LANGUAGE CPP, NoImplicitPrelude, BangPatterns, MagicHash, DefaultSignatures #-}
 
 -----------------------------------------------------------------------------
 -- |
@@ -22,7 +22,6 @@
 module Data.Bits (
   Bits(
     (.&.), (.|.), xor,
-    complement,
     shift,
     rotate,
     zeroBits,
@@ -38,6 +37,9 @@ module Data.Bits (
     unsafeShiftL, unsafeShiftR,
     rotateL, rotateR,
     popCount
+  ),
+  Complement(
+    complement
   ),
   FiniteBits(
     finiteBitSize,
@@ -74,7 +76,7 @@ infixl 5 .|.
 -- * Bits are numbered from 0 with bit 0 being the least
 --   significant bit.
 class Eq a => Bits a where
-    {-# MINIMAL (.&.), (.|.), xor, complement,
+    {-# MINIMAL (.&.), (.|.), xor,
                 (shift | (shiftL, shiftR)),
                 (rotate | (rotateL, rotateR)),
                 bitSize, bitSizeMaybe, isSigned, testBit, bit, popCount #-}
@@ -87,9 +89,6 @@ class Eq a => Bits a where
 
     -- | Bitwise \"xor\"
     xor :: a -> a -> a
-
-    {-| Reverse all the bits in the argument -}
-    complement        :: a -> a
 
     {-| @'shift' x i@ shifts @x@ left by @i@ bits if @i@ is positive,
         or right by @-i@ bits otherwise.
@@ -164,6 +163,7 @@ class Eq a => Bits a where
 
     -- | @x \`clearBit\` i@ is the same as @x .&. complement (bit i)@
     clearBit          :: a -> Int -> a
+    default clearBit  :: Complement a => a -> Int -> a
 
     -- | @x \`complementBit\` i@ is the same as @x \`xor\` bit i@
     complementBit     :: a -> Int -> a
@@ -284,10 +284,19 @@ class Eq a => Bits a where
         @since 4.5.0.0 -}
     popCount          :: a -> Int
 
+-- | The 'Complement' class denotes 'Bits' types which have 'complement'.
+--
+-- @since 4.99.0.0
+class Bits b => Complement b where
+    -- | Reverse all the bits in the argument
+    --
+    -- Moved from 'Bits' in 4.99.0.0
+    complement        :: b -> b
+
 -- |The 'FiniteBits' class denotes types with a finite, fixed number of bits.
 --
 -- @since 4.7.0.0
-class Bits b => FiniteBits b where
+class Complement b => FiniteBits b where
     -- | Return the number of bits in the type of the argument.
     -- The actual value of the argument is ignored. Moreover, 'finiteBitSize'
     -- is total, in contrast to the deprecated 'bitSize' function it replaces.
@@ -327,6 +336,7 @@ class Bits b => FiniteBits b where
 
         w = finiteBitSize x
 
+
     -- | Count number of zero bits following the least significant set bit.
     --
     -- @
@@ -356,7 +366,6 @@ class Bits b => FiniteBits b where
              | otherwise   = go (i+1)
 
         w = finiteBitSize x
-
 
 -- The defaults below are written with lambdas so that e.g.
 --     bit = bitDefault
@@ -404,8 +413,6 @@ instance Bits Bool where
 
     xor = (/=)
 
-    complement = not
-
     shift x 0 = x
     shift _ _ = False
 
@@ -425,6 +432,10 @@ instance Bits Bool where
 
     popCount False = 0
     popCount True  = 1
+
+-- | @since 4.99.0.0
+instance Complement Bool where
+    complement = not
 
 -- | @since 4.7.0.0
 instance FiniteBits Bool where
@@ -450,7 +461,6 @@ instance Bits Int where
     (I# x#) .&.   (I# y#)          = I# (x# `andI#` y#)
     (I# x#) .|.   (I# y#)          = I# (x# `orI#`  y#)
     (I# x#) `xor` (I# y#)          = I# (x# `xorI#` y#)
-    complement (I# x#)             = I# (notI# x#)
     (I# x#) `shift` (I# i#)
         | isTrue# (i# >=# 0#)      = I# (x# `iShiftL#` i#)
         | otherwise                = I# (x# `iShiftRA#` negateInt# i#)
@@ -476,6 +486,10 @@ instance Bits Int where
 
     isSigned _             = True
 
+-- | @since 4.99.0.0
+instance Complement Int where
+    complement (I# x#)             = I# (notI# x#)
+
 -- | @since 4.6.0.0
 instance FiniteBits Int where
     finiteBitSize _ = WORD_SIZE_IN_BITS
@@ -494,7 +508,6 @@ instance Bits Word where
     (W# x#) .&.   (W# y#)    = W# (x# `and#` y#)
     (W# x#) .|.   (W# y#)    = W# (x# `or#`  y#)
     (W# x#) `xor` (W# y#)    = W# (x# `xor#` y#)
-    complement (W# x#)       = W# (not# x#)
     (W# x#) `shift` (I# i#)
         | isTrue# (i# >=# 0#)      = W# (x# `shiftL#` i#)
         | otherwise                = W# (x# `shiftRL#` negateInt# i#)
@@ -527,12 +540,15 @@ instance FiniteBits Word where
     countTrailingZeros (W# x#) = I# (word2Int# (ctz# x#))
     {-# INLINE countTrailingZeros #-}
 
+-- | @since 4.99.0.0
+instance Complement Word where
+    complement (W# x#)       = W# (not# x#)
+
 -- | @since 2.01
 instance Bits Integer where
    (.&.) = andInteger
    (.|.) = orInteger
    xor = xorInteger
-   complement = complementInteger
    shift x i@(I# i#) | i >= 0    = shiftLInteger x i#
                      | otherwise = shiftRInteger x (negateInt# i#)
    testBit x (I# i) = testBitInteger x i
@@ -547,13 +563,15 @@ instance Bits Integer where
    bitSize _  = errorWithoutStackTrace "Data.Bits.bitSize(Integer)"
    isSigned _ = True
 
+-- | @since 4.99.0.0
+instance Complement Integer where
+    complement = complementInteger
+
 -- | @since 4.8.0
 instance Bits Natural where
    (.&.) = andNatural
    (.|.) = orNatural
    xor = xorNatural
-   complement _ = errorWithoutStackTrace
-                    "Bits.complement: Natural complement undefined"
    shift x i
      | i >= 0    = shiftLNatural x i
      | otherwise = shiftRNatural x (negate i)
