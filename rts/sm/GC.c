@@ -1643,7 +1643,6 @@ collect_pinned_object_blocks (void)
             // Mark objects as belonging to the nonmoving heap
             for (bdescr *bd = capabilities[n]->pinned_object_blocks; bd != NULL; bd = bd->link) {
                 bd->flags |= BF_NONMOVING;
-                bd->gen = oldest_gen;
                 bd->gen_no = oldest_gen->no;
                 oldest_gen->n_large_words += bdescr_free(bd) - bdescr_start(bd);
                 oldest_gen->n_large_blocks += bd->blocks;
