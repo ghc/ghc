@@ -615,7 +615,7 @@ popStackElement(traverseState *ts) {
     debug("popStackElement() to the previous stack.\n");
 
     ASSERT(ts->stackTop + 1 == ts->stackLimit);
-    ASSERT(ts->stackBottom == bdescr_start((stackElement *)ts->currentStack));
+    ASSERT(ts->stackBottom == (stackElement *) bdescr_start(ts->currentStack));
 
     if (ts->firstStack == ts->currentStack) {
         // The stack is completely empty.
