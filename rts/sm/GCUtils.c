@@ -67,6 +67,15 @@ bdescr* allocGroupOnNode_sync(uint32_t node, uint32_t n)
     return bd;
 }
 
+bdescr* allocAlignedGroupOnNode_sync(uint32_t node, uint32_t n)
+{
+    bdescr *bd;
+    ACQUIRE_ALLOC_SPIN_LOCK();
+    bd = allocAlignedGroupOnNode(node,n);
+    RELEASE_ALLOC_SPIN_LOCK();
+    return bd;
+}
+
 WARD_NEED(sharing_sm_lock)
 static uint32_t
 allocBlocks_sync(uint32_t n, bdescr **hd)

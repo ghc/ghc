@@ -17,6 +17,7 @@
 // to include the declaration so that the compiler doesn't clobber the register.
 #include "GCThread.h"
 #include "GCTDecl.h"
+#include "GCUtils.h"
 #include "Schedule.h"
 #include "Stats.h"
 
@@ -588,12 +589,10 @@ static struct NonmovingSegment *nonmovingAllocSegment(uint32_t node)
     if (ret == NULL) {
         // Take gc spinlock: another thread may be scavenging a moving
         // generation and call `todo_block_full`
-        ACQUIRE_ALLOC_SPIN_LOCK();
-        bdescr *bd = allocAlignedGroupOnNode(node, NONMOVING_SEGMENT_BLOCKS);
+        bdescr *bd = allocAlignedGroupOnNode_sync(node, NONMOVING_SEGMENT_BLOCKS);
         // See Note [Live data accounting in nonmoving collector].
         oldest_gen->n_blocks += bd->blocks;
         oldest_gen->n_words  += BLOCK_SIZE_W * bd->blocks;
-        RELEASE_ALLOC_SPIN_LOCK();
 
         for (StgWord32 i = 0; i < bd->blocks; ++i) {
             initBdescr(&bd[i], oldest_gen, oldest_gen);

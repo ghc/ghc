@@ -198,6 +198,7 @@ anySparks (void)
  * -------------------------------------------------------------------------- */
 
 #if defined(THREADED_RTS)
+WARD_NEED(capability_lock_held)
 STATIC_INLINE void
 newReturningTask (Capability *cap, Task *task)
 {
@@ -217,6 +218,7 @@ newReturningTask (Capability *cap, Task *task)
     ASSERT_RETURNING_TASKS(cap,task);
 }
 
+WARD_NEED(capability_lock_held)
 STATIC_INLINE Task *
 popReturningTask (Capability *cap)
 {
@@ -542,7 +544,7 @@ releaseCapability_ (Capability* cap,
     ASSERT_RETURNING_TASKS(cap,task);
     ASSERT_LOCK_HELD(&cap->lock);
 
-    RELAXED_STORE(&cap->running_task, NULL);
+    set_running_task(cap, NULL);
 
     // Check to see whether a worker thread can be given
     // the go-ahead to return the result of an external call..
