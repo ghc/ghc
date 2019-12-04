@@ -167,7 +167,7 @@ stealWSDeque_ (WSDeque *q)
     if (t < b) {
         /* Non-empty queue */
         result = RELAXED_LOAD(&q->elements[t % q->size]);
-        if (CASTOP(&q->top, t, t+1)) {
+        if (!CASTOP(&q->top, t, t+1)) {
             return NULL;
         }
     }
@@ -196,9 +196,8 @@ stealWSDeque (WSDeque *q)
 bool
 pushWSDeque (WSDeque* q, void * elem)
 {
-    StgInt t = ACQUIRE_LOAD(&q->top);
-    SEQ_CST_FENCE();
     StgInt b = ACQUIRE_LOAD(&q->bottom);
+    StgInt t = ACQUIRE_LOAD(&q->top);
 
     if ( b - t > q->size - 1 ) {
         /* Full queue */
