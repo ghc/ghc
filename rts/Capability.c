@@ -910,7 +910,7 @@ void waitForCapability (Capability **pCap, Task *task)
     debugTrace(DEBUG_sched, "returning; I want capability %d", cap->no);
 
     acquire_capability_lock(cap);
-    if (get_running_task(cap)) {
+    if (get_running_task(cap) == NULL) {
         // It's free; just grab it
         set_running_task(cap, task);
         release_capability_lock(cap);
