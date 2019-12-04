@@ -875,7 +875,7 @@ compact(StgClosure *static_objects,
         for (W_ n = 0; n < n_capabilities; n++) {
             for (bdescr *bd = capabilities[n]->mut_lists[g];
                  bd != NULL; bd = bd->link) {
-                for (p = bdescr_start(bd); p < bdescr_free(bd); p++) {
+                for (StgPtr p = bdescr_start(bd); p < bdescr_free(bd); p++) {
                     thread((StgClosure **)p);
                 }
             }
