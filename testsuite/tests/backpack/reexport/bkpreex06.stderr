@@ -6,3 +6,5 @@
 [3 of 3] Processing r
   [1 of 4] Compiling A1[sig]          ( r/A1.hsig, nothing )
   [2 of 4] Compiling A2[sig]          ( r/A2.hsig, nothing )
+  [3 of 4] Instantiating p
+  [4 of 4] Instantiating q

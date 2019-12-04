@@ -499,20 +499,29 @@ backpackProgressMsg level dflags msg =
 mkBackpackMsg :: BkpM Messager
 mkBackpackMsg = do
     level <- getBkpLevel
-    return $ \hsc_env mod_index recomp mod_summary ->
+    return $ \hsc_env mod_index recomp node ->
       let dflags = hsc_dflags hsc_env
           showMsg msg reason =
             backpackProgressMsg level dflags $
                 showModuleIndex mod_index ++
                 msg ++ showModMsg dflags (hscTarget dflags)
-                                  (recompileRequired recomp) mod_summary
+                                  (recompileRequired recomp) node
                     ++ reason
-      in case recomp of
-            MustCompile -> showMsg "Compiling " ""
-            UpToDate
-                | verbosity (hsc_dflags hsc_env) >= 2 -> showMsg "Skipping  " ""
-                | otherwise -> return ()
-            RecompBecause reason -> showMsg "Compiling " (" [" ++ reason ++ "]")
+      in case node of
+           InstantiationNode _ ->
+             case recomp of
+                 MustCompile -> showMsg "Instantiating " ""
+                 UpToDate
+                     | verbosity (hsc_dflags hsc_env) >= 2 -> showMsg "Skipping  " ""
+                     | otherwise -> return ()
+                 RecompBecause reason -> showMsg "Instantiating " (" [" ++ reason ++ "]")
+           ModuleNode _ ->
+             case recomp of
+               MustCompile -> showMsg "Compiling " ""
+               UpToDate
+                 | verbosity (hsc_dflags hsc_env) >= 2 -> showMsg "Skipping  " ""
+                 | otherwise -> return ()
+               RecompBecause reason -> showMsg "Compiling " (" [" ++ reason ++ "]")
 
 -- | 'PprStyle' for Backpack messages; here we usually want the module to
 -- be qualified (so we can tell how it was instantiated.) But we try not

@@ -51,6 +51,7 @@ import HscTypes
 import Module
 import TcIface          ( typecheckIface )
 import TcRnMonad        ( initIfaceCheck )
+import MkIface          ( RecompileRequired ( MustCompile ) )
 import HscMain
 
 import Bag              ( unitBag, listToBag, unionManyBags, isEmptyBag )
@@ -1103,8 +1104,7 @@ parUpsweep n_jobs mHscMessage old_hpt stable_mods cleanup sccs = do
                   case mod of
                     InstantiationNode iuid -> do
                       hsc_env <- readMVar hsc_env_var
-                      liftIO $ runHsc hsc_env $ ioMsgMaybe $
-                        tcRnCheckUnitId hsc_env $ IndefiniteUnitId iuid
+                      liftIO $ upsweep_inst hsc_env mHscMessage mod_idx (length sccs) iuid
                       pure Succeeded
                     ModuleNode mod' ->
                       parUpsweep_one mod' home_mod_map comp_graph_loops
@@ -1482,7 +1482,7 @@ upsweep mHscMessage old_hpt stable_mods cleanup sccs = do
   upsweep' old_hpt done
      (AcyclicSCC (InstantiationNode iuid) : mods) mod_index nmods
    = do hsc_env <- getSession
-        liftIO $ runHsc hsc_env $ ioMsgMaybe $ tcRnCheckUnitId hsc_env $ IndefiniteUnitId iuid
+        liftIO $ upsweep_inst hsc_env mHscMessage mod_index nmods iuid
         upsweep' old_hpt done mods (mod_index+1) nmods
         -- TODO(@Ericson2314) keep going hoop
 
@@ -1575,6 +1575,19 @@ maybeGetIfaceDate dflags location
     = modificationTimeIfExists (ml_hi_file location)
  | otherwise
     = return Nothing
+
+upsweep_inst :: HscEnv
+             -> Maybe Messager
+             -> Int  -- index of module
+             -> Int  -- total number of modules
+             -> IndefUnitId
+             -> IO ()
+upsweep_inst hsc_env mHscMessage mod_index nmods iuid = do
+        case mHscMessage of
+            Just hscMessage -> hscMessage hsc_env (mod_index, nmods) MustCompile (InstantiationNode iuid)
+            Nothing -> return ()
+        runHsc hsc_env $ ioMsgMaybe $ tcRnCheckUnitId hsc_env $ IndefiniteUnitId iuid
+        pure ()
 
 -- | Compile a single module.  Always produce a Linkable for it if
 -- successful.  If no compilation happened, return the old Linkable.

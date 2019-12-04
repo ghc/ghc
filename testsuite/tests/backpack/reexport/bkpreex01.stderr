@@ -4,3 +4,4 @@
   [1 of 4] Compiling B                ( p/B.hs, nothing )
   [2 of 4] Compiling H[sig]           ( p/H.hsig, nothing )
   [3 of 4] Compiling A                ( p/A.hs, nothing )
+  [4 of 4] Instantiating h

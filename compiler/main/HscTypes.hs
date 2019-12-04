@@ -2925,9 +2925,14 @@ instance Outputable ModSummary where
              char '}'
             ]
 
-showModMsg :: DynFlags -> HscTarget -> Bool -> ModSummary -> String
-showModMsg dflags target recomp mod_summary = showSDoc dflags $
-   if gopt Opt_HideSourcePaths dflags
+showModMsg :: DynFlags -> HscTarget -> Bool -> WorkGraphNode -> String
+showModMsg dflags _ _ (InstantiationNode indef_unit) = showSDoc dflags $
+  text $ unComponentId $ indefUnitIdComponentId indef_unit
+  where
+    unComponentId :: ComponentId -> String
+    unComponentId (ComponentId s) = unpackFS s
+showModMsg dflags target recomp (ModuleNode mod_summary) = showSDoc dflags $
+  if gopt Opt_HideSourcePaths dflags
       then text mod_str
       else hsep $
          [ text (mod_str ++ replicate (max 0 (16 - length mod_str)) ' ')

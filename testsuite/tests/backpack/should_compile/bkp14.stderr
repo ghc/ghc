@@ -9,3 +9,4 @@
 [3 of 3] Processing q
   [1 of 3] Compiling Y[sig]           ( q/Y.hsig, nothing )
   [2 of 3] Compiling X                ( q/X.hs, nothing )
+  [3 of 3] Instantiating p
