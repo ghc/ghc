@@ -564,7 +564,7 @@ checkCompactObjects(bdescr *bd)
 
             totalW += Bdescr((P_)block)->blocks * BLOCK_SIZE_W;
 
-            const bdescr *block_bd = Bdescr((P_)block));
+            const bdescr *block_bd = Bdescr((P_)block);
             StgPtr start = bdescr_start(block_bd) + sizeofW(StgCompactNFDataBlock);
             StgPtr free;
             if (bdescr_start(block_bd) == (P_)str->nursery) {
