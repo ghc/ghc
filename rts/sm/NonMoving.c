@@ -576,9 +576,9 @@ unsigned int nonmovingBlockCountFromSize(uint8_t log_block_size)
  * Request a fresh segment from the free segment list or allocate one of the
  * given node.
  *
- * Caller must hold SM_MUTEX (although we take the gc_alloc_block_sync spinlock
- * under the assumption that we are in a GC context).
+ * Caller must hold SM_MUTEX.
  */
+WARD_NEED(may_call_sm)
 static struct NonmovingSegment *nonmovingAllocSegment(uint32_t node)
 {
     // First try taking something off of the free list
@@ -589,7 +589,7 @@ static struct NonmovingSegment *nonmovingAllocSegment(uint32_t node)
     if (ret == NULL) {
         // Take gc spinlock: another thread may be scavenging a moving
         // generation and call `todo_block_full`
-        bdescr *bd = allocAlignedGroupOnNode_sync(node, NONMOVING_SEGMENT_BLOCKS);
+        bdescr *bd = allocAlignedGroupOnNode(node, NONMOVING_SEGMENT_BLOCKS);
         // See Note [Live data accounting in nonmoving collector].
         oldest_gen->n_blocks += bd->blocks;
         oldest_gen->n_words  += BLOCK_SIZE_W * bd->blocks;
@@ -654,6 +654,7 @@ static struct NonmovingSegment *pop_active_segment(struct NonmovingAllocator *al
 }
 
 /* Allocate a block in the nonmoving heap. Caller must hold SM_MUTEX. sz is in words */
+WARD_NEED(sharing_sm_lock)
 GNUC_ATTR_HOT
 void *nonmovingAllocate(Capability *cap, StgWord sz)
 {
@@ -693,7 +694,9 @@ void *nonmovingAllocate(Capability *cap, StgWord sz)
 
         // there are no active segments, allocate new segment
         if (new_current == NULL) {
+            ACQUIRE_ALLOC_SPIN_LOCK();
             new_current = nonmovingAllocSegment(cap->node);
+            RELEASE_ALLOC_SPIN_LOCK();
             nonmovingInitSegment(new_current, log_block_size);
         }
 
@@ -775,6 +778,7 @@ void nonmovingExit(void)
  *
  * Must hold sm_mutex.
  */
+WARD_NEED(may_call_sm)
 void nonmovingAddCapabilities(uint32_t new_n_caps)
 {
     unsigned int old_n_caps = nonmovingHeap.n_caps;
