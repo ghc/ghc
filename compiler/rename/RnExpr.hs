@@ -232,16 +232,15 @@ rnExpr expr@(SectionR {})
   = do  { addErr (sectionErr expr); rnSection expr }
 
 ---------------------------------------------
-rnExpr (HsCoreAnn x src ann expr)
+rnExpr (HsPragE x prag expr)
   = do { (expr', fvs_expr) <- rnLExpr expr
-       ; return (HsCoreAnn x src ann expr', fvs_expr) }
-
-rnExpr (HsSCC x src lbl expr)
-  = do { (expr', fvs_expr) <- rnLExpr expr
-       ; return (HsSCC x src lbl expr', fvs_expr) }
-rnExpr (HsTickPragma x src info srcInfo expr)
-  = do { (expr', fvs_expr) <- rnLExpr expr
-       ; return (HsTickPragma x src info srcInfo expr', fvs_expr) }
+       ; return (HsPragE x (rn_prag prag) expr', fvs_expr) }
+  where
+    rn_prag :: HsPragE GhcPs -> HsPragE GhcRn
+    rn_prag (HsPragSCC x1 src ann) = HsPragSCC x1 src ann
+    rn_prag (HsPragCore x1 src lbl) = HsPragCore x1 src lbl
+    rn_prag (HsPragTick x1 src info srcInfo) = HsPragTick x1 src info srcInfo
+    rn_prag (XHsPragE x) = noExtCon x
 
 rnExpr (HsLam x matches)
   = do { (matches', fvMatch) <- rnMatchGroup LambdaExpr rnLExpr matches
@@ -1369,7 +1368,7 @@ segsToStmts empty_rec_stmt ((defs, uses, fwds, ss) : segs) fvs_later
   where
     (later_stmts, later_uses) = segsToStmts empty_rec_stmt segs fvs_later
     new_stmt | non_rec   = head ss
-             | otherwise = cL (getLoc (head ss)) rec_stmt
+             | otherwise = L (getLoc (head ss)) rec_stmt
     rec_stmt = empty_rec_stmt { recS_stmts     = ss
                               , recS_later_ids = nameSetElemsStable used_later
                               , recS_rec_ids   = nameSetElemsStable fwds }

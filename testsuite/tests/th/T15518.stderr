@@ -1,4 +1,4 @@
-T15518.hs:(5,3)-(8,6): Splicing declarations
+T15518.hs:(5,2)-(8,7): Splicing declarations
     [d| f :: Bool -> ()
         f = \case
               True -> ()

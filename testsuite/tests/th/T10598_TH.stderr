@@ -1,13 +1,10 @@
-T10598_TH.hs:(27,3)-(42,50): Splicing declarations
+T10598_TH.hs:(27,2)-(42,51): Splicing declarations
     do fooDataName <- newName "Foo"
        mkFooConName <- newName "MkFoo"
        let fooType = conT fooDataName
        sequence
          [newtypeD
-            (cxt [])
-            fooDataName
-            []
-            Nothing
+            (cxt []) fooDataName [] Nothing
             (normalC
                mkFooConName
                [bangType
@@ -16,18 +13,15 @@ T10598_TH.hs:(27,3)-(42,50): Splicing declarations
              derivClause (Just AnyclassStrategy) [[t| C |]],
              derivClause (Just NewtypeStrategy) [[t| Read |]]],
           standaloneDerivWithStrategyD
-            (Just StockStrategy)
-            (cxt [])
+            (Just StockStrategy) (cxt [])
             [t| Ord $(fooType) |]
             pending(rn) [<splice, fooType>],
           standaloneDerivWithStrategyD
-            (Just AnyclassStrategy)
-            (cxt [])
+            (Just AnyclassStrategy) (cxt [])
             [t| D $(fooType) |]
             pending(rn) [<splice, fooType>],
           standaloneDerivWithStrategyD
-            (Just NewtypeStrategy)
-            (cxt [])
+            (Just NewtypeStrategy) (cxt [])
             [t| Show $(fooType) |]
             pending(rn) [<splice, fooType>]]
   ======>

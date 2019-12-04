@@ -87,7 +87,7 @@ last []                 =  errorEmptyList "last"
 #else
 -- Use foldl to make last a good consumer.
 -- This will compile to good code for the actual GHC.List.last.
--- (At least as long it is eta-expaned, otherwise it does not, #10260.)
+-- (At least as long it is eta-expanded, otherwise it does not, #10260.)
 last xs = foldl (\_ x -> x) lastError xs
 {-# INLINE last #-}
 -- The inline pragma is required to make GHC remember the implementation via
@@ -400,7 +400,7 @@ strictUncurryScanr f pair = case pair of
 scanrFB :: (a -> b -> b) -> (b -> c -> c) -> a -> (b, c) -> (b, c)
 scanrFB f c = \x ~(r, est) -> (f x r, r `c` est)
 -- This lazy pattern match on the tuple is necessary to prevent
--- an infinite loop when scanr recieves a fusable infinite list,
+-- an infinite loop when scanr receives a fusable infinite list,
 -- which was the reason for #16943.
 -- See Note [scanrFB and evaluation] below
 

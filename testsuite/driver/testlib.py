@@ -1379,7 +1379,7 @@ def metric_dict(name, way, metric, value) -> PerfStat:
 # way: the way.
 # stats_file: the path of the stats_file containing the stats for the test.
 # range_fields: see TestOptions.stats_range_fields
-# Returns a pass/fail object. Passes if the stats are withing the expected value ranges.
+# Returns a pass/fail object. Passes if the stats are within the expected value ranges.
 # This prints the results for the user.
 def check_stats(name: TestName,
                 way: WayName,

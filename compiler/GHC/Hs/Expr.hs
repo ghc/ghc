@@ -431,19 +431,6 @@ data HsExpr p
                 (ArithSeqInfo p)
 
   -- For details on above see note [Api annotations] in ApiAnnotation
-  | HsSCC       (XSCC p)
-                SourceText            -- Note [Pragma source text] in BasicTypes
-                StringLiteral         -- "set cost centre" SCC pragma
-                (LHsExpr p)           -- expr whose cost is to be measured
-
-  -- | - 'ApiAnnotation.AnnKeywordId' : 'ApiAnnotation.AnnOpen' @'{-\# CORE'@,
-  --             'ApiAnnotation.AnnVal', 'ApiAnnotation.AnnClose' @'\#-}'@
-
-  -- For details on above see note [Api annotations] in ApiAnnotation
-  | HsCoreAnn   (XCoreAnn p)
-                SourceText            -- Note [Pragma source text] in BasicTypes
-                StringLiteral         -- hdaume: core annotation
-                (LHsExpr p)
 
   -----------------------------------------------------------
   -- MetaHaskell Extensions
@@ -511,25 +498,9 @@ data HsExpr p
      Int                                -- module-local tick number for False
      (LHsExpr p)                        -- sub-expression
 
-  -- | - 'ApiAnnotation.AnnKeywordId' : 'ApiAnnotation.AnnOpen',
-  --       'ApiAnnotation.AnnOpen' @'{-\# GENERATED'@,
-  --       'ApiAnnotation.AnnVal','ApiAnnotation.AnnVal',
-  --       'ApiAnnotation.AnnColon','ApiAnnotation.AnnVal',
-  --       'ApiAnnotation.AnnMinus',
-  --       'ApiAnnotation.AnnVal','ApiAnnotation.AnnColon',
-  --       'ApiAnnotation.AnnVal',
-  --       'ApiAnnotation.AnnClose' @'\#-}'@
-
-  -- For details on above see note [Api annotations] in ApiAnnotation
-  | HsTickPragma                      -- A pragma introduced tick
-     (XTickPragma p)
-     SourceText                       -- Note [Pragma source text] in BasicTypes
-     (StringLiteral,(Int,Int),(Int,Int))
-                                      -- external span for this tick
-     ((SourceText,SourceText),(SourceText,SourceText))
-        -- Source text for the four integers used in the span.
-        -- See note [Pragma source text] in BasicTypes
-     (LHsExpr p)
+  ---------------------------------------
+  -- Expressions annotated with pragmas, written as {-# ... #-}
+  | HsPragE (XPragE p) (HsPragE p) (LHsExpr p)
 
   ---------------------------------------
   -- Finally, HsWrap appears only in typechecker output
@@ -625,8 +596,6 @@ type instance XArithSeq      GhcPs = NoExtField
 type instance XArithSeq      GhcRn = NoExtField
 type instance XArithSeq      GhcTc = PostTcExpr
 
-type instance XSCC           (GhcPass _) = NoExtField
-type instance XCoreAnn       (GhcPass _) = NoExtField
 type instance XBracket       (GhcPass _) = NoExtField
 
 type instance XRnBracketOut  (GhcPass _) = NoExtField
@@ -641,11 +610,53 @@ type instance XStatic        GhcTc = NameSet
 
 type instance XTick          (GhcPass _) = NoExtField
 type instance XBinTick       (GhcPass _) = NoExtField
-type instance XTickPragma    (GhcPass _) = NoExtField
+
+type instance XPragE         (GhcPass _) = NoExtField
+
 type instance XWrap          (GhcPass _) = NoExtField
 type instance XXExpr         (GhcPass _) = NoExtCon
 
 -- ---------------------------------------------------------------------
+
+-- | A pragma, written as {-# ... #-}, that may appear within an expression.
+data HsPragE p
+  = HsPragSCC   (XSCC p)
+                SourceText            -- Note [Pragma source text] in BasicTypes
+                StringLiteral         -- "set cost centre" SCC pragma
+
+  -- | - 'ApiAnnotation.AnnKeywordId' : 'ApiAnnotation.AnnOpen' @'{-\# CORE'@,
+  --             'ApiAnnotation.AnnVal', 'ApiAnnotation.AnnClose' @'\#-}'@
+
+  -- For details on above see note [Api annotations] in ApiAnnotation
+  | HsPragCore  (XCoreAnn p)
+                SourceText            -- Note [Pragma source text] in BasicTypes
+                StringLiteral         -- hdaume: core annotation
+
+  -- | - 'ApiAnnotation.AnnKeywordId' : 'ApiAnnotation.AnnOpen',
+  --       'ApiAnnotation.AnnOpen' @'{-\# GENERATED'@,
+  --       'ApiAnnotation.AnnVal','ApiAnnotation.AnnVal',
+  --       'ApiAnnotation.AnnColon','ApiAnnotation.AnnVal',
+  --       'ApiAnnotation.AnnMinus',
+  --       'ApiAnnotation.AnnVal','ApiAnnotation.AnnColon',
+  --       'ApiAnnotation.AnnVal',
+  --       'ApiAnnotation.AnnClose' @'\#-}'@
+
+  -- For details on above see note [Api annotations] in ApiAnnotation
+  | HsPragTick                        -- A pragma introduced tick
+     (XTickPragma p)
+     SourceText                       -- Note [Pragma source text] in BasicTypes
+     (StringLiteral,(Int,Int),(Int,Int))
+                                      -- external span for this tick
+     ((SourceText,SourceText),(SourceText,SourceText))
+        -- Source text for the four integers used in the span.
+        -- See note [Pragma source text] in BasicTypes
+
+  | XHsPragE (XXPragE p)
+
+type instance XSCC           (GhcPass _) = NoExtField
+type instance XCoreAnn       (GhcPass _) = NoExtField
+type instance XTickPragma    (GhcPass _) = NoExtField
+type instance XXPragE        (GhcPass _) = NoExtCon
 
 -- | Located Haskell Tuple Argument
 --
@@ -857,10 +868,7 @@ ppr_expr (HsLit _ lit)      = ppr lit
 ppr_expr (HsOverLit _ lit)  = ppr lit
 ppr_expr (HsPar _ e)        = parens (ppr_lexpr e)
 
-ppr_expr (HsCoreAnn _ stc (StringLiteral sta s) e)
-  = vcat [pprWithSourceText stc (text "{-# CORE")
-          <+> pprWithSourceText sta (doubleQuotes $ ftext s) <+> text "#-}"
-         , ppr_lexpr e]
+ppr_expr (HsPragE _ prag e) = sep [ppr prag, ppr_lexpr e]
 
 ppr_expr e@(HsApp {})        = ppr_apps e []
 ppr_expr e@(HsAppType {})    = ppr_apps e []
@@ -912,7 +920,7 @@ ppr_expr (SectionR _ op expr)
 ppr_expr (ExplicitTuple _ exprs boxity)
     -- Special-case unary boxed tuples so that they are pretty-printed as
     -- `Unit x`, not `(x)`
-  | [dL -> L _ (Present _ expr)] <- exprs
+  | [L _ (Present _ expr)] <- exprs
   , Boxed <- boxity
   = hsep [text (mkTupleStr Boxed 1), ppr expr]
   | otherwise
@@ -990,13 +998,6 @@ ppr_expr (ExprWithTySig _ expr sig)
 
 ppr_expr (ArithSeq _ _ info) = brackets (ppr info)
 
-ppr_expr (HsSCC _ st (StringLiteral stl lbl) expr)
-  = sep [ pprWithSourceText st (text "{-# SCC")
-         -- no doublequotes if stl empty, for the case where the SCC was written
-         -- without quotes.
-          <+> pprWithSourceText stl (ftext lbl) <+> text "#-}",
-          ppr expr ]
-
 ppr_expr (HsWrap _ co_fn e)
   = pprHsWrapper co_fn (\parens -> if parens then pprExpr e
                                              else pprExpr e)
@@ -1027,13 +1028,6 @@ ppr_expr (HsBinTick _ tickIdTrue tickIdFalse exp)
           ppr tickIdFalse,
           text ">(",
           ppr exp, text ")"]
-ppr_expr (HsTickPragma _ _ externalSrcLoc _ exp)
-  = pprTicks (ppr exp) $
-    hcat [text "tickpragma<",
-          pprExternalSrcLoc externalSrcLoc,
-          text ">(",
-          ppr exp,
-          text ")"]
 
 ppr_expr (HsRecFld _ f) = ppr f
 ppr_expr (XExpr x) = ppr x
@@ -1110,7 +1104,6 @@ hsExprNeedsParens p = go
     go (HsLit _ l)                    = hsLitNeedsParens p l
     go (HsOverLit _ ol)               = hsOverLitNeedsParens p ol
     go (HsPar{})                      = False
-    go (HsCoreAnn _ _ _ (L _ e))      = go e
     go (HsApp{})                      = p >= appPrec
     go (HsAppType {})                 = p >= appPrec
     go (OpApp{})                      = p >= opPrec
@@ -1132,7 +1125,7 @@ hsExprNeedsParens p = go
     go (RecordUpd{})                  = False
     go (ExprWithTySig{})              = p >= sigPrec
     go (ArithSeq{})                   = False
-    go (HsSCC{})                      = p >= appPrec
+    go (HsPragE{})                    = p >= appPrec
     go (HsWrap _ _ e)                 = go e
     go (HsSpliceE{})                  = False
     go (HsBracket{})                  = False
@@ -1142,7 +1135,6 @@ hsExprNeedsParens p = go
     go (HsStatic{})                   = p >= appPrec
     go (HsTick _ _ (L _ e))           = go e
     go (HsBinTick _ _ _ (L _ e))      = go e
-    go (HsTickPragma _ _ _ _ (L _ e)) = go e
     go (RecordCon{})                  = False
     go (HsRecFld{})                   = False
     go (XExpr{})                      = True
@@ -1171,6 +1163,24 @@ isAtomicHsExpr (HsWrap _ _ e)    = isAtomicHsExpr e
 isAtomicHsExpr (HsPar _ e)       = isAtomicHsExpr (unLoc e)
 isAtomicHsExpr (HsRecFld{})      = True
 isAtomicHsExpr _                 = False
+
+instance Outputable (HsPragE (GhcPass p)) where
+  ppr (HsPragCore _ stc (StringLiteral sta s)) =
+    pprWithSourceText stc (text "{-# CORE")
+    <+> pprWithSourceText sta (doubleQuotes $ ftext s) <+> text "#-}"
+  ppr (HsPragSCC _ st (StringLiteral stl lbl)) =
+    pprWithSourceText st (text "{-# SCC")
+     -- no doublequotes if stl empty, for the case where the SCC was written
+     -- without quotes.
+    <+> pprWithSourceText stl (ftext lbl) <+> text "#-}"
+  ppr (HsPragTick _ st (StringLiteral sta s, (v1,v2), (v3,v4)) ((s1,s2),(s3,s4))) =
+    pprWithSourceText st (text "{-# GENERATED")
+    <+> pprWithSourceText sta (doubleQuotes $ ftext s)
+    <+> pprWithSourceText s1 (ppr v1) <+> char ':' <+> pprWithSourceText s2 (ppr v2)
+    <+> char '-'
+    <+> pprWithSourceText s3 (ppr v3) <+> char ':' <+> pprWithSourceText s4 (ppr v4)
+    <+> text "#-}"
+  ppr (XHsPragE x) = noExtCon x
 
 {-
 ************************************************************************
@@ -2308,9 +2318,8 @@ type instance XXSplice       (GhcPass _) = NoExtCon
 -- type captures explicitly how it was originally written, for use in the pretty
 -- printer.
 data SpliceDecoration
-  = HasParens -- ^ $( splice ) or $$( splice )
-  | HasDollar -- ^ $splice or $$splice
-  | NoParens  -- ^ bare splice
+  = DollarSplice  -- ^ $splice or $$splice
+  | BareSplice    -- ^ bare splice
   deriving (Data, Eq, Show)
 
 instance Outputable SpliceDecoration where
@@ -2452,12 +2461,12 @@ instance (OutputableBndrId p) => Outputable (HsSplice (GhcPass p)) where
 
 pprPendingSplice :: (OutputableBndrId p)
                  => SplicePointName -> LHsExpr (GhcPass p) -> SDoc
-pprPendingSplice n e = angleBrackets (ppr n <> comma <+> ppr e)
+pprPendingSplice n e = angleBrackets (ppr n <> comma <+> ppr (stripParensHsExpr e))
 
 pprSpliceDecl ::  (OutputableBndrId p)
           => HsSplice (GhcPass p) -> SpliceExplicitFlag -> SDoc
 pprSpliceDecl e@HsQuasiQuote{} _ = pprSplice e
-pprSpliceDecl e ExplicitSplice   = text "$(" <> ppr_splice_decl e <> text ")"
+pprSpliceDecl e ExplicitSplice   = text "$" <> ppr_splice_decl e
 pprSpliceDecl e ImplicitSplice   = ppr_splice_decl e
 
 ppr_splice_decl :: (OutputableBndrId p)
@@ -2466,17 +2475,13 @@ ppr_splice_decl (HsUntypedSplice _ _ n e) = ppr_splice empty n e empty
 ppr_splice_decl e = pprSplice e
 
 pprSplice :: (OutputableBndrId p) => HsSplice (GhcPass p) -> SDoc
-pprSplice (HsTypedSplice _ HasParens  n e)
-  = ppr_splice (text "$$(") n e (text ")")
-pprSplice (HsTypedSplice _ HasDollar n e)
+pprSplice (HsTypedSplice _ DollarSplice n e)
   = ppr_splice (text "$$") n e empty
-pprSplice (HsTypedSplice _ NoParens n e)
-  = ppr_splice empty n e empty
-pprSplice (HsUntypedSplice _ HasParens  n e)
-  = ppr_splice (text "$(") n e (text ")")
-pprSplice (HsUntypedSplice _ HasDollar n e)
+pprSplice (HsTypedSplice _ BareSplice _ _ )
+  = panic "Bare typed splice"  -- impossible
+pprSplice (HsUntypedSplice _ DollarSplice n e)
   = ppr_splice (text "$")  n e empty
-pprSplice (HsUntypedSplice _ NoParens n e)
+pprSplice (HsUntypedSplice _ BareSplice n e)
   = ppr_splice empty  n e empty
 pprSplice (HsQuasiQuote _ n q _ s)      = ppr_quasi n q s
 pprSplice (HsSpliced _ _ thing)         = ppr thing

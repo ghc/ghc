@@ -13,7 +13,7 @@
 
 
  class Presentable a where
-       userFormat :: a -> String       -- in prefered display format
+       userFormat :: a -> String       -- in preferred display format
 
 
 

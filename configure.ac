@@ -465,7 +465,7 @@ dnl ** Building a cross compiler?
 dnl --------------------------------------------------------------
 CrossCompiling=NO
 # If 'host' and 'target' differ, then this means we are building a cross-compiler.
-if test "$TargetPlatform" != "$HostPlatform" ; then
+if test "$target" != "$host" ; then
     CrossCompiling=YES
     cross_compiling=yes   # This tells configure that it can accept just 'target',
                           # otherwise you get
@@ -715,7 +715,9 @@ FP_GCC_SUPPORTS_NO_PIE
 dnl ** Used to determine how to compile ghc-prim's atomics.c, used by
 dnl    unregisterised, Sparc, and PPC backends.
 FP_GCC_SUPPORTS__ATOMICS
-AC_DEFINE([HAVE_C11_ATOMICS], [$CONF_GCC_SUPPORTS__ATOMICS], [Does GCC support __atomic primitives?])
+if test $CONF_GCC_SUPPORTS__ATOMICS = YES ; then
+  AC_DEFINE([HAVE_C11_ATOMICS], [1], [Does GCC support __atomic primitives?])
+fi
 
 FP_GCC_EXTRA_FLAGS
 

@@ -38,7 +38,7 @@ import System.IO
 import Control.Arrow ((***))
 
 -- -----------------------------------------------------------------------------
--- Argument kinds (rougly equivalent to PrimRep)
+-- Argument kinds (roughly equivalent to PrimRep)
 
 data ArgRep
   = N   -- non-ptr

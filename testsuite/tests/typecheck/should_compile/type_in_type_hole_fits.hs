@@ -55,7 +55,7 @@ newtype Sorted (cpu :: AsympPoly) -- The minimum operational complexity
 
 -- Merge sort is O(N*Log(N)) on average in complexity, so that's the
 -- minimum complexity we promise to satisfy. Same goes with memory, which is
--- O(N), and as we all know, mergesort is a stable sorting algoritm.
+-- O(N), and as we all know, mergesort is a stable sorting algorithm.
 mergeSort :: (Ord a, n >=. O(N*.LogN), m >=. O(N), IsStable s) =>
              [a] -> Sorted n m s a
 mergeSort = Sorted . sort

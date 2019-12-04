@@ -8,7 +8,7 @@ data Nested_0 :: forall a_1 .
                  Data.Proxy.Proxy ('(:) a_1
                                         ('(:) b_2 ('(:) c_3 ('(:) d_4 ('(:) e_5 '[]))))) ->
                  *
-T16326_TH.hs:(17,3)-(24,13): Splicing declarations
+T16326_TH.hs:(17,2)-(24,14): Splicing declarations
     do info <- reify ''Foo2
        liftIO $ hPutStrLn stderr $ pprint info
        dec <- [d| data Nested :: forall a.

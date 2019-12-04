@@ -105,7 +105,7 @@
       contain the name of the actual dll to load. This will be the only content
       of the section. In the symbol table, the last symbol will be the name
       used to refer to the dll in the relocation tables. This name will always
-      be in the format "symbol_name_iname", however when refered to, the format
+      be in the format "symbol_name_iname", however when referred to, the format
       "_head_symbol_name" is used.
 
       We record this symbol early on during GetNames and load the dll and use
@@ -1535,7 +1535,7 @@ ocGetNames_PEi386 ( ObjectCode* oc )
           }
           setImportSymbol (oc, sname);
 
-          /* Don't process this oc any futher. Just exit.  */
+          /* Don't process this oc any further. Just exit.  */
           oc->n_symbols = 0;
           oc->symbols   = NULL;
           stgFree (oc->image);

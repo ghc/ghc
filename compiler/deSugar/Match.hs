@@ -271,7 +271,7 @@ matchView (var:vars) ty (eqns@(eqn1:_))
   = do  { -- we could pass in the expr from the PgView,
          -- but this needs to extract the pat anyway
          -- to figure out the type of the fresh variable
-         let ViewPat _ viewExpr (dL->L _ pat) = firstPat eqn1
+         let ViewPat _ viewExpr (L _ pat) = firstPat eqn1
          -- do the rest of the compilation
         ; let pat_ty' = hsPatType pat
         ; var' <- newUniqueId var pat_ty'
@@ -407,16 +407,16 @@ tidy1 :: Id                  -- The Id being scrutinised
 tidy1 v o (ParPat _ pat)      = tidy1 v o (unLoc pat)
 tidy1 v o (SigPat _ pat _)    = tidy1 v o (unLoc pat)
 tidy1 _ _ (WildPat ty)        = return (idDsWrapper, WildPat ty)
-tidy1 v o (BangPat _ (dL->L l p)) = tidy_bang_pat v o l p
+tidy1 v o (BangPat _ (L l p)) = tidy_bang_pat v o l p
 
         -- case v of { x -> mr[] }
         -- = case v of { _ -> let x=v in mr[] }
-tidy1 v _ (VarPat _ (dL->L _ var))
+tidy1 v _ (VarPat _ (L _ var))
   = return (wrapBind var v, WildPat (idType var))
 
         -- case v of { x@p -> mr[] }
         -- = case v of { p -> let x=v in mr[] }
-tidy1 v o (AsPat _ (dL->L _ var) pat)
+tidy1 v o (AsPat _ (L _ var) pat)
   = do  { (wrap, pat') <- tidy1 v o (unLoc pat)
         ; return (wrapBind var v . wrap, pat') }
 
@@ -472,7 +472,7 @@ tidy1 _ o (LitPat _ lit)
        ; return (idDsWrapper, tidyLitPat lit) }
 
 -- NPats: we *might* be able to replace these w/ a simpler form
-tidy1 _ o (NPat ty (dL->L _ lit@OverLit { ol_val = v }) mb_neg eq)
+tidy1 _ o (NPat ty (L _ lit@OverLit { ol_val = v }) mb_neg eq)
   = do { unless (isGenerated o) $
            let lit' | Just _ <- mb_neg = lit{ ol_val = negateOverLitVal v }
                     | otherwise = lit
@@ -480,7 +480,7 @@ tidy1 _ o (NPat ty (dL->L _ lit@OverLit { ol_val = v }) mb_neg eq)
        ; return (idDsWrapper, tidyNPat lit mb_neg eq ty) }
 
 -- NPlusKPat: we may want to warn about the literals
-tidy1 _ o n@(NPlusKPat _ _ (dL->L _ lit1) lit2 _ _)
+tidy1 _ o n@(NPlusKPat _ _ (L _ lit1) lit2 _ _)
   = do { unless (isGenerated o) $ do
            warnAboutOverflowedOverLit lit1
            warnAboutOverflowedOverLit lit2
@@ -495,15 +495,15 @@ tidy_bang_pat :: Id -> Origin -> SrcSpan -> Pat GhcTc
               -> DsM (DsWrapper, Pat GhcTc)
 
 -- Discard par/sig under a bang
-tidy_bang_pat v o _ (ParPat _ (dL->L l p)) = tidy_bang_pat v o l p
-tidy_bang_pat v o _ (SigPat _ (dL->L l p) _) = tidy_bang_pat v o l p
+tidy_bang_pat v o _ (ParPat _ (L l p)) = tidy_bang_pat v o l p
+tidy_bang_pat v o _ (SigPat _ (L l p) _) = tidy_bang_pat v o l p
 
 -- Push the bang-pattern inwards, in the hope that
 -- it may disappear next time
 tidy_bang_pat v o l (AsPat x v' p)
-  = tidy1 v o (AsPat x v' (cL l (BangPat noExtField p)))
+  = tidy1 v o (AsPat x v' (L l (BangPat noExtField p)))
 tidy_bang_pat v o l (CoPat x w p t)
-  = tidy1 v o (CoPat x w (BangPat noExtField (cL l p)) t)
+  = tidy1 v o (CoPat x w (BangPat noExtField (L l p)) t)
 
 -- Discard bang around strict pattern
 tidy_bang_pat v o _ p@(LitPat {})    = tidy1 v o p
@@ -512,7 +512,7 @@ tidy_bang_pat v o _ p@(TuplePat {})  = tidy1 v o p
 tidy_bang_pat v o _ p@(SumPat {})    = tidy1 v o p
 
 -- Data/newtype constructors
-tidy_bang_pat v o l p@(ConPatOut { pat_con = (dL->L _ (RealDataCon dc))
+tidy_bang_pat v o l p@(ConPatOut { pat_con = L _ (RealDataCon dc)
                                  , pat_args = args
                                  , pat_arg_tys = arg_tys })
   -- Newtypes: push bang inwards (#9844)
@@ -538,7 +538,7 @@ tidy_bang_pat v o l p@(ConPatOut { pat_con = (dL->L _ (RealDataCon dc))
 --
 -- NB: SigPatIn, ConPatIn should not happen
 
-tidy_bang_pat _ _ l p = return (idDsWrapper, BangPat noExtField (cL l p))
+tidy_bang_pat _ _ l p = return (idDsWrapper, BangPat noExtField (L l p))
 
 -------------------
 push_bang_into_newtype_arg :: SrcSpan
@@ -549,16 +549,16 @@ push_bang_into_newtype_arg :: SrcSpan
 -- We are transforming   !(N p)   into   (N !p)
 push_bang_into_newtype_arg l _ty (PrefixCon (arg:args))
   = ASSERT( null args)
-    PrefixCon [cL l (BangPat noExtField arg)]
+    PrefixCon [L l (BangPat noExtField arg)]
 push_bang_into_newtype_arg l _ty (RecCon rf)
-  | HsRecFields { rec_flds = (dL->L lf fld) : flds } <- rf
+  | HsRecFields { rec_flds = L lf fld : flds } <- rf
   , HsRecField { hsRecFieldArg = arg } <- fld
   = ASSERT( null flds)
-    RecCon (rf { rec_flds = [cL lf (fld { hsRecFieldArg
-                                           = cL l (BangPat noExtField arg) })] })
+    RecCon (rf { rec_flds = [L lf (fld { hsRecFieldArg
+                                           = L l (BangPat noExtField arg) })] })
 push_bang_into_newtype_arg l ty (RecCon rf) -- If a user writes !(T {})
   | HsRecFields { rec_flds = [] } <- rf
-  = PrefixCon [cL l (BangPat noExtField (noLoc (WildPat ty)))]
+  = PrefixCon [L l (BangPat noExtField (noLoc (WildPat ty)))]
 push_bang_into_newtype_arg _ _ cd
   = pprPanic "push_bang_into_newtype_arg" (pprConArgs cd)
 
@@ -724,7 +724,7 @@ one pattern, and match simply only accepts one pattern.
 JJQC 30-Nov-1997
 -}
 
-matchWrapper ctxt mb_scr (MG { mg_alts = (dL->L _ matches)
+matchWrapper ctxt mb_scr (MG { mg_alts = L _ matches
                              , mg_ext = MatchGroupTc arg_tys rhs_ty
                              , mg_origin = origin })
   = do  { dflags <- getDynFlags
@@ -747,7 +747,7 @@ matchWrapper ctxt mb_scr (MG { mg_alts = (dL->L _ matches)
         ; return (new_vars, result_expr) }
   where
     -- Called once per equation in the match, or alternative in the case
-    mk_eqn_info vars (dL->L _ (Match { m_pats = pats, m_grhss = grhss }))
+    mk_eqn_info vars (L _ (Match { m_pats = pats, m_grhss = grhss }))
       = do { dflags <- getDynFlags
            ; let upats = map (unLoc . decideBangHood dflags) pats
                  dicts = collectEvVarsPats upats
@@ -763,8 +763,7 @@ matchWrapper ctxt mb_scr (MG { mg_alts = (dL->L _ matches)
            ; return (EqnInfo { eqn_pats = upats
                              , eqn_orig = FromSource
                              , eqn_rhs = match_result }) }
-    mk_eqn_info _ (dL->L _ (XMatch nec)) = noExtCon nec
-    mk_eqn_info _ _  = panic "mk_eqn_info: Impossible Match" -- due to #15884
+    mk_eqn_info _ (L _ (XMatch nec)) = noExtCon nec
 
     handleWarnings = if isGenerated origin
                      then discardWarningsDs
@@ -1004,8 +1003,8 @@ viewLExprEq (e1,_) (e2,_) = lexp e1 e2
     exp :: HsExpr GhcTc -> HsExpr GhcTc -> Bool
     -- real comparison is on HsExpr's
     -- strip parens
-    exp (HsPar _ (dL->L _ e)) e'   = exp e e'
-    exp e (HsPar _ (dL->L _ e'))   = exp e e'
+    exp (HsPar _ (L _ e)) e'   = exp e e'
+    exp e (HsPar _ (L _ e'))   = exp e e'
     -- because the expressions do not necessarily have the same type,
     -- we have to compare the wrappers
     exp (HsWrap _ h e) (HsWrap _ h' e') = wrap h h' && exp e e'
@@ -1058,8 +1057,8 @@ viewLExprEq (e1,_) (e2,_) = lexp e1 e2
         wrap res_wrap1 res_wrap2
 
     ---------
-    tup_arg (dL->L _ (Present _ e1)) (dL->L _ (Present _ e2)) = lexp e1 e2
-    tup_arg (dL->L _ (Missing t1))   (dL->L _ (Missing t2))   = eqType t1 t2
+    tup_arg (L _ (Present _ e1)) (L _ (Present _ e2)) = lexp e1 e2
+    tup_arg (L _ (Missing t1))   (L _ (Missing t2))   = eqType t1 t2
     tup_arg _ _ = False
 
     ---------
@@ -1094,13 +1093,13 @@ viewLExprEq (e1,_) (e2,_) = lexp e1 e2
     eq_list eq (x:xs) (y:ys) = eq x y && eq_list eq xs ys
 
 patGroup :: DynFlags -> Pat GhcTc -> PatGroup
-patGroup _ (ConPatOut { pat_con = (dL->L _ con)
+patGroup _ (ConPatOut { pat_con = L _ con
                       , pat_arg_tys = tys })
  | RealDataCon dcon <- con              = PgCon dcon
  | PatSynCon psyn <- con                = PgSyn psyn tys
 patGroup _ (WildPat {})                 = PgAny
 patGroup _ (BangPat {})                 = PgBang
-patGroup _ (NPat _ (dL->L _ (OverLit {ol_val=oval})) mb_neg _) =
+patGroup _ (NPat _ (L _ (OverLit {ol_val=oval})) mb_neg _) =
   case (oval, isJust mb_neg) of
    (HsIntegral   i, False) -> PgN (fromInteger (il_value i))
    (HsIntegral   i, True ) -> PgN (-fromInteger (il_value i))
@@ -1108,7 +1107,7 @@ patGroup _ (NPat _ (dL->L _ (OverLit {ol_val=oval})) mb_neg _) =
    (HsFractional r, True ) -> PgN (-fl_value r)
    (HsIsString _ s, _) -> ASSERT(isNothing mb_neg)
                           PgOverS s
-patGroup _ (NPlusKPat _ _ (dL->L _ (OverLit {ol_val=oval})) _ _ _) =
+patGroup _ (NPlusKPat _ _ (L _ (OverLit {ol_val=oval})) _ _ _) =
   case oval of
    HsIntegral i -> PgNpK (il_value i)
    _ -> pprPanic "patGroup NPlusKPat" (ppr oval)

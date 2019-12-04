@@ -1,10 +1,10 @@
-T13942.hs:(5,3)-(7,6): Splicing declarations
+T13942.hs:(5,2)-(7,7): Splicing declarations
     [d| f :: Either Int (Int -> Int)
         f = undefined |]
   ======>
     f :: Either Int (Int -> Int)
     f = undefined
-T13942.ppr.hs:(4,3)-(5,22): Splicing declarations
+T13942.ppr.hs:(4,2)-(5,23): Splicing declarations
     [d| f :: Either Int (Int -> Int)
         f = undefined |]
   ======>

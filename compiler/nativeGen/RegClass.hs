@@ -12,7 +12,7 @@ import  Unique
 
 -- | The class of a register.
 --      Used in the register allocator.
---      We treat all registers in a class as being interchangable.
+--      We treat all registers in a class as being interchangeable.
 --
 data RegClass
         = RcInteger

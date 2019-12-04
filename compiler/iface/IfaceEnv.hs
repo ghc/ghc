@@ -87,7 +87,7 @@ allocateGlobalBinder name_supply mod occ loc
         -- of the Name, so we set this field in the Name we return.
         --
         -- Then (bogus) multiple bindings of the same Name
-        -- get different SrcLocs can can be reported as such.
+        -- get different SrcLocs can be reported as such.
         --
         -- Possible other reason: it might be in the cache because we
         --      encountered an occurrence before the binding site for an

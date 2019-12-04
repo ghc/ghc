@@ -1,4 +1,4 @@
--- safe infered, with requirement base is trusted
+-- safe inferred, with requirement base is trusted
 module Check07_B where
 
 import Prelude

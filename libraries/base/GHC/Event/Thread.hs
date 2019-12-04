@@ -281,7 +281,7 @@ startIOManagerThread eventManagerArray i = do
         ThreadFinished -> create
         ThreadDied     -> do
           -- Sanity check: if the thread has died, there is a chance
-          -- that event manager is still alive. This could happend during
+          -- that event manager is still alive. This could happened during
           -- the fork, for example. In this case we should clean up
           -- open pipes and everything else related to the event manager.
           -- See #4449
@@ -308,7 +308,7 @@ startTimerManagerThread = modifyMVar_ timerManagerThreadVar $ \old -> do
         ThreadFinished -> create
         ThreadDied     -> do
           -- Sanity check: if the thread has died, there is a chance
-          -- that event manager is still alive. This could happend during
+          -- that event manager is still alive. This could happened during
           -- the fork, for example. In this case we should clean up
           -- open pipes and everything else related to the event manager.
           -- See #4449

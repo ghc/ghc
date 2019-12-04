@@ -1,0 +1,3 @@
+
+T16619.hs:2:12: warning:
+    -Wmissing-space-after-bang is deprecated: bang patterns can no longer be written with a space

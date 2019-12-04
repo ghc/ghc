@@ -1,6 +1,6 @@
 {-# LANGUAGE TypeFamilies, PartialTypeSignatures #-}
 
--- In #12033 this was called HsakellBug.hs
+-- In #12033 this was called HaskellBug.hs
 
 module T12033 where
 tripleStoreToRuleSet :: v -> v

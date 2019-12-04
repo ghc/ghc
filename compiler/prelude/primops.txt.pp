@@ -251,6 +251,13 @@ primop   IntMulOp    "*#"
    with commutable = True
         fixity = infixl 7
 
+primop   IntMul2Op    "timesInt2#" GenPrimOp
+   Int# -> Int# -> (# Int#, Int#, Int# #)
+   {Return a triple (isHighNeeded,high,low) where high and low are respectively
+   the high and low bits of the double-word result. isHighNeeded is a cheap way
+   to test if the high word is a sign-extension of the low word (isHighNeeded =
+   0#) or not (isHighNeeded = 1#).}
+
 primop   IntMulMayOfloOp  "mulIntMayOflo#"
    Dyadic   Int# -> Int# -> Int#
    {Return non-zero if there is any possibility that the upper word of a
@@ -2057,7 +2064,7 @@ primop FetchAddByteArrayOp_Int "fetchAddIntArray#" GenPrimOp
 primop FetchSubByteArrayOp_Int "fetchSubIntArray#" GenPrimOp
    MutableByteArray# s -> Int# -> Int# -> State# s -> (# State# s, Int# #)
    {Given an array, and offset in machine words, and a value to subtract,
-    atomically substract the value to the element. Returns the value of
+    atomically subtract the value to the element. Returns the value of
     the element before the operation. Implies a full memory barrier.}
    with has_side_effects = True
         can_fail = True
@@ -3242,7 +3249,7 @@ section "Bytecode operations"
         contain a list of instructions and data needed by these instructions.}
 ------------------------------------------------------------------------
 
-primtype BCO#
+primtype BCO
    { Primitive bytecode type. }
 
 primop   AddrToAnyOp "addrToAny#" GenPrimOp
@@ -3267,14 +3274,14 @@ primop   AnyToAddrOp "anyToAddr#" GenPrimOp
    code_size = 0
 
 primop   MkApUpd0_Op "mkApUpd0#" GenPrimOp
-   BCO# -> (# a #)
+   BCO -> (# a #)
    { Wrap a BCO in a {\tt AP_UPD} thunk which will be updated with the value of
      the BCO when evaluated. }
    with
    out_of_line = True
 
 primop  NewBCOOp "newBCO#" GenPrimOp
-   ByteArray# -> ByteArray# -> Array# a -> Int# -> ByteArray# -> State# s -> (# State# s, BCO# #)
+   ByteArray# -> ByteArray# -> Array# a -> Int# -> ByteArray# -> State# s -> (# State# s, BCO #)
    { {\tt newBCO\# instrs lits ptrs arity bitmap} creates a new bytecode object. The
      resulting object encodes a function of the given arity with the instructions
      encoded in {\tt instrs}, and a static reference table usage bitmap given by

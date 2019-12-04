@@ -50,7 +50,6 @@ import CoAxiom
 import VarSet
 import VarEnv
 import Name
-import PrelNames ( eqPrimTyConKey )
 import UniqDFM
 import Outputable
 import Maybes
@@ -1253,7 +1252,7 @@ because type families are saturated.
 
 But if S has a type family on its RHS we expand /before/ normalising
 the args t1, t2.  If we normalise t1, t2 first, we'll re-normalise them
-after expansion, and that can lead to /exponential/ behavour; see #13035.
+after expansion, and that can lead to /exponential/ behaviour; see #13035.
 
 Notice, though, that expanding first can in principle duplicate t1,t2,
 which might contain redexes. I'm sure you could conjure up an exponential
@@ -1772,9 +1771,8 @@ coreFlattenCo :: TvSubstEnv -> FlattenEnv
 coreFlattenCo subst env co
   = (env2, mkCoVarCo covar)
   where
-    fresh_name    = mkFlattenFreshCoName
     (env1, kind') = coreFlattenTy subst env (coercionType co)
-    covar         = uniqAway (fe_in_scope env1) (mkCoVar fresh_name kind')
+    covar         = mkFlattenFreshCoVar (fe_in_scope env1) kind'
     -- Add the covar to the FlattenEnv's in-scope set.
     -- See Note [Flattening], wrinkle 2A.
     env2          = updateInScopeSet env1 (flip extendInScopeSet covar)
@@ -1827,6 +1825,8 @@ mkFlattenFreshTyName :: Uniquable a => a -> Name
 mkFlattenFreshTyName unq
   = mkSysTvName (getUnique unq) (fsLit "flt")
 
-mkFlattenFreshCoName :: Name
-mkFlattenFreshCoName
-  = mkSystemVarName (deriveUnique eqPrimTyConKey 71) (fsLit "flc")
+mkFlattenFreshCoVar :: InScopeSet -> Kind -> CoVar
+mkFlattenFreshCoVar in_scope kind
+  = let uniq = unsafeGetFreshLocalUnique in_scope
+        name = mkSystemVarName uniq (fsLit "flc")
+    in mkCoVar name kind

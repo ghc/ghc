@@ -1227,7 +1227,7 @@ notOrphan _ = False
 chooseOrphanAnchor :: NameSet -> IsOrphan
 -- Something (rule, instance) is relate to all the Names in this
 -- list. Choose one of them to be an "anchor" for the orphan.  We make
--- the choice deterministic to avoid gratuitious changes in the ABI
+-- the choice deterministic to avoid gratuitous changes in the ABI
 -- hash (#4012).  Specifically, use lexicographic comparison of
 -- OccName rather than comparing Uniques
 --
@@ -1559,7 +1559,7 @@ data UnfoldingGuidance
 
       ug_size :: Int,     -- The "size" of the unfolding.
 
-      ug_res :: Int       -- Scrutinee discount: the discount to substract if the thing is in
+      ug_res :: Int       -- Scrutinee discount: the discount to subtract if the thing is in
     }                     -- a context (case (thing args) of ...),
                           -- (where there are the right number of arguments.)
 

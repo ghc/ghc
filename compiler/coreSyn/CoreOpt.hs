@@ -418,11 +418,12 @@ simple_bind_pair env@(SOE { soe_inl = inl_env, soe_subst = subst })
 
         -- Unconditionally safe to inline
     safe_to_inline :: OccInfo -> Bool
-    safe_to_inline (IAmALoopBreaker {}) = False
-    safe_to_inline IAmDead              = True
-    safe_to_inline occ@(OneOcc {})      =  not (occ_in_lam occ)
-                                        && occ_one_br occ
-    safe_to_inline (ManyOccs {})        = False
+    safe_to_inline IAmALoopBreaker{}                  = False
+    safe_to_inline IAmDead                            = True
+    safe_to_inline OneOcc{ occ_in_lam = NotInsideLam
+                         , occ_one_br = InOneBranch } = True
+    safe_to_inline OneOcc{}                           = False
+    safe_to_inline ManyOccs{}                         = False
 
 -------------------
 simple_out_bind :: TopLevelFlag
@@ -541,7 +542,7 @@ A program has the Let-Unfoldings property iff:
 
 - For every let-bound variable f, whether top-level or nested, whether
   recursive or not:
-  - Both the binding Id of f, and every occurence Id of f, has an idUnfolding.
+  - Both the binding Id of f, and every occurrence Id of f, has an idUnfolding.
   - For non-INLINE things, that unfolding will be f's right hand sids
   - For INLINE things (which have a "stable" unfolding) that unfolding is
     semantically equivalent to f's RHS, but derived from the original RHS of f
@@ -1225,11 +1226,11 @@ Here we implement the "push rules" from FC papers:
       (fun |> co) arg
   and we want to transform it to
     (fun arg') |> co'
-  for some suitable co' and tranformed arg'.
+  for some suitable co' and transformed arg'.
 
 * The PushK rule for data constructors.  We have
        (K e1 .. en) |> co
-  and we want to tranform to
+  and we want to transform to
        (K e1' .. en')
   by pushing the coercion into the arguments
 -}

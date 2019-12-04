@@ -1,0 +1,36 @@
+
+==================== Tidy Core ====================
+Result size of Tidy Core
+  = {terms: 34, types: 19, coercions: 0, joins: 0/0}
+
+-- RHS size: {terms: 1, types: 0, coercions: 0, joins: 0/0}
+$trModule4 = "main"#
+
+-- RHS size: {terms: 2, types: 0, coercions: 0, joins: 0/0}
+$trModule3 = TrNameS $trModule4
+
+-- RHS size: {terms: 1, types: 0, coercions: 0, joins: 0/0}
+$trModule2 = "T16402"#
+
+-- RHS size: {terms: 2, types: 0, coercions: 0, joins: 0/0}
+$trModule1 = TrNameS $trModule2
+
+-- RHS size: {terms: 3, types: 0, coercions: 0, joins: 0/0}
+$trModule = Module $trModule3 $trModule1
+
+-- RHS size: {terms: 7, types: 3, coercions: 0, joins: 0/0}
+smallWord_bar
+  = \ x -> case x of { W64# x# -> W64# (narrow16Word# x#) }
+
+-- RHS size: {terms: 1, types: 0, coercions: 0, joins: 0/0}
+smallWord_foo = smallWord_bar
+
+-- RHS size: {terms: 7, types: 3, coercions: 0, joins: 0/0}
+smallInt_bar
+  = \ x -> case x of { I64# x# -> I64# (narrow16Int# x#) }
+
+-- RHS size: {terms: 1, types: 0, coercions: 0, joins: 0/0}
+smallInt_foo = smallInt_bar
+
+
+

@@ -258,9 +258,9 @@ data AnnKeywordId
     | AnnOpenEQ  -- ^ '[|'
     | AnnOpenEQU -- ^ '[|', unicode variant
     | AnnOpenP   -- ^ '('
-    | AnnOpenPE  -- ^ '$('
-    | AnnOpenPTE -- ^ '$$('
     | AnnOpenS   -- ^ '['
+    | AnnDollar          -- ^ prefix '$'   -- TemplateHaskell
+    | AnnDollarDollar    -- ^ prefix '$$'  -- TemplateHaskell
     | AnnPackageName
     | AnnPattern
     | AnnProc

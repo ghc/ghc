@@ -1,2 +1,2 @@
-T10810.hs:6:3-24: Splicing declarations
+T10810.hs:6:2-25: Splicing declarations
     [d| data Foo = (:!) |] ======> data Foo = (:!)

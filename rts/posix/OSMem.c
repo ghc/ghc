@@ -183,7 +183,7 @@ my_mmap (void *addr, W_ size, int operation)
 
 #if defined(darwin_HOST_OS)
     // Without MAP_FIXED, Apple's mmap ignores addr.
-    // With MAP_FIXED, it overwrites already mapped regions, whic
+    // With MAP_FIXED, it overwrites already mapped regions, which
     // mmap(0, ... MAP_FIXED ...) is worst of all: It unmaps the program text
     // and replaces it with zeroes, causing instant death.
     // This behaviour seems to be conformant with IEEE Std 1003.1-2001.

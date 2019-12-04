@@ -374,8 +374,8 @@ patScopes
   -> [LPat (GhcPass p)]
   -> [PScoped (LPat (GhcPass p))]
 patScopes rsp useScope patScope xs =
-  map (\(RS sc a) -> PS rsp useScope sc (composeSrcSpan a)) $
-    listScopes patScope (map dL xs)
+  map (\(RS sc a) -> PS rsp useScope sc a) $
+    listScopes patScope xs
 
 -- | 'listScopes' specialised to 'TVScoped' things
 tvScopes
@@ -402,7 +402,7 @@ bar (x :: forall a. a -> a) = ... -- a is not in scope here
 bax (x :: a) = ... -- a is in scope here
 Because of HsWC and HsIB pass on their scope to their children
 we must wrap the LHsType in pattern signatures in a
-Shielded explictly, so that the HsWC/HsIB scope is not passed
+Shielded explicitly, so that the HsWC/HsIB scope is not passed
 on the the LHsType
 -}
 
@@ -579,10 +579,10 @@ instance HasType (LHsBind GhcTc) where
       _ -> makeNode bind spn
 
 instance HasType (Located (Pat GhcRn)) where
-  getTypeNode (dL -> L spn pat) = makeNode pat spn
+  getTypeNode (L spn pat) = makeNode pat spn
 
 instance HasType (Located (Pat GhcTc)) where
-  getTypeNode (dL -> L spn opat) = makeTypeNode opat spn (hsPatType opat)
+  getTypeNode (L spn opat) = makeTypeNode opat spn (hsPatType opat)
 
 instance HasType (LHsExpr GhcRn) where
   getTypeNode (L spn e) = makeNode e spn
@@ -766,7 +766,7 @@ instance ( a ~ GhcPass p
          , HasType (LPat a)
          , Data (HsSplice a)
          ) => ToHie (PScoped (Located (Pat (GhcPass p)))) where
-  toHie (PS rsp scope pscope lpat@(dL -> L ospan opat)) =
+  toHie (PS rsp scope pscope lpat@(L ospan opat)) =
     concatM $ getTypeNode lpat : case opat of
       WildPat _ ->
         []
@@ -778,7 +778,7 @@ instance ( a ~ GhcPass p
         ]
       AsPat _ lname pat ->
         [ toHie $ C (PatternBind scope
-                                 (combineScopes (mkLScope (dL pat)) pscope)
+                                 (combineScopes (mkLScope pat) pscope)
                                  rsp)
                     lname
         , toHie $ PS rsp scope pscope pat
@@ -822,7 +822,7 @@ instance ( a ~ GhcPass p
         ]
       SigPat _ pat sig ->
         [ toHie $ PS rsp scope pscope pat
-        , let cscope = mkLScope (dL pat) in
+        , let cscope = mkLScope pat in
             toHie $ TS (ResolvedScopes [cscope, scope, pscope])
                        (protectSig @a cscope sig)
               -- See Note [Scoping Rules for SigPat]
@@ -978,10 +978,7 @@ instance ( a ~ GhcPass p
       ArithSeq _ _ info ->
         [ toHie info
         ]
-      HsSCC _ _ _ expr ->
-        [ toHie expr
-        ]
-      HsCoreAnn _ _ _ expr ->
+      HsPragE _ _ expr ->
         [ toHie expr
         ]
       HsProc _ pat cmdtop ->
@@ -995,9 +992,6 @@ instance ( a ~ GhcPass p
         [ toHie expr
         ]
       HsBinTick _ _ _ expr ->
-        [ toHie expr
-        ]
-      HsTickPragma _ _ _ _ expr ->
         [ toHie expr
         ]
       HsWrap _ _ a ->

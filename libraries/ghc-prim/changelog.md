@@ -27,6 +27,16 @@
   reverses the order of its bits e.g. `0b110001` becomes `0b100011`.
   These primitives use optimized machine instructions when available.
 
+- Add Int# multiplication primop:
+
+      timesInt2# :: Int# -> Int# -> (# Int#, Int#, Int# #)
+
+   `timesInt2#` computes the multiplication of its two parameters and returns a
+   triple (isHighNeeded,high,low) where high and low are respectively the high
+   and low bits of the double-word result. isHighNeeded is a cheap way to test
+   if the high word is a sign-extension of the low word (isHighNeeded = 0#) or
+   not (isHighNeeded = 1#).
+
 ## 0.6.0
 
 - Shipped with GHC 8.8.1

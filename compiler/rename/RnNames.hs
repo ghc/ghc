@@ -92,7 +92,7 @@ mode changes, this triggers a recompilation from that module in the dependcy
 graph. So we can just worry mostly about direct imports.
 
 There is one trust property that can change for a package though without
-recompliation being triggered: package trust. So we must check that all
+recompilation being triggered: package trust. So we must check that all
 packages a module tranitively depends on to be trusted are still trusted when
 we are compiling this module (as due to recompilation avoidance some modules
 below may not be considered trusted any more without recompilation being

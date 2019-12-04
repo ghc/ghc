@@ -6956,7 +6956,7 @@ like this:
       client to deliberately override an instance from a library,
       without requiring a change to the library.)
 
--  If all the remaining candidates are incoherent, the search suceeds, returning
+-  If all the remaining candidates are incoherent, the search succeeds, returning
    an arbitrary surviving candidate.
 
 -  If more than one non-incoherent candidate remains, the search fails.
@@ -8784,7 +8784,7 @@ injectivity of a type family:
 
 5. In a *closed type family* all equations are ordered and in one place.
    Equations are also checked pair-wise but this time an equation has to
-   be paired with all the preceeding equations. Of course a
+   be paired with all the preceding equations. Of course a
    single-equation closed type family is trivially injective (unless
    (1), (2) or (3) above holds).
 
@@ -13108,10 +13108,9 @@ enable the quotation subset of Template Haskell (i.e. without splice syntax).
 The :extension:`TemplateHaskellQuotes` extension is considered safe under
 :ref:`safe-haskell` while :extension:`TemplateHaskell` is not.
 
--  A splice is written ``$x``, where ``x`` is an identifier, or
-   ``$(...)``, where the "..." is an arbitrary expression. There must be
-   no space between the "$" and the identifier or parenthesis. This use
-   of "$" overrides its meaning as an infix operator, just as "M.x"
+-  A splice is written ``$x``, where ``x`` is an arbitrary expression.
+   There must be no space between the "$" and the expression.
+   This use of "$" overrides its meaning as an infix operator, just as "M.x"
    overrides the meaning of "." as an infix operator. If you want the
    infix operator, put spaces around it.
 
@@ -13147,9 +13146,8 @@ The :extension:`TemplateHaskellQuotes` extension is considered safe under
 
    See :ref:`pts-where` for using partial type signatures in quotations.
 
--  A *typed* expression splice is written ``$$x``, where ``x`` is an
-   identifier, or ``$$(...)``, where the "..." is an arbitrary
-   expression.
+-  A *typed* expression splice is written ``$$x``, where ``x`` is
+   is an arbitrary expression.
 
    A typed expression splice can occur in place of an expression; the
    spliced expression must have type ``Q (TExp a)``
@@ -13403,6 +13401,17 @@ The :extension:`TemplateHaskellQuotes` extension is considered safe under
 The syntax for a declaration splice uses "``$``" not "``splice``". The type of
 the enclosed expression must be ``Q [Dec]``, not ``[Q Dec]``. Typed expression
 splices and quotations are supported.)
+
+.. ghc-flag:: -fenable-th-splice-warnings
+    :shortdesc: Generate warnings for Template Haskell splices
+    :type: dynamic
+    :reverse: -fno-enable-th-splices
+    :category: warnings
+
+    Template Haskell splices won't be checked for warnings, because the code
+    causing the warning might originate from a third-party library and possibly
+    was not written by the user. If you want to have warnings for splices
+    anyway, pass :ghc-flag:`-fenable-th-splice-warnings`.
 
 .. _th-usage:
 
@@ -14312,12 +14321,15 @@ Note the following points:
 
     f !x = 3
 
-  Is this a definition of the infix function "``(!)``", or of the "``f``"
-  with a bang pattern? GHC resolves this ambiguity in favour of the
-  latter. If you want to define ``(!)`` with bang-patterns enabled, you
-  have to do so using prefix notation: ::
+  Is this a definition of the infix function "``(!)``", or of the "``f``" with
+  a bang pattern? GHC resolves this ambiguity by looking at the surrounding
+  whitespace: ::
 
-    (!) f x = 3
+    a ! b = ...   -- infix operator
+    a !b = ...    -- bang pattern
+
+  See `GHC Proposal #229 <https://github.com/ghc-proposals/ghc-proposals/blob/master/proposals/0229-whitespace-bang-patterns.rst>`__
+  for the precise rules.
 
 
 .. _strict-data:
@@ -14348,6 +14360,13 @@ we interpret it as if they had written ::
 
 The extension only affects definitions in this module.
 
+The ``~`` annotation must be written in prefix form::
+
+   data T = MkT ~Int   -- valid
+   data T = MkT ~ Int  -- invalid
+
+See `GHC Proposal #229 <https://github.com/ghc-proposals/ghc-proposals/blob/master/proposals/0229-whitespace-bang-patterns.rst>`__
+for the precise rules.
 
 .. _strict:
 
@@ -14382,7 +14401,7 @@ optionally had by adding ``!`` in front of a variable.
 
    Adding ``~`` in front of ``x`` gives the regular lazy behavior.
 
-   Turning patterns into irrefutable ones requires ``~(~p)`` or ``(~ ~p)`` when ``Strict`` is enabled.
+   Turning patterns into irrefutable ones requires ``~(~p)`` when ``Strict`` is enabled.
 
 
 

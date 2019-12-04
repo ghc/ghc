@@ -1,4 +1,4 @@
-T14289c.hs:9:3-44: Splicing declarations
+T14289c.hs:9:2-45: Splicing declarations
     [d| data Foo a
           = Foo a
           deriving (a ~ a) |]
@@ -6,7 +6,7 @@ T14289c.hs:9:3-44: Splicing declarations
     data Foo a
       = Foo a
       deriving (a ~ a)
-T14289c.ppr.hs:(7,3)-(9,27): Splicing declarations
+T14289c.ppr.hs:(7,2)-(9,28): Splicing declarations
     [d| data Foo a
           = Foo a
           deriving (a ~ a) |]

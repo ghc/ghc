@@ -1,4 +1,4 @@
-T5700.hs:8:3-9: Splicing declarations
+T5700.hs:8:2-10: Splicing declarations
     mkC ''D
   ======>
     instance C D where

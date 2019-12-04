@@ -205,12 +205,6 @@ nameOccName name = n_occ  name
 nameSrcLoc  name = srcSpanStart (n_loc name)
 nameSrcSpan name = n_loc  name
 
-type instance SrcSpanLess Name = Name
-instance HasSrcSpan Name where
-  composeSrcSpan   (L sp  n) = n {n_loc = sp}
-  decomposeSrcSpan n         = L (n_loc n) n
-
-
 {-
 ************************************************************************
 *                                                                      *

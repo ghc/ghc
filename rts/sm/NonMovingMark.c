@@ -88,7 +88,7 @@ memcount n_nonmoving_marked_compact_blocks = 0;
  * move the same large object to nonmoving_marked_large_objects more than once.
  */
 static Mutex nonmoving_large_objects_mutex;
-// Note that we don't need a similar lock for compact objects becuase we never
+// Note that we don't need a similar lock for compact objects because we never
 // mark a compact object eagerly in a write barrier; all compact objects are
 // marked by the mark thread, so there can't be any races here.
 #endif

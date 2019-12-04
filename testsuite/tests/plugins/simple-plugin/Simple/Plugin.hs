@@ -46,7 +46,7 @@ findNameBndr target b
 mainPass :: ModGuts -> CoreM ModGuts
 mainPass guts = do
     putMsgS "Simple Plugin Pass Run"
-    anns <- getAnnotations deserializeWithData guts
+    (_, anns) <- getAnnotations deserializeWithData guts
     bindsOnlyPass (mapM (changeBind anns Nothing)) guts
 
 changeBind :: UniqFM [ReplaceWith] -> Maybe String -> CoreBind -> CoreM CoreBind

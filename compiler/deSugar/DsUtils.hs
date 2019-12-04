@@ -674,7 +674,7 @@ mkSelectorBinds :: [[Tickish Id]] -- ^ ticks to add, possibly
                 -- and all the desugared binds
 
 mkSelectorBinds ticks pat val_expr
-  | (dL->L _ (VarPat _ (dL->L _ v))) <- pat'     -- Special case (A)
+  | L _ (VarPat _ (L _ v)) <- pat'     -- Special case (A)
   = return (v, [(v, val_expr)])
 
   | is_flat_prod_lpat pat'           -- Special case (B)
@@ -721,9 +721,9 @@ mkSelectorBinds ticks pat val_expr
 
 strip_bangs :: LPat (GhcPass p) -> LPat (GhcPass p)
 -- Remove outermost bangs and parens
-strip_bangs (dL->L _ (ParPat _ p))  = strip_bangs p
-strip_bangs (dL->L _ (BangPat _ p)) = strip_bangs p
-strip_bangs lp                      = lp
+strip_bangs (L _ (ParPat _ p))  = strip_bangs p
+strip_bangs (L _ (BangPat _ p)) = strip_bangs p
+strip_bangs lp                  = lp
 
 is_flat_prod_lpat :: LPat (GhcPass p) -> Bool
 is_flat_prod_lpat = is_flat_prod_pat . unLoc
@@ -731,7 +731,7 @@ is_flat_prod_lpat = is_flat_prod_pat . unLoc
 is_flat_prod_pat :: Pat (GhcPass p) -> Bool
 is_flat_prod_pat (ParPat _ p)          = is_flat_prod_lpat p
 is_flat_prod_pat (TuplePat _ ps Boxed) = all is_triv_lpat ps
-is_flat_prod_pat (ConPatOut { pat_con  = (dL->L _ pcon)
+is_flat_prod_pat (ConPatOut { pat_con  = L _ pcon
                             , pat_args = ps})
   | RealDataCon con <- pcon
   , isProductTyCon (dataConTyCon con)
@@ -759,7 +759,7 @@ is_triv_pat _            = False
 mkLHsPatTup :: [LPat GhcTc] -> LPat GhcTc
 mkLHsPatTup []     = noLoc $ mkVanillaTuplePat [] Boxed
 mkLHsPatTup [lpat] = lpat
-mkLHsPatTup lpats  = cL (getLoc (head lpats)) $
+mkLHsPatTup lpats  = L (getLoc (head lpats)) $
                      mkVanillaTuplePat lpats Boxed
 
 mkVanillaTuplePat :: [OutPat GhcTc] -> Boxity -> Pat GhcTc
@@ -952,25 +952,25 @@ decideBangHood dflags lpat
   | otherwise   --  -XStrict
   = go lpat
   where
-    go lp@(dL->L l p)
+    go lp@(L l p)
       = case p of
-           ParPat x p    -> cL l (ParPat x (go p))
+           ParPat x p    -> L l (ParPat x (go p))
            LazyPat _ lp' -> lp'
            BangPat _ _   -> lp
-           _             -> cL l (BangPat noExtField lp)
+           _             -> L l (BangPat noExtField lp)
 
 -- | Unconditionally make a 'Pat' strict.
 addBang :: LPat GhcTc -- ^ Original pattern
         -> LPat GhcTc -- ^ Banged pattern
 addBang = go
   where
-    go lp@(dL->L l p)
+    go lp@(L l p)
       = case p of
-           ParPat x p    -> cL l (ParPat x (go p))
-           LazyPat _ lp' -> cL l (BangPat noExtField lp')
+           ParPat x p    -> L l (ParPat x (go p))
+           LazyPat _ lp' -> L l (BangPat noExtField lp')
                                   -- Should we bring the extension value over?
            BangPat _ _   -> lp
-           _             -> cL l (BangPat noExtField lp)
+           _             -> L l (BangPat noExtField lp)
 
 isTrueLHsExpr :: LHsExpr GhcTc -> Maybe (CoreExpr -> DsM CoreExpr)
 
@@ -980,24 +980,24 @@ isTrueLHsExpr :: LHsExpr GhcTc -> Maybe (CoreExpr -> DsM CoreExpr)
 --        * Trivial wappings of these
 -- The arguments to Just are any HsTicks that we have found,
 -- because we still want to tick then, even it they are always evaluated.
-isTrueLHsExpr (dL->L _ (HsVar _ (dL->L _ v)))
+isTrueLHsExpr (L _ (HsVar _ (L _ v)))
   |  v `hasKey` otherwiseIdKey
      || v `hasKey` getUnique trueDataConId
                                               = Just return
         -- trueDataConId doesn't have the same unique as trueDataCon
-isTrueLHsExpr (dL->L _ (HsConLikeOut _ con))
+isTrueLHsExpr (L _ (HsConLikeOut _ con))
   | con `hasKey` getUnique trueDataCon = Just return
-isTrueLHsExpr (dL->L _ (HsTick _ tickish e))
+isTrueLHsExpr (L _ (HsTick _ tickish e))
     | Just ticks <- isTrueLHsExpr e
     = Just (\x -> do wrapped <- ticks x
                      return (Tick tickish wrapped))
    -- This encodes that the result is constant True for Hpc tick purposes;
    -- which is specifically what isTrueLHsExpr is trying to find out.
-isTrueLHsExpr (dL->L _ (HsBinTick _ ixT _ e))
+isTrueLHsExpr (L _ (HsBinTick _ ixT _ e))
     | Just ticks <- isTrueLHsExpr e
     = Just (\x -> do e <- ticks x
                      this_mod <- getModule
                      return (Tick (HpcTick this_mod ixT) e))
 
-isTrueLHsExpr (dL->L _ (HsPar _ e))   = isTrueLHsExpr e
-isTrueLHsExpr _                       = Nothing
+isTrueLHsExpr (L _ (HsPar _ e))   = isTrueLHsExpr e
+isTrueLHsExpr _                   = Nothing

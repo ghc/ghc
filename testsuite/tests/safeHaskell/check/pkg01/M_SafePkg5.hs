@@ -1,6 +1,6 @@
 -- safe inference
 -- same module as M_SafePkg4 which compiles with -XSafe.
--- Want to make sure compiles fine and is infered safe and
+-- Want to make sure compiles fine and is inferred safe and
 -- also picks up corrected pkg trust requirements.
 module M_SafePkg5 where
 

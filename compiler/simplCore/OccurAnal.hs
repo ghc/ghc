@@ -371,7 +371,7 @@ That's why we compute
 
     So we must *not* postInlineUnconditionally 'g', even though
     its RHS turns out to be trivial.  (I'm assuming that 'g' is
-    not choosen as a loop breaker.)  Why not?  Because then we
+    not chosen as a loop breaker.)  Why not?  Because then we
     drop the binding for 'g', which leaves it out of scope in the
     RULE!
 
@@ -1534,8 +1534,8 @@ occAnalNonRecRhs env bndr bndrs body
 
     certainly_inline -- See Note [Cascading inlines]
       = case occ of
-          OneOcc { occ_in_lam = in_lam, occ_one_br = one_br }
-            -> not in_lam && one_br && active && not_stable
+          OneOcc { occ_in_lam = NotInsideLam, occ_one_br = InOneBranch }
+            -> active && not_stable
           _ -> False
 
     is_join_point = isAlwaysTailCalled occ
@@ -1783,14 +1783,14 @@ occAnal env (Case scrut bndr ty alts)
 
     occ_anal_scrut (Var v) (alt1 : other_alts)
         | not (null other_alts) || not (isDefaultAlt alt1)
-        = (mkOneOcc env v True 0, Var v)
+        = (mkOneOcc env v IsInteresting 0, Var v)
             -- The 'True' says that the variable occurs in an interesting
             -- context; the case has at least one non-default alternative
     occ_anal_scrut (Tick t e) alts
         | t `tickishScopesLike` SoftScope
           -- No reason to not look through all ticks here, but only
           -- for soft-scoped ticks we can do so without having to
-          -- update returned occurance info (see occAnal)
+          -- update returned occurrence info (see occAnal)
         = second (Tick t) $ occ_anal_scrut e alts
 
     occ_anal_scrut scrut _alts
@@ -1861,7 +1861,7 @@ occAnalApp env (Var fun, args, ticks)
 
     n_val_args = valArgCount args
     n_args     = length args
-    fun_uds    = mkOneOcc env fun (n_val_args > 0) n_args
+    fun_uds    = mkOneOcc env fun (if n_val_args > 0 then IsInteresting else NotInteresting) n_args
     is_exp     = isExpandableApp fun n_val_args
         -- See Note [CONLIKE pragma] in BasicTypes
         -- The definition of is_exp should match that in Simplify.prepareRhs
@@ -2210,7 +2210,7 @@ extendFvs env s
 
 Note [Binder swap]
 ~~~~~~~~~~~~~~~~~~
-The "binder swap" tranformation swaps occurence of the
+The "binder swap" tranformation swaps occurrence of the
 scrutinee of a case for occurrences of the case-binder:
 
  (1)  case x of b { pi -> ri }
@@ -2325,7 +2325,7 @@ as Dead, so we must zap the OccInfo on cb before making the
 binding x = cb.  See #5028.
 
 NB: the OccInfo on /occurrences/ really doesn't matter much; the simplifier
-doesn't use it. So this is only to satisfy the perhpas-over-picky Lint.
+doesn't use it. So this is only to satisfy the perhaps-over-picky Lint.
 
 Historical note [no-case-of-case]
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
@@ -2475,8 +2475,8 @@ andUDsList = foldl' andUDs emptyDetails
 mkOneOcc :: OccEnv -> Id -> InterestingCxt -> JoinArity -> UsageDetails
 mkOneOcc env id int_cxt arity
   | isLocalId id
-  = singleton $ OneOcc { occ_in_lam  = False
-                       , occ_one_br  = True
+  = singleton $ OneOcc { occ_in_lam  = NotInsideLam
+                       , occ_one_br  = InOneBranch
                        , occ_int_cxt = int_cxt
                        , occ_tail    = AlwaysTailCalled arity }
   | id `elemVarSet` occ_gbl_scrut env
@@ -2535,7 +2535,7 @@ zapDetails = markAllMany . markAllNonTailCalled -- effectively sets to noOccInfo
 
 lookupDetails :: UsageDetails -> Id -> OccInfo
 lookupDetails ud id
-  | isCoVar id  -- We do not currenly gather occurrence info (from types)
+  | isCoVar id  -- We do not currently gather occurrence info (from types)
   = noOccInfo   -- for CoVars, so we must conservatively mark them as used
                 -- See Note [DoO not mark CoVars as dead]
   | otherwise
@@ -2855,7 +2855,7 @@ markMany, markInsideLam, markNonTailCalled :: OccInfo -> OccInfo
 markMany IAmDead = IAmDead
 markMany occ     = ManyOccs { occ_tail = occ_tail occ }
 
-markInsideLam occ@(OneOcc {}) = occ { occ_in_lam = True }
+markInsideLam occ@(OneOcc {}) = occ { occ_in_lam = IsInsideLam }
 markInsideLam occ             = occ
 
 markNonTailCalled IAmDead = IAmDead
@@ -2876,9 +2876,9 @@ orOccInfo (OneOcc { occ_in_lam = in_lam1, occ_int_cxt = int_cxt1
                   , occ_tail   = tail1 })
           (OneOcc { occ_in_lam = in_lam2, occ_int_cxt = int_cxt2
                   , occ_tail   = tail2 })
-  = OneOcc { occ_one_br  = False -- False, because it occurs in both branches
-           , occ_in_lam  = in_lam1 || in_lam2
-           , occ_int_cxt = int_cxt1 && int_cxt2
+  = OneOcc { occ_one_br  = MultipleBranches -- because it occurs in both branches
+           , occ_in_lam  = in_lam1 `mappend` in_lam2
+           , occ_int_cxt = int_cxt1 `mappend` int_cxt2
            , occ_tail    = tail1 `andTailCallInfo` tail2 }
 
 orOccInfo a1 a2 = ASSERT( not (isDeadOcc a1 || isDeadOcc a2) )

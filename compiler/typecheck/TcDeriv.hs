@@ -369,7 +369,7 @@ the rest of the instance. The fact that it is suspended is important, because
 right now, we don't have ThetaTypes for the instances that use deriving clauses
 (only the standalone-derived ones).
 
-Now we can can collect the type family instances and extend the local instance
+Now we can collect the type family instances and extend the local instance
 environment. At this point, it is safe to run simplifyInstanceContexts on the
 deriving-clause instance specs, which gives us the ThetaTypes for the
 deriving-clause instances. Now we can feed all the ThetaTypes to the
@@ -1016,7 +1016,7 @@ a poly-kinded typeclass for a poly-kinded datatype. For example:
     class Category (cat :: k -> k -> *) where
     newtype T (c :: k -> k -> *) a b = MkT (c a b) deriving Category
 
-This case is suprisingly tricky. To see why, let's write out what instance GHC
+This case is surprisingly tricky. To see why, let's write out what instance GHC
 will attempt to derive (using -fprint-explicit-kinds syntax):
 
     instance Category k1 (T k2 c) where ...
@@ -1289,7 +1289,7 @@ When there are no type families, it's quite easy:
     instance Eq [a] => Eq (S a)         -- by coercion sym (Eq (:CoS a)) : Eq [a] ~ Eq (S a)
     instance Monad [] => Monad S        -- by coercion sym (Monad :CoS)  : Monad [] ~ Monad S
 
-When type familes are involved it's trickier:
+When type families are involved it's trickier:
 
     data family T a b
     newtype instance T Int a = MkT [a] deriving( Eq, Monad )

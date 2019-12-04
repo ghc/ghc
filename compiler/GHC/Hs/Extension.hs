@@ -606,8 +606,6 @@ type family XRecordCon      x
 type family XRecordUpd      x
 type family XExprWithTySig  x
 type family XArithSeq       x
-type family XSCC            x
-type family XCoreAnn        x
 type family XBracket        x
 type family XRnBracketOut   x
 type family XTcBracketOut   x
@@ -616,9 +614,14 @@ type family XProc           x
 type family XStatic         x
 type family XTick           x
 type family XBinTick        x
-type family XTickPragma     x
+type family XPragE          x
 type family XWrap           x
 type family XXExpr          x
+
+type family XSCC            x
+type family XCoreAnn        x
+type family XTickPragma     x
+type family XXPragE         x
 
 type ForallXExpr (c :: * -> Constraint) (x :: *) =
        ( c (XVar            x)

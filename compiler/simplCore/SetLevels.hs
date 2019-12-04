@@ -777,7 +777,7 @@ Exammples:
 It's controlled by a flag (floatConsts), because doing this too
 early loses opportunities for RULES which (needless to say) are
 important in some nofib programs (gcd is an example).  [SPJ note:
-I think this is obselete; the flag seems always on.]
+I think this is obsolete; the flag seems always on.]
 
 Note [Floating join point bindings]
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~

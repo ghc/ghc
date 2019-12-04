@@ -1,12 +1,12 @@
-T15243.hs:(10,3)-(15,6): Splicing declarations
+T15243.hs:(10,2)-(15,7): Splicing declarations
     [d| type family F (a :: k) :: k where
-          F  'Unit =  'Unit
-          F  '(,) =  '(,)
+          F 'Unit = 'Unit
+          F '(,) = '(,)
           F '[] = '[]
-          F  '(:) =  '(:) |]
+          F '(:) = '(:) |]
   ======>
     type family F (a :: k) :: k where
-      F  'Unit =  'Unit
-      F  '(,) =  '(,)
+      F 'Unit = 'Unit
+      F '(,) = '(,)
       F '[] = '[]
-      F  '(:) =  '(:)
+      F '(:) = '(:)

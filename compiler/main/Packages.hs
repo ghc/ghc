@@ -2135,7 +2135,7 @@ isDllName dflags this_mod name
         -- On Windows the hack for #8696 makes it unlinkable.
         -- As the entire setup of the code from Cmm down to the RTS expects
         -- the use of trampolines for the imported functions only when
-        -- doing intra-package linking, e.g. refering to a symbol defined in the same
+        -- doing intra-package linking, e.g. referring to a symbol defined in the same
         -- package should not use a trampoline.
         -- I much rather have dynamic TH not supported than the entire Dynamic linking
         -- not due to a hack.

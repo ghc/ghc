@@ -1,1 +1,1 @@
-T13856.hs:8:7-22: Splicing expression lamE [] [| 42 |] ======> 42
+T13856.hs:8:6-23: Splicing expression lamE [] [| 42 |] ======> 42

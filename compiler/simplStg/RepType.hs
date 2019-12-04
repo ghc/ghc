@@ -330,7 +330,7 @@ Examples include:
 
 The "representation or a primitive entity" specifies what kind of register is
 needed and how many bits are required. The data type TyCon.PrimRep
-enumerates all the possiblities.
+enumerates all the possibilities.
 
 data PrimRep
   = VoidRep

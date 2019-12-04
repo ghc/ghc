@@ -123,7 +123,7 @@ for two reasons:
   may actually give rise to
     f :: forall k. forall (f::k -> *) (a:k). f a -> f a
   So the sig_tvs will be [k,f,a], but only f,a are scoped.
-  NB: the scoped ones are not necessarily the *inital* ones!
+  NB: the scoped ones are not necessarily the *initial* ones!
 
 * Even aside from kind polymorphism, there may be more instantiated
   type variables than lexically-scoped ones.  For example:

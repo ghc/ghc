@@ -180,7 +180,7 @@ They only get converted into real Core,
 during the CorePrep phase, although TidyPgm looks ahead at what the
 core will be, so that it can see whether it involves CAFs.
 
-When we initally build an Integer literal, notably when
+When we initially build an Integer literal, notably when
 deserialising it from an interface file (see the Binary instance
 below), we don't have convenient access to the mkInteger Id.  So we
 just use an error thunk, and fill in the real Id when we do tcIfaceLit

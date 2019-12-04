@@ -991,7 +991,7 @@ more complicated it will be reported in a civilised way.
 
 Note [Error reporting for deriving clauses]
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
-A suprisingly tricky aspect of deriving to get right is reporting sensible
+A surprisingly tricky aspect of deriving to get right is reporting sensible
 error messages. In particular, if simplifyDeriv reaches a constraint that it
 cannot solve, which might include:
 

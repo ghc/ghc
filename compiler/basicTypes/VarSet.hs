@@ -171,7 +171,7 @@ transCloVarSet :: (VarSet -> VarSet)
 -- The function fn could be (Var -> VarSet), but we use (VarSet -> VarSet)
 -- for efficiency, so that the test can be batched up.
 -- It's essential that fn will work fine if given new candidates
--- one at at time; ie  fn {v1,v2} = fn v1 `union` fn v2
+-- one at a time; ie  fn {v1,v2} = fn v1 `union` fn v2
 -- Use fixVarSet if the function needs to see the whole set all at once
 transCloVarSet fn seeds
   = go seeds seeds
@@ -334,7 +334,7 @@ transCloDVarSet :: (DVarSet -> DVarSet)
 -- The function fn could be (Var -> DVarSet), but we use (DVarSet -> DVarSet)
 -- for efficiency, so that the test can be batched up.
 -- It's essential that fn will work fine if given new candidates
--- one at at time; ie  fn {v1,v2} = fn v1 `union` fn v2
+-- one at a time; ie  fn {v1,v2} = fn v1 `union` fn v2
 transCloDVarSet fn seeds
   = go seeds seeds
   where

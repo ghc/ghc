@@ -1,4 +1,4 @@
--- safe infered, with requirement base is trusted
+-- safe inferred, with requirement base is trusted
 module Check06_A where
 
 mainM :: Int -> Int

@@ -1426,10 +1426,17 @@ dispatchPrimop dflags = \case
     if ncg && (x86ish || ppc) || llvm
     then Left (MO_U_Mul2     (wordWidth dflags))
     else Right genericWordMul2Op
+
+  IntMul2Op  -> \_ -> OpDest_CallishHandledLater $
+    if ncg && x86ish
+    then Left (MO_S_Mul2     (wordWidth dflags))
+    else Right genericIntMul2Op
+
   FloatFabsOp -> \_ -> OpDest_CallishHandledLater $
     if (ncg && x86ish || ppc) || llvm
     then Left MO_F32_Fabs
     else Right $ genericFabsOp W32
+
   DoubleFabsOp -> \_ -> OpDest_CallishHandledLater $
     if (ncg && x86ish || ppc) || llvm
     then Left MO_F64_Fabs
@@ -1869,6 +1876,31 @@ genericWordMul2Op [res_h, res_l] [arg_x, arg_y]
                         topHalf (CmmReg xlyh),
                         topHalf (CmmReg r)])]
 genericWordMul2Op _ _ = panic "genericWordMul2Op"
+
+genericIntMul2Op :: GenericOp
+genericIntMul2Op [res_c, res_h, res_l] [arg_x, arg_y]
+ = do dflags <- getDynFlags
+      -- Implement algorithm from Hacker's Delight, 2nd edition, p.174
+      let t = cmmExprType dflags arg_x
+      p   <- newTemp t
+      -- 1) compute the multiplication as if numbers were unsigned
+      let wordMul2 = fromMaybe (panic "Unsupported out-of-line WordMul2Op")
+                               (emitPrimOp dflags WordMul2Op [arg_x,arg_y])
+      wordMul2 [p,res_l]
+      -- 2) correct the high bits of the unsigned result
+      let carryFill x = CmmMachOp (MO_S_Shr ww) [x, wwm1]
+          sub x y     = CmmMachOp (MO_Sub   ww) [x, y]
+          and x y     = CmmMachOp (MO_And   ww) [x, y]
+          neq x y     = CmmMachOp (MO_Ne    ww) [x, y]
+          f   x y     = (carryFill x) `and` y
+          wwm1        = CmmLit (CmmInt (fromIntegral (widthInBits ww - 1)) ww)
+          rl x        = CmmReg (CmmLocal x)
+          ww          = wordWidth dflags
+      emit $ catAGraphs
+             [ mkAssign (CmmLocal res_h) (rl p `sub` f arg_x arg_y `sub` f arg_y arg_x)
+             , mkAssign (CmmLocal res_c) (rl res_h `neq` carryFill (rl res_l))
+             ]
+genericIntMul2Op _ _ = panic "genericIntMul2Op"
 
 -- This replicates what we had in libraries/base/GHC/Float.hs:
 --

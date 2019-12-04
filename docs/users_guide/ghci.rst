@@ -2121,7 +2121,7 @@ On systems with ``.dll``-style shared libraries, the actual library
 loaded will be ``lib.dll``, ``liblib.dll``. GHCi also has full support for
 import libraries, either Microsoft style ``.lib``, or GNU GCC style ``.a`` and
 ``.dll.a`` libraries. If you have an import library it is advisable to always
-specify the import libary instead of the ``.dll``. e.g. use ``-lgcc` instead of
+specify the import library instead of the ``.dll``. e.g. use ``-lgcc` instead of
 ``-llibgcc_s_seh-1``. Again, GHCi will signal an error if it can't find the
 library.
 
@@ -2387,7 +2387,7 @@ commonly used commands.
     Attempting to redefine an existing command name results in an error
     unless the ``:def!`` form is used, in which case the old command
     with that name is silently overwritten. However for builtin commands
-    the old command can still be used by preceeding the command name with
+    the old command can still be used by preceding the command name with
     a double colon (eg ``::load``).
     It's not possible to redefine the commands ``:{``, ``:}`` and ``:!``.
 

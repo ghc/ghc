@@ -232,19 +232,20 @@ import Control.DeepSeq
 -- | Status of a compilation to hard-code
 data HscStatus
     -- | Nothing to do.
-    = HscNotGeneratingCode ModIface
+    = HscNotGeneratingCode ModIface ModDetails
     -- | Nothing to do because code already exists.
-    | HscUpToDate ModIface
+    | HscUpToDate ModIface ModDetails
     -- | Update boot file result.
-    | HscUpdateBoot ModIface
+    | HscUpdateBoot ModIface ModDetails
     -- | Generate signature file (backpack)
-    | HscUpdateSig ModIface
+    | HscUpdateSig ModIface ModDetails
     -- | Recompile this module.
     | HscRecomp
         { hscs_guts       :: CgGuts
           -- ^ Information for the code generator.
         , hscs_mod_location :: !ModLocation
           -- ^ Module info
+        , hscs_mod_details :: !ModDetails
         , hscs_partial_iface  :: !PartialModIface
           -- ^ Partial interface
         , hscs_old_iface_hash :: !(Maybe Fingerprint)
@@ -385,7 +386,7 @@ handleFlagWarnings dflags warns = do
       -- It would be nicer if warns :: [Located MsgDoc], but that
       -- has circular import problems.
       bag = listToBag [ mkPlainWarnMsg dflags loc (text warn)
-                      | Warn _ (dL->L loc warn) <- warns' ]
+                      | Warn _ (L loc warn) <- warns' ]
 
   printOrThrowWarnings dflags bag
 

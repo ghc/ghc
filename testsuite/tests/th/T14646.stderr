@@ -1,4 +1,4 @@
-T14646.hs:(5,3)-(6,24): Splicing declarations
+T14646.hs:(5,2)-(6,25): Splicing declarations
     [d| f :: (forall a. a) -> Int
         f _ = undefined |]
   ======>

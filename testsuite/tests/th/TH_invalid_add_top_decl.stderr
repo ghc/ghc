@@ -1,5 +1,5 @@
 
-TH_invalid_add_top_decl.hs:5:3:
+TH_invalid_add_top_decl.hs:5:2: error:
     Error in a declaration passed to addTopDecls:
       Empty stmt list in do-block
       When splicing a TH declaration: emptyDo = do

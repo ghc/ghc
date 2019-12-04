@@ -427,7 +427,7 @@ wrapOp :: String -> String
 wrapOp nm | isAlpha (head nm) = nm
           | otherwise         = "(" ++ nm ++ ")"
 
--- | Turn an identifer or operator into its infix form
+-- | Turn an identifier or operator into its infix form
 asInfix :: String -> String
 asInfix nm | isAlpha (head nm) = "`" ++ nm ++ "`"
            | otherwise         = nm
@@ -857,7 +857,7 @@ ppType (TyApp (TyCon "ByteArray#")  []) = "byteArrayPrimTy"
 ppType (TyApp (TyCon "RealWorld")   []) = "realWorldTy"
 ppType (TyApp (TyCon "ThreadId#")   []) = "threadIdPrimTy"
 ppType (TyApp (TyCon "ForeignObj#") []) = "foreignObjPrimTy"
-ppType (TyApp (TyCon "BCO#")        []) = "bcoPrimTy"
+ppType (TyApp (TyCon "BCO")         []) = "bcoPrimTy"
 ppType (TyApp (TyCon "Compact#")    []) = "compactPrimTy"
 ppType (TyApp (TyCon "()")          []) = "unitTy"      -- unitTy is TysWiredIn's name for ()
 

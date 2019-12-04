@@ -352,10 +352,10 @@ tcDerivStrategy ::
 tcDerivStrategy mb_lds
   = case mb_lds of
       Nothing -> boring_case Nothing
-      Just (dL->L loc ds) ->
+      Just (L loc ds) ->
         setSrcSpan loc $ do
           (ds', tvs) <- tc_deriv_strategy ds
-          pure (Just (cL loc ds'), tvs)
+          pure (Just (L loc ds'), tvs)
   where
     tc_deriv_strategy :: DerivStrategy GhcRn
                       -> TcM (DerivStrategy GhcTc, [TyVar])
@@ -1323,7 +1323,7 @@ saturateFamApp :: TcType -> TcKind -> TcM (TcType, TcKind)
 -- Precondition for (saturateFamApp ty kind):
 --     tcTypeKind ty = kind
 --
--- If 'ty' is an unsaturated family application wtih trailing
+-- If 'ty' is an unsaturated family application with trailing
 -- invisible arguments, instanttiate them.
 -- See Note [saturateFamApp]
 
@@ -1559,7 +1559,7 @@ very convenient to typecheck instance types like any other HsSigType.
 Admittedly the '(Eq a => Eq [a]) => blah' case is erroneous, but it's
 better to reject in checkValidType.  If we say that the body kind
 should be '*' we risk getting TWO error messages, one saying that Eq
-[a] doens't have kind '*', and one saying that we need a Constraint to
+[a] doesn't have kind '*', and one saying that we need a Constraint to
 the left of the outer (=>).
 
 How do we figure out the right body kind?  Well, it's a bit of a

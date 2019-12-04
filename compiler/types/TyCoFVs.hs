@@ -70,7 +70,7 @@ so we profiled several versions, exploring different implementation strategies.
    tyCoVarsOfType ty = fvVarSet $ tyCoFVsOfType ty
 
    This is not nice, because FV introduces some overhead to implement
-   determinism, and throught its "interesting var" function, neither of which
+   determinism, and through its "interesting var" function, neither of which
    we need here, so they are a complete waste.
 
 2. UnionVarSet version: instead of reusing the FV-based code, we simply used

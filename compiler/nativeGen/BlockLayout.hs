@@ -76,10 +76,10 @@ import Control.Monad (foldM)
   We have a CFG with edge weights based on which we try to place blocks next to
   each other.
 
-  Edge weights not only represent likelyhood of control transfer between blocks
+  Edge weights not only represent likelihood of control transfer between blocks
   but also how much a block would benefit from being placed sequentially after
   it's predecessor.
-  For example blocks which are preceeded by an info table are more likely to end
+  For example blocks which are preceded by an info table are more likely to end
   up in a different cache line than their predecessor and we can't eliminate the jump
   so there is less benefit to placing them sequentially.
 
@@ -359,7 +359,7 @@ takeL n (BlockChain blks) =
 -- While we could take into account the space between the two blocks which
 -- share an edge this blows up compile times quite a bit. It requires
 -- us to find all edges between two chains, check the distance for all edges,
--- rank them based on the distance and and only then we can select two chains
+-- rank them based on the distance and only then we can select two chains
 -- to combine. Which would add a lot of complexity for little gain.
 --
 -- So instead we just rank by the strength of the edge and use the first pair we
@@ -891,4 +891,3 @@ lookupDeleteUFM :: Uniquable key => UniqFM elt -> key
 lookupDeleteUFM m k = do -- Maybe monad
     v <- lookupUFM m k
     return (v, delFromUFM m k)
-
