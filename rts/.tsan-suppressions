@@ -7,3 +7,7 @@ race:capability_is_busy
 # This is a benign race during IO manager shutdown (between ioManagerWakeup
 # and GHC.Event.Control.closeControl).
 race:ioManagerWakeup
+
+# This is a potentially problematic race which I have yet to work out
+# (#17289)
+race:handle_tick
