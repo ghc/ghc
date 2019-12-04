@@ -52,7 +52,12 @@
 #include "RtsUtils.h"
 #include "WSDeque.h"
 
-#define CASTOP(addr,old,new) ((old) == cas(((StgPtr)addr),(old),(new)))
+static inline bool
+cas_top(WSDeque *q, StgInt old, StgInt new)
+{
+    return (StgWord) old == cas((StgPtr) &q->top, (StgWord) old, (StgWord) new);
+}
+
 
 /* -----------------------------------------------------------------------------
  * newWSDeque
@@ -125,10 +130,10 @@ freeWSDeque (WSDeque *q)
 void *
 popWSDeque (WSDeque *q)
 {
-    StgWord b = RELAXED_LOAD(&q->bottom) - 1;
+    StgInt b = RELAXED_LOAD(&q->bottom) - 1;
     RELAXED_STORE(&q->bottom, b);
     SEQ_CST_FENCE();
-    StgWord t = RELAXED_LOAD(&q->top);
+    StgInt t = RELAXED_LOAD(&q->top);
 
     void *result;
     if (t <= b) {
@@ -136,7 +141,7 @@ popWSDeque (WSDeque *q)
         result = RELAXED_LOAD(&q->elements[b & q->moduloSize]);
         if (t == b) {
             /* Single last element in queue */
-            if (!CASTOP(&q->top, t, t+1)) {
+            if (!cas_top(q, t, t+1)) {
                 /* Failed race */
                 result = NULL;
             }
@@ -159,15 +164,15 @@ popWSDeque (WSDeque *q)
 void *
 stealWSDeque_ (WSDeque *q)
 {
-    StgWord t = ACQUIRE_LOAD(&q->top);
+    StgInt t = ACQUIRE_LOAD(&q->top);
     SEQ_CST_FENCE();
-    StgWord b = ACQUIRE_LOAD(&q->bottom);
+    StgInt b = ACQUIRE_LOAD(&q->bottom);
 
     void *result = NULL;
     if (t < b) {
         /* Non-empty queue */
         result = RELAXED_LOAD(&q->elements[t % q->size]);
-        if (CASTOP(&q->top, t, t+1)) {
+        if (!cas_top(q, t, t+1)) {
             return NULL;
         }
     }
@@ -196,9 +201,8 @@ stealWSDeque (WSDeque *q)
 bool
 pushWSDeque (WSDeque* q, void * elem)
 {
-    StgInt t = ACQUIRE_LOAD(&q->top);
-    SEQ_CST_FENCE();
     StgInt b = ACQUIRE_LOAD(&q->bottom);
+    StgInt t = ACQUIRE_LOAD(&q->top);
 
     if ( b - t > q->size - 1 ) {
         /* Full queue */
