@@ -246,7 +246,8 @@ import {-# SOURCE #-} Coercion( mkNomReflCo, mkGReflCo, mkReflCo
                               , mkForAllCo, mkFunCo, mkAxiomInstCo, mkUnivCo
                               , mkSymCo, mkTransCo, mkNthCo, mkLRCo, mkInstCo
                               , mkKindCo, mkSubCo, mkFunCo, mkAxiomInstCo
-                              , decomposePiCos, coercionKind, coercionType
+                              , decomposePiCos, coercionKind, coercionLKind
+                              , coercionRKind, coercionType
                               , isReflexiveCo, seqCo )
 
 -- others
@@ -2433,7 +2434,7 @@ typeKind (TyConApp tc tys) = piResultTys (tyConKind tc) tys
 typeKind (LitTy l)         = typeLiteralKind l
 typeKind (FunTy {})        = liftedTypeKind
 typeKind (TyVarTy tyvar)   = tyVarKind tyvar
-typeKind (CastTy _ty co)   = pSnd $ coercionKind co
+typeKind (CastTy _ty co)   = coercionRKind co
 typeKind (CoercionTy co)   = coercionType co
 
 typeKind (AppTy fun arg)
@@ -2466,7 +2467,7 @@ tcTypeKind :: HasDebugCallStack => Type -> Kind
 tcTypeKind (TyConApp tc tys) = piResultTys (tyConKind tc) tys
 tcTypeKind (LitTy l)         = typeLiteralKind l
 tcTypeKind (TyVarTy tyvar)   = tyVarKind tyvar
-tcTypeKind (CastTy _ty co)   = pSnd $ coercionKind co
+tcTypeKind (CastTy _ty co)   = coercionRKind co
 tcTypeKind (CoercionTy co)   = coercionType co
 
 tcTypeKind (FunTy { ft_af = af, ft_res = res })
@@ -2694,7 +2695,7 @@ occCheckExpand vs_to_avoid ty
     go_co cxt@(as, env) (ForAllCo tv kind_co body_co)
       = do { kind_co' <- go_co cxt kind_co
            ; let tv' = setVarType tv $
-                       pFst (coercionKind kind_co')
+                       coercionLKind kind_co'
                  env' = extendVarEnv env tv tv'
                  as'  = as `delVarSet` tv
            ; body' <- go_co (as', env') body_co
