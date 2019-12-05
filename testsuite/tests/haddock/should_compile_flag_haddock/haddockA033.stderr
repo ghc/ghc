@@ -9,3 +9,9 @@ f 3 = 6
 <document comment>
 
 
+
+haddockA033.hs:5:1: warning: [-Winvalid-haddock]
+    A Haddock comment cannot appear in this position and will be ignored.
+
+haddockA033.hs:7:1: warning: [-Winvalid-haddock]
+    A Haddock comment cannot appear in this position and will be ignored.

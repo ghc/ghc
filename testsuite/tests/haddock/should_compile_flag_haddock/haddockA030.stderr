@@ -2,9 +2,13 @@
 ==================== Parser ====================
 module ShouldCompile where
 data A
-  = " comment for A " A |
+  = " A comment that documents the first constructor" A |
     " comment for B " B |
     " comment for C  " C |
     D
 
 
+
+haddockA030.hs:7:5: warning: [-Winvalid-haddock]
+    Multiple Haddock comments for a single entity are not allowed.
+    The extraneous comment will be ignored.
