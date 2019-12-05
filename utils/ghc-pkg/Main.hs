@@ -162,6 +162,7 @@ data Flag
   | FlagNoUserDb
   | FlagVerbosity (Maybe String)
   | FlagUnitId
+  | FlagShowUnitIds
   deriving Eq
 
 flags :: [OptDescr Flag]
@@ -200,6 +201,8 @@ flags = [
         "output version information and exit",
   Option [] ["simple-output"] (NoArg FlagSimpleOutput)
         "print output in easy-to-parse format for some commands",
+  Option [] ["show-unit-ids"] (NoArg FlagShowUnitIds)
+        "print unit-ids instead of package identifiers",
   Option [] ["names-only"] (NoArg FlagNamesOnly)
         "only print package names, not versions; can only be used with list --simple-output",
   Option [] ["ignore-case"] (NoArg FlagIgnoreCase)
@@ -1604,9 +1607,11 @@ listPackages verbosity my_flags mPackageName mModuleName = do
 
 simplePackageList :: [Flag] -> [InstalledPackageInfo] -> IO ()
 simplePackageList my_flags pkgs = do
-   let showPkg = if FlagNamesOnly `elem` my_flags then display . mungedName
-                                                  else display
-       strs = map showPkg $ map mungedId pkgs
+   let showPkg :: InstalledPackageInfo -> String
+       showPkg | FlagShowUnitIds `elem` my_flags = display . installedUnitId
+               | FlagNamesOnly `elem` my_flags   = display . mungedName . mungedId
+               | otherwise                       = display . mungedId
+       strs = map showPkg pkgs
    when (not (null pkgs)) $
       hPutStrLn stdout $ concat $ intersperse " " strs
 
@@ -1751,17 +1756,20 @@ checkConsistency verbosity my_flags = do
       -- db, because we may need it to verify package deps.
 
   let simple_output = FlagSimpleOutput `elem` my_flags
+  let unitid_output = FlagShowUnitIds `elem` my_flags
 
   let pkgs = allPackagesInStack db_stack
 
+      checkPackage :: InstalledPackageInfo -> IO [InstalledPackageInfo]
       checkPackage p = do
          (_,es,ws) <- runValidate $ checkPackageConfig p verbosity db_stack
                                                        True True
          if null es
-            then do when (not simple_output) $ do
-                      _ <- reportValidateErrors verbosity [] ws "" Nothing
-                      return ()
-                    return []
+            then do
+              when (not simple_output) $ do
+                  _ <- reportValidateErrors verbosity [] ws "" Nothing
+                  return ()
+              return []
             else do
               when (not simple_output) $ do
                   reportError ("There are problems in package " ++ display (mungedId p) ++ ":")
@@ -1777,15 +1785,20 @@ checkConsistency verbosity my_flags = do
 
   let not_broken_pkgs = filterOut broken_pkgs pkgs
       (_, trans_broken_pkgs) = closure [] not_broken_pkgs
+
+      all_broken_pkgs :: [InstalledPackageInfo]
       all_broken_pkgs = broken_pkgs ++ trans_broken_pkgs
 
   when (not (null all_broken_pkgs)) $ do
     if simple_output
       then simplePackageList my_flags all_broken_pkgs
       else do
-       reportError ("\nThe following packages are broken, either because they have a problem\n"++
+        let disp :: InstalledPackageInfo -> String
+            disp | unitid_output = display . installedUnitId
+                 | otherwise     = display . mungedId
+        reportError ("\nThe following packages are broken, either because they have a problem\n"++
                 "listed above, or because they depend on a broken package.")
-       mapM_ (hPutStrLn stderr . display . mungedId) all_broken_pkgs
+        mapM_ (hPutStrLn stderr . disp) all_broken_pkgs
 
   when (not (null all_broken_pkgs)) $ exitWith (ExitFailure 1)
 
