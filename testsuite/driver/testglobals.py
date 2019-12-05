@@ -216,6 +216,12 @@ class TestResult:
         self.stdout = stdout
         self.stderr = stderr
 
+# A performance metric measured in this test run.
+PerfMetric = NamedTuple('PerfMetric',
+                        [('change', MetricChange),
+                         ('stat', PerfStat),
+                         ('baseline', Optional[Baseline]) ])
+
 class TestRun:
    def __init__(self) -> None:
        self.start_time = None # type: Optional[datetime]
@@ -243,7 +249,7 @@ class TestRun:
        # [(change, PerfStat)] where change is one of the  MetricChange
        # constants: NewMetric, NoChange, Increase, Decrease.
        # NewMetric happens when the previous git commit has no metric recorded.
-       self.metrics = [] # type: List[Tuple[MetricChange, PerfStat, Optional[Baseline]]]
+       self.metrics = [] # type: List[PerfMetric]
 
 global t
 t = TestRun()

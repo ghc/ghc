@@ -791,12 +791,17 @@ instance Ppr Type where
        -- Works, in a degenerate way, for SigT, and puts parens round (ty :: kind)
        -- See Note [Pretty-printing kind signatures]
 instance Ppr TypeArg where
-    ppr (TANormal ty) = ppr ty
-    ppr (TyArg ki) = char '@' <> ppr ki
+    ppr (TANormal ty) = parensIf (isStarT ty) (ppr ty)
+    ppr (TyArg ki) = char '@' <> parensIf (isStarT ki) (ppr ki)
 
 pprParendTypeArg :: TypeArg -> Doc
-pprParendTypeArg (TANormal ty) = pprParendType ty
-pprParendTypeArg (TyArg ki) = char '@' <> pprParendType ki
+pprParendTypeArg (TANormal ty) = parensIf (isStarT ty) (pprParendType ty)
+pprParendTypeArg (TyArg ki) = char '@' <> parensIf (isStarT ki) (pprParendType ki)
+
+isStarT :: Type -> Bool
+isStarT StarT = True
+isStarT _ = False
+
 {- Note [Pretty-printing kind signatures]
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 GHC's parser only recognises a kind signature in a type when there are
@@ -810,17 +815,19 @@ pprTyApp (ArrowT, [TANormal arg1, TANormal arg2]) = sep [pprFunArgType arg1 <+> 
 pprTyApp (EqualityT, [TANormal arg1, TANormal arg2]) =
     sep [pprFunArgType arg1 <+> text "~", ppr arg2]
 pprTyApp (ListT, [TANormal arg]) = brackets (ppr arg)
+pprTyApp (TupleT 1, args) = pprTyApp (ConT (tupleTypeName 1), args)
+pprTyApp (PromotedTupleT 1, args) = pprTyApp (PromotedT (tupleDataName 1), args)
 pprTyApp (TupleT n, args)
- | length args == n
- = if n == 1
-   then pprTyApp (ConT (tupleTypeName 1), args)
-   else parens (commaSep args)
+ | length args == n, Just args' <- traverse fromTANormal args
+ = parens (commaSep args')
 pprTyApp (PromotedTupleT n, args)
- | length args == n
- = if n == 1
-   then pprTyApp (PromotedT (tupleDataName 1), args)
-   else quoteParens (commaSep args)
+ | length args == n, Just args' <- traverse fromTANormal args
+ = quoteParens (commaSep args')
 pprTyApp (fun, args) = pprParendType fun <+> sep (map pprParendTypeArg args)
+
+fromTANormal :: TypeArg -> Maybe Type
+fromTANormal (TANormal arg) = Just arg
+fromTANormal (TyArg _) = Nothing
 
 pprFunArgType :: Type -> Doc    -- Should really use a precedence argument
 -- Everything except forall and (->) binds more tightly than (->)
