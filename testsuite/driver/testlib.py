@@ -19,10 +19,11 @@ import collections
 import subprocess
 
 from testglobals import config, ghc_env, default_testopts, brokens, t, \
-                        TestRun, TestResult, TestOptions
+                        TestRun, TestResult, TestOptions, PerfMetric
 from testutil import strip_quotes, lndir, link_or_copy_file, passed, \
-                     failBecause, str_fail, str_pass, testing_metrics, \
+                     failBecause, testing_metrics, \
                      PassFail
+from term_color import Color, colored
 import testutil
 from cpu_features import have_cpu_feature
 import perf_notes as Perf
@@ -1428,7 +1429,7 @@ def check_stats(name: TestName,
                         tolerance_dev,
                         config.allowed_perf_changes,
                         config.verbose >= 4)
-                t.metrics.append((change, perf_stat, baseline))
+                t.metrics.append(PerfMetric(change=change, stat=perf_stat, baseline=baseline))
 
             # If any metric fails then the test fails.
             # Note, the remaining metrics are still run so that
@@ -2430,18 +2431,16 @@ def summary(t: TestRun, file: TextIO, short=False, color=False) -> None:
         # Only print the list of unexpected tests above.
         return
 
-    colorize = lambda s: s
-    if color:
-        if len(t.unexpected_failures) > 0 or \
-            len(t.unexpected_stat_failures) > 0 or \
-            len(t.unexpected_passes) > 0 or \
-            len(t.framework_failures) > 0:
-            colorize = str_fail
-        else:
-            colorize = str_pass
+    if len(t.unexpected_failures) > 0 or \
+        len(t.unexpected_stat_failures) > 0 or \
+        len(t.unexpected_passes) > 0 or \
+        len(t.framework_failures) > 0:
+        summary_color = Color.RED
+    else:
+        summary_color = Color.GREEN
 
     assert t.start_time is not None
-    file.write(colorize('SUMMARY') + ' for test run started at '
+    file.write(colored(summary_color, 'SUMMARY') + ' for test run started at '
                + t.start_time.strftime("%c %Z") + '\n'
                + str(datetime.datetime.now() - t.start_time).rjust(8)
                + ' spent to go through\n'

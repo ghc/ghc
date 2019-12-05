@@ -1,7 +1,7 @@
 
 T11361a.hs:7:3: error:
     • Illegal argument ‘*’ in:
-        ‘type F @* x = x’
+        ‘type F @(*) x = x’
         The arguments to ‘F’ must all be distinct type variables
     • In the default type instance declaration for ‘F’
       In the class declaration for ‘C’

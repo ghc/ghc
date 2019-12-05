@@ -65,6 +65,7 @@ nonmovingSweepSegment(struct NonmovingSegment *seg)
     } else {
         ASSERT(seg->next_free == 0);
         ASSERT(nonmovingSegmentInfo(seg)->next_free_snap == 0);
+        nonmovingClearBitmap(seg);
         return SEGMENT_FREE;
     }
 }
@@ -280,7 +281,7 @@ void nonmovingSweepMutLists()
     for (uint32_t n = 0; n < n_capabilities; n++) {
         Capability *cap = capabilities[n];
         bdescr *old_mut_list = cap->mut_lists[oldest_gen->no];
-        cap->mut_lists[oldest_gen->no] = allocBlockOnNode_sync(cap->node);
+        cap->mut_lists[oldest_gen->no] = allocBlockOnNode_lock(cap->node);
         for (bdescr *bd = old_mut_list; bd; bd = bd->link) {
             for (StgPtr p = bd->start; p < bd->free; p++) {
                 StgClosure **q = (StgClosure**)p;
