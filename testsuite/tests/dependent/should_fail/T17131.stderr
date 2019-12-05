@@ -1,0 +1,10 @@
+
+T17131.hs:12:34: error:
+    • Expected kind ‘TYPE ('TupleRep (TypeReps xs))’,
+        but ‘(# a #)’ has kind ‘TYPE ('TupleRep '[ 'LiftedRep])’
+    • In the type ‘(# a #)’
+      In the type family declaration for ‘Tuple#’
+      NB: Type ‘Tuple#’ was inferred to use visible dependent quantification.
+      Most types with visible dependent quantification are
+      polymorphically recursive and need a standalone kind
+      signature. Perhaps supply one, with StandaloneKindSignatures.
