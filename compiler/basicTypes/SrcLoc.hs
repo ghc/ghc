@@ -67,7 +67,9 @@ module SrcLoc (
 
         -- * StringBuffer locations
         BufPos(..),
+        getBufPos,
         BufSpan(..),
+        getBufSpan,
 
         -- * Located
         Located,
@@ -89,7 +91,7 @@ module SrcLoc (
         eqLocated, cmpLocated, combineLocs, addCLoc,
         leftmost_smallest, leftmost_largest, rightmost_smallest,
         spans, isSubspanOf, isRealSubspanOf, sortLocated,
-        sortRealLocated,
+        sortLocatedUsingBufPos, sortRealLocated,
         lookupSrcLoc, lookupSrcSpan,
 
         liftL,
@@ -103,6 +105,9 @@ module SrcLoc (
         psSpanStart,
         psSpanEnd,
         mkSrcSpanPs,
+
+        -- * Layout information
+        LayoutInfo(..)
 
     ) where
 
@@ -120,6 +125,7 @@ import Data.Data
 import Data.List (sortBy, intercalate)
 import Data.Function (on)
 import qualified Data.Map as Map
+import qualified Data.Semigroup
 
 {-
 ************************************************************************
@@ -141,13 +147,76 @@ data RealSrcLoc
                 {-# UNPACK #-} !Int     -- column number, begins at 1
   deriving (Eq, Ord)
 
--- | 0-based index identifying the raw location in the StringBuffer.
+-- | 0-based offset identifying the raw location in the 'StringBuffer'.
 --
--- Unlike 'RealSrcLoc', it is not affected by #line and {-# LINE ... #-}
--- pragmas. In particular, notice how 'setSrcLoc' and 'resetAlrLastLoc' in
--- Lexer.x update 'PsLoc' preserving 'BufPos'.
+-- The lexer increments the 'BufPos' every time a character (UTF-8 code point)
+-- is read from the input buffer. As UTF-8 is a variable-length encoding and
+-- 'StringBuffer' needs a byte offset for indexing, a 'BufPos' cannot be used
+-- for indexing.
 --
--- The parser guarantees that 'BufPos' are monotonic. See #17632.
+-- The parser guarantees that 'BufPos' are monotonic. See #17632. This means
+-- that syntactic constructs that appear later in the 'StringBuffer' are guaranteed to
+-- have a higher 'BufPos'. Constrast that with 'RealSrcLoc', which does *not* make the
+-- analogous guarantee about higher line/column numbers.
+--
+-- This is due to #line and {-# LINE ... #-} pragmas that can arbitrarily
+-- modify 'RealSrcLoc'. Notice how 'setSrcLoc' and 'resetAlrLastLoc' in Lexer.x
+-- update 'PsLoc', modifying 'RealSrcLoc' but preserving 'BufPos'.
+--
+-- Monotonicity makes 'BufPos' useful to determine the order in which syntactic
+-- elements appear in the source. Consider this example (haddockA041 in the test suite):
+--
+--  haddockA041.hs
+--      {-# LANGUAGE CPP #-}
+--      -- | Module header documentation
+--      module Comments_and_CPP_include where
+--      #include "IncludeMe.hs"
+--
+--  IncludeMe.hs:
+--      -- | Comment on T
+--      data T = MkT -- ^ Comment on MkT
+--
+-- After the C preprocessor runs, the 'StringBuffer' will contain a program that
+-- looks like this (unimportant lines at the beginning removed):
+--
+--    # 1 "haddockA041.hs"
+--    {-# LANGUAGE CPP #-}
+--    -- | Module header documentation
+--    module Comments_and_CPP_include where
+--    # 1 "IncludeMe.hs" 1
+--    -- | Comment on T
+--    data T = MkT -- ^ Comment on MkT
+--    # 7 "haddockA041.hs" 2
+--
+-- The line pragmas inserted by CPP make the error messages more informative.
+-- The downside is that we can't use RealSrcLoc to determine the ordering of
+-- syntactic elements.
+--
+-- With RealSrcLoc, we have the following location information recorded in the AST:
+--   * The module name is located at located at haddockA041.hs:3:8-31
+--   * The Haddock comment "Comment on T" is located at IncludeMe:1:1-17
+--   * The data declaration is located at IncludeMe.hs:2:1-32
+--
+-- Is the Haddock comment located between the module name and the data
+-- declaration? This is impossible to tell because the locations are not
+-- comparable, they even refer to different files.
+--
+-- On the other hand, with 'BufPos', we have the following location information:
+--   * The module name is located at 846-870
+--   * The Haddock comment "Comment on T" is located at 898-915
+--   * The data declaration is located at 916-928
+--
+-- Aside:  if you're wondering why the numbers are so high, try running
+--           @ghc -E haddockA041.hs@
+--         and see the extra fluff that CPP inserts at the start of the file.
+--
+-- For error messages, 'BufPos' is not useful at all. On the other hand, this is
+-- exactly what we need to determine the order of syntactic elements:
+--    870 < 898, therefore the Haddock comment appears *after* the module name.
+--    915 < 916, therefore the Haddock comment appears *before* the data declaration.
+--
+-- We use 'BufPos' in HaddockUtils.hs to associate Haddock comments with parts
+-- of the AST using location information (#17544).
 newtype BufPos = BufPos { bufPos :: Int }
   deriving (Eq, Ord, Show)
 
@@ -170,6 +239,10 @@ mkSrcLoc x line col = RealSrcLoc (mkRealSrcLoc x line col) Nothing
 
 mkRealSrcLoc :: FastString -> Int -> Int -> RealSrcLoc
 mkRealSrcLoc x line col = SrcLoc x line col
+
+getBufPos :: SrcLoc -> Maybe BufPos
+getBufPos (RealSrcLoc _ mbpos) = mbpos
+getBufPos (UnhelpfulLoc _) = Nothing
 
 -- | Built-in "bad" 'SrcLoc' values for particular locations
 noSrcLoc, generatedSrcLoc, interactiveSrcLoc :: SrcLoc
@@ -217,6 +290,12 @@ advanceBufPos (BufPos i) = BufPos (i+1)
 
 sortLocated :: [Located a] -> [Located a]
 sortLocated = sortBy (leftmost_smallest `on` getLoc)
+
+sortLocatedUsingBufPos ::  [Located a] -> [Located a]
+sortLocatedUsingBufPos = sortBy (cmp `on` getLoc)
+  where
+    cmp (getBufSpan -> Just a) (getBufSpan -> Just b) = compare a b
+    cmp a b = leftmost_smallest a b
 
 sortRealLocated :: [RealLocated a] -> [RealLocated a]
 sortRealLocated = sortBy (compare `on` getLoc)
@@ -296,6 +375,10 @@ data BufSpan =
   BufSpan { bufSpanStart, bufSpanEnd :: {-# UNPACK #-} !BufPos }
   deriving (Eq, Ord, Show)
 
+instance Semigroup BufSpan where
+  BufSpan start1 end1 <> BufSpan start2 end2 =
+    BufSpan (min start1 start2) (max end1 end2)
+
 -- | Source Span
 --
 -- A 'SrcSpan' identifies either a specific portion of a text file
@@ -342,6 +425,10 @@ instance ToJson RealSrcSpan where
 
 instance NFData SrcSpan where
   rnf x = x `seq` ()
+
+getBufSpan :: SrcSpan -> Maybe BufSpan
+getBufSpan (RealSrcSpan _ mbspan) = mbspan
+getBufSpan (UnhelpfulSpan _) = Nothing
 
 -- | Built-in "bad" 'SrcSpan's for common sources of location uncertainty
 noSrcSpan, wiredInSrcSpan, interactiveSrcSpan :: SrcSpan
@@ -739,3 +826,29 @@ psSpanEnd (PsSpan r b) = PsLoc (realSrcSpanEnd r) (bufSpanEnd b)
 
 mkSrcSpanPs :: PsSpan -> SrcSpan
 mkSrcSpanPs (PsSpan r b) = RealSrcSpan r (Just b)
+
+-- | Layout information for declarations.
+data LayoutInfo =
+
+    -- | Explicit braces written by the user.
+    --
+    -- @
+    -- class C a where { foo :: a; bar :: a }
+    -- @
+    ExplicitBraces
+  |
+    -- | Virtual braces inserted by the layout algorithm.
+    --
+    -- @
+    -- class C a where
+    --   foo :: a
+    --   bar :: a
+    -- @
+    VirtualBraces
+      !Int -- ^ Layout column (indentation level)
+  |
+    -- | Empty or compiler-generated blocks do not have layout information
+    -- associated with them.
+    NoLayoutInfo
+
+  deriving (Eq, Ord, Show, Data)
