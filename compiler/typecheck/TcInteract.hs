@@ -2644,15 +2644,19 @@ matchLocalInst :: TcPredType -> CtLoc -> TcS ClsInstResult
 matchLocalInst pred loc
   = do { ics <- getInertCans
        ; case match_local_inst (inert_insts ics) of
-           ([], False) -> return NoInstance
+           ([], False) -> do { traceTcS "No local instance for" (ppr pred)
+                             ; return NoInstance }
            ([(dfun_ev, inst_tys)], unifs)
              | not unifs
              -> do { let dfun_id = ctEvEvId dfun_ev
                    ; (tys, theta) <- instDFunType dfun_id inst_tys
-                   ; return $ OneInst { cir_new_theta = theta
-                                      , cir_mk_ev     = evDFunApp dfun_id tys
-                                      , cir_what      = LocalInstance } }
-           _ -> return NotSure }
+                   ; let result = OneInst { cir_new_theta = theta
+                                          , cir_mk_ev     = evDFunApp dfun_id tys
+                                          , cir_what      = LocalInstance }
+                   ; traceTcS "Local inst found:" (ppr result)
+                   ; return result }
+           _ -> do { traceTcS "Multiple local instances for" (ppr pred)
+                   ; return NotSure }}
   where
     pred_tv_set = tyCoVarsOfType pred
 

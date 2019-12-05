@@ -1554,7 +1554,7 @@ because of that. But without doing duplicate-elimination we will have
 two matching QCInsts when we try to solve constraints arising from f's
 RHS.
 
-The simplest thing is simply to eliminate duplicattes, which we do here.
+The simplest thing is simply to eliminate duplicates, which we do here.
 -}
 
 {- *********************************************************************
@@ -3017,6 +3017,7 @@ emitWorkNC evs
   = emitWork (map mkNonCanonical evs)
 
 emitWork :: [Ct] -> TcS ()
+emitWork [] = return ()   -- avoid printing, among other work
 emitWork cts
   = do { traceTcS "Emitting fresh work" (vcat (map ppr cts))
        ; updWorkListTcS (extendWorkListCts cts) }

@@ -762,7 +762,7 @@ isPendingScDict ct@(CDictCan { cc_pend_sc = True })
 isPendingScDict _ = Nothing
 
 isPendingScInst :: QCInst -> Maybe QCInst
--- Same as isPrendinScDict, but for QCInsts
+-- Same as isPendingScDict, but for QCInsts
 isPendingScInst qci@(QCI { qci_pend_sc = True })
                   = Just (qci { qci_pend_sc = False })
 isPendingScInst _ = Nothing
