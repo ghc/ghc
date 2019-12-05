@@ -28,7 +28,7 @@ import TyCon
 import TyCoRep   -- cleverly decomposes types, good for completeness checking
 import Coercion
 import CoreSyn
-import Id( idType, mkTemplateLocals )
+import Id( idType, mkTemplateLocals, mkTemplateLocalsNum )
 import FamInstEnv ( FamInstEnvs )
 import FamInst ( tcTopNormaliseNewTypeTF_maybe )
 import Var
@@ -483,31 +483,56 @@ mk_strict_superclasses :: NameSet -> CtEvidence
 -- Always return the immediate superclasses of (cls tys);
 -- and expand their superclasses, provided none of them are in rec_clss
 -- nor are repeated
-mk_strict_superclasses rec_clss ev tvs theta cls tys
-  | CtGiven { ctev_evar = evar, ctev_loc = loc } <- ev
-  = concatMapM (do_one_given evar (mk_given_loc loc)) $
+mk_strict_superclasses rec_clss (CtGiven { ctev_evar = evar, ctev_loc = loc })
+                       tvs theta cls tys
+  = concatMapM (do_one_given (mk_given_loc loc)) $
     classSCSelIds cls
   where
     dict_ids  = mkTemplateLocals theta
     size      = sizeTypes tys
 
-    do_one_given evar given_loc sel_id
+    do_one_given given_loc sel_id
       | isUnliftedType sc_pred
       , not (null tvs && null theta)
       = -- See Note [Equality superclasses in quantified constraints]
         return []
       | otherwise
       = do { given_ev <- newGivenEvVar given_loc $
-                         (given_ty, mk_sc_sel evar sel_id)
+                         mk_given_desc sel_id sc_pred
            ; mk_superclasses rec_clss given_ev tvs theta sc_pred }
       where
         sc_pred  = funResultTy (piResultTys (idType sel_id) tys)
-        given_ty = mkInfSigmaTy tvs theta sc_pred
 
-    mk_sc_sel evar sel_id
-      = EvExpr $ mkLams tvs $ mkLams dict_ids $
-        Var sel_id `mkTyApps` tys `App`
-        (evId evar `mkTyApps` mkTyVarTys tvs `mkVarApps` dict_ids)
+    mk_given_desc :: Id -> PredType -> (PredType, EvTerm)
+    mk_given_desc sel_id sc_pred
+      -- The sc_pred may itself be a quantified constraint like
+      -- forall b. D b => ..., but
+      -- quantified constraints cannot be nested like
+      -- (forall a. C a => forall b. D b => ...), so we just
+      -- swizzle the arguments around to make something like
+      -- (forall a b. (C a, D b) => ...) here.
+      = (swizzled_pred, swizzled_evterm)
+      where
+        (sc_tvs, sc_rho)          = splitForAllTys sc_pred
+        (sc_theta, sc_inner_pred) = splitFunTys sc_rho
+
+        all_tvs       = tvs `chkAppend` sc_tvs
+        all_theta     = theta `chkAppend` sc_theta
+        sc_dict_ids   = mkTemplateLocalsNum (length theta + 1) sc_theta
+        swizzled_pred = mkInfSigmaTy all_tvs all_theta sc_inner_pred
+
+        -- evar :: forall tvs. theta => cls tys
+        -- sel_id :: forall cls_tvs. cls cls_tvs
+        --                        -> forall sc_tvs. sc_theta => sc_inner_pred
+        -- swizzled_evterm :: forall tvs sc_tvs. theta => sc_theta => sc_inner_pred
+        swizzled_evterm = EvExpr $
+          mkLams all_tvs $
+          mkLams dict_ids $
+          mkLams sc_dict_ids $
+          Var sel_id
+            `mkTyApps` tys
+            `App` (evId evar `mkVarApps` (tvs ++ dict_ids))
+            `mkVarApps` (sc_tvs ++ sc_dict_ids)
 
     mk_given_loc loc
        | isCTupleClass cls
@@ -747,14 +772,14 @@ canForAll ev pend_sc
     do { -- Now decompose into its pieces and solve it
          -- (It takes a lot less code to flatten before decomposing.)
        ; case classifyPredType (ctEvPred new_ev) of
-           ForAllPred tv_bndrs theta pred
-              -> solveForAll new_ev tv_bndrs theta pred pend_sc
+           ForAllPred tvs theta pred
+              -> solveForAll new_ev tvs theta pred pend_sc
            _  -> pprPanic "canForAll" (ppr new_ev)
     } }
 
-solveForAll :: CtEvidence -> [TyVarBinder] -> TcThetaType -> PredType -> Bool
+solveForAll :: CtEvidence -> [TyVar] -> TcThetaType -> PredType -> Bool
             -> TcS (StopOrContinue Ct)
-solveForAll ev tv_bndrs theta pred pend_sc
+solveForAll ev tvs theta pred pend_sc
   | CtWanted { ctev_dest = dest } <- ev
   = -- See Note [Solving a Wanted forall-constraint]
     do { let skol_info = QuantCtxtSkol
@@ -784,7 +809,6 @@ solveForAll ev tv_bndrs theta pred pend_sc
   = stopWith ev "Derived forall-constraint"
   where
     loc = ctEvLoc ev
-    tvs = binderVars tv_bndrs
     qci = QCI { qci_ev = ev, qci_tvs = tvs
               , qci_pred = pred, qci_pend_sc = pend_sc }
 

@@ -1,6 +1,7 @@
 {-# LANGUAGE GADTs #-}
 {-# LANGUAGE QuantifiedConstraints #-}
 {-# LANGUAGE TypeFamilies #-}
+{-# LANGUAGE ConstraintKinds #-}
 
 module T17202 where
 
@@ -17,4 +18,3 @@ foo = Dict
 
 bar :: forall a. C3 a => Dict (C1 a)
 bar = Dict :: C2 a => Dict (C1 a)
-
