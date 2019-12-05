@@ -116,6 +116,7 @@ module Type (
         isLiftedType_maybe,
         isLiftedTypeKind, isUnliftedTypeKind,
         isLiftedRuntimeRep, isUnliftedRuntimeRep,
+        isLiftedLevity,
         isUnliftedType, mightBeUnliftedType, isUnboxedTupleType, isUnboxedSumType,
         isAlgType, isDataFamilyAppType,
         isPrimitiveType, isStrictType,
@@ -510,7 +511,15 @@ isLiftedRuntimeRep rep
   | Just rep' <- coreView rep          = isLiftedRuntimeRep rep'
   | TyConApp rr_tc rr_args <- rep
   , rr_tc `hasKey` boxedRepDataConKey
-  , [TyConApp lev_tc lev_args] <- rr_args
+  = case rr_args of
+      [rr_arg] -> isLiftedLevity rr_arg
+      _ -> ASSERT( False ) True -- this should probably just panic
+  | otherwise                          = False
+
+isLiftedLevity :: Type -> Bool
+isLiftedLevity lev
+  | Just lev' <- coreView lev          = isLiftedLevity lev'
+  | TyConApp lev_tc lev_args <- lev
   , lev_tc `hasKey` liftedDataConKey
   = ASSERT( null lev_args ) True
   | otherwise                          = False
