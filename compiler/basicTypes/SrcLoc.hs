@@ -104,6 +104,9 @@ module SrcLoc (
         psSpanEnd,
         mkSrcSpanPs,
 
+        -- * Layout information
+        LayoutInfo(..)
+
     ) where
 
 import GhcPrelude
@@ -119,6 +122,7 @@ import Data.Data
 import Data.List (sortBy, intercalate)
 import Data.Function (on)
 import qualified Data.Map as Map
+import qualified Data.Semigroup
 
 {-
 ************************************************************************
@@ -412,6 +416,12 @@ srcSpanFirstCharacter (RealSrcSpan span mbspan) =
       let bloc1@(BufLoc bl bc) = bufSpanStart bspan
           bloc2 = BufLoc bl (bc+1)
       in BufSpan bloc1 bloc2
+
+instance Semigroup SrcSpan where
+  (<>) = combineSrcSpans
+
+instance Monoid SrcSpan where
+  mempty = noSrcSpan
 
 {-
 ************************************************************************
@@ -728,3 +738,29 @@ combineMaybe2 _ Nothing Nothing = Nothing
 combineMaybe2 f (Just a) Nothing = Just (f a a)
 combineMaybe2 f Nothing (Just b) = Just (f b b)
 combineMaybe2 f (Just a) (Just b) = Just (f a b)
+
+-- | Layout information for declarations.
+data LayoutInfo =
+
+    -- | Explicit braces written by the user.
+    --
+    -- @
+    -- class C a where { foo :: a; bar :: a }
+    -- @
+    ExplicitBraces
+  |
+    -- | Virtual braces inserted by the layout algorithm.
+    --
+    -- @
+    -- class C a where
+    --   foo :: a
+    --   bar :: a
+    -- @
+    VirtualBraces
+      !Int -- ^ Layout column (indentation level)
+  |
+    -- | Empty or compiler-generated blocks do not have layout information
+    -- associated with them.
+    NoLayoutInfo
+
+  deriving (Eq, Ord, Data)
