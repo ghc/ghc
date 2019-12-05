@@ -67,7 +67,9 @@ module SrcLoc (
 
         -- * StringBuffer locations
         BufPos(..),
+        getBufPos,
         BufSpan(..),
+        getBufSpan,
 
         -- * Located
         Located,
@@ -104,6 +106,9 @@ module SrcLoc (
         psSpanEnd,
         mkSrcSpanPs,
 
+        -- * Layout information
+        LayoutInfo(..)
+
     ) where
 
 import GhcPrelude
@@ -120,6 +125,7 @@ import Data.Data
 import Data.List (sortBy, intercalate)
 import Data.Function (on)
 import qualified Data.Map as Map
+import qualified Data.Semigroup
 
 {-
 ************************************************************************
@@ -170,6 +176,10 @@ mkSrcLoc x line col = RealSrcLoc (mkRealSrcLoc x line col) Nothing
 
 mkRealSrcLoc :: FastString -> Int -> Int -> RealSrcLoc
 mkRealSrcLoc x line col = SrcLoc x line col
+
+getBufPos :: SrcLoc -> Maybe BufPos
+getBufPos (RealSrcLoc _ mbpos) = mbpos
+getBufPos (UnhelpfulLoc _) = Nothing
 
 -- | Built-in "bad" 'SrcLoc' values for particular locations
 noSrcLoc, generatedSrcLoc, interactiveSrcLoc :: SrcLoc
@@ -296,6 +306,10 @@ data BufSpan =
   BufSpan { bufSpanStart, bufSpanEnd :: {-# UNPACK #-} !BufPos }
   deriving (Eq, Ord, Show)
 
+instance Semigroup BufSpan where
+  BufSpan start1 end1 <> BufSpan start2 end2 =
+    BufSpan (min start1 start2) (max end1 end2)
+
 -- | Source Span
 --
 -- A 'SrcSpan' identifies either a specific portion of a text file
@@ -342,6 +356,10 @@ instance ToJson RealSrcSpan where
 
 instance NFData SrcSpan where
   rnf x = x `seq` ()
+
+getBufSpan :: SrcSpan -> Maybe BufSpan
+getBufSpan (RealSrcSpan _ mbspan) = mbspan
+getBufSpan (UnhelpfulSpan _) = Nothing
 
 -- | Built-in "bad" 'SrcSpan's for common sources of location uncertainty
 noSrcSpan, wiredInSrcSpan, interactiveSrcSpan :: SrcSpan
@@ -739,3 +757,29 @@ psSpanEnd (PsSpan r b) = PsLoc (realSrcSpanEnd r) (bufSpanEnd b)
 
 mkSrcSpanPs :: PsSpan -> SrcSpan
 mkSrcSpanPs (PsSpan r b) = RealSrcSpan r (Just b)
+
+-- | Layout information for declarations.
+data LayoutInfo =
+
+    -- | Explicit braces written by the user.
+    --
+    -- @
+    -- class C a where { foo :: a; bar :: a }
+    -- @
+    ExplicitBraces
+  |
+    -- | Virtual braces inserted by the layout algorithm.
+    --
+    -- @
+    -- class C a where
+    --   foo :: a
+    --   bar :: a
+    -- @
+    VirtualBraces
+      !Int -- ^ Layout column (indentation level)
+  |
+    -- | Empty or compiler-generated blocks do not have layout information
+    -- associated with them.
+    NoLayoutInfo
+
+  deriving (Eq, Ord, Data)

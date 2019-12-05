@@ -1,12 +1,11 @@
 [
-( CommentsTest.hs:11:1-33 =
-[(CommentsTest.hs:11:1-33,AnnDocCommentNext " The function @foo@ does blah")])
-
 ( CommentsTest.hs:(12,7)-(15,14) =
 [(CommentsTest.hs:14:15-24,AnnLineComment "-- value 2")])
 
 ( <no location info> =
-[(CommentsTest.hs:(3,1)-(7,2),AnnBlockComment "{-\nAn opening comment\n  {- with a nested one -}\n  {-# nested PRAGMA #-}\n-}"),
+[(CommentsTest.hs:11:1-33,AnnDocCommentNext " The function @foo@ does blah"),
+
+(CommentsTest.hs:(3,1)-(7,2),AnnBlockComment "{-\nAn opening comment\n  {- with a nested one -}\n  {-# nested PRAGMA #-}\n-}"),
 
 (CommentsTest.hs:1:1-31,AnnBlockComment "{-# LANGUAGE DeriveFoldable #-}")])
 ]
