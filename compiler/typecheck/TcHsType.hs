@@ -954,16 +954,23 @@ finish_tuple rn_ty tup_sort tau_tys tau_kinds exp_kind
                  UnboxedTuple    -> tau_reps ++ tau_tys
                  BoxedTuple      -> tau_tys
                  ConstraintTuple -> tau_tys
-       ; tycon <- case tup_sort of
-           ConstraintTuple
-             | arity > mAX_CTUPLE_SIZE
-                         -> failWith (bigConstraintTuple arity)
-             | otherwise -> tcLookupTyCon (cTupleTyConName arity)
-           BoxedTuple    -> do { let tc = tupleTyCon Boxed arity
-                               ; checkWiredInTyCon tc
-                               ; return tc }
-           UnboxedTuple  -> return (tupleTyCon Unboxed arity)
-       ; checkExpectedKind rn_ty (mkTyConApp tycon arg_tys) res_kind exp_kind }
+       ; if |  ConstraintTuple <- tup_sort
+            ,  [arg_ty]        <- arg_tys
+               -- Drop any uses of 1-tuple constraints here.
+               -- See Note [Ignore unary constraint tuples]
+            -> checkExpectedKind rn_ty arg_ty res_kind exp_kind
+            |  otherwise
+            -> do tycon <- case tup_sort of
+                    ConstraintTuple
+                      | arity > mAX_CTUPLE_SIZE
+                                  -> failWith (bigConstraintTuple arity)
+                      | otherwise -> tcLookupTyCon (cTupleTyConName arity)
+                    BoxedTuple    -> do { let tc = tupleTyCon Boxed arity
+                                        ; checkWiredInTyCon tc
+                                        ; return tc }
+                    UnboxedTuple  -> return (tupleTyCon Unboxed arity)
+                  checkExpectedKind rn_ty (mkTyConApp tycon arg_tys)
+                                    res_kind exp_kind }
   where
     arity = length tau_tys
     tau_reps = map kindRep tau_kinds
@@ -978,6 +985,46 @@ bigConstraintTuple arity
           <+> parens (text "max arity =" <+> int mAX_CTUPLE_SIZE))
        2 (text "Instead, use a nested tuple")
 
+{-
+Note [Ignore unary constraint tuples]
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+GHC provides unary tuples and unboxed tuples (see Note [One-tuples] in
+TysWiredIn) but does *not* provide unary constraint tuples. Why? First,
+recall the definition of a unary tuple data type:
+
+  data Unit a = Unit a
+
+Note that `Unit a` is *not* the same thing as `a`, since Unit is boxed and
+lazy. Therefore, the presence of `Unit` matters semantically. On the other
+hand, suppose we had a unary constraint tuple:
+
+  class a => Unit% a
+
+This compiles down a newtype (i.e., a cast) in Core, so `Unit% a` is
+semantically equivalent to `a`. Therefore, a 1-tuple constraint would have
+no user-visible impact, nor would it allow you to express anything that
+you couldn't otherwise.
+
+We could simply add Unit% for consistency with tuples (Unit) and unboxed
+tuples (Unit#), but that would require even more magic to wire in another
+magical class, so we opt not to do so. We must be careful, however, since
+one can try to sneak in uses of unary constraint tuples through Template
+Haskell, such as in this program (from #17511):
+
+  f :: $(pure (ForallT [] [TupleT 1 `AppT` (ConT ''Show `AppT` ConT ''Int)]
+                       (ConT ''String)))
+  -- f :: Unit% (Show Int) => String
+  f = "abc"
+
+This use of `TupleT 1` will produce an HsBoxedOrConstraintTuple of arity 1,
+and since it is used in a Constraint position, GHC will attempt to treat
+it as thought it were a constraint tuple, which can potentially lead to
+trouble if one attempts to look up the name of a constraint tuple of arity
+1 (as it won't exist). To avoid this trouble, we simply take any unary
+constraint tuples discovered when typechecking and drop them—i.e., treat
+"Unit% a" as though the user had written "a". This is always safe to do
+since the two constraints should be semantically equivalent.
+-}
 
 {- *********************************************************************
 *                                                                      *
