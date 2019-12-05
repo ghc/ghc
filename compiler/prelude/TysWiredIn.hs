@@ -722,9 +722,9 @@ created in Template Haskell or in, e.g., `deriving` code. There is
 nothing special about one-tuples in Core; in particular, they have no
 custom pretty-printing, just using `Unit`.
 
-NB (Feb 16): for /constraint/ one-tuples I have 'Unit%' but no class
-decl in GHC.Classes, so I think this part may not work properly. But
-it's unused I think.
+Note that there is *not* a unary constraint tuple, unlike for other forms of
+tuples. See [Ignore unary constraint tuples] in TcHsType for more
+details.
 
 See also Note [Flattening one-tuples] in MkCore and
 Note [Don't flatten tuples from HsSyn] in MkCore.
