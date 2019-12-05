@@ -1,6 +1,8 @@
 {-# LANGUAGE MagicHash, NoImplicitPrelude, TypeFamilies, UnboxedTuples,
              MultiParamTypeClasses, RoleAnnotations, CPP, TypeOperators,
              PolyKinds #-}
+
+{-# OPTIONS_GHC -ddump-simpl -ddump-ds -dsuppress-all -ddump-to-file #-}
 -----------------------------------------------------------------------------
 -- |
 -- Module      :  GHC.Types
@@ -497,3 +499,5 @@ data TyCon = TyCon WORD64_TY WORD64_TY   -- Fingerprint
                    TrName                -- Type constructor name
                    Int#                  -- How many kind variables do we accept?
                    KindRep               -- A representation of the type's kind
+
+
