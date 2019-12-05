@@ -5,6 +5,7 @@
 {-# LANGUAGE ConstraintKinds #-}
 {-# LANGUAGE BangPatterns #-}
 {-# LANGUAGE TupleSections #-}
+{-# LANGUAGE ScopedTypeVariables #-}
 
 {-# OPTIONS_GHC -Wno-incomplete-uni-patterns #-}
 
@@ -49,8 +50,12 @@ module GHC.Utils.Misc (
         chunkList,
 
         changeLast,
+        mapLastM,
 
         whenNonEmpty,
+
+        mergeListsBy,
+        isSorted,
 
         -- * Tuples
         fstOf3, sndOf3, thdOf3,
@@ -601,10 +606,65 @@ changeLast []     _  = panic "changeLast"
 changeLast [_]    x  = [x]
 changeLast (x:xs) x' = x : changeLast xs x'
 
+-- | Apply an effectful function to the last list element.
+-- Assumes a non-empty list (panics otherwise).
+mapLastM :: Functor f => (a -> f a) -> [a] -> f [a]
+mapLastM _ [] = panic "mapLastM: empty list"
+mapLastM f [x] = (\x' -> [x']) <$> f x
+mapLastM f (x:xs) = (x:) <$> mapLastM f xs
+
 whenNonEmpty :: Applicative m => [a] -> (NonEmpty a -> m ()) -> m ()
 whenNonEmpty []     _ = pure ()
 whenNonEmpty (x:xs) f = f (x :| xs)
 
+-- | Merge an unsorted list of sorted lists, for example:
+--
+--  mergeListsBy compare [ [2,5,15], [1,10,100] ] = [1,2,5,10,15,100] ]
+--
+--  O(n log k)
+mergeListsBy :: forall a. (a -> a -> Ordering) -> [[a]] -> [a]
+mergeListsBy cmp lists | debugIsOn, not (all sorted lists) =
+  -- When debugging is on, we check that the input lists are sorted.
+  panic "mergeListsBy: input lists must be sorted"
+  where sorted = isSorted cmp
+mergeListsBy cmp all_lists = merge_lists all_lists
+  where
+    -- Implements "Iterative 2-Way merge" described at
+    -- https://en.wikipedia.org/wiki/K-way_merge_algorithm
+
+    -- Merge two sorted lists into one in O(n).
+    merge2 :: [a] -> [a] -> [a]
+    merge2 [] ys = ys
+    merge2 xs [] = xs
+    merge2 (x:xs) (y:ys) =
+      case cmp x y of
+        GT -> y : merge2 (x:xs) ys
+        _  -> x : merge2 xs (y:ys)
+
+    -- Merge the first list with the second, the third with the fourth, and so
+    -- on. The output has half as much lists as the input.
+    merge_neighbours :: [[a]] -> [[a]]
+    merge_neighbours []   = []
+    merge_neighbours [xs] = [xs]
+    merge_neighbours (xs : ys : lists) =
+      merge2 xs ys : merge_neighbours lists
+
+    -- Since 'merge_neighbours' halves the amount of lists in each iteration,
+    -- we perform O(log k) iteration. Each iteration is O(n). The total running
+    -- time is therefore O(n log k).
+    merge_lists :: [[a]] -> [a]
+    merge_lists lists =
+      case merge_neighbours lists of
+        []     -> []
+        [xs]   -> xs
+        lists' -> merge_lists lists'
+
+isSorted :: (a -> a -> Ordering) -> [a] -> Bool
+isSorted cmp = sorted
+  where
+    sorted [] = True
+    sorted [_] = True
+    sorted (x:y:xs) = cmp x y /= GT && sorted (y:xs)
 {-
 ************************************************************************
 *                                                                      *
