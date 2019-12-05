@@ -63,6 +63,9 @@ import Data.Data hiding ( Fixity )
 -- All we actually declare here is the top-level structure for a module.
 data HsModule
   = HsModule {
+      hsmodLayout :: LayoutInfo,
+        -- ^ Layout info for the module.
+        -- For incomplete modules (e.g. the output of parseHeader), it is NoLayoutInfo.
       hsmodName :: Maybe (Located ModuleName),
         -- ^ @Nothing@: \"module X where\" is omitted (in which case the next
         --     field is Nothing too)
@@ -116,11 +119,11 @@ deriving instance Data HsModule
 
 instance Outputable HsModule where
 
-    ppr (HsModule Nothing _ imports decls _ mbDoc)
+    ppr (HsModule _ Nothing _ imports decls _ mbDoc)
       = pp_mb mbDoc $$ pp_nonnull imports
                     $$ pp_nonnull decls
 
-    ppr (HsModule (Just name) exports imports decls deprec mbDoc)
+    ppr (HsModule _ (Just name) exports imports decls deprec mbDoc)
       = vcat [
             pp_mb mbDoc,
             case exports of

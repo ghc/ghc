@@ -1,0 +1,154 @@
+
+==================== Parser AST ====================
+
+({ T17544_kw.hs:1:1 }
+ (HsModule
+  (VirtualBraces
+   (1))
+  (Just
+   ({ T17544_kw.hs:13:3-11 }
+    {ModuleName: T17544_kw}))
+  (Nothing)
+  []
+  [({ T17544_kw.hs:(15,1)-(16,20) }
+    (TyClD
+     (NoExtField)
+     (DataDecl
+      (NoExtField)
+      ({ T17544_kw.hs:15:6-8 }
+       (Unqual
+        {OccName: Foo}))
+      (HsQTvs
+       (NoExtField)
+       [])
+      (Prefix)
+      (HsDataDefn
+       (NoExtField)
+       (DataType)
+       ({ <no location info> }
+        [])
+       (Nothing)
+       (Nothing)
+       [({ T17544_kw.hs:16:9-20 }
+         (XConDecl
+          (ConDeclGADTPrefixPs
+           [({ T17544_kw.hs:16:9-13 }
+             (Unqual
+              {OccName: MkFoo}))]
+           (HsIB
+            (NoExtField)
+            ({ T17544_kw.hs:16:18-20 }
+             (HsTyVar
+              (NoExtField)
+              (NotPromoted)
+              ({ T17544_kw.hs:16:18-20 }
+               (Unqual
+                {OccName: Foo})))))
+           (Just
+            ({ T17544_kw.hs:15:10-35 }
+             (HsDocString
+              " Bad comment for MkFoo"))))))]
+       ({ <no location info> }
+        [])))))
+  ,({ T17544_kw.hs:(18,1)-(19,26) }
+    (TyClD
+     (NoExtField)
+     (DataDecl
+      (NoExtField)
+      ({ T17544_kw.hs:18:9-11 }
+       (Unqual
+        {OccName: Bar}))
+      (HsQTvs
+       (NoExtField)
+       [])
+      (Prefix)
+      (HsDataDefn
+       (NoExtField)
+       (NewType)
+       ({ <no location info> }
+        [])
+       (Nothing)
+       (Nothing)
+       [({ T17544_kw.hs:19:9-26 }
+         (XConDecl
+          (ConDeclGADTPrefixPs
+           [({ T17544_kw.hs:19:9-13 }
+             (Unqual
+              {OccName: MkBar}))]
+           (HsIB
+            (NoExtField)
+            ({ T17544_kw.hs:19:18-26 }
+             (HsFunTy
+              (NoExtField)
+              (HsUnrestrictedArrow)
+              ({ T17544_kw.hs:19:18-19 }
+               (HsTupleTy
+                (NoExtField)
+                (HsBoxedOrConstraintTuple)
+                []))
+              ({ T17544_kw.hs:19:24-26 }
+               (HsTyVar
+                (NoExtField)
+                (NotPromoted)
+                ({ T17544_kw.hs:19:24-26 }
+                 (Unqual
+                  {OccName: Bar})))))))
+           (Just
+            ({ T17544_kw.hs:18:13-38 }
+             (HsDocString
+              " Bad comment for MkBar"))))))]
+       ({ <no location info> }
+        [])))))
+  ,({ T17544_kw.hs:(21,1)-(24,18) }
+    (TyClD
+     (NoExtField)
+     (ClassDecl
+      (VirtualBraces
+       (5))
+      ({ <no location info> }
+       [])
+      ({ T17544_kw.hs:21:7-9 }
+       (Unqual
+        {OccName: Cls}))
+      (HsQTvs
+       (NoExtField)
+       [({ T17544_kw.hs:21:11 }
+         (UserTyVar
+          (NoExtField)
+          (())
+          ({ T17544_kw.hs:21:11 }
+           (Unqual
+            {OccName: a}))))])
+      (Prefix)
+      []
+      [({ T17544_kw.hs:24:5-18 }
+        (ClassOpSig
+         (NoExtField)
+         (False)
+         [({ T17544_kw.hs:24:5-13 }
+           (Unqual
+            {OccName: clsmethod}))]
+         (HsIB
+          (NoExtField)
+          ({ T17544_kw.hs:24:18 }
+           (HsTyVar
+            (NoExtField)
+            (NotPromoted)
+            ({ T17544_kw.hs:24:18 }
+             (Unqual
+              {OccName: a})))))))]
+      {Bag(Located (HsBind GhcPs)):
+       []}
+      []
+      []
+      [({ T17544_kw.hs:22:5-34 }
+        (DocCommentNext
+         (HsDocString
+          " Bad comment for clsmethod")))])))]
+  (Nothing)
+  (Just
+   ({ T17544_kw.hs:12:3-33 }
+    (HsDocString
+     " Bad comment for the module")))))
+
+

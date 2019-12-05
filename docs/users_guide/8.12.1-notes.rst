@@ -279,6 +279,46 @@ Arrow notation
          within 0.5 -< x
          ... |)
 
+Haddock
+~~~~~~~
+
+- Parsing is now more robust to insufficiently indented Haddock comments::
+
+    class C a where
+      f :: a -> a
+    -- ^ This comment used to trigger a parse error
+      g :: a -> a
+
+- :ghc-flag:`-Winvalid-haddock` is a new warning that reports discarded Haddock
+  comments that cannot be associated with AST elements::
+
+    myValue =
+      -- | Invalid (discarded) comment in an expression
+      2 + 2
+
+- When faced with several comments for a data constructor or a data constructor
+  field, Haddock now picks the first one instead of the last one.  The
+  extraneous comment is reported as invalid when :ghc-flag:`-Winvalid-haddock`
+  is enabled::
+
+    data T
+      -- | First comment
+      = MkT
+      -- ^ Second comment (rejected)
+
+
+- Haddock is now more relaxed about the placement of comments in types relative
+  to the function arrow ``->``, allowing more formatting styles::
+
+    f :: Int ->   -- ^ comment on Int (no longer a parse error)
+         Bool     -- ^ comment on Bool
+
+- Haddock can now parse the documentation comment for the first declaration in
+  a module without a module header (:ghc-ticket:`17561`)::
+
+    -- | This comment used to trigger a parse error
+    main = putStrLn "Hello"
+
 ``ghc-prim`` library
 ~~~~~~~~~~~~~~~~~~~~
 
@@ -318,6 +358,10 @@ Arrow notation
   All of ``g*``-functions from the module (``gtry``, ``gcatch``, etc.) are
   erased, and their ``exceptions``-alternatives are meant to be used in the
   GHC code instead.
+
+- ``parseModule`` is now the only parser entry point that deals with Haddock
+  comments. The other entry points (``parseDeclaration``, ``parseExpression``,
+  etc) do not insert the Haddock comments into the AST.
 
 ``base`` library
 ~~~~~~~~~~~~~~~~
