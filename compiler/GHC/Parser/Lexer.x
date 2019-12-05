@@ -66,7 +66,8 @@ module GHC.Parser.Lexer (
    lexTokenStream,
    AddAnn(..),mkParensApiAnn,
    addAnnsAt,
-   commentToAnnotation
+   commentToAnnotation,
+   HdkComment(..),
   ) where
 
 import GHC.Prelude
@@ -97,6 +98,8 @@ import GHC.Utils.Outputable
 import GHC.Data.StringBuffer
 import GHC.Data.FastString
 import GHC.Types.Unique.FM
+import GHC.Data.Maybe
+import GHC.Data.OrdList
 import GHC.Utils.Misc ( readRational, readHexRational )
 
 -- compiler/main
@@ -109,6 +112,7 @@ import GHC.Unit
 import GHC.Types.Basic ( InlineSpec(..), RuleMatchInfo(..),
                          IntegralLit(..), FractionalLit(..),
                          SourceText(..) )
+import GHC.Hs.Doc
 
 -- compiler/parser
 import GHC.Parser.CharClass
@@ -363,10 +367,8 @@ $tab          { warnTab }
 
 -- Haddock comments
 
-<0,option_prags> {
-  "-- " $docsym      / { ifExtension HaddockBit } { multiline_doc_comment }
-  "{-" \ ? $docsym   / { ifExtension HaddockBit } { nested_doc_comment }
-}
+"-- " $docsym      / { ifExtension HaddockBit } { multiline_doc_comment }
+"{-" \ ? $docsym   / { ifExtension HaddockBit } { nested_doc_comment }
 
 -- "special" symbols
 
@@ -1271,11 +1273,8 @@ nested_comment cont span buf len = do
   go (reverse $ lexemeToString buf len) (1::Int) input
   where
     go commentAcc 0 input = do
-      setInput input
-      b <- getBit RawTokenStreamBit
-      if b
-        then docCommentEnd input commentAcc ITblockComment buf span
-        else cont
+      let finalizeComment str = (Nothing, ITblockComment str)
+      commentEnd cont input commentAcc finalizeComment buf span
     go commentAcc n input = case alexGetChar' input of
       Nothing -> errBrace input (psRealSpan span)
       Just ('-',input) -> case alexGetChar' input of
@@ -1365,23 +1364,36 @@ return control to parseNestedPragma by returning the ITcomment_line_prag token.
 See #314 for more background on the bug this fixes.
 -}
 
-withLexedDocType :: (AlexInput -> (String -> Token) -> Bool -> P (PsLocated Token))
+withLexedDocType :: (AlexInput -> (String -> (HdkComment, Token)) -> Bool -> P (PsLocated Token))
                  -> P (PsLocated Token)
 withLexedDocType lexDocComment = do
   input@(AI _ buf) <- getInput
   case prevChar buf ' ' of
     -- The `Bool` argument to lexDocComment signals whether or not the next
     -- line of input might also belong to this doc comment.
-    '|' -> lexDocComment input ITdocCommentNext True
-    '^' -> lexDocComment input ITdocCommentPrev True
-    '$' -> lexDocComment input ITdocCommentNamed True
+    '|' -> lexDocComment input mkHdkCommentNext True
+    '^' -> lexDocComment input mkHdkCommentPrev True
+    '$' -> lexDocComment input mkHdkCommentNamed True
     '*' -> lexDocSection 1 input
     _ -> panic "withLexedDocType: Bad doc type"
  where
     lexDocSection n input = case alexGetChar' input of
       Just ('*', input) -> lexDocSection (n+1) input
-      Just (_,   _)     -> lexDocComment input (ITdocSection n) False
+      Just (_,   _)     -> lexDocComment input (mkHdkCommentSection n) False
       Nothing -> do setInput input; lexToken -- eof reached, lex it normally
+
+mkHdkCommentNext, mkHdkCommentPrev :: String -> (HdkComment, Token)
+mkHdkCommentNext str = (HdkCommentNext (mkHsDocString str), ITdocCommentNext str)
+mkHdkCommentPrev str = (HdkCommentPrev (mkHsDocString str), ITdocCommentPrev str)
+
+mkHdkCommentNamed :: String -> (HdkComment, Token)
+mkHdkCommentNamed str =
+  let (name, rest) = break isSpace str
+  in (HdkCommentNamed name (mkHsDocString rest), ITdocCommentNamed str)
+
+mkHdkCommentSection :: Int -> String -> (HdkComment, Token)
+mkHdkCommentSection n str =
+  (HdkCommentSection n (mkHsDocString str), ITdocSection n str)
 
 -- RULES pragmas turn on the forall and '.' keywords, and we turn them
 -- off again at the end of the pragma.
@@ -1425,17 +1437,34 @@ endPrag span _buf _len = do
 -- it writes the wrong token length to the parser state. This function is
 -- called afterwards, so it can just update the state.
 
-docCommentEnd :: AlexInput -> String -> (String -> Token) -> StringBuffer ->
-                 PsSpan -> P (PsLocated Token)
-docCommentEnd input commentAcc docType buf span = do
+commentEnd :: P (PsLocated Token)
+           -> AlexInput
+           -> String
+           -> (String -> (Maybe HdkComment, Token))
+           -> StringBuffer
+           -> PsSpan
+           -> P (PsLocated Token)
+commentEnd cont input commentAcc finalizeComment buf span = do
   setInput input
   let (AI loc nextBuf) = input
       comment = reverse commentAcc
       span' = mkPsSpan (psSpanStart span) loc
       last_len = byteDiff buf nextBuf
-
   span `seq` setLastToken span' last_len
-  return (L span' (docType comment))
+  let (m_hdk_comment, hdk_token) = finalizeComment comment
+  whenIsJust m_hdk_comment $ \hdk_comment ->
+    P $ \s -> POk (s {hdk_comments = hdk_comments s `snocOL` L span' hdk_comment}) ()
+  b <- getBit RawTokenStreamBit
+  if b then return (L span' hdk_token)
+       else cont
+
+docCommentEnd :: AlexInput -> String -> (String -> (HdkComment, Token)) -> StringBuffer ->
+                 PsSpan -> P (PsLocated Token)
+docCommentEnd input commentAcc docType buf span = do
+  let finalizeComment str =
+        let (hdk_comment, token) = docType str
+        in (Just hdk_comment, token)
+  commentEnd lexToken input commentAcc finalizeComment buf span
 
 errBrace :: AlexInput -> RealSrcSpan -> P a
 errBrace (AI end _) span = failLocMsgP (realSrcSpanStart span) (psRealLoc end) "unterminated `{-'"
@@ -2170,6 +2199,15 @@ data ParserFlags = ParserFlags {
   , pExtsBitmap     :: !ExtsBitmap -- ^ bitmap of permitted extensions
   }
 
+-- | Haddock comment as produced by the lexer. These are accumulated in
+-- 'PState' and then processed in "GHC.Parser.PostProcess.Haddock".
+data HdkComment
+  = HdkCommentNext HsDocString
+  | HdkCommentPrev HsDocString
+  | HdkCommentNamed String HsDocString
+  | HdkCommentSection Int HsDocString
+  deriving Show
+
 data PState = PState {
         buffer     :: StringBuffer,
         options    :: ParserFlags,
@@ -2211,7 +2249,13 @@ data PState = PState {
         annotations :: [(ApiAnnKey,[RealSrcSpan])],
         eof_pos :: Maybe RealSrcSpan,
         comment_q :: [RealLocated AnnotationComment],
-        annotations_comments :: [(RealSrcSpan,[RealLocated AnnotationComment])]
+        annotations_comments :: [(RealSrcSpan,[RealLocated AnnotationComment])],
+
+        -- Haddock comments accumulated in ascending order of their location
+        -- (BufPos). We use OrdList to get O(1) snoc.
+        --
+        -- See Note [Adding Haddock comments to the syntax tree] in GHC.Parser.PostProcess.Haddock
+        hdk_comments :: OrdList (PsLocated HdkComment)
      }
         -- last_loc and last_len are used when generating error messages,
         -- and in pushCurrentContext only.  Sigh, if only Happy passed the
@@ -2698,7 +2742,8 @@ mkPStatePure options buf loc =
       annotations = [],
       eof_pos = Nothing,
       comment_q = [],
-      annotations_comments = []
+      annotations_comments = [],
+      hdk_comments = nilOL
     }
   where init_loc = PsLoc loc (BufPos 0)
 
@@ -2916,10 +2961,6 @@ lexer queueComments cont = do
   let lexTokenFun = if alr then lexTokenAlr else lexToken
   (L span tok) <- lexTokenFun
   --trace ("token: " ++ show tok) $ do
-
-  if (queueComments && isDocComment tok)
-    then queueComment (L (psRealSpan span) tok)
-    else return ()
 
   if (queueComments && isComment tok)
     then queueComment (L (psRealSpan span) tok) >> lexer queueComments cont
@@ -3372,13 +3413,10 @@ commentToAnnotation _                           = panic "commentToAnnotation"
 isComment :: Token -> Bool
 isComment (ITlineComment     _)   = True
 isComment (ITblockComment    _)   = True
+isComment (ITdocCommentNext  _)   = True
+isComment (ITdocCommentPrev  _)   = True
+isComment (ITdocCommentNamed _)   = True
+isComment (ITdocSection      _ _) = True
+isComment (ITdocOptions      _)   = True
 isComment _ = False
-
-isDocComment :: Token -> Bool
-isDocComment (ITdocCommentNext  _)   = True
-isDocComment (ITdocCommentPrev  _)   = True
-isDocComment (ITdocCommentNamed _)   = True
-isDocComment (ITdocSection      _ _) = True
-isDocComment (ITdocOptions      _)   = True
-isDocComment _ = False
 }
