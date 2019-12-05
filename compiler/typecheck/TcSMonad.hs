@@ -1528,13 +1528,20 @@ lookupInertTyVar ieqs tv
 addInertForAll :: QCInst -> TcS ()
 -- Add a local Given instance, typically arising from a type signature
 addInertForAll new_qci
-  = updInertCans $ \ics ->
-    ics { inert_insts = add_qci (inert_insts ics) }
+  = do { ics <- getInertCans
+       ; insts' <- add_qci (inert_insts ics)
+       ; setInertCans (ics { inert_insts = insts' }) }
   where
-    add_qci :: [QCInst] -> [QCInst]
+    add_qci :: [QCInst] -> TcS [QCInst]
     -- See Note [Do not add duplicate quantified instances]
-    add_qci qcis | any same_qci qcis = qcis
-                 | otherwise         = new_qci : qcis
+    add_qci qcis
+      | any same_qci qcis
+      = do { traceTcS "skipping duplicate quantified instance" (ppr new_qci)
+           ; return qcis }
+
+      | otherwise
+      = do { traceTcS "adding new inert quantified instance" (ppr new_qci)
+           ; return (new_qci : qcis) }
 
     same_qci old_qci = tcEqType (ctEvPred (qci_ev old_qci))
                                 (ctEvPred (qci_ev new_qci))
@@ -1555,7 +1562,7 @@ because of that. But without doing duplicate-elimination we will have
 two matching QCInsts when we try to solve constraints arising from f's
 RHS.
 
-The simplest thing is simply to eliminate duplicattes, which we do here.
+The simplest thing is simply to eliminate duplicates, which we do here.
 -}
 
 {- *********************************************************************
@@ -3021,6 +3028,7 @@ emitWorkNC evs
   = emitWork (map mkNonCanonical evs)
 
 emitWork :: [Ct] -> TcS ()
+emitWork [] = return ()   -- avoid printing, among other work
 emitWork cts
   = do { traceTcS "Emitting fresh work" (vcat (map ppr cts))
        ; updWorkListTcS (extendWorkListCts cts) }
