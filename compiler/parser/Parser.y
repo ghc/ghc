@@ -68,6 +68,7 @@ import DataCon          ( DataCon, dataConName )
 import SrcLoc
 import Module
 import BasicTypes
+import GHC.Hs.Doc
 
 -- compiler/types
 import Type             ( funTyCon )
@@ -622,7 +623,7 @@ TH_QQUASIQUOTE  { L _ (ITqQuasiQuote _) }
 %tokentype { (Located Token) }
 
 -- Exported parsers
-%name parseModule module
+%name parseModuleNoHaddock module
 %name parseSignature signature
 %name parseImport importdecl
 %name parseStatement e_stmt
@@ -1088,8 +1089,8 @@ topdecl :: { LHsDecl GhcPs }
 --
 cl_decl :: { LTyClDecl GhcPs }
         : 'class' tycl_hdr fds where_cls
-                {% amms (mkClassDecl (comb4 $1 $2 $3 $4) $2 $3 (snd $ unLoc $4))
-                        (mj AnnClass $1:(fst $ unLoc $3)++(fst $ unLoc $4)) }
+                {% amms (mkClassDecl (comb4 $1 $2 $3 $4) $2 $3 (sndOf3 $ unLoc $4) (thdOf3 $ unLoc $4))
+                        (mj AnnClass $1:(fst $ unLoc $3)++(fstOf3 $ unLoc $4)) }
 
 -- Type declarations (toplevel)
 --
@@ -1548,20 +1549,23 @@ decls_cls :: { Located ([AddAnn],OrdList (LHsDecl GhcPs)) }  -- Reversed
 
 decllist_cls
         :: { Located ([AddAnn]
-                     , OrdList (LHsDecl GhcPs)) }      -- Reversed
+                     , OrdList (LHsDecl GhcPs)
+                     , LayoutInfo) }      -- Reversed
         : '{'         decls_cls '}'     { sLL $1 $> (moc $1:mcc $3:(fst $ unLoc $2)
-                                             ,snd $ unLoc $2) }
-        |     vocurly decls_cls close   { $2 }
+                                             ,snd $ unLoc $2, ExplicitBraces) }
+        |     vocurly decls_cls close   { let { L l (anns, decls) = $2 }
+                                           in L l (anns, decls, VirtualBraces (getVOCURLY $1)) }
 
 -- Class body
 --
 where_cls :: { Located ([AddAnn]
-                       ,(OrdList (LHsDecl GhcPs))) }    -- Reversed
+                       ,(OrdList (LHsDecl GhcPs))    -- Reversed
+                       ,LayoutInfo) }
                                 -- No implicit parameters
                                 -- May have type declarations
-        : 'where' decllist_cls          { sLL $1 $> (mj AnnWhere $1:(fst $ unLoc $2)
-                                             ,snd $ unLoc $2) }
-        | {- empty -}                   { noLoc ([],nilOL) }
+        : 'where' decllist_cls          { sLL $1 $> (mj AnnWhere $1:(fstOf3 $ unLoc $2)
+                                             ,sndOf3 $ unLoc $2,thdOf3 $ unLoc $2) }
+        | {- empty -}                   { noLoc ([],nilOL,NoLayoutInfo) }
 
 -- Declarations in instance bodies
 --
@@ -3826,6 +3830,7 @@ getINLINE       (L _ (ITinline_prag _ inl conl)) = (inl,conl)
 getSPEC_INLINE  (L _ (ITspec_inline_prag _ True))  = (Inline,  FunLike)
 getSPEC_INLINE  (L _ (ITspec_inline_prag _ False)) = (NoInline,FunLike)
 getCOMPLETE_PRAGs (L _ (ITcomplete_prag x)) = x
+getVOCURLY      (L (RealSrcSpan _ (Just l)) ITvocurly) = bufLocCol (bufSpanStart l)
 
 getDOCNEXT (L _ (ITdocCommentNext x)) = x
 getDOCPREV (L _ (ITdocCommentPrev x)) = x
@@ -4127,4 +4132,7 @@ oll l =
 asl :: [Located a] -> Located b -> Located a -> P ()
 asl [] (L ls _) (L l _) = addAnnotation l          AnnSemi ls
 asl (x:_xs) (L ls _) _x = addAnnotation (getLoc x) AnnSemi ls
+
+parseModule :: P (Located HsModule)
+parseModule = parseModuleNoHaddock >>= addModuleHaddock
 }
