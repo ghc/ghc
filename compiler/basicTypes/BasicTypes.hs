@@ -821,6 +821,13 @@ data TupleSort
   | ConstraintTuple
   deriving( Eq, Data )
 
+instance Outputable TupleSort where
+  ppr ts = text $
+    case ts of
+      BoxedTuple      -> "BoxedTuple"
+      UnboxedTuple    -> "UnboxedTuple"
+      ConstraintTuple -> "ConstraintTuple"
+
 tupleSortBoxity :: TupleSort -> Boxity
 tupleSortBoxity BoxedTuple      = Boxed
 tupleSortBoxity UnboxedTuple    = Unboxed
