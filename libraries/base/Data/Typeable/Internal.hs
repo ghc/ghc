@@ -87,7 +87,6 @@ module Data.Typeable.Internal (
     trLiftedRep
   ) where
 
--- import GHC.IO.Unsafe (unsafePerformIO)
 import GHC.Base
 import qualified GHC.Arr as A
 import GHC.Types ( TYPE )
@@ -114,20 +113,6 @@ import {-# SOURCE #-} GHC.Fingerprint
                 The TyCon type
 *                                                                      *
 ********************************************************************* -}
-
--- foreign import ccall unsafe "HsBase.h debugBelch2"
---    debugBelch :: Addr# -> Addr# -> IO ()
--- 
--- myDebugBelch :: Addr# -> IO ()
--- myDebugBelch msg = debugBelch "%s\n"# msg
--- 
--- myTrace :: Addr# -> a -> a
--- myTrace msg expr = unsafePerformIO $ do
---   myDebugBelch msg
---   return expr
-
-myTrace :: Addr# -> a -> a
-myTrace _ a = a
 
 modulePackage :: Module -> String
 modulePackage (Module p _) = trNameString p
@@ -378,7 +363,7 @@ mkTrType = TrType
 -- Note that this is unsafe as it allows you to construct
 -- ill-kinded types.
 mkTrCon :: forall k (a :: k). TyCon -> [SomeTypeRep] -> TypeRep a
-mkTrCon tc kind_vars = myTrace "mkTrCon called"# $ TrTyCon
+mkTrCon tc kind_vars = TrTyCon
     { trTyConFingerprint = fpr
     , trTyCon = tc
     , trKindVars = kind_vars
@@ -418,27 +403,20 @@ mkTrApp :: forall k1 k2 (a :: k1 -> k2) (b :: k1).
            TypeRep (a :: k1 -> k2)
         -> TypeRep (b :: k1)
         -> TypeRep (a b)
-mkTrApp a0 b0 = myTrace "mkTrApp was called"# (go a0 b0)
-  where
-  go :: forall k1x k2x (ax :: k1x -> k2x) (bx :: k1x).
-           TypeRep (ax :: k1x -> k2x)
-        -> TypeRep (bx :: k1x)
-        -> TypeRep (ax bx)
-  go a b
-    -- See Note [Kind caching], Wrinkle 2
+mkTrApp a b -- See Note [Kind caching], Wrinkle 2
     | Just HRefl <- a `eqTypeRep` trTYPE
     , Just HRefl <- b `eqTypeRep` trLiftedRep
     = TrType
 
     | TrFun {trFunRes = res_kind} <- typeRepKind a
-    = myTrace "mkTrApp decided on TrApp"# $ TrApp
+    = TrApp
       { trAppFingerprint = fpr
       , trAppFun = a
       , trAppArg = b
       , trAppKind = res_kind }
 
-    | otherwise = myTrace "mkTrApp trying to throw error"# (error ("Ill-kinded type application: "
-                             ++ show (typeRepKind a)))
+    | otherwise = error ("Ill-kinded type application: "
+                             ++ show (typeRepKind a))
     where
       fpr_a = typeRepFingerprint a
       fpr_b = typeRepFingerprint b
@@ -618,18 +596,16 @@ sameTypeRep a b = typeRepFingerprint a == typeRepFingerprint b
 
 -- | Observe the kind of a type.
 typeRepKind :: TypeRep (a :: k) -> TypeRep k
-typeRepKind arg = myTrace "typeRepKind called"# (go arg)
-  where
-  go TrType = TrType
-  go (TrTyCon {trTyConKind = kind}) = kind
-  go (TrApp {trAppKind = kind}) = kind
-  go (TrFun {}) = typeRep @Type
+typeRepKind TrType = TrType
+typeRepKind (TrTyCon {trTyConKind = kind}) = kind
+typeRepKind (TrApp {trAppKind = kind}) = kind
+typeRepKind (TrFun {}) = typeRep @Type
 
 tyConKind :: TyCon -> [SomeTypeRep] -> SomeTypeRep
 tyConKind (TyCon _ _ _ _ nKindVars# kindRep) kindVars =
     let kindVarsArr :: A.Array KindBndr SomeTypeRep
         kindVarsArr = A.listArray (0, I# (nKindVars# -# 1#)) kindVars
-    in myTrace "tyConKind calling instantiateKindRep"# (instantiateKindRep kindVarsArr kindRep)
+    in instantiateKindRep kindVarsArr kindRep
 
 instantiateKindRep :: A.Array KindBndr SomeTypeRep -> KindRep -> SomeTypeRep
 instantiateKindRep vars = go
@@ -645,37 +621,15 @@ instantiateKindRep vars = go
             applyTy (SomeTypeRep acc) ty
               | SomeTypeRep ty' <- go ty
               = SomeTypeRep $ mkTrApp (unsafeCoerce acc) ty'
-        in case args of
-             [] ->
-               myTrace "instantiateKindRep: KindRepTyConApp tc []"#
-               (foldl' applyTy tycon_app ty_args)
-             [KindRepTYPE _] ->
-               myTrace "instantiateKindRep: KindRepTyConApp tc [KindRepTYPE r]"#
-               (foldl' applyTy tycon_app ty_args)
-             [KindRepApp _ _] ->
-               myTrace "instantiateKindRep: KindRepTyConApp tc [KindRepApp f a]"#
-               (foldl' applyTy tycon_app ty_args)
-             [KindRepFun _ _] ->
-               myTrace "instantiateKindRep: KindRepTyConApp tc [KindRepFun a b]"#
-               (foldl' applyTy tycon_app ty_args)
-             [KindRepTyConApp _ _] ->
-               myTrace "instantiateKindRep: KindRepTyConApp tc [KindRepTyConApp f a]"#
-               (foldl' applyTy tycon_app ty_args)
-             _ -> myTrace "instantiateKindRep: KindRepTyConApp tc args"#
-               (foldl' applyTy tycon_app ty_args)
+        in foldl' applyTy tycon_app ty_args
     go (KindRepVar var)
-      = myTrace "instantiateKindRep: KindRepVar var"# (vars A.! var)
+      = vars A.! var
     go (KindRepApp f a)
-      = myTrace "instantiateKindRep: KindRepApp f a"# (SomeTypeRep $ mkTrApp (unsafeCoerceRep $ go f) (unsafeCoerceRep $ go a))
+      = SomeTypeRep $ mkTrApp (unsafeCoerceRep $ go f) (unsafeCoerceRep $ go a)
     go (KindRepFun a b)
-      = myTrace "instantiateKindRep: KindRepFun a b"# (SomeTypeRep $ mkTrFun (unsafeCoerceRep $ go a) (unsafeCoerceRep $ go b))
-    go (KindRepTYPE r) = myTrace "instantiateKindRep: KindRepTYPE r"#
-      ( case r of
-          BoxedRep lev -> myTrace "instantiateKindRep: KindRepTYPE (BoxedRep v)"# $ case lev of
-            Lifted -> SomeTypeRep TrType
-            Unlifted -> unkindedTypeRep $ tYPE `kApp` runtimeRepTypeRep r
-          _ -> myTrace "instantiateKindRep: KindRepTYPE r, not BoxedRep v"# (unkindedTypeRep $ tYPE `kApp` runtimeRepTypeRep r)
-      )
+      = SomeTypeRep $ mkTrFun (unsafeCoerceRep $ go a) (unsafeCoerceRep $ go b)
+    go (KindRepTYPE (BoxedRep Lifted)) = SomeTypeRep TrType
+    go (KindRepTYPE r) = unkindedTypeRep $ tYPE `kApp` runtimeRepTypeRep r
     go (KindRepTypeLitS sort s)
       = mkTypeLitFromString sort (unpackCStringUtf8# s)
     go (KindRepTypeLitD sort s)
@@ -710,16 +664,8 @@ buildList = foldr cons nil
     nil = kindedTypeRep @[k] @'[]
     cons x rest = SomeKindedTypeRep (typeRep @'(:)) `kApp` x `kApp` rest
 
-runtimeRepTypeMsg :: RuntimeRep -> Addr#
-{-# noinline runtimeRepTypeMsg #-}
-runtimeRepTypeMsg x = case x of
-  IntRep -> "runtimeRepTypeRep IntRep"#
-  BoxedRep Lifted -> "runtimeRepTypeRep (BoxedRep Lifted)"#
-  BoxedRep Unlifted -> "runtimeRepTypeRep (BoxedRep Unlifted)"#
-  _ -> "runtimeRepTypeRep: other data constructor"#
-
 runtimeRepTypeRep :: RuntimeRep -> SomeKindedTypeRep RuntimeRep
-runtimeRepTypeRep r = myTrace (runtimeRepTypeMsg r) $
+runtimeRepTypeRep r =
     case r of
       BoxedRep Lifted -> SomeKindedTypeRep trLiftedRep
       BoxedRep v  -> kindedTypeRep @_ @'BoxedRep
