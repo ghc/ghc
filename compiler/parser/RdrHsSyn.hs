@@ -124,7 +124,6 @@ import PrelNames        ( allNameStrings )
 import SrcLoc
 import Unique           ( hasKey )
 import OrdList          ( OrdList, fromOL )
-import Bag              ( emptyBag, consBag )
 import Outputable
 import FastString
 import Maybes
@@ -417,33 +416,18 @@ cvBindsAndSigs :: OrdList (LHsDecl GhcPs)
 -- Input decls contain just value bindings and signatures
 -- and in case of class or instance declarations also
 -- associated type declarations. They might also contain Haddock comments.
-cvBindsAndSigs fb = go (fromOL fb)
+cvBindsAndSigs fb = do
+  fb' <- drop_bad_decls (fromOL fb)
+  return (partitionBindsAndSigs (uncurry getMonoBind) fb')
   where
-    go []              = return (emptyBag, [], [], [], [], [])
-    go ((L l (ValD _ b)) : ds)
-      = do { (bs, ss, ts, tfis, dfis, docs) <- go ds'
-           ; return (b' `consBag` bs, ss, ts, tfis, dfis, docs) }
-      where
-        (b', ds') = getMonoBind (L l b) ds
-    go ((L l decl) : ds)
-      = do { (bs, ss, ts, tfis, dfis, docs) <- go ds
-           ; case decl of
-               SigD _ s
-                 -> return (bs, L l s : ss, ts, tfis, dfis, docs)
-               TyClD _ (FamDecl _ t)
-                 -> return (bs, ss, L l t : ts, tfis, dfis, docs)
-               InstD _ (TyFamInstD { tfid_inst = tfi })
-                 -> return (bs, ss, ts, L l tfi : tfis, dfis, docs)
-               InstD _ (DataFamInstD { dfid_inst = dfi })
-                 -> return (bs, ss, ts, tfis, L l dfi : dfis, docs)
-               DocD _ d
-                 -> return (bs, ss, ts, tfis, dfis, L l d : docs)
-               SpliceD _ d
-                 -> addFatalError l $
-                    hang (text "Declaration splices are allowed only" <+>
-                          text "at the top level:")
-                       2 (ppr d)
-               _ -> pprPanic "cvBindsAndSigs" (ppr decl) }
+    drop_bad_decls [] = return []
+    drop_bad_decls (L l (SpliceD _ d) : ds) = do
+      addError l $
+        hang (text "Declaration splices are allowed only" <+>
+              text "at the top level:")
+           2 (ppr d)
+      drop_bad_decls ds
+    drop_bad_decls (d:ds) = (d:) <$> drop_bad_decls ds
 
 -----------------------------------------------------------------------------
 -- Group function bindings into equation groups

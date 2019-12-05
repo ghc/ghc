@@ -1,1 +1,1 @@
-ITdocCommentNamed "bar some\n named chunk"
+HdkCommentNamed "bar" (HsDocString " some\n named chunk")

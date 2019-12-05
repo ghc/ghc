@@ -926,6 +926,7 @@ data WarningFlag =
    | Opt_WarnInferredSafeImports          -- Since 8.10
    | Opt_WarnMissingSafeHaskellMode       -- Since 8.10
    | Opt_WarnDerivingDefaults
+   | Opt_WarnIgnoredHaddock
    deriving (Eq, Show, Enum)
 
 data Language = Haskell98 | Haskell2010
@@ -4148,7 +4149,8 @@ wWarningFlagsDeps = [
   flagSpec "partial-fields"              Opt_WarnPartialFields,
   flagSpec "prepositive-qualified-module"
                                          Opt_WarnPrepositiveQualifiedModule,
-  flagSpec "unused-packages"             Opt_WarnUnusedPackages
+  flagSpec "unused-packages"             Opt_WarnUnusedPackages,
+  flagSpec "ignored-haddock"             Opt_WarnIgnoredHaddock
  ]
 
 -- | These @-\<blah\>@ flags can all be reversed with @-no-\<blah\>@
@@ -4879,7 +4881,8 @@ standardWarnings -- see Note [Documenting warning flags]
         Opt_WarnSimplifiableClassConstraints,
         Opt_WarnStarBinder,
         Opt_WarnInaccessibleCode,
-        Opt_WarnSpaceAfterBang
+        Opt_WarnSpaceAfterBang,
+        Opt_WarnIgnoredHaddock
       ]
 
 -- | Things you get with -W

@@ -100,6 +100,7 @@ import Data.Bits
 import Data.Data
 import Data.List
 import Data.Ord
+import qualified Data.Semigroup
 
 {-
 ************************************************************************
@@ -346,6 +347,12 @@ srcSpanFirstCharacter (RealSrcSpan span) = RealSrcSpan $ mkRealSrcSpan loc1 loc2
   where
     loc1@(SrcLoc f l c) = realSrcSpanStart span
     loc2 = SrcLoc f l (c+1)
+
+instance Semigroup SrcSpan where
+  (<>) = combineSrcSpans
+
+instance Monoid SrcSpan where
+  mempty = noSrcSpan
 
 {-
 ************************************************************************

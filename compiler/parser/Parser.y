@@ -67,6 +67,7 @@ import DataCon          ( DataCon, dataConName )
 import SrcLoc
 import Module
 import BasicTypes
+import GHC.Hs.Doc
 
 -- compiler/types
 import Type             ( funTyCon )
@@ -621,7 +622,7 @@ TH_QQUASIQUOTE  { L _ (ITqQuasiQuote _) }
 %tokentype { (Located Token) }
 
 -- Exported parsers
-%name parseModule module
+%name parseModuleNoHaddock module
 %name parseSignature signature
 %name parseImport importdecl
 %name parseStatement e_stmt
@@ -4126,4 +4127,7 @@ oll l =
 asl :: [Located a] -> Located b -> Located a -> P ()
 asl [] (L ls _) (L l _) = addAnnotation l          AnnSemi ls
 asl (x:_xs) (L ls _) _x = addAnnotation (getLoc x) AnnSemi ls
+
+parseModule :: P (Located (HsModule GhcPs))
+parseModule = parseModuleNoHaddock >>= addModuleHaddock
 }

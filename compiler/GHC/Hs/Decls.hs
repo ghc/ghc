@@ -84,8 +84,8 @@ module GHC.Hs.Decls (
   resultVariableName,
 
   -- * Grouping
-  HsGroup(..),  emptyRdrGroup, emptyRnGroup, appendGroups, hsGroupInstDecls
-
+  HsGroup(..),  emptyRdrGroup, emptyRnGroup, appendGroups, hsGroupInstDecls,
+  partitionBindsAndSigs, flattenBindsAndSigs,
     ) where
 
 -- friends:
@@ -166,6 +166,61 @@ type instance XSpliceD    (GhcPass _) = NoExtField
 type instance XDocD       (GhcPass _) = NoExtField
 type instance XRoleAnnotD (GhcPass _) = NoExtField
 type instance XXHsDecl    (GhcPass _) = NoExtCon
+
+partitionBindsAndSigs
+  :: ((LHsBind GhcPs, [LHsDecl GhcPs]) -> (LHsBind GhcPs, [LHsDecl GhcPs]))
+  -> [LHsDecl GhcPs]
+  -> (LHsBinds GhcPs, [LSig GhcPs], [LFamilyDecl GhcPs],
+      [LTyFamInstDecl GhcPs], [LDataFamInstDecl GhcPs], [LDocDecl])
+partitionBindsAndSigs getMonoBind = go
+  where
+    go [] = (emptyBag, [], [], [], [], [])
+    go ((L l (ValD _ b)) : ds) =
+      let (b', ds') = getMonoBind (L l b, ds)
+          (bs, ss, ts, tfis, dfis, docs) = go ds'
+      in (b' `consBag` bs, ss, ts, tfis, dfis, docs)
+    go ((L l decl) : ds) =
+      let (bs, ss, ts, tfis, dfis, docs) = go ds in
+      case decl of
+        SigD _ s
+          -> (bs, L l s : ss, ts, tfis, dfis, docs)
+        TyClD _ (FamDecl _ t)
+          -> (bs, ss, L l t : ts, tfis, dfis, docs)
+        InstD _ (TyFamInstD { tfid_inst = tfi })
+          -> (bs, ss, ts, L l tfi : tfis, dfis, docs)
+        InstD _ (DataFamInstD { dfid_inst = dfi })
+          -> (bs, ss, ts, tfis, L l dfi : dfis, docs)
+        DocD _ d
+          -> (bs, ss, ts, tfis, dfis, L l d : docs)
+        _ -> pprPanic "partitionBindsAndSigs" (ppr decl)
+
+flattenBindsAndSigs
+  :: (LHsBinds GhcPs, [LSig GhcPs], [LFamilyDecl GhcPs],
+      [LTyFamInstDecl GhcPs], [LDataFamInstDecl GhcPs], [LDocDecl])
+  -> [LHsDecl GhcPs]
+flattenBindsAndSigs (all_bs, all_ss, all_ts, all_tfis, all_dfis, all_docs) =
+  sortLocated $ go (bagToList all_bs) all_ss all_ts all_tfis all_dfis all_docs
+  where
+    go (L l b : bs) ss ts tfis dfis docs =
+      L l (ValD noExtField b)
+        : go bs ss ts tfis dfis docs
+    go bs (L l s : ss) ts tfis dfis docs =
+      L l (SigD noExtField s)
+        : go bs ss ts tfis dfis docs
+    go bs ss (L l t : ts) tfis dfis docs =
+      L l (TyClD noExtField (FamDecl noExtField t))
+        : go bs ss ts tfis dfis docs
+    go bs ss ts (L l tfi : tfis) dfis docs =
+      L l (InstD noExtField (TyFamInstD noExtField tfi))
+        : go bs ss ts tfis dfis docs
+    go bs ss ts tfis (L l dfi : dfis) docs =
+      L l (InstD noExtField (DataFamInstD noExtField dfi))
+        : go bs ss ts tfis dfis docs
+    go bs ss ts tfis dfis (L l d : docs) =
+      L l (DocD noExtField d)
+        : go bs ss ts tfis dfis docs
+
+    go [] [] [] [] [] [] = []
 
 -- NB: all top-level fixity decls are contained EITHER
 -- EITHER SigDs
