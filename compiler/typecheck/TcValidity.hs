@@ -1928,7 +1928,7 @@ checkInstTermination theta head_pred
                                -- See Note [Invisible arguments and termination]
 
          ForAllPred tvs _ head_pred'
-           -> check (foralld_tvs `extendVarSetList` binderVars tvs) head_pred'
+           -> check (foralld_tvs `extendVarSetList` tvs) head_pred'
               -- Termination of the quantified predicate itself is checked
               -- when the predicates are individually checked for validity
 
