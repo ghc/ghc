@@ -117,7 +117,7 @@ handle_tick(int unused STG_UNUSED)
           if (RtsFlags.GcFlags.doIdleGC) {
               recent_activity = ACTIVITY_INACTIVE;
               inter_gc_ticks_to_gc = RtsFlags.GcFlags.interIdleGCWait /
-                                       RtsFlags.MiscFlags.tickInterval;
+                                     RtsFlags.MiscFlags.tickInterval;
 #if defined(THREADED_RTS)
               wakeUpRts();
               // The scheduler will call stopTimer() when it has done
@@ -139,8 +139,8 @@ handle_tick(int unused STG_UNUSED)
 #endif
           }
       } else {
-              if (idle_ticks_to_gc) idle_ticks_to_gc--;
-              if (inter_gc_ticks_to_gc) inter_gc_ticks_to_gc--;
+          if (idle_ticks_to_gc) idle_ticks_to_gc--;
+          if (inter_gc_ticks_to_gc) inter_gc_ticks_to_gc--;
       }
       break;
   default:
