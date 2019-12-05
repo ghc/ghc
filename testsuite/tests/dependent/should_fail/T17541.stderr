@@ -1,0 +1,10 @@
+
+T17541.hs:20:17: error:
+    • Expected kind ‘TYPE (Rep rep)’,
+        but ‘Int#’ has kind ‘TYPE 'IntRep’
+    • In the type ‘Int#’
+      In the type family declaration for ‘Unboxed’
+      NB: Type ‘Unboxed’ was inferred to use visible dependent quantification.
+      Most types with visible dependent quantification are
+      polymorphically recursive and need a standalone kind
+      signature. Perhaps supply one, with StandaloneKindSignatures.

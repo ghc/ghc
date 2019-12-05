@@ -316,8 +316,8 @@ support making synonyms of types with higher-rank kinds.  But
 you can always specify a CUSK directly to make this work out.
 See tc269 for an example.
 
-Note [Skip decls with CUSKs in kcLTyClDecl]
-~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+Note [CUSKs and PolyKinds]
+~~~~~~~~~~~~~~~~~~~~~~~~~~
 Consider
 
     data T (a :: *) = MkT (S a)   -- Has CUSK
@@ -530,7 +530,8 @@ kcTyClGroup kisig_env decls
           --    3. Generalise the inferred kinds
           -- See Note [Kind checking for type and class decls]
 
-        ; cusks_enabled <- xoptM LangExt.CUSKs
+        ; cusks_enabled <- xoptM LangExt.CUSKs <&&> xoptM LangExt.PolyKinds
+                    -- See Note [CUSKs and PolyKinds]
         ; let (kindless_decls, kinded_decls) = partitionWith get_kind decls
 
               get_kind d
@@ -559,10 +560,8 @@ kcTyClGroup kisig_env decls
                     -- NB: the environment extension overrides the tycon
                     --     promotion-errors bindings
                     --     See Note [Type environment evolution]
-                  ; poly_kinds  <- xoptM LangExt.PolyKinds
                   ; tcExtendKindEnvWithTyCons mono_tcs $
-                    mapM_ kcLTyClDecl (if poly_kinds then kindless_decls else decls)
-                    -- See Note [Skip decls with CUSKs in kcLTyClDecl]
+                    mapM_ kcLTyClDecl kindless_decls
 
                   ; return mono_tcs }
 
@@ -974,7 +973,39 @@ time mapped to 'kb'.  That's how C and D end up with differently-named
 final TyVars despite the fact that we unified kka:=kkb
 
 zonkRecTyVarBndrs we need to do knot-tying because of the need to
-apply this same substitution to the kind of each.  -}
+apply this same substitution to the kind of each.
+
+Note [Inferring visible dependent quantification]
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+Consider
+
+  data T k :: k -> Type where
+    MkT1 :: T Type Int
+    MkT2 :: T (Type -> Type) Maybe
+
+This looks like it should work. However, it is polymorphically recursive,
+as the uses of T in the constructor types specialize the k in the kind
+of T. This trips up our dear users (#17131, #17541), and so we add
+a "landmark" context (which cannot be suppressed) whenever we
+spot inferred visible dependent quantification (VDQ).
+
+It's hard to know when we've actually been tripped up by polymorphic recursion
+specifically, so we just include a note to users whenever we infer VDQ. The
+testsuite did not show up a single spurious inclusion of this message.
+
+The context is added in addVDQNote, which looks for a visible TyConBinder
+that also appears in the TyCon's kind. (I first looked at the kind for
+a visible, dependent quantifier, but Note [No polymorphic recursion] in
+TcHsType defeats that approach.) addVDQNote is used in kcTyClDecl,
+which is used only when inferring the kind of a tycon (never with a CUSK or
+SAK).
+
+Once upon a time, I (Richard E) thought that the tycon-kind could
+not be a forall-type. But this is wrong: data T :: forall k. k -> Type
+(with -XNoCUSKs) could end up here. And this is all OK.
+
+
+-}
 
 --------------
 tcExtendKindEnvWithTyCons :: [TcTyCon] -> TcM a -> TcM a
@@ -1258,30 +1289,32 @@ Therefore, 'mb_parent_tycon' of any closed type family has to be Nothing.
 ------------------------------------------------------------------------
 kcLTyClDecl :: LTyClDecl GhcRn -> TcM ()
   -- See Note [Kind checking for type and class decls]
+  -- Called only for declarations without a signature (no CUSKs or SAKs here)
 kcLTyClDecl (L loc decl)
   = setSrcSpan loc $
-    tcAddDeclCtxt decl $
-    do { traceTc "kcTyClDecl {" (ppr tc_name)
-       ; kcTyClDecl decl
+    do { tycon <- kcLookupTcTyCon tc_name
+       ; traceTc "kcTyClDecl {" (ppr tc_name)
+       ; addVDQNote tycon $   -- See Note [Inferring visible dependent quantification]
+         addErrCtxt (tcMkDeclCtxt decl) $
+         kcTyClDecl decl tycon
        ; traceTc "kcTyClDecl done }" (ppr tc_name) }
   where
-    tc_name = tyClDeclLName decl
+    tc_name = tcdName decl
 
-kcTyClDecl :: TyClDecl GhcRn -> TcM ()
+kcTyClDecl :: TyClDecl GhcRn -> TcTyCon -> TcM ()
 -- This function is used solely for its side effect on kind variables
 -- NB kind signatures on the type variables and
 --    result kind signature have already been dealt with
 --    by inferInitialKind, so we can ignore them here.
 
 kcTyClDecl (DataDecl { tcdLName    = (L _ name)
-                     , tcdDataDefn = defn })
+                     , tcdDataDefn = defn }) tyCon
   | HsDataDefn { dd_cons = cons@((L _ (ConDeclGADT {})) : _)
                , dd_ctxt = (L _ [])
                , dd_ND = new_or_data } <- defn
-  = do { tyCon <- kcLookupTcTyCon name
-         -- See Note [Implementation of UnliftedNewtypes] STEP 2
-       ; kcConDecls new_or_data (tyConResKind tyCon) cons
-       }
+  = -- See Note [Implementation of UnliftedNewtypes] STEP 2
+    kcConDecls new_or_data (tyConResKind tyCon) cons
+
     -- hs_tvs and dd_kindSig already dealt with in inferInitialKind
     -- This must be a GADT-style decl,
     --        (see invariants of DataDefn declaration)
@@ -1294,18 +1327,17 @@ kcTyClDecl (DataDecl { tcdLName    = (L _ name)
                , dd_ND = new_or_data } <- defn
   = bindTyClTyVars name $ \ _ _ ->
     do { _ <- tcHsContext ctxt
-       ; tyCon <- kcLookupTcTyCon name
        ; kcConDecls new_or_data (tyConResKind tyCon) cons
        }
 
-kcTyClDecl (SynDecl { tcdLName = L _ name, tcdRhs = rhs })
+kcTyClDecl (SynDecl { tcdLName = L _ name, tcdRhs = rhs }) _tycon
   = bindTyClTyVars name $ \ _ res_kind ->
     discardResult $ tcCheckLHsType rhs res_kind
         -- NB: check against the result kind that we allocated
         -- in inferInitialKinds.
 
 kcTyClDecl (ClassDecl { tcdLName = L _ name
-                      , tcdCtxt = ctxt, tcdSigs = sigs })
+                      , tcdCtxt = ctxt, tcdSigs = sigs }) _tycon
   = bindTyClTyVars name $ \ _ _ ->
     do  { _ <- tcHsContext ctxt
         ; mapM_ (wrapLocM_ kc_sig) sigs }
@@ -1315,18 +1347,15 @@ kcTyClDecl (ClassDecl { tcdLName = L _ name
 
     skol_info = TyConSkol ClassFlavour name
 
-kcTyClDecl (FamDecl _ (FamilyDecl { fdLName  = L _ fam_tc_name
-                                  , fdInfo   = fd_info }))
+kcTyClDecl (FamDecl _ (FamilyDecl { fdInfo   = fd_info })) fam_tc
 -- closed type families look at their equations, but other families don't
 -- do anything here
   = case fd_info of
-      ClosedTypeFamily (Just eqns) ->
-        do { fam_tc <- kcLookupTcTyCon fam_tc_name
-           ; mapM_ (kcTyFamInstEqn fam_tc) eqns }
+      ClosedTypeFamily (Just eqns) -> mapM_ (kcTyFamInstEqn fam_tc) eqns
       _ -> return ()
-kcTyClDecl (FamDecl _ (XFamilyDecl nec))        = noExtCon nec
-kcTyClDecl (DataDecl _ _ _ _ (XHsDataDefn nec)) = noExtCon nec
-kcTyClDecl (XTyClDecl nec)                      = noExtCon nec
+kcTyClDecl (FamDecl _ (XFamilyDecl nec))        _ = noExtCon nec
+kcTyClDecl (DataDecl _ _ _ _ (XHsDataDefn nec)) _ = noExtCon nec
+kcTyClDecl (XTyClDecl nec)                      _ = noExtCon nec
 
 -------------------
 
@@ -4156,6 +4185,46 @@ checkValidRoles tc
 *                                                                      *
 ************************************************************************
 -}
+
+tcMkDeclCtxt :: TyClDecl GhcRn -> SDoc
+tcMkDeclCtxt decl = hsep [text "In the", pprTyClDeclFlavour decl,
+                      text "declaration for", quotes (ppr (tcdName decl))]
+
+addVDQNote :: TcTyCon -> TcM a -> TcM a
+-- See Note [Inferring visible dependent quantification]
+-- Only types without a signature (CUSK or SAK) here
+addVDQNote tycon thing_inside
+  | ASSERT2( isTcTyCon tycon, ppr tycon )
+    ASSERT2( not (tcTyConIsPoly tycon), ppr tycon $$ ppr tc_kind )
+    has_vdq
+  = addLandmarkErrCtxt vdq_warning thing_inside
+  | otherwise
+  = thing_inside
+  where
+      -- Check whether a tycon has visible dependent quantification.
+      -- This will *always* be a TcTyCon. Furthermore, it will *always*
+      -- be an ungeneralised TcTyCon, straight out of kcInferDeclHeader.
+      -- Thus, all the TyConBinders will be anonymous. Thus, the
+      -- free variables of the tycon's kind will be the same as the free
+      -- variables from all the binders.
+    has_vdq  = any is_vdq_tcb (tyConBinders tycon)
+    tc_kind  = tyConKind tycon
+    kind_fvs = tyCoVarsOfType tc_kind
+
+    is_vdq_tcb tcb = (binderVar tcb `elemVarSet` kind_fvs) &&
+                     isVisibleTyConBinder tcb
+
+    vdq_warning = vcat
+      [ text "NB: Type" <+> quotes (ppr tycon) <+>
+        text "was inferred to use visible dependent quantification."
+      , text "Most types with visible dependent quantification are"
+      , text "polymorphically recursive and need a standalone kind"
+      , text "signature. Perhaps supply one, with StandaloneKindSignatures."
+      ]
+
+tcAddDeclCtxt :: TyClDecl GhcRn -> TcM a -> TcM a
+tcAddDeclCtxt decl thing_inside
+  = addErrCtxt (tcMkDeclCtxt decl) thing_inside
 
 tcAddTyFamInstCtxt :: TyFamInstDecl GhcRn -> TcM a -> TcM a
 tcAddTyFamInstCtxt decl

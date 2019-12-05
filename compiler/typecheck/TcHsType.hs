@@ -1985,7 +1985,8 @@ kcInferDeclHeader name flav
                       , hsq_explicit = hs_tvs }) kc_res_ki
   -- No standalane kind signature and no CUSK.
   -- See note [Required, Specified, and Inferred for types] in TcTyClsDecls
-  = do { (scoped_kvs, (tc_tvs, res_kind))
+  = addTyConFlavCtxt name flav $
+    do { (scoped_kvs, (tc_tvs, res_kind))
            -- Why bindImplicitTKBndrs_Q_Tv which uses newTyVarTyVar?
            -- See Note [Inferring kinds for type declarations] in TcTyClsDecls
            <- bindImplicitTKBndrs_Q_Tv kv_ns            $
