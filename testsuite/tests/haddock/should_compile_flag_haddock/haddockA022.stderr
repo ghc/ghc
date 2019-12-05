@@ -1,9 +1,19 @@
 
 ==================== Parser ====================
-main = print (test :: Int)
-     where
-	 test = 0
-	 test2 = 1
-	 test3 = 2
+main
+  = print (test :: Int)
+  where
+      test = 0
+      test2 = 1
+      test3 = 2
 
 
+
+haddockA022.hs:4:5: warning: [-Winvalid-haddock]
+    A Haddock comment cannot appear in this position and will be ignored.
+
+haddockA022.hs:6:5: warning: [-Winvalid-haddock]
+    A Haddock comment cannot appear in this position and will be ignored.
+
+haddockA022.hs:10:5: warning: [-Winvalid-haddock]
+    A Haddock comment cannot appear in this position and will be ignored.

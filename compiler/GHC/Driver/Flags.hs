@@ -496,6 +496,7 @@ data WarningFlag =
    | Opt_WarnMissingSafeHaskellMode       -- Since 8.10
    | Opt_WarnCompatUnqualifiedImports     -- Since 8.10
    | Opt_WarnDerivingDefaults
+   | Opt_WarnInvalidHaddock               -- Since 8.12
    deriving (Eq, Show, Enum)
 
 -- | Used when outputting warnings: if a reason is given, it is

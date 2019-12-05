@@ -7,6 +7,7 @@ module GHC.Hs.Doc
   , LHsDocString
   , mkHsDocString
   , mkHsDocStringUtf8ByteString
+  , isEmptyDocString
   , unpackHDS
   , hsDocStringToByteString
   , ppr_mbDoc
@@ -63,6 +64,9 @@ instance Binary HsDocString where
 
 instance Outputable HsDocString where
   ppr = doubleQuotes . text . unpackHDS
+
+isEmptyDocString :: HsDocString -> Bool
+isEmptyDocString (HsDocString bs) = BS.null bs
 
 mkHsDocString :: String -> HsDocString
 mkHsDocString s =

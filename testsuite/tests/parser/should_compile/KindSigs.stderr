@@ -3,6 +3,8 @@
 
 ({ KindSigs.hs:1:1 }
  (HsModule
+  (VirtualBraces
+   (1))
   (Just
    ({ KindSigs.hs:6:8-15 }
     {ModuleName: KindSigs}))

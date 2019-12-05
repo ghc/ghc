@@ -92,6 +92,7 @@ module GHC.Hs.Decls (
   HsGroup(..),  emptyRdrGroup, emptyRnGroup, appendGroups, hsGroupInstDecls,
   hsGroupTopLevelFixitySigs,
 
+  partitionBindsAndSigs,
     ) where
 
 -- friends:
@@ -218,6 +219,34 @@ which translates each fixity signature in `hs_fixds` and `hs_tyclds` into a
 Template Haskell `Dec`. If there are any duplicate signatures between the two
 fields, this will result in an error (#17608).
 -}
+
+-- | Partition a list of HsDecl into function/pattern bindings, signatures,
+-- type family declarations, type family instances, and documentation comments.
+--
+-- NB. Only works on HsDecls that can appear in a class declaration.
+partitionBindsAndSigs
+  :: [LHsDecl GhcPs]
+  -> (LHsBinds GhcPs, [LSig GhcPs], [LFamilyDecl GhcPs],
+      [LTyFamInstDecl GhcPs], [LDataFamInstDecl GhcPs], [LDocDecl])
+partitionBindsAndSigs = go
+  where
+    go [] = (emptyBag, [], [], [], [], [])
+    go ((L l decl) : ds) =
+      let (bs, ss, ts, tfis, dfis, docs) = go ds in
+      case decl of
+        ValD _ b
+          -> (L l b `consBag` bs, ss, ts, tfis, dfis, docs)
+        SigD _ s
+          -> (bs, L l s : ss, ts, tfis, dfis, docs)
+        TyClD _ (FamDecl _ t)
+          -> (bs, ss, L l t : ts, tfis, dfis, docs)
+        InstD _ (TyFamInstD { tfid_inst = tfi })
+          -> (bs, ss, ts, L l tfi : tfis, dfis, docs)
+        InstD _ (DataFamInstD { dfid_inst = dfi })
+          -> (bs, ss, ts, tfis, L l dfi : dfis, docs)
+        DocD _ d
+          -> (bs, ss, ts, tfis, dfis, L l d : docs)
+        _ -> pprPanic "partitionBindsAndSigs" (ppr decl)
 
 -- | Haskell Group
 --
@@ -643,9 +672,28 @@ type instance XDataDecl     GhcPs = NoExtField
 type instance XDataDecl     GhcRn = DataDeclRn
 type instance XDataDecl     GhcTc = DataDeclRn
 
-type instance XClassDecl    GhcPs = NoExtField
+type instance XClassDecl    GhcPs = LayoutInfo  -- See Note [Class LayoutInfo]
 type instance XClassDecl    GhcRn = NameSet -- FVs
 type instance XClassDecl    GhcTc = NameSet -- FVs
+
+{- Note [Class LayoutInfo]
+~~~~~~~~~~~~~~~~~~~~~~~~~~
+The LayoutInfo is used to associate Haddock comments with parts of the declaration.
+Compare the following examples:
+
+    class C a where
+      f :: a -> Int
+      -- ^ comment on f
+
+    class C a where
+      f :: a -> Int
+    -- ^ comment on C
+
+Notice how "comment on f" and "comment on C" differ only by indentation level.
+Thus we have to record the indentation level of the class declarations.
+
+See also Note [Adding Haddock comments to the syntax tree] in GHC.Parser.PostProcess.Haddock
+-}
 
 type instance XXTyClDecl    (GhcPass _) = NoExtCon
 
