@@ -62,7 +62,7 @@ data T a b
   = " This comment describes the 'A' constructor"
     A Int (Maybe Float) |
     " This comment describes the 'B' constructor"
-    B (T a b, T Int Float)
+    B (T a b, T Int Float) ""
 <document comment>
 data T2 a b = T2 a b
 <document comment>
@@ -89,7 +89,7 @@ newtype N6 a b = " docs on the constructor only" N6 {n6 :: a b}
 newtype N7 a b = " The 'N7' constructor" N7 {n7 :: a b}
 class (D a) => C a where
   a :: IO a
-  b :: [a]
+  b :: [a] " this is a description of the 'b' method"
   c :: a
 <document comment>
 class D a where

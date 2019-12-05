@@ -929,6 +929,7 @@ data WarningFlag =
    | Opt_WarnMissingSafeHaskellMode       -- Since 8.10
    | Opt_WarnCompatUnqualifiedImports     -- Since 8.10
    | Opt_WarnDerivingDefaults
+   | Opt_WarnIgnoredHaddock
    deriving (Eq, Show, Enum)
 
 data Language = Haskell98 | Haskell2010
@@ -4168,7 +4169,8 @@ wWarningFlagsDeps = [
   flagSpec "prepositive-qualified-module"
                                          Opt_WarnPrepositiveQualifiedModule,
   flagSpec "unused-packages"             Opt_WarnUnusedPackages,
-  flagSpec "compat-unqualified-imports"  Opt_WarnCompatUnqualifiedImports
+  flagSpec "compat-unqualified-imports"  Opt_WarnCompatUnqualifiedImports,
+  flagSpec "ignored-haddock"             Opt_WarnIgnoredHaddock
  ]
 
 -- | These @-\<blah\>@ flags can all be reversed with @-no-\<blah\>@
