@@ -268,9 +268,10 @@ rnSpliceGen run_splice pend_splice splice
                 ; writeMutVar ps_var (pending_splice : ps)
                 ; return (result, fvs) }
 
-        _ ->  do { (splice', fvs1) <- checkNoErrs $
-                                      setStage (Splice splice_type) $
-                                      rnSplice splice
+        _ ->  do { checkTopSpliceAllowed splice
+                 ; (splice', fvs1) <- checkNoErrs $
+                                         setStage (Splice splice_type) $
+                                         rnSplice splice
                    -- checkNoErrs: don't attempt to run the splice if
                    -- renaming it failed; otherwise we get a cascade of
                    -- errors from e.g. unbound variables
@@ -281,6 +282,22 @@ rnSpliceGen run_splice pend_splice splice
      splice_type = if is_typed_splice
                    then Typed
                    else Untyped
+
+
+-- Nested splices are fine without TemplateHaskell because they
+-- are not executed until the top-level splice is run.
+checkTopSpliceAllowed :: HsSplice GhcPs -> RnM ()
+checkTopSpliceAllowed splice = do
+  let (herald, ext) = spliceExtension splice
+  extEnabled <- xoptM ext
+  unless extEnabled
+    (failWith $ text herald <+> text "are not permitted without" <+> ppr ext)
+  where
+     spliceExtension :: HsSplice GhcPs -> (String, LangExt.Extension)
+     spliceExtension (HsQuasiQuote {}) = ("Quasi-quotes", LangExt.QuasiQuotes)
+     spliceExtension (HsTypedSplice {}) = ("Top-level splices", LangExt.TemplateHaskell)
+     spliceExtension (HsUntypedSplice {}) = ("Top-level splices", LangExt.TemplateHaskell)
+     spliceExtension s = pprPanic "spliceExtension" (ppr s)
 
 ------------------
 
@@ -642,7 +659,8 @@ rnSpliceDecl (XSpliceDecl nec) = noExtCon nec
 rnTopSpliceDecls :: HsSplice GhcPs -> RnM ([LHsDecl GhcPs], FreeVars)
 -- Declaration splice at the very top level of the module
 rnTopSpliceDecls splice
-   = do  { (rn_splice, fvs) <- checkNoErrs $
+   =  do { checkTopSpliceAllowed splice
+         ; (rn_splice, fvs) <- checkNoErrs $
                                setStage (Splice Untyped) $
                                rnSplice splice
            -- As always, be sure to checkNoErrs above lest we end up with

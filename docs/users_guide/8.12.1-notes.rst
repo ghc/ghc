@@ -42,6 +42,9 @@ Template Haskell
    forms have now been generalised in terms of a minimal interface necessary for the
    implementation rather than the overapproximation of the ``Q`` monad.
 
+ - The ``-XTemplateHaskellQuotes`` extension now allows nested splices as nested
+   splices do not lead directly to compile-time evaluation. (!2288)
+
 ``ghc-prim`` library
 ~~~~~~~~~~~~~~~~~~~~
 
