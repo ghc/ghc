@@ -1313,7 +1313,6 @@ repRole (L _ (Just Nominal))          = rep2_nw nominalRName []
 repRole (L _ (Just Representational)) = rep2_nw representationalRName []
 repRole (L _ (Just Phantom))          = rep2_nw phantomRName []
 repRole (L _ Nothing)                 = rep2_nw inferRName []
-repRole _ = panic "repRole: Impossible Match" -- due to #15884
 
 -----------------------------------------------------------------------------
 --              Splices
