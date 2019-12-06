@@ -100,11 +100,7 @@ lint-submods-mr:
   tags:
     - lint
   script:
-    - |
-      grep TBA libraries/*/changelog.md && (
-          echo "Error: Found \"TBA\"s in changelogs."
-          exit 1
-      )
+    - bash .gitlab/linters/check-changelogs.sh
 
 lint-changelogs:
   extends: .lint-changelogs
