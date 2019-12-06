@@ -207,8 +207,23 @@ instance Applicative Q where
 --              The Quote class
 --
 -----------------------------------------------------
+-- The Quote class implements the minimal interface which is necessary for
+-- desugaring quotations.
+--
+-- * The `Monad m` superclass is needed to stitch together the different
+-- AST fragments.
+-- * `newName` is used when desugaring binding structures such as lambdas
+-- to generate fresh names.
+--
+-- Therefore the type of an untyped quotation in GHC is `Quote m => m Exp`
+--
+-- For many years the type of a quotation was fixed to be `Q Exp` but by
+-- more precisely specifying the minimal interface it enables the `Exp` to
+-- be extracted purely from the quotation without interacting with `Q`.
 
 class Monad m => Quote m where
+  -- | Given a string, construct a new unique name which is guaranteed to
+  -- never be captured.
   newName :: String -> m Name
 
 instance Quote Q where
