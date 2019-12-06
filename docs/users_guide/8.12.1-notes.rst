@@ -46,6 +46,9 @@ Template Haskell
    ``where`` bindings properly. Previously, such fixity declarations would
    be dropped when quoted due to a Template Haskell bug.
 
+ - The ``-XTemplateHaskellQuotes`` extension now allows nested splices as nested
+   splices do not lead directly to compile-time evaluation. (!2288)
+
 ``ghc-prim`` library
 ~~~~~~~~~~~~~~~~~~~~
 
