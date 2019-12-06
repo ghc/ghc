@@ -42,7 +42,7 @@ OutputNormalizer = Callable[[str], str]
 IssueNumber = NewType("IssueNumber", int)
 
 # Used by perf_notes
-GitHash = NewType("GitHash", str)
+GitHash = NewType("GitHash", str) # a Git commit hash
 GitRef = NewType("GitRef", str)
 TestEnv = NewType("TestEnv", str)
 MetricName = NewType("MetricName", str)

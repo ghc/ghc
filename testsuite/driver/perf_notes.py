@@ -46,8 +46,17 @@ def is_worktree_dirty() -> bool:
     return subprocess.check_output(['git', 'status', '--porcelain']) != b''
 
 #
-# Some data access functions. A the moment this uses git notes.
+# Some data access functions. At the moment this uses git notes.
 #
+
+NoteNamespace = NewType("NoteNamespace", str)
+
+# The git notes namespace for local results.
+LocalNamespace = NoteNamespace("perf")
+
+# The git notes namespace for ci results.
+CiNamespace = NoteNamespace("ci/" + LocalNamespace)
+
 
 # The metrics (a.k.a stats) are named tuples, PerfStat, in this form:
 #
@@ -109,8 +118,8 @@ def parse_perf_stat(stat_str: str) -> PerfStat:
 
 # Get all recorded (in a git note) metrics for a given commit.
 # Returns an empty array if the note is not found.
-def get_perf_stats(commit: GitRef=GitRef('HEAD'),
-                   namespace: str='perf'
+def get_perf_stats(commit: Union[GitRef, GitHash]=GitRef('HEAD'),
+                   namespace: NoteNamespace = LocalNamespace
                    ) -> List[PerfStat]:
     try:
         log = subprocess.check_output(['git', 'notes', '--ref=' + namespace, 'show', commit], stderr=subprocess.STDOUT).decode('utf-8')
@@ -151,7 +160,7 @@ def commit_hash(commit: Union[GitHash, GitRef]) -> GitHash:
 #               }
 #   }
 _get_allowed_perf_changes_cache = {} # type: Dict[GitHash, Dict[TestName, List[AllowedPerfChange]]]
-def get_allowed_perf_changes(commit: GitRef=GitRef('HEAD')
+def get_allowed_perf_changes(commit: Union[GitRef, GitHash]=GitRef('HEAD')
                              ) -> Dict[TestName, List[AllowedPerfChange]]:
     global _get_allowed_perf_changes_cache
     chash = commit_hash(commit)
@@ -281,7 +290,7 @@ def format_perf_stat(stats: Union[PerfStat, List[PerfStat]], delimitor: str = "\
 # Returns True if the note was successfully appended.
 def append_perf_stat(stats: List[PerfStat],
                      commit: GitRef = GitRef('HEAD'),
-                     namespace: str ='perf',
+                     namespace: NoteNamespace = LocalNamespace,
                      max_tries: int=5
                      ) -> bool:
     # Append to git note
@@ -311,12 +320,6 @@ def append_perf_stat(stats: List[PerfStat],
 
 # Max number of ancestor commits to search when compiling a baseline performance metric.
 BaselineSearchDepth = 75
-
-# The git notes name space for local results.
-LocalNamespace = "perf"
-
-# The git notes name space for ci results.
-CiNamespace = "ci/" + LocalNamespace
 
 # (isCalculated, best fit ci test_env or None)
 BestFitCiTestEnv = (False, None) # type: Tuple[bool, Optional[TestEnv]]
@@ -349,7 +352,7 @@ _baseline_depth_commit_log = {} # type: Dict[GitHash, List[GitHash]]
 
 # Get the commit hashes for the last BaselineSearchDepth commits from and
 # including the input commit. The output commits are all commit hashes.
-def baseline_commit_log(commit: GitRef) -> List[GitHash]:
+def baseline_commit_log(commit: Union[GitHash,GitRef]) -> List[GitHash]:
     global _baseline_depth_commit_log
     chash = commit_hash(commit)
     if not commit in _baseline_depth_commit_log:
@@ -391,75 +394,50 @@ _commit_metric_cache = {} # type: ignore
 #                      instead when looking for ci results)
 # metric: str - test metric
 # way: str - test way
-# returns: the Baseline named tuple or None if no metric was found within
+# returns: the Baseline or None if no metric was found within
 #          BaselineSearchDepth commits and since the last expected change
 #          (ignoring any expected change in the given commit).
-def baseline_metric(commit: GitRef,
+def baseline_metric(commit: GitHash,
                     name: TestName,
                     test_env: TestEnv,
                     metric: MetricName,
                     way: WayName
-                    ) -> Baseline:
+                    ) -> Optional[Baseline]:
     # For performance reasons (in order to avoid calling commit_hash), we assert
     # commit is already a commit hash.
     assert is_commit_hash(commit)
 
     # Get all recent commit hashes.
     commit_hashes = baseline_commit_log(commit)
-    def depth_to_commit(depth):
-        return commit_hashes[depth]
 
-    def has_expected_change(commit):
-        return get_allowed_perf_changes(commit).get(name) \
-                != None
-
-    # Bool -> String
-    def namespace(useCiNamespace):
-        return CiNamespace if useCiNamespace else LocalNamespace
-
-    ci_test_env = best_fit_ci_test_env()
-
-    # gets the metric of a given commit
-    # (Bool, Int) -> (float | None)
-    def commit_metric(useCiNamespace, depth):
-        currentCommit = depth_to_commit(depth)
-
-        # Get test environment.
-        effective_test_env = ci_test_env if useCiNamespace else test_env
-        if effective_test_env == None:
-            # This can happen when no best fit ci test is found.
-            return None
-
-        return get_commit_metric(namespace(useCiNamespace), currentCommit, effective_test_env, name, metric, way)
+    def has_expected_change(commit: GitHash) -> bool:
+        return get_allowed_perf_changes(commit).get(name) is not None
 
     # Searches through previous commits trying local then ci for each commit in.
-    def search(useCiNamespace, depth):
-        # Stop if reached the max search depth.
-        # We use len(commit_hashes) instead of BaselineSearchDepth incase
-        # baseline_commit_log() returned fewer than BaselineSearchDepth hashes.
-        if depth >= len(commit_hashes):
-            return None
+    def find_baseline(namespace: NoteNamespace,
+                      test_env: TestEnv
+                      ) -> Optional[Baseline]:
+        for depth, current_commit in list(enumerate(commit_hashes))[1:]:
+            # Check for a metric on this commit.
+            current_metric = get_commit_metric(namespace, current_commit, test_env, name, metric, way)
+            if current_metric is not None:
+                return Baseline(current_metric, current_commit, depth)
 
-        # Check for a metric on this commit.
-        current_metric = commit_metric(useCiNamespace, depth)
-        if current_metric != None:
-            return Baseline(current_metric, depth_to_commit(depth), depth)
+            # Stop if there is an expected change at this commit. In that case
+            # metrics on ancestor commits will not be a valid baseline.
+            if has_expected_change(current_commit):
+                return None
 
-        # Metric is not available.
-        # If tried local, now try CI.
-        if not useCiNamespace:
-            return search(True, depth)
+        return None
 
-        # Stop if there is an expected change at this commit. In that case
-        # metrics on ancestor commits will not be a valid baseline.
-        if has_expected_change(depth_to_commit(depth)):
-            return None
+    # Test environment to use when comparing against CI namespace
+    ci_test_env = best_fit_ci_test_env()
 
-        # Move to the parent commit.
-        return search(False, depth + 1)
+    baseline = find_baseline(LocalNamespace, test_env) # type: Optional[Baseline]
+    if baseline is None and ci_test_env is not None:
+        baseline = find_baseline(CiNamespace, ci_test_env)
 
-    # Start search from parent commit using local name space.
-    return search(False, 1)
+    return baseline
 
 # Same as get_commit_metric(), but converts the result to a string or keeps it
 # as None.
@@ -484,7 +462,7 @@ def get_commit_metric_value_str_or_none(gitNoteRef,
 # way: test way
 # returns: PerfStat | None if stats don't exist for the given input
 def get_commit_metric(gitNoteRef,
-                      ref: GitRef,
+                      ref: Union[GitRef, GitHash],
                       test_env: TestEnv,
                       name: TestName,
                       metric: MetricName,
@@ -631,9 +609,10 @@ def main() -> None:
     # Main logic of the program when called from the command-line.
     #
 
-    ref = 'perf'
+    ref = NoteNamespace('perf')
     if args.ci:
-        ref = 'ci/perf'
+        ref = NoteNamespace('ci/perf')
+
     commits = args.commits
     if args.commits:
         # Commit range
