@@ -13133,6 +13133,10 @@ The :extension:`TemplateHaskellQuotes` extension is considered safe under
    that declaration splices are not allowed anywhere except at top level
    (outside any other declarations).
 
+   The ``Q`` monad is a monad defined in ``Language.Haskell.TH.Syntax`` which
+   supports several useful operations during code generation such as reporting
+   errors or looking up identifiers in the environment.
+
 -  A expression quotation is written in Oxford brackets, thus:
 
    -  ``[| ... |]``, or ``[e| ... |]``, where the "..." is an
@@ -13147,6 +13151,10 @@ The :extension:`TemplateHaskellQuotes` extension is considered safe under
    -  ``[p| ... |]``, where the "..." is a pattern; the quotation has
       type ``Quote m => m Pat``.
 
+   The ``Quote`` type class is the minimal interface necessary to implement
+   the desugaring of quotations. The ``Q`` monad is an instance of ``Quote`` but
+   contains many more operations which are not needed for defining quotations.
+
    See :ref:`pts-where` for using partial type signatures in quotations.
 
 -  Splices can be nested inside quotation brackets. For example the fragment
@@ -13159,7 +13167,7 @@ The :extension:`TemplateHaskellQuotes` extension is considered safe under
 
     plusC = [| $oneC + $twoC |]
 
-- The type of a quotation depends on the types of the nested splices inside it::
+- The precise type of a quotation depends on the types of the nested splices inside it::
 
       -- Add a redundant constraint to demonstrate that constraints on the
       -- monad used to build the representation are propagated when using nested
@@ -13172,7 +13180,7 @@ The :extension:`TemplateHaskellQuotes` extension is considered safe under
       g :: (Quote m, C m) => m Exp
       g = [| $f + $f |]
 
-   A top-level splice still requires its argument to be of type ``Q Exp``.
+   Remember, a top-level splice still requires its argument to be of type ``Q Exp``.
    So then splicing in ``g`` will cause ``m`` to be instantiated to ``Q``::
 
     h :: Int
