@@ -237,7 +237,7 @@ remNatural   (NatJ# n) (NatS# d)   = NatS# (remBigNatWord n d)
 remNatural   (NatJ# n) (NatJ# d)   = bigNatToNatural (remBigNat n d)
 -- {-# CONSTANT_FOLDED remNatural #-}
 
--- | @since 4.X.0.0
+-- | @since 4.12.0.0
 naturalToInteger :: Natural -> Integer
 naturalToInteger (NatS# w)  = wordToInteger w
 naturalToInteger (NatJ# bn) = Jp# bn
