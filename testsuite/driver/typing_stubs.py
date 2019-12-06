@@ -1,5 +1,5 @@
-# Stub definitions for things provided by the typing package
-# for use by older Python versions.
+# Stub definitions for things provided by the `typing` package for use by older
+# Python versions which don't ship with `typing`.
 
 import collections
 
