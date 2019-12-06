@@ -1,2 +1,2 @@
 data Main.Proxy1 (a_0 :: Main.Id1 k_1) = Main.Proxy1
-data Main.Proxy2 (a_0 :: Main.Id2 * k_1) = Main.Proxy2
+data Main.Proxy2 (a_0 :: Main.Id2 (*) k_1) = Main.Proxy2
