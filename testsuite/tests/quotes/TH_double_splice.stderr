@@ -1,0 +1,7 @@
+
+TH_double_splice.hs:6:12: error:
+    • Top-level splices are not permitted without TemplateHaskell
+    • In the untyped splice: $(error "should not happen")
+      In the untyped splice: $($(error "should not happen"))
+      In the Template Haskell quotation
+        [| $($(error "should not happen")) |]
