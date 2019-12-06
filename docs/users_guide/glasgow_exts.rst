@@ -13107,7 +13107,7 @@ Syntax
 Template Haskell has the following new syntactic constructions. You need to use
 the extension :extension:`TemplateHaskell` to switch these syntactic extensions on.
 Alternatively, the :extension:`TemplateHaskellQuotes` extension can be used to
-enable the quotation subset of Template Haskell (i.e. without splice syntax).
+enable the quotation subset of Template Haskell (i.e. without top-level splices).
 The :extension:`TemplateHaskellQuotes` extension is considered safe under
 :ref:`safe-haskell` while :extension:`TemplateHaskell` is not.
 
