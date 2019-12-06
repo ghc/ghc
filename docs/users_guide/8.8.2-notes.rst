@@ -1,0 +1,85 @@
+.. _release-8-8-2:
+
+Release notes for version 8.8.2
+===============================
+
+GHC 8.8.2 is a minor release intended to fix regressions and minor bugs in the 8.8.1.
+
+Highlights
+----------
+
+- A bug (:ghc-ticket:`17088`) in the compacting garbage collector resulting in
+  segmentations faults under specific circumstances. Note that this may affect
+  user programs even if they did not explicitly request the compacting GC
+  (using the :rts-flag:`-c` RTS flag) since GHC may fallback to compacting
+  collection during times of high memory pressure.
+
+- A code generator bug (:ghc-ticket:`17334`) resulting in GHC panics has been fixed.
+
+- A bug in ``process`` causing builds using ``hsc2hs`` to fail
+  non-deterministically on Windows has been fixed (:ghc-ticket:`17480`)
+
+- A typechecker bug (:ghc-ticket:`12088`) resulting in programs being
+  unexpectedly rejected has been fixed.
+
+- A bug in the implementation of compact normal forms resulting in segmentation
+  faults in some uses of :ghc-ticket:`17044` has been fixed.
+
+- A bug causing GHC to incorrectly complain about incompatible LLVM versions
+  when using GHC 7.0.1 has been fixed.
+
+Known issues
+------------
+
+- A long-standing bug (:ghc-ticket:`16893`) which can cause some applications
+  of ``unsafeCoerce`` to segmentation fault is only partially fixed in this
+  release. This release only avoids this issue in the uses of ``unsafeCoerce``
+  in ``Data.Typeable.Internal``, which was the proximate cause of
+  :ghc-ticket:`16893`.
+
+  However, it is possible that this bug could manifest in user-code using
+  ``unsafeCoerce`` to perform dynamic type checks. See the ticket for details.
+
+Included libraries
+------------------
+
+The package database provided with this distribution also contains a number of
+packages other than GHC itself. See the changelogs provided with these packages
+for further change information.
+
+.. ghc-package-list::
+
+    libraries/array/array.cabal:             Dependency of ``ghc`` library
+    libraries/base/base.cabal:               Core library
+    libraries/binary/binary.cabal:           Dependency of ``ghc`` library
+    libraries/bytestring/bytestring.cabal:   Dependency of ``ghc`` library
+    libraries/Cabal/Cabal/Cabal.cabal:       Dependency of ``ghc-pkg`` utility
+    libraries/containers/containers/containers.cabal:   Dependency of ``ghc`` library
+    libraries/deepseq/deepseq.cabal:         Dependency of ``ghc`` library
+    libraries/directory/directory.cabal:     Dependency of ``ghc`` library
+    libraries/filepath/filepath.cabal:       Dependency of ``ghc`` library
+    compiler/ghc.cabal:                      The compiler itself
+    libraries/ghci/ghci.cabal:               The REPL interface
+    libraries/ghc-boot/ghc-boot.cabal:       Internal compiler library
+    libraries/ghc-boot-th/ghc-boot-th.cabal: Internal compiler library
+    libraries/ghc-compact/ghc-compact.cabal: Core library
+    libraries/ghc-heap/ghc-heap.cabal:       GHC heap-walking library
+    libraries/ghc-prim/ghc-prim.cabal:       Core library
+    libraries/haskeline/haskeline.cabal:     Dependency of ``ghci`` executable
+    libraries/hpc/hpc.cabal:                 Dependency of ``hpc`` executable
+    libraries/integer-gmp/integer-gmp.cabal: Core library
+    libraries/libiserv/libiserv.cabal:       Internal compiler library
+    libraries/mtl/mtl.cabal:                 Dependency of ``Cabal`` library
+    libraries/parsec/parsec.cabal:           Dependency of ``Cabal`` library
+    libraries/process/process.cabal:         Dependency of ``ghc`` library
+    libraries/pretty/pretty.cabal:           Dependency of ``ghc`` library
+    libraries/stm/stm.cabal:                 Dependency of ``haskeline`` library
+    libraries/template-haskell/template-haskell.cabal:     Core library
+    libraries/terminfo/terminfo.cabal:       Dependency of ``haskeline`` library
+    libraries/text/text.cabal:               Dependency of ``Cabal`` library
+    libraries/time/time.cabal:               Dependency of ``ghc`` library
+    libraries/transformers/transformers.cabal: Dependency of ``ghc`` library
+    libraries/unix/unix.cabal:               Dependency of ``ghc`` library
+    libraries/Win32/Win32.cabal:             Dependency of ``ghc`` library
+    libraries/xhtml/xhtml.cabal:             Dependency of ``haddock`` executable
+
