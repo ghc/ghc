@@ -1449,9 +1449,9 @@ varsym_prefix :: Action
 varsym_prefix = sym $ \exts s ->
   if | TypeApplicationsBit `xtest` exts, s == fsLit "@"
      -> return ITtypeApp
-     | ThBit `xtest` exts, s == fsLit "$"
+     | ThQuotesBit `xtest` exts, s == fsLit "$"
      -> return ITdollar
-     | ThBit `xtest` exts, s == fsLit "$$"
+     | ThQuotesBit `xtest` exts, s == fsLit "$$"
      -> return ITdollardollar
      | s == fsLit "!" -> return ITbang
      | s == fsLit "~" -> return ITtilde
@@ -2785,7 +2785,7 @@ srcParseErr options buf len
         last100 = decodePrevNChars 100 buf
         doInLast100 = "do" `isInfixOf` last100
         mdoInLast100 = "mdo" `isInfixOf` last100
-        th_enabled = ThBit `xtest` pExtsBitmap options
+        th_enabled = ThQuotesBit `xtest` pExtsBitmap options
         ps_enabled = PatternSynonymsBit `xtest` pExtsBitmap options
 
 -- Report a parse failure, giving the span of the previous token as

@@ -1,0 +1,4 @@
+
+TTH_top_splice.hs:6:7: error:
+    • Top-level splices are not permitted without TemplateHaskell
+    • In the typed splice: $$([|| 1 ||])
