@@ -62,7 +62,7 @@ Language
 
 - GHC now parses visible, dependent quantifiers (as proposed in
   `GHC proposal 35
-  <https://github.com/ghc-proposals/ghc-proposals/blob/master/proposals/0035-forall-arrow.rst>`__),
+  <https://github.com/ghc-proposals/ghc-proposals/blob/master/proposals/0081-forall-arrow.rst>`__),
   such as the following: ::
 
     data Proxy :: forall k -> k -> Type
@@ -142,7 +142,7 @@ Language
   enable :ghc-flag:`-XRankNTypes` in ``B`` to accept the inferred type signature.
 
 - Type family dependencies (also known as injective type families)
-  sometimes now need ``-XUndecidableInstances`` in order to be
+  sometimes now need :ghc-flag:`-XUndecidableInstances` in order to be
   accepted. Here is an example::
 
     type family F1 a = r | r -> a
@@ -150,7 +150,7 @@ Language
     type instance F2 [a] = Maybe (F1 a)
 
   Because GHC needs to look under a type family to see that ``a`` is determined
-  by the right-hand side of ``F2``\'s equation, this now needs ``-XUndecidableInstances``.
+  by the right-hand side of ``F2``\'s equation, this now needs :ghc-flag:`-XUndecidableInstances`.
   The problem is very much akin to its need to detect some functional dependencies.
     
 Compiler
@@ -161,7 +161,7 @@ Compiler
   redundant or unused uses of a record wildcard match.
 
 - Calls to ``memset`` and ``memcpy`` are now unrolled more aggressively
-  and the produced code is more efficient on `x86_64` with added
+  and the produced code is more efficient on x86-64 with added
   support for 64-bit ``MOV``\s. In particular, ``setByteArray#`` and
   ``copyByteArray#`` calls that were not optimized before, now will
   be. See :ghc-ticket:`16052`.
@@ -183,8 +183,8 @@ Compiler
   the sample start event contains a timestamp of when the census occurred.
   The retainer profiling events are emitted using the standard events.
 
-- The eventlog now logs the cost centre stack on each sample. This enables
-  the ``.prof`` file to be partially reconstructed from the eventlog.
+- The eventlog now records the cost centre stack on each profiler sample. This
+  enables the ``.prof`` file to be partially reconstructed from the eventlog.
 
 - Add new flag :ghc-flag:`-fkeep-going` which makes the compiler
   continue as far as it can despite errors.
@@ -194,8 +194,8 @@ Compiler
   will be removed in a later version of GHC.
 
 - Windows bindist has been updated to GCC 9.2 and binutils 2.32.  These binaries have
-  been patched to no longer have have the MAX_PATH limit.  Windows users should no longer
-  have any issues with long path names.
+  been patched to no longer have have the ``MAX_PATH`` limit.  Windows users
+  should no longer have any issues with long path names.
 
 - Introduce ``DynFlags`` plugins, that allow users to modidy the ``DynFlags``
   that GHC is going to use when processing a set of files, from plugins.
