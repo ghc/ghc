@@ -47,6 +47,8 @@ import Maybes
 import Util
 import FastString
 import Outputable
+import Data.Function ( on )
+import DynFlags
 
 import Control.Monad ( unless, void )
 import Control.Arrow ( first )
