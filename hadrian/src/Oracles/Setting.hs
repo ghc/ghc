@@ -242,7 +242,7 @@ ghcWithInterpreter = do
                           , "freebsd", "dragonfly", "netbsd", "openbsd"
                           , "darwin", "kfreebsdgnu" ]
     goodArch <- anyTargetArch [ "i386", "x86_64", "powerpc", "sparc"
-                              , "sparc64", "arm", "s390x" ]
+                              , "sparc64", "arm", "aarch64", "s390x" ]
     return $ goodOs && goodArch
 
 -- | Check to use @libffi@ for adjustors.
