@@ -477,7 +477,7 @@ lockCAF (StgRegTable *reg, StgIndStatic *caf)
     // Secondly I think static thunks can't have payload: anything that they
     // reference should be in SRTs
     ASSERT(orig_info_tbl->layout.payload.ptrs == 0);
-    // Becuase the payload is empty we just push the SRT
+    // Because the payload is empty we just push the SRT
     IF_NONMOVING_WRITE_BARRIER_ENABLED {
         StgThunkInfoTable *thunk_info = itbl_to_thunk_itbl(orig_info_tbl);
         if (thunk_info->i.srt) {
