@@ -1,6 +1,6 @@
 cabal-version:        2.2
 name:                 haddock-library
-version:              1.8.0
+version:              1.8.0.1
 synopsis:             Library exposing some functionality of Haddock.
 
 description:          Haddock is a documentation-generation tool for Haskell
@@ -49,6 +49,7 @@ library
     Documentation.Haddock.Types
 
   other-modules:
+    CompatPrelude
     Documentation.Haddock.Parser.Util
     Documentation.Haddock.Parser.Monad
     Documentation.Haddock.Parser.Identifier

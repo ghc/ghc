@@ -29,7 +29,6 @@ import qualified Data.Text as T
 import           Data.Text                   ( Text )
 
 import           Control.Monad               ( mfilter )
-import           Data.Functor                ( ($>) )
 import           Data.String                 ( IsString(..) )
 import           Data.Bits                   ( Bits(..) )
 import           Data.Char                   ( ord )
@@ -37,7 +36,9 @@ import           Data.List                   ( foldl' )
 import           Control.Applicative as App
 
 import           Documentation.Haddock.Types ( Version )
+
 import           Prelude hiding (takeWhile)
+import           CompatPrelude
 
 -- | The only bit of information we really care about truding along with us
 -- through parsing is the version attached to a @\@since@ annotation - if

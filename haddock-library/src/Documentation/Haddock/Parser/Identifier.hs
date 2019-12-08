@@ -1,4 +1,3 @@
-{-# LANGUAGE CPP          #-}
 {-# LANGUAGE BangPatterns #-}
 {-# LANGUAGE ViewPatterns #-}
 -- |
@@ -29,15 +28,8 @@ import qualified Data.Text as T
 
 import           Data.Char (isAlpha, isAlphaNum)
 import Control.Monad (guard)
-import Data.Functor (($>))
-#if MIN_VERSION_base(4,9,0)
-import           Text.Read.Lex                      (isSymbolChar)
-#else
-import           Data.Char                          (GeneralCategory (..),
-                                                     generalCategory)
-#endif
-
 import Data.Maybe
+import CompatPrelude
 
 -- | Identifier string surrounded with namespace, opening, and closing quotes/backticks.
 data Identifier = Identifier !Namespace !Char String !Char
@@ -56,24 +48,6 @@ parseValid = do
           s' = s{ stateInput = inp', statePos = posCl }
       in setParserState s' $> Identifier ns op (T.unpack ident) cl
 
-
-#if !MIN_VERSION_base(4,9,0)
--- inlined from base-4.10.0.0
-isSymbolChar :: Char -> Bool
-isSymbolChar c = not (isPuncChar c) && case generalCategory c of
-    MathSymbol           -> True
-    CurrencySymbol       -> True
-    ModifierSymbol       -> True
-    OtherSymbol          -> True
-    DashPunctuation      -> True
-    OtherPunctuation     -> c `notElem` "'\""
-    ConnectorPunctuation -> c /= '_'
-    _                    -> False
-  where
-    -- | The @special@ character class as defined in the Haskell Report.
-    isPuncChar :: Char -> Bool
-    isPuncChar = (`elem` (",;()[]{}`" :: String))
-#endif
 
 -- | Try to parse a delimited identifier off the front of the given input.
 --
