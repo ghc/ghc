@@ -305,7 +305,7 @@ sortByLoc = sortOn getLoc
 -- | Collect docs and attach them to the right declarations.
 --
 -- A declaration may have multiple doc strings attached to it.
-collectDocs :: [LHsDecl pass] -> [(LHsDecl pass, [HsDocString])]
+collectDocs :: [LHsDecl (GhcPass p)] -> [(LHsDecl (GhcPass p), [HsDocString])]
 -- ^ This is an example.
 collectDocs = go [] Nothing
   where
@@ -321,7 +321,7 @@ collectDocs = go [] Nothing
     finished decl docs rest = (decl, reverse docs) : rest
 
 -- | Filter out declarations that we don't handle in Haddock
-filterDecls :: [(LHsDecl a, doc)] -> [(LHsDecl a, doc)]
+filterDecls :: [(LHsDecl (GhcPass p), doc)] -> [(LHsDecl (GhcPass p), doc)]
 filterDecls = filter (isHandled . unLoc . fst)
   where
     isHandled (ForD _ (ForeignImport {})) = True
@@ -336,7 +336,7 @@ filterDecls = filter (isHandled . unLoc . fst)
 
 
 -- | Go through all class declarations and filter their sub-declarations
-filterClasses :: [(LHsDecl a, doc)] -> [(LHsDecl a, doc)]
+filterClasses :: [(LHsDecl (GhcPass p), doc)] -> [(LHsDecl (GhcPass p), doc)]
 filterClasses = map (first (mapLoc filterClass))
   where
     filterClass (TyClD x c@(ClassDecl {})) =
