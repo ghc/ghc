@@ -44,14 +44,17 @@ data MetaDoc mod id =
           } deriving (Eq, Show, Functor, Foldable, Traversable)
 
 #if MIN_VERSION_base(4,8,0)
+-- | __NOTE__: Only defined for @base >= 4.8.0@
 instance Bifunctor MetaDoc where
   bimap f g (MetaDoc m d) = MetaDoc m (bimap f g d)
 #endif
 
 #if MIN_VERSION_base(4,10,0)
+-- | __NOTE__: Only defined for @base >= 4.10.0@
 instance Bifoldable MetaDoc where
   bifoldr f g z d = bifoldr f g z (_doc d)
 
+-- | __NOTE__: Only defined for @base >= 4.10.0@
 instance Bitraversable MetaDoc where
   bitraverse f g (MetaDoc m d) = MetaDoc m <$> bitraverse f g d
 #endif
@@ -131,6 +134,7 @@ data DocH mod id
   deriving (Eq, Show, Functor, Foldable, Traversable)
 
 #if MIN_VERSION_base(4,8,0)
+-- | __NOTE__: Only defined for @base >= 4.8.0@
 instance Bifunctor DocH where
   bimap _ _ DocEmpty = DocEmpty
   bimap f g (DocAppend docA docB) = DocAppend (bimap f g docA) (bimap f g docB)
@@ -159,6 +163,7 @@ instance Bifunctor DocH where
 #endif
 
 #if MIN_VERSION_base(4,10,0)
+-- | __NOTE__: Only defined for @base >= 4.10.0@
 instance Bifoldable DocH where
   bifoldr f g z (DocAppend docA docB) = bifoldr f g (bifoldr f g z docA) docB
   bifoldr f g z (DocParagraph doc) = bifoldr f g z doc
@@ -176,6 +181,7 @@ instance Bifoldable DocH where
   bifoldr f g z (DocTable (Table header body)) = foldr (\r acc -> foldr (flip (bifoldr f g)) acc r) (foldr (\r acc -> foldr (flip (bifoldr f g)) acc r) z body) header
   bifoldr _ _ z _ = z
 
+-- | __NOTE__: Only defined for @base >= 4.10.0@
 instance Bitraversable DocH where
   bitraverse _ _ DocEmpty = pure DocEmpty
   bitraverse f g (DocAppend docA docB) = DocAppend <$> bitraverse f g docA <*> bitraverse f g docB
