@@ -98,6 +98,7 @@ import {-# SOURCE #-} GHC.Hs.Expr( HsExpr, HsSplice, pprExpr,
 import GHC.Hs.Binds
 import GHC.Hs.Types
 import GHC.Hs.Doc
+import GHC.Hs.Extension
 import TyCon
 import BasicTypes
 import Coercion
@@ -124,7 +125,7 @@ import Data.Data        hiding (TyCon,Fixity, Infix)
 ************************************************************************
 -}
 
-type LHsDecl p = Located (HsDecl p)
+type LHsDecl p = XRec p HsDecl
         -- ^ When in a list this may have
         --
         --  - 'ApiAnnotation.AnnKeywordId' : 'ApiAnnotation.AnnSemi'
