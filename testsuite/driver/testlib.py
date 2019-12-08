@@ -1241,7 +1241,7 @@ def extras_build( way, extra_mods, extra_hc_opts ):
 
     return {'passFail' : 'pass', 'hc_opts' : extra_hc_opts}
 
-def simple_build(name: Union[TestName, str],
+def simple_build(name,
                  way: WayName,
                  extra_hc_opts: str,
                  should_fail: bool,
