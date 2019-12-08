@@ -174,7 +174,7 @@ data Width   = W8 | W16 | W32 | W64
 instance Outputable Width where
    ppr rep = ptext (mrStr rep)
 
-mrStr :: Width -> LitString
+mrStr :: Width -> PtrString
 mrStr = sLit . show
 
 
