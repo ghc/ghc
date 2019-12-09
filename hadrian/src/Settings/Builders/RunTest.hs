@@ -93,9 +93,6 @@ runTestBuilderArgs = builder RunTest ? do
     let timeoutProg = root -/- timeoutPath
     statsFilesDir <- expr haddockStatsFilesDir
 
-    -- See #16087
-    let ghcBuiltByLlvm = False -- TODO: Implement this check
-
     let asBool :: String -> Bool -> String
         asBool s b = s ++ show b
 
@@ -128,7 +125,6 @@ runTestBuilderArgs = builder RunTest ? do
 
             , arg "-e", arg $ "config.ghc_dynamic_by_default=" ++ show hasDynamicByDefault
             , arg "-e", arg $ "config.ghc_dynamic=" ++ show hasDynamic
-            , arg "-e", arg $ "config.ghc_built_by_llvm=" ++ show ghcBuiltByLlvm
 
             , arg "-e", arg $ "config.top=" ++ show (top -/- "testsuite")
             , arg "-e", arg $ "config.wordsize=" ++ show wordsize
