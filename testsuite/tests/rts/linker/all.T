@@ -56,17 +56,27 @@ def checkDynAsm(actual_file, normaliser):
 # separately now.
 # These should have extra_clean() arguments, but I need
 # to somehow extract out the name of DLLs to do that
-test('T5435_v_asm_a', [extra_files(['T5435.hs', 'T5435_asm.c']), req_rts_linker],
+test('T5435_v_asm_a',
+     [extra_files(['T5435.hs', 'T5435_asm.c']),
+      req_rts_linker,
+      when(arch('arm'), expect_broken(17559))],
      makefile_test, ['T5435_v_asm_a'])
 # this one just needs to run on linux, as darwin/mingw32 are covered
 # by the _a test already.
-test('T5435_v_asm_b', [extra_files(['T5435.hs', 'T5435_asm.c']), req_rts_linker,
-                       when(opsys('darwin') or opsys('mingw32'), skip)],
+test('T5435_v_asm_b',
+     [extra_files(['T5435.hs', 'T5435_asm.c']),
+      req_rts_linker,
+      when(arch('arm'), expect_broken(17559)),
+      when(opsys('darwin') or opsys('mingw32'), skip)],
      makefile_test, ['T5435_v_asm_b'])
-test('T5435_v_gcc', [extra_files(['T5435.hs', 'T5435_gcc.c']), req_rts_linker],
+test('T5435_v_gcc',
+     [extra_files(['T5435.hs', 'T5435_gcc.c']),
+      req_rts_linker,
+      when(arch('arm'), expect_broken(17559))],
      makefile_test, ['T5435_v_gcc'])
-test('T5435_dyn_asm', [extra_files(['T5435.hs', 'T5435_asm.c']),
-                       check_stdout(checkDynAsm)],
+test('T5435_dyn_asm',
+     [extra_files(['T5435.hs', 'T5435_asm.c']),
+      check_stdout(checkDynAsm)],
      makefile_test, ['T5435_dyn_asm'])
 test('T5435_dyn_gcc', extra_files(['T5435.hs', 'T5435_gcc.c']) , makefile_test, ['T5435_dyn_gcc'])
 
