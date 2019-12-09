@@ -54,9 +54,11 @@ class Binary a where
   put :: a -> Put ()
   get :: Get a
 
+  {-# INLINE put #-}
   default put :: (Generic a, GBinary (Rep a)) => a -> Put ()
   put = gput . from
 
+  {-# INLINE get #-}
   default get :: (Generic a, GBinary (Rep a)) => Get a
   get = to <$> gget
 
@@ -64,24 +66,29 @@ class Binary a where
 -- Convenience functions
 -- -----------------------------------------------------------------------------
 
+{-# INLINE encode #-}
 encode :: Binary a => a -> BinData
 encode = runPut . put
 
+{-# INLINE decode #-}
 decode :: Binary a => BinData -> a
 decode bd = runGet bd get
 
 -- Put the argument at the specified pointer, leaving the current index
 -- at the location after that.
+{-# INLINE putAt #-}
 putAt :: Binary a => Bin a -> a -> Put ()
 putAt ptr x = seekP ptr >> put x
 
 -- Get data from the specified pointer, leaving the current index at the
 -- location after that.
+{-# INLINE getAt #-}
 getAt :: Binary a => Bin a -> Get a
 getAt ptr = seekG ptr >> get
 
 -- Put the argument at the specified pointer, and return to the current
 -- location afterwards.
+{-# INLINE putTo #-}
 putTo :: Binary a => Bin a -> a -> Put ()
 putTo ptr x = do
   here <- tellP
@@ -91,6 +98,7 @@ putTo ptr x = do
 
 -- Get data from the specified pointer, and return to the current location
 -- afterwards.
+{-# INLINE getFrom #-}
 getFrom :: Binary a => Bin a -> Get a
 getFrom ptr = do
   here <- tellG
@@ -103,6 +111,7 @@ getFrom ptr = do
 -- Lazy reading and writing
 -- -----------------------------------------------------------------------------
 
+{-# INLINE lazyPut #-}
 lazyPut :: Binary a => a -> Put ()
 lazyPut a = do
   p_a <- tellP
@@ -112,6 +121,7 @@ lazyPut a = do
   putAt p_a q
   seekP q
 
+{-# INLINE lazyGet #-}
 lazyGet :: Binary a => Get a
 lazyGet = do
   p   <- get
@@ -129,23 +139,33 @@ class GBinary (f :: * -> *) where
   gget :: Get (f a)
 
 instance GBinary U1 where
+  {-# INLINE gput #-}
   gput U1 = return ()
+  {-# INLINE gget #-}
   gget    = return U1
 
 instance GBinary a => GBinary (M1 i c a) where
+  {-# INLINE gput #-}
   gput (M1 x) = gput x
+  {-# INLINE gget #-}
   gget        = M1 <$> gget
 
 instance Binary a => GBinary (K1 i a) where
+  {-# INLINE gput #-}
   gput (K1 x) = put x
+  {-# INLINE gget #-}
   gget        = K1 <$> get
 
 instance (GBinary a, GBinary b) => GBinary (a :*: b) where
+  {-# INLINE gput #-}
   gput (x :*: y) = gput x >> gput y
+  {-# INLINE gget #-}
   gget           = (:*:) <$> gget <*> gget
 
 instance (GSumBinary (a :+: b)) => GBinary (a :+: b) where
+  {-# INLINE gput #-}
   gput = gsput (maxIndex @(a :+: b))
+  {-# INLINE gget #-}
   gget = gsget =<< get
 
 class KnownNat (SumSize f) => GSumBinary (f :: * -> *) where
@@ -156,19 +176,25 @@ class KnownNat (SumSize f) => GSumBinary (f :: * -> *) where
 instance (GSumBinary a, GSumBinary b, KnownNat (SumSize (a :+: b)))
        => GSumBinary (a :+: b) where
   type SumSize (a :+: b) = SumSize a + SumSize b
+  {-# INLINE gsput #-}
   gsput n (L1 x) = gsput (n - sumSize @b) x
   gsput n (R1 x) = gsput  n               x
+  {-# INLINE gsget #-}
   gsget n | n <= maxIndex @a = L1 <$> gsget  n
           | otherwise        = R1 <$> gsget (n - sumSize @a)
 
 instance GBinary (M1 i c a) => GSumBinary (M1 i c a) where
   type SumSize (M1 i c a) = 1
+  {-# INLINE gsput #-}
   gsput n x = put n >> gput x
+  {-# INLINE gsget #-}
   gsget _   = gget
 
+{-# INLINE sumSize #-}
 sumSize :: forall f. GSumBinary f => Int8
 sumSize = fromIntegral $ natVal' (proxy# :: Proxy# (SumSize f))
 
+{-# INLINE maxIndex #-}
 maxIndex :: forall f. GSumBinary f => Int8
 maxIndex = sumSize @f - 1
 
@@ -177,25 +203,35 @@ maxIndex = sumSize @f - 1
 -- -----------------------------------------------------------------------------
 
 instance Binary () where
-    put () = return ()
-    get    = return ()
+  {-# INLINE put #-}
+  put () = return ()
+  {-# INLINE get #-}
+  get    = return ()
 
 instance Binary Bool where
-    put b = putByte (fromIntegral (fromEnum b))
-    get   = do x <- getWord8; return $! (toEnum (fromIntegral x))
+  {-# INLINE put #-}
+  put b = putByte (fromIntegral (fromEnum b))
+  {-# INLINE get #-}
+  get   = do x <- getWord8; return $! (toEnum (fromIntegral x))
 
 instance Binary Char where
+  {-# INLINE put #-}
   put c = put (fromIntegral (ord c) :: Word32)
+  {-# INLINE get #-}
   get   = do x <- get; return $! chr (fromIntegral (x :: Word32))
 
 instance Binary Int where
+  {-# INLINE put #-}
   put = putInt
+  {-# INLINE get #-}
   get = getInt
 
 instance Binary a => Binary [a] where
+  {-# INLINE put #-}
   put xs = do
     put (length xs)
     mapM_ put xs
+  {-# INLINE get #-}
   get = do
     loop =<< (get :: Get Int)
     where
@@ -203,152 +239,202 @@ instance Binary a => Binary [a] where
       loop n = (:) <$> get <*> loop (pred n)
 
 instance (Ix a, Binary a, Binary b) => Binary (Array a b) where
-    put arr = do
-        put $ bounds arr
-        put $ elems arr
-    get = do
-        bounds <- get
-        xs <- get
-        return $ listArray bounds xs
+  {-# INLINE put #-}
+  put arr = do
+      put $ bounds arr
+      put $ elems arr
+  {-# INLINE get #-}
+  get = do
+      bounds <- get
+      xs <- get
+      return $ listArray bounds xs
 
 instance (Binary a, Binary b) => Binary (a,b) where
-    put (a,b) = do put a; put b
-    get       = do a <- get
-                   b <- get
-                   return (a,b)
+  {-# INLINE put #-}
+  put (a,b) = do put a; put b
+  {-# INLINE get #-}
+  get       = do a <- get
+                 b <- get
+                 return (a,b)
 
 instance (Binary a, Binary b, Binary c) => Binary (a,b,c) where
-    put (a,b,c) = do put a; put b; put c
-    get         = do a <- get
-                     b <- get
-                     c <- get
-                     return (a,b,c)
+  {-# INLINE put #-}
+  put (a,b,c) = do put a; put b; put c
+  {-# INLINE get #-}
+  get         = do a <- get
+                   b <- get
+                   c <- get
+                   return (a,b,c)
 
 instance (Binary a, Binary b, Binary c, Binary d) => Binary (a,b,c,d) where
-    put (a,b,c,d) = do put a; put b; put c; put d
-    get           = do a <- get
-                       b <- get
-                       c <- get
-                       d <- get
-                       return (a,b,c,d)
+  {-# INLINE put #-}
+  put (a,b,c,d) = do put a; put b; put c; put d
+  {-# INLINE get #-}
+  get           = do a <- get
+                     b <- get
+                     c <- get
+                     d <- get
+                     return (a,b,c,d)
 
 instance (Binary a, Binary b, Binary c, Binary d, Binary e) => Binary (a,b,c,d, e) where
-    put (a,b,c,d, e) = do put a; put b; put c; put d; put e;
-    get              = do a <- get
-                          b <- get
-                          c <- get
-                          d <- get
-                          e <- get
-                          return (a,b,c,d,e)
+  {-# INLINE put #-}
+  put (a,b,c,d, e) = do put a; put b; put c; put d; put e;
+  {-# INLINE get #-}
+  get              = do a <- get
+                        b <- get
+                        c <- get
+                        d <- get
+                        e <- get
+                        return (a,b,c,d,e)
 
 instance (Binary a, Binary b, Binary c, Binary d, Binary e, Binary f) => Binary (a,b,c,d, e, f) where
-    put (a,b,c,d, e, f) = do put a; put b; put c; put d; put e; put f;
-    get                 = do a <- get
-                             b <- get
-                             c <- get
-                             d <- get
-                             e <- get
-                             f <- get
-                             return (a,b,c,d,e,f)
+  {-# INLINE put #-}
+  put (a,b,c,d, e, f) = do put a; put b; put c; put d; put e; put f;
+  {-# INLINE get #-}
+  get                 = do a <- get
+                           b <- get
+                           c <- get
+                           d <- get
+                           e <- get
+                           f <- get
+                           return (a,b,c,d,e,f)
 
 instance (Binary a, Binary b, Binary c, Binary d, Binary e, Binary f, Binary g) => Binary (a,b,c,d,e,f,g) where
-    put (a,b,c,d,e,f,g) = do put a; put b; put c; put d; put e; put f; put g
-    get                 = do a <- get
-                             b <- get
-                             c <- get
-                             d <- get
-                             e <- get
-                             f <- get
-                             g <- get
-                             return (a,b,c,d,e,f,g)
+  {-# INLINE put #-}
+  put (a,b,c,d,e,f,g) = do put a; put b; put c; put d; put e; put f; put g
+  {-# INLINE get #-}
+  get                 = do a <- get
+                           b <- get
+                           c <- get
+                           d <- get
+                           e <- get
+                           f <- get
+                           g <- get
+                           return (a,b,c,d,e,f,g)
 
 instance Binary a => Binary (Maybe a) where
-    put Nothing  = putByte 0
-    put (Just a) = do putByte 1; put a
-    get          = do h <- getWord8
-                      case h of
-                        0 -> return Nothing
-                        _ -> do x <- get; return (Just x)
+  {-# INLINE put #-}
+  put Nothing  = putByte 0
+  put (Just a) = do putByte 1; put a
+  {-# INLINE get #-}
+  get          = do h <- getWord8
+                    case h of
+                      0 -> return Nothing
+                      _ -> do x <- get; return (Just x)
 
 instance (Binary a, Binary b) => Binary (Either a b) where
-    put (Left  a) = do putByte 0; put a
-    put (Right b) = do putByte 1; put b
-    get           = do h <- getWord8
-                       case h of
-                         0 -> do a <- get; return (Left a)
-                         _ -> do b <- get; return (Right b)
+  {-# INLINE put #-}
+  put (Left  a) = do putByte 0; put a
+  put (Right b) = do putByte 1; put b
+  {-# INLINE get #-}
+  get           = do h <- getWord8
+                     case h of
+                       0 -> do a <- get; return (Left a)
+                       _ -> do b <- get; return (Right b)
 
 instance Binary UTCTime where
-    put u = do put (utctDay u)
-               put (utctDayTime u)
-    get = do day <- get
-             dayTime <- get
-             return $ UTCTime { utctDay = day, utctDayTime = dayTime }
+  {-# INLINE put #-}
+  put u = do put (utctDay u)
+             put (utctDayTime u)
+  {-# INLINE get #-}
+  get = do day <- get
+           dayTime <- get
+           return $ UTCTime { utctDay = day, utctDayTime = dayTime }
 
 instance Binary Day where
-    put d = put (toModifiedJulianDay d)
-    get = do i <- get
-             return $ ModifiedJulianDay { toModifiedJulianDay = i }
+  {-# INLINE put #-}
+  put d = put (toModifiedJulianDay d)
+  {-# INLINE get #-}
+  get = do i <- get
+           return $ ModifiedJulianDay { toModifiedJulianDay = i }
 
 instance Binary DiffTime where
-    put dt = put (toRational dt)
-    get = do r <- get
-             return $ fromRational r
+  {-# INLINE put #-}
+  put dt = put (toRational dt)
+  {-# INLINE get #-}
+  get = do r <- get
+           return $ fromRational r
 
 instance (Binary a) => Binary (Ratio a) where
-    put (a :% b) = do put a; put b
-    get = do a <- get; b <- get; return (a :% b)
+  {-# INLINE put #-}
+  put (a :% b) = do put a; put b
+  {-# INLINE get #-}
+  get = do a <- get; b <- get; return (a :% b)
 
 -- -----------------------------------------------------------------------------
 -- Primitives
 -- -----------------------------------------------------------------------------
 
 instance Binary Word8 where
+  {-# INLINE put #-}
   put !w = putWord8 w
+  {-# INLINE get #-}
   get    = getWord8
 
 instance Binary Word16 where
+  {-# INLINE put #-}
   put = putULEB128
+  {-# INLINE get #-}
   get = getULEB128
 
 instance Binary Word32 where
+  {-# INLINE put #-}
   put = putULEB128
+  {-# INLINE get #-}
   get = getULEB128
 
 instance Binary Word64 where
+  {-# INLINE put #-}
   put = putULEB128
+  {-# INLINE get #-}
   get = getULEB128
 
 instance Binary Int8 where
+  {-# INLINE put #-}
   put w = put (fromIntegral w :: Word8)
+  {-# INLINE get #-}
   get   = do w <- get; return $! (fromIntegral (w :: Word8))
 
 instance Binary Int16 where
+  {-# INLINE put #-}
   put = putSLEB128
+  {-# INLINE get #-}
   get = getSLEB128
 
 instance Binary Int32 where
+  {-# INLINE put #-}
   put = putSLEB128
+  {-# INLINE get #-}
   get = getSLEB128
 
 instance Binary Int64 where
+  {-# INLINE put #-}
   put = putSLEB128
+  {-# INLINE get #-}
   get = getSLEB128
 
 instance Binary FastString where
+  {-# INLINE put #-}
   put = putAFastString
+  {-# INLINE get #-}
   get = getAFastString
 
 instance Binary (Bin a) where
-  get = getBin
+  {-# INLINE put #-}
   put = putBin
+  {-# INLINE get #-}
+  get = getBin
 
 instance Binary Strict.ByteString where
+  {-# INLINE put #-}
   put = putByteString
+  {-# INLINE get #-}
   get = getByteString
 
 instance Binary Lazy.ByteString where
+  {-# INLINE put #-}
   put = put . Lazy.toStrict
+  {-# INLINE get #-}
   get = Lazy.fromStrict <$> get
 
 -- -----------------------------------------------------------------------------
@@ -400,6 +486,7 @@ The instance is used for in Binary Integer and Binary Rational in basicTypes/Lit
 -}
 
 instance Binary Integer where
+    {-# INLINE put #-}
     put i
       | i >= lo64 && i <= hi64 = do
           putWord8 0
@@ -412,6 +499,7 @@ instance Binary Integer where
       where
         lo64 = fromIntegral (minBound :: Int64)
         hi64 = fromIntegral (maxBound :: Int64)
+    {-# INLINE get #-}
     get = do
       int_kind <- getWord8
       case int_kind of
