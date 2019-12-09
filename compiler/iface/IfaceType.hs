@@ -1311,7 +1311,7 @@ pprTyTcApp' ctxt_prec tc tys dflags style
   | tc `ifaceTyConHasKey` tYPETyConKey
   , IA_Arg (IfaceTyConApp rep IA_Nil) Required IA_Nil <- tys
   , rep `ifaceTyConHasKey` liftedRepDataConKey
-  = kindType
+  = ppr_kind_type ctxt_prec
 
   | otherwise
   = getPprDebug $ \dbg ->
@@ -1327,6 +1327,14 @@ pprTyTcApp' ctxt_prec tc tys dflags style
   where
     info = ifaceTyConInfo tc
     tys_wo_kinds = appArgsIfaceTypesArgFlags $ stripInvisArgs dflags tys
+
+ppr_kind_type :: PprPrec -> SDoc
+ppr_kind_type ctxt_prec =
+  sdocWithDynFlags $ \dflags ->
+    if useStarIsType dflags
+    then maybeParen ctxt_prec starPrec $
+         unicodeSyntax (char '★') (char '*')
+    else text "Type"
 
 -- | Pretty-print a type-level equality.
 -- Returns (Just doc) if the argument is a /saturated/ application
@@ -1436,7 +1444,7 @@ ppr_iface_tc_app pp _ tc [ty]
 
 ppr_iface_tc_app pp ctxt_prec tc tys
   | tc `ifaceTyConHasKey` liftedTypeKindTyConKey
-  = kindType
+  = ppr_kind_type ctxt_prec
 
   | not (isSymOcc (nameOccName (ifaceTyConName tc)))
   = pprIfacePrefixApp ctxt_prec (ppr tc) (map (pp appPrec) tys)

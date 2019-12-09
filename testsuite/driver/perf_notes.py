@@ -23,6 +23,7 @@ from collections import namedtuple
 from math import ceil, trunc
 
 from testutil import passed, failBecause, testing_metrics
+from term_color import Color, colored
 
 from my_typing import *
 
@@ -70,10 +71,26 @@ Baseline = NamedTuple('Baseline', [('perfStat', PerfStat),
                                    ('commitDepth', int)])
 
 class MetricChange(Enum):
+    # The metric appears to have no baseline and is presumably a new test.
     NewMetric = 'NewMetric'
+
+    # The metric has not changed.
     NoChange = 'NoChange'
+
+    # The metric increased.
     Increase = 'Increase'
+
+    # The metric decreased.
     Decrease = 'Decrease'
+
+    def __str__(self):
+        strings = {
+            MetricChange.NewMetric: colored(Color.BLUE,  "new"),
+            MetricChange.NoChange:  colored(Color.WHITE, "unchanged"),
+            MetricChange.Increase:  colored(Color.RED,   "increased"),
+            MetricChange.Decrease:  colored(Color.GREEN, "decreased")
+        }
+        return strings[self]
 
 AllowedPerfChange = NamedTuple('AllowedPerfChange',
                                [('direction', MetricChange),
@@ -188,7 +205,7 @@ def parse_allowed_perf_changes(commitMsg: str
 # Calculates a suggested string to append to the git commit in order to accept the
 # given changes.
 # changes: [(MetricChange, PerfStat)]
-def allow_changes_string(changes: List[Tuple[MetricChange, PerfStat, Any]]
+def allow_changes_string(changes: List[Tuple[MetricChange, PerfStat]]
                          ) -> str:
     Dec = MetricChange.Decrease
     Inc = MetricChange.Increase
@@ -198,7 +215,7 @@ def allow_changes_string(changes: List[Tuple[MetricChange, PerfStat, Any]]
 
     # Map tests to a map from change direction to metrics.
     test_to_dir_to_metrics = {} # type: Dict[TestName, Dict[MetricChange, List[MetricName]]]
-    for (change, perf_stat, _baseline) in changes:
+    for (change, perf_stat) in changes:
         change_dir_to_metrics = test_to_dir_to_metrics.setdefault(perf_stat.test, { Inc: [], Dec: [] })
         change_dir_to_metrics[change].append(perf_stat.metric)
 
@@ -555,7 +572,7 @@ def check_stats_change(actual: PerfStat,
     # Print errors and create pass/fail object.
     result = passed()
     if not change_allowed:
-        error = change.value + ' from ' + baseline.perfStat.test_env + \
+        error = str(change) + ' from ' + baseline.perfStat.test_env + \
                 ' baseline @ HEAD~' + str(baseline.commitDepth)
         print(actual.metric, error + ':')
         result = failBecause('stat ' + error, tag='stat')

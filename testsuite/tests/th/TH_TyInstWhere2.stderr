@@ -6,5 +6,5 @@ TH_TyInstWhere2.hs:8:2: warning:
 
 TH_TyInstWhere2.hs:14:2: warning:
     type family F1_0 (a_1 :: k_2) :: * where
-    F1_0 @* GHC.Types.Int = GHC.Types.Bool
+    F1_0 @(*) GHC.Types.Int = GHC.Types.Bool
     F1_0 @GHC.Types.Bool 'GHC.Types.False = GHC.Types.Char

@@ -28,7 +28,7 @@ module Outputable (
         semi, comma, colon, dcolon, space, equals, dot, vbar,
         arrow, larrow, darrow, arrowt, larrowt, arrowtt, larrowtt,
         lparen, rparen, lbrack, rbrack, lbrace, rbrace, underscore,
-        blankLine, forAllLit, kindType, bullet,
+        blankLine, forAllLit, bullet,
         (<>), (<+>), hcat, hsep,
         ($$), ($+$), vcat,
         sep, cat,
@@ -91,7 +91,7 @@ import GhcPrelude
 
 import {-# SOURCE #-}   DynFlags( DynFlags, hasPprDebug, hasNoDebugOutput,
                                   targetPlatform, pprUserLength, pprCols,
-                                  useUnicode, useUnicodeSyntax, useStarIsType,
+                                  useUnicode, useUnicodeSyntax,
                                   shouldUseColor, unsafeGlobalDynFlags,
                                   shouldUseHexWordLiterals )
 import {-# SOURCE #-}   Module( UnitId, Module, ModuleName, moduleName )
@@ -648,12 +648,6 @@ rbrace     = docToSDoc $ Pretty.rbrace
 
 forAllLit :: SDoc
 forAllLit = unicodeSyntax (char '∀') (text "forall")
-
-kindType :: SDoc
-kindType = sdocWithDynFlags $ \dflags ->
-    if useStarIsType dflags
-    then unicodeSyntax (char '★') (char '*')
-    else text "Type"
 
 bullet :: SDoc
 bullet = unicode (char '•') (char '*')
