@@ -142,3 +142,4 @@ test('T17414',
       when(opsys('linux'), skip),
       high_memory_usage],
      compile_and_run, [''])
+test('T17510', expect_broken(17510), compile_and_run, [''])
