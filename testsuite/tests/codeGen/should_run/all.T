@@ -59,6 +59,7 @@ test('cgrun054', normal, compile_and_run, [''])
 test('cgrun055', normal, compile_and_run, [''])
 test('cgrun056', normal, compile_and_run, [''])
 test('cgrun057', [ only_ways(prof_ways),
+                   when(arch('arm'), expect_broken(17554)),
                    extra_run_opts('+RTS -xc') ], compile_and_run, [''])
 test('cgrun058', normal, compile_and_run, [''])
 test('cgrun059', exit_code(1), compile_and_run, [''])
