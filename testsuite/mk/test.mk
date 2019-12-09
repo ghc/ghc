@@ -178,6 +178,7 @@ else
 RUNTEST_OPTS += -e ghc_with_smp=False
 endif
 
+# Does the LLVM backend work?
 ifeq "$(LLC)" ""
 RUNTEST_OPTS += -e ghc_with_llvm=False
 else ifeq "$(TargetARCH_CPP)" "powerpc"
@@ -242,13 +243,6 @@ else ifeq "$(LOCAL)" "NO"
 RUNTEST_OPTS += -e config.local=False
 else
 RUNTEST_OPTS += -e config.local=True
-endif
-
-# Some tests in ext-interp fail when ghc-stage2 is built using LLVM. See #16087
-ifeq "$(findstring llvm,$(BUILD_FLAVOUR))" ""
-RUNTEST_OPTS += -e config.ghc_built_by_llvm=False
-else
-RUNTEST_OPTS += -e config.ghc_built_by_llvm=True
 endif
 
 RUNTEST_OPTS +=  \
