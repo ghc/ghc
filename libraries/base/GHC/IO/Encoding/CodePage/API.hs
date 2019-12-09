@@ -7,6 +7,9 @@ module GHC.IO.Encoding.CodePage.API (
     mkCodePageEncoding
   ) where
 
+-- Required for WORDS_BIGENDIAN
+#include "ghcautoconf.h"
+
 import Foreign.C
 import Foreign.Ptr
 import Foreign.Marshal
