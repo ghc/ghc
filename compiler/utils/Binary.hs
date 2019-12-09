@@ -528,24 +528,31 @@ roll   = foldl' unstep 0 . reverse
 -- -----------------------------------------------------------------------------
 
 instance Binary TyCon where
+    {-# INLINE put #-}
     put tc = do
         put (tyConPackage tc)
         put (tyConModule tc)
         put (tyConName tc)
         put (tyConKindArgs tc)
         put (tyConKindRep tc)
+    {-# INLINE get #-}
     get =
         mkTyCon <$> get <*> get <*> get <*> get <*> get
 
 instance Binary VecCount where
+    {-# INLINE put #-}
     put = putByte . fromIntegral . fromEnum
+    {-# INLINE get #-}
     get = toEnum . fromIntegral <$> getByte
 
 instance Binary VecElem where
+    {-# INLINE put #-}
     put = putByte . fromIntegral . fromEnum
+    {-# INLINE get #-}
     get = toEnum . fromIntegral <$> getByte
 
 instance Binary RuntimeRep where
+    {-# INLINE put #-}
     put (VecRep a b)    = putByte 0 >> put a >> put b
     put (TupleRep reps) = putByte 1 >> put reps
     put (SumRep reps)   = putByte 2 >> put reps
@@ -569,6 +576,7 @@ instance Binary RuntimeRep where
     put Word32Rep       = putByte 17
 #endif
 
+    {-# INLINE get #-}
     get = do
         tag <- getByte
         case tag of
@@ -597,6 +605,7 @@ instance Binary RuntimeRep where
           _  -> fail "Binary.putRuntimeRep: invalid tag"
 
 instance Binary KindRep where
+    {-# INLINE put #-}
     put (KindRepTyConApp tc k) = putByte 0 >> put tc >> put k
     put (KindRepVar bndr) = putByte 1 >> put bndr
     put (KindRepApp a b) = putByte 2 >> put a >> put b
@@ -604,6 +613,7 @@ instance Binary KindRep where
     put (KindRepTYPE r) = putByte 4 >> put r
     put (KindRepTypeLit sort r) = putByte 5 >> put sort >> put r
 
+    {-# INLINE get #-}
     get = do
         tag <- getByte
         case tag of
@@ -616,8 +626,10 @@ instance Binary KindRep where
           _ -> fail "Binary.putKindRep: invalid tag"
 
 instance Binary TypeLitSort where
+    {-# INLINE put #-}
     put TypeLitSymbol = putByte 0
     put TypeLitNat = putByte 1
+    {-# INLINE get #-}
     get = do
         tag <- getByte
         case tag of
@@ -691,7 +703,9 @@ getSomeTypeRep = do
                       ++ map ("    "++) info
 
 instance Typeable a => Binary (TypeRep (a :: k)) where
+    {-# INLINE put #-}
     put = putTypeRep
+    {-# INLINE get #-}
     get = do
         SomeTypeRep rep <- getSomeTypeRep
         case rep `eqTypeRep` expected of
@@ -704,7 +718,9 @@ instance Typeable a => Binary (TypeRep (a :: k)) where
      where expected = typeRep :: TypeRep a
 
 instance Binary SomeTypeRep where
+    {-# INLINE put #-}
     put (SomeTypeRep rep) = putTypeRep rep
+    {-# INLINE get #-}
     get = getSomeTypeRep
 
 -- -----------------------------------------------------------------------------
@@ -712,18 +728,22 @@ instance Binary SomeTypeRep where
 -- -----------------------------------------------------------------------------
 
 instance Binary LeftOrRight where
+   {-# INLINE put #-}
    put CLeft  = putByte 0
    put CRight = putByte 1
 
+   {-# INLINE get #-}
    get = do { h <- getByte
             ; case h of
                 0 -> return CLeft
                 _ -> return CRight }
 
 instance Binary PromotionFlag where
+   {-# INLINE put #-}
    put NotPromoted = putByte 0
    put IsPromoted  = putByte 1
 
+   {-# INLINE get #-}
    get = do
        n <- getByte
        case n of
@@ -732,12 +752,16 @@ instance Binary PromotionFlag where
          _ -> fail "Binary(IsPromoted): fail)"
 
 instance Binary Fingerprint where
+  {-# INLINE put #-}
   put (Fingerprint w1 w2) = do put w1; put w2
+  {-# INLINE get #-}
   get = do w1 <- get ; w2 <- get; return (Fingerprint w1 w2)
 
 instance Binary FunctionOrData where
+    {-# INLINE put #-}
     put IsFunction = putByte 0
     put IsData     = putByte 1
+    {-# INLINE get #-}
     get = do
         h <- getByte
         case h of
@@ -746,9 +770,11 @@ instance Binary FunctionOrData where
           _ -> panic "Binary FunctionOrData"
 
 instance Binary TupleSort where
+    {-# INLINE put #-}
     put BoxedTuple      = putByte 0
     put UnboxedTuple    = putByte 1
     put ConstraintTuple = putByte 2
+    {-# INLINE get #-}
     get = do
       h <- getByte
       case h of
@@ -757,6 +783,7 @@ instance Binary TupleSort where
         _ -> do return ConstraintTuple
 
 instance Binary Activation where
+    {-# INLINE put #-}
     put NeverActive = do
             putByte 0
     put AlwaysActive = do
@@ -769,6 +796,7 @@ instance Binary Activation where
             putByte 3
             put src
             put ab
+    {-# INLINE get #-}
     get = do
             h <- getByte
             case h of
@@ -782,6 +810,7 @@ instance Binary Activation where
                       return (ActiveAfter src ab)
 
 instance Binary InlinePragma where
+    {-# INLINE put #-}
     put (InlinePragma s a b c d) = do
             put s
             put a
@@ -789,6 +818,7 @@ instance Binary InlinePragma where
             put c
             put d
 
+    {-# INLINE get #-}
     get = do
            s <- get
            a <- get
@@ -798,19 +828,23 @@ instance Binary InlinePragma where
            return (InlinePragma s a b c d)
 
 instance Binary RuleMatchInfo where
+    {-# INLINE put #-}
     put FunLike = putByte 0
     put ConLike = putByte 1
+    {-# INLINE get #-}
     get = do
             h <- getByte
             if h == 1 then return ConLike
                       else return FunLike
 
 instance Binary InlineSpec where
+    {-# INLINE put #-}
     put NoUserInline    = putByte 0
     put Inline          = putByte 1
     put Inlinable       = putByte 2
     put NoInline        = putByte 3
 
+    {-# INLINE get #-}
     get = do h <- getByte
              case h of
                0 -> return NoUserInline
@@ -819,10 +853,12 @@ instance Binary InlineSpec where
                _ -> return NoInline
 
 instance Binary RecFlag where
+    {-# INLINE put #-}
     put Recursive = do
             putByte 0
     put NonRecursive = do
             putByte 1
+    {-# INLINE get #-}
     get = do
             h <- getByte
             case h of
@@ -830,11 +866,13 @@ instance Binary RecFlag where
               _ -> do return NonRecursive
 
 instance Binary OverlapMode where
+    {-# INLINE put #-}
     put (NoOverlap    s) = putByte 0 >> put s
     put (Overlaps     s) = putByte 1 >> put s
     put (Incoherent   s) = putByte 2 >> put s
     put (Overlapping  s) = putByte 3 >> put s
     put (Overlappable s) = putByte 4 >> put s
+    {-# INLINE get #-}
     get = do
         h <- getByte
         case h of
@@ -847,20 +885,24 @@ instance Binary OverlapMode where
 
 
 instance Binary OverlapFlag where
+    {-# INLINE put #-}
     put flag = do put (overlapMode flag)
                   put (isSafeOverlap flag)
+    {-# INLINE get #-}
     get = do
         h <- get
         b <- get
         return OverlapFlag { overlapMode = h, isSafeOverlap = b }
 
 instance Binary FixityDirection where
+    {-# INLINE put #-}
     put InfixL = do
         putByte 0
     put InfixR = do
         putByte 1
     put InfixN = do
         putByte 2
+    {-# INLINE get #-}
     get = do
         h <- getByte
         case h of
@@ -869,10 +911,12 @@ instance Binary FixityDirection where
           _ -> do return InfixN
 
 instance Binary BasicTypes.Fixity where
+    {-# INLINE put #-}
     put (Fixity src aa ab) = do
             put src
             put aa
             put ab
+    {-# INLINE get #-}
     get = do
           src <- get
           aa  <- get
@@ -880,6 +924,7 @@ instance Binary BasicTypes.Fixity where
           return (Fixity src aa ab)
 
 instance Binary WarningTxt where
+    {-# INLINE put #-}
     put (WarningTxt s w) = do
             putByte 0
             put s
@@ -889,6 +934,7 @@ instance Binary WarningTxt where
             put s
             put d
 
+    {-# INLINE get #-}
     get = do
             h <- getByte
             case h of
@@ -900,25 +946,30 @@ instance Binary WarningTxt where
                       return (DeprecatedTxt s d)
 
 instance Binary StringLiteral where
+  {-# INLINE put #-}
   put (StringLiteral st fs) = do
             put st
             put fs
+  {-# INLINE get #-}
   get = do
             st <- get
             fs <- get
             return (StringLiteral st fs)
 
 instance Binary a => Binary (Located a) where
+    {-# INLINE put #-}
     put (L l x) = do
             put l
             put x
 
+    {-# INLINE get #-}
     get = do
             l <- get
             x <- get
             return (L l x)
 
 instance Binary RealSrcSpan where
+  {-# INLINE put #-}
   put ss = do
            put (srcSpanFile ss)
            put (srcSpanStartLine ss)
@@ -926,6 +977,7 @@ instance Binary RealSrcSpan where
            put (srcSpanEndLine ss)
            put (srcSpanEndCol ss)
 
+  {-# INLINE get #-}
   get = do f  <- get
            sl <- get
            sc <- get
@@ -935,6 +987,7 @@ instance Binary RealSrcSpan where
                                  (mkRealSrcLoc f el ec))
 
 instance Binary SrcSpan where
+  {-# INLINE put #-}
   put (RealSrcSpan ss) = do
           putByte 0
           put ss
@@ -943,6 +996,7 @@ instance Binary SrcSpan where
           putByte 1
           put s
 
+  {-# INLINE get #-}
   get = do
           h <- getByte
           case h of
@@ -952,20 +1006,24 @@ instance Binary SrcSpan where
                     return (UnhelpfulSpan s)
 
 instance Binary Serialized where
+    {-# INLINE put #-}
     put (Serialized the_type bytes) = do
         put the_type
         put bytes
+    {-# INLINE get #-}
     get = do
         the_type <- get
         bytes <- get
         return (Serialized the_type bytes)
 
 instance Binary SourceText where
+  {-# INLINE put #-}
   put NoSourceText = putByte 0
   put (SourceText s) = do
         putByte 1
         put s
 
+  {-# INLINE get #-}
   get = do
     h <- getByte
     case h of
