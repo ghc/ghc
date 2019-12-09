@@ -888,6 +888,8 @@ nightly-i386-windows-hadrian:
     reports:
       junit: junit.xml
     paths:
+      # N.B. variable interpolation apparently doesn't work on Windows so
+      # this can't be $BIN_DIST_TAR_COMP
       - "ghc-x86_64-mingw32.tar.xz"
       - junit.xml
 
