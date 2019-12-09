@@ -78,9 +78,11 @@ import Data.ByteString.Unsafe
 -- Byte
 -- -----------------------------------------------------------------------------
 
+{-# INLINE putByte #-}
 putByte :: Word8 -> Put ()
 putByte !w = putWord8 w
 
+{-# INLINE getByte #-}
 getByte :: Get Word8
 getByte = getWord8
 
@@ -88,18 +90,22 @@ getByte = getWord8
 -- Word
 -- -----------------------------------------------------------------------------
 
+{-# INLINE putWord8 #-}
 putWord8 :: Word8 -> Put ()
 putWord8 !w = putPrim 1 (\op -> poke op w)
 
+{-# INLINE getWord8 #-}
 getWord8 :: Get Word8
 getWord8 = getPrim 1 peek
 
+{-# INLINE putWord16 #-}
 putWord16 :: Word16 -> Put ()
 putWord16 w = putPrim 2 (\op -> do
   pokeElemOff op 0 (fromIntegral (w `shiftR` 8))
   pokeElemOff op 1 (fromIntegral (w .&. 0xFF))
   )
 
+{-# INLINE getWord16 #-}
 getWord16 :: Get Word16
 getWord16 = getPrim 2 (\op -> do
   w0 <- fromIntegral <$> peekElemOff op 0
@@ -107,6 +113,7 @@ getWord16 = getPrim 2 (\op -> do
   return $! w0 `shiftL` 8 .|. w1
   )
 
+{-# INLINE putWord32 #-}
 putWord32 :: Word32 -> Put ()
 putWord32 w = putPrim 4 (\op -> do
   pokeElemOff op 0 (fromIntegral (w `shiftR` 24))
@@ -115,6 +122,7 @@ putWord32 w = putPrim 4 (\op -> do
   pokeElemOff op 3 (fromIntegral (w .&. 0xFF))
   )
 
+{-# INLINE getWord32 #-}
 getWord32 :: Get Word32
 getWord32 = getPrim 4 (\op -> do
   w0 <- fromIntegral <$> peekElemOff op 0
@@ -128,6 +136,7 @@ getWord32 = getPrim 4 (\op -> do
             w3
   )
 
+{-# INLINE putWord64 #-}
 putWord64 :: Word64 -> Put ()
 putWord64 w = putPrim 8 (\op -> do
   pokeElemOff op 0 (fromIntegral (w `shiftR` 56))
@@ -140,6 +149,7 @@ putWord64 w = putPrim 8 (\op -> do
   pokeElemOff op 7 (fromIntegral (w .&. 0xFF))
   )
 
+{-# INLINE getWord64 #-}
 getWord64 :: Get Word64
 getWord64 = getPrim 8 (\op -> do
   w0 <- fromIntegral <$> peekElemOff op 0
@@ -165,27 +175,35 @@ getWord64 = getPrim 8 (\op -> do
 -- Fixed-size Ints
 -- -----------------------------------------------------------------------------
 
+{-# INLINE putInt8 #-}
 putInt8 :: Int8 -> Put ()
 putInt8 = putWord8 . fromIntegral
 
+{-# INLINE getInt8 #-}
 getInt8 :: Get Int8
 getInt8 = (fromIntegral $!) <$> getWord8
 
+{-# INLINE putInt16 #-}
 putInt16 :: Int16 -> Put ()
 putInt16 = putSLEB128
 
+{-# INLINE getInt16 #-}
 getInt16 :: Get Int16
 getInt16 = getSLEB128
 
+{-# INLINE putInt32 #-}
 putInt32 :: Int32 -> Put ()
 putInt32 = putSLEB128
 
+{-# INLINE getInt32 #-}
 getInt32 :: Get Int32
 getInt32 = getSLEB128
 
+{-# INLINE putInt64 #-}
 putInt64 :: Int64 -> Put ()
 putInt64 = putSLEB128
 
+{-# INLINE getInt64 #-}
 getInt64 :: Get Int64
 getInt64 = getSLEB128
 
@@ -193,9 +211,11 @@ getInt64 = getSLEB128
 -- Bin
 -- -----------------------------------------------------------------------------
 
+{-# INLINE putBin #-}
 putBin :: Bin a -> Put ()
 putBin (BinPtr !p) = putWord32 (fromIntegral p :: Word32)
 
+{-# INLINE getBin #-}
 getBin :: Get (Bin a)
 getBin = BinPtr . fromIntegral <$> getWord32
 
@@ -203,6 +223,7 @@ getBin = BinPtr . fromIntegral <$> getWord32
 -- ByteString
 -- -----------------------------------------------------------------------------
 
+{-# INLINE putByteString #-}
 putByteString :: ByteString -> Put ()
 putByteString bs = do
   let len = BS.length bs
@@ -211,6 +232,7 @@ putByteString bs = do
     unsafeUseAsCString bs $ \ptr ->
       memcpy op (castPtr ptr) len
 
+{-# INLINE getByteString #-}
 getByteString :: Get ByteString
 getByteString = do
   len <- getInt
@@ -223,26 +245,33 @@ getByteString = do
 -- FastString and Name
 -- -----------------------------------------------------------------------------
 
+{-# INLINE putAFastString #-}
 putAFastString :: FastString -> Put ()
 putAFastString fs = put_fs <$!> userDataP >>= ($! fs)
 
+{-# INLINE getAFastString #-}
 getAFastString :: Get FastString
 getAFastString = get_fs =<< userDataG
 
+{-# INLINE putFS #-}
 putFS :: FastString -> Put ()
 putFS = putByteString . bytesFS
 
+{-# INLINE getFS #-}
 getFS :: Get FastString
 getFS = do
   l <- getInt
   getPrim l (\src -> pure $! mkFastStringBytes src l)
 
+{-# INLINE putNonBindingName #-}
 putNonBindingName :: Name -> Put ()
 putNonBindingName n = put_nonbinding_name <$> userDataP >>= ($ n)
 
+{-# INLINE putBindingName #-}
 putBindingName :: Name -> Put ()
 putBindingName n = put_binding_name <$> userDataP >>= ($ n)
 
+{-# INLINE getAName #-}
 getAName :: Get Name
 getAName = get_name =<< userDataG
 
@@ -258,6 +287,7 @@ getAName = get_name =<< userDataG
 {-# SPECIALISE putULEB128 :: Int64  -> Put () #-}
 {-# SPECIALISE putULEB128 :: Int32  -> Put () #-}
 {-# SPECIALISE putULEB128 :: Int16  -> Put () #-}
+{-# INLINE putULEB128 #-}
 putULEB128 :: forall a. (Integral a, FiniteBits a) => a -> Put ()
 putULEB128 w =
 #if defined(DEBUG)
@@ -283,6 +313,7 @@ putULEB128 w =
 {-# SPECIALISE getULEB128 :: Get Int64  #-}
 {-# SPECIALISE getULEB128 :: Get Int32  #-}
 {-# SPECIALISE getULEB128 :: Get Int16  #-}
+{-# INLINE getULEB128 #-}
 getULEB128 :: forall a. (Integral a, FiniteBits a) => Get a
 getULEB128 =
     go 0 0
@@ -306,6 +337,7 @@ getULEB128 =
 {-# SPECIALISE putSLEB128 :: Int64  -> Put () #-}
 {-# SPECIALISE putSLEB128 :: Int32  -> Put () #-}
 {-# SPECIALISE putSLEB128 :: Int16  -> Put () #-}
+{-# INLINE putSLEB128 #-}
 putSLEB128 :: forall a. (Integral a, FiniteBits a) => a -> Put ()
 putSLEB128 initial = go initial
   where
@@ -334,6 +366,7 @@ putSLEB128 initial = go initial
 {-# SPECIALISE getSLEB128 :: Get Int64  #-}
 {-# SPECIALISE getSLEB128 :: Get Int32  #-}
 {-# SPECIALISE getSLEB128 :: Get Int16  #-}
+{-# INLINE getSLEB128 #-}
 getSLEB128 :: forall a. (Integral a, FiniteBits a) => Get a
 getSLEB128 = do
     (val,shift,signed) <- go 0 0
@@ -358,9 +391,11 @@ getSLEB128 = do
 -- Standard types
 -- -----------------------------------------------------------------------------
 
+{-# INLINE putInt #-}
 putInt :: Int -> Put ()
 putInt i = putSLEB128 (fromIntegral i :: Int64)
 
+{-# INLINE getInt #-}
 getInt :: Get Int
 getInt = (fromIntegral $!) <$> (getSLEB128 :: Get Int64)
 
@@ -371,6 +406,7 @@ getInt = (fromIntegral $!) <$> (getSLEB128 :: Get Int64)
 type Dictionary = Array Int FastString -- The dictionary
                                        -- Should be 0-indexed
 
+{-# INLINE putDictionary #-}
 putDictionary :: Int -> UniqFM (Int,FastString) -> Put ()
 putDictionary sz dict = do
   putInt sz
@@ -378,6 +414,7 @@ putDictionary sz dict = do
     -- It's OK to use nonDetEltsUFM here because the elements have indices
     -- that array uses to create order
 
+{-# INLINE getDictionary #-}
 getDictionary :: Get Dictionary
 getDictionary = do
   sz <- getInt

@@ -34,6 +34,8 @@ data BinData = BinData { binSize :: !Int, unarr :: !BinArray }
 newtype Bin a = BinPtr Int
   deriving (Eq, Ord, Show, Bounded)
 
+
+{-# INLINE castBin #-}
 castBin :: Bin a -> Bin b
 castBin (BinPtr !i) = BinPtr i
 
@@ -41,6 +43,7 @@ castBin (BinPtr !i) = BinPtr i
 --
 -- It is quite important that no references to the 'ByteString' leak out of the
 -- continuation lest terrible things happen.
+{-# INLINE withBinBuffer #-}
 withBinBuffer :: BinData -> (ByteString -> IO a) -> IO a
 withBinBuffer (BinData sz arr) action =
   withForeignPtr arr $ \ptr ->
@@ -62,6 +65,7 @@ data EnvP
        put_arr    :: !(IORef BinArray)
      }
 
+{-# INLINE allocate #-}
 allocate :: Int -> IO EnvP
 allocate initialSize = do
   arr <- mallocForeignPtrBytes initialSize
@@ -72,6 +76,7 @@ allocate initialSize = do
       writeFastMutInt int n
       return int
 
+{-# INLINE expand #-}
 expand :: Int -> Put ()
 expand off = do
   sz  <- putSize
@@ -91,27 +96,35 @@ expand off = do
     getSize !sz | sz >= off = sz
                 | otherwise = getSize (sz * 2)
 
+{-# INLINE reallocate #-}
 reallocate :: Put ()
 reallocate = expand . (2 *) =<< putSize
 
+{-# INLINE runBuffer #-}
 runBuffer :: Int -> Put () -> IO BinData
 runBuffer initialSize (Put m) = do
   bin <- runReaderT (m >> ask) =<< allocate initialSize
   off <- readFastMutInt (put_offset bin)
   BinData off <$> readIORef (put_arr bin)
 
+{-# INLINE runPutIO #-}
 runPutIO :: Put () -> IO BinData
 runPutIO = runBuffer (1024 * 1024)
 
+{-# INLINE runPut #-}
 runPut :: Put () -> BinData
 runPut = unsafePerformIO . runPutIO
 
+{-# INLINE askP #-}
 askP :: Put EnvP
 askP = Put ask
 
+{-# INLINE putEnv #-}
 putEnv :: (EnvP -> IO a) -> Put a
 putEnv f = Put $ liftIO . f =<< ask
 
+{-# INLINE putOffset #-}
+{-# INLINE putSize #-}
 putOffset, putSize :: Put Int
 putOffset = putEnv (readFastMutInt . put_offset)
 putSize   = putEnv (readFastMutInt . put_size  )
@@ -123,6 +136,7 @@ putArr = putEnv (readIORef . put_arr)
 -- Putting
 -- -----------------------------------------------------------------------------
 
+{-# INLINE putPrim #-}
 putPrim :: Int -> (Ptr Word8 -> IO ()) -> Put ()
 putPrim n f = do
   ix <- putOffset
@@ -135,20 +149,25 @@ putPrim n f = do
       withForeignPtr arr $ \op -> f (op `plusPtr` ix)
       writeFastMutInt ixr (ix + n)
 
+{-# INLINE ioP #-}
 ioP :: IO a -> Put a
 ioP m = Put (liftIO m)
 
+{-# INLINE userDataP #-}
 userDataP :: Put UserDataP
 userDataP = Put $ put_user <$> ask
 
+{-# INLINE offsetP #-}
 offsetP :: Put Int
 offsetP = do EnvP _ off _ _ <- askP; Put . liftIO $ readFastMutInt off
 
+{-# INLINE seekP #-}
 seekP :: Bin a -> Put ()
 seekP (BinPtr !i) = do
   EnvP _ ixr _ _ <- askP
   Put . liftIO $ writeFastMutInt ixr i
 
+{-# INLINE tellP #-}
 tellP :: Put (Bin a)
 tellP = BinPtr <$> offsetP
 
@@ -168,39 +187,51 @@ data EnvG
        get_arr    :: !BinData
      }
 
+{-# INLINE runGetIO #-}
 runGetIO :: BinData -> Get a -> IO a
 runGetIO bd m = runReaderT (unget m) =<< mkEnvG bd
 
+{-# INLINE runGet #-}
 runGet :: BinData -> Get a -> a
 runGet bd = unsafePerformIO . runGetIO bd
 
+{-# INLINE askG #-}
 askG :: Get EnvG
 askG = Get ask
 
+{-# INLINE offsetG #-}
 offsetG :: Get Int
 offsetG = do EnvG _ off _ _ <- askG; Get . liftIO $ readFastMutInt off
 
+{-# INLINE seekG #-}
 seekG :: Bin a -> Get ()
 seekG (BinPtr !i) = do
   EnvG _ ixr _ _ <- askG
   Get . liftIO $ writeFastMutInt ixr i
 
+{-# INLINE tellG #-}
 tellG :: Get (Bin a)
 tellG = BinPtr <$> offsetG
 
+{-# INLINE getEnv #-}
 getEnv :: (EnvG -> IO a) -> Get a
 getEnv f = Get $ liftIO . f =<< ask
 
+{-# INLINE getOffset #-}
+{-# INLINE getEnd #-}
 getOffset, getEnd :: Get Int
 getOffset = getEnv (readFastMutInt . get_offset)
 getEnd    = Get $ get_end <$> ask
 
+{-# INLINE getSize #-}
 getSize :: Get Int
 getSize = Get $ binSize . get_arr <$> ask
 
+{-# INLINE getArr #-}
 getArr :: Get BinArray
 getArr =  Get $ unarr . get_arr <$> ask
 
+{-# INLINE mkEnvG #-}
 mkEnvG :: BinData -> IO EnvG
 mkEnvG bd@(BinData size _) = do
   i <- newFastMutInt
@@ -211,6 +242,7 @@ mkEnvG bd@(BinData size _) = do
 -- Getting
 -- -----------------------------------------------------------------------------
 
+{-# INLINE getPrim #-}
 getPrim :: Int -> (Ptr Word8 -> IO a) -> Get a
 getPrim n f = do
   ix  <- getOffset
@@ -225,6 +257,7 @@ getPrim n f = do
       writeFastMutInt ixr (ix + n)
       return w
 
+{-# INLINE interleaveG #-}
 interleaveG :: Get a -> Get a
 interleaveG m = do
   env <- askG
@@ -236,12 +269,15 @@ interleaveG m = do
       writeFastMutInt off' =<< readFastMutInt off
       return $ EnvG dat off' end arr
 
+{-# INLINE getSlice #-}
 getSlice :: Bin b -> Get a -> Get a
 getSlice (BinPtr !end) (Get m) = Get $ local (\x -> x {get_end = end}) m
 
+{-# INLINE ioG #-}
 ioG :: IO a -> Get a
 ioG m = Get (liftIO m)
 
+{-# INLINE userDataG #-}
 userDataG :: Get UserDataG
 userDataG = Get $ get_user <$> ask
 
@@ -249,12 +285,14 @@ userDataG = Get $ get_user <$> ask
 -- File IO
 -- -----------------------------------------------------------------------------
 
+{-# INLINE writeBinData #-}
 writeBinData :: BinData -> FilePath -> IO ()
 writeBinData (BinData sz arr) fp =
   withBinaryFile fp WriteMode $ \h ->
     withForeignPtr arr $ \p ->
       hPutBuf h p sz
 
+{-# INLINE readBinData #-}
 readBinData :: FilePath -> IO BinData
 readBinData fp =
   withBinaryFile fp ReadMode $ \h -> do
@@ -276,6 +314,7 @@ data UserDataP
        put_fs              :: FastString -> Put ()
      }
 
+{-# INLINE writeState #-}
 writeState :: (Name -> Put ())
            -> (Name -> Put ())
            -> (FastString -> Put ())
@@ -291,9 +330,11 @@ data UserDataG
        get_fs   :: Get FastString
      }
 
+{-# INLINE noUserData #-}
 noUserData :: a
 noUserData = panic "Binary.UserData not defined"
 
+{-# INLINE readState #-}
 readState :: Get Name
           -> Get FastString
           -> Get a
