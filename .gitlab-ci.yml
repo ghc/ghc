@@ -470,7 +470,6 @@ nightly-aarch64-linux-deb9:
   extends: .validate-linux
   stage: full-build
   image: "registry.gitlab.haskell.org/ghc/ci-images/armv7-linux-deb9:$DOCKER_REV"
-  allow_failure: true
   variables:
     TEST_ENV: "armv7-linux-deb9"
     BIN_DIST_PREP_TAR_COMP: "ghc-armv7-linux-deb9.tar.xz"
