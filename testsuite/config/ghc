@@ -179,6 +179,15 @@ def get_compiler_info():
 
     config.have_ncg = compilerInfoDict.get("Have native code generator", "NO") == "YES"
 
+    # Whether GHC itself was built using the LLVM backend. We need to know this
+    # since some tests in ext-interp fail when stage2 ghc is built using
+    # LLVM. See #16087.
+    #
+    # The condition here is a bit approximate: we assume that if stage2 doesn't
+    # have the NCG and isn't unregisterised then it must be using the LLVM
+    # backend by default.
+    config.ghc_built_by_llvm = not config.have_ncg and not config.unregisterised
+
     config.have_RTS_linker = compilerInfoDict.get("target has RTS linker", "NO") == "YES"
     # external interpreter needs RTS linker support
     # If the field is not present (GHC 8.0 and earlier), assume we don't
@@ -220,6 +229,7 @@ def get_compiler_info():
         config.ghc_plugin_way   = "normal"
 
 # Note [Replacing backward slashes in config.libdir]
+# ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 #
 # We *do* need to replace backslashes in config.libdir, for the following
 # reason:
