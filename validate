@@ -90,11 +90,11 @@ do
         be_quiet=1
         ;;
     --legacy)
-	use_hadrian=NO
-	;;
+        use_hadrian=NO
+        ;;
     --stack)
-	use_stack=YES
-	;;
+        use_stack=YES
+        ;;
     --help)
         show_help
         exit 0;;
@@ -109,12 +109,12 @@ done
 check_packages () {
     if [ "$bindistdir" = "" ]
     then
-	if [ "$use_hadrian" = "YES" ]
-	then
-	    ghc_pkg=$hadrian_build_root/stage1/bin/ghc-pkg
-	else
+        if [ "$use_hadrian" = "YES" ]
+        then
+            ghc_pkg=$hadrian_build_root/stage1/bin/ghc-pkg
+        else
             ghc_pkg=inplace/bin/ghc-pkg
-	fi
+        fi
     else
         ghc_pkg="$bindistdir"/bin/ghc-pkg
     fi
@@ -148,31 +148,31 @@ echo "using THREADS=${threads}" >&2
 if [ "$use_hadrian" = "NO" ]
 then
     make="gmake"
-   if type gmake > /dev/null 2> /dev/null
-   then
-       make="gmake"
-   else
-       make="make"
-   fi
-   if [ $be_quiet -eq 1 ]; then
-       # See Note [Default build system verbosity].
-       make="$make -s"
-   fi
-   $make -C utils/checkUniques
+    if type gmake > /dev/null 2> /dev/null
+    then
+        make="gmake"
+    else
+        make="make"
+    fi
+    if [ $be_quiet -eq 1 ]; then
+        # See Note [Default build system verbosity].
+        make="$make -s"
+    fi
+    $make -C utils/checkUniques
 else
     # Just build hadrian.
     if [ "$use_stack" = "NO" ]
     then
-       hadrian/build.sh --help > /dev/null
-       cd hadrian
-       hadrian_cmd=$(cabal new-exec -- which hadrian)
+        hadrian/build.sh --help > /dev/null
+        cd hadrian
+        hadrian_cmd=$(cabal new-exec -- which hadrian)
     else
-       if [ $no_clean -eq 0 ]; then
-          rm -rf hadrian/.stack-work
-       fi
-       hadrian/build.stack.sh --help > /dev/null
-       cd hadrian
-       hadrian_cmd=$(stack exec -- which hadrian)
+        if [ $no_clean -eq 0 ]; then
+            rm -rf hadrian/.stack-work
+        fi
+        hadrian/build.stack.sh --help > /dev/null
+        cd hadrian
+        hadrian_cmd=$(stack exec -- which hadrian)
     fi
     cd ..
     # TODO: define a hadrian Flavour that mimics
@@ -180,121 +180,119 @@ else
     # Until then, we're using the default flavour.
     hadrian="$hadrian_cmd -j$threads --build-root=$hadrian_build_root"
     if [ $be_quiet -eq 0 ]; then
-	hadrian="$hadrian -V"
+        hadrian="$hadrian -V"
     fi
     echo "Hadrian command: $hadrian"
 fi
 
 if [ $testsuite_only -eq 0 ]; then
+    thisdir=`pwd`
 
-thisdir=`pwd`
-
-if [ $no_clean -eq 0 ]; then
-    if [ "$use_hadrian" = "NO" ]
-    then
-	$make maintainer-clean
-    else
-	$hadrian clean && rm -rf $hadrian_build_root
-    fi
-
-    INSTDIR="$thisdir/inst"
-
-    python3 ./boot --validate
-    ./configure --prefix="$INSTDIR" $config_args
-fi
-
-if [ "$use_hadrian" = "NO" ]
-then
-    echo "Validating=YES"       >  mk/are-validating.mk
-    echo "ValidateSpeed=$speed" >> mk/are-validating.mk
-    echo "ValidateHpc=$hpc"     >> mk/are-validating.mk
-
-    # Note [Default build system verbosity].
-    #
-    # From https://gitlab.haskell.org/ghc/ghc/wikis/design/build-system:
-    #
-    #   "The build system should clearly report what it's doing (and sometimes
-    #   why), without being too verbose. It should emit actual command lines as
-    #   much as possible, so that they can be inspected and cut & pasted."
-    #
-    # That should be the default. Only suppress commands, by setting V=0 and using
-    # `make -s`, when user explicitly asks for it with `./validate --quiet`.
-    if [ $be_quiet -eq 1 ]; then
-	# See Note [Default build system verbosity].
-	echo "V=0"                  >> mk/are-validating.mk # Less gunk
-    fi
-
-    $make -j$threads
-    # For a "debug make", add "--debug=b --debug=m"
-else
-    case $speed in
-    SLOW)
-      flavour=slow-validate ;;
-    NORMAL)
-      flavour=validate ;;
-    FAST)
-      flavour=validate ;;
-    esac
-    $hadrian --flavour=$flavour
-fi
-
-check_packages post-build
-
-bindistdir="bindisttest/install   dir"
-ghc="$bindistdir/bin/ghc"
-
-# -----------------------------------------------------------------------------
-# Build and test a binary distribution (not --fast)
-
-if [ $speed != "FAST" ]; then
-    if [ "$use_hadrian" = "NO" ]
-    then
-	$make binary-dist-prep TAR_COMP=$tar_comp
-	$make test_bindist TEST_PREP=YES TAR_COMP=$tar_comp
-    else
-	$hadrian binary-dist --docs=no-sphinx
-	cfgdir=$(find $hadrian_build_root/bindist/ -name 'configure' | head -1)
-	dir=$(dirname $cfgdir)
-	cd "$dir"
-	./configure --prefix="$thisdir/$bindistdir" && make install
-	cd $thisdir
-	"$ghc" -e 'Data.Text.IO.putStrLn (Data.Text.pack "bindist test: OK")'
-    fi
-
-    check_packages post-install
-
-    if [ "$use_hadrian" = "NO" ]
-    then
-	$make validate_build_xhtml BINDIST_PREFIX="$thisdir/$bindistdir"
-    else
-        cd libraries/xhtml
-        dynamicGhc=$("../../$ghc" --info | grep "GHC Dynamic" | cut -d',' -f3 | cut -d'"' -f2)
-        if [ "$dynamicGhc" = "NO" ]
+    if [ $no_clean -eq 0 ]; then
+        if [ "$use_hadrian" = "NO" ]
         then
-            libFlags="--enable-shared --disable-library-vanilla"
+            $make maintainer-clean
         else
-            libFlags="--disable-shared --enable-library-vanilla"
+            $hadrian clean && rm -rf $hadrian_build_root
         fi
-        libFlags="$libFlags --disable-library-prof"
 
-       "../../$ghc" --make Setup
-       ./Setup configure \
-            --with-ghc="$thisdir/$ghc" \
-            --with-haddock="$thisdir/$bindistdir/bin/haddock" \
-            $libFlags \
-		    --global --builddir=dist-bindist \
-		    --prefix="$thisdir/$bindistdir"
-	    ./Setup build --builddir=dist-bindist
-	    ./Setup haddock -v0 --ghc-options=-optP-P --builddir=dist-bindist
-	    ./Setup install --builddir=dist-bindist
-	    ./Setup clean --builddir=dist-bindist
-	    rm -f Setup Setup.exe Setup.hi Setup.o
-	    cd ../../
+        INSTDIR="$thisdir/inst"
+
+        python3 ./boot --validate
+        ./configure --prefix="$INSTDIR" $config_args
     fi
 
-    check_packages post-xhtml
-fi
+    if [ "$use_hadrian" = "NO" ]
+    then
+        echo "Validating=YES"       >  mk/are-validating.mk
+        echo "ValidateSpeed=$speed" >> mk/are-validating.mk
+        echo "ValidateHpc=$hpc"     >> mk/are-validating.mk
 
+        # Note [Default build system verbosity].
+        #
+        # From https://gitlab.haskell.org/ghc/ghc/wikis/design/build-system:
+        #
+        #   "The build system should clearly report what it's doing (and sometimes
+        #   why), without being too verbose. It should emit actual command lines as
+        #   much as possible, so that they can be inspected and cut & pasted."
+        #
+        # That should be the default. Only suppress commands, by setting V=0 and using
+        # `make -s`, when user explicitly asks for it with `./validate --quiet`.
+        if [ $be_quiet -eq 1 ]; then
+      # See Note [Default build system verbosity].
+            echo "V=0"                  >> mk/are-validating.mk # Less gunk
+        fi
+
+        $make -j$threads
+        # For a "debug make", add "--debug=b --debug=m"
+    else
+        case $speed in
+        SLOW)
+            flavour=slow-validate ;;
+        NORMAL)
+            flavour=validate ;;
+        FAST)
+            flavour=validate ;;
+        esac
+        $hadrian --flavour=$flavour
+    fi
+
+    check_packages post-build
+
+    bindistdir="bindisttest/install   dir"
+    ghc="$bindistdir/bin/ghc"
+
+    # -----------------------------------------------------------------------------
+    # Build and test a binary distribution (not --fast)
+
+    if [ $speed != "FAST" ]; then
+        if [ "$use_hadrian" = "NO" ]
+        then
+            $make binary-dist-prep TAR_COMP=$tar_comp
+            $make test_bindist TEST_PREP=YES TAR_COMP=$tar_comp
+        else
+            $hadrian binary-dist --docs=no-sphinx
+            cfgdir=$(find $hadrian_build_root/bindist/ -name 'configure' | head -1)
+            dir=$(dirname $cfgdir)
+            cd "$dir"
+            ./configure --prefix="$thisdir/$bindistdir" && make install
+            cd $thisdir
+            "$ghc" -e 'Data.Text.IO.putStrLn (Data.Text.pack "bindist test: OK")'
+        fi
+
+        check_packages post-install
+
+        if [ "$use_hadrian" = "NO" ]
+        then
+            $make validate_build_xhtml BINDIST_PREFIX="$thisdir/$bindistdir"
+        else
+            cd libraries/xhtml
+            dynamicGhc=$("../../$ghc" --info | grep "GHC Dynamic" | cut -d',' -f3 | cut -d'"' -f2)
+            if [ "$dynamicGhc" = "NO" ]
+            then
+                libFlags="--enable-shared --disable-library-vanilla"
+            else
+                libFlags="--disable-shared --enable-library-vanilla"
+            fi
+            libFlags="$libFlags --disable-library-prof"
+
+            "../../$ghc" --make Setup
+            ./Setup configure \
+                --with-ghc="$thisdir/$ghc" \
+                --with-haddock="$thisdir/$bindistdir/bin/haddock" \
+                $libFlags \
+                --global --builddir=dist-bindist \
+                --prefix="$thisdir/$bindistdir"
+            ./Setup build --builddir=dist-bindist
+            ./Setup haddock -v0 --ghc-options=-optP-P --builddir=dist-bindist
+            ./Setup install --builddir=dist-bindist
+            ./Setup clean --builddir=dist-bindist
+            rm -f Setup Setup.exe Setup.hi Setup.o
+            cd ../../
+        fi
+
+        check_packages post-xhtml
+    fi
 fi # testsuite-only
 
 # -----------------------------------------------------------------------------
@@ -322,20 +320,20 @@ fi
 
 case "$speed" in
 SLOW)
-        MAKE_TEST_TARGET=slowtest
-        BINDIST="BINDIST=YES"
-	HADRIAN_TEST_SPEED=slow
-        ;;
+    MAKE_TEST_TARGET=slowtest
+    BINDIST="BINDIST=YES"
+    HADRIAN_TEST_SPEED=slow
+    ;;
 NORMAL)
-        MAKE_TEST_TARGET=test
-        BINDIST="BINDIST=YES"
-	HADRIAN_TEST_SPEED=normal
-        ;;
+    MAKE_TEST_TARGET=test
+    BINDIST="BINDIST=YES"
+    HADRIAN_TEST_SPEED=normal
+    ;;
 FAST)
-        MAKE_TEST_TARGET=fasttest
-        BINDIST="BINDIST=NO"
-	HADRIAN_TEST_SPEED=fast
-        ;;
+    MAKE_TEST_TARGET=fasttest
+    BINDIST="BINDIST=NO"
+    HADRIAN_TEST_SPEED=fast
+    ;;
 esac
 
 if [ $be_quiet -eq 1 ] && [ -z $VERBOSE ]; then
@@ -354,19 +352,19 @@ if [ "$use_hadrian" = "NO" ]
 then
     # Use LOCAL=0, see Note [Running tests in /tmp].
     $make -C testsuite/tests $BINDIST $PYTHON_ARG \
-	  $MAKE_TEST_TARGET stage=2 LOCAL=0 $TEST_VERBOSITY THREADS=$threads \
-	  NO_PRINT_SUMMARY=YES SUMMARY_FILE=../../testsuite_summary.txt \
-	  JUNIT_FILE=../../testsuite.xml \
-	  2>&1 | tee testlog
+    $MAKE_TEST_TARGET stage=2 LOCAL=0 $TEST_VERBOSITY THREADS=$threads \
+    NO_PRINT_SUMMARY=YES SUMMARY_FILE=../../testsuite_summary.txt \
+    JUNIT_FILE=../../testsuite.xml \
+    2>&1 | tee testlog
 
     # Run a few tests using the stage1 compiler.
     # See Note [Why is there no stage1 setup function?].
     # Don't use BINDIST=YES, as stage1 is not available in a bindist.
     $make -C testsuite/tests/stage1 $PYTHON_ARG \
-	  $MAKE_TEST_TARGET stage=1 LOCAL=0 $TEST_VERBOSITY THREADS=$threads \
-	  NO_PRINT_SUMMARY=YES SUMMARY_FILE=../../../testsuite_summary_stage1.txt \
-	  JUNIT_FILE=../../../testsuite_stage1.xml \
-	  2>&1 | tee testlog-stage1
+    $MAKE_TEST_TARGET stage=1 LOCAL=0 $TEST_VERBOSITY THREADS=$threads \
+    NO_PRINT_SUMMARY=YES SUMMARY_FILE=../../../testsuite_summary_stage1.txt \
+    JUNIT_FILE=../../../testsuite_stage1.xml \
+    2>&1 | tee testlog-stage1
 else
     testghc="$thisdir/$ghc"
     arg="test --test-speed=$HADRIAN_TEST_SPEED \
@@ -436,7 +434,7 @@ NOTE: If you have made changes that may cause failures not tested for by
 the minimal testing procedure, please do further testing as necessary.
 -------------------------------------------------------------------
 EOF
-   fi
+    fi
 else
     if [ $be_quiet -eq 0 ]
     then
