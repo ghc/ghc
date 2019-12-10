@@ -174,7 +174,7 @@ mkBootModDetailsTc hsc_env
                 | id <- typeEnvIds type_env
                 , keep_it id ]
 
-    final_tcs  = filterOut (isWiredInName . getName) tcs
+    final_tcs  = filterOut isWiredIn tcs
                  -- See Note [Drop wired-in things]
     type_env1  = typeEnvFromEntities final_ids final_tcs fam_insts
     insts'     = mkFinalClsInsts type_env1 insts
@@ -385,10 +385,10 @@ tidyProgram hsc_env  (ModGuts { mg_module    = mod
               ; final_ids  = [ if omit_prags then trimId id else id
                              | id <- bindersOfBinds tidy_binds
                              , isExternalName (idName id)
-                             , not (isWiredInName (getName id))
+                             , not (isWiredIn id)
                              ]   -- See Note [Drop wired-in things]
 
-              ; final_tcs      = filterOut (isWiredInName . getName) tcs
+              ; final_tcs      = filterOut isWiredIn tcs
                                  -- See Note [Drop wired-in things]
               ; type_env       = typeEnvFromEntities final_ids final_tcs fam_insts
               ; tidy_cls_insts = mkFinalClsInsts type_env cls_insts

@@ -7,6 +7,7 @@
 {-# Language TypeSynonymInstances   #-}
 {-# Language FlexibleInstances      #-}
 {-# Language QuantifiedConstraints  #-}
+{-# Language FlexibleContexts       #-}
 
 module T15943 where
 
