@@ -334,6 +334,51 @@ def cleanup_and_exit(exitcode):
         shutil.rmtree(tempdir, ignore_errors=True)
     exit(exitcode)
 
+def html_tabulate_metrics(metrics: List[PerfMetric]) -> None:
+    cols = [
+        "test", "way",
+        "metric", "value",
+        "baseline value", "relative chg.",
+        ""
+    ]
+    s = []
+    s += ["<table>", "<tr>"]
+    s += ["<th>{}</th>".format(label) for label in cols]
+    s += ["</tr>"]
+
+    for metric in sorted(metrics, key=lambda m: (m.stat.test, m.stat.way)):
+        s += ["<tr>"]
+        vals = [
+            metric.stat.test,
+            metric.stat.way,
+            "{:.3f}".format(metric.stat.value)
+        ]
+
+        if metric.baseline is not None:
+            val0 = metric.baseline.perfStat.value
+            val1 = metric.stat.value
+            rel = 100 * (val1 - val0) / val0
+            if rel >= 5:
+                arrow = "⇑"
+            elif rel <= 5:
+                arrow = "⇓"
+            else:
+                arrow = ""
+
+            vals += [
+                "{:.3f}".format(val1),
+                "{:.1f}%".format(rel),
+                arrow
+            ]
+        else:
+            vals += [ "n/a", "n/a" ]
+
+        s += ["<td>{}</td>".format(val) for val in vals]
+        s += ["</tr>"]
+
+    s += ["</table>"]
+    return ''.join(s)
+
 def tabulate_metrics(metrics: List[PerfMetric]) -> None:
     for metric in sorted(metrics, key=lambda m: (m.stat.test, m.stat.way)):
         print("{test:24}  {metric:40}  {value:15.3f}".format(
