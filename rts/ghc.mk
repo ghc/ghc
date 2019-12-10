@@ -489,10 +489,15 @@ endif
 endif
 
 # add CFLAGS for libffi
+ifeq "$(UseSystemLibFFI)" "YES"
+LIBFFI_CFLAGS = $(addprefix -I,$(FFIIncludeDir))
+else
+LIBFFI_CFLAGS =
+endif
 # ffi.h triggers prototype warnings, so disable them here:
-rts/Interpreter_CC_OPTS += -Wno-strict-prototypes
-rts/Adjustor_CC_OPTS    += -Wno-strict-prototypes
-rts/sm/Storage_CC_OPTS  += -Wno-strict-prototypes
+rts/Interpreter_CC_OPTS += -Wno-strict-prototypes $(LIBFFI_CFLAGS)
+rts/Adjustor_CC_OPTS    += -Wno-strict-prototypes $(LIBFFI_CFLAGS)
+rts/sm/Storage_CC_OPTS  += -Wno-strict-prototypes $(LIBFFI_CFLAGS)
 # ffi.h triggers undefined macro warnings on PowerPC, disable those:
 # this matches substrings of powerpc64le, including "powerpc" and "powerpc64"
 ifneq "$(findstring $(TargetArch_CPP), powerpc64le)" ""
