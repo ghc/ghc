@@ -649,7 +649,8 @@ validate-x86_64-linux-deb9-dwarf:
   variables:
     TEST_ENV: "x86_64-linux-deb10"
     BIN_DIST_PREP_TAR_COMP: "./ghc-x86_64-deb10-linux.tar.xz"
-    XZ: "xz -T0"
+    # pxz doesn't exist; it's xz --threads
+    XZ: "xz --threads=$CORES"
   cache:
     key: linux-x86_64-deb10
 
