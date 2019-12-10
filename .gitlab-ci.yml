@@ -681,6 +681,7 @@ release-x86_64-linux-deb10:
   extends: .validate-linux
   stage: full-build
   image: "registry.gitlab.haskell.org/ghc/ci-images/x86_64-linux-deb8:$DOCKER_REV"
+  allow_failure: true
   variables:
     TEST_ENV: "x86_64-linux-deb8"
     BIN_DIST_PREP_TAR_COMP: "ghc-x86_64-deb8-linux.tar.xz"
