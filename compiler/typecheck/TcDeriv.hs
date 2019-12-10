@@ -1915,7 +1915,7 @@ doDerivInstErrorChecks1 mechanism =
 
         rdr_env <- lift getGlobalRdrEnv
         let data_con_names = map dataConName (tyConDataCons rep_tc)
-            hidden_data_cons = not (isWiredInName (tyConName rep_tc)) &&
+            hidden_data_cons = not (isWiredIn rep_tc) &&
                                (isAbstractTyCon rep_tc ||
                                 any not_in_scope data_con_names)
             not_in_scope dc  = isNothing (lookupGRE_Name rdr_env dc)
