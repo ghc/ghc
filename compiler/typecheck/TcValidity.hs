@@ -1116,15 +1116,14 @@ check_pred_help under_syn env dflags ctxt pred
         | isCTupleClass cls   -> check_tuple_pred under_syn env dflags ctxt pred tys
         | otherwise           -> check_class_pred env dflags ctxt pred cls tys
 
-      EqPred NomEq _ _  -> -- a ~# b
-                           check_eq_pred env dflags pred
-
-      EqPred ReprEq _ _ -> -- Ugh!  When inferring types we may get
-                           -- f :: (a ~R# b) => blha
-                           -- And we want to treat that like (Coercible a b)
-                           -- We should probably check argument shapes, but we
-                           -- didn't do so before, so I'm leaving it for now
-                           return ()
+      EqPred _ _ _      -> pprPanic "check_pred_help" (ppr pred)
+              -- EqPreds, such as (t1 ~ #t2) or (t1 ~R# t2), don't even have kind Constraint
+              -- and should never appear before the '=>' of a type.  Thus
+              --     f :: (a ~# b) => blah
+              -- is wrong.  For user written signatures, it'll be rejected by kind-checking
+              -- well before we get to validity checking.  For inferred types we are careful
+              -- to box such constraints in TcType.pickQuantifiablePreds, as described
+              -- in Note [Lift equality constraints when quantifying] in TcType
 
       ForAllPred _ theta head -> check_quant_pred env dflags ctxt pred theta head
       IrredPred {}            -> check_irred_pred under_syn env dflags ctxt pred
@@ -1139,13 +1138,18 @@ check_eq_pred env dflags pred
 
 check_quant_pred :: TidyEnv -> DynFlags -> UserTypeCtxt
                  -> PredType -> ThetaType -> PredType -> TcM ()
-check_quant_pred env dflags _ctxt pred theta head_pred
+check_quant_pred env dflags ctxt pred theta head_pred
   = addErrCtxt (text "In the quantified constraint" <+> quotes (ppr pred)) $
     do { -- Check the instance head
          case classifyPredType head_pred of
-            ClassPred cls tys -> checkValidInstHead SigmaCtxt cls tys
                                  -- SigmaCtxt tells checkValidInstHead that
                                  -- this is the head of a quantified constraint
+            ClassPred cls tys -> do { checkValidInstHead SigmaCtxt cls tys
+                                    ; check_pred_help False env dflags ctxt head_pred }
+                               -- need check_pred_help to do extra pred-only validity
+                               -- checks, such as for (~). Otherwise, we get #17563
+                               -- NB: checks for the context are covered by the check_type
+                               -- in check_pred_ty
             IrredPred {}      | hasTyVarHead head_pred
                               -> return ()
             _                 -> failWithTcM (badQuantHeadErr env pred)
@@ -1216,10 +1220,9 @@ solved to add+canonicalise another (Foo a) constraint.  -}
 check_class_pred :: TidyEnv -> DynFlags -> UserTypeCtxt
                  -> PredType -> Class -> [TcType] -> TcM ()
 check_class_pred env dflags ctxt pred cls tys
-  |  isEqPredClass cls    -- (~) and (~~) are classified as classes,
-                          -- but here we want to treat them as equalities
-  = -- pprTrace "check_class" (ppr cls) $
-    check_eq_pred env dflags pred
+  | isEqPredClass cls    -- (~) and (~~) are classified as classes,
+                         -- but here we want to treat them as equalities
+  = check_eq_pred env dflags pred
 
   | isIPClass cls
   = do { check_arity
