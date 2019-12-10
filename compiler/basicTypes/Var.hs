@@ -55,7 +55,7 @@ module Var (
         setIdExported, setIdNotExported,
 
         -- ** Predicates
-        isId, isTyVar, isTcTyVar,
+        isId, isTyVar, isTcTyVar, isMetaTyVar,
         isLocalVar, isLocalId, isCoVar, isNonCoVarId, isTyCoVar,
         isGlobalId, isExportedId,
         mustHaveLocalBinding,
@@ -91,7 +91,8 @@ import GhcPrelude
 
 import {-# SOURCE #-}   TyCoRep( Type, Kind )
 import {-# SOURCE #-}   TyCoPpr( pprKind )
-import {-# SOURCE #-}   TcType( TcTyVarDetails, pprTcTyVarDetails, vanillaSkolemTv )
+import {-# SOURCE #-}   TcType( TcTyVarDetails, isMetaTyVarDetails
+                              , pprTcTyVarDetails, vanillaSkolemTv )
 import {-# SOURCE #-}   IdInfo( IdDetails, IdInfo, coVarDetails, isCoVarDetails,
                                 vanillaIdInfo, pprIdDetails )
 
@@ -711,6 +712,12 @@ isTyVar _            = False
 isTcTyVar :: Var -> Bool      -- True of TcTyVar only
 isTcTyVar (TcTyVar {}) = True
 isTcTyVar _            = False
+
+isMetaTyVar :: Var -> Bool
+-- This function is here because we use it in TyCoFVs,
+-- which is quite low down in the dependency tree
+isMetaTyVar (TcTyVar { tc_tv_details = d } ) = isMetaTyVarDetails d
+isMetaTyVar _ = False
 
 isTyCoVar :: Var -> Bool
 isTyCoVar v = isTyVar v || isCoVar v

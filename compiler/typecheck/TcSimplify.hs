@@ -2385,12 +2385,12 @@ floatEqualities skols given_ids ev_binds_var no_given_eqs
              -- seed_skols: See Note [What prevents a constraint from floating] (1,2,3)
              -- Include the EvIds of any non-floating constraints
 
-             extended_skols = transCloVarSet (add_captured_ev_ids candidate_eqs) seed_skols
+--             extended_skols = transCloVarSet (add_captured_ev_ids candidate_eqs) seed_skols
                  -- extended_skols contains the EvIds of all the trapped constraints
                  -- See Note [What prevents a constraint from floating] (3)
 
-             (flt_eqs, no_flt_eqs) = partitionBag (is_floatable extended_skols)
-                                                  candidate_eqs
+             is_floatable ct = seed_skols `disjointFromType` ctPred ct
+             (flt_eqs, no_flt_eqs) = partitionBag is_floatable candidate_eqs
 
              remaining_simples = no_float_cts `andCts` no_flt_eqs
 
@@ -2399,7 +2399,8 @@ floatEqualities skols given_ids ev_binds_var no_given_eqs
        ; mapM_ promoteTyVarTcS (tyCoVarsOfCtsList flt_eqs)
 
        ; traceTcS "floatEqualities" (vcat [ text "Skols =" <+> ppr skols
-                                          , text "Extended skols =" <+> ppr extended_skols
+                                          , text "Seed skols =" <+> ppr seed_skols
+--                                          , text "Extended skols =" <+> ppr extended_skols
                                           , text "Simples =" <+> ppr simples
                                           , text "Candidate eqs =" <+> ppr candidate_eqs
                                           , text "Floated eqs =" <+> ppr flt_eqs])
@@ -2413,6 +2414,8 @@ floatEqualities skols given_ids ev_binds_var no_given_eqs
     add_non_flt_ct ct acc | isDerivedCt ct = acc
                           | otherwise      = extendVarSet acc (ctEvId ct)
 
+
+{-
     is_floatable :: VarSet -> Ct -> Bool
     is_floatable skols ct
       | isDerivedCt ct = not (tyCoVarsOfCt ct `intersectsVarSet` skols)
@@ -2425,6 +2428,7 @@ floatEqualities skols given_ids ev_binds_var no_given_eqs
            | isDerivedCt ct                           = acc
            | tyCoVarsOfCt ct `intersectsVarSet` skols = extendVarSet acc (ctEvId ct)
            | otherwise                                = acc
+-}
 
     -- Identify which equalities are candidates for floating
     -- Float out alpha ~ ty, or ty ~ alpha which might be unified outside

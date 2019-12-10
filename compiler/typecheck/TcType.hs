@@ -37,7 +37,7 @@ module TcType (
   --------------------------------
   -- MetaDetails
   TcTyVarDetails(..), pprTcTyVarDetails, vanillaSkolemTv, superSkolemTv,
-  MetaDetails(Flexi, Indirect), MetaInfo(..),
+  isMetaTyVarDetails, MetaDetails(Flexi, Indirect), MetaInfo(..),
   isImmutableTyVar, isSkolemTyVar, isMetaTyVar,  isMetaTyVarTy, isTyVarTy,
   tcIsTcTyVar, isTyVarTyVar, isOverlappableTyVar,  isTyConableTyVar,
   isFskTyVar, isFmvTyVar, isFlattenTyVar,
@@ -173,6 +173,8 @@ module TcType (
   tyCoVarsOfTypeList, tyCoVarsOfTypesList,
   noFreeVarsOfType,
 
+  disjointFromType,
+
   --------------------------------
   pprKind, pprParendKind, pprSigmaType,
   pprType, pprParendType, pprTypeApp, pprTyThingCategory, tyThingCategory,
@@ -230,6 +232,7 @@ import Data.List  ( mapAccumL )
 -- import Data.Functor.Identity( Identity(..) )
 import Data.IORef
 import Data.List.NonEmpty( NonEmpty(..) )
+
 
 {-
 ************************************************************************
@@ -533,6 +536,10 @@ pprTcTyVarDetails (SkolemTv lvl True)  = text "ssk" <> colon <> ppr lvl
 pprTcTyVarDetails (SkolemTv lvl False) = text "sk"  <> colon <> ppr lvl
 pprTcTyVarDetails (MetaTv { mtv_info = info, mtv_tclvl = tclvl })
   = ppr info <> colon <> ppr tclvl
+
+isMetaTyVarDetails :: TcTyVarDetails -> Bool
+isMetaTyVarDetails (MetaTv {}) = True
+isMetaTyVarDetails _           = False
 
 -----------------------------
 data MetaDetails
@@ -933,7 +940,7 @@ isImmutableTyVar :: TyVar -> Bool
 isImmutableTyVar tv = isSkolemTyVar tv
 
 isTyConableTyVar, isSkolemTyVar, isOverlappableTyVar,
-  isMetaTyVar, isAmbiguousTyVar,
+  isAmbiguousTyVar,
   isFmvTyVar, isFskTyVar, isFlattenTyVar :: TcTyVar -> Bool
 
 isTyConableTyVar tv
@@ -976,13 +983,6 @@ isOverlappableTyVar tv
   = case tcTyVarDetails tv of
         SkolemTv _ overlappable -> overlappable
         _                       -> False
-  | otherwise = False
-
-isMetaTyVar tv
-  | isTyVar tv -- See Note [Coercion variables in free variable lists]
-  = case tcTyVarDetails tv of
-        MetaTv {} -> True
-        _         -> False
   | otherwise = False
 
 -- isAmbiguousTyVar is used only when reporting type errors
@@ -2445,3 +2445,70 @@ isNextArgVisible ty
   | otherwise                              = True
     -- this second case might happen if, say, we have an unzonked TauTv.
     -- But TauTvs can't range over types that take invisible arguments
+
+
+{- *********************************************************************
+*                                                                      *
+          Disjoint vars of a type
+*                                                                      *
+********************************************************************* -}
+
+infixl 9 `disjointFromType`, `disjointFromCo`
+
+disjointFromType :: TyCoVarSet -> TcType -> Bool
+-- (tcvs `disjointFromType` ty) returns True if ty would
+-- be well-scoped if floated outside of the binding site of tcvs
+-- This specifically includes coercion holes
+disjointFromType bad ty
+  = go ty
+  where
+    go (TyVarTy tv)             = not (tv `elemVarSet` bad) &&
+                                  (not (isMetaTyVar tv) || go (tyVarKind tv))
+    go (TyConApp _ tys)         = all go tys
+    go (LitTy {})               = True
+    go (AppTy fun arg)          = go fun && go arg
+    go (FunTy _ arg res)        = go arg && go res
+    go (ForAllTy (Bndr v _) ty) = go (varType v) &&
+                                  ((bad `delVarSet` v) `disjointFromType` ty)
+    go (CastTy ty co)           = go ty && disjointFromCo bad co
+    go (CoercionTy co)          = disjointFromCo bad co
+
+disjointFromCo :: TyCoVarSet -> Coercion -> Bool
+disjointFromCo bad co
+  = go co
+  where
+    go (Refl ty)             = bad `disjointFromType` ty
+    go (GRefl _ ty mco)      = bad `disjointFromType` ty && goMCo mco
+    go (TyConAppCo _ _ cos)  = all go cos
+    go (AppCo co arg)        = go co  && go arg
+    go (FunCo _ co1 co2)     = go co1 && go co2
+    go (ForAllCo v kco co)   = bad `disjointFromType` varType v &&
+                               go kco                           &&
+                               (bad `delVarSet` v) `disjointFromCo` co
+    go (CoVarCo v)           = goVar v
+    go (HoleCo h)            = goVar (coHoleCoVar h)
+    go (AxiomInstCo _ _ cos) = all go cos
+    go (UnivCo p _ t1 t2)    = goProv p &&
+                               bad `disjointFromType` t1 &&
+                               bad `disjointFromType` t2
+    go (SymCo co)            = go co
+    go (TransCo co1 co2)     = go co1 && go co2
+    go (NthCo _ _ co)        = go co
+    go (LRCo _ co)           = go co
+    go (InstCo co arg)       = go co && go arg
+    go (KindCo co)           = go co
+    go (SubCo co)            = go co
+    go (AxiomRuleCo _ cos)   = all go cos
+
+    goMCo MRefl    = True
+    goMCo (MCo co) = go co
+
+    goProv UnsafeCoerceProv     = True
+    goProv (PluginProv _)       = True
+    goProv (PhantomProv kco)    = go kco
+    goProv (ProofIrrelProv kco) = go kco
+
+    goVar v = not (v `elemVarSet` bad) &&
+              bad `disjointFromType` varType v
+      -- Is the "deep" part necessary both for
+      -- coercion variables and for holes?
