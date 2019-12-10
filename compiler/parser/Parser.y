@@ -766,13 +766,22 @@ signature :: { Located (HsModule GhcPs) }
                     ([mj AnnSignature $2, mj AnnWhere $6] ++ fst $7) }
 
 module :: { Located (HsModule GhcPs) }
-       : maybedocheader 'module' modid maybemodwarning maybeexports 'where' body
+       -- it is important that we include both rules below and not use
+       -- maybedocheader here since we may have a module which begins with a
+       -- declaration with docstring (see #17561).
+       : moduleheader 'module' modid maybemodwarning maybeexports 'where' body
              {% fileSrcSpan >>= \ loc ->
                 ams (L loc (HsModule (Just $3) $5 (fst $ snd $7)
                               (snd $ snd $7) $4 $1)
                     )
                     ([mj AnnModule $2, mj AnnWhere $6] ++ fst $7) }
-        | body2
+       | 'module' modid maybemodwarning maybeexports 'where' body
+             {% fileSrcSpan >>= \ loc ->
+                ams (L loc (HsModule (Just $2) $4 (fst $ snd $6)
+                              (snd $ snd $6) $3 Nothing)
+                    )
+                    ([mj AnnModule $1, mj AnnWhere $5] ++ fst $6) }
+       | body2
                 {% fileSrcSpan >>= \ loc ->
                    ams (L loc (HsModule Nothing Nothing
                                (fst $ snd $1) (snd $ snd $1) Nothing Nothing))
