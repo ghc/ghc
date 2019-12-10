@@ -927,7 +927,7 @@ dsDo stmts
                do_arg (ApplicativeArgOne _ pat expr _ fail_op) =
                  ((pat, fail_op), dsLExpr expr)
                do_arg (ApplicativeArgMany _ stmts ret pat) =
-                 ((pat, noSyntaxExpr), dsDo (stmts ++ [noLoc $ mkLastStmt (noLoc ret)]))
+                 ((pat, Nothing), dsDo (stmts ++ [noLoc $ mkLastStmt (noLoc ret)]))
                do_arg (XApplicativeArg nec) = noExtCon nec
 
            ; rhss' <- sequence rhss
@@ -961,7 +961,7 @@ dsDo stmts
       where
         new_bind_stmt = cL loc $ BindStmt bind_ty (mkBigLHsPatTupId later_pats)
                                          mfix_app bind_op
-                                         noSyntaxExpr  -- Tuple cannot fail
+                                         Nothing  -- Tuple cannot fail
 
         tup_ids      = rec_ids ++ filterOut (`elem` rec_ids) later_ids
         tup_ty       = mkBigCoreTupTy (map idType tup_ids) -- Deals with singleton case
@@ -988,16 +988,16 @@ dsDo stmts
     go _ (TransStmt {}) _ = panic "dsDo TransStmt"
     go _ (XStmtLR nec)  _ = noExtCon nec
 
-handle_failure :: LPat GhcTc -> MatchResult -> SyntaxExpr GhcTc -> DsM CoreExpr
+handle_failure :: LPat GhcTc -> MatchResult -> Maybe (SyntaxExpr GhcTc) -> DsM CoreExpr
     -- In a do expression, pattern-match failure just calls
     -- the monadic 'fail' rather than throwing an exception
-handle_failure pat match fail_op
+handle_failure pat match (Just fail_op)
   | matchCanFail match
   = do { dflags <- getDynFlags
        ; fail_msg <- mkStringExpr (mk_fail_msg dflags pat)
        ; fail_expr <- dsSyntaxExpr fail_op [fail_msg]
        ; extractMatchResult match fail_expr }
-  | otherwise
+handle_failure _ match _
   = extractMatchResult match (error "It can't fail")
 
 mk_fail_msg :: HasSrcSpan e => DynFlags -> e -> String
