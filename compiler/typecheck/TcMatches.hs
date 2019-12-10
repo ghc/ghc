@@ -934,7 +934,7 @@ tcMonadFailOp :: CtOrigin
               -> TcRn (Maybe (SyntaxExpr GhcTcId))  -- Typechecked fail op
 -- Get a 'fail' operator expression, to use if the pattern match fails.
 -- This won't be used in cases where we've already determined the pattern
--- match can't fail (so the fail op is Nothing), however, it seems that the 
+-- match can't fail (so the fail op is Nothing), however, it seems that the
 -- isIrrefutableHsPat test is still required here for some reason I haven't
 -- yet determined.
 tcMonadFailOp orig pat fail_op res_ty
