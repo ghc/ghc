@@ -1,0 +1,6 @@
+
+T17563.hs:5:9: error:
+    • Illegal equational constraint a b ~ a c
+      (Use GADTs or TypeFamilies to permit this)
+    • In the quantified constraint ‘forall (a :: * -> *). a b ~ a c’
+      In the type signature: blah :: (forall a. a b ~ a c) => b -> c

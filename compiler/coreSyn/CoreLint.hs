@@ -2367,7 +2367,7 @@ lookupIdInScope id_occ
                             2 (pprBndr LetBind id_occ)
     bad_global id_bnd = isGlobalId id_occ
                      && isLocalId id_bnd
-                     && not (isWiredInName (idName id_occ))
+                     && not (isWiredIn id_occ)
        -- 'bad_global' checks for the case where an /occurrence/ is
        -- a GlobalId, but there is an enclosing binding fora a LocalId.
        -- NB: the in-scope variables are mostly LocalIds, checked by lintIdBndr,

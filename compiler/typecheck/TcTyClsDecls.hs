@@ -3394,6 +3394,12 @@ checkValidTyCon tc
   | isPrimTyCon tc   -- Happens when Haddock'ing GHC.Prim
   = return ()
 
+  | isWiredIn tc     -- validity-checking wired-in tycons is a waste of
+                     -- time. More importantly, a wired-in tycon might
+                     -- violate assumptions. Example: (~) has a superclass
+                     -- mentioning (~#), which is ill-kinded in source Haskell
+  = traceTc "Skipping validity check for wired-in" (ppr tc)
+
   | otherwise
   = do { traceTc "checkValidTyCon" (ppr tc $$ ppr (tyConClass_maybe tc))
        ; if | Just cl <- tyConClass_maybe tc
