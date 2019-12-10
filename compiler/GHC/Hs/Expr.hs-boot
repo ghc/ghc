@@ -13,7 +13,7 @@ module GHC.Hs.Expr where
 import SrcLoc     ( Located )
 import Outputable ( SDoc, Outputable )
 import {-# SOURCE #-} OccName (OccName)
-import {-# SOURCE #-} RdrName (GlobalRdrEnv)
+import RdrName (GlobalRdrEnv)
 import {-# SOURCE #-} GHC.Hs.Pat  ( LPat )
 import BasicTypes ( SpliceExplicitFlag(..))
 import GHC.Hs.Extension ( OutputableBndrId, GhcPass )
