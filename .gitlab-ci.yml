@@ -649,8 +649,6 @@ validate-x86_64-linux-deb9-dwarf:
   variables:
     TEST_ENV: "x86_64-linux-deb10"
     BIN_DIST_PREP_TAR_COMP: "./ghc-x86_64-deb10-linux.tar.xz"
-    # pxz doesn't exist; it's xz --threads
-    XZ: "xz --threads=$CORES"
   cache:
     key: linux-x86_64-deb10
 
@@ -715,7 +713,6 @@ release-x86_64-linux-deb8:
     BUILD_SPHINX_PDF: "NO"
     TEST_ENV: "x86_64-linux-alpine"
     BIN_DIST_PREP_TAR_COMP: "ghc-x86_64-alpine-linux.tar.xz"
-    XZ: "xz --threads=$CORES"
     # Can't use ld.gold due to #13958.
     CONFIGURE_ARGS: "--disable-ld-override"
   cache:
@@ -748,8 +745,6 @@ nightly-x86_64-linux-alpine:
     BUILD_SPHINX_PDF: "NO"
     TEST_ENV: "x86_64-linux-centos7"
     BIN_DIST_PREP_TAR_COMP: "ghc-x86_64-centos7-linux.tar.xz"
-    # pxz is not available on centos7 for reasons I can't understand
-    XZ: "xz"
     # CentOS seems to default to ascii
     LANG: "en_US.UTF-8"
   cache:
