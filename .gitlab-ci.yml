@@ -562,7 +562,7 @@ nightly-x86_64-linux-deb9:
 # N.B. Has DEBUG assertions enabled in stage2
 validate-x86_64-linux-deb9-debug:
   extends: .build-x86_64-linux-deb9
-  stage: build
+  stage: full-build
   variables:
     BUILD_FLAVOUR: validate
     # Ensure that stage2 also has DEBUG enabled
@@ -631,7 +631,7 @@ release-x86_64-linux-deb9:
 
 validate-x86_64-linux-deb9-dwarf:
   extends: .build-x86_64-linux-deb9
-  stage: build
+  stage: full-build
   variables:
     CONFIGURE_ARGS: "--enable-dwarf-unwind"
     BUILD_FLAVOUR: dwarf
