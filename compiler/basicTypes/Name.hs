@@ -61,7 +61,7 @@ module Name (
         isSystemName, isInternalName, isExternalName,
         isTyVarName, isTyConName, isDataConName,
         isValName, isVarName,
-        isWiredInName, isBuiltInSyntax,
+        isWiredInName, isWiredIn, isBuiltInSyntax,
         isHoleName,
         wiredInNameTyThing_maybe,
         nameIsLocalOrFrom, nameIsHomePackage,
@@ -220,6 +220,9 @@ isWiredInName     :: Name -> Bool
 
 isWiredInName (Name {n_sort = WiredIn _ _ _}) = True
 isWiredInName _                               = False
+
+isWiredIn :: NamedThing thing => thing -> Bool
+isWiredIn = isWiredInName . getName
 
 wiredInNameTyThing_maybe :: Name -> Maybe TyThing
 wiredInNameTyThing_maybe (Name {n_sort = WiredIn _ thing _}) = Just thing
