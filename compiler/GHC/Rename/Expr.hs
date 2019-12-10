@@ -1682,7 +1682,7 @@ stmtTreeToStmts monad_names ctxt (StmtTreeOne (L _ (BindStmt _ pat rhs _ fail_op
                             , is_body_stmt     = False
                             , fail_operator    = fail_op}]
                       False tail'
-stmtTreeToStmts monad_names ctxt (StmtTreeOne (L _ (BodyStmt _ rhs _ fail_op),_))
+stmtTreeToStmts monad_names ctxt (StmtTreeOne (L _ (BodyStmt _ rhs _ guard_op),_))
                 tail _tail_fvs
   | (False,tail') <- needJoin monad_names tail
   = mkApplicativeStmt ctxt
@@ -1691,7 +1691,7 @@ stmtTreeToStmts monad_names ctxt (StmtTreeOne (L _ (BodyStmt _ rhs _ fail_op),_)
        , app_arg_pattern  = nlWildPatName
        , arg_expr         = rhs
        , is_body_stmt     = True
-       , fail_operator    = fail_op}] False tail'
+       , fail_operator    = Just guard_op}] False tail'
 
 stmtTreeToStmts _monad_names _ctxt (StmtTreeOne (s,_)) tail _tail_fvs =
   return (s : tail, emptyNameSet)
@@ -1727,7 +1727,7 @@ stmtTreeToStmts monad_names ctxt (StmtTreeApplicative trees) tail tail_fvs = do
              , app_arg_pattern  = nlWildPatName
              , arg_expr         = exp
              , is_body_stmt     = True
-             , fail_operator    = fail_op
+             , fail_operator    = Just fail_op
              }, emptyFVs)
    stmtTreeArg ctxt tail_fvs tree = do
      let stmts = flattenStmtTree tree
@@ -2147,16 +2147,16 @@ badIpBinds what binds
 
 monadFailOp :: LPat GhcPs
             -> HsStmtContext GhcRn
-            -> RnM (SyntaxExpr GhcRn, FreeVars)
+            -> RnM (Maybe (SyntaxExpr GhcRn), FreeVars)
 monadFailOp pat ctxt
   -- If the pattern is irrefutable (e.g.: wildcard, tuple, ~pat, etc.)
   -- we should not need to fail.
-  | isIrrefutableHsPat pat = return (noSyntaxExpr, emptyFVs)
+  | isIrrefutableHsPat pat = return (Nothing, emptyFVs)
 
   -- For non-monadic contexts (e.g. guard patterns, list
   -- comprehensions, etc.) we should not need to fail.  See Note
   -- [Failing pattern matches in Stmts]
-  | not (isMonadFailStmtContext ctxt) = return (noSyntaxExpr, emptyFVs)
+  | not (isMonadFailStmtContext ctxt) = return (Nothing, emptyFVs)
 
   | otherwise = getMonadFailOp
 
@@ -2184,11 +2184,12 @@ So, in this case, we synthesize the function
 (rather than plain 'fail') for the 'fail' operation. This is done in
 'getMonadFailOp'.
 -}
-getMonadFailOp :: RnM (SyntaxExpr GhcRn, FreeVars) -- Syntax expr fail op
+getMonadFailOp :: RnM (Maybe (SyntaxExpr GhcRn), FreeVars) -- Syntax expr fail op
 getMonadFailOp
  = do { xOverloadedStrings <- fmap (xopt LangExt.OverloadedStrings) getDynFlags
       ; xRebindableSyntax <- fmap (xopt LangExt.RebindableSyntax) getDynFlags
-      ; reallyGetMonadFailOp xRebindableSyntax xOverloadedStrings
+      ; (fail, fvs) <- reallyGetMonadFailOp xRebindableSyntax xOverloadedStrings
+      ; return (Just fail, fvs)
       }
   where
     reallyGetMonadFailOp rebindableSyntax overloadedStrings
