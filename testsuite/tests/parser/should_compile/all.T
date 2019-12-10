@@ -164,3 +164,4 @@ test('proposal-229f',
      multimod_compile_and_run, ['proposal-229f.hs', ''])
 
 test('T15730a', normal, compile_and_run, [''])
+test('T17561', normal, compile_and_run, ['-haddock'])
