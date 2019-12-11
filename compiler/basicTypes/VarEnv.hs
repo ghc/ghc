@@ -70,12 +70,13 @@ module VarEnv (
 
         -- * TidyEnv and its operation
         TidyEnv,
-        emptyTidyEnv, mkEmptyTidyEnv
+        emptyTidyEnv, mkEmptyTidyEnv, delTidyEnvList
     ) where
 
 import GhcPrelude
 
 import OccName
+import Name
 import Var
 import VarSet
 import UniqSet
@@ -407,6 +408,12 @@ emptyTidyEnv = (emptyTidyOccEnv, emptyVarEnv)
 
 mkEmptyTidyEnv :: TidyOccEnv -> TidyEnv
 mkEmptyTidyEnv occ_env = (occ_env, emptyVarEnv)
+
+delTidyEnvList :: TidyEnv -> [Var] -> TidyEnv
+delTidyEnvList (occ_env, var_env) vs = (occ_env', var_env')
+  where
+    occ_env' = occ_env `delTidyOccEnvList` map (occNameFS . getOccName) vs
+    var_env' = var_env `delVarEnvList` vs
 
 {-
 ************************************************************************

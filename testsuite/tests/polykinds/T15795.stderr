@@ -1,12 +1,13 @@
 
-T15825.hs:14:10: error:
+T15795.hs:12:3: error:
     • Cannot generalise type because a skolem would escape.
       When generalising this type:
-        forall k (a :: C k). X (a @x0)
+        forall k (b :: k). T @k @a0 b
       these skolems would escape:
         k
       if we quantified this variable:
-        (x0 :: k)
+        (a0 :: k)
       (Indeed, I sometimes struggle even printing this correctly,
        due to its ill-scoped nature.)
-    • In the instance declaration for ‘X (a :: *)’
+    • In the definition of data constructor ‘MkT’
+      In the data declaration for ‘T’

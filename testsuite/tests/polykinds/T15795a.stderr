@@ -1,12 +1,13 @@
 
-T15825.hs:14:10: error:
+T15795a.hs:9:3: error:
     • Cannot generalise type because a skolem would escape.
       When generalising this type:
-        forall k (a :: C k). X (a @x0)
+        forall u (a :: u). F @u @cat10 a
       these skolems would escape:
-        k
+        u
       if we quantified this variable:
-        (x0 :: k)
+        (cat10 :: u)
       (Indeed, I sometimes struggle even printing this correctly,
        due to its ill-scoped nature.)
-    • In the instance declaration for ‘X (a :: *)’
+    • In the definition of data constructor ‘Prod’
+      In the data declaration for ‘F’

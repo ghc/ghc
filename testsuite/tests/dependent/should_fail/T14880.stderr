@@ -1,0 +1,16 @@
+
+T14880.hs:12:5: error:
+    • Cannot generalise type because a skolem would escape.
+      When generalising this type:
+        forall x arg.
+        ((Foo arg @a0 :: (Proxy @{arg} a0 -> *))
+         ~ (Foo arg @a0 :: (Proxy @{arg} a0 -> *))) =>
+        Bar x
+      these skolems would escape:
+        arg
+      if we quantified this variable:
+        (a0 :: arg)
+      (Indeed, I sometimes struggle even printing this correctly,
+       due to its ill-scoped nature.)
+    • In the definition of data constructor ‘MkBar’
+      In the data declaration for ‘Bar’
