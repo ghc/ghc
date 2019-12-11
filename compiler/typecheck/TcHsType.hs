@@ -269,6 +269,7 @@ tc_hs_sig_type :: SkolemInfo -> LHsSigType GhcRn
 -- No validity checking or zonking
 -- Returns also a Bool indicating whether the type induced an insoluble constraint;
 -- True <=> constraint is insoluble
+-- See Note [Recipe for checking a signature]
 tc_hs_sig_type skol_info hs_sig_type ctxt_kind
   | HsIB { hsib_ext = sig_vars, hsib_body = hs_ty } <- hs_sig_type
   = do { (tc_lvl, (wanted, (spec_tkvs, ty)))
@@ -388,7 +389,7 @@ tcHsClsInstType user_ctxt hs_inst_ty
 ----------------------------------------------
 -- | Type-check a visible type application
 tcHsTypeApp :: LHsWcType GhcRn -> Kind -> TcM Type
--- See Note [Recipe for checking a signature] in TcHsType
+-- See Note [Recipe for checking a signature]
 tcHsTypeApp wc_ty kind
   | HsWC { hswc_ext = sig_wcs, hswc_body = hs_ty } <- wc_ty
   = do { ty <- solveLocalEqualities "tcHsTypeApp" $
@@ -1702,8 +1703,10 @@ Note [Recipe for checking a signature]
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 Checking a user-written signature requires several steps:
 
- 1. Generate constraints.
- 2. Solve constraints.
+ With a bumped TcLevel {
+   1. Generate constraints.
+   2. Solve constraints.
+ }
  3. Promote tyvars and/or kind-generalize.
  4. Zonk.
  5. Check validity.
@@ -1717,11 +1720,11 @@ order: Implicit]). Additionally, solving is necessary in order to
 kind-generalize correctly: otherwise, we do not know which metavariables
 are left unsolved.
 
-Step 3 is done by a call to candidateQTyVarsOfType, followed by a call to
-kindGeneralize{All,Some,None}. Here, we have to deal with the fact that
-metatyvars generated in the type may have a bumped TcLevel, because explicit
-foralls raise the TcLevel. To avoid these variables from ever being visible in
-the surrounding context, we must obey the following dictum:
+Step 3 is done by a call to kindGeneralize{All,Some,None}. Here, we have to
+deal with the fact that metatyvars generated in the type may have a bumped
+TcLevel, because explicit foralls raise the TcLevel. To avoid these variables
+from ever being visible in the surrounding context, we must obey the following
+dictum:
 
   Every metavariable in a type must either be
     (A) generalized, or
@@ -1731,9 +1734,9 @@ the surrounding context, we must obey the following dictum:
 The kindGeneralize functions do not require pre-zonking; they zonk as they
 go.
 
-If you are actually doing kind-generalization, you need to bump the level
-before generating constraints, as we will only generalize variables with
-a TcLevel higher than the ambient one.
+If you use kindGeneralizeNone, you can skip bumping the level in the recipe
+above. Only variables with a bumped level are generalized, so it's necessary
+to bump the level in other cases.
 
 After promoting/generalizing, we need to zonk again because both
 promoting and generalizing fill in metavariables.

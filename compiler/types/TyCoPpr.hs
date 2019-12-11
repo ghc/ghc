@@ -7,6 +7,7 @@ module TyCoPpr
         -- * Pretty-printing types
         pprType, pprParendType, pprPrecType, pprPrecTypeX,
         pprTypeApp, pprTCvBndr, pprTCvBndrs,
+        pprTyConBinders,
         pprSigmaType,
         pprTheta, pprParendTheta, pprForAll, pprUserForAll,
         pprTyVar, pprTyVars,
@@ -47,7 +48,7 @@ import IfaceType
 import VarSet
 import VarEnv
 
-import DynFlags   ( gopt_set,
+import DynFlags   ( gopt_set, gopt,
                     GeneralFlag(Opt_PrintExplicitKinds, Opt_PrintExplicitRuntimeReps) )
 import Outputable
 import BasicTypes ( PprPrec(..), topPrec, sigPrec, opPrec
@@ -189,6 +190,27 @@ pprTyVar tv
   | otherwise             = parens (ppr tv <+> dcolon <+> ppr kind)
   where
     kind = tyVarKind tv
+
+-- | Print the binders as they might appear in a surface-level
+-- declaration.
+pprTyConBinders :: [TyConBinder] -> SDoc
+pprTyConBinders tcbs = sdocWithDynFlags $ \dflags ->
+  let print_kinds = gopt Opt_PrintExplicitKinds dflags
+      ppr_tcb (Bndr tv flag) = case flag of
+        NamedTCB Required                -> pprTyVar tv
+        NamedTCB Specified | print_kinds -> char '@' <> pprTyVar tv
+        NamedTCB Inferred  | print_kinds -> char '@' <>
+          braces (if isLiftedTypeKind kind  -- cf. pprTyVar
+                  then ppr tv
+                  else ppr tv <+> dcolon <+> ppr kind)
+          where kind = tyVarKind tv
+        AnonTCB VisArg                   -> pprTyVar tv
+        _                                -> empty
+         -- last case covers invisible arguments without
+         -- -fprint-explicit-kinds, and also AnonTCB InvisArg
+
+  in
+  sep (map ppr_tcb tcbs)
 
 -----------------
 debugPprType :: Type -> SDoc
