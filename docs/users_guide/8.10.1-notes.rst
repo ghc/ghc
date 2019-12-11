@@ -12,6 +12,8 @@ Highlights
 
 - The :extension:`UnliftedNewtypes` extension.
 
+- A new, :rts-flag:`low-latency garbage collector <-xn>` for the oldest generation.
+
 Full details
 ------------
 
