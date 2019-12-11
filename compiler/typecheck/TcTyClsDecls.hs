@@ -50,7 +50,7 @@ import Coercion
 import TcOrigin
 import Type
 import TyCoRep   -- for checkValidRoles
-import TyCoPpr( pprTyVars, pprWithExplicitKindsWhen )
+import TyCoPpr( pprTyVars, pprWithExplicitKindsWhen, pprTyConBinders )
 import Class
 import CoAxiom
 import TyCon
@@ -1724,6 +1724,30 @@ There's also a change in the renamer:
 For completeness, it was also necessary to make coerce work on
 unlifted types, resolving #13595.
 
+Note [Unquantifiable kind variables]
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+Consider (#17562):
+
+  class (forall a. a b ~ a c) => C b c
+
+After elaboration and solving, we get
+
+  class (forall (a :: k -> kappa). (~) kappa (a b) (a c)) => C @{k} b c
+
+Note that kappa is unconstrained. (The k comes from generaliseTcTyCon,
+which has happened earlier.) We cannot possibly quantify over kappa -- there's
+nowhere to put it. But instead, we try to quantify over it, failing if
+we find any variable to quantify. Without this step, the final zonker
+(in TcHsSyn) will zap kappa to Any. In the case here, we then get an
+inexplicable failure about the use of the Any type family in the head of
+a quantified constraint.
+
+If we have -XNoPolyKinds, then all is well: quantifyTyVars will default
+kappa to Type.
+
+When trying to quantify, we don't want to quantify over class variables,
+so we quantify the type (forall class_tvs. ctxt => ()).
+
 -}
 
 tcTyClDecl :: RolesInfo -> LTyClDecl GhcRn -> TcM (TyCon, [DerivInfo])
@@ -1824,6 +1848,16 @@ tcClassDecl1 roles_info class_name hs_ctxt meths fundeps sigs ats at_defs
                   ; at_stuff  <- tcClassATs class_name clas ats at_defs
                   ; return (ctxt, fds, sig_stuff, at_stuff) }
 
+       ; bad_kvs <- kindGeneralizeAll (mkForAllTys (tyConTyVarBinders binders) $
+                                       mkPhiTy ctxt unitTy)
+          -- See Note [Unquantifiable kind variables]
+          -- See also Note [Recipe for checking a signature] in TcHsType
+          -- We don't generalize here because we don't have anywhere
+          -- to put freshly-generalized variables
+
+       ; unless (null bad_kvs) $
+         unquantifiable_kind_vars binders bad_kvs ctxt
+
        -- The solveEqualities will report errors for any
        -- unsolved equalities, so these zonks should not encounter
        -- any unfilled coercion variables unless there is such an error
@@ -1853,6 +1887,21 @@ tcClassDecl1 roles_info class_name hs_ctxt meths fundeps sigs ats at_defs
     tc_fundep (tvs1, tvs2) = do { tvs1' <- mapM (tcLookupTyVar . unLoc) tvs1 ;
                                 ; tvs2' <- mapM (tcLookupTyVar . unLoc) tvs2 ;
                                 ; return (tvs1', tvs2') }
+
+    unquantifiable_kind_vars binders bad_kvs ctxt
+      = do { let (env1, binders') = tidyTyCoVarBinders emptyTidyEnv binders
+                 (env2, bad_kvs') = tidyVarBndrs env1 bad_kvs
+           ; (env3, ctxt') <- zonkTidyTcTypes env2 ctxt
+           ; let doc = pprWithExplicitKindsWhen True $ -- always print kinds in this message
+                       vcat [ sep [ text "Unconstrained kind variable" <> plural bad_kvs'
+                                  , pprTyVars bad_kvs'
+                                  , text "in superclass context:" ]
+                            , nest 2 (text "class" <+> sep
+                                          [ pprThetaArrowTy ctxt'
+                                          , ppr class_name <+> pprTyConBinders binders' ])
+                            , text "Perhaps add a kind signature to a local type variable." ]
+            ; failWithTcM (env3, doc) }
+
 
 
 {- Note [Associated type defaults]

@@ -1,0 +1,7 @@
+
+T17562b.hs:6:1: error:
+    • Unconstrained kind variable k1 in superclass context:
+        class (forall (a :: k -> k1). (a b :: k1) ~ (a c :: k1)) =>
+              C @{k} (b :: k) (c :: k)
+      Perhaps add a kind signature to a local type variable.
+    • In the class declaration for ‘C’
