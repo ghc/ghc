@@ -95,8 +95,8 @@ tidyTyCoVarBinders tidy_env tvbs
 tidyFreeTyCoVars :: TidyEnv -> [TyCoVar] -> TidyEnv
 -- ^ Add the free 'TyVar's to the env in tidy form,
 -- so that we can tidy the type they are free in
-tidyFreeTyCoVars (full_occ_env, var_env) tyvars
-  = fst (tidyOpenTyCoVars (full_occ_env, var_env) tyvars)
+tidyFreeTyCoVars tidy_env tyvars
+  = fst (tidyOpenTyCoVars tidy_env tyvars)
 
 ---------------
 tidyOpenTyCoVars :: TidyEnv -> [TyCoVar] -> (TidyEnv, [TyCoVar])
@@ -232,5 +232,3 @@ tidyCo env@(_, subst) co
 
 tidyCos :: TidyEnv -> [Coercion] -> [Coercion]
 tidyCos env = map (tidyCo env)
-
-

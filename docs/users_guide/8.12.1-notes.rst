@@ -18,6 +18,12 @@ Full details
 Language
 ~~~~~~~~
 
+* In obscure scenarios, GHC now rejects programs it previously accepted, but
+  with unhelpful types. For example, if (with ``-XPartialTypeSignatures``) you
+  were to write ``x :: forall (f :: forall a (b :: a -> Type). b _). f _``, GHC previously
+  would have accepted ``x``, but its type would have involved the mysterious ``Any``
+  internal type family. Now, GHC rejects, explaining the situation.
+
 Compiler
 ~~~~~~~~
 
