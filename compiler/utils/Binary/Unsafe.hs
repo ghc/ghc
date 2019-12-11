@@ -53,7 +53,7 @@ withBinBuffer (BinData sz arr) action =
 -- Put
 -- -----------------------------------------------------------------------------
 
-data EnvP = EnvP !UserDataP !FastMutInt !FastMutInt !(IORef BinArray)
+data EnvP = EnvP UserDataP !FastMutInt !FastMutInt !(IORef BinArray)
 
 newtype Put a = Put { unput :: EnvP -> IO a }
 
@@ -152,7 +152,7 @@ userDataP = Put $ \(EnvP ud _ _ _) -> return ud
 -- Get
 -- -----------------------------------------------------------------------------
 
-data EnvG = EnvG !UserDataG !FastMutInt !Int !BinData
+data EnvG = EnvG UserDataG !FastMutInt !Int !BinData
 
 newtype Get a = Get { unget :: EnvG -> IO a }
 
