@@ -18,7 +18,7 @@
 module GHC.ByteOrder where
 
 -- Required for WORDS_BIGENDIAN
-#include "ghcautoconf.h"
+#include <ghcautoconf.h>
 
 -- | Byte ordering.
 data ByteOrder
