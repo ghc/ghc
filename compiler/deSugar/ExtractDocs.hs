@@ -196,7 +196,7 @@ subordinates instMap decl = case decl of
         derivs  = [ (instName, [unLoc doc], M.empty)
                   | (l, doc) <- mapMaybe (extract_deriv_ty . hsib_body) $
                                 concatMap (unLoc . deriv_clause_tys . unLoc) $
-                                unLoc $ dd_derivs dd
+                                hsDerivingClauses $ unLoc $ dd_derivs dd
                   , Just instName <- [M.lookup l instMap] ]
 
         extract_deriv_ty :: LHsType GhcRn -> Maybe (SrcSpan, LHsDocString)
