@@ -1752,12 +1752,12 @@ rnDataDefn doc (HsDataDefn { dd_ND = new_or_data, dd_cType = cType
                      (L _ (ConDeclGADT {})) : _  -> False
                      _                           -> True
 
-    rn_derivs (L loc ds)
+    rn_derivs (L loc (HsDerivingClauses ds))
       = do { deriv_strats_ok <- xoptM LangExt.DerivingStrategies
            ; failIfTc (lengthExceeds ds 1 && not deriv_strats_ok)
                multipleDerivClausesErr
            ; (ds', fvs) <- mapFvRn (rnLHsDerivingClause doc) ds
-           ; return (L loc ds', fvs) }
+           ; return (L loc (HsDerivingClauses ds'), fvs) }
 rnDataDefn _ (XHsDataDefn nec) = noExtCon nec
 
 warnNoDerivStrat :: Maybe (LDerivStrategy GhcRn)

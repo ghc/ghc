@@ -1119,7 +1119,7 @@ ty_decl :: { LTyClDecl GhcPs }
         | data_or_newtype capi_ctype tycl_hdr constrs maybe_derivings
                 {% amms (mkTyData (comb4 $1 $3 $4 $5) (snd $ unLoc $1) $2 $3
                            Nothing (reverse (snd $ unLoc $4))
-                                   (fmap reverse $5))
+                                   (fmap (HsDerivingClauses . reverse . hsDerivingClauses) $5))
                                    -- We need the location on tycl_hdr in case
                                    -- constrs and deriving are both empty
                         ((fst $ unLoc $1):(fst $ unLoc $4)) }
@@ -1130,7 +1130,7 @@ ty_decl :: { LTyClDecl GhcPs }
                  maybe_derivings
             {% amms (mkTyData (comb4 $1 $3 $5 $6) (snd $ unLoc $1) $2 $3
                             (snd $ unLoc $4) (snd $ unLoc $5)
-                            (fmap reverse $6) )
+                            (fmap (HsDerivingClauses . reverse . hsDerivingClauses) $6) )
                                    -- We need the location on tycl_hdr in case
                                    -- constrs and deriving are both empty
                     ((fst $ unLoc $1):(fst $ unLoc $4)++(fst $ unLoc $5)) }
@@ -1177,7 +1177,7 @@ inst_decl :: { LInstDecl GhcPs }
                           maybe_derivings
             {% amms (mkDataFamInst (comb4 $1 $4 $5 $6) (snd $ unLoc $1) $3 (snd $ unLoc $4)
                                       Nothing (reverse (snd  $ unLoc $5))
-                                              (fmap reverse $6))
+                                              (fmap (HsDerivingClauses . reverse . hsDerivingClauses) $6))
                     ((fst $ unLoc $1):mj AnnInstance $2:(fst $ unLoc $4)++(fst $ unLoc $5)) }
 
           -- GADT instance declaration
@@ -1186,7 +1186,7 @@ inst_decl :: { LInstDecl GhcPs }
                  maybe_derivings
             {% amms (mkDataFamInst (comb4 $1 $4 $6 $7) (snd $ unLoc $1) $3 (snd $ unLoc $4)
                                    (snd $ unLoc $5) (snd $ unLoc $6)
-                                   (fmap reverse $7))
+                                   (fmap (HsDerivingClauses . reverse . hsDerivingClauses) $7))
                     ((fst $ unLoc $1):mj AnnInstance $2
                        :(fst $ unLoc $4)++(fst $ unLoc $5)++(fst $ unLoc $6)) }
 
@@ -1346,7 +1346,7 @@ at_decl_inst :: { LInstDecl GhcPs }
         | data_or_newtype opt_instance capi_ctype tycl_hdr_inst constrs maybe_derivings
                {% amms (mkDataFamInst (comb4 $1 $4 $5 $6) (snd $ unLoc $1) $3 (snd $ unLoc $4)
                                     Nothing (reverse (snd $ unLoc $5))
-                                            (fmap reverse $6))
+                                            (fmap (HsDerivingClauses . reverse . hsDerivingClauses) $6))
                        ((fst $ unLoc $1):$2++(fst $ unLoc $4)++(fst $ unLoc $5)) }
 
         -- GADT instance declaration, with optional 'instance' keyword
@@ -1355,7 +1355,7 @@ at_decl_inst :: { LInstDecl GhcPs }
                  maybe_derivings
                 {% amms (mkDataFamInst (comb4 $1 $4 $6 $7) (snd $ unLoc $1) $3
                                 (snd $ unLoc $4) (snd $ unLoc $5) (snd $ unLoc $6)
-                                (fmap reverse $7))
+                                (fmap (HsDerivingClauses . reverse . hsDerivingClauses) $7))
                         ((fst $ unLoc $1):$2++(fst $ unLoc $4)++(fst $ unLoc $5)++(fst $ unLoc $6)) }
 
 data_or_newtype :: { Located (AddAnn, NewOrData) }
@@ -2358,11 +2358,11 @@ fielddecl :: { LConDeclField GhcPs }
 
 -- Reversed!
 maybe_derivings :: { HsDeriving GhcPs }
-        : {- empty -}             { noLoc [] }
-        | derivings               { $1 }
+        : {- empty -}             { noLoc (HsDerivingClauses []) }
+        | derivings               { fmap HsDerivingClauses $1 }
 
 -- A list of one or more deriving clauses at the end of a datatype
-derivings :: { HsDeriving GhcPs }
+derivings :: { Located [LHsDerivingClause GhcPs] }
         : derivings deriving      { sLL $1 $> $ $2 : unLoc $1 }
         | deriving                { sLL $1 $> [$1] }
 

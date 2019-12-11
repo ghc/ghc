@@ -745,8 +745,8 @@ tcDataFamInstDecl mb_clsinfo
        ; checkValidTyCon rep_tc
 
        ; let m_deriv_info = case derivs of
-               L _ []    -> Nothing
-               L _ preds ->
+               L _ (HsDerivingClauses[]) -> Nothing
+               L _ (HsDerivingClauses preds) ->
                  Just $ DerivInfo { di_rep_tc  = rep_tc
                                   , di_scoped_tvs = mkTyVarNamePairs (tyConTyVars rep_tc)
                                   , di_clauses = preds

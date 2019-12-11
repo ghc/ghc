@@ -656,7 +656,7 @@ cvt_id_arg (i, str, ty)
 
 cvtDerivs :: [TH.DerivClause] -> CvtM (HsDeriving GhcPs)
 cvtDerivs cs = do { cs' <- mapM cvtDerivClause cs
-                  ; returnL cs' }
+                  ; returnL (HsDerivingClauses cs') }
 
 cvt_fundep :: FunDep -> CvtM (LHsFunDep GhcPs)
 cvt_fundep (FunDep xs ys) = do { xs' <- mapM tNameL xs
