@@ -1,0 +1,8 @@
+
+T14880-2.hs:12:9: error:
+    • Cannot generalise type; skolem ‘arg’ would escape its scope
+      if I tried to quantify (a0 :: arg) in this type:
+        forall arg. Proxy @{Proxy @{arg} a0 -> *} (Foo arg @a0) -> ()
+      (Indeed, I sometimes struggle even printing this correctly,
+       due to its ill-scoped nature.)
+    • In the type signature: quux :: forall arg. Proxy (Foo arg) -> ()
