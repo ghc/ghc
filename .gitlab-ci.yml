@@ -548,6 +548,11 @@ nightly-i386-linux-deb9:
     when: always
     expire_in: 2 week
 
+release-x86_64-linux-deb9:
+  <<: *release
+  extends: .build-x86_64-linux-deb9
+  stage: full-build
+
 nightly-x86_64-linux-deb9:
   extends: .build-x86_64-linux-deb9
   stage: full-build
@@ -695,9 +700,6 @@ release-x86_64-linux-deb10:
 release-x86_64-linux-deb8:
   <<: *release
   extends: .build-x86_64-linux-deb8
-  artifacts:
-    when: always
-    expire_in: 2 week
 
 #################################
 # x86_64-linux-alpine
@@ -753,9 +755,6 @@ nightly-x86_64-linux-alpine:
 release-x86_64-linux-centos7:
   <<: *release
   extends: .build-x86_64-linux-centos7
-  artifacts:
-    when: always
-    expire_in: 2 week
 
 #################################
 # x86_64-linux-fedora27
