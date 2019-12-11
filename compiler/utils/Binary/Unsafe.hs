@@ -53,32 +53,28 @@ withBinBuffer (BinData sz arr) action =
 -- Put
 -- -----------------------------------------------------------------------------
 
-newtype Put a = Put { unput ::
-       UserDataP
-    -> FastMutInt
-    -> FastMutInt
-    -> IORef BinArray
-    -> IO a
-  }
+data EnvP = EnvP !UserDataP !FastMutInt !FastMutInt !(IORef BinArray)
+
+newtype Put a = Put { unput :: EnvP -> IO a }
 
 instance Functor Put where
   {-# INLINE fmap #-}
-  fmap f (Put m) = Put $ \ud ixr end bd ->
-    fmap f (m ud ixr end bd)
+  fmap f m = Put $ \env ->
+    fmap f (unput m env)
 
 instance Applicative Put where
   {-# INLINE pure #-}
-  pure x = Put $ \_ _ _ _ -> pure x
+  pure x = Put $ \_ -> pure x
 
   {-# INLINE (<*>) #-}
-  (Put f) <*> (Put x) = Put $ \ud ixr end bd ->
-    f ud ixr end bd <*> x ud ixr end bd
+  f <*> x = Put $ \env ->
+    unput f env <*> unput x env
 
 instance Monad Put where
   {-# INLINE (>>=) #-}
-  (Put x) >>= f = Put $ \ud ixr end bd -> do
-    a <- x ud ixr end bd
-    unput (f a) ud ixr end bd
+  x >>= f = Put $ \env -> do
+    a <- unput x env
+    unput (f a) env
 
 instance MonadFail Put where
   {-# INLINE fail #-}
@@ -109,7 +105,7 @@ runBuffer initialSize m = do
   writeFastMutInt szr initialSize
   arr  <- mallocForeignPtrBytes initialSize
   binr <- newIORef arr
-  unput m noUserData ixr szr binr
+  unput m (EnvP noUserData ixr szr binr)
   BinData <$> readFastMutInt ixr <*> readIORef binr
 
 {-# INLINE runPutIO #-}
@@ -126,7 +122,7 @@ runPut = unsafePerformIO . runPutIO
 
 {-# INLINE putPrim #-}
 putPrim :: Int -> (Ptr Word8 -> IO ()) -> Put ()
-putPrim n f = Put $ \_ ixr szr binr -> do
+putPrim n f = Put $ \(EnvP _ ixr szr binr) -> do
   ix <- readFastMutInt ixr
   sz <- readFastMutInt szr
   arr <- readIORef binr
@@ -136,51 +132,48 @@ putPrim n f = Put $ \_ ixr szr binr -> do
 
 {-# INLINE ioP #-}
 ioP :: IO a -> Put a
-ioP m = Put $ \_ _ _ _ -> m
+ioP m = Put $ \_ -> m
 
 {-# INLINE seekP #-}
 seekP :: Bin a -> Put ()
-seekP (BinPtr !i) = Put $ \_ ixr _ _ ->
+seekP (BinPtr !i) = Put $ \(EnvP _ ixr _ _) ->
   writeFastMutInt ixr i
 
 {-# INLINE tellP #-}
 tellP :: Put (Bin a)
-tellP = Put $ \_ ixr _ _ -> BinPtr <$> readFastMutInt ixr
+tellP = Put $ \(EnvP _ ixr _ _) ->
+  BinPtr <$> readFastMutInt ixr
 
 {-# INLINE userDataP #-}
 userDataP :: Put UserDataP
-userDataP = Put $ \ud _ _ _ -> return ud
+userDataP = Put $ \(EnvP ud _ _ _) -> return ud
 
 -- -----------------------------------------------------------------------------
 -- Get
 -- -----------------------------------------------------------------------------
 
-newtype Get a = Get { unget ::
-       UserDataG
-    -> FastMutInt
-    -> Int
-    -> BinData
-    -> IO a
-  }
+data EnvG = EnvG !UserDataG !FastMutInt !Int !BinData
+
+newtype Get a = Get { unget :: EnvG -> IO a }
 
 instance Functor Get where
   {-# INLINE fmap #-}
-  fmap f (Get m) = Get $ \ud ixr end bd ->
-    fmap f (m ud ixr end bd)
+  fmap f m = Get $ \env ->
+    fmap f (unget m env)
 
 instance Applicative Get where
   {-# INLINE pure #-}
-  pure x = Get $ \_ _ _ _ -> pure x
+  pure x = Get $ \_ -> pure x
 
   {-# INLINE (<*>) #-}
-  (Get f) <*> (Get x) = Get $ \ud ixr end bd ->
-    f ud ixr end bd <*> x ud ixr end bd
+  f <*> x = Get $ \env ->
+    unget f env <*> unget x env
 
 instance Monad Get where
   {-# INLINE (>>=) #-}
-  (Get x) >>= f = Get $ \ud ixr end bd -> do
-    a <- x ud ixr end bd
-    unget (f a) ud ixr end bd
+  x >>= f = Get $ \env -> do
+    a <- unget x env
+    unget (f a) env
 
 instance MonadFail Get where
   {-# INLINE fail #-}
@@ -191,7 +184,7 @@ runGetIO :: BinData -> Get a -> IO a
 runGetIO bd@(BinData size _) m = do
   ixr <- newFastMutInt
   writeFastMutInt ixr 0
-  unget m noUserData ixr size bd
+  unget m (EnvG noUserData ixr size bd)
 
 {-# INLINE runGet #-}
 runGet :: BinData -> Get a -> a
@@ -199,12 +192,13 @@ runGet bd = unsafePerformIO . runGetIO bd
 
 {-# INLINE seekG #-}
 seekG :: Bin a -> Get ()
-seekG (BinPtr !i) = Get $ \_ ixr _ _ ->
+seekG (BinPtr !i) = Get $ \(EnvG _ ixr _ _) ->
   writeFastMutInt ixr i
 
 {-# INLINE tellG #-}
 tellG :: Get (Bin a)
-tellG = Get $ \_ ixr _ _ -> BinPtr <$> readFastMutInt ixr
+tellG = Get $ \(EnvG _ ixr _ _) ->
+  BinPtr <$> readFastMutInt ixr
 
 -- -----------------------------------------------------------------------------
 -- Getting
@@ -212,7 +206,7 @@ tellG = Get $ \_ ixr _ _ -> BinPtr <$> readFastMutInt ixr
 
 {-# INLINE getPrim #-}
 getPrim :: Int -> (Ptr Word8 -> IO a) -> Get a
-getPrim n f = Get $ \_ ixr end (BinData _ arr) -> do
+getPrim n f = Get $ \(EnvG _ ixr end (BinData _ arr)) -> do
   ix <- readFastMutInt ixr
   when (ix + n > end) $
     ioError (mkIOError eofErrorType "Binary.Internal.getPrim" Nothing Nothing)
@@ -222,23 +216,23 @@ getPrim n f = Get $ \_ ixr end (BinData _ arr) -> do
 
 {-# INLINE interleaveG #-}
 interleaveG :: Get a -> Get a
-interleaveG m = Get $ \ud ixr end bd -> do
+interleaveG m = Get $ \(EnvG ud ixr end bd) -> do
  ixr' <- newFastMutInt
  writeFastMutInt ixr' =<< readFastMutInt ixr
- unsafeInterleaveIO $ unget m ud ixr' end bd
+ unsafeInterleaveIO $ unget m (EnvG ud ixr' end bd)
 
 {-# INLINE getSlice #-}
 getSlice :: Bin b -> Get a -> Get a
-getSlice (BinPtr !end) m = Get $ \ud ixr _ bd ->
-  unget m ud ixr end bd
+getSlice (BinPtr !end) m = Get $ \(EnvG ud ixr _ bd) ->
+  unget m (EnvG ud ixr end bd)
 
 {-# INLINE ioG #-}
 ioG :: IO a -> Get a
-ioG m = Get $ \_ _ _ _ -> m
+ioG m = Get $ \_ -> m
 
 {-# INLINE userDataG #-}
 userDataG :: Get UserDataG
-userDataG = Get $ \ud _ _ _ -> return ud
+userDataG = Get $ \(EnvG ud _ _ _) -> return ud
 
 -- -----------------------------------------------------------------------------
 -- File IO
@@ -279,8 +273,8 @@ writeState :: (Name -> Put ())
            -> (FastString -> Put ())
            -> Put a
            -> Put a
-writeState nonbind bind fs m = Put $ \_ ixr szr binr ->
-  unput m (UserDataP nonbind bind fs) ixr szr binr
+writeState nonbind bind fs m = Put $ \(EnvP _ ixr szr binr) ->
+  unput m (EnvP (UserDataP nonbind bind fs) ixr szr binr)
 
 data UserDataG
    = UserDataG {
@@ -297,5 +291,5 @@ readState :: Get Name
           -> Get FastString
           -> Get a
           -> Get a
-readState name fs m = Get $ \_ ixr end bd ->
-  unget m (UserDataG name fs) ixr end bd
+readState name fs m = Get $ \(EnvG _ ixr end bd) ->
+  unget m (EnvG (UserDataG name fs) ixr end bd)
