@@ -1723,7 +1723,7 @@ wiredInDerivInfo tycon decl
                     if isFunTyCon tycon || isPrimTyCon tycon
                        then []  -- no tyConTyVars
                        else mkTyVarNamePairs (tyConTyVars tycon)
-                , di_clauses = unLoc derivs
+                , di_clauses = hsDerivingClauses $ unLoc derivs
                 , di_ctxt = tcMkDeclCtxt decl } ]
 wiredInDerivInfo _ _ = []
 
@@ -2264,7 +2264,7 @@ tcDataDefn err_ctxt
             -- unlike the finalized 'tycon' defined above which is an 'AlgTyCon'
        ; let deriv_info = DerivInfo { di_rep_tc = tycon
                                     , di_scoped_tvs = tcTyConScopedTyVars tctc
-                                    , di_clauses = unLoc derivs
+                                    , di_clauses = hsDerivingClauses $ unLoc derivs
                                     , di_ctxt = err_ctxt }
        ; traceTc "tcDataDefn" (ppr tc_name $$ ppr tycon_binders $$ ppr extra_bndrs)
        ; return (tycon, [deriv_info]) }

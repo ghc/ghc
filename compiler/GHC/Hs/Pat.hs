@@ -72,7 +72,7 @@ import Data.Data hiding (TyCon,Fixity)
 type InPat p  = LPat p        -- No 'Out' constructors
 type OutPat p = LPat p        -- No 'In' constructors
 
-type LPat p = XRec p Pat
+type LPat p = XLoc p Pat
 
 -- | Pattern
 --

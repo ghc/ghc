@@ -1379,13 +1379,13 @@ instance ToHie (HsDataDefn GhcRn) where
     ]
   toHie (XHsDataDefn _) = pure []
 
-instance ToHie (HsDeriving GhcRn) where
-  toHie (L span clauses) = concatM
+instance ToHie (Located (HsDerivingClauses GhcRn)) where
+  toHie (L span (HsDerivingClauses clauses)) = concatM
     [ pure $ locOnly span
     , toHie clauses
     ]
 
-instance ToHie (LHsDerivingClause GhcRn) where
+instance ToHie (Located (HsDerivingClause GhcRn)) where
   toHie (L span cl) = concatM $ makeNode cl span : case cl of
       HsDerivingClause _ strat (L ispan tys) ->
         [ toHie strat

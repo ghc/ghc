@@ -20,7 +20,8 @@
 module GHC.Hs.Decls (
   -- * Toplevel declarations
   HsDecl(..), LHsDecl, HsDataDefn(..), HsDeriving, LHsFunDep,
-  HsDerivingClause(..), LHsDerivingClause, NewOrData(..), newOrDataToFlavour,
+  HsDerivingClause(..), HsDerivingClauses(..), LHsDerivingClause,
+  NewOrData(..), newOrDataToFlavour,
   StandaloneKindSig(..), LStandaloneKindSig, standaloneKindSigName,
 
   -- ** Class or type declarations
@@ -124,7 +125,7 @@ import Data.Data        hiding (TyCon,Fixity, Infix)
 ************************************************************************
 -}
 
-type LHsDecl p = Located (HsDecl p)
+type LHsDecl p = XLoc p HsDecl
         -- ^ When in a list this may have
         --
         --  - 'ApiAnnotation.AnnKeywordId' : 'ApiAnnotation.AnnSemi'
@@ -1199,8 +1200,10 @@ type instance XCHsDataDefn    (GhcPass _) = NoExtField
 
 type instance XXHsDataDefn    (GhcPass _) = NoExtCon
 
+
+newtype HsDerivingClauses pass = HsDerivingClauses { hsDerivingClauses :: [LHsDerivingClause pass] }
 -- | Haskell Deriving clause
-type HsDeriving pass = Located [LHsDerivingClause pass]
+type HsDeriving pass = XLoc pass HsDerivingClauses
   -- ^ The optional @deriving@ clauses of a data declaration. "Clauses" is
   -- plural because one can specify multiple deriving clauses using the
   -- @-XDerivingStrategies@ language extension.
@@ -1209,7 +1212,7 @@ type HsDeriving pass = Located [LHsDerivingClause pass]
   -- requested to derive, in order. If no deriving clauses were specified,
   -- the list is empty.
 
-type LHsDerivingClause pass = Located (HsDerivingClause pass)
+type LHsDerivingClause pass = XLoc pass HsDerivingClause
 
 -- | A single @deriving@ clause of a data declaration.
 --
@@ -1462,7 +1465,7 @@ pp_data_defn pp_hdr (HsDataDefn { dd_ND = new_or_data, dd_ctxt = context
     pp_sig = case mb_sig of
                Nothing   -> empty
                Just kind -> dcolon <+> ppr kind
-    pp_derivings (L _ ds) = vcat (map ppr ds)
+    pp_derivings (L _ (HsDerivingClauses ds)) = vcat (map ppr ds)
 pp_data_defn _ (XHsDataDefn x) = ppr x
 
 instance OutputableBndrId p

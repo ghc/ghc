@@ -810,7 +810,7 @@ repBangTy ty = do
 -------------------------------------------------------
 
 repDerivs :: HsDeriving GhcRn -> DsM (Core [TH.DerivClauseQ])
-repDerivs (L _ clauses)
+repDerivs (L _ (HsDerivingClauses clauses))
   = repList derivClauseQTyConName repDerivClause clauses
 
 repDerivClause :: LHsDerivingClause GhcRn

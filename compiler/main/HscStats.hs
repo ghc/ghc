@@ -136,7 +136,7 @@ ppSourceStats short (L _ (HsModule _ exports imports ldecls _ _))
 
     data_info (DataDecl { tcdDataDefn = HsDataDefn
                                           { dd_cons = cs
-                                          , dd_derivs = L _ derivs}})
+                                          , dd_derivs = L _ (HsDerivingClauses derivs)}})
         = ( length cs
           , foldl' (\s dc -> length (deriv_clause_tys $ unLoc dc) + s)
                    0 derivs )
