@@ -1,0 +1,16 @@
+
+T16946.hs:11:9: error:
+    • Cannot generalise type; skolem ‘k’ would escape its scope
+      if I tried to quantify (y0 :: k) in this type:
+        forall k (c :: k -> k -> *)
+               (m :: forall (x :: k) (y :: k). c x y -> * -> *) a.
+        CatMonad @k c m =>
+        a -> m @y0 @y0 (Id @{k} @y0 c) a
+      (Indeed, I sometimes struggle even printing this correctly,
+       due to its ill-scoped nature.)
+    • In the type signature:
+        boom :: forall k
+                       (c :: k -> k -> Type)
+                       (m :: forall (x :: k) (y :: k). c x y -> Type -> Type)
+                       a.
+                CatMonad c m => a -> m (Id c) a

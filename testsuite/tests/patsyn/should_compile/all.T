@@ -75,7 +75,6 @@ test('T14058', [extra_files(['T14058.hs', 'T14058a.hs'])],
                multimod_compile, ['T14058', '-v0'])
 test('T14326', normal, compile, [''])
 test('T14394', normal, ghci_script, ['T14394.script'])
-test('T14552', normal, compile, [''])
 test('T14498', normal, compile, [''])
 test('T16682', [extra_files(['T16682.hs', 'T16682a.hs'])],
                multimod_compile, ['T16682', '-v0 -fwarn-incomplete-patterns -fno-code'])

@@ -5,7 +5,7 @@ module TyCoPpr
         PprPrec(..), topPrec, sigPrec, opPrec, funPrec, appPrec, maybeParen,
 
         -- * Pretty-printing types
-        pprType, pprParendType, pprPrecType, pprPrecTypeX,
+        pprType, pprParendType, pprTidiedType, pprPrecType, pprPrecTypeX,
         pprTypeApp, pprTCvBndr, pprTCvBndrs,
         pprSigmaType,
         pprTheta, pprParendTheta, pprForAll, pprUserForAll,
@@ -81,9 +81,12 @@ See Note [Precedence in types] in BasicTypes.
 -- See Note [Pretty printing via Iface syntax] in PprTyThing
 --------------------------------------------------------
 
-pprType, pprParendType :: Type -> SDoc
+pprType, pprParendType, pprTidiedType :: Type -> SDoc
 pprType       = pprPrecType topPrec
 pprParendType = pprPrecType appPrec
+
+-- already pre-tidied
+pprTidiedType = pprIfaceType . toIfaceTypeX emptyVarSet
 
 pprPrecType :: PprPrec -> Type -> SDoc
 pprPrecType = pprPrecTypeX emptyTidyEnv

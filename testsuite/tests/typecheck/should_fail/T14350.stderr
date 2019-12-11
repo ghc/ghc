@@ -1,30 +1,52 @@
 
-T14350.hs:59:15: error:
-    • Couldn't match expected type ‘Proxy a1
-                                    -> Apply (Apply c 'Proxy) (Apply g 'Proxy)’
-                  with actual type ‘Sing (f @@ t0)’
-    • The function ‘applySing’ is applied to three arguments,
-      but its type ‘Sing f -> Sing t0 -> Sing (f @@ t0)’ has only two
-      In the expression: applySing f Proxy Proxy
-      In an equation for ‘dcomp’: dcomp f g x = applySing f Proxy Proxy
-    • Relevant bindings include
-        x :: Sing x (bound at T14350.hs:59:11)
-        g :: Sing g (bound at T14350.hs:59:9)
-        f :: Sing f (bound at T14350.hs:59:7)
-        dcomp :: Sing f
-                 -> Sing g -> Sing x -> (c @@ 'Proxy) @@ (g @@ 'Proxy)
-          (bound at T14350.hs:59:1)
-
-T14350.hs:59:27: error:
-    • Couldn't match expected type ‘Sing t0’
-                  with actual type ‘Proxy a0’
-    • In the second argument of ‘applySing’, namely ‘Proxy’
-      In the expression: applySing f Proxy Proxy
-      In an equation for ‘dcomp’: dcomp f g x = applySing f Proxy Proxy
-    • Relevant bindings include
-        x :: Sing x (bound at T14350.hs:59:11)
-        g :: Sing g (bound at T14350.hs:59:9)
-        f :: Sing f (bound at T14350.hs:59:7)
-        dcomp :: Sing f
-                 -> Sing g -> Sing x -> (c @@ 'Proxy) @@ (g @@ 'Proxy)
-          (bound at T14350.hs:59:1)
+T14350.hs:49:10: error:
+    • Cannot generalise type; skolem ‘a’ would escape its scope
+      if I tried to quantify (x0 :: a) in this type:
+        forall a (b1 :: a ~> *)
+               (c :: forall (x :: a). Proxy @{a} x ~> ((@@) @{*} @{a} b1 x ~> *))
+               (f :: forall (x :: a) (y :: (@@) @{*} @{a} b1 x).
+                     Proxy @{a} x
+                     ~> (Proxy @{Apply @a @(*) b1 x} y
+                         ~> (@@)
+                              @{*}
+                              @{Apply @a @(*) b1 x}
+                              ((@@)
+                                 @{Apply @a @(*) b1 x ~> *} @{Proxy @{a} x} (c @x) ('Proxy @{a} @x))
+                              y))
+               (g :: forall (x :: a). Proxy @{a} x ~> (@@) @{*} @{a} b1 x)
+               (x :: a).
+        Sing
+          @(Proxy @{a} x0
+            ~> (Proxy @{Apply @a @(*) b1 x0} y0
+                ~> Apply
+                     @(Apply @a @(*) b1 x0)
+                     @(*)
+                     (Apply
+                        @(Proxy @{a} x0)
+                        @(Apply @a @(*) b1 x0 ~> *)
+                        (c @x0)
+                        ('Proxy @{a} @x0))
+                     y0))
+          (f @x0 @y0)
+        -> Sing @(Proxy @{a} x1 ~> Apply @a @(*) b1 x1) (g @x1)
+        -> Sing @a x
+        -> (@@)
+             @{*}
+             @{Apply @a @(*) b1 x}
+             ((@@)
+                @{Apply @a @(*) b1 x ~> *} @{Proxy @{a} x} (c @x) ('Proxy @{a} @x))
+             ((@@)
+                @{Apply @a @(*) b1 x} @{Proxy @{a} x} (g @x) ('Proxy @{a} @x))
+      (Indeed, I sometimes struggle even printing this correctly,
+       due to its ill-scoped nature.)
+    • In the type signature:
+        dcomp :: forall (a :: Type)
+                        (b :: a ~> Type)
+                        (c :: forall (x :: a). Proxy x ~> b @@ x ~> Type)
+                        (f :: forall (x :: a) (y :: b @@ x).
+                              Proxy x ~> Proxy y ~> c @@ ('Proxy :: Proxy x) @@ y)
+                        (g :: forall (x :: a). Proxy x ~> b @@ x)
+                        (x :: a).
+                 Sing f
+                 -> Sing g
+                    -> Sing x -> c @@ ('Proxy :: Proxy x) @@ (g @@ ('Proxy :: Proxy x))

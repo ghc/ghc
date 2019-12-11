@@ -34,7 +34,7 @@ module Outputable (
         sep, cat,
         fsep, fcat,
         hang, hangNotEmpty, punctuate, ppWhen, ppUnless,
-        speakNth, speakN, speakNOf, plural, isOrAre, doOrDoes,
+        speakNth, speakN, speakNOf, plural, isOrAre, doOrDoes, itsOrTheir,
         unicodeSyntax,
 
         coloured, keyword,
@@ -1159,6 +1159,15 @@ isOrAre _   = text "are"
 doOrDoes :: [a] -> SDoc
 doOrDoes [_] = text "does"
 doOrDoes _   = text "do"
+
+-- | Determines the form of possessive appropriate for the length of a list:
+--
+-- > itsOrTheir [x]   = text "its"
+-- > itsOrTheir [x,y] = text "their"
+-- > itsOrTheir []    = text "their"  -- probably avoid this
+itsOrTheir :: [a] -> SDoc
+itsOrTheir [_] = text "its"
+itsOrTheir _   = text "their"
 
 {-
 ************************************************************************
