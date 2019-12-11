@@ -94,7 +94,7 @@ module OccName (
 
         -- * Tidying up
         TidyOccEnv, emptyTidyOccEnv, initTidyOccEnv,
-        tidyOccName, avoidClashesOccEnv,
+        tidyOccName, avoidClashesOccEnv, delTidyOccEnvList,
 
         -- FsEnv
         FastStringEnv, emptyFsEnv, lookupFsEnv, extendFsEnv, mkFsEnv
@@ -818,7 +818,7 @@ Every id contributes a type variable to the type signature, and all of them are
 
     (id,id,id) :: (a2 -> a2, a1 -> a1, a -> a)
 
-which is a bit unfortunate, as it unfairly renames only one of them. What we
+which is a bit unfortunate, as it unfairly renames only two of them. What we
 would like to see is
 
     (id,id,id) :: (a3 -> a3, a2 -> a2, a1 -> a1)
@@ -845,6 +845,9 @@ initTidyOccEnv :: [OccName] -> TidyOccEnv       -- Initialise with names to avoi
 initTidyOccEnv = foldl' add emptyUFM
   where
     add env (OccName _ fs) = addToUFM env fs 1
+
+delTidyOccEnvList :: TidyOccEnv -> [FastString] -> TidyOccEnv
+delTidyOccEnvList = delListFromUFM
 
 -- see Note [Tidying multiple names at once]
 avoidClashesOccEnv :: TidyOccEnv -> [OccName] -> TidyOccEnv

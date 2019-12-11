@@ -237,7 +237,7 @@ dependentArgErr (arg, bad_cos)
 ~~-~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 Consider
   data AST a = Sym [a]
-  class Prj s where { prj :: [a] -> Maybe (s a)
+  class Prj s where { prj :: [a] -> Maybe (s a) }
   pattern P x <= Sym (prj -> Just x)
 
 Here we get a matcher with this type
@@ -261,7 +261,7 @@ mentions the existentials.  We can conveniently do that by making the
    forall ex_tvs. arg_ty
 
 After that, Note [Naughty quantification candidates] in TcMType takes
-over, and zonks any such naughty variables to Any.
+over and errors.
 
 Note [Remove redundant provided dicts]
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~

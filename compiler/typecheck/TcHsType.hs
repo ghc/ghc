@@ -1770,7 +1770,7 @@ the surrounding context, we must obey the following dictum:
   Every metavariable in a type must either be
     (A) generalized, or
     (B) promoted, or        See Note [Promotion in signatures]
-    (C) zapped to Any       See Note [Naughty quantification candidates] in TcMType
+    (C) a cause to error    See Note [Naughty quantification candidates] in TcMType
 
 The kindGeneralize functions do not require pre-zonking; they zonk as they
 go.
