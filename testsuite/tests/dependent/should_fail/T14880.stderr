@@ -1,0 +1,16 @@
+
+T14880.hs:12:5: error:
+    • Skolem escape leads to quantification failure.
+      When quantifying this type:
+        forall x arg1.
+        ((Foo arg1 @a0 :: (Proxy @{arg1} a0 -> *))
+         ~ (Foo arg1 @a0 :: (Proxy @{arg1} a0 -> *))) =>
+        Bar x
+      these skolems would escape:
+        arg
+      if we quantified this variable:
+        (a0 :: arg)
+      (Indeed, I struggle even printing this correctly,
+       due to its ill-scoped nature.)
+    • In the definition of data constructor ‘MkBar’
+      In the data declaration for ‘Bar’

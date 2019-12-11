@@ -1,12 +1,12 @@
 
-T15825.hs:14:10: error:
+T14880-2.hs:12:9: error:
     • Skolem escape leads to quantification failure.
       When quantifying this type:
-        forall k1 (a :: C k1). X (a @x0)
+        forall arg1. Proxy @{Proxy @{arg1} a0 -> *} (Foo arg1 @a0) -> ()
       these skolems would escape:
-        k
+        arg
       if we quantified this variable:
-        (x0 :: k)
+        (a0 :: arg)
       (Indeed, I struggle even printing this correctly,
        due to its ill-scoped nature.)
-    • In the instance declaration for ‘X (a :: *)’
+    • In the type signature: quux :: forall arg. Proxy (Foo arg) -> ()

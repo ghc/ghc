@@ -1,12 +1,13 @@
 
-T15825.hs:14:10: error:
+T15795.hs:12:3: error:
     • Skolem escape leads to quantification failure.
       When quantifying this type:
-        forall k1 (a :: C k1). X (a @x0)
+        forall k1 (b :: k1). T @k1 @a0 b
       these skolems would escape:
         k
       if we quantified this variable:
-        (x0 :: k)
+        (a0 :: k)
       (Indeed, I struggle even printing this correctly,
        due to its ill-scoped nature.)
-    • In the instance declaration for ‘X (a :: *)’
+    • In the definition of data constructor ‘MkT’
+      In the data declaration for ‘T’
