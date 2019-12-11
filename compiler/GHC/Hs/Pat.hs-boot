@@ -10,10 +10,10 @@
 module GHC.Hs.Pat where
 
 import Outputable
-import GHC.Hs.Extension ( OutputableBndrId, GhcPass, XRec )
+import GHC.Hs.Extension ( OutputableBndrId, GhcPass, XLoc )
 
 type role Pat nominal
 data Pat (i :: *)
-type LPat i = XRec i Pat
+type LPat i = XLoc i Pat
 
 instance OutputableBndrId p => Outputable (Pat (GhcPass p))
