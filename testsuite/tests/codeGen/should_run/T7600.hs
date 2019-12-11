@@ -18,7 +18,7 @@
 module Main (main) where
 
 -- Required for WORDS_BIGENDIAN
-#include "ghcautoconf.h"
+#include <ghcautoconf.h>
 
 import T7600_A
 
