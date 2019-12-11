@@ -1,0 +1,20 @@
+
+T16946.hs:11:9: error:
+    • Cannot generalise type because a skolem would escape.
+      When generalising this type:
+        forall k (c :: k -> k -> *)
+               (m :: forall (x :: k) (y :: k). c x y -> * -> *) a.
+        CatMonad @k c m =>
+        a -> m @y0 @y0 (Id @{k} @y0 c) a
+      these skolems would escape:
+        k
+      if we quantified this variable:
+        (y0 :: k)
+      (Indeed, I sometimes struggle even printing this correctly,
+       due to its ill-scoped nature.)
+    • In the type signature:
+        boom :: forall k
+                       (c :: k -> k -> Type)
+                       (m :: forall (x :: k) (y :: k). c x y -> Type -> Type)
+                       a.
+                CatMonad c m => a -> m (Id c) a

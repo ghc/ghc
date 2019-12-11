@@ -1,12 +1,12 @@
 
-T15825.hs:14:10: error:
+T14880-2.hs:12:9: error:
     • Cannot generalise type because a skolem would escape.
       When generalising this type:
-        forall k (a :: C k). X (a @x0)
+        forall arg. Proxy @{Proxy @{arg} a0 -> *} (Foo arg @a0) -> ()
       these skolems would escape:
-        k
+        arg
       if we quantified this variable:
-        (x0 :: k)
+        (a0 :: arg)
       (Indeed, I sometimes struggle even printing this correctly,
        due to its ill-scoped nature.)
-    • In the instance declaration for ‘X (a :: *)’
+    • In the type signature: quux :: forall arg. Proxy (Foo arg) -> ()
