@@ -12,6 +12,7 @@
                                       -- in module GHC.Hs.PlaceHolder
 {-# LANGUAGE ConstraintKinds #-}
 {-# LANGUAGE TypeFamilies #-}
+{-# LANGUAGE LiberalTypeSynonyms #-}
 
 -- | Abstract syntax of global declarations.
 --
@@ -104,7 +105,6 @@ import TyCon
 import BasicTypes
 import Coercion
 import ForeignCall
-import GHC.Hs.Extension
 import NameSet
 
 -- others:
@@ -126,7 +126,7 @@ import Data.Data        hiding (TyCon,Fixity, Infix)
 ************************************************************************
 -}
 
-type LHsDecl p = XRec p HsDecl
+type LHsDecl p = XLoc p HsDecl
         -- ^ When in a list this may have
         --
         --  - 'ApiAnnotation.AnnKeywordId' : 'ApiAnnotation.AnnSemi'
@@ -1204,7 +1204,7 @@ type instance XXHsDataDefn    (GhcPass _) = NoExtCon
 
 newtype HsDerivingClauses pass = HsDerivingClauses { hsDerivingClauses :: [LHsDerivingClause pass] }
 -- | Haskell Deriving clause
-type HsDeriving pass = XRec pass HsDerivingClauses
+type HsDeriving pass = XLoc pass HsDerivingClauses
   -- ^ The optional @deriving@ clauses of a data declaration. "Clauses" is
   -- plural because one can specify multiple deriving clauses using the
   -- @-XDerivingStrategies@ language extension.
@@ -1213,7 +1213,7 @@ type HsDeriving pass = XRec pass HsDerivingClauses
   -- requested to derive, in order. If no deriving clauses were specified,
   -- the list is empty.
 
-type LHsDerivingClause pass = XRec pass HsDerivingClause
+type LHsDerivingClause pass = XLoc pass HsDerivingClause
 
 -- | A single @deriving@ clause of a data declaration.
 --

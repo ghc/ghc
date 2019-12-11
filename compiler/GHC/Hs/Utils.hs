@@ -976,7 +976,7 @@ collectHsIdBinders, collectHsValBinders
 collectHsIdBinders  = collect_hs_val_binders True
 collectHsValBinders = collect_hs_val_binders False
 
-collectHsBindBinders :: XRec pass Pat ~ Located (Pat pass) =>
+collectHsBindBinders :: XLoc pass Pat ~ Located (Pat pass) =>
                         HsBindLR pass idR -> [IdP pass]
 -- ^ Collect both Ids and pattern-synonym binders
 collectHsBindBinders b = collect_bind False b []
@@ -1003,7 +1003,7 @@ collect_binds :: Bool -> LHsBindsLR (GhcPass p) idR ->
 -- ^ Collect Ids, or Ids + pattern synonyms, depending on boolean flag
 collect_binds ps binds acc = foldr (collect_bind ps . unLoc) acc binds
 
-collect_bind :: XRec pass Pat ~ Located (Pat pass) =>
+collect_bind :: XLoc pass Pat ~ Located (Pat pass) =>
                 Bool -> HsBindLR pass idR ->
                 [IdP pass] -> [IdP pass]
 collect_bind _ (PatBind { pat_lhs = p })           acc = collect_lpat p acc
@@ -1067,7 +1067,7 @@ collectPatsBinders :: [LPat (GhcPass p)] -> [IdP (GhcPass p)]
 collectPatsBinders pats = foldr collect_lpat [] pats
 
 -------------
-collect_lpat :: XRec pass Pat ~ Located (Pat pass) =>
+collect_lpat :: XLoc pass Pat ~ Located (Pat pass) =>
                 LPat pass -> [IdP pass] -> [IdP pass]
 collect_lpat p bndrs
   = go (unLoc p)
