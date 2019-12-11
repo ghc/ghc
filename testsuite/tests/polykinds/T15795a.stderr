@@ -1,0 +1,9 @@
+
+T15795a.hs:9:3: error:
+    • Cannot generalise type; skolem ‘u’ would escape its scope
+      if I tried to quantify (cat10 :: u) in this type:
+        forall u (a :: u). F @u @cat10 a
+      (Indeed, I sometimes struggle even printing this correctly,
+       due to its ill-scoped nature.)
+    • In the definition of data constructor ‘Prod’
+      In the data declaration for ‘F’
