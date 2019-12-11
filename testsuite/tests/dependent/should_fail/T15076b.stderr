@@ -1,0 +1,11 @@
+
+T15076b.hs:8:8: error:
+    • Cannot generalise type; skolem ‘a’ would escape its scope
+      if I tried to quantify (x0 :: a) in this type:
+        forall a (f :: forall (x :: a). Proxy @{a} x -> *).
+        Proxy @{Proxy @{a} x0 -> *} (f @x0) -> ()
+      (Indeed, I sometimes struggle even printing this correctly,
+       due to its ill-scoped nature.)
+    • In the type signature:
+        foo :: forall (a :: Type) (f :: forall (x :: a). Proxy x -> Type).
+               Proxy f -> ()
