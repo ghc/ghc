@@ -1149,8 +1149,7 @@ So alpha is entirely unconstrained.
 
 What then should we do with alpha?  During generalization, every
 metavariable is either (A) promoted, (B) generalized, or (C) zapped
-(according again to Note [Recipe for checking a signature] in
-TcHsType).
+(according to Note [Recipe for checking a signature] in TcHsType).
 
  * We can't generalise it.
  * We can't promote it, because its kind prevents that
@@ -1158,11 +1157,14 @@ TcHsType).
    go into the typing environment (as the type of some let-bound
    variable, say), and then chaos erupts when we try to instantiate.
 
-So, we zap it, eagerly, to Any. We don't have to do this eager zapping
-in terms (say, in `length []`) because terms are never re-examined before
-the final zonk (which zaps any lingering metavariables to Any).
+Previously, we zapped it to Any. This worked, but it had the unfortunate
+effect of causing Any sometimes to appear in error messages. If this
+kind of signature happens, the user probably has made a mistake -- no
+one really wants Any in their types. So we now error. This must be
+a hard error (failure in the monad) to avoid other messages from mentioning
+Any.
 
-We do this eager zapping in candidateQTyVars, which always precedes
+We do this eager erroring in candidateQTyVars, which always precedes
 generalisation, because at that moment we have a clear picture of what
 skolems are in scope within the type itself (e.g. that 'forall arg').
 
@@ -1247,13 +1249,14 @@ partitionCandidates dvs@(DV { dv_kvs = kvs, dv_tvs = tvs }) pred
 -- See Note [Dependent type variables]
 candidateQTyVarsOfType :: TcType       -- not necessarily zonked
                        -> TcM CandidatesQTvs
-candidateQTyVarsOfType ty = collect_cand_qtvs False emptyVarSet mempty ty
+candidateQTyVarsOfType ty = collect_cand_qtvs ty False emptyVarSet mempty ty
 
 -- | Like 'candidateQTyVarsOfType', but over a list of types
 -- The variables to quantify must have a TcLevel strictly greater than
 -- the ambient level. (See Wrinkle in Note [Naughty quantification candidates])
 candidateQTyVarsOfTypes :: [Type] -> TcM CandidatesQTvs
-candidateQTyVarsOfTypes tys = foldlM (collect_cand_qtvs False emptyVarSet) mempty tys
+candidateQTyVarsOfTypes tys = foldlM (\acc ty -> collect_cand_qtvs ty False emptyVarSet acc ty)
+                                     mempty tys
 
 -- | Like 'candidateQTyVarsOfType', but consider every free variable
 -- to be dependent. This is appropriate when generalizing a *kind*,
@@ -1261,11 +1264,12 @@ candidateQTyVarsOfTypes tys = foldlM (collect_cand_qtvs False emptyVarSet) mempt
 -- to Type.)
 candidateQTyVarsOfKind :: TcKind       -- Not necessarily zonked
                        -> TcM CandidatesQTvs
-candidateQTyVarsOfKind ty = collect_cand_qtvs True emptyVarSet mempty ty
+candidateQTyVarsOfKind ty = collect_cand_qtvs ty True emptyVarSet mempty ty
 
 candidateQTyVarsOfKinds :: [TcKind]    -- Not necessarily zonked
                        -> TcM CandidatesQTvs
-candidateQTyVarsOfKinds tys = foldM (collect_cand_qtvs True emptyVarSet) mempty tys
+candidateQTyVarsOfKinds tys = foldM (\acc ty -> collect_cand_qtvs ty True emptyVarSet acc ty)
+                                    mempty tys
 
 delCandidates :: CandidatesQTvs -> [Var] -> CandidatesQTvs
 delCandidates (DV { dv_kvs = kvs, dv_tvs = tvs, dv_cvs = cvs }) vars
@@ -1274,7 +1278,8 @@ delCandidates (DV { dv_kvs = kvs, dv_tvs = tvs, dv_cvs = cvs }) vars
        , dv_cvs = cvs `delVarSetList`  vars }
 
 collect_cand_qtvs
-  :: Bool            -- True <=> consider every fv in Type to be dependent
+  :: TcType          -- original type that we started recurring into; for errors
+  -> Bool            -- True <=> consider every fv in Type to be dependent
   -> VarSet          -- Bound variables (locals only)
   -> CandidatesQTvs  -- Accumulating parameter
   -> Type            -- Not necessarily zonked
@@ -1284,14 +1289,14 @@ collect_cand_qtvs
 --   * Looks through meta-tyvars as it goes;
 --     no need to zonk in advance
 --
---   * Needs to be monadic anyway, because it does the zap-naughty
---     stuff; see Note [Naughty quantification candidates]
+--   * Needs to be monadic anyway, because it handles naughty
+--     quantification; see Note [Naughty quantification candidates]
 --
 --   * Returns fully-zonked CandidateQTvs, including their kinds
 --     so that subsequent dependency analysis (to build a well
 --     scoped telescope) works correctly
 
-collect_cand_qtvs is_dep bound dvs ty
+collect_cand_qtvs orig_ty is_dep bound dvs ty
   = go dvs ty
   where
     is_bound tv = tv `elemVarSet` bound
@@ -1304,8 +1309,8 @@ collect_cand_qtvs is_dep bound dvs ty
     go dv (FunTy _ arg res) = foldlM go dv [arg, res]
     go dv (LitTy {})        = return dv
     go dv (CastTy ty co)    = do dv1 <- go dv ty
-                                 collect_cand_qtvs_co bound dv1 co
-    go dv (CoercionTy co)   = collect_cand_qtvs_co bound dv co
+                                 collect_cand_qtvs_co orig_ty bound dv1 co
+    go dv (CoercionTy co)   = collect_cand_qtvs_co orig_ty bound dv co
 
     go dv (TyVarTy tv)
       | is_bound tv      = return dv
@@ -1315,8 +1320,8 @@ collect_cand_qtvs is_dep bound dvs ty
                                   Nothing     -> go_tv dv tv }
 
     go dv (ForAllTy (Bndr tv _) ty)
-      = do { dv1 <- collect_cand_qtvs True bound dv (tyVarKind tv)
-           ; collect_cand_qtvs is_dep (bound `extendVarSet` tv) dv1 ty }
+      = do { dv1 <- collect_cand_qtvs orig_ty True bound dv (tyVarKind tv)
+           ; collect_cand_qtvs orig_ty is_dep (bound `extendVarSet` tv) dv1 ty }
 
     -----------------
     go_tv dv@(DV { dv_kvs = kvs, dv_tvs = tvs }) tv
@@ -1334,25 +1339,23 @@ collect_cand_qtvs is_dep bound dvs ty
                  -- (#15795) and to make the naughty check
                  -- (which comes next) works correctly
 
+           ; let tv_kind_vars = tyCoVarsOfType tv_kind
            ; cur_lvl <- getTcLevel
            ; if |  tcTyVarLevel tv <= cur_lvl
                 -> return dv   -- this variable is from an outer context; skip
                                -- See Note [Use level numbers ofor quantification]
 
-                |  intersectsVarSet bound (tyCoVarsOfType tv_kind)
+                |  intersectsVarSet bound tv_kind_vars
                    -- the tyvar must not be from an outer context, but we have
                    -- already checked for this.
                    -- See Note [Naughty quantification candidates]
-                -> do { traceTc "Zapping naughty quantifier" $
+                -> do { traceTc "Naughty quantifier" $
                           vcat [ ppr tv <+> dcolon <+> ppr tv_kind
                                , text "bound:" <+> pprTyVars (nonDetEltsUniqSet bound)
-                               , text "fvs:" <+> pprTyVars (nonDetEltsUniqSet $
-                                                            tyCoVarsOfType tv_kind) ]
+                               , text "fvs:" <+> pprTyVars (nonDetEltsUniqSet tv_kind_vars) ]
 
-                      ; writeMetaTyVar tv (anyTypeOfKind tv_kind)
-
-                      -- See Note [Recurring into kinds for candidateQTyVars]
-                      ; collect_cand_qtvs True bound dv tv_kind }
+                      ; let escapees = intersectVarSet bound tv_kind_vars
+                      ; naughtyQuantification orig_ty tv escapees }
 
                 |  otherwise
                 -> do { let tv' = tv `setTyVarKind` tv_kind
@@ -1361,15 +1364,16 @@ collect_cand_qtvs is_dep bound dvs ty
                                 -- See Note [Order of accumulation]
 
                         -- See Note [Recurring into kinds for candidateQTyVars]
-                      ; collect_cand_qtvs True bound dv' tv_kind } }
+                      ; collect_cand_qtvs orig_ty True bound dv' tv_kind } }
 
-collect_cand_qtvs_co :: VarSet -- bound variables
+collect_cand_qtvs_co :: TcType -- original type at top of recursion; for errors
+                     -> VarSet -- bound variables
                      -> CandidatesQTvs -> Coercion
                      -> TcM CandidatesQTvs
-collect_cand_qtvs_co bound = go_co
+collect_cand_qtvs_co orig_ty bound = go_co
   where
-    go_co dv (Refl ty)             = collect_cand_qtvs True bound dv ty
-    go_co dv (GRefl _ ty mco)      = do dv1 <- collect_cand_qtvs True bound dv ty
+    go_co dv (Refl ty)             = collect_cand_qtvs orig_ty True bound dv ty
+    go_co dv (GRefl _ ty mco)      = do dv1 <- collect_cand_qtvs orig_ty True bound dv ty
                                         go_mco dv1 mco
     go_co dv (TyConAppCo _ _ cos)  = foldlM go_co dv cos
     go_co dv (AppCo co1 co2)       = foldlM go_co dv [co1, co2]
@@ -1377,8 +1381,8 @@ collect_cand_qtvs_co bound = go_co
     go_co dv (AxiomInstCo _ _ cos) = foldlM go_co dv cos
     go_co dv (AxiomRuleCo _ cos)   = foldlM go_co dv cos
     go_co dv (UnivCo prov _ t1 t2) = do dv1 <- go_prov dv prov
-                                        dv2 <- collect_cand_qtvs True bound dv1 t1
-                                        collect_cand_qtvs True bound dv2 t2
+                                        dv2 <- collect_cand_qtvs orig_ty True bound dv1 t1
+                                        collect_cand_qtvs orig_ty True bound dv2 t2
     go_co dv (SymCo co)            = go_co dv co
     go_co dv (TransCo co1 co2)     = foldlM go_co dv [co1, co2]
     go_co dv (NthCo _ _ co)        = go_co dv co
@@ -1397,7 +1401,7 @@ collect_cand_qtvs_co bound = go_co
 
     go_co dv (ForAllCo tcv kind_co co)
       = do { dv1 <- go_co dv kind_co
-           ; collect_cand_qtvs_co (bound `extendVarSet` tcv) dv1 co }
+           ; collect_cand_qtvs_co orig_ty (bound `extendVarSet` tcv) dv1 co }
 
     go_mco dv MRefl    = return dv
     go_mco dv (MCo co) = go_co dv co
@@ -1413,7 +1417,7 @@ collect_cand_qtvs_co bound = go_co
       | cv `elemVarSet` cvs = return dv
 
         -- See Note [Recurring into kinds for candidateQTyVars]
-      | otherwise           = collect_cand_qtvs True bound
+      | otherwise           = collect_cand_qtvs orig_ty True bound
                                     (dv { dv_cvs = cvs `extendVarSet` cv })
                                     (idType cv)
 
@@ -2317,8 +2321,8 @@ tidySigSkol env cx ty tv_prs
 %************************************************************************
 %*                                                                      *
              Levity polymorphism checks
-*                                                                      *
-************************************************************************
+*                                                                       *
+*************************************************************************
 
 See Note [Levity polymorphism checking] in DsMonad
 
@@ -2363,3 +2367,48 @@ formatLevPolyErr ty
   where
     (tidy_env, tidy_ty) = tidyOpenType emptyTidyEnv ty
     tidy_ki             = tidyType tidy_env (tcTypeKind ty)
+
+{-
+%************************************************************************
+%*                                                                      *
+             Error messages
+*                                                                       *
+*************************************************************************
+
+-}
+
+-- See Note [Naughty quantification candidates]
+naughtyQuantification :: TcType   -- original type user wanted to quantify
+                      -> TcTyVar  -- naughty var
+                      -> TyVarSet -- skolems that would escape
+                      -> TcM a
+naughtyQuantification orig_ty tv escapees
+  = do { orig_ty1 <- zonkTcType orig_ty  -- in case it's not zonked
+
+       ; escapees' <- mapM zonkTcTyVarToTyVar $
+                      nonDetEltsUniqSet escapees
+                     -- we'll just be printing, so no harmful non-determinism
+
+       ; let fvs  = tyCoVarsOfTypeWellScoped orig_ty1
+             env0 = tidyFreeTyCoVars emptyTidyEnv fvs
+             env  = env0 `delTidyEnvList` escapees'
+                    -- this avoids gratuitous renaming of the escaped
+                    -- variables; very confusing to users!
+
+             orig_ty'   = tidyType env orig_ty1
+             ppr_tidied = pprTyVars . map (tidyTyCoVarOcc env)
+             doc = pprWithExplicitKindsWhen True $
+                   vcat [ sep [ text "Cannot generalise type; skolem" <> plural escapees'
+                              , quotes $ ppr_tidied escapees'
+                              , text "would escape" <+> itsOrTheir escapees' <+> text "scope"
+                              ]
+                        , sep [ text "if I tried to quantify"
+                              , ppr_tidied [tv]
+                              , text "in this type:"
+                              ]
+                        , nest 2 (pprTidiedType orig_ty')
+                        , text "(Indeed, I sometimes struggle even printing this correctly,"
+                        , text " due to its ill-scoped nature.)"
+                        ]
+
+       ; failWithTcM (env, doc) }
