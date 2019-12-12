@@ -1360,8 +1360,7 @@ Specifically
 -- Some very important subtleties here: see Note [mkCastTy subtleties]
 mkCastTy :: Type -> Coercion -> Type
 mkCastTy ty co
-  | let co_res_kind = pSnd (coercionKind co)
-  , typeKind ty `eqType` co_res_kind     -- (EQ2) from the Note
+  | typeKind ty `eqType` coercionRKind co     -- (EQ2) from the Note
     -- Not isReflexiveCo!  See Note [mkCastTy subtleties]
   = ty
 

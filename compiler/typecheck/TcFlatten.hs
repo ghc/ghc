@@ -1179,27 +1179,26 @@ flatten_one ty@(FunTy _ ty1 ty2)
        ; role <- getRole
        ; let sym_kco1 = mkTcSymCo kco1
              sym_kco2 = mkTcSymCo kco2
-             co1' = co1 `mkTcTransCo` mkGReflRightCo role xi1 sym_kco1
-       ; let co2' = co2 `mkTcTransCo` mkGReflRightCo role xi2 sym_kco2
+             co1' = mkGReflLeftCo role xi1 sym_kco1 `mkTcTransCo` co1
+             co2' = mkGReflLeftCo role xi2 sym_kco2 `mkTcTransCo` co2
        ; return (ty { ft_arg = xi1 `mkTcCastTy` sym_kco1
                     , ft_res = xi2 `mkTcCastTy` sym_kco2 }
-                , mkSymCo (mkFunCo role co1' co2')) }
+                , mkFunCo role co1' co2') }
   -- This is a specialised version of the cleverness in flatten_ty_con_app
+  -- It's as if we had (->) @r1 @r2 t1 t2.  We flatten r1 and r2, so we must
+  -- ensure that the flattened versions of t1, t2 have those flattened kinds
+  --
   -- Input: (ty1 -> ty2)
   -- co1 :: xi1 ~ ty1
   -- co2 :: xi2 ~ ty2
-  -- kco1 :: kxi1 ~ kind(xi1)
-  -- kco2 :: kxi2 ~ kind(xi2)
+  -- kco1 :: flat_kxi1 ~ kind(xi1)
+  -- kco2 :: flat_kxi2 ~ kind(xi2)
   -- res_ty = (xi1 |> sym kco1) -> (xi2 |> sym kco2)
-  -- res_co :: ty ~ res_ty = mkFunCo co1' co2'
-  -- co1' :: ty1 ~ (xi1 |> sym kco1)
-  --      = co1 ; grefl1
-  -- grefl1 :: xi1 ~ (xi1 |> sym kco1)
-  --        =  Grefl xi1 (MCo kco1)
-  -- co2' :: ty2 ~ (xi2 |> sym kco2)
-  -- grefl2 :: xi2 ~ (xi1 |> sym kco2)
-  --        =  Grefl xi2 (MCo kco2)
-  -- Result: (res_ty, sym res_co)
+  -- res_co :: res_ty ~ ty             = mkFunCo co1' co2'
+  -- co1'   :: (xi1 |> sym kco1) ~ ty1 = gr1 ; co1
+  -- gr1    :: (xi1 |> sym kco1) ~ xi1 = mkGReflLeft xi (sym kco1)
+  -- co2'   :: (xi2 |> sym kco2) ~ ty2 = gr2 ; co2
+  -- gr2    :: (xi2 |> sym kco2) ~ xi2 = mkGReflLeft xi (sym kco2)
 
 flatten_one ty@(ForAllTy {})
 -- TODO (RAE): This is inadequate, as it doesn't flatten the kind of

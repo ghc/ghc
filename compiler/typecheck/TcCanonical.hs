@@ -1868,9 +1868,9 @@ canEqTyVar ev eq_rel swapped tv1 ps_xi1 xi2 ps_xi2
                               , text "~"
                               , parens (ppr xi2 <+> dcolon <+> ppr k2) ]
                         , ppr flat_k1
-                        , ppr k1_co
+                        , ppr k1_co <+> dcolon <+> ppr (coercionKind k1_co)
                         , ppr flat_k2
-                        , ppr k2_co ])
+                        , ppr k2_co <+> dcolon <+> ppr (coercionKind k2_co)])
 
          -- We know the LHS is a tyvar. So let's dump all the coercions on the RHS
          -- If flat_k1 == flat_k2, let's dump all the coercions on the RHS and
@@ -1892,6 +1892,15 @@ canEqTyVar ev eq_rel swapped tv1 ps_xi1 xi2 ps_xi2
                                                (mkTcReflCo role xi1) rhs_co
                        -- NB: rewriteEqEvidence executes a swap, if any, so we're
                        -- NotSwapped now.
+
+                 ; traceTcS "canEqTyVar2"
+                      (vcat [ text "rhs_kind_co" <+> ppr rhs_kind_co <+>
+                                 dcolon <+> ppr (coercionKind rhs_kind_co)
+                            , text "new_rhs" <+> ppr new_rhs
+                            , text "ps_rhs" <+> ppr ps_rhs
+                            , text "rhs_co" <+> ppr rhs_co
+                            , text "new_ev" <+> ppr new_ev ])
+
                  ; canEqTyVarHomo new_ev eq_rel NotSwapped tv1 ps_xi1 new_rhs ps_rhs }
          else
     do { let sym_k1_co = mkTcSymCo k1_co  -- :: kind(xi1) ~N flat_k1
