@@ -23,10 +23,10 @@ Highlights
   unexpectedly rejected has been fixed.
 
 - A bug in the implementation of compact normal forms resulting in segmentation
-  faults in some uses of :ghc-ticket:`17044` has been fixed.
+  faults in some uses (:ghc-ticket:`17044`) has been fixed.
 
 - A bug causing GHC to incorrectly complain about incompatible LLVM versions
-  when using GHC 7.0.1 has been fixed.
+  when using LLVM 7.0.1 has been fixed (:ghc-ticket:`16990`).
 
 Known issues
 ------------
@@ -38,7 +38,8 @@ Known issues
   :ghc-ticket:`16893`.
 
   However, it is possible that this bug could manifest in user-code using
-  ``unsafeCoerce`` to perform dynamic type checks. See the ticket for details.
+  ``unsafeCoerce`` to perform dynamic type checks. See the :ghc-ticket:`ticket
+  <16893>` for details.
 
 Included libraries
 ------------------
