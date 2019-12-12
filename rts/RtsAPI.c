@@ -682,6 +682,7 @@ void hs_try_putmvar (/* in */ int capability,
 {
     Task *task = getTask();
     Capability *cap;
+    Capability *task_old_cap USED_IF_THREADS;
 
     if (capability < 0) {
         capability = task->preferred_capability;
@@ -702,6 +703,7 @@ void hs_try_putmvar (/* in */ int capability,
     // If the capability is free, we can perform the tryPutMVar immediately
     if (cap->running_task == NULL) {
         cap->running_task = task;
+        task_old_cap = task->cap;
         task->cap = cap;
         RELEASE_LOCK(&cap->lock);
 
@@ -712,6 +714,7 @@ void hs_try_putmvar (/* in */ int capability,
         // Wake up the capability, which will start running the thread that we
         // just awoke (if there was one).
         releaseCapability(cap);
+        task->cap = task_old_cap;
     } else {
         PutMVar *p = stgMallocBytes(sizeof(PutMVar),"hs_try_putmvar");
         // We cannot deref the StablePtr if we don't have a capability,
