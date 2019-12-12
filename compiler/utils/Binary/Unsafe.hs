@@ -9,6 +9,7 @@ import qualified Control.Monad.Fail
 #endif
 
 import GhcPrelude
+import GHC.Exts (oneShot)
 
 import Control.Monad (when)
 import Data.IORef
@@ -60,20 +61,20 @@ newtype Put a = Put { unput :: EnvP -> IO a }
 
 instance Functor Put where
   {-# INLINE fmap #-}
-  fmap f m = Put $ \env ->
+  fmap f m = Put . oneShot $ \env ->
     fmap f (unput m env)
 
 instance Applicative Put where
   {-# INLINE pure #-}
-  pure x = Put $ \_ -> pure x
+  pure x = Put . oneShot $ \_ -> pure x
 
   {-# INLINE (<*>) #-}
-  f <*> x = Put $ \env ->
+  f <*> x = Put . oneShot $ \env ->
     unput f env <*> unput x env
 
 instance Monad Put where
   {-# INLINE (>>=) #-}
-  x >>= f = Put $ \env -> do
+  x >>= f = Put . oneShot $ \env -> do
     a <- unput x env
     unput (f a) env
 #if !MIN_VERSION_base(4,13,0)
@@ -127,7 +128,7 @@ runPut = unsafePerformIO . runPutIO
 
 {-# INLINE putPrim #-}
 putPrim :: Int -> (Ptr Word8 -> IO ()) -> Put ()
-putPrim n f = Put $ \(EnvP _ ixr szr binr) -> do
+putPrim n f = Put . oneShot $ \(EnvP _ ixr szr binr) -> do
   ix <- readFastMutInt ixr
   sz <- readFastMutInt szr
   arr <- readIORef binr
@@ -137,21 +138,21 @@ putPrim n f = Put $ \(EnvP _ ixr szr binr) -> do
 
 {-# INLINE ioP #-}
 ioP :: IO a -> Put a
-ioP m = Put $ \_ -> m
+ioP m = Put . oneShot $ \_ -> m
 
 {-# INLINE seekP #-}
 seekP :: Bin a -> Put ()
-seekP (BinPtr !i) = Put $ \(EnvP _ ixr _ _) ->
+seekP (BinPtr !i) = Put . oneShot $ \(EnvP _ ixr _ _) ->
   writeFastMutInt ixr i
 
 {-# INLINE tellP #-}
 tellP :: Put (Bin a)
-tellP = Put $ \(EnvP _ ixr _ _) ->
+tellP = Put . oneShot  $ \(EnvP _ ixr _ _) ->
   BinPtr <$> readFastMutInt ixr
 
 {-# INLINE userDataP #-}
 userDataP :: Put UserDataP
-userDataP = Put $ \(EnvP ud _ _ _) -> return ud
+userDataP = Put . oneShot $ \(EnvP ud _ _ _) -> return ud
 
 -- -----------------------------------------------------------------------------
 -- Get
@@ -163,20 +164,20 @@ newtype Get a = Get { unget :: EnvG -> IO a }
 
 instance Functor Get where
   {-# INLINE fmap #-}
-  fmap f m = Get $ \env ->
+  fmap f m = Get . oneShot $ \env ->
     fmap f (unget m env)
 
 instance Applicative Get where
   {-# INLINE pure #-}
-  pure x = Get $ \_ -> pure x
+  pure x = Get . oneShot $ \_ -> pure x
 
   {-# INLINE (<*>) #-}
-  f <*> x = Get $ \env ->
+  f <*> x = Get . oneShot $ \env ->
     unget f env <*> unget x env
 
 instance Monad Get where
   {-# INLINE (>>=) #-}
-  x >>= f = Get $ \env -> do
+  x >>= f = Get . oneShot $ \env -> do
     a <- unget x env
     unget (f a) env
 #if !MIN_VERSION_base(4,13,0)
@@ -201,12 +202,12 @@ runGet bd = unsafePerformIO . runGetIO bd
 
 {-# INLINE seekG #-}
 seekG :: Bin a -> Get ()
-seekG (BinPtr !i) = Get $ \(EnvG _ ixr _ _) ->
+seekG (BinPtr !i) = Get . oneShot $ \(EnvG _ ixr _ _) ->
   writeFastMutInt ixr i
 
 {-# INLINE tellG #-}
 tellG :: Get (Bin a)
-tellG = Get $ \(EnvG _ ixr _ _) ->
+tellG = Get . oneShot $ \(EnvG _ ixr _ _) ->
   BinPtr <$> readFastMutInt ixr
 
 -- -----------------------------------------------------------------------------
@@ -215,7 +216,7 @@ tellG = Get $ \(EnvG _ ixr _ _) ->
 
 {-# INLINE getPrim #-}
 getPrim :: Int -> (Ptr Word8 -> IO a) -> Get a
-getPrim n f = Get $ \(EnvG _ ixr end (BinData _ arr)) -> do
+getPrim n f = Get . oneShot $ \(EnvG _ ixr end (BinData _ arr)) -> do
   ix <- readFastMutInt ixr
   when (ix + n > end) $
     ioError (mkIOError eofErrorType "Binary.Internal.getPrim" Nothing Nothing)
@@ -225,23 +226,23 @@ getPrim n f = Get $ \(EnvG _ ixr end (BinData _ arr)) -> do
 
 {-# INLINE interleaveG #-}
 interleaveG :: Get a -> Get a
-interleaveG m = Get $ \(EnvG ud ixr end bd) -> do
+interleaveG m = Get . oneShot $ \(EnvG ud ixr end bd) -> do
  ixr' <- newFastMutInt
  writeFastMutInt ixr' =<< readFastMutInt ixr
  unsafeInterleaveIO $ unget m (EnvG ud ixr' end bd)
 
 {-# INLINE getSlice #-}
 getSlice :: Bin b -> Get a -> Get a
-getSlice (BinPtr !end) m = Get $ \(EnvG ud ixr _ bd) ->
+getSlice (BinPtr !end) m = Get . oneShot $ \(EnvG ud ixr _ bd) ->
   unget m (EnvG ud ixr end bd)
 
 {-# INLINE ioG #-}
 ioG :: IO a -> Get a
-ioG m = Get $ \_ -> m
+ioG m = Get . oneShot $ \_ -> m
 
 {-# INLINE userDataG #-}
 userDataG :: Get UserDataG
-userDataG = Get $ \(EnvG ud _ _ _) -> return ud
+userDataG = Get . oneShot $ \(EnvG ud _ _ _) -> return ud
 
 -- -----------------------------------------------------------------------------
 -- File IO
@@ -282,7 +283,7 @@ writeState :: (Name -> Put ())
            -> (FastString -> Put ())
            -> Put a
            -> Put a
-writeState nonbind bind fs m = Put $ \(EnvP _ ixr szr binr) ->
+writeState nonbind bind fs m = Put . oneShot $ \(EnvP _ ixr szr binr) ->
   unput m (EnvP (UserDataP nonbind bind fs) ixr szr binr)
 
 data UserDataG
@@ -300,5 +301,5 @@ readState :: Get Name
           -> Get FastString
           -> Get a
           -> Get a
-readState name fs m = Get $ \(EnvG _ ixr end bd) ->
+readState name fs m = Get . oneShot $ \(EnvG _ ixr end bd) ->
   unget m (EnvG (UserDataG name fs) ixr end bd)
