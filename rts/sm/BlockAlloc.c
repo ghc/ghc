@@ -332,7 +332,7 @@ split_block_high (bdescr *bd, W_ n)
 
     bdescr* ret = bd + bd->blocks - n; // take n blocks off the end
     ret->blocks = n;
-    ret->free = bdescr_start(bd) + (bd->blocks - n)*BLOCK_SIZE_W;
+    bdescr_set_free(ret, bdescr_start(bd) + (bd->blocks - n)*BLOCK_SIZE_W);
     ret->link = NULL;
 
     bd->blocks -= n;
@@ -353,7 +353,7 @@ split_block_low (bdescr *bd, W_ n)
 
     bdescr* bd_ = bd + n;
     bd_->blocks = bd->blocks - n;
-    bd_->free = bdescr_start(bd) + (bd->blocks - n)*BLOCK_SIZE_W;
+    bdescr_set_free(bd_,  bdescr_start(bd) + (bd->blocks - n)*BLOCK_SIZE_W);
 
     bd->blocks = n;
 

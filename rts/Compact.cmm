@@ -386,7 +386,7 @@ stg_compactGetFirstBlockzh ( P_ str )
     // We have to save Hp back to the nursery, otherwise the size will
     // be wrong.
     bd = Bdescr(StgCompactNFData_nursery(str));
-    bdescr_free_off(bd) = StgCompactNFData_hp(str) - bdescr_start(bd);
+    bdescr_set_free(bd, StgCompactNFData_hp(str));
 
     bd = Bdescr(str);
     size = TO_W_(bdescr_free_off(bd));
