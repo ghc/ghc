@@ -454,7 +454,7 @@ openNursery df tso = do
      -- start = bdescr_start(CurrentNursery)
      mkAssign bdstartreg (nursery_bdescr_start df cnreg),
 
-     -- Hp = CurrentNursery->free - 1;
+     -- Hp = CurrentNursery->free - WDS(1);
      let hp = CmmMachOp (mo_wordAdd df)
                 [CmmReg bdstartreg, CmmReg bdfreereg]
      in mkAssign hpReg (cmmOffsetW df hp (-1)),
