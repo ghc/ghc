@@ -4,10 +4,11 @@
 module Binary.Unsafe where
 
 #if !MIN_VERSION_base(4,13,0)
-import Control.Monad.Fail (MonadFail(..))
+import Control.Monad.Fail (MonadFail)
+import qualified Control.Monad.Fail
 #endif
 
-import GhcPrelude hiding (fail)
+import GhcPrelude
 
 import Control.Monad (when)
 import Data.IORef
@@ -75,6 +76,10 @@ instance Monad Put where
   x >>= f = Put $ \env -> do
     a <- unput x env
     unput (f a) env
+#if !MIN_VERSION_base(4,13,0)
+  {-# INLINE fail #-}
+  fail = ioP . fail
+#endif
 
 instance MonadFail Put where
   {-# INLINE fail #-}
@@ -174,6 +179,10 @@ instance Monad Get where
   x >>= f = Get $ \env -> do
     a <- unget x env
     unget (f a) env
+#if !MIN_VERSION_base(4,13,0)
+  {-# INLINE fail #-}
+  fail = ioG . fail
+#endif
 
 instance MonadFail Get where
   {-# INLINE fail #-}
@@ -253,7 +262,7 @@ readBinData fp =
     arr <- mallocForeignPtrBytes sz
     count <- withForeignPtr arr $ \p -> hGetBuf h p sz
     when (count /= sz) $
-      error ("Binary.Internal.readBinMem: only read " ++ show count ++ " bytes")
+      error ("Binary.Unsafe.readBinData: only read " ++ show count ++ " bytes")
     return $ BinData sz arr
 
 -- -----------------------------------------------------------------------------
