@@ -901,18 +901,22 @@ can_eq_nc' _flat rdr_env envs ev eq_rel ty1 ps_ty1 ty2 ps_ty2
   , Just stuff2 <- tcTopNormaliseNewTypeTF_maybe envs rdr_env ty2
   = can_eq_newtype_nc ev IsSwapped  ty2 stuff2 ty1 ps_ty1
 
--- Then, get rid of casts
-can_eq_nc' flat _rdr_env _envs ev eq_rel (CastTy ty1 co1) _ ty2 ps_ty2
-  = canEqCast flat ev eq_rel NotSwapped ty1 co1 ty2 ps_ty2
-can_eq_nc' flat _rdr_env _envs ev eq_rel ty1 ps_ty1 (CastTy ty2 co2) _
-  = canEqCast flat ev eq_rel IsSwapped ty2 co2 ty1 ps_ty1
-
+-- Do the TyVarTy check before the CastTy check, becuause canEqTyVar is quite
+-- content with (a ~ (ty |> co)).  Moreover that might be homogeneous
+-- while (a ~ ty) is not, so doing canEqCast first just leads to more work
+--
 -- NB: pattern match on True: we want only flat types sent to canEqTyVar.
 -- See also Note [No top-level newtypes on RHS of representational equalities]
 can_eq_nc' True _rdr_env _envs ev eq_rel (TyVarTy tv1) ps_ty1 ty2 ps_ty2
   = canEqTyVar ev eq_rel NotSwapped tv1 ps_ty1 ty2 ps_ty2
 can_eq_nc' True _rdr_env _envs ev eq_rel ty1 ps_ty1 (TyVarTy tv2) ps_ty2
   = canEqTyVar ev eq_rel IsSwapped tv2 ps_ty2 ty1 ps_ty1
+
+-- Then, get rid of casts
+can_eq_nc' flat _rdr_env _envs ev eq_rel (CastTy ty1 co1) _ ty2 ps_ty2
+  = canEqCast flat ev eq_rel NotSwapped ty1 co1 ty2 ps_ty2
+can_eq_nc' flat _rdr_env _envs ev eq_rel ty1 ps_ty1 (CastTy ty2 co2) _
+  = canEqCast flat ev eq_rel IsSwapped ty2 co2 ty1 ps_ty1
 
 ----------------------
 -- Otherwise try to decompose
@@ -928,7 +932,8 @@ can_eq_nc' _flat _rdr_env _envs ev eq_rel ty1@(LitTy l1) _ (LitTy l2) _
 -- Including FunTy (s -> t)
 can_eq_nc' _flat _rdr_env _envs ev eq_rel ty1 _ ty2 _
     --- See Note [FunTy and decomposing type constructor applications].
-  | Just (tc1, tys1) <- repSplitTyConApp_maybe ty1
+  | Just (tc1, tys1) <- pprTrace "can_eq_nc'1" (ppr ty1 $$ ppr ty2 $$ ppr (repSplitTyConApp_maybe ty1) $$ ppr (repSplitTyConApp_maybe ty2)) $
+                        repSplitTyConApp_maybe ty1
   , Just (tc2, tys2) <- repSplitTyConApp_maybe ty2
   , not (isTypeFamilyTyCon tc1)
   , not (isTypeFamilyTyCon tc2)
@@ -1884,14 +1889,15 @@ canEqTyVar ev eq_rel swapped tv1 ps_xi1 xi2 ps_xi2
          then do { let rhs_kind_co = mkTcSymCo k2_co `mkTcTransCo` k1_co
                          -- :: kind(xi2) ~N kind(xi1)
 
-                       new_rhs     = xi2 `mkCastTy` rhs_kind_co
-                       ps_rhs      = ps_xi2 `mkCastTy` rhs_kind_co
+                       lhs_refl_co = mkTcNomReflCo k1
+                       new_rhs     = xi2    `mkCastTy` rhs_kind_co `mkCastTy` lhs_refl_co
+                       ps_rhs      = ps_xi2 `mkCastTy` rhs_kind_co `mkCastTy` lhs_refl_co
                        rhs_co      = mkTcGReflLeftCo role xi2 rhs_kind_co
 
                  ; new_ev <- rewriteEqEvidence ev swapped xi1 new_rhs
                                                (mkTcReflCo role xi1) rhs_co
-                       -- NB: rewriteEqEvidence executes a swap, if any, so we're
-                       -- NotSwapped now.
+                       -- NB: rewriteEqEvidence executes a swap, if any,
+                       --     so we're NotSwapped now.
 
                  ; traceTcS "canEqTyVar2"
                       (vcat [ text "rhs_kind_co" <+> ppr rhs_kind_co <+>

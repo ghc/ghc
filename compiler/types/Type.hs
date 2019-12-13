@@ -781,7 +781,7 @@ mkAppTy :: Type -> Type -> Type
 -- See Note [mkAppTy subtleties]
 mkAppTy (CastTy fun_ty co) arg_ty
   | ([arg_co], res_co) <- decomposePiCos (typeKind fun_ty) co
-                                         (pSnd $ coercionKind co) [arg_ty]
+                                         (coercionRKind co) [arg_ty]
   = (fun_ty `mkAppTy` (arg_ty `mkCastTy` arg_co)) `mkCastTy` res_co
 
 mkAppTy (TyConApp tc tys) ty2 = mkTyConApp tc (tys ++ [ty2])
@@ -805,10 +805,12 @@ mkAppTys ty1 []   = ty1
 mkAppTys (CastTy fun_ty co) arg_tys
   = -- Much more efficient then nested mkAppTy
     -- But see Note [mkAppTy subtleties]
-    foldl' AppTy ((mkAppTys fun_ty casted_arg_tys) `mkCastTy` res_co) leftovers
+    let result = foldl' AppTy ((mkAppTys fun_ty casted_arg_tys) `mkCastTy` res_co) leftovers
+    in pprTrace "mkAppTys" (ppr fun_ty $$ ppr co $$ ppr arg_tys $$ ppr result )
+       result
   where
     (arg_cos, res_co) = decomposePiCos (typeKind fun_ty) co
-                                       (pSnd $ coercionKind co) arg_tys
+                                       (coercionRKind co) arg_tys
     (args_to_cast, leftovers) = splitAtList arg_cos arg_tys
     casted_arg_tys = zipWith mkCastTy args_to_cast arg_cos
 

@@ -1216,10 +1216,11 @@ flatten_one ty@(ForAllTy {})
 
 flatten_one (CastTy ty g)
   = do { (xi, co) <- flatten_one ty
-       ; (g', _)  <- flatten_co g
+--       ; (g', _)  <- flatten_co g
 
        ; role <- getRole
-       ; return (mkCastTy xi g', castCoercionKind co role xi ty g' g) }
+       ; return (mkCastTy xi g, castCoercionKind co role xi ty g g) }
+--       ; return (mkCastTy xi g', castCoercionKind co role xi ty g' g) }
 
 flatten_one (CoercionTy co) = first mkCoercionTy <$> flatten_co co
 
@@ -1280,7 +1281,14 @@ flatten_app_ty_args fun_xi fun_co arg_tys
                     <- flatten_vector (tcTypeKind fun_xi) (repeat Nominal) arg_tys
                 ; let arg_xi = mkAppTys fun_xi arg_xis
                       arg_co = mkAppCos fun_co arg_cos
-                ; return (arg_xi, arg_co, kind_co) }
+                ; pprTrace "flatten_app_ty_args" (vcat
+                      [ text "fun_xi" <+> ppr fun_xi
+                      , text "arg_xis" <+> ppr arg_xis
+                      , text "arg_xi" <+> ppr arg_xi
+                      , text "fun_co" <+> ppr fun_co
+                      , text "arg_co" <+> ppr arg_co
+                      ]) $
+                  return (arg_xi, arg_co, kind_co) }
 
        ; role <- getRole
        ; return (homogenise_result xi co role kind_co) }
