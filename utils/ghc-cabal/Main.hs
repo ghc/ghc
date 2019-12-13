@@ -26,6 +26,7 @@ import Distribution.Types.LocalBuildInfo
 import Distribution.Verbosity
 import qualified Distribution.InstalledPackageInfo as Installed
 import qualified Distribution.Simple.PackageIndex as PackageIndex
+import Distribution.Utils.ShortText (fromShortText)
 
 import Control.Exception (bracket)
 import Control.Monad
@@ -430,7 +431,7 @@ generate directory distdir config_args
                 variablePrefix ++ "_COMPONENT_ID = " ++ localCompatPackageKey lbi,
                 variablePrefix ++ "_MODULES = " ++ unwords mods,
                 variablePrefix ++ "_HIDDEN_MODULES = " ++ unwords otherMods,
-                variablePrefix ++ "_SYNOPSIS =" ++ (unwords $ lines $ synopsis pd),
+                variablePrefix ++ "_SYNOPSIS =" ++ (unwords $ lines $ fromShortText $ synopsis pd),
                 variablePrefix ++ "_HS_SRC_DIRS = " ++ unwords (hsSourceDirs bi),
                 variablePrefix ++ "_DEPS = " ++ unwords deps,
                 variablePrefix ++ "_DEP_IPIDS = " ++ unwords dep_ipids,
@@ -474,9 +475,9 @@ generate directory distdir config_args
                 ]
       writeFile (distdir ++ "/package-data.mk") $ unlines xs
 
-      writeFileUtf8 (distdir ++ "/haddock-prologue.txt") $
-          if null (description pd) then synopsis pd
-                                   else description pd
+      writeFileUtf8 (distdir ++ "/haddock-prologue.txt") $ fromShortText $
+          if null (fromShortText $ description pd) then synopsis pd
+                                                   else description pd
   where
      escape = foldr (\c xs -> if c == '#' then '\\':'#':xs else c:xs) []
      wrap = mapM wrap1
