@@ -83,6 +83,7 @@ import qualified Data.Foldable as F
 import qualified Data.Traversable as F
 import qualified Data.Set as Set
 import qualified Data.Map as Map
+import qualified Data.ByteString as BS
 
 #if defined(mingw32_HOST_OS)
 import GHC.ConsoleHandler
@@ -945,7 +946,7 @@ readParseDatabase verbosity mb_user_conf mode use_cache path
 parseSingletonPackageConf :: Verbosity -> FilePath -> IO InstalledPackageInfo
 parseSingletonPackageConf verbosity file = do
   when (verbosity > Normal) $ infoLn ("reading package config: " ++ file)
-  readUTF8File file >>= fmap fst . parsePackageInfo
+  BS.readFile file >>= fmap fst . parsePackageInfo
 
 cachefilename :: FilePath
 cachefilename = "package.cache"
@@ -1140,7 +1141,7 @@ registerPackage input verbosity my_flags multi_instance
   expanded <- if expand_env_vars then expandEnvVars s force
                                  else return s
 
-  (pkg, ws) <- parsePackageInfo expanded
+  (pkg, ws) <- parsePackageInfo $ toUTF8BS expanded
   when (verbosity >= Normal) $
       infoLn "done."
 
@@ -1174,7 +1175,7 @@ registerPackage input verbosity my_flags multi_instance
   changeDB verbosity (removes ++ [AddPackage pkg]) db_to_operate_on db_stack
 
 parsePackageInfo
-        :: String
+        :: BS.ByteString
         -> IO (InstalledPackageInfo, [ValidateWarning])
 parsePackageInfo str =
   case parseInstalledPackageInfo str of
