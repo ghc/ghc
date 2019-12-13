@@ -1124,7 +1124,6 @@ have no coercion variables.
 
 Note [Generalized reflexive coercion]
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
-
 GRefl is a generalized reflexive coercion (see #15192). It wraps a kind
 coercion, which might be reflexive (MRefl) or any coercion (MCo co). The typing
 rules for GRefl:
@@ -1133,7 +1132,8 @@ rules for GRefl:
   ------------------------------------
   GRefl r ty MRefl: ty ~r ty
 
-  ty : k1       co :: k1 ~ k2
+        k1 : *  k2 : *
+  ty : k1       co :: k1 ~N k2
   ------------------------------------
   GRefl r ty (MCo co) : ty ~r ty |> co
 
