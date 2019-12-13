@@ -145,7 +145,7 @@ push_scanned_block (bdescr *bd, gen_workspace *ws)
     ASSERT(bd->u.scan == bdescr_free(bd));
 
     if (bd->blocks == 1 &&
-        bdescr_start(bd) + BLOCK_SIZE_W - bdescr_free(bd) > WORK_UNIT_WORDS)
+        bd->free_off / sizeof(StgWord) + BLOCK_SIZE_W > WORK_UNIT_WORDS)
     {
         // A partially full block: put it on the part_list list.
         // Only for single objects - see Note [big objects]
@@ -310,7 +310,7 @@ alloc_todo_block (gen_workspace *ws, uint32_t size)
     // Grab a part block if we have one, and it has enough room
     bd = ws->part_list;
     if (bd != NULL &&
-        bdescr_start(bd) + bd->blocks * BLOCK_SIZE_W - bdescr_free(bd) > (int)size)
+        bd->free_off / sizeof(StgWord) + bd->blocks * BLOCK_SIZE_W > (int)size)
     {
         ws->part_list = bd->link;
         ws->n_part_blocks -= bd->blocks;
