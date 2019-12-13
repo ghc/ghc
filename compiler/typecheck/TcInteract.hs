@@ -403,14 +403,17 @@ runSolverPipeline pipeline workItem
        }
   where run_pipeline :: [(String,SimplifierStage)] -> StopOrContinue Ct
                      -> TcS (StopOrContinue Ct)
-        run_pipeline [] res        = return res
-        run_pipeline _ (Stop ev s) = return (Stop ev s)
-        run_pipeline ((stg_name,stg):stgs) (ContinueWith ct)
-          = do { traceTcS ("runStage " ++ stg_name ++ " {")
-                          (text "workitem   = " <+> ppr ct)
-               ; res <- stg ct
-               ; traceTcS ("end stage " ++ stg_name ++ " }") empty
-               ; run_pipeline stgs res }
+        run_pipeline _      (Stop ev s) = return (Stop ev s)
+        run_pipeline stages (ContinueWith ct)
+          = checkCtInvariants ct $
+            case stages of
+               [] -> return (ContinueWith ct)
+               (stage_name,stage) : stages
+                  -> do { traceTcS ("runStage " ++ stage_name ++ " {")
+                                   (text "workitem   = " <+> ppr ct)
+                        ; res <- stage ct
+                        ; traceTcS ("end stage " ++ stage_name ++ " }") empty
+                        ; run_pipeline stages res }
 
 {-
 Example 1:

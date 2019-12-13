@@ -28,6 +28,7 @@ module Constraint (
         ctEvExpr, ctEvTerm, ctEvCoercion, ctEvEvId,
         tyCoVarsOfCt, tyCoVarsOfCts,
         tyCoVarsOfCtList, tyCoVarsOfCtsList,
+        checkCtInvariants,
 
         WantedConstraints(..), insolubleWC, emptyWC, isEmptyWC,
         isSolvedWC, andWC, unionsWC, mkSimpleWC, mkImplicWC,
@@ -415,6 +416,30 @@ instance Outputable Ct where
          CQuantCan (QCI { qci_pend_sc = pend_sc })
             | pend_sc   -> text "CQuantCan(psc)"
             | otherwise -> text "CQuantCan"
+
+{- *********************************************************************
+*                                                                      *
+        Invariant checking
+*                                                                      *
+********************************************************************* -}
+
+checkCtInvariants :: Ct -> a -> a
+
+checkCtInvariants _ result   -- Normal compile route picks this path always
+  | not debugIsOn = result
+
+checkCtInvariants (CTyEqCan { cc_ev = ev, cc_tyvar = tv, cc_rhs = rhs }) _
+  | not (lhs_k `tcEqType` rhs_k)
+  = pprPanic "checkCtInvariants: CTyEqCan: kind mismatch" $
+    vcat [ ppr ev
+         , ppr tv <+> dcolon <+> ppr lhs_k
+         , ppr rhs <+> dcolon <+> ppr rhs_k ]
+  where
+    lhs_k = tyVarKind tv
+    rhs_k = typeKind rhs
+
+checkCtInvariants _ result
+  = result
 
 {-
 ************************************************************************
