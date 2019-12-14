@@ -51,7 +51,6 @@ import Outputable
 
 import Control.Monad ( unless, void )
 import Control.Arrow ( first )
-import Data.List     ( partition )
 
 ------------------------------------------------------------------------
 --              cgExpr: the main function
@@ -602,6 +601,15 @@ chooseReturnBndrs bndr PolyAlt _alts
 chooseReturnBndrs _ _ _ = panic "chooseReturnBndrs"
                              -- MultiValAlt has only one alternative
 
+-- space conscious partition
+partition_ :: (a -> Bool) -> [a] -> ([a], [a])
+partition_ _ [] = ([], [])
+partition_ p l@(a : as)
+    | (y, n) <- partition_ p as =
+                if p a
+                then (if null n then l else a : y, n)
+                else (y, if null y then l else a : n)
+
 -------------------------------------
 cgAlts :: (GcPlan,ReturnKind) -> NonVoid Id -> AltType -> [CgStgAlt]
        -> FCode ReturnKind
@@ -638,7 +646,7 @@ cgAlts gc_plan bndr (AlgAlt tycon) alts
               !ptag_expr = cmmConstrTag1 dflags (CmmReg bndr_reg)
               !branches' = first succ <$> branches
               !maxpt = mAX_PTR_TAG dflags
-              (!via_ptr, !via_info) = partition ((< maxpt) . fst) branches'
+              (!via_ptr, !via_info) = partition_ ((< maxpt) . fst) branches'
               !small = isSmallFamily dflags fam_sz
 
                 -- Is the constructor tag in the node reg?
