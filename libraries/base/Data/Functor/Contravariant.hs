@@ -22,7 +22,6 @@
 ----------------------------------------------------------------------------
 
 module Data.Functor.Contravariant (
-{-
   -- * Contravariant Functors
     Contravariant(..)
   , phantom
@@ -44,7 +43,6 @@ module Data.Functor.Contravariant (
 
   -- * Dual arrows
   , Op(..)
--}
   ) where
 
 import Control.Applicative
@@ -60,14 +58,6 @@ import Data.Proxy
 import GHC.Generics
 
 import Prelude hiding ((.),id)
-
-class Contravariant f where
-  contramap :: (a -> b) -> f b -> f a
-
-(>$) :: Contravariant f => b -> f b -> f a
-(>$) = contramap . const
-
-{-
 
 -- | The class of contravariant functors.
 --
@@ -291,4 +281,3 @@ instance Floating a => Floating (Op a b) where
   acosh (Op f) = Op $ acosh . f
   Op f ** Op g = Op $ \a -> f a ** g a
   logBase (Op f) (Op g) = Op $ \a -> logBase (f a) (g a)
--}
