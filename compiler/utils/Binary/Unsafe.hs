@@ -5,11 +5,13 @@ module Binary.Unsafe where
 
 #if !MIN_VERSION_base(4,13,0)
 import Control.Monad.Fail (MonadFail)
+import qualified Control.Monad.Fail
 #endif
 
 import GhcPrelude
+import GHC.Exts
 
-import Control.Monad.Reader
+import Control.Monad
 import Data.IORef
 import Data.ByteString (ByteString)
 import qualified Data.ByteString.Unsafe as BS
@@ -53,8 +55,34 @@ withBinBuffer (BinData sz arr) action =
 -- Put
 -- -----------------------------------------------------------------------------
 
-newtype Put a = Put { unput :: ReaderT EnvP IO a }
-  deriving (Functor, Applicative, Monad, MonadFail)
+newtype Put a = Put { unput :: EnvP -> IO a }
+
+instance Functor Put where
+  {-# INLINE fmap #-}
+  fmap f m = Put . oneShot $ \env -> fmap f (unput m env)
+
+instance Applicative Put where
+  {-# INLINE pure #-}
+  pure x = Put . oneShot $ \_ -> pure x
+
+  {-# INLINE (<*>) #-}
+  f <*> x = Put . oneShot $ \env ->
+    unput f env <*> unput x env
+
+instance Monad Put where
+  {-# INLINE (>>=) #-}
+  x >>= f = Put . oneShot $ \env -> do
+    a <- unput x env
+    unput (f a) env
+
+#if !MIN_VERSION_base(4,13,0)
+  {-# INLINE fail #-}
+  fail s = Put . oneShot $ \_ -> fail s
+#endif
+
+instance MonadFail Put where
+  {-# INLINE fail #-}
+  fail s = Put . oneShot $ \_ -> fail s
 
 -- Internal reader data for `Put` monad.
 data EnvP
@@ -65,47 +93,33 @@ data EnvP
        put_arr    :: !(IORef BinArray)
      }
 
-{-# INLINE allocate #-}
-allocate :: Int -> IO EnvP
-allocate initialSize = do
-  arr <- mallocForeignPtrBytes initialSize
-  EnvP noUserData <$> initInt 0 <*> initInt initialSize <*> newIORef arr
-  where
-    initInt n   = do
-      int <- newFastMutInt
-      writeFastMutInt int n
-      return int
-
 {-# INLINE expand #-}
-expand :: Int -> Put ()
-expand off = do
-  sz  <- putSize
-  arr <- putArr
+expand :: Int -> FastMutInt -> IORef BinArray -> IO ()
+expand off szr binr = do
+  sz   <- readFastMutInt szr
   let !sz' = getSize sz
-  Put $ do
-    sz_r  <- put_size <$> ask
-    arr_r <- put_arr  <$> ask
-    liftIO $ do
-      arr' <- mallocForeignPtrBytes sz'
-      withForeignPtr arr $ \old ->
-        withForeignPtr arr' $ \new ->
-          copyBytes new old sz
-      writeFastMutInt sz_r sz'
-      writeIORef arr_r arr'
+  arr' <- mallocForeignPtrBytes sz'
+  arr  <- readIORef binr
+  withForeignPtr arr $ \old ->
+    withForeignPtr arr' $ \new ->
+      copyBytes new old sz
+  writeFastMutInt szr sz'
+  writeIORef binr arr'
   where
     getSize !sz | sz >= off = sz
                 | otherwise = getSize (sz * 2)
 
-{-# INLINE reallocate #-}
-reallocate :: Put ()
-reallocate = expand . (2 *) =<< putSize
-
 {-# INLINE runBuffer #-}
 runBuffer :: Int -> Put () -> IO BinData
-runBuffer initialSize (Put m) = do
-  bin <- runReaderT (m >> ask) =<< allocate initialSize
-  off <- readFastMutInt (put_offset bin)
-  BinData off <$> readIORef (put_arr bin)
+runBuffer initialSize m = do
+  ixr  <- newFastMutInt
+  szr  <- newFastMutInt
+  writeFastMutInt ixr 0
+  writeFastMutInt szr initialSize
+  arr  <- mallocForeignPtrBytes initialSize
+  binr <- newIORef arr
+  unput m (EnvP noUserData ixr szr binr)
+  BinData <$> readFastMutInt ixr <*> readIORef binr
 
 {-# INLINE runPutIO #-}
 runPutIO :: Put () -> IO BinData
@@ -115,68 +129,70 @@ runPutIO = runBuffer (1024 * 1024)
 runPut :: Put () -> BinData
 runPut = unsafePerformIO . runPutIO
 
-{-# INLINE askP #-}
-askP :: Put EnvP
-askP = Put ask
-
-{-# INLINE putEnv #-}
-putEnv :: (EnvP -> IO a) -> Put a
-putEnv f = Put $ liftIO . f =<< ask
-
-{-# INLINE putOffset #-}
-{-# INLINE putSize #-}
-putOffset, putSize :: Put Int
-putOffset = putEnv (readFastMutInt . put_offset)
-putSize   = putEnv (readFastMutInt . put_size  )
-
-putArr :: Put BinArray
-putArr = putEnv (readIORef . put_arr)
-
 -- -----------------------------------------------------------------------------
 -- Putting
 -- -----------------------------------------------------------------------------
 
 {-# INLINE putPrim #-}
 putPrim :: Int -> (Ptr Word8 -> IO ()) -> Put ()
-putPrim n f = do
-  ix <- putOffset
-  sz <- putSize
-  when (ix + n > sz) (expand (ix + n))
-  arr <- putArr
-  Put $ do
-    ixr <- put_offset <$> ask
-    liftIO $ do
-      withForeignPtr arr $ \op -> f (op `plusPtr` ix)
-      writeFastMutInt ixr (ix + n)
+putPrim n f = Put . oneShot $ \(EnvP _ ixr szr binr) -> do
+  ix <- readFastMutInt ixr
+  sz <- readFastMutInt szr
+  when (ix + n > sz) (expand (ix + n) szr binr)
+  arr <- readIORef binr
+  withForeignPtr arr $ \op -> f (op `plusPtr` ix)
+  writeFastMutInt ixr (ix + n)
 
 {-# INLINE ioP #-}
 ioP :: IO a -> Put a
-ioP m = Put (liftIO m)
+ioP m = Put . oneShot $ \_ -> m
 
 {-# INLINE userDataP #-}
 userDataP :: Put UserDataP
-userDataP = Put $ put_user <$> ask
-
-{-# INLINE offsetP #-}
-offsetP :: Put Int
-offsetP = do EnvP _ off _ _ <- askP; Put . liftIO $ readFastMutInt off
+userDataP = Put . oneShot $ \(EnvP ud _ _ _) -> return ud
 
 {-# INLINE seekP #-}
 seekP :: Bin a -> Put ()
-seekP (BinPtr !i) = do
-  EnvP _ ixr _ _ <- askP
-  Put . liftIO $ writeFastMutInt ixr i
+seekP (BinPtr !i) = Put . oneShot $ \(EnvP _ ixr _ _) ->
+  writeFastMutInt ixr i
 
 {-# INLINE tellP #-}
 tellP :: Put (Bin a)
-tellP = BinPtr <$> offsetP
+tellP = Put . oneShot $ \(EnvP _ ixr _ _) ->
+  BinPtr <$> readFastMutInt ixr
 
 -- -----------------------------------------------------------------------------
 -- Get
 -- -----------------------------------------------------------------------------
 
-newtype Get a = Get { unget :: ReaderT EnvG IO a }
-  deriving (Functor, Applicative, Monad, MonadFail)
+newtype Get a = Get { unget :: EnvG -> IO a }
+
+instance Functor Get where
+  {-# INLINE fmap #-}
+  fmap f m = Get . oneShot $ \env -> fmap f (unget m env)
+
+instance Applicative Get where
+  {-# INLINE pure #-}
+  pure x = Get . oneShot $ \_ -> pure x
+
+  {-# INLINE (<*>) #-}
+  f <*> x = Get . oneShot $ \env ->
+    unget f env <*> unget x env
+
+instance Monad Get where
+  {-# INLINE (>>=) #-}
+  x >>= f = Get . oneShot $ \env -> do
+    a <- unget x env
+    unget (f a) env
+
+#if !MIN_VERSION_base(4,13,0)
+  {-# INLINE fail #-}
+  fail s = Get . oneShot $ \_ -> fail s
+#endif
+
+instance MonadFail Get where
+  {-# INLINE fail #-}
+  fail s = Get . oneShot $ \_ -> fail s
 
 -- Internal reader data for `Get` monad.
 data EnvG
@@ -189,54 +205,25 @@ data EnvG
 
 {-# INLINE runGetIO #-}
 runGetIO :: BinData -> Get a -> IO a
-runGetIO bd m = runReaderT (unget m) =<< mkEnvG bd
+runGetIO bd@(BinData sz _) m = do
+  ixr <- newFastMutInt
+  writeFastMutInt ixr 0
+  unget m (EnvG noUserData ixr sz bd)
+
 
 {-# INLINE runGet #-}
 runGet :: BinData -> Get a -> a
 runGet bd = unsafePerformIO . runGetIO bd
 
-{-# INLINE askG #-}
-askG :: Get EnvG
-askG = Get ask
-
-{-# INLINE offsetG #-}
-offsetG :: Get Int
-offsetG = do EnvG _ off _ _ <- askG; Get . liftIO $ readFastMutInt off
-
 {-# INLINE seekG #-}
 seekG :: Bin a -> Get ()
-seekG (BinPtr !i) = do
-  EnvG _ ixr _ _ <- askG
-  Get . liftIO $ writeFastMutInt ixr i
+seekG (BinPtr !i) = Get . oneShot $ \(EnvG _ ixr _ _) ->
+  writeFastMutInt ixr i
 
 {-# INLINE tellG #-}
 tellG :: Get (Bin a)
-tellG = BinPtr <$> offsetG
-
-{-# INLINE getEnv #-}
-getEnv :: (EnvG -> IO a) -> Get a
-getEnv f = Get $ liftIO . f =<< ask
-
-{-# INLINE getOffset #-}
-{-# INLINE getEnd #-}
-getOffset, getEnd :: Get Int
-getOffset = getEnv (readFastMutInt . get_offset)
-getEnd    = Get $ get_end <$> ask
-
-{-# INLINE getSize #-}
-getSize :: Get Int
-getSize = Get $ binSize . get_arr <$> ask
-
-{-# INLINE getArr #-}
-getArr :: Get BinArray
-getArr =  Get $ unarr . get_arr <$> ask
-
-{-# INLINE mkEnvG #-}
-mkEnvG :: BinData -> IO EnvG
-mkEnvG bd@(BinData size _) = do
-  i <- newFastMutInt
-  writeFastMutInt i 0
-  return $ EnvG noUserData i size bd
+tellG = Get . oneShot $ \(EnvG _ ixr _ _) ->
+  BinPtr <$> readFastMutInt ixr
 
 -- -----------------------------------------------------------------------------
 -- Getting
@@ -244,42 +231,33 @@ mkEnvG bd@(BinData size _) = do
 
 {-# INLINE getPrim #-}
 getPrim :: Int -> (Ptr Word8 -> IO a) -> Get a
-getPrim n f = do
-  ix  <- getOffset
-  end <- getEnd
+getPrim n f = Get . oneShot $ \(EnvG _ ixr end (BinData _ arr)) -> do
+  ix <- readFastMutInt ixr
   when (ix + n > end) $
-    ioG $ ioError (mkIOError eofErrorType "Binary.Internal.getPrim" Nothing Nothing)
-  arr <- getArr
-  do
-    ixr <- get_offset <$> askG
-    ioG $ do
-      w <- withForeignPtr arr $ \op -> f (op `plusPtr` ix)
-      writeFastMutInt ixr (ix + n)
-      return w
+    ioError (mkIOError eofErrorType "Binary.Unsafe.getPrim" Nothing Nothing)
+  w <- withForeignPtr arr $ \op -> f (op `plusPtr` ix)
+  writeFastMutInt ixr (ix + n)
+  return w
 
 {-# INLINE interleaveG #-}
 interleaveG :: Get a -> Get a
-interleaveG m = do
-  env <- askG
-  ioG $ unsafeInterleaveIO . runReaderT (unget m) =<< dup env
-  where
-    dup :: EnvG -> IO EnvG
-    dup (EnvG dat off end arr) = do
-      off' <- newFastMutInt
-      writeFastMutInt off' =<< readFastMutInt off
-      return $ EnvG dat off' end arr
+interleaveG m = Get . oneShot $ \(EnvG ud ixr end bd) -> do
+  ixr' <- newFastMutInt
+  writeFastMutInt ixr' =<< readFastMutInt ixr
+  unget m (EnvG ud ixr' end bd)
 
 {-# INLINE getSlice #-}
 getSlice :: Bin b -> Get a -> Get a
-getSlice (BinPtr !end) (Get m) = Get $ local (\x -> x {get_end = end}) m
+getSlice (BinPtr !end) m = Get . oneShot $ \(EnvG ud ixr _ bd) ->
+  unget m (EnvG ud ixr end bd)
 
 {-# INLINE ioG #-}
 ioG :: IO a -> Get a
-ioG m = Get (liftIO m)
+ioG m = Get . oneShot $ \_ -> m
 
 {-# INLINE userDataG #-}
 userDataG :: Get UserDataG
-userDataG = Get $ get_user <$> ask
+userDataG = Get . oneShot $ \(EnvG ud _ _ _) -> return ud
 
 -- -----------------------------------------------------------------------------
 -- File IO
@@ -300,7 +278,7 @@ readBinData fp =
     arr <- mallocForeignPtrBytes sz
     count <- withForeignPtr arr $ \p -> hGetBuf h p sz
     when (count /= sz) $
-      error ("Binary.Internal.readBinMem: only read " ++ show count ++ " bytes")
+      error ("Binary.Unsafe.readBinData: only read " ++ show count ++ " bytes")
     return $ BinData sz arr
 
 -- -----------------------------------------------------------------------------
@@ -320,9 +298,8 @@ writeState :: (Name -> Put ())
            -> (FastString -> Put ())
            -> Put a
            -> Put a
-writeState nonbind bind fs (Put m) = Put $ local setWriteState m
-  where
-    setWriteState env = env { put_user = UserDataP nonbind bind fs }
+writeState nonbind bind fs m = Put . oneShot $ \(EnvP _ ixr szr binr) ->
+  unput m (EnvP (UserDataP nonbind bind fs) ixr szr binr)
 
 data UserDataG
    = UserDataG {
@@ -332,13 +309,12 @@ data UserDataG
 
 {-# INLINE noUserData #-}
 noUserData :: a
-noUserData = panic "Binary.UserData not defined"
+noUserData = panic "Binary.Unsafe.noUserData"
 
 {-# INLINE readState #-}
 readState :: Get Name
           -> Get FastString
           -> Get a
           -> Get a
-readState name fs (Get m) = Get $ local setReadState m
-  where
-    setReadState env = env { get_user = UserDataG name fs }
+readState name fs m = Get . oneShot $ \(EnvG _ ixr end bd) ->
+  unget m (EnvG (UserDataG name fs) ixr end bd)
