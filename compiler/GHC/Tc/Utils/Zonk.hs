@@ -1190,7 +1190,7 @@ zonkStmt env _ (LetStmt x (L l binds))
   = do (env1, new_binds) <- zonkLocalBinds env binds
        return (env1, LetStmt x (L l new_binds))
 
-zonkStmt env zBody (BindStmt bind_ty pat body bind_op fail_op)
+zonkStmt env zBody (BindStmt (bind_op, bind_ty, fail_op) pat body)
   = do  { (env1, new_bind) <- zonkSyntaxExpr env bind_op
         ; new_bind_ty <- zonkTcTypeToTypeX env1 bind_ty
         ; new_body <- zBody env1 body
@@ -1199,7 +1199,7 @@ zonkStmt env zBody (BindStmt bind_ty pat body bind_op fail_op)
             Nothing -> return Nothing
             Just f -> fmap (Just . snd) (zonkSyntaxExpr env1 f)
         ; return ( env2
-                 , BindStmt new_bind_ty new_pat new_body new_bind new_fail) }
+                 , BindStmt (new_bind, new_bind_ty, new_fail) new_pat new_body) }
 
 -- Scopes: join > ops (in reverse order) > pats (in forward order)
 --              > rest of stmts
@@ -1214,14 +1214,14 @@ zonkStmt env _zBody (ApplicativeStmt body_ty args mb_join)
     zonk_join env (Just j) = second Just <$> zonkSyntaxExpr env j
 
     get_pat :: (SyntaxExpr GhcTcId, ApplicativeArg GhcTcId) -> LPat GhcTcId
-    get_pat (_, ApplicativeArgOne _ pat _ _ _) = pat
+    get_pat (_, ApplicativeArgOne _ pat _ _) = pat
     get_pat (_, ApplicativeArgMany _ _ _ pat) = pat
 
     replace_pat :: LPat GhcTcId
                 -> (SyntaxExpr GhcTc, ApplicativeArg GhcTc)
                 -> (SyntaxExpr GhcTc, ApplicativeArg GhcTc)
-    replace_pat pat (op, ApplicativeArgOne x _ a isBody fail_op)
-      = (op, ApplicativeArgOne x pat a isBody fail_op)
+    replace_pat pat (op, ApplicativeArgOne fail_op _ a isBody)
+      = (op, ApplicativeArgOne fail_op pat a isBody)
     replace_pat pat (op, ApplicativeArgMany x a b _)
       = (op, ApplicativeArgMany x a b pat)
 
@@ -1241,13 +1241,13 @@ zonkStmt env _zBody (ApplicativeStmt body_ty args mb_join)
            ; return (env2, (new_op, new_arg) : new_args) }
     zonk_args_rev env [] = return (env, [])
 
-    zonk_arg env (ApplicativeArgOne x pat expr isBody fail_op)
+    zonk_arg env (ApplicativeArgOne fail_op pat expr isBody)
       = do { new_expr <- zonkLExpr env expr
            ; new_fail <- forM fail_op $ \old_fail ->
               do { (_, fail') <- zonkSyntaxExpr env old_fail
                  ; return fail'
                  }
-           ; return (ApplicativeArgOne x pat new_expr isBody new_fail) }
+           ; return (ApplicativeArgOne new_fail pat new_expr isBody) }
     zonk_arg env (ApplicativeArgMany x stmts ret pat)
       = do { (env1, new_stmts) <- zonkStmts env zonkLExpr stmts
            ; new_ret           <- zonkExpr env1 ret

@@ -69,7 +69,8 @@ module GHC.Hs.Utils(
   nlHsAppTy, nlHsAppKindTy, nlHsTyVar, nlHsFunTy, nlHsParTy, nlHsTyConApp,
 
   -- * Stmts
-  mkTransformStmt, mkTransformByStmt, mkBodyStmt, mkBindStmt, mkTcBindStmt,
+  mkTransformStmt, mkTransformByStmt, mkBodyStmt,
+  mkPsBindStmt, mkRnBindStmt, mkTcBindStmt,
   mkLastStmt,
   emptyTransStmt, mkGroupUsingStmt, mkGroupByUsingStmt,
   emptyRecStmt, emptyRecStmtName, emptyRecStmtId, mkRecStmt,
@@ -259,10 +260,10 @@ mkLastStmt :: IsPass idR => Located (bodyR (GhcPass idR))
            -> StmtLR (GhcPass idL) (GhcPass idR) (Located (bodyR (GhcPass idR)))
 mkBodyStmt :: Located (bodyR GhcPs)
            -> StmtLR (GhcPass idL) GhcPs (Located (bodyR GhcPs))
-mkBindStmt :: IsPass idR => (XBindStmt (GhcPass idL) (GhcPass idR)
-                         (Located (bodyR (GhcPass idR))) ~ NoExtField)
-           => LPat (GhcPass idL) -> Located (bodyR (GhcPass idR))
-           -> StmtLR (GhcPass idL) (GhcPass idR) (Located (bodyR (GhcPass idR)))
+mkPsBindStmt :: LPat GhcPs -> Located (bodyR GhcPs)
+             -> StmtLR GhcPs GhcPs (Located (bodyR GhcPs))
+mkRnBindStmt :: LPat GhcRn -> Located (bodyR GhcRn)
+             -> StmtLR GhcRn GhcRn (Located (bodyR GhcRn))
 mkTcBindStmt :: LPat GhcTc -> Located (bodyR GhcTc)
              -> StmtLR GhcTc GhcTc (Located (bodyR GhcTc))
 
@@ -320,9 +321,9 @@ mkGroupByUsingStmt ss b u = emptyTransStmt { trS_form = GroupForm, trS_stmts = s
 mkLastStmt body = LastStmt noExtField body Nothing noSyntaxExpr
 mkBodyStmt body
   = BodyStmt noExtField body noSyntaxExpr noSyntaxExpr
-mkBindStmt pat body
-  = BindStmt noExtField pat body noSyntaxExpr Nothing
-mkTcBindStmt pat body = BindStmt unitTy pat body noSyntaxExpr Nothing
+mkPsBindStmt pat body = BindStmt noExtField pat body
+mkRnBindStmt pat body = BindStmt (noSyntaxExpr, Nothing) pat body
+mkTcBindStmt pat body = BindStmt (noSyntaxExpr, unitTy, Nothing) pat body
   -- don't use placeHolderTypeTc above, because that panics during zonking
 
 emptyRecStmt' :: forall idL idR body. IsPass idR
@@ -1059,7 +1060,7 @@ collectLStmtBinders = collectStmtBinders . unLoc
 collectStmtBinders :: StmtLR (GhcPass idL) (GhcPass idR) body
                    -> [IdP (GhcPass idL)]
   -- Id Binders for a Stmt... [but what about pattern-sig type vars]?
-collectStmtBinders (BindStmt _ pat _ _ _)  = collectPatBinders pat
+collectStmtBinders (BindStmt _ pat _)      = collectPatBinders pat
 collectStmtBinders (LetStmt _  binds)      = collectLocalBinders (unLoc binds)
 collectStmtBinders (BodyStmt {})           = []
 collectStmtBinders (LastStmt {})           = []
@@ -1349,7 +1350,7 @@ lStmtsImplicits = hs_lstmts
 
     hs_stmt :: StmtLR GhcRn (GhcPass idR) (Located (body (GhcPass idR)))
             -> [(SrcSpan, [Name])]
-    hs_stmt (BindStmt _ pat _ _ _) = lPatImplicits pat
+    hs_stmt (BindStmt _ pat _) = lPatImplicits pat
     hs_stmt (ApplicativeStmt _ args _) = concatMap do_arg args
       where do_arg (_, ApplicativeArgOne { app_arg_pattern = pat }) = lPatImplicits pat
             do_arg (_, ApplicativeArgMany { app_stmts = stmts }) = hs_lstmts stmts

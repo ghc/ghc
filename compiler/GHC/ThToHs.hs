@@ -1147,7 +1147,7 @@ cvtStmts = mapM cvtStmt
 
 cvtStmt :: TH.Stmt -> CvtM (Hs.LStmt GhcPs (LHsExpr GhcPs))
 cvtStmt (NoBindS e)    = do { e' <- cvtl e; returnL $ mkBodyStmt e' }
-cvtStmt (TH.BindS p e) = do { p' <- cvtPat p; e' <- cvtl e; returnL $ mkBindStmt p' e' }
+cvtStmt (TH.BindS p e) = do { p' <- cvtPat p; e' <- cvtl e; returnL $ mkPsBindStmt p' e' }
 cvtStmt (TH.LetS ds)   = do { ds' <- cvtLocalDecs (text "a let binding") ds
                             ; returnL $ LetStmt noExtField (noLoc ds') }
 cvtStmt (TH.ParS dss)  = do { dss' <- mapM cvt_one dss

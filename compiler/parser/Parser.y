@@ -3292,7 +3292,7 @@ stmt  :: { forall b. DisambECP b => PV (LStmt GhcPs (Located b)) }
 
 qual  :: { forall b. DisambECP b => PV (LStmt GhcPs (Located b)) }
     : bindpat '<-' exp                   { runECP_PV $3 >>= \ $3 ->
-                                           ams (sLL $1 $> $ mkBindStmt $1 $3)
+                                           ams (sLL $1 $> $ mkPsBindStmt $1 $3)
                                                [mu AnnLarrow $2] }
     | exp                                { runECP_PV $1 >>= \ $1 ->
                                            return $ sL1 $1 $ mkBodyStmt $1 }

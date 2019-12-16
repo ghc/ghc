@@ -122,7 +122,7 @@ matchGuards (LetStmt _ binds : stmts) ctx rhs rhs_ty = do
         --         so we can't desugar the bindings without the
         --         body expression in hand
 
-matchGuards (BindStmt _ pat bind_rhs _ _ : stmts) ctx rhs rhs_ty = do
+matchGuards (BindStmt _ pat bind_rhs : stmts) ctx rhs rhs_ty = do
     let upat = unLoc pat
     match_var <- selectMatchVar upat
 

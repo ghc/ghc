@@ -933,7 +933,7 @@ dsDo stmts
       = do { rest <- goL stmts
            ; dsLocalBinds binds rest }
 
-    go _ (BindStmt res1_ty pat rhs bind_op fail_op) stmts
+    go _ (BindStmt (bind_op, res1_ty, fail_op) pat rhs) stmts
       = do  { body     <- goL stmts
             ; rhs'     <- dsLExpr rhs
             ; var   <- selectSimpleMatchVarL pat
@@ -947,7 +947,7 @@ dsDo stmts
              let
                (pats, rhss) = unzip (map (do_arg . snd) args)
 
-               do_arg (ApplicativeArgOne _ pat expr _ fail_op) =
+               do_arg (ApplicativeArgOne fail_op pat expr _) =
                  ((pat, fail_op), dsLExpr expr)
                do_arg (ApplicativeArgMany _ stmts ret pat) =
                  ((pat, Nothing), dsDo (stmts ++ [noLoc $ mkLastStmt (noLoc ret)]))
@@ -981,9 +981,13 @@ dsDo stmts
                         , recS_ret_ty = body_ty} }) stmts
       = goL (new_bind_stmt : stmts)  -- rec_ids can be empty; eg  rec { print 'x' }
       where
-        new_bind_stmt = L loc $ BindStmt bind_ty (mkBigLHsPatTupId later_pats)
-                                         mfix_app bind_op
-                                         Nothing  -- Tuple cannot fail
+        new_bind_stmt = L loc $ BindStmt
+          ( bind_op
+          , bind_ty
+          , Nothing -- Tuple cannot fail
+          )
+          (mkBigLHsPatTupId later_pats)
+          mfix_app
 
         tup_ids      = rec_ids ++ filterOut (`elem` rec_ids) later_ids
         tup_ty       = mkBigCoreTupTy (map idType tup_ids) -- Deals with singleton case

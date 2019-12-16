@@ -866,7 +866,7 @@ dsCmdStmt ids local_vars out_ids (BodyStmt c_ty cmd _ _) env_ids = do
 -- It would be simpler and more consistent to do this using second,
 -- but that's likely to be defined in terms of first.
 
-dsCmdStmt ids local_vars out_ids (BindStmt _ pat cmd _ _) env_ids = do
+dsCmdStmt ids local_vars out_ids (BindStmt _ pat cmd) env_ids = do
     let pat_ty = hsLPatType pat
     (core_cmd, fv_cmd, env_ids1) <- dsfixCmd ids local_vars unitTy pat_ty cmd
     let pat_vars = mkVarSet (collectPatBinders pat)
