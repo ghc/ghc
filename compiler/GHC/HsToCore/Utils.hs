@@ -23,6 +23,7 @@ module GHC.HsToCore.Utils (
         cantFailMatchResult, alwaysFailMatchResult,
         extractMatchResult, combineMatchResults,
         adjustMatchResult,  adjustMatchResultDs,
+        shareFailureHandler,
         mkCoLetMatchResult, mkViewMatchResult, mkGuardedMatchResult,
         matchCanFail, mkEvalMatchResult,
         mkCoPrimCaseMatchResult, mkCoAlgCaseMatchResult, mkCoSynCaseMatchResult,
@@ -206,30 +207,22 @@ cantFailMatchResult :: CoreExpr -> MatchResult
 cantFailMatchResult expr = MatchResult_Unfailable $ return expr
 
 extractMatchResult :: MatchResult -> CoreExpr -> DsM CoreExpr
-extractMatchResult (MatchResult_Unfailable match_fn) _
-  = match_fn
-extractMatchResult (MatchResult_Failable match_fn) fail_expr = do
-    (fail_bind, if_it_fails) <- mkFailurePair fail_expr
-    body <- match_fn if_it_fails
-    return (mkCoreLet fail_bind body)
+extractMatchResult match_result failure_expr =
+  runMatchResult
+    failure_expr
+    (shareFailureHandler match_result)
 
 combineMatchResults :: MatchResult -> MatchResult -> MatchResult
-combineMatchResults (MatchResult_Failable body_fn1)
-                    (MatchResult_Failable body_fn2)
-  = MatchResult_Failable $ \fail -> do
-      body2 <- body_fn2 fail
-      (fail_bind, duplicatable_expr) <- mkFailurePair body2
-      body1 <- body_fn1 duplicatable_expr
-      return (Let fail_bind body1)
-combineMatchResults (MatchResult_Failable body_fn1)
-                    (MatchResult_Unfailable body_fn2)
-  = MatchResult_Unfailable $ do
-      body2 <- body_fn2
-      (fail_bind, duplicatable_expr) <- mkFailurePair body2
-      body1 <- body_fn1 duplicatable_expr
-      return (Let fail_bind body1)
 combineMatchResults match_result1@(MatchResult_Unfailable _) _
   = match_result1
+combineMatchResults match_result1 match_result2 =
+  -- if the first pattern needs a failure handler (i.e. if it is is fallible),
+  -- make it let-bind it bind it with `shareFailureHandler`.
+  case shareFailureHandler match_result1 of
+    MatchResult_Unfailable _ -> match_result1
+    MatchResult_Failable body_fn1 -> MatchResult_Failable $ \fail_expr ->
+      -- Before actually failing, try the next match arm.
+      body_fn1 =<< runMatchResult fail_expr match_result2
 
 adjustMatchResult :: (a -> b) -> MatchResult' a -> MatchResult' b
 adjustMatchResult = fmap
@@ -855,6 +848,18 @@ mkFailurePair expr
                  App (Var fail_fun_var) (Var voidPrimId)) }
   where
     ty = exprType expr
+
+-- Uses '@mkFailurePair@' to bind the failure case. Infallible matches have
+-- neither a failure arg or failure "hole", so nothing is let-bound, and no
+-- extraneous Core is produced.
+shareFailureHandler :: MatchResult -> MatchResult
+shareFailureHandler = \case
+  mr@(MatchResult_Unfailable _) -> mr
+  MatchResult_Failable match_fn -> MatchResult_Failable $ \fail_expr -> do
+    (fail_bind, shared_failure_handler) <- mkFailurePair fail_expr
+    body <- match_fn shared_failure_handler
+    -- Never unboxed, per the above, so always OK for `let` not `case`.
+    return $ Let fail_bind body
 
 {-
 Note [Failure thunks and CPR]

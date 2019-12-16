@@ -1021,14 +1021,14 @@ dsDo stmts
 dsHandleMonadicFailure :: LPat GhcTc -> MatchResult -> SyntaxExpr GhcTc -> DsM CoreExpr
     -- In a do expression, pattern-match failure just calls
     -- the monadic 'fail' rather than throwing an exception
-dsHandleMonadicFailure pat match fail_op
-  | matchCanFail match
-  = do { dflags <- getDynFlags
-       ; fail_msg <- mkStringExpr (mk_fail_msg dflags pat)
-       ; fail_expr <- dsSyntaxExpr fail_op [fail_msg]
-       ; extractMatchResult match fail_expr }
-  | otherwise
-  = extractMatchResult match (error "It can't fail")
+dsHandleMonadicFailure pat match fail_op =
+  case shareFailureHandler match of
+    MatchResult_Unfailable body -> body
+    MatchResult_Failable body -> do
+      dflags <- getDynFlags
+      fail_msg <- mkStringExpr (mk_fail_msg dflags pat)
+      fail_expr <- dsSyntaxExpr fail_op [fail_msg]
+      body fail_expr
 
 mk_fail_msg :: DynFlags -> Located e -> String
 mk_fail_msg dflags pat = "Pattern match failure in do expression at " ++
