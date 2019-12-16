@@ -1368,16 +1368,16 @@ Specifically
 -- Some very important subtleties here: see Note [mkCastTy subtleties]
 mkCastTy :: Type -> Coercion -> Type
 mkCastTy ty co
-  | isReflexiveCo co    -- (EQ2) from the Note
+  | isReflexiveCo co    -- (EQ2) from Note [mkCastTy subtleties]
   = ty
 
 mkCastTy (CastTy ty co1) co2
-  -- (EQ3) from the Note
+  -- (EQ3) from Note [mkCastTy subtleties]
   = mkCastTy ty (co1 `mkTransCo` co2)
       -- call mkCastTy again for the reflexivity check
 
 mkCastTy (ForAllTy (Bndr tv vis) inner_ty) co
-  -- (EQ4) from the Note
+  -- (EQ4) from Note [mkCastTy subtleties]
   | isTyVar tv
   , let fvs = tyCoVarsOfCo co
   = -- have to make sure that pushing the co in doesn't capture the bound var!

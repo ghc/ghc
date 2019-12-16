@@ -390,7 +390,8 @@ orphNamesOfCo (InstCo co arg)       = orphNamesOfCo co `unionNameSet` orphNamesO
 orphNamesOfCo (KindCo co)           = orphNamesOfCo co
 orphNamesOfCo (SubCo co)            = orphNamesOfCo co
 orphNamesOfCo (AxiomRuleCo _ cs)    = orphNamesOfCos cs
-orphNamesOfCo (HoleCo _)            = emptyNameSet
+orphNamesOfCo co@(HoleCo {})        = pprPanic "orphaNamesOfCo:HoleCo" (ppr co)
+orphNamesOfCo co@(ZonkCo {})        = pprPanic "orphaNamesOfCo:ZonkCo" (ppr co)
 
 orphNamesOfProv :: UnivCoProvenance -> NameSet
 orphNamesOfProv UnsafeCoerceProv    = emptyNameSet

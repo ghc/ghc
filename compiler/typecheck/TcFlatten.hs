@@ -35,8 +35,6 @@ import Control.Monad
 import MonadUtils    ( zipWith3M )
 import Data.Foldable ( foldrM )
 
-import Control.Arrow ( first )
-
 {-
 Note [The flattening story]
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~
@@ -852,10 +850,21 @@ flattenArgsNom ev tc tys
          has no filled-in metavariables
       co :: xi ~ ty
 
-Key invariants:
-  (F0) co :: xi ~ zonk(ty)
-  (F1) tcTypeKind(xi) succeeds and returns a fully zonked kind
-  (F2) tcTypeKind(xi) `eqType` zonk(tcTypeKind(ty))
+Key postconditions:
+  (F0) co :: xi ~ ty
+
+  (F1) All tyvars (both meta and skolem) in xi
+         are inert wrt (a) the inert set equalities
+                       (b) the mutable state (i.e filled-in meta-tyvars)
+         other than tyvars in coercions
+
+  (F2) xi has no type functions, except
+         - under a ForAll, or
+         - in a coercion, or
+         - you are running the flattener in SubstOnly mode
+
+  (F2) Flattening does not change the kind:
+          tcTypeKind(xi) `eqType` tcTypeKind(ty)
 
 Note that it is flatten's job to flatten *every type function it sees*.
 flatten is only called on *arguments* to type functions, by canEqGiven.
@@ -888,7 +897,7 @@ TcCanonical.canEqTyVar).
 Flattening is always homogeneous. That is, the kind of the result of flattening is
 always the same as the kind of the input, modulo zonking. More formally:
 
-  (F2) tcTypeKind(xi) `eqType` zonk(tcTypeKind(ty))
+  (F3) tcTypeKind(xi) `eqType` zonk(tcTypeKind(ty))
 
 This invariant means that the kind of a flattened type might not itself be flat.
 
@@ -1216,22 +1225,16 @@ flatten_one ty@(ForAllTy {})
 
 flatten_one (CastTy ty g)
   = do { (xi, co) <- flatten_one ty
---       ; (g', _)  <- flatten_co g
-
        ; role <- getRole
        ; return (mkCastTy xi g, castCoercionKind co role xi ty g g) }
---       ; return (mkCastTy xi g', castCoercionKind co role xi ty g' g) }
+          -- co :: xi ~ ty
+          -- Need  (xi |> g) ~ (ty |> g)
 
-flatten_one (CoercionTy co) = first mkCoercionTy <$> flatten_co co
-
--- | "Flatten" a coercion. Really, just zonk it so we can uphold
--- (F1) of Note [Flattening]
-flatten_co :: Coercion -> FlatM (Coercion, Coercion)
-flatten_co co
-  = do { co <- liftTcS $ zonkCo co
-       ; env_role <- getRole
-       ; let co' = mkTcReflCo env_role (mkCoercionTy co)
-       ; return (co, co') }
+flatten_one (CoercionTy co)
+  -- E.g.   K (COERCION co), where K is a promoted GADT datacon
+  = do { role <- getRole
+       ; let co' = mkTcReflCo role (mkCoercionTy co)
+       ; return (CoercionTy co, co' ) }
 
 -- flatten (nested) AppTys
 flatten_app_tys :: Type -> [Type] -> FlatM (Xi, Coercion)
@@ -1281,14 +1284,7 @@ flatten_app_ty_args fun_xi fun_co arg_tys
                     <- flatten_vector (tcTypeKind fun_xi) (repeat Nominal) arg_tys
                 ; let arg_xi = mkAppTys fun_xi arg_xis
                       arg_co = mkAppCos fun_co arg_cos
-                ; pprTrace "flatten_app_ty_args" (vcat
-                      [ text "fun_xi" <+> ppr fun_xi
-                      , text "arg_xis" <+> ppr arg_xis
-                      , text "arg_xi" <+> ppr arg_xi
-                      , text "fun_co" <+> ppr fun_co
-                      , text "arg_co" <+> ppr arg_co
-                      ]) $
-                  return (arg_xi, arg_co, kind_co) }
+                ; return (arg_xi, arg_co, kind_co) }
 
        ; role <- getRole
        ; return (homogenise_result xi co role kind_co) }
@@ -1301,7 +1297,7 @@ flatten_ty_con_app tc tys
              tyconapp_co = mkTyConAppCo role tc cos
        ; return (homogenise_result tyconapp_xi tyconapp_co role kind_co) }
 
--- Make the result of flattening homogeneous (Note [Flattening] (F2))
+-- Make the result of flattening homogeneous (Note [Flattening] (F3))
 homogenise_result :: Xi              -- a flattened type
                   -> Coercion        -- :: xi ~r original ty
                   -> Role            -- r
@@ -1620,8 +1616,8 @@ flattenTyVar tv
                    -- ; traceFlat "flattenTyVar2" (ppr tv $$ ppr ty2)
                    ; return (ty2, co2 `mkTransCo` co1) }
 
-           FTRNotFollowed   -- Done, but make sure the kind is zonked
-                            -- Note [Flattening] invariant (F0) and (F1)
+           FTRNotFollowed   -- Do not flatten the kind:
+                            -- Note [Flattening] invariant (F3)
              -> do { -- tv' <- liftTcS $ updateTyVarKindM zonkTcType tv
                      let tv' = tv
                    ; role <- getRole
@@ -1640,10 +1636,11 @@ flatten_tyvar1 tv
        ; case mb_ty of
            Just ty -> do { traceFlat "Following filled tyvar"
                              (ppr tv <+> equals <+> ppr ty)
---                         ; role <- getRole
-                         ; return (FTRFollowed ty (mkZonkCo ty (mkTyVarTy tv))) } ;
-                                       -- ToDo: ignoring role here; is that right?
---                         ; return (FTRFollowed ty (mkReflCo role ty)) } ;
+                         ; role <- getRole
+                         ; let co = downgradeRole role Nominal $
+                                    mkZonkCo ty (mkTyVarTy tv)
+                         ; return (FTRFollowed ty co) }
+
            Nothing -> do { traceFlat "Unfilled tyvar" (pprTyVar tv)
                          ; fr <- getFlavourRole
                          ; flatten_tyvar2 tv fr } }

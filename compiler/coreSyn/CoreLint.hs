@@ -719,7 +719,8 @@ lintCoreExpr :: CoreExpr -> LintM OutType
 -- If you edit this function, you may need to update the GHC formalism
 -- See Note [GHC Formalism]
 lintCoreExpr (Var var)
-  = lintVarOcc var 0
+  = pprTrace "lce" (ppr var) $
+    lintVarOcc var 0
 
 lintCoreExpr (Lit lit)
   = return (literalType lit)
@@ -803,8 +804,9 @@ lintCoreExpr (Lam var expr)
     do { body_ty <- lintCoreExpr expr
        ; return $ mkLamType var' body_ty }
 
-lintCoreExpr (Case scrut var alt_ty alts)
-  = lintCaseExpr scrut var alt_ty alts
+lintCoreExpr e@(Case scrut var alt_ty alts)
+  = pprTrace "LintCase" (ppr e) $
+    lintCaseExpr scrut var alt_ty alts
 
 -- This case can't happen; linting types in expressions gets routed through
 -- lintCoreArgs
@@ -1231,15 +1233,19 @@ lintBinders site (var:vars) linterF = lintBinder site var $ \var' ->
 -- See Note [GHC Formalism]
 lintBinder :: BindingSite -> Var -> (Var -> LintM a) -> LintM a
 lintBinder site var linterF
-  | isTyVar var = lintTyBndr                  var linterF
-  | isCoVar var = lintCoBndr                  var linterF
-  | otherwise   = lintIdBndr NotTopLevel site var linterF
+  | isTyVar var = pprTrace "lintTyBndr1" (ppr var) $
+                  lintTyBndr                  var linterF
+  | isCoVar var = pprTrace "lintCoBndr1" (ppr var) $
+                  lintCoBndr                  var linterF
+  | otherwise   = pprTrace "lintIdBndr1" (ppr var) $
+                  lintIdBndr NotTopLevel site var linterF
 
 lintTyBndr :: InTyVar -> (OutTyVar -> LintM a) -> LintM a
 lintTyBndr tv thing_inside
   = do { subst <- getTCvSubst
        ; let (subst', tv') = substTyVarBndr subst tv
-       ; lintKind (varType tv')
+       ; -- pprTrace "lintTyBndrs" (ppr tv $$ ppr tv' $$ ppr subst $$ ppr subst') $
+         lintKind (varType tv')
        ; updateTCvSubst subst' (thing_inside tv') }
 
 lintCoBndr :: InCoVar -> (OutCoVar -> LintM a) -> LintM a
@@ -1249,7 +1255,8 @@ lintCoBndr cv thing_inside
        ; lintKind (varType cv')
        ; lintL (isCoVarType (varType cv'))
                (text "CoVar with non-coercion type:" <+> pprTyVar cv)
-       ; updateTCvSubst subst' (thing_inside cv') }
+       ; -- pprTrace "lintCoBndr" (ppr cv $$ ppr subst') $
+         updateTCvSubst subst' (thing_inside cv') }
 
 lintLetBndrs :: TopLevelFlag -> [Var] -> LintM a -> LintM a
 lintLetBndrs top_lvl ids linterF
@@ -2050,10 +2057,13 @@ lintCoercion this@(AxiomRuleCo co cs)
                           [ text "Expected:" <+> int (n + length es)
                           , text "Provided:" <+> int n ]
 
-lintCoercion (HoleCo h)
-  = do { addErrL $ text "Unfilled coercion hole:" <+> ppr h
+lintCoercion co@(HoleCo h)
+  = do { addErrL $ text "Unfilled coercion hole:" <+> ppr co
        ; lintCoercion (CoVarCo (coHoleCoVar h)) }
 
+lintCoercion co@(ZonkCo t1 t2)
+  = do { addErrL $ text "Unexpected ZonkCo" <+> ppr co
+       ; return (typeKind t1, typeKind t2, t1, t2, Nominal) }
 
 ----------
 lintUnliftedCoVar :: CoVar -> LintM ()

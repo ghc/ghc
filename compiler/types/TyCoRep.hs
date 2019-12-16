@@ -1679,7 +1679,7 @@ typeSize (CoercionTy co)            = coercionSize co
 
 coercionSize :: Coercion -> Int
 coercionSize (Refl ty)             = typeSize ty
-coercionSize (ZonkCo ty1 ty2)      = 0  -- Will disapper after zonking
+coercionSize (ZonkCo {})           = 0  -- Will disapper after zonking
 coercionSize (GRefl _ ty MRefl)    = typeSize ty
 coercionSize (GRefl _ ty (MCo co)) = 1 + typeSize ty + coercionSize co
 coercionSize (TyConAppCo _ _ args) = 1 + sum (map coercionSize args)

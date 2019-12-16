@@ -757,7 +757,8 @@ ppr_monobind (AbsBinds { abs_tvs = tyvars, abs_ev_vars = dictvars
       [ text "Exports:" <+>
           brackets (sep (punctuate comma (map ppr exports)))
       , text "Exported types:" <+>
-          vcat [pprBndr LetBind (abe_poly ex) | ex <- exports]
+          vcat [ pprBndr LetBind (abe_poly ex) $$ pprBndr LetBind (abe_mono ex)
+               | ex <- exports]
       , text "Binds:" <+> pprLHsBinds val_binds
       , text "Evidence:" <+> ppr ev_binds ]
     else

@@ -1592,6 +1592,7 @@ freeNamesIfCoercion (IfaceForAllCo _ kind_co co)
 freeNamesIfCoercion (IfaceFreeCoVar _) = emptyNameSet
 freeNamesIfCoercion (IfaceCoVarCo _)   = emptyNameSet
 freeNamesIfCoercion (IfaceHoleCo _)    = emptyNameSet
+freeNamesIfCoercion (IfaceZonkCo {})   = emptyNameSet
 freeNamesIfCoercion (IfaceAxiomInstCo ax _ cos)
   = unitNameSet ax &&& fnList freeNamesIfCoercion cos
 freeNamesIfCoercion (IfaceUnivCo p _ t1 t2)

@@ -1083,7 +1083,7 @@ zonkCoFn env (WpFun c1 c2 t1 d) = do { (env1, c1') <- zonkCoFn env c1
                                      ; t1'         <- zonkTcTypeToTypeX env2 t1
                                      ; return (env2, WpFun c1' c2' t1' d) }
 zonkCoFn env (WpCast co) = do { co' <- zonkCoToCo env co
-                              ; let wrap' | isReflexiveCo co' = WpHole
+                              ; let wrap' -- | isReflexiveCo co' = WpHole
                                           | otherwise         = WpCast co'
                               ; return (env, wrap') }
 zonkCoFn env (WpEvLam ev)   = do { (env', ev') <- zonkEvBndrX env ev
@@ -1868,13 +1868,23 @@ zonkCoHole env hole@(CoercionHole { ch_ref = ref, ch_co_var = cv })
                              -- this as a coercion hole led to #15787
 
 zonk_tycomapper :: TyCoMapper ZonkEnv TcM
-zonk_tycomapper = TyCoMapper
-  { tcm_tyvar      = zonkTyVarOcc
-  , tcm_covar      = zonkCoVarOcc
-  , tcm_hole       = zonkCoHole
-  , tcm_tycobinder = \env tv _vis -> zonkTyBndrX env tv
-  , tcm_tycon      = zonkTcTyConToTyCon
-  , tcm_zonkco     = zonkZonkCo zonk_tycomapper }
+zonk_tycomapper
+  = TyCoMapper { tcm_tyvar      = zonkTyVarOcc
+               , tcm_covar      = zonkCoVarOcc
+               , tcm_hole       = zonkCoHole
+               , tcm_tycobinder = \env tv _vis -> zonkTyBndrX env tv
+               , tcm_tycon      = zonkTcTyConToTyCon
+               , tcm_zonkco     = zonk_co }
+  where
+    zonk_co :: ZonkEnv -> TcType -> TcType -> TcM Coercion
+    -- This is where ZonkCo dies: zonking should make the
+    -- types equal, so we can produce Refl instead
+    zonk_co env t1 t2
+      = do { t2 <- zonkTcTypeToTypeX env t2  -- Heuristic: t2 is faster to zonk
+           ; when debugIsOn $
+             do { t1 <- zonkTcTypeToTypeX env t1
+                ; MASSERT2( t1 `tcEqType` t2, ppr t1 $$ ppr t2 ) }
+           ; return (mkTcNomReflCo t2) }
 
 -- Zonk a TyCon by changing a TcTyCon to a regular TyCon
 zonkTcTyConToTyCon :: TcTyCon -> TcM TyCon

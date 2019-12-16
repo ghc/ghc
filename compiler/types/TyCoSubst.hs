@@ -631,14 +631,18 @@ checkValidSubst subst@(TCvSubst in_scope tenv cenv) tys cos a
              text "cenv" <+> ppr cenv $$
              text "cenvFVs" <+> ppr (tyCoVarsOfCosSet cenv) $$
              text "tys" <+> ppr tys $$
-             text "cos" <+> ppr cos )
+             text "cos" <+> ppr cos $$
+             text "missing tvs" <+> ppr (tyCoVarsOfTypesSet tenv `minusVarSet` in_scope_set) $$
+             text "missing cvs" <+> ppr (tyCoVarsOfCosSet cenv `minusVarSet` in_scope_set)
+             )
     ASSERT2( tysCosFVsInScope,
              text "in_scope" <+> ppr in_scope $$
              text "tenv" <+> ppr tenv $$
              text "cenv" <+> ppr cenv $$
              text "tys" <+> ppr tys $$
              text "cos" <+> ppr cos $$
-             text "needInScope" <+> ppr needInScope )
+             text "needInScope" <+> ppr needInScope $$
+             text "missing" <+> ppr (needInScope `minusVarSet` in_scope_set) )
     a
   where
   substDomain = nonDetKeysUFM tenv ++ nonDetKeysUFM cenv
@@ -647,7 +651,7 @@ checkValidSubst subst@(TCvSubst in_scope tenv cenv) tys cos a
   needInScope = (tyCoVarsOfTypes tys `unionVarSet` tyCoVarsOfCos cos)
                   `delListFromUniqSet_Directly` substDomain
   tysCosFVsInScope = needInScope `varSetInScope` in_scope
-
+  in_scope_set = getInScopeVars in_scope
 
 -- | Substitute within a 'Type'
 -- The substitution has to satisfy the invariants described in
@@ -962,7 +966,7 @@ substTyVarBndrUsing subst_fn subst@(TCvSubst in_scope tenv cenv) old_var
     -- Assertion check that we are not capturing something in the substitution
 
     old_ki = tyVarKind old_var
-    no_kind_change = noFreeVarsOfType old_ki -- verify that kind is closed
+    no_kind_change = noFreeVarsOfType old_ki
     no_change = no_kind_change && (new_var == old_var)
         -- no_change means that the new_var is identical in
         -- all respects to the old_var (same unique, same kind)

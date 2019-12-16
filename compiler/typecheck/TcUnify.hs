@@ -152,6 +152,11 @@ matchExpectedFunTys herald arity orig_ty thing_inside
       Check ty -> go [] arity ty
       _        -> defer [] arity orig_ty
   where
+    go :: [ExpSigmaType] -> Arity -> TcType -> TcM (a, HsWrapper)
+    -- (go acc_arg_tys n fun_ty)  = (result, wrap)
+    --    acc_arg_tys are [tm .. t1] in reverse order
+    -- where m = arity-n; when n=0 we are done
+    -- wrap :: (t(m+1) -> ... -> t_n -> t_r) ~> fun_ty
     go acc_arg_tys 0 ty
       = do { result <- thing_inside (reverse acc_arg_tys) (mkCheckExpType ty)
            ; return (result, idHsWrapper) }
@@ -174,7 +179,9 @@ matchExpectedFunTys herald arity orig_ty thing_inside
       = do { cts <- readMetaTyVar tv
            ; case cts of
                Indirect ty' -> do { (res, wrap) <- go acc_arg_tys n ty'
-                                  ; return (res, mkWpCastN (ty `mkTcZonkCo` ty') <.> wrap) }
+                                  ; return (res, mkWpCastN (ty' `mkTcZonkCo` ty) <.> wrap) }
+-- NB: this is unnecessary, since these wrappers apply to *terms*
+--     and we never look at terms until we zonk them.
                Flexi        -> defer acc_arg_tys n (mkCheckExpType ty) }
 
        -- In all other cases we bale out into ordinary unification
@@ -262,7 +269,7 @@ matchActualFunTysPart herald ct_orig mb_thing arity orig_ty
   where
     -- This function has a bizarre mechanic: it accumulates arguments on
     -- the way down and also builds an argument list on the way up. Why:
-    -- 1. The returns args list and the accumulated args list might be different.
+    -- 1. The returned args list and the accumulated args list might be different.
     --    The accumulated args include all the arg types for the function,
     --    including those from before this function was called. The returned
     --    list should include only those arguments produced by this call of
@@ -276,6 +283,11 @@ matchActualFunTysPart herald ct_orig mb_thing arity orig_ty
        -> [TcSigmaType] -- accumulator of arguments (reversed)
        -> TcSigmaType   -- the remainder of the type as we're processing
        -> TcM (HsWrapper, [TcSigmaType], TcSigmaType)
+    -- (go n acc_args fun_ty) = (wrap, arg_tys, res_ty)
+    -- Then   wrap :: fun_ty ~> (ty(m+1) -> ... -> ty_n -> res_ty)
+    --        arg_tys = ty_(n+1) ... ty_n
+    --        m = arity-n; when n=0 we are done
+    -- acc_args is used only for error messages
     go 0 _ ty = return (idHsWrapper, [], ty)
 
     go n acc_args ty
@@ -303,7 +315,10 @@ matchActualFunTysPart herald ct_orig mb_thing arity orig_ty
       = do { cts <- readMetaTyVar tv
            ; case cts of
                Indirect ty' -> do { (wrap, arg_tys, res_ty) <- go n acc_args ty'
-                                  ; return (mkWpCastN (ty `mkTcZonkCo` ty') <.> wrap, arg_tys, res_ty) }
+                                  ; return ( wrap <.> mkWpCastN (ty `mkTcZonkCo` ty')
+-- NB: this is unnecessary, since these wrappers apply to *terms*
+--     and we never look at terms until we zonk them.
+                                           , arg_tys, res_ty) }
                Flexi        -> defer n ty }
 
        -- In all other cases we bale out into ordinary unification
@@ -755,6 +770,8 @@ tc_sub_type_ds eq_orig inst_orig ctxt ty_actual ty_expected
                         (ppr tv_a <+> text "-->" <+> ppr ty_a')
                     ; wrap <- tc_sub_type_ds eq_orig inst_orig ctxt ty_a' ty_e
                     ; return (wrap <.> mkWpCastN (mkZonkCo ty_a ty_a')) }
+-- NB: this is unnecessary, since these wrappers apply to *terms*
+--     and we never look at terms until we zonk them.
                Unfilled _   -> unify }
 
     -- Historical note (Sept 16): there was a case here for

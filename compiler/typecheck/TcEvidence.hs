@@ -214,7 +214,6 @@ data HsWrapper
        -- the desugarer. See Note [Levity polymorphism checking] in DsMonad
 
   | WpCast TcCoercionR        -- A cast:  [] `cast` co
-                              -- Guaranteed not the identity coercion
                               -- At role Representational
 
         -- Evidence abstraction and application

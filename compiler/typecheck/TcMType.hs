@@ -74,7 +74,7 @@ module TcMType (
   CandidatesQTvs(..), delCandidates, candidateKindVars, partitionCandidates,
   zonkAndSkolemise, skolemiseQuantifiedTyVar,
   defaultTyVar, quantifyTyVars, isQuantifiableTv,
-  zonkTcType, zonkTcTypes, zonkCo, zonkZonkCo,
+  zonkTcType, zonkTcTypes, zonkCo,
   zonkTyCoVarKind,
 
   zonkEvVar, zonkWC, zonkSimples,
@@ -2106,7 +2106,7 @@ zonkTcTypeMapper = TyCoMapper
   , tcm_hole       = hole
   , tcm_tycobinder = zonk_bndr
   , tcm_tycon      = zonkTcTyCon
-  , tcm_zonkco     = zonkZonkCo zonkTcTypeMapper }
+  , tcm_zonkco     = zonk_co }
   where
     zonk_bndr :: () -> TyCoVar -> ArgFlag -> TcM ((), TyCoVar)
     zonk_bndr _ tv _vis
@@ -2122,15 +2122,15 @@ zonkTcTypeMapper = TyCoMapper
                Nothing -> do { cv' <- zonkCoVar cv
                              ; return $ HoleCo (hole { ch_co_var = cv' }) } }
 
-zonkZonkCo :: Monad m => TyCoMapper env m -> env -> TcType -> TcType -> m Coercion
--- This is where ZonkCo dies: zonking should make the
--- types equal, so we can produce Refl instead
-zonkZonkCo mapper env t1 t2
-  = do { t1 <- mapType mapper env t1
-       ; when debugIsOn $
-         do { t2 <- mapType mapper env t2
-            ; MASSERT2( t1 `tcEqType` t2, ppr t1 $$ ppr t2 ) }
-       ; return (Refl t1) }
+    zonk_co :: () -> TcType -> TcType -> TcM Coercion
+    -- This is where ZonkCo dies: zonking should make the
+    -- types equal, so we can produce Refl instead
+    zonk_co _env t1 t2
+      = do { t2 <- zonkTcType t2  -- Heuristic: t2 is faster to zonk
+           ; when debugIsOn $
+             do { t1 <- zonkTcType t1
+                ; MASSERT2( t1 `tcEqType` t2, ppr t1 $$ ppr t2 ) }
+           ; return (mkTcNomReflCo t2) }
 
 zonkTcTyCon :: TcTyCon -> TcM TcTyCon
 -- Only called on TcTyCons

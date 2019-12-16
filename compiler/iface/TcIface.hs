@@ -1240,8 +1240,9 @@ tcIfaceCo = go
     go (IfaceSubCo c)            = SubCo    <$> go c
     go (IfaceAxiomRuleCo ax cos) = AxiomRuleCo <$> tcIfaceCoAxiomRule ax
                                                <*> mapM go cos
-    go (IfaceFreeCoVar c)        = pprPanic "tcIfaceCo:IfaceFreeCoVar" (ppr c)
-    go (IfaceHoleCo c)           = pprPanic "tcIfaceCo:IfaceHoleCo"    (ppr c)
+    go co@(IfaceFreeCoVar {}) = pprPanic "tcIfaceCo:IfaceFreeCoVar" (ppr co)
+    go co@(IfaceHoleCo {})    = pprPanic "tcIfaceCo:IfaceHoleCo"    (ppr co)
+    go co@(IfaceZonkCo {})    = pprPanic "tcIfaceCo:IfaceZonkCo"    (ppr co)
 
     go_var :: FastString -> IfL CoVar
     go_var = tcIfaceLclId

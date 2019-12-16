@@ -393,6 +393,7 @@ tcExpr expr@(OpApp fix arg1 op arg2) res_ty
        ; (wrap, op', [HsValArg arg1', HsValArg arg2'])
            <- tcApp (Just $ mk_op_msg op)
                      op [HsValArg arg1, HsValArg arg2] res_ty
+       ; traceTc "return from tcApp" (ppr (mkHsWrap wrap $ OpApp fix arg1' op' arg2'))
        ; return (mkHsWrap wrap $ OpApp fix arg1' op' arg2') }
 
 -- Right sections, equivalent to \ x -> x `op` expr, or
@@ -1159,7 +1160,7 @@ tcFunApp :: Maybe SDoc  -- like "The function `f' is applied to"
 tcFunApp m_herald rn_fun tc_fun fun_sigma rn_args res_ty
   = do { let orig = lexprCtOrigin rn_fun
 
-       ; traceTc "tcFunApp" (ppr rn_fun <+> dcolon <+> ppr fun_sigma $$ ppr rn_args $$ ppr res_ty)
+       ; traceTc "tcFunApp1" (ppr rn_fun <+> dcolon <+> ppr fun_sigma $$ ppr rn_args $$ ppr res_ty)
        ; (wrap_fun, tc_args, actual_res_ty)
            <- tcArgs rn_fun fun_sigma orig rn_args
                      (m_herald `orElse` mk_app_msg rn_fun rn_args)
@@ -1171,6 +1172,7 @@ tcFunApp m_herald rn_fun tc_fun fun_sigma rn_args res_ty
                        (Just $ unLoc $ wrapHsArgs rn_fun rn_args)
                        actual_res_ty res_ty
 
+       ; traceTc "tcFunApp2" (ppr tc_fun $$ ppr wrap_fun $$ ppr wrap_res)
        ; return (wrap_res, mkLHsWrap wrap_fun tc_fun, tc_args) }
 
 mk_app_msg :: LHsExpr GhcRn -> [LHsExprArgIn] -> SDoc
