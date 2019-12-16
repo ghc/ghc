@@ -10,7 +10,7 @@
 -----------------------------------------------------------------------------
 module Hadrian.Builder.Sphinx (SphinxMode (..), args) where
 
-import Development.Shake         hiding (Verbosity(..))
+import Development.Shake
 import Development.Shake.Classes
 import GHC.Generics
 import Hadrian.Expression
@@ -18,7 +18,7 @@ import Hadrian.Utilities
 
 -- | Sphinx can be used in three different modes to convert reStructuredText
 -- documents into HTML, LaTeX or Man pages.
-data SphinxMode = Info | Html | Latex | Man deriving (Eq, Generic, Show)
+data SphinxMode = InfoM | HtmlM | LatexM | ManM deriving (Eq, Generic, Show)
 
 instance Binary   SphinxMode
 instance Hashable SphinxMode
@@ -36,7 +36,7 @@ args mode = do
             , arg outPath ]
   where
     modeString = case mode of
-        Info  -> "texinfo"
-        Html  -> "html"
-        Latex -> "latex"
-        Man   -> "man"
+        InfoM  -> "texinfo"
+        HtmlM  -> "html"
+        LatexM -> "latex"
+        ManM   -> "man"

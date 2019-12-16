@@ -172,7 +172,7 @@ buildSphinxHtml path = do
             rstFilesDir = pathPath path
         rstFiles <- getDirectoryFiles rstFilesDir ["**/*.rst"]
         need (map (rstFilesDir -/-) rstFiles)
-        build $ target docContext (Sphinx Html) [pathPath path] [dest]
+        build $ target docContext (Sphinx HtmlM) [pathPath path] [dest]
         checkSphinxWarnings dest
 
 ------------------------------------ Haddock -----------------------------------
@@ -285,7 +285,7 @@ buildSphinxPdf path = do
             let rstFilesDir = pathPath path
             rstFiles <- getDirectoryFiles rstFilesDir ["**/*.rst"]
             need (map (rstFilesDir -/-) rstFiles)
-            build $ target docContext (Sphinx Latex) [pathPath path] [dir]
+            build $ target docContext (Sphinx LatexM) [pathPath path] [dir]
             checkSphinxWarnings dir
             build $ target docContext Xelatex [path <.> "tex"] [dir]
             copyFileUntracked (dir -/- path <.> "pdf") file
@@ -302,7 +302,7 @@ buildSphinxInfoGuide = do
             let rstFilesDir = pathPath path
             rstFiles <- getDirectoryFiles rstFilesDir ["**/*.rst"]
             need (map (rstFilesDir -/-) rstFiles)
-            build $ target docContext (Sphinx Info) [pathPath path] [dir]
+            build $ target docContext (Sphinx InfoM) [pathPath path] [dir]
             checkSphinxWarnings dir
             -- Sphinx outputs texinfo source and a makefile, the
             -- default target of which actually produces the target
@@ -334,7 +334,7 @@ buildManPage = do
     root -/- manPageBuildPath %> \file -> do
         need ["docs/users_guide/ghc.rst"]
         withTempDir $ \dir -> do
-            build $ target docContext (Sphinx Man) ["docs/users_guide"] [dir]
+            build $ target docContext (Sphinx ManM) ["docs/users_guide"] [dir]
             checkSphinxWarnings dir
             copyFileUntracked (dir -/- "ghc.1") file
 
