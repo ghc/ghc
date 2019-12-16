@@ -10,7 +10,7 @@
 -----------------------------------------------------------------------------
 module Hadrian.Builder.Sphinx (SphinxMode (..), args) where
 
-import Development.Shake
+import Development.Shake         hiding (Verbosity(..))
 import Development.Shake.Classes
 import GHC.Generics
 import Hadrian.Expression
