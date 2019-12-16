@@ -11,7 +11,8 @@ Desugaring expressions.
 {-# LANGUAGE ViewPatterns #-}
 
 module DsExpr ( dsExpr, dsLExpr, dsLExprNoLP, dsLocalBinds
-              , dsValBinds, dsLit, dsSyntaxExpr ) where
+              , dsValBinds, dsLit, dsSyntaxExpr
+              , dsHandleMonadicFailure ) where
 
 #include "HsVersions.h"
 
@@ -918,7 +919,7 @@ dsDo stmts
             ; var   <- selectSimpleMatchVarL pat
             ; match <- matchSinglePatVar var (StmtCtxt DoExpr) pat
                                       res1_ty (cantFailMatchResult body)
-            ; match_code <- handle_failure pat match fail_op
+            ; match_code <- dsHandleMonadicFailure pat match fail_op
             ; dsSyntaxExpr bind_op [rhs', Lam var match_code] }
 
     go _ (ApplicativeStmt body_ty args mb_join) stmts
@@ -940,7 +941,7 @@ dsDo stmts
                    = do { var   <- selectSimpleMatchVarL pat
                         ; match <- matchSinglePatVar var (StmtCtxt DoExpr) pat
                                    body_ty (cantFailMatchResult body)
-                        ; match_code <- handle_failure pat match fail_op
+                        ; match_code <- dsHandleMonadicFailure pat match fail_op
                         ; return (var:vs, match_code)
                         }
 
@@ -990,10 +991,10 @@ dsDo stmts
     go _ (TransStmt {}) _ = panic "dsDo TransStmt"
     go _ (XStmtLR nec)  _ = noExtCon nec
 
-handle_failure :: LPat GhcTc -> MatchResult -> SyntaxExpr GhcTc -> DsM CoreExpr
+dsHandleMonadicFailure :: LPat GhcTc -> MatchResult -> SyntaxExpr GhcTc -> DsM CoreExpr
     -- In a do expression, pattern-match failure just calls
     -- the monadic 'fail' rather than throwing an exception
-handle_failure pat match fail_op
+dsHandleMonadicFailure pat match fail_op
   | matchCanFail match
   = do { dflags <- getDynFlags
        ; fail_msg <- mkStringExpr (mk_fail_msg dflags pat)
