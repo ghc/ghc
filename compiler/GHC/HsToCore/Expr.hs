@@ -1017,23 +1017,23 @@ dsDo stmts
 dsHandleMonadicFailure :: LPat GhcTc -> MatchResult -> FailOperator GhcTc -> DsM CoreExpr
     -- In a do expression, pattern-match failure just calls
     -- the monadic 'fail' rather than throwing an exception
-dsHandleMonadicFailure pat match m_fail_op
-  | matchCanFail match = do
-    fail_op <- case m_fail_op of
-      -- Note that (non-monadic) list comprehension, pattern guards, etc could
-      -- have fallible bindings without an explicit failure op, but this is
-      -- handled elsewhere. See Note [Failing pattern matches in Stmts] the
-      -- breakdown of regular and special binds.
-      Nothing -> pprPanic "missing fail op" $
-        text "Pattern match:" <+> ppr pat <+>
-        text "is failable, and fail_expr was left unset"
-      Just fail_op -> pure fail_op
-    dflags <- getDynFlags
-    fail_msg <- mkStringExpr (mk_fail_msg dflags pat)
-    fail_expr <- dsSyntaxExpr fail_op [fail_msg]
-    extractMatchResult match fail_expr
-  | otherwise =
-    extractMatchResult match (error "It can't fail")
+dsHandleMonadicFailure pat match m_fail_op =
+  case shareFailureHandler match of
+    MR_Infallible body -> body
+    MR_Fallible body -> do
+      fail_op <- case m_fail_op of
+        -- Note that (non-monadic) list comprehension, pattern guards, etc could
+        -- have fallible bindings without an explicit failure op, but this is
+        -- handled elsewhere. See Note [Failing pattern matches in Stmts] the
+        -- breakdown of regular and special binds.
+        Nothing -> pprPanic "missing fail op" $
+          text "Pattern match:" <+> ppr pat <+>
+          text "is failable, and fail_expr was left unset"
+        Just fail_op -> pure fail_op
+      dflags <- getDynFlags
+      fail_msg <- mkStringExpr (mk_fail_msg dflags pat)
+      fail_expr <- dsSyntaxExpr fail_op [fail_msg]
+      body fail_expr
 
 mk_fail_msg :: DynFlags -> Located e -> String
 mk_fail_msg dflags pat = "Pattern match failure in do expression at " ++
