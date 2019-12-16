@@ -2186,26 +2186,25 @@ So, in this case, we synthesize the function
 -}
 getMonadFailOp :: RnM (Maybe (SyntaxExpr GhcRn), FreeVars) -- Syntax expr fail op
 getMonadFailOp
- = do { xOverloadedStrings <- fmap (xopt LangExt.OverloadedStrings) getDynFlags
-      ; xRebindableSyntax <- fmap (xopt LangExt.RebindableSyntax) getDynFlags
-      ; (fail, fvs) <- reallyGetMonadFailOp xRebindableSyntax xOverloadedStrings
-      ; return (Just fail, fvs)
-      }
-  where
-    reallyGetMonadFailOp rebindableSyntax overloadedStrings
-      | rebindableSyntax && overloadedStrings = do
-        (failExpr, failFvs) <- lookupSyntaxName failMName
-        (fromStringExpr, fromStringFvs) <- lookupSyntaxName fromStringName
-        let arg_lit = fsLit "arg"
-            arg_name = mkSystemVarName (mkVarOccUnique arg_lit) arg_lit
-            arg_syn_expr = mkRnSyntaxExpr arg_name
-        let body :: LHsExpr GhcRn =
-              nlHsApp (noLoc $ syn_expr failExpr)
-                      (nlHsApp (noLoc $ syn_expr fromStringExpr)
-                                (noLoc $ syn_expr arg_syn_expr))
-        let failAfterFromStringExpr :: HsExpr GhcRn =
-              unLoc $ mkHsLam [noLoc $ VarPat noExtField $ noLoc arg_name] body
-        let failAfterFromStringSynExpr :: SyntaxExpr GhcRn =
-              mkSyntaxExpr failAfterFromStringExpr
-        return (failAfterFromStringSynExpr, failFvs `plusFV` fromStringFvs)
-      | otherwise = lookupSyntaxName failMName
+ = do xOverloadedStrings <- fmap (xopt LangExt.OverloadedStrings) getDynFlags
+      xRebindableSyntax <- fmap (xopt LangExt.RebindableSyntax) getDynFlags
+      xNoFallibleDo <- fmap (not . xopt LangExt.FallibleDo) getDynFlags
+      if | xNoFallibleDo -> return (Nothing, emptyFVs)
+         | xRebindableSyntax && xOverloadedStrings -> do
+            (failExpr, failFvs) <- lookupSyntaxName failMName
+            (fromStringExpr, fromStringFvs) <- lookupSyntaxName fromStringName
+            let arg_lit = fsLit "arg"
+                arg_name = mkSystemVarName (mkVarOccUnique arg_lit) arg_lit
+                arg_syn_expr = mkRnSyntaxExpr arg_name
+            let body :: LHsExpr GhcRn =
+                  nlHsApp (noLoc $ syn_expr failExpr)
+                          (nlHsApp (noLoc $ syn_expr fromStringExpr)
+                                    (noLoc $ syn_expr arg_syn_expr))
+            let failAfterFromStringExpr :: HsExpr GhcRn =
+                  unLoc $ mkHsLam [noLoc $ VarPat noExtField $ noLoc arg_name] body
+            let failAfterFromStringSynExpr :: SyntaxExpr GhcRn =
+                  mkSyntaxExpr failAfterFromStringExpr
+            return (Just failAfterFromStringSynExpr, failFvs `plusFV` fromStringFvs)
+         | otherwise -> do
+            (fail, fvs) <- lookupSyntaxName failMName
+            return (Just fail, fvs)
