@@ -1038,7 +1038,7 @@ instance ( a ~ GhcPass p
       LastStmt _ body _ _ ->
         [ toHie body
         ]
-      BindStmt _ pat body _ _ ->
+      BindStmt _ pat body ->
         [ toHie $ PS (getRealSpan $ getLoc body) scope NoScope pat
         , toHie body
         ]
@@ -1168,7 +1168,7 @@ instance ( a ~ GhcPass p
          , Data (StmtLR a a (Located (HsExpr a)))
          , Data (HsLocalBinds a)
          ) => ToHie (RScoped (ApplicativeArg (GhcPass p))) where
-  toHie (RS sc (ApplicativeArgOne _ pat expr _ _)) = concatM
+  toHie (RS sc (ApplicativeArgOne _ pat expr _)) = concatM
     [ toHie $ PS Nothing sc NoScope pat
     , toHie expr
     ]
