@@ -54,11 +54,11 @@ class Binary a where
   put :: a -> Put ()
   get :: Get a
 
-  {-# INLINE put #-}
+  {-# INLINABLE put #-}
   default put :: (Generic a, GBinary (Rep a)) => a -> Put ()
   put = gput . from
 
-  {-# INLINE get #-}
+  {-# INLINABLE get #-}
   default get :: (Generic a, GBinary (Rep a)) => Get a
   get = to <$> gget
 
@@ -66,29 +66,29 @@ class Binary a where
 -- Convenience functions
 -- -----------------------------------------------------------------------------
 
-{-# INLINE encode #-}
+{-# INLINABLE encode #-}
 encode :: Binary a => a -> BinData
 encode = runPut . put
 
-{-# INLINE decode #-}
+{-# INLINABLE decode #-}
 decode :: Binary a => BinData -> a
 decode bd = runGet bd get
 
 -- Put the argument at the specified pointer, leaving the current index
 -- at the location after that.
-{-# INLINE putAt #-}
+{-# INLINABLE putAt #-}
 putAt :: Binary a => Bin a -> a -> Put ()
 putAt ptr x = seekP ptr >> put x
 
 -- Get data from the specified pointer, leaving the current index at the
 -- location after that.
-{-# INLINE getAt #-}
+{-# INLINABLE getAt #-}
 getAt :: Binary a => Bin a -> Get a
 getAt ptr = seekG ptr >> get
 
 -- Put the argument at the specified pointer, and return to the current
 -- location afterwards.
-{-# INLINE putTo #-}
+{-# INLINABLE putTo #-}
 putTo :: Binary a => Bin a -> a -> Put ()
 putTo ptr x = do
   here <- tellP
@@ -98,7 +98,7 @@ putTo ptr x = do
 
 -- Get data from the specified pointer, and return to the current location
 -- afterwards.
-{-# INLINE getFrom #-}
+{-# INLINABLE getFrom #-}
 getFrom :: Binary a => Bin a -> Get a
 getFrom ptr = do
   here <- tellG
@@ -111,7 +111,7 @@ getFrom ptr = do
 -- Lazy reading and writing
 -- -----------------------------------------------------------------------------
 
-{-# INLINE lazyPut #-}
+{-# INLINABLE lazyPut #-}
 lazyPut :: Binary a => a -> Put ()
 lazyPut a = do
   p_a <- tellP
@@ -121,7 +121,7 @@ lazyPut a = do
   putAt p_a q
   seekP q
 
-{-# INLINE lazyGet #-}
+{-# INLINABLE lazyGet #-}
 lazyGet :: Binary a => Get a
 lazyGet = do
   p   <- get
@@ -139,33 +139,33 @@ class GBinary (f :: * -> *) where
   gget :: Get (f a)
 
 instance GBinary U1 where
-  {-# INLINE gput #-}
+  {-# INLINABLE gput #-}
   gput U1 = return ()
-  {-# INLINE gget #-}
+  {-# INLINABLE gget #-}
   gget    = return U1
 
 instance GBinary a => GBinary (M1 i c a) where
-  {-# INLINE gput #-}
+  {-# INLINABLE gput #-}
   gput (M1 x) = gput x
-  {-# INLINE gget #-}
+  {-# INLINABLE gget #-}
   gget        = M1 <$> gget
 
 instance Binary a => GBinary (K1 i a) where
-  {-# INLINE gput #-}
+  {-# INLINABLE gput #-}
   gput (K1 x) = put x
-  {-# INLINE gget #-}
+  {-# INLINABLE gget #-}
   gget        = K1 <$> get
 
 instance (GBinary a, GBinary b) => GBinary (a :*: b) where
-  {-# INLINE gput #-}
+  {-# INLINABLE gput #-}
   gput (x :*: y) = gput x >> gput y
-  {-# INLINE gget #-}
+  {-# INLINABLE gget #-}
   gget           = (:*:) <$> gget <*> gget
 
 instance (GSumBinary (a :+: b)) => GBinary (a :+: b) where
-  {-# INLINE gput #-}
+  {-# INLINABLE gput #-}
   gput = gsput (maxIndex @(a :+: b))
-  {-# INLINE gget #-}
+  {-# INLINABLE gget #-}
   gget = gsget =<< get
 
 class KnownNat (SumSize f) => GSumBinary (f :: * -> *) where
@@ -176,25 +176,25 @@ class KnownNat (SumSize f) => GSumBinary (f :: * -> *) where
 instance (GSumBinary a, GSumBinary b, KnownNat (SumSize (a :+: b)))
        => GSumBinary (a :+: b) where
   type SumSize (a :+: b) = SumSize a + SumSize b
-  {-# INLINE gsput #-}
+  {-# INLINABLE gsput #-}
   gsput n (L1 x) = gsput (n - sumSize @b) x
   gsput n (R1 x) = gsput  n               x
-  {-# INLINE gsget #-}
+  {-# INLINABLE gsget #-}
   gsget n | n <= maxIndex @a = L1 <$> gsget  n
           | otherwise        = R1 <$> gsget (n - sumSize @a)
 
 instance GBinary (M1 i c a) => GSumBinary (M1 i c a) where
   type SumSize (M1 i c a) = 1
-  {-# INLINE gsput #-}
+  {-# INLINABLE gsput #-}
   gsput n x = put n >> gput x
-  {-# INLINE gsget #-}
+  {-# INLINABLE gsget #-}
   gsget _   = gget
 
-{-# INLINE sumSize #-}
+{-# INLINABLE sumSize #-}
 sumSize :: forall f. GSumBinary f => Int8
 sumSize = fromIntegral $ natVal' (proxy# :: Proxy# (SumSize f))
 
-{-# INLINE maxIndex #-}
+{-# INLINABLE maxIndex #-}
 maxIndex :: forall f. GSumBinary f => Int8
 maxIndex = sumSize @f - 1
 
@@ -203,35 +203,35 @@ maxIndex = sumSize @f - 1
 -- -----------------------------------------------------------------------------
 
 instance Binary () where
-  {-# INLINE put #-}
+  {-# INLINABLE put #-}
   put () = return ()
-  {-# INLINE get #-}
+  {-# INLINABLE get #-}
   get    = return ()
 
 instance Binary Bool where
-  {-# INLINE put #-}
+  {-# INLINABLE put #-}
   put b = putByte (fromIntegral (fromEnum b))
-  {-# INLINE get #-}
+  {-# INLINABLE get #-}
   get   = do x <- getWord8; return $! (toEnum (fromIntegral x))
 
 instance Binary Char where
-  {-# INLINE put #-}
+  {-# INLINABLE put #-}
   put c = put (fromIntegral (ord c) :: Word32)
-  {-# INLINE get #-}
+  {-# INLINABLE get #-}
   get   = do x <- get; return $! chr (fromIntegral (x :: Word32))
 
 instance Binary Int where
-  {-# INLINE put #-}
+  {-# INLINABLE put #-}
   put = putInt
-  {-# INLINE get #-}
+  {-# INLINABLE get #-}
   get = getInt
 
 instance Binary a => Binary [a] where
-  {-# INLINE put #-}
+  {-# INLINABLE put #-}
   put xs = do
     put (length xs)
     mapM_ put xs
-  {-# INLINE get #-}
+  {-# INLINABLE get #-}
   get = do
     loop =<< (get :: Get Int)
     where
@@ -239,37 +239,37 @@ instance Binary a => Binary [a] where
       loop n = (:) <$> get <*> loop (pred n)
 
 instance (Ix a, Binary a, Binary b) => Binary (Array a b) where
-  {-# INLINE put #-}
+  {-# INLINABLE put #-}
   put arr = do
       put $ bounds arr
       put $ elems arr
-  {-# INLINE get #-}
+  {-# INLINABLE get #-}
   get = do
       bounds <- get
       xs <- get
       return $ listArray bounds xs
 
 instance (Binary a, Binary b) => Binary (a,b) where
-  {-# INLINE put #-}
+  {-# INLINABLE put #-}
   put (a,b) = do put a; put b
-  {-# INLINE get #-}
+  {-# INLINABLE get #-}
   get       = do a <- get
                  b <- get
                  return (a,b)
 
 instance (Binary a, Binary b, Binary c) => Binary (a,b,c) where
-  {-# INLINE put #-}
+  {-# INLINABLE put #-}
   put (a,b,c) = do put a; put b; put c
-  {-# INLINE get #-}
+  {-# INLINABLE get #-}
   get         = do a <- get
                    b <- get
                    c <- get
                    return (a,b,c)
 
 instance (Binary a, Binary b, Binary c, Binary d) => Binary (a,b,c,d) where
-  {-# INLINE put #-}
+  {-# INLINABLE put #-}
   put (a,b,c,d) = do put a; put b; put c; put d
-  {-# INLINE get #-}
+  {-# INLINABLE get #-}
   get           = do a <- get
                      b <- get
                      c <- get
@@ -277,9 +277,9 @@ instance (Binary a, Binary b, Binary c, Binary d) => Binary (a,b,c,d) where
                      return (a,b,c,d)
 
 instance (Binary a, Binary b, Binary c, Binary d, Binary e) => Binary (a,b,c,d, e) where
-  {-# INLINE put #-}
+  {-# INLINABLE put #-}
   put (a,b,c,d, e) = do put a; put b; put c; put d; put e;
-  {-# INLINE get #-}
+  {-# INLINABLE get #-}
   get              = do a <- get
                         b <- get
                         c <- get
@@ -288,9 +288,9 @@ instance (Binary a, Binary b, Binary c, Binary d, Binary e) => Binary (a,b,c,d, 
                         return (a,b,c,d,e)
 
 instance (Binary a, Binary b, Binary c, Binary d, Binary e, Binary f) => Binary (a,b,c,d, e, f) where
-  {-# INLINE put #-}
+  {-# INLINABLE put #-}
   put (a,b,c,d, e, f) = do put a; put b; put c; put d; put e; put f;
-  {-# INLINE get #-}
+  {-# INLINABLE get #-}
   get                 = do a <- get
                            b <- get
                            c <- get
@@ -300,9 +300,9 @@ instance (Binary a, Binary b, Binary c, Binary d, Binary e, Binary f) => Binary 
                            return (a,b,c,d,e,f)
 
 instance (Binary a, Binary b, Binary c, Binary d, Binary e, Binary f, Binary g) => Binary (a,b,c,d,e,f,g) where
-  {-# INLINE put #-}
+  {-# INLINABLE put #-}
   put (a,b,c,d,e,f,g) = do put a; put b; put c; put d; put e; put f; put g
-  {-# INLINE get #-}
+  {-# INLINABLE get #-}
   get                 = do a <- get
                            b <- get
                            c <- get
@@ -313,52 +313,52 @@ instance (Binary a, Binary b, Binary c, Binary d, Binary e, Binary f, Binary g) 
                            return (a,b,c,d,e,f,g)
 
 instance Binary a => Binary (Maybe a) where
-  {-# INLINE put #-}
+  {-# INLINABLE put #-}
   put Nothing  = putByte 0
   put (Just a) = do putByte 1; put a
-  {-# INLINE get #-}
+  {-# INLINABLE get #-}
   get          = do h <- getWord8
                     case h of
                       0 -> return Nothing
                       _ -> do x <- get; return (Just x)
 
 instance (Binary a, Binary b) => Binary (Either a b) where
-  {-# INLINE put #-}
+  {-# INLINABLE put #-}
   put (Left  a) = do putByte 0; put a
   put (Right b) = do putByte 1; put b
-  {-# INLINE get #-}
+  {-# INLINABLE get #-}
   get           = do h <- getWord8
                      case h of
                        0 -> do a <- get; return (Left a)
                        _ -> do b <- get; return (Right b)
 
 instance Binary UTCTime where
-  {-# INLINE put #-}
+  {-# INLINABLE put #-}
   put u = do put (utctDay u)
              put (utctDayTime u)
-  {-# INLINE get #-}
+  {-# INLINABLE get #-}
   get = do day <- get
            dayTime <- get
            return $ UTCTime { utctDay = day, utctDayTime = dayTime }
 
 instance Binary Day where
-  {-# INLINE put #-}
+  {-# INLINABLE put #-}
   put d = put (toModifiedJulianDay d)
-  {-# INLINE get #-}
+  {-# INLINABLE get #-}
   get = do i <- get
            return $ ModifiedJulianDay { toModifiedJulianDay = i }
 
 instance Binary DiffTime where
-  {-# INLINE put #-}
+  {-# INLINABLE put #-}
   put dt = put (toRational dt)
-  {-# INLINE get #-}
+  {-# INLINABLE get #-}
   get = do r <- get
            return $ fromRational r
 
 instance (Binary a) => Binary (Ratio a) where
-  {-# INLINE put #-}
+  {-# INLINABLE put #-}
   put (a :% b) = do put a; put b
-  {-# INLINE get #-}
+  {-# INLINABLE get #-}
   get = do a <- get; b <- get; return (a :% b)
 
 -- -----------------------------------------------------------------------------
@@ -366,75 +366,75 @@ instance (Binary a) => Binary (Ratio a) where
 -- -----------------------------------------------------------------------------
 
 instance Binary Word8 where
-  {-# INLINE put #-}
+  {-# INLINABLE put #-}
   put !w = putWord8 w
-  {-# INLINE get #-}
+  {-# INLINABLE get #-}
   get    = getWord8
 
 instance Binary Word16 where
-  {-# INLINE put #-}
+  {-# INLINABLE put #-}
   put = putULEB128
-  {-# INLINE get #-}
+  {-# INLINABLE get #-}
   get = getULEB128
 
 instance Binary Word32 where
-  {-# INLINE put #-}
+  {-# INLINABLE put #-}
   put = putULEB128
-  {-# INLINE get #-}
+  {-# INLINABLE get #-}
   get = getULEB128
 
 instance Binary Word64 where
-  {-# INLINE put #-}
+  {-# INLINABLE put #-}
   put = putULEB128
-  {-# INLINE get #-}
+  {-# INLINABLE get #-}
   get = getULEB128
 
 instance Binary Int8 where
-  {-# INLINE put #-}
+  {-# INLINABLE put #-}
   put w = put (fromIntegral w :: Word8)
-  {-# INLINE get #-}
+  {-# INLINABLE get #-}
   get   = do w <- get; return $! (fromIntegral (w :: Word8))
 
 instance Binary Int16 where
-  {-# INLINE put #-}
+  {-# INLINABLE put #-}
   put = putSLEB128
-  {-# INLINE get #-}
+  {-# INLINABLE get #-}
   get = getSLEB128
 
 instance Binary Int32 where
-  {-# INLINE put #-}
+  {-# INLINABLE put #-}
   put = putSLEB128
-  {-# INLINE get #-}
+  {-# INLINABLE get #-}
   get = getSLEB128
 
 instance Binary Int64 where
-  {-# INLINE put #-}
+  {-# INLINABLE put #-}
   put = putSLEB128
-  {-# INLINE get #-}
+  {-# INLINABLE get #-}
   get = getSLEB128
 
 instance Binary FastString where
-  {-# INLINE put #-}
+  {-# INLINABLE put #-}
   put = putAFastString
-  {-# INLINE get #-}
+  {-# INLINABLE get #-}
   get = getAFastString
 
 instance Binary (Bin a) where
-  {-# INLINE put #-}
+  {-# INLINABLE put #-}
   put = putBin
-  {-# INLINE get #-}
+  {-# INLINABLE get #-}
   get = getBin
 
 instance Binary Strict.ByteString where
-  {-# INLINE put #-}
+  {-# INLINABLE put #-}
   put = putByteString
-  {-# INLINE get #-}
+  {-# INLINABLE get #-}
   get = getByteString
 
 instance Binary Lazy.ByteString where
-  {-# INLINE put #-}
+  {-# INLINABLE put #-}
   put = put . Lazy.toStrict
-  {-# INLINE get #-}
+  {-# INLINABLE get #-}
   get = Lazy.fromStrict <$> get
 
 -- -----------------------------------------------------------------------------
@@ -486,7 +486,7 @@ The instance is used for in Binary Integer and Binary Rational in basicTypes/Lit
 -}
 
 instance Binary Integer where
-    {-# INLINE put #-}
+    {-# INLINABLE put #-}
     put i
       | i >= lo64 && i <= hi64 = do
           putWord8 0
@@ -499,7 +499,7 @@ instance Binary Integer where
       where
         lo64 = fromIntegral (minBound :: Int64)
         hi64 = fromIntegral (maxBound :: Int64)
-    {-# INLINE get #-}
+    {-# INLINABLE get #-}
     get = do
       int_kind <- getWord8
       case int_kind of
@@ -528,31 +528,31 @@ roll   = foldl' unstep 0 . reverse
 -- -----------------------------------------------------------------------------
 
 instance Binary TyCon where
-    {-# INLINE put #-}
+    {-# INLINABLE put #-}
     put tc = do
         put (tyConPackage tc)
         put (tyConModule tc)
         put (tyConName tc)
         put (tyConKindArgs tc)
         put (tyConKindRep tc)
-    {-# INLINE get #-}
+    {-# INLINABLE get #-}
     get =
         mkTyCon <$> get <*> get <*> get <*> get <*> get
 
 instance Binary VecCount where
-    {-# INLINE put #-}
+    {-# INLINABLE put #-}
     put = putByte . fromIntegral . fromEnum
-    {-# INLINE get #-}
+    {-# INLINABLE get #-}
     get = toEnum . fromIntegral <$> getByte
 
 instance Binary VecElem where
-    {-# INLINE put #-}
+    {-# INLINABLE put #-}
     put = putByte . fromIntegral . fromEnum
-    {-# INLINE get #-}
+    {-# INLINABLE get #-}
     get = toEnum . fromIntegral <$> getByte
 
 instance Binary RuntimeRep where
-    {-# INLINE put #-}
+    {-# INLINABLE put #-}
     put (VecRep a b)    = putByte 0 >> put a >> put b
     put (TupleRep reps) = putByte 1 >> put reps
     put (SumRep reps)   = putByte 2 >> put reps
@@ -576,7 +576,7 @@ instance Binary RuntimeRep where
     put Word32Rep       = putByte 17
 #endif
 
-    {-# INLINE get #-}
+    {-# INLINABLE get #-}
     get = do
         tag <- getByte
         case tag of
@@ -605,7 +605,7 @@ instance Binary RuntimeRep where
           _  -> fail "Binary.putRuntimeRep: invalid tag"
 
 instance Binary KindRep where
-    {-# INLINE put #-}
+    {-# INLINABLE put #-}
     put (KindRepTyConApp tc k) = putByte 0 >> put tc >> put k
     put (KindRepVar bndr) = putByte 1 >> put bndr
     put (KindRepApp a b) = putByte 2 >> put a >> put b
@@ -613,7 +613,7 @@ instance Binary KindRep where
     put (KindRepTYPE r) = putByte 4 >> put r
     put (KindRepTypeLit sort r) = putByte 5 >> put sort >> put r
 
-    {-# INLINE get #-}
+    {-# INLINABLE get #-}
     get = do
         tag <- getByte
         case tag of
@@ -626,10 +626,10 @@ instance Binary KindRep where
           _ -> fail "Binary.putKindRep: invalid tag"
 
 instance Binary TypeLitSort where
-    {-# INLINE put #-}
+    {-# INLINABLE put #-}
     put TypeLitSymbol = putByte 0
     put TypeLitNat = putByte 1
-    {-# INLINE get #-}
+    {-# INLINABLE get #-}
     get = do
         tag <- getByte
         case tag of
@@ -703,9 +703,9 @@ getSomeTypeRep = do
                       ++ map ("    "++) info
 
 instance Typeable a => Binary (TypeRep (a :: k)) where
-    {-# INLINE put #-}
+    {-# INLINABLE put #-}
     put = putTypeRep
-    {-# INLINE get #-}
+    {-# INLINABLE get #-}
     get = do
         SomeTypeRep rep <- getSomeTypeRep
         case rep `eqTypeRep` expected of
@@ -718,9 +718,9 @@ instance Typeable a => Binary (TypeRep (a :: k)) where
      where expected = typeRep :: TypeRep a
 
 instance Binary SomeTypeRep where
-    {-# INLINE put #-}
+    {-# INLINABLE put #-}
     put (SomeTypeRep rep) = putTypeRep rep
-    {-# INLINE get #-}
+    {-# INLINABLE get #-}
     get = getSomeTypeRep
 
 -- -----------------------------------------------------------------------------
@@ -728,22 +728,22 @@ instance Binary SomeTypeRep where
 -- -----------------------------------------------------------------------------
 
 instance Binary LeftOrRight where
-   {-# INLINE put #-}
+   {-# INLINABLE put #-}
    put CLeft  = putByte 0
    put CRight = putByte 1
 
-   {-# INLINE get #-}
+   {-# INLINABLE get #-}
    get = do { h <- getByte
             ; case h of
                 0 -> return CLeft
                 _ -> return CRight }
 
 instance Binary PromotionFlag where
-   {-# INLINE put #-}
+   {-# INLINABLE put #-}
    put NotPromoted = putByte 0
    put IsPromoted  = putByte 1
 
-   {-# INLINE get #-}
+   {-# INLINABLE get #-}
    get = do
        n <- getByte
        case n of
@@ -752,16 +752,16 @@ instance Binary PromotionFlag where
          _ -> fail "Binary(IsPromoted): fail)"
 
 instance Binary Fingerprint where
-  {-# INLINE put #-}
+  {-# INLINABLE put #-}
   put (Fingerprint w1 w2) = do put w1; put w2
-  {-# INLINE get #-}
+  {-# INLINABLE get #-}
   get = do w1 <- get ; w2 <- get; return (Fingerprint w1 w2)
 
 instance Binary FunctionOrData where
-    {-# INLINE put #-}
+    {-# INLINABLE put #-}
     put IsFunction = putByte 0
     put IsData     = putByte 1
-    {-# INLINE get #-}
+    {-# INLINABLE get #-}
     get = do
         h <- getByte
         case h of
@@ -770,11 +770,11 @@ instance Binary FunctionOrData where
           _ -> panic "Binary FunctionOrData"
 
 instance Binary TupleSort where
-    {-# INLINE put #-}
+    {-# INLINABLE put #-}
     put BoxedTuple      = putByte 0
     put UnboxedTuple    = putByte 1
     put ConstraintTuple = putByte 2
-    {-# INLINE get #-}
+    {-# INLINABLE get #-}
     get = do
       h <- getByte
       case h of
@@ -783,7 +783,7 @@ instance Binary TupleSort where
         _ -> do return ConstraintTuple
 
 instance Binary Activation where
-    {-# INLINE put #-}
+    {-# INLINABLE put #-}
     put NeverActive = do
             putByte 0
     put AlwaysActive = do
@@ -796,7 +796,7 @@ instance Binary Activation where
             putByte 3
             put src
             put ab
-    {-# INLINE get #-}
+    {-# INLINABLE get #-}
     get = do
             h <- getByte
             case h of
@@ -810,7 +810,7 @@ instance Binary Activation where
                       return (ActiveAfter src ab)
 
 instance Binary InlinePragma where
-    {-# INLINE put #-}
+    {-# INLINABLE put #-}
     put (InlinePragma s a b c d) = do
             put s
             put a
@@ -818,7 +818,7 @@ instance Binary InlinePragma where
             put c
             put d
 
-    {-# INLINE get #-}
+    {-# INLINABLE get #-}
     get = do
            s <- get
            a <- get
@@ -828,23 +828,23 @@ instance Binary InlinePragma where
            return (InlinePragma s a b c d)
 
 instance Binary RuleMatchInfo where
-    {-# INLINE put #-}
+    {-# INLINABLE put #-}
     put FunLike = putByte 0
     put ConLike = putByte 1
-    {-# INLINE get #-}
+    {-# INLINABLE get #-}
     get = do
             h <- getByte
             if h == 1 then return ConLike
                       else return FunLike
 
 instance Binary InlineSpec where
-    {-# INLINE put #-}
+    {-# INLINABLE put #-}
     put NoUserInline    = putByte 0
     put Inline          = putByte 1
     put Inlinable       = putByte 2
     put NoInline        = putByte 3
 
-    {-# INLINE get #-}
+    {-# INLINABLE get #-}
     get = do h <- getByte
              case h of
                0 -> return NoUserInline
@@ -853,12 +853,12 @@ instance Binary InlineSpec where
                _ -> return NoInline
 
 instance Binary RecFlag where
-    {-# INLINE put #-}
+    {-# INLINABLE put #-}
     put Recursive = do
             putByte 0
     put NonRecursive = do
             putByte 1
-    {-# INLINE get #-}
+    {-# INLINABLE get #-}
     get = do
             h <- getByte
             case h of
@@ -866,13 +866,13 @@ instance Binary RecFlag where
               _ -> do return NonRecursive
 
 instance Binary OverlapMode where
-    {-# INLINE put #-}
+    {-# INLINABLE put #-}
     put (NoOverlap    s) = putByte 0 >> put s
     put (Overlaps     s) = putByte 1 >> put s
     put (Incoherent   s) = putByte 2 >> put s
     put (Overlapping  s) = putByte 3 >> put s
     put (Overlappable s) = putByte 4 >> put s
-    {-# INLINE get #-}
+    {-# INLINABLE get #-}
     get = do
         h <- getByte
         case h of
@@ -885,24 +885,24 @@ instance Binary OverlapMode where
 
 
 instance Binary OverlapFlag where
-    {-# INLINE put #-}
+    {-# INLINABLE put #-}
     put flag = do put (overlapMode flag)
                   put (isSafeOverlap flag)
-    {-# INLINE get #-}
+    {-# INLINABLE get #-}
     get = do
         h <- get
         b <- get
         return OverlapFlag { overlapMode = h, isSafeOverlap = b }
 
 instance Binary FixityDirection where
-    {-# INLINE put #-}
+    {-# INLINABLE put #-}
     put InfixL = do
         putByte 0
     put InfixR = do
         putByte 1
     put InfixN = do
         putByte 2
-    {-# INLINE get #-}
+    {-# INLINABLE get #-}
     get = do
         h <- getByte
         case h of
@@ -911,12 +911,12 @@ instance Binary FixityDirection where
           _ -> do return InfixN
 
 instance Binary BasicTypes.Fixity where
-    {-# INLINE put #-}
+    {-# INLINABLE put #-}
     put (Fixity src aa ab) = do
             put src
             put aa
             put ab
-    {-# INLINE get #-}
+    {-# INLINABLE get #-}
     get = do
           src <- get
           aa  <- get
@@ -924,7 +924,7 @@ instance Binary BasicTypes.Fixity where
           return (Fixity src aa ab)
 
 instance Binary WarningTxt where
-    {-# INLINE put #-}
+    {-# INLINABLE put #-}
     put (WarningTxt s w) = do
             putByte 0
             put s
@@ -934,7 +934,7 @@ instance Binary WarningTxt where
             put s
             put d
 
-    {-# INLINE get #-}
+    {-# INLINABLE get #-}
     get = do
             h <- getByte
             case h of
@@ -946,30 +946,30 @@ instance Binary WarningTxt where
                       return (DeprecatedTxt s d)
 
 instance Binary StringLiteral where
-  {-# INLINE put #-}
+  {-# INLINABLE put #-}
   put (StringLiteral st fs) = do
             put st
             put fs
-  {-# INLINE get #-}
+  {-# INLINABLE get #-}
   get = do
             st <- get
             fs <- get
             return (StringLiteral st fs)
 
 instance Binary a => Binary (Located a) where
-    {-# INLINE put #-}
+    {-# INLINABLE put #-}
     put (L l x) = do
             put l
             put x
 
-    {-# INLINE get #-}
+    {-# INLINABLE get #-}
     get = do
             l <- get
             x <- get
             return (L l x)
 
 instance Binary RealSrcSpan where
-  {-# INLINE put #-}
+  {-# INLINABLE put #-}
   put ss = do
            put (srcSpanFile ss)
            put (srcSpanStartLine ss)
@@ -977,7 +977,7 @@ instance Binary RealSrcSpan where
            put (srcSpanEndLine ss)
            put (srcSpanEndCol ss)
 
-  {-# INLINE get #-}
+  {-# INLINABLE get #-}
   get = do f  <- get
            sl <- get
            sc <- get
@@ -987,7 +987,7 @@ instance Binary RealSrcSpan where
                                  (mkRealSrcLoc f el ec))
 
 instance Binary SrcSpan where
-  {-# INLINE put #-}
+  {-# INLINABLE put #-}
   put (RealSrcSpan ss) = do
           putByte 0
           put ss
@@ -996,7 +996,7 @@ instance Binary SrcSpan where
           putByte 1
           put s
 
-  {-# INLINE get #-}
+  {-# INLINABLE get #-}
   get = do
           h <- getByte
           case h of
@@ -1006,24 +1006,24 @@ instance Binary SrcSpan where
                     return (UnhelpfulSpan s)
 
 instance Binary Serialized where
-    {-# INLINE put #-}
+    {-# INLINABLE put #-}
     put (Serialized the_type bytes) = do
         put the_type
         put bytes
-    {-# INLINE get #-}
+    {-# INLINABLE get #-}
     get = do
         the_type <- get
         bytes <- get
         return (Serialized the_type bytes)
 
 instance Binary SourceText where
-  {-# INLINE put #-}
+  {-# INLINABLE put #-}
   put NoSourceText = putByte 0
   put (SourceText s) = do
         putByte 1
         put s
 
-  {-# INLINE get #-}
+  {-# INLINABLE get #-}
   get = do
     h <- getByte
     case h of
