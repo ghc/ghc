@@ -451,7 +451,7 @@
 #define updateWithIndirection(p1, p2, and_then) \
     W_ bd;                                                      \
     bd = Bdescr(p1);                                            \
-    if (bdescr_gen_no(bd) != 0 :: bits16) {                     \
+    if (bdescr_gen_no(bd) != 0 :: bits16) (likely: False) {     \
       IF_NONMOVING_WRITE_BARRIER_ENABLED {                      \
         ccall updateRemembSetPushThunk_(BaseReg, p1 "ptr");     \
       }                                                         \
@@ -478,7 +478,7 @@ INLINE_HEADER void updateWithIndirection (Capability *cap,
     /* occurs in RaiseAsync.c:raiseAsync() */
     /* See Note [Heap memory barriers] in SMP.h */
     bdescr *bd = Bdescr((StgPtr)p1);
-    if (bd->gen_no != 0) {
+    if (RTS_UNLIKELY(bd->gen_no != 0)) {
         IF_NONMOVING_WRITE_BARRIER_ENABLED {
             updateRemembSetPushThunk(cap, (StgThunk*)p1);
         }
