@@ -64,7 +64,7 @@ import Util
 import Bag
 import Outputable
 import PatSyn
-
+import qualified GHC.LanguageExtensions.Type as LangExt
 import Control.Monad
 
 {-
@@ -922,7 +922,7 @@ dsDo stmts
             ; var   <- selectSimpleMatchVarL pat
             ; match <- matchSinglePatVar var (StmtCtxt DoExpr) pat
                                       res1_ty (cantFailMatchResult body)
-            ; match_code <- dsHandleMonadicFailure pat match fail_op
+            ; match_code <- dsHandleMonadicFailure res1_ty pat match fail_op
             ; dsSyntaxExpr bind_op [rhs', Lam var match_code] }
 
     go _ (ApplicativeStmt body_ty args mb_join) stmts
@@ -944,7 +944,7 @@ dsDo stmts
                    = do { var   <- selectSimpleMatchVarL pat
                         ; match <- matchSinglePatVar var (StmtCtxt DoExpr) pat
                                    body_ty (cantFailMatchResult body)
-                        ; match_code <- dsHandleMonadicFailure pat match fail_op
+                        ; match_code <- dsHandleMonadicFailure body_ty pat match fail_op
                         ; return (var:vs, match_code)
                         }
 
@@ -998,25 +998,26 @@ dsDo stmts
     go _ (TransStmt {}) _ = panic "dsDo TransStmt"
     go _ (XStmtLR nec)  _ = noExtCon nec
 
-dsHandleMonadicFailure :: LPat GhcTc -> MatchResult -> Maybe (SyntaxExpr GhcTc) -> DsM CoreExpr
+dsHandleMonadicFailure :: Type -> LPat GhcTc -> MatchResult -> Maybe (SyntaxExpr GhcTc) -> DsM CoreExpr
     -- In a do expression, pattern-match failure just calls
     -- the monadic 'fail' rather than throwing an exception
-dsHandleMonadicFailure pat match m_fail_op =
+dsHandleMonadicFailure ty pat match m_fail_op =
   case shareFailureHandler match of
     MatchResult_Unfailable body -> body
     MatchResult_Failable body -> do
-      fail_op <- case m_fail_op of
-        -- Note that (non-monadic) list comprehension, pattern guards, etc could
-        -- have fallible bindings without an explicit failure op, but this is
-        -- handled elsewhere. See Note [Failing pattern matches in Stmts] the
-        -- breakdown of regular and special binds.
-        Nothing -> pprPanic "missing fail op" $
-          text "Pattern match:" <+> ppr pat <+>
-          text "is failable, and fail_expr was left unset"
-        Just fail_op -> pure fail_op
       dflags <- getDynFlags
-      fail_msg <- mkStringExpr (mk_fail_msg dflags pat)
-      fail_expr <- dsSyntaxExpr fail_op [fail_msg]
+      fail_expr <- case m_fail_op of
+        -- Note that (non-monadic) list comprehension, pattern guards, etc could
+        -- have fallible bindings without either an explicit failure or
+        -- `-XNoFallibleDo`, but this is handled elsewhere. See Note [Failing
+        -- pattern matches in Stmts] the breakdown of regular and special binds.
+        Nothing -> do
+          let xNoFallibleDo = not $ xopt LangExt.FallibleDo dflags
+          MASSERT2(xNoFallibleDo, text "Pattern match:" <+> ppr pat <+> text "is failable, and fail_expr was left unset")
+          mkErrorAppDs pAT_ERROR_ID ty (matchContextErrString (StmtCtxt (DoExpr :: HsStmtContext GhcTc)))
+        Just fail_op -> do
+          fail_msg <- mkStringExpr (mk_fail_msg dflags pat)
+          dsSyntaxExpr fail_op [fail_msg]
       body fail_expr
 
 mk_fail_msg :: DynFlags -> Located e -> String

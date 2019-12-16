@@ -143,4 +143,5 @@ data Extension
    | ImportQualifiedPost
    | CUSKs
    | StandaloneKindSignatures
+   | FallibleDo
    deriving (Eq, Enum, Show, Generic, Bounded)
