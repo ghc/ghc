@@ -14,6 +14,7 @@ import Pair
 import Util
 
 mkReflCo :: Role -> Type -> Coercion
+mkZonkCo :: Type -> Type -> Coercion
 mkTyConAppCo :: HasDebugCallStack => Role -> TyCon -> [Coercion] -> Coercion
 mkAppCo :: Coercion -> Coercion -> Coercion
 mkForAllCo :: TyCoVar -> Coercion -> Coercion -> Coercion

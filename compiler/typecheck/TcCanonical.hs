@@ -932,8 +932,7 @@ can_eq_nc' _flat _rdr_env _envs ev eq_rel ty1@(LitTy l1) _ (LitTy l2) _
 -- Including FunTy (s -> t)
 can_eq_nc' _flat _rdr_env _envs ev eq_rel ty1 _ ty2 _
     --- See Note [FunTy and decomposing type constructor applications].
-  | Just (tc1, tys1) <- pprTrace "can_eq_nc'1" (ppr ty1 $$ ppr ty2 $$ ppr (repSplitTyConApp_maybe ty1) $$ ppr (repSplitTyConApp_maybe ty2)) $
-                        repSplitTyConApp_maybe ty1
+  | Just (tc1, tys1) <- repSplitTyConApp_maybe ty1
   , Just (tc2, tys2) <- repSplitTyConApp_maybe ty2
   , not (isTypeFamilyTyCon tc1)
   , not (isTypeFamilyTyCon tc2)
@@ -1872,10 +1871,10 @@ canEqTyVar ev eq_rel swapped tv1 ps_xi1 xi2 ps_xi2
                   (vcat [ sep [ parens (ppr tv1 <+> dcolon <+> ppr k1)
                               , text "~"
                               , parens (ppr xi2 <+> dcolon <+> ppr k2) ]
-                        , ppr flat_k1
-                        , ppr k1_co <+> dcolon <+> ppr (coercionKind k1_co)
-                        , ppr flat_k2
-                        , ppr k2_co <+> dcolon <+> ppr (coercionKind k2_co)])
+                        , text "flat_k1" <+> ppr flat_k1
+                        , text "k1_co" <+> ppr k1_co <+> dcolon <+> ppr (coercionKind k1_co)
+                        , text "flat_k2" <+> ppr flat_k2
+                        , text "k2_co" <+> ppr k2_co <+> dcolon <+> ppr (coercionKind k2_co)])
 
          -- We know the LHS is a tyvar. So let's dump all the coercions on the RHS
          -- If flat_k1 == flat_k2, let's dump all the coercions on the RHS and
@@ -1889,9 +1888,8 @@ canEqTyVar ev eq_rel swapped tv1 ps_xi1 xi2 ps_xi2
          then do { let rhs_kind_co = mkTcSymCo k2_co `mkTcTransCo` k1_co
                          -- :: kind(xi2) ~N kind(xi1)
 
-                       lhs_refl_co = mkTcNomReflCo k1
-                       new_rhs     = xi2    `mkCastTy` rhs_kind_co `mkCastTy` lhs_refl_co
-                       ps_rhs      = ps_xi2 `mkCastTy` rhs_kind_co `mkCastTy` lhs_refl_co
+                       new_rhs     = xi2    `mkCastTy` rhs_kind_co
+                       ps_rhs      = ps_xi2 `mkCastTy` rhs_kind_co
                        rhs_co      = mkTcGReflLeftCo role xi2 rhs_kind_co
 
                  ; new_ev <- rewriteEqEvidence ev swapped xi1 new_rhs

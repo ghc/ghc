@@ -192,6 +192,10 @@ opt_co4_wrap env sym rep r co
     result
 -}
 
+-- These two should not occur at all after type inference is complete
+opt_co4 _ _ _ _ co@(HoleCo {}) = pprPanic "opt_co4: unexpected HoleCo" (ppr co)
+opt_co4 _ _ _ _ co@(ZonkCo {}) = pprPanic "opt_co4: unexpected ZonkCo" (ppr co)
+
 opt_co4 env _   rep r (Refl ty)
   = ASSERT2( r == Nominal, text "Expected role:" <+> ppr r    $$
                            text "Found role:" <+> ppr Nominal $$
@@ -281,9 +285,6 @@ opt_co4 env sym rep r (CoVarCo cv)
                                      <+> ppr cv $$ ppr env)
                          cv
           -- cv1 might have a substituted kind!
-
-opt_co4 _ _ _ _ (HoleCo h)
-  = pprPanic "opt_univ fell into a hole" (ppr h)
 
 opt_co4 env sym rep r (AxiomInstCo con ind cos)
     -- Do *not* push sym inside top-level axioms

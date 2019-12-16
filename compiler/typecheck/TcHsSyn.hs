@@ -1077,13 +1077,15 @@ zonkCoFn :: ZonkEnv -> HsWrapper -> TcM (ZonkEnv, HsWrapper)
 zonkCoFn env WpHole   = return (env, WpHole)
 zonkCoFn env (WpCompose c1 c2) = do { (env1, c1') <- zonkCoFn env c1
                                     ; (env2, c2') <- zonkCoFn env1 c2
-                                    ; return (env2, WpCompose c1' c2') }
+                                    ; return (env2, c1' <.> c2') }
 zonkCoFn env (WpFun c1 c2 t1 d) = do { (env1, c1') <- zonkCoFn env c1
                                      ; (env2, c2') <- zonkCoFn env1 c2
                                      ; t1'         <- zonkTcTypeToTypeX env2 t1
                                      ; return (env2, WpFun c1' c2' t1' d) }
 zonkCoFn env (WpCast co) = do { co' <- zonkCoToCo env co
-                              ; return (env, WpCast co') }
+                              ; let wrap' | isReflexiveCo co' = WpHole
+                                          | otherwise         = WpCast co'
+                              ; return (env, wrap') }
 zonkCoFn env (WpEvLam ev)   = do { (env', ev') <- zonkEvBndrX env ev
                                  ; return (env', WpEvLam ev') }
 zonkCoFn env (WpEvApp arg)  = do { arg' <- zonkEvTerm env arg
@@ -1871,7 +1873,8 @@ zonk_tycomapper = TyCoMapper
   , tcm_covar      = zonkCoVarOcc
   , tcm_hole       = zonkCoHole
   , tcm_tycobinder = \env tv _vis -> zonkTyBndrX env tv
-  , tcm_tycon      = zonkTcTyConToTyCon }
+  , tcm_tycon      = zonkTcTyConToTyCon
+  , tcm_zonkco     = zonkZonkCo zonk_tycomapper }
 
 -- Zonk a TyCon by changing a TcTyCon to a regular TyCon
 zonkTcTyConToTyCon :: TcTyCon -> TcM TyCon

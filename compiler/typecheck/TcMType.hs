@@ -74,7 +74,7 @@ module TcMType (
   CandidatesQTvs(..), delCandidates, candidateKindVars, partitionCandidates,
   zonkAndSkolemise, skolemiseQuantifiedTyVar,
   defaultTyVar, quantifyTyVars, isQuantifiableTv,
-  zonkTcType, zonkTcTypes, zonkCo,
+  zonkTcType, zonkTcTypes, zonkCo, zonkZonkCo,
   zonkTyCoVarKind,
 
   zonkEvVar, zonkWC, zonkSimples,
@@ -1357,6 +1357,8 @@ collect_cand_qtvs_co :: VarSet -- bound variables
 collect_cand_qtvs_co bound = go_co
   where
     go_co dv (Refl ty)             = collect_cand_qtvs True bound dv ty
+    go_co dv (ZonkCo t1 t2)        = do { dv1 <- collect_cand_qtvs True bound dv t1
+                                        ; collect_cand_qtvs True bound dv1 t2 }
     go_co dv (GRefl _ ty mco)      = do dv1 <- collect_cand_qtvs True bound dv ty
                                         go_mco dv1 mco
     go_co dv (TyConAppCo _ _ cos)  = foldlM go_co dv cos
@@ -2099,12 +2101,18 @@ zonkCoVar = zonkId
 -- before all metavars are filled in.
 zonkTcTypeMapper :: TyCoMapper () TcM
 zonkTcTypeMapper = TyCoMapper
-  { tcm_tyvar = const zonkTcTyVar
-  , tcm_covar = const (\cv -> mkCoVarCo <$> zonkTyCoVarKind cv)
-  , tcm_hole  = hole
-  , tcm_tycobinder = \_env tv _vis -> ((), ) <$> zonkTyCoVarKind tv
-  , tcm_tycon      = zonkTcTyCon }
+  { tcm_tyvar      = const zonkTcTyVar
+  , tcm_covar      = const (\cv -> mkCoVarCo <$> zonkTyCoVarKind cv)
+  , tcm_hole       = hole
+  , tcm_tycobinder = zonk_bndr
+  , tcm_tycon      = zonkTcTyCon
+  , tcm_zonkco     = zonkZonkCo zonkTcTypeMapper }
   where
+    zonk_bndr :: () -> TyCoVar -> ArgFlag -> TcM ((), TyCoVar)
+    zonk_bndr _ tv _vis
+      = do { tv' <- zonkTyCoVarKind tv
+           ; return ((), tv') }
+
     hole :: () -> CoercionHole -> TcM Coercion
     hole _ hole@(CoercionHole { ch_ref = ref, ch_co_var = cv })
       = do { contents <- readTcRef ref
@@ -2113,6 +2121,16 @@ zonkTcTypeMapper = TyCoMapper
                              ; checkCoercionHole cv co' }
                Nothing -> do { cv' <- zonkCoVar cv
                              ; return $ HoleCo (hole { ch_co_var = cv' }) } }
+
+zonkZonkCo :: Monad m => TyCoMapper env m -> env -> TcType -> TcType -> m Coercion
+-- This is where ZonkCo dies: zonking should make the
+-- types equal, so we can produce Refl instead
+zonkZonkCo mapper env t1 t2
+  = do { t1 <- mapType mapper env t1
+       ; when debugIsOn $
+         do { t2 <- mapType mapper env t2
+            ; MASSERT2( t1 `tcEqType` t2, ppr t1 $$ ppr t2 ) }
+       ; return (Refl t1) }
 
 zonkTcTyCon :: TcTyCon -> TcM TcTyCon
 -- Only called on TcTyCons

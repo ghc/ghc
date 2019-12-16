@@ -326,7 +326,8 @@ data IfaceMCoercion
   | IfaceMCo IfaceCoercion
 
 data IfaceCoercion
-  = IfaceReflCo       IfaceType
+  = IfaceZonkCo       IfaceType IfaceType
+  | IfaceReflCo       IfaceType
   | IfaceGReflCo      Role IfaceType (IfaceMCoercion)
   | IfaceFunCo        Role IfaceCoercion IfaceCoercion
   | IfaceTyConAppCo   Role IfaceTyCon [IfaceCoercion]
@@ -503,6 +504,7 @@ substIfaceType env ty
     go_mco IfaceMRefl    = IfaceMRefl
     go_mco (IfaceMCo co) = IfaceMCo $ go_co co
 
+    go_co (IfaceZonkCo t1 t2)        = IfaceZonkCo (go t1) (go t1)
     go_co (IfaceReflCo ty)           = IfaceReflCo (go ty)
     go_co (IfaceGReflCo r ty mco)    = IfaceGReflCo r (go ty) (go_mco mco)
     go_co (IfaceFunCo r c1 c2)       = IfaceFunCo r (go_co c1) (go_co c2)
@@ -1525,8 +1527,11 @@ pprIfaceCoercion = ppr_co topPrec
 pprParendIfaceCoercion = ppr_co appPrec
 
 ppr_co :: PprPrec -> IfaceCoercion -> SDoc
-ppr_co _         (IfaceReflCo ty) = angleBrackets (ppr ty) <> ppr_role Nominal
-ppr_co _         (IfaceGReflCo r ty IfaceMRefl)
+ppr_co ctxt_prec (IfaceZonkCo t1 t2)
+  = maybeParen ctxt_prec appPrec $
+    text "ZonkCo" <+> pprParendIfaceType t1 <+> pprParendIfaceType t2
+ppr_co _ (IfaceReflCo ty) = angleBrackets (ppr ty) <> ppr_role Nominal
+ppr_co _ (IfaceGReflCo r ty IfaceMRefl)
   = angleBrackets (ppr ty) <> ppr_role r
 ppr_co ctxt_prec (IfaceGReflCo r ty (IfaceMCo co))
   = ppr_special_co ctxt_prec
@@ -1889,10 +1894,9 @@ instance Binary IfaceCoercion where
           putByte bh 17
           put_ bh a
           put_ bh b
-  put_ _ (IfaceFreeCoVar cv)
-       = pprPanic "Can't serialise IfaceFreeCoVar" (ppr cv)
-  put_ _  (IfaceHoleCo cv)
-       = pprPanic "Can't serialise IfaceHoleCo" (ppr cv)
+  put_ _ co@(IfaceFreeCoVar {}) = badPutCo co
+  put_ _ co@(IfaceZonkCo {})    = badPutCo co
+  put_ _ co@(IfaceHoleCo {})    = badPutCo co
           -- See Note [Holes in IfaceCoercion]
 
   get bh = do
@@ -1977,6 +1981,8 @@ instance Binary IfaceUnivCoProv where
                    return $ IfacePluginProv a
            _ -> panic ("get IfaceUnivCoProv " ++ show tag)
 
+badPutCo :: IfaceCoercion -> a
+badPutCo co = pprPanic "Can't serialise coercion" (ppr co)
 
 instance Binary (DefMethSpec IfaceType) where
     put_ bh VanillaDM     = putByte bh 0
@@ -2008,6 +2014,7 @@ instance NFData IfaceTyLit where
 instance NFData IfaceCoercion where
   rnf = \case
     IfaceReflCo f1 -> rnf f1
+    IfaceZonkCo f1 f2 -> rnf f1 `seq` rnf f2
     IfaceGReflCo f1 f2 f3 -> f1 `seq` rnf f2 `seq` rnf f3
     IfaceFunCo f1 f2 f3 -> f1 `seq` rnf f2 `seq` rnf f3
     IfaceTyConAppCo f1 f2 f3 -> f1 `seq` rnf f2 `seq` rnf f3

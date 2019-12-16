@@ -265,6 +265,7 @@ toIfaceCoercionX fr co
     go_mco MRefl     = IfaceMRefl
     go_mco (MCo co)  = IfaceMCo $ go co
 
+    go (ZonkCo t1 t2)       = IfaceZonkCo (toIfaceTypeX fr t1) (toIfaceTypeX fr t2)
     go (Refl ty)            = IfaceReflCo (toIfaceTypeX fr ty)
     go (GRefl r ty mco)     = IfaceGReflCo r (toIfaceTypeX fr ty) (go_mco mco)
     go (CoVarCo cv)

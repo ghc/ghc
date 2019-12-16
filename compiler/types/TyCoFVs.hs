@@ -208,6 +208,8 @@ tyCoVarsOfCos cos = ty_co_vars_of_cos cos emptyVarSet emptyVarSet
 
 ty_co_vars_of_co :: Coercion -> TyCoVarSet -> TyCoVarSet -> TyCoVarSet
 ty_co_vars_of_co (Refl ty)            is acc = ty_co_vars_of_type ty is acc
+ty_co_vars_of_co (ZonkCo ty1 ty2)     is acc = ty_co_vars_of_type ty1 is $
+                                               ty_co_vars_of_type ty2 is acc
 ty_co_vars_of_co (GRefl _ ty mco)     is acc = ty_co_vars_of_type ty is $
                                                ty_co_vars_of_mco mco is acc
 ty_co_vars_of_co (TyConAppCo _ _ cos) is acc = ty_co_vars_of_cos cos is acc
@@ -342,6 +344,7 @@ exactTyCoVarsOfType ty
     goMCo (MCo co) = goCo co
 
     goCo (Refl ty)            = go ty
+    goCo (ZonkCo ty1 ty2)     = go ty1 `unionVarSet` go ty2
     goCo (GRefl _ ty mco)     = go ty `unionVarSet` goMCo mco
     goCo (TyConAppCo _ _ args)= goCos args
     goCo (AppCo co arg)     = goCo co `unionVarSet` goCo arg
@@ -439,6 +442,9 @@ tyCoFVsOfCo :: Coercion -> FV
 -- See Note [Free variables of types]
 tyCoFVsOfCo (Refl ty) fv_cand in_scope acc
   = tyCoFVsOfType ty fv_cand in_scope acc
+tyCoFVsOfCo (ZonkCo ty1 ty2) fv_cand in_scope acc
+  = tyCoFVsOfType ty1 fv_cand in_scope $
+    tyCoFVsOfType ty2 fv_cand in_scope acc
 tyCoFVsOfCo (GRefl _ ty mco) fv_cand in_scope acc
   = (tyCoFVsOfType ty `unionFV` tyCoFVsOfMCo mco) fv_cand in_scope acc
 tyCoFVsOfCo (TyConAppCo _ _ cos) fv_cand in_scope acc = tyCoFVsOfCos cos fv_cand in_scope acc
@@ -526,9 +532,9 @@ almostDevoidCoVarOfCo cv co =
   almost_devoid_co_var_of_co co cv
 
 almost_devoid_co_var_of_co :: Coercion -> CoVar -> Bool
-almost_devoid_co_var_of_co (Refl {}) _ = True   -- covar is allowed in Refl and
-almost_devoid_co_var_of_co (GRefl {}) _ = True  -- GRefl, so we don't look into
-                                                -- the coercions
+almost_devoid_co_var_of_co (Refl {})   _ = True  -- covar is allowed in Refl and
+almost_devoid_co_var_of_co (GRefl {})  _ = True  -- GRefl, so we don't look into
+almost_devoid_co_var_of_co (ZonkCo {}) _ = True  -- the coercions
 almost_devoid_co_var_of_co (TyConAppCo _ _ cos) cv
   = almost_devoid_co_var_of_cos cos cv
 almost_devoid_co_var_of_co (AppCo co arg) cv
@@ -730,6 +736,7 @@ noFreeVarsOfTypes = all noFreeVarsOfType
 -- isEmptyVarSet . tyCoVarsOfCo, but faster in the non-forall case.
 noFreeVarsOfCo :: Coercion -> Bool
 noFreeVarsOfCo (Refl ty)              = noFreeVarsOfType ty
+noFreeVarsOfCo (ZonkCo ty1 ty2)       = noFreeVarsOfType ty1 && noFreeVarsOfType ty2
 noFreeVarsOfCo (GRefl _ ty co)        = noFreeVarsOfType ty && noFreeVarsOfMCo co
 noFreeVarsOfCo (TyConAppCo _ _ args)  = all noFreeVarsOfCo args
 noFreeVarsOfCo (AppCo c1 c2)          = noFreeVarsOfCo c1 && noFreeVarsOfCo c2

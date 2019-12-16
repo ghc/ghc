@@ -60,7 +60,7 @@ import {-# SOURCE #-} Coercion ( mkCoVarCo, mkKindCo, mkNthCo, mkTransCo
                                , mkFunCo, mkForAllCo, mkUnivCo
                                , mkAxiomInstCo, mkAppCo, mkGReflCo
                                , mkInstCo, mkLRCo, mkTyConAppCo
-                               , mkCoercionType
+                               , mkCoercionType, mkZonkCo
                                , coercionKind, coercionLKind, coVarKindsTypesRole )
 
 import TyCoRep
@@ -791,6 +791,7 @@ subst_co subst co
     go_mco (MCo co) = MCo (go co)
 
     go :: Coercion -> Coercion
+    go (ZonkCo t1 t2)        = (mkZonkCo $! (go_ty t1)) $! (go_ty t2)
     go (Refl ty)             = mkNomReflCo $! (go_ty ty)
     go (GRefl r ty mco)      = (mkGReflCo r $! (go_ty ty)) $! (go_mco mco)
     go (TyConAppCo r tc args)= let args' = map go args

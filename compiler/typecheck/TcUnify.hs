@@ -173,7 +173,8 @@ matchExpectedFunTys herald arity orig_ty thing_inside
       | isMetaTyVar tv
       = do { cts <- readMetaTyVar tv
            ; case cts of
-               Indirect ty' -> go acc_arg_tys n ty'
+               Indirect ty' -> do { (res, wrap) <- go acc_arg_tys n ty'
+                                  ; return (res, mkWpCastN (ty `mkTcZonkCo` ty') <.> wrap) }
                Flexi        -> defer acc_arg_tys n (mkCheckExpType ty) }
 
        -- In all other cases we bale out into ordinary unification
@@ -301,7 +302,8 @@ matchActualFunTysPart herald ct_orig mb_thing arity orig_ty
       | isMetaTyVar tv
       = do { cts <- readMetaTyVar tv
            ; case cts of
-               Indirect ty' -> go n acc_args ty'
+               Indirect ty' -> do { (wrap, arg_tys, res_ty) <- go n acc_args ty'
+                                  ; return (mkWpCastN (ty `mkTcZonkCo` ty') <.> wrap, arg_tys, res_ty) }
                Flexi        -> defer n ty }
 
        -- In all other cases we bale out into ordinary unification
@@ -387,11 +389,12 @@ matchExpectedTyConApp tc orig_ty
        | tc == tycon  -- Common case
        = return (mkTcNomReflCo ty, args)
 
-    go (TyVarTy tv)
+    go ty@(TyVarTy tv)
        | isMetaTyVar tv
        = do { cts <- readMetaTyVar tv
             ; case cts of
-                Indirect ty -> go ty
+                Indirect ty' -> do { (co, args) <- go ty'
+                                   ; return (co `mkTcTransCo` (ty' `mkTcZonkCo` ty), args) }
                 Flexi       -> defer }
 
     go _ = defer
@@ -430,11 +433,12 @@ matchExpectedAppTy orig_ty
       | Just (fun_ty, arg_ty) <- tcSplitAppTy_maybe ty
       = return (mkTcNomReflCo orig_ty, (fun_ty, arg_ty))
 
-    go (TyVarTy tv)
+    go ty@(TyVarTy tv)
       | isMetaTyVar tv
       = do { cts <- readMetaTyVar tv
            ; case cts of
-               Indirect ty -> go ty
+               Indirect ty' -> do { (co, stuff) <- go ty'
+                                  ; return (co `mkTcTransCo` (ty' `mkTcZonkCo` ty), stuff) }
                Flexi       -> defer }
 
     go _ = defer
@@ -743,13 +747,14 @@ tc_sub_type_ds eq_orig inst_orig ctxt ty_actual ty_expected
     go ty_a ty_e | Just ty_a' <- tcView ty_a = go ty_a' ty_e
                  | Just ty_e' <- tcView ty_e = go ty_a  ty_e'
 
-    go (TyVarTy tv_a) ty_e
+    go ty_a@(TyVarTy tv_a) ty_e
       = do { lookup_res <- lookupTcTyVar tv_a
            ; case lookup_res of
                Filled ty_a' ->
                  do { traceTc "tcSubTypeDS_NC_O following filled act meta-tyvar:"
                         (ppr tv_a <+> text "-->" <+> ppr ty_a')
-                    ; tc_sub_type_ds eq_orig inst_orig ctxt ty_a' ty_e }
+                    ; wrap <- tc_sub_type_ds eq_orig inst_orig ctxt ty_a' ty_e
+                    ; return (wrap <.> mkWpCastN (mkZonkCo ty_a ty_a')) }
                Unfilled _   -> unify }
 
     -- Historical note (Sept 16): there was a case here for
@@ -1025,6 +1030,8 @@ promoteTcType dest_lvl ty
 
     dont_promote_it :: TcM (TcCoercion, TcType)
     dont_promote_it  -- Check that ty :: TYPE rr, for some (fresh) rr
+      = return (mkTcNomReflCo ty, ty)
+{-
       = do { res_kind <- newOpenTypeKind
            ; let ty_kind = tcTypeKind ty
                  kind_orig = TypeEqOrigin { uo_actual   = ty_kind
@@ -1034,6 +1041,10 @@ promoteTcType dest_lvl ty
            ; ki_co <- uType KindLevel kind_orig (tcTypeKind ty) res_kind
            ; let co = mkTcGReflRightCo Nominal ty ki_co
            ; return (co, ty `mkCastTy` ki_co) }
+This cast really gets in the way.
+It turns  forall m. Monad m => forall a b. blah
+   into   forall m. (Monad m => forall a b. blah) |> ZonkCo Lite
+-}
 
 {- Note [Promoting a type]
 ~~~~~~~~~~~~~~~~~~~~~~~~~~
@@ -1431,17 +1442,20 @@ uType t_or_k origin orig_ty1 orig_ty2
         -- Note that we pass in *original* (before synonym expansion),
         -- so that type variables tend to get filled in with
         -- the most informative version of the type
-    go (TyVarTy tv1) ty2
+    go ty1@(TyVarTy tv1) ty2
       = do { lookup_res <- lookupTcTyVar tv1
            ; case lookup_res of
-               Filled ty1   -> do { traceTc "found filled tyvar" (ppr tv1 <+> text ":->" <+> ppr ty1)
-                                  ; go ty1 ty2 }
+               Filled ty1' -> do { traceTc "found filled tyvar" (ppr tv1 <+> text ":->" <+> ppr ty1')
+                                 ; co <- go ty1' ty2
+                                 ; return ((ty1 `mkTcZonkCo` ty1') `mkTcTransCo` co) }
+
                Unfilled _ -> uUnfilledVar origin t_or_k NotSwapped tv1 ty2 }
-    go ty1 (TyVarTy tv2)
+    go ty1 ty2@(TyVarTy tv2)
       = do { lookup_res <- lookupTcTyVar tv2
            ; case lookup_res of
-               Filled ty2   -> do { traceTc "found filled tyvar" (ppr tv2 <+> text ":->" <+> ppr ty2)
-                                  ; go ty1 ty2 }
+               Filled ty2' -> do { traceTc "found filled tyvar" (ppr tv2 <+> text ":->" <+> ppr ty2')
+                                 ; co <- go ty1 ty2'
+                                 ; return (co `mkTcTransCo` (ty2' `mkTcZonkCo` ty2)) }
                Unfilled _ -> uUnfilledVar origin t_or_k IsSwapped tv2 ty1 }
 
       -- See Note [Expanding synonyms during unification]
@@ -1706,7 +1720,7 @@ uUnfilledVar2 origin t_or_k swapped tv1 ty2
                -- NB: tv1 should still be unfilled, despite the kind unification
                --     because tv1 is not free in ty2 (or, hence, in its kind)
              then do { writeMetaTyVar tv1 ty2'
-                     ; return (mkTcNomReflCo ty2') }
+                     ; return (unSwap swapped mkTcZonkCo ty1 ty2') }
 
              else defer } -- This cannot be solved now.  See TcCanonical
                           -- Note [Equalities with incompatible kinds]
@@ -2096,8 +2110,9 @@ matchExpectedFunKind hs_ty n k = go n k
       | isMetaTyVar kvar
       = do { maybe_kind <- readMetaTyVar kvar
            ; case maybe_kind of
-                Indirect fun_kind -> go n fun_kind
-                Flexi ->             defer n k }
+                Indirect k' -> do { (co, res) <- go n k'
+                                  ; return ((k `mkTcZonkCo` k') `mkTcTransCo` co, res) }
+                Flexi       -> defer n k }
 
     go n (FunTy af arg res)
       = do { (co, k') <- go (n-1) res

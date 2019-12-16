@@ -32,7 +32,7 @@ module TcEvidence (
   TcCoercion, TcCoercionR, TcCoercionN, TcCoercionP, CoercionHole,
   TcMCoercion,
   Role(..), LeftOrRight(..), pickLR,
-  mkTcReflCo, mkTcNomReflCo, mkTcRepReflCo,
+  mkTcReflCo, mkTcNomReflCo, mkTcRepReflCo, mkTcZonkCo,
   mkTcTyConAppCo, mkTcAppCo, mkTcFunCo,
   mkTcAxInstCo, mkTcUnbranchedAxInstCo, mkTcForAllCo, mkTcForAllCos,
   mkTcSymCo, mkTcTransCo, mkTcNthCo, mkTcLRCo, mkTcSubCo, maybeTcSubCo,
@@ -102,6 +102,7 @@ type TcCoercionP = CoercionP    -- a phantom coercion
 type TcMCoercion = MCoercion
 
 mkTcReflCo             :: Role -> TcType -> TcCoercion
+mkTcZonkCo             :: TcType -> TcType -> TcCoercion
 mkTcSymCo              :: TcCoercion -> TcCoercion
 mkTcTransCo            :: TcCoercion -> TcCoercion -> TcCoercion
 mkTcNomReflCo          :: TcType -> TcCoercionN
@@ -164,6 +165,7 @@ mkTcCoherenceRightCo   = mkCoherenceRightCo
 mkTcPhantomCo          = mkPhantomCo
 mkTcKindCo             = mkKindCo
 mkTcCoVarCo            = mkCoVarCo
+mkTcZonkCo             = mkZonkCo
 
 tcCoercionKind         = coercionKind
 tcCoercionRole         = coercionRole

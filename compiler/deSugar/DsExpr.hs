@@ -192,16 +192,16 @@ dsUnliftedBind (AbsBinds { abs_tvs = [], abs_ev_vars = []
        ; ds_binds <- dsTcEvBinds_s ev_binds
        ; return (mkCoreLets ds_binds body2) }
 
-dsUnliftedBind (FunBind { fun_id = L l fun
-                        , fun_matches = matches
-                        , fun_co_fn = co_fn
-                        , fun_tick = tick }) body
+dsUnliftedBind bind@(FunBind { fun_id = L l fun
+                             , fun_matches = matches
+                             , fun_co_fn = co_fn
+                             , fun_tick = tick }) body
                -- Can't be a bang pattern (that looks like a PatBind)
                -- so must be simply unboxed
   = do { (args, rhs) <- matchWrapper (mkPrefixFunRhs (L l $ idName fun))
                                      Nothing matches
        ; MASSERT( null args ) -- Functions aren't lifted
-       ; MASSERT( isIdHsWrapper co_fn )
+       ; MASSERT2( isIdHsWrapper co_fn, ppr bind $$ ppr co_fn )
        ; let rhs' = mkOptTickBox tick rhs
        ; return (bindNonRec fun rhs' body) }
 

@@ -1005,7 +1005,10 @@ data Coercion
           -- Use (Refl ty), not (GRefl Nominal ty MRefl)
           -- Use (GRefl Representational _ _), not (SubCo (GRefl Nominal _ _))
 
-  -- These ones simply lift the correspondingly-named
+  -- ZonkCo ty1 ty2 :: ty1 ~N ty2
+  | ZonkCo Type Type
+
+  -- These next ones simply lift the correspondingly-named
   -- Type constructors into Coercions
 
   -- TyConAppCo :: "e" -> _ -> ?? -> e
@@ -1676,6 +1679,7 @@ typeSize (CoercionTy co)            = coercionSize co
 
 coercionSize :: Coercion -> Int
 coercionSize (Refl ty)             = typeSize ty
+coercionSize (ZonkCo ty1 ty2)      = 0  -- Will disapper after zonking
 coercionSize (GRefl _ ty MRefl)    = typeSize ty
 coercionSize (GRefl _ ty (MCo co)) = 1 + typeSize ty + coercionSize co
 coercionSize (TyConAppCo _ _ args) = 1 + sum (map coercionSize args)

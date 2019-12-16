@@ -29,7 +29,7 @@ module Coercion (
         mkAxInstCo, mkUnbranchedAxInstCo,
         mkAxInstRHS, mkUnbranchedAxInstRHS,
         mkAxInstLHS, mkUnbranchedAxInstLHS,
-        mkPiCo, mkPiCos, mkCoCast,
+        mkPiCo, mkPiCos, mkCoCast, mkZonkCo,
         mkSymCo, mkTransCo, mkTransMCo,
         mkNthCo, nthCoRole, mkLRCo,
         mkInstCo, mkAppCo, mkAppCos, mkTyConAppCo, mkFunCo,
@@ -672,6 +672,9 @@ mkReflCo :: Role -> Type -> Coercion
 mkReflCo Nominal ty = Refl ty
 mkReflCo r       ty = GRefl r ty MRefl
 
+mkZonkCo :: Type -> Type -> Coercion
+mkZonkCo = ZonkCo
+
 -- | Make a representational reflexive coercion
 mkRepReflCo :: Type -> Coercion
 mkRepReflCo ty = GRefl Representational ty MRefl
@@ -751,7 +754,7 @@ mkAppCos :: Coercion
 mkAppCos co1 cos = foldl' mkAppCo co1 cos
 
 {- Note [Unused coercion variable in ForAllCo]
-
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 See Note [Unused coercion variable in ForAllTy] in TyCoRep for the motivation for
 checking coercion variable in types.
 To lift the design choice to (ForAllCo cv kind_co body_co), we have two options:
@@ -975,6 +978,7 @@ mkSymCo :: Coercion -> Coercion
 -- of symmetry to the leaves; the optimizer will take care of that.
 mkSymCo co | isReflCo co          = co
 mkSymCo    (SymCo co)             = co
+mkSymCo    (ZonkCo t1 t2)         = ZonkCo t2 t1
 mkSymCo    (SubCo (SymCo co))     = SubCo co
 mkSymCo co                        = SymCo co
 
@@ -985,7 +989,8 @@ mkTransCo co1 co2 | isReflCo co1 = co2
                   | isReflCo co2 = co1
 mkTransCo (GRefl r t1 (MCo co1)) (GRefl _ _ (MCo co2))
   = GRefl r t1 (MCo $ mkTransCo co1 co2)
-mkTransCo co1 co2                 = TransCo co1 co2
+mkTransCo (ZonkCo t1 _) (ZonkCo _ t2) = ZonkCo t1 t2
+mkTransCo co1           co2           = TransCo co1 co2
 
 -- | Compose two MCoercions via transitivity
 mkTransMCo :: MCoercion -> MCoercion -> MCoercion
@@ -1391,6 +1396,7 @@ promoteCoercion co = case co of
       -> ASSERT( False )
          mkNomReflCo liftedTypeKind
 
+    ZonkCo {}      -> mkKindCo co
     CoVarCo {}     -> mkKindCo co
     HoleCo {}      -> mkKindCo co
     AxiomInstCo {} -> mkKindCo co
@@ -2131,6 +2137,7 @@ seqMCo MRefl    = ()
 seqMCo (MCo co) = seqCo co
 
 seqCo :: Coercion -> ()
+seqCo (ZonkCo t1 t2)            = seqType t1 `seq` seqType t2
 seqCo (Refl ty)                 = seqType ty
 seqCo (GRefl r ty mco)          = r `seq` seqType ty `seq` seqMCo mco
 seqCo (TyConAppCo r tc cos)     = r `seq` tc `seq` seqCos cos
@@ -2196,6 +2203,7 @@ coercionLKind :: Coercion -> Type
 coercionLKind co
   = go co
   where
+    go (ZonkCo ty1 _)           = ty1
     go (Refl ty)                = ty
     go (GRefl _ ty _)           = ty
     go (TyConAppCo _ tc cos)    = mkTyConApp tc (map go cos)
@@ -2251,6 +2259,7 @@ coercionRKind :: Coercion -> Type
 coercionRKind co
   = go co
   where
+    go (ZonkCo _ ty2)           = ty2
     go (Refl ty)                = ty
     go (GRefl _ ty MRefl)       = ty
     go (GRefl _ ty (MCo co1))   = mkCastTy ty co1
@@ -2356,7 +2365,8 @@ change reduces /total/ compile time by a factor of more than ten.
 coercionRole :: Coercion -> Role
 coercionRole = go
   where
-    go (Refl _) = Nominal
+    go (ZonkCo {}) = Nominal
+    go (Refl {})   = Nominal
     go (GRefl r _ _) = r
     go (TyConAppCo r _ _) = r
     go (AppCo co1 _) = go co1

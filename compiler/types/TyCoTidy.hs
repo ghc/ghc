@@ -198,6 +198,7 @@ tidyCo env@(_, subst) co
     go_mco (MCo co) = MCo (go co)
 
     go (Refl ty)             = Refl (tidyType env ty)
+    go (ZonkCo ty1 ty2)      = ZonkCo (tidyType env ty1) (tidyType env ty2) 
     go (GRefl r ty mco)      = GRefl r (tidyType env ty) $! go_mco mco
     go (TyConAppCo r tc cos) = let args = map go cos
                                in args `seqList` TyConAppCo r tc args

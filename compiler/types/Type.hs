@@ -3,7 +3,7 @@
 --
 -- Type - public interface
 
-{-# LANGUAGE CPP, FlexibleContexts #-}
+{-# LANGUAGE CPP, FlexibleContexts, RankNTypes, ScopedTypeVariables #-}
 {-# OPTIONS_GHC -fno-warn-orphans #-}
 
 -- | Main functions for manipulating types and type-related things
@@ -245,10 +245,10 @@ import {-# SOURCE #-} Coercion( mkNomReflCo, mkGReflCo, mkReflCo
                               , mkTyConAppCo, mkAppCo, mkCoVarCo, mkAxiomRuleCo
                               , mkForAllCo, mkFunCo, mkAxiomInstCo, mkUnivCo
                               , mkSymCo, mkTransCo, mkNthCo, mkLRCo, mkInstCo
-                              , mkKindCo, mkSubCo, mkFunCo, mkAxiomInstCo
-                              , decomposePiCos, coercionKind, coercionLKind
+                              , mkKindCo, mkSubCo, mkFunCo, mkAxiomInstCo, mkZonkCo
+                              , decomposePiCos, coercionLKind
                               , coercionRKind, coercionType
-                              , seqCo )
+                              , isReflexiveCo, seqCo )
 
 -- others
 import Util
@@ -426,6 +426,8 @@ expandTypeSynonyms ty
 
     go_co subst (Refl ty)
       = mkNomReflCo (go subst ty)
+    go_co subst (ZonkCo ty1 ty2)
+      = ZonkCo (go subst ty1) (go subst ty2)
     go_co subst (GRefl r ty mco)
       = mkGReflCo r (go subst ty) (go_mco subst mco)
        -- NB: coercions are always expanded upon creation
@@ -549,10 +551,9 @@ isRuntimeRepVar :: TyVar -> Bool
 isRuntimeRepVar = isRuntimeRepTy . tyVarKind
 
 
-{-
-************************************************************************
+{- *********************************************************************
 *                                                                      *
-   Analyzing types
+                mapType  and   mapCoercion
 *                                                                      *
 ************************************************************************
 
@@ -607,21 +608,25 @@ data TyCoMapper env m
           -- b) To turn TcTyCons into TyCons.
           --    See Note [Type checking recursive type and class declarations]
           --    in TcTyClsDecls
+
+      , tcm_zonkco :: env -> Type -> Type -> m Coercion
       }
 
 {-# INLINABLE mapType #-}  -- See Note [Specialising mappers]
 mapType :: Monad m => TyCoMapper env m -> env -> Type -> m Type
-mapType mapper@(TyCoMapper { tcm_tyvar = tyvar
+mapType mapper@(TyCoMapper { tcm_tyvar      = tyvar
                            , tcm_tycobinder = tycobinder
-                           , tcm_tycon = tycon })
+                           , tcm_tycon      = tycon })
         env ty
   = go ty
   where
+    go_co = mapCoercion mapper env
+
     go (TyVarTy tv)    = tyvar env tv
     go (AppTy t1 t2)   = mkAppTy <$> go t1 <*> go t2
     go ty@(LitTy {})   = return ty
-    go (CastTy ty co)  = mkCastTy <$> go ty <*> mapCoercion mapper env co
-    go (CoercionTy co) = CoercionTy <$> mapCoercion mapper env co
+    go (CastTy ty co)  = mkCastTy <$> go ty <*> go_co co
+    go (CoercionTy co) = CoercionTy <$> go_co co
 
     go ty@(FunTy _ arg res)
       = do { arg' <- go arg; res' <- go res
@@ -645,20 +650,25 @@ mapType mapper@(TyCoMapper { tcm_tyvar = tyvar
            ; return $ ForAllTy (Bndr tv' vis) inner' }
 
 {-# INLINABLE mapCoercion #-}  -- See Note [Specialising mappers]
-mapCoercion :: Monad m
+mapCoercion :: forall m env. Monad m
             => TyCoMapper env m -> env -> Coercion -> m Coercion
-mapCoercion mapper@(TyCoMapper { tcm_covar = covar
-                               , tcm_hole = cohole
+mapCoercion mapper@(TyCoMapper { tcm_covar      = covar
+                               , tcm_hole       = cohole
                                , tcm_tycobinder = tycobinder
-                               , tcm_tycon = tycon })
+                               , tcm_tycon      = tycon
+                               , tcm_zonkco     = zonkco })
             env co
   = go co
   where
-    go_mco MRefl    = return MRefl
-    go_mco (MCo co) = MCo <$> (go co)
+    go_ty :: Type -> m Type
+    go_ty = mapType mapper env
 
-    go (Refl ty) = Refl <$> mapType mapper env ty
-    go (GRefl r ty mco) = mkGReflCo r <$> mapType mapper env ty <*> (go_mco mco)
+    go_mco MRefl    = return MRefl
+    go_mco (MCo co) = MCo <$> go co
+
+    go (Refl ty)        = Refl <$> go_ty ty
+    go (ZonkCo t1 t2)   = zonkco env t1 t2
+    go (GRefl r ty mco) = mkGReflCo r <$> go_ty ty <*> go_mco mco
     go (TyConAppCo r tc args)
       = do { tc' <- if isTcTyCon tc
                     then tycon tc
@@ -692,6 +702,7 @@ mapCoercion mapper@(TyCoMapper { tcm_covar = covar
     go_prov (PhantomProv co)    = PhantomProv <$> go co
     go_prov (ProofIrrelProv co) = ProofIrrelProv <$> go co
     go_prov p@(PluginProv _)    = return p
+
 
 {-
 ************************************************************************
@@ -1348,11 +1359,6 @@ Specifically
   in test dependent/should_compile/dynamic-paper.
   See Note [Respecting definitional equality] in TyCoRep
 
-* EQ2: crucially, note that we do /not/ use isReflexiveCo,
-  because during type inference the kind of 'ty' may be less
-  zonked than the input kind of the coercion.  See
-   Note [The Purely Kinded Type Invariant (PKTI)] in TcHsType
-
 * EQ3 (cast of cast) is easy
 
 * EQ4 (cast of forall) is reasonably easy
@@ -1362,8 +1368,7 @@ Specifically
 -- Some very important subtleties here: see Note [mkCastTy subtleties]
 mkCastTy :: Type -> Coercion -> Type
 mkCastTy ty co
-  | typeKind ty `eqType` coercionRKind co     -- (EQ2) from the Note
-    -- Not isReflexiveCo!  See Note [mkCastTy subtleties]
+  | isReflexiveCo co    -- (EQ2) from the Note
   = ty
 
 mkCastTy (CastTy ty co1) co2
@@ -2722,6 +2727,9 @@ occCheckExpand vs_to_avoid ty
     ------------------
     go_co cxt (Refl ty)                 = do { ty' <- go cxt ty
                                              ; return (mkNomReflCo ty') }
+    go_co cxt (ZonkCo t1 t2)            = do { t1' <- go cxt t1
+                                             ; t2' <- go cxt t2
+                                             ; return (mkZonkCo t1' t2') }
     go_co cxt (GRefl r ty mco)          = do { mco' <- go_mco cxt mco
                                              ; ty' <- go cxt ty
                                              ; return (mkGReflCo r ty' mco') }
@@ -2808,6 +2816,7 @@ tyConsOfType ty
      go (CoercionTy co)             = go_co co
 
      go_co (Refl ty)               = go ty
+     go_co (ZonkCo t1 t2)          = go t1 `unionUniqSets` go t2
      go_co (GRefl _ ty mco)        = go ty `unionUniqSets` go_mco mco
      go_co (TyConAppCo _ tc args)  = go_tc tc `unionUniqSets` go_cos args
      go_co (AppCo co arg)          = go_co co `unionUniqSets` go_co arg
