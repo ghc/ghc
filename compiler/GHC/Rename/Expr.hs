@@ -2167,15 +2167,12 @@ So, in this case, we synthesize the function
 'getMonadFailOp'.
 -}
 getMonadFailOp :: RnM (FailOperator GhcRn, FreeVars) -- Syntax expr fail op
-getMonadFailOp
- = do { xOverloadedStrings <- fmap (xopt LangExt.OverloadedStrings) getDynFlags
-      ; xRebindableSyntax <- fmap (xopt LangExt.RebindableSyntax) getDynFlags
-      ; (fail, fvs) <- reallyGetMonadFailOp xRebindableSyntax xOverloadedStrings
-      ; return (Just fail, fvs)
-      }
-  where
-    reallyGetMonadFailOp rebindableSyntax overloadedStrings
-      | rebindableSyntax && overloadedStrings = do
+getMonadFailOp = do
+  xOverloadedStrings <- fmap (xopt LangExt.OverloadedStrings) getDynFlags
+  xRebindableSyntax <- fmap (xopt LangExt.RebindableSyntax) getDynFlags
+  xNoFallibleDo <- fmap (not . xopt LangExt.FallibleDo) getDynFlags
+  if | xNoFallibleDo -> return (Nothing, emptyFVs)
+     | xRebindableSyntax && xOverloadedStrings -> do
         (failExpr, failFvs) <- lookupSyntaxExpr failMName
         (fromStringExpr, fromStringFvs) <- lookupSyntaxExpr fromStringName
         let arg_lit = mkVarOcc "arg"
@@ -2188,5 +2185,7 @@ getMonadFailOp
               unLoc $ mkHsLam [noLoc $ VarPat noExtField $ noLoc arg_name] body
         let failAfterFromStringSynExpr :: SyntaxExpr GhcRn =
               mkSyntaxExpr failAfterFromStringExpr
-        return (failAfterFromStringSynExpr, failFvs `plusFV` fromStringFvs)
-      | otherwise = lookupSyntax failMName
+        return (Just failAfterFromStringSynExpr, failFvs `plusFV` fromStringFvs)
+     | otherwise -> do
+        (fail, fvs) <- lookupSyntax failMName
+        return (Just fail, fvs)

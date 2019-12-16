@@ -58,6 +58,8 @@ import GHC.Core.TyCo.Rep
 import GHC.Core.Type
 import GHC.HsToCore.Utils       (isTrueLHsExpr)
 import Maybes
+import EnumSet (EnumSet)
+import qualified EnumSet
 import qualified GHC.LanguageExtensions as LangExt
 import MonadUtils (concatMapM)
 
@@ -1169,7 +1171,7 @@ dsPmWarn dflags ctx@(DsMatchContext kind loc) vars result
 
     flag_i = overlapping dflags kind
     flag_u = exhaustive dflags kind
-    flag_u_reason = maybe NoReason Reason (exhaustiveWarningFlag kind)
+    flag_u_reason = maybe NoReason Reason (exhaustiveWarningFlag (extensionFlags dflags) kind)
 
     maxPatterns = maxUncoveredPatterns dflags
 
@@ -1261,27 +1263,33 @@ overlapping dflags _      = wopt Opt_WarnOverlappingPatterns dflags
 
 -- | Check whether the exhaustiveness checker should run (exhaustiveness only)
 exhaustive :: DynFlags -> HsMatchContext id -> Bool
-exhaustive  dflags = maybe False (`wopt` dflags) . exhaustiveWarningFlag
+exhaustive  dflags = maybe False (`wopt` dflags) . exhaustiveWarningFlag (extensionFlags dflags)
 
 -- | Denotes whether an exhaustiveness check is supported, and if so,
 -- via which 'WarningFlag' it's controlled.
 -- Returns 'Nothing' if check is not supported.
-exhaustiveWarningFlag :: HsMatchContext id -> Maybe WarningFlag
-exhaustiveWarningFlag (FunRhs {})   = Just Opt_WarnIncompletePatterns
-exhaustiveWarningFlag CaseAlt       = Just Opt_WarnIncompletePatterns
-exhaustiveWarningFlag IfAlt         = Just Opt_WarnIncompletePatterns
-exhaustiveWarningFlag LambdaExpr    = Just Opt_WarnIncompleteUniPatterns
-exhaustiveWarningFlag PatBindRhs    = Just Opt_WarnIncompleteUniPatterns
-exhaustiveWarningFlag PatBindGuards = Just Opt_WarnIncompletePatterns
-exhaustiveWarningFlag ProcExpr      = Just Opt_WarnIncompleteUniPatterns
-exhaustiveWarningFlag RecUpd        = Just Opt_WarnIncompletePatternsRecUpd
-exhaustiveWarningFlag ThPatSplice   = Nothing
-exhaustiveWarningFlag PatSyn        = Nothing
-exhaustiveWarningFlag ThPatQuote    = Nothing
-exhaustiveWarningFlag (StmtCtxt {}) = Nothing -- Don't warn about incomplete patterns
-                                       -- in list comprehensions, pattern guards
-                                       -- etc. They are often *supposed* to be
-                                       -- incomplete
+exhaustiveWarningFlag :: EnumSet LangExt.Extension -> HsMatchContext id -> Maybe WarningFlag
+exhaustiveWarningFlag exts = \case
+  (FunRhs {})   -> Just Opt_WarnIncompletePatterns
+  CaseAlt       -> Just Opt_WarnIncompletePatterns
+  IfAlt         -> Just Opt_WarnIncompletePatterns
+  LambdaExpr    -> Just Opt_WarnIncompleteUniPatterns
+  PatBindRhs    -> Just Opt_WarnIncompleteUniPatterns
+  PatBindGuards -> Just Opt_WarnIncompletePatterns
+  ProcExpr      -> Just Opt_WarnIncompleteUniPatterns
+  RecUpd        -> Just Opt_WarnIncompletePatternsRecUpd
+  ThPatSplice   -> Nothing
+  PatSyn        -> Nothing
+  ThPatQuote    -> Nothing
+  (StmtCtxt DoExpr) | not (EnumSet.member LangExt.FallibleDo exts) ->
+    Just Opt_WarnIncompleteUniPatterns
+  (StmtCtxt MDoExpr) | not (EnumSet.member LangExt.FallibleDo exts) ->
+    Just Opt_WarnIncompleteUniPatterns
+  (StmtCtxt {}) -> Nothing
+    -- Don't warn about incomplete patterns
+    -- in list comprehensions, pattern guards
+    -- etc. They are often *supposed* to be
+    -- incomplete
 
 -- True <==> singular
 pprContext :: Bool -> DsMatchContext -> SDoc -> ((SDoc -> SDoc) -> SDoc) -> SDoc

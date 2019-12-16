@@ -1645,7 +1645,8 @@ languageExtensions Nothing
    -- NB: MonoPatBinds is no longer the default
 
 languageExtensions (Just Haskell98)
-    = [LangExt.ImplicitPrelude,
+    = [LangExt.FallibleDo,
+       LangExt.ImplicitPrelude,
        -- See Note [When is StarIsType enabled]
        LangExt.StarIsType,
        LangExt.CUSKs,
@@ -1662,7 +1663,8 @@ languageExtensions (Just Haskell98)
       ]
 
 languageExtensions (Just Haskell2010)
-    = [LangExt.ImplicitPrelude,
+    = [LangExt.FallibleDo,
+       LangExt.ImplicitPrelude,
        -- See Note [When is StarIsType enabled]
        LangExt.StarIsType,
        LangExt.CUSKs,
@@ -3783,6 +3785,7 @@ xFlagsDeps = [
   flagSpec "ExplicitForAll"                   LangExt.ExplicitForAll,
   flagSpec "ExplicitNamespaces"               LangExt.ExplicitNamespaces,
   flagSpec "ExtendedDefaultRules"             LangExt.ExtendedDefaultRules,
+  flagSpec "FallibleDo"                       LangExt.FallibleDo,
   flagSpec "FlexibleContexts"                 LangExt.FlexibleContexts,
   flagSpec "FlexibleInstances"                LangExt.FlexibleInstances,
   flagSpec "ForeignFunctionInterface"         LangExt.ForeignFunctionInterface,
