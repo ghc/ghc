@@ -236,13 +236,13 @@ todo_block_full (uint32_t size, gen_workspace *ws)
 {
     bool urgent_to_push, can_extend;
     StgPtr p;
-    bdescr *bd;
 
     // todo_free has been pre-incremented by Evac.c:alloc_for_copy().  We
     // are expected to leave it bumped when we've finished here.
     ws->todo_free -= size;
 
-    bd = ws->todo_bd;
+    bdescr *const bd = ws->todo_bd;
+    const StgPtr start = bdescr_start(bd);
 
     ASSERT(bd != NULL);
     ASSERT(bd->link == NULL);
@@ -268,15 +268,15 @@ todo_block_full (uint32_t size, gen_workspace *ws)
     // room for the current object, *and* we're not into the second or
     // subsequent block of a large block (see Note [big objects]).
     can_extend =
-        ws->todo_free + size <= bdescr_start(bd) + bd->blocks * BLOCK_SIZE_W
+        ws->todo_free + size <= start + bd->blocks * BLOCK_SIZE_W
         && ws->todo_free < bdescr_start(ws->todo_bd) + BLOCK_SIZE_W;
 
     if (!urgent_to_push && can_extend)
     {
-        ws->todo_lim = stg_min(bdescr_start(bd) + bd->blocks * BLOCK_SIZE_W,
+        ws->todo_lim = stg_min(start + bd->blocks * BLOCK_SIZE_W,
                                ws->todo_lim + stg_max(WORK_UNIT_WORDS,size));
         debugTrace(DEBUG_gc, "increasing limit for %p to %p",
-                   bdescr_start(bd), ws->todo_lim);
+                   start, ws->todo_lim);
         p = ws->todo_free;
         ws->todo_free += size;
 
