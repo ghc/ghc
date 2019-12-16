@@ -2193,11 +2193,10 @@ tcUserStmt (L loc (BodyStmt _ expr _ _))
                                (NValBinds [(NonRecursive,unitBag the_bind)] [])
 
               -- [it <- e]
-              bind_stmt = L loc $ BindStmt noExtField
+              bind_stmt = L loc $ BindStmt
+                                       (mkRnSyntaxExpr bindIOName, Nothing)
                                        (L loc (VarPat noExtField (L loc fresh_it)))
                                        (nlHsApp ghciStep rn_expr)
-                                       (mkRnSyntaxExpr bindIOName)
-                                       Nothing
 
               -- [; print it]
               print_it  = L loc $ BodyStmt noExtField
@@ -2327,8 +2326,8 @@ tcUserStmt rdr_stmt@(L loc _)
 
        ; ghciStep <- getGhciStepIO
        ; let gi_stmt
-               | (L loc (BindStmt ty pat expr op1 op2)) <- rn_stmt
-                     = L loc $ BindStmt ty pat (nlHsApp ghciStep expr) op1 op2
+               | (L loc (BindStmt x pat expr)) <- rn_stmt
+                     = L loc $ BindStmt x pat (nlHsApp ghciStep expr)
                | otherwise = rn_stmt
 
        ; opt_pr_flag <- goptM Opt_PrintBindResult

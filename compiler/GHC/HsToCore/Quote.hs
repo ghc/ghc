@@ -1613,7 +1613,7 @@ repLSts :: [LStmt GhcRn (LHsExpr GhcRn)] -> MetaM ([GenSymBind], [Core (M TH.Stm
 repLSts stmts = repSts (map unLoc stmts)
 
 repSts :: [Stmt GhcRn (LHsExpr GhcRn)] -> MetaM ([GenSymBind], [Core (M TH.Stmt)])
-repSts (BindStmt _ p e _ _ : ss) =
+repSts (BindStmt _ p e : ss) =
    do { e2 <- repLE e
       ; ss1 <- mkGenSyms (collectPatBinders p)
       ; addBinds ss1 $ do {

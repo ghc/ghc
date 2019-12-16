@@ -241,7 +241,7 @@ deListComp (stmt@(TransStmt {}) : quals) list = do
     (inner_list_expr, pat) <- dsTransStmt stmt
     deBindComp pat inner_list_expr quals list
 
-deListComp (BindStmt _ pat list1 _ _ : quals) core_list2 = do -- rule A' above
+deListComp (BindStmt _ pat list1 : quals) core_list2 = do -- rule A' above
     core_list1 <- dsLExprNoLP list1
     deBindComp pat core_list1 quals core_list2
 
@@ -349,7 +349,7 @@ dfListComp c_id n_id (stmt@(TransStmt {}) : quals) = do
     -- Anyway, we bind the newly grouped list via the generic binding function
     dfBindComp c_id n_id (pat, inner_list_expr) quals
 
-dfListComp c_id n_id (BindStmt _ pat list1 _ _ : quals) = do
+dfListComp c_id n_id (BindStmt _ pat list1 : quals) = do
     -- evaluate the two lists
     core_list1 <- dsLExpr list1
 
@@ -495,7 +495,7 @@ dsMcStmt (LetStmt _ binds) stmts
        ; dsLocalBinds binds rest }
 
 --   [ .. | a <- m, stmts ]
-dsMcStmt (BindStmt bind_ty pat rhs bind_op fail_op) stmts
+dsMcStmt (BindStmt (bind_op, bind_ty, fail_op) pat rhs) stmts
   = do { rhs' <- dsLExpr rhs
        ; dsMcBindStmt pat rhs' bind_op fail_op bind_ty stmts }
 

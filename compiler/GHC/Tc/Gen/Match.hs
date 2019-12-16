@@ -415,7 +415,7 @@ tcGuardStmt _ (BodyStmt _ guard _ _) res_ty thing_inside
         ; thing  <- thing_inside res_ty
         ; return (BodyStmt boolTy guard' noSyntaxExpr noSyntaxExpr, thing) }
 
-tcGuardStmt ctxt (BindStmt _ pat rhs _ _) res_ty thing_inside
+tcGuardStmt ctxt (BindStmt _ pat rhs) res_ty thing_inside
   = do  { (rhs', rhs_ty) <- tcInferRhoNC rhs
                                    -- Stmt has a context already
         ; (pat', thing)  <- tcPat_O (StmtCtxt ctxt) (lexprCtOrigin rhs)
@@ -449,7 +449,7 @@ tcLcStmt _ _ (LastStmt x body noret _) elt_ty thing_inside
        ; return (LastStmt x body' noret noSyntaxExpr, thing) }
 
 -- A generator, pat <- rhs
-tcLcStmt m_tc ctxt (BindStmt _ pat rhs _ _) elt_ty thing_inside
+tcLcStmt m_tc ctxt (BindStmt _ pat rhs) elt_ty thing_inside
  = do   { pat_ty <- newFlexiTyVarTy liftedTypeKind
         ; rhs'   <- tcMonoExpr rhs (mkCheckExpType $ mkTyConApp m_tc [pat_ty])
         ; (pat', thing)  <- tcPat (StmtCtxt ctxt) pat (mkCheckExpType pat_ty) $
@@ -568,7 +568,7 @@ tcMcStmt _ (LastStmt x body noret return_op) res_ty thing_inside
 --                            q   ::   a
 --
 
-tcMcStmt ctxt (BindStmt _ pat rhs bind_op fail_op) res_ty thing_inside
+tcMcStmt ctxt (BindStmt (bind_op, fail_op) pat rhs) res_ty thing_inside
            -- (>>=) :: rhs_ty -> (pat_ty -> new_res_ty) -> res_ty
   = do  { ((rhs', pat', thing, new_res_ty), bind_op')
             <- tcSyntaxOp MCompOrigin bind_op
@@ -585,7 +585,7 @@ tcMcStmt ctxt (BindStmt _ pat rhs bind_op fail_op) res_ty thing_inside
             tcMonadFailOp (MCompPatOrigin pat) pat' fail new_res_ty
 
 
-        ; return (BindStmt new_res_ty pat' rhs' bind_op' fail_op', thing) }
+        ; return (BindStmt (bind_op', new_res_ty, fail_op') pat' rhs', thing) }
 
 -- Boolean expressions.
 --
@@ -827,7 +827,7 @@ tcDoStmt _ (LastStmt x body noret _) res_ty thing_inside
        ; thing <- thing_inside (panic "tcDoStmt: thing_inside")
        ; return (LastStmt x body' noret noSyntaxExpr, thing) }
 
-tcDoStmt ctxt (BindStmt _ pat rhs bind_op fail_op) res_ty thing_inside
+tcDoStmt ctxt (BindStmt (bind_op, fail_op) pat rhs) res_ty thing_inside
   = do  {       -- Deal with rebindable syntax:
                 --       (>>=) :: rhs_ty -> (pat_ty -> new_res_ty) -> res_ty
                 -- This level of generality is needed for using do-notation
@@ -846,7 +846,7 @@ tcDoStmt ctxt (BindStmt _ pat rhs bind_op fail_op) res_ty thing_inside
         ; fail_op' <- fmap join . forM fail_op $ \fail ->
             tcMonadFailOp (DoPatOrigin pat) pat' fail new_res_ty
 
-        ; return (BindStmt new_res_ty pat' rhs' bind_op' fail_op', thing) }
+        ; return (BindStmt (bind_op', new_res_ty, fail_op') pat' rhs', thing) }
 
 tcDoStmt ctxt (ApplicativeStmt _ pairs mb_join) res_ty thing_inside
   = do  { let tc_app_stmts ty = tcApplicativeStmts ctxt pairs ty $
@@ -1029,13 +1029,13 @@ tcApplicativeStmts ctxt pairs rhs_ty thing_inside
           -> TcM (ApplicativeArg GhcTcId)
 
     goArg body_ty (ApplicativeArgOne
-                    { app_arg_pattern = pat
-                    , arg_expr        = rhs
-                    , fail_operator   = fail_op
+                    { xarg_app_arg_one = fail_op
+                    , app_arg_pattern = pat
+                    , arg_expr = rhs
                     , ..
                     }, pat_ty, exp_ty)
       = setSrcSpan (combineSrcSpans (getLoc pat) (getLoc rhs)) $
-        addErrCtxt (pprStmtInCtxt ctxt (mkBindStmt pat rhs))   $
+        addErrCtxt (pprStmtInCtxt ctxt (mkRnBindStmt pat rhs))   $
         do { rhs' <- tcMonoExprNC rhs (mkCheckExpType exp_ty)
            ; (pat', _) <- tcPat (StmtCtxt ctxt) pat (mkCheckExpType pat_ty) $
                           return ()
@@ -1043,9 +1043,9 @@ tcApplicativeStmts ctxt pairs rhs_ty thing_inside
                tcMonadFailOp (DoPatOrigin pat) pat' fail body_ty
 
            ; return (ApplicativeArgOne
-                      { app_arg_pattern = pat'
+                      { xarg_app_arg_one = fail_op'
+                      , app_arg_pattern = pat'
                       , arg_expr        = rhs'
-                      , fail_operator   = fail_op'
                       , .. }
                     ) }
 
