@@ -2635,7 +2635,7 @@ newDictBndr :: SpecEnv -> CoreBndr -> SpecM CoreBndr
 newDictBndr env b = do { uniq <- getUniqueM
                        ; let n   = idName b
                              ty' = substTy env (idType b)
-                       ; return (mkUserLocalOrCoVar (nameOccName n) uniq ty' (getSrcSpan n)) }
+                       ; return (mkUserLocal (nameOccName n) uniq ty' (getSrcSpan n)) }
 
 newSpecIdSM :: Id -> Type -> Maybe JoinArity -> SpecM Id
     -- Give the new Id a similar occurrence name to the old one
@@ -2643,7 +2643,7 @@ newSpecIdSM old_id new_ty join_arity_maybe
   = do  { uniq <- getUniqueM
         ; let name    = idName old_id
               new_occ = mkSpecOcc (nameOccName name)
-              new_id  = mkUserLocalOrCoVar new_occ uniq new_ty (getSrcSpan name)
+              new_id  = mkUserLocal new_occ uniq new_ty (getSrcSpan name)
                           `asJoinId_maybe` join_arity_maybe
         ; return new_id }
 
