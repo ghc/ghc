@@ -149,3 +149,5 @@ test('T15897',
       run_timeout_multiplier(2),
       fragile(15467)],
      makefile_test, ['T15897'])
+
+test('T17572', [ extra_run_opts('+RTS -h -RTS')], compile_and_run, [''])
