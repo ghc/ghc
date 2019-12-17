@@ -79,11 +79,11 @@ import Control.Monad
 import Data.List
 
 data MetaWrappers = MetaWrappers {
-      -- Apply arguments to a function of type `forall m . Quote m =>`
+      -- Applies its argument to a type argument `m` and dictionary `Quote m`
       quoteWrapper :: CoreExpr -> CoreExpr
-      -- Apply arguments to a function of type `forall m . Monad m =>`
+      -- Apply its argument to a type argument `m` and a dictionary `Monad m`
     , monadWrapper :: CoreExpr -> CoreExpr
-      -- Convert tau into m tau for the container type m
+      -- Apply the container typed variable `m` to the argument type `T` to get `m T`.
     , metaTy :: Type -> Type
     }
 
