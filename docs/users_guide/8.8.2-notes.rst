@@ -19,8 +19,11 @@ Highlights
 - A bug in ``process`` causing builds using ``hsc2hs`` to fail
   non-deterministically on Windows has been fixed (:ghc-ticket:`17480`)
 
-- A typechecker bug (:ghc-ticket:`12088`) resulting in programs being
-  unexpectedly rejected has been fixed.
+- A typechecker bug (:ghc-ticket:`17112`) resulting in GHC panicking
+  on some programs has been fixed.
+
+- A bug (:ghc-ticket:`16707`) in the implementation of software transactional memory potentially
+  resulting in hanging transactions has been fixed.
 
 - A bug in the implementation of compact normal forms resulting in segmentation
   faults in some uses (:ghc-ticket:`17044`) has been fixed.
