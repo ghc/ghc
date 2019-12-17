@@ -451,7 +451,7 @@ data HsExpr p
 
   | HsTcBracketOut
       (XTcBracketOut p)
-      (Maybe QuoteWrapper)         -- The wrapper to apply type and dictionary argument
+      (Maybe QuoteWrapper) -- The wrapper to apply type and dictionary argument
                            -- to the quote.
       (HsBracket GhcRn)    -- Output of the type checker is the *original*
                            -- renamed expression, plus
