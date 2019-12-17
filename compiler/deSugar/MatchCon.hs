@@ -34,6 +34,7 @@ import SrcLoc
 import Outputable
 import Control.Monad(liftM)
 import Data.List (groupBy)
+import Data.List.NonEmpty (NonEmpty(..))
 
 {-
 We are confronted with the first column of patterns in a set of
@@ -88,40 +89,38 @@ have-we-used-all-the-constructors? question; the local function
 @match_cons_used@ does all the real work.
 -}
 
-matchConFamily :: [Id]
+matchConFamily :: NonEmpty Id
                -> Type
-               -> [[EquationInfo]]
+               -> NonEmpty (NonEmpty EquationInfo)
                -> DsM MatchResult
 -- Each group of eqns is for a single constructor
-matchConFamily (var:vars) ty groups
+matchConFamily (var :| vars) ty groups
   = do alts <- mapM (fmap toRealAlt . matchOneConLike vars ty) groups
        return (mkCoAlgCaseMatchResult var ty alts)
   where
     toRealAlt alt = case alt_pat alt of
         RealDataCon dcon -> alt{ alt_pat = dcon }
         _ -> panic "matchConFamily: not RealDataCon"
-matchConFamily [] _ _ = panic "matchConFamily []"
 
-matchPatSyn :: [Id]
+matchPatSyn :: NonEmpty Id
             -> Type
-            -> [EquationInfo]
+            -> NonEmpty EquationInfo
             -> DsM MatchResult
-matchPatSyn (var:vars) ty eqns
+matchPatSyn (var :| vars) ty eqns
   = do alt <- fmap toSynAlt $ matchOneConLike vars ty eqns
        return (mkCoSynCaseMatchResult var ty alt)
   where
     toSynAlt alt = case alt_pat alt of
         PatSynCon psyn -> alt{ alt_pat = psyn }
         _ -> panic "matchPatSyn: not PatSynCon"
-matchPatSyn _ _ _ = panic "matchPatSyn []"
 
 type ConArgPats = HsConDetails (LPat GhcTc) (HsRecFields GhcTc (LPat GhcTc))
 
 matchOneConLike :: [Id]
                 -> Type
-                -> [EquationInfo]
+                -> NonEmpty EquationInfo
                 -> DsM (CaseAlt ConLike)
-matchOneConLike vars ty (eqn1 : eqns)   -- All eqns for a single constructor
+matchOneConLike vars ty (eqn1 :| eqns)   -- All eqns for a single constructor
   = do  { let inst_tys = ASSERT( all tcIsTcTyVar ex_tvs )
                            -- ex_tvs can only be tyvars as data types in source
                            -- Haskell cannot mention covar yet (Aug 2018).
@@ -195,7 +194,6 @@ matchOneConLike vars ty (eqn1 : eqns)   -- All eqns for a single constructor
         lookup_fld (L _ rpat) = lookupNameEnv_NF fld_var_env
                                             (idName (unLoc (hsRecFieldId rpat)))
     select_arg_vars _ [] = panic "matchOneCon/select_arg_vars []"
-matchOneConLike _ _ [] = panic "matchOneCon []"
 
 -----------------
 compatible_pats :: (ConArgPats,a) -> (ConArgPats,a) -> Bool

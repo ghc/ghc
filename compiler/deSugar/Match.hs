@@ -7,6 +7,8 @@ The @match@ function
 -}
 
 {-# LANGUAGE CPP #-}
+{-# LANGUAGE MonadComprehensions #-}
+{-# LANGUAGE OverloadedLists #-}
 {-# LANGUAGE TypeFamilies #-}
 {-# LANGUAGE ViewPatterns #-}
 
@@ -55,7 +57,8 @@ import Unique
 import UniqDFM
 
 import Control.Monad( when, unless )
-import Data.List ( groupBy )
+import Data.List.NonEmpty (NonEmpty(..))
+import qualified Data.List.NonEmpty as NEL
 import qualified Data.Map as Map
 
 {-
@@ -161,11 +164,10 @@ See also Note [Localise pattern binders] in DsUtils
 
 type MatchId = Id   -- See Note [Match Ids]
 
-match :: [MatchId]        -- ^ Variables rep\'ing the exprs we\'re matching with
-                          -- ^ See Note [Match Ids]
-      -> Type             -- ^ Type of the case expression
-      -> [EquationInfo]   -- ^ Info about patterns, etc. (type synonym below)
-      -> DsM MatchResult  -- ^ Desugared result!
+match :: [MatchId] -- ^ Variables rep\'ing the exprs we\'re matching with. See Note [Match Ids]
+      -> Type -- ^ Type of the case expression
+      -> [EquationInfo] -- ^ Info about patterns, etc. (type synonym below)
+      -> DsM MatchResult -- ^ Desugared result!
 
 match [] ty eqns
   = ASSERT2( not (null eqns), ppr ty )
@@ -175,13 +177,12 @@ match [] ty eqns
                       eqn_rhs eqn
                     | eqn <- eqns ]
 
-match vars@(v:_) ty eqns    -- Eqns *can* be empty
+match (v:vs) ty eqns    -- Eqns *can* be empty
   = ASSERT2( all (isInternalName . idName) vars, ppr vars )
     do  { dflags <- getDynFlags
                 -- Tidy the first pattern, generating
                 -- auxiliary bindings if necessary
         ; (aux_binds, tidy_eqns) <- mapAndUnzipM (tidyEqnInfo v) eqns
-
                 -- Group the equations and match each group in turn
         ; let grouped = groupEquations dflags tidy_eqns
 
@@ -192,21 +193,22 @@ match vars@(v:_) ty eqns    -- Eqns *can* be empty
         ; return (adjustMatchResult (foldr (.) id aux_binds) $
                   foldr1 combineMatchResults match_results) }
   where
-    dropGroup :: [(PatGroup,EquationInfo)] -> [EquationInfo]
-    dropGroup = map snd
+    vars = v :| vs
 
-    match_groups :: [[(PatGroup,EquationInfo)]] -> DsM [MatchResult]
+    dropGroup :: Functor f => f (PatGroup,EquationInfo) -> f EquationInfo
+    dropGroup = fmap snd
+
+    match_groups :: [NonEmpty (PatGroup,EquationInfo)] -> DsM (NonEmpty MatchResult)
     -- Result list of [MatchResult] is always non-empty
     match_groups [] = matchEmpty v ty
-    match_groups gs = mapM match_group gs
+    match_groups (g:gs) = mapM match_group $ g :| gs
 
-    match_group :: [(PatGroup,EquationInfo)] -> DsM MatchResult
-    match_group [] = panic "match_group"
-    match_group eqns@((group,_) : _)
+    match_group :: NonEmpty (PatGroup,EquationInfo) -> DsM MatchResult
+    match_group eqns@((group,_) :| _)
         = case group of
-            PgCon {}  -> matchConFamily  vars ty (subGroupUniq [(c,e) | (PgCon c, e) <- eqns])
+            PgCon {}  -> matchConFamily  vars ty (ne $ subGroupUniq [(c,e) | (PgCon c, e) <- eqns'])
             PgSyn {}  -> matchPatSyn     vars ty (dropGroup eqns)
-            PgLit {}  -> matchLiterals   vars ty (subGroupOrd [(l,e) | (PgLit l, e) <- eqns])
+            PgLit {}  -> matchLiterals   vars ty (ne $ subGroupOrd [(l,e) | (PgLit l, e) <- eqns'])
             PgAny     -> matchVariables  vars ty (dropGroup eqns)
             PgN {}    -> matchNPats      vars ty (dropGroup eqns)
             PgOverS {}-> matchNPats      vars ty (dropGroup eqns)
@@ -215,6 +217,10 @@ match vars@(v:_) ty eqns    -- Eqns *can* be empty
             PgCo {}   -> matchCoercion   vars ty (dropGroup eqns)
             PgView {} -> matchView       vars ty (dropGroup eqns)
             PgOverloadedList -> matchOverloadedList vars ty (dropGroup eqns)
+      where eqns' = NEL.toList eqns
+            ne l = case NEL.nonEmpty l of
+              Just nel -> nel
+              Nothing -> pprPanic "match match_group" $ text "Empty result should be impossible since input was non-empty"
 
     -- FIXME: we should also warn about view patterns that should be
     -- commoned up but are not
@@ -231,7 +237,7 @@ match vars@(v:_) ty eqns    -- Eqns *can* be empty
           maybeWarn $ (map (\g -> text "Putting these view expressions into the same case:" <+> (ppr g))
                        (filter (not . null) gs))
 
-matchEmpty :: MatchId -> Type -> DsM [MatchResult]
+matchEmpty :: MatchId -> Type -> DsM (NonEmpty MatchResult)
 -- See Note [Empty case expressions]
 matchEmpty var res_ty
   = return [MatchResult CanFail mk_seq]
@@ -239,35 +245,32 @@ matchEmpty var res_ty
     mk_seq fail = return $ mkWildCase (Var var) (idType var) res_ty
                                       [(DEFAULT, [], fail)]
 
-matchVariables :: [MatchId] -> Type -> [EquationInfo] -> DsM MatchResult
+matchVariables :: NonEmpty MatchId -> Type -> NonEmpty EquationInfo -> DsM MatchResult
 -- Real true variables, just like in matchVar, SLPJ p 94
 -- No binding to do: they'll all be wildcards by now (done in tidy)
-matchVariables (_:vars) ty eqns = match vars ty (shiftEqns eqns)
-matchVariables [] _ _ = panic "matchVariables"
+matchVariables (_ :| vars) ty eqns = match vars ty $ NEL.toList $ shiftEqns eqns
 
-matchBangs :: [MatchId] -> Type -> [EquationInfo] -> DsM MatchResult
-matchBangs (var:vars) ty eqns
-  = do  { match_result <- match (var:vars) ty $
-                          map (decomposeFirstPat getBangPat) eqns
+matchBangs :: NonEmpty MatchId -> Type -> NonEmpty EquationInfo -> DsM MatchResult
+matchBangs (var :| vars) ty eqns
+  = do  { match_result <- match (var:vars) ty $ NEL.toList $
+            decomposeFirstPat getBangPat <$> eqns
         ; return (mkEvalMatchResult var ty match_result) }
-matchBangs [] _ _ = panic "matchBangs"
 
-matchCoercion :: [MatchId] -> Type -> [EquationInfo] -> DsM MatchResult
+matchCoercion :: NonEmpty MatchId -> Type -> NonEmpty EquationInfo -> DsM MatchResult
 -- Apply the coercion to the match variable and then match that
-matchCoercion (var:vars) ty (eqns@(eqn1:_))
+matchCoercion (var :| vars) ty (eqns@(eqn1 :| _))
   = do  { let CoPat _ co pat _ = firstPat eqn1
         ; let pat_ty' = hsPatType pat
         ; var' <- newUniqueId var pat_ty'
-        ; match_result <- match (var':vars) ty $
-                          map (decomposeFirstPat getCoPat) eqns
+        ; match_result <- match (var':vars) ty $ NEL.toList $
+            decomposeFirstPat getCoPat <$> eqns
         ; core_wrap <- dsHsWrapper co
         ; let bind = NonRec var' (core_wrap (Var var))
         ; return (mkCoLetMatchResult bind match_result) }
-matchCoercion _ _ _ = panic "matchCoercion"
 
-matchView :: [MatchId] -> Type -> [EquationInfo] -> DsM MatchResult
+matchView :: NonEmpty MatchId -> Type -> NonEmpty EquationInfo -> DsM MatchResult
 -- Apply the view function to the match variable and then match that
-matchView (var:vars) ty (eqns@(eqn1:_))
+matchView (var :| vars) ty (eqns@(eqn1 :| _))
   = do  { -- we could pass in the expr from the PgView,
          -- but this needs to extract the pat anyway
          -- to figure out the type of the fresh variable
@@ -275,26 +278,25 @@ matchView (var:vars) ty (eqns@(eqn1:_))
          -- do the rest of the compilation
         ; let pat_ty' = hsPatType pat
         ; var' <- newUniqueId var pat_ty'
-        ; match_result <- match (var':vars) ty $
-                          map (decomposeFirstPat getViewPat) eqns
+        ; match_result <- match (var':vars) ty $ NEL.toList $
+            decomposeFirstPat getViewPat <$> eqns
          -- compile the view expressions
         ; viewExpr' <- dsLExpr viewExpr
         ; return (mkViewMatchResult var'
                     (mkCoreAppDs (text "matchView") viewExpr' (Var var))
                     match_result) }
-matchView _ _ _ = panic "matchView"
 
-matchOverloadedList :: [MatchId] -> Type -> [EquationInfo] -> DsM MatchResult
-matchOverloadedList (var:vars) ty (eqns@(eqn1:_))
+matchOverloadedList :: NonEmpty MatchId -> Type -> NonEmpty EquationInfo -> DsM MatchResult
+matchOverloadedList (var :| vars) ty (eqns@(eqn1 :| _))
 -- Since overloaded list patterns are treated as view patterns,
 -- the code is roughly the same as for matchView
   = do { let ListPat (ListPatTc elt_ty (Just (_,e))) _ = firstPat eqn1
        ; var' <- newUniqueId var (mkListTy elt_ty)  -- we construct the overall type by hand
-       ; match_result <- match (var':vars) ty $
-                            map (decomposeFirstPat getOLPat) eqns -- getOLPat builds the pattern inside as a non-overloaded version of the overloaded list pattern
+       ; match_result <- match (var':vars) ty $ NEL.toList $
+           decomposeFirstPat getOLPat <$> eqns -- getOLPat builds the pattern inside as a non-overloaded version of the overloaded list pattern
        ; e' <- dsSyntaxExpr e [Var var]
-       ; return (mkViewMatchResult var' e' match_result) }
-matchOverloadedList _ _ _ = panic "matchOverloadedList"
+       ; return (mkViewMatchResult var' e' match_result)
+       }
 
 -- decompose the first pattern and leave the rest alone
 decomposeFirstPat :: (Pat GhcTc -> Pat GhcTc) -> EquationInfo -> EquationInfo
@@ -889,22 +891,24 @@ the PgN constructor as a Rational if numeric, and add a PgOverStr constructor
 for overloaded strings.
 -}
 
-groupEquations :: DynFlags -> [EquationInfo] -> [[(PatGroup, EquationInfo)]]
+groupEquations :: DynFlags -> [EquationInfo] -> [NonEmpty (PatGroup, EquationInfo)]
 -- If the result is of form [g1, g2, g3],
 -- (a) all the (pg,eq) pairs in g1 have the same pg
 -- (b) none of the gi are empty
 -- The ordering of equations is unchanged
 groupEquations dflags eqns
-  = groupBy same_gp [(patGroup dflags (firstPat eqn), eqn) | eqn <- eqns]
+  = NEL.groupBy same_gp $ [(patGroup dflags (firstPat eqn), eqn) | eqn <- eqns]
+  -- comprehension on NonEmpty
   where
     same_gp :: (PatGroup,EquationInfo) -> (PatGroup,EquationInfo) -> Bool
     (pg1,_) `same_gp` (pg2,_) = pg1 `sameGroup` pg2
 
-subGroup :: (m -> [[EquationInfo]]) -- Map.elems
+-- TODO Make subGroup1 using a NonEmptyMap
+subGroup :: (m -> [NonEmpty EquationInfo]) -- Map.elems
          -> m -- Map.empty
-         -> (a -> m -> Maybe [EquationInfo]) -- Map.lookup
-         -> (a -> [EquationInfo] -> m -> m) -- Map.insert
-         -> [(a, EquationInfo)] -> [[EquationInfo]]
+         -> (a -> m -> Maybe (NonEmpty EquationInfo)) -- Map.lookup
+         -> (a -> NonEmpty EquationInfo -> m -> m) -- Map.insert
+         -> [(a, EquationInfo)] -> [NonEmpty EquationInfo]
 -- Input is a particular group.  The result sub-groups the
 -- equations by with particular constructor, literal etc they match.
 -- Each sub-list in the result has the same PatGroup
@@ -912,19 +916,19 @@ subGroup :: (m -> [[EquationInfo]]) -- Map.elems
 -- Parameterized by map operations to allow different implementations
 -- and constraints, eg. types without Ord instance.
 subGroup elems empty lookup insert group
-    = map reverse $ elems $ foldl' accumulate empty group
+    = fmap NEL.reverse $ elems $ foldl' accumulate empty group
   where
     accumulate pg_map (pg, eqn)
       = case lookup pg pg_map of
-          Just eqns -> insert pg (eqn:eqns) pg_map
-          Nothing   -> insert pg [eqn]      pg_map
+          Just eqns -> insert pg (NEL.cons eqn eqns) pg_map
+          Nothing   -> insert pg [eqn] pg_map
     -- pg_map :: Map a [EquationInfo]
     -- Equations seen so far in reverse order of appearance
 
-subGroupOrd :: Ord a => [(a, EquationInfo)] -> [[EquationInfo]]
+subGroupOrd :: Ord a => [(a, EquationInfo)] -> [NonEmpty EquationInfo]
 subGroupOrd = subGroup Map.elems Map.empty Map.lookup Map.insert
 
-subGroupUniq :: Uniquable a => [(a, EquationInfo)] -> [[EquationInfo]]
+subGroupUniq :: Uniquable a => [(a, EquationInfo)] -> [NonEmpty EquationInfo]
 subGroupUniq =
   subGroup eltsUDFM emptyUDFM (flip lookupUDFM) (\k v m -> addToUDFM m k v)
 

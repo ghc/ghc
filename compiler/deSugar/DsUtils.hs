@@ -84,6 +84,8 @@ import qualified GHC.LanguageExtensions as LangExt
 import TcEvidence
 
 import Control.Monad    ( zipWithM )
+import Data.List.NonEmpty (NonEmpty(..))
+import qualified Data.List.NonEmpty as NEL
 
 {-
 ************************************************************************
@@ -186,9 +188,9 @@ worthy of a type synonym and a few handy functions.
 firstPat :: EquationInfo -> Pat GhcTc
 firstPat eqn = ASSERT( notNull (eqn_pats eqn) ) head (eqn_pats eqn)
 
-shiftEqns :: [EquationInfo] -> [EquationInfo]
+shiftEqns :: Functor f => f EquationInfo -> f EquationInfo
 -- Drop the first pattern in each equation
-shiftEqns eqns = [ eqn { eqn_pats = tail (eqn_pats eqn) } | eqn <- eqns ]
+shiftEqns = fmap $ \eqn -> eqn { eqn_pats = tail (eqn_pats eqn) }
 
 -- Functions on MatchResults
 
@@ -286,13 +288,13 @@ data CaseAlt a = MkCaseAlt{ alt_pat :: a,
                             alt_result :: MatchResult }
 
 mkCoAlgCaseMatchResult
-  :: Id                 -- Scrutinee
-  -> Type               -- Type of exp
-  -> [CaseAlt DataCon]  -- Alternatives (bndrs *include* tyvars, dicts)
+  :: Id -- ^ Scrutinee
+  -> Type -- ^ Type of exp
+  -> NonEmpty (CaseAlt DataCon) -- ^ Alternatives (bndrs *include* tyvars, dicts)
   -> MatchResult
 mkCoAlgCaseMatchResult var ty match_alts
   | isNewtype  -- Newtype case; use a let
-  = ASSERT( null (tail match_alts) && null (tail arg_ids1) )
+  = ASSERT( null match_alts_tail && null (tail arg_ids1) )
     mkCoLetMatchResult (NonRec arg_id1 newtype_rhs) match_result1
 
   | otherwise
@@ -303,8 +305,8 @@ mkCoAlgCaseMatchResult var ty match_alts
         -- [Interesting: because of GADTs, we can't rely on the type of
         --  the scrutinised Id to be sufficiently refined to have a TyCon in it]
 
-    alt1@MkCaseAlt{ alt_bndrs = arg_ids1, alt_result = match_result1 }
-      = ASSERT( notNull match_alts ) head match_alts
+    alt1@MkCaseAlt{ alt_bndrs = arg_ids1, alt_result = match_result1 } :| match_alts_tail
+      = match_alts
     -- Stuff for newtype
     arg_id1       = ASSERT( notNull arg_ids1 ) head arg_ids1
     var_ty        = idType var
@@ -314,9 +316,6 @@ mkCoAlgCaseMatchResult var ty match_alts
 
 mkCoSynCaseMatchResult :: Id -> Type -> CaseAlt PatSyn -> MatchResult
 mkCoSynCaseMatchResult var ty alt = MatchResult CanFail $ mkPatSynCase var ty alt
-
-sort_alts :: [CaseAlt DataCon] -> [CaseAlt DataCon]
-sort_alts = sortWith (dataConTag . alt_pat)
 
 mkPatSynCase :: Id -> Type -> CaseAlt PatSyn -> CoreExpr -> DsM CoreExpr
 mkPatSynCase var ty alt fail = do
@@ -337,17 +336,16 @@ mkPatSynCase var ty alt fail = do
     ensure_unstrict cont | needs_void_lam = Lam voidArgId cont
                          | otherwise      = cont
 
-mkDataConCase :: Id -> Type -> [CaseAlt DataCon] -> MatchResult
-mkDataConCase _   _  []            = panic "mkDataConCase: no alternatives"
-mkDataConCase var ty alts@(alt1:_) = MatchResult fail_flag mk_case
+mkDataConCase :: Id -> Type -> NonEmpty (CaseAlt DataCon) -> MatchResult
+mkDataConCase var ty alts@(alt1 :| _) = MatchResult fail_flag mk_case
   where
     con1          = alt_pat alt1
     tycon         = dataConTyCon con1
     data_cons     = tyConDataCons tycon
-    match_results = map alt_result alts
+    match_results = fmap alt_result alts
 
-    sorted_alts :: [CaseAlt DataCon]
-    sorted_alts  = sort_alts alts
+    sorted_alts :: NonEmpty (CaseAlt DataCon)
+    sorted_alts  = NEL.sortWith (dataConTag . alt_pat) alts
 
     var_ty       = idType var
     (_, ty_args) = tcSplitTyConApp var_ty -- Don't look through newtypes
@@ -356,7 +354,7 @@ mkDataConCase var ty alts@(alt1:_) = MatchResult fail_flag mk_case
     mk_case :: CoreExpr -> DsM CoreExpr
     mk_case fail = do
         alts <- mapM (mk_alt fail) sorted_alts
-        return $ mkWildCase (Var var) (idType var) ty (mk_default fail ++ alts)
+        return $ mkWildCase (Var var) (idType var) ty (mk_default fail ++ NEL.toList alts)
 
     mk_alt :: CoreExpr -> CaseAlt DataCon -> DsM CoreAlt
     mk_alt fail MkCaseAlt{ alt_pat = con,
@@ -376,11 +374,11 @@ mkDataConCase var ty alts@(alt1:_) = MatchResult fail_flag mk_case
 
     fail_flag :: CanItFail
     fail_flag | exhaustive_case
-              = foldr orFail CantFail [can_it_fail | MatchResult can_it_fail _ <- match_results]
+              = foldr orFail CantFail [can_it_fail | MatchResult can_it_fail _ <- NEL.toList match_results]
               | otherwise
               = CanFail
 
-    mentioned_constructors = mkUniqSet $ map alt_pat alts
+    mentioned_constructors = mkUniqSet $ map alt_pat $ NEL.toList alts
     un_mentioned_constructors
         = mkUniqSet data_cons `minusUniqSet` mentioned_constructors
     exhaustive_case = isEmptyUniqSet un_mentioned_constructors
