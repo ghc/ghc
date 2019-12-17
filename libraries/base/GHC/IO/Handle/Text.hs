@@ -911,12 +911,16 @@ hGetBuf h !ptr count
 
 bufReadNonEmpty :: Handle__ -> Buffer Word8 -> Ptr Word8 -> Int -> Int -> IO Int
 bufReadNonEmpty h_@Handle__{..}
+                -- w for width, r for ... read ptr?
                 buf@Buffer{ bufRaw=raw, bufR=w, bufL=r, bufSize=sz }
                 ptr !so_far !count
  = do
         debugIO ":: bufReadNonEmpty"
+        -- We use < instead of <= because for count == avail
+        -- we need to reset bufL and bufR to zero.
+        -- See also: INVARIANTS on Buffers
         let avail = w - r
-        if (count <= avail)
+        if (count < avail)
            then do
                 copyFromRawBuffer ptr raw r count
                 writeIORef haByteBuffer buf{ bufL = r + count }
@@ -935,24 +939,28 @@ bufReadNonEmpty h_@Handle__{..}
            then return so_far'
            else bufReadEmpty h_ buf' ptr' so_far' remaining
 
-
+-- We want to read more data, but the buffer is empty. (buffL == buffR == 0)
+-- See also Note [INVARIANTS on Buffers] in Buffer.hs
 bufReadEmpty :: Handle__ -> Buffer Word8 -> Ptr Word8 -> Int -> Int -> IO Int
 bufReadEmpty h_@Handle__{..}
              buf@Buffer{ bufRaw=raw, bufR=w, bufL=r, bufSize=sz, bufOffset=bff }
              ptr so_far count
- | count > sz = do count <- loop haDevice 0 bff count
-                   let buf1 = bufferAddOffset (fromIntegral count) buf
-                   -- let buf2 = buf1 { bufR = w + count }
-                   writeIORef haByteBuffer buf1
-                   debugIO ("bufReadEmpty: " ++ summaryBuffer buf1)
-                   return count
+ | count > sz
+ = do
+        count <- loop haDevice 0 bff count
+        let buf1 = bufferAddOffset (fromIntegral count) buf
+        writeIORef haByteBuffer buf1
+        debugIO ("bufReadEmpty: " ++ summaryBuffer buf1)
+        return count
  | otherwise = do
-     (r,buf') <- Buffered.fillReadBuffer haDevice buf
-     if r == 0
-        then return so_far
-        else do writeIORef haByteBuffer buf'
-                bufReadNonEmpty h_ buf' ptr so_far count
+        (r,buf') <- Buffered.fillReadBuffer haDevice buf
+        if r == 0
+            then return so_far
+            else do writeIORef haByteBuffer buf'
+                    bufReadNonEmpty h_ buf' ptr so_far count
  where
+  -- Read @bytes@ byte into ptr. Repeating the read until either zero
+  -- bytes where read, or we are done reading.
   loop :: RawIO.RawIO dev => dev -> Int -> Word64 -> Int -> IO Int
   loop dev delta off bytes | bytes <= 0 = return (so_far + delta)
   loop dev delta off bytes = do
@@ -1070,6 +1078,9 @@ bufReadNBNonEmpty h_@Handle__{..}
                   ptr so_far count
   = do
         let avail = w - r
+        -- We use < instead of <= because for count == avail
+        -- we need to reset bufL and bufR to zero.
+        -- See also [INVARIANTS on Buffers] in Buffer.hs
         if (count < avail)
            then do
                 copyFromRawBuffer ptr raw r count
