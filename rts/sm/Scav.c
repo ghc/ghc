@@ -438,9 +438,9 @@ scavenge_block (bdescr *bd)
 
   p = bd->u.scan;
 
-  // we might be evacuating into the very object that we're
+  // we might be evacuating into the very block that we're currently
   // scavenging, so we have to check the real bdescr_free(bd) pointer each
-  // time around the loop.
+  // time around the loop. To avoid recomputing bdescr_start(bd) every time we it.
   const StgPtr start = (const StgPtr) bdescr_start(bd);
   while (p < start + bd->free_off / sizeof(StgWord) || (bd == ws->todo_bd && p < ws->todo_free)) {
 
@@ -832,17 +832,18 @@ scavenge_block (bdescr *bd)
     }
   }
 
-  if (p > bdescr_free(bd))  {
-      gct->copied += ws->todo_free - bdescr_free(bd);
+  const StgPtr free = start + bd->free_off / sizeof(StgWord);
+  if (p > free)  {
+      gct->copied += ws->todo_free - free;
       bdescr_set_free(bd, p);
   }
 
   debugTrace(DEBUG_gc, "   scavenged %ld bytes",
-             (unsigned long)((bdescr_free(bd) - bd->u.scan) * sizeof(W_)));
+             (unsigned long)((free - bd->u.scan) * sizeof(W_)));
 
   // update stats: this is a block that has been scavenged
-  gct->scanned += bdescr_free(bd) - bd->u.scan;
-  bd->u.scan = bdescr_free(bd);
+  gct->scanned += free - bd->u.scan;
+  bd->u.scan = free;
 
   if (bd != ws->todo_bd) {
       // we're not going to evac any more objects into
