@@ -326,8 +326,7 @@ data IfaceMCoercion
   | IfaceMCo IfaceCoercion
 
 data IfaceCoercion
-  = IfaceZonkCo       IfaceType IfaceType
-  | IfaceReflCo       IfaceType
+  = IfaceReflCo       IfaceType
   | IfaceGReflCo      Role IfaceType (IfaceMCoercion)
   | IfaceFunCo        Role IfaceCoercion IfaceCoercion
   | IfaceTyConAppCo   Role IfaceTyCon [IfaceCoercion]
@@ -347,6 +346,12 @@ data IfaceCoercion
   | IfaceInstCo       IfaceCoercion IfaceCoercion
   | IfaceKindCo       IfaceCoercion
   | IfaceSubCo        IfaceCoercion
+
+  -- These three constructors are needed only when using IfaceCo for
+  -- pretty-printing. They should not appear in "finished" types,
+  -- and are not serialised into interface files. (The Binary
+  -- instance panics if it sees one of these.)
+  | IfaceZonkCo       IfaceType IfaceType
   | IfaceFreeCoVar    CoVar    -- See Note [Free tyvars in IfaceType]
   | IfaceHoleCo       CoVar    -- ^ See Note [Holes in IfaceCoercion]
 
@@ -504,7 +509,7 @@ substIfaceType env ty
     go_mco IfaceMRefl    = IfaceMRefl
     go_mco (IfaceMCo co) = IfaceMCo $ go_co co
 
-    go_co (IfaceZonkCo t1 t2)        = IfaceZonkCo (go t1) (go t1)
+    go_co (IfaceZonkCo t1 t2)        = IfaceZonkCo (go t1) (go t2)
     go_co (IfaceReflCo ty)           = IfaceReflCo (go ty)
     go_co (IfaceGReflCo r ty mco)    = IfaceGReflCo r (go ty) (go_mco mco)
     go_co (IfaceFunCo r c1 c2)       = IfaceFunCo r (go_co c1) (go_co c2)

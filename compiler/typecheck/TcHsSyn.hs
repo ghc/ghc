@@ -1083,8 +1083,9 @@ zonkCoFn env (WpFun c1 c2 t1 d) = do { (env1, c1') <- zonkCoFn env c1
                                      ; t1'         <- zonkTcTypeToTypeX env2 t1
                                      ; return (env2, WpFun c1' c2' t1' d) }
 zonkCoFn env (WpCast co) = do { co' <- zonkCoToCo env co
-                              ; let wrap' -- | isReflexiveCo co' = WpHole
+                              ; let wrap' | isReflexiveCo co' = WpHole
                                           | otherwise         = WpCast co'
+                                    -- See Note [Eliminating casts]
                               ; return (env, wrap') }
 zonkCoFn env (WpEvLam ev)   = do { (env', ev') <- zonkEvBndrX env ev
                                  ; return (env', WpEvLam ev') }
@@ -1098,6 +1099,14 @@ zonkCoFn env (WpTyApp ty)   = do { ty' <- zonkTcTypeToTypeX env ty
 zonkCoFn env (WpLet bs)     = do { (env1, bs') <- zonkTcEvBinds env bs
                                  ; return (env1, WpLet bs') }
 
+{- Note [Eliminating casts]
+~~~~~~~~~~~~~~~~~~~~~~~~~~~
+This is the first time we zonk a coercion in a WpCast, and hence
+it's the first time we can tun those ZonkCos into nothing at all.
+So it seems like a good momennt to elminate it altogether if possible.
+It's just an optimisation, not necessary. It'll disappear pretty
+soon anyway.
+-}
 -------------------------------------------------------------------------
 zonkOverLit :: ZonkEnv -> HsOverLit GhcTcId -> TcM (HsOverLit GhcTc)
 zonkOverLit env lit@(OverLit {ol_ext = OverLitTc r ty, ol_witness = e })

@@ -153,9 +153,8 @@ module Type (
         tyCoVarsOfTypesWellScoped,
 
         -- * Type comparison
-        eqType, eqTypeX, eqTypes, nonDetCmpType, nonDetCmpTypes, nonDetCmpTypeX,
-        nonDetCmpTypesX, nonDetCmpTc,
-        eqVarBndrs,
+        eqType, eqTypeX, eqTypes, eqVarBndrs,
+        nonDetCmpType, nonDetCmpTypes, nonDetCmpTc,
 
         -- * Forcing evaluation of types
         seqType, seqTypes,
@@ -816,9 +815,7 @@ mkAppTys ty1 []   = ty1
 mkAppTys (CastTy fun_ty co) arg_tys
   = -- Much more efficient then nested mkAppTy
     -- But see Note [mkAppTy subtleties]
-    let result = foldl' AppTy ((mkAppTys fun_ty casted_arg_tys) `mkCastTy` res_co) leftovers
-    in pprTrace "mkAppTys" (ppr fun_ty $$ ppr co $$ ppr arg_tys $$ ppr result )
-       result
+    foldl' AppTy ((mkAppTys fun_ty casted_arg_tys) `mkCastTy` res_co) leftovers
   where
     (arg_cos, res_co) = decomposePiCos (typeKind fun_ty) co
                                        (coercionRKind co) arg_tys
@@ -2221,7 +2218,7 @@ eqType t1 t2 = isEqual $ nonDetCmpType t1 t2
 
 -- | Compare types with respect to a (presumably) non-empty 'RnEnv2'.
 eqTypeX :: RnEnv2 -> Type -> Type -> Bool
-eqTypeX env t1 t2 = isEqual $ nonDetCmpTypeX env t1 t2
+eqTypeX env t1 t2 = isEqualType $ nonDetCmpTypeX env t1 t2
   -- It's OK to use nonDetCmpType here and eqTypeX is deterministic,
   -- nonDetCmpTypeX does equality deterministically
 
@@ -2259,12 +2256,12 @@ See Note [Unique Determinism] for more details.
 nonDetCmpType :: Type -> Type -> Ordering
 nonDetCmpType t1 t2
   -- we know k1 and k2 have the same kind, because they both have kind *.
-  = nonDetCmpTypeX rn_env t1 t2
+  = toOrdering $ nonDetCmpTypeX rn_env t1 t2
   where
     rn_env = mkRnEnv2 (mkInScopeSet (tyCoVarsOfTypes [t1, t2]))
 
 nonDetCmpTypes :: [Type] -> [Type] -> Ordering
-nonDetCmpTypes ts1 ts2 = nonDetCmpTypesX rn_env ts1 ts2
+nonDetCmpTypes ts1 ts2 = toOrdering $ nonDetCmpTypesX rn_env ts1 ts2
   where
     rn_env = mkRnEnv2 (mkInScopeSet (tyCoVarsOfTypes (ts1 ++ ts2)))
 
@@ -2278,37 +2275,41 @@ data TypeOrdering = TLT  -- ^ @t1 < t2@
                   | TGT  -- ^ @t1 > t2@
                   deriving (Eq, Ord, Enum, Bounded)
 
-nonDetCmpTypeX :: RnEnv2 -> Type -> Type -> Ordering  -- Main workhorse
+isEqualType :: TypeOrdering -> Bool
+isEqualType TEQ = True
+isEqualType _   = False
+
+thenCmpTy :: TypeOrdering -> TypeOrdering -> TypeOrdering
+thenCmpTy TEQ  rel  = rel
+thenCmpTy TEQX rel  = hasCast rel
+thenCmpTy rel  _    = rel
+
+toOrdering :: TypeOrdering -> Ordering
+toOrdering TLT  = LT
+toOrdering TEQ  = EQ
+toOrdering TEQX = EQ
+toOrdering TGT  = GT
+
+liftOrdering :: Ordering -> TypeOrdering
+liftOrdering LT = TLT
+liftOrdering EQ = TEQ
+liftOrdering GT = TGT
+
+hasCast :: TypeOrdering -> TypeOrdering
+hasCast TEQ = TEQX
+hasCast rel = rel
+
+nonDetCmpTypeX :: RnEnv2 -> Type -> Type -> TypeOrdering  -- Main workhorse
     -- See Note [Non-trivial definitional equality] in TyCoRep
 nonDetCmpTypeX env orig_t1 orig_t2 =
     case go env orig_t1 orig_t2 of
       -- If there are casts then we also need to do a comparison of the kinds of
       -- the types being compared
-      TEQX          -> toOrdering $ go env k1 k2
-      ty_ordering   -> toOrdering ty_ordering
+      TEQX          -> go env k1 k2
+      ty_ordering   -> ty_ordering
   where
     k1 = typeKind orig_t1
     k2 = typeKind orig_t2
-
-    toOrdering :: TypeOrdering -> Ordering
-    toOrdering TLT  = LT
-    toOrdering TEQ  = EQ
-    toOrdering TEQX = EQ
-    toOrdering TGT  = GT
-
-    liftOrdering :: Ordering -> TypeOrdering
-    liftOrdering LT = TLT
-    liftOrdering EQ = TEQ
-    liftOrdering GT = TGT
-
-    thenCmpTy :: TypeOrdering -> TypeOrdering -> TypeOrdering
-    thenCmpTy TEQ  rel  = rel
-    thenCmpTy TEQX rel  = hasCast rel
-    thenCmpTy rel  _    = rel
-
-    hasCast :: TypeOrdering -> TypeOrdering
-    hasCast TEQ = TEQX
-    hasCast rel = rel
 
     -- Returns both the resulting ordering relation between the two types
     -- and whether either contains a cast.
@@ -2330,7 +2331,7 @@ nonDetCmpTypeX env orig_t1 orig_t2 =
       | Just (s1, t1) <- repSplitAppTy_maybe ty1
       = go env s1 s2 `thenCmpTy` go env t1 t2
     go env (FunTy _ s1 t1) (FunTy _ s2 t2)
-      = go env s1 s2 `thenCmpTy` go env t1 t2
+      = nonDetCmpTypeX env s1 s2 `thenCmpTy` nonDetCmpTypeX env t1 t2
     go env (TyConApp tc1 tys1) (TyConApp tc2 tys2)
       = liftOrdering (tc1 `nonDetCmpTc` tc2) `thenCmpTy` gos env tys1 tys2
     go _   (LitTy l1)          (LitTy l2)          = liftOrdering (compare l1 l2)
@@ -2360,13 +2361,13 @@ nonDetCmpTypeX env orig_t1 orig_t2 =
     gos env (ty1:tys1) (ty2:tys2) = go env ty1 ty2 `thenCmpTy` gos env tys1 tys2
 
 -------------
-nonDetCmpTypesX :: RnEnv2 -> [Type] -> [Type] -> Ordering
-nonDetCmpTypesX _   []        []        = EQ
+nonDetCmpTypesX :: RnEnv2 -> [Type] -> [Type] -> TypeOrdering
+nonDetCmpTypesX _   []        []        = TEQ
 nonDetCmpTypesX env (t1:tys1) (t2:tys2) = nonDetCmpTypeX env t1 t2
-                                          `thenCmp`
+                                          `thenCmpTy`
                                           nonDetCmpTypesX env tys1 tys2
-nonDetCmpTypesX _   []        _         = LT
-nonDetCmpTypesX _   _         []        = GT
+nonDetCmpTypesX _   []        _         = TLT
+nonDetCmpTypesX _   _         []        = TGT
 
 -------------
 -- | Compare two 'TyCon's. NB: This should /never/ see 'Constraint' (as

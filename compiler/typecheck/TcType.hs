@@ -1452,18 +1452,12 @@ tcEqType :: HasDebugCallStack => TcType -> TcType -> Bool
 -- tcEqType is a proper implements the same Note [Non-trivial definitional
 -- equality] (in TyCoRep) as `eqType`, but Type.eqType believes (* ==
 -- Constraint), and that is NOT what we want in the type checker!
-tcEqType ty1 ty2
-  =  tc_eq_type False False ki1 ki2
-  && tc_eq_type False False ty1 ty2
-  where
-    ki1 = tcTypeKind ty1
-    ki2 = tcTypeKind ty2
+tcEqType ty1 ty2 = tc_eq_type False False ty1 ty2
 
 -- | Just like 'tcEqType', but will return True for types of different kinds
 -- as long as their non-coercion structure is identical.
 tcEqTypeNoKindCheck :: TcType -> TcType -> Bool
-tcEqTypeNoKindCheck ty1 ty2
-  = tc_eq_type False False ty1 ty2
+tcEqTypeNoKindCheck ty1 ty2 = tc_eq_type_nc False False ty1 ty2
 
 -- | Like 'tcEqType', but returns True if the /visible/ part of the types
 -- are equal, even if they are really unequal (in the invisible bits)
@@ -1477,15 +1471,25 @@ pickyEqType :: TcType -> TcType -> Bool
 -- This ignores kinds and coercions, because this is used only for printing.
 pickyEqType ty1 ty2 = tc_eq_type True False ty1 ty2
 
-
-
--- | Real worker for 'tcEqType'. No kind check!
+-- | Does a kind check
 tc_eq_type :: Bool          -- ^ True <=> do not expand type synonyms
            -> Bool          -- ^ True <=> compare visible args only
            -> Type -> Type
            -> Bool
+tc_eq_type keep_syns vis ty1 ty2
+  =  tc_eq_type_nc keep_syns vis ki1 ki2
+  && tc_eq_type_nc keep_syns vis ty1 ty2
+  where
+    ki1 = tcTypeKind ty1
+    ki2 = tcTypeKind ty2
+
+-- | Real worker for 'tcEqType'. No kind check!
+tc_eq_type_nc :: Bool          -- ^ True <=> do not expand type synonyms
+              -> Bool          -- ^ True <=> compare visible args only
+              -> Type -> Type
+              -> Bool
 -- Flags False, False is the usual setting for tc_eq_type
-tc_eq_type keep_syns vis_only orig_ty1 orig_ty2
+tc_eq_type_nc keep_syns vis_only orig_ty1 orig_ty2
   = go orig_env orig_ty1 orig_ty2
   where
     go :: RnEnv2 -> Type -> Type -> Bool
@@ -1508,7 +1512,11 @@ tc_eq_type keep_syns vis_only orig_ty1 orig_ty2
     -- AppTy case means that tcRepSplitAppTy_maybe may see an unzonked
     -- kind variable, which causes things to blow up.
     go env (FunTy _ arg1 res1) (FunTy _ arg2 res2)
+      | vis_only
       = go env arg1 arg2 && go env res1 res2
+      | otherwise
+      = tc_eq_type keep_syns vis_only arg1 arg2 &&
+        tc_eq_type keep_syns vis_only res1 res2
     go env ty (FunTy _ arg res) = eqFunTy env arg res ty
     go env (FunTy _ arg res) ty = eqFunTy env arg res ty
 

@@ -1655,8 +1655,6 @@ solveByUnification wd tv xi
 
        ; unifyTyVar tv xi
        ; setEvBindIfWanted wd (evCoercion (mkTcZonkCo tv_ty xi)) }
-         -- This is one of the two bitrhplaces of ZonkCo;
-         -- the other is in TcUnify
 
 {- Note [Avoid double unifications]
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
