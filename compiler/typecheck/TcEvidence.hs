@@ -48,7 +48,7 @@ module TcEvidence (
   unwrapIP, wrapIP,
 
   -- * QuoteWrapper
-  QuoteWrapper(..), applyQuoteWrapper
+  QuoteWrapper(..), applyQuoteWrapper, quoteWrapperTyVarTy
   ) where
 #include "HsVersions.h"
 
@@ -1010,15 +1010,18 @@ wrapIP ty = mkSymCo (unwrapIP ty)
 -- A datatype used to pass information when desugaring quotations
 ----------------------------------------------------------------------
 
--- We have to pass a `EvVar` and `TyVar` into `dsBracket` so that the
+-- We have to pass a `EvVar` and `Type` into `dsBracket` so that the
 -- correct evidence and types are applied to all the TH combinators. We
 -- need to use a different data type because `Type` and `EvVar` can't be
 -- referenced directly in `HsExpr` due to import cycles.
 --
--- The TyVar is a metavariable for `m`
 -- The EvVar is evidence for `Quote m`
+-- The Type is a metavariable for `m`
 --
 data QuoteWrapper = QuoteWrapper EvVar Type deriving Data.Data
+
+quoteWrapperTyVarTy :: QuoteWrapper -> Type
+quoteWrapperTyVarTy (QuoteWrapper _ t) = t
 
 -- | Convert the QuoteWrapper into a normal HsWrapper which can be used to
 -- apply its contents.

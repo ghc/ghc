@@ -680,12 +680,6 @@ instance Quasi Q where
 -- The following operations are used solely in DsMeta when desugaring brackets
 -- They are not necessary for the user, who can use ordinary return and (>>=) etc
 
-returnQ :: a -> Q a
-returnQ = return
-
-bindQ :: Q a -> (a -> Q b) -> Q b
-bindQ = (>>=)
-
 sequenceQ :: forall m . Monad m => forall a . [m a] -> m [a]
 sequenceQ = sequence
 
