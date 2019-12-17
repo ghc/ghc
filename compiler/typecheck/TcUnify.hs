@@ -1721,38 +1721,50 @@ uUnfilledVar2 :: CtOrigin
 uUnfilledVar2 origin t_or_k swapped tv1 ty2
   = do { dflags  <- getDynFlags
        ; cur_lvl <- getTcLevel
-       ; go dflags cur_lvl }
-  where
-    go dflags cur_lvl
-      | canSolveByUnification cur_lvl tv1 ty2
-      , Just ty2' <- metaTyVarUpdateOK dflags tv1 ty2
-      = do { co_k <- uType KindLevel kind_origin (tcTypeKind ty2') (tyVarKind tv1)
-           ; traceTc "uUnfilledVar2 ok" $
-             vcat [ ppr tv1 <+> dcolon <+> ppr (tyVarKind tv1)
+       ; mb_ty2' <- can_solve dflags cur_lvl
+       ; traceTc "uUnfilledVar2 ok" $
+             vcat [ ppr tv1 <+> dcolon <+> ppr k1
                   , ppr ty2 <+> dcolon <+> ppr (tcTypeKind  ty2)
-                  , ppr (isTcReflCo co_k), ppr co_k ]
+                  , text "mb_ty2'" <+> ppr mb_ty2' ]
 
-           ; if isTcReflCo co_k
-               -- Only proceed if the kinds match
-               -- NB: tv1 should still be unfilled, despite the kind unification
-               --     because tv1 is not free in ty2 (or, hence, in its kind)
-             then do { writeMetaTyVar tv1 ty2'
-                     ; return (unSwap swapped mkTcZonkCo ty1 ty2') }
-
-             else defer } -- This cannot be solved now.  See TcCanonical
-                          -- Note [Equalities with incompatible kinds]
-
-      | otherwise
-      = do { traceTc "uUnfilledVar2 not ok" (ppr tv1 $$ ppr ty2)
-               -- Occurs check or an untouchable: just defer
+       ; case mb_ty2' of
+           Nothing   -> unSwap swapped (uType_defer t_or_k origin) ty1 ty2
+               -- Occurs check, untouchable, or kind mis-match: just defer
                -- NB: occurs check isn't necessarily fatal:
                --     eg tv1 occurred in type family parameter
-            ; defer }
 
+           Just ty2' -> do { writeMetaTyVar tv1 ty2'
+                           ; return (unSwap swapped mkTcZonkCo ty1 ty2') } }
+               -- NB: In the Just case, tv1 should still be unfilled, despite
+               --     the kind unification in can_solve2, because tv1 is
+               --     not free in ty2 (or, hence, in its kind)
+  where
     ty1 = mkTyVarTy tv1
+    k1  = tyVarKind tv1
     kind_origin = KindEqOrigin ty1 (Just ty2) origin (Just t_or_k)
 
-    defer = unSwap swapped (uType_defer t_or_k origin) ty1 ty2
+    can_solve dflags cur_lvl
+      | canSolveByUnification cur_lvl tv1 ty2
+      , Just ty2' <- metaTyVarUpdateOK dflags tv1 ty2
+      = can_solve2 ty2'
+      | otherwise
+      = return Nothing
+
+    can_solve2 ty2
+      | k1 `tcEqType` k2
+      = return (Just ty2)
+      | otherwise
+      = do { (co_k, lie) <- captureConstraints $
+                            uType KindLevel kind_origin k2 k1
+           ; if isEmptyWC lie
+             then return (Just (ty2 `mkCastTy` co_k))
+             else return Nothing }
+             -- Only proceed if the kind coercion is definitely soluble;
+             -- i.e. has no dependent constraints
+             -- See TcCanonical Note [Equalities with incompatible kinds]
+      where
+        k2 = tcTypeKind ty2
+
 
 swapOverTyVars :: TcTyVar -> TcTyVar -> Bool
 swapOverTyVars tv1 tv2
