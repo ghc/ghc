@@ -1,3 +1,3 @@
-{-# OPTIONS_GHC -Wwarn-missing-signatues -Werror=incomplete-patterns #-}
+{-# OPTIONS_GHC -Wwarn-missing-signatures -Werror=incomplete-patterns #-}
 
 foo () = ()

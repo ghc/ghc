@@ -1,6 +1,6 @@
 -- Both blocks are illegal Haskell 98, because of the un-saturated
 -- type synonym, but (rather obscurely) at one point (GHC 6.3), we
--- acceped 'blah', but rejected 'blah1'
+-- accepted 'blah', but rejected 'blah1'
 
 module ShouldFail where
 

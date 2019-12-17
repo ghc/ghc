@@ -135,7 +135,7 @@ data MachOp
   | MO_VU_Quot Length Width
   | MO_VU_Rem  Length Width
 
-  -- Floting point vector element insertion and extraction operations
+  -- Floating point vector element insertion and extraction operations
   | MO_VF_Insert  Length Width   -- Insert scalar into vector
   | MO_VF_Extract Length Width   -- Extract scalar from vector
 

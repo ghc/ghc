@@ -1042,7 +1042,7 @@ reportConflictInstErr fam_inst (match1 : _)
                , let ax = famInstAxiom fi ])
  where
    getSpan = getSrcLoc . famInstAxiom
-   -- The sortWith just arranges that instances are dislayed in order
+   -- The sortWith just arranges that instances are displayed in order
    -- of source location, which reduced wobbling in error messages,
    -- and is better for users
 

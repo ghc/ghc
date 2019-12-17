@@ -295,7 +295,7 @@
     in constant space when applied to lists. (#10830)
 
   * `mkFunTy`, `mkAppTy`, and `mkTyConApp` from `Data.Typeable` no longer exist.
-    This functionality is superceded by the interfaces provided by
+    This functionality is superseded by the interfaces provided by
     `Type.Reflection`.
 
   * `mkTyCon3` is no longer exported by `Data.Typeable`. This function is

@@ -3,7 +3,7 @@
  * (c) The GHC Team 1995-2002
  *
  * Support for concurrent non-blocking I/O and thread waiting in the
- * non-threaded RTS.  In the threded RTS, this file is not used at
+ * non-threaded RTS.  In the threaded RTS, this file is not used at
  * all, instead we use the IO manager thread implemented in Haskell in
  * the base package.
  *
