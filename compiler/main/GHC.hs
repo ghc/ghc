@@ -44,7 +44,7 @@ module GHC (
         guessTarget,
 
         -- * Loading\/compiling the program
-        depanal,
+        depanal, depanalE,
         load, LoadHowMuch(..), InteractiveImport(..),
         SuccessFlag(..), succeeded, failed,
         defaultWarnErrLogger, WarnErrLogger,
