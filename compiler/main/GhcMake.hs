@@ -10,7 +10,7 @@
 --
 -- -----------------------------------------------------------------------------
 module GhcMake(
-        depanal, depanalPartial,
+        depanal, depanalE, depanalPartial,
         load, load', LoadHowMuch(..),
 
         downsweep,
@@ -55,7 +55,7 @@ import Exception        ( tryIO, gbracket, gfinally )
 import FastString
 import Maybes           ( expectJust )
 import Name
-import MonadUtils       ( allM, MonadIO )
+import MonadUtils       ( allM )
 import Outputable
 import Panic
 import SrcLoc
@@ -116,20 +116,37 @@ label_self thread_name = do
 -- @OPTIONS@ and @LANGUAGE@ pragmas of the parsed module.  Thus if you want
 -- changes to the 'DynFlags' to take effect you need to call this function
 -- again.
+-- In case of errors, just throw them.
 --
 depanal :: GhcMonad m =>
            [ModuleName]  -- ^ excluded modules
         -> Bool          -- ^ allow duplicate roots
         -> m ModuleGraph
 depanal excluded_mods allow_dup_roots = do
+    (errs, mod_graph) <- depanalE excluded_mods allow_dup_roots
+    if isEmptyBag errs
+      then pure mod_graph
+      else throwErrors errs
+
+-- | Perform dependency analysis like in 'depanal'.
+-- In case of errors, the errors and an empty module graph are returned.
+depanalE :: GhcMonad m =>     -- New for #17459
+            [ModuleName]      -- ^ excluded modules
+            -> Bool           -- ^ allow duplicate roots
+            -> m (ErrorMessages, ModuleGraph)
+depanalE excluded_mods allow_dup_roots = do
     hsc_env <- getSession
     (errs, mod_graph) <- depanalPartial excluded_mods allow_dup_roots
     if isEmptyBag errs
       then do
         warnMissingHomeModules hsc_env mod_graph
         setSession hsc_env { hsc_mod_graph = mod_graph }
-        return mod_graph
-      else throwErrors errs
+        pure (errs, mod_graph)
+      else do
+        -- We don't have a complete module dependency graph,
+        -- The graph may be disconnected and is unusable.
+        setSession hsc_env { hsc_mod_graph = emptyMG }
+        pure (errs, emptyMG)
 
 
 -- | Perform dependency analysis like 'depanal' but return a partial module
@@ -260,16 +277,19 @@ data LoadHowMuch
 -- Calls the 'defaultWarnErrLogger' after each compiling each module, whether
 -- successful or not.
 --
--- Throw a 'SourceError' if errors are encountered before the actual
--- compilation starts (e.g., during dependency analysis).  All other errors
--- are reported using the 'defaultWarnErrLogger'.
+-- If errors are encountered during dependency analysis, the module `depanalE`
+-- returns together with the errors an empty ModuleGraph.
+-- After processing this empty ModuleGraph, the errors of depanalE are thrown.
+-- All other errors are reported using the 'defaultWarnErrLogger'.
 --
 load :: GhcMonad m => LoadHowMuch -> m SuccessFlag
 load how_much = do
-    mod_graph <- depanal [] False
+    (errs, mod_graph) <- depanalE [] False                        -- #17459
     success <- load' how_much (Just batchMsg) mod_graph
     warnUnusedPackages
-    pure success
+    if isEmptyBag errs
+      then pure success
+      else throwErrors errs
 
 -- Note [Unused packages]
 --
@@ -2030,12 +2050,6 @@ warnUnnecessarySourceImports sccs = do
                  <+> quotes (ppr mod))
 
 
-reportImportErrors :: MonadIO m => [Either ErrorMessages b] -> m [b]
-reportImportErrors xs | null errs = return oks
-                      | otherwise = throwErrors $ unionManyBags errs
-  where (errs, oks) = partitionEithers xs
-
-
 -----------------------------------------------------------------------------
 --
 -- | Downsweep (dependency analysis)
@@ -2065,8 +2079,8 @@ downsweep :: HscEnv
 downsweep hsc_env old_summaries excl_mods allow_dup_roots
    = do
        rootSummaries <- mapM getRootSummary roots
-       rootSummariesOk <- reportImportErrors rootSummaries
-       let root_map = mkRootMap rootSummariesOk
+       let (errs, rootSummariesOk) = partitionEithers rootSummaries -- #17549
+           root_map = mkRootMap rootSummariesOk
        checkDuplicates root_map
        map0 <- loop (concatMap calcDeps rootSummariesOk) root_map
        -- if we have been passed -fno-code, we enable code generation
@@ -2082,7 +2096,9 @@ downsweep hsc_env old_summaries excl_mods allow_dup_roots
              (defaultObjectTarget dflags)
              map0
            else return map0
-       return $ concat $ nodeMapElts map1
+       if null errs
+         then pure $ concat $ nodeMapElts map1
+         else pure $ map Left errs
      where
         calcDeps = msDeps
 
