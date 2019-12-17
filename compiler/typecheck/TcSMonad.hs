@@ -1597,7 +1597,7 @@ So in kickOutRewritable we look at all the tyvars of the
 CFunEqCan, including the fsk.
 -}
 
-addInertCan :: Ct -> TcS ()  -- Constraints *other than* equalities
+addInertCan :: Ct -> TcS ()
 -- Precondition: item /is/ canonical
 -- See Note [Adding an equality to the InertCans]
 addInertCan ct

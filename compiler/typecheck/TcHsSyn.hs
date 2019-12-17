@@ -1594,7 +1594,12 @@ zonkCoreExpr env (Type ty)
     = Type <$> zonkTcTypeToTypeX env ty
 
 zonkCoreExpr env (Cast e co)
-    = Cast <$> zonkCoreExpr env e <*> zonkCoToCo env co
+    = do { e'  <- zonkCoreExpr env e
+         ; co' <- zonkCoToCo env co
+         ; if isReflexiveCo co'
+           then return e'  -- See Note [Eliminating casts]
+           else return (Cast e' co') }
+
 zonkCoreExpr env (Tick t e)
     = Tick t <$> zonkCoreExpr env e -- Do we need to zonk in ticks?
 

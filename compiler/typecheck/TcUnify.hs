@@ -1760,8 +1760,13 @@ uUnfilledVar2 origin t_or_k swapped tv1 ty2
              then return (Just (ty2 `mkCastTy` co_k))
              else return Nothing }
              -- Only proceed if the kind coercion is definitely soluble;
-             -- i.e. has no dependent constraints
-             -- See TcCanonical Note [Equalities with incompatible kinds]
+             -- i.e. has no dependent constraints.  Note that this specifically
+             -- includes co_k being (or containing) ZonkCos, which will happen
+             -- if we had to do some unification, or followed through some
+             -- earlier unification
+             --
+             -- See TcCanonical Note [Equalities with incompatible kinds] for
+             -- why we want to defer if we can't instantly solve
       where
         k2 = tcTypeKind ty2
 

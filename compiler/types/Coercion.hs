@@ -63,7 +63,7 @@ module Coercion (
 
         pickLR,
 
-        isGReflCo, isReflCo, isReflCo_maybe, isGReflCo_maybe, isReflexiveCo, isReflexiveCo_maybe,
+        isGReflCo, isReflCo, isReflCo_maybe, isGReflCo_maybe, isReflexiveCo,
         isReflCoVar_maybe, isGReflMCo, coToMCo,
 
         -- ** Coercion variables
@@ -570,7 +570,7 @@ isGReflCo_maybe _ = Nothing
 
 -- | Returns the type coerced if this coercion is reflexive. Guaranteed
 -- to work very quickly. Sometimes a coercion can be reflexive, but not
--- obviously so. c.f. 'isReflexiveCo_maybe'
+-- obviously so. c.f. 'isReflexiveCo'
 isReflCo_maybe :: Coercion -> Maybe (Type, Role)
 isReflCo_maybe (Refl ty) = Just (ty, Nominal)
 isReflCo_maybe (GRefl r ty mco) | isGReflMCo mco = Just (ty, r)
@@ -579,19 +579,12 @@ isReflCo_maybe _ = Nothing
 -- | Slowly checks if the coercion is reflexive. Don't call this in a loop,
 -- as it walks over the entire coercion.
 isReflexiveCo :: Coercion -> Bool
-isReflexiveCo = isJust . isReflexiveCo_maybe
-
--- | Extracts the coerced type from a reflexive coercion. This potentially
--- walks over the entire coercion, so avoid doing this in a loop.
-isReflexiveCo_maybe :: Coercion -> Maybe (Type, Role)
-isReflexiveCo_maybe (Refl ty) = Just (ty, Nominal)
-isReflexiveCo_maybe (GRefl r ty mco) | isGReflMCo mco = Just (ty, r)
-isReflexiveCo_maybe co
-  | ty1 `eqType` ty2
-  = Just (ty1, r)
-  | otherwise
-  = Nothing
-  where (Pair ty1 ty2, r) = coercionKindRole co
+isReflexiveCo (Refl {})            = True
+isReflexiveCo (SubCo co)           = isReflexiveCo co
+isReflexiveCo (SymCo co)           = isReflexiveCo co
+isReflexiveCo (GRefl _ _ MRefl)    = True
+isReflexiveCo (GRefl _ _ (MCo co)) = isReflexiveCo co
+isReflexiveCo co = coercionLKind co `eqType` coercionRKind co
 
 coToMCo :: Coercion -> MCoercion
 coToMCo c = if isReflCo c

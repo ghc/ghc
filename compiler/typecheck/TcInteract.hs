@@ -692,7 +692,7 @@ interactIrred inerts workItem@(CIrredCan { cc_ev = ev_w, cc_insol = insoluble })
                -- which can happen with solveOneFromTheOther, so that
                -- we get distinct error messages with -fdefer-type-errors
                -- See Note [Do not add duplicate derived insolubles]
-  , not (isDroppableCt workItem)
+  , not (isDerivedCt workItem)
   = continueWith workItem
 
   | let (matching_irreds, others) = findMatchingIrreds (inert_irreds inerts) ev_w
@@ -790,25 +790,26 @@ Example of (b): assume a top-level class and instance declaration:
 
 Assume we have started with an implication:
 
-  forall c. Eq c => { wc_simple = D [c] c [W] }
+  forall c. Eq c => { wc_simple = [W] D [c] c }
 
 which we have simplified to:
 
-  forall c. Eq c => { wc_simple = D [c] c [W]
-                                  (c ~ [c]) [D] }
+  forall c. Eq c => { wc_simple = [W] D [c] c
+                                  [D] (c ~ [c]) }
 
 For some reason, e.g. because we floated an equality somewhere else,
 we might try to re-solve this implication. If we do not do a
 dropDerivedWC, then we will end up trying to solve the following
 constraints the second time:
 
-  (D [c] c) [W]
-  (c ~ [c]) [D]
+  [W] (D [c] c)
+  [D] (c ~ [c])
 
 which will result in two Deriveds to end up in the insoluble set:
 
-  wc_simple   = D [c] c [W]
-               (c ~ [c]) [D], (c ~ [c]) [D]
+  wc_simple   = [W] D [c] c
+                [D] (c ~ [c])
+                [D] (c ~ [c])
 -}
 
 {-
