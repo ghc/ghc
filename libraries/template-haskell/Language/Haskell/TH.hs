@@ -84,7 +84,7 @@ module Language.Haskell.TH(
         Pat(..), FieldExp, FieldPat,
     -- ** Types
         Type(..), TyVarBndr(..), TyLit(..), Kind, Cxt, Pred, Syntax.Role(..),
-        FamilyResultSig(..), Syntax.InjectivityAnn(..), PatSynType,
+        FamilyResultSig(..), Syntax.InjectivityAnn(..), PatSynType, BangType, VarBangType,
 
     -- * Library functions
     module Language.Haskell.TH.Lib,

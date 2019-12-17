@@ -18,4 +18,3 @@ qq :: Q Exp
 qq = [| 5 |]
 
 quote = [| $(idQ) $(qq) |]
-
