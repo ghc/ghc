@@ -124,6 +124,8 @@ import Text.Printf
 import Numeric (showFFloat)
 import Data.Graph (SCC(..))
 import Data.List (intersperse)
+import Data.List.NonEmpty (NonEmpty (..))
+import qualified Data.List.NonEmpty as NEL
 
 import GHC.Fingerprint
 import GHC.Show         ( showMultiLineString )
@@ -818,6 +820,9 @@ instance Outputable () where
 
 instance (Outputable a) => Outputable [a] where
     ppr xs = brackets (fsep (punctuate comma (map ppr xs)))
+
+instance (Outputable a) => Outputable (NonEmpty a) where
+    ppr = ppr . NEL.toList
 
 instance (Outputable a) => Outputable (Set a) where
     ppr s = braces (fsep (punctuate comma (map ppr (Set.toList s))))
