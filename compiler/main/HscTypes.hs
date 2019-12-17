@@ -2325,6 +2325,7 @@ class Monad m => MonadThings m where
         lookupTyCon :: Name -> m TyCon
         lookupTyCon = liftM tyThingTyCon . lookupThing
 
+-- Instance used in DsMeta
 instance MonadThings m => MonadThings (ReaderT s m) where
   lookupThing = lift . lookupThing
 
