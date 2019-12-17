@@ -9,7 +9,7 @@ Highlights
 ----------
 
 - A bug (:ghc-ticket:`17088`) in the compacting garbage collector resulting in
-  segmentations faults under specific circumstances. Note that this may affect
+  segmentation faults under specific circumstances. Note that this may affect
   user programs even if they did not explicitly request the compacting GC
   (using the :rts-flag:`-c` RTS flag) since GHC may fallback to compacting
   collection during times of high memory pressure.
