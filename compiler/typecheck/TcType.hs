@@ -1517,8 +1517,6 @@ tc_eq_type_nc keep_syns vis_only orig_ty1 orig_ty2
       | otherwise
       = tc_eq_type keep_syns vis_only arg1 arg2 &&
         tc_eq_type keep_syns vis_only res1 res2
-    go env ty (FunTy _ arg res) = eqFunTy env arg res ty
-    go env (FunTy _ arg res) ty = eqFunTy env arg res ty
 
       -- See Note [Equality on AppTys] in Type
     go env (AppTy s1 t1)        ty2
@@ -1552,26 +1550,6 @@ tc_eq_type_nc keep_syns vis_only orig_ty1 orig_ty2
         inviss  = map isInvisibleTyConBinder bndrs
 
     orig_env = mkRnEnv2 $ mkInScopeSet $ tyCoVarsOfTypes [orig_ty1, orig_ty2]
-
-    -- @eqFunTy arg res ty@ is True when @ty@ equals @FunTy arg res@. This is
-    -- sometimes hard to know directly because @ty@ might have some casts
-    -- obscuring the FunTy. And 'splitAppTy' is difficult because we can't
-    -- always extract a RuntimeRep (see Note [xyz]) if the kind of the arg or
-    -- res is unzonked/unflattened. Thus this function, which handles this
-    -- corner case.
-    eqFunTy :: RnEnv2 -> Type -> Type -> Type -> Bool
-               -- Last arg is /not/ FunTy
-    eqFunTy env arg res ty@(AppTy{}) = get_args ty []
-      where
-        get_args :: Type -> [Type] -> Bool
-        get_args (AppTy f x)       args = get_args f (x:args)
-        get_args (CastTy t _)      args = get_args t args
-        get_args (TyConApp tc tys) args
-          | tc == funTyCon
-          , [_, _, arg', res'] <- tys ++ args
-          = go env arg arg' && go env res res'
-        get_args _ _    = False
-    eqFunTy _ _ _ _     = False
 
 {- *********************************************************************
 *                                                                      *
