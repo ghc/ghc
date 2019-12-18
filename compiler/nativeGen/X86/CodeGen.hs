@@ -1771,7 +1771,11 @@ genJump :: CmmExpr{-the branch target-} -> [Reg] -> NatM InstrBlock
 
 genJump (CmmLoad mem _) regs = do
   Amode target code <- getAmode mem
-  return (code `snocOL` JMP (OpAddr target) regs)
+  -- We follow all indirect jumps with a UD2 instruction to ensure that the
+  -- instruction decoder doesn't attempt to decode the fallthrough path, which
+  -- can result in resource conflicts. See Intel Software Optimisation Manual
+  -- Section 3.4.1.6 (Branch Type Selection), Rule 14.
+  return (code `snocOL` JMP (OpAddr target) regs `snocOL` UD2)
 
 genJump (CmmLit lit) regs = do
   return (unitOL (JMP (OpImm (litToImm lit)) regs))

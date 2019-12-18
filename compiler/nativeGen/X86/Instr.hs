@@ -329,6 +329,8 @@ data Instr
         | CMPXCHG     Format Operand Operand -- src (r), dst (r/m), eax implicit
         | MFENCE
 
+        | UD2
+
 data PrefetchVariant = NTA | Lvl0 | Lvl1 | Lvl2
 
 
@@ -430,6 +432,7 @@ x86_regUsageOfInstr platform instr
     XADD _ src dst      -> usageMM src dst
     CMPXCHG _ src dst   -> usageRMM src dst (OpReg eax)
     MFENCE -> noUsage
+    UD2 -> noUsage
 
     _other              -> panic "regUsage: unrecognised instr"
  where
