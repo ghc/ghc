@@ -69,7 +69,7 @@ main = do putStrLn "=== Subtraction ==="
           print (neginf + nan)
           print (neginf + inf)
           print (neginf + neginf)
-          putStrLn "=== Mutiplication ==="
+          putStrLn "=== Multiplication ==="
           print (zero * zero)
           print (zero * one)
           print (zero * nan)
