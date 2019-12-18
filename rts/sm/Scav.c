@@ -441,8 +441,9 @@ scavenge_block (bdescr *bd)
   // we might be evacuating into the very object that we're
   // scavenging, so we have to check the real bdescr_free(bd) pointer each
   // time around the loop.
-  const StgPtr start = (const StgPtr) bdescr_start(bd);
-  while (p < start + bd->free_off / sizeof(StgWord) || (bd == ws->todo_bd && p < ws->todo_free)) {
+loop: ;
+  const StgPtr end = (const StgPtr) bdescr_free(bd);
+  while (p < end || (bd == ws->todo_bd && p < ws->todo_free)) {
 
     ASSERT(bd->link == NULL);
     ASSERT(LOOKS_LIKE_CLOSURE_PTR(p));
@@ -832,9 +833,12 @@ scavenge_block (bdescr *bd)
     }
   }
 
-  if (p > bdescr_free(bd))  {
-      gct->copied += ws->todo_free - bdescr_free(bd);
-      bdescr_set_free(bd, p);
+  StgPtr free = bdescr_free(bd);
+  if (p < free) goto loop;
+  if (p > free)  {
+      gct->copied += ws->todo_free - free;
+      bd->free_off = (uint8_t *) p - (uint8_t *) bdescr_start(bd);
+      free = p;
   }
 
   debugTrace(DEBUG_gc, "   scavenged %ld bytes",
