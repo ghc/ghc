@@ -13,6 +13,7 @@ callMemcpy:
 	movl 12(%r14),%eax
 	movl %eax,12(%rbx)
 	jmp *(%rbp)
+	ud2
 	.size callMemcpy, .-callMemcpy
 .section .note.GNU-stack,"",@progbits
 .ident "GHC 7.7.20121009"

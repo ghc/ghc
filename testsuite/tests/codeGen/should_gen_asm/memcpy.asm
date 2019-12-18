@@ -7,3 +7,4 @@ callMemcpy:
         call memcpy
         addq
         jmp
+        ud2

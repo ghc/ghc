@@ -9,6 +9,7 @@ callMemset:
 	movl $16843009,8(%rbx)
 	movl $16843009,12(%rbx)
 	jmp *(%rbp)
+	ud2
 	.size callMemset, .-callMemset
 .section .note.GNU-stack,"",@progbits
 .ident "GHC 7.9.20140311"
