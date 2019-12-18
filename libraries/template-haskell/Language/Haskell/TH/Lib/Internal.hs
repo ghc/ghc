@@ -1,4 +1,3 @@
-{-# LANGUAGE ApplicativeDo #-}
 -- |
 -- Language.Haskell.TH.Lib.Internal exposes some additional functionality that
 -- is used internally in GHC's integration with Template Haskell. This is not a
@@ -17,8 +16,6 @@ module Language.Haskell.TH.Lib.Internal where
 
 import Language.Haskell.TH.Syntax hiding (Role, InjectivityAnn)
 import qualified Language.Haskell.TH.Syntax as TH
--- Was imported for numTyLit
---import qualified Control.Monad.Fail as F
 import Control.Applicative(liftA, liftA2)
 import Data.Word( Word8 )
 import Prelude

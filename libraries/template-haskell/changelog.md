@@ -2,7 +2,7 @@
 
 ## 2.17.0.0
 
-  * Implement Overloaded Quotations (GHC Proposal #XX). This patch modifies a
+  * Implement Overloaded Quotations (GHC Proposal #246). This patch modifies a
      few fundamental things in the API. All the library combinators are generalised
      to be in terms of a new minimal class `Quote`. The type of `lift` and `liftTyped`
      are modified to return `m Exp` rather than `Q Exp`. Instances written in terms
