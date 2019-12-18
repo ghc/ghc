@@ -371,7 +371,7 @@ alloc_todo_block (gen_workspace *ws, uint32_t size)
     ws->todo_bd = bd;
     ws->todo_free = bdescr_free(bd);
     ws->todo_lim  = stg_min(bdescr_start(bd) + bd->blocks * BLOCK_SIZE_W,
-                            bdescr_free(bd) + stg_max(WORK_UNIT_WORDS,size));
+                            ws->todo_free + stg_max(WORK_UNIT_WORDS,size));
                      // See Note [big objects]
 
     debugTrace(DEBUG_gc, "alloc new todo block %p for gen  %d",

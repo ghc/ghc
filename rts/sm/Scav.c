@@ -880,11 +880,11 @@ scavenge_block (bdescr *bd)
   }
 
   debugTrace(DEBUG_gc, "   scavenged %ld bytes",
-             (unsigned long)((bdescr_free(bd) - bd->u.scan) * sizeof(W_)));
+             (unsigned long)((free - bd->u.scan) * sizeof(W_)));
 
   // update stats: this is a block that has been scavenged
-  gct->scanned += bdescr_free(bd) - bd->u.scan;
-  bd->u.scan = bdescr_free(bd);
+  gct->scanned += free - bd->u.scan;
+  bd->u.scan = free;
 
   if (bd != ws->todo_bd) {
       // we're not going to evac any more objects into
