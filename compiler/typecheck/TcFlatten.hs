@@ -1365,7 +1365,7 @@ Under a forall, we
   (b) MUST NOT flatten type family applications
 Hence FMSubstOnly.
 
-For (a) consider   c ~ a, a ~ T (forall b. (b, [c]))
+For (a) consider [G] c ~ a, [G] a ~ T (forall b. (b, [c]))
 If we don't apply the c~a substitution to the second constraint
 we won't see the occurs-check error.
 

@@ -754,11 +754,7 @@ ppr_monobind (AbsBinds { abs_tvs = tyvars, abs_ev_vars = dictvars
       hang (text "AbsBinds" <+> brackets (interpp'SP tyvars)
                                     <+> brackets (interpp'SP dictvars))
          2 $ braces $ vcat
-      [ text "Exports:" <+>
-          brackets (sep (punctuate comma (map ppr exports)))
-      , text "Exported types:" <+>
-          vcat [ pprBndr LetBind (abe_poly ex) $$ pprBndr LetBind (abe_mono ex)
-               | ex <- exports]
+      [ text "Exports:" <+> vcat (map ppr exports)
       , text "Binds:" <+> pprLHsBinds val_binds
       , text "Evidence:" <+> ppr ev_binds ]
     else
@@ -767,9 +763,11 @@ ppr_monobind (XHsBindsLR x) = ppr x
 
 instance OutputableBndrId p => Outputable (ABExport (GhcPass p)) where
   ppr (ABE { abe_wrap = wrap, abe_poly = gbl, abe_mono = lcl, abe_prags = prags })
-    = vcat [ ppr gbl <+> text "<=" <+> ppr lcl
-           , nest 2 (pprTcSpecPrags prags)
-           , nest 2 (text "wrap:" <+> ppr wrap)]
+    = text "ABE {" <+>
+        vcat [ text "poly:"  <+> pprBndr LetBind gbl
+             , text "mono:"  <+> pprBndr LetBind lcl
+             , text "prags:" <+> pprTcSpecPrags prags
+             , text "wrap:"  <+> ppr wrap] <+> char '}'
   ppr (XABExport x) = ppr x
 
 instance (OutputableBndrId l, OutputableBndrId r,
