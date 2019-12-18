@@ -107,7 +107,8 @@ byteCodeGen hsc_env this_mod binds tycs mb_modBreaks
              (panic "ByteCodeGen.byteCodeGen: missing final emitBc?")
 
         dumpIfSet_dyn dflags Opt_D_dump_BCOs
-           "Proto-BCOs" (vcat (intersperse (char ' ') (map ppr proto_bcos)))
+           "Proto-BCOs" FormatByteCode
+           (vcat (intersperse (char ' ') (map ppr proto_bcos)))
 
         cbc <- assembleBCOs hsc_env proto_bcos tycs (map snd stringPtrs)
           (case modBreaks of
@@ -175,7 +176,8 @@ coreExprToBCOs hsc_env this_mod expr
       when (notNull mallocd)
            (panic "ByteCodeGen.coreExprToBCOs: missing final emitBc?")
 
-      dumpIfSet_dyn dflags Opt_D_dump_BCOs "Proto-BCOs" (ppr proto_bco)
+      dumpIfSet_dyn dflags Opt_D_dump_BCOs "Proto-BCOs" FormatByteCode
+         (ppr proto_bco)
 
       assembleOneBCO hsc_env proto_bco
   where dflags = hsc_dflags hsc_env

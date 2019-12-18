@@ -96,12 +96,12 @@ stg2stg dflags this_mod binds
             return binds'
 
     dump_when flag header binds
-      = dumpIfSet_dyn dflags flag header (pprStgTopBindings binds)
+      = dumpIfSet_dyn dflags flag header FormatSTG (pprStgTopBindings binds)
 
     end_pass what binds2
       = liftIO $ do -- report verbosely, if required
           dumpIfSet_dyn dflags Opt_D_verbose_stg2stg what
-            (vcat (map ppr binds2))
+            FormatSTG (vcat (map ppr binds2))
           stg_linter False what binds2
           return binds2
 
