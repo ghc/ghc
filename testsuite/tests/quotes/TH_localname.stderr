@@ -1,6 +1,6 @@
 
 TH_localname.hs:3:11: error:
-    • Ambiguous type variable ‘m0’ arising from a static form
+    • Ambiguous type variable ‘m0’ arising from a quotation bracket
       prevents the constraint ‘(Language.Haskell.TH.Syntax.Quote
                                   m0)’ from being solved.
       Relevant bindings include
