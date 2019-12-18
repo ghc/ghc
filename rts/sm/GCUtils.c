@@ -147,14 +147,14 @@ push_scanned_block (bdescr *bd, gen_workspace *ws)
     ASSERT(bd->u.scan == bdescr_free(bd));
 
     if (bd->blocks == 1 &&
-        bdescr_start(bd) + BLOCK_SIZE_W - bdescr_free(bd) > WORK_UNIT_WORDS)
+        (BLOCK_SIZE_W - WORK_UNIT_WORDS) * sizeof(StgWord) > bd->free_off)
     {
         // A partially full block: put it on the part_list list.
         // Only for single objects - see Note [big objects]
         bd->link = ws->part_list;
         ws->part_list = bd;
         ws->n_part_blocks += bd->blocks;
-        ws->n_part_words += bdescr_free(bd) - bdescr_start(bd);
+        ws->n_part_words += bd->free_off / sizeof(StgWord);
         IF_DEBUG(sanity,
                  ASSERT(countBlocks(ws->part_list) == ws->n_part_blocks));
     }
@@ -164,7 +164,7 @@ push_scanned_block (bdescr *bd, gen_workspace *ws)
         bd->link = ws->scavd_list;
         ws->scavd_list = bd;
         ws->n_scavd_blocks += bd->blocks;
-        ws->n_scavd_words += bdescr_free(bd) - bdescr_start(bd);
+        ws->n_scavd_words += bd->free_off / sizeof(StgWord);
         IF_DEBUG(sanity,
                  ASSERT(countBlocks(ws->scavd_list) == ws->n_scavd_blocks));
     }
@@ -334,11 +334,11 @@ alloc_todo_block (gen_workspace *ws, uint32_t size)
     // Grab a part block if we have one, and it has enough room
     bd = ws->part_list;
     if (bd != NULL &&
-        bdescr_start(bd) + bd->blocks * BLOCK_SIZE_W - bdescr_free(bd) > (int)size)
+        bd->blocks * BLOCK_SIZE_W > bd->free_off / sizeof(W_) + size)
     {
         ws->part_list = bd->link;
         ws->n_part_blocks -= bd->blocks;
-        ws->n_part_words -= bdescr_free(bd) - bdescr_start(bd);
+        ws->n_part_words -= bd->free_off / sizeof(W_);
     }
     else
     {
