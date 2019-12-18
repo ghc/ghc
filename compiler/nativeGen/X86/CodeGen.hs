@@ -180,11 +180,16 @@ verifyBasicBlock instrs
             CALL {}     | atEnd -> faultyBlockWith i
                         | not atEnd -> go atEnd instr
             -- All instructions ok, check if we reached the end and continue.
-            _ | not atEnd -> go (isJumpishInstr i) instr
-              -- Only jumps allowed at the end of basic blocks.
-              | otherwise -> if isJumpishInstr i
-                                then go True instr
-                                else faultyBlockWith i
+            _ | not atEnd         -> go (isJumpishInstr i) instr
+              | isTerminalInstr i -> go True instr
+              | otherwise         -> faultyBlockWith i
+
+    -- Only jumps (or UD2, which always follows indirect jumps)
+    -- allowed at the end of basic blocks.
+    isTerminalInstr UD2 = True
+    isTerminalInstr i | isJumpishInstr i = True
+    isTerminalInstr _ = False
+
     faultyBlockWith i
         = pprPanic "Non control flow instructions after end of basic block."
                    (ppr i <+> text "in:" $$ vcat (map ppr instrs))
@@ -1766,19 +1771,28 @@ assignReg_FltCode _ reg src = do
   let platform = targetPlatform dflags
   return (src_code (getRegisterReg platform  reg))
 
+-- Note [UD2 after indirect jumps]
+-- ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+--
+-- We follow all indirect jumps with a UD2 instruction to ensure that the
+-- instruction decoder doesn't attempt to decode the fallthrough path, which
+-- can result in resource conflicts. See Intel Software Optimisation Manual
+-- Section 3.4.1.6 (Branch Type Selection), Rule 14.
 
 genJump :: CmmExpr{-the branch target-} -> [Reg] -> NatM InstrBlock
 
 genJump (CmmLoad mem _) regs = do
   Amode target code <- getAmode mem
-  return (code `snocOL` JMP (OpAddr target) regs)
+  -- See Note [UD2 after indirect jumps]
+  return (code `snocOL` JMP (OpAddr target) regs `snocOL` UD2)
 
 genJump (CmmLit lit) regs = do
   return (unitOL (JMP (OpImm (litToImm lit)) regs))
 
 genJump expr regs = do
   (reg,code) <- getSomeReg expr
-  return (code `snocOL` JMP (OpReg reg) regs)
+  -- See Note [UD2 after indirect jumps]
+  return (code `snocOL` JMP (OpReg reg) regs `snocOL` UD2)
 
 
 -- -----------------------------------------------------------------------------

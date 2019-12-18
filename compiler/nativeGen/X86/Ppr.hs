@@ -832,6 +832,7 @@ pprInstr (XADD format src dst) = pprFormatOpOp (sLit "xadd") format src dst
 pprInstr (CMPXCHG format src dst)
    = pprFormatOpOp (sLit "cmpxchg") format src dst
 
+pprInstr UD2 = text "\t ud2"
 
 
 --------------------------
