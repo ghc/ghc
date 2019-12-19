@@ -81,6 +81,7 @@ module Type (
 
         -- ** Analyzing types
         TyCoMapper(..), mapType, mapCoercion,
+        TyCoFolder(..), foldType,
 
         -- (Newtypes)
         newTyConInstRhs,
@@ -551,10 +552,9 @@ isRuntimeRepVar :: TyVar -> Bool
 isRuntimeRepVar = isRuntimeRepTy . tyVarKind
 
 
-{-
-************************************************************************
+{- *********************************************************************
 *                                                                      *
-   Analyzing types
+               mapType
 *                                                                      *
 ************************************************************************
 
@@ -694,6 +694,7 @@ mapCoercion mapper@(TyCoMapper { tcm_covar = covar
     go_prov (PhantomProv co)    = PhantomProv <$> go co
     go_prov (ProofIrrelProv co) = ProofIrrelProv <$> go co
     go_prov p@(PluginProv _)    = return p
+
 
 {-
 ************************************************************************
