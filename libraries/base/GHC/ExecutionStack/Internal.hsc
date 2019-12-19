@@ -150,7 +150,7 @@ stackFrames st@(StackTrace fptr) = unsafePerformIO $ withSession $ \sess -> do
     unknown symbols). I think this is a reasonable price to pay, however, as
     module loading/unloading is a rather rare event.
 
-    Morover, we stand to gain a great deal by lazy lookups as the stack frames
+    Moreover, we stand to gain a great deal by lazy lookups as the stack frames
     may never even be requested, meaning the only effort wasted is the
     collection of the stack frames themselves.
 

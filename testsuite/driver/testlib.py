@@ -1185,7 +1185,7 @@ def ghci_script( name, way, script):
     # script can invoke the correct compiler by using ':! $HC $HC_OPTS'
     cmd = ('HC={{compiler}} HC_OPTS="{flags}" {{compiler}} {way_flags} {flags}'
           ).format(flags=flags, way_flags=way_flags)
-      # NB: put way_flags before flags so that flags in all.T can overrie others
+      # NB: put way_flags before flags so that flags in all.T can override others
 
     getTestOpts().stdin = script
     return simple_run( name, way, cmd, getTestOpts().extra_run_opts )

@@ -440,7 +440,7 @@ static HsInt loadArchive_ (pathchar *path)
                     break;
                 }
             }
-            /* If we didn't find a '/', then a space teminates the
+            /* If we didn't find a '/', then a space terminates the
                filename. Note that if we don't find one, then
                thisFileNameSize ends up as 16, and we already have the
                '\0' at the end. */

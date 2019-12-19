@@ -82,7 +82,7 @@ def testing_metrics():
 # are forced to just copy instead.
 #
 # We define the following function to make this magic more
-# explicit/discoverable. You are enouraged to use it instead of os.symlink.
+# explicit/discoverable. You are encouraged to use it instead of os.symlink.
 if platform.system() == 'Windows' and os.getenv('FORCE_SYMLINKS') == None:
     def link_or_copy_file(src: Path, dst: Path):
         shutil.copyfile(str(src), str(dst))

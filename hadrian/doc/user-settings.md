@@ -166,7 +166,7 @@ userPackage = library "user-package"
 You will also need to add `userPackage` to a specific build stage by modifying
 the `packages` setting of the user flavour as otherwise it will not be built.
 
-You can choose which integer library to use when builing GHC using the
+You can choose which integer library to use when building GHC using the
 `integerLibrary` setting of the build flavour. Possible values are: `integerGmp`
 (default) and `integerSimple`.
 ```haskell

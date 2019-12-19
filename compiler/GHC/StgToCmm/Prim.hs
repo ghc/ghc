@@ -2159,7 +2159,7 @@ vecElemProjectCast _      _        _   =  Nothing
 --    values!
 --      The current design with respect to register mapping of scalars could
 --    very well be the best,but exploring the  design space and doing careful
---    measurments is the only only way to validate that.
+--    measurements is the only only way to validate that.
 --      In some next generation CPU ISAs, notably RISC V, the SIMD extension
 --    includes  support for a sort of run time CPU dependent vectorization parameter,
 --    where a loop may act upon a single scalar each iteration OR some 2,4,8 ...

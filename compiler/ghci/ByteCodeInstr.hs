@@ -68,7 +68,7 @@ data BCInstr
    | PUSH32 !Word16
 
    -- Push the specifiec local as a 8, 16, 32 bit value onto the stack, but the
-   -- value will take the whole word on the stack (i.e., the stack will gorw by
+   -- value will take the whole word on the stack (i.e., the stack will grow by
    -- a word)
    -- This is useful when extracting a packed constructor field for further use.
    -- Currently we expect all values on the stack to take full words, except for

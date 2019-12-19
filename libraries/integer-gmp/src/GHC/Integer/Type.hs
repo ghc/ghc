@@ -1852,7 +1852,7 @@ unsafeSnocFreezeBigNat# mbn0@(MBN# mba0#) limb# s = go s'
         _ <- svoid (writeWordArray# mba# n# limb#)
         unsafeFreezeBigNat# (MBN# mba#)
 
--- | May shrink underlyng 'ByteArray#' if needed to satisfy BigNat invariant
+-- | May shrink underlying 'ByteArray#' if needed to satisfy BigNat invariant
 unsafeRenormFreezeBigNat# :: MutBigNat s -> S s BigNat
 unsafeRenormFreezeBigNat# mbn s
   | isTrue# (n0# ==# 0#)  = (# s'', nullBigNat #)

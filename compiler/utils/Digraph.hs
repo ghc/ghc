@@ -464,7 +464,7 @@ instance Outputable EdgeType where
 
 newtype Time = Time Int deriving (Eq,Ord,Num,Outputable)
 
---Allow for specialzation
+--Allow for specialization
 {-# INLINEABLE classifyEdges #-}
 
 -- | Given a start vertex, a way to get successors from a node

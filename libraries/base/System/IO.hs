@@ -202,7 +202,7 @@ module System.IO (
     -- as @\'\\r\\n\'@.
     --
     -- A text-mode 'Handle' has an associated 'NewlineMode' that
-    -- specifies how to transate newline characters.  The
+    -- specifies how to translate newline characters.  The
     -- 'NewlineMode' specifies the input and output translation
     -- separately, so that for instance you can translate @\'\\r\\n\'@
     -- to @\'\\n\'@ on input, but leave newlines as @\'\\n\'@ on output.

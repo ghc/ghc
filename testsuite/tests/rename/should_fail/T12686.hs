@@ -5,7 +5,7 @@ import Data.Proxy
 x = True
 
 data Bad = Bad 'x
--- The 'x should be rejeted in a civilised way
+-- The 'x should be rejected in a civilised way
 
 data AlsoBad = AlsoBad {
   a :: Int,

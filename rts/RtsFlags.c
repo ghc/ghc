@@ -535,7 +535,7 @@ char** getUTF8Args(int* argc)
 
     // We create two argument arrays, one which is later permutated by the RTS
     // instead of the main argv.
-    // The other one is used to free the allocted memory later.
+    // The other one is used to free the allocated memory later.
     char** argv = (char**) stgMallocBytes(sizeof(char*) * (*argc + 1),
                                           "getUTF8Args 1");
     win32_full_utf8_argv = (char**) stgMallocBytes(sizeof(char*) * (*argc + 1),

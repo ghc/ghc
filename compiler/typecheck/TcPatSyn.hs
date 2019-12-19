@@ -283,7 +283,7 @@ Similarly consider
   pattern Bam x y <- (MkS (x::a), MkS (y::a)))
 
 The pattern (Bam x y) binds two (Ord a) dictionaries, but we only
-need one.  Agian mkMimimalWithSCs removes the redundant one.
+need one.  Again mkMimimalWithSCs removes the redundant one.
 
 Note [Equality evidence in pattern synonyms]
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~

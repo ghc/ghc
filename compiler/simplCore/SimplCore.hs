@@ -881,7 +881,7 @@ Hence,there's a possibility of leaving unchanged something like this:
 By the time we've thrown away the types in STG land this
 could be eliminated.  But I don't think it's very common
 and it's dangerous to do this fiddling in STG land
-because we might elminate a binding that's mentioned in the
+because we might eliminate a binding that's mentioned in the
 unfolding for something.
 
 Note [Indirection zapping and ticks]

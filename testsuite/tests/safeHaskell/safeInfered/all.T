@@ -61,7 +61,7 @@ test('UnsafeWarn05', normal, compile, [''])
 test('UnsafeWarn06', normal, compile, [''])
 test('UnsafeWarn07', normal, compile, [''])
 
-# Chck -fwa-safe works
+# Check -fwa-safe works
 test('SafeWarn01', normal, compile, [''])
 
 test('T16689', normal, compile, ['-Wsafe'])

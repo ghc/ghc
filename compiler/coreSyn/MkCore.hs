@@ -886,7 +886,7 @@ After doing case-of-known-constructor, and expanding $WMkT we get
 Yikes!  That bogusly appears to evaluate the absentError!
 
 This is extremely tiresome.  Another way to think of this is that, in
-Core, it is an invariant that a strict data contructor, like MkT, must
+Core, it is an invariant that a strict data constructor, like MkT, must
 be applied only to an argument in HNF. So (absentError "blah") had
 better be non-bottom.
 

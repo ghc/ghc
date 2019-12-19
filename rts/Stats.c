@@ -617,7 +617,7 @@ There are currently three reporting functions:
   * report_machine_readable:
       Responsible for producing '+RTS -t --machine-readable' output.
   * report_one_line:
-      Responsible for productin '+RTS -t' output
+      Responsible for producing '+RTS -t' output
 
 Stats are accumulated into the global variable 'stats' as the program runs, then
 in 'stat_exit' we do the following:

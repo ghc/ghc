@@ -4,7 +4,7 @@ Copyright: GHC Team
 License: BSD3
 Author: GHC Team <cvs-ghc@haskell.org>
 Maintainer: GHC Team <cvs-ghc@haskell.org>
-Synopsis: timout utility
+Synopsis: timeout utility
 Description: timeout utility
 Category: Development
 build-type: Simple

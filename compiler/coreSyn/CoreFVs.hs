@@ -496,7 +496,7 @@ ruleLhsFreeIds = fvVarSet . ruleLhsFVIds
 
 ruleLhsFreeIdsList :: CoreRule -> [Var]
 -- ^ This finds all locally-defined free Ids on the left hand side of a rule
--- and returns them as a determinisitcally ordered list
+-- and returns them as a deterministically ordered list
 ruleLhsFreeIdsList = fvVarList . ruleLhsFVIds
 
 ruleLhsFVIds :: CoreRule -> FV

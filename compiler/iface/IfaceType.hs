@@ -1320,7 +1320,7 @@ pprTyTcApp' ctxt_prec tc tys dflags style
   | otherwise
   = getPprDebug $ \dbg ->
     if | not dbg && tc `ifaceTyConHasKey` errorMessageTypeErrorFamKey
-         -- Suppress detail unles you _really_ want to see
+         -- Suppress detail unless you _really_ want to see
          -> text "(TypeError ...)"
 
        | Just doc <- ppr_equality ctxt_prec tc (appArgsIfaceTypes tys)

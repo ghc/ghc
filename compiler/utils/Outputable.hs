@@ -39,7 +39,7 @@ module Outputable (
 
         coloured, keyword,
 
-        -- * Converting 'SDoc' into strings and outputing it
+        -- * Converting 'SDoc' into strings and outputting it
         printSDoc, printSDocLn, printForUser, printForUserPartWay,
         printForC, bufLeftRenderSDoc,
         pprCode, mkCodeStyle,

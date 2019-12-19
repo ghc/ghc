@@ -138,7 +138,7 @@ mkConvArray xs = "ConvArray \"" ++ concatMap mkHex xs ++ "\"#"
 --
 -- Fix a block size S which is a power of two.  We compress an array of N
 -- entries (where N>>S) as follows.  First, split the array into blocks of size
--- S, then remove all repeate blocks to form the "value" array.  Then construct
+-- S, then remove all repeated blocks to form the "value" array.  Then construct
 -- a separate "index" array which maps the position of blocks in the old array
 -- to a position in the value array.
 --

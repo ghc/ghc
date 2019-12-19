@@ -814,7 +814,7 @@ HsBool removeLibrarySearchPath(HsPtr dll_path_index)
 /* -----------------------------------------------------------------------------
  * insert a symbol in the hash table
  *
- * Returns: 0 on failure, nozero on success
+ * Returns: 0 on failure, nonzero on success
  */
 HsInt insertSymbol(pathchar* obj_name, SymbolName* key, SymbolAddr* data)
 {

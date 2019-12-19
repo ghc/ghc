@@ -56,7 +56,7 @@ time you fire up a build. This is not possible with the Make build system.
   build -j8
   ```
 
-- Bulding a stage 1 or 2 GHC executable
+- Building a stage 1 or 2 GHC executable
 
   ``` sh
   # Make

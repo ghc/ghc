@@ -1733,7 +1733,7 @@ of ``-W(no-)*``.
 
     The option :ghc-flag:`-Wunused-packages` warns about packages, specified on
     command line via :ghc-flag:`-package ⟨pkg⟩` or
-    :ghc-flag:`-package-id ⟨unit-id⟩`, but were not loaded during compication.
+    :ghc-flag:`-package-id ⟨unit-id⟩`, but were not loaded during compilation.
     Usually it means that you have an unused dependency.
 
     You may want to enable this warning on a clean build or enable :ghc-flag:`-fforce-recomp`

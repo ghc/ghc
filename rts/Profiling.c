@@ -740,7 +740,7 @@ reportCCSProfiling( void )
 }
 
 /* -----------------------------------------------------------------------------
- * Accumulating total allocatinos and tick count
+ * Accumulating total allocations and tick count
    -------------------------------------------------------------------------- */
 
 /* Helper */

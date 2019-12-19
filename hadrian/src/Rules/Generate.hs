@@ -215,7 +215,7 @@ ghcWrapper stage  = do
                                ++ [ "-package-db " ++ dbPath | stage == Stage1 ]
                                ++ [ "$@" ]
 
--- | Given a 'String' replace charaters '.' and '-' by underscores ('_') so that
+-- | Given a 'String' replace characters '.' and '-' by underscores ('_') so that
 -- the resulting 'String' is a valid C preprocessor identifier.
 cppify :: String -> String
 cppify = replaceEq '-' '_' . replaceEq '.' '_'

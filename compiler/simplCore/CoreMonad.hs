@@ -415,7 +415,7 @@ pprTickCounts :: Map Tick Int -> SDoc
 pprTickCounts counts
   = vcat (map pprTickGroup groups)
   where
-    groups :: [[(Tick,Int)]]    -- Each group shares a comon tag
+    groups :: [[(Tick,Int)]]    -- Each group shares a common tag
                                 -- toList returns common tags adjacent
     groups = groupBy same_tag (Map.toList counts)
     same_tag (tick1,_) (tick2,_) = tickToTag tick1 == tickToTag tick2

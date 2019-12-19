@@ -7,7 +7,7 @@ section "rodata" { memsetErr : bits8[] "Memset Error - align: %d size: %d\n"; }
 section "rodata" { memcpyErr : bits8[] "Memcpy Error - align: %d size: %d\n"; }
 // You have to call printf with the same number of args for every call.
 // This is as the LLVM backend doesn't support vararg functions.
-section "rodata" { memmoveErr : bits8[] "Memmove Error Occured\n"; }
+section "rodata" { memmoveErr : bits8[] "Memmove Error Occurred\n"; }
 
 memintrinTest (W_ dummy)
 {

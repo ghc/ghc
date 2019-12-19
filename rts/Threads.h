@@ -36,7 +36,7 @@ bool removeThreadFromDeQueue   (Capability *cap, StgTSO **head, StgTSO **tail, S
 
 StgBool isThreadBound (StgTSO* tso);
 
-// Overfow/underflow
+// Overflow/underflow
 void threadStackOverflow  (Capability *cap, StgTSO *tso);
 W_   threadStackUnderflow (Capability *cap, StgTSO *tso);
 

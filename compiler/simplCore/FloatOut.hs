@@ -529,7 +529,7 @@ from the body of the let that depend on the staying-put bindings.
 
 We used instead to do the partitionByMajorLevel on the RHS of an '=',
 in floatRhs.  But that was quite tiresome.  We needed to test for
-values or trival rhss, because (in particular) we don't want to insert
+values or trivial rhss, because (in particular) we don't want to insert
 new bindings between the "=" and the "\".  E.g.
         f = \x -> let <bind> in <body>
 We do not want

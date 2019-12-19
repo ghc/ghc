@@ -383,7 +383,7 @@ by saying ``-fno-wombat``.
     a shared-memory
     multiprocessor <http://community.haskell.org/~simonmar/papers/multiproc.pdf>`__.
 
-    See :ref:`parallel-compile-options` for a dicussion on its use.
+    See :ref:`parallel-compile-options` for a discussion on its use.
 
 .. ghc-flag:: -fexcess-precision
     :shortdesc: Enable excess intermediate precision

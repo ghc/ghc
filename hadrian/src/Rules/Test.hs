@@ -80,7 +80,7 @@ testRules = do
     "test" ~> do
         needTestBuilders
 
-        -- TODO : Should we remove the previosly generated config file?
+        -- TODO : Should we remove the previously generated config file?
         -- Prepare Ghc configuration file for input compiler.
         need [root -/- ghcConfigPath, root -/- timeoutPath]
 

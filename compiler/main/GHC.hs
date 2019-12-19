@@ -638,7 +638,7 @@ setProgramDynFlags_ invalidate_needed dflags = do
 -- that the next downsweep will think that all the files have changed
 -- and preprocess them again.  This won't necessarily cause everything
 -- to be recompiled, because by the time we check whether we need to
--- recopmile a module, we'll have re-summarised the module and have a
+-- recompile a module, we'll have re-summarised the module and have a
 -- correct ModSummary.
 --
 invalidateModSummaryCache :: GhcMonad m => m ()

@@ -198,7 +198,7 @@ cgRhs :: Id
                  CgIdInfo         -- The info for this binding
                , FCode CmmAGraph  -- A computation which will generate the
                                   -- code for the binding, and return an
-                                  -- assignent of the form "x = Hp - n"
+                                  -- assignment of the form "x = Hp - n"
                                   -- (see above)
                )
 

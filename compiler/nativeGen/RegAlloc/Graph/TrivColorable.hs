@@ -26,7 +26,7 @@ import Panic
 --      This gets hammered by scanGraph during register allocation,
 --      so needs to be fairly efficient.
 --
---      NOTE:   This only works for arcitectures with just RcInteger and RcDouble
+--      NOTE:   This only works for architectures with just RcInteger and RcDouble
 --              (which are disjoint) ie. x86, x86_64 and ppc
 --
 --      The number of allocatable regs is hard coded in here so we can do

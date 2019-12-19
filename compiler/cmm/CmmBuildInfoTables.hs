@@ -227,7 +227,7 @@ implemented.
    case, if the closure is not locally defined then we can't point to
    it directly from the info table, because this is the text section
    which cannot contain runtime relocations. In this case we skip this
-   optimisation and generate the singleton SRT, becase SRTs are in the
+   optimisation and generate the singleton SRT, because SRTs are in the
    data section and *can* have relocatable references.
 
 2. [FUN] A static function closure can also be an SRT, we simply put

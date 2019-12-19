@@ -247,7 +247,7 @@ Miscellaneous RTS options
     catch unhandled exceptions using the Windows exception handling mechanism.
     This option is primarily useful for when you are using the Haskell code as a
     DLL, and don't want the RTS to ungracefully terminate your application on
-    erros such as segfaults.
+    errors such as segfaults.
 
 .. rts-flag:: --generate-crash-dumps
 

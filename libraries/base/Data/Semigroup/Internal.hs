@@ -4,7 +4,7 @@
 {-# LANGUAGE PolyKinds #-}
 {-# LANGUAGE ScopedTypeVariables #-}
 
--- | Auxilary definitions for 'Semigroup'
+-- | Auxiliary definitions for 'Semigroup'
 --
 -- This module provides some @newtype@ wrappers and helpers which are
 -- reexported from the "Data.Semigroup" module or imported directly

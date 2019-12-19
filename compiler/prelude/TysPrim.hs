@@ -442,7 +442,7 @@ So for example:
 We abbreviate '*' specially:
     type * = TYPE 'LiftedRep
 
-The 'rr' parameter tells us how the value is represented at runime.
+The 'rr' parameter tells us how the value is represented at runtime.
 
 Generally speaking, you can't be polymorphic in 'rr'.  E.g
    f :: forall (rr:RuntimeRep) (a:TYPE rr). a -> [a]

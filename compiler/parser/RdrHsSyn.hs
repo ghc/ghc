@@ -1042,7 +1042,7 @@ checkImportDecl mPre mPost = do
 
   importQualifiedPostEnabled <- getBit ImportQualifiedPostBit
 
-  -- Error if 'qualified' found in postpostive position and
+  -- Error if 'qualified' found in postpositive position and
   -- 'ImportQualifiedPost' is not in effect.
   whenJust mPost $ \post ->
     when (not importQualifiedPostEnabled) $

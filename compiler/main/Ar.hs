@@ -13,7 +13,7 @@ the same name.)
 As Archives are rather simple structurally, we can just build the archives
 with Haskell directly and use ranlib on the final result to get the symbol
 index. This should allow us to work around with the differences/abailability
-of libtool across differet platforms.
+of libtool across different platforms.
 -}
 module Ar
   (ArchiveEntry(..)

@@ -121,7 +121,7 @@ exprs =
      mkRLet go  (mkLams [x] (mkACase (mkLams [y] $ mkLit 0) (Var go `mkVarApps` [x]))) $
      mkRLet go2 (mkLams [x] (mkACase (mkLams [y] $ mkLit 0) (Var go2 `mkVarApps` [x]))) $
          Var go `mkApps` [go2 `mkLApps` [0,1], mkLit 0]
-  , ("mutual recursion (thunks), called mutiple times (both arity 1 would be bad!)",) $
+  , ("mutual recursion (thunks), called multiple times (both arity 1 would be bad!)",) $
      Let (Rec [ (n, mkACase (mkLams [y] $ mkLit 0) (Var d))
               , (d, mkACase (mkLams [y] $ mkLit 0) (Var n))]) $
          Var n `mkApps` [Var d `mkApps` [Var d `mkApps` [mkLit 0]]]

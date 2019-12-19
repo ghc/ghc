@@ -84,7 +84,7 @@ so we profiled several versions, exploring different implementation strategies.
 
    This looks deceptively similar, but while FV internally builds a list- and
    set-generating function, the VarSet functions manipulate sets directly, and
-   the latter peforms a lot worse than the naive FV version.
+   the latter performs a lot worse than the naive FV version.
 
 3. Accumulator-style VarSet version: this is what we use now. We do use VarSet
    as our data structure, but delegate the actual work to a new

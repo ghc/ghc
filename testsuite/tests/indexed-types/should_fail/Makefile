@@ -11,7 +11,7 @@ T8227:
 	-'$(TEST_HC)' $(TEST_HC_OPTS) -c T8227.hs
 
 # T8129 is trying to ensure that we don't get an 
-# an asertion failure with -ddump-tc-trace
+# an assertion failure with -ddump-tc-trace
 T8129:
 	-'$(TEST_HC)' $(TEST_HC_OPTS) -c -ddump-tc-trace T8129.hs 2> T8129.trace > T8129.trace
 	grep -a deduce T8129.trace

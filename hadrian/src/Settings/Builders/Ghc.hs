@@ -176,7 +176,7 @@ commonGhcArgs = do
             , packageGhcArgs
             , includeGhcArgs
             -- When compiling RTS for Stage1 or Stage2 we do not have it (yet)
-            -- in the package database. We therefore explicity supply the path
+            -- in the package database. We therefore explicitly supply the path
             -- to the @ghc-version@ file, to prevent GHC from trying to open the
             -- RTS package in the package database and failing.
             , package rts ? notStage0 ? arg ("-ghcversion-file=" ++ ghcVersion)

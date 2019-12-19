@@ -495,7 +495,7 @@ tcHiBootIface hsc_src mod
                 -- In --make and interactive mode, if this module has an hs-boot file
                 -- we'll have compiled it already, and it'll be in the HPT
                 --
-                -- We check wheher the interface is a *boot* interface.
+                -- We check whether the interface is a *boot* interface.
                 -- It can happen (when using GHC from Visual Studio) that we
                 -- compile a module in TypecheckOnly mode, with a stable,
                 -- fully-populated HPT.  In that case the boot interface isn't there

@@ -297,7 +297,7 @@ cpsTop hsc_env proc =
 --      Sp = Sp + 16
 --      ...y...y...
 --
--- But since we don't see any benefits from running sinking befroe stack
+-- But since we don't see any benefits from running sinking before stack
 -- layout, this situation probably doesn't arise too often in practice.
 --
 

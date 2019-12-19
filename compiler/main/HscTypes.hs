@@ -1651,7 +1651,7 @@ It's exactly the same for type-family instances.  See #7102
 data InteractiveContext
   = InteractiveContext {
          ic_dflags     :: DynFlags,
-             -- ^ The 'DynFlags' used to evaluate interative expressions
+             -- ^ The 'DynFlags' used to evaluate interactive expressions
              -- and statements.
 
          ic_mod_index :: Int,

@@ -9,7 +9,7 @@ License: BSD3
 -- XXX License-File: LICENSE
 Author: XXX
 Maintainer: XXX
-Synopsis: iserv allows GHC to delegate Tempalte Haskell computations
+Synopsis: iserv allows GHC to delegate Template Haskell computations
 Description:
   GHC can be provided with a path to the iserv binary with
   @-pgmi=/path/to/iserv-bin@, and will in combination with

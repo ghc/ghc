@@ -1,4 +1,4 @@
--- Test for transform list comp which should work for monad comp aswell:
+-- Test for transform list comp which should work for monad comp as well:
 --
 -- Test trying to use a function bound in the list comprehension as the group function
 

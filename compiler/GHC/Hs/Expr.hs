@@ -2572,7 +2572,7 @@ data ArithSeqInfo id
   | FromThenTo      (LHsExpr id)
                     (LHsExpr id)
                     (LHsExpr id)
--- AZ: Sould ArithSeqInfo have a TTG extension?
+-- AZ: Should ArithSeqInfo have a TTG extension?
 
 instance OutputableBndrId p
          => Outputable (ArithSeqInfo (GhcPass p)) where

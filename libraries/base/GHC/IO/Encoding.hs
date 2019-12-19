@@ -82,7 +82,7 @@ utf8_bom = UTF8.utf8_bom
 utf16  :: TextEncoding
 utf16 = UTF16.utf16
 
--- | The UTF-16 Unicode encoding (litte-endian)
+-- | The UTF-16 Unicode encoding (little-endian)
 utf16le  :: TextEncoding
 utf16le = UTF16.utf16le
 
@@ -95,7 +95,7 @@ utf16be = UTF16.utf16be
 utf32  :: TextEncoding
 utf32 = UTF32.utf32
 
--- | The UTF-32 Unicode encoding (litte-endian)
+-- | The UTF-32 Unicode encoding (little-endian)
 utf32le  :: TextEncoding
 utf32le = UTF32.utf32le
 

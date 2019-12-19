@@ -44,7 +44,7 @@ a function, one called multiple times via a forking recursion:
 two functions (recursive):
     go 2
     go2 2
-mutual recursion (thunks), called mutiple times (both arity 1 would be bad!):
+mutual recursion (thunks), called multiple times (both arity 1 would be bad!):
     d 0
     n 0
 mutual recursion (functions), but no thunks:

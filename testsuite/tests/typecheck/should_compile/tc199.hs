@@ -5,7 +5,7 @@
 -- Hence needing AllowAmbiguousTypes
 --
 -- However, arguably the instance declaration should be accepted,
--- beause it's equivalent to
+-- because it's equivalent to
 --      instance Baz Int Int where { foo x = x }
 -- which *does* typecheck
 

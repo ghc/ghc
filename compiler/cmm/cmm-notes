@@ -27,7 +27,7 @@ More notes (June 11)
 
 More notes (May 11)
 ~~~~~~~~~~~~~~~~~~~
-In CmmNode, consider spliting CmmCall into two: call and jump
+In CmmNode, consider splitting CmmCall into two: call and jump
 
 Notes on new codegen (Aug 10)
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~

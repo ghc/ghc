@@ -38,7 +38,7 @@ import Outputable
 
 {- Note [Pretty printing via IfaceSyn]
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
-Our general plan for prett-printing
+Our general plan for pretty-printing
   - Types
   - TyCons
   - Classes

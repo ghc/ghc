@@ -6,7 +6,7 @@
 -- Maintainer : andrey.mokhov@gmail.com
 -- Stability  : experimental
 --
--- This module defines Shake rules corresponing to the /Cabal oracle/; see
+-- This module defines Shake rules corresponding to the /Cabal oracle/; see
 -- the module "Hadrian.Oracles.Cabal" for various supported queries.
 -----------------------------------------------------------------------------
 module Hadrian.Oracles.Cabal.Rules where

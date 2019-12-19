@@ -245,7 +245,7 @@ uint32_t getNumberOfProcessors (void);
 // type from the OSThreadId.
 //
 // If the feature cannot be supported on an OS, it is OK to always return 0.
-// In particular it would almost certaily be meaningless on systems not using
+// In particular it would almost certainly be meaningless on systems not using
 // a 1:1 threading model.
 
 // We use a common serialisable representation on all OSs

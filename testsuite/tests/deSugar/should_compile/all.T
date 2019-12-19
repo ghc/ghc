@@ -81,7 +81,7 @@ test('T5252', [], makefile_test, [])
 test('T5455', normal, compile, [''])
 test('T5001', [only_ways(['optasm'])], multimod_compile, ['T5001', '-v0'])
 
-# T5252Take2 failed when compiled *wihtout* optimisation
+# T5252Take2 failed when compiled *without* optimisation
 test('T5252Take2', [], makefile_test, [])
 test('T2431', normal, compile, ['-ddump-simpl -dsuppress-uniques'])
 test('T7669', normal, compile, [''])

@@ -187,7 +187,7 @@ throwToSelf (Capability *cap, StgTSO *tso, StgClosure *exception)
    MessageThrowTo *   exception was not raised; the source TSO
                       should now put itself in the state
                       BlockedOnMsgThrowTo, and when it is ready
-                      it should unlock the mssage using
+                      it should unlock the message using
                       unlockClosure(msg, &stg_MSG_THROWTO_info);
                       If it decides not to raise the exception after
                       all, it can revoke it safely with

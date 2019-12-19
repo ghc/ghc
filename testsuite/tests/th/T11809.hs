@@ -10,4 +10,4 @@ module T11809 where
  getD  = unD someD   -- unD should resolve to the record selector above!
  |]
 
-getD' = unD someD    -- dito here outside of the splice!
+getD' = unD someD    -- ditto here outside of the splice!

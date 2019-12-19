@@ -12,7 +12,7 @@ a rich but light-weight mark-up language aimed at producing documentation. The
 `Sphinx <http://sphinx-doc.org/>`__ tool is used to produce the final PDF and
 HTML documentation.
 
-This document (also written in ReST) serves as a brief introducion to ReST and to
+This document (also written in ReST) serves as a brief introduction to ReST and to
 document the conventions used in the User's Guide. This document is *not* intended
 to be a thorough guide to ReST. For this see the resources referenced
 `below <#references>`__.
