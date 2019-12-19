@@ -2,7 +2,7 @@
 test('T2526', normal, compile, ['-fwarn-missing-signatures -fwarn-missing-exported-signatures'])
 test('T9178', [], multimod_compile, ['T9178', '-Wall'])
 
-# T9230.hs contains a tab charater. Test that -Wtabs is enabled by default.
+# T9230.hs contains a tab character. Test that -Wtabs is enabled by default.
 test('T9230', normal, compile, [''])
 
 test('T10908', normal, compile, [''])

@@ -582,7 +582,7 @@ aliasify (LMGlobal var val) = do
 -- point of definition instead of the point of usage, as was previously
 -- done. See #9142 for details.
 --
--- Finally, case (1) is trival. As we already have a definition for
+-- Finally, case (1) is trivial. As we already have a definition for
 -- and therefore know the type of the referenced symbol, we can do
 -- away with casting the alias to the desired type in @getSymbolPtr@
 -- and instead just emit a reference to the definition symbol directly.

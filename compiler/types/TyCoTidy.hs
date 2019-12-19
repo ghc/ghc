@@ -144,7 +144,7 @@ tidyType env (CoercionTy co)      = CoercionTy $! (tidyCo env co)
 
 
 -- The following two functions differ from mkForAllTys and splitForAllTys in that
--- they expect/preserve the ArgFlag argument. Thes belong to types/Type.hs, but
+-- they expect/preserve the ArgFlag argument. These belong to types/Type.hs, but
 -- how should they be named?
 mkForAllTys' :: [(TyCoVar, ArgFlag)] -> Type -> Type
 mkForAllTys' tvvs ty = foldr strictMkForAllTy ty tvvs

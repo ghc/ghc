@@ -17,7 +17,7 @@ import GHC.StaticPtr
 {-------------------------------------------------------------------------------
   Standard Cloud-Haskell-like infrastructure
 
-  See <https://gitlab.haskell.org/ghc/ghc/wikis/typeable-t> for a dicussion of 'SC'.
+  See <https://gitlab.haskell.org/ghc/ghc/wikis/typeable-t> for a discussion of 'SC'.
 -------------------------------------------------------------------------------}
 
 class Serializable a -- empty class, just for demonstration purposes

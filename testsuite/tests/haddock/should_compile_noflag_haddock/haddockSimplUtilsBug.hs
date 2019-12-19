@@ -32,7 +32,7 @@ postInlineUnconditionally
 --      in \y. ....case f of {...} ....
 -- Here f is used just once, and duplicating the case work is fine (exprIsCheap).
 -- But
--- * We can't preInlineUnconditionally because that woud invalidate
+-- * We can't preInlineUnconditionally because that would invalidate
 --   the occ info for b.
 -- * We can't postInlineUnconditionally because the RHS is big, and
 --   that risks exponential behaviour

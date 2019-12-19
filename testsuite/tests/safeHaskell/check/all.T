@@ -31,7 +31,7 @@ test('Check03', normal, multi_compile, ['Check03', [
                                        ], '-fpackage-trust'])
 
 # Check a slightly larger transitive program. Check01 isn't imported
-# safely by Check03 so we don't require base trused at end.
+# safely by Check03 so we don't require base trusted at end.
 test('Check04', normal, multi_compile, ['Check04', [
                                        ('Check04_A.hs', ''),
                                        ('Check04_B.hs', '-trust base'),

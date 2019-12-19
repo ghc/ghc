@@ -380,7 +380,7 @@ dfBindComp c_id n_id (pat, core_list1) quals = do
     b <- newSysLocalDs b_ty
     x <- newSysLocalDs x_ty
 
-    -- build rest of the comprehesion
+    -- build rest of the comprehension
     core_rest <- dfListComp c_id b quals
 
     -- build the pattern match

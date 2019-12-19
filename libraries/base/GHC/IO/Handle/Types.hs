@@ -386,7 +386,7 @@ nativeNewline = LF
 #endif
 
 -- | Map @\'\\r\\n\'@ into @\'\\n\'@ on input, and @\'\\n\'@ to the native newline
--- represetnation on output.  This mode can be used on any platform, and
+-- representation on output.  This mode can be used on any platform, and
 -- works with text files using any newline convention.  The downside is
 -- that @readFile >>= writeFile@ might yield a different file.
 --

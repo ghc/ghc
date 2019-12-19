@@ -686,7 +686,7 @@ isIrrefutableHsPat :: (OutputableBndrId p) => LPat (GhcPass p) -> Bool
 -- Specifically on a ConPatIn, which is what it sees for a
 -- (LPat Name) in the renamer, it doesn't know the size of the
 -- constructor family, so it returns False.  Result: only
--- tuple patterns are considered irrefuable at the renamer stage.
+-- tuple patterns are considered irrefutable at the renamer stage.
 --
 -- But if it returns True, the pattern is definitely irrefutable
 isIrrefutableHsPat

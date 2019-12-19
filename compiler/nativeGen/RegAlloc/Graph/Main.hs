@@ -83,7 +83,7 @@ regAlloc dflags regsFree slotsFree slotsCount code cfg
 
 -- | Perform solver iterations for the graph coloring allocator.
 --
---   We extract a register confict graph from the provided cmm code,
+--   We extract a register conflict graph from the provided cmm code,
 --   and try to colour it. If that works then we use the solution rewrite
 --   the code with real hregs. If coloring doesn't work we add spill code
 --   and try to colour it again. After `maxSpinCount` iterations we give up.

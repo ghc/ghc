@@ -385,7 +385,7 @@ exitHpc(void) {
 
   // Only write the tix file if you are the original process.
   // Any sub-process from use of fork from inside Haskell will
-  // not clober the .tix file.
+  // not clobber the .tix file.
 
   if (hpc_pid == getpid()) {
     FILE *f = __rts_fopen(tixFilename,"w+");

@@ -319,7 +319,7 @@ seqDVarSet s = sizeDVarSet s `seq` ()
 extendDVarSetList :: DVarSet -> [Var] -> DVarSet
 extendDVarSetList = addListToUniqDSet
 
--- | Convert a DVarSet to a VarSet by forgeting the order of insertion
+-- | Convert a DVarSet to a VarSet by forgetting the order of insertion
 dVarSetToVarSet :: DVarSet -> VarSet
 dVarSetToVarSet = unsafeUFMToUniqSet . udfmToUfm . getUniqDSet
 

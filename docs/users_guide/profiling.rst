@@ -536,7 +536,7 @@ has the following properties,
     The profile tree itself
 
 Each entry in ``cost_centres`` is an object describing a cost-centre of the
-program having the following properies,
+program having the following properties,
 
 ``id`` (integral number)
     A unique identifier used to refer to the cost-centre
