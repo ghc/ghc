@@ -212,7 +212,9 @@ outputForeignStubs dflags mod location stubs
         createDirectoryIfMissing True (takeDirectory stub_h)
 
         dumpIfSet_dyn dflags Opt_D_dump_foreign
-                      "Foreign export header file" stub_h_output_d
+                      "Foreign export header file"
+                      FormatC
+                      stub_h_output_d
 
         -- we need the #includes from the rts package for the stub files
         let rts_includes =
@@ -230,7 +232,7 @@ outputForeignStubs dflags mod location stubs
                 ("#include <HsFFI.h>\n" ++ cplusplus_hdr) cplusplus_ftr
 
         dumpIfSet_dyn dflags Opt_D_dump_foreign
-                      "Foreign export stubs" stub_c_output_d
+                      "Foreign export stubs" FormatC stub_c_output_d
 
         stub_c_file_exists
            <- outputForeignStubs_help stub_c stub_c_output_w

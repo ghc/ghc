@@ -91,6 +91,7 @@ pprintClosureCommand bindThings force str = do
          Just subst' -> do { dflags <- GHC.getSessionDynFlags
                            ; liftIO $
                                dumpIfSet_dyn dflags Opt_D_dump_rtti "RTTI"
+                                 FormatText
                                  (fsep $ [text "RTTI Improvement for", ppr id,
                                   text "old substitution:" , ppr subst,
                                   text "new substitution:" , ppr subst'])

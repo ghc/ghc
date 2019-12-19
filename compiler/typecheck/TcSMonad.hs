@@ -146,6 +146,7 @@ import Type
 import Coercion
 import Unify
 
+import ErrUtils
 import TcEvidence
 import Class
 import TyCon
@@ -2733,7 +2734,10 @@ csTraceTcM mk_doc
        ; when (  dopt Opt_D_dump_cs_trace dflags
                   || dopt Opt_D_dump_tc_trace dflags )
               ( do { msg <- mk_doc
-                   ; TcM.traceTcRn Opt_D_dump_cs_trace msg }) }
+                   ; TcM.dumpTcRn False
+                       (dumpOptionsFromFlag Opt_D_dump_cs_trace)
+                       "" FormatText
+                       msg }) }
 
 runTcS :: TcS a                -- What to run
        -> TcM (a, EvBindMap)

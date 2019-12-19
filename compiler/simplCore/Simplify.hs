@@ -260,7 +260,8 @@ simplRecOrTopPair env top_lvl is_rec mb_cont old_bndr new_bndr rhs
       | not (dopt Opt_D_verbose_core2core dflags)
       = thing_inside
       | otherwise
-      = pprTrace ("SimplBind " ++ what) (ppr old_bndr) thing_inside
+      = traceAction dflags ("SimplBind " ++ what)
+         (ppr old_bndr) thing_inside
 
 --------------------------
 simplLazyBind :: SimplEnv
@@ -1793,14 +1794,20 @@ completeCall env var cont
     interesting_cont = interestingCallContext env call_cont
     active_unf       = activeUnfolding (getMode env) var
 
+    log_inlining doc
+      = liftIO $ dumpAction dflags
+           (mkUserStyle dflags alwaysQualify AllTheWay)
+           (dumpOptionsFromFlag Opt_D_dump_inlinings)
+           "" FormatText doc
+
     dump_inline unfolding cont
       | not (dopt Opt_D_dump_inlinings dflags) = return ()
       | not (dopt Opt_D_verbose_core2core dflags)
       = when (isExternalName (idName var)) $
-            liftIO $ printOutputForUser dflags alwaysQualify $
+            log_inlining $
                 sep [text "Inlining done:", nest 4 (ppr var)]
       | otherwise
-      = liftIO $ printOutputForUser dflags alwaysQualify $
+      = liftIO $ log_inlining $
            sep [text "Inlining done: " <> ppr var,
                 nest 4 (vcat [text "Inlined fn: " <+> nest 2 (ppr unfolding),
                               text "Cont:  " <+> ppr cont])]
@@ -2065,17 +2072,21 @@ tryRules env rules fn args call_cont
 
     nodump
       | dopt Opt_D_dump_rule_rewrites dflags
-      = liftIO $ dumpSDoc dflags alwaysQualify Opt_D_dump_rule_rewrites "" empty
+      = liftIO $ do
+         touchDumpFile dflags (dumpOptionsFromFlag Opt_D_dump_rule_rewrites)
 
       | dopt Opt_D_dump_rule_firings dflags
-      = liftIO $ dumpSDoc dflags alwaysQualify Opt_D_dump_rule_firings "" empty
+      = liftIO $ do
+         touchDumpFile dflags (dumpOptionsFromFlag Opt_D_dump_rule_firings)
 
       | otherwise
       = return ()
 
     log_rule dflags flag hdr details
-      = liftIO . dumpSDoc dflags alwaysQualify flag "" $
-                   sep [text hdr, nest 4 details]
+      = liftIO $ do
+         let sty = mkDumpStyle dflags alwaysQualify
+         dumpAction dflags sty (dumpOptionsFromFlag flag) "" FormatText $
+           sep [text hdr, nest 4 details]
 
 trySeqRules :: SimplEnv
             -> OutExpr -> InExpr   -- Scrutinee and RHS

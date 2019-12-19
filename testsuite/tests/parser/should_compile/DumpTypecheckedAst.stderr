@@ -1,5 +1,5 @@
 
-==================== Typechecker ====================
+==================== Typechecker AST ====================
 
 {Bag(Located (HsBind Var)):
  [({ <no location info> }
