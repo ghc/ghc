@@ -55,7 +55,7 @@ addTrits (m1, (x1:x2:xs)) (m2, (y1:y2:ys)) = (u,addStream (x1:x2:xs) (y1:y2:ys))
 
 
 
--- Substraction of 2 Trits
+-- Subtraction of 2 Trits
 subTrits :: Trit -> Trit -> Trit
 subTrits x y = addTrits x (neg y)
 

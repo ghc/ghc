@@ -383,7 +383,7 @@ pprCycle summaries = pp_group (CyclicSCC summaries)
     pp_group (CyclicSCC mss)
         = ASSERT( not (null boot_only) )
                 -- The boot-only list must be non-empty, else there would
-                -- be an infinite chain of non-boot imoprts, and we've
+                -- be an infinite chain of non-boot imports, and we've
                 -- already checked for that in processModDeps
           pp_ms loop_breaker $$ vcat (map pp_group groups)
         where

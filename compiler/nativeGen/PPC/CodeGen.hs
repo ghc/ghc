@@ -425,7 +425,7 @@ getRegister' dflags (CmmReg reg)
 getRegister' dflags tree@(CmmRegOff _ _)
   = getRegister' dflags (mangleIndexTree dflags tree)
 
-    -- for 32-bit architectuers, support some 64 -> 32 bit conversions:
+    -- for 32-bit architectures, support some 64 -> 32 bit conversions:
     -- TO_W_(x), TO_W_(x >> 32)
 
 getRegister' dflags (CmmMachOp (MO_UU_Conv W64 W32)

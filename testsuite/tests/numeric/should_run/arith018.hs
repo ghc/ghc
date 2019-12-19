@@ -1,5 +1,5 @@
 -- exposes a bug in the native code generator in GHC 6.4.1.  Division by
--- a power of 2 was being mis-optimsed to a direct shift.
+-- a power of 2 was being mis-optimised to a direct shift.
 
 main = do
   print (map f4 [(-20) .. (-1)])

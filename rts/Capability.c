@@ -794,7 +794,7 @@ void waitForCapability (Capability **pCap, Task *task)
             }
         }
 
-        // record the Capability as the one this Task is now assocated with.
+        // record the Capability as the one this Task is now associated with.
         task->cap = cap;
 
     } else {

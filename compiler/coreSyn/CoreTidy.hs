@@ -196,7 +196,7 @@ tidyLetBndr rec_tidy_env env@(tidy_env, var_env) id
         -- Don't attempt to recompute arity here; this is just tidying!
         -- Trying to do so led to #17294
         --
-        -- Set inline-prag info so that we preseve it across
+        -- Set inline-prag info so that we preserve it across
         -- separate compilation boundaries
         old_info = idInfo id
         new_info = vanillaIdInfo

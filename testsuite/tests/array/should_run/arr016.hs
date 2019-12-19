@@ -122,7 +122,7 @@ rift n xs = comb (drop n xs) (take n xs)
       comb []     []     = []
 
 
--- suffle makes n random rifts. Typically after
+-- shuffle makes n random rifts. Typically after
 -- log n rifts, the list is in a pretty random order.
 -- (where n is the number of elements in the list)
 

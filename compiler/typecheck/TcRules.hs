@@ -108,7 +108,7 @@ tcRule (HsRule { rd_ext  = ext
        --      RULE:  forall v. fst (ss v) = fst v
        -- The type of the rhs of the rule is just a, but v::(a,(b,c))
        --
-       -- We also need to get the completely-uconstrained tyvars of
+       -- We also need to get the completely-unconstrained tyvars of
        -- the LHS, lest they otherwise get defaulted to Any; but we do that
        -- during zonking (see TcHsSyn.zonkRule)
 

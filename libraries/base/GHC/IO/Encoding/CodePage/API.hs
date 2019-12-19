@@ -317,7 +317,7 @@ cpEncode cp _max_char_size = \ibuf obuf -> do
      | ocnt == 0 = return (Left True)
      | otherwise = alloca $ \defaulted_ptr -> do
       poke defaulted_ptr False
-      err <- c_WideCharToMultiByte (fromIntegral cp) 0 -- NB: the WC_ERR_INVALID_CHARS flag is uselses: only has an effect with the UTF-8 code page
+      err <- c_WideCharToMultiByte (fromIntegral cp) 0 -- NB: the WC_ERR_INVALID_CHARS flag is useless: only has an effect with the UTF-8 code page
                                    iptr (fromIntegral icnt) optr (fromIntegral ocnt)
                                    nullPtr defaulted_ptr
       defaulted <- peek defaulted_ptr

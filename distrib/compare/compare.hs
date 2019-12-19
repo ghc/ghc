@@ -17,7 +17,7 @@ import Tar
 -- * Check installed trees too
 -- * Check hashbangs
 
-sizeChangeThresholds :: [(Integer,  -- Theshold only applies if one of
+sizeChangeThresholds :: [(Integer,  -- Threshold only applies if one of
                                     -- the files is at least this big
                           Integer)] -- Size changed if the larger file's
                                     -- size is at least this %age of the

@@ -1166,7 +1166,7 @@ etaTyConAppCo_maybe tc co
   , tc1 == tc2
   , isInjectiveTyCon tc r  -- See Note [NthCo and newtypes] in TyCoRep
   , let n = length tys1
-  , tys2 `lengthIs` n      -- This can fail in an erroneous progam
+  , tys2 `lengthIs` n      -- This can fail in an erroneous program
                            -- E.g. T a ~# T a b
                            -- #14607
   = ASSERT( tc == tc1 )
