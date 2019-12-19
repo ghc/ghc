@@ -715,7 +715,7 @@ isTickSubScope = cmp
         cmp (SubScope u s) s'@(SubScope u' _)      = u == u' || cmp s s'
 
 -- | Combine two tick scopes. The new scope should be sub-scope of
--- both parameters. We simplfy automatically if one tick scope is a
+-- both parameters. We simplify automatically if one tick scope is a
 -- sub-scope of the other already.
 combineTickScopes :: CmmTickScope -> CmmTickScope -> CmmTickScope
 combineTickScopes s1 s2

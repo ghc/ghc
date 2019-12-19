@@ -5,7 +5,7 @@ import GHC.Base
 -- This oneShot is a lie, and together with unsafePerformIO (in the form of
 -- trace) in OneShot2, we can observe the difference.
 
--- Two modules to ensure that oneShot annotations surive interface files, both
+-- Two modules to ensure that oneShot annotations survive interface files, both
 -- in explicits unfoldings (foo) and in unannotated functions (baz)
 
 foo :: Int -> Int -> Int

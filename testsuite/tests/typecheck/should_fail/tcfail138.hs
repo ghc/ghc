@@ -3,7 +3,7 @@
              FlexibleInstances, UndecidableInstances #-}
 -- UndecidableInstances because (L a b) is no smaller than (C a b)
 
--- This one shows up another rather subtle functional-dependecy
+-- This one shows up another rather subtle functional-dependency
 -- case.  The error is:
 --
 --    Could not deduce (C a b') from the context (C a b)

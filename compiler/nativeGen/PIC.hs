@@ -217,7 +217,7 @@ howToAccessLabel
 
 -- Windows
 -- In Windows speak, a "module" is a set of objects linked into the
--- same Portable Exectuable (PE) file. (both .exe and .dll files are PEs).
+-- same Portable Executable (PE) file. (both .exe and .dll files are PEs).
 --
 -- If we're compiling a multi-module program then symbols from other modules
 -- are accessed by a symbol pointer named __imp_SYMBOL. At runtime we have the

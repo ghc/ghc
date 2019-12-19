@@ -1339,7 +1339,7 @@ users complain bitterly (#13834, #17150.)
 The right error is the CHoleCan, which reports 'wurble' as out of
 scope, and tries to give its type.
 
-Fortunately in tcArgs we still have acces to the function, so
+Fortunately in tcArgs we still have access to the function, so
 we can check if it is a HsUnboundVar.  If so, we simply fail
 immediately.  We've already inferred the type of the function,
 so we'll /already/ have emitted a CHoleCan constraint; failing

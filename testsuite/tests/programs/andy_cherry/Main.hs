@@ -105,19 +105,19 @@
        -> String               -- result
  prog OutputPGN _
                = pgnPrinter True       -- print out game(s)
-               . map runInterp         -- interprete all games
+               . map runInterp         -- interpret all games
  prog OutputRawPGN _
                = pgnPrinter False      -- print out game(s)
-               . map runInterp         -- interprete all games
+               . map runInterp         -- interpret all games
  prog OutputHeader _
                = pgnHeadPrinter        -- print out game(s) headers
-               . map runInterp         -- interprete all games
+               . map runInterp         -- interpret all games
  prog OutputTEX _
                = texPrinter            -- print out game(s)
-               . map runInterp         -- interprete all games
+               . map runInterp         -- interpret all games
  prog ViewGame std_in
                = interactViewer std_in -- print out game(s)
-               . runInterp             -- interprete the game
+               . runInterp             -- interpret the game
                . head                  -- should check for only *one* object
  prog OutputParser _ 
                = userFormat

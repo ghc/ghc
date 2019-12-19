@@ -33,7 +33,7 @@
 #
 # :extension:`extension`
 #
-# Language exensions can be listed:
+# Language extensions can be listed:
 #
 # .. extension-print::
 #     :type: table/list/summary (REQUIRED)

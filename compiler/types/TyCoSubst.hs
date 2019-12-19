@@ -527,7 +527,7 @@ hole will remain. Then, when we're checking x's definition, we skolemise
 x's type (in order to, e.g., bring the scoped type variable `a` into scope).
 This requires performing a substitution for the fresh skolem variables.
 
-This subsitution needs to affect the kind of the coercion hole, too --
+This substitution needs to affect the kind of the coercion hole, too --
 otherwise, the kind will have an out-of-scope variable in it. More problematically
 in practice (we won't actually notice the out-of-scope variable ever), skolems
 in the kind might have too high a level, triggering a failure to uphold the

@@ -240,7 +240,7 @@ for more background.
 
 \gram{\ottR}
 
-The \texttt{GRefl} constructor taks an $[[mg]]$. It wraps a kind coercion, which
+The \texttt{GRefl} constructor takes an $[[mg]]$. It wraps a kind coercion, which
 might be reflexive or any coercion:
 
 \gram{\ottmg}
