@@ -61,6 +61,9 @@ module TyCoRep (
         -- * Functions over coercions
         pickLR,
 
+        -- ** Analyzing types
+        TyCoFolder(..), foldType, foldTypes, foldCoercion, foldCoercions,
+
         -- * Sizes
         typeSize, coercionSize, provSize
     ) where
@@ -1632,6 +1635,182 @@ Here,
     co5 = TyConAppCo Nominal (~#) [<*>, <*>, co4, <Bool>]
 -}
 
+
+{- *********************************************************************
+*                                                                      *
+                foldType  and   foldCoercion
+*                                                                      *
+********************************************************************* -}
+
+{- Note [foldType]
+~~~~~~~~~~~~~~~~~~
+foldType is a bit more powerful than perhaps it looks:
+
+* You can fold with an accumulating parameter, via
+     TyCoFolder env (Endo a)
+  Recall newtype Endo a = Endo (a->a)
+
+* You can fold monadically with a monad M, via
+     TyCoFolder env (M a)
+  provided you have
+     instance ..  => Monoid (M a)
+
+Note [mapType vs foldType]
+~~~~~~~~~~~~~~~~~~~~~~~~~~
+We define foldType here, but mapType in module Type. Why?
+
+* foldType is used in TyCoFVs for finding free variables.
+  It's a very simple function that analyses a type,
+  but does not construct one.
+
+* mapType constructs new types, and so it needs to call
+  the "smart constructors", mkAppTy, mkCastTy, and so on.
+  These are sophisticated functions, and can't be defined
+  here in TyCoRep.
+
+Note [Specialising foldType]
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+We inline foldType at every call site (there are not many), so that it
+becomes specialised for the particular monoid *and* TyCoFolder at
+that site.  This is just for efficiency, but walking over types is
+done a *lot* in GHC, so worth optimising.
+
+We were worried that
+    TyCoFolder env (Endo a)
+might not eta-expand.  Recall newtype Endo a = Endo (a->a).
+
+In particular, given
+   fvs :: Type -> TyCoVarSet
+   fvs ty = appEndo (foldType tcf emptyVarSet ty) emptyVarSet
+
+   tcf :: TyCoFolder enf (Endo a)
+   tcf = TyCoFolder { tcf_tyvar = do_tv, ... }
+      where
+        do_tvs is tv = Endo do_it
+           where
+             do_it acc | tv `elemVarSet` is  = acc
+                       | tv `elemVarSet` acc = acc
+                       | otherwise = acc `extendVarSet` tv
+
+
+we want to end up with
+   fvs ty = go emptyVarSet ty emptyVarSet
+     where
+       go env (TyVarTy tv) acc = acc `extendVarSet` tv
+       ..etc..
+
+And indeed this happens.
+  - Selections from 'tcf' are done at compile time
+  - 'go' is nicely eta-expanded.
+
+We were also worried about
+   deep_fvs :: Type -> TyCoVarSet
+   deep_fvs ty = appEndo (foldType deep_tcf emptyVarSet ty) emptyVarSet
+
+   deep_tcf :: TyCoFolder enf (Endo a)
+   deep_tcf = TyCoFolder { tcf_tyvar = do_tv, ... }
+      where
+        do_tvs is tv = Endo do_it
+           where
+             do_it acc | tv `elemVarSet` is  = acc
+                       | tv `elemVarSet` acc = acc
+                       | otherwise = deep_fvs (varType tv)
+                                     `unionVarSet` acc
+                                     `extendVarSet` tv
+
+Here deep_fvs and deep_tcf are mutually recursive, unlike fvs and tcf.
+But, amazingly, we get good code here too. GHC is careful not to makr
+TyCoFolder data constructor for deep_tcf as a loop breaker, so the
+record selections still cancel.  And eta expansion still happens too.
+-}
+
+data TyCoFolder env a
+  = TyCoFolder
+      { tcf_tyvar :: env -> TyVar -> a
+      , tcf_covar :: env -> CoVar -> a
+      , tcf_hole  :: env -> CoercionHole -> a
+          -- ^ What to do with coercion holes.
+          -- See Note [Coercion holes] in TyCoRep.
+
+      , tcf_tycobinder :: env -> TyCoVar -> ArgFlag -> env
+          -- ^ The returned env is used in the extended scope
+      }
+
+{-# INLINE foldTypes #-}  -- See Note [Specialising foldType]
+foldTypes :: Monoid a => TyCoFolder env a -> env -> [Type] -> a
+foldTypes folder env = foldMap (foldType folder env)
+
+{-# INLINE foldCoercions #-}  -- See Note [Specialising foldType]
+foldCoercions :: Monoid a => TyCoFolder env a -> env -> [Coercion] -> a
+foldCoercions folder env = foldMap (foldCoercion folder env)
+
+{-# INLINE foldType  #-}  -- See Note [Specialising foldType]
+foldType     :: Monoid a => TyCoFolder env a -> env -> Type     -> a
+
+{-# INLINE foldCoercion  #-}  -- See Note [Specialising foldType]
+foldCoercion :: Monoid a => TyCoFolder env a -> env -> Coercion -> a
+foldCoercion folder env = snd (fold_tyco folder env)
+
+foldType folder env = fst (fold_tyco folder env)
+
+{-# INLINE fold_tyco  #-}  -- See Note [Specialising foldType]
+fold_tyco :: Monoid a => TyCoFolder env a -> env
+          -> (Type -> a, Coercion -> a)
+fold_tyco (TyCoFolder { tcf_tyvar      = tyvar
+                      , tcf_tycobinder = tycobinder
+                      , tcf_covar      = covar
+                      , tcf_hole       = cohole }) env
+  = (go_ty env, go_co env)
+  where
+    go_ty env (TyVarTy tv)      = tyvar env tv
+    go_ty env (AppTy t1 t2)     = go_ty env t1 `mappend` go_ty env t2
+    go_ty _   (LitTy {})        = mempty
+    go_ty env (CastTy ty co)    = go_ty env ty `mappend` go_co env co
+    go_ty env (CoercionTy co)   = go_co env co
+    go_ty env (FunTy _ arg res) = go_ty env arg `mappend` go_ty env res
+    go_ty env (TyConApp _ tys)  = go_tys env tys
+    go_ty env (ForAllTy (Bndr tv vis) inner)
+      = let env' = tycobinder env tv vis
+        in go_ty env (varType tv) `mappend` go_ty env' inner
+
+    -- Explicit recursion becuase using foldr builds a local
+    -- loop (with env free) and I'm not confident it'll be
+    -- lambda lifted in the end
+    go_tys _   []     = mempty
+    go_tys env (t:ts) = go_ty env t `mappend` go_tys env ts
+
+    go_cos _   []     = mempty
+    go_cos env (c:cs) = go_co env c `mappend` go_cos env cs
+
+    go_co env (Refl ty)               = go_ty env ty
+    go_co env (GRefl _ ty MRefl)      = go_ty env ty
+    go_co env (GRefl _ ty (MCo co))   = go_ty env ty `mappend` go_co env co
+    go_co env (TyConAppCo _ _ args)   = go_cos env args
+    go_co env (AppCo c1 c2)           = go_co env c1 `mappend` go_co env c2
+    go_co env (FunCo _ c1 c2)         = go_co env c1 `mappend` go_co env c2
+    go_co env (CoVarCo cv)            = covar env cv
+    go_co env (AxiomInstCo _ _ args)  = go_cos env args
+    go_co env (HoleCo hole)           = cohole env hole
+    go_co env (UnivCo p _ t1 t2)      = go_prov env p `mappend` go_ty env t1
+                                                      `mappend` go_ty env t2
+    go_co env (SymCo co)              = go_co env co
+    go_co env (TransCo c1 c2)         = go_co env c1 `mappend` go_co env c2
+    go_co env (AxiomRuleCo _ cos)     = go_cos env cos
+    go_co env (NthCo _ _ co)          = go_co env co
+    go_co env (LRCo _ co)             = go_co env co
+    go_co env (InstCo co arg)         = go_co env co `mappend` go_co env arg
+    go_co env (KindCo co)             = go_co env co
+    go_co env (SubCo co)              = go_co env co
+    go_co env (ForAllCo tv kind_co co)
+      = go_co env kind_co `mappend` go_ty env (varType tv)
+                          `mappend` go_co env' co
+      where
+        env' = tycobinder env tv Inferred
+
+    go_prov env (PhantomProv co)    = go_co env co
+    go_prov env (ProofIrrelProv co) = go_co env co
+    go_prov _   UnsafeCoerceProv    = mempty
+    go_prov _   (PluginProv _)      = mempty
 
 {- *********************************************************************
 *                                                                      *
