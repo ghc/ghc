@@ -138,7 +138,7 @@ test('T17414',
       when(opsys('mingw32'), fragile(17453)),
       # It is common for tmpfs to be mounted to a small tmpfs on modern Linux
       # distributions. This test needs to create a large file which will exceed the
-      # size of this filesystem onsequently we must skip it (see #17459).
+      # size of this filesystem consequently we must skip it (see #17459).
       when(opsys('linux'), skip),
       high_memory_usage],
      compile_and_run, [''])

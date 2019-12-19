@@ -1943,7 +1943,7 @@ liftCoSubstTyVar (LC subst env) r v
 
 callback:
   We want 'liftCoSubstVarBndrUsing' to be general enough to be reused in
-  FamInstEnv, therefore the input arg 'fun' returns a pair with polymophic type
+  FamInstEnv, therefore the input arg 'fun' returns a pair with polymorphic type
   in snd.
   However in 'liftCoSubstVarBndr', we don't need the snd, so we use unit and
   ignore the fourth component of the return value.

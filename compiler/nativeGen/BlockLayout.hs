@@ -374,7 +374,7 @@ combineNeighbourhood  :: [CfgEdge] -- ^ Edges to consider
                       -- were used to fuse chains and as such no longer need to be
                       -- considered.
 combineNeighbourhood edges chains
-    = -- pprTraceIt "Neigbours" $
+    = -- pprTraceIt "Neighbours" $
     --   pprTrace "combineNeighbours" (ppr edges) $
       applyEdges edges endFrontier startFrontier (Set.empty)
     where

@@ -1325,7 +1325,7 @@ like this ::
         pure = return
         x <*> y = do f <- x; a <- y; return (f a)
 
-will result in an infinte loop when ``<*>`` is called.
+will result in an infinite loop when ``<*>`` is called.
 
 Just as you wouldn't define a ``Monad`` instance using the do-notation, you
 shouldn't define ``Functor`` or ``Applicative`` instance using do-notation (when

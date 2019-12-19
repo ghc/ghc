@@ -44,7 +44,7 @@ import GHC.IO.Handle.Lock.NoOp
 -- 2) The implementation uses 'LockFileEx' on Windows and 'flock' otherwise,
 -- hence all of their caveats also apply here.
 --
--- 3) On non-Windows plaftorms that don't support 'flock' (e.g. Solaris) this
+-- 3) On non-Windows platforms that don't support 'flock' (e.g. Solaris) this
 -- function throws 'FileLockingNotImplemented'. We deliberately choose to not
 -- provide fcntl based locking instead because of its broken semantics.
 --

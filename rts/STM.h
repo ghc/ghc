@@ -63,7 +63,7 @@ StgTRecHeader *stmStartNestedTransaction(Capability *cap, StgTRecHeader *outer
 );
 
 /*
- * Roll back the current transatcion context.  NB: if this is a nested tx
+ * Roll back the current transaction context.  NB: if this is a nested tx
  * then we merge its read set into its parents.  This is because a change
  * to that read set could change whether or not the tx should abort.
  */

@@ -1,7 +1,7 @@
 {-# LANGUAGE TypeFamilies, FlexibleContexts #-}
 
 -- This one sent an earlier version of GHC into a
--- loop in the simplfier, because we allowed a RULE
+-- loop in the simplifier, because we allowed a RULE
 -- to fire on a loop-breaker
 --
 -- Discovered by Roman L, Nov 09

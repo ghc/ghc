@@ -5,7 +5,7 @@
    The mutual recursion between munch and f causes lots of
    closures to be built, of the form (munch n s), for some n and s.
    Now, all of these closures are entered and each has as its value
-   the result delivere by the next; so the result is that there is
+   the result delivered by the next; so the result is that there is
    a massive chain of identical updates.
 
    As it turns out, they are mostly garbage, so the GC could eliminate

@@ -38,7 +38,7 @@ import Data.Maybe
 import Control.Monad (join)
 
 
--- | Records the expected cost to spill some regster.
+-- | Records the expected cost to spill some register.
 type SpillCostRecord
  =      ( VirtualReg    -- register name
         , Int           -- number of writes to this reg

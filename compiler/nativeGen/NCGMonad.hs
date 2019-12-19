@@ -226,7 +226,7 @@ addNodeBetweenNat from between to
           addWeightEdge between old weight .
           delEdge from old $ m
         | otherwise
-        = pprPanic "Faild to update cfg: Untracked edge" (ppr (from,to))
+        = pprPanic "Failed to update cfg: Untracked edge" (ppr (from,to))
 
 
 -- | Place `succ` after `block` and change any edges
