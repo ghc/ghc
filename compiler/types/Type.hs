@@ -3,7 +3,7 @@
 --
 -- Type - public interface
 
-{-# LANGUAGE CPP, FlexibleContexts #-}
+{-# LANGUAGE CPP, FlexibleContexts, RankNTypes, ScopedTypeVariables #-}
 {-# OPTIONS_GHC -fno-warn-orphans #-}
 
 -- | Main functions for manipulating types and type-related things
@@ -81,6 +81,7 @@ module Type (
 
         -- ** Analyzing types
         TyCoMapper(..), mapType, mapCoercion,
+        TyCoFolder(..), foldType, foldCoercion,
 
         -- (Newtypes)
         newTyConInstRhs,
@@ -694,6 +695,98 @@ mapCoercion mapper@(TyCoMapper { tcm_covar = covar
     go_prov (PhantomProv co)    = PhantomProv <$> go co
     go_prov (ProofIrrelProv co) = ProofIrrelProv <$> go co
     go_prov p@(PluginProv _)    = return p
+
+
+{- *********************************************************************
+*                                                                      *
+                foldType  and   foldCoercion
+*                                                                      *
+********************************************************************* -}
+
+{- Note [foldType]
+~~~~~~~~~~~~~~~~~~
+foldType is a bit more powerful than perhaps it looks:
+
+* You can fold with an accumulating parameter, via
+     TyCoFolder env (a -> a)
+  ToDo: check that eta-expansion works right if you do this
+
+* You can fold monadically with a monad M, via
+     TyCoFolder env (M a)
+  provided you have
+     instance Monoid a => Monoid (M a)
+
+Note [Specialising foldType]
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+We inline foldType at every call site (there are not many), so that
+it is becomes specialised for the particular monoid and TyCoFolder
+at that site.  This is just for efficiency.
+
+This makes it harder to also expose foldCoercion.  We'd have to
+do some pairing to acheive this; not too hard but not yet needed.
+-}
+
+data TyCoFolder env a
+  = TyCoFolder
+      { tcf_tyvar :: env -> TyVar -> a
+      , tcf_covar :: env -> CoVar -> a
+      , tcf_hole  :: env -> CoercionHole -> a
+          -- ^ What to do with coercion holes.
+          -- See Note [Coercion holes] in TyCoRep.
+
+      , tcf_tycobinder :: env -> TyCoVar -> ArgFlag -> (env, a)
+          -- ^ The returned env is used in the extended scope
+      }
+
+{-# INLINE foldType #-}  -- See Note [Specialising foldType]
+foldType :: Monoid a => TyCoFolder env a -> env -> Type -> a
+foldType (TyCoFolder { tcf_tyvar      = tyvar
+                     , tcf_tycobinder = tycobinder
+                     , tcf_covar      = covar
+                     , tcf_hole       = cohole })
+  = go_ty
+  where
+    go_ty env (TyVarTy tv)      = tyvar env tv
+    go_ty env (AppTy t1 t2)     = go_ty env t1 `mappend` go_ty env t2
+    go_ty _   (LitTy {})        = mempty
+    go_ty env (CastTy ty co)    = go_ty env ty `mappend` go_co env co
+    go_ty env (CoercionTy co)   = go_co env co
+    go_ty env (FunTy _ arg res) = go_ty env arg `mappend` go_ty env res
+    go_ty env (TyConApp _ tys)  = go_tys env tys
+    go_ty env (ForAllTy (Bndr tv vis) inner)
+      = let (env', r1) =  tycobinder env tv vis
+        in r1 `mappend` go_ty env' inner
+
+    go_tys env = foldr (mappend . go_ty env) mempty
+    go_cos env = foldr (mappend . go_co env) mempty
+
+    go_co env (Refl ty)               = go_ty env ty
+    go_co env (GRefl _ ty MRefl)      = go_ty env ty
+    go_co env (GRefl _ ty (MCo co))   = go_ty env ty `mappend` go_co env co
+    go_co env (TyConAppCo _ _ args)   = go_cos env args
+    go_co env (AppCo c1 c2)           = go_co env c1 `mappend` go_co env c2
+    go_co env (FunCo _ c1 c2)         = go_co env c1 `mappend` go_co env c2
+    go_co env (CoVarCo cv)            = covar env cv
+    go_co env (AxiomInstCo _ _ args)  = go_cos env args
+    go_co env (HoleCo hole)           = cohole env hole
+    go_co env (UnivCo p _ t1 t2)      = go_prov env p `mappend` go_ty env t1 `mappend` go_ty env t2
+    go_co env (SymCo co)              = go_co env co
+    go_co env (TransCo c1 c2)         = go_co env c1 `mappend` go_co env c2
+    go_co env (AxiomRuleCo _ cos)     = go_cos env cos
+    go_co env (NthCo _ _ co)          = go_co env co
+    go_co env (LRCo _ co)             = go_co env co
+    go_co env (InstCo co arg)         = go_co env co `mappend` go_co env arg
+    go_co env (KindCo co)             = go_co env co
+    go_co env (SubCo co)              = go_co env co
+    go_co env (ForAllCo tv kind_co co)
+      = go_co env kind_co `mappend` bndr_res `mappend` go_co env' co
+      where
+        (env', bndr_res) = tycobinder env tv Inferred
+
+    go_prov env (PhantomProv co)    = go_co env co
+    go_prov env (ProofIrrelProv co) = go_co env co
+    go_prov _   UnsafeCoerceProv    = mempty
+    go_prov _   (PluginProv _)      = mempty
 
 {-
 ************************************************************************
