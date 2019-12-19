@@ -154,7 +154,7 @@ EXTERN_INLINE void load_load_barrier(void);
  * closure are visible *before* the write exposing the new closure is made visible:
  *
  * - Allocate memory for the closure
- * - Write the closure's info pointer and fields (ordering betweeen this doesn't
+ * - Write the closure's info pointer and fields (ordering between this doesn't
  *   matter since the closure isn't yet visible to anyone else).
  * - Write barrier
  * - Make closure visible to other cores

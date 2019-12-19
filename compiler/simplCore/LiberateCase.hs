@@ -164,7 +164,7 @@ libCaseBind env (Rec pairs)
 {- Note [Not bottoming Ids]
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~
 Do not specialise error-functions (this is unusual, but I once saw it,
-(acually in Data.Typable.Internal)
+(actually in Data.Typable.Internal)
 
 Note [Only functions!]
 ~~~~~~~~~~~~~~~~~~~~~~

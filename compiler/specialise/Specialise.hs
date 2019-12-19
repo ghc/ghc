@@ -199,7 +199,7 @@ the two instances of +.sel weren't originally at the same type.
 Further notes on (b)
 
 * There are quite a few variations here.  For example, the defn of
-  +.sel could be floated ouside the \y, to attempt to gain laziness.
+  +.sel could be floated outside the \y, to attempt to gain laziness.
   It certainly mustn't be floated outside the \d because the d has to
   be in scope too.
 

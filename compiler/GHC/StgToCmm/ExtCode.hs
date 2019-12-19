@@ -102,7 +102,7 @@ instance HasDynFlags CmmParse where
                                    return (d, dflags))
 
 
--- | Takes the variable decarations and imports from the monad
+-- | Takes the variable declarations and imports from the monad
 --      and makes an environment, which is looped back into the computation.
 --      In this way, we can have embedded declarations that scope over the whole
 --      procedure, and imports that scope over the entire module.

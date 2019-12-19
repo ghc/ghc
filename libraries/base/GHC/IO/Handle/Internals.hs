@@ -358,7 +358,7 @@ ioe_bufsiz n = ioException
 -- Wrapper for Handle encoding/decoding.
 
 -- The interface for TextEncoding changed so that a TextEncoding doesn't raise
--- an exception if it encounters an invalid sequnce. Furthermore, encoding
+-- an exception if it encounters an invalid sequence. Furthermore, encoding
 -- returns a reason as to why encoding stopped, letting us know if it was due
 -- to input/output underflow or an invalid sequence.
 --

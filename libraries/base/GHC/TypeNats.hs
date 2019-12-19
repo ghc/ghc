@@ -113,7 +113,7 @@ After inlining and simplification, this ends up looking something like this:
 
 `KnownNat` is the constructor for dictionaries for the class `KnownNat`.
 See Note [magicDictId magic] in "basicType/MkId.hs" for details on how
-we actually construct the dictionry.
+we actually construct the dictionary.
 
 Note that using `Any Nat` is not really correct, as multilple calls to
 `someNatVal` would violate coherence:

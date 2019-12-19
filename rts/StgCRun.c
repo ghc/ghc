@@ -140,7 +140,7 @@ STG_NO_OPTIMIZE StgWord8 *win32AllocStack(void)
  * alignment for these jumps.
  *
  * This gives us binary compatibility with LLVM and GCC as well as dealing
- * with the FFI. Previously we just maintianed a 16n byte alignment for
+ * with the FFI. Previously we just maintained a 16n byte alignment for
  * procedure entry and calls, which led to bugs (see #4211 and #5250).
  *
  * To change this convention you need to change the code here, and in

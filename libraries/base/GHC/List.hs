@@ -425,7 +425,7 @@ The type of (g :: (a -> b -> b) -> b -> b) allows us to apply parametricity:
 Either the tuple is returned (trivial), or scanrFB is called:
     g (scanrFB f c) (q0,n) = scanrFB ... (g' (scanrFB f c) (q0,n))
 Notice that thanks to the strictness of scanrFB, the expression
-g' (scanrFB f c) (q0,n) gets evaluated aswell. In particular, if g' is a
+g' (scanrFB f c) (q0,n) gets evaluated as well. In particular, if g' is a
 recursive case of g, parametricity applies again and we will again have a
 possible call to scanrFB. In short, g (scanrFB f c) (q0,n) will end up being
 completely evaluated. This is resource consuming for large lists and if the

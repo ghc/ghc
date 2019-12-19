@@ -103,7 +103,7 @@ class IsStatic p where
 instance IsStatic StaticPtr where
     fromStaticPtr = id
 
--- | Miscelaneous information available for debugging purposes.
+-- | Miscellaneous information available for debugging purposes.
 data StaticPtrInfo = StaticPtrInfo
     { -- | Package key of the package where the static pointer is defined
       spInfoUnitId  :: String
