@@ -156,7 +156,7 @@ importDecl name
   where
     nd_doc = text "Need decl for" <+> ppr name
     not_found_msg = hang (text "Can't find interface-file declaration for" <+>
-                                pprNameSpace (occNameSpace (nameOccName name)) <+> ppr name)
+                                pprNameSpace (nameNameSpace name) <+> ppr name)
                        2 (vcat [text "Probable cause: bug in .hi-boot file, or inconsistent .hi file",
                                 text "Use -ddump-if-trace to get an idea of which file caused the error"])
     found_things_msg eps =

@@ -1,0 +1,7 @@
+
+T17593.hs:5:1: error:
+    The type signature for ‘<+>’ lacks an accompanying binding
+
+T17593.hs:8:6: error:
+    The standalone kind signature for ‘MkT’
+      lacks an accompanying binding

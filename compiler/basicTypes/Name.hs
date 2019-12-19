@@ -50,7 +50,7 @@ module Name (
 
         -- ** Manipulating and deconstructing 'Name's
         nameUnique, setNameUnique,
-        nameOccName, nameModule, nameModule_maybe,
+        nameOccName, nameNameSpace, nameModule, nameModule_maybe,
         setNameLoc,
         tidyNameOcc,
         localiseName,
@@ -196,14 +196,16 @@ instance HasOccName Name where
 
 nameUnique              :: Name -> Unique
 nameOccName             :: Name -> OccName
+nameNameSpace           :: Name -> NameSpace
 nameModule              :: HasDebugCallStack => Name -> Module
 nameSrcLoc              :: Name -> SrcLoc
 nameSrcSpan             :: Name -> SrcSpan
 
-nameUnique  name = n_uniq name
-nameOccName name = n_occ  name
-nameSrcLoc  name = srcSpanStart (n_loc name)
-nameSrcSpan name = n_loc  name
+nameUnique    name = n_uniq name
+nameOccName   name = n_occ  name
+nameNameSpace name = occNameSpace (n_occ name)
+nameSrcLoc    name = srcSpanStart (n_loc name)
+nameSrcSpan   name = n_loc  name
 
 {-
 ************************************************************************
