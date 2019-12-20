@@ -1,5 +1,9 @@
 packages: ./
 
+documentation: False
+profiling: False
+library-profiling: False
+
 -- This essentially freezes the build plan for hadrian
 index-state: 2019-12-16T07:24:23Z
 

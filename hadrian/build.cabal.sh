@@ -1,7 +1,7 @@
 #!/usr/bin/env bash
 
-CABAL=cabal
-CABFLAGS="--disable-documentation --disable-profiling --disable-library-profiling $CABFLAGS"
+CABAL=${CABAL-cabal}
+CABFLAGS="$CABFLAGS"
 
 # It is currently more robust to pass Cabal an absolute path to the project file.
 PROJ="$PWD/hadrian/cabal.project"
@@ -19,7 +19,7 @@ if ! type "$CABAL" > /dev/null; then
 fi
 
 CABVERSTR=$("$CABAL" --numeric-version)
-CABVER=( ${CABVERSTR//./ } )
+IFS="." read -ra CABVER <<< "$CABVERSTR"
 
 build_failed() {
     ( ghc --info | grep -s '("Support SMP","YES")' > /dev/null ) \
@@ -34,15 +34,18 @@ EOF
     exit 1
 }
 
-if [ "${CABVER[0]}" -gt 2 -o "${CABVER[0]}" -eq 2 -a "${CABVER[1]}" -ge 2 ];
+if [ "${CABVER[0]}" -lt 2 ] || [ "${CABVER[0]}" -eq 2 ] && [ "${CABVER[1]}" -lt 2 ];
 then
-    "$CABAL" --project-file="$PROJ" new-build $CABFLAGS -j exe:hadrian
-    # use new-exec instead of new-run to make sure that the build-tools (alex & happy) are in PATH
-    "$CABAL" --project-file="$PROJ" new-exec  $CABFLAGS    hadrian -- \
-        --directory "$PWD" \
-        "$@" \
-        || build_failed
-else
     echo "Cabal version is too old; you need at least cabal-install 2.2"
     exit 2
 fi
+
+# shellcheck disable=SC2086
+"$CABAL" --project-file="$PROJ" v2-build $CABFLAGS -j exe:hadrian
+
+# use new-exec instead of new-run to make sure that the build-tools (alex & happy) are in PATH
+# shellcheck disable=SC2086
+"$CABAL" --project-file="$PROJ" v2-exec  $CABFLAGS    hadrian -- \
+    --directory "$PWD" \
+    "$@" \
+    || build_failed
