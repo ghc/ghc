@@ -62,8 +62,6 @@ import qualified GHC.LanguageExtensions as LangExt
 
 import Control.Monad (when, forM_, zipWithM)
 import Data.List (elemIndex)
-import Data.Array (Array)
-import qualified Data.Array as Array
 import qualified Data.Semigroup as Semi
 
 {-
@@ -123,35 +121,6 @@ instance Outputable PmGrd where
 
 type GrdVec = [PmGrd]
 
--- | Each 'Delta' is proof (i.e., a model of the fact) that some values are not
--- covered by a pattern match. E.g. @f Nothing = <rhs>@ might be given an
--- uncovered set @[x :-> Just y]@ or @[x /= Nothing]@, where @x@ is the variable
--- matching against @f@'s first argument.
-type Uncovered = Deltas
-
--- Instead of keeping the whole sets in memory, we keep a flag for both the
--- covered and the divergent set (we store the uncovered set though, since we
--- want to print it).
-
-data Covered = Covered | NotCovered
-  deriving Show
-
-instance Outputable Covered where
-  ppr = text . show
-
-instance Semi.Semigroup Covered where
-  NotCovered <> NotCovered = NotCovered
-  _          <> _          = Covered
-
-instance Monoid Covered where
-  mempty = NotCovered
-
-data Diverged = Diverged | NotDiverged
-  deriving Show
-
-instance Outputable Diverged where
-  ppr = text . show
-
 data Precision = Approximate | Precise
   deriving (Eq, Show)
 
@@ -166,57 +135,47 @@ instance Monoid Precision where
   mempty = Precise
   mappend = (Semi.<>)
 
--- | Pattern check result
---
--- * Redundant clauses
--- * Not-covered clauses (or their type, if no pattern is available)
--- * Clauses with inaccessible RHS
--- * A flag saying whether we ran into the 'maxPmCheckModels' limit for the
---   purpose of suggesting to crank it up in the warning message
---
--- More details about the classification of clauses into useful, redundant
--- and with inaccessible right hand side can be found here:
---
---     https://gitlab.haskell.org/ghc/ghc/wikis/pattern-match-check
---
-type CheckResult = CheckResult' DigestedTree
-data CheckResult' a
-  = CheckResult
-  { cr_clauses :: !a
-  , cr_uncov   :: !Uncovered
-  , cr_approx  :: !Precision
-  }
+-- | Means by which we identify a RHS for later pretty-printing in a warning
+-- message. 'SDoc' for the equation to show, 'Located' for the location.
+type RhsInfo = Located SDoc
 
-instance Outputable a => Outputable (CheckResult' a) where
-  ppr (CheckResult c unc pc)
-    = hang (text "CheckResult" <+> ppr c <+> ppr pc) 2 (ppr unc)
-
-data ClauseTree a
-  = Rhs !(Located SDoc)
-  -- ^ SDoc for the equation to show, Located for the location
-  | Many !(Array Int a)
-
-instance (Outputable a) => Outputable (ClauseTree a) where
-  ppr (Rhs sdoc) = ppr sdoc
-  ppr (Many cs)  = nest 2 $ vcat $ map ppr $ Array.elems cs
-
+-- | A representation of the desugaring to 'PmGrd's of all clauses of a
+-- function definition/pattern match/etc.
 data GrdTree
-  = Guard !PmGrd !GrdTree
-  | GrdTree !(ClauseTree GrdTree)
+  = Rhs !RhsInfo
+  | Sequence !GrdTree !GrdTree
+  -- ^ @Sequence l r@ first matches against @l@, and then matches all
+  -- fallen-through against @r@. Models top-to-bottom semantics of pattern
+  -- matching.
+  | Guard !PmGrd !GrdTree
+  -- ^ @Guard grd t@ will try to match @grd@ and on success continue to match
+  -- @t@. Falls through if either match fails. Models left-to-right semantics
+  -- of pattern matching.
 
-data DigestedTree
-  = Diverges !DigestedTree
-  | Inaccessible !DigestedTree
-  | DigestedTree !(ClauseTree DigestedTree)
+-- | The digest of 'checkGrdTree', representing the annotated pattern-match
+-- tree. 'redundantAndInaccessibleRhss' can figure out redundant and proper
+-- inaccessible RHSs from this.
+data AnnotatedTree
+  = AccessibleRhs !RhsInfo
+  -- ^ A RHS deemed accessible.
+  | InaccessibleRhs !RhsInfo
+  -- ^ A RHS deemed inaccessible; no value could possibly reach it.
+  | MayDiverge !AnnotatedTree
+  -- ^ Asserts that the tree may force diverging values, so not all of its
+  -- clauses can be redundant.
+  | SequenceAnn !AnnotatedTree !AnnotatedTree
+  -- ^ Mirrors 'Sequence' for preserving the skeleton of a 'GrdTree's.
 
 instance Outputable GrdTree where
-  ppr (Guard grd t) = ppr grd <+> ppr t
-  ppr (GrdTree t)   = ppr t
+  ppr (Rhs sdoc)     = ppr sdoc
+  ppr (Sequence l r) = ppr l <> char ';' $$ ppr r
+  ppr (Guard grd t)  = ppr grd <+> ppr t
 
-instance Outputable DigestedTree where
-  ppr (Diverges     t) = char '⚡' <> ppr t
-  ppr (Inaccessible t) = char '✕' <> ppr t
-  ppr (DigestedTree t) = ppr t
+instance Outputable AnnotatedTree where
+  ppr (AccessibleRhs sdoc)   = ppr sdoc
+  ppr (InaccessibleRhs sdoc) = char '✕' <> ppr sdoc
+  ppr (MayDiverge t)         = char '⚡' <> ppr t
+  ppr (SequenceAnn l r)      = ppr l <> char ';' $$ ppr r
 
 newtype Deltas = MkDeltas (Bag Delta)
 
@@ -239,6 +198,23 @@ addPmCtsDeltas deltas cts = liftDeltasM (\d -> addPmCts d cts) deltas
 -- terms of @notNull <$> provideEvidence 1 ds@.
 isInhabited :: Deltas -> DsM Bool
 isInhabited (MkDeltas ds) = pure (not (null ds))
+
+-- | Pattern check result
+--
+-- * The 'AnnotatedTree', capturing redundancy info for each clause
+-- * The set of uncovered values falling out at the bottom
+-- * A flag saying whether we ran into the 'maxPmCheckModels' limit for the
+--   purpose of suggesting to crank it up in the warning message
+data CheckResult
+  = CheckResult
+  { cr_clauses :: !AnnotatedTree
+  , cr_uncov   :: !Deltas
+  , cr_approx  :: !Precision
+  }
+
+instance Outputable CheckResult where
+  ppr (CheckResult c unc pc)
+    = hang (text "CheckResult" <+> ppr c <+> ppr pc) 2 (ppr unc)
 
 {-
 %************************************************************************
@@ -590,12 +566,11 @@ translateConPatOut fam_insts x con univ_tys ex_tvs dicts = \case
       pure (con_grd : bang_grds ++ arg_grds)
 
 mkGrdTreeRhs :: Located SDoc -> GrdVec -> GrdTree
-mkGrdTreeRhs sdoc = foldr Guard (GrdTree (Rhs sdoc))
+mkGrdTreeRhs sdoc = foldr Guard (Rhs sdoc)
 
 mkGrdTreeMany :: GrdVec -> [GrdTree] -> GrdTree
-mkGrdTreeMany grds trees = foldr Guard root grds
-  where
-    root = GrdTree (Many (Array.listArray (0, length trees-1) trees))
+mkGrdTreeMany _    []    = panic "mkGrdTreeMany empty"
+mkGrdTreeMany grds trees = foldr Guard (foldr1 Sequence trees) grds
 
 -- Translate a single match
 translateMatch :: FamInstEnvs -> [Id] -> LMatch GhcTc (LHsExpr GhcTc)
@@ -872,15 +847,6 @@ brows.
             Heart of the algorithm: checkGrdTree
 %*                                                                      *
 %************************************************************************
-
-Main functions are:
-
-* checkGrdTree :: GrdTree -> Deltas -> DsM CheckResult
-
-  Walks down the spine of the 'CtTree', continually collecting and checking
-  constraints for satisfiability, ultimately digesting results into annotations
-  of a 'DigestedTree' and an 'Uncovered' set (see 'CheckResult').
-
 -}
 
 -- | @throttle limit old new@ returns @old@ if the number of 'Delta's in @new@
@@ -898,32 +864,31 @@ conMatchForces (PmAltConLike (RealDataCon dc))
   | isNewTyCon (dataConTyCon dc) = False
 conMatchForces _                 = True
 
--- | Translates from a 'GrdTree' to a 'CtTree'. The differences between the two
--- are as follows:
+-- | Computes two things:
 --
---   * 'GrdVec's have inherent scoping, 'PmCts' don't.
---   * The semantics of 'PmGrd' permit "failure" (of a guard) and "divergence".
---     'PmCt' doesn't have that notion: It's just a constraint that may or may
---     not be compatible with a set of other constraints. Consequently, to map
---     the fall-through semantics of 'PmGrd', 'checkGrdTree' introduces
---     'DivergeIf' and 'FallthroughIf' for 'PmBang' and 'PmCon'.
+--   * The set of uncovered values not matched by any of the clauses of the
+--     'GrdTree'. Note that 'PmCon' guards are the only way in which values
+--     fall through from one 'Many' branch to the next.
+--   * An 'AnnotatedTree' that contains divergence and inaccessibility info
+--     for all clauses. Will be fed to 'redundantAndInaccessibleRhss' for
+--     presenting redundant and proper innaccessible RHSs to the user.
 checkGrdTree' :: GrdTree -> Deltas -> DsM CheckResult
 -- RHS: Check that it covers something and wrap Inaccessible if not
-checkGrdTree' (GrdTree (Rhs sdoc)) deltas = do
+checkGrdTree' (Rhs sdoc) deltas = do
   is_covered <- isInhabited deltas
+  let clauses = if is_covered then AccessibleRhs sdoc else InaccessibleRhs sdoc
   pure CheckResult
-    { cr_clauses = applyWhen (not is_covered) Inaccessible (DigestedTree (Rhs sdoc))
+    { cr_clauses = clauses
     , cr_uncov   = MkDeltas emptyBag
     , cr_approx  = Precise }
--- Many: Thread residual uncovered sets from equation to equation
-checkGrdTree' (GrdTree (Many trees)) deltas = do
-  let init_res = CheckResult [] deltas Precise
-  let go (CheckResult cs' deltas prec) grd_tree = do
-        CheckResult c' unc prec' <- checkGrdTree' grd_tree deltas
-        pure $ CheckResult (c':cs') unc (prec Semi.<> prec')
-  res@CheckResult{ cr_clauses = cs' } <- foldlM go init_res trees
-  let cs_array = Array.listArray (Array.bounds trees) (reverse cs')
-  pure res{ cr_clauses = DigestedTree (Many cs_array) }
+-- Sequence: Thread residual uncovered sets from equation to equation
+checkGrdTree' (Sequence l r) unc_0 = do
+  CheckResult l' unc_1 prec_l <- checkGrdTree' l unc_0
+  CheckResult r' unc_2 prec_r <- checkGrdTree' r unc_1
+  pure CheckResult
+    { cr_clauses = SequenceAnn l' r'
+    , cr_uncov = unc_2
+    , cr_approx = prec_l Semi.<> prec_r }
 -- let x = e: Refine with x ~ e
 checkGrdTree' (Guard (PmLet x e) tree) deltas = do
   deltas' <- addPmCtsDeltas deltas (unitBag (PmCoreCt x e))
@@ -932,7 +897,7 @@ checkGrdTree' (Guard (PmLet x e) tree) deltas = do
 checkGrdTree' (Guard (PmBang x) tree) deltas = do
   has_diverged <- addPmCtsDeltas deltas (unitBag (PmBotCt x)) >>= isInhabited
   res <- checkGrdTree' tree deltas
-  pure res{ cr_clauses = applyWhen has_diverged Diverges (cr_clauses res) }
+  pure res{ cr_clauses = applyWhen has_diverged MayDiverge (cr_clauses res) }
 -- Con: Diverge on x ~ ⊥, fall through on x /~ K and refine with x ~ K ys
 --      and type info
 checkGrdTree' (Guard (PmCon x con dicts args) tree) deltas = do
@@ -941,12 +906,13 @@ checkGrdTree' (Guard (PmCon x con dicts args) tree) deltas = do
       then addPmCtsDeltas deltas (unitBag (PmBotCt x)) >>= isInhabited
       else pure False
   unc_this <- addPmCtsDeltas deltas (unitBag (PmNotConCt x con))
-  deltas' <- addPmCtsDeltas deltas (listToBag (PmTyCt . evVarPred <$> dicts) `snocBag` PmConCt x con args)
-  CheckResult dig_tree' unc_inner prec <- checkGrdTree' tree deltas'
+  deltas' <- addPmCtsDeltas deltas $
+    listToBag (PmTyCt . evVarPred <$> dicts) `snocBag` PmConCt x con args
+  CheckResult tree' unc_inner prec <- checkGrdTree' tree deltas'
   limit <- maxPmCheckModels <$> getDynFlags
   let (prec', unc') = throttle limit deltas (unc_this Semi.<> unc_inner)
   pure CheckResult
-    { cr_clauses = applyWhen has_diverged Diverges dig_tree'
+    { cr_clauses = applyWhen has_diverged MayDiverge tree'
     , cr_uncov = unc'
     , cr_approx = prec Semi.<> prec' }
 
@@ -954,7 +920,7 @@ checkGrdTree' (Guard (PmCon x con dicts args) tree) deltas = do
 checkGrdTree :: GrdTree -> Deltas -> DsM CheckResult
 checkGrdTree guards deltas = do
   tracePm "checkGrdTree {" $ vcat [ ppr guards
-                             , ppr deltas ]
+                                  , ppr deltas ]
   res <- checkGrdTree' guards deltas
   tracePm "}:" (ppr res) -- braces are easier to match by tooling
   return res
@@ -1086,21 +1052,55 @@ needToRunPmCheck dflags origin
   | otherwise
   = notNull (filter (`wopt` dflags) allPmCheckWarnings)
 
-redundantAndInaccessibleRhss :: DigestedTree -> ([Located SDoc], [Located SDoc])
-redundantAndInaccessibleRhss tree = (fromOL ol_red, fromOL ol_div)
+redundantAndInaccessibleRhss :: AnnotatedTree -> ([RhsInfo], [RhsInfo])
+redundantAndInaccessibleRhss tree = (fromOL ol_red, fromOL ol_inacc)
   where
-    (ol_red, ol_div, _cov) = go Covered tree
-    go Covered    (DigestedTree (Rhs _))      = (nilOL,       nilOL, Covered)
-    go NotCovered (DigestedTree (Rhs sdoc))   = (unitOL sdoc, nilOL, NotCovered)
-    go cov        (DigestedTree (Many trees)) = foldMap (go cov) trees
-    go _          (Inaccessible tree)         = go NotCovered tree
-    -- A diverging match makes all the children inaccessible if all of them were
-    -- redundant before. So if there is one child that is reachable, then
-    -- all the others are redundant, because termination doesn't change and it
-    -- doesn't matter where exactly we force ⊥. See #17465.
-    go cov        (Diverges     tree)         = case go cov tree of
-      (red, div, NotCovered) -> (nilOL, div `appOL` red, NotCovered)
-      res                    -> res
+    (_ol_acc, ol_inacc, ol_red) = go tree
+    -- | Collects RHSs which are
+    --    1. accessible
+    --    2. proper inaccessible (so we can't delete them)
+    --    3. hypothetically redundant (so not only inaccessible RHS, but we can
+    --       even safely delete the equation without altering semantics)
+    -- See Note [Determining inaccessible clauses]
+    go :: AnnotatedTree -> (OrdList RhsInfo, OrdList RhsInfo, OrdList RhsInfo)
+    go (AccessibleRhs info)   = (unitOL info, nilOL, nilOL)
+    go (InaccessibleRhs info) = (nilOL,       nilOL, unitOL info) -- presumably redundant
+    go (SequenceAnn l r)      = go l Semi.<> go r
+    go (MayDiverge t)         = case go t of
+      -- See Note [Determining inaccessible clauses]
+      (acc, inacc, red)
+        | isNilOL acc && isNilOL inacc -> (nilOL, red, nilOL)
+      res                              -> res
+
+{- Note [Determining inaccessible clauses]
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+Consider
+  f _  True = ()
+  f () True = ()
+  f _  _    = ()
+Is f's second clause redundant? The perhaps surprising answer is, no, it isn't!
+@f (error "boom") False@ will force the error with clause 2, but will return
+() if it was deleted, so clearly not redundant. Yet for now combination of
+arguments we can ever reach clause 2's RHS, so we say it has inaccessible RHS
+(as opposed to being completely redundant).
+
+We detect an inaccessible RHS simply by pretending it's redundant, until we see
+that it's part of a sub-tree in the pattern match that forces some argument
+(which corresponds to wrapping the 'AnnotatedTree' in 'MayDiverge'). Then we
+turn all supposedly redundant RHSs into inaccessible ones.
+
+But as it turns out (@g@ from #17465) this is too conservative:
+  g () | False = ()
+       | otherwise = ()
+g's first clause has an inaccessible RHS, but it's also safe to delete. So it's
+redundant, really! But by just turning all redundant child clauses into
+inaccessible ones, we report the first clause as inaccessible.
+
+Clearly, it is enough if we say that we only degrade if *not all* of the child
+clauses are redundant. As long as there is at least one clause which we announce
+not to be redundant, the guard prefix responsible for the 'MayDiverge' will
+survive. Hence we check for that in 'redundantAndInaccessibleRhss'.
+-}
 
 -- | Issue all the warnings (coverage, exhaustiveness, inaccessibility)
 dsPmWarn :: DynFlags -> DsMatchContext -> [Id] -> CheckResult -> DsM ()
