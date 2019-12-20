@@ -312,6 +312,7 @@ test('T17409',
      normal,
      makefile_test, ['T17409'])
 test('T17429', normal, compile, ['-dcore-lint -O2'])
+test('T17590', normal, compile, ['-dcore-lint -O2'])
 test('T17722', normal, multimod_compile, ['T17722B', '-dcore-lint -O2 -v0'])
 test('T17724', normal, compile, ['-dcore-lint -O2'])
 test('T17787',  [ grep_errmsg(r'foo') ], compile, ['-ddump-simpl -dsuppress-uniques'])
