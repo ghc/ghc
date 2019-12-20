@@ -24,3 +24,6 @@ cabal.sandbox.config
 
 # ghcid output
 /ghcid.txt
+
+# build.cabal.offline.sh directory
+.cabal

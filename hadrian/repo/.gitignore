@@ -1,0 +1,3 @@
+*.cabal
+*.tar.gz
+noindex.cache
