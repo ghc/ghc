@@ -1255,7 +1255,7 @@ ocVerifyImage_PEi386 ( ObjectCode* oc )
          */
         COFF_reloc* rel = (COFF_reloc*)
                            myindex ( sizeof_COFF_reloc, reltab, 0 );
-        noRelocs = rel->VirtualAddress;
+        noRelocs = rel->VirtualAddress - 1;
         relocs_offset = 1;
       } else {
         noRelocs = sectab_i->NumberOfRelocations;
