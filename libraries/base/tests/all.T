@@ -253,4 +253,6 @@ test('T15349', [exit_code(1), expect_broken_for(15349, ['ghci'])], compile_and_r
 test('T16111', exit_code(1), compile_and_run, [''])
 test('T16943a', normal, compile_and_run, [''])
 test('T16943b', normal, compile_and_run, [''])
-test('T17499', collect_stats('bytes allocated',5), compile_and_run, ['-O -w'])
+# This frequently times out with integer-simple
+test('T17499', [when(integer_simple(), skip), collect_stats('bytes allocated',5)],
+     compile_and_run, ['-O -w'])
