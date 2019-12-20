@@ -16,7 +16,7 @@ module DsListComp ( dsListComp, dsMonadComp ) where
 
 import GhcPrelude
 
-import {-# SOURCE #-} DsExpr ( dsExpr, dsLExpr, dsLExprNoLP, dsLocalBinds, dsSyntaxExpr )
+import {-# SOURCE #-} DsExpr ( dsHandleMonadicFailure, dsExpr, dsLExpr, dsLExprNoLP, dsLocalBinds, dsSyntaxExpr )
 
 import GHC.Hs
 import TcHsSyn
@@ -624,25 +624,8 @@ dsMcBindStmt pat rhs' bind_op fail_op res1_ty stmts
         ; var      <- selectSimpleMatchVarL pat
         ; match <- matchSinglePatVar var (StmtCtxt DoExpr) pat
                                   res1_ty (cantFailMatchResult body)
-        ; match_code <- handle_failure pat match fail_op
+        ; match_code <- dsHandleMonadicFailure pat match fail_op
         ; dsSyntaxExpr bind_op [rhs', Lam var match_code] }
-
-  where
-    -- In a monad comprehension expression, pattern-match failure just calls
-    -- the monadic `fail` rather than throwing an exception
-    handle_failure pat match fail_op
-      | matchCanFail match
-        = do { dflags <- getDynFlags
-             ; fail_msg <- mkStringExpr (mk_fail_msg dflags pat)
-             ; fail_expr <- dsSyntaxExpr fail_op [fail_msg]
-             ; extractMatchResult match fail_expr }
-      | otherwise
-        = extractMatchResult match (error "It can't fail")
-
-    mk_fail_msg :: DynFlags -> Located e -> String
-    mk_fail_msg dflags pat
-        = "Pattern match failure in monad comprehension at " ++
-          showPpr dflags (getLoc pat)
 
 -- Desugar nested monad comprehensions, for example in `then..` constructs
 --    dsInnerMonadComp quals [a,b,c] ret_op
