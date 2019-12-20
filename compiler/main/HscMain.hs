@@ -74,7 +74,7 @@ module HscMain
     , hscCompileCoreExpr'
       -- We want to make sure that we export enough to be able to redefine
       -- hscFileFrontEnd in client code
-    , hscParse', hscSimplify', hscDesugar', tcRnModule'
+    , hscParse', hscSimplify', hscDesugar', tcRnModule', doCodeGen
     , getHscEnv
     , hscSimpleIface'
     , oneShotMsg
@@ -1454,7 +1454,8 @@ hscGenHardCode hsc_env cgguts location output_filename = do
 
             ------------------  Code output -----------------------
             rawcmms0 <- {-# SCC "cmmToRawCmm" #-}
-                      cmmToRawCmm dflags cmms
+                      lookupHook cmmToRawCmmHook
+                        (\dflg _ -> cmmToRawCmm dflg) dflags dflags (Just this_mod) cmms
 
             let dump a = do
                   unless (null a) $
@@ -1516,7 +1517,8 @@ hscCompileCmmFile hsc_env filename output_filename = runHsc hsc_env $ do
         unless (null cmmgroup) $
           dumpIfSet_dyn dflags Opt_D_dump_cmm "Output Cmm"
             FormatCMM (ppr cmmgroup)
-        rawCmms <- cmmToRawCmm dflags (Stream.yield cmmgroup)
+        rawCmms <- lookupHook cmmToRawCmmHook
+                     (\dflgs _ -> cmmToRawCmm dflgs) dflags dflags Nothing (Stream.yield cmmgroup)
         _ <- codeOutput dflags cmm_mod output_filename no_loc NoStubs [] []
              rawCmms
         return ()
@@ -1544,7 +1546,7 @@ doCodeGen hsc_env this_mod data_tycons
 
     let cmm_stream :: Stream IO CmmGroup ()
         cmm_stream = {-# SCC "StgToCmm" #-}
-            StgToCmm.codeGen dflags this_mod data_tycons
+            lookupHook stgToCmmHook StgToCmm.codeGen dflags dflags this_mod data_tycons
                            cost_centre_info stg_binds_w_fvs hpc_info
 
         -- codegen consumes a stream of CmmGroup, and produces a new
