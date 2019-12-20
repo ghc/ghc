@@ -31,7 +31,7 @@ main = do
   let num = sizeUniqSet modules
 --  print num
 --  print (map moduleNameString $ nonDetEltsUniqSet modules)
-  unless (num < 165) $ exitWith (ExitFailure num)
+  unless (num < 190) $ exitWith (ExitFailure num)
 
 parserDeps :: FilePath -> IO (UniqSet ModuleName)
 parserDeps libdir =
