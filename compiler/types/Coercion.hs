@@ -63,11 +63,11 @@ module Coercion (
 
         pickLR,
 
-        isGReflCo, isReflCo, isReflCo_maybe, isGReflCo_maybe, isReflexiveCo,
+        isGReflCo, isReflCo, isReflCo_maybe, isZonkCo, isGReflCo_maybe, isReflexiveCo,
         isReflCoVar_maybe, isGReflMCo, coToMCo,
 
         -- ** Coercion variables
-        mkCoVar, isCoVar, coVarName, setCoVarName, setCoVarUnique,
+        mkCoVar, isCoVar, coVarName, setCoVarName, setCoVarUnique, setCoVarPred,
         isCoVar_maybe,
 
         -- ** Free variables
@@ -169,7 +169,10 @@ setCoVarUnique :: CoVar -> Unique -> CoVar
 setCoVarUnique = setVarUnique
 
 setCoVarName :: CoVar -> Name -> CoVar
-setCoVarName   = setVarName
+setCoVarName = setVarName
+
+setCoVarPred :: CoVar -> PredType -> CoVar
+setCoVarPred = setVarType
 
 {-
 %************************************************************************
@@ -556,10 +559,27 @@ isGReflMCo _ = False
 -- | Tests if this coercion is obviously reflexive. Guaranteed to work
 -- very quickly. Sometimes a coercion can be reflexive, but not obviously
 -- so. c.f. 'isReflexiveCo'
+--
+--    isReflCo co  =>   co : t ~ t
 isReflCo :: Coercion -> Bool
 isReflCo (Refl{}) = True
 isReflCo (GRefl _ _ mco) | isGReflMCo mco = True
 isReflCo _ = False
+
+-- | Tests if this coercion is reflexive after zonkign.
+-- Guaranteed to work quickly. c.f. isReflCo
+--
+--    isZonkCo co  =>   co : t1 ~ t2, and zonk(t1)=zonk(t2)
+--
+-- ToDo: Is it better to have more cases here (eg TyConAppCo)
+--       or to make mkTyConAppCo smarter, to bubble up ZonkCos?
+isZonkCo :: Coercion -> Bool
+isZonkCo (ZonkCo {})          = True
+isZonkCo co | isReflCo co     = True
+isZonkCo (TyConAppCo _ _ cos) = all isZonkCo cos
+isZonkCo (AppCo co1 co2)      = isZonkCo co1 && isZonkCo co2
+isZonkCo _                    = False  -- Always safe
+
 
 -- | Returns the type coerced if this coercion is a generalized reflexive
 -- coercion. Guaranteed to work very quickly.

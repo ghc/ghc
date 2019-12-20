@@ -1362,10 +1362,22 @@ canEqCast flat ev eq_rel swapped ty1 co1 ty2 ps_ty2
   = do { traceTcS "Decomposing cast" (vcat [ ppr ev
                                            , ppr ty1 <+> text "|>" <+> ppr co1
                                            , ppr ps_ty2 ])
-       ; new_ev <- rewriteEqEvidence ev swapped ty1 ps_ty2
-                                     (mkTcGReflRightCo role ty1 co1)
-                                     (mkTcReflCo role ps_ty2)
-       ; can_eq_nc flat new_ev eq_rel ty1 ty1 ty2 ps_ty2 }
+       ; let lhs_co = mkTcGReflRightCo role ty1 co1
+             rhs_co = mkTcReflCo role ps_ty2
+
+       -- Under NotSwapped we have
+       --   ev     :: (ty1 |> co1) ~ ty2
+       --   co1    :: kind(ty1) ~ k2
+       --   lhs_co :: ty1 ~ (ty1 |> co1)
+       --   rhs_co :: ty2 ~ ty2
+       --   new_ev :: ty1 ~ ty2
+       ; case swapped of   -- Swap back because we want to hit the
+                           -- Note [Rewriting with ZonkCo] case of rewriteEqEvidence
+          NotSwapped -> do { new_ev <- rewriteEqEvidence ev NotSwapped ty1 ps_ty2 lhs_co rhs_co
+                           ; can_eq_nc flat new_ev eq_rel ty1 ty1 ty2 ps_ty2 }
+          IsSwapped  -> do { new_ev <- rewriteEqEvidence ev NotSwapped ps_ty2 ty1 rhs_co lhs_co
+                           ; can_eq_nc flat new_ev eq_rel ty2 ps_ty2 ty1 ty1 }
+    }
   where
     role = eqRelRole eq_rel
 
@@ -2268,15 +2280,15 @@ Main purpose: create new evidence for new_pred;
         Given           Already in inert               Nothing
                         Not                            Just new_evidence
 
-Note [Rewriting with Refl]
-~~~~~~~~~~~~~~~~~~~~~~~~~~
+Note [Rewriting with ZonkCo]
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 If the coercion is just reflexivity then you may re-use the same
-variable.  But be careful!  Although the coercion is Refl, new_pred
+variable.  But be careful!  Although the coercion is ZonkCo, new_pred
 may reflect the result of unification alpha := ty, so new_pred might
 not _look_ the same as old_pred, and it's vital to proceed from now on
 using new_pred.
 
-qThe flattener preserves type synonyms, so they should appear in new_pred
+The flattener preserves type synonyms, so they should appear in new_pred
 as well as in old_pred; that is important for good error messages.
  -}
 
@@ -2348,8 +2360,8 @@ rewriteEqEvidence old_ev swapped nlhs nrhs lhs_co rhs_co
   = return (old_ev { ctev_pred = new_pred })
 
   | NotSwapped <- swapped
-  , isTcReflCo lhs_co      -- See Note [Rewriting with Refl]
-  , isTcReflCo rhs_co
+  , isZonkCo lhs_co      -- See Note [Rewriting with ZonkCo]
+  , isZonkCo rhs_co
   = return (old_ev { ctev_pred = new_pred })
 
   | CtGiven { ctev_evar = old_evar } <- old_ev

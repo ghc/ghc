@@ -1625,8 +1625,18 @@ add_item ics item@(CFunEqCan { cc_fun = tc, cc_tyargs = tys })
   = ics { inert_funeqs = insertFunEq (inert_funeqs ics) tc tys item }
 
 add_item ics item@(CTyEqCan { cc_tyvar = tv, cc_ev = ev })
-  = ics { inert_eqs   = addTyEq (inert_eqs ics) tv item
+  = ics { inert_eqs   = addTyEq (inert_eqs ics) tv item'
         , inert_count = bumpUnsolvedCount ev (inert_count ics) }
+  where
+    item' = case ev of
+              CtGiven { ctev_pred = pred, ctev_evar = co_var }
+                -> item { cc_ev = ev { ctev_evar = co_var `setCoVarPred` pred } }
+              _ -> item
+      -- The evidence Id in a Given equality in InertEqs must match
+      -- the predicate (which is not true of all CTyEqCans), else when
+      -- we fetch it out in TcFlatten.flatten_tyvar2, ctEvCoercion won't have the
+      -- correct type, and we'll mess up the WKTI
+      -- See Note [Ct/evidence invariant]
 
 add_item ics@(IC { inert_irreds = irreds, inert_count = count })
          item@(CIrredCan { cc_ev = ev, cc_insol = insoluble })
