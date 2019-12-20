@@ -39,6 +39,7 @@ import TcType ( isFloatingTy )
 import Var
 import VarEnv
 import VarSet
+import UniqSet( nonDetEltsUniqSet )
 import Name
 import Id
 import IdInfo
@@ -73,6 +74,7 @@ import qualified Control.Monad.Fail as MonadFail
 import MonadUtils
 import Data.Foldable      ( toList )
 import Data.List.NonEmpty ( NonEmpty )
+import Data.List          ( partition )
 import Data.Maybe
 import Pair
 import qualified GHC.LanguageExtensions as LangExt
@@ -161,21 +163,44 @@ this invariant in lintType.
 Note [Linting type lets]
 ~~~~~~~~~~~~~~~~~~~~~~~~
 In the desugarer, it's very very convenient to be able to say (in effect)
-        let a = Type Int in <body>
+        let a = Type Bool in
+        let x::a = True in <body>
 That is, use a type let.   See Note [Type let] in CoreSyn.
+One place it is used is in mkWwArgs; see Note [Join points and beta-redexes]
+in WwLib.  (Maybe there are other "clients" of this feature; I'm not sure).
 
-However, when linting <body> we need to remember that a=Int, else we might
-reject a correct program.  So we carry a type substitution (in this example
-[a -> Int]) and apply this substitution before comparing types.  The function
+* Hence when linting <body> we need to remember that a=Int, else we might
+  reject a correct program.  So we carry a type substitution (in this example
+  [a -> Bool]) and apply this substitution before comparing types.  This is
+  in the le_subst field of LintEnv.
+
+* The function
         lintInTy :: Type -> LintM (Type, Kind)
-returns a substituted type.
+  returns a substituted type.
 
-When we encounter a binder (like x::a) we must apply the substitution
-to the type of the binding variable.  lintBinders does this.
+* When we encounter a binder (like x::a) we must apply the substitution
+  to the type of the binding variable.  lintBinders does this.
 
-For Ids, the type-substituted Id is added to the in_scope set (which
-itself is part of the TCvSubst we are carrying down), and when we
-find an occurrence of an Id, we fetch it from the in-scope set.
+* Clearly we need to clone tyvar binders as we go.
+
+* But take care (#17590)! We must also clone CoVar binders:
+    let a = TYPE (ty |> cv)
+    in \cv -> blah
+  blindly substituting for `a` might capture `cv`.
+
+* Alas, when cloning a coercion variables we might choose a unique
+  that happens to clash with an inner Id, thus
+      \cv_66 -> let wild_X7 = blah in blah
+  We decide to clone `cv_66` becuase it's already in scope.  Fine, choose a
+  new unique.  Aha, X7 looks good.  So we get
+      \cv_X7 -> let wild_X7 = blah in blah
+  This is all fine, but we must not let this be captured by the in-scope
+  wild_X7.
+
+  One solution: clone Ids too.  But it's easier just to keep a separate
+  set of in-scope Ids, in le_ids of LintEnv.
+
+Sigh.  We might want to explore getting rid of type-let!
 
 Note [Bad unsafe coercion]
 ~~~~~~~~~~~~~~~~~~~~~~~~~~
@@ -417,9 +442,9 @@ lintCoreBindings :: DynFlags -> CoreToDo -> [Var] -> CoreProgram -> (Bag MsgDoc,
 -- If you edit this function, you may need to update the GHC formalism
 -- See Note [GHC Formalism]
 lintCoreBindings dflags pass local_in_scope binds
-  = initL dflags flags in_scope_set $
-    addLoc TopLevelBindings         $
-    lintLetBndrs TopLevel binders   $
+  = initL dflags flags local_in_scope $
+    addLoc TopLevelBindings           $
+    lintLetBndrs TopLevel binders     $
         -- Put all the top-level binders in scope at the start
         -- This is because transformation rules can bring something
         -- into use 'unexpectedly'
@@ -427,8 +452,6 @@ lintCoreBindings dflags pass local_in_scope binds
        ; checkL (null ext_dups) (dupExtVars ext_dups)
        ; mapM lint_bind binds }
   where
-    in_scope_set = mkInScopeSet (mkVarSet local_in_scope)
-
     flags = defaultLintFlags
                { lf_check_global_ids = check_globals
                , lf_check_inline_loop_breakers = check_lbs
@@ -499,12 +522,12 @@ lintUnfolding :: DynFlags
               -> CoreExpr
               -> Maybe MsgDoc   -- Nothing => OK
 
-lintUnfolding dflags locn vars expr
+lintUnfolding dflags locn var_set expr
   | isEmptyBag errs = Nothing
   | otherwise       = Just (pprMessageBag errs)
   where
-    in_scope = mkInScopeSet vars
-    (_warns, errs) = initL dflags defaultLintFlags in_scope linter
+    vars = nonDetEltsUniqSet var_set
+    (_warns, errs) = initL dflags defaultLintFlags vars linter
     linter = addLoc (ImportedUnfolding locn) $
              lintCoreExpr expr
 
@@ -517,8 +540,7 @@ lintExpr dflags vars expr
   | isEmptyBag errs = Nothing
   | otherwise       = Just (pprMessageBag errs)
   where
-    in_scope = mkInScopeSet (mkVarSet vars)
-    (_warns, errs) = initL dflags defaultLintFlags in_scope linter
+    (_warns, errs) = initL dflags defaultLintFlags vars linter
     linter = addLoc TopLevelBindings $
              lintCoreExpr expr
 
@@ -758,7 +780,7 @@ lintCoreExpr (Let (NonRec tv (Type ty)) body)
     do  { addLoc (RhsOf tv) $ lintTyKind tv' ty'
                 -- Now extend the substitution so we
                 -- take advantage of it in the body
-        ; extendSubstL tv ty'        $
+        ; extendTvSubstL tv ty'        $
           addLoc (BodyOfLetRec [tv]) $
           lintCoreExpr body } }
 
@@ -1281,13 +1303,14 @@ lintIdBndr top_lvl bind_site id linterF
        ; checkL (not (isExternalName (Var.varName id)) || is_top_lvl)
            (mkNonTopExternalNameMsg id)
 
-       ; (ty, k) <- addLoc (IdTy id) $
-                    lintInTy (idType id)
+       ; (id_ty, k) <- addLoc (IdTy id) $
+                       lintInTy (idType id)
+       ; let id' = setIdType id id_ty
 
           -- See Note [Levity polymorphism invariants] in CoreSyn
        ; lintL (isJoinId id || not (isKindLevPoly k))
            (text "Levity-polymorphic binder:" <+>
-                 (ppr id <+> dcolon <+> parens (ppr ty <+> dcolon <+> ppr k)))
+                 (ppr id <+> dcolon <+> parens (ppr id_ty <+> dcolon <+> ppr k)))
 
        -- Check that a join-id is a not-top-level let-binding
        ; when (isJoinId id) $
@@ -1296,11 +1319,10 @@ lintIdBndr top_lvl bind_site id linterF
 
        -- Check that the Id does not have type (t1 ~# t2) or (t1 ~R# t2);
        -- if so, it should be a CoVar, and checked by lintCoVarBndr
-       ; lintL (not (isCoVarType ty))
-               (text "Non-CoVar has coercion type" <+> ppr id <+> dcolon <+> ppr ty)
+       ; lintL (not (isCoVarType id_ty))
+               (text "Non-CoVar has coercion type" <+> ppr id <+> dcolon <+> ppr id_ty)
 
-       ; let id' = setIdType id ty
-       ; addInScopeVar id' $ (linterF id') }
+       ; addInScopeId id' $ (linterF id') }
   where
     is_top_lvl = isTopLevel top_lvl
     is_let_bind = case bind_site of
@@ -1323,8 +1345,7 @@ lintTypes dflags vars tys
   | isEmptyBag errs = Nothing
   | otherwise       = Just (pprMessageBag errs)
   where
-    in_scope = emptyInScopeSet
-    (_warns, errs) = initL dflags defaultLintFlags in_scope linter
+    (_warns, errs) = initL dflags defaultLintFlags vars linter
     linter = lintBinders LambdaBind vars $ \_ ->
              mapM_ lintInTy tys
 
@@ -1353,8 +1374,8 @@ lintType :: OutType -> LintM LintedKind
 -- See Note [GHC Formalism]
 lintType (TyVarTy tv)
   = do { checkL (isTyVar tv) (mkBadTyVarMsg tv)
-       ; lintTyCoVarInScope tv
-       ; return (tyVarKind tv) }
+       ; tv' <- lintTyCoVarInScope tv
+       ; return (tyVarKind tv') }
          -- We checked its kind when we added it to the envt
 
 lintType ty@(AppTy t1 t2)
@@ -1744,7 +1765,7 @@ lintCoercion (ForAllCo tv1 kind_co co)
   | isTyVar tv1
   = do { (_, k2) <- lintStarCoercion kind_co
        ; let tv2 = setTyVarKind tv1 k2
-       ; addInScopeVar tv1 $
+       ; addInScopeTyCoVar tv1 $
     do {
        ; (k3, k4, t1, t2, r) <- lintCoercion co
        ; in_scope <- getInScope
@@ -1768,7 +1789,7 @@ lintCoercion (ForAllCo cv1 kind_co co)
                (text "Covar can only appear in Refl and GRefl: " <+> ppr co)
        ; (_, k2) <- lintStarCoercion kind_co
        ; let cv2 = setVarType cv1 k2
-       ; addInScopeVar cv1 $
+       ; addInScopeTyCoVar cv1 $
     do {
        ; (k3, k4, t1, t2, r) <- lintCoercion co
        ; checkValueKind k3 (text "the body of a ForAllCo over covar:" <+> ppr co)
@@ -1808,9 +1829,8 @@ lintCoercion (CoVarCo cv)
   = failWithL (hang (text "Bad CoVarCo:" <+> ppr cv)
                   2 (text "With offending type:" <+> ppr (varType cv)))
   | otherwise
-  = do { lintTyCoVarInScope cv
-       ; cv' <- lookupIdInScope cv
-       ; lintUnliftedCoVar cv
+  = do { cv' <- lintTyCoVarInScope cv
+       ; lintUnliftedCoVar cv'
        ; return $ coVarKindsTypesRole cv' }
 
 -- See Note [Bad unsafe coercion]
@@ -2078,10 +2098,14 @@ data LintEnv
   = LE { le_flags :: LintFlags       -- Linting the result of this pass
        , le_loc   :: [LintLocInfo]   -- Locations
 
-       , le_subst :: TCvSubst  -- Current type substitution
+       , le_subst :: TCvSubst  -- Current TyCo substitution
+                               --    See Note [Linting type lets]
+                               -- /Only/ substitutes for type variables;
+                               --        but might clone CoVars
                                -- We also use le_subst to keep track of
-                               -- /all variables/ in scope, both Ids and TyVars
+                               -- in-scope TyVars and CoVars
 
+       , le_ids   :: IdSet     -- In-scope Ids
        , le_joins :: IdSet     -- Join points in scope that are valid
                                -- A subset of the InScopeSet in le_subst
                                -- See Note [Join points]
@@ -2225,17 +2249,19 @@ data LintLocInfo
   | InType Type         -- Inside a type
   | InCo   Coercion     -- Inside a coercion
 
-initL :: DynFlags -> LintFlags -> InScopeSet
+initL :: DynFlags -> LintFlags -> [Var]
        -> LintM a -> WarnsAndErrs    -- Warnings and errors
-initL dflags flags in_scope m
+initL dflags flags vars m
   = case unLintM m env (emptyBag, emptyBag) of
       (Just _, errs) -> errs
       (Nothing, errs@(_, e)) | not (isEmptyBag e) -> errs
                              | otherwise -> pprPanic ("Bug in Lint: a failure occurred " ++
                                                       "without reporting an error message") empty
   where
+    (tcvs, ids) = partition isTyCoVar vars
     env = LE { le_flags = flags
-             , le_subst = mkEmptyTCvSubst in_scope
+             , le_subst = mkEmptyTCvSubst (mkInScopeSet (mkVarSet tcvs))
+             , le_ids   = mkVarSet ids
              , le_joins = emptyVarSet
              , le_loc = []
              , le_dynflags = dflags }
@@ -2308,15 +2334,22 @@ inCasePat = LintM $ \ env errs -> (Just (is_case_pat env), errs)
     is_case_pat (LE { le_loc = CasePat {} : _ }) = True
     is_case_pat _other                           = False
 
-addInScopeVar :: Var -> LintM a -> LintM a
-addInScopeVar var m
+addInScopeTyCoVar :: Var -> LintM a -> LintM a
+addInScopeTyCoVar var m
   = LintM $ \ env errs ->
-    unLintM m (env { le_subst = extendTCvInScope (le_subst env) var
-                   , le_joins = delVarSet        (le_joins env) var
-               }) errs
+    unLintM m (env { le_subst = extendTCvInScope (le_subst env) var }) errs
 
-extendSubstL :: TyVar -> Type -> LintM a -> LintM a
-extendSubstL tv ty m
+addInScopeId :: Id -> LintM a -> LintM a
+addInScopeId id m
+  = LintM $ \ env errs ->
+    unLintM m (env { le_ids   = extendVarSet (le_ids env) id
+                   , le_joins = delVarSet    (le_joins env) id }) errs
+
+getInScopeIds :: LintM IdSet
+getInScopeIds = LintM (\env errs -> (Just (le_ids env), errs))
+
+extendTvSubstL :: TyVar -> Type -> LintM a -> LintM a
+extendTvSubstL tv ty m
   = LintM $ \ env errs ->
     unLintM m (env { le_subst = Type.extendTvSubst (le_subst env) tv ty }) errs
 
@@ -2356,8 +2389,8 @@ applySubstCo co = do { subst <- getTCvSubst; return (substCo subst co) }
 
 lookupIdInScope :: Id -> LintM Id
 lookupIdInScope id_occ
-  = do { subst <- getTCvSubst
-       ; case lookupInScope (getTCvInScope subst) id_occ of
+  = do { in_scope_ids <- getInScopeIds
+       ; case lookupVarSet in_scope_ids id_occ of
            Just id_bnd  -> do { checkL (not (bad_global id_bnd)) global_in_scope
                               ; return id_bnd }
            Nothing -> do { checkL (not is_local) local_out_of_scope
@@ -2389,12 +2422,14 @@ lookupJoinId id
             Just id' -> return (isJoinId_maybe id')
             Nothing  -> return Nothing }
 
-lintTyCoVarInScope :: TyCoVar -> LintM ()
+lintTyCoVarInScope :: TyCoVar -> LintM TyCoVar
 lintTyCoVarInScope var
   = do { subst <- getTCvSubst
-       ; lintL (var `isInScope` subst)
-               (hang (text "The variable" <+> pprBndr LetBind var)
-                   2 (text "is out of scope")) }
+       ; case lookupInScope (getTCvInScope subst) var of
+            Just var' -> return var'
+            Nothing -> failWithL $
+                       hang (text "The TyCo variable" <+> pprBndr LetBind var)
+                          2 (text "is out of scope") }
 
 ensureEqTys :: OutType -> OutType -> MsgDoc -> LintM ()
 -- check ty2 is subtype of ty1 (ie, has same structure but usage
