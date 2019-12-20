@@ -121,6 +121,7 @@ data CoreToDo           -- These are diff core-to-core passes,
   | CoreTidy
   | CorePrep
   | CoreOccurAnal
+  | CoreToANF
 
 instance Outputable CoreToDo where
   ppr (CoreDoSimplify _ _)     = text "Simplifier"
@@ -141,6 +142,7 @@ instance Outputable CoreToDo where
   ppr CoreTidy                 = text "Tidy Core"
   ppr CorePrep                 = text "CorePrep"
   ppr CoreOccurAnal            = text "Occurrence analysis"
+  ppr CoreToANF                = text "Convert to ANF"
   ppr CoreDoPrintCore          = text "Print core"
   ppr (CoreDoRuleCheck {})     = text "Rule check"
   ppr CoreDoNothing            = text "CoreDoNothing"

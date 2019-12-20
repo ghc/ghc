@@ -442,6 +442,7 @@ Library
         RnUtils
         RnUnbound
         CoreMonad
+        ANF
         CSE
         FloatIn
         FloatOut

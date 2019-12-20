@@ -15,6 +15,7 @@ import GhcPrelude
 import DynFlags
 import CoreSyn
 import HscTypes
+import ANF              ( anfProgram )
 import CSE              ( cseProgram )
 import Rules            ( mkRuleBase, unionRuleBase,
                           extendRuleBaseList, ruleCheckProgram, addRuleInfo,
@@ -150,9 +151,12 @@ getCoreToDo dflags
                           , sm_inline     = True
                           , sm_case_case  = True }
 
+    anf_when_rules = if rules_on then CoreToANF else CoreDoNothing
+    
     simpl_phase phase names iter
       = CoreDoPasses
       $   [ maybe_strictness_before phase
+          , anf_when_rules
           , CoreDoSimplify iter
                 (base_mode { sm_phase = Phase phase
                            , sm_names = names })
@@ -164,15 +168,18 @@ getCoreToDo dflags
 
 
         -- initial simplify: mk specialiser happy: minimum effort please
-    simpl_gently = CoreDoSimplify max_iter
-                       (base_mode { sm_phase = InitialPhase
-                                  , sm_names = ["Gentle"]
-                                  , sm_rules = rules_on   -- Note [RULEs enabled in SimplGently]
-                                  , sm_inline = True
-                                              -- See Note [Inline in InitialPhase]
-                                  , sm_case_case = False })
-                          -- Don't do case-of-case transformations.
-                          -- This makes full laziness work better
+    simpl_gently = CoreDoPasses
+                 $ [ anf_when_rules
+                   , CoreDoSimplify max_iter
+                        (base_mode { sm_phase = InitialPhase
+                                    , sm_names = ["Gentle"]
+                                    , sm_rules = rules_on   -- Note [RULEs enabled in SimplGently]
+                                    , sm_inline = True
+                                                -- See Note [Inline in InitialPhase]
+                                    , sm_case_case = False })
+                            -- Don't do case-of-case transformations.
+                            -- This makes full laziness work better
+                   ]
 
     strictness_pass = if ww_on
                        then [CoreDoStrictness,CoreDoWorkerWrapper]
@@ -202,6 +209,7 @@ getCoreToDo dflags
     core_todo =
      if opt_level == 0 then
        [ static_ptrs_float_outwards,
+         anf_when_rules,
          CoreDoSimplify max_iter
              (base_mode { sm_phase = Phase 0
                         , sm_names = ["Non-opt simplification"] })
@@ -422,6 +430,9 @@ runCorePasses passes guts
 doCorePass :: CoreToDo -> ModGuts -> CoreM ModGuts
 doCorePass pass@(CoreDoSimplify {})  = {-# SCC "Simplify" #-}
                                        simplifyPgm pass
+
+doCorePass CoreToANF                 = {-# SCC "ANF" #-}
+                                       doPassM anfProgram
 
 doCorePass CoreCSE                   = {-# SCC "CommonSubExpr" #-}
                                        doPass cseProgram
