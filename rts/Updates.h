@@ -58,7 +58,7 @@
     SET_INFO(p1, stg_BLACKHOLE_info);                           \
     LDV_RECORD_CREATE(p1);                                      \
     bd = Bdescr(p1);                                            \
-    if (bdescr_gen_no(bd) != 0 :: bits16) (likely: False) {     \
+    if (bdescr_gen_no(bd) != 0 :: bits16) (likely: True) {      \
       recordMutableCap(p1, TO_W_(bdescr_gen_no(bd)));           \
       TICK_UPD_OLD_IND();                                       \
       and_then;                                                 \
