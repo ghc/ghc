@@ -379,7 +379,7 @@ stgCseAlt env ty case_bndr (DataAlt dataCon, args, rhs)
             -- `stgCaseBndrInScope` here. If the case binder is not in scope we
             -- don't add it to the CSE env. See also #15300.
             | stgCaseBndrInScope ty True -- CSE runs after unarise
-            = addDataCon case_bndr dataCon (map StgVarArg args') env1
+            = addDataCon case_bndr (Lax dataCon) (map StgVarArg args') env1
             | otherwise
             = env1
 --- NOT YET!          env2 = addDataCon case_bndr (Lax dataCon) (map StgVarArg args') env1
