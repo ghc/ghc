@@ -10,21 +10,18 @@ Contents:
    :maxdepth: 4
    :numbered:
 
-   license
    intro
-   8.8.1-notes
-   8.10.1-notes
-   8.12.1-notes
+   release-notes
    ghci
    runghc
    usage
    profiling
-   sooner
    lang
    ffi-chap
    extending_ghc
-   gone_wrong
    debug-info
+   gone_wrong
+   hints
    utils
    win32-dlls
    bugs
