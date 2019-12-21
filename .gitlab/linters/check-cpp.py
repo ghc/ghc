@@ -26,6 +26,9 @@ for l in linters:
     l.add_path_filter(lambda path: path != Path('docs', 'coding-style.html'))
     # Don't lint vendored code
     l.add_path_filter(lambda path: not path.name == 'config.guess')
+    # Don't lint font files
+    l.add_path_filter(lambda path: not path.parent == Path('docs','users_guide',
+        'rtd-theme', 'static', 'fonts'))
 
 if __name__ == '__main__':
     run_linters(linters)
