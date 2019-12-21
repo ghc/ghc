@@ -89,9 +89,7 @@ $(libffi_STAMP_CONFIGURE): $(TOUCH_DEP)
 	cd libffi && \
 	    cd build && \
 	    CC=$(CC_STAGE1) \
-	    CPP="$(CC_STAGE1) -E" \
 	    CXX=$(CC_STAGE1) \
-	    CXXCPP="$(CC_STAGE1:gcc=g++) -E" \
 	    LD=$(LD) \
 	    AR=$(AR_STAGE1) \
 	    NM=$(NM) \
