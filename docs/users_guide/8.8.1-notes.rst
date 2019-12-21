@@ -1,7 +1,7 @@
 .. _release-8-8-1:
 
-Release notes for version 8.8.1
-===============================
+Version 8.8.1
+=============
 
 The significant changes to the various parts of the compiler are listed in the
 following sections. There have also been numerous bug fixes and performance

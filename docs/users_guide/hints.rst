@@ -1,7 +1,7 @@
 .. _sooner-faster-quicker:
 
-Advice on: sooner, faster, smaller, thriftier
-=============================================
+Hints
+=====
 
 Please advise us of other "helpful hints" that should go here!
 
