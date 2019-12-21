@@ -1,4 +1,4 @@
-{-# OPTIONS_GHC -O2 -funbox-strict-fields #-}
+{-# OPTIONS_GHC -O2 -funbox-strict-fields -ticky -ddump-stg #-}
 {-# LANGUAGE GeneralizedNewtypeDeriving, BangPatterns, CPP #-}
 
 module Binary.Unsafe where
@@ -169,30 +169,30 @@ newtype Get a = Get { unget :: EnvG -> IO a }
 
 instance Functor Get where
   {-# INLINE fmap #-}
-  fmap f m = Get $ \env -> fmap f (unget m env)
+  fmap f m = Get . oneShot $ \env -> fmap f (unget m env)
 
 instance Applicative Get where
   {-# INLINE pure #-}
-  pure x = Get $ \_ -> pure x
+  pure x = Get . oneShot $ \_ -> pure x
 
   {-# INLINE (<*>) #-}
-  f <*> x = Get $ \env ->
+  f <*> x = Get . oneShot $ \env ->
     unget f env <*> unget x env
 
 instance Monad Get where
   {-# INLINE (>>=) #-}
-  x >>= f = Get $ \env -> do
+  x >>= f = Get . oneShot $ \env -> do
     a <- unget x env
     unget (f a) env
 
 #if !MIN_VERSION_base(4,13,0)
   {-# INLINE fail #-}
-  fail s = Get $ \_ -> fail s
+  fail s = Get . oneShot $ \_ -> fail s
 #endif
 
 instance MonadFail Get where
   {-# INLINE fail #-}
-  fail s = Get $ \_ -> fail s
+  fail s = Get . oneShot $ \_ -> fail s
 
 -- Internal reader data for `Get` monad.
 data EnvG
@@ -217,12 +217,12 @@ runGet bd = unsafePerformIO . runGetIO bd
 
 {-# INLINE seekG #-}
 seekG :: Bin a -> Get ()
-seekG (BinPtr !i) = Get $ \(EnvG _ ixr _ _) ->
+seekG (BinPtr !i) = Get . oneShot $ \(EnvG _ ixr _ _) ->
   writeFastMutInt ixr i
 
 {-# INLINE tellG #-}
 tellG :: Get (Bin a)
-tellG = Get $ \(EnvG _ ixr _ _) ->
+tellG = Get . oneShot $ \(EnvG _ ixr _ _) ->
   BinPtr <$> readFastMutInt ixr
 
 -- -----------------------------------------------------------------------------
@@ -231,7 +231,7 @@ tellG = Get $ \(EnvG _ ixr _ _) ->
 
 {-# INLINE getPrim #-}
 getPrim :: Int -> (Ptr Word8 -> IO a) -> Get a
-getPrim n f = Get $ \(EnvG _ ixr end (BinData _ arr)) -> do
+getPrim n f = Get . oneShot $ \(EnvG _ ixr end (BinData _ arr)) -> do
   ix <- readFastMutInt ixr
   when (ix + n > end) $
     ioError (mkIOError eofErrorType "Binary.Unsafe.getPrim" Nothing Nothing)
@@ -241,23 +241,23 @@ getPrim n f = Get $ \(EnvG _ ixr end (BinData _ arr)) -> do
 
 {-# INLINE interleaveG #-}
 interleaveG :: Get a -> Get a
-interleaveG m = Get $ \(EnvG ud ixr end bd) -> do
+interleaveG m = Get . oneShot $ \(EnvG ud ixr end bd) -> do
   ixr' <- newFastMutInt
   writeFastMutInt ixr' =<< readFastMutInt ixr
   unget m (EnvG ud ixr' end bd)
 
 {-# INLINE getSlice #-}
 getSlice :: Bin b -> Get a -> Get a
-getSlice (BinPtr !end) m = Get $ \(EnvG ud ixr _ bd) ->
+getSlice (BinPtr !end) m = Get . oneShot $ \(EnvG ud ixr _ bd) ->
   unget m (EnvG ud ixr end bd)
 
 {-# INLINE ioG #-}
 ioG :: IO a -> Get a
-ioG m = Get $ \_ -> m
+ioG m = Get . oneShot $ \_ -> m
 
 {-# INLINE userDataG #-}
 userDataG :: Get UserDataG
-userDataG = Get $ \(EnvG ud _ _ _) -> return ud
+userDataG = Get . oneShot $ \(EnvG ud _ _ _) -> return ud
 
 -- -----------------------------------------------------------------------------
 -- File IO
@@ -316,5 +316,5 @@ readState :: Get Name
           -> Get FastString
           -> Get a
           -> Get a
-readState name fs m = Get $ \(EnvG _ ixr end bd) ->
+readState name fs m = Get . oneShot $ \(EnvG _ ixr end bd) ->
   unget m (EnvG (UserDataG name fs) ixr end bd)
