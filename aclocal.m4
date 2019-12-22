@@ -2121,26 +2121,26 @@ AC_SUBST(LIBRARY_[]translit([$1], [-], [_])[]_VERSION)
 
 # XCODE_VERSION()
 # --------------------------------
-# Gets the version number of XCode, if on a Mac
+# Gets the version number of Xcode, if on a Mac
 AC_DEFUN([XCODE_VERSION],[
     if test "$TargetVendor_CPP" = "apple"
     then
-        AC_MSG_CHECKING(XCode version)
-        XCodeVersion=`(xcode-select -p >& /dev/null && xcodebuild -version) | grep Xcode | sed "s/Xcode //"`
-        # Old XCode versions don't actually give the XCode version
-        if test "$XCodeVersion" = ""
+        AC_MSG_CHECKING(Xcode version)
+        XcodeVersion=`(xcode-select -p >& /dev/null && xcodebuild -version) | grep Xcode | sed "s/Xcode //"`
+        # Old Xcode versions don't actually give the Xcode version
+        if test "$XcodeVersion" = ""
         then
             AC_MSG_RESULT(not found (too old?))
-            XCodeVersion1=0
-            XCodeVersion2=0
+            XcodeVersion1=0
+            XcodeVersion2=0
         else
-            AC_MSG_RESULT($XCodeVersion)
-            XCodeVersion1=`echo "$XCodeVersion" | sed 's/\..*//'`
+            AC_MSG_RESULT($XcodeVersion)
+            XcodeVersion1=`echo "$XcodeVersion" | sed 's/\..*//'`
             changequote(, )dnl
-            XCodeVersion2=`echo "$XCodeVersion" | sed 's/[^.]*\.\([^.]*\).*/\1/'`
+            XcodeVersion2=`echo "$XcodeVersion" | sed 's/[^.]*\.\([^.]*\).*/\1/'`
             changequote([, ])dnl
-            AC_MSG_NOTICE(XCode version component 1: $XCodeVersion1)
-            AC_MSG_NOTICE(XCode version component 2: $XCodeVersion2)
+            AC_MSG_NOTICE(Xcode version component 1: $XcodeVersion1)
+            AC_MSG_NOTICE(Xcode version component 2: $XcodeVersion2)
         fi
     fi
 ])
