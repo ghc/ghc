@@ -586,7 +586,7 @@ AC_SUBST([NmCmd])
 if test "$TargetOS_CPP" = "darwin"
 then
     AC_MSG_CHECKING(whether nm program is broken)
-    # Some versions of XCode ship a broken version of `nm`. Detect and work
+    # Some versions of Xcode ship a broken version of `nm`. Detect and work
     # around this issue. See : https://gitlab.haskell.org/ghc/ghc/issues/11744
     nmver=$(${NM} --version | grep version | sed 's/ //g')
     case "$nmver" in
