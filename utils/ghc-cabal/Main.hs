@@ -17,6 +17,7 @@ import Distribution.Simple.Program.HcPkg
 import Distribution.Simple.Setup (ConfigFlags(configStripLibs), fromFlagOrDefault, toFlag)
 import Distribution.Simple.Utils (defaultPackageDesc, findHookedPackageDesc, writeFileAtomic,
                                   toUTF8LBS)
+import qualified Distribution.Utils.ShortText.ShortText as ShortText
 import Distribution.Simple.Build (writeAutogenFiles)
 import Distribution.Simple.Register
 import qualified Distribution.Compat.Graph as Graph
@@ -27,6 +28,7 @@ import Distribution.Verbosity
 import qualified Distribution.InstalledPackageInfo as Installed
 import qualified Distribution.Simple.PackageIndex as PackageIndex
 
+import qualified Data.ByteString.Char8 as BS
 import Control.Exception (bracket)
 import Control.Monad
 import Control.Applicative ((<|>))
@@ -430,7 +432,7 @@ generate directory distdir config_args
                 variablePrefix ++ "_COMPONENT_ID = " ++ localCompatPackageKey lbi,
                 variablePrefix ++ "_MODULES = " ++ unwords mods,
                 variablePrefix ++ "_HIDDEN_MODULES = " ++ unwords otherMods,
-                variablePrefix ++ "_SYNOPSIS =" ++ (unwords $ lines $ synopsis pd),
+                variablePrefix ++ "_SYNOPSIS =" ++ (unwords $ lines $ ShortText.unpack synopsis pd),
                 variablePrefix ++ "_HS_SRC_DIRS = " ++ unwords (hsSourceDirs bi),
                 variablePrefix ++ "_DEPS = " ++ unwords deps,
                 variablePrefix ++ "_DEP_IPIDS = " ++ unwords dep_ipids,
@@ -474,9 +476,11 @@ generate directory distdir config_args
                 ]
       writeFile (distdir ++ "/package-data.mk") $ unlines xs
 
-      writeFileUtf8 (distdir ++ "/haddock-prologue.txt") $
-          if null (description pd) then synopsis pd
-                                   else description pd
+      writeFileUtf8 (distdir ++ "/haddock-prologue.txt")
+          $ ShortText.unpack
+          $ if ShortText.null (description pd)
+              then synopsis pd
+              else description pd
   where
      escape = foldr (\c xs -> if c == '#' then '\\':'#':xs else c:xs) []
      wrap = mapM wrap1

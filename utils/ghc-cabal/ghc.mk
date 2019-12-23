@@ -23,9 +23,9 @@ CABAL_CONSTRAINT := --constraint="Cabal == $(CABAL_DOTTED_VERSION)"
 # macros is triggered by `-hide-all-packages`, so we have to explicitly
 # enumerate all packages we need in scope.
 ifeq "$(Windows_Host)" "YES"
-CABAL_BUILD_DEPS := ghc-prim base array transformers time containers bytestring deepseq process pretty directory Win32
+CABAL_BUILD_DEPS := ghc-prim base array transformers time containers bytestring deepseq process pretty directory filepath Win32
 else
-CABAL_BUILD_DEPS := ghc-prim base array transformers time containers bytestring deepseq process pretty directory unix
+CABAL_BUILD_DEPS := ghc-prim base array transformers time containers bytestring deepseq process pretty directory filepath unix
 endif
 
 ghc-cabal_DIST_BINARY_NAME = ghc-cabal$(exeext0)

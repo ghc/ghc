@@ -53,13 +53,14 @@ import Distribution.Types.UnqualComponentName
 import Distribution.Types.LibraryName
 import Distribution.Types.MungedPackageName
 import Distribution.Types.MungedPackageId
-import Distribution.Simple.Utils (fromUTF8BS, toUTF8BS, writeUTF8File, readUTF8File)
+import Distribution.Simple.Utils (fromUTF8BS, toUTF8BS, writeUTF8File)
 import qualified Data.Version as Version
 import System.FilePath as FilePath
 import qualified System.FilePath.Posix as FilePath.Posix
 import System.Directory ( getAppUserDataDirectory, createDirectoryIfMissing,
                           getModificationTime )
 import Text.Printf
+import qualified Data.ByteString.Char8 as BS
 
 import Prelude
 
@@ -948,7 +949,7 @@ readParseDatabase verbosity mb_user_conf mode use_cache path
 parseSingletonPackageConf :: Verbosity -> FilePath -> IO InstalledPackageInfo
 parseSingletonPackageConf verbosity file = do
   when (verbosity > Normal) $ infoLn ("reading package config: " ++ file)
-  readUTF8File file >>= fmap fst . parsePackageInfo
+  BS.readFile file >>= fmap fst . parsePackageInfo
 
 cachefilename :: FilePath
 cachefilename = "package.cache"
@@ -1132,16 +1133,15 @@ registerPackage input verbosity my_flags multi_instance
       "-" -> do
         when (verbosity >= Normal) $
             info "Reading package info from stdin ... "
-        -- fix the encoding to UTF-8, since this is an interchange format
-        hSetEncoding stdin utf8
-        getContents
+        BS.getContents
       f   -> do
         when (verbosity >= Normal) $
             info ("Reading package info from " ++ show f ++ " ... ")
-        readUTF8File f
+        BS.readFile f
 
-  expanded <- if expand_env_vars then expandEnvVars s force
-                                 else return s
+  expanded <- if expand_env_vars
+                then BS.pack <$> expandEnvVars (BS.unpack s) force
+                else return s
 
   (pkg, ws) <- parsePackageInfo expanded
   when (verbosity >= Normal) $
@@ -1177,7 +1177,7 @@ registerPackage input verbosity my_flags multi_instance
   changeDB verbosity (removes ++ [AddPackage pkg]) db_to_operate_on db_stack
 
 parsePackageInfo
-        :: String
+        :: BS.ByteString
         -> IO (InstalledPackageInfo, [ValidateWarning])
 parsePackageInfo str =
   case parseInstalledPackageInfo str of
