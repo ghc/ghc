@@ -11,7 +11,7 @@
 -- And, as we have the info in hand, we may convert some lets to
 -- let-no-escapes.
 
-module CoreToStg ( coreToStg ) where
+module GHC.CoreToStg ( coreToStg ) where
 
 #include "HsVersions.h"
 
@@ -21,10 +21,10 @@ import CoreSyn
 import CoreUtils        ( exprType, findDefault, isJoinBind
                         , exprIsTickedString_maybe )
 import CoreArity        ( manifestArity )
-import StgSyn
+import GHC.Stg.Syntax
 
 import Type
-import RepType
+import GHC.Types.RepType
 import TyCon
 import MkId             ( coercionTokenId )
 import Id

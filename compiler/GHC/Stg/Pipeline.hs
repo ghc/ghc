@@ -9,19 +9,19 @@
 {-# LANGUAGE FlexibleContexts #-}
 {-# LANGUAGE TypeFamilies #-}
 
-module SimplStg ( stg2stg ) where
+module GHC.Stg.Pipeline ( stg2stg ) where
 
 #include "HsVersions.h"
 
 import GhcPrelude
 
-import StgSyn
+import GHC.Stg.Syntax
 
-import StgLint          ( lintStgTopBindings )
-import StgStats         ( showStgStats )
-import UnariseStg       ( unarise )
-import StgCse           ( stgCse )
-import StgLiftLams      ( stgLiftLams )
+import GHC.Stg.Lint     ( lintStgTopBindings )
+import GHC.Stg.Stats    ( showStgStats )
+import GHC.Stg.Unarise  ( unarise )
+import GHC.Stg.CSE      ( stgCse )
+import GHC.Stg.Lift     ( stgLiftLams )
 import Module           ( Module )
 
 import DynFlags
@@ -128,7 +128,7 @@ getStgToDo dflags =
   filter (/= StgDoNothing)
     [ mandatory StgUnarise
     -- Important that unarisation comes first
-    -- See Note [StgCse after unarisation] in StgCse
+    -- See Note [StgCse after unarisation] in GHC.Stg.CSE
     , optional Opt_StgCSE StgCSE
     , optional Opt_StgLiftLams StgLiftLams
     , optional Opt_StgStats StgStats

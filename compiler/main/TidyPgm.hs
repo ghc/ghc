@@ -21,7 +21,7 @@ import CoreUnfold
 import CoreFVs
 import CoreTidy
 import CoreMonad
-import CorePrep
+import GHC.CoreToStg.Prep
 import CoreUtils        (rhsIsStatic)
 import CoreStats        (coreBindsStats, CoreStats(..))
 import CoreSeq          (seqBinds)
