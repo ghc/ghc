@@ -1,134 +1,134 @@
 [submodule "libraries/binary"]
 	path = libraries/binary
-	url = ../packages/binary.git
+	url = https://gitlab.haskell.org/ghc/packages/binary.git
 	ignore = untracked
 [submodule "libraries/bytestring"]
 	path = libraries/bytestring
-	url = ../packages/bytestring.git
+	url = https://gitlab.haskell.org/ghc/packages/bytestring.git
 	ignore = untracked
 [submodule "libraries/Cabal"]
 	path = libraries/Cabal
-	url = ../packages/Cabal.git
+	url = https://gitlab.haskell.org/ghc/packages/Cabal.git
 	ignore = untracked
 [submodule "libraries/containers"]
 	path = libraries/containers
-	url = ../packages/containers.git
+	url = https://gitlab.haskell.org/ghc/packages/containers.git
 	ignore = untracked
 [submodule "libraries/haskeline"]
 	path = libraries/haskeline
-	url = ../packages/haskeline.git
+	url = https://gitlab.haskell.org/ghc/packages/haskeline.git
 	ignore = untracked
 [submodule "libraries/pretty"]
 	path = libraries/pretty
-	url = ../packages/pretty.git
+	url = https://gitlab.haskell.org/ghc/packages/pretty.git
 	ignore = untracked
 [submodule "libraries/terminfo"]
 	path = libraries/terminfo
-	url = ../packages/terminfo.git
+	url = https://gitlab.haskell.org/ghc/packages/terminfo.git
 	ignore = untracked
 [submodule "libraries/transformers"]
 	path = libraries/transformers
-	url = ../packages/transformers.git
+	url = https://gitlab.haskell.org/ghc/packages/transformers.git
 	ignore = untracked
 [submodule "libraries/xhtml"]
 	path = libraries/xhtml
-	url = ../packages/xhtml.git
+	url = https://gitlab.haskell.org/ghc/packages/xhtml.git
 	ignore = untracked
 [submodule "libraries/Win32"]
 	path = libraries/Win32
-	url = ../packages/Win32.git
+	url = https://gitlab.haskell.org/ghc/packages/Win32.git
 	ignore = untracked
 [submodule "libraries/primitive"]
 	path = libraries/primitive
-	url = ../packages/primitive.git
+	url = https://gitlab.haskell.org/ghc/packages/primitive.git
 	ignore = untracked
 [submodule "libraries/vector"]
 	path = libraries/vector
-	url = ../packages/vector.git
+	url = https://gitlab.haskell.org/ghc/packages/vector.git
 	ignore = untracked
 [submodule "libraries/time"]
 	path = libraries/time
-	url = ../packages/time.git
+	url = https://gitlab.haskell.org/ghc/packages/time.git
 	ignore = untracked
 [submodule "libraries/random"]
 	path = libraries/random
-	url = ../packages/random.git
+	url = https://gitlab.haskell.org/ghc/packages/random.git
 	ignore = untracked
 [submodule "libraries/array"]
 	path = libraries/array
-	url = ../packages/array.git
+	url = https://gitlab.haskell.org/ghc/packages/array.git
 	ignore = untracked
 [submodule "libraries/deepseq"]
 	path = libraries/deepseq
-	url = ../packages/deepseq.git
+	url = https://gitlab.haskell.org/ghc/packages/deepseq.git
 	ignore = untracked
 [submodule "libraries/directory"]
 	path = libraries/directory
-	url = ../packages/directory.git
+	url = https://gitlab.haskell.org/ghc/packages/directory.git
 	ignore = untracked
 [submodule "libraries/filepath"]
 	path = libraries/filepath
-	url = ../packages/filepath.git
+	url = https://gitlab.haskell.org/ghc/packages/filepath.git
 	ignore = untracked
 [submodule "libraries/hpc"]
 	path = libraries/hpc
-	url = ../packages/hpc.git
+	url = https://gitlab.haskell.org/ghc/packages/hpc.git
 	ignore = untracked
 [submodule "libraries/parsec"]
 	path = libraries/parsec
-	url = ../packages/parsec.git
+	url = https://gitlab.haskell.org/ghc/packages/parsec.git
 	ignore = untracked
 [submodule "libraries/text"]
 	path = libraries/text
-	url = ../packages/text.git
+	url = https://gitlab.haskell.org/ghc/packages/text.git
 	ignore = untracked
 [submodule "libraries/mtl"]
 	path = libraries/mtl
-	url = ../packages/mtl.git
+	url = https://gitlab.haskell.org/ghc/packages/mtl.git
 	ignore = untracked
 [submodule "libraries/process"]
 	path = libraries/process
-	url = ../packages/process.git
+	url = https://gitlab.haskell.org/ghc/packages/process.git
 	ignore = untracked
 [submodule "libraries/unix"]
 	path = libraries/unix
-	url = ../packages/unix.git
+	url = https://gitlab.haskell.org/ghc/packages/unix.git
 	ignore = untracked
 [submodule "libraries/parallel"]
 	path = libraries/parallel
-	url = ../packages/parallel.git
+	url = https://gitlab.haskell.org/ghc/packages/parallel.git
 	ignore = untracked
 [submodule "libraries/stm"]
 	path = libraries/stm
-	url = ../packages/stm.git
+	url = https://gitlab.haskell.org/ghc/packages/stm.git
 	ignore = untracked
 [submodule "libraries/dph"]
 	path = libraries/dph
-	url = ../packages/dph.git
+	url = https://gitlab.haskell.org/ghc/packages/dph.git
 	ignore = untracked
 [submodule "utils/haddock"]
 	path = utils/haddock
-	url = ../haddock.git
+	url = https://gitlab.haskell.org/ghc/haddock.git
 	ignore = untracked
 	branch = ghc-head
 [submodule "nofib"]
 	path = nofib
-	url = ../nofib.git
+	url = https://gitlab.haskell.org/ghc/nofib.git
 	ignore = untracked
 [submodule "utils/hsc2hs"]
 	path = utils/hsc2hs
-	url = ../hsc2hs.git
+	url = https://gitlab.haskell.org/ghc/hsc2hs.git
 	ignore = untracked
 [submodule "libffi-tarballs"]
 	path = libffi-tarballs
-	url = ../libffi-tarballs.git
+	url = https://gitlab.haskell.org/ghc/libffi-tarballs.git
 	ignore = untracked
 [submodule "gmp-tarballs"]
 	path = libraries/integer-gmp/gmp/gmp-tarballs
-	url = ../gmp-tarballs.git
+	url = https://gitlab.haskell.org/ghc/gmp-tarballs.git
 [submodule ".arc-linters/arcanist-external-json-linter"]
 	path = .arc-linters/arcanist-external-json-linter
-	url = ../arcanist-external-json-linter.git
+	url = https://gitlab.haskell.org/ghc/arcanist-external-json-linter.git
 [submodule "hadrian"]
 	path = hadrian
-	url = ../hadrian.git
+	url = https://gitlab.haskell.org/ghc/hadrian.git
