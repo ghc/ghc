@@ -69,10 +69,8 @@ uint32_t numa_map[MAX_NUMA_NODES];
 
 /* Let foreign code get the current Capability -- assuming there is one!
  * This is useful for unsafe foreign calls because they are called with
- * the current Capability held, but they are not passed it. For example,
- * see see the integer-gmp package which calls allocate() in its
- * stgAllocForGMP() function (which gets called by gmp functions).
- * */
+ * the current Capability held, but they are not passed it.
+ */
 Capability * rts_unsafeGetMyCapability (void)
 {
 #if defined(THREADED_RTS)
