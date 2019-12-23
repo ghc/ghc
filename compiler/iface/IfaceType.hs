@@ -1322,6 +1322,9 @@ pprTyTcApp' ctxt_prec tc tys dflags style
     if | not dbg && tc `ifaceTyConHasKey` errorMessageTypeErrorFamKey
          -- Suppress detail unles you _really_ want to see
          -> text "(TypeError ...)"
+       | not dbg && tc `ifaceTyConHasKey` errorMessageTypeWarningFamKey
+          -- Suppress detail unles you _really_ want to see
+         -> text "(TypeWarning ...)"
 
        | Just doc <- ppr_equality ctxt_prec tc (appArgsIfaceTypes tys)
          -> doc

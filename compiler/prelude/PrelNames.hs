@@ -462,6 +462,9 @@ basicKnownKeyNames
         , typeErrorVAppendDataConName
         , typeErrorShowTypeDataConName
 
+        -- Custom type warnigns
+        , errorMessageTypeWarningFamName
+
     ]
 
 genericTyConNames :: [Name]
@@ -1302,6 +1305,9 @@ errorMessageTypeErrorFamName
   , typeErrorShowTypeDataConName
   :: Name
 
+-- Custom type warnigns
+errorMessageTypeWarningFamName :: Name
+
 errorMessageTypeErrorFamName =
   tcQual gHC_TYPELITS (fsLit "TypeError") errorMessageTypeErrorFamKey
 
@@ -1317,6 +1323,8 @@ typeErrorVAppendDataConName =
 typeErrorShowTypeDataConName =
   dcQual gHC_TYPELITS (fsLit "ShowType") typeErrorShowTypeDataConKey
 
+errorMessageTypeWarningFamName =
+  tcQual gHC_TYPELITS (fsLit "TypeWarning") errorMessageTypeWarningFamKey
 
 
 -- Dynamic
@@ -1888,6 +1896,10 @@ someTypeRepDataConKey = mkPreludeTyConUnique 189
 
 typeSymbolAppendFamNameKey :: Unique
 typeSymbolAppendFamNameKey = mkPreludeTyConUnique 190
+
+-- Custom user type-warnings
+errorMessageTypeWarningFamKey :: Unique
+errorMessageTypeWarningFamKey =  mkPreludeTyConUnique 191
 
 ---------------- Template Haskell -------------------
 --      THNames.hs: USES TyConUniques 200-299

@@ -18,9 +18,9 @@
 GHC's @DataKinds@ language extension lifts data constructors, natural
 numbers, and strings to the type level. This module provides the
 primitives needed for working with type-level numbers (the 'Nat' kind)
-and strings (the 'Symbol') kind. It also defines the 'TypeError' type
-family, a feature that makes use of type-level strings to support user
-defined type errors.
+and strings (the 'Symbol') kind. It also defines the 'TypeError' and
+`TypeWarning` type families, a feature that makes use of type-level strings
+to support user defined type errors and warnings.
 
 For now, this module is the API for working with type-level literals.
 However, please note that it is a work in progress and is subject to change.
@@ -51,6 +51,7 @@ module GHC.TypeLits
 
   -- * User-defined type errors
   , TypeError
+  , TypeWarning
   , ErrorMessage(..)
 
   ) where
@@ -195,6 +196,23 @@ infixl 6 :<>:
 -- @since 4.9.0.0
 type family TypeError (a :: ErrorMessage) :: b where
 
+-- | Type-level warning
+--
+-- Similiar to TypeError but instead of issuing an error it shows a warning.
+--
+-- @
+-- type family FitsIn x where
+--   FitsIn 0        = ()
+--   FitsIn 1        = Word8
+--   FitsIn 2        = Word16
+--   FitsIn a        = TypeWarning (Text "The byte size " :<>: ShowType a :<>:
+--                                  Text " is defaulted to Integer.")
+--                                  Integer
+-- @
+--
+-- @since 4.13.0.0
+type family TypeWarning (a :: ErrorMessage) (t :: k) :: k where
+  TypeWarning _ b = b
 
 --------------------------------------------------------------------------------
 
