@@ -35,11 +35,11 @@ basic properties listed above.
 {-# LANGUAGE ScopedTypeVariables, FlexibleContexts, TypeFamilies,
   DeriveFunctor #-}
 
-module StgLint ( lintStgTopBindings ) where
+module GHC.Stg.Lint ( lintStgTopBindings ) where
 
 import GhcPrelude
 
-import StgSyn
+import GHC.Stg.Syntax
 
 import DynFlags
 import Bag              ( Bag, emptyBag, isEmptyBag, snocBag, bagToList )
@@ -52,7 +52,7 @@ import CoreSyn          ( AltCon(..) )
 import Name             ( getSrcLoc, nameIsLocalOrFrom )
 import ErrUtils         ( MsgDoc, Severity(..), mkLocMessage )
 import Type
-import RepType
+import GHC.Types.RepType
 import SrcLoc
 import Outputable
 import Module           ( Module )

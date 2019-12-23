@@ -19,7 +19,7 @@ generation.
 {-# LANGUAGE UndecidableInstances #-}
 {-# LANGUAGE ConstraintKinds #-}
 
-module StgSyn (
+module GHC.Stg.Syntax (
         StgArg(..),
 
         GenStgTopBinding(..), GenStgBinding(..), GenStgExpr(..), GenStgRhs(..),
@@ -81,7 +81,7 @@ import PprCore     ( {- instances -} )
 import PrimOp      ( PrimOp, PrimCall )
 import TyCon       ( PrimRep(..), TyCon )
 import Type        ( Type )
-import RepType     ( typePrimRep1 )
+import GHC.Types.RepType     ( typePrimRep1 )
 import Util
 
 import Data.List.NonEmpty ( NonEmpty, toList )

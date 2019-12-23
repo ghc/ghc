@@ -1,7 +1,7 @@
 module Main where
 
 import DynFlags
-import RepType
+import GHC.Types.RepType
 import SMRep
 import GHC.StgToCmm.Layout
 import GHC.StgToCmm.Closure

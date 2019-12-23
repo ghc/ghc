@@ -36,7 +36,7 @@ import Cmm
 import CmmInfo
 import CmmUtils
 import CLabel
-import StgSyn
+import GHC.Stg.Syntax
 import CostCentre
 import Id
 import IdInfo

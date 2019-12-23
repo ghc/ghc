@@ -66,7 +66,7 @@ module GHC.StgToCmm.Closure (
 
 import GhcPrelude
 
-import StgSyn
+import GHC.Stg.Syntax
 import SMRep
 import Cmm
 import PprCmmExpr() -- For Outputable instances
@@ -82,7 +82,7 @@ import Type
 import TyCoRep
 import TcType
 import TyCon
-import RepType
+import GHC.Types.RepType
 import BasicTypes
 import Outputable
 import DynFlags

@@ -4,7 +4,7 @@
 
 -- | Hides away distracting bookkeeping while lambda lifting into a 'LiftM'
 -- monad.
-module StgLiftLams.LiftM (
+module GHC.Stg.Lift.Monad (
     decomposeStgBinding, mkStgBinding,
     Env (..),
     -- * #floats# Handling floats
@@ -33,8 +33,8 @@ import IdInfo
 import Name
 import Outputable
 import OrdList
-import StgSubst
-import StgSyn
+import GHC.Stg.Subst
+import GHC.Stg.Syntax
 import Type
 import UniqSupply
 import Util

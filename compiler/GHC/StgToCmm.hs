@@ -30,7 +30,7 @@ import Cmm
 import CmmUtils
 import CLabel
 
-import StgSyn
+import GHC.Stg.Syntax
 import DynFlags
 import ErrUtils
 
@@ -38,7 +38,7 @@ import HscTypes
 import CostCentre
 import Id
 import IdInfo
-import RepType
+import GHC.Types.RepType
 import DataCon
 import TyCon
 import Module

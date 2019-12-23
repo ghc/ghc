@@ -28,7 +28,7 @@ import GHC.StgToCmm.Ticky
 import GHC.StgToCmm.Utils
 import GHC.StgToCmm.Closure
 
-import StgSyn
+import GHC.Stg.Syntax
 
 import MkGraph
 import BlockId
@@ -42,7 +42,7 @@ import Id
 import PrimOp
 import TyCon
 import Type             ( isUnliftedType )
-import RepType          ( isVoidTy, countConRepArgs )
+import GHC.Types.RepType          ( isVoidTy, countConRepArgs )
 import CostCentre       ( CostCentreStack, currentCCS )
 import Maybes
 import Util

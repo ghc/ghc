@@ -5,7 +5,7 @@
 -- | Provides the heuristics for when it's beneficial to lambda lift bindings.
 -- Most significantly, this employs a cost model to estimate impact on heap
 -- allocations, by looking at an STG expression's 'Skeleton'.
-module StgLiftLams.Analysis (
+module GHC.Stg.Lift.Analysis (
     -- * #when# When to lift
     -- $when
 
@@ -27,7 +27,7 @@ import Demand
 import DynFlags
 import Id
 import SMRep ( WordOff )
-import StgSyn
+import GHC.Stg.Syntax
 import qualified GHC.StgToCmm.ArgRep  as StgToCmm.ArgRep
 import qualified GHC.StgToCmm.Closure as StgToCmm.Closure
 import qualified GHC.StgToCmm.Layout  as StgToCmm.Layout

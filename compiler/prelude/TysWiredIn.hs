@@ -144,7 +144,7 @@ import Id
 import Constants        ( mAX_TUPLE_SIZE, mAX_CTUPLE_SIZE, mAX_SUM_SIZE )
 import Module           ( Module )
 import Type
-import RepType
+import GHC.Types.RepType
 import DataCon
 import {-# SOURCE #-} ConLike
 import TyCon

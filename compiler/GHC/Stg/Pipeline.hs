@@ -9,19 +9,19 @@
 {-# LANGUAGE FlexibleContexts #-}
 {-# LANGUAGE TypeFamilies #-}
 
-module SimplStg ( stg2stg ) where
+module GHC.Stg.Pipeline ( stg2stg ) where
 
 #include "HsVersions.h"
 
 import GhcPrelude
 
-import StgSyn
+import GHC.Stg.Syntax
 
-import StgLint          ( lintStgTopBindings )
-import StgStats         ( showStgStats )
-import UnariseStg       ( unarise )
-import StgCse           ( stgCse )
-import StgLiftLams      ( stgLiftLams )
+import GHC.Stg.Lint     ( lintStgTopBindings )
+import GHC.Stg.Stats    ( showStgStats )
+import GHC.Stg.Unarise  ( unarise )
+import GHC.Stg.CSE      ( stgCse )
+import GHC.Stg.Lift     ( stgLiftLams )
 import Module           ( Module )
 
 import DynFlags

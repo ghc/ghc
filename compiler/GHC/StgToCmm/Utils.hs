@@ -75,7 +75,7 @@ import UniqSupply (MonadUnique(..))
 import DynFlags
 import FastString
 import Outputable
-import RepType
+import GHC.Types.RepType
 
 import Data.ByteString (ByteString)
 import qualified Data.ByteString.Char8 as BS8
