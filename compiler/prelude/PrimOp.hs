@@ -38,7 +38,7 @@ import Name
 import PrelNames        ( gHC_PRIMOPWRAPPERS )
 import TyCon            ( TyCon, isPrimTyCon, PrimRep(..) )
 import Type
-import RepType          ( typePrimRep1, tyConPrimRep1 )
+import GHC.Types.RepType          ( typePrimRep1, tyConPrimRep1 )
 import BasicTypes       ( Arity, Fixity(..), FixityDirection(..), Boxity(..),
                           SourceText(..) )
 import SrcLoc           ( wiredInSrcSpan )

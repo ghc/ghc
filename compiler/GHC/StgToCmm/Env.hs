@@ -41,7 +41,7 @@ import Id
 import MkGraph
 import Name
 import Outputable
-import StgSyn
+import GHC.Stg.Syntax
 import Type
 import TysPrim
 import UniqFM
