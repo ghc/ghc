@@ -19,7 +19,7 @@ generation.
 {-# LANGUAGE UndecidableInstances #-}
 {-# LANGUAGE ConstraintKinds #-}
 
-module StgSyn (
+module GHC.Stg.Syntax (
         StgArg(..),
 
         GenStgTopBinding(..), GenStgBinding(..), GenStgExpr(..), GenStgRhs(..),
@@ -81,7 +81,7 @@ import PprCore     ( {- instances -} )
 import PrimOp      ( PrimOp, PrimCall )
 import TyCon       ( PrimRep(..), TyCon )
 import Type        ( Type )
-import RepType     ( typePrimRep1 )
+import GHC.Types.RepType     ( typePrimRep1 )
 import Util
 
 import Data.List.NonEmpty ( NonEmpty, toList )
@@ -238,7 +238,7 @@ literals.
         -- which can't be let-bound
   | StgConApp   DataCon
                 [StgArg] -- Saturated
-                [Type]   -- See Note [Types in StgConApp] in UnariseStg
+                [Type]   -- See Note [Types in StgConApp] in GHC.Stg.Unarise
 
   | StgOpApp    StgOp    -- Primitive op or foreign call
                 [StgArg] -- Saturated.

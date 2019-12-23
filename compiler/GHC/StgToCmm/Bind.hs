@@ -36,7 +36,7 @@ import Cmm
 import CmmInfo
 import CmmUtils
 import CLabel
-import StgSyn
+import GHC.Stg.Syntax
 import CostCentre
 import Id
 import IdInfo
@@ -206,7 +206,7 @@ cgRhs id (StgRhsCon cc con args)
   = withNewTickyCounterCon (idName id) $
     buildDynCon id True cc con (assertNonVoidStgArgs args)
       -- con args are always non-void,
-      -- see Note [Post-unarisation invariants] in UnariseStg
+      -- see Note [Post-unarisation invariants] in GHC.Stg.Unarise
 
 {- See Note [GC recovery] in compiler/GHC.StgToCmm/Closure.hs -}
 cgRhs id (StgRhsClosure fvs cc upd_flag args body)
@@ -275,7 +275,7 @@ mkRhsClosure    dflags bndr _cc
 
   , let (_, _, params_w_offsets) = mkVirtConstrOffsets dflags (addIdReps (assertNonVoidIds params))
                                    -- pattern binders are always non-void,
-                                   -- see Note [Post-unarisation invariants] in UnariseStg
+                                   -- see Note [Post-unarisation invariants] in GHC.Stg.Unarise
   , Just the_offset <- assocMaybe params_w_offsets (NonVoid selectee)
 
   , let offset_into_int = bytesToWordsRoundUp dflags the_offset
