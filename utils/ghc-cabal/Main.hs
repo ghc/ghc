@@ -20,6 +20,7 @@ import Distribution.Simple.Utils (defaultPackageDesc, findHookedPackageDesc, wri
 import Distribution.Simple.Build (writeAutogenFiles)
 import Distribution.Simple.Register
 import qualified Distribution.Compat.Graph as Graph
+import qualified Distribution.Utils.ShortText as ShortText
 import Distribution.Text
 import Distribution.Types.MungedPackageId
 import Distribution.Types.LocalBuildInfo
@@ -430,7 +431,7 @@ generate directory distdir config_args
                 variablePrefix ++ "_COMPONENT_ID = " ++ localCompatPackageKey lbi,
                 variablePrefix ++ "_MODULES = " ++ unwords mods,
                 variablePrefix ++ "_HIDDEN_MODULES = " ++ unwords otherMods,
-                variablePrefix ++ "_SYNOPSIS =" ++ (unwords $ lines $ synopsis pd),
+                variablePrefix ++ "_SYNOPSIS =" ++ (unwords $ lines $ ShortText.fromShortText $ synopsis pd),
                 variablePrefix ++ "_HS_SRC_DIRS = " ++ unwords (hsSourceDirs bi),
                 variablePrefix ++ "_DEPS = " ++ unwords deps,
                 variablePrefix ++ "_DEP_IPIDS = " ++ unwords dep_ipids,
@@ -475,8 +476,9 @@ generate directory distdir config_args
       writeFile (distdir ++ "/package-data.mk") $ unlines xs
 
       writeFileUtf8 (distdir ++ "/haddock-prologue.txt") $
-          if null (description pd) then synopsis pd
-                                   else description pd
+          if ShortText.null (description pd)
+            then ShortText.fromShortText (synopsis pd)
+            else ShortText.fromShortText (description pd)
   where
      escape = foldr (\c xs -> if c == '#' then '\\':'#':xs else c:xs) []
      wrap = mapM wrap1
