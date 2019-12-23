@@ -1035,7 +1035,7 @@ mkDataTyConRhs cons
 -- constructor of 'PrimRep'. This data structure allows us to store this
 -- information right in the 'TyCon'. The other approach would be to look
 -- up things like @RuntimeRep@'s @PrimRep@ by known-key every time.
--- See also Note [Getting from RuntimeRep to PrimRep] in RepType
+-- See also Note [Getting from RuntimeRep to PrimRep] in GHC.Types.RepType
 data RuntimeRepInfo
   = NoRRI       -- ^ an ordinary promoted data con
   | RuntimeRep ([Type] -> [PrimRep])
@@ -1411,14 +1411,14 @@ On the other hand, CmmType includes some "nonsense" values, such as
 CmmType GcPtrCat W32 on a 64-bit machine.
 
 The PrimRep type is closely related to the user-visible RuntimeRep type.
-See Note [RuntimeRep and PrimRep] in RepType.
+See Note [RuntimeRep and PrimRep] in GHC.Types.RepType.
 
 -}
 
 -- | A 'PrimRep' is an abstraction of a type.  It contains information that
 -- the code generator needs in order to pass arguments, return results,
--- and store values of this type. See also Note [RuntimeRep and PrimRep] in RepType
--- and Note [VoidRep] in RepType.
+-- and store values of this type. See also Note [RuntimeRep and PrimRep] in
+-- GHC.Types.RepType and Note [VoidRep] in GHC.Types.RepType.
 data PrimRep
   = VoidRep
   | LiftedRep

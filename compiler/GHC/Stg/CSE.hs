@@ -84,13 +84,13 @@ Solution: do unarise first.
 
 -}
 
-module StgCse (stgCse) where
+module GHC.Stg.CSE (stgCse) where
 
 import GhcPrelude
 
 import DataCon
 import Id
-import StgSyn
+import GHC.Stg.Syntax
 import Outputable
 import VarEnv
 import CoreSyn (AltCon(..))

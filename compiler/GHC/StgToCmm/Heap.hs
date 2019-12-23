@@ -22,7 +22,7 @@ module GHC.StgToCmm.Heap (
 
 import GhcPrelude hiding ((<*>))
 
-import StgSyn
+import GHC.Stg.Syntax
 import CLabel
 import GHC.StgToCmm.Layout
 import GHC.StgToCmm.Utils

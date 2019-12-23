@@ -66,7 +66,7 @@ module GHC.StgToCmm.Closure (
 
 import GhcPrelude
 
-import StgSyn
+import GHC.Stg.Syntax
 import SMRep
 import Cmm
 import PprCmmExpr() -- For Outputable instances
@@ -82,7 +82,7 @@ import Type
 import TyCoRep
 import TcType
 import TyCon
-import RepType
+import GHC.Types.RepType
 import BasicTypes
 import Outputable
 import DynFlags
@@ -142,7 +142,7 @@ nonVoidIds ids = [NonVoid id | id <- ids, not (isVoidTy (idType id))]
 
 -- | Used in places where some invariant ensures that all these Ids are
 -- non-void; e.g. constructor field binders in case expressions.
--- See Note [Post-unarisation invariants] in UnariseStg.
+-- See Note [Post-unarisation invariants] in GHC.Stg.Unarise.
 assertNonVoidIds :: [Id] -> [NonVoid Id]
 assertNonVoidIds ids = ASSERT(not (any (isVoidTy . idType) ids))
                        coerce ids
@@ -152,7 +152,7 @@ nonVoidStgArgs args = [NonVoid arg | arg <- args, not (isVoidTy (stgArgType arg)
 
 -- | Used in places where some invariant ensures that all these arguments are
 -- non-void; e.g. constructor arguments.
--- See Note [Post-unarisation invariants] in UnariseStg.
+-- See Note [Post-unarisation invariants] in GHC.Stg.Unarise.
 assertNonVoidStgArgs :: [StgArg] -> [NonVoid StgArg]
 assertNonVoidStgArgs args = ASSERT(not (any (isVoidTy . stgArgType) args))
                             coerce args
@@ -169,7 +169,7 @@ assertNonVoidStgArgs args = ASSERT(not (any (isVoidTy . stgArgType) args))
 -- See Note [Post-unarisation invariants]
 idPrimRep :: Id -> PrimRep
 idPrimRep id = typePrimRep1 (idType id)
-    -- See also Note [VoidRep] in RepType
+    -- See also Note [VoidRep] in GHC.Types.RepType
 
 -- | Assumes that Ids have one PrimRep, which holds after unarisation.
 -- See Note [Post-unarisation invariants]

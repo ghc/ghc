@@ -194,7 +194,7 @@ STG programs after unarisation have these invariants:
 
 {-# LANGUAGE CPP, TupleSections #-}
 
-module UnariseStg (unarise) where
+module GHC.Stg.Unarise (unarise) where
 
 #include "HsVersions.h"
 
@@ -210,8 +210,8 @@ import MkCore (aBSENT_SUM_FIELD_ERROR_ID)
 import MkId (voidPrimId, voidArgId)
 import MonadUtils (mapAccumLM)
 import Outputable
-import RepType
-import StgSyn
+import GHC.Types.RepType
+import GHC.Stg.Syntax
 import Type
 import TysPrim (intPrimTy,wordPrimTy,word64PrimTy)
 import TysWiredIn
@@ -353,7 +353,7 @@ unariseExpr rho (StgCase scrut bndr alt_ty alts)
        alts'  <- unariseAlts rho alt_ty bndr alts
        return (StgCase scrut' bndr alt_ty alts')
                        -- bndr may have a unboxed sum/tuple type but it will be
-                       -- dead after unarise (checked in StgLint)
+                       -- dead after unarise (checked in GHC.Stg.Lint)
 
 unariseExpr rho (StgLet ext bind e)
   = StgLet ext <$> unariseBinding rho bind <*> unariseExpr rho e

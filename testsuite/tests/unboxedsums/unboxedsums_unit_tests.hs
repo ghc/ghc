@@ -4,7 +4,7 @@ import BasicTypes
 import GHC
 import GhcMonad
 import Outputable
-import RepType
+import GHC.Types.RepType
 import TysPrim
 import TysWiredIn
 import UniqSet

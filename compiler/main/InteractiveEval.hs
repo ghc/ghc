@@ -61,7 +61,7 @@ import FamInstEnv ( FamInst )
 import CoreFVs    ( orphNamesOfFamInst )
 import TyCon
 import Type             hiding( typeKind )
-import RepType
+import GHC.Types.RepType
 import TcType
 import Constraint
 import TcOrigin

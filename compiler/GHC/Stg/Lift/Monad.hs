@@ -4,7 +4,7 @@
 
 -- | Hides away distracting bookkeeping while lambda lifting into a 'LiftM'
 -- monad.
-module StgLiftLams.LiftM (
+module GHC.Stg.Lift.Monad (
     decomposeStgBinding, mkStgBinding,
     Env (..),
     -- * #floats# Handling floats
@@ -33,8 +33,8 @@ import IdInfo
 import Name
 import Outputable
 import OrdList
-import StgSubst
-import StgSyn
+import GHC.Stg.Subst
+import GHC.Stg.Syntax
 import Type
 import UniqSupply
 import Util
@@ -137,7 +137,7 @@ emptyEnv dflags = Env dflags emptySubst emptyVarEnv False
 -- business and will just manipulate it indirectly through actions in 'LiftM'.
 
 -- | We need to detect when we are lifting something out of the RHS of a
--- recursive binding (c.f. "StgLiftLams.LiftM#floats"), in which case that
+-- recursive binding (c.f. "GHC.Stg.Lift.Monad#floats"), in which case that
 -- binding needs to be added to the same top-level recursive group. This
 -- requires we detect a certain nesting structure, which is encoded by
 -- 'StartBindingGroup' and 'EndBindingGroup'.

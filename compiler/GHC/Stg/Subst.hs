@@ -1,6 +1,6 @@
 {-# LANGUAGE CPP #-}
 
-module StgSubst where
+module GHC.Stg.Subst where
 
 #include "HsVersions.h"
 

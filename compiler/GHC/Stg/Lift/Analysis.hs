@@ -5,7 +5,7 @@
 -- | Provides the heuristics for when it's beneficial to lambda lift bindings.
 -- Most significantly, this employs a cost model to estimate impact on heap
 -- allocations, by looking at an STG expression's 'Skeleton'.
-module StgLiftLams.Analysis (
+module GHC.Stg.Lift.Analysis (
     -- * #when# When to lift
     -- $when
 
@@ -27,7 +27,7 @@ import Demand
 import DynFlags
 import Id
 import SMRep ( WordOff )
-import StgSyn
+import GHC.Stg.Syntax
 import qualified GHC.StgToCmm.ArgRep  as StgToCmm.ArgRep
 import qualified GHC.StgToCmm.Closure as StgToCmm.Closure
 import qualified GHC.StgToCmm.Layout  as StgToCmm.Layout
@@ -45,7 +45,7 @@ import Data.Maybe ( mapMaybe )
 --   1. It tags the syntax tree with analysis information in the form of
 --      'BinderInfo' at each binder and 'Skeleton's at each let-binding
 --      by 'tagSkeletonTopBind' and friends.
---   2. The resulting syntax tree is treated by the "StgLiftLams.Transformation"
+--   2. The resulting syntax tree is treated by the "GHC.Stg.Lift"
 --      module, calling out to 'goodToLift' to decide if a binding is worthwhile
 --      to lift.
 --      'goodToLift' consults argument occurrence information in 'BinderInfo'
@@ -78,7 +78,7 @@ import Data.Maybe ( mapMaybe )
 --  [Closure growth] introduced when former free variables have to be available
 --    at call sites may actually lead to an increase in overall allocations
 --  resulting from a lift. Estimating closure growth is described in
---  "StgLiftLams.Analysis#clogro" and is what most of this module is ultimately
+--  "GHC.Stg.Lift.Analysis#clogro" and is what most of this module is ultimately
 --  concerned with.
 --
 -- There's a <https://gitlab.haskell.org/ghc/ghc/wikis/late-lam-lift wiki page> with
@@ -145,7 +145,7 @@ data BinderInfo
   = BindsClosure !Id !Bool -- ^ Let(-no-escape)-bound thing with a flag
                            --   indicating whether it occurs as an argument
                            --   or in a nullary application
-                           --   (see "StgLiftLams.Analysis#arg_occs").
+                           --   (see "GHC.Stg.Lift.Analysis#arg_occs").
   | BoringBinder !Id       -- ^ Every other kind of binder
 
 -- | Gets the bound 'Id' out a 'BinderInfo'.
@@ -214,7 +214,7 @@ tagSkeletonTopBind bind = bind'
 -- | Tags binders of an 'StgExpr' with its 'BinderInfo' and let bindings with
 -- their 'Skeleton's. Additionally, returns its 'Skeleton' and the set of binder
 -- occurrences in argument and nullary application position
--- (cf. "StgLiftLams.Analysis#arg_occs").
+-- (cf. "GHC.Stg.Lift.Analysis#arg_occs").
 tagSkeletonExpr :: CgStgExpr -> (Skeleton, IdSet, LlStgExpr)
 tagSkeletonExpr (StgLit lit)
   = (NilSk, emptyVarSet, StgLit lit)
@@ -227,7 +227,7 @@ tagSkeletonExpr (StgApp f args)
   where
     arg_occs
       -- This checks for nullary applications, which we treat the same as
-      -- argument occurrences, see "StgLiftLams.Analysis#arg_occs".
+      -- argument occurrences, see "GHC.Stg.Lift.Analysis#arg_occs".
       | null args = unitVarSet f
       | otherwise = mkArgOccs args
 tagSkeletonExpr (StgLam _ _) = pprPanic "stgLiftLams" (text "StgLam")
@@ -352,13 +352,13 @@ tagSkeletonAlt (con, bndrs, rhs)
     arg_occs = alt_arg_occs `delVarSetList` bndrs
 
 -- | Combines several heuristics to decide whether to lambda-lift a given
--- @let@-binding to top-level. See "StgLiftLams.Analysis#when" for details.
+-- @let@-binding to top-level. See "GHC.Stg.Lift.Analysis#when" for details.
 goodToLift
   :: DynFlags
   -> TopLevelFlag
   -> RecFlag
   -> (DIdSet -> DIdSet) -- ^ An expander function, turning 'InId's into
-                        -- 'OutId's. See 'StgLiftLams.LiftM.liftedIdsExpander'.
+                        -- 'OutId's. See 'GHC.Stg.Lift.Monad.liftedIdsExpander'.
   -> [(BinderInfo, LlStgRhs)]
   -> Skeleton
   -> Maybe DIdSet       -- ^ @Just abs_ids@ <=> This binding is beneficial to
@@ -507,7 +507,7 @@ idClosureFootprint dflags
 -- | @closureGrowth expander sizer f fvs@ computes the closure growth in words
 -- as a result of lifting @f@ to top-level. If there was any growing closure
 -- under a multi-shot lambda, the result will be 'infinity'.
--- Also see "StgLiftLams.Analysis#clogro".
+-- Also see "GHC.Stg.Lift.Analysis#clogro".
 closureGrowth
   :: (DIdSet -> DIdSet)
   -- ^ Expands outer free ids that were lifted to their free vars

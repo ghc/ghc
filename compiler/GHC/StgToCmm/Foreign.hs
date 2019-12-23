@@ -20,7 +20,7 @@ module GHC.StgToCmm.Foreign (
 
 import GhcPrelude hiding( succ, (<*>) )
 
-import StgSyn
+import GHC.Stg.Syntax
 import GHC.StgToCmm.Prof (storeCurCCS, ccsType)
 import GHC.StgToCmm.Env
 import GHC.StgToCmm.Monad
@@ -33,7 +33,7 @@ import Cmm
 import CmmUtils
 import MkGraph
 import Type
-import RepType
+import GHC.Types.RepType
 import CLabel
 import SMRep
 import ForeignCall

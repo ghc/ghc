@@ -37,7 +37,7 @@ import Literal
 import PrimOp
 import CoreFVs
 import Type
-import RepType
+import GHC.Types.RepType
 import DataCon
 import TyCon
 import Util

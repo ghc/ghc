@@ -40,7 +40,7 @@ import GHC.Platform
 import BasicTypes
 import BlockId
 import MkGraph
-import StgSyn
+import GHC.Stg.Syntax
 import Cmm
 import Module   ( rtsUnitId )
 import Type     ( Type, tyConAppTyCon )

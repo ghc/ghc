@@ -30,7 +30,7 @@ import Cmm
 import CmmUtils
 import CLabel
 
-import StgSyn
+import GHC.Stg.Syntax
 import DynFlags
 import ErrUtils
 
@@ -38,7 +38,7 @@ import HscTypes
 import CostCentre
 import Id
 import IdInfo
-import RepType
+import GHC.Types.RepType
 import DataCon
 import TyCon
 import Module
@@ -147,7 +147,7 @@ cgTopRhs :: DynFlags -> RecFlag -> Id -> CgStgRhs -> (CgIdInfo, FCode ())
 cgTopRhs dflags _rec bndr (StgRhsCon _cc con args)
   = cgTopRhsCon dflags bndr con (assertNonVoidStgArgs args)
       -- con args are always non-void,
-      -- see Note [Post-unarisation invariants] in UnariseStg
+      -- see Note [Post-unarisation invariants] in GHC.Stg.Unarise
 
 cgTopRhs dflags rec bndr (StgRhsClosure fvs cc upd_flag args body)
   = ASSERT(isEmptyDVarSet fvs)    -- There should be no free variables
