@@ -19,7 +19,7 @@ module GHC.StgToCmm.DataCon (
 
 import GhcPrelude
 
-import StgSyn
+import GHC.Stg.Syntax
 import CoreSyn  ( AltCon(..) )
 
 import GHC.StgToCmm.Monad
@@ -40,7 +40,7 @@ import DataCon
 import DynFlags
 import FastString
 import Id
-import RepType (countConRepArgs)
+import GHC.Types.RepType (countConRepArgs)
 import Literal
 import PrelInfo
 import Outputable
