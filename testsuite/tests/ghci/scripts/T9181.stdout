@@ -26,6 +26,11 @@ data GHC.TypeLits.SomeSymbol
 type GHC.TypeLits.TypeError :: forall b.
                                GHC.TypeLits.ErrorMessage -> b
 type family GHC.TypeLits.TypeError a where
+type GHC.TypeLits.TypeWarning :: forall k.
+                                 GHC.TypeLits.ErrorMessage -> k -> k
+type family GHC.TypeLits.TypeWarning a t where
+  forall k (_1 :: GHC.TypeLits.ErrorMessage) (b :: k).
+    GHC.TypeLits.TypeWarning _1 b = b
 GHC.TypeLits.natVal ::
   GHC.TypeNats.KnownNat n => proxy n -> Integer
 GHC.TypeLits.natVal' ::

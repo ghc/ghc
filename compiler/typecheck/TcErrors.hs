@@ -560,10 +560,9 @@ reportWanteds ctxt tc_lvl (WC { wc_simple = simples, wc_impl = implics })
     -- (see TcRnTypes.insolubleCt) is caught here, otherwise
     -- we might suppress its error message, and proceed on past
     -- type checking to get a Lint error later
-    report1 = [ ("Out of scope",   is_out_of_scope,      True,  mkHoleReporter tidy_cts)
-              , ("Holes",          is_hole,              False, mkHoleReporter tidy_cts)
-              , ("custom_error",   is_user_type_error,   True,  mkUserTypeErrorReporter)
-              , ("custom_warning", is_user_type_warning, False, mkUserTypeWarningReporter)
+    report1 = [ ("Out of scope", is_out_of_scope,    True,  mkHoleReporter tidy_cts)
+              , ("Holes",        is_hole,            False, mkHoleReporter tidy_cts)
+              , ("custom_error", is_user_type_error, True,  mkUserTypeErrorReporter)
 
               , given_eq_spec
               , ("insoluble2",   utterly_wrong,  True, mkGroupReporter mkEqErr)
@@ -613,7 +612,6 @@ reportWanteds ctxt tc_lvl (WC { wc_simple = simples, wc_impl = implics })
     is_hole         ct _ = isHoleCt ct
 
     is_user_type_error ct _ = isUserTypeErrorCt ct
-    is_user_type_warning ct _ = isUserTypeWarningCt ct
 
     is_homo_equality _ (EqPred _ ty1 ty2) = tcTypeKind ty1 `tcEqType` tcTypeKind ty2
     is_homo_equality _ _                  = False
@@ -718,21 +716,6 @@ mkUserTypeError ctxt ct = mkErrorMsgFromCt ctxt ct
                         $ case getUserTypeErrorMsg ct of
                             Just msg -> msg
                             Nothing  -> pprPanic "mkUserTypeError" (ppr ct)
-
-mkUserTypeWarningReporter :: Reporter
-mkUserTypeWarningReporter ctxt
-  = mapM_ $ \ct -> do { err <- mkUserTypeWarning ctxt ct
-                      ; maybeReportError ctxt err
-                      ; addDeferredBinding ctxt err ct }
-
-mkUserTypeWarning :: ReportErrCtxt -> Ct -> TcM ErrMsg
-mkUserTypeWarning ctxt ct = mkErrorMsgFromCt ctxt ct
-                        $ important
-                        $ pprUserTypeErrorTy
-                        $ case getUserTypeWarning ct of
-                            Just (msg, _) -> msg
-                            Nothing  -> pprPanic "mkUserTypeError" (ppr ct)
-
 
 
 mkGivenErrorReporter :: Reporter
