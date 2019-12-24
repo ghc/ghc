@@ -16,3 +16,4 @@ bigNatRemWord# :: BigNat -> Word# -> Word#
 bigNatShiftR# :: BigNat -> Word# -> BigNat
 bigNatShiftL# :: BigNat -> Word# -> BigNat
 bigNatCtz# :: BigNat -> Word#
+bigNatCtzWord# :: BigNat -> Word#
