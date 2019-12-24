@@ -379,6 +379,7 @@ tidyProgram hsc_env mod_guts =
     -- Print one-line size info
     let cs = coreBindsStats tidy_binds
     Err.dumpIfSet_dyn dflags Opt_D_dump_core_stats "Core Stats"
+            Err.FormatText
             (text "Tidy size (terms,types,coercions)"
              <+> ppr (moduleName mod) <> colon
              <+> int (cs_tm cs)

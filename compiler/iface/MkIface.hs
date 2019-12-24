@@ -226,6 +226,7 @@ mkIface hsc_env desugared_guts mod_details = do
     unless (null tidy_rules) $
       dumpIfSet_any dflags [Opt_D_dump_simpl, Opt_D_dump_rules]
         (showSDoc dflags (text "Tidy Rules"))
+        FormatText
         (pprRules tidy_rules)
 
     iface <-

@@ -451,13 +451,13 @@ dumpIfSet dflags flag hdr doc
 dumpIfSet_dyn :: DynFlags -> DumpFlag -> String -> DumpFormat -> SDoc -> IO ()
 dumpIfSet_dyn = dumpIfSet_dyn_printer alwaysQualify
 
-dumpIfSet_any :: DynFlags -> [DumpFlag] -> String -> SDoc -> IO ()
-dumpIfSet_any dflags flags hdr doc = go flags
+dumpIfSet_any :: DynFlags -> [DumpFlag] -> String -> DumpFormat -> SDoc -> IO ()
+dumpIfSet_any dflags flags hdr fmt doc = go flags
   where
     go [] = return ()
     go (f : fs)
       | dopt f dflags
-      = dumpSDoc dflags alwaysQualify f hdr doc
+      = dumpAction dflags (mkDumpStyle dflags alwaysQualify) (dumpOptionsFromFlag f) hdr fmt doc
       | otherwise
       = go fs
 
