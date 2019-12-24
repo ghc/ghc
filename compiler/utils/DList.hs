@@ -2,14 +2,11 @@
 {-# OPTIONS_HADDOCK prune #-}
 {-# LANGUAGE CPP #-}
 {-# LANGUAGE TypeFamilies #-} -- For the IsList and IsString instances
-
-#if defined(__GLASGOW_HASKELL__) && __GLASGOW_HASKELL__ >= 708
 {-# LANGUAGE PatternSynonyms #-}
 -- Mark this module as trustworthy even though we import 'IsList' from GHC.Exts,
 -- which is marked unsafe. 'IsList' is safe.
 {-# LANGUAGE Trustworthy #-}
 {-# LANGUAGE ViewPatterns #-}
-#endif
 
 -----------------------------------------------------------------------------
 -- |
@@ -26,12 +23,7 @@
 -----------------------------------------------------------------------------
 
 module DList
-
-#if defined(__GLASGOW_HASKELL__) && __GLASGOW_HASKELL__ >= 800
   ( DList(Nil, Cons)
-#else
-  ( DList
-#endif
 
   -- * Construction
   , fromList
@@ -52,13 +44,6 @@ module DList
   , unfoldr
   , foldr
   , map
-
-#if defined(__GLASGOW_HASKELL__) && __GLASGOW_HASKELL__ >= 708 && __GLASGOW_HASKELL__ < 800
-  -- * Pattern Synonyms
-  , pattern Nil
-  , pattern Cons
-#endif
-
   ) where
 
 import Prelude hiding (concat, foldr, map, head, tail, replicate)
@@ -69,31 +54,17 @@ import Data.String (IsString(..))
 
 import qualified Data.Foldable as F
 
-#if !MIN_VERSION_base(4,8,0)
-import Data.Monoid
-import Data.Foldable (Foldable)
-import Control.Applicative(Applicative(..))
-#endif
-
-#if MIN_VERSION_base(4,9,0)
 import Data.Semigroup (Semigroup(..))
 #if !MIN_VERSION_base(4,13,0)
 import Control.Monad.Fail (MonadFail(..))
 #endif
-#endif
-
-#ifdef __GLASGOW_HASKELL__
 
 import Text.Read (Lexeme(Ident), lexP, parens, prec, readPrec, readListPrec,
                   readListPrecDefault)
 
-#if __GLASGOW_HASKELL__ >= 708
 import GHC.Exts (IsList)
 -- Make IsList type and methods visible for instance.
 import qualified GHC.Exts (IsList(Item, fromList, toList))
-#endif
-
-#endif
 
 import Control.Applicative(Alternative, (<|>))
 import qualified Control.Applicative (empty)
@@ -131,21 +102,15 @@ toList      :: DList a -> [a]
 toList      = ($[]) . unDL
 {-# INLINE toList #-}
 
-#if defined(__GLASGOW_HASKELL__) && __GLASGOW_HASKELL__ >= 708
 -- | A unidirectional pattern synonym using 'toList' in a view pattern and
 -- matching on @[]@
-#if __GLASGOW_HASKELL__ >= 710
 pattern Nil :: DList a
-#endif
 pattern Nil <- (toList -> [])
 
 -- | A unidirectional pattern synonym using 'toList' in a view pattern and
 -- matching on @x:xs@ such that you have the pattern @Cons x xs@
-#if __GLASGOW_HASKELL__ >= 710
 pattern Cons :: a -> [a] -> DList a
-#endif
 pattern Cons x xs <- (toList -> x:xs)
-#endif
 
 -- | Apply a dlist to a list to get the underlying list with an extension
 --
@@ -233,18 +198,11 @@ instance Ord a => Ord (DList a) where
 -- The Read and Show instances were adapted from Data.Sequence.
 
 instance Read a => Read (DList a) where
-#ifdef __GLASGOW_HASKELL__
   readPrec = parens $ prec 10 $ do
     Ident "fromList" <- lexP
     dl <- readPrec
     return (fromList dl)
   readListPrec = readListPrecDefault
-#else
-  readsPrec p = readParen (p > 10) $ \r -> do
-    ("fromList", s) <- lex r
-    (dl, t) <- reads s
-    return (fromList dl, t)
-#endif
 
 instance Show a => Show (DList a) where
   showsPrec p dl = showParen (p > 10) $
@@ -284,11 +242,9 @@ instance Monad DList where
   {-# INLINE fail #-}
 #endif
 
-#if MIN_VERSION_base(4,9,0)
 instance MonadFail DList where
   fail _ = empty
   {-# INLINE fail #-}
-#endif
 
 instance MonadPlus DList where
   mzero    = empty
@@ -313,15 +269,11 @@ instance Foldable DList where
   foldl1 f    = List.foldl1 f . toList
   {-# INLINE foldl1 #-}
 
--- CPP: foldl', foldr' added to Foldable in 7.6.1
--- http://www.haskell.org/ghc/docs/7.6.1/html/users_guide/release-7-6-1.html
-#if defined(__GLASGOW_HASKELL__) && __GLASGOW_HASKELL__ >= 706
   foldl' f x  = List.foldl' f x . toList
   {-# INLINE foldl' #-}
 
   foldr' f x  = F.foldr' f x . toList
   {-# INLINE foldr' #-}
-#endif
 
 -- This is _not_ a flexible instance to allow certain uses of overloaded
 -- strings. See tests/OverloadedStrings.hs for an example and
@@ -331,16 +283,13 @@ instance a ~ Char => IsString (DList a) where
   fromString = fromList
   {-# INLINE fromString #-}
 
-#if defined(__GLASGOW_HASKELL__) && __GLASGOW_HASKELL__ >= 708
 instance IsList (DList a) where
   type Item (DList a) = a
   fromList = fromList
   {-# INLINE fromList #-}
   toList = toList
   {-# INLINE toList #-}
-#endif
 
-#if MIN_VERSION_base(4,9,0)
 instance Semigroup (DList a) where
   (<>) = append
   {-# INLINE (<>) #-}
@@ -350,4 +299,3 @@ instance Semigroup (DList a) where
     where
       rep 0 = empty
       rep i = x <> rep (pred i)
-#endif
