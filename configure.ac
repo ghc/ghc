@@ -530,7 +530,7 @@ AC_ARG_WITH([gcc],
         AC_MSG_ERROR([--with-gcc=$withval is obsolete (use './configure CC=$withval' or 'CC=$withval ./configure' instead)]))
 
 AC_ARG_WITH([clang],
-        AS_HELP_STRING([--with-clang=ARG], [Use ARG as the path to gcc (obsolete, use CC=ARG instead) [default=autodetect]]),
+        AS_HELP_STRING([--with-clang=ARG], [Use ARG as the path to clang (obsolete, use CC=ARG instead) [default=autodetect]]),
         AC_MSG_ERROR([--with-clang=$withval is obsolete (use './configure CC=$withval' or 'CC=$withval ./configure' instead)]))
 
 dnl detect compiler (prefer gcc over clang) and set $CC (unless CC already set),
