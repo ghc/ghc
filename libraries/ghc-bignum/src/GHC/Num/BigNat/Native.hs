@@ -185,11 +185,14 @@ bignat_mul
 bignat_mul mwa wa wb s1 =
    -- initialize the resulting WordArray
    case mwaFill# mwa 0## 0## (int2Word# sz) s1 of
-      s' -> mulEachB 0# s' -- loop on b Words
+      s' -> mulEachB ctzB s' -- loop on b Words
    where
       !szA = wordArraySize# wa
       !szB = wordArraySize# wb
       !sz  = szA +# szB
+
+      !ctzA = word2Int# (bigNatCtzWord# wa)
+      !ctzB = word2Int# (bigNatCtzWord# wb)
 
       -- multiply a single bj Word# to the whole wa WordArray
       mul bj j i carry s
@@ -211,7 +214,7 @@ bignat_mul mwa wa wb s1 =
          | True = case indexWordArray# wb i of
             -- detect bj == 0## and skip the loop
             0## -> mulEachB (i +# 1#) s
-            bi  -> case mul bi i 0# 0## s of
+            bi  -> case mul bi i ctzA 0## s of
                      s' -> mulEachB (i +# 1#) s'
 
 bignat_sub
@@ -418,8 +421,7 @@ bignat_quotrem mwq mwr uwa uwb s1 =
 
       -- right shift amount in bits if isLeftShift == False
       shr = shrW `minusWord#` shl
-      nw  = word2Int# (shr `uncheckedShiftRL#` WORD_SIZE_BITS_SHIFT#)
-      nb  = word2Int# (shr `and#` WORD_SIZE_BITS_MASK##)
+      !(# nw, nb #)  = count_words_bits_int shr
 
       normalizeB ws
          | isLeftShift = bigNatShiftL# ws shl

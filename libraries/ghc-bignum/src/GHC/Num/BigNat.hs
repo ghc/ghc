@@ -1189,3 +1189,21 @@ bigNatCtz# a
 -- Return 0 for zero BigNat
 bigNatCtz :: BigNat -> Word
 bigNatCtz a = W# (bigNatCtz# a)
+
+-- | Return count of trailing zero words
+--
+-- Return 0 for zero BigNat
+bigNatCtzWord# :: BigNat -> Word#
+bigNatCtzWord# a
+   | bigNatIsZero a = 0##
+   | True           = go 0# 0##
+      where
+         go i c = case indexWordArray# a i of
+            0## -> go (i +# 1#) (c `plusWord#` 1##)
+            _   -> c
+
+-- | Return count of trailing zero words
+--
+-- Return 0 for zero BigNat
+bigNatCtzWord :: BigNat -> Word
+bigNatCtzWord a = W# (bigNatCtzWord# a)

@@ -561,6 +561,13 @@ bigNatTests = testGroup "BigNat"
       let
          n = bigNatCtz x
       in BN ((x `bigNatShiftR` n) `bigNatShiftL` n) === BN x
+
+   , testProperty "ctzWord 0" $ bigNatCtzWord (bigNatFromWord 0) === 0
+
+   , testProperty "ctzWord 0x1000..00 == 1" $ bigNatCtzWord (bigNatFromWord2# 0x1000## 0##) === 1
+
+   , testProperty "ctzWord (0x100 `shiftL` WORD_SIZE * n) == n" $
+        \n -> bigNatCtzWord (bigNatFromWord 0x100 `bigNatShiftL` (WORD_SIZE_IN_BITS * n)) === n
    ]
 
 naturalTests :: TestTree
