@@ -1404,7 +1404,7 @@ echo "\
       which is version   : $GhcVersion
 "
 
-if test "x$CC_LLVM_BACKEND" = "x1"; then
+if test "x$CcLlvmBackend" = "xYES"; then
     CompilerName="clang        "
 else
     CompilerName="gcc          "
