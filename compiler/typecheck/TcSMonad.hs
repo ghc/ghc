@@ -138,7 +138,7 @@ import qualified TcRnMonad as TcM
 import qualified TcMType as TcM
 import qualified ClsInst as TcM( matchGlobalInst, ClsInstResult(..) )
 import qualified TcEnv as TcM
-       ( checkWellStaged, tcGetDefaultTys, tcLookupClass, tcLookupId, topIdLvl )
+       ( checkWellStaged, tcGetDefaultTys, tcLookupClass, tcLookupId, topIdLvl, tcInitTidyEnv )
 import ClsInst( InstanceWhat(..), safeOverlap, instanceReturnsDictCon )
 import TcType
 import DynFlags
@@ -155,6 +155,7 @@ import TcErrors   ( solverDepthErrorTcS )
 import Name
 import Module ( HasModule, getModule )
 import RdrName ( GlobalRdrEnv, GlobalRdrElt )
+import PrelNames (errorMessageTypeWarningFamName)
 import qualified RnEnv as TcM
 import Var
 import VarEnv
@@ -3566,12 +3567,22 @@ matchFamTcM tycon args
        ; TcM.traceTc "matchFamTcM" $
          vcat [ text "Matching:" <+> ppr (mkTyConApp tycon args)
               , ppr_res match_fam_result ]
+       -- When we rewrite a type warning we issue the warning message
+       ; let issue_type_warning
+              = (tyConName tycon == errorMessageTypeWarningFamName) &&
+                (isJust match_fam_result)
+       ; when issue_type_warning (warn_with $ head $ tail args)
        ; return match_fam_result }
   where
     ppr_res Nothing        = text "Match failed"
     ppr_res (Just (co,ty)) = hang (text "Match succeeded:")
                                 2 (vcat [ text "Rewrites to:" <+> ppr ty
                                         , text "Coercion:" <+> ppr co ])
+
+    warn_with msg = do { env0 <- TcM.tcInitTidyEnv
+                       ; let (env1, tidy_msg) = tidyOpenType env0 msg
+                       ; TcM.addWarnTcM NoReason (env1, pprUserTypeErrorTy tidy_msg)
+                       }
 
 {-
 Note [Residual implications]
