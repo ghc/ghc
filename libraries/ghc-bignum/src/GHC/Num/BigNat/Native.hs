@@ -282,7 +282,6 @@ bignat_shiftr mwa wa n s1
       !sz           = szA -# nw
       !sh           = WORD_SIZE_IN_BITS# -# nb
 
-      -- Bit granularity (c is the carry from the previous shift)
       mwaBitShift i c s
          | isTrue# (i <# 0#) = s
          | True =
@@ -391,17 +390,15 @@ bignat_quotrem
    -> WordArray#
    -> State# s
    -> State# s
-bignat_quotrem mwq mwr uwa uwb s0 =
-   -- allocate a temporary array for normalized A
-   case newWordArray# szna s0     of { (# s1, mwa #) ->
-   case normalizeA mwa uwa s1   of { s2 ->
-   case mwaSize# mwq s2           of { (# s3, szQ #) ->
+bignat_quotrem mwq mwr uwa uwb s1 =
+   case normalizeA s1     of { (# s2, mwa #) ->
+   case mwaSize# mwq s2   of { (# s3, szQ #) ->
    -- normalized quotrem
    case bignat_quotrem_normalized mwq szQ mwa (normalizeB uwb) s3 of { s4 ->
    -- copy and denormalize remainder from mwa to mwr
    -- mwq is already not normalized
    denormalizeR mwr mwa s4
-   }}}}
+   }}}
 
    where
       -- Normalization consists in left-shifting bits in B and A so that the
@@ -409,27 +406,57 @@ bignat_quotrem mwq mwr uwa uwb s0 =
       -- quotient prediction much more efficient as we only use the most
       -- significant words to make the prediction.
       --
-      -- TODO: maybe try removing common trailing zero Words in `a` and `b`
+      -- We also remove the common trailing zero Words in `a` and `b`
       -- during the normalization
-      shl  = clz# (indexWordArray# uwb (wordArraySize# uwb -# 1#))
-      ishl = word2Int# shl
+      shl = clz# (indexWordArray# uwb (wordArraySize# uwb -# 1#))
 
-      szna = wordArraySize# uwa +# 1# -- normalizing A can add a newer higher limb
+      -- common number of zero less-significant bits (round to lower word size)
+      shrW = minW# (bigNatCtz# uwa) (bigNatCtz# uwb)
+               `and#` (not# WORD_SIZE_BITS_MASK##)
 
-      normalizeB ws = bigNatShiftL# ws shl
+      isLeftShift  = isTrue# (shrW `eqWord#` 0##)
 
-      normalizeA mwd ws s
-         = case mwaWrite# mwd (wordArraySize# ws) 0## s of -- potential carry
-            s -> case bignat_shiftl mwd ws shl s of
-               s -> mwaTrimZeroes# mwd s
+      -- right shift amount in bits if isLeftShift == False
+      shr = shrW `minusWord#` shl
+      nw  = word2Int# (shr `uncheckedShiftRL#` WORD_SIZE_BITS_SHIFT#)
+      nb  = word2Int# (shr `and#` WORD_SIZE_BITS_MASK##)
 
-      denormalizeR mwd mws s
+      normalizeB ws
+         | isLeftShift = bigNatShiftL# ws shl
+         | True        = bigNatShiftR# ws shr
+
+      normalizeA s
+         | isLeftShift
+         , 0## <- shl
+         = let szna = wordArraySize# uwa
+           in case newWordArray# szna s of
+               (# s, mwa #) -> case mwaArrayCopy# mwa 0# uwa 0# szna s of
+                  s -> (# s, mwa #)
+
+         | isLeftShift
+         = let szna = wordArraySize# uwa +# 1# -- Normalizing A can add a newer higher limb
+           in case newWordArray# szna s of
+               (# s, mwa #) -> case bignat_shiftl mwa uwa shl s of
+                     s -> (# s, mwa #)
+
+         | True
+         = let szna = wordArraySize# uwa -# nw
+           in case newWordArray# szna s of
+               (# s, mwa #) -> case bignat_shiftr mwa uwa shr s of
+                     s -> case mwaTrimZeroes# mwa s of
+                        s -> (# s, mwa #)
+
+      denormalizeR mwr mws s
          = case mwaTrimZeroes# mws s of
             s -> case unsafeFreezeByteArray# mws s of
-               (# s, ws #) -> case mwaSetSize# mwd (wordArraySize# ws) s of
-                  s | isTrue# (ishl ==# 0#) -> mwaArrayCopy# mwd 0# ws 0# (wordArraySize# ws) s
-                    | True                  -> case bignat_shiftr mwd ws shl s of
-                                                  s -> mwaTrimZeroes# mwd s
+               (# s, ws #) -> if
+                  | isLeftShift -> case mwaSetSize# mwr (wordArraySize# ws) s of
+                                    s -> case bignat_shiftr mwr ws shl s of
+                                       s -> mwaTrimZeroes# mwr s
+                  | True        -> let sz = wordArraySize# ws +# nw +# (nb /=# 0#)
+                                   in case mwaSetSize# mwr sz s of
+                                    s -> case bignat_shiftl mwr ws shr s of
+                                       s -> mwaTrimZeroes# mwr s
 
 bignat_quot
    :: MutableWordArray# RealWorld
