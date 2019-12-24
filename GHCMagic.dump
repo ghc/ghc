@@ -1,0 +1,508 @@
+Glasgow Haskell Compiler, Version 8.10.0.20191221, stage 1 booted by GHC version 8.6.5
+*** initializing package database:
+Using binary package database: /home/awilliams/Development/ghc/_build/stage0/lib/package.conf.d/package.cache
+Using binary package database: _build/stage1/lib/package.conf.d/package.cache
+package flags [-package-id rts-1.0{unit rts-1.0 True ([])}]
+loading package database /home/awilliams/Development/ghc/_build/stage0/lib/package.conf.d
+loading package database _build/stage1/lib/package.conf.d
+wired-in package ghc-prim mapped to ghc-prim-0.5.3
+wired-in package integer-wired-in mapped to integer-gmp-1.0.2.0
+wired-in package base mapped to base-4.12.0.0
+wired-in package rts mapped to rts-1.0
+wired-in package template-haskell mapped to template-haskell-2.16.0.0
+wired-in package ghc mapped to ghc-8.10.0.20191221
+!!! initializing package database: finished in 15.63 milliseconds, allocated 7.683 megabytes
+Created temporary directory: /tmp/ghc24960_0
+*** systool:cpp:
+*** C pre-processor:
+!!! systool:cpp: finished in 0.00 milliseconds, allocated 0.170 megabytes
+*** Checking old interface for GHC.Magic (use -ddump-hi-diffs for more details):
+*** Parser [GHC.Magic]:
+!!! Parser [GHC.Magic]: finished in 15.63 milliseconds, allocated 3.942 megabytes
+*** Renamer/typechecker [GHC.Magic]:
+!!! Renamer/typechecker [GHC.Magic]: finished in 15.63 milliseconds, allocated 6.933 megabytes
+*** Desugar [GHC.Magic]:
+
+==================== Desugar (before optimization) ====================
+Result size of Desugar (before optimization)
+  = {terms: 31, types: 53, coercions: 0, joins: 0/0}
+
+Rec {
+-- RHS size: {terms: 5, types: 0, coercions: 0, joins: 0/0}
+GHC.Magic.$trModule :: GHC.Types.Module
+[LclIdX]
+GHC.Magic.$trModule
+  = GHC.Types.Module
+      (GHC.Types.TrNameS "ghc-prim"#) (GHC.Types.TrNameS "GHC.Magic"#)
+
+-- RHS size: {terms: 5, types: 6, coercions: 0, joins: 0/0}
+runRW# [InlPrag=NOINLINE]
+  :: forall (r :: RuntimeRep) (o :: TYPE r).
+     (State# RealWorld -> o) -> o
+[LclIdX]
+runRW#
+  = \ (@ (r_afe :: RuntimeRep))
+      (@ (o_aff :: TYPE r_afe))
+      (m_adS :: State# RealWorld -> o_aff) ->
+      m_adS realWorld#
+
+-- RHS size: {terms: 6, types: 8, coercions: 0, joins: 0/0}
+oneShot
+  :: forall (q :: RuntimeRep) (r :: RuntimeRep) (a :: TYPE q)
+            (b :: TYPE r).
+     (a -> b) -> a -> b
+[LclIdX]
+oneShot
+  = \ (@ (q_afh :: RuntimeRep))
+      (@ (r_afi :: RuntimeRep))
+      (@ (a_afj :: TYPE q_afh))
+      (@ (b_afk :: TYPE r_afi))
+      (f_adR :: a_afj -> b_afk) ->
+      f_adR
+
+-- RHS size: {terms: 3, types: 3, coercions: 0, joins: 0/0}
+lazy :: forall a. a -> a
+[LclIdX]
+lazy = \ (@ a_afm) (x_adQ :: a_afm) -> x_adQ
+
+-- RHS size: {terms: 3, types: 3, coercions: 0, joins: 0/0}
+noinline [InlPrag=NOINLINE] :: forall a. a -> a
+[LclIdX]
+noinline = \ (@ a_afo) (x_adP :: a_afo) -> x_adP
+
+-- RHS size: {terms: 3, types: 3, coercions: 0, joins: 0/0}
+inline [InlPrag=NOINLINE[0]] :: forall a. a -> a
+[LclIdX]
+inline = \ (@ a_afq) (x_adO :: a_afq) -> x_adO
+end Rec }
+
+
+
+Result size of Desugar (before optimization)
+  = {terms: 31, types: 53, coercions: 0, joins: 0/0}
+*** Core Linted result of Desugar (before optimization):
+
+==================== Desugar (after optimization) ====================
+Result size of Desugar (after optimization)
+  = {terms: 31, types: 53, coercions: 0, joins: 0/0}
+
+-- RHS size: {terms: 3, types: 3, coercions: 0, joins: 0/0}
+inline [InlPrag=NOINLINE[0]] :: forall a. a -> a
+[LclIdX,
+ Unf=Unf{Src=<vanilla>, TopLvl=True, Value=True, ConLike=True,
+         WorkFree=True, Expandable=True,
+         Guidance=ALWAYS_IF(arity=1,unsat_ok=True,boring_ok=True)}]
+inline = \ (@ a_afq) (x_adO :: a_afq) -> x_adO
+
+-- RHS size: {terms: 3, types: 3, coercions: 0, joins: 0/0}
+noinline [InlPrag=NOINLINE] :: forall a. a -> a
+[LclIdX,
+ Unf=Unf{Src=<vanilla>, TopLvl=True, Value=True, ConLike=True,
+         WorkFree=True, Expandable=True,
+         Guidance=ALWAYS_IF(arity=1,unsat_ok=True,boring_ok=True)}]
+noinline = \ (@ a_afo) (x_adP :: a_afo) -> x_adP
+
+-- RHS size: {terms: 3, types: 3, coercions: 0, joins: 0/0}
+lazy :: forall a. a -> a
+[LclIdX,
+ Unf=Unf{Src=<vanilla>, TopLvl=True, Value=True, ConLike=True,
+         WorkFree=True, Expandable=True,
+         Guidance=ALWAYS_IF(arity=1,unsat_ok=True,boring_ok=True)}]
+lazy = \ (@ a_afm) (x_adQ :: a_afm) -> x_adQ
+
+-- RHS size: {terms: 6, types: 8, coercions: 0, joins: 0/0}
+oneShot
+  :: forall (q :: RuntimeRep) (r :: RuntimeRep) (a :: TYPE q)
+            (b :: TYPE r).
+     (a -> b) -> a -> b
+[LclIdX,
+ Unf=Unf{Src=<vanilla>, TopLvl=True, Value=True, ConLike=True,
+         WorkFree=True, Expandable=True,
+         Guidance=ALWAYS_IF(arity=1,unsat_ok=True,boring_ok=True)}]
+oneShot
+  = \ (@ (q_afh :: RuntimeRep))
+      (@ (r_afi :: RuntimeRep))
+      (@ (a_afj :: TYPE q_afh))
+      (@ (b_afk :: TYPE r_afi))
+      (f_adR :: a_afj -> b_afk) ->
+      f_adR
+
+-- RHS size: {terms: 5, types: 6, coercions: 0, joins: 0/0}
+runRW# [InlPrag=NOINLINE]
+  :: forall (r :: RuntimeRep) (o :: TYPE r).
+     (State# RealWorld -> o) -> o
+[LclIdX,
+ Unf=Unf{Src=<vanilla>, TopLvl=True, Value=True, ConLike=True,
+         WorkFree=True, Expandable=True,
+         Guidance=ALWAYS_IF(arity=1,unsat_ok=True,boring_ok=True)}]
+runRW#
+  = \ (@ (r_afe :: RuntimeRep))
+      (@ (o_aff :: TYPE r_afe))
+      (m_adS :: State# RealWorld -> o_aff) ->
+      m_adS realWorld#
+
+-- RHS size: {terms: 5, types: 0, coercions: 0, joins: 0/0}
+GHC.Magic.$trModule :: GHC.Types.Module
+[LclIdX,
+ Unf=Unf{Src=<vanilla>, TopLvl=True, Value=True, ConLike=True,
+         WorkFree=True, Expandable=True, Guidance=IF_ARGS [] 100 30}]
+GHC.Magic.$trModule
+  = GHC.Types.Module
+      (GHC.Types.TrNameS "ghc-prim"#) (GHC.Types.TrNameS "GHC.Magic"#)
+
+
+
+Result size of Desugar (after optimization)
+  = {terms: 31, types: 53, coercions: 0, joins: 0/0}
+*** Core Linted result of Desugar (after optimization):
+!!! Desugar [GHC.Magic]: finished in 0.00 milliseconds, allocated 3.077 megabytes
+*** Convert to ANF [GHC.Magic]:
+
+==================== Convert to ANF ====================
+Result size of Convert to ANF
+  = {terms: 70, types: 131, coercions: 0, joins: 0/18}
+
+-- RHS size: {terms: 7, types: 9, coercions: 0, joins: 0/2}
+inline [InlPrag=NOINLINE[0]] :: forall a. a -> a
+[LclIdX,
+ Unf=Unf{Src=<vanilla>, TopLvl=True, Value=True, ConLike=True,
+         WorkFree=True, Expandable=True,
+         Guidance=ALWAYS_IF(arity=1,unsat_ok=True,boring_ok=True)}]
+inline
+  = let {
+      v_sfJ :: forall a. a -> a
+      [LclId]
+      v_sfJ
+        = \ (@ a_afq) ->
+            let {
+              v_sfI :: a_afq -> a_afq
+              [LclId]
+              v_sfI = \ (x_adO :: a_afq) -> x_adO } in
+            v_sfI } in
+    v_sfJ
+
+-- RHS size: {terms: 7, types: 9, coercions: 0, joins: 0/2}
+noinline [InlPrag=NOINLINE] :: forall a. a -> a
+[LclIdX,
+ Unf=Unf{Src=<vanilla>, TopLvl=True, Value=True, ConLike=True,
+         WorkFree=True, Expandable=True,
+         Guidance=ALWAYS_IF(arity=1,unsat_ok=True,boring_ok=True)}]
+noinline
+  = let {
+      v_sfL :: forall a. a -> a
+      [LclId]
+      v_sfL
+        = \ (@ a_afo) ->
+            let {
+              v_sfK :: a_afo -> a_afo
+              [LclId]
+              v_sfK = \ (x_adP :: a_afo) -> x_adP } in
+            v_sfK } in
+    v_sfL
+
+-- RHS size: {terms: 7, types: 9, coercions: 0, joins: 0/2}
+lazy :: forall a. a -> a
+[LclIdX,
+ Unf=Unf{Src=<vanilla>, TopLvl=True, Value=True, ConLike=True,
+         WorkFree=True, Expandable=True,
+         Guidance=ALWAYS_IF(arity=1,unsat_ok=True,boring_ok=True)}]
+lazy
+  = let {
+      v_sfN :: forall a. a -> a
+      [LclId]
+      v_sfN
+        = \ (@ a_afm) ->
+            let {
+              v_sfM :: a_afm -> a_afm
+              [LclId]
+              v_sfM = \ (x_adQ :: a_afm) -> x_adQ } in
+            v_sfM } in
+    v_sfN
+
+-- RHS size: {terms: 16, types: 45, coercions: 0, joins: 0/5}
+oneShot
+  :: forall (q :: RuntimeRep) (r :: RuntimeRep) (a :: TYPE q)
+            (b :: TYPE r).
+     (a -> b) -> a -> b
+[LclIdX,
+ Unf=Unf{Src=<vanilla>, TopLvl=True, Value=True, ConLike=True,
+         WorkFree=True, Expandable=True,
+         Guidance=ALWAYS_IF(arity=1,unsat_ok=True,boring_ok=True)}]
+oneShot
+  = let {
+      v_sfS
+        :: forall (q :: RuntimeRep) (r :: RuntimeRep) (a :: TYPE q)
+                  (b :: TYPE r).
+           (a -> b) -> a -> b
+      [LclId]
+      v_sfS
+        = \ (@ (q_afh :: RuntimeRep)) ->
+            let {
+              v_sfR
+                :: forall (r :: RuntimeRep) (a :: TYPE q_afh) (b :: TYPE r).
+                   (a -> b) -> a -> b
+              [LclId]
+              v_sfR
+                = \ (@ (r_afi :: RuntimeRep)) ->
+                    let {
+                      v_sfQ
+                        :: forall (a :: TYPE q_afh) (b :: TYPE r_afi). (a -> b) -> a -> b
+                      [LclId]
+                      v_sfQ
+                        = \ (@ (a_afj :: TYPE q_afh)) ->
+                            let {
+                              v_sfP :: forall (b :: TYPE r_afi). (a_afj -> b) -> a_afj -> b
+                              [LclId]
+                              v_sfP
+                                = \ (@ (b_afk :: TYPE r_afi)) ->
+                                    let {
+                                      v_sfO :: (a_afj -> b_afk) -> a_afj -> b_afk
+                                      [LclId]
+                                      v_sfO = \ (f_adR :: a_afj -> b_afk) -> f_adR } in
+                                    v_sfO } in
+                            v_sfP } in
+                    v_sfQ } in
+            v_sfR } in
+    v_sfS
+
+-- RHS size: {terms: 14, types: 24, coercions: 0, joins: 0/3}
+runRW# [InlPrag=NOINLINE]
+  :: forall (r :: RuntimeRep) (o :: TYPE r).
+     (State# RealWorld -> o) -> o
+[LclIdX,
+ Unf=Unf{Src=<vanilla>, TopLvl=True, Value=True, ConLike=True,
+         WorkFree=True, Expandable=True,
+         Guidance=ALWAYS_IF(arity=1,unsat_ok=True,boring_ok=True)}]
+runRW#
+  = let {
+      v_sfW
+        :: forall (r :: RuntimeRep) (o :: TYPE r).
+           (State# RealWorld -> o) -> o
+      [LclId]
+      v_sfW
+        = \ (@ (r_afe :: RuntimeRep)) ->
+            let {
+              v_sfV :: forall (o :: TYPE r_afe). (State# RealWorld -> o) -> o
+              [LclId]
+              v_sfV
+                = \ (@ (o_aff :: TYPE r_afe)) ->
+                    let {
+                      v_sfU :: (State# RealWorld -> o_aff) -> o_aff
+                      [LclId]
+                      v_sfU
+                        = \ (m_adS :: State# RealWorld -> o_aff) ->
+                            case m_adS realWorld# of v_sfT { __DEFAULT -> v_sfT } } in
+                    v_sfU } in
+            v_sfV } in
+    v_sfW
+
+-- RHS size: {terms: 13, types: 5, coercions: 0, joins: 0/4}
+GHC.Magic.$trModule :: GHC.Types.Module
+[LclIdX,
+ Unf=Unf{Src=<vanilla>, TopLvl=True, Value=True, ConLike=True,
+         WorkFree=True, Expandable=True, Guidance=IF_ARGS [] 100 30}]
+GHC.Magic.$trModule
+  = let {
+      v_sfX :: GHC.Types.TrName
+      [LclId]
+      v_sfX = GHC.Types.TrNameS "ghc-prim"# } in
+    let {
+      v_sfY :: GHC.Types.TrName -> GHC.Types.Module
+      [LclId]
+      v_sfY = GHC.Types.Module v_sfX } in
+    let {
+      v_sfZ :: GHC.Types.TrName
+      [LclId]
+      v_sfZ = GHC.Types.TrNameS "GHC.Magic"# } in
+    let {
+      v_sg0 :: GHC.Types.Module
+      [LclId]
+      v_sg0 = v_sfY v_sfZ } in
+    v_sg0
+
+
+
+Result size of Convert to ANF
+  = {terms: 70, types: 131, coercions: 0, joins: 0/18}
+*** Core Linted result of Convert to ANF:
+*** Core Lint errors : in result of Convert to ANF ***
+libraries/ghc-prim/GHC/Magic.hs:128:8: warning:
+    Levity-polymorphic binder: v_sfT :: (o_aff :: TYPE r_afe)
+    In the RHS of runRW# :: forall (r :: RuntimeRep) (o :: TYPE r).
+                            (State# RealWorld -> o) -> o
+    In the RHS of v_sfW :: forall (r :: RuntimeRep) (o :: TYPE r).
+                           (State# RealWorld -> o) -> o
+    In the body of lambda with binder r_afe :: RuntimeRep
+    In the RHS of v_sfV :: forall (o :: TYPE r_afe).
+                           (State# RealWorld -> o) -> o
+    In the body of lambda with binder o_aff :: TYPE r_afe
+    In the RHS of v_sfU :: (State# RealWorld -> o_aff) -> o_aff
+    In the body of lambda with binder m_adS :: State# RealWorld
+                                               -> o_aff
+    Substitution: [TCvSubst
+                     In scope: InScope {lazy oneShot runRW# inline noinline m_adS r_afe
+                                        o_aff $trModule}
+                     Type env: [aff :-> o_aff]
+                     Co env: []]
+*** Offending Program ***
+inline [InlPrag=NOINLINE[0]] :: forall a. a -> a
+[LclIdX,
+ Unf=Unf{Src=<vanilla>, TopLvl=True, Value=True, ConLike=True,
+         WorkFree=True, Expandable=True,
+         Guidance=ALWAYS_IF(arity=1,unsat_ok=True,boring_ok=True)}]
+inline
+  = let {
+      v_sfJ :: forall a. a -> a
+      [LclId]
+      v_sfJ
+        = \ (@ a_afq) ->
+            let {
+              v_sfI :: a_afq -> a_afq
+              [LclId]
+              v_sfI = \ (x_adO :: a_afq) -> x_adO } in
+            v_sfI } in
+    v_sfJ
+
+noinline [InlPrag=NOINLINE] :: forall a. a -> a
+[LclIdX,
+ Unf=Unf{Src=<vanilla>, TopLvl=True, Value=True, ConLike=True,
+         WorkFree=True, Expandable=True,
+         Guidance=ALWAYS_IF(arity=1,unsat_ok=True,boring_ok=True)}]
+noinline
+  = let {
+      v_sfL :: forall a. a -> a
+      [LclId]
+      v_sfL
+        = \ (@ a_afo) ->
+            let {
+              v_sfK :: a_afo -> a_afo
+              [LclId]
+              v_sfK = \ (x_adP :: a_afo) -> x_adP } in
+            v_sfK } in
+    v_sfL
+
+lazy :: forall a. a -> a
+[LclIdX,
+ Unf=Unf{Src=<vanilla>, TopLvl=True, Value=True, ConLike=True,
+         WorkFree=True, Expandable=True,
+         Guidance=ALWAYS_IF(arity=1,unsat_ok=True,boring_ok=True)}]
+lazy
+  = let {
+      v_sfN :: forall a. a -> a
+      [LclId]
+      v_sfN
+        = \ (@ a_afm) ->
+            let {
+              v_sfM :: a_afm -> a_afm
+              [LclId]
+              v_sfM = \ (x_adQ :: a_afm) -> x_adQ } in
+            v_sfM } in
+    v_sfN
+
+oneShot
+  :: forall (q :: RuntimeRep) (r :: RuntimeRep) (a :: TYPE q)
+            (b :: TYPE r).
+     (a -> b) -> a -> b
+[LclIdX,
+ Unf=Unf{Src=<vanilla>, TopLvl=True, Value=True, ConLike=True,
+         WorkFree=True, Expandable=True,
+         Guidance=ALWAYS_IF(arity=1,unsat_ok=True,boring_ok=True)}]
+oneShot
+  = let {
+      v_sfS
+        :: forall (q :: RuntimeRep) (r :: RuntimeRep) (a :: TYPE q)
+                  (b :: TYPE r).
+           (a -> b) -> a -> b
+      [LclId]
+      v_sfS
+        = \ (@ (q_afh :: RuntimeRep)) ->
+            let {
+              v_sfR
+                :: forall (r :: RuntimeRep) (a :: TYPE q_afh) (b :: TYPE r).
+                   (a -> b) -> a -> b
+              [LclId]
+              v_sfR
+                = \ (@ (r_afi :: RuntimeRep)) ->
+                    let {
+                      v_sfQ
+                        :: forall (a :: TYPE q_afh) (b :: TYPE r_afi). (a -> b) -> a -> b
+                      [LclId]
+                      v_sfQ
+                        = \ (@ (a_afj :: TYPE q_afh)) ->
+                            let {
+                              v_sfP :: forall (b :: TYPE r_afi). (a_afj -> b) -> a_afj -> b
+                              [LclId]
+                              v_sfP
+                                = \ (@ (b_afk :: TYPE r_afi)) ->
+                                    let {
+                                      v_sfO :: (a_afj -> b_afk) -> a_afj -> b_afk
+                                      [LclId]
+                                      v_sfO = \ (f_adR :: a_afj -> b_afk) -> f_adR } in
+                                    v_sfO } in
+                            v_sfP } in
+                    v_sfQ } in
+            v_sfR } in
+    v_sfS
+
+runRW# [InlPrag=NOINLINE]
+  :: forall (r :: RuntimeRep) (o :: TYPE r).
+     (State# RealWorld -> o) -> o
+[LclIdX,
+ Unf=Unf{Src=<vanilla>, TopLvl=True, Value=True, ConLike=True,
+         WorkFree=True, Expandable=True,
+         Guidance=ALWAYS_IF(arity=1,unsat_ok=True,boring_ok=True)}]
+runRW#
+  = let {
+      v_sfW
+        :: forall (r :: RuntimeRep) (o :: TYPE r).
+           (State# RealWorld -> o) -> o
+      [LclId]
+      v_sfW
+        = \ (@ (r_afe :: RuntimeRep)) ->
+            let {
+              v_sfV :: forall (o :: TYPE r_afe). (State# RealWorld -> o) -> o
+              [LclId]
+              v_sfV
+                = \ (@ (o_aff :: TYPE r_afe)) ->
+                    let {
+                      v_sfU :: (State# RealWorld -> o_aff) -> o_aff
+                      [LclId]
+                      v_sfU
+                        = \ (m_adS :: State# RealWorld -> o_aff) ->
+                            case m_adS realWorld# of v_sfT { __DEFAULT -> v_sfT } } in
+                    v_sfU } in
+            v_sfV } in
+    v_sfW
+
+$trModule :: Module
+[LclIdX,
+ Unf=Unf{Src=<vanilla>, TopLvl=True, Value=True, ConLike=True,
+         WorkFree=True, Expandable=True, Guidance=IF_ARGS [] 100 30}]
+$trModule
+  = let {
+      v_sfX :: TrName
+      [LclId]
+      v_sfX = TrNameS "ghc-prim"# } in
+    let {
+      v_sfY :: TrName -> Module
+      [LclId]
+      v_sfY = Module v_sfX } in
+    let {
+      v_sfZ :: TrName
+      [LclId]
+      v_sfZ = TrNameS "GHC.Magic"# } in
+    let {
+      v_sg0 :: Module
+      [LclId]
+      v_sg0 = v_sfY v_sfZ } in
+    v_sg0
+
+*** End of Offense ***
+
+
+<no location info>: error: 
+Compilation had errors
+
+
+*** Deleting temp files:
+*** Deleting temp dirs:
