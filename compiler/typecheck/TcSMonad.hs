@@ -138,7 +138,7 @@ import qualified TcRnMonad as TcM
 import qualified TcMType as TcM
 import qualified ClsInst as TcM( matchGlobalInst, ClsInstResult(..) )
 import qualified TcEnv as TcM
-       ( checkWellStaged, tcGetDefaultTys, tcLookupClass, tcLookupId, topIdLvl )
+       ( checkWellStaged, tcGetDefaultTys, tcLookupClass, tcLookupId, topIdLvl, tcInitTidyEnv )
 import ClsInst( InstanceWhat(..), safeOverlap, instanceReturnsDictCon )
 import TcType
 import DynFlags
@@ -155,6 +155,7 @@ import TcErrors   ( solverDepthErrorTcS )
 import Name
 import Module ( HasModule, getModule )
 import RdrName ( GlobalRdrEnv, GlobalRdrElt )
+import PrelNames (errorMessageTypeWarningFamName)
 import qualified RnEnv as TcM
 import Var
 import VarEnv
@@ -3560,7 +3561,9 @@ matchFam tycon args = wrapTcS $ matchFamTcM tycon args
 matchFamTcM :: TyCon -> [Type] -> TcM (Maybe (CoercionN, TcType))
 -- Given (F tys) return (ty, co), where co :: F tys ~N ty
 matchFamTcM tycon args
-  = do { fam_envs <- FamInst.tcGetFamInstEnvs
+  = do { let is_type_warning = (tyConName tycon == errorMessageTypeWarningFamName)
+       ; when is_type_warning (add_warn_msg $ head $ tail args)
+       ; fam_envs <- FamInst.tcGetFamInstEnvs
        ; let match_fam_result
               = reduceTyFamApp_maybe fam_envs Nominal tycon args
        ; TcM.traceTc "matchFamTcM" $
@@ -3572,6 +3575,10 @@ matchFamTcM tycon args
     ppr_res (Just (co,ty)) = hang (text "Match succeeded:")
                                 2 (vcat [ text "Rewrites to:" <+> ppr ty
                                         , text "Coercion:" <+> ppr co ])
+
+    add_warn_msg msg = do { env0 <- TcM.tcInitTidyEnv
+                     ; let (env1, tidy_msg) = tidyOpenType env0 msg
+                     ; TcM.addWarnTcM NoReason (env1, pprUserTypeErrorTy tidy_msg) }
 
 {-
 Note [Residual implications]

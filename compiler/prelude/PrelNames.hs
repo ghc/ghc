@@ -1305,9 +1305,6 @@ errorMessageTypeErrorFamName
   , typeErrorShowTypeDataConName
   :: Name
 
--- Custom type warnigns
-errorMessageTypeWarningFamName :: Name
-
 errorMessageTypeErrorFamName =
   tcQual gHC_TYPELITS (fsLit "TypeError") errorMessageTypeErrorFamKey
 
@@ -1323,6 +1320,9 @@ typeErrorVAppendDataConName =
 typeErrorShowTypeDataConName =
   dcQual gHC_TYPELITS (fsLit "ShowType") typeErrorShowTypeDataConKey
 
+
+-- Custom type warnings
+errorMessageTypeWarningFamName :: Name
 errorMessageTypeWarningFamName =
   tcQual gHC_TYPELITS (fsLit "TypeWarning") errorMessageTypeWarningFamKey
 
