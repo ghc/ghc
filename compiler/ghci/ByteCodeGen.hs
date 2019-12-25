@@ -21,6 +21,7 @@ import GHCi
 import GHCi.FFI
 import GHCi.RemoteTypes
 import BasicTypes
+import qualified DList as DL
 import DynFlags
 import Outputable
 import GHC.Platform
@@ -1110,10 +1111,10 @@ doCase d s p (_,scrut) bndr alts is_unboxed_tuple
           binds = Map.toList p
           -- NB: unboxed tuple cases bind the scrut binder to the same offset
           -- as one of the alt binders, so we have to remove any duplicates here:
-          rel_slots = nub $ map fromIntegral $ concat (map spread binds)
-          spread (id, offset) | isFollowableArg (bcIdArgRep id) = [ rel_offset ]
-                              | otherwise                      = []
-                where rel_offset = trunc16W $ bytesToWords dflags (d - offset)
+          rel_slots = nub . DL.toList $ DL.concatMap spread binds
+          spread (id, offset) | isFollowableArg (bcIdArgRep id) = DL.singleton rel_offset
+                              | otherwise                       = DL.empty
+                where rel_offset = fromIntegral . trunc16W $ bytesToWords dflags (d - offset)
 
      alt_stuff <- mapM codeAlt alts
      alt_final <- mkMultiBranch maybe_ncons alt_stuff

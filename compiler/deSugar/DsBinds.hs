@@ -64,6 +64,7 @@ import Maybes
 import OrdList
 import Bag
 import BasicTypes
+import qualified DList as DL
 import DynFlags
 import FastString
 import Util
@@ -110,10 +111,14 @@ dsTopLHsBinds binds
 -- | Desugar all other kind of bindings, Ids of strict binds are returned to
 -- later be forced in the binding group body, see Note [Desugar Strict binds]
 dsLHsBinds :: LHsBinds GhcTc -> DsM ([Id], [(Id,CoreExpr)])
-dsLHsBinds binds
-  = do { ds_bs <- mapBagM dsLHsBind binds
-       ; return (foldBag (\(a, a') (b, b') -> (a ++ b, a' ++ b'))
-                         id ([], []) ds_bs) }
+dsLHsBinds binds = do
+  let bindsToDL (str, bnds) = (DL.fromList str, DL.fromList bnds)
+  ds_bs <- mapBagM (fmap bindsToDL . dsLHsBind) binds
+  let
+    (strictDL, bindingDL) =
+      foldBag (\(a, a') (b, b') -> (a DL.++ b, a' DL.++ b'))
+              id (DL.empty, DL.empty) ds_bs
+  return (DL.toList strictDL, DL.toList bindingDL)
 
 ------------------------
 dsLHsBind :: LHsBind GhcTc

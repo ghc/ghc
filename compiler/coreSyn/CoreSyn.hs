@@ -111,6 +111,7 @@ import Literal
 import DataCon
 import Module
 import BasicTypes
+import qualified DList as DL
 import DynFlags
 import Outputable
 import Util
@@ -2108,7 +2109,7 @@ bindersOf (Rec pairs)       = [binder | (binder, _) <- pairs]
 
 -- | 'bindersOf' applied to a list of binding groups
 bindersOfBinds :: [Bind b] -> [b]
-bindersOfBinds binds = foldr ((++) . bindersOf) [] binds
+bindersOfBinds = DL.toList . DL.concat . fmap (DL.fromList . bindersOf)
 
 rhssOfBind :: Bind b -> [Expr b]
 rhssOfBind (NonRec _ rhs) = [rhs]
@@ -2120,9 +2121,11 @@ rhssOfAlts alts = [e | (_,_,e) <- alts]
 -- | Collapse all the bindings in the supplied groups into a single
 -- list of lhs\/rhs pairs suitable for binding in a 'Rec' binding group
 flattenBinds :: [Bind b] -> [(b, Expr b)]
-flattenBinds (NonRec b r : binds) = (b,r) : flattenBinds binds
-flattenBinds (Rec prs1   : binds) = prs1 ++ flattenBinds binds
-flattenBinds []                   = []
+flattenBinds = DL.toList . go
+  where
+    go (NonRec b r : binds) = DL.cons (b,r) (go binds)
+    go (Rec prs1   : binds) = (DL.fromList prs1) DL.++ go binds
+    go []                   = DL.empty
 
 -- | We often want to strip off leading lambdas before getting down to
 -- business. Variants are 'collectTyBinders', 'collectValBinders',

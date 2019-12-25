@@ -11,6 +11,7 @@ module DsUsage (
 
 import GhcPrelude
 
+import qualified DList as DL
 import DynFlags
 import HscTypes
 import TcRnTypes
@@ -111,18 +112,16 @@ mkUsageInfo hsc_env this_mod dir_imp_mods used_names dependent_files merged
   = do
     eps <- hscEPS hsc_env
     hashes <- mapM getFileHash dependent_files
-    plugin_usages <- mapM (mkPluginUsage hsc_env) pluginModules
-    let mod_usages = mk_mod_usage_info (eps_PIT eps) hsc_env this_mod
-                                       dir_imp_mods used_names
-        usages = mod_usages ++ [ UsageFile { usg_file_path = f
-                                           , usg_file_hash = hash }
-                               | (f, hash) <- zip dependent_files hashes ]
-                            ++ [ UsageMergedRequirement
-                                    { usg_mod = mod,
-                                      usg_mod_hash = hash
-                                    }
-                               | (mod, hash) <- merged ]
-                            ++ concat plugin_usages
+    plugin_usages <- DL.concatMapA (mkPluginUsage hsc_env) pluginModules
+    let mod_usages = DL.fromList $ mk_mod_usage_info (eps_PIT eps) hsc_env
+                                                     this_mod dir_imp_mods
+                                                     used_names
+        usage_files = DL.fromList $
+                        uncurry UsageFile <$> zip dependent_files hashes
+        usage_mergedreqs = DL.fromList $
+                             uncurry UsageMergedRequirement <$> merged
+        usages = DL.toList $ mod_usages DL.++ usage_files DL.++ usage_mergedreqs
+                                        DL.++ plugin_usages
     usages `seqList` return usages
     -- seq the list of Usages returned: occasionally these
     -- don't get evaluated for a while and we can end up hanging on to
@@ -163,7 +162,7 @@ One way to improve this is to either:
     compare implementation hashes for recompilation. Creation of implementation
     hashes is however potentially expensive.
 -}
-mkPluginUsage :: HscEnv -> ModIface -> IO [Usage]
+mkPluginUsage :: HscEnv -> ModIface -> IO (DL.DList Usage)
 mkPluginUsage hsc_env pluginModule
   = case lookupPluginModuleWithSuggestions dflags pNm Nothing of
     LookupFound _ pkg -> do
@@ -196,7 +195,7 @@ mkPluginUsage hsc_env pluginModule
               ++ unlines paths
              )
              (ppr pNm)
-        _  -> mapM hashFile (nub files)
+        _  -> DL.fromList <$> mapM hashFile (nub files)
     _ -> do
       foundM <- findPluginModule hsc_env pNm
       case foundM of
@@ -206,7 +205,7 @@ mkPluginUsage hsc_env pluginModule
         Found ml _ -> do
           pluginObject <- hashFile (ml_obj_file ml)
           depObjects   <- catMaybes <$> mapM lookupObjectFile deps
-          return (nub (pluginObject : depObjects))
+          return . DL.fromList $ nub (pluginObject : depObjects)
         _ -> pprPanic "mkPluginUsage: no object file found" (ppr pNm)
   where
     dflags   = hsc_dflags hsc_env

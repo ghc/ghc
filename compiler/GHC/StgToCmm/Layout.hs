@@ -1,5 +1,6 @@
 {-# LANGUAGE BangPatterns #-}
 {-# LANGUAGE CPP #-}
+{-# LANGUAGE ViewPatterns #-}
 
 -----------------------------------------------------------------------------
 --
@@ -52,6 +53,7 @@ import StgSyn
 import Id
 import TyCon             ( PrimRep(..), primRepSizeB )
 import BasicTypes        ( RepArity )
+import qualified DList as DL
 import DynFlags
 import Module
 
@@ -362,19 +364,21 @@ just more arguments that we are passing on the stack (cml_args).
 -- pushing on the stack for "extra" arguments to a function which requires
 -- fewer arguments than we currently have.
 slowArgs :: DynFlags -> [(ArgRep, Maybe CmmExpr)] -> [(ArgRep, Maybe CmmExpr)]
-slowArgs _ [] = []
-slowArgs dflags args -- careful: reps contains voids (V), but args does not
-  | gopt Opt_SccProfilingOn dflags
-              = save_cccs ++ this_pat ++ slowArgs dflags rest_args
-  | otherwise =              this_pat ++ slowArgs dflags rest_args
+slowArgs dflags args = DL.toList (go dflags args)
   where
-    (arg_pat, n)            = slowCallPattern (map fst args)
-    (call_args, rest_args)  = splitAt n args
+    go _ [] = DL.empty
+    go dflags args -- careful: reps contains voids (V), but args does not
+      | gopt Opt_SccProfilingOn dflags
+                  = save_cccs DL.++ this_pat DL.++ go dflags rest_args
+      | otherwise =                 this_pat DL.++ go dflags rest_args
+      where
+        (arg_pat, n)                          = slowCallPattern (map fst args)
+        (DL.fromList -> call_args, rest_args) = splitAt n args
 
-    stg_ap_pat = mkCmmRetInfoLabel rtsUnitId arg_pat
-    this_pat   = (N, Just (mkLblExpr stg_ap_pat)) : call_args
-    save_cccs  = [(N, Just (mkLblExpr save_cccs_lbl)), (N, Just cccsExpr)]
-    save_cccs_lbl = mkCmmRetInfoLabel rtsUnitId (fsLit "stg_restore_cccs")
+        stg_ap_pat = mkCmmRetInfoLabel rtsUnitId arg_pat
+        this_pat   = DL.cons (N, Just (mkLblExpr stg_ap_pat)) call_args
+        save_cccs  = DL.fromList [(N, Just (mkLblExpr save_cccs_lbl)), (N, Just cccsExpr)]
+        save_cccs_lbl = mkCmmRetInfoLabel rtsUnitId (fsLit "stg_restore_cccs")
 
 -------------------------------------------------------------------------
 ----        Laying out objects on the heap and stack
@@ -427,9 +431,12 @@ mkVirtHeapOffsetsWithPadding dflags header things =
     ASSERT(not (any (isVoidRep . fst . fromNonVoid) things))
     ( tot_wds
     , bytesToWordsRoundUp dflags bytes_of_ptrs
-    , concat (ptrs_w_offsets ++ non_ptrs_w_offsets) ++ final_pad
+    , DL.toList paddings_out
     )
   where
+    paddings_out = DL.concat ptrs_w_offsets DL.++ DL.concat non_ptrs_w_offsets
+                                            DL.++ final_pad
+
     hdr_words = case header of
       NoHeader -> 0
       StdHeader -> fixedHdrSizeW dflags
@@ -447,9 +454,9 @@ mkVirtHeapOffsetsWithPadding dflags header things =
 
     final_pad_size = tot_wds * word_size - tot_bytes
     final_pad
-        | final_pad_size > 0 = [(Padding final_pad_size
-                                         (hdr_bytes + tot_bytes))]
-        | otherwise          = []
+        | final_pad_size > 0 = DL.singleton $
+                                 Padding final_pad_size (hdr_bytes + tot_bytes)
+        | otherwise          = DL.empty
 
     word_size = wORD_SIZE dflags
 
@@ -474,10 +481,11 @@ mkVirtHeapOffsetsWithPadding dflags header things =
         field_off = FieldOff (NonVoid thing) final_offset
 
         with_padding field_off
-            | padding == 0 = [field_off]
-            | otherwise    = [ Padding padding (hdr_bytes + bytes_so_far)
-                             , field_off
-                             ]
+            | padding == 0 = DL.singleton field_off
+            | otherwise    = DL.fromList
+                               [ Padding padding (hdr_bytes + bytes_so_far)
+                               , field_off
+                               ]
 
 
 mkVirtHeapOffsets
@@ -538,10 +546,12 @@ mkArgDescr dflags args
          Nothing      -> ArgGen  arg_bits
 
 argBits :: DynFlags -> [ArgRep] -> [Bool]        -- True for non-ptr, False for ptr
-argBits _      []           = []
-argBits dflags (P   : args) = False : argBits dflags args
-argBits dflags (arg : args) = take (argRepSizeW dflags arg) (repeat True)
-                    ++ argBits dflags args
+argBits dflags args = DL.toList (go dflags args)
+  where
+    go _      []           = DL.empty
+    go dflags (P   : args) = DL.cons False (go dflags args)
+    go dflags (arg : args) = DL.replicate (argRepSizeW dflags arg) True
+                       DL.++ go dflags args
 
 ----------------------
 stdPattern :: [ArgRep] -> Maybe Int
