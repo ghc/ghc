@@ -741,11 +741,11 @@ doSRTs dflags moduleSRTInfo procs data_ = do
   let static_data_env :: Map CLabel CAFSet
       static_data_env =
         Map.fromList $
-        flip mapMaybe data_ $
+        flip map data_ $
         \(set, CmmData _ static) ->
           case static of
-            CmmStatics lbl _ _ _ -> Just (lbl, set)
-            CmmStaticsRaw _ _ -> Nothing
+            CmmStatics lbl _ _ _ -> (lbl, set)
+            CmmStaticsRaw lbl _ -> (lbl, set)
 
       static_data :: Set CLabel
       static_data = Map.keysSet static_data_env
@@ -806,7 +806,26 @@ doSRTs dflags moduleSRTInfo procs data_ = do
     decls' =
       concatMap (updInfoSRTs dflags srtFieldMap funSRTMap has_caf_refs') decls
 
-  return (moduleSRTInfo', srt_decls ++ decls')
+  -- Finally update CafInfos for raw static literals (CmmStaticsRaw). Those are
+  -- not analysed in oneSRT so we never add entries for them to the SRTMap.
+  let srtMap_w_raws =
+        foldl' (\(srtMap :: SRTMap) (_, decl) ->
+                  case decl of
+                    CmmData _ CmmStatics{} ->
+                      -- already updated by oneSRT
+                      srtMap
+                    CmmData _ (CmmStaticsRaw lbl _)
+                      | isIdLabel lbl ->
+                          -- not analysed by oneSRT, declare it non-CAFFY here
+                          Map.insert (mkCAFLabel lbl) Nothing srtMap
+                      | otherwise ->
+                          -- Not an IdLabel, ignore
+                          srtMap
+                    CmmProc{} ->
+                      pprPanic "doSRTs" (text "Found Proc in static data list:" <+> ppr decl))
+               (moduleSRTMap moduleSRTInfo') data_
+
+  return (moduleSRTInfo'{ moduleSRTMap = srtMap_w_raws }, srt_decls ++ decls')
 
 
 -- | Build the SRT for a strongly-connected component of blocks
