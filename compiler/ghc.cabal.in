@@ -240,6 +240,7 @@ Library
         SrcLoc
         UniqSupply
         Unique
+        UpdateCafInfos
         Var
         VarEnv
         VarSet
