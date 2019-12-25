@@ -136,7 +136,7 @@ Library
         UnboxedTuples
         UndecidableInstances
 
-    Include-Dirs: . parser utils
+    Include-Dirs: . utils
 
     -- We need to set the unit id to ghc (without a version number)
     -- as it's magic.
@@ -154,9 +154,9 @@ Library
     Install-Includes: HsVersions.h
 
     c-sources:
-        parser/cutils.c
-        ghci/keepCAFsForGHCi.c
+        cbits/cutils.c
         cbits/genSym.c
+        ghci/keepCAFsForGHCi.c
 
     hs-source-dirs:
         .
@@ -586,8 +586,6 @@ Library
         Hoopl.Dataflow
         Hoopl.Graph
         Hoopl.Label
---        CgInfoTbls used in ghci/DebuggerUtils
---        CgHeapery  mkVirtHeapOffsets used in ghci
 
     Exposed-Modules:
             AsmCodeGen
