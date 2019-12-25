@@ -68,7 +68,7 @@ readProcessEnvWithExitCode
     -> IO (ExitCode, String, String) -- ^ (exit_code, stdout, stderr)
 readProcessEnvWithExitCode prog args env_update = do
     current_env <- getEnvironment
-    readCreateProcessWithExitCode (proc prog args) {
+    readCreateProcessWithExitCode ((proc prog args) {use_process_jobs = True}) {
         env = Just (replaceVar env_update current_env) } ""
 
 -- Don't let gcc localize version info string, #8825
@@ -220,8 +220,21 @@ builderMainLoop dflags filter_fn pgm real_args mb_cwd mb_env = do
   -- unless an exception was raised.
   let safely inner = mask $ \restore -> do
         -- acquire
-        (hStdIn, hStdOut, hStdErr, hProcess) <- restore $
-          runInteractiveProcess pgm real_args mb_cwd mb_env
+        -- On Windows due to how exec is emulated the old process will exit and
+        -- a new process will be created. This means waiting for termination of
+        -- the parent process will get you in a race condition as the child may
+        -- not have finished yet.  This caused #16450.  To fix this use a
+        -- process job to track all child processes and wait for each one to
+        -- finish.
+        let procdata = (proc pgm real_args) { cwd = mb_cwd
+                                            , env = mb_env
+                                            , use_process_jobs = True
+                                            , std_in  = CreatePipe
+                                            , std_out = CreatePipe
+                                            , std_err = CreatePipe
+                                            }
+        (Just hStdIn, Just hStdOut, Just hStdErr, hProcess) <- restore $
+          createProcess_ "builderMainLoop" procdata
         let cleanup_handles = do
               hClose hStdIn
               hClose hStdOut
