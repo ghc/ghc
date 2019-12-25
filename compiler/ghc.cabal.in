@@ -378,6 +378,7 @@ Library
         DriverPhases
         PipelineMonad
         DriverPipeline
+        DList
         DynFlags
         ErrUtils
         Finder
