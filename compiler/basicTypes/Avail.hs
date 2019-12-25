@@ -36,6 +36,8 @@ import NameSet
 
 import FieldLabel
 import Binary
+import qualified DList as DL
+import DList ( DList )
 import ListSetOps
 import Outputable
 import Util
@@ -178,7 +180,7 @@ availFlds (AvailTC _ _ fs) = fs
 availFlds _                = []
 
 availsNamesWithOccs :: [AvailInfo] -> [(Name, OccName)]
-availsNamesWithOccs = concatMap availNamesWithOccs
+availsNamesWithOccs = DL.toList . DL.concatMap availNamesWithOccs'
 
 -- | 'Name's made available by the availability information, paired with
 -- the 'OccName' used to refer to each one.
@@ -189,10 +191,14 @@ availsNamesWithOccs = concatMap availNamesWithOccs
 --
 -- See Note [Representing fields in AvailInfo].
 availNamesWithOccs :: AvailInfo -> [(Name, OccName)]
-availNamesWithOccs (Avail n) = [(n, nameOccName n)]
-availNamesWithOccs (AvailTC _ ns fs)
-  = [ (n, nameOccName n) | n <- ns ] ++
-    [ (flSelector fl, mkVarOccFS (flLabel fl)) | fl <- fs ]
+availNamesWithOccs = DL.toList . availNamesWithOccs'
+
+availNamesWithOccs' :: AvailInfo -> DList (Name, OccName)
+availNamesWithOccs' (Avail n) = DL.singleton (n, nameOccName n)
+availNamesWithOccs' (AvailTC _ ns fs) = ns' DL.++ fs'
+  where
+    ns' = DL.fromList [ (n, nameOccName n) | n <- ns ]
+    fs' = DL.fromList [ (flSelector fl, mkVarOccFS (flLabel fl)) | fl <- fs ]
 
 -- -----------------------------------------------------------------------------
 -- Utility

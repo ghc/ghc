@@ -84,6 +84,8 @@ import TyCon
 import Unique
 import Outputable
 import TysPrim
+import qualified DList as DL
+import DList ( DList )
 import DynFlags
 import FastString
 import Maybes
@@ -2144,12 +2146,12 @@ eqTickish _ l r = l == r
 -- | Finds differences between core expressions, modulo alpha and
 -- renaming. Setting @top@ means that the @IdInfo@ of bindings will be
 -- checked for differences as well.
-diffExpr :: Bool -> RnEnv2 -> CoreExpr -> CoreExpr -> [SDoc]
-diffExpr _   env (Var v1)   (Var v2)   | rnOccL env v1 == rnOccR env v2 = []
-diffExpr _   _   (Lit lit1) (Lit lit2) | lit1 == lit2                   = []
-diffExpr _   env (Type t1)  (Type t2)  | eqTypeX env t1 t2              = []
+diffExpr :: Bool -> RnEnv2 -> CoreExpr -> CoreExpr -> DList SDoc
+diffExpr _   env (Var v1)   (Var v2)   | rnOccL env v1 == rnOccR env v2 = DL.empty
+diffExpr _   _   (Lit lit1) (Lit lit2) | lit1 == lit2                   = DL.empty
+diffExpr _   env (Type t1)  (Type t2)  | eqTypeX env t1 t2              = DL.empty
 diffExpr _   env (Coercion co1) (Coercion co2)
-                                       | eqCoercionX env co1 co2        = []
+                                       | eqCoercionX env co1 co2        = DL.empty
 diffExpr top env (Cast e1 co1)  (Cast e2 co2)
   | eqCoercionX env co1 co2                = diffExpr top env e1 e2
 diffExpr top env (Tick n1 e1)   e2
@@ -2162,25 +2164,25 @@ diffExpr top env (Tick n1 e1)   (Tick n2 e2)
  -- generated names, which are allowed to differ.
 diffExpr _   _   (App (App (Var absent) _) _)
                  (App (App (Var absent2) _) _)
-  | isBottomingId absent && isBottomingId absent2 = []
+  | isBottomingId absent && isBottomingId absent2 = DL.empty
 diffExpr top env (App f1 a1)    (App f2 a2)
-  = diffExpr top env f1 f2 ++ diffExpr top env a1 a2
+  = diffExpr top env f1 f2 DL.++ diffExpr top env a1 a2
 diffExpr top env (Lam b1 e1)  (Lam b2 e2)
   | eqTypeX env (varType b1) (varType b2)   -- False for Id/TyVar combination
   = diffExpr top (rnBndr2 env b1 b2) e1 e2
 diffExpr top env (Let bs1 e1) (Let bs2 e2)
   = let (ds, env') = diffBinds top env (flattenBinds [bs1]) (flattenBinds [bs2])
-    in ds ++ diffExpr top env' e1 e2
+    in ds DL.++ diffExpr top env' e1 e2
 diffExpr top env (Case e1 b1 t1 a1) (Case e2 b2 t2 a2)
   | equalLength a1 a2 && not (null a1) || eqTypeX env t1 t2
     -- See Note [Empty case alternatives] in TrieMap
-  = diffExpr top env e1 e2 ++ concat (zipWith diffAlt a1 a2)
+  = diffExpr top env e1 e2 DL.++ DL.concat (zipWith diffAlt a1 a2)
   where env' = rnBndr2 env b1 b2
         diffAlt (c1, bs1, e1) (c2, bs2, e2)
-          | c1 /= c2  = [text "alt-cons " <> ppr c1 <> text " /= " <> ppr c2]
+          | c1 /= c2  = DL.singleton (text "alt-cons " <> ppr c1 <> text " /= " <> ppr c2)
           | otherwise = diffExpr top (rnBndrs2 env' bs1 bs2) e1 e2
 diffExpr _  _ e1 e2
-  = [fsep [ppr e1, text "/=", ppr e2]]
+  = DL.singleton (fsep [ppr e1, text "/=", ppr e2])
 
 -- | Finds differences between core bindings, see @diffExpr@.
 --
@@ -2193,10 +2195,10 @@ diffExpr _  _ e1 e2
 -- which we then speculatively match by ordering them. It's by no means
 -- perfect, but gets the job done well enough.
 diffBinds :: Bool -> RnEnv2 -> [(Var, CoreExpr)] -> [(Var, CoreExpr)]
-          -> ([SDoc], RnEnv2)
+          -> (DList SDoc, RnEnv2)
 diffBinds top env binds1 = go (length binds1) env binds1
  where go _    env []     []
-          = ([], env)
+          = (DL.empty, env)
        go fuel env binds1 binds2
           -- No binds left to compare? Bail out early.
           | null binds1 || null binds2
@@ -2225,23 +2227,24 @@ diffBinds top env binds1 = go (length binds1) env binds1
        -- now we just return the comparison results when we pair up
        -- the binds in a pseudo-random order.
        warn env binds1 binds2 =
-         concatMap (uncurry (diffBind env)) (zip binds1' binds2') ++
-         unmatched "unmatched left-hand:" (drop l binds1') ++
+         DL.concatMap (uncurry (diffBind env)) (zip binds1' binds2') DL.++
+         unmatched "unmatched left-hand:" (drop l binds1') DL.++
          unmatched "unmatched right-hand:" (drop l binds2')
         where binds1' = sortBy (comparing fst) binds1
               binds2' = sortBy (comparing fst) binds2
               l = min (length binds1') (length binds2')
-       unmatched _   [] = []
-       unmatched txt bs = [text txt $$ ppr (Rec bs)]
+       unmatched _   [] = DL.empty
+       unmatched txt bs = DL.singleton (text txt $$ ppr (Rec bs))
        diffBind env (bndr1,expr1) (bndr2,expr2)
-         | ds@(_:_) <- diffExpr top env expr1 expr2
+         | ds <- diffExpr top env expr1 expr2
+         , not (null ds)
          = locBind "in binding" bndr1 bndr2 ds
          | otherwise
          = diffIdInfo env bndr1 bndr2
 
 -- | Find differences in @IdInfo@. We will especially check whether
 -- the unfoldings match, if present (see @diffUnfold@).
-diffIdInfo :: RnEnv2 -> Var -> Var -> [SDoc]
+diffIdInfo :: RnEnv2 -> Var -> Var -> DList SDoc
 diffIdInfo env bndr1 bndr2
   | arityInfo info1 == arityInfo info2
     && cafInfo info1 == cafInfo info2
@@ -2254,21 +2257,21 @@ diffIdInfo env bndr1 bndr2
   = locBind "in unfolding of" bndr1 bndr2 $
     diffUnfold env (unfoldingInfo info1) (unfoldingInfo info2)
   | otherwise
-  = locBind "in Id info of" bndr1 bndr2
-    [fsep [pprBndr LetBind bndr1, text "/=", pprBndr LetBind bndr2]]
+  = locBind "in Id info of" bndr1 bndr2 . DL.singleton $ 
+    fsep [pprBndr LetBind bndr1, text "/=", pprBndr LetBind bndr2]
   where info1 = idInfo bndr1; info2 = idInfo bndr2
 
 -- | Find differences in unfoldings. Note that we will not check for
 -- differences of @IdInfo@ in unfoldings, as this is generally
 -- redundant, and can lead to an exponential blow-up in complexity.
-diffUnfold :: RnEnv2 -> Unfolding -> Unfolding -> [SDoc]
-diffUnfold _   NoUnfolding    NoUnfolding                 = []
-diffUnfold _   BootUnfolding  BootUnfolding               = []
-diffUnfold _   (OtherCon cs1) (OtherCon cs2) | cs1 == cs2 = []
+diffUnfold :: RnEnv2 -> Unfolding -> Unfolding -> DList SDoc
+diffUnfold _   NoUnfolding    NoUnfolding                 = DL.empty
+diffUnfold _   BootUnfolding  BootUnfolding               = DL.empty
+diffUnfold _   (OtherCon cs1) (OtherCon cs2) | cs1 == cs2 = DL.empty
 diffUnfold env (DFunUnfolding bs1 c1 a1)
                (DFunUnfolding bs2 c2 a2)
   | c1 == c2 && equalLength bs1 bs2
-  = concatMap (uncurry (diffExpr False env')) (zip a1 a2)
+  = DL.concatMap (uncurry (diffExpr False env')) (zip a1 a2)
   where env' = rnBndrs2 env bs1 bs2
 diffUnfold env (CoreUnfolding t1 _ _ v1 cl1 wf1 x1 g1)
                (CoreUnfolding t2 _ _ v2 cl2 wf2 x2 g2)
@@ -2276,11 +2279,11 @@ diffUnfold env (CoreUnfolding t1 _ _ v1 cl1 wf1 x1 g1)
     && wf1 == wf2 && x1 == x2 && g1 == g2
   = diffExpr False env t1 t2
 diffUnfold _   uf1 uf2
-  = [fsep [ppr uf1, text "/=", ppr uf2]]
+  = DL.singleton $ fsep [ppr uf1, text "/=", ppr uf2]
 
 -- | Add location information to diff messages
-locBind :: String -> Var -> Var -> [SDoc] -> [SDoc]
-locBind loc b1 b2 diffs = map addLoc diffs
+locBind :: String -> Var -> Var -> DList SDoc -> DList SDoc
+locBind loc b1 b2 diffs = fmap addLoc diffs
   where addLoc d            = d $$ nest 2 (parens (text loc <+> bindLoc))
         bindLoc | b1 == b2  = ppr b1
                 | otherwise = ppr b1 <> char '/' <> ppr b2

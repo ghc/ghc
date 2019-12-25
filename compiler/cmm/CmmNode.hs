@@ -36,6 +36,7 @@ import Outputable
 import SMRep
 import CoreSyn (Tickish)
 import qualified Unique as U
+import qualified DList as DL
 
 import Hoopl.Block
 import Hoopl.Graph
@@ -655,18 +656,22 @@ data CmmTickScope
 
 -- | Output all scope paths.
 scopeToPaths :: CmmTickScope -> [[U.Unique]]
-scopeToPaths GlobalScope           = [[]]
-scopeToPaths (SubScope u s)        = map (u:) (scopeToPaths s)
-scopeToPaths (CombinedScope s1 s2) = scopeToPaths s1 ++ scopeToPaths s2
+scopeToPaths s = DL.toList (go s)
+  where
+    go GlobalScope           = DL.singleton []
+    go (SubScope u s)        = fmap (u:) (go s)
+    go (CombinedScope s1 s2) = go s1 DL.++ go s2
 
 -- | Returns the head uniques of the scopes. This is based on the
 -- assumption that the @Unique@ of @SubScope@ identifies the
 -- underlying super-scope. Used for efficient equality and comparison,
 -- see below.
 scopeUniques :: CmmTickScope -> [U.Unique]
-scopeUniques GlobalScope           = []
-scopeUniques (SubScope u _)        = [u]
-scopeUniques (CombinedScope s1 s2) = scopeUniques s1 ++ scopeUniques s2
+scopeUniques s = DL.toList (go s)
+  where
+    go GlobalScope           = DL.empty
+    go (SubScope u _)        = DL.singleton u
+    go (CombinedScope s1 s2) = go s1 DL.++ go s2
 
 -- Equality and order is based on the head uniques defined above. We
 -- take care to short-cut the (extremely) common cases.

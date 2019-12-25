@@ -36,6 +36,7 @@ module DList
   , cons
   , snoc
   , append
+  , (++)
   , concat
   , replicate
   , list
@@ -44,9 +45,11 @@ module DList
   , unfoldr
   , foldr
   , map
+  , concatMap
+  , concatMapA
   ) where
 
-import Prelude hiding (concat, foldr, map, head, tail, replicate)
+import Prelude hiding (concat, foldr, map, head, tail, replicate, (++), concatMap)
 import qualified Data.List as List
 import Control.Monad as M
 import Data.Function (on)
@@ -94,7 +97,7 @@ newtype DList a = DL { unDL :: [a] -> [a] }
 
 -- | Convert a list to a dlist
 fromList    :: [a] -> DList a
-fromList    = DL . (++)
+fromList    = DL . (List.++)
 {-# INLINE fromList #-}
 
 -- | Convert a dlist to a list
@@ -145,6 +148,12 @@ append       :: DList a -> DList a -> DList a
 append xs ys = DL (unDL xs . unDL ys)
 {-# INLINE append #-}
 
+-- | /O(1)/. 'append' in operator form.
+(++)         :: DList a -> DList a -> DList a
+(++)         = append
+{-# INLINE (++) #-}
+infixr 5 ++
+
 -- | /O(spine)/. Concatenate dlists
 concat       :: [DList a] -> DList a
 concat       = List.foldr append empty
@@ -188,6 +197,14 @@ foldr f b    = List.foldr f b . toList
 map          :: (a -> b) -> DList a -> DList b
 map f        = foldr (cons . f) empty
 {-# INLINE map #-}
+
+-- | /O(n)/. concatMap for difference lists.
+concatMap :: (Foldable t) => (a -> DList b) -> t a -> DList b
+concatMap f xs = F.foldr (append . f) empty xs
+
+-- | /O(n)/. Applicative 'concatMap'.
+concatMapA :: (Foldable t, Applicative f) => (a -> f (DList b)) -> t a -> f (DList b)
+concatMapA f xs = F.foldr (\x acc -> append <$> f x <*> acc) (pure empty) xs
 
 instance Eq a => Eq (DList a) where
     (==) = (==) `on` toList
