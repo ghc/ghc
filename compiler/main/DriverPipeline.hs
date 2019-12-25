@@ -67,6 +67,7 @@ import Ar
 import Bag              ( unitBag )
 import FastString       ( mkFastString )
 import MkIface          ( mkFullIface )
+import UpdateCafInfos   ( updateModDetailsCafInfos )
 
 import Exception
 import System.Directory
@@ -1190,11 +1191,8 @@ runPhase (HscOut src_flavour mod_name result) _ dflags = do
                       hscGenHardCode hsc_env' cgguts mod_location output_fn
 
                     final_iface <- liftIO (mkFullIface hsc_env'{hsc_dflags=iface_dflags} partial_iface (Just caf_infos))
-                    -- TODO(osa): ModIface and ModDetails need to be in sync,
-                    -- but we only generate ModIface with the backend info. See
-                    -- !2100 for more discussion on this. This will be fixed
-                    -- with !1304 or !2100.
-                    setIface final_iface mod_details
+                    let final_mod_details = updateModDetailsCafInfos caf_infos mod_details
+                    setIface final_iface final_mod_details
 
                     -- See Note [Writing interface files]
                     let if_dflags = dflags `gopt_unset` Opt_BuildDynamicToo
