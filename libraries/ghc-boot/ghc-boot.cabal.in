@@ -24,7 +24,6 @@ description:    This library is shared between GHC, ghc-pkg, and other boot
                 and program do not have to depend on Cabal.
 cabal-version:  >=1.22
 build-type:     Simple
-extra-source-files: changelog.md
 
 source-repository head
     type:     git
