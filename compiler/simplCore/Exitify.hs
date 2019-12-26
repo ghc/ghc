@@ -49,6 +49,7 @@ import CoreFVs
 import FastString
 import Type
 import Util( mapSnd )
+import qualified DList as DL
 
 import Data.Bifunctor
 import Control.Monad
@@ -120,7 +121,7 @@ exitifyRec in_scope pairs
         forM ann_pairs $ \(x,rhs) -> do
             -- go past the lambdas of the join point
             let (args, body) = collectNAnnBndrs (idJoinArity x) rhs
-            body' <- go args body
+            body' <- go (DL.fromList args) body
             let rhs' = mkLams args body'
             return (x, rhs')
 
@@ -131,7 +132,7 @@ exitifyRec in_scope pairs
     -- variables bound on the way and lifts it out as a join point.
     --
     -- ExitifyM is a state monad to keep track of floated binds
-    go :: [Var]           -- ^ Variables that are in-scope here, but
+    go :: DL.DList Var    -- ^ Variables that are in-scope here, but
                           -- not in scope at the joinrec; that is,
                           -- we must potentially abstract over them.
                           -- Invariant: they are kept in dependency order
@@ -144,7 +145,7 @@ exitifyRec in_scope pairs
         | -- An exit expression has no recursive calls
           let fvs = dVarSetToVarSet (freeVarsOf ann_e)
         , disjointVarSet fvs recursive_calls
-        = go_exit captured (deAnnotate ann_e) fvs
+        = go_exit (DL.toList captured) (deAnnotate ann_e) fvs
 
     -- We could not turn it into a exit joint point. So now recurse
     -- into all expression where eligible exit join points might sit,
@@ -153,7 +154,7 @@ exitifyRec in_scope pairs
     -- Case right hand sides are in tail-call position
     go captured (_, AnnCase scrut bndr ty alts) = do
         alts' <- forM alts $ \(dc, pats, rhs) -> do
-            rhs' <- go (captured ++ [bndr] ++ pats) rhs
+            rhs' <- go (DL.snoc captured bndr DL.++: pats) rhs
             return (dc, pats, rhs')
         return $ Case (deAnnotate scrut) bndr ty alts'
 
@@ -162,9 +163,9 @@ exitifyRec in_scope pairs
         | AnnNonRec j rhs <- ann_bind
         , Just join_arity <- isJoinId_maybe j
         = do let (params, join_body) = collectNAnnBndrs join_arity rhs
-             join_body' <- go (captured ++ params) join_body
+             join_body' <- go (captured DL.++: params) join_body
              let rhs' = mkLams params join_body'
-             body' <- go (captured ++ [j]) body
+             body' <- go (DL.snoc captured j) body
              return $ Let (NonRec j rhs') body'
 
         -- rec join point, RHSs and body are in tail-call position
@@ -174,15 +175,15 @@ exitifyRec in_scope pairs
              pairs' <- forM pairs $ \(j,rhs) -> do
                  let join_arity = idJoinArity j
                      (params, join_body) = collectNAnnBndrs join_arity rhs
-                 join_body' <- go (captured ++ js ++ params) join_body
+                 join_body' <- go (captured DL.++: js DL.++: params) join_body
                  let rhs' = mkLams params join_body'
                  return (j, rhs')
-             body' <- go (captured ++ js) body
+             body' <- go (captured DL.++: js) body
              return $ Let (Rec pairs') body'
 
         -- normal Let, only the body is in tail-call position
         | otherwise
-        = do body' <- go (captured ++ bindersOf bind ) body
+        = do body' <- go (captured DL.++: bindersOf bind) body
              return $ Let bind body'
       where bind = deAnnBind ann_bind
 
