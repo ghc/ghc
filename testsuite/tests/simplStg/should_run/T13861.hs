@@ -90,6 +90,12 @@ eq2 :: a :~: b -> b :~: a
 eq2 Refl = Refl
 {-# NOINLINE eq2 #-}
 
+data EqWitness a b where
+  EqWitness :: EqWitness a a
+
+eq3 :: a :~: b -> EqWitness b a
+eq3 Refl = EqWitness
+{-# NOINLINE eq3 #-}
 
 test x = do
     let (r1,r2) = bar x
@@ -108,7 +114,9 @@ test x = do
     let (r46, r47) = (Refl, eq1 r46)
     (same $! r46) $! r47                -- no, GADT
     let (r48, r49) = (Refl, eq2 r48)
-    (same $! r48) $! r49                -- no, GADT (FIXME: result says 'yes'; old CSE, only index changes)
+    (same $! r48) $! r49                -- yes, GADT but only index changes
+    let (r48a, r49a) = (Refl, eq3 r48a)
+    (same $! r48a) $! r49a              -- no, GADT
     let (r50, r51) = (True, quux r50)
     (same $! r50) $! r51                -- yes, quux is STG identity
     let (r52, r53) = (Tru, quux' r52)
