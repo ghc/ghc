@@ -37,6 +37,7 @@ module DList
   , snoc
   , append
   , (++)
+  , (++:)
   , concat
   , replicate
   , list
@@ -153,6 +154,12 @@ append xs ys = DL (unDL xs . unDL ys)
 (++)         = append
 {-# INLINE (++) #-}
 infixr 5 ++
+
+-- | /O(1)/. Append a list to an existing DList.
+(++:)        :: DList a -> [a] -> DList a
+xs ++: ys    = DL (unDL xs . (List.++ ys))
+{-# INLINE (++:) #-}
+infixl 5 ++:
 
 -- | /O(spine)/. Concatenate dlists
 concat       :: [DList a] -> DList a
