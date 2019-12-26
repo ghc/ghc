@@ -350,6 +350,8 @@ void initCapabilities (void)
         for (i = 0; i < MAX_NUMA_NODES; i++) {
             numa_map[i] = 0;
         }
+    } else if (RtsFlags.DebugFlags.numa) {
+        // n_numa_nodes was set by RtsFlags.c
     } else {
         uint32_t nNodes = osNumaNodes();
         if (nNodes > MAX_NUMA_NODES) {
