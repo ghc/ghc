@@ -1,4 +1,4 @@
-## 0.6.1 (edit as necessary)
+## 0.6.1
 
 - Shipped with GHC 8.10.1
 
