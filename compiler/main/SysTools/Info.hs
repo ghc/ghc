@@ -231,13 +231,13 @@ getCompilerInfo' dflags = do
         -- FreeBSD clang
         | any ("FreeBSD clang version" `isInfixOf`) stde =
           return Clang
-        -- XCode 5.1 clang
+        -- Xcode 5.1 clang
         | any ("Apple LLVM version 5.1" `isPrefixOf`) stde =
           return AppleClang51
-        -- XCode 5 clang
+        -- Xcode 5 clang
         | any ("Apple LLVM version" `isPrefixOf`) stde =
           return AppleClang
-        -- XCode 4.1 clang
+        -- Xcode 4.1 clang
         | any ("Apple clang version" `isPrefixOf`) stde =
           return AppleClang
          -- Unknown linker.
