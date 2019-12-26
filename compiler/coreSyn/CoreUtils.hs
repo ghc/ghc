@@ -495,7 +495,7 @@ bindNonRec bndr rhs body
 -- | Tests whether we have to use a @case@ rather than @let@ binding for this expression
 -- as per the invariants of 'CoreExpr': see "CoreSyn#let_app_invariant"
 needsCaseBinding :: Type -> CoreExpr -> Bool
-needsCaseBinding ty rhs = isUnliftedType ty && not (exprOkForSpeculation rhs)
+needsCaseBinding ty rhs = mightBeUnliftedType ty && not (exprOkForSpeculation rhs)
         -- Make a case expression instead of a let
         -- These can arise either from the desugarer,
         -- or from beta reductions: (\x.e) (x +# y)
