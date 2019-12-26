@@ -19,7 +19,6 @@ description:    This library contains various bits shared between the @ghc@ and
                 be depended upon by user code.
 cabal-version:  >=1.10
 build-type:     Simple
-extra-source-files: changelog.md
 
 source-repository head
     type:     git
