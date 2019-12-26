@@ -17,11 +17,8 @@ import LlvmCodeGen.Ppr
 import LlvmCodeGen.Regs
 import LlvmMangler
 
-import BlockId
 import GHC.StgToCmm.CgUtils ( fixStgRegisters )
 import Cmm
-import CmmUtils
-import Hoopl.Block
 import Hoopl.Collections
 import PprCmm
 
@@ -31,7 +28,6 @@ import GHC.Platform ( platformArch, Arch(..) )
 import ErrUtils
 import FastString
 import Outputable
-import UniqSupply
 import SysTools ( figureLlvmVersion )
 import qualified Stream
 
@@ -150,44 +146,13 @@ cmmDataLlvmGens statics
 
        renderLlvm $ pprLlvmData (concat gss', concat tss)
 
--- | LLVM can't handle entry blocks which loop back to themselves (could be
--- seen as an LLVM bug) so we rearrange the code to keep the original entry
--- label which branches to a newly generated second label that branches back
--- to itself. See: #11649
-fixBottom :: RawCmmDecl -> LlvmM RawCmmDecl
-fixBottom cp@(CmmProc hdr entry_lbl live g) =
-    maybe (pure cp) fix_block $ mapLookup (g_entry g) blk_map
-  where
-    blk_map = toBlockMap g
-
-    fix_block :: CmmBlock -> LlvmM RawCmmDecl
-    fix_block blk
-        | (CmmEntry e_lbl tickscp, middle, CmmBranch b_lbl) <- blockSplit blk
-        , isEmptyBlock middle
-        , e_lbl == b_lbl = do
-            new_lbl <- mkBlockId <$> getUniqueM
-
-            let fst_blk =
-                    BlockCC (CmmEntry e_lbl tickscp) BNil (CmmBranch new_lbl)
-                snd_blk =
-                    BlockCC (CmmEntry new_lbl tickscp) BNil (CmmBranch new_lbl)
-
-            pure . CmmProc hdr entry_lbl live . ofBlockMap (g_entry g)
-                $ mapFromList [(e_lbl, fst_blk), (new_lbl, snd_blk)]
-
-    fix_block _ = pure cp
-
-fixBottom rcd = pure rcd
-
 -- | Complete LLVM code generation phase for a single top-level chunk of Cmm.
 cmmLlvmGen ::RawCmmDecl -> LlvmM ()
 cmmLlvmGen cmm@CmmProc{} = do
 
     -- rewrite assignments to global regs
     dflags <- getDynFlag id
-    fixed_cmm <- fixBottom $
-                    {-# SCC "llvm_fix_regs" #-}
-                    fixStgRegisters dflags cmm
+    let fixed_cmm = {-# SCC "llvm_fix_regs" #-} fixStgRegisters dflags cmm
 
     dumpIfSetLlvm Opt_D_dump_opt_cmm "Optimised Cmm"
       FormatCMM (pprCmmGroup [fixed_cmm])
