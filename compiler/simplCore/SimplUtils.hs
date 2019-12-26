@@ -68,6 +68,7 @@ import MonadUtils
 import Outputable
 import PrelRules
 import FastString       ( fsLit )
+import qualified DList as DL
 
 import Control.Monad    ( when )
 import Data.List        ( sortBy )
@@ -1402,20 +1403,21 @@ mkLam _env [] body _cont
   = return body
 mkLam env bndrs body cont
   = do { dflags <- getDynFlags
-       ; mkLam' dflags bndrs body }
+       ; mkLam' dflags (DL.fromList bndrs) body }
   where
-    mkLam' :: DynFlags -> [OutBndr] -> OutExpr -> SimplM OutExpr
+    mkLam' :: DynFlags -> DL.DList OutBndr -> OutExpr -> SimplM OutExpr
     mkLam' dflags bndrs (Cast body co)
-      | not (any bad bndrs)
+      | let bndrs' = DL.toList bndrs
+      , not (any bad bndrs')
         -- Note [Casts and lambdas]
       = do { lam <- mkLam' dflags bndrs body
-           ; return (mkCast lam (mkPiCos Representational bndrs co)) }
+           ; return (mkCast lam (mkPiCos Representational bndrs' co)) }
       where
         co_vars  = tyCoVarsOfCo co
         bad bndr = isCoVar bndr && bndr `elemVarSet` co_vars
 
     mkLam' dflags bndrs body@(Lam {})
-      = mkLam' dflags (bndrs ++ bndrs1) body1
+      = mkLam' dflags (bndrs DL.++ DL.fromList bndrs1) body1
       where
         (bndrs1, body1) = collectBinders body
 
@@ -1425,8 +1427,9 @@ mkLam env bndrs body cont
 
     mkLam' dflags bndrs body
       | gopt Opt_DoEtaReduction dflags
-      , Just etad_lam <- tryEtaReduce bndrs body
-      = do { tick (EtaReduction (head bndrs))
+      , bndrs'@(bndr':_) <- DL.toList bndrs
+      , Just etad_lam <- tryEtaReduce bndrs' body
+      = do { tick (EtaReduction bndr')
            ; return etad_lam }
 
       | not (contIsRhs cont)   -- See Note [Eta-expanding lambdas]
@@ -1434,14 +1437,15 @@ mkLam env bndrs body cont
       , any isRuntimeVar bndrs
       , let body_arity = exprEtaExpandArity dflags body
       , body_arity > 0
-      = do { tick (EtaExpansion (head bndrs))
-           ; let res = mkLams bndrs (etaExpand body_arity body)
-           ; traceSmpl "eta expand" (vcat [text "before" <+> ppr (mkLams bndrs body)
+      , bndrs'@(bndr':_) <- DL.toList bndrs
+      = do { tick (EtaExpansion bndr')
+           ; let res = mkLams bndrs' (etaExpand body_arity body)
+           ; traceSmpl "eta expand" (vcat [text "before" <+> ppr (mkLams bndrs' body)
                                           , text "after" <+> ppr res])
            ; return res }
 
       | otherwise
-      = return (mkLams bndrs body)
+      = return $ mkLams (DL.toList bndrs) body
 
 {-
 Note [Eta expanding lambdas]
