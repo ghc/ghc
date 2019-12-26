@@ -108,7 +108,7 @@ test x = do
     let (r46, r47) = (Refl, eq1 r46)
     (same $! r46) $! r47                -- no, GADT
     let (r48, r49) = (Refl, eq2 r48)
-    (same $! r48) $! r49                -- no, GADT
+    (same $! r48) $! r49                -- no, GADT (FIXME: result says 'yes'; old CSE, only index changes)
     let (r50, r51) = (True, quux r50)
     (same $! r50) $! r51                -- yes, quux is STG identity
     let (r52, r53) = (Tru, quux' r52)
