@@ -23,10 +23,10 @@ def normalise_address(str):
                   str)
 
 test('derefnull',
-     [# LLVM Optimiser considers dereference of a null pointer
-      # undefined and marks the code as unreachable which means
-      # that later optimisations remove it altogether.
-      omit_ways(['optllvm']),
+     [# The LLVM backend in particular does not guarantee any particular
+      # behavior on null dereference (similar to #10332).
+      omit_ways(llvm_ways),
+      when(not(have_ncg()), skip),
       # SIGSEGV on Linux (which we make the default)
       exit_code(139),
       # Apparently the output can be different on different
