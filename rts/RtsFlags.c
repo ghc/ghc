@@ -990,6 +990,7 @@ error = true;
                           RtsFlags.GcFlags.numa = true;
                           RtsFlags.DebugFlags.numa = true;
                           RtsFlags.GcFlags.numaMask = (1<<nNodes) - 1;
+                          n_numa_nodes = nNodes;
                       }
                   }
 #endif
