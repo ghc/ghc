@@ -97,6 +97,26 @@ eq3 :: a :~: b -> EqWitness b a
 eq3 Refl = EqWitness
 {-# NOINLINE eq3 #-}
 
+data BigFam = A | B | C | D | E | F | G | H | I | J | K | M | N | O | P deriving (Enum, Show)
+
+big1 :: BigFam -> [Bool]
+big1 A = []
+{-# NOINLINE big1 #-}
+
+big2 :: BigFam -> Bool
+big2 B = True
+{-# NOINLINE big2 #-}
+
+data Week = Mon | Tue | Wed | Thu | Fri | Sat | Sun deriving (Enum, Show)
+
+big3 :: BigFam -> Week
+big3 E = Fri
+{-# NOINLINE big3 #-}
+
+big4 :: BigFam -> Week
+big4 G = Sun
+{-# NOINLINE big4 #-}
+
 test x = do
     let (r1,r2) = bar x
     (same $! r1) $! r2                  -- yes
@@ -142,6 +162,14 @@ test x = do
     case r3 of
       Just b -> print ("YAY", b)
       Nothing -> print "BAD"
+    let (r8, r9) = (A, big1 r8)
+    (same $! r8) $! r9                  -- yes
+    let (r82, r92) = (B, big2 r82)
+    (same $! r82) $! r92                -- yes
+    let (r83, r93) = (E, big3 r83)
+    (same $! r83) $! r93                -- yes
+    let (r84, r94) = (G, big4 r84)
+    (same $! r84) $! r94                -- yes
 {-# NOINLINE test #-}
 
 main = test "foo"
