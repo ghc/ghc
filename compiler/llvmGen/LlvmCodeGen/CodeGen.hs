@@ -70,16 +70,16 @@ genLlvmProc _ = panic "genLlvmProc: case that shouldn't reach here!"
 basicBlocksCodeGen :: LiveGlobalRegs -> [CmmBlock]
                       -> LlvmM ([LlvmBasicBlock], [LlvmCmmDecl])
 basicBlocksCodeGen _    []                     = panic "no entry block!"
-basicBlocksCodeGen live (entryBlock:cmmBlocks)
-  = do (prologue, prologueTops) <- funPrologue live (entryBlock:cmmBlocks)
+basicBlocksCodeGen live cmmBlocks
+  = do bid <- newBlockId
+       (prologue, prologueTops) <- funPrologue live cmmBlocks
+       let entryBlock = BasicBlock bid (fromOL prologue)
 
        -- Generate code
-       (BasicBlock bid entry, entryTops) <- basicBlockCodeGen entryBlock
        (blocks, topss) <- fmap unzip $ mapM basicBlockCodeGen cmmBlocks
 
        -- Compose
-       let entryBlock = BasicBlock bid (fromOL prologue ++ entry)
-       return (entryBlock : blocks, prologueTops ++ entryTops ++ concat topss)
+       return (entryBlock : blocks, prologueTops ++ concat topss)
 
 
 -- | Generate code for one block
