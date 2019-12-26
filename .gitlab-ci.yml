@@ -847,7 +847,6 @@ nightly-i386-windows-hadrian:
 .build-windows-make:
   extends: .build-windows
   stage: full-build
-  allow_failure: true
   variables:
     BUILD_FLAVOUR: "quick"
     GHC_VERSION: "8.6.5"
