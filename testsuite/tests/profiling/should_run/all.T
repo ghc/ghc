@@ -151,3 +151,4 @@ test('T15897',
      makefile_test, ['T15897'])
 
 test('T17572', [], compile_and_run, [''])
+test('T17573', [], compile_and_run, [''])
