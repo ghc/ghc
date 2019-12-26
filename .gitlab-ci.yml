@@ -936,6 +936,7 @@ release-x86_64-linux-fedora27-dwarf:
 
 validate-x86_64-windows-hadrian:
   extends: .build-windows-hadrian
+  allow_failure: false
   variables:
     MSYSTEM: MINGW64
     TEST_ENV: "x86_64-windows-hadrian"
@@ -977,6 +978,7 @@ nightly-i386-windows-hadrian:
 
 .build-x86_64-windows-make:
   extends: .build-windows-make
+  allow_failure: false
   variables:
     MSYSTEM: MINGW64
     TEST_ENV: "x86_64-windows"
