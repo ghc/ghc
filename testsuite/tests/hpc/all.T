@@ -22,4 +22,5 @@ test('T2991', [cmd_wrapper(T2991), extra_clean(['T2991LiterateModule.hi',
               # Run with 'ghc --main'. Do not list other modules explicitly.
               multimod_compile_and_run, ['T2991', ''])
 
-test('T17073', normal, makefile_test, ['T17073 HPC={hpc}'])
+test('T17073', when(opsys('mingw32'), expect_broken(17607)),
+     makefile_test, ['T17073 HPC={hpc}'])
