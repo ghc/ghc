@@ -44,6 +44,7 @@ module GHC.Cmm.CLabel (
         mkAsmTempLabel,
         mkAsmTempDerivedLabel,
         mkAsmTempEndLabel,
+        mkAsmTempProcEndLabel,
         mkAsmTempDieLabel,
 
         mkDirty_MUT_VAR_Label,
@@ -754,6 +755,10 @@ mkAsmTempDerivedLabel = AsmTempDerivedLabel
 
 mkAsmTempEndLabel :: CLabel -> CLabel
 mkAsmTempEndLabel l = mkAsmTempDerivedLabel l (fsLit "_end")
+
+-- | A label indicating the end of a procedure.
+mkAsmTempProcEndLabel :: CLabel -> CLabel
+mkAsmTempProcEndLabel l = mkAsmTempDerivedLabel l (fsLit "_proc_end")
 
 -- | Construct a label for a DWARF Debug Information Entity (DIE)
 -- describing another symbol.
