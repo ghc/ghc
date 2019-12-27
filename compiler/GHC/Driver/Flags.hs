@@ -274,6 +274,7 @@ data GeneralFlag
    -- forwards all -L flags to the collect2 command without using a
    -- response file and as such breaking apart.
    | Opt_SingleLibFolder
+   | Opt_ExposeInternalSymbols
    | Opt_KeepCAFs
    | Opt_KeepGoing
    | Opt_ByteCode
