@@ -1417,7 +1417,7 @@ mkLam env bndrs body cont
         bad bndr = isCoVar bndr && bndr `elemVarSet` co_vars
 
     mkLam' dflags bndrs body@(Lam {})
-      = mkLam' dflags (bndrs DL.++: bndrs1) body1
+      = mkLam' dflags (bndrs DL.++. bndrs1) body1
       where
         (bndrs1, body1) = collectBinders body
 

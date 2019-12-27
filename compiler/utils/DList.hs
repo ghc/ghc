@@ -37,7 +37,9 @@ module DList
   , snoc
   , append
   , (++)
-  , (++:)
+  , (++.)
+  , (.++)
+  , (.++.)
   , concat
   , replicate
   , list
@@ -46,11 +48,13 @@ module DList
   , unfoldr
   , foldr
   , map
+  , omap
+  , reverse
   , concatMap
   , concatMapA
   ) where
 
-import Prelude hiding (concat, foldr, map, head, tail, replicate, (++), concatMap)
+import Prelude hiding (concat, foldr, map, head, tail, replicate, (++), concatMap, reverse)
 import qualified Data.List as List
 import Control.Monad as M
 import Data.Function (on)
@@ -156,10 +160,21 @@ append xs ys = DL (unDL xs . unDL ys)
 infixr 5 ++
 
 -- | /O(1)/. Append a list to an existing DList.
-(++:)        :: DList a -> [a] -> DList a
-xs ++: ys    = DL (unDL xs . (List.++ ys))
-{-# INLINE (++:) #-}
-infixl 5 ++:
+(++.)        :: DList a -> [a] -> DList a
+xs ++. ys    = DL (unDL xs . (List.++ ys))
+{-# INLINE (++.) #-}
+infixl 5 ++.
+
+-- | /O(1)/. Append a list to an existing DList.
+(.++)        :: [a] -> DList a -> DList a
+xs .++ ys    = DL ((List.++ xs) . unDL ys)
+{-# INLINE (.++) #-}
+infixl 5 .++
+
+-- | /O(1)/. Make a DList that represents a list concatenation.
+(.++.) :: [a] -> [a] -> DList a
+xs .++. ys = DL ((List.++ xs) . (List.++ ys) )
+infixr 5 .++.
 
 -- | /O(spine)/. Concatenate dlists
 concat       :: [DList a] -> DList a
@@ -204,6 +219,14 @@ foldr f b    = List.foldr f b . toList
 map          :: (a -> b) -> DList a -> DList b
 map f        = foldr (cons . f) empty
 {-# INLINE map #-}
+
+-- Monomorphic map over difference lists.
+omap         :: (a -> a) -> DList a -> DList a
+omap f xs    = DL (fmap f . unDL xs)
+
+-- | /O(1)/. reverse for difference lists.
+reverse :: DList a -> DList a
+reverse xs = DL (List.reverse . unDL xs)
 
 -- | /O(n)/. concatMap for difference lists.
 concatMap :: (Foldable t) => (a -> DList b) -> t a -> DList b
