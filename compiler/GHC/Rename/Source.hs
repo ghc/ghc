@@ -104,10 +104,10 @@ rnSrcDecls group@(HsGroup { hs_valds   = val_decls,
                             hs_ruleds  = rule_decls,
                             hs_docs    = docs })
  = do {
-   -- (A) Process the fixity declarations, creating a mapping from
-   --     FastStrings to FixItems.
-   --     Also checks for duplicates.
-   local_fix_env <- makeMiniFixityEnv fix_decls ;
+   -- (A) Process the top-level fixity declarations, creating a mapping from
+   --     FastStrings to FixItems. Also checks for duplicates.
+   --     See Note [Top-level fixity signatures in an HsGroup] in GHC.Hs.Decls
+   local_fix_env <- makeMiniFixityEnv $ hsGroupTopLevelFixitySigs group ;
 
    -- (B) Bring top level binders (and their fixities) into scope,
    --     *except* for the value bindings, which get done in step (D)
@@ -2301,13 +2301,8 @@ add gp loc (SpliceD _ splice@(SpliceDecl _ _ flag)) ds
                      -- relevant to the larger base of users.
                      -- See #12146 for discussion.
 
--- Class declarations: pull out the fixity signatures to the top
-add gp@(HsGroup {hs_tyclds = ts, hs_fixds = fs}) l (TyClD _ d) ds
-  | isClassDecl d
-  = let fsigs = [ L l f
-                | L l (FixSig _ f) <- tcdSigs d ] in
-    addl (gp { hs_tyclds = add_tycld (L l d) ts, hs_fixds = fsigs ++ fs}) ds
-  | otherwise
+-- Class declarations: added to the TyClGroup
+add gp@(HsGroup {hs_tyclds = ts}) l (TyClD _ d) ds
   = addl (gp { hs_tyclds = add_tycld (L l d) ts }) ds
 
 -- Signatures: fixity sigs go a different place than all others

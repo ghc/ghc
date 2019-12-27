@@ -84,7 +84,8 @@ module GHC.Hs.Decls (
   resultVariableName,
 
   -- * Grouping
-  HsGroup(..),  emptyRdrGroup, emptyRnGroup, appendGroups, hsGroupInstDecls
+  HsGroup(..),  emptyRdrGroup, emptyRnGroup, appendGroups, hsGroupInstDecls,
+  hsGroupTopLevelFixitySigs,
 
     ) where
 
@@ -167,18 +168,49 @@ type instance XDocD       (GhcPass _) = NoExtField
 type instance XRoleAnnotD (GhcPass _) = NoExtField
 type instance XXHsDecl    (GhcPass _) = NoExtCon
 
--- NB: all top-level fixity decls are contained EITHER
--- EITHER SigDs
--- OR     in the ClassDecls in TyClDs
---
--- The former covers
---      a) data constructors
---      b) class methods (but they can be also done in the
---              signatures of class decls)
---      c) imported functions (that have an IfacSig)
---      d) top level decls
---
--- The latter is for class methods only
+{-
+Note [Top-level fixity signatures in an HsGroup]
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+An `HsGroup p` stores every top-level fixity declarations in one of two places:
+
+1. hs_fixds :: [LFixitySig p]
+
+   This stores fixity signatures for top-level declarations (e.g., functions,
+   data constructors, classes, type families, etc.) as well as fixity
+   signatures for class methods written outside of the class, as in this
+   example:
+
+     infixl 4 `m1`
+     class C1 a where
+       m1 :: a -> a -> a
+
+2. hs_tyclds :: [TyClGroup p]
+
+   Each type class can be found in a TyClDecl inside a TyClGroup, and that
+   TyClDecl stores the fixity signatures for its methods written inside of the
+   class, as in this example:
+
+     class C2 a where
+       infixl 4 `m2`
+       m2 :: a -> a -> a
+
+The story for fixity signatures for class methods is made slightly complicated
+by the fact that they can appear both inside and outside of the class itself,
+and both forms of fixity signatures are considered top-level. This matters
+in `GHC.Rename.Source.rnSrcDecls`, which must create a fixity environment out
+of all top-level fixity signatures before doing anything else. Therefore,
+`rnSrcDecls` must be aware of both (1) and (2) above. The
+`hsGroupTopLevelFixitySigs` function is responsible for collecting this
+information from an `HsGroup`.
+
+One might wonder why we even bother separating top-level fixity signatures
+into two places at all. That is, why not just take the fixity signatures
+from `hs_tyclds` and put them into `hs_fixds` so that they are all in one
+location? This ends up causing problems for `DsMeta.repTopDs`, which translates
+each fixity signature in `hs_fixds` and `hs_tyclds` into a Template Haskell
+`Dec`. If there are any duplicate signatures between the two fields, this will
+result in an error (#17608).
+-}
 
 -- | Haskell Group
 --
@@ -199,8 +231,10 @@ data HsGroup p
         hs_derivds :: [LDerivDecl p],
 
         hs_fixds  :: [LFixitySig p],
-                -- Snaffled out of both top-level fixity signatures,
-                -- and those in class declarations
+                -- A list of fixity signatures defined for top-level
+                -- declarations and class methods (defined outside of the class
+                -- itself).
+                -- See Note [Top-level fixity signatures in an HsGroup]
 
         hs_defds  :: [LDefaultDecl p],
         hs_fords  :: [LForeignDecl p],
@@ -231,6 +265,19 @@ emptyGroup = HsGroup { hs_ext = noExtField,
                        hs_valds = error "emptyGroup hs_valds: Can't happen",
                        hs_splcds = [],
                        hs_docs = [] }
+
+-- | The fixity signatures for each top-level declaration and class method
+-- in an 'HsGroup'.
+-- See Note [Top-level fixity signatures in an HsGroup]
+hsGroupTopLevelFixitySigs :: HsGroup (GhcPass p) -> [LFixitySig (GhcPass p)]
+hsGroupTopLevelFixitySigs (HsGroup{ hs_fixds = fixds, hs_tyclds = tyclds }) =
+    fixds ++ cls_fixds
+  where
+    cls_fixds = [ L loc sig
+                | L _ ClassDecl{tcdSigs = sigs} <- tyClGroupTyClDecls tyclds
+                , L loc (FixSig _ sig) <- sigs
+                ]
+hsGroupTopLevelFixitySigs (XHsGroup nec) = noExtCon nec
 
 appendGroups :: HsGroup (GhcPass p) -> HsGroup (GhcPass p)
              -> HsGroup (GhcPass p)
