@@ -41,6 +41,7 @@ import Demand           ( argOneShots, argsOneShots )
 import Digraph          ( SCC(..), Node(..)
                         , stronglyConnCompFromEdgedVerticesUniq
                         , stronglyConnCompFromEdgedVerticesUniqR )
+import qualified DList as DL
 import Unique
 import UniqFM
 import UniqSet
@@ -76,11 +77,11 @@ occurAnalysePgm this_mod active_unf active_rule imp_rules binds
     init_env = initOccEnv { occ_rule_act = active_rule
                           , occ_unf_act  = active_unf }
 
-    (final_usage, occ_anald_binds) = go init_env binds
-    (_, occ_anald_glommed_binds)   = occAnalRecBind init_env TopLevel
-                                                    imp_rule_edges
-                                                    (flattenBinds occ_anald_binds)
-                                                    initial_uds
+    (final_usage, DL.toList -> occ_anald_binds) = go init_env binds
+    (_, occ_anald_glommed_binds)                = occAnalRecBind init_env TopLevel
+                                                                 imp_rule_edges
+                                                                 (flattenBinds occ_anald_binds)
+                                                                 initial_uds
           -- It's crucial to re-analyse the glommed-together bindings
           -- so that we establish the right loop breakers. Otherwise
           -- we can easily create an infinite loop (#9583 is an example)
@@ -99,11 +100,11 @@ occurAnalysePgm this_mod active_unf active_rule imp_rules binds
                                              `delVarSetList` ru_bndrs imp_rule
                             , arg <- ru_args imp_rule ]
 
-    go :: OccEnv -> [CoreBind] -> (UsageDetails, [CoreBind])
+    go :: OccEnv -> [CoreBind] -> (UsageDetails, DL.DList CoreBind)
     go _ []
-        = (initial_uds, [])
+        = (initial_uds, DL.empty)
     go env (bind:binds)
-        = (final_usage, bind' ++ binds')
+        = (final_usage, bind' DL..++ binds')
         where
            (bs_usage, binds')   = go env binds
            (final_usage, bind') = occAnalBind env TopLevel imp_rule_edges bind
@@ -2122,19 +2123,20 @@ oneShotGroup :: OccEnv -> [CoreBndr]
         -- the binder. This is useful to guide subsequent float-in/float-out tranformations
 
 oneShotGroup env@(OccEnv { occ_one_shots = ctxt }) bndrs
-  = go ctxt bndrs []
+  = fmap DL.toList (go ctxt bndrs DL.empty)
   where
+    go :: [OneShotInfo] -> [Var] -> DL.DList Id -> (OccEnv, DL.DList Var)
     go ctxt [] rev_bndrs
       = ( env { occ_one_shots = ctxt, occ_encl = OccVanilla }
-        , reverse rev_bndrs )
+        , rev_bndrs )
 
     go [] bndrs rev_bndrs
       = ( env { occ_one_shots = [], occ_encl = OccVanilla }
-        , reverse rev_bndrs ++ bndrs )
+        , DL.reverse rev_bndrs DL.++. bndrs )
 
     go ctxt@(one_shot : ctxt') (bndr : bndrs) rev_bndrs
-      | isId bndr = go ctxt' bndrs (bndr': rev_bndrs)
-      | otherwise = go ctxt  bndrs (bndr : rev_bndrs)
+      | isId bndr = go ctxt' bndrs (DL.cons bndr' rev_bndrs)
+      | otherwise = go ctxt  bndrs (DL.cons bndr rev_bndrs)
       where
         bndr' = updOneShotInfo bndr one_shot
                -- Use updOneShotInfo, not setOneShotInfo, as pre-existing
