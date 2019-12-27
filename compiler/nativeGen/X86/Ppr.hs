@@ -87,8 +87,7 @@ pprNatCmmDecl proc@(CmmProc top_info lbl _ (ListGraph blocks)) =
         pprProcAlignment $$
         pprLabel lbl $$ -- blocks guaranteed not null, so label needed
         vcat (map (pprBasicBlock top_info) blocks) $$
-        (if debugLevel dflags > 0
-         then ppr (mkAsmTempEndLabel lbl) <> char ':' else empty) $$
+        procEndLbl dflags $$
         pprSizeDecl lbl
 
     Just (Statics info_lbl _) ->
@@ -99,6 +98,7 @@ pprNatCmmDecl proc@(CmmProc top_info lbl _ (ListGraph blocks)) =
           then ppr (mkDeadStripPreventer info_lbl) <> char ':'
           else empty) $$
       vcat (map (pprBasicBlock top_info) blocks) $$
+      procEndLbl dflags $$
       -- above: Even the first block gets a label, because with branch-chain
       -- elimination, it might be the target of a goto.
       (if platformHasSubsectionsViaSymbols platform
@@ -109,6 +109,10 @@ pprNatCmmDecl proc@(CmmProc top_info lbl _ (ListGraph blocks)) =
             <+> ppr (mkDeadStripPreventer info_lbl)
        else empty) $$
       pprSizeDecl info_lbl
+  where
+    procEndLbl dflags
+      | debugLevel dflags > 0 = ppr (mkAsmTempProcEndLabel lbl) <> char ':'
+      | otherwise             = empty
 
 -- | Output the ELF .size directive.
 pprSizeDecl :: CLabel -> SDoc
