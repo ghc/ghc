@@ -42,6 +42,10 @@ Template Haskell
    forms have now been generalised in terms of a minimal interface necessary for the
    implementation rather than the overapproximation of the ``Q`` monad.
 
+ - Template Haskell quotes now handle fixity declarations in ``let`` and
+   ``where`` bindings properly. Previously, such fixity declarations would
+   be dropped when quoted due to a Template Haskell bug.
+
 ``ghc-prim`` library
 ~~~~~~~~~~~~~~~~~~~~
 
@@ -56,6 +60,20 @@ Template Haskell
                      => ([Word8] -> a) -> ModGuts
                      -> CoreM (ModuleEnv [a], NameEnv [a])
 
+ - The meaning of the ``hs_fixds`` field of ``HsGroup`` has changed slightly.
+   It now only contains fixity signatures defined for top-level declarations
+   and class methods defined *outside* of the class itself. Previously,
+   ``hs_fixds`` would also contain fixity signatures for class methods defined
+   *inside* the class, such as the fixity signature for ``m`` in the following
+   example: ::
+
+     class C a where
+       infixl 4 `m`
+       m :: a -> a -> a
+
+   If you wish to attain the previous behavior of ``hs_fixds``, use the new
+   ``hsGroupTopLevelFixitySigs`` function, which collects all top-level fixity
+   signatures, including those for class methods defined inside classes.
 
 ``base`` library
 ~~~~~~~~~~~~~~~~
