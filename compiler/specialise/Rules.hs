@@ -510,7 +510,7 @@ matchRule dflags rule_env _is_active fn args _rough_args
           (BuiltinRule { ru_try = match_fn })
 -- Built-in rules can't be switched off, it seems
   = case match_fn dflags rule_env fn args of
-        Nothing   -> Left Nothing
+        Nothing   -> Left []
         Just expr -> Right expr
 
 matchRule dflags in_scope is_active fn args rough_args
