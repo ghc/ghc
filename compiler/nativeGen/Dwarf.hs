@@ -99,10 +99,10 @@ dwarfGen df modLoc us blocks = do
 -- scattered in the final binary. Without split sections, we could make a
 -- single arange based on the first/last proc.
 mkDwarfARange :: DebugBlock -> DwarfARange
-mkDwarfARange proc = DwarfARange start end
+mkDwarfARange proc = DwarfARange lbl end
   where
-    start = dblCLabel proc
-    end = mkAsmTempEndLabel start
+    lbl = dblCLabel proc
+    end = mkAsmTempProcEndLabel lbl
 
 -- | Header for a compilation unit, establishing global format
 -- parameters
