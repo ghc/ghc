@@ -39,8 +39,11 @@ import BasicTypes       (Alignment, mkAlignment, alignmentBytes)
 import DynFlags
 import Cmm              hiding (topInfoTable)
 import BlockId
+import Module           ( Module )
+import Name             ( isInternalName )
+import OccName          ( occNameFS, occName )
 import CLabel
-import Unique           ( pprUniqueAlways )
+import Unique           ( pprUniqueAlways, getUnique )
 import GHC.Platform
 import FastString
 import Outputable
@@ -73,11 +76,11 @@ pprProcAlignment :: SDoc
 pprProcAlignment = sdocWithDynFlags $ \dflags ->
   (maybe empty (pprAlign . mkAlignment) (cmmProcAlignment dflags))
 
-pprNatCmmDecl :: NatCmmDecl (Alignment, CmmStatics) Instr -> SDoc
-pprNatCmmDecl (CmmData section dats) =
+pprNatCmmDecl :: Module -> NatCmmDecl (Alignment, CmmStatics) Instr -> SDoc
+pprNatCmmDecl _this_mod (CmmData section dats) =
   pprSectionAlign section $$ pprDatas dats
 
-pprNatCmmDecl proc@(CmmProc top_info lbl _ (ListGraph blocks)) =
+pprNatCmmDecl this_mod proc@(CmmProc top_info lbl _ (ListGraph blocks)) =
   sdocWithDynFlags $ \dflags ->
   pprProcAlignment $$
   case topInfoTable proc of
@@ -85,6 +88,7 @@ pprNatCmmDecl proc@(CmmProc top_info lbl _ (ListGraph blocks)) =
         -- special case for code without info table:
         pprSectionAlign (Section Text lbl) $$
         pprProcAlignment $$
+        pprProcLabel this_mod lbl $$
         pprLabel lbl $$ -- blocks guaranteed not null, so label needed
         vcat (map (pprBasicBlock top_info) blocks) $$
         (if debugLevel dflags > 0
@@ -95,6 +99,7 @@ pprNatCmmDecl proc@(CmmProc top_info lbl _ (ListGraph blocks)) =
       sdocWithPlatform $ \platform ->
       pprSectionAlign (Section Text info_lbl) $$
       pprProcAlignment $$
+      pprProcLabel this_mod lbl $$
       (if platformHasSubsectionsViaSymbols platform
           then ppr (mkDeadStripPreventer info_lbl) <> char ':'
           else empty) $$
@@ -109,6 +114,22 @@ pprNatCmmDecl proc@(CmmProc top_info lbl _ (ListGraph blocks)) =
             <+> ppr (mkDeadStripPreventer info_lbl)
        else empty) $$
       pprSizeDecl info_lbl
+
+pprProcLabel :: Module -> CLabel -> SDoc
+pprProcLabel this_mod lbl = sdocWithDynFlags $ \dflags ->
+    if gopt Opt_ExposeAllSymbols dflags then doc else empty
+  where
+    doc
+      | Just nm <- hasHaskellName lbl
+      , isInternalName nm
+      = char '_' <> ppr this_mod
+        <> char '_'
+        <> ztext (zEncodeFS (occNameFS (occName nm)))
+        <> char '_'
+        <> pprUniqueAlways (getUnique nm)
+        <> char ':'
+      | otherwise
+      = empty
 
 -- | Output the ELF .size directive.
 pprSizeDecl :: CLabel -> SDoc
