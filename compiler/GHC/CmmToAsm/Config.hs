@@ -18,8 +18,7 @@ import GHC.Utils.Outputable
 data NCGConfig = NCGConfig
    { ncgPlatform              :: !Platform        -- ^ Target platform
    , ncgAsmContext            :: !SDocContext     -- ^ Context for ASM code generation
-   , ncgThisModule            :: !Module          -- ^ The name of the module we are currently compiling (for generating debug information)
-                                                  -- See Note [Internal proc labels] in CLabel.
+   , ncgThisModule            :: !Module          -- ^ The name of the module we are currently compiling
    , ncgProcAlignment         :: !(Maybe Int)     -- ^ Mandatory proc alignment
    , ncgExternalDynamicRefs   :: !Bool            -- ^ Generate code to link against dynamic libraries
    , ncgPIC                   :: !Bool            -- ^ Enable Position-Independent Code
@@ -40,6 +39,7 @@ data NCGConfig = NCGConfig
    , ncgDwarfEnabled          :: !Bool            -- ^ Enable Dwarf generation
    , ncgDwarfUnwindings       :: !Bool            -- ^ Enable unwindings
    , ncgDwarfStripBlockInfo   :: !Bool            -- ^ Strip out block information from generated Dwarf
+   , ncgExposeInternalSymbols :: !Bool            -- ^ Expose symbol table entries for internal symbols
    }
 
 -- | Return Word size
