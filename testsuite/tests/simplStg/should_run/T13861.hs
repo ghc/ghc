@@ -120,7 +120,7 @@ big4 G = Sun
 data BigFamX = Ax | Bx | Cx | Dx | Ex | Fx | Gx | Hx Int | Ix deriving Show
 
 big5 :: BigFam -> BigFamX
-big5 (H i) = (Hx i)
+big5 (H i) = Hx i
 {-# NOINLINE big5 #-}
 
 big6 :: BigFam -> BigFamX
@@ -182,7 +182,8 @@ test x = do
     let (r84, r94) = (G, big4 r84)
     (same $! r84) $! r94                -- yes
     let (r85, r95) = (H 42, big5 r85)
-    (same $! r85) $! r95                -- yes (FIXME: currently 'no')
+    (same $! r85) $! r95                -- yes (FIXME: currently 'no', due to -fworker-wrapper)
+    print r95
     let (r86, r96) = (I, big6 r86)
     (same $! r86) $! r96                -- yes
 {-# NOINLINE test #-}
