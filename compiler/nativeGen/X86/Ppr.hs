@@ -78,7 +78,6 @@ pprNatCmmDecl (CmmData section dats) =
   pprSectionAlign section $$ pprDatas dats
 
 pprNatCmmDecl proc@(CmmProc top_info lbl _ (ListGraph blocks)) =
-  sdocWithDynFlags $ \dflags ->
   pprProcAlignment $$
   case topInfoTable proc of
     Nothing ->
@@ -87,8 +86,8 @@ pprNatCmmDecl proc@(CmmProc top_info lbl _ (ListGraph blocks)) =
         pprProcAlignment $$
         pprLabel lbl $$ -- blocks guaranteed not null, so label needed
         vcat (map (pprBasicBlock top_info) blocks) $$
-        (if debugLevel dflags > 0
-         then ppr (mkAsmTempEndLabel lbl) <> char ':' else empty) $$
+        pprBlockEndLabel lbl $$
+        pprProcEndLabel lbl $$
         pprSizeDecl lbl
 
     Just (Statics info_lbl _) ->
@@ -99,6 +98,7 @@ pprNatCmmDecl proc@(CmmProc top_info lbl _ (ListGraph blocks)) =
           then ppr (mkDeadStripPreventer info_lbl) <> char ':'
           else empty) $$
       vcat (map (pprBasicBlock top_info) blocks) $$
+      pprProcEndLabel info_lbl $$
       -- above: Even the first block gets a label, because with branch-chain
       -- elimination, it might be the target of a goto.
       (if platformHasSubsectionsViaSymbols platform
@@ -109,6 +109,21 @@ pprNatCmmDecl proc@(CmmProc top_info lbl _ (ListGraph blocks)) =
             <+> ppr (mkDeadStripPreventer info_lbl)
        else empty) $$
       pprSizeDecl info_lbl
+
+ifDebugLevel :: Int -> SDoc -> SDoc
+ifDebugLevel min_lvl doc =
+    sdocWithDynFlags $ \dflags ->
+        if debugLevel dflags >= min_lvl then doc else empty
+
+pprProcEndLabel :: CLabel -- ^ Procedure name
+                -> SDoc
+pprProcEndLabel lbl =
+    ifDebugLevel 0 $ ppr (mkAsmTempProcEndLabel lbl) <> char ':'
+
+pprBlockEndLabel :: CLabel -- ^ Block name
+                 -> SDoc
+pprBlockEndLabel lbl =
+    ifDebugLevel 0 $ ppr (mkAsmTempEndLabel lbl) <> char ':'
 
 -- | Output the ELF .size directive.
 pprSizeDecl :: CLabel -> SDoc
@@ -124,8 +139,7 @@ pprBasicBlock info_env (BasicBlock blockid instrs)
     maybe_infotable dflags $
     pprLabel asmLbl $$
     vcat (map pprInstr instrs) $$
-    (if debugLevel dflags > 0
-     then ppr (mkAsmTempEndLabel asmLbl) <> char ':' else empty)
+    pprBlockEndLabel asmLbl
   where
     asmLbl = blockLbl blockid
     maybe_infotable dflags c = case mapLookup blockid info_env of
