@@ -40,6 +40,7 @@ data NCGConfig = NCGConfig
    , ncgDwarfUnwindings       :: !Bool            -- ^ Enable unwindings
    , ncgDwarfStripBlockInfo   :: !Bool            -- ^ Strip out block information from generated Dwarf
    , ncgExposeInternalSymbols :: !Bool            -- ^ Expose symbol table entries for internal symbols
+   , ncgDwarfSourceNotes      :: !Bool            -- ^ Enable GHC-specific source note DIEs
    }
 
 -- | Return Word size
