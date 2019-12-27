@@ -2042,7 +2042,6 @@ tryRules env rules fn args call_cont
   | otherwise
   = do -- No rule fires
     nodump
-    printOrThrowWarnings ws
     return Nothing
   where
     dflags     = seDynFlags env

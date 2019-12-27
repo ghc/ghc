@@ -51,20 +51,19 @@ import IdInfo           ( RuleInfo( RuleInfo ) )
 import Var
 import VarEnv
 import VarSet
-import Name             ( Name, NamedThing(..), nameIsLocalOrFrom, getSrcSpan )
+import Name             ( Name, NamedThing(..), nameIsLocalOrFrom )
 import NameSet
 import NameEnv
 import UniqFM
 import Unify            ( ruleMatchTyKiX )
 import BasicTypes
-import DynFlags         ( DynFlags, WarnReason ( Reason ), WarningFlag ( Opt_WarnAffineRules ) )
+import DynFlags         ( DynFlags )
 import Outputable
 import FastString
 import Maybes
 import Bag
 import Util
 import Demand
-import ErrUtils
 import Data.List
 import Data.Ord
 import Control.Monad    ( guard )
@@ -513,7 +512,7 @@ matchRule dflags rule_env _is_active fn args _rough_args
         Nothing   -> Left []
         Just expr -> Right expr
 
-matchRule dflags in_scope is_active fn args rough_args
+matchRule _ in_scope is_active _ args rough_args
           (Rule { ru_name = rule_name, ru_act = act, ru_rough = tpl_tops
                 , ru_bndrs = tpl_vars, ru_args = tpl_args, ru_rhs = rhs
                 , ru_auto = rule_auto })
@@ -1240,7 +1239,7 @@ ruleAppCheck_help env fn args rules
     rule_info dflags rule
         | Right _ <- match
         = text "matches (which is very peculiar!)"
-        | Left nonAff <- match
+        | Left nonAff@(_:_) <- match
         = text "has non-affine arguments" <+> pprQuotedList nonAff
         where
           match = matchRule dflags (emptyInScopeSet, rc_id_unf env)
