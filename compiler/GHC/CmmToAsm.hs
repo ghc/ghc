@@ -1190,5 +1190,6 @@ initNCGConfig dflags this_mod = NCGConfig
    , ncgDwarfEnabled        = debugLevel dflags > 0
    , ncgDwarfUnwindings     = debugLevel dflags >= 1
    , ncgDwarfStripBlockInfo = debugLevel dflags < 2 -- We strip out block information when running with -g0 or -g1.
+   , ncgExposeInternalSymbols = gopt Opt_ExposeInternalSymbols dflags
    }
 
