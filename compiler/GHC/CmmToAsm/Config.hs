@@ -17,6 +17,8 @@ import GHC.Utils.Outputable
 data NCGConfig = NCGConfig
    { ncgPlatform              :: !Platform        -- ^ Target platform
    , ncgAsmContext            :: !SDocContext     -- ^ Context for ASM code generation
+   , ncgThisModule            :: !Module          -- ^ The name of the module we are currently compiling (for generating debug information)
+                                                  -- See Note [Internal proc labels] in CLabel.
    , ncgProcAlignment         :: !(Maybe Int)     -- ^ Mandatory proc alignment
    , ncgExternalDynamicRefs   :: !Bool            -- ^ Generate code to link against dynamic libraries
    , ncgPIC                   :: !Bool            -- ^ Enable Position-Independent Code

@@ -152,7 +152,7 @@ nativeCodeGen :: forall a . DynFlags -> Module -> ModLocation -> Handle -> UniqS
               -> Stream IO RawCmmGroup a
               -> IO a
 nativeCodeGen dflags this_mod modLoc h us cmms
- = let config   = initNCGConfig dflags
+ = let config   = initNCGConfig dflags this_mod
        platform = ncgPlatform config
        nCG' :: ( OutputableP Platform statics, Outputable jumpDest, Instruction instr)
             => NcgImpl statics instr jumpDest -> IO a
@@ -1146,9 +1146,10 @@ cmmExprNative referenceKind expr = do
            -> return other
 
 -- | Initialize the native code generator configuration from the DynFlags
-initNCGConfig :: DynFlags -> NCGConfig
-initNCGConfig dflags = NCGConfig
+initNCGConfig :: DynFlags -> Module -> NCGConfig
+initNCGConfig dflags this_mod = NCGConfig
    { ncgPlatform              = targetPlatform dflags
+   , pprThisModule            = this_mod
    , ncgAsmContext            = initSDocContext dflags (PprCode AsmStyle)
    , ncgProcAlignment         = cmmProcAlignment dflags
    , ncgExternalDynamicRefs   = gopt Opt_ExternalDynamicRefs dflags
