@@ -1302,8 +1302,8 @@ pprCLbl (RtsLabel (RtsSlowFastTickyCtr pat))
 pprCLbl (ForeignLabel str _ _ _)
   = ftext str
 
-pprCLbl (IdLabel name _cafs flavor) =
-  internalNamePrefix name <> ppr name <> ppIdFlavor flavor
+pprCLbl (IdLabel name _cafs flavor)
+  = internalNamePrefix name <> ppr name <> ppIdFlavor flavor
 
 pprCLbl (CC_Label cc)           = ppr cc
 pprCLbl (CCS_Label ccs)         = ppr ccs
@@ -1347,8 +1347,8 @@ instance Outputable ForeignLabelSource where
         ForeignLabelInExternalPackage   -> parens $ text "external package"
 
 internalNamePrefix :: Name -> SDoc
-internalNamePrefix name = getPprStyle $ \ sty ->
-  if asmStyle sty && isRandomGenerated then
+internalNamePrefix name = sdocWithDynFlags $ \dflags -> getPprStyle $ \ sty ->
+  if asmStyle sty && isRandomGenerated && not (gopt Opt_ExposeAllSymbols dflags) then
     sdocWithPlatform $ \platform ->
       ptext (asmTempLabelPrefix platform)
   else
