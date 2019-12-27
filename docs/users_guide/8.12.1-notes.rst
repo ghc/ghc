@@ -32,6 +32,10 @@ Runtime system
 Template Haskell
 ~~~~~~~~~~~~~~~~
 
+ - Template Haskell quotes now handle fixity declarations in ``let`` and
+   ``where`` bindings properly. Previously, such fixity declarations would
+   be dropped when quoted due to a Template Haskell bug.
+
 ``ghc-prim`` library
 ~~~~~~~~~~~~~~~~~~~~
 
