@@ -68,6 +68,20 @@ import Outputable (SDoc, pprPanic, ppr)
 import Cmm (RawCmmDecl, CmmStatics)
 import CFG
 
+-- Note [Internal labels]
+-- ~~~~~~~~~~~~~~~~~~~~~~
+--
+-- Some tools (e.g. the `perf` utility on Linux) rely on the symbol table
+-- for resolution of function names. To help these tools we provide the
+-- (enabled by default) -fexpose-all-symbols flag which causes GHC to produce
+-- symbols even for symbols with are internal to a module (although such
+-- symbols will have only local linkage).
+--
+-- To avoid confusion, it is desireable to add a module-qualifier to the
+-- symbol name. However, the Name type's Internal constructor doesn't carry
+-- knowledge of the current Module. Consequently, we pass it explicitly to
+-- pprNatCmmDecl.
+
 data NcgImpl statics instr jumpDest = NcgImpl {
     cmmTopCodeGen             :: RawCmmDecl -> NatM [NatCmmDecl statics instr],
     generateJumpTableForInstr :: instr -> Maybe (NatCmmDecl statics instr),
@@ -75,7 +89,9 @@ data NcgImpl statics instr jumpDest = NcgImpl {
     canShortcut               :: instr -> Maybe jumpDest,
     shortcutStatics           :: (BlockId -> Maybe jumpDest) -> statics -> statics,
     shortcutJump              :: (BlockId -> Maybe jumpDest) -> instr -> instr,
-    pprNatCmmDecl             :: NatCmmDecl statics instr -> SDoc,
+    pprNatCmmDecl             :: Module -- ^ Only for printing internal labels.
+                                        -- See Note [Internal labels]
+                              -> NatCmmDecl statics instr -> SDoc,
     maxSpillSlots             :: Int,
     allocatableRegs           :: [RealReg],
     ncgExpandTop              :: [NatCmmDecl statics instr] -> [NatCmmDecl statics instr],
