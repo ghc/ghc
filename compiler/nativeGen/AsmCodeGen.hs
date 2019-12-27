@@ -480,7 +480,7 @@ cmmNativeGens dflags this_mod modLoc ncgImpl h dbgMap = go
 
         emitNativeCode dflags h $ vcat $
           map pprDecl newFileIds ++
-          map (pprNatCmmDecl ncgImpl) native
+          map (pprNatCmmDecl ncgImpl this_mod) native
 
         -- force evaluation all this stuff to avoid space leaks
         {-# SCC "seqString" #-} evaluate $ seqList (showSDoc dflags $ vcat $ map ppr imports) ()
@@ -570,7 +570,7 @@ cmmNativeGen dflags this_mod modLoc ncgImpl us fileIds dbgMap cmm count
 
         dumpIfSet_dyn dflags
                 Opt_D_dump_asm_native "Native code" FormatASM
-                (vcat $ map (pprNatCmmDecl ncgImpl) native)
+                (vcat $ map (pprNatCmmDecl ncgImpl this_mod) native)
 
         maybeDumpCfg dflags (Just nativeCfgWeights) "CFG Weights - Native" proc_name
 
@@ -628,7 +628,7 @@ cmmNativeGen dflags this_mod modLoc ncgImpl us fileIds dbgMap cmm count
                 dumpIfSet_dyn dflags
                         Opt_D_dump_asm_regalloc "Registers allocated"
                         FormatCMM
-                        (vcat $ map (pprNatCmmDecl ncgImpl) alloced)
+                        (vcat $ map (pprNatCmmDecl ncgImpl this_mod) alloced)
 
                 dumpIfSet_dyn dflags
                         Opt_D_dump_asm_regalloc_stages "Build/spill stages"
@@ -672,7 +672,7 @@ cmmNativeGen dflags this_mod modLoc ncgImpl us fileIds dbgMap cmm count
                 dumpIfSet_dyn dflags
                         Opt_D_dump_asm_regalloc "Registers allocated"
                         FormatCMM
-                        (vcat $ map (pprNatCmmDecl ncgImpl) alloced)
+                        (vcat $ map (pprNatCmmDecl ncgImpl this_mod) alloced)
 
                 let mPprStats =
                         if dopt Opt_D_dump_asm_stats dflags
@@ -764,7 +764,7 @@ cmmNativeGen dflags this_mod modLoc ncgImpl us fileIds dbgMap cmm count
         dumpIfSet_dyn dflags
                 Opt_D_dump_asm_expanded "Synthetic instructions expanded"
                 FormatCMM
-                (vcat $ map (pprNatCmmDecl ncgImpl) expanded)
+                (vcat $ map (pprNatCmmDecl ncgImpl this_mod) expanded)
 
         -- generate unwinding information from cmm
         let unwinds :: BlockMap [UnwindPoint]
