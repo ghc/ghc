@@ -10,7 +10,7 @@ def f( name, opts ):
 setTestOpts(f)
 
 test('T9291', normal, compile_and_run, [''])
-test('T13861', normal, compile_and_run, [''])
+test('T13861', normal, compile_and_run, ['-fno-worker-wrapper'])
 
 test('T13536', normal, compile_and_run, [''])
 

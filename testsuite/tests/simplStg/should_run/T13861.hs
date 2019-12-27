@@ -182,7 +182,7 @@ test x = do
     let (r84, r94) = (G, big4 r84)
     (same $! r84) $! r94                -- yes
     let (r85, r95) = (H 42, big5 r85)
-    (same $! r85) $! r95                -- yes (FIXME: currently 'no', due to -fworker-wrapper)
+    (same $! r85) $! r95                -- yes ('no', due to -fworker-wrapper)
     print r95
     let (r86, r96) = (I, big6 r86)
     (same $! r86) $! r96                -- yes
