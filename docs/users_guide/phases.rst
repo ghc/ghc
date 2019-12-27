@@ -720,6 +720,19 @@ Options affecting code generation
     all target platforms. See the :ghc-flag:`--print-object-splitting-supported`
     flag to check whether your GHC supports object splitting.
 
+.. ghc-flag:: -fexpose-internal-symbols
+    :shortdesc: Produce symbols for all functions, including internal functions.
+    :type: dynamic
+    :category: codegen
+
+    Request that GHC emits verbose symbol tables which include local symbols
+    for module-internal functions. These can be useful for tools like
+    :ref:`perf <https://perf.wiki.kernel.org/>` but increase object file sizes.
+
+    :ghc-flag:`-fno-expose-internal-symbols` suppresses all non-global symbol
+    table entries, resulting in smaller object file sizes at the expense of
+    debuggability.
+
 .. _options-linker:
 
 Options affecting linking

@@ -118,6 +118,7 @@ module GHC.Cmm.CLabel (
         LabelStyle (..),
         pprDebugCLabel,
         pprCLabel,
+        ppInternalProcLabel,
 
         -- * Others
         dynamicLinkerLabelInfo,
@@ -1360,6 +1361,39 @@ pprCLabel platform sty lbl =
    CmmLabel _ _ fs CmmRet      -> maybe_underscore $ ftext fs <> text "_ret"
    CmmLabel _ _ fs CmmClosure  -> maybe_underscore $ ftext fs <> text "_closure"
 
+-- Note [Internal proc labels]
+-- ~~~~~~~~~~~~~~~~~~~~~~~~~~~
+--
+-- Some tools (e.g. the `perf` utility on Linux) rely on the symbol table
+-- for resolution of function names. To help these tools we provide the
+-- (enabled by default) -fexpose-all-symbols flag which causes GHC to produce
+-- symbols even for symbols with are internal to a module (although such
+-- symbols will have only local linkage).
+--
+-- Note that these labels are *not* referred to by code. They are strictly for
+-- diagnostics purposes.
+--
+-- To avoid confusion, it is desireable to add a module-qualifier to the
+-- symbol name. However, the Name type's Internal constructor doesn't carry
+-- knowledge of the current Module. Consequently, we have to pass this around
+-- explicitly.
+
+-- | Generate a label for a procedure internal to a module (if
+-- 'Opt_ExposeAllSymbols' is enabled).
+-- See Note [Internal proc labels].
+ppInternalProcLabel :: Module     -- ^ the current module
+                    -> CLabel
+                    -> Maybe SDoc -- ^ the internal proc label
+ppInternalProcLabel this_mod (IdLabel nm _ flavour)
+  | isInternalName nm
+  = Just
+     $ text "_" <> ppr this_mod
+    <> char '_'
+    <> ztext (zEncodeFS (occNameFS (occName nm)))
+    <> char '_'
+    <> pprUniqueAlways (getUnique nm)
+    <> ppIdFlavor flavour
+ppInternalProcLabel _ _ = Nothing
 
 ppIdFlavor :: IdLabelInfo -> SDoc
 ppIdFlavor x = pp_cSEP <> case x of
