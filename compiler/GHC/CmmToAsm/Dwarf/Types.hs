@@ -190,7 +190,7 @@ pprDwarfInfoOpen platform _ (DwarfSubprogram _ name label parent) =
   $$ pprLabelString platform label
   $$ pprFlag (externallyVisibleCLabel label)
   $$ pprWord platform (pdoc platform label)
-  $$ pprWord platform (pdoc platform $ mkAsmTempEndLabel label)
+  $$ pprWord platform (pdoc platform $ mkAsmTempProcEndLabel label)
   $$ pprByte 1
   $$ pprByte dW_OP_call_frame_cfa
   $$ parentValue
@@ -354,7 +354,7 @@ pprFrameProc :: Platform -> CLabel -> UnwindTable -> DwarfFrameProc -> SDoc
 pprFrameProc platform frameLbl initUw (DwarfFrameProc procLbl hasInfo blocks)
   = let fdeLabel    = mkAsmTempDerivedLabel procLbl (fsLit "_fde")
         fdeEndLabel = mkAsmTempDerivedLabel procLbl (fsLit "_fde_end")
-        procEnd     = mkAsmTempEndLabel procLbl
+        procEnd     = mkAsmTempProcEndLabel procLbl
         ifInfo str  = if hasInfo then text str else empty
                       -- see [Note: Info Offset]
     in vcat [ whenPprDebug $ text "# Unwinding for" <+> pdoc platform procLbl <> colon
