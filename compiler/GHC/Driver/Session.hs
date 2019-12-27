@@ -394,7 +394,6 @@ import Foreign (Ptr)
 -- -----------------------------------------------------------------------------
 -- DynFlags
 
-
 -- | Used to differentiate the scope an include needs to apply to.
 -- We have to split the include paths to avoid accidentally forcing recursive
 -- includes since -I overrides the system search paths. See #14312.
@@ -3546,6 +3545,7 @@ fFlagsDeps = [
   flagSpec "error-spans"                      Opt_ErrorSpans,
   flagSpec "excess-precision"                 Opt_ExcessPrecision,
   flagSpec "expose-all-unfoldings"            Opt_ExposeAllUnfoldings,
+  flagSpec "expose-all-symbols"               Opt_ExposeAllSymbols,
   flagSpec "external-dynamic-refs"            Opt_ExternalDynamicRefs,
   flagSpec "external-interpreter"             Opt_ExternalInterpreter,
   flagSpec "flat-cache"                       Opt_FlatCache,
@@ -3915,7 +3915,8 @@ defaultFlags settings
       Opt_RPath,
       Opt_SharedImplib,
       Opt_SimplPreInlining,
-      Opt_VersionMacros
+      Opt_VersionMacros,
+      Opt_ExposeAllSymbols
     ]
 
     ++ [f | (ns,f) <- optLevelFlags, 0 `elem` ns]

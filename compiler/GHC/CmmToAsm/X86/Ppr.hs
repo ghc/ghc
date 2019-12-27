@@ -41,6 +41,7 @@ import GHC.Driver.Session
 import GHC.Cmm              hiding (topInfoTable)
 import GHC.Cmm.BlockId
 import GHC.Cmm.CLabel
+import Module           ( Module )
 import Unique           ( pprUniqueAlways )
 import GHC.Platform
 import FastString
@@ -75,11 +76,11 @@ pprProcAlignment config = maybe empty (pprAlign platform . mkAlignment) (ncgProc
    where
       platform = ncgPlatform config
 
-pprNatCmmDecl :: NCGConfig -> NatCmmDecl (Alignment, RawCmmStatics) Instr -> SDoc
-pprNatCmmDecl config (CmmData section dats) =
+pprNatCmmDecl :: NCGConfig -> Module -> NatCmmDecl (Alignment, RawCmmStatics) Instr -> SDoc
+pprNatCmmDecl config _this_mod (CmmData section dats) =
   pprSectionAlign config section $$ pprDatas config dats
 
-pprNatCmmDecl config proc@(CmmProc top_info lbl _ (ListGraph blocks)) =
+pprNatCmmDecl config this_mod proc@(CmmProc top_info lbl _ (ListGraph blocks)) =
   let platform = ncgPlatform config in
   pprProcAlignment config $$
   case topInfoTable proc of
@@ -87,6 +88,7 @@ pprNatCmmDecl config proc@(CmmProc top_info lbl _ (ListGraph blocks)) =
         -- special case for code without info table:
         pprSectionAlign config (Section Text lbl) $$
         pprProcAlignment config $$
+        pprProcLabel this_mod lbl $$
         pprLabel platform lbl $$ -- blocks guaranteed not null, so label needed
         vcat (map (pprBasicBlock config top_info) blocks) $$
         (if ncgDebugLevel config > 0
@@ -96,6 +98,7 @@ pprNatCmmDecl config proc@(CmmProc top_info lbl _ (ListGraph blocks)) =
     Just (RawCmmStatics info_lbl _) ->
       pprSectionAlign config (Section Text info_lbl) $$
       pprProcAlignment config $$
+      pprProcLabel this_mod lbl $$
       (if platformHasSubsectionsViaSymbols platform
           then ppr (mkDeadStripPreventer info_lbl) <> char ':'
           else empty) $$
@@ -110,6 +113,12 @@ pprNatCmmDecl config proc@(CmmProc top_info lbl _ (ListGraph blocks)) =
             <+> ppr (mkDeadStripPreventer info_lbl)
        else empty) $$
       pprSizeDecl platform info_lbl
+
+pprProcLabel :: Module -> CLabel -> SDoc
+pprProcLabel this_mod lbl = sdocWithDynFlags $ \dflags ->
+    case ppInternalProcLabel dflags this_mod lbl of
+      Just lbl' -> lbl' <> char ':'
+      Nothing   -> empty
 
 -- | Output the ELF .size directive.
 pprSizeDecl :: Platform -> CLabel -> SDoc

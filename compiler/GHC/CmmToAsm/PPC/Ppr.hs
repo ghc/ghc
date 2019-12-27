@@ -29,6 +29,7 @@ import GHC.Cmm.Dataflow.Label
 import GHC.Cmm.BlockId
 import GHC.Cmm.CLabel
 import GHC.Cmm.Ppr.Expr () -- For Outputable instances
+import Module (Module)
 
 import Unique                ( pprUniqueAlways, getUnique )
 import GHC.Platform
@@ -43,12 +44,12 @@ import Data.Bits
 -- -----------------------------------------------------------------------------
 -- Printing this stuff out
 
-pprNatCmmDecl :: NCGConfig -> NatCmmDecl RawCmmStatics Instr -> SDoc
-pprNatCmmDecl config (CmmData section dats) =
+pprNatCmmDecl :: NCGConfig -> Module -> NatCmmDecl RawCmmStatics Instr -> SDoc
+pprNatCmmDecl config _this_mod (CmmData section dats) =
   pprSectionAlign config section
   $$ pprDatas (ncgPlatform config) dats
 
-pprNatCmmDecl config proc@(CmmProc top_info lbl _ (ListGraph blocks)) =
+pprNatCmmDecl config _this_mod proc@(CmmProc top_info lbl _ (ListGraph blocks)) =
   let platform = ncgPlatform config in
   case topInfoTable proc of
     Nothing ->
