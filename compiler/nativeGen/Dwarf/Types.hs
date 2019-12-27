@@ -180,7 +180,7 @@ pprDwarfInfoOpen _ (DwarfSubprogram _ name label
   $$ pprString (renderWithStyle df (ppr label) (mkCodeStyle CStyle))
   $$ pprFlag (externallyVisibleCLabel label)
   $$ pprWord (ppr label)
-  $$ pprWord (ppr $ mkAsmTempEndLabel label)
+  $$ pprWord (ppr $ mkAsmTempProcEndLabel label)
   $$ pprByte 1
   $$ pprByte dW_OP_call_frame_cfa
   $$ parentValue
