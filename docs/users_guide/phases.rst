@@ -652,6 +652,20 @@ Options affecting code generation
     and ``-dynhisuf`` are the counterparts of ``-o``, ``-osuf``, and
     ``-hisuf`` respectively, but applying to the dynamic compilation.
 
+.. ghc-flag:: -fexpose-all-symbols
+    :shortdesc: Produce symbols for all functions, including internal functions.
+    :type: dynamic
+    :category: codegen
+    :default: on
+
+    By default, GHC emits verbose symbol tables which include local symbols for
+    module-internal functions. These can be useful for tools like :ref:`perf
+    <https://perf.wiki.kernel.org/>` but increase object file sizes.
+
+    :ghc-flag:`-fno-expose-all-symbols` suppresses all non-global symbol table
+    entries, resulting in smaller object file sizes at the expense of
+    debuggability.
+
 .. _options-linker:
 
 Options affecting linking
