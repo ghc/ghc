@@ -37,6 +37,7 @@ data NCGConfig = NCGConfig
    , ncgDwarfEnabled          :: !Bool            -- ^ Enable Dwarf generation
    , ncgDwarfUnwindings       :: !Bool            -- ^ Enable unwindings
    , ncgDwarfStripBlockInfo   :: !Bool            -- ^ Strip out block information from generated Dwarf
+   , ncgDwarfSourceNotes      :: !Bool            -- ^ Enable GHC-specific source note DIEs
    }
 
 -- | Return Word size

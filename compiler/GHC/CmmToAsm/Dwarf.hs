@@ -195,14 +195,17 @@ procToDwarf config prc
   goodParent _ = True
 
 -- | Generate DWARF info for a block
-blockToDwarf :: DebugBlock -> DwarfInfo
-blockToDwarf blk
-  = DwarfBlock { dwChildren = concatMap tickToDwarf (dblTicks blk)
-                              ++ map blockToDwarf (dblBlocks blk)
+blockToDwarf :: NCGConfig -> DebugBlock -> DwarfInfo
+blockToDwarf config blk
+  = DwarfBlock { dwChildren = map blockToDwarf (dblBlocks blk) ++ srcNotes
                , dwLabel    = dblCLabel blk
                , dwMarker   = marker
                }
   where
+    srcNotes
+      | ncgDwarfSourceNotes config = concatMap tickToDwarf (dblTicks blk)
+      | otherwise                  = []
+
     marker
       | Just _ <- dblPosition blk = Just $ mkAsmTempLabel $ dblLabel blk
       | otherwise                 = Nothing   -- block was optimized out
