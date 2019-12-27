@@ -197,7 +197,9 @@ procToDwarf df prc
 -- | Generate DWARF info for a block
 blockToDwarf :: DynFlags -> DebugBlock -> DwarfInfo
 blockToDwarf df blk
-  = DwarfBlock { dwChildren = concatMap (tickToDwarf df) (dblTicks blk)
+  = DwarfBlock { dwChildren = (if debugLevel df >= 3
+                                 then concatMap (tickToDwarf df) (dblTicks blk)
+                                 else [])
                               ++ map (blockToDwarf df) (dblBlocks blk)
                , dwLabel    = dblCLabel blk
                , dwMarker   = marker
