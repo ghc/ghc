@@ -39,6 +39,7 @@ import BasicTypes       (Alignment, mkAlignment, alignmentBytes)
 import DynFlags
 import Cmm              hiding (topInfoTable)
 import BlockId
+import Module           ( Module )
 import CLabel
 import Unique           ( pprUniqueAlways )
 import GHC.Platform
@@ -73,17 +74,18 @@ pprProcAlignment :: SDoc
 pprProcAlignment = sdocWithDynFlags $ \dflags ->
   (maybe empty (pprAlign . mkAlignment) (cmmProcAlignment dflags))
 
-pprNatCmmDecl :: NatCmmDecl (Alignment, CmmStatics) Instr -> SDoc
-pprNatCmmDecl (CmmData section dats) =
+pprNatCmmDecl :: Module -> NatCmmDecl (Alignment, CmmStatics) Instr -> SDoc
+pprNatCmmDecl _this_mod (CmmData section dats) =
   pprSectionAlign section $$ pprDatas dats
 
-pprNatCmmDecl proc@(CmmProc top_info lbl _ (ListGraph blocks)) =
+pprNatCmmDecl this_mod proc@(CmmProc top_info lbl _ (ListGraph blocks)) =
   pprProcAlignment $$
   case topInfoTable proc of
     Nothing ->
         -- special case for code without info table:
         pprSectionAlign (Section Text lbl) $$
         pprProcAlignment $$
+        pprProcLabel this_mod lbl $$
         pprLabel lbl $$ -- blocks guaranteed not null, so label needed
         vcat (map (pprBasicBlock top_info) blocks) $$
         pprBlockEndLabel lbl $$
@@ -94,6 +96,7 @@ pprNatCmmDecl proc@(CmmProc top_info lbl _ (ListGraph blocks)) =
       sdocWithPlatform $ \platform ->
       pprSectionAlign (Section Text info_lbl) $$
       pprProcAlignment $$
+      pprProcLabel this_mod lbl $$
       (if platformHasSubsectionsViaSymbols platform
           then ppr (mkDeadStripPreventer info_lbl) <> char ':'
           else empty) $$
@@ -109,6 +112,12 @@ pprNatCmmDecl proc@(CmmProc top_info lbl _ (ListGraph blocks)) =
             <+> ppr (mkDeadStripPreventer info_lbl)
        else empty) $$
       pprSizeDecl info_lbl
+
+pprProcLabel :: Module -> CLabel -> SDoc
+pprProcLabel this_mod lbl = sdocWithDynFlags $ \dflags ->
+    case ppInternalProcLabel dflags this_mod lbl of
+      Just lbl' -> lbl' <> char ':'
+      Nothing   -> empty
 
 ifDebugLevel :: Int -> SDoc -> SDoc
 ifDebugLevel min_lvl doc =

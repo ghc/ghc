@@ -41,6 +41,7 @@ import Cmm hiding (topInfoTable)
 import PprCmm() -- For Outputable instances
 import BlockId
 import CLabel
+import Module (Module)
 import Hoopl.Label
 import Hoopl.Collections
 
@@ -52,11 +53,11 @@ import FastString
 -- -----------------------------------------------------------------------------
 -- Printing this stuff out
 
-pprNatCmmDecl :: NatCmmDecl CmmStatics Instr -> SDoc
-pprNatCmmDecl (CmmData section dats) =
+pprNatCmmDecl :: Module -> NatCmmDecl CmmStatics Instr -> SDoc
+pprNatCmmDecl _this_mod (CmmData section dats) =
   pprSectionAlign section $$ pprDatas dats
 
-pprNatCmmDecl proc@(CmmProc top_info lbl _ (ListGraph blocks)) =
+pprNatCmmDecl _this_mod proc@(CmmProc top_info lbl _ (ListGraph blocks)) =
   case topInfoTable proc of
     Nothing ->
         -- special case for code without info table:

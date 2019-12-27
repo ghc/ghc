@@ -653,6 +653,7 @@ data GeneralFlag
    -- forwards all -L flags to the collect2 command without using a
    -- response file and as such breaking apart.
    | Opt_SingleLibFolder
+   | Opt_ExposeAllSymbols
    | Opt_KeepCAFs
    | Opt_KeepGoing
    | Opt_ByteCode
@@ -4211,6 +4212,7 @@ fFlagsDeps = [
   flagSpec "error-spans"                      Opt_ErrorSpans,
   flagSpec "excess-precision"                 Opt_ExcessPrecision,
   flagSpec "expose-all-unfoldings"            Opt_ExposeAllUnfoldings,
+  flagSpec "expose-all-symbols"               Opt_ExposeAllSymbols,
   flagSpec "external-dynamic-refs"            Opt_ExternalDynamicRefs,
   flagSpec "external-interpreter"             Opt_ExternalInterpreter,
   flagSpec "flat-cache"                       Opt_FlatCache,
@@ -4580,7 +4582,8 @@ defaultFlags settings
       Opt_RPath,
       Opt_SharedImplib,
       Opt_SimplPreInlining,
-      Opt_VersionMacros
+      Opt_VersionMacros,
+      Opt_ExposeAllSymbols
     ]
 
     ++ [f | (ns,f) <- optLevelFlags, 0 `elem` ns]
