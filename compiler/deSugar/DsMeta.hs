@@ -143,7 +143,7 @@ repTopDs group@(HsGroup { hs_valds   = valds
                      ; kisig_ds <- mapM repKiSigD (concatMap group_kisigs tyclds)
                      ; inst_ds  <- mapM repInstD instds
                      ; deriv_ds <- mapM repStandaloneDerivD derivds
-                     ; fix_ds   <- mapM repFixD fixds
+                     ; fix_ds   <- mapM repLFixD fixds
                      ; _        <- mapM no_default_decl defds
                      ; for_ds   <- mapM repForD fords
                      ; _        <- mapM no_warn (concatMap (wd_warnings . unLoc)
@@ -655,8 +655,11 @@ repSafety PlayRisky = rep2 unsafeName []
 repSafety PlayInterruptible = rep2 interruptibleName []
 repSafety PlaySafe = rep2 safeName []
 
-repFixD :: LFixitySig GhcRn -> DsM [(SrcSpan, Core TH.DecQ)]
-repFixD (L loc (FixitySig _ names (Fixity _ prec dir)))
+repLFixD :: LFixitySig GhcRn -> DsM [(SrcSpan, Core TH.DecQ)]
+repLFixD (L loc fix_sig) = rep_fix_d loc fix_sig
+
+rep_fix_d :: SrcSpan -> FixitySig GhcRn -> DsM [(SrcSpan, Core TH.DecQ)]
+rep_fix_d loc (FixitySig _ names (Fixity _ prec dir))
   = do { MkC prec' <- coreIntLit prec
        ; let rep_fn = case dir of
                         InfixL -> infixLDName
@@ -667,7 +670,7 @@ repFixD (L loc (FixitySig _ names (Fixity _ prec dir)))
                    ; dec <- rep2 rep_fn [prec', name']
                    ; return (loc,dec) }
        ; mapM do_one names }
-repFixD (L _ (XFixitySig nec)) = noExtCon nec
+rep_fix_d _ (XFixitySig nec) = noExtCon nec
 
 repRuleD :: LRuleDecl GhcRn -> DsM (SrcSpan, Core TH.DecQ)
 repRuleD (L loc (HsRule { rd_name = n
@@ -862,7 +865,7 @@ rep_sig (L loc (ClassOpSig _ is_deflt nms ty))
   | is_deflt     = mapM (rep_ty_sig defaultSigDName loc ty) nms
   | otherwise    = mapM (rep_ty_sig sigDName loc ty) nms
 rep_sig d@(L _ (IdSig {}))           = pprPanic "rep_sig IdSig" (ppr d)
-rep_sig (L _   (FixSig {}))          = return [] -- fixity sigs at top level
+rep_sig (L loc (FixSig _ fix_sig))   = rep_fix_d loc fix_sig
 rep_sig (L loc (InlineSig _ nm ispec))= rep_inline nm ispec loc
 rep_sig (L loc (SpecSig _ nm tys ispec))
   = concatMapM (\t -> rep_specialise nm t ispec loc) tys
