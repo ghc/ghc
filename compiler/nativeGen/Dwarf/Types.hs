@@ -100,7 +100,7 @@ pprAbbrevDecls haveDebugLine =
       -- DwAbbrSubprogramWithParent
       subprogramAttrs =
            [ (dW_AT_name, dW_FORM_string)
-           , (dW_AT_MIPS_linkage_name, dW_FORM_string)
+           , (dW_AT_linkage_name, dW_FORM_string)
            , (dW_AT_external, dW_FORM_flag)
            , (dW_AT_low_pc, dW_FORM_addr)
            , (dW_AT_high_pc, dW_FORM_addr)
