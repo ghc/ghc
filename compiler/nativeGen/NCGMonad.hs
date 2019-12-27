@@ -75,7 +75,9 @@ data NcgImpl statics instr jumpDest = NcgImpl {
     canShortcut               :: instr -> Maybe jumpDest,
     shortcutStatics           :: (BlockId -> Maybe jumpDest) -> statics -> statics,
     shortcutJump              :: (BlockId -> Maybe jumpDest) -> instr -> instr,
-    pprNatCmmDecl             :: NatCmmDecl statics instr -> SDoc,
+    -- | 'Module' is only for printing internal labels. See Note [Internal proc
+    -- labels] in CLabel.
+    pprNatCmmDecl             :: Module -> NatCmmDecl statics instr -> SDoc,
     maxSpillSlots             :: Int,
     allocatableRegs           :: [RealReg],
     ncgExpandTop              :: [NatCmmDecl statics instr] -> [NatCmmDecl statics instr],
