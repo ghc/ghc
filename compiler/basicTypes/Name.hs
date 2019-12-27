@@ -567,7 +567,10 @@ pprExternal sty uniq mod occ is_wired is_builtin
 
 pprInternal :: PprStyle -> Unique -> OccName -> SDoc
 pprInternal sty uniq occ
-  | codeStyle sty  = pprUniqueAlways uniq
+  | codeStyle sty  = sdocWithDynFlags $ \dflags ->
+                       if gopt Opt_ExposeAllSymbols dflags
+                         then char '_' <> ppr_z_occ_name occ <> ppr_underscore_unique uniq
+                         else pprUniqueAlways uniq
   | debugStyle sty = ppr_occ_name occ <> braces (hsep [pprNameSpaceBrief (occNameSpace occ),
                                                        pprUnique uniq])
   | dumpStyle sty  = ppr_occ_name occ <> ppr_underscore_unique uniq
