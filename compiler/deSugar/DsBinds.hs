@@ -705,7 +705,7 @@ dsSpec mb_poly_rhs (L loc (SpecPrag poly_id spec_co spec_inl))
                             `setIdUnfolding`  spec_unf
              arity_decrease = count isValArg args - count isId spec_bndrs
 
-       ; rule <- dsMkUserRule this_mod is_local_id
+       ; rule <- dsMkUserRule this_mod is_local_id GHCGenerated
                         (mkFastString ("SPEC " ++ showPpr dflags poly_name))
                         rule_act poly_name
                         rule_bndrs args
@@ -757,11 +757,10 @@ dsSpec mb_poly_rhs (L loc (SpecPrag poly_id spec_co spec_inl))
     rule_act | no_act_spec = inlinePragmaActivation id_inl   -- Inherit
              | otherwise   = spec_prag_act                   -- Specified by user
 
-
-dsMkUserRule :: Module -> Bool -> RuleName -> Activation
+dsMkUserRule :: Module -> Bool -> RuleOrigin -> RuleName -> Activation
        -> Name -> [CoreBndr] -> [CoreExpr] -> CoreExpr -> DsM CoreRule
-dsMkUserRule this_mod is_local name act fn bndrs args rhs = do
-    let rule = mkRule this_mod False is_local name act fn bndrs args rhs
+dsMkUserRule this_mod is_local origin name act fn bndrs args rhs = do
+    let rule = mkRule this_mod origin is_local name act fn bndrs args rhs
     dflags <- getDynFlags
     when (isOrphan (ru_orphan rule) && wopt Opt_WarnOrphans dflags) $
         warnDs (Reason Opt_WarnOrphans) (ruleOrphWarn rule)

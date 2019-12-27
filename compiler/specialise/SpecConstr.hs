@@ -1735,7 +1735,7 @@ spec_one env fn arg_bndrs body (call_pat@(qvars, pats), rule_number)
               rule_rhs   = mkVarApps (Var spec_id) spec_call_args
               inline_act = idInlineActivation fn
               this_mod   = sc_module spec_env
-              rule       = mkRule this_mod True {- Auto -} True {- Local -}
+              rule       = mkRule this_mod GHCGenerated True {- Local -}
                                   rule_name inline_act fn_name qvars pats rule_rhs
                            -- See Note [Transfer activation]
         ; return (spec_usg, OS { os_pat = call_pat, os_rule = rule

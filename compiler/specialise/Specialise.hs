@@ -1469,7 +1469,7 @@ specCalls mb_mod env existing_rules calls_for_me fn rhs
 
                 rule_wout_eta = mkRule
                                   this_mod
-                                  True {- Auto generated -}
+                                  GHCGenerated
                                   is_local
                                   rule_name
                                   inl_act       -- Note [Auto-specialisation and RULES]

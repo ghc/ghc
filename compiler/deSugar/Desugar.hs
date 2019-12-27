@@ -404,7 +404,7 @@ dsRule (L loc (HsRule { rd_name = name
               arg_ids = filterOut (`elemVarSet` final_bndrs_set) $
                         exprsSomeFreeVarsList isId args
 
-        ; rule <- dsMkUserRule this_mod is_local
+        ; rule <- dsMkUserRule this_mod is_local UserWritten
                          rule_name rule_act fn_name final_bndrs args
                          final_rhs
         ; when (wopt Opt_WarnInlineRuleShadowing dflags) $

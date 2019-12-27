@@ -23,7 +23,7 @@ module Rules (
         -- * Misc. CoreRule helpers
         rulesOfBinds, getRules, pprRulesForUser,
 
-        lookupRule, mkRule, roughTopNames
+        lookupRule, mkRule, RuleOrigin(..), roughTopNames
     ) where
 
 #include "HsVersions.h"
@@ -170,11 +170,14 @@ might have a specialisation
 where pi' :: Lift Int# is the specialised version of pi.
 -}
 
-mkRule :: Module -> Bool -> Bool -> RuleName -> Activation
+data RuleOrigin = UserWritten | GHCGenerated
+                deriving (Show, Eq)
+
+mkRule :: Module -> RuleOrigin -> Bool -> RuleName -> Activation
        -> Name -> [CoreBndr] -> [CoreExpr] -> CoreExpr -> CoreRule
 -- ^ Used to make 'CoreRule' for an 'Id' defined in the module being
 -- compiled. See also 'CoreSyn.CoreRule'
-mkRule this_mod is_auto is_local name act fn bndrs args rhs
+mkRule this_mod origin is_local name act fn bndrs args rhs
   = Rule { ru_name = name, ru_fn = fn, ru_act = act,
            ru_bndrs = bndrs, ru_args = args,
            ru_rhs = rhs,
@@ -183,6 +186,8 @@ mkRule this_mod is_auto is_local name act fn bndrs args rhs
            ru_orphan = orph,
            ru_auto = is_auto, ru_local = is_local }
   where
+    is_auto = origin == GHCGenerated
+
         -- Compute orphanhood.  See Note [Orphans] in InstEnv
         -- A rule is an orphan only if none of the variables
         -- mentioned on its left-hand side are locally defined
@@ -511,10 +516,12 @@ matchRule dflags rule_env _is_active fn args _rough_args
 
 matchRule dflags in_scope is_active fn args rough_args
           (Rule { ru_name = rule_name, ru_act = act, ru_rough = tpl_tops
-                , ru_bndrs = tpl_vars, ru_args = tpl_args, ru_rhs = rhs })
+                , ru_bndrs = tpl_vars, ru_args = tpl_args, ru_rhs = rhs
+                , ru_auto = rule_auto })
   | not (is_active act)               = Left Nothing
   | ruleCantMatch tpl_tops rough_args = Left Nothing
-  | not (null nonAffineArgs)          = Left (Just affineWarning)
+  | not rule_auto
+  , not (null nonAffineArgs)          = Left (Just affineWarning)
   | otherwise = case matchN in_scope rule_name tpl_vars tpl_args args rhs of
     Just match -> Right match
     Nothing -> Left Nothing
