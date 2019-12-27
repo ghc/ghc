@@ -190,7 +190,7 @@ pprDwarfInfoOpen platform _ (DwarfSubprogram _ name label parent) =
   $$ pprLabelString platform label
   $$ pprFlag (externallyVisibleCLabel label)
   $$ pprWord platform (pdoc platform label)
-  $$ pprWord platform (pdoc platform $ mkAsmTempEndLabel label)
+  $$ pprWord platform (pdoc platform $ mkAsmTempProcEndLabel label)
   $$ pprByte 1
   $$ pprByte dW_OP_call_frame_cfa
   $$ parentValue
