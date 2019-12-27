@@ -387,15 +387,15 @@ pprRuleBase rules = pprUFM rules $ \rss ->
 lookupRule :: DynFlags -> InScopeEnv
            -> (Activation -> Bool)      -- When rule is active
            -> Id -> [CoreExpr]
-           -> [CoreRule] -> Either [WarnMsg] (CoreRule, CoreExpr)
+           -> [CoreRule] -> Maybe (CoreRule, CoreExpr)
 
 -- See Note [Extra args in rule matching]
 -- See comments on matchRule
 lookupRule dflags in_scope is_active fn args rules
   = -- pprTrace "matchRules" (ppr fn <+> ppr args $$ ppr rules ) $
-    case go [] [] rules of
-        (m:ms, []) -> Right (findBest (fn,args') m ms)
-        (_, ws)    -> Left ws
+    case go [] rules of
+        (m:ms) -> Just (findBest (fn,args') m ms)
+        _      -> Nothing
   where
     rough_args = map roughTopName args
 
@@ -405,12 +405,11 @@ lookupRule dflags in_scope is_active fn args rules
     args' = map (stripTicksTopE tickishFloatable) args
     ticks = concatMap (stripTicksTopT tickishFloatable) args
 
-    go :: [(CoreRule,CoreExpr)] -> [WarnMsg] -> [CoreRule] -> ([(CoreRule,CoreExpr)], [WarnMsg])
-    go ms ws [] = (ms, ws)
-    go ms ws (r:rs) = case matchRule dflags in_scope is_active fn args' rough_args r of
-      Right e       -> go ((r,mkTicks ticks e):ms) ws rs
-      Left (Just w) -> go ms (w:ws) rs
-      Left Nothing  -> go ms ws rs
+    go :: [(CoreRule,CoreExpr)] -> [CoreRule] -> [(CoreRule,CoreExpr)]
+    go ms [] = ms
+    go ms (r:rs) = case matchRule dflags in_scope is_active fn args' rough_args r of
+      Right e       -> go ((r,mkTicks ticks e):ms) rs
+      Left _        -> go ms rs
 
 findBest :: (Id, [CoreExpr])
          -> (CoreRule,CoreExpr) -> [(CoreRule,CoreExpr)] -> (CoreRule,CoreExpr)
@@ -483,7 +482,7 @@ to lookupRule are the result of a lazy substitution
 ------------------------------------
 matchRule :: DynFlags -> InScopeEnv -> (Activation -> Bool)
           -> Id -> [CoreExpr] -> [Maybe Name]
-          -> CoreRule -> Either (Maybe WarnMsg) CoreExpr
+          -> CoreRule -> Either [CoreExpr] CoreExpr
 
 -- If (matchRule rule args) returns Just (name,rhs)
 -- then (f args) matches the rule, and the corresponding
@@ -518,23 +517,14 @@ matchRule dflags in_scope is_active fn args rough_args
           (Rule { ru_name = rule_name, ru_act = act, ru_rough = tpl_tops
                 , ru_bndrs = tpl_vars, ru_args = tpl_args, ru_rhs = rhs
                 , ru_auto = rule_auto })
-  | not (is_active act)               = Left Nothing
-  | ruleCantMatch tpl_tops rough_args = Left Nothing
+  | not (is_active act)               = Left []
+  | ruleCantMatch tpl_tops rough_args = Left []
   | not rule_auto
-  , not (null nonAffineArgs)          = Left (Just affineWarning)
+  , not (null nonAffineArgs)          = Left nonAffineArgs
   | otherwise = case matchN in_scope rule_name tpl_vars tpl_args args rhs of
     Just match -> Right match
-    Nothing -> Left Nothing
+    Nothing -> Left []
   where
-    primaryMsg, secondaryMsg :: MsgDoc
-    primaryMsg = pprRuleName rule_name 
-            <+> text "cannot fire because some of its arguments are non-affine."
-    secondaryMsg = pprQuotedList nonAffineArgs <+> text "are used more than once."
-
-    affineWarning :: WarnMsg
-    affineWarning = makeIntoWarning (Reason Opt_WarnAffineRules) $
-      mkLongWarnMsg dflags (getSrcSpan fn) neverQualify primaryMsg secondaryMsg
-
     nonAffineArgs :: [CoreExpr]
     nonAffineArgs = filter (not . argIsAffine) args
 
@@ -1248,9 +1238,13 @@ ruleAppCheck_help env fn args rules
         = text "Rule" <+> doubleQuotes (ftext name)
 
     rule_info dflags rule
-        | Right _ <- matchRule dflags (emptyInScopeSet, rc_id_unf env)
-                               noBlackList fn args rough_args rule
+        | Right _ <- match
         = text "matches (which is very peculiar!)"
+        | Left nonAff <- match
+        = text "has non-affine arguments" <+> pprQuotedList nonAff
+        where
+          match = matchRule dflags (emptyInScopeSet, rc_id_unf env)
+                            noBlackList fn args rough_args rule
 
     rule_info _ (BuiltinRule {}) = text "does not match"
 
