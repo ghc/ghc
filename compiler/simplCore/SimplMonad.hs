@@ -17,7 +17,10 @@ module SimplMonad (
         -- Counting
         SimplCount, tick, freeTick, checkedTick,
         getSimplCount, zeroSimplCount, pprSimplCount,
-        plusSimplCount, isZeroSimplCount
+        plusSimplCount, isZeroSimplCount,
+
+        -- Warnings
+        printOrThrowWarnings
     ) where
 
 import GhcPrelude
@@ -35,6 +38,8 @@ import CoreMonad
 import Outputable
 import FastString
 import MonadUtils
+import Bag                 ( listToBag )
+import qualified HscTypes
 import ErrUtils as Err
 import Util                ( count )
 import Panic               (throwGhcExceptionIO, GhcException (..))
@@ -250,3 +255,9 @@ freeTick :: Tick -> SimplM ()
 freeTick t
    = SM (\_st_env us sc -> let sc' = doFreeSimplTick t sc
                            in sc' `seq` return ((), us, sc'))
+
+printOrThrowWarnings :: [WarnMsg] -> SimplM ()
+printOrThrowWarnings []   = return ()
+printOrThrowWarnings errs = do
+  dyn <- getDynFlags
+  liftIO $ HscTypes.printOrThrowWarnings dyn (listToBag errs)

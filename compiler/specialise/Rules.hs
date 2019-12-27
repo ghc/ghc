@@ -51,18 +51,20 @@ import IdInfo           ( RuleInfo( RuleInfo ) )
 import Var
 import VarEnv
 import VarSet
-import Name             ( Name, NamedThing(..), nameIsLocalOrFrom )
+import Name             ( Name, NamedThing(..), nameIsLocalOrFrom, getSrcSpan )
 import NameSet
 import NameEnv
 import UniqFM
 import Unify            ( ruleMatchTyKiX )
 import BasicTypes
-import DynFlags         ( DynFlags )
+import DynFlags         ( DynFlags, WarnReason ( Reason ), WarningFlag ( Opt_WarnAffineRules ) )
 import Outputable
 import FastString
 import Maybes
 import Bag
 import Util
+import Demand
+import ErrUtils
 import Data.List
 import Data.Ord
 import Control.Monad    ( guard )
@@ -380,15 +382,15 @@ pprRuleBase rules = pprUFM rules $ \rss ->
 lookupRule :: DynFlags -> InScopeEnv
            -> (Activation -> Bool)      -- When rule is active
            -> Id -> [CoreExpr]
-           -> [CoreRule] -> Maybe (CoreRule, CoreExpr)
+           -> [CoreRule] -> Either [WarnMsg] (CoreRule, CoreExpr)
 
 -- See Note [Extra args in rule matching]
 -- See comments on matchRule
 lookupRule dflags in_scope is_active fn args rules
   = -- pprTrace "matchRules" (ppr fn <+> ppr args $$ ppr rules ) $
-    case go [] rules of
-        []     -> Nothing
-        (m:ms) -> Just (findBest (fn,args') m ms)
+    case go [] [] rules of
+        (m:ms, []) -> Right (findBest (fn,args') m ms)
+        (_, ws)    -> Left ws
   where
     rough_args = map roughTopName args
 
@@ -398,18 +400,12 @@ lookupRule dflags in_scope is_active fn args rules
     args' = map (stripTicksTopE tickishFloatable) args
     ticks = concatMap (stripTicksTopT tickishFloatable) args
 
-    go :: [(CoreRule,CoreExpr)] -> [CoreRule] -> [(CoreRule,CoreExpr)]
-    go ms [] = ms
-    go ms (r:rs)
-      | Just e <- matchRule dflags in_scope is_active fn args' rough_args r
-      = go ((r,mkTicks ticks e):ms) rs
-      | otherwise
-      = -- pprTrace "match failed" (ppr r $$ ppr args $$
-        --   ppr [ (arg_id, unfoldingTemplate unf)
-        --       | Var arg_id <- args
-        --       , let unf = idUnfolding arg_id
-        --       , isCheapUnfolding unf] )
-        go ms rs
+    go :: [(CoreRule,CoreExpr)] -> [WarnMsg] -> [CoreRule] -> ([(CoreRule,CoreExpr)], [WarnMsg])
+    go ms ws [] = (ms, ws)
+    go ms ws (r:rs) = case matchRule dflags in_scope is_active fn args' rough_args r of
+      Right e       -> go ((r,mkTicks ticks e):ms) ws rs
+      Left (Just w) -> go ms (w:ws) rs
+      Left Nothing  -> go ms ws rs
 
 findBest :: (Id, [CoreExpr])
          -> (CoreRule,CoreExpr) -> [(CoreRule,CoreExpr)] -> (CoreRule,CoreExpr)
@@ -482,7 +478,7 @@ to lookupRule are the result of a lazy substitution
 ------------------------------------
 matchRule :: DynFlags -> InScopeEnv -> (Activation -> Bool)
           -> Id -> [CoreExpr] -> [Maybe Name]
-          -> CoreRule -> Maybe CoreExpr
+          -> CoreRule -> Either (Maybe WarnMsg) CoreExpr
 
 -- If (matchRule rule args) returns Just (name,rhs)
 -- then (f args) matches the rule, and the corresponding
@@ -510,15 +506,35 @@ matchRule dflags rule_env _is_active fn args _rough_args
           (BuiltinRule { ru_try = match_fn })
 -- Built-in rules can't be switched off, it seems
   = case match_fn dflags rule_env fn args of
-        Nothing   -> Nothing
-        Just expr -> Just expr
+        Nothing   -> Left Nothing
+        Just expr -> Right expr
 
-matchRule _ in_scope is_active _ args rough_args
+matchRule dflags in_scope is_active fn args rough_args
           (Rule { ru_name = rule_name, ru_act = act, ru_rough = tpl_tops
                 , ru_bndrs = tpl_vars, ru_args = tpl_args, ru_rhs = rhs })
-  | not (is_active act)               = Nothing
-  | ruleCantMatch tpl_tops rough_args = Nothing
-  | otherwise = matchN in_scope rule_name tpl_vars tpl_args args rhs
+  | not (is_active act)               = Left Nothing
+  | ruleCantMatch tpl_tops rough_args = Left Nothing
+  | not (null nonAffineArgs)          = Left (Just affineWarning)
+  | otherwise = case matchN in_scope rule_name tpl_vars tpl_args args rhs of
+    Just match -> Right match
+    Nothing -> Left Nothing
+  where
+    primaryMsg, secondaryMsg :: MsgDoc
+    primaryMsg = pprRuleName rule_name 
+            <+> text "cannot fire because some of its arguments are non-affine."
+    secondaryMsg = pprQuotedList nonAffineArgs <+> text "are used more than once."
+
+    affineWarning :: WarnMsg
+    affineWarning = makeIntoWarning (Reason Opt_WarnAffineRules) $
+      mkLongWarnMsg dflags (getSrcSpan fn) neverQualify primaryMsg secondaryMsg
+
+    nonAffineArgs :: [CoreExpr]
+    nonAffineArgs = filter (not . argIsAffine) args
+
+argIsAffine :: CoreExpr -> Bool
+argIsAffine (Var bndr) = isAbsDmd dmd || isUsedOnce dmd
+  where dmd = idDemandInfo bndr
+argIsAffine _          = True
 
 ---------------------------------------
 matchN  :: InScopeEnv
@@ -1225,8 +1241,8 @@ ruleAppCheck_help env fn args rules
         = text "Rule" <+> doubleQuotes (ftext name)
 
     rule_info dflags rule
-        | Just _ <- matchRule dflags (emptyInScopeSet, rc_id_unf env)
-                              noBlackList fn args rough_args rule
+        | Right _ <- matchRule dflags (emptyInScopeSet, rc_id_unf env)
+                               noBlackList fn args rough_args rule
         = text "matches (which is very peculiar!)"
 
     rule_info _ (BuiltinRule {}) = text "does not match"

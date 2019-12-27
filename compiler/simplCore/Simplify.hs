@@ -2021,28 +2021,31 @@ tryRules env rules fn args call_cont
                  -- The binder is dead, but should have the right type
       ; return (Just (val_arg, Select dup new_bndr new_alts se cont)) }
 -}
+  | otherwise = do
+    let eRule = lookupRule dflags (getUnfoldingInRuleMatch env)
+                            (activeRule (getMode env)) fn
+                            (argInfoAppArgs args) rules
 
-  | Just (rule, rule_rhs) <- lookupRule dflags (getUnfoldingInRuleMatch env)
-                                        (activeRule (getMode env)) fn
-                                        (argInfoAppArgs args) rules
-  -- Fire a rule for the function
-  = do { checkedTick (RuleFired (ruleName rule))
-       ; let cont' = pushSimplifiedArgs zapped_env
-                                        (drop (ruleArity rule) args)
-                                        call_cont
-                     -- (ruleArity rule) says how
-                     -- many args the rule consumed
+    case eRule of
+      Right (rule, rule_rhs) -> do
+        -- Fire a rule for the function
+        checkedTick (RuleFired (ruleName rule))
+        let cont' = pushSimplifiedArgs zapped_env
+                                      (drop (ruleArity rule) args)
+                                      call_cont
+                    -- (ruleArity rule) says how
+                    -- many args the rule consumed
 
-             occ_anald_rhs = occurAnalyseExpr rule_rhs
-                 -- See Note [Occurrence-analyse after rule firing]
-       ; dump rule rule_rhs
-       ; return (Just (zapped_env, occ_anald_rhs, cont')) }
-            -- The occ_anald_rhs and cont' are all Out things
-            -- hence zapping the environment
-
-  | otherwise  -- No rule fires
-  = do { nodump  -- This ensures that an empty file is written
-       ; return Nothing }
+            occ_anald_rhs = occurAnalyseExpr rule_rhs
+                -- See Note [Occurrence-analyse after rule firing]
+        dump rule rule_rhs
+        return (Just (zapped_env, occ_anald_rhs, cont'))
+              -- The occ_anald_rhs and cont' are all Out things
+              -- hence zapping the environment
+      Left ws -> do -- No rule fires, warnings may have been generated
+        nodump
+        printOrThrowWarnings ws
+        return Nothing
 
   where
     dflags     = seDynFlags env

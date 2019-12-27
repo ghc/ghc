@@ -926,6 +926,7 @@ data WarningFlag =
    | Opt_WarnInferredSafeImports          -- Since 8.10
    | Opt_WarnMissingSafeHaskellMode       -- Since 8.10
    | Opt_WarnDerivingDefaults
+   | Opt_WarnAffineRules
    deriving (Eq, Show, Enum)
 
 data Language = Haskell98 | Haskell2010
@@ -4046,6 +4047,7 @@ wWarningFlagsDeps = [
 -- See Note [Updating flag description in the User's Guide]
 -- See Note [Supporting CLI completion]
 -- Please keep the list of flags below sorted alphabetically
+  flagSpec "affine-rules"                Opt_WarnAffineRules,
   flagSpec "alternative-layout-rule-transitional"
                                       Opt_WarnAlternativeLayoutRuleTransitional,
   depFlagSpec "auto-orphans"             Opt_WarnAutoOrphans
@@ -4879,7 +4881,8 @@ standardWarnings -- see Note [Documenting warning flags]
         Opt_WarnSimplifiableClassConstraints,
         Opt_WarnStarBinder,
         Opt_WarnInaccessibleCode,
-        Opt_WarnSpaceAfterBang
+        Opt_WarnSpaceAfterBang,
+        Opt_WarnAffineRules
       ]
 
 -- | Things you get with -W
