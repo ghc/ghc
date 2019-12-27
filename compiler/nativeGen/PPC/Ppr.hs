@@ -28,6 +28,7 @@ import Hoopl.Label
 import BlockId
 import CLabel
 import PprCmmExpr () -- For Outputable instances
+import Module (Module)
 
 import Unique                ( pprUniqueAlways, getUnique )
 import GHC.Platform
@@ -42,11 +43,11 @@ import Data.Bits
 -- -----------------------------------------------------------------------------
 -- Printing this stuff out
 
-pprNatCmmDecl :: NatCmmDecl CmmStatics Instr -> SDoc
-pprNatCmmDecl (CmmData section dats) =
+pprNatCmmDecl :: Module -> NatCmmDecl CmmStatics Instr -> SDoc
+pprNatCmmDecl _this_mod (CmmData section dats) =
   pprSectionAlign section $$ pprDatas dats
 
-pprNatCmmDecl proc@(CmmProc top_info lbl _ (ListGraph blocks)) =
+pprNatCmmDecl _this_mod proc@(CmmProc top_info lbl _ (ListGraph blocks)) =
   case topInfoTable proc of
     Nothing ->
        sdocWithPlatform $ \platform ->
