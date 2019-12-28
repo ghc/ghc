@@ -626,11 +626,11 @@ getCallMethod _ _name _ (LFUnknown True) _n_arg _v_args _cg_locs _self_loop_info
 
 getCallMethod _ _name id (LFUnknown False) 0 _v_args _cg_loc _self_loop_info
   | isEvaldUnfolding (idUnfolding id)
-  = pprTrace "getCallMethod" (ppr id) ReturnIt -- seems to come from case, must be (tagged) WHNF already
+  = ReturnIt -- seems to come from case, must be (tagged) WHNF already
 
 getCallMethod _ name _id (LFUnknown False) 0 _v_args _cg_loc _self_loop_info
   | occNameString (nameOccName name) == "wild" -- TODO: make this robust
-  = pprTrace "getCallMethod*" (ppr _id) ReturnIt -- seems to come from case, must be (tagged) WHNF already
+  = ReturnIt -- seems to come from case, must be (tagged) WHNF already
 
 getCallMethod _ name _ (LFUnknown False) n_args _v_args _cg_loc _self_loop_info
   = ASSERT2( n_args == 0, ppr name <+> ppr n_args )
