@@ -52,15 +52,32 @@ updateRuleCafInfos non_cafs rule@Rule{ ru_rhs = rhs } = rule{ ru_rhs = updateExp
 --------------------------------------------------------------------------------
 
 updateInstCafInfos :: NameSet -> ClsInst -> ClsInst
-updateInstCafInfos non_cafs = updateClsInstDFun (updateIdCafInfo non_cafs)
+updateInstCafInfos non_cafs =
+    updateClsInstDFun (updateIdUnfolding non_cafs . updateIdCafInfo non_cafs)
 
 --------------------------------------------------------------------------------
 -- TyThings
 --------------------------------------------------------------------------------
 
 updateTyThingCafInfos :: NameSet -> TyThing -> TyThing
-updateTyThingCafInfos non_cafs (AnId id) = AnId (updateIdCafInfo non_cafs id)
+
+updateTyThingCafInfos non_cafs (AnId id) =
+    AnId (updateIdUnfolding non_cafs (updateIdCafInfo non_cafs id))
+
 updateTyThingCafInfos _ other = other -- AConLike, ATyCon, ACoAxiom
+
+--------------------------------------------------------------------------------
+-- Unfoldings
+--------------------------------------------------------------------------------
+
+updateIdUnfolding :: NameSet -> Id -> Id
+updateIdUnfolding non_cafs id =
+    case idUnfolding id of
+      unf@CoreUnfolding{ uf_tmpl = tmpl } ->
+        setIdUnfolding id unf{ uf_tmpl = updateExprCafInfos non_cafs tmpl }
+      unf@DFunUnfolding{ df_args = args } ->
+        setIdUnfolding id unf{ df_args = map (updateExprCafInfos non_cafs) args }
+      _ -> id
 
 --------------------------------------------------------------------------------
 -- Expressions
