@@ -900,17 +900,18 @@ oneSRT dflags staticFuns lbls caf_lbls isCAF cafs static_data = do
     blockids = getBlockLabels lbls
 
     -- Can we merge this SRT with a FUN_STATIC closure?
+    maybeFunClosure :: Maybe (CLabel, Label)
+    otherFunLabels :: [CLabel]
     (maybeFunClosure, otherFunLabels) =
       case [ (l,b) | b <- blockids, Just l <- [mapLookup b staticFuns] ] of
         [] -> (Nothing, [])
-        ((l,b):xs) -> (Just (l,b), map (mkCAFLabel . fst) xs)
+        ((l,b):xs) -> (Just (l,b), map fst xs)
 
-    -- Remove recursive references from the SRT, except for (all but
-    -- one of the) static functions. See Note [recursive SRTs].
+    -- Remove recursive references from the SRT
     nonRec :: Set CAFLabel
-    nonRec = cafs `Set.difference`
-      (Set.fromList caf_lbls `Set.difference` Set.fromList otherFunLabels)
+    nonRec = cafs `Set.difference` Set.fromList caf_lbls
 
+    -- Resolve references to their SRT entries
     resolved :: [SRTEntry]
     resolved = mapMaybe (resolveCAF srtMap) (Set.toList nonRec)
 
@@ -921,7 +922,7 @@ oneSRT dflags staticFuns lbls caf_lbls isCAF cafs static_data = do
 
     -- Remove SRTEntries that are also in an SRT that we refer to.
     -- Implements the [Filter] optimisation.
-    filtered = Set.fromList resolved `Set.difference` allBelow
+    filtered0 = Set.fromList resolved `Set.difference` allBelow
 
   srtTraceM "oneSRT:"
      (text "srtMap:" <+> ppr srtMap $$
@@ -930,9 +931,12 @@ oneSRT dflags staticFuns lbls caf_lbls isCAF cafs static_data = do
       text "caf_lbls:" <+> ppr caf_lbls $$
       text "static_data:" <+> ppr static_data $$
       text "cafs:" <+> ppr cafs $$
+      text "blockids:" <+> ppr blockids $$
+      text "maybeFunClosure:" <+> ppr maybeFunClosure $$
+      text "otherFunLabels:" <+> ppr otherFunLabels $$
       text "resolved:" <+> ppr resolved $$
       text "allBelow:" <+> ppr allBelow $$
-      text "filtered:" <+> ppr filtered)
+      text "filtered0:" <+> ppr filtered0)
 
   let
     isStaticFun = isJust maybeFunClosure
@@ -963,80 +967,89 @@ oneSRT dflags staticFuns lbls caf_lbls isCAF cafs static_data = do
     allStaticData =
       all (\(CAFLabel clbl) -> Set.member clbl static_data) caf_lbls
 
-  case Set.toList filtered of
-    [] -> do
-      srtTraceM "oneSRT: empty" (ppr caf_lbls)
-      updateSRTMap Nothing
-      return ([], [], [], False)
+  if Set.null filtered0 then do
+    srtTraceM "oneSRT: empty" (ppr caf_lbls)
+    updateSRTMap Nothing
+    return ([], [], [], False)
+  else do
+    -- We're going to build an SRT for this group, which should include function
+    -- references in the group. See Note [recursive SRTs].
+    let allBelow_funs =
+          Set.fromList (map (SRTEntry . toClosureLbl) otherFunLabels)
+    let filtered = filtered0 `Set.union` allBelow_funs
+    srtTraceM "oneSRT" (text "filtered:" <+> ppr filtered $$
+                        text "allBelow_funs:" <+> ppr allBelow_funs)
+    case Set.toList filtered of
+      [] -> pprPanic "oneSRT" empty -- unreachable
 
-    -- [Inline] - when we have only one entry there is no need to
-    -- build an SRT object at all, instead we put the singleton SRT
-    -- entry in the info table.
-    [one@(SRTEntry lbl)]
-      | -- Info tables refer to SRTs by offset (as noted in the section
-        -- "Referring to an SRT from the info table" of Note [SRTs]). However,
-        -- when dynamic linking is used we cannot guarantee that the offset
-        -- between the SRT and the info table will fit in the offset field.
-        -- Consequently we build a singleton SRT in in this case.
-        not (labelDynamic dflags this_mod lbl)
+      -- [Inline] - when we have only one entry there is no need to
+      -- build an SRT object at all, instead we put the singleton SRT
+      -- entry in the info table.
+      [one@(SRTEntry lbl)]
+        | -- Info tables refer to SRTs by offset (as noted in the section
+          -- "Referring to an SRT from the info table" of Note [SRTs]). However,
+          -- when dynamic linking is used we cannot guarantee that the offset
+          -- between the SRT and the info table will fit in the offset field.
+          -- Consequently we build a singleton SRT in in this case.
+          not (labelDynamic dflags this_mod lbl)
 
-        -- MachO relocations can't express offsets between compilation units at
-        -- all, so we are always forced to build a singleton SRT in this case.
-          && (not (osMachOTarget $ platformOS $ targetPlatform dflags)
-             || isLocalCLabel this_mod lbl) -> do
+          -- MachO relocations can't express offsets between compilation units at
+          -- all, so we are always forced to build a singleton SRT in this case.
+            && (not (osMachOTarget $ platformOS $ targetPlatform dflags)
+               || isLocalCLabel this_mod lbl) -> do
 
-        -- If we have a static function closure, then it becomes the
-        -- SRT object, and everything else points to it. (the only way
-        -- we could have multiple labels here is if this is a
-        -- recursive group, see Note [recursive SRTs])
-        case maybeFunClosure of
-          Just (staticFunLbl,staticFunBlock) ->
-              return ([], withLabels, [], True)
-            where
-              withLabels =
-                [ (b, if b == staticFunBlock then lbl else staticFunLbl)
-                | b <- blockids ]
+          -- If we have a static function closure, then it becomes the
+          -- SRT object, and everything else points to it. (the only way
+          -- we could have multiple labels here is if this is a
+          -- recursive group, see Note [recursive SRTs])
+          case maybeFunClosure of
+            Just (staticFunLbl,staticFunBlock) ->
+                return ([], withLabels, [], True)
+              where
+                withLabels =
+                  [ (b, if b == staticFunBlock then lbl else staticFunLbl)
+                  | b <- blockids ]
+            Nothing -> do
+              srtTraceM "oneSRT: one" (text "caf_lbls:" <+> ppr caf_lbls $$
+                                       text "one:" <+> ppr one)
+              updateSRTMap (Just one)
+              return ([], map (,lbl) blockids, [], True)
+
+      cafList | allStaticData ->
+        return ([], [], [], not (null cafList))
+
+      cafList ->
+        -- Check whether an SRT with the same entries has been emitted already.
+        -- Implements the [Common] optimisation.
+        case Map.lookup filtered (dedupSRTs topSRT) of
+          Just srtEntry@(SRTEntry srtLbl)  -> do
+            srtTraceM "oneSRT [Common]" (ppr caf_lbls <+> ppr srtLbl)
+            updateSRTMap (Just srtEntry)
+            return ([], map (,srtLbl) blockids, [], True)
           Nothing -> do
-            srtTraceM "oneSRT: one" (text "caf_lbls:" <+> ppr caf_lbls $$
-                                     text "one:" <+> ppr one)
-            updateSRTMap (Just one)
-            return ([], map (,lbl) blockids, [], True)
-
-    cafList | allStaticData ->
-      return ([], [], [], not (null cafList))
-
-    cafList ->
-      -- Check whether an SRT with the same entries has been emitted already.
-      -- Implements the [Common] optimisation.
-      case Map.lookup filtered (dedupSRTs topSRT) of
-        Just srtEntry@(SRTEntry srtLbl)  -> do
-          srtTraceM "oneSRT [Common]" (ppr caf_lbls <+> ppr srtLbl)
-          updateSRTMap (Just srtEntry)
-          return ([], map (,srtLbl) blockids, [], True)
-        Nothing -> do
-          -- No duplicates: we have to build a new SRT object
-          (decls, funSRTs, srtEntry) <-
-            case maybeFunClosure of
-              Just (fun,block) ->
-                return ( [], [(block, cafList)], SRTEntry fun )
-              Nothing -> do
-                (decls, entry) <- lift $ buildSRTChain dflags cafList
-                return (decls, [], entry)
-          updateSRTMap (Just srtEntry)
-          let allBelowThis = Set.union allBelow filtered
-              newFlatSRTs = Map.insert srtEntry allBelowThis (flatSRTs topSRT)
-              -- When all definition in this group are static data we don't
-              -- generate any SRTs.
-              newDedupSRTs = Map.insert filtered srtEntry (dedupSRTs topSRT)
-          modify' (\state -> state{ dedupSRTs = newDedupSRTs,
-                                    flatSRTs = newFlatSRTs })
-          srtTraceM "oneSRT: new" (text "caf_lbls:" <+> ppr caf_lbls $$
-                                    text "filtered:" <+> ppr filtered $$
-                                    text "srtEntry:" <+> ppr srtEntry $$
-                                    text "newDedupSRTs:" <+> ppr newDedupSRTs $$
-                                    text "newFlatSRTs:" <+> ppr newFlatSRTs)
-          let SRTEntry lbl = srtEntry
-          return (decls, map (,lbl) blockids, funSRTs, True)
+            -- No duplicates: we have to build a new SRT object
+            (decls, funSRTs, srtEntry) <-
+              case maybeFunClosure of
+                Just (fun,block) ->
+                  return ( [], [(block, cafList)], SRTEntry fun )
+                Nothing -> do
+                  (decls, entry) <- lift $ buildSRTChain dflags cafList
+                  return (decls, [], entry)
+            updateSRTMap (Just srtEntry)
+            let allBelowThis = Set.union allBelow filtered
+                newFlatSRTs = Map.insert srtEntry allBelowThis (flatSRTs topSRT)
+                -- When all definition in this group are static data we don't
+                -- generate any SRTs.
+                newDedupSRTs = Map.insert filtered srtEntry (dedupSRTs topSRT)
+            modify' (\state -> state{ dedupSRTs = newDedupSRTs,
+                                      flatSRTs = newFlatSRTs })
+            srtTraceM "oneSRT: new" (text "caf_lbls:" <+> ppr caf_lbls $$
+                                      text "filtered:" <+> ppr filtered $$
+                                      text "srtEntry:" <+> ppr srtEntry $$
+                                      text "newDedupSRTs:" <+> ppr newDedupSRTs $$
+                                      text "newFlatSRTs:" <+> ppr newFlatSRTs)
+            let SRTEntry lbl = srtEntry
+            return (decls, map (,lbl) blockids, funSRTs, True)
 
 
 -- | build a static SRT object (or a chain of objects) from a list of
