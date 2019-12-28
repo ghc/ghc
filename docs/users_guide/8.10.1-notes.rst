@@ -160,6 +160,10 @@ Compiler
 
 - The :ghc-flag:`LLVM backend <-fllvm>` of this release is to be used with LLVM 9.
 
+- (x86) Native code generator support for legacy x87 floating point coprocessor
+  has been removed. From this point forth GHC will only support floating point
+  via SSE2.
+
 - Add new flags :ghc-flag:`-Wunused-record-wildcards` and
   :ghc-flag:`-Wredundant-record-wildcards`  which warn users when they have
   redundant or unused uses of a record wildcard match.
