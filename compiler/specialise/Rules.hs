@@ -519,18 +519,23 @@ matchRule _ in_scope is_active _ args rough_args
   | not (is_active act)               = Left []
   | ruleCantMatch tpl_tops rough_args = Left []
   | not rule_auto
-  , not (null nonAffineArgs)          = Left nonAffineArgs
+  , [] /= tpl_vars
+  , [] /= nonAffineOrDictArgs         = Left nonAffineOrDictArgs
   | otherwise = case matchN in_scope rule_name tpl_vars tpl_args args rhs of
     Just match -> Right match
     Nothing -> Left []
   where
-    nonAffineArgs :: [CoreExpr]
-    nonAffineArgs = filter (not . argIsAffine) args
+    nonAffineOrDictArgs :: [CoreExpr]
+    nonAffineOrDictArgs = filter (not . argIsAffineOrDict) args
 
-argIsAffine :: CoreExpr -> Bool
-argIsAffine (Var bndr) = isAbsDmd dmd || isUsedOnce dmd
-  where dmd = idDemandInfo bndr
-argIsAffine _          = True
+argIsAffineOrDict :: CoreExpr -> Bool
+argIsAffineOrDict (Var bndr) = isAbsDmd dmd || isUsedOnce dmd || is_class
+  where
+    ty = idType bndr
+    mTyCon = tyConAppTyCon_maybe ty
+    is_class = maybe False isClassTyCon mTyCon
+    dmd = idDemandInfo bndr
+argIsAffineOrDict _          = True
 
 ---------------------------------------
 matchN  :: InScopeEnv
