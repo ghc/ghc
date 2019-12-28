@@ -41,7 +41,8 @@ import CoreUtils        ( exprType, eqExpr, mkTick, mkTicks,
                           isJoinBind )
 import PprCore          ( pprRules )
 import Type             ( Type, TCvSubst, extendTvSubst, extendCvSubst
-                        , mkEmptyTCvSubst, substTy )
+                        , mkEmptyTCvSubst, substTy, tyConAppTyCon_maybe )
+import TyCon            ( isClassTyCon )
 import TcType           ( tcSplitTyConApp_maybe )
 import TysWiredIn       ( anyTypeOfKind )
 import Coercion
@@ -519,8 +520,8 @@ matchRule _ in_scope is_active _ args rough_args
   | not (is_active act)               = Left []
   | ruleCantMatch tpl_tops rough_args = Left []
   | not rule_auto
-  , [] /= tpl_vars
-  , [] /= nonAffineOrDictArgs         = Left nonAffineOrDictArgs
+  , not (null tpl_vars)
+  , not (null nonAffineOrDictArgs)    = Left nonAffineOrDictArgs
   | otherwise = case matchN in_scope rule_name tpl_vars tpl_args args rhs of
     Just match -> Right match
     Nothing -> Left []
