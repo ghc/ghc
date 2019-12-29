@@ -502,7 +502,7 @@ gHC_PRIM, gHC_TYPES, gHC_GENERICS, gHC_MAGIC,
     gHC_CLASSES, gHC_PRIMOPWRAPPERS, gHC_BASE, gHC_ENUM,
     gHC_GHCI, gHC_GHCI_HELPERS, gHC_CSTRING,
     gHC_SHOW, gHC_READ, gHC_NUM, gHC_MAYBE, gHC_INTEGER_TYPE, gHC_NATURAL,
-    gHC_LIST, gHC_TUPLE, dATA_TUPLE, dATA_EITHER, dATA_STRING,
+    gHC_LIST, gHC_TUPLE, dATA_TUPLE, dATA_EITHER, dATA_LIST, dATA_STRING,
     dATA_FOLDABLE, dATA_TRAVERSABLE,
     gHC_CONC, gHC_IO, gHC_IO_Exception,
     gHC_ST, gHC_IX, gHC_STABLE, gHC_PTR, gHC_ERR, gHC_REAL,
@@ -534,6 +534,7 @@ gHC_LIST        = mkBaseModule (fsLit "GHC.List")
 gHC_TUPLE       = mkPrimModule (fsLit "GHC.Tuple")
 dATA_TUPLE      = mkBaseModule (fsLit "Data.Tuple")
 dATA_EITHER     = mkBaseModule (fsLit "Data.Either")
+dATA_LIST       = mkBaseModule (fsLit "Data.List")
 dATA_STRING     = mkBaseModule (fsLit "Data.String")
 dATA_FOLDABLE   = mkBaseModule (fsLit "Data.Foldable")
 dATA_TRAVERSABLE= mkBaseModule (fsLit "Data.Traversable")

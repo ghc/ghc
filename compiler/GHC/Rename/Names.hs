@@ -380,6 +380,9 @@ rnImportDecl this_mod
           _           -> return ()
      )
 
+    -- Complain about -Wcompat-unqualified-imports violations.
+    warnUnqualifiedImport decl iface
+
     let new_imp_decl = L loc (decl { ideclExt = noExtField, ideclSafe = mod_safe'
                                    , ideclHiding = new_imp_details })
 
@@ -485,6 +488,40 @@ calculateAvails dflags iface mod_safe' want_boot imported_by =
           -- See Note [Trust Own Package]
           imp_trust_own_pkg = pkg_trust_req
      }
+
+
+-- | Issue a warning if the user imports Data.List without either an import
+-- list or `qualified`. This is part of the migration plan for the
+-- `Data.List.singleton` proposal. See #17244.
+warnUnqualifiedImport :: ImportDecl GhcPs -> ModIface -> RnM ()
+warnUnqualifiedImport decl iface =
+    whenWOptM Opt_WarnCompatUnqualifiedImports
+    $ when bad_import
+    $ addWarnAt (Reason Opt_WarnCompatUnqualifiedImports) loc warning
+  where
+    mod = mi_module iface
+    loc = getLoc $ ideclName decl
+
+    is_qual = isImportDeclQualified (ideclQualified decl)
+    has_import_list =
+      -- We treat a `hiding` clause as not having an import list although
+      -- it's not entirely clear this is the right choice.
+      case ideclHiding decl of
+        Just (False, _) -> True
+        _               -> False
+    bad_import =
+      mod `elemModuleSet` qualifiedMods
+      && not is_qual
+      && not has_import_list
+
+    warning = vcat
+      [ text "To ensure compatibility with future core libraries changes"
+      , text "imports to" <+> ppr (ideclName decl) <+> text "should be"
+      , text "either qualified or have an explicit import list."
+      ]
+
+    -- Modules for which we warn if we see unqualified imports
+    qualifiedMods = mkModuleSet [ dATA_LIST ]
 
 
 warnRedundantSourceImport :: ModuleName -> SDoc
