@@ -1194,7 +1194,7 @@ foreignCall conv_string results_code expr_code args_code safety ret
           "C" -> return CCallConv
           "stdcall" -> return StdCallConv
           "winapi" ->
-            case (os, arch)
+            case (os, arch) of
               (OSMinGW32, ArchX86_64) -> return CCallConv
               (OSMinGW32, ArchX86)    -> return StdCallConv
               _ -> fail "`winapi' calling convention only valid on Windows"
