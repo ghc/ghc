@@ -44,7 +44,6 @@ generally likely to indicate bugs in your program. These are:
     * :ghc-flag:`-Wtabs`
     * :ghc-flag:`-Wunrecognised-warning-flags`
     * :ghc-flag:`-Winaccessible-code`
-    * :ghc-flag:`-Wstar-is-type`
     * :ghc-flag:`-Wstar-binder`
 
 The following flags are simple ways to select standard "packages" of warnings:
