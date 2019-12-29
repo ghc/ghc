@@ -738,6 +738,15 @@ release-x86_64-linux-deb10:
   <<: *release
   extends: .build-x86_64-linux-deb10
 
+release-x86_64-linux-deb10-dwarf:
+  <<: *release
+  extends: .build-x86_64-linux-deb10
+  variables:
+    CONFIGURE_ARGS: "--enable-dwarf-unwind"
+    BUILD_FLAVOUR: dwarf
+    TEST_ENV: "x86_64-linux-deb10-dwarf"
+    BIN_DIST_PREP_TAR_COMP: "ghc-x86_64-deb10-linux-dwarf.tar.xz"
+
 #################################
 # x86_64-linux-ubuntu 20.04
 #################################
@@ -853,7 +862,7 @@ release-x86_64-linux-centos7:
 # x86_64-linux-fedora27
 #################################
 
-validate-x86_64-linux-fedora27:
+.build-x86_64-linux-fedora27:
   extends: .validate-linux
   stage: full-build
   image: "registry.gitlab.haskell.org/ghc/ci-images/x86_64-linux-fedora27:$DOCKER_REV"
@@ -862,7 +871,6 @@ validate-x86_64-linux-fedora27:
     LLC: /bin/false
     OPT: /bin/false
     TEST_ENV: "x86_64-linux-fedora27"
-    BIN_DIST_PREP_TAR_COMP: "ghc-x86_64-fedora27-linux.tar.xz"
   cache:
     key: linux-x86_64-fedora27
   artifacts:
@@ -870,6 +878,20 @@ validate-x86_64-linux-fedora27:
     # These are used for head.hackage jobs therefore we keep them around for
     # longer.
     expire_in: 8 week
+
+validate-x86_64-linux-fedora27:
+  extends: .build-x86_64-linux-fedora27
+  variables:
+    BIN_DIST_PREP_TAR_COMP: "ghc-x86_64-fedora27-linux.tar.xz"
+
+release-x86_64-linux-fedora27-dwarf:
+  <<: *release
+  extends: .build-x86_64-linux-fedora27
+  variables:
+    CONFIGURE_ARGS: "--enable-dwarf-unwind"
+    BUILD_FLAVOUR: dwarf
+    BIN_DIST_PREP_TAR_COMP: "ghc-x86_64-fedora27-linux-dwarf.tar.xz"
+    TEST_ENV: "x86_64-linux-fedora27-dwarf"
 
 ############################################################
 # Validation via Pipelines (Windows)
