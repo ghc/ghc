@@ -581,20 +581,27 @@ def main() -> None:
     parser.add_argument("--add-note", nargs=3,
                         help="Development only. --add-note N commit seed \
                         Adds N fake metrics to the given commit using the random seed.")
-    parser.add_argument("--chart", nargs='?', default=None, action='store', const='./PerformanceChart.html',
-                        help='Create a chart of the results an save it to the given file. Default to "./PerformanceChart.html".')
     parser.add_argument("--ci", action='store_true',
                         help="Use ci results. You must fetch these with:\n    " \
                             + "$ git fetch https://gitlab.haskell.org/ghc/ghc-performance-notes.git refs/notes/perf:refs/notes/ci/perf")
-    parser.add_argument("--test-env",
-                        help="The given test environment to be compared. Use 'local' for localy run results. If using --ci, see .gitlab-ci file for TEST_ENV settings.")
-    parser.add_argument("--test-name",
-                        help="Filters for tests matching the given regular expression.")
-    parser.add_argument("--metric",
-                        help="Test metric (one of " + str(testing_metrics()) + ").")
-    parser.add_argument("--way",
-                        help="Test way (one of " + str(testing_metrics()) + ").")
-    parser.add_argument("commits", nargs=argparse.REMAINDER,
+
+    group = parser.add_argument_group(title='Filtering', description="Select which subset of performance metrics to dump")
+    group.add_argument("--test-env",
+                       help="The given test environment to be compared. Use 'local' for localy run results. If using --ci, see .gitlab-ci file for TEST_ENV settings.")
+    group.add_argument("--test-name",
+                       help="Filters for tests matching the given regular expression.")
+    group.add_argument("--metric",
+                       help="Test metric (one of " + str(testing_metrics()) + ").")
+    group.add_argument("--way",
+                       help="Test way (one of " + str(testing_metrics()) + ").")
+
+    group = parser.add_argument_group(title='Plotting', description="Plot historical performance metrics")
+    group.add_argument("--chart", nargs='?', default=None, action='store', const='./PerformanceChart.html',
+                       help='Create a chart of the results an save it to the given file. Default to "./PerformanceChart.html".')
+    group.add_argument("--zero-y", action='store_true',
+                       help='When charting, include 0 in y axis')
+
+    parser.add_argument("commits", nargs='+',
                         help="Either a list of commits or a single commit range (e.g. HEAD~10..HEAD).")
     args = parser.parse_args()
 
@@ -691,7 +698,13 @@ def main() -> None:
                         'borderColor': hash_rgb_str((env, name, metric, way))
                     } for (env, name, metric, way) in testSeries]
                 },
-                'options': {}
+                'options': {
+                    'scales': {
+                        'yAxes': [{
+                            'ticks': { 'beginAtZero': True }
+                        }]
+                    }
+                }
             }
 
 
