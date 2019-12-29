@@ -687,7 +687,8 @@ substRule subst subst_ru_fn rule@(Rule { ru_bndrs = bndrs, ru_args = args
          , ru_fn    = if is_local
                         then subst_ru_fn fn_name
                         else fn_name
-         , ru_args  = map (substExpr doc subst') args
+         , ru_args  = map (stripTicksE (const True) . substExpr doc subst') args
+           -- See Note [Rule templates are devoid of ticks] in Rules.
          , ru_rhs   = substExpr (text "foo") subst' rhs }
            -- Do NOT optimise the RHS (previously we did simplOptExpr here)
            -- See Note [Substitute lazily]

@@ -1573,6 +1573,10 @@ lintCoreRule fun fun_ty rule@(Rule { ru_name = name, ru_bndrs = bndrs
                                    , ru_args = args, ru_rhs = rhs })
   = lintBinders LambdaBind bndrs $ \ _ ->
     do { lhs_ty <- lintCoreArgs fun_ty args
+
+         -- Ensure template arguments contain no ticks
+       ; forM_ args $ \arg -> checkL (null $ stripTicksT (const True) arg)
+                                $ template_arg_with_tick_doc arg
        ; rhs_ty <- case isJoinId_maybe fun of
                      Just join_arity
                        -> do { checkL (args `lengthIs` join_arity) $
@@ -1592,6 +1596,9 @@ lintCoreRule fun fun_ty rule@(Rule { ru_name = name, ru_bndrs = bndrs
     }
   where
     rule_doc = text "Rule" <+> doubleQuotes (ftext name) <> colon
+
+    template_arg_with_tick_doc arg =
+      rule_doc <+> text "Argument" <+> ppr arg <+> text "contains tick(s)"
 
     lhs_fvs = exprsFreeVars args
     rhs_fvs = exprFreeVars rhs

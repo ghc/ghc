@@ -3656,5 +3656,6 @@ simplRules env mb_new_id rules mb_cont
            ; rhs'  <- simplExprC rule_env rhs rhs_cont
            ; return (rule { ru_bndrs = bndrs'
                           , ru_fn    = fn_name'
-                          , ru_args  = args'
+                          , ru_args  = map (stripTicksE (const True)) args'
+                              -- See Note [Rule templates are devoid of ticks] in Rules.
                           , ru_rhs   = rhs' }) }

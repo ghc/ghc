@@ -1024,6 +1024,24 @@ tick scope, we can float them upwards to the rule application site.
 
 cf Note [Notes in call patterns] in SpecConstr
 
+Note [Rule templates are devoid of ticks]
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+
+As mentioned in Note [Tick annotations in RULE matching], the matcher allows
+ticks only in very few cases. In particular, they are completely disallowed
+in the rule template. Core Lint checks this invariant.
+
+However, there are a few ways in which ticks can sneak in to the template.
+#17619 is one particularly tricky way:
+
+ 1. SpecConstr creates a rule on `f` with a free variable `x` in its template.
+ 2. CSE rewrites the RHS of `x` to `<tick> y`
+ 3. The simplifier unconditionally post-inlines `x`
+ 4. The simplifier simplifes `f`'s rules and, in so doing, substitutes `x ~>
+    <tick> y`, introducing a tick into the template of the rule.
+
+To avoid this, we strip ticks after substituting in to rule templates.
+
 Note [Matching lets]
 ~~~~~~~~~~~~~~~~~~~~
 Matching a let-expression.  Consider
