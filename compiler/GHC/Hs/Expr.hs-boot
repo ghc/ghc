@@ -15,6 +15,7 @@ import Outputable ( SDoc, Outputable )
 import {-# SOURCE #-} GHC.Hs.Pat  ( LPat )
 import BasicTypes ( SpliceExplicitFlag(..))
 import GHC.Hs.Extension ( OutputableBndrId, GhcPass )
+import Data.Kind  ( Type )
 
 type role HsExpr nominal
 type role HsCmd nominal
@@ -22,12 +23,12 @@ type role MatchGroup nominal nominal
 type role GRHSs nominal nominal
 type role HsSplice nominal
 type role SyntaxExpr nominal
-data HsExpr (i :: *)
-data HsCmd  (i :: *)
-data HsSplice (i :: *)
-data MatchGroup (a :: *) (body :: *)
-data GRHSs (a :: *) (body :: *)
-data SyntaxExpr (i :: *)
+data HsExpr (i :: Type)
+data HsCmd  (i :: Type)
+data HsSplice (i :: Type)
+data MatchGroup (a :: Type) (body :: Type)
+data GRHSs (a :: Type) (body :: Type)
+data SyntaxExpr (i :: Type)
 
 instance OutputableBndrId p => Outputable (HsExpr (GhcPass p))
 instance OutputableBndrId p => Outputable (HsCmd (GhcPass p))
