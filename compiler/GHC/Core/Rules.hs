@@ -714,11 +714,15 @@ match :: RuleMatchEnv
       -> CoreExpr               -- Target
       -> Maybe RuleSubst
 
--- We look through certain ticks. See note [Tick annotations in RULE matching]
+-- We look through certain ticks. See Note [Tick annotations in RULE matching]
 match renv subst e1 (Tick t e2)
   | tickishFloatable t
   = match renv subst' e1 e2
   where subst' = subst { rs_binds = rs_binds subst . mkTick t }
+match renv subst (Tick t e1) e2
+  -- Ignore ticks in rule template.
+  | tickishFloatable t
+  =  match renv subst e1 e2
 match _ _ e@Tick{} _
   = pprPanic "Tick in rule" (ppr e)
 
@@ -1016,7 +1020,7 @@ Hence, (a) the guard (not (isLocallyBoundR v2))
 Note [Tick annotations in RULE matching]
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
-We used to unconditionally look through Notes in both template and
+We used to unconditionally look through ticks in both template and
 expression being matched. This is actually illegal for counting or
 cost-centre-scoped ticks, because we have no place to put them without
 changing entry counts and/or costs. So now we just fail the match in
@@ -1024,6 +1028,11 @@ these cases.
 
 On the other hand, where we are allowed to insert new cost into the
 tick scope, we can float them upwards to the rule application site.
+
+Moreover, we may encounter ticks in the template of a rule. There are a few
+ways in which these may be introduced (e.g. #18162, #17619). Such ticks are
+ignored by the matcher. See Note [Simplifying rules] in
+GHC.Core.Opt.Simplify.Utils for details.
 
 cf Note [Notes in call patterns] in GHC.Core.Opt.SpecConstr
 

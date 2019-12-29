@@ -830,6 +830,21 @@ Ticks into the LHS, which makes matching trickier. #10665, #10745.
 Doing this to either side confounds tools like HERMIT, which seek to reason
 about and apply the RULES as originally written. See #10829.
 
+There is, however, one case where we are pretty much /forced/ to transform the
+LHS of a rule: postInlineUnconditionally. For instance, in the case of
+
+    let f = g @Int in f
+
+We very much want to inline f into the body of the let. However, to do so (and
+be able to safely drop f's binding) we must inline into all occurrences of f,
+including those in the LHS of rules.
+
+This can cause somewhat surprising results; for instance, in #18162 we found
+that a rule template contained ticks in its arguments, because
+postInlineUnconditionally substituted in a trivial expression that contains
+ticks. See Note [Tick annotations in RULE matching] in GHC.Core.Rules for
+details.
+
 Note [No eta expansion in stable unfoldings]
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 If we have a stable unfolding
@@ -1251,6 +1266,10 @@ it's best to inline it anyway.  We often get a=E; b=a from desugaring,
 with both a and b marked NOINLINE.  But that seems incompatible with
 our new view that inlining is like a RULE, so I'm sticking to the 'active'
 story for now.
+
+NB: unconditional inlining of this sort can introduce ticks in places that
+may seem surprising; for instance, the LHS of rules. See Note [Simplfying
+rules] for details.
 -}
 
 postInlineUnconditionally
