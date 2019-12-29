@@ -87,7 +87,11 @@ updateIdUnfolding non_cafs id =
 updateExprCafInfos :: NameSet -> CoreExpr -> CoreExpr
 updateExprCafInfos non_cafs = go
   where
-    go_id = updateIdCafInfo non_cafs
+    go_id var
+      | isId var
+      = updateIdUnfolding non_cafs (updateIdCafInfo non_cafs var)
+      | otherwise
+      = var
 
     go :: CoreExpr -> CoreExpr
     go (Var v) = Var (go_id v)
