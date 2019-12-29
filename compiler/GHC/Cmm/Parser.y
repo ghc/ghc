@@ -1186,12 +1186,20 @@ foreignCall
         -> CmmReturnInfo
         -> PD (CmmParse ())
 foreignCall conv_string results_code expr_code args_code safety ret
-  = do  conv <- case conv_string of
+  = do  dflags <- getDynFlags
+        let platform = targetPlatform dflags
+            arch = platformArch platform
+            os   = platformOS   platform
+        conv <- case conv_string of
           "C" -> return CCallConv
           "stdcall" -> return StdCallConv
+          "winapi" ->
+            case (os, arch)
+              (OSMinGW32, ArchX86_64) -> return CCallConv
+              (OSMinGW32, ArchX86)    -> return StdCallConv
+              _ -> fail "`winapi' calling convention only valid on Windows"
           _ -> fail ("unknown calling convention: " ++ conv_string)
         return $ do
-          dflags <- getDynFlags
           results <- sequence results_code
           expr <- expr_code
           args <- sequence args_code
