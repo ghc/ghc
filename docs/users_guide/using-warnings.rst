@@ -124,6 +124,7 @@ The following flags are simple ways to select standard "packages" of warnings:
         * :ghc-flag:`-Wsemigroup`
         * :ghc-flag:`-Wnoncanonical-monoid-instances`
         * :ghc-flag:`-Wstar-is-type`
+        * :ghc-flag:`-Wcompat-unqualified-imports`
 
 .. ghc-flag:: -Wno-compat
     :shortdesc: Disables all warnings enabled by :ghc-flag:`-Wcompat`.
@@ -219,12 +220,31 @@ of ``-W(no-)*``.
         encountered on the command line.
     :type: dynamic
     :reverse: -Wno-unrecognised-warning-flags
+    :default: on
     :category:
 
     Enables warnings when the compiler encounters a ``-W...`` flag that is not
     recognised.
 
-    This warning is on by default.
+.. ghc-flag:: -Wcompat-unqualified-imports
+    :shortdesc: Report unqualified imports of core libraries which are expected
+      to cause compatibility problems in future releases.
+    :type: dynamic
+    :reverse: -Wno-compat-unqualified-imports
+    :category:
+
+    Warns on qualified imports of core library modules which are subject to
+    change in future GHC releases. Currently the following modules are covered
+    by this warning:
+
+     - ``Data.List`` due to the future addition of ``Data.List.singleton`` and
+       specialisation of exports to the ``[]`` type. See the
+       :ref:`mailing list
+       <https://groups.google.com/forum/#!topic/haskell-core-libraries/q3zHLmzBa5E>`
+       for details.
+
+    This warning can be addressed by either adding an explicit import list or
+    using a ``qualified`` import.
 
 .. ghc-flag:: -Wtyped-holes
     :shortdesc: Report warnings when :ref:`typed hole <typed-holes>` errors are
@@ -232,13 +252,12 @@ of ``-W(no-)*``.
         :ghc-flag:`-fdefer-typed-holes`.
     :type: dynamic
     :reverse: -Wno-typed-holes
+    :default: on
     :category:
 
     Determines whether the compiler reports typed holes warnings. Has no
     effect unless typed holes errors are deferred until runtime. See
     :ref:`typed-holes` and :ref:`defer-type-errors`
-
-    This warning is on by default.
 
 .. ghc-flag:: -Wdeferred-type-errors
     :shortdesc: Report warnings when :ref:`deferred type errors
