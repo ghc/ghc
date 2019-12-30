@@ -81,7 +81,7 @@ import Outputable
 import PprCmm () -- For Outputable instances
 import qualified DynFlags as D
 
-import Data.List
+import Data.List (sort, nub, partition)
 import Data.STRef.Strict
 import Control.Monad.ST
 

@@ -50,7 +50,7 @@ import VarSet
 import Control.Monad
 import Control.Monad.Trans.Class  (lift)
 import Control.Monad.Trans.Reader (ask)
-import Data.List
+import Data.List                  (sortBy)
 import Data.Maybe
 
 ----------------------
