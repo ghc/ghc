@@ -27,11 +27,13 @@ import GHC.Cmm.Dataflow.Label
 import GHC.Cmm.Dataflow.Block
 import GHC.Cmm.Dataflow.Collections
 
+import Data.Kind
+
 -- | A (possibly empty) collection of closed/closed blocks
 type Body n = LabelMap (Block n C C)
 
 -- | @Body@ abstracted over @block@
-type Body' block (n :: Extensibility -> Extensibility -> *) = LabelMap (block n C C)
+type Body' block (n :: Extensibility -> Extensibility -> Type) = LabelMap (block n C C)
 
 -------------------------------
 -- | Gives access to the anchor points for
@@ -76,7 +78,7 @@ type Graph = Graph' Block
 -- | @Graph'@ is abstracted over the block type, so that we can build
 -- graphs of annotated blocks for example (Compiler.Hoopl.Dataflow
 -- needs this).
-data Graph' block (n :: Extensibility -> Extensibility -> *) e x where
+data Graph' block (n :: Extensibility -> Extensibility -> Type) e x where
   GNil  :: Graph' block n O O
   GUnit :: block n O O -> Graph' block n O O
   GMany :: MaybeO e (block n O C)

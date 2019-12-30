@@ -39,6 +39,7 @@ import qualified Data.Map    as Map
 import qualified Data.IntMap as IntMap
 import Outputable
 import Control.Monad( (>=>) )
+import Data.Kind( Type )
 
 {-
 This module implements TrieMaps, which are finite mappings
@@ -65,7 +66,7 @@ type XT a = Maybe a -> Maybe a  -- How to alter a non-existent elt (Nothing)
                                 --               or an existing elt (Just)
 
 class TrieMap m where
-   type Key m :: *
+   type Key m :: Type
    emptyTM  :: m a
    lookupTM :: forall b. Key m -> m b -> Maybe b
    alterTM  :: forall b. Key m -> XT b -> m b -> m b
