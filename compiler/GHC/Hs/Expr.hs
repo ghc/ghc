@@ -55,6 +55,7 @@ import {-# SOURCE #-} TcRnTypes (TcLclEnv)
 -- libraries:
 import Data.Data hiding (Fixity(..))
 import qualified Data.Data as Data (Fixity(..))
+import qualified Data.Kind
 import Data.Maybe (isNothing)
 
 import GHCi.RemoteTypes ( ForeignRef )
@@ -130,7 +131,7 @@ type family SyntaxExpr p
 -- noSyntaxExpr would be ambiguous.
 type instance SyntaxExpr (GhcPass p) = SyntaxExprGhc p
 
-type family SyntaxExprGhc (p :: Pass) = (r :: *) | r -> p where
+type family SyntaxExprGhc (p :: Pass) = (r :: Data.Kind.Type) | r -> p where
   SyntaxExprGhc 'Parsed      = NoExtField
   SyntaxExprGhc 'Renamed     = SyntaxExprRn
   SyntaxExprGhc 'Typechecked = SyntaxExprTc
