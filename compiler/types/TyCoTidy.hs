@@ -28,7 +28,7 @@ import Var
 import VarEnv
 import Util (seqList)
 
-import Data.List
+import Data.List (mapAccumL)
 
 {-
 %************************************************************************
