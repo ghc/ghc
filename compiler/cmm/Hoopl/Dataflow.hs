@@ -43,13 +43,14 @@ import Data.Array
 import Data.Maybe
 import Data.IntSet (IntSet)
 import qualified Data.IntSet as IntSet
+import Data.Kind (Type)
 
 import Hoopl.Block
 import Hoopl.Graph
 import Hoopl.Collections
 import Hoopl.Label
 
-type family   Fact (x :: Extensibility) f :: *
+type family   Fact (x :: Extensibility) f :: Type
 type instance Fact C f = FactBase f
 type instance Fact O f = f
 

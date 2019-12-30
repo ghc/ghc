@@ -139,6 +139,7 @@ import Text.ParserCombinators.ReadP as ReadP
 import Data.Char
 import qualified Data.Monoid as Monoid
 import Data.Data       ( dataTypeOf, fromConstr, dataTypeConstrs )
+import Data.Kind       ( Type )
 
 #include "HsVersions.h"
 
@@ -1735,7 +1736,7 @@ instance DisambInfixOp RdrName where
 -- See Note [Ambiguous syntactic categories]
 class b ~ (Body b) GhcPs => DisambECP b where
   -- | See Note [Body in DisambECP]
-  type Body b :: * -> *
+  type Body b :: Type -> Type
   -- | Return a command without ambiguity, or fail in a non-command context.
   ecpFromCmd' :: LHsCmd GhcPs -> PV (Located b)
   -- | Return an expression without ambiguity, or fail in a non-expression context.
@@ -1845,7 +1846,7 @@ even when -XUndecidableSuperClasses are not required.
 {- Note [Body in DisambECP]
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~
 There are helper functions (mkBodyStmt, mkBindStmt, unguardedRHS, etc) that
-require their argument to take a form of (body GhcPs) for some (body :: * ->
+require their argument to take a form of (body GhcPs) for some (body :: Type ->
 *). To satisfy this requirement, we say that (b ~ Body b GhcPs) in the
 superclass constraints of DisambECP.
 
