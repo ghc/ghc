@@ -253,7 +253,32 @@ cmmLayoutStack dflags procpoints entry_args
     blocks_with_reloads <-
         insertReloadsAsNeeded dflags procpoints final_stackmaps entry new_blocks
     new_blocks' <- mapM (lowerSafeForeignCall dflags) blocks_with_reloads
-    return (ofBlockList entry new_blocks', final_stackmaps)
+
+    let new_blocks'' = addInitialUnwinds dflags final_stackmaps new_blocks'
+
+    return (ofBlockList entry new_blocks'', final_stackmaps)
+
+-- | Add unwind pseudo-instruction at the beginning of each block to
+-- document Sp level for debugging
+addInitialUnwinds :: DynFlags
+                  -> LabelMap StackMap  -- ^ final 'StackMap's`
+                  -> [CmmBlock]         -- ^ blocks
+                  -> [CmmBlock]
+addInitialUnwinds dflags stackmaps blocks
+  | debugLevel dflags == 0 = blocks
+  | otherwise = map add_initial_unwind blocks
+  where
+    add_initial_unwind :: CmmBlock -> CmmBlock
+    add_initial_unwind blk
+      | Just stackmap <- mapLookup (entryLabel blk) stackmaps
+      , let sp_unwind = CmmRegOff spReg (sm_sp stackmap - wORD_SIZE dflags)
+      = prependHeadNode (CmmUnwind [(Sp, Just sp_unwind)]) blk
+      | otherwise = blk
+
+    prependHeadNode :: CmmNode O O -> CmmBlock -> CmmBlock
+    prependHeadNode n blk =
+      let (head, blks) = blockSplitHead  blk
+       in blockJoinHead head (blockCons n blks)
 
 -- -----------------------------------------------------------------------------
 -- Pass 1
@@ -865,20 +890,12 @@ getAreaOff stackmaps (Young l) =
 maybeAddSpAdj
   :: DynFlags -> ByteOff -> ByteOff -> Block CmmNode O O -> Block CmmNode O O
 maybeAddSpAdj dflags sp0 sp_off block =
-  add_initial_unwind $ add_adj_unwind $ adj block
+    add_adj_unwind $ adj block
   where
     adj block
       | sp_off /= 0
       = block `blockSnoc` CmmAssign spReg (cmmOffset dflags spExpr sp_off)
       | otherwise = block
-    -- Add unwind pseudo-instruction at the beginning of each block to
-    -- document Sp level for debugging
-    add_initial_unwind block
-      | debugLevel dflags > 0
-      = CmmUnwind [(Sp, Just sp_unwind)] `blockCons` block
-      | otherwise
-      = block
-      where sp_unwind = CmmRegOff spReg (sp0 - wORD_SIZE dflags)
 
     -- Add unwind pseudo-instruction right after the Sp adjustment
     -- if there is one.
