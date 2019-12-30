@@ -42,7 +42,7 @@ import Data.Bool        ( (&&) )
 import Data.Char        ( isDigit, isAlphaNum )
 import Data.Eq
 import Data.Int         ( Int )
-import Data.List
+import Data.List        ( map, sort, concat, concatMap, intersperse, (++) )
 import Data.Ord
 import Data.String      ( String )
 import GHC.Generics

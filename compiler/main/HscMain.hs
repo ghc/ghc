@@ -164,7 +164,7 @@ import Stream (Stream)
 
 import Util
 
-import Data.List
+import Data.List        ( nub, isPrefixOf, partition )
 import Control.Monad
 import Data.IORef
 import System.FilePath as FilePath
@@ -177,7 +177,7 @@ import Control.DeepSeq (force)
 
 import HieAst           ( mkHieFile )
 import HieTypes         ( getAsts, hie_asts, hie_module )
-import HieBin           ( readHieFile, writeHieFile , hie_file_result)
+import HieBin           ( readHieFile, writeHieFile, hie_file_result )
 import HieDebug         ( diffFile, validateScopes )
 
 #include "HsVersions.h"
