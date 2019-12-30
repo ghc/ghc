@@ -1444,7 +1444,7 @@ mkPackageState dflags dbs preload0 = do
           we build a mapping saying what every in scope module name points to.
 -}
 
-  -- This, and the other reverse's that you will see, are due to the face that
+  -- This, and the other reverse's that you will see, are due to the fact that
   -- packageFlags, pluginPackageFlags, etc. are all specified in *reverse* order
   -- than they are on the command line.
   let other_flags = reverse (packageFlags dflags)
