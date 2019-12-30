@@ -61,14 +61,12 @@ import qualified IOEnv  ( liftIO )
 import Var
 import Outputable
 import FastString
-import qualified ErrUtils as Err
-import ErrUtils( Severity(..) )
+import ErrUtils( Severity(..), DumpFormat (..), dumpOptionsFromFlag )
 import UniqSupply
-import UniqFM       ( UniqFM, mapUFM, filterUFM )
 import MonadUtils
 import NameCache
 import SrcLoc
-import Data.List
+import Data.List (intersperse, groupBy, sortBy)
 import Data.Ord
 import Data.Dynamic
 import Data.IORef
