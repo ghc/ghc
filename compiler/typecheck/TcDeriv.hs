@@ -72,7 +72,7 @@ import qualified GHC.LanguageExtensions as LangExt
 import Control.Monad
 import Control.Monad.Trans.Class
 import Control.Monad.Trans.Reader
-import Data.List
+import Data.List (partition, find)
 
 {-
 ************************************************************************

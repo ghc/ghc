@@ -57,7 +57,7 @@ import Control.Monad
 
 import Data.Char (isSpace)
 import Data.IORef
-import Data.List
+import Data.List (intercalate, isPrefixOf, isSuffixOf, nub, partition)
 import Data.Maybe
 import Control.Concurrent.MVar
 

@@ -54,7 +54,7 @@ import Util
 import qualified GHC.LanguageExtensions as LangExt
 
 import Panic
-import Data.List
+import Data.List ( partition )
 import System.Exit
 import Control.Monad
 import System.FilePath

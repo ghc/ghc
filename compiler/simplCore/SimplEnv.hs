@@ -69,7 +69,7 @@ import Outputable
 import Util
 import UniqFM                   ( pprUniqFM )
 
-import Data.List
+import Data.List (mapAccumL)
 
 {-
 ************************************************************************

@@ -165,7 +165,7 @@ import Stream (Stream)
 
 import Util
 
-import Data.List
+import Data.List        ( nub, isPrefixOf, partition )
 import Control.Monad
 import Data.IORef
 import System.FilePath as FilePath

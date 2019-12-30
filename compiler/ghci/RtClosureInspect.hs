@@ -62,7 +62,7 @@ import GHC.Runtime.Layout ( roundUpTo )
 
 import Control.Monad
 import Data.Maybe
-import Data.List
+import Data.List ((\\))
 #if defined(INTEGER_GMP)
 import GHC.Exts
 import Data.Array.Base

@@ -80,7 +80,7 @@ import Control.Monad
 import Control.Monad.Trans.Class
 import Control.Monad.Trans.Except (throwE, runExceptT)
 import Data.Char
-import Data.List
+import Data.List ( isPrefixOf, partition, intercalate )
 import Data.Maybe
 import Prelude
 
