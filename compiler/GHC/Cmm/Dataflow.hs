@@ -43,13 +43,14 @@ import Data.Array
 import Data.Maybe
 import Data.IntSet (IntSet)
 import qualified Data.IntSet as IntSet
+import Data.Kind (Type)
 
 import GHC.Cmm.Dataflow.Block
 import GHC.Cmm.Dataflow.Graph
 import GHC.Cmm.Dataflow.Collections
 import GHC.Cmm.Dataflow.Label
 
-type family   Fact (x :: Extensibility) f :: *
+type family   Fact (x :: Extensibility) f :: Type
 type instance Fact C f = FactBase f
 type instance Fact O f = f
 
