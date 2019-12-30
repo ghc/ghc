@@ -147,7 +147,7 @@ type GhcTcId = GhcTc                -- Old 'TcId' type param
 -- | GHC's L prefixed variants wrap their vanilla variant in this type family,
 -- to add 'SrcLoc' info via 'Located'. Other passes than 'GhcPass' not
 -- interested in location information can define this instance as @f p@.
-type family XRec p (f :: * -> *) = r | r -> p f
+type family XRec p (f :: Type -> Type) = r | r -> p f
 type instance XRec (GhcPass p) f = Located (f (GhcPass p))
 
 -- | Maps the "normal" id type for a given pass
@@ -179,7 +179,7 @@ type family XHsIPBinds       x x'
 type family XEmptyLocalBinds x x'
 type family XXHsLocalBindsLR x x'
 
-type ForallXHsLocalBindsLR (c :: * -> Constraint) (x :: *) (x' :: *) =
+type ForallXHsLocalBindsLR (c :: Type -> Constraint) (x :: Type) (x' :: Type) =
        ( c (XHsValBinds      x x')
        , c (XHsIPBinds       x x')
        , c (XEmptyLocalBinds x x')
@@ -190,7 +190,7 @@ type ForallXHsLocalBindsLR (c :: * -> Constraint) (x :: *) (x' :: *) =
 type family XValBinds    x x'
 type family XXValBindsLR x x'
 
-type ForallXValBindsLR (c :: * -> Constraint) (x :: *) (x' :: *) =
+type ForallXValBindsLR (c :: Type -> Constraint) (x :: Type) (x' :: Type) =
        ( c (XValBinds    x x')
        , c (XXValBindsLR x x')
        )
@@ -204,7 +204,7 @@ type family XAbsBinds   x x'
 type family XPatSynBind x x'
 type family XXHsBindsLR x x'
 
-type ForallXHsBindsLR (c :: * -> Constraint) (x :: *) (x' :: *) =
+type ForallXHsBindsLR (c :: Type -> Constraint) (x :: Type) (x' :: Type) =
        ( c (XFunBind    x x')
        , c (XPatBind    x x')
        , c (XVarBind    x x')
@@ -217,7 +217,7 @@ type ForallXHsBindsLR (c :: * -> Constraint) (x :: *) (x' :: *) =
 type family XABE x
 type family XXABExport x
 
-type ForallXABExport (c :: * -> Constraint) (x :: *) =
+type ForallXABExport (c :: Type -> Constraint) (x :: Type) =
        ( c (XABE       x)
        , c (XXABExport x)
        )
@@ -226,7 +226,7 @@ type ForallXABExport (c :: * -> Constraint) (x :: *) =
 type family XPSB x x'
 type family XXPatSynBind x x'
 
-type ForallXPatSynBind  (c :: * -> Constraint) (x :: *) (x' :: *) =
+type ForallXPatSynBind  (c :: Type -> Constraint) (x :: Type) (x' :: Type) =
        ( c (XPSB         x x')
        , c (XXPatSynBind x x')
        )
@@ -235,7 +235,7 @@ type ForallXPatSynBind  (c :: * -> Constraint) (x :: *) (x' :: *) =
 type family XIPBinds    x
 type family XXHsIPBinds x
 
-type ForallXHsIPBinds (c :: * -> Constraint) (x :: *) =
+type ForallXHsIPBinds (c :: Type -> Constraint) (x :: Type) =
        ( c (XIPBinds    x)
        , c (XXHsIPBinds x)
        )
@@ -244,7 +244,7 @@ type ForallXHsIPBinds (c :: * -> Constraint) (x :: *) =
 type family XCIPBind x
 type family XXIPBind x
 
-type ForallXIPBind (c :: * -> Constraint) (x :: *) =
+type ForallXIPBind (c :: Type -> Constraint) (x :: Type) =
        ( c (XCIPBind x)
        , c (XXIPBind x)
        )
@@ -263,7 +263,7 @@ type family XSCCFunSig        x
 type family XCompleteMatchSig x
 type family XXSig             x
 
-type ForallXSig (c :: * -> Constraint) (x :: *) =
+type ForallXSig (c :: Type -> Constraint) (x :: Type) =
        ( c (XTypeSig          x)
        , c (XPatSynSig        x)
        , c (XClassOpSig       x)
@@ -282,7 +282,7 @@ type ForallXSig (c :: * -> Constraint) (x :: *) =
 type family XFixitySig          x
 type family XXFixitySig         x
 
-type ForallXFixitySig (c :: * -> Constraint) (x :: *) =
+type ForallXFixitySig (c :: Type -> Constraint) (x :: Type) =
        ( c (XFixitySig         x)
        , c (XXFixitySig        x)
        )
@@ -311,7 +311,7 @@ type family XDocD        x
 type family XRoleAnnotD  x
 type family XXHsDecl     x
 
-type ForallXHsDecl (c :: * -> Constraint) (x :: *) =
+type ForallXHsDecl (c :: Type -> Constraint) (x :: Type) =
        ( c (XTyClD       x)
        , c (XInstD       x)
        , c (XDerivD      x)
@@ -334,7 +334,7 @@ type ForallXHsDecl (c :: * -> Constraint) (x :: *) =
 type family XCHsGroup      x
 type family XXHsGroup      x
 
-type ForallXHsGroup (c :: * -> Constraint) (x :: *) =
+type ForallXHsGroup (c :: Type -> Constraint) (x :: Type) =
        ( c (XCHsGroup       x)
        , c (XXHsGroup       x)
        )
@@ -344,7 +344,7 @@ type ForallXHsGroup (c :: * -> Constraint) (x :: *) =
 type family XSpliceDecl       x
 type family XXSpliceDecl      x
 
-type ForallXSpliceDecl (c :: * -> Constraint) (x :: *) =
+type ForallXSpliceDecl (c :: Type -> Constraint) (x :: Type) =
        ( c (XSpliceDecl        x)
        , c (XXSpliceDecl       x)
        )
@@ -357,7 +357,7 @@ type family XDataDecl      x
 type family XClassDecl     x
 type family XXTyClDecl     x
 
-type ForallXTyClDecl (c :: * -> Constraint) (x :: *) =
+type ForallXTyClDecl (c :: Type -> Constraint) (x :: Type) =
        ( c (XFamDecl       x)
        , c (XSynDecl       x)
        , c (XDataDecl      x)
@@ -370,7 +370,7 @@ type ForallXTyClDecl (c :: * -> Constraint) (x :: *) =
 type family XCTyClGroup      x
 type family XXTyClGroup      x
 
-type ForallXTyClGroup (c :: * -> Constraint) (x :: *) =
+type ForallXTyClGroup (c :: Type -> Constraint) (x :: Type) =
        ( c (XCTyClGroup       x)
        , c (XXTyClGroup       x)
        )
@@ -382,7 +382,7 @@ type family XCKindSig         x -- Clashes with XKindSig above
 type family XTyVarSig         x
 type family XXFamilyResultSig x
 
-type ForallXFamilyResultSig (c :: * -> Constraint) (x :: *) =
+type ForallXFamilyResultSig (c :: Type -> Constraint) (x :: Type) =
        ( c (XNoSig            x)
        , c (XCKindSig         x)
        , c (XTyVarSig         x)
@@ -394,7 +394,7 @@ type ForallXFamilyResultSig (c :: * -> Constraint) (x :: *) =
 type family XCFamilyDecl      x
 type family XXFamilyDecl      x
 
-type ForallXFamilyDecl (c :: * -> Constraint) (x :: *) =
+type ForallXFamilyDecl (c :: Type -> Constraint) (x :: Type) =
        ( c (XCFamilyDecl       x)
        , c (XXFamilyDecl       x)
        )
@@ -404,7 +404,7 @@ type ForallXFamilyDecl (c :: * -> Constraint) (x :: *) =
 type family XCHsDataDefn      x
 type family XXHsDataDefn      x
 
-type ForallXHsDataDefn (c :: * -> Constraint) (x :: *) =
+type ForallXHsDataDefn (c :: Type -> Constraint) (x :: Type) =
        ( c (XCHsDataDefn       x)
        , c (XXHsDataDefn       x)
        )
@@ -414,7 +414,7 @@ type ForallXHsDataDefn (c :: * -> Constraint) (x :: *) =
 type family XCHsDerivingClause      x
 type family XXHsDerivingClause      x
 
-type ForallXHsDerivingClause (c :: * -> Constraint) (x :: *) =
+type ForallXHsDerivingClause (c :: Type -> Constraint) (x :: Type) =
        ( c (XCHsDerivingClause       x)
        , c (XXHsDerivingClause       x)
        )
@@ -425,7 +425,7 @@ type family XConDeclGADT   x
 type family XConDeclH98    x
 type family XXConDecl      x
 
-type ForallXConDecl (c :: * -> Constraint) (x :: *) =
+type ForallXConDecl (c :: Type -> Constraint) (x :: Type) =
        ( c (XConDeclGADT    x)
        , c (XConDeclH98     x)
        , c (XXConDecl       x)
@@ -436,7 +436,7 @@ type ForallXConDecl (c :: * -> Constraint) (x :: *) =
 type family XCFamEqn      x r
 type family XXFamEqn      x r
 
-type ForallXFamEqn (c :: * -> Constraint) (x :: *) (r :: *) =
+type ForallXFamEqn (c :: Type -> Constraint) (x :: Type) (r :: Type) =
        ( c (XCFamEqn       x r)
        , c (XXFamEqn       x r)
        )
@@ -446,7 +446,7 @@ type ForallXFamEqn (c :: * -> Constraint) (x :: *) (r :: *) =
 type family XCClsInstDecl      x
 type family XXClsInstDecl      x
 
-type ForallXClsInstDecl (c :: * -> Constraint) (x :: *) =
+type ForallXClsInstDecl (c :: Type -> Constraint) (x :: Type) =
        ( c (XCClsInstDecl       x)
        , c (XXClsInstDecl       x)
        )
@@ -458,7 +458,7 @@ type family XDataFamInstD  x
 type family XTyFamInstD    x
 type family XXInstDecl     x
 
-type ForallXInstDecl (c :: * -> Constraint) (x :: *) =
+type ForallXInstDecl (c :: Type -> Constraint) (x :: Type) =
        ( c (XClsInstD       x)
        , c (XDataFamInstD   x)
        , c (XTyFamInstD     x)
@@ -470,7 +470,7 @@ type ForallXInstDecl (c :: * -> Constraint) (x :: *) =
 type family XCDerivDecl      x
 type family XXDerivDecl      x
 
-type ForallXDerivDecl (c :: * -> Constraint) (x :: *) =
+type ForallXDerivDecl (c :: Type -> Constraint) (x :: Type) =
        ( c (XCDerivDecl       x)
        , c (XXDerivDecl       x)
        )
@@ -484,7 +484,7 @@ type family XViaStrategy x
 type family XCDefaultDecl      x
 type family XXDefaultDecl      x
 
-type ForallXDefaultDecl (c :: * -> Constraint) (x :: *) =
+type ForallXDefaultDecl (c :: Type -> Constraint) (x :: Type) =
        ( c (XCDefaultDecl       x)
        , c (XXDefaultDecl       x)
        )
@@ -495,7 +495,7 @@ type family XForeignImport     x
 type family XForeignExport     x
 type family XXForeignDecl      x
 
-type ForallXForeignDecl (c :: * -> Constraint) (x :: *) =
+type ForallXForeignDecl (c :: Type -> Constraint) (x :: Type) =
        ( c (XForeignImport      x)
        , c (XForeignExport      x)
        , c (XXForeignDecl       x)
@@ -506,7 +506,7 @@ type ForallXForeignDecl (c :: * -> Constraint) (x :: *) =
 type family XCRuleDecls      x
 type family XXRuleDecls      x
 
-type ForallXRuleDecls (c :: * -> Constraint) (x :: *) =
+type ForallXRuleDecls (c :: Type -> Constraint) (x :: Type) =
        ( c (XCRuleDecls       x)
        , c (XXRuleDecls       x)
        )
@@ -517,7 +517,7 @@ type ForallXRuleDecls (c :: * -> Constraint) (x :: *) =
 type family XHsRule          x
 type family XXRuleDecl       x
 
-type ForallXRuleDecl (c :: * -> Constraint) (x :: *) =
+type ForallXRuleDecl (c :: Type -> Constraint) (x :: Type) =
        ( c (XHsRule           x)
        , c (XXRuleDecl        x)
        )
@@ -528,7 +528,7 @@ type family XCRuleBndr      x
 type family XRuleBndrSig    x
 type family XXRuleBndr      x
 
-type ForallXRuleBndr (c :: * -> Constraint) (x :: *) =
+type ForallXRuleBndr (c :: Type -> Constraint) (x :: Type) =
        ( c (XCRuleBndr       x)
        , c (XRuleBndrSig     x)
        , c (XXRuleBndr       x)
@@ -539,7 +539,7 @@ type ForallXRuleBndr (c :: * -> Constraint) (x :: *) =
 type family XWarnings        x
 type family XXWarnDecls      x
 
-type ForallXWarnDecls (c :: * -> Constraint) (x :: *) =
+type ForallXWarnDecls (c :: Type -> Constraint) (x :: Type) =
        ( c (XWarnings        x)
        , c (XXWarnDecls      x)
        )
@@ -549,7 +549,7 @@ type ForallXWarnDecls (c :: * -> Constraint) (x :: *) =
 type family XWarning        x
 type family XXWarnDecl      x
 
-type ForallXWarnDecl (c :: * -> Constraint) (x :: *) =
+type ForallXWarnDecl (c :: Type -> Constraint) (x :: Type) =
        ( c (XWarning        x)
        , c (XXWarnDecl      x)
        )
@@ -559,7 +559,7 @@ type ForallXWarnDecl (c :: * -> Constraint) (x :: *) =
 type family XHsAnnotation  x
 type family XXAnnDecl      x
 
-type ForallXAnnDecl (c :: * -> Constraint) (x :: *) =
+type ForallXAnnDecl (c :: Type -> Constraint) (x :: Type) =
        ( c (XHsAnnotation  x)
        , c (XXAnnDecl      x)
        )
@@ -569,7 +569,7 @@ type ForallXAnnDecl (c :: * -> Constraint) (x :: *) =
 type family XCRoleAnnotDecl  x
 type family XXRoleAnnotDecl  x
 
-type ForallXRoleAnnotDecl (c :: * -> Constraint) (x :: *) =
+type ForallXRoleAnnotDecl (c :: Type -> Constraint) (x :: Type) =
        ( c (XCRoleAnnotDecl  x)
        , c (XXRoleAnnotDecl  x)
        )
@@ -623,7 +623,7 @@ type family XCoreAnn        x
 type family XTickPragma     x
 type family XXPragE         x
 
-type ForallXExpr (c :: * -> Constraint) (x :: *) =
+type ForallXExpr (c :: Type -> Constraint) (x :: Type) =
        ( c (XVar            x)
        , c (XUnboundVar     x)
        , c (XConLikeOut     x)
@@ -673,7 +673,7 @@ type family XUnambiguous        x
 type family XAmbiguous          x
 type family XXAmbiguousFieldOcc x
 
-type ForallXAmbiguousFieldOcc (c :: * -> Constraint) (x :: *) =
+type ForallXAmbiguousFieldOcc (c :: Type -> Constraint) (x :: Type) =
        ( c (XUnambiguous        x)
        , c (XAmbiguous          x)
        , c (XXAmbiguousFieldOcc x)
@@ -685,7 +685,7 @@ type family XPresent  x
 type family XMissing  x
 type family XXTupArg  x
 
-type ForallXTupArg (c :: * -> Constraint) (x :: *) =
+type ForallXTupArg (c :: Type -> Constraint) (x :: Type) =
        ( c (XPresent x)
        , c (XMissing x)
        , c (XXTupArg x)
@@ -699,7 +699,7 @@ type family XQuasiQuote    x
 type family XSpliced       x
 type family XXSplice       x
 
-type ForallXSplice (c :: * -> Constraint) (x :: *) =
+type ForallXSplice (c :: Type -> Constraint) (x :: Type) =
        ( c (XTypedSplice   x)
        , c (XUntypedSplice x)
        , c (XQuasiQuote    x)
@@ -718,7 +718,7 @@ type family XVarBr      x
 type family XTExpBr     x
 type family XXBracket   x
 
-type ForallXBracket (c :: * -> Constraint) (x :: *) =
+type ForallXBracket (c :: Type -> Constraint) (x :: Type) =
        ( c (XExpBr      x)
        , c (XPatBr      x)
        , c (XDecBrL     x)
@@ -734,7 +734,7 @@ type ForallXBracket (c :: * -> Constraint) (x :: *) =
 type family XCmdTop  x
 type family XXCmdTop x
 
-type ForallXCmdTop (c :: * -> Constraint) (x :: *) =
+type ForallXCmdTop (c :: Type -> Constraint) (x :: Type) =
        ( c (XCmdTop  x)
        , c (XXCmdTop x)
        )
@@ -744,7 +744,7 @@ type ForallXCmdTop (c :: * -> Constraint) (x :: *) =
 type family XMG           x b
 type family XXMatchGroup  x b
 
-type ForallXMatchGroup (c :: * -> Constraint) (x :: *) (b :: *) =
+type ForallXMatchGroup (c :: Type -> Constraint) (x :: Type) (b :: Type) =
        ( c (XMG          x b)
        , c (XXMatchGroup x b)
        )
@@ -754,7 +754,7 @@ type ForallXMatchGroup (c :: * -> Constraint) (x :: *) (b :: *) =
 type family XCMatch  x b
 type family XXMatch  x b
 
-type ForallXMatch (c :: * -> Constraint) (x :: *) (b :: *) =
+type ForallXMatch (c :: Type -> Constraint) (x :: Type) (b :: Type) =
        ( c (XCMatch  x b)
        , c (XXMatch  x b)
        )
@@ -764,7 +764,7 @@ type ForallXMatch (c :: * -> Constraint) (x :: *) (b :: *) =
 type family XCGRHSs  x b
 type family XXGRHSs  x b
 
-type ForallXGRHSs (c :: * -> Constraint) (x :: *) (b :: *) =
+type ForallXGRHSs (c :: Type -> Constraint) (x :: Type) (b :: Type) =
        ( c (XCGRHSs  x b)
        , c (XXGRHSs  x b)
        )
@@ -774,7 +774,7 @@ type ForallXGRHSs (c :: * -> Constraint) (x :: *) (b :: *) =
 type family XCGRHS  x b
 type family XXGRHS  x b
 
-type ForallXGRHS (c :: * -> Constraint) (x :: *) (b :: *) =
+type ForallXGRHS (c :: Type -> Constraint) (x :: Type) (b :: Type) =
        ( c (XCGRHS  x b)
        , c (XXGRHS  x b)
        )
@@ -791,7 +791,7 @@ type family XTransStmt       x x' b
 type family XRecStmt         x x' b
 type family XXStmtLR         x x' b
 
-type ForallXStmtLR (c :: * -> Constraint) (x :: *)  (x' :: *) (b :: *) =
+type ForallXStmtLR (c :: Type -> Constraint) (x :: Type)  (x' :: Type) (b :: Type) =
        ( c (XLastStmt         x x' b)
        , c (XBindStmt         x x' b)
        , c (XApplicativeStmt  x x' b)
@@ -817,7 +817,7 @@ type family XCmdDo      x
 type family XCmdWrap    x
 type family XXCmd       x
 
-type ForallXCmd (c :: * -> Constraint) (x :: *) =
+type ForallXCmd (c :: Type -> Constraint) (x :: Type) =
        ( c (XCmdArrApp  x)
        , c (XCmdArrForm x)
        , c (XCmdApp     x)
@@ -836,7 +836,7 @@ type ForallXCmd (c :: * -> Constraint) (x :: *) =
 type family XParStmtBlock  x x'
 type family XXParStmtBlock x x'
 
-type ForallXParStmtBlock (c :: * -> Constraint) (x :: *) (x' :: *) =
+type ForallXParStmtBlock (c :: Type -> Constraint) (x :: Type) (x' :: Type) =
        ( c (XParStmtBlock  x x')
        , c (XXParStmtBlock x x')
        )
@@ -847,7 +847,7 @@ type family XApplicativeArgOne   x
 type family XApplicativeArgMany  x
 type family XXApplicativeArg     x
 
-type ForallXApplicativeArg (c :: * -> Constraint) (x :: *) =
+type ForallXApplicativeArg (c :: Type -> Constraint) (x :: Type) =
        ( c (XApplicativeArgOne   x)
        , c (XApplicativeArgMany  x)
        , c (XXApplicativeArg     x)
@@ -880,7 +880,7 @@ type family XXLit x
 
 -- | Helper to apply a constraint to all extension points. It has one
 -- entry per extension point type family.
-type ForallXHsLit (c :: * -> Constraint) (x :: *) =
+type ForallXHsLit (c :: Type -> Constraint) (x :: Type) =
   ( c (XHsChar       x)
   , c (XHsCharPrim   x)
   , c (XHsDoublePrim x)
@@ -900,7 +900,7 @@ type ForallXHsLit (c :: * -> Constraint) (x :: *) =
 type family XOverLit  x
 type family XXOverLit x
 
-type ForallXOverLit (c :: * -> Constraint) (x :: *) =
+type ForallXOverLit (c :: Type -> Constraint) (x :: Type) =
        ( c (XOverLit  x)
        , c (XXOverLit x)
        )
@@ -928,7 +928,7 @@ type family XCoPat     x
 type family XXPat      x
 
 
-type ForallXPat (c :: * -> Constraint) (x :: *) =
+type ForallXPat (c :: Type -> Constraint) (x :: Type) =
        ( c (XWildPat   x)
        , c (XVarPat    x)
        , c (XLazyPat   x)
@@ -954,7 +954,7 @@ type ForallXPat (c :: * -> Constraint) (x :: *) =
 type family XHsQTvs       x
 type family XXLHsQTyVars  x
 
-type ForallXLHsQTyVars (c :: * -> Constraint) (x :: *) =
+type ForallXLHsQTyVars (c :: Type -> Constraint) (x :: Type) =
        ( c (XHsQTvs       x)
        , c (XXLHsQTyVars  x)
        )
@@ -964,7 +964,7 @@ type ForallXLHsQTyVars (c :: * -> Constraint) (x :: *) =
 type family XHsIB              x b
 type family XXHsImplicitBndrs  x b
 
-type ForallXHsImplicitBndrs (c :: * -> Constraint) (x :: *) (b :: *) =
+type ForallXHsImplicitBndrs (c :: Type -> Constraint) (x :: Type) (b :: Type) =
        ( c (XHsIB              x b)
        , c (XXHsImplicitBndrs  x b)
        )
@@ -974,7 +974,7 @@ type ForallXHsImplicitBndrs (c :: * -> Constraint) (x :: *) (b :: *) =
 type family XHsWC              x b
 type family XXHsWildCardBndrs  x b
 
-type ForallXHsWildCardBndrs(c :: * -> Constraint) (x :: *) (b :: *) =
+type ForallXHsWildCardBndrs(c :: Type -> Constraint) (x :: Type) (b :: Type) =
        ( c (XHsWC              x b)
        , c (XXHsWildCardBndrs  x b)
        )
@@ -1007,7 +1007,7 @@ type family XXType           x
 
 -- | Helper to apply a constraint to all extension points. It has one
 -- entry per extension point type family.
-type ForallXType (c :: * -> Constraint) (x :: *) =
+type ForallXType (c :: Type -> Constraint) (x :: Type) =
        ( c (XForAllTy        x)
        , c (XQualTy          x)
        , c (XTyVar           x)
@@ -1039,7 +1039,7 @@ type family XUserTyVar   x
 type family XKindedTyVar x
 type family XXTyVarBndr  x
 
-type ForallXTyVarBndr (c :: * -> Constraint) (x :: *) =
+type ForallXTyVarBndr (c :: Type -> Constraint) (x :: Type) =
        ( c (XUserTyVar      x)
        , c (XKindedTyVar    x)
        , c (XXTyVarBndr     x)
@@ -1050,7 +1050,7 @@ type ForallXTyVarBndr (c :: * -> Constraint) (x :: *) =
 type family XConDeclField  x
 type family XXConDeclField x
 
-type ForallXConDeclField (c :: * -> Constraint) (x :: *) =
+type ForallXConDeclField (c :: Type -> Constraint) (x :: Type) =
        ( c (XConDeclField  x)
        , c (XXConDeclField x)
        )
@@ -1060,7 +1060,7 @@ type ForallXConDeclField (c :: * -> Constraint) (x :: *) =
 type family XCFieldOcc x
 type family XXFieldOcc x
 
-type ForallXFieldOcc (c :: * -> Constraint) (x :: *) =
+type ForallXFieldOcc (c :: Type -> Constraint) (x :: Type) =
        ( c (XCFieldOcc x)
        , c (XXFieldOcc x)
        )
@@ -1072,7 +1072,7 @@ type ForallXFieldOcc (c :: * -> Constraint) (x :: *) =
 type family XCImportDecl       x
 type family XXImportDecl       x
 
-type ForallXImportDecl (c :: * -> Constraint) (x :: *) =
+type ForallXImportDecl (c :: Type -> Constraint) (x :: Type) =
        ( c (XCImportDecl x)
        , c (XXImportDecl x)
        )
@@ -1089,7 +1089,7 @@ type family XIEDoc             x
 type family XIEDocNamed        x
 type family XXIE               x
 
-type ForallXIE (c :: * -> Constraint) (x :: *) =
+type ForallXIE (c :: Type -> Constraint) (x :: Type) =
        ( c (XIEVar x)
        , c (XIEThingAbs        x)
        , c (XIEThingAll        x)
