@@ -31,7 +31,7 @@ import GhcPrelude
 import Outputable
 import Unique
 import RegClass
-import Data.List
+import Data.List (intersect)
 
 -- | An identifier for a primitive real machine register.
 type RegNo
