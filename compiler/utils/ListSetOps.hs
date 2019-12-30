@@ -28,7 +28,7 @@ import GhcPrelude
 import Outputable
 import Util
 
-import Data.List
+import qualified Data.List as L
 import qualified Data.List.NonEmpty as NE
 import Data.List.NonEmpty (NonEmpty(..))
 import qualified Data.Set as S
@@ -40,7 +40,7 @@ getNth xs n = ASSERT2( xs `lengthExceeds` n, ppr n $$ ppr xs )
 deleteBys :: (a -> a -> Bool) -> [a] -> [a] -> [a]
 -- (deleteBys eq xs ys) returns xs-ys, using the given equality function
 -- Just like 'Data.List.delete' but with an equality function
-deleteBys eq xs ys = foldl' (flip (deleteBy eq)) xs ys
+deleteBys eq xs ys = foldl' (flip (L.deleteBy eq)) xs ys
 
 {-
 ************************************************************************
@@ -153,7 +153,7 @@ equivClasses :: (a -> a -> Ordering) -- Comparison
 
 equivClasses _   []      = []
 equivClasses _   [stuff] = [stuff :| []]
-equivClasses cmp items   = NE.groupBy eq (sortBy cmp items)
+equivClasses cmp items   = NE.groupBy eq (L.sortBy cmp items)
   where
     eq a b = case cmp a b of { EQ -> True; _ -> False }
 
@@ -166,7 +166,7 @@ removeDups :: (a -> a -> Ordering) -- Comparison function
 removeDups _   []  = ([], [])
 removeDups _   [x] = ([x],[])
 removeDups cmp xs
-  = case (mapAccumR collect_dups [] (equivClasses cmp xs)) of { (dups, xs') ->
+  = case L.mapAccumR collect_dups [] (equivClasses cmp xs) of { (dups, xs') ->
     (xs', dups) }
   where
     collect_dups :: [NonEmpty a] -> NonEmpty a -> ([NonEmpty a], a)
@@ -175,6 +175,6 @@ removeDups cmp xs
 
 findDupsEq :: (a->a->Bool) -> [a] -> [NonEmpty a]
 findDupsEq _  [] = []
-findDupsEq eq (x:xs) | null eq_xs  = findDupsEq eq xs
-                     | otherwise   = (x :| eq_xs) : findDupsEq eq neq_xs
-    where (eq_xs, neq_xs) = partition (eq x) xs
+findDupsEq eq (x:xs) | L.null eq_xs  = findDupsEq eq xs
+                     | otherwise     = (x :| eq_xs) : findDupsEq eq neq_xs
+    where (eq_xs, neq_xs) = L.partition (eq x) xs
