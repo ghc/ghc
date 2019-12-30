@@ -83,7 +83,7 @@ import UniqSet ( nonDetEltsUniqSet )
 import qualified GHC.LanguageExtensions as LangExt
 
 import Data.Function
-import Data.List
+import Data.List (partition, sortBy, groupBy, intersect)
 import qualified Data.Set as Set
 
 {-

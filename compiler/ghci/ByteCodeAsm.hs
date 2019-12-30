@@ -55,7 +55,7 @@ import Data.Array.Unsafe( castSTUArray )
 
 import Foreign
 import Data.Char        ( ord )
-import Data.List
+import Data.List        ( genericLength )
 import Data.Map (Map)
 import Data.Maybe (fromMaybe)
 import qualified Data.Map as Map
