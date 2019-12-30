@@ -112,7 +112,7 @@ import qualified GHC.LanguageExtensions as LangExt
 import Util ( HasDebugCallStack )
 
 import Data.IORef
-import Data.List
+import Data.List (intercalate)
 import Control.Monad
 
 {- *********************************************************************

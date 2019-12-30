@@ -146,7 +146,7 @@ import UniqDSet
 import FastString
 import Binary
 import Util
-import Data.List
+import Data.List (sortBy, sort)
 import Data.Ord
 import GHC.PackageDb (BinaryStringRep(..), DbUnitIdModuleRep(..), DbModule(..), DbUnitId(..))
 import Fingerprint

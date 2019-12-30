@@ -16,7 +16,7 @@ import Unique
 import UniqSet
 import UniqFM
 
-import Data.List
+import Data.List (mapAccumL)
 import Data.Maybe
 
 
