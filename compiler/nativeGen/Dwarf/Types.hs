@@ -345,7 +345,7 @@ pprFrameProc :: CLabel -> UnwindTable -> DwarfFrameProc -> SDoc
 pprFrameProc frameLbl initUw (DwarfFrameProc procLbl hasInfo blocks)
   = let fdeLabel    = mkAsmTempDerivedLabel procLbl (fsLit "_fde")
         fdeEndLabel = mkAsmTempDerivedLabel procLbl (fsLit "_fde_end")
-        procEnd     = mkAsmTempEndLabel procLbl
+        procEnd     = mkAsmTempProcEndLabel procLbl
         ifInfo str  = if hasInfo then text str else empty
                       -- see [Note: Info Offset]
     in vcat [ whenPprDebug $ text "# Unwinding for" <+> ppr procLbl <> colon
