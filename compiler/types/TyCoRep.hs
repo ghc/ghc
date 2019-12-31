@@ -1068,6 +1068,8 @@ data Coercion
 
   | HoleCo CoercionHole              -- ^ See Note [Coercion holes]
                                      -- Only present during typechecking
+  | ErasedCoercion -- ^ optimization hack because cast terms blowup fusion heavy
+                   -- code, implied whenever corelint isn't enabled
   deriving Data.Data
 
 type CoercionN = Coercion       -- always nominal
@@ -1672,6 +1674,7 @@ coercionSize (ForAllCo _ h co)   = 1 + coercionSize co + coercionSize h
 coercionSize (FunCo _ co1 co2)   = 1 + coercionSize co1 + coercionSize co2
 coercionSize (CoVarCo _)         = 1
 coercionSize (HoleCo _)          = 1
+coercionSize ErasedCoercion      = 1
 coercionSize (AxiomInstCo _ _ args) = 1 + sum (map coercionSize args)
 coercionSize (UnivCo p _ t1 t2)  = 1 + provSize p + typeSize t1 + typeSize t2
 coercionSize (SymCo co)          = 1 + coercionSize co
