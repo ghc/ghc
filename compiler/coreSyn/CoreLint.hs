@@ -301,6 +301,8 @@ coreDumpFlag CoreDesugarOpt           = Just Opt_D_dump_ds
 coreDumpFlag CoreTidy                 = Just Opt_D_dump_simpl
 coreDumpFlag CorePrep                 = Just Opt_D_dump_prep
 coreDumpFlag CoreOccurAnal            = Just Opt_D_dump_occur_anal
+coreDumpFlag CoreEraseCoercionEvidence =
+    panic "imposible to lint core with erased coercions,rebuild libraries with core linting enabled"
 
 coreDumpFlag CoreDoPrintCore          = Nothing
 coreDumpFlag (CoreDoRuleCheck {})     = Nothing
@@ -1687,6 +1689,7 @@ lintCoercion :: OutCoercion -> LintM (LintedKind, LintedKind, LintedType, Linted
 
 -- If you edit this function, you may need to update the GHC formalism
 -- See Note [GHC Formalism]
+lintCoercion ErasedCoercion = panic "core linting requires core lint on your dependencies"
 lintCoercion (Refl ty)
   = do { k <- lintType ty
        ; return (k, k, ty, ty, Nominal) }

@@ -523,7 +523,7 @@ substIfaceType env ty
     go_co (IfaceKindCo co)           = IfaceKindCo (go_co co)
     go_co (IfaceSubCo co)            = IfaceSubCo (go_co co)
     go_co (IfaceAxiomRuleCo n cos)   = IfaceAxiomRuleCo n (go_cos cos)
-
+    go_co (IfaceErased) = IfaceErased
     go_cos = map go_co
 
     go_prov IfaceUnsafeCoerceProv    = IfaceUnsafeCoerceProv
@@ -1596,7 +1596,7 @@ ppr_co ctxt_prec (IfaceSubCo co)
   = ppr_special_co ctxt_prec (text "Sub") [co]
 ppr_co ctxt_prec (IfaceKindCo co)
   = ppr_special_co ctxt_prec (text "Kind") [co]
-
+ppr_co ctxt_prec (IfaceErased) = text "ErasedCoercion"
 ppr_special_co :: PprPrec -> SDoc -> [IfaceCoercion] -> SDoc
 ppr_special_co ctxt_prec doc cos
   = maybeParen ctxt_prec appPrec
@@ -1890,6 +1890,8 @@ instance Binary IfaceCoercion where
           putByte bh 17
           put_ bh a
           put_ bh b
+  put_ bh (IfaceErased) = do
+          putByte bh 18
   put_ _ (IfaceFreeCoVar cv)
        = pprPanic "Can't serialise IfaceFreeCoVar" (ppr cv)
   put_ _  (IfaceHoleCo cv)
@@ -1952,6 +1954,8 @@ instance Binary IfaceCoercion where
            17-> do a <- get bh
                    b <- get bh
                    return $ IfaceAxiomRuleCo a b
+           18 -> do
+                  return $ IfaceErased
            _ -> panic ("get IfaceCoercion " ++ show tag)
 
 instance Binary IfaceUnivCoProv where
@@ -2027,6 +2031,7 @@ instance NFData IfaceCoercion where
     IfaceSubCo f1 -> rnf f1
     IfaceFreeCoVar f1 -> f1 `seq` ()
     IfaceHoleCo f1 -> f1 `seq` ()
+    IfaceErased -> ()
 
 instance NFData IfaceUnivCoProv where
   rnf x = seq x ()
