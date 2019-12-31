@@ -4,7 +4,7 @@ import GhcPrelude
 
 import CoreSyn
 import HscTypes         ( ModGuts(..) )
-
+import Coercion
 import CoreMonad        ( CoreM )
 import DynFlags
 import TyCoRep (Coercion(ErasedCoercion))
@@ -37,6 +37,7 @@ coreExprEraseProof (Case  scrut v ty alts  )=
     Case (coreExprEraseProof scrut) v ty (map eraseAltPfs alts)
 coreExprEraseProof (Cast  e co ) = Cast (coreExprEraseProof e) (ErasedCoercion role lty rty )
   where
+    (Pair lty rty,role) = coercionKindRole
 coreExprEraseProof (Tick  tick e)= Tick tick (coreExprEraseProof e)
 coreExprEraseProof (Type  t) = Type t
 coreExprEraseProof (Coercion _)= Coercion ErasedCoercion
