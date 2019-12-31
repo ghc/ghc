@@ -110,7 +110,7 @@ module Coercion (
 
         -- * Other
         promoteCoercion, buildCoercion,
-
+        ErasedCoercion,
         simplifyArgsWorker
        ) where
 
@@ -1435,7 +1435,7 @@ promoteCoercion co = case co of
 
     SubCo g
       -> promoteCoercion g
-
+    ErasedCoercion -> ErasedCoercion
   where
     Pair ty1 ty2 = coercionKind co
     ki1 = typeKind ty1
@@ -2123,6 +2123,7 @@ seqMCo MRefl    = ()
 seqMCo (MCo co) = seqCo co
 
 seqCo :: Coercion -> ()
+seqCo (ErasedCoercion) = ()
 seqCo (Refl ty)                 = seqType ty
 seqCo (GRefl r ty mco)          = r `seq` seqType ty `seq` seqMCo mco
 seqCo (TyConAppCo r tc cos)     = r `seq` tc `seq` seqCos cos
@@ -2188,6 +2189,7 @@ coercionLKind :: Coercion -> Type
 coercionLKind co
   = go co
   where
+    go (ErasedCoercion)   = panic "erased coercions have no type, dont lint em"
     go (Refl ty)                = ty
     go (GRefl _ ty _)           = ty
     go (TyConAppCo _ tc cos)    = mkTyConApp tc (map go cos)
@@ -2243,6 +2245,7 @@ coercionRKind :: Coercion -> Type
 coercionRKind co
   = go co
   where
+    go (ErasedCoercion)= panic  "no kind for erased coercions "
     go (Refl ty)                = ty
     go (GRefl _ ty MRefl)       = ty
     go (GRefl _ ty (MCo co1))   = mkCastTy ty co1
@@ -2366,6 +2369,7 @@ coercionRole = go
     go (KindCo {}) = Nominal
     go (SubCo _) = Representational
     go (AxiomRuleCo ax _) = coaxrRole ax
+    go (ErasedCoercion) = panic "coercionRole is not defined for ErasedCoercion"
 
 {-
 Note [Nested InstCos]

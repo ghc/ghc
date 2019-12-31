@@ -145,6 +145,7 @@ instance Outputable CoreToDo where
   ppr CoreOccurAnal            = text "Occurrence analysis"
   ppr CoreDoPrintCore          = text "Print core"
   ppr (CoreDoRuleCheck {})     = text "Rule check"
+  ppr (CoreEraseCoercionEvidence) = text "Erase Coercion Proofs"
   ppr CoreDoNothing            = text "CoreDoNothing"
   ppr (CoreDoPasses passes)    = text "CoreDoPasses" <+> ppr passes
 

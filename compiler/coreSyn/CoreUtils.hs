@@ -114,12 +114,14 @@ exprType :: CoreExpr -> Type
 -- really be said to have a type
 exprType (Var var)           = idType var
 exprType (Lit lit)           = literalType lit
+exprType (Coercion ErasedCoercion) = panic "exprType of ErasedCoercion"
 exprType (Coercion co)       = coercionType co
 exprType (Let bind body)
   | NonRec tv rhs <- bind    -- See Note [Type bindings]
   , Type ty <- rhs           = substTyWithUnchecked [tv] [ty] (exprType body)
   | otherwise                = exprType body
 exprType (Case _ _ ty _)     = ty
+exprType (Cast e ErasedCoercion)= exprType e -- this is representationally true
 exprType (Cast _ co)         = pSnd (coercionKind co)
 exprType (Tick _ e)          = exprType e
 exprType (Lam binder expr)   = mkLamType binder (exprType expr)
@@ -177,6 +179,7 @@ isExprLevPoly = go
    go_app (Lam _ e)       = go_app e
    go_app (Let _ e)       = go_app e
    go_app (Case _ _ ty _) = resultIsLevPoly ty
+   go_app (Cast e ErasedCoercion) = go_app e
    go_app (Cast _ co)     = resultIsLevPoly (coercionRKind co)
    go_app (Tick _ e)      = go_app e
    go_app e@(Type {})     = pprPanic "isExprLevPoly app ty" (ppr e)
@@ -259,6 +262,7 @@ applyTypeToArgs e op_ty args
 -- | Wrap the given expression in the coercion safely, dropping
 -- identity coercions and coalescing nested coercions
 mkCast :: CoreExpr -> CoercionR -> CoreExpr
+mkCast e ErasedCoercion = e
 mkCast e co
   | ASSERT2( coercionRole co == Representational
            , text "coercion" <+> ppr co <+> ptext (sLit "passed to mkCast")
