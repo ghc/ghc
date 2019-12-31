@@ -449,6 +449,7 @@ Library
         OccurAnal
         SAT
         SetLevels
+        CoreEraseCoercionProofs
         SimplCore
         SimplEnv
         SimplMonad

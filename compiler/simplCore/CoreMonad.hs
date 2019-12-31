@@ -122,6 +122,7 @@ data CoreToDo           -- These are diff core-to-core passes,
   | CoreTidy
   | CorePrep
   | CoreOccurAnal
+  | CoreEraseCoercionEvidence --
 
 instance Outputable CoreToDo where
   ppr (CoreDoSimplify _ _)     = text "Simplifier"

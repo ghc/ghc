@@ -48,6 +48,7 @@ import DmdAnal          ( dmdAnalProgram )
 import CallArity        ( callArityAnalProgram )
 import Exitify          ( exitifyProgram )
 import WorkWrap         ( wwTopBinds )
+import CoreEraseCoercionProofs (eraseCoercionProgram,coreProgramEraseCoercionProofs)
 import SrcLoc
 import Util
 import Module
@@ -121,6 +122,7 @@ getCoreToDo dflags
     phases        = simplPhases        dflags
     max_iter      = maxSimplIterations dflags
     rule_check    = ruleCheck          dflags
+
     call_arity    = gopt Opt_CallArity                    dflags
     exitification = gopt Opt_Exitification                dflags
     strictness    = gopt Opt_Strictness                   dflags
@@ -457,12 +459,16 @@ doCorePass CoreDoSpecialising        = {-# SCC "Specialise" #-}
 doCorePass CoreDoSpecConstr          = {-# SCC "SpecConstr" #-}
                                        specConstrProgram
 
+doCorePass CoreEraseCoercionEvidence = {-# SCC "EraseCoercionEvidence" #-}
+                                       doEraseCoercions
+
 doCorePass CoreDoPrintCore              = observe   printCore
 doCorePass (CoreDoRuleCheck phase pat)  = ruleCheckPass phase pat
 doCorePass CoreDoNothing                = return
 doCorePass (CoreDoPasses passes)        = runCorePasses passes
 
 doCorePass (CoreDoPluginPass _ pass) = {-# SCC "Plugin" #-} pass
+
 
 doCorePass pass@CoreDesugar          = pprPanic "doCorePass" (ppr pass)
 doCorePass pass@CoreDesugarOpt       = pprPanic "doCorePass" (ppr pass)
@@ -724,7 +730,8 @@ simplifyPgmIO pass@(CoreDoSimplify max_iterations mode)
            if isZeroSimplCount counts1 then
                 return ( "Simplifier reached fixed point", iteration_no
                        , totalise (counts1 : counts_so_far)  -- Include "free" ticks
-                       , guts { mg_binds = binds1, mg_rules = rules1 } )
+                       , guts { mg_binds =coreProgramEraseCoercionProofs dflags binds1
+                                ,mg_rules = rules1 } )
            else do {
                 -- Short out indirections
                 -- We do this *after* at least one run of the simplifier
@@ -741,7 +748,8 @@ simplifyPgmIO pass@(CoreDoSimplify max_iterations mode)
            lintPassResult hsc_env pass binds2 ;
 
                 -- Loop
-           do_iteration us2 (iteration_no + 1) (counts1:counts_so_far) binds2 rules1
+           do_iteration us2 (iteration_no + 1) (counts1:counts_so_far)
+                  (coreProgramEraseCoercionProofs dflags binds2) rules1
            } }
       | otherwise = panic "do_iteration"
       where
