@@ -974,8 +974,11 @@ oneSRT dflags staticFuns lbls caf_lbls isCAF cafs static_data = do
   else do
     -- We're going to build an SRT for this group, which should include function
     -- references in the group. See Note [recursive SRTs].
-    let allBelow_funs =
-          Set.fromList (map (SRTEntry . toClosureLbl) otherFunLabels)
+    let allBelow_funs :: Set SRTEntry
+        allBelow_funs =
+          Set.fromList $
+          map (SRTEntry . toClosureLbl) $
+          maybe id ((:) . fst) maybeFunClosure $ otherFunLabels
     let filtered = filtered0 `Set.union` allBelow_funs
     srtTraceM "oneSRT" (text "filtered:" <+> ppr filtered $$
                         text "allBelow_funs:" <+> ppr allBelow_funs)
