@@ -1,7 +1,7 @@
 {-# LANGUAGE CPP #-}
 {-# LANGUAGE FlexibleContexts #-}
 
-module RepType
+module GHC.Types.RepType
   (
     -- * Code generator views onto Types
     UnaryType, NvUnaryType, isNvUnaryType,
@@ -133,7 +133,7 @@ isVoidTy = null . typePrimRep
 {- **********************************************************************
 *                                                                       *
                 Unboxed sums
- See Note [Translating unboxed sums to unboxed tuples] in UnariseStg.hs
+ See Note [Translating unboxed sums to unboxed tuples] in GHC.Stg.Unarise
 *                                                                       *
 ********************************************************************** -}
 
@@ -366,7 +366,7 @@ data RuntimeRep = VecRep VecCount VecElem   -- ^ a SIMD vector type
 It's all in 1-1 correspondence with PrimRep except for TupleRep and SumRep,
 which describe unboxed products and sums respectively. RuntimeRep is defined
 in the library ghc-prim:GHC.Types. It is also "wired-in" to GHC: see
-TysWiredIn.runtimeRepTyCon. The unarisation pass, in StgUnarise, transforms the
+TysWiredIn.runtimeRepTyCon. The unarisation pass, in GHC.Stg.Unarise, transforms the
 program, so that that every variable has a type that has a PrimRep. For
 example, unarisation transforms our utup function above, to take two Int
 arguments instead of one (# Int, Int #) argument.

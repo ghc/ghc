@@ -1,12 +1,12 @@
 -- | Free variable analysis on STG terms.
-module StgFVs (
+module GHC.Stg.FVs (
     annTopBindingsFreeVars,
     annBindingFreeVars
   ) where
 
 import GhcPrelude
 
-import StgSyn
+import GHC.Stg.Syntax
 import Id
 import VarSet
 import CoreSyn    ( Tickish(Breakpoint) )

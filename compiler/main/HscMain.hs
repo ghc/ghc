@@ -123,16 +123,16 @@ import MkIface
 import Desugar
 import SimplCore
 import TidyPgm
-import CorePrep
-import CoreToStg        ( coreToStg )
+import GHC.CoreToStg.Prep
+import GHC.CoreToStg        ( coreToStg )
+import GHC.Stg.Syntax
+import GHC.Stg.FVs      ( annTopBindingsFreeVars )
+import GHC.Stg.Pipeline ( stg2stg )
 import qualified GHC.StgToCmm as StgToCmm ( codeGen )
-import StgSyn
-import StgFVs           ( annTopBindingsFreeVars )
 import CostCentre
 import ProfInit
 import TyCon
 import Name
-import SimplStg         ( stg2stg )
 import Cmm
 import CmmParse         ( parseCmmFile )
 import CmmBuildInfoTables

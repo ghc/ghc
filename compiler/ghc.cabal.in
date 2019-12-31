@@ -175,9 +175,7 @@ Library
         profiling
         rename
         simplCore
-        simplStg
         specialise
-        stgSyn
         stranal
         typecheck
         types
@@ -311,7 +309,6 @@ Library
         CoreArity
         CoreFVs
         CoreLint
-        CorePrep
         CoreSubst
         CoreOpt
         CoreSyn
@@ -454,23 +451,23 @@ Library
         SimplMonad
         SimplUtils
         Simplify
-        SimplStg
-        StgStats
-        StgCse
-        StgLiftLams
-        StgLiftLams.Analysis
-        StgLiftLams.LiftM
-        StgLiftLams.Transformation
-        StgSubst
-        UnariseStg
-        RepType
+        GHC.Stg.Pipeline
+        GHC.Stg.Stats
+        GHC.Stg.CSE
+        GHC.Stg.Lift
+        GHC.Stg.Lift.Analysis
+        GHC.Stg.Lift.Monad
+        GHC.Stg.Subst
+        GHC.Stg.Unarise
+        GHC.Stg.Lint
+        GHC.Stg.Syntax
+        GHC.Stg.FVs
+        GHC.CoreToStg
+        GHC.CoreToStg.Prep
+        GHC.Types.RepType
         Rules
         SpecConstr
         Specialise
-        CoreToStg
-        StgLint
-        StgSyn
-        StgFVs
         CallArity
         DmdAnal
         Exitify
