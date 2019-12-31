@@ -437,6 +437,7 @@ tyCoVarsOfCosSet cos = tyCoVarsOfCos $ nonDetEltsUFM cos
 tyCoFVsOfCo :: Coercion -> FV
 -- Extracts type and coercion variables from a coercion
 -- See Note [Free variables of types]
+tyCoFVsOfCo (ErasedCoercion) _ _ _ = emptyFV
 tyCoFVsOfCo (Refl ty) fv_cand in_scope acc
   = tyCoFVsOfType ty fv_cand in_scope acc
 tyCoFVsOfCo (GRefl _ ty mco) fv_cand in_scope acc
