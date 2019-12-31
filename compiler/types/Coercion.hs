@@ -1435,7 +1435,8 @@ promoteCoercion co = case co of
 
     SubCo g
       -> promoteCoercion g
-    ErasedCoercion -> ErasedCoercion
+
+    ErasedCoercion r lty rty -> ErasedCoercion r ty1 ty2
   where
     Pair ty1 ty2 = coercionKind co
     ki1 = typeKind ty1
@@ -2123,7 +2124,7 @@ seqMCo MRefl    = ()
 seqMCo (MCo co) = seqCo co
 
 seqCo :: Coercion -> ()
-seqCo (ErasedCoercion) = ()
+seqCo (ErasedCoercion r lt rt) = r `seq` seqType lt `seq` seqType rt
 seqCo (Refl ty)                 = seqType ty
 seqCo (GRefl r ty mco)          = r `seq` seqType ty `seq` seqMCo mco
 seqCo (TyConAppCo r tc cos)     = r `seq` tc `seq` seqCos cos
@@ -2189,7 +2190,7 @@ coercionLKind :: Coercion -> Type
 coercionLKind co
   = go co
   where
-    go (ErasedCoercion)   = panic "erased coercions have no type, dont lint em"
+    go (ErasedCoercion _role ltyp _rtyp)   = ltype
     go (Refl ty)                = ty
     go (GRefl _ ty _)           = ty
     go (TyConAppCo _ tc cos)    = mkTyConApp tc (map go cos)
@@ -2244,8 +2245,7 @@ go_nth d ty
 coercionRKind :: Coercion -> Type
 coercionRKind co
   = go co
-  where
-    go (ErasedCoercion)= panic  "no kind for erased coercions "
+    go (ErasedCoercion _role _ltyp rtype)   = k
     go (Refl ty)                = ty
     go (GRefl _ ty MRefl)       = ty
     go (GRefl _ ty (MCo co1))   = mkCastTy ty co1
@@ -2351,6 +2351,7 @@ change reduces /total/ compile time by a factor of more than ten.
 coercionRole :: Coercion -> Role
 coercionRole = go
   where
+    go (ErasedCoercion r _ _) = r
     go (Refl _) = Nominal
     go (GRefl r _ _) = r
     go (TyConAppCo r _ _) = r
@@ -2369,7 +2370,7 @@ coercionRole = go
     go (KindCo {}) = Nominal
     go (SubCo _) = Representational
     go (AxiomRuleCo ax _) = coaxrRole ax
-    go (ErasedCoercion) = panic "coercionRole is not defined for ErasedCoercion"
+    go (ErasedCoercion r _ _) = r
 
 {-
 Note [Nested InstCos]

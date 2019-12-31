@@ -1578,7 +1578,8 @@ freeNamesIfMCoercion IfaceMRefl    = emptyNameSet
 freeNamesIfMCoercion (IfaceMCo co) = freeNamesIfCoercion co
 
 freeNamesIfCoercion :: IfaceCoercion -> NameSet
-freeNamesIfCoercion IfaceErased = emptyNameSet
+freeNamesIfCoercion (IfaceErased _role ltyp rtyp)
+  = freeNamesIfType ltyp && freeNamesIfType rtyp
 freeNamesIfCoercion (IfaceReflCo t) = freeNamesIfType t
 freeNamesIfCoercion (IfaceGReflCo _ t mco)
   = freeNamesIfType t &&& freeNamesIfMCoercion mco

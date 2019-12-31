@@ -265,7 +265,7 @@ toIfaceCoercionX fr co
     go_mco MRefl     = IfaceMRefl
     go_mco (MCo co)  = IfaceMCo $ go co
 
-    go (ErasedCoercion)     = IfaceErased
+    go (ErasedCoercion r lty rty)     = IfaceErased r lty rty
     go (Refl ty)            = IfaceReflCo (toIfaceTypeX fr ty)
     go (GRefl r ty mco)     = IfaceGReflCo r (toIfaceTypeX fr ty) (go_mco mco)
     go (CoVarCo cv)
