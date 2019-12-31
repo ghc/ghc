@@ -475,7 +475,6 @@ ppIdInfo id info
     [ (True, pp_scope <> ppr (idDetails id))
     , (has_arity,        text "Arity=" <> int arity)
     , (has_called_arity, text "CallArity=" <> int called_arity)
-    , (has_caf_info,     text "Caf=" <> ppr caf_info)
     , (has_str_info,     text "Str=" <> pprStrictness str_info)
     , (has_unf,          text "Unf=" <> ppr unf_info)
     , (not (null rules), text "RULES:" <+> vcat (map pprRule rules))
@@ -492,9 +491,6 @@ ppIdInfo id info
 
     called_arity = callArityInfo info
     has_called_arity = called_arity /= 0
-
-    caf_info = cafInfo info
-    has_caf_info = not (mayHaveCafRefs caf_info)
 
     str_info = strictnessInfo info
     has_str_info = not (isTopSig str_info)
