@@ -237,7 +237,7 @@ cmmDebugLabels isMeta nats = seqList lbls lbls
         -- consist of meta instructions -- we will declare them missing,
         -- which will skip debug data generation without messing up the
         -- block hierarchy.
-        lbls = map blockId $ filter (not . allMeta) $ concatMap getBlocks nats
+        lbls = map blockId $ concatMap getBlocks nats
         getBlocks (CmmProc _ _ _ (ListGraph bs)) = bs
         getBlocks _other                         = []
         allMeta (BasicBlock _ instrs) = all isMeta instrs
