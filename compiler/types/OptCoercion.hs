@@ -191,7 +191,7 @@ opt_co4_wrap env sym rep r co
     pprTrace "opt_co4_wrap }" (ppr co $$ text "---" $$ ppr result) $
     result
 -}
-opt_co4 _lc _sym _rp _role ErasedCoercion = ErasedCoercion
+opt_co4 _lc _sym _rp _role e@(ErasedCoercion) = e
 opt_co4 env _   rep r (Refl ty)
   = ASSERT2( r == Nominal, text "Expected role:" <+> ppr r    $$
                            text "Found role:" <+> ppr Nominal $$

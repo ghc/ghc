@@ -35,7 +35,8 @@ coreExprEraseProof (Lam   v e) =  Lam v $ coreExprEraseProof e
 coreExprEraseProof (Let   binder bod) = Let (eraseBinders binder) (coreExprEraseProof bod)
 coreExprEraseProof (Case  scrut v ty alts  )=
     Case (coreExprEraseProof scrut) v ty (map eraseAltPfs alts)
-coreExprEraseProof (Cast  e _) = Cast (coreExprEraseProof e) ErasedCoercion
+coreExprEraseProof (Cast  e co ) = Cast (coreExprEraseProof e) (ErasedCoercion role lty rty )
+  where
 coreExprEraseProof (Tick  tick e)= Tick tick (coreExprEraseProof e)
 coreExprEraseProof (Type  t) = Type t
 coreExprEraseProof (Coercion _)= Coercion ErasedCoercion

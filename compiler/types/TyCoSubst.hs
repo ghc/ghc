@@ -791,6 +791,7 @@ subst_co subst co
     go_mco (MCo co) = MCo (go co)
 
     go :: Coercion -> Coercion
+    go (ErasedCoercion r lty rty ) = ErasedCoercion  r $! (go_ty lty) $! (go_ty rty)
     go (Refl ty)             = mkNomReflCo $! (go_ty ty)
     go (GRefl r ty mco)      = (mkGReflCo r $! (go_ty ty)) $! (go_mco mco)
     go (TyConAppCo r tc args)= let args' = map go args

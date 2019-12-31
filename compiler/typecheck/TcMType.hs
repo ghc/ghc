@@ -1356,6 +1356,10 @@ collect_cand_qtvs_co :: VarSet -- bound variables
                      -> TcM CandidatesQTvs
 collect_cand_qtvs_co bound = go_co
   where
+
+    go_co dv (ErasedCoercion _role lty rty ) = do
+                                    dv1 <-collect_cand_qtvs True bound dv lty
+                                    collect_cand_qtvs True bound dv1 rty
     go_co dv (Refl ty)             = collect_cand_qtvs True bound dv ty
     go_co dv (GRefl _ ty mco)      = do dv1 <- collect_cand_qtvs True bound dv ty
                                         go_mco dv1 mco
