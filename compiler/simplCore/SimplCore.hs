@@ -460,7 +460,7 @@ doCorePass CoreDoSpecConstr          = {-# SCC "SpecConstr" #-}
                                        specConstrProgram
 
 doCorePass CoreEraseCoercionEvidence = {-# SCC "EraseCoercionEvidence" #-}
-                                       doEraseCoercions
+                                       eraseCoercionProgram
 
 doCorePass CoreDoPrintCore              = observe   printCore
 doCorePass (CoreDoRuleCheck phase pat)  = ruleCheckPass phase pat
