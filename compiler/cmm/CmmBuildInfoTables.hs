@@ -543,13 +543,7 @@ cafTransfers contLbls entry topLbl
             _ ->
               set
     in
-      srtTrace "cafTransfers" (text "block:" <+> ppr block $$
-                                text "contLbls:" <+> ppr contLbls $$
-                                text "entry:" <+> ppr entry $$
-                                text "topLbl:" <+> ppr topLbl $$
-                                text "cafs in exit:" <+> ppr joined $$
-                                text "result:" <+> ppr result) $
-        mapSingleton (entryLabel eNode) result
+      mapSingleton (entryLabel eNode) result
 
 
 -- -----------------------------------------------------------------------------
@@ -645,9 +639,7 @@ depAnalSRTs
   -> [CmmDecl]
   -> [SCC (SomeLabel, CAFLabel, Set CAFLabel)]
 depAnalSRTs cafEnv cafEnv_static decls =
-  srtTrace "depAnalSRTs" (text "decls:" <+> ppr decls $$
-                           text "nodes:" <+> ppr (map node_payload nodes) $$
-                           text "graph:" <+> ppr graph) graph
+  graph
  where
   labelledBlocks = concatMap getLabelledBlocks decls
   labelToBlock = Map.fromList (map swap labelledBlocks)
@@ -878,12 +870,19 @@ references to static function closures.
 -- | Build an SRT for a set of blocks
 oneSRT
   :: DynFlags
-  -> LabelMap CLabel            -- which blocks are static function entry points
-  -> [SomeLabel]                -- blocks in this set
-  -> [CAFLabel]                 -- labels for those blocks
-  -> Bool                       -- True <=> this SRT is for a CAF
-  -> Set CAFLabel               -- SRT for this set
-  -> Set CLabel                 -- Static data labels in this group
+  -- | Maps static function entry points to their closure labels
+  -> LabelMap CLabel
+  -- | Code and data labels in this group
+  -> [SomeLabel]
+  -- | Closure labels of code blocks with info tables in this group
+  -> [CAFLabel]
+  -- | True <=> this SRT is for a CAF
+  -> Bool
+  -- | Potentially CAFFY references from this group
+  -> Set CAFLabel
+  -- | Static data labels in this group (TODO: Why not get these from `lbls`?)
+  -> Set CLabel
+
   -> StateT ModuleSRTInfo UniqSM
        ( [CmmDeclSRTs]                -- SRT objects we built
        , [(Label, CLabel)]            -- SRT fields for these blocks' itbls
@@ -900,8 +899,15 @@ oneSRT dflags staticFuns lbls caf_lbls isCAF cafs static_data = do
     blockids = getBlockLabels lbls
 
     -- Can we merge this SRT with a FUN_STATIC closure?
+    --
+    --   maybeFunClosure = (closure label, entry block label) of the FUN_STATIC
+    --   closure that we'll be using as SRT (for [FUN])
+    --
+    --   otherFunLabels = closure labels of other FUN_STATICs in this Cmm group
+    --
     maybeFunClosure :: Maybe (CLabel, Label)
     otherFunLabels :: [CLabel]
+
     (maybeFunClosure, otherFunLabels) =
       case [ (l,b) | b <- blockids, Just l <- [mapLookup b staticFuns] ] of
         [] -> (Nothing, [])
@@ -911,32 +917,37 @@ oneSRT dflags staticFuns lbls caf_lbls isCAF cafs static_data = do
     nonRec :: Set CAFLabel
     nonRec = cafs `Set.difference` Set.fromList caf_lbls
 
-    -- Resolve references to their SRT entries
-    resolved :: [SRTEntry]
-    resolved = mapMaybe (resolveCAF srtMap) (Set.toList nonRec)
+    -- Resolve references to outside of the group to their SRT entries
+    resolved_nonRec :: [SRTEntry]
+    resolved_nonRec = mapMaybe (resolveCAF srtMap) (Set.toList nonRec)
 
-    -- The set of all SRTEntries in SRTs that we refer to from here.
-    allBelow =
-      Set.unions [ lbls | caf <- resolved
+    -- The set of all SRTEntries in SRTs that this group refers.
+    allBelow_nonRec :: Set SRTEntry
+    allBelow_nonRec =
+      Set.unions [ lbls | caf <- resolved_nonRec
                         , Just lbls <- [Map.lookup caf (flatSRTs topSRT)] ]
 
     -- Remove SRTEntries that are also in an SRT that we refer to.
     -- Implements the [Filter] optimisation.
-    filtered0 = Set.fromList resolved `Set.difference` allBelow
+    filtered_nonRec :: Set SRTEntry
+    filtered_nonRec = Set.fromList resolved_nonRec `Set.difference` allBelow_nonRec
 
   srtTraceM "oneSRT:"
-     (text "srtMap:" <+> ppr srtMap $$
-      text "nonRec:" <+> ppr nonRec $$
+     (text "staticFuns:" <+> ppr staticFuns $$
       text "lbls:" <+> ppr lbls $$
       text "caf_lbls:" <+> ppr caf_lbls $$
-      text "static_data:" <+> ppr static_data $$
+      text "isCAF:" <+> ppr isCAF $$
       text "cafs:" <+> ppr cafs $$
+      text "static_data:" <+> ppr static_data $$
+      text "=====" $$
+      text "srtMap:" <+> ppr srtMap $$
       text "blockids:" <+> ppr blockids $$
       text "maybeFunClosure:" <+> ppr maybeFunClosure $$
       text "otherFunLabels:" <+> ppr otherFunLabels $$
-      text "resolved:" <+> ppr resolved $$
-      text "allBelow:" <+> ppr allBelow $$
-      text "filtered0:" <+> ppr filtered0)
+      text "nonRec:" <+> ppr nonRec $$
+      text "resolved_nonRec:" <+> ppr resolved_nonRec $$
+      text "allBelow_nonRec:" <+> ppr allBelow_nonRec $$
+      text "filtered_nonRec:" <+> ppr filtered_nonRec)
 
   let
     isStaticFun = isJust maybeFunClosure
@@ -967,18 +978,22 @@ oneSRT dflags staticFuns lbls caf_lbls isCAF cafs static_data = do
     allStaticData =
       all (\(CAFLabel clbl) -> Set.member clbl static_data) caf_lbls
 
-  if Set.null filtered0 then do
+  if Set.null filtered_nonRec then do
+    -- SRT is empty
     srtTraceM "oneSRT: empty" (ppr caf_lbls)
     updateSRTMap Nothing
     return ([], [], [], False)
   else do
     -- We're going to build an SRT for this group, which should include function
     -- references in the group. See Note [recursive SRTs].
-    let allBelow_funs =
-          Set.fromList (map (SRTEntry . toClosureLbl) otherFunLabels)
-    let filtered = filtered0 `Set.union` allBelow_funs
-    srtTraceM "oneSRT" (text "filtered:" <+> ppr filtered $$
-                        text "allBelow_funs:" <+> ppr allBelow_funs)
+    let
+      recursive_refs, filtered :: Set SRTEntry
+      recursive_refs = Set.fromList (map SRTEntry (mapElems staticFuns))
+      filtered = filtered_nonRec `Set.union` recursive_refs
+
+    srtTraceM "oneSRT" (text "recursive_refs:" <+> ppr recursive_refs $$
+                        text "filtered:" <+> ppr filtered)
+
     case Set.toList filtered of
       [] -> pprPanic "oneSRT" empty -- unreachable
 
@@ -1003,7 +1018,8 @@ oneSRT dflags staticFuns lbls caf_lbls isCAF cafs static_data = do
           -- we could have multiple labels here is if this is a
           -- recursive group, see Note [recursive SRTs])
           case maybeFunClosure of
-            Just (staticFunLbl,staticFunBlock) ->
+            Just (staticFunLbl,staticFunBlock) -> do
+                srtTraceM "oneSRT: fun" (ppr withLabels)
                 return ([], withLabels, [], True)
               where
                 withLabels =
@@ -1015,6 +1031,8 @@ oneSRT dflags staticFuns lbls caf_lbls isCAF cafs static_data = do
               updateSRTMap (Just one)
               return ([], map (,lbl) blockids, [], True)
 
+      -- When all definition in this group are static data we don't
+      -- generate an SRT.
       cafList | allStaticData ->
         return ([], [], [], not (null cafList))
 
@@ -1030,27 +1048,24 @@ oneSRT dflags staticFuns lbls caf_lbls isCAF cafs static_data = do
             -- No duplicates: we have to build a new SRT object
             (decls, funSRTs, srtEntry) <-
               case maybeFunClosure of
-                Just (fun,block) ->
+                Just (fun,block) -> do
+                  srtTraceM "oneSRT" (text "Using FUN" <+> ppr fun <+> text "as SRT")
                   return ( [], [(block, cafList)], SRTEntry fun )
                 Nothing -> do
+                  srtTraceM "oneSRT" (text "Building new SRT for" <+> ppr cafList)
                   (decls, entry) <- lift $ buildSRTChain dflags cafList
                   return (decls, [], entry)
             updateSRTMap (Just srtEntry)
-            let allBelowThis = Set.union allBelow filtered
+            let allBelowThis = Set.union allBelow_nonRec filtered -- TODO (osa): I don't understand this line
                 newFlatSRTs = Map.insert srtEntry allBelowThis (flatSRTs topSRT)
-                -- When all definition in this group are static data we don't
-                -- generate any SRTs.
                 newDedupSRTs = Map.insert filtered srtEntry (dedupSRTs topSRT)
             modify' (\state -> state{ dedupSRTs = newDedupSRTs,
                                       flatSRTs = newFlatSRTs })
-            srtTraceM "oneSRT: new" (text "caf_lbls:" <+> ppr caf_lbls $$
-                                      text "filtered:" <+> ppr filtered $$
-                                      text "srtEntry:" <+> ppr srtEntry $$
-                                      text "newDedupSRTs:" <+> ppr newDedupSRTs $$
-                                      text "newFlatSRTs:" <+> ppr newFlatSRTs)
+            srtTraceM "oneSRT: new" (text "allBelowThis:" <+> ppr allBelowThis $$
+                                     text "newFlatSRTs:" <+> ppr newFlatSRTs $$
+                                     text "newDedupSRTs:" <+> ppr newDedupSRTs)
             let SRTEntry lbl = srtEntry
             return (decls, map (,lbl) blockids, funSRTs, True)
-
 
 -- | build a static SRT object (or a chain of objects) from a list of
 -- SRTEntries.
@@ -1149,8 +1164,8 @@ updInfoSRTs dflags srt_env funSRTEnv caffy (CmmProc top_info top_l live g)
 
 
 srtTrace :: String -> SDoc -> b -> b
--- srtTrace = pprTrace
-srtTrace _ _ b = b
+srtTrace = pprTrace
+-- srtTrace _ _ b = b
 
 srtTraceM :: Applicative f => String -> SDoc -> f ()
 srtTraceM str doc = srtTrace str doc (pure ())
