@@ -7,7 +7,7 @@ import HscTypes         ( ModGuts(..) )
 
 import CoreMonad        ( CoreM )
 import DynFlags
-
+import TyCoRep (Coercion(ErasedCoercion))
 {-
 Top-level interface function, @eraseCoercionProgram@.
 
@@ -22,7 +22,7 @@ eraseCoercionProgram pgm@(ModGuts { mg_binds = binds })
 coreProgramEraseCoercionProofs :: DynFlags ->CoreProgram -> CoreProgram
 coreProgramEraseCoercionProofs dflags topLevelBindings =
     if not (gopt Opt_DoCoreLinting dflags) then
-      case  topLevelBindings of
+     flip  map  topLevelBindings $  \ x -> case  e of
           NonRec v expr -> NonRec v $  coreExprEraseProof expr
           Rec bindings -> Rec $ map (\(v,expr)-> (v,coreExprEraseProof expr)) bindings
       else topLevelBindings
@@ -32,7 +32,7 @@ coreExprEraseProof e@(Var   _) = e
 coreExprEraseProof e@(Lit   _) = e
 coreExprEraseProof (App   f  e)  = App (coreExprEraseProof f) (coreExprEraseProof)
 coreExprEraseProof (Lam   v e) =  Lam v $ coreExprEraseProof e
-coreExprEraseProof (Let   binders bod) = Let (eraseBinders binder) (coreExprEraseProof bod)
+coreExprEraseProof (Let   binder bod) = Let (eraseBinders binder) (coreExprEraseProof bod)
 coreExprEraseProof (Case  scrut v ty alts  )=
     Case (coreExprEraseProof scrut) v ty (map eraseAltPfs alts)
 coreExprEraseProof (Cast  e _) = Cast (coreExprEraseProof e) ErasedCoercion

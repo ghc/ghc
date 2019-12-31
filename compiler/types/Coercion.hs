@@ -110,7 +110,7 @@ module Coercion (
 
         -- * Other
         promoteCoercion, buildCoercion,
-        ErasedCoercion,
+
         simplifyArgsWorker
        ) where
 
