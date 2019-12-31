@@ -1347,9 +1347,30 @@ ppInternalProcLabel :: DynFlags
                     -> Module     -- ^ the current module
                     -> CLabel
                     -> Maybe SDoc -- ^ the internal proc label
+ppInternalProcLabel dflags _this_mod _
+  | not $ gopt Opt_ExposeAllSymbols dflags = Nothing
+-- We must expose labels for C-- objects since gdb's symbol resolution
+-- algorithm ignores symbols of type "object", which we use due to TNTC.
+-- See Note [Declare info table symbols as @object].
+ppInternalProcLabel dflags _this_mod (CmmLabel uid name flavour)
+  | tablesNextToCode dflags
+  , Just suffix <- mb_suffix
+  = Just
+     $ text "_" <> ztext (zEncodeFS (unitIdFS uid))
+    <> char '_'
+    <> ztext (zEncodeFS name)
+    <> suffix
+  where
+    mb_suffix =
+      case flavour of
+        CmmInfo    -> Just $ text "_info"
+        CmmEntry   -> Just $ text "_entry"
+        CmmRet     -> Just $ text "_ret"
+        CmmRetInfo -> Just $ text "_info"
+        CmmClosure -> Just $ text "_closure"
+        _          -> Nothing
 ppInternalProcLabel dflags this_mod (IdLabel nm _ flavour)
-  | gopt Opt_ExposeAllSymbols dflags
-  , isInternalName nm
+  | isInternalName nm
   = Just
      $ text "_" <> ppr this_mod
     <> char '_'
