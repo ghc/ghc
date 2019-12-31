@@ -206,7 +206,10 @@ pprLabelType' dflags lbl =
     text "@object"
   where
     {-
-    NOTE: This is a bit hacky.
+    Note [Declare info table symbols as @object]
+    ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+
+    This is a bit hacky.
 
     With the `tablesNextToCode` info tables look like this:
     ```
