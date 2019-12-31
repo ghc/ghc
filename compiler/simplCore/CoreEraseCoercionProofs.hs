@@ -15,7 +15,7 @@ Top-level interface function, @eraseCoercionProgram@.
 
 eraseCoercionProgram :: ModGuts -> CoreM ModGuts
 eraseCoercionProgram pgm@(ModGuts { mg_binds = binds })
-  = do { dflags <- getDynFlags
+  = do { dflags <- getDynFlags ;
          return (pgm { mg_binds = map (coreProgramEraseCoercionProofs dflags) binds })
         }
 
@@ -28,8 +28,8 @@ coreProgramEraseCoercionProofs dflags topLevelBindings =
       else topLevelBindings
 
 coreExprEraseProof :: Expr b -> Expr b
-coreExprEraseProof e@(Var   Id) = e
-coreExprEraseProof e@(Lit   Literal) = e
+coreExprEraseProof e@(Var   _) = e
+coreExprEraseProof e@(Lit   _) = e
 coreExprEraseProof (App   f  e)  = App (coreExprEraseProof f) (coreExprEraseProof)
 coreExprEraseProof (Lam   v e) =  Lam v $ coreExprEraseProof e
 coreExprEraseProof (Let   binders bod) = Let (eraseBinders binder) (coreExprEraseProof bod)

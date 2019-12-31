@@ -348,6 +348,7 @@ data IfaceCoercion
   | IfaceSubCo        IfaceCoercion
   | IfaceFreeCoVar    CoVar    -- See Note [Free tyvars in IfaceType]
   | IfaceHoleCo       CoVar    -- ^ See Note [Holes in IfaceCoercion]
+  | IfaceErased  --- coercions are erased
 
 data IfaceUnivCoProv
   = IfaceUnsafeCoerceProv
