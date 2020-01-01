@@ -197,6 +197,7 @@ tidyCo env@(_, subst) co
     go_mco MRefl    = MRefl
     go_mco (MCo co) = MCo (go co)
 
+    go (ErasedCoercion r lty rty ) = ErasedCoercion r (tidyType env lty) (tidyType env rty)
     go (Refl ty)             = Refl (tidyType env ty)
     go (GRefl r ty mco)      = GRefl r (tidyType env ty) $! go_mco mco
     go (TyConAppCo r tc cos) = let args = map go cos
