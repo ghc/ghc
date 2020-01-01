@@ -543,6 +543,10 @@ resolvePackageConfig dflags UserPkgConf = runMaybeT $ do
   exist <- tryMaybeT $ doesDirectoryExist pkgconf
   if exist then return pkgconf else mzero
 resolvePackageConfig _ (PkgConfFile name) = return $ Just name
+-- this ignores package configs for the host, since these are resolved
+-- separately (by replacing HostPkgConfFile with PkgConfFile)
+resolvePackageConfig _ (HostPkgConfFile name) = return Nothing
+
 
 readPackageConfig :: DynFlags -> FilePath -> IO (FilePath, [PackageConfig])
 readPackageConfig dflags conf_file = do

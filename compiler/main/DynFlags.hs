@@ -3873,6 +3873,8 @@ package_flags_deps = [
         ------- Packages ----------------------------------------------------
     make_ord_flag defFlag "package-db"
       (HasArg (addPkgConfRef . PkgConfFile))
+  , make_ord_flag defFlag "host-package-db"
+      (HasArg (addPkgConfRef . HostPkgConfFile))
   , make_ord_flag defFlag "clear-package-db"      (NoArg clearPkgConf)
   , make_ord_flag defFlag "no-global-package-db"  (NoArg removeGlobalPkgConf)
   , make_ord_flag defFlag "no-user-package-db"    (NoArg removeUserPkgConf)
@@ -5237,6 +5239,9 @@ data PkgConfRef
   = GlobalPkgConf
   | UserPkgConf
   | PkgConfFile FilePath
+  | HostPkgConfFile FilePath -- ^a package config file that specifies
+                             --  packages compiled for the same host as
+                             --  the compiler.
   deriving Eq
 
 addPkgConfRef :: PkgConfRef -> DynP ()
@@ -5400,6 +5405,10 @@ parseEnvFile envfile = mapM_ parseEntry . lines
   where
     parseEntry str = case words str of
       ("package-db": _)     -> addPkgConfRef (PkgConfFile (envdir </> db))
+        -- relative package dbs are interpreted relative to the env file
+        where envdir = takeDirectory envfile
+              db     = drop 11 str
+      ("host-package-db": _) -> addPkgConfRef (HostPkgConfFile (envdir </> db))
         -- relative package dbs are interpreted relative to the env file
         where envdir = takeDirectory envfile
               db     = drop 11 str
