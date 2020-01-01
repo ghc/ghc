@@ -1016,13 +1016,22 @@ mkNthCo r n co
   where
     Pair ty1 ty2 = coercionKind co
 
-    go _r _n (ErasedCoercion _r1 _lt1 _rt1 ) = panic "mkNthCo did a thing"
+
     go r 0 co
       | Just (ty, _) <- isReflCo_maybe co
       , Just (tv, _) <- splitForAllTy_maybe ty
       = -- works for both tyvar and covar
         ASSERT( r == Nominal )
         mkNomReflCo (varType tv)
+
+    go r 0 (ErasedCoercion _ lt rt)
+      | Just(ltv,_) <- splitForAllTy_maybe lt
+      , Just(rtv,_) <- splitForAllTy_maybe rt
+
+      = -- ErasedCoercion proofs are quite strange!
+        ASSERT(r == Nominal)
+        ErasedCoercion Nominal (varType ltv) (varType rtv )
+
 
     go r n co
       | Just (ty, r0) <- isReflCo_maybe co
@@ -1038,6 +1047,26 @@ mkNthCo r n co
               = n == 0
               | otherwise
               = False
+
+    go r n (ErasedCoercion r0 lt rt )
+      | Just (ltycon,lts) <- splitTyConApp_maybe lt
+      , Just (rtycon,rts) <- splitTyConApp_maybe rt
+      ,let ltc = tyConAppTyCon lt  --- not sure why i'm copying this debugging stuff
+      ,let rtc = tyConAppTyCon rt
+      = ASSERT2( ok_tc_app lt n, ppr n $$ ppr lt)
+        ASSERT2( ok_tc_app rt n, ppr n $$ ppr rt )
+        ASSERT( nthRole r0 ltc n == r )
+        ASSERT( nthRole r0 rtc n == r )
+        ErasedCoercion r (tyConAppArgN n lt) (tyConAppArgN n rt)
+      where ok_tc_app :: Type -> Int -> Bool
+            ok_tc_app ty n
+              | Just (_, tys) <- splitTyConApp_maybe ty
+              = tys `lengthExceeds` n
+              | isForAllTy ty  -- nth:0 pulls out a kind coercion from a hetero forall
+              = n == 0
+              | otherwise
+              = False
+
 
     go r 0 (ForAllCo _ kind_co _)
       = ASSERT( r == Nominal )
