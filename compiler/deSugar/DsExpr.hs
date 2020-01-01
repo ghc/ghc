@@ -537,7 +537,8 @@ ds_expr _ (HsStatic _ expr@(dL->L loc _)) = do
            _             -> (0, 0)
         srcLoc = mkCoreConApps (tupleDataCon Boxed 2)
                      [ Type intTy              , Type intTy
-                     , mkIntExprInt dflags line, mkIntExprInt dflags col
+                     , mkIntExpr dflags (toInteger line)
+                     , mkIntExpr dflags (toInteger col)
                      ]
 
     putSrcSpanDs loc $ return $
@@ -899,7 +900,7 @@ dsExplicitList elt_ty Nothing xs
 dsExplicitList elt_ty (Just fln) xs
   = do { list <- dsExplicitList elt_ty Nothing xs
        ; dflags <- getDynFlags
-       ; dsSyntaxExpr fln [mkIntExprInt dflags (length xs), list] }
+       ; dsSyntaxExpr fln [mkIntExpr dflags (toInteger (length xs)), list] }
 
 dsArithSeq :: PostTcExpr -> (ArithSeqInfo GhcTc) -> DsM CoreExpr
 dsArithSeq expr (From from)

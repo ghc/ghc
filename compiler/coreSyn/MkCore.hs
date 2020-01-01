@@ -11,8 +11,8 @@ module MkCore (
         sortQuantVars, castBottomExpr,
 
         -- * Constructing boxed literals
-        mkWordExpr, mkWordExprWord,
-        mkIntExpr, mkIntExprInt,
+        mkWordExpr, mkWordExprWrap,
+        mkIntExpr, mkIntExprWrap,
         mkIntegerExpr, mkNaturalExpr,
         mkFloatExpr, mkDoubleExpr,
         mkCharExpr, mkStringExpr, mkStringExprFS, mkStringExprFSWith,
@@ -244,21 +244,23 @@ castBottomExpr e res_ty
 ************************************************************************
 -}
 
--- | Create a 'CoreExpr' which will evaluate to the given @Int@
+-- | Create a 'CoreExpr' which will evaluate to an @Int@ with the given value
 mkIntExpr :: DynFlags -> Integer -> CoreExpr        -- Result = I# i :: Int
 mkIntExpr dflags i = mkCoreConApps intDataCon  [mkIntLit dflags i]
 
--- | Create a 'CoreExpr' which will evaluate to the given @Int@
-mkIntExprInt :: DynFlags -> Int -> CoreExpr         -- Result = I# i :: Int
-mkIntExprInt dflags i = mkCoreConApps intDataCon  [mkIntLitInt dflags i]
+-- | Create a 'CoreExpr' which will evaluate to an @Int@ with the given value,
+--   truncated to fit the target word size
+mkIntExprWrap :: DynFlags -> Integer -> CoreExpr         -- Result = I# i :: Int
+mkIntExprWrap dflags i = mkCoreConApps intDataCon  [mkIntLitWrap dflags i]
 
--- | Create a 'CoreExpr' which will evaluate to the a @Word@ with the given value
+-- | Create a 'CoreExpr' which will evaluate to a @Word@ with the given value
 mkWordExpr :: DynFlags -> Integer -> CoreExpr
 mkWordExpr dflags w = mkCoreConApps wordDataCon [mkWordLit dflags w]
 
--- | Create a 'CoreExpr' which will evaluate to the given @Word@
-mkWordExprWord :: DynFlags -> Word -> CoreExpr
-mkWordExprWord dflags w = mkCoreConApps wordDataCon [mkWordLitWord dflags w]
+-- | Create a 'CoreExpr' which will evaluate to a @Word@ with the given value,
+--   truncated to fit the target word size
+mkWordExprWrap :: DynFlags -> Integer -> CoreExpr
+mkWordExprWrap dflags w = mkCoreConApps wordDataCon [mkWordLitWrap dflags w]
 
 -- | Create a 'CoreExpr' which will evaluate to the given @Integer@
 mkIntegerExpr  :: MonadThings m => Integer -> m CoreExpr  -- Result :: Integer

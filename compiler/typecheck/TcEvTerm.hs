@@ -43,10 +43,10 @@ evCallStack cs = do
                sequence [ mkStringExprFS (unitIdFS $ moduleUnitId m)
                         , mkStringExprFS (moduleNameFS $ moduleName m)
                         , mkStringExprFS (srcSpanFile l)
-                        , return $ mkIntExprInt df (srcSpanStartLine l)
-                        , return $ mkIntExprInt df (srcSpanStartCol l)
-                        , return $ mkIntExprInt df (srcSpanEndLine l)
-                        , return $ mkIntExprInt df (srcSpanEndCol l)
+                        , return $ mkIntExpr df (toInteger $ srcSpanStartLine l)
+                        , return $ mkIntExpr df (toInteger $ srcSpanStartCol l)
+                        , return $ mkIntExpr df (toInteger $ srcSpanEndLine l)
+                        , return $ mkIntExpr df (toInteger $ srcSpanEndCol l)
                         ]
 
   emptyCS <- Var <$> lookupId emptyCallStackName
