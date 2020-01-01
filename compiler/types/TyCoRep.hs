@@ -1068,7 +1068,7 @@ data Coercion
 
   | HoleCo CoercionHole              -- ^ See Note [Coercion holes]
                                      -- Only present during typechecking
-  | ErasedCoercion -- ^ optimization hack because cast terms blowup fusion heavy
+  | ErasedCoercion Role Type Type-- ^ optimization hack because cast terms blowup fusion heavy
                    -- code, implied whenever corelint isn't enabled
   deriving Data.Data
 

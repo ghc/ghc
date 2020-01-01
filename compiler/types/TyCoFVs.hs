@@ -210,7 +210,7 @@ ty_co_vars_of_co :: Coercion -> TyCoVarSet -> TyCoVarSet -> TyCoVarSet
 ty_co_vars_of_co (ErasedCoercion _r lty rty) is acc =  ty_co_vars_of_type rty is $
                                                        ty_co_vars_of_type lty is acc
 ty_co_vars_of_co (Refl ty)            is acc = ty_co_vars_of_type ty is acc
-ty_co_vars_of_co (GRefl _ ty mco)     is acc = ty_co_vars_of_type ty is acc $
+ty_co_vars_of_co (GRefl _ ty mco)     is acc = ty_co_vars_of_type ty is $
                                                ty_co_vars_of_mco mco is acc
 ty_co_vars_of_co (TyConAppCo _ _ cos) is acc = ty_co_vars_of_cos cos is acc
 ty_co_vars_of_co (AppCo co arg)       is acc = ty_co_vars_of_co co is $
