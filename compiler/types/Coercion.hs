@@ -709,6 +709,12 @@ mkFunCo r co1 co2
 mkAppCo :: Coercion     -- ^ :: t1 ~r t2
         -> Coercion     -- ^ :: s1 ~N s2, where s1 :: k1, s2 :: k2
         -> Coercion     -- ^ :: t1 s1 ~r t2 s2
+mkAppCo co1 co2
+  | r2 == Nominal  || (r1 == Phantom && (r2 == Nominal || r2 == Phantom))
+  = ErasedCoercion r1 (mkAppTy lt1 lt2) (mkAppTy rt1 rt2)
+  where
+    (Pair lt1 rt1,r1) = coercionKindRole co1
+    (Pair lt2 rt2,r2) = coercionKindRole co2
 mkAppCo co arg
   | Just (ty1, r) <- isReflCo_maybe co
   , Just (ty2, _) <- isReflCo_maybe arg
@@ -968,6 +974,7 @@ mkSymCo :: Coercion -> Coercion
 mkSymCo co | isReflCo co          = co
 mkSymCo    (SymCo co)             = co
 mkSymCo    (SubCo (SymCo co))     = SubCo co
+mkSymCo (ErasedCoercion r lt rt)  = ErasedCoercion r rt lt
 mkSymCo co                        = SymCo co
 
 -- | Create a new 'Coercion' by composing the two given 'Coercion's transitively.
@@ -977,7 +984,20 @@ mkTransCo co1 co2 | isReflCo co1 = co2
                   | isReflCo co2 = co1
 mkTransCo (GRefl r t1 (MCo co1)) (GRefl _ _ (MCo co2))
   = GRefl r t1 (MCo $ mkTransCo co1 co2)
-mkTransCo co1 co2                 = TransCo co1 co2
+mkTransCo co1 co2
+    | isErasedCoercion co1 || isErasedCoercion co2
+     =   ErasedCoercion r1 lt1 rt2
+    |  otherwise            = TransCo co1 co2
+  where
+    (Pair lt1 _rt1,r1) = coercionKindRole co1
+    (Pair _lt2 rt2,_r2) = coercionKindRole co2
+isErasedCoercion_maybe :: Coercion -> Maybe (Role,Type,Type)
+isErasedCoercion_maybe (ErasedCoercion r lt rt) = Just (r,lt,rt)
+isErasedCoercion_maybe _ = Nothing
+
+isErasedCoercion :: Coercion -> Bool
+isErasedCoercion c = case isErasedCoercion_maybe c of
+                      Just _ -> True ; Nothing -> False
 
 -- | Compose two MCoercions via transitivity
 mkTransMCo :: MCoercion -> MCoercion -> MCoercion
@@ -996,6 +1016,7 @@ mkNthCo r n co
   where
     Pair ty1 ty2 = coercionKind co
 
+    go _r _n (ErasedCoercion _r1 _lt1 _rt1 ) = panic "mkNthCo did a thing"
     go r 0 co
       | Just (ty, _) <- isReflCo_maybe co
       , Just (tv, _) <- splitForAllTy_maybe ty
@@ -1184,6 +1205,7 @@ mkKindCo co
 mkSubCo :: Coercion -> Coercion
 -- Input coercion is Nominal, result is Representational
 -- see also Note [Role twiddling functions]
+mkSubCo (ErasedCoercion Nominal lt rt) = ErasedCoercion Representational lt rt
 mkSubCo (Refl ty) = GRefl Representational ty MRefl
 mkSubCo (GRefl Nominal ty co) = GRefl Representational ty co
 mkSubCo (TyConAppCo Nominal tc cos)
@@ -1255,6 +1277,7 @@ setNominalRole_maybe r co
   | r == Nominal = Just co
   | otherwise = setNominalRole_maybe_helper co
   where
+    setNominalRole_maybe_helper (ErasedCoercion _ lt rt) = Just (ErasedCoercion Nominal lt rt)
     setNominalRole_maybe_helper (SubCo co)  = Just co
     setNominalRole_maybe_helper co@(Refl _) = Just co
     setNominalRole_maybe_helper (GRefl _ ty co) = Just $ GRefl Nominal ty co
@@ -1297,9 +1320,9 @@ mkPhantomCo h t1 t2
 
 -- takes any coercion and turns it into a Phantom coercion
 toPhantomCo :: Coercion -> Coercion
-toPhantomCo co
-  = mkPhantomCo (mkKindCo co) ty1 ty2
-  where Pair ty1 ty2 = coercionKind co
+toPhantomCo (ErasedCoercion _ lt rt) = ErasedCoercion Phantom lt rt
+toPhantomCo co  = mkPhantomCo (mkKindCo co) ty1 ty2
+    where Pair ty1 ty2 = coercionKind co
 
 -- Convert args to a TyConAppCo Nominal to the same TyConAppCo Representational
 applyRoles :: TyCon -> [Coercion] -> [Coercion]
@@ -1436,7 +1459,7 @@ promoteCoercion co = case co of
     SubCo g
       -> promoteCoercion g
 
-    ErasedCoercion r lty rty -> ErasedCoercion r ty1 ty2
+    ErasedCoercion r _lty _rty -> ErasedCoercion r ty1 ty2
   where
     Pair ty1 ty2 = coercionKind co
     ki1 = typeKind ty1
@@ -2371,7 +2394,7 @@ coercionRole = go
     go (KindCo {}) = Nominal
     go (SubCo _) = Representational
     go (AxiomRuleCo ax _) = coaxrRole ax
-    go (ErasedCoercion r _ _) = r
+
 
 {-
 Note [Nested InstCos]
