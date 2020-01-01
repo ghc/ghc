@@ -1691,7 +1691,7 @@ lintCoercion :: OutCoercion -> LintM (LintedKind, LintedKind, LintedType, Linted
 -- See Note [GHC Formalism]
 lintCoercion (ErasedCoercion role lty rty)
   = do { kl <- lintType lty ;
-         kr <- lintType rty
+         kr <- lintType rty ;
          return (kl,kr,lty,rty,role)
        }
 lintCoercion (Refl ty)
