@@ -78,7 +78,7 @@ import IdInfo
 import PrelNames( absentErrorIdKey )
 import Type
 import Predicate
-import TyCoRep( TyCoBinder(..), TyBinder , Coercion(ErasedCoercion))
+import TyCoRep( TyCoBinder(..), TyBinder )
 import Coercion
 import TyCon
 import Unique
