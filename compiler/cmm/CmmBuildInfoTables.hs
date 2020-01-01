@@ -882,19 +882,25 @@ references to static function closures.
 -- | Build an SRT for a set of blocks
 oneSRT
   :: DynFlags
-  -- | Maps static function entry points to their closure labels.
+
+  -- Maps static function entry points to their closure labels.
   -- Note that this map is for *all* static functions in the program, not just
   -- in the current group.
   -> LabelMap CLabel
-  -- | Code and data labels in this group
+
+  -- Code and data labels in this group
   -> [SomeLabel]
-  -- | Closure labels of code blocks with info tables in this group
+
+  -- Closure labels of code blocks with info tables in this group
   -> [CAFLabel]
-  -- | True <=> this SRT is for a CAF
+
+  -- True <=> this SRT is for a CAF
   -> Bool
-  -- | Potentially CAFFY references from this group
+
+  -- Potentially CAFFY references from this group
   -> Set CAFLabel
-  -- | Static data labels in this group (TODO: Why not get these from `lbls`?)
+
+  -- Static data labels in this group (TODO: Why not get these from `lbls`?)
   -> Set CLabel
 
   -> StateT ModuleSRTInfo UniqSM
@@ -1134,7 +1140,7 @@ buildSRT dflags refs = do
 updInfoSRTs
   :: DynFlags
 
-  -- | SRT labels for each block. Maps continuation and entry labels to their
+  -- SRT labels for each block. Maps continuation and entry labels to their
   -- SRTs.
   --
   --      e.g. c1vC :-> _u1wO_srt
@@ -1143,7 +1149,7 @@ updInfoSRTs
   --
   -> LabelMap CLabel
 
-  -- | SRTs to merge into FUN_STATIC closures. E.g. if we have
+  -- SRTs to merge into FUN_STATIC closures. E.g. if we have
   --
   --     c1vn :-> [x_closure, y_closure]
   --
@@ -1152,7 +1158,7 @@ updInfoSRTs
   --
   -> LabelMap [SRTEntry]
 
-  -- | Whether the CmmDecl's group has CAF references, to be able to generate
+  -- Whether the CmmDecl's group has CAF references, to be able to generate
   -- STATIC_LINK fields
   -> Bool
 
