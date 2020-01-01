@@ -795,8 +795,12 @@ doSRTs dflags moduleSRTInfo procs data_ = do
     srtFieldMap = mapFromList (concat pairs)
     funSRTMap = mapFromList (concat funSRTs)
     has_caf_refs' = or has_caf_refs
-    decls' =
-      concatMap (updInfoSRTs dflags srtFieldMap funSRTMap has_caf_refs') decls
+
+  srtTraceM "doSRTs" (text "funSRTMap:" <+> ppr funSRTMap $$
+                      text "srtFieldMap:" <+> ppr srtFieldMap)
+
+  let
+    decls' = concatMap (updInfoSRTs dflags srtFieldMap funSRTMap has_caf_refs') decls
 
   -- Finally update CafInfos for raw static literals (CmmStaticsRaw). Those are
   -- not analysed in oneSRT so we never add entries for them to the SRTMap.
@@ -870,7 +874,9 @@ references to static function closures.
 -- | Build an SRT for a set of blocks
 oneSRT
   :: DynFlags
-  -- | Maps static function entry points to their closure labels
+  -- | Maps static function entry points to their closure labels.
+  -- Note that this map is for *all* static functions in the program, not just
+  -- in the current group.
   -> LabelMap CLabel
   -- | Code and data labels in this group
   -> [SomeLabel]
@@ -988,7 +994,13 @@ oneSRT dflags staticFuns lbls caf_lbls isCAF cafs static_data = do
     -- references in the group. See Note [recursive SRTs].
     let
       recursive_refs, filtered :: Set SRTEntry
-      recursive_refs = Set.fromList (map SRTEntry (mapElems staticFuns))
+      recursive_refs =
+        -- NB. we can't use staticFuns here as that's for all static functions
+        -- in the module, not just the ones in the current group
+        Set.fromList $
+        maybe id ((:) . SRTEntry . fst) maybeFunClosure $
+        map SRTEntry otherFunLabels
+
       filtered = filtered_nonRec `Set.union` recursive_refs
 
     srtTraceM "oneSRT" (text "recursive_refs:" <+> ppr recursive_refs $$
@@ -1061,11 +1073,16 @@ oneSRT dflags staticFuns lbls caf_lbls isCAF cafs static_data = do
                 newDedupSRTs = Map.insert filtered srtEntry (dedupSRTs topSRT)
             modify' (\state -> state{ dedupSRTs = newDedupSRTs,
                                       flatSRTs = newFlatSRTs })
-            srtTraceM "oneSRT: new" (text "allBelowThis:" <+> ppr allBelowThis $$
-                                     text "newFlatSRTs:" <+> ppr newFlatSRTs $$
-                                     text "newDedupSRTs:" <+> ppr newDedupSRTs)
             let SRTEntry lbl = srtEntry
-            return (decls, map (,lbl) blockids, funSRTs, True)
+                pairs = map (,lbl) blockids
+            srtTraceM "oneSRT: new" (text "decls:" <+> ppr decls $$
+                                     text "funSRTs:" <+> ppr funSRTs $$
+                                     text "srtEntry:" <+> ppr srtEntry $$
+                                     text "allBelowThis:" <+> ppr allBelowThis $$
+                                     text "newFlatSRTs:" <+> ppr newFlatSRTs $$
+                                     text "newDedupSRTs:" <+> ppr newDedupSRTs $$
+                                     text "pairs:" <+> ppr pairs)
+            return (decls, pairs, funSRTs, True)
 
 -- | build a static SRT object (or a chain of objects) from a list of
 -- SRTEntries.
@@ -1108,9 +1125,29 @@ buildSRT dflags refs = do
 -- static closures, splicing in SRT fields as necessary.
 updInfoSRTs
   :: DynFlags
-  -> LabelMap CLabel               -- SRT labels for each block
-  -> LabelMap [SRTEntry]           -- SRTs to merge into FUN_STATIC closures
-  -> Bool                          -- Whether the CmmDecl's group has CAF references
+
+  -- | SRT labels for each block. Maps continuation and entry labels to their
+  -- SRTs.
+  --
+  --      e.g. c1vC :-> _u1wO_srt
+  --           or
+  --           c1vQ :-> $fEqCDS_$c/=_closure
+  --
+  -> LabelMap CLabel
+
+  -- | SRTs to merge into FUN_STATIC closures. E.g. if we have
+  --
+  --     c1vn :-> [x_closure, y_closure]
+  --
+  -- Then c1vn is an entry labels for a FUN_STATIC, and the closure for this
+  -- function will have x_closure and y_closure in the payload.
+  --
+  -> LabelMap [SRTEntry]
+
+  -- | Whether the CmmDecl's group has CAF references, to be able to generate
+  -- STATIC_LINK fields
+  -> Bool
+
   -> CmmDecl
   -> [CmmDeclSRTs]
 
@@ -1123,44 +1160,64 @@ updInfoSRTs dflags _ _ caffy (CmmData s (CmmStatics lbl itbl ccs payload))
     caf_info = if caffy then MayHaveCafRefs else NoCafRefs
     field_lits = mkStaticClosureFields dflags itbl ccs caf_info payload
 
-updInfoSRTs dflags srt_env funSRTEnv caffy (CmmProc top_info top_l live g)
-  | Just (_,closure) <- maybeStaticClosure = [ proc, closure ]
-  | otherwise = [ proc ]
+updInfoSRTs dflags srtFieldMap funSRTMap caffy (CmmProc top_info top_l live g)
+  | Just (_,closure) <- maybeStaticClosure
+  = [ proc, closure ]
+  | otherwise
+  = [ proc ]
   where
     caf_info = if caffy then MayHaveCafRefs else NoCafRefs
     proc = CmmProc top_info { info_tbls = newTopInfo } top_l live g
     newTopInfo = mapMapWithKey updInfoTbl (info_tbls top_info)
     updInfoTbl l info_tbl
       | l == g_entry g, Just (inf, _) <- maybeStaticClosure = inf
-      | otherwise  = info_tbl { cit_srt = mapLookup l srt_env }
+      | otherwise  = info_tbl { cit_srt = mapLookup l srtFieldMap }
 
     -- Generate static closures [FUN].  Note that this also generates
     -- static closures for thunks (CAFs), because it's easier to treat
     -- them uniformly in the code generator.
     maybeStaticClosure :: Maybe (CmmInfoTable, CmmDeclSRTs)
+
     maybeStaticClosure
-      | Just info_tbl@CmmInfoTable{..} <-
-           mapLookup (g_entry g) (info_tbls top_info)
+      | Just info_tbl@CmmInfoTable{..} <- mapLookup (g_entry g) (info_tbls top_info)
+      , srtTrace "maybeStaticClosure" (text "cit_clo:" <+> ppr cit_clo $$
+                                       text "cit_rep:" <+> ppr cit_rep) True
       , Just (id, ccs) <- cit_clo
       , isStaticRep cit_rep =
         let
-          (newInfo, srtEntries) = case mapLookup (g_entry g) funSRTEnv of
+          (newInfo, srtEntries) = case mapLookup (g_entry g) funSRTMap of
+
             Nothing ->
-              -- if we don't add SRT entries to this closure, then we
-              -- want to set the srt field in its info table as usual
-              (info_tbl { cit_srt = mapLookup (g_entry g) srt_env }, [])
-            Just srtEntries -> srtTrace "maybeStaticFun" (ppr res)
-              (info_tbl { cit_rep = new_rep }, res)
-              where res = [ CmmLabel lbl | SRTEntry lbl <- srtEntries ]
+              -- If we don't add SRT entries to this closure, then we
+              -- want to set the SRT field in its info table as usual
+              (info_tbl { cit_srt = mapLookup (g_entry g) srtFieldMap }, [])
+
+            Just srtEntries ->
+              -- Otherwise add SRT entries to the closure
+              -- (TODO (osa): BUT we still want to update the SRT field to
+              -- pointo to the closure, right?? right???)
+              srtTrace "maybeStaticFun" (ppr res $$ ppr new_rep)
+                (info_tbl { cit_rep = new_rep
+                          , cit_srt = mapLookup (g_entry g) srtFieldMap -- TODO (osa): see above
+                          }, res)
+              where
+                res = [ CmmLabel lbl | SRTEntry lbl <- srtEntries ]
+
+                new_rep = case cit_rep of
+                   HeapRep sta ptrs nptrs ty ->
+                     HeapRep sta (ptrs + length srtEntries) nptrs ty
+                   _other -> panic "maybeStaticFun"
+
           fields = mkStaticClosureFields dflags info_tbl ccs caf_info srtEntries
-          new_rep = case cit_rep of
-             HeapRep sta ptrs nptrs ty ->
-               HeapRep sta (ptrs + length srtEntries) nptrs ty
-             _other -> panic "maybeStaticFun"
           lbl = mkLocalClosureLabel (idName id) caf_info
         in
+          srtTrace "maybeStaticClosure" (text "oldInfo:" <+> ppr info_tbl $$
+                                         text "newInfo:" <+> ppr newInfo $$
+                                         text "lbl: "<+> ppr lbl $$
+                                         text "fields:" <+> ppr fields) $
           Just (newInfo, mkDataLits (Section Data lbl) lbl fields)
-      | otherwise = Nothing
+      | otherwise
+      = Nothing
 
 
 srtTrace :: String -> SDoc -> b -> b
