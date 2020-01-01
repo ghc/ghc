@@ -38,10 +38,10 @@ coreExprEraseProof (Case  scrut v ty alts  )=
     Case (coreExprEraseProof scrut) v ty (map eraseAltPfs alts)
     --- TODO : add mrefl and refl cases,
     --- that should suffice to prevent regresions vs current ghc
-coreExprEraseProof (Cast  e co ) =case co of
+coreExprEraseProof (Cast  e co ) = case co of
       (Refl _t) -> Cast e  co
       (GRefl _r _t MRefl) -> Cast e co
-      (_) ->  Coercion (ErasedCoercion role lty rty  Cast (coreExprEraseProof e) (ErasedCoercion role lty rty )
+      (_) ->  Cast (coreExprEraseProof e) (ErasedCoercion role lty rty )
   where
     (Pair lty rty,role) = coercionKindRole co
 coreExprEraseProof (Tick  tick e)= Tick tick (coreExprEraseProof e)
