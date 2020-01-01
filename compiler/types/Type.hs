@@ -424,7 +424,8 @@ expandTypeSynonyms ty
     go_mco _     MRefl    = MRefl
     go_mco subst (MCo co) = MCo (go_co subst co)
 
-    go_co _ ErasedCoercion = panic "go_co for expand type synonyms pandic on erased coercions"
+    go_co subst (ErasedCoercion r lty rty)
+      = ErasedCoercion r (go subst lty) (go subst rty)
     go_co subst (Refl ty)
       = mkNomReflCo (go subst ty)
     go_co subst (GRefl r ty mco)
@@ -658,7 +659,8 @@ mapCoercion mapper@(TyCoMapper { tcm_covar = covar
     go_mco MRefl    = return MRefl
     go_mco (MCo co) = MCo <$> (go co)
 
-    go (ErasedCoercion) = return ErasedCoercion
+    go (ErasedCoercion r lty rty )
+      = ErasedCoercion r <$> mapType mapper env lty <*>  mapType mapper env rty
     go (Refl ty) = Refl <$> mapType mapper env ty
     go (GRefl r ty mco) = mkGReflCo r <$> mapType mapper env ty <*> (go_mco mco)
     go (TyConAppCo r tc args)
@@ -2683,7 +2685,9 @@ occCheckExpand vs_to_avoid ty
     go_mco ctx (MCo co) = MCo <$> go_co ctx co
 
     ------------------
-    go_co _  ErasedCoercion = Nothing
+    go_co ctx  (ErasedCoercion r lty rty ) = do { lty' <- go ctx lty
+                                              ; rty' <- go ctx rty
+                                              ; return $ ErasedCoercion  r lty' rty' }
     go_co cxt (Refl ty)                 = do { ty' <- go cxt ty
                                              ; return (mkNomReflCo ty') }
     go_co cxt (GRefl r ty mco)          = do { mco' <- go_mco cxt mco
@@ -2771,7 +2775,7 @@ tyConsOfType ty
      go (CastTy ty co)              = go ty `unionUniqSets` go_co co
      go (CoercionTy co)             = go_co co
 
-     go_co (ErasedCoercion)        = emptyUniqSet
+     go_co (ErasedCoercion r lty rty ) =  go lty `unionUniqSets` go rty
      go_co (Refl ty)               = go ty
      go_co (GRefl _ ty mco)        = go ty `unionUniqSets` go_mco mco
      go_co (TyConAppCo _ tc args)  = go_tc tc `unionUniqSets` go_cos args

@@ -2190,7 +2190,7 @@ coercionLKind :: Coercion -> Type
 coercionLKind co
   = go co
   where
-    go (ErasedCoercion _role ltyp _rtyp)   = ltype
+    go (ErasedCoercion _role ltyp _rtyp)   = ltyp
     go (Refl ty)                = ty
     go (GRefl _ ty _)           = ty
     go (TyConAppCo _ tc cos)    = mkTyConApp tc (map go cos)
@@ -2245,7 +2245,8 @@ go_nth d ty
 coercionRKind :: Coercion -> Type
 coercionRKind co
   = go co
-    go (ErasedCoercion _role _ltyp rtype)   = k
+  where
+    go (ErasedCoercion _role _ltyp rtype)   = rtype
     go (Refl ty)                = ty
     go (GRefl _ ty MRefl)       = ty
     go (GRefl _ ty (MCo co1))   = mkCastTy ty co1

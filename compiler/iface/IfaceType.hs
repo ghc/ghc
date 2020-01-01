@@ -523,7 +523,7 @@ substIfaceType env ty
     go_co (IfaceKindCo co)           = IfaceKindCo (go_co co)
     go_co (IfaceSubCo co)            = IfaceSubCo (go_co co)
     go_co (IfaceAxiomRuleCo n cos)   = IfaceAxiomRuleCo n (go_cos cos)
-    go_co (IfaceErased role lty rty) = IfaceErased role (go_co lty rty)
+    go_co (IfaceErased role lty rty) = IfaceErased role (go lty)  (go rty)
     go_cos = map go_co
 
     go_prov IfaceUnsafeCoerceProv    = IfaceUnsafeCoerceProv
@@ -1596,7 +1596,7 @@ ppr_co ctxt_prec (IfaceSubCo co)
   = ppr_special_co ctxt_prec (text "Sub") [co]
 ppr_co ctxt_prec (IfaceKindCo co)
   = ppr_special_co ctxt_prec (text "Kind") [co]
-ppr_co ctxt_prec (IfaceErased role lty rtyp)
+ppr_co ctxt_prec (IfaceErased role lty rty)
   = maybeParen ctxt_prec appPrec $
     text "ErasedCoercion" <+> ppr role <+>
     pprParendIfaceType lty <+> pprParendIfaceType rty
@@ -1894,10 +1894,10 @@ instance Binary IfaceCoercion where
           put_ bh a
           put_ bh b
   put_ bh (IfaceErased r lty rty) = do
-          putByte bh 18
-          putByte bh r
-          putByte bh lty
-          putByte bh rty
+           putByte bh 18
+           put_ bh r
+           put_ bh lty
+           put_ bh rty
   put_ _ (IfaceFreeCoVar cv)
        = pprPanic "Can't serialise IfaceFreeCoVar" (ppr cv)
   put_ _  (IfaceHoleCo cv)
@@ -1964,7 +1964,7 @@ instance Binary IfaceCoercion where
                   role <- get bh
                   lty  <- get bh
                   rty  <- get bh
-                  return $ IfaceErased r lty rty
+                  return $ IfaceErased role lty rty
            _ -> panic ("get IfaceCoercion " ++ show tag)
 
 instance Binary IfaceUnivCoProv where
@@ -2040,7 +2040,7 @@ instance NFData IfaceCoercion where
     IfaceSubCo f1 -> rnf f1
     IfaceFreeCoVar f1 -> f1 `seq` ()
     IfaceHoleCo f1 -> f1 `seq` ()
-    IfaceErased rl lty rty-> rnf r `seq`  rn lty `seq` rnf rty
+    IfaceErased rl lty rty-> rl `seq`  rnf lty `seq` rnf rty
 
 instance NFData IfaceUnivCoProv where
   rnf x = seq x ()
