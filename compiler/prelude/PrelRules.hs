@@ -802,6 +802,8 @@ removeOp32 :: RuleM CoreExpr
 removeOp32 = do
   dflags <- getDynFlags
   case platformWordSize (targetPlatform dflags) of
+    _ | platformArch (targetPlatform dflags) == ArchJavaScript ->
+      mzero
     PW4 -> do
       [e] <- getArgs
       return e
