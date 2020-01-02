@@ -769,7 +769,7 @@ doSRTs dflags moduleSRTInfo procs data_ = do
     cafsWithSRTs = getCAFs cafEnv decls
 
   srtTraceM "doSRTs" (text "data:" <+> ppr data_ $$
-                      text "procs:" <+> ppr procs $$
+                      text "cafEnv:" <+> ppr cafEnv $$
                       text "static_data_env:" <+> ppr static_data_env $$
                       text "sccs:" <+> ppr sccs $$
                       text "cafsWithSRTs:" <+> ppr cafsWithSRTs)
