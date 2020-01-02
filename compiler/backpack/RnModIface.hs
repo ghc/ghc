@@ -702,8 +702,8 @@ rnIfaceCo (IfaceSubCo c) = IfaceSubCo <$> rnIfaceCo c
 rnIfaceCo (IfaceAxiomRuleCo ax cos)
     = IfaceAxiomRuleCo ax <$> mapM rnIfaceCo cos
 rnIfaceCo (IfaceKindCo c) = IfaceKindCo <$> rnIfaceCo c
-rnIfaceCo (IfaceErased role lty rty)
-    = IfaceErased role <$>  rnIfaceType lty <*> rnIfaceType rty
+rnIfaceCo (IfaceErased as bs cs  role lty rty)
+    = IfaceErased as bs cs role <$>  rnIfaceType lty <*> rnIfaceType rty
 
 rnIfaceTyCon :: Rename IfaceTyCon
 rnIfaceTyCon (IfaceTyCon n info)

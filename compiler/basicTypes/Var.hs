@@ -58,7 +58,7 @@ module Var (
         isId, isTyVar, isTcTyVar,
         isLocalVar, isLocalId, isCoVar, isNonCoVarId, isTyCoVar,
         isGlobalId, isExportedId,
-        mustHaveLocalBinding,
+        mustHaveLocalBinding, isCoercionHole,
 
         -- * ArgFlags
         ArgFlag(..), isVisibleArgFlag, isInvisibleArgFlag, sameVis,
@@ -93,7 +93,7 @@ import {-# SOURCE #-}   TyCoRep( Type, Kind )
 import {-# SOURCE #-}   TyCoPpr( pprKind )
 import {-# SOURCE #-}   TcType( TcTyVarDetails, pprTcTyVarDetails, vanillaSkolemTv )
 import {-# SOURCE #-}   IdInfo( IdDetails, IdInfo, coVarDetails, isCoVarDetails,
-                                vanillaIdInfo, pprIdDetails )
+                                vanillaIdInfo, pprIdDetails,isCoercionHoleDetails )
 
 import Name hiding (varName)
 import Unique ( Uniquable, Unique, getKey, getUnique
@@ -760,3 +760,10 @@ isExportedId :: Var -> Bool
 isExportedId (Id { idScope = GlobalId })        = True
 isExportedId (Id { idScope = LocalId Exported}) = True
 isExportedId _ = False
+
+
+-- | Is this a CoercionHoleId? See Note [Coercion holes] in TyCoRep.
+--- copied from wip/zap-coercions
+isCoercionHole :: Var -> Bool
+isCoercionHole (Id { id_details = details }) = isCoercionHoleDetails details
+isCoercionHole _                             = False

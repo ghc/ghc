@@ -265,7 +265,17 @@ toIfaceCoercionX fr co
     go_mco MRefl     = IfaceMRefl
     go_mco (MCo co)  = IfaceMCo $ go co
 
-    go (ErasedCoercion r lty rty)     = IfaceErased r (toIfaceType lty) (toIfaceType rty)
+    go (ErasedCoercion fvs r lty rty)     = IfaceErased tvs cvs openVars r (toIfaceTypeX fr lty) (toIfaceTypeX fr rty)
+
+                          where
+                            (tvs, cvs, openVars) = foldl' f ([], [], []) (dVarSetElems fvs)
+                            isOpen = (`elemVarSet` fr)
+                            f (a,b,c) v
+                              | isOpen v  = (a, b, v:c)
+                              | isCoVar v = (a, toIfaceCoVar v:b, c)
+                              | isTyVar v = (toIfaceTyVar v:a, b, c)
+                              | otherwise = panic "ToIface.toIfaceCoercionX(go_prov): Bad free variable in ZappedProv"
+
     go (Refl ty)            = IfaceReflCo (toIfaceTypeX fr ty)
     go (GRefl r ty mco)     = IfaceGReflCo r (toIfaceTypeX fr ty) (go_mco mco)
     go (CoVarCo cv)

@@ -14,7 +14,7 @@ Haskell. [WDP 94/11])
 module IdInfo (
         -- * The IdDetails type
         IdDetails(..), pprIdDetails, coVarDetails, isCoVarDetails,
-        JoinArity, isJoinIdDetails_maybe,
+        JoinArity, isJoinIdDetails_maybe, isCoercionHoleDetails,
         RecSelParent(..),
 
         -- * The IdInfo type
@@ -159,6 +159,11 @@ data IdDetails
   | CoVarId    -- ^ A coercion variable
                -- This only covers /un-lifted/ coercions, of type
                -- (t1 ~# t2) or (t1 ~R# t2), not their lifted variants
+  | CoercionHoleId  -- ^ A variable introduced for tracking the scoping of
+                    -- a coercion hole during typechecking. See
+                    -- Note [Coercion holes] in TyCoRep.
+                    -- cribbed from bgamari wip/zap-coercions
+
   | JoinId JoinArity           -- ^ An 'Id' for a join point taking n arguments
        -- Note [Join points] in CoreSyn
 
@@ -183,6 +188,11 @@ coVarDetails = CoVarId
 isCoVarDetails :: IdDetails -> Bool
 isCoVarDetails CoVarId = True
 isCoVarDetails _       = False
+
+-- | Check if an 'IdDetails' says 'CoercionHoleId'.
+isCoercionHoleDetails :: IdDetails -> Bool
+isCoercionHoleDetails CoercionHoleId = True
+isCoercionHoleDetails _              = False
 
 isJoinIdDetails_maybe :: IdDetails -> Maybe JoinArity
 isJoinIdDetails_maybe (JoinId join_arity) = Just join_arity

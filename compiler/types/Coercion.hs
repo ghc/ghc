@@ -111,7 +111,14 @@ module Coercion (
         -- * Other
         promoteCoercion, buildCoercion,
 
-        simplifyArgsWorker
+        simplifyArgsWorker,
+
+        --- * coercion erasure
+        forcedEraseCoercion,
+        eraseCoercion,
+        mkErasedCoercion,
+        alwaysMkErasedCoercion
+
        ) where
 
 #include "HsVersions.h"
@@ -144,6 +151,7 @@ import TysPrim
 import ListSetOps
 import Maybes
 import UniqFM
+import DynFlags         ( DynFlags, shouldEraseCoercions)
 
 import Control.Monad (foldM, zipWithM)
 import Data.Function ( on )
@@ -709,12 +717,6 @@ mkFunCo r co1 co2
 mkAppCo :: Coercion     -- ^ :: t1 ~r t2
         -> Coercion     -- ^ :: s1 ~N s2, where s1 :: k1, s2 :: k2
         -> Coercion     -- ^ :: t1 s1 ~r t2 s2
-mkAppCo co1 co2
-  | r2 == Nominal  || (r1 == Phantom && (r2 == Nominal || r2 == Phantom))
-  = ErasedCoercion r1 (mkAppTy lt1 lt2) (mkAppTy rt1 rt2)
-  where
-    (Pair lt1 rt1,r1) = coercionKindRole co1
-    (Pair lt2 rt2,r2) = coercionKindRole co2
 mkAppCo co arg
   | Just (ty1, r) <- isReflCo_maybe co
   , Just (ty2, _) <- isReflCo_maybe arg
@@ -974,7 +976,7 @@ mkSymCo :: Coercion -> Coercion
 mkSymCo co | isReflCo co          = co
 mkSymCo    (SymCo co)             = co
 mkSymCo    (SubCo (SymCo co))     = SubCo co
-mkSymCo (ErasedCoercion r lt rt)  = ErasedCoercion r rt lt
+mkSymCo (ErasedCoercion fv r lt rt)  = ErasedCoercion fv r rt lt
 mkSymCo co                        = SymCo co
 
 -- | Create a new 'Coercion' by composing the two given 'Coercion's transitively.
@@ -984,20 +986,121 @@ mkTransCo co1 co2 | isReflCo co1 = co2
                   | isReflCo co2 = co1
 mkTransCo (GRefl r t1 (MCo co1)) (GRefl _ _ (MCo co2))
   = GRefl r t1 (MCo $ mkTransCo co1 co2)
-mkTransCo co1 co2
-    | isErasedCoercion co1 || isErasedCoercion co2
-     =   ErasedCoercion r1 lt1 rt2
-    |  otherwise            = TransCo co1 co2
-  where
-    (Pair lt1 _rt1,r1) = coercionKindRole co1
-    (Pair _lt2 rt2,_r2) = coercionKindRole co2
-isErasedCoercion_maybe :: Coercion -> Maybe (Role,Type,Type)
-isErasedCoercion_maybe (ErasedCoercion r lt rt) = Just (r,lt,rt)
+mkTransCo (ErasedCoercion  fvs1 r t1a _t1b) (ErasedCoercion fvs2 _ _t2a t2b)
+  = ErasedCoercion  (fvs1 `unionDVarSet` fvs2) r t1a t2b
+mkTransCo (ErasedCoercion  fvs r t1a _t1b) co2
+  = ErasedCoercion (fvs `unionDVarSet` tyCoVarsOfCoDSet co2) r t1a t2b
+  where Pair _t2a t2b = coercionKind co2
+mkTransCo co1 (ErasedCoercion  fvs r _t2a t2b)
+  = ErasedCoercion  (fvs `unionDVarSet` tyCoVarsOfCoDSet co1) r t1a t2b
+  where Pair t1a _t1b = coercionKind co1
+mkTransCo co1 co2                 = TransCo co1 co2
+
+
+isErasedCoercion_maybe :: Coercion -> Maybe (DVarSet,Role,Type,Type)
+isErasedCoercion_maybe (ErasedCoercion fv  r lt rt) = Just (fv,r,lt,rt)
 isErasedCoercion_maybe _ = Nothing
 
 isErasedCoercion :: Coercion -> Bool
 isErasedCoercion c = case isErasedCoercion_maybe c of
                       Just _ -> True ; Nothing -> False
+
+-- shamelessly copied from Ben Gamari's version of this code
+-- | Make a Erased coercion if building of coercions is disabled, otherwise
+-- return the given un-erased coercion.
+mkErasedCoercion :: HasDebugCallStack
+                 => DynFlags
+                 -> Coercion  -- ^ the un-Erased coercion
+                 -> Pair Type -- ^ the kind of the coercion
+                 -> Role      -- ^ the role of the coercion
+                 -> DTyCoVarSet -- ^ the free variables of the coercion
+                 -> Coercion
+mkErasedCoercion dflags co (Pair ty1 ty2) role fvs
+  | debugIsOn && real_role /= role =
+    pprPanic "mkErasedCoercion(roles mismatch)" panic_doc
+  | debugIsOn && not co_kind_ok =
+    pprPanic "mkErasedCoercion(kind mismatch)" panic_doc
+  | not $ shouldEraseCoercions dflags = co
+  | otherwise =
+    ErasedCoercion fvs   role ty1 ty2
+  where
+    (Pair real_ty1 real_ty2, real_role) = coercionKindRole co
+    real_fvs = tyCoVarsOfCoDSet co
+        -- We must unify here (at the loss of some precision in the assertion)
+        -- since we may encounter flattening skolems.
+    --co_kind_ok = isJust $ tcUnifyTys (const BindMe) [real_ty1, real_ty2] [ty1, ty2]
+    co_kind_ok = True
+        -- N.B. It's not generally possible to check fCvs against the actual
+        -- free variable set since we may encounter flattening skolems during
+        -- reduction.
+    panic_doc = vcat
+        [ text "real role:" <+> ppr real_role
+        , text "given role:" <+> ppr role
+        , text "real ty1:" <+> ppr real_ty1
+        , text "given ty1:" <+> ppr ty1
+        , text "real ty2:" <+> ppr real_ty2
+        , text "given ty2:" <+> ppr ty2
+        , text "real free co vars:" <+> ppr real_fvs
+        , text "given free co vars:" <+> ppr fvs
+        , text "coercion:" <+> ppr co
+        ]
+
+-- | Replace a coercion with a erased coercion unless coercions are needed.
+eraseCoercion :: DynFlags -> Coercion -> Coercion
+eraseCoercion _ co@(ErasedCoercion _ _ _ _ ) = co  -- already zapped
+eraseCoercion _ co@(Refl _) = co  -- Refl is smaller than zapped coercions
+eraseCoercion _ co@(GRefl _r _ty MRefl ) = co
+eraseCoercion dflags co =
+    mkErasedCoercion dflags co (Pair t1 t2) role fvs
+  where
+    (Pair t1 t2, role) = coercionKindRole co
+    fvs = filterDVarSet (not . isCoercionHole) $ tyCoVarsOfCoDSet co
+
+alwaysMkErasedCoercion :: HasDebugCallStack
+                 => Coercion  -- ^ the un-Erased coercion
+                 -> Pair Type -- ^ the kind of the coercion
+                 -> Role      -- ^ the role of the coercion
+                 -> DTyCoVarSet -- ^ the free variables of the coercion
+                 -> Coercion
+alwaysMkErasedCoercion co (Pair ty1 ty2) role fvs
+  | debugIsOn && real_role /= role =
+    pprPanic "mkErasedCoercion(roles mismatch)" panic_doc
+  | debugIsOn && not co_kind_ok =
+    pprPanic "mkErasedCoercion(kind mismatch)" panic_doc
+  | otherwise =
+    ErasedCoercion fvs   role ty1 ty2
+  where
+    (Pair real_ty1 real_ty2, real_role) = coercionKindRole co
+    real_fvs = tyCoVarsOfCoDSet co
+        -- We must unify here (at the loss of some precision in the assertion)
+        -- since we may encounter flattening skolems.
+    --co_kind_ok = isJust $ tcUnifyTys (const BindMe) [real_ty1, real_ty2] [ty1, ty2]
+    co_kind_ok = True
+        -- N.B. It's not generally possible to check fCvs against the actual
+        -- free variable set since we may encounter flattening skolems during
+        -- reduction.
+    panic_doc = vcat
+        [ text "real role:" <+> ppr real_role
+        , text "given role:" <+> ppr role
+        , text "real ty1:" <+> ppr real_ty1
+        , text "given ty1:" <+> ppr ty1
+        , text "real ty2:" <+> ppr real_ty2
+        , text "given ty2:" <+> ppr ty2
+        , text "real free co vars:" <+> ppr real_fvs
+        , text "given free co vars:" <+> ppr fvs
+        , text "coercion:" <+> ppr co
+        ]
+
+
+forcedEraseCoercion ::  HasDebugCallStack => Coercion -> Coercion
+forcedEraseCoercion co@(ErasedCoercion _ _ _ _ ) = co  -- already zapped
+forcedEraseCoercion co@(Refl _) = co  -- Refl is smaller than zapped coercions
+forcedEraseCoercion co@(GRefl _r _ty MRefl ) = co
+forcedEraseCoercion co =
+    alwaysMkErasedCoercion  co (Pair t1 t2) role fvs
+  where
+    (Pair t1 t2, role) = coercionKindRole co
+    fvs = filterDVarSet (not . isCoercionHole) $ tyCoVarsOfCoDSet co
 
 -- | Compose two MCoercions via transitivity
 mkTransMCo :: MCoercion -> MCoercion -> MCoercion
@@ -1024,13 +1127,13 @@ mkNthCo r n co
         ASSERT( r == Nominal )
         mkNomReflCo (varType tv)
 
-    go r 0 (ErasedCoercion _ lt rt)
+    go r 0 (ErasedCoercion fvs _ lt rt)
       | Just(ltv,_) <- splitForAllTy_maybe lt
       , Just(rtv,_) <- splitForAllTy_maybe rt
 
       = -- ErasedCoercion proofs are quite strange!
         ASSERT(r == Nominal)
-        ErasedCoercion Nominal (varType ltv) (varType rtv )
+        ErasedCoercion fvs Nominal (varType ltv) (varType rtv )
 
 
     go r n co
@@ -1048,7 +1151,7 @@ mkNthCo r n co
               | otherwise
               = False
 
-    go r n (ErasedCoercion r0 lt rt )
+    go r n (ErasedCoercion fv r0 lt rt )
       | Just (ltycon,lts) <- splitTyConApp_maybe lt
       , Just (rtycon,rts) <- splitTyConApp_maybe rt
       ,let ltc = tyConAppTyCon lt  --- not sure why i'm copying this debugging stuff
@@ -1057,7 +1160,7 @@ mkNthCo r n co
         ASSERT2( ok_tc_app rt n, ppr n $$ ppr rt )
         ASSERT( nthRole r0 ltc n == r )
         ASSERT( nthRole r0 rtc n == r )
-        ErasedCoercion r (tyConAppArgN n lt) (tyConAppArgN n rt)
+        ErasedCoercion fv r (tyConAppArgN n lt) (tyConAppArgN n rt)
       where ok_tc_app :: Type -> Int -> Bool
             ok_tc_app ty n
               | Just (_, tys) <- splitTyConApp_maybe ty
@@ -1219,6 +1322,8 @@ mkKindCo co | Just (ty, _) <- isReflCo_maybe co = Refl (typeKind ty)
 mkKindCo (GRefl _ _ (MCo co)) = co
 mkKindCo (UnivCo (PhantomProv h) _ _ _)    = h
 mkKindCo (UnivCo (ProofIrrelProv h) _ _ _) = h
+mkKindCo (ErasedCoercion fvs r lt rt )
+        = (ErasedCoercion fvs Nominal (typeKind lt) (typeKind rt))
 mkKindCo co
   | Pair ty1 ty2 <- coercionKind co
        -- generally, calling coercionKind during coercion creation is a bad idea,
@@ -1234,7 +1339,7 @@ mkKindCo co
 mkSubCo :: Coercion -> Coercion
 -- Input coercion is Nominal, result is Representational
 -- see also Note [Role twiddling functions]
-mkSubCo (ErasedCoercion Nominal lt rt) = ErasedCoercion Representational lt rt
+mkSubCo (ErasedCoercion fvs Nominal lt rt) = ErasedCoercion fvs  Representational lt rt
 mkSubCo (Refl ty) = GRefl Representational ty MRefl
 mkSubCo (GRefl Nominal ty co) = GRefl Representational ty co
 mkSubCo (TyConAppCo Nominal tc cos)
@@ -1306,7 +1411,7 @@ setNominalRole_maybe r co
   | r == Nominal = Just co
   | otherwise = setNominalRole_maybe_helper co
   where
-    setNominalRole_maybe_helper (ErasedCoercion _ lt rt) = Just (ErasedCoercion Nominal lt rt)
+    setNominalRole_maybe_helper (ErasedCoercion fvs  _ lt rt) = Just (ErasedCoercion fvs Nominal lt rt)
     setNominalRole_maybe_helper (SubCo co)  = Just co
     setNominalRole_maybe_helper co@(Refl _) = Just co
     setNominalRole_maybe_helper (GRefl _ ty co) = Just $ GRefl Nominal ty co
@@ -1349,7 +1454,7 @@ mkPhantomCo h t1 t2
 
 -- takes any coercion and turns it into a Phantom coercion
 toPhantomCo :: Coercion -> Coercion
-toPhantomCo (ErasedCoercion _ lt rt) = ErasedCoercion Phantom lt rt
+toPhantomCo (ErasedCoercion fvs _ lt rt) = ErasedCoercion fvs Phantom lt rt
 toPhantomCo co  = mkPhantomCo (mkKindCo co) ty1 ty2
     where Pair ty1 ty2 = coercionKind co
 
@@ -1488,7 +1593,7 @@ promoteCoercion co = case co of
     SubCo g
       -> promoteCoercion g
 
-    ErasedCoercion r _lty _rty -> ErasedCoercion r ty1 ty2
+    ErasedCoercion fvs r _lty _rty -> ErasedCoercion fvs r ty1 ty2
   where
     Pair ty1 ty2 = coercionKind co
     ki1 = typeKind ty1
@@ -2176,7 +2281,7 @@ seqMCo MRefl    = ()
 seqMCo (MCo co) = seqCo co
 
 seqCo :: Coercion -> ()
-seqCo (ErasedCoercion r lt rt) = r `seq` seqType lt `seq` seqType rt
+seqCo (ErasedCoercion fvs r lt rt) = seqDVarSet fvs `seq`r `seq` seqType lt `seq` seqType rt
 seqCo (Refl ty)                 = seqType ty
 seqCo (GRefl r ty mco)          = r `seq` seqType ty `seq` seqMCo mco
 seqCo (TyConAppCo r tc cos)     = r `seq` tc `seq` seqCos cos
@@ -2242,7 +2347,7 @@ coercionLKind :: Coercion -> Type
 coercionLKind co
   = go co
   where
-    go (ErasedCoercion _role ltyp _rtyp)   = ltyp
+    go (ErasedCoercion _fvs _role ltyp _rtyp)   = ltyp
     go (Refl ty)                = ty
     go (GRefl _ ty _)           = ty
     go (TyConAppCo _ tc cos)    = mkTyConApp tc (map go cos)
@@ -2298,7 +2403,7 @@ coercionRKind :: Coercion -> Type
 coercionRKind co
   = go co
   where
-    go (ErasedCoercion _role _ltyp rtype)   = rtype
+    go (ErasedCoercion _fvs _role _ltyp rtype)   = rtype
     go (Refl ty)                = ty
     go (GRefl _ ty MRefl)       = ty
     go (GRefl _ ty (MCo co1))   = mkCastTy ty co1
@@ -2404,7 +2509,7 @@ change reduces /total/ compile time by a factor of more than ten.
 coercionRole :: Coercion -> Role
 coercionRole = go
   where
-    go (ErasedCoercion r _ _) = r
+    go (ErasedCoercion _ r  _ _ ) = r
     go (Refl _) = Nominal
     go (GRefl r _ _) = r
     go (TyConAppCo r _ _) = r
