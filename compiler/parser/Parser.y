@@ -618,6 +618,8 @@ TH_QQUASIQUOTE  { L _ (ITqQuasiQuote _) }
 
 %monad { P } { >>= } { return }
 %lexer { (lexer True) } { L _ ITeof }
+  -- Replace 'lexer' above with 'lexerDbg'
+  -- to dump the tokens fed to the parser.
 %tokentype { (Located Token) }
 
 -- Exported parsers
