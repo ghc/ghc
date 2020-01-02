@@ -643,7 +643,7 @@ tyCoFVsBndr' (Bndr tv _) fvs = FV.delFV tv fvs `unionFV` tyCoFVsOfType' (tyVarKi
 -------------------------------------------------------------------------------
 
 -- | Traverses the type, defaulting type variables of kind 'RuntimeRep' to
--- 'LiftedType'. See 'defaultRuntimeRepVars' in IfaceType.hs the original such
+-- 'LiftedType'. See 'defaultRuntimeRepVars' in GHC.Iface.Type the original such
 -- function working over `IfaceType`'s.
 defaultRuntimeRepVars :: Type -> Type
 defaultRuntimeRepVars = go emptyVarEnv

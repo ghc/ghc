@@ -18,8 +18,8 @@ import Data.Maybe
 import System.Directory
 import System.FilePath
 
-import HieTypes       ( HieFile(..), HieASTs(..) )
-import HieBin         ( readHieFile, hie_file_result)
+import GHC.Iface.Ext.Types  ( HieFile(..), HieASTs(..) )
+import GHC.Iface.Ext.Binary ( readHieFile, hie_file_result)
 import Data.Map as M
 import FastString     ( mkFastString )
 import Module         ( Module, moduleName )

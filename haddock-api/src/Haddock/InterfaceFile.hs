@@ -31,7 +31,7 @@ import qualified Data.Map as Map
 import Data.Map (Map)
 import Data.Word
 
-import BinIface (getSymtabName, getDictFastString)
+import GHC.Iface.Binary (getSymtabName, getDictFastString)
 import Binary
 import FastMutInt
 import FastString
@@ -39,7 +39,7 @@ import GHC hiding (NoLink)
 import GhcMonad (withSession)
 import HscTypes
 import NameCache
-import IfaceEnv
+import GHC.Iface.Env
 import Name
 import UniqFM
 import UniqSupply

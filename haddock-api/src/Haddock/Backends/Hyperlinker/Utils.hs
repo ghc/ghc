@@ -18,8 +18,8 @@ import Haddock.Utils
 import Haddock.Backends.Xhtml.Utils
 
 import GHC
-import HieTypes     ( HieAST(..), HieType(..), HieArgs(..), TypeIndex, HieTypeFlat )
-import IfaceType
+import GHC.Iface.Ext.Types ( HieAST(..), HieType(..), HieArgs(..), TypeIndex, HieTypeFlat )
+import GHC.Iface.Type
 import Name         ( getOccFS, getOccString )
 import Outputable   ( showSDoc )
 import Var          ( VarBndr(..) )
@@ -82,9 +82,9 @@ lineFormat :: String
 lineFormat = "line-%{LINE}"
 
 
--- * HIE file procesddsing
+-- * HIE file processing
 
--- This belongs in GHC's HieUtils...
+-- This belongs in GHC.Iface.Ext.Utils...
 
 -- | Pretty-printed type, ready to be turned into HTML by @xhtml@
 type PrintedType = String

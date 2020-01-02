@@ -12,7 +12,7 @@ import Haddock.Backends.Hyperlinker.Utils
 
 import qualified Data.ByteString as BS
 
-import HieTypes
+import GHC.Iface.Ext.Types
 import Module   ( ModuleName, moduleNameString )
 import Name     ( getOccString, isInternalName, Name, nameModule, nameUnique )
 import SrcLoc
