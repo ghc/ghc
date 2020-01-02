@@ -14,6 +14,7 @@ module TyCoSubst
         TCvSubst(..), TvSubstEnv, CvSubstEnv,
         emptyTvSubstEnv, emptyCvSubstEnv, composeTCvSubstEnv, composeTCvSubst,
         emptyTCvSubst, mkEmptyTCvSubst, isEmptyTCvSubst,
+        substFreeDVarSet,
         mkTCvSubst, mkTvSubst, mkCvSubst,
         getTvSubstEnv,
         getCvSubstEnv, getTCvInScope, getTCvSubstRangeFVs,
@@ -791,7 +792,12 @@ subst_co subst co
     go_mco (MCo co) = MCo (go co)
 
     go :: Coercion -> Coercion
-    go (ErasedCoercion r lty rty ) = (ErasedCoercion  r   $! (go_ty lty)) $! (go_ty rty)
+    go (ErasedCoercion fvs r lty rty )
+      = (((ErasedCoercion
+          $! (substFreeDVarSet subst fvs))
+          $! r)
+          $! (go_ty lty))
+          $! (go_ty rty)
     go (Refl ty)             = mkNomReflCo $! (go_ty ty)
     go (GRefl r ty mco)      = (mkGReflCo r $! (go_ty ty)) $! (go_mco mco)
     go (TyConAppCo r tc args)= let args' = map go args
@@ -825,6 +831,15 @@ subst_co subst co
     -- See Note [Substituting in a coercion hole]
     go_hole h@(CoercionHole { ch_co_var = cv })
       = h { ch_co_var = updateVarType go_ty cv }
+
+
+-- | Perform a substitution within a 'DVarSet' of free variables.
+substFreeDVarSet :: TCvSubst -> DVarSet -> DVarSet
+substFreeDVarSet subst =
+    let f v
+          | isTyVar v = tyCoVarsOfTypeDSet $ substTyVar subst v
+          | otherwise = tyCoVarsOfCoDSet $ substCoVar subst v
+    in mapUnionDVarSet f . dVarSetElems
 
 substForAllCoBndr :: TCvSubst -> TyCoVar -> KindCoercion
                   -> (TCvSubst, TyCoVar, Coercion)

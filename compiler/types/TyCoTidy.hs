@@ -24,8 +24,10 @@ import TyCoFVs (tyCoVarsOfTypesWellScoped, tyCoVarsOfTypeList)
 import Name hiding (varName)
 import Var
 import VarEnv
+import VarSet
 import Util (seqList)
 
+import Data.Maybe ( fromMaybe )
 import Data.List
 
 {-
@@ -197,7 +199,10 @@ tidyCo env@(_, subst) co
     go_mco MRefl    = MRefl
     go_mco (MCo co) = MCo (go co)
 
-    go (ErasedCoercion r lty rty ) = ErasedCoercion r (tidyType env lty) (tidyType env rty)
+    -- this is seemingly missing in
+    go (ErasedCoercion fvs  r lty rty )
+      = ErasedCoercion (mapUnionDVarSet (unitDVarSet . substCoVar) (dVarSetElems fvs))
+                       r (tidyType env lty) (tidyType env rty)
     go (Refl ty)             = Refl (tidyType env ty)
     go (GRefl r ty mco)      = GRefl r (tidyType env ty) $! go_mco mco
     go (TyConAppCo r tc cos) = let args = map go cos
@@ -225,6 +230,8 @@ tidyCo env@(_, subst) co
     go (SubCo co)            = SubCo $! go co
     go (AxiomRuleCo ax cos)  = let cos1 = tidyCos env cos
                                in cos1 `seqList` AxiomRuleCo ax cos1
+
+    substCoVar cv = fromMaybe cv $ lookupVarEnv subst cv
 
     go_prov UnsafeCoerceProv    = UnsafeCoerceProv
     go_prov (PhantomProv co)    = PhantomProv (go co)

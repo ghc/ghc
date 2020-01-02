@@ -66,6 +66,7 @@ module DynFlags (
         positionIndependent,
         optimisationFlags,
         setFlagsFromEnvFile,
+        shouldEraseCoercions,
 
         Way(..), mkBuildTag, wayRTSOnly, addWay', updateWays,
         wayGeneralFlags, wayUnsetGeneralFlags,
@@ -506,6 +507,7 @@ data GeneralFlag
    = Opt_DumpToFile                     -- ^ Append dump output to files instead of stdout.
    | Opt_D_faststring_stats
    | Opt_D_dump_minimal_imports
+   | Opt_EraseCoercions
    | Opt_DoCoreLinting
    | Opt_DoStgLinting
    | Opt_DoCmmLinting
@@ -1697,6 +1699,10 @@ shouldUseColor dflags = overrideWith (canUseColor dflags) (useColor dflags)
 shouldUseHexWordLiterals :: DynFlags -> Bool
 shouldUseHexWordLiterals dflags =
   Opt_HexWordLiterals `EnumSet.member` generalFlags dflags
+
+shouldEraseCoercions :: DynFlags -> Bool
+shouldEraseCoercions dflags =
+  not  (gopt Opt_DoCoreLinting dflags) ||  not (gopt Opt_EraseCoercions dflags)
 
 -- | Are we building with @-fPIE@ or @-fPIC@ enabled?
 positionIndependent :: DynFlags -> Bool
@@ -3313,7 +3319,8 @@ dynamic_flags_deps = [
         ------ Debugging ----------------------------------------------------
   , make_ord_flag defGhcFlag "dstg-stats"
         (NoArg (setGeneralFlag Opt_StgStats))
-
+  , make_ord_flag defGhcFlag "derase-coercions"
+        (NoArg (setGeneralFlag Opt_EraseCoercions))
   , make_ord_flag defGhcFlag "ddump-cmm"
         (setDumpFlag Opt_D_dump_cmm)
   , make_ord_flag defGhcFlag "ddump-cmm-from-stg"

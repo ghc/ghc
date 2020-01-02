@@ -1215,8 +1215,10 @@ tcIfaceCo = go
     go_mco IfaceMRefl    = pure MRefl
     go_mco (IfaceMCo co) = MCo <$> (go co)
 
-    go (IfaceErased r ltyi rtyi)
-                                 = ErasedCoercion r  <$>(tcIfaceType ltyi)
+    go (IfaceErased tvs cvs _ r ltyi rtyi)
+                                 = do cvs' <- mapM tcIfaceLclId cvs
+                                      tvs' <- mapM tcIfaceTyVar tvs
+                                      ErasedCoercion ( mkDVarSet $! cvs' ++  tvs') r  <$>(tcIfaceType ltyi)
                                                      <*>(tcIfaceType rtyi)
     go (IfaceReflCo t)           = Refl <$> tcIfaceType t
     go (IfaceGReflCo r t mco)    = GRefl r <$> tcIfaceType t <*> go_mco mco
