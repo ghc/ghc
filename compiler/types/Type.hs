@@ -65,7 +65,7 @@ module Type (
         mkCastTy, mkCoercionTy, splitCastTy_maybe,
         discardCast,
 
-        userTypeError_maybe, userTypeWarning_maybe, pprUserTypeErrorTy,
+        userTypeError_maybe, redTypeWarning_maybe, pprUserTypeErrorTy,
 
         coAxNthLHS,
         stripCoercionTy,
@@ -947,16 +947,13 @@ userTypeError_maybe t
        ; guard (tyConName tc == errorMessageTypeErrorFamName)
        ; return msg }
 
--- | Is this type a custom user warning?
--- If so, give us the kind, the warning message and the return Kind
-userTypeWarning_maybe :: Type -> Maybe (Type, Type)
-userTypeWarning_maybe t
-  = do { (tc, _kind : msg : retTy : _) <- splitTyConApp_maybe t
-          -- There may be more than 3 arguments, if the type warning is
-          -- used as a type constructor (e.g. at kind `Type -> Type`).
-
-       ; guard (tyConName tc == errorMessageTypeWarningFamName)
-       ; return (msg, retTy) }
+-- | Is this type a reduced user warning?
+-- If so, give us the warning message.
+redTypeWarning_maybe :: Type -> Maybe Type
+redTypeWarning_maybe t
+  = do { (tc, msg : _) <- splitTyConApp_maybe t
+       ; guard (tyConName tc == errorMessageReducedTypeWarningFamName)
+       ; return msg }
 
 -- | Render a type corresponding to a user type error into a SDoc.
 pprUserTypeErrorTy :: Type -> SDoc

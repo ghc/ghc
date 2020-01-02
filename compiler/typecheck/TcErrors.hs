@@ -478,14 +478,15 @@ warnRedundantConstraints ctxt env info ev_vars
          <+> pprEvVarTheta redundant_evs
 
    redundant_evs =
-       filterOut is_type_error $ filterOut is_type_warning $
+       filterOut is_type_warn_or_err $
        case info of -- See Note [Redundant constraints in instance decls]
          InstSkol -> filterOut (improving . idType) ev_vars
          _        -> ev_vars
 
    -- See #15232
-   is_type_error = isJust . userTypeError_maybe . idType
-   is_type_warning = isJust . userTypeWarning_maybe . idType
+   is_type_warn_or_err = or . (xs <*>) . pure . idType
+     where
+       xs = [isJust . userTypeError_maybe, isJust . redTypeWarning_maybe]
 
    improving pred -- (transSuperClasses p) does not include p
      = any isImprovementPred (pred : transSuperClasses pred)
@@ -560,9 +561,10 @@ reportWanteds ctxt tc_lvl (WC { wc_simple = simples, wc_impl = implics })
     -- (see TcRnTypes.insolubleCt) is caught here, otherwise
     -- we might suppress its error message, and proceed on past
     -- type checking to get a Lint error later
-    report1 = [ ("Out of scope", is_out_of_scope,    True,  mkHoleReporter tidy_cts)
-              , ("Holes",        is_hole,            False, mkHoleReporter tidy_cts)
-              , ("custom_error", is_user_type_error, True,  mkUserTypeErrorReporter)
+    report1 = [ ("Out of scope",   is_out_of_scope,     True,  mkHoleReporter tidy_cts)
+              , ("Holes",          is_hole,             False, mkHoleReporter tidy_cts)
+              , ("custom_error",   is_user_type_error,  True,  mkUserTypeErrorReporter)
+              , ("custom_warning", is_red_type_warning, True,  mkUserTypeWarningReporter)
 
               , given_eq_spec
               , ("insoluble2",   utterly_wrong,  True, mkGroupReporter mkEqErr)
@@ -612,6 +614,7 @@ reportWanteds ctxt tc_lvl (WC { wc_simple = simples, wc_impl = implics })
     is_hole         ct _ = isHoleCt ct
 
     is_user_type_error ct _ = isUserTypeErrorCt ct
+    is_red_type_warning ct _ = isRedTypeWarningCt ct
 
     is_homo_equality _ (EqPred _ ty1 ty2) = tcTypeKind ty1 `tcEqType` tcTypeKind ty2
     is_homo_equality _ _                  = False
@@ -716,6 +719,20 @@ mkUserTypeError ctxt ct = mkErrorMsgFromCt ctxt ct
                         $ case getUserTypeErrorMsg ct of
                             Just msg -> msg
                             Nothing  -> pprPanic "mkUserTypeError" (ppr ct)
+
+mkUserTypeWarningReporter :: Reporter
+mkUserTypeWarningReporter ctxt
+  = mapM_ $ \ct -> do { msg <- mkUserTypeWarning ctxt ct
+                      ; reportWarning NoReason msg
+                      }
+
+mkUserTypeWarning :: ReportErrCtxt -> Ct -> TcM ErrMsg
+mkUserTypeWarning ctxt ct = mkErrorMsgFromCt ctxt ct
+                        $ important
+                        $ pprUserTypeErrorTy
+                        $ case getRedTypeWarningMsg ct of
+                            Just msg -> msg
+                            Nothing  -> pprPanic "mkUserTypeWarning" (ppr ct)
 
 
 mkGivenErrorReporter :: Reporter

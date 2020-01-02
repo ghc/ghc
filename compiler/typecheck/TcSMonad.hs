@@ -138,7 +138,7 @@ import qualified TcRnMonad as TcM
 import qualified TcMType as TcM
 import qualified ClsInst as TcM( matchGlobalInst, ClsInstResult(..) )
 import qualified TcEnv as TcM
-       ( checkWellStaged, tcGetDefaultTys, tcLookupClass, tcLookupId, topIdLvl, tcInitTidyEnv )
+       ( checkWellStaged, tcGetDefaultTys, tcLookupClass, tcLookupId, topIdLvl )
 import ClsInst( InstanceWhat(..), safeOverlap, instanceReturnsDictCon )
 import TcType
 import DynFlags
@@ -151,11 +151,12 @@ import TcEvidence
 import Class
 import TyCon
 import TcErrors   ( solverDepthErrorTcS )
+import TysWiredIn ( constraintKind )
 
 import Name
 import Module ( HasModule, getModule )
 import RdrName ( GlobalRdrEnv, GlobalRdrElt )
-import PrelNames (errorMessageTypeWarningFamName)
+import PrelNames (errorMessageTypeWarningFamName, errorMessageReducedTypeWarningFamName)
 import qualified RnEnv as TcM
 import Var
 import VarEnv
@@ -3568,10 +3569,10 @@ matchFamTcM tycon args
          vcat [ text "Matching:" <+> ppr (mkTyConApp tycon args)
               , ppr_res match_fam_result ]
        -- When we rewrite a type warning we issue the warning message
-       ; let issue_type_warning
-              = (tyConName tycon == errorMessageTypeWarningFamName) &&
-                (isJust match_fam_result)
-       ; when issue_type_warning (warn_with $ head $ tail args)
+       ; let ty_warn_rewritten
+               = (tyConName tycon == errorMessageTypeWarningFamName) &&
+                 (isJust match_fam_result)
+       ; when ty_warn_rewritten gen_red_type_warn
        ; return match_fam_result }
   where
     ppr_res Nothing        = text "Match failed"
@@ -3579,10 +3580,22 @@ matchFamTcM tycon args
                                 2 (vcat [ text "Rewrites to:" <+> ppr ty
                                         , text "Coercion:" <+> ppr co ])
 
-    warn_with msg = do { env0 <- TcM.tcInitTidyEnv
-                       ; let (env1, tidy_msg) = tidyOpenType env0 msg
-                       ; TcM.addWarnTcM NoReason (env1, pprUserTypeErrorTy tidy_msg)
-                       }
+    gen_red_type_warn = do { let msg = head $ tail args
+                           ; let msg_binder = head $ tail $ tyConBinders tycon
+                           ; let red_ty_warn_tycon = mkFamilyTyCon
+                                  errorMessageReducedTypeWarningFamName
+                                  [msg_binder]
+                                  constraintKind
+                                  Nothing
+                                  (ClosedSynFamilyTyCon Nothing)
+                                  Nothing
+                                  NotInjective
+                           ; let red_ty_warn_ty = mkTyConApp red_ty_warn_tycon [msg]
+                           ; TcM.traceTc "Emitting ReducedTypeWarning with message: " $
+                             ppr msg
+                           ; _ <- TcM.emitWanted TypeWarnReductionOrigin red_ty_warn_ty
+                           ; return ()
+                           }
 
 {-
 Note [Residual implications]
