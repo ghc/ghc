@@ -24,7 +24,7 @@ import GhcPrelude
 
 import GHCi
 import GHCi.RemoteTypes
-import LoadIface
+import GHC.Iface.Load
 import ByteCodeLink
 import ByteCodeAsm
 import ByteCodeTypes

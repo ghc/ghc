@@ -38,7 +38,7 @@ import TcEnv
 import RnEnv
 import RnFixity
 import RnUtils          ( warnUnusedTopBinds, mkFieldEnv )
-import LoadIface        ( loadSrcInterface )
+import GHC.Iface.Load   ( loadSrcInterface )
 import TcRnMonad
 import PrelNames
 import Module
@@ -285,9 +285,9 @@ rnImportDecl this_mod
 
     -- Check for self-import, which confuses the typechecker (#9032)
     -- ghc --make rejects self-import cycles already, but batch-mode may not
-    -- at least not until TcIface.tcHiBootIface, which is too late to avoid
+    -- at least not until GHC.IfaceToCore.tcHiBootIface, which is too late to avoid
     -- typechecker crashes.  (Indirect self imports are not caught until
-    -- TcIface, see #10337 tracking how to make this error better.)
+    -- GHC.IfaceToCore, see #10337 tracking how to make this error better.)
     --
     -- Originally, we also allowed 'import {-# SOURCE #-} M', but this
     -- caused bug #10182: in one-shot mode, we should never load an hs-boot
@@ -453,7 +453,7 @@ calculateAvails dflags iface mod_safe' want_boot imported_by =
             -- finished dealing with the direct imports we want to
             -- know if any of them depended on CM.hi-boot, in
             -- which case we should do the hi-boot consistency
-            -- check.  See LoadIface.loadHiBootInterface
+            -- check.  See GHC.Iface.Load.loadHiBootInterface
             ((moduleName imp_mod,want_boot):dep_mods deps,dep_pkgs deps,ptrust)
 
          | otherwise =

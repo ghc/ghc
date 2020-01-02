@@ -23,7 +23,7 @@ import GHC              ( -- DynFlags(..), HscTarget(..),
 import CmdLineParser
 
 -- Implementations of the various modes (--show-iface, mkdependHS. etc.)
-import LoadIface        ( showIface )
+import GHC.Iface.Load   ( showIface )
 import HscMain          ( newHscEnv )
 import DriverPipeline   ( oneShot, compileFile )
 import DriverMkDepend   ( doMkDependHS )
@@ -64,7 +64,7 @@ import UniqSupply
 import MonadUtils       ( liftIO )
 
 -- Imports for --abi-hash
-import LoadIface           ( loadUserInterface )
+import GHC.Iface.Load           ( loadUserInterface )
 import Module              ( mkModuleName )
 import Finder              ( findImportedModule, cannotFindModule )
 import TcRnMonad           ( initIfaceCheck )

@@ -46,8 +46,8 @@ module RnEnv (
 
 import GhcPrelude
 
-import LoadIface        ( loadInterfaceForName, loadSrcInterface_maybe )
-import IfaceEnv
+import GHC.Iface.Load   ( loadInterfaceForName, loadSrcInterface_maybe )
+import GHC.Iface.Env
 import GHC.Hs
 import RdrName
 import HscTypes

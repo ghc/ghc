@@ -177,14 +177,14 @@ that e.g. literalType can return the right Type for them.
 
 They only get converted into real Core,
     mkInteger [c1, c2, .., cn]
-during the CorePrep phase, although TidyPgm looks ahead at what the
+during the CorePrep phase, although GHC.Iface.Tidy looks ahead at what the
 core will be, so that it can see whether it involves CAFs.
 
 When we initially build an Integer literal, notably when
 deserialising it from an interface file (see the Binary instance
 below), we don't have convenient access to the mkInteger Id.  So we
 just use an error thunk, and fill in the real Id when we do tcIfaceLit
-in TcIface.
+in GHC.IfaceToCore.
 
 Note [Natural literals]
 ~~~~~~~~~~~~~~~~~~~~~~~
