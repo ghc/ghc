@@ -893,7 +893,7 @@ tidyOccName env occ@(OccName occ_sp fs)
 ************************************************************************
 *                                                                      *
                 Binary instance
-    Here rather than BinIface because OccName is abstract
+    Here rather than in GHC.Iface.Binary because OccName is abstract
 *                                                                      *
 ************************************************************************
 -}

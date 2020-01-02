@@ -8,9 +8,9 @@ import SrcLoc
 import UniqSupply
 import Name
 
-import HieBin
-import HieTypes
-import HieUtils
+import GHC.Iface.Ext.Binary
+import GHC.Iface.Ext.Types
+import GHC.Iface.Ext.Utils
 
 import DynFlags
 import SysTools

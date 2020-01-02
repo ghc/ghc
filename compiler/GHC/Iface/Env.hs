@@ -2,7 +2,7 @@
 
 {-# LANGUAGE CPP, RankNTypes, BangPatterns #-}
 
-module IfaceEnv (
+module GHC.Iface.Env (
         newGlobalBinder, newInteractiveBinder,
         externaliseName,
         lookupIfaceTop,
@@ -33,7 +33,7 @@ import Avail
 import Module
 import FastString
 import FastStringEnv
-import IfaceType
+import GHC.Iface.Type
 import NameCache
 import UniqSupply
 import SrcLoc
@@ -149,7 +149,7 @@ updNameCacheIO hsc_env mod occ upd_fn = do {
     --      we read the name-cache
     --      then pull on mod (say)
     --      which does some stuff that modifies the name cache
-    -- This did happen, with tycon_mod in TcIface.tcIfaceAlt (DataAlt..)
+    -- This did happen, with tycon_mod in GHC.IfaceToCore.tcIfaceAlt (DataAlt..)
 
     mod `seq` occ `seq` return ()
   ; updNameCache (hsc_NC hsc_env) upd_fn }

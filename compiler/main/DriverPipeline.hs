@@ -66,7 +66,7 @@ import FileCleanup
 import Ar
 import Bag              ( unitBag )
 import FastString       ( mkFastString )
-import MkIface          ( mkFullIface )
+import GHC.Iface.Utils  ( mkFullIface )
 
 import Exception
 import System.Directory

@@ -479,13 +479,13 @@ stgRhsArity (StgRhsCon _ _ _) = 0
 -- ~~~~~~~~~~~~~~~~~~~~~~
 --
 -- `topStgBindHasCafRefs` is only used by an assert (`consistentCafInfo` in
--- `CoreToStg`) to make sure CAF-ness predicted by `TidyPgm` is consistent with
+-- `CoreToStg`) to make sure CAF-ness predicted by `GHC.Iface.Tidy` is consistent with
 -- reality.
 --
 -- Specifically, if the RHS mentions any Id that itself is marked
 -- `MayHaveCafRefs`; or if the binding is a top-level updateable thunk; then the
 -- `Id` for the binding should be marked `MayHaveCafRefs`. The potential trouble
--- is that `TidyPgm` computed the CAF info on the `Id` but some transformations
+-- is that `GHC.Iface.Tidy` computed the CAF info on the `Id` but some transformations
 -- have taken place since then.
 
 topStgBindHasCafRefs :: GenStgTopBinding pass -> Bool
@@ -547,7 +547,7 @@ stgArgHasCafRefs _
 stgIdHasCafRefs :: Id -> Bool
 stgIdHasCafRefs id =
   -- We are looking for occurrences of an Id that is bound at top level, and may
-  -- have CAF refs. At this point (after TidyPgm) top-level Ids (whether
+  -- have CAF refs. At this point (after GHC.Iface.Tidy) top-level Ids (whether
   -- imported or defined in this module) are GlobalIds, so the test is easy.
   isGlobalId id && mayHaveCafRefs (idCafInfo id)
 

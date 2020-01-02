@@ -685,7 +685,7 @@ Note [How tuples work]  See also Note [Known-key names] in PrelNames
   E.g. tupleTyCon has a Boxity argument
 
 * When looking up an OccName in the original-name cache
-  (IfaceEnv.lookupOrigNameCache), we spot the tuple OccName to make sure
+  (GHC.Iface.Env.lookupOrigNameCache), we spot the tuple OccName to make sure
   we get the right wired-in name.  This guy can't tell the difference
   between BoxedTuple and ConstraintTuple (same OccName!), so tuples
   are not serialised into interface files using OccNames at all.

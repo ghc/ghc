@@ -387,7 +387,7 @@ of reasons:
 
 In CoreTidy we must make all these LocalIds into GlobalIds, so that in
 importing modules (in --make mode) we treat them as properly global.
-That is what is happening in, say tidy_insts in TidyPgm.
+That is what is happening in, say tidy_insts in GHC.Iface.Tidy.
 
 ************************************************************************
 *                                                                      *
