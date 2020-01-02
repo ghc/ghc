@@ -20,6 +20,7 @@ module Constraint (
         isCNonCanonical, isWantedCt, isDerivedCt,
         isGivenCt, isHoleCt, isOutOfScopeCt, isExprHoleCt, isTypeHoleCt,
         isUserTypeErrorCt, getUserTypeErrorMsg,
+        isRedTypeWarningCt, getRedTypeWarningMsg,
         ctEvidence, ctLoc, setCtLoc, ctPred, ctFlavour, ctEqRel, ctOrigin,
         ctEvId, mkTcEqPredLikeEv,
         mkNonCanonical, mkNonCanonicalCt, mkGivens,
@@ -746,11 +747,30 @@ getUserTypeErrorMsg ct = findUserTypeError (ctPred ct)
                               Just (_,ts) -> ts
                           (t,ts) -> t : ts
 
-
-
-
 isUserTypeErrorCt :: Ct -> Bool
 isUserTypeErrorCt ct = case getUserTypeErrorMsg ct of
+                         Just _ -> True
+                         _      -> False
+
+-- | A constraint is considered to be a custom type warning, if it contains
+-- reduced type warnings anywhere in it.
+-- See Note [Custom type errors in constraints]
+getRedTypeWarningMsg :: Ct -> Maybe Type
+getRedTypeWarningMsg ct = findRedTypeWarning (ctPred ct)
+  where
+  findRedTypeWarning t = msum ( redTypeWarning_maybe t
+                             : map findRedTypeWarning (subTys t)
+                             )
+
+  subTys t            = case splitAppTys t of
+                          (t,[]) ->
+                            case splitTyConApp_maybe t of
+                              Nothing     -> []
+                              Just (_,ts) -> ts
+                          (t,ts) -> t : ts
+
+isRedTypeWarningCt :: Ct -> Bool
+isRedTypeWarningCt ct = case getRedTypeWarningMsg ct of
                          Just _ -> True
                          _      -> False
 

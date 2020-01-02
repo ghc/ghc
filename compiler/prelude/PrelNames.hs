@@ -464,6 +464,7 @@ basicKnownKeyNames
 
         -- Custom type warnigns
         , errorMessageTypeWarningFamName
+        , errorMessageReducedTypeWarningFamName
 
     ]
 
@@ -1322,9 +1323,11 @@ typeErrorShowTypeDataConName =
 
 
 -- Custom type warnings
-errorMessageTypeWarningFamName :: Name
+errorMessageTypeWarningFamName, errorMessageReducedTypeWarningFamName :: Name
 errorMessageTypeWarningFamName =
   tcQual gHC_TYPELITS (fsLit "TypeWarning") errorMessageTypeWarningFamKey
+errorMessageReducedTypeWarningFamName =
+  tcQual gHC_TYPELITS (fsLit "ReducedTypeWarning") errorMessageReducedTypeWarningFamKey
 
 
 -- Dynamic
@@ -1898,8 +1901,9 @@ typeSymbolAppendFamNameKey :: Unique
 typeSymbolAppendFamNameKey = mkPreludeTyConUnique 190
 
 -- Custom user type-warnings
-errorMessageTypeWarningFamKey :: Unique
-errorMessageTypeWarningFamKey =  mkPreludeTyConUnique 191
+errorMessageTypeWarningFamKey, errorMessageReducedTypeWarningFamKey :: Unique
+errorMessageTypeWarningFamKey = mkPreludeTyConUnique 191
+errorMessageReducedTypeWarningFamKey = mkPreludeTyConUnique 192
 
 ---------------- Template Haskell -------------------
 --      THNames.hs: USES TyConUniques 200-299

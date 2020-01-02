@@ -344,7 +344,7 @@ data CtOrigin
   | OccurrenceOf Name              -- Occurrence of an overloaded identifier
   | OccurrenceOfRecSel RdrName     -- Occurrence of a record selector
   | AppOrigin                      -- An application of some kind
-
+  | TypeWarnReductionOrigin        -- When reduction of type warning occured
   | SpecPragOrigin UserTypeCtxt    -- Specialisation pragma for
                                    -- function or instance
 
@@ -444,11 +444,13 @@ data CtOrigin
         -- is solvable or not.
 -- An origin is visible if the place where the constraint arises is manifest
 -- in user code. Currently, all origins are visible except for invisible
--- TypeEqOrigins. This is used when choosing which error of
--- several to report
+-- TypeEqOrigins and TypeWarnReductionOrigin. TypeWarning reductions happen
+-- completely in the compiler and is never manifested in user code.
+-- This is used when choosing which error of several to report
 isVisibleOrigin :: CtOrigin -> Bool
 isVisibleOrigin (TypeEqOrigin { uo_visible = vis }) = vis
 isVisibleOrigin (KindEqOrigin _ _ sub_orig _)       = isVisibleOrigin sub_orig
+isVisibleOrigin (TypeWarnReductionOrigin)           = False
 isVisibleOrigin _                                   = True
 
 -- Converts a visible origin to an invisible one, if possible. Currently,
@@ -626,6 +628,7 @@ pprCtOrigin simple_origin
 pprCtO :: CtOrigin -> SDoc
 pprCtO (OccurrenceOf name)   = hsep [text "a use of", quotes (ppr name)]
 pprCtO (OccurrenceOfRecSel name) = hsep [text "a use of", quotes (ppr name)]
+pprCtO TypeWarnReductionOrigin = text "a TypeWarning reduction"
 pprCtO AppOrigin             = text "an application"
 pprCtO (IPOccOrigin name)    = hsep [text "a use of implicit parameter", quotes (ppr name)]
 pprCtO (OverLabelOrigin l)   = hsep [text "the overloaded label"

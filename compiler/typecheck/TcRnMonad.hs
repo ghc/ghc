@@ -550,8 +550,7 @@ getEpsAndHpt :: TcRnIf gbl lcl (ExternalPackageState, HomePackageTable)
 getEpsAndHpt = do { env <- getTopEnv; eps <- readMutVar (hsc_EPS env)
                   ; return (eps, hsc_HPT env) }
 
--- | A convenient wrapper for taking a @MaybeErr MsgDoc a@ and throwing
--- an exception if it is an error.
+-- | A convenient wrapper 2
 withException :: TcRnIf gbl lcl (MaybeErr MsgDoc a) -> TcRnIf gbl lcl a
 withException do_this = do
     r <- do_this
