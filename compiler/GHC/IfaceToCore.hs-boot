@@ -1,8 +1,9 @@
-module TcIface where
+module GHC.IfaceToCore where
 
 import GhcPrelude
-import IfaceSyn    ( IfaceDecl, IfaceClsInst, IfaceFamInst, IfaceRule,
-                     IfaceAnnotation, IfaceCompleteMatch )
+import GHC.Iface.Syntax
+   ( IfaceDecl, IfaceClsInst, IfaceFamInst, IfaceRule
+   , IfaceAnnotation, IfaceCompleteMatch )
 import TyCoRep     ( TyThing )
 import TcRnTypes   ( IfL )
 import InstEnv     ( ClsInst )

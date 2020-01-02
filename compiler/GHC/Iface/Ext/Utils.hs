@@ -2,25 +2,25 @@
 {-# LANGUAGE TupleSections #-}
 {-# LANGUAGE OverloadedStrings #-}
 {-# LANGUAGE FlexibleInstances #-}
-module HieUtils where
+module GHC.Iface.Ext.Utils where
 
 import GhcPrelude
 
 import CoreMap
 import DynFlags                   ( DynFlags )
 import FastString                 ( FastString, mkFastString )
-import IfaceType
+import GHC.Iface.Type
 import Name hiding (varName)
 import Outputable                 ( renderWithStyle, ppr, defaultUserStyle )
 import SrcLoc
-import ToIface
+import GHC.CoreToIface
 import TyCon
 import TyCoRep
 import Type
 import Var
 import VarEnv
 
-import HieTypes
+import GHC.Iface.Ext.Types
 
 import qualified Data.Map as M
 import qualified Data.Set as S

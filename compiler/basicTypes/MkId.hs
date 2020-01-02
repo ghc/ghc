@@ -362,8 +362,8 @@ The solution is simple, though: just make the newtype wrappers
 as ephemeral as the newtype workers. In other words, give the wrappers
 compulsory unfoldings and no bindings. The compulsory unfolding is given
 in wrap_unf in mkDataConRep, and the lack of a binding happens in
-TidyPgm.getTyConImplicitBinds, where we say that a newtype has no implicit
-bindings.
+GHC.Iface.Tidy.getTyConImplicitBinds, where we say that a newtype has no
+implicit bindings.
 
 ************************************************************************
 *                                                                      *
@@ -649,7 +649,7 @@ mkDataConRep dflags fam_envs wrap_name mb_bangs data_con
                          `setInlinePragInfo`    wrap_prag
                          `setUnfoldingInfo`     wrap_unf
                          `setStrictnessInfo`    wrap_sig
-                             -- We need to get the CAF info right here because TidyPgm
+                             -- We need to get the CAF info right here because GHC.Iface.Tidy
                              -- does not tidy the IdInfo of implicit bindings (like the wrapper)
                              -- so it not make sure that the CAF info is sane
                          `setLevityInfoWithType` wrap_ty
@@ -1496,7 +1496,7 @@ Note [seqId magic]
 ~~~~~~~~~~~~~~~~~~
 'GHC.Prim.seq' is special in several ways.
 
-a) Its fixity is set in LoadIface.ghcPrimIface
+a) Its fixity is set in GHC.Iface.Load.ghcPrimIface
 
 b) It has quite a bit of desugaring magic.
    See DsUtils.hs Note [Desugaring seq (1)] and (2) and (3)
@@ -1601,7 +1601,7 @@ running the simplifier.
 
 'noinline' needs to be wired-in because it gets inserted automatically
 when we serialize an expression to the interface format. See
-Note [Inlining and hs-boot files] in ToIface
+Note [Inlining and hs-boot files] in GHC.CoreToIface
 
 Note that noinline as currently implemented can hide some simplifications since
 it hides strictness from the demand analyser. Specifically, the demand analyser

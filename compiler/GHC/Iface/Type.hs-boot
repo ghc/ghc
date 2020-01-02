@@ -1,7 +1,8 @@
--- Used only by ToIface.hs-boot
-
-module IfaceType( IfaceType, IfaceTyCon, IfaceForAllBndr
-                , IfaceCoercion, IfaceTyLit, IfaceAppArgs ) where
+module GHC.Iface.Type
+   ( IfaceType, IfaceTyCon, IfaceForAllBndr
+   , IfaceCoercion, IfaceTyLit, IfaceAppArgs
+   )
+where
 
 import Var (VarBndr, ArgFlag)
 

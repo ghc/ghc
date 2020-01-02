@@ -1,4 +1,4 @@
-module IfaceEnv where
+module GHC.Iface.Env where
 
 import Module
 import OccName

@@ -58,7 +58,7 @@ import Module
 import Name
 import Packages ( trusted, getPackageDetails, getInstalledPackageDetails,
                   listVisibleModuleNames, pprFlag )
-import IfaceSyn ( showToHeader )
+import GHC.Iface.Syntax ( showToHeader )
 import PprTyThing
 import PrelNames
 import RdrName ( getGRE_NameQualifier_maybes, getRdrName )

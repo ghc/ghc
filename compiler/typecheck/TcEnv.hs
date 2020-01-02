@@ -74,11 +74,11 @@ module TcEnv(
 import GhcPrelude
 
 import GHC.Hs
-import IfaceEnv
+import GHC.Iface.Env
 import TcRnMonad
 import TcMType
 import TcType
-import LoadIface
+import GHC.Iface.Load
 import PrelNames
 import TysWiredIn
 import Id
@@ -209,7 +209,7 @@ span of the Name.
 
 
 tcLookupLocatedGlobal :: Located Name -> TcM TyThing
--- c.f. IfaceEnvEnv.tcIfaceGlobal
+-- c.f. GHC.IfaceToCore.tcIfaceGlobal
 tcLookupLocatedGlobal name
   = addLocM tcLookupGlobal name
 

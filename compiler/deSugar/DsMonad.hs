@@ -60,7 +60,7 @@ import CoreSyn
 import MkCore    ( unitExpr )
 import CoreUtils ( exprType, isExprLevPoly )
 import GHC.Hs
-import TcIface
+import GHC.IfaceToCore
 import TcMType ( checkForLevPolyX, formatLevPolyErr )
 import PrelNames
 import RdrName

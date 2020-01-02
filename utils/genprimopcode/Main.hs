@@ -268,7 +268,7 @@ gen_hs_source (Info defaults entries) =
                      -- with Declaration for $fEqMaybe:
                      --       attempting to use module ‘GHC.Classes’
                      --       (libraries/ghc-prim/./GHC/Classes.hs) which is not loaded
-                     -- coming from LoadIface.homeModError
+                     -- coming from GHC.IFace.Load.homeModError
                      -- I'm not sure precisely why; but I *am* sure that we don't need
                      -- any type-class defaulting; and it's clearly wrong to need
                      -- the base package when haddocking ghc-prim

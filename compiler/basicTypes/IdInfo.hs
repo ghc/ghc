@@ -409,7 +409,7 @@ differently because:
   a) they might be nested, in which case a global table won't work
   b) the RULE might mention free variables, which we use to keep things alive
 
-In TidyPgm, when the LocalId becomes a GlobalId, its RULES are stripped off
+In GHC.Iface.Tidy, when the LocalId becomes a GlobalId, its RULES are stripped off
 and put in the global list.
 -}
 
