@@ -489,7 +489,7 @@ We use this to check all top-level unfoldings that come in from interfaces
 
 We do not need to call lintUnfolding on unfoldings that are nested within
 top-level unfoldings; they are linted when we lint the top-level unfolding;
-hence the `TopLevelFlag` on `tcPragExpr` in TcIface.
+hence the `TopLevelFlag` on `tcPragExpr` in GHC.IfaceToCore.
 
 -}
 

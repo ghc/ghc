@@ -6,8 +6,8 @@
 {-# LANGUAGE CPP #-}
 {-# LANGUAGE LambdaCase #-}
 
-module IfaceSyn (
-        module IfaceType,
+module GHC.Iface.Syntax (
+        module GHC.Iface.Type,
 
         IfaceDecl(..), IfaceFamTyConFlav(..), IfaceClassOp(..), IfaceAT(..),
         IfaceConDecl(..), IfaceConDecls(..), IfaceEqSpec,
@@ -44,7 +44,7 @@ module IfaceSyn (
 
 import GhcPrelude
 
-import IfaceType
+import GHC.Iface.Type
 import BinFingerprint
 import CoreSyn( IsOrphan, isOrphan )
 import DynFlags( gopt, GeneralFlag (Opt_PrintAxiomIncomps) )
@@ -90,8 +90,8 @@ infixl 3 &&&
 -- | A binding top-level 'Name' in an interface file (e.g. the name of an
 -- 'IfaceDecl').
 type IfaceTopBndr = Name
-  -- It's convenient to have a Name in the IfaceSyn, although in each
-  -- case the namespace is implied by the context. However, having an
+  -- It's convenient to have a Name in the Iface syntax, although in each
+  -- case the namespace is implied by the context. However, having a
   -- Name makes things like ifaceDeclImplicitBndrs and ifaceDeclFingerprints
   -- very convenient. Moreover, having the key of the binder means that
   -- we can encode known-key things cleverly in the symbol table. See Note
@@ -187,8 +187,8 @@ data IfaceTyConParent
   = IfNoParent
   | IfDataInstance
        IfExtName     -- Axiom name
-       IfaceTyCon    -- Family TyCon (pretty-printing only, not used in TcIface)
-                     -- see Note [Pretty printing via IfaceSyn] in PprTyThing
+       IfaceTyCon    -- Family TyCon (pretty-printing only, not used in GHC.IfaceToCore)
+                     -- see Note [Pretty printing via Iface syntax] in PprTyThing
        IfaceAppArgs  -- Arguments of the family TyCon
 
 data IfaceFamTyConFlav
@@ -197,7 +197,7 @@ data IfaceFamTyConFlav
   | IfaceClosedSynFamilyTyCon (Maybe (IfExtName, [IfaceAxBranch]))
     -- ^ Name of associated axiom and branches for pretty printing purposes,
     -- or 'Nothing' for an empty closed family without an axiom
-    -- See Note [Pretty printing via IfaceSyn] in PprTyThing
+    -- See Note [Pretty printing via Iface syntax] in PprTyThing
   | IfaceAbstractClosedSynFamilyTyCon
   | IfaceBuiltInSynFamTyCon -- for pretty printing purposes only
 
@@ -405,7 +405,7 @@ ifaceDeclImplicitBndrs :: IfaceDecl -> [OccName]
 -- N.B. the set of names returned here *must* match the set of
 -- TyThings returned by HscTypes.implicitTyThings, in the sense that
 -- TyThing.getOccName should define a bijection between the two lists.
--- This invariant is used in LoadIface.loadDecl (see note [Tricky iface loop])
+-- This invariant is used in GHC.Iface.Load.loadDecl (see note [Tricky iface loop])
 -- The order of the list does not matter.
 
 ifaceDeclImplicitBndrs (IfaceData {ifName = tc_name, ifCons = cons })
@@ -528,9 +528,9 @@ data IfaceJoinInfo = IfaceNotJoinPoint
 {-
 Note [Empty case alternatives]
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
-In IfaceSyn an IfaceCase does not record the types of the alternatives,
-unlike CorSyn Case.  But we need this type if the alternatives are empty.
-Hence IfaceECase.  See Note [Empty case alternatives] in CoreSyn.
+In Iface syntax an IfaceCase does not record the types of the alternatives,
+unlike Core syntax Case. But we need this type if the alternatives are empty.
+Hence IfaceECase. See Note [Empty case alternatives] in CoreSyn.
 
 Note [Expose recursive functions]
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
@@ -599,7 +599,7 @@ pprAxBranch pp_tc idx (IfaceAxBranch { ifaxbTyVars = tvs
     $+$
     nest 4 maybe_incomps
   where
-    -- See Note [Printing foralls in type family instances] in IfaceType
+    -- See Note [Printing foralls in type family instances] in GHC.Iface.Type
     ppr_binders = maybe_index <+>
       pprUserIfaceForAll (map (mkIfaceForAllTvBndr Specified) tvs)
     pp_lhs = hang pp_tc 2 (pprParendIfaceAppArgs pat_tys)
@@ -763,7 +763,7 @@ pprIfaceDecl ss (IfaceData { ifName = tycon, ifCType = ctype,
                      , nest 2 $ ppShowIface ss pp_extra ]
   where
     is_data_instance = isIfaceDataInstance parent
-    -- See Note [Printing foralls in type family instances] in IfaceType
+    -- See Note [Printing foralls in type family instances] in GHC.Iface.Type
     pp_data_inst_forall :: SDoc
     pp_data_inst_forall = pprUserIfaceForAll forall_bndrs
 
@@ -807,7 +807,7 @@ pprIfaceDecl ss (IfaceData { ifName = tycon, ifCType = ctype,
     pp_ki_sig = ppWhen ki_sig_printable $
                 pprStandaloneKindSig name_doc (mkIfaceTyConKind binders kind)
 
-    -- See Note [Suppressing binder signatures] in IfaceType
+    -- See Note [Suppressing binder signatures] in GHC.Iface.Type
     suppress_bndr_sig = SuppressBndrSig ki_sig_printable
 
     name_doc = pprPrefixIfDeclBndr (ss_how_much ss) (occName tycon)
@@ -837,7 +837,7 @@ pprIfaceDecl ss (IfaceClass { ifName  = clas
          , pprClassStandaloneKindSig ss clas (mkIfaceTyConKind binders constraintIfaceKind)
          , text "class" <+> pprIfaceDeclHead suppress_bndr_sig [] ss clas binders <+> pprFundeps fds ]
   where
-    -- See Note [Suppressing binder signatures] in IfaceType
+    -- See Note [Suppressing binder signatures] in GHC.Iface.Type
     suppress_bndr_sig = SuppressBndrSig True
 
 pprIfaceDecl ss (IfaceClass { ifName  = clas
@@ -878,7 +878,7 @@ pprIfaceDecl ss (IfaceClass { ifName  = clas
           (\_ def -> cparen (isLexSym def) (ppr def)) 0 minDef <+>
         text "#-}"
 
-      -- See Note [Suppressing binder signatures] in IfaceType
+      -- See Note [Suppressing binder signatures] in GHC.Iface.Type
       suppress_bndr_sig = SuppressBndrSig True
 
 pprIfaceDecl ss (IfaceSynonym { ifName    = tc
@@ -894,7 +894,7 @@ pprIfaceDecl ss (IfaceSynonym { ifName    = tc
     (tvs, theta, tau) = splitIfaceSigmaTy mono_ty
     name_doc = pprPrefixIfDeclBndr (ss_how_much ss) (occName tc)
 
-    -- See Note [Suppressing binder signatures] in IfaceType
+    -- See Note [Suppressing binder signatures] in GHC.Iface.Type
     suppress_bndr_sig = SuppressBndrSig True
 
 pprIfaceDecl ss (IfaceFamily { ifName = tycon
@@ -951,7 +951,7 @@ pprIfaceDecl ss (IfaceFamily { ifName = tycon
         $$ ppShowIface ss (text "axiom" <+> ppr ax)
     pp_branches _ = Outputable.empty
 
-    -- See Note [Suppressing binder signatures] in IfaceType
+    -- See Note [Suppressing binder signatures] in GHC.Iface.Type
     suppress_bndr_sig = SuppressBndrSig True
 
 pprIfaceDecl _ (IfacePatSyn { ifName = name,
@@ -1417,11 +1417,11 @@ instance Outputable IfaceUnfolding where
 {-
 ************************************************************************
 *                                                                      *
-              Finding the Names in IfaceSyn
+              Finding the Names in Iface syntax
 *                                                                      *
 ************************************************************************
 
-This is used for dependency analysis in MkIface, so that we
+This is used for dependency analysis in GHC.Iface.Utils, so that we
 fingerprint a declaration before the things that depend on it.  It
 is specific to interface-file fingerprinting in the sense that we
 don't collect *all* Names: for example, the DFun of an instance is
@@ -1945,7 +1945,7 @@ knot in the type checker. It saved ~1% of the total build time of GHC.
 When we read an interface file, we extend the PTE, a mapping of Names
 to TyThings, with the declarations we have read. The extension of the
 PTE is strict in the Names, but not in the TyThings themselves.
-LoadIface.loadDecl calculates the list of (Name, TyThing) bindings to
+GHC.Iface.Load.loadDecl calculates the list of (Name, TyThing) bindings to
 add to the PTE. For an IfaceId, there's just one binding to add; and
 the ty, details, and idinfo fields of an IfaceId are used only in the
 TyThing. So by reading those fields lazily we may be able to save the
@@ -2423,7 +2423,7 @@ instance Binary IfaceCompleteMatch where
 ************************************************************************
 *                                                                      *
                 NFData instances
-   See Note [Avoiding space leaks in toIface*] in ToIface
+   See Note [Avoiding space leaks in toIface*] in GHC.CoreToIface
 *                                                                      *
 ************************************************************************
 -}

@@ -283,8 +283,8 @@ Loop breaking is surprisingly subtle.  First read the section 4 of
 We avoid infinite inlinings by choosing loop breakers, and
 ensuring that a loop breaker cuts each loop.
 
-See also Note [Inlining and hs-boot files] in ToIface, which deals
-with a closely related source of infinite loops.
+See also Note [Inlining and hs-boot files] in GHC.Core.ToIface, which
+deals with a closely related source of infinite loops.
 
 Fundamentally, we do SCC analysis on a graph.  For each recursive
 group we choose a loop breaker, delete all edges to that node,

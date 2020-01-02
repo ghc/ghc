@@ -21,7 +21,7 @@ import InstEnv( roughMatchTcs )
 import Coercion
 import CoreLint
 import TcEvidence
-import LoadIface
+import GHC.Iface.Load
 import TcRnMonad
 import SrcLoc
 import TyCon
@@ -142,7 +142,7 @@ addressed yet.
 * The call to checkFamConsistency for imported functions occurs very
   early (in tcRnImports) and that causes problems if the imported
   instances use type declared in the module being compiled.
-  See Note [Loading your own hi-boot file] in LoadIface.
+  See Note [Loading your own hi-boot file] in GHC.Iface.Load.
 -}
 
 {-

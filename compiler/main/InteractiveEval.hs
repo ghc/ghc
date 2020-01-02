@@ -56,9 +56,9 @@ import HscMain
 import GHC.Hs
 import HscTypes
 import InstEnv
-import IfaceEnv   ( newInteractiveBinder )
-import FamInstEnv ( FamInst )
-import CoreFVs    ( orphNamesOfFamInst )
+import GHC.Iface.Env   ( newInteractiveBinder )
+import FamInstEnv      ( FamInst )
+import CoreFVs         ( orphNamesOfFamInst )
 import TyCon
 import Type             hiding( typeKind )
 import GHC.Types.RepType

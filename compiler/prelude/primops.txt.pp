@@ -204,7 +204,7 @@ primtype (->) a b
   }
   with fixity = infixr -1
          -- This fixity is only the one picked up by Haddock. If you
-         -- change this, do update 'ghcPrimIface' in 'LoadIface.hs'.
+         -- change this, do update 'ghcPrimIface' in 'GHC.Iface.Load'.
 
 ------------------------------------------------------------------------
 section "Char#"
@@ -3367,7 +3367,7 @@ pseudoop   "seq"
      you must use the function {\tt pseq} from the "parallel" package. }
    with fixity = infixr 0
          -- This fixity is only the one picked up by Haddock. If you
-         -- change this, do update 'ghcPrimIface' in 'LoadIface.hs'.
+         -- change this, do update 'ghcPrimIface' in 'GHC.Iface.Load'.
 
 pseudoop   "unsafeCoerce#"
    a -> b

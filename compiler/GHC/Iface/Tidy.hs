@@ -6,7 +6,7 @@
 
 {-# LANGUAGE CPP, DeriveFunctor, ViewPatterns #-}
 
-module TidyPgm (
+module GHC.Iface.Tidy (
        mkBootModDetailsTc, tidyProgram
    ) where
 
@@ -46,7 +46,7 @@ import Name hiding (varName)
 import NameSet
 import NameCache
 import Avail
-import IfaceEnv
+import GHC.Iface.Env
 import TcEnv
 import TcRnMonad
 import DataCon
@@ -216,7 +216,7 @@ globaliseAndTidyBootId :: Id -> Id
 --     * unchanged Name (might be Internal or External)
 --     * unchanged details
 --     * VanillaIdInfo (makes a conservative assumption about Caf-hood and arity)
---     * BootUnfolding (see Note [Inlining and hs-boot files] in ToIface)
+--     * BootUnfolding (see Note [Inlining and hs-boot files] in GHC.CoreToIface)
 globaliseAndTidyBootId id
   = globaliseId id `setIdType`      tidyTopType (idType id)
                    `setIdUnfolding` BootUnfolding
@@ -528,7 +528,7 @@ It's much safer just to inject them right at the end, after tidying.
 
 Oh: two other reasons for injecting them late:
 
-  - If implicit Ids are already in the bindings when we start TidyPgm,
+  - If implicit Ids are already in the bindings when we start tidying,
     we'd have to be careful not to treat them as external Ids (in
     the sense of chooseExternalIds); else the Ids mentioned in *their*
     RHSs will be treated as external and you get an interface file
@@ -1277,14 +1277,14 @@ CAF list to keep track of non-collectable CAFs.
 Note [Disgusting computation of CafRefs]
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 We compute hasCafRefs here, because IdInfo is supposed to be finalised
-after TidyPgm.  But CorePrep does some transformations that affect CAF-hood.
+after tidying. But CorePrep does some transformations that affect CAF-hood.
 So we have to *predict* the result here, which is revolting.
 
 In particular CorePrep expands Integer and Natural literals. So in the
 prediction code here we resort to applying the same expansion (cvt_literal).
 There are also numerous other ways in which we can introduce inconsistencies
-between CorePrep and TidyPgm. See Note [CAFfyness inconsistencies due to eta
-expansion in TidyPgm] for one such example.
+between CorePrep and GHC.Iface.Tidy. See Note [CAFfyness inconsistencies due to
+eta expansion in TidyPgm] for one such example.
 
 Ugh! What ugliness we hath wrought.
 
@@ -1292,8 +1292,9 @@ Ugh! What ugliness we hath wrought.
 Note [CAFfyness inconsistencies due to eta expansion in TidyPgm]
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 Eta expansion during CorePrep can have non-obvious negative consequences on
-the CAFfyness computation done by TidyPgm (see Note [Disgusting computation of
-CafRefs] in TidyPgm). This late expansion happens/happened for a few reasons:
+the CAFfyness computation done by tidying (see Note [Disgusting computation of
+CafRefs] in GHC.Iface.Tidy). This late expansion happens/happened for a few
+reasons:
 
  * CorePrep previously eta expanded unsaturated primop applications, as
    described in Note [Primop wrappers]).

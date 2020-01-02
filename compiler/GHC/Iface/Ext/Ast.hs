@@ -12,7 +12,7 @@ Main functions for .hie file generation
 {-# LANGUAGE AllowAmbiguousTypes #-}
 {-# LANGUAGE ViewPatterns #-}
 {-# LANGUAGE DeriveDataTypeable #-}
-module HieAst ( mkHieFile ) where
+module GHC.Iface.Ext.Ast ( mkHieFile ) where
 
 import GhcPrelude
 
@@ -37,11 +37,11 @@ import Type                       ( mkVisFunTys, Type )
 import TysWiredIn                 ( mkListTy, mkSumTy )
 import Var                        ( Id, Var, setVarName, varName, varType )
 import TcRnTypes
-import MkIface                    ( mkIfaceExports )
+import GHC.Iface.Utils            ( mkIfaceExports )
 import Panic
 
-import HieTypes
-import HieUtils
+import GHC.Iface.Ext.Types
+import GHC.Iface.Ext.Utils
 
 import qualified Data.Array as A
 import qualified Data.ByteString as BS
@@ -81,7 +81,7 @@ instance ToHie (IEContext (Located ModuleName)) where ...
 
 data Context a = C ContextInfo a -- Used for names and bindings
 
-`ContextInfo` is defined in `HieTypes`, and looks like
+`ContextInfo` is defined in `GHC.Iface.Ext.Types`, and looks like
 
 data ContextInfo
   = Use                -- ^ regular variable
@@ -112,7 +112,7 @@ provide a `Scope` and a `Span` for your binding. Both of these are basically
 The `SrcSpan` in the `Scope` is supposed to span over the part of the source
 where the symbol can be legally allowed to occur. For more details on how to
 calculate this, see Note [Capturing Scopes and other non local information]
-in HieAst.
+in GHC.Iface.Ext.Ast.
 
 The binding `Span` is supposed to be the span of the entire binding for
 the name.

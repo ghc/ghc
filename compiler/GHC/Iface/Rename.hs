@@ -6,7 +6,7 @@
 -- are doing indefinite typechecking and need instantiations
 -- of modules which do not necessarily exist yet.
 
-module RnModIface(
+module GHC.Iface.Rename (
     rnModIface,
     rnModExports,
     tcRnModIface,
@@ -23,7 +23,7 @@ import HscTypes
 import Module
 import UniqFM
 import Avail
-import IfaceSyn
+import GHC.Iface.Syntax
 import FieldLabel
 import Var
 import ErrUtils
@@ -35,7 +35,7 @@ import Fingerprint
 import BasicTypes
 
 -- a bit vexing
-import {-# SOURCE #-} LoadIface
+import {-# SOURCE #-} GHC.Iface.Load
 import DynFlags
 
 import qualified Data.Traversable as T
@@ -43,7 +43,7 @@ import qualified Data.Traversable as T
 import Bag
 import Data.IORef
 import NameShape
-import IfaceEnv
+import GHC.Iface.Env
 
 tcRnMsgMaybe :: IO (Either ErrorMessages a) -> TcM a
 tcRnMsgMaybe do_this = do

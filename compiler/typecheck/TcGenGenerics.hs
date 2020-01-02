@@ -27,7 +27,7 @@ import FamInstEnv       ( FamInst, FamFlavor(..), mkSingleCoAxiom )
 import FamInst
 import Module           ( moduleName, moduleNameFS
                         , moduleUnitId, unitIdFS, getModule )
-import IfaceEnv         ( newGlobalBinder )
+import GHC.Iface.Env    ( newGlobalBinder )
 import Name      hiding ( varName )
 import RdrName
 import BasicTypes

@@ -3,7 +3,7 @@
 {-# LANGUAGE ViewPatterns #-}
 
 module DsUsage (
-    -- * Dependency/fingerprinting code (used by MkIface)
+    -- * Dependency/fingerprinting code (used by GHC.Iface.Utils)
     mkUsageInfo, mkUsedNames, mkDependencies
     ) where
 

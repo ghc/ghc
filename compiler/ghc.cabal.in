@@ -180,24 +180,23 @@ Library
         typecheck
         types
         utils
-        hieFile
 
     -- we use an explicit Prelude
     Default-Extensions:
         NoImplicitPrelude
 
     Exposed-Modules:
-        HieTypes
-        HieDebug
-        HieBin
-        HieUtils
-        HieAst
+        GHC.Iface.Ext.Types
+        GHC.Iface.Ext.Debug
+        GHC.Iface.Ext.Binary
+        GHC.Iface.Ext.Utils
+        GHC.Iface.Ext.Ast
         Ar
         FileCleanup
         DriverBkp
         BkpSyn
         NameShape
-        RnModIface
+        GHC.Iface.Rename
         Avail
         AsmUtils
         BasicTypes
@@ -355,16 +354,16 @@ Library
         GHC.Hs.Types
         GHC.Hs.Utils
         GHC.Hs.Dump
-        BinIface
+        GHC.Iface.Binary
         BinFingerprint
         BuildTyCl
-        IfaceEnv
-        IfaceSyn
-        IfaceType
-        ToIface
-        LoadIface
-        MkIface
-        TcIface
+        GHC.Iface.Env
+        GHC.Iface.Syntax
+        GHC.Iface.Type
+        GHC.CoreToIface
+        GHC.Iface.Load
+        GHC.Iface.Utils
+        GHC.IfaceToCore
         FlagChecker
         Annotations
         CmdLineParser
@@ -406,7 +405,7 @@ Library
         SysTools.Tasks
         SysTools.Settings
         Elf
-        TidyPgm
+        GHC.Iface.Tidy
         Ctype
         HaddockUtils
         Lexer

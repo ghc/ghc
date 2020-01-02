@@ -24,8 +24,8 @@ import GHCi.RemoteTypes
 import GhcMonad
 import HscTypes
 import Id
-import IfaceSyn ( showToHeader )
-import IfaceEnv( newInteractiveBinder )
+import GHC.Iface.Syntax ( showToHeader )
+import GHC.Iface.Env    ( newInteractiveBinder )
 import Name
 import Var hiding ( varName )
 import VarSet

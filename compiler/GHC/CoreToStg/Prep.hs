@@ -228,7 +228,7 @@ corePrepTopBinds initialCorePrepEnv binds
 
 mkDataConWorkers :: DynFlags -> ModLocation -> [TyCon] -> [CoreBind]
 -- See Note [Data constructor workers]
--- c.f. Note [Injecting implicit bindings] in TidyPgm
+-- c.f. Note [Injecting implicit bindings] in GHC.Iface.Tidy
 mkDataConWorkers dflags mod_loc data_tycons
   = [ NonRec id (tick_it (getName data_con) (Var id))
                                 -- The ice is thin here, but it works
@@ -1070,8 +1070,8 @@ unsaturated applications (identified by 'hasNoBinding', currently just
 foreign calls and unboxed tuple/sum constructors).
 
 Note that eta expansion in CorePrep is very fragile due to the "prediction" of
-CAFfyness made by TidyPgm (see Note [CAFfyness inconsistencies due to eta
-expansion in CorePrep] in TidyPgm for details.  We previously saturated primop
+CAFfyness made during tidying (see Note [CAFfyness inconsistencies due to eta
+expansion in CorePrep] in GHC.Iface.Tidy for details.  We previously saturated primop
 applications here as well but due to this fragility (see #16846) we now deal
 with this another way, as described in Note [Primop wrappers] in PrimOp.
 

@@ -1170,7 +1170,7 @@ We have
               :: * -> * -> *
 So again we must instantiate.
 
-The same thing happens in ToIface.toIfaceAppArgsX.
+The same thing happens in GHC.CoreToIface.toIfaceAppArgsX.
 
 
 ---------------------------------------------------------------------
@@ -2937,7 +2937,7 @@ classifiesTypeWithValues k = isJust (kindRep_maybe k)
 %*                                                                      *
 %************************************************************************
 
-Most pretty-printing is either in TyCoRep or IfaceType.
+Most pretty-printing is either in TyCoRep or GHC.Iface.Type.
 
 -}
 

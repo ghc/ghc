@@ -1,4 +1,5 @@
-module LoadIface where
+module GHC.Iface.Load where
+
 import Module (Module)
 import TcRnMonad (IfM)
 import HscTypes (ModIface)

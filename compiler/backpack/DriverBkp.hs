@@ -43,7 +43,7 @@ import UniqDFM
 import Outputable
 import Maybes
 import HeaderInfo
-import MkIface
+import GHC.Iface.Utils
 import GhcMake
 import UniqDSet
 import PrelNames

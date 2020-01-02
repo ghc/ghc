@@ -2,14 +2,25 @@
 Binary serialization for .hie files.
 -}
 {-# LANGUAGE ScopedTypeVariables #-}
-module HieBin ( readHieFile, readHieFileWithVersion, HieHeader, writeHieFile, HieName(..), toHieName, HieFileResult(..), hieMagic, hieNameOcc) where
+module GHC.Iface.Ext.Binary
+   ( readHieFile
+   , readHieFileWithVersion
+   , HieHeader
+   , writeHieFile
+   , HieName(..)
+   , toHieName
+   , HieFileResult(..)
+   , hieMagic
+   , hieNameOcc
+   )
+where
 
 import GHC.Settings               ( maybeRead )
 
 import Config                     ( cProjectVersion )
 import GhcPrelude
 import Binary
-import BinIface                   ( getDictFastString )
+import GHC.Iface.Binary           ( getDictFastString )
 import FastMutInt
 import FastString                 ( FastString )
 import Module                     ( Module )
@@ -33,7 +44,7 @@ import Control.Monad              ( replicateM, when )
 import System.Directory           ( createDirectoryIfMissing )
 import System.FilePath            ( takeDirectory )
 
-import HieTypes
+import GHC.Iface.Ext.Types
 
 -- | `Name`'s get converted into `HieName`'s before being written into @.hie@
 -- files. See 'toHieName' and 'fromHieName' for logic on how to convert between
@@ -389,4 +400,4 @@ getHieName bh = do
     2 -> do
       (c,i) <- get bh
       return $ KnownKeyName $ mkUnique c i
-    _ -> panic "HieBin.getHieName: invalid tag"
+    _ -> panic "GHC.Iface.Ext.Binary.getHieName: invalid tag"

@@ -77,7 +77,7 @@ Note [Overall plumbing for rules]
      the IdInfo for that Id.  See Note [Attach rules to local ids] in
      DsBinds
 
-* TidyPgm strips off all the rules from local Ids and adds them to
+* GHC.Iface.Tidy strips off all the rules from local Ids and adds them to
   mg_rules, so that the ModGuts has *all* the locally-declared rules.
 
 * The HomePackageTable contains a ModDetails for each home package

@@ -13,7 +13,7 @@ module RnFixity ( MiniFixityEnv,
 
 import GhcPrelude
 
-import LoadIface
+import GHC.Iface.Load
 import GHC.Hs
 import RdrName
 import HscTypes

@@ -43,8 +43,8 @@ import Predicate
 import TcOrigin
 
 -- others:
-import IfaceType( pprIfaceType, pprIfaceTypeApp )
-import ToIface  ( toIfaceTyCon, toIfaceTcArgs, toIfaceType )
+import GHC.Iface.Type   ( pprIfaceType, pprIfaceTypeApp )
+import GHC.CoreToIface  ( toIfaceTyCon, toIfaceTcArgs, toIfaceType )
 import GHC.Hs           -- HsType
 import TcRnMonad        -- TcType, amongst others
 import TcEnv       ( tcInitTidyEnv, tcInitOpenTidyEnv )

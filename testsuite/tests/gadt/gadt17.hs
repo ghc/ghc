@@ -1,8 +1,8 @@
 {-# LANGUAGE GADTs #-}
 {-# OPTIONS_GHC -O #-}
 
--- This one showed up a bug that required type refinement in TcIface
--- See the call to coreRefineTys in TcIface
+-- This one showed up a bug that required type refinement in GHC.IfaceToCore
+-- See the call to coreRefineTys in GHC.IfaceToCore
 --
 -- Tests for bug: https://gitlab.haskell.org/ghc/ghc/issues/685
 

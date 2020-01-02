@@ -367,7 +367,7 @@ dsAbsBinds dflags tyvars dicts exports
 --
 -- Other decisions about whether to inline are made in
 -- `calcUnfoldingGuidance` but the decision about whether to then expose
--- the unfolding in the interface file is made in `TidyPgm.addExternal`
+-- the unfolding in the interface file is made in `GHC.Iface.Tidy.addExternal`
 -- using this information.
 ------------------------
 makeCorePair :: DynFlags -> Id -> Bool -> Arity -> CoreExpr

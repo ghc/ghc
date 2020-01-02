@@ -25,7 +25,7 @@ import Name
 import NameEnv
 import TcRnMonad
 import Util
-import IfaceEnv
+import GHC.Iface.Env
 
 import Control.Monad
 

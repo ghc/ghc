@@ -366,7 +366,7 @@ data DataCon
         dcExTyCoVars     :: [TyCoVar],
 
         -- INVARIANT: the UnivTyVars and ExTyCoVars all have distinct OccNames
-        -- Reason: less confusing, and easier to generate IfaceSyn
+        -- Reason: less confusing, and easier to generate Iface syntax
 
         -- The type/coercion vars in the order the user wrote them [c,y,x,b]
         -- INVARIANT: the set of tyvars in dcUserTyVarBinders is exactly the set

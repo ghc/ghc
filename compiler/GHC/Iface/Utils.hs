@@ -9,7 +9,7 @@
 -- | Module for constructing @ModIface@ values (interface files),
 -- writing them to disk and comparing two versions to see if
 -- recompilation is required.
-module MkIface (
+module GHC.Iface.Utils (
         mkPartialIface,
         mkFullIface,
 
@@ -62,10 +62,10 @@ Basic idea:
 
 import GhcPrelude
 
-import IfaceSyn
+import GHC.Iface.Syntax
 import BinFingerprint
-import LoadIface
-import ToIface
+import GHC.Iface.Load
+import GHC.CoreToIface
 import FlagChecker
 
 import DsUsage ( mkUsageInfo, mkUsedNames, mkDependencies )
@@ -94,7 +94,7 @@ import RdrName
 import NameEnv
 import NameSet
 import Module
-import BinIface
+import GHC.Iface.Binary
 import ErrUtils
 import Digraph
 import SrcLoc
@@ -977,14 +977,14 @@ declExtras fix_fn ann_fn rule_env inst_env fi_env dm_env decl
 
 {- Note [default method Name] (see also #15970)
 
-The Names for the default methods aren't available in the IfaceSyn.
+The Names for the default methods aren't available in Iface syntax.
 
 * We originally start with a DefMethInfo from the class, contain a
   Name for the default method
 
-* We turn that into IfaceSyn as a DefMethSpec which lacks a Name
+* We turn that into Iface syntax as a DefMethSpec which lacks a Name
   entirely. Why? Because the Name can be derived from the method name
-  (in TcIface), so doesn't need to be serialised into the interface
+  (in GHC.IfaceToCore), so doesn't need to be serialised into the interface
   file.
 
 But now we have to get the Name back, because the class declaration's
@@ -1094,7 +1094,7 @@ That is, in Y,
   - but the parent (used for grouping and naming in T(..) exports) is X.T
   - and in this case we export X.T too
 
-In the result of MkIfaceExports, the names are grouped by defining module,
+In the result of mkIfaceExports, the names are grouped by defining module,
 so we may need to split up a single Avail into multiple ones.
 
 Note [Internal used_names]
@@ -1913,7 +1913,7 @@ tyConToIfaceDecl env tycon
           -- (b) when pretty-printing an Iface data declaration in H98-style syntax,
           --     we know that the type variables will line up
           -- The latter (b) is important because we pretty-print type constructors
-          -- by converting to IfaceSyn and pretty-printing that
+          -- by converting to Iface syntax and pretty-printing that
           con_env1 = (fst tc_env1, mkVarEnv (zipEqual "ifaceConDecl" univ_tvs tc_tyvars))
                      -- A bit grimy, perhaps, but it's simple!
 

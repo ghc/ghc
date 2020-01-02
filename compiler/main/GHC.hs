@@ -306,7 +306,7 @@ import GhcMake
 import DriverPipeline   ( compileOne' )
 import GhcMonad
 import TcRnMonad        ( finalSafeMode, fixSafeInstances, initIfaceTcRn )
-import LoadIface        ( loadSysInterface )
+import GHC.Iface.Load   ( loadSysInterface )
 import TcRnTypes
 import Predicate
 import Packages
@@ -327,7 +327,7 @@ import InstEnv
 import FamInstEnv ( FamInst )
 import SrcLoc
 import CoreSyn
-import TidyPgm
+import GHC.Iface.Tidy
 import DriverPhases     ( Phase(..), isHaskellSrcFilename )
 import Finder
 import HscTypes
@@ -1335,7 +1335,7 @@ pprParenSymName a = parenSymOcc (getOccName a) (ppr (getName a))
 -- ToDo: check for small transformations that happen to the syntax in
 -- the typechecker (eg. -e ==> negate e, perhaps for fromIntegral)
 
--- ToDo: maybe use TH syntax instead of IfaceSyn?  There's already a way
+-- ToDo: maybe use TH syntax instead of Iface syntax?  There's already a way
 -- to get from TyCons, Ids etc. to TH syntax (reify).
 
 -- :browse will use either lm_toplev or inspect lm_interface, depending

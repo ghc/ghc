@@ -195,7 +195,7 @@ import DriverPhases     ( Phase, HscSource(..), hscSourceString
                         , isHsBootOrSig, isHsigFile )
 import qualified DriverPhases as Phase
 import BasicTypes
-import IfaceSyn
+import GHC.Iface.Syntax
 import Maybes
 import Outputable
 import SrcLoc
@@ -1607,7 +1607,7 @@ Where do interactively-bound Ids come from?
     TcRnDriver.externaliseAndTidyId, so they get Names like Ghic4.foo.
 
   - Ids bound by the debugger etc have Names constructed by
-    IfaceEnv.newInteractiveBinder; at the call sites it is followed by
+    GHC.Iface.Env.newInteractiveBinder; at the call sites it is followed by
     mkVanillaGlobal or mkVanillaGlobalWithInfo.  So again, they are
     all Global, External.
 
@@ -2042,9 +2042,9 @@ Examples:
 -- scope, just for a start!
 
 -- N.B. the set of TyThings returned here *must* match the set of
--- names returned by LoadIface.ifaceDeclImplicitBndrs, in the sense that
+-- names returned by GHC.Iface.Load.ifaceDeclImplicitBndrs, in the sense that
 -- TyThing.getOccName should define a bijection between the two lists.
--- This invariant is used in LoadIface.loadDecl (see note [Tricky iface loop])
+-- This invariant is used in GHC.Iface.Load.loadDecl (see note [Tricky iface loop])
 -- The order of the list does not matter.
 implicitTyThings :: TyThing -> [TyThing]
 implicitTyThings (AnId _)       = []
@@ -2490,7 +2490,7 @@ data Dependencies
                         -- ^ All the plugins used while compiling this module.
          }
   deriving( Eq )
-        -- Equality used only for old/new comparison in MkIface.addFingerprints
+        -- Equality used only for old/new comparison in GHC.Iface.Utils.addFingerprints
         -- See 'TcRnTypes.ImportAvails' for details on dependencies.
 
 instance Binary Dependencies where

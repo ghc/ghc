@@ -9,7 +9,7 @@ Type checking of type signatures in interface files
 {-# LANGUAGE CPP #-}
 {-# LANGUAGE NondecreasingIndentation #-}
 
-module TcIface (
+module GHC.IfaceToCore (
         tcLookupImported_maybe,
         importDecl, checkWiredInTyCon, tcHiBootIface, typecheckIface,
         typecheckIfacesForMerging,
@@ -25,9 +25,9 @@ module TcIface (
 import GhcPrelude
 
 import TcTypeNats(typeNatCoAxiomRules)
-import IfaceSyn
-import LoadIface
-import IfaceEnv
+import GHC.Iface.Syntax
+import GHC.Iface.Load
+import GHC.Iface.Env
 import BuildTyCl
 import TcRnMonad
 import TcType
@@ -120,11 +120,11 @@ Suppose we are typechecking an interface A.hi, and we come across
 a Name for another entity defined in A.hi.  How do we get the
 'TyCon', in this case?  There are three cases:
 
-    1) tcHiBootIface in TcIface: We're typechecking an hi-boot file in
-    preparation of checking if the hs file we're building
-    is compatible.  In this case, we want all of the internal
-    TyCons to MATCH the ones that we just constructed during
-    typechecking: the knot is thus tied through if_rec_types.
+    1) tcHiBootIface in GHC.IfaceToCore: We're typechecking an
+    hi-boot file in preparation of checking if the hs file we're
+    building is compatible.  In this case, we want all of the
+    internal TyCons to MATCH the ones that we just constructed
+    during typechecking: the knot is thus tied through if_rec_types.
 
     2) retypecheckLoop in GhcMake: We are retypechecking a
     mutually recursive cluster of hi files, in order to ensure
@@ -356,7 +356,7 @@ typecheckIfacesForMerging mod ifaces tc_env_var =
     ignore_prags <- goptM Opt_IgnoreInterfacePragmas
     -- Build the initial environment
     -- NB: Don't include dfuns here, because we don't want to
-    -- serialize them out.  See Note [rnIfaceNeverExported] in RnModIface
+    -- serialize them out.  See Note [rnIfaceNeverExported] in GHC.Iface.Rename
     -- NB: But coercions are OK, because they will have the right OccName.
     let mk_decl_env decls
             = mkOccEnv [ (getOccName decl, decl)
@@ -376,7 +376,7 @@ typecheckIfacesForMerging mod ifaces tc_env_var =
 
     -- OK, now typecheck each ModIface using this environment
     details <- forM ifaces $ \iface -> do
-        -- See Note [Resolving never-exported Names in TcIface]
+        -- See Note [Resolving never-exported Names] in GHC.IfaceToCore
         type_env <- fixM $ \type_env -> do
             setImplicitEnvM type_env $ do
                 decls <- loadDecls ignore_prags (mi_decls iface)
@@ -416,7 +416,7 @@ typecheckIfaceForInstantiate nsubst iface =
                         (text "typecheckIfaceForInstantiate")
                         (mi_boot iface) nsubst $ do
     ignore_prags <- goptM Opt_IgnoreInterfacePragmas
-    -- See Note [Resolving never-exported Names in TcIface]
+    -- See Note [Resolving never-exported Names] in GHC.IfaceToCore
     type_env <- fixM $ \type_env -> do
         setImplicitEnvM type_env $ do
             decls     <- loadDecls ignore_prags (mi_decls iface)
@@ -438,8 +438,8 @@ typecheckIfaceForInstantiate nsubst iface =
                         , md_complete_sigs = complete_sigs
                         }
 
--- Note [Resolving never-exported Names in TcIface]
--- ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+-- Note [Resolving never-exported Names]
+-- ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 -- For the high-level overview, see
 -- Note [Handling never-exported TyThings under Backpack]
 --
@@ -1711,7 +1711,7 @@ tcIfaceExtId name = do { thing <- tcIfaceGlobal name
                           AnId id -> return id
                           _       -> pprPanic "tcIfaceExtId" (ppr name$$ ppr thing) }
 
--- See Note [Resolving never-exported Names in TcIface]
+-- See Note [Resolving never-exported Names] in GHC.IfaceToCore
 tcIfaceImplicit :: Name -> IfL TyThing
 tcIfaceImplicit n = do
     lcl_env <- getLclEnv

@@ -35,8 +35,8 @@ import HscTypes (lookupFixity, mi_fix)
 import GHC.Hs
 import Inst
 import InstEnv
-import LoadIface (loadInterfaceForName)
-import Module (getModule)
+import GHC.Iface.Load (loadInterfaceForName)
+import Module         (getModule)
 import Name
 import Outputable
 import PrelNames

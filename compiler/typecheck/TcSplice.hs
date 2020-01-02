@@ -73,7 +73,7 @@ import Type
 import NameSet
 import TcMType
 import TcHsType
-import TcIface
+import GHC.IfaceToCore
 import TyCoRep
 import FamInst
 import FamInstEnv
@@ -86,7 +86,7 @@ import OccName
 import Hooks
 import Var
 import Module
-import LoadIface
+import GHC.Iface.Load
 import Class
 import TyCon
 import CoAxiom

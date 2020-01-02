@@ -24,7 +24,7 @@
 
 module RdrName (
         -- * The main type
-        RdrName(..),    -- Constructors exported only to BinIface
+        RdrName(..),    -- Constructors exported only to GHC.Iface.Binary
 
         -- ** Construction
         mkRdrUnqual, mkRdrQual,

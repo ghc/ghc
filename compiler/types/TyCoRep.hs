@@ -76,7 +76,7 @@ import {-# SOURCE #-} TyCoPpr ( pprType, pprCo, pprTyLit )
 import {-# SOURCE #-} ConLike ( ConLike(..), conLikeName )
 
 -- friends:
-import IfaceType
+import GHC.Iface.Type
 import Var
 import VarSet
 import Name hiding ( varName )

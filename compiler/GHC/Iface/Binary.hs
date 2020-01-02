@@ -9,7 +9,7 @@
 -- compiler is severely affected
 
 -- | Binary interface file support.
-module BinIface (
+module GHC.Iface.Binary (
         -- * Public API for interface file serialisation
         writeBinIface,
         readBinIface,
@@ -37,7 +37,7 @@ import GhcPrelude
 
 import TcRnMonad
 import PrelInfo   ( isKnownKeyName, lookupKnownKeyName )
-import IfaceEnv
+import GHC.Iface.Env
 import HscTypes
 import Module
 import Name
