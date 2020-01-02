@@ -1008,12 +1008,9 @@ oneSRT dflags staticFuns lbls caf_lbls isCAF cafs static_data = do
     -- references in the group. See Note [recursive SRTs].
     let
       recursive_refs, filtered :: Set SRTEntry
-      recursive_refs =
-        -- NB. we can't use staticFuns here as that's for all static functions
-        -- in the module, not just the ones in the current group
-        Set.fromList $
-        maybe id ((:) . SRTEntry . fst) maybeFunClosure $
-        map SRTEntry otherFunLabels
+      -- NB. we can't use staticFuns here as that's for all static functions
+      -- in the module, not just the ones in the current group
+      recursive_refs = Set.fromList (map SRTEntry otherFunLabels)
 
       filtered = filtered_nonRec `Set.union` recursive_refs
 
@@ -1208,12 +1205,8 @@ updInfoSRTs dflags srtFieldMap funSRTMap caffy (CmmProc top_info top_l live g)
 
             Just srtEntries ->
               -- Otherwise add SRT entries to the closure
-              -- (TODO (osa): BUT we still want to update the SRT field to
-              -- pointo to the closure, right?? right???)
               srtTrace "maybeStaticFun" (ppr res $$ ppr new_rep)
-                (info_tbl { cit_rep = new_rep
-                          , cit_srt = mapLookup (g_entry g) srtFieldMap -- TODO (osa): see above
-                          }, res)
+                (info_tbl { cit_rep = new_rep }, res)
               where
                 res = [ CmmLabel lbl | SRTEntry lbl <- srtEntries ]
 
