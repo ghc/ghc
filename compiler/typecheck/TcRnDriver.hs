@@ -50,7 +50,7 @@ import GhcPrelude
 
 import {-# SOURCE #-} TcSplice ( finishTH, runRemoteModFinalizers )
 import RnSplice ( rnTopSpliceDecls, traceSplice, SpliceInfo(..) )
-import IfaceEnv( externaliseName )
+import GHC.Iface.Env( externaliseName )
 import TcHsType
 import TcValidity( checkValidType )
 import TcMatches
@@ -65,8 +65,8 @@ import TysWiredIn ( unitTy, mkListTy )
 import Plugins
 import DynFlags
 import GHC.Hs
-import IfaceSyn ( ShowSub(..), showToHeader )
-import IfaceType( ShowForAllFlag(..) )
+import GHC.Iface.Syntax ( ShowSub(..), showToHeader )
+import GHC.Iface.Type   ( ShowForAllFlag(..) )
 import PatSyn( pprPatSynType )
 import PrelNames
 import PrelInfo
@@ -87,21 +87,21 @@ import FamInstEnv( FamInst, pprFamInst, famInstsRepTyCons
                  , famInstEnvElts, extendFamInstEnvList, normaliseType )
 import TcAnnotations
 import TcBinds
-import MkIface          ( coAxiomToIfaceDecl )
+import GHC.Iface.Utils  ( coAxiomToIfaceDecl )
 import HeaderInfo       ( mkPrelImports )
 import TcDefaults
 import TcEnv
 import TcRules
 import TcForeign
 import TcInstDcls
-import TcIface
+import GHC.IfaceToCore
 import TcMType
 import TcType
 import TcSimplify
 import TcTyClsDecls
 import TcTypeable ( mkTypeableBinds )
 import TcBackpack
-import LoadIface
+import GHC.Iface.Load
 import RnNames
 import RnEnv
 import RnSource
@@ -767,7 +767,7 @@ the new tycons and ids.
 
 This most works well, but there is one problem: DFuns!  We do not want
 to look at the mb_insts of the ModDetails in SelfBootInfo, because a
-dfun in one of those ClsInsts is gotten (in TcIface.tcIfaceInst) by a
+dfun in one of those ClsInsts is gotten (in GHC.IfaceToCore.tcIfaceInst) by a
 (lazily evaluated) lookup in the if_rec_types.  We could extend the
 type env, do a setGloblaTypeEnv etc; but that all seems very indirect.
 It is much more directly simply to extract the DFunIds from the
@@ -1834,7 +1834,7 @@ being called "Main.main".  That's why root_main_id has a fixed module
 ":Main".)
 
 This is unusual: it's a LocalId whose Name has a Module from another
-module.  Tiresomely, we must filter it out again in MkIface, les we
+module. Tiresomely, we must filter it out again in GHC.Iface.Utils, less we
 get two defns for 'main' in the interface file!
 
 
@@ -2813,7 +2813,7 @@ ppr_tycons debug fam_insts type_env
          roles = tyConRoles tc
          boring_role | isClassTyCon tc = Nominal
                      | otherwise       = Representational
-            -- Matches the choice in IfaceSyn, calls to pprRoles
+            -- Matches the choice in GHC.Iface.Syntax, calls to pprRoles
 
     ppr_ax ax = ppr (coAxiomToIfaceDecl ax)
       -- We go via IfaceDecl rather than using pprCoAxiom

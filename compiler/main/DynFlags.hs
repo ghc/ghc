@@ -4787,7 +4787,7 @@ didn't.  Reason was:
  * Eta reduction wasn't happening in the simplifier, but it was
    happening in CorePrep, on
         $fBla = MkDict (/\a. K a)
- * Result: rhsIsStatic told TidyPgm that $fBla might have CAF refs
+ * Result: rhsIsStatic told GHC.Iface.Tidy that $fBla might have CAF refs
    but the eta-reduced version (MkDict K) obviously doesn't
 Simple solution: just let the simplifier do eta-reduction even in -O0.
 After all, CorePrep does it unconditionally!  Not a big deal, but

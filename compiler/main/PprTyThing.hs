@@ -22,11 +22,11 @@ module PprTyThing (
 import GhcPrelude
 
 import Type    ( Type, ArgFlag(..), TyThing(..), mkTyVarBinders, tidyOpenType )
-import IfaceSyn ( ShowSub(..), ShowHowMuch(..), AltPpr(..)
+import GHC.Iface.Syntax ( ShowSub(..), ShowHowMuch(..), AltPpr(..)
   , showToHeader, pprIfaceDecl )
 import CoAxiom ( coAxiomTyCon )
 import HscTypes( tyThingParent_maybe )
-import MkIface ( tyThingToIfaceDecl )
+import GHC.Iface.Utils ( tyThingToIfaceDecl )
 import FamInstEnv( FamInst(..), FamFlavor(..) )
 import TyCoPpr ( pprUserForAll, pprTypeApp, pprSigmaType )
 import Name
@@ -36,8 +36,8 @@ import Outputable
 -- -----------------------------------------------------------------------------
 -- Pretty-printing entities that we get from the GHC API
 
-{- Note [Pretty printing via IfaceSyn]
-~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+{- Note [Pretty printing via Iface syntax]
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 Our general plan for pretty-printing
   - Types
   - TyCons
@@ -45,19 +45,19 @@ Our general plan for pretty-printing
   - Pattern synonyms
   ...etc...
 
-is to convert them to IfaceSyn, and pretty-print that. For example
+is to convert them to Iface syntax, and pretty-print that. For example
   - pprType converts a Type to an IfaceType, and pretty prints that.
   - pprTyThing converts the TyThing to an IfaceDecl,
     and pretty prints that.
 
-So IfaceSyn play a dual role:
+So Iface syntax plays a dual role:
   - it's the internal version of an interface files
   - it's used for pretty-printing
 
 Why do this?
 
 * A significant reason is that we need to be able
-  to pretty-print IfaceSyn (to display Foo.hi), and it was a
+  to pretty-print Iface syntax (to display Foo.hi), and it was a
   pain to duplicate masses of pretty-printing goop, esp for
   Type and IfaceType.
 
@@ -72,7 +72,7 @@ Why do this?
 
 * Interface files contains fast-strings, not uniques, so the very same
   tidying must take place when we convert to IfaceDecl. E.g.
-  MkIface.tyThingToIfaceDecl which converts a TyThing (i.e. TyCon,
+  GHC.Iface.Utils.tyThingToIfaceDecl which converts a TyThing (i.e. TyCon,
   Class etc) to an IfaceDecl.
 
   Bottom line: IfaceDecls are already 'tidy', so it's straightforward
@@ -87,17 +87,17 @@ Why do this?
 
 Consequences:
 
-- IfaceSyn (and IfaceType) must contain enough information to
+- Iface syntax (and IfaceType) must contain enough information to
   print nicely.  Hence, for example, the IfaceAppArgs type, which
   allows us to suppress invisible kind arguments in types
-  (see Note [Suppressing invisible arguments] in IfaceType)
+  (see Note [Suppressing invisible arguments] in GHC.Iface.Type)
 
 - In a few places we have info that is used only for pretty-printing,
-  and is totally ignored when turning IfaceSyn back into TyCons
-  etc (in TcIface). For example, IfaceClosedSynFamilyTyCon
+  and is totally ignored when turning Iface syntax back into Core
+  (in GHC.IfaceToCore). For example, IfaceClosedSynFamilyTyCon
   stores a [IfaceAxBranch] that is used only for pretty-printing.
 
-- See Note [Free tyvars in IfaceType] in IfaceType
+- See Note [Free tyvars in IfaceType] in GHC.Iface.Type
 
 See #7730, #8776 for details   -}
 
@@ -121,7 +121,7 @@ pprFamInst (FamInst { fi_flavor = SynFamilyInst, fi_axiom = axiom
     hang (text "type instance"
             <+> pprUserForAll (mkTyVarBinders Specified tvs)
                 -- See Note [Printing foralls in type family instances]
-                -- in IfaceType
+                -- in GHC.Iface.Type
             <+> pprTypeApp (coAxiomTyCon axiom) lhs_tys)
        2 (equals <+> ppr rhs)
 

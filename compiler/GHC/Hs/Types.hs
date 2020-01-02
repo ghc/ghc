@@ -1686,7 +1686,7 @@ hsTypeNeedsParens p = go
 
 maybeAddSpace :: [LHsType pass] -> SDoc -> SDoc
 -- See Note [Printing promoted type constructors]
--- in IfaceType.  This code implements the same
+-- in GHC.Iface.Type.  This code implements the same
 -- logic for printing HsType
 maybeAddSpace tys doc
   | (ty : _) <- tys

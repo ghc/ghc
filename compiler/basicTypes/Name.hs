@@ -162,7 +162,7 @@ Note [About the NameSorts]
 
 2.  In any invocation of GHC, an External Name for "M.x" has one and only one
     unique.  This unique association is ensured via the Name Cache;
-    see Note [The Name Cache] in IfaceEnv.
+    see Note [The Name Cache] in GHC.Iface.Env.
 
 3.  Things with a External name are given C static labels, so they finally
     appear in the .o file's symbol table.  They appear in the symbol table
@@ -367,7 +367,7 @@ mkDerivedInternalName derive_occ uniq (Name { n_occ = occ, n_loc = loc })
 -- | Create a name which definitely originates in the given module
 mkExternalName :: Unique -> Module -> OccName -> SrcSpan -> Name
 -- WATCH OUT! External Names should be in the Name Cache
--- (see Note [The Name Cache] in IfaceEnv), so don't just call mkExternalName
+-- (see Note [The Name Cache] in GHC.Iface.Env), so don't just call mkExternalName
 -- with some fresh unique without populating the Name Cache
 mkExternalName uniq mod occ loc
   = Name { n_uniq = uniq, n_sort = External mod,
@@ -502,8 +502,9 @@ instance Data Name where
 -}
 
 -- | Assumes that the 'Name' is a non-binding one. See
--- 'IfaceSyn.putIfaceTopBndr' and 'IfaceSyn.getIfaceTopBndr' for serializing
--- binding 'Name's. See 'UserData' for the rationale for this distinction.
+-- 'GHC.Iface.Syntax.putIfaceTopBndr' and 'GHC.Iface.Syntax.getIfaceTopBndr' for
+-- serializing binding 'Name's. See 'UserData' for the rationale for this
+-- distinction.
 instance Binary Name where
    put_ bh name =
       case getUserData bh of

@@ -79,7 +79,7 @@ import TcEnv
 import TcMType
 import TcValidity
 import TcUnify
-import TcIface
+import GHC.IfaceToCore
 import TcSimplify
 import TcHsSyn
 import TyCoRep
@@ -3101,7 +3101,7 @@ for D, to fill out its kind.  Ideally we don't want this type variable
 to be 'a', because when pretty printing we'll get
             class C a b where
                data D b a0
-(NB: the tidying happens in the conversion to IfaceSyn, which happens
+(NB: the tidying happens in the conversion to Iface syntax, which happens
 as part of pretty-printing a TyThing.)
 
 That's why we look in the LocalRdrEnv to see what's in scope. This is

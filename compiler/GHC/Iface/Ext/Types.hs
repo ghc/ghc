@@ -8,14 +8,14 @@ For more information see https://gitlab.haskell.org/ghc/ghc/wikis/hie-files
 {-# LANGUAGE TypeSynonymInstances #-}
 {-# LANGUAGE FlexibleInstances #-}
 {-# LANGUAGE ScopedTypeVariables #-}
-module HieTypes where
+module GHC.Iface.Ext.Types where
 
 import GhcPrelude
 
 import Config
 import Binary
 import FastString                 ( FastString )
-import IfaceType
+import GHC.Iface.Type
 import Module                     ( ModuleName, Module )
 import Name                       ( Name )
 import Outputable hiding ( (<>) )

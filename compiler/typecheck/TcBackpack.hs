@@ -30,13 +30,13 @@ import TcTyDecls
 import InstEnv
 import FamInstEnv
 import Inst
-import TcIface
+import GHC.IfaceToCore
 import TcMType
 import TcType
 import TcSimplify
 import Constraint
 import TcOrigin
-import LoadIface
+import GHC.Iface.Load
 import RnNames
 import ErrUtils
 import Id
@@ -54,7 +54,7 @@ import RnFixity ( lookupFixityRn )
 import Maybes
 import TcEnv
 import Var
-import IfaceSyn
+import GHC.Iface.Syntax
 import PrelNames
 import qualified Data.Map as Map
 
@@ -63,7 +63,7 @@ import UniqDSet
 import NameShape
 import TcErrors
 import TcUnify
-import RnModIface
+import GHC.Iface.Rename
 import Util
 
 import Control.Monad
@@ -462,7 +462,7 @@ inheritedSigPvpWarning =
 --    to 'Name's, so this case needs to be handled specially.
 --
 --    The details are in the documentation for 'typecheckIfacesForMerging'.
---    and the Note [Resolving never-exported Names in TcIface].
+--    and the Note [Resolving never-exported Names] in GHC.IfaceToCore.
 --
 --  * When we rename modules and signatures, we use the export lists to
 --    decide how the declarations should be renamed.  However, this
@@ -471,7 +471,7 @@ inheritedSigPvpWarning =
 --    *consistently*, so that 'typecheckIfacesForMerging' can wire them
 --    up as needed.
 --
---    The details are in Note [rnIfaceNeverExported] in 'RnModIface'.
+--    The details are in Note [rnIfaceNeverExported] in 'GHC.Iface.Rename'.
 --
 -- The root cause for all of these complications is the fact that these
 -- logically "implicit" entities are defined indirectly in an interface
@@ -859,7 +859,7 @@ mergeSignatures
     -- when we have a ClsInst, we can pull up the correct DFun to check if
     -- the types match.
     --
-    -- See also Note [rnIfaceNeverExported] in RnModIface
+    -- See also Note [rnIfaceNeverExported] in GHC.Iface.Rename
     dfun_insts <- forM (tcg_insts tcg_env) $ \inst -> do
         n <- newDFunName (is_cls inst) (is_tys inst) (nameSrcSpan (is_dfun_name inst))
         let dfun = setVarName (is_dfun inst) n

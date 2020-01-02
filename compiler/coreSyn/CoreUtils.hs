@@ -2502,9 +2502,9 @@ rhsIsStatic
    -> (Name -> Bool)         -- Which names are dynamic
    -> (LitNumType -> Integer -> Maybe CoreExpr)
       -- Desugaring for some literals (disgusting)
-      -- C.f. Note [Disgusting computation of CafRefs] in TidyPgm
+      -- C.f. Note [Disgusting computation of CafRefs] in GHC.Iface.Tidy
    -> CoreExpr -> Bool
--- It's called (i) in TidyPgm.hasCafRefs to decide if the rhs is, or
+-- It's called (i) in GHC.Iface.Tidy.hasCafRefs to decide if the rhs is, or
 -- refers to, CAFs; (ii) in CoreToStg to decide whether to put an
 -- update flag on it and (iii) in DsExpr to decide how to expand
 -- list literals

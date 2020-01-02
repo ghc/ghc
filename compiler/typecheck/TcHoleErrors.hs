@@ -54,7 +54,7 @@ import ExtractDocs ( extractDocs )
 import qualified Data.Map as Map
 import GHC.Hs.Doc      ( unpackHDS, DeclDocMap(..) )
 import HscTypes        ( ModIface_(..) )
-import LoadIface       ( loadInterfaceForNameMaybe )
+import GHC.Iface.Load  ( loadInterfaceForNameMaybe )
 
 import PrelInfo (knownKeyNames)
 
