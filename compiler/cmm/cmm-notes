@@ -139,7 +139,7 @@ a dominator analysis, using the Dataflow Engine.
   a CAF (or refers to CAFs).  See the IdLabel constructor of CLabel.
 
 * The CAF-ness of the original top-level definitions is figured out
-  (by TidyPgm) before we generate C--.  This CafInfo is only set for
+  (by GHC.Iface.Tidy) before we generate C--.  This CafInfo is only set for
   top-level Ids; nested bindings stay with MayHaveCafRefs.
 
 * Currently an SRT contains (only) pointers to (top-level) closures.
@@ -182,4 +182,3 @@ a dominator analysis, using the Dataflow Engine.
 
 * DECIDED: we can generate SRTs based on the final Cmm program
   without knowledge of how it is generated.
-

@@ -31,7 +31,7 @@ module Unique (
 
         mkUniqueGrimily,                -- Used in UniqSupply only!
         getKey,                         -- Used in Var, UniqFM, Name only!
-        mkUnique, unpkUnique,           -- Used in BinIface only
+        mkUnique, unpkUnique,           -- Used in GHC.Iface.Binary only
         eqUnique, ltUnique,
         incrUnique,
 
@@ -178,7 +178,7 @@ unpkUnique (MkUnique u)
 -- | The interface file symbol-table encoding assumes that known-key uniques fit
 -- in 30-bits; verify this.
 --
--- See Note [Symbol table representation of names] in BinIface for details.
+-- See Note [Symbol table representation of names] in GHC.Iface.Binary for details.
 isValidKnownKeyUnique :: Unique -> Bool
 isValidKnownKeyUnique u =
     case unpkUnique u of

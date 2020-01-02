@@ -9,7 +9,7 @@ Loading interface files
 {-# LANGUAGE CPP, BangPatterns, RecordWildCards, NondecreasingIndentation #-}
 {-# LANGUAGE TypeFamilies #-}
 {-# OPTIONS_GHC -fno-warn-orphans #-}
-module LoadIface (
+module GHC.Iface.Load (
         -- Importing one thing
         tcLookupImported_maybe, importDecl,
         checkWiredInTyCon, ifCheckWiredInThing,
@@ -23,7 +23,7 @@ module LoadIface (
         loadInterface,
         loadSysInterface, loadUserInterface, loadPluginInterface,
         findAndReadIface, readIface,    -- Used when reading the module's old interface
-        loadDecls,      -- Should move to TcIface and be renamed
+        loadDecls,      -- Should move to GHC.IfaceToCore and be renamed
         initExternalPackageState,
         moduleFreeHolesPrecise,
         needWiredInHomeIface, loadWiredInHomeIface,
@@ -36,13 +36,13 @@ module LoadIface (
 
 import GhcPrelude
 
-import {-# SOURCE #-}   TcIface( tcIfaceDecl, tcIfaceRules, tcIfaceInst,
-                                 tcIfaceFamInst,
-                                 tcIfaceAnnotations, tcIfaceCompleteSigs )
+import {-# SOURCE #-} GHC.IfaceToCore
+   ( tcIfaceDecl, tcIfaceRules, tcIfaceInst, tcIfaceFamInst
+   , tcIfaceAnnotations, tcIfaceCompleteSigs )
 
 import DynFlags
-import IfaceSyn
-import IfaceEnv
+import GHC.Iface.Syntax
+import GHC.Iface.Env
 import HscTypes
 
 import BasicTypes hiding (SuccessFlag(..))
@@ -69,14 +69,14 @@ import Finder
 import UniqFM
 import SrcLoc
 import Outputable
-import BinIface
+import GHC.Iface.Binary
 import Panic
 import Util
 import FastString
 import Fingerprint
 import Hooks
 import FieldLabel
-import RnModIface
+import GHC.Iface.Rename
 import UniqDSet
 import Plugins
 
@@ -187,8 +187,8 @@ for any module with an instance decl or RULE that we might want.
 
 * BUT, if the TyCon is a wired-in TyCon, we don't really need its interface;
   but we must make sure we read its interface in case it has instances or
-  rules.  That is what LoadIface.loadWiredInHomeIface does.  It's called
-  from TcIface.{tcImportDecl, checkWiredInTyCon, ifCheckWiredInThing}
+  rules.  That is what GHC.Iface.Load.loadWiredInHomeIface does.  It's called
+  from GHC.IfaceToCore.{tcImportDecl, checkWiredInTyCon, ifCheckWiredInThing}
 
 * HOWEVER, only do this for TyCons.  There are no wired-in Classes.  There
   are some wired-in Ids, but we don't want to load their interfaces. For
@@ -486,7 +486,7 @@ loadInterface doc_str mod from
                             -- Warn warn against an EPS-updating import
                             -- of one's own boot file! (one-shot only)
                             -- See Note [Loading your own hi-boot file]
-                            -- in MkIface.
+                            -- in GHC.Iface.Utils.
 
         ; WARN( bad_boot, ppr mod )
           updateEps_  $ \ eps ->
@@ -535,7 +535,7 @@ loadInterface doc_str mod from
 Generally speaking, when compiling module M, we should not
 load M.hi boot into the EPS.  After all, we are very shortly
 going to have full information about M.  Moreover, see
-Note [Do not update EPS with your own hi-boot] in MkIface.
+Note [Do not update EPS with your own hi-boot] in GHC.Iface.Utils.
 
 But there is a HORRIBLE HACK here.
 

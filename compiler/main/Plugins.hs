@@ -119,7 +119,7 @@ data Plugin = Plugin {
   , interfaceLoadAction :: forall lcl . [CommandLineOption] -> ModIface
                                           -> IfM lcl ModIface
     -- ^ Modify an interface that have been loaded. This is called by
-    -- LoadIface when an interface is successfully loaded. Not applied to
+    -- GHC.Iface.Load when an interface is successfully loaded. Not applied to
     -- the loading of the plugin interface. Tools that rely on information from
     -- modules other than the currently compiled one should implement this
     -- function.

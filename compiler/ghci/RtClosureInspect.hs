@@ -47,7 +47,7 @@ import TyCon
 import Name
 import OccName
 import Module
-import IfaceEnv
+import GHC.Iface.Env
 import Util
 import VarSet
 import BasicTypes       ( Boxity(..) )

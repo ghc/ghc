@@ -174,13 +174,13 @@ exprArity has the following invariants:
       can get "n" manifest lambdas to the top.
 
 Why is this important?  Because
-  - In TidyPgm we use exprArity to fix the *final arity* of
+  - In GHC.Iface.Tidy we use exprArity to fix the *final arity* of
     each top-level Id, and in
   - In CorePrep we use etaExpand on each rhs, so that the visible lambdas
     actually match that arity, which in turn means
     that the StgRhs has the right number of lambdas
 
-An alternative would be to do the eta-expansion in TidyPgm, at least
+An alternative would be to do the eta-expansion in GHC.Iface.Tidy, at least
 for top-level bindings, in which case we would not need the trim_arity
 in exprArity.  That is a less local change, so I'm going to leave it for today!
 

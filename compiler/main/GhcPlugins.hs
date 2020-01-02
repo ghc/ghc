@@ -87,7 +87,7 @@ import Unique           ( Unique, Uniquable(..) )
 import FastString
 import Data.Maybe
 
-import IfaceEnv         ( lookupOrigIO )
+import GHC.Iface.Env    ( lookupOrigIO )
 import GhcPrelude
 import MonadUtils       ( mapMaybeM )
 import GHC.ThToHs       ( thRdrNameGuesses )

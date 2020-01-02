@@ -113,18 +113,18 @@ import Parser
 import Lexer
 import SrcLoc
 import TcRnDriver
-import TcIface          ( typecheckIface )
+import GHC.IfaceToCore  ( typecheckIface )
 import TcRnMonad
 import TcHsSyn          ( ZonkFlexi (DefaultFlexi) )
 import NameCache        ( initNameCache )
-import LoadIface        ( ifaceStats, initExternalPackageState )
+import GHC.Iface.Load   ( ifaceStats, initExternalPackageState )
 import PrelInfo
-import MkIface
+import GHC.Iface.Utils
 import Desugar
 import SimplCore
-import TidyPgm
+import GHC.Iface.Tidy
 import GHC.CoreToStg.Prep
-import GHC.CoreToStg        ( coreToStg )
+import GHC.CoreToStg    ( coreToStg )
 import GHC.Stg.Syntax
 import GHC.Stg.FVs      ( annTopBindingsFreeVars )
 import GHC.Stg.Pipeline ( stg2stg )
@@ -175,10 +175,10 @@ import qualified Data.Set as S
 import Data.Set (Set)
 import Control.DeepSeq (force)
 
-import HieAst           ( mkHieFile )
-import HieTypes         ( getAsts, hie_asts, hie_module )
-import HieBin           ( readHieFile, writeHieFile , hie_file_result)
-import HieDebug         ( diffFile, validateScopes )
+import GHC.Iface.Ext.Ast    ( mkHieFile )
+import GHC.Iface.Ext.Types  ( getAsts, hie_asts, hie_module )
+import GHC.Iface.Ext.Binary ( readHieFile, writeHieFile , hie_file_result)
+import GHC.Iface.Ext.Debug  ( diffFile, validateScopes )
 
 #include "HsVersions.h"
 
@@ -1745,7 +1745,7 @@ hscParsedDecls hsc_env decls = runInteractiveHsc hsc_env $ do
                        , isExternalName (idName id)
                        , not (isDFunId id || isImplicitId id) ]
             -- We only need to keep around the external bindings
-            -- (as decided by TidyPgm), since those are the only ones
+            -- (as decided by GHC.Iface.Tidy), since those are the only ones
             -- that might later be looked up by name.  But we can exclude
             --    - DFunIds, which are in 'cls_insts' (see Note [ic_tythings] in HscTypes
             --    - Implicit Ids, which are implicit in tcs

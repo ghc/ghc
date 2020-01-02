@@ -2,7 +2,7 @@
 {-# LANGUAGE Strict #-} -- See Note [Avoiding space leaks in toIface*]
 
 -- | Functions for converting Core things to interface file things.
-module ToIface
+module GHC.CoreToIface
     ( -- * Binders
       toIfaceTvBndr
     , toIfaceTvBndrs
@@ -47,7 +47,7 @@ module ToIface
 
 import GhcPrelude
 
-import IfaceSyn
+import GHC.Iface.Syntax
 import DataCon
 import Id
 import IdInfo
@@ -86,8 +86,9 @@ after code gen has run, in which case we might carry megabytes of core
 AST in the heap which is no longer needed.
 
 We avoid this in two ways.
-* First we use -XStrict in ToIface which avoids many thunks to begin with.
-* Second we define NFData instance for IFaceSyn and use them to
+* First we use -XStrict in GHC.CoreToIface which avoids many thunks
+  to begin with.
+* Second we define NFData instance for Iface syntax and use them to
   force any remaining thunks.
 
 -XStrict is not sufficient as patterns of the form `f (g x)` would still
@@ -156,13 +157,13 @@ toIfaceTypeX :: VarSet -> Type -> IfaceType
 --    translates the tyvars in 'free' as IfaceFreeTyVars
 --
 -- Synonyms are retained in the interface type
-toIfaceTypeX fr (TyVarTy tv)   -- See Note [TcTyVars in IfaceType] in IfaceType
+toIfaceTypeX fr (TyVarTy tv)   -- See Note [TcTyVars in IfaceType] in GHC.Iface.Type
   | tv `elemVarSet` fr         = IfaceFreeTyVar tv
   | otherwise                  = IfaceTyVar (toIfaceTyVar tv)
 toIfaceTypeX fr ty@(AppTy {})  =
   -- Flatten as many argument AppTys as possible, then turn them into an
   -- IfaceAppArgs list.
-  -- See Note [Suppressing invisible arguments] in IfaceType.
+  -- See Note [Suppressing invisible arguments] in GHC.Iface.Type.
   let (head, args) = splitAppTys ty
   in IfaceAppTy (toIfaceTypeX fr head) (toIfaceAppTyArgsX fr head args)
 toIfaceTypeX _  (LitTy n)      = IfaceLitTy (toIfaceTyLit n)
@@ -268,7 +269,7 @@ toIfaceCoercionX fr co
     go (Refl ty)            = IfaceReflCo (toIfaceTypeX fr ty)
     go (GRefl r ty mco)     = IfaceGReflCo r (toIfaceTypeX fr ty) (go_mco mco)
     go (CoVarCo cv)
-      -- See [TcTyVars in IfaceType] in IfaceType
+      -- See [TcTyVars in IfaceType] in GHC.Iface.Type
       | cv `elemVarSet` fr  = IfaceFreeCoVar cv
       | otherwise           = IfaceCoVarCo (toIfaceCoVar cv)
     go (HoleCo h)           = IfaceHoleCo  (coHoleCoVar h)
@@ -314,7 +315,7 @@ toIfaceAppTyArgsX :: VarSet -> Type -> [Type] -> IfaceAppArgs
 toIfaceAppTyArgsX fr ty ty_args = toIfaceAppArgsX fr (typeKind ty) ty_args
 
 toIfaceAppArgsX :: VarSet -> Kind -> [Type] -> IfaceAppArgs
--- See Note [Suppressing invisible arguments] in IfaceType
+-- See Note [Suppressing invisible arguments] in GHC.Iface.Type
 -- We produce a result list of args describing visibility
 -- The awkward case is
 --    T :: forall k. * -> k
@@ -422,7 +423,7 @@ toIfaceLetBndr id  = IfLetBndr (occNameFS (getOccName id))
                                (toIfaceIdInfo (idInfo id))
                                (toIfaceJoinInfo (isJoinId_maybe id))
   -- Put into the interface file any IdInfo that CoreTidy.tidyLetBndr
-  -- has left on the Id.  See Note [IdInfo on nested let-bindings] in IfaceSyn
+  -- has left on the Id.  See Note [IdInfo on nested let-bindings] in GHC.Iface.Syntax
 
 toIfaceIdDetails :: IdDetails -> IfaceIdDetails
 toIfaceIdDetails VanillaId                      = IfVanillaId
@@ -446,7 +447,7 @@ toIfaceIdInfo id_info
        []    -> NoInfo
        infos -> HasInfo infos
                -- NB: strictness and arity must appear in the list before unfolding
-               -- See TcIface.tcUnfolding
+               -- See GHC.IfaceToCore.tcUnfolding
   where
     ------------  Arity  --------------
     arity_info = arityInfo id_info
@@ -497,7 +498,7 @@ toIfUnfolding lb (CoreUnfolding { uf_tmpl = rhs
         InlineCompulsory -> IfCompulsory if_rhs
         InlineRhs        -> IfCoreUnfold False if_rhs
         -- Yes, even if guidance is UnfNever, expose the unfolding
-        -- If we didn't want to expose the unfolding, TidyPgm would
+        -- If we didn't want to expose the unfolding, GHC.Iface.Tidy would
         -- have stuck in NoUnfolding.  For supercompilation we want
         -- to see that unfolding!
   where

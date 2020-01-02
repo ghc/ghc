@@ -12,7 +12,7 @@ This module defines interface types and binders
 {-# LANGUAGE LambdaCase #-}
     -- FlexibleInstances for Binary (DefMethSpec IfaceType)
 
-module IfaceType (
+module GHC.Iface.Type (
         IfExtName, IfLclName,
 
         IfaceType(..), IfacePredType, IfaceKind, IfaceCoercion(..),
@@ -92,7 +92,7 @@ import Control.DeepSeq
 
 type IfLclName = FastString     -- A local name in iface syntax
 
-type IfExtName = Name   -- An External or WiredIn Name can appear in IfaceSyn
+type IfExtName = Name   -- An External or WiredIn Name can appear in Iface syntax
                         -- (However Internal or System Names never should)
 
 data IfaceBndr          -- Local (non-top-level) binders
@@ -137,7 +137,7 @@ type IfaceKind     = IfaceType
 -- | A kind of universal type, used for types and kinds.
 --
 -- Any time a 'Type' is pretty-printed, it is first converted to an 'IfaceType'
--- before being printed. See Note [Pretty printing via IfaceSyn] in PprTyThing
+-- before being printed. See Note [Pretty printing via Iface syntax] in PprTyThing
 data IfaceType
   = IfaceFreeTyVar TyVar                -- See Note [Free tyvars in IfaceType]
   | IfaceTyVar     IfLclName            -- Type/coercion variable only, not tycon
@@ -238,11 +238,11 @@ data IfaceTyConSort = IfaceNormalTyCon          -- ^ a regular tycon
                     deriving (Eq)
 
 {- Note [Free tyvars in IfaceType]
-~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 Nowadays (since Nov 16, 2016) we pretty-print a Type by converting to
 an IfaceType and pretty printing that.  This eliminates a lot of
 pretty-print duplication, and it matches what we do with pretty-
-printing TyThings. See Note [Pretty printing via IfaceSyn] in PprTyThing.
+printing TyThings. See Note [Pretty printing via Iface syntax] in PprTyThing.
 
 It works fine for closed types, but when printing debug traces (e.g.
 when using -ddump-tc-trace) we print a lot of /open/ types.  These
@@ -611,9 +611,9 @@ since the corresponding Core constructor:
       | TyConApp TyCon [Type]
 
 Already puts all of its arguments into a list. So when converting a Type to an
-IfaceType (see toIfaceAppArgsX in ToIface), we simply use the kind of the TyCon
-(which is cached) to guide the process of converting the argument Types into an
-IfaceAppArgs list.
+IfaceType (see toIfaceAppArgsX in GHC.Core.ToIface), we simply use the kind of
+the TyCon (which is cached) to guide the process of converting the argument
+Types into an IfaceAppArgs list.
 
 We also want this behavior for IfaceAppTy, since given:
 
@@ -629,7 +629,7 @@ tycon case, because the corresponding Core constructor for IfaceAppTy:
       | AppTy Type Type
 
 Only stores one argument at a time. Therefore, when converting an AppTy to an
-IfaceAppTy (in toIfaceTypeX in ToIface), we:
+IfaceAppTy (in toIfaceTypeX in GHC.CoreToIface), we:
 
 1. Flatten the chain of AppTys down as much as possible
 2. Use typeKind to determine the function Type's kind
@@ -1110,7 +1110,7 @@ pprIfaceForAllBndr bndr =
       pprIfaceTvBndr tv suppress_sig (UseBndrParens True)
     Bndr (IfaceIdBndr idv) _ -> pprIfaceIdBndr idv
   where
-    -- See Note [Suppressing binder signatures] in IfaceType
+    -- See Note [Suppressing binder signatures]
     suppress_sig = SuppressBndrSig False
 
 pprIfaceForAllCoBndr :: (IfLclName, IfaceCoercion) -> SDoc
