@@ -1292,11 +1292,13 @@ mkCoherenceRightCo r ty co co2
   | otherwise = co2 `mkTransCo` GRefl r ty (MCo co)
 
 -- | Given @co :: (a :: k) ~ (b :: k')@ produce @co' :: k ~ k'@.
-mkKindCo :: Coercion -> Coercion
+mkKindCo :: HasCallStack =>Coercion -> Coercion
 mkKindCo co | Just (ty, _) <- isReflCo_maybe co = Refl (typeKind ty)
 mkKindCo (GRefl _ _ (MCo co)) = co
 mkKindCo (UnivCo (PhantomProv h) _ _ _)    = h
 mkKindCo (UnivCo (ProofIrrelProv h) _ _ _) = h
+mkKindCo (UnivCo ErasedProv _ t1 t2 )
+  = mkUnivCo ErasedProv Nominal  (typeKind t1) (typeKind t2)
 mkKindCo co
   | Pair ty1 ty2 <- coercionKind co
        -- generally, calling coercionKind during coercion creation is a bad idea,
@@ -1309,10 +1311,11 @@ mkKindCo co
   | otherwise
   = KindCo co
 
-mkSubCo :: Coercion -> Coercion
+mkSubCo :: HasCallStack =>Coercion -> Coercion
 -- Input coercion is Nominal, result is Representational
 -- see also Note [Role twiddling functions]
 mkSubCo (Refl ty) = GRefl Representational ty MRefl
+mkSubCo (UnivCo ErasedProv Nominal t1 t2) =mkUnivCo ErasedProv Representational t1 t2
 mkSubCo (GRefl Nominal ty co) = GRefl Representational ty co
 mkSubCo (TyConAppCo Nominal tc cos)
   = TyConAppCo Representational tc (applyRoles tc cos)
@@ -1519,6 +1522,7 @@ promoteCoercion co = case co of
     UnivCo (PhantomProv kco) _ _ _    -> kco
     UnivCo (ProofIrrelProv kco) _ _ _ -> kco
     UnivCo (PluginProv _) _ _ _       -> mkKindCo co
+    UnivCo ErasedProv _r t1 t2         -> mkUnivCo ErasedProv Nominal (typeKind t1) (typeKind t2)
 
     SymCo g
       -> mkSymCo (promoteCoercion g)

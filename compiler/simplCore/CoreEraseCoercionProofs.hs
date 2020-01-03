@@ -42,8 +42,7 @@ coreExprEraseProof (Cast  e co ) =    Cast (coreExprEraseProof e) (forcedEraseCo
 coreExprEraseProof (Tick  tick e)= Tick tick (coreExprEraseProof e)
 coreExprEraseProof (Type  t) = Type t
 coreExprEraseProof (Coercion co )=  Coercion $! forcedEraseCoercion co
-  where
-    (Pair lty rty,role) = coercionKindRole co
+
 eraseAltPfs :: CoreAlt -> CoreAlt
 eraseAltPfs (con, vars, body) = (con,vars,coreExprEraseProof body)
 
