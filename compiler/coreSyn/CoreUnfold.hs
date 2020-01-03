@@ -1287,6 +1287,20 @@ traceInline dflags inline_id str doc result
  | otherwise
  = result
 
+-- | This is an awful but temporary workaround for #17615, where the
+-- case analysis from the 'ufVeryAggressive' selector causes the entire
+-- 'DynFlags' to be unpacked into local bindings (due to binder swap). This
+-- results in a tremendous amount of stack spillage, severely bloating the code
+-- generated for 'callSiteInline'.
+--
+-- The right solution here is likely to fix binder swap to avoid this terrible
+-- behavior (since there are likely other instances of this as well) but this
+-- case was serious enough that it showed up in a CPU profile and consequently
+-- I wanted to fix it for 8.10.
+very_aggressive :: DynFlags -> Bool
+very_aggressive = ufVeryAggressive
+{-# NOINLINE very_aggressive #-}
+
 tryUnfolding :: DynFlags -> Id -> Bool -> [ArgSummary] -> CallCtxt
              -> CoreExpr -> Bool -> Bool -> UnfoldingGuidance
              -> Maybe CoreExpr
@@ -1297,7 +1311,7 @@ tryUnfolding dflags id lone_variable
      UnfNever -> traceInline dflags id str (text "UnfNever") Nothing
 
      UnfWhen { ug_arity = uf_arity, ug_unsat_ok = unsat_ok, ug_boring_ok = boring_ok }
-        | enough_args && (boring_ok || some_benefit || ufVeryAggressive dflags)
+        | enough_args && (boring_ok || some_benefit || very_aggressive dflags)
                 -- See Note [INLINE for small functions (3)]
         -> traceInline dflags id str (mk_doc some_benefit empty True) (Just unf_template)
         | otherwise
@@ -1307,7 +1321,7 @@ tryUnfolding dflags id lone_variable
           enough_args = (n_val_args >= uf_arity) || (unsat_ok && n_val_args > 0)
 
      UnfIfGoodArgs { ug_args = arg_discounts, ug_res = res_discount, ug_size = size }
-        | ufVeryAggressive dflags
+        | very_aggressive dflags
         -> traceInline dflags id str (mk_doc some_benefit extra_doc True) (Just unf_template)
         | is_wf && some_benefit && small_enough
         -> traceInline dflags id str (mk_doc some_benefit extra_doc True) (Just unf_template)
