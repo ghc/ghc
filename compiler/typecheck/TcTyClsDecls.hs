@@ -3412,8 +3412,14 @@ checkValidTyCon tc
             | Just fam_flav <- famTyConFlav_maybe tc
               -> case fam_flav of
                { ClosedSynFamilyTyCon (Just ax)
-                   -> tcAddClosedTypeFamilyDeclCtxt tc $
-                      checkValidCoAxiom ax
+                   -> tcAddClosedTypeFamilyDeclCtxt tc $ do
+                      -- Ensure that the TyCon in the equation matches
+                      -- the tycon of the class head. See #17633.
+                      checkTc (co_ax_tc tc == tc)
+                        text "The type constructor" <+> ppr (co_ax_tc tc) <+>
+                        text "in the LHS of the equation must match the family" <+>
+                        text "name" <+> ppr tc <> text "."
+                      checkValidCoAxiom tc ax
                ; ClosedSynFamilyTyCon Nothing   -> return ()
                ; AbstractClosedSynFamilyTyCon ->
                  do { hsBoot <- tcIsHsBootOrSig
