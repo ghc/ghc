@@ -35,6 +35,7 @@ module Id (
         -- ** Simple construction
         mkGlobalId, mkVanillaGlobal, mkVanillaGlobalWithInfo,
         mkLocalId, mkLocalCoVar, mkLocalIdOrCoVar,
+        mkLocalIdOrCoVarWithInfo,
         mkLocalIdWithInfo, mkExportedLocalId, mkExportedVanillaId,
         mkSysLocal, mkSysLocalM, mkSysLocalOrCoVar, mkSysLocalOrCoVarM,
         mkUserLocal, mkUserLocalOrCoVar,
@@ -268,6 +269,14 @@ mkLocalId :: HasDebugCallStack => Name -> Type -> Id
 mkLocalId name ty = ASSERT( not (isCoVarType ty) )
                     mkLocalIdWithInfo name ty vanillaIdInfo
 
+
+
+    -- proper ids only; no covars!
+mkLocalIdWithInfo :: HasDebugCallStack => Name -> Type -> IdInfo -> Id
+mkLocalIdWithInfo name ty info = ASSERT( not (isCoVarType ty) )
+                                 Var.mkLocalVar VanillaId name ty info
+        -- Note [Free type variables]
+
 -- | Make a local CoVar
 mkLocalCoVar :: Name -> Type -> CoVar
 mkLocalCoVar name ty
@@ -280,11 +289,14 @@ mkLocalIdOrCoVar name ty
   | isCoVarType ty = mkLocalCoVar name ty
   | otherwise      = mkLocalId    name ty
 
-    -- proper ids only; no covars!
-mkLocalIdWithInfo :: HasDebugCallStack => Name -> Type -> IdInfo -> Id
-mkLocalIdWithInfo name ty info = ASSERT( not (isCoVarType ty) )
-                                 Var.mkLocalVar VanillaId name ty info
-        -- Note [Free type variables]
+-- | Make a local id, with the IdDetails set to CoVarId if the type indicates
+-- so.
+mkLocalIdOrCoVarWithInfo :: Name -> Type -> IdInfo -> Id
+mkLocalIdOrCoVarWithInfo name ty info
+  = Var.mkLocalVar details name ty info
+  where
+    details | isCoVarType ty = CoVarId
+            | otherwise      = VanillaId
 
 -- | Create a local 'Id' that is marked as exported.
 -- This prevents things attached to it from being removed as dead code.

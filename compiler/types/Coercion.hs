@@ -1322,7 +1322,7 @@ mkKindCo co | Just (ty, _) <- isReflCo_maybe co = Refl (typeKind ty)
 mkKindCo (GRefl _ _ (MCo co)) = co
 mkKindCo (UnivCo (PhantomProv h) _ _ _)    = h
 mkKindCo (UnivCo (ProofIrrelProv h) _ _ _) = h
-mkKindCo (ErasedCoercion fvs r lt rt )
+mkKindCo (ErasedCoercion fvs _r lt rt )
         = (ErasedCoercion fvs Nominal (typeKind lt) (typeKind rt))
 mkKindCo co
   | Pair ty1 ty2 <- coercionKind co
@@ -2419,7 +2419,7 @@ coercionRKind co
     go (InstCo aco arg)         = go_app aco [go arg]
     go (KindCo co)              = typeKind (go co)
     go (SubCo co)               = go co
-    go (NthCo _ d co)           = go_nth d (go co)
+    go (NthCo _ d co)           = go_nth d (go co) -- something wrong here ;)
     go (AxiomInstCo ax ind cos) = go_ax_inst ax ind (map go cos)
     go (AxiomRuleCo ax cos)     = pSnd $ expectJust "coercionKind" $
                                   coaxrProves ax $ map coercionKind cos
