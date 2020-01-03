@@ -651,7 +651,7 @@ mapCoercion :: Monad m
             => TyCoMapper env m -> env -> Coercion -> m Coercion
 mapCoercion mapper@(TyCoMapper { tcm_covar = covar
                                , tcm_hole = cohole
-                               , tcm_tyvar = tyvar
+                               -- , tcm_tyvar = tyvar
                                , tcm_tycobinder = tycobinder
                                , tcm_tycon = tycon })
             env co
@@ -696,6 +696,7 @@ mapCoercion mapper@(TyCoMapper { tcm_covar = covar
     go_prov (PhantomProv co)    = PhantomProv <$> go co
     go_prov (ProofIrrelProv co) = ProofIrrelProv <$> go co
     go_prov p@(PluginProv _)    = return p
+    go_prov ErasedProv          = return ErasedProv
 
 {-
 ************************************************************************
