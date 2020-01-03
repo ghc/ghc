@@ -117,7 +117,6 @@ synonymTyConsOfType ty
      go_mco MRefl    = emptyNameEnv
      go_mco (MCo co) = go_co co
 
-     go_co (ErasedCoercion _fvs _r lty rty ) = go lty `plusNameEnv` go rty
      go_co (Refl ty)              = go ty
      go_co (GRefl _ ty mco)       = go ty `plusNameEnv` go_mco mco
      go_co (TyConAppCo _ tc cs)   = go_tc tc `plusNameEnv` go_co_s cs
@@ -141,6 +140,7 @@ synonymTyConsOfType ty
      go_prov (PhantomProv co)     = go_co co
      go_prov (ProofIrrelProv co)  = go_co co
      go_prov (PluginProv _)       = emptyNameEnv
+     go_prov ErasedProv           = emptyNameEnv
 
      go_tc tc | isTypeSynonymTyCon tc = unitNameEnv (tyConName tc) tc
               | otherwise             = emptyNameEnv

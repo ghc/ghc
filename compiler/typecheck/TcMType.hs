@@ -1362,11 +1362,6 @@ collect_cand_qtvs_co :: VarSet -- bound variables
                      -> TcM CandidatesQTvs
 collect_cand_qtvs_co bound = go_co
   where
-
-    go_co dv (ErasedCoercion fvs  _role lty rty ) = do
-                                    dv1 <-collect_cand_qtvs True bound dv lty
-                                    dv2 <- collect_cand_qtvs True bound dv1 rty
-                                    foldlM go_cv dv2 (dVarSetElems fvs)
     go_co dv (Refl ty)             = collect_cand_qtvs True bound dv ty
     go_co dv (GRefl _ ty mco)      = do dv1 <- collect_cand_qtvs True bound dv ty
                                         go_mco dv1 mco
@@ -1402,6 +1397,7 @@ collect_cand_qtvs_co bound = go_co
     go_mco dv (MCo co) = go_co dv co
 
     go_prov dv UnsafeCoerceProv    = return dv
+    go_prov dv ErasedProv          = return dv
     go_prov dv (PhantomProv co)    = go_co dv co
     go_prov dv (ProofIrrelProv co) = go_co dv co
     go_prov dv (PluginProv _)      = return dv

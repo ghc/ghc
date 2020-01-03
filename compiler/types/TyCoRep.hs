@@ -1068,11 +1068,6 @@ data Coercion
 
   | HoleCo CoercionHole              -- ^ See Note [Coercion holes]
                                      -- Only present during typechecking
-  | ErasedCoercion DTyCoVarSet Role Type Type
-     --  ^ optimization hack because cast terms blowup fusion heavy
-                   -- code, implied whenever corelint isn't enabled.
-                   -- we track coercion free variables for interface files,
-                   -- even though
   deriving Data.Data
 
 type CoercionN = Coercion       -- always nominal
@@ -1484,6 +1479,10 @@ data UnivCoProvenance
 
   | PluginProv String  -- ^ From a plugin, which asserts that this coercion
                        --   is sound. The string is for the use of the plugin.
+  | ErasedProv --  ^ optimization hack because cast terms blowup fusion heavy
+                   -- code, implied whenever corelint isn't enabled.
+                   -- Q: should we track coercion free variables for interface files,
+                   -- even though
 
   deriving Data.Data
 
@@ -1677,9 +1676,6 @@ coercionSize (ForAllCo _ h co)   = 1 + coercionSize co + coercionSize h
 coercionSize (FunCo _ co1 co2)   = 1 + coercionSize co1 + coercionSize co2
 coercionSize (CoVarCo _)         = 1
 coercionSize (HoleCo _)          = 1
-coercionSize (ErasedCoercion cofvs _ lty rty  )
-                                 =   1 + typeSize lty + typeSize rty
-                                       + sizeUniqDSet cofvs
 coercionSize (AxiomInstCo _ _ args) = 1 + sum (map coercionSize args)
 coercionSize (UnivCo p _ t1 t2)  = 1 + provSize p + typeSize t1 + typeSize t2
 coercionSize (SymCo co)          = 1 + coercionSize co
@@ -1696,3 +1692,4 @@ provSize UnsafeCoerceProv    = 1
 provSize (PhantomProv co)    = 1 + coercionSize co
 provSize (ProofIrrelProv co) = 1 + coercionSize co
 provSize (PluginProv _)      = 1
+provSize (ErasedProv)        = 1

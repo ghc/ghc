@@ -207,10 +207,6 @@ tyCoVarsOfCos cos = ty_co_vars_of_cos cos emptyVarSet emptyVarSet
 
 
 ty_co_vars_of_co :: Coercion -> TyCoVarSet -> TyCoVarSet -> TyCoVarSet
-ty_co_vars_of_co (ErasedCoercion fvs  _r lty rty) is acc
-                                             =  ty_co_vars_of_type rty is $
-                                                ty_co_vars_of_type lty is $
-                                                    dVarSetToVarSet fvs `unionVarSet` acc
 ty_co_vars_of_co (Refl ty)            is acc = ty_co_vars_of_type ty is acc
 ty_co_vars_of_co (GRefl _ ty mco)     is acc = ty_co_vars_of_type ty is $
                                                ty_co_vars_of_mco mco is acc
@@ -263,6 +259,7 @@ ty_co_vars_of_prov (PhantomProv co)    is acc = ty_co_vars_of_co co is acc
 ty_co_vars_of_prov (ProofIrrelProv co) is acc = ty_co_vars_of_co co is acc
 ty_co_vars_of_prov UnsafeCoerceProv    _  acc = acc
 ty_co_vars_of_prov (PluginProv _)      _  acc = acc
+ty_co_vars_of_prov ErasedProv          _  acc = acc
 
 -- | Generates an in-scope set from the free variables in a list of types
 -- and a list of coercions
@@ -345,8 +342,7 @@ exactTyCoVarsOfType ty
     goMCo MRefl    = emptyVarSet
     goMCo (MCo co) = goCo co
 
-    goCo (ErasedCoercion fvs _ lty rty )
-     =  go lty `unionVarSet` go rty `unionVarSet` dVarSetToVarSet fvs
+
     goCo (Refl ty)            = go ty
     goCo (GRefl _ ty mco)     = go ty `unionVarSet` goMCo mco
     goCo (TyConAppCo _ _ args)= goCos args
@@ -373,6 +369,7 @@ exactTyCoVarsOfType ty
     goProv (PhantomProv kco)    = goCo kco
     goProv (ProofIrrelProv kco) = goCo kco
     goProv (PluginProv _)       = emptyVarSet
+    goProv (ErasedProv)         = emptyVarSet
 
     goVar v = unitVarSet v `unionVarSet` go (varType v)
 
@@ -443,9 +440,6 @@ tyCoVarsOfCosSet cos = tyCoVarsOfCos $ nonDetEltsUFM cos
 tyCoFVsOfCo :: Coercion -> FV
 -- Extracts type and coercion variables from a coercion
 -- See Note [Free variables of types]
-tyCoFVsOfCo (ErasedCoercion fvs  _ lty rty) fv_cand in_scope acc
-  = (tyCoFVsOfType lty `unionFV` tyCoFVsOfType rty
-                       `unionFV` (mkFVs $ dVarSetElems fvs)) fv_cand in_scope acc
 tyCoFVsOfCo (Refl ty) fv_cand in_scope acc
   = tyCoFVsOfType ty fv_cand in_scope acc
 tyCoFVsOfCo (GRefl _ ty mco) fv_cand in_scope acc
@@ -484,6 +478,7 @@ tyCoFVsOfProv UnsafeCoerceProv    fv_cand in_scope acc = emptyFV fv_cand in_scop
 tyCoFVsOfProv (PhantomProv co)    fv_cand in_scope acc = tyCoFVsOfCo co fv_cand in_scope acc
 tyCoFVsOfProv (ProofIrrelProv co) fv_cand in_scope acc = tyCoFVsOfCo co fv_cand in_scope acc
 tyCoFVsOfProv (PluginProv _)      fv_cand in_scope acc = emptyFV fv_cand in_scope acc
+tyCoFVsOfProv ErasedProv          fv_cand in_scope acc = emptyFV fv_cand in_scope acc
 
 tyCoFVsOfCos :: [Coercion] -> FV
 tyCoFVsOfCos []       fv_cand in_scope acc = emptyFV fv_cand in_scope acc
@@ -535,7 +530,6 @@ almostDevoidCoVarOfCo cv co =
   almost_devoid_co_var_of_co co cv
 
 almost_devoid_co_var_of_co :: Coercion -> CoVar -> Bool
-almost_devoid_co_var_of_co (ErasedCoercion fvs _ _  _)  cv =  cv `elemDVarSet` fvs
 almost_devoid_co_var_of_co (Refl {}) _ = True   -- covar is allowed in Refl and
 almost_devoid_co_var_of_co (GRefl {}) _ = True  -- GRefl, so we don't look into
                                                 -- the coercions
@@ -590,6 +584,7 @@ almost_devoid_co_var_of_prov (ProofIrrelProv co) cv
   = almost_devoid_co_var_of_co co cv
 almost_devoid_co_var_of_prov UnsafeCoerceProv _ = True
 almost_devoid_co_var_of_prov (PluginProv _) _ = True
+almost_devoid_co_var_of_prov ErasedProv _  = True
 
 almost_devoid_co_var_of_type :: Type -> CoVar -> Bool
 almost_devoid_co_var_of_type (TyVarTy _) _ = True
@@ -739,8 +734,6 @@ noFreeVarsOfTypes = all noFreeVarsOfType
 -- | Returns True if this coercion has no free variables. Should be the same as
 -- isEmptyVarSet . tyCoVarsOfCo, but faster in the non-forall case.
 noFreeVarsOfCo :: Coercion -> Bool
-noFreeVarsOfCo (ErasedCoercion fvs _r lty rty)=  noFreeVarsOfType lty &&
-                                            noFreeVarsOfType rty && isEmptyDVarSet fvs
 noFreeVarsOfCo (Refl ty)              = noFreeVarsOfType ty
 noFreeVarsOfCo (GRefl _ ty co)        = noFreeVarsOfType ty && noFreeVarsOfMCo co
 noFreeVarsOfCo (TyConAppCo _ _ args)  = all noFreeVarsOfCo args
@@ -769,6 +762,7 @@ noFreeVarsOfProv UnsafeCoerceProv    = True
 noFreeVarsOfProv (PhantomProv co)    = noFreeVarsOfCo co
 noFreeVarsOfProv (ProofIrrelProv co) = noFreeVarsOfCo co
 noFreeVarsOfProv (PluginProv {})     = True
+noFreeVarsOfProv ErasedProv          = True
 
 {-
 %************************************************************************

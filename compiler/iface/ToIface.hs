@@ -265,19 +265,6 @@ toIfaceCoercionX fr co
     go_mco MRefl     = IfaceMRefl
     go_mco (MCo co)  = IfaceMCo $ go co
 
-    go (ErasedCoercion fvs r lty rty)     = IfaceErased tvs cvs openVars r (toIfaceTypeX fr lty) (toIfaceTypeX fr rty)
-
-                          where
-                            (tvs, cvs, openVars) = foldl' f ([], [], []) (dVarSetElems fvs)
-                            isOpen = (`elemVarSet` fr)
-                            f (a,b,c) v
-                              | isOpen v  = (a, b, v:c)
-                              | isCoVar v = (a, toIfaceCoVar v:b, c)
-                              | isTyVar v = (toIfaceTyVar v:a, b, c)
-                              |otherwise = (a,b,c)
-              --  -   | otherwise = panic "ToIface.toIfaceCoercionX(go): Bad free variable in ErasedCoercion"
-              --    TODO FIX ME all the upstream filtering
-
     go (Refl ty)            = IfaceReflCo (toIfaceTypeX fr ty)
     go (GRefl r ty mco)     = IfaceGReflCo r (toIfaceTypeX fr ty) (go_mco mco)
     go (CoVarCo cv)
@@ -312,6 +299,7 @@ toIfaceCoercionX fr co
                             fr' = fr `delVarSet` tv
 
     go_prov :: UnivCoProvenance -> IfaceUnivCoProv
+    go_prov ErasedProv          = IfaceErasedProv
     go_prov UnsafeCoerceProv    = IfaceUnsafeCoerceProv
     go_prov (PhantomProv co)    = IfacePhantomProv (go co)
     go_prov (ProofIrrelProv co) = IfaceProofIrrelProv (go co)

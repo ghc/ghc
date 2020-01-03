@@ -792,12 +792,6 @@ subst_co subst co
     go_mco (MCo co) = MCo (go co)
 
     go :: Coercion -> Coercion
-    go (ErasedCoercion fvs r lty rty )
-      = (((ErasedCoercion
-          $! (substFreeDVarSet subst fvs))
-          $! r)
-          $! (go_ty lty))
-          $! (go_ty rty)
     go (Refl ty)             = mkNomReflCo $! (go_ty ty)
     go (GRefl r ty mco)      = (mkGReflCo r $! (go_ty ty)) $! (go_mco mco)
     go (TyConAppCo r tc args)= let args' = map go args
@@ -823,6 +817,7 @@ subst_co subst co
                                 in cs1 `seqList` AxiomRuleCo c cs1
     go (HoleCo h)            = HoleCo $! go_hole h
 
+    go_prov ErasedProv           = ErasedProv
     go_prov UnsafeCoerceProv     = UnsafeCoerceProv
     go_prov (PhantomProv kco)    = PhantomProv (go kco)
     go_prov (ProofIrrelProv kco) = ProofIrrelProv (go kco)

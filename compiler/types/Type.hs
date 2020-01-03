@@ -424,8 +424,7 @@ expandTypeSynonyms ty
     go_mco _     MRefl    = MRefl
     go_mco subst (MCo co) = MCo (go_co subst co)
 
-    go_co subst (ErasedCoercion  fvs r lty rty)
-      = ErasedCoercion (substFreeDVarSet subst fvs) r (go subst lty) (go subst rty)
+
     go_co subst (Refl ty)
       = mkNomReflCo (go subst ty)
     go_co subst (GRefl r ty mco)
@@ -465,6 +464,7 @@ expandTypeSynonyms ty
     go_co _ (HoleCo h)
       = pprPanic "expandTypeSynonyms hit a hole" (ppr h)
 
+    go_prov _     ErasedProv          = ErasedProv
     go_prov _     UnsafeCoerceProv    = UnsafeCoerceProv
     go_prov subst (PhantomProv co)    = PhantomProv (go_co subst co)
     go_prov subst (ProofIrrelProv co) = ProofIrrelProv (go_co subst co)
@@ -660,15 +660,6 @@ mapCoercion mapper@(TyCoMapper { tcm_covar = covar
     go_mco MRefl    = return MRefl
     go_mco (MCo co) = MCo <$> (go co)
 
-    go (ErasedCoercion fvs  r lty rty )
-      =
-        let bndrFVs v | isCoVar v = tyCoVarsOfCoDSet <$> covar env v
-              | isTyVar v = tyCoVarsOfTypeDSet <$> tyvar env v
-              | isCoercionHole v = return emptyDVarSet
-              | otherwise = pprPanic "mapCoercion(coercion): Bad free variable" (ppr v)
-         in
-            do fvs' <- unionDVarSets <$> mapM bndrFVs (dVarSetElems fvs)
-               (ErasedCoercion fvs' r <$>  mapType mapper env lty <*> mapType mapper env rty)
 
     go (Refl ty) = Refl <$> mapType mapper env ty
     go (GRefl r ty mco) = mkGReflCo r <$> mapType mapper env ty <*> (go_mco mco)
@@ -2694,10 +2685,6 @@ occCheckExpand vs_to_avoid ty
     go_mco ctx (MCo co) = MCo <$> go_co ctx co
 
     ------------------
-    go_co ctx  (ErasedCoercion fvs r lty rty )
-                                        = do { lty' <- go ctx lty
-                                              ; rty' <- go ctx rty
-                                              ; return $ ErasedCoercion fvs  r lty' rty' }
     go_co cxt (Refl ty)                 = do { ty' <- go cxt ty
                                              ; return (mkNomReflCo ty') }
     go_co cxt (GRefl r ty mco)          = do { mco' <- go_mco cxt mco
@@ -2757,6 +2744,7 @@ occCheckExpand vs_to_avoid ty
     go_prov cxt (PhantomProv co)    = PhantomProv <$> go_co cxt co
     go_prov cxt (ProofIrrelProv co) = ProofIrrelProv <$> go_co cxt co
     go_prov _   p@(PluginProv _)    = return p
+    go_prov _   ErasedProv          = return ErasedProv
 
 
 {-
@@ -2785,7 +2773,6 @@ tyConsOfType ty
      go (CastTy ty co)              = go ty `unionUniqSets` go_co co
      go (CoercionTy co)             = go_co co
 
-     go_co (ErasedCoercion _fv _r lty rty ) =  go lty `unionUniqSets` go rty
      go_co (Refl ty)               = go ty
      go_co (GRefl _ ty mco)        = go ty `unionUniqSets` go_mco mco
      go_co (TyConAppCo _ tc args)  = go_tc tc `unionUniqSets` go_cos args
@@ -2808,6 +2795,7 @@ tyConsOfType ty
      go_mco MRefl    = emptyUniqSet
      go_mco (MCo co) = go_co co
 
+     go_prov ErasedProv          = emptyUniqSet
      go_prov UnsafeCoerceProv    = emptyUniqSet
      go_prov (PhantomProv co)    = go_co co
      go_prov (ProofIrrelProv co) = go_co co
