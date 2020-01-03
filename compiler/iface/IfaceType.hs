@@ -348,7 +348,6 @@ data IfaceCoercion
   | IfaceSubCo        IfaceCoercion
   | IfaceFreeCoVar    CoVar    -- See Note [Free tyvars in IfaceType]
   | IfaceHoleCo       CoVar    -- ^ See Note [Holes in IfaceCoercion]
-  | IfaceErased     [IfLclName] [IfLclName] [Var]  Role IfaceType IfaceType
 
     -- ^ @local tyvars, local covars, open free variables@
     --
@@ -362,6 +361,7 @@ data IfaceUnivCoProv
   | IfacePhantomProv IfaceCoercion
   | IfaceProofIrrelProv IfaceCoercion
   | IfacePluginProv String
+  | IfaceErasedProv
 
 {- Note [Holes in IfaceCoercion]
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
@@ -530,9 +530,10 @@ substIfaceType env ty
     go_co (IfaceKindCo co)           = IfaceKindCo (go_co co)
     go_co (IfaceSubCo co)            = IfaceSubCo (go_co co)
     go_co (IfaceAxiomRuleCo n cos)   = IfaceAxiomRuleCo n (go_cos cos)
-    go_co (IfaceErased as bs cs role lty rty) = IfaceErased as bs cs  role (go lty)  (go rty)
+
     go_cos = map go_co
 
+    go_prov IfaceErasedProv          = IfaceErasedProv
     go_prov IfaceUnsafeCoerceProv    = IfaceUnsafeCoerceProv
     go_prov (IfacePhantomProv co)    = IfacePhantomProv (go_co co)
     go_prov (IfaceProofIrrelProv co) = IfaceProofIrrelProv (go_co co)
@@ -1603,10 +1604,6 @@ ppr_co ctxt_prec (IfaceSubCo co)
   = ppr_special_co ctxt_prec (text "Sub") [co]
 ppr_co ctxt_prec (IfaceKindCo co)
   = ppr_special_co ctxt_prec (text "Kind") [co]
-ppr_co ctxt_prec (IfaceErased as bs cs  role lty rty)
-  = maybeParen ctxt_prec appPrec $
-    text "ErasedCoercion" <+> ppr (as,bs,cs) <+> ppr role <+>
-    pprParendIfaceType lty <+> pprParendIfaceType rty
 ppr_special_co :: PprPrec -> SDoc -> [IfaceCoercion] -> SDoc
 ppr_special_co ctxt_prec doc cos
   = maybeParen ctxt_prec appPrec
@@ -1629,6 +1626,9 @@ pprIfaceUnivCoProv (IfaceProofIrrelProv co)
   = text "irrel" <+> pprParendIfaceCoercion co
 pprIfaceUnivCoProv (IfacePluginProv s)
   = text "plugin" <+> doubleQuotes (text s)
+pprIfaceUnivCoProv IfaceErasedProv
+  = text "Erased"
+
 
 -------------------
 instance Outputable IfaceTyCon where
@@ -1900,15 +1900,6 @@ instance Binary IfaceCoercion where
           putByte bh 17
           put_ bh a
           put_ bh b
-  put_ bh (IfaceErased as bs _nocs r lty rty) = do
-           putByte bh 18
-           put_ bh as
-           put_ bh bs
-           -- no cs because ... we dont?
-           -- would
-           put_ bh r
-           put_ bh lty
-           put_ bh rty
   put_ _ (IfaceFreeCoVar cv)
        = pprPanic "Can't serialise IfaceFreeCoVar" (ppr cv)
   put_ _  (IfaceHoleCo cv)
@@ -1971,13 +1962,7 @@ instance Binary IfaceCoercion where
            17-> do a <- get bh
                    b <- get bh
                    return $ IfaceAxiomRuleCo a b
-           18 -> do
-                  as  <- get bh
-                  bs <- get bh
-                  role <- get bh
-                  lty  <- get bh
-                  rty  <- get bh
-                  return $ IfaceErased as bs [] role lty rty
+
            _ -> panic ("get IfaceCoercion " ++ show tag)
 
 instance Binary IfaceUnivCoProv where
@@ -1991,6 +1976,8 @@ instance Binary IfaceUnivCoProv where
   put_ bh (IfacePluginProv a) = do
           putByte bh 4
           put_ bh a
+  put_ bh (IfaceErasedProv) = do
+          putByte bh 5
 
   get bh = do
       tag <- getByte bh
@@ -2002,6 +1989,7 @@ instance Binary IfaceUnivCoProv where
                    return $ IfaceProofIrrelProv a
            4 -> do a <- get bh
                    return $ IfacePluginProv a
+           5 -> return $ IfaceErasedProv
            _ -> panic ("get IfaceUnivCoProv " ++ show tag)
 
 
@@ -2053,8 +2041,6 @@ instance NFData IfaceCoercion where
     IfaceSubCo f1 -> rnf f1
     IfaceFreeCoVar f1 -> f1 `seq` ()
     IfaceHoleCo f1 -> f1 `seq` ()
-    IfaceErased as bs cs  rl lty rty->  liftRnf rwhnf as `seq` liftRnf rwhnf bs `seq` liftRnf rwhnf cs
-                  `seq` rl `seq`  rnf lty `seq` rnf rty
 
 instance NFData IfaceUnivCoProv where
   rnf x = seq x ()

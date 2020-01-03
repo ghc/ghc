@@ -191,7 +191,7 @@ opt_co4_wrap env sym rep r co
     pprTrace "opt_co4_wrap }" (ppr co $$ text "---" $$ ppr result) $
     result
 -}
-opt_co4 _lc _sym _rp _role e@(ErasedCoercion _ _ _ _) = e
+opt_co4 _lc _sym _rp _role e@(UnivCo ErasedProv _ _ _) = e
 opt_co4 env _   rep r (Refl ty)
   = ASSERT2( r == Nominal, text "Expected role:" <+> ppr r    $$
                            text "Found role:" <+> ppr Nominal $$
@@ -554,6 +554,7 @@ opt_univ env sym prov role oty1 oty2
 
   where
     prov' = case prov of
+      ErasedProv         -> prov
       UnsafeCoerceProv   -> prov
       PhantomProv kco    -> PhantomProv $ opt_co4_wrap env sym False Nominal kco
       ProofIrrelProv kco -> ProofIrrelProv $ opt_co4_wrap env sym False Nominal kco

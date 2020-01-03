@@ -1689,12 +1689,6 @@ lintCoercion :: OutCoercion -> LintM (LintedKind, LintedKind, LintedType, Linted
 
 -- If you edit this function, you may need to update the GHC formalism
 -- See Note [GHC Formalism]
-lintCoercion (ErasedCoercion fvs role lty rty)
-  = do { kl <- lintType lty ;
-         kr <- lintType rty ;
-         mapM_ lintTyCoVarInScope (dVarSetElems fvs);
-         return (kl,kr,lty,rty,role)
-       }
 lintCoercion (Refl ty)
   = do { k <- lintType ty
        ; return (k, k, ty, ty, Nominal) }
@@ -1826,6 +1820,7 @@ lintCoercion co@(UnivCo prov r ty1 ty2)
   = do { k1 <- lintType ty1
        ; k2 <- lintType ty2
        ; case prov of
+           ErasedProv       ->  return ()
            UnsafeCoerceProv -> return ()  -- no extra checks
 
            PhantomProv kco    -> do { lintRole co Phantom r

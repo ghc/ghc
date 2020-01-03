@@ -199,10 +199,6 @@ tidyCo env@(_, subst) co
     go_mco MRefl    = MRefl
     go_mco (MCo co) = MCo (go co)
 
-    -- this is seemingly missing in
-    go (ErasedCoercion fvs  r lty rty )
-      = ErasedCoercion (mapUnionDVarSet (unitDVarSet . substCoVar) (dVarSetElems fvs))
-                       r (tidyType env lty) (tidyType env rty)
     go (Refl ty)             = Refl (tidyType env ty)
     go (GRefl r ty mco)      = GRefl r (tidyType env ty) $! go_mco mco
     go (TyConAppCo r tc cos) = let args = map go cos
@@ -237,6 +233,7 @@ tidyCo env@(_, subst) co
     go_prov (PhantomProv co)    = PhantomProv (go co)
     go_prov (ProofIrrelProv co) = ProofIrrelProv (go co)
     go_prov p@(PluginProv _)    = p
+    go_prov ErasedProv          = ErasedProv
 
 tidyCos :: TidyEnv -> [Coercion] -> [Coercion]
 tidyCos env = map (tidyCo env)

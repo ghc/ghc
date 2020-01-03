@@ -1215,11 +1215,6 @@ tcIfaceCo = go
     go_mco IfaceMRefl    = pure MRefl
     go_mco (IfaceMCo co) = MCo <$> (go co)
 
-    go (IfaceErased tvs cvs _ r ltyi rtyi)
-                                 = do cvs' <- mapM tcIfaceLclId cvs
-                                      tvs' <- mapM tcIfaceTyVar tvs
-                                      ErasedCoercion ( mkDVarSet $! cvs' ++  tvs') r  <$>(tcIfaceType ltyi)
-                                                     <*>(tcIfaceType rtyi)
     go (IfaceReflCo t)           = Refl <$> tcIfaceType t
     go (IfaceGReflCo r t mco)    = GRefl r <$> tcIfaceType t <*> go_mco mco
     go (IfaceFunCo r c1 c2)      = mkFunCo r <$> go c1 <*> go c2
@@ -1252,6 +1247,7 @@ tcIfaceCo = go
     go_var = tcIfaceLclId
 
 tcIfaceUnivCoProv :: IfaceUnivCoProv -> IfL UnivCoProvenance
+tcIfaceUnivCoProv IfaceErasedProv            = return ErasedProv
 tcIfaceUnivCoProv IfaceUnsafeCoerceProv     = return UnsafeCoerceProv
 tcIfaceUnivCoProv (IfacePhantomProv kco)    = PhantomProv <$> tcIfaceCo kco
 tcIfaceUnivCoProv (IfaceProofIrrelProv kco) = ProofIrrelProv <$> tcIfaceCo kco
