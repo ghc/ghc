@@ -323,7 +323,7 @@ which type variables are mentioned in a type.  It only matters
 occasionally -- see the calls to exactTyCoVarsOfType.
 -}
 
-exactTyCoVarsOfType :: Type -> TyCoVarSet
+exactTyCoVarsOfType :: HasCallStack => Type -> TyCoVarSet
 -- Find the free type variables (of any kind)
 -- but *expand* type synonyms.  See Note [Silly type synonym] above.
 exactTyCoVarsOfType ty
@@ -385,7 +385,7 @@ exactTyCoVarsOfTypes tys = mapUnionVarSet exactTyCoVarsOfType tys
 --
 -- Eta-expanded because that makes it run faster (apparently)
 -- See Note [FV eta expansion] in FV for explanation.
-tyCoFVsOfType :: Type -> FV
+tyCoFVsOfType :: HasCallStack => Type -> FV
 -- See Note [Free variables of types]
 tyCoFVsOfType (TyVarTy v)        f bound_vars (acc_list, acc_set)
   | not (f v) = (acc_list, acc_set)
@@ -437,7 +437,7 @@ tyCoVarsOfCosSet cos = tyCoVarsOfCos $ nonDetEltsUFM cos
   -- It's OK to use nonDetEltsUFM here because we immediately forget the
   -- ordering by returning a set
 
-tyCoFVsOfCo :: Coercion -> FV
+tyCoFVsOfCo :: HasCallStack => Coercion -> FV
 -- Extracts type and coercion variables from a coercion
 -- See Note [Free variables of types]
 tyCoFVsOfCo (Refl ty) fv_cand in_scope acc
@@ -473,7 +473,7 @@ tyCoFVsOfCoVar :: CoVar -> FV
 tyCoFVsOfCoVar v fv_cand in_scope acc
   = (unitFV v `unionFV` tyCoFVsOfType (varType v)) fv_cand in_scope acc
 
-tyCoFVsOfProv :: UnivCoProvenance -> FV
+tyCoFVsOfProv :: HasCallStack => UnivCoProvenance -> FV
 tyCoFVsOfProv UnsafeCoerceProv    fv_cand in_scope acc = emptyFV fv_cand in_scope acc
 tyCoFVsOfProv (PhantomProv co)    fv_cand in_scope acc = tyCoFVsOfCo co fv_cand in_scope acc
 tyCoFVsOfProv (ProofIrrelProv co) fv_cand in_scope acc = tyCoFVsOfCo co fv_cand in_scope acc
@@ -525,7 +525,7 @@ coVarsOfCos cos = getCoVarSet (tyCoFVsOfCos cos)
 -- | Given a covar and a coercion, returns True if covar is almost devoid in
 -- the coercion. That is, covar can only appear in Refl and GRefl.
 -- See last wrinkle in Note [Unused coercion variable in ForAllCo] in Coercion
-almostDevoidCoVarOfCo :: CoVar -> Coercion -> Bool
+almostDevoidCoVarOfCo :: HasCallStack => CoVar -> Coercion -> Bool
 almostDevoidCoVarOfCo cv co =
   almost_devoid_co_var_of_co co cv
 

@@ -341,7 +341,7 @@ instance Outputable PmLitValue where
   ppr (PmLitOverString s) = pprHsString s
 
 -- Take care of negated literals
-minuses :: Int -> SDoc -> SDoc
+minuses ::  HasCallStack => Int -> SDoc -> SDoc
 minuses n sdoc = iterate (\sdoc -> parens (char '-' <> sdoc)) sdoc !! n
 
 instance Outputable PmLit where
