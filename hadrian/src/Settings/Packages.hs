@@ -132,6 +132,13 @@ packageArgs = do
           builder (Cabal Flags) ? arg "in-ghc-tree"
 
         ------------------------------- haskeline ------------------------------
+        -- Hadrian doesn't currently support packages containing both libraries
+        -- and executables. This flag disables the latter.
+        , package haskeline ?
+          builder (Cabal Flags) ? arg "-examples"
+        -- Don't depend upon terminfo when cross-compiling to avoid unnecessary
+        -- dependencies.
+        -- TODO: Perhaps the user should rather be responsible for this?
         , package haskeline ?
           builder (Cabal Flags) ? cross ? arg "-terminfo"
 
