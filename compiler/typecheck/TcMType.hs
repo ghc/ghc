@@ -109,6 +109,7 @@ import TcRnMonad        -- TcType, amongst others
 import Constraint
 import TcEvidence
 import Id
+import IdInfo (IdDetails(CoercionHoleId))
 import Name
 import VarSet
 import TysWiredIn
@@ -318,6 +319,11 @@ newImplication
 *                                                                      *
 ************************************************************************
 -}
+
+newCoHoleVar :: TcPredType -> TcRnIf gbl lbl CoVar
+newCoHoleVar ty = do { var <- newEvVar ty
+                     ; return $ setIdDetails var CoercionHoleId
+                     }
 
 newCoercionHole :: TcPredType -> TcM CoercionHole
 newCoercionHole pred_ty

@@ -739,7 +739,7 @@ noFreeVarsOfTypes = all noFreeVarsOfType
 -- | Returns True if this coercion has no free variables. Should be the same as
 -- isEmptyVarSet . tyCoVarsOfCo, but faster in the non-forall case.
 noFreeVarsOfCo :: Coercion -> Bool
-noFreeVarsOfCo (ErasedCoercion fvs r lty rty)=  noFreeVarsOfType lty &&
+noFreeVarsOfCo (ErasedCoercion fvs _r lty rty)=  noFreeVarsOfType lty &&
                                             noFreeVarsOfType rty && isEmptyDVarSet fvs
 noFreeVarsOfCo (Refl ty)              = noFreeVarsOfType ty
 noFreeVarsOfCo (GRefl _ ty co)        = noFreeVarsOfType ty && noFreeVarsOfMCo co

@@ -274,7 +274,9 @@ toIfaceCoercionX fr co
                               | isOpen v  = (a, b, v:c)
                               | isCoVar v = (a, toIfaceCoVar v:b, c)
                               | isTyVar v = (toIfaceTyVar v:a, b, c)
-                              | otherwise = panic "ToIface.toIfaceCoercionX(go_prov): Bad free variable in ZappedProv"
+                              |otherwise = (a,b,c)
+              --  -   | otherwise = panic "ToIface.toIfaceCoercionX(go): Bad free variable in ErasedCoercion"
+              --    TODO FIX ME all the upstream filtering
 
     go (Refl ty)            = IfaceReflCo (toIfaceTypeX fr ty)
     go (GRefl r ty mco)     = IfaceGReflCo r (toIfaceTypeX fr ty) (go_mco mco)

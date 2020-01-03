@@ -217,8 +217,9 @@ pprIdDetails other     = brackets (pp other)
                               = brackets $ text "RecSel" <>
                                            ppWhen is_naughty (text "(naughty)")
    pp CoVarId                 = text "CoVarId"
+   pp CoercionHoleId          = text "CoercionHoleId"
    pp (JoinId arity)          = text "JoinId" <> parens (int arity)
-
+-- fixmeee
 {-
 ************************************************************************
 *                                                                      *
