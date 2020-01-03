@@ -385,25 +385,27 @@ the right names for them:
   only when building the given package, or that the said options should be used
   when building all known packages, if the Hadrian command ever gets them to be
   built;
-- the third slot is the builder, `ghc` or `cc`, to refer to GHC commands or
-  C compiler commands;
-- the final slot is the builder mode, `{c, hs, link, deps, toolargs}`:
+- the remaining slots specify the builder and how it was invoked,
+  
+  * `ghc` refers to GHC commands; the final slot refers to how GHC is invoked:
 
-    * `c` for commands that build C files with GHC
-	* `hs` for commands that compile Haskell modules with GHC
-	* `link` for GHC linking command
-	* `deps` for commands that figure out dependencies between Haskell modules
-	  (with `ghc -M`)
-	* `toolargs` for GHC commands that are used to generate the right ghci
-	  argument for `hadrian/ghci.sh` to work
+    * `c.opts` for commands that build C files with GHC
+	  * `hs.opts` for commands that compile Haskell modules with GHC
+	  * `link.opts` for GHC linking command
+	  * `deps.opts` for commands that figure out dependencies between Haskell modules
+	    (with `ghc -M`)
+	  * `toolargs.opts` for GHC commands that are used to generate the right ghci
+	    argument for `hadrian/ghci.sh` to work
 
-  for GHC and `{c, deps}`:
+  * `cc` refers to C compiler commands
 
-    * `c` for commands that call the C compiler on some C files
-	* `deps` for commands that call the C compiler for figuring out
-	  dependencies between C files
+    * `c.opts` for commands that call the C compiler on some C files
+	  * `deps.opts` for commands that call the C compiler for figuring out
+	    dependencies between C files
 
-  for the C compiler;
+  * `cabal.configure.opts` refers to Cabal configure command line. Note that
+    package flags can be given by adding `--flags=...` arguments.
+
 - using a wildcard (`*`) ranges over all possible values for a given "slot";
 - `=` entirely overrides the arguments for a given builder in a given context,
   with the value specified on the right hand side of `=`, while `+=` merely

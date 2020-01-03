@@ -226,10 +226,17 @@ builderPredicate = builderSetting <&> (\(wstg, wpkg, builderMode) ->
   wildcard (pure True) stage wstg <&&>
   wildcard (pure True) package wpkg <&&>
   (case builderMode of
-     Left ghcMode -> wildcard (builder Ghc) (builder . Ghc) ghcMode
-     Right ccMode -> wildcard (builder Cc) (builder . Cc) ccMode))
+     BM_Ghc ghcMode -> wildcard (builder Ghc) (builder . Ghc) ghcMode
+     BM_Cc  ccMode  -> wildcard (builder Cc) (builder . Cc) ccMode
+     BM_CabalConfigure -> builder (Cabal Setup) )
+  )
 
   where (<&&>) = liftA2 (&&)
+
+-- | Which builder a setting should apply to
+data BuilderMode = BM_Ghc (Wildcard GhcMode)
+                 | BM_Cc  (Wildcard CcMode)
+                 | BM_CabalConfigure
 
 -- | Interpretation-agnostic description of the builder settings
 --   supported by Hadrian.
@@ -238,6 +245,7 @@ builderPredicate = builderSetting <&> (\(wstg, wpkg, builderMode) ->
 --
 --   > (<stage> or *).(<package name> or *).ghc.(<ghc mode> or *).opts
 --   > (<stage> or *).(<package name> or *).cc.(<cc mode> or *).opts
+--   > (<stage> or *).(<package name> or *).cabal.configure.opts
 --
 --   where:
 --     - @<stage>@ is one of @stage0@, @stage1@, @stage2@ or @stage3@;
@@ -255,13 +263,15 @@ builderPredicate = builderSetting <&> (\(wstg, wpkg, builderMode) ->
 --       apply GHC or C compiler options uniformly over all stages, packages
 --       and compiler modes, if we so desire, by using a wildcard in the
 --       appropriate spot.
-builderSetting :: Match f => f (Wildcard Stage, Wildcard Package, Either (Wildcard GhcMode) (Wildcard CcMode))
+builderSetting :: Match f
+               => f (Wildcard Stage, Wildcard Package, BuilderMode)
 builderSetting = (,,)
              <$> wild stages
              <*> wild pkgs
              <*> matchOneOf
-                   [ str "ghc" *> fmap Left (wild ghcBuilder) <* str "opts"
-                   , str "cc" *> fmap Right (wild ccBuilder) <* str "opts"
+                   [ str "ghc" *> fmap BM_Ghc (wild ghcBuilder) <* str "opts"
+                   , str "cc" *> fmap BM_Cc (wild ccBuilder) <* str "opts"
+                   , BM_CabalConfigure <$ str "cabal" <* str "configure" <* str "opts"
                    ]
 
   where ghcBuilder =
