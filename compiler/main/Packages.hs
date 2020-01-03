@@ -1034,22 +1034,22 @@ findWiredInPackages dflags prec_map pkgs vis_map = do
         findWiredInPackage :: [PackageConfig] -> WiredInUnitId
                            -> IO (Maybe (WiredInUnitId, PackageConfig))
         findWiredInPackage pkgs wired_pkg =
-           let all_ps = [ p | p <- pkgs, p `matches` wired_pkg ]
+           let all_ps = [ trace "CCCCCXXX ######" p | p <- pkgs, trace "CCCCC ######" (p `matches` wired_pkg) ]
                all_exposed_ps =
-                    [ p | p <- all_ps
-                        , Map.member (packageConfigId p) vis_map ] in
-           case all_exposed_ps of
+                    [ trace "EEEEEE ######" p | p <- all_ps
+                        , Map.member (trace "DDDDDD ######" packageConfigId p) vis_map ] in
+           case trace "all_exposed_ps" all_exposed_ps of
             [] -> case all_ps of
                        []   -> notfound
-                       many -> pick (head (sortByPreference prec_map many))
-            many -> pick (head (sortByPreference prec_map many))
+                       many -> trace "BBBB ######" pick (head (sortByPreference prec_map many))
+            many -> trace "AAAA ######" pick (head (sortByPreference prec_map many))
           where
                 notfound = do
                           debugTraceMsg dflags 2 $
                             text "wired-in package "
                                  <> text wired_pkg
                                  <> text " not found."
-                          return Nothing
+                          return (trace "CULPRIT?" Nothing)
                 pick :: PackageConfig
                      -> IO (Maybe (WiredInUnitId, PackageConfig))
                 pick pkg = do
@@ -1058,12 +1058,12 @@ findWiredInPackages dflags prec_map pkgs vis_map = do
                                  <> text wired_pkg
                                  <> text " mapped to "
                                  <> ppr (unitId pkg)
-                        return (Just (wired_pkg, pkg))
+                        trace "pick ######" return (Just (wired_pkg, pkg))
 
 
-  mb_wired_in_pkgs <- mapM (findWiredInPackage pkgs) wired_in_pkgids
+  mb_wired_in_pkgs <- trace "mb_wired_in_pkgs ######" mapM (trace "findWiredInPackage ######" findWiredInPackage pkgs) wired_in_pkgids
   let
-        wired_in_pkgs = catMaybes mb_wired_in_pkgs
+        wired_in_pkgs = trace "catMaybes ######" catMaybes mb_wired_in_pkgs
 
         -- this is old: we used to assume that if there were
         -- multiple versions of wired-in packages installed that
@@ -1079,7 +1079,7 @@ findWiredInPackages dflags prec_map pkgs vis_map = do
         -}
 
         wiredInMap :: Map WiredUnitId WiredUnitId
-        wiredInMap = Map.fromList
+        wiredInMap = trace "wiredInMap ######" Map.fromList
           [ (key, DefUnitId (stringToInstalledUnitId wiredInUnitId))
           | (wiredInUnitId, pkg) <- wired_in_pkgs
           , Just key <- pure $ definitePackageConfigId pkg
@@ -1087,8 +1087,8 @@ findWiredInPackages dflags prec_map pkgs vis_map = do
 
         updateWiredInDependencies pkgs = map (upd_deps . upd_pkg) pkgs
           where upd_pkg pkg
-                  | Just def_uid <- definitePackageConfigId pkg
-                  , Just wiredInUnitId <- Map.lookup def_uid wiredInMap
+                  | Just def_uid <- trace "def_uid ######" definitePackageConfigId pkg
+                  , Just wiredInUnitId <- trace "wiredInUnitId ######" Map.lookup def_uid wiredInMap
                   = let fs = installedUnitIdFS (unDefUnitId wiredInUnitId)
                     in pkg {
                       unitId = fsToInstalledUnitId fs,
@@ -1105,7 +1105,7 @@ findWiredInPackages dflags prec_map pkgs vis_map = do
                     }
 
 
-  return (updateWiredInDependencies pkgs, wiredInMap)
+  trace "OUT ######" return (updateWiredInDependencies pkgs, wiredInMap)
 
 -- Helper functions for rewiring Module and UnitId.  These
 -- rewrite UnitIds of modules in wired-in packages to the form known to the
@@ -1456,16 +1456,16 @@ mkPackageState dflags dbs preload0 = do
 
   -- Now that we've merged everything together, prune out unusable
   -- packages.
-  let (pkg_map2, unusable, sccs) = validateDatabase dflags pkg_map1
+  let (pkg_map2, unusable, sccs) = trace "validateDatabase ######" validateDatabase dflags pkg_map1
 
-  reportCycles dflags sccs
-  reportUnusable dflags unusable
+  trace "reportCycles ######" reportCycles dflags sccs
+  trace "reportUnusable ######" reportUnusable dflags unusable
 
   -- Apply trust flags (these flags apply regardless of whether
   -- or not packages are visible or not)
   pkgs1 <- foldM (applyTrustFlag dflags prec_map unusable)
                  (Map.elems pkg_map2) (reverse (trustFlags dflags))
-  let prelim_pkg_db = extendPackageConfigMap emptyPackageConfigMap pkgs1
+  let prelim_pkg_db = trace "extendPackageConfigMap ######" extendPackageConfigMap emptyPackageConfigMap pkgs1
 
   --
   -- Calculate the initial set of units from package databases, prior to any package flags.
@@ -1521,7 +1521,7 @@ mkPackageState dflags dbs preload0 = do
   -- -hide-package).  This needs to know about the unusable packages, since if a
   -- user tries to enable an unusable package, we should let them know.
   --
-  vis_map2 <- foldM (applyPackageFlag dflags prec_map prelim_pkg_db unusable
+  vis_map2 <- trace "vis_map2 ######" foldM (applyPackageFlag dflags prec_map prelim_pkg_db unusable
                         (gopt Opt_HideAllPackages dflags) pkgs1)
                             vis_map1 other_flags
 
@@ -1530,11 +1530,15 @@ mkPackageState dflags dbs preload0 = do
   -- it modifies the unit ids of wired in packages, but when we process
   -- package arguments we need to key against the old versions.
   --
-  (pkgs2, wired_map) <- findWiredInPackages dflags prec_map pkgs1 vis_map2
-  let pkg_db = extendPackageConfigMap emptyPackageConfigMap pkgs2
+  () <- trace "before findWiredInPackages ######" pure ()
+  (pkgs2, wired_map) <- trace "findWiredInPackages ######" findWiredInPackages dflags prec_map pkgs1 vis_map2
+
+  () <- trace "before extendPackageConfigMap ######" pure ()
+  let pkg_db = trace "extendPackageConfigMap ######" extendPackageConfigMap emptyPackageConfigMap pkgs2
+  () <- trace "after extendPackageConfigMap ######" pure ()
 
   -- Update the visibility map, so we treat wired packages as visible.
-  let vis_map = updateVisibilityMap wired_map vis_map2
+  let vis_map = trace "updateVisibilityMap ######" updateVisibilityMap wired_map vis_map2
 
   let hide_plugin_pkgs = gopt Opt_HideAllPluginPackages dflags
   plugin_vis_map <-
@@ -1573,7 +1577,7 @@ mkPackageState dflags dbs preload0 = do
   -- NB: preload IS important even for type-checking, because we
   -- need the correct include path to be set.
   --
-  let preload1 = Map.keys (Map.filter uv_explicit vis_map)
+  let preload1 = trace "preload1 ######" Map.keys (Map.filter uv_explicit vis_map)
 
   let pkgname_map = foldl' add Map.empty pkgs2
         where add pn_map p
@@ -1608,7 +1612,7 @@ mkPackageState dflags dbs preload0 = do
                         $ (basicLinkedPackages ++ preload2)
 
   -- Close the preload packages with their dependencies
-  dep_preload <- closeDeps dflags pkg_db (zip (map toInstalledUnitId preload3) (repeat Nothing))
+  dep_preload <- trace "closeDeps ######" closeDeps dflags pkg_db (zip (map toInstalledUnitId preload3) (repeat Nothing))
   let new_dep_preload = filter (`notElem` preload0) dep_preload
 
   let mod_map1 = mkModuleToPkgConfAll dflags pkg_db vis_map
@@ -1631,7 +1635,7 @@ mkPackageState dflags dbs preload0 = do
     requirementContext = req_ctx
     }
   let new_insts = fmap (map (fmap (upd_wired_in_mod wired_map))) (thisUnitIdInsts_ dflags)
-  return (pstate, new_dep_preload, new_insts)
+  trace "return ######" return (pstate, new_dep_preload, new_insts)
 
 -- | Given a wired-in 'UnitId', "unwire" it into the 'UnitId'
 -- that it was recorded as in the package database.

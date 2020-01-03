@@ -96,7 +96,7 @@ preprocess :: HscEnv
            -> Maybe Phase -- ^ starting phase
            -> IO (Either ErrorMessages (DynFlags, FilePath))
 preprocess hsc_env input_fn mb_input_buf mb_phase =
-  handleSourceError (\err -> return (Left (srcErrorMessages err))) $
+  trace "preprocess ######" handleSourceError (\err -> return (Left (srcErrorMessages err))) $
   ghandle handler $
   fmap Right $ do
   MASSERT2(isJust mb_phase || isHaskellSrcFilename input_fn, text input_fn)
@@ -533,7 +533,7 @@ findHSLib dflags dirs lib = do
 
 oneShot :: HscEnv -> Phase -> [(String, Maybe Phase)] -> IO ()
 oneShot hsc_env stop_phase srcs = do
-  o_files <- mapM (compileFile hsc_env stop_phase) srcs
+  o_files <- trace "oneShot ######" mapM (compileFile hsc_env stop_phase) srcs
   doLink (hsc_dflags hsc_env) stop_phase o_files
 
 compileFile :: HscEnv -> Phase -> (FilePath, Maybe Phase) -> IO FilePath
