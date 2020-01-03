@@ -3,7 +3,6 @@ module CoreEraseCoercionProofs (eraseCoercionProgram,coreProgramEraseCoercionPro
 import GhcPrelude
 
 import CoreSyn
-import Pair
 import HscTypes         ( ModGuts(..) )
 import Coercion
 import CoreMonad        ( CoreM )
