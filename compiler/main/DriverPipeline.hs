@@ -1250,7 +1250,7 @@ runPhase (RealPhase cc_phase) input_fn dflags
 
         -- pass -D or -optP to preprocessor when compiling foreign C files
         -- (#16737). Doing it in this way is simpler and also enable the C
-        -- compiler to performs preprocessing and parsing in a single pass,
+        -- compiler to perform preprocessing and parsing in a single pass,
         -- but it may introduce inconsistency if a different pgm_P is specified.
         let more_preprocessor_opts = concat
               [ ["-Xpreprocessor", i]
