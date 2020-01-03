@@ -76,7 +76,7 @@ import Control.Monad
 ************************************************************************
 -}
 
-synonymTyConsOfType :: Type -> [TyCon]
+synonymTyConsOfType :: HasCallStack => Type -> [TyCon]
 -- Does not look through type synonyms at all
 -- Return a list of synonym tycons
 -- Keep this synchronized with 'expandTypeSynonyms'

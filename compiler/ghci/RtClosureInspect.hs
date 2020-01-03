@@ -816,7 +816,7 @@ cvObtainTerm hsc_env max_depth force old_ty hval = runTR hsc_env $ do
       worker ct ty hval n | isFunTy ty = Suspension ct (dictsView ty) hval n
                           | otherwise  = Suspension ct ty hval n
 
-extractSubTerms :: (Type -> ForeignHValue -> TcM Term)
+extractSubTerms :: HasCallStack => (Type -> ForeignHValue -> TcM Term)
                 -> GenClosure ForeignHValue -> [Type] -> TcM [Term]
 extractSubTerms recurse clos = liftM thdOf3 . go 0 0
   where

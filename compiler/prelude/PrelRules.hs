@@ -2132,7 +2132,7 @@ tx_con_tte _      alt@(LitAlt {}) = pprPanic "caseRules" (ppr alt)
 tx_con_tte dflags (DataAlt dc)  -- See Note [caseRules for tagToEnum]
   = Just $ LitAlt $ mkLitInt dflags $ toInteger $ dataConTagZ dc
 
-tx_con_dtt :: Type -> AltCon -> Maybe AltCon
+tx_con_dtt :: HasCallStack => Type -> AltCon -> Maybe AltCon
 tx_con_dtt _  DEFAULT = Just DEFAULT
 tx_con_dtt ty (LitAlt (LitNumber LitNumInt i _))
    | tag >= 0

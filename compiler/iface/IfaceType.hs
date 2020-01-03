@@ -492,7 +492,7 @@ inDomIfaceTySubst :: IfaceTySubst -> IfaceTvBndr -> Bool
 -- See Note [Substitution on IfaceType]
 inDomIfaceTySubst subst (fs, _) = isJust (lookupFsEnv subst fs)
 
-substIfaceType :: IfaceTySubst -> IfaceType -> IfaceType
+substIfaceType :: HasCallStack => IfaceTySubst -> IfaceType -> IfaceType
 -- See Note [Substitution on IfaceType]
 substIfaceType env ty
   = go ty

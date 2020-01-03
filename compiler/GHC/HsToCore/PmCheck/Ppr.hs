@@ -199,7 +199,7 @@ data PmExprList
 --   ending in a wildcard variable x (of list type). Should be pretty-printed as
 --   (1:2:_).
 -- * @pmExprAsList [] == Just ('NilTerminated' [])@
-pmExprAsList :: Delta -> PmAltCon -> [Id] -> Maybe PmExprList
+pmExprAsList :: HasCallStack => Delta -> PmAltCon -> [Id] -> Maybe PmExprList
 pmExprAsList delta = go_con []
   where
     go_var rev_pref x

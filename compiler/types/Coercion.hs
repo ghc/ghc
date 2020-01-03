@@ -714,7 +714,7 @@ mkFunCo r co1 co2
 -- | Apply a 'Coercion' to another 'Coercion'.
 -- The second coercion must be Nominal, unless the first is Phantom.
 -- If the first is Phantom, then the second can be either Phantom or Nominal.
-mkAppCo :: Coercion     -- ^ :: t1 ~r t2
+mkAppCo :: HasCallStack => Coercion     -- ^ :: t1 ~r t2
         -> Coercion     -- ^ :: s1 ~N s2, where s1 :: k1, s2 :: k2
         -> Coercion     -- ^ :: t1 s1 ~r t2 s2
 mkAppCo co arg
@@ -981,7 +981,7 @@ mkSymCo co                        = SymCo co
 
 -- | Create a new 'Coercion' by composing the two given 'Coercion's transitively.
 --   (co1 ; co2)
-mkTransCo :: Coercion -> Coercion -> Coercion
+mkTransCo :: HasCallStack => Coercion -> Coercion -> Coercion
 mkTransCo co1 co2 | isReflCo co1 = co2
                   | isReflCo co2 = co1
 mkTransCo (GRefl r t1 (MCo co1)) (GRefl _ _ (MCo co2))
@@ -997,18 +997,18 @@ mkTransCo (GRefl r t1 (MCo co1)) (GRefl _ _ (MCo co2))
 mkTransCo co1 co2                 = TransCo co1 co2
 
 
-isErasedCoercion_maybe :: Coercion -> Maybe (Role,Type,Type)
+isErasedCoercion_maybe :: HasCallStack => Coercion -> Maybe (Role,Type,Type)
 isErasedCoercion_maybe (UnivCo ErasedProv r lt rt) = Just (r,lt,rt)
 isErasedCoercion_maybe _ = Nothing
 
-isErasedCoercion :: Coercion -> Bool
+isErasedCoercion ::HasCallStack => Coercion -> Bool
 isErasedCoercion c = case isErasedCoercion_maybe c of
                       Just _ -> True ; Nothing -> False
 
 -- shamelessly copied from Ben Gamari's version of this code
 -- | Make a Erased coercion if building of coercions is disabled, otherwise
 -- return the given un-erased coercion.
-mkErasedCoercion :: HasDebugCallStack
+mkErasedCoercion :: HasCallStack
                  => DynFlags
                  -> Coercion  -- ^ the un-Erased coercion
                  -> Pair Type -- ^ the kind of the coercion
@@ -1046,17 +1046,18 @@ mkErasedCoercion dflags co (Pair ty1 ty2) role fvs
         ]
 
 -- | Replace a coercion with a erased coercion unless coercions are needed.
-eraseCoercion :: DynFlags -> Coercion -> Coercion
+eraseCoercion :: HasCallStack => DynFlags -> Coercion -> Coercion
 eraseCoercion _ co@(UnivCo ErasedProv _ _ _ ) = co  -- already zapped
 eraseCoercion _ co@(Refl _) = co  -- Refl is smaller than zapped coercions
 eraseCoercion _ co@(GRefl _r _ty MRefl ) = co
+eraseCoercion _ c | Just (t,r)<-  isReflexiveCo_maybe c = mkReflCo r t
 eraseCoercion dflags co =
     mkErasedCoercion dflags co (Pair t1 t2) role fvs
   where
     (Pair t1 t2, role) = coercionKindRole co
     fvs = filterDVarSet (not . isCoercionHole) $ tyCoVarsOfCoDSet co
 
-alwaysMkErasedCoercion :: HasDebugCallStack
+alwaysMkErasedCoercion :: HasCallStack
                  => Coercion  -- ^ the un-Erased coercion
                  -> Pair Type -- ^ the kind of the coercion
                  -> Role      -- ^ the role of the coercion
@@ -1092,10 +1093,11 @@ alwaysMkErasedCoercion co (Pair ty1 ty2) role _fvs
         ]
 
 
-forcedEraseCoercion ::  HasDebugCallStack => Coercion -> Coercion
+forcedEraseCoercion ::  HasCallStack  => Coercion -> Coercion
 forcedEraseCoercion co@(UnivCo ErasedProv _ _ _ ) = co  -- already erased/zapped
 forcedEraseCoercion co@(Refl _) = co  -- Refl is smaller than erased coercions
 forcedEraseCoercion co@(GRefl _r _ty MRefl ) = co
+forcedEraseCoercion co | Just (t,r)<-  isReflexiveCo_maybe co = mkReflCo r t
 forcedEraseCoercion co =
     alwaysMkErasedCoercion  co (Pair t1 t2) role fvs
   where
@@ -1108,7 +1110,7 @@ mkTransMCo MRefl     co2       = co2
 mkTransMCo co1       MRefl     = co1
 mkTransMCo (MCo co1) (MCo co2) = MCo (mkTransCo co1 co2)
 
-mkNthCo :: HasDebugCallStack
+mkNthCo :: HasCallStack
         => Role  -- The role of the coercion you're creating
         -> Int   -- Zero-indexed
         -> Coercion
@@ -1327,7 +1329,7 @@ mkSubCo co = ASSERT2( coercionRole co == Nominal, ppr co <+> ppr (coercionRole c
              SubCo co
 
 -- | Changes a role, but only a downgrade. See Note [Role twiddling functions]
-downgradeRole_maybe :: Role   -- ^ desired role
+downgradeRole_maybe :: HasCallStack => Role   -- ^ desired role
                     -> Role   -- ^ current role
                     -> Coercion -> Maybe Coercion
 -- In (downgradeRole_maybe dr cr co) it's a precondition that
@@ -1380,7 +1382,7 @@ mkProofIrrelCo r kco        g1 g2 = mkUnivCo (ProofIrrelProv kco) r
 
 -- | Converts a coercion to be nominal, if possible.
 -- See Note [Role twiddling functions]
-setNominalRole_maybe :: Role -- of input coercion
+setNominalRole_maybe ::HasCallStack => Role -- of input coercion
                      -> Coercion -> Maybe Coercion
 setNominalRole_maybe r co
   | r == Nominal = Just co
@@ -1416,6 +1418,7 @@ setNominalRole_maybe r co
                      PhantomProv _    -> False  -- should always be phantom
                      ProofIrrelProv _ -> True   -- it's always safe
                      PluginProv _     -> False  -- who knows? This choice is conservative.
+                     ErasedProv -> False -- conservatively say no
       = Just $ UnivCo prov Nominal co1 co2
     setNominalRole_maybe_helper _ = Nothing
 
@@ -1468,7 +1471,7 @@ ltRole Nominal          _       = True
 
 -- | like mkKindCo, but aggressively & recursively optimizes to avoid using
 -- a KindCo constructor. The output role is nominal.
-promoteCoercion :: Coercion -> CoercionN
+promoteCoercion :: HasCallStack => Coercion -> CoercionN
 
 -- First cases handles anything that should yield refl.
 promoteCoercion co = case co of
@@ -2281,7 +2284,7 @@ seqProv UnsafeCoerceProv    = ()
 seqProv (PhantomProv co)    = seqCo co
 seqProv (ProofIrrelProv co) = seqCo co
 seqProv (PluginProv _)      = ()
-seqPov  ErasedProv          = ()
+seqProv  ErasedProv          = ()
 
 seqCos :: [Coercion] -> ()
 seqCos []       = ()

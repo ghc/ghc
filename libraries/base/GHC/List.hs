@@ -917,10 +917,10 @@ concat = foldr (++) []
 -- | List index (subscript) operator, starting from 0.
 -- It is an instance of the more general 'Data.List.genericIndex',
 -- which takes an index of any integral type.
-(!!)                    :: [a] -> Int -> a
+(!!)                    :: HasCallStack => [a] -> Int -> a
 #if defined(USE_REPORT_PRELUDE)
-xs     !! n | n < 0 =  errorWithoutStackTrace "Prelude.!!: negative index"
-[]     !! _         =  errorWithoutStackTrace "Prelude.!!: index too large"
+xs     !! n | n < 0 =  error "Prelude.!!: negative index"
+[]     !! _         =  error "Prelude.!!: index too large"
 (x:_)  !! 0         =  x
 (_:xs) !! n         =  xs !! (n-1)
 #else
