@@ -1,5 +1,5 @@
 :! cp A1.hs A.hs
-import Data.List
+import Data.List (nub)
 :load A
 -- Data.List should still be in scope:
 :t nub

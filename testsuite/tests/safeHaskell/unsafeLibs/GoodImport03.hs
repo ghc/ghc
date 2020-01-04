@@ -46,7 +46,7 @@ import Data.Functor
 import Data.IORef
 import Data.Int
 import Data.Ix
-import Data.List
+import Data.List ()  -- -Wno-compat-unqualified-imports
 import Data.Maybe
 import Data.Monoid
 import Data.Ord

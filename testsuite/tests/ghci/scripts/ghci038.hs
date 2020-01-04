@@ -1,3 +1,3 @@
 module Foo where
-import Data.List
+import Data.List (map)
 x = map
