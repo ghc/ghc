@@ -54,7 +54,7 @@ import IfaceEnv( externaliseName )
 import TcHsType
 import TcValidity( checkValidType )
 import TcMatches
-import Inst( deeplyInstantiate )
+import Inst( topInstantiate )
 import TcUnify( checkConstraints )
 import RnTypes
 import RnExpr
@@ -2377,7 +2377,7 @@ tcRnExpr hsc_env mode rdr_expr
              pushTcLevelM          $
              do { (_tc_expr, expr_ty) <- tcInferSigma rn_expr
                 ; if inst
-                  then snd <$> deeplyInstantiate orig expr_ty
+                  then snd <$> topInstantiate orig expr_ty
                   else return expr_ty } ;
 
     -- Generalise

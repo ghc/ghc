@@ -22,8 +22,9 @@ module TcMatches ( tcMatchesFun, tcGRHS, tcGRHSsPat, tcMatchesCase, tcMatchLambd
 
 import GhcPrelude
 
-import {-# SOURCE #-}   TcExpr( tcSyntaxOp, tcInferRhoNC, tcInferRho
-                              , tcCheckId, tcMonoExpr, tcMonoExprNC, tcPolyExpr )
+import {-# SOURCE #-}   TcExpr( tcSyntaxOp, tcInferRho, tcInferRhoNC
+                              , tcCheckId, tcMonoExpr, tcMonoExprNC
+                              , tcPolyExpr, tcPolyExprExpected )
 
 import BasicTypes (LexicalFixity(..))
 import GHC.Hs
@@ -87,15 +88,10 @@ tcMatchesFun fn@(L _ fun_name) matches exp_ty
           traceTc "tcMatchesFun" (ppr fun_name $$ ppr exp_ty)
         ; checkArgs fun_name matches
 
-        ; (wrap_gen, (wrap_fun, group))
-            <- tcSkolemiseET (FunSigCtxt fun_name True) exp_ty $ \ exp_rho ->
-                  -- Note [Polymorphic expected type for tcMatchesFun]
-               do { (matches', wrap_fun)
-                       <- matchExpectedFunTys herald arity exp_rho $
-                          \ pat_tys rhs_ty ->
-                          tcMatches match_ctxt pat_tys rhs_ty matches
-                  ; return (wrap_fun, matches') }
-        ; return (wrap_gen <.> wrap_fun, group) }
+        ; (groups, wrap) <- matchExpectedFunTys herald (FunSigCtxt fun_name True) arity exp_ty $
+            \ pat_tys rhs_ty -> 
+            tcMatches match_ctxt pat_tys rhs_ty matches
+        ; return (wrap, groups) }
   where
     arity = matchGroupArity matches
     herald = text "The equation(s) for"
@@ -132,7 +128,7 @@ tcMatchLambda :: SDoc -- see Note [Herald for matchExpectedFunTys] in TcUnify
               -> ExpRhoType   -- deeply skolemised
               -> TcM (MatchGroup GhcTcId (LHsExpr GhcTcId), HsWrapper)
 tcMatchLambda herald match_ctxt match res_ty
-  = matchExpectedFunTys herald n_pats res_ty $ \ pat_tys rhs_ty ->
+  = matchExpectedFunTys herald GenSigCtxt n_pats res_ty $ \ pat_tys rhs_ty ->
     tcMatches match_ctxt pat_tys rhs_ty match
   where
     n_pats | isEmptyMatchGroup match = 1   -- must be lambda-case
@@ -318,10 +314,10 @@ tcDoStmts MonadComp (L l stmts) res_ty
 
 tcDoStmts ctxt _ _ = pprPanic "tcDoStmts" (pprStmtContext ctxt)
 
-tcBody :: LHsExpr GhcRn -> ExpRhoType -> TcM (LHsExpr GhcTcId)
+tcBody :: LHsExpr GhcRn -> ExpSigmaType -> TcM (LHsExpr GhcTcId)
 tcBody body res_ty
   = do  { traceTc "tcBody" (ppr res_ty)
-        ; tcMonoExpr body res_ty
+        ; tcPolyExprExpected body res_ty
         }
 
 {-

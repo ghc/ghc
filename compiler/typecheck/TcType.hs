@@ -69,6 +69,7 @@ module TcType (
   tcRepGetNumAppTys,
   tcGetCastedTyVar_maybe, tcGetTyVar_maybe, tcGetTyVar, nextRole,
   tcSplitSigmaTy, tcSplitNestedSigmaTys, tcDeepSplitSigmaTy_maybe,
+  tcIsGuardingTyCon, tcIsGuardedType,
 
   ---------------------------------
   -- Predicates.
@@ -78,7 +79,7 @@ module TcType (
   isSigmaTy, isRhoTy, isRhoExpTy, isOverloadedTy,
   isFloatingTy, isDoubleTy, isFloatTy, isIntTy, isWordTy, isStringTy,
   isIntegerTy, isBoolTy, isUnitTy, isCharTy, isCallStackTy, isCallStackPred,
-  hasIPPred, isTauTy, isTauTyCon, tcIsTyVarTy, tcIsForAllTy,
+  hasIPPred, isTauTy, isTauTyCon, isFullyMonoTauTy, tcIsTyVarTy, tcIsForAllTy,
   isPredTy, isTyVarClassPred, isTyVarHead, isInsolubleOccursCheck,
   checkValidClsArgs, hasTyVarHead,
   isRigidTy, isAlmostFunctionFree,
@@ -1290,6 +1291,16 @@ tcSplitTyConApp :: Type -> (TyCon, [Type])
 tcSplitTyConApp ty = case tcSplitTyConApp_maybe ty of
                         Just stuff -> stuff
                         Nothing    -> pprPanic "tcSplitTyConApp" (pprType ty)
+
+tcIsGuardingTyCon :: TyCon -> Bool
+tcIsGuardingTyCon tc = not (isFunTyCon tc) && isInjectiveTyCon tc Nominal
+
+tcIsGuardedType :: Type -> Bool
+tcIsGuardedType ty
+  | Just (tc, _) <- tcSplitTyConApp_maybe ty
+  = tcIsGuardingTyCon tc
+  | otherwise
+  = False
 
 -----------------------
 tcSplitFunTys :: Type -> ([Type], Type)

@@ -10,8 +10,8 @@ The @Inst@ type: dictionaries or method instances
 {-# LANGUAGE FlexibleContexts #-}
 
 module Inst (
-       deeplySkolemise,
-       topInstantiate, topInstantiateInferred, deeplyInstantiate,
+       topSkolemise, -- deeplySkolemise,
+       topInstantiate, topInstantiateInferred, -- deeplyInstantiate,
        instCall, instDFunType, instStupidTheta, instTyVarsWith,
        newWanted, newWanteds,
 
@@ -38,7 +38,7 @@ import {-# SOURCE #-}   TcExpr( tcPolyExpr, tcSyntaxOp )
 import {-# SOURCE #-}   TcUnify( unifyType, unifyKind )
 
 import BasicTypes ( IntegralLit(..), SourceText(..) )
-import FastString
+-- import FastString
 import GHC.Hs
 import TcHsSyn
 import TcRnMonad
@@ -143,6 +143,7 @@ ToDo: this eta-abstraction plays fast and loose with termination,
       fix this
 -}
 
+{-
 deeplySkolemise :: TcSigmaType
                 -> TcM ( HsWrapper
                        , [(Name,TyVar)]     -- All skolemised variables
@@ -170,6 +171,44 @@ deeplySkolemise ty
                     , tv_prs1  ++ tvs_prs2
                     , ev_vars1 ++ ev_vars2
                     , mkVisFunTys arg_tys' rho ) }
+
+      | otherwise
+      = return (idHsWrapper, [], [], substTy subst ty)
+        -- substTy is a quick no-op on an empty substitution
+-}
+
+topSkolemise :: TcSigmaType
+             -> TcM ( HsWrapper
+                    , [(Name,TyVar)]     -- All skolemised variables
+                    , [EvVar]            -- All "given"s
+                    , TcRhoType )
+
+topSkolemise ty
+  = go init_subst ty
+  where
+    init_subst = mkEmptyTCvSubst (mkInScopeSet (tyCoVarsOfType ty))
+
+    go subst ty
+      | Just ty' <- tcView ty
+      = go subst ty'
+
+    go subst ty
+      | (tvs, theta, ty') <- tcSplitSigmaTy ty
+      , not (null tvs && null theta)
+      = do { -- let arg_tys' = substTys subst arg_tys
+             -- ; ids1           <- newSysLocalIds (fsLit "dk") arg_tys'
+             (subst', tvs1) <- tcInstSkolTyVarsX subst tvs
+           ; ev_vars1       <- newEvVars (substTheta subst' theta)
+           ; (wrap, tvs_prs2, ev_vars2, rho) <- go subst' ty'
+           ; let tv_prs1 = map tyVarName tvs `zip` tvs1
+           ; return ( -- mkWpLams ids1
+                      mkWpTyLams tvs1
+                      <.> mkWpLams ev_vars1
+                      <.> wrap
+                      -- <.> mkWpEvVarApps ids1
+                    , tv_prs1  ++ tvs_prs2
+                    , ev_vars1 ++ ev_vars2
+                    , rho ) }
 
       | otherwise
       = return (idHsWrapper, [], [], substTy subst ty)
@@ -241,6 +280,7 @@ top_instantiate inst_all orig ty
       | inst_all  = True
       | otherwise = binderArgFlag bndr == Inferred
 
+{-
 deeplyInstantiate :: CtOrigin -> TcSigmaType -> TcM (HsWrapper, TcRhoType)
 --   Int -> forall a. a -> a  ==>  (\x:Int. [] x alpha) :: Int -> alpha
 -- In general if
@@ -293,7 +333,7 @@ deeply_instantiate orig subst ty
                        , text "new type:" <+> ppr ty'
                        , text "subst:"    <+> ppr subst ])
       ; return (idHsWrapper, ty') }
-
+-}
 
 instTyVarsWith :: CtOrigin -> [TyVar] -> [TcType] -> TcM TCvSubst
 -- Use this when you want to instantiate (forall a b c. ty) with

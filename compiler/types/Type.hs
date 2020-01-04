@@ -106,7 +106,7 @@ module Type (
         isTyVarTy, isFunTy, isCoercionTy,
         isCoercionTy_maybe, isForAllTy,
         isForAllTy_ty, isForAllTy_co,
-        isPiTy, isTauTy, isFamFreeTy,
+        isPiTy, isTauTy, isFullyMonoTauTy, isFamFreeTy,
         isCoVarType,
 
         isValidJoinPointType,
@@ -1818,6 +1818,19 @@ isTauTy (FunTy _ a b)         = isTauTy a && isTauTy b
 isTauTy (ForAllTy {})         = False
 isTauTy (CastTy ty _)         = isTauTy ty
 isTauTy (CoercionTy _)        = False  -- Not sure about this
+
+-- @isTauTy@ tests if a type has no foralls or =>
+isFullyMonoTauTy :: Type -> Bool
+isFullyMonoTauTy ty | Just ty' <- coreView ty = isTauTy ty'
+isFullyMonoTauTy (TyVarTy _)          = True
+isFullyMonoTauTy (LitTy {})           = True
+isFullyMonoTauTy (TyConApp tc tys)    = all isFullyMonoTauTy tys && isTauTyCon tc
+isFullyMonoTauTy (AppTy a b)          = isFullyMonoTauTy a && isFullyMonoTauTy b
+isFullyMonoTauTy (FunTy InvisArg _ _) = False
+isFullyMonoTauTy (FunTy _ a b)        = isFullyMonoTauTy a && isFullyMonoTauTy b
+isFullyMonoTauTy (ForAllTy {})        = False
+isFullyMonoTauTy (CastTy ty _)        = isFullyMonoTauTy ty
+isFullyMonoTauTy (CoercionTy _)       = True
 
 {-
 %************************************************************************

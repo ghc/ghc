@@ -12,15 +12,17 @@ Type subsumption and unification
 module TcUnify (
   -- Full-blown subsumption
   tcWrapResult, tcWrapResultO, tcSkolemise, tcSkolemiseET,
-  tcSubTypeHR, tcSubTypeO, tcSubType_NC, tcSubTypeDS,
-  tcSubTypeDS_NC_O, tcSubTypeET,
+  tcSubType, tcSubType_NC, tcSubTypeET, tcSubType_NC_O,
+  tcSubTypeHR, tcSubTypeO,
+  -- tcSubTypeDS, tcSubTypeDS_NC_O, 
   checkConstraints, checkTvConstraints,
   buildImplicationFor, emitResidualTvConstraint,
 
   -- Various unifications
-  unifyType, unifyKind,
+  unifyType, unifyTypeImpredicatively, unifyKind, uQuickLookTryFillPoly,
   uType, promoteTcType,
   swapOverTyVars, canSolveByUnification,
+  tcQuickLookUnify,
 
   --------------------------------
   -- Holes
@@ -67,6 +69,7 @@ import Bag
 import Util
 import qualified GHC.LanguageExtensions as LangExt
 import Outputable
+import Unify( tcPartialUnifyTyKis, BindFlag(..) )
 
 import Data.Maybe( isNothing )
 import Control.Monad
@@ -137,8 +140,10 @@ passed in.
 -}
 
 -- Use this one when you have an "expected" type.
+-- This function skolemises at each polytype.
 matchExpectedFunTys :: forall a.
                        SDoc   -- See Note [Herald for matchExpectedFunTys]
+                    -> UserTypeCtxt
                     -> Arity
                     -> ExpRhoType  -- deeply skolemised
                     -> ([ExpSigmaType] -> ExpRhoType -> TcM a)
@@ -147,17 +152,24 @@ matchExpectedFunTys :: forall a.
 -- If    matchExpectedFunTys n ty = (_, wrap)
 -- then  wrap : (t1 -> ... -> tn -> ty_r) ~> ty,
 --   where [t1, ..., tn], ty_r are passed to the thing_inside
-matchExpectedFunTys herald arity orig_ty thing_inside
+matchExpectedFunTys herald ctx arity orig_ty thing_inside
   = case orig_ty of
       Check ty -> go [] arity ty
       _        -> defer [] arity orig_ty
   where
+    go acc_arg_tys n ty
+      | Just ty' <- tcView ty = go acc_arg_tys n ty'
+
     go acc_arg_tys 0 ty
       = do { result <- thing_inside (reverse acc_arg_tys) (mkCheckExpType ty)
            ; return (result, idHsWrapper) }
 
     go acc_arg_tys n ty
-      | Just ty' <- tcView ty = go acc_arg_tys n ty'
+      | not (null tvs && null theta)
+      = do { (wrap_gen, (result, wrap_res)) <- tcSkolemise ctx ty $ \_ -> go acc_arg_tys n
+           ; return (result, wrap_gen <.> wrap_res) }
+      where
+        (tvs, theta, _) = tcSplitSigmaTy ty
 
     go acc_arg_tys n (FunTy { ft_af = af, ft_arg = arg_ty, ft_res = res_ty })
       = ASSERT( af == VisArg )
@@ -203,7 +215,7 @@ matchExpectedFunTys herald arity orig_ty thing_inside
            ; more_arg_tys <- mapM readExpType more_arg_tys
            ; res_ty       <- readExpType res_ty
            ; let unif_fun_ty = mkVisFunTys more_arg_tys res_ty
-           ; wrap <- tcSubTypeDS AppOrigin GenSigCtxt unif_fun_ty fun_ty
+           ; wrap <- tcSubType AppOrigin GenSigCtxt unif_fun_ty fun_ty
                          -- Not a good origin at all :-(
            ; return (result, wrap) }
 
@@ -221,6 +233,7 @@ matchExpectedFunTys herald arity orig_ty thing_inside
 
 -- Like 'matchExpectedFunTys', but used when you have an "actual" type,
 -- for example in function application
+-- This function instantiates at each poltype.
 matchActualFunTys :: SDoc   -- See Note [Herald for matchExpectedFunTys]
                   -> CtOrigin
                   -> Maybe (HsExpr GhcRn)   -- the thing with type TcSigmaType
@@ -278,15 +291,15 @@ matchActualFunTysPart herald ct_orig mb_thing arity orig_ty
     go 0 _ ty = return (idHsWrapper, [], ty)
 
     go n acc_args ty
+      | Just ty' <- tcView ty = go n acc_args ty'
+
+    go n acc_args ty
       | not (null tvs && null theta)
       = do { (wrap1, rho) <- topInstantiate ct_orig ty
            ; (wrap2, arg_tys, res_ty) <- go n acc_args rho
            ; return (wrap2 <.> wrap1, arg_tys, res_ty) }
       where
         (tvs, theta, _) = tcSplitSigmaTy ty
-
-    go n acc_args ty
-      | Just ty' <- tcView ty = go n acc_args ty'
 
     go n acc_args (FunTy { ft_af = af, ft_arg = arg_ty, ft_res = res_ty })
       = ASSERT( af == VisArg )
@@ -540,12 +553,11 @@ skolemising the type.
 -}
 
 
--- | Call this variant when you are in a higher-rank situation and
--- you know the right-hand type is deeply skolemised.
+-- | Call this variant when you are in a higher-rank situation
 tcSubTypeHR :: CtOrigin               -- ^ of the actual type
             -> Maybe (HsExpr GhcRn)   -- ^ If present, it has type ty_actual
             -> TcSigmaType -> ExpRhoType -> TcM HsWrapper
-tcSubTypeHR orig = tcSubTypeDS_NC_O orig GenSigCtxt
+tcSubTypeHR orig = tcSubType_NC_O orig GenSigCtxt
 
 ------------------------
 tcSubTypeET :: CtOrigin -> UserTypeCtxt
@@ -583,7 +595,7 @@ tcSubTypeO orig ctxt ty_actual ty_expected
                                        , pprUserTypeCtxt ctxt
                                        , ppr ty_actual
                                        , ppr ty_expected ])
-       ; tcSubTypeDS_NC_O orig ctxt Nothing ty_actual ty_expected }
+       ; tcSubType_NC_O orig ctxt Nothing ty_actual ty_expected }
 
 addSubTypeCtxt :: TcType -> ExpType -> TcM a -> TcM a
 addSubTypeCtxt ty_actual ty_expected thing_inside
@@ -613,6 +625,12 @@ addSubTypeCtxt ty_actual ty_expected thing_inside
 -- The "_NC" variants do not add a typechecker-error context;
 -- the caller is assumed to do that
 
+tcSubType :: CtOrigin -> UserTypeCtxt -> TcSigmaType -> ExpRhoType -> TcM HsWrapper
+tcSubType orig ctxt ty_actual ty_expected
+  = addSubTypeCtxt ty_actual ty_expected $
+    do { traceTc "tcSubTypeDS_NC" (vcat [pprUserTypeCtxt ctxt, ppr ty_actual, ppr ty_expected])
+       ; tcSubType_NC_O orig ctxt Nothing ty_actual ty_expected }
+
 tcSubType_NC :: UserTypeCtxt -> TcSigmaType -> TcSigmaType -> TcM HsWrapper
 -- Checks that actual <= expected
 -- Returns HsWrapper :: actual ~ expected
@@ -625,6 +643,20 @@ tcSubType_NC ctxt ty_actual ty_expected
                           , uo_thing    = Nothing
                           , uo_visible  = True }
 
+tcSubType_NC_O :: CtOrigin   -- origin used for instantiation only
+               -> UserTypeCtxt
+               -> Maybe (HsExpr GhcRn)
+               -> TcSigmaType -> ExpRhoType -> TcM HsWrapper
+tcSubType_NC_O inst_orig ctxt m_thing ty_actual ty_expected
+  = case ty_expected of
+      Infer inf_res -> fillInferResult inst_orig ty_actual inf_res
+      Check ty      -> tc_sub_tc_type eq_orig inst_orig ctxt ty_actual ty
+         where
+           eq_orig = TypeEqOrigin { uo_actual = ty_actual, uo_expected = ty
+                                  , uo_thing  = ppr <$> m_thing
+                                  , uo_visible = True }
+
+{-
 tcSubTypeDS :: CtOrigin -> UserTypeCtxt -> TcSigmaType -> ExpRhoType -> TcM HsWrapper
 -- Just like tcSubType, but with the additional precondition that
 -- ty_expected is deeply skolemised (hence "DS")
@@ -647,6 +679,7 @@ tcSubTypeDS_NC_O inst_orig ctxt m_thing ty_actual ty_expected
            eq_orig = TypeEqOrigin { uo_actual = ty_actual, uo_expected = ty
                                   , uo_thing  = ppr <$> m_thing
                                   , uo_visible = True }
+-}
 
 ---------------
 tc_sub_tc_type :: CtOrigin   -- used when calling uType
@@ -661,7 +694,7 @@ tc_sub_tc_type eq_orig inst_orig ctxt ty_actual ty_expected
          vcat [ text "ty_actual   =" <+> ppr ty_actual
               , text "ty_expected =" <+> ppr ty_expected ]
        ; mkWpCastN <$>
-         uType TypeLevel eq_orig ty_actual ty_expected }
+         uType TypeLevel eq_orig False ty_actual ty_expected }
 
   | otherwise   -- This is the general case
   = do { traceTc "tc_sub_tc_type (general case)" $
@@ -747,9 +780,9 @@ tc_sub_type_ds eq_orig inst_orig ctxt ty_actual ty_expected
       = do { lookup_res <- lookupTcTyVar tv_a
            ; case lookup_res of
                Filled ty_a' ->
-                 do { traceTc "tcSubTypeDS_NC_O following filled act meta-tyvar:"
+                 do { traceTc "tcSubType_NC_O following filled act meta-tyvar:"
                         (ppr tv_a <+> text "-->" <+> ppr ty_a')
-                    ; tc_sub_type_ds eq_orig inst_orig ctxt ty_a' ty_e }
+                    ; tc_sub_tc_type eq_orig inst_orig ctxt ty_a' ty_e }
                Unfilled _   -> unify }
 
     -- Historical note (Sept 16): there was a case here for
@@ -762,15 +795,15 @@ tc_sub_type_ds eq_orig inst_orig ctxt ty_actual ty_expected
 
     go (FunTy { ft_af = VisArg, ft_arg = act_arg, ft_res = act_res })
        (FunTy { ft_af = VisArg, ft_arg = exp_arg, ft_res = exp_res })
-      = -- See Note [Co/contra-variance of subsumption checking]
-        do { res_wrap <- tc_sub_type_ds eq_orig inst_orig  ctxt       act_res exp_res
-           ; arg_wrap <- tc_sub_tc_type eq_orig given_orig GenSigCtxt exp_arg act_arg
-                         -- GenSigCtxt: See Note [Setting the argument context]
+      = 
+        do { arg_wrap <- mkWpCastN <$> uType TypeLevel eq_orig False exp_arg act_arg
+           ; res_wrap <- mkWpCastN <$> uType TypeLevel eq_orig False act_res exp_res
+           -- ; res_wrap <- tc_sub_type_ds eq_orig inst_orig ctxt act_res exp_res
            ; return (mkWpFun arg_wrap res_wrap exp_arg exp_res doc) }
+               -- GenSigCtxt: See Note [Setting the argument context]
                -- arg_wrap :: exp_arg ~> act_arg
                -- res_wrap :: act-res ~> exp_res
       where
-        given_orig = GivenOrigin (SigSkol GenSigCtxt exp_arg [])
         doc = text "When checking that" <+> quotes (ppr ty_actual) <+>
               text "is more polymorphic than" <+> quotes (ppr ty_expected)
 
@@ -778,10 +811,12 @@ tc_sub_type_ds eq_orig inst_orig ctxt ty_actual ty_expected
       | let (tvs, theta, _) = tcSplitSigmaTy ty_a
       , not (null tvs && null theta)
       = do { (in_wrap, in_rho) <- topInstantiate inst_orig ty_a
-           ; body_wrap <- tc_sub_type_ds
-                            (eq_orig { uo_actual = in_rho
+              -- quick look
+           ; in_rho' <- getDynFlags >>= quick_look inst_orig in_rho ty_e
+           ; body_wrap <- tc_sub_tc_type
+                            (eq_orig { uo_actual = in_rho'
                                      , uo_expected = ty_expected })
-                            inst_orig ctxt in_rho ty_e
+                            inst_orig ctxt in_rho' ty_e
            ; return (body_wrap <.> in_wrap) }
 
       | otherwise   -- Revert to unification
@@ -793,7 +828,7 @@ tc_sub_type_ds eq_orig inst_orig ctxt ty_actual ty_expected
          --  a -> forall b. b -> b     <=   alpha beta gamma
          -- where we end up with alpha := (->)
 
-    inst_and_unify = do { (wrap, rho_a) <- deeplyInstantiate inst_orig ty_actual
+    inst_and_unify = do { (wrap, rho_a) <- topInstantiate inst_orig ty_actual
 
                            -- If we haven't recurred through an arrow, then
                            -- the eq_orig will list ty_actual. In this case,
@@ -807,12 +842,100 @@ tc_sub_type_ds eq_orig inst_orig ctxt ty_actual ty_expected
                                   -> eq_orig { uo_actual = rho_a }
                                 _ -> eq_orig
 
-                        ; cow <- uType TypeLevel eq_orig' rho_a ty_expected
+                        ; cow <- uType TypeLevel eq_orig' False rho_a ty_expected
                         ; return (mkWpCastN cow <.> wrap) }
 
 
      -- use versions without synonyms expanded
-    unify = mkWpCastN <$> uType TypeLevel eq_orig ty_actual ty_expected
+    unify = mkWpCastN <$> uType TypeLevel eq_orig False ty_actual ty_expected
+
+    quick_look orig in_rho ty_e dflags
+      | xopt LangExt.ImpredicativeTypes dflags
+      = do { ql_subst <- tcQuickLookUnify in_rho ty_e
+           ; forM_ (tyCoVarsOfTypesList [in_rho, ty_e]) $ \v ->
+               case lookupTyVar ql_subst v of
+                 Nothing -> return ()  -- no information was found
+                 Just ql_ty -> uQuickLookTryFillPoly orig v ql_ty
+           ; traceTc "tc_sub_type_ds quick look" (ppr ql_subst)
+           ; zonkTcType in_rho }
+      | otherwise
+      = return in_rho
+
+{-
+Note [Quick look unification]
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+When the `ImpredicativeTypes` extension is on, an additional
+"quick look" pass is done at every application
+(see note [Quick look impredicativity] in TcExpr)
+and during subtype checking (see tc_sub_type_ds).
+In both cases we need to use a restricted version of unification
+(implemented below in `tcQuickLookUnify`) which only performs
+such unification when a type variable is found under a type
+constructor. For example:
+* quickLookUnify alpha (forall a. a -> a)
+    => does nothing, since alpha is not guarded
+* quickLookUnify [alpha] [forall a. a -> a]
+    => unifies "alpha := forall a. a -> a"
+
+A type is "guarded" when:
+* it is of the form `T ...`, and `T` is an injective
+  type constructor, but not `(->)`; or
+* it is the first argument to a function type.
+-}
+tcQuickLookUnify :: TcType -> TcType -> TcM TCvSubst
+tcQuickLookUnify ty1 ty2 
+  = do { lvl <- getTcLevel
+       ; tcQuickLookUnify' lvl ty1 ty2 }
+
+tcQuickLookUnify' :: TcLevel -> TcType -> TcType -> TcM TCvSubst
+tcQuickLookUnify' lvl ty1 ty2
+  | Just ty1' <- tcView ty1
+  = tcQuickLookUnify' lvl ty1' ty2
+  | Just ty2' <- tcView ty2
+  = tcQuickLookUnify' lvl ty1 ty2'
+  -- case of one being a monotype => unify
+  | tcIsGuardedType ty1 || tcIsGuardedType ty2
+  = do { traceTc "tcQuickLookUnify/mono" (vcat [ppr ty1, ppr ty2])
+       ; case tcPartialUnifyTyKis bind_flag [ty1] [ty2] of
+           Just subst -> return subst
+           Nothing    -> return emptyTCvSubst }
+  -- case of both being functions
+  | Just (arg1, res1) <- tcSplitFunTy_maybe ty1
+  , Just (arg2, res2) <- tcSplitFunTy_maybe ty2
+  = do { traceTc "tcQuickLookUnify/arrow-arrow" (vcat [ppr ty1, ppr ty2])
+       ; case tcPartialUnifyTyKis bind_flag [arg1] [arg2] of
+           Nothing -> tcQuickLookUnify' lvl res1 res2
+           Just subst1
+             -> let res1' = substTyAddInScope subst1 res1
+                    res2' = substTyAddInScope subst1 res2
+                in flip composeTCvSubst subst1 <$> tcQuickLookUnify' lvl res1' res2' }
+  -- case of variable and function type
+  | Just (arg1, res1) <- tcSplitFunTy_maybe ty1
+  , TyVarTy tv2 <- ty2, isTouchableMetaTyVar lvl tv2
+  = do { traceTc "tcQuickLookUnify/arrow-var" (vcat [ppr ty1, ppr ty2])
+       ; beta <- newFlexiTyVarTy (tcTypeKind res1)
+       ; let new_fun_ty  = mkVisFunTy arg1 beta
+             small_subst = zipTvSubst [tv2] [new_fun_ty]
+             ty1' = substTyAddInScope small_subst ty1
+       ; subst' <- tcQuickLookUnify' lvl ty1' new_fun_ty
+       ; return (composeTCvSubst subst' small_subst) }
+  | Just (arg2, res2) <- tcSplitFunTy_maybe ty2
+  , TyVarTy tv1 <- ty1, isTouchableMetaTyVar lvl tv1
+  = do { traceTc "tcQuickLookUnify/var-arrow" (vcat [ppr ty1, ppr ty2])
+       ; beta <- newFlexiTyVarTy (tcTypeKind res2)
+       ; let new_fun_ty  = mkVisFunTy arg2 beta
+             small_subst = zipTvSubst [tv1] [new_fun_ty]
+             ty2' = substTyAddInScope small_subst ty2
+       ; subst' <- tcQuickLookUnify' lvl new_fun_ty ty2'
+       ; return (composeTCvSubst subst' small_subst) }
+  | otherwise
+  = return emptyTCvSubst
+  where  
+    bind_flag tv
+      | isTouchableMetaTyVar lvl tv
+      = BindMe
+      | otherwise
+      = Skolem
 
 {- Note [Settting the argument context]
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
@@ -855,8 +978,8 @@ tcWrapResultO :: CtOrigin -> HsExpr GhcRn -> HsExpr GhcTcId -> TcSigmaType -> Ex
 tcWrapResultO orig rn_expr expr actual_ty res_ty
   = do { traceTc "tcWrapResult" (vcat [ text "Actual:  " <+> ppr actual_ty
                                       , text "Expected:" <+> ppr res_ty ])
-       ; cow <- tcSubTypeDS_NC_O orig GenSigCtxt
-                                 (Just rn_expr) actual_ty res_ty
+       ; cow <- tcSubType_NC_O orig GenSigCtxt
+                               (Just rn_expr) actual_ty res_ty
        ; return (mkHsWrap cow expr) }
 
 
@@ -888,7 +1011,7 @@ fillInferResult :: CtOrigin -> TcType -> InferResult -> TcM HsWrapper
 -- See Note [Deep instantiation of InferResult]
 fillInferResult orig ty inf_res@(IR { ir_inst = instantiate_me })
   | instantiate_me
-  = do { (wrap, rho) <- deeplyInstantiate orig ty
+  = do { (wrap, rho) <- topInstantiate orig ty
        ; co <- fill_infer_result rho inf_res
        ; return (mkWpCastN co <.> wrap) }
 
@@ -1031,7 +1154,7 @@ promoteTcType dest_lvl ty
                                           , uo_expected = res_kind
                                           , uo_thing    = Nothing
                                           , uo_visible  = False }
-           ; ki_co <- uType KindLevel kind_orig (tcTypeKind ty) res_kind
+           ; ki_co <- uType KindLevel kind_orig False (tcTypeKind ty) res_kind
            ; let co = mkTcGReflRightCo Nominal ty ki_co
            ; return (co, ty `mkCastTy` ki_co) }
 
@@ -1126,7 +1249,7 @@ tcSkolemise ctxt expected_ty thing_inside
    -- We expect expected_ty to be a forall-type
    -- If not, the call is a no-op
   = do  { traceTc "tcSkolemise" Outputable.empty
-        ; (wrap, tv_prs, given, rho') <- deeplySkolemise expected_ty
+        ; (wrap, tv_prs, given, rho') <- topSkolemise expected_ty
 
         ; lvl <- getTcLevel
         ; when debugIsOn $
@@ -1342,12 +1465,20 @@ The exported functions are all defined as versions of some
 non-exported generic functions.
 -}
 
-unifyType :: Maybe (HsExpr GhcRn)   -- ^ If present, has type 'ty1'
+unifyType, unifyTypeImpredicatively
+          :: Maybe (HsExpr GhcRn)   -- ^ If present, has type 'ty1'
           -> TcTauType -> TcTauType -> TcM TcCoercionN
 -- Actual and expected types
 -- Returns a coercion : ty1 ~ ty2
-unifyType thing ty1 ty2 = traceTc "utype" (ppr ty1 $$ ppr ty2 $$ ppr thing) >>
-                          uType TypeLevel origin ty1 ty2
+unifyType = unifyType' False
+unifyTypeImpredicatively = unifyType' True
+
+unifyType' :: Bool                   -- ^ Allow impredicativity?
+           -> Maybe (HsExpr GhcRn)   -- ^ If present, has type 'ty1'
+           -> TcTauType -> TcTauType -> TcM TcCoercionN
+unifyType' impred thing ty1 ty2
+  = traceTc "utype" (ppr ty1 $$ ppr ty2 $$ ppr thing) >>
+    uType TypeLevel origin impred ty1 ty2
   where
     origin = TypeEqOrigin { uo_actual = ty1, uo_expected = ty2
                           , uo_thing  = ppr <$> thing
@@ -1355,7 +1486,7 @@ unifyType thing ty1 ty2 = traceTc "utype" (ppr ty1 $$ ppr ty2 $$ ppr thing) >>
 
 unifyKind :: Maybe (HsType GhcRn) -> TcKind -> TcKind -> TcM CoercionN
 unifyKind thing ty1 ty2 = traceTc "ukind" (ppr ty1 $$ ppr ty2 $$ ppr thing) >>
-                          uType KindLevel origin ty1 ty2
+                          uType KindLevel origin False ty1 ty2
   where origin = TypeEqOrigin { uo_actual = ty1, uo_expected = ty2
                               , uo_thing  = ppr <$> thing
                               , uo_visible = True } -- also always from a visible context
@@ -1372,7 +1503,15 @@ unifyKind thing ty1 ty2 = traceTc "ukind" (ppr ty1 $$ ppr ty2 $$ ppr thing) >>
 uType is the heart of the unifier.
 -}
 
-uType, uType_defer
+uType
+  :: TypeOrKind
+  -> CtOrigin
+  -> Bool      -- can unify with polytypes?
+  -> TcType    -- ty1 is the *actual* type
+  -> TcType    -- ty2 is the *expected* type
+  -> TcM CoercionN
+
+uType_defer
   :: TypeOrKind
   -> CtOrigin
   -> TcType    -- ty1 is the *actual* type
@@ -1400,7 +1539,7 @@ uType_defer t_or_k origin ty1 ty2
        ; return co }
 
 --------------
-uType t_or_k origin orig_ty1 orig_ty2
+uType t_or_k origin can_unify_poly_tv orig_ty1 orig_ty2
   = do { tclvl <- getTcLevel
        ; traceTc "u_tys" $ vcat
               [ text "tclvl" <+> ppr tclvl
@@ -1420,11 +1559,11 @@ uType t_or_k origin orig_ty1 orig_ty2
      -- recognize (t |> co) ~ (t |> co), which is nice. Previously, we
      -- didn't do it this way, and then the unification above was deferred.
     go (CastTy t1 co1) t2
-      = do { co_tys <- uType t_or_k origin t1 t2
+      = do { co_tys <- uType t_or_k origin can_unify_poly_tv t1 t2
            ; return (mkCoherenceLeftCo Nominal t1 co1 co_tys) }
 
     go t1 (CastTy t2 co2)
-      = do { co_tys <- uType t_or_k origin t1 t2
+      = do { co_tys <- uType t_or_k origin can_unify_poly_tv t1 t2
            ; return (mkCoherenceRightCo Nominal t2 co2 co_tys) }
 
         -- Variables; go for uUnfilledVar
@@ -1436,13 +1575,13 @@ uType t_or_k origin orig_ty1 orig_ty2
            ; case lookup_res of
                Filled ty1   -> do { traceTc "found filled tyvar" (ppr tv1 <+> text ":->" <+> ppr ty1)
                                   ; go ty1 ty2 }
-               Unfilled _ -> uUnfilledVar origin t_or_k NotSwapped tv1 ty2 }
+               Unfilled _ -> uUnfilledVar origin t_or_k NotSwapped can_unify_poly_tv tv1 ty2 }
     go ty1 (TyVarTy tv2)
       = do { lookup_res <- lookupTcTyVar tv2
            ; case lookup_res of
                Filled ty2   -> do { traceTc "found filled tyvar" (ppr tv2 <+> text ":->" <+> ppr ty2)
                                   ; go ty1 ty2 }
-               Unfilled _ -> uUnfilledVar origin t_or_k IsSwapped tv2 ty1 }
+               Unfilled _ -> uUnfilledVar origin t_or_k IsSwapped can_unify_poly_tv tv2 ty1 }
 
       -- See Note [Expanding synonyms during unification]
     go ty1@(TyConApp tc1 []) (TyConApp tc2 [])
@@ -1463,8 +1602,8 @@ uType t_or_k origin orig_ty1 orig_ty2
 
         -- Functions (or predicate functions) just check the two parts
     go (FunTy _ fun1 arg1) (FunTy _ fun2 arg2)
-      = do { co_l <- uType t_or_k origin fun1 fun2
-           ; co_r <- uType t_or_k origin arg1 arg2
+      = do { co_l <- uType t_or_k origin can_unify_poly_tv fun1 fun2
+           ; co_r <- uType t_or_k origin can_unify_poly_tv arg1 arg2
            ; return $ mkFunCo Nominal co_l co_r }
 
         -- Always defer if a type synonym family (type function)
@@ -1478,7 +1617,7 @@ uType t_or_k origin orig_ty1 orig_ty2
       -- See Note [Mismatched type lists and application decomposition]
       | tc1 == tc2, equalLength tys1 tys2
       = ASSERT2( isGenerativeTyCon tc1 Nominal, ppr tc1 )
-        do { cos <- zipWith3M (uType t_or_k) origins' tys1 tys2
+        do { cos <- zipWith3M (\o -> uType t_or_k o can_unify_poly_tv) origins' tys1 tys2
            ; return $ mkTyConAppCo Nominal tc1 cos }
       where
         origins' = map (\is_vis -> if is_vis then origin else toInvisibleOrigin origin)
@@ -1510,6 +1649,7 @@ uType t_or_k origin orig_ty1 orig_ty2
            ; kco <- uType KindLevel
                           (KindEqOrigin orig_ty1 (Just orig_ty2) origin
                                         (Just t_or_k))
+                          can_unify_poly_tv
                           ty1 ty2
            ; return $ mkProofIrrelCo Nominal kco co1 co2 }
 
@@ -1524,11 +1664,11 @@ uType t_or_k origin orig_ty1 orig_ty2
 
     ------------------
     go_app vis s1 t1 s2 t2
-      = do { co_s <- uType t_or_k origin s1 s2
+      = do { co_s <- uType t_or_k origin can_unify_poly_tv s1 s2
            ; let arg_origin
                    | vis       = origin
                    | otherwise = toInvisibleOrigin origin
-           ; co_t <- uType t_or_k arg_origin t1 t2
+           ; co_t <- uType t_or_k arg_origin can_unify_poly_tv t1 t2
            ; return $ mkAppCo co_s co_t }
 
 {- Note [Check for equality before deferring]
@@ -1625,10 +1765,28 @@ of the substitution; rather, notice that @uVar@ (defined below) nips
 back into @uTys@ if it turns out that the variable is already bound.
 -}
 
+-- fills a variable only if it points to a type with foralls
+uQuickLookTryFillPoly :: CtOrigin -> TcTyVar -> TcSigmaType -> TcM ()
+uQuickLookTryFillPoly origin tv1 ty2
+  = go =<< getTcLevel
+  where
+    go lvl
+      | isTouchableMetaTyVar lvl tv1
+      , not (isFullyMonoTauTy ty2) -- do not fill if not a polytype
+      = do { lookup_res <- lookupTcTyVar tv1
+           ; case lookup_res of
+               Filled _ -> return ()
+               Unfilled _ -> do { _ <- uUnfilledVar origin TypeLevel NotSwapped
+                                                    True tv1 ty2
+                                ; return () } }
+      | otherwise
+      = return ()
+
 ----------
 uUnfilledVar :: CtOrigin
              -> TypeOrKind
              -> SwapFlag
+             -> Bool           -- can unify tv with polytypes?
              -> TcTyVar        -- Tyvar 1: not necessarily a meta-tyvar
                                --    definitely not a /filled/ meta-tyvar
              -> TcTauType      -- Type 2
@@ -1636,28 +1794,29 @@ uUnfilledVar :: CtOrigin
 -- "Unfilled" means that the variable is definitely not a filled-in meta tyvar
 --            It might be a skolem, or untouchable, or meta
 
-uUnfilledVar origin t_or_k swapped tv1 ty2
+uUnfilledVar origin t_or_k swapped can_unify_poly_tv tv1 ty2
   = do { ty2 <- zonkTcType ty2
              -- Zonk to expose things to the
              -- occurs check, and so that if ty2
              -- looks like a type variable then it
              -- /is/ a type variable
-       ; uUnfilledVar1 origin t_or_k swapped tv1 ty2 }
+       ; uUnfilledVar1 origin t_or_k swapped can_unify_poly_tv tv1 ty2 }
 
 ----------
 uUnfilledVar1 :: CtOrigin
               -> TypeOrKind
               -> SwapFlag
+              -> Bool           -- can unify tv with polytypes?
               -> TcTyVar        -- Tyvar 1: not necessarily a meta-tyvar
                                 --    definitely not a /filled/ meta-tyvar
               -> TcTauType      -- Type 2, zonked
               -> TcM Coercion
-uUnfilledVar1 origin t_or_k swapped tv1 ty2
+uUnfilledVar1 origin t_or_k swapped can_unify_poly_tv tv1 ty2
   | Just tv2 <- tcGetTyVar_maybe ty2
   = go tv2
 
   | otherwise
-  = uUnfilledVar2 origin t_or_k swapped tv1 ty2
+  = uUnfilledVar2 origin t_or_k swapped can_unify_poly_tv tv1 ty2
 
   where
     -- 'go' handles the case where both are
@@ -1673,29 +1832,29 @@ uUnfilledVar1 origin t_or_k swapped tv1 ty2
                      -- not have happened yet, and it's an invariant of
                      -- uUnfilledTyVar2 that ty2 is fully zonked
                      -- Omitting this caused #16902
-                ; uUnfilledVar2 origin t_or_k (flipSwap swapped)
+                ; uUnfilledVar2 origin t_or_k (flipSwap swapped) can_unify_poly_tv
                            tv2 (mkTyVarTy tv1) }
 
            | otherwise
-           = uUnfilledVar2 origin t_or_k swapped tv1 ty2
+           = uUnfilledVar2 origin t_or_k swapped can_unify_poly_tv tv1 ty2
 
 ----------
 uUnfilledVar2 :: CtOrigin
               -> TypeOrKind
               -> SwapFlag
+              -> Bool           -- can unify tv with polytypes?
               -> TcTyVar        -- Tyvar 1: not necessarily a meta-tyvar
                                 --    definitely not a /filled/ meta-tyvar
               -> TcTauType      -- Type 2, zonked
               -> TcM Coercion
-uUnfilledVar2 origin t_or_k swapped tv1 ty2
-  = do { dflags  <- getDynFlags
-       ; cur_lvl <- getTcLevel
-       ; go dflags cur_lvl }
+uUnfilledVar2 origin t_or_k swapped can_unify_poly_tv tv1 ty2
+  = do { cur_lvl <- getTcLevel
+       ; go cur_lvl }
   where
-    go dflags cur_lvl
+    go cur_lvl
       | canSolveByUnification cur_lvl tv1 ty2
-      , Just ty2' <- metaTyVarUpdateOK dflags tv1 ty2
-      = do { co_k <- uType KindLevel kind_origin (tcTypeKind ty2') (tyVarKind tv1)
+      , Just ty2' <- metaTyVarUpdateOK can_unify_poly_tv tv1 ty2
+      = do { co_k <- uType KindLevel kind_origin can_unify_poly_tv (tcTypeKind ty2') (tyVarKind tv1)
            ; traceTc "uUnfilledVar2 ok" $
              vcat [ ppr tv1 <+> dcolon <+> ppr (tyVarKind tv1)
                   , ppr ty2 <+> dcolon <+> ppr (tcTypeKind  ty2)
@@ -2113,7 +2272,7 @@ matchExpectedFunKind hs_ty n k = go n k
                                         , uo_thing    = Just (ppr hs_ty)
                                         , uo_visible  = True
                                         }
-           ; uType KindLevel origin k new_fun }
+           ; uType KindLevel origin False k new_fun }
 
 {- *********************************************************************
 *                                                                      *
@@ -2189,7 +2348,7 @@ occCheckForErrors :: DynFlags -> TcTyVar -> Type -> MetaTyVarUpdateResult ()
 --   a) the given variable occurs in the given type.
 --   b) there is a forall in the type (unless we have -XImpredicativeTypes)
 occCheckForErrors dflags tv ty
-  = case preCheck dflags True tv ty of
+  = case preCheck True (xopt LangExt.ImpredicativeTypes dflags) tv ty of
       MTVU_OK _   -> MTVU_OK ()
       MTVU_Bad    -> MTVU_Bad
       MTVU_Occurs -> case occCheckExpand [tv] ty of
@@ -2197,7 +2356,7 @@ occCheckForErrors dflags tv ty
                        Just _  -> MTVU_OK ()
 
 ----------------
-metaTyVarUpdateOK :: DynFlags
+metaTyVarUpdateOK :: Bool                -- are polytypes allowed
                   -> TcTyVar             -- tv :: k1
                   -> TcType              -- ty :: k2
                   -> Maybe TcType        -- possibly-expanded ty
@@ -2224,15 +2383,15 @@ metaTyVarUpdateOK :: DynFlags
 --
 -- See Note [Refactoring hazard: checkTauTvUpdate]
 
-metaTyVarUpdateOK dflags tv ty
-  = case preCheck dflags False tv ty of
+metaTyVarUpdateOK can_unify_poly_tv tv ty
+  = case preCheck False can_unify_poly_tv tv ty of
          -- False <=> type families not ok
          -- See Note [Prevent unification with type families]
       MTVU_OK _   -> Just ty
       MTVU_Bad    -> Nothing  -- forall, predicate, or type function
       MTVU_Occurs -> occCheckExpand [tv] ty
 
-preCheck :: DynFlags -> Bool -> TcTyVar -> TcType -> MetaTyVarUpdateResult ()
+preCheck :: Bool -> Bool -> TcTyVar -> TcType -> MetaTyVarUpdateResult ()
 -- A quick check for
 --   (a) a forall type (unless -XImpredicativeTypes)
 --   (b) a predicate type (unless -XImpredicativeTypes)
@@ -2243,11 +2402,11 @@ preCheck :: DynFlags -> Bool -> TcTyVar -> TcType -> MetaTyVarUpdateResult ()
 -- inside the kinds of variables it mentions.  But for (c) we do
 -- look in the kinds of course.
 
-preCheck dflags ty_fam_ok tv ty
+preCheck ty_fam_ok can_unify_poly_tv tv ty
   = fast_check ty
   where
     details          = tcTyVarDetails tv
-    impredicative_ok = canUnifyWithPolyType dflags details
+    impredicative_ok = canUnifyWithPolyType details can_unify_poly_tv
 
     ok :: MetaTyVarUpdateResult ()
     ok = MTVU_OK ()
@@ -2295,10 +2454,10 @@ preCheck dflags ty_fam_ok tv ty
       | not (ty_fam_ok        || isFamFreeTyCon tc) = True
       | otherwise                                   = False
 
-canUnifyWithPolyType :: DynFlags -> TcTyVarDetails -> Bool
-canUnifyWithPolyType dflags details
+canUnifyWithPolyType :: TcTyVarDetails -> Bool -> Bool
+canUnifyWithPolyType details can_unify_poly_tv
   = case details of
       MetaTv { mtv_info = TyVarTv }    -> False
-      MetaTv { mtv_info = TauTv }      -> xopt LangExt.ImpredicativeTypes dflags
+      MetaTv { mtv_info = TauTv }      -> can_unify_poly_tv -- xopt LangExt.ImpredicativeTypes dflags
       _other                           -> True
           -- We can have non-meta tyvars in given constraints

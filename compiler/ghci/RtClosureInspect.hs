@@ -628,7 +628,9 @@ addConstraint actual expected = do
       discardResult $
       captureConstraints $
       do { (ty1, ty2) <- congruenceNewtypes actual expected
-         ; unifyType Nothing ty1 ty2 }
+         -- The newtypes may be instantiated impredicatively,
+         -- so we need to use the corresponding version of unification
+         ; unifyTypeImpredicatively Nothing ty1 ty2 }
      -- TOMDO: what about the coercion?
      -- we should consider family instances
 
@@ -1280,7 +1282,9 @@ congruenceNewtypes lhs rhs = go lhs rhs >>= \rhs' -> return (lhs,rhs')
                (_, vars) <- instTyVars (tyConTyVars new_tycon)
                let ty' = mkTyConApp new_tycon (mkTyVarTys vars)
                    rep_ty = unwrapType ty'
-               _ <- liftTcM (unifyType Nothing ty rep_ty)
+                    -- At this point unification is allowed to unify any types,
+                    -- including polymorphic one, so we need impredicative unif.
+               _ <- liftTcM (unifyTypeImpredicatively Nothing ty rep_ty)
         -- assumes that reptype doesn't ^^^^ touch tyconApp args
                return ty'
 
