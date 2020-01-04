@@ -38,9 +38,9 @@ import Prelude ()
 
 import Prelude
 :show imports
-import Data.List hiding (nub)
+import Data.Tuple hiding (swap)
 :show imports
-import qualified Data.List as Q
+import qualified Data.Tuple as Q
 :show imports
-:m -Data.List
+:m -Data.Tuple
 :show imports
