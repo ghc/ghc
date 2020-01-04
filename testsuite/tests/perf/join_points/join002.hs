@@ -1,6 +1,6 @@
 module Main where
 
-import Data.List
+import Data.List (find)
 
 -- These four functions should all wind up the same; they represent successive
 -- simplifications that should happen. (Actual details may vary, since find

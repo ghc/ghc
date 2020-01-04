@@ -13,7 +13,7 @@ import Data.Data
 import System.Environment
 import Control.Monad
 import Control.Monad.Trans.State
-import Data.List
+import Data.List (sortBy)
 import Data.Ord
 import Prelude hiding (traverse)
 

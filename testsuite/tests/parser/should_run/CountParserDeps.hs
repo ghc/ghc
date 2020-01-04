@@ -17,7 +17,6 @@ import HscMain
 import GHC
 import Util
 import Data.Maybe
-import Data.List
 import Control.Monad
 import Control.Monad.IO.Class
 import System.Environment

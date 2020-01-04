@@ -1,4 +1,4 @@
-import Data.List
+import Data.List (iterate')
 
 -- this should evaluate in constant space
 main :: IO ()
