@@ -1,7 +1,7 @@
 import Control.Concurrent
 import Control.Exception
 import Control.Monad
-import Data.List
+import Data.List (sort)
 
 new = newQSemN
 wait = waitQSemN

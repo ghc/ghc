@@ -1,3 +1,5 @@
+{-# OPTIONS_GHC -Wno-compat-unqualified-imports #-}
+
 -- !!! Checking that you can hide a constructor
 module ShouldCompile where
 

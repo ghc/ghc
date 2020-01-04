@@ -22,10 +22,10 @@ x :: (a -> b) -> [a] -> [b]
 import Prelude
 :module +*Foo
 import Prelude
-import Data.List hiding ( nub )
+import Data.Tuple hiding ( swap )
 :module +*Foo
 import Prelude
-import Data.List hiding ( nub )
-import qualified Data.List as Q
+import Data.Tuple hiding ( swap )
+import qualified Data.Tuple as Q
 :module +*Foo
 import Prelude

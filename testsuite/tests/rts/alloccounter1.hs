@@ -2,7 +2,7 @@ module Main where
 
 import Control.Exception
 import Control.Monad
-import Data.List
+import Data.List (sort)
 import System.Mem
 
 main = do

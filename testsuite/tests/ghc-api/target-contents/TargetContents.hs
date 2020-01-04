@@ -7,7 +7,7 @@ import GHC
 
 import Control.Monad
 import Control.Monad.IO.Class (liftIO)
-import Data.List
+import Data.List (intercalate)
 import Data.Maybe
 import Data.Time.Calendar
 import Data.Time.Clock
