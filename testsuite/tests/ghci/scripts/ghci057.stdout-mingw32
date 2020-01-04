@@ -16,6 +16,7 @@ warning settings:
   -Wsemigroup
   -Wnoncanonical-monoid-instances
   -Wstar-is-type
+  -Wcompat-unqualified-imports
 Should fail, GADTs is not enabled
 options currently set: none.
 base language is: Haskell2010
@@ -38,6 +39,7 @@ warning settings:
   -Wsemigroup
   -Wnoncanonical-monoid-instances
   -Wstar-is-type
+  -Wcompat-unqualified-imports
 Should work, GADTs is in force from :set
 options currently set: none.
 base language is: Haskell2010
@@ -59,6 +61,7 @@ warning settings:
   -Wsemigroup
   -Wnoncanonical-monoid-instances
   -Wstar-is-type
+  -Wcompat-unqualified-imports
 Should fail, GADTs is now disabled
 base language is: Haskell2010
 with the following modifiers:
@@ -82,5 +85,6 @@ warning settings:
   -Wsemigroup
   -Wnoncanonical-monoid-instances
   -Wstar-is-type
+  -Wcompat-unqualified-imports
 Should fail, GADTs is only enabled at the prompt
 C :: T Int

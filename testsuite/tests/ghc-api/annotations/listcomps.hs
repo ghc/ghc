@@ -6,7 +6,7 @@ module Main where
 
 -- import Data.Generics
 import Data.Data
-import Data.List
+import Data.List (intercalate)
 import System.IO
 import GHC
 import BasicTypes
