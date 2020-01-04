@@ -4,7 +4,7 @@
 
 module Temp where
 
-import Data.List
+import Data.List (mapAccumL)
 
 data Data = Data {name :: String}
 

@@ -14,7 +14,7 @@ import Config
 import Annrun01_Help
 
 import qualified Language.Haskell.TH as TH
-import Data.List
+import Data.List (sortBy)
 import Data.Function
 
 main :: IO ()
