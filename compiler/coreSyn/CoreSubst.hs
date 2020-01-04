@@ -745,7 +745,7 @@ Breakpoints can't handle free variables with unlifted types anyway.
 {-
 Note [Worker inlining]
 ~~~~~~~~~~~~~~~~~~~~~~
-A worker can get sustituted away entirely.
+A worker can get substituted away entirely.
         - it might be trivial
         - it might simply be very small
 We do not treat an InlWrapper as an 'occurrence' in the occurrence

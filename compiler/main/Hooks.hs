@@ -21,6 +21,8 @@ module Hooks ( Hooks
              , runRnSpliceHook
              , getValueSafelyHook
              , createIservProcessHook
+             , stgToCmmHook
+             , cmmToRawCmmHook
              ) where
 
 import GhcPrelude
@@ -43,6 +45,12 @@ import SrcLoc
 import Type
 import System.Process
 import BasicTypes
+import Module
+import TyCon
+import CostCentre
+import GHC.Stg.Syntax
+import Stream
+import Cmm
 import GHC.Hs.Extension
 
 import Data.Maybe
@@ -73,6 +81,8 @@ emptyHooks = Hooks
   , runRnSpliceHook        = Nothing
   , getValueSafelyHook     = Nothing
   , createIservProcessHook = Nothing
+  , stgToCmmHook           = Nothing
+  , cmmToRawCmmHook        = Nothing
   }
 
 data Hooks = Hooks
@@ -95,6 +105,10 @@ data Hooks = Hooks
   , getValueSafelyHook     :: Maybe (HscEnv -> Name -> Type
                                                           -> IO (Maybe HValue))
   , createIservProcessHook :: Maybe (CreateProcess -> IO ProcessHandle)
+  , stgToCmmHook           :: Maybe (DynFlags -> Module -> [TyCon] -> CollectedCCs
+                                 -> [CgStgTopBinding] -> HpcInfo -> Stream IO CmmGroup ())
+  , cmmToRawCmmHook        :: Maybe (DynFlags -> Maybe Module -> Stream IO CmmGroup ()
+                                 -> IO (Stream IO RawCmmGroup ()))
   }
 
 getHooked :: (Functor f, HasDynFlags f) => (Hooks -> Maybe a) -> a -> f a

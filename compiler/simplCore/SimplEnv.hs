@@ -372,7 +372,7 @@ where the let shadows the lambda.  Really this means something like
 - Then that continuation gets pushed under the let
 
 - Finally we simplify 'arg'.  We want
-     - the static, lexical environment bindig x :-> x1
+     - the static, lexical environment binding x :-> x1
      - the in-scopeset from "here", under the 'let' which includes
        both x1 and x2
 

@@ -1724,7 +1724,7 @@ type Arity = Int
 -- | In 'PrimTyConI', is the type constructor unlifted?
 type Unlifted = Bool
 
--- | 'InstanceDec' desribes a single instance of a class or type function.
+-- | 'InstanceDec' describes a single instance of a class or type function.
 -- It is just a 'Dec', but guaranteed to be one of the following:
 --
 --   * 'InstanceD' (with empty @['Dec']@)

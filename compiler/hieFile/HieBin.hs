@@ -48,7 +48,7 @@ instance Ord HieName where
   compare (ExternalName a b c) (ExternalName d e f) = compare (a,b,c) (d,e,f)
   compare (LocalName a b) (LocalName c d) = compare (a,b) (c,d)
   compare (KnownKeyName a) (KnownKeyName b) = nonDetCmpUnique a b
-    -- Not actually non determinstic as it is a KnownKey
+    -- Not actually non deterministic as it is a KnownKey
   compare ExternalName{} _ = LT
   compare LocalName{} ExternalName{} = GT
   compare LocalName{} _ = LT

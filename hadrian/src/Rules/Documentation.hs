@@ -97,7 +97,7 @@ documentationRules = do
                       -- include manpage unless --docs=no-sphinx[-man] is given.
                    ++ [ manPageBuildPath | SphinxMan `Set.member` doctargets ]
 
-                      -- include toplevel html target uness we neither want
+                      -- include toplevel html target unless we neither want
                       -- haddocks nor html pages produced by sphinx.
                    ++ [ html | Set.size (doctargets `Set.intersection`
                                          Set.fromList [Haddocks, SphinxHTML]

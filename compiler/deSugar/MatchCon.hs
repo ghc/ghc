@@ -253,7 +253,7 @@ Now consider:
 
 In the first we must test y first; in the second we must test x
 first.  So we must divide even the equations for a single constructor
-T into sub-goups, based on whether they match the same field in the
+T into sub-groups, based on whether they match the same field in the
 same order.  That's what the (groupBy compatible_pats) grouping.
 
 All non-record patterns are "compatible" in this sense, because the

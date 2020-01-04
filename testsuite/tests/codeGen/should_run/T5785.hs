@@ -28,7 +28,7 @@ main = do
     print (2316287658 :: Int32)
     print (2316287658 :: Int64)
 
-    -- this requries a 64 (unsigned) bit word to store correctly
+    -- this requires a 64 (unsigned) bit word to store correctly
     print (32342316287658 :: Word8)
     print (32342316287658 :: Word16)
     print (32342316287658 :: Word32)

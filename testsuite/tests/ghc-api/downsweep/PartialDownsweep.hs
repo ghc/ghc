@@ -1,6 +1,6 @@
 {-# LANGUAGE ScopedTypeVariables, ViewPatterns #-}
 
--- | This test checks if 'downsweep can return partial results when vaious
+-- | This test checks if 'downsweep can return partial results when various
 -- kinds of parse errors occur in modules.
 
 import GHC
