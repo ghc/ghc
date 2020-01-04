@@ -1,7 +1,6 @@
 import System.IO
 import GHC.IO.Handle
 import Control.Monad
-import Data.List
 
 newlines = ["\n","\r","\r\n","\n\r","\n\n","\r\r"]
 

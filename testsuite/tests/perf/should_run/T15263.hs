@@ -1,6 +1,6 @@
 module Main where
 
-import Data.List
+import Data.List (foldr)
 
 expensive :: [Word]
 expensive = [1 .. 10000]

@@ -11,7 +11,6 @@
 
 module DoRestrictedM where
 
-import Data.List
 import Prelude (const, String, ($), (.), Maybe(..))
 import qualified Prelude
 import qualified Data.Set as Set
