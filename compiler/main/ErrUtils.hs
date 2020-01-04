@@ -41,7 +41,7 @@ module ErrUtils (
         getCaretDiagnostic,
 
         -- * Dump files
-        dumpIfSet, dumpIfSet_dyn, dumpIfSet_dyn_printer,
+        dumpIfSet, dumpIfSet_dyn, dumpIfSet_any, dumpIfSet_dyn_printer,
         dumpOptionsFromFlag, DumpOptions (..),
         DumpFormat (..), DumpAction, dumpAction, defaultDumpAction,
         TraceAction, traceAction, defaultTraceAction,
@@ -450,6 +450,16 @@ dumpIfSet dflags flag hdr doc
 -- Do nothing if it is unset
 dumpIfSet_dyn :: DynFlags -> DumpFlag -> String -> DumpFormat -> SDoc -> IO ()
 dumpIfSet_dyn = dumpIfSet_dyn_printer alwaysQualify
+
+dumpIfSet_any :: DynFlags -> [DumpFlag] -> String -> DumpFormat -> SDoc -> IO ()
+dumpIfSet_any dflags flags hdr fmt doc = go flags
+  where
+    go [] = return ()
+    go (f : fs)
+      | dopt f dflags
+      = dumpAction dflags (mkDumpStyle dflags alwaysQualify) (dumpOptionsFromFlag f) hdr fmt doc
+      | otherwise
+      = go fs
 
 -- | a wrapper around 'dumpAction'.
 -- First check whether the dump flag is set

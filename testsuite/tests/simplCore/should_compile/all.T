@@ -135,7 +135,7 @@ test('T5366',
 test('T7796', [], makefile_test, ['T7796'])
 test('T5550', omit_ways(prof_ways), compile, [''])
 test('T7865', normal, makefile_test, ['T7865'])
-test('T7785', only_ways(['optasm']), compile, ['-ddump-rules'])
+test('T7785', only_ways(['optasm']), compile, ['-ddump-rules -dsuppress-uniques'])
 test('T7702',
      [extra_files(['T7702plugin']),
       only_ways([config.ghc_plugin_way]),
@@ -175,8 +175,8 @@ test('T8832',
       ('-DT8832_WORDSIZE_64' if wordsize(64) else '')])
 test('T8848', normal,
      makefile_test, ['T8848'])
-test('T8848a', only_ways(['optasm']), compile, ['-ddump-rules'])
-test('T8331', only_ways(['optasm']), compile, ['-ddump-rules'])
+test('T8848a', only_ways(['optasm']), compile, ['-ddump-rules -dsuppress-uniques'])
+test('T8331', only_ways(['optasm']), compile, ['-ddump-rules -dsuppress-uniques'])
 test('T6056', only_ways(['optasm']), multimod_compile, ['T6056', '-v0 -ddump-rule-firings'])
 test('T9400', only_ways(['optasm']), compile, ['-O0 -ddump-simpl -dsuppress-uniques -dsuppress-ticks'])
 test('T9441a', [only_ways(['optasm']), check_errmsg(r'f1 = f2') ], compile, ['-ddump-simpl -dsuppress-ticks'])
