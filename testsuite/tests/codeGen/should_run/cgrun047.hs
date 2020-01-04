@@ -6,7 +6,7 @@ module Main where
 -- specified.  Through a process of elimination I've managed to reproduce
 -- the problemin the following (much simpler) piece of code:
 
-import Data.List
+import Data.List (groupBy)
 
 test es =
   concat (groupBy eq (zip [0..(length es) - 1] es))

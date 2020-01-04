@@ -6,7 +6,7 @@ import GHC.Exts
 
 import Control.Monad
 import Data.Bits
-import Data.List
+import Data.List (sort, group)
 import System.Exit
 
 allEqual :: Eq a => [a] -> Bool

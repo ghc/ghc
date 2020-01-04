@@ -37,7 +37,7 @@ T9086:
 	'$(TEST_HC)' $(TEST_HC_OPTS) -ignore-dot-ghci -e ":main" T9086.hs
 
 T9905:
-	'$(TEST_HC)' $(TEST_HC_OPTS) -ignore-dot-ghci -e "import Data.List" -e "sort [2,1]"
+	'$(TEST_HC)' $(TEST_HC_OPTS) -ignore-dot-ghci -e "import Data.List (sort)" -e "sort [2,1]"
 
 T9905b:
 	'$(TEST_HC)' $(TEST_HC_OPTS) -ignore-dot-ghci -e "import qualified Data.List as L" -e "L.sort [2,1]"

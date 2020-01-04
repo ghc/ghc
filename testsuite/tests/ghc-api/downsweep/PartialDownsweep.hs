@@ -14,7 +14,7 @@ import Control.Monad
 import Control.Monad.IO.Class (liftIO)
 import Control.Exception
 import Data.IORef
-import Data.List
+import Data.List (sort, find, stripPrefix, isPrefixOf, isSuffixOf)
 import Data.Either
 
 import System.Environment
