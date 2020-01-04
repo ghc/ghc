@@ -11,10 +11,10 @@
 
 module DoRestrictedM where
 
-import Data.List
 import Prelude (const, String, ($), (.), Maybe(..))
 import qualified Prelude
 import qualified Data.Set as Set
+import Data.List ((++))
 
 -- Defining the restricted monad
 class MN2 m a where

@@ -10,7 +10,7 @@ module TH_RichKinds2 where
 
 import qualified Data.Kind as K
 import Data.Char
-import Data.List
+import Data.List (splitAt, span, elemIndex)
 import Language.Haskell.TH
 
 $(return [OpenTypeFamilyD (TypeFamilyHead

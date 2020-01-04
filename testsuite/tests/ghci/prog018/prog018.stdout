@@ -11,9 +11,9 @@ A.hs:8:15: warning: [-Wunused-matches (in -Wextra)]
     Defined but not used: ‘x’
 
 B.hs:7:1: warning: [-Wunused-imports (in -Wextra)]
-    The import of ‘Data.List’ is redundant
-      except perhaps to import instances from ‘Data.List’
-    To import instances alone, use: import Data.List()
+    The import of ‘Data.Tuple’ is redundant
+      except perhaps to import instances from ‘Data.Tuple’
+    To import instances alone, use: import Data.Tuple()
 
 C.hs:6:7: error: Variable not in scope: variableNotInScope :: ()
 Failed, two modules loaded.

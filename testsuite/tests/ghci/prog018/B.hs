@@ -4,4 +4,4 @@ module B
   ) where
 
 import A
-import Data.List
+import Data.Tuple

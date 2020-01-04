@@ -18,6 +18,7 @@ warning settings:
   -Wsemigroup
   -Wnoncanonical-monoid-instances
   -Wstar-is-type
+  -Wcompat-unqualified-imports
 ~~~~~~~~~~ Testing :set -a
 options currently set: none.
 base language is: Haskell2010

@@ -4,7 +4,7 @@ module Main where
 
 import GHC.Conc (getNumProcessors, getNumCapabilities)
 import GHC.Environment
-import Data.List
+import Data.List (isPrefixOf)
 
 main :: IO ()
 main = do

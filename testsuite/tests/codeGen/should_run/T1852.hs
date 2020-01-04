@@ -1,5 +1,4 @@
 {-# OPTIONS_GHC -funbox-strict-fields #-}
-import Data.List
 
 data Vec4 = Vec4 !Float !Float !Float !Float
 

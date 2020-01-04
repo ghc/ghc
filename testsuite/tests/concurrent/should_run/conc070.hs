@@ -1,6 +1,5 @@
 import Control.Concurrent
 import GHC.Conc
-import Data.List
 import Data.Maybe
 
 main = do
