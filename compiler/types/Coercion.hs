@@ -156,6 +156,7 @@ import DynFlags         ( DynFlags, shouldEraseCoercions)
 import Control.Monad (foldM, zipWithM)
 import Data.Function ( on )
 import Data.Char( isDigit )
+import GHC.Stack.Types ( HasCallStack )
 
 {-
 %************************************************************************

@@ -36,6 +36,7 @@ import Data.Maybe
 import GHC.Base
 import GHC.Num (Num(..))
 import GHC.Integer (Integer)
+import GHC.Stack.Types ( HasCallStack )
 
 infixl 9  !!
 infix  4 `elem`, `notElem`
