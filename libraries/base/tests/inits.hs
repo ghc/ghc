@@ -1,7 +1,7 @@
 {-# LANGUAGE RankNTypes #-}
 module Main (main) where
 
-import Data.List
+import Data.List (reverse, scanl, inits)
 
 -- A simple implementation of inits that should be obviously correct.
 {-# NOINLINE initsR #-}

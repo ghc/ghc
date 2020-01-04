@@ -2,8 +2,8 @@
 -- !!! be empty.
 module ShouldCompile where
 
-import Data.List  ()
-import Data.List  hiding ()
+import Data.Tuple  ()
+import Data.Tuple  hiding ()
 
 x :: Int
 x = 1
