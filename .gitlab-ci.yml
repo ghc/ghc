@@ -210,10 +210,11 @@ lint-release-changelogs:
       export METRICS_FILE=$CI_PROJECT_DIR/performance-metrics.tsv
       git config user.email "ben+ghc-ci@smart-cactus.org"
       git config user.name "GHC GitLab CI"
-    - hadrian/build.cabal.sh --flavour=$FLAVOUR -j`mk/detect-cpu-count.sh` --docs=no-sphinx test --summary-junit=./junit.xml --test-compiler=$TOP/_build/install/bin/ghc || (.gitlab/push-test-metrics.sh && false)
+      .gitlab/test-metrics.sh pull
+    - hadrian/build.cabal.sh --flavour=$FLAVOUR -j`mk/detect-cpu-count.sh` --docs=no-sphinx test --summary-junit=./junit.xml --test-compiler=$TOP/_build/install/bin/ghc || (.gitlab/test-metrics.sh push && false)
     - |
       # Push git notes.
-      .gitlab/push-test-metrics.sh
+      .gitlab/test-metrics.sh push
   cache:
     key: hadrian
     paths:
@@ -304,12 +305,13 @@ hadrian-ghc-in-ghci:
       METRICS_FILE=$CI_PROJECT_DIR/performance-metrics.tsv
       git config user.email "ben+ghc-ci@smart-cactus.org"
       git config user.name "GHC GitLab CI"
+      .gitlab/test-metrics.sh pull
     - |
       THREADS=`mk/detect-cpu-count.sh`
-      make $TEST_TYPE THREADS=$THREADS JUNIT_FILE=../../junit.xml METRICS_FILE=$METRICS_FILE || (METRICS_FILE=$METRICS_FILE .gitlab/push-test-metrics.sh && false)
+      make $TEST_TYPE THREADS=$THREADS JUNIT_FILE=../../junit.xml METRICS_FILE=$METRICS_FILE || (METRICS_FILE=$METRICS_FILE .gitlab/test-metrics.sh push && false)
     - |
       # Push git notes.
-      METRICS_FILE=$METRICS_FILE .gitlab/push-test-metrics.sh
+      METRICS_FILE=$METRICS_FILE .gitlab/test-metrics.sh push
   dependencies: []
   artifacts:
     reports:
