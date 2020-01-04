@@ -6,7 +6,7 @@ import DynFlags
 import Finder
 
 import Control.Monad.IO.Class (liftIO)
-import Data.List
+import Data.List (sort, stripPrefix)
 import Data.Either
 
 import System.Environment

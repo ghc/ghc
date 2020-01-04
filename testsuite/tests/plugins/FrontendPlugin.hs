@@ -8,7 +8,7 @@ import DriverPipeline hiding ( hsc_env )
 import DriverPhases
 import System.Exit
 import Control.Monad
-import Data.List
+import Data.List (partition)
 
 frontendPlugin :: FrontendPlugin
 frontendPlugin = defaultFrontendPlugin {

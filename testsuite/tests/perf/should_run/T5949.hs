@@ -1,4 +1,4 @@
-import Data.List
+import Data.List (foldr)
 
 {-
 This should get a worker that takes three arguments.

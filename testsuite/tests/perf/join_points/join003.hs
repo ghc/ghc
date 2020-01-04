@@ -12,7 +12,7 @@ module Main (
   main
 ) where
 
-import Data.List
+import Data.List (find)
 
 divides :: Int -> Int -> Bool
 p `divides` n = n `mod` p == 0
