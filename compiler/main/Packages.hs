@@ -206,7 +206,7 @@ fromExposedModules :: Bool -> ModuleOrigin
 fromExposedModules e = ModOrigin (Just e) [] [] False
 
 -- | Smart constructor for a module which is in @reexported-modules@.  Takes
--- as an argument whether or not the reexporting package is expsed, and
+-- as an argument whether or not the reexporting package is exposed, and
 -- also its 'PackageConfig'.
 fromReexportedModules :: Bool -> PackageConfig -> ModuleOrigin
 fromReexportedModules True pkg = ModOrigin Nothing [pkg] [] False
@@ -569,7 +569,7 @@ readPackageConfig dflags conf_file = do
                       "can't find a package database at " ++ conf_file
 
   let
-      -- Fix #16360: remove trailing slash from conf_file before calculting pkgroot
+      -- Fix #16360: remove trailing slash from conf_file before calculating pkgroot
       conf_file' = dropTrailingPathSeparator conf_file
       top_dir = topDir dflags
       pkgroot = takeDirectory conf_file'
@@ -1491,7 +1491,7 @@ mkPackageState dflags dbs preload0 = do
       -- When exposing units, we want to consider all of those in the most preferable
       -- packages. We can implement that by looking for units that are equi-preferable
       -- with the most preferable unit for package. Being equi-preferable means that
-      -- they must be in the same database, with the same version, and the same pacakge name.
+      -- they must be in the same database, with the same version, and the same package name.
       --
       -- We must take care to consider all these units and not just the most
       -- preferable one, otherwise we can end up with problems like #16228.

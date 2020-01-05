@@ -225,7 +225,7 @@ But caching the type in the Case constructor
   exprType (Case scrut bndr ty alts) = ty
 is better for at least three reasons:
 
-* It works when there are no alternatives (see case invarant 1 above)
+* It works when there are no alternatives (see case invariant 1 above)
 
 * It might be faster in deeply-nested situations.
 
@@ -1042,7 +1042,7 @@ data TickishScoping =
     --     ==>
     --   tick<...> case foo of x -> bar
     --
-    -- While this is always leagl, we want to make a best effort to
+    -- While this is always legal, we want to make a best effort to
     -- only make us of this where it exposes transformation
     -- opportunities.
   | SoftScope
@@ -1262,8 +1262,8 @@ its left hand side mentions nothing defined in this module.  Orphan-hood
 has two major consequences
 
  * A module that contains orphans is called an "orphan module".  If
-   the module being compiled depends (transitively) on an oprhan
-   module M, then M.hi is read in regardless of whether M is oherwise
+   the module being compiled depends (transitively) on an orphan
+   module M, then M.hi is read in regardless of whether M is otherwise
    needed. This is to ensure that we don't miss any instance decls in
    M.  But it's painful, because it means we need to keep track of all
    the orphan modules below us.
@@ -1273,7 +1273,7 @@ has two major consequences
    mentions on the LHS.  For example
       data T = T1 | T2
       instance Eq T where ....
-   The instance (Eq T) is incorprated as part of T's fingerprint.
+   The instance (Eq T) is incorporated as part of T's fingerprint.
 
    In contrast, orphans are all fingerprinted together in the
    mi_orph_hash field of the ModIface.

@@ -4027,7 +4027,7 @@ setBreakFlag toggle arr i = do
 --
 -- Bugfix: if the user closed stdout or stderr, the flushing will fail,
 -- raising another exception.  We therefore don't put the recursive
--- handler arond the flushing operation, so if stderr is closed
+-- handler around the flushing operation, so if stderr is closed
 -- GHCi will just die gracefully rather than going into an infinite loop.
 handler :: GhciMonad m => SomeException -> m Bool
 handler exception = do

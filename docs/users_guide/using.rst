@@ -99,7 +99,7 @@ to the files ``Foo.hs`` and ``Bar.hs``.
 
     ``-fno-specialise -O1``
 
-        ``-fspecialise`` will be enabled as the ``-fno-specialise`` is overriden
+        ``-fspecialise`` will be enabled as the ``-fno-specialise`` is overridden
         by the ``-O1``.
 
     ``-O1 -fno-specialise``
