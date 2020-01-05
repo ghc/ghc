@@ -323,7 +323,7 @@ repTopDs group@(HsGroup { hs_valds   = valds
       = notHandledL loc "Default declarations" (ppr decl)
     no_warn :: LWarnDecl GhcRn -> MetaM a
     no_warn (L loc (Warning _ thing _))
-      = notHandledL loc "WARNING and DEPRECATION pragmas" $
+      = notHandledL (locA loc) "WARNING and DEPRECATION pragmas" $
                     text "Pragma for declaration of" <+> ppr thing
     no_doc (L loc _)
       = notHandledL loc "Haddock documentation" empty
@@ -591,7 +591,7 @@ repInjectivityAnn :: Maybe (LInjectivityAnn GhcRn)
                   -> MetaM (Core (Maybe TH.InjectivityAnn))
 repInjectivityAnn Nothing =
     do { coreNothing injAnnTyConName }
-repInjectivityAnn (Just (L _ (InjectivityAnn lhs rhs))) =
+repInjectivityAnn (Just (L _ (InjectivityAnn _ lhs rhs))) =
     do { lhs'   <- lookupBinder (unLoc lhs)
        ; rhs1   <- mapM (lookupBinder . unLoc) rhs
        ; rhs2   <- coreList nameTyConName rhs1
@@ -611,7 +611,7 @@ repLFunDeps :: [LHsFunDep GhcRn] -> MetaM (Core [TH.FunDep])
 repLFunDeps fds = repList funDepTyConName repLFunDep fds
 
 repLFunDep :: LHsFunDep GhcRn -> MetaM (Core TH.FunDep)
-repLFunDep (L _ (xs, ys))
+repLFunDep (L _ (FunDep _ xs ys))
    = do xs' <- repList nameTyConName (lookupBinder . unLoc) xs
         ys' <- repList nameTyConName (lookupBinder . unLoc) ys
         repFunDep xs' ys'
@@ -821,7 +821,7 @@ repRuleD (L loc (HsRule { rd_name = n
                          ; rhs' <- repLE rhs
                          ; repPragRule n' ty_bndrs' tm_bndrs' lhs' rhs' act' }
            ; wrapGenSyms ss rule  }
-       ; return (loc, rule) }
+       ; return (locA loc, rule) }
 
 ruleBndrNames :: LRuleBndr GhcRn -> [Name]
 ruleBndrNames (L _ (RuleBndr _ n))      = [unLoc n]
@@ -990,7 +990,7 @@ rep_sig (L _   (SCCFunSig {}))        = notHandled "SCC pragmas" empty
 rep_sig (L loc (CompleteMatchSig _ _st cls mty))
   = rep_complete_sig cls mty loc
 
-rep_ty_sig :: Name -> SrcSpan -> LHsSigType GhcRn -> Located Name
+rep_ty_sig :: Name -> SrcSpan -> LHsSigType GhcRn -> LocatedA Name
            -> MetaM (SrcSpan, Core (M TH.Dec))
 -- Don't create the implicit and explicit variables when desugaring signatures,
 -- see Note [Scoped type variables in class and instance declarations].
@@ -1015,7 +1015,7 @@ rep_ty_sig mk_sig loc sig_ty nm
        ; sig     <- repProto mk_sig nm1 ty1
        ; return (loc, sig) }
 
-rep_patsyn_ty_sig :: SrcSpan -> LHsSigType GhcRn -> Located Name
+rep_patsyn_ty_sig :: SrcSpan -> LHsSigType GhcRn -> LocatedA Name
                   -> MetaM (SrcSpan, Core (M TH.Dec))
 -- represents a pattern synonym type signature;
 -- see Note [Pattern synonym type signatures and Template Haskell] in Convert
@@ -1043,12 +1043,12 @@ rep_patsyn_ty_sig loc sig_ty nm
        ; sig      <- repProto patSynSigDName nm1 ty1
        ; return (loc, sig) }
 
-rep_wc_ty_sig :: Name -> SrcSpan -> LHsSigWcType GhcRn -> Located Name
+rep_wc_ty_sig :: Name -> SrcSpan -> LHsSigWcType GhcRn -> LocatedA Name
               -> MetaM (SrcSpan, Core (M TH.Dec))
 rep_wc_ty_sig mk_sig loc sig_ty nm
   = rep_ty_sig mk_sig loc (hswc_body sig_ty) nm
 
-rep_inline :: Located Name
+rep_inline :: LocatedA Name
            -> InlinePragma      -- Never defaultInlinePragma
            -> SrcSpan
            -> MetaM [(SrcSpan, Core (M TH.Dec))]
@@ -1061,7 +1061,7 @@ rep_inline nm ispec loc
        ; return [(loc, pragma)]
        }
 
-rep_specialise :: Located Name -> LHsSigType GhcRn -> InlinePragma
+rep_specialise :: LocatedA Name -> LHsSigType GhcRn -> InlinePragma
                -> SrcSpan
                -> MetaM [(SrcSpan, Core (M TH.Dec))]
 rep_specialise nm ty ispec loc
@@ -1102,8 +1102,8 @@ repPhases (ActiveAfter _ i)  = do { MkC arg <- coreIntLit i
                                   ; dataCon' fromPhaseDataConName [arg] }
 repPhases _                  = dataCon allPhasesDataConName
 
-rep_complete_sig :: Located [Located Name]
-                 -> Maybe (Located Name)
+rep_complete_sig :: Located [LocatedA Name]
+                 -> Maybe (LocatedA Name)
                  -> SrcSpan
                  -> MetaM [(SrcSpan, Core (M TH.Dec))]
 rep_complete_sig (L _ cls) mty loc
@@ -1270,7 +1270,7 @@ repLTy ty = repTy (unLoc ty)
 -- handled separately in repTy.
 repForallT :: HsType GhcRn -> MetaM (Core (M TH.Type))
 repForallT ty
- | (tvs, ctxt, tau) <- splitLHsSigmaTyInvis (noLoc ty)
+ | (tvs, ctxt, tau) <- splitLHsSigmaTyInvis (noLocA ty)
  = addHsTyVarBinds tvs $ \bndrs ->
    do { ctxt1  <- repLContext ctxt
       ; tau1   <- repLTy tau
@@ -1408,7 +1408,7 @@ repLEs es = repListM expTyConName repLE es
 --        unless we can make sure that constructs, which are plainly not
 --        supported in TH already lead to error messages at an earlier stage
 repLE :: LHsExpr GhcRn -> MetaM (Core (M TH.Exp))
-repLE (L loc e) = mapReaderT (putSrcSpanDs loc) (repE e)
+repLE (L loc e) = mapReaderT (putSrcSpanDs (locA loc)) (repE e)
 
 repE :: HsExpr GhcRn -> MetaM (Core (M TH.Exp))
 repE (HsVar _ (L _ x)) =
@@ -1423,7 +1423,7 @@ repE (HsIPVar _ n) = rep_implicit_param_name n >>= repImplicitParamVar
 repE (HsOverLabel _ _ s) = repOverLabel s
 
 repE e@(HsRecFld _ f) = case f of
-  Unambiguous x _ -> repE (HsVar noExtField (noLoc x))
+  Unambiguous x _ -> repE (HsVar noExtField (noLocA x))
   Ambiguous{}     -> notHandled "Ambiguous record selectors" (ppr e)
 
         -- Remember, we're desugaring renamer output here, so
@@ -1608,7 +1608,7 @@ repFields (HsRecFields { rec_flds = flds })
   where
     rep_fld :: LHsRecField GhcRn (LHsExpr GhcRn)
             -> MetaM (Core (M TH.FieldExp))
-    rep_fld (L _ fld) = do { fn <- lookupLOcc (hsRecFieldSel fld)
+    rep_fld (L _ fld) = do { fn <- lookupLOcc (reLocA $ hsRecFieldSel fld)
                            ; e  <- repLE (hsRecFieldArg fld)
                            ; repFieldExp fn e }
 
@@ -1740,7 +1740,7 @@ rep_implicit_param_bind (L loc (IPBind _ ename (L _ rhs)))
                         panic "rep_implicit_param_bind: post typechecking"
       ; rhs' <- repE rhs
       ; ipb <- repImplicitParamBind name rhs'
-      ; return (loc, ipb) }
+      ; return (locA loc, ipb) }
 
 rep_implicit_param_name :: HsIPName -> MetaM (Core String)
 rep_implicit_param_name (HsIPName name) = coreStringLit (unpackFS name)
@@ -1776,14 +1776,14 @@ rep_bind (L loc (FunBind
         ; p    <- repPvar fn'
         ; ans  <- repVal p guardcore wherecore
         ; ans' <- wrapGenSyms ss ans
-        ; return (loc, ans') }
+        ; return (locA loc, ans') }
 
 rep_bind (L loc (FunBind { fun_id = fn
                          , fun_matches = MG { mg_alts = L _ ms } }))
  =   do { ms1 <- mapM repClauseTup ms
         ; fn' <- lookupLBinder fn
         ; ans <- repFun fn' (nonEmptyCoreList ms1)
-        ; return (loc, ans) }
+        ; return (locA loc, ans) }
 
 rep_bind (L loc (PatBind { pat_lhs = pat
                          , pat_rhs = GRHSs _ guards (L _ wheres) }))
@@ -1792,7 +1792,7 @@ rep_bind (L loc (PatBind { pat_lhs = pat
         ; guardcore <- addBinds ss (repGuards guards)
         ; ans  <- repVal patcore guardcore wherecore
         ; ans' <- wrapGenSyms ss ans
-        ; return (loc, ans') }
+        ; return (locA loc, ans') }
 
 rep_bind (L _ (VarBind { var_id = v, var_rhs = e}))
  =   do { v' <- lookupBinder v
@@ -1816,9 +1816,9 @@ rep_bind (L loc (PatSynBind _ (PSB { psb_id   = syn
             ; pat'   <- repLP pat
             ; repPatSynD syn' args' dir' pat' })
        ; patSynD'' <- wrapGenArgSyms args ss patSynD'
-       ; return (loc, patSynD'') }
+       ; return (locA loc, patSynD'') }
   where
-    mkGenArgSyms :: HsPatSynDetails (Located Name) -> MetaM [GenSymBind]
+    mkGenArgSyms :: HsPatSynDetails (LocatedA Name) -> MetaM [GenSymBind]
     -- for Record Pattern Synonyms we want to conflate the selector
     -- and the pattern-only names in order to provide a nicer TH
     -- API. Whereas inside GHC, record pattern synonym selectors and
@@ -1837,7 +1837,7 @@ rep_bind (L loc (PatSynBind _ (PSB { psb_id   = syn
       = [ (pat, id) | (sel, id) <- genSyms, (sel', pat) <- selsPats
                     , sel == sel' ]
 
-    wrapGenArgSyms :: HsPatSynDetails (Located Name)
+    wrapGenArgSyms :: HsPatSynDetails (LocatedA Name)
                    -> [GenSymBind] -> Core (M TH.Dec) -> MetaM (Core (M TH.Dec))
     wrapGenArgSyms (RecCon _) _  dec = return dec
     wrapGenArgSyms _          ss dec = wrapGenSyms ss dec
@@ -1850,7 +1850,7 @@ repPatSynD :: Core TH.Name
 repPatSynD (MkC syn) (MkC args) (MkC dir) (MkC pat)
   = rep2 patSynDName [syn, args, dir, pat]
 
-repPatSynArgs :: HsPatSynDetails (Located Name) -> MetaM (Core (M TH.PatSynArgs))
+repPatSynArgs :: HsPatSynDetails (LocatedA Name) -> MetaM (Core (M TH.PatSynArgs))
 repPatSynArgs (PrefixCon args)
   = do { args' <- repList nameTyConName lookupLOcc args
        ; repPrefixPatSynArgs args' }
@@ -1966,7 +1966,7 @@ repP (ConPat NoExtField dc details)
    }
  where
    rep_fld :: LHsRecField GhcRn (LPat GhcRn) -> MetaM (Core (M (TH.Name, TH.Pat)))
-   rep_fld (L _ fld) = do { MkC v <- lookupLOcc (hsRecFieldSel fld)
+   rep_fld (L _ fld) = do { MkC v <- lookupLOcc (reLocA $ hsRecFieldSel fld)
                           ; MkC p <- repLP (hsRecFieldArg fld)
                           ; rep2 fieldPatName [v,p] }
 
@@ -2022,7 +2022,7 @@ addBinds bs m = mapReaderT (dsExtendMetaEnv (mkNameEnv [(n,DsBound id) | (n,id) 
 
 -- Look up a locally bound name
 --
-lookupLBinder :: Located Name -> MetaM (Core TH.Name)
+lookupLBinder :: LocatedA Name -> MetaM (Core TH.Name)
 lookupLBinder n = lookupBinder (unLoc n)
 
 lookupBinder :: Name -> MetaM (Core TH.Name)
@@ -2037,7 +2037,7 @@ lookupBinder = lookupOcc
 --  * If it is a global name, generate the "original name" representation (ie,
 --   the <module>:<name> form) for the associated entity
 --
-lookupLOcc :: Located Name -> MetaM (Core TH.Name)
+lookupLOcc :: LocatedA Name -> MetaM (Core TH.Name)
 -- Lookup an occurrence; it can't be a splice.
 -- Use the in-scope bindings if they exist
 lookupLOcc n = lookupOcc (unLoc n)
@@ -2411,9 +2411,9 @@ repDerivStrategy mds =
     Nothing -> nothing
     Just ds ->
       case unLoc ds of
-        StockStrategy    -> just =<< repStockStrategy
-        AnyclassStrategy -> just =<< repAnyclassStrategy
-        NewtypeStrategy  -> just =<< repNewtypeStrategy
+        StockStrategy    _ -> just =<< repStockStrategy
+        AnyclassStrategy _ -> just =<< repAnyclassStrategy
+        NewtypeStrategy  _ -> just =<< repNewtypeStrategy
         ViaStrategy ty   -> do ty' <- repLTy (hsSigType ty)
                                via_strat <- repViaStrategy ty'
                                just via_strat
@@ -2537,14 +2537,14 @@ repImplicitParamBind (MkC n) (MkC e) = rep2 implicitParamBindDName [n, e]
 repCtxt :: Core [(M TH.Pred)] -> MetaM (Core (M TH.Cxt))
 repCtxt (MkC tys) = rep2 cxtName [tys]
 
-repDataCon :: Located Name
+repDataCon :: LocatedA Name
            -> HsConDeclDetails GhcRn
            -> MetaM (Core (M TH.Con))
 repDataCon con details
     = do con' <- lookupLOcc con -- See Note [Binders and occurrences]
          repConstr details Nothing [con']
 
-repGadtDataCons :: [Located Name]
+repGadtDataCons :: [LocatedA Name]
                 -> HsConDeclDetails GhcRn
                 -> LHsType GhcRn
                 -> MetaM (Core (M TH.Con))

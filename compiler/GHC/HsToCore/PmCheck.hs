@@ -274,7 +274,7 @@ checkSingle dflags ctxt@(DsMatchContext kind locn) var p = do
 -- | Exhaustive for guard matches, is used for guards in pattern bindings and
 -- in @MultiIf@ expressions. Returns the 'Deltas' covered by the RHSs.
 checkGuardMatches
-  :: HsMatchContext GhcRn         -- ^ Match context, for warning messages
+  :: HsMatchContext Name          -- ^ Match context, for warning messages
   -> GRHSs GhcTc (LHsExpr GhcTc)  -- ^ The GRHSs to check
   -> DsM [Deltas]                 -- ^ Covered 'Deltas' for each RHS, for long
                                   --   distance info
@@ -282,7 +282,7 @@ checkGuardMatches hs_ctx guards@(GRHSs _ grhss _) = do
     let combinedLoc = foldl1 combineSrcSpans (map getLoc grhss)
         dsMatchContext = DsMatchContext hs_ctx combinedLoc
         match = L combinedLoc $
-                  Match { m_ext = noExtField
+                  Match { m_ext = noAnn
                         , m_ctxt = hs_ctx
                         , m_pats = []
                         , m_grhss = guards }
@@ -654,8 +654,8 @@ translateLGRHS fam_insts match_loc pats (L _loc (GRHS _ gs _)) =
   mkGrdTreeRhs loc_sdoc <$> concatMapM (translateGuard fam_insts . unLoc) gs
     where
       loc_sdoc
-        | null gs   = L match_loc (sep (map ppr pats))
-        | otherwise = L grd_loc   (sep (map ppr pats) <+> vbar <+> interpp'SP gs)
+        | null gs   = L match_loc      (sep (map ppr pats))
+        | otherwise = L (locA grd_loc) (sep (map ppr pats) <+> vbar <+> interpp'SP gs)
       L grd_loc _ = head gs
 
 -- | Translate a guard statement to a 'GrdVec'

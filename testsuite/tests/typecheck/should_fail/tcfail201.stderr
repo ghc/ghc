@@ -11,7 +11,7 @@ tcfail201.hs:17:56: error:
         Actual type: c (HsDoc id0)
     • In the expression: z DocEmpty
       In a case alternative: DocEmpty -> z DocEmpty
-      In the expression: case hsDoc of { DocEmpty -> z DocEmpty }
+      In the expression: case hsDoc of DocEmpty -> z DocEmpty
     • Relevant bindings include
         hsDoc :: a (bound at tcfail201.hs:16:13)
         gfoldl' :: (forall a1 b. c (a1 -> b) -> a1 -> c b)

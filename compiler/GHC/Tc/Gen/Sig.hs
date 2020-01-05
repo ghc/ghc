@@ -284,7 +284,7 @@ no_anon_wc lty = go lty
                                         && go ty
       HsQualTy { hst_ctxt = L _ ctxt
                , hst_body = ty }  -> gos ctxt && go ty
-      HsSpliceTy _ (HsSpliced _ _ (HsSplicedTy ty)) -> go $ L noSrcSpan ty
+      HsSpliceTy _ (HsSpliced _ _ (HsSplicedTy ty)) -> go $ L noSrcSpanA ty
       HsSpliceTy{} -> True
       HsTyLit{} -> True
       HsTyVar{} -> True

@@ -28,6 +28,10 @@ checkPprProgPath, checkPprSourcePath :: FilePath
 checkPprProgPath = "test/bin/check-ppr" <.> exe
 checkPprSourcePath = "utils/check-ppr/Main.hs"
 
+checkExactProgPath, checkExactSourcePath :: FilePath
+checkExactProgPath = "test/bin/check-exact" <.> exe
+checkExactSourcePath = "utils/check-exact/Main.hs"
+
 checkApiAnnotationsProgPath, checkApiAnnotationsSourcePath :: FilePath
 checkApiAnnotationsProgPath = "test/bin/check-api-annotations" <.> exe
 checkApiAnnotationsSourcePath = "utils/check-api-annotations/Main.hs"
@@ -35,6 +39,7 @@ checkApiAnnotationsSourcePath = "utils/check-api-annotations/Main.hs"
 checkPrograms :: [(FilePath, FilePath, Package)]
 checkPrograms =
     [ (checkPprProgPath, checkPprSourcePath, checkPpr)
+    , (checkExactProgPath, checkExactSourcePath, checkExact)
     , (checkApiAnnotationsProgPath, checkApiAnnotationsSourcePath, checkApiAnnotations)
     ]
 
@@ -53,8 +58,9 @@ testRules = do
         -- Reasons why this is required are not entirely clear.
         cmd ["bash"] ["-c", ghc0Path ++ " " ++ ghcConfigHsPath ++ " -o " ++ (root -/- ghcConfigProgPath)]
 
-    -- Rules for building check-ppr and check-ppr-annotations with the compiler
-    -- we are going to test (in-tree or out-of-tree).
+    -- Rules for building check-ppr, check-exact and
+    -- check-ppr-annotations with the compiler we are going to test
+    -- (in-tree or out-of-tree).
     forM_ checkPrograms $ \(progPath, sourcePath, progPkg) ->
         root -/- progPath %> \path -> do
             need [ sourcePath ]
@@ -117,7 +123,9 @@ testRules = do
               ]
 
         pythonPath      <- builderPath Python
-        need [ root -/- checkPprProgPath, root -/- checkApiAnnotationsProgPath ]
+        need [ root -/- checkPprProgPath
+             , root -/- checkExactProgPath
+             , root -/- checkApiAnnotationsProgPath ]
 
         -- Set environment variables for test's Makefile.
         -- TODO: Ideally we would define all those env vars in 'env', so that
@@ -133,6 +141,7 @@ testRules = do
             setEnv "TEST_HC_OPTS" ghcFlags
             setEnv "TEST_HC_OPTS_INTERACTIVE" ghciFlags
             setEnv "CHECK_PPR" (top -/- root -/- checkPprProgPath)
+            setEnv "CHECK_EXACT" (top -/- root -/- checkExactProgPath)
             setEnv "CHECK_API_ANNOTATIONS"
                    (top -/- root -/- checkApiAnnotationsProgPath)
 
