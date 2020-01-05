@@ -12,8 +12,13 @@
     (TyClD
      (NoExtField)
      (DataDecl
-      (NoExtField)
-      ({ T15323.hs:5:6-17 }
+      (ApiAnn
+       [(AddApiAnn AnnData { T15323.hs:5:1-4 })
+       ,(AddApiAnn AnnWhere { T15323.hs:5:21-25 })]
+       [(nnnnnnnn
+         (AnnLineComment
+          "parser has not filled in annotation commments properly here"))])
+      (SrcSpanAnn (ApiAnnNotUsed) { T15323.hs:5:6-17 }
        (Unqual
         {OccName: MaybeDefault}))
       (HsQTvs
@@ -21,7 +26,7 @@
        [({ T15323.hs:5:19 }
          (UserTyVar
           (NoExtField)
-          ({ T15323.hs:5:19 }
+          (SrcSpanAnn (ApiAnnNotUsed) { T15323.hs:5:19 }
            (Unqual
             {OccName: v}))))])
       (Prefix)
@@ -35,7 +40,7 @@
        [({ T15323.hs:6:5-56 }
          (ConDeclGADT
           (NoExtField)
-          [({ T15323.hs:6:5-14 }
+          [(SrcSpanAnn (ApiAnnNotUsed) { T15323.hs:6:5-14 }
             (Unqual
              {OccName: TestParens}))]
           ({ T15323.hs:6:21-55 }
@@ -45,29 +50,40 @@
            [({ T15323.hs:6:28 }
              (UserTyVar
               (NoExtField)
-              ({ T15323.hs:6:28 }
+              (SrcSpanAnn (ApiAnnNotUsed) { T15323.hs:6:28 }
                (Unqual
                 {OccName: v}))))])
           (Just
            ({ T15323.hs:6:32-37 }
             [({ T15323.hs:6:32-37 }
               (HsParTy
-               (NoExtField)
+               (ApiAnn
+                [(AddApiAnn AnnOpenP { T15323.hs:6:32 })
+                ,(AddApiAnn AnnCloseP { T15323.hs:6:37 })]
+                [])
                ({ T15323.hs:6:33-36 }
                 (HsAppTy
                  (NoExtField)
                  ({ T15323.hs:6:33-34 }
                   (HsTyVar
-                   (NoExtField)
+                   (ApiAnn
+                    []
+                    [(nnnnnnnn
+                      (AnnLineComment
+                       "parser has not filled in annotation commments properly here"))])
                    (NotPromoted)
-                   ({ T15323.hs:6:33-34 }
+                   (SrcSpanAnn (ApiAnnNotUsed) { T15323.hs:6:33-34 }
                     (Unqual
                      {OccName: Eq}))))
                  ({ T15323.hs:6:36 }
                   (HsTyVar
-                   (NoExtField)
+                   (ApiAnn
+                    []
+                    [(nnnnnnnn
+                      (AnnLineComment
+                       "parser has not filled in annotation commments properly here"))])
                    (NotPromoted)
-                   ({ T15323.hs:6:36 }
+                   (SrcSpanAnn (ApiAnnNotUsed) { T15323.hs:6:36 }
                     (Unqual
                      {OccName: v}))))))))]))
           (PrefixCon
@@ -77,16 +93,24 @@
             (NoExtField)
             ({ T15323.hs:6:42-53 }
              (HsTyVar
-              (NoExtField)
+              (ApiAnn
+               []
+               [(nnnnnnnn
+                 (AnnLineComment
+                  "parser has not filled in annotation commments properly here"))])
               (NotPromoted)
-              ({ T15323.hs:6:42-53 }
+              (SrcSpanAnn (ApiAnnNotUsed) { T15323.hs:6:42-53 }
                (Unqual
                 {OccName: MaybeDefault}))))
             ({ T15323.hs:6:55 }
              (HsTyVar
-              (NoExtField)
+              (ApiAnn
+               []
+               [(nnnnnnnn
+                 (AnnLineComment
+                  "parser has not filled in annotation commments properly here"))])
               (NotPromoted)
-              ({ T15323.hs:6:55 }
+              (SrcSpanAnn (ApiAnnNotUsed) { T15323.hs:6:55 }
                (Unqual
                 {OccName: v}))))))
           (Nothing)))]

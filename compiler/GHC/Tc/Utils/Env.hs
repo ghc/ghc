@@ -208,10 +208,10 @@ span of the Name.
 -}
 
 
-tcLookupLocatedGlobal :: Located Name -> TcM TyThing
+tcLookupLocatedGlobal :: LocatedA Name -> TcM TyThing
 -- c.f. GHC.IfaceToCore.tcIfaceGlobal
 tcLookupLocatedGlobal name
-  = addLocM tcLookupGlobal name
+  = addLocMA tcLookupGlobal name
 
 tcLookupGlobal :: Name -> TcM TyThing
 -- The Name is almost always an ExternalName, but not always
@@ -289,14 +289,14 @@ tcLookupAxiom name = do
         ACoAxiom ax -> return ax
         _           -> wrongThingErr "axiom" (AGlobal thing) name
 
-tcLookupLocatedGlobalId :: Located Name -> TcM Id
-tcLookupLocatedGlobalId = addLocM tcLookupId
+tcLookupLocatedGlobalId :: LocatedA Name -> TcM Id
+tcLookupLocatedGlobalId = addLocMA tcLookupId
 
-tcLookupLocatedClass :: Located Name -> TcM Class
-tcLookupLocatedClass = addLocM tcLookupClass
+tcLookupLocatedClass :: LocatedA Name -> TcM Class
+tcLookupLocatedClass = addLocMA tcLookupClass
 
-tcLookupLocatedTyCon :: Located Name -> TcM TyCon
-tcLookupLocatedTyCon = addLocM tcLookupTyCon
+tcLookupLocatedTyCon :: LocatedA Name -> TcM TyCon
+tcLookupLocatedTyCon = addLocMA tcLookupTyCon
 
 -- Find the instance that exactly matches a type class application.  The class arguments must be precisely
 -- the same as in the instance declaration (modulo renaming & casts).
@@ -403,8 +403,8 @@ tcExtendRecEnv gbl_stuff thing_inside
 ************************************************************************
 -}
 
-tcLookupLocated :: Located Name -> TcM TcTyThing
-tcLookupLocated = addLocM tcLookup
+tcLookupLocated :: LocatedA Name -> TcM TcTyThing
+tcLookupLocated = addLocMA tcLookup
 
 tcLookupLcl_maybe :: Name -> TcM (Maybe TcTyThing)
 tcLookupLcl_maybe name
@@ -976,12 +976,12 @@ newDFunName clas tys loc
         ; dfun_occ <- chooseUniqueOccTc (mkDFunOcc info_string is_boot)
         ; newGlobalBinder mod dfun_occ loc }
 
-newFamInstTyConName :: Located Name -> [Type] -> TcM Name
-newFamInstTyConName (L loc name) tys = mk_fam_inst_name id loc name [tys]
+newFamInstTyConName :: LocatedA Name -> [Type] -> TcM Name
+newFamInstTyConName (L loc name) tys = mk_fam_inst_name id (locA loc) name [tys]
 
-newFamInstAxiomName :: Located Name -> [[Type]] -> TcM Name
+newFamInstAxiomName :: LocatedA Name -> [[Type]] -> TcM Name
 newFamInstAxiomName (L loc name) branches
-  = mk_fam_inst_name mkInstTyCoOcc loc name branches
+  = mk_fam_inst_name mkInstTyCoOcc (locA loc) name branches
 
 mk_fam_inst_name :: (OccName -> OccName) -> SrcSpan -> Name -> [[Type]] -> TcM Name
 mk_fam_inst_name adaptOcc loc tc_name tyss

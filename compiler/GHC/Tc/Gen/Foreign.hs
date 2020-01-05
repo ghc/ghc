@@ -403,7 +403,7 @@ tcFExport fo@(ForeignExport { fd_name = L loc nm, fd_sig_ty = hs_ty, fd_fe = spe
     -- We need to give a name to the new top-level binding that
     -- is *stable* (i.e. the compiler won't change it later),
     -- because this name will be referred to by the C code stub.
-    id  <- mkStableIdFromName nm sig_ty loc mkForeignExportOcc
+    id  <- mkStableIdFromName nm sig_ty (locA loc) mkForeignExportOcc
     return ( mkVarBind id rhs
            , ForeignExport { fd_name = L loc id
                            , fd_sig_ty = undefined

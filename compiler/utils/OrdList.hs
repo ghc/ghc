@@ -16,6 +16,7 @@ module OrdList (
         OrdList,
         nilOL, isNilOL, unitOL, appOL, consOL, snocOL, concatOL, lastOL,
         headOL,
+        initOL, tailOL, unsnocOL, unconsOL,
         mapOL, fromOL, toOL, foldrOL, foldlOL, reverseOL, fromOLReverse,
         strictlyEqOL, strictlyOrdOL
 ) where
@@ -73,6 +74,10 @@ concatOL :: [OrdList a] -> OrdList a
 headOL   :: OrdList a   -> a
 lastOL   :: OrdList a   -> a
 lengthOL :: OrdList a   -> Int
+initOL   :: OrdList a   -> OrdList a
+tailOL   :: OrdList a   -> OrdList a
+unsnocOL :: OrdList a   -> (OrdList a, a)
+unconsOL :: OrdList a   -> (a, OrdList a)
 
 nilOL        = None
 unitOL as    = One as
@@ -93,6 +98,36 @@ lastOL (Many as)   = last as
 lastOL (Cons _ as) = lastOL as
 lastOL (Snoc _ a)  = a
 lastOL (Two _ as)  = lastOL as
+
+initOL None                = panic "initOL"
+initOL (One _)             = None
+initOL (Many [_])          = None
+initOL (Many as)           = Many (init as)
+initOL (Cons a (Many [_])) = One a
+initOL (Cons a (One _))    = One a
+initOL (Cons a as)         = Cons a (initOL as)
+initOL (Snoc as _)         = as
+initOL (Two as (Many [_])) = as
+initOL (Two as (One _))    = as
+initOL (Two as bs)         = Two as (initOL bs)
+
+tailOL None                = panic "initOL"
+tailOL (One _)             = None
+tailOL (Many [_])          = None
+tailOL (Many as)           = Many (tail as)
+tailOL (Cons _ as)         = as
+tailOL (Snoc (Many [_]) b) = One b
+tailOL (Snoc (One _) b)    = One b
+tailOL (Snoc as b)         = Snoc (tailOL as) b
+tailOL (Two (Many [_]) bs) = bs
+tailOL (Two (One _)    bs) = bs
+tailOL (Two as bs)         = Two (tailOL as) bs
+
+unconsOL None      = panic "unconsOL"
+unconsOL as        = (headOL as, tailOL as)
+
+unsnocOL None      = panic "unsnocOL"
+unsnocOL as        = (initOL as, lastOL as)
 
 lengthOL None        = 0
 lengthOL (One _)     = 1

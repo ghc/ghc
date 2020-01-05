@@ -13,6 +13,7 @@ module GHC.Hs.Dump (
         -- * Dumping ASTs
         showAstData,
         BlankSrcSpan(..),
+        BlankApiAnnotations(..),
     ) where
 
 import GhcPrelude
@@ -21,6 +22,7 @@ import Data.Data hiding (Fixity)
 import Bag
 import GHC.Types.Basic
 import FastString
+import Lexer (AddApiAnn(..))
 import GHC.Types.Name.Set
 import GHC.Types.Name
 import GHC.Core.DataCon
@@ -35,17 +37,22 @@ import qualified Data.ByteString as B
 data BlankSrcSpan = BlankSrcSpan | NoBlankSrcSpan
                   deriving (Eq,Show)
 
+data BlankApiAnnotations = BlankApiAnnotations | NoBlankApiAnnotations
+                  deriving (Eq,Show)
+
 -- | Show a GHC syntax tree. This parameterised because it is also used for
 -- comparing ASTs in ppr roundtripping tests, where the SrcSpan's are blanked
 -- out, to avoid comparing locations, only structure
-showAstData :: Data a => BlankSrcSpan -> a -> SDoc
-showAstData b a0 = blankLine $$ showAstData' a0
+showAstData :: Data a => BlankSrcSpan -> BlankApiAnnotations -> a -> SDoc
+showAstData bs ba a0 = blankLine $$ showAstData' a0
   where
     showAstData' :: Data a => a -> SDoc
     showAstData' =
       generic
               `ext1Q` list
               `extQ` string `extQ` fastString `extQ` srcSpan
+              `extQ` annotation
+              `extQ` addApiAnn
               `extQ` lit `extQ` litr `extQ` litt
               `extQ` bytestring
               `extQ` name `extQ` occName `extQ` moduleName `extQ` var
@@ -115,12 +122,24 @@ showAstData b a0 = blankLine $$ showAstData' a0
             moduleName m = braces $ text "ModuleName: " <> ppr m
 
             srcSpan :: SrcSpan -> SDoc
-            srcSpan ss = case b of
+            srcSpan ss = case bs of
              BlankSrcSpan -> text "{ ss }"
              NoBlankSrcSpan -> braces $ char ' ' <>
                              (hang (ppr ss) 1
                                    -- TODO: show annotations here
                                    (text ""))
+
+            annotation :: ApiAnn -> SDoc
+            annotation anns = case ba of
+             BlankApiAnnotations -> parens $ text "ApiAnn"
+             NoBlankApiAnnotations -> parens $ text (showConstr (toConstr anns))
+                                               $$ vcat (gmapQ showAstData' anns)
+
+            addApiAnn :: AddApiAnn -> SDoc
+            addApiAnn (AddApiAnn a s) = case ba of
+             BlankApiAnnotations -> parens $ text "AddApiAnn"
+             NoBlankApiAnnotations ->
+              parens $ text "AddApiAnn" <+> ppr a <+> srcSpan s
 
             var  :: Var -> SDoc
             var v      = braces $ text "Var: " <> ppr v
@@ -157,8 +176,12 @@ showAstData b a0 = blankLine $$ showAstData' a0
                    case cast ss of
                         Just (s :: SrcSpan) ->
                           srcSpan s
-                        Nothing -> text "nnnnnnnn"
+                        Nothing -> case cast ss of
+                          Just ((SrcSpanAnn a s) :: SrcSpanAnn) ->
+                            text "SrcSpanAnn" <+> showAstData' a <+> srcSpan s
+                          Nothing -> text "nnnnnnnn"
                       $$ showAstData' a
+
 
 normalize_newlines :: String -> String
 normalize_newlines ('\\':'r':'\\':'n':xs) = '\\':'n':normalize_newlines xs

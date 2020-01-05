@@ -149,14 +149,16 @@ tcClassSigs clas sigs def_methods
        ; traceTc "tcClassSigs 2" (ppr clas)
        ; return op_info }
   where
+    vanilla_sigs :: [Located ([LocatedA Name], LHsSigType GhcRn)] -- AZ temp
     vanilla_sigs = [L loc (nm,ty) | L loc (ClassOpSig _ False nm ty) <- sigs]
+    gen_sigs :: [Located ([LocatedA Name], LHsSigType GhcRn)] -- AZ temp
     gen_sigs     = [L loc (nm,ty) | L loc (ClassOpSig _ True  nm ty) <- sigs]
     dm_bind_names :: [Name] -- These ones have a value binding in the class decl
     dm_bind_names = [op | L _ (FunBind {fun_id = L _ op}) <- bagToList def_methods]
 
     skol_info = TyConSkol ClassFlavour clas
 
-    tc_sig :: NameEnv (SrcSpan, Type) -> ([Located Name], LHsSigType GhcRn)
+    tc_sig :: NameEnv (SrcSpan, Type) -> ([LocatedA Name], LHsSigType GhcRn)
            -> TcM [TcMethInfo]
     tc_sig gen_dm_env (op_names, op_hs_ty)
       = do { traceTc "ClsSig 1" (ppr op_names)
@@ -170,9 +172,12 @@ tcClassSigs clas sigs def_methods
                   | nm `elem` dm_bind_names                 = Just VanillaDM
                   | otherwise                               = Nothing
 
+    tc_gen_sig :: ([LocatedA Name], LHsSigType GhcRn)
+                      -> IOEnv (Env TcGblEnv TcLclEnv) [(Name, (SrcSpan, Type))] -- AZ temp
     tc_gen_sig (op_names, gen_hs_ty)
       = do { gen_op_ty <- tcClassSigType skol_info op_names gen_hs_ty
-           ; return [ (op_name, (loc, gen_op_ty)) | L loc op_name <- op_names ] }
+           ; return [ (op_name, (locA loc, gen_op_ty))
+                                                 | L loc op_name <- op_names ] }
 
 {-
 ************************************************************************
@@ -187,8 +192,8 @@ tcClassDecl2 :: LTyClDecl GhcRn          -- The class declaration
 
 tcClassDecl2 (L _ (ClassDecl {tcdLName = class_name, tcdSigs = sigs,
                                 tcdMeths = default_binds}))
-  = recoverM (return emptyLHsBinds)     $
-    setSrcSpan (getLoc class_name)      $
+  = recoverM (return emptyLHsBinds) $
+    setSrcSpanA (getLoc class_name) $
     do  { clas <- tcLookupLocatedClass class_name
 
         -- We make a separate binding for each default method.
@@ -287,7 +292,7 @@ tcDefMeth clas tyvars this_dict binds_in hs_sig_fn prag_fn
        ; let local_dm_id = mkLocalId local_dm_name local_dm_ty
              local_dm_sig = CompleteSig { sig_bndr = local_dm_id
                                         , sig_ctxt  = ctxt
-                                        , sig_loc   = getLoc (hsSigType hs_ty) }
+                                        , sig_loc   = getLocA (hsSigType hs_ty) }
 
        ; (ev_binds, (tc_bind, _))
                <- checkConstraints skol_info tyvars [this_dict] $
@@ -336,7 +341,7 @@ tcClassMinimalDef _clas sigs op_info
   where
     -- By default require all methods without a default implementation
     defMindef :: ClassMinimalDef
-    defMindef = mkAnd [ noLoc (mkVar name)
+    defMindef = mkAnd [ noLocA (mkVar name)
                       | (name, _, Nothing) <- op_info ]
 
 instantiateMethod :: Class -> TcId -> [TcType] -> TcType
@@ -367,7 +372,7 @@ mkHsSigFun sigs = lookupNameEnv env
   where
     env = mkHsSigEnv get_classop_sig sigs
 
-    get_classop_sig :: LSig GhcRn -> Maybe ([Located Name], LHsSigType GhcRn)
+    get_classop_sig :: LSig GhcRn -> Maybe ([LocatedA Name], LHsSigType GhcRn)
     get_classop_sig  (L _ (ClassOpSig _ _ ns hs_ty)) = Just (ns, hs_ty)
     get_classop_sig  _                               = Nothing
 
@@ -386,7 +391,7 @@ findMethodBind sel_name binds prag_fn
 
     f bind@(L _ (FunBind { fun_id = L bndr_loc op_name }))
       | op_name == sel_name
-             = Just (bind, bndr_loc, prags)
+             = Just (bind, locA bndr_loc, prags)
     f _other = Nothing
 
 ---------------------------
@@ -516,7 +521,7 @@ tcATDefault loc inst_subst defined_ats (ATI fam_tc defs)
              (tv', cv') = partition isTyVar tcv'
              tvs'     = scopedSort tv'
              cvs'     = scopedSort cv'
-       ; rep_tc_name <- newFamInstTyConName (L loc (tyConName fam_tc)) pat_tys'
+       ; rep_tc_name <- newFamInstTyConName (L (noAnnSrcSpan loc) (tyConName fam_tc)) pat_tys'
        ; let axiom = mkSingleCoAxiom Nominal rep_tc_name tvs' [] cvs'
                                      fam_tc pat_tys' rhs'
            -- NB: no validity check. We check validity of default instances
