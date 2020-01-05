@@ -1,5 +1,8 @@
 {-# LANGUAGE ConstraintKinds #-}
 {-# LANGUAGE DeriveDataTypeable #-}
+{-# LANGUAGE DeriveFunctor      #-}
+{-# LANGUAGE DeriveFoldable     #-}
+{-# LANGUAGE DeriveTraversable  #-}
 {-# LANGUAGE EmptyCase #-}
 {-# LANGUAGE EmptyDataDeriving #-}
 {-# LANGUAGE FlexibleContexts #-}
@@ -31,8 +34,9 @@ import Data.Data hiding ( Fixity )
 import GHC.Types.Name
 import GHC.Types.Name.Reader
 import GHC.Types.Var
-import GHC.Utils.Outputable
-import GHC.Types.SrcLoc (Located)
+import GHC.Utils.Outputable hiding ((<>))
+import GHC.Types.SrcLoc
+import GHC.Parser.Annotation
 
 import Data.Kind
 
@@ -170,7 +174,7 @@ noExtCon x = case x of {}
 -- to add 'SrcLoc' info via 'Located'. Other passes than 'GhcPass' not
 -- interested in location information can define this instance as @f p@.
 type family XRec p (f :: Type -> Type) = r | r -> p f
-type instance XRec (GhcPass p) f = Located (f (GhcPass p))
+type instance XRec (GhcPass p) f = LocatedA (f (GhcPass p))
 
 {-
 Note [NoExtCon and strict fields]
@@ -217,6 +221,7 @@ instance Typeable p => Data (GhcPass p) where
   gunfold _ _ _ = panic "instance Data GhcPass"
   toConstr  _   = panic "instance Data GhcPass"
   dataTypeOf _  = panic "instance Data GhcPass"
+
 
 data Pass = Parsed | Renamed | Typechecked
          deriving (Data)
@@ -371,6 +376,11 @@ type family XClassDecl     x
 type family XXTyClDecl     x
 
 -- -------------------------------------
+-- FunDep type families
+type family XCFunDep      x
+type family XXFunDep      x
+
+-- -------------------------------------
 -- TyClGroup type families
 type family XCTyClGroup      x
 type family XXTyClGroup      x
@@ -427,7 +437,10 @@ type family XXDerivDecl      x
 
 -- -------------------------------------
 -- DerivStrategy type family
-type family XViaStrategy x
+type family XStockStrategy    x
+type family XAnyClassStrategy x
+type family XNewtypeStrategy  x
+type family XViaStrategy      x
 
 -- -------------------------------------
 -- DefaultDecl type families
@@ -475,6 +488,11 @@ type family XXAnnDecl      x
 -- RoleAnnotDecl type families
 type family XCRoleAnnotDecl  x
 type family XXRoleAnnotDecl  x
+
+-- -------------------------------------
+-- InjectivityAnn type families
+type family XCInjectivityAnn  x
+type family XXInjectivityAnn  x
 
 -- =====================================================================
 -- Type families for the HsExpr extension points
@@ -753,9 +771,6 @@ type family XIEGroup           x
 type family XIEDoc             x
 type family XIEDocNamed        x
 type family XXIE               x
-
--- -------------------------------------
-
 
 -- =====================================================================
 -- End of Type family definitions

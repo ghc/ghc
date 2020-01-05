@@ -50,6 +50,7 @@ import GHC.Core.Utils
 import GHC.Core.Unfold
 import GHC.Core.Lint
 import GHC.Core.Make
+import GHC.Parser.Annotation ( noLocA )
 import GHC.Types.Id
 import GHC.Types.Id.Make
 import GHC.Types.Id.Info
@@ -233,7 +234,7 @@ mergeIfaceDecl d1 d2
                     (mkNameEnv [ (n, op) | op@(IfaceClassOp n _ _) <- ops2 ])
       in d1 { ifBody = (ifBody d1) {
                 ifSigs  = ops,
-                ifMinDef = BF.mkOr [noLoc bf1, noLoc bf2]
+                ifMinDef = BF.mkOr [noLocA bf1, noLocA bf2]
                 }
             } `withRolesFrom` d2
     -- It doesn't matter; we'll check for consistency later when

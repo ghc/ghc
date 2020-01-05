@@ -1844,7 +1844,7 @@ checkValidInstance ctxt hs_type ty
   = failWithTc (text "Arity mis-match in instance head")
 
   | otherwise
-  = do  { setSrcSpan head_loc $
+  = do  { setSrcSpanA head_loc $
           checkValidInstHead ctxt clas inst_tys
 
         ; traceTc "checkValidInstance {" (ppr ty)

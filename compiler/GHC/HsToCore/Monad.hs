@@ -23,7 +23,7 @@ module GHC.HsToCore.Monad (
         duplicateLocalDs, newSysLocalDsNoLP, newSysLocalDs,
         newSysLocalsDsNoLP, newSysLocalsDs, newUniqueId,
         newFailLocalDs, newPredVarDs,
-        getSrcSpanDs, putSrcSpanDs,
+        getSrcSpanDs, putSrcSpanDs, putSrcSpanDsA,
         mkPrintUnqualifiedDs,
         newUnique,
         UniqSupply, newUniqueSupply,
@@ -101,7 +101,7 @@ import Data.IORef
 -}
 
 data DsMatchContext
-  = DsMatchContext (HsMatchContext GhcRn) SrcSpan
+  = DsMatchContext (HsMatchContext Name) SrcSpan
   deriving ()
 
 instance Outputable DsMatchContext where
@@ -416,6 +416,9 @@ putSrcSpanDs (UnhelpfulSpan {}) thing_inside
   = thing_inside
 putSrcSpanDs (RealSrcSpan real_span _) thing_inside
   = updLclEnv (\ env -> env {dsl_loc = real_span}) thing_inside
+
+putSrcSpanDsA :: SrcSpanAnn' ann -> DsM a -> DsM a
+putSrcSpanDsA loc = putSrcSpanDs (locA loc)
 
 -- | Emit a warning for the current source location
 -- NB: Warns whether or not -Wxyz is set

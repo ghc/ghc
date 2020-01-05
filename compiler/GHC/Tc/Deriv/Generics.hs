@@ -332,9 +332,9 @@ gk2gkDC Gen1_{} d = Gen1_DC $ last $ dataConUnivTyVars d
 -- Bindings for the Generic instance
 mkBindsRep :: GenericKind -> TyCon -> LHsBinds GhcPs
 mkBindsRep gk tycon =
-    unitBag (mkRdrFunBind (L loc from01_RDR) [from_eqn])
+    unitBag (mkRdrFunBind (L (noAnnSrcSpan loc) from01_RDR) [from_eqn])
   `unionBags`
-    unitBag (mkRdrFunBind (L loc to01_RDR) [to_eqn])
+    unitBag (mkRdrFunBind (L (noAnnSrcSpan loc) to01_RDR) [to_eqn])
       where
         -- The topmost M1 (the datatype metadata) has the exact same type
         -- across all cases of a from/to definition, and can be factored out

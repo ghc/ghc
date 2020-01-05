@@ -7,13 +7,15 @@ gadt7.hs:16:38: error:
                    in a case alternative
           at gadt7.hs:16:33
       ‘p’ is a rigid type variable bound by
-        the inferred type of i1b :: T a -> p -> p1 at gadt7.hs:16:1-44
+        the inferred type of i1b :: T a -> p -> p1
+        at gadt7.hs:16:1-44
       ‘p1’ is a rigid type variable bound by
-        the inferred type of i1b :: T a -> p -> p1 at gadt7.hs:16:1-44
+        the inferred type of i1b :: T a -> p -> p1
+        at gadt7.hs:16:1-44
       Possible fix: add a type signature for ‘i1b’
     • In the expression: y1
       In a case alternative: K -> y1
-      In the expression: case t1 of { K -> y1 }
+      In the expression: case t1 of K -> y1
     • Relevant bindings include
         y1 :: p (bound at gadt7.hs:16:16)
         y :: p (bound at gadt7.hs:16:7)

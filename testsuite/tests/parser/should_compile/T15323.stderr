@@ -12,8 +12,13 @@
     (TyClD
      (NoExtField)
      (DataDecl
-      (NoExtField)
-      ({ T15323.hs:5:6-17 }
+      (ApiAnn
+       [(AddApiAnn AnnData { T15323.hs:5:1-4 })
+       ,(AddApiAnn AnnWhere { T15323.hs:5:21-25 })]
+       [(nnnnnnnn
+         (AnnLineComment
+          "parser has not filled in annotation commments properly here"))])
+      (SrcSpanAnn (ApiAnnNotUsed) { T15323.hs:5:6-17 }
        (Unqual
         {OccName: MaybeDefault}))
       (HsQTvs

@@ -30,10 +30,11 @@ testOneFile libdir fileName = do
        p <- parseOneFile libdir fileName
        let
          origAst = showSDoc unsafeGlobalDynFlags
-                     $ showAstData BlankSrcSpan (pm_parsed_source p)
+                     $ showAstData BlankSrcSpan BlankApiAnnotations
+                                                         (pm_parsed_source p)
          pped    = pragmas ++ "\n" ++ pp (pm_parsed_source p)
-         anns    = pm_annotations p
-         pragmas = getPragmas anns
+         anns'   = pm_annotations p
+         pragmas = getPragmas anns'
 
          newFile = dropExtension fileName <.> "ppr" <.> takeExtension fileName
          astFile = fileName <.> "ast"
@@ -46,7 +47,8 @@ testOneFile libdir fileName = do
 
        let newAstStr :: String
            newAstStr = showSDoc unsafeGlobalDynFlags
-                         $ showAstData BlankSrcSpan (pm_parsed_source p')
+                         $ showAstData BlankSrcSpan BlankApiAnnotations
+                                                         (pm_parsed_source p')
        writeFile newAstFile newAstStr
 
        if origAst == newAstStr
@@ -85,17 +87,15 @@ parseOneFile libdir fileName = do
          parseModule modSum
 
 getPragmas :: ApiAnns -> String
-getPragmas anns = pragmaStr
+getPragmas anns' = pragmaStr
   where
     tokComment (L _ (AnnBlockComment s)) = s
     tokComment (L _ (AnnLineComment  s)) = s
     tokComment _ = ""
 
-    comments = map tokComment $ sortRealLocated $ apiAnnRogueComments anns
-    pragmas = filter (\c -> isPrefixOf "{-#" c ) comments
+    comments' = map tokComment $ sortRealLocated $ apiAnnRogueComments anns'
+    pragmas = filter (\c -> isPrefixOf "{-#" c ) comments'
     pragmaStr = intercalate "\n" pragmas
 
 pp :: (Outputable a) => a -> String
 pp a = showPpr unsafeGlobalDynFlags a
-
-

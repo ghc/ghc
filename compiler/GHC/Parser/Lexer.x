@@ -42,6 +42,7 @@
 
 {
 {-# LANGUAGE BangPatterns #-}
+{-# LANGUAGE DeriveDataTypeable #-}
 {-# LANGUAGE LambdaCase #-}
 {-# LANGUAGE MultiWayIf #-}
 
@@ -53,7 +54,7 @@ module GHC.Parser.Lexer (
    P(..), ParseResult(..), mkParserFlags, mkParserFlags', ParserFlags(..),
    appendWarning,
    appendError,
-   allocateComments,
+   allocateComments, newComments,
    MonadP(..),
    getRealSrcLoc, getPState, withHomeUnitId,
    failMsgP, failLocMsgP, srcParseFail,
@@ -64,7 +65,7 @@ module GHC.Parser.Lexer (
    ExtBits(..),
    xtest,
    lexTokenStream,
-   AddAnn(..),mkParensApiAnn,
+   mkParensApiAnn,
    addAnnsAt,
    commentToAnnotation
   ) where
@@ -2134,7 +2135,6 @@ data PState = PState {
         -- locations of 'noise' tokens in the source, so that users of
         -- the GHC API can do source to source conversions.
         -- See note [Api annotations] in GHC.Parser.Annotation
-        annotations :: [(ApiAnnKey,[RealSrcSpan])],
         eof_pos :: Maybe RealSrcSpan,
         comment_q :: [RealLocated AnnotationComment],
         annotations_comments :: [(RealSrcSpan,[RealLocated AnnotationComment])]
@@ -2616,7 +2616,7 @@ mkPStatePure options buf loc =
       alr_context = [],
       alr_expecting_ocurly = Nothing,
       alr_justClosedExplicitLetBlock = False,
-      annotations = [],
+      -- AZ annotations = [],
       eof_pos = Nothing,
       comment_q = [],
       annotations_comments = []
@@ -2654,11 +2654,14 @@ class Monad m => MonadP m where
   addFatalError :: SrcSpan -> SDoc -> m a
   -- | Check if a given flag is currently set in the bitmap.
   getBit :: ExtBits -> m Bool
-  -- | Given a location and a list of AddAnn, apply them all to the location.
-  addAnnotation :: SrcSpan          -- SrcSpan of enclosing AST construct
+  -- | Given a location and a list of AddApiAnn, apply them all to the location.
+  addAnnotation :: RealSrcSpan      -- SrcSpan of enclosing AST construct
                 -> AnnKeywordId     -- The first two parameters are the key
-                -> SrcSpan          -- The location of the keyword itself
+                -> RealSrcSpan      -- The location of the keyword itself
                 -> m ()
+  -- | Go through the @comment_q@ in @PState@ and remove all comments
+  -- that belong within the given span
+  allocateCommentsP :: RealSrcSpan -> m [RealLocated AnnotationComment]
 
 appendError
   :: SrcSpan
@@ -2698,13 +2701,20 @@ instance MonadP P where
     addError span msg >> P PFailed
   getBit ext = P $ \s -> let b =  ext `xtest` pExtsBitmap (options s)
                          in b `seq` POk s b
-  addAnnotation (RealSrcSpan l _) a (RealSrcSpan v _) = do
-    addAnnotationOnly l a v
-    allocateCommentsP l
-  addAnnotation _ _ _ = return ()
+  addAnnotation l a v = do
+    return ()
+  allocateCommentsP ss = P $ \s ->
+    let (comment_q', newAnns) = allocateComments ss (comment_q s) in
+      POk s {
+         comment_q = comment_q'
+       , annotations_comments = newAnns ++ (annotations_comments s)
+       } (newComments newAnns)
 
-addAnnsAt :: MonadP m => SrcSpan -> [AddAnn] -> m ()
-addAnnsAt l = mapM_ (\(AddAnn a v) -> addAnnotation l a v)
+addAnnsAt :: (MonadP m) => SrcSpan -> [AddApiAnn] -> m [RealLocated AnnotationComment]
+addAnnsAt (RealSrcSpan l _) anns = do
+  cs <- allocateCommentsP l
+  return cs
+addAnnsAt _ _ = return []
 
 addTabWarning :: RealSrcSpan -> P ()
 addTabWarning srcspan
@@ -3209,60 +3219,30 @@ clean_pragma prag = canon_ws (map toLower (unprefix prag))
 %************************************************************************
 -}
 
--- | Encapsulated call to addAnnotation, requiring only the SrcSpan of
---   the AST construct the annotation belongs to; together with the
---   AnnKeywordId, this is the key of the annotation map.
---
---   This type is useful for places in the parser where it is not yet
---   known what SrcSpan an annotation should be added to.  The most
---   common situation is when we are parsing a list: the annotations
---   need to be associated with the AST element that *contains* the
---   list, not the list itself.  'AddAnn' lets us defer adding the
---   annotations until we finish parsing the list and are now parsing
---   the enclosing element; we then apply the 'AddAnn' to associate
---   the annotations.  Another common situation is where a common fragment of
---   the AST has been factored out but there is no separate AST node for
---   this fragment (this occurs in class and data declarations). In this
---   case, the annotation belongs to the parent data declaration.
---
---   The usual way an 'AddAnn' is created is using the 'mj' ("make jump")
---   function, and then it can be discharged using the 'ams' function.
-data AddAnn = AddAnn AnnKeywordId SrcSpan
-
-addAnnotationOnly :: RealSrcSpan -> AnnKeywordId -> RealSrcSpan -> P ()
-addAnnotationOnly l a v = P $ \s -> POk s {
-  annotations = ((l,a), [v]) : annotations s
-  } ()
 
 -- |Given a 'SrcSpan' that surrounds a 'HsPar' or 'HsParTy', generate
--- 'AddAnn' values for the opening and closing bordering on the start
+-- 'AddApiAnn' values for the opening and closing bordering on the start
 -- and end of the span
-mkParensApiAnn :: SrcSpan -> [AddAnn]
+mkParensApiAnn :: SrcSpan -> [AddApiAnn]
 mkParensApiAnn (UnhelpfulSpan _)  = []
-mkParensApiAnn (RealSrcSpan ss _) = [AddAnn AnnOpenP lo,AddAnn AnnCloseP lc]
+mkParensApiAnn (RealSrcSpan ss _) = [AddApiAnn AnnOpenP lo,AddApiAnn AnnCloseP lc]
   where
     f = srcSpanFile ss
     sl = srcSpanStartLine ss
     sc = srcSpanStartCol ss
     el = srcSpanEndLine ss
     ec = srcSpanEndCol ss
-    lo = RealSrcSpan (mkRealSrcSpan (realSrcSpanStart ss)        (mkRealSrcLoc f sl (sc+1))) Nothing
-    lc = RealSrcSpan (mkRealSrcSpan (mkRealSrcLoc f el (ec - 1)) (realSrcSpanEnd ss))        Nothing
+    lo = mkRealSrcSpan (realSrcSpanStart ss)        (mkRealSrcLoc f sl (sc+1))
+    lc = mkRealSrcSpan (mkRealSrcLoc f el (ec - 1)) (realSrcSpanEnd ss)
 
 queueComment :: RealLocated Token -> P()
 queueComment c = P $ \s -> POk s {
   comment_q = commentToAnnotation c : comment_q s
   } ()
 
--- | Go through the @comment_q@ in @PState@ and remove all comments
--- that belong within the given span
-allocateCommentsP :: RealSrcSpan -> P ()
-allocateCommentsP ss = P $ \s ->
-  let (comment_q', newAnns) = allocateComments ss (comment_q s) in
-    POk s {
-       comment_q = comment_q'
-     , annotations_comments = newAnns ++ (annotations_comments s)
-     } ()
+newComments :: [(RealSrcSpan,[RealLocated AnnotationComment])] -> [RealLocated AnnotationComment]
+newComments [] = []
+newComments ((_,cs):_) = cs
 
 allocateComments
   :: RealSrcSpan

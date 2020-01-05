@@ -19,9 +19,9 @@ T13199.hs:33:2-30: Splicing declarations
 T13199.hs:36:2-29: Splicing declarations
     [d| k = id @(Maybe Int) |] ======> k = id @(Maybe Int)
 T13199.hs:38:2-59: Splicing declarations
-    [d| l = case Just 'a' of { Just a -> Just ((\ x -> x) a) } |]
+    [d| l = case Just 'a' of Just a -> Just ((\ x -> x) a) |]
   ======>
-    l = case Just 'a' of { Just a -> Just ((\ x -> x) a) }
+    l = case Just 'a' of Just a -> Just ((\ x -> x) a)
 T13199.ppr.hs:11:2-42: Splicing declarations
     [d| instance C (Maybe a) (Maybe b) c |]
   ======>
@@ -42,7 +42,7 @@ T13199.ppr.hs:16:2-29: Splicing declarations
     [d| j B {aa = a} = True |] ======> j B {aa = a} = True
 T13199.ppr.hs:17:2-29: Splicing declarations
     [d| k = id @(Maybe Int) |] ======> k = id @(Maybe Int)
-T13199.ppr.hs:18:2-64: Splicing declarations
-    [d| l = case Just 'a' of { Just a -> Just ((\ x -> x) a) } |]
+T13199.ppr.hs:18:2-60: Splicing declarations
+    [d| l = case Just 'a' of Just a -> Just ((\ x -> x) a) |]
   ======>
-    l = case Just 'a' of { Just a -> Just ((\ x -> x) a) }
+    l = case Just 'a' of Just a -> Just ((\ x -> x) a)

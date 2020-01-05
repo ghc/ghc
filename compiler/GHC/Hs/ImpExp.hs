@@ -28,6 +28,7 @@ import GHC.Utils.Outputable
 import GHC.Data.FastString
 import GHC.Types.SrcLoc
 import GHC.Hs.Extension
+import GHC.Parser.Annotation
 
 import Data.Data
 import Data.Maybe
@@ -43,7 +44,7 @@ One per \tr{import} declaration in a module.
 -}
 
 -- | Located Import Declaration
-type LImportDecl pass = Located (ImportDecl pass)
+type LImportDecl pass = LocatedA (ImportDecl pass)
         -- ^ When in a list this may have
         --
         --  - 'ApiAnnotation.AnnKeywordId' : 'ApiAnnotation.AnnSemi'
@@ -60,12 +61,12 @@ data ImportDeclQualifiedStyle
 -- | Given two possible located 'qualified' tokens, compute a style
 -- (in a conforming Haskell program only one of the two can be not
 -- 'Nothing'). This is called from 'GHC.Parser'.
-importDeclQualifiedStyle :: Maybe (Located a)
-                         -> Maybe (Located a)
-                         -> ImportDeclQualifiedStyle
+importDeclQualifiedStyle :: Maybe RealSrcSpan
+                         -> Maybe RealSrcSpan
+                         -> (Maybe RealSrcSpan, ImportDeclQualifiedStyle)
 importDeclQualifiedStyle mPre mPost =
-  if isJust mPre then QualifiedPre
-  else if isJust mPost then QualifiedPost else NotQualified
+  if isJust mPre then (mPre, QualifiedPre)
+  else if isJust mPost then (mPost,QualifiedPost) else (Nothing, NotQualified)
 
 -- | Convenience function to answer the question if an import decl. is
 -- qualified.
@@ -88,7 +89,7 @@ data ImportDecl pass
       ideclQualified :: ImportDeclQualifiedStyle, -- ^ If/how the import is qualified.
       ideclImplicit  :: Bool,          -- ^ True => implicit import (of Prelude)
       ideclAs        :: Maybe (Located ModuleName),  -- ^ as Module
-      ideclHiding    :: Maybe (Bool, Located [LIE pass])
+      ideclHiding    :: Maybe (Bool, LocatedL [LIE pass])
                                        -- ^ (True => hiding, names)
     }
   | XImportDecl !(XXImportDecl pass)
@@ -109,12 +110,30 @@ data ImportDecl pass
 
      -- For details on above see note [Api annotations] in GHC.Parser.Annotation
 
-type instance XCImportDecl  (GhcPass _) = NoExtField
+type instance XCImportDecl  GhcPs = ApiAnn' ApiAnnImportDecl
+type instance XCImportDecl  GhcRn = NoExtField
+type instance XCImportDecl  GhcTc = NoExtField
+
 type instance XXImportDecl  (GhcPass _) = NoExtCon
 
-simpleImportDecl :: ModuleName -> ImportDecl (GhcPass p)
+-- ---------------------------------------------------------------------
+
+-- API Annotations types
+
+data ApiAnnImportDecl = ApiAnnImportDecl
+  { importDeclAnnImport    :: RealSrcSpan
+  , importDeclAnnPragma    :: Maybe (RealSrcSpan, RealSrcSpan)
+  , importDeclAnnSafe      :: Maybe RealSrcSpan
+  , importDeclAnnQualified :: Maybe RealSrcSpan
+  , importDeclAnnPackage   :: Maybe RealSrcSpan
+  , importDeclAnnAs        :: Maybe RealSrcSpan
+  } deriving (Data)
+
+-- ---------------------------------------------------------------------
+
+simpleImportDecl :: ModuleName -> ImportDecl GhcPs
 simpleImportDecl mn = ImportDecl {
-      ideclExt       = noExtField,
+      ideclExt       = noAnn,
       ideclSourceSrc = NoSourceText,
       ideclName      = noLoc mn,
       ideclPkgQual   = Nothing,
@@ -180,9 +199,9 @@ instance OutputableBndrId p
 -- primarily for accurate pretty printing of ParsedSource, and API Annotation
 -- placement.
 data IEWrappedName name
-  = IEName    (Located name)  -- ^ no extra
-  | IEPattern (Located name)  -- ^ pattern X
-  | IEType    (Located name)  -- ^ type (:+:)
+  = IEName    (LocatedN name)  -- ^ no extra
+  | IEPattern (LocatedN name)  -- ^ pattern X
+  | IEType    (LocatedN name)  -- ^ type (:+:)
   deriving (Eq,Data)
 
 -- | Located name with possible adornment
@@ -193,7 +212,7 @@ type LIEWrappedName name = Located (IEWrappedName name)
 
 
 -- | Located Import or Export
-type LIE pass = Located (IE pass)
+type LIE pass = LocatedA (IE pass)
         -- ^ When in a list this may have
         --
         --  - 'ApiAnnotation.AnnKeywordId' : 'ApiAnnotation.AnnComma'
@@ -254,11 +273,18 @@ data IE pass
   | IEDocNamed          (XIEDocNamed pass) String    -- ^ Reference to named doc
   | XIE !(XXIE pass)
 
-type instance XIEVar             (GhcPass _) = NoExtField
-type instance XIEThingAbs        (GhcPass _) = NoExtField
-type instance XIEThingAll        (GhcPass _) = NoExtField
-type instance XIEThingWith       (GhcPass _) = NoExtField
-type instance XIEModuleContents  (GhcPass _) = NoExtField
+type instance XIEVar             GhcPs = ApiAnn
+type instance XIEVar             GhcRn = NoExtField
+type instance XIEVar             GhcTc = NoExtField
+
+type instance XIEThingAbs        (GhcPass _) = ApiAnn
+type instance XIEThingAll        (GhcPass _) = ApiAnn
+type instance XIEThingWith       (GhcPass _) = ApiAnn
+
+type instance XIEModuleContents  GhcPs = ApiAnn
+type instance XIEModuleContents  GhcRn = NoExtField
+type instance XIEModuleContents  GhcTc = NoExtField
+
 type instance XIEGroup           (GhcPass _) = NoExtField
 type instance XIEDoc             (GhcPass _) = NoExtField
 type instance XIEDocNamed        (GhcPass _) = NoExtField
@@ -302,16 +328,20 @@ ieNames (IEGroup          {})     = []
 ieNames (IEDoc            {})     = []
 ieNames (IEDocNamed       {})     = []
 
+ieWrappedLName :: IEWrappedName name -> LocatedN name
+ieWrappedLName (IEName    ln) = ln
+ieWrappedLName (IEPattern ln) = ln
+ieWrappedLName (IEType    ln) = ln
+
 ieWrappedName :: IEWrappedName name -> name
-ieWrappedName (IEName    (L _ n)) = n
-ieWrappedName (IEPattern (L _ n)) = n
-ieWrappedName (IEType    (L _ n)) = n
+ieWrappedName = unLoc . ieWrappedLName
+
 
 lieWrappedName :: LIEWrappedName name -> name
 lieWrappedName (L _ n) = ieWrappedName n
 
-ieLWrappedName :: LIEWrappedName name -> Located name
-ieLWrappedName (L l n) = L l (ieWrappedName n)
+ieLWrappedName :: LIEWrappedName name -> LocatedN name
+ieLWrappedName (L _ n) = ieWrappedLName n
 
 replaceWrappedName :: IEWrappedName name1 -> name2 -> IEWrappedName name2
 replaceWrappedName (IEName    (L l _)) n = IEName    (L l n)
