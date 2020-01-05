@@ -107,7 +107,7 @@ dsTopLHsBinds binds
     bang_binds     = filterBag (isBangedHsBind   . unLoc) binds
 
     top_level_err desc (L loc bind)
-      = putSrcSpanDs loc $
+      = putSrcSpanDs (locA loc) $
         errDs (hang (text "Top-level" <+> text desc <+> text "aren't allowed:")
                   2 (ppr bind))
 
@@ -124,7 +124,7 @@ dsLHsBinds binds
 dsLHsBind :: LHsBind GhcTc
           -> DsM ([Id], [(Id,CoreExpr)])
 dsLHsBind (L loc bind) = do dflags <- getDynFlags
-                            putSrcSpanDs loc $ dsHsBind dflags bind
+                            putSrcSpanDs (locA loc) $ dsHsBind dflags bind
 
 -- | Desugar a single binding (or group of recursive binds).
 dsHsBind :: DynFlags
@@ -150,7 +150,7 @@ dsHsBind dflags b@(FunBind { fun_id = L _ fun
                            , fun_ext = co_fn
                            , fun_tick = tick })
  = do   { (args, body) <- matchWrapper
-                           (mkPrefixFunRhs (noLoc $ idName fun))
+                           (mkPrefixFunRhs (noLocA $ idName fun))
                            Nothing matches
         ; core_wrap <- dsHsWrapper co_fn
         ; let body' = mkOptTickBox tick body

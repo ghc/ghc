@@ -90,7 +90,7 @@ tcLetPat sig_fn no_gen pat pat_ty thing_inside
        ; tc_lpat pat pat_ty penv thing_inside }
 
 -----------------
-tcPats :: HsMatchContext GhcRn
+tcPats :: HsMatchContext Name
        -> [LPat GhcRn]            -- Patterns,
        -> [ExpSigmaType]         --   and their types
        -> TcM a                  --   and the checker for the body
@@ -112,7 +112,7 @@ tcPats ctxt pats pat_tys thing_inside
   where
     penv = PE { pe_lazy = False, pe_ctxt = LamPat ctxt, pe_orig = PatOrigin }
 
-tcInferPat :: HsMatchContext GhcRn -> LPat GhcRn
+tcInferPat :: HsMatchContext Name -> LPat GhcRn
            -> TcM a
            -> TcM ((LPat GhcTcId, a), TcSigmaType)
 tcInferPat ctxt pat thing_inside
@@ -121,14 +121,14 @@ tcInferPat ctxt pat thing_inside
  where
     penv = PE { pe_lazy = False, pe_ctxt = LamPat ctxt, pe_orig = PatOrigin }
 
-tcCheckPat :: HsMatchContext GhcRn
+tcCheckPat :: HsMatchContext Name
            -> LPat GhcRn -> TcSigmaType
            -> TcM a                     -- Checker for body
            -> TcM (LPat GhcTcId, a)
 tcCheckPat ctxt = tcCheckPat_O ctxt PatOrigin
 
 -- | A variant of 'tcPat' that takes a custom origin
-tcCheckPat_O :: HsMatchContext GhcRn
+tcCheckPat_O :: HsMatchContext Name
              -> CtOrigin              -- ^ origin to use if the type needs inst'ing
              -> LPat GhcRn -> TcSigmaType
              -> TcM a                 -- Checker for body
@@ -155,7 +155,7 @@ data PatEnv
 
 data PatCtxt
   = LamPat   -- Used for lambdas, case etc
-       (HsMatchContext GhcRn)
+       (HsMatchContext Name)
 
   | LetPat   -- Used only for let(rec) pattern bindings
              -- See Note [Typing patterns in pattern bindings]
@@ -323,7 +323,7 @@ tc_lpat :: LPat GhcRn
         -> TcM a
         -> TcM (LPat GhcTcId, a)
 tc_lpat (L span pat) pat_ty penv thing_inside
-  = setSrcSpan span $
+  = setSrcSpanA span $
     do  { (pat', res) <- maybeWrapPatCtxt pat (tc_pat penv pat pat_ty)
                                           thing_inside
         ; return (L span pat', res) }
@@ -382,7 +382,7 @@ tc_pat _ (WildPat _) pat_ty thing_inside
         ; return (WildPat pat_ty, res) }
 
 tc_pat penv (AsPat x (L nm_loc name) pat) pat_ty thing_inside
-  = do  { (wrap, bndr_id) <- setSrcSpan nm_loc (tcPatBndr penv name pat_ty)
+  = do  { (wrap, bndr_id) <- setSrcSpan (locA nm_loc) (tcPatBndr penv name pat_ty)
         ; (pat', res) <- tcExtendIdEnv1 name bndr_id $
                          tc_lpat pat (mkCheckExpType $ idType bndr_id)
                                  penv thing_inside
@@ -498,8 +498,8 @@ tc_pat penv (TuplePat _ pats boxity) pat_ty thing_inside
                                  -- pat_ty /= pat_ty iff coi /= IdCo
               possibly_mangled_result
                 | gopt Opt_IrrefutableTuples dflags &&
-                  isBoxed boxity      = LazyPat noExtField (noLoc unmangled_result)
-                | otherwise           = unmangled_result
+                  isBoxed boxity   = LazyPat noExtField (noLocA unmangled_result)
+                | otherwise        = unmangled_result
 
         ; pat_ty <- readExpType pat_ty
         ; ASSERT( con_arg_tys `equalLength` pats ) -- Syntactically enforced
@@ -615,7 +615,7 @@ tc_pat penv (NPlusKPat _ (L nm_loc name)
             <- tcSyntaxOpGen orig minus [synKnownType pat_ty, SynRho] SynAny $
                \ [lit2_ty, var_ty] ->
                do { lit2' <- newOverloadedLit lit (mkCheckExpType lit2_ty)
-                  ; (wrap, bndr_id) <- setSrcSpan nm_loc $
+                  ; (wrap, bndr_id) <- setSrcSpan (locA nm_loc) $
                                      tcPatBndr penv name (mkCheckExpType var_ty)
                            -- co :: var_ty ~ idType bndr_id
 
@@ -807,7 +807,7 @@ to express the local scope of GADT refinements.
 -- MkT :: forall a b c. (a~[b]) => b -> c -> T a
 --       with scrutinee of type (T ty)
 
-tcConPat :: PatEnv -> Located Name
+tcConPat :: PatEnv -> LocatedA Name
          -> ExpSigmaType           -- Type of the pattern
          -> HsConPatDetails GhcRn -> TcM a
          -> TcM (Pat GhcTcId, a)
@@ -820,7 +820,7 @@ tcConPat penv con_lname@(L _ con_name) pat_ty arg_pats thing_inside
                                              pat_ty arg_pats thing_inside
         }
 
-tcDataConPat :: PatEnv -> Located Name -> DataCon
+tcDataConPat :: PatEnv -> LocatedA Name -> DataCon
              -> ExpSigmaType               -- Type of the pattern
              -> HsConPatDetails GhcRn -> TcM a
              -> TcM (Pat GhcTcId, a)
@@ -839,7 +839,7 @@ tcDataConPat penv (L con_span con_name) data_con pat_ty
         ; pat_ty <- readExpType pat_ty
 
           -- Add the stupid theta
-        ; setSrcSpan con_span $ addDataConStupidTheta data_con ctxt_res_tys
+        ; setSrcSpanA con_span $ addDataConStupidTheta data_con ctxt_res_tys
 
         ; let all_arg_tys = eqSpecPreds eq_spec ++ theta ++ arg_tys
         ; checkExistentials ex_tvs all_arg_tys penv
@@ -923,7 +923,7 @@ tcDataConPat penv (L con_span con_name) data_con pat_ty
         ; return (mkHsWrapPat wrap res_pat pat_ty, res)
         } }
 
-tcPatSynPat :: PatEnv -> Located Name -> PatSyn
+tcPatSynPat :: PatEnv -> LocatedA Name -> PatSyn
             -> ExpSigmaType                -- Type of the pattern
             -> HsConPatDetails GhcRn -> TcM a
             -> TcM (Pat GhcTcId, a)
@@ -1097,13 +1097,13 @@ tcConArgs con_like arg_tys (RecCon (HsRecFields rpats dd)) penv thing_inside
   where
     tc_field :: Checker (LHsRecField GhcRn (LPat GhcRn))
                         (LHsRecField GhcTcId (LPat GhcTcId))
-    tc_field (L l (HsRecField (L loc (FieldOcc sel (L lr rdr))) pat pun))
+    tc_field (L l (HsRecField x (L loc (FieldOcc sel (L lr rdr))) pat pun))
              penv thing_inside
       = do { sel'   <- tcLookupId sel
            ; pat_ty <- setSrcSpan loc $ find_field_ty sel
                                           (occNameFS $ rdrNameOcc rdr)
            ; (pat', res) <- tcConArg (pat, pat_ty) penv thing_inside
-           ; return (L l (HsRecField (L loc (FieldOcc sel' (L lr rdr))) pat'
+           ; return (L l (HsRecField x (L loc (FieldOcc sel' (L lr rdr))) pat'
                                                                     pun), res) }
 
 

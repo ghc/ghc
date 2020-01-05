@@ -22,7 +22,7 @@ T15370.hs:20:13: warning: [-Wdeferred-type-errors (in -Wdefault)]
         Actual type: S r
     • In the expression: no + _
       In a case alternative: Refl -> no + _
-      In the expression: case mkRefl @x @y of { Refl -> no + _ }
+      In the expression: case mkRefl @x @y of Refl -> no + _
     • Relevant bindings include
         no :: S r (bound at T15370.hs:18:7)
         right :: S r -> () (bound at T15370.hs:18:1)

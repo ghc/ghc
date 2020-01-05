@@ -28,11 +28,18 @@ module GHC.Hs.Extension where
 import GHC.Prelude
 
 import Data.Data hiding ( Fixity )
+import Data.Function (on)
+import Data.List (sortBy)
+import Data.Semigroup
 import GHC.Types.Name
 import GHC.Types.Name.Reader
 import GHC.Types.Var
-import GHC.Utils.Outputable
-import GHC.Types.SrcLoc (Located)
+import GHC.Utils.Binary
+import GHC.Utils.Outputable hiding ((<>))
+import GHC.Types.SrcLoc (Located, GenLocated(..), RealLocated, SrcSpan,
+                         noSrcSpan, leftmost_smallest, combineSrcSpans, getLoc)
+import GHC.Parser.Lexer (AddApiAnn)
+import GHC.Parser.Annotation
 
 import Data.Kind
 
@@ -170,7 +177,7 @@ noExtCon x = case x of {}
 -- to add 'SrcLoc' info via 'Located'. Other passes than 'GhcPass' not
 -- interested in location information can define this instance as @f p@.
 type family XRec p (f :: Type -> Type) = r | r -> p f
-type instance XRec (GhcPass p) f = Located (f (GhcPass p))
+type instance XRec (GhcPass p) f = LocatedA (f (GhcPass p))
 
 {-
 Note [NoExtCon and strict fields]
@@ -217,6 +224,137 @@ instance Typeable p => Data (GhcPass p) where
   gunfold _ _ _ = panic "instance Data GhcPass"
   toConstr  _   = panic "instance Data GhcPass"
   dataTypeOf _  = panic "instance Data GhcPass"
+
+-- | The API Annotations are now kept in the HsSyn AST for the GhcPs
+--   phase. We do not always have API Annotations though, only for
+--   parsed code. This type captures that, and allows the
+--   representation decision to be easily revisited as it evolves.
+data ApiAnn' ann
+  = ApiAnn { anns     :: ann -- ^ Annotations added by the Parser
+           , comments :: [RealLocated AnnotationComment]
+              -- ^ Comments enclosed in the SrcSpan of the element
+              -- this `ApiAnn'` is attached to
+           }
+  | ApiAnnNotUsed -- ^ No Annotation for generated code,
+                                 -- e.g. from TH, deriving, etc.
+        deriving (Data, Eq)
+
+type ApiAnn = ApiAnn' [AddApiAnn]
+type ApiAnnComments = [RealLocated AnnotationComment]
+
+data NoApiAnns = NoApiAnns
+  deriving (Data,Eq,Ord)
+
+type ApiAnnCO = ApiAnn' NoApiAnns -- ^ Api Annotations for comments only
+
+noComments ::ApiAnnCO
+noComments = ApiAnn NoApiAnns []
+
+comment :: ApiAnnComments -> ApiAnnCO
+comment cs = ApiAnn NoApiAnns cs
+
+type LocatedA = GenLocated SrcSpanAnn
+
+data SrcSpanAnn = SrcSpanAnn { ann :: ApiAnn, locA :: SrcSpan }
+        deriving (Data, Eq)
+
+instance Outputable SrcSpanAnn where
+  ppr (SrcSpanAnn a l) = text "SrcSpanAnn" <+> ppr a <+> ppr l
+
+sortLocatedA :: [LocatedA a] -> [LocatedA a]
+sortLocatedA = sortBy (leftmost_smallest `on` getLocA)
+
+mapLocA :: (a -> b) -> Located a -> LocatedA b
+mapLocA f (L l a) = L (noAnnSrcSpan l) (f a)
+
+-- AZ:TODO: move this somewhere sane
+
+combineLocsA :: LocatedA a -> LocatedA b -> SrcSpanAnn
+combineLocsA (L a _) (L b _) = combineSrcSpansA a b
+
+combineSrcSpansA :: SrcSpanAnn -> SrcSpanAnn -> SrcSpanAnn
+combineSrcSpansA (SrcSpanAnn aa la) (SrcSpanAnn ab lb)
+  = SrcSpanAnn (aa <> ab) (combineSrcSpans la lb)
+
+-- | Combine locations from two 'Located' things and add them to a third thing
+addCLocA :: LocatedA a -> Located b -> c -> LocatedA c
+addCLocA a b c = L (noAnnSrcSpan $ combineSrcSpans (locA $ getLoc a) (getLoc b)) c
+
+addCLocAA :: LocatedA a -> LocatedA b -> c -> LocatedA c
+addCLocAA a b c = L (noAnnSrcSpan $ combineSrcSpans (locA $ getLoc a) (locA $ getLoc b)) c
+
+-- ---------------------------------------------------------------------
+-- Managing annotations for lists
+-- ---------------------------------------------------------------------
+
+data AnnList
+  = AnnList {
+      alOpenLoc      :: SrcSpan,
+      alOpenKeyword  :: AnnKeywordId,
+      alCloseLoc     :: SrcSpan,
+      alCloseKeyword :: AnnKeywordId
+      } deriving (Data)
+
+-- ---------------------------------------------------------------------
+
+reAnn :: [AddApiAnn] -> ApiAnnComments -> Located a -> LocatedA a
+reAnn anns cs (L l a) = L (SrcSpanAnn (ApiAnn anns cs) l) a
+
+noLocA :: a -> LocatedA a
+noLocA = L (SrcSpanAnn ApiAnnNotUsed noSrcSpan)
+
+getLocA :: LocatedA a -> SrcSpan
+getLocA (L (SrcSpanAnn _ l) _) = l
+
+getLocAnn :: Located a  -> SrcSpanAnn
+getLocAnn (L l _) = SrcSpanAnn ApiAnnNotUsed l
+
+noAnnSrcSpan :: SrcSpan -> SrcSpanAnn
+noAnnSrcSpan l = SrcSpanAnn ApiAnnNotUsed l
+
+noSrcSpanA :: SrcSpanAnn
+noSrcSpanA = noAnnSrcSpan noSrcSpan
+
+reLoc :: LocatedA a -> Located a
+reLoc (L (SrcSpanAnn _ l) a) = L l a
+
+reLocA :: Located a -> LocatedA a
+reLocA (L l a) = (L (SrcSpanAnn ApiAnnNotUsed l) a)
+
+noAnn :: ApiAnn' a
+noAnn = ApiAnnNotUsed
+
+addAnns :: ApiAnn -> [AddApiAnn] -> ApiAnnComments -> ApiAnn
+addAnns (ApiAnn as1 cs) as2 cs2 = ApiAnn (as1 ++ as2) (cs ++ cs2)
+addAnns ApiAnnNotUsed [] [] = ApiAnnNotUsed
+addAnns ApiAnnNotUsed as cs = ApiAnn as cs
+
+
+instance (Semigroup a) => Semigroup (ApiAnn' a) where
+  ApiAnnNotUsed <> x = x
+  x <> ApiAnnNotUsed = x
+  (ApiAnn a1 b1) <> (ApiAnn a2 b2) = ApiAnn (a1 <> a2) (b1 <> b2)
+
+instance (Monoid a) => Monoid (ApiAnn' a) where
+  mempty = ApiAnnNotUsed
+
+
+instance (Outputable a) => Outputable (ApiAnn' a) where
+  ppr (ApiAnn a c)  = text "ApiAnn" <+> ppr a <+> ppr c
+  ppr ApiAnnNotUsed = text "ApiAnnNotUsed"
+
+
+instance Binary a => Binary (LocatedA a) where
+  -- We do not serialise the annotations
+    put_ bh (L l x) = do
+            put_ bh (locA l)
+            put_ bh x
+
+    get bh = do
+            l <- get bh
+            x <- get bh
+            return (L (noAnnSrcSpan l) x)
+
 
 data Pass = Parsed | Renamed | Typechecked
          deriving (Data)
@@ -371,6 +509,11 @@ type family XClassDecl     x
 type family XXTyClDecl     x
 
 -- -------------------------------------
+-- FunDep type families
+type family XCFunDep      x
+type family XXFunDep      x
+
+-- -------------------------------------
 -- TyClGroup type families
 type family XCTyClGroup      x
 type family XXTyClGroup      x
@@ -427,7 +570,10 @@ type family XXDerivDecl      x
 
 -- -------------------------------------
 -- DerivStrategy type family
-type family XViaStrategy x
+type family XStockStrategy    x
+type family XAnyClassStrategy x
+type family XNewtypeStrategy  x
+type family XViaStrategy      x
 
 -- -------------------------------------
 -- DefaultDecl type families
@@ -475,6 +621,11 @@ type family XXAnnDecl      x
 -- RoleAnnotDecl type families
 type family XCRoleAnnotDecl  x
 type family XXRoleAnnotDecl  x
+
+-- -------------------------------------
+-- InjectivityAnn type families
+type family XCInjectivityAnn  x
+type family XXInjectivityAnn  x
 
 -- =====================================================================
 -- Type families for the HsExpr extension points
@@ -741,9 +892,6 @@ type family XIEGroup           x
 type family XIEDoc             x
 type family XIEDocNamed        x
 type family XXIE               x
-
--- -------------------------------------
-
 
 -- =====================================================================
 -- End of Type family definitions

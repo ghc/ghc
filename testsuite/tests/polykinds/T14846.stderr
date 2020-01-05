@@ -44,9 +44,9 @@ T14846.hs:39:12: error:
                  StructI xx structured
           -- Defined at T14846.hs:28:10
     • In the expression: struct :: AStruct (Structured a cls)
-      In the expression: case struct :: AStruct (Structured a cls) of
+      In the expression: case struct :: AStruct (Structured a cls) of {}
       In an equation for ‘i’:
-          i = case struct :: AStruct (Structured a cls) of
+          i = case struct :: AStruct (Structured a cls) of {}
 
 T14846.hs:39:44: error:
     • Expected kind ‘Struct cls3 -> Constraint’,

@@ -9,7 +9,9 @@
   (Nothing)
   [({ KindSigs.hs:8:1-16 }
     (ImportDecl
-     (NoExtField)
+     (ApiAnn
+      [(AddApiAnn AnnImport { KindSigs.hs:8:1-6 })]
+      [])
      (NoSourceText)
      ({ KindSigs.hs:8:8-16 }
       {ModuleName: Data.Kind})
@@ -24,7 +26,13 @@
     (TyClD
      (NoExtField)
      (FamDecl
-      (NoExtField)
+      (ApiAnn
+       [(AddApiAnn AnnType { KindSigs.hs:11:1-4 })
+       ,(AddApiAnn AnnFamily { KindSigs.hs:11:6-11 })
+       ,(AddApiAnn AnnWhere { KindSigs.hs:11:19-23 })]
+       [(nnnnnnnn
+         (AnnLineComment
+          "parser has not filled in annotation commments properly here"))])
       (FamilyDecl
        (NoExtField)
        (ClosedTypeFamily
@@ -34,37 +42,51 @@
             (NoExtField)
             (FamEqn
              (NoExtField)
-             ({ KindSigs.hs:12:3-5 }
+             (SrcSpanAnn (ApiAnnNotUsed) { KindSigs.hs:12:3-5 }
               (Unqual
                {OccName: Foo}))
              (Nothing)
              [(HsValArg
                ({ KindSigs.hs:12:7 }
                 (HsTyVar
-                 (NoExtField)
+                 (ApiAnn
+                  []
+                  [(nnnnnnnn
+                    (AnnLineComment
+                     "parser has not filled in annotation commments properly here"))])
                  (NotPromoted)
-                 ({ KindSigs.hs:12:7 }
+                 (SrcSpanAnn (ApiAnnNotUsed) { KindSigs.hs:12:7 }
                   (Unqual
                    {OccName: a})))))]
              (Prefix)
              ({ KindSigs.hs:12:11-21 }
               (HsKindSig
-               (NoExtField)
+               (ApiAnn
+                [(AddApiAnn AnnDcolon { KindSigs.hs:12:15-16 })]
+                [])
                ({ KindSigs.hs:12:11-13 }
                 (HsTyVar
-                 (NoExtField)
+                 (ApiAnn
+                  []
+                  [(nnnnnnnn
+                    (AnnLineComment
+                     "parser has not filled in annotation commments properly here"))])
                  (NotPromoted)
-                 ({ KindSigs.hs:12:11-13 }
+                 (SrcSpanAnn (ApiAnnNotUsed) { KindSigs.hs:12:11-13 }
                   (Unqual
                    {OccName: Int}))))
                ({ KindSigs.hs:12:18-21 }
                 (HsTyVar
-                 (NoExtField)
+                 (ApiAnn
+                  []
+                  [(nnnnnnnn
+                    (AnnLineComment
+                     "parser has not filled in annotation commments properly here"))])
                  (NotPromoted)
-                 ({ KindSigs.hs:12:18-21 }
+                 (SrcSpanAnn (ApiAnnNotUsed) { KindSigs.hs:12:18-21 }
                   (Unqual
                    {OccName: Type})))))))))]))
-       ({ KindSigs.hs:11:13-15 }
+       (SrcSpanAnn (ApiAnnNotUsed) { KindSigs.hs:11:13-15 }
         (Unqual
          {OccName: Foo}))
        (HsQTvs
@@ -72,7 +94,7 @@
         [({ KindSigs.hs:11:17 }
           (UserTyVar
            (NoExtField)
-           ({ KindSigs.hs:11:17 }
+           (SrcSpanAnn (ApiAnnNotUsed) { KindSigs.hs:11:17 }
             (Unqual
              {OccName: a}))))])
        (Prefix)
@@ -84,8 +106,13 @@
     (TyClD
      (NoExtField)
      (SynDecl
-      (NoExtField)
-      ({ KindSigs.hs:15:6-8 }
+      (ApiAnn
+       [(AddApiAnn AnnType { KindSigs.hs:15:1-4 })
+       ,(AddApiAnn AnnEqual { KindSigs.hs:15:12 })]
+       [(nnnnnnnn
+         (AnnLineComment
+          "parser has not filled in annotation commments properly here"))])
+      (SrcSpanAnn (ApiAnnNotUsed) { KindSigs.hs:15:6-8 }
        (Unqual
         {OccName: Bar}))
       (HsQTvs
@@ -93,71 +120,107 @@
        [({ KindSigs.hs:15:10 }
          (UserTyVar
           (NoExtField)
-          ({ KindSigs.hs:15:10 }
+          (SrcSpanAnn (ApiAnnNotUsed) { KindSigs.hs:15:10 }
            (Unqual
             {OccName: a}))))])
       (Prefix)
       ({ KindSigs.hs:15:14-51 }
        (HsTupleTy
-        (NoExtField)
+        (ApiAnn
+         [(AddApiAnn AnnOpenP { KindSigs.hs:15:14 })
+         ,(AddApiAnn AnnCloseP { KindSigs.hs:15:51 })]
+         [])
         (HsBoxedOrConstraintTuple)
         [({ KindSigs.hs:15:16-26 }
           (HsKindSig
-           (NoExtField)
+           (ApiAnn
+            [(AddApiAnn AnnDcolon { KindSigs.hs:15:20-21 })]
+            [])
            ({ KindSigs.hs:15:16-18 }
             (HsTyVar
-             (NoExtField)
+             (ApiAnn
+              []
+              [(nnnnnnnn
+                (AnnLineComment
+                 "parser has not filled in annotation commments properly here"))])
              (NotPromoted)
-             ({ KindSigs.hs:15:16-18 }
+             (SrcSpanAnn (ApiAnnNotUsed) { KindSigs.hs:15:16-18 }
               (Unqual
                {OccName: Int}))))
            ({ KindSigs.hs:15:23-26 }
             (HsTyVar
-             (NoExtField)
+             (ApiAnn
+              []
+              [(nnnnnnnn
+                (AnnLineComment
+                 "parser has not filled in annotation commments properly here"))])
              (NotPromoted)
-             ({ KindSigs.hs:15:23-26 }
+             (SrcSpanAnn (ApiAnnNotUsed) { KindSigs.hs:15:23-26 }
               (Unqual
                {OccName: Type}))))))
         ,({ KindSigs.hs:15:29-32 }
           (HsTyVar
-           (NoExtField)
+           (ApiAnn
+            []
+            [(nnnnnnnn
+              (AnnLineComment
+               "parser has not filled in annotation commments properly here"))])
            (NotPromoted)
-           ({ KindSigs.hs:15:29-32 }
+           (SrcSpanAnn (ApiAnnNotUsed) { KindSigs.hs:15:29-32 }
             (Unqual
              {OccName: Bool}))))
         ,({ KindSigs.hs:15:35-49 }
           (HsKindSig
-           (NoExtField)
+           (ApiAnn
+            [(AddApiAnn AnnDcolon { KindSigs.hs:15:43-44 })]
+            [])
            ({ KindSigs.hs:15:35-41 }
             (HsAppTy
              (NoExtField)
              ({ KindSigs.hs:15:35-39 }
               (HsTyVar
-               (NoExtField)
+               (ApiAnn
+                []
+                [(nnnnnnnn
+                  (AnnLineComment
+                   "parser has not filled in annotation commments properly here"))])
                (NotPromoted)
-               ({ KindSigs.hs:15:35-39 }
+               (SrcSpanAnn (ApiAnnNotUsed) { KindSigs.hs:15:35-39 }
                 (Unqual
                  {OccName: Maybe}))))
              ({ KindSigs.hs:15:41 }
               (HsTyVar
-               (NoExtField)
+               (ApiAnn
+                []
+                [(nnnnnnnn
+                  (AnnLineComment
+                   "parser has not filled in annotation commments properly here"))])
                (NotPromoted)
-               ({ KindSigs.hs:15:41 }
+               (SrcSpanAnn (ApiAnnNotUsed) { KindSigs.hs:15:41 }
                 (Unqual
                  {OccName: a}))))))
            ({ KindSigs.hs:15:46-49 }
             (HsTyVar
-             (NoExtField)
+             (ApiAnn
+              []
+              [(nnnnnnnn
+                (AnnLineComment
+                 "parser has not filled in annotation commments properly here"))])
              (NotPromoted)
-             ({ KindSigs.hs:15:46-49 }
+             (SrcSpanAnn (ApiAnnNotUsed) { KindSigs.hs:15:46-49 }
               (Unqual
                {OccName: Type}))))))])))))
   ,({ KindSigs.hs:16:1-54 }
     (TyClD
      (NoExtField)
      (SynDecl
-      (NoExtField)
-      ({ KindSigs.hs:16:6-9 }
+      (ApiAnn
+       [(AddApiAnn AnnType { KindSigs.hs:16:1-4 })
+       ,(AddApiAnn AnnEqual { KindSigs.hs:16:13 })]
+       [(nnnnnnnn
+         (AnnLineComment
+          "parser has not filled in annotation commments properly here"))])
+      (SrcSpanAnn (ApiAnnNotUsed) { KindSigs.hs:16:6-9 }
        (Unqual
         {OccName: Bar'}))
       (HsQTvs
@@ -165,71 +228,107 @@
        [({ KindSigs.hs:16:11 }
          (UserTyVar
           (NoExtField)
-          ({ KindSigs.hs:16:11 }
+          (SrcSpanAnn (ApiAnnNotUsed) { KindSigs.hs:16:11 }
            (Unqual
             {OccName: a}))))])
       (Prefix)
       ({ KindSigs.hs:16:15-54 }
        (HsTupleTy
-        (NoExtField)
+        (ApiAnn
+         [(AddApiAnn AnnOpen { KindSigs.hs:16:15-16 })
+         ,(AddApiAnn AnnClose { KindSigs.hs:16:53-54 })]
+         [])
         (HsUnboxedTuple)
         [({ KindSigs.hs:16:18-28 }
           (HsKindSig
-           (NoExtField)
+           (ApiAnn
+            [(AddApiAnn AnnDcolon { KindSigs.hs:16:22-23 })]
+            [])
            ({ KindSigs.hs:16:18-20 }
             (HsTyVar
-             (NoExtField)
+             (ApiAnn
+              []
+              [(nnnnnnnn
+                (AnnLineComment
+                 "parser has not filled in annotation commments properly here"))])
              (NotPromoted)
-             ({ KindSigs.hs:16:18-20 }
+             (SrcSpanAnn (ApiAnnNotUsed) { KindSigs.hs:16:18-20 }
               (Unqual
                {OccName: Int}))))
            ({ KindSigs.hs:16:25-28 }
             (HsTyVar
-             (NoExtField)
+             (ApiAnn
+              []
+              [(nnnnnnnn
+                (AnnLineComment
+                 "parser has not filled in annotation commments properly here"))])
              (NotPromoted)
-             ({ KindSigs.hs:16:25-28 }
+             (SrcSpanAnn (ApiAnnNotUsed) { KindSigs.hs:16:25-28 }
               (Unqual
                {OccName: Type}))))))
         ,({ KindSigs.hs:16:31-34 }
           (HsTyVar
-           (NoExtField)
+           (ApiAnn
+            []
+            [(nnnnnnnn
+              (AnnLineComment
+               "parser has not filled in annotation commments properly here"))])
            (NotPromoted)
-           ({ KindSigs.hs:16:31-34 }
+           (SrcSpanAnn (ApiAnnNotUsed) { KindSigs.hs:16:31-34 }
             (Unqual
              {OccName: Bool}))))
         ,({ KindSigs.hs:16:37-51 }
           (HsKindSig
-           (NoExtField)
+           (ApiAnn
+            [(AddApiAnn AnnDcolon { KindSigs.hs:16:45-46 })]
+            [])
            ({ KindSigs.hs:16:37-43 }
             (HsAppTy
              (NoExtField)
              ({ KindSigs.hs:16:37-41 }
               (HsTyVar
-               (NoExtField)
+               (ApiAnn
+                []
+                [(nnnnnnnn
+                  (AnnLineComment
+                   "parser has not filled in annotation commments properly here"))])
                (NotPromoted)
-               ({ KindSigs.hs:16:37-41 }
+               (SrcSpanAnn (ApiAnnNotUsed) { KindSigs.hs:16:37-41 }
                 (Unqual
                  {OccName: Maybe}))))
              ({ KindSigs.hs:16:43 }
               (HsTyVar
-               (NoExtField)
+               (ApiAnn
+                []
+                [(nnnnnnnn
+                  (AnnLineComment
+                   "parser has not filled in annotation commments properly here"))])
                (NotPromoted)
-               ({ KindSigs.hs:16:43 }
+               (SrcSpanAnn (ApiAnnNotUsed) { KindSigs.hs:16:43 }
                 (Unqual
                  {OccName: a}))))))
            ({ KindSigs.hs:16:48-51 }
             (HsTyVar
-             (NoExtField)
+             (ApiAnn
+              []
+              [(nnnnnnnn
+                (AnnLineComment
+                 "parser has not filled in annotation commments properly here"))])
              (NotPromoted)
-             ({ KindSigs.hs:16:48-51 }
+             (SrcSpanAnn (ApiAnnNotUsed) { KindSigs.hs:16:48-51 }
               (Unqual
                {OccName: Type}))))))])))))
   ,({ KindSigs.hs:19:1-26 }
     (TyClD
      (NoExtField)
      (SynDecl
-      (NoExtField)
-      ({ KindSigs.hs:19:6-8 }
+      (ApiAnn
+       [(AddApiAnn AnnType { KindSigs.hs:19:1-4 })
+       ,(AddApiAnn AnnEqual { KindSigs.hs:19:10 })]
+       [(nnnnnnnn
+         (AnnLineComment
+          "parser has not filled in annotation commments properly here"))])
+      (SrcSpanAnn (ApiAnnNotUsed) { KindSigs.hs:19:6-8 }
        (Unqual
         {OccName: Baz}))
       (HsQTvs
@@ -238,30 +337,47 @@
       (Prefix)
       ({ KindSigs.hs:19:12-26 }
        (HsListTy
-        (NoExtField)
+        (ApiAnn
+         [(AddApiAnn AnnOpenS { KindSigs.hs:19:12 })
+         ,(AddApiAnn AnnCloseS { KindSigs.hs:19:26 })]
+         [])
         ({ KindSigs.hs:19:14-24 }
          (HsKindSig
-          (NoExtField)
+          (ApiAnn
+           [(AddApiAnn AnnDcolon { KindSigs.hs:19:18-19 })]
+           [])
           ({ KindSigs.hs:19:14-16 }
            (HsTyVar
-            (NoExtField)
+            (ApiAnn
+             []
+             [(nnnnnnnn
+               (AnnLineComment
+                "parser has not filled in annotation commments properly here"))])
             (NotPromoted)
-            ({ KindSigs.hs:19:14-16 }
+            (SrcSpanAnn (ApiAnnNotUsed) { KindSigs.hs:19:14-16 }
              (Unqual
               {OccName: Int}))))
           ({ KindSigs.hs:19:21-24 }
            (HsTyVar
-            (NoExtField)
+            (ApiAnn
+             []
+             [(nnnnnnnn
+               (AnnLineComment
+                "parser has not filled in annotation commments properly here"))])
             (NotPromoted)
-            ({ KindSigs.hs:19:21-24 }
+            (SrcSpanAnn (ApiAnnNotUsed) { KindSigs.hs:19:21-24 }
              (Unqual
               {OccName: Type})))))))))))
   ,({ KindSigs.hs:22:1-44 }
     (SigD
      (NoExtField)
      (TypeSig
-      (NoExtField)
-      [({ KindSigs.hs:22:1-3 }
+      (ApiAnn
+       [(AddApiAnn AnnDcolon { KindSigs.hs:22:5-6 })]
+       [(nnnnnnnn
+         (AnnLineComment
+          "parser has not filled in annotation commments properly here"))])
+      [(SrcSpanAnn (ApiAnnNotUsed) { KindSigs.hs:22:1-3 }
         (Unqual
          {OccName: qux}))]
       (HsWC
@@ -270,61 +386,94 @@
         (NoExtField)
         ({ KindSigs.hs:22:8-44 }
          (HsFunTy
-          (NoExtField)
+          (ApiAnn
+           [(AddApiAnn AnnRarrow { KindSigs.hs:22:22-23 })]
+           [])
           ({ KindSigs.hs:22:8-20 }
            (HsParTy
-            (NoExtField)
+            (ApiAnn
+             [(AddApiAnn AnnOpenP { KindSigs.hs:22:8 })
+             ,(AddApiAnn AnnCloseP { KindSigs.hs:22:20 })]
+             [])
             ({ KindSigs.hs:22:9-19 }
              (HsKindSig
-              (NoExtField)
+              (ApiAnn
+               [(AddApiAnn AnnDcolon { KindSigs.hs:22:13-14 })]
+               [])
               ({ KindSigs.hs:22:9-11 }
                (HsTyVar
-                (NoExtField)
+                (ApiAnn
+                 []
+                 [(nnnnnnnn
+                   (AnnLineComment
+                    "parser has not filled in annotation commments properly here"))])
                 (NotPromoted)
-                ({ KindSigs.hs:22:9-11 }
+                (SrcSpanAnn (ApiAnnNotUsed) { KindSigs.hs:22:9-11 }
                  (Unqual
                   {OccName: Int}))))
               ({ KindSigs.hs:22:16-19 }
                (HsTyVar
-                (NoExtField)
+                (ApiAnn
+                 []
+                 [(nnnnnnnn
+                   (AnnLineComment
+                    "parser has not filled in annotation commments properly here"))])
                 (NotPromoted)
-                ({ KindSigs.hs:22:16-19 }
+                (SrcSpanAnn (ApiAnnNotUsed) { KindSigs.hs:22:16-19 }
                  (Unqual
                   {OccName: Type}))))))))
           ({ KindSigs.hs:22:25-44 }
            (HsFunTy
-            (NoExtField)
+            (ApiAnn
+             [(AddApiAnn AnnRarrow { KindSigs.hs:22:30-31 })]
+             [])
             ({ KindSigs.hs:22:25-28 }
              (HsTyVar
-              (NoExtField)
+              (ApiAnn
+               []
+               [(nnnnnnnn
+                 (AnnLineComment
+                  "parser has not filled in annotation commments properly here"))])
               (NotPromoted)
-              ({ KindSigs.hs:22:25-28 }
+              (SrcSpanAnn (ApiAnnNotUsed) { KindSigs.hs:22:25-28 }
                (Unqual
                 {OccName: Bool}))))
             ({ KindSigs.hs:22:33-44 }
              (HsParTy
-              (NoExtField)
+              (ApiAnn
+               [(AddApiAnn AnnOpenP { KindSigs.hs:22:33 })
+               ,(AddApiAnn AnnCloseP { KindSigs.hs:22:44 })]
+               [])
               ({ KindSigs.hs:22:34-43 }
                (HsKindSig
-                (NoExtField)
+                (ApiAnn
+                 [(AddApiAnn AnnDcolon { KindSigs.hs:22:37-38 })]
+                 [])
                 ({ KindSigs.hs:22:34-35 }
                  (HsTupleTy
-                  (NoExtField)
+                  (ApiAnn
+                   [(AddApiAnn AnnOpenP { KindSigs.hs:22:34 })
+                   ,(AddApiAnn AnnCloseP { KindSigs.hs:22:35 })]
+                   [])
                   (HsBoxedOrConstraintTuple)
                   []))
                 ({ KindSigs.hs:22:40-43 }
                  (HsTyVar
-                  (NoExtField)
+                  (ApiAnn
+                   []
+                   [(nnnnnnnn
+                     (AnnLineComment
+                      "parser has not filled in annotation commments properly here"))])
                   (NotPromoted)
-                  ({ KindSigs.hs:22:40-43 }
+                  (SrcSpanAnn (ApiAnnNotUsed) { KindSigs.hs:22:40-43 }
                    (Unqual
                     {OccName: Type})))))))))))))))))
   ,({ KindSigs.hs:23:1-12 }
     (ValD
      (NoExtField)
      (FunBind
-      (NoExtField)
-      ({ KindSigs.hs:23:1-3 }
+      (ApiAnnNotUsed)
+      (SrcSpanAnn (ApiAnnNotUsed) { KindSigs.hs:23:1-3 }
        (Unqual
         {OccName: qux}))
       (MG
@@ -334,7 +483,7 @@
           (Match
            (NoExtField)
            (FunRhs
-            ({ KindSigs.hs:23:1-3 }
+            (SrcSpanAnn (ApiAnnNotUsed) { KindSigs.hs:23:1-3 }
              (Unqual
               {OccName: qux}))
             (Prefix)
@@ -354,7 +503,10 @@
                ({ KindSigs.hs:23:11-12 }
                 (HsVar
                  (NoExtField)
-                 ({ KindSigs.hs:23:11-12 }
+                 (SrcSpanAnn (ApiAnn
+                              [(AddApiAnn AnnOpenP { KindSigs.hs:23:11 })
+                              ,(AddApiAnn AnnCloseP { KindSigs.hs:23:12 })]
+                              []) { KindSigs.hs:23:11-12 }
                   (Exact
                    {Name: ()}))))))]
             ({ <no location info> }
@@ -366,8 +518,13 @@
     (TyClD
      (NoExtField)
      (SynDecl
-      (NoExtField)
-      ({ KindSigs.hs:26:6-9 }
+       (ApiAnn
+       [(AddApiAnn AnnType { KindSigs.hs:26:1-4 })
+       ,(AddApiAnn AnnEqual { KindSigs.hs:26:11 })]
+       [(nnnnnnnn
+         (AnnLineComment
+          "parser has not filled in annotation commments properly here"))])
+      (SrcSpanAnn (ApiAnnNotUsed) { KindSigs.hs:26:6-9 }
        (Unqual
         {OccName: Quux}))
       (HsQTvs
@@ -376,31 +533,50 @@
       (Prefix)
       ({ KindSigs.hs:26:13-29 }
        (HsExplicitListTy
-        (NoExtField)
+        (ApiAnn
+         [(AddApiAnn AnnSimpleQuote { KindSigs.hs:26:13 })
+         ,(AddApiAnn AnnOpenS { KindSigs.hs:26:14 })
+         ,(AddApiAnn AnnCloseS { KindSigs.hs:26:29 })]
+         [])
         (IsPromoted)
         [({ KindSigs.hs:26:16-27 }
           (HsKindSig
-           (NoExtField)
+           (ApiAnn
+            [(AddApiAnn AnnDcolon { KindSigs.hs:26:21-22 })]
+            [])
            ({ KindSigs.hs:26:16-19 }
             (HsTyVar
-             (NoExtField)
+             (ApiAnn
+              []
+              [(nnnnnnnn
+                (AnnLineComment
+                 "parser has not filled in annotation commments properly here"))])
              (NotPromoted)
-             ({ KindSigs.hs:26:16-19 }
+             (SrcSpanAnn (ApiAnnNotUsed) { KindSigs.hs:26:16-19 }
               (Unqual
                {OccName: True}))))
            ({ KindSigs.hs:26:24-27 }
             (HsTyVar
-             (NoExtField)
+             (ApiAnn
+              []
+              [(nnnnnnnn
+                (AnnLineComment
+                 "parser has not filled in annotation commments properly here"))])
              (NotPromoted)
-             ({ KindSigs.hs:26:24-27 }
+             (SrcSpanAnn (ApiAnnNotUsed) { KindSigs.hs:26:24-27 }
               (Unqual
                {OccName: Bool}))))))])))))
   ,({ KindSigs.hs:27:1-45 }
     (TyClD
      (NoExtField)
      (SynDecl
-      (NoExtField)
-      ({ KindSigs.hs:27:6-10 }
+      (ApiAnn
+       [(AddApiAnn AnnType { KindSigs.hs:27:1-4 })
+       ,(AddApiAnn AnnEqual { KindSigs.hs:27:12 })]
+       [(nnnnnnnn
+         (AnnLineComment
+          "parser has not filled in annotation commments properly here"))])
+      (SrcSpanAnn (ApiAnnNotUsed) { KindSigs.hs:27:6-10 }
        (Unqual
         {OccName: Quux'}))
       (HsQTvs
@@ -409,48 +585,76 @@
       (Prefix)
       ({ KindSigs.hs:27:14-45 }
        (HsExplicitListTy
-        (NoExtField)
+        (ApiAnn
+         [(AddApiAnn AnnOpenS { KindSigs.hs:27:14 })
+         ,(AddApiAnn AnnCloseS { KindSigs.hs:27:45 })]
+         [])
         (NotPromoted)
         [({ KindSigs.hs:27:16-27 }
           (HsKindSig
-           (NoExtField)
+           (ApiAnn
+            [(AddApiAnn AnnDcolon { KindSigs.hs:27:21-22 })]
+            [])
            ({ KindSigs.hs:27:16-19 }
             (HsTyVar
-             (NoExtField)
+             (ApiAnn
+              []
+              [(nnnnnnnn
+                (AnnLineComment
+                 "parser has not filled in annotation commments properly here"))])
              (NotPromoted)
-             ({ KindSigs.hs:27:16-19 }
+             (SrcSpanAnn (ApiAnnNotUsed) { KindSigs.hs:27:16-19 }
               (Unqual
                {OccName: True}))))
            ({ KindSigs.hs:27:24-27 }
             (HsTyVar
-             (NoExtField)
+             (ApiAnn
+              []
+              [(nnnnnnnn
+                (AnnLineComment
+                 "parser has not filled in annotation commments properly here"))])
              (NotPromoted)
-             ({ KindSigs.hs:27:24-27 }
+             (SrcSpanAnn (ApiAnnNotUsed) { KindSigs.hs:27:24-27 }
               (Unqual
                {OccName: Bool}))))))
         ,({ KindSigs.hs:27:30-42 }
           (HsKindSig
-           (NoExtField)
+           (ApiAnn
+            [(AddApiAnn AnnDcolon { KindSigs.hs:27:36-37 })]
+            [])
            ({ KindSigs.hs:27:30-34 }
             (HsTyVar
-             (NoExtField)
+             (ApiAnn
+              []
+              [(nnnnnnnn
+                (AnnLineComment
+                 "parser has not filled in annotation commments properly here"))])
              (NotPromoted)
-             ({ KindSigs.hs:27:30-34 }
+             (SrcSpanAnn (ApiAnnNotUsed) { KindSigs.hs:27:30-34 }
               (Unqual
                {OccName: False}))))
            ({ KindSigs.hs:27:39-42 }
             (HsTyVar
-             (NoExtField)
+             (ApiAnn
+              []
+              [(nnnnnnnn
+                (AnnLineComment
+                 "parser has not filled in annotation commments properly here"))])
              (NotPromoted)
-             ({ KindSigs.hs:27:39-42 }
+             (SrcSpanAnn (ApiAnnNotUsed) { KindSigs.hs:27:39-42 }
               (Unqual
                {OccName: Bool}))))))])))))
   ,({ KindSigs.hs:28:1-44 }
     (TyClD
      (NoExtField)
      (SynDecl
-      (NoExtField)
-      ({ KindSigs.hs:28:6-10 }
+      (ApiAnn
+       [(AddApiAnn AnnType { KindSigs.hs:28:1-4 })
+       ,(AddApiAnn AnnEqual { KindSigs.hs:28:14 })]
+       [(nnnnnnnn
+         (AnnLineComment
+          "parser has not filled in annotation commments properly here"))])
+      (SrcSpanAnn (ApiAnnNotUsed) { KindSigs.hs:28:6-10 }
        (Unqual
         {OccName: Quuux}))
       (HsQTvs
@@ -458,57 +662,90 @@
        [({ KindSigs.hs:28:12 }
          (UserTyVar
           (NoExtField)
-          ({ KindSigs.hs:28:12 }
+          (SrcSpanAnn (ApiAnnNotUsed) { KindSigs.hs:28:12 }
            (Unqual
             {OccName: b}))))])
       (Prefix)
       ({ KindSigs.hs:28:16-44 }
        (HsExplicitTupleTy
-        (NoExtField)
+        (ApiAnn
+         [(AddApiAnn AnnSimpleQuote { KindSigs.hs:28:16 })
+         ,(AddApiAnn AnnOpenP { KindSigs.hs:28:17 })
+         ,(AddApiAnn AnnCloseP { KindSigs.hs:28:44 })]
+         [])
         [({ KindSigs.hs:28:19-39 }
           (HsKindSig
-           (NoExtField)
+           (ApiAnn
+            [(AddApiAnn AnnDcolon { KindSigs.hs:28:31-32 })]
+            [])
            ({ KindSigs.hs:28:19-29 }
             (HsExplicitListTy
-             (NoExtField)
+             (ApiAnn
+              [(AddApiAnn AnnOpenS { KindSigs.hs:28:19 })
+              ,(AddApiAnn AnnCloseS { KindSigs.hs:28:29 })]
+              [])
              (NotPromoted)
              [({ KindSigs.hs:28:20-22 }
                (HsTyVar
-                (NoExtField)
+                (ApiAnn
+                 []
+                 [(nnnnnnnn
+                   (AnnLineComment
+                    "parser has not filled in annotation commments properly here"))])
                 (NotPromoted)
-                ({ KindSigs.hs:28:20-22 }
+                (SrcSpanAnn (ApiAnnNotUsed) { KindSigs.hs:28:20-22 }
                  (Unqual
                   {OccName: Int}))))
              ,({ KindSigs.hs:28:25-28 }
                (HsTyVar
-                (NoExtField)
+                (ApiAnn
+                 []
+                 [(nnnnnnnn
+                   (AnnLineComment
+                    "parser has not filled in annotation commments properly here"))])
                 (NotPromoted)
-                ({ KindSigs.hs:28:25-28 }
+                (SrcSpanAnn (ApiAnnNotUsed) { KindSigs.hs:28:25-28 }
                  (Unqual
                   {OccName: Bool}))))]))
            ({ KindSigs.hs:28:34-39 }
             (HsListTy
-             (NoExtField)
+             (ApiAnn
+              [(AddApiAnn AnnOpenS { KindSigs.hs:28:34 })
+              ,(AddApiAnn AnnCloseS { KindSigs.hs:28:39 })]
+              [])
              ({ KindSigs.hs:28:35-38 }
               (HsTyVar
-               (NoExtField)
+               (ApiAnn
+                []
+                [(nnnnnnnn
+                  (AnnLineComment
+                   "parser has not filled in annotation commments properly here"))])
                (NotPromoted)
-               ({ KindSigs.hs:28:35-38 }
+               (SrcSpanAnn (ApiAnnNotUsed) { KindSigs.hs:28:35-38 }
                 (Unqual
                  {OccName: Type}))))))))
         ,({ KindSigs.hs:28:42 }
           (HsTyVar
-           (NoExtField)
+           (ApiAnn
+            []
+            [(nnnnnnnn
+              (AnnLineComment
+               "parser has not filled in annotation commments properly here"))])
            (NotPromoted)
-           ({ KindSigs.hs:28:42 }
+           (SrcSpanAnn (ApiAnnNotUsed) { KindSigs.hs:28:42 }
             (Unqual
              {OccName: b}))))])))))
   ,({ KindSigs.hs:31:1-31 }
     (TyClD
      (NoExtField)
      (SynDecl
-      (NoExtField)
-      ({ KindSigs.hs:31:6-17 }
+      (ApiAnn
+       [(AddApiAnn AnnType { KindSigs.hs:31:1-4 })
+       ,(AddApiAnn AnnEqual { KindSigs.hs:31:19 })]
+       [(nnnnnnnn
+         (AnnLineComment
+          "parser has not filled in annotation commments properly here"))])
+      (SrcSpanAnn (ApiAnnNotUsed) { KindSigs.hs:31:6-17 }
        (Unqual
         {OccName: Sarsaparilla}))
       (HsQTvs
@@ -517,27 +754,41 @@
       (Prefix)
       ({ KindSigs.hs:31:21-31 }
        (HsKindSig
-        (NoExtField)
+        (ApiAnn
+         [(AddApiAnn AnnDcolon { KindSigs.hs:31:25-26 })]
+         [])
         ({ KindSigs.hs:31:21-23 }
          (HsTyVar
-          (NoExtField)
+          (ApiAnn
+           []
+           [(nnnnnnnn
+             (AnnLineComment
+              "parser has not filled in annotation commments properly here"))])
           (NotPromoted)
-          ({ KindSigs.hs:31:21-23 }
+          (SrcSpanAnn (ApiAnnNotUsed) { KindSigs.hs:31:21-23 }
            (Unqual
             {OccName: Int}))))
         ({ KindSigs.hs:31:28-31 }
          (HsTyVar
-          (NoExtField)
+          (ApiAnn
+           []
+           [(nnnnnnnn
+             (AnnLineComment
+              "parser has not filled in annotation commments properly here"))])
           (NotPromoted)
-          ({ KindSigs.hs:31:28-31 }
+          (SrcSpanAnn (ApiAnnNotUsed) { KindSigs.hs:31:28-31 }
            (Unqual
             {OccName: Type})))))))))
   ,({ KindSigs.hs:34:1-22 }
     (SigD
      (NoExtField)
      (TypeSig
-      (NoExtField)
-      [({ KindSigs.hs:34:1-4 }
+      (ApiAnn
+       [(AddApiAnn AnnDcolon { KindSigs.hs:34:6-7 })]
+       [(nnnnnnnn
+         (AnnLineComment
+          "parser has not filled in annotation commments properly here"))])
+      [(SrcSpanAnn (ApiAnnNotUsed) { KindSigs.hs:34:1-4 }
         (Unqual
          {OccName: true}))]
       (HsWC
@@ -546,30 +797,43 @@
         (NoExtField)
         ({ KindSigs.hs:34:9-22 }
          (HsParTy
-          (NoExtField)
+          (ApiAnn
+           [(AddApiAnn AnnOpenP { KindSigs.hs:34:9 })
+           ,(AddApiAnn AnnCloseP { KindSigs.hs:34:22 })]
+           [])
           ({ KindSigs.hs:34:10-21 }
            (HsKindSig
-            (NoExtField)
+            (ApiAnn
+             [(AddApiAnn AnnDcolon { KindSigs.hs:34:15-16 })]
+             [])
             ({ KindSigs.hs:34:10-13 }
              (HsTyVar
-              (NoExtField)
+              (ApiAnn
+               []
+               [(nnnnnnnn
+                 (AnnLineComment
+                  "parser has not filled in annotation commments properly here"))])
               (NotPromoted)
-              ({ KindSigs.hs:34:10-13 }
+              (SrcSpanAnn (ApiAnnNotUsed) { KindSigs.hs:34:10-13 }
                (Unqual
                 {OccName: Bool}))))
             ({ KindSigs.hs:34:18-21 }
              (HsTyVar
-              (NoExtField)
+              (ApiAnn
+               []
+               [(nnnnnnnn
+                 (AnnLineComment
+                  "parser has not filled in annotation commments properly here"))])
               (NotPromoted)
-              ({ KindSigs.hs:34:18-21 }
+              (SrcSpanAnn (ApiAnnNotUsed) { KindSigs.hs:34:18-21 }
                (Unqual
                 {OccName: Type})))))))))))))
   ,({ KindSigs.hs:35:1-11 }
     (ValD
      (NoExtField)
      (FunBind
-      (NoExtField)
-      ({ KindSigs.hs:35:1-4 }
+      (ApiAnnNotUsed)
+      (SrcSpanAnn (ApiAnnNotUsed) { KindSigs.hs:35:1-4 }
        (Unqual
         {OccName: true}))
       (MG
@@ -579,7 +843,7 @@
           (Match
            (NoExtField)
            (FunRhs
-            ({ KindSigs.hs:35:1-4 }
+            (SrcSpanAnn (ApiAnnNotUsed) { KindSigs.hs:35:1-4 }
              (Unqual
               {OccName: true}))
             (Prefix)
@@ -594,7 +858,7 @@
                ({ KindSigs.hs:35:8-11 }
                 (HsVar
                  (NoExtField)
-                 ({ KindSigs.hs:35:8-11 }
+                 (SrcSpanAnn (ApiAnnNotUsed) { KindSigs.hs:35:8-11 }
                   (Unqual
                    {OccName: True}))))))]
             ({ <no location info> }
