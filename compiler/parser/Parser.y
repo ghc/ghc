@@ -2742,15 +2742,15 @@ aexp    :: { ECP }
         : qvar TIGHT_INFIX_AT aexp
                                 { ECP $
                                    runECP_PV $3 >>= \ $3 ->
-                                   amms (mkHsAsPatPV (comb2 $1 $>) $1 $3) [mj AnnAt $2] }
+                                   amms (mkHsAsPatPV (comb2 $1 $>) $1 $3 (ma AnnAt $2)) [mj AnnAt $2] }
 
         -- See Note [Whitespace-sensitive operator parsing] in Lexer.x
         | PREFIX_TILDE aexp     { ECP $
                                    runECP_PV $2 >>= \ $2 ->
-                                   amms (mkHsLazyPatPV (comb2 $1 $>) $2) [mj AnnTilde $1] }
+                                   amms (mkHsLazyPatPV (comb2 $1 $>) $2 (ma AnnTilde $1)) [mj AnnTilde $1] }
         | PREFIX_BANG aexp      { ECP $
                                    runECP_PV $2 >>= \ $2 ->
-                                   amms (mkHsBangPatPV (comb2 $1 $>) $2) [mj AnnBang $1] }
+                                   amms (mkHsBangPatPV (comb2 $1 $>) $2 (ma AnnBang $1)) [mj AnnBang $1] }
 
         | '\\' apat apats '->' exp
                    {  ECP $
@@ -2843,16 +2843,19 @@ aexp2   :: { ECP }
                                            amms (mkHsParPV (comb2 $1 $>) $2) [mop $1,mcp $3] }
         | '(' tup_exprs ')'             { ECP $
                                            $2 >>= \ $2 ->
-                                           amms (mkSumOrTuplePV (comb2 $1 $>) Boxed (snd $2))
+                                           amms (mkSumOrTuplePV (comb2 $1 $>) Boxed (snd $2)
+                                                (AA ((mop $1:fst $2) ++ [mcp $3])))
                                                 ((mop $1:fst $2) ++ [mcp $3]) }
 
         | '(#' texp '#)'                { ECP $
                                            runECP_PV $2 >>= \ $2 ->
-                                           amms (mkSumOrTuplePV (comb2 $1 $>) Unboxed (Tuple [L (gl $2) (Just $2)]))
+                                           amms (mkSumOrTuplePV (comb2 $1 $>) Unboxed (Tuple [L (gl $2) (Just $2)])
+                                                (AA [mo $1,mc $3] ))
                                                 [mo $1,mc $3] }
         | '(#' tup_exprs '#)'           { ECP $
                                            $2 >>= \ $2 ->
-                                           amms (mkSumOrTuplePV (comb2 $1 $>) Unboxed (snd $2))
+                                           amms (mkSumOrTuplePV (comb2 $1 $>) Unboxed (snd $2)
+                                                (AA ((mo $1:fst $2) ++ [mc $3])))
                                                 ((mo $1:fst $2) ++ [mc $3]) }
 
         | '[' list ']'      { ECP $ $2 (comb2 $1 $>) >>= \a -> ams a [mos $1,mcs $3] }
@@ -2964,7 +2967,7 @@ texp :: { ECP }
         | exp '->' texp   { ECP $
                              runECP_PV $1 >>= \ $1 ->
                              runECP_PV $3 >>= \ $3 ->
-                             amms (mkHsViewPatPV (comb2 $1 $>) $1 $3) [mu AnnRarrow $2] }
+                             amms (mkHsViewPatPV (comb2 $1 $>) $1 $3 (AA [mu AnnRarrow $2])) [mu AnnRarrow $2] }
 
 -- Always at least one comma or bar.
 -- Though this can parse just commas (without any expressions), it won't
@@ -4028,6 +4031,10 @@ in ApiAnnotation.hs
 mj :: AnnKeywordId -> Located e -> AddAnn
 mj a l = AddAnn a (gl l)
 
+-- |Construct an AA from the annotation keyword and the location
+-- of the keyword itself
+ma :: AnnKeywordId -> Located e -> AA
+ma a l = AA [mj a l]
 
 -- |Construct an AddAnn from the annotation keyword and the Located Token. If
 -- the token has a unicode equivalent and this has been used, provide the

@@ -935,7 +935,7 @@ mkOneRecordSelector all_cons idDetails fl
     eq_subst = mkTvSubstPrs (map eqSpecPair eq_spec)
     inst_tys = substTyVars eq_subst univ_tvs
 
-    unit_rhs = mkLHsTupleExpr []
+    unit_rhs = mkLHsTupleExpr [] noExtField
     msg_lit = HsStringPrim NoSourceText (bytesFS lbl)
 
 {-

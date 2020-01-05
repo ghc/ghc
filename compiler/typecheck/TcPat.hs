@@ -470,7 +470,7 @@ tc_pat penv (TuplePat _ pats boxity) pat_ty thing_inside
                                  -- pat_ty /= pat_ty iff coi /= IdCo
               possibly_mangled_result
                 | gopt Opt_IrrefutableTuples dflags &&
-                  isBoxed boxity      = LazyPat noExtField (noLoc unmangled_result)
+                  isBoxed boxity      = LazyPat noAnn (noLoc unmangled_result)
                 | otherwise           = unmangled_result
 
         ; pat_ty <- readExpType pat_ty

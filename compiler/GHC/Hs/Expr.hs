@@ -559,9 +559,12 @@ type instance XNegApp        (GhcPass _) = NoExtField
 type instance XPar           (GhcPass _) = NoExtField
 type instance XSectionL      (GhcPass _) = NoExtField
 type instance XSectionR      (GhcPass _) = NoExtField
-type instance XExplicitTuple (GhcPass _) = NoExtField
 
-type instance XExplicitSum   GhcPs = NoExtField
+type instance XExplicitTuple GhcPs = AA
+type instance XExplicitTuple GhcRn = NoExtField
+type instance XExplicitTuple GhcTc = NoExtField
+
+type instance XExplicitSum   GhcPs = AA
 type instance XExplicitSum   GhcRn = NoExtField
 type instance XExplicitSum   GhcTc = [Type]
 

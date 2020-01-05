@@ -43,6 +43,7 @@
 {
 {-# LANGUAGE CPP #-}
 {-# LANGUAGE BangPatterns #-}
+{-# LANGUAGE DeriveDataTypeable #-}
 {-# LANGUAGE LambdaCase #-}
 {-# LANGUAGE MultiWayIf #-}
 
@@ -79,6 +80,7 @@ import Data.Char
 import Data.List
 import Data.Maybe
 import Data.Word
+import Data.Data
 
 import EnumSet (EnumSet)
 import qualified EnumSet
@@ -3208,7 +3210,7 @@ clean_pragma prag = canon_ws (map toLower (unprefix prag))
 --
 --   The usual way an 'AddAnn' is created is using the 'mj' ("make jump")
 --   function, and then it can be discharged using the 'ams' function.
-data AddAnn = AddAnn AnnKeywordId SrcSpan
+data AddAnn = AddAnn AnnKeywordId SrcSpan deriving (Data,Show)
 
 addAnnotationOnly :: SrcSpan -> AnnKeywordId -> SrcSpan -> P ()
 addAnnotationOnly l a v = P $ \s -> POk s {

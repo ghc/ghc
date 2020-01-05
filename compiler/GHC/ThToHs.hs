@@ -918,7 +918,7 @@ cvtl e = wrapL (cvt e)
     cvt (UnboxedTupE es) = cvt_tup es Unboxed
     cvt (UnboxedSumE e alt arity) = do { e' <- cvtl e
                                        ; unboxedSumChecks alt arity
-                                       ; return $ ExplicitSum noExtField
+                                       ; return $ ExplicitSum noAnn
                                                                    alt arity e'}
     cvt (CondE x y z)  = do { x' <- cvtl x; y' <- cvtl y; z' <- cvtl z;
                             ; return $ HsIf noExtField (Just noSyntaxExpr) x' y' z' }
@@ -1054,7 +1054,7 @@ cvt_tup es boxity = do { let cvtl_maybe Nothing  = return missingTupArg
                              cvtl_maybe (Just e) = fmap (Present noExtField) (cvtl e)
                        ; es' <- mapM cvtl_maybe es
                        ; return $ ExplicitTuple
-                                    noExtField
+                                    noAnn
                                     (map noLoc es')
                                     boxity }
 
@@ -1258,13 +1258,13 @@ cvtp (TH.LitP l)
 cvtp (TH.VarP s)       = do { s' <- vName s
                             ; return $ Hs.VarPat noExtField (noLoc s') }
 cvtp (TupP ps)         = do { ps' <- cvtPats ps
-                            ; return $ TuplePat noExtField ps' Boxed }
+                            ; return $ TuplePat noAnn ps' Boxed }
 cvtp (UnboxedTupP ps)  = do { ps' <- cvtPats ps
-                            ; return $ TuplePat noExtField ps' Unboxed }
+                            ; return $ TuplePat noAnn ps' Unboxed }
 cvtp (UnboxedSumP p alt arity)
                        = do { p' <- cvtPat p
                             ; unboxedSumChecks alt arity
-                            ; return $ SumPat noExtField p' alt arity }
+                            ; return $ SumPat noAnn p' alt arity }
 cvtp (ConP s ps)       = do { s' <- cNameL s; ps' <- cvtPats ps
                             ; let pps = map (parenthesizePat appPrec) ps'
                             ; return $ ConPatIn s' (PrefixCon pps) }
@@ -1279,10 +1279,10 @@ cvtp (ParensP p)       = do { p' <- cvtPat p;
                             ; case unLoc p' of  -- may be wrapped ConPatIn
                                 ParPat {} -> return $ unLoc p'
                                 _         -> return $ ParPat noExtField p' }
-cvtp (TildeP p)        = do { p' <- cvtPat p; return $ LazyPat noExtField p' }
-cvtp (BangP p)         = do { p' <- cvtPat p; return $ BangPat noExtField p' }
+cvtp (TildeP p)        = do { p' <- cvtPat p; return $ LazyPat noAnn p' }
+cvtp (BangP p)         = do { p' <- cvtPat p; return $ BangPat noAnn p' }
 cvtp (TH.AsP s p)      = do { s' <- vNameL s; p' <- cvtPat p
-                            ; return $ AsPat noExtField s' p' }
+                            ; return $ AsPat noAnn s' p' }
 cvtp TH.WildP          = return $ WildPat noExtField
 cvtp (RecP c fs)       = do { c' <- cNameL c; fs' <- mapM cvtPatFld fs
                             ; return $ ConPatIn c'
@@ -1293,7 +1293,7 @@ cvtp (ListP ps)        = do { ps' <- cvtPats ps
 cvtp (SigP p t)        = do { p' <- cvtPat p; t' <- cvtType t
                             ; return $ SigPat noExtField p' (mkLHsSigWcType t') }
 cvtp (ViewP e p)       = do { e' <- cvtl e; p' <- cvtPat p
-                            ; return $ ViewPat noExtField e' p'}
+                            ; return $ ViewPat noAnn e' p'}
 
 cvtPatFld :: (TH.Name, TH.Pat) -> CvtM (LHsRecField GhcPs (LPat GhcPs))
 cvtPatFld (s,p)
