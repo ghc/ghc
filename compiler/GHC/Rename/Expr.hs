@@ -278,11 +278,11 @@ rnExpr (ExplicitList x _  exps)
            else
             return  (ExplicitList x Nothing exps', fvs) }
 
-rnExpr (ExplicitTuple x tup_args boxity)
+rnExpr (ExplicitTuple _ tup_args boxity)
   = do { checkTupleSection tup_args
        ; checkTupSize (length tup_args)
        ; (tup_args', fvs) <- mapAndUnzipM rnTupArg tup_args
-       ; return (ExplicitTuple x tup_args' boxity, plusFVs fvs) }
+       ; return (ExplicitTuple noExtField tup_args' boxity, plusFVs fvs) }
   where
     rnTupArg (L l (Present x e)) = do { (e',fvs) <- rnLExpr e
                                       ; return (L l (Present x e'), fvs) }
@@ -290,9 +290,9 @@ rnExpr (ExplicitTuple x tup_args boxity)
                                         , emptyFVs)
     rnTupArg (L _ (XTupArg nec)) = noExtCon nec
 
-rnExpr (ExplicitSum x alt arity expr)
+rnExpr (ExplicitSum _ alt arity expr)
   = do { (expr', fvs) <- rnLExpr expr
-       ; return (ExplicitSum x alt arity expr', fvs) }
+       ; return (ExplicitSum noExtField alt arity expr', fvs) }
 
 rnExpr (RecordCon { rcon_con_name = con_id
                   , rcon_flds = rec_binds@(HsRecFields { rec_dotdot = dd }) })
@@ -1737,7 +1737,7 @@ stmtTreeToStmts monad_names ctxt (StmtTreeApplicative trees) tail tail_fvs = do
          pvars = nameSetElemsStable pvarset
            -- See Note [Deterministic ApplicativeDo and RecursiveDo desugaring]
          pat = mkBigLHsVarPatTup pvars
-         tup = mkBigLHsVarTup pvars
+         tup = mkBigLHsVarTup pvars noExtField
      (stmts',fvs2) <- stmtTreeToStmts monad_names ctxt tree [] pvarset
      (mb_ret, fvs1) <-
         if | L _ ApplicativeStmt{} <- last stmts' ->

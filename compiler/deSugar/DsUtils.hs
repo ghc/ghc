@@ -769,7 +769,7 @@ mkBigLHsVarTupId :: [Id] -> LHsExpr GhcTc
 mkBigLHsVarTupId ids = mkBigLHsTupId (map nlHsVar ids)
 
 mkBigLHsTupId :: [LHsExpr GhcTc] -> LHsExpr GhcTc
-mkBigLHsTupId = mkChunkified mkLHsTupleExpr
+mkBigLHsTupId = mkChunkified (\e -> mkLHsTupleExpr e noExtField)
 
 -- The Big equivalents for the source tuple patterns
 mkBigLHsVarPatTupId :: [Id] -> LPat GhcTc
@@ -955,7 +955,7 @@ decideBangHood dflags lpat
            ParPat x p    -> L l (ParPat x (go p))
            LazyPat _ lp' -> lp'
            BangPat _ _   -> lp
-           _             -> L l (BangPat noExtField lp)
+           _             -> L l (BangPat noAnn lp)
 
 -- | Unconditionally make a 'Pat' strict.
 addBang :: LPat GhcTc -- ^ Original pattern
@@ -965,10 +965,10 @@ addBang = go
     go lp@(L l p)
       = case p of
            ParPat x p    -> L l (ParPat x (go p))
-           LazyPat _ lp' -> L l (BangPat noExtField lp')
+           LazyPat _ lp' -> L l (BangPat noAnn lp')
                                   -- Should we bring the extension value over?
            BangPat _ _   -> lp
-           _             -> L l (BangPat noExtField lp)
+           _             -> L l (BangPat noAnn lp)
 
 isTrueLHsExpr :: LHsExpr GhcTc -> Maybe (CoreExpr -> DsM CoreExpr)
 
