@@ -23,6 +23,7 @@ import GHC.Core.TyCo.Rep
 import GHC.Core.Type
 import GHC.Types.Var
 import GHC.Types.Var.Env
+import GHC.Hs.Extension
 
 import GHC.Iface.Ext.Types
 
@@ -521,12 +522,22 @@ locOnly (RealSrcSpan span _) = do
   pure [Node e span []]
 locOnly _ = pure []
 
+mkScopeA :: SrcSpanAnn -> Scope
+mkScopeA l = mkScope (locA l)
+
 mkScope :: SrcSpan -> Scope
 mkScope (RealSrcSpan sp _) = LocalScope sp
 mkScope _ = NoScope
 
 mkLScope :: Located a -> Scope
 mkLScope = mkScope . getLoc
+
+-- mkLScopeA :: LocatedA a -> Scope
+mkLScopeA :: GenLocated (SrcSpanAnn' a) e -> Scope
+mkLScopeA = mkScope . locA . getLoc
+
+mkLScopeN :: ApiAnnName a -> Scope
+mkLScopeN = mkScope . getLocN
 
 combineScopes :: Scope -> Scope -> Scope
 combineScopes ModuleScope _ = ModuleScope
@@ -538,6 +549,14 @@ combineScopes (LocalScope a) (LocalScope b) =
 
 mkSourcedNodeInfo :: NodeOrigin -> NodeInfo a -> SourcedNodeInfo a
 mkSourcedNodeInfo org ni = SourcedNodeInfo $ M.singleton org ni
+
+{-# INLINEABLE makeNodeA #-}
+makeNodeA
+  :: (Monad m, Data a)
+  => a                       -- ^ helps fill in 'nodeAnnotations' (with 'Data')
+  -> SrcSpanAnn              -- ^ return an empty list if this is unhelpful
+  -> ReaderT NodeOrigin m [HieAST b]
+makeNodeA x spn = makeNode x (locA spn)
 
 {-# INLINEABLE makeNode #-}
 makeNode
@@ -553,6 +572,15 @@ makeNode x spn = do
   where
     cons = mkFastString . show . toConstr $ x
     typ = mkFastString . show . typeRepTyCon . typeOf $ x
+
+{-# INLINEABLE makeTypeNodeA #-}
+makeTypeNodeA
+  :: (Monad m, Data a)
+  => a                       -- ^ helps fill in 'nodeAnnotations' (with 'Data')
+  -> SrcSpanAnn              -- ^ return an empty list if this is unhelpful
+  -> Type                    -- ^ type to associate with the node
+  -> ReaderT NodeOrigin m [HieAST Type]
+makeTypeNodeA x spn etyp = makeTypeNode x (locA spn) etyp
 
 {-# INLINEABLE makeTypeNode #-}
 makeTypeNode

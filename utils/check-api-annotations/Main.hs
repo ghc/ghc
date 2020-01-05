@@ -26,7 +26,7 @@ testOneFile libdir fileName = do
              case ml_hs_file $ ms_location m of
                Nothing -> False
                Just fn -> fn == fileName
-       (anns,p) <- runGhc (Just libdir) $ do
+       (anns',p) <- runGhc (Just libdir) $ do
                         dflags <- getSessionDynFlags
                         _ <- setSessionDynFlags dflags
                         addTarget Target { targetId = TargetFile fileName Nothing
@@ -44,7 +44,7 @@ testOneFile libdir fileName = do
 
        let sspans = Set.fromList $ getAllSrcSpans (pm_parsed_source p)
 
-           ann_items = apiAnnItems anns
+           ann_items = apiAnnItems anns'
 
            exploded = [((kw,ss),[anchor])
                       | ((anchor,kw),sss) <- Map.toList ann_items,ss <- sss]
@@ -72,8 +72,8 @@ testOneFile libdir fileName = do
        -- putStrLn (intercalate "\n" [showAnns ann_items])
        putStrLn (showAnns ann_items)
        putStrLn "---Eof Position (should be Just)-----"
-       putStrLn (show (apiAnnEofPos anns))
-       if null problems' && null precedingProblems && isJust (apiAnnEofPos anns)
+       putStrLn (show (apiAnnEofPos anns'))
+       if null problems' && null precedingProblems && isJust (apiAnnEofPos anns')
           then exitSuccess
           else exitFailure
 
@@ -87,7 +87,7 @@ testOneFile libdir fileName = do
 
 
 showAnns :: Map.Map ApiAnnKey [RealSrcSpan] -> String
-showAnns anns = showAnnsList $ Map.toList anns
+showAnns anns' = showAnnsList $ Map.toList anns'
 
 showAnnsList :: [(ApiAnnKey, [RealSrcSpan])] -> String
 showAnnsList annsList = "[\n" ++ (intercalate ",\n"

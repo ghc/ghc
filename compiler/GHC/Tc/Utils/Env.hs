@@ -208,10 +208,10 @@ span of the Name.
 -}
 
 
-tcLookupLocatedGlobal :: Located Name -> TcM TyThing
+tcLookupLocatedGlobal :: LocatedA Name -> TcM TyThing
 -- c.f. GHC.IfaceToCore.tcIfaceGlobal
 tcLookupLocatedGlobal name
-  = addLocM tcLookupGlobal name
+  = addLocMA tcLookupGlobal name
 
 tcLookupGlobal :: Name -> TcM TyThing
 -- The Name is almost always an ExternalName, but not always
@@ -289,14 +289,14 @@ tcLookupAxiom name = do
         ACoAxiom ax -> return ax
         _           -> wrongThingErr "axiom" (AGlobal thing) name
 
-tcLookupLocatedGlobalId :: Located Name -> TcM Id
-tcLookupLocatedGlobalId = addLocM tcLookupId
+tcLookupLocatedGlobalId :: LocatedA Name -> TcM Id
+tcLookupLocatedGlobalId = addLocMA tcLookupId
 
-tcLookupLocatedClass :: Located Name -> TcM Class
-tcLookupLocatedClass = addLocM tcLookupClass
+tcLookupLocatedClass :: LocatedA Name -> TcM Class
+tcLookupLocatedClass = addLocMA tcLookupClass
 
-tcLookupLocatedTyCon :: Located Name -> TcM TyCon
-tcLookupLocatedTyCon = addLocM tcLookupTyCon
+tcLookupLocatedTyCon :: ApiAnnName Name -> TcM TyCon
+tcLookupLocatedTyCon = addLocMN tcLookupTyCon
 
 -- Find the instance that exactly matches a type class application.  The class arguments must be precisely
 -- the same as in the instance declaration (modulo renaming & casts).
@@ -403,8 +403,8 @@ tcExtendRecEnv gbl_stuff thing_inside
 ************************************************************************
 -}
 
-tcLookupLocated :: Located Name -> TcM TcTyThing
-tcLookupLocated = addLocM tcLookup
+tcLookupLocated :: LocatedA Name -> TcM TcTyThing
+tcLookupLocated = addLocMA tcLookup
 
 tcLookupLcl_maybe :: Name -> TcM (Maybe TcTyThing)
 tcLookupLcl_maybe name
@@ -690,14 +690,14 @@ tcAddDataFamConPlaceholders inst_decls thing_inside
     get_fi_cons :: DataFamInstDecl GhcRn -> [Name]
     get_fi_cons (DataFamInstDecl { dfid_eqn = HsIB { hsib_body =
                   FamEqn { feqn_rhs = HsDataDefn { dd_cons = cons } }}})
-      = map unLoc $ concatMap (getConNames . unLoc) cons
+      = map unApiName $ concatMap (getConNames . unLoc) cons
 
 
 tcAddPatSynPlaceholders :: [PatSynBind GhcRn GhcRn] -> TcM a -> TcM a
 -- See Note [Don't promote pattern synonyms]
 tcAddPatSynPlaceholders pat_syns thing_inside
   = tcExtendKindEnvList [ (name, APromotionErr PatSynPE)
-                        | PSB{ psb_id = L _ name } <- pat_syns ]
+                        | PSB{ psb_id = N _ name } <- pat_syns ]
        thing_inside
 
 getTypeSigNames :: [LSig GhcRn] -> NameSet
@@ -708,8 +708,8 @@ getTypeSigNames sigs
     get_type_sig :: LSig GhcRn -> NameSet -> NameSet
     get_type_sig sig ns =
       case sig of
-        L _ (TypeSig _ names _) -> extendNameSetList ns (map unLoc names)
-        L _ (PatSynSig _ names _) -> extendNameSetList ns (map unLoc names)
+        L _ (TypeSig _ names _) -> extendNameSetList ns (map unApiName names)
+        L _ (PatSynSig _ names _) -> extendNameSetList ns (map unApiName names)
         _ -> ns
 
 
@@ -981,12 +981,12 @@ newDFunName clas tys loc
         ; dfun_occ <- chooseUniqueOccTc (mkDFunOcc info_string is_boot)
         ; newGlobalBinder mod dfun_occ loc }
 
-newFamInstTyConName :: Located Name -> [Type] -> TcM Name
-newFamInstTyConName (L loc name) tys = mk_fam_inst_name id loc name [tys]
+newFamInstTyConName :: ApiAnnName Name -> [Type] -> TcM Name
+newFamInstTyConName (N loc name) tys = mk_fam_inst_name id (locA loc) name [tys]
 
-newFamInstAxiomName :: Located Name -> [[Type]] -> TcM Name
-newFamInstAxiomName (L loc name) branches
-  = mk_fam_inst_name mkInstTyCoOcc loc name branches
+newFamInstAxiomName :: ApiAnnName Name -> [[Type]] -> TcM Name
+newFamInstAxiomName (N loc name) branches
+  = mk_fam_inst_name mkInstTyCoOcc (locA loc) name branches
 
 mk_fam_inst_name :: (OccName -> OccName) -> SrcSpan -> Name -> [[Type]] -> TcM Name
 mk_fam_inst_name adaptOcc loc tc_name tyss

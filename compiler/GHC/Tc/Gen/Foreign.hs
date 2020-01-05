@@ -242,7 +242,7 @@ tcForeignImports' decls
 
 tcFImport :: LForeignDecl GhcRn
           -> TcM (Id, LForeignDecl GhcTc, Bag GlobalRdrElt)
-tcFImport (L dloc fo@(ForeignImport { fd_name = L nloc nm, fd_sig_ty = hs_ty
+tcFImport (L dloc fo@(ForeignImport { fd_name = N nloc nm, fd_sig_ty = hs_ty
                                     , fd_fi = imp_decl }))
   = setSrcSpan dloc $ addErrCtxt (foreignDeclCtxt fo)  $
     do { sig_ty <- tcHsSigType (ForSigCtxt nm) hs_ty
@@ -259,7 +259,7 @@ tcFImport (L dloc fo@(ForeignImport { fd_name = L nloc nm, fd_sig_ty = hs_ty
        ; imp_decl' <- tcCheckFIType arg_tys res_ty imp_decl
           -- Can't use sig_ty here because sig_ty :: Type and
           -- we need HsType Id hence the undefined
-       ; let fi_decl = ForeignImport { fd_name = L nloc id
+       ; let fi_decl = ForeignImport { fd_name = N nloc id
                                      , fd_sig_ty = undefined
                                      , fd_i_ext = mkSymCo norm_co
                                      , fd_fi = imp_decl' }
@@ -384,7 +384,7 @@ tcForeignExports' decls
 
 tcFExport :: ForeignDecl GhcRn
           -> TcM (LHsBind GhcTc, ForeignDecl GhcTc, Bag GlobalRdrElt)
-tcFExport fo@(ForeignExport { fd_name = L loc nm, fd_sig_ty = hs_ty, fd_fe = spec })
+tcFExport fo@(ForeignExport { fd_name = N loc nm, fd_sig_ty = hs_ty, fd_fe = spec })
   = addErrCtxt (foreignDeclCtxt fo) $ do
 
     sig_ty <- tcHsSigType (ForSigCtxt nm) hs_ty
@@ -403,9 +403,9 @@ tcFExport fo@(ForeignExport { fd_name = L loc nm, fd_sig_ty = hs_ty, fd_fe = spe
     -- We need to give a name to the new top-level binding that
     -- is *stable* (i.e. the compiler won't change it later),
     -- because this name will be referred to by the C code stub.
-    id  <- mkStableIdFromName nm sig_ty loc mkForeignExportOcc
+    id  <- mkStableIdFromName nm sig_ty (locA loc) mkForeignExportOcc
     return ( mkVarBind id rhs
-           , ForeignExport { fd_name = L loc id
+           , ForeignExport { fd_name = N loc id
                            , fd_sig_ty = undefined
                            , fd_e_ext = norm_co, fd_fe = spec' }
            , gres)

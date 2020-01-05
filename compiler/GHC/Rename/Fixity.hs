@@ -177,8 +177,8 @@ lookupFixityRn_help' name occ
     doc = text "Checking fixity for" <+> ppr name
 
 ---------------
-lookupTyFixityRn :: Located Name -> RnM Fixity
-lookupTyFixityRn = lookupFixityRn . unLoc
+lookupTyFixityRn :: ApiAnnName Name -> RnM Fixity
+lookupTyFixityRn = lookupFixityRn . unApiName
 
 -- | Look up the fixity of a (possibly ambiguous) occurrence of a record field
 -- selector.  We use 'lookupFixityRn'' so that we can specify the 'OccName' as
@@ -187,8 +187,8 @@ lookupTyFixityRn = lookupFixityRn . unLoc
 -- multiple possible selectors with different fixities, generate an error.
 lookupFieldFixityRn :: AmbiguousFieldOcc GhcRn -> RnM Fixity
 lookupFieldFixityRn (Unambiguous n lrdr)
-  = lookupFixityRn' n (rdrNameOcc (unLoc lrdr))
-lookupFieldFixityRn (Ambiguous _ lrdr) = get_ambiguous_fixity (unLoc lrdr)
+  = lookupFixityRn' n (rdrNameOcc (unApiName lrdr))
+lookupFieldFixityRn (Ambiguous _ lrdr) = get_ambiguous_fixity (unApiName lrdr)
   where
     get_ambiguous_fixity :: RdrName -> RnM Fixity
     get_ambiguous_fixity rdr_name = do

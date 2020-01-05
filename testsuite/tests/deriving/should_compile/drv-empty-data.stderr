@@ -7,7 +7,7 @@ Derived class instances:
     GHC.Read.readListPrec = GHC.Read.readListPrecDefault
   
   instance GHC.Show.Show (DrvEmptyData.Void a) where
-    GHC.Show.showsPrec _ z = case z of
+    GHC.Show.showsPrec _ z = case z of {}
   
   instance GHC.Classes.Ord (DrvEmptyData.Void a) where
     GHC.Classes.compare _ z = GHC.Types.EQ
@@ -17,36 +17,36 @@ Derived class instances:
   
   instance Data.Data.Data a =>
            Data.Data.Data (DrvEmptyData.Void a) where
-    Data.Data.gfoldl _ _ z = case z of
-    Data.Data.gunfold k z c = case Data.Data.constrIndex c of
-    Data.Data.toConstr z = case z of
+    Data.Data.gfoldl _ _ z = case z of {}
+    Data.Data.gunfold k z c = case Data.Data.constrIndex c of {}
+    Data.Data.toConstr z = case z of {}
     Data.Data.dataTypeOf _ = DrvEmptyData.$tVoid
     Data.Data.dataCast1 f = Data.Typeable.gcast1 f
   
   instance GHC.Base.Functor DrvEmptyData.Void where
-    GHC.Base.fmap _ z = case z of
-    (GHC.Base.<$) _ z = case z of
+    GHC.Base.fmap _ z = case z of {}
+    (GHC.Base.<$) _ z = case z of {}
   
   instance Data.Foldable.Foldable DrvEmptyData.Void where
     Data.Foldable.foldMap _ z = GHC.Base.mempty
   
   instance Data.Traversable.Traversable DrvEmptyData.Void where
-    Data.Traversable.traverse _ z = GHC.Base.pure (case z of)
+    Data.Traversable.traverse _ z = GHC.Base.pure (case z of {})
   
   instance GHC.Generics.Generic (DrvEmptyData.Void a) where
     GHC.Generics.from x
-      = GHC.Generics.M1 (case x of { x -> case x of })
-    GHC.Generics.to (GHC.Generics.M1 x) = case x of { x -> case x of }
+      = GHC.Generics.M1 (case x of x -> case x of {})
+    GHC.Generics.to (GHC.Generics.M1 x) = case x of x -> case x of {}
   
   instance GHC.Generics.Generic1 DrvEmptyData.Void where
     GHC.Generics.from1 x
-      = GHC.Generics.M1 (case x of { x -> case x of })
-    GHC.Generics.to1 (GHC.Generics.M1 x) = case x of { x -> case x of }
+      = GHC.Generics.M1 (case x of x -> case x of {})
+    GHC.Generics.to1 (GHC.Generics.M1 x) = case x of x -> case x of {}
   
   instance Language.Haskell.TH.Syntax.Lift
              (DrvEmptyData.Void a) where
-    Language.Haskell.TH.Syntax.lift z = GHC.Base.pure (case z of)
-    Language.Haskell.TH.Syntax.liftTyped z = GHC.Base.pure (case z of)
+    Language.Haskell.TH.Syntax.lift z = GHC.Base.pure (case z of {})
+    Language.Haskell.TH.Syntax.liftTyped z = GHC.Base.pure (case z of {})
   
   DrvEmptyData.$tVoid :: Data.Data.DataType
   DrvEmptyData.$tVoid = Data.Data.mkDataType "Void" []

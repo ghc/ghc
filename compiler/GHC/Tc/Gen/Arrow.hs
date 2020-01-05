@@ -32,6 +32,7 @@ import GHC.Tc.Types.Evidence
 import GHC.Types.Id( mkLocalId )
 import GHC.Tc.Utils.Instantiate
 import GHC.Builtin.Types
+import GHC.Types.Name
 import GHC.Types.Var.Set
 import GHC.Builtin.Types.Prim
 import GHC.Types.Basic( Arity )
@@ -134,7 +135,7 @@ tcCmdTop env (L loc (HsCmdTop names cmd)) cmd_ty@(cmd_stk, res_ty)
 tcCmd  :: CmdEnv -> LHsCmd GhcRn -> CmdType -> TcM (LHsCmd GhcTcId)
         -- The main recursive function
 tcCmd env (L loc cmd) res_ty
-  = setSrcSpan loc $ do
+  = setSrcSpan (locA loc) $ do
         { cmd' <- tc_cmd env cmd res_ty
         ; return (L loc cmd') }
 
@@ -145,7 +146,7 @@ tc_cmd env (HsCmdPar x cmd) res_ty
 
 tc_cmd env (HsCmdLet x (L l binds) (L body_loc body)) res_ty
   = do  { (binds', body') <- tcLocalBinds binds         $
-                             setSrcSpan body_loc        $
+                             setSrcSpan (locA body_loc) $
                              tc_cmd env body res_ty
         ; return (HsCmdLet x (L l binds') (L body_loc body')) }
 
@@ -257,7 +258,7 @@ tc_cmd env
                              tcPats LambdaExpr pats (map mkCheckExpType arg_tys) $
                              tc_grhss grhss cmd_stk' (mkCheckExpType res_ty)
 
-        ; let match' = L mtch_loc (Match { m_ext = noExtField
+        ; let match' = L mtch_loc (Match { m_ext = noAnn
                                          , m_ctxt = LambdaExpr, m_pats = pats'
                                          , m_grhss = grhss' })
               arg_tys = map hsLPatType pats'
@@ -267,7 +268,7 @@ tc_cmd env
         ; return (mkHsCmdWrap (mkWpCastN co) cmd') }
   where
     n_pats     = length pats
-    match_ctxt = (LambdaExpr :: HsMatchContext GhcRn)    -- Maybe KappaExpr?
+    match_ctxt = (LambdaExpr :: HsMatchContext Name)    -- Maybe KappaExpr?
     pg_ctxt    = PatGuard match_ctxt
 
     tc_grhss (GRHSs x grhss (L l binds)) stk_ty res_ty

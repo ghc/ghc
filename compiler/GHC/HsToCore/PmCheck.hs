@@ -274,7 +274,7 @@ checkSingle dflags ctxt@(DsMatchContext kind locn) var p = do
 -- | Exhaustive for guard matches, is used for guards in pattern bindings and
 -- in @MultiIf@ expressions. Returns the 'Deltas' covered by the RHSs.
 checkGuardMatches
-  :: HsMatchContext GhcRn         -- ^ Match context, for warning messages
+  :: HsMatchContext Name          -- ^ Match context, for warning messages
   -> GRHSs GhcTc (LHsExpr GhcTc)  -- ^ The GRHSs to check
   -> DsM [Deltas]                 -- ^ Covered 'Deltas' for each RHS, for long
                                   --   distance info
@@ -282,7 +282,7 @@ checkGuardMatches hs_ctx guards@(GRHSs _ grhss _) = do
     let combinedLoc = foldl1 combineSrcSpans (map getLoc grhss)
         dsMatchContext = DsMatchContext hs_ctx combinedLoc
         match = L combinedLoc $
-                  Match { m_ext = noExtField
+                  Match { m_ext = noAnn
                         , m_ctxt = hs_ctx
                         , m_pats = []
                         , m_grhss = guards }
@@ -427,7 +427,7 @@ mkPmLitGrds x lit = do
 translatePat :: FamInstEnvs -> Id -> Pat GhcTc -> DsM GrdVec
 translatePat fam_insts x pat = case pat of
   WildPat  _ty -> pure []
-  VarPat _ y   -> pure (mkPmLetVar (unLoc y) x)
+  VarPat _ y   -> pure (mkPmLetVar (unApiName y) x)
   ParPat _ p   -> translateLPat fam_insts x p
   LazyPat _ _  -> pure [] -- like a wildcard
   BangPat _ p  ->
@@ -437,7 +437,7 @@ translatePat fam_insts x pat = case pat of
 
   -- (x@pat)   ==>   Translate pat with x as match var and handle impedance
   --                 mismatch with incoming match var
-  AsPat _ (L _ y) p -> (mkPmLetVar y x ++) <$> translateLPat fam_insts y p
+  AsPat _ (N _ y) p -> (mkPmLetVar y x ++) <$> translateLPat fam_insts y p
 
   SigPat _ p _ty -> translateLPat fam_insts x p
 
@@ -499,7 +499,7 @@ translatePat fam_insts x pat = case pat of
     --
     -- See #14547, especially comment#9 and comment#10.
 
-  ConPat { pat_con     = L _ con
+  ConPat { pat_con     = N _ con
          , pat_args    = ps
          , pat_con_ext = ConPatTc
            { cpt_arg_tys = arg_tys
@@ -654,8 +654,8 @@ translateLGRHS fam_insts match_loc pats (L _loc (GRHS _ gs _)) =
   mkGrdTreeRhs loc_sdoc <$> concatMapM (translateGuard fam_insts . unLoc) gs
     where
       loc_sdoc
-        | null gs   = L match_loc (sep (map ppr pats))
-        | otherwise = L grd_loc   (sep (map ppr pats) <+> vbar <+> interpp'SP gs)
+        | null gs   = L match_loc      (sep (map ppr pats))
+        | otherwise = L (locA grd_loc) (sep (map ppr pats) <+> vbar <+> interpp'SP gs)
       L grd_loc _ = head gs
 
 -- | Translate a guard statement to a 'GrdVec'
@@ -1306,6 +1306,6 @@ pprContext singular (DsMatchContext kind _loc) msg rest_of_msg_fun
 
     (ppr_match, pref)
         = case kind of
-             FunRhs { mc_fun = L _ fun }
+             FunRhs { mc_fun = N _ fun }
                   -> (pprMatchContext kind, \ pp -> ppr fun <+> pp)
              _    -> (pprMatchContext kind, \ pp -> pp)

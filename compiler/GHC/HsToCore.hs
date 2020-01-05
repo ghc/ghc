@@ -379,8 +379,8 @@ dsRule (L loc (HsRule { rd_name = name
                       , rd_tmvs = vars
                       , rd_lhs  = lhs
                       , rd_rhs  = rhs }))
-  = putSrcSpanDs loc $
-    do  { let bndrs' = [var | L _ (RuleBndr _ (L _ var)) <- vars]
+  = putSrcSpanDs (locA loc) $
+    do  { let bndrs' = [var | L _ (RuleBndr _ (N _ var)) <- vars]
 
         ; lhs' <- unsetGOptM Opt_EnableRewriteRules $
                   unsetWOptM Opt_WarnIdentities $

@@ -8,64 +8,86 @@
     {Var: DumpTypecheckedAst.$tcT}
     ({ <no location info> }
      (HsApp
-      (NoExtField)
+      (ApiAnn
+       (NoApiAnns)
+       [])
       ({ <no location info> }
        (HsApp
-        (NoExtField)
+        (ApiAnn
+         (NoApiAnns)
+         [])
         ({ <no location info> }
          (HsApp
-          (NoExtField)
+        (ApiAnn
+         (NoApiAnns)
+         [])
           ({ <no location info> }
            (HsApp
-            (NoExtField)
+            (ApiAnn
+             (NoApiAnns)
+             [])
             ({ <no location info> }
              (HsApp
-              (NoExtField)
+              (ApiAnn
+               (NoApiAnns)
+               [])
               ({ <no location info> }
                (HsApp
-                (NoExtField)
+                (ApiAnn
+                 (NoApiAnns)
+                 [])
                 ({ <no location info> }
                  (HsConLikeOut
                   (NoExtField)
                   ({abstract:ConLike})))
                 ({ <no location info> }
                  (HsLit
-                  (NoExtField)
+                  (ApiAnn
+                   (NoApiAnns)
+                   [])
                   {HsWord{64}Prim (1374752024144278257) (NoSourceText)}))))
               ({ <no location info> }
                (HsLit
-                (NoExtField)
+                  (ApiAnn
+                   (NoApiAnns)
+                   [])
                 {HsWord{64}Prim (13654949607623281177) (NoSourceText)}))))
             ({ <no location info> }
              (HsVar
               (NoExtField)
-              ({ <no location info> }
+              (SrcSpanAnn (ApiAnnNotUsed) { <no location info> }
                {Var: DumpTypecheckedAst.$trModule})))))
           ({ <no location info> }
            (HsPar
-            (NoExtField)
+            (ApiAnnNotUsed)
             ({ <no location info> }
              (HsApp
-              (NoExtField)
+              (ApiAnn
+               (NoApiAnns)
+               [])
               ({ <no location info> }
                (HsConLikeOut
                 (NoExtField)
                 ({abstract:ConLike})))
               ({ <no location info> }
                (HsLit
-                (NoExtField)
+                (ApiAnn
+                 (NoApiAnns)
+                 [])
                 (HsStringPrim
                  (NoSourceText)
                  "T")))))))))
         ({ <no location info> }
          (HsLit
-          (NoExtField)
+          (ApiAnn
+           (NoApiAnns)
+           [])
           {HsInt{64}Prim (1) (SourceText
                               "1")}))))
       ({ <no location info> }
        (HsVar
         (NoExtField)
-        ({ <no location info> }
+        (SrcSpanAnn (ApiAnnNotUsed) { <no location info> }
          {Var: $krep})))))))
  ,({ <no location info> }
    (VarBind
@@ -73,129 +95,173 @@
     {Var: DumpTypecheckedAst.$tc'MkT}
     ({ <no location info> }
      (HsApp
-      (NoExtField)
+      (ApiAnn
+       (NoApiAnns)
+       [])
       ({ <no location info> }
        (HsApp
-        (NoExtField)
+        (ApiAnn
+         (NoApiAnns)
+         [])
         ({ <no location info> }
          (HsApp
-          (NoExtField)
+          (ApiAnn
+           (NoApiAnns)
+           [])
           ({ <no location info> }
            (HsApp
-            (NoExtField)
+            (ApiAnn
+             (NoApiAnns)
+             [])
             ({ <no location info> }
              (HsApp
-              (NoExtField)
+              (ApiAnn
+               (NoApiAnns)
+               [])
               ({ <no location info> }
                (HsApp
-                (NoExtField)
+                (ApiAnn
+                 (NoApiAnns)
+                 [])
                 ({ <no location info> }
                  (HsConLikeOut
                   (NoExtField)
                   ({abstract:ConLike})))
                 ({ <no location info> }
                  (HsLit
-                  (NoExtField)
+                  (ApiAnn
+                   (NoApiAnns)
+                   [])
                   {HsWord{64}Prim (10715337633704422415) (NoSourceText)}))))
               ({ <no location info> }
                (HsLit
-                (NoExtField)
+                (ApiAnn
+                 (NoApiAnns)
+                 [])
                 {HsWord{64}Prim (12411373583424111944) (NoSourceText)}))))
             ({ <no location info> }
              (HsVar
               (NoExtField)
-              ({ <no location info> }
+              (SrcSpanAnn (ApiAnnNotUsed) { <no location info> }
                {Var: DumpTypecheckedAst.$trModule})))))
           ({ <no location info> }
            (HsPar
-            (NoExtField)
+            (ApiAnnNotUsed)
             ({ <no location info> }
              (HsApp
-              (NoExtField)
+              (ApiAnn
+               (NoApiAnns)
+               [])
               ({ <no location info> }
                (HsConLikeOut
                 (NoExtField)
                 ({abstract:ConLike})))
               ({ <no location info> }
                (HsLit
-                (NoExtField)
+                (ApiAnn
+                 (NoApiAnns)
+                 [])
                 (HsStringPrim
                  (NoSourceText)
                  "'MkT")))))))))
         ({ <no location info> }
          (HsLit
-          (NoExtField)
+          (ApiAnn
+           (NoApiAnns)
+           [])
           {HsInt{64}Prim (3) (SourceText
                               "3")}))))
       ({ <no location info> }
        (HsVar
         (NoExtField)
-        ({ <no location info> }
-         {Var: $krep})))))))
+        (SrcSpanAnn (ApiAnnNotUsed) { <no location info> }
+         {Var: $krep})))))
  ,({ <no location info> }
    (VarBind
     (NoExtField)
     {Var: DumpTypecheckedAst.$tcPeano}
     ({ <no location info> }
      (HsApp
-      (NoExtField)
+      (ApiAnn
+       (NoApiAnns)
+       [])
       ({ <no location info> }
        (HsApp
-        (NoExtField)
+        (ApiAnn
+         (NoApiAnns)
+         [])
         ({ <no location info> }
          (HsApp
-          (NoExtField)
+          (ApiAnn
+           (NoApiAnns)
+           [])
           ({ <no location info> }
            (HsApp
-            (NoExtField)
+            (ApiAnn
+             (NoApiAnns)
+             [])
             ({ <no location info> }
              (HsApp
-              (NoExtField)
+              (ApiAnn
+               (NoApiAnns)
+               [])
               ({ <no location info> }
                (HsApp
-                (NoExtField)
+                (ApiAnn
+                 (NoApiAnns)
+                 [])
                 ({ <no location info> }
                  (HsConLikeOut
                   (NoExtField)
                   ({abstract:ConLike})))
                 ({ <no location info> }
                  (HsLit
-                  (NoExtField)
+                  (ApiAnn
+                   (NoApiAnns)
+                   [])
                   {HsWord{64}Prim (14073232900889011755) (NoSourceText)}))))
               ({ <no location info> }
                (HsLit
-                (NoExtField)
+                (ApiAnn
+                 (NoApiAnns)
+                 [])
                 {HsWord{64}Prim (2739668351064589274) (NoSourceText)}))))
             ({ <no location info> }
              (HsVar
               (NoExtField)
-              ({ <no location info> }
+              (SrcSpanAnn (ApiAnnNotUsed) { <no location info> }
                {Var: DumpTypecheckedAst.$trModule})))))
           ({ <no location info> }
            (HsPar
-            (NoExtField)
+            (ApiAnnNotUsed)
             ({ <no location info> }
              (HsApp
-              (NoExtField)
+              (ApiAnn
+               (NoApiAnns)
+               [])
               ({ <no location info> }
                (HsConLikeOut
                 (NoExtField)
                 ({abstract:ConLike})))
               ({ <no location info> }
                (HsLit
-                (NoExtField)
+                (ApiAnn
+                 (NoApiAnns)
+                 [])
                 (HsStringPrim
                  (NoSourceText)
                  "Peano")))))))))
         ({ <no location info> }
          (HsLit
-          (NoExtField)
+          (ApiAnn
+           (NoApiAnns)
+           [])
           {HsInt{64}Prim (0) (SourceText
                               "0")}))))
       ({ <no location info> }
        (HsVar
         (NoExtField)
-        ({ <no location info> }
+        (SrcSpanAnn (ApiAnnNotUsed) { <no location info> }
          {Var: GHC.Types.krep$*})))))))
  ,({ <no location info> }
    (VarBind
@@ -203,64 +269,86 @@
     {Var: DumpTypecheckedAst.$tc'Zero}
     ({ <no location info> }
      (HsApp
-      (NoExtField)
+      (ApiAnn
+       (NoApiAnns)
+       [])
       ({ <no location info> }
        (HsApp
-        (NoExtField)
+        (ApiAnn
+         (NoApiAnns)
+         [])
         ({ <no location info> }
          (HsApp
-          (NoExtField)
+          (ApiAnn
+           (NoApiAnns)
+           [])
           ({ <no location info> }
            (HsApp
-            (NoExtField)
+            (ApiAnn
+             (NoApiAnns)
+             [])
             ({ <no location info> }
              (HsApp
-              (NoExtField)
+              (ApiAnn
+               (NoApiAnns)
+               [])
               ({ <no location info> }
                (HsApp
-                (NoExtField)
+                (ApiAnn
+                 (NoApiAnns)
+                 [])
                 ({ <no location info> }
                  (HsConLikeOut
                   (NoExtField)
                   ({abstract:ConLike})))
                 ({ <no location info> }
                  (HsLit
-                  (NoExtField)
+                  (ApiAnn
+                   (NoApiAnns)
+                   [])
                   {HsWord{64}Prim (13760111476013868540) (NoSourceText)}))))
               ({ <no location info> }
                (HsLit
-                (NoExtField)
+                (ApiAnn
+                 (NoApiAnns)
+                 [])
                 {HsWord{64}Prim (12314848029315386153) (NoSourceText)}))))
             ({ <no location info> }
              (HsVar
               (NoExtField)
-              ({ <no location info> }
+              (SrcSpanAnn (ApiAnnNotUsed) { <no location info> }
                {Var: DumpTypecheckedAst.$trModule})))))
           ({ <no location info> }
            (HsPar
-            (NoExtField)
+            (ApiAnnNotUsed)
             ({ <no location info> }
              (HsApp
-              (NoExtField)
+              (ApiAnn
+               (NoApiAnns)
+               [])
               ({ <no location info> }
                (HsConLikeOut
                 (NoExtField)
                 ({abstract:ConLike})))
               ({ <no location info> }
                (HsLit
-                (NoExtField)
+                (ApiAnn
+                 (NoApiAnns)
+                 [])
                 (HsStringPrim
                  (NoSourceText)
                  "'Zero")))))))))
         ({ <no location info> }
          (HsLit
-          (NoExtField)
+          (ApiAnn
+           (NoApiAnns)
+           [])
           {HsInt{64}Prim (0) (SourceText
                               "0")}))))
       ({ <no location info> }
        (HsVar
         (NoExtField)
-        ({ <no location info> }
+        (SrcSpanAnn (ApiAnnNotUsed) { <no location info> }
          {Var: $krep})))))))
  ,({ <no location info> }
    (VarBind
@@ -268,64 +356,86 @@
     {Var: DumpTypecheckedAst.$tc'Succ}
     ({ <no location info> }
      (HsApp
-      (NoExtField)
+      (ApiAnn
+       (NoApiAnns)
+       [])
       ({ <no location info> }
        (HsApp
-        (NoExtField)
+        (ApiAnn
+         (NoApiAnns)
+         [])
         ({ <no location info> }
          (HsApp
-          (NoExtField)
+          (ApiAnn
+           (NoApiAnns)
+           [])
           ({ <no location info> }
            (HsApp
-            (NoExtField)
+            (ApiAnn
+             (NoApiAnns)
+             [])
             ({ <no location info> }
              (HsApp
-              (NoExtField)
+              (ApiAnn
+               (NoApiAnns)
+               [])
               ({ <no location info> }
                (HsApp
-                (NoExtField)
+                (ApiAnn
+                 (NoApiAnns)
+                 [])
                 ({ <no location info> }
                  (HsConLikeOut
                   (NoExtField)
                   ({abstract:ConLike})))
                 ({ <no location info> }
                  (HsLit
-                  (NoExtField)
+                  (ApiAnn
+                   (NoApiAnns)
+                   [])
                   {HsWord{64}Prim (1143980031331647856) (NoSourceText)}))))
               ({ <no location info> }
                (HsLit
-                (NoExtField)
+                (ApiAnn
+                 (NoApiAnns)
+                 [])
                 {HsWord{64}Prim (14802086722010293686) (NoSourceText)}))))
             ({ <no location info> }
              (HsVar
               (NoExtField)
-              ({ <no location info> }
+              (SrcSpanAnn (ApiAnnNotUsed) { <no location info> }
                {Var: DumpTypecheckedAst.$trModule})))))
           ({ <no location info> }
            (HsPar
-            (NoExtField)
+            (ApiAnnNotUsed)
             ({ <no location info> }
              (HsApp
-              (NoExtField)
+              (ApiAnn
+               (NoApiAnns)
+               [])
               ({ <no location info> }
                (HsConLikeOut
                 (NoExtField)
                 ({abstract:ConLike})))
               ({ <no location info> }
                (HsLit
-                (NoExtField)
+                (ApiAnn
+                 (NoApiAnns)
+                 [])
                 (HsStringPrim
                  (NoSourceText)
                  "'Succ")))))))))
         ({ <no location info> }
          (HsLit
-          (NoExtField)
+          (ApiAnn
+           (NoApiAnns)
+           [])
           {HsInt{64}Prim (0) (SourceText
                               "0")}))))
       ({ <no location info> }
        (HsVar
         (NoExtField)
-        ({ <no location info> }
+        (SrcSpanAnn (ApiAnnNotUsed) { <no location info> }
          {Var: $krep})))))))
  ,({ <no location info> }
    (VarBind
@@ -333,14 +443,18 @@
     {Var: $krep}
     ({ <no location info> }
      (HsApp
-      (NoExtField)
+      (ApiAnn
+       (NoApiAnns)
+       [])
       ({ <no location info> }
        (HsConLikeOut
         (NoExtField)
         ({abstract:ConLike})))
       ({ <no location info> }
        (HsLit
-        (NoExtField)
+        (ApiAnn
+         (NoApiAnns)
+         [])
         (HsInt
          (NoExtField)
          (IL
@@ -354,14 +468,18 @@
     {Var: $krep}
     ({ <no location info> }
      (HsApp
-      (NoExtField)
+      (ApiAnn
+       (NoApiAnns)
+       [])
       ({ <no location info> }
        (HsConLikeOut
         (NoExtField)
         ({abstract:ConLike})))
       ({ <no location info> }
        (HsLit
-        (NoExtField)
+        (ApiAnn
+         (NoApiAnns)
+         [])
         (HsInt
          (NoExtField)
          (IL
@@ -375,14 +493,18 @@
     {Var: $krep}
     ({ <no location info> }
      (HsApp
-      (NoExtField)
+      (ApiAnn
+       (NoApiAnns)
+       [])
       ({ <no location info> }
        (HsConLikeOut
         (NoExtField)
         ({abstract:ConLike})))
       ({ <no location info> }
        (HsLit
-        (NoExtField)
+        (ApiAnn
+         (NoApiAnns)
+         [])
         (HsInt
          (NoExtField)
          (IL
@@ -396,10 +518,14 @@
     {Var: $krep}
     ({ <no location info> }
      (HsApp
-      (NoExtField)
+      (ApiAnn
+       (NoApiAnns)
+       [])
       ({ <no location info> }
        (HsApp
-        (NoExtField)
+        (ApiAnn
+         (NoApiAnns)
+         [])
         ({ <no location info> }
          (HsConLikeOut
           (NoExtField)
@@ -407,12 +533,12 @@
         ({ <no location info> }
          (HsVar
           (NoExtField)
-          ({ <no location info> }
+          (SrcSpanAnn (ApiAnnNotUsed) { <no location info> }
            {Var: $krep})))))
       ({ <no location info> }
        (HsVar
         (NoExtField)
-        ({ <no location info> }
+        (SrcSpanAnn (ApiAnnNotUsed) { <no location info> }
          {Var: $krep})))))))
  ,({ <no location info> }
    (VarBind
@@ -420,10 +546,14 @@
     {Var: $krep}
     ({ <no location info> }
      (HsApp
-      (NoExtField)
+      (ApiAnn
+       (NoApiAnns)
+       [])
       ({ <no location info> }
        (HsApp
-        (NoExtField)
+        (ApiAnn
+         (NoApiAnns)
+         [])
         ({ <no location info> }
          (HsConLikeOut
           (NoExtField)
@@ -431,12 +561,12 @@
         ({ <no location info> }
          (HsVar
           (NoExtField)
-          ({ <no location info> }
+          (SrcSpanAnn (ApiAnnNotUsed) { <no location info> }
            {Var: $krep})))))
       ({ <no location info> }
        (HsVar
         (NoExtField)
-        ({ <no location info> }
+        (SrcSpanAnn (ApiAnnNotUsed) { <no location info> }
          {Var: GHC.Types.krep$*})))))))
  ,({ <no location info> }
    (VarBind
@@ -444,10 +574,14 @@
     {Var: $krep}
     ({ <no location info> }
      (HsApp
-      (NoExtField)
+      (ApiAnn
+       (NoApiAnns)
+       [])
       ({ <no location info> }
        (HsApp
-        (NoExtField)
+        (ApiAnn
+         (NoApiAnns)
+         [])
         ({ <no location info> }
          (HsConLikeOut
           (NoExtField)
@@ -455,12 +589,12 @@
         ({ <no location info> }
          (HsVar
           (NoExtField)
-          ({ <no location info> }
+          (SrcSpanAnn (ApiAnnNotUsed) { <no location info> }
            {Var: $krep})))))
       ({ <no location info> }
        (HsVar
         (NoExtField)
-        ({ <no location info> }
+        (SrcSpanAnn (ApiAnnNotUsed) { <no location info> }
          {Var: $krep})))))))
  ,({ <no location info> }
    (VarBind
@@ -468,10 +602,14 @@
     {Var: $krep}
     ({ <no location info> }
      (HsApp
-      (NoExtField)
+      (ApiAnn
+       (NoApiAnns)
+       [])
       ({ <no location info> }
        (HsApp
-        (NoExtField)
+        (ApiAnn
+         (NoApiAnns)
+         [])
         ({ <no location info> }
          (HsConLikeOut
           (NoExtField)
@@ -479,12 +617,12 @@
         ({ <no location info> }
          (HsVar
           (NoExtField)
-          ({ <no location info> }
+          (SrcSpanAnn (ApiAnnNotUsed) { <no location info> }
            {Var: $krep})))))
       ({ <no location info> }
        (HsVar
         (NoExtField)
-        ({ <no location info> }
+        (SrcSpanAnn (ApiAnnNotUsed) { <no location info> }
          {Var: $krep})))))))
  ,({ <no location info> }
    (VarBind
@@ -492,10 +630,14 @@
     {Var: $krep}
     ({ <no location info> }
      (HsApp
-      (NoExtField)
+      (ApiAnn
+       (NoApiAnns)
+       [])
       ({ <no location info> }
        (HsApp
-        (NoExtField)
+        (ApiAnn
+         (NoApiAnns)
+         [])
         ({ <no location info> }
          (HsConLikeOut
           (NoExtField)
@@ -503,12 +645,12 @@
         ({ <no location info> }
          (HsVar
           (NoExtField)
-          ({ <no location info> }
+          (SrcSpanAnn (ApiAnnNotUsed) { <no location info> }
            {Var: $krep})))))
       ({ <no location info> }
        (HsVar
         (NoExtField)
-        ({ <no location info> }
+        (SrcSpanAnn (ApiAnnNotUsed) { <no location info> }
          {Var: $krep})))))))
  ,({ <no location info> }
    (VarBind
@@ -516,10 +658,14 @@
     {Var: $krep}
     ({ <no location info> }
      (HsApp
-      (NoExtField)
+      (ApiAnn
+       (NoApiAnns)
+       [])
       ({ <no location info> }
        (HsApp
-        (NoExtField)
+        (ApiAnn
+         (NoApiAnns)
+         [])
         ({ <no location info> }
          (HsConLikeOut
           (NoExtField)
@@ -527,17 +673,21 @@
         ({ <no location info> }
          (HsVar
           (NoExtField)
-          ({ <no location info> }
+          (SrcSpanAnn (ApiAnnNotUsed) { <no location info> }
            {Var: DumpTypecheckedAst.$tcT})))))
       ({ <no location info> }
        (HsPar
-        (NoExtField)
+        (ApiAnnNotUsed)
         ({ <no location info> }
          (HsApp
-          (NoExtField)
+          (ApiAnn
+           (NoApiAnns)
+           [])
           ({ <no location info> }
            (HsApp
-            (NoExtField)
+            (ApiAnn
+             (NoApiAnns)
+             [])
             ({ <no location info> }
              (XExpr
               (HsWrap
@@ -551,17 +701,21 @@
             ({ <no location info> }
              (HsVar
               (NoExtField)
-              ({ <no location info> }
+              (SrcSpanAnn (ApiAnnNotUsed) { <no location info> }
                {Var: $krep})))))
           ({ <no location info> }
            (HsPar
-            (NoExtField)
+            (ApiAnnNotUsed)
             ({ <no location info> }
              (HsApp
-              (NoExtField)
+              (ApiAnn
+               (NoApiAnns)
+               [])
               ({ <no location info> }
                (HsApp
-                (NoExtField)
+                (ApiAnn
+                 (NoApiAnns)
+                 [])
                 ({ <no location info> }
                  (XExpr
                   (HsWrap
@@ -575,17 +729,21 @@
                 ({ <no location info> }
                  (HsVar
                   (NoExtField)
-                  ({ <no location info> }
+                  (SrcSpanAnn (ApiAnnNotUsed) { <no location info> }
                    {Var: $krep})))))
               ({ <no location info> }
                (HsPar
-                (NoExtField)
+                (ApiAnnNotUsed)
                 ({ <no location info> }
                  (HsApp
-                  (NoExtField)
+                  (ApiAnn
+                   (NoApiAnns)
+                   [])
                   ({ <no location info> }
                    (HsApp
-                    (NoExtField)
+                    (ApiAnn
+                     (NoApiAnns)
+                     [])
                     ({ <no location info> }
                      (XExpr
                       (HsWrap
@@ -599,7 +757,7 @@
                     ({ <no location info> }
                      (HsVar
                       (NoExtField)
-                      ({ <no location info> }
+                      (SrcSpanAnn (ApiAnnNotUsed) { <no location info> }
                        {Var: $krep})))))
                   ({ <no location info> }
                    (XExpr
@@ -617,10 +775,14 @@
     {Var: $krep}
     ({ <no location info> }
      (HsApp
-      (NoExtField)
+      (ApiAnn
+       (NoApiAnns)
+       [])
       ({ <no location info> }
        (HsApp
-        (NoExtField)
+        (ApiAnn
+         (NoApiAnns)
+         [])
         ({ <no location info> }
          (HsConLikeOut
           (NoExtField)
@@ -628,7 +790,7 @@
         ({ <no location info> }
          (HsVar
           (NoExtField)
-          ({ <no location info> }
+          (SrcSpanAnn (ApiAnnNotUsed) { <no location info> }
            {Var: DumpTypecheckedAst.$tcPeano})))))
       ({ <no location info> }
        (XExpr
@@ -646,43 +808,55 @@
     {Var: DumpTypecheckedAst.$trModule}
     ({ <no location info> }
      (HsApp
-      (NoExtField)
+      (ApiAnn
+       (NoApiAnns)
+       [])
       ({ <no location info> }
        (HsApp
-        (NoExtField)
+        (ApiAnn
+         (NoApiAnns)
+         [])
         ({ <no location info> }
          (HsConLikeOut
           (NoExtField)
           ({abstract:ConLike})))
         ({ <no location info> }
          (HsPar
-          (NoExtField)
+          (ApiAnnNotUsed)
           ({ <no location info> }
            (HsApp
-            (NoExtField)
+            (ApiAnn
+             (NoApiAnns)
+             [])
             ({ <no location info> }
              (HsConLikeOut
               (NoExtField)
               ({abstract:ConLike})))
             ({ <no location info> }
              (HsLit
-              (NoExtField)
+              (ApiAnn
+               (NoApiAnns)
+               [])
               (HsStringPrim
                (NoSourceText)
                "main")))))))))
       ({ <no location info> }
        (HsPar
-        (NoExtField)
+        (ApiAnnNotUsed)
         ({ <no location info> }
          (HsApp
-          (NoExtField)
+          (ApiAnn
+           (NoApiAnns)
+           [])
           ({ <no location info> }
            (HsConLikeOut
             (NoExtField)
             ({abstract:ConLike})))
           ({ <no location info> }
            (HsLit
-            (NoExtField)
+            (ApiAnn
+             (NoApiAnns)
+             [])
             (HsStringPrim
              (NoSourceText)
              "DumpTypecheckedAst")))))))))))
@@ -703,7 +877,7 @@
      [({ DumpTypecheckedAst.hs:18:1-23 }
        (FunBind
         (WpHole)
-        ({ DumpTypecheckedAst.hs:18:1-4 }
+        (SrcSpanAnn (ApiAnnNotUsed) { DumpTypecheckedAst.hs:18:1-4 }
          {Var: main})
         (MG
          (MatchGroupTc
@@ -718,7 +892,7 @@
             (Match
              (NoExtField)
              (FunRhs
-              ({ DumpTypecheckedAst.hs:18:1-4 }
+              (SrcSpanAnn (ApiAnnNotUsed) { DumpTypecheckedAst.hs:18:1-4 }
                {Name: main})
               (Prefix)
               (NoSrcStrict))
@@ -731,15 +905,19 @@
                  []
                  ({ DumpTypecheckedAst.hs:18:8-23 }
                   (HsApp
-                   (NoExtField)
+                   (ApiAnn
+                    (NoApiAnns)
+                    [])
                    ({ DumpTypecheckedAst.hs:18:8-15 }
                     (HsVar
                      (NoExtField)
-                     ({ <no location info> }
+                     (SrcSpanAnn (ApiAnnNotUsed) { <no location info> }
                       {Var: putStrLn})))
                    ({ DumpTypecheckedAst.hs:18:17-23 }
                     (HsLit
-                     (NoExtField)
+                     (ApiAnn
+                      (NoApiAnns)
+                      [])
                      (HsString
                       (SourceText
                        "\"hello\"")

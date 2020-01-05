@@ -202,7 +202,7 @@ data SkolemInfo
   | FamInstSkol         -- Bound at a family instance decl
   | PatSkol             -- An existential type variable bound by a pattern for
       ConLike           -- a data constructor with an existential type.
-      (HsMatchContext GhcRn)
+      (HsMatchContext Name)
              -- e.g.   data T = forall a. Eq a => MkT a
              --        f (MkT x) = ...
              -- The pattern MkT x will allocate an existential type
@@ -476,7 +476,7 @@ lexprCtOrigin :: LHsExpr GhcRn -> CtOrigin
 lexprCtOrigin (L _ e) = exprCtOrigin e
 
 exprCtOrigin :: HsExpr GhcRn -> CtOrigin
-exprCtOrigin (HsVar _ (L _ name)) = OccurrenceOf name
+exprCtOrigin (HsVar _ (N _ name)) = OccurrenceOf name
 exprCtOrigin (HsUnboundVar _ uv)  = UnboundOccurrenceOf uv
 exprCtOrigin (HsConLikeOut {})    = panic "exprCtOrigin HsConLikeOut"
 exprCtOrigin (HsRecFld _ f)       = OccurrenceOfRecSel (rdrNameAmbiguousFieldOcc f)
@@ -603,7 +603,7 @@ pprCtOrigin (Shouldn'tHappenOrigin note)
                     , text "https://gitlab.haskell.org/ghc/ghc/wikis/report-a-bug >>"
                     ]
 
-pprCtOrigin (ProvCtxtOrigin PSB{ psb_id = (L _ name) })
+pprCtOrigin (ProvCtxtOrigin PSB{ psb_id = (N _ name) })
   = hang (ctoHerald <+> text "the \"provided\" constraints claimed by")
        2 (text "the signature of" <+> quotes (ppr name))
 

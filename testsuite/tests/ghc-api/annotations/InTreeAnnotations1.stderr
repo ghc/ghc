@@ -1,0 +1,290 @@
+
+==================== Parser AST ====================
+
+({ InTreeAnnotations1.hs:1:1 }
+ (HsModule
+  (Just
+   ({ InTreeAnnotations1.hs:2:8-25 }
+    {ModuleName: InTreeAnnotations1}))
+  (Nothing)
+  []
+  [({ InTreeAnnotations1.hs:4:1-31 }
+    (ValD
+     (NoExtField)
+     (FunBind
+      (ApiAnnNotUsed)
+      (SrcSpanAnn (ApiAnnNotUsed) { InTreeAnnotations1.hs:4:1-3 }
+       (Unqual
+        {OccName: foo}))
+      (MG
+       (NoExtField)
+       ({ InTreeAnnotations1.hs:4:1-31 }
+        [({ InTreeAnnotations1.hs:4:1-31 }
+          (Match
+           (NoExtField)
+           (FunRhs
+            (SrcSpanAnn (ApiAnnNotUsed) { InTreeAnnotations1.hs:4:1-3 }
+             (Unqual
+              {OccName: foo}))
+            (Prefix)
+            (NoSrcStrict))
+           [({ InTreeAnnotations1.hs:4:5-11 }
+             (AsPat
+              (ApiAnn
+               [(AddApiAnn AnnAt { InTreeAnnotations1.hs:4:6 })]
+               [(nnnnnnnn
+                 (AnnLineComment
+                  "parser has not filled in annotation commments properly here"))])
+              (SrcSpanAnn (ApiAnnNotUsed) { InTreeAnnotations1.hs:4:5 }
+               (Unqual
+                {OccName: a}))
+              ({ InTreeAnnotations1.hs:4:7-11 }
+               (TuplePat
+                (ApiAnn
+                 [(AddApiAnn AnnOpenP { InTreeAnnotations1.hs:4:7 })
+                 ,(AddApiAnn AnnCloseP { InTreeAnnotations1.hs:4:11 })]
+                 [(nnnnnnnn
+                   (AnnLineComment
+                    "parser has not filled in annotation commments properly here"))])
+                [({ InTreeAnnotations1.hs:4:8 }
+                  (WildPat
+                   (NoExtField)))
+                ,({ InTreeAnnotations1.hs:4:10 }
+                  (WildPat
+                   (NoExtField)))]
+                (Boxed)))))
+           ,({ InTreeAnnotations1.hs:4:13-16 }
+             (BangPat
+              (ApiAnn
+               [(AddApiAnn AnnBang { InTreeAnnotations1.hs:4:13 })]
+               [(nnnnnnnn
+                 (AnnLineComment
+                  "parser has not filled in annotation commments properly here"))])
+              ({ InTreeAnnotations1.hs:4:14-16 }
+               (LitPat
+                (NoExtField)
+                (HsString
+                 (SourceText
+                  "/"a/"")
+                 {FastString: "a"})))))
+           ,({ InTreeAnnotations1.hs:4:18-19 }
+             (LazyPat
+              (ApiAnn
+               [(AddApiAnn AnnTilde { InTreeAnnotations1.hs:4:18 })]
+               [(nnnnnnnn
+                 (AnnLineComment
+                  "parser has not filled in annotation commments properly here"))])
+              ({ InTreeAnnotations1.hs:4:19 }
+               (VarPat
+                (NoExtField)
+                (SrcSpanAnn (ApiAnnNotUsed) { InTreeAnnotations1.hs:4:19 }
+                 (Unqual
+                  {OccName: x}))))))]
+           (GRHSs
+            (NoExtField)
+            [({ InTreeAnnotations1.hs:4:21-31 }
+              (GRHS
+               (NoExtField)
+               []
+               ({ InTreeAnnotations1.hs:4:23-31 }
+                (HsVar
+                 (NoExtField)
+                 (SrcSpanAnn (ApiAnnNotUsed) { InTreeAnnotations1.hs:4:23-31 }
+                  (Unqual
+                   {OccName: undefined}))))))]
+            ({ <no location info> }
+             (EmptyLocalBinds
+              (NoExtField))))))])
+       (FromSource))
+      [])))
+  ,({ InTreeAnnotations1.hs:6:1-27 }
+    (TyClD
+     (NoExtField)
+     (DataDecl
+      (ApiAnn
+       [(AddApiAnn AnnData { InTreeAnnotations1.hs:6:1-4 })
+       ,(AddApiAnn AnnEqual { InTreeAnnotations1.hs:6:8 })]
+       [(nnnnnnnn
+         (AnnLineComment
+          "parser has not filled in annotation commments properly here"))])
+      (SrcSpanAnn (ApiAnnNotUsed) { InTreeAnnotations1.hs:6:6 }
+       (Unqual
+        {OccName: T}))
+      (HsQTvs
+       (NoExtField)
+       [])
+      (Prefix)
+      (HsDataDefn
+       (NoExtField)
+       (DataType)
+       ({ <no location info> }
+        [])
+       (Nothing)
+       (Nothing)
+       [({ InTreeAnnotations1.hs:6:10-27 }
+         (ConDeclH98
+          (NoExtField)
+          (SrcSpanAnn (ApiAnnNotUsed) { InTreeAnnotations1.hs:6:10-12 }
+           (Unqual
+            {OccName: MkT}))
+          ({ <no location info> }
+           (False))
+          []
+          (Nothing)
+          (RecCon
+           ({ InTreeAnnotations1.hs:6:14-27 }
+            [({ InTreeAnnotations1.hs:6:16-25 }
+              (ConDeclField
+               (NoExtField)
+               [({ InTreeAnnotations1.hs:6:16 }
+                 (FieldOcc
+                  (NoExtField)
+                  (SrcSpanAnn (ApiAnnNotUsed) { InTreeAnnotations1.hs:6:16 }
+                   (Unqual
+                    {OccName: x}))))
+               ,({ InTreeAnnotations1.hs:6:18 }
+                 (FieldOcc
+                  (NoExtField)
+                  (SrcSpanAnn (ApiAnnNotUsed) { InTreeAnnotations1.hs:6:18 }
+                   (Unqual
+                    {OccName: y}))))]
+               ({ InTreeAnnotations1.hs:6:23-25 }
+                (HsTyVar
+                 (ApiAnn
+                  []
+                  [(nnnnnnnn
+                    (AnnLineComment
+                     "parser has not filled in annotation commments properly here"))])
+                 (NotPromoted)
+                 (SrcSpanAnn (ApiAnnNotUsed) { InTreeAnnotations1.hs:6:23-25 }
+                  (Unqual
+                   {OccName: Int}))))
+               (Nothing)))]))
+          (Nothing)))]
+       ({ <no location info> }
+        [])))))
+  ,({ InTreeAnnotations1.hs:8:1-43 }
+    (ValD
+     (NoExtField)
+     (FunBind
+      (ApiAnnNotUsed)
+      (SrcSpanAnn (ApiAnnNotUsed) { InTreeAnnotations1.hs:8:1 }
+       (Unqual
+        {OccName: f}))
+      (MG
+       (NoExtField)
+       ({ InTreeAnnotations1.hs:8:1-43 }
+        [({ InTreeAnnotations1.hs:8:1-43 }
+          (Match
+           (NoExtField)
+           (FunRhs
+            (SrcSpanAnn (ApiAnnNotUsed) { InTreeAnnotations1.hs:8:1 }
+             (Unqual
+              {OccName: f}))
+            (Prefix)
+            (NoSrcStrict))
+           [({ InTreeAnnotations1.hs:8:3-35 }
+             (ParPat
+              (NoExtField)
+              ({ InTreeAnnotations1.hs:8:4-34 }
+               (ConPatIn
+                (ApiAnn
+                 [(AddApiAnn AnnOpenC { InTreeAnnotations1.hs:8:8 })
+                 ,(AddApiAnn AnnCloseC { InTreeAnnotations1.hs:8:34 })]
+                 [(nnnnnnnn
+                   (AnnLineComment
+                    "parser has not filled in annotation commments properly here"))])
+                (SrcSpanAnn (ApiAnnNotUsed) { InTreeAnnotations1.hs:8:4-6 }
+                 (Unqual
+                  {OccName: MkT}))
+                (RecCon
+                 (HsRecFields
+                  [({ InTreeAnnotations1.hs:8:10-15 }
+                    (HsRecField
+                     ({ InTreeAnnotations1.hs:8:10 }
+                      (FieldOcc
+                       (NoExtField)
+                       (SrcSpanAnn (ApiAnnNotUsed) { InTreeAnnotations1.hs:8:10 }
+                        (Unqual
+                         {OccName: x}))))
+                     ({ InTreeAnnotations1.hs:8:14-15 }
+                      (BangPat
+                       (ApiAnn
+                        [(AddApiAnn AnnBang { InTreeAnnotations1.hs:8:14 })]
+                        [(nnnnnnnn
+                          (AnnLineComment
+                           "parser has not filled in annotation commments properly here"))])
+                       ({ InTreeAnnotations1.hs:8:15 }
+                        (VarPat
+                         (NoExtField)
+                         (SrcSpanAnn (ApiAnnNotUsed) { InTreeAnnotations1.hs:8:15 }
+                          (Unqual
+                           {OccName: v}))))))
+                     (False)))
+                  ,({ InTreeAnnotations1.hs:8:18-32 }
+                    (HsRecField
+                     ({ InTreeAnnotations1.hs:8:18 }
+                      (FieldOcc
+                       (NoExtField)
+                       (SrcSpanAnn (ApiAnnNotUsed) { InTreeAnnotations1.hs:8:18 }
+                        (Unqual
+                         {OccName: y}))))
+                     ({ InTreeAnnotations1.hs:8:22-32 }
+                      (ViewPat
+                       (ApiAnn
+                        [(AddApiAnn AnnRarrow { InTreeAnnotations1.hs:8:29-30 })]
+                        [(nnnnnnnn
+                          (AnnLineComment
+                           "parser has not filled in annotation commments properly here"))])
+                       ({ InTreeAnnotations1.hs:8:22-27 }
+                        (HsVar
+                         (NoExtField)
+                         (SrcSpanAnn (ApiAnnNotUsed) { InTreeAnnotations1.hs:8:22-27 }
+                          (Unqual
+                           {OccName: negate}))))
+                       ({ InTreeAnnotations1.hs:8:32 }
+                        (VarPat
+                         (NoExtField)
+                         (SrcSpanAnn (ApiAnnNotUsed) { InTreeAnnotations1.hs:8:32 }
+                          (Unqual
+                           {OccName: w}))))))
+                     (False)))]
+                  (Nothing)))))))]
+           (GRHSs
+            (NoExtField)
+            [({ InTreeAnnotations1.hs:8:37-43 }
+              (GRHS
+               (NoExtField)
+               []
+               ({ InTreeAnnotations1.hs:8:39-43 }
+                (OpApp
+                 (ApiAnn
+                  [(AddApiAnn AnnVal { InTreeAnnotations1.hs:8:41 })]
+                  [(nnnnnnnn
+                    (AnnLineComment
+                     "parser has not filled in annotation commments properly here"))])
+                 ({ InTreeAnnotations1.hs:8:39 }
+                  (HsVar
+                   (NoExtField)
+                   (SrcSpanAnn (ApiAnnNotUsed) { InTreeAnnotations1.hs:8:39 }
+                    (Unqual
+                     {OccName: v}))))
+                 ({ InTreeAnnotations1.hs:8:41 }
+                  (HsVar
+                   (NoExtField)
+                   (SrcSpanAnn (ApiAnnNotUsed) { InTreeAnnotations1.hs:8:41 }
+                    (Unqual
+                     {OccName: +}))))
+                 ({ InTreeAnnotations1.hs:8:43 }
+                  (HsVar
+                   (NoExtField)
+                   (SrcSpanAnn (ApiAnnNotUsed) { InTreeAnnotations1.hs:8:43 }
+                    (Unqual
+                     {OccName: w}))))))))]
+            ({ <no location info> }
+             (EmptyLocalBinds
+              (NoExtField))))))])
+       (FromSource))
+      [])))]
+  (Nothing)
+  (Nothing)))

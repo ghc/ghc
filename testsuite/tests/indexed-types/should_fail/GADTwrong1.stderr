@@ -11,7 +11,7 @@ GADTwrong1.hs:12:21: error:
         at GADTwrong1.hs:10:1-29
     • In the expression: y
       In a case alternative: T y -> y
-      In the expression: case T x :: T (Const b) of { T y -> y }
+      In the expression: case T x :: T (Const b) of T y -> y
     • Relevant bindings include
         y :: c (bound at GADTwrong1.hs:12:16)
         coerce :: a -> b (bound at GADTwrong1.hs:11:1)

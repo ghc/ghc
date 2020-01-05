@@ -104,7 +104,7 @@ tcRules decls = mapM (wrapLocM tcRuleDecls) decls
 tcRuleDecls :: RuleDecls GhcRn -> TcM (RuleDecls GhcTcId)
 tcRuleDecls (HsRules { rds_src = src
                      , rds_rules = decls })
-   = do { tc_decls <- mapM (wrapLocM tcRule) decls
+   = do { tc_decls <- mapM (wrapLocMA tcRule) decls
         ; return $ HsRules { rds_ext   = noExtField
                            , rds_src   = src
                            , rds_rules = tc_decls } }
@@ -175,7 +175,7 @@ tcRule (HsRule { rd_ext  = ext
                          , rd_name = rname
                          , rd_act = act
                          , rd_tyvs = ty_bndrs -- preserved for ppr-ing
-                         , rd_tmvs = map (noLoc . RuleBndr noExtField . noLoc)
+                         , rd_tmvs = map (noLoc . RuleBndr noAnn . noApiName)
                                          (qtkvs ++ tpl_ids)
                          , rd_lhs  = mkHsDictLet lhs_binds lhs'
                          , rd_rhs  = mkHsDictLet rhs_binds rhs' } }
@@ -218,11 +218,11 @@ tcRuleBndrs Nothing xs
 -- See Note [TcLevel in type checking rules]
 tcRuleTmBndrs :: [LRuleBndr GhcRn] -> TcM ([TcTyVar],[Id])
 tcRuleTmBndrs [] = return ([],[])
-tcRuleTmBndrs (L _ (RuleBndr _ (L _ name)) : rule_bndrs)
+tcRuleTmBndrs (L _ (RuleBndr _ (N _ name)) : rule_bndrs)
   = do  { ty <- newOpenFlexiTyVarTy
         ; (tyvars, tmvars) <- tcRuleTmBndrs rule_bndrs
         ; return (tyvars, mkLocalId name ty : tmvars) }
-tcRuleTmBndrs (L _ (RuleBndrSig _ (L _ name) rn_ty) : rule_bndrs)
+tcRuleTmBndrs (L _ (RuleBndrSig _ (N _ name) rn_ty) : rule_bndrs)
 --  e.g         x :: a->a
 --  The tyvar 'a' is brought into scope first, just as if you'd written
 --              a::*, x :: a->a

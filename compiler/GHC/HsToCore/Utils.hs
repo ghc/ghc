@@ -132,9 +132,9 @@ selectMatchVar :: Pat GhcTc -> DsM Id
 selectMatchVar (BangPat _ pat) = selectMatchVar (unLoc pat)
 selectMatchVar (LazyPat _ pat) = selectMatchVar (unLoc pat)
 selectMatchVar (ParPat _ pat)  = selectMatchVar (unLoc pat)
-selectMatchVar (VarPat _ var)  = return (localiseId (unLoc var))
+selectMatchVar (VarPat _ var)  = return (localiseId (unApiName var))
                                   -- Note [Localise pattern binders]
-selectMatchVar (AsPat _ var _) = return (unLoc var)
+selectMatchVar (AsPat _ var _) = return (unApiName var)
 selectMatchVar other_pat       = newSysLocalDsNoLP (hsPatType other_pat)
                                   -- OK, better make up one...
 
@@ -664,7 +664,7 @@ mkSelectorBinds :: [[Tickish Id]] -- ^ ticks to add, possibly
                 -- and all the desugared binds
 
 mkSelectorBinds ticks pat val_expr
-  | L _ (VarPat _ (L _ v)) <- pat'     -- Special case (A)
+  | L _ (VarPat _ (N _ v)) <- pat'     -- Special case (A)
   = return (v, [(v, val_expr)])
 
   | is_flat_prod_lpat pat'           -- Special case (B)
@@ -721,7 +721,7 @@ is_flat_prod_lpat = is_flat_prod_pat . unLoc
 is_flat_prod_pat :: Pat GhcTc -> Bool
 is_flat_prod_pat (ParPat _ p)          = is_flat_prod_lpat p
 is_flat_prod_pat (TuplePat _ ps Boxed) = all is_triv_lpat ps
-is_flat_prod_pat (ConPat { pat_con  = L _ pcon
+is_flat_prod_pat (ConPat { pat_con  = N _ pcon
                          , pat_args = ps})
   | RealDataCon con <- pcon
   , isProductTyCon (dataConTyCon con)
@@ -747,7 +747,7 @@ is_triv_pat _            = False
 ********************************************************************* -}
 
 mkLHsPatTup :: [LPat GhcTc] -> LPat GhcTc
-mkLHsPatTup []     = noLoc $ mkVanillaTuplePat [] Boxed
+mkLHsPatTup []     = noLocA $ mkVanillaTuplePat [] Boxed
 mkLHsPatTup [lpat] = lpat
 mkLHsPatTup lpats  = L (getLoc (head lpats)) $
                      mkVanillaTuplePat lpats Boxed
@@ -761,7 +761,7 @@ mkBigLHsVarTupId :: [Id] -> LHsExpr GhcTc
 mkBigLHsVarTupId ids = mkBigLHsTupId (map nlHsVar ids)
 
 mkBigLHsTupId :: [LHsExpr GhcTc] -> LHsExpr GhcTc
-mkBigLHsTupId = mkChunkified mkLHsTupleExpr
+mkBigLHsTupId = mkChunkified (\e -> mkLHsTupleExpr e noExtField)
 
 -- The Big equivalents for the source tuple patterns
 mkBigLHsVarPatTupId :: [Id] -> LPat GhcTc
@@ -969,7 +969,7 @@ isTrueLHsExpr :: LHsExpr GhcTc -> Maybe (CoreExpr -> DsM CoreExpr)
 --        * Trivial wappings of these
 -- The arguments to Just are any HsTicks that we have found,
 -- because we still want to tick then, even it they are always evaluated.
-isTrueLHsExpr (L _ (HsVar _ (L _ v)))
+isTrueLHsExpr (L _ (HsVar _ (N _ v)))
   |  v `hasKey` otherwiseIdKey
      || v `hasKey` getUnique trueDataConId
                                               = Just return

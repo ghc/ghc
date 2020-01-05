@@ -107,7 +107,7 @@ dsTopLHsBinds binds
     bang_binds     = filterBag (isBangedHsBind   . unLoc) binds
 
     top_level_err desc (L loc bind)
-      = putSrcSpanDs loc $
+      = putSrcSpanDs (locA loc) $
         errDs (hang (text "Top-level" <+> text desc <+> text "aren't allowed:")
                   2 (ppr bind))
 
@@ -124,7 +124,7 @@ dsLHsBinds binds
 dsLHsBind :: LHsBind GhcTc
           -> DsM ([Id], [(Id,CoreExpr)])
 dsLHsBind (L loc bind) = do dflags <- getDynFlags
-                            putSrcSpanDs loc $ dsHsBind dflags bind
+                            putSrcSpanDs (locA loc) $ dsHsBind dflags bind
 
 -- | Desugar a single binding (or group of recursive binds).
 dsHsBind :: DynFlags
@@ -145,7 +145,7 @@ dsHsBind dflags (VarBind { var_id = var
                           else []
         ; return (force_var, [core_bind]) }
 
-dsHsBind dflags b@(FunBind { fun_id = L loc fun
+dsHsBind dflags b@(FunBind { fun_id = N loc fun
                            , fun_matches = matches
                            , fun_ext = co_fn
                            , fun_tick = tick })
@@ -158,7 +158,7 @@ dsHsBind dflags b@(FunBind { fun_id = L loc fun
                           --            predicate of the coverage checker
                           -- See Note [Type and Term Equality Propagation] in "GHC.HsToCore.PmCheck"
                           matchWrapper
-                           (mkPrefixFunRhs (L loc (idName fun)))
+                           (mkPrefixFunRhs (N loc (idName fun)))
                            Nothing matches
 
         ; core_wrap <- dsHsWrapper co_fn

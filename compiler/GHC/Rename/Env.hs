@@ -9,8 +9,8 @@ GHC.Rename.Env contains functions which convert RdrNames into Names.
 
 module GHC.Rename.Env (
         newTopSrcBinder,
-        lookupLocatedTopBndrRn, lookupTopBndrRn,
-        lookupLocatedOccRn, lookupOccRn, lookupOccRn_maybe,
+        lookupLocatedTopBndrRn, lookupLocatedTopBndrRnN, lookupTopBndrRn,
+        lookupLocatedOccRn, lookupLocatedOccRnN, lookupOccRn, lookupOccRn_maybe,
         lookupLocalOccRn_maybe, lookupInfoOccRn,
         lookupLocalOccThLvl_maybe, lookupLocalOccRn,
         lookupTypeOccRn,
@@ -21,8 +21,8 @@ module GHC.Rename.Env (
         lookupSubBndrOcc_helper,
         combineChildLookupResult, -- Called by lookupChildrenExport
 
-        HsSigCtxt(..), lookupLocalTcNames, lookupSigOccRn,
-        lookupSigCtxtOccRn,
+        HsSigCtxt(..), lookupLocalTcNames, lookupSigOccRn, lookupSigOccRnN,
+        lookupSigCtxtOccRn, lookupSigCtxtOccRnN,
 
         lookupInstDeclBndr, lookupRecFieldOcc, lookupFamInstName,
         lookupConstructorFields,
@@ -150,8 +150,8 @@ we do not report deprecation warnings for LocalDef.  See also
 Note [Handling of deprecations]
 -}
 
-newTopSrcBinder :: Located RdrName -> RnM Name
-newTopSrcBinder (L loc rdr_name)
+newTopSrcBinder :: ApiAnnName RdrName -> RnM Name
+newTopSrcBinder (N loc rdr_name)
   | Just name <- isExact_maybe rdr_name
   =     -- This is here to catch
         --   (a) Exact-name binders created by Template Haskell
@@ -165,7 +165,7 @@ newTopSrcBinder (L loc rdr_name)
     if isExternalName name then
       do { this_mod <- getModule
          ; unless (this_mod == nameModule name)
-                  (addErrAt loc (badOrigBinding rdr_name))
+                  (addErrAt (locA loc) (badOrigBinding rdr_name))
          ; return name }
     else   -- See Note [Binders in Template Haskell] in "GHC.ThToHs"
       do { this_mod <- getModule
@@ -174,7 +174,7 @@ newTopSrcBinder (L loc rdr_name)
   | Just (rdr_mod, rdr_occ) <- isOrig_maybe rdr_name
   = do  { this_mod <- getModule
         ; unless (rdr_mod == this_mod || rdr_mod == rOOT_MAIN)
-                 (addErrAt loc (badOrigBinding rdr_name))
+                 (addErrAt (locA loc) (badOrigBinding rdr_name))
         -- When reading External Core we get Orig names as binders,
         -- but they should agree with the module gotten from the monad
         --
@@ -192,11 +192,11 @@ newTopSrcBinder (L loc rdr_name)
         -- the RdrName, not from the environment.  In principle, it'd be fine to
         -- have an arbitrary mixture of external core definitions in a single module,
         -- (apart from module-initialisation issues, perhaps).
-        ; newGlobalBinder rdr_mod rdr_occ loc }
+        ; newGlobalBinder rdr_mod rdr_occ (locA loc) }
 
   | otherwise
   = do  { when (isQual rdr_name)
-                 (addErrAt loc (badQualBndrErr rdr_name))
+                 (addErrAt (locA loc) (badQualBndrErr rdr_name))
                 -- Binders should not be qualified; if they are, and with a different
                 -- module name, we get a confusing "M.T is not in scope" error later
 
@@ -205,11 +205,11 @@ newTopSrcBinder (L loc rdr_name)
                 -- We are inside a TH bracket, so make an *Internal* name
                 -- See Note [Top-level Names in Template Haskell decl quotes] in GHC.Rename.Names
              do { uniq <- newUnique
-                ; return (mkInternalName uniq (rdrNameOcc rdr_name) loc) }
+                ; return (mkInternalName uniq (rdrNameOcc rdr_name) (locA loc)) }
           else
              do { this_mod <- getModule
-                ; traceRn "newTopSrcBinder" (ppr this_mod $$ ppr rdr_name $$ ppr loc)
-                ; newGlobalBinder this_mod (rdrNameOcc rdr_name) loc }
+                ; traceRn "newTopSrcBinder" (ppr this_mod $$ ppr rdr_name $$ ppr (locA loc))
+                ; newGlobalBinder this_mod (rdrNameOcc rdr_name) (locA loc) }
         }
 
 {-
@@ -369,14 +369,14 @@ lookupInstDeclBndr cls what rdr
     doc = what <+> text "of class" <+> quotes (ppr cls)
 
 -----------------------------------------------
-lookupFamInstName :: Maybe Name -> Located RdrName
-                  -> RnM (Located Name)
+lookupFamInstName :: Maybe Name -> ApiAnnName RdrName
+                  -> RnM (ApiAnnName Name)
 -- Used for TyData and TySynonym family instances only,
 -- See Note [Family instance binders]
 lookupFamInstName (Just cls) tc_rdr  -- Associated type; c.f GHC.Rename.Bind.rnMethodBind
-  = wrapLocM (lookupInstDeclBndr cls (text "associated type")) tc_rdr
+  = wrapLocMN (lookupInstDeclBndr cls (text "associated type")) tc_rdr
 lookupFamInstName Nothing tc_rdr     -- Family instance; tc_rdr is an *occurrence*
-  = lookupLocatedOccRn tc_rdr
+  = lookupLocatedOccRnN tc_rdr
 
 -----------------------------------------------
 lookupConstructorFields :: Name -> RnM [FieldLabel]
@@ -913,8 +913,11 @@ we'll miss the fact that the qualified import is redundant.
 -}
 
 
-lookupLocatedOccRn :: Located RdrName -> RnM (Located Name)
-lookupLocatedOccRn = wrapLocM lookupOccRn
+lookupLocatedOccRn :: LocatedA RdrName -> RnM (LocatedA Name)
+lookupLocatedOccRn = wrapLocMA lookupOccRn
+
+lookupLocatedOccRnN :: ApiAnnName RdrName -> RnM (ApiAnnName Name)
+lookupLocatedOccRnN = wrapLocMN lookupOccRn
 
 lookupLocalOccRn_maybe :: RdrName -> RnM (Maybe Name)
 -- Just look in the local environment
@@ -1466,16 +1469,34 @@ instance Outputable HsSigCtxt where
 
 lookupSigOccRn :: HsSigCtxt
                -> Sig GhcPs
-               -> Located RdrName -> RnM (Located Name)
+               -> LocatedA RdrName -> RnM (LocatedA Name)
 lookupSigOccRn ctxt sig = lookupSigCtxtOccRn ctxt (hsSigDoc sig)
+
+lookupSigOccRnN :: HsSigCtxt
+               -> Sig GhcPs
+               -> ApiAnnName RdrName -> RnM (ApiAnnName Name)
+lookupSigOccRnN ctxt sig = lookupSigCtxtOccRnN ctxt (hsSigDoc sig)
+
+
+-- | Lookup a name in relation to the names in a 'HsSigCtxt'
+lookupSigCtxtOccRnN :: HsSigCtxt
+                    -> SDoc         -- ^ description of thing we're looking up,
+                                   -- like "type family"
+                    -> ApiAnnName RdrName -> RnM (ApiAnnName Name)
+lookupSigCtxtOccRnN ctxt what
+  = wrapLocMN $ \ rdr_name ->
+    do { mb_name <- lookupBindGroupOcc ctxt what rdr_name
+       ; case mb_name of
+           Left err   -> do { addErr err; return (mkUnboundNameRdr rdr_name) }
+           Right name -> return name }
 
 -- | Lookup a name in relation to the names in a 'HsSigCtxt'
 lookupSigCtxtOccRn :: HsSigCtxt
                    -> SDoc         -- ^ description of thing we're looking up,
                                    -- like "type family"
-                   -> Located RdrName -> RnM (Located Name)
+                   -> LocatedA RdrName -> RnM (LocatedA Name)
 lookupSigCtxtOccRn ctxt what
-  = wrapLocM $ \ rdr_name ->
+  = wrapLocMA $ \ rdr_name ->
     do { mb_name <- lookupBindGroupOcc ctxt what rdr_name
        ; case mb_name of
            Left err   -> do { addErr err; return (mkUnboundNameRdr rdr_name) }
@@ -1716,10 +1737,10 @@ lookupSyntaxNames :: [Name]                         -- Standard names
 lookupSyntaxNames std_names
   = do { rebindable_on <- xoptM LangExt.RebindableSyntax
        ; if not rebindable_on then
-             return (map (HsVar noExtField . noLoc) std_names, emptyFVs)
+             return (map (HsVar noExtField . noApiName) std_names, emptyFVs)
         else
           do { usr_names <- mapM (lookupOccRn . mkRdrUnqual . nameOccName) std_names
-             ; return (map (HsVar noExtField . noLoc) usr_names, mkFVs usr_names) } }
+             ; return (map (HsVar noExtField . noApiName) usr_names, mkFVs usr_names) } }
 
 -- Error messages
 
