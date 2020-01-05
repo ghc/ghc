@@ -1800,7 +1800,8 @@ class b ~ (Body b) GhcPs => DisambECP b where
   -- | Disambiguate "(a -> b)" (view pattern)
   mkHsViewPatPV :: SrcSpan -> LHsExpr GhcPs -> Located b -> PV (Located b)
   -- | Disambiguate "a@b" (as-pattern)
-  mkHsAsPatPV :: SrcSpan -> Located RdrName -> Located b -> PV (Located b)
+  mkHsAsPatPV
+    :: SrcSpan -> Located RdrName -> Located b -> AA -> PV (Located b)
   -- | Disambiguate "~a" (lazy pattern)
   mkHsLazyPatPV :: SrcSpan -> Located b -> PV (Located b)
   -- | Disambiguate "!a" (bang pattern)
@@ -1895,7 +1896,7 @@ instance DisambECP (HsCmd GhcPs) where
     in pp_op <> ppr c
   mkHsViewPatPV l a b = cmdFail l $
     ppr a <+> text "->" <+> ppr b
-  mkHsAsPatPV l v c = cmdFail l $
+  mkHsAsPatPV l v c _ = cmdFail l $
     pprPrefixOcc (unLoc v) <> text "@" <> ppr c
   mkHsLazyPatPV l c = cmdFail l $
     text "~" <> ppr c
@@ -1947,7 +1948,7 @@ instance DisambECP (HsExpr GhcPs) where
   mkHsNegAppPV l a = return $ L l (NegApp noExtField a noSyntaxExpr)
   mkHsSectionR_PV l op e = return $ L l (SectionR noExtField op e)
   mkHsViewPatPV l a b = patSynErr "View pattern" l (ppr a <+> text "->" <+> ppr b) empty
-  mkHsAsPatPV l v e =
+  mkHsAsPatPV l v e _ =
     patSynErr "@-pattern" l (pprPrefixOcc (unLoc v) <> text "@" <> ppr e) $
     text "Type application syntax requires a space before '@'"
   mkHsLazyPatPV l e = patSynErr "Lazy pattern" l (text "~" <> ppr e) $
@@ -2038,9 +2039,9 @@ instance DisambECP (PatBuilder GhcPs) where
   mkHsViewPatPV l a b = do
     p <- checkLPat b
     return $ L l (PatBuilderPat (ViewPat noExtField a p))
-  mkHsAsPatPV l v e = do
+  mkHsAsPatPV l v e ann = do
     p <- checkLPat e
-    return $ L l (PatBuilderPat (AsPat noExtField v p))
+    return $ L l (PatBuilderPat (AsPat ann v p))
   mkHsLazyPatPV l e = do
     p <- checkLPat e
     return $ L l (PatBuilderPat (LazyPat noExtField p))

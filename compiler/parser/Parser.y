@@ -2740,7 +2740,7 @@ aexp    :: { ECP }
         : qvar TIGHT_INFIX_AT aexp
                                 { ECP $
                                    runECP_PV $3 >>= \ $3 ->
-                                   amms (mkHsAsPatPV (comb2 $1 $>) $1 $3) [mj AnnAt $2] }
+                                   amms (mkHsAsPatPV (comb2 $1 $>) $1 $3 (ma AnnAt $2)) [mj AnnAt $2] }
 
         -- See Note [Whitespace-sensitive operator parsing] in Lexer.x
         | PREFIX_TILDE aexp     { ECP $
@@ -4025,6 +4025,11 @@ in ApiAnnotation.hs
 -- of the keyword itself
 mj :: AnnKeywordId -> Located e -> AddAnn
 mj a l = AddAnn a (gl l)
+
+-- |Construct an AA from the annotation keyword and the location
+-- of the keyword itself
+ma :: AnnKeywordId -> Located e -> AA
+ma a l = AA $ mj a l
 
 
 -- |Construct an AddAnn from the annotation keyword and the Located Token. If

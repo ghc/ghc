@@ -1282,7 +1282,7 @@ cvtp (ParensP p)       = do { p' <- cvtPat p;
 cvtp (TildeP p)        = do { p' <- cvtPat p; return $ LazyPat noExtField p' }
 cvtp (BangP p)         = do { p' <- cvtPat p; return $ BangPat noExtField p' }
 cvtp (TH.AsP s p)      = do { s' <- vNameL s; p' <- cvtPat p
-                            ; return $ AsPat noExtField s' p' }
+                            ; return $ AsPat noAnn s' p' }
 cvtp TH.WildP          = return $ WildPat noExtField
 cvtp (RecP c fs)       = do { c' <- cNameL c; fs' <- mapM cvtPatFld fs
                             ; return $ ConPatIn c'

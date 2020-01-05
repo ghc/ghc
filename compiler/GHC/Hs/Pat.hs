@@ -287,7 +287,7 @@ type instance XWildPat GhcTc = Type
 
 type instance XVarPat  (GhcPass _) = NoExtField
 type instance XLazyPat (GhcPass _) = NoExtField
-type instance XAsPat   (GhcPass _) = NoExtField
+type instance XAsPat   (GhcPass _) = AA -- For '@'
 type instance XParPat  (GhcPass _) = NoExtField
 type instance XBangPat (GhcPass _) = NoExtField
 
