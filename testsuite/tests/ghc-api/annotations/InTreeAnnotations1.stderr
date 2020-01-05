@@ -1,0 +1,100 @@
+
+==================== Parser AST ====================
+
+({ InTreeAnnotations1.hs:1:1 }
+ (HsModule
+  (Just
+   ({ InTreeAnnotations1.hs:2:8-25 }
+    {ModuleName: InTreeAnnotations1}))
+  (Nothing)
+  []
+  [({ InTreeAnnotations1.hs:4:1-31 }
+    (ValD
+     (NoExtField)
+     (FunBind
+      (NoExtField)
+      ({ InTreeAnnotations1.hs:4:1-3 }
+       (Unqual
+        {OccName: foo}))
+      (MG
+       (NoExtField)
+       ({ InTreeAnnotations1.hs:4:1-31 }
+        [({ InTreeAnnotations1.hs:4:1-31 }
+          (Match
+           (NoExtField)
+           (FunRhs
+            ({ InTreeAnnotations1.hs:4:1-3 }
+             (Unqual
+              {OccName: foo}))
+            (Prefix)
+            (NoSrcStrict))
+           [({ InTreeAnnotations1.hs:4:5-11 }
+             (AsPat
+              (AA
+               [(AddAnn
+                (AnnAt)
+                { InTreeAnnotations1.hs:4:6 })])
+              ({ InTreeAnnotations1.hs:4:5 }
+               (Unqual
+                {OccName: a}))
+              ({ InTreeAnnotations1.hs:4:7-11 }
+               (TuplePat
+                (AA
+                 [(AddAnn
+                   (AnnOpenP)
+                   { InTreeAnnotations1.hs:4:7 })
+                 ,(AddAnn
+                   (AnnCloseP)
+                   { InTreeAnnotations1.hs:4:11 })])
+                [({ InTreeAnnotations1.hs:4:8 }
+                  (WildPat
+                   (NoExtField)))
+                ,({ InTreeAnnotations1.hs:4:10 }
+                  (WildPat
+                   (NoExtField)))]
+                (Boxed)))))
+           ,({ InTreeAnnotations1.hs:4:13-16 }
+             (BangPat
+              (AA
+               [(AddAnn
+                (AnnBang)
+                { InTreeAnnotations1.hs:4:13 })])
+              ({ InTreeAnnotations1.hs:4:14-16 }
+               (LitPat
+                (NoExtField)
+                (HsString
+                 (SourceText
+                  "/"a/"")
+                 {FastString: "a"})))))
+           ,({ InTreeAnnotations1.hs:4:18-19 }
+             (LazyPat
+              (AA
+               [(AddAnn
+                (AnnTilde)
+                { InTreeAnnotations1.hs:4:18 })])
+              ({ InTreeAnnotations1.hs:4:19 }
+               (VarPat
+                (NoExtField)
+                ({ InTreeAnnotations1.hs:4:19 }
+                 (Unqual
+                  {OccName: x}))))))]
+           (GRHSs
+            (NoExtField)
+            [({ InTreeAnnotations1.hs:4:21-31 }
+              (GRHS
+               (NoExtField)
+               []
+               ({ InTreeAnnotations1.hs:4:23-31 }
+                (HsVar
+                 (NoExtField)
+                 ({ InTreeAnnotations1.hs:4:23-31 }
+                  (Unqual
+                   {OccName: undefined}))))))]
+            ({ <no location info> }
+             (EmptyLocalBinds
+              (NoExtField))))))])
+       (FromSource))
+      (WpHole)
+      [])))]
+  (Nothing)
+  (Nothing)))

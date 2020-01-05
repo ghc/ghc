@@ -302,7 +302,8 @@ matchVarStack (param_id:param_ids) stack_id body = do
 
 mkHsEnvStackExpr :: [Id] -> Id -> LHsExpr GhcTc
 mkHsEnvStackExpr env_ids stack_id
-  = mkLHsTupleExpr [mkLHsVarTuple env_ids, nlHsVar stack_id]
+  = mkLHsTupleExpr [mkLHsVarTuple env_ids noExtField, nlHsVar stack_id]
+                   noExtField
 
 -- Translation of arrow abstraction
 
