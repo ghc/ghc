@@ -513,17 +513,19 @@ Tuples.  All these functions are *pre-typechecker* because they lack
 types on the tuple.
 -}
 
-mkLHsTupleExpr :: [LHsExpr (GhcPass a)] -> LHsExpr (GhcPass a)
+mkLHsTupleExpr :: [LHsExpr (GhcPass a)] -> XExplicitTuple (GhcPass a)
+               -> LHsExpr (GhcPass a)
 -- Makes a pre-typechecker boxed tuple, deals with 1 case
-mkLHsTupleExpr [e] = e
-mkLHsTupleExpr es
-  = noLoc $ ExplicitTuple noExtField (map (noLoc . (Present noExtField)) es) Boxed
+mkLHsTupleExpr [e] _ = e
+mkLHsTupleExpr es ext
+  = noLoc $ ExplicitTuple ext (map (noLoc . (Present noExtField)) es) Boxed
 
-mkLHsVarTuple :: [IdP (GhcPass a)] -> LHsExpr (GhcPass a)
-mkLHsVarTuple ids  = mkLHsTupleExpr (map nlHsVar ids)
+mkLHsVarTuple :: [IdP (GhcPass a)]  -> XExplicitTuple (GhcPass a)
+              -> LHsExpr (GhcPass a)
+mkLHsVarTuple ids ext = mkLHsTupleExpr (map nlHsVar ids) ext
 
 nlTuplePat :: [LPat GhcPs] -> Boxity -> LPat GhcPs
-nlTuplePat pats box = noLoc (TuplePat noExtField pats box)
+nlTuplePat pats box = noLoc (TuplePat noAnn pats box)
 
 missingTupArg :: HsTupArg GhcPs
 missingTupArg = Missing noExtField
@@ -534,11 +536,13 @@ mkLHsPatTup [lpat] = lpat
 mkLHsPatTup lpats  = L (getLoc (head lpats)) $ TuplePat noExtField lpats Boxed
 
 -- | The Big equivalents for the source tuple expressions
-mkBigLHsVarTup :: [IdP (GhcPass id)] -> LHsExpr (GhcPass id)
-mkBigLHsVarTup ids = mkBigLHsTup (map nlHsVar ids)
+mkBigLHsVarTup :: [IdP (GhcPass id)] -> XExplicitTuple (GhcPass id)
+               -> LHsExpr (GhcPass id)
+mkBigLHsVarTup ids anns = mkBigLHsTup (map nlHsVar ids) anns
 
-mkBigLHsTup :: [LHsExpr (GhcPass id)] -> LHsExpr (GhcPass id)
-mkBigLHsTup = mkChunkified mkLHsTupleExpr
+mkBigLHsTup :: [LHsExpr (GhcPass id)] -> XExplicitTuple (GhcPass id)
+            -> LHsExpr (GhcPass id)
+mkBigLHsTup es anns = mkChunkified (\e -> mkLHsTupleExpr e anns) es
 
 -- | The Big equivalents for the source tuple patterns
 mkBigLHsVarPatTup :: [IdP GhcRn] -> LPat GhcRn

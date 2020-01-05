@@ -1798,15 +1798,16 @@ class b ~ (Body b) GhcPs => DisambECP b where
   -- | Disambiguate "(# a)" (right operator section)
   mkHsSectionR_PV :: SrcSpan -> Located (InfixOp b) -> Located b -> PV (Located b)
   -- | Disambiguate "(a -> b)" (view pattern)
-  mkHsViewPatPV :: SrcSpan -> LHsExpr GhcPs -> Located b -> PV (Located b)
+  mkHsViewPatPV :: SrcSpan -> LHsExpr GhcPs -> Located b -> AA -> PV (Located b)
   -- | Disambiguate "a@b" (as-pattern)
-  mkHsAsPatPV :: SrcSpan -> Located RdrName -> Located b -> PV (Located b)
+  mkHsAsPatPV
+    :: SrcSpan -> Located RdrName -> Located b -> AA -> PV (Located b)
   -- | Disambiguate "~a" (lazy pattern)
-  mkHsLazyPatPV :: SrcSpan -> Located b -> PV (Located b)
+  mkHsLazyPatPV :: SrcSpan -> Located b -> AA -> PV (Located b)
   -- | Disambiguate "!a" (bang pattern)
-  mkHsBangPatPV :: SrcSpan -> Located b -> PV (Located b)
+  mkHsBangPatPV :: SrcSpan -> Located b -> AA -> PV (Located b)
   -- | Disambiguate tuple sections and unboxed sums
-  mkSumOrTuplePV :: SrcSpan -> Boxity -> SumOrTuple b -> PV (Located b)
+  mkSumOrTuplePV :: SrcSpan -> Boxity -> SumOrTuple b -> AA -> PV (Located b)
   -- | Validate infixexp LHS to reject unwanted {-# SCC ... #-} pragmas
   rejectPragmaPV :: Located b -> PV ()
 
@@ -1893,15 +1894,15 @@ instance DisambECP (HsCmd GhcPs) where
     let pp_op = fromMaybe (panic "cannot print infix operator")
                           (ppr_infix_expr (unLoc op))
     in pp_op <> ppr c
-  mkHsViewPatPV l a b = cmdFail l $
+  mkHsViewPatPV l a b _ = cmdFail l $
     ppr a <+> text "->" <+> ppr b
-  mkHsAsPatPV l v c = cmdFail l $
+  mkHsAsPatPV l v c _ = cmdFail l $
     pprPrefixOcc (unLoc v) <> text "@" <> ppr c
-  mkHsLazyPatPV l c = cmdFail l $
+  mkHsLazyPatPV l c _ = cmdFail l $
     text "~" <> ppr c
-  mkHsBangPatPV l c = cmdFail l $
+  mkHsBangPatPV l c _ = cmdFail l $
     text "!" <> ppr c
-  mkSumOrTuplePV l boxity a = cmdFail l (pprSumOrTuple boxity a)
+  mkSumOrTuplePV l boxity a _ = cmdFail l (pprSumOrTuple boxity a)
   rejectPragmaPV _ = return ()
 
 cmdFail :: SrcSpan -> SDoc -> PV a
@@ -1946,13 +1947,14 @@ instance DisambECP (HsExpr GhcPs) where
     checkRecordSyntax (L l r)
   mkHsNegAppPV l a = return $ L l (NegApp noExtField a noSyntaxExpr)
   mkHsSectionR_PV l op e = return $ L l (SectionR noExtField op e)
-  mkHsViewPatPV l a b = patSynErr "View pattern" l (ppr a <+> text "->" <+> ppr b) empty
-  mkHsAsPatPV l v e =
+  mkHsViewPatPV l a b _
+    = patSynErr "View pattern" l (ppr a <+> text "->" <+> ppr b) empty
+  mkHsAsPatPV l v e _ =
     patSynErr "@-pattern" l (pprPrefixOcc (unLoc v) <> text "@" <> ppr e) $
     text "Type application syntax requires a space before '@'"
-  mkHsLazyPatPV l e = patSynErr "Lazy pattern" l (text "~" <> ppr e) $
+  mkHsLazyPatPV l e _ = patSynErr "Lazy pattern" l (text "~" <> ppr e) $
     text "Did you mean to add a space after the '~'?"
-  mkHsBangPatPV l e = patSynErr "Bang pattern" l (text "!" <> ppr e) $
+  mkHsBangPatPV l e _ = patSynErr "Bang pattern" l (text "!" <> ppr e) $
     text "Did you mean to add a space after the '!'?"
   mkSumOrTuplePV = mkSumOrTupleExpr
   rejectPragmaPV (L _ (OpApp _ _ _ e)) =
@@ -2035,18 +2037,18 @@ instance DisambECP (PatBuilder GhcPs) where
       _ -> patFail l (text "-" <> ppr p)
     return $ L l (PatBuilderPat (mkNPat lit (Just noSyntaxExpr)))
   mkHsSectionR_PV l op p = patFail l (pprInfixOcc (unLoc op) <> ppr p)
-  mkHsViewPatPV l a b = do
+  mkHsViewPatPV l a b anns = do
     p <- checkLPat b
-    return $ L l (PatBuilderPat (ViewPat noExtField a p))
-  mkHsAsPatPV l v e = do
+    return $ L l (PatBuilderPat (ViewPat anns a p))
+  mkHsAsPatPV l v e a = do
     p <- checkLPat e
-    return $ L l (PatBuilderPat (AsPat noExtField v p))
-  mkHsLazyPatPV l e = do
+    return $ L l (PatBuilderPat (AsPat a v p))
+  mkHsLazyPatPV l e a = do
     p <- checkLPat e
-    return $ L l (PatBuilderPat (LazyPat noExtField p))
-  mkHsBangPatPV l e = do
+    return $ L l (PatBuilderPat (LazyPat a p))
+  mkHsBangPatPV l e a = do
     p <- checkLPat e
-    let pb = BangPat noExtField p
+    let pb = BangPat a p
     hintBangPat l pb
     return $ L l (PatBuilderPat pb)
   mkSumOrTuplePV = mkSumOrTuplePat
@@ -3031,28 +3033,30 @@ pprSumOrTuple boxity = \case
         Boxed -> (text "(", text ")")
         Unboxed -> (text "(#", text "#)")
 
-mkSumOrTupleExpr :: SrcSpan -> Boxity -> SumOrTuple (HsExpr GhcPs) -> PV (LHsExpr GhcPs)
+mkSumOrTupleExpr :: SrcSpan -> Boxity -> SumOrTuple (HsExpr GhcPs) -> AA
+                 -> PV (LHsExpr GhcPs)
 
 -- Tuple
-mkSumOrTupleExpr l boxity (Tuple es) =
-    return $ L l (ExplicitTuple noExtField (map toTupArg es) boxity)
+mkSumOrTupleExpr l boxity (Tuple es) anns =
+    return $ L l (ExplicitTuple anns (map toTupArg es) boxity)
   where
     toTupArg :: Located (Maybe (LHsExpr GhcPs)) -> LHsTupArg GhcPs
     toTupArg = mapLoc (maybe missingTupArg (Present noExtField))
 
 -- Sum
-mkSumOrTupleExpr l Unboxed (Sum alt arity e) =
-    return $ L l (ExplicitSum noExtField alt arity e)
-mkSumOrTupleExpr l Boxed a@Sum{} =
+mkSumOrTupleExpr l Unboxed (Sum alt arity e) anns =
+    return $ L l (ExplicitSum anns alt arity e)
+mkSumOrTupleExpr l Boxed a@Sum{} _ =
     addFatalError l (hang (text "Boxed sums not supported:") 2
                       (pprSumOrTuple Boxed a))
 
-mkSumOrTuplePat :: SrcSpan -> Boxity -> SumOrTuple (PatBuilder GhcPs) -> PV (Located (PatBuilder GhcPs))
+mkSumOrTuplePat :: SrcSpan -> Boxity -> SumOrTuple (PatBuilder GhcPs) -> AA
+                -> PV (Located (PatBuilder GhcPs))
 
 -- Tuple
-mkSumOrTuplePat l boxity (Tuple ps) = do
+mkSumOrTuplePat l boxity (Tuple ps) anns = do
   ps' <- traverse toTupPat ps
-  return $ L l (PatBuilderPat (TuplePat noExtField ps' boxity))
+  return $ L l (PatBuilderPat (TuplePat anns ps' boxity))
   where
     toTupPat :: Located (Maybe (Located (PatBuilder GhcPs))) -> PV (LPat GhcPs)
     toTupPat (L l p) = case p of
@@ -3060,10 +3064,10 @@ mkSumOrTuplePat l boxity (Tuple ps) = do
       Just p' -> checkLPat p'
 
 -- Sum
-mkSumOrTuplePat l Unboxed (Sum alt arity p) = do
+mkSumOrTuplePat l Unboxed (Sum alt arity p) anns = do
    p' <- checkLPat p
-   return $ L l (PatBuilderPat (SumPat noExtField p' alt arity))
-mkSumOrTuplePat l Boxed a@Sum{} =
+   return $ L l (PatBuilderPat (SumPat anns p' alt arity))
+mkSumOrTuplePat l Boxed a@Sum{} _ =
     addFatalError l (hang (text "Boxed sums not supported:") 2
                       (pprSumOrTuple Boxed a))
 

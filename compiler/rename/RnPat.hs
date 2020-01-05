@@ -454,7 +454,7 @@ rnPatAndThen mk (AsPat x rdr pat)
        ; pat' <- rnLPatAndThen mk pat
        ; return (AsPat x new_name pat') }
 
-rnPatAndThen mk p@(ViewPat x expr pat)
+rnPatAndThen mk p@(ViewPat _ expr pat)
   = do { liftCps $ do { vp_flag <- xoptM LangExt.ViewPatterns
                       ; checkErr vp_flag (badViewPat p) }
          -- Because of the way we're arranging the recursive calls,
@@ -463,7 +463,7 @@ rnPatAndThen mk p@(ViewPat x expr pat)
        ; pat' <- rnLPatAndThen mk pat
        -- Note: at this point the PreTcType in ty can only be a placeHolder
        -- ; return (ViewPat expr' pat' ty) }
-       ; return (ViewPat x expr' pat') }
+       ; return (ViewPat noExtField expr' pat') }
 
 rnPatAndThen mk (ConPatIn con stuff)
    -- rnConPatAndThen takes care of reconstructing the pattern
@@ -482,14 +482,14 @@ rnPatAndThen mk (ListPat _ pats)
                      ; return (ListPat (Just to_list_name) pats')}
           False -> return (ListPat Nothing pats') }
 
-rnPatAndThen mk (TuplePat x pats boxed)
+rnPatAndThen mk (TuplePat _ pats boxed)
   = do { liftCps $ checkTupSize (length pats)
        ; pats' <- rnLPatsAndThen mk pats
-       ; return (TuplePat x pats' boxed) }
+       ; return (TuplePat noExtField pats' boxed) }
 
-rnPatAndThen mk (SumPat x pat alt arity)
+rnPatAndThen mk (SumPat _ pat alt arity)
   = do { pat <- rnLPatAndThen mk pat
-       ; return (SumPat x pat alt arity)
+       ; return (SumPat noExtField pat alt arity)
        }
 
 -- If a splice has been run already, just rename the result.
