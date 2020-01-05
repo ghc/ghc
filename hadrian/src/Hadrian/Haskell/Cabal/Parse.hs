@@ -43,6 +43,7 @@ import Hadrian.Expression
 import Hadrian.Haskell.Cabal
 import Hadrian.Haskell.Cabal.Type
 import Hadrian.Oracles.Cabal
+import Hadrian.Oracles.ArgsHash
 import Hadrian.Target
 
 import Base
@@ -137,15 +138,20 @@ configurePackage context@Context {..} = do
             pure $ C.simpleUserHooks { C.postConf = \_ _ _ _ -> return () }
           | otherwise -> pure C.simpleUserHooks
 
-    -- Compute the list of flags, and the Cabal configurartion arguments
+    -- Compute the list of flags, and the Cabal configuration arguments
     flavourArgs <- args <$> flavour
+    verbosity   <- getVerbosity
     flagList    <- interpret (target context (Cabal Flags stage) [] []) flavourArgs
     argList     <- interpret (target context (Cabal Setup stage) [] []) flavourArgs
-    verbosity   <- getVerbosity
+    trackArgsHash (target context (Cabal Flags stage) [] [])
+    trackArgsHash (target context (Cabal Setup stage) [] [])
     let v = if verbosity >= Loud then "-v3" else "-v0"
+        argList' = argList ++ ["--flags=" ++ unwords flagList, v]
+
+    when (verbosity >= Loud) $ do
+        putProgressInfo $ "| Package " ++ quote (pkgName package) ++ " configure flags: " ++ unwords argList'
     traced "cabal-configure" $
-        C.defaultMainWithHooksNoReadArgs hooks gpd
-            (argList ++ ["--flags=" ++ unwords flagList, v])
+        C.defaultMainWithHooksNoReadArgs hooks gpd argList'
 
     dir <- Context.buildPath context
     files <- liftIO $ getDirectoryFilesIO "." [ dir -/- "include" -/- "**"
