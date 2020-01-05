@@ -239,6 +239,7 @@ tcCompleteSigs sigs =
               AcceptAny -> failWithTc ambiguousError
               Fixed _ tc  -> return $ mkMatch cls tc
 
+          check_complete_match :: LocatedA Name -> TcM CompleteMatch -- AZ Temp
           check_complete_match tc_name = do
             ty_con <- tcLookupLocatedTyCon tc_name
             (_, cls) <- checkCLTypes (Fixed Nothing ty_con)
@@ -262,10 +263,10 @@ tcCompleteSigs sigs =
 
 
       -- See note [Typechecking Complete Matches]
-      checkCLType :: (CompleteSigType, [ConLike]) -> Located Name
+      checkCLType :: (CompleteSigType, [ConLike]) -> LocatedA Name
                   -> TcM (CompleteSigType, [ConLike])
       checkCLType (cst, cs) n = do
-        cl <- addLocM tcLookupConLike n
+        cl <- addLocMA tcLookupConLike n
         let   (_,_,_,_,_,_, res_ty) = conLikeFullSig cl
               res_ty_con = fst <$> splitTyConApp_maybe res_ty
         case (cst, res_ty_con) of
@@ -335,7 +336,7 @@ tcLocalBinds (HsValBinds _ (ValBinds {})) _ = panic "tcLocalBinds"
 tcLocalBinds (HsIPBinds x (IPBinds _ ip_binds)) thing_inside
   = do  { ipClass <- tcLookupClass ipClassName
         ; (given_ips, ip_binds') <-
-            mapAndUnzipM (wrapLocSndM (tc_ip_bind ipClass)) ip_binds
+            mapAndUnzipM (wrapLocSndMA (tc_ip_bind ipClass)) ip_binds
 
         -- If the binding binds ?x = E, we  must now
         -- discharge any ?x constraints in expr_lie
@@ -356,7 +357,7 @@ tcLocalBinds (HsIPBinds x (IPBinds _ ip_binds)) thing_inside
             ; ip_id <- newDict ipClass [ p, ty ]
             ; expr' <- tcLExpr expr (mkCheckExpType ty)
             ; let d = toDict ipClass p ty `fmap` expr'
-            ; return (ip_id, (IPBind noExtField (Right ip_id) d)) }
+            ; return (ip_id, (IPBind noAnn (Right ip_id) d)) }
     tc_ip_bind _ (IPBind _ (Right {}) _) = panic "tc_ip_bind"
 
     -- Coerces a `t` into a dictionary for `IP "x" t`.
@@ -479,7 +480,7 @@ tc_group top_lvl sig_fn prag_fn (Recursive, binds) closed thing_inside
         -- See Note [Polymorphic recursion] in HsBinds.
     do  { traceTc "tc_group rec" (pprLHsBinds binds)
         ; whenIsJust mbFirstPatSyn $ \lpat_syn ->
-            recursivePatSynErr (getLoc lpat_syn) binds
+            recursivePatSynErr (locA $ getLoc lpat_syn) binds
         ; (binds1, thing) <- go sccs
         ; return ([(Recursive, binds1)], thing) }
                 -- Rec them all together
@@ -609,7 +610,7 @@ tcPolyBinds sig_fn prag_fn rec_group rec_tc closed bind_list
     ; return result }
   where
     binder_names = collectHsBindListBinders bind_list
-    loc = foldr1 combineSrcSpans (map getLoc bind_list)
+    loc = foldr1 combineSrcSpans (map (locA . getLoc) bind_list)
          -- The mbinds have been dependency analysed and
          -- may no longer be adjacent; so find the narrowest
          -- span that includes them all
@@ -693,7 +694,7 @@ tcPolyCheck prag_fn
        ; (tv_prs, theta, tau) <- tcInstType tcInstSkolTyVars poly_id
                 -- See Note [Instantiate sig with fresh variables]
 
-       ; mono_name <- newNameAt (nameOccName name) nm_loc
+       ; mono_name <- newNameAt (nameOccName name) (locA nm_loc)
        ; ev_vars   <- newEvVars theta
        ; let mono_id   = mkLocalId mono_name tau
              skol_info = SigSkol ctxt (idType poly_id) tv_prs
@@ -703,7 +704,7 @@ tcPolyCheck prag_fn
             <- checkConstraints skol_info skol_tvs ev_vars $
                tcExtendBinderStack [TcIdBndr mono_id NotTopLevel]  $
                tcExtendNameTyVarEnv tv_prs $
-               setSrcSpan loc           $
+               setSrcSpanA loc             $
                tcMatchesFun (L nm_loc mono_name) matches (mkCheckExpType tau)
 
        ; let prag_sigs = lookupPragEnv prag_fn name
@@ -711,7 +712,7 @@ tcPolyCheck prag_fn
        ; poly_id    <- addInlinePrags poly_id prag_sigs
 
        ; mod <- getModule
-       ; tick <- funBindTicks nm_loc mono_id mod prag_sigs
+       ; tick <- funBindTicks (locA nm_loc) mono_id mod prag_sigs
        ; let bind' = FunBind { fun_id      = L nm_loc mono_id
                              , fun_matches = matches'
                              , fun_ext     = co_fn
@@ -806,7 +807,7 @@ tcPolyInfer rec_tc prag_fn tc_sig_fn mono bind_list
 
        ; loc <- getSrcSpanM
        ; let poly_ids = map abe_poly exports
-             abs_bind = L loc $
+             abs_bind = L (noAnnSrcSpan loc) $
                         AbsBinds { abs_ext = noExtField
                                  , abs_tvs = qtvs
                                  , abs_ev_vars = givens, abs_ev_binds = [ev_binds]
@@ -1264,7 +1265,7 @@ tcMonoBinds is_rec sig_fn no_gen
         -- and *then* make the monomorphic Id for the LHS
         -- e.g.         f = \(x::forall a. a->a) -> <body>
         --      We want to infer a higher-rank type for f
-    setSrcSpan b_loc    $
+    setSrcSpanA b_loc      $
     do  { ((co_fn, matches'), rhs_ty)
             <- tcInfer $ \ exp_ty ->
                tcExtendBinderStack [TcIdBndr_ExpType name exp_ty NotTopLevel] $
@@ -1283,7 +1284,7 @@ tcMonoBinds is_rec sig_fn no_gen
                        , mbi_mono_id   = mono_id }]) }
 
 tcMonoBinds _ sig_fn no_gen binds
-  = do  { tc_binds <- mapM (wrapLocM (tcLhs sig_fn no_gen)) binds
+  = do  { tc_binds <- mapM (wrapLocMA (tcLhs sig_fn no_gen)) binds
 
         -- Bring the monomorphic Ids, into scope for the RHSs
         ; let mono_infos = getMonoBindInfo tc_binds
@@ -1300,7 +1301,7 @@ tcMonoBinds _ sig_fn no_gen binds
         ; traceTc "tcMonoBinds" $ vcat [ ppr n <+> ppr id <+> ppr (idType id)
                                        | (n,id) <- rhs_id_env]
         ; binds' <- tcExtendRecIds rhs_id_env $
-                    mapM (wrapLocM tcRhs) tc_binds
+                    mapM (wrapLocMA tcRhs) tc_binds
 
         ; return (listToBag binds', mono_infos) }
 
@@ -1342,7 +1343,7 @@ tcLhs sig_fn no_gen (FunBind { fun_id = L nm_loc name
     --           Just g = ...f...
     -- Hence always typechecked with InferGen
     do { mono_info <- tcLhsSigId no_gen (name, sig)
-       ; return (TcFunBind mono_info nm_loc matches) }
+       ; return (TcFunBind mono_info (locA nm_loc) matches) }
 
   | otherwise  -- No type signature
   = do { mono_ty <- newOpenFlexiTyVarTy
@@ -1350,7 +1351,7 @@ tcLhs sig_fn no_gen (FunBind { fun_id = L nm_loc name
        ; let mono_info = MBI { mbi_poly_name = name
                              , mbi_sig       = Nothing
                              , mbi_mono_id   = mono_id }
-       ; return (TcFunBind mono_info nm_loc matches) }
+       ; return (TcFunBind mono_info (locA nm_loc) matches) }
 
 tcLhs sig_fn no_gen (PatBind { pat_lhs = pat, pat_rhs = grhss })
   = -- See Note [Typechecking pattern bindings]
@@ -1420,9 +1421,9 @@ tcRhs (TcFunBind info@(MBI { mbi_sig = mb_sig, mbi_mono_id = mono_id })
   = tcExtendIdBinderStackForRhs [info]  $
     tcExtendTyVarEnvForRhs mb_sig       $
     do  { traceTc "tcRhs: fun bind" (ppr mono_id $$ ppr (idType mono_id))
-        ; (co_fn, matches') <- tcMatchesFun (L loc (idName mono_id))
+        ; (co_fn, matches') <- tcMatchesFun (L (noAnnSrcSpan loc) (idName mono_id))
                                  matches (mkCheckExpType $ idType mono_id)
-        ; return ( FunBind { fun_id = L loc mono_id
+        ; return ( FunBind { fun_id = L (noAnnSrcSpan loc) mono_id
                            , fun_matches = matches'
                            , fun_ext = co_fn
                            , fun_tick = [] } ) }
@@ -1472,7 +1473,7 @@ tcExtendIdBinderStackForRhs infos thing_inside
     -- NotTopLevel: it's a monomorphic binding
 
 ---------------------
-getMonoBindInfo :: [Located TcMonoBind] -> [MonoBindInfo]
+getMonoBindInfo :: [LocatedA TcMonoBind] -> [MonoBindInfo]
 getMonoBindInfo tc_binds
   = foldr (get_info . unLoc) [] tc_binds
   where

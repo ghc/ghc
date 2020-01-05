@@ -7,13 +7,14 @@ gadt-escape1.hs:19:58: error:
                    in a case alternative
           at gadt-escape1.hs:19:43-50
       ‘p’ is a rigid type variable bound by
-        the inferred type of weird1 :: p at gadt-escape1.hs:19:1-58
+        the inferred type of weird1 :: p
+        at gadt-escape1.hs:19:1-58
       Possible fix: add a type signature for ‘weird1’
       Expected type: p
         Actual type: ExpGADT t
     • In the expression: a
       In a case alternative: Hidden (ExpInt _) a -> a
       In the expression:
-        case (hval :: Hidden) of { Hidden (ExpInt _) a -> a }
+        case (hval :: Hidden) of Hidden (ExpInt _) a -> a
     • Relevant bindings include
         weird1 :: p (bound at gadt-escape1.hs:19:1)

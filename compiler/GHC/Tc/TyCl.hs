@@ -1572,7 +1572,7 @@ kcConDecls :: NewOrData
            -> [LConDecl GhcRn] -- The data constructors
            -> TcM ()
 kcConDecls new_or_data res_kind cons
-  = mapM_ (wrapLocM_ (kcConDecl new_or_data final_res_kind)) cons
+  = mapM_ (wrapLocMA_ (kcConDecl new_or_data final_res_kind)) cons
   where
     (_, final_res_kind) = splitPiTys res_kind
         -- See Note [kcConDecls result kind]
@@ -2039,7 +2039,7 @@ tcClassDecl1 roles_info class_name hs_ctxt meths fundeps sigs ats at_defs
                -- The checkTvConstraints is needed bring into scope the
                -- skolems bound by the class decl header (#17841)
                do { ctxt <- tcHsContext hs_ctxt
-                  ; fds  <- mapM (addLocM tc_fundep) fundeps
+                  ; fds  <- mapM (addLocMA tc_fundep) fundeps
                   ; sig_stuff <- tcClassSigs class_name sigs meths
                   ; at_stuff  <- tcClassATs class_name clas ats at_defs
                   ; return (ctxt, fds, sig_stuff, at_stuff) }
@@ -2071,9 +2071,11 @@ tcClassDecl1 roles_info class_name hs_ctxt meths fundeps sigs ats at_defs
        ; return clas }
   where
     skol_info = TyConSkol ClassFlavour class_name
-    tc_fundep (tvs1, tvs2) = do { tvs1' <- mapM (tcLookupTyVar . unLoc) tvs1 ;
+    tc_fundep :: GHC.Hs.FunDep GhcRn -> TcM ([Var],[Var])
+    tc_fundep (FunDep _ tvs1 tvs2)
+                           = do { tvs1' <- mapM (tcLookupTyVar . unLoc) tvs1 ;
                                 ; tvs2' <- mapM (tcLookupTyVar . unLoc) tvs2 ;
-                                ; return (tvs1', tvs2') }
+                                ; return (tvs1',tvs2') }
 
 
 {- Note [Associated type defaults]
@@ -2597,7 +2599,7 @@ tcInjectivity _ Nothing
   -- therefore we can always infer the result kind if we know the result type.
   -- But this does not seem to be useful in any way so we don't do it.  (Another
   -- reason is that the implementation would not be straightforward.)
-tcInjectivity tcbs (Just (L loc (InjectivityAnn _ lInjNames)))
+tcInjectivity tcbs (Just (L loc (InjectivityAnn _ _ lInjNames)))
   = setSrcSpan loc $
     do { let tvs = binderVars tcbs
        ; dflags <- getDynFlags
@@ -2727,7 +2729,7 @@ kcTyFamInstEqn tc_fam_tc
                                       , feqn_bndrs = mb_expl_bndrs
                                       , feqn_pats  = hs_pats
                                       , feqn_rhs   = hs_rhs_ty }}))
-  = setSrcSpan loc $
+  = setSrcSpanA loc $
     do { traceTc "kcTyFamInstEqn" (vcat
            [ text "tc_name ="    <+> ppr eqn_tc_name
            , text "fam_tc ="     <+> ppr tc_fam_tc <+> dcolon <+> ppr (tyConKind tc_fam_tc)
@@ -2766,7 +2768,7 @@ tcTyFamInstEqn fam_tc mb_clsinfo
                                       , feqn_pats   = hs_pats
                                       , feqn_rhs    = hs_rhs_ty }}))
   = ASSERT( getName fam_tc == eqn_tc_name )
-    setSrcSpan loc $
+    setSrcSpanA loc $
     do { traceTc "tcTyFamInstEqn" $
          vcat [ ppr fam_tc <+> ppr hs_pats
               , text "fam tc bndrs" <+> pprTyVars (tyConTyVars fam_tc)
@@ -2788,7 +2790,7 @@ tcTyFamInstEqn fam_tc mb_clsinfo
        -- (tcFamInstEqnGuts zonks to Type)
        ; return (mkCoAxBranch qtvs [] [] fam_tc pats rhs_ty
                               (map (const Nominal) qtvs)
-                              loc) }
+                              (locA loc)) }
 
 {-
 Kind check type patterns and kind annotate the embedded type variables.
@@ -2929,7 +2931,7 @@ tcFamTyPats fam_tc hs_pats
   where
     fam_name  = tyConName fam_tc
     fam_arity = tyConArity fam_tc
-    lhs_fun   = noLoc (HsTyVar noExtField NotPromoted (noLoc fam_name))
+    lhs_fun   = noLocA (HsTyVar noAnn NotPromoted (noLocA fam_name))
 
 unravelFamInstPats :: TcType -> [TcType]
 -- Decompose fam_app to get the argument patterns
@@ -3083,7 +3085,7 @@ tcConDecls :: KnotTied TyCon -> NewOrData
            -> [TyConBinder] -> TcKind   -- binders and result kind of tycon
            -> KnotTied Type -> [LConDecl GhcRn] -> TcM [DataCon]
 tcConDecls rep_tycon new_or_data tmpl_bndrs res_kind res_tmpl
-  = concatMapM $ addLocM $
+  = concatMapM $ addLocMA $
     tcConDecl rep_tycon (mkTyConTagMap rep_tycon)
               tmpl_bndrs res_kind res_tmpl new_or_data
     -- It's important that we pay for tag allocation here, once per TyCon,
@@ -4677,7 +4679,7 @@ fieldTypeMisMatch field_name con1 con2
   = sep [text "Constructors" <+> ppr con1 <+> text "and" <+> ppr con2,
          text "give different types for field", quotes (ppr field_name)]
 
-dataConCtxtName :: [Located Name] -> SDoc
+dataConCtxtName :: [LocatedA Name] -> SDoc
 dataConCtxtName [con]
    = text "In the definition of data constructor" <+> quotes (ppr con)
 dataConCtxtName con

@@ -88,7 +88,7 @@ dsInnerListComp (ParStmtBlock _ stmts bndrs _)
              list_ty          = mkListTy bndrs_tuple_type
 
              -- really use original bndrs below!
-       ; expr <- dsListComp (stmts ++ [noLoc $ mkLastStmt (mkBigLHsVarTupId bndrs)]) list_ty
+       ; expr <- dsListComp (stmts ++ [noLocA $ mkLastStmt (mkBigLHsVarTupId bndrs)]) list_ty
 
        ; return (expr, bndrs_tuple_type) }
 
@@ -479,7 +479,7 @@ dsMonadComp stmts = dsMcStmts stmts
 
 dsMcStmts :: [ExprLStmt GhcTc] -> DsM CoreExpr
 dsMcStmts []                      = panic "dsMcStmts"
-dsMcStmts ((L loc stmt) : lstmts) = putSrcSpanDs loc (dsMcStmt stmt lstmts)
+dsMcStmts ((L loc stmt) : lstmts) = putSrcSpanDsA loc (dsMcStmt stmt lstmts)
 
 ---------------
 dsMcStmt :: ExprStmt GhcTc -> [ExprLStmt GhcTc] -> DsM CoreExpr
@@ -632,7 +632,7 @@ dsInnerMonadComp :: [ExprLStmt GhcTc]
                  -> DsM CoreExpr
 dsInnerMonadComp stmts bndrs ret_op
   = dsMcStmts (stmts ++
-                 [noLoc (LastStmt noExtField (mkBigLHsVarTupId bndrs) Nothing ret_op)])
+                 [noLocA (LastStmt noExtField (mkBigLHsVarTupId bndrs) Nothing ret_op)])
 
 
 -- The `unzip` function for `GroupStmt` in a monad comprehensions

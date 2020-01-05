@@ -64,7 +64,7 @@ hole_constraints.hs:27:32: warning: [-Wtyped-holes (in -Wdefault)]
     • Found hole: _ :: String
     • In the expression: _
       In a case alternative: AnyShow x -> _
-      In the expression: case a of { AnyShow x -> _ }
+      In the expression: case a of AnyShow x -> _
     • Relevant bindings include
         x :: a (bound at hole_constraints.hs:27:27)
         a :: AnyShow (bound at hole_constraints.hs:27:5)

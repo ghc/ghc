@@ -76,3 +76,5 @@ test('T17388',      [extra_files(['Test17388.hs']),
                      ignore_stderr], makefile_test, ['T17388'])
 test('T17519',      [extra_files(['Test17519.hs']),
                      ignore_stderr], makefile_test, ['T17519'])
+
+test('InTreeAnnotations1',normal, compile, ['-dsuppress-uniques -ddump-parsed-ast'])

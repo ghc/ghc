@@ -206,7 +206,7 @@ tcRnModuleTcRnM :: HscEnv
 tcRnModuleTcRnM hsc_env mod_sum
                 (HsParsedModule {
                    hpm_module =
-                      (L loc (HsModule maybe_mod export_ies
+                      (L loc (HsModule _anns maybe_mod export_ies
                                        import_decls local_decls mod_deprec
                                        maybe_doc_hdr)),
                    hpm_src_files = src_files
@@ -243,9 +243,9 @@ tcRnModuleTcRnM hsc_env mod_sum
                              $ implicitRequirements hsc_env
                                 (map simplifyImport (prel_imports
                                                      ++ import_decls))
-        ; let { mkImport (Nothing, L _ mod_name) = noLoc
+        ; let { mkImport (Nothing, L _ mod_name) = noLocA
                 $ (simpleImportDecl mod_name)
-                  { ideclHiding = Just (False, noLoc [])}
+                  { ideclHiding = Just (False, noLocA [])}
               ; mkImport _ = panic "mkImport" }
         ; let { all_imports = prel_imports ++ import_decls
                        ++ map mkImport (raw_sig_imports ++ raw_req_imports) }
@@ -395,7 +395,7 @@ tcRnImports hsc_env import_decls
 
 tcRnSrcDecls :: Bool  -- False => no 'module M(..) where' header at all
              -> [LHsDecl GhcPs]               -- Declarations
-             -> Maybe (Located [LIE GhcPs])
+             -> Maybe (LocatedA [LIE GhcPs])
              -> TcM TcGblEnv
 tcRnSrcDecls explicit_mod_hdr decls export_ies
  = do { -- Do all the declarations
@@ -1712,7 +1712,7 @@ tcTyClsInstDecls tycl_decls deriv_decls binds
 -}
 
 checkMain :: Bool  -- False => no 'module M(..) where' header at all
-          -> Maybe (Located [LIE GhcPs])  -- Export specs of Main module
+          -> Maybe (LocatedA [LIE GhcPs])  -- Export specs of Main module
           -> TcM TcGblEnv
 -- If we are in module Main, check that 'main' is defined and exported.
 checkMain explicit_mod_hdr export_ies
@@ -1720,7 +1720,7 @@ checkMain explicit_mod_hdr export_ies
         ; tcg_env <- getGblEnv
         ; check_main dflags tcg_env explicit_mod_hdr export_ies }
 
-check_main :: DynFlags -> TcGblEnv -> Bool -> Maybe (Located [LIE GhcPs])
+check_main :: DynFlags -> TcGblEnv -> Bool -> Maybe (LocatedA [LIE GhcPs])
            -> TcM TcGblEnv
 check_main dflags tcg_env explicit_mod_hdr export_ies
  | mod /= main_mod
@@ -1777,6 +1777,7 @@ check_main dflags tcg_env explicit_mod_hdr export_ies
     use_as_main main_name = do
         { traceTc "checkMain found" (ppr main_mod <+> ppr main_fn)
         ; let loc       = srcLocSpan (getSrcLoc main_name)
+        ; let loc'      = noAnnSrcSpan loc
         ; ioTyCon <- tcLookupTyCon ioTyConName
         ; res_ty <- newFlexiTyVarTy liftedTypeKind
         ; let io_ty = mkTyConApp ioTyCon [res_ty]
@@ -1784,7 +1785,7 @@ check_main dflags tcg_env explicit_mod_hdr export_ies
         ; (ev_binds, main_expr)
                <- checkConstraints skol_info [] [] $
                   addErrCtxt mainCtxt    $
-                  tcLExpr (L loc (HsVar noExtField (L loc main_name)))
+                  tcLExpr (L loc' (HsVar noExtField (L loc' main_name)))
                           (mkCheckExpType io_ty)
 
                 -- See Note [Root-main Id]
@@ -1830,7 +1831,7 @@ check_main dflags tcg_env explicit_mod_hdr export_ies
 
     -- Select the main functions from the export list.
     -- Only the module name is needed, the function name is fixed.
-    selExportMains :: Maybe (Located [LIE GhcPs]) -> [ModuleName]    -- #16453
+    selExportMains :: Maybe (LocatedA [LIE GhcPs]) -> [ModuleName]    -- #16453
     selExportMains Nothing = [main_mod_nm]
         -- no main specified, but there is a header.
     selExportMains (Just exps) = fmap fst $
@@ -2175,7 +2176,7 @@ tcUserStmt (L loc (BodyStmt _ expr _ _))
         ; ghciStep <- getGhciStepIO
         ; uniq <- newUnique
         ; interPrintName <- getInteractivePrintName
-        ; let fresh_it  = itName uniq loc
+        ; let fresh_it  = itName uniq (locA loc)
               matches   = [mkMatch (mkPrefixFunRhs (L loc fresh_it)) [] rn_expr
                                    (noLoc emptyLocalBinds)]
               -- [it = expr]
@@ -2421,17 +2422,17 @@ tcGhciStmts stmts
            -- Note [Implementing unsafeCoerce] in base:Unsafe.Coerce
 
       ; let ret_expr = nlHsApp (nlHsTyApp ret_id [ret_ty]) $
-                       noLoc $ ExplicitList unitTy Nothing $
+                       noLocA $ ExplicitList unitTy Nothing $
                        map mk_item ids
 
             mk_item id = unsafe_coerce_id `nlHsTyApp` [ getRuntimeRep (idType id)
                                                       , getRuntimeRep unitTy
                                                       , idType id, unitTy]
                                           `nlHsApp` nlHsVar id
-            stmts = tc_stmts ++ [noLoc (mkLastStmt ret_expr)]
+            stmts = tc_stmts ++ [noLocA (mkLastStmt ret_expr)]
 
       ; return (ids, mkHsDictLet (EvBinds const_binds) $
-                     noLoc (HsDo io_ret_ty GhciStmtCtxt (noLoc stmts)))
+                     noLocA (HsDo io_ret_ty GhciStmtCtxt (noLoc stmts)))
     }
 
 -- | Generate a typed ghciStepIO expression (ghciStep :: Ty a -> IO a)
@@ -2442,16 +2443,16 @@ getGhciStepIO = do
     let ghciM   = nlHsAppTy (nlHsTyVar ghciTy) (nlHsTyVar a_tv)
         ioM     = nlHsAppTy (nlHsTyVar ioTyConName) (nlHsTyVar a_tv)
 
-        step_ty = noLoc $ HsForAllTy
+        step_ty = noLocA $ HsForAllTy
                      { hst_fvf = ForallInvis
-                     , hst_bndrs = [noLoc $ UserTyVar noExtField SpecifiedSpec (noLoc a_tv)]
-                     , hst_xforall = noExtField
+                     , hst_bndrs = [noLoc $ UserTyVar noAnn SpecifiedSpec (noLocA a_tv)]
+                     , hst_xforall = noAnn
                      , hst_body  = nlHsFunTy ghciM ioM }
 
         stepTy :: LHsSigWcType GhcRn
         stepTy = mkEmptyWildCardBndrs (mkEmptyImplicitBndrs step_ty)
 
-    return (noLoc $ ExprWithTySig noExtField (nlHsVar ghciStepIoMName) stepTy)
+    return (noLocA $ ExprWithTySig noExtField (nlHsVar ghciStepIoMName) stepTy)
 
 isGHCiMonad :: HscEnv -> String -> IO (Messages, Maybe Name)
 isGHCiMonad hsc_env ty
@@ -2490,7 +2491,7 @@ tcRnExpr hsc_env mode rdr_expr
         -- Now typecheck the expression, and generalise its type
         -- it might have a rank-2 type (e.g. :t runST)
     uniq <- newUnique ;
-    let { fresh_it  = itName uniq (getLoc rdr_expr) } ;
+    let { fresh_it  = itName uniq (getLocA rdr_expr) } ;
     ((tclvl, (_tc_expr, res_ty)), lie)
           <- captureTopConstraints $
              pushTcLevelM          $
@@ -2730,12 +2731,12 @@ getModuleInterface hsc_env mod
   = runTcInteractive hsc_env $
     loadModuleInterface (text "getModuleInterface") mod
 
-tcRnLookupRdrName :: HscEnv -> Located RdrName
+tcRnLookupRdrName :: HscEnv -> LocatedA RdrName
                   -> IO (Messages, Maybe [Name])
 -- ^ Find all the Names that this RdrName could mean, in GHCi
 tcRnLookupRdrName hsc_env (L loc rdr_name)
   = runTcInteractive hsc_env $
-    setSrcSpan loc           $
+    setSrcSpanA loc          $
     do {   -- If the identifier is a constructor (begins with an
            -- upper-case letter), then we need to consider both
            -- constructor and type class identifiers.
@@ -2874,7 +2875,7 @@ tcDump env
     full_dump  = pprLHsBinds (tcg_binds env)
         -- NB: foreign x-d's have undefined's in their types;
         --     hence can't show the tc_fords
-    ast_dump = showAstData NoBlankSrcSpan (tcg_binds env)
+    ast_dump = showAstData NoBlankSrcSpan NoBlankApiAnnotations (tcg_binds env)
 
 -- It's unpleasant having both pprModGuts and pprModDetails here
 pprTcGblEnv :: TcGblEnv -> SDoc

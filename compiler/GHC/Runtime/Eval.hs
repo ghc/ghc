@@ -775,7 +775,7 @@ findGlobalRdrEnv hsc_env imports
            (err : _, _)    -> Left err }
   where
     idecls :: [LImportDecl GhcPs]
-    idecls = [noLoc d | IIDecl d <- imports]
+    idecls = [noLocA d | IIDecl d <- imports]
 
     imods :: [ModuleName]
     imods = [m | IIModule m <- imports]
@@ -1189,10 +1189,11 @@ compileParsedExprRemote expr@(L loc _) = withSession $ \hsc_env -> do
   -- We will ignore the returned [Id], namely [expr_id], and not really
   -- create a new binding.
   let expr_fs = fsLit "_compileParsedExpr"
-      expr_name = mkInternalName (getUnique expr_fs) (mkTyVarOccFS expr_fs) loc
-      let_stmt = L loc . LetStmt noExtField . L loc . (HsValBinds noExtField) $
+      loc' = locA loc
+      expr_name = mkInternalName (getUnique expr_fs) (mkTyVarOccFS expr_fs) loc'
+      let_stmt = L loc . LetStmt noExtField . L loc' . (HsValBinds noExtField) $
         ValBinds noExtField
-                     (unitBag $ mkHsVarBind loc (getRdrName expr_name) expr) []
+                     (unitBag $ mkHsVarBind loc' (getRdrName expr_name) expr) []
 
   pstmt <- liftIO $ hscParsedStmt hsc_env let_stmt
   let (hvals_io, fix_env) = case pstmt of

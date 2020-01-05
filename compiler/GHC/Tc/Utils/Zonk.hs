@@ -145,9 +145,9 @@ hsLitType (HsDoublePrim _ _) = doublePrimTy
 
 shortCutLit :: Platform -> OverLitVal -> TcType -> Maybe (HsExpr GhcTcId)
 shortCutLit platform (HsIntegral int@(IL src neg i)) ty
-  | isIntTy ty  && platformInIntRange  platform i = Just (HsLit noExtField (HsInt noExtField int))
+  | isIntTy ty  && platformInIntRange  platform i = Just (HsLit noComments (HsInt noExtField int))
   | isWordTy ty && platformInWordRange platform i = Just (mkLit wordDataCon (HsWordPrim src i))
-  | isIntegerTy ty = Just (HsLit noExtField (HsInteger src i ty))
+  | isIntegerTy ty = Just (HsLit noComments (HsInteger src i ty))
   | otherwise = shortCutLit platform (HsFractional (integralFractionalLit neg i)) ty
         -- The 'otherwise' case is important
         -- Consider (3 :: Float).  Syntactically it looks like an IntLit,
@@ -161,11 +161,11 @@ shortCutLit _ (HsFractional f) ty
   | otherwise     = Nothing
 
 shortCutLit _ (HsIsString src s) ty
-  | isStringTy ty = Just (HsLit noExtField (HsString src s))
+  | isStringTy ty = Just (HsLit noComments (HsString src s))
   | otherwise     = Nothing
 
 mkLit :: DataCon -> HsLit GhcTc -> HsExpr GhcTc
-mkLit con lit = HsApp noExtField (nlHsDataCon con) (nlHsLit lit)
+mkLit con lit = HsApp noComments (nlHsDataCon con) (nlHsLit lit)
 
 ------------------------------
 hsOverLitName :: OverLitVal -> Name
@@ -341,7 +341,7 @@ zonkEnvIds (ZonkEnv { ze_id_env = id_env})
   -- It's OK to use nonDetEltsUFM here because we forget the ordering
   -- immediately by creating a TypeEnv
 
-zonkLIdOcc :: ZonkEnv -> Located TcId -> Located Id
+zonkLIdOcc :: ZonkEnv -> LocatedA TcId -> LocatedA Id
 zonkLIdOcc env = mapLoc (zonkIdOcc env)
 
 zonkIdOcc :: ZonkEnv -> TcId -> Id
@@ -506,7 +506,7 @@ zonkLocalBinds env (HsValBinds x (XValBindsLR (NValBinds binds sigs)))
            ; return (env2, (r,b'):bs') }
 
 zonkLocalBinds env (HsIPBinds x (IPBinds dict_binds binds )) = do
-    new_binds <- mapM (wrapLocM zonk_ip_bind) binds
+    new_binds <- mapM (wrapLocMA zonk_ip_bind) binds
     let
         env1 = extendIdZonkEnvRec env
                  [ n | (L _ (IPBind _ (Right n) _)) <- new_binds]
@@ -531,7 +531,7 @@ zonkMonoBinds :: ZonkEnv -> LHsBinds GhcTcId -> TcM (LHsBinds GhcTc)
 zonkMonoBinds env binds = mapBagM (zonk_lbind env) binds
 
 zonk_lbind :: ZonkEnv -> LHsBind GhcTcId -> TcM (LHsBind GhcTc)
-zonk_lbind env = wrapLocM (zonk_bind env)
+zonk_lbind env = wrapLocMA (zonk_bind env)
 
 zonk_bind :: ZonkEnv -> HsBind GhcTcId -> TcM (HsBind GhcTc)
 zonk_bind env bind@(PatBind { pat_lhs = pat, pat_rhs = grhss
@@ -628,8 +628,8 @@ zonk_bind env (PatSynBind x bind@(PSB { psb_id = L loc id
                        , psb_dir = dir' } }
 
 zonkPatSynDetails :: ZonkEnv
-                  -> HsPatSynDetails (Located TcId)
-                  -> HsPatSynDetails (Located Id)
+                  -> HsPatSynDetails (LocatedA TcId)
+                  -> HsPatSynDetails (LocatedA Id)
 zonkPatSynDetails env (PrefixCon as)
   = PrefixCon (map (zonkLIdOcc env) as)
 zonkPatSynDetails env (InfixCon a1 a2)
@@ -667,9 +667,9 @@ zonkLTcSpecPrags env ps
 -}
 
 zonkMatchGroup :: ZonkEnv
-            -> (ZonkEnv -> Located (body GhcTcId) -> TcM (Located (body GhcTc)))
-            -> MatchGroup GhcTcId (Located (body GhcTcId))
-            -> TcM (MatchGroup GhcTc (Located (body GhcTc)))
+            -> (ZonkEnv -> LocatedA (body GhcTcId) -> TcM (LocatedA (body GhcTc)))
+            -> MatchGroup GhcTcId (LocatedA (body GhcTcId))
+            -> TcM (MatchGroup GhcTc (LocatedA (body GhcTc)))
 zonkMatchGroup env zBody (MG { mg_alts = L l ms
                              , mg_ext = MatchGroupTc arg_tys res_ty
                              , mg_origin = origin })
@@ -681,9 +681,9 @@ zonkMatchGroup env zBody (MG { mg_alts = L l ms
                      , mg_origin = origin }) }
 
 zonkMatch :: ZonkEnv
-          -> (ZonkEnv -> Located (body GhcTcId) -> TcM (Located (body GhcTc)))
-          -> LMatch GhcTcId (Located (body GhcTcId))
-          -> TcM (LMatch GhcTc (Located (body GhcTc)))
+          -> (ZonkEnv -> LocatedA (body GhcTcId) -> TcM (LocatedA (body GhcTc)))
+          -> LMatch GhcTcId (LocatedA (body GhcTcId))
+          -> TcM (LMatch GhcTc (LocatedA (body GhcTc)))
 zonkMatch env zBody (L loc match@(Match { m_pats = pats
                                         , m_grhss = grhss }))
   = do  { (env1, new_pats) <- zonkPats env pats
@@ -692,9 +692,9 @@ zonkMatch env zBody (L loc match@(Match { m_pats = pats
 
 -------------------------------------------------------------------------
 zonkGRHSs :: ZonkEnv
-          -> (ZonkEnv -> Located (body GhcTcId) -> TcM (Located (body GhcTc)))
-          -> GRHSs GhcTcId (Located (body GhcTcId))
-          -> TcM (GRHSs GhcTc (Located (body GhcTc)))
+          -> (ZonkEnv -> LocatedA (body GhcTcId) -> TcM (LocatedA (body GhcTc)))
+          -> GRHSs GhcTcId (LocatedA (body GhcTcId))
+          -> TcM (GRHSs GhcTc (LocatedA (body GhcTc)))
 
 zonkGRHSs env zBody (GRHSs x grhss (L l binds)) = do
     (new_env, new_binds) <- zonkLocalBinds env binds
@@ -719,7 +719,7 @@ zonkLExpr  :: ZonkEnv -> LHsExpr GhcTcId   -> TcM (LHsExpr GhcTc)
 zonkExpr   :: ZonkEnv -> HsExpr GhcTcId    -> TcM (HsExpr GhcTc)
 
 zonkLExprs env exprs = mapM (zonkLExpr env) exprs
-zonkLExpr  env expr  = wrapLocM (zonkExpr env) expr
+zonkLExpr  env expr  = wrapLocMA (zonkExpr env) expr
 
 zonkExpr env (HsVar x (L l id))
   = ASSERT2( isNothing (isDataConId_maybe id), ppr id )
@@ -960,7 +960,7 @@ zonkSyntaxExpr env NoSyntaxExprTc = return (env, NoSyntaxExprTc)
 zonkLCmd  :: ZonkEnv -> LHsCmd GhcTcId   -> TcM (LHsCmd GhcTc)
 zonkCmd   :: ZonkEnv -> HsCmd GhcTcId    -> TcM (HsCmd GhcTc)
 
-zonkLCmd  env cmd  = wrapLocM (zonkCmd env) cmd
+zonkLCmd  env cmd  = wrapLocMA (zonkCmd env) cmd
 
 zonkCmd env (XCmd (HsWrap w cmd))
   = do { (env1, w') <- zonkCoFn env w
@@ -1092,18 +1092,18 @@ zonkArithSeq env (FromThenTo e1 e2 e3)
 
 -------------------------------------------------------------------------
 zonkStmts :: ZonkEnv
-          -> (ZonkEnv -> Located (body GhcTcId) -> TcM (Located (body GhcTc)))
-          -> [LStmt GhcTcId (Located (body GhcTcId))]
-          -> TcM (ZonkEnv, [LStmt GhcTc (Located (body GhcTc))])
+          -> (ZonkEnv -> LocatedA (body GhcTcId) -> TcM (LocatedA (body GhcTc)))
+          -> [LStmt GhcTcId (LocatedA (body GhcTcId))]
+          -> TcM (ZonkEnv, [LStmt GhcTc (LocatedA (body GhcTc))])
 zonkStmts env _ []     = return (env, [])
-zonkStmts env zBody (s:ss) = do { (env1, s')  <- wrapLocSndM (zonkStmt env zBody) s
+zonkStmts env zBody (s:ss) = do { (env1, s')  <- wrapLocSndMA (zonkStmt env zBody) s
                                 ; (env2, ss') <- zonkStmts env1 zBody ss
                                 ; return (env2, s' : ss') }
 
 zonkStmt :: ZonkEnv
-         -> (ZonkEnv -> Located (body GhcTcId) -> TcM (Located (body GhcTc)))
-         -> Stmt GhcTcId (Located (body GhcTcId))
-         -> TcM (ZonkEnv, Stmt GhcTc (Located (body GhcTc)))
+         -> (ZonkEnv -> LocatedA (body GhcTcId) -> TcM (LocatedA (body GhcTc)))
+         -> Stmt GhcTcId (LocatedA (body GhcTcId))
+         -> TcM (ZonkEnv, Stmt GhcTc (LocatedA (body GhcTc)))
 zonkStmt env _ (ParStmt bind_ty stmts_w_bndrs mzip_op bind_op)
   = do { (env1, new_bind_op) <- zonkSyntaxExpr env bind_op
        ; new_bind_ty <- zonkTcTypeToTypeX env1 bind_ty
@@ -1306,7 +1306,7 @@ zonkPat :: ZonkEnv -> LPat GhcTc -> TcM (ZonkEnv, LPat GhcTc)
 -- Extend the environment as we go, because it's possible for one
 -- pattern to bind something that is used in another (inside or
 -- to the right)
-zonkPat env pat = wrapLocSndM (zonk_pat env) pat
+zonkPat env pat = wrapLocSndMA (zonk_pat env) pat
 
 zonk_pat :: ZonkEnv -> Pat GhcTcId -> TcM (ZonkEnv, Pat GhcTc)
 zonk_pat env (ParPat x p)
@@ -1438,7 +1438,7 @@ zonk_pat env (NPlusKPat ty (L loc n) (L l lit1) lit2 e1 e2)
 
 zonk_pat env (XPat (CoPat co_fn pat ty))
   = do { (env', co_fn') <- zonkCoFn env co_fn
-       ; (env'', pat') <- zonkPat env' (noLoc pat)
+       ; (env'', pat') <- zonkPat env' (noLocA pat)
        ; ty' <- zonkTcTypeToTypeX env'' ty
        ; return (env'', XPat $ CoPat co_fn' (unLoc pat') ty')
        }
@@ -1496,7 +1496,7 @@ zonkForeignExport _ for_imp
   = return for_imp     -- Foreign imports don't need zonking
 
 zonkRules :: ZonkEnv -> [LRuleDecl GhcTcId] -> TcM [LRuleDecl GhcTc]
-zonkRules env rs = mapM (wrapLocM (zonkRule env)) rs
+zonkRules env rs = mapM (wrapLocMA (zonkRule env)) rs
 
 zonkRule :: ZonkEnv -> RuleDecl GhcTcId -> TcM (RuleDecl GhcTc)
 zonkRule env rule@(HsRule { rd_tmvs = tm_bndrs{-::[RuleBndr TcId]-}
