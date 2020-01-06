@@ -61,7 +61,7 @@ type LHsUnit n = Located (HsUnit n)
 -- | A declaration in a package, e.g. a module or signature definition,
 -- or an include.
 data HsUnitDecl n
-    = DeclD   HscSource (Located ModuleName) (Maybe (Located (HsModule GhcPs)))
+    = DeclD   HscSource (Located ModuleName) (Maybe (Located HsModule))
     | IncludeD   (IncludeDecl n)
 type LHsUnitDecl n = Located (HsUnitDecl n)
 

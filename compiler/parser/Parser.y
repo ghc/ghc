@@ -759,7 +759,7 @@ unitdecl :: { LHsUnitDecl PackageName }
 -- either, and DEPRECATED is only expected to be used by people who really
 -- know what they are doing. :-)
 
-signature :: { Located (HsModule GhcPs) }
+signature :: { Located HsModule }
        : maybedocheader 'signature' modid maybemodwarning maybeexports 'where' body
              {% fileSrcSpan >>= \ loc ->
                 ams (L loc (HsModule (Just $3) $5 (fst $ snd $7)
@@ -767,7 +767,7 @@ signature :: { Located (HsModule GhcPs) }
                     )
                     ([mj AnnSignature $2, mj AnnWhere $6] ++ fst $7) }
 
-module :: { Located (HsModule GhcPs) }
+module :: { Located HsModule }
        : maybedocheader 'module' modid maybemodwarning maybeexports 'where' body
              {% fileSrcSpan >>= \ loc ->
                 ams (L loc (HsModule (Just $3) $5 (fst $ snd $7)
@@ -824,7 +824,7 @@ top1    :: { ([LImportDecl GhcPs], [LHsDecl GhcPs]) }
 -----------------------------------------------------------------------------
 -- Module declaration & imports only
 
-header  :: { Located (HsModule GhcPs) }
+header  :: { Located HsModule }
         : maybedocheader 'module' modid maybemodwarning maybeexports 'where' header_body
                 {% fileSrcSpan >>= \ loc ->
                    ams (L loc (HsModule (Just $3) $5 $7 [] $4 $1

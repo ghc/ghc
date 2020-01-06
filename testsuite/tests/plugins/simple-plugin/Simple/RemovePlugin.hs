@@ -31,8 +31,8 @@ parsedPlugin [name, "parse"] _ pm
   = return $ pm { hpm_module = removeParsedBinding name (hpm_module pm) }
 parsedPlugin _ _ pm = return pm
 
-removeParsedBinding :: String -> Located (HsModule GhcPs)
-                         -> Located (HsModule GhcPs)
+removeParsedBinding :: String -> Located HsModule
+                         -> Located HsModule
 removeParsedBinding name (L l m)
   = (L l (m { hsmodDecls = filter (notNamedAs name) (hsmodDecls m) } ))
   where notNamedAs name (L _ (ValD _ (FunBind { fun_id = L _ fid })))
