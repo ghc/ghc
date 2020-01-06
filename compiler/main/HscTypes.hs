@@ -3098,7 +3098,7 @@ instance Binary IfaceTrustInfo where
 -}
 
 data HsParsedModule = HsParsedModule {
-    hpm_module    :: Located (HsModule GhcPs),
+    hpm_module    :: Located HsModule,
     hpm_src_files :: [FilePath],
        -- ^ extra source files (e.g. from #includes).  The lexer collects
        -- these from '# <file> <line>' pragmas, which the C preprocessor
