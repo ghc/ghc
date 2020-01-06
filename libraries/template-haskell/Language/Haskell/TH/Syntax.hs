@@ -852,7 +852,7 @@ instance Lift a => Lift [a] where
   liftTyped x = unsafeTExpCoerce (lift x)
   lift xs = do { xs' <- mapM lift xs; return (ListE xs') }
 
-liftString :: String -> Q Exp
+liftString :: Quote m => String -> m Exp
 -- Used in TcExpr to short-circuit the lifting for strings
 liftString s = return (LitE (StringL s))
 
