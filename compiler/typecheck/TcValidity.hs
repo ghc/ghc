@@ -525,8 +525,6 @@ vdqAllowed (ClassSCCtxt {}) = False
 vdqAllowed (SigmaCtxt {}) = False
 vdqAllowed (DataTyCtxt {}) = False
 vdqAllowed (DerivClauseCtxt {}) = False
--- MP: I am not sure
-vdqAllowed BracketCtxt = False
 
 {-
 Note [Correctness and performance of type synonym validity checking]
@@ -1350,8 +1348,6 @@ okIPCtxt (TyVarBndrKindCtxt {}) = False
 okIPCtxt (DataKindCtxt {})      = False
 okIPCtxt (TySynKindCtxt {})     = False
 okIPCtxt (TyFamResKindCtxt {})  = False
--- MP: Not sure
-okIPCtxt BracketCtxt            = False
 
 {-
 Note [Kind polymorphic type classes]

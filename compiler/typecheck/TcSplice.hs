@@ -214,10 +214,6 @@ tcUntypedBracket rn_expr brack ps res_ty
        -- splices.
        ; (brack_info, expected_type) <- brackTy brack
 
-       -- Unify the overall type of the bracket with the expected result
-       -- type
-       ; wrap <- tcSubTypeDS_NC_O BracketOrigin BracketCtxt (Just rn_expr) expected_type res_ty
-
        -- Match the expected type with the type of all the internal
        -- splices. They might have further constrained types and if they do
        -- we want to reflect that in the overall type of the bracket.
@@ -227,10 +223,13 @@ tcUntypedBracket rn_expr brack ps res_ty
 
        --
        ; traceTc "tc_bracket done untyped" (ppr expected_type)
-       -- Apply the type variable and quote evidence to the bracket, we
-       -- need to apply it to all the combinators manually as the core is
-       -- constructed by hand.
-       ; return $ mkHsWrap wrap $ HsTcBracketOut noExtField brack_info brack ps'
+
+       -- Unify the overall type of the bracket with the expected result
+       -- type
+       ; tcWrapResultO BracketOrigin rn_expr
+            (HsTcBracketOut noExtField brack_info brack ps')
+            expected_type res_ty
+
        }
 
 -- | A type variable with kind * -> * named "m"

@@ -111,7 +111,6 @@ data UserTypeCtxt
   | DataKindCtxt Name   -- The kind of a data/newtype (instance)
   | TySynKindCtxt Name  -- The kind of the RHS of a type synonym
   | TyFamResKindCtxt Name   -- The result kind of a type family
-  | BracketCtxt         -- An overloaded quotation [| e |]
 
 {-
 -- Notes re TySynCtxt
@@ -155,7 +154,6 @@ pprUserTypeCtxt (TyVarBndrKindCtxt n) = text "the kind annotation on the type va
 pprUserTypeCtxt (DataKindCtxt n)  = text "the kind annotation on the declaration for" <+> quotes (ppr n)
 pprUserTypeCtxt (TySynKindCtxt n) = text "the kind annotation on the declaration for" <+> quotes (ppr n)
 pprUserTypeCtxt (TyFamResKindCtxt n) = text "the result kind for" <+> quotes (ppr n)
-pprUserTypeCtxt (BracketCtxt)     = text "a quotation bracket"
 
 isSigMaybe :: UserTypeCtxt -> Maybe Name
 isSigMaybe (FunSigCtxt n _) = Just n
