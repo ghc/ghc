@@ -799,8 +799,11 @@ varStrictType = varBangType
 
 -- * Type Literals
 
--- MonadFail here complicates things (a lot)
-numTyLit :: (Quote m) => Integer -> m TyLit
+-- MonadFail here complicates things (a lot) because it would mean we would
+-- have to emit a MonadFail constraint during typechecking if there was any
+-- chance the desugaring would use numTyLit, which in general is hard to
+-- predict.
+numTyLit :: Quote m => Integer -> m TyLit
 numTyLit n = if n >= 0 then pure (NumTyLit n)
                        else error ("Negative type-level number: " ++ show n)
 

@@ -266,9 +266,8 @@ brackTy b =
         return (Just wrapper, final_ty)
   in
   case b of
-    -- These fields are never used
     (VarBr {}) -> (Nothing,) . flip mkTyConApp [] <$> tcLookupTyCon nameTyConName
-                                           -- Result type is Var (not Q-monadic)
+                                           -- Result type is Var (not Quote-monadic)
     (ExpBr {})  -> mkTy expTyConName  -- Result type is m Exp
     (TypBr {})  -> mkTy typeTyConName -- Result type is m Type
     (DecBrG {}) -> mkTy decsTyConName -- Result type is m [Dec]
