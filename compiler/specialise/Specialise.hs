@@ -2158,7 +2158,7 @@ pprCallInfo fn (CI { ci_key = key })
   = ppr fn <+> ppr key
 
 ppr_call_key_ty :: SpecArg -> Maybe SDoc
-ppr_call_key_ty (SpecType ty) = Just $ char '@' <+> pprParendType ty
+ppr_call_key_ty (SpecType ty) = Just $ char '@' <> pprParendType ty
 ppr_call_key_ty UnspecType    = Just $ char '_'
 ppr_call_key_ty (SpecDict _)  = Nothing
 ppr_call_key_ty UnspecArg     = Nothing

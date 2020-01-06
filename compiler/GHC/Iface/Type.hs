@@ -714,8 +714,8 @@ isIfaceTauType _ = True
 
 instance Outputable IfaceBndr where
     ppr (IfaceIdBndr bndr) = pprIfaceIdBndr bndr
-    ppr (IfaceTvBndr bndr) = char '@' <+> pprIfaceTvBndr bndr (SuppressBndrSig False)
-                                                              (UseBndrParens False)
+    ppr (IfaceTvBndr bndr) = char '@' <> pprIfaceTvBndr bndr (SuppressBndrSig False)
+                                                             (UseBndrParens False)
 
 pprIfaceBndrs :: [IfaceBndr] -> SDoc
 pprIfaceBndrs bs = sep (map ppr bs)

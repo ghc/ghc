@@ -46,7 +46,7 @@ $krep :: GHC.Types.KindRep
 [GblId, Unf=OtherCon []]
 $krep
   = GHC.Types.KindRepTyConApp
-      GHC.Types.$tcInt (GHC.Types.[] @ GHC.Types.KindRep)
+      GHC.Types.$tcInt (GHC.Types.[] @GHC.Types.KindRep)
 
 -- RHS size: {terms: 2, types: 0, coercions: 0, joins: 0/0}
 $krep1 :: GHC.Types.KindRep
@@ -80,7 +80,7 @@ $krep2 :: GHC.Types.KindRep
 [GblId, Unf=OtherCon []]
 $krep2
   = GHC.Types.KindRepTyConApp
-      Roles13.$tcAge (GHC.Types.[] @ GHC.Types.KindRep)
+      Roles13.$tcAge (GHC.Types.[] @GHC.Types.KindRep)
 
 -- RHS size: {terms: 3, types: 0, coercions: 0, joins: 0/0}
 $krep3 :: GHC.Types.KindRep
@@ -136,7 +136,7 @@ $krep4 :: [GHC.Types.KindRep]
 [GblId, Caf=NoCafRefs, Unf=OtherCon []]
 $krep4
   = GHC.Types.:
-      @ GHC.Types.KindRep $krep1 (GHC.Types.[] @ GHC.Types.KindRep)
+      @GHC.Types.KindRep $krep1 (GHC.Types.[] @GHC.Types.KindRep)
 
 -- RHS size: {terms: 3, types: 0, coercions: 0, joins: 0/0}
 $krep5 :: GHC.Types.KindRep

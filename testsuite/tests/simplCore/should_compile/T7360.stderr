@@ -47,22 +47,22 @@ fun2 :: forall a. [a] -> ((), Int)
  Unf=Unf{Src=InlineStable, TopLvl=True, Value=True, ConLike=True,
          WorkFree=True, Expandable=True,
          Guidance=ALWAYS_IF(arity=1,unsat_ok=True,boring_ok=False)
-         Tmpl= \ (@ a) (x [Occ=Once!] :: [a]) ->
+         Tmpl= \ (@a) (x [Occ=Once!] :: [a]) ->
                  (T7360.fun5,
                   case x of wild [Occ=Once] {
                     [] -> T7360.fun4;
                     : _ [Occ=Dead] _ [Occ=Dead] ->
-                      case GHC.List.$wlenAcc @ a wild 0# of ww2 [Occ=Once] { __DEFAULT ->
+                      case GHC.List.$wlenAcc @a wild 0# of ww2 [Occ=Once] { __DEFAULT ->
                       GHC.Types.I# ww2
                       }
                   })}]
 fun2
-  = \ (@ a) (x :: [a]) ->
+  = \ (@a) (x :: [a]) ->
       (T7360.fun5,
        case x of wild {
          [] -> T7360.fun4;
          : ds ds1 ->
-           case GHC.List.$wlenAcc @ a wild 0# of ww2 { __DEFAULT ->
+           case GHC.List.$wlenAcc @a wild 0# of ww2 { __DEFAULT ->
            GHC.Types.I# ww2
            }
        })
@@ -116,7 +116,7 @@ $krep :: GHC.Types.KindRep
 [GblId, Caf=NoCafRefs, Str=m1, Unf=OtherCon []]
 $krep
   = GHC.Types.KindRepTyConApp
-      GHC.Types.$tcInt (GHC.Types.[] @ GHC.Types.KindRep)
+      GHC.Types.$tcInt (GHC.Types.[] @GHC.Types.KindRep)
 
 -- RHS size: {terms: 1, types: 0, coercions: 0, joins: 0/0}
 T7360.$tcFoo2 :: GHC.Prim.Addr#
@@ -156,7 +156,7 @@ T7360.$tc'Foo4 [InlPrag=NOUSERINLINE[~]] :: GHC.Types.KindRep
 [GblId, Caf=NoCafRefs, Str=m1, Unf=OtherCon []]
 T7360.$tc'Foo4
   = GHC.Types.KindRepTyConApp
-      T7360.$tcFoo (GHC.Types.[] @ GHC.Types.KindRep)
+      T7360.$tcFoo (GHC.Types.[] @GHC.Types.KindRep)
 
 -- RHS size: {terms: 1, types: 0, coercions: 0, joins: 0/0}
 T7360.$tc'Foo6 :: GHC.Prim.Addr#

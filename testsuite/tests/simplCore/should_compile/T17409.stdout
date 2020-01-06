@@ -1,2 +1,2 @@
-      f = \ (x :: Bool) -> not (id @ Bool x); } in
-f = \ (x :: Bool) -> not (id @ Bool x)
+      f = \ (x :: Bool) -> not (id @Bool x); } in
+f = \ (x :: Bool) -> not (id @Bool x)
