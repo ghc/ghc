@@ -1341,7 +1341,6 @@ dnl doc/users_guide/ghc_config.py.in.
 LIBRARY_VERSION(base)
 LIBRARY_VERSION(Cabal, Cabal/Cabal)
 LIBRARY_VERSION(template-haskell)
-LIBRARY_VERSION(parallel)
 LIBRARY_VERSION(array)
 LIBRARY_VERSION(ghc-prim)
 LIBRARY_VERSION(ghc-compact)
