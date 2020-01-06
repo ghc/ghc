@@ -11,14 +11,14 @@ T2431.$WRefl [InlPrag=INLINE[0]] :: forall a. a :~: a
  Unf=Unf{Src=InlineStable, TopLvl=True, Value=True, ConLike=True,
          WorkFree=True, Expandable=True,
          Guidance=ALWAYS_IF(arity=0,unsat_ok=True,boring_ok=True)
-         Tmpl= \ (@ a) -> T2431.Refl @ a @ a @~ (<a>_N :: a GHC.Prim.~# a)}]
+         Tmpl= \ (@a) -> T2431.Refl @a @a @~(<a>_N :: a GHC.Prim.~# a)}]
 T2431.$WRefl
-  = \ (@ a) -> T2431.Refl @ a @ a @~ (<a>_N :: a GHC.Prim.~# a)
+  = \ (@a) -> T2431.Refl @a @a @~(<a>_N :: a GHC.Prim.~# a)
 
 -- RHS size: {terms: 4, types: 8, coercions: 0, joins: 0/0}
 absurd :: forall a. (Int :~: Bool) -> a
 [GblId, Arity=1, Caf=NoCafRefs, Str=<L,U>b, Unf=OtherCon []]
-absurd = \ (@ a) (x :: Int :~: Bool) -> case x of { }
+absurd = \ (@a) (x :: Int :~: Bool) -> case x of { }
 
 -- RHS size: {terms: 1, types: 0, coercions: 0, joins: 0/0}
 $trModule1 :: GHC.Prim.Addr#
@@ -77,12 +77,12 @@ $krep1 :: [GHC.Types.KindRep]
 [GblId, Caf=NoCafRefs, Unf=OtherCon []]
 $krep1
   = GHC.Types.:
-      @ GHC.Types.KindRep $krep (GHC.Types.[] @ GHC.Types.KindRep)
+      @GHC.Types.KindRep $krep (GHC.Types.[] @GHC.Types.KindRep)
 
 -- RHS size: {terms: 3, types: 1, coercions: 0, joins: 0/0}
 $krep2 :: [GHC.Types.KindRep]
 [GblId, Caf=NoCafRefs, Unf=OtherCon []]
-$krep2 = GHC.Types.: @ GHC.Types.KindRep $krep $krep1
+$krep2 = GHC.Types.: @GHC.Types.KindRep $krep $krep1
 
 -- RHS size: {terms: 3, types: 0, coercions: 0, joins: 0/0}
 $krep3 :: GHC.Types.KindRep

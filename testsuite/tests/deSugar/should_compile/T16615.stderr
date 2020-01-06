@@ -19,8 +19,8 @@ g :: Int -> Bool
  Unf=Unf{Src=<vanilla>, TopLvl=True, Value=True, ConLike=True,
          WorkFree=True, Expandable=True, Guidance=IF_ARGS [0] 120 10}]
 g = \ (i :: Int) ->
-      case == @ Int GHC.Classes.$fEqInt i (GHC.Types.I# 0#) of {
-        False -> f (pred @ Int GHC.Enum.$fEnumInt i);
+      case == @Int GHC.Classes.$fEqInt i (GHC.Types.I# 0#) of {
+        False -> f (pred @Int GHC.Enum.$fEnumInt i);
         True -> GHC.Types.False
       }
 
@@ -30,8 +30,8 @@ f [Occ=LoopBreaker] :: Int -> Bool
  Unf=Unf{Src=<vanilla>, TopLvl=True, Value=True, ConLike=True,
          WorkFree=True, Expandable=True, Guidance=IF_ARGS [0] 120 10}]
 f = \ (i :: Int) ->
-      case == @ Int GHC.Classes.$fEqInt i (GHC.Types.I# 0#) of {
-        False -> g (pred @ Int GHC.Enum.$fEnumInt i);
+      case == @Int GHC.Classes.$fEqInt i (GHC.Types.I# 0#) of {
+        False -> g (pred @Int GHC.Enum.$fEnumInt i);
         True -> GHC.Types.True
       }
 end Rec }

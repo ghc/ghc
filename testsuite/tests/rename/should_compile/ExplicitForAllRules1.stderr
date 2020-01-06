@@ -2,12 +2,12 @@
 ExplicitForAllRules1.hs:49:11: warning:
     Forall'd type variable ‘k’ is not bound in RULE lhs
       Orig bndrs: [k, a, b, x]
-      Orig lhs: id' @ a x
-      optimised lhs: id' @ a x
+      Orig lhs: id' @a x
+      optimised lhs: id' @a x
     Forall'd type variable ‘b’ is not bound in RULE lhs
       Orig bndrs: [k, a, b, x]
-      Orig lhs: id' @ a x
-      optimised lhs: id' @ a x
+      Orig lhs: id' @a x
+      optimised lhs: id' @a x
 
 ExplicitForAllRules1.hs:49:31: warning: [-Wunused-foralls (in -Wextra)]
     Unused quantified type variable ‘b’

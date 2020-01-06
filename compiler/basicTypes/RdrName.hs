@@ -280,7 +280,7 @@ instance Outputable RdrName where
 
 instance OutputableBndr RdrName where
     pprBndr _ n
-        | isTvOcc (rdrNameOcc n) = char '@' <+> ppr n
+        | isTvOcc (rdrNameOcc n) = char '@' <> ppr n
         | otherwise              = ppr n
 
     pprInfixOcc  rdr = pprInfixVar  (isSymOcc (rdrNameOcc rdr)) (ppr rdr)
