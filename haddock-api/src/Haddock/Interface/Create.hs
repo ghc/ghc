@@ -540,9 +540,10 @@ topDecls =
 
 -- | Extract a map of fixity declarations only
 mkFixMap :: HsGroup GhcRn -> FixMap
-mkFixMap group_ = M.fromList [ (n,f)
-                             | L _ (FixitySig _ ns f) <- hs_fixds group_,
-                               L _ n <- ns ]
+mkFixMap group_ =
+  M.fromList [ (n,f)
+             | L _ (FixitySig _ ns f) <- hsGroupTopLevelFixitySigs group_,
+               L _ n <- ns ]
 
 
 -- | Take all declarations except pragmas, infix decls, rules from an 'HsGroup'.
