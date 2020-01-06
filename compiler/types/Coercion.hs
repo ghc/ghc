@@ -529,7 +529,7 @@ mkRuntimeRepCo co
     kind_co = mkKindCo co  -- kind_co :: TYPE r1 ~ TYPE r2
                            -- (up to silliness with Constraint)
 
-isReflCoVar_maybe :: Var -> Maybe Coercion
+isReflCoVar_maybe ::  HasCallStack => Var -> Maybe Coercion
 -- If cv :: t~t then isReflCoVar_maybe cv = Just (Refl t)
 -- Works on all kinds of Vars, not just CoVars
 isReflCoVar_maybe cv
@@ -572,19 +572,19 @@ isGReflCo_maybe _ = Nothing
 -- | Returns the type coerced if this coercion is reflexive. Guaranteed
 -- to work very quickly. Sometimes a coercion can be reflexive, but not
 -- obviously so. c.f. 'isReflexiveCo_maybe'
-isReflCo_maybe :: Coercion -> Maybe (Type, Role)
+isReflCo_maybe ::   HasCallStack => Coercion -> Maybe (Type, Role)
 isReflCo_maybe (Refl ty) = Just (ty, Nominal)
 isReflCo_maybe (GRefl r ty mco) | isGReflMCo mco = Just (ty, r)
 isReflCo_maybe _ = Nothing
 
 -- | Slowly checks if the coercion is reflexive. Don't call this in a loop,
 -- as it walks over the entire coercion.
-isReflexiveCo :: Coercion -> Bool
+isReflexiveCo ::  HasCallStack => Coercion -> Bool
 isReflexiveCo = isJust . isReflexiveCo_maybe
 
 -- | Extracts the coerced type from a reflexive coercion. This potentially
 -- walks over the entire coercion, so avoid doing this in a loop.
-isReflexiveCo_maybe :: Coercion -> Maybe (Type, Role)
+isReflexiveCo_maybe ::  HasCallStack => Coercion -> Maybe (Type, Role)
 isReflexiveCo_maybe (Refl ty) = Just (ty, Nominal)
 isReflexiveCo_maybe (GRefl r ty mco) | isGReflMCo mco = Just (ty, r)
 isReflexiveCo_maybe co
@@ -2300,14 +2300,14 @@ seqCos (co:cos) = seqCo co `seq` seqCos cos
 -}
 
 -- | Apply 'coercionKind' to multiple 'Coercion's
-coercionKinds :: [Coercion] -> Pair [Type]
+coercionKinds ::  HasCallStack => [Coercion] -> Pair [Type]
 coercionKinds tys = sequenceA $ map coercionKind tys
 
 -- | Get a coercion's kind and role.
-coercionKindRole :: Coercion -> (Pair Type, Role)
+coercionKindRole ::  HasCallStack => Coercion -> (Pair Type, Role)
 coercionKindRole co = (coercionKind co, coercionRole co)
 
-coercionType :: Coercion -> Type
+coercionType :: HasCallStack => Coercion -> Type
 coercionType co = case coercionKindRole co of
   (Pair ty1 ty2, r) -> mkCoercionType r ty1 ty2
 
@@ -2318,10 +2318,10 @@ coercionType co = case coercionKindRole co of
 --
 -- i.e. the kind of @c@ relates @t1@ and @t2@, then @coercionKind c = Pair t1 t2@.
 
-coercionKind :: Coercion -> Pair Type
+coercionKind :: HasCallStack => Coercion -> Pair Type
 coercionKind co = Pair (coercionLKind co) (coercionRKind co)
 
-coercionLKind :: Coercion -> Type
+coercionLKind ::  HasCallStack => Coercion -> Type
 coercionLKind co
   = go co
   where
@@ -2363,7 +2363,7 @@ coercionLKind co
     go_app (InstCo co arg) args = go_app co (go arg:args)
     go_app co              args = piResultTys (go co) args
 
-go_nth :: Int -> Type -> Type
+go_nth :: HasCallStack => Int -> Type -> Type
 go_nth d ty
   | Just args <- tyConAppArgs_maybe ty
   = ASSERT( args `lengthExceeds` d )
@@ -2376,7 +2376,7 @@ go_nth d ty
   | otherwise
   = pprPanic "coercionLKind:nth" (ppr d <+> ppr ty)
 
-coercionRKind :: Coercion -> Type
+coercionRKind :: HasCallStack => Coercion -> Type
 coercionRKind co
   = go co
   where

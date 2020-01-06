@@ -7,7 +7,6 @@ import HscTypes         ( ModGuts(..) )
 import Coercion
 import CoreMonad        ( CoreM )
 import DynFlags
-import TyCoRep (Coercion(..))
 {-
 Top-level interface function, @eraseCoercionProgram@.
 

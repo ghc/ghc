@@ -35,9 +35,9 @@ mkSubCo :: HasCallStack => Coercion -> Coercion
 mkProofIrrelCo :: Role -> Coercion -> Coercion -> Coercion -> Coercion
 mkAxiomRuleCo :: CoAxiomRule -> [Coercion] -> Coercion
 
-isGReflCo :: Coercion -> Bool
-isReflCo :: Coercion -> Bool
-isReflexiveCo :: Coercion -> Bool
+isGReflCo ::  Coercion -> Bool
+isReflCo ::   Coercion -> Bool
+isReflexiveCo ::  HasCallStack =>Coercion -> Bool
 decomposePiCos :: HasDebugCallStack => Coercion -> Pair Type -> [Type] -> ([Coercion], Coercion)
 coVarKindsTypesRole :: HasDebugCallStack => CoVar -> (Kind, Kind, Type, Type, Role)
 coVarRole :: CoVar -> Role
@@ -48,7 +48,7 @@ data LiftingContext
 liftCoSubst :: HasDebugCallStack => Role -> LiftingContext -> Type -> Coercion
 seqCo :: Coercion -> ()
 
-coercionKind :: Coercion -> Pair Type
-coercionLKind :: Coercion -> Type
-coercionRKind :: Coercion -> Type
-coercionType :: Coercion -> Type
+coercionKind ::  HasCallStack =>Coercion -> Pair Type
+coercionLKind ::  HasCallStack =>Coercion -> Type
+coercionRKind ::  HasCallStack =>Coercion -> Type
+coercionType ::  HasCallStack => Coercion -> Type

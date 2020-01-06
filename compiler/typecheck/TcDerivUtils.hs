@@ -51,7 +51,7 @@ import THNames (liftClassKey)
 import TyCon
 import TyCoPpr (pprSourceTyCon)
 import Type
-import Util
+-- import Util
 import VarSet
 
 import Control.Monad.Trans.Reader
