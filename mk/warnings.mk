@@ -15,7 +15,7 @@ SRC_HC_OPTS_STAGE2 += $(WERROR)
 # core libraries to build in this configuration (see #13636).
 GhcRtsHcOpts    += -Wcpp-undef
 GhcStage1HcOpts += -Wcpp-undef
-GhcStage2HcOpts += -Wcpp-undef
+GhcStage2HcOpts += -Wcpp-undef -Wincomplete-uni-patterns -Wincomplete-record-updates
 
 ifneq "$(CcLlvmBackend)" "YES"
 
