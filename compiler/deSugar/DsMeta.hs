@@ -87,6 +87,8 @@ data MetaWrappers = MetaWrappers {
     , metaTy :: Type -> Type
     }
 
+-- | Construct the functions which will apply the relevant part of the
+-- QuoteWrapper to identifiers during desugaring.
 mkMetaWrappers :: QuoteWrapper -> DsM MetaWrappers
 mkMetaWrappers (QuoteWrapper quote_var_raw m_var) = do
       let quote_var = Var quote_var_raw
