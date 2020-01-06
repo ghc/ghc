@@ -10,14 +10,24 @@
 --   * Is compiled with -XNoImplicitPrelude
 --   * Explicitly imports GhcPrelude
 
-module GhcPrelude (module X) where
+module GhcPrelude (module X, (!!)) where
 
 -- We export the 'Semigroup' class but w/o the (<>) operator to avoid
 -- clashing with the (Outputable.<>) operator which is heavily used
 -- through GHC's code-base.
 
-import Prelude as X hiding ((<>))
+import Prelude as X hiding ((<>),(!!))
 import Data.Foldable as X (foldl')
+import GHC.Stack.Types as X ( HasCallStack )
+
+infixl 9  !!
+
+(!!) :: HasCallStack =>  [a] -> Int -> a
+xs     !! n | n < 0 =  error "Prelude.!!: negative index"
+[]     !! _         =  error "Prelude.!!: index too large"
+(x:_)  !! 0         =  x
+(_:xs) !! n         =  xs !! (n-1)
+
 
 {-
 Note [Why do we import Prelude here?]

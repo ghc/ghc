@@ -28,14 +28,20 @@ import GhcPrelude
 import Outputable
 import Util
 
-import Data.List
+import Data.List hiding ((!!))
 import qualified Data.List.NonEmpty as NE
 import Data.List.NonEmpty (NonEmpty(..))
 import qualified Data.Set as S
 
+import GHC.Stack.Types ( HasCallStack )
+
+
+
 getNth :: HasCallStack => Outputable a => [a] -> Int -> a
 getNth xs n = ASSERT2( xs `lengthExceeds` n, ppr n $$ ppr xs )
              xs !! n
+
+
 
 deleteBys :: (a -> a -> Bool) -> [a] -> [a] -> [a]
 -- (deleteBys eq xs ys) returns xs-ys, using the given equality function
