@@ -575,6 +575,7 @@ isGReflCo_maybe _ = Nothing
 isReflCo_maybe ::   HasCallStack => Coercion -> Maybe (Type, Role)
 isReflCo_maybe (Refl ty) = Just (ty, Nominal)
 isReflCo_maybe (GRefl r ty mco) | isGReflMCo mco = Just (ty, r)
+isReflCo_maybe (UnivCo ErasedProv r t1 t2) | t1 `eqType` t2 = Just (t1,r)
 isReflCo_maybe _ = Nothing
 
 -- | Slowly checks if the coercion is reflexive. Don't call this in a loop,
@@ -587,6 +588,9 @@ isReflexiveCo = isJust . isReflexiveCo_maybe
 isReflexiveCo_maybe ::  HasCallStack => Coercion -> Maybe (Type, Role)
 isReflexiveCo_maybe (Refl ty) = Just (ty, Nominal)
 isReflexiveCo_maybe (GRefl r ty mco) | isGReflMCo mco = Just (ty, r)
+isReflexiveCo_maybe (UnivCo ErasedProv r t1 t2)
+  | t1 `eqType` t2 = Just (t1,r)
+  | otherwise = Nothing
 isReflexiveCo_maybe co
   | ty1 `eqType` ty2
   = Just (ty1, r)
@@ -977,7 +981,7 @@ mkSymCo :: Coercion -> Coercion
 mkSymCo co | isReflCo co          = co
 mkSymCo    (SymCo co)             = co
 mkSymCo    (SubCo (SymCo co))     = SubCo co
--- mkSymCo (UnivCo ErasedProv r lt rt)  = mkUnivCo ErasedProv r rt lt
+mkSymCo (UnivCo ErasedProv r lt rt)  = mkUnivCo ErasedProv r rt lt
 mkSymCo co                        = SymCo co
 
 -- | Create a new 'Coercion' by composing the two given 'Coercion's transitively.
@@ -987,14 +991,14 @@ mkTransCo co1 co2 | isReflCo co1 = co2
                   | isReflCo co2 = co1
 mkTransCo (GRefl r t1 (MCo co1)) (GRefl _ _ (MCo co2))
   = GRefl r t1 (MCo $ mkTransCo co1 co2)
--- mkTransCo (UnivCo ErasedProv  r t1a _t1b) (UnivCo ErasedProv _ _t2a t2b)
---   = mkUnivCo ErasedProv r t1a t2b
--- mkTransCo (UnivCo ErasedProv r t1a _t1b) co2
---   = mkUnivCo ErasedProv r t1a t2b
---   where Pair _t2a t2b = coercionKind co2
--- mkTransCo co1 (UnivCo ErasedProv r _t2a t2b)
---   = mkUnivCo ErasedProv r t1a t2b
---   where Pair t1a _t1b = coercionKind co1
+mkTransCo (UnivCo ErasedProv  r t1a _t1b)
+          (UnivCo ErasedProv _ _t2a t2b) = mkUnivCo ErasedProv r t1a t2b
+mkTransCo (UnivCo ErasedProv r t1a _t1b)
+           co2                           = mkUnivCo ErasedProv r t1a t2b
+  where Pair _t2a t2b = coercionKind co2
+mkTransCo co1
+          (UnivCo ErasedProv r _t2a t2b) = mkUnivCo ErasedProv r t1a t2b
+  where Pair t1a _t1b = coercionKind co1
 mkTransCo co1 co2                 = TransCo co1 co2
 
 

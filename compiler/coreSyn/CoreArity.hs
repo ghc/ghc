@@ -493,7 +493,7 @@ vanillaArityType = ATop []      -- Totally uninformative
 
 -- ^ The Arity returned is the number of value args the
 -- expression can be applied to without doing much work
-exprEtaExpandArity :: DynFlags -> CoreExpr -> Arity
+exprEtaExpandArity :: HasCallStack =>  DynFlags -> CoreExpr -> Arity
 -- exprEtaExpandArity is used when eta expanding
 --      e  ==>  \xy -> e x y
 exprEtaExpandArity dflags e
@@ -734,7 +734,7 @@ data ArityEnv
        , ae_ped_bot  :: Bool       -- True <=> be pedantic about bottoms
   }
 
-arityType :: ArityEnv -> CoreExpr -> ArityType
+arityType ::  HasCallStack => ArityEnv -> CoreExpr -> ArityType
 
 arityType env (Cast e co)
   = case arityType env e of

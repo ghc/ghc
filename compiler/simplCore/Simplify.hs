@@ -1284,11 +1284,15 @@ simplCast :: SimplEnv -> InExpr -> Coercion -> SimplCont
 simplCast env body co0 cont0
   = do  { co1   <- {-#SCC "simplCast-simplCoercion" #-} simplCoercion env co0
         ; cont1 <- {-#SCC "simplCast-addCoerce" #-}
-                   if isReflCo co1
+                   if isReflCo co1  -- This or causes panics :)  || mustEraseCoercions
                    then return cont0  -- See Note [Optimising reflexivity]
                    else addCoerce co1 cont0
         ; {-#SCC "simplCast-simplExprF" #-} simplExprF env body cont1 }
   where
+        mustEraseCoercions :: Bool
+        mustEraseCoercions = shouldEraseCoercions $ seDynFlags env
+        --- this is mostly about nuking , works around a bug
+        --- but also the WRONG fix :)
         -- If the first parameter is MRefl, then simplifying revealed a
         -- reflexive coercion. Omit.
         addCoerceM :: MOutCoercion -> SimplCont -> SimplM SimplCont

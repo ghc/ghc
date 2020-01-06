@@ -108,7 +108,7 @@ import UniqSet
 ************************************************************************
 -}
 
-exprType :: CoreExpr -> Type
+exprType :: HasCallStack =>  CoreExpr -> Type
 -- ^ Recover the type of a well-typed Core expression. Fails when
 -- applied to the actual 'CoreSyn.Type' expression as it cannot
 -- really be said to have a type
@@ -221,7 +221,7 @@ Note that there might be existentially quantified coercion variables, too.
 -}
 
 -- Not defined with applyTypeToArg because you can't print from CoreSyn.
-applyTypeToArgs :: CoreExpr -> Type -> [CoreExpr] -> Type
+applyTypeToArgs :: HasCallStack =>  CoreExpr -> Type -> [CoreExpr] -> Type
 -- ^ A more efficient version of 'applyTypeToArg' when we have several arguments.
 -- The first argument is just for debugging, and gives some context
 applyTypeToArgs e op_ty args
@@ -1050,7 +1050,7 @@ also CoreArity.exprBotStrictness_maybe, but that's a bit more
 expensive.
 -}
 
-exprIsBottom :: CoreExpr -> Bool
+exprIsBottom :: HasCallStack => CoreExpr -> Bool
 -- See Note [Bottoming expressions]
 exprIsBottom e
   | isEmptyTy (exprType e)
