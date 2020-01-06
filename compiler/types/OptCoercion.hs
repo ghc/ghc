@@ -110,7 +110,7 @@ optCoercion :: DynFlags -> TCvSubst -> Coercion -> NormalCo
 --   *and* optimises it to reduce its size
 optCoercion dflags env co
   | hasNoOptCoercion dflags
-    || shouldEraseCoercion dflags --- this isnt the right fix :) TODO REVERT
+    || shouldEraseCoercions dflags --- this isnt the right fix :) TODO REVERT
          = substCo env co
   | otherwise               = optCoercion' env co
 
