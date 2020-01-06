@@ -183,7 +183,7 @@ tcRnExports explicit_mod exports
         ; let real_exports
                  | explicit_mod = exports
                  | has_main
-                          = Just (noLoc [noLoc (IEVar noExtField
+                          = Just (noLoc [noLoc (IEVar noAnn
                                      (noLoc (IEName $ noLoc default_main)))])
                         -- ToDo: the 'noLoc' here is unhelpful if 'main'
                         --       turns out to be out of scope

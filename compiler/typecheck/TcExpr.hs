@@ -245,9 +245,9 @@ tcExpr e@(HsOverLabel _ mb_fromLabel l) res_ty
          (L loc (HsVar noExtField (L loc fromLabel)))
          (mkEmptyWildCardBndrs (L loc (HsTyLit noExtField (HsStrTy NoSourceText l))))
 
-tcExpr (HsLam x match) res_ty
+tcExpr (HsLam _ match) res_ty
   = do  { (match', wrap) <- tcMatchLambda herald match_ctxt match res_ty
-        ; return (mkHsWrap wrap (HsLam x match')) }
+        ; return (mkHsWrap wrap (HsLam noExtField match')) }
   where
     match_ctxt = MC { mc_what = LambdaExpr, mc_body = tcBody }
     herald = sep [ text "The lambda expression" <+>

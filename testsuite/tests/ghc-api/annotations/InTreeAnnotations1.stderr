@@ -30,8 +30,8 @@
             (NoSrcStrict))
            [({ InTreeAnnotations1.hs:4:5-11 }
              (AsPat
-              (AA
-               [(AddAnn
+              (ApiAnn
+               [(AddApiAnn
                  (AnnAt)
                  { InTreeAnnotations1.hs:4:6 })])
               ({ InTreeAnnotations1.hs:4:5 }
@@ -39,11 +39,11 @@
                 {OccName: a}))
               ({ InTreeAnnotations1.hs:4:7-11 }
                (TuplePat
-                (AA
-                 [(AddAnn
+                (ApiAnn
+                 [(AddApiAnn
                    (AnnOpenP)
                    { InTreeAnnotations1.hs:4:7 })
-                 ,(AddAnn
+                 ,(AddApiAnn
                    (AnnCloseP)
                    { InTreeAnnotations1.hs:4:11 })])
                 [({ InTreeAnnotations1.hs:4:8 }
@@ -55,8 +55,8 @@
                 (Boxed)))))
            ,({ InTreeAnnotations1.hs:4:13-16 }
              (BangPat
-              (AA
-               [(AddAnn
+              (ApiAnn
+               [(AddApiAnn
                  (AnnBang)
                  { InTreeAnnotations1.hs:4:13 })])
               ({ InTreeAnnotations1.hs:4:14-16 }
@@ -68,8 +68,8 @@
                  {FastString: "a"})))))
            ,({ InTreeAnnotations1.hs:4:18-19 }
              (LazyPat
-              (AA
-               [(AddAnn
+              (ApiAnn
+               [(AddApiAnn
                  (AnnTilde)
                  { InTreeAnnotations1.hs:4:18 })])
               ({ InTreeAnnotations1.hs:4:19 }
@@ -100,7 +100,13 @@
     (TyClD
      (NoExtField)
      (DataDecl
-      (NoExtField)
+      (ApiAnn
+       [(AddApiAnn
+         (AnnData)
+         { InTreeAnnotations1.hs:6:1-4 })
+       ,(AddApiAnn
+         (AnnEqual)
+         { InTreeAnnotations1.hs:6:8 })])
       ({ InTreeAnnotations1.hs:6:6 }
        (Unqual
         {OccName: T}))
@@ -178,6 +184,13 @@
               (NoExtField)
               ({ InTreeAnnotations1.hs:8:4-34 }
                (ConPatIn
+                (ApiAnn
+                 [(AddApiAnn
+                   (AnnOpenC)
+                   { InTreeAnnotations1.hs:8:8 })
+                 ,(AddApiAnn
+                   (AnnCloseC)
+                   { InTreeAnnotations1.hs:8:34 })])
                 ({ InTreeAnnotations1.hs:8:4-6 }
                  (Unqual
                   {OccName: MkT}))
@@ -193,8 +206,8 @@
                          {OccName: x}))))
                      ({ InTreeAnnotations1.hs:8:14-15 }
                       (BangPat
-                       (AA
-                        [(AddAnn
+                       (ApiAnn
+                        [(AddApiAnn
                           (AnnBang)
                           { InTreeAnnotations1.hs:8:14 })])
                        ({ InTreeAnnotations1.hs:8:15 }
@@ -214,8 +227,8 @@
                          {OccName: y}))))
                      ({ InTreeAnnotations1.hs:8:22-32 }
                       (ViewPat
-                       (AA
-                        [(AddAnn
+                       (ApiAnn
+                        [(AddApiAnn
                           (AnnRarrow)
                           { InTreeAnnotations1.hs:8:29-30 })])
                        ({ InTreeAnnotations1.hs:8:22-27 }
@@ -240,7 +253,10 @@
                []
                ({ InTreeAnnotations1.hs:8:39-43 }
                 (OpApp
-                 (NoExtField)
+                 (ApiAnn
+                  [(AddApiAnn
+                    (AnnVal)
+                    { InTreeAnnotations1.hs:8:41 })])
                  ({ InTreeAnnotations1.hs:8:39 }
                   (HsVar
                    (NoExtField)

@@ -502,10 +502,10 @@ tidy_bang_pat v o _ (SigPat _ (L l p) _) = tidy_bang_pat v o l p
 
 -- Push the bang-pattern inwards, in the hope that
 -- it may disappear next time
-tidy_bang_pat v o l (AsPat x v' p)
-  = tidy1 v o (AsPat x v' (L l (BangPat noAnn p)))
+tidy_bang_pat v o l (AsPat _ v' p)
+  = tidy1 v o (AsPat noExtField v' (L l (BangPat noExtField p)))
 tidy_bang_pat v o l (CoPat x w p t)
-  = tidy1 v o (CoPat x w (BangPat noAnn (L l p)) t)
+  = tidy1 v o (CoPat x w (BangPat noExtField (L l p)) t)
 
 -- Discard bang around strict pattern
 tidy_bang_pat v o _ p@(LitPat {})    = tidy1 v o p
@@ -540,7 +540,7 @@ tidy_bang_pat v o l p@(ConPatOut { pat_con = L _ (RealDataCon dc)
 --
 -- NB: SigPatIn, ConPatIn should not happen
 
-tidy_bang_pat _ _ l p = return (idDsWrapper, BangPat noAnn (L l p))
+tidy_bang_pat _ _ l p = return (idDsWrapper, BangPat noExtField (L l p))
 
 -------------------
 push_bang_into_newtype_arg :: SrcSpan
@@ -551,16 +551,16 @@ push_bang_into_newtype_arg :: SrcSpan
 -- We are transforming   !(N p)   into   (N !p)
 push_bang_into_newtype_arg l _ty (PrefixCon (arg:args))
   = ASSERT( null args)
-    PrefixCon [L l (BangPat noAnn arg)]
+    PrefixCon [L l (BangPat noExtField arg)]
 push_bang_into_newtype_arg l _ty (RecCon rf)
   | HsRecFields { rec_flds = L lf fld : flds } <- rf
   , HsRecField { hsRecFieldArg = arg } <- fld
   = ASSERT( null flds)
     RecCon (rf { rec_flds = [L lf (fld { hsRecFieldArg
-                                           = L l (BangPat noAnn arg) })] })
+                                           = L l (BangPat noExtField arg) })] })
 push_bang_into_newtype_arg l ty (RecCon rf) -- If a user writes !(T {})
   | HsRecFields { rec_flds = [] } <- rf
-  = PrefixCon [L l (BangPat noAnn (noLoc (WildPat ty)))]
+  = PrefixCon [L l (BangPat noExtField (noLoc (WildPat ty)))]
 push_bang_into_newtype_arg _ _ cd
   = pprPanic "push_bang_into_newtype_arg" (pprConArgs cd)
 

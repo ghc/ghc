@@ -1827,10 +1827,10 @@ rnLDerivStrategy doc mds thing_inside
         failWith $ illegalDerivStrategyErr ds
 
       case ds of
-        StockStrategy    -> boring_case StockStrategy
-        AnyclassStrategy -> boring_case AnyclassStrategy
-        NewtypeStrategy  -> boring_case NewtypeStrategy
-        ViaStrategy via_ty ->
+        StockStrategy    _ -> boring_case (StockStrategy noExtField)
+        AnyclassStrategy _ -> boring_case (AnyclassStrategy noExtField)
+        NewtypeStrategy  _ -> boring_case (NewtypeStrategy noExtField)
+        ViaStrategy (XViaStrategyPs _ via_ty) ->
           do (via_ty', fvs1) <- rnHsSigType doc TypeLevel via_ty
              let HsIB { hsib_ext  = via_imp_tvs
                       , hsib_body = via_body } = via_ty'

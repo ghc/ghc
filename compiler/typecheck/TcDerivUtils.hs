@@ -263,9 +263,9 @@ data DerivSpecMechanism
 
 -- | Convert a 'DerivSpecMechanism' to its corresponding 'DerivStrategy'.
 derivSpecMechanismToStrategy :: DerivSpecMechanism -> DerivStrategy GhcTc
-derivSpecMechanismToStrategy DerivSpecStock{}               = StockStrategy
-derivSpecMechanismToStrategy DerivSpecNewtype{}             = NewtypeStrategy
-derivSpecMechanismToStrategy DerivSpecAnyClass              = AnyclassStrategy
+derivSpecMechanismToStrategy DerivSpecStock{}      = StockStrategy noExtField
+derivSpecMechanismToStrategy DerivSpecNewtype{}    = NewtypeStrategy noExtField
+derivSpecMechanismToStrategy DerivSpecAnyClass     = AnyclassStrategy noExtField
 derivSpecMechanismToStrategy (DerivSpecVia{dsm_via_ty = t}) = ViaStrategy t
 
 isDerivSpecStock, isDerivSpecNewtype, isDerivSpecAnyClass, isDerivSpecVia

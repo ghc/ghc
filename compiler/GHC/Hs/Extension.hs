@@ -28,7 +28,7 @@ import RdrName
 import Var
 import Outputable
 import SrcLoc (Located)
-import Lexer (AddAnn)
+import Lexer (AddApiAnn)
 
 import Data.Kind
 
@@ -135,15 +135,20 @@ code that consumes unused extension constructors.
 --   phase. We do not always have API Annotations though, only for
 --   parsed code. This type captures that, and allows the
 --   representation decision to be easily revisited as it evolves.
-data AA = AA [AddAnn] -- ^ Annotations added by the Parser
-        | AANotUsed -- ^ No Annotation for generated code, e.g. from
-                    -- TH, deriving, etc.
-        deriving (Data, Show)
+data ApiAnn = ApiAnn [AddApiAnn] -- ^ Annotations added by the Parser
+            | ApiAnnNotUsed      -- ^ No Annotation for generated code,
+                                 -- e.g. from TH, deriving, etc.
+        deriving (Data, Show, Eq)
 
-noAnn :: AA
-noAnn = AANotUsed
+noAnn :: ApiAnn
+noAnn = ApiAnnNotUsed
 
-instance Outputable AA where
+addAnns :: ApiAnn -> [AddApiAnn] -> ApiAnn
+addAnns (ApiAnn as1) as2 = ApiAnn (as1 ++ as2)
+addAnns ApiAnnNotUsed [] = ApiAnnNotUsed
+addAnns ApiAnnNotUsed as = ApiAnn as
+
+instance Outputable ApiAnn where
   ppr x = text (show x)
 
 -- | Used as a data type index for the hsSyn AST
@@ -493,7 +498,10 @@ type ForallXDerivDecl (c :: * -> Constraint) (x :: *) =
 
 -- -------------------------------------
 -- DerivStrategy type family
-type family XViaStrategy x
+type family XStockStrategy    x
+type family XAnyClassStrategy x
+type family XNewtypeStrategy  x
+type family XViaStrategy      x
 
 -- -------------------------------------
 -- DefaultDecl type families
@@ -933,7 +941,8 @@ type family XBangPat   x
 type family XListPat   x
 type family XTuplePat  x
 type family XSumPat    x
-type family XConPat    x
+type family XConPatIn  x
+type family XConPatOut x
 type family XViewPat   x
 type family XSplicePat x
 type family XLitPat    x
@@ -954,6 +963,8 @@ type ForallXPat (c :: * -> Constraint) (x :: *) =
        , c (XListPat   x)
        , c (XTuplePat  x)
        , c (XSumPat    x)
+       , c (XConPatIn  x)
+       , c (XConPatOut x)
        , c (XViewPat   x)
        , c (XSplicePat x)
        , c (XLitPat    x)

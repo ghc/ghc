@@ -1175,18 +1175,18 @@ mkEqnHelp overlap_mode tvs cls cls_args deriv_ctxt deriv_strat = do
       DerivEnv { denv_inst_tys = cls_args
                , denv_strat    = mb_strat } <- ask
       case mb_strat of
-        Just StockStrategy -> do
+        Just (StockStrategy _) -> do
           (cls_tys, inst_ty) <- expectNonNullaryClsArgs cls_args
           dit                <- expectAlgTyConApp cls_tys inst_ty
           mk_eqn_stock dit
 
-        Just AnyclassStrategy -> mk_eqn_anyclass
+        Just (AnyclassStrategy _) -> mk_eqn_anyclass
 
         Just (ViaStrategy via_ty) -> do
           (cls_tys, inst_ty) <- expectNonNullaryClsArgs cls_args
           mk_eqn_via cls_tys inst_ty via_ty
 
-        Just NewtypeStrategy -> do
+        Just (NewtypeStrategy _) -> do
           (cls_tys, inst_ty) <- expectNonNullaryClsArgs cls_args
           dit                <- expectAlgTyConApp cls_tys inst_ty
           unless (isNewTyCon (dit_rep_tc dit)) $

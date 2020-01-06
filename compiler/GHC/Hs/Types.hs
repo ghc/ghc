@@ -735,7 +735,10 @@ type instance XSpliceTy        GhcTc = Kind
 
 type instance XDocTy           (GhcPass _) = NoExtField
 type instance XBangTy          (GhcPass _) = NoExtField
-type instance XRecTy           (GhcPass _) = NoExtField
+
+type instance XRecTy           GhcPs = ApiAnn
+type instance XRecTy           GhcRn = NoExtField
+type instance XRecTy           GhcTc = NoExtField
 
 type instance XExplicitListTy  GhcPs = NoExtField
 type instance XExplicitListTy  GhcRn = NoExtField

@@ -798,7 +798,7 @@ instance ( a ~ GhcPass p
       SumPat _ pat _ _ ->
         [ toHie $ PS rsp scope pscope pat
         ]
-      ConPatIn c dets ->
+      ConPatIn _ c dets ->
         [ toHie $ C Use c
         , toHie $ contextify dets
         ]
@@ -1396,9 +1396,9 @@ instance ToHie (LHsDerivingClause GhcRn) where
 
 instance ToHie (Located (DerivStrategy GhcRn)) where
   toHie (L span strat) = concatM $ makeNode strat span : case strat of
-      StockStrategy -> []
-      AnyclassStrategy -> []
-      NewtypeStrategy -> []
+      StockStrategy _ -> []
+      AnyclassStrategy _ -> []
+      NewtypeStrategy _ -> []
       ViaStrategy s -> [ toHie $ TS (ResolvedScopes []) s ]
 
 instance ToHie (Located OverlapMode) where
