@@ -359,9 +359,12 @@ tcDerivStrategy mb_lds
   where
     tc_deriv_strategy :: DerivStrategy GhcRn
                       -> TcM (DerivStrategy GhcTc, [TyVar])
-    tc_deriv_strategy StockStrategy    = boring_case StockStrategy
-    tc_deriv_strategy AnyclassStrategy = boring_case AnyclassStrategy
-    tc_deriv_strategy NewtypeStrategy  = boring_case NewtypeStrategy
+    tc_deriv_strategy (StockStrategy    _)
+                                     = boring_case (StockStrategy noExtField)
+    tc_deriv_strategy (AnyclassStrategy _)
+                                     = boring_case (AnyclassStrategy noExtField)
+    tc_deriv_strategy (NewtypeStrategy  _)
+                                     = boring_case (NewtypeStrategy noExtField)
     tc_deriv_strategy (ViaStrategy ty) = do
       ty' <- checkNoErrs $ tcTopLHsType typeLevelMode ty AnyKind
       let (via_tvs, via_pred) = splitForAllTys ty'

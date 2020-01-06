@@ -264,8 +264,7 @@ Running generateModules from #14693 with DEPTH=16, WIDTH=30 finishes in
 rnImportDecl  :: Module -> LImportDecl GhcPs
              -> RnM (LImportDecl GhcRn, GlobalRdrEnv, ImportAvails, AnyHpcUsage)
 rnImportDecl this_mod
-             (L loc decl@(ImportDecl { ideclExt = noExtField
-                                     , ideclName = loc_imp_mod_name
+             (L loc decl@(ImportDecl { ideclName = loc_imp_mod_name
                                      , ideclPkgQual = mb_pkg
                                      , ideclSource = want_boot, ideclSafe = mod_safe
                                      , ideclQualified = qual_style, ideclImplicit = implicit

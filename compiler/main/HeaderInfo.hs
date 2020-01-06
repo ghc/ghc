@@ -126,7 +126,7 @@ mkPrelImports this_mod loc implicit_prelude import_decls
 
       preludeImportDecl :: LImportDecl GhcPs
       preludeImportDecl
-        = L loc $ ImportDecl { ideclExt       = noExtField,
+        = L loc $ ImportDecl { ideclExt       = noAnn,
                                ideclSourceSrc = NoSourceText,
                                ideclName      = L loc pRELUDE_NAME,
                                ideclPkgQual   = Nothing,

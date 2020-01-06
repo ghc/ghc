@@ -531,7 +531,7 @@ unliftedCompare lt_op eq_op a_expr b_expr lt eq gt
 
 nlConWildPat :: DataCon -> LPat GhcPs
 -- The pattern (K {})
-nlConWildPat con = noLoc (ConPatIn (noLoc (getRdrName con))
+nlConWildPat con = noLoc (ConPatIn noAnn (noLoc (getRdrName con))
                                    (RecCon (HsRecFields { rec_flds = []
                                                         , rec_dotdot = Nothing })))
 
@@ -1867,7 +1867,8 @@ nlHsAppType e s = noLoc (HsAppType noExtField e hs_ty)
     hs_ty = mkHsWildCardBndrs $ parenthesizeHsType appPrec (typeToLHsType s)
 
 nlExprWithTySig :: LHsExpr GhcPs -> Type -> LHsExpr GhcPs
-nlExprWithTySig e s = noLoc $ ExprWithTySig noExtField (parenthesizeHsExpr sigPrec e) hs_ty
+nlExprWithTySig e s
+  = noLoc $ ExprWithTySig noAnn (parenthesizeHsExpr sigPrec e) hs_ty
   where
     hs_ty = mkLHsSigWcType (typeToLHsType s)
 

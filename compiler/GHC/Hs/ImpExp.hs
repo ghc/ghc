@@ -109,12 +109,15 @@ data ImportDecl pass
 
      -- For details on above see note [Api annotations] in ApiAnnotation
 
-type instance XCImportDecl  (GhcPass _) = NoExtField
+type instance XCImportDecl  GhcPs = ApiAnn
+type instance XCImportDecl  GhcRn = NoExtField
+type instance XCImportDecl  GhcTc = NoExtField
+
 type instance XXImportDecl  (GhcPass _) = NoExtCon
 
-simpleImportDecl :: ModuleName -> ImportDecl (GhcPass p)
+simpleImportDecl :: ModuleName -> ImportDecl GhcPs
 simpleImportDecl mn = ImportDecl {
-      ideclExt       = noExtField,
+      ideclExt       = noAnn,
       ideclSourceSrc = NoSourceText,
       ideclName      = noLoc mn,
       ideclPkgQual   = Nothing,
@@ -255,11 +258,18 @@ data IE pass
   | IEDocNamed          (XIEDocNamed pass) String    -- ^ Reference to named doc
   | XIE (XXIE pass)
 
-type instance XIEVar             (GhcPass _) = NoExtField
+type instance XIEVar             GhcPs = ApiAnn
+type instance XIEVar             GhcRn = NoExtField
+type instance XIEVar             GhcTc = NoExtField
+
 type instance XIEThingAbs        (GhcPass _) = NoExtField
 type instance XIEThingAll        (GhcPass _) = NoExtField
 type instance XIEThingWith       (GhcPass _) = NoExtField
-type instance XIEModuleContents  (GhcPass _) = NoExtField
+
+type instance XIEModuleContents  GhcPs = ApiAnn
+type instance XIEModuleContents  GhcRn = NoExtField
+type instance XIEModuleContents  GhcTc = NoExtField
+
 type instance XIEGroup           (GhcPass _) = NoExtField
 type instance XIEDoc             (GhcPass _) = NoExtField
 type instance XIEDocNamed        (GhcPass _) = NoExtField

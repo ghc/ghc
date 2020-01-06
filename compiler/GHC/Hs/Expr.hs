@@ -538,46 +538,64 @@ data RecordUpdTc = RecordUpdTc
 -- ---------------------------------------------------------------------
 
 type instance XVar           (GhcPass _) = NoExtField
-type instance XUnboundVar    (GhcPass _) = NoExtField
+
+type instance XUnboundVar    GhcPs = ApiAnn
+type instance XUnboundVar    GhcRn = NoExtField
+type instance XUnboundVar    GhcTc = NoExtField
+
 type instance XConLikeOut    (GhcPass _) = NoExtField
 type instance XRecFld        (GhcPass _) = NoExtField
 type instance XOverLabel     (GhcPass _) = NoExtField
 type instance XIPVar         (GhcPass _) = NoExtField
 type instance XOverLitE      (GhcPass _) = NoExtField
 type instance XLitE          (GhcPass _) = NoExtField
-type instance XLam           (GhcPass _) = NoExtField
+
+type instance XLam           GhcPs = ApiAnn
+type instance XLam           GhcRn = ApiAnn -- to simplify mkHsLam
+type instance XLam           GhcTc = NoExtField
+
 type instance XLamCase       (GhcPass _) = NoExtField
 type instance XApp           (GhcPass _) = NoExtField
 
 type instance XAppTypeE      (GhcPass _) = NoExtField
 
-type instance XOpApp         GhcPs = NoExtField
+type instance XOpApp         GhcPs = ApiAnn
 type instance XOpApp         GhcRn = Fixity
 type instance XOpApp         GhcTc = Fixity
 
-type instance XNegApp        (GhcPass _) = NoExtField
+type instance XNegApp        GhcPs = ApiAnn
+type instance XNegApp        GhcRn = NoExtField
+type instance XNegApp        GhcTc = NoExtField
+
 type instance XPar           (GhcPass _) = NoExtField
 type instance XSectionL      (GhcPass _) = NoExtField
 type instance XSectionR      (GhcPass _) = NoExtField
 
-type instance XExplicitTuple GhcPs = AA
+type instance XExplicitTuple GhcPs = ApiAnn
 type instance XExplicitTuple GhcRn = NoExtField
 type instance XExplicitTuple GhcTc = NoExtField
 
-type instance XExplicitSum   GhcPs = AA
+type instance XExplicitSum   GhcPs = ApiAnn
 type instance XExplicitSum   GhcRn = NoExtField
 type instance XExplicitSum   GhcTc = [Type]
 
-type instance XCase          (GhcPass _) = NoExtField
-type instance XIf            (GhcPass _) = NoExtField
+type instance XCase          GhcPs = ApiAnn
+type instance XCase          GhcRn = NoExtField
+type instance XCase          GhcTc = NoExtField
+
+type instance XIf            GhcPs = ApiAnn
+type instance XIf            GhcRn = NoExtField
+type instance XIf            GhcTc = NoExtField
 
 type instance XMultiIf       GhcPs = NoExtField
 type instance XMultiIf       GhcRn = NoExtField
 type instance XMultiIf       GhcTc = Type
 
-type instance XLet           (GhcPass _) = NoExtField
+type instance XLet           GhcPs = ApiAnn
+type instance XLet           GhcRn = NoExtField
+type instance XLet           GhcTc = NoExtField
 
-type instance XDo            GhcPs = NoExtField
+type instance XDo            GhcPs = ApiAnn
 type instance XDo            GhcRn = NoExtField
 type instance XDo            GhcTc = Type
 
@@ -585,15 +603,17 @@ type instance XExplicitList  GhcPs = NoExtField
 type instance XExplicitList  GhcRn = NoExtField
 type instance XExplicitList  GhcTc = Type
 
-type instance XRecordCon     GhcPs = NoExtField
+type instance XRecordCon     GhcPs = ApiAnn
 type instance XRecordCon     GhcRn = NoExtField
 type instance XRecordCon     GhcTc = RecordConTc
 
-type instance XRecordUpd     GhcPs = NoExtField
+type instance XRecordUpd     GhcPs = ApiAnn
 type instance XRecordUpd     GhcRn = NoExtField
 type instance XRecordUpd     GhcTc = RecordUpdTc
 
-type instance XExprWithTySig (GhcPass _) = NoExtField
+type instance XExprWithTySig GhcPs = ApiAnn
+type instance XExprWithTySig GhcRn = NoExtField
+type instance XExprWithTySig GhcTc = NoExtField
 
 type instance XArithSeq      GhcPs = NoExtField
 type instance XArithSeq      GhcRn = NoExtField
@@ -1297,15 +1317,31 @@ type instance XCmdArrApp  GhcPs = NoExtField
 type instance XCmdArrApp  GhcRn = NoExtField
 type instance XCmdArrApp  GhcTc = Type
 
-type instance XCmdArrForm (GhcPass _) = NoExtField
-type instance XCmdApp     (GhcPass _) = NoExtField
-type instance XCmdLam     (GhcPass _) = NoExtField
-type instance XCmdPar     (GhcPass _) = NoExtField
-type instance XCmdCase    (GhcPass _) = NoExtField
-type instance XCmdIf      (GhcPass _) = NoExtField
-type instance XCmdLet     (GhcPass _) = NoExtField
+type instance XCmdArrForm GhcPs = ApiAnn
+type instance XCmdArrForm GhcRn = NoExtField
+type instance XCmdArrForm GhcTc = NoExtField
 
-type instance XCmdDo      GhcPs = NoExtField
+type instance XCmdApp     (GhcPass _) = NoExtField
+
+type instance XCmdLam     GhcPs = ApiAnn
+type instance XCmdLam     GhcRn = NoExtField
+type instance XCmdLam     GhcTc = NoExtField
+
+type instance XCmdPar     (GhcPass _) = NoExtField
+
+type instance XCmdCase    GhcPs = ApiAnn
+type instance XCmdCase    GhcRn = NoExtField
+type instance XCmdCase    GhcTc = NoExtField
+
+type instance XCmdIf      GhcPs = ApiAnn
+type instance XCmdIf      GhcRn = NoExtField
+type instance XCmdIf      GhcTc = NoExtField
+
+type instance XCmdLet     GhcPs = ApiAnn
+type instance XCmdLet     GhcRn = NoExtField
+type instance XCmdLet     GhcTc = NoExtField
+
+type instance XCmdDo      GhcPs = ApiAnn
 type instance XCmdDo      GhcRn = NoExtField
 type instance XCmdDo      GhcTc = Type
 

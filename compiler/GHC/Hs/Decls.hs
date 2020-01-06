@@ -52,6 +52,7 @@ module GHC.Hs.Decls (
   -- ** Deriving strategies
   DerivStrategy(..), LDerivStrategy,
   derivStrategyName, foldDerivStrategy, mapDerivStrategy,
+  XViaStrategyPs(..),
   -- ** @RULE@ declarations
   LRuleDecls,RuleDecls(..),RuleDecl(..),LRuleDecl,HsRuleRn(..),
   RuleBndr(..),LRuleBndr,
@@ -584,17 +585,19 @@ c.f. Note [Associated type tyvar names] in Class.hs
      Note [Family instance declaration binders]
 -}
 
-type instance XFamDecl      (GhcPass _) = NoExtField
+type instance XFamDecl      GhcPs = ApiAnn
+type instance XFamDecl      GhcRn = NoExtField
+type instance XFamDecl      GhcTc = NoExtField
 
-type instance XSynDecl      GhcPs = NoExtField
+type instance XSynDecl      GhcPs = ApiAnn
 type instance XSynDecl      GhcRn = NameSet -- FVs
 type instance XSynDecl      GhcTc = NameSet -- FVs
 
-type instance XDataDecl     GhcPs = NoExtField
+type instance XDataDecl     GhcPs = ApiAnn
 type instance XDataDecl     GhcRn = DataDeclRn
 type instance XDataDecl     GhcTc = DataDeclRn
 
-type instance XClassDecl    GhcPs = NoExtField
+type instance XClassDecl    GhcPs = ApiAnn
 type instance XClassDecl    GhcRn = NameSet -- FVs
 type instance XClassDecl    GhcTc = NameSet -- FVs
 
@@ -1272,7 +1275,10 @@ data StandaloneKindSig pass
       (LHsSigType pass)     -- Why not LHsSigWcType? See Note [Wildcards in standalone kind signatures]
   | XStandaloneKindSig (XXStandaloneKindSig pass)
 
-type instance XStandaloneKindSig (GhcPass p) = NoExtField
+type instance XStandaloneKindSig GhcPs = ApiAnn
+type instance XStandaloneKindSig GhcRn = NoExtField
+type instance XStandaloneKindSig GhcTc = NoExtField
+
 type instance XXStandaloneKindSig (GhcPass p) = NoExtCon
 
 standaloneKindSigName :: StandaloneKindSig (GhcPass p) -> IdP (GhcPass p)
@@ -1702,7 +1708,10 @@ data ClsInstDecl pass
     -- For details on above see note [Api annotations] in ApiAnnotation
   | XClsInstDecl (XXClsInstDecl pass)
 
-type instance XCClsInstDecl    (GhcPass _) = NoExtField
+type instance XCClsInstDecl    GhcPs = ApiAnn
+type instance XCClsInstDecl    GhcRn = NoExtField
+type instance XCClsInstDecl    GhcTc = NoExtField
+
 type instance XXClsInstDecl    (GhcPass _) = NoExtCon
 
 ----------------- Instances of all kinds -------------
@@ -1724,8 +1733,15 @@ data InstDecl pass  -- Both class and family instances
   | XInstDecl (XXInstDecl pass)
 
 type instance XClsInstD     (GhcPass _) = NoExtField
-type instance XDataFamInstD (GhcPass _) = NoExtField
-type instance XTyFamInstD   (GhcPass _) = NoExtField
+
+type instance XDataFamInstD GhcPs = ApiAnn
+type instance XDataFamInstD GhcRn = NoExtField
+type instance XDataFamInstD GhcTc = NoExtField
+
+type instance XTyFamInstD   GhcPs = ApiAnn
+type instance XTyFamInstD   GhcRn = NoExtField
+type instance XTyFamInstD   GhcTc = NoExtField
+
 type instance XXInstDecl    (GhcPass _) = NoExtCon
 
 instance OutputableBndrId p
@@ -1939,42 +1955,60 @@ type LDerivStrategy pass = Located (DerivStrategy pass)
 -- | Which technique the user explicitly requested when deriving an instance.
 data DerivStrategy pass
   -- See Note [Deriving strategies] in TcDeriv
-  = StockStrategy    -- ^ GHC's \"standard\" strategy, which is to implement a
+  = StockStrategy (XStockStrategy pass)
+                     -- ^ GHC's \"standard\" strategy, which is to implement a
                      --   custom instance for the data type. This only works
                      --   for certain types that GHC knows about (e.g., 'Eq',
                      --   'Show', 'Functor' when @-XDeriveFunctor@ is enabled,
                      --   etc.)
-  | AnyclassStrategy -- ^ @-XDeriveAnyClass@
-  | NewtypeStrategy  -- ^ @-XGeneralizedNewtypeDeriving@
+  | AnyclassStrategy (XAnyClassStrategy pass) -- ^ @-XDeriveAnyClass@
+  | NewtypeStrategy  (XNewtypeStrategy pass)  -- ^ @-XGeneralizedNewtypeDeriving@
   | ViaStrategy (XViaStrategy pass)
                      -- ^ @-XDerivingVia@
 
-type instance XViaStrategy GhcPs = LHsSigType GhcPs
+type instance XStockStrategy    GhcPs = ApiAnn
+type instance XStockStrategy    GhcRn = NoExtField
+type instance XStockStrategy    GhcTc = NoExtField
+
+type instance XAnyClassStrategy GhcPs = ApiAnn
+type instance XAnyClassStrategy GhcRn = NoExtField
+type instance XAnyClassStrategy GhcTc = NoExtField
+
+type instance XNewtypeStrategy  GhcPs = ApiAnn
+type instance XNewtypeStrategy  GhcRn = NoExtField
+type instance XNewtypeStrategy  GhcTc = NoExtField
+
+type instance XViaStrategy GhcPs = XViaStrategyPs
 type instance XViaStrategy GhcRn = LHsSigType GhcRn
 type instance XViaStrategy GhcTc = Type
 
+data XViaStrategyPs = XViaStrategyPs ApiAnn (LHsSigType GhcPs)
+
 instance OutputableBndrId p
         => Outputable (DerivStrategy (GhcPass p)) where
-    ppr StockStrategy    = text "stock"
-    ppr AnyclassStrategy = text "anyclass"
-    ppr NewtypeStrategy  = text "newtype"
-    ppr (ViaStrategy ty) = text "via" <+> ppr ty
+    ppr (StockStrategy    _) = text "stock"
+    ppr (AnyclassStrategy _) = text "anyclass"
+    ppr (NewtypeStrategy  _) = text "newtype"
+    ppr (ViaStrategy x)      = ppr x
+
+instance Outputable XViaStrategyPs where
+    ppr (XViaStrategyPs _ t) = ppr t
 
 -- | A short description of a @DerivStrategy'@.
 derivStrategyName :: DerivStrategy a -> SDoc
 derivStrategyName = text . go
   where
-    go StockStrategy    = "stock"
-    go AnyclassStrategy = "anyclass"
-    go NewtypeStrategy  = "newtype"
-    go (ViaStrategy {}) = "via"
+    go StockStrategy    {} = "stock"
+    go AnyclassStrategy {} = "anyclass"
+    go NewtypeStrategy  {} = "newtype"
+    go ViaStrategy      {} = "via"
 
 -- | Eliminate a 'DerivStrategy'.
 foldDerivStrategy :: (p ~ GhcPass pass)
                   => r -> (XViaStrategy p -> r) -> DerivStrategy p -> r
-foldDerivStrategy other _   StockStrategy    = other
-foldDerivStrategy other _   AnyclassStrategy = other
-foldDerivStrategy other _   NewtypeStrategy  = other
+foldDerivStrategy other _   (StockStrategy    _) = other
+foldDerivStrategy other _   (AnyclassStrategy _) = other
+foldDerivStrategy other _   (NewtypeStrategy  _) = other
 foldDerivStrategy _     via (ViaStrategy t)  = via t
 
 -- | Map over the @via@ type if dealing with 'ViaStrategy'. Otherwise,
@@ -2008,7 +2042,10 @@ data DefaultDecl pass
         -- For details on above see note [Api annotations] in ApiAnnotation
   | XDefaultDecl (XXDefaultDecl pass)
 
-type instance XCDefaultDecl    (GhcPass _) = NoExtField
+type instance XCDefaultDecl    GhcPs = ApiAnn
+type instance XCDefaultDecl    GhcRn = NoExtField
+type instance XCDefaultDecl    GhcTc = NoExtField
+
 type instance XXDefaultDecl    (GhcPass _) = NoExtCon
 
 instance OutputableBndrId p
@@ -2179,7 +2216,10 @@ data RuleDecls pass = HsRules { rds_ext   :: XCRuleDecls pass
                               , rds_rules :: [LRuleDecl pass] }
   | XRuleDecls (XXRuleDecls pass)
 
-type instance XCRuleDecls    (GhcPass _) = NoExtField
+type instance XCRuleDecls    GhcPs = ApiAnn
+type instance XCRuleDecls    GhcRn = NoExtField
+type instance XCRuleDecls    GhcTc = NoExtField
+
 type instance XXRuleDecls    (GhcPass _) = NoExtCon
 
 -- | Located Rule Declaration
@@ -2326,7 +2366,10 @@ data WarnDecls pass = Warnings { wd_ext      :: XWarnings pass
                                }
   | XWarnDecls (XXWarnDecls pass)
 
-type instance XWarnings      (GhcPass _) = NoExtField
+type instance XWarnings      GhcPs = ApiAnn
+type instance XWarnings      GhcRn = NoExtField
+type instance XWarnings      GhcTc = NoExtField
+
 type instance XXWarnDecls    (GhcPass _) = NoExtCon
 
 -- | Located Warning pragma Declaration
@@ -2431,7 +2474,10 @@ data RoleAnnotDecl pass
       -- For details on above see note [Api annotations] in ApiAnnotation
   | XRoleAnnotDecl (XXRoleAnnotDecl pass)
 
-type instance XCRoleAnnotDecl (GhcPass _) = NoExtField
+type instance XCRoleAnnotDecl GhcPs = ApiAnn
+type instance XCRoleAnnotDecl GhcRn = NoExtField
+type instance XCRoleAnnotDecl GhcTc = NoExtField
+
 type instance XXRoleAnnotDecl (GhcPass _) = NoExtCon
 
 instance OutputableBndr (IdP (GhcPass p))

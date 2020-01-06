@@ -386,10 +386,10 @@ rnPatAndThen :: NameMaker -> Pat GhcPs -> CpsRn (Pat GhcRn)
 rnPatAndThen _  (WildPat _)   = return (WildPat noExtField)
 rnPatAndThen mk (ParPat x pat)  = do { pat' <- rnLPatAndThen mk pat
                                      ; return (ParPat x pat') }
-rnPatAndThen mk (LazyPat x pat) = do { pat' <- rnLPatAndThen mk pat
-                                     ; return (LazyPat x pat') }
-rnPatAndThen mk (BangPat x pat) = do { pat' <- rnLPatAndThen mk pat
-                                     ; return (BangPat x pat') }
+rnPatAndThen mk (LazyPat _ pat) = do { pat' <- rnLPatAndThen mk pat
+                                     ; return (LazyPat noExtField pat') }
+rnPatAndThen mk (BangPat _ pat) = do { pat' <- rnLPatAndThen mk pat
+                                     ; return (BangPat noExtField pat') }
 rnPatAndThen mk (VarPat x (L l rdr))
     = do { loc <- liftCps getSrcSpanM
          ; name <- newPatName mk (L loc rdr)
@@ -397,7 +397,7 @@ rnPatAndThen mk (VarPat x (L l rdr))
      -- we need to bind pattern variables for view pattern expressions
      -- (e.g. in the pattern (x, x -> y) x needs to be bound in the rhs of the tuple)
 
-rnPatAndThen mk (SigPat x pat sig)
+rnPatAndThen mk (SigPat _ pat sig)
   -- When renaming a pattern type signature (e.g. f (a :: T) = ...), it is
   -- important to rename its type signature _before_ renaming the rest of the
   -- pattern, so that type variables are first bound by the _outermost_ pattern
@@ -409,7 +409,7 @@ rnPatAndThen mk (SigPat x pat sig)
   -- ~~~~~~~~~~~~~~~^                   the same `a' then used here
   = do { sig' <- rnHsSigCps sig
        ; pat' <- rnLPatAndThen mk pat
-       ; return (SigPat x pat' sig' ) }
+       ; return (SigPat noExtField pat' sig' ) }
 
 rnPatAndThen mk (LitPat x lit)
   | HsString src s <- lit
@@ -437,7 +437,7 @@ rnPatAndThen _ (NPat x (L l lit) mb_neg _eq)
        ; eq' <- liftCpsFV $ lookupSyntaxName eqName
        ; return (NPat x (L l lit') mb_neg' eq') }
 
-rnPatAndThen mk (NPlusKPat x rdr (L l lit) _ _ _ )
+rnPatAndThen mk (NPlusKPat _ rdr (L l lit) _ _ _ )
   = do { new_name <- newPatName mk rdr
        ; (lit', _) <- liftCpsFV $ rnOverLit lit -- See Note [Negative zero]
                                                 -- We skip negateName as
@@ -445,14 +445,14 @@ rnPatAndThen mk (NPlusKPat x rdr (L l lit) _ _ _ )
                                                 -- sense in n + k patterns
        ; minus <- liftCpsFV $ lookupSyntaxName minusName
        ; ge    <- liftCpsFV $ lookupSyntaxName geName
-       ; return (NPlusKPat x (L (nameSrcSpan new_name) new_name)
-                             (L l lit') lit' ge minus) }
+       ; return (NPlusKPat noExtField (L (nameSrcSpan new_name) new_name)
+                                      (L l lit') lit' ge minus) }
                 -- The Report says that n+k patterns must be in Integral
 
-rnPatAndThen mk (AsPat x rdr pat)
+rnPatAndThen mk (AsPat _ rdr pat)
   = do { new_name <- newPatLName mk rdr
        ; pat' <- rnLPatAndThen mk pat
-       ; return (AsPat x new_name pat') }
+       ; return (AsPat noExtField new_name pat') }
 
 rnPatAndThen mk p@(ViewPat _ expr pat)
   = do { liftCps $ do { vp_flag <- xoptM LangExt.ViewPatterns
@@ -465,7 +465,7 @@ rnPatAndThen mk p@(ViewPat _ expr pat)
        -- ; return (ViewPat expr' pat' ty) }
        ; return (ViewPat noExtField expr' pat') }
 
-rnPatAndThen mk (ConPatIn con stuff)
+rnPatAndThen mk (ConPatIn _ con stuff)
    -- rnConPatAndThen takes care of reconstructing the pattern
    -- The pattern for the empty list needs to be replaced by an empty explicit list pattern when overloaded lists is turned on.
   = case unLoc con == nameRdrName (dataConName nilDataCon) of
@@ -514,7 +514,7 @@ rnConPatAndThen :: NameMaker
 rnConPatAndThen mk con (PrefixCon pats)
   = do  { con' <- lookupConCps con
         ; pats' <- rnLPatsAndThen mk pats
-        ; return (ConPatIn con' (PrefixCon pats')) }
+        ; return (ConPatIn noExtField con' (PrefixCon pats')) }
 
 rnConPatAndThen mk con (InfixCon pat1 pat2)
   = do  { con' <- lookupConCps con
@@ -526,7 +526,7 @@ rnConPatAndThen mk con (InfixCon pat1 pat2)
 rnConPatAndThen mk con (RecCon rpats)
   = do  { con' <- lookupConCps con
         ; rpats' <- rnHsRecPatsAndThen mk con' rpats
-        ; return (ConPatIn con' (RecCon rpats')) }
+        ; return (ConPatIn noExtField con' (RecCon rpats')) }
 
 checkUnusedRecordWildcardCps :: SrcSpan -> Maybe [Name] -> CpsRn ()
 checkUnusedRecordWildcardCps loc dotdot_names =

@@ -9,7 +9,10 @@
   (Nothing)
   [({ KindSigs.hs:8:1-16 }
     (ImportDecl
-     (NoExtField)
+     (ApiAnn
+      [(AddApiAnn
+        (AnnImport)
+        { KindSigs.hs:8:1-6 })])
      (NoSourceText)
      ({ KindSigs.hs:8:8-16 }
       {ModuleName: Data.Kind})
@@ -22,9 +25,18 @@
      (Nothing)))]
   [({ KindSigs.hs:11:1-17 }
     (TyClD
-     (NoExtField)
-     (FamDecl
       (NoExtField)
+     (FamDecl
+     (ApiAnn
+      [(AddApiAnn
+        (AnnType)
+        { KindSigs.hs:11:1-4 })
+      ,(AddApiAnn
+        (AnnFamily)
+        { KindSigs.hs:11:6-11 })
+      ,(AddApiAnn
+        (AnnWhere)
+        { KindSigs.hs:11:19-23 })])
       (FamilyDecl
        (NoExtField)
        (ClosedTypeFamily
@@ -84,7 +96,13 @@
     (TyClD
      (NoExtField)
      (SynDecl
-      (NoExtField)
+      (ApiAnn
+       [(AddApiAnn
+         (AnnType)
+         { KindSigs.hs:15:1-4 })
+       ,(AddApiAnn
+         (AnnEqual)
+         { KindSigs.hs:15:12 })])
       ({ KindSigs.hs:15:6-8 }
        (Unqual
         {OccName: Bar}))
@@ -156,7 +174,13 @@
     (TyClD
      (NoExtField)
      (SynDecl
-      (NoExtField)
+      (ApiAnn
+       [(AddApiAnn
+         (AnnType)
+         { KindSigs.hs:16:1-4 })
+       ,(AddApiAnn
+         (AnnEqual)
+         { KindSigs.hs:16:13 })])
       ({ KindSigs.hs:16:6-9 }
        (Unqual
         {OccName: Bar'}))
@@ -228,7 +252,13 @@
     (TyClD
      (NoExtField)
      (SynDecl
-      (NoExtField)
+      (ApiAnn
+       [(AddApiAnn
+         (AnnType)
+         { KindSigs.hs:19:1-4 })
+       ,(AddApiAnn
+         (AnnEqual)
+         { KindSigs.hs:19:10 })])
       ({ KindSigs.hs:19:6-8 }
        (Unqual
         {OccName: Baz}))
@@ -367,7 +397,13 @@
     (TyClD
      (NoExtField)
      (SynDecl
-      (NoExtField)
+      (ApiAnn
+       [(AddApiAnn
+         (AnnType)
+         { KindSigs.hs:26:1-4 })
+       ,(AddApiAnn
+         (AnnEqual)
+         { KindSigs.hs:26:11 })])
       ({ KindSigs.hs:26:6-9 }
        (Unqual
         {OccName: Quux}))
@@ -400,7 +436,13 @@
     (TyClD
      (NoExtField)
      (SynDecl
-      (NoExtField)
+      (ApiAnn
+       [(AddApiAnn
+         (AnnType)
+         { KindSigs.hs:27:1-4 })
+       ,(AddApiAnn
+         (AnnEqual)
+         { KindSigs.hs:27:12 })])
       ({ KindSigs.hs:27:6-10 }
        (Unqual
         {OccName: Quux'}))
@@ -450,7 +492,13 @@
     (TyClD
      (NoExtField)
      (SynDecl
-      (NoExtField)
+      (ApiAnn
+       [(AddApiAnn
+         (AnnType)
+         { KindSigs.hs:28:1-4 })
+       ,(AddApiAnn
+         (AnnEqual)
+         { KindSigs.hs:28:14 })])
       ({ KindSigs.hs:28:6-10 }
        (Unqual
         {OccName: Quuux}))
@@ -508,7 +556,13 @@
     (TyClD
      (NoExtField)
      (SynDecl
-      (NoExtField)
+      (ApiAnn
+       [(AddApiAnn
+         (AnnType)
+         { KindSigs.hs:31:1-4 })
+       ,(AddApiAnn
+         (AnnEqual)
+         { KindSigs.hs:31:19 })])
       ({ KindSigs.hs:31:6-17 }
        (Unqual
         {OccName: Sarsaparilla}))
