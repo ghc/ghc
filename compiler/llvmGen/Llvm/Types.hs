@@ -566,7 +566,7 @@ instance Outputable LlvmFuncAttr where
   ppr OptSize            = text "optsize"
   ppr NoReturn           = text "noreturn"
   ppr NoUnwind           = text "nounwind"
-  ppr ReadNone           = text "readnon"
+  ppr ReadNone           = text "readnone"
   ppr ReadOnly           = text "readonly"
   ppr Ssp                = text "ssp"
   ppr SspReq             = text "ssqreq"
