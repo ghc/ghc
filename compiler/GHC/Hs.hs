@@ -63,12 +63,12 @@ import Data.Data hiding ( Fixity )
 -- | Haskell Module
 --
 -- All we actually declare here is the top-level structure for a module.
-data HsModule pass
+data HsModule
   = HsModule {
       hsmodName :: Maybe (Located ModuleName),
         -- ^ @Nothing@: \"module X where\" is omitted (in which case the next
         --     field is Nothing too)
-      hsmodExports :: Maybe (Located [LIE pass]),
+      hsmodExports :: Maybe (Located [LIE GhcPs]),
         -- ^ Export list
         --
         --  - @Nothing@: export list omitted, so export everything
@@ -82,11 +82,11 @@ data HsModule pass
         --                                   ,'ApiAnnotation.AnnClose'
 
         -- For details on above see note [Api annotations] in ApiAnnotation
-      hsmodImports :: [LImportDecl pass],
+      hsmodImports :: [LImportDecl GhcPs],
         -- ^ We snaffle interesting stuff out of the imported interfaces early
         -- on, adding that info to TyDecls/etc; so this list is often empty,
         -- downstream.
-      hsmodDecls :: [LHsDecl pass],
+      hsmodDecls :: [LHsDecl GhcPs],
         -- ^ Type, class, value, and interface signature decls
       hsmodDeprecMessage :: Maybe (Located WarningTxt),
         -- ^ reason\/explanation for warning/deprecation of this module
@@ -113,12 +113,10 @@ data HsModule pass
      --    hsmodImports,hsmodDecls if this style is used.
 
      -- For details on above see note [Api annotations] in ApiAnnotation
--- deriving instance (DataIdLR name name) => Data (HsModule name)
-deriving instance Data (HsModule GhcPs)
-deriving instance Data (HsModule GhcRn)
-deriving instance Data (HsModule GhcTc)
 
-instance (OutputableBndrId p) => Outputable (HsModule (GhcPass p)) where
+deriving instance Data HsModule
+
+instance Outputable HsModule where
 
     ppr (HsModule Nothing _ imports decls _ mbDoc)
       = pp_mb mbDoc $$ pp_nonnull imports
