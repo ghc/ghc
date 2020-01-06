@@ -294,7 +294,7 @@ mkCoAlgCaseMatchResult
   -> MatchResult
 mkCoAlgCaseMatchResult var ty match_alts
   | isNewtype  -- Newtype case; use a let
-  = ASSERT( null (NEL.tail match_alts) && null (tail arg_ids1) )
+  = ASSERT( null match_alts_tail && null (tail arg_ids1) )
     mkCoLetMatchResult (NonRec arg_id1 newtype_rhs) match_result1
 
   | otherwise
@@ -305,8 +305,8 @@ mkCoAlgCaseMatchResult var ty match_alts
         -- [Interesting: because of GADTs, we can't rely on the type of
         --  the scrutinised Id to be sufficiently refined to have a TyCon in it]
 
-    alt1@MkCaseAlt{ alt_bndrs = arg_ids1, alt_result = match_result1 }
-      = NEL.head match_alts
+    alt1@MkCaseAlt{ alt_bndrs = arg_ids1, alt_result = match_result1 } :| match_alts_tail
+      = match_alts
     -- Stuff for newtype
     arg_id1       = ASSERT( notNull arg_ids1 ) head arg_ids1
     var_ty        = idType var

@@ -420,9 +420,9 @@ matchLiterals (var :| vars) ty sub_groups
         }
   where
     match_group :: NonEmpty EquationInfo -> DsM (Literal, MatchResult)
-    match_group eqns
+    match_group eqns@(firstEqn :| _)
         = do { dflags <- getDynFlags
-             ; let LitPat _ hs_lit = firstPat (NEL.head eqns)
+             ; let LitPat _ hs_lit = firstPat firstEqn
              ; match_result <- match vars ty (NEL.toList $ shiftEqns eqns)
              ; return (hsLitKey dflags hs_lit, match_result) }
 

@@ -822,7 +822,7 @@ instance (Outputable a) => Outputable [a] where
     ppr xs = brackets (fsep (punctuate comma (map ppr xs)))
 
 instance (Outputable a) => Outputable (NonEmpty a) where
-    ppr xs = brackets (fsep (punctuate comma (map ppr $ NEL.toList xs)))
+    ppr = ppr . NEL.toList
 
 instance (Outputable a) => Outputable (Set a) where
     ppr s = braces (fsep (punctuate comma (map ppr (Set.toList s))))

@@ -7,6 +7,7 @@ The @match@ function
 -}
 
 {-# LANGUAGE CPP #-}
+{-# LANGUAGE MonadComprehensions #-}
 {-# LANGUAGE OverloadedLists #-}
 {-# LANGUAGE TypeFamilies #-}
 {-# LANGUAGE ViewPatterns #-}
@@ -163,18 +164,18 @@ See also Note [Localise pattern binders] in DsUtils
 
 type MatchId = Id   -- See Note [Match Ids]
 
-match
-  :: [MatchId] -- ^ Variables rep\'ing the exprs we\'re matching with. See Note [Match Ids]
-  -> Type -- ^ Type of the case expression
-  -> [EquationInfo] -- ^ Info about patterns, etc. (type synonym below)
-  -> DsM MatchResult -- ^ Desugared result!
+match :: [MatchId] -- ^ Variables rep\'ing the exprs we\'re matching with. See Note [Match Ids]
+      -> Type -- ^ Type of the case expression
+      -> [EquationInfo] -- ^ Info about patterns, etc. (type synonym below)
+      -> DsM MatchResult -- ^ Desugared result!
 
 match [] ty eqns
   = ASSERT2( not (null eqns), ppr ty )
     return (foldr1 combineMatchResults match_results)
   where
-    match_results = flip fmap eqns $ \eqn ->
-      ASSERT( null (eqn_pats eqn) ) (eqn_rhs eqn)
+    match_results = [ ASSERT( null (eqn_pats eqn) )
+                      eqn_rhs eqn
+                    | eqn <- eqns ]
 
 match (v:vs) ty eqns    -- Eqns *can* be empty
   = ASSERT2( all (isInternalName . idName) vars, ppr vars )
@@ -219,7 +220,7 @@ match (v:vs) ty eqns    -- Eqns *can* be empty
       where eqns' = NEL.toList eqns
             ne l = case NEL.nonEmpty l of
               Just nel -> nel
-              Nothing -> panic "Should be impossible since input was non-empty"
+              Nothing -> pprPanic "match match_group" $ text "Empty result should be impossible since input was non-empty"
 
     -- FIXME: we should also warn about view patterns that should be
     -- commoned up but are not
@@ -896,7 +897,8 @@ groupEquations :: DynFlags -> [EquationInfo] -> [NonEmpty (PatGroup, EquationInf
 -- (b) none of the gi are empty
 -- The ordering of equations is unchanged
 groupEquations dflags eqns
-  = NEL.groupBy same_gp $ flip fmap eqns $ \eqn -> (patGroup dflags (firstPat eqn), eqn)
+  = NEL.groupBy same_gp $ [(patGroup dflags (firstPat eqn), eqn) | eqn <- eqns]
+  -- comprehension on NonEmpty
   where
     same_gp :: (PatGroup,EquationInfo) -> (PatGroup,EquationInfo) -> Bool
     (pg1,_) `same_gp` (pg2,_) = pg1 `sameGroup` pg2
