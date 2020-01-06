@@ -255,10 +255,10 @@ rnExpr (HsCase x expr matches)
        ; (new_matches, ms_fvs) <- rnMatchGroup CaseAlt rnLExpr matches
        ; return (HsCase x new_expr new_matches, e_fvs `plusFV` ms_fvs) }
 
-rnExpr (HsLet x (L l binds) expr)
+rnExpr (HsLet _ (L l binds) expr)
   = rnLocalBindsAndThen binds $ \binds' _ -> do
       { (expr',fvExpr) <- rnLExpr expr
-      ; return (HsLet x (L l binds') expr', fvExpr) }
+      ; return (HsLet noExtField (L l binds') expr', fvExpr) }
 
 rnExpr (HsDo x do_or_lc (L l stmts))
   = do  { ((stmts', _), fvs) <-
@@ -473,19 +473,20 @@ rnCmd (HsCmdArrForm _ op _ (Just _) [arg1, arg2])
        ; final_e <- mkOpFormRn arg1' op' fixity arg2'
        ; return (final_e, fv_arg1 `plusFV` fv_op `plusFV` fv_arg2) }
 
-rnCmd (HsCmdArrForm x op f fixity cmds)
+rnCmd (HsCmdArrForm _ op f fixity cmds)
   = do { (op',fvOp) <- escapeArrowScope (rnLExpr op)
        ; (cmds',fvCmds) <- rnCmdArgs cmds
-       ; return (HsCmdArrForm x op' f fixity cmds', fvOp `plusFV` fvCmds) }
+       ; return ( HsCmdArrForm noExtField op' f fixity cmds'
+                , fvOp `plusFV` fvCmds) }
 
 rnCmd (HsCmdApp x fun arg)
   = do { (fun',fvFun) <- rnLCmd  fun
        ; (arg',fvArg) <- rnLExpr arg
        ; return (HsCmdApp x fun' arg', fvFun `plusFV` fvArg) }
 
-rnCmd (HsCmdLam x matches)
+rnCmd (HsCmdLam _ matches)
   = do { (matches', fvMatch) <- rnMatchGroup LambdaExpr rnLCmd matches
-       ; return (HsCmdLam x matches', fvMatch) }
+       ; return (HsCmdLam noExtField matches', fvMatch) }
 
 rnCmd (HsCmdPar x e)
   = do  { (e', fvs_e) <- rnLCmd e
@@ -503,10 +504,10 @@ rnCmd (HsCmdIf x _ p b1 b2)
        ; (mb_ite, fvITE) <- lookupIfThenElse
        ; return (HsCmdIf x mb_ite p' b1' b2', plusFVs [fvITE, fvP, fvB1, fvB2])}
 
-rnCmd (HsCmdLet x (L l binds) cmd)
+rnCmd (HsCmdLet _ (L l binds) cmd)
   = rnLocalBindsAndThen binds $ \ binds' _ -> do
       { (cmd',fvExpr) <- rnLCmd cmd
-      ; return (HsCmdLet x (L l binds') cmd', fvExpr) }
+      ; return (HsCmdLet noExtField (L l binds') cmd', fvExpr) }
 
 rnCmd (HsCmdDo x (L l stmts))
   = do  { ((stmts', _), fvs) <-

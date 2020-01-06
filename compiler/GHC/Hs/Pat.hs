@@ -317,11 +317,11 @@ type instance XNPat GhcPs = NoExtField
 type instance XNPat GhcRn = NoExtField
 type instance XNPat GhcTc = Type
 
-type instance XNPlusKPat GhcPs = NoExtField
+type instance XNPlusKPat GhcPs = AA
 type instance XNPlusKPat GhcRn = NoExtField
 type instance XNPlusKPat GhcTc = Type
 
-type instance XSigPat GhcPs = NoExtField
+type instance XSigPat GhcPs = AA
 type instance XSigPat GhcRn = NoExtField
 type instance XSigPat GhcTc = Type
 

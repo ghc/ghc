@@ -1,7 +1,7 @@
 {-# LANGUAGE ViewPatterns, BangPatterns #-}
 module InTreeAnnotations1 where
 
-foo a@(_,_) !"a" ~x = undefined
+foo a@(_,_) !"a" ~x :: Int = undefined
 
 data T = MkT { x,y :: Int }
 
