@@ -584,17 +584,19 @@ c.f. Note [Associated type tyvar names] in Class.hs
      Note [Family instance declaration binders]
 -}
 
-type instance XFamDecl      (GhcPass _) = NoExtField
+type instance XFamDecl      GhcPs = AA
+type instance XFamDecl      GhcRn = NoExtField
+type instance XFamDecl      GhcTc = NoExtField
 
-type instance XSynDecl      GhcPs = NoExtField
+type instance XSynDecl      GhcPs = AA
 type instance XSynDecl      GhcRn = NameSet -- FVs
 type instance XSynDecl      GhcTc = NameSet -- FVs
 
-type instance XDataDecl     GhcPs = NoExtField
+type instance XDataDecl     GhcPs = AA
 type instance XDataDecl     GhcRn = DataDeclRn
 type instance XDataDecl     GhcTc = DataDeclRn
 
-type instance XClassDecl    GhcPs = NoExtField
+type instance XClassDecl    GhcPs = AA
 type instance XClassDecl    GhcRn = NameSet -- FVs
 type instance XClassDecl    GhcTc = NameSet -- FVs
 
@@ -1272,7 +1274,10 @@ data StandaloneKindSig pass
       (LHsSigType pass)     -- Why not LHsSigWcType? See Note [Wildcards in standalone kind signatures]
   | XStandaloneKindSig (XXStandaloneKindSig pass)
 
-type instance XStandaloneKindSig (GhcPass p) = NoExtField
+type instance XStandaloneKindSig GhcPs = AA
+type instance XStandaloneKindSig GhcRn = NoExtField
+type instance XStandaloneKindSig GhcTc = NoExtField
+
 type instance XXStandaloneKindSig (GhcPass p) = NoExtCon
 
 standaloneKindSigName :: StandaloneKindSig (GhcPass p) -> IdP (GhcPass p)
@@ -1724,8 +1729,15 @@ data InstDecl pass  -- Both class and family instances
   | XInstDecl (XXInstDecl pass)
 
 type instance XClsInstD     (GhcPass _) = NoExtField
-type instance XDataFamInstD (GhcPass _) = NoExtField
-type instance XTyFamInstD   (GhcPass _) = NoExtField
+
+type instance XDataFamInstD GhcPs = AA
+type instance XDataFamInstD GhcRn = NoExtField
+type instance XDataFamInstD GhcTc = NoExtField
+
+type instance XTyFamInstD   GhcPs = AA
+type instance XTyFamInstD   GhcRn = NoExtField
+type instance XTyFamInstD   GhcTc = NoExtField
+
 type instance XXInstDecl    (GhcPass _) = NoExtCon
 
 instance OutputableBndrId p
@@ -2431,7 +2443,10 @@ data RoleAnnotDecl pass
       -- For details on above see note [Api annotations] in ApiAnnotation
   | XRoleAnnotDecl (XXRoleAnnotDecl pass)
 
-type instance XCRoleAnnotDecl (GhcPass _) = NoExtField
+type instance XCRoleAnnotDecl GhcPs = AA
+type instance XCRoleAnnotDecl GhcRn = NoExtField
+type instance XCRoleAnnotDecl GhcTc = NoExtField
+
 type instance XXRoleAnnotDecl (GhcPass _) = NoExtCon
 
 instance OutputableBndr (IdP (GhcPass p))

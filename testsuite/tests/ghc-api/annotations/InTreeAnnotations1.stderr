@@ -100,7 +100,13 @@
     (TyClD
      (NoExtField)
      (DataDecl
-      (NoExtField)
+      (AA
+       [(AddAnn
+         (AnnData)
+         { InTreeAnnotations1.hs:6:1-4 })
+       ,(AddAnn
+         (AnnEqual)
+         { InTreeAnnotations1.hs:6:8 })])
       ({ InTreeAnnotations1.hs:6:6 }
        (Unqual
         {OccName: T}))
@@ -240,7 +246,10 @@
                []
                ({ InTreeAnnotations1.hs:8:39-43 }
                 (OpApp
-                 (NoExtField)
+                 (AA
+                  [(AddAnn
+                    (AnnVal)
+                    { InTreeAnnotations1.hs:8:41 })])
                  ({ InTreeAnnotations1.hs:8:39 }
                   (HsVar
                    (NoExtField)

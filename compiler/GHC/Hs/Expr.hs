@@ -545,17 +545,24 @@ type instance XOverLabel     (GhcPass _) = NoExtField
 type instance XIPVar         (GhcPass _) = NoExtField
 type instance XOverLitE      (GhcPass _) = NoExtField
 type instance XLitE          (GhcPass _) = NoExtField
-type instance XLam           (GhcPass _) = NoExtField
+
+type instance XLam           GhcPs = AA
+type instance XLam           GhcRn = AA -- to simplify mkHsLam
+type instance XLam           GhcTc = NoExtField
+
 type instance XLamCase       (GhcPass _) = NoExtField
 type instance XApp           (GhcPass _) = NoExtField
 
 type instance XAppTypeE      (GhcPass _) = NoExtField
 
-type instance XOpApp         GhcPs = NoExtField
+type instance XOpApp         GhcPs = AA
 type instance XOpApp         GhcRn = Fixity
 type instance XOpApp         GhcTc = Fixity
 
-type instance XNegApp        (GhcPass _) = NoExtField
+type instance XNegApp        GhcPs = AA
+type instance XNegApp        GhcRn = NoExtField
+type instance XNegApp        GhcTc = NoExtField
+
 type instance XPar           (GhcPass _) = NoExtField
 type instance XSectionL      (GhcPass _) = NoExtField
 type instance XSectionR      (GhcPass _) = NoExtField
@@ -575,7 +582,9 @@ type instance XMultiIf       GhcPs = NoExtField
 type instance XMultiIf       GhcRn = NoExtField
 type instance XMultiIf       GhcTc = Type
 
-type instance XLet           (GhcPass _) = NoExtField
+type instance XLet           GhcPs = AA
+type instance XLet           GhcRn = NoExtField
+type instance XLet           GhcTc = NoExtField
 
 type instance XDo            GhcPs = NoExtField
 type instance XDo            GhcRn = NoExtField
@@ -593,7 +602,9 @@ type instance XRecordUpd     GhcPs = NoExtField
 type instance XRecordUpd     GhcRn = NoExtField
 type instance XRecordUpd     GhcTc = RecordUpdTc
 
-type instance XExprWithTySig (GhcPass _) = NoExtField
+type instance XExprWithTySig GhcPs = AA
+type instance XExprWithTySig GhcRn = NoExtField
+type instance XExprWithTySig GhcTc = NoExtField
 
 type instance XArithSeq      GhcPs = NoExtField
 type instance XArithSeq      GhcRn = NoExtField
@@ -1297,13 +1308,23 @@ type instance XCmdArrApp  GhcPs = NoExtField
 type instance XCmdArrApp  GhcRn = NoExtField
 type instance XCmdArrApp  GhcTc = Type
 
-type instance XCmdArrForm (GhcPass _) = NoExtField
+type instance XCmdArrForm GhcPs = AA
+type instance XCmdArrForm GhcRn = NoExtField
+type instance XCmdArrForm GhcTc = NoExtField
+
 type instance XCmdApp     (GhcPass _) = NoExtField
-type instance XCmdLam     (GhcPass _) = NoExtField
+
+type instance XCmdLam     GhcPs = AA
+type instance XCmdLam     GhcRn = NoExtField
+type instance XCmdLam     GhcTc = NoExtField
+
 type instance XCmdPar     (GhcPass _) = NoExtField
 type instance XCmdCase    (GhcPass _) = NoExtField
 type instance XCmdIf      (GhcPass _) = NoExtField
-type instance XCmdLet     (GhcPass _) = NoExtField
+
+type instance XCmdLet     GhcPs = AA
+type instance XCmdLet     GhcRn = NoExtField
+type instance XCmdLet     GhcTc = NoExtField
 
 type instance XCmdDo      GhcPs = NoExtField
 type instance XCmdDo      GhcRn = NoExtField

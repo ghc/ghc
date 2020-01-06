@@ -143,6 +143,11 @@ data AA = AA [AddAnn] -- ^ Annotations added by the Parser
 noAnn :: AA
 noAnn = AANotUsed
 
+addAnns :: AA -> [AddAnn] -> AA
+addAnns (AA as1) as2 = AA (as1 ++ as2)
+addAnns AANotUsed [] = AANotUsed
+addAnns AANotUsed as = AA as
+
 instance Outputable AA where
   ppr x = text (show x)
 

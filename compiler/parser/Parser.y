@@ -1089,8 +1089,9 @@ topdecl :: { LHsDecl GhcPs }
 --
 cl_decl :: { LTyClDecl GhcPs }
         : 'class' tycl_hdr fds where_cls
-                {% amms (mkClassDecl (comb4 $1 $2 $3 $4) $2 $3 (snd $ unLoc $4))
-                        (mj AnnClass $1:(fst $ unLoc $3)++(fst $ unLoc $4)) }
+                {% amms (mkClassDecl (comb4 $1 $2 $3 $4) $2 $3 (snd $ unLoc $4)
+                         (AA (mj AnnClass $1:(fst $ unLoc $3)++(fst $ unLoc $4))))
+                         (mj AnnClass $1:(fst $ unLoc $3)++(fst $ unLoc $4)) }
 
 -- Type declarations (toplevel)
 --
@@ -1104,7 +1105,8 @@ ty_decl :: { LTyClDecl GhcPs }
                 --
                 -- Note the use of type for the head; this allows
                 -- infix type constructors to be declared
-                {% amms (mkTySynonym (comb2 $1 $4) $2 $4)
+                {% amms (mkTySynonym (comb2 $1 $4) $2 $4
+                        (AA [mj AnnType $1,mj AnnEqual $3]))
                         [mj AnnType $1,mj AnnEqual $3] }
 
            -- type family declarations
@@ -1113,7 +1115,9 @@ ty_decl :: { LTyClDecl GhcPs }
                 -- Note the use of type for the head; this allows
                 -- infix type constructors to be declared
                 {% amms (mkFamDecl (comb4 $1 $3 $4 $5) (snd $ unLoc $6) $3
-                                   (snd $ unLoc $4) (snd $ unLoc $5))
+                                   (snd $ unLoc $4) (snd $ unLoc $5)
+                           (AA (mj AnnType $1:mj AnnFamily $2:(fst $ unLoc $4)
+                           ++ (fst $ unLoc $5) ++ (fst $ unLoc $6))))
                         (mj AnnType $1:mj AnnFamily $2:(fst $ unLoc $4)
                            ++ (fst $ unLoc $5) ++ (fst $ unLoc $6)) }
 
@@ -1121,7 +1125,8 @@ ty_decl :: { LTyClDecl GhcPs }
         | data_or_newtype capi_ctype tycl_hdr constrs maybe_derivings
                 {% amms (mkTyData (comb4 $1 $3 $4 $5) (snd $ unLoc $1) $2 $3
                            Nothing (reverse (snd $ unLoc $4))
-                                   (fmap reverse $5))
+                                   (fmap reverse $5)
+                           (AA ((fst $ unLoc $1):(fst $ unLoc $4))))
                                    -- We need the location on tycl_hdr in case
                                    -- constrs and deriving are both empty
                         ((fst $ unLoc $1):(fst $ unLoc $4)) }
@@ -1132,7 +1137,8 @@ ty_decl :: { LTyClDecl GhcPs }
                  maybe_derivings
             {% amms (mkTyData (comb4 $1 $3 $5 $6) (snd $ unLoc $1) $2 $3
                             (snd $ unLoc $4) (snd $ unLoc $5)
-                            (fmap reverse $6) )
+                            (fmap reverse $6)
+                            (AA ((fst $ unLoc $1):(fst $ unLoc $4)++(fst $ unLoc $5))))
                                    -- We need the location on tycl_hdr in case
                                    -- constrs and deriving are both empty
                     ((fst $ unLoc $1):(fst $ unLoc $4)++(fst $ unLoc $5)) }
@@ -1140,13 +1146,15 @@ ty_decl :: { LTyClDecl GhcPs }
           -- data/newtype family
         | 'data' 'family' type opt_datafam_kind_sig
                 {% amms (mkFamDecl (comb3 $1 $2 $4) DataFamily $3
-                                   (snd $ unLoc $4) Nothing)
+                                   (snd $ unLoc $4) Nothing
+                          (AA (mj AnnData $1:mj AnnFamily $2:(fst $ unLoc $4))))
                         (mj AnnData $1:mj AnnFamily $2:(fst $ unLoc $4)) }
 
 -- standalone kind signature
 standalone_kind_sig :: { LStandaloneKindSig GhcPs }
   : 'type' sks_vars '::' ktypedoc
-      {% amms (mkStandaloneKindSig (comb2 $1 $4) $2 $4)
+      {% amms (mkStandaloneKindSig (comb2 $1 $4) $2 $4
+               (AA [mj AnnType $1,mu AnnDcolon $3]))
               [mj AnnType $1,mu AnnDcolon $3] }
 
 -- See also: sig_vars
@@ -1171,7 +1179,8 @@ inst_decl :: { LInstDecl GhcPs }
            -- type instance declarations
         | 'type' 'instance' ty_fam_inst_eqn
                 {% ams $3 (fst $ unLoc $3)
-                >> amms (mkTyFamInst (comb2 $1 $3) (snd $ unLoc $3))
+                >> amms (mkTyFamInst (comb2 $1 $3) (snd $ unLoc $3)
+                        (AA (mj AnnType $1:mj AnnInstance $2:(fst $ unLoc $3))))
                     (mj AnnType $1:mj AnnInstance $2:(fst $ unLoc $3)) }
 
           -- data/newtype instance declaration
@@ -1179,7 +1188,8 @@ inst_decl :: { LInstDecl GhcPs }
                           maybe_derivings
             {% amms (mkDataFamInst (comb4 $1 $4 $5 $6) (snd $ unLoc $1) $3 (snd $ unLoc $4)
                                       Nothing (reverse (snd  $ unLoc $5))
-                                              (fmap reverse $6))
+                                              (fmap reverse $6)
+                      (AA ((fst $ unLoc $1):mj AnnInstance $2:(fst $ unLoc $4)++(fst $ unLoc $5))))
                     ((fst $ unLoc $1):mj AnnInstance $2:(fst $ unLoc $4)++(fst $ unLoc $5)) }
 
           -- GADT instance declaration
@@ -1188,7 +1198,9 @@ inst_decl :: { LInstDecl GhcPs }
                  maybe_derivings
             {% amms (mkDataFamInst (comb4 $1 $4 $6 $7) (snd $ unLoc $1) $3 (snd $ unLoc $4)
                                    (snd $ unLoc $5) (snd $ unLoc $6)
-                                   (fmap reverse $7))
+                                   (fmap reverse $7)
+                     (AA ((fst $ unLoc $1):mj AnnInstance $2
+                       :(fst $ unLoc $4)++(fst $ unLoc $5)++(fst $ unLoc $6))))
                     ((fst $ unLoc $1):mj AnnInstance $2
                        :(fst $ unLoc $4)++(fst $ unLoc $5)++(fst $ unLoc $6)) }
 
@@ -1297,7 +1309,8 @@ at_decl_cls :: { LHsDecl GhcPs }
         :  -- data family declarations, with optional 'family' keyword
           'data' opt_family type opt_datafam_kind_sig
                 {% amms (liftM mkTyClD (mkFamDecl (comb3 $1 $3 $4) DataFamily $3
-                                                  (snd $ unLoc $4) Nothing))
+                                                  (snd $ unLoc $4) Nothing
+                        (AA (mj AnnData $1:$2++(fst $ unLoc $4)))))
                         (mj AnnData $1:$2++(fst $ unLoc $4)) }
 
            -- type family declarations, with optional 'family' keyword
@@ -1306,23 +1319,27 @@ at_decl_cls :: { LHsDecl GhcPs }
                {% amms (liftM mkTyClD
                         (mkFamDecl (comb3 $1 $2 $3) OpenTypeFamily $2
                                    (fst . snd $ unLoc $3)
-                                   (snd . snd $ unLoc $3)))
+                                   (snd . snd $ unLoc $3)
+                         (AA (mj AnnType $1:(fst $ unLoc $3)))))
                        (mj AnnType $1:(fst $ unLoc $3)) }
         | 'type' 'family' type opt_at_kind_inj_sig
                {% amms (liftM mkTyClD
                         (mkFamDecl (comb3 $1 $3 $4) OpenTypeFamily $3
                                    (fst . snd $ unLoc $4)
-                                   (snd . snd $ unLoc $4)))
+                                   (snd . snd $ unLoc $4)
+                         (AA (mj AnnType $1:mj AnnFamily $2:(fst $ unLoc $4)))))
                        (mj AnnType $1:mj AnnFamily $2:(fst $ unLoc $4)) }
 
            -- default type instances, with optional 'instance' keyword
         | 'type' ty_fam_inst_eqn
                 {% ams $2 (fst $ unLoc $2) >>
-                   amms (liftM mkInstD (mkTyFamInst (comb2 $1 $2) (snd $ unLoc $2)))
+                   amms (liftM mkInstD (mkTyFamInst (comb2 $1 $2) (snd $ unLoc $2)
+                          (AA (mj AnnType $1:(fst $ unLoc $2)))))
                         (mj AnnType $1:(fst $ unLoc $2)) }
         | 'type' 'instance' ty_fam_inst_eqn
                 {% ams $3 (fst $ unLoc $3) >>
-                   amms (liftM mkInstD (mkTyFamInst (comb2 $1 $3) (snd $ unLoc $3)))
+                   amms (liftM mkInstD (mkTyFamInst (comb2 $1 $3) (snd $ unLoc $3)
+                              (AA (mj AnnType $1:mj AnnInstance $2:(fst $ unLoc $3)))))
                         (mj AnnType $1:mj AnnInstance $2:(fst $ unLoc $3)) }
 
 opt_family   :: { [AddAnn] }
@@ -1341,14 +1358,16 @@ at_decl_inst :: { LInstDecl GhcPs }
                 -- Note the use of type for the head; this allows
                 -- infix type constructors and type patterns
                 {% ams $3 (fst $ unLoc $3) >>
-                   amms (mkTyFamInst (comb2 $1 $3) (snd $ unLoc $3))
+                   amms (mkTyFamInst (comb2 $1 $3) (snd $ unLoc $3)
+                          (AA (mj AnnType $1:$2++(fst $ unLoc $3))))
                         (mj AnnType $1:$2++(fst $ unLoc $3)) }
 
         -- data/newtype instance declaration, with optional 'instance' keyword
         | data_or_newtype opt_instance capi_ctype tycl_hdr_inst constrs maybe_derivings
                {% amms (mkDataFamInst (comb4 $1 $4 $5 $6) (snd $ unLoc $1) $3 (snd $ unLoc $4)
                                     Nothing (reverse (snd $ unLoc $5))
-                                            (fmap reverse $6))
+                                            (fmap reverse $6)
+                        (AA ((fst $ unLoc $1):$2++(fst $ unLoc $4)++(fst $ unLoc $5))))
                        ((fst $ unLoc $1):$2++(fst $ unLoc $4)++(fst $ unLoc $5)) }
 
         -- GADT instance declaration, with optional 'instance' keyword
@@ -1357,7 +1376,8 @@ at_decl_inst :: { LInstDecl GhcPs }
                  maybe_derivings
                 {% amms (mkDataFamInst (comb4 $1 $4 $6 $7) (snd $ unLoc $1) $3
                                 (snd $ unLoc $4) (snd $ unLoc $5) (snd $ unLoc $6)
-                                (fmap reverse $7))
+                                (fmap reverse $7)
+                       (AA ((fst $ unLoc $1):$2++(fst $ unLoc $4)++(fst $ unLoc $5)++(fst $ unLoc $6))))
                         ((fst $ unLoc $1):$2++(fst $ unLoc $4)++(fst $ unLoc $5)++(fst $ unLoc $6)) }
 
 data_or_newtype :: { Located (AddAnn, NewOrData) }
@@ -1447,7 +1467,8 @@ stand_alone_deriving :: { LDerivDecl GhcPs }
 
 role_annot :: { LRoleAnnotDecl GhcPs }
 role_annot : 'type' 'role' oqtycon maybe_roles
-          {% amms (mkRoleAnnotDecl (comb3 $1 $3 $4) $3 (reverse (unLoc $4)))
+          {% amms (mkRoleAnnotDecl (comb3 $1 $3 $4) $3 (reverse (unLoc $4))
+                   (AA [mj AnnType $1,mj AnnRole $2]))
                   [mj AnnType $1,mj AnnRole $2] }
 
 -- Reversed!
@@ -2064,7 +2085,7 @@ atype :: { LHsType GhcPs }
         | PREFIX_BANG  atype             {% ams (sLL $1 $> (mkBangTy SrcStrict $2)) [mj AnnBang $1] }
 
         | '{' fielddecls '}'             {% amms (checkRecordSyntax
-                                                    (sLL $1 $> $ HsRecTy noExtField $2))
+                                                    (sLL $1 $> $ HsRecTy (AA [moc $1,mcc $3]) $2))
                                                         -- Constructor sigs only
                                                  [moc $1,mcc $3] }
         | '(' ')'                        {% ams (sLL $1 $> $ HsTupleTy noExtField
@@ -2577,8 +2598,9 @@ exp   :: { ECP }
                                 { ECP $
                                    runECP_PV $1 >>= \ $1 ->
                                    rejectPragmaPV $1 >>
-                                   amms (mkHsTySigPV (comb2 $1 $>) $1 $3)
-                                       [mu AnnDcolon $2] }
+                                   amms (mkHsTySigPV (comb2 $1 $>) $1 $3
+                                          (ma AnnDcolon $2))
+                                          [mu AnnDcolon $2] }
         | infixexp '-<' exp     {% runECP_P $1 >>= \ $1 ->
                                    runECP_P $3 >>= \ $3 ->
                                    fmap ecpFromCmd $
@@ -2615,7 +2637,8 @@ infixexp :: { ECP }
                                  runECP_PV $1 >>= \ $1 ->
                                  runECP_PV $3 >>= \ $3 ->
                                  rejectPragmaPV $1 >>
-                                 amms (mkHsOpAppPV (comb2 $1 $>) $1 $2 $3)
+                                 amms (mkHsOpAppPV (comb2 $1 $>) $1 $2 $3
+                                       (AA [mj AnnVal $2]))
                                      [mj AnnVal $2] }
                  -- AnnVal annotation for NPlusKPat, which discards the operator
 
@@ -2633,7 +2656,8 @@ exp_prag(e) :: { ECP }
 exp10 :: { ECP }
         : '-' fexp                      { ECP $
                                            runECP_PV $2 >>= \ $2 ->
-                                           amms (mkHsNegAppPV (comb2 $1 $>) $2)
+                                           amms (mkHsNegAppPV (comb2 $1 $>) $2
+                                                (AA [mj AnnMinus $1]))
                                                [mj AnnMinus $1] }
         | fexp                         { $1 }
 
@@ -2759,11 +2783,14 @@ aexp    :: { ECP }
                             [sLL $1 $> $ Match { m_ext = noExtField
                                                , m_ctxt = LambdaExpr
                                                , m_pats = $2:$3
-                                               , m_grhss = unguardedGRHSs $5 }]))
+                                               , m_grhss = unguardedGRHSs $5 }])
+                           (AA [mj AnnLam $1, mu AnnRarrow $4]))
                           [mj AnnLam $1, mu AnnRarrow $4] }
         | 'let' binds 'in' exp          {  ECP $
                                            runECP_PV $4 >>= \ $4 ->
-                                           amms (mkHsLetPV (comb2 $1 $>) (snd (unLoc $2)) $4)
+                                           amms (mkHsLetPV (comb2 $1 $>) (snd (unLoc $2)) $4
+                                                 (AA (mj AnnLet $1:mj AnnIn $3
+                                                 :(fst $ unLoc $2))))
                                                (mj AnnLet $1:mj AnnIn $3
                                                  :(fst $ unLoc $2)) }
         | '\\' 'lcase' altslist
@@ -2893,7 +2920,7 @@ aexp2   :: { ECP }
         -- arrow notation extension
         | '(|' aexp2 cmdargs '|)'  {% runECP_P $2 >>= \ $2 ->
                                       fmap ecpFromCmd $
-                                      ams (sLL $1 $> $ HsCmdArrForm noExtField $2 Prefix
+                                      ams (sLL $1 $> $ HsCmdArrForm (AA [mu AnnOpenB $1,mu AnnCloseB $4]) $2 Prefix
                                                            Nothing (reverse $3))
                                           [mu AnnOpenB $1,mu AnnCloseB $4] }
 

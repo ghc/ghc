@@ -32,7 +32,8 @@ testOneFile libdir fileName = do
        p <- parseOneFile libdir fileName
        let
          origAst = showSDoc unsafeGlobalDynFlags
-                     $ showAstData BlankSrcSpan (pm_parsed_source p)
+                     $ showAstData BlankSrcSpan BlankApiAnnotations
+                                                         (pm_parsed_source p)
          pped    = pragmas ++ "\n" ++ pp (pm_parsed_source p)
          anns    = pm_annotations p
          pragmas = getPragmas anns
@@ -48,7 +49,8 @@ testOneFile libdir fileName = do
 
        let newAstStr :: String
            newAstStr = showSDoc unsafeGlobalDynFlags
-                         $ showAstData BlankSrcSpan (pm_parsed_source p')
+                         $ showAstData BlankSrcSpan BlankApiAnnotations
+                                                         (pm_parsed_source p')
        writeFile newAstFile newAstStr
 
        if origAst == newAstStr
@@ -101,5 +103,4 @@ getPragmas anns = pragmaStr
 
 pp :: (Outputable a) => a -> String
 pp a = showPpr unsafeGlobalDynFlags a
-
 
