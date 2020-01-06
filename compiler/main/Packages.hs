@@ -1028,7 +1028,7 @@ findWiredInPackages dflags prec_map pkgs vis_map = do
         -- version).
         --
         -- You can also override the default choice by using -ignore-package:
-        -- this works even when there is no exposed wired in package
+        -- this works even when there is no exposed wired-in package
         -- available.
         --
         findWiredInPackage :: [PackageConfig] -> WiredInUnitId
