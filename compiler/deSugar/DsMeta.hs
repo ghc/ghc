@@ -70,6 +70,7 @@ import Class
 import HscTypes ( MonadThings )
 import DataCon
 import Var
+import DsBinds
 
 import GHC.TypeLits
 import Data.Kind (Constraint)
@@ -85,12 +86,14 @@ data MetaWrappers = MetaWrappers {
     , monadWrapper :: CoreExpr -> CoreExpr
       -- Apply the container typed variable `m` to the argument type `T` to get `m T`.
     , metaTy :: Type -> Type
+      -- Information about the wrappers which be printed to be inspected
+    , _debugWrappers :: (HsWrapper, HsWrapper, Type)
     }
 
 -- | Construct the functions which will apply the relevant part of the
 -- QuoteWrapper to identifiers during desugaring.
 mkMetaWrappers :: QuoteWrapper -> DsM MetaWrappers
-mkMetaWrappers (QuoteWrapper quote_var_raw m_var) = do
+mkMetaWrappers q@(QuoteWrapper quote_var_raw m_var) = do
       let quote_var = Var quote_var_raw
       -- Get the superclass selector to select the Monad dictionary, going
       -- to be used to construct the monadWrapper.
@@ -112,10 +115,13 @@ mkMetaWrappers (QuoteWrapper quote_var_raw m_var) = do
 
       let m_ty = Type m_var
           -- Construct the contents of MetaWrappers
-          quoteWrapper e = mkCoreApps e [m_ty, quote_var]
-          monadWrapper e = mkCoreApps e [m_ty, mkCoreApps (Var monad_sel) [m_ty, quote_var]]
+          quoteWrapper = applyQuoteWrapper q
+          monadWrapper = mkWpTyApps [m_var] <.> mkWpEvApps [EvExpr $ mkCoreApps (Var monad_sel) [m_ty, quote_var]]
           tyWrapper t = mkAppTy m_var t
-      return (MetaWrappers quoteWrapper monadWrapper tyWrapper)
+          debug = (quoteWrapper, monadWrapper, m_var)
+      q_f <- dsHsWrapper quoteWrapper
+      m_f <- dsHsWrapper monadWrapper
+      return (MetaWrappers q_f m_f tyWrapper debug)
 
 -- Turn A into m A
 wrapName :: Name -> MetaM Type
