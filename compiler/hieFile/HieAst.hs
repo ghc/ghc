@@ -798,7 +798,7 @@ instance ( a ~ GhcPass p
       SumPat _ pat _ _ ->
         [ toHie $ PS rsp scope pscope pat
         ]
-      ConPatIn c dets ->
+      ConPatIn _ c dets ->
         [ toHie $ C Use c
         , toHie $ contextify dets
         ]

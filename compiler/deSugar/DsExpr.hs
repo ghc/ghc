@@ -695,7 +695,8 @@ ds_expr _ expr@(RecordUpd { rupd_expr = record_expr, rupd_flds = fields
 
                  req_wrap = dict_req_wrap <.> mkWpTyApps in_inst_tys
 
-                 pat = noLoc $ ConPatOut { pat_con = noLoc con
+                 pat = noLoc $ ConPatOut { pat_o_ext = noExtField
+                                         , pat_con = noLoc con
                                          , pat_tvs = ex_tvs
                                          , pat_dicts = eqs_vars ++ theta_vars
                                          , pat_binds = emptyTcEvBinds
@@ -978,7 +979,7 @@ dsDo stmts
                                                     [mfix_pat] body]
                                , mg_ext = MatchGroupTc [tup_ty] body_ty
                                , mg_origin = Generated })
-        mfix_pat     = noLoc $ LazyPat noAnn $ mkBigLHsPatTupId rec_tup_pats
+        mfix_pat     = noLoc $ LazyPat noExtField $ mkBigLHsPatTupId rec_tup_pats
         body         = noLoc $ HsDo body_ty
                                 DoExpr (noLoc (rec_stmts ++ [ret_stmt]))
         ret_app      = nlHsSyntaxApps return_op [mkBigLHsTupId rets]
