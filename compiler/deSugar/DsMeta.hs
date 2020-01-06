@@ -87,6 +87,34 @@ data MetaWrappers = MetaWrappers {
     , metaTy :: Type -> Type
     }
 
+mkMetaWrappers :: QuoteWrapper -> DsM MetaWrappers
+mkMetaWrappers (QuoteWrapper quote_var_raw m_var) = do
+      let quote_var = Var quote_var_raw
+      -- Get the superclass selector to select the Monad dictionary, going
+      -- to be used to construct the monadWrapper.
+      quote_tc <- dsLookupTyCon quoteClassName
+      monad_tc <- dsLookupTyCon monadClassName
+      let Just cls = tyConClass_maybe quote_tc
+          Just monad_cls = tyConClass_maybe monad_tc
+          -- Quote m -> Monad m
+          monad_sel = classSCSelId cls 0
+
+          -- Only used for the defensive assertion that the selector has
+          -- the expected type
+          tyvars = dataConUserTyVarBinders (classDataCon cls)
+          expected_ty = mkForAllTys tyvars $
+                          mkInvisFunTy (mkClassPred cls (mkTyVarTys (binderVars tyvars)))
+                                       (mkClassPred monad_cls (mkTyVarTys (binderVars tyvars)))
+
+      MASSERT2( idType monad_sel `eqType` expected_ty, ppr monad_sel $$ ppr expected_ty)
+
+      let m_ty = Type m_var
+          -- Construct the contents of MetaWrappers
+          quoteWrapper e = mkCoreApps e [m_ty, quote_var]
+          monadWrapper e = mkCoreApps e [m_ty, mkCoreApps (Var monad_sel) [m_ty, quote_var]]
+          tyWrapper t = mkAppTy m_var t
+      return (MetaWrappers quoteWrapper monadWrapper tyWrapper)
+
 -- Turn A into m A
 wrapName :: Name -> MetaM Type
 wrapName n = do
@@ -113,34 +141,9 @@ dsBracket wrap brack splices
       -- In the overloaded case we have to get given a wrapper, it is just
       -- for variable quotations that there is no wrapper, because they
       -- have a simple type.
-      let (QuoteWrapper quote_var_raw m_var)  = expectJust "runOverloaded" wrap
-          quote_var = Var quote_var_raw
-      -- Get the superclass selector to select the Monad dictionary, going
-      -- to be used to construct the monadWrapper.
-      quote_tc <- dsLookupTyCon quoteClassName
-      monad_tc <- dsLookupTyCon monadClassName
-      let Just cls = tyConClass_maybe quote_tc
-          Just monad_cls = tyConClass_maybe monad_tc
-          -- Quote m -> Monad m
-          monad_sel = classSCSelId cls 0
+      mw <- mkMetaWrappers (expectJust "runOverloaded" wrap)
+      runReaderT (mapReaderT (dsExtendMetaEnv new_bit) act) mw
 
-          -- Only used for the defensive assertion that the selector has
-          -- the expected type
-          tyvars = dataConUserTyVarBinders (classDataCon cls)
-          expected_ty = mkForAllTys tyvars $
-                          mkInvisFunTy (mkClassPred cls (mkTyVarTys (binderVars tyvars)))
-                                       (mkClassPred monad_cls (mkTyVarTys (binderVars tyvars)))
-
-      MASSERT2( idType monad_sel `eqType` expected_ty, ppr monad_sel $$ ppr expected_ty)
-
-      let m_ty = Type m_var
-          -- Construct the contents of MetaWrappers
-          quoteWrapper e = mkCoreApps e [m_ty, quote_var]
-          monadWrapper e = mkCoreApps e [m_ty, mkCoreApps (Var monad_sel) [m_ty, quote_var]]
-          tyWrapper t = mkAppTy m_var t
-
-      runReaderT (mapReaderT (dsExtendMetaEnv new_bit) act)
-                 (MetaWrappers quoteWrapper monadWrapper tyWrapper)
 
     new_bit = mkNameEnv [(n, DsSplice (unLoc e))
                         | PendingTcSplice n e <- splices]
