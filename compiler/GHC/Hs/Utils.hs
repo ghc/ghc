@@ -194,9 +194,10 @@ mkHsAppType e t = addCLoc e t_body (HsAppType noExtField e paren_wct)
 mkHsAppTypes :: LHsExpr GhcRn -> [LHsWcType GhcRn] -> LHsExpr GhcRn
 mkHsAppTypes = foldl' mkHsAppType
 
-mkHsLam :: (XMG (GhcPass p) (LHsExpr (GhcPass p)) ~ NoExtField) =>
+mkHsLam :: (XMG (GhcPass p) (LHsExpr (GhcPass p)) ~ NoExtField,
+            XLam (GhcPass p) ~ ApiAnn) =>
   [LPat (GhcPass p)] -> LHsExpr (GhcPass p) -> LHsExpr (GhcPass p)
-mkHsLam pats body = mkHsPar (L (getLoc body) (HsLam noExtField matches))
+mkHsLam pats body = mkHsPar (L (getLoc body) (HsLam noAnn matches))
   where
     matches = mkMatchGroup Generated
                            [mkSimpleMatch LambdaExpr pats' body]
@@ -250,7 +251,8 @@ mkHsComp       :: HsStmtContext Name -> [ExprLStmt GhcPs] -> LHsExpr GhcPs
 
 mkNPat      :: Located (HsOverLit GhcPs) -> Maybe (SyntaxExpr GhcPs)
             -> Pat GhcPs
-mkNPlusKPat :: Located RdrName -> Located (HsOverLit GhcPs) -> Pat GhcPs
+mkNPlusKPat :: Located RdrName -> Located (HsOverLit GhcPs) -> ApiAnn
+            -> Pat GhcPs
 
 mkLastStmt :: Located (bodyR (GhcPass idR))
            -> StmtLR (GhcPass idL) (GhcPass idR) (Located (bodyR (GhcPass idR)))
@@ -288,8 +290,8 @@ mkHsCmdIf :: LHsExpr (GhcPass p) -> LHsCmd (GhcPass p) -> LHsCmd (GhcPass p)
 mkHsCmdIf c a b = HsCmdIf noExtField (Just noSyntaxExpr) c a b
 
 mkNPat lit neg     = NPat noExtField lit neg noSyntaxExpr
-mkNPlusKPat id lit
-  = NPlusKPat noExtField id lit (unLoc lit) noSyntaxExpr noSyntaxExpr
+mkNPlusKPat id lit anns
+  = NPlusKPat anns id lit (unLoc lit) noSyntaxExpr noSyntaxExpr
 
 mkTransformStmt    :: [ExprLStmt GhcPs] -> LHsExpr GhcPs
                    -> StmtLR GhcPs GhcPs (LHsExpr GhcPs)
@@ -349,7 +351,7 @@ mkRecStmt stmts  = emptyRecStmt { recS_stmts = stmts }
 -- | A useful function for building @OpApps@.  The operator is always a
 -- variable, and we don't know the fixity yet.
 mkHsOpApp :: LHsExpr GhcPs -> IdP GhcPs -> LHsExpr GhcPs -> HsExpr GhcPs
-mkHsOpApp e1 op e2 = OpApp noExtField e1 (noLoc (HsVar noExtField (noLoc op))) e2
+mkHsOpApp e1 op e2 = OpApp noAnn e1 (noLoc (HsVar noExtField (noLoc op))) e2
 
 unqualSplice :: RdrName
 unqualSplice = mkRdrUnqual (mkVarOccFS (fsLit "splice"))
@@ -478,7 +480,7 @@ nlHsCase :: LHsExpr GhcPs -> [LMatch GhcPs (LHsExpr GhcPs)]
          -> LHsExpr GhcPs
 nlList   :: [LHsExpr GhcPs] -> LHsExpr GhcPs
 
-nlHsLam match          = noLoc (HsLam noExtField (mkMatchGroup Generated [match]))
+nlHsLam match          = noLoc (HsLam noAnn (mkMatchGroup Generated [match]))
 nlHsPar e              = noLoc (HsPar noExtField e)
 
 -- | Note [Rebindable nlHsIf]

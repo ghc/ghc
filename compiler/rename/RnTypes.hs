@@ -1208,8 +1208,7 @@ right_op_ok _ _
 
 -- Parser initially makes negation bind more tightly than any other operator
 -- And "deriving" code should respect this (use HsPar if not)
-mkNegAppRn :: LHsExpr (GhcPass id) -> SyntaxExpr (GhcPass id)
-           -> RnM (HsExpr (GhcPass id))
+mkNegAppRn :: LHsExpr GhcRn -> SyntaxExpr GhcRn -> RnM (HsExpr GhcRn)
 mkNegAppRn neg_arg neg_name
   = ASSERT( not_op_app (unLoc neg_arg) )
     return (NegApp noExtField neg_arg neg_name)

@@ -1867,7 +1867,8 @@ nlHsAppType e s = noLoc (HsAppType noExtField e hs_ty)
     hs_ty = mkHsWildCardBndrs $ parenthesizeHsType appPrec (typeToLHsType s)
 
 nlExprWithTySig :: LHsExpr GhcPs -> Type -> LHsExpr GhcPs
-nlExprWithTySig e s = noLoc $ ExprWithTySig noExtField (parenthesizeHsExpr sigPrec e) hs_ty
+nlExprWithTySig e s
+  = noLoc $ ExprWithTySig noAnn (parenthesizeHsExpr sigPrec e) hs_ty
   where
     hs_ty = mkLHsSigWcType (typeToLHsType s)
 

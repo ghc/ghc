@@ -286,10 +286,20 @@ type instance XWildPat GhcRn = NoExtField
 type instance XWildPat GhcTc = Type
 
 type instance XVarPat  (GhcPass _) = NoExtField
-type instance XLazyPat (GhcPass _) = AA -- For '~'
-type instance XAsPat   (GhcPass _) = AA -- For '@'
+
+type instance XLazyPat GhcPs = ApiAnn -- For '~'
+type instance XLazyPat GhcRn = NoExtField
+type instance XLazyPat GhcTc = NoExtField
+
+type instance XAsPat   GhcPs = ApiAnn -- For '@'
+type instance XAsPat   GhcRn = NoExtField
+type instance XAsPat   GhcTc = NoExtField
+
 type instance XParPat  (GhcPass _) = NoExtField
-type instance XBangPat (GhcPass _) = AA -- For '!'
+
+type instance XBangPat GhcPs = ApiAnn -- For '!'
+type instance XBangPat GhcRn = NoExtField
+type instance XBangPat GhcTc = NoExtField
 
 -- Note: XListPat cannot be extended when using GHC 8.0.2 as the bootstrap
 -- compiler, as it triggers https://gitlab.haskell.org/ghc/ghc/issues/14396 for
@@ -298,15 +308,15 @@ type instance XListPat GhcPs = NoExtField
 type instance XListPat GhcRn = Maybe (SyntaxExpr GhcRn)
 type instance XListPat GhcTc = ListPatTc
 
-type instance XTuplePat GhcPs = AA
+type instance XTuplePat GhcPs = ApiAnn
 type instance XTuplePat GhcRn = NoExtField
 type instance XTuplePat GhcTc = [Type]
 
-type instance XSumPat GhcPs = AA
+type instance XSumPat GhcPs = ApiAnn
 type instance XSumPat GhcRn = NoExtField
 type instance XSumPat GhcTc = [Type]
 
-type instance XViewPat GhcPs = AA
+type instance XViewPat GhcPs = ApiAnn
 type instance XViewPat GhcRn = NoExtField
 type instance XViewPat GhcTc = Type
 
@@ -317,11 +327,11 @@ type instance XNPat GhcPs = NoExtField
 type instance XNPat GhcRn = NoExtField
 type instance XNPat GhcTc = Type
 
-type instance XNPlusKPat GhcPs = NoExtField
+type instance XNPlusKPat GhcPs = ApiAnn
 type instance XNPlusKPat GhcRn = NoExtField
 type instance XNPlusKPat GhcTc = Type
 
-type instance XSigPat GhcPs = NoExtField
+type instance XSigPat GhcPs = ApiAnn
 type instance XSigPat GhcRn = NoExtField
 type instance XSigPat GhcTc = Type
 
