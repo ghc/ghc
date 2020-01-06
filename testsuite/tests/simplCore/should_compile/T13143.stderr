@@ -8,7 +8,7 @@ Rec {
 T13143.$wf [InlPrag=NOINLINE, Occ=LoopBreaker]
   :: forall a. GHC.Prim.Void# -> a
 [GblId, Arity=1, Caf=NoCafRefs, Str=<B,A>b, Unf=OtherCon []]
-T13143.$wf = \ (@ a) _ [Occ=Dead] -> T13143.$wf @ a GHC.Prim.void#
+T13143.$wf = \ (@a) _ [Occ=Dead] -> T13143.$wf @a GHC.Prim.void#
 end Rec }
 
 -- RHS size: {terms: 4, types: 4, coercions: 0, joins: 0/0}
@@ -20,8 +20,8 @@ f [InlPrag=NOUSERINLINE[0]] :: forall a. Int -> a
  Unf=Unf{Src=InlineStable, TopLvl=True, Value=True, ConLike=True,
          WorkFree=True, Expandable=True,
          Guidance=ALWAYS_IF(arity=1,unsat_ok=True,boring_ok=True)
-         Tmpl= \ (@ a) _ [Occ=Dead] -> T13143.$wf @ a GHC.Prim.void#}]
-f = \ (@ a) _ [Occ=Dead] -> T13143.$wf @ a GHC.Prim.void#
+         Tmpl= \ (@a) _ [Occ=Dead] -> T13143.$wf @a GHC.Prim.void#}]
+f = \ (@a) _ [Occ=Dead] -> T13143.$wf @a GHC.Prim.void#
 
 -- RHS size: {terms: 1, types: 0, coercions: 0, joins: 0/0}
 T13143.$trModule4 :: GHC.Prim.Addr#
@@ -70,7 +70,7 @@ T13143.$trModule
 -- RHS size: {terms: 2, types: 1, coercions: 0, joins: 0/0}
 lvl :: Int
 [GblId, Str=b]
-lvl = T13143.$wf @ Int GHC.Prim.void#
+lvl = T13143.$wf @Int GHC.Prim.void#
 
 Rec {
 -- RHS size: {terms: 28, types: 7, coercions: 0, joins: 0/0}
