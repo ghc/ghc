@@ -4,11 +4,11 @@ T8274.$trModule4 :: Addr#
 T8274.$trModule4 = "main"#
 T8274.$trModule2 :: Addr#
 T8274.$trModule2 = "T8274"#
-$krep = GHC.Types.KindRepTyConApp GHC.Types.$tcWord# (GHC.Types.[] @ GHC.Types.KindRep)
-$krep1 = GHC.Types.KindRepTyConApp GHC.Types.$tcChar# (GHC.Types.[] @ GHC.Types.KindRep)
-$krep2 = GHC.Types.KindRepTyConApp GHC.Types.$tcDouble# (GHC.Types.[] @ GHC.Types.KindRep)
-$krep3 = GHC.Types.KindRepTyConApp GHC.Types.$tcFloat# (GHC.Types.[] @ GHC.Types.KindRep)
-$krep4 = GHC.Types.KindRepTyConApp GHC.Types.$tcInt# (GHC.Types.[] @ GHC.Types.KindRep)
+$krep = GHC.Types.KindRepTyConApp GHC.Types.$tcWord# (GHC.Types.[] @GHC.Types.KindRep)
+$krep1 = GHC.Types.KindRepTyConApp GHC.Types.$tcChar# (GHC.Types.[] @GHC.Types.KindRep)
+$krep2 = GHC.Types.KindRepTyConApp GHC.Types.$tcDouble# (GHC.Types.[] @GHC.Types.KindRep)
+$krep3 = GHC.Types.KindRepTyConApp GHC.Types.$tcFloat# (GHC.Types.[] @GHC.Types.KindRep)
+$krep4 = GHC.Types.KindRepTyConApp GHC.Types.$tcInt# (GHC.Types.[] @GHC.Types.KindRep)
 T8274.$tcP2 :: Addr#
 T8274.$tcP2 = "P"#
 T8274.$tcP = GHC.Types.TyCon 7483823267324216774## 12197132127820124256## T8274.$trModule T8274.$tcP1 0# GHC.Types.krep$*

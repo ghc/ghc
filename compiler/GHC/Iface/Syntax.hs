@@ -1290,8 +1290,8 @@ pprIfaceExpr _       (IfaceLcl v)       = ppr v
 pprIfaceExpr _       (IfaceExt v)       = ppr v
 pprIfaceExpr _       (IfaceLit l)       = ppr l
 pprIfaceExpr _       (IfaceFCall cc ty) = braces (ppr cc <+> ppr ty)
-pprIfaceExpr _       (IfaceType ty)     = char '@' <+> pprParendIfaceType ty
-pprIfaceExpr _       (IfaceCo co)       = text "@~" <+> pprParendIfaceCoercion co
+pprIfaceExpr _       (IfaceType ty)     = char '@' <> pprParendIfaceType ty
+pprIfaceExpr _       (IfaceCo co)       = text "@~" <> pprParendIfaceCoercion co
 
 pprIfaceExpr add_par app@(IfaceApp _ _) = add_par (pprIfaceApp app [])
 pprIfaceExpr _       (IfaceTuple c as)  = tupleParens c (pprWithCommas ppr as)

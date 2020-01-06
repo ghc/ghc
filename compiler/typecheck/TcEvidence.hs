@@ -924,7 +924,7 @@ pprHsWrapper wrap pp_thing_inside
     help it (WpCast co)   = add_parens $ sep [it False, nest 2 (text "|>"
                                               <+> pprParendCo co)]
     help it (WpEvApp id)  = no_parens  $ sep [it True, nest 2 (ppr id)]
-    help it (WpTyApp ty)  = no_parens  $ sep [it True, text "@" <+> pprParendType ty]
+    help it (WpTyApp ty)  = no_parens  $ sep [it True, text "@" <> pprParendType ty]
     help it (WpEvLam id)  = add_parens $ sep [ text "\\" <> pprLamBndr id <> dot, it False]
     help it (WpTyLam tv)  = add_parens $ sep [text "/\\" <> pprLamBndr tv <> dot, it False]
     help it (WpLet binds) = add_parens $ sep [text "let" <+> braces (ppr binds), it False]

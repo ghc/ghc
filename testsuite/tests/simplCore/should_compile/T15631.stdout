@@ -1,7 +1,7 @@
       case GHC.List.$wlenAcc
-      case GHC.List.$wlenAcc @ a w 0# of ww2 { __DEFAULT ->
-      case GHC.List.reverse1 @ a w (GHC.Types.[] @ a) of {
-        [] -> case Foo.f1 @ a of { GHC.Types.I# v1 -> GHC.Prim.+# ww2 v1 };
+      case GHC.List.$wlenAcc @a w 0# of ww2 { __DEFAULT ->
+      case GHC.List.reverse1 @a w (GHC.Types.[] @a) of {
+        [] -> case Foo.f1 @a of { GHC.Types.I# v1 -> GHC.Prim.+# ww2 v1 };
           case GHC.List.$wlenAcc
-                 case Foo.$wf @ a w of ww [Occ=Once] { __DEFAULT ->
-      case Foo.$wf @ a w of ww { __DEFAULT -> GHC.Types.I# ww }
+                 case Foo.$wf @a w of ww [Occ=Once] { __DEFAULT ->
+      case Foo.$wf @a w of ww { __DEFAULT -> GHC.Types.I# ww }

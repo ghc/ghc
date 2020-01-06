@@ -71,10 +71,10 @@ minusOne
   = case M.minusOne1 of {
       NatS# ds1 ->
         case ds1 of {
-          __DEFAULT -> GHC.Natural.underflowError @ Natural;
+          __DEFAULT -> GHC.Natural.underflowError @Natural;
           0## -> GHC.Natural.zero
         };
-      NatJ# ipv -> GHC.Natural.underflowError @ Natural
+      NatJ# ipv -> GHC.Natural.underflowError @Natural
     }
 
 -- RHS size: {terms: 1, types: 0, coercions: 0, joins: 0/0}

@@ -319,8 +319,8 @@ pprArg (Type ty)
  = sdocWithDynFlags $ \dflags ->
    if gopt Opt_SuppressTypeApplications dflags
    then empty
-   else text "@" <+> pprParendType ty
-pprArg (Coercion co) = text "@~" <+> pprOptCo co
+   else text "@" <> pprParendType ty
+pprArg (Coercion co) = text "@~" <> pprOptCo co
 pprArg expr          = pprParendExpr expr
 
 {-
@@ -381,7 +381,7 @@ pprCoreBinder bind_site bndr
 
 pprUntypedBinder :: Var -> SDoc
 pprUntypedBinder binder
-  | isTyVar binder = text "@" <+> ppr binder    -- NB: don't print kind
+  | isTyVar binder = text "@" <> ppr binder    -- NB: don't print kind
   | otherwise      = pprIdBndr binder
 
 pprTypedLamBinder :: BindingSite -> Bool -> Var -> SDoc
@@ -431,7 +431,7 @@ pprTypedLetBinder binder
 pprKindedTyVarBndr :: TyVar -> SDoc
 -- Print a type variable binder with its kind (but not if *)
 pprKindedTyVarBndr tyvar
-  = text "@" <+> pprTyVar tyvar
+  = text "@" <> pprTyVar tyvar
 
 -- pprIdBndr does *not* print the type
 -- When printing any Id binder in debug mode, we print its inline pragma and one-shot-ness
