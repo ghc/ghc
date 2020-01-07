@@ -30,7 +30,7 @@ import GhcPrelude
 import TysPrim
 import TysWiredIn
 
-import CmmType
+import GHC.Cmm.Type
 import Demand
 import Id               ( Id, mkVanillaGlobalWithInfo )
 import IdInfo           ( vanillaIdInfo, setCafInfo, CafInfo(NoCafRefs) )
