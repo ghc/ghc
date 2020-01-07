@@ -1186,6 +1186,31 @@ mkNthCo r n co
                                                             , ppr r ]) )
                                              arg_cos `getNth` n
 
+    go r n co@(UnivCo ErasedProv r0 t1 t2 )
+
+       ---- forall kind arg case
+      | n==0
+        , Just(varl,_bodl)<- splitForAllTy_maybe  t1
+        , Just(varr,_bodr)<- splitForAllTy_maybe  t2
+        = mkUnivCo ErasedProv Nominal (varType varl) (varType varr)
+
+      ---  funtyconco case
+      | Just(arg1,res1) <- splitFunTy_maybe t1
+        , Just (arg2, res2) <- splitFunTy_maybe t1
+        = case n of
+          0 -> ASSERT( r == Nominal ) mkRuntimeRepCo (mkUnivCo ErasedProv r arg1 arg2)
+          1 -> ASSERT( r == Nominal ) mkRuntimeRepCo (mkUnivCo ErasedProv r res1 res2)
+          2 -> ASSERT( r == r0 )      (mkUnivCo ErasedProv r arg1 arg2)
+          3 -> ASSERT( r == r0 )      (mkUnivCo ErasedProv r res1 res2)
+          _ ->pprPanic "mkNthCo(UnivCo as FunCo)" (ppr n $$ ppr co)
+
+      -- tyconapp case
+      | Just(con1,args1)  <- splitTyConApp_maybe t1
+        ,Just(con2,args2) <- splitTyConApp_maybe t2
+        = ( map (\(lty,rty)->  mkUnivCo ErasedProv r lty rty) $ zip args1 args2 )  `getNth` n
+
+
+
     go r n co =
       NthCo r n co
 
