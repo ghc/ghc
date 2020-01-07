@@ -12,11 +12,11 @@ import GhcPrelude
 
 import GHC.StgToCmm.Monad
 
-import MkGraph
-import CmmExpr
-import CLabel
+import GHC.Cmm.Graph
+import GHC.Cmm.Expr
+import GHC.Cmm.CLabel
 import Module
-import CmmUtils
+import GHC.Cmm.Utils
 import GHC.StgToCmm.Utils
 import HscTypes
 import DynFlags

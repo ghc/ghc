@@ -12,7 +12,7 @@ import SPARC.Instr
 import SPARC.Ppr        () -- For Outputable instances
 import Instruction
 
-import Cmm
+import GHC.Cmm
 
 import Outputable
 

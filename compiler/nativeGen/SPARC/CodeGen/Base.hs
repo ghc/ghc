@@ -24,8 +24,8 @@ import Reg
 
 import GHC.Platform.Regs
 import DynFlags
-import Cmm
-import PprCmmExpr () -- For Outputable instances
+import GHC.Cmm
+import GHC.Cmm.Ppr.Expr () -- For Outputable instances
 import GHC.Platform
 
 import Outputable
