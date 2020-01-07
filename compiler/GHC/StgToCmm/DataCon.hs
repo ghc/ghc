@@ -29,11 +29,11 @@ import GHC.StgToCmm.Layout
 import GHC.StgToCmm.Utils
 import GHC.StgToCmm.Closure
 
-import CmmExpr
-import CmmUtils
-import CLabel
-import MkGraph
-import SMRep
+import GHC.Cmm.Expr
+import GHC.Cmm.Utils
+import GHC.Cmm.CLabel
+import GHC.Cmm.Graph
+import GHC.Runtime.Layout
 import CostCentre
 import Module
 import DataCon

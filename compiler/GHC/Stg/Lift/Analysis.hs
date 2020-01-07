@@ -26,7 +26,7 @@ import BasicTypes
 import Demand
 import DynFlags
 import Id
-import SMRep ( WordOff )
+import GHC.Runtime.Layout ( WordOff )
 import GHC.Stg.Syntax
 import qualified GHC.StgToCmm.ArgRep  as StgToCmm.ArgRep
 import qualified GHC.StgToCmm.Closure as StgToCmm.Closure

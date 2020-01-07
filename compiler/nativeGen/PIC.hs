@@ -60,14 +60,14 @@ import Reg
 import NCGMonad
 
 
-import Hoopl.Collections
-import Cmm
-import CLabel           ( CLabel, ForeignLabelSource(..), pprCLabel,
+import GHC.Cmm.Dataflow.Collections
+import GHC.Cmm
+import GHC.Cmm.CLabel           ( CLabel, ForeignLabelSource(..), pprCLabel,
                           mkDynamicLinkerLabel, DynamicLinkerLabelInfo(..),
                           dynamicLinkerLabelInfo, mkPicBaseLabel,
                           labelDynamic, externallyVisibleCLabel )
 
-import CLabel           ( mkForeignLabel )
+import GHC.Cmm.CLabel           ( mkForeignLabel )
 
 
 import BasicTypes
