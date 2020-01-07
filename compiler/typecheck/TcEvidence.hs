@@ -1011,9 +1011,8 @@ wrapIP ty = mkSymCo (unwrapIP ty)
 ----------------------------------------------------------------------
 
 -- We have to pass a `EvVar` and `Type` into `dsBracket` so that the
--- correct evidence and types are applied to all the TH combinators. We
--- need to use a different data type because `Type` and `EvVar` can't be
--- referenced directly in `HsExpr` due to import cycles.
+-- correct evidence and types are applied to all the TH combinators.
+-- This data type bundles them up together with some convenience methods.
 --
 -- The EvVar is evidence for `Quote m`
 -- The Type is a metavariable for `m`

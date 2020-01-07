@@ -115,8 +115,6 @@ import Lexeme
 import qualified EnumSet
 import Plugins
 import Bag
-import Data.Char
-import TysPrim
 
 import qualified Language.Haskell.TH as TH
 -- THSyntax gives access to internal functions and data types
@@ -176,7 +174,7 @@ tcTypedBracket rn_expr brack@(TExpBr _ expr) res_ty
                                        -- from outside the bracket
 
        -- Make a new type variable for the type of the overall quote
-       ; [m_var] <- map mkTyVarTy . snd <$> newMetaTyVars [m_ty_var]
+       ; m_var <- mkTyVarTy <$> mkMetaTyVar
        -- Make sure the type variable satisfies Quote
        ; ev_var <- emitQuoteWanted m_var
        -- Bundle them together so they can be used in DsMeta for desugaring
@@ -231,10 +229,10 @@ tcUntypedBracket rn_expr brack ps res_ty
        }
 
 -- | A type variable with kind * -> * named "m"
-m_ty_var :: TyVar
-m_ty_var = mkTemplateTyVars
-            (repeat (mkVisFunTy liftedTypeKind liftedTypeKind))
-            !! (ord 'm' - ord 'a')
+mkMetaTyVar :: TcM TyVar
+mkMetaTyVar =
+  newNamedFlexiTyVar (fsLit "m") (mkVisFunTy liftedTypeKind liftedTypeKind)
+
 
 -- | For a type 'm', emit the constraint 'Quote m'.
 emitQuoteWanted :: Type -> TcM EvVar
@@ -251,7 +249,7 @@ brackTy :: HsBracket GhcRn -> TcM (Maybe QuoteWrapper, Type)
 brackTy b =
   let mkTy n = do
         -- New polymorphic type variable for the bracket
-        [m_var] <- map mkTyVarTy . snd <$> newMetaTyVars [m_ty_var]
+        m_var <- mkTyVarTy <$> mkMetaTyVar
         -- Emit a Quote constraint for the bracket
         ev_var <- emitQuoteWanted m_var
         -- Construct the final expected type of the quote, for example
