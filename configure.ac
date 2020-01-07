@@ -586,7 +586,7 @@ AC_SUBST([NmCmd])
 if test "$TargetOS_CPP" = "darwin"
 then
     AC_MSG_CHECKING(whether nm program is broken)
-    # Some versions of XCode ship a broken version of `nm`. Detect and work
+    # Some versions of Xcode ship a broken version of `nm`. Detect and work
     # around this issue. See : https://gitlab.haskell.org/ghc/ghc/issues/11744
     nmver=$(${NM} --version | grep version | sed 's/ //g')
     case "$nmver" in
@@ -715,7 +715,9 @@ FP_GCC_SUPPORTS_NO_PIE
 dnl ** Used to determine how to compile ghc-prim's atomics.c, used by
 dnl    unregisterised, Sparc, and PPC backends.
 FP_GCC_SUPPORTS__ATOMICS
-AC_DEFINE([HAVE_C11_ATOMICS], [$CONF_GCC_SUPPORTS__ATOMICS], [Does GCC support __atomic primitives?])
+if test $CONF_GCC_SUPPORTS__ATOMICS = YES ; then
+  AC_DEFINE([HAVE_C11_ATOMICS], [1], [Does GCC support __atomic primitives?])
+fi
 
 FP_GCC_EXTRA_FLAGS
 
@@ -852,6 +854,9 @@ AC_PATH_PROG(XELATEX,xelatex)
 
 dnl ** check for makeinfo
 AC_PATH_PROG(MAKEINFO,makeinfo)
+
+dnl ** check for Python for testsuite driver
+FIND_PYTHON
 
 dnl ** check for ghc-pkg command
 FP_PROG_GHC_PKG
@@ -1402,7 +1407,7 @@ echo "\
       which is version   : $GhcVersion
 "
 
-if test "x$CC_LLVM_BACKEND" = "x1"; then
+if test "x$CcLlvmBackend" = "xYES"; then
     CompilerName="clang        "
 else
     CompilerName="gcc          "

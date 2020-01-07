@@ -931,6 +931,11 @@ error = true;
                       printRtsInfo(rtsConfig);
                       stg_exit(0);
                   }
+                  else if (strequal("nonmoving-gc",
+                               &rts_argv[arg][2])) {
+                      OPTION_SAFE;
+                      RtsFlags.GcFlags.useNonmoving = true;
+                  }
 #if defined(THREADED_RTS)
                   else if (!strncmp("numa", &rts_argv[arg][2], 4)) {
                       if (!osBuiltWithNumaSupport()) {
@@ -1737,6 +1742,11 @@ static void normaliseRtsOpts (void)
 
     if (RtsFlags.GcFlags.useNonmoving && RtsFlags.GcFlags.generations == 1) {
         barf("The non-moving collector doesn't support -G1");
+    }
+
+    if (RtsFlags.ProfFlags.doHeapProfile != NO_HEAP_PROFILING &&
+            RtsFlags.GcFlags.useNonmoving) {
+        barf("The non-moving collector doesn't support profiling");
     }
 
     if (RtsFlags.GcFlags.compact && RtsFlags.GcFlags.useNonmoving) {

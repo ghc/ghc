@@ -431,6 +431,39 @@ When a variable is used, we compare
 
 -}
 
+-- | We only want to produce warnings for TH-splices if the user requests so.
+-- See Note [Warnings for TH splices].
+getThSpliceOrigin :: TcM Origin
+getThSpliceOrigin = do
+  warn <- goptM Opt_EnableThSpliceWarnings
+  if warn then return FromSource else return Generated
+
+{- Note [Warnings for TH splices]
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+We only produce warnings for TH splices when the user requests so
+(-fenable-th-splice-warnings). There are multiple reasons:
+
+  * It's not clear that the user that compiles a splice is the author of the code
+    that produces the warning. Think of the situation where she just splices in
+    code from a third-party library that produces incomplete pattern matches.
+    In this scenario, the user isn't even able to fix that warning.
+  * Gathering information for producing the warnings (pattern-match check
+    warnings in particular) is costly. There's no point in doing so if the user
+    is not interested in those warnings.
+
+That's why we store Origin flags in the Haskell AST. The functions from ThToHs
+take such a flag and depending on whether TH splice warnings were enabled or
+not, we pass FromSource (if the user requests warnings) or Generated
+(otherwise). This is implemented in getThSpliceOrigin.
+
+For correct pattern-match warnings it's crucial that we annotate the Origin
+consistently (#17270). In the future we could offer the Origin as part of the
+TH AST. That would enable us to give quotes from the current module get
+FromSource origin, and/or third library authors to tag certain parts of
+generated code as FromSource to enable warnings. That effort is tracked in
+#14838.
+-}
+
 {-
 ************************************************************************
 *                                                                      *
@@ -686,15 +719,16 @@ runRemoteModFinalizers (ThModFinalizers finRefs) = do
 
 runQResult
   :: (a -> String)
-  -> (SrcSpan -> a -> b)
+  -> (Origin -> SrcSpan -> a -> b)
   -> (ForeignHValue -> TcM a)
   -> SrcSpan
   -> ForeignHValue {- TH.Q a -}
   -> TcM b
 runQResult show_th f runQ expr_span hval
   = do { th_result <- runQ hval
+       ; th_origin <- getThSpliceOrigin
        ; traceTc "Got TH result:" (text (show_th th_result))
-       ; return (f expr_span th_result) }
+       ; return (f th_origin expr_span th_result) }
 
 
 -----------------
@@ -972,7 +1006,8 @@ instance TH.Quasi TcM where
 
   qAddTopDecls thds = do
       l <- getSrcSpanM
-      let either_hval = convertToHsDecls l thds
+      th_origin <- getThSpliceOrigin
+      let either_hval = convertToHsDecls th_origin l thds
       ds <- case either_hval of
               Left exn -> failWithTc $
                 hang (text "Error in a declaration passed to addTopDecls:")
@@ -1255,7 +1290,8 @@ reifyInstances th_nm th_tys
    = addErrCtxt (text "In the argument of reifyInstances:"
                  <+> ppr_th th_nm <+> sep (map ppr_th th_tys)) $
      do { loc <- getSrcSpanM
-        ; rdr_ty <- cvt loc (mkThAppTs (TH.ConT th_nm) th_tys)
+        ; th_origin <- getThSpliceOrigin
+        ; rdr_ty <- cvt th_origin loc (mkThAppTs (TH.ConT th_nm) th_tys)
           -- #9262 says to bring vars into scope, like in HsForAllTy case
           -- of rnHsTyKi
         ; let tv_rdrs = extractHsTyRdrTyVars rdr_ty
@@ -1297,10 +1333,10 @@ reifyInstances th_nm th_tys
     doc = ClassInstanceCtx
     bale_out msg = failWithTc msg
 
-    cvt :: SrcSpan -> TH.Type -> TcM (LHsType GhcPs)
-    cvt loc th_ty = case convertToHsType loc th_ty of
-                      Left msg -> failWithTc msg
-                      Right ty -> return ty
+    cvt :: Origin -> SrcSpan -> TH.Type -> TcM (LHsType GhcPs)
+    cvt origin loc th_ty = case convertToHsType origin loc th_ty of
+      Left msg -> failWithTc msg
+      Right ty -> return ty
 
 {-
 ************************************************************************

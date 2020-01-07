@@ -58,27 +58,28 @@ import System.IO.Unsafe
 -------------------------------------------------------------------
 --              The external interface
 
-convertToHsDecls :: SrcSpan -> [TH.Dec] -> Either MsgDoc [LHsDecl GhcPs]
-convertToHsDecls loc ds = initCvt loc (fmap catMaybes (mapM cvt_dec ds))
+convertToHsDecls :: Origin -> SrcSpan -> [TH.Dec] -> Either MsgDoc [LHsDecl GhcPs]
+convertToHsDecls origin loc ds = initCvt origin loc (fmap catMaybes (mapM cvt_dec ds))
   where
     cvt_dec d = wrapMsg "declaration" d (cvtDec d)
 
-convertToHsExpr :: SrcSpan -> TH.Exp -> Either MsgDoc (LHsExpr GhcPs)
-convertToHsExpr loc e
-  = initCvt loc $ wrapMsg "expression" e $ cvtl e
+convertToHsExpr :: Origin -> SrcSpan -> TH.Exp -> Either MsgDoc (LHsExpr GhcPs)
+convertToHsExpr origin loc e
+  = initCvt origin loc $ wrapMsg "expression" e $ cvtl e
 
-convertToPat :: SrcSpan -> TH.Pat -> Either MsgDoc (LPat GhcPs)
-convertToPat loc p
-  = initCvt loc $ wrapMsg "pattern" p $ cvtPat p
+convertToPat :: Origin -> SrcSpan -> TH.Pat -> Either MsgDoc (LPat GhcPs)
+convertToPat origin loc p
+  = initCvt origin loc $ wrapMsg "pattern" p $ cvtPat p
 
-convertToHsType :: SrcSpan -> TH.Type -> Either MsgDoc (LHsType GhcPs)
-convertToHsType loc t
-  = initCvt loc $ wrapMsg "type" t $ cvtType t
+convertToHsType :: Origin -> SrcSpan -> TH.Type -> Either MsgDoc (LHsType GhcPs)
+convertToHsType origin loc t
+  = initCvt origin loc $ wrapMsg "type" t $ cvtType t
 
 -------------------------------------------------------------------
-newtype CvtM a = CvtM { unCvtM :: SrcSpan -> Either MsgDoc (SrcSpan, a) }
+newtype CvtM a = CvtM { unCvtM :: Origin -> SrcSpan -> Either MsgDoc (SrcSpan, a) }
     deriving (Functor)
-        -- Push down the source location;
+        -- Push down the Origin (that is configurable by
+        -- -fenable-th-splice-warnings) and source location;
         -- Can fail, with a single error message
 
 -- NB: If the conversion succeeds with (Right x), there should
@@ -91,45 +92,48 @@ newtype CvtM a = CvtM { unCvtM :: SrcSpan -> Either MsgDoc (SrcSpan, a) }
 -- the spliced-in declarations get a location that at least relates to the splice point
 
 instance Applicative CvtM where
-    pure x = CvtM $ \loc -> Right (loc,x)
+    pure x = CvtM $ \_ loc -> Right (loc,x)
     (<*>) = ap
 
 instance Monad CvtM where
-  (CvtM m) >>= k = CvtM $ \loc -> case m loc of
-                                  Left err -> Left err
-                                  Right (loc',v) -> unCvtM (k v) loc'
+  (CvtM m) >>= k = CvtM $ \origin loc -> case m origin loc of
+    Left err -> Left err
+    Right (loc',v) -> unCvtM (k v) origin loc'
 
-initCvt :: SrcSpan -> CvtM a -> Either MsgDoc a
-initCvt loc (CvtM m) = fmap snd (m loc)
+initCvt :: Origin -> SrcSpan -> CvtM a -> Either MsgDoc a
+initCvt origin loc (CvtM m) = fmap snd (m origin loc)
 
 force :: a -> CvtM ()
 force a = a `seq` return ()
 
 failWith :: MsgDoc -> CvtM a
-failWith m = CvtM (\_ -> Left m)
+failWith m = CvtM (\_ _ -> Left m)
+
+getOrigin :: CvtM Origin
+getOrigin = CvtM (\origin loc -> Right (loc,origin))
 
 getL :: CvtM SrcSpan
-getL = CvtM (\loc -> Right (loc,loc))
+getL = CvtM (\_ loc -> Right (loc,loc))
 
 setL :: SrcSpan -> CvtM ()
-setL loc = CvtM (\_ -> Right (loc, ()))
+setL loc = CvtM (\_ _ -> Right (loc, ()))
 
 returnL :: HasSrcSpan a => SrcSpanLess a -> CvtM a
-returnL x = CvtM (\loc -> Right (loc, cL loc x))
+returnL x = CvtM (\_ loc -> Right (loc, cL loc x))
 
 returnJustL :: HasSrcSpan a => SrcSpanLess a -> CvtM (Maybe a)
 returnJustL = fmap Just . returnL
 
 wrapParL :: HasSrcSpan a =>
             (a -> SrcSpanLess a) -> SrcSpanLess a -> CvtM (SrcSpanLess  a)
-wrapParL add_par x = CvtM (\loc -> Right (loc, add_par (cL loc x)))
+wrapParL add_par x = CvtM (\_ loc -> Right (loc, add_par (cL loc x)))
 
 wrapMsg :: (Show a, TH.Ppr a) => String -> a -> CvtM b -> CvtM b
 -- E.g  wrapMsg "declaration" dec thing
 wrapMsg what item (CvtM m)
-  = CvtM (\loc -> case m loc of
-                     Left err -> Left (err $$ getPprStyle msg)
-                     Right v  -> Right v)
+  = CvtM $ \origin loc -> case m origin loc of
+      Left err -> Left (err $$ getPprStyle msg)
+      Right v  -> Right v
   where
         -- Show the item in pretty syntax normally,
         -- but with all its constructors if you say -dppr-debug
@@ -139,9 +143,9 @@ wrapMsg what item (CvtM m)
                     else text (pprint item))
 
 wrapL :: HasSrcSpan a => CvtM (SrcSpanLess a) -> CvtM a
-wrapL (CvtM m) = CvtM (\loc -> case m loc of
-                               Left err -> Left err
-                               Right (loc',v) -> Right (loc',cL loc v))
+wrapL (CvtM m) = CvtM $ \origin loc -> case m origin loc of
+  Left err -> Left err
+  Right (loc',v) -> Right (loc',cL loc v)
 
 -------------------------------------------------------------------
 cvtDecs :: [TH.Dec] -> CvtM [LHsDecl GhcPs]
@@ -152,7 +156,8 @@ cvtDec (TH.ValD pat body ds)
   | TH.VarP s <- pat
   = do  { s' <- vNameL s
         ; cl' <- cvtClause (mkPrefixFunRhs s') (Clause [] body ds)
-        ; returnJustL $ Hs.ValD noExtField $ mkFunBind s' [cl'] }
+        ; th_origin <- getOrigin
+        ; returnJustL $ Hs.ValD noExtField $ mkFunBind th_origin s' [cl'] }
 
   | otherwise
   = do  { pat' <- cvtPat pat
@@ -172,7 +177,8 @@ cvtDec (TH.FunD nm cls)
   | otherwise
   = do  { nm' <- vNameL nm
         ; cls' <- mapM (cvtClause (mkPrefixFunRhs nm')) cls
-        ; returnJustL $ Hs.ValD noExtField $ mkFunBind nm' cls' }
+        ; th_origin <- getOrigin
+        ; returnJustL $ Hs.ValD noExtField $ mkFunBind th_origin nm' cls' }
 
 cvtDec (TH.SigD nm typ)
   = do  { nm' <- vNameL nm
@@ -403,7 +409,8 @@ cvtDec (TH.PatSynD nm args dir pat)
     cvtDir _ ImplBidir       = return ImplicitBidirectional
     cvtDir n (ExplBidir cls) =
       do { ms <- mapM (cvtClause (mkPrefixFunRhs n)) cls
-         ; return $ ExplicitBidirectional $ mkMatchGroup FromSource ms }
+         ; th_origin <- getOrigin
+         ; return $ ExplicitBidirectional $ mkMatchGroup th_origin ms }
 
 cvtDec (TH.PatSynSigD nm ty)
   = do { nm' <- cNameL nm
@@ -464,8 +471,6 @@ cvt_ci_decs doc decs
         ; let (binds', prob_fams')   = partitionWith is_bind prob_binds'
         ; let (fams', bads)          = partitionWith is_fam_decl prob_fams'
         ; unless (null bads) (failWith (mkBadDecMsg doc bads))
-          --We use FromSource as the origin of the bind
-          -- because the TH declaration is user-written
         ; return (listToBag binds', sigs', fams', ats', adts') }
 
 ----------------
@@ -901,12 +906,14 @@ cvtl e = wrapL (cvt e)
                                -- lambda expressions. See #13856.
     cvt (LamE ps e)    = do { ps' <- cvtPats ps; e' <- cvtl e
                             ; let pats = map (parenthesizePat appPrec) ps'
-                            ; return $ HsLam noExtField (mkMatchGroup FromSource
+                            ; th_origin <- getOrigin
+                            ; return $ HsLam noExtField (mkMatchGroup th_origin
                                              [mkSimpleMatch LambdaExpr
                                              pats e'])}
     cvt (LamCaseE ms)  = do { ms' <- mapM (cvtMatch CaseAlt) ms
+                            ; th_origin <- getOrigin
                             ; return $ HsLamCase noExtField
-                                                   (mkMatchGroup FromSource ms')
+                                                   (mkMatchGroup th_origin ms')
                             }
     cvt (TupE es)        = cvt_tup es Boxed
     cvt (UnboxedTupE es) = cvt_tup es Unboxed
@@ -923,8 +930,9 @@ cvtl e = wrapL (cvt e)
     cvt (LetE ds e)    = do { ds' <- cvtLocalDecs (text "a let expression") ds
                             ; e' <- cvtl e; return $ HsLet noExtField (noLoc ds') e'}
     cvt (CaseE e ms)   = do { e' <- cvtl e; ms' <- mapM (cvtMatch CaseAlt) ms
+                            ; th_origin <- getOrigin
                             ; return $ HsCase noExtField e'
-                                                 (mkMatchGroup FromSource ms') }
+                                                 (mkMatchGroup th_origin ms') }
     cvt (DoE ss)       = cvtHsDo DoExpr ss
     cvt (MDoE ss)      = cvtHsDo MDoExpr ss
     cvt (CompE ss)     = cvtHsDo ListComp ss

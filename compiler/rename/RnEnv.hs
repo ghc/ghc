@@ -1475,9 +1475,16 @@ lookupBindGroupOcc ctxt what rdr_name
     lookup_top keep_me
       = do { env <- getGlobalRdrEnv
            ; let all_gres = lookupGlobalRdrEnv env (rdrNameOcc rdr_name)
-           ; let candidates_msg = candidates $ map gre_name
-                                             $ filter isLocalGRE
-                                             $ globalRdrEnvElts env
+                 names_in_scope = -- If rdr_name lacks a binding, only
+                                  -- recommend alternatives from related
+                                  -- namespaces. See #17593.
+                                  filter (\n -> nameSpacesRelated
+                                                  (rdrNameSpace rdr_name)
+                                                  (nameNameSpace n))
+                                $ map gre_name
+                                $ filter isLocalGRE
+                                $ globalRdrEnvElts env
+                 candidates_msg = candidates names_in_scope
            ; case filter (keep_me . gre_name) all_gres of
                [] | null all_gres -> bale_out_with candidates_msg
                   | otherwise     -> bale_out_with local_msg
