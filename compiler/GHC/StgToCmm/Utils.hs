@@ -52,20 +52,20 @@ import GhcPrelude
 
 import GHC.StgToCmm.Monad
 import GHC.StgToCmm.Closure
-import Cmm
-import BlockId
-import MkGraph
+import GHC.Cmm
+import GHC.Cmm.BlockId
+import GHC.Cmm.Graph as CmmGraph
 import GHC.Platform.Regs
-import CLabel
-import CmmUtils
-import CmmSwitch
+import GHC.Cmm.CLabel
+import GHC.Cmm.Utils
+import GHC.Cmm.Switch
 import GHC.StgToCmm.CgUtils
 
 import ForeignCall
 import IdInfo
 import Type
 import TyCon
-import SMRep
+import GHC.Runtime.Layout
 import Module
 import Literal
 import Digraph
@@ -458,8 +458,8 @@ mk_discrete_switch _ _tag_expr [(_tag,lbl)] Nothing _
         -- In that situation we can be sure the (:) case
         -- can't happen, so no need to test
 
--- SOMETHING MORE COMPLICATED: defer to CmmImplementSwitchPlans
--- See Note [Cmm Switches, the general plan] in CmmSwitch
+-- SOMETHING MORE COMPLICATED: defer to GHC.Cmm.Switch.Implement
+-- See Note [Cmm Switches, the general plan] in GHC.Cmm.Switch
 mk_discrete_switch signed tag_expr branches mb_deflt range
   = mkSwitch tag_expr $ mkSwitchTargets signed range mb_deflt (M.fromList branches)
 
@@ -568,7 +568,7 @@ label_code :: BlockId -> CmmAGraphScoped -> FCode BlockId
 -- and returns L
 label_code join_lbl (code,tsc) = do
     lbl <- newBlockId
-    emitOutOfLine lbl (code MkGraph.<*> mkBranch join_lbl, tsc)
+    emitOutOfLine lbl (code CmmGraph.<*> mkBranch join_lbl, tsc)
     return lbl
 
 --------------
