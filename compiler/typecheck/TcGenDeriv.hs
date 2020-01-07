@@ -515,7 +515,7 @@ unliftedOrdOp ty op a b
    b_expr = nlHsVar b
 
 unliftedCompare :: RdrName -> RdrName
-                -> LHsExpr GhcPs -> LHsExpr GhcPs   -- What to cmpare
+                -> LHsExpr GhcPs -> LHsExpr GhcPs   -- What to compare
                 -> LHsExpr GhcPs -> LHsExpr GhcPs -> LHsExpr GhcPs
                                                     -- Three results
                 -> LHsExpr GhcPs

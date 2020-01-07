@@ -861,11 +861,11 @@ visit_PPSArgs :: PPSArgs -> [T_Frame] -> (T_Errs, T_Fmts, Integer, T_Mins)
 -- This function's most general type is
 -- visit_PPSArgs :: forall a. (Integral a, Show a)
 --               => PPSArgs -> [T_Frame] -> (T_Errs, T_Fmts, a, T_Mins)
--- But in the same mutually recusive group is visit_PPS whose type becomes
+-- But in the same mutually recursive group is visit_PPS whose type becomes
 -- visit_PPS :: forall a. (Integral a, Show a)
 --           => PPS -> T_Frame -> (Bool, T_Formats, INT, INT, INT)
 -- which GHC now (rightfully) rejects that as ambiguous, even though
--- acutally default resolution will allow it at call sites,
+-- actually default resolution will allow it at call sites,
 -- So I've added a type signature 
 -- SLPJ July 2012
 

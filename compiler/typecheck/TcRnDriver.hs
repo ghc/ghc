@@ -1197,7 +1197,7 @@ checkBootTyCon is_boot tc1 tc2
     -- It would have been best if this was purely a question of defaults
     -- (i.e., a user could explicitly ask for one behavior or another) but
     -- the current role system isn't expressive enough to do this.
-    -- Having explict proj-roles would solve this problem.
+    -- Having explicit proj-roles would solve this problem.
 
     rolesSubtypeOf [] [] = True
     -- NB: this relation is the OPPOSITE of the subroling relation
@@ -2165,7 +2165,7 @@ two redundant type-error warnings, one from each plan.
 #14963 reveals another bug that when deferred type errors is enabled
 in GHCi, any reference of imported/loaded variables (directly or indirectly)
 in interactively issued naked expressions will cause ghc panic. See more
-detailed dicussion in #14963.
+detailed discussion in #14963.
 
 The interactively issued declarations, statements, as well as the modules
 loaded into GHCi, are not affected. That means, for declaration, you could
@@ -2782,7 +2782,7 @@ ppr_types debug type_env
                          _            -> False
              -- Data cons (workers and wrappers), pattern synonyms,
              -- etc are suppressed (unless -dppr-debug),
-             -- because they appear elsehwere
+             -- because they appear elsewhere
 
     ppr_sig id = hang (ppr id <+> dcolon) 2 (ppr (tidyTopType (idType id)))
 

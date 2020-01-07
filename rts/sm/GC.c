@@ -596,7 +596,7 @@ GarbageCollect (uint32_t collect_gen,
 
         /* free old memory and shift to-space into from-space for all
          * the collected generations (except the allocation area).  These
-         * freed blocks will probaby be quickly recycled.
+         * freed blocks will probably be quickly recycled.
          */
         if (gen->mark)
         {
@@ -646,7 +646,7 @@ GarbageCollect (uint32_t collect_gen,
             ASSERT(countBlocks(gen->blocks) == gen->n_blocks);
             ASSERT(countOccupied(gen->blocks) == gen->n_words);
         }
-        else // not copacted
+        else // not compacted
         {
             freeChain(gen->old_blocks);
         }

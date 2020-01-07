@@ -250,7 +250,7 @@ data IdInfo
         oneShotInfo     :: OneShotInfo,
         -- ^ Info about a lambda-bound variable, if the 'Id' is one
         inlinePragInfo  :: InlinePragma,
-        -- ^ Any inline pragma atached to the 'Id'
+        -- ^ Any inline pragma attached to the 'Id'
         occInfo         :: OccInfo,
         -- ^ How the 'Id' occurs in the program
         strictnessInfo  :: StrictSig,
@@ -425,7 +425,7 @@ data RuleInfo
                         -- ru_fn though.
                         -- Note [Rule dependency info] in OccurAnal
 
--- | Assume that no specilizations exist: always safe
+-- | Assume that no specializations exist: always safe
 emptyRuleInfo :: RuleInfo
 emptyRuleInfo = RuleInfo [] emptyDVarSet
 

@@ -551,7 +551,7 @@ is ill-kinded nonsense (#16923).
 
 To address both of these problems, GHC now uses this algorithm instead:
 
-1. Typecheck the `via` type and bring its boudn type variables into scope.
+1. Typecheck the `via` type and bring its bound type variables into scope.
 2. Take the first class in the `deriving` clause.
 3. Typecheck the class.
 4. Move on to the next class and repeat the process until all classes have been
