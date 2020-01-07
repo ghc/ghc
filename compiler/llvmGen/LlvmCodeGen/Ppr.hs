@@ -15,8 +15,8 @@ import Llvm
 import LlvmCodeGen.Base
 import LlvmCodeGen.Data
 
-import CLabel
-import Cmm
+import GHC.Cmm.CLabel
+import GHC.Cmm
 
 import FastString
 import Outputable
