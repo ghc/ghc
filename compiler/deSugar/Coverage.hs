@@ -41,7 +41,7 @@ import TyCon
 import BasicTypes
 import MonadUtils
 import Maybes
-import CLabel
+import GHC.Cmm.CLabel
 import Util
 
 import Data.Time

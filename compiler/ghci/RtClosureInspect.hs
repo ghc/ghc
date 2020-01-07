@@ -58,7 +58,7 @@ import DynFlags
 import Outputable as Ppr
 import GHC.Char
 import GHC.Exts.Heap
-import SMRep ( roundUpTo )
+import GHC.Runtime.Layout ( roundUpTo )
 
 import Control.Monad
 import Data.Maybe

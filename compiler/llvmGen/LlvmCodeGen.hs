@@ -18,9 +18,9 @@ import LlvmCodeGen.Regs
 import LlvmMangler
 
 import GHC.StgToCmm.CgUtils ( fixStgRegisters )
-import Cmm
-import Hoopl.Collections
-import PprCmm
+import GHC.Cmm
+import GHC.Cmm.Dataflow.Collections
+import GHC.Cmm.Ppr
 
 import BufWrite
 import DynFlags

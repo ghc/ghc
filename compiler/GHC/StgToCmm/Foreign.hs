@@ -9,7 +9,7 @@
 module GHC.StgToCmm.Foreign (
   cgForeignCall,
   emitPrimCall, emitCCall,
-  emitForeignCall,     -- For CmmParse
+  emitForeignCall,
   emitSaveThreadState,
   saveThreadState,
   emitLoadThreadState,
@@ -28,14 +28,14 @@ import GHC.StgToCmm.Utils
 import GHC.StgToCmm.Closure
 import GHC.StgToCmm.Layout
 
-import BlockId (newBlockId)
-import Cmm
-import CmmUtils
-import MkGraph
+import GHC.Cmm.BlockId (newBlockId)
+import GHC.Cmm
+import GHC.Cmm.Utils
+import GHC.Cmm.Graph
 import Type
 import GHC.Types.RepType
-import CLabel
-import SMRep
+import GHC.Cmm.CLabel
+import GHC.Runtime.Layout
 import ForeignCall
 import DynFlags
 import Maybes
@@ -202,7 +202,7 @@ emitPrimCall :: [CmmFormal] -> CallishMachOp -> [CmmActual] -> FCode ()
 emitPrimCall res op args
   = void $ emitForeignCall PlayRisky res (PrimTarget op) args
 
--- alternative entry point, used by CmmParse
+-- alternative entry point, used by GHC.Cmm.Parser
 emitForeignCall
         :: Safety
         -> [CmmFormal]          -- where to put the results
@@ -257,9 +257,9 @@ load_target_into_temp other_target@(PrimTarget _) =
 -- Note [Register Parameter Passing]).
 --
 -- However, we can't pattern-match on the expression here, because
--- this is used in a loop by CmmParse, and testing the expression
+-- this is used in a loop by GHC.Cmm.Parser, and testing the expression
 -- results in a black hole.  So we always create a temporary, and rely
--- on CmmSink to clean it up later.  (Yuck, ToDo).  The generated code
+-- on GHC.Cmm.Sink to clean it up later.  (Yuck, ToDo).  The generated code
 -- ends up being the same, at least for the RTS .cmm code.
 --
 maybe_assign_temp :: CmmExpr -> FCode CmmExpr

@@ -44,7 +44,7 @@ import RegAlloc.Linear.Base
 import RegAlloc.Liveness
 import Instruction
 import Reg
-import BlockId
+import GHC.Cmm.BlockId
 
 import DynFlags
 import Unique

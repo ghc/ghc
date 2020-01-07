@@ -2,10 +2,10 @@
 {-# LANGUAGE KindSignatures #-}
 module Main where
 
-import Hoopl.Block
-import Hoopl.Collections
-import Hoopl.Graph
-import Hoopl.Label
+import GHC.Cmm.Dataflow.Block
+import GHC.Cmm.Dataflow.Collections
+import GHC.Cmm.Dataflow.Graph
+import GHC.Cmm.Dataflow.Label
 
 import Data.Maybe
 

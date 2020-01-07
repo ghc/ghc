@@ -30,7 +30,7 @@ import Literal
 import TyCon
 import FastString
 import GHC.StgToCmm.Layout     ( ArgRep(..) )
-import SMRep
+import GHC.Runtime.Layout
 import DynFlags
 import Outputable
 import GHC.Platform

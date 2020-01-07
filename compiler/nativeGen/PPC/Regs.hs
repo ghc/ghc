@@ -55,8 +55,8 @@ import Reg
 import RegClass
 import Format
 
-import Cmm
-import CLabel           ( CLabel )
+import GHC.Cmm
+import GHC.Cmm.CLabel           ( CLabel )
 import Unique
 
 import GHC.Platform.Regs

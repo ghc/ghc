@@ -16,8 +16,8 @@ module CPrim
 
 import GhcPrelude
 
-import CmmType
-import CmmMachOp
+import GHC.Cmm.Type
+import GHC.Cmm.MachOp
 import Outputable
 
 popCntLabel :: Width -> String

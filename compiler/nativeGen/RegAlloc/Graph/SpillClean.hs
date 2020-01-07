@@ -35,15 +35,15 @@ import RegAlloc.Liveness
 import Instruction
 import Reg
 
-import BlockId
-import Cmm
+import GHC.Cmm.BlockId
+import GHC.Cmm
 import UniqSet
 import UniqFM
 import Unique
 import State
 import Outputable
 import GHC.Platform
-import Hoopl.Collections
+import GHC.Cmm.Dataflow.Collections
 
 import Data.List
 import Data.Maybe

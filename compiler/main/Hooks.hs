@@ -50,7 +50,7 @@ import TyCon
 import CostCentre
 import GHC.Stg.Syntax
 import Stream
-import Cmm
+import GHC.Cmm
 import GHC.Hs.Extension
 
 import Data.Maybe

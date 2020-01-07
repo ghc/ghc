@@ -16,7 +16,7 @@ import SPARC.Base
 import NCGMonad
 import Format
 
-import Cmm
+import GHC.Cmm
 
 import OrdList
 

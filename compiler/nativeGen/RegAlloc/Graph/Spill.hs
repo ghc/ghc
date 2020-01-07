@@ -12,9 +12,9 @@ import GhcPrelude
 import RegAlloc.Liveness
 import Instruction
 import Reg
-import Cmm hiding (RegSet)
-import BlockId
-import Hoopl.Collections
+import GHC.Cmm hiding (RegSet)
+import GHC.Cmm.BlockId
+import GHC.Cmm.Dataflow.Collections
 
 import MonadUtils
 import State

@@ -2,7 +2,7 @@ module Main where
 
 import DynFlags
 import GHC.Types.RepType
-import SMRep
+import GHC.Runtime.Layout
 import GHC.StgToCmm.Layout
 import GHC.StgToCmm.Closure
 import GHC

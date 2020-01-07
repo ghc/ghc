@@ -61,14 +61,14 @@ module GHC.StgToCmm.Monad (
 
 import GhcPrelude hiding( sequence, succ )
 
-import Cmm
+import GHC.Cmm
 import GHC.StgToCmm.Closure
 import DynFlags
-import Hoopl.Collections
-import MkGraph
-import BlockId
-import CLabel
-import SMRep
+import GHC.Cmm.Dataflow.Collections
+import GHC.Cmm.Graph as CmmGraph
+import GHC.Cmm.BlockId
+import GHC.Cmm.CLabel
+import GHC.Runtime.Layout
 import Module
 import Id
 import VarEnv
@@ -369,7 +369,7 @@ addCodeBlocksFrom :: CgState -> CgState -> CgState
 -- Add code blocks from the latter to the former
 -- (The cgs_stmts will often be empty, but not always; see codeOnly)
 s1 `addCodeBlocksFrom` s2
-  = s1 { cgs_stmts = cgs_stmts s1 MkGraph.<*> cgs_stmts s2,
+  = s1 { cgs_stmts = cgs_stmts s1 CmmGraph.<*> cgs_stmts s2,
          cgs_tops  = cgs_tops  s1 `appOL` cgs_tops  s2 }
 
 
@@ -715,7 +715,7 @@ emitStore l r = emitCgStmt (CgStmt (CmmStore l r))
 emit :: CmmAGraph -> FCode ()
 emit ag
   = do  { state <- getState
-        ; setState $ state { cgs_stmts = cgs_stmts state MkGraph.<*> ag } }
+        ; setState $ state { cgs_stmts = cgs_stmts state CmmGraph.<*> ag } }
 
 emitDecl :: CmmDecl -> FCode ()
 emitDecl decl
@@ -743,7 +743,7 @@ emitProcWithStackFrame conv mb_info lbl stk_args args (graph, tscope) True
         -- do layout
   = do  { dflags <- getDynFlags
         ; let (offset, live, entry) = mkCallEntry dflags conv args stk_args
-              graph' = entry MkGraph.<*> graph
+              graph' = entry CmmGraph.<*> graph
         ; emitProc mb_info lbl live (graph', tscope) offset True
         }
 emitProcWithStackFrame _ _ _ _ _ _ _ = panic "emitProcWithStackFrame"

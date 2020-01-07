@@ -13,16 +13,16 @@ import Llvm
 import LlvmCodeGen.Base
 import LlvmCodeGen.Regs
 
-import BlockId
+import GHC.Cmm.BlockId
 import GHC.Platform.Regs ( activeStgRegs )
-import CLabel
-import Cmm
-import PprCmm
-import CmmUtils
-import CmmSwitch
-import Hoopl.Block
-import Hoopl.Graph
-import Hoopl.Collections
+import GHC.Cmm.CLabel
+import GHC.Cmm
+import GHC.Cmm.Ppr as PprCmm
+import GHC.Cmm.Utils
+import GHC.Cmm.Switch
+import GHC.Cmm.Dataflow.Block
+import GHC.Cmm.Dataflow.Graph
+import GHC.Cmm.Dataflow.Collections
 
 import DynFlags
 import FastString

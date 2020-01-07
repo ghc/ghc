@@ -42,14 +42,14 @@ import TargetReg
 import GHC.Platform
 
 -- Our intermediate code:
-import BlockId
-import PprCmm           ( pprExpr )
-import Cmm
-import CmmUtils
-import CmmSwitch
-import CLabel
-import Hoopl.Block
-import Hoopl.Graph
+import GHC.Cmm.BlockId
+import GHC.Cmm.Ppr           ( pprExpr )
+import GHC.Cmm
+import GHC.Cmm.Utils
+import GHC.Cmm.Switch
+import GHC.Cmm.CLabel
+import GHC.Cmm.Dataflow.Block
+import GHC.Cmm.Dataflow.Graph
 
 -- The rest:
 import OrdList

@@ -24,9 +24,9 @@ module Dwarf.Types
 
 import GhcPrelude
 
-import Debug
-import CLabel
-import CmmExpr         ( GlobalReg(..) )
+import GHC.Cmm.DebugBlock
+import GHC.Cmm.CLabel
+import GHC.Cmm.Expr         ( GlobalReg(..) )
 import Encoding
 import FastString
 import Outputable

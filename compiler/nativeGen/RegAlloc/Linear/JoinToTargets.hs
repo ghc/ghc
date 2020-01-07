@@ -18,8 +18,8 @@ import RegAlloc.Liveness
 import Instruction
 import Reg
 
-import BlockId
-import Hoopl.Collections
+import GHC.Cmm.BlockId
+import GHC.Cmm.Dataflow.Collections
 import Digraph
 import DynFlags
 import Outputable

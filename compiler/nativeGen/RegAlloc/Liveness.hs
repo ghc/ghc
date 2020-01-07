@@ -40,11 +40,11 @@ import GhcPrelude
 import Reg
 import Instruction
 
-import BlockId
+import GHC.Cmm.BlockId
 import CFG
-import Hoopl.Collections
-import Hoopl.Label
-import Cmm hiding (RegSet, emptyRegSet)
+import GHC.Cmm.Dataflow.Collections
+import GHC.Cmm.Dataflow.Label
+import GHC.Cmm hiding (RegSet, emptyRegSet)
 
 import Digraph
 import DynFlags

@@ -20,10 +20,10 @@ import Instruction
 import NCGMonad
 import CFG
 
-import BlockId
-import Cmm
-import Hoopl.Collections
-import Hoopl.Label
+import GHC.Cmm.BlockId
+import GHC.Cmm
+import GHC.Cmm.Dataflow.Collections
+import GHC.Cmm.Dataflow.Label
 
 import DynFlags (gopt, GeneralFlag(..), DynFlags, backendMaintainsCfg)
 import UniqFM
@@ -35,7 +35,7 @@ import Outputable
 import Maybes
 
 -- DEBUGGING ONLY
---import Debug
+--import GHC.Cmm.DebugBlock
 --import Debug.Trace
 import ListSetOps (removeDups)
 

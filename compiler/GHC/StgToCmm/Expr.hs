@@ -30,10 +30,10 @@ import GHC.StgToCmm.Closure
 
 import GHC.Stg.Syntax
 
-import MkGraph
-import BlockId
-import Cmm hiding ( succ )
-import CmmInfo
+import GHC.Cmm.Graph
+import GHC.Cmm.BlockId
+import GHC.Cmm hiding ( succ )
+import GHC.Cmm.Info
 import CoreSyn
 import DataCon
 import DynFlags         ( mAX_PTR_TAG )

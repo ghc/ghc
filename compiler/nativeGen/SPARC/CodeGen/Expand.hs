@@ -14,7 +14,7 @@ import SPARC.Regs
 import Instruction
 import Reg
 import Format
-import Cmm
+import GHC.Cmm
 
 
 import Outputable

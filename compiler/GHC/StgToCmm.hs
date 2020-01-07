@@ -26,9 +26,9 @@ import GHC.StgToCmm.Closure
 import GHC.StgToCmm.Hpc
 import GHC.StgToCmm.Ticky
 
-import Cmm
-import CmmUtils
-import CLabel
+import GHC.Cmm
+import GHC.Cmm.Utils
+import GHC.Cmm.CLabel
 
 import GHC.Stg.Syntax
 import DynFlags
@@ -48,7 +48,7 @@ import BasicTypes
 import VarSet ( isEmptyDVarSet )
 
 import OrdList
-import MkGraph
+import GHC.Cmm.Graph
 
 import Data.IORef
 import Control.Monad (when,void)

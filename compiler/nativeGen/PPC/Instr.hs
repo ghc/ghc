@@ -33,14 +33,14 @@ import RegClass
 import Reg
 
 import GHC.Platform.Regs
-import BlockId
-import Hoopl.Collections
-import Hoopl.Label
+import GHC.Cmm.BlockId
+import GHC.Cmm.Dataflow.Collections
+import GHC.Cmm.Dataflow.Label
 import DynFlags
-import Cmm
-import CmmInfo
+import GHC.Cmm
+import GHC.Cmm.Info
 import FastString
-import CLabel
+import GHC.Cmm.CLabel
 import Outputable
 import GHC.Platform
 import UniqFM (listToUFM, lookupUFM)

@@ -133,11 +133,11 @@ import CostCentre
 import ProfInit
 import TyCon
 import Name
-import Cmm
-import CmmParse         ( parseCmmFile )
-import CmmBuildInfoTables
-import CmmPipeline
-import CmmInfo
+import GHC.Cmm
+import GHC.Cmm.Parser         ( parseCmmFile )
+import GHC.Cmm.Info.Build
+import GHC.Cmm.Pipeline
+import GHC.Cmm.Info
 import CodeOutput
 import InstEnv
 import FamInstEnv

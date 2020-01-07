@@ -49,11 +49,11 @@ import Reg
 import Format
 import TargetReg
 
-import BlockId
-import Hoopl.Collections
-import Hoopl.Label
-import CLabel           ( CLabel )
-import Debug
+import GHC.Cmm.BlockId
+import GHC.Cmm.Dataflow.Collections
+import GHC.Cmm.Dataflow.Label
+import GHC.Cmm.CLabel           ( CLabel )
+import GHC.Cmm.DebugBlock
 import FastString       ( FastString )
 import UniqFM
 import UniqSupply
@@ -65,7 +65,7 @@ import Control.Monad    ( ap )
 
 import Instruction
 import Outputable (SDoc, pprPanic, ppr)
-import Cmm (RawCmmDecl, CmmStatics)
+import GHC.Cmm (RawCmmDecl, CmmStatics)
 import CFG
 
 data NcgImpl statics instr jumpDest = NcgImpl {

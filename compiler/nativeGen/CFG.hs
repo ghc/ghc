@@ -46,15 +46,15 @@ where
 
 import GhcPrelude
 
-import BlockId
-import Cmm
+import GHC.Cmm.BlockId
+import GHC.Cmm as Cmm
 
-import CmmUtils
-import CmmSwitch
-import Hoopl.Collections
-import Hoopl.Label
-import Hoopl.Block
-import qualified Hoopl.Graph as G
+import GHC.Cmm.Utils
+import GHC.Cmm.Switch
+import GHC.Cmm.Dataflow.Collections
+import GHC.Cmm.Dataflow.Label
+import GHC.Cmm.Dataflow.Block
+import qualified GHC.Cmm.Dataflow.Graph as G
 
 import Util
 import Digraph
@@ -74,11 +74,10 @@ import Data.Bifunctor
 
 import Outputable
 -- DEBUGGING ONLY
---import Debug
--- import Debug.Trace
+--import GHC.Cmm.DebugBlock
 --import OrdList
---import Debug.Trace
-import PprCmm () -- For Outputable instances
+--import GHC.Cmm.DebugBlock.Trace
+import GHC.Cmm.Ppr () -- For Outputable instances
 import qualified DynFlags as D
 
 import Data.List
@@ -250,7 +249,7 @@ filterEdges f cfg =
 {- Note [Updating the CFG during shortcutting]
 
 See Note [What is shortcutting] in the control flow optimization
-code (CmmContFlowOpt.hs) for a slightly more in depth explanation on shortcutting.
+code (GHC.Cmm.ContFlowOpt) for a slightly more in depth explanation on shortcutting.
 
 In the native backend we shortcut jumps at the assembly level. (AsmCodeGen.hs)
 This means we remove blocks containing only one jump from the code

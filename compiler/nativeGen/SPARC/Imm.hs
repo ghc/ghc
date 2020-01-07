@@ -9,8 +9,8 @@ where
 
 import GhcPrelude
 
-import Cmm
-import CLabel
+import GHC.Cmm
+import GHC.Cmm.CLabel
 
 import Outputable
 

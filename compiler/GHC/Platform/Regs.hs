@@ -5,7 +5,7 @@ module GHC.Platform.Regs
 
 import GhcPrelude
 
-import CmmExpr
+import GHC.Cmm.Expr
 import GHC.Platform
 import Reg
 

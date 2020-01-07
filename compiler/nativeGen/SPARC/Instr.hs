@@ -38,11 +38,11 @@ import RegClass
 import Reg
 import Format
 
-import CLabel
+import GHC.Cmm.CLabel
 import GHC.Platform.Regs
-import BlockId
+import GHC.Cmm.BlockId
 import DynFlags
-import Cmm
+import GHC.Cmm
 import FastString
 import Outputable
 import GHC.Platform

@@ -124,7 +124,7 @@ Here is a running example:
 
 import GhcPrelude
 
-import CLabel
+import GHC.Cmm.CLabel
 import CoreSyn
 import CoreUtils (collectMakeStaticArgs)
 import DataCon

@@ -276,7 +276,7 @@ The alternatives are:
      is controlled. See Module.ModuleEnv
   3) Change the algorithm to use nonDetCmpUnique and document why it's still
      deterministic
-  4) Use TrieMap as done in CmmCommonBlockElim.groupByLabel
+  4) Use TrieMap as done in GHC.Cmm.CommonBlockElim.groupByLabel
 -}
 
 instance Eq Unique where

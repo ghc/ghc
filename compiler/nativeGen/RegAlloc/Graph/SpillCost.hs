@@ -22,9 +22,9 @@ import Reg
 
 import GraphBase
 
-import Hoopl.Collections (mapLookup)
-import Hoopl.Label
-import Cmm
+import GHC.Cmm.Dataflow.Collections (mapLookup)
+import GHC.Cmm.Dataflow.Label
+import GHC.Cmm
 import UniqFM
 import UniqSet
 import Digraph          (flattenSCCs)

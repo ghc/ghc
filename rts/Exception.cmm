@@ -6,7 +6,7 @@
  *
  * This file is written in a subset of C--, extended with various
  * features specific to GHC.  It is compiled by GHC directly.  For the
- * syntax of .cmm files, see the parser in ghc/compiler/cmm/CmmParse.y.
+ * syntax of .cmm files, see the parser in ghc/compiler/GHC/Cmm/Parser.y.
  *
  * ---------------------------------------------------------------------------*/
 

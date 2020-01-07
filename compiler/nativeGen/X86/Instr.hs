@@ -26,22 +26,22 @@ import RegClass
 import Reg
 import TargetReg
 
-import BlockId
-import Hoopl.Collections
-import Hoopl.Label
+import GHC.Cmm.BlockId
+import GHC.Cmm.Dataflow.Collections
+import GHC.Cmm.Dataflow.Label
 import GHC.Platform.Regs
-import Cmm
+import GHC.Cmm
 import FastString
 import Outputable
 import GHC.Platform
 
 import BasicTypes       (Alignment)
-import CLabel
+import GHC.Cmm.CLabel
 import DynFlags
 import UniqSet
 import Unique
 import UniqSupply
-import Debug (UnwindTable)
+import GHC.Cmm.DebugBlock (UnwindTable)
 
 import Control.Monad
 import Data.Maybe       (fromMaybe)

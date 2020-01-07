@@ -31,14 +31,14 @@ import GHC.StgToCmm.Monad
 import GHC.StgToCmm.Utils
 import GHC.StgToCmm.Closure
 
-import CLabel
+import GHC.Cmm.CLabel
 
-import BlockId
-import CmmExpr
-import CmmUtils
+import GHC.Cmm.BlockId
+import GHC.Cmm.Expr
+import GHC.Cmm.Utils
 import DynFlags
 import Id
-import MkGraph
+import GHC.Cmm.Graph
 import Name
 import Outputable
 import GHC.Stg.Syntax

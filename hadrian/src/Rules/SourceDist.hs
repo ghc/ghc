@@ -146,8 +146,8 @@ prepareTree dest = do
     -- files, which implements exactly the logic that we
     -- have for 'alexHappyFiles' above.
     alexHappyFiles =
-        [ (Stage0, compiler, "CmmParse.y", Just "cmm", "CmmParse.hs")
-        , (Stage0, compiler, "CmmLex.x", Just "cmm", "CmmLex.hs")
+        [ (Stage0, compiler, "Parser.y", Just ("GHC" -/- "Cmm"), "Parser.hs")
+        , (Stage0, compiler, "Lexer.x", Just ("GHC" -/- "Cmm"), "Lexer.hs")
         , (Stage0, compiler, "Parser.y", Just "parser", "Parser.hs")
         , (Stage0, compiler, "Lexer.x", Just "parser", "Lexer.hs")
         , (Stage0, hpcBin, "HpcParser.y", Nothing, "HpcParser.hs")

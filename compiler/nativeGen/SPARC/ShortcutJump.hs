@@ -13,9 +13,9 @@ import GhcPrelude
 import SPARC.Instr
 import SPARC.Imm
 
-import CLabel
-import BlockId
-import Cmm
+import GHC.Cmm.CLabel
+import GHC.Cmm.BlockId
+import GHC.Cmm
 
 import Panic
 import Outputable

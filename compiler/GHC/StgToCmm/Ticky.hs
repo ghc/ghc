@@ -23,9 +23,9 @@ Some of the relevant source files:
 
   * some codeGen/ modules import this one
 
-  * this module imports cmm/CLabel.hs to manage labels
+  * this module imports GHC.Cmm.CLabel to manage labels
 
-  * cmm/CmmParse.y expands some macros using generators defined in
+  * GHC.Cmm.Parser expands some macros using generators defined in
     this module
 
   * includes/stg/Ticky.h declares all of the global counters
@@ -112,11 +112,11 @@ import GHC.StgToCmm.Utils
 import GHC.StgToCmm.Monad
 
 import GHC.Stg.Syntax
-import CmmExpr
-import MkGraph
-import CmmUtils
-import CLabel
-import SMRep
+import GHC.Cmm.Expr
+import GHC.Cmm.Graph
+import GHC.Cmm.Utils
+import GHC.Cmm.CLabel
+import GHC.Runtime.Layout
 
 import Module
 import Name
@@ -517,7 +517,7 @@ tickyAllocHeap genuine hp
 
 
 --------------------------------------------------------------------------------
--- these three are only called from CmmParse.y (ie ultimately from the RTS)
+-- these three are only called from GHC.Cmm.Parser (ie ultimately from the RTS)
 
 -- the units are bytes
 

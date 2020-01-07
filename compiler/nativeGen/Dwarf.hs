@@ -4,11 +4,11 @@ module Dwarf (
 
 import GhcPrelude
 
-import CLabel
-import CmmExpr         ( GlobalReg(..) )
+import GHC.Cmm.CLabel
+import GHC.Cmm.Expr    ( GlobalReg(..) )
 import Config          ( cProjectName, cProjectVersion )
 import CoreSyn         ( Tickish(..) )
-import Debug
+import GHC.Cmm.DebugBlock
 import DynFlags
 import Module
 import Outputable
@@ -28,8 +28,8 @@ import qualified Data.Map as Map
 import System.FilePath
 import System.Directory ( getCurrentDirectory )
 
-import qualified Hoopl.Label as H
-import qualified Hoopl.Collections as H
+import qualified GHC.Cmm.Dataflow.Label as H
+import qualified GHC.Cmm.Dataflow.Collections as H
 
 -- | Generate DWARF/debug information
 dwarfGen :: DynFlags -> ModLocation -> UniqSupply -> [DebugBlock]

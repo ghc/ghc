@@ -55,8 +55,8 @@ import GHC.Platform.Regs
 import Reg
 import RegClass
 
-import Cmm
-import CLabel           ( CLabel )
+import GHC.Cmm
+import GHC.Cmm.CLabel           ( CLabel )
 import DynFlags
 import Outputable
 import GHC.Platform

@@ -22,7 +22,7 @@ import Instruction
 import Format
 import Reg
 
-import Cmm
+import GHC.Cmm
 
 import DynFlags
 import OrdList
