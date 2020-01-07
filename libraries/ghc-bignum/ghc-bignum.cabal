@@ -100,8 +100,9 @@ library
       cpp-options: -DBIGNUM_GMP
       other-modules:
          GHC.Num.BigNat.GMP
-      c-sources:
-         cbits/gmp_wrappers.c
+      if !flag(test)
+         c-sources:
+            cbits/gmp_wrappers.c
 
   if flag(ffi)
       cpp-options: -DBIGNUM_FFI
