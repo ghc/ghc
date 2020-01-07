@@ -136,7 +136,10 @@ wrapName n = do
 type MetaM a = ReaderT MetaWrappers DsM a
 
 -----------------------------------------------------------------------------
-dsBracket :: Maybe QuoteWrapper -> HsBracket GhcRn -> [PendingTcSplice] -> DsM CoreExpr
+dsBracket :: Maybe QuoteWrapper -- ^ This is Nothing only when we are dealing with a VarBr
+          -> HsBracket GhcRn
+          -> [PendingTcSplice]
+          -> DsM CoreExpr
 -- See Note [Desugaring Brackets]
 -- Returns a CoreExpr of type (M TH.Exp)
 -- The quoted thing is parameterised over Name, even though it has
@@ -208,11 +211,15 @@ to the correct things.
 2. monadWrapper wraps functions of type `forall m . Monad m => T`
 3. metaTy wraps a type in the polymorphic `m` variable of the whole representation.
 
-Note it is is important to directly apply the arguments to the combinators as
-the types of the combinators have to match up with the types of the splices.
-My first implementation just created a lambda and applied a wrapper to the whole
-quotation but this meant that if the splices were of a more specific type
-then there would be type errors.
+Historical note about the implementation: At the first attempt, I attempted to
+lie that the type of any quotation was `Quote m => m Exp` and then specialise it
+by applying a wrapper to pass the `m` and `Quote m` arguments. This approach was
+simpler to implement but didn't work because of nested splices. For example,
+you might have a nested splice of a more specific type which fixes the type of
+the overall quote and so all the combinators used must also be instantiated to
+that specific type. Therefore you really have to use the contents of the quote
+wrapper to directly apply the right type to the combinators rather than
+first generate a polymorphic definition and then just apply the wrapper at the end.
 
 -}
 

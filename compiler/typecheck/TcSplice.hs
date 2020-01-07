@@ -204,8 +204,7 @@ tcTypedBracket _ other_brack _
 -- tcUntypedBracket :: HsBracket Name -> [PendingRnSplice] -> ExpRhoType -> TcM (HsExpr TcId)
 -- See Note [Typechecking Overloaded Quotes]
 tcUntypedBracket rn_expr brack ps res_ty
-  = do { --res_ty <- expTypeToType res_ty
-         traceTc "tc_bracket untyped" (ppr brack $$ ppr ps)
+  = do { traceTc "tc_bracket untyped" (ppr brack $$ ppr ps)
 
 
        -- Create the type m Exp for expression bracket, m Type for a type
@@ -221,7 +220,6 @@ tcUntypedBracket rn_expr brack ps res_ty
                   Just m_var -> mapM (tcPendingSplice m_var) ps
                   Nothing -> ASSERT(null ps) return []
 
-       --
        ; traceTc "tc_bracket done untyped" (ppr expected_type)
 
        -- Unify the overall type of the bracket with the expected result
@@ -282,6 +280,7 @@ tcPendingSplice :: TcType -- Metavariable for the expected overall type of the
                 -> PendingRnSplice
                 -> TcM PendingTcSplice
 tcPendingSplice m_var (PendingRnSplice flavour splice_name expr)
+  -- See Note [Typechecking Overloaded Quotes]
   = do { meta_ty <- tcMetaTy meta_ty_name
          -- Expected type of splice, e.g. m Exp
        ; let expected_type = mkAppTy m_var meta_ty
