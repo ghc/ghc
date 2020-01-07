@@ -19,7 +19,7 @@ import GhcPrelude
 
 import GHC.StgToCmm.Closure ( idPrimRep )
 
-import SMRep            ( WordOff )
+import GHC.Runtime.Layout            ( WordOff )
 import Id               ( Id )
 import TyCon            ( PrimRep(..), primElemRepSizeB )
 import BasicTypes       ( RepArity )
