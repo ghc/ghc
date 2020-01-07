@@ -22,7 +22,7 @@ where
 
 import GhcPrelude
 
-import Cmm
+import GHC.Cmm
 import Outputable
 
 -- It looks very like the old MachRep, but it's now of purely local
