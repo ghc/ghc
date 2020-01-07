@@ -831,7 +831,7 @@ Here are the moving parts:
 
 * We define LitRubbish as a constructor in Literal.Literal
 
-* It is given its polymoprhic type by Literal.literalType
+* It is given its polymorphic type by Literal.literalType
 
 * WwLib.mk_absent_let introduces a LitRubbish for absent
   arguments of boxed, unlifted type.
@@ -842,7 +842,7 @@ Here are the moving parts:
   which the garbage collector can follow if it encounters it.
 
   We considered maintaining LitRubbish in STG, and lowering
-  it in the code genreators, but it seems simpler to do it
+  it in the code generators, but it seems simpler to do it
   once and for all in CoreToSTG.
 
   In ByteCodeAsm we just lower it as a 0 literal, because

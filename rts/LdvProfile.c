@@ -111,7 +111,7 @@ processHeapClosureForDead( const StgClosure *c )
     case BLACKHOLE:
     case BLOCKING_QUEUE:
         /*
-          'Ingore' cases
+          'Ignore' cases
         */
         // Why can we ignore IND closures? We assume that
         // any census is preceded by a major garbage collection, which

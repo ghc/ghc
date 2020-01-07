@@ -515,7 +515,7 @@ VERY IMPORTANT INVARIANT:
      constraint led to the ability to define unsafeCoerce
      in #17267.
 
-   - Exception 2: the magic built-in instace for (~) has no
+   - Exception 2: the magic built-in instance for (~) has no
      such guarantee.  It behaves as if we had
          class    (a ~# b) => (a ~ b) where {}
          instance (a ~# b) => (a ~ b) where {}
@@ -707,7 +707,7 @@ data InertCans   -- See Note [Detailed InertCans Invariants] for more
 
        , inert_funeqs :: FunEqMap Ct
               -- All CFunEqCans; index is the whole family head type.
-              -- All Nominal (that's an invarint of all CFunEqCans)
+              -- All Nominal (that's an invariant of all CFunEqCans)
               -- LHS is fully rewritten (modulo eqCanRewrite constraints)
               --     wrt inert_eqs
               -- Can include all flavours, [G], [W], [WD], [D]
@@ -776,7 +776,7 @@ Note [EqualCtList invariants]
 
 From the fourth invariant it follows that the list is
    - A single [G], or
-   - Zero or one [D] or [WD], followd by any number of [W]
+   - Zero or one [D] or [WD], followed by any number of [W]
 
 The Wanteds can't rewrite anything which is why we put them last
 
@@ -791,7 +791,7 @@ live in three places
     the InertCans. They can be [G], [W], [WD], or [D].
 
   * The inert_flat_cache.  This is used when flattening, to get maximal
-    sharing. Everthing in the inert_flat_cache is [G] or [WD]
+    sharing. Everything in the inert_flat_cache is [G] or [WD]
 
     It contains lots of things that are still in the work-list.
     E.g Suppose we have (w1: F (G a) ~ Int), and (w2: H (G a) ~ Int) in the
@@ -1854,7 +1854,7 @@ Givens, to give as informative an error messasge as possible
 (#12468, #11325).
 
 Hence:
- * In the main simlifier loops in TcSimplify (solveWanteds,
+ * In the main simplifier loops in TcSimplify (solveWanteds,
    simpl_loop), we feed the insolubles in solveSimpleWanteds,
    so that they get rewritten (albeit not solved).
 
@@ -2114,7 +2114,7 @@ getNoGivenEqs tclvl skol_tvs
   where
     eqs_given_here :: EqualCtList -> Bool
     eqs_given_here [ct@(CTyEqCan { cc_tyvar = tv })]
-                              -- Givens are always a sigleton
+                              -- Givens are always a singleton
       = not (skolem_bound_here tv) && ct_given_here ct
     eqs_given_here _ = False
 
