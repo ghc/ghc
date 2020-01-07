@@ -210,10 +210,11 @@ lint-release-changelogs:
       export METRICS_FILE=$CI_PROJECT_DIR/performance-metrics.tsv
       git config user.email "ben+ghc-ci@smart-cactus.org"
       git config user.name "GHC GitLab CI"
-    - hadrian/build.cabal.sh --flavour=$FLAVOUR -j`mk/detect-cpu-count.sh` --docs=no-sphinx test --summary-junit=./junit.xml --test-compiler=$TOP/_build/install/bin/ghc || (.gitlab/push-test-metrics.sh && false)
+      .gitlab/test-metrics.sh pull
+    - hadrian/build.cabal.sh --flavour=$FLAVOUR -j`mk/detect-cpu-count.sh` --docs=no-sphinx test --summary-junit=./junit.xml --test-compiler=$TOP/_build/install/bin/ghc || (.gitlab/test-metrics.sh push && false)
     - |
       # Push git notes.
-      .gitlab/push-test-metrics.sh
+      .gitlab/test-metrics.sh push
   cache:
     key: hadrian
     paths:
@@ -304,12 +305,13 @@ hadrian-ghc-in-ghci:
       METRICS_FILE=$CI_PROJECT_DIR/performance-metrics.tsv
       git config user.email "ben+ghc-ci@smart-cactus.org"
       git config user.name "GHC GitLab CI"
+      .gitlab/test-metrics.sh pull
     - |
       THREADS=`mk/detect-cpu-count.sh`
-      make $TEST_TYPE THREADS=$THREADS JUNIT_FILE=../../junit.xml METRICS_FILE=$METRICS_FILE || (METRICS_FILE=$METRICS_FILE .gitlab/push-test-metrics.sh && false)
+      make $TEST_TYPE THREADS=$THREADS JUNIT_FILE=../../junit.xml METRICS_FILE=$METRICS_FILE || (METRICS_FILE=$METRICS_FILE .gitlab/test-metrics.sh push && false)
     - |
       # Push git notes.
-      METRICS_FILE=$METRICS_FILE .gitlab/push-test-metrics.sh
+      METRICS_FILE=$METRICS_FILE .gitlab/test-metrics.sh push
   dependencies: []
   artifacts:
     reports:
@@ -847,7 +849,6 @@ nightly-i386-windows-hadrian:
 .build-windows-make:
   extends: .build-windows
   stage: full-build
-  allow_failure: true
   variables:
     BUILD_FLAVOUR: "quick"
     GHC_VERSION: "8.6.5"
@@ -861,7 +862,7 @@ nightly-i386-windows-hadrian:
     - bash -c "PATH=`pwd`/toolchain/bin:$PATH make -j`mk/detect-cpu-count.sh`"
     - bash -c "PATH=`pwd`/toolchain/bin:$PATH make binary-dist-prep TAR_COMP_OPTS=-1"
     - bash -c "PATH=`pwd`/toolchain/bin:$PATH make test_bindist TEST_PREP=YES"
-    - bash -c 'make V=0 test THREADS=`mk/detect-cpu-count.sh` JUNIT_FILE=../../junit.xml'
+    - bash -c 'make V=0 test PYTHON=/mingw64/bin/python3 THREADS=`mk/detect-cpu-count.sh` JUNIT_FILE=../../junit.xml'
   tags:
     - x86_64-windows
   artifacts:
