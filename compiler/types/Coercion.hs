@@ -311,7 +311,7 @@ where co_rep1, co_rep2 are the coercions on the representations.
 -- a list of 'Coercion's of kinds @A ~ D@, @B ~ E@ and @E ~ F@. Hence:
 --
 -- > decomposeCo 3 c [r1, r2, r3] = [nth r1 0 c, nth r2 1 c, nth r3 2 c]
-decomposeCo :: Arity -> Coercion
+decomposeCo :: HasCallStack => Arity -> Coercion
             -> [Role]  -- the roles of the output coercions
                        -- this must have at least as many
                        -- entries as the Arity provided

@@ -730,8 +730,9 @@ simplifyPgmIO pass@(CoreDoSimplify max_iterations mode)
            if isZeroSimplCount counts1 then
                 return ( "Simplifier reached fixed point", iteration_no
                        , totalise (counts1 : counts_so_far)  -- Include "free" ticks
-                       , guts { mg_binds =coreProgramEraseCoercionProofs dflags binds1
-                                ,mg_rules = rules1 } )
+                       , guts { mg_binds = binds1, mg_rules = rules1 } )
+                     {-  , guts { mg_binds =coreProgramEraseCoercionProofs dflags binds1
+                                ,mg_rules = rules1 } )-}
            else do {
                 -- Short out indirections
                 -- We do this *after* at least one run of the simplifier
@@ -748,8 +749,9 @@ simplifyPgmIO pass@(CoreDoSimplify max_iterations mode)
            lintPassResult hsc_env pass binds2 ;
 
                 -- Loop
-           do_iteration us2 (iteration_no + 1) (counts1:counts_so_far)
-                  (coreProgramEraseCoercionProofs dflags binds2) rules1
+           do_iteration us2 (iteration_no + 1) (counts1:counts_so_far) binds2 rules1
+  {-         do_iteration us2 (iteration_no + 1) (counts1:counts_so_far)
+                  (coreProgramEraseCoercionProofs dflags binds2) rules1-}
            } }
       | otherwise = panic "do_iteration"
       where

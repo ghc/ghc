@@ -1324,7 +1324,7 @@ splitCastTy_maybe _                            = Nothing
 -- | Make a 'CastTy'. The Coercion must be nominal. Checks the
 -- Coercion for reflexivity, dropping it if it's reflexive.
 -- See Note [Respecting definitional equality] in TyCoRep
-mkCastTy :: Type -> Coercion -> Type
+mkCastTy :: HasCallStack => Type -> Coercion -> Type
 mkCastTy ty co | isReflexiveCo co = ty  -- (EQ2) from the Note
 -- NB: Do the slow check here. This is important to keep the splitXXX
 -- functions working properly. Otherwise, we may end up with something

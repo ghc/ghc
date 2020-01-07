@@ -1128,7 +1128,7 @@ mkTcAppTys = mkAppTys
 mkTcAppTy :: Type -> Type -> Type
 mkTcAppTy = mkAppTy
 
-mkTcCastTy :: Type -> Coercion -> Type
+mkTcCastTy :: HasCallStack => Type -> Coercion -> Type
 mkTcCastTy = mkCastTy   -- Do we need a tc version of mkCastTy?
 
 {-
