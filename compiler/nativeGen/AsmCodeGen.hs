@@ -67,18 +67,18 @@ import Reg
 import NCGMonad
 import CFG
 import Dwarf
-import Debug
+import GHC.Cmm.DebugBlock
 
-import BlockId
+import GHC.Cmm.BlockId
 import GHC.StgToCmm.CgUtils ( fixStgRegisters )
-import Cmm
-import CmmUtils
-import Hoopl.Collections
-import Hoopl.Label
-import Hoopl.Block
-import CmmOpt           ( cmmMachOpFold )
-import PprCmm
-import CLabel
+import GHC.Cmm
+import GHC.Cmm.Utils
+import GHC.Cmm.Dataflow.Collections
+import GHC.Cmm.Dataflow.Label
+import GHC.Cmm.Dataflow.Block
+import GHC.Cmm.Opt           ( cmmMachOpFold )
+import GHC.Cmm.Ppr
+import GHC.Cmm.CLabel
 
 import UniqFM
 import UniqSupply
@@ -826,7 +826,7 @@ computeUnwinding _ ncgImpl (CmmProc _ _ _ (ListGraph blks)) =
     -- relevant register writes within a procedure.
     --
     -- However, the only unwinding information that we care about in GHC is for
-    -- Sp. The fact that CmmLayoutStack already ensures that we have unwind
+    -- Sp. The fact that GHC.Cmm.LayoutStack already ensures that we have unwind
     -- information at the beginning of every block means that there is no need
     -- to perform this sort of push-down.
     mapFromList [ (blk_lbl, extractUnwindPoints ncgImpl instrs)
