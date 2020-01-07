@@ -791,7 +791,7 @@ After optimisation, including SpecConstr, we get:
 
 Not good!  We build an (I# x) box every time around the loop.
 SpecConstr (as described in the paper) does not specialise f, despite
-the call (f ... (I# x)) because 'y' is not scrutinied in the body.
+the call (f ... (I# x)) because 'y' is not scrutinised in the body.
 But it is much better to specialise f for the case where the argument
 is of form (I# x); then we build the box only when returning y, which
 is on the cold path.
@@ -804,7 +804,7 @@ Here 'x' is not scrutinised in f's body; but if we did specialise 'f'
 then the call (g x) might allow 'g' to be specialised in turn.
 
 So sc_keen controls whether or not we take account of whether argument is
-scrutinised in the body.  True <=> ignore that, and speicalise whenever
+scrutinised in the body.  True <=> ignore that, and specialise whenever
 the function is applied to a data constructor.
 -}
 
@@ -1164,7 +1164,7 @@ instance Outputable ArgOcc where
 evalScrutOcc :: ArgOcc
 evalScrutOcc = ScrutOcc emptyUFM
 
--- Experimentally, this vesion of combineOcc makes ScrutOcc "win", so
+-- Experimentally, this version of combineOcc makes ScrutOcc "win", so
 -- that if the thing is scrutinised anywhere then we get to see that
 -- in the overall result, even if it's also used in a boxed way
 -- This might be too aggressive; see Note [Reboxing] Alternative 3
@@ -1934,7 +1934,7 @@ where, say,
    co :: Foo ~R (Int,Int)
 
 Here we definitely do want to specialise for that pair!  We do not
-match on the structre of the coercion; instead we just match on a
+match on the structure of the coercion; instead we just match on a
 coercion variable, so the RULE looks like
 
    forall (x::Int, y::Int, co :: (Int,Int) ~R Foo)

@@ -74,7 +74,7 @@ Note [Basic Simplifier Plan]
       - canonicalization
       - inert reactions
       - spontaneous reactions
-      - top-level intreactions
+      - top-level interactions
    Each stage returns a StopOrContinue and may have sideffected
    the inerts or worklist.
 
@@ -685,7 +685,7 @@ once had done). This problem can be tickled by typecheck/should_compile/holes.
 interactIrred :: InertCans -> Ct -> TcS (StopOrContinue Ct)
 
 interactIrred inerts workItem@(CIrredCan { cc_ev = ev_w, cc_insol = insoluble })
-  | insoluble  -- For insolubles, don't allow the constaint to be dropped
+  | insoluble  -- For insolubles, don't allow the constraint to be dropped
                -- which can happen with solveOneFromTheOther, so that
                -- we get distinct error messages with -fdefer-type-errors
                -- See Note [Do not add duplicate derived insolubles]
@@ -996,7 +996,7 @@ Note that:
 
 * The CtEvidence is the goal to be solved
 
-* The MaybeT anages early failure if we find a subgoal that
+* The MaybeT manages early failure if we find a subgoal that
   cannot be solved from instances.
 
 * The (EvBindMap, DictMap CtEvidence) is an accumulating purely-functional
@@ -1448,7 +1448,7 @@ gives rise to
    [W] F Int b ~ Bool
 from which we can derive b.  This requires looking at the defining equations of
 a type family, ie. finding equation with a matching RHS (Bool in this example)
-and infering values of type variables (b in this example) from the LHS patterns
+and inferring values of type variables (b in this example) from the LHS patterns
 of the matching equation.  For closed type families we have to perform
 additional apartness check for the selected equation to check that the selected
 is guaranteed to fire for given LHS arguments.
@@ -1506,7 +1506,7 @@ Notice the orientation (xi_w ~ xi_i) NOT (xi_i ~ xi_w):
     new_work :: xi_w ~ xi_i
     cw := ci ; sym new_work
 Why?  Consider the simplest case when xi1 is a type variable.  If
-we generate xi1~xi2, porcessing that constraint will kick out 'ci'.
+we generate xi1~xi2, processing that constraint will kick out 'ci'.
 If we generate xi2~xi1, there is less chance of that happening.
 Of course it can and should still happen if xi1=a, xi1=Int, say.
 But we want to avoid it happening needlessly.
@@ -2202,7 +2202,7 @@ we do *not* need to expand type synonyms because the matcher will do that for us
 Note [Improvement orientation]
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 A very delicate point is the orientation of derived equalities
-arising from injectivity improvement (#12522).  Suppse we have
+arising from injectivity improvement (#12522).  Suppose we have
   type family F x = t | t -> x
   type instance F (a, Int) = (Int, G a)
 where G is injective; and wanted constraints
@@ -2495,7 +2495,7 @@ Example, from the OutsideIn(X) paper:
        g :: forall a. Q [a] => [a] -> Int
        g x = wob x
 
-From 'g' we get the impliation constraint:
+From 'g' we get the implication constraint:
             forall a. Q [a] => (Q [beta], R beta [a])
 If we react (Q [beta]) with its top-level axiom, we end up with a
 (P beta), which we have no way of discharging. On the other hand,

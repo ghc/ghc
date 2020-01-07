@@ -321,7 +321,7 @@ improveClsFD clas_tvs fd
                         --
                         -- But note (a) we get them from the dfun_id, so they are *in order*
                         --              because the kind variables may be mentioned in the
-                        --              type variabes' kinds
+                        --              type variables' kinds
                         --          (b) we must apply 'subst' to the kinds, in case we have
                         --              matched out a kind variable, but not a type variable
                         --              whose kind mentions that kind variable!
@@ -606,7 +606,7 @@ Note [Bogus consistency check]
 In checkFunDeps we check that a new ClsInst is consistent with all the
 ClsInsts in the environment.
 
-The bogus aspect is discussed in #10675. Currenty it if the two
+The bogus aspect is discussed in #10675. Currently it if the two
 types are *contradicatory*, using (isNothing . tcUnifyTys).  But all
 the papers say we should check if the two types are *equal* thus
    not (substTys subst rtys1 `eqTypes` substTys subst rtys2)
