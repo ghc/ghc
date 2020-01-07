@@ -39,15 +39,15 @@ import Format
 import NCGMonad   ( NatM, getNewRegNat, getNewLabelNat )
 
 -- Our intermediate code:
-import BlockId
-import Cmm
-import CmmUtils
-import CmmSwitch
-import Hoopl.Block
-import Hoopl.Graph
+import GHC.Cmm.BlockId
+import GHC.Cmm
+import GHC.Cmm.Utils
+import GHC.Cmm.Switch
+import GHC.Cmm.Dataflow.Block
+import GHC.Cmm.Dataflow.Graph
 import PIC
 import Reg
-import CLabel
+import GHC.Cmm.CLabel
 import CPrim
 
 -- The rest:

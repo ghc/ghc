@@ -14,9 +14,9 @@ import GhcPrelude
 import Llvm
 import LlvmCodeGen.Base
 
-import BlockId
-import CLabel
-import Cmm
+import GHC.Cmm.BlockId
+import GHC.Cmm.CLabel
+import GHC.Cmm
 import DynFlags
 import GHC.Platform
 

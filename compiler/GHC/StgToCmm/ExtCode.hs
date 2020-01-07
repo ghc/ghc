@@ -42,11 +42,11 @@ import GhcPrelude
 import qualified GHC.StgToCmm.Monad as F
 import GHC.StgToCmm.Monad (FCode, newUnique)
 
-import Cmm
-import CLabel
-import MkGraph
+import GHC.Cmm
+import GHC.Cmm.CLabel
+import GHC.Cmm.Graph
 
-import BlockId
+import GHC.Cmm.BlockId
 import DynFlags
 import FastString
 import Module
