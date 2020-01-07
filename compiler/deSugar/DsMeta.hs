@@ -116,7 +116,8 @@ mkMetaWrappers q@(QuoteWrapper quote_var_raw m_var) = do
       let m_ty = Type m_var
           -- Construct the contents of MetaWrappers
           quoteWrapper = applyQuoteWrapper q
-          monadWrapper = mkWpTyApps [m_var] <.> mkWpEvApps [EvExpr $ mkCoreApps (Var monad_sel) [m_ty, quote_var]]
+          monadWrapper = mkWpEvApps [EvExpr $ mkCoreApps (Var monad_sel) [m_ty, quote_var]] <.>
+                            mkWpTyApps [m_var]
           tyWrapper t = mkAppTy m_var t
           debug = (quoteWrapper, monadWrapper, m_var)
       q_f <- dsHsWrapper quoteWrapper
