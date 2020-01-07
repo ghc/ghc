@@ -254,14 +254,14 @@ brackTy b =
         ev_var <- emitQuoteWanted m_var
         -- Construct the final expected type of the quote, for example
         -- m Exp or m Type
-        final_ty <- mkAppTy m_var . flip mkTyConApp [] <$> tcLookupTyCon n
+        final_ty <- mkAppTy m_var <$> tcMetaTy n
         -- Return the evidence variable and metavariable to be used during
         -- desugaring.
         let wrapper = QuoteWrapper ev_var m_var
         return (Just wrapper, final_ty)
   in
   case b of
-    (VarBr {}) -> (Nothing,) . flip mkTyConApp [] <$> tcLookupTyCon nameTyConName
+    (VarBr {}) -> (Nothing,) <$> tcMetaTy nameTyConName
                                            -- Result type is Var (not Quote-monadic)
     (ExpBr {})  -> mkTy expTyConName  -- Result type is m Exp
     (TypBr {})  -> mkTy typeTyConName -- Result type is m Type
