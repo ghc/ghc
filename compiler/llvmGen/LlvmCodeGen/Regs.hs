@@ -15,7 +15,7 @@ import GhcPrelude
 
 import Llvm
 
-import CmmExpr
+import GHC.Cmm.Expr
 import DynFlags
 import FastString
 import Outputable ( panic )
