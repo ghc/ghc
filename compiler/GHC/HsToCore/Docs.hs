@@ -1,5 +1,8 @@
 -- | Extract docs from the renamer output so they can be serialized.
 {-# LANGUAGE LambdaCase #-}
+{-# LANGUAGE RankNTypes #-}
+{-# LANGUAGE TypeApplications #-}
+{-# LANGUAGE ScopedTypeVariables #-}
 {-# LANGUAGE TypeFamilies #-}
 {-# LANGUAGE FlexibleContexts #-}
 {-# LANGUAGE ViewPatterns #-}
@@ -112,9 +115,7 @@ user-written. This lets us relate Names (from ClsInsts) to comments
 (associated with InstDecls and DerivDecls).
 -}
 
-getMainDeclBinder :: (CollectPass (GhcPass p))
-                  => HsDecl (GhcPass p)
-                  -> [IdP (GhcPass p)]
+getMainDeclBinder :: CollectPass (GhcPass p) => HsDecl (GhcPass p) -> [IdP (GhcPass p)]
 getMainDeclBinder (TyClD _ d) = [tcdName d]
 getMainDeclBinder (ValD _ d) =
   case collectHsBindBinders d of
@@ -125,13 +126,14 @@ getMainDeclBinder (ForD _ (ForeignImport _ name _ _)) = [unLoc name]
 getMainDeclBinder (ForD _ (ForeignExport _ _ _ _)) = []
 getMainDeclBinder _ = []
 
-sigNameNoLoc :: Sig pass -> [IdP pass]
-sigNameNoLoc (TypeSig    _   ns _)         = map unLoc ns
-sigNameNoLoc (ClassOpSig _ _ ns _)         = map unLoc ns
-sigNameNoLoc (PatSynSig  _   ns _)         = map unLoc ns
-sigNameNoLoc (SpecSig    _   n _ _)        = [unLoc n]
-sigNameNoLoc (InlineSig  _   n _)          = [unLoc n]
-sigNameNoLoc (FixSig _ (FixitySig _ ns _)) = map unLoc ns
+
+sigNameNoLoc :: forall pass. UnXRec pass => Sig pass -> [IdP pass]
+sigNameNoLoc (TypeSig    _   ns _)         = map (unXRec @pass) ns
+sigNameNoLoc (ClassOpSig _ _ ns _)         = map (unXRec @pass) ns
+sigNameNoLoc (PatSynSig  _   ns _)         = map (unXRec @pass) ns
+sigNameNoLoc (SpecSig    _   n _ _)        = [unXRec @pass n]
+sigNameNoLoc (InlineSig  _   n _)          = [unXRec @pass n]
+sigNameNoLoc (FixSig _ (FixitySig _ ns _)) = map (unXRec @pass) ns
 sigNameNoLoc _                             = []
 
 -- Extract the source location where an instance is defined. This is used
@@ -302,14 +304,14 @@ ungroup group_ =
 -- | Collect docs and attach them to the right declarations.
 --
 -- A declaration may have multiple doc strings attached to it.
-collectDocs :: [LHsDecl pass] -> [(LHsDecl pass, [HsDocString])]
+collectDocs :: forall p. UnXRec p => [LHsDecl p] -> [(LHsDecl p, [HsDocString])]
 -- ^ This is an example.
 collectDocs = go [] Nothing
   where
     go docs mprev decls = case (decls, mprev) of
-      ((unLoc->DocD _ (DocCommentNext s)) : ds, Nothing)   -> go (s:docs) Nothing ds
-      ((unLoc->DocD _ (DocCommentNext s)) : ds, Just prev) -> finished prev docs $ go [s] Nothing ds
-      ((unLoc->DocD _ (DocCommentPrev s)) : ds, mprev)     -> go (s:docs) mprev ds
+      ((unXRec @p -> DocD _ (DocCommentNext s)) : ds, Nothing)   -> go (s:docs) Nothing ds
+      ((unXRec @p -> DocD _ (DocCommentNext s)) : ds, Just prev) -> finished prev docs $ go [s] Nothing ds
+      ((unXRec @p -> DocD _ (DocCommentPrev s)) : ds, mprev)     -> go (s:docs) mprev ds
       (d                                  : ds, Nothing)   -> go docs (Just d) ds
       (d                                  : ds, Just prev) -> finished prev docs $ go [] (Just d) ds
       ([]                                     , Nothing)   -> []
@@ -318,8 +320,8 @@ collectDocs = go [] Nothing
     finished decl docs rest = (decl, reverse docs) : rest
 
 -- | Filter out declarations that we don't handle in Haddock
-filterDecls :: [(LHsDecl a, doc)] -> [(LHsDecl a, doc)]
-filterDecls = filter (isHandled . unLoc . fst)
+filterDecls :: forall p doc. UnXRec p => [(LHsDecl p, doc)] -> [(LHsDecl p, doc)]
+filterDecls = filter (isHandled . unXRec @p . fst)
   where
     isHandled (ForD _ (ForeignImport {})) = True
     isHandled (TyClD {})  = True
@@ -333,12 +335,12 @@ filterDecls = filter (isHandled . unLoc . fst)
 
 
 -- | Go through all class declarations and filter their sub-declarations
-filterClasses :: [(LHsDecl a, doc)] -> [(LHsDecl a, doc)]
-filterClasses = map (first (mapLoc filterClass))
+filterClasses :: forall p doc. (UnXRec p, MapXRec p) => [(LHsDecl p, doc)] -> [(LHsDecl p, doc)]
+filterClasses = map (first (mapXRec @p filterClass))
   where
     filterClass (TyClD x c@(ClassDecl {})) =
       TyClD x $ c { tcdSigs =
-        filter (liftA2 (||) (isUserSig . unLoc) isMinimalLSig) (tcdSigs c) }
+        filter (liftA2 (||) (isUserSig . unXRec @p) isMinimalLSig) (tcdSigs c) }
     filterClass d = d
 
 -- | Was this signature given by the user?

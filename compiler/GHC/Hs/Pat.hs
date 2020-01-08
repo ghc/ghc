@@ -78,7 +78,7 @@ import GHC.Types.Name (Name)
 -- libraries:
 import Data.Data hiding (TyCon,Fixity)
 
-type LPat p = XRec p Pat
+type LPat p = XRec p (Pat p)
 
 -- | Pattern
 --
@@ -93,7 +93,7 @@ data Pat p
 
        -- AZ:TODO above comment needs to be updated
   | VarPat      (XVarPat p)
-                (Located (IdP p))  -- ^ Variable Pattern
+                (XRec p (IdP p))  -- ^ Variable Pattern
 
                              -- See Note [Located RdrNames] in GHC.Hs.Expr
   | LazyPat     (XLazyPat p)
@@ -103,7 +103,7 @@ data Pat p
     -- For details on above see note [Api annotations] in GHC.Parser.Annotation
 
   | AsPat       (XAsPat p)
-                (Located (IdP p)) (LPat p)    -- ^ As pattern
+                (XRec p (IdP p)) (LPat p)    -- ^ As pattern
     -- ^ - 'GHC.Parser.Annotation.AnnKeywordId' : 'GHC.Parser.Annotation.AnnAt'
 
     -- For details on above see note [Api annotations] in GHC.Parser.Annotation
@@ -176,7 +176,7 @@ data Pat p
         ------------ Constructor patterns ---------------
   | ConPat {
         pat_con_ext :: XConPat p,
-        pat_con     :: Located (ConLikeP p),
+        pat_con     :: XRec p (ConLikeP p),
         pat_args    :: HsConPatDetails p
     }
     -- ^ Constructor Pattern
@@ -212,7 +212,7 @@ data Pat p
                     (XNPat p)            -- Overall type of pattern. Might be
                                          -- different than the literal's type
                                          -- if (==) or negate changes the type
-                    (Located (HsOverLit p))     -- ALWAYS positive
+                    (XRec p (HsOverLit p))     -- ALWAYS positive
                     (Maybe (SyntaxExpr p)) -- Just (Name of 'negate') for
                                            -- negative patterns, Nothing
                                            -- otherwise
@@ -224,8 +224,8 @@ data Pat p
 
   -- For details on above see note [Api annotations] in GHC.Parser.Annotation
   | NPlusKPat       (XNPlusKPat p)           -- Type of overall pattern
-                    (Located (IdP p))        -- n+k pattern
-                    (Located (HsOverLit p))  -- It'll always be an HsIntegral
+                    (XRec p (IdP p))         -- n+k pattern
+                    (XRec p (HsOverLit p))   -- It'll always be an HsIntegral
                     (HsOverLit p)            -- See Note [NPlusK patterns] in GHC.Tc.Gen.Pat
                      -- NB: This could be (PostTc ...), but that induced a
                      -- a new hs-boot file. Not worth it.

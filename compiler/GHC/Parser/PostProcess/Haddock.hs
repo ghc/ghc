@@ -8,6 +8,7 @@
 {-# LANGUAGE TypeFamilies #-}
 {-# LANGUAGE ViewPatterns #-}
 {-# LANGUAGE DerivingVia #-}
+{-# LANGUAGE RankNTypes #-}
 
 {- | This module implements 'addHaddockToModule', which inserts Haddock
     comments accumulated during parsing into the AST (#17544).
@@ -52,6 +53,7 @@ module GHC.Parser.PostProcess.Haddock (addHaddockToModule) where
 import GHC.Prelude hiding (mod)
 
 import GHC.Hs
+
 import GHC.Types.SrcLoc
 import GHC.Driver.Session ( WarningFlag(..) )
 import GHC.Utils.Outputable hiding ( (<>) )
@@ -301,7 +303,7 @@ instance HasHaddock (Located HsModule) where
 --    import I (a, b, c)         -- do not use here!
 --
 -- Imports cannot have documentation comments anyway.
-instance HasHaddock (Located [LIE GhcPs]) where
+instance HasHaddock (Located [Located (IE GhcPs)]) where
   addHaddock (L l_exports exports) =
     extendHdkA l_exports $ do
       exports' <- addHaddockInterleaveItems NoLayoutInfo mkDocIE exports
@@ -309,7 +311,7 @@ instance HasHaddock (Located [LIE GhcPs]) where
       pure $ L l_exports exports'
 
 -- Needed to use 'addHaddockInterleaveItems' in 'instance HasHaddock (Located [LIE GhcPs])'.
-instance HasHaddock (LIE GhcPs) where
+instance HasHaddock (Located (IE GhcPs)) where
   addHaddock a = a <$ registerHdkA a
 
 {- Add Haddock items to a list of non-Haddock items.
@@ -386,7 +388,7 @@ addHaddockInterleaveItems layout_info get_doc_item = go
         let loc_range = mempty { loc_range_col = ColumnFrom (n+1) }
         in hoistHdkA (inLocRange loc_range)
 
-instance HasHaddock (LHsDecl GhcPs) where
+instance HasHaddock (Located (HsDecl GhcPs)) where
   addHaddock ldecl =
     extendHdkA (getLoc ldecl) $
     traverse @Located addHaddock ldecl
@@ -594,7 +596,7 @@ instance HasHaddock (HsDataDefn GhcPs) where
 
 -- Process the deriving clauses of a data/newtype declaration.
 -- Not used for standalone deriving.
-instance HasHaddock (HsDeriving GhcPs) where
+instance HasHaddock (Located [Located (HsDerivingClause GhcPs)]) where
   addHaddock lderivs =
     extendHdkA (getLoc lderivs) $
     traverse @Located addHaddock lderivs
@@ -606,7 +608,7 @@ instance HasHaddock (HsDeriving GhcPs) where
 --    deriving (Ord {- ^ Comment on Ord N -}) via Down N
 --
 -- Not used for standalone deriving.
-instance HasHaddock (LHsDerivingClause GhcPs) where
+instance HasHaddock (Located (HsDerivingClause GhcPs)) where
   addHaddock lderiv =
     extendHdkA (getLoc lderiv) $
     for @Located lderiv $ \deriv ->
@@ -668,7 +670,7 @@ instance HasHaddock (LHsDerivingClause GhcPs) where
 --                     bool_field :: Bool }  -- ^ Comment on bool_field
 --                -> T
 --
-instance HasHaddock (LConDecl GhcPs) where
+instance HasHaddock (Located (ConDecl GhcPs)) where
   addHaddock (L l_con_decl con_decl) =
     extendHdkA l_con_decl $
     case con_decl of
@@ -920,10 +922,10 @@ We implement this in two steps:
 instance HasHaddock a => HasHaddock (HsScaled GhcPs a) where
   addHaddock (HsScaled mult a) = HsScaled mult <$> addHaddock a
 
-instance HasHaddock (LHsSigWcType GhcPs) where
+instance HasHaddock a => HasHaddock (HsWildCardBndrs GhcPs a) where
   addHaddock (HsWC _ t) = HsWC noExtField <$> addHaddock t
 
-instance HasHaddock (LHsSigType GhcPs) where
+instance HasHaddock a => HasHaddock (HsImplicitBndrs GhcPs a) where
   addHaddock (HsIB _ t) = HsIB noExtField <$> addHaddock t
 
 -- Process a type, adding documentation comments to function arguments
@@ -953,7 +955,7 @@ instance HasHaddock (LHsSigType GhcPs) where
 --
 -- This is achieved by simply ignoring (not registering the location of) the
 -- function arrow (->).
-instance HasHaddock (LHsType GhcPs) where
+instance HasHaddock (Located (HsType GhcPs)) where
   addHaddock (L l t) =
     extendHdkA l $
     case t of
