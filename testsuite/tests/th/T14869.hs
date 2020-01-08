@@ -9,7 +9,7 @@ import GHC.Exts
 import Language.Haskell.TH (pprint, reify, stringE)
 
 type MyConstraint = Constraint
-type MyLiftedRep  = LiftedRep
+type MyLiftedRep  = BoxedRep Lifted
 
 type family Foo1 :: Type
 type family Foo2 :: Constraint
