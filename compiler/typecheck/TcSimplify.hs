@@ -2544,6 +2544,11 @@ Here (1,2,3) are handled by the "seed_skols" calculation, and
 The possible dependence on givens, and evidence bindings, is more
 subtle than we'd realised at first.  See #14584.
 
+How can (4) arise? Suppose we have (k :: *), (a :: k), and ([G} k ~ *).
+Then form an equality like (a ~ Int) we might end up with
+    [W] co1 :: k ~ *
+    [W] co2 :: (a |> co1) ~ Int
+
 
 *********************************************************************************
 *                                                                               *
