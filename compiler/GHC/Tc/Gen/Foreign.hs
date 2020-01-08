@@ -6,6 +6,10 @@
 
 {-# LANGUAGE CPP #-}
 {-# LANGUAGE TypeFamilies #-}
+{-# LANGUAGE TypeApplications #-}
+{-# LANGUAGE ScopedTypeVariables #-}
+{-# LANGUAGE RankNTypes #-}
+{-# LANGUAGE ViewPatterns #-}
 
 -- | Typechecking @foreign@ declarations
 --
@@ -67,13 +71,13 @@ import qualified GHC.LanguageExtensions as LangExt
 import Control.Monad
 
 -- Defines a binding
-isForeignImport :: LForeignDecl name -> Bool
-isForeignImport (L _ (ForeignImport {})) = True
+isForeignImport :: forall name. UnXRec name => LForeignDecl name -> Bool
+isForeignImport (unXRec @name -> ForeignImport {}) = True
 isForeignImport _                        = False
 
 -- Exports a binding
-isForeignExport :: LForeignDecl name -> Bool
-isForeignExport (L _ (ForeignExport {})) = True
+isForeignExport :: forall name. UnXRec name => LForeignDecl name -> Bool
+isForeignExport (unXRec @name -> ForeignExport {}) = True
 isForeignExport _                        = False
 
 {-

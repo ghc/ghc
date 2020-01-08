@@ -205,7 +205,7 @@ still gets assigned a polytype.
 -- | When the MatchGroup has multiple RHSs, convert an Infer ExpType in the
 -- expected type into TauTvs.
 -- See Note [Case branches must never infer a non-tau type]
-tauifyMultipleMatches :: [LMatch id body]
+tauifyMultipleMatches :: [LMatch (GhcPass id) body]
                       -> [Scaled ExpType] -> TcM [Scaled ExpType]
 tauifyMultipleMatches group exp_tys
   | isSingletonMatchGroup group = return exp_tys

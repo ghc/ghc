@@ -1,10 +1,16 @@
 {-# OPTIONS_GHC -Wno-incomplete-record-updates #-}
 
+{-# LANGUAGE TypeFamilies #-}
+{-# LANGUAGE TypeApplications #-}
+{-# LANGUAGE ScopedTypeVariables #-}
+{-# LANGUAGE RankNTypes #-}
+
 module GHC.Parser.PostProcess.Haddock where
 
 import GHC.Prelude
 
 import GHC.Hs
+
 import GHC.Types.SrcLoc
 
 import Control.Monad
