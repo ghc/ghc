@@ -466,7 +466,7 @@ Note [Template Haskell levels]
                incremented by brackets [| |]
                incremented by name-quoting 'f
 
-When a variable is used, we compare
+* When a variable is used, checkWellStaged compares
         bind:  binding level, and
         use:   current level at usage site
 

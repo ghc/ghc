@@ -911,7 +911,12 @@ removeBindingShadowing bindings = reverse $ fst $ foldl
 
 data SpliceType = Typed | Untyped
 
-data ThStage    -- See Note [Template Haskell state diagram] in TcSplice
+data ThStage    -- See Note [Template Haskell state diagram]
+                -- and Note [Template Haskell levels] in TcSplice
+    -- Start at:   Comp
+    -- At bracket: wrap current stage in Brack
+    -- At splice:  currently Brack: return to previous stage
+    --             currently Comp/Splice: compile and run
   = Splice SpliceType -- Inside a top-level splice
                       -- This code will be run *at compile time*;
                       --   the result replaces the splice
@@ -980,11 +985,10 @@ outerLevel = 1  -- Things defined outside brackets
 
 thLevel :: ThStage -> ThLevel
 thLevel (Splice _)    = 0
-thLevel (RunSplice _) =
-    -- See Note [RunSplice ThLevel].
-    panic "thLevel: called when running a splice"
 thLevel Comp          = 1
 thLevel (Brack s _)   = thLevel s + 1
+thLevel (RunSplice _) = panic "thLevel: called when running a splice"
+                        -- See Note [RunSplice ThLevel].
 
 {- Node [RunSplice ThLevel]
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~
