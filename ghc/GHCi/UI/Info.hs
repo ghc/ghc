@@ -349,6 +349,7 @@ processAllTypeCheckedModule tcm = do
     getTypeLPat (L spn pat) =
         pure (Just (getMaybeId pat,spn,hsPatType pat))
       where
+        getMaybeId :: Pat GhcTc -> Maybe Id
         getMaybeId (VarPat _ (L _ vid)) = Just vid
         getMaybeId _                        = Nothing
 
