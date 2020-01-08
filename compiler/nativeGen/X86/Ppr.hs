@@ -1,4 +1,5 @@
 {-# LANGUAGE CPP #-}
+{-# LANGUAGE MultiWayIf #-}
 
 -----------------------------------------------------------------------------
 --
@@ -171,9 +172,16 @@ pprData (CmmUninitialised bytes)
 pprData (CmmStaticLit lit) = pprDataItem lit
 
 pprGloblDecl :: CLabel -> SDoc
-pprGloblDecl lbl
-  | not (externallyVisibleCLabel lbl) = empty
-  | otherwise = text ".globl " <> ppr lbl
+pprGloblDecl lbl = sdocWithDynFlags $ \dflags ->
+  if | Just _ <- maybeLocalBlockLabel lbl
+     , debugLevel dflags >= 4
+     -> mk_globl
+     | not (externallyVisibleCLabel lbl)
+     -> empty
+     | otherwise
+     -> mk_globl
+  where
+    mk_globl = text ".globl " <> ppr lbl
 
 pprLabelType' :: DynFlags -> CLabel -> SDoc
 pprLabelType' dflags lbl =
