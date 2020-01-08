@@ -60,7 +60,7 @@ import GhcMonad
 import DriverPhases
 import Module ( ModuleName, Module(moduleName))
 import Fingerprint
-import Data.List
+import Data.List (sort)
 import Outputable (Outputable(..), text, (<+>))
 
 --Qualified import so we can define a Semigroup instance

@@ -113,7 +113,7 @@ import ExtractDocs
 
 import Control.Monad
 import Data.Function
-import Data.List
+import Data.List (find, findIndex, mapAccumL, sortBy, sort)
 import qualified Data.Map as Map
 import qualified Data.Set as Set
 import Data.Ord

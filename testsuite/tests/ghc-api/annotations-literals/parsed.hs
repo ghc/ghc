@@ -5,7 +5,7 @@ module Main where
 
 import BasicTypes
 import Data.Data
-import Data.List
+import Data.List (intercalate)
 import System.IO
 import GHC
 import DynFlags

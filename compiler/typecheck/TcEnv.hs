@@ -112,7 +112,7 @@ import qualified GHC.LanguageExtensions as LangExt
 import Util ( HasDebugCallStack )
 
 import Data.IORef
-import Data.List
+import Data.List (intercalate)
 import Control.Monad
 
 {- *********************************************************************
@@ -830,7 +830,7 @@ tcMetaTy :: Name -> TcM Type
 -- E.g. given the name "Expr" return the type "Expr"
 tcMetaTy tc_name = do
     t <- tcLookupTyCon tc_name
-    return (mkTyConApp t [])
+    return (mkTyConTy t)
 
 isBrackStage :: ThStage -> Bool
 isBrackStage (Brack {}) = True
