@@ -1957,6 +1957,9 @@ too_many_args fun args
 -}
 
 checkThLocalId :: Id -> TcM ()
+-- The renamer has already done checkWellStaged,
+--   in RnSplice.checkThLocalName, so don't repeat that here.
+-- Here we just just add constraints fro cross-stage lifting
 checkThLocalId id
   = do  { mb_local_use <- getStageAndBindLevel (idName id)
         ; case mb_local_use of
@@ -1973,7 +1976,6 @@ checkCrossStageLifting :: TopLevelFlag -> Id -> ThStage -> TcM ()
 -- we must check whether there's a cross-stage lift to do
 -- Examples   \x -> [|| x ||]
 --            [|| map ||]
--- There is no error-checking to do, because the renamer did that
 --
 -- This is similar to checkCrossStageLifting in GHC.Rename.Splice, but
 -- this code is applied to *typed* brackets.
