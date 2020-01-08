@@ -433,6 +433,7 @@ rnCmdArgs (arg:args)
 rnCmdTop :: LHsCmdTop GhcPs -> RnM (LHsCmdTop GhcRn, FreeVars)
 rnCmdTop = wrapLocFstM rnCmdTop'
  where
+  rnCmdTop' :: HsCmdTop GhcPs -> RnM (HsCmdTop GhcRn, FreeVars)
   rnCmdTop' (HsCmdTop _ cmd)
    = do { (cmd', fvCmd) <- rnLCmd cmd
         ; let cmd_names = [arrAName, composeAName, firstAName] ++
@@ -1865,7 +1866,7 @@ hasRefutablePattern (ApplicativeArgOne { app_arg_pattern = pat
                                        , is_body_stmt = False}) = not (isIrrefutableHsPat pat)
 hasRefutablePattern _ = False
 
-isLetStmt :: LStmt a b -> Bool
+isLetStmt :: LStmt (GhcPass a) b -> Bool
 isLetStmt (L _ LetStmt{}) = True
 isLetStmt _ = False
 

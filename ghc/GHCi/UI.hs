@@ -9,6 +9,7 @@
 {-# LANGUAGE ScopedTypeVariables #-}
 {-# LANGUAGE TupleSections #-}
 {-# LANGUAGE ViewPatterns #-}
+{-# LANGUAGE TypeFamilies #-}
 
 -----------------------------------------------------------------------------
 --
@@ -1255,7 +1256,9 @@ runStmt input step = do
 
     mk_stmt :: SrcSpan -> HsBind GhcPs -> GhciLStmt GhcPs
     mk_stmt loc bind =
-      let l = L loc
+      let
+        l :: a -> Located a
+        l = L loc
       in l (LetStmt noExtField (l (HsValBinds noExtField (ValBinds noExtField (unitBag (l bind)) []))))
 
 -- | Clean up the GHCi environment after a statement has run
@@ -2797,6 +2800,7 @@ showDynFlags show_all dflags = do
      text "warning settings:" $$
          nest 2 (vcat (map (setting "-W" "-Wno-" wopt) DynFlags.wWarningFlags))
   where
+        setting :: String -> String -> (flag -> DynFlags -> Bool) -> FlagSpec flag -> SDoc
         setting prefix noPrefix test flag
           | quiet     = empty
           | is_on     = text prefix <> text name
