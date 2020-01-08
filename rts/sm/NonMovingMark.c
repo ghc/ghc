@@ -1265,7 +1265,7 @@ mark_closure (MarkQueue *queue, const StgClosure *p0, StgClosure **origin)
     ASSERT(!IS_FORWARDING_PTR(p->header.info));
 
     // N.B. only the first block of a compact region is guaranteed to carry
-    // BF_NONMOVING; conseqently we must separately check for BF_COMPACT.
+    // BF_NONMOVING; consequently we must separately check for BF_COMPACT.
     if (bd->flags & (BF_COMPACT | BF_NONMOVING)) {
 
         if (bd->flags & BF_COMPACT) {
@@ -1315,7 +1315,7 @@ mark_closure (MarkQueue *queue, const StgClosure *p0, StgClosure **origin)
     }
 
     // A pinned object that is still attached to a capability (because it's not
-    // filled yet). No need to trace it pinned objects can't contain poiners.
+    // filled yet). No need to trace it pinned objects can't contain pointers.
     else if (bd->flags & BF_PINNED) {
 #if defined(DEBUG)
         bool found_it = false;
