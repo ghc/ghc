@@ -15,6 +15,6 @@ import Data.Kind
 
 type role Pat nominal
 data Pat (i :: Type)
-type LPat i = XRec i Pat
+type LPat i = XRec i (Pat i)
 
 instance OutputableBndrId p => Outputable (Pat (GhcPass p))

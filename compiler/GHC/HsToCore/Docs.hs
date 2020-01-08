@@ -300,7 +300,8 @@ ungroup group_ =
 -- | Collect docs and attach them to the right declarations.
 --
 -- A declaration may have multiple doc strings attached to it.
-collectDocs :: [LHsDecl pass] -> [(LHsDecl pass, [HsDocString])]
+collectDocs :: XRec p (HsDecl p) ~ Located (HsDecl p) =>
+               [LHsDecl p] -> [(LHsDecl p, [HsDocString])]
 -- ^ This is an example.
 collectDocs = go [] Nothing
   where
@@ -316,7 +317,8 @@ collectDocs = go [] Nothing
     finished decl docs rest = (decl, reverse docs) : rest
 
 -- | Filter out declarations that we don't handle in Haddock
-filterDecls :: [(LHsDecl a, doc)] -> [(LHsDecl a, doc)]
+filterDecls :: XRec p (HsDecl p) ~ Located (HsDecl p) =>
+               [(LHsDecl p, doc)] -> [(LHsDecl p, doc)]
 filterDecls = filter (isHandled . unLoc . fst)
   where
     isHandled (ForD _ (ForeignImport {})) = True
@@ -331,7 +333,8 @@ filterDecls = filter (isHandled . unLoc . fst)
 
 
 -- | Go through all class declarations and filter their sub-declarations
-filterClasses :: [(LHsDecl a, doc)] -> [(LHsDecl a, doc)]
+filterClasses :: XRec p (HsDecl p) ~ Located (HsDecl p) =>
+                 [(LHsDecl p, doc)] -> [(LHsDecl p, doc)]
 filterClasses = map (first (mapLoc filterClass))
   where
     filterClass (TyClD x c@(ClassDecl {})) =
