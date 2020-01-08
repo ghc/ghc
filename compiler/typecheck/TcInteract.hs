@@ -1833,27 +1833,35 @@ doTopReactOther work_item
   = continueWith work_item
 
   | EqPred eq_rel t1 t2 <- classifyPredType pred
-  = -- See Note [Looking up primitive equalities in quantified constraints]
-    case boxEqPred eq_rel t1 t2 of
-      Nothing -> continueWith work_item
-      Just (cls, tys)
-        -> do { res <- matchLocalInst (mkClassPred cls tys) loc
-              ; case res of
-                  OneInst { cir_mk_ev = mk_ev }
-                    -> chooseInstance work_item
-                           (res { cir_mk_ev = mk_eq_ev cls tys mk_ev })
-                    where
-                  _ -> continueWith work_item }
+  = doTopReactEqPred work_item eq_rel t1 t2
 
   | otherwise
   = do { res <- matchLocalInst pred loc
        ; case res of
            OneInst {} -> chooseInstance work_item res
            _          -> continueWith work_item }
+
   where
-    ev = ctEvidence work_item
+    ev   = ctEvidence work_item
     loc  = ctEvLoc ev
     pred = ctEvPred ev
+
+doTopReactEqPred :: Ct -> EqRel -> TcType -> TcType -> TcS (StopOrContinue Ct)
+doTopReactEqPred work_item eq_rel t1 t2
+  -- See Note [Looking up primitive equalities in quantified constraints]
+  | Just (cls, tys) <- boxEqPred eq_rel t1 t2
+  = do { res <- matchLocalInst (mkClassPred cls tys) loc
+       ; case res of
+           OneInst { cir_mk_ev = mk_ev }
+             -> chooseInstance work_item
+                    (res { cir_mk_ev = mk_eq_ev cls tys mk_ev })
+           _ -> continueWith work_item }
+
+  | otherwise
+  = continueWith work_item
+  where
+    ev   = ctEvidence work_item
+    loc = ctEvLoc ev
 
     mk_eq_ev cls tys mk_ev evs
       = case (mk_ev evs) of
