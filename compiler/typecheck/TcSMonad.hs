@@ -3402,12 +3402,32 @@ setWantedEvTerm (HoleDest hole) tm
   = do { useVars (coVarsOfCo co)
        ; wrapTcS $ TcM.fillCoercionHole hole co }
   | otherwise
-  = do { let co_var = coHoleCoVar hole
+  = -- See Note [Yukky eq_sel for a HoleDest]
+    do { let co_var = coHoleCoVar hole
        ; setEvBind (mkWantedEvBind co_var tm)
        ; wrapTcS $ TcM.fillCoercionHole hole (mkTcCoVarCo co_var) }
 
 setWantedEvTerm (EvVarDest ev_id) tm
   = setEvBind (mkWantedEvBind ev_id tm)
+
+{- Note [Yukky eq_sel for a HoleDest]
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+How can it be that a Wanted with HoleDest gets evidence that isn't
+just a coercion? i.e. evTermCoercion_maybe returns Nothing.
+
+Consider [G] forall a. blah => a ~ T
+         [W] S ~# T
+
+Then doTopReactEqPred carefully looks up the (boxed) constraint (S ~
+T) in the quantified constraints, and wraps the (boxed) evidence it
+gets back in an eq_sel to extract the unboxed (S ~# T).  We can't put
+that term into a coercion, so we add a value binding
+    h = eq_sel (...)
+and the coercion variable h to fill the coercion hole.
+We even re-use the CoHole's Id for this binding!
+
+Yuk!
+-}
 
 setEvBindIfWanted :: CtEvidence -> EvTerm -> TcS ()
 setEvBindIfWanted ev tm
