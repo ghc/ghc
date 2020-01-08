@@ -43,7 +43,7 @@ One per \tr{import} declaration in a module.
 -}
 
 -- | Located Import Declaration
-type LImportDecl pass = Located (ImportDecl pass)
+type LImportDecl pass = XRec pass (ImportDecl pass)
         -- ^ When in a list this may have
         --
         --  - 'GHC.Parser.Annotation.AnnKeywordId' : 'GHC.Parser.Annotation.AnnSemi'
@@ -81,14 +81,14 @@ data ImportDecl pass
       ideclExt       :: XCImportDecl pass,
       ideclSourceSrc :: SourceText,
                                  -- Note [Pragma source text] in GHC.Types.Basic
-      ideclName      :: Located ModuleName, -- ^ Module name.
+      ideclName      :: XRec pass ModuleName, -- ^ Module name.
       ideclPkgQual   :: Maybe StringLiteral,  -- ^ Package qualifier.
       ideclSource    :: IsBootInterface,      -- ^ IsBoot <=> {-\# SOURCE \#-} import
       ideclSafe      :: Bool,          -- ^ True => safe import
       ideclQualified :: ImportDeclQualifiedStyle, -- ^ If/how the import is qualified.
       ideclImplicit  :: Bool,          -- ^ True => implicit import (of Prelude)
-      ideclAs        :: Maybe (Located ModuleName),  -- ^ as Module
-      ideclHiding    :: Maybe (Bool, Located [LIE pass])
+      ideclAs        :: Maybe (XRec pass ModuleName),  -- ^ as Module
+      ideclHiding    :: Maybe (Bool, XRec pass [LIE pass])
                                        -- ^ (True => hiding, names)
     }
   | XImportDecl !(XXImportDecl pass)
@@ -193,7 +193,7 @@ type LIEWrappedName name = Located (IEWrappedName name)
 
 
 -- | Located Import or Export
-type LIE pass = Located (IE pass)
+type LIE pass = XRec pass (IE pass)
         -- ^ When in a list this may have
         --
         --  - 'GHC.Parser.Annotation.AnnKeywordId' : 'GHC.Parser.Annotation.AnnComma'
@@ -230,7 +230,7 @@ data IE pass
                 (LIEWrappedName (IdP pass))
                 IEWildcard
                 [LIEWrappedName (IdP pass)]
-                [Located (FieldLbl (IdP pass))]
+                [XRec pass (FieldLbl (IdP pass))]
         -- ^ Imported or exported Thing With given imported or exported
         --
         -- The thing is a Class/Type and the imported or exported things are
@@ -241,7 +241,7 @@ data IE pass
         --                                   'GHC.Parser.Annotation.AnnType'
 
         -- For details on above see note [Api annotations] in GHC.Parser.Annotation
-  | IEModuleContents  (XIEModuleContents pass) (Located ModuleName)
+  | IEModuleContents  (XIEModuleContents pass) (XRec pass ModuleName)
         -- ^ Imported or exported module contents
         --
         -- (Export Only)

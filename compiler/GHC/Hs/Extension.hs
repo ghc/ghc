@@ -32,7 +32,7 @@ import GHC.Types.Name
 import GHC.Types.Name.Reader
 import GHC.Types.Var
 import GHC.Utils.Outputable
-import GHC.Types.SrcLoc (Located)
+import GHC.Types.SrcLoc (Located, unLoc, noLoc)
 
 import Data.Kind
 
@@ -168,9 +168,58 @@ noExtCon x = case x of {}
 
 -- | GHC's L prefixed variants wrap their vanilla variant in this type family,
 -- to add 'SrcLoc' info via 'Located'. Other passes than 'GhcPass' not
--- interested in location information can define this instance as @f p@.
-type family XRec p (f :: Type -> Type) = r | r -> p f
-type instance XRec (GhcPass p) f = Located (f (GhcPass p))
+-- interested in location information can define this as
+-- @type instance XRec NoLocated a = a@.
+-- See Note [XRec and SrcSpans in the AST]
+type family XRec p a = r | r -> a
+
+type instance XRec (GhcPass p) a = Located a
+
+{-
+Note [XRec and SrcSpans in the AST]
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+XRec is meant to replace most of the uses of `Located` in the AST. It is another
+extension point meant to make it easier for non-GHC applications to reuse the
+AST for their own purposes, and not have to deal the hassle of (perhaps) useless
+SrcSpans everywhere.
+
+instead of `Located (HsExpr p)` or similar types, we will now have `XRec p
+(HsExpr p)`
+
+XRec allows annotating certain points in the AST with extra information. This
+maybe be source spans (for GHC), nothing (for TH), types (for HIE files), api
+annotations (for exactprint) or anything else.
+
+This should hopefully bring us one step closer to sharing the AST between GHC
+and TH.
+
+We use the `UnXRec`, `MapXRec` and `WrapXRec` type classes to aid us in writing
+pass-polymorphic code that deals with `XRec`s
+-}
+
+-- | We can strip off the XRec to access the underlying data.
+-- See Note [XRec and SrcSpans in the AST]
+class UnXRec p where
+  unXRec :: XRec p a -> a
+
+-- | We can map over the underlying type contained in an @XRec@ while preserving
+-- the annotation as is.
+-- See Note [XRec and SrcSpans in the AST]
+class MapXRec p where
+  mapXRec :: (a -> b) -> XRec p a -> XRec p b
+
+-- | The trivial wrapper that carries no additional information
+-- @noLoc@ for @GhcPass p@
+-- See Note [XRec and SrcSpans in the AST]
+class WrapXRec p where
+  wrapXRec :: a -> XRec p a
+
+instance UnXRec (GhcPass p) where
+  unXRec = unLoc
+instance MapXRec (GhcPass p) where
+  mapXRec = fmap
+instance WrapXRec (GhcPass p) where
+  wrapXRec = noLoc
 
 {-
 Note [NoExtCon and strict fields]
