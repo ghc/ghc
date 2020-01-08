@@ -24,10 +24,10 @@ deriving instance Foo1 a
 class Foo2 (a :: TYPE ('TupleRep '[]))
 deriving instance Foo2 (##)
 
-class Foo3 (a :: TYPE ('SumRep '[ 'LiftedRep, 'LiftedRep ]))
+class Foo3 (a :: TYPE ('SumRep '[ 'BoxedRep 'Lifted, 'BoxedRep 'Lifted ]))
 deriving instance Foo3 a
 
-class Foo4 (a :: TYPE ('SumRep '[ 'LiftedRep, 'LiftedRep ]))
+class Foo4 (a :: TYPE ('SumRep '[ 'BoxedRep 'Lifted, 'BoxedRep 'Lifted ]))
 deriving instance Foo4 (# a | b #)
 
 class Foo5 (a :: Type)

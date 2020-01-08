@@ -31,7 +31,7 @@ foreign import ccall unsafe "is_doubleton_homogenous"
   c_is_doubleton_homogeneous :: MutableArrayArray# RealWorld -> IO Word8
 
 data Box :: Type where
-  Box :: (Any :: TYPE 'UnliftedRep) -> Box
+  Box :: (Any :: TYPE ('BoxedRep 'Unlifted)) -> Box
 
 -- An array of bytes
 data MutableByteArray :: Type where
