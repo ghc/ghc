@@ -14,6 +14,6 @@ import GHC.Hs.Extension ( OutputableBndrId, GhcPass, XRec )
 
 type role Pat nominal
 data Pat (i :: *)
-type LPat i = XRec i Pat
+type LPat i = XRec i (Pat i)
 
 instance OutputableBndrId p => Outputable (Pat (GhcPass p))
