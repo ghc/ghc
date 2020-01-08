@@ -78,7 +78,7 @@ import GHC.Types.Name (Name)
 -- libraries:
 import Data.Data hiding (TyCon,Fixity)
 
-type LPat p = XRec p Pat
+type LPat p = XRec p (Pat p)
 
 -- | Pattern
 --

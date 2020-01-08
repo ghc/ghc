@@ -1170,7 +1170,7 @@ collect_pat pat bndrs = case pat of
 --
 -- In particular, Haddock already makes use of this, with an instance for its 'DocNameI' pass so that
 -- it can reuse the code in GHC for collecting binders.
-class (XRec p Pat ~ Located (Pat p)) => CollectPass p where
+class (XRec p (Pat p) ~ Located (Pat p)) => CollectPass p where
   collectXXPat :: Proxy p -> XXPat p -> [IdP p] -> [IdP p]
 
 instance CollectPass (GhcPass 'Parsed) where
