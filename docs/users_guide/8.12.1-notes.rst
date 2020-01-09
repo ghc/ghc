@@ -18,9 +18,11 @@ Full details
 Language
 ~~~~~~~~
 
+The cmm compiler now accepts `prim %clz(8|16|32|64)` and
+`prim %ctz(8|16|32|64)` in user-written cmm.
+
 Compiler
 ~~~~~~~~
-
 
 GHCi
 ~~~~

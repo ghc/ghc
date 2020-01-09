@@ -1013,6 +1013,16 @@ callishMachOps = listToUFM $
         ("prefetch2", (MO_Prefetch_Data 2,)),
         ("prefetch3", (MO_Prefetch_Data 3,)),
 
+        ( "ctz8",  (MO_Ctz W8,)),
+        ( "ctz16", (MO_Ctz W16,)),
+        ( "ctz32", (MO_Ctz W32,)),
+        ( "ctz64", (MO_Ctz W64,)),
+
+        ( "clz8",  (MO_Clz W8,)),
+        ( "clz16", (MO_Clz W16,)),
+        ( "clz32", (MO_Clz W32,)),
+        ( "clz64", (MO_Clz W64,)),
+
         ( "popcnt8",  (MO_PopCnt W8,)),
         ( "popcnt16", (MO_PopCnt W16,)),
         ( "popcnt32", (MO_PopCnt W32,)),
