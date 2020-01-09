@@ -1845,7 +1845,7 @@ hasRefutablePattern (ApplicativeArgOne { app_arg_pattern = pat
                                        , is_body_stmt = False}) = not (isIrrefutableHsPat pat)
 hasRefutablePattern _ = False
 
-isLetStmt :: LStmt a b -> Bool
+isLetStmt :: LStmt (GhcPass a) b -> Bool
 isLetStmt (L _ LetStmt{}) = True
 isLetStmt _ = False
 

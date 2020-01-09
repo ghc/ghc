@@ -129,7 +129,7 @@ import Data.Data        hiding (TyCon,Fixity, Infix)
 ************************************************************************
 -}
 
-type LHsDecl p = Located (HsDecl p)
+type LHsDecl p = XRec p (HsDecl p)
         -- ^ When in a list this may have
         --
         --  - 'ApiAnnotation.AnnKeywordId' : 'ApiAnnotation.AnnSemi'
@@ -375,7 +375,7 @@ instance (OutputableBndrId p) => Outputable (HsGroup (GhcPass p)) where
           vcat_mb gap (Just d  : ds) = gap $$ d $$ vcat_mb blankLine ds
 
 -- | Located Splice Declaration
-type LSpliceDecl pass = Located (SpliceDecl pass)
+type LSpliceDecl pass = XRec pass (SpliceDecl pass)
 
 -- | Splice Declaration
 data SpliceDecl p
@@ -532,7 +532,7 @@ Interface file code:
 -}
 
 -- | Located Declaration of a Type or Class
-type LTyClDecl pass = Located (TyClDecl pass)
+type LTyClDecl pass = XRec pass (TyClDecl pass)
 
 -- | A type or class declaration.
 data TyClDecl pass
@@ -601,7 +601,7 @@ data TyClDecl pass
         -- For details on above see note [Api annotations] in GHC.Parser.Annotation
   | XTyClDecl !(XXTyClDecl pass)
 
-type LHsFunDep pass = Located (FunDep (Located (IdP pass)))
+type LHsFunDep pass = XRec pass (FunDep (Located (IdP pass)))
 
 data DataDeclRn = DataDeclRn
              { tcdDataCusk :: Bool    -- ^ does this have a CUSK?
@@ -1040,7 +1040,7 @@ See also Note [Injective type families] in GHC.Core.TyCon
 -}
 
 -- | Located type Family Result Signature
-type LFamilyResultSig pass = Located (FamilyResultSig pass)
+type LFamilyResultSig pass = XRec pass (FamilyResultSig pass)
 
 -- | type Family Result Signature
 data FamilyResultSig pass = -- see Note [FamilyResultSig]
@@ -1072,7 +1072,7 @@ type instance XXFamilyResultSig (GhcPass _) = NoExtCon
 
 
 -- | Located type Family Declaration
-type LFamilyDecl pass = Located (FamilyDecl pass)
+type LFamilyDecl pass = XRec pass (FamilyDecl pass)
 
 -- | type Family Declaration
 data FamilyDecl pass = FamilyDecl
@@ -1100,7 +1100,7 @@ type instance XXFamilyDecl    (GhcPass _) = NoExtCon
 
 
 -- | Located Injectivity Annotation
-type LInjectivityAnn pass = Located (InjectivityAnn pass)
+type LInjectivityAnn pass = XRec pass (InjectivityAnn pass)
 
 -- | If the user supplied an injectivity annotation it is represented using
 -- InjectivityAnn. At the moment this is a single injectivity condition - see
@@ -1212,7 +1212,7 @@ data HsDataDefn pass   -- The payload of a data type defn
     HsDataDefn { dd_ext    :: XCHsDataDefn pass,
                  dd_ND     :: NewOrData,
                  dd_ctxt   :: LHsContext pass,           -- ^ Context
-                 dd_cType  :: Maybe (Located CType),
+                 dd_cType  :: Maybe (XRec pass CType),
                  dd_kindSig:: Maybe (LHsKind pass),
                      -- ^ Optional kind signature.
                      --
@@ -1240,7 +1240,7 @@ type instance XCHsDataDefn    (GhcPass _) = NoExtField
 type instance XXHsDataDefn    (GhcPass _) = NoExtCon
 
 -- | Haskell Deriving clause
-type HsDeriving pass = Located [LHsDerivingClause pass]
+type HsDeriving pass = XRec pass [LHsDerivingClause pass]
   -- ^ The optional @deriving@ clauses of a data declaration. "Clauses" is
   -- plural because one can specify multiple deriving clauses using the
   -- @-XDerivingStrategies@ language extension.
@@ -1249,7 +1249,7 @@ type HsDeriving pass = Located [LHsDerivingClause pass]
   -- requested to derive, in order. If no deriving clauses were specified,
   -- the list is empty.
 
-type LHsDerivingClause pass = Located (HsDerivingClause pass)
+type LHsDerivingClause pass = XRec pass (HsDerivingClause pass)
 
 -- | A single @deriving@ clause of a data declaration.
 --
@@ -1303,7 +1303,7 @@ instance OutputableBndrId p
             _                            -> (ppDerivStrategy dcs, empty)
 
 -- | Located Standalone Kind Signature
-type LStandaloneKindSig pass = Located (StandaloneKindSig pass)
+type LStandaloneKindSig pass = XRec pass (StandaloneKindSig pass)
 
 data StandaloneKindSig pass
   = StandaloneKindSig (XStandaloneKindSig pass)
@@ -1344,7 +1344,7 @@ newOrDataToFlavour DataType = DataTypeFlavour
 
 
 -- | Located data Constructor Declaration
-type LConDecl pass = Located (ConDecl pass)
+type LConDecl pass = XRec pass (ConDecl pass)
       -- ^ May have 'ApiAnnotation.AnnKeywordId' : 'ApiAnnotation.AnnSemi' when
       --   in a GADT constructor list
 
@@ -1378,13 +1378,13 @@ type LConDecl pass = Located (ConDecl pass)
 data ConDecl pass
   = ConDeclGADT
       { con_g_ext   :: XConDeclGADT pass
-      , con_names   :: [Located (IdP pass)]
+      , con_names   :: [XRec pass (IdP pass)]
 
       -- The next four fields describe the type after the '::'
       -- See Note [GADT abstract syntax]
       -- The following field is Located to anchor API Annotations,
       -- AnnForall and AnnDot.
-      , con_forall  :: Located Bool      -- ^ True <=> explicit forall
+      , con_forall  :: XRec pass Bool    -- ^ True <=> explicit forall
                                          --   False => hsq_explicit is empty
       , con_qvars   :: LHsQTyVars pass
                        -- Whether or not there is an /explicit/ forall, we still
@@ -1400,9 +1400,9 @@ data ConDecl pass
 
   | ConDeclH98
       { con_ext     :: XConDeclH98 pass
-      , con_name    :: Located (IdP pass)
+      , con_name    :: XRec pass (IdP pass)
 
-      , con_forall  :: Located Bool
+      , con_forall  :: XRec pass Bool
                               -- ^ True <=> explicit user-written forall
                               --     e.g. data T a = forall b. MkT b (b->a)
                               --     con_ex_tvs = {b}
@@ -1468,12 +1468,12 @@ getConNames ConDeclGADT {con_names = names} = names
 getConArgs :: ConDecl pass -> HsConDeclDetails pass
 getConArgs d = con_args d
 
-hsConDeclArgTys :: HsConDeclDetails pass -> [LBangType pass]
+hsConDeclArgTys :: HsConDeclDetails (GhcPass p) -> [LBangType (GhcPass p)]
 hsConDeclArgTys (PrefixCon tys)    = tys
 hsConDeclArgTys (InfixCon ty1 ty2) = [ty1,ty2]
 hsConDeclArgTys (RecCon flds)      = map (cd_fld_type . unLoc) (unLoc flds)
 
-hsConDeclTheta :: Maybe (LHsContext pass) -> [LHsType pass]
+hsConDeclTheta :: Maybe (LHsContext (GhcPass p)) -> [LHsType (GhcPass p)]
 hsConDeclTheta Nothing            = []
 hsConDeclTheta (Just (L _ theta)) = theta
 
@@ -1589,7 +1589,7 @@ free-standing `type instance` declaration.
 ----------------- Type synonym family instances -------------
 
 -- | Located Type Family Instance Equation
-type LTyFamInstEqn pass = Located (TyFamInstEqn pass)
+type LTyFamInstEqn pass = XRec pass (TyFamInstEqn pass)
   -- ^ May have 'ApiAnnotation.AnnKeywordId' : 'ApiAnnotation.AnnSemi'
   --   when in a list
 
@@ -1641,10 +1641,10 @@ type TyFamInstEqn pass = FamInstEqn pass (LHsType pass)
 type TyFamDefltDecl = TyFamInstDecl
 
 -- | Located type family default declarations.
-type LTyFamDefltDecl pass = Located (TyFamDefltDecl pass)
+type LTyFamDefltDecl pass = XRec pass (TyFamDefltDecl pass)
 
 -- | Located Type Family Instance Declaration
-type LTyFamInstDecl pass = Located (TyFamInstDecl pass)
+type LTyFamInstDecl pass = XRec pass (TyFamInstDecl pass)
 
 -- | Type Family Instance Declaration
 newtype TyFamInstDecl pass = TyFamInstDecl { tfid_eqn :: TyFamInstEqn pass }
@@ -1657,7 +1657,7 @@ newtype TyFamInstDecl pass = TyFamInstDecl { tfid_eqn :: TyFamInstEqn pass }
 ----------------- Data family instances -------------
 
 -- | Located Data Family Instance Declaration
-type LDataFamInstDecl pass = Located (DataFamInstDecl pass)
+type LDataFamInstDecl pass = XRec pass (DataFamInstDecl pass)
 
 -- | Data Family Instance Declaration
 newtype DataFamInstDecl pass
@@ -1674,7 +1674,7 @@ newtype DataFamInstDecl pass
 ----------------- Family instances (common types) -------------
 
 -- | Located Family Instance Equation
-type LFamInstEqn pass rhs = Located (FamInstEqn pass rhs)
+type LFamInstEqn pass rhs = XRec pass (FamInstEqn pass rhs)
 
 -- | Family Instance Equation
 type FamInstEqn pass rhs = HsImplicitBndrs pass (FamEqn pass rhs)
@@ -1708,7 +1708,7 @@ type instance XXFamEqn    (GhcPass _) r = NoExtCon
 ----------------- Class instances -------------
 
 -- | Located Class Instance Declaration
-type LClsInstDecl pass = Located (ClsInstDecl pass)
+type LClsInstDecl pass = XRec pass (ClsInstDecl pass)
 
 -- | Class Instance Declaration
 data ClsInstDecl pass
@@ -1741,7 +1741,7 @@ type instance XXClsInstDecl    (GhcPass _) = NoExtCon
 ----------------- Instances of all kinds -------------
 
 -- | Located Instance Declaration
-type LInstDecl pass = Located (InstDecl pass)
+type LInstDecl pass = XRec pass (InstDecl pass)
 
 -- | Instance Declaration
 data InstDecl pass  -- Both class and family instances
@@ -1898,7 +1898,7 @@ instDeclDataFamInsts inst_decls
 -}
 
 -- | Located stand-alone 'deriving instance' declaration
-type LDerivDecl pass = Located (DerivDecl pass)
+type LDerivDecl pass = XRec pass (DerivDecl pass)
 
 -- | Stand-alone 'deriving instance' declaration
 data DerivDecl pass = DerivDecl
@@ -1949,7 +1949,7 @@ instance OutputableBndrId p
 -}
 
 -- | A 'Located' 'DerivStrategy'.
-type LDerivStrategy pass = Located (DerivStrategy pass)
+type LDerivStrategy pass = XRec pass (DerivStrategy pass)
 
 -- | Which technique the user explicitly requested when deriving an instance.
 data DerivStrategy pass
@@ -2015,7 +2015,7 @@ syntax, and that restriction must be checked in the front end.
 -}
 
 -- | Located Default Declaration
-type LDefaultDecl pass = Located (DefaultDecl pass)
+type LDefaultDecl pass = XRec pass (DefaultDecl pass)
 
 -- | Default Declaration
 data DefaultDecl pass
@@ -2049,7 +2049,7 @@ instance OutputableBndrId p
 --   has been used
 
 -- | Located Foreign Declaration
-type LForeignDecl pass = Located (ForeignDecl pass)
+type LForeignDecl pass = XRec pass (ForeignDecl pass)
 
 -- | Foreign Declaration
 data ForeignDecl pass
@@ -2186,7 +2186,7 @@ instance Outputable ForeignExport where
 -}
 
 -- | Located Rule Declarations
-type LRuleDecls pass = Located (RuleDecls pass)
+type LRuleDecls pass = XRec pass (RuleDecls pass)
 
   -- Note [Pragma source text] in GHC.Types.Basic
 -- | Rule Declarations
@@ -2199,7 +2199,7 @@ type instance XCRuleDecls    (GhcPass _) = NoExtField
 type instance XXRuleDecls    (GhcPass _) = NoExtCon
 
 -- | Located Rule Declaration
-type LRuleDecl pass = Located (RuleDecl pass)
+type LRuleDecl pass = XRec pass (RuleDecl pass)
 
 -- | Rule Declaration
 data RuleDecl pass
@@ -2235,11 +2235,11 @@ type instance XHsRule       GhcTc = HsRuleRn
 
 type instance XXRuleDecl    (GhcPass _) = NoExtCon
 
-flattenRuleDecls :: [LRuleDecls pass] -> [LRuleDecl pass]
+flattenRuleDecls :: [LRuleDecls (GhcPass p)] -> [LRuleDecl (GhcPass p)]
 flattenRuleDecls decls = concatMap (rds_rules . unLoc) decls
 
 -- | Located Rule Binder
-type LRuleBndr pass = Located (RuleBndr pass)
+type LRuleBndr pass = XRec pass (RuleBndr pass)
 
 -- | Rule Binder
 data RuleBndr pass
@@ -2329,7 +2329,7 @@ We use exported entities for things to deprecate.
 -}
 
 -- | Located Warning Declarations
-type LWarnDecls pass = Located (WarnDecls pass)
+type LWarnDecls pass = XRec pass (WarnDecls pass)
 
  -- Note [Pragma source text] in GHC.Types.Basic
 -- | Warning pragma Declarations
@@ -2343,7 +2343,7 @@ type instance XWarnings      (GhcPass _) = NoExtField
 type instance XXWarnDecls    (GhcPass _) = NoExtCon
 
 -- | Located Warning pragma Declaration
-type LWarnDecl pass = Located (WarnDecl pass)
+type LWarnDecl pass = XRec pass (WarnDecl pass)
 
 -- | Warning pragma Declaration
 data WarnDecl pass = Warning (XWarning pass) [Located (IdP pass)] WarningTxt
@@ -2374,7 +2374,7 @@ instance OutputableBndr (IdP (GhcPass p))
 -}
 
 -- | Located Annotation Declaration
-type LAnnDecl pass = Located (AnnDecl pass)
+type LAnnDecl pass = XRec pass (AnnDecl pass)
 
 -- | Annotation Declaration
 data AnnDecl pass = HsAnnotation
@@ -2426,7 +2426,7 @@ pprAnnProvenance (TypeAnnProvenance (L _ name))
 -}
 
 -- | Located Role Annotation Declaration
-type LRoleAnnotDecl pass = Located (RoleAnnotDecl pass)
+type LRoleAnnotDecl pass = XRec pass (RoleAnnotDecl pass)
 
 -- See #8185 for more info about why role annotations are
 -- top-level declarations

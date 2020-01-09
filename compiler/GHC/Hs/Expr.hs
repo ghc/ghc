@@ -71,7 +71,7 @@ import qualified Language.Haskell.TH as TH (Q)
 -- * Expressions proper
 
 -- | Located Haskell Expression
-type LHsExpr p = Located (HsExpr p)
+type LHsExpr p = XRec p (HsExpr p)
   -- ^ May have 'ApiAnnotation.AnnKeywordId' : 'ApiAnnotation.AnnComma' when
   --   in a list
 
@@ -722,7 +722,7 @@ type instance XXPragE        (GhcPass _) = NoExtCon
 -- @(,a,)@ is represented by
 -- @ExplicitTuple [Missing ty1, Present a, Missing ty3]@
 -- Which in turn stands for @(\x:ty1 \y:ty2. (x,a,y))@
-type LHsTupArg id = Located (HsTupArg id)
+type LHsTupArg id = XRec id (HsTupArg id)
 -- | - 'ApiAnnotation.AnnKeywordId' : 'ApiAnnotation.AnnComma'
 
 -- For details on above see note [Api annotations] in GHC.Parser.Annotation
@@ -741,7 +741,7 @@ type instance XMissing         GhcTc = Type
 
 type instance XXTupArg         (GhcPass _) = NoExtCon
 
-tupArgPresent :: LHsTupArg id -> Bool
+tupArgPresent :: LHsTupArg (GhcPass p) -> Bool
 tupArgPresent (L _ (Present {})) = True
 tupArgPresent (L _ (Missing {})) = False
 tupArgPresent (L _ (XTupArg {})) = False
@@ -1270,7 +1270,7 @@ We re-use HsExpr to represent these.
 -}
 
 -- | Located Haskell Command (for arrow syntax)
-type LHsCmd id = Located (HsCmd id)
+type LHsCmd id = XRec id (HsCmd id)
 
 -- | Haskell Command (e.g. a "statement" in an Arrow proc block)
 data HsCmd id
@@ -1398,7 +1398,7 @@ argument of a command-forming operator.
 -}
 
 -- | Located Haskell Top-level Command
-type LHsCmdTop p = Located (HsCmdTop p)
+type LHsCmdTop p = XRec p (HsCmdTop p)
 
 -- | Haskell Top-level Command
 data HsCmdTop p
@@ -1571,7 +1571,7 @@ type instance XMG         GhcTc b = MatchGroupTc
 type instance XXMatchGroup (GhcPass _) b = NoExtCon
 
 -- | Located Match
-type LMatch id body = Located (Match id body)
+type LMatch id body = XRec id (Match id body)
 -- ^ May have 'ApiAnnotation.AnnKeywordId' : 'ApiAnnotation.AnnSemi' when in a
 --   list
 
@@ -1640,7 +1640,7 @@ isEmptyMatchGroup (MG { mg_alts = ms }) = null $ unLoc ms
 isEmptyMatchGroup (XMatchGroup {})      = False
 
 -- | Is there only one RHS in this list of matches?
-isSingletonMatchGroup :: [LMatch id body] -> Bool
+isSingletonMatchGroup :: [LMatch (GhcPass p) body] -> Bool
 isSingletonMatchGroup matches
   | [L _ match] <- matches
   , Match { m_grhss = GRHSs { grhssGRHSs = [_] } } <- match
@@ -1680,7 +1680,7 @@ type instance XCGRHSs (GhcPass _) b = NoExtField
 type instance XXGRHSs (GhcPass _) b = NoExtCon
 
 -- | Located Guarded Right-Hand Side
-type LGRHS id body = Located (GRHS id body)
+type LGRHS id body = XRec id (GRHS id body)
 
 -- | Guarded Right Hand Side.
 data GRHS p body = GRHS (XCGRHS p body)
@@ -1777,10 +1777,10 @@ pp_rhs ctxt rhs = matchSeparator ctxt <+> pprDeeper (ppr rhs)
 -}
 
 -- | Located @do@ block Statement
-type LStmt id body = Located (StmtLR id id body)
+type LStmt id body = XRec id (StmtLR id id body)
 
 -- | Located Statement with separate Left and Right id's
-type LStmtLR idL idR body = Located (StmtLR idL idR body)
+type LStmtLR idL idR body = XRec idL (StmtLR idL idR body)
 
 -- | @do@ block Statement
 type Stmt id body = StmtLR id id body
@@ -2228,9 +2228,9 @@ Bool flag that is True when the original statement was a BodyStmt, so
 that we can pretty-print it correctly.
 -}
 
-instance (Outputable (StmtLR idL idL (LHsExpr idL)),
-          Outputable (XXParStmtBlock idL idR))
-        => Outputable (ParStmtBlock idL idR) where
+instance (Outputable (StmtLR (GhcPass idL) (GhcPass idL) (LHsExpr (GhcPass idL))),
+          Outputable (XXParStmtBlock (GhcPass idL) (GhcPass idR)))
+        => Outputable (ParStmtBlock (GhcPass idL) (GhcPass idR)) where
   ppr (ParStmtBlock _ stmts _ _) = interpp'SP stmts
   ppr (XParStmtBlock x)          = ppr x
 
@@ -2321,7 +2321,8 @@ pprArg (ApplicativeArgMany _ stmts return pat) =
      text "<-" <+>
      ppr (HsDo (panic "pprStmt") DoExpr (noLoc
                (stmts ++
-                   [noLoc (LastStmt noExtField (noLoc return) Nothing noSyntaxExpr)])))
+                   [noLoc (LastStmt noExtField (noLoc return) Nothing noSyntaxExpr)]))
+          :: HsExpr (GhcPass idL))
 
 pprTransformStmt :: (OutputableBndrId p)
                  => [IdP (GhcPass p)] -> LHsExpr (GhcPass p)

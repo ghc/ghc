@@ -3075,7 +3075,7 @@ dataDeclChecks tc_name new_or_data (L _ stupid_theta) cons
 
 
 -----------------------------------
-consUseGadtSyntax :: [LConDecl a] -> Bool
+consUseGadtSyntax :: [LConDecl (GhcPass a)] -> Bool
 consUseGadtSyntax (L _ (ConDeclGADT {}) : _) = True
 consUseGadtSyntax _                          = False
                  -- All constructors have same shape

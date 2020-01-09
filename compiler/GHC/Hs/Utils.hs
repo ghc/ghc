@@ -178,7 +178,8 @@ unguardedRHS :: SrcSpan -> Located (body (GhcPass p))
              -> [LGRHS (GhcPass p) (Located (body (GhcPass p)))]
 unguardedRHS loc rhs = [L loc (GRHS noExtField [] rhs)]
 
-mkMatchGroup :: (XMG name (Located (body name)) ~ NoExtField)
+mkMatchGroup :: XMG name (Located (body name)) ~ NoExtField
+             => XRec name (Match name (Located (body name))) ~ Located (Match name (Located (body name)))
              => Origin -> [LMatch name (Located (body name))]
              -> MatchGroup name (Located (body name))
 mkMatchGroup origin matches = MG { mg_ext = noExtField
@@ -881,7 +882,7 @@ mkPatSynBind name details lpat dir = PatSynBind noExtField psb
 
 -- |If any of the matches in the 'FunBind' are infix, the 'FunBind' is
 -- considered infix.
-isInfixFunBind :: HsBindLR id1 id2 -> Bool
+isInfixFunBind :: HsBindLR id1 (GhcPass id2) -> Bool
 isInfixFunBind (FunBind { fun_matches = MG _ matches _ })
   = any (isInfixMatch . unLoc) (unLoc matches)
 isInfixFunBind _ = False
@@ -1267,7 +1268,8 @@ hsLTyClDeclBinders (L loc (DataDecl    { tcdLName = (L _ name)
 
 
 -------------------
-hsForeignDeclsBinders :: [LForeignDecl pass] -> [Located (IdP pass)]
+hsForeignDeclsBinders :: XRec pass (ForeignDecl pass) ~ Located (ForeignDecl pass)
+                      => [LForeignDecl pass] -> [Located (IdP pass)]
 -- ^ See Note [SrcSpan for binders]
 hsForeignDeclsBinders foreign_decls
   = [ L decl_loc n

@@ -43,7 +43,7 @@ One per \tr{import} declaration in a module.
 -}
 
 -- | Located Import Declaration
-type LImportDecl pass = Located (ImportDecl pass)
+type LImportDecl pass = XRec pass (ImportDecl pass)
         -- ^ When in a list this may have
         --
         --  - 'ApiAnnotation.AnnKeywordId' : 'ApiAnnotation.AnnSemi'
@@ -193,7 +193,7 @@ type LIEWrappedName name = Located (IEWrappedName name)
 
 
 -- | Located Import or Export
-type LIE pass = Located (IE pass)
+type LIE pass = XRec pass (IE pass)
         -- ^ When in a list this may have
         --
         --  - 'ApiAnnotation.AnnKeywordId' : 'ApiAnnotation.AnnComma'

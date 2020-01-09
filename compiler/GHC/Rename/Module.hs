@@ -1655,7 +1655,7 @@ rnTyClDecl (ClassDecl { tcdCtxt = context, tcdLName = lcls,
     cls_doc  = ClassDeclCtx lcls
 
 -- Does the data type declaration include a CUSK?
-data_decl_has_cusk :: LHsQTyVars pass -> NewOrData -> Bool -> Maybe (LHsKind pass') -> RnM Bool
+data_decl_has_cusk :: LHsQTyVars (GhcPass p) -> NewOrData -> Bool -> Maybe (LHsKind (GhcPass p')) -> RnM Bool
 data_decl_has_cusk tyvars new_or_data no_rhs_kvs kind_sig = do
   { -- See Note [Unlifted Newtypes and CUSKs], and for a broader
     -- picture, see Note [Implementation of UnliftedNewtypes].
@@ -2041,7 +2041,7 @@ rnConDecls = mapFvRn (wrapLocFstM rnConDecl)
 rnConDecl :: ConDecl GhcPs -> RnM (ConDecl GhcRn, FreeVars)
 rnConDecl decl@(ConDeclH98 { con_name = name, con_ex_tvs = ex_tvs
                            , con_mb_cxt = mcxt, con_args = args
-                           , con_doc = mb_doc })
+                           , con_doc = mb_doc, con_forall = forall })
   = do  { _        <- addLocM checkConName name
         ; new_name <- lookupLocatedTopBndrRn name
         ; mb_doc'  <- rnMbLHsDoc mb_doc
@@ -2068,11 +2068,11 @@ rnConDecl decl@(ConDeclH98 { con_name = name, con_ex_tvs = ex_tvs
         ; return (decl { con_ext = noExtField
                        , con_name = new_name, con_ex_tvs = new_ex_tvs
                        , con_mb_cxt = new_context, con_args = new_args
-                       , con_doc = mb_doc' },
+                       , con_doc = mb_doc', con_forall = forall },
                   all_fvs) }}
 
 rnConDecl decl@(ConDeclGADT { con_names   = names
-                            , con_forall  = L _ explicit_forall
+                            , con_forall  = forall@(L _ explicit_forall)
                             , con_qvars   = qtvs
                             , con_mb_cxt  = mcxt
                             , con_args    = args
@@ -2121,7 +2121,7 @@ rnConDecl decl@(ConDeclGADT { con_names   = names
         ; return (decl { con_g_ext = noExtField, con_names = new_names
                        , con_qvars = new_qtvs, con_mb_cxt = new_cxt
                        , con_args = args', con_res_ty = res_ty'
-                       , con_doc = mb_doc' },
+                       , con_doc = mb_doc', con_forall = forall },
                   all_fvs) } }
 
 
