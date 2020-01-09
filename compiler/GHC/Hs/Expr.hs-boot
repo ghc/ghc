@@ -10,11 +10,10 @@
 
 module GHC.Hs.Expr where
 
-import SrcLoc     ( Located )
 import Outputable ( SDoc, Outputable )
 import {-# SOURCE #-} GHC.Hs.Pat  ( LPat )
 import BasicTypes ( SpliceExplicitFlag(..))
-import GHC.Hs.Extension ( OutputableBndrId, GhcPass )
+import GHC.Hs.Extension ( OutputableBndrId, GhcPass, XRec )
 
 type role HsExpr nominal
 type role HsCmd nominal
@@ -32,7 +31,7 @@ data SyntaxExpr (i :: *)
 instance OutputableBndrId p => Outputable (HsExpr (GhcPass p))
 instance OutputableBndrId p => Outputable (HsCmd (GhcPass p))
 
-type LHsExpr a = Located (HsExpr a)
+type LHsExpr a = XRec a (HsExpr a)
 
 pprLExpr :: (OutputableBndrId p) => LHsExpr (GhcPass p) -> SDoc
 
