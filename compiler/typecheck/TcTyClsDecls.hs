@@ -621,16 +621,16 @@ generaliseTcTyCon tc
        ; inferred <- quantifyTyVars dvs2
 
        -- Step 3a: rename all the Specified and Required tyvars back to
-       -- TyVars with their oroginal user-specified name.  Example
+       -- TyVars with their original user-specified name.  Example
        --     class C a_r23 where ....
        -- By this point we have scoped_prs = [(a_r23, a_r89[TyVarTv])]
        -- We return with the TyVar a_r23[TyVar],
        --    and ze mapping a_r89 :-> a_r23[TyVar]
+       -- See Note [Tricky scoping in generaliseTcTyCon]
        ; traceTc "generaliseTcTyCon: before zonkRec"
            (vcat [ text "spec_req_tvs =" <+> pprTyVars spec_req_tvs
                  , text "inferred =" <+> pprTyVars inferred ])
        ; (ze, final_spec_req_tvs) <- zonkRecTyVarBndrs spec_req_names spec_req_tvs
-           -- So ze maps from the tyvars that have ended up
 
        -- Step 3b: Apply that mapping to the other variables
        -- (remember they all started as TyVarTvs).
@@ -857,7 +857,7 @@ We do kind inference as follows:
     - Have complete fresh Names; see TcMType
       Note [Unification variables need fresh Names]
 
-  Assign initial monomorophic kinds to S, T
+  Assign initial monomorphic kinds to S, T
           T :: kk1 -> * -> kk2 -> *
           S :: kk3 -> * -> kk4 -> *
 
@@ -942,16 +942,16 @@ Consider #16342
     dop _ x = x :: Proxy (b::kb)
 
 C and D are mutually recursive, by the time we get to
-generaliseTcTyCon we'll have unified kka := kkb.
+generaliseTcTyCon we'll have unified ka := kb.
 
 But when typechecking the default declarations for 'cop' and 'dop' in
-tcDlassDecl2 we need {a, ka} and {b, kb} respectively to be in scope.
+tcClassDecl2 we need {a, ka} and {b, kb} respectively to be in scope.
 But at that point all we have is the utterly-final Class itself.
 
 Conclusion: the classTyVars of a class must have the same Name as
 that originally assigned by the user.  In our example, C must have
 classTyVars {a, ka, x} while D has classTyVars {a, kb, y}.  Despite
-the fact that kka and kkb got unified!
+the fact that ka and kb got unified!
 
 We achieve this sleight of hand in generaliseTcTyCon, using
 the specialised function zonkRecTyVarBndrs.  We make the call
@@ -962,7 +962,7 @@ zonkRecTyVarBndrs builds a recursive ZonkEnv that binds
    kkb :-> (ka :: <zonked kind of kkb>)
    aa  :-> (a  :: <konked kind of aa>)
    etc
-That is, it maps each skolemised TcTyVars to the utterly-final
+That is, it maps each skolemised TcTyVar to the utterly-final
 TyVar to put in the class, with its correct user-specified name.
 When generalising D we'll do the same thing, but the ZonkEnv will map
    kkb :-> (kb :: <zonked kind of kkb>)
