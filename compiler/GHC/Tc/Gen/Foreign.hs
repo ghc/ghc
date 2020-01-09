@@ -66,12 +66,12 @@ import qualified GHC.LanguageExtensions as LangExt
 import Control.Monad
 
 -- Defines a binding
-isForeignImport :: LForeignDecl name -> Bool
+isForeignImport :: LForeignDecl (GhcPass name) -> Bool
 isForeignImport (L _ (ForeignImport {})) = True
 isForeignImport _                        = False
 
 -- Exports a binding
-isForeignExport :: LForeignDecl name -> Bool
+isForeignExport :: LForeignDecl (GhcPass name) -> Bool
 isForeignExport (L _ (ForeignExport {})) = True
 isForeignExport _                        = False
 
