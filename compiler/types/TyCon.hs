@@ -918,8 +918,8 @@ data TyCon
         tcTyConFlavour :: TyConFlavour
                            -- ^ What sort of 'TyCon' this represents.
       }
-{- Note [Scoped tyvars in a TcTyCon]
 
+{- Note [Scoped tyvars in a TcTyCon]
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 The tcTyConScopedTyVars field records the lexicial-binding connection
 between the original, user-specified Name (i.e. thing in scope) and
