@@ -24,8 +24,10 @@ f x = $(spliceExpr "boo" [| x |])
 g x = $(spliceExpr $(litE (stringL "boo")) [| x |])
 
 -- Ordinary splice inside bracket
+h1 :: Q Exp
 h1 = [| $(litE (integerL 3)) |]
 
 -- Splice inside splice inside bracket
+h2 :: Q Exp
 h2 = [| $(litE ($(varE 'integerL) 3)) |]
 
