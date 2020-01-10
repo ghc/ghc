@@ -1,4 +1,4 @@
-{-# LANGUAGE DuplicateRecordFields, TemplateHaskell #-}
+{-# LANGUAGE DuplicateRecordFields, TemplateHaskell, NoMonomorphismRestriction #-}
 
 data S = MkS { x :: Int }
 data T = MkT { x :: Int }
