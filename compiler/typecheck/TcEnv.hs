@@ -508,7 +508,7 @@ isTypeClosedLetBndr :: Id -> Bool
 isTypeClosedLetBndr = noFreeVarsOfType . idType
 
 tcExtendRecIds :: [(Name, TcId)] -> TcM a -> TcM a
--- Used for binding the recurive uses of Ids in a binding
+-- Used for binding the recursive uses of Ids in a binding
 -- both top-level value bindings and nested let/where-bindings
 -- Does not extend the TcBinderStack
 tcExtendRecIds pairs thing_inside
@@ -819,7 +819,7 @@ topIdLvl :: Id -> ThLevel
 -- E.g. this is bad:
 --      x = [| foo |]
 --      $( f x )
--- By the time we are prcessing the $(f x), the binding for "x"
+-- By the time we are processing the $(f x), the binding for "x"
 -- will be in the global env, not the local one.
 topIdLvl id | isLocalId id = outerLevel
             | otherwise    = impLevel
@@ -877,7 +877,7 @@ tcGetDefaultTys
 {-
 Note [Extended defaults]
 ~~~~~~~~~~~~~~~~~~~~~
-In interative mode (or with -XExtendedDefaultRules) we add () as the first type we
+In interactive mode (or with -XExtendedDefaultRules) we add () as the first type we
 try when defaulting.  This has very little real impact, except in the following case.
 Consider:
         Text.Printf.printf "hello"
