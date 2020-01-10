@@ -1490,7 +1490,7 @@ primRepsCompatible dflags reps1 reps2 =
 -- fields. For instance, in @data Foo = Foo Float# Float#@ the two fields will
 -- take only 8 bytes, which for 64-bit arch will be equal to 1 word.
 -- See also mkVirtHeapOffsetsWithPadding for details of how data fields are
--- layed out.
+-- laid out.
 primRepSizeB :: DynFlags -> PrimRep -> Int
 primRepSizeB dflags IntRep           = wORD_SIZE dflags
 primRepSizeB dflags WordRep          = wORD_SIZE dflags
@@ -2526,7 +2526,7 @@ We used to pay linear cost per constructor, with each constructor looking up
 its relative index in the constructor list. That was quadratic and prohibitive
 for large data types with more than 10k constructors.
 
-The current strategy is to build a NameEnv with a mapping from costructor's
+The current strategy is to build a NameEnv with a mapping from constructor's
 Name to ConTag and pass it down to buildDataCon for efficient lookup.
 
 Relevant ticket: #14657

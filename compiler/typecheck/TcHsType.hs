@@ -265,7 +265,7 @@ tc_hs_sig_type :: SkolemInfo -> LHsSigType GhcRn
 -- Kind-checks/desugars an 'LHsSigType',
 --   solve equalities,
 --   and then kind-generalizes.
--- This will never emit constraints, as it uses solveEqualities interally.
+-- This will never emit constraints, as it uses solveEqualities internally.
 -- No validity checking or zonking
 -- Returns also a Bool indicating whether the type induced an insoluble constraint;
 -- True <=> constraint is insoluble
@@ -1170,7 +1170,7 @@ tcInferApps_nosat mode orig_hs_ty fun orig_hs_args
       (HsTypeArg _ ki_arg : _, Nothing) -> try_again_after_substing_or $
                                            ty_app_err ki_arg substed_fun_ki
 
-      ---------------- HsValArg: a nomal argument (fun ty)
+      ---------------- HsValArg: a normal argument (fun ty)
       (HsValArg arg : args, Just (ki_binder, inner_ki))
         -- next binder is invisible; need to instantiate it
         | isInvisibleBinder ki_binder   -- FunTy with InvisArg on LHS;
@@ -2446,7 +2446,7 @@ This should not kind-check.  Polymorphic recursion is known to
 be a tough nut.
 
 Previously, we laboriously (with help from the renamer)
-tried to give T the polymoprhic kind
+tried to give T the polymorphic kind
    T :: forall ka -> ka -> kappa -> Type
 where kappa is a unification variable, even in the inferInitialKinds
 phase (which is what kcInferDeclHeader is all about).  But
@@ -3041,7 +3041,7 @@ checkClassKindSig kind = checkTc (tcIsConstraintKind kind) err_msg
       text "unobscured by type families"
 
 tcbVisibilities :: TyCon -> [Type] -> [TyConBndrVis]
--- Result is in 1-1 correpondence with orig_args
+-- Result is in 1-1 correspondence with orig_args
 tcbVisibilities tc orig_args
   = go (tyConKind tc) init_subst orig_args
   where
@@ -3192,7 +3192,7 @@ tcPartialContext hs_theta
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 See also Note [Recipe for checking a signature]
 
-When we have a parital signature like
+When we have a partial signature like
    f,g :: forall a. a -> _
 we do the following
 
@@ -3204,7 +3204,7 @@ we do the following
   call tchsPartialSig (defined near this Note).  It kind-checks the
   LHsSigWcType, creating fresh unification variables for each "_"
   wildcard.  It's important that the wildcards for f and g are distinct
-  becase they migh get instantiated completely differently.  E.g.
+  because they might get instantiated completely differently.  E.g.
      f,g :: forall a. a -> _
      f x = a
      g x = True
@@ -3247,7 +3247,7 @@ more.  So I use a HACK:
   TcBinds.chooseInferredQuantifiers. This is ill-kinded because
   ordinary tuples can't contain constraints, but it works fine. And for
   ordinary tuples we don't have the same limit as for constraint
-  tuples (which need selectors and an assocated class).
+  tuples (which need selectors and an associated class).
 
 * Because it is ill-kinded, it trips an assert in writeMetaTyVar,
   so now I disable the assertion if we are writing a type of

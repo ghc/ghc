@@ -516,7 +516,7 @@ If you have
   {-# RULES "rule-for-f" forall x. f (g x) = ... #-}
 then there's a good chance that in a potential rule redex
     ...f (g e)...
-then 'f' or 'g' will inline befor the rule can fire.  Solution: add an
+then 'f' or 'g' will inline before the rule can fire.  Solution: add an
 INLINE [n] or NOINLINE [n] pragma to 'f' and 'g'.
 
 Note that this applies to all the free variables on the LHS, both the
