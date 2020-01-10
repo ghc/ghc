@@ -1101,7 +1101,7 @@ Invariant 1:
 Coercions have the following invariant
      Refl (similar for GRefl r ty MRefl) is always lifted as far as possible.
 
-You might think that a consequencs is:
+You might think that a consequences is:
      Every identity coercions has Refl at the root
 
 But that's not quite true because of coercion variables.  Consider
@@ -1565,7 +1565,7 @@ the evidence for unboxed equalities:
     holes are easier.
 
   - Moreover, nothing is lost from the lack of let-bindings. For
-    dicionaries want to achieve sharing to avoid recomoputing the
+    dictionaries want to achieve sharing to avoid recomoputing the
     dictionary.  But coercions are entirely erased, so there's little
     benefit to sharing. Indeed, even if we had a let-binding, we
     always inline types and coercions at every use site and drop the

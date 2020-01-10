@@ -347,7 +347,7 @@ state 1089 contains 1 shift/reduce conflicts.
 
     Conflict: 'forall'
 
-Example ambigutiy: '{-# RULES "name" forall a. forall ... #-}'
+Example ambiguity: '{-# RULES "name" forall a. forall ... #-}'
 
 Here the parser cannot tell whether the second 'forall' is the beginning of
 a term-level quantifier, for example:
@@ -1965,7 +1965,7 @@ context :: { LHsContext GhcPs }
                                                 ; ams ctx anns
                                                 } }
 
--- See Note [Constr variatons of non-terminals]
+-- See Note [Constr variations of non-terminals]
 constr_context :: { LHsContext GhcPs }
         :  constr_btype                 {% do { (anns,ctx) <- checkContext $1
                                                 ; if null (unLoc ctx)
@@ -2018,16 +2018,16 @@ typedoc :: { LHsType GhcPs }
                                                          $4)
                                                 [mu AnnRarrow $3] }
 
--- See Note [Constr variatons of non-terminals]
+-- See Note [Constr variations of non-terminals]
 constr_btype :: { LHsType GhcPs }
         : constr_tyapps                 {% mergeOps (unLoc $1) }
 
--- See Note [Constr variatons of non-terminals]
+-- See Note [Constr variations of non-terminals]
 constr_tyapps :: { Located [Located TyEl] } -- NB: This list is reversed
         : constr_tyapp                  { sL1 $1 [$1] }
         | constr_tyapps constr_tyapp    { sLL $1 $> $ $2 : (unLoc $1) }
 
--- See Note [Constr variatons of non-terminals]
+-- See Note [Constr variations of non-terminals]
 constr_tyapp :: { Located TyEl }
         : tyapp                         { $1 }
         | docprev                       { sL1 $1 $ TyElDocPrev (unLoc $1) }
@@ -2263,7 +2263,7 @@ constrs1 :: { Located [LConDecl GhcPs] }
                >> return (sLL $1 $> (addConDoc $5 $2 : addConDocFirst (unLoc $1) $4)) }
         | constr                                          { sL1 $1 [$1] }
 
-{- Note [Constr variatons of non-terminals]
+{- Note [Constr variations of non-terminals]
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
 In record declarations we assume that 'ctype' used to parse the type will not

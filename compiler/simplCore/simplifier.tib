@@ -335,7 +335,7 @@ should first be eliminated by the dead-alternative transformation.
 
 \subsection{Inlining}
 
-The inlining transformtion is simple enough:
+The inlining transformation is simple enough:
 @
   let x = R in B[x]  ===>   B[R]
 @
