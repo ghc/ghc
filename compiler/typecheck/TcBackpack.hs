@@ -687,7 +687,7 @@ mergeSignatures
         --     final test of the export list.)
         tcg_rdr_env = rdr_env `plusGlobalRdrEnv` tcg_rdr_env orig_tcg_env,
         -- Inherit imports from the local signature, so that module
-        -- rexports are picked up correctly
+        -- reexports are picked up correctly
         tcg_imports = tcg_imports orig_tcg_env,
         tcg_exports = exports,
         tcg_dus     = usesOnly (availsToNameSetWithSelectors exports),
