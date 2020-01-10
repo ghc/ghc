@@ -1787,7 +1787,7 @@ Note [Promotion in signatures]
 If an unsolved metavariable in a signature is not generalized
 (because we're not generalizing the construct -- e.g., pattern
 sig -- or because the metavars are constrained -- see kindGeneralizeSome)
-we need to promote to maintain (MetaTvInv) of Note [TcLevel and untouchable type variables]
+we need to promote to maintain (WantedTvInv) of Note [TcLevel and untouchable type variables]
 in TcType. Note that promotion is identical in effect to generalizing
 and the reinstantiating with a fresh metavariable at the current level.
 So in some sense, we generalize *all* variables, but then re-instantiate
@@ -1804,7 +1804,7 @@ than the surrounding context.) This kappa cannot be solved for while checking
 the pattern signature (which is not kind-generalized). When we are checking
 the *body* of foo, though, we need to unify the type of x with the argument
 type of bar. At this point, the ambient TcLevel is 1, and spotting a
-matavariable with level 2 would violate the (MetaTvInv) invariant of
+matavariable with level 2 would violate the (WantedTvInv) invariant of
 Note [TcLevel and untouchable type variables]. So, instead of kind-generalizing,
 we promote the metavariable to level 1. This is all done in kindGeneralizeNone.
 
