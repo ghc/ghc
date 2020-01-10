@@ -1,6 +1,6 @@
 {-# OPTIONS_GHC -XImpredicativeTypes -fno-warn-deprecated-flags #-}
 
--- Sept 16: now failing, beause I've furter reduced the scop
+-- Sept 16: now failing, because I've further reduced the scop
 --          of impredicative types
 
 module Base1 where

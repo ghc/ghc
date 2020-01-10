@@ -97,7 +97,7 @@ dwarfGen df modLoc us blocks = do
 -- | Build an address range entry for one proc.
 -- With split sections, each proc needs its own entry, since they may get
 -- scattered in the final binary. Without split sections, we could make a
--- single arange based on the first/last proc.
+-- single arrange based on the first/last proc.
 mkDwarfARange :: DebugBlock -> DwarfARange
 mkDwarfARange proc = DwarfARange start end
   where

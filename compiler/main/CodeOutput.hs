@@ -157,7 +157,7 @@ outputAsm dflags this_mod location filenm cmm_stream
  | platformMisc_ghcWithNativeCodeGen $ platformMisc dflags
   = do ncg_uniqs <- mkSplitUniqSupply 'n'
 
-       debugTraceMsg dflags 4 (text "Outputing asm to" <+> text filenm)
+       debugTraceMsg dflags 4 (text "Outputting asm to" <+> text filenm)
 
        {-# SCC "OutputAsm" #-} doOutput filenm $
            \h -> {-# SCC "NativeCodeGen" #-}

@@ -304,7 +304,7 @@ concatM :: Monad m => [m [a]] -> m [a]
 concatM xs = concat <$> sequence xs
 
 {- Note [Capturing Scopes and other non local information]
-toHie is a local tranformation, but scopes of bindings cannot be known locally,
+toHie is a local transformation, but scopes of bindings cannot be known locally,
 hence we have to push the relevant info down into the binding nodes.
 We use the following types (*Context and *Scoped) to wrap things and
 carry the required info
@@ -479,7 +479,7 @@ instance HasLoc (HsDataDefn GhcRn) where
   loc _ = noSrcSpan
 
 {- Note [Real DataCon Name]
-The typechecker subtitutes the conLikeWrapId for the name, but we don't want
+The typechecker substitutes the conLikeWrapId for the name, but we don't want
 this showing up in the hieFile, so we replace the name in the Id with the
 original datacon name
 See also Note [Data Constructor Naming]

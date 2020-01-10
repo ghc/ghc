@@ -212,7 +212,7 @@ The TyCon of an associated type should use the same variable names as its
 parent class. Thus
     class C a b where
       type F b x a :: *
-We make F use the same Name for 'a' as C does, and similary 'b'.
+We make F use the same Name for 'a' as C does, and similarly 'b'.
 
 The reason for this is when checking instances it's easier to match
 them up, to ensure they match.  Eg
