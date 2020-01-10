@@ -1798,7 +1798,7 @@ genLit _ CmmHighStackMark
 
 -- | Find CmmRegs that get assigned and allocate them on the stack
 --
--- Any register that gets written needs to be allcoated on the
+-- Any register that gets written needs to be allocated on the
 -- stack. This avoids having to map a CmmReg to an equivalent SSA form
 -- and avoids having to deal with Phi node insertion.  This is also
 -- the approach recommended by LLVM developers.

@@ -70,7 +70,7 @@ type MiniFixityEnv = FastStringEnv (Located Fixity)
         --
         -- It is keyed by the *FastString*, not the *OccName*, because
         -- the single fixity decl       infix 3 T
-        -- affects both the data constructor T and the type constrctor T
+        -- affects both the data constructor T and the type constructor T
         --
         -- We keep the location so that if we find
         -- a duplicate, we can report it sensibly
@@ -181,7 +181,7 @@ lookupTyFixityRn :: Located Name -> RnM Fixity
 lookupTyFixityRn = lookupFixityRn . unLoc
 
 -- | Look up the fixity of a (possibly ambiguous) occurrence of a record field
--- selector.  We use 'lookupFixityRn'' so that we can specifiy the 'OccName' as
+-- selector.  We use 'lookupFixityRn'' so that we can specify the 'OccName' as
 -- the field label, which might be different to the 'OccName' of the selector
 -- 'Name' if @DuplicateRecordFields@ is in use (#1173). If there are
 -- multiple possible selectors with different fixities, generate an error.

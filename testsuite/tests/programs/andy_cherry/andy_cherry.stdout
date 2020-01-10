@@ -77,7 +77,7 @@ Taking this knight loses a pawn
 \end{tabular}}|
 \end{center}
 |9\ldots~Bc5; 10.~f3, e*f3; 11.~g*f3, 0-0; 12.~Bd3|
-White can get presure down the `g' file, but first needs to solve the
+White can get pressure down the `g' file, but first needs to solve the
 problem of the Bishop on c5 guarding g8.
 \begin{center}|
 {\bf\begin{tabular}{rp{50pt}p{50pt}}
@@ -1936,7 +1936,7 @@ rooks that arrive on the 7th.
 24 & Rf*f7 & Rd8\\
 \end{tabular}}|
 \end{center}
-Silly, blocking the kings escape, athough its over anyway. I should
+Silly, blocking the kings escape, although its over anyway. I should
 have tried for at least one cheapo.
 |24\ldots~Re5|
 \begin{center}|

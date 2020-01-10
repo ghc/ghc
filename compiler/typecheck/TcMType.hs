@@ -1089,7 +1089,7 @@ E.g.  In the type    T k (a::k)
 We gather these variables using a CandidatesQTvs record:
   DV { dv_kvs: Variables free in the kind of a free type variable
                or of a forall-bound type variable
-     , dv_tvs: Variables sytactically free in the type }
+     , dv_tvs: Variables syntactically free in the type }
 
 So:  dv_kvs            are the kind variables of the type
      (dv_tvs - dv_kvs) are the type variable of the type
@@ -1326,11 +1326,11 @@ collect_cand_qtvs orig_ty is_dep bound dvs ty
     -----------------
     go_tv dv@(DV { dv_kvs = kvs, dv_tvs = tvs }) tv
       | tv `elemDVarSet` kvs
-      = return dv  -- We have met this tyvar aleady
+      = return dv  -- We have met this tyvar already
 
       | not is_dep
       , tv `elemDVarSet` tvs
-      = return dv  -- We have met this tyvar aleady
+      = return dv  -- We have met this tyvar already
 
       | otherwise
       = do { tv_kind <- zonkTcType (tyVarKind tv)
@@ -1585,7 +1585,7 @@ quantifyTyVars dvs@(DV{ dv_kvs = dep_tkvs, dv_tvs = nondep_tkvs })
        ; let dep_kvs     = scopedSort $ dVarSetElems dep_tkvs
                        -- scopedSort: put the kind variables into
                        --    well-scoped order.
-                       --    E.g.  [k, (a::k)] not the other way roud
+                       --    E.g.  [k, (a::k)] not the other way round
 
              nondep_tvs  = dVarSetElems (nondep_tkvs `minusDVarSet` dep_tkvs)
                  -- See Note [Dependent type variables]
@@ -1737,7 +1737,7 @@ defaultTyVar default_kind tv
            -- promote, skolemise, or zap-to-Any, to satisfy TcHsType
            --    Note [Recipe for checking a signature]
            -- Otherwise we get level-number assertion failures. It doesn't matter much
-           -- because we are in an error siutation anyway.
+           -- because we are in an error situation anyway.
            ; return False
         }
       where
