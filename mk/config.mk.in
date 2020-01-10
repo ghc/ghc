@@ -14,7 +14,7 @@
 # 	- config.mk is auto-generated from config.mk.in by configure.
 #	  If you edit config.mk your changes will be spammed.
 #
-#	- Settings in this file may be overriden by giving replacement
+#	- Settings in this file may be overridden by giving replacement
 #	  definitions in build.mk.  See build.mk.sample for a good
 #	  starting point for a build.mk file.
 #

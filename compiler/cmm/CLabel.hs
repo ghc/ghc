@@ -803,7 +803,7 @@ maybeLocalBlockLabel _                     = Nothing
 
 
 -- | Check whether a label corresponds to a C function that has
---      a prototype in a system header somehere, or is built-in
+--      a prototype in a system header somewhere, or is built-in
 --      to the C compiler. For these labels we avoid generating our
 --      own C prototypes.
 isMathFun :: CLabel -> Bool
@@ -1474,7 +1474,7 @@ mayRedirectTo symbol target
 {-
 Note [emit-time elimination of static indirections]
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
-As described in #15155, certain static values are repesentationally
+As described in #15155, certain static values are representationally
 equivalent, e.g. 'cast'ed values (when created by 'newtype' wrappers).
 
              newtype A = A Int

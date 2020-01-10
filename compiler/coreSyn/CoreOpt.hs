@@ -833,7 +833,7 @@ We need to be careful about UTF8 strings here. ""# contains a ByteString, so
 we must parse it back into a FastString to split off the first character.
 That way we can treat unpackCString# and unpackCStringUtf8# in the same way.
 
-We must also be caeful about
+We must also be careful about
    lvl = "foo"#
    ...(unpackCString# lvl)...
 to ensure that we see through the let-binding for 'lvl'.  Hence the
@@ -1138,7 +1138,7 @@ to compute the type arguments to the dictionary constructor.
 
 Note [DFun arity check]
 ~~~~~~~~~~~~~~~~~~~~~~~
-Here we check that the total number of supplied arguments (inclding
+Here we check that the total number of supplied arguments (including
 type args) matches what the dfun is expecting.  This may be *less*
 than the ordinary arity of the dfun: see Note [DFun unfoldings] in CoreSyn
 -}

@@ -83,7 +83,7 @@ import Data.Ord      (comparing)
 import qualified Data.Semigroup as Semigroup
 import Data.Tuple    (swap)
 
--- Debugging Infrastructre
+-- Debugging Infrastructure
 
 tracePm :: String -> SDoc -> DsM ()
 tracePm herald doc = do
@@ -142,7 +142,7 @@ mkOneConFull arg_tys con = do
   -- pprTrace "mkOneConFull" (ppr con $$ ppr arg_tys $$ ppr univ_tvs $$ ppr _con_res_ty) (return ())
   -- Substitute universals for type arguments
   let subst_univ = zipTvSubst univ_tvs arg_tys
-  -- Instantiate fresh existentials as arguments to the contructor. This is
+  -- Instantiate fresh existentials as arguments to the constructor. This is
   -- important for instantiating the Thetas and field types.
   (subst, _) <- cloneTyVarBndrs subst_univ ex_tvs <$> getUniqueSupplyM
   let field_tys' = substTys subst field_tys
@@ -175,7 +175,7 @@ Consider the following code (see #12957 and #15450):
 We want to warn that the pattern-matching in `f` is non-exhaustive. But GHC
 used not to do this; in fact, it would warn that the match was /redundant/!
 This is because the constraint (Int ~ Bool) in `f` is unsatisfiable, and the
-coverage checker deems any matches with unsatifiable constraint sets to be
+coverage checker deems any matches with unsatisfiable constraint sets to be
 unreachable.
 
 We decide to better than this. When beginning coverage checking, we first
@@ -562,7 +562,7 @@ tyIsSatisfiable recheck_complete_sets new_ty_cs = SC $ \delta ->
 Invariant applying to each VarInfo: Whenever we have @(C, [y,z])@ in 'vi_pos',
 any entry in 'vi_neg' must be incomparable to C (return Nothing) according to
 'eqPmAltCons'. Those entries that are comparable either lead to a refutation
-or are redudant. Examples:
+or are redundant. Examples:
 * @x ~ Just y@, @x /~ [Just]@. 'eqPmAltCon' returns @Equal@, so refute.
 * @x ~ Nothing@, @x /~ [Just]@. 'eqPmAltCon' returns @Disjoint@, so negative
   info is redundant and should be discarded.
@@ -934,7 +934,7 @@ guessConLikeUnivTyArgsFromResTy _   res_ty (PatSynCon ps)  = do
   subst <- tcMatchTy con_res_ty res_ty
   traverse (lookupTyVar subst) univ_tvs
 
--- | Kind of tries to add a non-void contraint to 'Delta', but doesn't really
+-- | Kind of tries to add a non-void constraint to 'Delta', but doesn't really
 -- commit to upholding that constraint in the future. This will be rectified
 -- in a follow-up patch. The status quo should work good enough for now.
 addVarNonVoidCt :: Delta -> Id -> MaybeT DsM Delta
@@ -1340,7 +1340,7 @@ determine whether a strict type is inhabitable by a terminating value or not.
 
 `nonVoid ty` returns True when either:
 1. `ty` has at least one InhabitationCandidate for which both its term and type
-   constraints are satifiable, and `nonVoid` returns `True` for all of the
+   constraints are satisfiable, and `nonVoid` returns `True` for all of the
    strict argument types in that InhabitationCandidate.
 2. We're unsure if it's inhabited by a terminating value.
 

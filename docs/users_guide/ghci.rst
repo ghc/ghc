@@ -2111,7 +2111,7 @@ libraries, in this order:
    systems may be overridden by setting the :envvar:`LD_LIBRARY_PATH`
    environment variable.
 
--  The linker standard library search can also be overriden on some systems using
+-  The linker standard library search can also be overridden on some systems using
    the :envvar:`LIBRARY_PATH` environment variable. Because of some
    implementation detail on Windows, setting ``LIBRARY_PATH`` will also extend
    the system loader path for any library it finds. So often setting

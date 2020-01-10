@@ -756,7 +756,7 @@ matchWrapper ctxt mb_scr (MG { mg_alts = L _ matches
 
            ; match_result <-
               -- Extend the environment with knowledge about
-              -- the matches before desguaring the RHS
+              -- the matches before desugaring the RHS
               -- See Note [Type and Term Equality Propagation]
               applyWhen (needToRunPmCheck dflags origin)
                         (addTyCsDs dicts . addScrutTmCs mb_scr vars . addPatTmCs upats vars)
@@ -952,7 +952,7 @@ fails we try to read a Bool. But clearly we can't combine the two into a single
 match.
 
 Conclusion: we can combine when we invoke PRead /at the same type/.  Hence
-in PgSyn we record the instantiaing types, and use them in sameGroup.
+in PgSyn we record the instantiating types, and use them in sameGroup.
 
 Note [Take care with pattern order]
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~

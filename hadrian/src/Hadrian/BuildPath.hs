@@ -40,7 +40,7 @@ parseBuildPath root afterBuild = do
 --
 -- > <build root>/stage<N>/lib/<arch>-<os>-ghc-<ghc version>/<something>
 --
--- where @something@ describes a library or object file or ... to be registerd
+-- where @something@ describes a library or object file or ... to be registered
 -- for the given package. These are files registered into a ghc-pkg database.
 --
 -- @a@, which represents that @something@, is instantiated with library-related

@@ -523,7 +523,7 @@ Note [Specialising imported functions] (referred to from Specialise)
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 BUT for *automatically-generated* rules, the programmer can't be
 responsible for the "programmer error" in Note [Rules for imported
-functions].  In paricular, consider specialising a recursive function
+functions].  In particular, consider specialising a recursive function
 defined in another module.  If we specialise a recursive function B.g,
 we get
          g_spec = .....(B.g Int).....
@@ -1300,7 +1300,7 @@ nodeScore :: OccEnv
           -> VarSet    -- Loop-breaker dependencies
           -> NodeScore
 nodeScore env old_bndr new_bndr bind_rhs lb_deps
-  | not (isId old_bndr)     -- A type or cercion variable is never a loop breaker
+  | not (isId old_bndr)     -- A type or coercion variable is never a loop breaker
   = (100, 0, False)
 
   | old_bndr `elemVarSet` lb_deps  -- Self-recursive things are great loop breakers
@@ -1974,7 +1974,7 @@ binders are unused.  See esp the call to isDeadBinder in
 Simplify.mkDupableAlt
 
 In this example, though, the Simplifier will bring 'a' and 'b' back to
-life, beause it binds 'y' to (a,b) (imagine got inlined and
+life, because it binds 'y' to (a,b) (imagine got inlined and
 scrutinised y).
 -}
 
@@ -2119,7 +2119,7 @@ oneShotGroup :: OccEnv -> [CoreBndr]
         -- The result binders have one-shot-ness set that they might not have had originally.
         -- This happens in (build (\c n -> e)).  Here the occurrence analyser
         -- linearity context knows that c,n are one-shot, and it records that fact in
-        -- the binder. This is useful to guide subsequent float-in/float-out tranformations
+        -- the binder. This is useful to guide subsequent float-in/float-out transformations
 
 oneShotGroup env@(OccEnv { occ_one_shots = ctxt }) bndrs
   = go ctxt bndrs []
@@ -2210,7 +2210,7 @@ extendFvs env s
 
 Note [Binder swap]
 ~~~~~~~~~~~~~~~~~~
-The "binder swap" tranformation swaps occurrence of the
+The "binder swap" transformation swaps occurrence of the
 scrutinee of a case for occurrences of the case-binder:
 
  (1)  case x of b { pi -> ri }
@@ -2559,7 +2559,7 @@ so we had better treat them as having noOccInfo.
 This showed up in #15696 we had something like
   case eq_sel d of co -> ...(typeError @(...co...) "urk")...
 
-Then 'd' was substitued by a dictionary, so the expression
+Then 'd' was substituted by a dictionary, so the expression
 simpified to
   case (Coercion <blah>) of co -> ...(typeError @(...co...) "urk")...
 

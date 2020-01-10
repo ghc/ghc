@@ -841,7 +841,7 @@ checkStability hpt sccs all_home_mods =
                                  -> isObjectLinkable l && t == linkableTime l
                                 _other  -> True
                 -- why '>=' rather than '>' above?  If the filesystem stores
-                -- times to the nearset second, we may occasionally find that
+                -- times to the nearest second, we may occasionally find that
                 -- the object & source have the same modification time,
                 -- especially if the source was automatically generated
                 -- and compiled.  Using >= is slightly unsafe, but it matches
@@ -1464,7 +1464,7 @@ upsweep mHscMessage old_hpt stable_mods cleanup sccs = do
                         -- Space-saving: delete the old HPT entry
                         -- for mod BUT if mod is a hs-boot
                         -- node, don't delete it.  For the
-                        -- interface, the HPT entry is probaby for the
+                        -- interface, the HPT entry is probably for the
                         -- main Haskell source file.  Deleting it
                         -- would force the real module to be recompiled
                         -- every time.
@@ -2389,7 +2389,7 @@ checkSummaryTimestamp
                  else return Nothing
 
            -- We have to repopulate the Finder's cache for file targets
-           -- because the file might not even be on the regular serach path
+           -- because the file might not even be on the regular search path
            -- and it was likely flushed in depanal. This is not technically
            -- needed when we're called from sumariseModule but it shouldn't
            -- hurt.

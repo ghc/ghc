@@ -201,7 +201,7 @@ flagRecompile =
 
 -- | Default plugin: does nothing at all, except for marking that safe
 -- inference has failed unless @-fplugin-trustworthy@ is passed. For
--- compatibility reaso you should base all your plugin definitions on this
+-- compatibility reason you should base all your plugin definitions on this
 -- default value.
 defaultPlugin :: Plugin
 defaultPlugin = Plugin {

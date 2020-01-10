@@ -587,7 +587,7 @@ def main() -> None:
 
     group = parser.add_argument_group(title='Filtering', description="Select which subset of performance metrics to dump")
     group.add_argument("--test-env",
-                       help="The given test environment to be compared. Use 'local' for localy run results. If using --ci, see .gitlab-ci file for TEST_ENV settings.")
+                       help="The given test environment to be compared. Use 'local' for locally run results. If using --ci, see .gitlab-ci file for TEST_ENV settings.")
     group.add_argument("--test-name",
                        help="Filters for tests matching the given regular expression.")
     group.add_argument("--metric",

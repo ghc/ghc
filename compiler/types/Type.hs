@@ -1128,7 +1128,7 @@ piResultTys ty orig_args@(arg:args)
       = -- We have not run out of arguments, but the function doesn't
         -- have the right kind to apply to them; so panic.
         -- Without the explicit isEmptyVarEnv test, an ill-kinded type
-        -- would give an infniite loop, which is very unhelpful
+        -- would give an infinite loop, which is very unhelpful
         -- c.f. #15473
         pprPanic "piResultTys2" (ppr ty $$ ppr orig_args $$ ppr all_args)
 
@@ -1159,7 +1159,7 @@ So
   T (forall b. b->b) * :: (b -> b)[ b :-> *]
                        :: * -> *
 
-In other words we must intantiate the forall!
+In other words we must instantiate the forall!
 
 Similarly (#15428)
    S :: forall k f. k -> f k
@@ -2440,7 +2440,7 @@ typeKind (CoercionTy co)   = coercionType co
 typeKind (AppTy fun arg)
   = go fun [arg]
   where
-    -- Accumulate the type arugments, so we can call piResultTys,
+    -- Accumulate the type arguments, so we can call piResultTys,
     -- rather than a succession of calls to piResultTy (which is
     -- asymptotically costly as the number of arguments increases)
     go (AppTy fun arg) args = go fun (arg:args)
@@ -2480,7 +2480,7 @@ tcTypeKind (FunTy { ft_af = af, ft_res = res })
 tcTypeKind (AppTy fun arg)
   = go fun [arg]
   where
-    -- Accumulate the type arugments, so we can call piResultTys,
+    -- Accumulate the type arguments, so we can call piResultTys,
     -- rather than a succession of calls to piResultTy (which is
     -- asymptotically costly as the number of arguments increases)
     go (AppTy fun arg) args = go fun (arg:args)

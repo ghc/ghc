@@ -181,7 +181,7 @@ type, with a cascade of follow-up errors.
 For example polykinds/T12593, T15577, and many others.
 
 Take care to ensure that you emit the insoluble constraints before
-failing, because they are what will ulimately lead to the error
+failing, because they are what will ultimately lead to the error
 messsage!
 -}
 
@@ -1064,7 +1064,7 @@ decideMonoTyVars :: InferMode
 --   (a) Free in the environment
 --   (b) Mentioned in a constraint we can't generalise
 --   (c) Connected by an equality to (a) or (b)
--- Also return CoVars that appear free in the final quatified types
+-- Also return CoVars that appear free in the final quantified types
 --   we can't quantify over these, and we must make sure they are in scope
 decideMonoTyVars infer_mode name_taus psigs candidates
   = do { (no_quant, maybe_quant) <- pick infer_mode candidates
@@ -1907,7 +1907,7 @@ generate evidence bindings for Givens. E.g.
    f x y = ...
 We'll have
    [G] d1 :: (a~b)
-and we'll specuatively generate the evidence binding
+and we'll speculatively generate the evidence binding
    [G] d2 :: (a ~# b) = sc_sel d
 
 Now d2 is available for solving.  But it may not be needed!  Usually
@@ -1917,7 +1917,7 @@ code, but:
  * It won't always be dropped (#13032).  In the case of an
    unlifted-equality superclass like d2 above, we generate
        case heq_sc d1 of d2 -> ...
-   and we can't (in general) drop that case exrpession in case
+   and we can't (in general) drop that case expression in case
    d1 is bottom.  So it's technically unsound to have added it
    in the first place.
 
@@ -2057,7 +2057,7 @@ of progress.  #8474 is a classic example:
     via solveNestedImplications, because we'll just get the
     same [D] again
 
-  * If we *do* re-solve, we'll get an ininite loop. It is cut off by
+  * If we *do* re-solve, we'll get an infinite loop. It is cut off by
     the fixed bound of 10, but solving the next takes 10*10*...*10 (ie
     exponentially many) iterations!
 
@@ -2160,7 +2160,7 @@ to applyDefaultingRules) to extract constraints that that might be defaulted.
 
 There is one caveat:
 
-1.  When infering most-general types (in simplifyInfer), we do *not*
+1.  When inferring most-general types (in simplifyInfer), we do *not*
     float anything out if the implication binds equality constraints,
     because that defeats the OutsideIn story.  Consider
        data T a where

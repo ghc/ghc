@@ -227,7 +227,7 @@ exitifyRec in_scope pairs
            ; return $ mkVarApps (Var v) abs_vars }
 
       where
-        -- Used to detect exit expressoins that are already proper exit jumps
+        -- Used to detect exit expressions that are already proper exit jumps
         isCapturedVarArg (Var v) = v `elem` captured
         isCapturedVarArg _ = False
 

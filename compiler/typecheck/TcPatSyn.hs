@@ -171,7 +171,7 @@ tcInferPatSynDecl (PSB { psb_id = lname@(L _ name), psb_args = details
                  = unzip (mapMaybe mkProvEvidence filtered_prov_dicts)
              req_theta = map evVarPred req_dicts
 
-       -- Report coercions that esacpe
+       -- Report coercions that escape
        -- See Note [Coercions that escape]
        ; args <- mapM zonkId args
        ; let bad_args = [ (arg, bad_cos) | arg <- args ++ prov_dicts
@@ -312,7 +312,7 @@ See also Note [Lift equality constraints when quantifying] in TcType
 Note [Coercions that escape]
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 #14507 showed an example where the inferred type of the matcher
-for the pattern synonym was somethign like
+for the pattern synonym was something like
    $mSO :: forall (r :: TYPE rep) kk (a :: k).
            TypeRep k a
            -> ((Bool ~ k) => TypeRep Bool (a |> co_a2sv) -> r)
@@ -1037,7 +1037,7 @@ We can't always do this:
 
 Note [Redundant constraints for builder]
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
-The builder can have redundant constraints, which are awkard to eliminate.
+The builder can have redundant constraints, which are awkward to eliminate.
 Consider
    pattern P = Just 34
 To match against this pattern we need (Eq a, Num a).  But to build
@@ -1074,7 +1074,7 @@ In tc{Infer/Check}PatSynDecl we will check that the pattern has the
 specified type.  We check the pattern *as a pattern*, so the type
 signature is a pattern signature, and so brings 'a' and 'b' into
 scope.  But we don't have a way to bind 'a, b' in the LHS, as we do
-'x', say.  Nevertheless, the sigature may be useful to constrain
+'x', say.  Nevertheless, the signature may be useful to constrain
 the type.
 
 When making the binding for the *builder*, though, we don't want

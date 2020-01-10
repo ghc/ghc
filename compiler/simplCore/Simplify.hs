@@ -1712,8 +1712,8 @@ case-of-case we may then end up with this totally bogus result
              C -> e) of <outer-alts>
 
 This would be OK in the language of the paper, but not in GHC: j is no longer
-a join point.  We can only do the "push contination into the RHS of the
-join point j" if we also push the contination right down to the /jumps/ to
+a join point.  We can only do the "push continuation into the RHS of the
+join point j" if we also push the continuation right down to the /jumps/ to
 j, so that it can evaporate there.  If we are doing case-of-case, we'll get to
 
     join x = case <j-rhs> of <outer-alts> in
@@ -2264,7 +2264,7 @@ Note that SimplUtils.mkCase combines identical RHSs.  So
            True  -> r
            False -> r
 
-Now again the case may be elminated by the CaseElim transformation.
+Now again the case may be eliminated by the CaseElim transformation.
 This includes things like (==# a# b#)::Bool so that we simplify
       case ==# a# b# of { True -> x; False -> x }
 to just

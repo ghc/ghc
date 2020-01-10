@@ -828,7 +828,7 @@ static StgBool validate_and_acquire_ownership (Capability *cap,
 // check_read_only : check that we've seen an atomic snapshot of the
 // non-updated TVars accessed by a trec.  This checks that the last TRec to
 // commit an update to the TVar is unchanged since the value was stashed in
-// validate_and_acquire_ownership.  If no udpate is seen to any TVar than
+// validate_and_acquire_ownership.  If no update is seen to any TVar than
 // all of them contained their expected values at the start of the call to
 // check_read_only.
 //
@@ -1252,7 +1252,7 @@ StgBool stmReWait(Capability *cap, StgTSO *tso) {
     park_tso(tso);
     revert_ownership(cap, trec, true);
   } else {
-    // The transcation has become invalid.  We can now remove it from the wait
+    // The transaction has become invalid.  We can now remove it from the wait
     // queues.
     if (trec -> state != TREC_CONDEMNED) {
       remove_watch_queue_entries_for_trec (cap, trec);

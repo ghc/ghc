@@ -291,7 +291,7 @@ from blocks suitable for shortcutting to their jump targets.
 Then it redirects all jump instructions to these blocks using the
 built up mapping.
 This function (shortcutWeightMap) takes the same mapping and
-applies the mapping to the CFG in the way layed out above.
+applies the mapping to the CFG in the way laid out above.
 
 -}
 shortcutWeightMap :: LabelMap (Maybe BlockId) -> CFG -> CFG
@@ -575,7 +575,7 @@ addNodesBetween m updates =
     so have a larger number of successors. So without more information
     we can only say that each individual successor is unlikely to be
     jumped to and we rank them accordingly.
-  * Calls - We currently ignore calls completly:
+  * Calls - We currently ignore calls completely:
         * By the time we return from a call there is a good chance
           that the address we return to has already been evicted from
           cache eliminating a main advantage sequential placement brings.
@@ -648,7 +648,7 @@ getCfg weights graph =
         (CmmCall { cml_cont = Nothing })   -> []
         other ->
             panic "Foo" $
-            ASSERT2(False, ppr "Unkown successor cause:" <>
+            ASSERT2(False, ppr "Unknown successor cause:" <>
               (ppr branch <+> text "=>" <> ppr (G.successors other)))
             map (\x -> ((bid,x),mkEdgeInfo 0)) $ G.successors other
       where
@@ -959,10 +959,10 @@ mkGlobalWeights root localCfg
 
     vertexMapping = mapFromList $ zip revOrder [0..] :: LabelMap Int
     blockMapping = listArray (0,mapSize vertexMapping - 1) revOrder :: Array Int BlockId
-    -- Map from blockId to indicies starting at zero
+    -- Map from blockId to indices starting at zero
     toVertex :: BlockId -> Int
     toVertex   blockId  = expectJust "mkGlobalWeights" $ mapLookup blockId vertexMapping
-    -- Map from indicies starting at zero to blockIds
+    -- Map from indices starting at zero to blockIds
     fromVertex :: Int -> BlockId
     fromVertex vertex   = blockMapping ! vertex
 
@@ -990,13 +990,13 @@ many instances of "loopy" Cmm where these make a difference.
 
 TODO:
 * The paper containers more benchmarks which should be implemented.
-* If we turn the likelyhood on if/else branches into a probability
+* If we turn the likelihood on if/else branches into a probability
   instead of true/false we could implement this as a Cmm pass.
   + The complete Cmm code still exists and can be accessed by the heuristics
   + There is no chance of register allocation/codegen inserting branches/blocks
   + making the TransitionSource info wrong.
   + potential to use this information in CmmPasses.
-  - Requires refactoring of all the code relying on the binary nature of likelyhood.
+  - Requires refactoring of all the code relying on the binary nature of likelihood.
   - Requires refactoring `loopInfo` to work on both, Cmm Graphs and the backend CFG.
 -}
 
@@ -1060,7 +1060,7 @@ staticBranchPrediction _root (LoopInfo l_backEdges loopLevels l_loops) cfg =
                 heuristics = map ($ ((s1,s1_info),(s2,s2_info)))
                             [lehPredicts, phPredicts, ohPredicts, ghPredicts, lhhPredicts, chPredicts
                             , shPredicts, rhPredicts]
-                -- Apply result of a heuristic. Argument is the likelyhood
+                -- Apply result of a heuristic. Argument is the likelihood
                 -- predicted for s1.
                 applyHeuristic :: CFG -> Maybe Prob -> CFG
                 applyHeuristic cfg Nothing = cfg
@@ -1101,7 +1101,7 @@ staticBranchPrediction _root (LoopInfo l_backEdges loopLevels l_loops) cfg =
         (m,not_m) = partition (\succ -> S.member (node, fst succ) backedges) successors
 
         -- Heuristics return nothing if they don't say anything about this branch
-        -- or Just (prob_s1) where prob_s1 is the likelyhood for s1 to be the
+        -- or Just (prob_s1) where prob_s1 is the likelihood for s1 to be the
         -- taken branch. s1 is the branch in the true case.
 
         -- Loop exit heuristic.

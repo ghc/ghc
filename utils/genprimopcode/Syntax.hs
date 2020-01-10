@@ -115,7 +115,7 @@ data SourceText = SourceText String
 {- Do some simple sanity checks:
     * all the default field names are unique
     * for each PrimOpSpec, all override field names are unique
-    * for each PrimOpSpec, all overriden field names   
+    * for each PrimOpSpec, all overridden field names   
           have a corresponding default value
     * that primop types correspond in certain ways to the 
       Category: eg if Comparison, the type must be of the form

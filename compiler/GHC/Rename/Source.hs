@@ -700,7 +700,7 @@ rnFamInstEqn doc atfi rhs_kvars
              -- bound in the type patterns.
        ; payload_kvar_names <- mapM (newTyVarNameRn mb_cls) payload_kvars
 
-         -- all names not bound in an explict forall
+         -- all names not bound in an explicit forall
        ; let all_imp_var_names = imp_var_names ++ payload_kvar_names
 
              -- All the free vars of the family patterns
@@ -768,7 +768,7 @@ rnTyFamInstDecl atfi (TyFamInstDecl { tfid_eqn = eqn })
 -- 1. A type family equation that is not associated
 --    with a parent type class ('NonAssocTyFamEqn')
 --
--- 2. An associated type family default delcaration ('AssocTyFamDeflt')
+-- 2. An associated type family default declaration ('AssocTyFamDeflt')
 --
 -- 3. An associated type family instance declaration ('AssocTyFamInst')
 data AssocTyFamInfo

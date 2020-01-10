@@ -227,7 +227,7 @@ report_unsolved type_errors expr_holes
                             , cec_suppress = insolubleWC wanted
                                  -- See Note [Suppressing error messages]
                                  -- Suppress low-priority errors if there
-                                 -- are insolule errors anywhere;
+                                 -- are insoluble errors anywhere;
                                  -- See #15539 and c.f. setting ic_status
                                  -- in TcSimplify.setImplicationStatus
                             , cec_warn_redundant = warn_redundant
@@ -553,7 +553,7 @@ reportWanteds ctxt tc_lvl (WC { wc_simple = simples, wc_impl = implics })
     env = cec_tidy ctxt
     tidy_cts = bagToList (mapBag (tidyCt env) simples)
 
-    -- report1: ones that should *not* be suppresed by
+    -- report1: ones that should *not* be suppressed by
     --          an insoluble somewhere else in the tree
     -- It's crucial that anything that is considered insoluble
     -- (see TcRnTypes.insolubleCt) is caught here, otherwise

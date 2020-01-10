@@ -997,7 +997,7 @@ doCase d s p (_,scrut) bndr alts is_unboxed_tuple
         ret_frame_size_b :: StackDepth
         ret_frame_size_b = 2 * wordSize dflags
 
-        -- The extra frame we push to save/restor the CCCS when profiling
+        -- The extra frame we push to save/restore the CCCS when profiling
         save_ccs_size_b | profiling = 2 * wordSize dflags
                         | otherwise = 0
 
@@ -1473,7 +1473,7 @@ The code we generate is this:
 The 'bogus-word' push is because TESTEQ_I expects the top of the stack
 to have an info-table, and the next word to have the value to be
 tested.  This is very weird, but it's the way it is right now.  See
-Interpreter.c.  We don't acutally need an info-table here; we just
+Interpreter.c.  We don't actually need an info-table here; we just
 need to have the argument to be one-from-top on the stack, hence pushing
 a 1-word null. See #8383.
 -}

@@ -722,7 +722,7 @@ Shift.$wgo = \ (w_sCS :: GHC.Prim.Int#) (w1_sCT :: [GHC.Types.Bool]) ->
 Note the massive shift on line "!!!!".  It can't happen, because we've checked
 that w < 64, but the optimiser didn't spot that. We DO NOT want to constant-fold this!
 Moreover, if the programmer writes (n `uncheckedShiftL` 9223372036854775807), we
-can't constant fold it, but if it gets to the assember we get
+can't constant fold it, but if it gets to the assembler we get
      Error: operand type mismatch for `shl'
 
 So the best thing to do is to rewrite the shift with a call to error,
@@ -1582,7 +1582,7 @@ match_bitInteger dflags id_unf fn [arg]
   | Just (LitNumber LitNumInt x _) <- exprIsLiteral_maybe id_unf arg
   , x >= 0
   , x <= (wordSizeInBits dflags - 1)
-    -- Make sure x is small enough to yield a decently small iteger
+    -- Make sure x is small enough to yield a decently small integer
     -- Attempting to construct the Integer for
     --    (bitInteger 9223372036854775807#)
     -- would be a bad idea (#14959)
@@ -2217,7 +2217,7 @@ Take care if we see something like
     -1# -> e2
     100 -> e3
 because there isn't a data constructor with tag -1 or 100. In this case the
-out-of-range alterantive is dead code -- we know the range of tags for x.
+out-of-range alternative is dead code -- we know the range of tags for x.
 
 Hence caseRules returns (AltCon -> Maybe AltCon), with Nothing indicating
 an alternative that is unreachable.

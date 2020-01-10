@@ -205,7 +205,7 @@ knownKeysMap = listToUFM [ (nameUnique n, n) | n <- knownKeyNames ]
 -- GHCi's ':info' command.
 lookupKnownNameInfo :: Name -> SDoc
 lookupKnownNameInfo name = case lookupNameEnv knownNamesInfo name of
-    -- If we do find a doc, we add comment delimeters to make the output
+    -- If we do find a doc, we add comment delimiters to make the output
     -- of ':info' valid Haskell.
     Nothing  -> empty
     Just doc -> vcat [text "{-", doc, text "-}"]

@@ -106,7 +106,7 @@ simply drop the `--freeze1` flag and Hadrian will rebuild all out-of-date files.
 
 * `--color` and `--no-color`: choose whether to use colors when printing build
 progress info. By default, Hadrian tries to determine if the terminal supports
-colored ouput, and proceeds accordingly.
+colored output, and proceeds accordingly.
 
 * `--progress-info=STYLE`: choose how build progress info is printed. There are
 four settings: `none`, `brief` (one line per build command; this is the default

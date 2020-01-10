@@ -1994,7 +1994,7 @@ case "$1" in
 
 # GHC_LLVM_TARGET(target_cpu, target_vendor, target_os, llvm_target_var)
 # --------------------------------
-# converts the canonicalized target into someting llvm can understand
+# converts the canonicalized target into something llvm can understand
 AC_DEFUN([GHC_LLVM_TARGET], [
   case "$2-$3" in
     *-freebsd*-gnueabihf)
@@ -2238,7 +2238,7 @@ EOF
 
 # FIND_GHC_BOOTSTRAP_PROG()
 # --------------------------------
-# Parse the bootstrap GHC's compier settings file for the location of things
+# Parse the bootstrap GHC's compiler settings file for the location of things
 # like the `llc` and `opt` commands.
 #
 # $1 = the variable to set

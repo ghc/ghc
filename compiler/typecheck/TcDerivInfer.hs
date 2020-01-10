@@ -948,7 +948,7 @@ unification variable for each iteration of simplifyDeriv. If we re-use the same
 unification variable across multiple iterations, then bad things can happen,
 such as #14933.
 
-Similarly for 'baz', givng the constraint C2
+Similarly for 'baz', giving the constraint C2
 
    forall[2]. Eq (Maybe s) => (Ord a, Show a,
                               Maybe s -> Maybe s -> Bool

@@ -363,7 +363,7 @@ data dependencies of the state token to enforce write-effect ordering
 ----------  can_fail ----------------------------
 A primop "can_fail" if it can fail with an *unchecked* exception on
 some elements of its input domain. Main examples:
-   division (fails on zero demoninator)
+   division (fails on zero denominator)
    array indexing (fails if the index is out of bounds)
 
 An "unchecked exception" is one that is an outright error, (not

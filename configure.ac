@@ -299,9 +299,9 @@ FP_DEFAULT_CHOICE_OVERRIDE_CHECK(
   [tables next to code],
   [tables apart from code],
   [TablesNextToCode],
-  [Build a tool chain with info tables layed out next to code (enabled by default when using the registerised ABI, on platforms that support it)])
+  [Build a tool chain with info tables laid out next to code (enabled by default when using the registerised ABI, on platforms that support it)])
 if test x"$TablesNextToCode" = xYES; then
-   AC_DEFINE([TABLES_NEXT_TO_CODE], [1], [Define to 1 if info tables are layed out next to code])
+   AC_DEFINE([TABLES_NEXT_TO_CODE], [1], [Define to 1 if info tables are laid out next to code])
 fi
 AC_SUBST(TablesNextToCode)
 

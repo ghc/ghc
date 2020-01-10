@@ -723,7 +723,7 @@ mkTopStgRhs dflags this_mod ccs bndr rhs
     (_, all_cafs_ccs) = getAllCAFsCC this_mod
 
 -- Generate a non-top-level RHS. Cost-centre is always currentCCS,
--- see Note [Cost-centre initialzation plan].
+-- see Note [Cost-centre initialization plan].
 mkStgRhs :: Id -> StgExpr -> StgRhs
 mkStgRhs bndr rhs
   | StgLam bndrs body <- rhs
@@ -837,7 +837,7 @@ data LetInfo
 -- For a let(rec)-bound variable, x, we record LiveInfo, the set of
 -- variables that are live if x is live.  This LiveInfo comprises
 --         (a) dynamic live variables (ones with a non-top-level binding)
---         (b) static live variabes (CAFs or things that refer to CAFs)
+--         (b) static live variables (CAFs or things that refer to CAFs)
 --
 -- For "normal" variables (a) is just x alone.  If x is a let-no-escaped
 -- variable then x is represented by a code pointer and a stack pointer

@@ -490,7 +490,7 @@ identicalClsInstHead :: ClsInst -> ClsInst -> Bool
 -- ^ True when when the instance heads are the same
 -- e.g.  both are   Eq [(a,b)]
 -- Used for overriding in GHCi
--- Obviously should be insenstive to alpha-renaming
+-- Obviously should be insensitive to alpha-renaming
 identicalClsInstHead (ClsInst { is_cls_nm = cls_nm1, is_tcs = rough1, is_tys = tys1 })
                      (ClsInst { is_cls_nm = cls_nm2, is_tcs = rough2, is_tys = tys2 })
   =  cls_nm1 == cls_nm2
@@ -702,7 +702,7 @@ unconstrained, then we don't know yet if the more specific instance
 will eventually apply.  GHC keeps going, and matches on the generic `C
 a'.  The fix is to, at each step, check to see if there's a reverse
 match, and if so, abort the search.  This prevents hugs from
-prematurely chosing a generic instance when a more specific one
+prematurely choosing a generic instance when a more specific one
 exists.
 
 --Jeff

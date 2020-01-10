@@ -701,7 +701,7 @@ count p = go 0
                      | otherwise = go n xs
 
 countWhile :: (a -> Bool) -> [a] -> Int
--- Length of an /initial prefix/ of the list satsifying p
+-- Length of an /initial prefix/ of the list satisfying p
 countWhile p = go 0
   where go !n (x:xs) | p x = go (n+1) xs
         go !n _            = n
@@ -977,7 +977,7 @@ fuzzyLookup user_entered possibilites
                                             poss_str user_entered
                        , distance <= fuzzy_threshold ]
   where
-    -- Work out an approriate match threshold:
+    -- Work out an appropriate match threshold:
     -- We report a candidate if its edit distance is <= the threshold,
     -- The threshold is set to about a quarter of the # of characters the user entered
     --   Length    Threshold

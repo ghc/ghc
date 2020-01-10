@@ -685,7 +685,7 @@ mkSingleCoAxiom :: Role -> Name
                 -> [TyVar] -> [TyVar] -> [CoVar]
                 -> TyCon -> [Type] -> Type
                 -> CoAxiom Unbranched
--- Make a single-branch CoAxiom, incluidng making the branch itself
+-- Make a single-branch CoAxiom, including making the branch itself
 -- Used for both type family (Nominal) and data family (Representational)
 -- axioms, hence passing in the Role
 mkSingleCoAxiom role ax_name tvs eta_tvs cvs fam_tc lhs_tys rhs_ty
@@ -1091,7 +1091,7 @@ reduceTyFamApp_maybe :: FamInstEnvs
 --    but *not* newtypes
 -- Works on type-synonym families always; data-families only if
 --     the role we seek is representational
--- It does *not* normlise the type arguments first, so this may not
+-- It does *not* normalise the type arguments first, so this may not
 --     go as far as you want. If you want normalised type arguments,
 --     use normaliseTcArgs first.
 --
@@ -1644,7 +1644,7 @@ There are wrinkles, of course:
    they did, then looking up `F b1` would yield the same flatten var for
    each.) So, even though `forall`-bound variables should really be in the
    in-scope set only when they are in scope, we retain these variables even
-   outside of their scope. This ensures that, if we enounter a fresh
+   outside of their scope. This ensures that, if we encounter a fresh
    `forall`-bound b, we will rename it to b2, not b1. Note that keeping a
    larger in-scope set than strictly necessary is always OK, as in-scope sets
    are only ever used to avoid collisions.

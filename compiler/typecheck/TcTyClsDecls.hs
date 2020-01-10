@@ -462,7 +462,7 @@ We do the following steps:
      TcTyCons, again overriding the promotion-error bindings.
 
      But note that the data constructor promotion errors are still in place
-     so that (in our example) a use of MkB will sitll be signalled as
+     so that (in our example) a use of MkB will still be signalled as
      an error.
 
   4. Typecheck the decls.
@@ -593,7 +593,7 @@ generaliseTcTyCon tc
              -- Running example in Note [Inferring kinds for type declarations]
              --    spec_req_prs = [ ("k1",kk1), ("a", (aa::kk1))
              --                   , ("k2",kk2), ("x", (xx::kk2))]
-             -- where "k1" dnotes the Name k1, and kk1, aa, etc are MetaTyVars,
+             -- where "k1" denotes the Name k1, and kk1, aa, etc are MetaTyVars,
              -- specifically TyVarTvs
 
        -- Step 0: zonk and skolemise the Specified and Required binders
@@ -837,7 +837,7 @@ We do kind inference as follows:
 
 * Step 1: inferInitialKinds, and in particular kcInferDeclHeader.
   Make a unification variable for each of the Required and Specified
-  type varialbes in the header.
+  type variables in the header.
 
   Record the connection between the Names the user wrote and the
   fresh unification variables in the tcTyConScopedTyVars field
@@ -862,7 +862,7 @@ We do kind inference as follows:
           S :: kk3 -> * -> kk4 -> *
 
 * Step 2: kcTyClDecl. Extend the environment with a TcTyCon for S and
-  T, with these monomophic kinds.  Now kind-check the declarations,
+  T, with these monomorphic kinds.  Now kind-check the declarations,
   and solve the resulting equalities.  The goal here is to discover
   constraints on all these unification variables.
 
@@ -1468,7 +1468,7 @@ I am a bit concerned about tycons with a declaration like
 It does not have a CUSK, so kcInferDeclHeader will make a TcTyCon
 with tyConResKind of Type -> forall k. k -> Type.  Even that is fine:
 the splitPiTys will look past the forall.  But I'm bothered about
-what if the type "in the corner" metions k?  This is incredibly
+what if the type "in the corner" mentions k?  This is incredibly
 obscure but something like this could be bad:
    data T a :: Type -> foral k. k -> TYPE (F k) where ...
 
@@ -2304,7 +2304,7 @@ tcDataDefn err_ctxt
     --
     -- Note that this is only a property that data type declarations possess,
     -- so one could not have, say, a data family instance in an hsig file that
-    -- has kind `Bool`. Therfore, this check need only occur in the code that
+    -- has kind `Bool`. Therefore, this check need only occur in the code that
     -- typechecks data type declarations.
     mk_permissive_kind HsigFile [] = True
     mk_permissive_kind _ _ = False
@@ -2355,7 +2355,7 @@ kcTyFamInstEqn tc_fam_tc
              --  type family Bar x y where
              --      Bar (x :: a) (y :: b) = Int
              --      Bar (x :: c) (y :: d) = Bool
-             -- During kind-checkig, a,b,c,d should be TyVarTvs and unify appropriately
+             -- During kind-checking, a,b,c,d should be TyVarTvs and unify appropriately
     }
   where
     vis_arity = length (tyConVisibleTyVars tc_fam_tc)
@@ -2445,10 +2445,10 @@ instances are not invoked directly in Haskell source code,
 so visible type application etc plays no role.
 
 So, the simple thing is
-   - gather candiates from [k, a, b] and pats
+   - gather candidates from [k, a, b] and pats
    - quantify over them
 
-Hence the sligtly mysterious call:
+Hence the slightly mysterious call:
     candidateQTyVarsOfTypes (pats ++ mkTyVarTys scoped_tvs)
 
 Simple, neat, but a little non-obvious!
@@ -3371,7 +3371,7 @@ Some notes:
 
   This is really bogus; now we have in scope a Class that is invalid
   in some way, with unknown downstream consequences.  A better
-  alterantive might be to make a fake class TyCon.  A job for another day.
+  alternative might be to make a fake class TyCon.  A job for another day.
 -}
 
 -------------------------
@@ -3967,7 +3967,7 @@ For instance, in the Enum class declaration:
 The default implementation for enum only works for types that are instances of
 Generic, and for which their generic Rep type is an instance of GEnum. But
 clearly enum doesn't _have_ to use this implementation, so naturally, the
-context for enum is allowed to be different to accomodate this. As a result,
+context for enum is allowed to be different to accommodate this. As a result,
 when we validity-check default type signatures, we ignore contexts completely.
 
 Note that when checking whether two type signatures match, we must take care to

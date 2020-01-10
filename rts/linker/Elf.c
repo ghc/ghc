@@ -775,7 +775,7 @@ ocGetNames_ELF ( ObjectCode* oc )
               alloc = SECTION_NOMEM;
           }
           // use the m32 allocator if either the image is not mapped
-          // (i.e. we cannot map the secions separately), or if the section
+          // (i.e. we cannot map the sections separately), or if the section
           // size is small.
           else if (!oc->imageMapped || size < getPageSize() / 3) {
               bool executable = kind == SECTIONKIND_CODE_OR_RODATA;

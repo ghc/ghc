@@ -324,7 +324,7 @@ pushStackElement(traverseState *ts, const stackElement se)
         newStackBlock(ts, nbd);
     }
 
-    // adjust stackTop (acutal push)
+    // adjust stackTop (actual push)
     ts->stackTop--;
     // If the size of stackElement was huge, we would better replace the
     // following statement by either a memcpy() call or a switch statement

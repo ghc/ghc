@@ -229,7 +229,7 @@ class  (RealFrac a, Floating a) => RealFloat a  where
                                  -- to wrong results, hence we clamp the
                                  -- scaling parameter.
                                  -- If n + k would be larger than h,
-                                 -- n + clamp b k must be too, simliar
+                                 -- n + clamp b k must be too, similar
                                  -- for smaller than l - d.
                                  -- Add a little extra to keep clear
                                  -- from the boundary cases.
@@ -1258,7 +1258,7 @@ word2Float (W# w) = F# (word2Float# w)
 {-
 Note [realToFrac int-to-float]
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
-Don found that the RULES for realToFrac/Int->Double and simliarly
+Don found that the RULES for realToFrac/Int->Double and similarly
 Float made a huge difference to some stream-fusion programs.  Here's
 an example
 

@@ -284,7 +284,7 @@ instance Outputable DwarfFrameBlock where
   ppr (DwarfFrameBlock hasInfo unwinds) = braces $ ppr hasInfo <+> ppr unwinds
 
 -- | Header for the @.debug_frame@ section. Here we emit the "Common
--- Information Entry" record that etablishes general call frame
+-- Information Entry" record that establishes general call frame
 -- parameters and the default stack layout.
 pprDwarfFrame :: DwarfFrame -> SDoc
 pprDwarfFrame DwarfFrame{dwCieLabel=cieLabel,dwCieInit=cieInit,dwCieProcs=procs}

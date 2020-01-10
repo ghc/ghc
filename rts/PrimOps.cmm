@@ -1313,7 +1313,7 @@ stg_atomicallyzh (P_ stm)
     code = stm;
     frame_result = NO_TREC;
 
-    /* Start the memory transcation */
+    /* Start the memory transaction */
     ("ptr" new_trec) = ccall stmStartTransaction(MyCapability() "ptr", old_trec "ptr");
     StgTSO_trec(CurrentTSO) = new_trec;
 

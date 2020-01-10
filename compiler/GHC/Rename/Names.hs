@@ -93,7 +93,7 @@ graph. So we can just worry mostly about direct imports.
 
 There is one trust property that can change for a package though without
 recompilation being triggered: package trust. So we must check that all
-packages a module tranitively depends on to be trusted are still trusted when
+packages a module transitively depends on to be trusted are still trusted when
 we are compiling this module (as due to recompilation avoidance some modules
 below may not be considered trusted any more without recompilation being
 triggered).
@@ -406,7 +406,7 @@ calculateAvails dflags iface mod_safe' want_boot imported_by =
       -- reported.  Easiest thing is just to filter them out up
       -- front. This situation only arises if a module imports
       -- itself, or another module that imported it.  (Necessarily,
-      -- this invoves a loop.)
+      -- this involves a loop.)
       --
       -- We do this *after* filterImports, so that if you say
       --      module A where
@@ -1510,7 +1510,7 @@ decls, and simply trim their import lists.  NB that
 
   * We do *not* change the 'qualified' or 'as' parts!
 
-  * We do not disard a decl altogether; we might need instances
+  * We do not discard a decl altogether; we might need instances
     from it.  Instead we just trim to an empty import list
 -}
 

@@ -2,7 +2,7 @@
 (c) The University of Glasgow 2006
 (c) The GRASP/AQUA Project, Glasgow University, 1997-1998
 
-\section[BasicTypes]{Miscellanous types}
+\section[BasicTypes]{Miscellaneous types}
 
 This module defines a miscellaneously collection of very simple
 types that
@@ -970,8 +970,8 @@ data InterestingCxt
   | NotInteresting
   deriving (Eq)
 
--- | If there is any 'interesting' identifier occurance, then the
--- aggregated occurance info of that identifier is considered interesting.
+-- | If there is any 'interesting' identifier occurrence, then the
+-- aggregated occurrence info of that identifier is considered interesting.
 instance Semi.Semigroup InterestingCxt where
   NotInteresting <> x = x
   IsInteresting  <> _ = IsInteresting
@@ -990,8 +990,8 @@ data InsideLam
   | NotInsideLam
   deriving (Eq)
 
--- | If any occurance of an identifier is inside a lambda, then the
--- occurance info of that identifier marks it as occuring inside a lambda
+-- | If any occurrence of an identifier is inside a lambda, then the
+-- occurrence info of that identifier marks it as occurring inside a lambda
 instance Semi.Semigroup InsideLam where
   NotInsideLam <> x = x
   IsInsideLam  <> _ = IsInsideLam
@@ -1003,7 +1003,7 @@ instance Monoid InsideLam where
 -----------------
 data OneBranch
   = InOneBranch
-    -- ^ One syntactic occurance: Occurs in only one case branch
+    -- ^ One syntactic occurrence: Occurs in only one case branch
     -- so no code-duplication issue to worry about
   | MultipleBranches
   deriving (Eq)

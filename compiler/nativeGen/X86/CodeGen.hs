@@ -1333,7 +1333,7 @@ x86_complex_amode :: CmmExpr -> CmmExpr -> Integer -> Integer -> NatM Amode
 x86_complex_amode base index shift offset
   = do (x_reg, x_code) <- getNonClobberedReg base
         -- x must be in a temp, because it has to stay live over y_code
-        -- we could compre x_reg and y_reg and do something better here...
+        -- we could compare x_reg and y_reg and do something better here...
        (y_reg, y_code) <- getSomeReg index
        let
            code = x_code `appOL` y_code

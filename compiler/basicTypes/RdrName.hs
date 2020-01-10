@@ -452,7 +452,7 @@ type GlobalRdrEnv = OccEnv [GlobalRdrElt]
 --
 --              NB: greOccName gre is usually the same as
 --                  nameOccName (gre_name gre), but not always in the
---                  case of record seectors; see greOccName
+--                  case of record selectors; see greOccName
 
 -- | Global Reader Element
 --
@@ -509,7 +509,7 @@ gre_lcl is True, or gre_imp is non-empty.
 
 It is just possible to have *both* if there is a module loop: a Name
 is defined locally in A, and also brought into scope by importing a
-module that SOURCE-imported A.  Exapmle (#7672):
+module that SOURCE-imported A.  Example (#7672):
 
  A.hs-boot   module A where
                data T

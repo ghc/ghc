@@ -846,7 +846,7 @@ pprInstr (FCMP reg1 reg2) = hcat [
             -- Note: we're using fcmpu, not fcmpo
             -- The difference is with fcmpo, compare with NaN is an invalid operation.
             -- We don't handle invalid fp ops, so we don't care.
-            -- Morever, we use `fcmpu 0, ...` rather than `fcmpu cr0, ...` for
+            -- Moreover, we use `fcmpu 0, ...` rather than `fcmpu cr0, ...` for
             -- better portability since some non-GNU assembler (such as
             -- IBM's `as`) tend not to support the symbolic register name cr0.
             -- This matches the syntax that GCC seems to emit for PPC targets.

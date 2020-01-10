@@ -441,7 +441,7 @@ newtype BuildProgressColour = BuildProgressColour String
     deriving Typeable
 
 -- | By default, Hadrian tries to figure out if the current terminal
---   supports colors using this function. The default can be overriden
+--   supports colors using this function. The default can be overridden
 --   by suppling @--[no-]color@.
 shouldUseColor :: IO Bool
 shouldUseColor =

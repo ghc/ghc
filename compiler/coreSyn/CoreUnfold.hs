@@ -226,13 +226,13 @@ specUnfolding to specialise its unfolding.  Some important points:
      {- INLINABLE f #-}
   Now if we specialise f, should the specialised version still have
   an INLINABLE pragma?  If it does, we'll capture a specialised copy
-  of <big-rhs> as its unfolding, and that probaby won't inline.  But
+  of <big-rhs> as its unfolding, and that probably won't inline.  But
   if we don't, the specialised version of <big-rhs> might be small
   enough to inline at a call site. This happens with Control.Monad.liftM3,
   and can cause a lot more allocation as a result (nofib n-body shows this).
 
   Moreover, keeping the INLINABLE thing isn't much help, because
-  the specialised function (probaby) isn't overloaded any more.
+  the specialised function (probably) isn't overloaded any more.
 
   Conclusion: drop the INLINEALE pragma.  In practice what this means is:
      if a stable unfolding has UnfoldingGuidance of UnfWhen,
@@ -255,7 +255,7 @@ The semantics of an INLINE pragma is
   that is, applied to at least as many arguments as appear
   on the LHS of the Haskell source definition.
 
-(This soure-code-derived arity is stored in the `ug_arity` field of
+(This source-code-derived arity is stored in the `ug_arity` field of
 the `UnfoldingGuidance`.)
 
 In the example, x's ug_arity is 0, so we should inline it at every use
@@ -362,14 +362,14 @@ the unfolding in question was a DFun unfolding.
 
 But more generally, the simplifier is designed on the
 basis that it is looking at occurrence-analysed expressions, so better
-ensure that they acutally are.
+ensure that they actually are.
 
 We use occurAnalyseExpr_NoBinderSwap instead of occurAnalyseExpr;
 see Note [No binder swap in unfoldings].
 
 Note [No binder swap in unfoldings]
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
-The binder swap can temporarily violate Core Lint, by assinging
+The binder swap can temporarily violate Core Lint, by assigning
 a LocalId binding to a GlobalId. For example, if A.foo{r872}
 is a GlobalId with unique r872, then
 
@@ -528,7 +528,7 @@ are very cheap, because exposing them to a caller is so valuable.
 
 [25/5/11] All sizes are now multiplied by 10, except for primops
 (which have sizes like 1 or 4.  This makes primops look fantastically
-cheap, and seems to be almost unversally beneficial.  Done partly as a
+cheap, and seems to be almost universally beneficial.  Done partly as a
 result of #4978.
 
 Note [Do not inline top-level bottoming functions]
@@ -1612,5 +1612,5 @@ computeDiscount dflags arg_discounts res_discount arg_infos cont_info
                 -- constructors; but we only want to invoke that large discount
                 -- when there's a case continuation.
                 -- Otherwise we, rather arbitrarily, threshold it.  Yuk.
-                -- But we want to aovid inlining large functions that return
+                -- But we want to avoid inlining large functions that return
                 -- constructors into contexts that are simply "interesting"

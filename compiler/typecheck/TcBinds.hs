@@ -144,7 +144,7 @@ up with a chain of identical values all hung onto by the CAF ff.
 
 Etc.
 
-NOTE: a bit of arity anaysis would push the (f a d) inside the (\ys...),
+NOTE: a bit of arity analysis would push the (f a d) inside the (\ys...),
 which would make the space leak go away in this case
 
 Solution: when typechecking the RHSs we always have in hand the
@@ -355,7 +355,7 @@ tcLocalBinds (HsIPBinds x (IPBinds _ ip_binds)) thing_inside
     tc_ip_bind _ (IPBind _ (Right {}) _) = panic "tc_ip_bind"
     tc_ip_bind _ (XIPBind nec) = noExtCon nec
 
-    -- Coerces a `t` into a dictionry for `IP "x" t`.
+    -- Coerces a `t` into a dictionary for `IP "x" t`.
     -- co : t -> IP "x" t
     toDict ipClass x ty = mkHsWrap $ mkWpCastR $
                           wrapIP $ mkClassPred ipClass [x,ty]
@@ -414,7 +414,7 @@ tcBindGroups :: TopLevelFlag -> TcSigFun -> TcPragEnv
              -> TcM ([(RecFlag, LHsBinds GhcTcId)], thing)
 -- Typecheck a whole lot of value bindings,
 -- one strongly-connected component at a time
--- Here a "strongly connected component" has the strightforward
+-- Here a "strongly connected component" has the straightforward
 -- meaning of a group of bindings that mention each other,
 -- ignoring type signatures (that part comes later)
 
@@ -1146,7 +1146,7 @@ But now consider:
   f x y = [x, y]
 
 We want to get an error from this, because 'a' and 'b' get unified.
-So we make a test, one per parital signature, to check that the
+So we make a test, one per partial signature, to check that the
 explicitly-quantified type variables have not been unified together.
 #14449 showed this up.
 
@@ -1544,7 +1544,7 @@ We typecheck pattern bindings as follows.  First tcLhs does this:
          Success => There was a type signature, so just use it,
                     checking compatibility with the expected type.
 
-         Failure => No type sigature.
+         Failure => No type signature.
              Infer case: (happens only outside any constructor pattern)
                          use a unification variable
                          at the outer level pc_lvl

@@ -166,7 +166,7 @@ warnAboutOverflowedOverLit hsOverLit = do
   dflags <- getDynFlags
   warnAboutOverflowedLiterals dflags (getIntegralLit hsOverLit)
 
--- | Emit warnings on integral literals which overflow the boudns implied by
+-- | Emit warnings on integral literals which overflow the bounds implied by
 -- their type.
 warnAboutOverflowedLit :: HsLit GhcTc -> DsM ()
 warnAboutOverflowedLit hsLit = do

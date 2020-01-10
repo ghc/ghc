@@ -305,7 +305,7 @@ int2Float (I# i) = F# (int2Float# i)
 --
 -- Note: Since the value is integral, the exponent can't be less than
 -- (-TYP_MANT_DIG), so we need not check the validity of the shift
--- distance for the right shfts here.
+-- distance for the right shifts here.
 
 {-# INLINE double2Integer #-}
 double2Integer :: Double -> Integer

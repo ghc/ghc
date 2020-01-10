@@ -52,7 +52,7 @@ int64_t signExtend(uint64_t val, uint8_t bits);
 bool isVectorPp(uint32_t *p);
 bool isLoadStore(uint32_t *p);
 
-/* aarch64 relocations may contain an addend alreay in the position
+/* aarch64 relocations may contain an addend already in the position
  * where we want to write the address offset to. Thus decoding as well
  * as encoding is needed.
  */
@@ -305,7 +305,7 @@ decodeAddend(ObjectCode * oc, Section * section, MachORelocationInfo * ri) {
         }
         case ARM64_RELOC_BRANCH26:
             /* take the lower 26 bits and shift them by 2. The last two are
-             * implicilty 0 (as the instructions must be aligned!) and sign
+             * implicitly 0 (as the instructions must be aligned!) and sign
              * extend to 64 bits.
              */
             return signExtend( (*p & 0x03FFFFFF) << 2, 28 );
@@ -543,7 +543,7 @@ relocateSectionAarch64(ObjectCode * oc, Section * section)
      *
      * - loaded the sections (potentially into non-contiguous memory),
      *   (in ocGetNames_MachO)
-     * - registered exported sybmols
+     * - registered exported symbols
      *   (in ocGetNames_MachO)
      * - and fixed the nlist[i].n_value for common storage symbols (N_UNDF,
      *   N_EXT and n_value != 0) so that they point into the common storage.

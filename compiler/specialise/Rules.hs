@@ -128,7 +128,7 @@ Note [Overall plumbing for rules]
      (b) from the ModGuts,
      (c) from the CoreMonad, and
      (d) from its mutable variable
-  [Of coures this means that we won't see new EPS rules that come in
+  [Of course this means that we won't see new EPS rules that come in
   during a single simplifier iteration, but that probably does not
   matter.]
 
@@ -317,7 +317,7 @@ ruleIsVisible vis_orphs Rule { ru_orphan = orph, ru_origin = origin }
 {- Note [Where rules are found]
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 The rules for an Id come from two places:
-  (a) the ones it is born with, stored inside the Id iself (idCoreRules fn),
+  (a) the ones it is born with, stored inside the Id itself (idCoreRules fn),
   (b) rules added in other modules, stored in the global RuleBase (imp_rules)
 
 It's tempting to think that
