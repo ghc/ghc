@@ -226,7 +226,7 @@ tcDefMeth clas tyvars this_dict binds_in hs_sig_fn prag_fn
           (sel_id, Just (dm_name, dm_spec))
   | Just (L bind_loc dm_bind, bndr_loc, prags) <- findMethodBind sel_name binds_in prag_fn
   = do { -- First look up the default method; it should be there!
-         -- It can be the orinary default method
+         -- It can be the ordinary default method
          -- or the generic-default method.  E.g of the latter
          --      class C a where
          --        op :: a -> a -> Bool

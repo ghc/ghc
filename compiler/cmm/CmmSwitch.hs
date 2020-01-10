@@ -324,7 +324,7 @@ targetSupportsSwitch _ = False
 -- | This function creates a SwitchPlan from a SwitchTargets value, breaking it
 -- down into smaller pieces suitable for code generation.
 createSwitchPlan :: SwitchTargets -> SwitchPlan
--- Lets do the common case of a singleton map quicky and efficiently (#10677)
+-- Lets do the common case of a singleton map quickly and efficiently (#10677)
 createSwitchPlan (SwitchTargets _signed _range (Just defLabel) m)
     | [(x, l)] <- M.toList m
     = IfEqual x l (Unconditionally defLabel)
@@ -484,7 +484,7 @@ reassocTuples initial ((a,b):tuples) last
 --
 --  - CmmSwitch, which provides the CmmSwitchTargets type and contains the strategy
 --    for implementing a Cmm switch (createSwitchPlan), and
---  - CmmImplementSwitchPlans, which contains the actuall Cmm graph modification,
+--  - CmmImplementSwitchPlans, which contains the actual Cmm graph modification,
 --
 -- for these reasons:
 --
