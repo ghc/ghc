@@ -674,7 +674,7 @@ data HsType pass
 
   | HsExplicitListTy       -- A promoted explicit list
         (XExplicitListTy pass)
-        PromotionFlag      -- whether explcitly promoted, for pretty printer
+        PromotionFlag      -- whether explicitly promoted, for pretty printer
         [LHsType pass]
       -- ^ - 'ApiAnnotation.AnnKeywordId' : 'ApiAnnotation.AnnOpen' @"'["@,
       --         'ApiAnnotation.AnnClose' @']'@
@@ -888,7 +888,7 @@ type LConDeclField pass = Located (ConDeclField pass)
       -- For details on above see note [Api annotations] in ApiAnnotation
 
 -- | Constructor Declaration Field
-data ConDeclField pass  -- Record fields have Haddoc docs on them
+data ConDeclField pass  -- Record fields have Haddock docs on them
   = ConDeclField { cd_fld_ext  :: XConDeclField pass,
                    cd_fld_names :: [LFieldOcc pass],
                                    -- ^ See Note [ConDeclField passs]
@@ -958,7 +958,7 @@ gives
 hsWcScopedTvs :: LHsSigWcType GhcRn -> [Name]
 -- Get the lexically-scoped type variables of a HsSigType
 --  - the explicitly-given forall'd type variables
---  - the named wildcars; see Note [Scoping of named wildcards]
+--  - the named wildcards; see Note [Scoping of named wildcards]
 -- because they scope in the same way
 hsWcScopedTvs sig_ty
   | HsWC { hswc_ext = nwcs, hswc_body = sig_ty1 }  <- sig_ty

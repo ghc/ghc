@@ -511,7 +511,7 @@ mkSimpleConMatch2 ctxt fold extra_pats con insides = do
         vars_needed = takeList insides as_RDRs
         pat = nlConVarPat con_name vars_needed
         -- Make sure to zip BEFORE invoking catMaybes. We want the variable
-        -- indicies in each expression to match up with the argument indices
+        -- indices in each expression to match up with the argument indices
         -- in con_expr (defined below).
         exps = catMaybes $ zipWith (\i v -> (`nlHsApp` nlHsVar v) <$> i)
                                    insides vars_needed

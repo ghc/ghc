@@ -130,7 +130,7 @@ unambiguous. See Note [Impedance matching] in TcBinds.
 
 This test is very conveniently implemented by calling
     tcSubType <type> <type>
-This neatly takes account of the functional dependecy stuff above,
+This neatly takes account of the functional dependency stuff above,
 and implicit parameter (see Note [Implicit parameters and ambiguity]).
 And this is what checkAmbiguity does.
 
@@ -170,7 +170,7 @@ In fact, because of the co/contra-variance implemented in tcSubType,
 this *does* catch function f above. too.
 
 Concerning (a) the ambiguity check is only used for *user* types, not
-for types coming from inteface files.  The latter can legitimately
+for types coming from interface files.  The latter can legitimately
 have ambiguous types. Example
 
    class S a where s :: a -> (Int,Int)
@@ -275,7 +275,7 @@ In a few places we do not want to check a user-specified type for ambiguity
 
   There is also an implementation reason (#11608).  In the RHS of
   a type synonym we don't (currently) instantiate 'a' and 'b' with
-  TcTyVars before calling checkValidType, so we get asertion failures
+  TcTyVars before calling checkValidType, so we get assertion failures
   from doing an ambiguity check on a type with TyVars in it.  Fixing this
   would not be hard, but let's wait till there's a reason.
 
@@ -972,7 +972,7 @@ expand S first, then T we get just
 which is fine.
 
 IMPORTANT: suppose T is a type synonym.  Then we must do validity
-checking on an appliation (T ty1 ty2)
+checking on an application (T ty1 ty2)
 
         *either* before expansion (i.e. check ty1, ty2)
         *or* after expansion (i.e. expand T ty1 ty2, and then check)
@@ -1971,7 +1971,7 @@ constraintKindsMsg = text "Use ConstraintKinds to permit this"
 Are these OK?
   type family F a
   instance F a    => C (Maybe [a]) where ...
-  intance C (F a) => C [[[a]]]     where ...
+  instance C (F a) => C [[[a]]]     where ...
 
 No: the type family in the instance head might blow up to an
 arbitrarily large type, depending on how 'a' is instantiated.
@@ -2320,7 +2320,7 @@ checkConsistentFamInst (InClsInst { ai_class = clas
     tv_name = mkInternalName (mkAlphaTyVarUnique 1) (mkTyVarOcc "_") noSrcSpan
 
     -- For check_match, bind_me, see
-    -- Note [Matching in the consistent-instantation check]
+    -- Note [Matching in the consistent-instantiation check]
     check_match :: [(Type,Type,ArgFlag)] -> TcM ()
     check_match triples = go emptyTCvSubst emptyTCvSubst triples
 
@@ -2421,7 +2421,7 @@ in injective positions on the left-hand side (by way of
 position, as `T` is not an injective type constructor, so we do not count that.
 Similarly for the `a` in `ConstType a`.
 
-Note [Matching in the consistent-instantation check]
+Note [Matching in the consistent-instantiation check]
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 Matching the class-instance header to family-instance tyvars is
 tricker than it sounds.  Consider (#13972)
