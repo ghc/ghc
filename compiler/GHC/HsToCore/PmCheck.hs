@@ -232,7 +232,7 @@ instance Monoid PartialResult where
 -- More details about the classification of clauses into useful, redundant
 -- and with inaccessible right hand side can be found here:
 --
---     https://gitlab.haskell.org/ghc/ghc/wikis/pattern-match-check
+--     https://www.microsoft.com/en-us/research/wp-content/uploads/2016/08/gadtpm-acm.pdf
 --
 data PmResult =
   PmResult {
