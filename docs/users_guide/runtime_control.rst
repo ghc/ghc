@@ -862,10 +862,10 @@ performance.
 
     By default, the flag will cause a warning to be emitted to stderr
     when the sync time exceeds the specified time.  This behaviour can
-    be overriden, however: the ``longGCSync()`` hook is called when
+    be overridden, however: the ``longGCSync()`` hook is called when
     the sync time is exceeded during the sync period, and the
     ``longGCSyncEnd()`` hook at the end. Both of these hooks can be
-    overriden in the ``RtsConfig`` when the runtime is started with
+    overridden in the ``RtsConfig`` when the runtime is started with
     ``hs_init_ghc()``. The default implementations of these hooks
     (``LongGcSync()`` and ``LongGCSyncEnd()`` respectively) print
     warnings to stderr.
@@ -1137,7 +1137,7 @@ When the program is linked with the :ghc-flag:`-eventlog` option
     logs a default set of events, suitable for use with tools like ThreadScope.
 
     Per default the events are written to :file:`{program}.eventlog` though
-    the mechanism for writing event log data can be overriden with a custom
+    the mechanism for writing event log data can be overridden with a custom
     `EventLogWriter`.
 
     For some special use cases you may want more control over which

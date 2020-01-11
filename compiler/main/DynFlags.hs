@@ -563,7 +563,7 @@ data GeneralFlag
    | Opt_RegsGraph                      -- do graph coloring register allocation
    | Opt_RegsIterative                  -- do iterative coalescing graph coloring register allocation
    | Opt_PedanticBottoms                -- Be picky about how we treat bottom
-   | Opt_LlvmTBAA                       -- Use LLVM TBAA infastructure for improving AA (hidden flag)
+   | Opt_LlvmTBAA                       -- Use LLVM TBAA infrastructure for improving AA (hidden flag)
    | Opt_LlvmFillUndefWithGarbage       -- Testing for undef bugs (hidden flag)
    | Opt_IrrefutableTuples
    | Opt_CmmSink
@@ -972,7 +972,7 @@ data DynFlags = DynFlags {
   rawSettings       :: [(String, String)],
 
   integerLibrary        :: IntegerLibrary,
-    -- ^ IntegerGMP or IntegerSimple. Set at configure time, but may be overriden
+    -- ^ IntegerGMP or IntegerSimple. Set at configure time, but may be overridden
     --   by GHC-API users. See Note [The integer library] in PrelNames
   llvmConfig            :: LlvmConfig,
     -- ^ N.B. It's important that this field is lazy since we load the LLVM
@@ -1106,7 +1106,7 @@ data DynFlags = DynFlags {
     -- they don't have to be loaded each time they are needed.  See
     -- 'DynamicLoading.initializePlugins'.
   staticPlugins            :: [StaticPlugin],
-    -- ^ staic plugins which do not need dynamic loading. These plugins are
+    -- ^ static plugins which do not need dynamic loading. These plugins are
     -- intended to be added by GHC API users directly to this list.
     --
     -- To add dynamically loaded plugins through the GHC API see
@@ -3005,7 +3005,7 @@ dynamic_flags_deps = [
                  Nothing -> upd (\d -> d { parMakeCount = Nothing })))
                  -- When the number of parallel builds
                  -- is omitted, it is the same
-                 -- as specifing that the number of
+                 -- as specifying that the number of
                  -- parallel builds is equal to the
                  -- result of getNumProcessors
   , make_ord_flag defFlag "instantiated-with"   (sepArg setUnitIdInsts)
@@ -5180,7 +5180,7 @@ setDumpFlag' dump_flag
                                              Opt_D_no_debug_output]
 
 forceRecompile :: DynP ()
--- Whenver we -ddump, force recompilation (by switching off the
+-- Whenever we -ddump, force recompilation (by switching off the
 -- recompilation checker), else you don't see the dump! However,
 -- don't switch it off in --make mode, else *everything* gets
 -- recompiled which probably isn't what you want

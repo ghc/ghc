@@ -4,14 +4,14 @@
 
 module TcEvidence (
 
-  -- HsWrapper
+  -- * HsWrapper
   HsWrapper(..),
   (<.>), mkWpTyApps, mkWpEvApps, mkWpEvVarApps, mkWpTyLams,
   mkWpLams, mkWpLet, mkWpCastN, mkWpCastR, collectHsWrapBinders,
   mkWpFun, idHsWrapper, isIdHsWrapper, isErasableHsWrapper,
   pprHsWrapper,
 
-  -- Evidence bindings
+  -- * Evidence bindings
   TcEvBinds(..), EvBindsVar(..),
   EvBindMap(..), emptyEvBindMap, extendEvBinds,
   lookupEvBind, evBindMapBinds, foldEvBindMap, filterEvBindMap,
@@ -19,7 +19,7 @@ module TcEvidence (
   EvBind(..), emptyTcEvBinds, isEmptyTcEvBinds, mkGivenEvBind, mkWantedEvBind,
   evBindVar, isCoEvBindsVar,
 
-  -- EvTerm (already a CoreExpr)
+  -- * EvTerm (already a CoreExpr)
   EvTerm(..), EvExpr,
   evId, evCoercion, evCast, evDFunApp,  evDataConApp, evSelector,
   mkEvCast, evVarsOfTerm, mkEvScSelectors, evTypeable, findNeededEvVars,
@@ -28,7 +28,7 @@ module TcEvidence (
   EvCallStack(..),
   EvTypeable(..),
 
-  -- TcCoercion
+  -- * TcCoercion
   TcCoercion, TcCoercionR, TcCoercionN, TcCoercionP, CoercionHole,
   TcMCoercion,
   Role(..), LeftOrRight(..), pickLR,
@@ -45,7 +45,10 @@ module TcEvidence (
   mkTcCoVarCo,
   isTcReflCo, isTcReflexiveCo, isTcGReflMCo, tcCoToMCo,
   tcCoercionRole,
-  unwrapIP, wrapIP
+  unwrapIP, wrapIP,
+
+  -- * QuoteWrapper
+  QuoteWrapper(..), applyQuoteWrapper, quoteWrapperTyVarTy
   ) where
 #include "HsVersions.h"
 
@@ -1002,3 +1005,25 @@ unwrapIP ty =
 -- dictionary. See 'unwrapIP'.
 wrapIP :: Type -> CoercionR
 wrapIP ty = mkSymCo (unwrapIP ty)
+
+----------------------------------------------------------------------
+-- A datatype used to pass information when desugaring quotations
+----------------------------------------------------------------------
+
+-- We have to pass a `EvVar` and `Type` into `dsBracket` so that the
+-- correct evidence and types are applied to all the TH combinators.
+-- This data type bundles them up together with some convenience methods.
+--
+-- The EvVar is evidence for `Quote m`
+-- The Type is a metavariable for `m`
+--
+data QuoteWrapper = QuoteWrapper EvVar Type deriving Data.Data
+
+quoteWrapperTyVarTy :: QuoteWrapper -> Type
+quoteWrapperTyVarTy (QuoteWrapper _ t) = t
+
+-- | Convert the QuoteWrapper into a normal HsWrapper which can be used to
+-- apply its contents.
+applyQuoteWrapper :: QuoteWrapper -> HsWrapper
+applyQuoteWrapper (QuoteWrapper ev_var m_var)
+  = mkWpEvVarApps [ev_var] <.> mkWpTyApps [m_var]

@@ -60,7 +60,7 @@ data AssocInstInfo
                                             -- Why scoped?  See bind_me in
                                             -- TcValidity.checkConsistentFamInst
               , ai_inst_env :: VarEnv Type  -- ^ Maps /class/ tyvars to their instance types
-                -- See Note [Matching in the consistent-instantation check]
+                -- See Note [Matching in the consistent-instantiation check]
     }
 
 isNotAssociated :: AssocInstInfo -> Bool
