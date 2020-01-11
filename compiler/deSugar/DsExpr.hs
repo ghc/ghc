@@ -709,7 +709,7 @@ ds_expr _ expr@(RecordUpd { rupd_expr = record_expr, rupd_flds = fields
 -- Template Haskell stuff
 
 ds_expr _ (HsRnBracketOut _ _ _)  = panic "dsExpr HsRnBracketOut"
-ds_expr _ (HsTcBracketOut _ x ps) = dsBracket x ps
+ds_expr _ (HsTcBracketOut _ hs_wrapper x ps) = dsBracket hs_wrapper x ps
 ds_expr _ (HsSpliceE _ s)         = pprPanic "dsExpr:splice" (ppr s)
 
 -- Arrow notation extension
@@ -1075,7 +1075,7 @@ warnDiscardedDoBindings rhs rhs_ty
                          _ -> return () } } }
 
   | otherwise   -- RHS does have type of form (m ty), which is weird
-  = return ()   -- but at lesat this warning is irrelevant
+  = return ()   -- but at least this warning is irrelevant
 
 badMonadBind :: LHsExpr GhcTc -> Type -> SDoc
 badMonadBind rhs elt_ty

@@ -1178,7 +1178,7 @@ wrapNewTypeBody tycon args result_expr
 -- When unwrapping, we do *not* apply any family coercion, because this will
 -- be done via a CoPat by the type checker.  We have to do it this way as
 -- computing the right type arguments for the coercion requires more than just
--- a spliting operation (cf, TcPat.tcConPat).
+-- a splitting operation (cf, TcPat.tcConPat).
 
 unwrapNewTypeBody :: TyCon -> [Type] -> CoreExpr -> CoreExpr
 unwrapNewTypeBody tycon args result_expr

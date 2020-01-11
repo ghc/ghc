@@ -658,7 +658,7 @@ rnTyVar env rdr_name
        ; return name }
 
 rnLTyVar :: Located RdrName -> RnM (Located Name)
--- Called externally; does not deal with wildards
+-- Called externally; does not deal with wildcards
 rnLTyVar (L loc rdr_name)
   = do { tyvar <- lookupTypeOccRn rdr_name
        ; return (L loc tyvar) }

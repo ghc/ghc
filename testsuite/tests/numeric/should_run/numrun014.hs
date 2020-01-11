@@ -1,5 +1,5 @@
 
--- Test that we don't have rules (or othre optimisations) doing the
+-- Test that we don't have rules (or other optimisations) doing the
 -- wrong thing for constant folding with Doubles.
 
 module Main (main) where
