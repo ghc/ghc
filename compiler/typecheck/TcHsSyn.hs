@@ -226,7 +226,7 @@ data ZonkEnv  -- See Note [The ZonkEnv]
   binding site.
 
   Unlike ze_tv_env, it is knot-tied: see extendIdZonkEnvRec.
-  In a mutually recusive group
+  In a mutually recursive group
      rec { f = ...g...; g = ...f... }
   we want the occurrence of g to point to the one zonked Id for g,
   and the same for f.
@@ -258,9 +258,9 @@ There are three possibilities:
 * DefaultFlexi: this is the common case, in situations like
      length @alpha ([] @alpha)
   It really doesn't matter what type we choose for alpha.  But
-  we must choose a type!  We can't leae mutable unification
+  we must choose a type!  We can't leave mutable unification
   variables floating around: after typecheck is complete, every
-  type variable occurrence must have a bindign site.
+  type variable occurrence must have a binding site.
 
   So we default it to 'Any' of the right kind.
 
@@ -277,7 +277,7 @@ There are three possibilities:
 -}
 
 data ZonkFlexi   -- See Note [Un-unified unification variables]
-  = DefaultFlexi    -- Default unbound unificaiton variables to Any
+  = DefaultFlexi    -- Default unbound unification variables to Any
   | SkolemiseFlexi  -- Skolemise unbound unification variables
                     -- See Note [Zonking the LHS of a RULE]
   | RuntimeUnkFlexi -- Used in the GHCi debugger
@@ -798,12 +798,18 @@ zonkExpr env (HsAppType x e t)
 zonkExpr _ e@(HsRnBracketOut _ _ _)
   = pprPanic "zonkExpr: HsRnBracketOut" (ppr e)
 
-zonkExpr env (HsTcBracketOut x body bs)
-  = do bs' <- mapM zonk_b bs
-       return (HsTcBracketOut x body bs')
+zonkExpr env (HsTcBracketOut x wrap body bs)
+  = do wrap' <- traverse zonkQuoteWrap wrap
+       bs' <- mapM (zonk_b env) bs
+       return (HsTcBracketOut x wrap' body bs')
   where
-    zonk_b (PendingTcSplice n e) = do e' <- zonkLExpr env e
-                                      return (PendingTcSplice n e')
+    zonkQuoteWrap (QuoteWrapper ev ty) = do
+        let ev' = zonkIdOcc env ev
+        ty' <- zonkTcTypeToTypeX env ty
+        return (QuoteWrapper ev' ty')
+
+    zonk_b env' (PendingTcSplice n e) = do e' <- zonkLExpr env' e
+                                           return (PendingTcSplice n e')
 
 zonkExpr env (HsSpliceE _ (HsSplicedT s)) =
   runTopSplice s >>= zonkExpr env
@@ -1754,7 +1760,7 @@ Solution: (see #15552 for other variants)
     But the code implements something a bit better
 
     * ZonkEnv contains ze_meta_tv_env, which maps
-          from a MetaTyVar (unificaion variable)
+          from a MetaTyVar (unification variable)
           to a Type (not a TcType)
 
     * In zonkTyVarOcc, we check this map to see if we have zonked

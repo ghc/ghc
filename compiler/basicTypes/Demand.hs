@@ -526,7 +526,7 @@ This too would get <Str, Used>, but this time there really isn't any
 point in w/w since the components of the pair are not used at all.
 
 So the solution is: don't aggressively collapse UProd [Used,Used] to
-Used; intead leave it as-is. In effect we are using the UseDmd to do a
+Used; instead leave it as-is. In effect we are using the UseDmd to do a
 little bit of boxity analysis.  Not very nice.
 
 Note [Used should win]
@@ -700,7 +700,7 @@ cleanEvalProdDmd n = JD { sd = HeadStr, ud = UProd (replicate n useTop) }
 {-
 ************************************************************************
 *                                                                      *
-           Demand: combining stricness and usage
+           Demand: combining strictness and usage
 *                                                                      *
 ************************************************************************
 -}
@@ -1089,7 +1089,7 @@ For a
 
 The CPR information, though, is valid after the number of arguments mentioned
 in the type is given. Therefore, when forgetting the demand on arguments, as in
-dmdAnalRhs, this needs to be considere (via removeDmdTyArgs).
+dmdAnalRhs, this needs to be considered (via removeDmdTyArgs).
 
 Consider
   b2 x y = x `seq` y `seq` error (show x)
@@ -1128,7 +1128,7 @@ We
  3. combine the termination results, but
  4. take CPR info from the first argument.
 
-3 and 4 are implementd in bothDmdResult.
+3 and 4 are implemented in bothDmdResult.
 -}
 
 -- Equality needed for fixpoints in DmdAnal
@@ -1444,7 +1444,7 @@ Note [Default demand on free variables]
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 If the variable is not mentioned in the environment of a demand type,
 its demand is taken to be a result demand of the type.
-    For the stricness component,
+    For the strictness component,
      if the result demand is a Diverges, then we use HyperStr
                                          else we use Lazy
     For the usage component, we use Absent.

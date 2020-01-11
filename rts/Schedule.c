@@ -226,7 +226,7 @@ schedule (Capability *initialCapability, Task *task)
     // In order to cleanly shut down the runtime, we want to:
     //   * make sure that all main threads return to their callers
     //     with the state 'Interrupted'.
-    //   * clean up all OS threads assocated with the runtime
+    //   * clean up all OS threads associated with the runtime
     //   * free all memory etc.
     //
     // So the sequence goes like this:
@@ -2906,7 +2906,7 @@ raiseExceptionHelper (StgRegTable *reg, StgTSO *tso, StgClosure *exception)
     // OLD COMMENT (we don't have MIN_UPD_SIZE now):
     // LDV profiling: stg_raise_info has THUNK as its closure
     // type. Since a THUNK takes at least MIN_UPD_SIZE words in its
-    // payload, MIN_UPD_SIZE is more approprate than 1.  It seems that
+    // payload, MIN_UPD_SIZE is more appropriate than 1.  It seems that
     // 1 does not cause any problem unless profiling is performed.
     // However, when LDV profiling goes on, we need to linearly scan
     // small object pool, where raise_closure is stored, so we should

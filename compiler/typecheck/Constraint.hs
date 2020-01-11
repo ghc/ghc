@@ -265,7 +265,7 @@ Example 1:  (c Int), where c :: * -> Constraint.  We can't do anything
 
 Example 2:  a ~ b, where a :: *, b :: k, where k is a kind variable
             We don't want to use this to substitute 'b' for 'a', in case
-            'k' is subsequently unifed with (say) *->*, because then
+            'k' is subsequently unified with (say) *->*, because then
             we'd have ill-kinded types floating about.  Rather we want
             to defer using the equality altogether until 'k' get resolved.
 
@@ -453,7 +453,7 @@ tyCoVarsOfCts :: Cts -> TcTyCoVarSet
 tyCoVarsOfCts = fvVarSet . tyCoFVsOfCts
 
 -- | Returns free variables of a bag of constraints as a deterministically
--- odered list. See Note [Deterministic FV] in FV.
+-- ordered list. See Note [Deterministic FV] in FV.
 tyCoVarsOfCtsList :: Cts -> [TcTyCoVar]
 tyCoVarsOfCtsList = fvVarList . tyCoFVsOfCts
 
@@ -827,7 +827,7 @@ Note that
 
     It's a bit of a special case, but it's easy to do.  The runtime cost
     is low because the unsolved set is usually empty anyway (errors
-    aside), and the first non-imlicit-parameter will terminate the search.
+    aside), and the first non-implicit-parameter will terminate the search.
 
     The special case is worth it (#11480, comment:2) because it
     applies to CallStack constraints, which aren't type errors. If we have
@@ -1181,7 +1181,7 @@ convenient to detect it in the constraint solver:
       forall a k (b::k). { wanted constraints }
 
 * Having solved {wanted}, before discarding the now-solved implication,
-  the costraint solver checks the dependency order of the skolem
+  the constraint solver checks the dependency order of the skolem
   variables (ic_skols).  This is done in setImplicationStatus.
 
 * This check is only necessary if the implication was born from a
@@ -1196,7 +1196,7 @@ convenient to detect it in the constraint solver:
 
 * Be careful /NOT/ to discard an implication with non-Nothing
   ic_telescope, even if ic_wanted is empty.  We must give the
-  constraint solver a chance to make that bad-telesope test!  Hence
+  constraint solver a chance to make that bad-telescope test!  Hence
   the extra guard in emitResidualTvConstraint; see #16247
 
 See also TcHsType Note [Keeping scoped variables in order: Explicit]

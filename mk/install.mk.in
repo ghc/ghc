@@ -12,7 +12,7 @@
 # 	- install.mk is auto-generated from install.mk.in by configure.
 #	  If you edit install.mk your changes will be spammed.
 #
-#	- Settings in this file may be overriden by giving replacement
+#	- Settings in this file may be overridden by giving replacement
 #	  definitions in build.mk.
 
 # Definition of installation directories, we don't use half of these, but since

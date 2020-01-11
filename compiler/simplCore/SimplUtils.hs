@@ -549,7 +549,7 @@ Note [Do not expose strictness if sm_inline=False]
 
   {-# RULES "foo" forall as bs. stream (zip as bs) = ..blah... #-}
 
-If we expose zip's bottoming nature when simplifing the LHS of the
+If we expose zip's bottoming nature when simplifying the LHS of the
 RULE we get
   {-# RULES "foo" forall as bs.
                    stream (case zip of {}) = ..blah... #-}
@@ -1053,7 +1053,7 @@ For example, it's tempting to look at trivial binding like
 and inline it unconditionally.  But suppose x is used many times,
 but this is the unique occurrence of y.  Then inlining x would change
 y's occurrence info, which breaks the invariant.  It matters: y
-might have a BIG rhs, which will now be dup'd at every occurrenc of x.
+might have a BIG rhs, which will now be dup'd at every occurrence of x.
 
 
 Even RHSs labelled InlineMe aren't caught here, because there might be
@@ -1236,7 +1236,7 @@ NOTE: This isn't our last opportunity to inline.  We're at the binding
 site right now, and we'll get another opportunity when we get to the
 occurrence(s)
 
-Note that we do this unconditional inlining only for trival RHSs.
+Note that we do this unconditional inlining only for trivial RHSs.
 Don't inline even WHNFs inside lambdas; doing so may simply increase
 allocation when the function is called. This isn't the last chance; see
 NOTE above.
@@ -1322,7 +1322,7 @@ postInlineUnconditionally env top_lvl bndr occ_info rhs
 --      in \y. ....case f of {...} ....
 -- Here f is used just once, and duplicating the case work is fine (exprIsCheap).
 -- But
---  - We can't preInlineUnconditionally because that woud invalidate
+--  - We can't preInlineUnconditionally because that would invalidate
 --    the occ info for b.
 --  - We can't postInlineUnconditionally because the RHS is big, and
 --    that risks exponential behaviour
@@ -1626,7 +1626,7 @@ where
 
 But there is really no point in doing this, and it generates masses of
 coercions and whatnot that eventually disappear again. For T9020, GHC
-allocated 6.6G beore, and 0.8G afterwards; and residency dropped from
+allocated 6.6G before, and 0.8G afterwards; and residency dropped from
 1.8G to 45M.
 
 But note that this won't eta-expand, say
@@ -2234,7 +2234,7 @@ Since the case is exhaustive (all cases are) we can convert it to
 
 This may generate sligthtly better code (although it should not, since
 all cases are exhaustive) and/or optimise better.  I'm not certain that
-it's necessary, but currenty we do make this change.  We do it here,
+it's necessary, but currently we do make this change.  We do it here,
 NOT in the TagToEnum rules (see "Beware" in Note [caseRules for tagToEnum]
 in PrelRules)
 -}
@@ -2315,7 +2315,7 @@ x=c1=I# a1.  So we'll bind a2 to a1, and get
     0 -> ...
     DEFAULT -> case a1 of ...
 
-This is corect, but we can't do a case merge in this sweep
+This is correct, but we can't do a case merge in this sweep
 because c2 /= a1.  Reason: the binding c1=I# a1 went inwards
 without getting changed to c1=I# c2.
 

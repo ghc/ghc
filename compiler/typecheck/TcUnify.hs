@@ -960,7 +960,7 @@ ir_inst = False: do not instantiate
     (let { f :: forall a. a -> a; f x = x } in f) @Int
 
    We'll call TcExpr.tcInferFun to infer the type of the (let .. in f)
-   And we don't want to instantite the type of 'f' when we reach it,
+   And we don't want to instantiate the type of 'f' when we reach it,
    else the outer visible type application won't work
 
 2. :type +v. When we say
@@ -1137,7 +1137,7 @@ tcSkolemise ctxt expected_ty thing_inside
                 text "given"       <+> ppr given,
                 text "inst type"   <+> ppr rho' ]
 
-        -- Generally we must check that the "forall_tvs" havn't been constrained
+        -- Generally we must check that the "forall_tvs" haven't been constrained
         -- The interesting bit here is that we must include the free variables
         -- of the expected_ty.  Here's an example:
         --       runST (newVar True)
@@ -2152,7 +2152,7 @@ This is legal; e.g. dependent/should_compile/T11635.
 We don't want to reject it because of the forall in beta's kind,
 but (see Note [Occurrence checking: look inside kinds]) we do
 need to look in beta's kind.  So we carry a flag saying if a 'forall'
-is OK, and sitch the flag on when stepping inside a kind.
+is OK, and switch the flag on when stepping inside a kind.
 
 Why is it OK?  Why does it not count as impredicative polymorphism?
 The reason foralls are bad is because we reply on "seeing" foralls

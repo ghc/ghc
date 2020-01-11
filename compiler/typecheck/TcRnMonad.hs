@@ -12,7 +12,7 @@ Functions for working with the typechecker environment (setters, getters...).
 
 
 module TcRnMonad(
-  -- * Initalisation
+  -- * Initialisation
   initTc, initTcWithGbl, initTcInteractive, initTcRnIf,
 
   -- * Simple accessors
@@ -1206,7 +1206,7 @@ mapAndRecoverM f xs
 
 -- | Apply the function to all elements on the input list
 -- If all succeed, return the list of results
--- Othewise fail, propagating all errors
+-- Otherwise fail, propagating all errors
 mapAndReportM :: (a -> TcRn b) -> [a] -> TcRn [b]
 mapAndReportM f xs
   = do { mb_rs <- mapM (attemptM . f) xs
@@ -1255,7 +1255,7 @@ tryTcDiscardingErrs recover thing_inside
         ; case mb_res of
             Just res | not (errorsFound dflags msgs)
                      , not (insolubleWC lie)
-              -> -- 'main' succeeed with no errors
+              -> -- 'main' succeeded with no errors
                  do { addMessages msgs  -- msgs might still have warnings
                     ; emitConstraints lie
                     ; return res }
@@ -1705,8 +1705,8 @@ constraints might be "variable out of scope" Hole constraints, and that
 might have been the actual original cause of the exception!  For
 example (#12529):
    f = p @ Int
-Here 'p' is out of scope, so we get an insolube Hole constraint. But
-the visible type application fails in the monad (thows an exception).
+Here 'p' is out of scope, so we get an insoluble Hole constraint. But
+the visible type application fails in the monad (throws an exception).
 We must not discard the out-of-scope error.
 
 So we /retain the insoluble constraints/ if there is an exception.

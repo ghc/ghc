@@ -18,6 +18,12 @@ Full details
 Language
 ~~~~~~~~
 
+* In obscure scenarios, GHC now rejects programs it previously accepted, but
+  with unhelpful types. For example, if (with ``-XPartialTypeSignatures``) you
+  were to write ``x :: forall (f :: forall a (b :: a -> Type). b _). f _``, GHC previously
+  would have accepted ``x``, but its type would have involved the mysterious ``Any``
+  internal type family. Now, GHC rejects, explaining the situation.
+
 Compiler
 ~~~~~~~~
 
@@ -31,6 +37,10 @@ Runtime system
 
 Template Haskell
 ~~~~~~~~~~~~~~~~
+
+ - Implement the Overloaded Quotations proposal (#246). The type of all quotation
+   forms have now been generalised in terms of a minimal interface necessary for the
+   implementation rather than the overapproximation of the ``Q`` monad.
 
 ``ghc-prim`` library
 ~~~~~~~~~~~~~~~~~~~~

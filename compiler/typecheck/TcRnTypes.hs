@@ -948,6 +948,13 @@ data PendingStuff
   | TcPending                     -- Typechecking the inside of a typed bracket
       (TcRef [PendingTcSplice])   --   Accumulate pending splices here
       (TcRef WantedConstraints)   --     and type constraints here
+      QuoteWrapper                -- A type variable and evidence variable
+                                  -- for the overall monad of
+                                  -- the bracket. Splices are checked
+                                  -- against this monad. The evidence
+                                  -- variable is used for desugaring
+                                  -- `lift`.
+
 
 topStage, topAnnStage, topSpliceStage :: ThStage
 topStage       = Comp
@@ -1173,7 +1180,7 @@ Here's the invariant:
    If an Id has ClosedTypeId=True (in its IdBindingInfo), then
    the Id's type is /definitely/ closed (has no free type variables).
    Specifically,
-       a) The Id's acutal type is closed (has no free tyvars)
+       a) The Id's actual type is closed (has no free tyvars)
        b) Either the Id has a (closed) user-supplied type signature
           or all its free variables are Global/ClosedLet
              or NonClosedLet with ClosedTypeId=True.
@@ -1512,7 +1519,7 @@ data TcIdSigInst
                --
                -- NB: The order of sig_inst_skols is irrelevant
                --     for a CompleteSig, but for a PartialSig see
-               --     Note [Quantified varaibles in partial type signatures]
+               --     Note [Quantified variables in partial type signatures]
 
          , sig_inst_theta  :: TcThetaType
                -- Instantiated theta.  In the case of a
@@ -1543,7 +1550,7 @@ if the original function had a signature like
 But that's ok: tcMatchesFun (called by tcRhs) can deal with that
 It happens, too!  See Note [Polymorphic methods] in TcClassDcl.
 
-Note [Quantified varaibles in partial type signatures]
+Note [Quantified variables in partial type signatures]
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 Consider
    f :: forall a b. _ -> a -> _ -> b
