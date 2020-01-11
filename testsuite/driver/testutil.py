@@ -87,6 +87,7 @@ if os.name == 'nt' and os.getenv('FORCE_SYMLINKS') == None:
         shutil.copyfile(str(src), str(dst))
 else:
     def link_or_copy_file(src: Path, dst: Path):
+        print(os.name, os.getenv('FORCE_SYMLINKS'))
         os.symlink(str(src), str(dst))
 
 class Watcher(object):
