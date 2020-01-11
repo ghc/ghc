@@ -75,7 +75,7 @@ The algorithm is based on the paper:
   "GADTs Meet Their Match:
      Pattern-matching Warnings That Account for GADTs, Guards, and Laziness"
 
-    http://people.cs.kuleuven.be/~george.karachalias/papers/p424-karachalias.pdf
+    https://www.microsoft.com/en-us/research/wp-content/uploads/2016/08/gadtpm-acm.pdf
 
 %************************************************************************
 %*                                                                      *
