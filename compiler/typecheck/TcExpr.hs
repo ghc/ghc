@@ -1957,6 +1957,9 @@ too_many_args fun args
 -}
 
 checkThLocalId :: Id -> TcM ()
+-- The renamer has already done checkWellStaged,
+--   in RnSplice.checkThLocalName, so don't repeat that here.
+-- Here we just just add constraints fro cross-stage lifting
 checkThLocalId id
   = do  { mb_local_use <- getStageAndBindLevel (idName id)
         ; case mb_local_use of
@@ -1973,12 +1976,11 @@ checkCrossStageLifting :: TopLevelFlag -> Id -> ThStage -> TcM ()
 -- we must check whether there's a cross-stage lift to do
 -- Examples   \x -> [|| x ||]
 --            [|| map ||]
--- There is no error-checking to do, because the renamer did that
 --
 -- This is similar to checkCrossStageLifting in GHC.Rename.Splice, but
 -- this code is applied to *typed* brackets.
 
-checkCrossStageLifting top_lvl id (Brack _ (TcPending ps_var lie_var))
+checkCrossStageLifting top_lvl id (Brack _ (TcPending ps_var lie_var q))
   | isTopLevel top_lvl
   = when (isExternalName id_name) (keepAlive id_name)
     -- See Note [Keeping things alive for Template Haskell] in GHC.Rename.Splice
@@ -2015,7 +2017,8 @@ checkCrossStageLifting top_lvl id (Brack _ (TcPending ps_var lie_var))
                    -- Update the pending splices
         ; ps <- readMutVar ps_var
         ; let pending_splice = PendingTcSplice id_name
-                                 (nlHsApp (noLoc lift) (nlHsVar id))
+                                 (nlHsApp (mkLHsWrap (applyQuoteWrapper q) (noLoc lift))
+                                          (nlHsVar id))
         ; writeMutVar ps_var (pending_splice : ps)
 
         ; return () }

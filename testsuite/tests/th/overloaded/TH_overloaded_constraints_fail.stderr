@@ -1,0 +1,13 @@
+
+TH_overloaded_constraints_fail.hs:20:14: error:
+    • Couldn't match type ‘Identity’ with ‘Q’
+      Expected type: Q Exp
+        Actual type: Identity Exp
+    • In the expression: idQ
+      In the expression:
+        [| $(idQ) $(qq) |]
+        pending(rn) [<splice, qq>, <splice, idQ>]
+      In an equation for ‘quote’:
+          quote
+            = [| $(idQ) $(qq) |]
+              pending(rn) [<splice, qq>, <splice, idQ>]
