@@ -1,4 +1,5 @@
 {-# LANGUAGE MagicHash, NoImplicitPrelude, BangPatterns #-}
+
 -----------------------------------------------------------------------------
 -- |
 -- Module      :  GHC.CString
@@ -73,25 +74,19 @@ All of this goes for unpackCStringUtf8# too.
 unpackCString# :: Addr# -> [Char]
 {-# NOINLINE CONLIKE unpackCString# #-}
 unpackCString# addr
-  = unpack 0#
-  where
-    unpack nh
-      | isTrue# (ch `eqChar#` '\0'#) = []
-      | True                         = C# ch : unpack (nh +# 1#)
+    | isTrue# (ch `eqChar#` '\0'#) = []
+    | True                         = C# ch : unpackCString# (addr `plusAddr#` 1#)
       where
-        !ch = indexCharOffAddr# addr nh
+        !ch = indexCharOffAddr# addr 0#
 
 unpackAppendCString# :: Addr# -> [Char] -> [Char]
 {-# NOINLINE unpackAppendCString# #-}
      -- See the NOINLINE note on unpackCString#
 unpackAppendCString# addr rest
-  = unpack 0#
-  where
-    unpack nh
-      | isTrue# (ch `eqChar#` '\0'#) = rest
-      | True                         = C# ch : unpack (nh +# 1#)
+    | isTrue# (ch `eqChar#` '\0'#) = rest
+    | True                         = C# ch : unpackAppendCString# (addr `plusAddr#` 1#) rest
       where
-        !ch = indexCharOffAddr# addr nh
+        !ch = indexCharOffAddr# addr 0#
 
 unpackFoldrCString# :: Addr# -> (Char  -> a -> a) -> a -> a
 
@@ -110,45 +105,35 @@ unpackFoldrCString# :: Addr# -> (Char  -> a -> a) -> a -> a
 -- each is highly gratuitous.  See nofib/real/anna/PrettyPrint.
 
 unpackFoldrCString# addr f z
-  = unpack 0#
+  | isTrue# (ch `eqChar#` '\0'#) = z
+  | True                         = C# ch `f` unpackFoldrCString# (addr `plusAddr#` 1#) f z
   where
-    unpack nh
-      | isTrue# (ch `eqChar#` '\0'#) = z
-      | True                         = C# ch `f` unpack (nh +# 1#)
-      where
-        !ch = indexCharOffAddr# addr nh
+    !ch = indexCharOffAddr# addr 0#
 
 -- There's really no point in inlining this for the same reasons as
 -- unpackCString. See Note [Inlining unpackCString#] above for details.
 unpackCStringUtf8# :: Addr# -> [Char]
 {-# NOINLINE CONLIKE unpackCStringUtf8# #-}
 unpackCStringUtf8# addr
-  = unpack 0#
-  where
-    -- We take care to strictly evaluate the character decoding as
-    -- indexCharOffAddr# is marked with the can_fail flag and
-    -- consequently GHC won't evaluate the expression unless it is absolutely
-    -- needed.
-    unpack nh
-      | isTrue# (ch `eqChar#` '\0'#  ) = []
-      | isTrue# (ch `leChar#` '\x7F'#) = C# ch : unpack (nh +# 1#)
-      | isTrue# (ch `leChar#` '\xDF'#) =
-          let !c = C# (chr# (((ord# ch                                  -# 0xC0#) `uncheckedIShiftL#`  6#) +#
-                              (ord# (indexCharOffAddr# addr (nh +# 1#)) -# 0x80#)))
-          in c : unpack (nh +# 2#)
-      | isTrue# (ch `leChar#` '\xEF'#) =
-          let !c = C# (chr# (((ord# ch                                  -# 0xE0#) `uncheckedIShiftL#` 12#) +#
-                             ((ord# (indexCharOffAddr# addr (nh +# 1#)) -# 0x80#) `uncheckedIShiftL#`  6#) +#
-                              (ord# (indexCharOffAddr# addr (nh +# 2#)) -# 0x80#)))
-          in c : unpack (nh +# 3#)
-      | True                           =
-          let !c = C# (chr# (((ord# ch                                  -# 0xF0#) `uncheckedIShiftL#` 18#) +#
-                             ((ord# (indexCharOffAddr# addr (nh +# 1#)) -# 0x80#) `uncheckedIShiftL#` 12#) +#
-                             ((ord# (indexCharOffAddr# addr (nh +# 2#)) -# 0x80#) `uncheckedIShiftL#`  6#) +#
-                              (ord# (indexCharOffAddr# addr (nh +# 3#)) -# 0x80#)))
-          in c : unpack (nh +# 4#)
+    | isTrue# (ch `eqChar#` '\0'#  ) = []
+    | isTrue# (ch `leChar#` '\x7F'#) = C# ch : unpackCStringUtf8# (addr `plusAddr#` 1#)
+    | isTrue# (ch `leChar#` '\xDF'#) =
+        let !c = C# (chr# (((ord# ch                                  -# 0xC0#) `uncheckedIShiftL#`  6#) +#
+                            (ord# (indexCharOffAddr# (addr `plusAddr#` 1#) 0#) -# 0x80#)))
+        in c : unpackCStringUtf8# (addr `plusAddr#` 2#)
+    | isTrue# (ch `leChar#` '\xEF'#) =
+        let !c = C# (chr# (((ord# ch                                             -# 0xE0#) `uncheckedIShiftL#` 12#) +#
+                           ((ord# (indexCharOffAddr# (addr `plusAddr#` 1#) 0#) -# 0x80#) `uncheckedIShiftL#`  6#) +#
+                            (ord# (indexCharOffAddr# (addr `plusAddr#` 2#) 0#) -# 0x80#)))
+        in c : unpackCStringUtf8# (addr `plusAddr#` 3#)
+    | True                           =
+        let !c = C# (chr# (((ord# ch                                  -# 0xF0#) `uncheckedIShiftL#` 18#) +#
+                           ((ord# (indexCharOffAddr# (addr `plusAddr#` 1#) 0#) -# 0x80#) `uncheckedIShiftL#` 12#) +#
+                           ((ord# (indexCharOffAddr# (addr `plusAddr#` 2#) 0#) -# 0x80#) `uncheckedIShiftL#`  6#) +#
+                            (ord# (indexCharOffAddr# (addr `plusAddr#` 3#) 0#) -# 0x80#)))
+        in c : unpackCStringUtf8# (addr `plusAddr#` 4#)
       where
-        !ch = indexCharOffAddr# addr nh
+        !ch = indexCharOffAddr# addr 0#
 
 -- There's really no point in inlining this for the same reasons as
 -- unpackCString. See Note [Inlining unpackCString#] above for details.
@@ -157,6 +142,7 @@ unpackNBytes# :: Addr# -> Int# -> [Char]
 unpackNBytes# _addr 0#   = []
 unpackNBytes#  addr len# = unpack [] (len# -# 1#)
     where
+     unpack :: [Char] -> Int# -> [Char]
      unpack acc i#
       | isTrue# (i# <# 0#)  = acc
       | True                =
