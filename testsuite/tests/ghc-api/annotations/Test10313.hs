@@ -4,7 +4,7 @@
 
 module Test10313 where
 
-import "b\x61se" Data.List
+import "b\x61se" Data.List ()
 
 {-# WARNING Logic
           , solverCheckAndGetModel

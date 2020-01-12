@@ -68,7 +68,7 @@ import UniqFM       ( UniqFM, mapUFM, filterUFM )
 import MonadUtils
 import NameCache
 import SrcLoc
-import Data.List
+import Data.List (intersperse, groupBy, sortBy)
 import Data.Ord
 import Data.Dynamic
 import Data.IORef

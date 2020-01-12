@@ -8,7 +8,7 @@ module Main where
 
 -- import Data.Generics
 import Data.Data hiding (Fixity)
-import Data.List
+import Data.List (intercalate)
 import System.IO
 import GHC
 import BasicTypes

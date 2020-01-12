@@ -7,7 +7,7 @@
 module Main (main) where
 
 import Control.Monad
-import Data.List
+import Data.List ( (\\) )
 import DynFlags
 import Language.Haskell.Extension
 
