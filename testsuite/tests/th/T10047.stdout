@@ -1,2 +1,2 @@
-[| $(dyn "foo") |] :: ExpQ
-[| [n|foo|] |] :: ExpQ
+[| $(dyn "foo") |] :: Quote m => m Exp
+[| [n|foo|] |] :: Q Exp
