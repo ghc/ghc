@@ -8,7 +8,7 @@
 % o I (ADR) think it would be worth making the connection with CPS explicit.
 %   Now that we have explicit activation records (on the stack), we can
 %   explain the whole system in terms of CPS and tail calls --- with the
-%   one requirement that we carefuly distinguish stack-allocated objects
+%   one requirement that we carefully distinguish stack-allocated objects
 %   from heap-allocated objects.
 
 % \documentstyle[preprint]{acmconf}
@@ -572,7 +572,7 @@ evaluation completes, the evaluators overwrite the application with an
 \item[Black holes] are used to mark updateable closures which are
 currently being evaluated.  ``Black holing'' an object cures a
 potential space leak and detects certain classes of infinite loops.
-More imporantly, black holes act as synchronisation objects between
+More importantly, black holes act as synchronisation objects between
 separate threads: if a second thread tries to enter an updateable
 closure which is already being evaluated, the second thread is added
 to a list of blocked threads and the thread is suspended.
@@ -1488,7 +1488,7 @@ Calls to @index_<feature>@ will insert the cost centre / category
 record in the @<feature>@ hash table, if not already inserted. The hash
 index is memoised in the record and returned. 
 
-CURRENTLY ONLY ONE MEMOISATION SLOT IS AVILABLE IN EACH RECORD SO
+CURRENTLY ONLY ONE MEMOISATION SLOT IS AVAILABLE IN EACH RECORD SO
 HASHING CAN ONLY BE DONE ON ONE FEATURE FOR EACH RECORD. This can be
 easily relaxed at the expense of extra memoisation space or continued
 rehashing.
@@ -2428,7 +2428,7 @@ object is unreachable.
 \end{tabular}
 \end{center}
 
-\ToDo{Weak poitners}
+\ToDo{Weak pointers}
 
 \subsubsection{Stable names}
 \label{sec:STABLE_NAME}
@@ -4548,7 +4548,7 @@ The entry code for a BCO does the following:
 \end{itemize}
 
 BCO's for thunks and functions have the same entry conventions as
-slow entry points: they expect to find their arguments on the stac
+slow entry points: they expect to find their arguments on the stack
 with unboxed arguments preceded by appropriate tags.
 
 \subsection{A GHC thread returns to a Hugs-compiled return address}

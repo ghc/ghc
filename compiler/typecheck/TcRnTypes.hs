@@ -911,7 +911,12 @@ removeBindingShadowing bindings = reverse $ fst $ foldl
 
 data SpliceType = Typed | Untyped
 
-data ThStage    -- See Note [Template Haskell state diagram] in TcSplice
+data ThStage    -- See Note [Template Haskell state diagram]
+                -- and Note [Template Haskell levels] in TcSplice
+    -- Start at:   Comp
+    -- At bracket: wrap current stage in Brack
+    -- At splice:  currently Brack: return to previous stage
+    --             currently Comp/Splice: compile and run
   = Splice SpliceType -- Inside a top-level splice
                       -- This code will be run *at compile time*;
                       --   the result replaces the splice
@@ -973,11 +978,10 @@ outerLevel = 1  -- Things defined outside brackets
 
 thLevel :: ThStage -> ThLevel
 thLevel (Splice _)    = 0
-thLevel (RunSplice _) =
-    -- See Note [RunSplice ThLevel].
-    panic "thLevel: called when running a splice"
 thLevel Comp          = 1
 thLevel (Brack s _)   = thLevel s + 1
+thLevel (RunSplice _) = panic "thLevel: called when running a splice"
+                        -- See Note [RunSplice ThLevel].
 
 {- Node [RunSplice ThLevel]
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~
@@ -1173,7 +1177,7 @@ Here's the invariant:
    If an Id has ClosedTypeId=True (in its IdBindingInfo), then
    the Id's type is /definitely/ closed (has no free type variables).
    Specifically,
-       a) The Id's acutal type is closed (has no free tyvars)
+       a) The Id's actual type is closed (has no free tyvars)
        b) Either the Id has a (closed) user-supplied type signature
           or all its free variables are Global/ClosedLet
              or NonClosedLet with ClosedTypeId=True.
@@ -1512,7 +1516,7 @@ data TcIdSigInst
                --
                -- NB: The order of sig_inst_skols is irrelevant
                --     for a CompleteSig, but for a PartialSig see
-               --     Note [Quantified varaibles in partial type signatures]
+               --     Note [Quantified variables in partial type signatures]
 
          , sig_inst_theta  :: TcThetaType
                -- Instantiated theta.  In the case of a
@@ -1543,7 +1547,7 @@ if the original function had a signature like
 But that's ok: tcMatchesFun (called by tcRhs) can deal with that
 It happens, too!  See Note [Polymorphic methods] in TcClassDcl.
 
-Note [Quantified varaibles in partial type signatures]
+Note [Quantified variables in partial type signatures]
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 Consider
    f :: forall a b. _ -> a -> _ -> b
