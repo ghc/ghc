@@ -468,6 +468,7 @@ translatePat fam_insts x pat = case pat of
   AsPat _ (dL->L _ y) p -> (mkPmLetVar y x ++) <$> translateLPat fam_insts y p
 
   SigPat _ p _ty -> translateLPat fam_insts x p
+  AppTypePat _ p _ty -> translateLPat fam_insts x p
 
   -- See Note [Translate CoPats]
   -- Generally the translation is

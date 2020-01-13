@@ -1837,23 +1837,24 @@ can do with the rest of the statements in the same "do" expression.
 isStrictPattern :: LPat (GhcPass p) -> Bool
 isStrictPattern lpat =
   case unLoc lpat of
-    WildPat{}       -> False
-    VarPat{}        -> False
-    LazyPat{}       -> False
-    AsPat _ _ p     -> isStrictPattern p
-    ParPat _ p      -> isStrictPattern p
-    ViewPat _ _ p   -> isStrictPattern p
-    SigPat _ p _    -> isStrictPattern p
-    BangPat{}       -> True
-    ListPat{}       -> True
-    TuplePat{}      -> True
-    SumPat{}        -> True
-    ConPatIn{}      -> True
-    ConPatOut{}     -> True
-    LitPat{}        -> True
-    NPat{}          -> True
-    NPlusKPat{}     -> True
-    SplicePat{}     -> True
+    WildPat{}        -> False
+    VarPat{}         -> False
+    LazyPat{}        -> False
+    AsPat _ _ p      -> isStrictPattern p
+    ParPat _ p       -> isStrictPattern p
+    ViewPat _ _ p    -> isStrictPattern p
+    SigPat _ p _     -> isStrictPattern p
+    AppTypePat _ p _ -> isStrictPattern p
+    BangPat{}        -> True
+    ListPat{}        -> True
+    TuplePat{}       -> True
+    SumPat{}         -> True
+    ConPatIn{}       -> True
+    ConPatOut{}      -> True
+    LitPat{}         -> True
+    NPat{}           -> True
+    NPlusKPat{}      -> True
+    SplicePat{}      -> True
     _otherwise -> panic "isStrictPattern"
 
 hasStrictPattern :: ExprStmtTree -> Bool

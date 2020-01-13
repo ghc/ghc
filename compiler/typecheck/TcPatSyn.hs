@@ -949,7 +949,7 @@ tcPatToExpr name args pat = go pat
 
     go1 (SigPat _ pat _) = go1 (unLoc pat)
         -- See Note [Type signatures and the builder expression]
-
+    go1 (AppTypePat _ pat _) = go1 (unLoc pat)
     go1 (VarPat _ (dL->L l var))
         | var `elemNameSet` lhsVars
         = return $ HsVar noExtField (cL l var)

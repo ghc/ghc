@@ -406,6 +406,7 @@ tidy1 :: Id                  -- The Id being scrutinised
 
 tidy1 v o (ParPat _ pat)      = tidy1 v o (unLoc pat)
 tidy1 v o (SigPat _ pat _)    = tidy1 v o (unLoc pat)
+tidy1 v o (AppTypePat _ pat _) = tidy1 v o (unLoc pat)
 tidy1 _ _ (WildPat ty)        = return (idDsWrapper, WildPat ty)
 tidy1 v o (BangPat _ (dL->L l p)) = tidy_bang_pat v o l p
 

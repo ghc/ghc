@@ -905,24 +905,25 @@ type ForallXOverLit (c :: * -> Constraint) (x :: *) =
 -- =====================================================================
 -- Type families for the HsPat extension points
 
-type family XWildPat   x
-type family XVarPat    x
-type family XLazyPat   x
-type family XAsPat     x
-type family XParPat    x
-type family XBangPat   x
-type family XListPat   x
-type family XTuplePat  x
-type family XSumPat    x
-type family XConPat    x
-type family XViewPat   x
-type family XSplicePat x
-type family XLitPat    x
-type family XNPat      x
-type family XNPlusKPat x
-type family XSigPat    x
-type family XCoPat     x
-type family XXPat      x
+type family XWildPat    x
+type family XVarPat     x
+type family XLazyPat    x
+type family XAsPat      x
+type family XParPat     x
+type family XBangPat    x
+type family XListPat    x
+type family XTuplePat   x
+type family XSumPat     x
+type family XConPat     x
+type family XViewPat    x
+type family XSplicePat  x
+type family XLitPat     x
+type family XNPat       x
+type family XNPlusKPat  x
+type family XSigPat     x
+type family XCoPat      x
+type family XAppTypePat x
+type family XXPat       x
 
 
 type ForallXPat (c :: * -> Constraint) (x :: *) =

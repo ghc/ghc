@@ -119,6 +119,8 @@ hsPatType (ConPatOut { pat_con = lcon
                      , pat_arg_tys = tys })
                                         = conLikeResTy (unLoc lcon) tys
 hsPatType (SigPat ty _ _)               = ty
+hsPatType (AppTypePat _ pat _)          = hsLPatType pat
+  -- Type applications in patterns shouldn't change the type of the pattern.
 hsPatType (NPat ty _ _ _)               = ty
 hsPatType (NPlusKPat ty _ _ _ _ _)      = ty
 hsPatType (CoPat _ _ _ ty)              = ty
@@ -1446,6 +1448,10 @@ zonk_pat env (SigPat ty pat hs_ty)
   = do  { ty' <- zonkTcTypeToTypeX env ty
         ; (env', pat') <- zonkPat env pat
         ; return (env', SigPat ty' pat' hs_ty) }
+
+zonk_pat env (AppTypePat ty pat hs_ty)
+  = do  { (env', pat') <- zonkPat env pat
+        ; return (env', AppTypePat ty pat' hs_ty) }
 
 zonk_pat env (NPat ty (dL->L l lit) mb_neg eq_expr)
   = do  { (env1, eq_expr') <- zonkSyntaxExpr env eq_expr

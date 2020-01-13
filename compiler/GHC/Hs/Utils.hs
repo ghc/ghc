@@ -1093,6 +1093,7 @@ collect_lpat p bndrs
                                   = go pat
     go (SplicePat _ _)            = bndrs
     go (CoPat _ _ pat _)          = go pat
+    go (AppTypePat _ pat _)       = collect_lpat pat bndrs -- TODO: Should we collect variables occurring in the type? They'd naturally be type variables rather than term variables, so we'd need to distinguish those. Might need an analogous function for this by the end.
     go (XPat {})                  = bndrs
 
 {-

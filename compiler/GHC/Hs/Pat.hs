@@ -270,6 +270,8 @@ data Pat p
         -- the scrutinee, followed by a match on 'pat'
     -- ^ Coercion Pattern
 
+  | AppTypePat (XAppTypePat p) (LPat p) (LHsWcType (NoGhcTc p))
+    -- ^ Visible type application
   -- | Trees that Grow extension point for new constructors
   | XPat
       (XXPat p)
@@ -285,11 +287,14 @@ type instance XWildPat GhcPs = NoExtField
 type instance XWildPat GhcRn = NoExtField
 type instance XWildPat GhcTc = Type
 
-type instance XVarPat  (GhcPass _) = NoExtField
-type instance XLazyPat (GhcPass _) = NoExtField
-type instance XAsPat   (GhcPass _) = NoExtField
-type instance XParPat  (GhcPass _) = NoExtField
-type instance XBangPat (GhcPass _) = NoExtField
+type instance XVarPat     (GhcPass _) = NoExtField
+type instance XLazyPat    (GhcPass _) = NoExtField
+type instance XAsPat      (GhcPass _) = NoExtField
+type instance XParPat     (GhcPass _) = NoExtField
+type instance XBangPat    (GhcPass _) = NoExtField
+type instance XAppTypePat (GhcPass _) = NoExtField
+
+type instance XAppTypeE   (GhcPass _) = NoExtField
 
 -- Note: XListPat cannot be extended when using GHC 8.0.2 as the bootstrap
 -- compiler, as it triggers https://gitlab.haskell.org/ghc/ghc/issues/14396 for
@@ -554,6 +559,7 @@ pprPat (ConPatOut { pat_con = con
                          , ppr binds])
           <+> pprConArgs details
     else pprUserCon (unLoc con) details
+pprPat (AppTypePat _ pat ty)    = ppr pat <+> text "@" <> ppr ty
 pprPat (XPat n)                 = noExtCon n
 
 
@@ -728,6 +734,7 @@ isIrrefutableHsPat
     -- We conservatively assume that no TH splices are irrefutable
     -- since we cannot know until the splice is evaluated.
     go (SplicePat {})      = False
+    go (AppTypePat _ pat _) = goL pat
 
     go (XPat {})           = False
 
@@ -776,6 +783,7 @@ patNeedsParens p = go
     go (ListPat {})      = False
     go (LitPat _ l)      = hsLitNeedsParens p l
     go (NPat _ lol _ _)  = hsOverLitNeedsParens p (unLoc lol)
+    go (AppTypePat {})   = True
     go (XPat {})         = True -- conservative default
 
 -- | @'conPatNeedsParens' p cp@ returns 'True' if the constructor patterns @cp@

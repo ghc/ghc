@@ -1246,6 +1246,7 @@ collectl (dL->L _ pat) bndrs
     go (SigPat _ pat _)           = collectl pat bndrs
     go (CoPat _ _ pat _)          = collectl (noLoc pat) bndrs
     go (ViewPat _ _ pat)          = collectl pat bndrs
+    go (AppTypePat _ pat _)       = collectl pat bndrs -- TODO(Cale): Collect type variables?
     go p@(SplicePat {})           = pprPanic "collectl/go" (ppr p)
     go p@(XPat {})                = pprPanic "collectl/go" (ppr p)
 

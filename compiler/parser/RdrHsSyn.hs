@@ -1121,6 +1121,9 @@ checkAPat loc e0 = do
          return (ConPatIn (cL cl c) (InfixCon l r))
 
    PatBuilderPar e    -> checkLPat e >>= (return . (ParPat noExtField))
+   PatBuilderAppType p t -> do
+     p' <- checkLPat p
+     return (AppTypePat noExtField p' t)
    _           -> patFail loc (ppr e0)
 
 placeHolderPunRhs :: DisambECP b => PV (Located b)
@@ -1869,6 +1872,8 @@ class b ~ (Body b) GhcPs => DisambECP b where
   mkHsBangPatPV :: SrcSpan -> Located b -> PV (Located b)
   -- | Disambiguate tuple sections and unboxed sums
   mkSumOrTuplePV :: SrcSpan -> Boxity -> SumOrTuple b -> PV (Located b)
+  -- | Disambiguate "e @t" type applications
+  mkHsAppTypePV :: SrcSpan -> NoExtField -> Located b -> LHsWcType GhcPs -> PV (Located b)
 
 {- Note [UndecidableSuperClasses for associated types]
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
@@ -1959,6 +1964,7 @@ instance p ~ GhcPs => DisambECP (HsCmd p) where
   mkHsBangPatPV l c = cmdFail l $
     text "!" <> ppr c
   mkSumOrTuplePV l boxity a = cmdFail l (pprSumOrTuple boxity a)
+  mkHsAppTypePV l _ c t = cmdFail l (ppr c <+> text "@" <> ppr t) -- TODO: Test this
 
 cmdFail :: SrcSpan -> SDoc -> PV a
 cmdFail loc e = addFatalError loc $
@@ -2011,6 +2017,9 @@ instance p ~ GhcPs => DisambECP (HsExpr p) where
   mkHsBangPatPV l e = patSynErr "Bang pattern" l (text "!" <> ppr e) $
     text "Did you mean to add a space after the '!'?"
   mkSumOrTuplePV = mkSumOrTupleExpr
+  mkHsAppTypePV l x e t = do
+    checkExpBlockArguments e
+    return $ cL l (HsAppType x e t)
 
 patSynErr :: String -> SrcSpan -> SDoc -> SDoc -> PV (LHsExpr GhcPs)
 patSynErr item l e explanation =
@@ -2031,6 +2040,7 @@ data PatBuilder p
   | PatBuilderOpApp (Located (PatBuilder p)) (Located RdrName) (Located (PatBuilder p))
   | PatBuilderVar (Located RdrName)
   | PatBuilderOverLit (HsOverLit GhcPs)
+  | PatBuilderAppType (Located (PatBuilder p)) (LHsWcType GhcPs)
 
 instance Outputable (PatBuilder GhcPs) where
   ppr (PatBuilderPat p) = ppr p
@@ -2039,6 +2049,7 @@ instance Outputable (PatBuilder GhcPs) where
   ppr (PatBuilderOpApp (L _ p1) op (L _ p2)) = ppr p1 <+> ppr op <+> ppr p2
   ppr (PatBuilderVar v) = ppr v
   ppr (PatBuilderOverLit l) = ppr l
+  ppr (PatBuilderAppType (L _ p) t) = ppr p <+> text "@" <> ppr t
 
 instance DisambECP (PatBuilder GhcPs) where
   type Body (PatBuilder GhcPs) = PatBuilder
@@ -2099,6 +2110,8 @@ instance DisambECP (PatBuilder GhcPs) where
     hintBangPat l pb
     return $ cL l (PatBuilderPat pb)
   mkSumOrTuplePV = mkSumOrTuplePat
+  mkHsAppTypePV l _ e t = do
+    return $ cL l (PatBuilderAppType e t)
 
 checkUnboxedStringLitPat :: Located (HsLit GhcPs) -> PV ()
 checkUnboxedStringLitPat (dL->L loc lit) =

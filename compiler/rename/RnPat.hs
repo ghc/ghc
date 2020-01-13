@@ -411,7 +411,11 @@ rnPatAndThen mk (SigPat x pat sig)
   = do { sig' <- rnHsSigCps sig
        ; pat' <- rnLPatAndThen mk pat
        ; return (SigPat x pat' sig' ) }
-
+rnPatAndThen mk (AppTypePat x pat ty)
+  = do { ty' <- liftCpsFV (rnHsWcType HsTypeCtx ty)
+       ; pat' <- rnLPatAndThen mk pat
+       ; return (AppTypePat x pat' ty') }
+  -- TODO(Cale): Does the comment for SigPat above apply in this case as well? We actually probably want to ensure that variables are not repeated at all in type application patterns, just as for ordinary variables.
 rnPatAndThen mk (LitPat x lit)
   | HsString src s <- lit
   = do { ovlStr <- liftCps (xoptM LangExt.OverloadedStrings)

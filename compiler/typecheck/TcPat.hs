@@ -421,6 +421,10 @@ tc_pat penv (SigPat _ pat sig_ty) pat_ty thing_inside
         ; pat_ty <- readExpType pat_ty
         ; return (mkHsWrapPat wrap (SigPat inner_ty pat' sig_ty) pat_ty, res) }
 
+tc_pat penv (AppTypePat x pat ap_ty) pat_ty thing_inside
+  = do  { (pat', res) <- tc_lpat pat pat_ty penv thing_inside
+        ; return (AppTypePat x pat' ap_ty, res) 
+        }
 ------------------------
 -- Lists, tuples, arrays
 tc_pat penv (ListPat Nothing pats) pat_ty thing_inside
