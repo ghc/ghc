@@ -922,11 +922,11 @@ except that we'll eta-reduce the axiom to
   axiom AxDrep forall a b. D [(a,b]] = Drep a b
 There are several fiddly subtleties lurking here
 
-* The representation tycon Drep is parameerised over the free
+* The representation tycon Drep is parameterised over the free
   variables of the pattern, in no particular order. So there is no
   guarantee that 'p' and 'q' will come last in Drep's parameters, and
   in the right order.  So, if the /patterns/ of the family insatance
-  are eta-redcible, we re-order Drep's parameters to put the
+  are eta-reducible, we re-order Drep's parameters to put the
   eta-reduced type variables last.
 
 * Although we eta-reduce the axiom, we eta-/expand/ the representation
@@ -941,7 +941,7 @@ There are several fiddly subtleties lurking here
 
   So in type-checking the LHS (DP Int) we need to check that it is
   more polymorphic than the signature.  To do that we must skolemise
-  the siganture and istantiate the call of DP.  So we end up with
+  the signature and instantiate the call of DP.  So we end up with
      data instance DP [b] @(k1,k2) (z :: (k1,k2)) where
 
   Note that we must parameterise the representation tycon DPrep over
@@ -978,7 +978,7 @@ There are several fiddly subtleties lurking here
   tricky to sort out.  Consider
       data family D k :: k
   Then consider D (forall k2. k2 -> k2) Type Type
-  The visibilty flags on an application of D may affected by the arguments
+  The visibility flags on an application of D may affected by the arguments
   themselves.  Heavy sigh.  But not truly hard; that's what tcbVisibilities
   does.
 
@@ -1443,7 +1443,7 @@ NB2: the silent-superclass solution introduced new problems
 NB3: the silent-superclass solution also generated tons of
      extra dictionaries.  For example, in monad-transformer
      code, when constructing a Monad dictionary you had to pass
-     an Applicative dictionary; and to construct that you neede
+     an Applicative dictionary; and to construct that you need
      a Functor dictionary. Yet these extra dictionaries were
      often never used.  Test T3064 compiled *far* faster after
      silent superclasses were eliminated.
