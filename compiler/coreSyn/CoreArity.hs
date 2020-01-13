@@ -938,7 +938,7 @@ etaExpand :: Arity              -- ^ Result should have this number of value arg
 etaExpand n orig_expr
   = go n orig_expr
   where
-      -- Strip off existing lambdas and casts
+      -- Strip off existing lambdas and casts before handing off to mkEtaWW
       -- Note [Eta expansion and SCCs]
     go 0 expr = expr
     go n (Lam v body) | isTyVar v = Lam v (go n     body)
@@ -949,7 +949,7 @@ etaExpand n orig_expr
         retick $ etaInfoAbs etas (etaInfoApp subst' sexpr etas)
       where
           in_scope = mkInScopeSet (exprFreeVars expr)
-          (in_scope', etas) = mkEtaWW n orig_expr in_scope (exprType expr)
+          (in_scope', etas) = mkEtaWW n (ppr orig_expr) in_scope (exprType expr)
           subst' = mkEmptySubst in_scope'
 
           -- Find ticks behind type apps.
@@ -1040,14 +1040,27 @@ etaInfoAppTy ty (EtaVar v : eis) = etaInfoAppTy (applyTypeToArg ty (varToCoreExp
 etaInfoAppTy _  (EtaCo co : eis) = etaInfoAppTy (coercionRKind co) eis
 
 --------------
-mkEtaWW :: Arity -> CoreExpr -> InScopeSet -> Type
-        -> (InScopeSet, [EtaInfo])
-        -- EtaInfo contains fresh variables,
-        --   not free in the incoming CoreExpr
-        -- Outgoing InScopeSet includes the EtaInfo vars
-        --   and the original free vars
+-- | @mkEtaWW n _ fvs ty@ will compute the 'EtaInfo' necessary for eta-expanding
+-- an expression @e :: ty@ to take @n@ value arguments, where @fvs@ are the
+-- free variables of @e@.
+--
+-- Note that this function is entirely unconcerned about cost centres and other
+-- semantically-irrelevant source annotations, so call sites must take care to
+-- preserve that info. See Note [Eta expansion and SCCs].
+mkEtaWW
+  :: Arity
+  -- ^ How many value arguments to eta-expand
+  -> SDoc
+  -- ^ The pretty-printed original expression, for warnings.
+  -> InScopeSet
+  -- ^ A super-set of the free vars of the expression to eta-expand.
+  -> Type
+  -> (InScopeSet, [EtaInfo])
+  -- ^ The variables in 'EtaInfo' are fresh wrt. to the incoming 'InScopeSet'.
+  -- The outgoing 'InScopeSet' extends the incoming 'InScopeSet' with the
+  -- fresh variables in 'EtaInfo'.
 
-mkEtaWW orig_n orig_expr in_scope orig_ty
+mkEtaWW orig_n ppr_orig_expr in_scope orig_ty
   = go orig_n empty_subst orig_ty []
   where
     empty_subst = mkEmptyTCvSubst in_scope
@@ -1104,7 +1117,7 @@ mkEtaWW orig_n orig_expr in_scope orig_ty
        | otherwise       -- We have an expression of arity > 0,
                          -- but its type isn't a function, or a binder
                          -- is levity-polymorphic
-       = WARN( True, (ppr orig_n <+> ppr orig_ty) $$ ppr orig_expr )
+       = WARN( True, (ppr orig_n <+> ppr orig_ty) $$ ppr_orig_expr )
          (getTCvInScope subst, reverse eis)
         -- This *can* legitimately happen:
         -- e.g.  coerce Int (\x. x) Essentially the programmer is
