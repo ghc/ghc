@@ -3021,8 +3021,6 @@ dynamic_flags_deps = [
     ------- ways ---------------------------------------------------------------
   , make_ord_flag defGhcFlag "prof"           (NoArg (addWay WayProf))
   , make_ord_flag defGhcFlag "eventlog"       (NoArg (addWay WayEventLog))
-  , make_dep_flag defGhcFlag "smp"
-      (NoArg $ addWay WayThreaded) "Use -threaded instead"
   , make_ord_flag defGhcFlag "debug"          (NoArg (addWay WayDebug))
   , make_ord_flag defGhcFlag "threaded"       (NoArg (addWay WayThreaded))
 
