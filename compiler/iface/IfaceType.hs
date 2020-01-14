@@ -22,10 +22,12 @@ module IfaceType (
         IfaceTyLit(..), IfaceAppArgs(..),
         IfaceContext, IfaceBndr(..), IfaceOneShot(..), IfaceLamBndr,
         IfaceTvBndr, IfaceIdBndr, IfaceTyConBinder,
+        IfaceForAllSpecBndr,
         IfaceForAllBndr, ArgFlag(..), AnonArgFlag(..),
         ForallVisFlag(..), ShowForAllFlag(..),
         mkIfaceForAllTvBndr,
         mkIfaceTyConKind,
+        ifaceForAllSpecToBndrs, ifaceForAllSpecToBndr,
 
         ifForAllBndrVar, ifForAllBndrName, ifaceBndrName,
         ifTyConBinderVar, ifTyConBinderName,
@@ -167,8 +169,9 @@ data IfaceTyLit
   | IfaceStrTyLit FastString
   deriving (Eq)
 
-type IfaceTyConBinder = VarBndr IfaceBndr TyConBndrVis
-type IfaceForAllBndr  = VarBndr IfaceBndr ArgFlag
+type IfaceTyConBinder    = VarBndr IfaceBndr TyConBndrVis
+type IfaceForAllBndr     = VarBndr IfaceBndr ArgFlag
+type IfaceForAllSpecBndr = VarBndr IfaceBndr Specificity
 
 -- | Make an 'IfaceForAllBndr' from an 'IfaceTvBndr'.
 mkIfaceForAllTvBndr :: ArgFlag -> IfaceTvBndr -> IfaceForAllBndr
@@ -182,6 +185,12 @@ mkIfaceTyConKind bndrs res_kind = foldr mk res_kind bndrs
     mk :: IfaceTyConBinder -> IfaceKind -> IfaceKind
     mk (Bndr tv (AnonTCB af))   k = IfaceFunTy af (ifaceBndrType tv) k
     mk (Bndr tv (NamedTCB vis)) k = IfaceForAllTy (Bndr tv vis) k
+
+ifaceForAllSpecToBndrs :: [IfaceForAllSpecBndr] -> [IfaceForAllBndr]
+ifaceForAllSpecToBndrs = map ifaceForAllSpecToBndr
+
+ifaceForAllSpecToBndr :: IfaceForAllSpecBndr -> IfaceForAllBndr
+ifaceForAllSpecToBndr (Bndr tv spec) = Bndr tv (Invisible spec)
 
 -- | Stores the arguments in a type application as a list.
 -- See @Note [Suppressing invisible arguments]@.

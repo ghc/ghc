@@ -783,7 +783,7 @@ tcDataFamInstDecl _ _ = panic "tcDataFamInstDecl"
 
 -----------------------
 tcDataFamInstHeader
-    :: AssocInstInfo -> TyCon -> [Name] -> Maybe [LHsTyVarBndr GhcRn]
+    :: AssocInstInfo -> TyCon -> [Name] -> Maybe [LHsTyVarBndr () GhcRn]
     -> LexicalFixity -> LHsContext GhcRn
     -> HsTyPats GhcRn -> Maybe (LHsKind GhcRn) -> [LConDecl GhcRn]
     -> NewOrData

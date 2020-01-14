@@ -34,6 +34,7 @@ module   RdrHsSyn (
         mkRdrRecordCon, mkRdrRecordUpd,
         setRdrNameSpace,
         filterCTuple,
+        fromSpecTyVarBndr, fromSpecTyVarBndrs,
 
         cvBindGroup,
         cvBindsAndSigs,
@@ -114,7 +115,7 @@ import BasicTypes
 import TcEvidence       ( idHsWrapper )
 import Lexer
 import Lexeme           ( isLexCon )
-import Type             ( TyThing(..), funTyCon )
+import Type             ( TyThing(..), funTyCon, Specificity(..) )
 import TysWiredIn       ( cTupleTyConName, tupleTyCon, tupleDataCon,
                           nilDataConName, nilDataConKey,
                           listTyConName, listTyConKey, eqTyCon_RDR,
@@ -263,7 +264,7 @@ mkStandaloneKindSig loc lhs rhs =
                        2 (pprWithCommas ppr vs)
                   , text "See https://gitlab.haskell.org/ghc/ghc/issues/16754 for details." ]
 
-mkTyFamInstEqn :: Maybe [LHsTyVarBndr GhcPs]
+mkTyFamInstEqn :: Maybe [LHsTyVarBndr () GhcPs]
                -> LHsType GhcPs
                -> LHsType GhcPs
                -> P (TyFamInstEqn GhcPs,[AddAnn])
@@ -281,7 +282,7 @@ mkTyFamInstEqn bndrs lhs rhs
 mkDataFamInst :: SrcSpan
               -> NewOrData
               -> Maybe (Located CType)
-              -> (Maybe ( LHsContext GhcPs), Maybe [LHsTyVarBndr GhcPs]
+              -> (Maybe ( LHsContext GhcPs), Maybe [LHsTyVarBndr () GhcPs]
                         , LHsType GhcPs)
               -> Maybe (LHsKind GhcPs)
               -> [LConDecl GhcPs]
@@ -380,6 +381,20 @@ mkRoleAnnotDecl loc tycon roles
       -- will this last case ever happen??
     suggestions list = hang (text "Perhaps you meant one of these:")
                        2 (pprWithCommas (quotes . ppr) list)
+
+fromSpecTyVarBndrs :: [LHsTyVarBndr Specificity GhcPs] -> P [LHsTyVarBndr () GhcPs]
+fromSpecTyVarBndrs = mapM fromSpecTyVarBndr
+
+fromSpecTyVarBndr :: LHsTyVarBndr Specificity GhcPs -> P (LHsTyVarBndr () GhcPs)
+fromSpecTyVarBndr (L loc (UserTyVar xtv flag idp)) = case flag of
+  SSpecified -> return $ L loc $ UserTyVar xtv () idp
+  SInferred  -> addFatalError loc
+                  (text "Inferred type variables are not allowed here")
+fromSpecTyVarBndr (L loc (KindedTyVar xtv flag idp k)) = case flag of
+  SSpecified -> return $ L loc $ KindedTyVar xtv () idp k
+  SInferred  -> addFatalError loc
+                  (text "Inferred type variables are not allowed here")
+fromSpecTyVarBndr (L loc (XTyVarBndr bndr)) = return (L loc (XTyVarBndr bndr))
 
 {- **********************************************************************
 
@@ -650,7 +665,7 @@ recordPatSynErr loc pat =
     text "record syntax not supported for pattern synonym declarations:" $$
     ppr pat
 
-mkConDeclH98 :: Located RdrName -> Maybe [LHsTyVarBndr GhcPs]
+mkConDeclH98 :: Located RdrName -> Maybe [LHsTyVarBndr Specificity GhcPs]
                 -> Maybe (LHsContext GhcPs) -> HsConDeclDetails GhcPs
                 -> ConDecl GhcPs
 
@@ -799,7 +814,7 @@ eitherToP (Left (loc, doc)) = addFatalError loc doc
 eitherToP (Right thing)     = return thing
 
 checkTyVars :: SDoc -> SDoc -> Located RdrName -> [LHsTypeArg GhcPs]
-            -> P ( LHsQTyVars GhcPs  -- the synthesized type variables
+            -> P ( LHsQTyVars () GhcPs  -- the synthesized type variables
                  , [AddAnn] )        -- action which adds annotations
 -- ^ Check whether the given list of type parameters are all type variables
 -- (possibly with a kind signature).
@@ -819,18 +834,18 @@ checkTyVars pp_what equals_or_where tc tparms
                             <+> text "declaration for" <+> quotes (ppr tc)]
         -- Keep around an action for adjusting the annotations of extra parens
     chkParens :: [AddAnn] -> LHsType GhcPs
-              -> P (LHsTyVarBndr GhcPs, [AddAnn])
+              -> P (LHsTyVarBndr () GhcPs, [AddAnn])
     chkParens acc (L l (HsParTy _ ty)) = chkParens (mkParensApiAnn l ++ acc) ty
     chkParens acc ty = do
       tv <- chk ty
       return (tv, reverse acc)
 
         -- Check that the name space is correct!
-    chk :: LHsType GhcPs -> P (LHsTyVarBndr GhcPs)
+    chk :: LHsType GhcPs -> P (LHsTyVarBndr () GhcPs)
     chk (L l (HsKindSig _ (L lv (HsTyVar _ _ (L _ tv))) k))
-        | isRdrTyVar tv    = return (L l (KindedTyVar noExtField (L lv tv) k))
+        | isRdrTyVar tv    = return (L l (KindedTyVar noExtField () (L lv tv) k))
     chk (L l (HsTyVar _ _ (L ltv tv)))
-        | isRdrTyVar tv    = return (L l (UserTyVar noExtField (L ltv tv)))
+        | isRdrTyVar tv    = return (L l (UserTyVar noExtField () (L ltv tv)))
     chk t@(L loc _)
         = addFatalError loc $
                 vcat [ text "Unexpected type" <+> quotes (ppr t)
@@ -877,17 +892,19 @@ mkRuleBndrs = fmap (fmap cvt_one)
           RuleBndrSig noExtField v (mkLHsSigWcType sig)
 
 -- turns RuleTyTmVars into HsTyVarBndrs - this is more interesting
-mkRuleTyVarBndrs :: [LRuleTyTmVar] -> [LHsTyVarBndr GhcPs]
+-- GJ : This only gets used on (the 1st set of) explicitly written foralls in rules. I assume we can just make these specified, or do we want to support inferred variables here as well? in that case we need to update rule_var in Parser.y
+mkRuleTyVarBndrs :: [LRuleTyTmVar] -> [LHsTyVarBndr Specificity GhcPs]
 mkRuleTyVarBndrs = fmap (fmap cvt_one)
-  where cvt_one (RuleTyTmVar v Nothing)    = UserTyVar   noExtField (fmap tm_to_ty v)
+  where cvt_one (RuleTyTmVar v Nothing)
+          = UserTyVar noExtField SSpecified (fmap tm_to_ty v)
         cvt_one (RuleTyTmVar v (Just sig))
-          = KindedTyVar noExtField (fmap tm_to_ty v) sig
+          = KindedTyVar noExtField SSpecified (fmap tm_to_ty v) sig
     -- takes something in namespace 'varName' to something in namespace 'tvName'
         tm_to_ty (Unqual occ) = Unqual (setOccNameSpace tvName occ)
         tm_to_ty _ = panic "mkRuleTyVarBndrs"
 
 -- See note [Parsing explicit foralls in Rules] in Parser.y
-checkRuleTyVarBndrNames :: [LHsTyVarBndr GhcPs] -> P ()
+checkRuleTyVarBndrNames :: [LHsTyVarBndr flag GhcPs] -> P ()
 checkRuleTyVarBndrNames = mapM_ (check . fmap hsTyVarName)
   where check (L loc (Unqual occ)) = do
           when ((occNameString occ ==) `any` ["forall","family","role"])

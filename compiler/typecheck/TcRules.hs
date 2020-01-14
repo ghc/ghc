@@ -114,6 +114,7 @@ tcRule (HsRule { rd_ext  = ext
 
        ; let tpl_ids = lhs_evs ++ id_bndrs
        ; forall_tkvs <- candidateQTyVarsOfTypes $
+       -- GJ : TODO I think we can be more specific here
                         map (mkSpecForAllTys tv_bndrs) $  -- don't quantify over lexical tyvars
                         rule_ty : map idType tpl_ids
        ; qtkvs <- quantifyTyVars forall_tkvs
@@ -148,7 +149,7 @@ tcRule (HsRule { rd_ext  = ext
                          , rd_rhs  = mkHsDictLet rhs_binds rhs' } }
 tcRule (XRuleDecl nec) = noExtCon nec
 
-generateRuleConstraints :: Maybe [LHsTyVarBndr GhcRn] -> [LRuleBndr GhcRn]
+generateRuleConstraints :: Maybe [LHsTyVarBndr Specificity GhcRn] -> [LRuleBndr GhcRn]
                         -> LHsExpr GhcRn -> LHsExpr GhcRn
                         -> TcM ( [TyVar]
                                , [TcId]
@@ -173,11 +174,12 @@ generateRuleConstraints ty_bndrs tm_bndrs lhs rhs
        ; return (tv_bndrs, id_bndrs, lhs', all_lhs_wanted, rhs', rhs_wanted, rule_ty) } }
 
 -- See Note [TcLevel in type checking rules]
-tcRuleBndrs :: Maybe [LHsTyVarBndr GhcRn] -> [LRuleBndr GhcRn]
+tcRuleBndrs :: Maybe [LHsTyVarBndr Specificity GhcRn] -> [LRuleBndr GhcRn]
             -> TcM ([TcTyVar], [Id])
 tcRuleBndrs (Just bndrs) xs
-  = do { (tys1,(tys2,tms)) <- bindExplicitTKBndrs_Skol bndrs $
+  = do { (tybndrs1,(tys2,tms)) <- bindExplicitTKBndrs_Skol bndrs $
                               tcRuleTmBndrs xs
+       ; let tys1 = binderVars tybndrs1
        ; return (tys1 ++ tys2, tms) }
 
 tcRuleBndrs Nothing xs

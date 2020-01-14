@@ -22,7 +22,7 @@ module TcType (
   -- Types
   TcType, TcSigmaType, TcRhoType, TcTauType, TcPredType, TcThetaType,
   TcTyVar, TcTyVarSet, TcDTyVarSet, TcTyCoVarSet, TcDTyCoVarSet,
-  TcKind, TcCoVar, TcTyCoVar, TcTyVarBinder, TcTyCon,
+  TcKind, TcCoVar, TcTyCoVar, TcTyVarBinder, TcTyVarSpecBinder, TcTyCon,
   KnotTied,
 
   ExpType(..), InferResult(..), ExpSigmaType, ExpRhoType, mkCheckExpType,
@@ -338,8 +338,9 @@ type TcTyCoVar = Var    -- Either a TcTyVar or a CoVar
         -- a cannot occur inside a MutTyVar in T; that is,
         -- T is "flattened" before quantifying over a
 
-type TcTyVarBinder   = TyVarBinder
-type TcTyCon         = TyCon   -- these can be the TcTyCon constructor
+type TcTyVarBinder     = TyVarBinder
+type TcTyVarSpecBinder = TyVarSpecBinder
+type TcTyCon           = TyCon   -- these can be the TcTyCon constructor
 
 -- These types do not have boxy type variables in them
 type TcPredType     = PredType
@@ -1177,8 +1178,9 @@ tcSplitForAllTys ty
 -- @'sameVis' argf supplied_argf@ is 'True', where @argf@ is the visibility
 -- of the @ForAllTy@'s binder and @supplied_argf@ is the visibility provided
 -- as an argument to this function.
-tcSplitForAllTysSameVis :: ArgFlag -> Type -> ([TyVar], Type)
-tcSplitForAllTysSameVis supplied_argf ty = ASSERT( all isTyVar (fst sty) ) sty
+-- All split tyvars are annotated with their argf.
+tcSplitForAllTysSameVis :: ArgFlag -> Type -> ([(TyVar,ArgFlag)], Type)
+tcSplitForAllTysSameVis supplied_argf ty = ASSERT( all (isTyVar . fst) (fst sty) ) sty
   where sty = splitForAllTysSameVis supplied_argf ty
 
 -- | Like 'tcSplitForAllTys', but splits off only named binders.

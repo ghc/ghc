@@ -399,7 +399,7 @@ repFamilyDecl decl@(L loc (FamilyDecl { fdInfo      = info
                                       , fdResultSig = L _ resultSig
                                       , fdInjectivityAnn = injectivity }))
   = do { tc1 <- lookupLOcc tc           -- See note [Binders and occurrences]
-       ; let mkHsQTvs :: [LHsTyVarBndr GhcRn] -> LHsQTyVars GhcRn
+       ; let mkHsQTvs :: [LHsTyVarBndr () GhcRn] -> LHsQTyVars () GhcRn
              mkHsQTvs tvs = HsQTvs { hsq_ext = []
                                    , hsq_explicit = tvs }
              resTyVar = case resultSig of
@@ -1006,7 +1006,7 @@ addSimpleTyVarBinds names thing_inside
        ; term <- addBinds fresh_names thing_inside
        ; wrapGenSyms fresh_names term }
 
-addHsTyVarBinds :: [LHsTyVarBndr GhcRn]  -- the binders to be added
+addHsTyVarBinds :: [LHsTyVarBndr flag GhcRn]  -- the binders to be added
                 -> (Core [TH.TyVarBndrQ] -> DsM (Core (TH.Q a)))  -- action in the ext env
                 -> DsM (Core (TH.Q a))
 addHsTyVarBinds exp_tvs thing_inside
@@ -1019,7 +1019,7 @@ addHsTyVarBinds exp_tvs thing_inside
   where
     mk_tv_bndr (tv, (_,v)) = repTyVarBndrWithKind tv (coreVar v)
 
-addTyVarBinds :: LHsQTyVars GhcRn                    -- the binders to be added
+addTyVarBinds :: LHsQTyVars flag GhcRn                    -- the binders to be added
               -> (Core [TH.TyVarBndrQ] -> DsM (Core (TH.Q a)))  -- action in the ext env
               -> DsM (Core (TH.Q a))
 -- gensym a list of type variables and enter them into the meta environment;
@@ -1033,7 +1033,7 @@ addTyVarBinds (HsQTvs { hsq_ext = imp_tvs
     thing_inside
 addTyVarBinds (XLHsQTyVars nec) _ = noExtCon nec
 
-addTyClTyVarBinds :: LHsQTyVars GhcRn
+addTyClTyVarBinds :: LHsQTyVars () GhcRn
                   -> (Core [TH.TyVarBndrQ] -> DsM (Core (TH.Q a)))
                   -> DsM (Core (TH.Q a))
 
@@ -1056,26 +1056,26 @@ addTyClTyVarBinds tvs m
 
        ; wrapGenSyms freshNames term }
   where
-    mk_tv_bndr :: LHsTyVarBndr GhcRn -> DsM (Core TH.TyVarBndrQ)
+    mk_tv_bndr :: LHsTyVarBndr () GhcRn -> DsM (Core TH.TyVarBndrQ)
     mk_tv_bndr tv = do { v <- lookupBinder (hsLTyVarName tv)
                        ; repTyVarBndrWithKind tv v }
 
 -- Produce kinded binder constructors from the Haskell tyvar binders
 --
-repTyVarBndrWithKind :: LHsTyVarBndr GhcRn
+repTyVarBndrWithKind :: LHsTyVarBndr flag GhcRn
                      -> Core TH.Name -> DsM (Core TH.TyVarBndrQ)
-repTyVarBndrWithKind (L _ (UserTyVar _ _)) nm
+repTyVarBndrWithKind (L _ (UserTyVar _ _ _)) nm
   = repPlainTV nm
-repTyVarBndrWithKind (L _ (KindedTyVar _ _ ki)) nm
+repTyVarBndrWithKind (L _ (KindedTyVar _ _ _ ki)) nm
   = repLTy ki >>= repKindedTV nm
 repTyVarBndrWithKind _ _ = panic "repTyVarBndrWithKind"
 
 -- | Represent a type variable binder
-repTyVarBndr :: LHsTyVarBndr GhcRn -> DsM (Core TH.TyVarBndrQ)
-repTyVarBndr (L _ (UserTyVar _ (L _ nm)) )
+repTyVarBndr :: LHsTyVarBndr flag GhcRn -> DsM (Core TH.TyVarBndrQ)
+repTyVarBndr (L _ (UserTyVar _ _ (L _ nm)) )
   = do { nm' <- lookupBinder nm
        ; repPlainTV nm' }
-repTyVarBndr (L _ (KindedTyVar _ (L _ nm) ki))
+repTyVarBndr (L _ (KindedTyVar _ _ (L _ nm) ki))
   = do { nm' <- lookupBinder nm
        ; ki' <- repLTy ki
        ; repKindedTV nm' ki' }

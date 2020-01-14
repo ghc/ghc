@@ -6,6 +6,10 @@
 This module converts Template Haskell syntax into Hs syntax
 -}
 
+-- GJ : TODO Atm no explicit specificity in template haskell
+-- Temporary solution is just to make all the bound variables Specified.
+-- GJ : TODO Update syntax file (Ask for feedback: flags or tuples in the MR)
+
 {-# LANGUAGE DeriveFunctor #-}
 {-# LANGUAGE FlexibleContexts #-}
 {-# LANGUAGE ScopedTypeVariables #-}
@@ -476,7 +480,7 @@ cvt_ci_decs doc decs
 cvt_tycl_hdr :: TH.Cxt -> TH.Name -> [TH.TyVarBndr]
              -> CvtM ( LHsContext GhcPs
                      , Located RdrName
-                     , LHsQTyVars GhcPs)
+                     , LHsQTyVars () GhcPs)
 cvt_tycl_hdr cxt tc tvs
   = do { cxt' <- cvtContext funPrec cxt
        ; tc'  <- tconNameL tc
@@ -487,7 +491,7 @@ cvt_tycl_hdr cxt tc tvs
 cvt_datainst_hdr :: TH.Cxt -> Maybe [TH.TyVarBndr] -> TH.Type
                -> CvtM ( LHsContext GhcPs
                        , Located RdrName
-                       , Maybe [LHsTyVarBndr GhcPs]
+                       , Maybe [LHsTyVarBndr () GhcPs]
                        , HsTyPats GhcPs)
 cvt_datainst_hdr cxt bndrs tys
   = do { cxt' <- cvtContext funPrec cxt
@@ -507,7 +511,7 @@ cvt_datainst_hdr cxt bndrs tys
 ----------------
 cvt_tyfam_head :: TypeFamilyHead
                -> CvtM ( Located RdrName
-                       , LHsQTyVars GhcPs
+                       , LHsQTyVars () GhcPs
                        , Hs.LFamilyResultSig GhcPs
                        , Maybe (Hs.LInjectivityAnn GhcPs))
 
@@ -579,7 +583,7 @@ cvtConstr (InfixC st1 c st2)
         ; returnL $ mkConDeclH98 c' Nothing Nothing (InfixCon st1' st2') }
 
 cvtConstr (ForallC tvs ctxt con)
-  = do  { tvs'      <- cvtTvs tvs
+  = do  { tvs'      <- cvtTvsSpec tvs
         ; ctxt'     <- cvtContext funPrec ctxt
         ; L _ con'  <- cvtConstr con
         ; returnL $ add_forall tvs' ctxt' con' }
@@ -761,7 +765,7 @@ cvtPragmaD (SpecialiseInstP ty)
 cvtPragmaD (RuleP nm ty_bndrs tm_bndrs lhs rhs phases)
   = do { let nm' = mkFastString nm
        ; let act = cvtPhases phases AlwaysActive
-       ; ty_bndrs' <- traverse (mapM cvt_tv) ty_bndrs
+       ; ty_bndrs' <- traverse (mapM cvt_tv_spec) ty_bndrs
        ; tm_bndrs' <- mapM cvtRuleBndr tm_bndrs
        ; lhs'   <- cvtl lhs
        ; rhs'   <- cvtl rhs
@@ -1321,17 +1325,29 @@ cvtOpAppP x op y
 -----------------------------------------------------------
 --      Types and type variables
 
-cvtTvs :: [TH.TyVarBndr] -> CvtM (LHsQTyVars GhcPs)
+cvtTvs :: [TH.TyVarBndr] -> CvtM (LHsQTyVars () GhcPs)
 cvtTvs tvs = do { tvs' <- mapM cvt_tv tvs; return (mkHsQTvs tvs') }
 
-cvt_tv :: TH.TyVarBndr -> CvtM (LHsTyVarBndr GhcPs)
+cvt_tv :: TH.TyVarBndr -> CvtM (LHsTyVarBndr () GhcPs)
 cvt_tv (TH.PlainTV nm)
   = do { nm' <- tNameL nm
-       ; returnL $ UserTyVar noExtField nm' }
+       ; returnL $ UserTyVar noExtField () nm' }
 cvt_tv (TH.KindedTV nm ki)
   = do { nm' <- tNameL nm
        ; ki' <- cvtKind ki
-       ; returnL $ KindedTyVar noExtField nm' ki' }
+       ; returnL $ KindedTyVar noExtField () nm' ki' }
+
+cvtTvsSpec :: [TH.TyVarBndr] -> CvtM (LHsQTyVars Specificity GhcPs)
+cvtTvsSpec tvs = do { tvs' <- mapM cvt_tv_spec tvs; return (mkHsQTvs tvs') }
+
+cvt_tv_spec :: TH.TyVarBndr -> CvtM (LHsTyVarBndr Specificity GhcPs)
+cvt_tv_spec (TH.PlainTV nm)
+  = do { nm' <- tNameL nm
+       ; returnL $ UserTyVar noExtField SSpecified nm' }
+cvt_tv_spec (TH.KindedTV nm ki)
+  = do { nm' <- tNameL nm
+       ; ki' <- cvtKind ki
+       ; returnL $ KindedTyVar noExtField SSpecified nm' ki' }
 
 cvtRole :: TH.Role -> Maybe Coercion.Role
 cvtRole TH.NominalR          = Just Coercion.Nominal
@@ -1433,7 +1449,7 @@ cvtTypeKind ty_str ty
 
            ForallT tvs cxt ty
              | null tys'
-             -> do { tvs' <- cvtTvs tvs
+             -> do { tvs' <- cvtTvsSpec tvs
                    ; cxt' <- cvtContext funPrec cxt
                    ; ty'  <- cvtType ty
                    ; loc <- getL
@@ -1444,7 +1460,7 @@ cvtTypeKind ty_str ty
 
            ForallVisT tvs ty
              | null tys'
-             -> do { tvs' <- cvtTvs tvs
+             -> do { tvs' <- cvtTvsSpec tvs
                    ; ty'  <- cvtType ty
                    ; loc  <- getL
                    ; pure $ mkHsForAllTy tvs loc ForallVis tvs' ty' }
@@ -1683,7 +1699,7 @@ cvtPatSynSigTy (ForallT univs reqs (ForallT exis provs ty))
                                                         , hst_xqual = noExtField
                                                         , hst_body = ty' }) }
   | null reqs             = do { l      <- getL
-                               ; univs' <- hsQTvExplicit <$> cvtTvs univs
+                               ; univs' <- hsQTvExplicit <$> cvtTvsSpec univs
                                ; ty'    <- cvtType (ForallT exis provs ty)
                                ; let forTy = HsForAllTy
                                               { hst_fvf = ForallInvis
@@ -1744,7 +1760,7 @@ mkHsForAllTy :: [TH.TyVarBndr]
              -> ForallVisFlag
              -- ^ Whether this is @forall@ is visible (e.g., @forall a ->@)
              --   or invisible (e.g., @forall a.@)
-             -> LHsQTyVars GhcPs
+             -> LHsQTyVars Specificity GhcPs
              -- ^ The converted type variable binders
              -> LHsType GhcPs
              -- ^ The converted rho type

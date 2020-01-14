@@ -46,6 +46,7 @@ import PrelNames        ( applicativeClassName, pureAName, thenAName
                         , semigroupClassName, sappendName
                         , monoidClassName, mappendName
                         )
+import Type             ( Specificity )
 import Name
 import NameSet
 import NameEnv
@@ -1056,8 +1057,8 @@ bindRuleTmVars doc tyvs vars names thing_inside
     bind_free_tvs = case tyvs of Nothing -> AlwaysBind
                                  Just _  -> NeverBind
 
-bindRuleTyVars :: HsDocContext -> SDoc -> Maybe [LHsTyVarBndr GhcPs]
-               -> (Maybe [LHsTyVarBndr GhcRn]  -> RnM (b, FreeVars))
+bindRuleTyVars :: HsDocContext -> SDoc -> Maybe [LHsTyVarBndr Specificity GhcPs]
+               -> (Maybe [LHsTyVarBndr Specificity GhcRn]  -> RnM (b, FreeVars))
                -> RnM (b, FreeVars)
 bindRuleTyVars doc in_doc (Just bndrs) thing_inside
   = bindLHsTyVarBndrs doc (Just in_doc) Nothing bndrs (thing_inside . Just)
@@ -1677,7 +1678,7 @@ rnTyClDecl (ClassDecl { tcdCtxt = context, tcdLName = lcls,
 rnTyClDecl (XTyClDecl nec) = noExtCon nec
 
 -- Does the data type declaration include a CUSK?
-data_decl_has_cusk :: LHsQTyVars pass -> NewOrData -> Bool -> Maybe (LHsKind pass') -> RnM Bool
+data_decl_has_cusk :: LHsQTyVars flag pass -> NewOrData -> Bool -> Maybe (LHsKind pass') -> RnM Bool
 data_decl_has_cusk tyvars new_or_data no_rhs_kvs kind_sig = do
   { -- See Note [Unlifted Newtypes and CUSKs], and for a broader
     -- picture, see Note [Implementation of UnliftedNewtypes].
@@ -1977,7 +1978,7 @@ rnFamResultSig _ (XFamilyResultSig nec) = noExtCon nec
 -- | Rename injectivity annotation. Note that injectivity annotation is just the
 -- part after the "|".  Everything that appears before it is renamed in
 -- rnFamDecl.
-rnInjectivityAnn :: LHsQTyVars GhcRn           -- ^ Type variables declared in
+rnInjectivityAnn :: LHsQTyVars flag GhcRn      -- ^ Type variables declared in
                                                --   type family head
                  -> LFamilyResultSig GhcRn     -- ^ Result signature
                  -> LInjectivityAnn GhcPs      -- ^ Injectivity annotation

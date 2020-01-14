@@ -1985,7 +1985,7 @@ reifyType ty@(CoercionTy {})= noTH (sLit "coercions in types") (ppr ty)
 reify_for_all :: TyCoRep.ArgFlag -> TyCoRep.Type -> TcM TH.Type
 -- Arg of reify_for_all is always ForAllTy or a predicate FunTy
 reify_for_all argf ty = do
-  tvs' <- reifyTyVars tvs
+  tvs' <- reifyTyVars $ map fst tvs
   case argToForallVisFlag argf of
     ForallVis   -> do phi' <- reifyType phi
                       pure $ TH.ForallVisT tvs' phi'
