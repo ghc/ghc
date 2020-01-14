@@ -711,22 +711,34 @@ tc_hs_type mode (HsOpTy _ ty1 (L _ op) ty2) exp_kind
 --------- Foralls
 tc_hs_type mode forall@(HsForAllTy { hst_fvf = fvf, hst_bndrs = hs_tvs
                                    , hst_body = ty }) exp_kind
-  = do { (tclvl, wanted, (tvs', ty'))
+  = do { (tclvl, wanted, (tvs_bndrs, ty'))
             <- pushLevelAndCaptureConstraints $
                bindExplicitTKBndrs_Skol hs_tvs $
                tc_lhs_type mode ty exp_kind
     -- Do not kind-generalise here!  See Note [Kind generalisation]
     -- Why exp_kind?  See Note [Body kind of HsForAllTy]
-       ; let argf        = case fvf of
-                             ForallVis   -> Required
-                             ForallInvis -> Specified
-             bndrs       = mkTyVarBinders argf tvs'
-             skol_info   = ForAllSkol (ppr forall)
+       ; let skol_info   = ForAllSkol (ppr forall)
              m_telescope = Just (sep (map ppr hs_tvs))
 
-       ; emitResidualTvConstraint skol_info m_telescope tvs' tclvl wanted
+       ; tv_bndrs <- mapM construct_bndr tvs_bndrs
 
-       ; return (mkForAllTys bndrs ty') }
+       ; emitResidualTvConstraint skol_info m_telescope (binderVars tv_bndrs) tclvl wanted
+
+       ; return (mkForAllTys tv_bndrs ty') }
+  where
+    construct_bndr :: TcTyVarSpecBinder -> TcM TcTyVarBinder
+    construct_bndr (Bndr tv spec) = do { argf <- spec_to_argf spec
+                                       ; return $ mkTyVarBinder argf tv }
+
+    -- See Note [Variable Specificity and Forall Visibility]
+    spec_to_argf :: Specificity -> TcM ArgFlag
+    spec_to_argf SSpecified = case fvf of
+      ForallVis   -> return Required
+      ForallInvis -> return Specified
+    spec_to_argf SInferred  = case fvf of -- GJ : TODO Nicer error message
+      ForallVis   -> do { addErrTc (text "Unexpected inferred variable in required forall binder:" <+> ppr forall)
+                        ; return Required }
+      ForallInvis -> return Inferred
 
 tc_hs_type mode (HsQualTy { hst_ctxt = ctxt, hst_body = rn_ty }) exp_kind
   | null (unLoc ctxt)
@@ -857,6 +869,29 @@ tc_hs_type mode ty@(HsOpTy {})             ek = tc_infer_hs_type_ek mode ty ek
 tc_hs_type mode ty@(HsKindSig {})          ek = tc_infer_hs_type_ek mode ty ek
 tc_hs_type mode ty@(XHsType (NHsCoreTy{})) ek = tc_infer_hs_type_ek mode ty ek
 tc_hs_type _    wc@(HsWildCardTy _)        ek = tcAnonWildCardOcc wc ek
+
+{-
+Note [Variable Specificity and Forall Visibility]
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+A HsForAllTy contains a ForAllVisFlag to denote the visibility of the forall
+binder. Furthermore, each bound variable also has a Specificity. Together these
+determine the variable binders (ArgFlag) for each variable in the generated
+ForAllTy type.
+
+This table summarises this relation:
+-----------------------------------------------------------------------
+| User-written type         ForAllVisFlag     Specificity     ArgFlag
+|----------------------------------------------------------------------
+| f :: forall a. type       ForallInvis       SSpecified      Specified
+| f :: forall {a}. type     ForallInvis       SInferred       Inferred
+| f :: forall a -> type     ForallVis         SSpecified      Required
+| f :: forall {a} -> type   ForallVis         SInferred       /
+|   This last form is non-sensical and is thus rejected.
+-----------------------------------------------------------------------
+
+For more information regarding the interpretation of the resulting ArgFlag, see
+Note [VarBndrs, TyCoVarBinders, TyConBinders, and visibility] in TyCoRep.
+-}
 
 ------------------------------------------
 tc_fun_type :: TcTyMode -> LHsType GhcRn -> LHsType GhcRn -> TcKind
@@ -1859,7 +1894,7 @@ kcDeclHeader
   :: InitialKindStrategy
   -> Name              -- ^ of the thing being checked
   -> TyConFlavour      -- ^ What sort of 'TyCon' is being checked
-  -> LHsQTyVars GhcRn  -- ^ Binders in the header
+  -> LHsQTyVars () GhcRn  -- ^ Binders in the header
   -> TcM ContextKind   -- ^ The result kind
   -> TcM TcTyCon       -- ^ A suitably-kinded TcTyCon
 kcDeclHeader (InitialKindCheck msig) = kcCheckDeclHeader msig
@@ -1886,7 +1921,7 @@ kcCheckDeclHeader
   :: SAKS_or_CUSK
   -> Name              -- ^ of the thing being checked
   -> TyConFlavour      -- ^ What sort of 'TyCon' is being checked
-  -> LHsQTyVars GhcRn  -- ^ Binders in the header
+  -> LHsQTyVars () GhcRn  -- ^ Binders in the header
   -> TcM ContextKind   -- ^ The result kind. AnyKind == no result signature
   -> TcM TcTyCon       -- ^ A suitably-kinded generalized TcTyCon
 kcCheckDeclHeader (SAKS sig) = kcCheckDeclHeader_sig sig
@@ -1895,7 +1930,7 @@ kcCheckDeclHeader CUSK       = kcCheckDeclHeader_cusk
 kcCheckDeclHeader_cusk
   :: Name              -- ^ of the thing being checked
   -> TyConFlavour      -- ^ What sort of 'TyCon' is being checked
-  -> LHsQTyVars GhcRn  -- ^ Binders in the header
+  -> LHsQTyVars () GhcRn  -- ^ Binders in the header
   -> TcM ContextKind   -- ^ The result kind
   -> TcM TcTyCon       -- ^ A suitably-kinded generalized TcTyCon
 kcCheckDeclHeader_cusk name flav
@@ -1977,7 +2012,7 @@ kcCheckDeclHeader_cusk _ _ (XLHsQTyVars nec) _ = noExtCon nec
 kcInferDeclHeader
   :: Name              -- ^ of the thing being checked
   -> TyConFlavour      -- ^ What sort of 'TyCon' is being checked
-  -> LHsQTyVars GhcRn
+  -> LHsQTyVars () GhcRn
   -> TcM ContextKind   -- ^ The result kind
   -> TcM TcTyCon       -- ^ A suitably-kinded non-generalized TcTyCon
 kcInferDeclHeader name flav
@@ -2034,7 +2069,7 @@ kcCheckDeclHeader_sig
   :: Kind              -- ^ Standalone kind signature, fully zonked! (zonkTcTypeToType)
   -> Name              -- ^ of the thing being checked
   -> TyConFlavour      -- ^ What sort of 'TyCon' is being checked
-  -> LHsQTyVars GhcRn  -- ^ Binders in the header
+  -> LHsQTyVars () GhcRn  -- ^ Binders in the header
   -> TcM ContextKind   -- ^ The result kind. AnyKind == no result signature
   -> TcM TcTyCon       -- ^ A suitably-kinded TcTyCon
 kcCheckDeclHeader_sig kisig name flav ktvs kc_res_ki =
@@ -2220,8 +2255,8 @@ kcCheckDeclHeader_sig kisig name flav ktvs kc_res_ki =
     check_zipped_binder (ZippedBinder _ Nothing) = return ()
     check_zipped_binder (ZippedBinder tb (Just b)) =
       case unLoc b of
-        UserTyVar _ _ -> return ()
-        KindedTyVar _ v v_hs_ki -> do
+        UserTyVar _ _ _ -> return ()
+        KindedTyVar _ _ v v_hs_ki -> do
           v_ki <- tcLHsKindSig (TyVarBndrKindCtxt (unLoc v)) v_hs_ki
           discardResult $ -- See Note [discardResult in kcCheckDeclHeader_sig]
             unifyKind (Just (HsTyVar noExtField NotPromoted v))
@@ -2245,14 +2280,14 @@ kcCheckDeclHeader_sig kisig name flav ktvs kc_res_ki =
 
 -- A quantifier from a kind signature zipped with a user-written binder for it.
 data ZippedBinder =
-  ZippedBinder TyBinder (Maybe (LHsTyVarBndr GhcRn))
+  ZippedBinder TyBinder (Maybe (LHsTyVarBndr () GhcRn)) -- GJ Note : Only used for declarations, which do not feature expl specificity flags
 
 -- See Note [Arity inference in kcCheckDeclHeader_sig]
 zipBinders
   :: Kind                      -- kind signature
-  -> [LHsTyVarBndr GhcRn]      -- user-written binders
+  -> [LHsTyVarBndr () GhcRn]      -- user-written binders
   -> ([ZippedBinder],          -- zipped binders
-      [LHsTyVarBndr GhcRn],    -- remaining user-written binders
+      [LHsTyVarBndr () GhcRn],    -- remaining user-written binders
       Kind)                    -- remainder of the kind signature
 zipBinders = zip_binders []
   where
@@ -2274,7 +2309,7 @@ zipBinders = zip_binders []
           in
             zip_binders (zb:acc) ki' bs'
 
-tooManyBindersErr :: Kind -> [LHsTyVarBndr GhcRn] -> SDoc
+tooManyBindersErr :: Kind -> [LHsTyVarBndr () GhcRn] -> SDoc
 tooManyBindersErr ki bndrs =
    hang (text "Not a function kind:")
       4 (ppr ki) $$
@@ -2626,29 +2661,53 @@ newFlexiKindedTyVarTyVar = newFlexiKindedTyVar newTyVarTyVar
 --------------------------------------
 
 bindExplicitTKBndrs_Skol, bindExplicitTKBndrs_Tv
-    :: [LHsTyVarBndr GhcRn]
+    :: [LHsTyVarBndr Specificity GhcRn]
     -> TcM a
-    -> TcM ([TcTyVar], a)
+    -> TcM ([TcTyVarSpecBinder], a)
 
 bindExplicitTKBndrs_Skol = bindExplicitTKBndrsX (tcHsTyVarBndr newSkolemTyVar)
 bindExplicitTKBndrs_Tv   = bindExplicitTKBndrsX (tcHsTyVarBndr newTyVarTyVar)
 
 bindExplicitTKBndrs_Q_Skol, bindExplicitTKBndrs_Q_Tv
     :: ContextKind
-    -> [LHsTyVarBndr GhcRn]
+    -> [LHsTyVarBndr () GhcRn]
     -> TcM a
     -> TcM ([TcTyVar], a)
 
-bindExplicitTKBndrs_Q_Skol ctxt_kind = bindExplicitTKBndrsX (tcHsQTyVarBndr ctxt_kind newSkolemTyVar)
-bindExplicitTKBndrs_Q_Tv   ctxt_kind = bindExplicitTKBndrsX (tcHsQTyVarBndr ctxt_kind newTyVarTyVar)
+bindExplicitTKBndrs_Q_Skol ctxt_kind = bindExplicitTKBndrsX_Q (tcHsQTyVarBndr ctxt_kind newSkolemTyVar)
+bindExplicitTKBndrs_Q_Tv   ctxt_kind = bindExplicitTKBndrsX_Q (tcHsQTyVarBndr ctxt_kind newTyVarTyVar)
 
+-- GJ : TODO Combine these two functions
 bindExplicitTKBndrsX
-    :: (HsTyVarBndr GhcRn -> TcM TcTyVar)
-    -> [LHsTyVarBndr GhcRn]
+    :: (HsTyVarBndr Specificity GhcRn -> TcM TcTyVar)
+    -> [LHsTyVarBndr Specificity GhcRn]
+    -> TcM a
+    -> TcM ([TcTyVarSpecBinder], a)  -- Returned [TcTyVar] are in 1-1 correspondence
+                                     -- with the passed-in [LHsTyVarBndr]
+bindExplicitTKBndrsX tc_tv hs_tvs thing_inside
+  = do { traceTc "bindExplicTKBndrs" (ppr hs_tvs)
+       ; go hs_tvs }
+  where
+    go [] = do { res <- thing_inside
+               ; return ([], res) }
+    go (L _ hs_tv : hs_tvs)
+       = do { tv <- tc_tv hs_tv
+            -- Extend the environment as we go, in case a binder
+            -- is mentioned in the kind of a later binder
+            --   e.g. forall k (a::k). blah
+            -- NB: tv's Name may differ from hs_tv's
+            -- See TcMType Note [Unification variables need fresh Names]
+            ; (tvs,res) <- tcExtendNameTyVarEnv [(hsTyVarName hs_tv, tv)] $
+                           go hs_tvs
+            ; return ((Bndr tv (hsTyVarBndrFlag hs_tv)):tvs, res) }
+
+bindExplicitTKBndrsX_Q
+    :: (HsTyVarBndr () GhcRn -> TcM TcTyVar)
+    -> [LHsTyVarBndr () GhcRn]
     -> TcM a
     -> TcM ([TcTyVar], a)  -- Returned [TcTyVar] are in 1-1 correspondence
                            -- with the passed-in [LHsTyVarBndr]
-bindExplicitTKBndrsX tc_tv hs_tvs thing_inside
+bindExplicitTKBndrsX_Q tc_tv hs_tvs thing_inside
   = do { traceTc "bindExplicTKBndrs" (ppr hs_tvs)
        ; go hs_tvs }
   where
@@ -2667,12 +2726,12 @@ bindExplicitTKBndrsX tc_tv hs_tvs thing_inside
 
 -----------------
 tcHsTyVarBndr :: (Name -> Kind -> TcM TyVar)
-              -> HsTyVarBndr GhcRn -> TcM TcTyVar
+              -> HsTyVarBndr flag GhcRn -> TcM TcTyVar
 -- Returned TcTyVar has the same name; no cloning
-tcHsTyVarBndr new_tv (UserTyVar _ (L _ tv_nm))
+tcHsTyVarBndr new_tv (UserTyVar _ _ (L _ tv_nm))
   = do { kind <- newMetaKindVar
        ; new_tv tv_nm kind }
-tcHsTyVarBndr new_tv (KindedTyVar _ (L _ tv_nm) lhs_kind)
+tcHsTyVarBndr new_tv (KindedTyVar _ _ (L _ tv_nm) lhs_kind)
   = do { kind <- tcLHsKindSig (TyVarBndrKindCtxt tv_nm) lhs_kind
        ; new_tv tv_nm kind }
 tcHsTyVarBndr _ (XTyVarBndr nec) = noExtCon nec
@@ -2680,18 +2739,18 @@ tcHsTyVarBndr _ (XTyVarBndr nec) = noExtCon nec
 -----------------
 tcHsQTyVarBndr :: ContextKind
                -> (Name -> Kind -> TcM TyVar)
-               -> HsTyVarBndr GhcRn -> TcM TcTyVar
+               -> HsTyVarBndr () GhcRn -> TcM TcTyVar
 -- Just like tcHsTyVarBndr, but also
 --   - uses the in-scope TyVar from class, if it exists
 --   - takes a ContextKind to use for the no-sig case
-tcHsQTyVarBndr ctxt_kind new_tv (UserTyVar _ (L _ tv_nm))
+tcHsQTyVarBndr ctxt_kind new_tv (UserTyVar _ _ (L _ tv_nm))
   = do { mb_tv <- tcLookupLcl_maybe tv_nm
        ; case mb_tv of
            Just (ATyVar _ tv) -> return tv
            _ -> do { kind <- newExpectedKind ctxt_kind
                    ; new_tv tv_nm kind } }
 
-tcHsQTyVarBndr _ new_tv (KindedTyVar _ (L _ tv_nm) lhs_kind)
+tcHsQTyVarBndr _ new_tv (KindedTyVar _ _ (L _ tv_nm) lhs_kind)
   = do { kind <- tcLHsKindSig (TyVarBndrKindCtxt tv_nm) lhs_kind
        ; mb_tv <- tcLookupLcl_maybe tv_nm
        ; case mb_tv of
@@ -3133,7 +3192,7 @@ tcHsPartialSigType ctxt sig_ty
          , hsib_body = hs_ty } <- ib_ty
   , (explicit_hs_tvs, L _ hs_ctxt, hs_tau) <- splitLHsSigmaTy hs_ty
   = addSigCtxt ctxt hs_ty $
-    do { (implicit_tvs, (explicit_tvs, (wcs, wcx, theta, tau)))
+    do { (implicit_tvs, (explicit_tvbndrs, (wcs, wcx, theta, tau)))
             <- solveLocalEqualities "tcHsPartialSigType"    $
                  -- This solveLocalEqualiltes fails fast if there are
                  -- insoluble equalities. See TcSimplify
@@ -3148,6 +3207,8 @@ tcHsPartialSigType ctxt sig_ty
                   ; tau <- tcHsOpenType hs_tau
 
                   ; return (wcs, wcx, theta, tau) }
+
+       ; let explicit_tvs = binderVars explicit_tvbndrs
 
          -- No kind-generalization here:
        ; kindGeneralizeNone (mkSpecForAllTys implicit_tvs $

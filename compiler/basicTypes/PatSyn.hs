@@ -67,13 +67,13 @@ data PatSyn
                                        -- psArgs
 
         -- Universally-quantified type variables
-        psUnivTyVars  :: [TyVarBinder],
+        psUnivTyVars  :: [TyVarSpecBinder],
 
         -- Required dictionaries (may mention psUnivTyVars)
         psReqTheta    :: ThetaType,
 
         -- Existentially-quantified type vars
-        psExTyVars    :: [TyVarBinder],
+        psExTyVars    :: [TyVarSpecBinder],
 
         -- Provided dictionaries (may mention psUnivTyVars or psExTyVars)
         psProvTheta   :: ThetaType,
@@ -354,10 +354,10 @@ instance Data.Data PatSyn where
 -- | Build a new pattern synonym
 mkPatSyn :: Name
          -> Bool                 -- ^ Is the pattern synonym declared infix?
-         -> ([TyVarBinder], ThetaType) -- ^ Universially-quantified type
-                                       -- variables and required dicts
-         -> ([TyVarBinder], ThetaType) -- ^ Existentially-quantified type
-                                       -- variables and provided dicts
+         -> ([TyVarSpecBinder], ThetaType) -- ^ Universially-quantified type
+                                           -- variables and required dicts
+         -> ([TyVarSpecBinder], ThetaType) -- ^ Existentially-quantified type
+                                           -- variables and provided dicts
          -> [Type]               -- ^ Original arguments
          -> Type                 -- ^ Original result type
          -> (Id, Bool)           -- ^ Name of matcher
@@ -411,13 +411,13 @@ patSynFieldType ps label
       Just (_, ty) -> ty
       Nothing -> pprPanic "dataConFieldType" (ppr ps <+> ppr label)
 
-patSynUnivTyVarBinders :: PatSyn -> [TyVarBinder]
+patSynUnivTyVarBinders :: PatSyn -> [TyVarSpecBinder]
 patSynUnivTyVarBinders = psUnivTyVars
 
 patSynExTyVars :: PatSyn -> [TyVar]
 patSynExTyVars ps = binderVars (psExTyVars ps)
 
-patSynExTyVarBinders :: PatSyn -> [TyVarBinder]
+patSynExTyVarBinders :: PatSyn -> [TyVarSpecBinder]
 patSynExTyVarBinders = psExTyVars
 
 patSynSig :: PatSyn -> ([TyVar], ThetaType, [TyVar], ThetaType, [Type], Type)
@@ -473,12 +473,12 @@ pprPatSynType :: PatSyn -> SDoc
 pprPatSynType (MkPatSyn { psUnivTyVars = univ_tvs,  psReqTheta  = req_theta
                         , psExTyVars   = ex_tvs,    psProvTheta = prov_theta
                         , psArgs       = orig_args, psResultTy = orig_res_ty })
-  = sep [ pprForAll univ_tvs
+  = sep [ pprForAll $ tyVarSpecToBinders univ_tvs
         , pprThetaArrowTy req_theta
         , ppWhen insert_empty_ctxt $ parens empty <+> darrow
         , pprType sigma_ty ]
   where
-    sigma_ty = mkForAllTys ex_tvs  $
+    sigma_ty = mkForAllTys (tyVarSpecToBinders ex_tvs) $
                mkInvisFunTys prov_theta $
                mkVisFunTys orig_args orig_res_ty
     insert_empty_ctxt = null req_theta && not (null prov_theta && null ex_tvs)

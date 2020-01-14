@@ -730,6 +730,8 @@ This table summarises the visibility rules:
 
 ---- In term declarations ----
 
+-- GJ : TODO Update this with explicit specificity examples
+
 * Inferred.  Function defn, with no signature:  f1 x = x
   We infer f1 :: forall {a}. a -> a, with 'a' Inferred
   It's Inferred because it doesn't appear in any

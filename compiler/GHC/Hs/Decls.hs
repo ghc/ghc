@@ -511,7 +511,7 @@ data TyClDecl pass
     -- For details on above see note [Api annotations] in ApiAnnotation
     SynDecl { tcdSExt   :: XSynDecl pass          -- ^ Post renameer, FVs
             , tcdLName  :: Located (IdP pass)     -- ^ Type constructor
-            , tcdTyVars :: LHsQTyVars pass        -- ^ Type variables; for an
+            , tcdTyVars :: LHsQTyVars () pass     -- ^ Type variables; for an
                                                   -- associated type these
                                                   -- include outer binders
             , tcdFixity :: LexicalFixity    -- ^ Fixity used in the declaration
@@ -528,7 +528,7 @@ data TyClDecl pass
     -- For details on above see note [Api annotations] in ApiAnnotation
     DataDecl { tcdDExt     :: XDataDecl pass       -- ^ Post renamer, CUSK flag, FVs
              , tcdLName    :: Located (IdP pass)   -- ^ Type constructor
-             , tcdTyVars   :: LHsQTyVars pass      -- ^ Type variables
+             , tcdTyVars   :: LHsQTyVars () pass   -- ^ Type variables
                               -- See Note [TyVar binders for associated declarations]
              , tcdFixity   :: LexicalFixity        -- ^ Fixity used in the declaration
              , tcdDataDefn :: HsDataDefn pass }
@@ -536,7 +536,7 @@ data TyClDecl pass
   | ClassDecl { tcdCExt    :: XClassDecl pass,         -- ^ Post renamer, FVs
                 tcdCtxt    :: LHsContext pass,         -- ^ Context...
                 tcdLName   :: Located (IdP pass),      -- ^ Name of the class
-                tcdTyVars  :: LHsQTyVars pass,         -- ^ Class type variables
+                tcdTyVars  :: LHsQTyVars () pass,      -- ^ Class type variables
                 tcdFixity  :: LexicalFixity, -- ^ Fixity used in the declaration
                 tcdFDs     :: [LHsFunDep pass],         -- ^ Functional deps
                 tcdSigs    :: [LSig pass],              -- ^ Methods' signatures
@@ -668,7 +668,7 @@ tyClDeclLName decl = tcdLName decl
 tcdName :: TyClDecl pass -> IdP pass
 tcdName = unLoc . tyClDeclLName
 
-tyClDeclTyVars :: TyClDecl pass -> LHsQTyVars pass
+tyClDeclTyVars :: TyClDecl pass -> LHsQTyVars () pass
 tyClDeclTyVars (FamDecl { tcdFam = FamilyDecl { fdTyVars = tvs } }) = tvs
 tyClDeclTyVars d = tcdTyVars d
 
@@ -758,7 +758,7 @@ instance OutputableBndrId p
 
 pp_vanilla_decl_head :: (OutputableBndrId p)
    => Located (IdP (GhcPass p))
-   -> LHsQTyVars (GhcPass p)
+   -> LHsQTyVars flag (GhcPass p)
    -> LexicalFixity
    -> LHsContext (GhcPass p)
    -> SDoc
@@ -1023,7 +1023,7 @@ data FamilyResultSig pass = -- see Note [FamilyResultSig]
 
   -- For details on above see note [Api annotations] in ApiAnnotation
 
-  | TyVarSig (XTyVarSig pass) (LHsTyVarBndr pass)
+  | TyVarSig (XTyVarSig pass) (LHsTyVarBndr () pass)
   -- ^ - 'ApiAnnotation.AnnKeywordId' :
   --             'ApiAnnotation.AnnOpenP','ApiAnnotation.AnnDcolon',
   --             'ApiAnnotation.AnnCloseP', 'ApiAnnotation.AnnEqual'
@@ -1046,7 +1046,7 @@ data FamilyDecl pass = FamilyDecl
   { fdExt            :: XCFamilyDecl pass
   , fdInfo           :: FamilyInfo pass              -- type/data, closed/open
   , fdLName          :: Located (IdP pass)           -- type constructor
-  , fdTyVars         :: LHsQTyVars pass              -- type variables
+  , fdTyVars         :: LHsQTyVars () pass              -- type variables
                        -- See Note [TyVar binders for associated declarations]
   , fdFixity         :: LexicalFixity                -- Fixity used in the declaration
   , fdResultSig      :: LFamilyResultSig pass        -- result signature
@@ -1096,8 +1096,8 @@ famResultKindSignature (NoSig _) = Nothing
 famResultKindSignature (KindSig _ ki) = Just ki
 famResultKindSignature (TyVarSig _ bndr) =
   case unLoc bndr of
-    UserTyVar _ _ -> Nothing
-    KindedTyVar _ _ ki -> Just ki
+    UserTyVar _ _ _ -> Nothing
+    KindedTyVar _ _ _ ki -> Just ki
     XTyVarBndr nec -> noExtCon nec
 famResultKindSignature (XFamilyResultSig nec) = noExtCon nec
 
@@ -1348,7 +1348,7 @@ data ConDecl pass
       -- AnnForall and AnnDot.
       , con_forall  :: Located Bool      -- ^ True <=> explicit forall
                                          --   False => hsq_explicit is empty
-      , con_qvars   :: LHsQTyVars pass
+      , con_qvars   :: LHsQTyVars Specificity pass
                        -- Whether or not there is an /explicit/ forall, we still
                        -- need to capture the implicitly-bound type/kind variables
 
@@ -1369,7 +1369,7 @@ data ConDecl pass
                               --     e.g. data T a = forall b. MkT b (b->a)
                               --     con_ex_tvs = {b}
                               -- False => con_ex_tvs is empty
-      , con_ex_tvs :: [LHsTyVarBndr pass]      -- ^ Existentials only
+      , con_ex_tvs :: [LHsTyVarBndr Specificity pass]      -- ^ Existentials only
       , con_mb_cxt :: Maybe (LHsContext pass)  -- ^ User-written context (if any)
       , con_args   :: HsConDeclDetails pass    -- ^ Arguments; can be InfixCon
 
@@ -1658,7 +1658,7 @@ data FamEqn pass rhs
   = FamEqn
        { feqn_ext    :: XCFamEqn pass rhs
        , feqn_tycon  :: Located (IdP pass)
-       , feqn_bndrs  :: Maybe [LHsTyVarBndr pass] -- ^ Optional quantified type vars
+       , feqn_bndrs  :: Maybe [LHsTyVarBndr () pass] -- ^ Optional quantified type vars
        , feqn_pats   :: HsTyPats pass
        , feqn_fixity :: LexicalFixity -- ^ Fixity used in the declaration
        , feqn_rhs    :: rhs
@@ -1793,7 +1793,7 @@ pprDataFamInstFlavour (DataFamInstDecl (XHsImplicitBndrs x))
 
 pprHsFamInstLHS :: (OutputableBndrId p)
    => IdP (GhcPass p)
-   -> Maybe [LHsTyVarBndr (GhcPass p)]
+   -> Maybe [LHsTyVarBndr flag (GhcPass p)]
    -> HsTyPats (GhcPass p)
    -> LexicalFixity
    -> LHsContext (GhcPass p)
@@ -2193,7 +2193,7 @@ data RuleDecl pass
        , rd_name :: Located (SourceText,RuleName)
            -- ^ Note [Pragma source text] in BasicTypes
        , rd_act  :: Activation
-       , rd_tyvs :: Maybe [LHsTyVarBndr (NoGhcTc pass)]
+       , rd_tyvs :: Maybe [LHsTyVarBndr Specificity (NoGhcTc pass)]
            -- ^ Forall'd type vars
        , rd_tmvs :: [LRuleBndr pass]
            -- ^ Forall'd term vars, before typechecking; after typechecking

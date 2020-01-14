@@ -1905,7 +1905,7 @@ tyConToIfaceDecl env tycon
         where
           (univ_tvs, ex_tvs, eq_spec, theta, arg_tys, _)
             = dataConFullSig data_con
-          user_bndrs = dataConUserTyVarBinders data_con
+          user_bndrs = dataConUserTyVarSpecBinders data_con
 
           -- Tidy the univ_tvs of the data constructor to be identical
           -- to the tyConTyVars of the type constructor.  This means
@@ -1928,7 +1928,7 @@ tyConToIfaceDecl env tycon
           -- tidying produced. Therefore, tidying the user-written tyvars is a
           -- simple matter of looking up each variable in the substitution,
           -- which tidyTyCoVarOcc accomplishes.
-          tidyUserTyCoVarBinder :: TidyEnv -> TyCoVarBinder -> TyCoVarBinder
+          tidyUserTyCoVarBinder :: TidyEnv -> TyCoVarSpecBinder -> TyCoVarSpecBinder
           tidyUserTyCoVarBinder env (Bndr tv vis) =
             Bndr (tidyTyCoVarOcc env tv) vis
 

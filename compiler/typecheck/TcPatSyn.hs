@@ -92,7 +92,7 @@ recoverPSB (PSB { psb_id = L _ name
     (_arg_names, _rec_fields, is_infix) = collectPatSynArgInfo details
     mk_placeholder matcher_name
       = mkPatSyn name is_infix
-                        ([mkTyVarBinder Specified alphaTyVar], []) ([], [])
+                        ([mkTyVarBinder SSpecified alphaTyVar], []) ([], [])
                         [] -- Arg tys
                         alphaTy
                         (matcher_id, True) Nothing
@@ -182,9 +182,9 @@ tcInferPatSynDecl (PSB { psb_id = lname@(L _ name), psb_args = details
 
        ; traceTc "tcInferPatSynDecl }" $ (ppr name $$ ppr ex_tvs)
        ; tc_patsyn_finish lname dir is_infix lpat'
-                          (mkTyVarBinders Inferred univ_tvs
+                          (mkTyVarBinders SInferred univ_tvs -- GJ : TODO Do we have more specific information somewhere?
                             , req_theta,  ev_binds, req_dicts)
-                          (mkTyVarBinders Inferred ex_tvs
+                          (mkTyVarBinders SInferred ex_tvs
                             , mkTyVarTys ex_tvs, prov_theta, prov_evs)
                           (map nlHsVar args, map idType args)
                           pat_ty rec_fields } }
@@ -373,8 +373,8 @@ tcCheckPatSynDecl psb@PSB{ psb_id = lname@(L _ name), psb_args = details
        ; let univ_fvs = closeOverKinds $
                         (tyCoVarsOfTypes (pat_ty : req_theta) `extendVarSetList` explicit_univ_tvs)
              (extra_univ, extra_ex) = partition ((`elemVarSet` univ_fvs) . binderVar) implicit_tvs
-             univ_bndrs = extra_univ ++ mkTyVarBinders Specified explicit_univ_tvs
-             ex_bndrs   = extra_ex   ++ mkTyVarBinders Specified explicit_ex_tvs
+             univ_bndrs = extra_univ ++ mkTyVarBinders SSpecified explicit_univ_tvs -- GJ : TODO Do we have more specific information somewhere?
+             ex_bndrs   = extra_ex   ++ mkTyVarBinders SSpecified explicit_ex_tvs
              univ_tvs   = binderVars univ_bndrs
              ex_tvs     = binderVars ex_bndrs
 
@@ -593,8 +593,8 @@ tc_patsyn_finish :: Located Name      -- ^ PatSyn Name
                  -> HsPatSynDir GhcRn -- ^ PatSyn type (Uni/Bidir/ExplicitBidir)
                  -> Bool              -- ^ Whether infix
                  -> LPat GhcTc        -- ^ Pattern of the PatSyn
-                 -> ([TcTyVarBinder], [PredType], TcEvBinds, [EvVar])
-                 -> ([TcTyVarBinder], [TcType], [PredType], [EvTerm])
+                 -> ([TcTyVarSpecBinder], [PredType], TcEvBinds, [EvVar])
+                 -> ([TcTyVarSpecBinder], [TcType], [PredType], [EvTerm])
                  -> ([LHsExpr GhcTcId], [TcType])   -- ^ Pattern arguments and
                                                     -- types
                  -> TcType            -- ^ Pattern type
@@ -782,8 +782,8 @@ isUnidirectional ExplicitBidirectional{} = False
 -}
 
 mkPatSynBuilderId :: HsPatSynDir a -> Located Name
-                  -> [TyVarBinder] -> ThetaType
-                  -> [TyVarBinder] -> ThetaType
+                  -> [TyVarSpecBinder] -> ThetaType
+                  -> [TyVarSpecBinder] -> ThetaType
                   -> [Type] -> Type
                   -> TcM (Maybe (Id, Bool))
 mkPatSynBuilderId dir (L _ name)
@@ -796,8 +796,8 @@ mkPatSynBuilderId dir (L _ name)
        ; let theta          = req_theta ++ prov_theta
              need_dummy_arg = isUnliftedType pat_ty && null arg_tys && null theta
              builder_sigma  = add_void need_dummy_arg $
-                              mkForAllTys univ_bndrs $
-                              mkForAllTys ex_bndrs $
+                              mkForAllTys (tyVarSpecToBinders univ_bndrs) $
+                              mkForAllTys (tyVarSpecToBinders ex_bndrs) $
                               mkPhiTy theta $
                               mkVisFunTys arg_tys $
                               pat_ty

@@ -5,7 +5,7 @@
 \section{@Vars@: Variables}
 -}
 
-{-# LANGUAGE CPP, FlexibleContexts, MultiWayIf, FlexibleInstances, DeriveDataTypeable #-}
+{-# LANGUAGE CPP, FlexibleContexts, MultiWayIf, FlexibleInstances, DeriveDataTypeable, PatternSynonyms #-}
 
 -- |
 -- #name_types#
@@ -61,15 +61,19 @@ module Var (
         mustHaveLocalBinding,
 
         -- * ArgFlags
-        ArgFlag(..), isVisibleArgFlag, isInvisibleArgFlag, sameVis,
+        ArgFlag(Invisible,Required,Specified,Inferred),
+        isVisibleArgFlag, isInvisibleArgFlag, sameVis,
         AnonArgFlag(..), ForallVisFlag(..), argToForallVisFlag,
+        Specificity(..), argFlagToSpecificity,
 
         -- * TyVar's
         VarBndr(..), TyCoVarBinder, TyVarBinder,
+        TyCoVarSpecBinder, TyVarSpecBinder,
         binderVar, binderVars, binderArgFlag, binderType,
         mkTyCoVarBinder, mkTyCoVarBinders,
         mkTyVarBinder, mkTyVarBinders,
-        isTyVarBinder,
+        isTyVarBinder, tyVarSpecToBinder, tyVarSpecToBinders,
+        splitTyVarsOnSpecificity, mapVarBndr, mapVarBndrs,
 
         -- ** Constructing TyVar's
         mkTyVar, mkTcTyVar,
@@ -387,9 +391,20 @@ updateVarTypeM f id = do { ty' <- f (varType id)
 -- permitted by request ('Specified') (visible type application), or
 -- prohibited entirely from appearing in source Haskell ('Inferred')?
 -- See Note [VarBndrs, TyCoVarBinders, TyConBinders, and visibility] in TyCoRep
-data ArgFlag = Inferred | Specified | Required
+data ArgFlag = Invisible Specificity
+             | Required
   deriving (Eq, Ord, Data)
   -- (<) on ArgFlag means "is less visible than"
+
+data Specificity = SInferred
+                 | SSpecified
+  deriving (Eq, Ord, Data)
+
+pattern Inferred, Specified :: ArgFlag
+pattern Inferred  = Invisible SInferred
+pattern Specified = Invisible SSpecified
+
+{-# COMPLETE Required, Specified, Inferred #-}
 
 -- | Does this 'ArgFlag' classify an argument that is written in Haskell?
 isVisibleArgFlag :: ArgFlag -> Bool
@@ -404,15 +419,24 @@ isInvisibleArgFlag = not . isVisibleArgFlag
 -- arguments are visible, others are not. So this function
 -- equates 'Specified' and 'Inferred'. Used for printing.
 sameVis :: ArgFlag -> ArgFlag -> Bool
-sameVis Required Required = True
-sameVis Required _        = False
-sameVis _        Required = False
-sameVis _        _        = True
+sameVis Required      Required      = True
+sameVis (Invisible _) (Invisible _) = True
+sameVis _             _             = False
 
 instance Outputable ArgFlag where
   ppr Required  = text "[req]"
   ppr Specified = text "[spec]"
   ppr Inferred  = text "[infrd]"
+
+instance Binary Specificity where
+  put_ bh SSpecified = putByte bh 0
+  put_ bh SInferred  = putByte bh 1
+
+  get bh = do
+    h <- getByte bh
+    case h of
+      0 -> return SSpecified
+      _ -> return SInferred
 
 instance Binary ArgFlag where
   put_ bh Required  = putByte bh 0
@@ -425,6 +449,11 @@ instance Binary ArgFlag where
       0 -> return Required
       1 -> return Specified
       _ -> return Inferred
+
+-- | Convert an 'ArgFlag' to its corresponding 'Specificity'.
+argFlagToSpecificity :: ArgFlag -> Specificity
+argFlagToSpecificity Required      = SSpecified
+argFlagToSpecificity (Invisible s) = s
 
 -- | The non-dependent version of 'ArgFlag'.
 
@@ -520,8 +549,16 @@ data VarBndr var argf = Bndr var argf
 -- home in TyCoRep, because it's used in DataCon.hs-boot
 --
 -- A 'TyVarBinder' is a binder with only TyVar
-type TyCoVarBinder = VarBndr TyCoVar ArgFlag
-type TyVarBinder   = VarBndr TyVar ArgFlag
+type TyCoVarBinder     = VarBndr TyCoVar ArgFlag
+type TyVarBinder       = VarBndr TyVar ArgFlag
+type TyCoVarSpecBinder = VarBndr TyCoVar Specificity
+type TyVarSpecBinder   = VarBndr TyVar Specificity
+
+tyVarSpecToBinders :: [VarBndr a Specificity] -> [VarBndr a ArgFlag]
+tyVarSpecToBinders = map tyVarSpecToBinder
+
+tyVarSpecToBinder :: (VarBndr a Specificity) -> (VarBndr a ArgFlag)
+tyVarSpecToBinder (Bndr tv vis) = Bndr tv (Invisible vis)
 
 binderVar :: VarBndr tv argf -> tv
 binderVar (Bndr v _) = v
@@ -536,32 +573,52 @@ binderType :: VarBndr TyCoVar argf -> Type
 binderType (Bndr tv _) = varType tv
 
 -- | Make a named binder
-mkTyCoVarBinder :: ArgFlag -> TyCoVar -> TyCoVarBinder
+mkTyCoVarBinder :: vis -> TyCoVar -> (VarBndr TyCoVar vis)
 mkTyCoVarBinder vis var = Bndr var vis
 
 -- | Make a named binder
 -- 'var' should be a type variable
-mkTyVarBinder :: ArgFlag -> TyVar -> TyVarBinder
+mkTyVarBinder :: vis -> TyVar -> (VarBndr TyVar vis)
 mkTyVarBinder vis var
   = ASSERT( isTyVar var )
     Bndr var vis
 
 -- | Make many named binders
-mkTyCoVarBinders :: ArgFlag -> [TyCoVar] -> [TyCoVarBinder]
+mkTyCoVarBinders :: vis -> [TyCoVar] -> [VarBndr TyCoVar vis]
 mkTyCoVarBinders vis = map (mkTyCoVarBinder vis)
 
 -- | Make many named binders
 -- Input vars should be type variables
-mkTyVarBinders :: ArgFlag -> [TyVar] -> [TyVarBinder]
+mkTyVarBinders :: vis -> [TyVar] -> [VarBndr TyVar vis]
 mkTyVarBinders vis = map (mkTyVarBinder vis)
 
 isTyVarBinder :: TyCoVarBinder -> Bool
 isTyVarBinder (Bndr v _) = isTyVar v
 
+mapVarBndr :: (var -> var') -> (VarBndr var flag) -> (VarBndr var' flag)
+mapVarBndr f (Bndr v fl) = Bndr (f v) fl
+
+mapVarBndrs :: (var -> var') -> [VarBndr var flag] -> [VarBndr var' flag]
+mapVarBndrs f = map (mapVarBndr f)
+
+-- | Split a list of annotated tyvars, based on their specificity.
+-- Returns the inferred and specified tyvars separately (in this order).
+splitTyVarsOnSpecificity :: [TyVarSpecBinder] -> ([TyVar] , [TyVar])
+splitTyVarsOnSpecificity tvs = ( binderVars $ filter is_inferred tvs
+                               , binderVars $ filter is_specified tvs )
+  where
+    is_inferred :: TyVarSpecBinder -> Bool
+    is_inferred = (==) SInferred . binderArgFlag
+    is_specified :: TyVarSpecBinder -> Bool
+    is_specified = not . is_inferred
+
 instance Outputable tv => Outputable (VarBndr tv ArgFlag) where
   ppr (Bndr v Required)  = ppr v
   ppr (Bndr v Specified) = char '@' <> ppr v
   ppr (Bndr v Inferred)  = braces (ppr v)
+
+instance Outputable tv => Outputable (VarBndr tv Specificity) where
+  ppr = ppr . tyVarSpecToBinder
 
 instance (Binary tv, Binary vis) => Binary (VarBndr tv vis) where
   put_ bh (Bndr tv vis) = do { put_ bh tv; put_ bh vis }

@@ -32,7 +32,7 @@ module DataCon (
         dataConTyCon, dataConOrigTyCon,
         dataConUserType,
         dataConUnivTyVars, dataConExTyCoVars, dataConUnivAndExTyCoVars,
-        dataConUserTyVars, dataConUserTyVarBinders,
+        dataConUserTyVars, dataConUserTyVarBinders, dataConUserTyVarSpecBinders,
         dataConEqSpec, dataConTheta,
         dataConStupidTheta,
         dataConInstArgTys, dataConOrigArgTys, dataConOrigResTy,
@@ -373,7 +373,7 @@ data DataCon
         --            of tyvars (*not* covars) of dcExTyCoVars unioned with the
         --            set of dcUnivTyVars whose tyvars do not appear in dcEqSpec
         -- See Note [DataCon user type variable binders]
-        dcUserTyVarBinders :: [TyVarBinder],
+        dcUserTyVarBinders :: [TyVarSpecBinder],
 
         dcEqSpec :: [EqSpec],   -- Equalities derived from the result type,
                                 -- _as written by the programmer_.
@@ -892,10 +892,10 @@ mkDataCon :: Name
                             -- if it is a record, otherwise empty
           -> [TyVar]        -- ^ Universals.
           -> [TyCoVar]      -- ^ Existentials.
-          -> [TyVarBinder]  -- ^ User-written 'TyVarBinder's.
-                            --   These must be Inferred/Specified.
-                            --   See @Note [TyVarBinders in DataCons]@
-          -> [EqSpec]       -- ^ GADT equalities
+          -> [TyVarSpecBinder]  -- ^ User-written 'TyVarBinder's.
+                                --   These must be Inferred/Specified.
+                                --   See @Note [TyVarBinders in DataCons]@
+          -> [EqSpec]           -- ^ GADT equalities
           -> KnotTied ThetaType -- ^ Theta-type occurring before the arguments proper
           -> [KnotTied Type]    -- ^ Original argument types
           -> KnotTied Type      -- ^ Original result type
@@ -964,8 +964,8 @@ mkDataCon name declared_infix prom_info
                  mkTyConApp rep_tycon (mkTyVarTys univ_tvs)
 
       -- See Note [Promoted data constructors] in TyCon
-    prom_tv_bndrs = [ mkNamedTyConBinder vis tv
-                    | Bndr tv vis <- user_tvbs ]
+    prom_tv_bndrs = [ mkNamedTyConBinder (Invisible spec) tv
+                    | Bndr tv spec <- user_tvbs ]
 
     fresh_names = freshNames (map getName user_tvbs)
       -- fresh_names: make sure that the "anonymous" tyvars don't
@@ -1058,7 +1058,10 @@ dataConUserTyVars (MkData { dcUserTyVarBinders = tvbs }) = binderVars tvbs
 -- | 'TyCoVarBinder's for the type variables of the constructor, in the order the
 -- user wrote them
 dataConUserTyVarBinders :: DataCon -> [TyVarBinder]
-dataConUserTyVarBinders = dcUserTyVarBinders
+dataConUserTyVarBinders = tyVarSpecToBinders . dcUserTyVarBinders
+
+dataConUserTyVarSpecBinders :: DataCon -> [TyVarSpecBinder]
+dataConUserTyVarSpecBinders = dcUserTyVarBinders
 
 -- | Equalities derived from the result type of the data constructor, as written
 -- by the programmer in any GADT declaration. This includes *all* GADT-like
@@ -1280,7 +1283,7 @@ dataConUserType :: DataCon -> Type
 dataConUserType (MkData { dcUserTyVarBinders = user_tvbs,
                           dcOtherTheta = theta, dcOrigArgTys = arg_tys,
                           dcOrigResTy = res_ty })
-  = mkForAllTys user_tvbs $
+  = mkForAllTys (tyVarSpecToBinders user_tvbs) $
     mkInvisFunTys theta $
     mkVisFunTys arg_tys $
     res_ty

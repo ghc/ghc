@@ -381,8 +381,8 @@ patScopes rsp useScope patScope xs =
 tvScopes
   :: TyVarScope
   -> Scope
-  -> [LHsTyVarBndr a]
-  -> [TVScoped (LHsTyVarBndr a)]
+  -> [LHsTyVarBndr flag a]
+  -> [TVScoped (LHsTyVarBndr flag a)]
 tvScopes tvScope rhsScope xs =
   map (\(RS sc a)-> TVS tvScope sc a) $ listScopes rhsScope xs
 
@@ -443,7 +443,7 @@ instance HasLoc thing => HasLoc (TScoped thing) where
 instance HasLoc thing => HasLoc (PScoped thing) where
   loc (PS _ _ _ a) = loc a
 
-instance HasLoc (LHsQTyVars GhcRn) where
+instance HasLoc (LHsQTyVars flag GhcRn) where
   loc (HsQTvs _ vs) = loc vs
   loc _ = noSrcSpan
 
@@ -1598,18 +1598,18 @@ instance (ToHie tm, ToHie ty) => ToHie (HsArg tm ty) where
   toHie (HsTypeArg _ ty) = toHie ty
   toHie (HsArgPar sp) = pure $ locOnly sp
 
-instance ToHie (TVScoped (LHsTyVarBndr GhcRn)) where
+instance Data flag => ToHie (TVScoped (LHsTyVarBndr flag GhcRn)) where
   toHie (TVS tsc sc (L span bndr)) = concatM $ makeNode bndr span : case bndr of
-      UserTyVar _ var ->
+      UserTyVar _ _ var ->
         [ toHie $ C (TyVarBind sc tsc) var
         ]
-      KindedTyVar _ var kind ->
+      KindedTyVar _ _ var kind ->
         [ toHie $ C (TyVarBind sc tsc) var
         , toHie kind
         ]
       XTyVarBndr _ -> []
 
-instance ToHie (TScoped (LHsQTyVars GhcRn)) where
+instance Data flag => ToHie (TScoped (LHsQTyVars flag GhcRn)) where
   toHie (TS sc (HsQTvs implicits vars)) = concatM $
     [ pure $ bindingsOnly bindings
     , toHie $ tvScopes sc NoScope vars
