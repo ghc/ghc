@@ -305,7 +305,8 @@ summaryBuffer !buf  -- Strict => slightly better code
                            in if null p then "0x0" else '0':'x':p
         ppr x = x
 
--- INVARIANTS on Buffers:
+-- Note [INVARIANTS on Buffers]
+-- ~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 --   * r <= w
 --   * if r == w, and the buffer is for reading, then r == 0 && w == 0
 --   * a write buffer is never full.  If an operation
