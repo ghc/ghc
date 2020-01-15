@@ -61,7 +61,13 @@ ifeq "$(GhcThreaded)" "YES"
 # Use threaded RTS with GHCi, so threads don't get blocked at the prompt.
 ghc_stage2_MORE_HC_OPTS += -threaded
 ghc_stage3_MORE_HC_OPTS += -threaded
+else
+# Opt out from threaded GHC. See ghc-bin.cabal.in
+ghc_stage2_CONFIGURE_OPTS += -f-threaded
+ghc_stage3_CONFIGURE_OPTS += -f-threaded
 endif
+# Stage-0 compiler isn't guaranteed to have a threaded RTS.
+ghc_stage1_CONFIGURE_OPTS += -f-threaded
 
 ifeq "$(GhcProfiled)" "YES"
 ghc_stage2_PROGRAM_WAY = p
