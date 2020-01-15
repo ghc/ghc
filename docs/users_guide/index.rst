@@ -15,10 +15,9 @@ Contents:
    ghci
    runghc
    usage
-   profiling
-   lang
-   ffi-chap
+   exts
    extending_ghc
+   profiling
    debug-info
    gone_wrong
    hints
