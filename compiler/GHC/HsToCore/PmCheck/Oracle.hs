@@ -70,7 +70,7 @@ import DsMonad hiding (foldlM)
 import FamInst
 import FamInstEnv
 
-import Control.Monad (guard, mzero)
+import Control.Monad (guard, mzero, when)
 import Control.Monad.Trans.Class (lift)
 import Control.Monad.Trans.State.Strict
 import Data.Bifunctor (second)
@@ -112,9 +112,9 @@ markMatched con (PM ms) = PM (del_one_con con <$> ms)
 
 -- | Instantiate a 'ConLike' given its universal type arguments. Instantiates
 -- existential and term binders with fresh variables of appropriate type.
--- Returns instantiated term variables from the match, type evidence and the
--- types of strict constructor fields.
-mkOneConFull :: [Type] -> ConLike -> DsM ([Id], Bag TyCt, [Type])
+-- Returns instantiated type and term variables from the match, type evidence
+-- and the types of strict constructor fields.
+mkOneConFull :: [Type] -> ConLike -> DsM ([TyVar], [Id], Bag TyCt, [Type])
 --  * 'con' K is a ConLike
 --       - In the case of DataCons and most PatSynCons, these
 --         are associated with a particular TyCon T
@@ -132,11 +132,12 @@ mkOneConFull :: [Type] -> ConLike -> DsM ([Id], Bag TyCt, [Type])
 -- be a concrete TyCon.
 --
 -- Suppose y1 is a strict field. Then we get
--- Results: [y1,..,yn]
+-- Results: bs
+--          [y1,..,yn]
 --          Q
 --          [s1]
 mkOneConFull arg_tys con = do
-  let (univ_tvs, ex_tvs, eq_spec, thetas, _req_theta , field_tys, _con_res_ty)
+  let (univ_tvs, ex_tvs, eq_spec, thetas, _req_theta, field_tys, _con_res_ty)
         = conLikeFullSig con
   -- pprTrace "mkOneConFull" (ppr con $$ ppr arg_tys $$ ppr univ_tvs $$ ppr _con_res_ty) (return ())
   -- Substitute universals for type arguments
@@ -158,7 +159,7 @@ mkOneConFull arg_tys con = do
         | otherwise
         = map isBanged $ conLikeImplBangs con
       strict_arg_tys = filterByList arg_is_strict field_tys'
-  return (vars, listToBag ty_cs, strict_arg_tys)
+  return (ex_tvs, vars, listToBag ty_cs, strict_arg_tys)
 
 -------------------------
 -- * Pattern match oracle
@@ -755,7 +756,7 @@ canDiverge delta@MkDelta{ delta_tm_st = ts } x
   | VI _ pos neg _ <- lookupVarInfo ts x
   = null neg && all pos_can_diverge pos
   where
-    pos_can_diverge (PmAltConLike (RealDataCon dc), [y])
+    pos_can_diverge (PmAltConLike (RealDataCon dc), _, [y])
       -- See Note [Divergence of Newtype matches]
       | isNewTyCon (dataConTyCon dc) = canDiverge delta y
     pos_can_diverge _ = False
@@ -795,13 +796,13 @@ lookupRefuts MkDelta{ delta_tm_st = ts@(TmSt (SDIE env) _) } k =
     Just (Indirect y) -> vi_neg (lookupVarInfo ts y)
     Just (Entry vi)   -> vi_neg vi
 
-isDataConSolution :: (PmAltCon, [Id]) -> Bool
-isDataConSolution (PmAltConLike (RealDataCon _), _) = True
-isDataConSolution _                                 = False
+isDataConSolution :: (PmAltCon, [TyVar], [Id]) -> Bool
+isDataConSolution (PmAltConLike (RealDataCon _), _, _) = True
+isDataConSolution _                                    = False
 
 -- @lookupSolution delta x@ picks a single solution ('vi_pos') of @x@ from
 -- possibly many, preferring 'RealDataCon' solutions whenever possible.
-lookupSolution :: Delta -> Id -> Maybe (PmAltCon, [Id])
+lookupSolution :: Delta -> Id -> Maybe (PmAltCon, [TyVar], [Id])
 lookupSolution delta x = case vi_pos (lookupVarInfo (delta_tm_st delta) x) of
   []                                         -> Nothing
   pos
@@ -817,9 +818,9 @@ data TmCt
   -- ^ @TmVarCt x y@ encodes "x ~ y", equating @x@ and @y@.
   | TmCoreCt    !Id !CoreExpr
   -- ^ @TmCoreCt x e@ encodes "x ~ e", equating @x@ with the 'CoreExpr' @e@.
-  | TmConCt     !Id !PmAltCon ![Id]
-  -- ^ @TmConCt x K ys@ encodes "x ~ K ys", equating @x@ with the 'PmAltCon'
-  -- application @K ys@.
+  | TmConCt     !Id !PmAltCon ![TyVar] ![Id]
+  -- ^ @TmConCt x K tvs ys@ encodes "x ~ K @tvs ys", equating @x@ with the 'PmAltCon'
+  -- application @K @tvs ys@.
   | TmNotConCt  !Id !PmAltCon
   -- ^ @TmNotConCt x K@ encodes "x /~ K", asserting that @x@ can't be headed
   -- by @K@.
@@ -830,12 +831,15 @@ data TmCt
   -- ^ @TmNotBotCt x y@ encodes "x /~ ⊥", asserting that @x@ can't be ⊥.
 
 instance Outputable TmCt where
-  ppr (TmVarCt x y)        = ppr x <+> char '~' <+> ppr y
-  ppr (TmCoreCt x e)       = ppr x <+> char '~' <+> ppr e
-  ppr (TmConCt x con args) = ppr x <+> char '~' <+> hsep (ppr con : map ppr args)
-  ppr (TmNotConCt x con)   = ppr x <+> text "/~" <+> ppr con
-  ppr (TmBotCt x)          = ppr x <+> text "~ ⊥"
-  ppr (TmNotBotCt x)       = ppr x <+> text "/~ ⊥"
+  ppr (TmVarCt x y)            = ppr x <+> char '~' <+> ppr y
+  ppr (TmCoreCt x e)           = ppr x <+> char '~' <+> ppr e
+  ppr (TmConCt x con tvs args) = ppr x <+> char '~' <+> hsep (ppr con : pp_tvs ++ pp_args)
+    where
+      pp_tvs  = map ((<> char '@') . ppr) tvs
+      pp_args = map ppr args
+  ppr (TmNotConCt x con)       = ppr x <+> text "/~" <+> ppr con
+  ppr (TmBotCt x)              = ppr x <+> text "~ ⊥"
+  ppr (TmNotBotCt x)           = ppr x <+> text "/~ ⊥"
 
 type TyCt = PredType
 
@@ -849,17 +853,17 @@ data PmCt
 type PmCts = Bag PmCt
 
 pattern PmVarCt :: Id -> Id -> PmCt
-pattern PmVarCt x y         = PmTmCt (TmVarCt x y)
+pattern PmVarCt x y            = PmTmCt (TmVarCt x y)
 pattern PmCoreCt :: Id -> CoreExpr -> PmCt
-pattern PmCoreCt x e        = PmTmCt (TmCoreCt x e)
-pattern PmConCt :: Id -> PmAltCon -> [Id] -> PmCt
-pattern PmConCt x con args  = PmTmCt (TmConCt x con args)
+pattern PmCoreCt x e           = PmTmCt (TmCoreCt x e)
+pattern PmConCt :: Id -> PmAltCon -> [TyVar] -> [Id] -> PmCt
+pattern PmConCt x con tvs args = PmTmCt (TmConCt x con tvs args)
 pattern PmNotConCt :: Id -> PmAltCon -> PmCt
-pattern PmNotConCt x con    = PmTmCt (TmNotConCt x con)
+pattern PmNotConCt x con       = PmTmCt (TmNotConCt x con)
 pattern PmBotCt :: Id -> PmCt
-pattern PmBotCt x           = PmTmCt (TmBotCt x)
+pattern PmBotCt x              = PmTmCt (TmBotCt x)
 pattern PmNotBotCt :: Id -> PmCt
-pattern PmNotBotCt x        = PmTmCt (TmNotBotCt x)
+pattern PmNotBotCt x           = PmTmCt (TmNotBotCt x)
 {-# COMPLETE PmTyCt, PmVarCt, PmCoreCt, PmConCt, PmNotConCt, PmBotCt, PmNotBotCt #-}
 
 instance Outputable PmCt where
@@ -886,12 +890,12 @@ partitionTyTmCts = partitionEithers . map to_either . toList
 -- | Adds a single term constraint by dispatching to the various term oracle
 -- functions.
 addTmCt :: Delta -> TmCt -> MaybeT DsM Delta
-addTmCt delta (TmVarCt x y)        = addVarVarCt delta (x, y)
-addTmCt delta (TmCoreCt x e)       = addVarCoreCt delta x e
-addTmCt delta (TmConCt x con args) = addVarConCt delta x con args
-addTmCt delta (TmNotConCt x con)   = addRefutableAltCon delta x con
-addTmCt delta (TmBotCt x)          = addVarBotCt delta x
-addTmCt delta (TmNotBotCt x)       = addVarNonVoidCt delta x
+addTmCt delta (TmVarCt x y)            = addVarVarCt delta (x, y)
+addTmCt delta (TmCoreCt x e)           = addVarCoreCt delta x e
+addTmCt delta (TmConCt x con tvs args) = addVarConCt delta x con tvs args
+addTmCt delta (TmNotConCt x con)       = addRefutableAltCon delta x con
+addTmCt delta (TmBotCt x)              = addVarBotCt delta x
+addTmCt delta (TmNotBotCt x)           = addVarNonVoidCt delta x
 
 -- | In some future this will actually add a constraint to 'Delta' that we plan
 -- to preserve. But for now, we just check if we can add the constraint to the
@@ -908,11 +912,11 @@ addRefutableAltCon :: Delta -> Id -> PmAltCon -> MaybeT DsM Delta
 addRefutableAltCon delta@MkDelta{ delta_tm_st = TmSt env reps } x nalt = do
   vi@(VI _ pos neg pm) <- lift (initLookupVarInfo delta x)
   -- 1. Bail out quickly when nalt contradicts a solution
-  let contradicts nalt (cl, _args) = eqPmAltCon cl nalt == Equal
+  let contradicts nalt (cl, _tvs, _args) = eqPmAltCon cl nalt == Equal
   guard (not (any (contradicts nalt) pos))
   -- 2. Only record the new fact when it's not already implied by one of the
   -- solutions
-  let implies nalt (cl, _args) = eqPmAltCon cl nalt == Disjoint
+  let implies nalt (cl, _tvs, _args) = eqPmAltCon cl nalt == Disjoint
   let neg'
         | any (implies nalt) pos = neg
         -- See Note [Completeness checking with required Thetas]
@@ -1037,7 +1041,7 @@ ensureInhabited delta vi = fmap (set_cache vi) <$> test (vi_cache vi) -- This wo
       case guessConLikeUnivTyArgsFromResTy env (vi_ty vi) con of
         Nothing -> pure True -- be conservative about this
         Just arg_tys -> do
-          (_vars, ty_cs, strict_arg_tys) <- mkOneConFull arg_tys con
+          (_tvs, _vars, ty_cs, strict_arg_tys) <- mkOneConFull arg_tys con
           tracePm "inh_test" (ppr con $$ ppr ty_cs)
           -- No need to run the term oracle compared to pmIsSatisfiable
           fmap isJust <$> runSatisfiabilityCheck delta $ mconcat
@@ -1102,7 +1106,7 @@ equate delta@MkDelta{ delta_tm_st = TmSt env reps } x y
         let env_refs = setEntrySDIE env_ind y vi_y
         let delta_refs = delta{ delta_tm_st = TmSt env_refs reps }
         -- and then gradually merge every positive fact we have on x into y
-        let add_fact delta (cl, args) = addVarConCt delta y cl args
+        let add_fact delta (cl, tvs, args) = addVarConCt delta y cl tvs args
         delta_pos <- foldlM add_fact delta_refs (vi_pos vi_x)
         -- Do the same for negative info
         let add_refut delta nalt = addRefutableAltCon delta y nalt
@@ -1116,26 +1120,39 @@ equate delta@MkDelta{ delta_tm_st = TmSt env reps } x y
 -- other solutions, reject (@Nothing@) otherwise.
 --
 -- See Note [TmState invariants].
-addVarConCt :: Delta -> Id -> PmAltCon -> [Id] -> MaybeT DsM Delta
-addVarConCt delta@MkDelta{ delta_tm_st = TmSt env reps } x alt args = do
+addVarConCt :: Delta -> Id -> PmAltCon -> [TyVar] -> [Id] -> MaybeT DsM Delta
+addVarConCt delta@MkDelta{ delta_tm_st = TmSt env reps } x alt tvs args = do
   VI ty pos neg cache <- lift (initLookupVarInfo delta x)
   -- First try to refute with a negative fact
   guard (all ((/= Equal) . eqPmAltCon alt) neg)
   -- Then see if any of the other solutions (remember: each of them is an
   -- additional refinement of the possible values x could take) indicate a
   -- contradiction
-  guard (all ((/= Disjoint) . eqPmAltCon alt . fst) pos)
-  -- Now we should be good! Add (alt, args) as a possible solution, or refine an
-  -- existing one
-  case find ((== Equal) . eqPmAltCon alt . fst) pos of
-    Just (_, other_args) -> do
-      foldlM addVarVarCt delta (zip args other_args)
+  guard (all ((/= Disjoint) . eqPmAltCon alt . fstOf3) pos)
+  -- Now we should be good! Add (alt, tvs, args) as a possible solution, or
+  -- refine an existing one
+  case find ((== Equal) . eqPmAltCon alt . fstOf3) pos of
+    Just (_con, other_tvs, other_args) -> do
+      -- We must unify existentially bound ty vars and arguments!
+      let ty_cts = equateTyVarsCts tvs other_tvs
+      when (length args /= length other_args) $
+        lift $ tracePm "error" (ppr x <+> ppr alt <+> ppr args <+> ppr other_args)
+      let tm_cts = zipWithEqual "addVarConCt" PmVarCt args other_args
+      MaybeT $ addPmCts delta (listToBag ty_cts `unionBags` listToBag tm_cts)
     Nothing -> do
       -- Filter out redundant negative facts (those that compare Just False to
       -- the new solution)
       let neg' = filter ((== PossiblyOverlap) . eqPmAltCon alt) neg
-      let pos' = (alt,args):pos
+      let pos' = (alt, tvs, args):pos
       pure delta{ delta_tm_st = TmSt (setEntrySDIE env x (VI ty pos' neg' cache)) reps}
+
+equateTyVarsCts :: [TyVar] -> [TyVar] -> [PmCt]
+equateTyVarsCts as bs
+  = map (\(a, b) -> PmTyCt $ mkPrimEqPred (mkTyVarTy a) (mkTyVarTy b))
+  -- The following line filters out trivial Refl constraints, so that we don't
+  -- need to initialise the type oracle that often
+  $ filter (uncurry (/=))
+  $ zipEqual "equateTyVarsCts" as bs
 
 ----------------------------------------
 -- * Enumerating inhabitation candidates
@@ -1163,9 +1180,9 @@ mkInhabitationCandidate :: Id -> DataCon -> DsM InhabitationCandidate
 mkInhabitationCandidate x dc = do
   let cl = RealDataCon dc
   let tc_args = tyConAppArgs (idType x)
-  (arg_vars, ty_cs, strict_arg_tys) <- mkOneConFull tc_args cl
+  (ty_vars, arg_vars, ty_cs, strict_arg_tys) <- mkOneConFull tc_args cl
   pure InhabitationCandidate
-        { ic_cs = PmTyCt <$> ty_cs `snocBag` PmConCt x (PmAltConLike cl) arg_vars
+        { ic_cs = PmTyCt <$> ty_cs `snocBag` PmConCt x (PmAltConLike cl) ty_vars arg_vars
         , ic_strict_arg_tys = strict_arg_tys
         }
 
@@ -1187,7 +1204,9 @@ inhabitationCandidates MkDelta{ delta_ty_st = ty_st } ty = do
     build_newtype (ty, dc, _arg_ty) x = do
       -- ty is the type of @dc x@. It's a @dataConTyCon dc@ application.
       y <- mkPmId ty
-      pure (y, PmConCt y (PmAltConLike (RealDataCon dc)) [x])
+      -- Newtypes don't have existentials (yet?!), so passing an empty list as
+      -- ex_tvs.
+      pure (y, PmConCt y (PmAltConLike (RealDataCon dc)) [] [x])
 
     build_newtypes :: Id -> [(Type, DataCon, Type)] -> DsM (Id, [PmCt])
     build_newtypes x = foldrM (\dc (x, cts) -> go dc x cts) (x, [])
@@ -1508,7 +1527,7 @@ provideEvidence = go
           -- where @x@ will have two possibly compatible solutions, @Just y@ for
           -- some @y@ and @SomePatSyn z@ for some @z@. We must find evidence for @y@
           -- and @z@ that is valid at the same time. These constitute arg_vas below.
-          let arg_vas = concatMap (\(_cl, args) -> args) pos
+          let arg_vas = concatMap (\(_cl, _tvs, args) -> args) pos
           go (arg_vas ++ xs) n delta
         []
           -- When there are literals involved, just print negative info
@@ -1526,7 +1545,9 @@ provideEvidence = go
       (_src_ty, dcs, core_ty) <- tntrGuts <$> pmTopNormaliseType (delta_ty_st delta) (idType x)
       let build_newtype (x, delta) (_ty, dc, arg_ty) = do
             y <- lift $ mkPmId arg_ty
-            delta' <- addVarConCt delta x (PmAltConLike (RealDataCon dc)) [y]
+            -- Newtypes don't have existentials (yet?!), so passing an empty
+            -- list as ex_tvs.
+            delta' <- addVarConCt delta x (PmAltConLike (RealDataCon dc)) [] [y]
             pure (y, delta')
       runMaybeT (foldlM build_newtype (x, delta) dcs) >>= \case
         Nothing -> pure []
@@ -1553,8 +1574,8 @@ provideEvidence = go
       case guessConLikeUnivTyArgsFromResTy env ty cl of
         Nothing -> pure [delta] -- No idea idea how to refine this one, so just finish off with a wildcard
         Just arg_tys -> do
-          (arg_vars, new_ty_cs, strict_arg_tys) <- mkOneConFull arg_tys cl
-          let new_tm_cs = unitBag (TmConCt x (PmAltConLike cl) arg_vars)
+          (tvs, arg_vars, new_ty_cs, strict_arg_tys) <- mkOneConFull arg_tys cl
+          let new_tm_cs = unitBag (TmConCt x (PmAltConLike cl) tvs arg_vars)
           -- Now check satifiability
           mb_delta <- pmIsSatisfiable delta new_ty_cs new_tm_cs strict_arg_tys
           tracePm "instantiate_cons" (vcat [ ppr x
@@ -1625,14 +1646,21 @@ addVarCoreCt delta x e = do
       = case unpackFS s of
           -- We need this special case to break a loop with coreExprAsPmLit
           -- Otherwise we alternate endlessly between [] and ""
-          [] -> data_con_app x nilDataCon []
+          [] -> data_con_app x nilDataCon [] []
           s' -> core_expr x (mkListExpr charTy (map mkCharExpr s'))
       | Just lit <- coreExprAsPmLit e
       = pm_lit x lit
-      | Just (_in_scope, _empty_floats@[], dc, _arg_tys, args)
+      | Just (in_scope, _empty_floats@[], dc, _arg_tys, args)
             <- exprIsConApp_maybe in_scope_env e
-      = do { arg_ids <- traverse bind_expr args
-           ; data_con_app x dc arg_ids }
+      = do { let dc_ex_tvs               = dataConExTyCoVars dc
+                 arty                    = dataConSourceArity dc
+                 (_ex_ty_args, val_args) = splitAtList dc_ex_tvs args
+                 vis_args                = reverse $ take arty $ reverse val_args
+           ; uniq_supply <- lift $ lift $ getUniqueSupplyM
+           ; let (_, ex_tvs) = cloneTyVarBndrs (mkEmptyTCvSubst in_scope) dc_ex_tvs uniq_supply
+           -- See Note [Why we don't record existential type constraints]
+           ; arg_ids <- traverse bind_expr vis_args
+           ; data_con_app x dc ex_tvs arg_ids }
       -- See Note [Detecting pattern synonym applications in expressions]
       | Var y <- e, Nothing <- isDataConId_maybe x
       -- We don't consider DataCons flexible variables
@@ -1663,22 +1691,38 @@ addVarCoreCt delta x e = do
         represent_expr e = StateT $ \delta ->
           swap <$> lift (representCoreExpr delta e)
 
-    data_con_app :: Id -> DataCon -> [Id] -> StateT Delta (MaybeT DsM) ()
-    data_con_app x dc args = pm_alt_con_app x (PmAltConLike (RealDataCon dc)) args
+    data_con_app :: Id -> DataCon -> [TyVar] -> [Id] -> StateT Delta (MaybeT DsM) ()
+    data_con_app x dc tvs args = pm_alt_con_app x (PmAltConLike (RealDataCon dc)) tvs args
 
     pm_lit :: Id -> PmLit -> StateT Delta (MaybeT DsM) ()
-    pm_lit x lit = pm_alt_con_app x (PmAltLit lit) []
+    pm_lit x lit = pm_alt_con_app x (PmAltLit lit) [] []
 
     -- | Adds the given constructor application as a solution for @x@.
-    pm_alt_con_app :: Id -> PmAltCon -> [Id] -> StateT Delta (MaybeT DsM) ()
-    pm_alt_con_app x con args = modifyT $ \delta -> addVarConCt delta x con args
+    pm_alt_con_app :: Id -> PmAltCon -> [TyVar] -> [Id] -> StateT Delta (MaybeT DsM) ()
+    pm_alt_con_app x con tvs args = modifyT $ \delta -> addVarConCt delta x con tvs args
 
 -- | Like 'modify', but with an effectful modifier action
 modifyT :: Monad m => (s -> m s) -> StateT s m ()
 modifyT f = StateT $ fmap ((,) ()) . f
 
-{- Note [Detecting pattern synonym applications in expressions]
-~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+{- Note [Why we don't record existential type constraints]
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+When we have
+
+  data Ex where Ex :: a -> Ex
+  f _ | let x = Ex @Int 15 = case x of Ex -> ...
+
+we see that `Ex`'s existential in the `Ex` application in the RHS of `x` is
+bound to `Int`. Eventually this application will run by `addVarCoreCt`,
+which freshens `a` to `a'` and adds the constraint `x ~ Ex @a' 15`.
+
+Now, we *could* add the constraint @a' ~ Int@, but that is never useful, because
+types are irrelevant. And in fact, if the programmer assumed that @a' ~ Int@
+in the case alt, it would be rejected as a type error. So we simply don't
+include the constraint.
+
+Note [Detecting pattern synonym applications in expressions]
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 At the moment we fail to detect pattern synonyms in scrutinees and RHS of
 guards. This could be alleviated with considerable effort and complexity, but
 the returns are meager. Consider:
@@ -1690,12 +1734,11 @@ the returns are meager. Consider:
       P 15 ->
 
 Compared to the situation where P and Q are DataCons, the lack of generativity
-means we could never flag Q as redundant.
-(also see Note [Undecidable Equality for PmAltCons] in PmTypes.)
-On the other hand, if we fail to recognise the pattern synonym, we flag the
-pattern match as inexhaustive. That wouldn't happen if we had knowledge about
-the scrutinee, in which case the oracle basically knows "If it's a P, then its
-field is 15".
+means we could never flag Q as redundant. (also see Note [Undecidable Equality
+for PmAltCons] in PmTypes.) On the other hand, if we fail to recognise the
+pattern synonym, we flag the pattern match as inexhaustive. That wouldn't happen
+if we had knowledge about the scrutinee, in which case the oracle basically
+knows "If it's a P, then its field is 15".
 
 This is a pretty narrow use case and I don't think we should to try to fix it
 until a user complains energetically.
