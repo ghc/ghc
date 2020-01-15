@@ -321,23 +321,23 @@ warnUnusedPackages = do
 
         withDash = (<+>) (text "-")
 
-        matchingStr :: String -> PackageConfig -> Bool
+        matchingStr :: String -> UnitInfo -> Bool
         matchingStr str p
                 =  str == sourcePackageIdString p
                 || str == packageNameString p
 
-        matching :: DynFlags -> PackageArg -> PackageConfig -> Bool
+        matching :: DynFlags -> PackageArg -> UnitInfo -> Bool
         matching _ (PackageArg str) p = matchingStr str p
         matching dflags (UnitIdArg uid) p = uid == realUnitId dflags p
 
         -- For wired-in packages, we have to unwire their id,
         -- otherwise they won't match package flags
-        realUnitId :: DynFlags -> PackageConfig -> UnitId
+        realUnitId :: DynFlags -> UnitInfo -> UnitId
         realUnitId dflags
           = unwireUnitId dflags
           . DefiniteUnitId
           . DefUnitId
-          . installedPackageConfigId
+          . installedUnitInfoId
 
 -- | Generalized version of 'load' which also supports a custom
 -- 'Messager' (for reporting progress) and 'ModuleGraph' (generally

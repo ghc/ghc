@@ -1985,8 +1985,8 @@ mkQualModule dflags mod
 -- (1) don't qualify if the package in question is "main", and (2) only qualify
 -- with a unit id if the package ID would be ambiguous.
 mkQualPackage :: DynFlags -> QueryQualifyPackage
-mkQualPackage dflags pkg_key
-     | pkg_key == mainUnitId || pkg_key == interactiveUnitId
+mkQualPackage dflags uid
+     | uid == mainUnitId || uid == interactiveUnitId
         -- Skip the lookup if it's main, since it won't be in the package
         -- database!
      = False
@@ -1997,7 +1997,7 @@ mkQualPackage dflags pkg_key
      = False
      | otherwise
      = True
-     where mb_pkgid = fmap sourcePackageId (lookupPackage dflags pkg_key)
+     where mb_pkgid = fmap sourcePackageId (lookupUnit dflags uid)
 
 -- | A function which only qualifies package names if necessary; but
 -- qualifies all other identifiers.

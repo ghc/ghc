@@ -51,7 +51,7 @@ import DriverPhases     ( HscSource(..) )
 import HscTypes         ( IsBootInterface, WarningTxt(..) )
 import DynFlags
 import BkpSyn
-import PackageConfig
+import UnitInfo
 
 -- compiler/utils
 import OrdList
