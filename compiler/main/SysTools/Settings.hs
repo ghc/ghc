@@ -108,7 +108,7 @@ initSettings top_dir = do
   ldSupportsFilelist      <- getBooleanSetting "ld supports filelist"
   ldIsGnuLd               <- getBooleanSetting "ld is GNU ld"
 
-  let pkgconfig_path = installed "package.conf.d"
+  let globalpkgdb_path = installed "package.conf.d"
       ghc_usage_msg_path  = installed "ghc-usage.txt"
       ghci_usage_msg_path = installed "ghci-usage.txt"
 
@@ -186,7 +186,7 @@ initSettings top_dir = do
       , fileSettings_ghciUsagePath  = ghci_usage_msg_path
       , fileSettings_toolDir        = mtool_dir
       , fileSettings_topDir         = top_dir
-      , fileSettings_systemPackageConfig = pkgconfig_path
+      , fileSettings_globalPackageDatabase = globalpkgdb_path
       }
 
     , sToolSettings = ToolSettings
