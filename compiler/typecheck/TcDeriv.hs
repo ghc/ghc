@@ -717,7 +717,7 @@ tcStandaloneDerivInstType
 tcStandaloneDerivInstType ctxt
     (HsWC { hswc_body = deriv_ty@(HsIB { hsib_ext = vars
                                        , hsib_body   = deriv_ty_body })})
-  | (tvs, theta, rho) <- splitLHsSigmaTy deriv_ty_body
+  | (tvs, theta, rho) <- splitLHsSigmaTyInvis deriv_ty_body
   , L _ [wc_pred] <- theta
   , L wc_span (HsWildCardTy _) <- ignoreParens wc_pred
   = do dfun_ty <- tcHsClsInstType ctxt $

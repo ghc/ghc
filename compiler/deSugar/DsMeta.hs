@@ -349,7 +349,7 @@ get_scoped_tvs (L _ signature)
       --    here 'k' scopes too
       | HsIB { hsib_ext = implicit_vars
              , hsib_body = hs_ty } <- sig
-      , (explicit_vars, _) <- splitLHsForAllTy hs_ty
+      , (explicit_vars, _) <- splitLHsForAllTyInvis hs_ty
       = implicit_vars ++ hsLTyVarNames explicit_vars
     get_scoped_tvs_from_sig (XHsImplicitBndrs nec)
       = noExtCon nec
@@ -1240,7 +1240,7 @@ repContext ctxt = do preds <- repListM typeTyConName repLTy ctxt
 repHsSigType :: LHsSigType GhcRn -> MetaM (Core (M TH.Type))
 repHsSigType (HsIB { hsib_ext = implicit_tvs
                    , hsib_body = body })
-  | (explicit_tvs, ctxt, ty) <- splitLHsSigmaTy body
+  | (explicit_tvs, ctxt, ty) <- splitLHsSigmaTyInvis body
   = addSimpleTyVarBinds implicit_tvs $
       -- See Note [Don't quantify implicit type variables in quotes]
     addHsTyVarBinds explicit_tvs $ \ th_explicit_tvs ->
@@ -1264,21 +1264,29 @@ repLTys tys = mapM repLTy tys
 repLTy :: LHsType GhcRn -> MetaM (Core (M TH.Type))
 repLTy ty = repTy (unLoc ty)
 
-repForall :: ForallVisFlag -> HsType GhcRn -> MetaM (Core (M TH.Type))
--- Arg of repForall is always HsForAllTy or HsQualTy
-repForall fvf ty
- | (tvs, ctxt, tau) <- splitLHsSigmaTy (noLoc ty)
+-- Desugar a type headed by an invisible forall (e.g., @forall a. a@) or
+-- a context (e.g., @Show a => a@) into a ForallT from L.H.TH.Syntax.
+-- In other words, the argument to this function is always an
+-- @HsForAllTy ForallInvis@ or @HsQualTy@.
+-- Types headed by visible foralls (which are desugared to ForallVisT) are
+-- handled separately in repTy.
+repForallT :: HsType GhcRn -> MetaM (Core (M TH.Type))
+repForallT ty
+ | (tvs, ctxt, tau) <- splitLHsSigmaTyInvis (noLoc ty)
  = addHsTyVarBinds tvs $ \bndrs ->
    do { ctxt1  <- repLContext ctxt
-      ; ty1    <- repLTy tau
-      ; case fvf of
-          ForallVis   -> repTForallVis bndrs ty1    -- forall a      -> {...}
-          ForallInvis -> repTForall bndrs ctxt1 ty1 -- forall a. C a => {...}
+      ; tau1   <- repLTy tau
+      ; repTForall bndrs ctxt1 tau1 -- forall a. C a => {...}
       }
 
 repTy :: HsType GhcRn -> MetaM (Core (M TH.Type))
-repTy ty@(HsForAllTy {hst_fvf = fvf}) = repForall fvf         ty
-repTy ty@(HsQualTy {})                = repForall ForallInvis ty
+repTy ty@(HsForAllTy { hst_fvf = fvf, hst_bndrs = tvs, hst_body = body }) =
+  case fvf of
+    ForallInvis -> repForallT ty
+    ForallVis   -> addHsTyVarBinds tvs $ \bndrs ->
+                   do body1 <- repLTy body
+                      repTForallVis bndrs body1
+repTy ty@(HsQualTy {}) = repForallT ty
 
 repTy (HsTyVar _ _ (L _ n))
   | isLiftedTypeKindTyConName n       = repTStar
