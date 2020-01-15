@@ -95,6 +95,7 @@ data PmGrd
     PmCon {
       pm_id          :: !Id,
       pm_con_con     :: !PmAltCon,
+      pm_con_tvs     :: ![TyVar],
       pm_con_dicts   :: ![EvVar],
       pm_con_args    :: ![Id]
     }
@@ -113,7 +114,7 @@ data PmGrd
 
 -- | Should not be user-facing.
 instance Outputable PmGrd where
-  ppr (PmCon x alt _con_dicts con_args)
+  ppr (PmCon x alt _tvs _con_dicts con_args)
     = hsep [ppr alt, hsep (map ppr con_args), text "<-", ppr x]
   ppr (PmBang x) = char '!' <> ppr x
   ppr (PmLet x expr) = hsep [text "let", ppr x, text "=", ppr expr]
@@ -354,7 +355,7 @@ mkPmLetVar x y          = [PmLet x (Var y)]
 vanillaConGrd :: Id -> DataCon -> [Id] -> PmGrd
 vanillaConGrd scrut con arg_ids =
   PmCon { pm_id = scrut, pm_con_con = PmAltConLike (RealDataCon con)
-        , pm_con_dicts = [], pm_con_args = arg_ids }
+        , pm_con_tvs = [], pm_con_dicts = [], pm_con_args = arg_ids }
 
 -- | Creates a 'GrdVec' refining a match var of list type to a list,
 -- where list fields are matched against the incoming tagged 'GrdVec's.
@@ -389,6 +390,7 @@ mkPmLitGrds x (PmLit _ (PmLitString s)) = do
 mkPmLitGrds x lit = do
   let grd = PmCon { pm_id = x
                   , pm_con_con = PmAltLit lit
+                  , pm_con_tvs = []
                   , pm_con_dicts = []
                   , pm_con_args = [] }
   pure [grd]
@@ -585,7 +587,7 @@ translateConPatOut fam_insts x con univ_tys ex_tvs dicts = \case
 
       -- 1. the constructor pattern match itself
       arg_ids <- zipWithM get_pat_id [0..] arg_tys
-      let con_grd = PmCon x (PmAltConLike con) dicts arg_ids
+      let con_grd = PmCon x (PmAltConLike con) ex_tvs dicts arg_ids
 
       -- 2. bang strict fields
       let arg_is_banged = map isBanged $ conLikeImplBangs con
@@ -935,14 +937,14 @@ checkGrdTree' (Guard (PmBang x) tree) deltas = do
   pure res{ cr_clauses = applyWhen has_diverged mayDiverge (cr_clauses res) }
 -- Con: Diverge on x ~ ⊥, fall through on x /~ K and refine with x ~ K ys
 --      and type info
-checkGrdTree' (Guard (PmCon x con dicts args) tree) deltas = do
+checkGrdTree' (Guard (PmCon x con tvs dicts args) tree) deltas = do
   has_diverged <-
     if conMatchForces con
       then addPmCtDeltas deltas (PmBotCt x) >>= isInhabited
       else pure False
   unc_this <- addPmCtDeltas deltas (PmNotConCt x con)
   deltas' <- addPmCtsDeltas deltas $
-    listToBag (PmTyCt . evVarPred <$> dicts) `snocBag` PmConCt x con args
+    listToBag (PmTyCt . evVarPred <$> dicts) `snocBag` PmConCt x con tvs args
   CheckResult tree' unc_inner prec <- checkGrdTree' tree deltas'
   limit <- maxPmCheckModels <$> getDynFlags
   let (prec', unc') = throttle limit deltas (unc_this Semi.<> unc_inner)
@@ -1032,10 +1034,10 @@ addScrutTmCs (Just scr) [x] k = do
   locallyExtendPmDelta (\delta -> addPmCts delta (unitBag (PmCoreCt x scr_e))) k
 addScrutTmCs _   _   _ = panic "addScrutTmCs: HsCase with more than one case binder"
 
-addPmConCts :: Delta -> Id -> PmAltCon -> [EvVar] -> [Id] -> DsM (Maybe Delta)
-addPmConCts delta x con dicts fields = runMaybeT $ do
+addPmConCts :: Delta -> Id -> PmAltCon -> [TyVar] -> [EvVar] -> [Id] -> DsM (Maybe Delta)
+addPmConCts delta x con tvs dicts fields = runMaybeT $ do
   delta_ty    <- MaybeT $ addPmCts delta (listToBag (PmTyCt . evVarPred <$> dicts))
-  delta_tm_ty <- MaybeT $ addPmCts delta_ty (unitBag (PmConCt x con fields))
+  delta_tm_ty <- MaybeT $ addPmCts delta_ty (unitBag (PmConCt x con tvs fields))
   pure delta_tm_ty
 
 -- | Add equalities to the local 'DsM' environment when checking the RHS of a
@@ -1068,9 +1070,9 @@ computeCovered (PmLet { pm_id = x, pm_let_expr = e } : ps) delta = do
 computeCovered (PmBang{} : ps) delta = do
   computeCovered ps delta
 computeCovered (p : ps) delta
-  | PmCon{ pm_id = x, pm_con_con = con, pm_con_args = args
+  | PmCon{ pm_id = x, pm_con_con = con, pm_con_tvs = tvs, pm_con_args = args
          , pm_con_dicts = dicts } <- p
-  = addPmConCts delta x con dicts args >>= \case
+  = addPmConCts delta x con tvs dicts args >>= \case
       Nothing     -> pure Nothing
       Just delta' -> computeCovered ps delta'
 
