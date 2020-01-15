@@ -769,7 +769,7 @@ validate-x86_64-linux-fedora27:
   <<: *only-default
   before_script:
     - git clean -xdf
-    - git submodule foreach git clean -xdf
+    - git submodule foreach 'bash -c "git clean -xdf || true"'
 
     # Use a local temporary directory to ensure that concurrent builds don't
     # interfere with one another
