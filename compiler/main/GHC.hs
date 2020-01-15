@@ -34,6 +34,7 @@ module GHC (
         getSessionDynFlags, setSessionDynFlags,
         getProgramDynFlags, setProgramDynFlags, setLogAction,
         getInteractiveDynFlags, setInteractiveDynFlags,
+        interpretPackageEnv,
 
         -- * Targets
         Target(..), TargetId(..), Phase,
@@ -346,7 +347,6 @@ import Util
 import StringBuffer
 import Outputable
 import BasicTypes
-import Maybes           ( expectJust )
 import FastString
 import qualified Parser
 import Lexer
@@ -364,7 +364,6 @@ import Data.Foldable
 import qualified Data.Map.Strict as Map
 import Data.Set (Set)
 import qualified Data.Sequence as Seq
-import System.Directory ( doesFileExist )
 import Data.Maybe
 import Data.Time
 import Data.Typeable    ( Typeable )
@@ -374,6 +373,11 @@ import System.Exit      ( exitWith, ExitCode(..) )
 import Exception
 import Data.IORef
 import System.FilePath
+
+import Maybes
+import System.IO.Error  ( isDoesNotExistError )
+import System.Environment ( getEnv )
+import System.Directory
 
 
 -- %************************************************************************
@@ -588,9 +592,10 @@ checkBrokenTablesNextToCode' dflags
 setSessionDynFlags :: GhcMonad m => DynFlags -> m [InstalledUnitId]
 setSessionDynFlags dflags = do
   dflags' <- checkNewDynFlags dflags
-  (dflags'', preload) <- liftIO $ initPackages dflags'
-  modifySession $ \h -> h{ hsc_dflags = dflags''
-                         , hsc_IC = (hsc_IC h){ ic_dflags = dflags'' } }
+  dflags'' <- liftIO $ interpretPackageEnv dflags'
+  (dflags''', preload) <- liftIO $ initPackages dflags''
+  modifySession $ \h -> h{ hsc_dflags = dflags'''
+                         , hsc_IC = (hsc_IC h){ ic_dflags = dflags''' } }
   invalidateModSummaryCache
   return preload
 
@@ -1563,3 +1568,138 @@ parser str dflags filename =
      POk pst rdr_module ->
          let (warns,_) = getMessages pst dflags in
          (warns, Right rdr_module)
+
+-- -----------------------------------------------------------------------------
+-- | Find the package environment (if one exists)
+--
+-- We interpret the package environment as a set of package flags; to be
+-- specific, if we find a package environment file like
+--
+-- > clear-package-db
+-- > global-package-db
+-- > package-db blah/package.conf.d
+-- > package-id id1
+-- > package-id id2
+--
+-- we interpret this as
+--
+-- > [ -hide-all-packages
+-- > , -clear-package-db
+-- > , -global-package-db
+-- > , -package-db blah/package.conf.d
+-- > , -package-id id1
+-- > , -package-id id2
+-- > ]
+--
+-- There's also an older syntax alias for package-id, which is just an
+-- unadorned package id
+--
+-- > id1
+-- > id2
+--
+interpretPackageEnv :: DynFlags -> IO DynFlags
+interpretPackageEnv dflags = do
+    mPkgEnv <- runMaybeT $ msum $ [
+                   getCmdLineArg >>= \env -> msum [
+                       probeNullEnv env
+                     , probeEnvFile env
+                     , probeEnvName env
+                     , cmdLineError env
+                     ]
+                 , getEnvVar >>= \env -> msum [
+                       probeNullEnv env
+                     , probeEnvFile env
+                     , probeEnvName env
+                     , envError     env
+                     ]
+                 , notIfHideAllPackages >> msum [
+                       findLocalEnvFile >>= probeEnvFile
+                     , probeEnvName defaultEnvName
+                     ]
+                 ]
+    case mPkgEnv of
+      Nothing ->
+        -- No environment found. Leave DynFlags unchanged.
+        return dflags
+      Just "-" -> do
+        -- Explicitly disabled environment file. Leave DynFlags unchanged.
+        return dflags
+      Just envfile -> do
+        content <- readFile envfile
+        compilationProgressMsg dflags ("Loaded package environment from " ++ envfile)
+        let (_, dflags') = runCmdLine (runEwM (setFlagsFromEnvFile envfile content)) dflags
+
+        return dflags'
+  where
+    -- Loading environments (by name or by location)
+
+    namedEnvPath :: String -> MaybeT IO FilePath
+    namedEnvPath name = do
+     appdir <- versionedAppDir dflags
+     return $ appdir </> "environments" </> name
+
+    probeEnvName :: String -> MaybeT IO FilePath
+    probeEnvName name = probeEnvFile =<< namedEnvPath name
+
+    probeEnvFile :: FilePath -> MaybeT IO FilePath
+    probeEnvFile path = do
+      guard =<< liftMaybeT (doesFileExist path)
+      return path
+
+    probeNullEnv :: FilePath -> MaybeT IO FilePath
+    probeNullEnv "-" = return "-"
+    probeNullEnv _   = mzero
+
+    -- Various ways to define which environment to use
+
+    getCmdLineArg :: MaybeT IO String
+    getCmdLineArg = MaybeT $ return $ packageEnv dflags
+
+    getEnvVar :: MaybeT IO String
+    getEnvVar = do
+      mvar <- liftMaybeT $ try $ getEnv "GHC_ENVIRONMENT"
+      case mvar of
+        Right var -> return var
+        Left err  -> if isDoesNotExistError err then mzero
+                                                else liftMaybeT $ throwIO err
+
+    notIfHideAllPackages :: MaybeT IO ()
+    notIfHideAllPackages =
+      guard (not (gopt Opt_HideAllPackages dflags))
+
+    defaultEnvName :: String
+    defaultEnvName = "default"
+
+    -- e.g. .ghc.environment.x86_64-linux-7.6.3
+    localEnvFileName :: FilePath
+    localEnvFileName = ".ghc.environment" <.> versionedFilePath dflags
+
+    -- Search for an env file, starting in the current dir and looking upwards.
+    -- Fail if we get to the users home dir or the filesystem root. That is,
+    -- we don't look for an env file in the user's home dir. The user-wide
+    -- env lives in ghc's versionedAppDir/environments/default
+    findLocalEnvFile :: MaybeT IO FilePath
+    findLocalEnvFile = do
+        curdir  <- liftMaybeT getCurrentDirectory
+        homedir <- tryMaybeT getHomeDirectory
+        let probe dir | isDrive dir || dir == homedir
+                      = mzero
+            probe dir = do
+              let file = dir </> localEnvFileName
+              exists <- liftMaybeT (doesFileExist file)
+              if exists
+                then return file
+                else probe (takeDirectory dir)
+        probe curdir
+
+    -- Error reporting
+
+    cmdLineError :: String -> MaybeT IO a
+    cmdLineError env = liftMaybeT . throwGhcExceptionIO . CmdLineError $
+      "Package environment " ++ show env ++ " not found"
+
+    envError :: String -> MaybeT IO a
+    envError env = liftMaybeT . throwGhcExceptionIO . CmdLineError $
+         "Package environment "
+      ++ show env
+      ++ " (specified in GHC_ENVIRONMENT) not found"
