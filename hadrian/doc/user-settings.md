@@ -35,6 +35,8 @@ data Flavour = Flavour {
     ghcProfiled :: Bool,
     -- | Build GHC with debug information.
     ghcDebugged :: Bool
+    -- | Build the GHC executable against the threaded runtime system.
+    ghcThreaded :: Bool,
     -- | Whether to build docs and which ones
     --   (haddocks, user manual, haddock manual)
     ghcDocs :: Action DocTargets }
