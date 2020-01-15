@@ -465,7 +465,7 @@ data VarInfo
   -- ^ The type of the variable. Important for rejecting possible GADT
   -- constructors or incompatible pattern synonyms (@Just42 :: Maybe Int@).
 
-  , vi_pos :: ![(PmAltCon, [Id])]
+  , vi_pos :: ![(PmAltCon, [TyVar], [Id])]
   -- ^ Positive info: 'PmAltCon' apps it is (i.e. @x ~ [Just y, PatSyn z]@), all
   -- at the same time (i.e. conjunctive).  We need a list because of nested
   -- pattern matches involving pattern synonym
