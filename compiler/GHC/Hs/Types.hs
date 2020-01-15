@@ -1235,10 +1235,16 @@ splitLHsPatSynTy ty = (univs, reqs, exis, provs, ty4)
 -- | Decompose a sigma type (of the form @forall <tvs>. context => body@)
 -- into its constituent parts.
 --
--- Note that this function looks through parentheses, so it will work on types
--- such as @(forall a. <...>)@. The downside to this is that it is not
--- generally possible to take the returned types and reconstruct the original
--- type (parentheses and all) from them.
+-- Some caveats:
+--
+-- * This function looks through parentheses, so it will work on types
+--   such as @(forall a. <...>)@. The downside to this is that it is not
+--   generally possible to take the returned types and reconstruct the original
+--   type (parentheses and all) from them.
+--
+-- * The function splits both visible @forall@s (e.g., @forall a -> a@) and
+--   invisible @forall@s (e.g., @forall a. a@). If you only wish to split
+--   invisible @forall@s, use 'splitLHsSigmaTyInvis' instead.
 splitLHsSigmaTy :: LHsType pass
                 -> ([LHsTyVarBndr pass], LHsContext pass, LHsType pass)
 splitLHsSigmaTy ty
@@ -1268,10 +1274,16 @@ splitLHsSigmaTyInvis ty
 -- | Decompose a type of the form @forall <tvs>. body@) into its constituent
 -- parts.
 --
--- Note that this function looks through parentheses, so it will work on types
--- such as @(forall a. <...>)@. The downside to this is that it is not
--- generally possible to take the returned types and reconstruct the original
--- type (parentheses and all) from them.
+-- Some caveats:
+--
+-- * This function looks through parentheses, so it will work on types
+--   such as @(forall a. <...>)@. The downside to this is that it is not
+--   generally possible to take the returned types and reconstruct the original
+--   type (parentheses and all) from them.
+--
+-- * The function splits both visible @forall@s (e.g., @forall a -> a@) and
+--   invisible @forall@s (e.g., @forall a. a@). If you only wish to split
+--   invisible @forall@s, use 'splitLHsForAllTyInvis' instead.
 splitLHsForAllTy :: LHsType pass -> ([LHsTyVarBndr pass], LHsType pass)
 splitLHsForAllTy (L _ (HsParTy _ ty)) = splitLHsForAllTy ty
 splitLHsForAllTy (L _ (HsForAllTy { hst_bndrs = tvs, hst_body = body })) = (tvs, body)
