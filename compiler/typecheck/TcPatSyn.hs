@@ -343,17 +343,17 @@ tcCheckPatSynDecl :: PatSynBind GhcRn GhcRn
                   -> TcM (LHsBinds GhcTc, TcGblEnv)
 tcCheckPatSynDecl psb@PSB{ psb_id = lname@(L _ name), psb_args = details
                          , psb_def = lpat, psb_dir = dir }
-                  TPSI{ patsig_implicit_bndrs = implicit_tvs
-                      , patsig_univ_bndrs = explicit_univ_tvs, patsig_prov = prov_theta
-                      , patsig_ex_bndrs   = explicit_ex_tvs,   patsig_req  = req_theta
+                  TPSI{ patsig_implicit_bndrs = implicit_bndrs
+                      , patsig_univ_bndrs = explicit_univ_bndrs, patsig_prov = prov_theta
+                      , patsig_ex_bndrs   = explicit_ex_bndrs,   patsig_req  = req_theta
                       , patsig_body_ty    = sig_body_ty }
   = addPatSynCtxt lname $
     do { let decl_arity = length arg_names
              (arg_names, rec_fields, is_infix) = collectPatSynArgInfo details
 
        ; traceTc "tcCheckPatSynDecl" $
-         vcat [ ppr implicit_tvs, ppr explicit_univ_tvs, ppr req_theta
-              , ppr explicit_ex_tvs, ppr prov_theta, ppr sig_body_ty ]
+         vcat [ ppr implicit_bndrs, ppr explicit_univ_bndrs, ppr req_theta
+              , ppr explicit_ex_bndrs, ppr prov_theta, ppr sig_body_ty ]
 
        ; (arg_tys, pat_ty) <- case tcSplitFunTysN decl_arity sig_body_ty of
                                  Right stuff  -> return stuff
@@ -362,7 +362,7 @@ tcCheckPatSynDecl psb@PSB{ psb_id = lname@(L _ name), psb_args = details
        -- Complain about:  pattern P :: () => forall x. x -> P x
        -- The existential 'x' should not appear in the result type
        -- Can't check this until we know P's arity
-       ; let bad_tvs = filter (`elemVarSet` tyCoVarsOfType pat_ty) explicit_ex_tvs
+       ; let bad_tvs = filter (`elemVarSet` tyCoVarsOfType pat_ty) $ binderVars explicit_ex_bndrs
        ; checkTc (null bad_tvs) $
          hang (sep [ text "The result type of the signature for" <+> quotes (ppr name) <> comma
                    , text "namely" <+> quotes (ppr pat_ty) ])
@@ -371,10 +371,10 @@ tcCheckPatSynDecl psb@PSB{ psb_id = lname@(L _ name), psb_args = details
 
          -- See Note [The pattern-synonym signature splitting rule] in TcSigs
        ; let univ_fvs = closeOverKinds $
-                        (tyCoVarsOfTypes (pat_ty : req_theta) `extendVarSetList` explicit_univ_tvs)
-             (extra_univ, extra_ex) = partition ((`elemVarSet` univ_fvs) . binderVar) implicit_tvs
-             univ_bndrs = extra_univ ++ mkTyVarBinders SSpecified explicit_univ_tvs -- GJ : TODO Do we have more specific information somewhere?
-             ex_bndrs   = extra_ex   ++ mkTyVarBinders SSpecified explicit_ex_tvs
+                        (tyCoVarsOfTypes (pat_ty : req_theta) `extendVarSetList` (binderVars explicit_univ_bndrs))
+             (extra_univ, extra_ex) = partition ((`elemVarSet` univ_fvs) . binderVar) implicit_bndrs
+             univ_bndrs = extra_univ ++ explicit_univ_bndrs
+             ex_bndrs   = extra_ex   ++ explicit_ex_bndrs
              univ_tvs   = binderVars univ_bndrs
              ex_tvs     = binderVars ex_bndrs
 
