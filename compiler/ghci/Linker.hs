@@ -1255,7 +1255,7 @@ linkPackages' hsc_env new_pks pls = do
         = throwGhcExceptionIO (CmdLineError ("unknown package: " ++ unpackFS (installedUnitIdFS new_pkg)))
 
 
-linkPackage :: HscEnv -> PackageConfig -> IO ()
+linkPackage :: HscEnv -> UnitInfo -> IO ()
 linkPackage hsc_env pkg
    = do
         let dflags    = hsc_dflags hsc_env
@@ -1408,7 +1408,7 @@ load_dyn hsc_env crash_early dll = do
       , "(the package DLL is loaded by the system linker"
       , " which manages dependencies by itself)." ]
 
-loadFrameworks :: HscEnv -> Platform -> PackageConfig -> IO ()
+loadFrameworks :: HscEnv -> Platform -> UnitInfo -> IO ()
 loadFrameworks hsc_env platform pkg
     = when (platformUsesFrameworks platform) $ mapM_ load frameworks
   where

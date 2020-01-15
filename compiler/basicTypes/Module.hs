@@ -170,7 +170,7 @@ import qualified FiniteMap as Map
 import System.FilePath
 
 import {-# SOURCE #-} DynFlags (DynFlags)
-import {-# SOURCE #-} Packages (componentIdString, improveUnitId, PackageConfigMap, getPackageConfigMap, displayInstalledUnitId)
+import {-# SOURCE #-} Packages (componentIdString, improveUnitId, UnitInfoMap, getUnitInfoMap, displayInstalledUnitId)
 
 -- Note [The identifier lexicon]
 -- ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
@@ -642,7 +642,7 @@ indefUnitIdToUnitId dflags iuid =
     -- p[H=impl:H].  If we *only* wrap in p[H=impl:H]
     -- IndefiniteUnitId, they won't compare equal; only
     -- after improvement will the equality hold.
-    improveUnitId (getPackageConfigMap dflags) $
+    improveUnitId (getUnitInfoMap dflags) $
         IndefiniteUnitId iuid
 
 data IndefModule = IndefModule {
@@ -943,18 +943,18 @@ type ShHoleSubst = ModuleNameEnv Module
 -- @p[A=<A>]:B@ maps to @p[A=q():A]:B@ with @A=q():A@;
 -- similarly, @<A>@ maps to @q():A@.
 renameHoleModule :: DynFlags -> ShHoleSubst -> Module -> Module
-renameHoleModule dflags = renameHoleModule' (getPackageConfigMap dflags)
+renameHoleModule dflags = renameHoleModule' (getUnitInfoMap dflags)
 
 -- | Substitutes holes in a 'UnitId', suitable for renaming when
 -- an include occurs; see Note [Representation of module/name variable].
 --
 -- @p[A=<A>]@ maps to @p[A=<B>]@ with @A=<B>@.
 renameHoleUnitId :: DynFlags -> ShHoleSubst -> UnitId -> UnitId
-renameHoleUnitId dflags = renameHoleUnitId' (getPackageConfigMap dflags)
+renameHoleUnitId dflags = renameHoleUnitId' (getUnitInfoMap dflags)
 
--- | Like 'renameHoleModule', but requires only 'PackageConfigMap'
+-- | Like 'renameHoleModule', but requires only 'UnitInfoMap'
 -- so it can be used by "Packages".
-renameHoleModule' :: PackageConfigMap -> ShHoleSubst -> Module -> Module
+renameHoleModule' :: UnitInfoMap -> ShHoleSubst -> Module -> Module
 renameHoleModule' pkg_map env m
   | not (isHoleModule m) =
         let uid = renameHoleUnitId' pkg_map env (moduleUnitId m)
@@ -963,9 +963,9 @@ renameHoleModule' pkg_map env m
   -- NB m = <Blah>, that's what's in scope.
   | otherwise = m
 
--- | Like 'renameHoleUnitId, but requires only 'PackageConfigMap'
+-- | Like 'renameHoleUnitId, but requires only 'UnitInfoMap'
 -- so it can be used by "Packages".
-renameHoleUnitId' :: PackageConfigMap -> ShHoleSubst -> UnitId -> UnitId
+renameHoleUnitId' :: UnitInfoMap -> ShHoleSubst -> UnitId -> UnitId
 renameHoleUnitId' pkg_map env uid =
     case uid of
       (IndefiniteUnitId
@@ -975,7 +975,7 @@ renameHoleUnitId' pkg_map env uid =
           -> if isNullUFM (intersectUFM_C const (udfmToUfm (getUniqDSet fh)) env)
                 then uid
                 -- Functorially apply the substitution to the instantiation,
-                -- then check the 'PackageConfigMap' to see if there is
+                -- then check the 'UnitInfoMap' to see if there is
                 -- a compiled version of this 'UnitId' we can improve to.
                 -- See Note [UnitId to InstalledUnitId] improvement
                 else improveUnitId pkg_map $

@@ -23,7 +23,7 @@ import GHC.Hs
 import SrcLoc
 import Outputable
 import Module
-import PackageConfig
+import UnitInfo
 
 {-
 ************************************************************************

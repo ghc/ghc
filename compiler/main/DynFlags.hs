@@ -55,7 +55,7 @@ module DynFlags (
         PackageFlag(..), PackageArg(..), ModRenaming(..),
         packageFlagsChanged,
         IgnorePackageFlag(..), TrustFlag(..),
-        PackageDBFlag(..), PkgConfRef(..),
+        PackageDBFlag(..), PkgDbRef(..),
         Option(..), showOpt,
         DynLibLoader(..),
         fFlags, fLangFlags, xFlags,
@@ -96,7 +96,7 @@ module DynFlags (
         sToolDir,
         sTopDir,
         sTmpDir,
-        sSystemPackageConfig,
+        sGlobalPackageDatabasePath,
         sLdSupportsCompactUnwind,
         sLdSupportsBuildId,
         sLdSupportsFilelist,
@@ -153,7 +153,7 @@ module DynFlags (
         programName, projectVersion,
         ghcUsagePath, ghciUsagePath, topDir, tmpDir,
         versionedAppDir, versionedFilePath,
-        extraGccViaCFlags, systemPackageConfig,
+        extraGccViaCFlags, globalPackageDatabasePath,
         pgm_L, pgm_P, pgm_F, pgm_c, pgm_a, pgm_l, pgm_dll, pgm_T,
         pgm_windres, pgm_libtool, pgm_ar, pgm_ranlib, pgm_lo, pgm_lc,
         pgm_lcc, pgm_i,
@@ -254,11 +254,10 @@ import GHC.Platform
 import GHC.UniqueSubdir (uniqueSubdir)
 import PlatformConstants
 import Module
-import PackageConfig
 import {-# SOURCE #-} Plugins
 import {-# SOURCE #-} Hooks
 import {-# SOURCE #-} PrelNames ( mAIN )
-import {-# SOURCE #-} Packages (PackageState, emptyPackageState)
+import {-# SOURCE #-} Packages (PackageState, emptyPackageState, PackageDatabase)
 import DriverPhases     ( Phase(..), phaseInputExt )
 import Config
 import CliOption
@@ -1146,11 +1145,23 @@ data DynFlags = DynFlags {
   packageEnv            :: Maybe FilePath,
         -- ^ Filepath to the package environment file (if overriding default)
 
-  -- Package state
-  -- NB. do not modify this field, it is calculated by
-  -- Packages.initPackages
-  pkgDatabase           :: Maybe [(FilePath, [PackageConfig])],
+  pkgDatabase           :: Maybe [PackageDatabase],
+        -- ^ Stack of package databases for the target platform.
+        --
+        -- A "package database" is a misleading name as it is really a Unit
+        -- database (cf Note [The identifier lexicon]).
+        --
+        -- This field is populated by `initPackages`.
+        --
+        -- 'Nothing' means the databases have never been read from disk. If
+        -- `initPackages` is called again, it doesn't reload the databases from
+        -- disk.
+
   pkgState              :: PackageState,
+        -- ^ Consolidated unit database built by 'initPackages' from the package
+        -- databases in 'pkgDatabase' and flags ('-ignore-package', etc.).
+        --
+        -- It also contains mapping from module names to actual Modules.
 
   -- Temporary files
   -- These have to be IORefs, because the defaultCleanupHandler needs to
@@ -1440,8 +1451,8 @@ tmpDir                :: DynFlags -> String
 tmpDir dflags = fileSettings_tmpDir $ fileSettings dflags
 extraGccViaCFlags     :: DynFlags -> [String]
 extraGccViaCFlags dflags = toolSettings_extraGccViaCFlags $ toolSettings dflags
-systemPackageConfig   :: DynFlags -> FilePath
-systemPackageConfig dflags = fileSettings_systemPackageConfig $ fileSettings dflags
+globalPackageDatabasePath   :: DynFlags -> FilePath
+globalPackageDatabasePath dflags = fileSettings_globalPackageDatabase $ fileSettings dflags
 pgm_L                 :: DynFlags -> String
 pgm_L dflags = toolSettings_pgm_L $ toolSettings dflags
 pgm_P                 :: DynFlags -> (String,[Option])
@@ -1647,7 +1658,7 @@ data PackageFlag
   deriving (Eq) -- NB: equality instance is used by packageFlagsChanged
 
 data PackageDBFlag
-  = PackageDB PkgConfRef
+  = PackageDB PkgDbRef
   | NoUserPackageDB
   | NoGlobalPackageDB
   | ClearPackageDBs
@@ -2033,7 +2044,6 @@ defaultDynFlags mySettings llvmConfig =
         trustFlags              = [],
         packageEnv              = Nothing,
         pkgDatabase             = Nothing,
-        -- This gets filled in with GHC.setSessionDynFlags
         pkgState                = emptyPackageState,
         ways                    = defaultWays mySettings,
         buildTag                = mkBuildTag (defaultWays mySettings),
@@ -3856,19 +3866,19 @@ package_flags_deps :: [(Deprecation, Flag (CmdLineP DynFlags))]
 package_flags_deps = [
         ------- Packages ----------------------------------------------------
     make_ord_flag defFlag "package-db"
-      (HasArg (addPkgConfRef . PkgConfFile))
-  , make_ord_flag defFlag "clear-package-db"      (NoArg clearPkgConf)
-  , make_ord_flag defFlag "no-global-package-db"  (NoArg removeGlobalPkgConf)
-  , make_ord_flag defFlag "no-user-package-db"    (NoArg removeUserPkgConf)
+      (HasArg (addPkgDbRef . PkgDbPath))
+  , make_ord_flag defFlag "clear-package-db"      (NoArg clearPkgDb)
+  , make_ord_flag defFlag "no-global-package-db"  (NoArg removeGlobalPkgDb)
+  , make_ord_flag defFlag "no-user-package-db"    (NoArg removeUserPkgDb)
   , make_ord_flag defFlag "global-package-db"
-      (NoArg (addPkgConfRef GlobalPkgConf))
+      (NoArg (addPkgDbRef GlobalPkgDb))
   , make_ord_flag defFlag "user-package-db"
-      (NoArg (addPkgConfRef UserPkgConf))
+      (NoArg (addPkgDbRef UserPkgDb))
     -- backwards compat with GHC<=7.4 :
   , make_dep_flag defFlag "package-conf"
-      (HasArg $ addPkgConfRef . PkgConfFile) "Use -package-db instead"
+      (HasArg $ addPkgDbRef . PkgDbPath) "Use -package-db instead"
   , make_dep_flag defFlag "no-user-package-conf"
-      (NoArg removeUserPkgConf)              "Use -no-user-package-db instead"
+      (NoArg removeUserPkgDb)              "Use -no-user-package-db instead"
   , make_ord_flag defGhcFlag "package-name"       (HasArg $ \name -> do
                                       upd (setUnitId name))
                                       -- TODO: Since we JUST deprecated
@@ -5201,26 +5211,26 @@ setVerbosity mb_n = upd (\dfs -> dfs{ verbosity = mb_n `orElse` 3 })
 setDebugLevel :: Maybe Int -> DynP ()
 setDebugLevel mb_n = upd (\dfs -> dfs{ debugLevel = mb_n `orElse` 2 })
 
-data PkgConfRef
-  = GlobalPkgConf
-  | UserPkgConf
-  | PkgConfFile FilePath
+data PkgDbRef
+  = GlobalPkgDb
+  | UserPkgDb
+  | PkgDbPath FilePath
   deriving Eq
 
-addPkgConfRef :: PkgConfRef -> DynP ()
-addPkgConfRef p = upd $ \s ->
+addPkgDbRef :: PkgDbRef -> DynP ()
+addPkgDbRef p = upd $ \s ->
   s { packageDBFlags = PackageDB p : packageDBFlags s }
 
-removeUserPkgConf :: DynP ()
-removeUserPkgConf = upd $ \s ->
+removeUserPkgDb :: DynP ()
+removeUserPkgDb = upd $ \s ->
   s { packageDBFlags = NoUserPackageDB : packageDBFlags s }
 
-removeGlobalPkgConf :: DynP ()
-removeGlobalPkgConf = upd $ \s ->
+removeGlobalPkgDb :: DynP ()
+removeGlobalPkgDb = upd $ \s ->
  s { packageDBFlags = NoGlobalPackageDB : packageDBFlags s }
 
-clearPkgConf :: DynP ()
-clearPkgConf = upd $ \s ->
+clearPkgDb :: DynP ()
+clearPkgDb = upd $ \s ->
   s { packageDBFlags = ClearPackageDBs : packageDBFlags s }
 
 parsePackageFlag :: String                 -- the flag
@@ -5367,13 +5377,13 @@ parseEnvFile :: FilePath -> String -> DynP ()
 parseEnvFile envfile = mapM_ parseEntry . lines
   where
     parseEntry str = case words str of
-      ("package-db": _)     -> addPkgConfRef (PkgConfFile (envdir </> db))
+      ("package-db": _)     -> addPkgDbRef (PkgDbPath (envdir </> db))
         -- relative package dbs are interpreted relative to the env file
         where envdir = takeDirectory envfile
               db     = drop 11 str
-      ["clear-package-db"]  -> clearPkgConf
-      ["global-package-db"] -> addPkgConfRef GlobalPkgConf
-      ["user-package-db"]   -> addPkgConfRef UserPkgConf
+      ["clear-package-db"]  -> clearPkgDb
+      ["global-package-db"] -> addPkgDbRef GlobalPkgDb
+      ["user-package-db"]   -> addPkgDbRef UserPkgDb
       ["package-id", pkgid] -> exposePackageId pkgid
       (('-':'-':_):_)       -> return () -- comments
       -- and the original syntax introduced in 7.10:
@@ -5603,7 +5613,7 @@ compilerInfo dflags
        ("Debug on",                    showBool debugIsOn),
        ("LibDir",                      topDir dflags),
        -- The path of the global package database used by GHC
-       ("Global Package DB",           systemPackageConfig dflags)
+       ("Global Package DB",           globalPackageDatabasePath dflags)
       ]
   where
     showBool True  = "YES"

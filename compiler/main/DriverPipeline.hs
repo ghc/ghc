@@ -2014,7 +2014,7 @@ doCpp dflags raw input_fn output_fn = do
 
     -- MIN_VERSION macros
     let uids = explicitPackages (pkgState dflags)
-        pkgs = catMaybes (map (lookupPackage dflags) uids)
+        pkgs = catMaybes (map (lookupUnit dflags) uids)
     mb_macro_include <-
         if not (null pkgs) && gopt Opt_VersionMacros dflags
             then do macro_stub <- newTempName dflags TFL_CurrentModule "h"
@@ -2074,7 +2074,7 @@ getBackendDefs _ =
 -- ---------------------------------------------------------------------------
 -- Macros (cribbed from Cabal)
 
-generatePackageVersionMacros :: [PackageConfig] -> String
+generatePackageVersionMacros :: [UnitInfo] -> String
 generatePackageVersionMacros pkgs = concat
   -- Do not add any C-style comments. See #3389.
   [ generateMacros "" pkgname version

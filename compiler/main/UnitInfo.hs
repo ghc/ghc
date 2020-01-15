@@ -6,26 +6,26 @@
 --
 -- (c) The University of Glasgow, 2004
 --
-module PackageConfig (
+module UnitInfo (
         -- $package_naming
 
         -- * UnitId
         packageConfigId,
-        expandedPackageConfigId,
-        definitePackageConfigId,
-        installedPackageConfigId,
+        expandedUnitInfoId,
+        definiteUnitInfoId,
+        installedUnitInfoId,
 
-        -- * The PackageConfig type: information about a package
-        PackageConfig,
+        -- * The UnitInfo type: information about a unit
+        UnitInfo,
         InstalledPackageInfo(..),
         ComponentId(..),
         SourcePackageId(..),
         PackageName(..),
         Version(..),
-        defaultPackageConfig,
+        defaultUnitInfo,
         sourcePackageIdString,
         packageNameString,
-        pprPackageConfig,
+        pprUnitInfo,
     ) where
 
 #include "HsVersions.h"
@@ -41,10 +41,10 @@ import Module
 import Unique
 
 -- -----------------------------------------------------------------------------
--- Our PackageConfig type is the InstalledPackageInfo from ghc-boot,
+-- Our UnitInfo type is the InstalledPackageInfo from ghc-boot,
 -- which is similar to a subset of the InstalledPackageInfo type from Cabal.
 
-type PackageConfig = InstalledPackageInfo
+type UnitInfo = InstalledPackageInfo
                        ComponentId
                        SourcePackageId
                        PackageName
@@ -80,21 +80,21 @@ instance Outputable SourcePackageId where
 instance Outputable PackageName where
   ppr (PackageName str) = ftext str
 
-defaultPackageConfig :: PackageConfig
-defaultPackageConfig = emptyInstalledPackageInfo
+defaultUnitInfo :: UnitInfo
+defaultUnitInfo = emptyInstalledPackageInfo
 
-sourcePackageIdString :: PackageConfig -> String
+sourcePackageIdString :: UnitInfo -> String
 sourcePackageIdString pkg = unpackFS str
   where
     SourcePackageId str = sourcePackageId pkg
 
-packageNameString :: PackageConfig -> String
+packageNameString :: UnitInfo -> String
 packageNameString pkg = unpackFS str
   where
     PackageName str = packageName pkg
 
-pprPackageConfig :: PackageConfig -> SDoc
-pprPackageConfig InstalledPackageInfo {..} =
+pprUnitInfo :: UnitInfo -> SDoc
+pprUnitInfo InstalledPackageInfo {..} =
     vcat [
       field "name"                 (ppr packageName),
       field "version"              (text (showVersion packageVersion)),
@@ -133,22 +133,22 @@ pprPackageConfig InstalledPackageInfo {..} =
 -- wired-in packages like @base@ & @rts@, we don't necessarily know what the
 -- version is, so these are handled specially; see #wired_in_packages#.
 
--- | Get the GHC 'UnitId' right out of a Cabalish 'PackageConfig'
-installedPackageConfigId :: PackageConfig -> InstalledUnitId
-installedPackageConfigId = unitId
+-- | Get the GHC 'UnitId' right out of a Cabalish 'UnitInfo'
+installedUnitInfoId :: UnitInfo -> InstalledUnitId
+installedUnitInfoId = unitId
 
-packageConfigId :: PackageConfig -> UnitId
+packageConfigId :: UnitInfo -> UnitId
 packageConfigId p =
     if indefinite p
         then newUnitId (componentId p) (instantiatedWith p)
         else DefiniteUnitId (DefUnitId (unitId p))
 
-expandedPackageConfigId :: PackageConfig -> UnitId
-expandedPackageConfigId p =
+expandedUnitInfoId :: UnitInfo -> UnitId
+expandedUnitInfoId p =
     newUnitId (componentId p) (instantiatedWith p)
 
-definitePackageConfigId :: PackageConfig -> Maybe DefUnitId
-definitePackageConfigId p =
+definiteUnitInfoId :: UnitInfo -> Maybe DefUnitId
+definiteUnitInfoId p =
     case packageConfigId p of
         DefiniteUnitId def_uid -> Just def_uid
         _ -> Nothing

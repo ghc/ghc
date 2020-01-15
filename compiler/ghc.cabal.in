@@ -387,7 +387,7 @@ Library
         HscTypes
         InteractiveEval
         InteractiveEvalTypes
-        PackageConfig
+        UnitInfo
         Packages
         PlatformConstants
         Plugins

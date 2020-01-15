@@ -7,7 +7,7 @@ module Settings
   , sToolDir
   , sTopDir
   , sTmpDir
-  , sSystemPackageConfig
+  , sGlobalPackageDatabasePath
   , sLdSupportsCompactUnwind
   , sLdSupportsBuildId
   , sLdSupportsFilelist
@@ -99,8 +99,8 @@ sTopDir              :: Settings -> FilePath
 sTopDir = fileSettings_topDir . sFileSettings
 sTmpDir              :: Settings -> String
 sTmpDir = fileSettings_tmpDir . sFileSettings
-sSystemPackageConfig :: Settings -> FilePath
-sSystemPackageConfig = fileSettings_systemPackageConfig . sFileSettings
+sGlobalPackageDatabasePath :: Settings -> FilePath
+sGlobalPackageDatabasePath = fileSettings_globalPackageDatabase . sFileSettings
 
 sLdSupportsCompactUnwind :: Settings -> Bool
 sLdSupportsCompactUnwind = toolSettings_ldSupportsCompactUnwind . sToolSettings
