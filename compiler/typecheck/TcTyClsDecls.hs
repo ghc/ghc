@@ -82,7 +82,7 @@ import Data.List
 import qualified Data.List.NonEmpty as NE
 import Data.List.NonEmpty ( NonEmpty(..) )
 import qualified Data.Set as Set
-
+import Data.Tuple
 
 {-
 ************************************************************************
@@ -569,7 +569,10 @@ kcTyClGroup kisig_env decls
         -- Finally, go through each tycon and give it its final kind,
         -- with all the required, specified, and inferred variables
         -- in order.
-        ; generalized_tcs <- mapAndReportM generaliseTcTyCon inferred_tcs
+        ; let inferred_tc_env =
+                mkNameEnv $ map (\tc -> (tyConName tc, tc)) inferred_tcs
+        ; generalized_tcs <-
+                concatMapM (generaliseTyClDecl inferred_tc_env) kindless_decls
 
         ; let poly_tcs = checked_tcs ++ generalized_tcs
         ; traceTc "---- kcTyClGroup end ---- }" (ppr_tc_kinds poly_tcs)
@@ -579,16 +582,61 @@ kcTyClGroup kisig_env decls
     ppr_tc_kinds tcs = vcat (map pp_tc tcs)
     pp_tc tc = ppr (tyConName tc) <+> dcolon <+> ppr (tyConKind tc)
 
-generaliseTcTyCon :: TcTyCon -> TcM TcTyCon
-generaliseTcTyCon tc
+generaliseTyClDecl :: NameEnv TcTyCon -> LTyClDecl GhcRn -> TcM [TcTyCon]
+generaliseTyClDecl inferred_tc_env (L _ decl) = do
+  let names_in_this_decl :: [Name]
+      names_in_this_decl = tycld_names decl
+
+      inferred_tcs :: [TcTyCon]
+      inferred_tcs = map (lookupNameEnv_NF inferred_tc_env) names_in_this_decl
+                     -- These lookups should never fail
+
+      swizzle_prs :: [(TyVar, Name)]
+      -- Maps the representative TyVar to
+      -- the name to use in this decl
+      swizzle_prs = [ (tv, scoped_nm)
+                    | tc <- inferred_tcs
+                    , (scoped_nm, tv) <- tcTyConScopedTyVars tc ]
+
+      swizzle_env :: TyVarEnv Name
+      swizzle_env = mkVarEnv swizzle_prs
+
+  -- Check for duplicates
+  -- E.g. data SameKind (a::k) (b::k)
+  --      data T (a::k1) (b::k2) = MkT (SameKind a b)
+  -- Here k1 and k2 start as TyVarTvs, and get unified with each other
+  -- If this happens, things get very confused later, so fail fast
+  checkDuplicateTyConBinders $ map swap swizzle_prs
+
+  mapAndReportM (generaliseTcTyCon swizzle_env) inferred_tcs
+  where
+    tycld_names :: TyClDecl GhcRn -> [Name]
+    tycld_names (ClassDecl { tcdLName = L _ cls_name, tcdATs = ats })
+      = cls_name : map (fam_decl_name . unLoc) ats
+    tycld_names (DataDecl { tcdLName = L _ name })
+      = [name]
+    tycld_names (FamDecl { tcdFam = decl })
+      = [fam_decl_name decl]
+    tycld_names (SynDecl { tcdLName = L _ name })
+      = [name]
+    tycld_names (XTyClDecl nec)
+      = noExtCon nec
+
+    fam_decl_name :: FamilyDecl GhcRn -> Name
+    fam_decl_name (FamilyDecl { fdLName = L _ name })
+      = name
+    fam_decl_name (XFamilyDecl nec)
+      = noExtCon nec
+
+generaliseTcTyCon :: TyVarEnv Name -> TcTyCon -> TcM TcTyCon
+generaliseTcTyCon swizzle_env tc
   -- See Note [Required, Specified, and Inferred for types]
   = setSrcSpan (getSrcSpan tc) $
     addTyConCtxt tc $
     do { let tc_name      = tyConName tc
              tc_res_kind  = tyConResKind tc
              spec_req_prs = tcTyConScopedTyVars tc
-
-             (spec_req_names, spec_req_tvs) = unzip spec_req_prs
+             spec_req_tvs = map snd spec_req_prs
              -- NB: spec_req_tvs includes both Specified and Required
              -- Running example in Note [Inferring kinds for type declarations]
              --    spec_req_prs = [ ("k1",kk1), ("a", (aa::kk1))
@@ -603,12 +651,14 @@ generaliseTcTyCon tc
              -- Running example, where kk1 := kk2, so we get
              --   [kk2,kk2]
 
-       -- Step 1: Check for duplicates
-       -- E.g. data SameKind (a::k) (b::k)
-       --      data T (a::k1) (b::k2) = MkT (SameKind a b)
-       -- Here k1 and k2 start as TyVarTvs, and get unified with each other
-       -- If this happens, things get very confused later, so fail fast
-       ; checkDuplicateTyConBinders spec_req_names spec_req_tvs
+       -- Step 1: Find the Specified and Inferred variables
+       -- NB: spec_req_tvs = spec_tvs ++ req_tvs
+       --     And req_tvs is 1-1 with tyConTyVars
+       --     See Note [Scoped tyvars in a TcTyCon] in TyCon
+       ; let n_spec              = length spec_req_tvs - tyConArity tc
+             (spec_tvs, req_tvs) = splitAt n_spec spec_req_tvs
+             sorted_spec_tvs     = scopedSort spec_tvs
+                             -- NB: maintain the L-R order of scoped_tvs
 
        -- Step 2a: find all the Inferred variables we want to quantify over
        -- NB: candidateQTyVarsOfKinds zonks as it goes
@@ -620,23 +670,16 @@ generaliseTcTyCon tc
        -- Returned 'inferred' are scope-sorted and skolemised
        ; inferred <- quantifyTyVars dvs2
 
-       -- Step 3a: rename all the Specified and Required tyvars back to
-       -- TyVars with their oroginal user-specified name.  Example
-       --     class C a_r23 where ....
-       -- By this point we have scoped_prs = [(a_r23, a_r89[TyVarTv])]
-       -- We return with the TyVar a_r23[TyVar],
-       --    and ze mapping a_r89 :-> a_r23[TyVar]
-       ; traceTc "generaliseTcTyCon: before zonkRec"
+       ; traceTc "generaliseTcTyCon: pre zonk"
            (vcat [ text "spec_req_tvs =" <+> pprTyVars spec_req_tvs
                  , text "inferred =" <+> pprTyVars inferred ])
-       ; (ze, final_spec_req_tvs) <- zonkRecTyVarBndrs spec_req_names spec_req_tvs
-           -- So ze maps from the tyvars that have ended up
 
-       -- Step 3b: Apply that mapping to the other variables
-       -- (remember they all started as TyVarTvs).
-       -- They have been skolemised by quantifyTyVars.
-       ; (ze, inferred) <- zonkTyBndrsX ze inferred
-       ; tc_res_kind    <- zonkTcTypeToTypeX ze tc_res_kind
+       -- Step 3: final zonking
+       ; ze <- emptyZonkEnv
+       ; (ze, inferred)        <- zonkSwizzleTyBndrsX swizzle_env ze inferred
+       ; (ze, sorted_spec_tvs) <- zonkSwizzleTyBndrsX swizzle_env ze sorted_spec_tvs
+       ; (ze, req_tvs)         <- zonkSwizzleTyBndrsX swizzle_env ze req_tvs
+       ; tc_res_kind           <- zonkTcTypeToTypeX ze tc_res_kind
 
        ; traceTc "generaliseTcTyCon: post zonk" $
          vcat [ text "tycon =" <+> ppr tc
@@ -644,32 +687,24 @@ generaliseTcTyCon tc
               , text "ze =" <+> ppr ze
               , text "spec_req_prs =" <+> ppr spec_req_prs
               , text "spec_req_tvs =" <+> pprTyVars spec_req_tvs
-              , text "final_spec_req_tvs =" <+> pprTyVars final_spec_req_tvs ]
+              , text "sorted_spec_tvs =" <+> pprTyVars sorted_spec_tvs
+              , text "req_tvs =" <+> ppr req_tvs ]
 
-       -- Step 4: Find the Specified and Inferred variables
-       -- NB: spec_req_tvs = spec_tvs ++ req_tvs
-       --     And req_tvs is 1-1 with tyConTyVars
-       --     See Note [Scoped tyvars in a TcTyCon] in TyCon
-       ; let n_spec        = length final_spec_req_tvs - tyConArity tc
-             (spec_tvs, req_tvs) = splitAt n_spec final_spec_req_tvs
-             specified     = scopedSort spec_tvs
-                             -- NB: maintain the L-R order of scoped_tvs
-
-       -- Step 5: Make the TyConBinders.
-             to_user tv     = lookupTyVarOcc ze tv `orElse` tv
+       -- Step 4: Make the TyConBinders.
+       ; let to_user tv     = lookupTyVarOcc ze tv `orElse` tv
              dep_fv_set     = mapVarSet to_user (candidateKindVars dvs1)
              inferred_tcbs  = mkNamedTyConBinders Inferred inferred
-             specified_tcbs = mkNamedTyConBinders Specified specified
+             specified_tcbs = mkNamedTyConBinders Specified sorted_spec_tvs
              required_tcbs  = map (mkRequiredTyConBinder dep_fv_set) req_tvs
 
-       -- Step 6: Assemble the final list.
+       -- Step 5: Assemble the final list.
              final_tcbs = concat [ inferred_tcbs
                                  , specified_tcbs
                                  , required_tcbs ]
 
-       -- Step 7: Make the result TcTyCon
+       -- Step 6: Make the result TcTyCon
              tycon = mkTcTyCon tc_name final_tcbs tc_res_kind
-                            (mkTyVarNamePairs final_spec_req_tvs)
+                            (mkTyVarNamePairs (sorted_spec_tvs ++ req_tvs))
                             True {- it's generalised now -}
                             (tyConFlavour tc)
 
@@ -677,26 +712,25 @@ generaliseTcTyCon tc
          vcat [ text "tycon =" <+> ppr tc
               , text "tc_res_kind =" <+> ppr tc_res_kind
               , text "dep_fv_set =" <+> ppr dep_fv_set
-              , text "final_spec_req_tvs =" <+> pprTyVars final_spec_req_tvs
-              , text "inferred =" <+> pprTyVars inferred
-              , text "specified =" <+> pprTyVars specified
+              , text "inferred_tcbs =" <+> ppr inferred_tcbs
+              , text "specified_tcbs =" <+> ppr specified_tcbs
               , text "required_tcbs =" <+> ppr required_tcbs
               , text "final_tcbs =" <+> ppr final_tcbs ]
 
-       -- Step 8: Check for validity.
+       -- Step 7: Check for validity.
        -- We do this here because we're about to put the tycon into the
        -- the environment, and we don't want anything malformed there
        ; checkTyConTelescope tycon
 
        ; return tycon }
 
-checkDuplicateTyConBinders :: [Name] -> [TcTyVar] -> TcM ()
-checkDuplicateTyConBinders spec_req_names spec_req_tvs
+checkDuplicateTyConBinders :: [(Name, TcTyVar)] -> TcM ()
+checkDuplicateTyConBinders spec_req_prs
   | null dups = return ()
   | otherwise = mapM_ report_dup dups >> failM
   where
     dups :: [(Name,Name)]
-    dups = findDupTyVarTvs $ spec_req_names `zip` spec_req_tvs
+    dups = findDupTyVarTvs spec_req_prs
 
     report_dup (n1, n2)
       = setSrcSpan (getSrcSpan n2) $

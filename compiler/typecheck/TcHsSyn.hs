@@ -34,7 +34,7 @@ module TcHsSyn (
         zonkTopBndrs,
         ZonkEnv, ZonkFlexi(..), emptyZonkEnv, mkEmptyZonkEnv, initZonkEnv,
         zonkTyVarBinders, zonkTyVarBindersX, zonkTyVarBinderX,
-        zonkTyBndrs, zonkTyBndrsX, zonkRecTyVarBndrs,
+        zonkTyBndrs, zonkTyBndrsX, zonkSwizzleTyBndrsX,
         zonkTcTypeToType,  zonkTcTypeToTypeX,
         zonkTcTypesToTypes, zonkTcTypesToTypesX,
         zonkTyVarOcc,
@@ -333,12 +333,6 @@ extendTyZonkEnv1 :: ZonkEnv -> TyVar -> ZonkEnv
 extendTyZonkEnv1 ze@(ZonkEnv { ze_tv_env = ty_env }) tv
   = ze { ze_tv_env = extendVarEnv ty_env tv tv }
 
-extendTyZonkEnvN :: ZonkEnv -> [(Name,TyVar)] -> ZonkEnv
-extendTyZonkEnvN ze@(ZonkEnv { ze_tv_env = ty_env }) pairs
-  = ze { ze_tv_env = foldl add ty_env pairs }
-  where
-    add env (name, tv) = extendVarEnv_Directly env (getUnique name) tv
-
 setZonkType :: ZonkEnv -> ZonkFlexi -> ZonkEnv
 setZonkType ze flexi = ze { ze_flexi = flexi }
 
@@ -464,21 +458,17 @@ zonkTyVarBinderX env (Bndr tv vis)
   = do { (env', tv') <- zonkTyBndrX env tv
        ; return (env', Bndr tv' vis) }
 
-zonkRecTyVarBndrs :: [Name] -> [TcTyVar] -> TcM (ZonkEnv, [TyVar])
+zonkSwizzleTyBndrsX ::
+  TyVarEnv Name -> ZonkEnv -> [TcTyVar] -> TcM (ZonkEnv, [TyVar])
 -- This rather specialised function is used in exactly one place.
 -- See Note [Tricky scoping in generaliseTcTyCon] in TcTyClsDecls.
-zonkRecTyVarBndrs names tc_tvs
-  = initZonkEnv $ \ ze ->
-    fixM $ \ ~(_, rec_new_tvs) ->
-    do { let ze' = extendTyZonkEnvN ze $
-                   zipWithLazy (\ tc_tv new_tv -> (getName tc_tv, new_tv))
-                               tc_tvs rec_new_tvs
-       ; new_tvs <- zipWithM (zonk_one ze') names tc_tvs
-       ; return (ze', new_tvs) }
+zonkSwizzleTyBndrsX swizzle_env = mapAccumLM (zonkSwizzleTyBndrX swizzle_env)
+
+zonkSwizzleTyBndrX ::
+  TyVarEnv Name -> ZonkEnv -> TcTyVar -> TcM (ZonkEnv, TyVar)
+zonkSwizzleTyBndrX swizzle_env ze tv = zonkTyBndrX ze tv'
   where
-    zonk_one ze name tc_tv
-      = do { ki <- zonkTcTypeToTypeX ze (tyVarKind tc_tv)
-           ; return (mkTyVar name ki) }
+    tv' = maybe tv (setTyVarName tv) $ lookupVarEnv swizzle_env tv
 
 zonkTopExpr :: HsExpr GhcTcId -> TcM (HsExpr GhcTc)
 zonkTopExpr e = initZonkEnv $ \ ze -> zonkExpr ze e
