@@ -104,6 +104,7 @@ import GHC.Word
 import GHC.Int
 import GHC.Ptr
 import GHC.Stack
+import Data.Tuple( snd )
 
 import qualified Data.Coerce
 import Data.String
@@ -258,12 +259,12 @@ instance IsList CallStack where
 -- types.
 atomicModifyMutVar#
   :: MutVar# s a
-  -> (a -> b)
+  -> (a -> (b,c))
   -> State# s
   -> (# State# s, c #)
 atomicModifyMutVar# mv f s =
-  case unsafeCoerce# (atomicModifyMutVar2# mv f s) of
-    (# s', _, ~(_, res) #) -> (# s', res #)
+  case atomicModifyMutVar2# mv f s of
+     (# s', _, res #) -> (# s', snd res #)
 
 -- | Resize a mutable array to new specified size. The returned
 -- 'SmallMutableArray#' is either the original 'SmallMutableArray#'

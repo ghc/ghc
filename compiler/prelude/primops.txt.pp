@@ -2534,7 +2534,7 @@ primop  SameMutVarOp "sameMutVar#" GenPrimOp
 -- atomic compare-and-swap as it is merely replacing a pointer.
 
 primop  AtomicModifyMutVar2Op "atomicModifyMutVar2#" GenPrimOp
-   MutVar# s a -> (a -> c) -> State# s -> (# State# s, a, c #)
+   MutVar# s a -> (a -> (a, b)) -> State# s -> (# State# s, a, (a, b) #)
    { Modify the contents of a {\tt MutVar\#}, returning the previous
      contents and the result of applying the given function to the
      previous contents. Note that this isn't strictly

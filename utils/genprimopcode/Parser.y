@@ -162,11 +162,15 @@ pType : paT '->' pType { TyF $1 $3 }
 paT :: { Ty }
 paT : pTycon ppTs     { TyApp $1 $2 }
     | pUnboxedTupleTy { $1 }
+    | pBoxedTupleTy   { $1 }
     | '(' pType ')'   { $2 }
     | lowerName       { TyVar $1 }
 
 pUnboxedTupleTy :: { Ty }
 pUnboxedTupleTy : '(#' pCommaTypes '#)' { TyUTup $2 }
+
+pBoxedTupleTy :: { Ty }
+pBoxedTupleTy : '(' pType ',' pCommaTypes ')'   { TyTup ($2:$4) }
 
 pCommaTypes :: { [Ty] }
 pCommaTypes : pType ',' pCommaTypes { $1 : $3 }

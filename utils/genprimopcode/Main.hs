@@ -79,6 +79,7 @@ desugarVectorSpec i              = case vecOptions i of
         desugarTy (TyApp tycon ts)    = TyApp tycon (map desugarTy ts)
         desugarTy t@(TyVar {})        = t
         desugarTy (TyUTup ts)         = TyUTup (map desugarTy ts)
+        desugarTy (TyTup ts)          = TyTup (map desugarTy ts)
 
     conCat :: String -> String
     conCat "Int8"   = "IntVec"
@@ -414,6 +415,9 @@ pprTy = pty
           pty t      = pbty t
 
           pbty (TyApp tc ts) = unwords (wrapOp (show tc) : map paty ts)
+          pbty (TyTup ts)    = "("
+                            ++ concat (intersperse "," (map pty ts))
+                            ++ ")"
           pbty (TyUTup ts)   = "(# "
                             ++ concat (intersperse "," (map pty ts))
                             ++ " #)"
@@ -477,6 +481,7 @@ gen_latex_doc (Info defaults entries)
                    pty (TyC t1 t2) = pbty t1 ++ " => " ++ pty t2
                    pty t = pbty t
                    pbty (TyApp tc ts) = show tc ++ (concat (map (' ':) (map paty ts)))
+                   pbty (TyTup ts)  = "(" ++ (concat (intersperse "," (map pty ts))) ++ ")"
                    pbty (TyUTup ts) = "(# " ++ (concat (intersperse "," (map pty ts))) ++ " #)"
                    pbty t = paty t
                    paty (TyVar tv) = tv
@@ -487,13 +492,16 @@ gen_latex_doc (Info defaults entries)
                    pty (TyC t1 t2) = pbty t1 ++ " => " ++ pty t2
                    pty t = pbty t
                    pbty (TyApp tc ts) = (zencode (show tc)) ++ (concat (map (' ':) (map paty ts)))
+                   pbty (TyTup ts) = (zencode (tuplenm (length ts))) ++ (concat ((map (' ':) (map paty ts))))
                    pbty (TyUTup ts) = (zencode (utuplenm (length ts))) ++ (concat ((map (' ':) (map paty ts))))
                    pbty t = paty t
                    paty (TyVar tv) = zencode tv
                    paty (TyApp tc []) = zencode (show tc)
                    paty t = "(" ++ pty t ++ ")"
-                   utuplenm 1 = "(# #)"
+                   utuplenm 0 = "(# #)"
                    utuplenm n = "(#" ++ (replicate (n-1) ',') ++ "#)"
+                   tuplenm 0 = "()"
+                   tuplenm n = "(" ++ (replicate (n-1) ',') ++ ")"
                    foralls = if tvars == [] then "" else "%forall " ++ (tbinds tvars)
                    tvars = tvars_of typ
                    tbinds [] = ". "
@@ -503,6 +511,7 @@ gen_latex_doc (Info defaults entries)
            tvars_of (TyC t1 t2) = tvars_of t1 `union` tvars_of t2
            tvars_of (TyApp _ ts) = foldl union [] (map tvars_of ts)
            tvars_of (TyUTup ts) = foldr union [] (map tvars_of ts)
+           tvars_of (TyTup ts)  = foldr union [] (map tvars_of ts)
            tvars_of (TyVar tv) = [tv]
 
            mk_options o =
@@ -895,6 +904,8 @@ ppType (TyApp (VecTyCon _ pptc) [])      = pptc
 
 ppType (TyUTup ts) = "(mkTupleTy Unboxed "
                      ++ listify (map ppType ts) ++ ")"
+ppType (TyTup ts) = "(mkTupleTy Boxed "
+                     ++ listify (map ppType ts) ++ ")"
 
 ppType (TyF s d) = "(mkVisFunTy (" ++ ppType s ++ ") (" ++ ppType d ++ "))"
 ppType (TyC s d) = "(mkInvisFunTy (" ++ ppType s ++ ") (" ++ ppType d ++ "))"
@@ -920,6 +931,7 @@ tvsIn (TyF t1 t2)    = tvsIn t1 ++ tvsIn t2
 tvsIn (TyC t1 t2)    = tvsIn t1 ++ tvsIn t2
 tvsIn (TyApp _ tys)  = concatMap tvsIn tys
 tvsIn (TyVar tv)     = [tv]
+tvsIn (TyTup  tys)   = concatMap tvsIn tys
 tvsIn (TyUTup tys)   = concatMap tvsIn tys
 
 tyconsIn :: Ty -> [TyCon]
@@ -928,6 +940,7 @@ tyconsIn (TyC t1 t2)    = tyconsIn t1 `union` tyconsIn t2
 tyconsIn (TyApp tc tys) = foldr union [tc] $ map tyconsIn tys
 tyconsIn (TyVar _)      = []
 tyconsIn (TyUTup tys)   = foldr union [] $ map tyconsIn tys
+tyconsIn (TyTup tys)    = foldr union [] $ map tyconsIn tys
 
 arity :: Ty -> Int
 arity = length . fst . flatTys

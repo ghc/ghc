@@ -74,7 +74,8 @@ data Ty
    | TyC    Ty Ty -- We only allow one constraint, keeps the grammar simpler
    | TyApp  TyCon [Ty]
    | TyVar  TyVar
-   | TyUTup [Ty]   -- unboxed tuples; just a TyCon really, 
+   | TyTup  [Ty]
+   | TyUTup [Ty]   -- unboxed tuples; just a TyCon really,
                    -- but convenient like this
    deriving (Eq,Show)
 
