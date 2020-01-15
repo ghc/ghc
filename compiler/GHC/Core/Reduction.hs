@@ -807,7 +807,7 @@ simplifyArgsWorker orig_ki_binders orig_inner_ki orig_fvs
        orig_ki_binders orig_inner_ki
        orig_roles orig_simplified_args
   where
-    orig_lc = emptyLiftingContext $ mkInScopeSet $ orig_fvs
+    orig_lc = emptyLiftingContext $ mkInScopeSet orig_fvs
 
     go :: LiftingContext  -- mapping from tyvars to rewriting coercions
        -> [TyCoBinder]    -- Unsubsted binders of function's kind

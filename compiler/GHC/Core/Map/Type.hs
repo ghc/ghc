@@ -48,13 +48,13 @@ import GHC.Types.Var.Env
 import GHC.Types.Unique.FM
 import GHC.Utils.Outputable
 
-import GHC.Data.Maybe
 import GHC.Utils.Panic
 
 import qualified Data.Map    as Map
 import qualified Data.IntMap as IntMap
 
 import Control.Monad ( (>=>) )
+import GHC.Data.Maybe
 
 -- NB: Be careful about RULES and type families (#5821).  So we should make sure
 -- to specify @Key TypeMapX@ (and not @DeBruijn Type@, the reduced form)
@@ -136,16 +136,17 @@ xtC (D env co) f (CoercionMapX m)
 type TypeMapG = GenMap TypeMapX
 
 -- | @TypeMapX a@ is the base map from @DeBruijn Type@ to @a@, but without the
--- 'GenMap' optimization.
+-- 'GenMap' optimization. See Note [Computing equality on types] in GHC.Core.Type.
 data TypeMapX a
   = TM { tm_var    :: VarMap a
-       , tm_app    :: TypeMapG (TypeMapG a)
+       , tm_app    :: TypeMapG (TypeMapG a)  -- Note [Equality on AppTys] in GHC.Core.Type
        , tm_tycon  :: DNameEnv a
 
          -- only InvisArg arrows here
        , tm_funty  :: TypeMapG (TypeMapG (TypeMapG a))
                        -- keyed on the argument, result rep, and result
                        -- constraints are never linear-restricted and are always lifted
+                       -- See also Note [Equality on FunTys] in GHC.Core.TyCo.Rep
 
        , tm_forall :: TypeMapG (BndrMap a) -- See Note [Binders] in GHC.Core.Map.Expr
        , tm_tylit  :: TyLitMap a
