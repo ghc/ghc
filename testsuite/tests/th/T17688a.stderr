@@ -1,0 +1,1 @@
+{-# SPECIALISE GHC.Base.id :: forall a_0 -> a_0 -> a_0 #-}
