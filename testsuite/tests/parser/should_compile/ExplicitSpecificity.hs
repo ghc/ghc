@@ -1,4 +1,4 @@
-{-# LANGUAGE RankNTypes, PolyKinds, GADTs, TypeApplications, PatternSynonyms #-}
+{-# LANGUAGE RankNTypes, PolyKinds, GADTs, TypeApplications, PatternSynonyms, ExistentialQuantification #-}
 
 module ExplicitSpecificity where
 
@@ -54,20 +54,26 @@ bar2 = let { x1 = C1 @Int 42
            }
        in ()
 
-  -- GJ : TODO Explicit Specificity in pattern synonyms
--- pattern Pat1 a = C2 Type a Proxy
--- pattern Pat2 {k} a = C2 k a Proxy
--- pattern Pat3 = C2 Type a Proxy
--- pattern Pat4 = forall {a}. C2 Type a Proxy
+data T7 a where C7 :: forall a b. a -> b -> T7 a
 
--- bar3 :: (T2 a) -> ()
--- bar3 (Pat1 Int) = ()
+data T8 a where C8 :: forall a {b}. a -> b -> T8 a
 
--- bar4 :: (T2 a) -> ()
--- bar4 (Pat2 Int) = ()
+pattern Pat1 :: forall a. () => forall b. a -> b -> T7 a
+pattern Pat1 x y = C7 x y
 
--- bar5 :: (T2 a) -> ()
--- bar5 Pat3 = ()
+pattern Pat2 :: forall {a}. () => forall b. a -> b -> T7 a
+pattern Pat2 x y = C7 x y
 
--- bar6 :: (T2 a) -> ()
--- bar6 Pat4 = ()
+pattern Pat3 :: forall a. () => forall b. a -> b -> T8 a
+pattern Pat3 x y = C8 x y
+
+pattern Pat4 :: forall {a}. () => forall b. a -> b -> T8 a
+pattern Pat4 x y = C8 x y
+
+bar3 :: (T7 a) -> ()
+bar3 (Pat1 x y) = ()
+bar3 (Pat2 x y) = ()
+
+bar4 :: (T8 a) -> ()
+bar4 (Pat3 x y) = ()
+bar4 (Pat4 x y) = ()
