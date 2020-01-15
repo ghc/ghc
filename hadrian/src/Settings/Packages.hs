@@ -96,7 +96,9 @@ packageArgs = do
             -- the 'threaded' flag is True by default, but
             -- let's record explicitly that we link all ghc
             -- executables with the threaded runtime.
-            , arg "threaded" ] ]
+            , stage0 ? arg "-threaded"
+            , notStage0 ? ifM (ghcThreaded <$> expr flavour) (arg "threaded") (arg "-threaded") ]
+          ]
 
         -------------------------------- ghcPkg --------------------------------
         , package ghcPkg ?
