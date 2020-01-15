@@ -349,12 +349,12 @@ findPackageModule hsc_env mod = do
 -- requires a few invariants to be upheld: (1) the 'Module' in question must
 -- be the module identifier of the *original* implementation of a module,
 -- not a reexport (this invariant is upheld by @Packages.hs@) and (2)
--- the 'PackageConfig' must be consistent with the unit id in the 'Module'.
+-- the 'UnitInfo' must be consistent with the unit id in the 'Module'.
 -- The redundancy is to avoid an extra lookup in the package state
 -- for the appropriate config.
-findPackageModule_ :: HscEnv -> InstalledModule -> PackageConfig -> IO InstalledFindResult
+findPackageModule_ :: HscEnv -> InstalledModule -> UnitInfo -> IO InstalledFindResult
 findPackageModule_ hsc_env mod pkg_conf =
-  ASSERT2( installedModuleUnitId mod == installedPackageConfigId pkg_conf, ppr (installedModuleUnitId mod) <+> ppr (installedPackageConfigId pkg_conf) )
+  ASSERT2( installedModuleUnitId mod == installedUnitInfoId pkg_conf, ppr (installedModuleUnitId mod) <+> ppr (installedUnitInfoId pkg_conf) )
   modLocationCache hsc_env mod $
 
   -- special case for GHC.Prim; we won't find it in the filesystem.
@@ -714,19 +714,19 @@ cantFindErr cannot_find _ dflags mod_name find_result
          tried_these files dflags
 
     pkg_hidden :: UnitId -> SDoc
-    pkg_hidden pkgid =
+    pkg_hidden uid =
         text "It is a member of the hidden package"
-        <+> quotes (ppr pkgid)
+        <+> quotes (ppr uid)
         --FIXME: we don't really want to show the unit id here we should
         -- show the source package id or installed package id if it's ambiguous
-        <> dot $$ pkg_hidden_hint pkgid
-    pkg_hidden_hint pkgid
+        <> dot $$ pkg_hidden_hint uid
+    pkg_hidden_hint uid
      | gopt Opt_BuildingCabalPackage dflags
-        = let pkg = expectJust "pkg_hidden" (lookupPackage dflags pkgid)
+        = let pkg = expectJust "pkg_hidden" (lookupUnit dflags uid)
            in text "Perhaps you need to add" <+>
               quotes (ppr (packageName pkg)) <+>
               text "to the build-depends in your .cabal file."
-     | Just pkg <- lookupPackage dflags pkgid
+     | Just pkg <- lookupUnit dflags uid
          = text "You can run" <+>
            quotes (text ":set -package " <> ppr (packageName pkg)) <+>
            text "to expose it." $$

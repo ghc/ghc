@@ -190,7 +190,7 @@ withBkpSession cid insts deps session_type do_this = do
         importPaths = [],
         -- Synthesized the flags
         packageFlags = packageFlags dflags ++ map (\(uid0, rn) ->
-          let uid = unwireUnitId dflags (improveUnitId (getPackageConfigMap dflags) $ renameHoleUnitId dflags (listToUFM insts) uid0)
+          let uid = unwireUnitId dflags (improveUnitId (getUnitInfoMap dflags) $ renameHoleUnitId dflags (listToUFM insts) uid0)
           in ExposePackage
             (showSDoc dflags
                 (text "-unit-id" <+> ppr uid <+> ppr rn))
@@ -271,7 +271,7 @@ buildUnit session cid insts lunit = do
 
     dflags <- getDynFlags
     -- IMPROVE IT
-    let deps = map (improveUnitId (getPackageConfigMap dflags)) deps0
+    let deps = map (improveUnitId (getUnitInfoMap dflags)) deps0
 
     mb_old_eps <- case session of
                     TcSession -> fmap Just getEpsGhc
@@ -375,20 +375,19 @@ compileExe lunit = do
         ok <- load' LoadAllTargets (Just msg) mod_graph
         when (failed ok) (liftIO $ exitWith (ExitFailure 1))
 
-addPackage :: GhcMonad m => PackageConfig -> m ()
+-- | Register a new virtual package database containing a single unit
+addPackage :: GhcMonad m => UnitInfo -> m ()
 addPackage pkg = do
-    dflags0 <- GHC.getSessionDynFlags
-    case pkgDatabase dflags0 of
+    dflags <- GHC.getSessionDynFlags
+    case pkgDatabase dflags of
         Nothing -> panic "addPackage: called too early"
-        Just pkgs -> do let dflags = dflags0 { pkgDatabase =
-                            Just (pkgs ++ [("(in memory " ++ showSDoc dflags0 (ppr (unitId pkg)) ++ ")", [pkg])]) }
-                        _ <- GHC.setSessionDynFlags dflags
-                        -- By this time, the global ref has probably already
-                        -- been forced, in which case doing this isn't actually
-                        -- going to do you any good.
-                        -- dflags <- GHC.getSessionDynFlags
-                        -- liftIO $ setUnsafeGlobalDynFlags dflags
-                        return ()
+        Just dbs -> do
+         let newdb = PackageDatabase
+               { packageDatabasePath  = "(in memory " ++ showSDoc dflags (ppr (unitId pkg)) ++ ")"
+               , packageDatabaseUnits = [pkg]
+               }
+         _ <- GHC.setSessionDynFlags (dflags { pkgDatabase = Just (dbs ++ [newdb]) })
+         return ()
 
 -- Precondition: UnitId is NOT InstalledUnitId
 compileInclude :: Int -> (Int, UnitId) -> BkpM ()
@@ -397,7 +396,7 @@ compileInclude n (i, uid) = do
     let dflags = hsc_dflags hsc_env
     msgInclude (i, n) uid
     -- Check if we've compiled it already
-    case lookupPackage dflags uid of
+    case lookupUnit dflags uid of
         Nothing -> do
             case splitUnitIdInsts uid of
                 (_, Just indef) ->
