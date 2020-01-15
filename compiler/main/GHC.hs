@@ -1311,7 +1311,7 @@ packageDbModules :: GhcMonad m =>
                  -> m [Module]
 packageDbModules only_exposed = do
    dflags <- getSessionDynFlags
-   let pkgs = eltsUFM (pkgIdMap (pkgState dflags))
+   let pkgs = eltsUFM (unitInfoMap (pkgState dflags))
    return $
      [ mkModule pid modname
      | p <- pkgs
