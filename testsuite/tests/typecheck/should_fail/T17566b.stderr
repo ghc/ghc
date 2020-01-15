@@ -1,0 +1,4 @@
+
+T17566b.hs:7:17: error:
+    • Couldn't match ‘k1’ with ‘k2’
+    • In the class declaration for ‘C’
