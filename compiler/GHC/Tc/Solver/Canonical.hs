@@ -904,7 +904,6 @@ track whether or not we've already rewritten.
 It is conceivable to do a better job at tracking whether or not a type
 is rewritten, but this is left as future work. (Mar '15)
 
-
 Note [Decomposing FunTy]
 ~~~~~~~~~~~~~~~~~~~~~~~~
 can_eq_nc' may attempt to decompose a FunTy that is un-zonked.  This
@@ -1281,8 +1280,8 @@ zonk_eq_types = go
         split2 = tcSplitFunTy_maybe ty2
 
     go ty1 ty2
-      | Just (tc1, tys1) <- repSplitTyConApp_maybe ty1
-      , Just (tc2, tys2) <- repSplitTyConApp_maybe ty2
+      | Just (tc1, tys1) <- tcRepSplitTyConApp_maybe ty1
+      , Just (tc2, tys2) <- tcRepSplitTyConApp_maybe ty2
       = if tc1 == tc2 && tys1 `equalLength` tys2
           -- Crucial to check for equal-length args, because
           -- we cannot assume that the two args to 'go' have

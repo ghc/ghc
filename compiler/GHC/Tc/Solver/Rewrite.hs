@@ -33,11 +33,12 @@ import GHC.Tc.Solver.Monad as TcS
 import GHC.Utils.Misc
 import GHC.Data.Maybe
 import GHC.Exts (oneShot)
+import Data.Bifunctor
 import Control.Monad
 import GHC.Utils.Monad ( zipWith3M )
 import Data.List.NonEmpty ( NonEmpty(..) )
-
-import Control.Arrow ( first )
+import Control.Applicative (liftA3)
+import GHC.Builtin.Types.Prim (tYPETyCon)
 
 {-
 ************************************************************************
@@ -474,28 +475,28 @@ rewrite_args_slow binders inner_ki fvs roles tys
 -- a Derived rewriting a Derived. The solution would be to generate evidence for
 -- Deriveds, thus avoiding this whole noBogusCoercions idea. See also
 -- Note [No derived kind equalities]
-  = do { rewritten_args <- zipWith3M fl (map isNamedBinder binders ++ repeat True)
+  = do { rewritten_args <- zipWith3M rw (map isNamedBinder binders ++ repeat True)
                                         roles tys
        ; return (simplifyArgsWorker binders inner_ki fvs roles rewritten_args) }
   where
-    {-# INLINE fl #-}
-    fl :: Bool   -- must we ensure to produce a real coercion here?
-                  -- see comment at top of function
+    {-# INLINE rw #-}
+    rw :: Bool   -- must we ensure to produce a real coercion here?
+                 -- see comment at top of function
        -> Role -> Type -> RewriteM (Xi, Coercion)
-    fl True  r ty = noBogusCoercions $ fl1 r ty
-    fl False r ty =                    fl1 r ty
+    rw True  r ty = noBogusCoercions $ rw1 r ty
+    rw False r ty =                    rw1 r ty
 
-    {-# INLINE fl1 #-}
-    fl1 :: Role -> Type -> RewriteM (Xi, Coercion)
-    fl1 Nominal ty
+    {-# INLINE rw1 #-}
+    rw1 :: Role -> Type -> RewriteM (Xi, Coercion)
+    rw1 Nominal ty
       = setEqRel NomEq $
         rewrite_one ty
 
-    fl1 Representational ty
+    rw1 Representational ty
       = setEqRel ReprEq $
         rewrite_one ty
 
-    fl1 Phantom ty
+    rw1 Phantom ty
     -- See Note [Phantoms in the rewriter]
       = do { ty <- liftTcS $ zonkTcType ty
            ; return (ty, mkReflCo Phantom ty) }
@@ -534,13 +535,47 @@ rewrite_one (TyConApp tc tys)
   | otherwise
   = rewrite_ty_con_app tc tys
 
-rewrite_one ty@(FunTy { ft_mult = mult, ft_arg = ty1, ft_res = ty2 })
-  = do { (xi1,co1) <- rewrite_one ty1
-       ; (xi2,co2) <- rewrite_one ty2
-       ; (xi3,co3) <- setEqRel NomEq $ rewrite_one mult
+rewrite_one (FunTy { ft_af = vis, ft_mult = mult, ft_arg = ty1, ft_res = ty2 })
+  = do { (arg_xi,arg_co) <- rewrite_one ty1
+       ; (res_xi,res_co) <- rewrite_one ty2
+
+        -- Important: look at the *reduced* type, so that any unzonked variables
+        -- in kinds are gone and the getRuntimeRep succeeds.
+        -- cf. Note [Decomposing FunTy] in GHC.Tc.Solver.Canonical.
+       ; let arg_rep = getRuntimeRep arg_xi
+             res_rep = getRuntimeRep res_xi
+
+       ; (w_redn, arg_rep_redn, res_rep_redn) <- setEqRel NomEq $
+           liftA3 (,,) (rewrite_one mult)
+                       (rewrite_one arg_rep)
+                       (rewrite_one res_rep)
        ; role <- getRole
-       ; return (ty { ft_mult = xi3, ft_arg = xi1, ft_res = xi2 }
-                , mkFunCo role co3 co1 co2) }
+
+       ; let arg_rep_co = snd arg_rep_redn
+                -- :: arg_rep ~ arg_rep_xi
+             arg_ki_co  = mkTyConAppCo Nominal tYPETyCon [arg_rep_co]
+                -- :: TYPE arg_rep ~ TYPE arg_rep_xi
+             casted_arg_redn =
+                 ( mkCastTy arg_xi arg_ki_co
+                 , mkCoherenceRightCo role arg_xi arg_ki_co arg_co
+                 )
+                -- :: ty1 ~> arg_xi |> arg_ki_co
+
+             res_ki_co  = mkTyConAppCo Nominal tYPETyCon [snd res_rep_redn]
+             casted_res_redn =
+                ( mkCastTy res_xi res_ki_co
+                , mkCoherenceRightCo role res_xi res_ki_co res_co
+                )
+
+          -- We must rewrite the representations, because that's what would
+          -- be done if we used TyConApp instead of FunTy. These rewritten
+          -- representations are seen only in casts of the arg and res, below.
+          -- Forgetting this caused #19677.
+       ; return
+            ( mkFunTy vis (fst w_redn) (fst casted_arg_redn) (fst casted_res_redn)
+            , mkFunCo role (snd w_redn) (snd casted_arg_redn) (snd casted_res_redn)
+            )
+       }
 
 rewrite_one ty@(ForAllTy {})
 -- TODO (RAE): This is inadequate, as it doesn't rewrite the kind of

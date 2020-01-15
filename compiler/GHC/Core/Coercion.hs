@@ -454,7 +454,7 @@ decomposePiCos orig_co (Pair orig_k1 orig_k2) orig_args
        -> (TCvSubst,Kind)  -- Rhs kind of coercion
        -> [Type]           -- Arguments to that function
        -> ([CoercionN], Coercion)
-    -- Invariant:  co :: subst1(k2) ~ subst2(k2)
+    -- Invariant:  co :: subst1(k1) ~ subst2(k2)
 
     go acc_arg_cos (subst1,k1) co (subst2,k2) (ty:tys)
       | Just (a, t1) <- splitForAllTyCoVar_maybe k1

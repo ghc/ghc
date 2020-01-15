@@ -1739,7 +1739,22 @@ that (a Int) will satisfy (PKTI).
 
 The absence of this caused #14174 and #14520.
 
-The calls to mkAppTyM is the other place we are very careful.
+The calls to mkAppTyM is the other place we are very careful; see Note [mkAppTyM].
+
+Wrinkle around FunTy:
+Note that the PKTI does *not* guarantee anything about the shape of FunTys.
+Specifically, when we have (FunTy vis mult arg res), it should be the case
+that arg :: TYPE rr1 and res :: TYPE rr2, for some rr1 and rr2. However, we
+might not have this. Example: if the user writes (a -> b), then we might
+invent a :: kappa1 and b :: kappa2. We soon will check whether kappa1 ~ TYPE rho1
+(for some rho1), and that will lead to kappa1 := TYPE rho1 (ditto for kappa2).
+However, when we build the FunTy, we might not have zonked `a`, and so the
+FunTy will be built without being able to purely extract the RuntimeReps.
+
+Because the PKTI does not guarantee that the RuntimeReps are available in a FunTy,
+we must be aware of this when splitting: splitTyConApp and splitAppTy will *not*
+split a FunTy if the RuntimeReps are not available. See also Note [Decomposing FunTy]
+in GHC.Tc.Solver.Canonical.
 
 Note [mkAppTyM]
 ~~~~~~~~~~~~~~~

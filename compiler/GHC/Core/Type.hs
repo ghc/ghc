@@ -43,6 +43,7 @@ module GHC.Core.Type (
         tcSplitTyConApp_maybe,
         splitListTyConApp_maybe,
         repSplitTyConApp_maybe,
+        tcRepSplitTyConApp_maybe,
 
         mkForAllTy, mkForAllTys, mkInvisForAllTys, mkTyCoInvForAllTys,
         mkSpecForAllTy, mkSpecForAllTys,
@@ -1059,13 +1060,16 @@ tcRepSplitAppTy_maybe :: Type -> Maybe (Type,Type)
 -- ^ Does the AppTy split as in 'tcSplitAppTy_maybe', but assumes that
 -- any coreView stuff is already done. Refuses to look through (c => t)
 tcRepSplitAppTy_maybe (FunTy { ft_af = af, ft_mult = w, ft_arg = ty1, ft_res = ty2 })
-  | InvisArg <- af
-  = Nothing  -- See Note [Decomposing fat arrow c=>t]
-  | otherwise
+  | VisArg <- af   -- See Note [Decomposing fat arrow c=>t]
+
+  -- See Note [The Purely Kinded Type Invariant (PKTI)] in GHC.Tc.Gen.HsType,
+  -- Wrinkle around FunTy
+  , Just rep1 <- getRuntimeRep_maybe ty1
+  , Just rep2 <- getRuntimeRep_maybe ty2
   = Just (TyConApp funTyCon [w, rep1, rep2, ty1], ty2)
-  where
-    rep1 = getRuntimeRep ty1
-    rep2 = getRuntimeRep ty2
+
+  | otherwise
+  = Nothing
 
 tcRepSplitAppTy_maybe (AppTy ty1 ty2)    = Just (ty1, ty2)
 tcRepSplitAppTy_maybe (TyConApp tc tys)
@@ -1473,16 +1477,23 @@ splitTyConApp_maybe = repSplitTyConApp_maybe . coreFullView
 tcSplitTyConApp_maybe :: HasCallStack => Type -> Maybe (TyCon, [Type])
 -- Defined here to avoid module loops between Unify and TcType.
 tcSplitTyConApp_maybe ty | Just ty' <- tcView ty = tcSplitTyConApp_maybe ty'
-tcSplitTyConApp_maybe (TyConApp tc tys)          = Just (tc, tys)
-tcSplitTyConApp_maybe (FunTy VisArg w arg res)
-  | Just arg_rep <- getRuntimeRep_maybe arg
-  , Just res_rep <- getRuntimeRep_maybe res
-  = Just (funTyCon, [w, arg_rep, res_rep, arg, res])
-tcSplitTyConApp_maybe _ = Nothing
+                         | otherwise             = tcRepSplitTyConApp_maybe ty
 
 -------------------
 repSplitTyConApp_maybe :: HasDebugCallStack => Type -> Maybe (TyCon, [Type])
 -- ^ Like 'splitTyConApp_maybe', but doesn't look through synonyms. This
+-- assumes the synonyms have already been dealt with.
+repSplitTyConApp_maybe (TyConApp tc tys) = Just (tc, tys)
+repSplitTyConApp_maybe (FunTy _ w arg res)
+  -- NB: we're in Core, so no check for VisArg
+  = Just (funTyCon, [w, arg_rep, res_rep, arg, res])
+  where
+    arg_rep = getRuntimeRep arg
+    res_rep = getRuntimeRep res
+repSplitTyConApp_maybe _ = Nothing
+
+tcRepSplitTyConApp_maybe :: HasDebugCallStack => Type -> Maybe (TyCon, [Type])
+-- ^ Like 'tcSplitTyConApp_maybe', but doesn't look through synonyms. This
 -- assumes the synonyms have already been dealt with.
 --
 -- Moreover, for a FunTy, it only succeeds if the argument types
@@ -1490,13 +1501,15 @@ repSplitTyConApp_maybe :: HasDebugCallStack => Type -> Maybe (TyCon, [Type])
 -- the funTyCon requires.  This will usually be true;
 -- but may be temporarily false during canonicalization:
 --     see Note [Decomposing FunTy] in GHC.Tc.Solver.Canonical
---
-repSplitTyConApp_maybe (TyConApp tc tys) = Just (tc, tys)
-repSplitTyConApp_maybe (FunTy _ w arg res)
+--     and Note [The Purely Kinded Type Invariant (PKTI)] in GHC.Tc.Gen.HsType,
+--         Wrinkle around FunTy
+tcRepSplitTyConApp_maybe (TyConApp tc tys) = Just (tc, tys)
+tcRepSplitTyConApp_maybe (FunTy VisArg w arg res)
+  -- NB: VisArg. See Note [Decomposing fat arrow c=>t]
   | Just arg_rep <- getRuntimeRep_maybe arg
   , Just res_rep <- getRuntimeRep_maybe res
   = Just (funTyCon, [w, arg_rep, res_rep, arg, res])
-repSplitTyConApp_maybe _ = Nothing
+tcRepSplitTyConApp_maybe _ = Nothing
 
 -------------------
 -- | Attempts to tease a list type apart and gives the type of the elements if
@@ -2508,6 +2521,17 @@ ordering leads to nondeterminism. We hit the same problem in the TyVarTy case,
 comparing type variables is nondeterministic, note the call to nonDetCmpVar in
 nonDetCmpTypeX.
 See Note [Unique Determinism] for more details.
+
+Note [Computing equality on types]
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+There are several places within GHC that depend on the precise choice of
+definitional equality used. If we change that definition, all these places
+must be updated. This Note merely serves as a place for all these places
+to refer to, so searching for references to this Note will find every place
+that needs to be updated.
+
+See also Note [Non-trivial definitional equality] in GHC.Core.TyCo.Rep.
+
 -}
 
 nonDetCmpType :: Type -> Type -> Ordering
@@ -2537,6 +2561,7 @@ data TypeOrdering = TLT  -- ^ @t1 < t2@
 
 nonDetCmpTypeX :: RnEnv2 -> Type -> Type -> Ordering  -- Main workhorse
     -- See Note [Non-trivial definitional equality] in GHC.Core.TyCo.Rep
+    -- See Note [Computing equality on types]
 nonDetCmpTypeX env orig_t1 orig_t2 =
     case go env orig_t1 orig_t2 of
       -- If there are casts then we also need to do a comparison of the kinds of
@@ -2591,7 +2616,10 @@ nonDetCmpTypeX env orig_t1 orig_t2 =
       | Just (s1, t1) <- repSplitAppTy_maybe ty1
       = go env s1 s2 `thenCmpTy` go env t1 t2
     go env (FunTy _ w1 s1 t1) (FunTy _ w2 s2 t2)
-      = go env s1 s2 `thenCmpTy` go env t1 t2 `thenCmpTy` go env w1 w2
+        -- NB: nonDepCmpTypeX does the kind check requested by
+        -- Note [Equality on FunTys] in GHC.Core.TyCo.Rep
+      = liftOrdering (nonDetCmpTypeX env s1 s2 `thenCmp` nonDetCmpTypeX env t1 t2)
+          `thenCmpTy` go env w1 w2
         -- Comparing multiplicities last because the test is usually true
     go env (TyConApp tc1 tys1) (TyConApp tc2 tys2)
       = liftOrdering (tc1 `nonDetCmpTc` tc2) `thenCmpTy` gos env tys1 tys2
