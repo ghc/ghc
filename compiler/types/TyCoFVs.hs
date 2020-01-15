@@ -1,9 +1,7 @@
 {-# LANGUAGE CPP #-}
 
 module TyCoFVs
-  (     deep_tcvs_of_type,
-
-        shallowTyCoVarsOfType, shallowTyCoVarsOfTypes,
+  (     shallowTyCoVarsOfType, shallowTyCoVarsOfTypes,
         tyCoVarsOfType,        tyCoVarsOfTypes,
         tyCoVarsOfTypeDSet, tyCoVarsOfTypesDSet,
 
@@ -200,43 +198,37 @@ kind are free.
 ********************************************************************* -}
 
 tyCoVarsOfType :: Type -> TyCoVarSet
-tyCoVarsOfType ty = deep_tcvs_of_type ty emptyVarSet emptyVarSet
+tyCoVarsOfType ty = appEndo (deep_ty ty) emptyVarSet
 -- Alternative:
 --   tyCoVarsOfType ty = closeOverKinds (shallowTyCoVarsOfType ty)
 
 tyCoVarsOfTypes :: [Type] -> TyCoVarSet
-tyCoVarsOfTypes tys = deep_tcvs_of_types tys emptyVarSet emptyVarSet
+tyCoVarsOfTypes tys = appEndo (deep_tys tys) emptyVarSet
 -- Alternative:
 --   tyCoVarsOfTypes tys = closeOverKinds (shallowTyCoVarsOfTypes tys)
 
 tyCoVarsOfCo :: Coercion -> TyCoVarSet
 -- See Note [Free variables of Coercions]
-tyCoVarsOfCo co = deep_tcvs_of_co co emptyVarSet emptyVarSet
+tyCoVarsOfCo co = appEndo (deep_co co) emptyVarSet
 
 tyCoVarsOfCos :: [Coercion] -> TyCoVarSet
-tyCoVarsOfCos cos = deep_tcvs_of_cos cos emptyVarSet emptyVarSet
+tyCoVarsOfCos cos = appEndo (deep_cos cos) emptyVarSet
 
-deep_tcvs_of_type :: Type -> TyCoVarSet -> TyCoVarSet -> TyCoVarSet
-deep_tcvs_of_type ty is acc = appEndo (foldType deepTcvFolder is ty) acc
-
-deep_tcvs_of_types :: [Type] -> TyCoVarSet -> TyCoVarSet -> TyCoVarSet
-deep_tcvs_of_types tys is acc = appEndo (foldTypes deepTcvFolder is tys) acc
-
-deep_tcvs_of_co :: Coercion -> TyCoVarSet -> TyCoVarSet -> TyCoVarSet
-deep_tcvs_of_co co is acc = appEndo (foldCoercion deepTcvFolder is co) acc
-
-deep_tcvs_of_cos :: [Coercion] -> TyCoVarSet -> TyCoVarSet -> TyCoVarSet
-deep_tcvs_of_cos cos is acc = appEndo (foldCoercions deepTcvFolder is cos) acc
+deep_ty  :: Type -> Endo TyCoVarSet
+deep_tys :: [Type] -> Endo TyCoVarSet
+deep_co  :: Coercion -> Endo TyCoVarSet
+deep_cos :: [Coercion] -> Endo TyCoVarSet
+(deep_ty, deep_tys, deep_co, deep_cos) = foldTyCo deepTcvFolder emptyVarSet
 
 deepTcvFolder :: TyCoFolder TyCoVarSet (Endo TyCoVarSet)
 deepTcvFolder = TyCoFolder { tcf_tyvar = do_tcv, tcf_covar = do_tcv
-                       , tcf_hole  = do_hole, tcf_tycobinder = do_bndr }
+                           , tcf_hole  = do_hole, tcf_tycobinder = do_bndr }
   where
     do_tcv is v = Endo do_it
       where
         do_it acc | v `elemVarSet` is  = acc
                   | v `elemVarSet` acc = acc
-                  | otherwise          = deep_tcvs_of_type (varType v) emptyVarSet $
+                  | otherwise          = appEndo (deep_ty (varType v)) $
                                          acc `extendVarSet` v
 
     do_bndr is tcv _ = extendVarSet is tcv

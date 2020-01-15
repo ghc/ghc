@@ -62,7 +62,7 @@ module TyCoRep (
         pickLR,
 
         -- ** Analyzing types
-        TyCoFolder(..), foldType, foldTypes, foldCoercion, foldCoercions,
+        TyCoFolder(..), foldTyCo,
 
         -- * Sizes
         typeSize, coercionSize, provSize
@@ -1736,31 +1736,14 @@ data TyCoFolder env a
           -- ^ The returned env is used in the extended scope
       }
 
-{-# INLINE foldTypes #-}  -- See Note [Specialising foldType]
-foldTypes :: Monoid a => TyCoFolder env a -> env -> [Type] -> a
-foldTypes folder env = foldMap (foldType folder env)
-
-{-# INLINE foldCoercions #-}  -- See Note [Specialising foldType]
-foldCoercions :: Monoid a => TyCoFolder env a -> env -> [Coercion] -> a
-foldCoercions folder env = foldMap (foldCoercion folder env)
-
-{-# INLINE foldType  #-}  -- See Note [Specialising foldType]
-foldType     :: Monoid a => TyCoFolder env a -> env -> Type     -> a
-
-{-# INLINE foldCoercion  #-}  -- See Note [Specialising foldType]
-foldCoercion :: Monoid a => TyCoFolder env a -> env -> Coercion -> a
-foldCoercion folder env = snd (fold_tyco folder env)
-
-foldType folder env = fst (fold_tyco folder env)
-
-{-# INLINE fold_tyco  #-}  -- See Note [Specialising foldType]
-fold_tyco :: Monoid a => TyCoFolder env a -> env
-          -> (Type -> a, Coercion -> a)
-fold_tyco (TyCoFolder { tcf_tyvar      = tyvar
+{-# INLINE foldTyCo  #-}  -- See Note [Specialising foldType]
+foldTyCo :: Monoid a => TyCoFolder env a -> env
+         -> (Type -> a, [Type] -> a, Coercion -> a, [Coercion] -> a)
+foldTyCo (TyCoFolder { tcf_tyvar      = tyvar
                       , tcf_tycobinder = tycobinder
                       , tcf_covar      = covar
                       , tcf_hole       = cohole }) env
-  = (go_ty env, go_co env)
+  = (go_ty env, go_tys env, go_co env, go_cos env)
   where
     go_ty env (TyVarTy tv)      = tyvar env tv
     go_ty env (AppTy t1 t2)     = go_ty env t1 `mappend` go_ty env t2

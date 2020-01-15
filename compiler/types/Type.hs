@@ -81,7 +81,7 @@ module Type (
 
         -- ** Analyzing types
         TyCoMapper(..), mapType, mapCoercion,
-        TyCoFolder(..), foldType,
+        TyCoFolder(..), foldTyCo,
 
         -- (Newtypes)
         newTyConInstRhs,
