@@ -15,8 +15,8 @@ import Outputable                 ( renderWithStyle, ppr, defaultUserStyle )
 import SrcLoc
 import GHC.CoreToIface
 import TyCon
-import TyCoRep hiding( foldType )
-import Type    hiding( foldType )
+import TyCoRep
+import Type
 import Var
 import VarEnv
 
