@@ -593,8 +593,8 @@ tc_patsyn_finish :: Located Name      -- ^ PatSyn Name
                  -> HsPatSynDir GhcRn -- ^ PatSyn type (Uni/Bidir/ExplicitBidir)
                  -> Bool              -- ^ Whether infix
                  -> LPat GhcTc        -- ^ Pattern of the PatSyn
-                 -> ([TcTyVarSpecBinder], [PredType], TcEvBinds, [EvVar])
-                 -> ([TcTyVarSpecBinder], [TcType], [PredType], [EvTerm])
+                 -> ([TcInvisTVBinder], [PredType], TcEvBinds, [EvVar])
+                 -> ([TcInvisTVBinder], [TcType], [PredType], [EvTerm])
                  -> ([LHsExpr GhcTcId], [TcType])   -- ^ Pattern arguments and
                                                     -- types
                  -> TcType            -- ^ Pattern type
@@ -782,8 +782,8 @@ isUnidirectional ExplicitBidirectional{} = False
 -}
 
 mkPatSynBuilderId :: HsPatSynDir a -> Located Name
-                  -> [TyVarSpecBinder] -> ThetaType
-                  -> [TyVarSpecBinder] -> ThetaType
+                  -> [InvisTVBinder] -> ThetaType
+                  -> [InvisTVBinder] -> ThetaType
                   -> [Type] -> Type
                   -> TcM (Maybe (Id, Bool))
 mkPatSynBuilderId dir (L _ name)

@@ -2757,7 +2757,7 @@ tcConDecl rep_tycon tag_map tmpl_bndrs res_kind res_tmpl new_or_data
        -- Can't print univ_tvs, arg_tys etc, because we are inside the knot here
        ; traceTc "tcConDecl 2" (ppr name $$ ppr field_lbls)
        ; let
-           univ_tvbs = tyConTyVarSpecBinders tmpl_bndrs
+           univ_tvbs = tyConInvisTVBinders tmpl_bndrs
            univ_tvs  = binderVars univ_tvbs
            ex_tvbs   = mkTyVarBinders InferredSpec qkvs ++
                        user_qtvbndrs
@@ -2974,14 +2974,14 @@ errors reported in one pass.  See #7175, and #10836.
 rejigConRes :: [KnotTied TyConBinder] -> KnotTied Type    -- Template for result type; e.g.
                                   -- data instance T [a] b c ...
                                   --      gives template ([a,b,c], T [a] b c)
-            -> [TyVarSpecBinder]  -- The constructor's type variables (both inferred and user-written)
+            -> [InvisTVBinder]    -- The constructor's type variables (both inferred and user-written)
             -> KnotTied Type      -- res_ty
             -> ([TyVar],          -- Universal
                 [TyVar],          -- Existential (distinct OccNames from univs)
-                [TyVarSpecBinder], -- The constructor's rejigged, user-written
-                                   -- type variables
-                [EqSpec],      -- Equality predicates
-                TCvSubst)      -- Substitution to apply to argument types
+                [InvisTVBinder],  -- The constructor's rejigged, user-written
+                                  -- type variables
+                [EqSpec],         -- Equality predicates
+                TCvSubst)         -- Substitution to apply to argument types
         -- We don't check that the TyCon given in the ResTy is
         -- the same as the parent tycon, because checkValidDataCon will do it
 -- NB: All arguments may potentially be knot-tied

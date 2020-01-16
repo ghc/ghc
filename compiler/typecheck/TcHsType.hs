@@ -726,7 +726,7 @@ tc_hs_type mode forall@(HsForAllTy { hst_fvf = fvf, hst_bndrs = hs_tvs
 
        ; return (mkForAllTys tv_bndrs ty') }
   where
-    construct_bndr :: TcTyVarSpecBinder -> TcM TcTyVarBinder
+    construct_bndr :: TcInvisTVBinder -> TcM TcTyVarBinder
     construct_bndr (Bndr tv spec) = do { argf <- spec_to_argf spec
                                        ; return $ mkTyVarBinder argf tv }
 
@@ -2663,7 +2663,7 @@ newFlexiKindedTyVarTyVar = newFlexiKindedTyVar newTyVarTyVar
 bindExplicitTKBndrs_Skol, bindExplicitTKBndrs_Tv
     :: [LHsTyVarBndr Specificity GhcRn]
     -> TcM a
-    -> TcM ([TcTyVarSpecBinder], a)
+    -> TcM ([TcInvisTVBinder], a)
 
 bindExplicitTKBndrs_Skol = bindExplicitTKBndrsX (tcHsTyVarBndr newSkolemTyVar)
 bindExplicitTKBndrs_Tv   = bindExplicitTKBndrsX (tcHsTyVarBndr newTyVarTyVar)
@@ -2682,7 +2682,7 @@ bindExplicitTKBndrsX
     :: (HsTyVarBndr Specificity GhcRn -> TcM TcTyVar)
     -> [LHsTyVarBndr Specificity GhcRn]
     -> TcM a
-    -> TcM ([TcTyVarSpecBinder], a)  -- Returned [TcTyVar] are in 1-1 correspondence
+    -> TcM ([TcInvisTVBinder], a)  -- Returned [TcTyVar] are in 1-1 correspondence
                                      -- with the passed-in [LHsTyVarBndr]
 bindExplicitTKBndrsX tc_tv hs_tvs thing_inside
   = do { traceTc "bindExplicTKBndrs" (ppr hs_tvs)

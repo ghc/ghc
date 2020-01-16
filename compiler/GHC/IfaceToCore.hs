@@ -893,7 +893,7 @@ tcIfaceDataCons tycon_name tycon tc_tybinders if_cons
                                 ; mkNewTyConRhs tycon_name tycon data_con }
   where
     univ_tvs :: [TyVar]
-    univ_tvs = binderVars (tyConTyVarSpecBinders tc_tybinders)
+    univ_tvs = binderVars (tyConInvisTVBinders tc_tybinders)
 
     tag_map :: NameEnv ConTag
     tag_map = mkTyConTagMap tycon
