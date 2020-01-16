@@ -12,7 +12,7 @@ module FV (
         FV, InterestingVarFun,
 
         -- * Running the computations
-        fvVarListVarSet, fvVarList, fvVarSet, fvDVarSet,
+        fvVarList, fvVarSet, fvDVarSet,
 
         -- ** Manipulating those computations
         unitFV,
@@ -46,22 +46,21 @@ type InterestingVarFun = Var -> Bool
 -- Merging costs O(n+m) for UniqFM and for UniqDFM there's an additional log
 -- factor. It's cheaper to incrementally add to a list and use a set to check
 -- for duplicates.
-type FV = InterestingVarFun
-             -- Used for filtering sets as we build them
-          -> VarSet
-             -- Locally bound variables
-          -> ([Var], VarSet)
-             -- List to preserve ordering and set to check for membership,
-             -- so that the list doesn't have duplicates
-             -- For explanation of why using `VarSet` is not deterministic see
-             -- Note [Deterministic UniqFM] in UniqDFM.
-          -> ([Var], VarSet)
+type FV = InterestingVarFun -- Used for filtering sets as we build them
+        -> VarSet           -- Locally bound variables
+        -> VarAcc           -- Accumulator
+        -> VarAcc
+
+type VarAcc = ([Var], VarSet)  -- List to preserve ordering and set to check for membership,
+                               -- so that the list doesn't have duplicates
+                               -- For explanation of why using `VarSet` is not deterministic see
+                               -- Note [Deterministic UniqFM] in UniqDFM.
 
 -- Note [FV naming conventions]
 -- ~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 -- To get the performance and determinism that FV provides, FV computations
 -- need to built up from smaller FV computations and then evaluated with
--- one of `fvVarList`, `fvDVarSet`, `fvVarListVarSet`. That means the functions
+-- one of `fvVarList`, `fvDVarSet` That means the functions
 -- returning FV need to be exported.
 --
 -- The conventions are:
@@ -84,26 +83,26 @@ type FV = InterestingVarFun
 -- | Run a free variable computation, returning a list of distinct free
 -- variables in deterministic order and a non-deterministic set containing
 -- those variables.
-fvVarListVarSet :: FV ->  ([Var], VarSet)
-fvVarListVarSet fv = fv (const True) emptyVarSet ([], emptyVarSet)
+fvVarAcc :: FV ->  ([Var], VarSet)
+fvVarAcc fv = fv (const True) emptyVarSet ([], emptyVarSet)
 
 -- | Run a free variable computation, returning a list of distinct free
 -- variables in deterministic order.
 fvVarList :: FV -> [Var]
-fvVarList = fst . fvVarListVarSet
+fvVarList = fst . fvVarAcc
 
 -- | Run a free variable computation, returning a deterministic set of free
 -- variables. Note that this is just a wrapper around the version that
 -- returns a deterministic list. If you need a list you should use
 -- `fvVarList`.
 fvDVarSet :: FV -> DVarSet
-fvDVarSet = mkDVarSet . fst . fvVarListVarSet
+fvDVarSet = mkDVarSet . fvVarList
 
 -- | Run a free variable computation, returning a non-deterministic set of
 -- free variables. Don't use if the set will be later converted to a list
 -- and the order of that list will impact the generated code.
 fvVarSet :: FV -> VarSet
-fvVarSet = snd . fvVarListVarSet
+fvVarSet = snd . fvVarAcc
 
 -- Note [FV eta expansion]
 -- ~~~~~~~~~~~~~~~~~~~~~~~

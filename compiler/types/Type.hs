@@ -148,7 +148,7 @@ module Type (
         typeSize, occCheckExpand,
 
         -- ** Closing over kinds
-        closeOverKindsDSet, closeOverKindsFV, closeOverKindsList,
+        closeOverKindsDSet, closeOverKindsList,
         closeOverKinds,
 
         -- * Well-scoped lists of variables
