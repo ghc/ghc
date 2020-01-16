@@ -402,7 +402,7 @@ mkDictSelId name clas
     arg_tys        = dataConRepArgTys data_con  -- Includes the dictionary superclasses
     val_index      = assoc "MkId.mkDictSelId" (sel_names `zip` [0..]) name
 
-    sel_ty = mkForAllTys tyvars $
+    sel_ty = mkInvisForAllTys tyvars $
              mkInvisFunTy (mkClassPred clas (mkTyVarTys (binderVars tyvars))) $
              getNth arg_tys val_index
 
@@ -1458,10 +1458,10 @@ coerceId = pcMiscPrelId coerceName ty info
                        `setUnfoldingInfo`  mkCompulsoryUnfolding rhs
     eqRTy     = mkTyConApp coercibleTyCon [ tYPE r , a, b ]
     eqRPrimTy = mkTyConApp eqReprPrimTyCon [ tYPE r, tYPE r, a, b ]
-    ty        = mkForAllTys [ Bndr rv Inferred
-                            , Bndr av Specified
-                            , Bndr bv Specified
-                            ] $
+    ty        = mkInvisForAllTys [ Bndr rv InferredSpec
+                                 , Bndr av SpecifiedSpec
+                                 , Bndr bv SpecifiedSpec
+                                 ] $
                 mkInvisFunTy eqRTy $
                 mkVisFunTy a b
 

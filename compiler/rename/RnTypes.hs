@@ -798,14 +798,14 @@ bindLRdrNames rdrs thing_inside
          thing_inside var_names }
 
 ---------------
-bindHsQTyVars :: forall a b flag.
+bindHsQTyVars :: forall a b.
                  HsDocContext
               -> Maybe SDoc         -- Just d => check for unused tvs
                                     --   d is a phrase like "in the type ..."
               -> Maybe a            -- Just _  => an associated type decl
               -> [Located RdrName]  -- Kind variables from scope, no dups
-              -> (LHsQTyVars flag GhcPs)
-              -> (LHsQTyVars flag GhcRn -> Bool -> RnM (b, FreeVars))
+              -> (LHsQTyVars () GhcPs)
+              -> (LHsQTyVars () GhcRn -> Bool -> RnM (b, FreeVars))
                   -- The Bool is True <=> all kind variables used in the
                   -- kind signature are bound on the left.  Reason:
                   -- the last clause of Note [CUSKs: Complete user-supplied
@@ -959,7 +959,8 @@ So tvs is {k,a} and kvs is {k}.
 NB: we do this only at the binding site of 'tvs'.
 -}
 
-bindLHsTyVarBndrs :: HsDocContext
+bindLHsTyVarBndrs :: (OutputableBndrFlag flag)
+                  => HsDocContext
                   -> Maybe SDoc            -- Just d => check for unused tvs
                                            --   d is a phrase like "in the type ..."
                   -> Maybe a               -- Just _  => an associated type decl
@@ -1411,7 +1412,7 @@ dataKindsErr env thing
 inTypeDoc :: HsType GhcPs -> SDoc
 inTypeDoc ty = text "In the type" <+> quotes (ppr ty)
 
-warnUnusedForAll :: SDoc -> LHsTyVarBndr flag GhcRn -> FreeVars -> TcM ()
+warnUnusedForAll :: (OutputableBndrFlag flag) => SDoc -> LHsTyVarBndr flag GhcRn -> FreeVars -> TcM ()
 warnUnusedForAll in_doc (L loc tv) used_names
   = whenWOptM Opt_WarnUnusedForalls $
     unless (hsTyVarName tv `elemNameSet` used_names) $

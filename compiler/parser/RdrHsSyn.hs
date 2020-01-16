@@ -387,12 +387,12 @@ fromSpecTyVarBndrs = mapM fromSpecTyVarBndr
 
 fromSpecTyVarBndr :: LHsTyVarBndr Specificity GhcPs -> P (LHsTyVarBndr () GhcPs)
 fromSpecTyVarBndr (L loc (UserTyVar xtv flag idp)) = case flag of
-  SSpecified -> return $ L loc $ UserTyVar xtv () idp
-  SInferred  -> addFatalError loc
+  SpecifiedSpec -> return $ L loc $ UserTyVar xtv () idp
+  InferredSpec  -> addFatalError loc
                   (text "Inferred type variables are not allowed here")
 fromSpecTyVarBndr (L loc (KindedTyVar xtv flag idp k)) = case flag of
-  SSpecified -> return $ L loc $ KindedTyVar xtv () idp k
-  SInferred  -> addFatalError loc
+  SpecifiedSpec -> return $ L loc $ KindedTyVar xtv () idp k
+  InferredSpec  -> addFatalError loc
                   (text "Inferred type variables are not allowed here")
 fromSpecTyVarBndr (L loc (XTyVarBndr bndr)) = return (L loc (XTyVarBndr bndr))
 
@@ -896,9 +896,9 @@ mkRuleBndrs = fmap (fmap cvt_one)
 mkRuleTyVarBndrs :: [LRuleTyTmVar] -> [LHsTyVarBndr Specificity GhcPs]
 mkRuleTyVarBndrs = fmap (fmap cvt_one)
   where cvt_one (RuleTyTmVar v Nothing)
-          = UserTyVar noExtField SSpecified (fmap tm_to_ty v)
+          = UserTyVar noExtField SpecifiedSpec (fmap tm_to_ty v)
         cvt_one (RuleTyTmVar v (Just sig))
-          = KindedTyVar noExtField SSpecified (fmap tm_to_ty v) sig
+          = KindedTyVar noExtField SpecifiedSpec (fmap tm_to_ty v) sig
     -- takes something in namespace 'varName' to something in namespace 'tvName'
         tm_to_ty (Unqual occ) = Unqual (setOccNameSpace tvName occ)
         tm_to_ty _ = panic "mkRuleTyVarBndrs"

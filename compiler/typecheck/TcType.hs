@@ -131,7 +131,8 @@ module TcType (
   Type, PredType, ThetaType, TyCoBinder,
   ArgFlag(..), AnonArgFlag(..), ForallVisFlag(..),
 
-  mkForAllTy, mkForAllTys, mkTyCoInvForAllTys, mkSpecForAllTys, mkTyCoInvForAllTy,
+  mkForAllTy, mkForAllTys, mkInvisForAllTys, mkTyCoInvForAllTys,
+  mkSpecForAllTys, mkTyCoInvForAllTy,
   mkInvForAllTy, mkInvForAllTys,
   mkVisFunTy, mkVisFunTys, mkInvisFunTy, mkInvisFunTys,
   mkTyConApp, mkAppTy, mkAppTys,
@@ -1179,8 +1180,8 @@ tcSplitForAllTys ty
 -- of the @ForAllTy@'s binder and @supplied_argf@ is the visibility provided
 -- as an argument to this function.
 -- All split tyvars are annotated with their argf.
-tcSplitForAllTysSameVis :: ArgFlag -> Type -> ([(TyVar,ArgFlag)], Type)
-tcSplitForAllTysSameVis supplied_argf ty = ASSERT( all (isTyVar . fst) (fst sty) ) sty
+tcSplitForAllTysSameVis :: ArgFlag -> Type -> ([TyVarBinder], Type)
+tcSplitForAllTysSameVis supplied_argf ty = ASSERT( all (isTyVar . binderVar) (fst sty) ) sty
   where sty = splitForAllTysSameVis supplied_argf ty
 
 -- | Like 'tcSplitForAllTys', but splits off only named binders.

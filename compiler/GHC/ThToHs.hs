@@ -1343,11 +1343,11 @@ cvtTvsSpec tvs = do { tvs' <- mapM cvt_tv_spec tvs; return (mkHsQTvs tvs') }
 cvt_tv_spec :: TH.TyVarBndr -> CvtM (LHsTyVarBndr Specificity GhcPs)
 cvt_tv_spec (TH.PlainTV nm)
   = do { nm' <- tNameL nm
-       ; returnL $ UserTyVar noExtField SSpecified nm' }
+       ; returnL $ UserTyVar noExtField SpecifiedSpec nm' }
 cvt_tv_spec (TH.KindedTV nm ki)
   = do { nm' <- tNameL nm
        ; ki' <- cvtKind ki
-       ; returnL $ KindedTyVar noExtField SSpecified nm' ki' }
+       ; returnL $ KindedTyVar noExtField SpecifiedSpec nm' ki' }
 
 cvtRole :: TH.Role -> Maybe Coercion.Role
 cvtRole TH.NominalR          = Just Coercion.Nominal

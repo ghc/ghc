@@ -496,9 +496,9 @@ tyConTyVarSpecBinders tc_bndrs
    mk_binder (Bndr tv tc_vis) = mkTyVarBinder vis tv
       where
         vis = case tc_vis of
-                AnonTCB VisArg           -> SSpecified
-                AnonTCB InvisArg         -> SInferred   -- See Note [AnonTCB InvisArg]
-                NamedTCB Required        -> SSpecified
+                AnonTCB VisArg           -> SpecifiedSpec
+                AnonTCB InvisArg         -> InferredSpec   -- See Note [AnonTCB InvisArg]
+                NamedTCB Required        -> SpecifiedSpec
                 NamedTCB (Invisible vis) -> vis
 
 -- Returns only tyvars, as covars are always inferred

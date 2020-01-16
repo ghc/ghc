@@ -447,8 +447,8 @@ tcPatSynSig name sig_ty
               , text "prov" <+> ppr prov'
               , text "body_ty" <+> ppr body_ty' ]
        ; return (TPSI { patsig_name = name
-                      , patsig_implicit_bndrs = mkTyVarBinders SInferred kvs ++
-                                                mkTyVarBinders SInferred implicit_tvs'
+                      , patsig_implicit_bndrs = mkTyVarBinders InferredSpec kvs ++
+                                                mkTyVarBinders InferredSpec implicit_tvs'
                       , patsig_univ_bndrs     = univ_tvbndrs'
                       , patsig_req            = req'
                       , patsig_ex_bndrs       = ex_tvbndrs'
@@ -460,9 +460,9 @@ tcPatSynSig name sig_ty
     build_patsyn_type kvs imp univ_bndrs req ex_bndrs prov body
       = mkInvForAllTys kvs $
         mkSpecForAllTys imp $
-        mkForAllTys (tyVarSpecToBinders univ_bndrs) $
+        mkInvisForAllTys univ_bndrs $
         mkPhiTy req $
-        mkForAllTys (tyVarSpecToBinders ex_bndrs) $
+        mkInvisForAllTys ex_bndrs $
         mkPhiTy prov $
         body
 tcPatSynSig _ (XHsImplicitBndrs nec) = noExtCon nec

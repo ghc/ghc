@@ -2734,7 +2734,7 @@ tcConDecl rep_tycon tag_map tmpl_bndrs res_kind res_tmpl new_or_data
          --   and discovered only by generalization
 
        ; kvs <- kindGeneralizeAll (mkSpecForAllTys tmpl_tvs $
-                                   mkForAllTys (tyVarSpecToBinders exp_tvbndrs) $
+                                   mkInvisForAllTys exp_tvbndrs $
                                    mkPhiTy ctxt $
                                    mkVisFunTys arg_tys $
                                    unitTy)
@@ -2759,7 +2759,7 @@ tcConDecl rep_tycon tag_map tmpl_bndrs res_kind res_tmpl new_or_data
        ; let
            univ_tvbs = tyConTyVarSpecBinders tmpl_bndrs
            univ_tvs  = binderVars univ_tvbs
-           ex_tvbs   = mkTyVarBinders SInferred qkvs ++
+           ex_tvbs   = mkTyVarBinders InferredSpec qkvs ++
                        user_qtvbndrs
            ex_tvs    = qkvs ++ user_qtvs
            -- For H98 datatypes, the user-written tyvar binders are precisely
@@ -2818,13 +2818,13 @@ tcConDecl rep_tycon tag_map tmpl_bndrs _res_kind res_tmpl new_or_data
        ; imp_tvs <- zonkAndScopedSort imp_tvs
 
        ; tkvs <- kindGeneralizeAll (mkSpecForAllTys imp_tvs $
-                                    mkForAllTys (tyVarSpecToBinders exp_tvbndrs) $
+                                    mkInvisForAllTys exp_tvbndrs $
                                     mkPhiTy ctxt $
                                     mkVisFunTys arg_tys $
                                     res_ty)
 
-       ; let tvbndrs =  (mkTyVarBinders SInferred tkvs)
-                     ++ (mkTyVarBinders SInferred imp_tvs)
+       ; let tvbndrs =  (mkTyVarBinders InferredSpec tkvs)
+                     ++ (mkTyVarBinders InferredSpec imp_tvs)
                      ++ exp_tvbndrs
 
              -- Zonk to Types

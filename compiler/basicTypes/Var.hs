@@ -64,16 +64,15 @@ module Var (
         ArgFlag(Invisible,Required,Specified,Inferred),
         isVisibleArgFlag, isInvisibleArgFlag, sameVis,
         AnonArgFlag(..), ForallVisFlag(..), argToForallVisFlag,
-        Specificity(..), argFlagToSpecificity,
+        Specificity(..),
 
         -- * TyVar's
-        VarBndr(..), TyCoVarBinder, TyVarBinder,
-        TyCoVarSpecBinder, TyVarSpecBinder,
+        VarBndr(..), TyCoVarBinder, TyVarBinder, TyVarSpecBinder,
         binderVar, binderVars, binderArgFlag, binderType,
         mkTyCoVarBinder, mkTyCoVarBinders,
         mkTyVarBinder, mkTyVarBinders,
         isTyVarBinder, tyVarSpecToBinder, tyVarSpecToBinders,
-        splitTyVarsOnSpecificity, mapVarBndr, mapVarBndrs,
+        mapVarBndr, mapVarBndrs,
 
         -- ** Constructing TyVar's
         mkTyVar, mkTcTyVar,
@@ -396,13 +395,13 @@ data ArgFlag = Invisible Specificity
   deriving (Eq, Ord, Data)
   -- (<) on ArgFlag means "is less visible than"
 
-data Specificity = SInferred
-                 | SSpecified
+data Specificity = InferredSpec
+                 | SpecifiedSpec
   deriving (Eq, Ord, Data)
 
 pattern Inferred, Specified :: ArgFlag
-pattern Inferred  = Invisible SInferred
-pattern Specified = Invisible SSpecified
+pattern Inferred  = Invisible InferredSpec
+pattern Specified = Invisible SpecifiedSpec
 
 {-# COMPLETE Required, Specified, Inferred #-}
 
@@ -429,14 +428,14 @@ instance Outputable ArgFlag where
   ppr Inferred  = text "[infrd]"
 
 instance Binary Specificity where
-  put_ bh SSpecified = putByte bh 0
-  put_ bh SInferred  = putByte bh 1
+  put_ bh SpecifiedSpec = putByte bh 0
+  put_ bh InferredSpec  = putByte bh 1
 
   get bh = do
     h <- getByte bh
     case h of
-      0 -> return SSpecified
-      _ -> return SInferred
+      0 -> return SpecifiedSpec
+      _ -> return InferredSpec
 
 instance Binary ArgFlag where
   put_ bh Required  = putByte bh 0
@@ -449,11 +448,6 @@ instance Binary ArgFlag where
       0 -> return Required
       1 -> return Specified
       _ -> return Inferred
-
--- | Convert an 'ArgFlag' to its corresponding 'Specificity'.
-argFlagToSpecificity :: ArgFlag -> Specificity
-argFlagToSpecificity Required      = SSpecified
-argFlagToSpecificity (Invisible s) = s
 
 -- | The non-dependent version of 'ArgFlag'.
 
@@ -551,7 +545,6 @@ data VarBndr var argf = Bndr var argf
 -- A 'TyVarBinder' is a binder with only TyVar
 type TyCoVarBinder     = VarBndr TyCoVar ArgFlag
 type TyVarBinder       = VarBndr TyVar ArgFlag
-type TyCoVarSpecBinder = VarBndr TyCoVar Specificity
 type TyVarSpecBinder   = VarBndr TyVar Specificity
 
 tyVarSpecToBinders :: [VarBndr a Specificity] -> [VarBndr a ArgFlag]
@@ -600,17 +593,6 @@ mapVarBndr f (Bndr v fl) = Bndr (f v) fl
 
 mapVarBndrs :: (var -> var') -> [VarBndr var flag] -> [VarBndr var' flag]
 mapVarBndrs f = map (mapVarBndr f)
-
--- | Split a list of annotated tyvars, based on their specificity.
--- Returns the inferred and specified tyvars separately (in this order).
-splitTyVarsOnSpecificity :: [TyVarSpecBinder] -> ([TyVar] , [TyVar])
-splitTyVarsOnSpecificity tvs = ( binderVars $ filter is_inferred tvs
-                               , binderVars $ filter is_specified tvs )
-  where
-    is_inferred :: TyVarSpecBinder -> Bool
-    is_inferred = (==) SInferred . binderArgFlag
-    is_specified :: TyVarSpecBinder -> Bool
-    is_specified = not . is_inferred
 
 instance Outputable tv => Outputable (VarBndr tv ArgFlag) where
   ppr (Bndr v Required)  = ppr v

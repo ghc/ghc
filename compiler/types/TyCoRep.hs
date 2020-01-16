@@ -47,7 +47,7 @@ module TyCoRep (
         mkTyConTy, mkTyVarTy, mkTyVarTys,
         mkTyCoVarTy, mkTyCoVarTys,
         mkFunTy, mkVisFunTy, mkInvisFunTy, mkVisFunTys, mkInvisFunTys,
-        mkForAllTy, mkForAllTys,
+        mkForAllTy, mkForAllTys, mkInvisForAllTys,
         mkPiTy, mkPiTys,
 
         -- * Functions over binders
@@ -940,6 +940,10 @@ mkForAllTy tv vis ty = ForAllTy (Bndr tv vis) ty
 -- | Wraps foralls over the type using the provided 'TyCoVar's from left to right
 mkForAllTys :: [TyCoVarBinder] -> Type -> Type
 mkForAllTys tyvars ty = foldr ForAllTy ty tyvars
+
+-- | Wraps foralls over the type using the provided 'TyVarSpecBinder's from left to right
+mkInvisForAllTys :: [TyVarSpecBinder] -> Type -> Type
+mkInvisForAllTys tyvars ty = foldr ForAllTy ty $ tyVarSpecToBinders tyvars
 
 mkPiTy:: TyCoBinder -> Type -> Type
 mkPiTy (Anon af ty1) ty2        = FunTy { ft_af = af, ft_arg = ty1, ft_res = ty2 }

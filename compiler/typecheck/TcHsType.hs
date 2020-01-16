@@ -732,10 +732,10 @@ tc_hs_type mode forall@(HsForAllTy { hst_fvf = fvf, hst_bndrs = hs_tvs
 
     -- See Note [Variable Specificity and Forall Visibility]
     spec_to_argf :: Specificity -> TcM ArgFlag
-    spec_to_argf SSpecified = case fvf of
+    spec_to_argf SpecifiedSpec = case fvf of
       ForallVis   -> return Required
       ForallInvis -> return Specified
-    spec_to_argf SInferred  = case fvf of -- GJ : TODO Nicer error message
+    spec_to_argf InferredSpec  = case fvf of -- GJ : TODO Nicer error message
       ForallVis   -> do { addErrTc (text "Unexpected inferred variable in required forall binder:" <+> ppr forall)
                         ; return Required }
       ForallInvis -> return Inferred
@@ -879,15 +879,15 @@ determine the variable binders (ArgFlag) for each variable in the generated
 ForAllTy type.
 
 This table summarises this relation:
------------------------------------------------------------------------
-| User-written type         ForAllVisFlag     Specificity     ArgFlag
-|----------------------------------------------------------------------
-| f :: forall a. type       ForallInvis       SSpecified      Specified
-| f :: forall {a}. type     ForallInvis       SInferred       Inferred
-| f :: forall a -> type     ForallVis         SSpecified      Required
-| f :: forall {a} -> type   ForallVis         SInferred       /
+--------------------------------------------------------------------------
+| User-written type         ForAllVisFlag     Specificity        ArgFlag
+|-------------------------------------------------------------------------
+| f :: forall a. type       ForallInvis       SpecifiedSpec      Specified
+| f :: forall {a}. type     ForallInvis       InferredSpec       Inferred
+| f :: forall a -> type     ForallVis         SpecifiedSpec      Required
+| f :: forall {a} -> type   ForallVis         InferredSpec       /
 |   This last form is non-sensical and is thus rejected.
------------------------------------------------------------------------
+--------------------------------------------------------------------------
 
 For more information regarding the interpretation of the resulting ArgFlag, see
 Note [VarBndrs, TyCoVarBinders, TyConBinders, and visibility] in TyCoRep.

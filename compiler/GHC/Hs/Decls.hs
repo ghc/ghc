@@ -756,7 +756,7 @@ instance OutputableBndrId p
       ppr instds
   ppr (XTyClGroup x) = ppr x
 
-pp_vanilla_decl_head :: (OutputableBndrId p)
+pp_vanilla_decl_head :: (OutputableBndrId p, OutputableBndrFlag flag)
    => Located (IdP (GhcPass p))
    -> LHsQTyVars flag (GhcPass p)
    -> LexicalFixity
@@ -1793,7 +1793,7 @@ pprDataFamInstFlavour (DataFamInstDecl (XHsImplicitBndrs x))
 
 pprHsFamInstLHS :: (OutputableBndrId p)
    => IdP (GhcPass p)
-   -> Maybe [LHsTyVarBndr flag (GhcPass p)]
+   -> Maybe [LHsTyVarBndr () (GhcPass p)]
    -> HsTyPats (GhcPass p)
    -> LexicalFixity
    -> LHsContext (GhcPass p)
