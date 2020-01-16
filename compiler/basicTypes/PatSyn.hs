@@ -67,13 +67,13 @@ data PatSyn
                                        -- psArgs
 
         -- Universally-quantified type variables
-        psUnivTyVars  :: [TyVarSpecBinder],
+        psUnivTyVars  :: [InvisTVBinder],
 
         -- Required dictionaries (may mention psUnivTyVars)
         psReqTheta    :: ThetaType,
 
         -- Existentially-quantified type vars
-        psExTyVars    :: [TyVarSpecBinder],
+        psExTyVars    :: [InvisTVBinder],
 
         -- Provided dictionaries (may mention psUnivTyVars or psExTyVars)
         psProvTheta   :: ThetaType,
@@ -354,10 +354,10 @@ instance Data.Data PatSyn where
 -- | Build a new pattern synonym
 mkPatSyn :: Name
          -> Bool                 -- ^ Is the pattern synonym declared infix?
-         -> ([TyVarSpecBinder], ThetaType) -- ^ Universially-quantified type
-                                           -- variables and required dicts
-         -> ([TyVarSpecBinder], ThetaType) -- ^ Existentially-quantified type
-                                           -- variables and provided dicts
+         -> ([InvisTVBinder], ThetaType) -- ^ Universially-quantified type
+                                         -- variables and required dicts
+         -> ([InvisTVBinder], ThetaType) -- ^ Existentially-quantified type
+                                         -- variables and provided dicts
          -> [Type]               -- ^ Original arguments
          -> Type                 -- ^ Original result type
          -> (Id, Bool)           -- ^ Name of matcher
@@ -411,13 +411,13 @@ patSynFieldType ps label
       Just (_, ty) -> ty
       Nothing -> pprPanic "dataConFieldType" (ppr ps <+> ppr label)
 
-patSynUnivTyVarBinders :: PatSyn -> [TyVarSpecBinder]
+patSynUnivTyVarBinders :: PatSyn -> [InvisTVBinder]
 patSynUnivTyVarBinders = psUnivTyVars
 
 patSynExTyVars :: PatSyn -> [TyVar]
 patSynExTyVars ps = binderVars (psExTyVars ps)
 
-patSynExTyVarBinders :: PatSyn -> [TyVarSpecBinder]
+patSynExTyVarBinders :: PatSyn -> [InvisTVBinder]
 patSynExTyVarBinders = psExTyVars
 
 patSynSig :: PatSyn -> ([TyVar], ThetaType, [TyVar], ThetaType, [Type], Type)

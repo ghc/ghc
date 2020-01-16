@@ -941,8 +941,8 @@ mkForAllTy tv vis ty = ForAllTy (Bndr tv vis) ty
 mkForAllTys :: [TyCoVarBinder] -> Type -> Type
 mkForAllTys tyvars ty = foldr ForAllTy ty tyvars
 
--- | Wraps foralls over the type using the provided 'TyVarSpecBinder's from left to right
-mkInvisForAllTys :: [TyVarSpecBinder] -> Type -> Type
+-- | Wraps foralls over the type using the provided 'InvisTVBinder's from left to right
+mkInvisForAllTys :: [InvisTVBinder] -> Type -> Type
 mkInvisForAllTys tyvars ty = foldr ForAllTy ty $ tyVarSpecToBinders tyvars
 
 mkPiTy:: TyCoBinder -> Type -> Type

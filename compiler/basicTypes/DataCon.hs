@@ -373,7 +373,7 @@ data DataCon
         --            of tyvars (*not* covars) of dcExTyCoVars unioned with the
         --            set of dcUnivTyVars whose tyvars do not appear in dcEqSpec
         -- See Note [DataCon user type variable binders]
-        dcUserTyVarBinders :: [TyVarSpecBinder],
+        dcUserTyVarBinders :: [InvisTVBinder],
 
         dcEqSpec :: [EqSpec],   -- Equalities derived from the result type,
                                 -- _as written by the programmer_.
@@ -892,7 +892,7 @@ mkDataCon :: Name
                             -- if it is a record, otherwise empty
           -> [TyVar]        -- ^ Universals.
           -> [TyCoVar]      -- ^ Existentials.
-          -> [TyVarSpecBinder]  -- ^ User-written 'TyVarBinder's.
+          -> [InvisTVBinder]    -- ^ User-written 'TyVarBinder's.
                                 --   These must be Inferred/Specified.
                                 --   See @Note [TyVarBinders in DataCons]@
           -> [EqSpec]           -- ^ GADT equalities
@@ -1055,9 +1055,9 @@ dataConUserTyVars :: DataCon -> [TyVar]
 dataConUserTyVars (MkData { dcUserTyVarBinders = tvbs }) = binderVars tvbs
 
 -- See Note [DataCon user type variable binders]
--- | 'TyVarSpecBinder's for the type variables of the constructor, in the order the
+-- | 'InvisTVBinder's for the type variables of the constructor, in the order the
 -- user wrote them
-dataConUserTyVarBinders :: DataCon -> [TyVarSpecBinder]
+dataConUserTyVarBinders :: DataCon -> [InvisTVBinder]
 dataConUserTyVarBinders = dcUserTyVarBinders
 
 -- | Equalities derived from the result type of the data constructor, as written

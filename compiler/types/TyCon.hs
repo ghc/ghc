@@ -99,7 +99,7 @@ module TyCon(
         newTyConDataCon_maybe,
         algTcFields,
         tyConRuntimeRepInfo,
-        tyConBinders, tyConResKind, tyConTyVarSpecBinders,
+        tyConBinders, tyConResKind, tyConInvisTVBinders,
         tcTyConScopedTyVars, tcTyConIsPoly,
         mkTyConTagMap,
 
@@ -487,10 +487,10 @@ mkTyConKind bndrs res_kind = foldr mk res_kind bndrs
     mk (Bndr tv (AnonTCB af))   k = mkFunTy af (varType tv) k
     mk (Bndr tv (NamedTCB vis)) k = mkForAllTy tv vis k
 
-tyConTyVarSpecBinders :: [TyConBinder]       -- From the TyCon
-                      -> [TyVarSpecBinder]   -- Suitable for the foralls of a term function
+tyConInvisTVBinders :: [TyConBinder]   -- From the TyCon
+                      -> [InvisTVBinder] -- Suitable for the foralls of a term function
 -- See Note [Building TyVarBinders from TyConBinders]
-tyConTyVarSpecBinders tc_bndrs
+tyConInvisTVBinders tc_bndrs
  = map mk_binder tc_bndrs
  where
    mk_binder (Bndr tv tc_vis) = mkTyVarBinder vis tv

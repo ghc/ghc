@@ -67,7 +67,7 @@ module Var (
         Specificity(..),
 
         -- * TyVar's
-        VarBndr(..), TyCoVarBinder, TyVarBinder, TyVarSpecBinder,
+        VarBndr(..), TyCoVarBinder, TyVarBinder, InvisTVBinder,
         binderVar, binderVars, binderArgFlag, binderType,
         mkTyCoVarBinder, mkTyCoVarBinders,
         mkTyVarBinder, mkTyVarBinders,
@@ -545,7 +545,7 @@ data VarBndr var argf = Bndr var argf
 -- A 'TyVarBinder' is a binder with only TyVar
 type TyCoVarBinder     = VarBndr TyCoVar ArgFlag
 type TyVarBinder       = VarBndr TyVar ArgFlag
-type TyVarSpecBinder   = VarBndr TyVar Specificity
+type InvisTVBinder     = VarBndr TyVar Specificity
 
 tyVarSpecToBinders :: [VarBndr a Specificity] -> [VarBndr a ArgFlag]
 tyVarSpecToBinders = map tyVarSpecToBinder
