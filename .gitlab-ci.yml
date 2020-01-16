@@ -5,7 +5,7 @@ variables:
   DOCKER_REV: 408eff66aef6ca2b44446c694c5a56d6ca0460cc
 
   # Sequential version number capturing the versions of all tools fetched by
-  # .gitlab/win32-init.sh.
+  # .gitlab/win32-ci.sh.
   WINDOWS_TOOLCHAIN_VERSION: 1
 
   # Disable shallow clones; they break our linting rules
@@ -770,28 +770,13 @@ validate-x86_64-linux-fedora27:
   before_script:
     - git clean -xdf
 
-    # Use a local temporary directory to ensure that concurrent builds don't
-    # interfere with one another
-    - |
-      mkdir tmp
-      set TMP=%cd%\tmp
-      set TEMP=%cd%\tmp
-
+    # We are in a bare cmd.exe session; bring msys binaries into PATH
     - set PATH=C:\msys64\usr\bin;%PATH%
-    # On Windows submodules can inexplicably get into funky states where git
-    # believes that the submodule is initialized yet its associated repository
-    # is not valid. Avoid failing in this case with the following insanity.
-    - |
-      bash -c 'git submodule sync --recursive || git submodule deinit --force --all'
-      bash -c 'git submodule update --init --recursive'
-      git submodule foreach git clean -xdf
-    - git checkout .gitmodules
-    - "git fetch https://gitlab.haskell.org/ghc/ghc-performance-notes.git refs/notes/perf:refs/notes/perf || true"
-    - bash .gitlab/win32-init.sh
+
+    # Setup toolchain
+    - bash .gitlab/win32-ci.sh setup
   after_script:
-    - rd /s /q tmp
     - robocopy /np /nfl /ndl /e "%APPDATA%\cabal" cabal-cache
-    - bash -c 'make clean || true'
   dependencies: []
   variables:
     #FORCE_SYMLINKS: 1
@@ -812,15 +797,9 @@ validate-x86_64-linux-fedora27:
   # due to #16574 this currently fails
   allow_failure: true
   script:
-    - |
-      python boot
-      bash -c './configure --enable-tarballs-autodownload GHC=`pwd`/toolchain/bin/ghc HAPPY=`pwd`/toolchain/bin/happy ALEX=`pwd`/toolchain/bin/alex'
-    - bash -c "PATH=`pwd`/toolchain/bin:$PATH hadrian/build.cabal.sh --flavour=$FLAVOUR -j`mk/detect-cpu-count.sh` --flavour=Quick --docs=no-sphinx binary-dist"
-    - mv _build/bindist/ghc*.tar.xz ghc.tar.xz
-    - bash -c "export TOP=$(pwd); cd _build/bindist/ghc-*/ && PATH=$TOP/toolchain/bin:$PATH ./configure --prefix=$TOP/_build/install && make install && cd ../../../"
-    - bash -c "export TOP=$(pwd); PATH=$TOP/toolchain/bin:$PATH hadrian/build.cabal.sh --flavour=$FLAVOUR -j`mk/detect-cpu-count.sh` --flavour=quick test --summary-junit=./junit.xml --skip-perf --test-compiler=$TOP/_build/install/bin/ghc"
-    # skipping perf tests for now since we build a quick-flavoured GHC,
-    # which might result in some broken perf tests?
+    - bash ~/.gitlab/win32-ci.sh configure
+    - bash ~/.gitlab/win32-ci.sh build_hadrian
+    - bash ~/.gitlab/win32-ci.sh test_hadrian
   tags:
     - x86_64-windows
   artifacts:
@@ -859,15 +838,9 @@ nightly-i386-windows-hadrian:
     GHC_VERSION: "8.6.5"
     BIN_DIST_PREP_TAR_COMP: "ghc-x86_64-mingw32.tar.xz"
   script:
-    - |
-      python boot
-      bash -c './configure --enable-tarballs-autodownload GHC=`pwd`/toolchain/bin/ghc HAPPY=`pwd`/toolchain/bin/happy ALEX=`pwd`/toolchain/bin/alex $CONFIGURE_ARGS'
-    - bash -c "echo include mk/flavours/${BUILD_FLAVOUR}.mk > mk/build.mk"
-    - bash -c "echo 'GhcLibHcOpts+=-haddock' >> mk/build.mk"
-    - bash -c "PATH=`pwd`/toolchain/bin:$PATH make -j`mk/detect-cpu-count.sh`"
-    - bash -c "PATH=`pwd`/toolchain/bin:$PATH make binary-dist-prep TAR_COMP_OPTS=-1"
-    - bash -c "PATH=`pwd`/toolchain/bin:$PATH make test_bindist TEST_PREP=YES"
-    - bash -c 'make V=0 test PYTHON=/mingw64/bin/python3 THREADS=`mk/detect-cpu-count.sh` JUNIT_FILE=../../junit.xml'
+    - bash .gitlab/win32-ci.sh configure
+    - bash .gitlab/win32-ci.sh build_make
+    - bash .gitlab/win32-ci.sh test_make
   tags:
     - x86_64-windows
   artifacts:
