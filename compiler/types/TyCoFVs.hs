@@ -47,8 +47,7 @@ import GhcPrelude
 
 import {-# SOURCE #-} Type   (coreView, tcView, partitionInvisibleTypes)
 
--- import Data.Monoid as DM ( Endo(..), All(..) )
-import Data.Monoid as DM ( Endo(..) )
+import Data.Monoid as DM ( Endo(..), All(..) )
 import TyCoRep
 import TyCon
 import Var
@@ -261,9 +260,9 @@ tyCoVarsOfCo co = runTyCoVars (deep_co co)
 tyCoVarsOfCos :: [Coercion] -> TyCoVarSet
 tyCoVarsOfCos cos = runTyCoVars (deep_cos cos)
 
-deep_ty  :: Type -> Endo TyCoVarSet
-deep_tys :: [Type] -> Endo TyCoVarSet
-deep_co  :: Coercion -> Endo TyCoVarSet
+deep_ty  :: Type       -> Endo TyCoVarSet
+deep_tys :: [Type]     -> Endo TyCoVarSet
+deep_co  :: Coercion   -> Endo TyCoVarSet
 deep_cos :: [Coercion] -> Endo TyCoVarSet
 (deep_ty, deep_tys, deep_co, deep_cos) = foldTyCo deepTcvFolder emptyVarSet
 
@@ -316,9 +315,9 @@ shallowTyCoVarsOfCoVarEnv cos = shallowTyCoVarsOfCos (nonDetEltsUFM cos)
   -- It's OK to use nonDetEltsUFM here because we immediately
   -- forget the ordering by returning a set
 
-shallow_ty  :: Type -> Endo TyCoVarSet
-shallow_tys :: [Type] -> Endo TyCoVarSet
-shallow_co  :: Coercion -> Endo TyCoVarSet
+shallow_ty  :: Type       -> Endo TyCoVarSet
+shallow_tys :: [Type]     -> Endo TyCoVarSet
+shallow_co  :: Coercion   -> Endo TyCoVarSet
 shallow_cos :: [Coercion] -> Endo TyCoVarSet
 (shallow_ty, shallow_tys, shallow_co, shallow_cos) = foldTyCo shallowTcvFolder emptyVarSet
 
@@ -858,8 +857,6 @@ invisibleVarsOfTypes = mapUnionFV invisibleVarsOfType
 *                                                                      *
 ********************************************************************* -}
 
-{-   Desired!
-
 nfvFolder :: TyCoFolder TyCoVarSet DM.All
 nfvFolder = TyCoFolder { tcf_tyvar = do_tcv, tcf_covar = do_tcv
                        , tcf_hole = do_hole, tcf_tycobinder = do_bndr }
@@ -868,66 +865,20 @@ nfvFolder = TyCoFolder { tcf_tyvar = do_tcv, tcf_covar = do_tcv
     do_hole _ _  = All True    -- I'm unsure; probably never happens
     do_bndr is tv _ = is `extendVarSet` tv
 
+nfv_ty  :: Type       -> DM.All
+nfv_tys :: [Type]     -> DM.All
+nfv_co  :: Coercion   -> DM.All
+(nfv_ty, nfv_tys, nfv_co, _) = foldTyCo nfvFolder emptyVarSet
+
 noFreeVarsOfType :: Type -> Bool
-noFreeVarsOfType = DM.getAll . foldType nfvFolder emptyVarSet
+noFreeVarsOfType ty = DM.getAll (nfv_ty ty)
 
 noFreeVarsOfTypes :: [Type] -> Bool
-noFreeVarsOfTypes = DM.getAll . foldTypes nfvFolder emptyVarSet
+noFreeVarsOfTypes tys = DM.getAll (nfv_tys tys)
 
 noFreeVarsOfCo :: Coercion -> Bool
-noFreeVarsOfCo = getAll . foldCoercion nfvFolder emptyVarSet
--}
+noFreeVarsOfCo co = getAll (nfv_co co)
 
--- | Returns True if this type has no free variables. Should be the same as
--- isEmptyVarSet . tyCoVarsOfType, but faster in the non-forall case.
-noFreeVarsOfType :: Type -> Bool
-noFreeVarsOfType (TyVarTy _)      = False
-noFreeVarsOfType (AppTy t1 t2)    = noFreeVarsOfType t1 && noFreeVarsOfType t2
-noFreeVarsOfType (TyConApp _ tys) = all noFreeVarsOfType tys
-noFreeVarsOfType ty@(ForAllTy {}) = isEmptyVarSet (tyCoVarsOfType ty)
-noFreeVarsOfType (FunTy _ t1 t2)  = noFreeVarsOfType t1 && noFreeVarsOfType t2
-noFreeVarsOfType (LitTy _)        = True
-noFreeVarsOfType (CastTy ty co)   = noFreeVarsOfType ty && noFreeVarsOfCo co
-noFreeVarsOfType (CoercionTy co)  = noFreeVarsOfCo co
-
-noFreeVarsOfMCo :: MCoercion -> Bool
-noFreeVarsOfMCo MRefl    = True
-noFreeVarsOfMCo (MCo co) = noFreeVarsOfCo co
-
-noFreeVarsOfTypes :: [Type] -> Bool
-noFreeVarsOfTypes = all noFreeVarsOfType
-
--- | Returns True if this coercion has no free variables. Should be the same as
--- isEmptyVarSet . tyCoVarsOfCo, but faster in the non-forall case.
-noFreeVarsOfCo :: Coercion -> Bool
-noFreeVarsOfCo (Refl ty)              = noFreeVarsOfType ty
-noFreeVarsOfCo (GRefl _ ty co)        = noFreeVarsOfType ty && noFreeVarsOfMCo co
-noFreeVarsOfCo (TyConAppCo _ _ args)  = all noFreeVarsOfCo args
-noFreeVarsOfCo (AppCo c1 c2)          = noFreeVarsOfCo c1 && noFreeVarsOfCo c2
-noFreeVarsOfCo co@(ForAllCo {})       = isEmptyVarSet (tyCoVarsOfCo co)
-noFreeVarsOfCo (FunCo _ c1 c2)        = noFreeVarsOfCo c1 && noFreeVarsOfCo c2
-noFreeVarsOfCo (CoVarCo _)            = False
-noFreeVarsOfCo (HoleCo {})            = True    -- I'm unsure; probably never happens
-noFreeVarsOfCo (AxiomInstCo _ _ args) = all noFreeVarsOfCo args
-noFreeVarsOfCo (UnivCo p _ t1 t2)     = noFreeVarsOfProv p &&
-                                        noFreeVarsOfType t1 &&
-                                        noFreeVarsOfType t2
-noFreeVarsOfCo (SymCo co)             = noFreeVarsOfCo co
-noFreeVarsOfCo (TransCo co1 co2)      = noFreeVarsOfCo co1 && noFreeVarsOfCo co2
-noFreeVarsOfCo (NthCo _ _ co)         = noFreeVarsOfCo co
-noFreeVarsOfCo (LRCo _ co)            = noFreeVarsOfCo co
-noFreeVarsOfCo (InstCo co1 co2)       = noFreeVarsOfCo co1 && noFreeVarsOfCo co2
-noFreeVarsOfCo (KindCo co)            = noFreeVarsOfCo co
-noFreeVarsOfCo (SubCo co)             = noFreeVarsOfCo co
-noFreeVarsOfCo (AxiomRuleCo _ cs)     = all noFreeVarsOfCo cs
-
--- | Returns True if this UnivCoProv has no free variables. Should be the same as
--- isEmptyVarSet . tyCoVarsOfProv, but faster in the non-forall case.
-noFreeVarsOfProv :: UnivCoProvenance -> Bool
-noFreeVarsOfProv UnsafeCoerceProv    = True
-noFreeVarsOfProv (PhantomProv co)    = noFreeVarsOfCo co
-noFreeVarsOfProv (ProofIrrelProv co) = noFreeVarsOfCo co
-noFreeVarsOfProv (PluginProv {})     = True
 
 {- *********************************************************************
 *                                                                      *
