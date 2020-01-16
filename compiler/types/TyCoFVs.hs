@@ -67,6 +67,31 @@ import Panic
 %************************************************************************
 -}
 
+{- Note [Shallow and deep free variables]
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+Definitions
+
+* Shallow free variables of a type: the variables
+  affected by substitution. Specifically, the (TyVarTy tv)
+  and (CoVar cv) that appear
+    - In the type and coercions appearing in the type
+    - In shallow free variables of the kind of a Forall binder
+  but NOT in the kind of the /occurrences/ of a type variable.
+
+* Deep free variables of a type: shallow free variables, plus
+  the deep free variables of the kinds of those variables.
+  That is,  deepFVs( t ) = closeOverKinds( shallowFVs( t ) )
+
+Examples:
+
+  Type                     Shallow     Deep
+  ---------------------------------
+  (a : (k:Type))           {a}        {a,k}
+  forall (a:(k:Type)). a   {k}        {k}
+  (a:k->Type) (b:k)        {a,b}      {a,b,k}
+-}
+
+
 {- Note [Free variables of types]
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 The family of functions tyCoVarsOfType, tyCoVarsOfTypes etc, returns
@@ -247,6 +272,7 @@ noView _ = Nothing
 {- *********************************************************************
 *                                                                      *
           Deep free variables
+          See Note [Shallow and deep free variables]
 *                                                                      *
 ********************************************************************* -}
 
@@ -293,8 +319,10 @@ deepTcvFolder = TyCoFolder { tcf_view = noView
 {- *********************************************************************
 *                                                                      *
           Shallow free variables
+          See Note [Shallow and deep free variables]
 *                                                                      *
 ********************************************************************* -}
+
 
 shallowTyCoVarsOfType :: Type -> TyCoVarSet
 -- See Note [Free variables of types]
