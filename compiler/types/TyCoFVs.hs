@@ -411,11 +411,17 @@ deepCoVarFolder = TyCoFolder { tcf_view = noView
                              , tcf_hole  = do_hole, tcf_tycobinder = do_bndr }
   where
     do_tyvar _ _  = mempty
+      -- This do_tyvar means we won't see any CoVars in this
+      -- TyVar's kind.   This may be wrong; but it's the way it's
+      -- always been.  And its awkward to change, because
+      -- the tyvar won't end up in the accumulator, so
+      -- we'd look repeatedly.  Blargh.
+
     do_covar is v = Endo do_it
       where
         do_it acc | v `elemVarSet` is  = acc
                   | v `elemVarSet` acc = acc
-                  | otherwise          = appEndo (deep_ty (varType v)) $
+                  | otherwise          = appEndo (deep_cv_ty (varType v)) $
                                          acc `extendVarSet` v
 
     do_bndr is tcv _ = extendVarSet is tcv
