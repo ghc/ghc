@@ -17,8 +17,7 @@ import Haddock.Types ( MDoc )
 import GHC           ( Name )
 import Module        ( Module, moduleNameString, moduleName, moduleUnitId, unitIdString )
 import DynFlags      ( DynFlags )
-import Packages      ( lookupPackage )
-import PackageConfig ( sourcePackageIdString )
+import Packages      ( lookupPackage, sourcePackageIdString )
 
 import qualified Control.Applicative as A
 
