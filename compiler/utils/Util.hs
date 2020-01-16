@@ -306,8 +306,7 @@ chkAppend xs ys
 
 {-
 A paranoid @zip@ (and some @zipWith@ friends) that checks the lists
-are of equal length.  Alastair Reid thinks this should only happen if
-DEBUGging on; hey, why not?
+are of equal length.
 -}
 
 zipEqual        :: String -> [a] -> [b] -> [(a,b)]
@@ -315,12 +314,6 @@ zipWithEqual    :: String -> (a->b->c) -> [a]->[b]->[c]
 zipWith3Equal   :: String -> (a->b->c->d) -> [a]->[b]->[c]->[d]
 zipWith4Equal   :: String -> (a->b->c->d->e) -> [a]->[b]->[c]->[d]->[e]
 
-#if !defined(DEBUG)
-zipEqual      _ = zip
-zipWithEqual  _ = zipWith
-zipWith3Equal _ = zipWith3
-zipWith4Equal _ = zipWith4
-#else
 zipEqual _   []     []     = []
 zipEqual msg (a:as) (b:bs) = (a,b) : zipEqual msg as bs
 zipEqual msg _      _      = panic ("zipEqual: unequal lists:"++msg)
@@ -338,7 +331,6 @@ zipWith4Equal msg z (a:as) (b:bs) (c:cs) (d:ds)
                                 =  z a b c d : zipWith4Equal msg z as bs cs ds
 zipWith4Equal _   _ [] [] [] [] =  []
 zipWith4Equal msg _ _  _  _  _  =  panic ("zipWith4Equal: unequal lists:"++msg)
-#endif
 
 -- | 'zipLazy' is a kind of 'zip' that is lazy in the second list (observe the ~)
 zipLazy :: [a] -> [b] -> [(a,b)]

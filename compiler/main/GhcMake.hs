@@ -914,7 +914,7 @@ type BuildModule = (Module, IsBoot)
 -- boot modules specially when building compilation graphs, since they break
 -- cycles.  Regular source files and signature files are treated equivalently.
 data IsBoot = IsBoot | NotBoot
-    deriving (Ord, Eq, Show, Read)
+    deriving (Ord, Eq, Show)
 
 -- | Tests if an 'HscSource' is a boot file, primarily for constructing
 -- elements of 'BuildModule'.
@@ -1870,10 +1870,10 @@ typecheckLoop dflags hsc_env mods = do
       let new_hsc_env = hsc_env{ hsc_HPT = new_hpt }
       mds <- initIfaceCheck (text "typecheckLoop") new_hsc_env $
                 mapM (typecheckIface . hm_iface) hmis
-      let new_hpt = addListToHpt old_hpt
-                        (zip mods [ hmi{ hm_details = details }
-                                  | (hmi,details) <- zip hmis mds ])
-      return new_hpt
+      return $ addListToHpt old_hpt $
+        zipEqual "typecheckLoop - 1" mods
+          [ hmi{ hm_details = details }
+          | (hmi,details) <- zipEqual "typecheckLoop - 2" hmis mds ]
   return hsc_env{ hsc_HPT = new_hpt }
   where
     old_hpt = hsc_HPT hsc_env
