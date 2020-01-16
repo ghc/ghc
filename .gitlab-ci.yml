@@ -5,17 +5,16 @@ variables:
   DOCKER_REV: 408eff66aef6ca2b44446c694c5a56d6ca0460cc
 
   # Sequential version number capturing the versions of all tools fetched by
-  # .gitlab/win32-init.sh.
+  # .gitlab/ci.sh.
   WINDOWS_TOOLCHAIN_VERSION: 1
 
   # Disable shallow clones; they break our linting rules
   GIT_DEPTH: 0
 
-before_script:
-  - git submodule sync --recursive
-  - git submodule update --init --recursive
-  - git checkout .gitmodules
-  - "git fetch https://gitlab.haskell.org/ghc/ghc-performance-notes.git refs/notes/perf:refs/notes/perf || true"
+  # Overridden by individual jobs
+  CONFIGURE_ARGS: ""
+
+  GIT_SUBMODULE_STRATEGY: "recursive"
 
 stages:
   - lint        # Source linting
@@ -37,6 +36,9 @@ stages:
     - web
 
 .release: &release
+  variables:
+    BUILD_FLAVOUR: "perf"
+    FLAVOUR: "perf"
   artifacts:
     when: always
     expire_in: 1 year
@@ -194,26 +196,10 @@ lint-release-changelogs:
   variables:
     FLAVOUR: "validate"
   script:
-    - cabal update
-    - git clean -xdf && git submodule foreach git clean -xdf
-    - .gitlab/prepare-system.sh
-    - if [[ -d ./cabal-cache ]]; then cp -R ./.cabal-cache ~/.cabal-cache; fi
-    - ./boot
-    - ./configure $CONFIGURE_ARGS
-    - hadrian/build.cabal.sh --flavour=$FLAVOUR -j`mk/detect-cpu-count.sh` --docs=no-sphinx binary-dist
-    - mv _build/bindist/ghc*.tar.xz ghc.tar.xz
-    - export TOP=$(pwd)
-    - cd _build/bindist/ghc-*/ && ./configure --prefix=$TOP/_build/install && make install && cd ../../../
-    - |
-      # Prepare to push git notes.
-      export METRICS_FILE=$CI_PROJECT_DIR/performance-metrics.tsv
-      git config user.email "ben+ghc-ci@smart-cactus.org"
-      git config user.name "GHC GitLab CI"
-      .gitlab/test-metrics.sh pull
-    - hadrian/build.cabal.sh --flavour=$FLAVOUR -j`mk/detect-cpu-count.sh` --docs=no-sphinx test --summary-junit=./junit.xml --test-compiler=$TOP/_build/install/bin/ghc || (.gitlab/test-metrics.sh push && false)
-    - |
-      # Push git notes.
-      .gitlab/test-metrics.sh push
+    - .gitlab/ci.sh setup
+    - .gitlab/ci.sh configure
+    - .gitlab/ci.sh build_hadrian
+    - .gitlab/ci.sh test_hadrian
   cache:
     key: hadrian
     paths:
@@ -238,6 +224,8 @@ lint-release-changelogs:
     - git submodule update --init --recursive
     - git checkout .gitmodules
     - "git fetch https://gitlab.haskell.org/ghc/ghc-performance-notes.git refs/notes/perf:refs/notes/perf || true"
+  after_script:
+    - .gitlab/ci.sh clean
   tags:
     - x86_64-linux
 
@@ -270,7 +258,7 @@ hadrian-ghc-in-ghci:
     - cabal update
     - cd hadrian; cabal new-build --project-file=ci.project; cd ..
     - git clean -xdf && git submodule foreach git clean -xdf
-    - .gitlab/prepare-system.sh
+    - .gitlab/ci.sh setup
     - if [[ -d ./cabal-cache ]]; then cp -R ./.cabal-cache ~/.cabal-cache; fi
     - ./boot
     - ./configure $CONFIGURE_ARGS
@@ -289,28 +277,12 @@ hadrian-ghc-in-ghci:
   <<: *only-default
   variables:
     TEST_TYPE: test
-  before_script:
-    - git clean -xdf && git submodule foreach git clean -xdf
+    MAKE_ARGS: "-Werror"
   script:
-    - ./boot
-    - ./configure $CONFIGURE_ARGS
-    - |
-      THREADS=`mk/detect-cpu-count.sh`
-      make V=0 -j$THREADS WERROR=-Werror
-    - make binary-dist-prep TAR_COMP_OPTS="-1"
-    - make test_bindist TEST_PREP=YES
-    - |
-      # Prepare to push git notes.
-      METRICS_FILE=$CI_PROJECT_DIR/performance-metrics.tsv
-      git config user.email "ben+ghc-ci@smart-cactus.org"
-      git config user.name "GHC GitLab CI"
-      .gitlab/test-metrics.sh pull
-    - |
-      THREADS=`mk/detect-cpu-count.sh`
-      make $TEST_TYPE THREADS=$THREADS JUNIT_FILE=../../junit.xml METRICS_FILE=$METRICS_FILE || (METRICS_FILE=$METRICS_FILE .gitlab/test-metrics.sh push && false)
-    - |
-      # Push git notes.
-      METRICS_FILE=$METRICS_FILE .gitlab/test-metrics.sh push
+    - .gitlab/ci.sh setup
+    - .gitlab/ci.sh configure
+    - .gitlab/ci.sh build_make
+    - .gitlab/ci.sh test_make
   dependencies: []
   artifacts:
     reports:
@@ -320,6 +292,79 @@ hadrian-ghc-in-ghci:
       - $BIN_DIST_PREP_TAR_COMP
       - junit.xml
       - performance-metrics.tsv
+
+#################################
+# x86_64-freebsd
+#################################
+
+.build-x86_64-freebsd:
+  extends: .validate
+  tags:
+    - x86_64-freebsd
+  allow_failure: true
+  variables:
+    # N.B. we use iconv from ports as I see linker errors when we attempt
+    # to use the "native" iconv embedded in libc as suggested by the
+    # porting guide [1].
+    # [1] https://www.freebsd.org/doc/en/books/porters-handbook/using-iconv.html)
+    CONFIGURE_ARGS: "--with-gmp-includes=/usr/local/include --with-gmp-libraries=/usr/local/lib --with-iconv-includes=/usr/local/include --with-iconv-libraries=/usr/local/lib"
+    GHC_VERSION: 8.6.3
+    CABAL_INSTALL_VERSION: 3.0.0.0
+    BIN_DIST_PREP_TAR_COMP: "ghc-x86_64-portbld-freebsd.tar.xz"
+    TEST_ENV: "x86_64-freebsd"
+    BUILD_FLAVOUR: "validate"
+  after_script:
+    - cp -Rf $HOME/.cabal cabal-cache
+    - .gitlab/ci.sh clean
+  artifacts:
+    when: always
+    expire_in: 2 week
+  cache:
+    key: "freebsd-$GHC_VERSION"
+    paths:
+      - cabal-cache
+      - toolchain
+
+# Disabled due to lack of builder capacity
+.validate-x86_64-freebsd:
+  extends: .build-x86_64-freebsd
+  stage: full-build
+
+nightly-x86_64-freebsd:
+  <<: *nightly
+  extends: .build-x86_64-freebsd
+  stage: full-build
+
+.build-x86_64-freebsd-hadrian:
+  extends: .validate-hadrian
+  stage: full-build
+  tags:
+    - x86_64-freebsd
+  allow_failure: true
+  variables:
+    CONFIGURE_ARGS: "--with-gmp-includes=/usr/local/include --with-gmp-libraries=/usr/local/lib --with-iconv-includes=/usr/local/include --with-iconv-libraries=/usr/local/lib"
+    HADRIAN_ARGS: "--docs=no-sphinx"
+    GHC_VERSION: 8.6.3
+    CABAL_INSTALL_VERSION: 3.0.0.0
+    BIN_DIST_PREP_TAR_COMP: "ghc-x86_64-portbld-freebsd.tar.xz"
+    TEST_ENV: "x86_64-freebsd-hadrian"
+    FLAVOUR: "validate"
+  after_script:
+    - cp -Rf $HOME/.cabal cabal-cache
+    - .gitlab/ci.sh clean
+  artifacts:
+    when: always
+    expire_in: 2 week
+  cache:
+    key: "freebsd-$GHC_VERSION"
+    paths:
+      - cabal-cache
+      - toolchain
+
+# Disabled due to lack of builder capacity
+.validate-x86_64-freebsd-hadrian:
+  extends: .build-x86_64-freebsd-hadrian
+  stage: full-build
 
 #################################
 # x86_64-darwin
@@ -332,25 +377,18 @@ validate-x86_64-darwin:
     - x86_64-darwin
   variables:
     GHC_VERSION: 8.6.5
-    CABAL_INSTALL_VERSION: 2.4.1.0
+    CABAL_INSTALL_VERSION: 3.0.0.0
     BIN_DIST_PREP_TAR_COMP: "ghc-x86_64-apple-darwin.tar.xz"
     MACOSX_DEPLOYMENT_TARGET: "10.7"
     # Only Sierra and onwards supports clock_gettime. See #12858
     ac_cv_func_clock_gettime: "no"
     LANG: "en_US.UTF-8"
-    CONFIGURE_ARGS: --with-intree-gmp
+    CONFIGURE_ARGS: "--with-intree-gmp"
     TEST_ENV: "x86_64-darwin"
-  before_script:
-    - git clean -xdf && git submodule foreach git clean -xdf
-    - git submodule sync --recursive
-    - git submodule update --init --recursive
-    - git checkout .gitmodules
-    - "git fetch https://gitlab.haskell.org/ghc/ghc-performance-notes.git refs/notes/perf:refs/notes/perf || true"
-
-    - bash .gitlab/darwin-init.sh
-    - PATH="`pwd`/toolchain/bin:$PATH"
+    BUILD_FLAVOUR: "perf"
   after_script:
     - cp -Rf $HOME/.cabal cabal-cache
+    - .gitlab/ci.sh clean
   artifacts:
     when: always
     expire_in: 2 week
@@ -374,26 +412,14 @@ validate-x86_64-darwin:
     CONFIGURE_ARGS: --with-intree-gmp
     TEST_ENV: "x86_64-darwin-hadrian"
     FLAVOUR: "validate"
-  before_script:
-    - git clean -xdf && git submodule foreach git clean -xdf
-    - git submodule sync --recursive
-    - git submodule update --init --recursive
-    - git checkout .gitmodules
-    - "git fetch https://gitlab.haskell.org/ghc/ghc-performance-notes.git refs/notes/perf:refs/notes/perf || true"
-
-    - bash .gitlab/darwin-init.sh
-    - PATH="`pwd`/toolchain/bin:$PATH"
   script:
-    - cabal update
-    - ./boot
-    - ./configure $CONFIGURE_ARGS
-    - hadrian/build.cabal.sh --flavour=$FLAVOUR -j`mk/detect-cpu-count.sh` --docs=no-sphinx binary-dist
-    - mv _build/bindist/ghc*.tar.xz ghc.tar.xz
-    - export TOP=$(pwd)
-    - cd _build/bindist/ghc-*/ && ./configure --prefix=$TOP/_build/install && make install && cd ../../../
-    - hadrian/build.cabal.sh --flavour=$FLAVOUR -j`mk/detect-cpu-count.sh` --docs=no-sphinx test --summary-junit=./junit.xml --test-compiler=$TOP/_build/install/bin/ghc
+    - .gitlab/ci.sh setup
+    - .gitlab/ci.sh configure
+    - .gitlab/ci.sh build_hadrian
+    - .gitlab/ci.sh test_hadrian
   after_script:
     - cp -Rf $HOME/.cabal cabal-cache
+    - .gitlab/ci.sh clean
   artifacts:
     when: always
     expire_in: 2 week
@@ -407,19 +433,15 @@ validate-x86_64-darwin:
   extends: .validate
   tags:
     - x86_64-linux
+  variables:
+    BUILD_FLAVOUR: "perf"
   before_script:
-    - git clean -xdf && git submodule foreach git clean -xdf
-    - git submodule sync --recursive
-    - git submodule update --init --recursive
-    - git checkout .gitmodules
-    - "git fetch https://gitlab.haskell.org/ghc/ghc-performance-notes.git refs/notes/perf:refs/notes/perf || true"
       # Build hyperlinked sources for documentation when building releases
     - |
       if [[ -n "$CI_COMMIT_TAG" ]]; then
-        echo "EXTRA_HADDOCK_OPTS += --hyperlinked-source --quickjump" >> mk/build.mk
+        HADDOCK_HYPERLINKED_SOURCES=1
       fi
 
-    - .gitlab/prepare-system.sh
     # workaround for docker permissions
     - sudo chown ghc:ghc -R .
   after_script:
@@ -771,57 +793,44 @@ validate-x86_64-linux-fedora27:
   before_script:
     - git clean -xdf
 
-    # Use a local temporary directory to ensure that concurrent builds don't
-    # interfere with one another
-    - |
-      mkdir tmp
-      set TMP=%cd%\tmp
-      set TEMP=%cd%\tmp
-
-    - set PATH=C:\msys64\usr\bin;%PATH%
-    # On Windows submodules can inexplicably get into funky states where git
-    # believes that the submodule is initialized yet its associated repository
-    # is not valid. Avoid failing in this case with the following insanity.
-    - |
-      bash -c 'git submodule sync --recursive || git submodule deinit --force --all'
-      bash -c 'git submodule update --init --recursive'
-      git submodule foreach git clean -xdf
-    - git checkout .gitmodules
-    - "git fetch https://gitlab.haskell.org/ghc/ghc-performance-notes.git refs/notes/perf:refs/notes/perf || true"
-    - bash .gitlab/win32-init.sh
+    # Setup toolchain
+    - bash .gitlab/ci.sh setup
   after_script:
-    - rd /s /q tmp
-    - robocopy /np /nfl /ndl /e "%APPDATA%\cabal" cabal-cache
-    - bash -c 'make clean || true'
+    - |
+      Copy-Item -Recurse -Path $Env:APPDATA\cabal -Destination cabal-cache
+    - bash .gitlab/ci.sh clean
   dependencies: []
   variables:
     #FORCE_SYMLINKS: 1
     LANG: "en_US.UTF-8"
     SPHINXBUILD: "/mingw64/bin/sphinx-build.exe"
+    CABAL_INSTALL_VERSION: 3.0.0.0
+    GHC_VERSION: "8.6.5"
   cache:
     paths:
       - cabal-cache
-      - ghc-8.6.5
+      - toolchain
       - ghc-tarballs
 
 .build-windows-hadrian:
   extends: .build-windows
   stage: full-build
   variables:
-    GHC_VERSION: "8.6.5"
     FLAVOUR: "validate"
+    # skipping perf tests for now since we build a quick-flavoured GHC,
+    # which might result in some broken perf tests?
+    HADRIAN_ARGS: "--docs=no-sphinx --skip-perf"
+
   # due to #16574 this currently fails
   allow_failure: true
+
   script:
-    - |
-      python boot
-      bash -c './configure --enable-tarballs-autodownload GHC=`pwd`/toolchain/bin/ghc HAPPY=`pwd`/toolchain/bin/happy ALEX=`pwd`/toolchain/bin/alex'
-    - bash -c "PATH=`pwd`/toolchain/bin:$PATH hadrian/build.cabal.sh --flavour=$FLAVOUR -j`mk/detect-cpu-count.sh` --docs=no-sphinx binary-dist"
-    - mv _build/bindist/ghc*.tar.xz ghc.tar.xz
-    - bash -c "export TOP=$(pwd); cd _build/bindist/ghc-*/ && PATH=$TOP/toolchain/bin:$PATH ./configure --prefix=$TOP/_build/install && make install && cd ../../../"
-    - bash -c "export TOP=$(pwd); PATH=$TOP/toolchain/bin:$PATH hadrian/build.cabal.sh --flavour=$FLAVOUR -j`mk/detect-cpu-count.sh` test --summary-junit=./junit.xml --test-compiler=$TOP/_build/install/bin/ghc"
+    - bash .gitlab/ci.sh configure
+    - bash .gitlab/ci.sh build_hadrian
+    - bash .gitlab/ci.sh test_hadrian
   tags:
-    - x86_64-windows
+    - new-x86_64-windows
+    - test
   artifacts:
     reports:
       junit: junit.xml
@@ -833,7 +842,6 @@ validate-x86_64-linux-fedora27:
 
 validate-x86_64-windows-hadrian:
   extends: .build-windows-hadrian
-  stage: full-build
   variables:
     MSYSTEM: MINGW64
     TEST_ENV: "x86_64-windows-hadrian"
@@ -856,20 +864,14 @@ nightly-i386-windows-hadrian:
   stage: full-build
   variables:
     BUILD_FLAVOUR: "quick"
-    GHC_VERSION: "8.6.5"
     BIN_DIST_PREP_TAR_COMP: "ghc-x86_64-mingw32.tar.xz"
   script:
-    - |
-      python boot
-      bash -c './configure --enable-tarballs-autodownload GHC=`pwd`/toolchain/bin/ghc HAPPY=`pwd`/toolchain/bin/happy ALEX=`pwd`/toolchain/bin/alex $CONFIGURE_ARGS'
-    - bash -c "echo include mk/flavours/${BUILD_FLAVOUR}.mk > mk/build.mk"
-    - bash -c "echo 'GhcLibHcOpts+=-haddock' >> mk/build.mk"
-    - bash -c "PATH=`pwd`/toolchain/bin:$PATH make -j`mk/detect-cpu-count.sh`"
-    - bash -c "PATH=`pwd`/toolchain/bin:$PATH make binary-dist-prep TAR_COMP_OPTS=-1"
-    - bash -c "PATH=`pwd`/toolchain/bin:$PATH make test_bindist TEST_PREP=YES"
-    - bash -c 'make V=0 test PYTHON=/mingw64/bin/python3 THREADS=`mk/detect-cpu-count.sh` JUNIT_FILE=../../junit.xml'
+    - bash .gitlab/ci.sh configure
+    - bash .gitlab/ci.sh build_make
+    - bash .gitlab/ci.sh test_make
   tags:
-    - x86_64-windows
+    - new-x86_64-windows
+    - test
   artifacts:
     when: always
     expire_in: 2 week
@@ -881,64 +883,60 @@ nightly-i386-windows-hadrian:
       - "ghc-x86_64-mingw32.tar.xz"
       - junit.xml
 
-validate-x86_64-windows:
+.build-x86_64-windows-make:
   extends: .build-windows-make
   variables:
     MSYSTEM: MINGW64
-    CONFIGURE_ARGS: "--target=x86_64-unknown-mingw32"
     TEST_ENV: "x86_64-windows"
   cache:
     key: "x86_64-windows-$WINDOWS_TOOLCHAIN_VERSION"
 
+validate-x86_64-windows:
+  extends: .build-x86_64-windows-make
+
 nightly-x86_64-windows:
-  extends: .build-windows-make
+  extends: .build-x86_64-windows-make
   stage: full-build
   variables:
     BUILD_FLAVOUR: "validate"
-    MSYSTEM: MINGW64
-    CONFIGURE_ARGS: "--target=x86_64-unknown-mingw32"
   only:
     variables:
       - $NIGHTLY
-  cache:
-    key: "x86_64-windows-$WINDOWS_TOOLCHAIN_VERSION"
 
 # Normal Windows validate builds are profiled; that won't do for releases.
 release-x86_64-windows:
   <<: *release
   extends: validate-x86_64-windows
   variables:
-    MSYSTEM: MINGW64
     BUILD_FLAVOUR: "perf"
-    CONFIGURE_ARGS: "--target=x86_64-unknown-mingw32"
-    TEST_ENV: "x86_64-windows"
+
+
+.build-i386-windows-make:
+  extends: .build-windows-make
+  variables:
+    MSYSTEM: MINGW32
+    # Due to #15934
+    BUILD_PROF_LIBS: "NO"
+    TEST_ENV: "i386-windows"
+  cache:
+    key: "i386-windows-$WINDOWS_TOOLCHAIN_VERSION"
+
+validate-i386-windows:
+  extends: .build-i386-windows-make
+  variables:
+    BUILD_FLAVOUR: "perf"
 
 release-i386-windows:
   <<: *release
-  extends: .build-windows-make
+  extends: .build-i386-windows-make
   variables:
-    MSYSTEM: MINGW32
     BUILD_FLAVOUR: "perf"
-    CONFIGURE_ARGS: "--target=i386-unknown-mingw32"
-    # Due to #15934
-    BUILD_PROF_LIBS: "NO"
-    TEST_ENV: "i386-windows"
-  cache:
-    key: "i386-windows-$WINDOWS_TOOLCHAIN_VERSION"
 
 nightly-i386-windows:
-  extends: .build-windows-make
+  extends: .build-i386-windows-make
   only:
     variables:
       - $NIGHTLY
-  variables:
-    MSYSTEM: MINGW32
-    CONFIGURE_ARGS: "--target=i386-unknown-mingw32"
-    # Due to #15934
-    BUILD_PROF_LIBS: "NO"
-    TEST_ENV: "i386-windows"
-  cache:
-    key: "i386-windows-$WINDOWS_TOOLCHAIN_VERSION"
 
 ############################################################
 # Cleanup
