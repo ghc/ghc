@@ -336,6 +336,57 @@ shallowTcvFolder = TyCoFolder { tcf_tyvar = do_tcv, tcf_covar = do_tcv
 
 {- *********************************************************************
 *                                                                      *
+          Free coercion variables
+*                                                                      *
+********************************************************************* -}
+
+
+{- Note [Finding free coercion varibles]
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+Here we are only interested in the free /coercion/ variables.
+We can achieve this through a slightly differnet TyCo folder.
+
+Notice that we look deeply, into kinds.
+
+See #14880.
+-}
+
+coVarsOfType  :: Type       -> CoVarSet
+coVarsOfTypes :: [Type]     -> CoVarSet
+coVarsOfCo    :: Coercion   -> CoVarSet
+coVarsOfCos   :: [Coercion] -> CoVarSet
+
+coVarsOfType  ty  = runTyCoVars (deep_cv_ty ty)
+coVarsOfTypes tys = runTyCoVars (deep_cv_tys tys)
+coVarsOfCo    co  = runTyCoVars (deep_cv_co co)
+coVarsOfCos   cos = runTyCoVars (deep_cv_cos cos)
+
+deep_cv_ty  :: Type       -> Endo CoVarSet
+deep_cv_tys :: [Type]     -> Endo CoVarSet
+deep_cv_co  :: Coercion   -> Endo CoVarSet
+deep_cv_cos :: [Coercion] -> Endo CoVarSet
+(deep_cv_ty, deep_cv_tys, deep_cv_co, deep_cv_cos) = foldTyCo deepCoVarFolder emptyVarSet
+
+deepCoVarFolder :: TyCoFolder TyCoVarSet (Endo CoVarSet)
+deepCoVarFolder = TyCoFolder { tcf_tyvar = do_tyvar, tcf_covar = do_covar
+                           , tcf_hole  = do_hole, tcf_tycobinder = do_bndr }
+  where
+    do_tyvar _ _  = mempty
+    do_covar is v = Endo do_it
+      where
+        do_it acc | v `elemVarSet` is  = acc
+                  | v `elemVarSet` acc = acc
+                  | otherwise          = appEndo (deep_ty (varType v)) $
+                                         acc `extendVarSet` v
+
+    do_bndr is tcv _ = extendVarSet is tcv
+    do_hole is hole  = do_covar is (coHoleCoVar hole)
+                       -- See Note [CoercionHoles and coercion free variables]
+                       -- in TyCoRep
+
+
+{- *********************************************************************
+*                                                                      *
           Closing over kinds
 *                                                                      *
 ********************************************************************* -}
@@ -555,38 +606,6 @@ tyCoFVsOfCos :: [Coercion] -> FV
 tyCoFVsOfCos []       fv_cand in_scope acc = emptyFV fv_cand in_scope acc
 tyCoFVsOfCos (co:cos) fv_cand in_scope acc = (tyCoFVsOfCo co `unionFV` tyCoFVsOfCos cos) fv_cand in_scope acc
 
-
-------------- Extracting the CoVars of a type or coercion -----------
-
-{- Note [CoVarsOfX and the InterestingVarFun]
-~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
-The coVarsOfType, coVarsOfTypes, coVarsOfCo, and coVarsOfCos functions are
-implemented in terms of the respective FV equivalents (tyCoFVsOf...), rather
-than the VarSet-based flavors (tyCoVarsOf...), despite the performance
-considerations outlined in Note [Free variables of types].
-
-This is because FV includes the InterestingVarFun, which is useful here,
-because we can cleverly use it to restrict our calculations to CoVars - this
-is what getCoVarSet achieves.
-
-See #14880.
-
--}
-
-getCoVarSet :: FV -> CoVarSet
-getCoVarSet fv = snd (fv isCoVar emptyVarSet ([], emptyVarSet))
-
-coVarsOfType :: Type -> CoVarSet
-coVarsOfType ty = getCoVarSet (tyCoFVsOfType ty)
-
-coVarsOfTypes :: [Type] -> TyCoVarSet
-coVarsOfTypes tys = getCoVarSet (tyCoFVsOfTypes tys)
-
-coVarsOfCo :: Coercion -> CoVarSet
-coVarsOfCo co = getCoVarSet (tyCoFVsOfCo co)
-
-coVarsOfCos :: [Coercion] -> CoVarSet
-coVarsOfCos cos = getCoVarSet (tyCoFVsOfCos cos)
 
 ----- Whether a covar is /Almost Devoid/ in a type or coercion ----
 
