@@ -382,4 +382,4 @@ modulePackageInfo dflags flags (Just modu) =
   , optPackageVersion flags <|> fmap packageVersion pkgDb
   )
   where
-    pkgDb = lookupPackage dflags (moduleUnitId modu)
+    pkgDb = lookupUnit dflags (moduleUnitId modu)
