@@ -897,6 +897,42 @@ would re-occur and we end up with an infinite loop in which each kicks
 out the other (#14363).
 -}
 
+{- *********************************************************************
+*                                                                      *
+          The "exact" free variables of a type
+*                                                                      *
+********************************************************************* -}
+
+{- Note [Silly type synonym]
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+Consider
+  type T a = Int
+What are the free tyvars of (T x)?  Empty, of course!
+
+exactTyCoVarsOfType is used by the type checker to figure out exactly
+which type variables are mentioned in a type.  It only matters
+occasionally -- see the calls to exactTyCoVarsOfType.
+
+We place this function here in TcType, note in TyCoFVs,
+because we want to "see" tcView (efficiency issue only).
+-}
+
+exactTyCoVarsOfType  :: Type   -> TyCoVarSet
+exactTyCoVarsOfTypes :: [Type] -> TyCoVarSet
+-- Find the free type variables (of any kind)
+-- but *expand* type synonyms.  See Note [Silly type synonym] above.
+
+exactTyCoVarsOfType  ty  = runTyCoVars (exact_ty ty)
+exactTyCoVarsOfTypes tys = runTyCoVars (exact_tys tys)
+
+exact_ty  :: Type       -> Endo TyCoVarSet
+exact_tys :: [Type]     -> Endo TyCoVarSet
+(exact_ty, exact_tys, _, _) = foldTyCo exactTcvFolder emptyVarSet
+
+exactTcvFolder :: TyCoFolder TyCoVarSet (Endo TyCoVarSet)
+exactTcvFolder = deepTcvFolder { tcf_view = tcView }
+                 -- This is the key line
+
 {-
 ************************************************************************
 *                                                                      *
