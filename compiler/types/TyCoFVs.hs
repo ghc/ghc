@@ -8,6 +8,7 @@ module TyCoFVs
         tyCoFVsBndr, tyCoFVsVarBndr, tyCoFVsVarBndrs,
         tyCoFVsOfType, tyCoVarsOfTypeList,
         tyCoFVsOfTypes, tyCoVarsOfTypesList,
+        deepTcvFolder,
 
         shallowTyCoVarsOfTyVarEnv, shallowTyCoVarsOfCoVarEnv,
 
@@ -25,9 +26,6 @@ module TyCoFVs
         injectiveVarsOfType, injectiveVarsOfTypes,
         invisibleVarsOfType, invisibleVarsOfTypes,
 
-        -- Exact free vars
-        exactTyCoVarsOfType, exactTyCoVarsOfTypes,
-
         -- No Free vars
         noFreeVarsOfType, noFreeVarsOfTypes, noFreeVarsOfCo,
 
@@ -39,13 +37,15 @@ module TyCoFVs
         closeOverKindsDSet, closeOverKindsList,
         closeOverKinds,
 
+        -- * Raw materials
+        Endo(..), runTyCoVars
   ) where
 
 #include "HsVersions.h"
 
 import GhcPrelude
 
-import {-# SOURCE #-} Type   (coreView, tcView, partitionInvisibleTypes)
+import {-# SOURCE #-} Type   (coreView, partitionInvisibleTypes)
 
 import Data.Monoid as DM ( Endo(..), All(..) )
 import TyCoRep
@@ -215,8 +215,9 @@ Recall that
 
 So `mappend` for Endos is just function composition.
 
-It's very important that, after optimisation, we end up
-with an arity-three function, something like this:
+It's very important that, after optimisation, we end up with
+* an arity-three function
+* that is strict in the accumulator
 
    fvs env (TyVarTy v) acc
       | v `elemVarSet` env = acc
@@ -225,16 +226,23 @@ with an arity-three function, something like this:
    fvs env (AppTy t1 t2)   = fvs env t1 (fvs env t2 acc)
    ...
 
-The optimiser does do this, but not very robustly. It depends
+The "strict in the accumulator" part is to ensure that in the
+AppTy equation we don't build a thunk for (fvs env t2 acc).
+
+The optimiser does do all this, but not very robustly. It depends
 critially on the basic arity-2 function not being exported, so that
 all its calls are visibly to three arguments. This analysis is
 done by the Call Arity pass.
+
+TL;DR: check this regularly!
 -}
 
 runTyCoVars :: Endo TyCoVarSet -> TyCoVarSet
 {-# INLINE runTyCoVars #-}
 runTyCoVars f = appEndo f emptyVarSet
 
+noView :: Type -> Maybe Type
+noView _ = Nothing
 
 {- *********************************************************************
 *                                                                      *
@@ -266,7 +274,8 @@ deep_cos :: [Coercion] -> Endo TyCoVarSet
 (deep_ty, deep_tys, deep_co, deep_cos) = foldTyCo deepTcvFolder emptyVarSet
 
 deepTcvFolder :: TyCoFolder TyCoVarSet (Endo TyCoVarSet)
-deepTcvFolder = TyCoFolder { tcf_tyvar = do_tcv, tcf_covar = do_tcv
+deepTcvFolder = TyCoFolder { tcf_view = noView
+                           , tcf_tyvar = do_tcv, tcf_covar = do_tcv
                            , tcf_hole  = do_hole, tcf_tycobinder = do_bndr }
   where
     do_tcv is v = Endo do_it
@@ -321,7 +330,8 @@ shallow_cos :: [Coercion] -> Endo TyCoVarSet
 (shallow_ty, shallow_tys, shallow_co, shallow_cos) = foldTyCo shallowTcvFolder emptyVarSet
 
 shallowTcvFolder :: TyCoFolder TyCoVarSet (Endo TyCoVarSet)
-shallowTcvFolder = TyCoFolder { tcf_tyvar = do_tcv, tcf_covar = do_tcv
+shallowTcvFolder = TyCoFolder { tcf_view = noView
+                              , tcf_tyvar = do_tcv, tcf_covar = do_tcv
                               , tcf_hole  = do_hole, tcf_tycobinder = do_bndr }
   where
     do_tcv is v = Endo do_it
@@ -368,8 +378,9 @@ deep_cv_cos :: [Coercion] -> Endo CoVarSet
 (deep_cv_ty, deep_cv_tys, deep_cv_co, deep_cv_cos) = foldTyCo deepCoVarFolder emptyVarSet
 
 deepCoVarFolder :: TyCoFolder TyCoVarSet (Endo CoVarSet)
-deepCoVarFolder = TyCoFolder { tcf_tyvar = do_tyvar, tcf_covar = do_covar
-                           , tcf_hole  = do_hole, tcf_tycobinder = do_bndr }
+deepCoVarFolder = TyCoFolder { tcf_view = noView
+                             , tcf_tyvar = do_tyvar, tcf_covar = do_covar
+                             , tcf_hole  = do_hole, tcf_tycobinder = do_bndr }
   where
     do_tyvar _ _  = mempty
     do_covar is v = Endo do_it
@@ -702,75 +713,6 @@ almost_devoid_co_var_of_types (ty:tys) cv
 
 {- *********************************************************************
 *                                                                      *
-          The "exact" free variables of a type
-*                                                                      *
-********************************************************************* -}
-
-{- Note [Silly type synonym]
-~~~~~~~~~~~~~~~~~~~~~~~~~~~~
-Consider
-  type T a = Int
-What are the free tyvars of (T x)?  Empty, of course!
-
-exactTyCoVarsOfType is used by the type checker to figure out exactly
-which type variables are mentioned in a type.  It only matters
-occasionally -- see the calls to exactTyCoVarsOfType.
--}
-
-exactTyCoVarsOfType :: Type -> TyCoVarSet
--- Find the free type variables (of any kind)
--- but *expand* type synonyms.  See Note [Silly type synonym] above.
-exactTyCoVarsOfType ty
-  = go ty
-  where
-    go ty | Just ty' <- tcView ty = go ty'  -- This is the key line
-    go (TyVarTy tv)         = goVar tv
-    go (TyConApp _ tys)     = exactTyCoVarsOfTypes tys
-    go (LitTy {})           = emptyVarSet
-    go (AppTy fun arg)      = go fun `unionVarSet` go arg
-    go (FunTy _ arg res)    = go arg `unionVarSet` go res
-    go (ForAllTy bndr ty)   = delBinderVar (go ty) bndr `unionVarSet` go (binderType bndr)
-    go (CastTy ty co)       = go ty `unionVarSet` goCo co
-    go (CoercionTy co)      = goCo co
-
-    goMCo MRefl    = emptyVarSet
-    goMCo (MCo co) = goCo co
-
-    goCo (Refl ty)            = go ty
-    goCo (GRefl _ ty mco)     = go ty `unionVarSet` goMCo mco
-    goCo (TyConAppCo _ _ args)= goCos args
-    goCo (AppCo co arg)     = goCo co `unionVarSet` goCo arg
-    goCo (ForAllCo tv k_co co)
-      = goCo co `delVarSet` tv `unionVarSet` goCo k_co
-    goCo (FunCo _ co1 co2)   = goCo co1 `unionVarSet` goCo co2
-    goCo (CoVarCo v)         = goVar v
-    goCo (HoleCo h)          = goVar (coHoleCoVar h)
-    goCo (AxiomInstCo _ _ args) = goCos args
-    goCo (UnivCo p _ t1 t2)  = goProv p `unionVarSet` go t1 `unionVarSet` go t2
-    goCo (SymCo co)          = goCo co
-    goCo (TransCo co1 co2)   = goCo co1 `unionVarSet` goCo co2
-    goCo (NthCo _ _ co)      = goCo co
-    goCo (LRCo _ co)         = goCo co
-    goCo (InstCo co arg)     = goCo co `unionVarSet` goCo arg
-    goCo (KindCo co)         = goCo co
-    goCo (SubCo co)          = goCo co
-    goCo (AxiomRuleCo _ c)   = goCos c
-
-    goCos cos = foldr (unionVarSet . goCo) emptyVarSet cos
-
-    goProv UnsafeCoerceProv     = emptyVarSet
-    goProv (PhantomProv kco)    = goCo kco
-    goProv (ProofIrrelProv kco) = goCo kco
-    goProv (PluginProv _)       = emptyVarSet
-
-    goVar v = unitVarSet v `unionVarSet` go (varType v)
-
-exactTyCoVarsOfTypes :: [Type] -> TyVarSet
-exactTyCoVarsOfTypes tys = mapUnionVarSet exactTyCoVarsOfType tys
-
-
-{- *********************************************************************
-*                                                                      *
                  Injective free vars
 *                                                                      *
 ********************************************************************* -}
@@ -884,7 +826,8 @@ invisibleVarsOfTypes = mapUnionFV invisibleVarsOfType
 ********************************************************************* -}
 
 nfvFolder :: TyCoFolder TyCoVarSet DM.All
-nfvFolder = TyCoFolder { tcf_tyvar = do_tcv, tcf_covar = do_tcv
+nfvFolder = TyCoFolder { tcf_view = noView
+                       , tcf_tyvar = do_tcv, tcf_covar = do_tcv
                        , tcf_hole = do_hole, tcf_tycobinder = do_bndr }
   where
     do_tcv is tv = All (tv `elemVarSet` is)
