@@ -1726,7 +1726,9 @@ record selections still cancel.  And eta expansion still happens too.
 
 data TyCoFolder env a
   = TyCoFolder
-      { tcf_tyvar :: env -> TyVar -> a
+      { tcf_view  :: Type -> Maybe Type   -- Optional "view" function
+                                          -- E.g. expand synonyms
+      , tcf_tyvar :: env -> TyVar -> a
       , tcf_covar :: env -> CoVar -> a
       , tcf_hole  :: env -> CoercionHole -> a
           -- ^ What to do with coercion holes.
@@ -1739,12 +1741,14 @@ data TyCoFolder env a
 {-# INLINE foldTyCo  #-}  -- See Note [Specialising foldType]
 foldTyCo :: Monoid a => TyCoFolder env a -> env
          -> (Type -> a, [Type] -> a, Coercion -> a, [Coercion] -> a)
-foldTyCo (TyCoFolder { tcf_tyvar      = tyvar
-                      , tcf_tycobinder = tycobinder
-                      , tcf_covar      = covar
-                      , tcf_hole       = cohole }) env
+foldTyCo (TyCoFolder { tcf_view       = view
+                     , tcf_tyvar      = tyvar
+                     , tcf_tycobinder = tycobinder
+                     , tcf_covar      = covar
+                     , tcf_hole       = cohole }) env
   = (go_ty env, go_tys env, go_co env, go_cos env)
   where
+    go_ty env ty | Just ty' <- view ty = go_ty env ty'
     go_ty env (TyVarTy tv)      = tyvar env tv
     go_ty env (AppTy t1 t2)     = go_ty env t1 `mappend` go_ty env t2
     go_ty _   (LitTy {})        = mempty
@@ -1753,7 +1757,7 @@ foldTyCo (TyCoFolder { tcf_tyvar      = tyvar
     go_ty env (FunTy _ arg res) = go_ty env arg `mappend` go_ty env res
     go_ty env (TyConApp _ tys)  = go_tys env tys
     go_ty env (ForAllTy (Bndr tv vis) inner)
-      = let env' = tycobinder env tv vis
+      = let !env' = tycobinder env tv vis  -- Avoid building a thunk here
         in go_ty env (varType tv) `mappend` go_ty env' inner
 
     -- Explicit recursion becuase using foldr builds a local
