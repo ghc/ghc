@@ -1,4 +1,22 @@
--- | Free variable analysis on STG terms.
+-- | Non-global free variable analysis on STG terms. This pass annotates
+-- non-top-level closure bindings with captured variables. Global variables are
+-- not captured. For example, in a top-level binding like
+--
+--     f = \[x,y] .
+--       let g = \[p] . reverse (x ++ p)
+--       in g y
+--
+-- In g, `reverse` and `(++)` are global variables so they're not considered
+-- free. `p` is an argument, so `x` is the only actual free variable here. The
+-- annotated version is thus:
+--
+--     f = \[x,y] .
+--       let g = [x] \[p] . reverse (x ++ p)
+--       in g y
+--
+-- Top-level closure bindings never capture variables as all of their free
+-- variables are global.
+--
 module GHC.Stg.FVs (
     annTopBindingsFreeVars,
     annBindingFreeVars
