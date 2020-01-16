@@ -10,7 +10,11 @@ following sections.
 Highlights
 ----------
 
-- The :extension:`UnliftedNewtypes` extension.
+- The :extension:`UnliftedNewtypes` extension, allowing ``newtype``\s to be
+  wrap types of kind other than ``Type``.
+
+- The :extension:`StandaloneKindSignatures` extension, allowing explicit
+  signatures on type constructors.
 
 - A new, :rts-flag:`low-latency garbage collector <-xn>` for the oldest generation.
 
