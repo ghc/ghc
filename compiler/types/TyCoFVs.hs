@@ -36,7 +36,7 @@ module TyCoFVs
         tyCoVarsOfTypesWellScoped,
 
         -- * Closing over kinds
-        closeOverKindsDSet, closeOverKindsFV, closeOverKindsList,
+        closeOverKindsDSet, closeOverKindsList,
         closeOverKinds,
 
   ) where
