@@ -1,0 +1,6 @@
+
+T15712.hs:18:16: error:
+    • Expecting one more argument to ‘GEndo’
+      Expected kind ‘* -> *’, but ‘GEndo’ has kind ‘(* -> *) -> * -> *’
+    • In the first argument of ‘Codensity’, namely ‘GEndo’
+      In the newtype declaration for ‘LogicT’
