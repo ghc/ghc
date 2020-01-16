@@ -419,13 +419,12 @@ lintCoreBindings :: DynFlags -> CoreToDo -> [Var] -> CoreProgram -> (Bag MsgDoc,
 lintCoreBindings dflags pass local_in_scope binds
   = initL dflags flags in_scope_set $
     addLoc TopLevelBindings         $
-    lintLetBndrs TopLevel binders   $
-        -- Put all the top-level binders in scope at the start
-        -- This is because transformation rules can bring something
-        -- into use 'unexpectedly'
     do { checkL (null dups) (dupVars dups)
        ; checkL (null ext_dups) (dupExtVars ext_dups)
-       ; mapM lint_bind binds }
+       ; foldr (\bind lintF -> lintLetBndrs TopLevel (bindersOf bind) (lint_bind bind >> lintF))
+               (return ())
+               binds
+       }
   where
     in_scope_set = mkInScopeSet (mkVarSet local_in_scope)
 
@@ -1300,7 +1299,7 @@ lintIdBndr top_lvl bind_site id linterF
                (text "Non-CoVar has coercion type" <+> ppr id <+> dcolon <+> ppr ty)
 
        ; let id' = setIdType id ty
-       ; addInScopeVar id' $ (linterF id') }
+       ; addInScopeVar id' (linterF id') }
   where
     is_top_lvl = isTopLevel top_lvl
     is_let_bind = case bind_site of
@@ -1401,7 +1400,7 @@ lintType t@(ForAllTy (Bndr tv _vis) ty)
            Nothing -> failWithL (hang (text "Variable escape in forall:")
                                     2 (vcat [ text "type:" <+> ppr t
                                             , text "kind:" <+> ppr k ]))
-    }
+       }
 
 lintType t@(ForAllTy (Bndr cv _vis) ty)
   -- forall over coercions
@@ -1415,7 +1414,7 @@ lintType t@(ForAllTy (Bndr cv _vis) ty)
        ; return liftedTypeKind
            -- We don't check variable escape here. Namely, k could refer to cv'
            -- See Note [NthCo and newtypes] in TyCoRep
-    }}
+       }}
 
 lintType ty@(LitTy l) = lintTyLit l >> return (typeKind ty)
 
@@ -1707,8 +1706,8 @@ lintCoercion (GRefl r ty (MCo co))
 lintCoercion co@(TyConAppCo r tc cos)
   | tc `hasKey` funTyConKey
   , [_rep1,_rep2,_co1,_co2] <- cos
-  = do { failWithL (text "Saturated TyConAppCo (->):" <+> ppr co)
-       } -- All saturated TyConAppCos should be FunCos
+  = failWithL (text "Saturated TyConAppCo (->):" <+> ppr co)
+    -- All saturated TyConAppCos should be FunCos
 
   | Just {} <- synTyConDefn_maybe tc
   = failWithL (text "Synonym in TyConAppCo:" <+> ppr co)
@@ -2094,7 +2093,7 @@ data LintFlags
        , lf_check_inline_loop_breakers :: Bool -- See Note [Checking for INLINE loop breakers]
        , lf_check_static_ptrs :: StaticPtrCheck -- ^ See Note [Checking StaticPtrs]
        , lf_report_unsat_syns :: Bool -- ^ See Note [Linting type synonym applications]
-    }
+       }
 
 -- See Note [Checking StaticPtrs]
 data StaticPtrCheck
