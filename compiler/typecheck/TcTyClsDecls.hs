@@ -2823,8 +2823,8 @@ tcConDecl rep_tycon tag_map tmpl_bndrs _res_kind res_tmpl new_or_data
                                     mkVisFunTys arg_tys $
                                     res_ty)
 
-       ; let tvbndrs =  (mkTyVarBinders InferredSpec tkvs)
-                     ++ (mkTyVarBinders InferredSpec imp_tvs)
+       ; let tvbndrs =  (mkTyVarBinders SpecifiedSpec tkvs)
+                     ++ (mkTyVarBinders SpecifiedSpec imp_tvs)
                      ++ exp_tvbndrs
 
              -- Zonk to Types
@@ -2835,8 +2835,6 @@ tcConDecl rep_tycon tag_map tmpl_bndrs _res_kind res_tmpl new_or_data
 
        ; let (univ_tvs, ex_tvs, tvbndrs', eq_preds, arg_subst)
                = rejigConRes tmpl_bndrs res_tmpl tvbndrs res_ty
-             -- NB: this is a /lazy/ binding, so we pass six thunks to
-             --     buildDataCon without yet forcing the guards in rejigConRes
              -- See Note [Checking GADT return types]
 
              ctxt'      = substTys arg_subst ctxt

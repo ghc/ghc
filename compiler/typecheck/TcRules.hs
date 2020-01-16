@@ -114,7 +114,6 @@ tcRule (HsRule { rd_ext  = ext
 
        ; let tpl_ids = lhs_evs ++ id_bndrs
        ; forall_tkvs <- candidateQTyVarsOfTypes $
-       -- GJ : TODO I think we can be more specific here
                         map (mkSpecForAllTys tv_bndrs) $  -- don't quantify over lexical tyvars
                         rule_ty : map idType tpl_ids
        ; qtkvs <- quantifyTyVars forall_tkvs
