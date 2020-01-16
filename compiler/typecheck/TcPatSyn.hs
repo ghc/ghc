@@ -92,7 +92,7 @@ recoverPSB (PSB { psb_id = L _ name
     (_arg_names, _rec_fields, is_infix) = collectPatSynArgInfo details
     mk_placeholder matcher_name
       = mkPatSyn name is_infix
-                        ([mkTyVarBinder SSpecified alphaTyVar], []) ([], [])
+                        ([mkTyVarBinder SpecifiedSpec alphaTyVar], []) ([], [])
                         [] -- Arg tys
                         alphaTy
                         (matcher_id, True) Nothing
@@ -182,9 +182,9 @@ tcInferPatSynDecl (PSB { psb_id = lname@(L _ name), psb_args = details
 
        ; traceTc "tcInferPatSynDecl }" $ (ppr name $$ ppr ex_tvs)
        ; tc_patsyn_finish lname dir is_infix lpat'
-                          (mkTyVarBinders SInferred univ_tvs -- GJ : TODO Do we have more specific information somewhere?
+                          (mkTyVarBinders InferredSpec univ_tvs
                             , req_theta,  ev_binds, req_dicts)
-                          (mkTyVarBinders SInferred ex_tvs
+                          (mkTyVarBinders InferredSpec ex_tvs
                             , mkTyVarTys ex_tvs, prov_theta, prov_evs)
                           (map nlHsVar args, map idType args)
                           pat_ty rec_fields } }
@@ -796,8 +796,8 @@ mkPatSynBuilderId dir (L _ name)
        ; let theta          = req_theta ++ prov_theta
              need_dummy_arg = isUnliftedType pat_ty && null arg_tys && null theta
              builder_sigma  = add_void need_dummy_arg $
-                              mkForAllTys (tyVarSpecToBinders univ_bndrs) $
-                              mkForAllTys (tyVarSpecToBinders ex_bndrs) $
+                              mkInvisForAllTys univ_bndrs $
+                              mkInvisForAllTys ex_bndrs $
                               mkPhiTy theta $
                               mkVisFunTys arg_tys $
                               pat_ty

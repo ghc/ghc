@@ -30,6 +30,7 @@ module GHC.Hs.Types (
         HsIPName(..), hsIPNameFS,
         HsArg(..), numVisibleArgs,
         LHsTypeArg,
+        OutputableBndrFlag,
 
         LBangType, BangType,
         HsSrcBang(..), HsImplBang(..),
@@ -61,7 +62,6 @@ module GHC.Hs.Types (
         splitHsFunType, hsTyGetAppHead_maybe,
         mkHsOpTy, mkHsAppTy, mkHsAppTys, mkHsAppKindTy,
         ignoreParens, hsSigType, hsSigWcType,
-        hsLTyVarBndrToType, hsLTyVarBndrsToTypes,
         hsTyKindSig,
         hsConDetailsArgs,
         hsTyVarBndrFlag,
@@ -487,6 +487,9 @@ instance OutputableBndr HsIPName where
 --------------------------------------------------
 
 -- | Haskell Type Variable Binder
+-- The flag annotates the binder. It is 'Specificity' in places where
+-- explicit specificity is allowed (e.g. x :: forall {a} b. ...) or
+-- '()' in other places.
 data HsTyVarBndr flag pass
   = UserTyVar        -- no explicit kinding
          (XUserTyVar pass)
@@ -540,7 +543,7 @@ data HsType pass
       , hst_fvf     :: ForallVisFlag -- Is this `forall a -> {...}` or
                                      --         `forall a. {...}`?
       , hst_bndrs   :: [LHsTyVarBndr Specificity pass]
-                                       -- Explicit, user-supplied 'forall a b c'
+                                       -- Explicit, user-supplied 'forall a {b} c'
       , hst_body    :: LHsType pass      -- body type
       }
       -- ^ - 'ApiAnnotation.AnnKeywordId' : 'ApiAnnotation.AnnForall',
@@ -1078,21 +1081,6 @@ hsLTyVarLocName = mapLoc hsTyVarName
 hsLTyVarLocNames :: LHsQTyVars flag (GhcPass p) -> [Located (IdP (GhcPass p))]
 hsLTyVarLocNames qtvs = map hsLTyVarLocName (hsQTvExplicit qtvs)
 
--- | Convert a LHsTyVarBndr to an equivalent LHsType.
-hsLTyVarBndrToType :: LHsTyVarBndr flag (GhcPass p) -> LHsType (GhcPass p)
-hsLTyVarBndrToType = mapLoc cvt
-  where cvt (UserTyVar _ _ n) = HsTyVar noExtField NotPromoted n
-        cvt (KindedTyVar _ _ (L name_loc n) kind)
-          = HsKindSig noExtField
-                   (L name_loc (HsTyVar noExtField NotPromoted (L name_loc n))) kind
-        cvt (XTyVarBndr nec) = noExtCon nec
-
--- | Convert a LHsTyVarBndrs to a list of types.
--- Works on *type* variable only, no kind vars.
-hsLTyVarBndrsToTypes :: LHsQTyVars flag (GhcPass p) -> [LHsType (GhcPass p)]
-hsLTyVarBndrsToTypes (HsQTvs { hsq_explicit = tvbs }) = map hsLTyVarBndrToType tvbs
-hsLTyVarBndrsToTypes (XLHsQTyVars nec) = noExtCon nec
-
 -- | Get the kind signature of a type, ignoring parentheses:
 --
 --   hsTyKindSig   `Maybe                    `   =   Nothing
@@ -1454,6 +1442,21 @@ ambiguousFieldOcc (XFieldOcc nec) = noExtCon nec
 ************************************************************************
 -}
 
+class OutputableBndrFlag flag where
+    pprTyVarBndr :: OutputableBndrId p => HsTyVarBndr flag (GhcPass p) -> SDoc
+
+instance OutputableBndrFlag () where
+    pprTyVarBndr (UserTyVar _ _ n)     = ppr n
+    pprTyVarBndr (KindedTyVar _ _ n k) = parens $ hsep [ppr n, dcolon, ppr k]
+    pprTyVarBndr (XTyVarBndr nec)      = noExtCon nec
+
+instance OutputableBndrFlag Specificity where
+    pprTyVarBndr (UserTyVar _ SpecifiedSpec n)     = ppr n
+    pprTyVarBndr (UserTyVar _ InferredSpec n)      = braces $ ppr n
+    pprTyVarBndr (KindedTyVar _ SpecifiedSpec n k) = parens $ hsep [ppr n, dcolon, ppr k]
+    pprTyVarBndr (KindedTyVar _ InferredSpec n k)  = braces $ hsep [ppr n, dcolon, ppr k]
+    pprTyVarBndr (XTyVarBndr nec)               = noExtCon nec
+
 instance OutputableBndrId p => Outputable (HsType (GhcPass p)) where
     ppr ty = pprHsType ty
 
@@ -1461,15 +1464,13 @@ instance Outputable HsTyLit where
     ppr = ppr_tylit
 
 instance OutputableBndrId p
-       => Outputable (LHsQTyVars flag (GhcPass p)) where
+       => Outputable (LHsQTyVars () (GhcPass p)) where
     ppr (HsQTvs { hsq_explicit = tvs }) = interppSP tvs
     ppr (XLHsQTyVars x) = ppr x
 
-instance OutputableBndrId p
+instance (OutputableBndrId p, OutputableBndrFlag flag)
        => Outputable (HsTyVarBndr flag (GhcPass p)) where
-    ppr (UserTyVar _ _ n)     = ppr n
-    ppr (KindedTyVar _ _ n k) = parens $ hsep [ppr n, dcolon, ppr k]
-    ppr (XTyVarBndr nec)      = noExtCon nec
+    ppr = pprTyVarBndr
 
 instance Outputable thing
        => Outputable (HsImplicitBndrs (GhcPass p) thing) where
@@ -1486,7 +1487,7 @@ pprAnonWildCard = char '_'
 
 -- | Prints a forall; When passed an empty list, prints @forall .@/@forall ->@
 -- only when @-dppr-debug@ is enabled.
-pprHsForAll :: (OutputableBndrId p)
+pprHsForAll :: (OutputableBndrId p, OutputableBndrFlag flag)
             => ForallVisFlag -> [LHsTyVarBndr flag (GhcPass p)]
             -> LHsContext (GhcPass p) -> SDoc
 pprHsForAll = pprHsForAllExtra Nothing
@@ -1498,7 +1499,7 @@ pprHsForAll = pprHsForAllExtra Nothing
 -- function for this is needed, as the extra-constraints wildcard is removed
 -- from the actual context and type, and stored in a separate field, thus just
 -- printing the type will not print the extra-constraints wildcard.
-pprHsForAllExtra :: (OutputableBndrId p)
+pprHsForAllExtra :: (OutputableBndrId p, OutputableBndrFlag flag)
                  => Maybe SrcSpan -> ForallVisFlag
                  -> [LHsTyVarBndr flag (GhcPass p)]
                  -> LHsContext (GhcPass p) -> SDoc
@@ -1514,7 +1515,7 @@ pprHsForAllExtra extra fvf qtvs cxt
 -- @forall.@ when passed @Just []@. Prints nothing if passed 'Nothing'
 pprHsExplicitForAll :: (OutputableBndrId p)
                     => ForallVisFlag
-                    -> Maybe [LHsTyVarBndr flag (GhcPass p)] -> SDoc
+                    -> Maybe [LHsTyVarBndr () (GhcPass p)] -> SDoc
 pprHsExplicitForAll fvf (Just qtvs) = forAllLit <+> interppSP qtvs
                                                  <> ppr_forall_separator fvf
 pprHsExplicitForAll _   Nothing     = empty

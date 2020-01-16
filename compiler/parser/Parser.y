@@ -2148,13 +2148,13 @@ tv_bndrs :: { [LHsTyVarBndr Specificity GhcPs] }
          | {- empty -}                  { [] }
 
 tv_bndr :: { LHsTyVarBndr Specificity GhcPs }
-        : tyvar                         { sL1 $1 (UserTyVar noExtField SSpecified $1) }
-        | '{' tyvar '}'                 {% ams (sLL $1 $> (UserTyVar noExtField SInferred $2))
+        : tyvar                         { sL1 $1 (UserTyVar noExtField SpecifiedSpec $1) }
+        | '{' tyvar '}'                 {% ams (sLL $1 $> (UserTyVar noExtField InferredSpec $2))
                                                [mop $1, mcp $3] }
-        | '(' tyvar '::' kind ')'       {% ams (sLL $1 $> (KindedTyVar noExtField SSpecified $2 $4))
+        | '(' tyvar '::' kind ')'       {% ams (sLL $1 $> (KindedTyVar noExtField SpecifiedSpec $2 $4))
                                                [mop $1,mu AnnDcolon $3
                                                ,mcp $5] }
-        | '{' tyvar '::' kind '}'       {% ams (sLL $1 $> (KindedTyVar noExtField SInferred $2 $4))
+        | '{' tyvar '::' kind '}'       {% ams (sLL $1 $> (KindedTyVar noExtField InferredSpec $2 $4))
                                                [mop $1,mu AnnDcolon $3
                                                ,mcp $5] }
 

@@ -700,11 +700,15 @@ typeToLHsType ty
                  Required  -> f `nlHsAppTy`     arg')
              head (zip args arg_flags)
 
-    go_tv :: (TyVar,ArgFlag) -> LHsTyVarBndr Specificity GhcPs
-    go_tv (tv,argf) = noLoc $ KindedTyVar noExtField
-                                   (argFlagToSpecificity argf)
-                                   (noLoc (getRdrName tv))
-                                   (go (tyVarKind tv))
+    argf_to_spec :: ArgFlag -> Specificity
+    argf_to_spec Required      = SpecifiedSpec
+    argf_to_spec (Invisible s) = s
+
+    go_tv :: TyVarBinder -> LHsTyVarBndr Specificity GhcPs
+    go_tv (Bndr tv argf) = noLoc $ KindedTyVar noExtField
+                                               (argf_to_spec argf)
+                                               (noLoc (getRdrName tv))
+                                               (go (tyVarKind tv))
 
 {-
 Note [Kind signatures in typeToLHsType]

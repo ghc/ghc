@@ -32,7 +32,7 @@ module DataCon (
         dataConTyCon, dataConOrigTyCon,
         dataConUserType,
         dataConUnivTyVars, dataConExTyCoVars, dataConUnivAndExTyCoVars,
-        dataConUserTyVars, dataConUserTyVarBinders, dataConUserTyVarSpecBinders,
+        dataConUserTyVars, dataConUserTyVarBinders,
         dataConEqSpec, dataConTheta,
         dataConStupidTheta,
         dataConInstArgTys, dataConOrigArgTys, dataConOrigResTy,
@@ -1055,13 +1055,10 @@ dataConUserTyVars :: DataCon -> [TyVar]
 dataConUserTyVars (MkData { dcUserTyVarBinders = tvbs }) = binderVars tvbs
 
 -- See Note [DataCon user type variable binders]
--- | 'TyCoVarBinder's for the type variables of the constructor, in the order the
+-- | 'TyVarSpecBinder's for the type variables of the constructor, in the order the
 -- user wrote them
-dataConUserTyVarBinders :: DataCon -> [TyVarBinder]
-dataConUserTyVarBinders = tyVarSpecToBinders . dcUserTyVarBinders
-
-dataConUserTyVarSpecBinders :: DataCon -> [TyVarSpecBinder]
-dataConUserTyVarSpecBinders = dcUserTyVarBinders
+dataConUserTyVarBinders :: DataCon -> [TyVarSpecBinder]
+dataConUserTyVarBinders = dcUserTyVarBinders
 
 -- | Equalities derived from the result type of the data constructor, as written
 -- by the programmer in any GADT declaration. This includes *all* GADT-like
@@ -1283,7 +1280,7 @@ dataConUserType :: DataCon -> Type
 dataConUserType (MkData { dcUserTyVarBinders = user_tvbs,
                           dcOtherTheta = theta, dcOrigArgTys = arg_tys,
                           dcOrigResTy = res_ty })
-  = mkForAllTys (tyVarSpecToBinders user_tvbs) $
+  = mkInvisForAllTys user_tvbs $
     mkInvisFunTys theta $
     mkVisFunTys arg_tys $
     res_ty
