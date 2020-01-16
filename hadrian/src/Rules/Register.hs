@@ -38,7 +38,9 @@ configurePackageRules = do
     root -/- "**/setup-config" %> \out -> do
         (stage, path) <- parsePath (parseSetupConfig root) "<setup config path parser>" out
         let pkg = unsafeFindPackageByPath path
-        Cabal.configurePackage (Context stage pkg vanilla)
+        let ctx = Context stage pkg vanilla
+        needLibrary =<< contextDependencies ctx
+        Cabal.configurePackage ctx
 
     root -/- "**/autogen/cabal_macros.h" %> \out -> do
         (stage, path) <- parsePath (parseToBuildSubdirectory root) "<cabal macros path parser>" out
