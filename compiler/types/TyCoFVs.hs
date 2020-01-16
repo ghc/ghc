@@ -54,7 +54,6 @@ import Var
 import FV
 
 import UniqFM
-import UniqSet( nonDetEltsUniqSet )
 import VarSet
 import VarEnv
 import Util
@@ -343,10 +342,18 @@ shallowTcvFolder = TyCoFolder { tcf_tyvar = do_tcv, tcf_covar = do_tcv
 
 ------------- Closing over kinds -----------------
 
-closeOverKinds :: TyVarSet -> TyVarSet
-closeOverKinds = fvVarSet . closeOverKindsFV . nonDetEltsUniqSet
+closeOverKinds :: TyCoVarSet -> TyCoVarSet
+-- For each element of the input set,
+-- add the deep free variables of its kind
+closeOverKinds vs = nonDetFoldVarSet do_one vs vs
+  where
+    do_one v acc = appEndo (deep_ty (varType v)) acc
 
-{- ---------------- Alternative version 1 (preferred) -------------
+{- --------------- Alternative version 1 (using FV) ------------
+closeOverKinds = fvVarSet . closeOverKindsFV . nonDetEltsUniqSet
+-}
+
+{- ---------------- Alternative version 2 -------------
 
 -- | Add the kind variables free in the kinds of the tyvars in the given set.
 -- Returns a non-deterministic set.
@@ -368,7 +375,7 @@ closeOverKinds vs
 
 -}
 
-{- ---------------- Alternative version -------------
+{- ---------------- Alternative version 3 -------------
 -- | Add the kind variables free in the kinds of the tyvars in the given set.
 -- Returns a non-deterministic set.
 closeOverKinds :: TyVarSet -> TyVarSet
