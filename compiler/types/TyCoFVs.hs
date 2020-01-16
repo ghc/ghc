@@ -193,26 +193,73 @@ kind are free.
 
 {- *********************************************************************
 *                                                                      *
+          Endo for free variables
+*                                                                      *
+********************************************************************* -}
+
+{- Note [Acumulating parameter free variables]
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+We can use foldType to build an accumulating-parameter version of a
+free-var finder, thus:
+
+    fvs :: Type -> TyCoVarSet
+    fvs ty = appEndo (foldType folder ty) emptyVarSet
+
+Recall that
+    foldType :: TyCoFolder env a -> env -> Type -> a
+
+    newtype Endo a = Endo (a -> a)   -- In Data.Monoid
+    instance Monoid a => Monoid (Endo a) where
+       (Endo f) `mappend` (Endo g) = Endo (f.g)
+
+    appEndo :: Endo a -> a -> a
+    appEndo (Endo f) x = f x
+
+So `mappend` for Endos is just function composition.
+
+It's very important that, after optimisation, we end up
+with an arity-three function, something like this:
+
+   fvs env (TyVarTy v) acc
+      | v `elemVarSet` env = acc
+      | v `elemVarSet` acc = acc
+      | otherwise          = acc `extendVarSet` v
+   fvs env (AppTy t1 t2)   = fvs env t1 (fvs env t2 acc)
+   ...
+
+The optimiser does do this, but not very robustly. It depends
+critially on the basic arity-2 function not being exported, so that
+all its calls are visibly to three arguments. This analysis is
+done by the Call Arity pass.
+-}
+
+runTyCoVars :: Endo TyCoVarSet -> TyCoVarSet
+{-# INLINE runTyCoVars #-}
+runTyCoVars f = appEndo f emptyVarSet
+
+
+{- *********************************************************************
+*                                                                      *
           Deep free variables
 *                                                                      *
 ********************************************************************* -}
 
 tyCoVarsOfType :: Type -> TyCoVarSet
-tyCoVarsOfType ty = appEndo (deep_ty ty) emptyVarSet
+tyCoVarsOfType ty = runTyCoVars (deep_ty ty)
 -- Alternative:
 --   tyCoVarsOfType ty = closeOverKinds (shallowTyCoVarsOfType ty)
 
 tyCoVarsOfTypes :: [Type] -> TyCoVarSet
-tyCoVarsOfTypes tys = appEndo (deep_tys tys) emptyVarSet
+tyCoVarsOfTypes tys = runTyCoVars (deep_tys tys)
 -- Alternative:
 --   tyCoVarsOfTypes tys = closeOverKinds (shallowTyCoVarsOfTypes tys)
 
 tyCoVarsOfCo :: Coercion -> TyCoVarSet
 -- See Note [Free variables of Coercions]
-tyCoVarsOfCo co = appEndo (deep_co co) emptyVarSet
+tyCoVarsOfCo co = runTyCoVars (deep_co co)
 
 tyCoVarsOfCos :: [Coercion] -> TyCoVarSet
-tyCoVarsOfCos cos = appEndo (deep_cos cos) emptyVarSet
+tyCoVarsOfCos cos = runTyCoVars (deep_cos cos)
 
 deep_ty  :: Type -> Endo TyCoVarSet
 deep_tys :: [Type] -> Endo TyCoVarSet
@@ -235,6 +282,65 @@ deepTcvFolder = TyCoFolder { tcf_tyvar = do_tcv, tcf_covar = do_tcv
     do_hole is hole  = do_tcv is (coHoleCoVar hole)
                        -- See Note [CoercionHoles and coercion free variables]
                        -- in TyCoRep
+
+{- *********************************************************************
+*                                                                      *
+          Shallow free variables
+*                                                                      *
+********************************************************************* -}
+
+shallowTyCoVarsOfType :: Type -> TyCoVarSet
+-- See Note [Free variables of types]
+shallowTyCoVarsOfType ty = runTyCoVars (shallow_ty ty)
+
+shallowTyCoVarsOfTypes :: [Type] -> TyCoVarSet
+shallowTyCoVarsOfTypes tys = runTyCoVars (shallow_tys tys)
+
+shallowTyCoVarsOfCo :: Coercion -> TyCoVarSet
+shallowTyCoVarsOfCo co = runTyCoVars (shallow_co co)
+
+shallowTyCoVarsOfCos :: [Coercion] -> TyCoVarSet
+shallowTyCoVarsOfCos cos = runTyCoVars (shallow_cos cos)
+
+-- | Returns free variables of types, including kind variables as
+-- a non-deterministic set. For type synonyms it does /not/ expand the
+-- synonym.
+shallowTyCoVarsOfTyVarEnv :: TyVarEnv Type -> TyCoVarSet
+-- See Note [Free variables of types]
+shallowTyCoVarsOfTyVarEnv tys = shallowTyCoVarsOfTypes (nonDetEltsUFM tys)
+  -- It's OK to use nonDetEltsUFM here because we immediately
+  -- forget the ordering by returning a set
+
+shallowTyCoVarsOfCoVarEnv :: CoVarEnv Coercion -> TyCoVarSet
+shallowTyCoVarsOfCoVarEnv cos = shallowTyCoVarsOfCos (nonDetEltsUFM cos)
+  -- It's OK to use nonDetEltsUFM here because we immediately
+  -- forget the ordering by returning a set
+
+shallow_ty  :: Type -> Endo TyCoVarSet
+shallow_tys :: [Type] -> Endo TyCoVarSet
+shallow_co  :: Coercion -> Endo TyCoVarSet
+shallow_cos :: [Coercion] -> Endo TyCoVarSet
+(shallow_ty, shallow_tys, shallow_co, shallow_cos) = foldTyCo shallowTcvFolder emptyVarSet
+
+shallowTcvFolder :: TyCoFolder TyCoVarSet (Endo TyCoVarSet)
+shallowTcvFolder = TyCoFolder { tcf_tyvar = do_tcv, tcf_covar = do_tcv
+                              , tcf_hole  = do_hole, tcf_tycobinder = do_bndr }
+  where
+    do_tcv is v = Endo do_it
+      where
+        do_it acc | v `elemVarSet` is  = acc
+                  | v `elemVarSet` acc = acc
+                  | otherwise          = acc `extendVarSet` v
+
+    do_bndr is tcv _ = extendVarSet is tcv
+    do_hole _ _  = mempty   -- Ignore coercion holes
+
+
+{- *********************************************************************
+*                                                                      *
+          Closing over kinds
+*                                                                      *
+********************************************************************* -}
 
 ------------- Closing over kinds -----------------
 
@@ -287,100 +393,6 @@ close_over_kinds wl acc
                  | otherwise
                  = close_over_kinds (shallowTyCoVarsOfType (varType v)) $
                    acc `extendVarSet` v
--}
-
-
-{- *********************************************************************
-*                                                                      *
-          Shallow free variables
-*                                                                      *
-********************************************************************* -}
-
-shallowTyCoVarsOfType :: Type -> TyCoVarSet
--- See Note [Free variables of types]
-shallowTyCoVarsOfType ty = tyCoVarsOfType ty
-
-shallowTyCoVarsOfTypes :: [Type] -> TyCoVarSet
-shallowTyCoVarsOfTypes tys = tyCoVarsOfTypes tys
-
-shallowTyCoVarsOfCo :: Coercion -> TyCoVarSet
-shallowTyCoVarsOfCo co = tyCoVarsOfCo co
-
-shallowTyCoVarsOfCos :: [Coercion] -> TyCoVarSet
-shallowTyCoVarsOfCos cos = tyCoVarsOfCos cos
-
--- | Returns free variables of types, including kind variables as
--- a non-deterministic set. For type synonyms it does /not/ expand the
--- synonym.
-shallowTyCoVarsOfTyVarEnv :: TyVarEnv Type -> TyCoVarSet
--- See Note [Free variables of types]
-shallowTyCoVarsOfTyVarEnv tys = tyCoVarsOfTypes $ nonDetEltsUFM tys
-  -- It's OK to use nonDetEltsUFM here because we immediately forget the
-  -- ordering by returning a set
-
-shallowTyCoVarsOfCoVarEnv :: CoVarEnv Coercion -> TyCoVarSet
-shallowTyCoVarsOfCoVarEnv cos = tyCoVarsOfCos $ nonDetEltsUFM cos
-  -- It's OK to use nonDetEltsUFM here because we immediately forget the
-  -- ordering by returning a set
-
-{-
-shallowTyCoVarsOfType :: Type -> TyCoVarSet
--- See Note [Free variables of types]
-shallowTyCoVarsOfType ty = ty_co_vars_of_type ty emptyVarSet emptyVarSet
-
-shallowTyCoVarsOfTypes :: [Type] -> TyCoVarSet
-shallowTyCoVarsOfTypes tys = ty_co_vars_of_types tys emptyVarSet emptyVarSet
-
-shallowTyCoVarsOfCo :: Coercion -> TyCoVarSet
-shallowTyCoVarsOfCo co = ty_co_vars_of_co co emptyVarSet emptyVarSet
-
-shallowTyCoVarsOfCos :: [Coercion] -> TyCoVarSet
-shallowTyCoVarsOfCos cos = ty_co_vars_of_cos cos emptyVarSet emptyVarSet
-
--- | Returns free variables of types, including kind variables as
--- a non-deterministic set. For type synonyms it does /not/ expand the
--- synonym.
-shallowTyCoVarsOfTyVarEnv :: TyVarEnv Type -> TyCoVarSet
--- See Note [Free variables of types]
-shallowTyCoVarsOfTyVarEnv tys = shallowTyCoVarsOfTypes $ nonDetEltsUFM tys
-  -- It's OK to use nonDetEltsUFM here because we immediately forget the
-  -- ordering by returning a set
-
-shallowTyCoVarsOfCoVarEnv :: CoVarEnv Coercion -> TyCoVarSet
-shallowTyCoVarsOfCoVarEnv cos = shallowTyCoVarsOfCos $ nonDetEltsUFM cos
-  -- It's OK to use nonDetEltsUFM here because we immediately forget the
-  -- ordering by returning a set
-
-tcvFolder :: TyCoFolder TyCoVarSet (Endo TyCoVarSet)
-tcvFolder = TyCoFolder { tcf_tyvar = do_tcv, tcf_covar = do_tcv
-                       , tcf_hole  = do_hole, tcf_tycobinder = do_bndr }
-  where
-    do_tcv is v = Endo do_it
-      where
-        do_it acc | v `elemVarSet` is  = acc
-                  | v `elemVarSet` acc = acc
-                  | otherwise          = acc `extendVarSet` v
-
-    do_bndr is tcv _ = extendVarSet is tcv
-    do_hole _ _  = mempty   -- Ignore coercion holes
-
--- | Compute the *shallow* free type variables of a 'Type'. See Note [Shallow
--- and deep free variable sets].
-ty_co_vars_of_type :: Type -> TyCoVarSet -> TyCoVarSet -> TyCoVarSet
-ty_co_vars_of_type ty is acc = appEndo (foldType tcvFolder is ty) acc
-
--- | Compute the *shallow* free type variables of a 'Type'. See Note [Shallow
--- and deep free variable sets].
-ty_co_vars_of_types :: [Type] -> TyCoVarSet -> TyCoVarSet -> TyCoVarSet
-ty_co_vars_of_types tys is acc = appEndo (foldTypes tcvFolder is tys) acc
-
--- Same, for coercions
-ty_co_vars_of_co :: Coercion -> TyCoVarSet -> TyCoVarSet -> TyCoVarSet
-ty_co_vars_of_co co is acc = appEndo (foldCoercion tcvFolder is co) acc
-
-ty_co_vars_of_cos :: [Coercion] -> TyCoVarSet -> TyCoVarSet -> TyCoVarSet
-ty_co_vars_of_cos cos is acc = appEndo (foldCoercions tcvFolder is cos) acc
-
 -}
 
 
