@@ -382,19 +382,27 @@ mkRoleAnnotDecl loc tycon roles
     suggestions list = hang (text "Perhaps you meant one of these:")
                        2 (pprWithCommas (quotes . ppr) list)
 
+-- | Converts a list of 'LHsTyVarBndr's annotated with their 'Specificity' to
+-- binders without annotations. Only accepts specified variables, and errors if
+-- any of the provided binders has an 'InferredSpec' annotation.
 fromSpecTyVarBndrs :: [LHsTyVarBndr Specificity GhcPs] -> P [LHsTyVarBndr () GhcPs]
 fromSpecTyVarBndrs = mapM fromSpecTyVarBndr
 
+-- | Converts 'LHsTyVarBndr' annotated with its 'Specificity' to one without
+-- annotations. Only accepts specified variables, and errors if the provided
+-- binder has an 'InferredSpec' annotation.
 fromSpecTyVarBndr :: LHsTyVarBndr Specificity GhcPs -> P (LHsTyVarBndr () GhcPs)
-fromSpecTyVarBndr (L loc (UserTyVar xtv flag idp)) = case flag of
-  SpecifiedSpec -> return $ L loc $ UserTyVar xtv () idp
-  InferredSpec  -> addFatalError loc
-                  (text "Inferred type variables are not allowed here")
-fromSpecTyVarBndr (L loc (KindedTyVar xtv flag idp k)) = case flag of
-  SpecifiedSpec -> return $ L loc $ KindedTyVar xtv () idp k
-  InferredSpec  -> addFatalError loc
-                  (text "Inferred type variables are not allowed here")
-fromSpecTyVarBndr (L loc (XTyVarBndr bndr)) = return (L loc (XTyVarBndr bndr))
+fromSpecTyVarBndr bndr = case bndr of
+  (L loc (UserTyVar xtv flag idp))     -> (check_spec flag loc)
+                                          >> return (L loc $ UserTyVar xtv () idp)
+  (L loc (KindedTyVar xtv flag idp k)) -> (check_spec flag loc)
+                                          >> return (L loc $ KindedTyVar xtv () idp k)
+  (L _   (XTyVarBndr bndr))            -> noExtCon bndr
+  where
+    check_spec :: Specificity -> SrcSpan -> P ()
+    check_spec SpecifiedSpec _   = return ()
+    check_spec InferredSpec  loc = addFatalError loc
+                                   (text "Inferred type variables are not allowed here")
 
 {- **********************************************************************
 
@@ -892,7 +900,6 @@ mkRuleBndrs = fmap (fmap cvt_one)
           RuleBndrSig noExtField v (mkLHsSigWcType sig)
 
 -- turns RuleTyTmVars into HsTyVarBndrs - this is more interesting
--- GJ : This only gets used on (the 1st set of) explicitly written foralls in rules. I assume we can just make these specified, or do we want to support inferred variables here as well? in that case we need to update rule_var in Parser.y
 mkRuleTyVarBndrs :: [LRuleTyTmVar] -> [LHsTyVarBndr Specificity GhcPs]
 mkRuleTyVarBndrs = fmap (fmap cvt_one)
   where cvt_one (RuleTyTmVar v Nothing)

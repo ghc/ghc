@@ -41,7 +41,7 @@ import TcEnv( tcLookupId )
 import TcEvidence( HsWrapper, (<.>) )
 
 import DynFlags
-import Var      ( TyVar, Specificity(..), tyVarKind, binderVars, mkTyVarBinders, tyVarSpecToBinders )
+import Var      ( TyVar, Specificity(..), tyVarKind, binderVars, mkTyVarBinders )
 import Id       ( Id, idName, idType, idInlinePragma, setInlinePragma, mkLocalId )
 import PrelNames( mkUnboundName )
 import BasicTypes
@@ -458,7 +458,7 @@ tcPatSynSig name sig_ty
     ctxt = PatSynCtxt name
 
     build_patsyn_type kvs imp univ_bndrs req ex_bndrs prov body
-      = mkInvForAllTys kvs $
+      = mkInfForAllTys kvs $
         mkSpecForAllTys imp $
         mkInvisForAllTys univ_bndrs $
         mkPhiTy req $

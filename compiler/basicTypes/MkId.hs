@@ -1352,7 +1352,7 @@ proxyHashId
     [kv,tv] = mkTemplateKiTyVars [liftedTypeKind] id
     kv_ty   = mkTyVarTy kv
     tv_ty   = mkTyVarTy tv
-    ty      = mkInvForAllTy kv $ mkSpecForAllTy tv $ mkProxyPrimTy kv_ty tv_ty
+    ty      = mkInfForAllTy kv $ mkSpecForAllTy tv $ mkProxyPrimTy kv_ty tv_ty
 
 ------------------------------------------------
 unsafeCoerceId :: Id
@@ -1404,7 +1404,7 @@ seqId = pcMiscPrelId seqName ty info
 
     -- seq :: forall (r :: RuntimeRep) a (b :: TYPE r). a -> b -> b
     ty  =
-      mkInvForAllTy runtimeRep2TyVar
+      mkInfForAllTy runtimeRep2TyVar
       $ mkSpecForAllTys [alphaTyVar, openBetaTyVar]
       $ mkVisFunTy alphaTy (mkVisFunTy openBetaTy openBetaTy)
 

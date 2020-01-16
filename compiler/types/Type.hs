@@ -42,7 +42,7 @@ module Type (
         mkForAllTy, mkForAllTys, mkInvisForAllTys, mkTyCoInvForAllTys,
         mkSpecForAllTy, mkSpecForAllTys,
         mkVisForAllTys, mkTyCoInvForAllTy,
-        mkInvForAllTy, mkInvForAllTys,
+        mkInfForAllTy, mkInfForAllTys,
         splitForAllTys, splitForAllTysSameVis,
         splitForAllVarBndrs,
         splitForAllTy_maybe, splitForAllTy,
@@ -1427,8 +1427,8 @@ mkTyCoInvForAllTy tv ty
   = ForAllTy (Bndr tv Inferred) ty
 
 -- | Like 'mkTyCoInvForAllTy', but tv should be a tyvar
-mkInvForAllTy :: TyVar -> Type -> Type
-mkInvForAllTy tv ty = ASSERT( isTyVar tv )
+mkInfForAllTy :: TyVar -> Type -> Type
+mkInfForAllTy tv ty = ASSERT( isTyVar tv )
                       ForAllTy (Bndr tv Inferred) ty
 
 -- | Like 'mkForAllTys', but assumes all variables are dependent and
@@ -1437,8 +1437,8 @@ mkTyCoInvForAllTys :: [TyCoVar] -> Type -> Type
 mkTyCoInvForAllTys tvs ty = foldr mkTyCoInvForAllTy ty tvs
 
 -- | Like 'mkTyCoInvForAllTys', but tvs should be a list of tyvar
-mkInvForAllTys :: [TyVar] -> Type -> Type
-mkInvForAllTys tvs ty = foldr mkInvForAllTy ty tvs
+mkInfForAllTys :: [TyVar] -> Type -> Type
+mkInfForAllTys tvs ty = foldr mkInfForAllTy ty tvs
 
 -- | Like 'mkForAllTy', but assumes the variable is dependent and 'Specified',
 -- a common case
