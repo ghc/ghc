@@ -744,6 +744,7 @@ loop:
   // * Except when compiling into Windows DLLs which don't support cross-package
   //    data references very well.
   //
+  // See Note [INTLIKE closures] currently in StgMiscClosures.cmm
   case CONSTR_0_1:
   {
 #if defined(COMPILING_WINDOWS_DLL)
@@ -753,27 +754,10 @@ loop:
       if(tag == 1 &&
             (StgInt)w >= MIN_INTLIKE &&
             (StgInt)w <= MAX_INTLIKE) {
-        //   puts("FooBar");
           *p =  TAG_CLOSURE(tag,
                             (StgClosure *)INTLIKE_CLOSURE((StgChar)w)
                            );
       }
-
-
-    //   if (info == Czh_con_info &&
-    //       // unsigned, so always true:  (StgChar)w >= MIN_CHARLIKE &&
-    //       (StgChar)w <= MAX_CHARLIKE) {
-    //       *p =  TAG_CLOSURE(tag,
-    //                         (StgClosure *)CHARLIKE_CLOSURE((StgChar)w)
-    //                        );
-    //   }
-    //   else if (info == Izh_con_info &&
-    //       (StgInt)w >= MIN_INTLIKE && (StgInt)w <= MAX_INTLIKE) {
-    //       *p = TAG_CLOSURE(tag,
-    //                          (StgClosure *)INTLIKE_CLOSURE((StgInt)w)
-    //                          );
-    //   }
-
       else {
           copy_tag_nolock(p,info,q,sizeofW(StgHeader)+1,gen_no,tag);
       }
