@@ -855,7 +855,7 @@ nightly-i386-windows-hadrian:
       - "ghc-x86_64-mingw32.tar.xz"
       - junit.xml
 
-validate-x86_64-windows:
+.build-x86_64-windows-make:
   extends: .build-windows-make
   variables:
     MSYSTEM: MINGW64
@@ -864,55 +864,53 @@ validate-x86_64-windows:
   cache:
     key: "x86_64-windows-$WINDOWS_TOOLCHAIN_VERSION"
 
+validate-x86_64-windows:
+  extends: .build-x86_64-windows-make
+
 nightly-x86_64-windows:
-  extends: .build-windows-make
+  extends: .build-x86_64-windows-make
   stage: full-build
   variables:
     BUILD_FLAVOUR: "validate"
-    MSYSTEM: MINGW64
-    CONFIGURE_ARGS: "--target=x86_64-unknown-mingw32"
   only:
     variables:
       - $NIGHTLY
-  cache:
-    key: "x86_64-windows-$WINDOWS_TOOLCHAIN_VERSION"
 
 # Normal Windows validate builds are profiled; that won't do for releases.
 release-x86_64-windows:
   <<: *release
   extends: validate-x86_64-windows
   variables:
-    MSYSTEM: MINGW64
     BUILD_FLAVOUR: "perf"
-    CONFIGURE_ARGS: "--target=x86_64-unknown-mingw32"
-    TEST_ENV: "x86_64-windows"
+
+
+.build-i386-windows:
+  extends: .build-windows-make
+  variables:
+    MSYSTEM: MINGW32
+    CONFIGURE_ARGS: "--target=i386-unknown-mingw32"
+    # Due to #15934
+    BUILD_PROF_LIBS: "NO"
+    TEST_ENV: "i386-windows"
+  cache:
+    key: "i386-windows-$WINDOWS_TOOLCHAIN_VERSION"
+
+validate-i386-windows:
+  extends: .build-i386-windows-make
+  variables:
+    BUILD_FLAVOUR: "perf"
 
 release-i386-windows:
   <<: *release
-  extends: .build-windows-make
+  extends: .build-i386-windows-make
   variables:
-    MSYSTEM: MINGW32
     BUILD_FLAVOUR: "perf"
-    CONFIGURE_ARGS: "--target=i386-unknown-mingw32"
-    # Due to #15934
-    BUILD_PROF_LIBS: "NO"
-    TEST_ENV: "i386-windows"
-  cache:
-    key: "i386-windows-$WINDOWS_TOOLCHAIN_VERSION"
 
 nightly-i386-windows:
-  extends: .build-windows-make
+  extends: .build-i386-windows-make
   only:
     variables:
       - $NIGHTLY
-  variables:
-    MSYSTEM: MINGW32
-    CONFIGURE_ARGS: "--target=i386-unknown-mingw32"
-    # Due to #15934
-    BUILD_PROF_LIBS: "NO"
-    TEST_ENV: "i386-windows"
-  cache:
-    key: "i386-windows-$WINDOWS_TOOLCHAIN_VERSION"
 
 ############################################################
 # Cleanup
