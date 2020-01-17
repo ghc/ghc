@@ -7,7 +7,7 @@
 -- Pepe Iborra (supported by Google SoC) 2006
 --
 -----------------------------------------------------------------------------
-module RtClosureInspect(
+module GHC.Runtime.Heap.Inspect(
      -- * Entry points and types
      cvObtainTerm,
      cvReconstructType,
@@ -27,7 +27,7 @@ module RtClosureInspect(
 
 import GhcPrelude
 
-import GHCi
+import GHC.Runtime.Interpreter as GHCi
 import GHCi.RemoteTypes
 import HscTypes
 
@@ -58,7 +58,7 @@ import DynFlags
 import Outputable as Ppr
 import GHC.Char
 import GHC.Exts.Heap
-import GHC.Runtime.Layout ( roundUpTo )
+import GHC.Runtime.Heap.Layout ( roundUpTo )
 
 import Control.Monad
 import Data.Maybe

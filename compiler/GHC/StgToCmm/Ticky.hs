@@ -116,7 +116,7 @@ import GHC.Cmm.Expr
 import GHC.Cmm.Graph
 import GHC.Cmm.Utils
 import GHC.Cmm.CLabel
-import GHC.Runtime.Layout
+import GHC.Runtime.Heap.Layout
 
 import Module
 import Name

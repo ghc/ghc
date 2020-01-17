@@ -52,7 +52,7 @@ import SrcLoc
 import Util
 import Module
 import Plugins          ( withPlugins, installCoreToDos )
-import DynamicLoading  -- ( initializePlugins )
+import GHC.Runtime.Loader  -- ( initializePlugins )
 
 import UniqSupply       ( UniqSupply, mkSplitUniqSupply, splitUniqSupply )
 import UniqFM

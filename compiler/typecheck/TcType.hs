@@ -1025,7 +1025,7 @@ isMetaTyVar tv
 -- isAmbiguousTyVar is used only when reporting type errors
 -- It picks out variables that are unbound, namely meta
 -- type variables and the RuntimUnk variables created by
--- RtClosureInspect.zonkRTTIType.  These are "ambiguous" in
+-- GHC.Runtime.Heap.Inspect.zonkRTTIType.  These are "ambiguous" in
 -- the sense that they stand for an as-yet-unknown type
 isAmbiguousTyVar tv
   | isTyVar tv -- See Note [Coercion variables in free variable lists]

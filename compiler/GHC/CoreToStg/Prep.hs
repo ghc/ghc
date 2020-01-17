@@ -946,7 +946,7 @@ pragma.  It is levity-polymorphic.
                               -> (# State# RealWorld, o #)
 
 It needs no special treatment in GHC except this special inlining here
-in CorePrep (and in ByteCodeGen).
+in CorePrep (and in GHC.CoreToByteCode).
 
 -- ---------------------------------------------------------------------------
 --      CpeArg: produces a result satisfying CpeArg

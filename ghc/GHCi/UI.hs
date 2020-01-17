@@ -33,10 +33,10 @@ import qualified GHCi.UI.Monad as GhciMonad ( args, runStmt, runDecls' )
 import GHCi.UI.Monad hiding ( args, runStmt )
 import GHCi.UI.Tags
 import GHCi.UI.Info
-import Debugger
+import GHC.Runtime.Debugger
 
 -- The GHC interface
-import GHCi
+import GHC.Runtime.Interpreter
 import GHCi.RemoteTypes
 import GHCi.BreakArray
 import DynFlags
@@ -68,7 +68,7 @@ import qualified Lexer
 import StringBuffer
 import Outputable hiding ( printForUser, printForUserPartWay )
 
-import DynamicLoading ( initializePlugins )
+import GHC.Runtime.Loader ( initializePlugins )
 
 -- Other random utilities
 import BasicTypes hiding ( isTopLevel )
@@ -76,7 +76,7 @@ import Config
 import Digraph
 import Encoding
 import FastString
-import Linker
+import GHC.Runtime.Linker
 import Maybes ( orElse, expectJust )
 import NameSet
 import Panic hiding ( showException )
@@ -3153,7 +3153,7 @@ ticket contains an analysis of the situation and suggests the solution
 implemented above.
 
 The same filter was also implemented to fix #11051 [3]. See the
-Note [What to show to users] in compiler/main/InteractiveEval.hs
+Note [What to show to users] in GHC.Runtime.Eval
 
 [1] https://gitlab.haskell.org/ghc/ghc/issues/12525
 [2] https://gitlab.haskell.org/ghc/ghc/issues/12525#note_123489

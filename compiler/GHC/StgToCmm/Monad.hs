@@ -68,7 +68,7 @@ import GHC.Cmm.Dataflow.Collections
 import GHC.Cmm.Graph as CmmGraph
 import GHC.Cmm.BlockId
 import GHC.Cmm.CLabel
-import GHC.Runtime.Layout
+import GHC.Runtime.Heap.Layout
 import Module
 import Id
 import VarEnv

@@ -35,7 +35,7 @@ import DynFlags
 import FastString
 import ForeignCall
 import Outputable
-import GHC.Runtime.Layout
+import GHC.Runtime.Heap.Layout
 import CoreSyn (Tickish)
 import qualified Unique as U
 
