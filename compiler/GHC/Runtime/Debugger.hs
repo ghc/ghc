@@ -12,14 +12,14 @@
 --
 -----------------------------------------------------------------------------
 
-module Debugger (pprintClosureCommand, showTerm, pprTypeAndContents) where
+module GHC.Runtime.Debugger (pprintClosureCommand, showTerm, pprTypeAndContents) where
 
 import GhcPrelude
 
-import Linker
-import RtClosureInspect
+import GHC.Runtime.Linker
+import GHC.Runtime.Heap.Inspect
 
-import GHCi
+import GHC.Runtime.Interpreter
 import GHCi.RemoteTypes
 import GhcMonad
 import HscTypes

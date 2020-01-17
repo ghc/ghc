@@ -4,7 +4,7 @@
 --
 
 -- | Bytecode assembler types
-module ByteCodeTypes
+module GHC.ByteCode.Types
   ( CompiledByteCode(..), seqCompiledByteCode, FFIInfo(..)
   , UnlinkedBCO(..), BCOPtr(..), BCONPtr(..)
   , ItblEnv, ItblPtr(..)
@@ -114,7 +114,7 @@ data CgBreakInfo
    { cgb_vars   :: [Maybe (Id,Word16)]
    , cgb_resty  :: Type
    }
--- See Note [Syncing breakpoint info] in compiler/main/InteractiveEval.hs
+-- See Note [Syncing breakpoint info] in GHC.Runtime.Eval
 
 -- Not a real NFData instance because we can't rnf Id or Type
 seqCgBreakInfo :: CgBreakInfo -> ()

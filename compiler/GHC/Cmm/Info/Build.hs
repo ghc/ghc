@@ -27,7 +27,7 @@ import GHC.Cmm.Utils
 import DynFlags
 import Maybes
 import Outputable
-import GHC.Runtime.Layout
+import GHC.Runtime.Heap.Layout
 import UniqSupply
 import CostCentre
 import GHC.StgToCmm.Heap

@@ -42,7 +42,7 @@ import GHC.StgToCmm.Monad
 import GHC.StgToCmm.Utils
 
 import GHC.Cmm.Graph
-import GHC.Runtime.Layout
+import GHC.Runtime.Heap.Layout
 import GHC.Cmm.BlockId
 import GHC.Cmm
 import GHC.Cmm.Utils
