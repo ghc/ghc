@@ -34,7 +34,7 @@ module Id (
 
         -- ** Simple construction
         mkGlobalId, mkVanillaGlobal, mkVanillaGlobalWithInfo,
-        mkLocalId, mkLocalCoVar, mkLocalIdOrCoVar,
+        mkLocalId, mkLocalCoVar, mkLocalCoHoleCoVar, mkLocalIdOrCoVar,
         mkLocalIdWithInfo, mkExportedLocalId, mkExportedVanillaId,
         mkSysLocal, mkSysLocalM, mkSysLocalOrCoVar, mkSysLocalOrCoVarM,
         mkUserLocal, mkUserLocalOrCoVar,
@@ -273,6 +273,12 @@ mkLocalCoVar :: Name -> Type -> CoVar
 mkLocalCoVar name ty
   = ASSERT( isCoVarType ty )
     Var.mkLocalVar CoVarId name ty vanillaIdInfo
+
+-- | Make a local coercion hole CoVar
+mkLocalCoHoleCoVar :: Name -> Type -> CoVar
+mkLocalCoHoleCoVar name ty
+  = ASSERT( isCoVarType ty)
+    Var.mkLocalVar CoHoleId name ty vanillaIdInfo
 
 -- | Like 'mkLocalId', but checks the type to see if it should make a covar
 mkLocalIdOrCoVar :: Name -> Type -> Id

@@ -42,6 +42,7 @@ import Name
 import RdrName ( lookupGRE_Name, GlobalRdrEnv, mkRdrUnqual )
 import PrelNames ( typeableClassName )
 import Id
+import IdInfo
 import Var
 import VarSet
 import VarEnv
@@ -900,8 +901,9 @@ addDeferredBinding ctxt err ct
            HoleDest hole
              -> do { -- See Note [Deferred errors for coercion holes]
                      let co_var = coHoleCoVar hole
-                   ; addTcEvBind ev_binds_var $ mkWantedEvBind co_var err_tm
-                   ; fillCoercionHole hole (mkTcCoVarCo co_var) }}
+                         co_var' = setIdDetails co_var CoVarId  -- Ew.
+                   ; addTcEvBind ev_binds_var $ mkWantedEvBind co_var' err_tm
+                   ; fillCoercionHole hole (mkTcCoVarCo co_var') }}
 
   | otherwise   -- Do not set any evidence for Given/Derived
   = return ()

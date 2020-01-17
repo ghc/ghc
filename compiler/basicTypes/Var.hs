@@ -56,7 +56,7 @@ module Var (
 
         -- ** Predicates
         isId, isTyVar, isTcTyVar,
-        isLocalVar, isLocalId, isCoVar, isNonCoVarId, isTyCoVar,
+        isLocalVar, isLocalId, isCoVar, isCoHoleCoVar, isNonCoVarId, isTyCoVar,
         isGlobalId, isExportedId,
         mustHaveLocalBinding,
 
@@ -93,7 +93,7 @@ import {-# SOURCE #-}   TyCoRep( Type, Kind )
 import {-# SOURCE #-}   TyCoPpr( pprKind )
 import {-# SOURCE #-}   TcType( TcTyVarDetails, pprTcTyVarDetails, vanillaSkolemTv )
 import {-# SOURCE #-}   IdInfo( IdDetails, IdInfo, coVarDetails, isCoVarDetails,
-                                vanillaIdInfo, pprIdDetails )
+                                isCoHoleDetails, vanillaIdInfo, pprIdDetails )
 
 import Name hiding (varName)
 import Unique ( Uniquable, Unique, getKey, getUnique
@@ -727,10 +727,17 @@ isCoVar :: Var -> Bool
 isCoVar (Id { id_details = details }) = isCoVarDetails details
 isCoVar _                             = False
 
+-- | Is this a coercion hole variable?
+-- See Note [CoercionHoles and coercion free variables] in TyCoRep
+isCoHoleCoVar :: Var -> Bool
+isCoHoleCoVar (Id { id_details = details }) = isCoHoleDetails details
+isCoHoleCoVar _                             = False
+
 -- | Is this a term variable ('Id') that is /not/ a coercion variable?
 -- Satisfies @'isId' v ==> 'isCoVar' v == not ('isNonCoVarId' v)@.
 isNonCoVarId :: Var -> Bool
-isNonCoVarId (Id { id_details = details }) = not (isCoVarDetails details)
+isNonCoVarId (Id { id_details = details }) = not (isCoVarDetails details) &&
+                                             not (isCoHoleDetails details)
 isNonCoVarId _                             = False
 
 isLocalId :: Var -> Bool

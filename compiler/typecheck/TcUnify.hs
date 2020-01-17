@@ -2182,6 +2182,11 @@ instance Monad MetaTyVarUpdateResult where
   MTVU_Bad     >>= _ = MTVU_Bad
   MTVU_Occurs  >>= _ = MTVU_Occurs
 
+instance Outputable a => Outputable (MetaTyVarUpdateResult a) where
+  ppr (MTVU_OK a) = text "MTVU_OK" <+> ppr a
+  ppr MTVU_Bad    = text "MTVU_Bad"
+  ppr MTVU_Occurs = text "MTVU_Occurs"
+
 occCheckForErrors :: DynFlags -> TcTyVar -> Type -> MetaTyVarUpdateResult ()
 -- Just for error-message generation; so we return MetaTyVarUpdateResult
 -- so the caller can report the right kind of error
@@ -2206,6 +2211,8 @@ metaTyVarUpdateOK :: DynFlags
 -- Check (a) that tv doesn't occur in ty (occurs check)
 --       (b) that ty does not have any foralls
 --           (in the impredicative case), or type functions
+--       (c) that ty does not have any coercion holes
+--           See Note [Equalities with incompatible kinds] in TcCanonical
 --
 -- We have two possible outcomes:
 -- (1) Return the type to update the type variable with,
@@ -2225,11 +2232,11 @@ metaTyVarUpdateOK :: DynFlags
 -- See Note [Refactoring hazard: checkTauTvUpdate]
 
 metaTyVarUpdateOK dflags tv ty
-  = case preCheck dflags False tv ty of
+  = case pprTraceIt "RAE2" $ preCheck dflags False tv ty of
          -- False <=> type families not ok
          -- See Note [Prevent unification with type families]
       MTVU_OK _   -> Just ty
-      MTVU_Bad    -> Nothing  -- forall, predicate, or type function
+      MTVU_Bad    -> Nothing  -- forall, predicate, type function, or coercion hole
       MTVU_Occurs -> occCheckExpand [tv] ty
 
 preCheck :: DynFlags -> Bool -> TcTyVar -> TcType -> MetaTyVarUpdateResult ()
@@ -2254,7 +2261,8 @@ preCheck dflags ty_fam_ok tv ty
 
     fast_check :: TcType -> MetaTyVarUpdateResult ()
     fast_check (TyVarTy tv')
-      | tv == tv' = MTVU_Occurs
+      | tv == tv' = pprTrace "RAE5" (ppr tv $$ ppr ty) $
+                    MTVU_Occurs
       | otherwise = fast_check_occ (tyVarKind tv')
            -- See Note [Occurrence checking: look inside kinds]
 
@@ -2280,14 +2288,19 @@ preCheck dflags ty_fam_ok tv ty
      -- For kinds, we only do an occurs check; we do not worry
      -- about type families or foralls
      -- See Note [Checking for foralls]
-    fast_check_occ k | tv `elemVarSet` tyCoVarsOfType k = MTVU_Occurs
+    fast_check_occ k | tv `elemVarSet` tyCoVarsOfType k = pprTrace "RAE6" (ppr ty $$ ppr tv $$ ppr k) $
+                                                          MTVU_Occurs
                      | otherwise                        = ok
 
      -- For coercions, we are only doing an occurs check here;
      -- no bother about impredicativity in coercions, as they're
      -- inferred
-    fast_check_co co | tv `elemVarSet` tyCoVarsOfCo co = MTVU_Occurs
-                     | otherwise                       = ok
+    fast_check_co co | anyVarSet isCoHoleCoVar fvs = pprTrace "RAE3" (ppr ty $$ ppr co $$ ppr fvs) $
+                                                     MTVU_Bad
+                     | tv `elemVarSet` fvs         = pprTrace "RAE4" (ppr ty $$ ppr co $$ ppr tv $$ ppr fvs) $
+                                                     MTVU_Occurs
+                     | otherwise                   = ok
+      where fvs = tyCoVarsOfCo co
 
     bad_tc :: TyCon -> Bool
     bad_tc tc

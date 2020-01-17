@@ -1812,6 +1812,39 @@ kickOutAfterUnification new_tv
        ; setInertCans ics2
        ; return n_kicked }
 
+kickOutAfterFillingCoercionHole :: CoercionHole -> TcS ()
+kickOutAfterFillingCoercionHole hole
+  = do { ics <- getInertCans
+       ; let (kicked_out, ics') = kick_out ics
+             n_kicked           = workListSize kicked_out
+
+       ; unless (n_kicked == 0) $
+         do { updWorkListTcS (appendWorkList kicked_out)
+            ; csTraceTcS $
+              hang (text "Kick out, hole =" <+> ppr hole)
+                 2 (vcat [ text "n-kicked =" <+> int n_kicked
+                         , text "kicked_out =" <+> ppr kicked_out
+                         , text "Residual inerts =" <+> ppr ics' ]) }
+
+       ; setInertCans ics' }
+  where
+    kick_out :: InertCans -> (WorkList, InertCans)
+    kick_out ics@(IC { inert_irreds = irreds })
+      = let (to_kick, to_keep) = partitionBag kick_ct irreds
+
+            kicked_out = extendWorkListCts (bagToList to_kick) emptyWorkList
+            ics'       = ics { inert_irreds = to_keep }
+        in
+        (kicked_out, ics')
+
+    kick_ct :: Ct -> Bool
+    -- This is not particularly efficient. Ways to do better:
+    --  1) Have a custom function that looks for a coercion hole and returns a Bool
+    --  2) Keep co-hole-blocked constraints in a separate part of the inert set,
+    --     keyed by their co-hole. (Is it possible for more than one co-hole to be
+    --     in a constraint? I doubt it.)
+    kick_ct ct = coHoleCoVar hole `elemVarSet` tyCoVarsOfType (ctPred ct)
+
 {- Note [kickOutRewritable]
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~
 See also Note [inert_eqs: the inert equalities].
@@ -3392,7 +3425,7 @@ useVars co_vars
 setWantedEq :: TcEvDest -> Coercion -> TcS ()
 setWantedEq (HoleDest hole) co
   = do { useVars (coVarsOfCo co)
-       ; wrapTcS $ TcM.fillCoercionHole hole co }
+       ; fillCoercionHole hole co }
 setWantedEq (EvVarDest ev) _ = pprPanic "setWantedEq" (ppr ev)
 
 -- | Good for both equalities and non-equalities
@@ -3400,14 +3433,19 @@ setWantedEvTerm :: TcEvDest -> EvTerm -> TcS ()
 setWantedEvTerm (HoleDest hole) tm
   | Just co <- evTermCoercion_maybe tm
   = do { useVars (coVarsOfCo co)
-       ; wrapTcS $ TcM.fillCoercionHole hole co }
+       ; fillCoercionHole hole co }
   | otherwise
   = do { let co_var = coHoleCoVar hole
        ; setEvBind (mkWantedEvBind co_var tm)
-       ; wrapTcS $ TcM.fillCoercionHole hole (mkTcCoVarCo co_var) }
+       ; fillCoercionHole hole (mkTcCoVarCo co_var) }
 
 setWantedEvTerm (EvVarDest ev_id) tm
   = setEvBind (mkWantedEvBind ev_id tm)
+
+fillCoercionHole :: CoercionHole -> Coercion -> TcS ()
+fillCoercionHole hole co
+  = do { wrapTcS $ TcM.fillCoercionHole hole co
+       ; kickOutAfterFillingCoercionHole hole }
 
 setEvBindIfWanted :: CtEvidence -> EvTerm -> TcS ()
 setEvBindIfWanted ev tm

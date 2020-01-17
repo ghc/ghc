@@ -321,7 +321,8 @@ newImplication
 
 newCoercionHole :: TcPredType -> TcM CoercionHole
 newCoercionHole pred_ty
-  = do { co_var <- newEvVar pred_ty
+  = do { name <- newSysName (predTypeOccName pred_ty)
+       ; let co_var = mkLocalCoHoleCoVar name pred_ty
        ; traceTc "New coercion hole:" (ppr co_var)
        ; ref <- newMutVar Nothing
        ; return $ CoercionHole { ch_co_var = co_var, ch_ref = ref } }
@@ -1918,7 +1919,7 @@ zonkTyCoVar :: TyCoVar -> TcM TcType
 -- Works on TyVars and TcTyVars
 zonkTyCoVar tv | isTcTyVar tv = zonkTcTyVar tv
                | isTyVar   tv = mkTyVarTy <$> zonkTyCoVarKind tv
-               | otherwise    = ASSERT2( isCoVar tv, ppr tv )
+               | otherwise    = ASSERT2( isCoVar tv || isCoHoleCoVar tv, ppr tv )
                                 mkCoercionTy . mkCoVarCo <$> zonkTyCoVarKind tv
    -- Hackily, when typechecking type and class decls
    -- we have TyVars in scope added (only) in
