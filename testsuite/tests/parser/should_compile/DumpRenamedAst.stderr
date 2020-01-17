@@ -207,6 +207,7 @@
           [({ DumpRenamedAst.hs:11:21-29 }
             (KindedTyVar
              (NoExtField)
+             (())
              ({ DumpRenamedAst.hs:11:21-22 }
               {Name: as})
              ({ DumpRenamedAst.hs:11:27-29 }
@@ -353,15 +354,13 @@
                   {Name: GHC.Types.Type}))))))
             [({ DumpRenamedAst.hs:19:3-45 }
               (ConDeclGADT
-               (NoExtField)
+               [{Name: f}
+               ,{Name: g}]
                [({ DumpRenamedAst.hs:19:3-5 }
                  {Name: DumpRenamedAst.Nat})]
                ({ DumpRenamedAst.hs:19:10-45 }
                 (False))
-               (HsQTvs
-                [{Name: f}
-                ,{Name: g}]
-                [])
+               []
                (Nothing)
                (PrefixCon
                 [({ DumpRenamedAst.hs:19:10-34 }
@@ -374,6 +373,7 @@
                      [({ DumpRenamedAst.hs:19:18-19 }
                        (UserTyVar
                         (NoExtField)
+                        (SpecifiedSpec)
                         ({ DumpRenamedAst.hs:19:18-19 }
                          {Name: xx})))]
                      ({ DumpRenamedAst.hs:19:22-33 }
@@ -452,11 +452,13 @@
          [({ DumpRenamedAst.hs:21:8 }
            (UserTyVar
             (NoExtField)
+            (())
             ({ DumpRenamedAst.hs:21:8 }
              {Name: f})))
          ,({ DumpRenamedAst.hs:21:11-16 }
            (KindedTyVar
             (NoExtField)
+            (())
             ({ DumpRenamedAst.hs:21:11 }
              {Name: a})
             ({ DumpRenamedAst.hs:21:16 }
@@ -588,6 +590,7 @@
           [({ DumpRenamedAst.hs:23:17-22 }
             (KindedTyVar
              (NoExtField)
+             (())
              ({ DumpRenamedAst.hs:23:17 }
               {Name: a})
              ({ DumpRenamedAst.hs:23:22 }
@@ -599,6 +602,7 @@
           ,({ DumpRenamedAst.hs:23:26-39 }
             (KindedTyVar
              (NoExtField)
+             (())
              ({ DumpRenamedAst.hs:23:26 }
               {Name: f})
              ({ DumpRenamedAst.hs:23:31-39 }

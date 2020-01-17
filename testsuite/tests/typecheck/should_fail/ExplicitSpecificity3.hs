@@ -1,6 +1,6 @@
 {-# LANGUAGE RankNTypes, PolyKinds, TypeFamilies #-}
 
-module ExplicitSpecificity4 where
+module ExplicitSpecificity3 where
 
 type family F {k} (a::k) :: *
 type instance F String = Int
