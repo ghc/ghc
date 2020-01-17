@@ -4,6 +4,7 @@
 
 set -e
 
+echo hello
 case $MSYSTEM in
   MINGW32)
     triple="i386-unknown-mingw32"
@@ -18,19 +19,28 @@ case $MSYSTEM in
     exit 1
     ;;
 esac
+echo "hello world"
 
-# Bring mingw64 toolchain into PATH
-source /etc/profile
+ls /etc
+bash /etc/profile || true
 
+# Bring mingw toolchain into PATH
+source /etc/msystem
+MINGW_MOUNT_POINT="${MINGW_PREFIX}"
+PATH="$MINGW_MOUNT_POINT/bin:$PATH"
+
+echo "hello world2"
 # This will contain GHC's local native toolchain
 toolchain="$PWD/toolchain"
 PATH="$toolchain/bin:$PATH"
 
+echo "hello world3"
 # Use a local temporary directory to ensure that concurrent builds don't
 # interfere with one another
 mkdir -p tmp
 export TMP=$PWD/tmp
 export TEMP=$PWD/tmp
+echo "hello world4"
 
 function run() {
   echo "Running $@..."
@@ -95,20 +105,22 @@ configure() {
 build_make() {
   echo "include mk/flavours/${BUILD_FLAVOUR}.mk" > mk/build.mk
   echo 'GhcLibHcOpts+=-haddock' >> mk/build.mk
-  make -j`mk/detect-cpu-count.sh`
+  run make -j`mk/detect-cpu-count.sh`
   mv _build/bindist/ghc*.tar.xz ghc.tar.xz
 }
 
 fetch_perf_notes() {
   echo "Fetching perf notes..."
-  git fetch https://gitlab.haskell.org/ghc/ghc-performance-notes.git refs/notes/perf:refs/notes/perf \
+  git fetch \
+    https://gitlab.haskell.org/ghc/ghc-performance-notes.git \
+    refs/notes/perf:refs/notes/perf \
     || echo "warning: Failed to fetch perf notes"
 }
 
 test_make() {
-  make binary-dist-prep TAR_COMP_OPTS=-1
-  make test_bindist TEST_PREP=YES
-  make V=0 test \
+  run make binary-dist-prep TAR_COMP_OPTS=-1
+  run make test_bindist TEST_PREP=YES
+  run make V=0 test \
     THREADS=`mk/detect-cpu-count.sh` \
     JUNIT_FILE=../../junit.xml
 }
@@ -119,7 +131,7 @@ clean_make() {
 }
 
 build_hadrian() {
-  hadrian/build.cabal.sh \
+  run hadrian/build.cabal.sh \
     --flavour=$FLAVOUR \
     -j`mk/detect-cpu-count.sh` \
     --flavour=Quick \
@@ -132,13 +144,13 @@ build_hadrian() {
 test_hadrian() {
   export TOP=$(pwd)
   cd _build/bindist/ghc-*/
-  ./configure --prefix=$TOP/_build/install
-  make install
+  run ./configure --prefix=$TOP/_build/install
+  run make install
   cd ../../../
 
   # skipping perf tests for now since we build a quick-flavoured GHC,
   # which might result in some broken perf tests?
-  hadrian/build.cabal.sh \
+  run hadrian/build.cabal.sh \
     --flavour=$FLAVOUR \
     -j`mk/detect-cpu-count.sh` \
     --flavour=quick \
