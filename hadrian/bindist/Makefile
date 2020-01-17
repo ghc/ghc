@@ -71,22 +71,37 @@ endef
 
 
 .PHONY: install
-install: install_lib install_bin install_includes
-install: install_docs install_wrappers install_ghci
-install: install_mingw update_package_db
+
+ifeq "$(TargetOS_CPP)" "mingw32"
+install_bin: install_mingw install_bin_direct
+else
+install_bin: install_bin_libdir install_wrappers
+endif
+
+install: install_bin install_lib install_includes
+install: install_docs install_ghci update_package_db
 
 ActualBinsDir=${ghclibdir}/bin
+ifeq "$(TargetOS_CPP)" "mingw32"
+ActualLibsDir=${ghclibdir}
+else
 ActualLibsDir=${ghclibdir}/lib
+endif
 WrapperBinsDir=${bindir}
 
 # We need to install binaries relative to libraries.
 BINARIES = $(wildcard ./bin/*)
-install_bin:
+install_bin_libdir:
 	@echo "Copying binaries to $(ActualBinsDir)"
 	$(INSTALL_DIR) "$(ActualBinsDir)"
 	for i in $(BINARIES); do \
 		cp -R $$i "$(ActualBinsDir)"; \
 	done
+
+install_bin_direct:
+	@echo "Copying binaries to $(WrapperBinsDir)"
+	$(INSTALL_DIR) "$(WrapperBinsDir)"
+	cp ./bin/* "$(WrapperBinsDir)/"
 
 install_ghci:
 	@echo "Copying and installing ghci"
@@ -105,7 +120,7 @@ install_lib:
 
 INCLUDES = $(wildcard ./include/*)
 install_includes:
-	@echo "Copying libraries to $(includedir)"
+	@echo "Copying include files to $(includedir)"
 	$(INSTALL_DIR) "$(includedir)"
 	for i in $(INCLUDES); do \
 		cp -R $$i "$(includedir)/"; \
@@ -113,34 +128,30 @@ install_includes:
 
 DOCS = $(wildcard ./docs/*)
 install_docs:
-	@echo "Copying libraries to $(docdir)"
+	@echo "Copying docs to $(docdir)"
 	$(INSTALL_DIR) "$(docdir)"
 	for i in $(DOCS); do \
 		cp -R $$i "$(docdir)/"; \
 	done
 
 BINARY_NAMES=$(shell ls ./wrappers/)
-install_wrappers:
-	@echo "Installing Wrapper scripts"
+install_wrappers: install_bin_libdir
+	@echo "Installing wrapper scripts"
 	$(INSTALL_DIR) "$(WrapperBinsDir)"
 	$(foreach p, $(BINARY_NAMES),\
 		$(call installscript,$p,$(WrapperBinsDir)/$p,$(WrapperBinsDir),$(ActualBinsDir),$(ActualBinsDir)/$p,$(ActualLibsDir),$(docdir),$(includedir)))
 
 PKG_CONFS = $(shell find "$(ActualLibsDir)/package.conf.d" -name '*.conf' | sed 's:   :xxx:g')
-update_package_db:
+update_package_db: install_bin install_lib
 	@echo "$(PKG_CONFS)"
 	@echo "Updating the package DB"
 	$(foreach p, $(PKG_CONFS),\
 		$(call patchpackageconf,$(shell echo $(notdir $p) | sed 's/-\([0-9]*[0-9]\.\)*conf//g'),$(shell echo "$p" | sed 's:xxx:   :g'),$(docdir),$(shell realpath --relative-to="$(libdir)" "$(docdir)")))
 	'$(WrapperBinsDir)/ghc-pkg' recache
 
-# The 'foreach' that copies the mingw directory will only trigger a copy
-# when the wildcard matches, therefore only on Windows.
-MINGW = $(wildcard ./mingw)
 install_mingw:
 	@echo "Installing MingGW"
 	$(INSTALL_DIR) "$(prefix)/mingw"
-	$(foreach d, $(MINGW),\
-		cp -R ./mingw "$(prefix)")
+	cp -R ./mingw "$(prefix)"
 # END INSTALL
 # ----------------------------------------------------------------------
