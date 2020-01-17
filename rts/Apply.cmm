@@ -192,28 +192,77 @@ again:
 }
 
 /* -----------------------------------------------------------------------------
-   Entry Code for a PAP.
+   Note [PAP representation]
+   ~~~~~~~~~~~~~~~~~~~~~~~~~
 
-   This entry code is *only* called by one of the stg_ap functions.
-   On entry: Sp points to the remaining arguments on the stack.  If
-   the stack check fails, we can just push the PAP on the stack and
-   return to the scheduler.
+   Pointers to PAPs are never tagged, and PAPs can't be directly entered. The
+   problem with tagging a PAP is that most of the time we can't distinguish a
+   PAP from a FUN in function application code (an exception to this is
+   described in Note [avoid intermediate PAPs] in StgCmmLayout) so we call
+   generic apply functions for both function and PAP applications (e.g.
+   stg_ap_pp_fast for applying two pointers), and we want a fast path in
+   functions like stg_ap_pp_fast for when the arity of the function matches
+   number of arguments applied. E.g. in stg_ap_pp_fast:
 
-   On entry: R1 points to the PAP.  The rest of the function's
-   arguments (apart from those that are already in the PAP) are on the
-   stack, starting at Sp(0).  R2 contains an info table which
-   describes these arguments, which is used in the event that the
-   stack check in the entry code below fails.  The info table is
-   currently one of the stg_ap_*_ret family, as this code is always
-   entered from those functions.
+       // R1 is the function
+       if (GETTAG(R1)==2) {
+           R3 = W_[Sp+WDS(2)];
+           R2 = W_[Sp+WDS(1)];
+           Sp_adj(3);
+           jump %GET_ENTRY(R1-2) [R1,R2,R3];
+       }
+
+   If we tag PAP pointers similar to FUN pointers we have a few options:
+
+   - In this code path check that R1 is not a PAP. This makes the fast path
+     slower.
+
+   - Make it possible to enter stg_PAP_info directly, with the same calling
+     convention for FUNs, as shown above. For this the entry code needs to know
+     about the various calling conventions, and which convention is currently
+     being used, so this is not easy to implement.
+
+   - Implement different info tables for PAPs based on how many args they need
+     to be saturated and tag PAP pointers with the number of args they need as
+     the tag (so a PAP that needs two args to be saturated would have
+     stg_PAP_pp_info as the info table and be tagged 2). Entry code for e.g.
+     stg_PAP_pp_info would load the args as in stg_PAP_apply, expecting the last
+     two arguments in the registers according to the calling convention for
+     applying two pointers.
+
+   - Instead of tagging them as how many arguments they need to be saturated,
+     tag them as how many arguments they're applied so far, and give them their
+     own info tables (e.g. stg_PAP_2_info for a PAP that is applied two args).
+     However we still can't use the FUN fast path for PAPs with this, because
+     the entry code would need to know about different calling conventions, and
+     which calling convention is being used on entry (same problem as option (2)
+     above).
+
+   So instead we never tag a PAP pointer so that the slow path in e.g.
+   stg_ap_pp_fast will be taken when applying to a PAP, which will do a case
+   analysis on closure type and arity and either jump to stg_PAP_apply
+   (saturated or over-saturated applications) or allocate a new PAP
+   (under-saturated applications).
+
+   Note [Code to apply a PAP]
+   ~~~~~~~~~~~~~~~~~~~~~~~~~~
+
+   Currently stg_PAP_apply works like this: On entry R1 points to the PAP.  The
+   rest of the function's arguments (apart from those that are already in the
+   PAP) are on the stack, starting at Sp(0).  R2 contains an info table which
+   describes these arguments, which is used in the event that the stack check in
+   the entry code below fails.  The info table is currently one of the
+   stg_ap_*_ret family, as this code is always entered from those functions.
 
    The idea is to copy the chunk of stack from the PAP object onto the
    stack / into registers, and enter the function.
    -------------------------------------------------------------------------- */
 
+// Note [PAPs representation]
 INFO_TABLE(stg_PAP,/*special layout*/0,0,PAP,"PAP","PAP")
 {  ccall barf("PAP object (%p) entered!", R1) never returns; }
 
+// Note [Code to apply a PAP]
 stg_PAP_apply /* no args => explicit stack */
 {
   W_ Words;
