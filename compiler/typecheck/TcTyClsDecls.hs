@@ -6,7 +6,7 @@
 TcTyClsDecls: Typecheck type and class declarations
 -}
 
-{-# LANGUAGE CPP, TupleSections, MultiWayIf #-}
+{-# LANGUAGE CPP, TupleSections, ScopedTypeVariables, MultiWayIf #-}
 {-# LANGUAGE TypeFamilies #-}
 {-# LANGUAGE ViewPatterns #-}
 
@@ -641,11 +641,10 @@ generaliseTyClDecl inferred_tc_env (L _ decl)
   = do { let names_in_this_decl :: [Name]
              names_in_this_decl = tycld_names decl
 
-             inferred_tcs :: [TcTyCon]
-             inferred_tcs = map (lookupNameEnv_NF inferred_tc_env) names_in_this_decl
-                            -- These lookups should never fail
+       ; tc_with_tvs :: [(TcTyCon, [(Name,TcTyVar)])]
+             <- mapM skolemise_tc_tycon names_in_this_decl
 
-             swizzle_prs :: [(TyVar, Name)]
+       ; let swizzle_prs :: [(Name,TyVar)]
              -- Maps the representative TyVar to the name to use in this decl
              -- The 'nub' is because associated types share type variables
              -- with the parent
@@ -654,12 +653,7 @@ generaliseTyClDecl inferred_tc_env (L _ decl)
              --                     for T:   [("f",f),("b",b)]
              --       Note the duplicated (f,f)
              -- See Note [Generalising the kind of a TcTyCon]
-             swizzle_prs = nub [ (tv, scoped_nm)
-                               | tc <- inferred_tcs
-                               , (scoped_nm, tv) <- tcTyConScopedTyVars tc ]
-
-             swizzle_env :: TyVarEnv Name
-             swizzle_env = mkVarEnv swizzle_prs
+             swizzle_prs = nub $ concatMap snd tc_with_tvs
 
          -- Check for duplicates
          -- E.g. data SameKind (a::k) (b::k)
@@ -669,9 +663,10 @@ generaliseTyClDecl inferred_tc_env (L _ decl)
        ; traceTc "generaliseTyClDecl" $
          vcat [ ppr decl
               , text "swizzle_prs" <+> ppr swizzle_prs ]
-       ; checkDuplicateTyConBinders $ map swap swizzle_prs
+       ; checkDuplicateTyConBinders swizzle_prs
 
-       ; mapAndReportM (generaliseTcTyCon swizzle_env) inferred_tcs }
+       ; let swizzle_env = mkVarEnv (map swap swizzle_prs)
+       ; mapAndReportM (generaliseTcTyCon swizzle_env) tc_with_tvs }
   where
     tycld_names :: TyClDecl GhcRn -> [Name]
     tycld_names decl = tcdName decl : at_names decl
@@ -679,14 +674,23 @@ generaliseTyClDecl inferred_tc_env (L _ decl)
     at_names (ClassDecl { tcdATs = ats }) = map (familyDeclName . unLoc) ats
     at_names _ = []  -- Only class decls have associated types
 
-generaliseTcTyCon :: TyVarEnv Name -> TcTyCon -> TcM TcTyCon
-generaliseTcTyCon swizzle_env tc
+    skolemise_tc_tycon :: Name -> TcM (TcTyCon, [(Name,TcTyVar)])
+    -- Zonk and skolemise the Specified and Required binders
+    -- It's essential that they are skolems, not MetaTyVars,
+    -- for Step 3 in generaliseTcTyCon to work right
+    skolemise_tc_tycon tc_name
+      = do { let tc = lookupNameEnv_NF inferred_tc_env tc_name
+                      -- This lookup should not fail
+           ; scoped_prs <- mapSndM zonkAndSkolemise (tcTyConScopedTyVars tc)
+           ; return (tc, scoped_prs) }
+
+generaliseTcTyCon :: TyVarEnv Name -> (TcTyCon, [(Name,TcTyVar)]) -> TcM TcTyCon
+generaliseTcTyCon swizzle_env (tc, spec_req_prs)
   -- See Note [Required, Specified, and Inferred for types]
   = setSrcSpan (getSrcSpan tc) $
     addTyConCtxt tc $
     do { let tc_name      = tyConName tc
              tc_res_kind  = tyConResKind tc
-             spec_req_prs = tcTyConScopedTyVars tc
              spec_req_tvs = map snd spec_req_prs
              -- NB: spec_req_tvs includes both Specified and Required
              -- Running example in Note [Inferring kinds for type declarations]
@@ -694,13 +698,6 @@ generaliseTcTyCon swizzle_env tc
              --                   , ("k2",kk2), ("x", (xx::kk2))]
              -- where "k1" denotes the Name k1, and kk1, aa, etc are MetaTyVars,
              -- specifically TyVarTvs
-
-       -- Step 0: zonk and skolemise the Specified and Required binders
-       -- It's essential that they are skolems, not MetaTyVars,
-       -- for Step 3 to work right
-       ; spec_req_tvs <- mapM zonkAndSkolemise spec_req_tvs
-             -- Running example, where kk1 := kk2, so we get
-             --   [kk2,kk2]
 
        -- Step 1: Find the Specified and Inferred variables
        -- NB: spec_req_tvs = spec_tvs ++ req_tvs
