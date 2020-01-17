@@ -140,7 +140,7 @@ timeoutProgBuilder = do
     root    <- buildRoot
     if windowsHost
         then do
-            prog <- programPath =<< programContext Stage1 timeout
+            prog <- programPath =<< programContext Stage0 timeout
             copyFile prog (root -/- timeoutPath)
         else do
             python <- builderPath Python
@@ -154,12 +154,12 @@ timeoutProgBuilder = do
 needTestBuilders :: Action ()
 needTestBuilders = do
     testGhc <- testCompiler <$> userSetting defaultTestArgs
-    when (testGhc `elem` ["stage1", "stage2", "stage3"]) needTestsuitePackages
+    when (testGhc `elem` ["stage1", "stage2", "stage3"])
+         (needTestsuitePackages testGhc)
 
 -- | Build extra programs and libraries required by testsuite
-needTestsuitePackages :: Action ()
-needTestsuitePackages = do
-    testGhc <- testCompiler <$> userSetting defaultTestArgs
+needTestsuitePackages :: String -> Action ()
+needTestsuitePackages testGhc = do
     when (testGhc `elem` ["stage1", "stage2", "stage3"]) $ do
         let stg = stageOf testGhc
         allpkgs   <- packages <$> flavour
