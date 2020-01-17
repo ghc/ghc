@@ -310,7 +310,6 @@ checkMatches dflags ctxt vars matches = do
     -- This must be an -XEmptyCase. See Note [Checking EmptyCase]
     [] | [var] <- vars -> addPmCtDeltas init_deltas (PmNotBotCt var)
     _                  -> pure init_deltas
-  tracePm "checkMatches: missing" (ppr missing)
   fam_insts <- dsGetFamInstEnvs
   grd_tree  <- mkGrdTreeMany [] <$> mapM (translateMatch fam_insts vars) matches
   res <- checkGrdTree grd_tree missing
