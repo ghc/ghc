@@ -5,7 +5,7 @@
 
 {-# LANGUAGE CPP,GeneralizedNewtypeDeriving #-}
 
-module GHC.Runtime.Layout (
+module GHC.Runtime.Heap.Layout (
         -- * Words and bytes
         WordOff, ByteOff,
         wordsToBytes, bytesToWordsRoundUp,

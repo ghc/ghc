@@ -159,7 +159,7 @@ data Integer  = S#                !Int#
                 -- ^ iff value in @]-inf, minBound::'Int'[@ range
 
 -- NOTE: the above representation is baked into the GHCi debugger in
--- compiler/ghci/RtClosureInspect.hs. If you change it here, fixes
+-- GHC.Runtime.Heap.Inspect. If you change it here, fixes
 -- will be required over there too. Tests for this are in
 -- testsuite/tests/ghci.debugger.
 
