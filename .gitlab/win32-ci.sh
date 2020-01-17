@@ -2,7 +2,7 @@
 
 # This is the primary driver of the Win32 CI infrastructure.
 
-set -e
+set -euf -o pipefail
 
 # Wrap escape sequences in \[ \] to avoid wrapping issues
 NO_COLOUR="\[\e[0m\]"
@@ -76,13 +76,13 @@ PATH="$toolchain/bin:$PATH"
 
 # Use a local temporary directory to ensure that concurrent builds don't
 # interfere with one another
-mkdir -p tmp
+mkdir -p $TOP/tmp
 export TMP=$TOP/tmp
 export TEMP=$TOP/tmp
 
 # Extract GHC toolchain
-setup() {
-  if [ -d "`pwd`/cabal-cache" ]; then
+function setup() {
+  if [ -d "$TOP/cabal-cache" ]; then
       info "Extracting cabal cache..."
       cp -Rf cabal-cache $APPDATA/cabal
   fi
@@ -125,7 +125,7 @@ setup() {
   $toolchain/bin/alex --version
 }
 
-cleanup_submodules() {
+function cleanup_submodules() {
   # On Windows submodules can inexplicably get into funky states where git
   # believes that the submodule is initialized yet its associated repository
   # is not valid. Avoid failing in this case with the following insanity.
@@ -134,7 +134,7 @@ cleanup_submodules() {
   git submodule foreach git clean -xdf
 }
 
-configure() {
+function configure() {
   run python boot
   run ./configure \
     --enable-tarballs-autodownload \
@@ -146,15 +146,15 @@ configure() {
     || ( cat config.log; fail "configure failed" )
 }
 
-build_make() {
+function build_make() {
   echo "include mk/flavours/${BUILD_FLAVOUR}.mk" > mk/build.mk
   echo 'GhcLibHcOpts+=-haddock' >> mk/build.mk
-  run make -j`mk/detect-cpu-count.sh`
+  run make -j$(mk/detect-cpu-count.sh)
   mv _build/bindist/ghc*.tar.xz ghc.tar.xz
   ls -lh ghc.tar.xz
 }
 
-fetch_perf_notes() {
+function fetch_perf_notes() {
   info "Fetching perf notes..."
   git fetch \
     https://gitlab.haskell.org/ghc/ghc-performance-notes.git \
@@ -162,23 +162,23 @@ fetch_perf_notes() {
     || warn "warning: Failed to fetch perf notes"
 }
 
-test_make() {
+function test_make() {
   run make binary-dist-prep TAR_COMP_OPTS=-1
   run make test_bindist TEST_PREP=YES
   run make V=0 test \
-    THREADS=`mk/detect-cpu-count.sh` \
+    THREADS=$(mk/detect-cpu-count.sh) \
     JUNIT_FILE=../../junit.xml
 }
 
-clean_make() {
+function clean_make() {
   rm -R tmp
   make clean || true
 }
 
-build_hadrian() {
+function build_hadrian() {
   run hadrian/build.cabal.sh \
     --flavour=$FLAVOUR \
-    -j`mk/detect-cpu-count.sh` \
+    -j$(mk/detect-cpu-count.sh) \
     --flavour=Quick \
     --docs=no-sphinx \
     binary-dist
@@ -186,7 +186,7 @@ build_hadrian() {
   mv _build/bindist/ghc*.tar.xz ghc.tar.xz
 }
 
-test_hadrian() {
+function test_hadrian() {
   cd _build/bindist/ghc-*/
   run ./configure --prefix=$TOP/_build/install
   run make install
@@ -196,7 +196,7 @@ test_hadrian() {
   # which might result in some broken perf tests?
   run hadrian/build.cabal.sh \
     --flavour=$FLAVOUR \
-    -j`mk/detect-cpu-count.sh` \
+    -j$(mk/detect-cpu-count.sh) \
     --flavour=quick \
     test \
     --summary-junit=./junit.xml \
@@ -204,7 +204,7 @@ test_hadrian() {
     --test-compiler=$TOP/_build/install/bin/ghc
 }
 
-clean_hadrian() {
+function clean_hadrian() {
   rm -R tmp
   run rm -Rf _build
 }

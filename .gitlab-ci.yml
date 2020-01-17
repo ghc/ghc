@@ -11,6 +11,9 @@ variables:
   # Disable shallow clones; they break our linting rules
   GIT_DEPTH: 0
 
+  # Overridden by individual jobs
+  CONFIGURE_ARGS: ""
+
 before_script:
   - git submodule sync --recursive
   - git submodule update --init --recursive
