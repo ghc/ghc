@@ -7,8 +7,10 @@ EXPORTS
 	ghczmprim_GHCziTypes_False_closure
 	ghczmprim_GHCziTypes_Czh_con_info
 	ghczmprim_GHCziTypes_Izh_con_info
+	ghczmprim_GHCziTypes_BWTzh_con_info
 	ghczmprim_GHCziTypes_Fzh_con_info
 	ghczmprim_GHCziTypes_Dzh_con_info
 	ghczmprim_GHCziTypes_Wzh_con_info
 	ghczmprim_GHCziTypes_Czh_static_info
 	ghczmprim_GHCziTypes_Izh_static_info
+

@@ -704,11 +704,49 @@ INFO_TABLE( stg_COMPACT_NFDATA_DIRTY, 0, 8, COMPACT_NFDATA, "COMPACT_NFDATA", "C
 { foreign "C" barf("COMPACT_NFDATA_DIRTY object (%p) entered!", R1) never returns; }
 
 /* ----------------------------------------------------------------------------
-   CHARLIKE and INTLIKE closures.
+   Note [INTLIKE closures]
+   ~~~~~~~~~~~~~~~~~~~~~~~
 
-   These are static representations of Chars and small Ints, so that
-   we can remove dynamic Chars and Ints during garbage collection and
-   replace them with references to the static objects.
+   These are static representations of Closures like small Ints, Chars and other
+   compatible closures so that we can remove their dynamic versions during garbage
+   collection and replace them with references to the static objects.
+
+   We do so by looking for CONSTR_0_1 closures checking their payload and tags.
+   If we have a matching static closure we replace the reference to the dynamic object
+   with a reference to a static closure with the same payload.
+
+   A matching closure must have:
+   * A tag of 1
+   * Closure type CONSTR_0_1
+   * MIN_INTLIKE <= payload <= MAX_INTLIKE
+
+   This is because we only preallocate closures with tag 1 (1-based tag) and payloads in the range of
+   MIN_INTLIKE to MAX_INTLIKE.
+
+   This works since any closure of type `CONSTR_0_1` for non-profiling builds
+   has the same info table content if it has the same tag.
+   This follows from the fact that info tables describe:
+   * closure type
+   * heap layout
+   * pointer tag
+
+   The fact that we do so is only observeable if users manually inspect and compare
+   the info table pointers of objects. Something GHC makes no guarantees about.
+
+   In profiled builds the info tables also include type and constructor name.
+
+   This difference does not show up in heap profiles, as static objects are not included
+   in the heap census. If users manually inspect the heap of a profiled program then
+   this could be observed when reading the constructor name or type from the info table.
+   In this case instead of the original constructor/type name the one of the static closure
+   will show up. For this reason we rewrite closures to the type "StaticBoxedWordType"
+   instead of simply using Int closures, as this is hopefully less confusing in these cases.
+   The type StaticBoxedWordType is defined in ghc-prim for the benefit of this
+   substitution.
+
+   This works for GHC defined types like Word/Int/Char/Int8/... and user defined
+   types of the same shape.
+
    ------------------------------------------------------------------------- */
 
 #if defined(COMPILING_WINDOWS_DLL)
@@ -721,278 +759,16 @@ INFO_TABLE( stg_COMPACT_NFDATA_DIRTY, 0, 8, COMPACT_NFDATA, "COMPACT_NFDATA", "C
  *    we don't rewrite to static closures at all with Windows DLLs.
  */
 // #warning Is this correct? _imp is a pointer!
-#define Char_hash_con_info _imp__ghczmprim_GHCziTypes_Czh_con_info
 #define Int_hash_con_info _imp__ghczmprim_GHCziTypes_Izh_con_info
+#define BWT_hash_con_info _imp__ghczmprim_GHCziTypes_BWTzh_con_info
 #else
-#define Char_hash_con_info ghczmprim_GHCziTypes_Czh_con_info
 #define Int_hash_con_info ghczmprim_GHCziTypes_Izh_con_info
+#define BWT_hash_con_info ghczmprim_GHCziTypes_BWTzh_con_info
 #endif
 
-
-#define CHARLIKE_HDR(n)  CLOSURE(Char_hash_con_info, n)
-#define INTLIKE_HDR(n)   CLOSURE(Int_hash_con_info, n)
+#define INTLIKE_HDR(n)   CLOSURE(BWT_hash_con_info, n)
 
 #if !(defined(COMPILING_WINDOWS_DLL))
-section "data" {
- stg_CHARLIKE_closure:
-    CHARLIKE_HDR(0)
-    CHARLIKE_HDR(1)
-    CHARLIKE_HDR(2)
-    CHARLIKE_HDR(3)
-    CHARLIKE_HDR(4)
-    CHARLIKE_HDR(5)
-    CHARLIKE_HDR(6)
-    CHARLIKE_HDR(7)
-    CHARLIKE_HDR(8)
-    CHARLIKE_HDR(9)
-    CHARLIKE_HDR(10)
-    CHARLIKE_HDR(11)
-    CHARLIKE_HDR(12)
-    CHARLIKE_HDR(13)
-    CHARLIKE_HDR(14)
-    CHARLIKE_HDR(15)
-    CHARLIKE_HDR(16)
-    CHARLIKE_HDR(17)
-    CHARLIKE_HDR(18)
-    CHARLIKE_HDR(19)
-    CHARLIKE_HDR(20)
-    CHARLIKE_HDR(21)
-    CHARLIKE_HDR(22)
-    CHARLIKE_HDR(23)
-    CHARLIKE_HDR(24)
-    CHARLIKE_HDR(25)
-    CHARLIKE_HDR(26)
-    CHARLIKE_HDR(27)
-    CHARLIKE_HDR(28)
-    CHARLIKE_HDR(29)
-    CHARLIKE_HDR(30)
-    CHARLIKE_HDR(31)
-    CHARLIKE_HDR(32)
-    CHARLIKE_HDR(33)
-    CHARLIKE_HDR(34)
-    CHARLIKE_HDR(35)
-    CHARLIKE_HDR(36)
-    CHARLIKE_HDR(37)
-    CHARLIKE_HDR(38)
-    CHARLIKE_HDR(39)
-    CHARLIKE_HDR(40)
-    CHARLIKE_HDR(41)
-    CHARLIKE_HDR(42)
-    CHARLIKE_HDR(43)
-    CHARLIKE_HDR(44)
-    CHARLIKE_HDR(45)
-    CHARLIKE_HDR(46)
-    CHARLIKE_HDR(47)
-    CHARLIKE_HDR(48)
-    CHARLIKE_HDR(49)
-    CHARLIKE_HDR(50)
-    CHARLIKE_HDR(51)
-    CHARLIKE_HDR(52)
-    CHARLIKE_HDR(53)
-    CHARLIKE_HDR(54)
-    CHARLIKE_HDR(55)
-    CHARLIKE_HDR(56)
-    CHARLIKE_HDR(57)
-    CHARLIKE_HDR(58)
-    CHARLIKE_HDR(59)
-    CHARLIKE_HDR(60)
-    CHARLIKE_HDR(61)
-    CHARLIKE_HDR(62)
-    CHARLIKE_HDR(63)
-    CHARLIKE_HDR(64)
-    CHARLIKE_HDR(65)
-    CHARLIKE_HDR(66)
-    CHARLIKE_HDR(67)
-    CHARLIKE_HDR(68)
-    CHARLIKE_HDR(69)
-    CHARLIKE_HDR(70)
-    CHARLIKE_HDR(71)
-    CHARLIKE_HDR(72)
-    CHARLIKE_HDR(73)
-    CHARLIKE_HDR(74)
-    CHARLIKE_HDR(75)
-    CHARLIKE_HDR(76)
-    CHARLIKE_HDR(77)
-    CHARLIKE_HDR(78)
-    CHARLIKE_HDR(79)
-    CHARLIKE_HDR(80)
-    CHARLIKE_HDR(81)
-    CHARLIKE_HDR(82)
-    CHARLIKE_HDR(83)
-    CHARLIKE_HDR(84)
-    CHARLIKE_HDR(85)
-    CHARLIKE_HDR(86)
-    CHARLIKE_HDR(87)
-    CHARLIKE_HDR(88)
-    CHARLIKE_HDR(89)
-    CHARLIKE_HDR(90)
-    CHARLIKE_HDR(91)
-    CHARLIKE_HDR(92)
-    CHARLIKE_HDR(93)
-    CHARLIKE_HDR(94)
-    CHARLIKE_HDR(95)
-    CHARLIKE_HDR(96)
-    CHARLIKE_HDR(97)
-    CHARLIKE_HDR(98)
-    CHARLIKE_HDR(99)
-    CHARLIKE_HDR(100)
-    CHARLIKE_HDR(101)
-    CHARLIKE_HDR(102)
-    CHARLIKE_HDR(103)
-    CHARLIKE_HDR(104)
-    CHARLIKE_HDR(105)
-    CHARLIKE_HDR(106)
-    CHARLIKE_HDR(107)
-    CHARLIKE_HDR(108)
-    CHARLIKE_HDR(109)
-    CHARLIKE_HDR(110)
-    CHARLIKE_HDR(111)
-    CHARLIKE_HDR(112)
-    CHARLIKE_HDR(113)
-    CHARLIKE_HDR(114)
-    CHARLIKE_HDR(115)
-    CHARLIKE_HDR(116)
-    CHARLIKE_HDR(117)
-    CHARLIKE_HDR(118)
-    CHARLIKE_HDR(119)
-    CHARLIKE_HDR(120)
-    CHARLIKE_HDR(121)
-    CHARLIKE_HDR(122)
-    CHARLIKE_HDR(123)
-    CHARLIKE_HDR(124)
-    CHARLIKE_HDR(125)
-    CHARLIKE_HDR(126)
-    CHARLIKE_HDR(127)
-    CHARLIKE_HDR(128)
-    CHARLIKE_HDR(129)
-    CHARLIKE_HDR(130)
-    CHARLIKE_HDR(131)
-    CHARLIKE_HDR(132)
-    CHARLIKE_HDR(133)
-    CHARLIKE_HDR(134)
-    CHARLIKE_HDR(135)
-    CHARLIKE_HDR(136)
-    CHARLIKE_HDR(137)
-    CHARLIKE_HDR(138)
-    CHARLIKE_HDR(139)
-    CHARLIKE_HDR(140)
-    CHARLIKE_HDR(141)
-    CHARLIKE_HDR(142)
-    CHARLIKE_HDR(143)
-    CHARLIKE_HDR(144)
-    CHARLIKE_HDR(145)
-    CHARLIKE_HDR(146)
-    CHARLIKE_HDR(147)
-    CHARLIKE_HDR(148)
-    CHARLIKE_HDR(149)
-    CHARLIKE_HDR(150)
-    CHARLIKE_HDR(151)
-    CHARLIKE_HDR(152)
-    CHARLIKE_HDR(153)
-    CHARLIKE_HDR(154)
-    CHARLIKE_HDR(155)
-    CHARLIKE_HDR(156)
-    CHARLIKE_HDR(157)
-    CHARLIKE_HDR(158)
-    CHARLIKE_HDR(159)
-    CHARLIKE_HDR(160)
-    CHARLIKE_HDR(161)
-    CHARLIKE_HDR(162)
-    CHARLIKE_HDR(163)
-    CHARLIKE_HDR(164)
-    CHARLIKE_HDR(165)
-    CHARLIKE_HDR(166)
-    CHARLIKE_HDR(167)
-    CHARLIKE_HDR(168)
-    CHARLIKE_HDR(169)
-    CHARLIKE_HDR(170)
-    CHARLIKE_HDR(171)
-    CHARLIKE_HDR(172)
-    CHARLIKE_HDR(173)
-    CHARLIKE_HDR(174)
-    CHARLIKE_HDR(175)
-    CHARLIKE_HDR(176)
-    CHARLIKE_HDR(177)
-    CHARLIKE_HDR(178)
-    CHARLIKE_HDR(179)
-    CHARLIKE_HDR(180)
-    CHARLIKE_HDR(181)
-    CHARLIKE_HDR(182)
-    CHARLIKE_HDR(183)
-    CHARLIKE_HDR(184)
-    CHARLIKE_HDR(185)
-    CHARLIKE_HDR(186)
-    CHARLIKE_HDR(187)
-    CHARLIKE_HDR(188)
-    CHARLIKE_HDR(189)
-    CHARLIKE_HDR(190)
-    CHARLIKE_HDR(191)
-    CHARLIKE_HDR(192)
-    CHARLIKE_HDR(193)
-    CHARLIKE_HDR(194)
-    CHARLIKE_HDR(195)
-    CHARLIKE_HDR(196)
-    CHARLIKE_HDR(197)
-    CHARLIKE_HDR(198)
-    CHARLIKE_HDR(199)
-    CHARLIKE_HDR(200)
-    CHARLIKE_HDR(201)
-    CHARLIKE_HDR(202)
-    CHARLIKE_HDR(203)
-    CHARLIKE_HDR(204)
-    CHARLIKE_HDR(205)
-    CHARLIKE_HDR(206)
-    CHARLIKE_HDR(207)
-    CHARLIKE_HDR(208)
-    CHARLIKE_HDR(209)
-    CHARLIKE_HDR(210)
-    CHARLIKE_HDR(211)
-    CHARLIKE_HDR(212)
-    CHARLIKE_HDR(213)
-    CHARLIKE_HDR(214)
-    CHARLIKE_HDR(215)
-    CHARLIKE_HDR(216)
-    CHARLIKE_HDR(217)
-    CHARLIKE_HDR(218)
-    CHARLIKE_HDR(219)
-    CHARLIKE_HDR(220)
-    CHARLIKE_HDR(221)
-    CHARLIKE_HDR(222)
-    CHARLIKE_HDR(223)
-    CHARLIKE_HDR(224)
-    CHARLIKE_HDR(225)
-    CHARLIKE_HDR(226)
-    CHARLIKE_HDR(227)
-    CHARLIKE_HDR(228)
-    CHARLIKE_HDR(229)
-    CHARLIKE_HDR(230)
-    CHARLIKE_HDR(231)
-    CHARLIKE_HDR(232)
-    CHARLIKE_HDR(233)
-    CHARLIKE_HDR(234)
-    CHARLIKE_HDR(235)
-    CHARLIKE_HDR(236)
-    CHARLIKE_HDR(237)
-    CHARLIKE_HDR(238)
-    CHARLIKE_HDR(239)
-    CHARLIKE_HDR(240)
-    CHARLIKE_HDR(241)
-    CHARLIKE_HDR(242)
-    CHARLIKE_HDR(243)
-    CHARLIKE_HDR(244)
-    CHARLIKE_HDR(245)
-    CHARLIKE_HDR(246)
-    CHARLIKE_HDR(247)
-    CHARLIKE_HDR(248)
-    CHARLIKE_HDR(249)
-    CHARLIKE_HDR(250)
-    CHARLIKE_HDR(251)
-    CHARLIKE_HDR(252)
-    CHARLIKE_HDR(253)
-    CHARLIKE_HDR(254)
-    CHARLIKE_HDR(255)
-}
-
 section "data" {
  stg_INTLIKE_closure:
     INTLIKE_HDR(-16) /* MIN_INTLIKE == -16 */
