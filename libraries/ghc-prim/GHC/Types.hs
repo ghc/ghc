@@ -163,6 +163,8 @@ data {-# CTYPE "HsFloat" #-} Float = F# Float#
 -- to the IEEE double-precision type.
 data {-# CTYPE "HsDouble" #-} Double = D# Double#
 
+-- See Note [INTLIKE closures] in StcMiscClosures.cmm
+data {-# CTYPE "HsInt" #-} StaticBoxedWordType = BWT# Word#
 
 {- *********************************************************************
 *                                                                      *

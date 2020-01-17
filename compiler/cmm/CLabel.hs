@@ -430,9 +430,9 @@ data CmmLabelInfo
   | CmmEntry                    -- ^ misc rts entry points,     suffix _entry
   | CmmRetInfo                  -- ^ misc rts ret info tables,  suffix _info
   | CmmRet                      -- ^ misc rts return points,    suffix _ret
-  | CmmData                     -- ^ misc rts data bits, eg CHARLIKE_closure
+  | CmmData                     -- ^ misc rts data bits, eg INTLIKE_closure
   | CmmCode                     -- ^ misc rts code
-  | CmmClosure                  -- ^ closures eg CHARLIKE_closure
+  | CmmClosure                  -- ^ closures eg INTLIKE_closure
   | CmmPrimCall                 -- ^ a prim call to some hand written Cmm code
   deriving (Eq, Ord)
 

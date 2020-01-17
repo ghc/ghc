@@ -215,6 +215,7 @@ ld-options:
          , "-Wl,-u,ghczmprim_GHCziTypes_Fzh_con_info"
          , "-Wl,-u,ghczmprim_GHCziTypes_Dzh_con_info"
          , "-Wl,-u,ghczmprim_GHCziTypes_Wzh_con_info"
+         , "-Wl,-u,ghczmprim_GHCziTypes_BWTzh_con_info"
          , "-Wl,-u,base_GHCziPtr_Ptr_con_info"
          , "-Wl,-u,base_GHCziPtr_FunPtr_con_info"
          , "-Wl,-u,base_GHCziInt_I8zh_con_info"
