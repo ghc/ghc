@@ -4,7 +4,7 @@
 -- | Interacting with the interpreter, whether it is running on an
 -- external process or in the current process.
 --
-module GHCi
+module GHC.Runtime.Interpreter
   ( -- * High-level interface to the interpreter
     evalStmt, EvalStatus_(..), EvalStatus, EvalResult(..), EvalExpr(..)
   , resumeStmt
@@ -135,7 +135,7 @@ The main pieces are:
   server.  This is a fairly simple wrapper, most of the functionality
   is provided by modules in libraries/ghci.
 
-- This module (GHCi) which provides the interface to the server used
+- This module which provides the interface to the server used
   by the rest of GHC.
 
 GHC works with and without -fexternal-interpreter.  With the flag, all

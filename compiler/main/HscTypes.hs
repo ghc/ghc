@@ -155,8 +155,8 @@ module HscTypes (
 
 import GhcPrelude
 
-import ByteCodeTypes
-import InteractiveEvalTypes ( Resume )
+import GHC.ByteCode.Types
+import GHC.Runtime.Eval.Types ( Resume )
 import GHCi.Message         ( Pipe )
 import GHCi.RemoteTypes
 import GHC.ForeignSrcLang
@@ -190,7 +190,7 @@ import TysWiredIn
 import Packages hiding  ( Version(..) )
 import CmdLineParser
 import DynFlags
-import LinkerTypes      ( DynLinker, Linkable(..), Unlinked(..), SptEntry(..) )
+import GHC.Runtime.Linker.Types      ( DynLinker, Linkable(..), Unlinked(..), SptEntry(..) )
 import DriverPhases     ( Phase, HscSource(..), hscSourceString
                         , isHsBootOrSig, isHsigFile )
 import qualified DriverPhases as Phase
@@ -1680,7 +1680,7 @@ data InteractiveContext
 
          ic_rn_gbl_env :: GlobalRdrEnv,
              -- ^ The cached 'GlobalRdrEnv', built by
-             -- 'InteractiveEval.setContext' and updated regularly
+             -- 'GHC.Runtime.Eval.setContext' and updated regularly
              -- It contains everything in scope at the command line,
              -- including everything in ic_tythings
 

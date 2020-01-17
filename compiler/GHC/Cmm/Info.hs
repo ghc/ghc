@@ -38,7 +38,7 @@ import GhcPrelude
 import GHC.Cmm
 import GHC.Cmm.Utils
 import GHC.Cmm.CLabel
-import GHC.Runtime.Layout
+import GHC.Runtime.Heap.Layout
 import GHC.Data.Bitmap
 import Stream (Stream)
 import qualified Stream

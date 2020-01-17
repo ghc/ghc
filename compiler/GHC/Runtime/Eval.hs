@@ -11,7 +11,7 @@
 --
 -- -----------------------------------------------------------------------------
 
-module InteractiveEval (
+module GHC.Runtime.Eval (
         Resume(..), History(..),
         execStmt, execStmt', ExecOptions(..), execOptions, ExecResult(..), resumeExec,
         runDecls, runDeclsWithLocation, runParsedDecls,
@@ -48,9 +48,9 @@ module InteractiveEval (
 
 import GhcPrelude
 
-import InteractiveEvalTypes
+import GHC.Runtime.Eval.Types
 
-import GHCi
+import GHC.Runtime.Interpreter as GHCi
 import GHCi.Message
 import GHCi.RemoteTypes
 import GhcMonad
@@ -75,8 +75,8 @@ import NameSet
 import Avail
 import RdrName
 import VarEnv
-import ByteCodeTypes
-import Linker
+import GHC.ByteCode.Types
+import GHC.Runtime.Linker as Linker
 import DynFlags
 import Unique
 import UniqSupply
@@ -88,7 +88,7 @@ import Panic
 import Maybes
 import ErrUtils
 import SrcLoc
-import RtClosureInspect
+import GHC.Runtime.Heap.Inspect
 import Outputable
 import FastString
 import Bag
@@ -661,7 +661,7 @@ pushResume hsc_env resume = hsc_env { hsc_IC = ictxt1 }
   Note [Syncing breakpoint info]
 
   To display the values of the free variables for a single breakpoint, the
-  function `compiler/main/InteractiveEval.hs:bindLocalsAtBreakpoint` pulls
+  function `GHC.Runtime.Eval.bindLocalsAtBreakpoint` pulls
   out the information from the fields `modBreaks_breakInfo` and
   `modBreaks_vars` of the `ModBreaks` data structure.
   For a specific breakpoint this gives 2 lists of type `Id` (or `Var`)
@@ -671,9 +671,9 @@ pushResume hsc_env resume = hsc_env { hsc_IC = ictxt1 }
 
   There are 3 situations where items are removed from the Id list
   (or replaced with `Nothing`):
-  1.) If function `compiler/ghci/ByteCodeGen.hs:schemeER_wrk` (which creates
+  1.) If function `GHC.CoreToByteCode.schemeER_wrk` (which creates
       the Id list) doesn't find an Id in the ByteCode environement.
-  2.) If function `compiler/main/InteractiveEval.hs:bindLocalsAtBreakpoint`
+  2.) If function `GHC.Runtime.Eval.bindLocalsAtBreakpoint`
       filters out unboxed elements from the Id list, because GHCi cannot
       yet handle them.
   3.) If the GHCi interpreter doesn't find the reference to a free variable

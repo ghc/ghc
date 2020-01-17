@@ -35,7 +35,7 @@ import DynFlags
 import FastString
 import ForeignCall
 import OrdList
-import GHC.Runtime.Layout (ByteOff)
+import GHC.Runtime.Heap.Layout (ByteOff)
 import UniqSupply
 import Util
 import Panic

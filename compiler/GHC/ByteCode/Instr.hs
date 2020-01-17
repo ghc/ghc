@@ -4,8 +4,8 @@
 --  (c) The University of Glasgow 2002-2006
 --
 
--- | ByteCodeInstrs: Bytecode instruction definitions
-module ByteCodeInstr (
+-- | Bytecode instruction definitions
+module GHC.ByteCode.Instr (
         BCInstr(..), ProtoBCO(..), bciStackUse,
   ) where
 
@@ -13,7 +13,7 @@ module ByteCodeInstr (
 
 import GhcPrelude
 
-import ByteCodeTypes
+import GHC.ByteCode.Types
 import GHCi.RemoteTypes
 import GHCi.FFI (C_ffi_cif)
 import GHC.StgToCmm.Layout     ( ArgRep(..) )
@@ -28,7 +28,7 @@ import Literal
 import DataCon
 import VarSet
 import PrimOp
-import GHC.Runtime.Layout
+import GHC.Runtime.Heap.Layout
 
 import Data.Word
 import GHC.Stack.CCS (CostCentre)

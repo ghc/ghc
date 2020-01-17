@@ -2946,7 +2946,7 @@ Note [Runtime skolems]
 ~~~~~~~~~~~~~~~~~~~~~~
 We want to give a reasonably helpful error message for ambiguity
 arising from *runtime* skolems in the debugger.  These
-are created by in RtClosureInspect.zonkRTTIType.
+are created by in GHC.Runtime.Heap.Inspect.zonkRTTIType.
 
 ************************************************************************
 *                                                                      *

@@ -1,5 +1,5 @@
 -- crashes in 7.2.1 and earlier, due to bogus calculations of label
--- offsets in ByteCodeAsm for a BCO with large instructions.
+-- offsets in GHC.ByteCode.Asm for a BCO with large instructions.
 
 main = print (map foo [1,50..5000] )
 

@@ -122,7 +122,7 @@ getClosureRaw x = do
                 ptrList = amap' Box $ Array 0 (pelems - 1) pelems pointers
             pure (Ptr iptr, rawWds, ptrList)
 
--- From compiler/ghci/RtClosureInspect.hs
+-- From GHC.Runtime.Heap.Inspect
 amap' :: (t -> b) -> Array Int t -> [b]
 amap' f (Array i0 i _ arr#) = map g [0 .. i - i0]
     where g (I# i#) = case indexArray# arr# i# of
@@ -145,7 +145,7 @@ getClosure x = do
     case tipe itbl of
         t | t >= CONSTR && t <= CONSTR_NOCAF -> do
             (p, m, n) <- dataConNames iptr
-            if m == "ByteCodeInstr" && n == "BreakInfo"
+            if m == "GHC.ByteCode.Instr" && n == "BreakInfo"
               then pure $ UnsupportedClosure itbl
               else pure $ ConstrClosure itbl pts npts p m n
 

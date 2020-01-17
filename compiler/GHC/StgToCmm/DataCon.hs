@@ -33,7 +33,7 @@ import GHC.Cmm.Expr
 import GHC.Cmm.Utils
 import GHC.Cmm.CLabel
 import GHC.Cmm.Graph
-import GHC.Runtime.Layout
+import GHC.Runtime.Heap.Layout
 import CostCentre
 import Module
 import DataCon

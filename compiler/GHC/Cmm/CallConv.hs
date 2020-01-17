@@ -8,7 +8,7 @@ module GHC.Cmm.CallConv (
 import GhcPrelude
 
 import GHC.Cmm.Expr
-import GHC.Runtime.Layout
+import GHC.Runtime.Heap.Layout
 import GHC.Cmm (Convention(..))
 import GHC.Cmm.Ppr () -- For Outputable instances
 

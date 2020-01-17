@@ -4,8 +4,8 @@
 --  (c) The University of Glasgow 2002-2006
 --
 
--- | ByteCodeLink: Bytecode assembler and linker
-module ByteCodeAsm (
+-- | Bytecode assembler and linker
+module GHC.ByteCode.Asm (
         assembleBCOs, assembleOneBCO,
 
         bcoFreeNames,
@@ -17,11 +17,11 @@ module ByteCodeAsm (
 
 import GhcPrelude
 
-import ByteCodeInstr
-import ByteCodeItbls
-import ByteCodeTypes
+import GHC.ByteCode.Instr
+import GHC.ByteCode.InfoTable
+import GHC.ByteCode.Types
 import GHCi.RemoteTypes
-import GHCi
+import GHC.Runtime.Interpreter
 
 import HscTypes
 import Name
@@ -30,7 +30,7 @@ import Literal
 import TyCon
 import FastString
 import GHC.StgToCmm.Layout     ( ArgRep(..) )
-import GHC.Runtime.Layout
+import GHC.Runtime.Heap.Layout
 import DynFlags
 import Outputable
 import GHC.Platform
@@ -460,8 +460,8 @@ assembleI dflags i = case i of
       LitNumWord    -> int (fromIntegral i)
       LitNumInt64   -> int64 (fromIntegral i)
       LitNumWord64  -> int64 (fromIntegral i)
-      LitNumInteger -> panic "ByteCodeAsm.literal: LitNumInteger"
-      LitNumNatural -> panic "ByteCodeAsm.literal: LitNumNatural"
+      LitNumInteger -> panic "GHC.ByteCode.Asm.literal: LitNumInteger"
+      LitNumNatural -> panic "GHC.ByteCode.Asm.literal: LitNumNatural"
     -- We can lower 'LitRubbish' to an arbitrary constant, but @NULL@ is most
     -- likely to elicit a crash (rather than corrupt memory) in case absence
     -- analysis messed up.

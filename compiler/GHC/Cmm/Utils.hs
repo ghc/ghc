@@ -75,7 +75,7 @@ import GhcPrelude
 import TyCon    ( PrimRep(..), PrimElemRep(..) )
 import GHC.Types.RepType  ( UnaryType, SlotTy (..), typePrimRep1 )
 
-import GHC.Runtime.Layout
+import GHC.Runtime.Heap.Layout
 import GHC.Cmm
 import GHC.Cmm.BlockId
 import GHC.Cmm.CLabel

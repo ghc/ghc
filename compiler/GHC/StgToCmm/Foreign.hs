@@ -35,7 +35,7 @@ import GHC.Cmm.Graph
 import Type
 import GHC.Types.RepType
 import GHC.Cmm.CLabel
-import GHC.Runtime.Layout
+import GHC.Runtime.Heap.Layout
 import ForeignCall
 import DynFlags
 import Maybes

@@ -1106,7 +1106,7 @@ data DynFlags = DynFlags {
     -- loaded here is directed by pluginModNames. Arguments are loaded from
     -- pluginModNameOpts. The purpose of this field is to cache the plugins so
     -- they don't have to be loaded each time they are needed.  See
-    -- 'DynamicLoading.initializePlugins'.
+    -- 'GHC.Runtime.Loader.initializePlugins'.
   staticPlugins            :: [StaticPlugin],
     -- ^ static plugins which do not need dynamic loading. These plugins are
     -- intended to be added by GHC API users directly to this list.

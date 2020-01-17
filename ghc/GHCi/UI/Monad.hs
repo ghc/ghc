@@ -48,7 +48,7 @@ import SrcLoc
 import Module
 import RdrName (mkOrig)
 import PrelNames (gHC_GHCI_HELPERS)
-import GHCi
+import GHC.Runtime.Interpreter
 import GHCi.RemoteTypes
 import GHC.Hs (ImportDecl, GhcPs, GhciLStmt, LHsDecl)
 import GHC.Hs.Utils

@@ -14,10 +14,10 @@ module Coverage (addTicksToBinds, hpcInitCode) where
 
 import GhcPrelude as Prelude
 
-import qualified GHCi
+import qualified GHC.Runtime.Interpreter as GHCi
 import GHCi.RemoteTypes
 import Data.Array
-import ByteCodeTypes
+import GHC.ByteCode.Types
 import GHC.Stack.CCS
 import Type
 import GHC.Hs

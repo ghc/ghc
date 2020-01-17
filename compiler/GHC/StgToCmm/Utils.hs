@@ -66,7 +66,7 @@ import ForeignCall
 import IdInfo
 import Type
 import TyCon
-import GHC.Runtime.Layout
+import GHC.Runtime.Heap.Layout
 import Module
 import Literal
 import Digraph

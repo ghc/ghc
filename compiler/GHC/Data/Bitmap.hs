@@ -17,7 +17,7 @@ module GHC.Data.Bitmap (
 
 import GhcPrelude
 
-import GHC.Runtime.Layout
+import GHC.Runtime.Heap.Layout
 import DynFlags
 import Util
 

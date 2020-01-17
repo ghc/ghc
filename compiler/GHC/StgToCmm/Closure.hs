@@ -67,7 +67,7 @@ module GHC.StgToCmm.Closure (
 import GhcPrelude
 
 import GHC.Stg.Syntax
-import GHC.Runtime.Layout
+import GHC.Runtime.Heap.Layout
 import GHC.Cmm
 import GHC.Cmm.Ppr.Expr() -- For Outputable instances
 

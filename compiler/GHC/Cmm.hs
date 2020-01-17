@@ -31,7 +31,7 @@ import CostCentre
 import GHC.Cmm.CLabel
 import GHC.Cmm.BlockId
 import GHC.Cmm.Node
-import GHC.Runtime.Layout
+import GHC.Runtime.Heap.Layout
 import GHC.Cmm.Expr
 import GHC.Cmm.Dataflow.Block
 import GHC.Cmm.Dataflow.Collections

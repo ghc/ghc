@@ -231,7 +231,7 @@ import GHC.Cmm.BlockId
 import GHC.Cmm.Lexer
 import GHC.Cmm.CLabel
 import GHC.Cmm.Monad
-import GHC.Runtime.Layout
+import GHC.Runtime.Heap.Layout
 import Lexer
 
 import CostCentre
