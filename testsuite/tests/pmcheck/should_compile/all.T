@@ -110,6 +110,8 @@ test('T17465', normal, compile,
      ['-fwarn-incomplete-patterns -fwarn-overlapping-patterns'])
 test('T17646', normal, compile,
      ['-fwarn-incomplete-patterns -fwarn-overlapping-patterns'])
+test('T17703', normal, compile,
+     ['-fwarn-incomplete-patterns -fwarn-overlapping-patterns'])
 
 # Other tests
 test('pmc001', [], compile,
