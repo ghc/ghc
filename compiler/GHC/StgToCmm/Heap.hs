@@ -35,7 +35,7 @@ import GHC.StgToCmm.Env
 import GHC.Cmm.Graph
 
 import GHC.Cmm.Dataflow.Label
-import GHC.Runtime.Layout
+import GHC.Runtime.Heap.Layout
 import GHC.Cmm.BlockId
 import GHC.Cmm
 import GHC.Cmm.Utils

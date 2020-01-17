@@ -33,7 +33,7 @@ module GhcMake(
 
 import GhcPrelude
 
-import qualified Linker         ( unload )
+import qualified GHC.Runtime.Linker as Linker
 
 import DriverPhases
 import DriverPipeline
