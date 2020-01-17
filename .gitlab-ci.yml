@@ -780,13 +780,13 @@ validate-x86_64-linux-fedora27:
     - robocopy /np /nfl /ndl /e "%APPDATA%\cabal" cabal-cache
   dependencies: []
   variables:
-    FORCE_SYMLINKS: 1
+    #FORCE_SYMLINKS: 1
     LANG: "en_US.UTF-8"
     SPHINXBUILD: "/mingw64/bin/sphinx-build.exe"
   cache:
     paths:
       - cabal-cache
-      - ghc-8.6.5
+      - toolchain
       - ghc-tarballs
 
 .build-windows-hadrian:

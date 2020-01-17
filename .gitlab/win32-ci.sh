@@ -4,9 +4,44 @@
 
 set -e
 
+# Wrap escape sequences in \[ \] to avoid wrapping issues
+NO_COLOUR="\[\e[0m\]"
+BLACK="\[\e[0;30m\]"
+GRAY="\[\e[1,30m\]"
+RED="\[\e[0;31m\]"
+LT_RED="\[\e[1;31m\]"
+BROWN="\[\e[0;33m\]"
+LT_BROWN="\[\e[1;33m\]"
+GREEN="\[\e[0;32m\]"
+LT_GREEN="\[\e[1;32m\]"
+BLUE="\[\e[0;34m\]"
+LT_BLUE="\[\e[1;34m\]"
+PURPLE="\[\e[0;35m\]"
+LT_PURPLE="\[\e[1;35m\]"
+CYAN="\[\e[0;36m\]"
+LT_CYAN="\[\e[1;36m\]"
+WHITE="\[\e[1;37m\]"
+LT_GRAY="\[\e[0,37m\]"
+
+echo_color() {
+  local color="$1"
+  local msg="$2"
+  echo "${color}${msg}${NO_COLOR}"
+}
+
+error() { echo_color "${RED}" "$1" }
+warn() { echo_color "${LT_BROWN}" "$1" }
+info() { echo_color "${LT_BLUE}" "$1" }
+
+fail() { error "$1"; exit 1 }
+
+function run() {
+  info "Running $@..."
+  $@ || ( error "$@ failed"; return 1 )
+}
+
 if [ -z "$GHC_VERSION" ]; then
-  echo "GHC_VERSION not set"
-  exit 1;
+  fail "GHC_VERSION not set"
 fi
 
 case $MSYSTEM in
@@ -19,8 +54,7 @@ case $MSYSTEM in
     cabal_arch="x86_64"
     ;;
   *)
-    echo "win32-init: Unknown MSYSTEM $MSYSTEM"
-    exit 1
+    fail "win32-init: Unknown MSYSTEM $MSYSTEM"
     ;;
 esac
 
@@ -44,50 +78,45 @@ mkdir -p tmp
 export TMP=$TOP/tmp
 export TEMP=$TOP/tmp
 
-function run() {
-  echo "Running $@..."
-  $@
-}
-
 # Extract GHC toolchain
 setup() {
   if [ -d "`pwd`/cabal-cache" ]; then
-      echo "Extracting cabal cache..."
+      info "Extracting cabal cache..."
       cp -Rf cabal-cache $APPDATA/cabal
   fi
 
   if [ ! -e $toolchain/bin/ghc ]; then
       url="https://downloads.haskell.org/~ghc/$GHC_VERSION/ghc-$GHC_VERSION-$triple.tar.xz"
-      echo "Fetching GHC binary distribution from $url..."
+      info "Fetching GHC binary distribution from $url..."
       curl $url | tar -xJ
       mv ghc-$GHC_VERSION/* toolchain
   fi
 
   if [ ! -e $toolchain/bin/cabal ]; then
       url="https://downloads.haskell.org/~cabal/cabal-install-2.4.1.0/cabal-install-2.4.1.0-$cabal_arch-unknown-mingw32.zip"
-      echo "Fetching cabal binary distribution from $url..."
+      info "Fetching cabal binary distribution from $url..."
       curl $url > $TMP/cabal.zip
       unzip $TMP/cabal.zip
       mv cabal.exe $toolchain/bin
   fi
 
   if [ ! -e $toolchain/bin/happy ]; then
-      echo "Building happy..."
+      info "Building happy..."
       cabal update
       cabal install happy
       cp $(cygpath $APPDATA)/cabal/bin/happy $toolchain/bin
   fi
 
   if [ ! -e $toolchain/bin/alex ]; then
-      echo "Building alex..."
+      info "Building alex..."
       cabal update
       cabal install alex
       cp $(cygpath $APPDATA)/cabal/bin/alex $toolchain/bin
   fi
 
-  echo "====================================================="
-  echo "Toolchain versions"
-  echo "====================================================="
+  info "====================================================="
+  info "Toolchain versions"
+  info "====================================================="
   $toolchain/bin/ghc --version
   $toolchain/bin/cabal --version
   $toolchain/bin/happy --version
@@ -110,7 +139,7 @@ configure() {
     GHC=$toolchain/bin/ghc \
     HAPPY=$toolchain/bin/happy \
     ALEX=$toolchain/bin/alex \
-    || cat config.log
+    || ( cat config.log; fail "configure failed" )
 }
 
 build_make() {
@@ -118,14 +147,15 @@ build_make() {
   echo 'GhcLibHcOpts+=-haddock' >> mk/build.mk
   run make -j`mk/detect-cpu-count.sh`
   mv _build/bindist/ghc*.tar.xz ghc.tar.xz
+  ls -lh ghc.tar.xz
 }
 
 fetch_perf_notes() {
-  echo "Fetching perf notes..."
+  info "Fetching perf notes..."
   git fetch \
     https://gitlab.haskell.org/ghc/ghc-performance-notes.git \
     refs/notes/perf:refs/notes/perf \
-    || echo "warning: Failed to fetch perf notes"
+    || warn "warning: Failed to fetch perf notes"
 }
 
 test_make() {
@@ -184,7 +214,5 @@ case $1 in
   build_hadrian) build_hadrian ;;
   test_hadrian) fetch_perf_notes; test_hadrian ;;
   clean_hadrian) clean_hadrian ;;
-  *)
-    echo "unknown mode $1"
-    exit 1 ;;
+  *) fail "unknown mode $1" ;;
 esac
