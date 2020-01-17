@@ -599,19 +599,19 @@ oracle) contradictory. This implies a few invariants:
   detect this, but we could just compare whole COMPLETE sets to vi_neg every
   time, if it weren't for performance.
 
-Maintaining these invariants in 'addVarVarCt' (the core of the term oracle) and
-'addRefutableAltCon' is subtle.
+Maintaining these invariants in 'addVarCt' (the core of the term oracle) and
+'addNotConCt' is subtle.
 * Merging VarInfos. Example: Add the fact @x ~ y@ (see 'equate').
   - (COMPLETE) If we had @x /~ True@ and @y /~ False@, then we get
     @x /~ [True,False]@. This is vacuous by matter of comparing to the built-in
     COMPLETE set, so should refute.
   - (Pos/Neg) If we had @x /~ True@ and @y ~ True@, we have to refute.
-* Adding positive information. Example: Add the fact @x ~ K ys@ (see 'addVarConCt')
+* Adding positive information. Example: Add the fact @x ~ K ys@ (see 'addConCt')
   - (Neg) If we had @x /~ K@, refute.
   - (Pos) If we had @x ~ K2@, and that contradicts the new solution according to
     'eqPmAltCon' (ex. K2 is [] and K is (:)), then refute.
   - (Refine) If we had @x /~ K zs@, unify each y with each z in turn.
-* Adding negative information. Example: Add the fact @x /~ Nothing@ (see 'addRefutableAltCon')
+* Adding negative information. Example: Add the fact @x /~ Nothing@ (see 'addNotConCt')
   - (Refut) If we have @x ~ K ys@, refute.
   - (Redundant) If we have @x ~ K2@ and @eqPmAltCon K K2 == Disjoint@
     (ex. Just and Nothing), the info is redundant and can be
@@ -620,8 +620,8 @@ Maintaining these invariants in 'addVarVarCt' (the core of the term oracle) and
     @x /~ [Just,Nothing]@. This is vacuous by matter of comparing to the built-in
     COMPLETE set, so should refute.
 
-Note that merging VarInfo in equate can be done by calling out to 'addVarConCt' and
-'addRefutableAltCon' for each of the facts individually.
+Note that merging VarInfo in equate can be done by calling out to 'addConCt' and
+'addNotConCt' for each of the facts individually.
 
 Note [Representation of Strings in TmState]
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
@@ -731,7 +731,7 @@ merging different COMPLETE sets after the fact is very complicated and possibly
 inefficient.
 
 So in fact, we just *drop* the coercion arising from the CoPat when handling
-handling the constraint @y ~ x |> co@ in addVarCoreCt, just equating @y ~ x@.
+handling the constraint @y ~ x |> co@ in addCoreCt, just equating @y ~ x@.
 We then handle the fallout in initPossibleMatches, which has to get a hand at
 both the representation TyCon tc_rep and the parent data family TyCon tc_fam.
 It considers three cases after having established that the Type is a TyConApp:
@@ -890,26 +890,27 @@ partitionTyTmCts = partitionEithers . map to_either . toList
 -- | Adds a single term constraint by dispatching to the various term oracle
 -- functions.
 addTmCt :: Delta -> TmCt -> MaybeT DsM Delta
-addTmCt delta (TmVarCt x y)            = addVarVarCt delta (x, y)
-addTmCt delta (TmCoreCt x e)           = addVarCoreCt delta x e
-addTmCt delta (TmConCt x con tvs args) = addVarConCt delta x con tvs args
-addTmCt delta (TmNotConCt x con)       = addRefutableAltCon delta x con
-addTmCt delta (TmBotCt x)              = addVarBotCt delta x
-addTmCt delta (TmNotBotCt x)           = addVarNonVoidCt delta x
+addTmCt delta (TmVarCt x y)            = addVarCt delta x y
+addTmCt delta (TmCoreCt x e)           = addCoreCt delta x e
+addTmCt delta (TmConCt x con tvs args) = addConCt delta x con tvs args
+addTmCt delta (TmNotConCt x con)       = addNotConCt delta x con
+addTmCt delta (TmBotCt x)              = addBotCt delta x
+addTmCt delta (TmNotBotCt x)           = addNonVoidCt delta x
 
 -- | In some future this will actually add a constraint to 'Delta' that we plan
 -- to preserve. But for now, we just check if we can add the constraint to the
 -- current 'Delta'. If so, we return the original 'Delta', if not, we fail.
-addVarBotCt :: Delta -> Id -> MaybeT DsM Delta
-addVarBotCt delta x
+addBotCt :: Delta -> Id -> MaybeT DsM Delta
+addBotCt delta x
   | canDiverge delta x = pure delta
   | otherwise          = mzero
 
--- | Record that a particular 'Id' can't take the shape of a 'PmAltCon' in the
--- 'Delta' and return @Nothing@ if that leads to a contradiction.
+-- | Record that a @x ~/ K@ constraint, e.g. that a particular 'Id' @x@ can't
+-- take the shape of a 'PmAltCon' @K@ in the 'Delta' and return @Nothing@ if
+-- that leads to a contradiction.
 -- See Note [TmState invariants].
-addRefutableAltCon :: Delta -> Id -> PmAltCon -> MaybeT DsM Delta
-addRefutableAltCon delta@MkDelta{ delta_tm_st = TmSt env reps } x nalt = do
+addNotConCt :: Delta -> Id -> PmAltCon -> MaybeT DsM Delta
+addNotConCt delta@MkDelta{ delta_tm_st = TmSt env reps } x nalt = do
   vi@(VI _ pos neg pm) <- lift (initLookupVarInfo delta x)
   -- 1. Bail out quickly when nalt contradicts a solution
   let contradicts nalt (cl, _tvs, _args) = eqPmAltCon cl nalt == Equal
@@ -953,7 +954,7 @@ deemed redundant? The answer is, of course, No! The required theta is like a
 hidden parameter which must be supplied at the pattern match site, so PRead
 is much more like a view pattern (where behavior depends on the particular value
 passed in).
-The simple solution here is to forget in 'addRefutableAltCon' that we matched
+The simple solution here is to forget in 'addNotConCt' that we matched
 on synonyms with a required Theta like @PRead@, so that subsequent matches on
 the same constructor are never flagged as redundant. The consequence is that
 we no longer detect the actually redundant match in
@@ -991,11 +992,11 @@ guessConLikeUnivTyArgsFromResTy _   res_ty (PatSynCon ps)  = do
   subst <- tcMatchTy con_res_ty res_ty
   traverse (lookupTyVar subst) univ_tvs
 
--- | Kind of tries to add a non-void constraint to 'Delta', but doesn't really
--- commit to upholding that constraint in the future. This will be rectified
--- in a follow-up patch. The status quo should work good enough for now.
-addVarNonVoidCt :: Delta -> Id -> MaybeT DsM Delta
-addVarNonVoidCt delta@MkDelta{ delta_tm_st = TmSt env reps } x = do
+-- | Kind of tries to add the constraint @x ~/ ⊥@ to 'Delta', but doesn't really
+-- commit to upholding that constraint in the future. This will be rectified in
+-- a follow-up patch. The status quo should work good enough for now.
+addNonVoidCt :: Delta -> Id -> MaybeT DsM Delta
+addNonVoidCt delta@MkDelta{ delta_tm_st = TmSt env reps } x = do
   vi  <- lift $ initLookupVarInfo delta x
   vi' <- MaybeT $ ensureInhabited delta vi
   -- vi' has probably constructed and then thinned out some PossibleMatches.
@@ -1073,8 +1074,8 @@ ensureAllPossibleMatchesInhabited delta@MkDelta{ delta_tm_st = TmSt env reps }
 -- has integrated the knowledge from the equality constraint.
 --
 -- See Note [TmState invariants].
-addVarVarCt :: Delta -> (Id, Id) -> MaybeT DsM Delta
-addVarVarCt delta@MkDelta{ delta_tm_st = TmSt env _ } (x, y)
+addVarCt :: Delta -> Id -> Id -> MaybeT DsM Delta
+addVarCt delta@MkDelta{ delta_tm_st = TmSt env _ } x y
   -- It's important that we never @equate@ two variables of the same equivalence
   -- class, otherwise we might get cyclic substitutions.
   -- Cf. 'extendSubstAndSolve' and
@@ -1106,22 +1107,22 @@ equate delta@MkDelta{ delta_tm_st = TmSt env reps } x y
         let env_refs = setEntrySDIE env_ind y vi_y
         let delta_refs = delta{ delta_tm_st = TmSt env_refs reps }
         -- and then gradually merge every positive fact we have on x into y
-        let add_fact delta (cl, tvs, args) = addVarConCt delta y cl tvs args
+        let add_fact delta (cl, tvs, args) = addConCt delta y cl tvs args
         delta_pos <- foldlM add_fact delta_refs (vi_pos vi_x)
         -- Do the same for negative info
-        let add_refut delta nalt = addRefutableAltCon delta y nalt
+        let add_refut delta nalt = addNotConCt delta y nalt
         delta_neg <- foldlM add_refut delta_pos (vi_neg vi_x)
-        -- vi_cache will be updated in addRefutableAltCon, so we are good to
+        -- vi_cache will be updated in addNotConCt, so we are good to
         -- go!
         pure delta_neg
 
--- | @addVarConCt x alt args ts@ extends the substitution with a solution
--- @x :-> (alt, args)@ if compatible with refutable shapes of @x@ and its
+-- | @addConCt x alt tvs args ts@ extends the substitution with a solution
+-- @x :-> (alt, tvs, args)@ if compatible with refutable shapes of @x@ and its
 -- other solutions, reject (@Nothing@) otherwise.
 --
 -- See Note [TmState invariants].
-addVarConCt :: Delta -> Id -> PmAltCon -> [TyVar] -> [Id] -> MaybeT DsM Delta
-addVarConCt delta@MkDelta{ delta_tm_st = TmSt env reps } x alt tvs args = do
+addConCt :: Delta -> Id -> PmAltCon -> [TyVar] -> [Id] -> MaybeT DsM Delta
+addConCt delta@MkDelta{ delta_tm_st = TmSt env reps } x alt tvs args = do
   VI ty pos neg cache <- lift (initLookupVarInfo delta x)
   -- First try to refute with a negative fact
   guard (all ((/= Equal) . eqPmAltCon alt) neg)
@@ -1134,10 +1135,10 @@ addVarConCt delta@MkDelta{ delta_tm_st = TmSt env reps } x alt tvs args = do
   case find ((== Equal) . eqPmAltCon alt . fstOf3) pos of
     Just (_con, other_tvs, other_args) -> do
       -- We must unify existentially bound ty vars and arguments!
-      let ty_cts = equateTyVarsCts tvs other_tvs
+      let ty_cts = equateTys (map mkTyVarTy tvs) (map mkTyVarTy other_tvs)
       when (length args /= length other_args) $
         lift $ tracePm "error" (ppr x <+> ppr alt <+> ppr args <+> ppr other_args)
-      let tm_cts = zipWithEqual "addVarConCt" PmVarCt args other_args
+      let tm_cts = zipWithEqual "addConCt" PmVarCt args other_args
       MaybeT $ addPmCts delta (listToBag ty_cts `unionBags` listToBag tm_cts)
     Nothing -> do
       -- Filter out redundant negative facts (those that compare Just False to
@@ -1146,13 +1147,13 @@ addVarConCt delta@MkDelta{ delta_tm_st = TmSt env reps } x alt tvs args = do
       let pos' = (alt, tvs, args):pos
       pure delta{ delta_tm_st = TmSt (setEntrySDIE env x (VI ty pos' neg' cache)) reps}
 
-equateTyVarsCts :: [TyVar] -> [TyVar] -> [PmCt]
-equateTyVarsCts as bs
-  = map (\(a, b) -> PmTyCt $ mkPrimEqPred (mkTyVarTy a) (mkTyVarTy b))
+equateTys :: [Type] -> [Type] -> [PmCt]
+equateTys ts us
+  = map (\(t, u) -> PmTyCt $ mkPrimEqPred t u)
   -- The following line filters out trivial Refl constraints, so that we don't
   -- need to initialise the type oracle that often
-  $ filter (uncurry (/=))
-  $ zipEqual "equateTyVarsCts" as bs
+  $ filter (not . uncurry eqType)
+  $ zipEqual "equateTys" ts us
 
 ----------------------------------------
 -- * Enumerating inhabitation candidates
@@ -1547,7 +1548,7 @@ provideEvidence = go
             y <- lift $ mkPmId arg_ty
             -- Newtypes don't have existentials (yet?!), so passing an empty
             -- list as ex_tvs.
-            delta' <- addVarConCt delta x (PmAltConLike (RealDataCon dc)) [] [y]
+            delta' <- addConCt delta x (PmAltConLike (RealDataCon dc)) [] [y]
             pure (y, delta')
       runMaybeT (foldlM build_newtype (x, delta) dcs) >>= \case
         Nothing -> pure []
@@ -1606,8 +1607,10 @@ pickMinimalCompleteSet _ (PM clss) = do
   tracePm "pickMinimalCompleteSet" (ppr $ NonEmpty.toList clss)
   pure (Just (minimumBy (comparing sizeUniqDSet) clss))
 
--- | See if we already encountered a semantically equivalent expression and
--- return its representative.
+-- | Finds a representant of the semantic equality class of the given @e@.
+-- Which is the @x@ of a @let x = e'@ constraint (with @e@ semantically
+-- equivalent to @e'@) we encountered earlier, or a fresh identifier if
+-- there weren't any such constraints.
 representCoreExpr :: Delta -> CoreExpr -> DsM (Delta, Id)
 representCoreExpr delta@MkDelta{ delta_tm_st = ts@TmSt{ ts_reps = reps } } e
   | Just rep <- lookupCoreMap reps e = pure (delta, rep)
@@ -1617,16 +1620,23 @@ representCoreExpr delta@MkDelta{ delta_tm_st = ts@TmSt{ ts_reps = reps } } e
       let delta' = delta{ delta_tm_st = ts{ ts_reps = reps' } }
       pure (delta', rep)
 
--- Most of our actions thread around a delta from one computation to the next,
--- thereby potentially failing. This is expressed in the following Monad:
--- type PmM a = StateT Delta (MaybeT DsM) a
-
--- | Records that a variable @x@ is equal to a 'CoreExpr' @e@.
-addVarCoreCt :: Delta -> Id -> CoreExpr -> MaybeT DsM Delta
-addVarCoreCt delta x e = do
+-- | Inspects a 'PmCoreCt' @let x = e@ by recording constraints for @x@ based
+-- on the shape of the 'CoreExpr' @e@. Examples:
+--
+--   * For @let x = Just (42, 'z')@ we want to record the
+--     constraints @x ~ Just a, a ~ (b, c), b ~ 42, c ~ 'z'@.
+--     See 'data_con_app'.
+--   * For @let x = unpackCString# "tmp"@ we want to record the literal
+--     constraint @x ~ "tmp"@.
+--   * For @let x = I# 42@ we want the literal constraint @x ~ 42@. Similar
+--     for other literals. See 'coreExprAsPmLit'.
+--   * Finally, if we have @let x = e@ and we already have seen @let y = e@, we
+--     want to record @x ~ y@.
+addCoreCt :: Delta -> Id -> CoreExpr -> MaybeT DsM Delta
+addCoreCt delta x e = do
   dflags <- getDynFlags
   let e' = simpleOptExpr dflags e
-  lift $ tracePm "addVarCoreCt" (ppr x $$ ppr e $$ ppr e')
+  lift $ tracePm "addCoreCt" (ppr x $$ ppr e $$ ppr e')
   execStateT (core_expr x e') delta
   where
     -- | Takes apart a 'CoreExpr' and tries to extract as much information about
@@ -1646,30 +1656,21 @@ addVarCoreCt delta x e = do
       = case unpackFS s of
           -- We need this special case to break a loop with coreExprAsPmLit
           -- Otherwise we alternate endlessly between [] and ""
-          [] -> data_con_app x nilDataCon [] []
+          [] -> data_con_app x emptyInScopeSet nilDataCon []
           s' -> core_expr x (mkListExpr charTy (map mkCharExpr s'))
       | Just lit <- coreExprAsPmLit e
       = pm_lit x lit
       | Just (in_scope, _empty_floats@[], dc, _arg_tys, args)
             <- exprIsConApp_maybe in_scope_env e
-      = do { let dc_ex_tvs               = dataConExTyCoVars dc
-                 arty                    = dataConSourceArity dc
-                 (_ex_ty_args, val_args) = splitAtList dc_ex_tvs args
-                 vis_args                = reverse $ take arty $ reverse val_args
-           ; uniq_supply <- lift $ lift $ getUniqueSupplyM
-           ; let (_, ex_tvs) = cloneTyVarBndrs (mkEmptyTCvSubst in_scope) dc_ex_tvs uniq_supply
-           -- See Note [Why we don't record existential type constraints]
-           ; arg_ids <- traverse bind_expr vis_args
-           ; data_con_app x dc ex_tvs arg_ids }
+      = data_con_app x in_scope dc args
       -- See Note [Detecting pattern synonym applications in expressions]
       | Var y <- e, Nothing <- isDataConId_maybe x
       -- We don't consider DataCons flexible variables
-      = modifyT (\delta -> addVarVarCt delta (x, y))
+      = modifyT (\delta -> addVarCt delta x y)
       | otherwise
       -- Any other expression. Try to find other uses of a semantically
       -- equivalent expression and represent them by the same variable!
-      = do { rep <- represent_expr e
-           ; modifyT (\delta -> addVarVarCt delta (x, rep)) }
+      = equate_with_similar_expr x e
       where
         expr_ty       = exprType e
         expr_in_scope = mkInScopeSet (exprFreeVars e)
@@ -1679,47 +1680,74 @@ addVarCoreCt delta x e = do
         -- up substituting inside a forall or lambda (i.e. seldom)
         -- so using exprFreeVars seems fine.   See MR !1647.
 
-        bind_expr :: CoreExpr -> StateT Delta (MaybeT DsM) Id
-        bind_expr e = do
-          x <- lift (lift (mkPmId (exprType e)))
-          core_expr x e
-          pure x
+    -- | The @e@ in @let x = e@ had no familiar form. But we can still see if
+    -- see if we already encountered a constraint @let y = e'@ with @e'@
+    -- semantically equivalent to @e@, in which case we may add the constraint
+    -- @x ~ y@.
+    equate_with_similar_expr :: Id -> CoreExpr -> StateT Delta (MaybeT DsM) ()
+    equate_with_similar_expr x e = do
+      rep <- StateT $ \delta -> swap <$> lift (representCoreExpr delta e)
+      -- Note that @rep == x@ if we encountered @e@ for the first time.
+      modifyT (\delta -> addVarCt delta x rep)
 
-        -- See if we already encountered a semantically equivalent expression
-        -- and return its representative
-        represent_expr :: CoreExpr -> StateT Delta (MaybeT DsM) Id
-        represent_expr e = StateT $ \delta ->
-          swap <$> lift (representCoreExpr delta e)
+    bind_expr :: CoreExpr -> StateT Delta (MaybeT DsM) Id
+    bind_expr e = do
+      x <- lift (lift (mkPmId (exprType e)))
+      core_expr x e
+      pure x
 
-    data_con_app :: Id -> DataCon -> [TyVar] -> [Id] -> StateT Delta (MaybeT DsM) ()
-    data_con_app x dc tvs args = pm_alt_con_app x (PmAltConLike (RealDataCon dc)) tvs args
+    -- | Look at @let x = K taus theta es@ and generate the following
+    -- constraints:
+    --   1. @a_1 ~ tau_1, ..., a_n ~ tau_n@ for fresh @a_i@
+    --   2. @y_1 ~ e_1, ..., y_m ~ e_m@ for fresh @y_i@
+    --   3. @x ~ K as ys@
+    data_con_app :: Id -> InScopeSet -> DataCon -> [CoreExpr] -> StateT Delta (MaybeT DsM) ()
+    data_con_app x in_scope dc args = do
+      let dc_ex_tvs              = dataConExTyCoVars dc
+          arty                   = dataConSourceArity dc
+          (ex_ty_args, val_args) = splitAtList dc_ex_tvs args
+          ex_tys                 = map exprToType ex_ty_args
+          vis_args               = reverse $ take arty $ reverse val_args
+      uniq_supply <- lift $ lift $ getUniqueSupplyM
+      let (_, ex_tvs) = cloneTyVarBndrs (mkEmptyTCvSubst in_scope) dc_ex_tvs uniq_supply
+          ty_cts      = equateTys (map mkTyVarTy ex_tvs) ex_tys
+      -- 1. @a_1 ~ tau_1, ..., a_n ~ tau_n@ for fresh @a_i@
+      -- See Note [Existential type constraints from PmCoreCt]
+      modifyT $ \delta -> MaybeT $ addPmCts delta (listToBag ty_cts)
+      -- 2. @y_1 ~ e_1, ..., y_m ~ e_m@ for fresh @y_i@
+      arg_ids <- traverse bind_expr vis_args
+      -- 3. @x ~ K as ys@
+      pm_alt_con_app x (PmAltConLike (RealDataCon dc)) ex_tvs arg_ids
 
+    -- | Adds a literal constraint, i.e. @x ~ 42@.
     pm_lit :: Id -> PmLit -> StateT Delta (MaybeT DsM) ()
     pm_lit x lit = pm_alt_con_app x (PmAltLit lit) [] []
 
     -- | Adds the given constructor application as a solution for @x@.
     pm_alt_con_app :: Id -> PmAltCon -> [TyVar] -> [Id] -> StateT Delta (MaybeT DsM) ()
-    pm_alt_con_app x con tvs args = modifyT $ \delta -> addVarConCt delta x con tvs args
+    pm_alt_con_app x con tvs args = modifyT $ \delta -> addConCt delta x con tvs args
 
 -- | Like 'modify', but with an effectful modifier action
 modifyT :: Monad m => (s -> m s) -> StateT s m ()
 modifyT f = StateT $ fmap ((,) ()) . f
 
-{- Note [Why we don't record existential type constraints]
-~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+{- Note [Existential type constraints from PmCoreCt]
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 When we have
 
   data Ex where Ex :: a -> Ex
   f _ | let x = Ex @Int 15 = case x of Ex -> ...
 
 we see that `Ex`'s existential in the `Ex` application in the RHS of `x` is
-bound to `Int`. Eventually this application will run by `addVarCoreCt`,
+bound to `Int`. Eventually this application will run by `addCoreCt`,
 which freshens `a` to `a'` and adds the constraint `x ~ Ex @a' 15`.
 
-Now, we *could* add the constraint @a' ~ Int@, but that is never useful, because
-types are irrelevant. And in fact, if the programmer assumed that @a' ~ Int@
-in the case alt, it would be rejected as a type error. So we simply don't
-include the constraint.
+Now, we it *might* seem as if adding the constraint @a' ~ Int@ is never useful,
+because types are irrelevant and if the programmer assumed that @a' ~ Int@
+in the case alt, it would be rejected as a type error.
+
+But in fact there are examples which are best handled by recording these
+constraints, as #17703 shows.
 
 Note [Detecting pattern synonym applications in expressions]
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
