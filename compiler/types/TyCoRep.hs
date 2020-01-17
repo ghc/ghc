@@ -730,8 +730,6 @@ This table summarises the visibility rules:
 
 ---- In term declarations ----
 
--- GJ : TODO Update this with explicit specificity examples
-
 * Inferred.  Function defn, with no signature:  f1 x = x
   We infer f1 :: forall {a}. a -> a, with 'a' Inferred
   It's Inferred because it doesn't appear in any
@@ -746,16 +744,22 @@ This table summarises the visibility rules:
      f3 :: forall a. a -> a; f3 x = x
   So f3 gets the type f3 :: forall a. a -> a, with 'a' Specified
 
+* Inferred.  Function defn, with signature (explicit forall), marked as inferred:
+     f4 :: forall {a}. a -> a; f4 x = x
+  So f4 gets the type f4 :: forall {a}. a -> a, with 'a' Inferred
+  It's Inferred because the user marked it as such, even though it does appear
+  in the user-written signature for f4
+
 * Inferred/Specified.  Function signature with inferred kind polymorphism.
-     f4 :: a b -> Int
-  So 'f4' gets the type f4 :: forall {k} (a:k->*) (b:k). a b -> Int
+     f5 :: a b -> Int
+  So 'f5' gets the type f5 :: forall {k} (a:k->*) (b:k). a b -> Int
   Here 'k' is Inferred (it's not mentioned in the type),
   but 'a' and 'b' are Specified.
 
 * Specified.  Function signature with explicit kind polymorphism
-     f5 :: a (b :: k) -> Int
+     f6 :: a (b :: k) -> Int
   This time 'k' is Specified, because it is mentioned explicitly,
-  so we get f5 :: forall (k:*) (a:k->*) (b:k). a b -> Int
+  so we get f6 :: forall (k:*) (a:k->*) (b:k). a b -> Int
 
 * Similarly pattern synonyms:
   Inferred - from inferred types (e.g. no pattern type signature)
