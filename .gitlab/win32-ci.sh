@@ -21,6 +21,7 @@ case $MSYSTEM in
 esac
 echo "hello world"
 
+ls 
 # Bring mingw64 toolchain into PATH
 source /etc/profile
 
