@@ -250,7 +250,7 @@ declNames :: LHsDecl DocNameI
              , [DocName]       --   names being declared
              )
 declNames (L _ decl) = case decl of
-  TyClD _ d  -> (empty, [tcdName d])
+  TyClD _ d  -> (empty, [tcdNameI d])
   SigD _ (TypeSig _ lnames _ ) -> (empty, map unLoc lnames)
   SigD _ (PatSynSig _ lnames _) -> (text "pattern", map unLoc lnames)
   ForD _ (ForeignImport _ (L _ n) _ _) -> (empty, [n])
