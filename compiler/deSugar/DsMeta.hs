@@ -324,7 +324,7 @@ repTyClD (L loc (ClassDecl { tcdCtxt = cxt, tcdLName = cls,
                              tcdSigs = sigs, tcdMeths = meth_binds,
                              tcdATs = ats, tcdATDefs = atds }))
   = do { cls1 <- lookupLOcc cls         -- See note [Binders and occurrences]
-       ; dec  <- addTyVarBinds tvs $ \bndrs ->
+       ; dec  <- addQTyVarBinds tvs $ \bndrs ->
            do { cxt1   <- repLContext cxt
           -- See Note [Scoped type variables in class and instance declarations]
               ; (ss, sigs_binds) <- rep_sigs_binds sigs meth_binds
@@ -399,7 +399,7 @@ repFamilyDecl decl@(L loc (FamilyDecl { fdInfo      = info
                                       , fdResultSig = L _ resultSig
                                       , fdInjectivityAnn = injectivity }))
   = do { tc1 <- lookupLOcc tc           -- See note [Binders and occurrences]
-       ; let mkHsQTvs :: [LHsTyVarBndr () GhcRn] -> LHsQTyVars () GhcRn
+       ; let mkHsQTvs :: [LHsTyVarBndr () GhcRn] -> LHsQTyVars GhcRn
              mkHsQTvs tvs = HsQTvs { hsq_ext = []
                                    , hsq_explicit = tvs }
              resTyVar = case resultSig of
@@ -757,22 +757,23 @@ repC (L _ (ConDeclH98 { con_name = con
             }
        }
 
-repC (L _ (ConDeclGADT { con_names  = cons
-                       , con_qvars  = qtvs
+repC (L _ (ConDeclGADT { con_g_ext  = imp_tvs
+                       , con_names  = cons
+                       , con_qvars  = exp_tvs
                        , con_mb_cxt = mcxt
                        , con_args   = args
                        , con_res_ty = res_ty }))
-  | isEmptyLHsQTvs qtvs  -- No implicit or explicit variables
-  , Nothing <- mcxt      -- No context
-                         -- ==> no need for a forall
+  | null imp_tvs && null exp_tvs -- No implicit or explicit variables
+  , Nothing <- mcxt              -- No context
+                                 -- ==> no need for a forall
   = repGadtDataCons cons args res_ty
 
   | otherwise
-  = addTyVarBinds qtvs $ \ ex_bndrs ->
+  = addTyVarBinds exp_tvs imp_tvs $ \ ex_bndrs ->
              -- See Note [Don't quantify implicit type variables in quotes]
     do { c'    <- repGadtDataCons cons args res_ty
        ; ctxt' <- repMbContext mcxt
-       ; if null (hsQTvExplicit qtvs) && isNothing mcxt
+       ; if null exp_tvs && isNothing mcxt
          then return c'
          else rep2 forallCName ([unC ex_bndrs, unC ctxt', unC c']) }
 
@@ -1019,21 +1020,28 @@ addHsTyVarBinds exp_tvs thing_inside
   where
     mk_tv_bndr (tv, (_,v)) = repTyVarBndrWithKind tv (coreVar v)
 
-addTyVarBinds :: LHsQTyVars flag GhcRn                    -- the binders to be added
-              -> (Core [TH.TyVarBndrQ] -> DsM (Core (TH.Q a)))  -- action in the ext env
+addQTyVarBinds :: LHsQTyVars GhcRn                              -- the binders to be added
+               -> (Core [TH.TyVarBndrQ] -> DsM (Core (TH.Q a))) -- action in the ext env
+               -> DsM (Core (TH.Q a))
+addQTyVarBinds (HsQTvs { hsq_ext = imp_tvs
+                      , hsq_explicit = exp_tvs })
+              thing_inside
+  = addTyVarBinds exp_tvs imp_tvs thing_inside
+addQTyVarBinds (XLHsQTyVars nec) _ = noExtCon nec
+
+addTyVarBinds :: [LHsTyVarBndr flag GhcRn]                     -- the binders to be added
+              -> [Name]
+              -> (Core [TH.TyVarBndrQ] -> DsM (Core (TH.Q a))) -- action in the ext env
               -> DsM (Core (TH.Q a))
 -- gensym a list of type variables and enter them into the meta environment;
 -- the computations passed as the second argument is executed in that extended
 -- meta environment and gets the *new* names on Core-level as an argument
-addTyVarBinds (HsQTvs { hsq_ext = imp_tvs
-                      , hsq_explicit = exp_tvs })
-              thing_inside
+addTyVarBinds exp_tvs imp_tvs thing_inside
   = addSimpleTyVarBinds imp_tvs $
     addHsTyVarBinds exp_tvs $
     thing_inside
-addTyVarBinds (XLHsQTyVars nec) _ = noExtCon nec
 
-addTyClTyVarBinds :: LHsQTyVars () GhcRn
+addTyClTyVarBinds :: LHsQTyVars GhcRn
                   -> (Core [TH.TyVarBndrQ] -> DsM (Core (TH.Q a)))
                   -> DsM (Core (TH.Q a))
 

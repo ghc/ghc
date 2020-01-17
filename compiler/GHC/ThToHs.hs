@@ -480,7 +480,7 @@ cvt_ci_decs doc decs
 cvt_tycl_hdr :: TH.Cxt -> TH.Name -> [TH.TyVarBndr]
              -> CvtM ( LHsContext GhcPs
                      , Located RdrName
-                     , LHsQTyVars () GhcPs)
+                     , LHsQTyVars GhcPs)
 cvt_tycl_hdr cxt tc tvs
   = do { cxt' <- cvtContext funPrec cxt
        ; tc'  <- tconNameL tc
@@ -511,7 +511,7 @@ cvt_datainst_hdr cxt bndrs tys
 ----------------
 cvt_tyfam_head :: TypeFamilyHead
                -> CvtM ( Located RdrName
-                       , LHsQTyVars () GhcPs
+                       , LHsQTyVars GhcPs
                        , Hs.LFamilyResultSig GhcPs
                        , Maybe (Hs.LInjectivityAnn GhcPs))
 
@@ -594,17 +594,17 @@ cvtConstr (ForallC tvs ctxt con)
 
     add_forall tvs' cxt' con@(ConDeclGADT { con_qvars = qvars, con_mb_cxt = cxt })
       = con { con_forall = noLoc $ not (null all_tvs)
-            , con_qvars  = mkHsQTvs all_tvs
+            , con_qvars  = all_tvs
             , con_mb_cxt = add_cxt cxt' cxt }
       where
-        all_tvs = hsQTvExplicit tvs' ++ hsQTvExplicit qvars
+        all_tvs = tvs' ++ qvars
 
     add_forall tvs' cxt' con@(ConDeclH98 { con_ex_tvs = ex_tvs, con_mb_cxt = cxt })
       = con { con_forall = noLoc $ not (null all_tvs)
             , con_ex_tvs = all_tvs
             , con_mb_cxt = add_cxt cxt' cxt }
       where
-        all_tvs = hsQTvExplicit tvs' ++ ex_tvs
+        all_tvs = tvs' ++ ex_tvs
 
     add_forall _ _ (XConDecl nec) = noExtCon nec
 
@@ -1325,7 +1325,7 @@ cvtOpAppP x op y
 -----------------------------------------------------------
 --      Types and type variables
 
-cvtTvs :: [TH.TyVarBndr] -> CvtM (LHsQTyVars () GhcPs)
+cvtTvs :: [TH.TyVarBndr] -> CvtM (LHsQTyVars GhcPs)
 cvtTvs tvs = do { tvs' <- mapM cvt_tv tvs; return (mkHsQTvs tvs') }
 
 cvt_tv :: TH.TyVarBndr -> CvtM (LHsTyVarBndr () GhcPs)
@@ -1337,8 +1337,8 @@ cvt_tv (TH.KindedTV nm ki)
        ; ki' <- cvtKind ki
        ; returnL $ KindedTyVar noExtField () nm' ki' }
 
-cvtTvsSpec :: [TH.TyVarBndr] -> CvtM (LHsQTyVars Specificity GhcPs)
-cvtTvsSpec tvs = do { tvs' <- mapM cvt_tv_spec tvs; return (mkHsQTvs tvs') }
+cvtTvsSpec :: [TH.TyVarBndr] -> CvtM [LHsTyVarBndr Specificity GhcPs]
+cvtTvsSpec = mapM cvt_tv_spec
 
 cvt_tv_spec :: TH.TyVarBndr -> CvtM (LHsTyVarBndr Specificity GhcPs)
 cvt_tv_spec (TH.PlainTV nm)
@@ -1699,7 +1699,7 @@ cvtPatSynSigTy (ForallT univs reqs (ForallT exis provs ty))
                                                         , hst_xqual = noExtField
                                                         , hst_body = ty' }) }
   | null reqs             = do { l      <- getL
-                               ; univs' <- hsQTvExplicit <$> cvtTvsSpec univs
+                               ; univs' <- cvtTvsSpec univs
                                ; ty'    <- cvtType (ForallT exis provs ty)
                                ; let forTy = HsForAllTy
                                               { hst_fvf = ForallInvis
@@ -1760,7 +1760,7 @@ mkHsForAllTy :: [TH.TyVarBndr]
              -> ForallVisFlag
              -- ^ Whether this is @forall@ is visible (e.g., @forall a ->@)
              --   or invisible (e.g., @forall a.@)
-             -> LHsQTyVars Specificity GhcPs
+             -> [LHsTyVarBndr Specificity GhcPs]
              -- ^ The converted type variable binders
              -> LHsType GhcPs
              -- ^ The converted rho type
@@ -1769,7 +1769,7 @@ mkHsForAllTy :: [TH.TyVarBndr]
 mkHsForAllTy tvs loc fvf tvs' rho_ty
   | null tvs  = rho_ty
   | otherwise = L loc $ HsForAllTy { hst_fvf = fvf
-                                   , hst_bndrs = hsQTvExplicit tvs'
+                                   , hst_bndrs = tvs'
                                    , hst_xforall = noExtField
                                    , hst_body = rho_ty }
 

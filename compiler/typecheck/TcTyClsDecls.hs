@@ -1427,10 +1427,8 @@ kcConDecl new_or_data res_kind (ConDeclH98
        }
 
 kcConDecl new_or_data res_kind (ConDeclGADT
-    { con_names = names, con_qvars = qtvs, con_mb_cxt = cxt
-    , con_args = args, con_res_ty = res_ty })
-  | HsQTvs { hsq_ext = implicit_tkv_nms
-           , hsq_explicit = explicit_tkv_nms } <- qtvs
+    { con_names = names, con_qvars = explicit_tkv_nms, con_mb_cxt = cxt
+    , con_args = args, con_res_ty = res_ty, con_g_ext = implicit_tkv_nms })
   = -- Even though the GADT-style data constructor's type is closed,
     -- we must still kind-check the type, because that may influence
     -- the inferred kind of the /type/ constructor.  Example:
@@ -1447,7 +1445,6 @@ kcConDecl new_or_data res_kind (ConDeclGADT
        ; kcConArgTys new_or_data res_kind (hsConDeclArgTys args)
        ; _ <- tcHsOpenType res_ty
        ; return () }
-kcConDecl _ _ (ConDeclGADT _ _ _ (XLHsQTyVars nec) _ _ _ _) = noExtCon nec
 kcConDecl _ _ (XConDecl nec) = noExtCon nec
 
 {- Note [kcConDecls result kind]
@@ -2786,12 +2783,11 @@ tcConDecl rep_tycon tag_map tmpl_bndrs res_kind res_tmpl new_or_data
 tcConDecl rep_tycon tag_map tmpl_bndrs _res_kind res_tmpl new_or_data
   -- NB: don't use res_kind here, as it's ill-scoped. Instead, we get
   -- the res_kind by typechecking the result type.
-          (ConDeclGADT { con_names = names
-                       , con_qvars = qtvs
+          (ConDeclGADT { con_g_ext = implicit_tkv_nms
+                       , con_names = names
+                       , con_qvars = explicit_tkv_nms
                        , con_mb_cxt = cxt, con_args = hs_args
                        , con_res_ty = hs_res_ty })
-  | HsQTvs { hsq_ext = implicit_tkv_nms
-           , hsq_explicit = explicit_tkv_nms } <- qtvs
   = addErrCtxt (dataConCtxtName names) $
     do { traceTc "tcConDecl 1 gadt" (ppr names)
        ; let (L _ name : _) = names
@@ -2863,8 +2859,6 @@ tcConDecl rep_tycon tag_map tmpl_bndrs _res_kind res_tmpl new_or_data
        ; traceTc "tcConDecl 2" (ppr names)
        ; mapM buildOneDataCon names
        }
-tcConDecl _ _ _ _ _ _ (ConDeclGADT _ _ _ (XLHsQTyVars nec) _ _ _ _)
-  = noExtCon nec
 tcConDecl _ _ _ _ _ _ (XConDecl nec) = noExtCon nec
 
 tcConIsInfixH98 :: Name

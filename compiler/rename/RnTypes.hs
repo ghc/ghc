@@ -804,8 +804,8 @@ bindHsQTyVars :: forall a b.
                                     --   d is a phrase like "in the type ..."
               -> Maybe a            -- Just _  => an associated type decl
               -> [Located RdrName]  -- Kind variables from scope, no dups
-              -> (LHsQTyVars () GhcPs)
-              -> (LHsQTyVars () GhcRn -> Bool -> RnM (b, FreeVars))
+              -> (LHsQTyVars GhcPs)
+              -> (LHsQTyVars GhcRn -> Bool -> RnM (b, FreeVars))
                   -- The Bool is True <=> all kind variables used in the
                   -- kind signature are bound on the left.  Reason:
                   -- the last clause of Note [CUSKs: Complete user-supplied

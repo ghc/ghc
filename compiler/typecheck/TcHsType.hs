@@ -1895,7 +1895,7 @@ kcDeclHeader
   :: InitialKindStrategy
   -> Name              -- ^ of the thing being checked
   -> TyConFlavour      -- ^ What sort of 'TyCon' is being checked
-  -> LHsQTyVars () GhcRn  -- ^ Binders in the header
+  -> LHsQTyVars GhcRn  -- ^ Binders in the header
   -> TcM ContextKind   -- ^ The result kind
   -> TcM TcTyCon       -- ^ A suitably-kinded TcTyCon
 kcDeclHeader (InitialKindCheck msig) = kcCheckDeclHeader msig
@@ -1922,7 +1922,7 @@ kcCheckDeclHeader
   :: SAKS_or_CUSK
   -> Name              -- ^ of the thing being checked
   -> TyConFlavour      -- ^ What sort of 'TyCon' is being checked
-  -> LHsQTyVars () GhcRn  -- ^ Binders in the header
+  -> LHsQTyVars GhcRn  -- ^ Binders in the header
   -> TcM ContextKind   -- ^ The result kind. AnyKind == no result signature
   -> TcM TcTyCon       -- ^ A suitably-kinded generalized TcTyCon
 kcCheckDeclHeader (SAKS sig) = kcCheckDeclHeader_sig sig
@@ -1931,7 +1931,7 @@ kcCheckDeclHeader CUSK       = kcCheckDeclHeader_cusk
 kcCheckDeclHeader_cusk
   :: Name              -- ^ of the thing being checked
   -> TyConFlavour      -- ^ What sort of 'TyCon' is being checked
-  -> LHsQTyVars () GhcRn  -- ^ Binders in the header
+  -> LHsQTyVars GhcRn  -- ^ Binders in the header
   -> TcM ContextKind   -- ^ The result kind
   -> TcM TcTyCon       -- ^ A suitably-kinded generalized TcTyCon
 kcCheckDeclHeader_cusk name flav
@@ -2013,7 +2013,7 @@ kcCheckDeclHeader_cusk _ _ (XLHsQTyVars nec) _ = noExtCon nec
 kcInferDeclHeader
   :: Name              -- ^ of the thing being checked
   -> TyConFlavour      -- ^ What sort of 'TyCon' is being checked
-  -> LHsQTyVars () GhcRn
+  -> LHsQTyVars GhcRn
   -> TcM ContextKind   -- ^ The result kind
   -> TcM TcTyCon       -- ^ A suitably-kinded non-generalized TcTyCon
 kcInferDeclHeader name flav
@@ -2070,7 +2070,7 @@ kcCheckDeclHeader_sig
   :: Kind              -- ^ Standalone kind signature, fully zonked! (zonkTcTypeToType)
   -> Name              -- ^ of the thing being checked
   -> TyConFlavour      -- ^ What sort of 'TyCon' is being checked
-  -> LHsQTyVars () GhcRn  -- ^ Binders in the header
+  -> LHsQTyVars GhcRn  -- ^ Binders in the header
   -> TcM ContextKind   -- ^ The result kind. AnyKind == no result signature
   -> TcM TcTyCon       -- ^ A suitably-kinded TcTyCon
 kcCheckDeclHeader_sig kisig name flav ktvs kc_res_ki =

@@ -368,9 +368,9 @@ deriving instance (Data body) => Data (HsRecFields GhcTc body)
 -- Data derivations from GHC.Hs.Types ----------------------------------
 
 -- deriving instance (DataIdLR p p) => Data (LHsQTyVars p)
-deriving instance (Data flag) => Data (LHsQTyVars flag GhcPs)
-deriving instance (Data flag) => Data (LHsQTyVars flag GhcRn)
-deriving instance (Data flag) => Data (LHsQTyVars flag GhcTc)
+deriving instance Data (LHsQTyVars GhcPs)
+deriving instance Data (LHsQTyVars GhcRn)
+deriving instance Data (LHsQTyVars GhcTc)
 
 -- deriving instance (DataIdLR p p, Data thing) =>Data (HsImplicitBndrs p thing)
 deriving instance (Data thing) => Data (HsImplicitBndrs GhcPs thing)

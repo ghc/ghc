@@ -443,7 +443,7 @@ instance HasLoc thing => HasLoc (TScoped thing) where
 instance HasLoc thing => HasLoc (PScoped thing) where
   loc (PS _ _ _ a) = loc a
 
-instance HasLoc (LHsQTyVars flag GhcRn) where
+instance HasLoc (LHsQTyVars GhcRn) where
   loc (HsQTvs _ vs) = loc vs
   loc _ = noSrcSpan
 
@@ -1406,10 +1406,11 @@ instance ToHie (Located OverlapMode) where
 
 instance ToHie (LConDecl GhcRn) where
   toHie (L span decl) = concatM $ makeNode decl span : case decl of
-      ConDeclGADT { con_names = names, con_qvars = qvars
+      ConDeclGADT { con_names = names, con_qvars = exp_vars, con_g_ext = imp_vars
                   , con_mb_cxt = ctx, con_args = args, con_res_ty = typ } ->
         [ toHie $ map (C (Decl ConDec $ getRealSpan span)) names
-        , toHie $ TS (ResolvedScopes [ctxScope, rhsScope]) qvars
+        , concatM $ [ pure $ bindingsOnly bindings
+                    , toHie $ tvScopes resScope NoScope exp_vars ]
         , toHie ctx
         , toHie args
         , toHie typ
@@ -1419,6 +1420,8 @@ instance ToHie (LConDecl GhcRn) where
           ctxScope = maybe NoScope mkLScope ctx
           argsScope = condecl_scope args
           tyScope = mkLScope typ
+          resScope = ResolvedScopes [ctxScope, rhsScope]
+          bindings = map (C $ TyVarBind (mkScope (loc exp_vars)) resScope) imp_vars
       ConDeclH98 { con_name = name, con_ex_tvs = qvars
                  , con_mb_cxt = ctx, con_args = dets } ->
         [ toHie $ C (Decl ConDec $ getRealSpan span) name
@@ -1609,7 +1612,7 @@ instance Data flag => ToHie (TVScoped (LHsTyVarBndr flag GhcRn)) where
         ]
       XTyVarBndr _ -> []
 
-instance Data flag => ToHie (TScoped (LHsQTyVars flag GhcRn)) where
+instance ToHie (TScoped (LHsQTyVars GhcRn)) where
   toHie (TS sc (HsQTvs implicits vars)) = concatM $
     [ pure $ bindingsOnly bindings
     , toHie $ tvScopes sc NoScope vars
