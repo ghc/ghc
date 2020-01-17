@@ -205,6 +205,7 @@ patch_tarball () {
     local base="$(pwd)"
     local patcher_base="$(pwd)/ghc-tarballs/ghc-jailbreak/$arch"
     local tmpdir="ghc-tarballs/tmpdir"
+    rm -Rf $tmpdir
     mkdir -p $tmpdir
     cd $tmpdir
     tar xJf "$base/$tarball_name"
@@ -213,8 +214,10 @@ patch_tarball () {
     tar cJf "$base/$newfile" .
     cd "$base"
     rm -rf $tmpdir
-    gpg --output "$base/${newfile}.sig" --detach-sig "$base/$newfile"
-    rm -f "$base/$tarball_name"
+    if [ -n "$SIGN_USER" ]; then
+      gpg --output "$base/${newfile}.sig" --detach-sig "$base/$newfile"
+      rm -f "$base/$tarball_name"
+    fi
 }
 
 show_hashes_for_binaries() {
@@ -280,13 +283,15 @@ case $1 in
             -o ghc-tarballs/ghc-jailbreak/ghc-jailbreak.tar.gz --create-dirs -#
         tar -C ghc-tarballs/ghc-jailbreak/ -xf ghc-tarballs/ghc-jailbreak/ghc-jailbreak.tar.gz
 
-        find ghc-tarballs/mingw-w64/ \(   -iname "*binutils*.tar.xz" \
-                                       -o -iname "*gcc*.tar.xz" \) \
-        -exec bash -c 'patch_tarball "$0"' {} \;
+        find ghc-tarballs/mingw-w64/ \
+          \(   -iname "*binutils*.tar.xz" \
+            -o -iname "*gcc*.tar.xz" \) \
+          -exec bash -c 'patch_tarball "$0"' {} \;
 
         rm -rf ghc-tarballs/ghc-jailbreak
 
         echo "Finished tarball generation, toolchain has been pre-patched."
+        echo "Resulting tarballs are in ./ghc-tarballs/"
         exit 0
         ;;
     *)

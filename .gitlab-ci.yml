@@ -11,6 +11,9 @@ variables:
   # Disable shallow clones; they break our linting rules
   GIT_DEPTH: 0
 
+  # Overridden by individual jobs
+  CONFIGURE_ARGS: ""
+
 before_script:
   - git submodule sync --recursive
   - git submodule update --init --recursive
@@ -786,7 +789,7 @@ validate-x86_64-linux-fedora27:
   cache:
     paths:
       - cabal-cache
-      - ghc-8.6.5
+      - toolchain
       - ghc-tarballs
 
 .build-windows-hadrian:
@@ -798,9 +801,9 @@ validate-x86_64-linux-fedora27:
   # due to #16574 this currently fails
   allow_failure: true
   script:
-    - bash ~/.gitlab/win32-ci.sh configure
-    - bash ~/.gitlab/win32-ci.sh build_hadrian
-    - bash ~/.gitlab/win32-ci.sh test_hadrian
+    - bash .gitlab/win32-ci.sh configure
+    - bash .gitlab/win32-ci.sh build_hadrian
+    - bash .gitlab/win32-ci.sh test_hadrian
   tags:
     - x86_64-windows
   artifacts:
@@ -859,7 +862,6 @@ nightly-i386-windows-hadrian:
   extends: .build-windows-make
   variables:
     MSYSTEM: MINGW64
-    CONFIGURE_ARGS: "--target=x86_64-unknown-mingw32"
     TEST_ENV: "x86_64-windows"
   cache:
     key: "x86_64-windows-$WINDOWS_TOOLCHAIN_VERSION"
@@ -884,11 +886,10 @@ release-x86_64-windows:
     BUILD_FLAVOUR: "perf"
 
 
-.build-i386-windows:
+.build-i386-windows-make:
   extends: .build-windows-make
   variables:
     MSYSTEM: MINGW32
-    CONFIGURE_ARGS: "--target=i386-unknown-mingw32"
     # Due to #15934
     BUILD_PROF_LIBS: "NO"
     TEST_ENV: "i386-windows"
