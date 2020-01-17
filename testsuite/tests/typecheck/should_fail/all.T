@@ -549,3 +549,6 @@ test('T17213', [extra_files(['T17213a.hs'])], multimod_compile_fail, ['T17213', 
 test('T17355', normal, compile_fail, [''])
 test('T17360', normal, compile_fail, [''])
 test('T17563', normal, compile_fail, [''])
+test('ExplicitSpecificity1', normal, compile_fail, [''])
+test('ExplicitSpecificity2', normal, compile_fail, [''])
+test('ExplicitSpecificity3', normal, compile_fail, [''])
