@@ -693,7 +693,7 @@ mkGadtDecl names ty
   = (ConDeclGADT { con_g_ext  = noExtField
                  , con_names  = names
                  , con_forall = L l $ isLHsForAllTy ty'
-                 , con_qvars  = mkHsQTvs tvs
+                 , con_qvars  = tvs
                  , con_mb_cxt = mcxt
                  , con_args   = args
                  , con_res_ty = res_ty
@@ -822,7 +822,7 @@ eitherToP (Left (loc, doc)) = addFatalError loc doc
 eitherToP (Right thing)     = return thing
 
 checkTyVars :: SDoc -> SDoc -> Located RdrName -> [LHsTypeArg GhcPs]
-            -> P ( LHsQTyVars () GhcPs  -- the synthesized type variables
+            -> P ( LHsQTyVars GhcPs  -- the synthesized type variables
                  , [AddAnn] )        -- action which adds annotations
 -- ^ Check whether the given list of type parameters are all type variables
 -- (possibly with a kind signature).

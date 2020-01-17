@@ -50,7 +50,7 @@ module GHC.Hs.Types (
 
         mkHsImplicitBndrs, mkHsWildCardBndrs, hsImplicitBody,
         mkEmptyImplicitBndrs, mkEmptyWildCardBndrs,
-        mkHsQTvs, hsQTvExplicit, emptyLHsQTvs, isEmptyLHsQTvs,
+        mkHsQTvs, hsQTvExplicit, emptyLHsQTvs,
         isHsKindedTyVar, hsTvbAllKinded, isLHsForAllTy,
         hsScopedTvs, hsWcScopedTvs, dropWildCards,
         hsTyVarName, hsAllLTyVarNames, hsLTyVarLocNames,
@@ -324,10 +324,10 @@ type LHsTyVarBndr flag pass = Located (HsTyVarBndr flag pass)
                          -- See Note [HsType binders]
 
 -- | Located Haskell Quantified Type Variables
-data LHsQTyVars flag pass   -- See Note [HsType binders]
+data LHsQTyVars pass   -- See Note [HsType binders]
   = HsQTvs { hsq_ext :: XHsQTvs pass
 
-           , hsq_explicit :: [LHsTyVarBndr flag pass]
+           , hsq_explicit :: [LHsTyVarBndr () pass]
                 -- Explicit variables, written by the user
                 -- See Note [HsForAllTy tyvar binders]
     }
@@ -343,19 +343,14 @@ type instance XHsQTvs GhcTc = HsQTvsRn
 
 type instance XXLHsQTyVars  (GhcPass _) = NoExtCon
 
-mkHsQTvs :: [LHsTyVarBndr flag GhcPs] -> LHsQTyVars flag GhcPs
+mkHsQTvs :: [LHsTyVarBndr () GhcPs] -> LHsQTyVars GhcPs
 mkHsQTvs tvs = HsQTvs { hsq_ext = noExtField, hsq_explicit = tvs }
 
-hsQTvExplicit :: LHsQTyVars flag pass -> [LHsTyVarBndr flag pass]
+hsQTvExplicit :: LHsQTyVars pass -> [LHsTyVarBndr () pass]
 hsQTvExplicit = hsq_explicit
 
-emptyLHsQTvs :: LHsQTyVars flag GhcRn
+emptyLHsQTvs :: LHsQTyVars GhcRn
 emptyLHsQTvs = HsQTvs { hsq_ext = [], hsq_explicit = [] }
-
-isEmptyLHsQTvs :: LHsQTyVars flag GhcRn -> Bool
-isEmptyLHsQTvs (HsQTvs { hsq_ext = imp, hsq_explicit = exp })
-  = null imp && null exp
-isEmptyLHsQTvs _ = False
 
 ------------------------------------------------
 --            HsImplicitBndrs
@@ -528,7 +523,7 @@ isHsKindedTyVar (KindedTyVar {}) = True
 isHsKindedTyVar (XTyVarBndr {})  = False
 
 -- | Do all type variables in this 'LHsQTyVars' come with kind annotations?
-hsTvbAllKinded :: LHsQTyVars flag pass -> Bool
+hsTvbAllKinded :: LHsQTyVars pass -> Bool
 hsTvbAllKinded = all (isHsKindedTyVar . unLoc) . hsQTvExplicit
 
 instance NamedThing (HsTyVarBndr flag GhcRn) where
@@ -1064,11 +1059,11 @@ hsLTyVarName = hsTyVarName . unLoc
 hsLTyVarNames :: [LHsTyVarBndr flag (GhcPass p)] -> [IdP (GhcPass p)]
 hsLTyVarNames = map hsLTyVarName
 
-hsExplicitLTyVarNames :: LHsQTyVars flag (GhcPass p) -> [IdP (GhcPass p)]
+hsExplicitLTyVarNames :: LHsQTyVars (GhcPass p) -> [IdP (GhcPass p)]
 -- Explicit variables only
 hsExplicitLTyVarNames qtvs = map hsLTyVarName (hsQTvExplicit qtvs)
 
-hsAllLTyVarNames :: LHsQTyVars flag GhcRn -> [Name]
+hsAllLTyVarNames :: LHsQTyVars GhcRn -> [Name]
 -- All variables
 hsAllLTyVarNames (HsQTvs { hsq_ext = kvs
                          , hsq_explicit = tvs })
@@ -1078,7 +1073,7 @@ hsAllLTyVarNames (XLHsQTyVars nec) = noExtCon nec
 hsLTyVarLocName :: LHsTyVarBndr flag (GhcPass p) -> Located (IdP (GhcPass p))
 hsLTyVarLocName = mapLoc hsTyVarName
 
-hsLTyVarLocNames :: LHsQTyVars flag (GhcPass p) -> [Located (IdP (GhcPass p))]
+hsLTyVarLocNames :: LHsQTyVars (GhcPass p) -> [Located (IdP (GhcPass p))]
 hsLTyVarLocNames qtvs = map hsLTyVarLocName (hsQTvExplicit qtvs)
 
 -- | Get the kind signature of a type, ignoring parentheses:
@@ -1464,7 +1459,7 @@ instance Outputable HsTyLit where
     ppr = ppr_tylit
 
 instance OutputableBndrId p
-       => Outputable (LHsQTyVars () (GhcPass p)) where
+       => Outputable (LHsQTyVars (GhcPass p)) where
     ppr (HsQTvs { hsq_explicit = tvs }) = interppSP tvs
     ppr (XLHsQTyVars x) = ppr x
 

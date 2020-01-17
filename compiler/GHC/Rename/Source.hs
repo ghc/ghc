@@ -1678,7 +1678,7 @@ rnTyClDecl (ClassDecl { tcdCtxt = context, tcdLName = lcls,
 rnTyClDecl (XTyClDecl nec) = noExtCon nec
 
 -- Does the data type declaration include a CUSK?
-data_decl_has_cusk :: LHsQTyVars flag pass -> NewOrData -> Bool -> Maybe (LHsKind pass') -> RnM Bool
+data_decl_has_cusk :: LHsQTyVars pass -> NewOrData -> Bool -> Maybe (LHsKind pass') -> RnM Bool
 data_decl_has_cusk tyvars new_or_data no_rhs_kvs kind_sig = do
   { -- See Note [Unlifted Newtypes and CUSKs], and for a broader
     -- picture, see Note [Implementation of UnliftedNewtypes].
@@ -1978,7 +1978,7 @@ rnFamResultSig _ (XFamilyResultSig nec) = noExtCon nec
 -- | Rename injectivity annotation. Note that injectivity annotation is just the
 -- part after the "|".  Everything that appears before it is renamed in
 -- rnFamDecl.
-rnInjectivityAnn :: LHsQTyVars flag GhcRn      -- ^ Type variables declared in
+rnInjectivityAnn :: LHsQTyVars GhcRn      -- ^ Type variables declared in
                                                --   type family head
                  -> LFamilyResultSig GhcRn     -- ^ Result signature
                  -> LInjectivityAnn GhcPs      -- ^ Injectivity annotation
@@ -2101,7 +2101,7 @@ rnConDecl decl@(ConDeclH98 { con_name = name, con_ex_tvs = ex_tvs
 
 rnConDecl decl@(ConDeclGADT { con_names   = names
                             , con_forall  = L _ explicit_forall
-                            , con_qvars   = qtvs
+                            , con_qvars   = explicit_tkvs
                             , con_mb_cxt  = mcxt
                             , con_args    = args
                             , con_res_ty  = res_ty
@@ -2110,8 +2110,7 @@ rnConDecl decl@(ConDeclGADT { con_names   = names
         ; new_names <- mapM lookupLocatedTopBndrRn names
         ; mb_doc'   <- rnMbLHsDoc mb_doc
 
-        ; let explicit_tkvs = hsQTvExplicit qtvs
-              theta         = hsConDeclTheta mcxt
+        ; let theta         = hsConDeclTheta mcxt
               arg_tys       = hsConDeclArgTys args
 
           -- We must ensure that we extract the free tkvs in left-to-right
@@ -2142,12 +2141,9 @@ rnConDecl decl@(ConDeclGADT { con_names   = names
                                       -- See Note [GADT abstract syntax] in GHC.Hs.Decls
                                       (PrefixCon arg_tys, final_res_ty)
 
-              new_qtvs =  HsQTvs { hsq_ext = implicit_tkvs
-                                 , hsq_explicit  = explicit_tkvs }
-
         ; traceRn "rnConDecl2" (ppr names $$ ppr implicit_tkvs $$ ppr explicit_tkvs)
-        ; return (decl { con_g_ext = noExtField, con_names = new_names
-                       , con_qvars = new_qtvs, con_mb_cxt = new_cxt
+        ; return (decl { con_g_ext = implicit_tkvs, con_names = new_names
+                       , con_qvars = explicit_tkvs, con_mb_cxt = new_cxt
                        , con_args = args', con_res_ty = res_ty'
                        , con_doc = mb_doc' },
                   all_fvs) } }
