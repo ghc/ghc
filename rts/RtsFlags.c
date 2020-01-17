@@ -324,7 +324,7 @@ usage_text[] = {
 "  -S[<file>] Detailed GC statistics (if <file> omitted, uses stderr)",
 "",
 "",
-"  -Z         Don't squeeze out update frames on stack overflow",
+"  -Z         Don't squeeze out update frames on context switch",
 "  -B         Sound the bell at the start of each garbage collection",
 #if defined(PROFILING)
 "",

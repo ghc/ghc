@@ -1332,7 +1332,7 @@ recommended for everyday use!
 
 .. rts-flag:: -Z
 
-    Turn *off* "update-frame squeezing" at garbage-collection time.
+    Turn *off* update frame squeezing on context switch.
     (There's no particularly good reason to turn it off, except to
     ensure the accuracy of certain data collected regarding thunk entry
     counts.)
