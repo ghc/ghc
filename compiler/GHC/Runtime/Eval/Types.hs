@@ -6,7 +6,7 @@
 --
 -- -----------------------------------------------------------------------------
 
-module InteractiveEvalTypes (
+module GHC.Runtime.Eval.Types (
         Resume(..), History(..), ExecResult(..),
         SingleStep(..), isStep, ExecOptions(..),
         BreakInfo(..)
