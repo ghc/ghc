@@ -846,6 +846,6 @@ Here are the moving parts:
   it in the code generators, but it seems simpler to do it
   once and for all in CoreToSTG.
 
-  In ByteCodeAsm we just lower it as a 0 literal, because
+  In GHC.ByteCode.Asm we just lower it as a 0 literal, because
   it's all boxed and lifted to the host GC anyway.
 -}

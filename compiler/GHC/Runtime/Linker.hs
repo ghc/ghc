@@ -9,25 +9,34 @@
 -- This module deals with the top-level issues of dynamic linking,
 -- calling the object-code linker and the byte-code linker where
 -- necessary.
-module Linker ( getHValue, showLinkerState,
-                linkExpr, linkDecls, unload, withExtendedLinkEnv,
-                extendLinkEnv, deleteFromLinkEnv,
-                extendLoadedPkgs,
-                linkPackages, initDynLinker, linkModule,
-                linkCmdLineLibs,
-                uninitializedLinker
-        ) where
+module GHC.Runtime.Linker
+   ( getHValue
+   , showLinkerState
+   , linkExpr
+   , linkDecls
+   , unload
+   , withExtendedLinkEnv
+   , extendLinkEnv
+   , deleteFromLinkEnv
+   , extendLoadedPkgs
+   , linkPackages
+   , initDynLinker
+   , linkModule
+   , linkCmdLineLibs
+   , uninitializedLinker
+   )
+where
 
 #include "HsVersions.h"
 
 import GhcPrelude
 
-import GHCi
+import GHC.Runtime.Interpreter
 import GHCi.RemoteTypes
 import GHC.Iface.Load
-import ByteCodeLink
-import ByteCodeAsm
-import ByteCodeTypes
+import GHC.ByteCode.Linker
+import GHC.ByteCode.Asm
+import GHC.ByteCode.Types
 import TcRnMonad
 import Packages
 import DriverPhases
@@ -37,7 +46,7 @@ import Name
 import NameEnv
 import Module
 import ListSetOps
-import LinkerTypes (DynLinker(..), LinkerUnitId, PersistentLinkerState(..))
+import GHC.Runtime.Linker.Types (DynLinker(..), LinkerUnitId, PersistentLinkerState(..))
 import DynFlags
 import BasicTypes
 import Outputable
@@ -175,7 +184,7 @@ getHValue hsc_env name = do
               m <- lookupClosure hsc_env (unpackFS sym_to_find)
               case m of
                 Just hvref -> mkFinalizedHValue hsc_env hvref
-                Nothing -> linkFail "ByteCodeLink.lookupCE"
+                Nothing -> linkFail "GHC.ByteCode.Linker.lookupCE"
                              (unpackFS sym_to_find)
 
 linkDependencies :: HscEnv -> PersistentLinkerState
