@@ -67,13 +67,13 @@ module GHC.StgToCmm.Closure (
 import GhcPrelude
 
 import GHC.Stg.Syntax
-import SMRep
-import Cmm
-import PprCmmExpr() -- For Outputable instances
+import GHC.Runtime.Layout
+import GHC.Cmm
+import GHC.Cmm.Ppr.Expr() -- For Outputable instances
 
 import CostCentre
-import BlockId
-import CLabel
+import GHC.Cmm.BlockId
+import GHC.Cmm.CLabel
 import Id
 import IdInfo
 import DataCon

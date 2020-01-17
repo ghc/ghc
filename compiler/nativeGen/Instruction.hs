@@ -18,11 +18,11 @@ import GhcPrelude
 
 import Reg
 
-import BlockId
-import Hoopl.Collections
-import Hoopl.Label
+import GHC.Cmm.BlockId
+import GHC.Cmm.Dataflow.Collections
+import GHC.Cmm.Dataflow.Label
 import DynFlags
-import Cmm hiding (topInfoTable)
+import GHC.Cmm hiding (topInfoTable)
 import GHC.Platform
 
 -- | Holds a list of source and destination registers used by a
