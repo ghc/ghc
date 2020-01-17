@@ -2762,7 +2762,8 @@ checkTyConTelescope tc
               2 pp_tc_kind
          , extra
          , hang (text "Perhaps try this order instead:")
-              2 (pprTyVars sorted_tvs) ]
+              2 (pprTyVars sorted_tvs)
+         , ppr tcbs ]
 
   | otherwise
   = return ()

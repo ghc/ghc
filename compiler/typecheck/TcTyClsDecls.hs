@@ -431,6 +431,60 @@ TcTyCons are used for two distinct purposes
 
 See also Note [Type checking recursive type and class declarations].
 
+Note [Generalising the kind of a TcTyCon]
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+Consider
+   class C (f :: k) x where
+      type T f
+      op :: D f => blah
+   class D (g :: j) y where
+      op :: C g => y -> blah
+
+Here C and D are considered mutually recursive.  Neither has a CUSK.
+Just before generalisation we have the (un-quantified) kinds
+   C :: k1 -> k2 -> Constraint
+   T :: k1 -> Type
+   D :: k1 -> Type -> Constraint
+Notice that f's kind and g's kind have been unified to 'k1'. We say
+that k1 is the "representative" of k in C's decl, and of j in D's decl.
+
+Now when quantifying, we'd like to end up with
+   C :: forall {k2}. forall k. k -> k2 -> Constraint
+   T :: forall k. k -> Type
+   D :: forall j. j -> Type -> Constraint
+
+That is, we want to swizzle the representative to have the name given
+by the user. This is mainly for error messages, and output of :info in
+GHCi.
+
+* The mapping from representative TyVar back to the user-specified
+  Name is recorded in the tyConScopedTyVars of the TcTyCon.
+
+* The swizzling is actually performed as we construct the final
+  kind for the TyCon, by zonkSwizzleTyBndrsX.
+
+But there are errors to catch here.  Suppose we had
+   class E (f :: j) (g :: k) where
+     op :: SameKind f g -> blah
+
+Then, just before generalisation we will have the (unquantified)
+   E :: k1 -> k1 -> Constraint
+
+That's bad!  Two distinctly-named tyvars (j and k) have ended up with
+the same representative k1.  So when swizzling, we check (in
+checkDuplicatedTyConBinders) that two distinct source names map
+to the same representative.
+
+We do this check across associated types within a class decl
+too.  So
+   class C (f :: k) x where
+      type T (f :: j)
+would elicit a complaint, because j and k end up with the
+same representative (since they are both f's kind.  Hence
+the call to checkDuplicateTyConBinders is in generaliseTyClDecl,
+rather than in generaliseTcTyCon.
+
+
 Note [Type environment evolution]
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 As we typecheck a group of declarations the type environment evolves.
@@ -583,50 +637,47 @@ kcTyClGroup kisig_env decls
     pp_tc tc = ppr (tyConName tc) <+> dcolon <+> ppr (tyConKind tc)
 
 generaliseTyClDecl :: NameEnv TcTyCon -> LTyClDecl GhcRn -> TcM [TcTyCon]
-generaliseTyClDecl inferred_tc_env (L _ decl) = do
-  let names_in_this_decl :: [Name]
-      names_in_this_decl = tycld_names decl
+generaliseTyClDecl inferred_tc_env (L _ decl)
+  = do { let names_in_this_decl :: [Name]
+             names_in_this_decl = tycld_names decl
 
-      inferred_tcs :: [TcTyCon]
-      inferred_tcs = map (lookupNameEnv_NF inferred_tc_env) names_in_this_decl
-                     -- These lookups should never fail
+             inferred_tcs :: [TcTyCon]
+             inferred_tcs = map (lookupNameEnv_NF inferred_tc_env) names_in_this_decl
+                            -- These lookups should never fail
 
-      swizzle_prs :: [(TyVar, Name)]
-      -- Maps the representative TyVar to
-      -- the name to use in this decl
-      swizzle_prs = [ (tv, scoped_nm)
-                    | tc <- inferred_tcs
-                    , (scoped_nm, tv) <- tcTyConScopedTyVars tc ]
+             swizzle_prs :: [(TyVar, Name)]
+             -- Maps the representative TyVar to the name to use in this decl
+             -- The 'nub' is because associated types share type variables
+             -- with the parent
+             -- e.g.  class C f a where { type T f b }
+             --       Scoped tyvars for C:   [("f",f),("a",a)]
+             --                     for T:   [("f",f),("b",b)]
+             --       Note the duplicated (f,f)
+             -- See Note [Generalising the kind of a TcTyCon]
+             swizzle_prs = nub [ (tv, scoped_nm)
+                               | tc <- inferred_tcs
+                               , (scoped_nm, tv) <- tcTyConScopedTyVars tc ]
 
-      swizzle_env :: TyVarEnv Name
-      swizzle_env = mkVarEnv swizzle_prs
+             swizzle_env :: TyVarEnv Name
+             swizzle_env = mkVarEnv swizzle_prs
 
-  -- Check for duplicates
-  -- E.g. data SameKind (a::k) (b::k)
-  --      data T (a::k1) (b::k2) = MkT (SameKind a b)
-  -- Here k1 and k2 start as TyVarTvs, and get unified with each other
-  -- If this happens, things get very confused later, so fail fast
-  checkDuplicateTyConBinders $ map swap swizzle_prs
+         -- Check for duplicates
+         -- E.g. data SameKind (a::k) (b::k)
+         --      data T (a::k1) (b::k2) = MkT (SameKind a b)
+         -- Here k1 and k2 start as TyVarTvs, and get unified with each other
+         -- If this happens, things get very confused later, so fail fast
+       ; traceTc "generaliseTyClDecl" $
+         vcat [ ppr decl
+              , text "swizzle_prs" <+> ppr swizzle_prs ]
+       ; checkDuplicateTyConBinders $ map swap swizzle_prs
 
-  mapAndReportM (generaliseTcTyCon swizzle_env) inferred_tcs
+       ; mapAndReportM (generaliseTcTyCon swizzle_env) inferred_tcs }
   where
     tycld_names :: TyClDecl GhcRn -> [Name]
-    tycld_names (ClassDecl { tcdLName = L _ cls_name, tcdATs = ats })
-      = cls_name : map (fam_decl_name . unLoc) ats
-    tycld_names (DataDecl { tcdLName = L _ name })
-      = [name]
-    tycld_names (FamDecl { tcdFam = decl })
-      = [fam_decl_name decl]
-    tycld_names (SynDecl { tcdLName = L _ name })
-      = [name]
-    tycld_names (XTyClDecl nec)
-      = noExtCon nec
+    tycld_names decl = tcdName decl : at_names decl
 
-    fam_decl_name :: FamilyDecl GhcRn -> Name
-    fam_decl_name (FamilyDecl { fdLName = L _ name })
-      = name
-    fam_decl_name (XFamilyDecl nec)
-      = noExtCon nec
+    at_names (ClassDecl { tcdATs = ats }) = map (familyDeclName . unLoc) ats
+    at_names _ = []  -- Only class decls have associated types
 
 generaliseTcTyCon :: TyVarEnv Name -> TcTyCon -> TcM TcTyCon
 generaliseTcTyCon swizzle_env tc
@@ -658,7 +709,8 @@ generaliseTcTyCon swizzle_env tc
        ; let n_spec              = length spec_req_tvs - tyConArity tc
              (spec_tvs, req_tvs) = splitAt n_spec spec_req_tvs
              sorted_spec_tvs     = scopedSort spec_tvs
-                             -- NB: maintain the L-R order of scoped_tvs
+                 -- NB: We can't do the sort until we've zonked
+                 --     Maintain the L-R order of scoped_tvs
 
        -- Step 2a: find all the Inferred variables we want to quantify over
        -- NB: candidateQTyVarsOfKinds zonks as it goes
@@ -675,6 +727,7 @@ generaliseTcTyCon swizzle_env tc
                  , text "inferred =" <+> pprTyVars inferred ])
 
        -- Step 3: final zonking
+       -- See Note [Generalising the kind of a TcTyCon]
        ; ze <- emptyZonkEnv
        ; (ze, inferred)        <- zonkSwizzleTyBndrsX swizzle_env ze inferred
        ; (ze, sorted_spec_tvs) <- zonkSwizzleTyBndrsX swizzle_env ze sorted_spec_tvs
@@ -688,7 +741,8 @@ generaliseTcTyCon swizzle_env tc
               , text "spec_req_prs =" <+> ppr spec_req_prs
               , text "spec_req_tvs =" <+> pprTyVars spec_req_tvs
               , text "sorted_spec_tvs =" <+> pprTyVars sorted_spec_tvs
-              , text "req_tvs =" <+> ppr req_tvs ]
+              , text "req_tvs =" <+> ppr req_tvs
+              , text "zonk-env =" <+> ppr ze ]
 
        -- Step 4: Make the TyConBinders.
        ; let to_user tv     = lookupTyVarOcc ze tv `orElse` tv
@@ -1061,8 +1115,8 @@ mk_prom_err_env :: TyClDecl GhcRn -> TcTypeEnv
 mk_prom_err_env (ClassDecl { tcdLName = L _ nm, tcdATs = ats })
   = unitNameEnv nm (APromotionErr ClassPE)
     `plusNameEnv`
-    mkNameEnv [ (name, APromotionErr TyConPE)
-              | (L _ (FamilyDecl { fdLName = L _ name })) <- ats ]
+    mkNameEnv [ (familyDeclName at, APromotionErr TyConPE)
+              | L _ at <- ats ]
 
 mk_prom_err_env (DataDecl { tcdLName = L _ name
                           , tcdDataDefn = HsDataDefn { dd_cons = cons } })
@@ -1916,10 +1970,10 @@ tcClassATs class_name cls ats at_defs
        ; mapM tc_at ats }
   where
     at_def_tycon :: LTyFamDefltDecl GhcRn -> Name
-    at_def_tycon (L _ eqn) = tyFamInstDeclName eqn
+    at_def_tycon = tyFamInstDeclName . unLoc
 
     at_fam_name :: LFamilyDecl GhcRn -> Name
-    at_fam_name (L _ decl) = unLoc (fdLName decl)
+    at_fam_name = familyDeclName . unLoc
 
     at_names = mkNameSet (map at_fam_name ats)
 

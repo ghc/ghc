@@ -325,13 +325,13 @@ extendZonkEnv ze@(ZonkEnv { ze_tv_env = tyco_env, ze_id_env = id_env }) vars
   where
     (tycovars, ids) = partition isTyCoVar vars
 
-extendIdZonkEnv1 :: ZonkEnv -> Var -> ZonkEnv
-extendIdZonkEnv1 ze@(ZonkEnv { ze_id_env = id_env }) id
+extendIdZonkEnv :: ZonkEnv -> Var -> ZonkEnv
+extendIdZonkEnv ze@(ZonkEnv { ze_id_env = id_env }) id
   = ze { ze_id_env = extendVarEnv id_env id id }
 
-extendTyZonkEnv1 :: ZonkEnv -> TyVar -> ZonkEnv
-extendTyZonkEnv1 ze@(ZonkEnv { ze_tv_env = ty_env }) tv
-  = ze { ze_tv_env = extendVarEnv ty_env tv tv }
+extendTyZonkEnv :: ZonkEnv -> TyVar -> TyVar -> ZonkEnv
+extendTyZonkEnv ze@(ZonkEnv { ze_tv_env = ty_env }) tv tv'
+  = ze { ze_tv_env = extendVarEnv ty_env tv tv' }
 
 setZonkType :: ZonkEnv -> ZonkFlexi -> ZonkEnv
 setZonkType ze flexi = ze { ze_flexi = flexi }
@@ -421,7 +421,7 @@ zonkEvVarOcc env v
 zonkCoreBndrX :: ZonkEnv -> Var -> TcM (ZonkEnv, Var)
 zonkCoreBndrX env v
   | isId v = do { v' <- zonkIdBndr env v
-                ; return (extendIdZonkEnv1 env v', v') }
+                ; return (extendIdZonkEnv env v', v') }
   | otherwise = zonkTyBndrX env v
 
 zonkCoreBndrsX :: ZonkEnv -> [Var] -> TcM (ZonkEnv, [Var])
@@ -441,7 +441,7 @@ zonkTyBndrX env tv
     do { ki <- zonkTcTypeToTypeX env (tyVarKind tv)
                -- Internal names tidy up better, for iface files.
        ; let tv' = mkTyVar (tyVarName tv) ki
-       ; return (extendTyZonkEnv1 env tv', tv') }
+       ; return (extendTyZonkEnv env tv tv', tv') }
 
 zonkTyVarBinders ::  [VarBndr TcTyVar vis]
                  -> TcM (ZonkEnv, [VarBndr TyVar vis])
@@ -464,11 +464,15 @@ zonkSwizzleTyBndrsX ::
 -- See Note [Tricky scoping in generaliseTcTyCon] in TcTyClsDecls.
 zonkSwizzleTyBndrsX swizzle_env = mapAccumLM (zonkSwizzleTyBndrX swizzle_env)
 
-zonkSwizzleTyBndrX ::
-  TyVarEnv Name -> ZonkEnv -> TcTyVar -> TcM (ZonkEnv, TyVar)
-zonkSwizzleTyBndrX swizzle_env ze tv = zonkTyBndrX ze tv'
-  where
-    tv' = maybe tv (setTyVarName tv) $ lookupVarEnv swizzle_env tv
+zonkSwizzleTyBndrX :: TyVarEnv Name -> ZonkEnv
+                   -> TcTyVar -> TcM (ZonkEnv, TyVar)
+-- Like zonkTyBndrX, but swizzles the Name
+zonkSwizzleTyBndrX swizzle_env ze tv
+  = ASSERT2( isImmutableTyVar tv, ppr tv <+> dcolon <+> ppr (tyVarKind tv) )
+    do { ki <- zonkTcTypeToTypeX ze (tyVarKind tv)
+       ; let name' = lookupVarEnv swizzle_env tv `orElse` tyVarName tv
+             tv'   = mkTyVar name' ki
+       ; return (extendTyZonkEnv ze tv tv', tv') }
 
 zonkTopExpr :: HsExpr GhcTcId -> TcM (HsExpr GhcTc)
 zonkTopExpr e = initZonkEnv $ \ ze -> zonkExpr ze e
@@ -1345,7 +1349,7 @@ zonk_pat env (WildPat ty)
 
 zonk_pat env (VarPat x (L l v))
   = do  { v' <- zonkIdBndr env v
-        ; return (extendIdZonkEnv1 env v', VarPat x (L l v')) }
+        ; return (extendIdZonkEnv env v', VarPat x (L l v')) }
 
 zonk_pat env (LazyPat x pat)
   = do  { (env', pat') <- zonkPat env pat
@@ -1357,7 +1361,7 @@ zonk_pat env (BangPat x pat)
 
 zonk_pat env (AsPat x (L loc v) pat)
   = do  { v' <- zonkIdBndr env v
-        ; (env', pat') <- zonkPat (extendIdZonkEnv1 env v') pat
+        ; (env', pat') <- zonkPat (extendIdZonkEnv env v') pat
         ; return (env', AsPat x (L loc v') pat') }
 
 zonk_pat env (ViewPat ty expr pat)
@@ -1447,7 +1451,7 @@ zonk_pat env (NPlusKPat ty (L loc n) (L l lit1) lit2 e1 e2)
         ; lit1' <- zonkOverLit env2 lit1
         ; lit2' <- zonkOverLit env2 lit2
         ; ty' <- zonkTcTypeToTypeX env2 ty
-        ; return (extendIdZonkEnv1 env2 n',
+        ; return (extendIdZonkEnv env2 n',
                   NPlusKPat ty' (L loc n') (L l lit1') lit2' e1' e2') }
 
 zonk_pat env (CoPat x co_fn pat ty)
@@ -1595,7 +1599,7 @@ zonkCoreExpr env (Case scrut b ty alts)
     = do scrut' <- zonkCoreExpr env scrut
          ty' <- zonkTcTypeToTypeX env ty
          b' <- zonkIdBndr env b
-         let env1 = extendIdZonkEnv1 env b'
+         let env1 = extendIdZonkEnv env b'
          alts' <- mapM (zonkCoreAlt env1) alts
          return $ Case scrut' b' ty' alts'
 
@@ -1609,7 +1613,7 @@ zonkCoreBind :: ZonkEnv -> CoreBind -> TcM (ZonkEnv, CoreBind)
 zonkCoreBind env (NonRec v e)
     = do v' <- zonkIdBndr env v
          e' <- zonkCoreExpr env e
-         let env1 = extendIdZonkEnv1 env v'
+         let env1 = extendIdZonkEnv env v'
          return (env1, NonRec v' e')
 zonkCoreBind env (Rec pairs)
     = do (env1, pairs') <- fixM go
