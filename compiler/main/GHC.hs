@@ -132,7 +132,7 @@ module GHC (
 
         -- ** Compiling expressions
         HValue, parseExpr, compileParsedExpr,
-        InteractiveEval.compileExpr, dynCompileExpr,
+        GHC.Runtime.Eval.compileExpr, dynCompileExpr,
         ForeignHValue,
         compileExprRemote, compileParsedExprRemote,
 
@@ -154,8 +154,8 @@ module GHC (
         modInfoModBreaks,
         ModBreaks(..), BreakIndex,
         BreakInfo(breakInfo_number, breakInfo_module),
-        InteractiveEval.back,
-        InteractiveEval.forward,
+        GHC.Runtime.Eval.back,
+        GHC.Runtime.Eval.forward,
 
         -- * Abstract syntax elements
 
@@ -295,10 +295,10 @@ module GHC (
 
 import GhcPrelude hiding (init)
 
-import ByteCodeTypes
-import InteractiveEval
-import InteractiveEvalTypes
-import GHCi
+import GHC.ByteCode.Types
+import GHC.Runtime.Eval
+import GHC.Runtime.Eval.Types
+import GHC.Runtime.Interpreter
 import GHCi.RemoteTypes
 
 import PprTyThing       ( pprFamInst )
@@ -1526,15 +1526,15 @@ getGHCiMonad = fmap (ic_monad . hsc_IC) getSession
 
 getHistorySpan :: GhcMonad m => History -> m SrcSpan
 getHistorySpan h = withSession $ \hsc_env ->
-    return $ InteractiveEval.getHistorySpan hsc_env h
+    return $ GHC.Runtime.Eval.getHistorySpan hsc_env h
 
 obtainTermFromVal :: GhcMonad m => Int ->  Bool -> Type -> a -> m Term
 obtainTermFromVal bound force ty a = withSession $ \hsc_env ->
-    liftIO $ InteractiveEval.obtainTermFromVal hsc_env bound force ty a
+    liftIO $ GHC.Runtime.Eval.obtainTermFromVal hsc_env bound force ty a
 
 obtainTermFromId :: GhcMonad m => Int -> Bool -> Id -> m Term
 obtainTermFromId bound force id = withSession $ \hsc_env ->
-    liftIO $ InteractiveEval.obtainTermFromId hsc_env bound force id
+    liftIO $ GHC.Runtime.Eval.obtainTermFromId hsc_env bound force id
 
 
 -- | Returns the 'TyThing' for a 'Name'.  The 'Name' may refer to any

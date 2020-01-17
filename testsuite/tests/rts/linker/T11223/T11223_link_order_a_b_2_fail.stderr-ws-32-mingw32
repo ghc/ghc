@@ -12,7 +12,7 @@ This could be caused by:
 ghc-stage2.exe: ^^ Could not load '_c', dependency unresolved. See top entry above.
 
 
-ByteCodeLink: can't find label
+GHC.ByteCode.Linker: can't find label
 During interactive linking, GHCi couldn't find the following symbol:
   c
 This may be due to you not asking GHCi to load extra object files,
