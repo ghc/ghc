@@ -28,7 +28,7 @@ import GhcPrelude
 import GHC.StgToCmm.Closure
 import GHC.StgToCmm.Utils
 import GHC.StgToCmm.Monad
-import GHC.Runtime.Layout
+import GHC.Runtime.Heap.Layout
 
 import GHC.Cmm.Graph
 import GHC.Cmm
