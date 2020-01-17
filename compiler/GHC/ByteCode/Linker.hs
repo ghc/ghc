@@ -8,8 +8,8 @@
 --  (c) The University of Glasgow 2002-2006
 --
 
--- | ByteCodeLink: Bytecode assembler and linker
-module ByteCodeLink (
+-- | Bytecode assembler and linker
+module GHC.ByteCode.Linker (
         ClosureEnv, emptyClosureEnv, extendClosureEnv,
         linkBCO, lookupStaticPtr,
         lookupIE,
@@ -25,8 +25,8 @@ import GHCi.ResolvedBCO
 import GHCi.BreakArray
 import SizedSeq
 
-import GHCi
-import ByteCodeTypes
+import GHC.Runtime.Interpreter
+import GHC.ByteCode.Types
 import HscTypes
 import Name
 import NameEnv
@@ -90,7 +90,7 @@ lookupStaticPtr hsc_env addr_of_label_string = do
   m <- lookupSymbol hsc_env addr_of_label_string
   case m of
     Just ptr -> return ptr
-    Nothing  -> linkFail "ByteCodeLink: can't find label"
+    Nothing  -> linkFail "GHC.ByteCode.Linker: can't find label"
                   (unpackFS addr_of_label_string)
 
 lookupIE :: HscEnv -> ItblEnv -> Name -> IO (Ptr ())
@@ -108,7 +108,7 @@ lookupIE hsc_env ie con_nm =
                    n <- lookupSymbol hsc_env sym_to_find2
                    case n of
                       Just addr -> return addr
-                      Nothing   -> linkFail "ByteCodeLink.lookupIE"
+                      Nothing   -> linkFail "GHC.ByteCode.Linker.lookupIE"
                                       (unpackFS sym_to_find1 ++ " or " ++
                                        unpackFS sym_to_find2)
 
@@ -118,7 +118,7 @@ lookupPrimOp hsc_env primop = do
   m <- lookupSymbol hsc_env (mkFastString sym_to_find)
   case m of
     Just p -> return (toRemotePtr p)
-    Nothing -> linkFail "ByteCodeLink.lookupCE(primop)" sym_to_find
+    Nothing -> linkFail "GHC.ByteCode.Linker.lookupCE(primop)" sym_to_find
 
 resolvePtr
   :: HscEnv -> ItblEnv -> ClosureEnv -> NameEnv Int -> RemoteRef BreakArray
@@ -135,7 +135,7 @@ resolvePtr hsc_env _ie ce bco_ix _ (BCOPtrName nm)
        m <- lookupSymbol hsc_env sym_to_find
        case m of
          Just p -> return (ResolvedBCOStaticPtr (toRemotePtr p))
-         Nothing -> linkFail "ByteCodeLink.lookupCE" (unpackFS sym_to_find)
+         Nothing -> linkFail "GHC.ByteCode.Linker.lookupCE" (unpackFS sym_to_find)
 resolvePtr hsc_env _ _ _ _ (BCOPtrPrimOp op) =
   ResolvedBCOStaticPtr <$> lookupPrimOp hsc_env op
 resolvePtr hsc_env ie ce bco_ix breakarray (BCOPtrBCO bco) =

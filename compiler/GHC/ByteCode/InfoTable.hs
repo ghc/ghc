@@ -4,15 +4,15 @@
 --  (c) The University of Glasgow 2002-2006
 --
 
--- | ByteCodeItbls: Generate infotables for interpreter-made bytecodes
-module ByteCodeItbls ( mkITbls ) where
+-- | Generate infotables for interpreter-made bytecodes
+module GHC.ByteCode.InfoTable ( mkITbls ) where
 
 #include "HsVersions.h"
 
 import GhcPrelude
 
-import ByteCodeTypes
-import GHCi
+import GHC.ByteCode.Types
+import GHC.Runtime.Interpreter
 import DynFlags
 import HscTypes
 import Name             ( Name, getName )

@@ -18,7 +18,7 @@ import GHC.Cmm.Graph
 import ForeignCall
 import GHC.Cmm.Liveness
 import GHC.Cmm.ProcPoint
-import GHC.Runtime.Layout
+import GHC.Runtime.Heap.Layout
 import GHC.Cmm.Dataflow.Block
 import GHC.Cmm.Dataflow.Collections
 import GHC.Cmm.Dataflow
