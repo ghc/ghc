@@ -975,8 +975,8 @@ def test_common_work(watcher: testutil.Watcher,
             except KeyboardInterrupt:
                 stopNow()
             except Exception as e:
-                framework_fail(name, way, str(e))
                 traceback.print_exc()
+                framework_fail(name, way, traceback.format_exc())
 
         t.n_tests_skipped += len(set(all_ways) - set(do_ways))
 
