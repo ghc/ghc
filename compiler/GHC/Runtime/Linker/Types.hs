@@ -6,7 +6,7 @@
 --
 -----------------------------------------------------------------------------
 
-module LinkerTypes (
+module GHC.Runtime.Linker.Types (
       DynLinker(..),
       PersistentLinkerState(..),
       LinkerUnitId,
@@ -20,7 +20,7 @@ import Data.Time               ( UTCTime )
 import Data.Maybe              ( Maybe )
 import Control.Concurrent.MVar ( MVar )
 import Module                  ( InstalledUnitId, Module )
-import ByteCodeTypes           ( ItblEnv, CompiledByteCode )
+import GHC.ByteCode.Types           ( ItblEnv, CompiledByteCode )
 import Outputable
 import Var                     ( Id )
 import GHC.Fingerprint.Type    ( Fingerprint )

@@ -31,7 +31,7 @@ import GHC.StgToCmm.Foreign    (emitPrimCall)
 import GHC.Cmm.Graph
 import CoreSyn          ( AltCon(..), tickishIsCode )
 import GHC.Cmm.BlockId
-import GHC.Runtime.Layout
+import GHC.Runtime.Heap.Layout
 import GHC.Cmm
 import GHC.Cmm.Info
 import GHC.Cmm.Utils
