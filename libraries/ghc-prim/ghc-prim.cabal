@@ -12,6 +12,16 @@ build-type:     Custom
 description:
     This package contains the primitive types and operations supplied by GHC.
 
+Flag boot
+    Description: Is this stage 1?
+    Default: False
+    Manual: True
+
+Flag install
+    Description: Is this stage 2?
+    Default: True
+    Manual: True
+
 extra-source-files: changelog.md
 
 source-repository head
@@ -81,3 +91,27 @@ Library
     -- We need to set the unit ID to ghc-prim (without a version number)
     -- as it's magic.
     ghc-options: -this-unit-id ghc-prim
+
+    if flag(boot)
+      include-dirs: dist-boot
+    else
+      if flag(install)
+        include-dirs: dist-install
+
+    install-includes:
+        ghc_boot_platform.h
+        primop-data-decl.hs-incl
+        primop-tag.hs-incl
+        primop-list.hs-incl
+        primop-has-side-effects.hs-incl
+        primop-out-of-line.hs-incl
+        primop-commutable.hs-incl
+        primop-code-size.hs-incl
+        primop-can-fail.hs-incl
+        primop-strictness.hs-incl
+        primop-fixity.hs-incl
+        primop-primop-info.hs-incl
+        primop-vector-uniques.hs-incl
+        primop-vector-tys.hs-incl
+        primop-vector-tys-exports.hs-incl
+        primop-vector-tycons.hs-incl

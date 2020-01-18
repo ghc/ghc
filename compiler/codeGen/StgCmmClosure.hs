@@ -62,7 +62,7 @@ module StgCmmClosure (
         staticClosureNeedsLink,
     ) where
 
-#include "../includes/MachDeps.h"
+#include "MachDeps.h"
 
 #include "HsVersions.h"
 

@@ -132,4 +132,3 @@ mAX_SMALL_BITMAP_SIZE dflags
 
 seqBitmap :: Bitmap -> a -> a
 seqBitmap = seqList
-

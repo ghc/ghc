@@ -8,6 +8,17 @@
 -- ---------------------------------------------------------------------------
 
 {
+-- Careful optimisation of the parser: we don't want to throw everything
+-- at it, because that takes too long and doesn't buy much, but we do want
+-- to inline certain key external functions, so we instruct GHC not to
+-- throw away inlinings as it would normally do in -O0 mode.
+-- Since GHC version 7.8, we need -fcmm-sink to be
+-- passed to the compiler. This is required on x86 to avoid the
+-- register allocator running out of stack slots when compiling this
+-- module with -fPIC -dynamic.
+-- See #8182 for all the details
+{-# OPTIONS_GHC -O0 -fno-ignore-interface-pragmas -fcmm-sink #-}
+
 -- | This module provides the generated Happy parser for Haskell. It exports
 -- a number of parsers which may be used in any library that uses the GHC API.
 -- A common usage pattern is to initialize the parser state with a given string

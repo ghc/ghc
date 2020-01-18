@@ -113,12 +113,13 @@ def boot_pkgs():
         elif len(cabals) == 1:
             cabal = cabals[0]
 
-            if os.path.isfile(cabal):
+            ghc_mk = os.path.join(package, 'ghc.mk')
+
+            if os.path.isfile(cabal) and not os.path.isfile(ghc_mk):
                 # strip both .cabal and .in
                 pkg = os.path.splitext(os.path.splitext(os.path.basename(cabal))[0])[0]
                 top = os.path.join(*['..'] * len(os.path.normpath(package).split(os.path.sep)))
 
-                ghc_mk = os.path.join(package, 'ghc.mk')
                 print('Creating %s' % ghc_mk)
                 with open(ghc_mk, 'w') as f:
                     f.write(dedent(

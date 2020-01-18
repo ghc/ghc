@@ -8,6 +8,11 @@
 
 -- The default is a bit too low for the quite large primOpInfo definition
 {-# OPTIONS_GHC -fmax-pmcheck-iterations=10000000 #-}
+-- GHC itself doesn't know about the pimop bits, so we have to
+-- switch off the recompilation checker for that module:
+{-# OPTIONS_GHC -fforce-recomp #-}
+
+
 
 module PrimOp (
         PrimOp(..), PrimOpVecCat(..), allThePrimOps,

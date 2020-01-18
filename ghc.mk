@@ -591,26 +591,6 @@ BOOT_LIBS = $(foreach lib,$(PACKAGES_STAGE0),$(libraries/$(lib)_dist-boot_v_LIB)
 libraries/ghci_dist-install_CONFIGURE_OPTS += --flags=ghci
 
 # ----------------------------------------
-# Special magic for the ghc-prim package
-
-# We want the ghc-prim package to include the GHC.Prim module when it
-# is registered, but not when it is built, because GHC.Prim is not a
-# real source module, it is built-in to GHC.
-
-# Strip it out again before building the package:
-define libraries/ghc-prim_PACKAGE_MAGIC
-libraries/ghc-prim_dist-install_MODULES := $$(filter-out GHC.Prim,$$(libraries/ghc-prim_dist-install_MODULES))
-endef
-
-PRIMOPS_TXT_STAGE1 = compiler/stage1/build/primops.txt
-
-libraries/ghc-prim/dist-install/build/GHC/PrimopWrappers.hs : $$(genprimopcode_INPLACE) $(PRIMOPS_TXT_STAGE1) | $$(dir $$@)/.
-	"$(genprimopcode_INPLACE)" --make-haskell-wrappers < $(PRIMOPS_TXT_STAGE1) >$@
-
-# Required so that Haddock documents the primops.
-libraries/ghc-prim_dist-install_EXTRA_HADDOCK_SRCS = libraries/ghc-prim/dist-install/build/autogen/GHC/Prim.hs
-
-# ----------------------------------------
 # Special magic for the integer package
 
 ifneq "$(CLEANING)" "YES"

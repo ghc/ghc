@@ -20,29 +20,35 @@ Category: Development
 Build-Type: Simple
 Cabal-Version: >=1.10
 
+extra-source-files:
+    utils/md5.h
+    Unique.h
+    nativeGen/NCG.h
+    parser/cutils.h
+
 Flag ghci
     Description: Build GHCi support.
-    Default: False
-    Manual: True
-
-Flag stage1
-    Description: Is this stage 1?
-    Default: False
-    Manual: True
-
-Flag stage2
-    Description: Is this stage 2?
-    Default: False
-    Manual: True
-
-Flag stage3
-    Description: Is this stage 3?
     Default: False
     Manual: True
 
 Flag terminfo
     Description: Build GHC with terminfo support on non-Windows platforms.
     Default: True
+    Manual: True
+
+Flag stage1
+    Description: Build Stage1 GHC (STAGE=1)
+    Default: False
+    Manual: True
+
+Flag stage2
+    Description: Build Stage1 GHC (STAGE=2)
+    Default: True
+    Manual: True
+
+Flag stage3
+    Description: Build Stage1 GHC (STAGE=3)
+    Default: False
     Manual: True
 
 Library
@@ -67,6 +73,9 @@ Library
                    ghc-heap   == @ProjectVersionMunged@,
                    ghci == @ProjectVersionMunged@
 
+    build-tool-depends: alex:alex,
+                        happy:happy
+
     if os(windows)
         Build-Depends: Win32  >= 2.3 && < 2.7
     else
@@ -79,6 +88,15 @@ Library
                  -Wnoncanonical-monad-instances
                  -Wnoncanonical-monadfail-instances
                  -Wnoncanonical-monoid-instances
+
+    if flag(stage1)
+        ghc-options: -DSTAGE=1
+    else
+        if flag(stage2)
+            ghc-options: -DSTAGE=2
+        else
+            if flag(stage3)
+                ghc-options: -DSTAGE=3
 
     if flag(ghci)
         CPP-Options: -DGHCI
@@ -118,17 +136,6 @@ Library
     -- We need to set the unit id to ghc (without a version number)
     -- as it's magic.
     GHC-Options: -this-unit-id ghc
-
-    if flag(stage1)
-        Include-Dirs: stage1
-    else
-        if flag(stage2)
-            Include-Dirs: stage2
-        else
-            if flag(stage3)
-                Include-Dirs: stage2
-
-    Install-Includes: HsVersions.h, ghc_boot_platform.h
 
     c-sources:
         parser/cutils.c

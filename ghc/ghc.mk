@@ -14,10 +14,6 @@ ghc_USES_CABAL = YES
 ghc_PACKAGE = ghc-bin
 ghc_EXECUTABLE = ghc
 
-ghc_stage1_CONFIGURE_OPTS += --flags=stage1
-ghc_stage2_CONFIGURE_OPTS += --flags=stage2
-ghc_stage3_CONFIGURE_OPTS += --flags=stage3
-
 ifeq "$(GhcWithInterpreter)" "YES"
 ghc_stage2_CONFIGURE_OPTS += --flags=ghci
 ghc_stage3_CONFIGURE_OPTS += --flags=ghci
@@ -121,9 +117,9 @@ ghc/stage2/build/tmp/$(ghc_stage2_PROG) : $(foreach lib,$(PACKAGES_STAGE1),$(lib
 endif
 
 # Modules here import HsVersions.h, so we need ghc_boot_platform.h
-$(ghc_stage1_depfile_haskell) : compiler/stage1/$(PLATFORM_H)
-$(ghc_stage2_depfile_haskell) : compiler/stage2/$(PLATFORM_H)
-$(ghc_stage3_depfile_haskell) : compiler/stage3/$(PLATFORM_H)
+$(ghc_stage1_depfile_haskell) : libraries/ghc-prim/dist-boot/$(PLATFORM_H)
+$(ghc_stage2_depfile_haskell) : libraries/ghc-prim/dist-install/$(PLATFORM_H)
+$(ghc_stage3_depfile_haskell) : libraries/ghc-prim/dist-install/$(PLATFORM_H)
 
 all_ghc_stage1 : $(GHC_STAGE1)
 all_ghc_stage2 : $(GHC_STAGE2)
@@ -177,6 +173,12 @@ endif
 INSTALL_LIBS += settings
 INSTALL_LIBS += llvm-targets
 INSTALL_LIBS += llvm-passes
+
+# A rather nasty hack needed because we still have headers in
+# ghc-prim and rts.
+ghc_stage1_HC_OPTS += -Irts/build -Ilibraries/ghc-prim/dist-boot
+ghc_stage2_HC_OPTS += -Irts/build -Ilibraries/ghc-prim/dist-install
+ghc_stage3_HC_OPTS += -Irts/build -Ilibraries/ghc-prim/dist-install
 
 ifeq "$(Windows_Host)" "NO"
 install: install_ghc_link

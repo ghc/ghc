@@ -142,8 +142,58 @@ instance Outputable (Term) where
 -- Runtime Closure information functions
 ----------------------------------------
 
-isConstr, isIndirection, isThunk :: GenClosure a -> Bool
-isConstr ConstrClosure{} = True
+instance Outputable ClosureType where
+  ppr = text . show
+
+#include "rts/storage/ClosureTypes.h"
+
+aP_CODE, pAP_CODE :: Int
+aP_CODE = AP
+pAP_CODE = PAP
+#undef AP
+#undef PAP
+
+getClosureData :: DynFlags -> a -> IO Closure
+getClosureData dflags a =
+   case unpackClosure# a of
+     (# iptr, ptrs, nptrs #) -> do
+           let iptr0 = Ptr iptr
+           let iptr1
+                | ghciTablesNextToCode = iptr0
+                | otherwise =
+                   -- the info pointer we get back from unpackClosure#
+                   -- is to the beginning of the standard info table,
+                   -- but the Storable instance for info tables takes
+                   -- into account the extra entry pointer when
+                   -- !ghciTablesNextToCode, so we must adjust here:
+                   iptr0 `plusPtr` negate (wORD_SIZE dflags)
+           itbl <- peekItbl iptr1
+           let tipe = readCType (InfoTable.tipe itbl)
+               elems = fromIntegral (InfoTable.ptrs itbl)
+               ptrsList = Array 0 (elems - 1) elems ptrs
+               nptrs_data = ClosureNonPtrs nptrs
+           ASSERT(elems >= 0) return ()
+           ptrsList `seq`
+            return (Closure tipe iptr0 itbl ptrsList nptrs_data)
+
+readCType :: Integral a => a -> ClosureType
+readCType i
+ | i >= CONSTR && i <= CONSTR_NOCAF        = Constr
+ | i >= FUN    && i <= FUN_STATIC          = Fun
+ | i >= THUNK  && i < THUNK_SELECTOR       = Thunk i'
+ | i == THUNK_SELECTOR                     = ThunkSelector
+ | i == BLACKHOLE                          = Blackhole
+ | i >= IND    && i <= IND_STATIC          = Indirection i'
+ | i' == aP_CODE                           = AP
+ | i == AP_STACK                           = AP
+ | i' == pAP_CODE                          = PAP
+ | i == MUT_VAR_CLEAN || i == MUT_VAR_DIRTY= MutVar i'
+ | i == MVAR_CLEAN    || i == MVAR_DIRTY   = MVar i'
+ | otherwise                               = Other  i'
+  where i' = fromIntegral i
+
+isConstr, isIndirection, isThunk :: ClosureType -> Bool
+isConstr Constr = True
 isConstr    _   = False
 
 isIndirection IndClosure{} = True
