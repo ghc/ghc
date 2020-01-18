@@ -52,6 +52,7 @@ data TestArgs = TestArgs
     , testConfigFile :: String
     , testConfigs    :: [String]
     , testJUnit      :: Maybe FilePath
+    , testMetrics    :: Maybe FilePath
     , testOnly       :: [String]
     , testOnlyPerf   :: Bool
     , testSkipPerf   :: Bool
@@ -71,6 +72,7 @@ defaultTestArgs = TestArgs
     , testConfigFile = "testsuite/config/ghc"
     , testConfigs    = []
     , testJUnit      = Nothing
+    , testMetrics    = Nothing
     , testOnly       = []
     , testOnlyPerf   = False
     , testSkipPerf   = False

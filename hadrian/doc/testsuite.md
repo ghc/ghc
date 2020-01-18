@@ -112,6 +112,9 @@ build test --only-perf
 build test --skip-perf
 ```
 
+The testsuite driver will produce a summary of the observed performance metrics
+if `hadrian` is passed the `--summary-metrics=<file>` flag.
+
 ## Test speed
 
 You can run the tests in `slow`, `normal` (default) or `fast`
