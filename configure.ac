@@ -946,7 +946,7 @@ FP_CHECK_SIZEOF_AND_ALIGNMENT(uint64_t)
 
 dnl for use in settings file
 TargetWordSize=$ac_cv_sizeof_void_p
-if test "x$TargetWordSize" == 8; then
+if test "x$TargetWordSize" = x8; then
   AC_SUBST([Cabal64bit],[True])
 else
   AC_SUBST([Cabal64bit],[False])
