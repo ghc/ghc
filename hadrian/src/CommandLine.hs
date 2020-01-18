@@ -52,6 +52,7 @@ data TestArgs = TestArgs
     , testConfigFile :: String
     , testConfigs    :: [String]
     , testJUnit      :: Maybe FilePath
+    , testMetrics    :: Maybe FilePath
     , testOnly       :: [String]
     , testOnlyPerf   :: Bool
     , testSkipPerf   :: Bool
@@ -71,6 +72,7 @@ defaultTestArgs = TestArgs
     , testConfigFile = "testsuite/config/ghc"
     , testConfigs    = []
     , testJUnit      = Nothing
+    , testMetrics    = Nothing
     , testOnly       = []
     , testOnlyPerf   = False
     , testSkipPerf   = False
@@ -142,6 +144,9 @@ readTestConfigFile filepath =
 
 readTestJUnit :: Maybe String -> Either String (CommandLineArgs -> CommandLineArgs)
 readTestJUnit filepath = Right $ \flags -> flags { testArgs = (testArgs flags) { testJUnit = filepath } }
+
+readTestMetrics :: Maybe String -> Either String (CommandLineArgs -> CommandLineArgs)
+readTestMetrics filepath = Right $ \flags -> flags { testArgs = (testArgs flags) { testMetrics = filepath } }
 
 readTestOnly :: Maybe String -> Either String (CommandLineArgs -> CommandLineArgs)
 readTestOnly tests = Right $ \flags ->
@@ -240,6 +245,8 @@ optDescrs =
       "Configurations to run test, in key=value format."
     , Option [] ["summary-junit"] (OptArg readTestJUnit "TEST_SUMMARY_JUNIT")
       "Output testsuite summary in JUnit format."
+    , Option [] ["summary-metrics"] (OptArg readTestMetrics "METRICS_FILE")
+      "Output testsuite performance metrics summary."
     , Option [] ["only"] (OptArg readTestOnly "TESTS")
       "Test cases to run."
     , Option [] ["only-perf"] (NoArg readTestOnlyPerf)
