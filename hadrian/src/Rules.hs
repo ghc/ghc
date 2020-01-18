@@ -54,8 +54,8 @@ toolArgsTarget = do
     need [ root -/- dir -/- "Config.hs" ]
     need [ root -/- dir -/- "Parser.hs" ]
     need [ root -/- dir -/- "Lexer.hs" ]
-    need [ root -/- dir -/- "CmmParse.hs" ]
-    need [ root -/- dir -/- "CmmLex.hs" ]
+    need [ root -/- dir -/- "GHC" -/- "Cmm" -/- "Parser.hs" ]
+    need [ root -/- dir -/- "GHC" -/- "Cmm" -/- "Lexer.hs"  ]
 
     -- Find out the arguments that are needed to load a module into the
     -- session
