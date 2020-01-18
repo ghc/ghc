@@ -49,9 +49,7 @@ module GHCi
 import GhcPrelude
 
 import GHCi.Message
-#if defined(GHCI)
-import GHCi.Run
-#endif
+
 import GHCi.RemoteTypes
 import GHCi.ResolvedBCO
 import GHCi.BreakArray (BreakArray)
@@ -154,11 +152,11 @@ Other Notes on Remote GHCi
   * Note [Remote Template Haskell] in libraries/ghci/GHCi/TH.hs
 -}
 
-#if !defined(GHCI)
+
 needExtInt :: IO a
 needExtInt = throwIO
   (InstallationError "this operation requires -fexternal-interpreter")
-#endif
+
 
 -- | Run a command in the interpreter's context.  With
 -- @-fexternal-interpreter@, the command is serialized and sent to an
@@ -172,11 +170,7 @@ iservCmd hsc_env@HscEnv{..} msg
        uninterruptibleMask_ $ do -- Note [uninterruptibleMask_]
          iservCall iserv msg
  | otherwise = -- Just run it directly
-#if defined(GHCI)
-   run msg
-#else
    needExtInt
-#endif
 
 -- Note [uninterruptibleMask_ and iservCmd]
 --
@@ -377,11 +371,7 @@ lookupSymbol hsc_env@HscEnv{..} str
                writeIORef iservLookupSymbolCache $! addToUFM cache str p
                return (Just p)
  | otherwise =
-#if defined(GHCI)
-   fmap fromRemotePtr <$> run (LookupSymbol (unpackFS str))
-#else
    needExtInt
-#endif
 
 lookupClosure :: HscEnv -> String -> IO (Maybe HValueRef)
 lookupClosure hsc_env str =

@@ -25,9 +25,7 @@ import HscMain          ( newHscEnv )
 import DriverPipeline   ( oneShot, compileFile )
 import DriverMkDepend   ( doMkDependHS )
 import DriverBkp   ( doBackpack )
-#if defined(GHCI)
 import GHCi.UI          ( interactiveUI, ghciWelcomeMsg, defaultGhciSettings )
-#endif
 
 -- Frontend plugins
 #if defined(GHCI)
@@ -257,15 +255,10 @@ main' postLoadMode dflags0 args flagWarnings = do
 
 ghciUI :: HscEnv -> DynFlags -> [(FilePath, Maybe Phase)] -> Maybe [String]
        -> Ghc ()
-#if !defined(GHCI)
-ghciUI _ _ _ _ =
-  throwGhcException (CmdLineError "not built for interactive use")
-#else
 ghciUI hsc_env dflags0 srcs maybe_expr = do
   dflags1 <- liftIO (initializePlugins hsc_env dflags0)
   _ <- GHC.setSessionDynFlags dflags1
   interactiveUI defaultGhciSettings srcs maybe_expr
-#endif
 
 -- -----------------------------------------------------------------------------
 -- Splitting arguments into source files and object files.  This is where we
