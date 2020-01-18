@@ -181,7 +181,7 @@ readTestSpeed ms =
     set flag flags = flags { testArgs = (testArgs flags) {testSpeed = flag} }
 
 readTestSummary :: Maybe String -> Either String (CommandLineArgs -> CommandLineArgs)
-readTestSummary filepath = Right $ \flags -> flags { testArgs = (testArgs flags) { testJUnit = filepath } }
+readTestSummary filepath = Right $ \flags -> flags { testArgs = (testArgs flags) { testSummary = filepath } }
 
 readTestVerbose :: Maybe String -> Either String (CommandLineArgs -> CommandLineArgs)
 readTestVerbose verbose = Right $ \flags -> flags { testArgs = (testArgs flags) { testVerbosity = verbose } }
