@@ -108,7 +108,7 @@ tcRule (HsRule { rd_ext  = ext
        --      RULE:  forall v. fst (ss v) = fst v
        -- The type of the rhs of the rule is just a, but v::(a,(b,c))
        --
-       -- We also need to get the completely-uconstrained tyvars of
+       -- We also need to get the completely-unconstrained tyvars of
        -- the LHS, lest they otherwise get defaulted to Any; but we do that
        -- during zonking (see TcHsSyn.zonkRule)
 
@@ -198,7 +198,7 @@ tcRuleTmBndrs (L _ (RuleBndrSig _ (L _ name) rn_ty) : rule_bndrs)
 --   error for each out-of-scope type variable used
   = do  { let ctxt = RuleSigCtxt name
         ; (_ , tvs, id_ty) <- tcHsPatSigType ctxt rn_ty
-        ; let id  = mkLocalIdOrCoVar name id_ty
+        ; let id  = mkLocalId name id_ty
                     -- See Note [Pattern signature binders] in TcHsType
 
               -- The type variables scope over subsequent bindings; yuk

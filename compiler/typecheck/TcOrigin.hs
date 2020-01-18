@@ -430,6 +430,7 @@ data CtOrigin
   | HoleOrigin
   | UnboundOccurrenceOf OccName
   | ListOrigin          -- An overloaded list
+  | BracketOrigin       -- An overloaded quotation bracket
   | StaticOrigin        -- A static form
   | FailablePattern (LPat GhcTcId) -- A failable pattern in do-notation for the
                                    -- MonadFail Proposal (MFP). Obsolete when
@@ -504,8 +505,7 @@ exprCtOrigin (RecordCon {})      = Shouldn'tHappenOrigin "record construction"
 exprCtOrigin (RecordUpd {})      = Shouldn'tHappenOrigin "record update"
 exprCtOrigin (ExprWithTySig {})  = ExprSigOrigin
 exprCtOrigin (ArithSeq {})       = Shouldn'tHappenOrigin "arithmetic sequence"
-exprCtOrigin (HsSCC _ _ _ e)     = lexprCtOrigin e
-exprCtOrigin (HsCoreAnn _ _ _ e) = lexprCtOrigin e
+exprCtOrigin (HsPragE _ _ e)     = lexprCtOrigin e
 exprCtOrigin (HsBracket {})      = Shouldn'tHappenOrigin "TH bracket"
 exprCtOrigin (HsRnBracketOut {})= Shouldn'tHappenOrigin "HsRnBracketOut"
 exprCtOrigin (HsTcBracketOut {})= panic "exprCtOrigin HsTcBracketOut"
@@ -514,7 +514,6 @@ exprCtOrigin (HsProc {})         = Shouldn'tHappenOrigin "proc"
 exprCtOrigin (HsStatic {})       = Shouldn'tHappenOrigin "static expression"
 exprCtOrigin (HsTick _ _ e)           = lexprCtOrigin e
 exprCtOrigin (HsBinTick _ _ _ e)      = lexprCtOrigin e
-exprCtOrigin (HsTickPragma _ _ _ _ e) = lexprCtOrigin e
 exprCtOrigin (HsWrap {})        = panic "exprCtOrigin HsWrap"
 exprCtOrigin (XExpr nec)        = noExtCon nec
 
@@ -641,7 +640,7 @@ pprCtO IfOrigin              = text "an if expression"
 pprCtO (LiteralOrigin lit)   = hsep [text "the literal", quotes (ppr lit)]
 pprCtO (ArithSeqOrigin seq)  = hsep [text "the arithmetic sequence", quotes (ppr seq)]
 pprCtO SectionOrigin         = text "an operator section"
-pprCtO AssocFamPatOrigin     = text "the LHS of a famly instance"
+pprCtO AssocFamPatOrigin     = text "the LHS of a family instance"
 pprCtO TupleOrigin           = text "a tuple"
 pprCtO NegateOrigin          = text "a use of syntactic negation"
 pprCtO (ScOrigin n)          = text "the superclasses of an instance declaration"
@@ -657,4 +656,5 @@ pprCtO AnnOrigin             = text "an annotation"
 pprCtO HoleOrigin            = text "a use of" <+> quotes (text "_")
 pprCtO ListOrigin            = text "an overloaded list"
 pprCtO StaticOrigin          = text "a static form"
+pprCtO BracketOrigin         = text "a quotation bracket"
 pprCtO _                     = panic "pprCtOrigin"

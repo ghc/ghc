@@ -213,3 +213,6 @@ test('PrimFFIWord16', [omit_ways(['ghci'])], compile_and_run, ['PrimFFIWord16_c.
 test('T493', [omit_ways(['ghci'])], compile_and_run, ['T493_c.c'])
 
 test('UnliftedNewtypesByteArrayOffset', [omit_ways(['ghci'])], compile_and_run, ['UnliftedNewtypesByteArrayOffset_c.c'])
+
+test('T17471', [omit_ways(['ghci'])], compile_and_run,
+     ['T17471_c.c -optc-D -optcFOO'])

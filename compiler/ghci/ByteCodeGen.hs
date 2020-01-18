@@ -37,7 +37,7 @@ import Literal
 import PrimOp
 import CoreFVs
 import Type
-import RepType
+import GHC.Types.RepType
 import DataCon
 import TyCon
 import Util
@@ -107,7 +107,8 @@ byteCodeGen hsc_env this_mod binds tycs mb_modBreaks
              (panic "ByteCodeGen.byteCodeGen: missing final emitBc?")
 
         dumpIfSet_dyn dflags Opt_D_dump_BCOs
-           "Proto-BCOs" (vcat (intersperse (char ' ') (map ppr proto_bcos)))
+           "Proto-BCOs" FormatByteCode
+           (vcat (intersperse (char ' ') (map ppr proto_bcos)))
 
         cbc <- assembleBCOs hsc_env proto_bcos tycs (map snd stringPtrs)
           (case modBreaks of
@@ -164,19 +165,19 @@ coreExprToBCOs hsc_env this_mod expr
       -- create a totally bogus name for the top-level BCO; this
       -- should be harmless, since it's never used for anything
       let invented_name  = mkSystemVarName (mkPseudoUniqueE 0) (fsLit "ExprTopLevel")
-          invented_id    = Id.mkLocalId invented_name (panic "invented_id's type")
 
       -- the uniques are needed to generate fresh variables when we introduce new
       -- let bindings for ticked expressions
       us <- mkSplitUniqSupply 'y'
       (BcM_State _dflags _us _this_mod _final_ctr mallocd _ _ _, proto_bco)
          <- runBc hsc_env us this_mod Nothing emptyVarEnv $
-              schemeTopBind (invented_id, simpleFreeVars expr)
+              schemeR [] (invented_name, simpleFreeVars expr)
 
       when (notNull mallocd)
            (panic "ByteCodeGen.coreExprToBCOs: missing final emitBc?")
 
-      dumpIfSet_dyn dflags Opt_D_dump_BCOs "Proto-BCOs" (ppr proto_bco)
+      dumpIfSet_dyn dflags Opt_D_dump_BCOs "Proto-BCOs" FormatByteCode
+         (ppr proto_bco)
 
       assembleOneBCO hsc_env proto_bco
   where dflags = hsc_dflags hsc_env
@@ -321,7 +322,7 @@ schemeTopBind (id, rhs)
                        (Right rhs) 0 0 [{-no bitmap-}] False{-not alts-})
 
   | otherwise
-  = schemeR [{- No free variables -}] (id, rhs)
+  = schemeR [{- No free variables -}] (getName id, rhs)
 
 
 -- -----------------------------------------------------------------------------
@@ -333,13 +334,13 @@ schemeTopBind (id, rhs)
 -- removing the free variables and arguments.
 --
 -- Park the resulting BCO in the monad.  Also requires the
--- variable to which this value was bound, so as to give the
--- resulting BCO a name.
+-- name of the variable to which this value was bound,
+-- so as to give the resulting BCO a name.
 
 schemeR :: [Id]                 -- Free vars of the RHS, ordered as they
                                 -- will appear in the thunk.  Empty for
                                 -- top-level things, which have no free vars.
-        -> (Id, AnnExpr Id DVarSet)
+        -> (Name, AnnExpr Id DVarSet)
         -> BcM (ProtoBCO Name)
 schemeR fvs (nm, rhs)
 {-
@@ -370,7 +371,7 @@ collect (_, e) = go [] e
 
 schemeR_wrk
     :: [Id]
-    -> Id
+    -> Name
     -> AnnExpr Id DVarSet             -- expression e, for debugging only
     -> ([Var], AnnExpr' Var DVarSet)  -- result of collect on e
     -> BcM (ProtoBCO Name)
@@ -396,7 +397,7 @@ schemeR_wrk fvs nm original_body (args, body)
          bitmap = mkBitmap dflags bits
      body_code <- schemeER_wrk sum_szsb_args p_init body
 
-     emitBc (mkProtoBCO dflags (getName nm) body_code (Right original_body)
+     emitBc (mkProtoBCO dflags nm body_code (Right original_body)
                  arity bitmap_size bitmap False{-not alts-})
 
 -- introduce break instructions for ticked expressions
@@ -575,7 +576,7 @@ schemeE d s p (AnnLet binds (_,body)) = do
                      _other -> False
 
          compile_bind d' fvs x rhs size arity off = do
-                bco <- schemeR fvs (x,rhs)
+                bco <- schemeR fvs (getName x,rhs)
                 build_thunk d' fvs size bco off arity
 
          compile_binds =
@@ -996,7 +997,7 @@ doCase d s p (_,scrut) bndr alts is_unboxed_tuple
         ret_frame_size_b :: StackDepth
         ret_frame_size_b = 2 * wordSize dflags
 
-        -- The extra frame we push to save/restor the CCCS when profiling
+        -- The extra frame we push to save/restore the CCCS when profiling
         save_ccs_size_b | profiling = 2 * wordSize dflags
                         | otherwise = 0
 
@@ -1472,7 +1473,7 @@ The code we generate is this:
 The 'bogus-word' push is because TESTEQ_I expects the top of the stack
 to have an info-table, and the next word to have the value to be
 tested.  This is very weird, but it's the way it is right now.  See
-Interpreter.c.  We don't acutally need an info-table here; we just
+Interpreter.c.  We don't actually need an info-table here; we just
 need to have the argument to be one-from-top on the stack, hence pushing
 a 1-word null. See #8383.
 -}

@@ -87,7 +87,7 @@ data Node k cls color
         -- | Colors that cannot be used by this node.
         , nodeExclusions        :: UniqSet color
 
-        -- | Colors that this node would prefer to be, in decending order.
+        -- | Colors that this node would prefer to be, in descending order.
         , nodePreference        :: [color]
 
         -- | Neighbors that this node would like to be colored the same as.

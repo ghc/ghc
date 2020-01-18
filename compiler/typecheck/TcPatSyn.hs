@@ -81,7 +81,7 @@ tcPatSynDecl psb mb_sig
 recoverPSB :: PatSynBind GhcRn GhcRn
            -> TcM (LHsBinds GhcTc, TcGblEnv)
 -- See Note [Pattern synonym error recovery]
-recoverPSB (PSB { psb_id = (dL->L _ name)
+recoverPSB (PSB { psb_id = L _ name
                 , psb_args = details })
  = do { matcher_name <- newImplicitBinder name mkMatcherOcc
       ; let placeholder = AConLike $ PatSynCon $
@@ -135,7 +135,7 @@ pattern.) But it'll do for now.
 
 tcInferPatSynDecl :: PatSynBind GhcRn GhcRn
                   -> TcM (LHsBinds GhcTc, TcGblEnv)
-tcInferPatSynDecl (PSB { psb_id = lname@(dL->L _ name), psb_args = details
+tcInferPatSynDecl (PSB { psb_id = lname@(L _ name), psb_args = details
                        , psb_def = lpat, psb_dir = dir })
   = addPatSynCtxt lname $
     do { traceTc "tcInferPatSynDecl {" $ ppr name
@@ -153,7 +153,7 @@ tcInferPatSynDecl (PSB { psb_id = lname@(dL->L _ name), psb_args = details
              mk_named_tau arg
                = (getName arg, mkSpecForAllTys ex_tvs (varType arg))
                -- The mkSpecForAllTys is important (#14552), albeit
-               -- slightly artifical (there is no variable with this funny type).
+               -- slightly artificial (there is no variable with this funny type).
                -- We do not want to quantify over variable (alpha::k)
                -- that mention the existentially-bound type variables
                -- ex_tvs in its kind k.
@@ -171,7 +171,7 @@ tcInferPatSynDecl (PSB { psb_id = lname@(dL->L _ name), psb_args = details
                  = unzip (mapMaybe mkProvEvidence filtered_prov_dicts)
              req_theta = map evVarPred req_dicts
 
-       -- Report coercions that esacpe
+       -- Report coercions that escape
        -- See Note [Coercions that escape]
        ; args <- mapM zonkId args
        ; let bad_args = [ (arg, bad_cos) | arg <- args ++ prov_dicts
@@ -237,7 +237,7 @@ dependentArgErr (arg, bad_cos)
 ~~-~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 Consider
   data AST a = Sym [a]
-  class Prj s where { prj :: [a] -> Maybe (s a)
+  class Prj s where { prj :: [a] -> Maybe (s a) }
   pattern P x <= Sym (prj -> Just x)
 
 Here we get a matcher with this type
@@ -261,7 +261,7 @@ mentions the existentials.  We can conveniently do that by making the
    forall ex_tvs. arg_ty
 
 After that, Note [Naughty quantification candidates] in TcMType takes
-over, and zonks any such naughty variables to Any.
+over and errors.
 
 Note [Remove redundant provided dicts]
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
@@ -283,7 +283,7 @@ Similarly consider
   pattern Bam x y <- (MkS (x::a), MkS (y::a)))
 
 The pattern (Bam x y) binds two (Ord a) dictionaries, but we only
-need one.  Agian mkMimimalWithSCs removes the redundant one.
+need one.  Again mkMimimalWithSCs removes the redundant one.
 
 Note [Equality evidence in pattern synonyms]
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
@@ -307,12 +307,12 @@ and is not implicitly instantiated.
 So in mkProvEvidence we lift (a ~# b) to (a ~ b).  Tiresome, and
 marginally less efficient, if the builder/martcher are not inlined.
 
-See also Note [Lift equality constaints when quantifying] in TcType
+See also Note [Lift equality constraints when quantifying] in TcType
 
 Note [Coercions that escape]
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 #14507 showed an example where the inferred type of the matcher
-for the pattern synonym was somethign like
+for the pattern synonym was something like
    $mSO :: forall (r :: TYPE rep) kk (a :: k).
            TypeRep k a
            -> ((Bool ~ k) => TypeRep Bool (a |> co_a2sv) -> r)
@@ -341,7 +341,7 @@ is not very helpful, but at least we don't get a Lint error.
 tcCheckPatSynDecl :: PatSynBind GhcRn GhcRn
                   -> TcPatSynInfo
                   -> TcM (LHsBinds GhcTc, TcGblEnv)
-tcCheckPatSynDecl psb@PSB{ psb_id = lname@(dL->L _ name), psb_args = details
+tcCheckPatSynDecl psb@PSB{ psb_id = lname@(L _ name), psb_args = details
                          , psb_def = lpat, psb_dir = dir }
                   TPSI{ patsig_implicit_bndrs = implicit_tvs
                       , patsig_univ_bndrs = explicit_univ_tvs, patsig_prov = prov_theta
@@ -569,12 +569,12 @@ collectPatSynArgInfo details =
     splitRecordPatSyn :: RecordPatSynField (Located Name)
                       -> (Name, Name)
     splitRecordPatSyn (RecordPatSynField
-                       { recordPatSynPatVar     = (dL->L _ patVar)
-                       , recordPatSynSelectorId = (dL->L _ selId) })
+                       { recordPatSynPatVar     = L _ patVar
+                       , recordPatSynSelectorId = L _ selId })
       = (patVar, selId)
 
 addPatSynCtxt :: Located Name -> TcM a -> TcM a
-addPatSynCtxt (dL->L loc name) thing_inside
+addPatSynCtxt (L loc name) thing_inside
   = setSrcSpan loc $
     addErrCtxt (text "In the declaration for pattern synonym"
                 <+> quotes (ppr name)) $
@@ -685,7 +685,7 @@ tcPatSynMatcher :: Located Name
                 -> TcType
                 -> TcM ((Id, Bool), LHsBinds GhcTc)
 -- See Note [Matchers and builders for pattern synonyms] in PatSyn
-tcPatSynMatcher (dL->L loc name) lpat
+tcPatSynMatcher (L loc name) lpat
                 (univ_tvs, req_theta, req_ev_binds, req_dicts)
                 (ex_tvs, ex_tys, prov_theta, prov_dicts)
                 (args, arg_tys) pat_ty
@@ -726,9 +726,9 @@ tcPatSynMatcher (dL->L loc name) lpat
                      else [mkHsCaseAlt lpat  cont',
                            mkHsCaseAlt lwpat fail']
              body = mkLHsWrap (mkWpLet req_ev_binds) $
-                    cL (getLoc lpat) $
+                    L (getLoc lpat) $
                     HsCase noExtField (nlHsVar scrutinee) $
-                    MG{ mg_alts = cL (getLoc lpat) cases
+                    MG{ mg_alts = L (getLoc lpat) cases
                       , mg_ext = MatchGroupTc [pat_ty] res_ty
                       , mg_origin = Generated
                       }
@@ -739,18 +739,18 @@ tcPatSynMatcher (dL->L loc name) lpat
                        , mg_ext = MatchGroupTc [pat_ty, cont_ty, fail_ty] res_ty
                        , mg_origin = Generated
                        }
-             match = mkMatch (mkPrefixFunRhs (cL loc name)) []
+             match = mkMatch (mkPrefixFunRhs (L loc name)) []
                              (mkHsLams (rr_tv:res_tv:univ_tvs)
                                        req_dicts body')
                              (noLoc (EmptyLocalBinds noExtField))
              mg :: MatchGroup GhcTc (LHsExpr GhcTc)
-             mg = MG{ mg_alts = cL (getLoc match) [match]
+             mg = MG{ mg_alts = L (getLoc match) [match]
                     , mg_ext = MatchGroupTc [] res_ty
                     , mg_origin = Generated
                     }
 
        ; let bind = FunBind{ fun_ext = emptyNameSet
-                           , fun_id = cL loc matcher_id
+                           , fun_id = L loc matcher_id
                            , fun_matches = mg
                            , fun_co_fn = idHsWrapper
                            , fun_tick = [] }
@@ -786,7 +786,7 @@ mkPatSynBuilderId :: HsPatSynDir a -> Located Name
                   -> [TyVarBinder] -> ThetaType
                   -> [Type] -> Type
                   -> TcM (Maybe (Id, Bool))
-mkPatSynBuilderId dir (dL->L _ name)
+mkPatSynBuilderId dir (L _ name)
                   univ_bndrs req_theta ex_bndrs prov_theta
                   arg_tys pat_ty
   | isUnidirectional dir
@@ -812,7 +812,7 @@ mkPatSynBuilderId dir (dL->L _ name)
 tcPatSynBuilderBind :: PatSynBind GhcRn GhcRn
                     -> TcM (LHsBinds GhcTc)
 -- See Note [Matchers and builders for pattern synonyms] in PatSyn
-tcPatSynBuilderBind (PSB { psb_id = (dL->L loc name)
+tcPatSynBuilderBind (PSB { psb_id = L loc name
                          , psb_def = lpat
                          , psb_dir = dir
                          , psb_args = details })
@@ -840,7 +840,7 @@ tcPatSynBuilderBind (PSB { psb_id = (dL->L loc name)
                           | otherwise      = match_group
 
              bind = FunBind { fun_ext = placeHolderNamesTc
-                            , fun_id      = cL loc (idName builder_id)
+                            , fun_id      = L loc (idName builder_id)
                             , fun_matches = match_group'
                             , fun_co_fn   = idHsWrapper
                             , fun_tick    = [] }
@@ -864,9 +864,9 @@ tcPatSynBuilderBind (PSB { psb_id = (dL->L loc name)
     mk_mg :: LHsExpr GhcRn -> MatchGroup GhcRn (LHsExpr GhcRn)
     mk_mg body = mkMatchGroup Generated [builder_match]
           where
-            builder_args  = [cL loc (VarPat noExtField (cL loc n))
-                            | (dL->L loc n) <- args]
-            builder_match = mkMatch (mkPrefixFunRhs (cL loc name))
+            builder_args  = [L loc (VarPat noExtField (L loc n))
+                            | L loc n <- args]
+            builder_match = mkMatch (mkPrefixFunRhs (L loc name))
                                     builder_args body
                                     (noLoc (EmptyLocalBinds noExtField))
 
@@ -878,9 +878,8 @@ tcPatSynBuilderBind (PSB { psb_id = (dL->L loc name)
     add_dummy_arg :: MatchGroup GhcRn (LHsExpr GhcRn)
                   -> MatchGroup GhcRn (LHsExpr GhcRn)
     add_dummy_arg mg@(MG { mg_alts =
-                           (dL->L l [dL->L loc
-                                           match@(Match { m_pats = pats })]) })
-      = mg { mg_alts = cL l [cL loc (match { m_pats = nlWildPatName : pats })] }
+                           (L l [L loc match@(Match { m_pats = pats })]) })
+      = mg { mg_alts = L l [L loc (match { m_pats = nlWildPatName : pats })] }
     add_dummy_arg other_mg = pprPanic "add_dummy_arg" $
                              pprMatches other_mg
 tcPatSynBuilderBind (XPatSynBind nec) = noExtCon nec
@@ -926,9 +925,9 @@ tcPatToExpr name args pat = go pat
     -- Make a prefix con for prefix and infix patterns for simplicity
     mkPrefixConExpr :: Located Name -> [LPat GhcRn]
                     -> Either MsgDoc (HsExpr GhcRn)
-    mkPrefixConExpr lcon@(dL->L loc _) pats
+    mkPrefixConExpr lcon@(L loc _) pats
       = do { exprs <- mapM go pats
-           ; return (foldl' (\x y -> HsApp noExtField (cL loc x) y)
+           ; return (foldl' (\x y -> HsApp noExtField (L loc x) y)
                             (HsVar noExtField lcon) exprs) }
 
     mkRecordConExpr :: Located Name -> HsRecFields GhcRn (LPat GhcRn)
@@ -938,7 +937,7 @@ tcPatToExpr name args pat = go pat
            ; return (RecordCon noExtField con exprFields) }
 
     go :: LPat GhcRn -> Either MsgDoc (LHsExpr GhcRn)
-    go (dL->L loc p) = cL loc <$> go1 p
+    go (L loc p) = L loc <$> go1 p
 
     go1 :: Pat GhcRn -> Either MsgDoc (HsExpr GhcRn)
     go1 (ConPatIn con info)
@@ -950,9 +949,9 @@ tcPatToExpr name args pat = go pat
     go1 (SigPat _ pat _) = go1 (unLoc pat)
         -- See Note [Type signatures and the builder expression]
 
-    go1 (VarPat _ (dL->L l var))
+    go1 (VarPat _ (L l var))
         | var `elemNameSet` lhsVars
-        = return $ HsVar noExtField (cL l var)
+        = return $ HsVar noExtField (L l var)
         | otherwise
         = Left (quotes (ppr var) <+> text "is not bound by the LHS of the pattern synonym")
     go1 (ParPat _ pat)          = fmap (HsPar noExtField) $ go pat
@@ -969,7 +968,7 @@ tcPatToExpr name args pat = go pat
                                                                    (noLoc expr)
                                          }
     go1 (LitPat _ lit)              = return $ HsLit noExtField lit
-    go1 (NPat _ (dL->L _ n) mb_neg _)
+    go1 (NPat _ (L _ n) mb_neg _)
         | Just neg <- mb_neg        = return $ unLoc $ nlHsSyntaxApps neg
                                                      [noLoc (HsOverLit noExtField n)]
         | otherwise                 = return $ HsOverLit noExtField n
@@ -1038,7 +1037,7 @@ We can't always do this:
 
 Note [Redundant constraints for builder]
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
-The builder can have redundant constraints, which are awkard to eliminate.
+The builder can have redundant constraints, which are awkward to eliminate.
 Consider
    pattern P = Just 34
 To match against this pattern we need (Eq a, Num a).  But to build
@@ -1075,7 +1074,7 @@ In tc{Infer/Check}PatSynDecl we will check that the pattern has the
 specified type.  We check the pattern *as a pattern*, so the type
 signature is a pattern signature, and so brings 'a' and 'b' into
 scope.  But we don't have a way to bind 'a, b' in the LHS, as we do
-'x', say.  Nevertheless, the sigature may be useful to constrain
+'x', say.  Nevertheless, the signature may be useful to constrain
 the type.
 
 When making the binding for the *builder*, though, we don't want
@@ -1142,7 +1141,7 @@ tcCollectEx pat = go pat
       = mergeMany . map goRecFd $ flds
 
     goRecFd :: LHsRecField GhcTc (LPat GhcTc) -> ([TyVar], [EvVar])
-    goRecFd (dL->L _ HsRecField{ hsRecFieldArg = p }) = go p
+    goRecFd (L _ HsRecField{ hsRecFieldArg = p }) = go p
 
     merge (vs1, evs1) (vs2, evs2) = (vs1 ++ vs2, evs1 ++ evs2)
     mergeMany = foldr merge empty

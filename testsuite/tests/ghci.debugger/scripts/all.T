@@ -4,7 +4,7 @@ setTestOpts([extra_run_opts('-ignore-dot-ghci'),
 
 
 test('print001', normal, ghci_script, ['print001.script'])
-test('print002', extra_files(['../Test.hs']), ghci_script, ['print002.script'])
+test('print002', [extra_files(['../Test.hs']), when(arch('arm'), fragile(17557))], ghci_script, ['print002.script'])
 test('print003', extra_files(['../Test.hs']), ghci_script, ['print003.script'])
 test('print004', normal, ghci_script, ['print004.script'])
 test('print005', extra_files(['../QSort.hs']), ghci_script, ['print005.script'])
@@ -109,7 +109,9 @@ test('T7386', normal, ghci_script, ['T7386.script'])
 test('T8487', normal, ghci_script, ['T8487.script'])
 test('T8557', normal, ghci_script, ['T8557.script'])
 test('T12458', normal, ghci_script, ['T12458.script'])
-test('T13825-debugger', when(arch('powerpc64'), expect_broken(14455)),
+test('T13825-debugger',
+      [when(arch('powerpc64'), expect_broken(14455)),
+       when(arch('arm'), fragile_for(17557, ['ghci-ext']))],
       ghci_script, ['T13825-debugger.script'])
 test('T14690', normal, ghci_script, ['T14690.script'])
 test('T16700', normal, ghci_script, ['T16700.script'])

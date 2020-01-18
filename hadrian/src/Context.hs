@@ -51,7 +51,7 @@ libPath Context {..} = buildRoot <&> (-/- (stageString stage -/- "lib"))
 -- | Get the directory name for binary distribution files
 -- @<arch>-<os>-ghc-<version>@.
 --
--- We preform some renaming to accomodate Cabal's slightly different naming
+-- We preform some renaming to accommodate Cabal's slightly different naming
 -- conventions (see 'cabalOsString' and 'cabalArchString').
 distDir :: Stage -> Action FilePath
 distDir st = do

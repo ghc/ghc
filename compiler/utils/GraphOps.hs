@@ -233,7 +233,7 @@ addExclusions u getClass colors graph
         = foldr (addExclusion u getClass) graph colors
 
 
--- | Add a coalescence edge to the graph, creating nodes if requried.
+-- | Add a coalescence edge to the graph, creating nodes if required.
 --      It is considered adventageous to assign the same color to nodes in a coalesence.
 addCoalesce
         :: Uniquable k
@@ -264,8 +264,8 @@ delCoalesce k1 k2
 
 
 -- | Add a color preference to the graph, creating nodes if required.
---      The most recently added preference is the most prefered.
---      The algorithm tries to assign a node it's prefered color if possible.
+--      The most recently added preference is the most preferred.
+--      The algorithm tries to assign a node it's preferred color if possible.
 --
 addPreference
         :: Uniquable k

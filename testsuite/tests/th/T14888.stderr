@@ -1,7 +1,7 @@
-T14888.hs:6:10-30: Splicing type
+T14888.hs:6:9-31: Splicing type
     [t| (->) Bool Bool |] ======> Bool -> Bool
-T14888.hs:15:3-11: Splicing declarations return [] ======>
-T14888.hs:18:23-59: Splicing expression
+T14888.hs:15:2-12: Splicing declarations return [] ======>
+T14888.hs:18:22-60: Splicing expression
     reify ''Functor' >>= stringE . pprint
   ======>
     "class T14888.Functor' (f_0 :: * -> *)

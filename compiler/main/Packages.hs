@@ -85,7 +85,7 @@ import CmdLineParser
 import System.Environment ( getEnv )
 import FastString
 import ErrUtils         ( debugTraceMsg, MsgDoc, dumpIfSet_dyn, compilationProgressMsg,
-                          withTiming )
+                          withTiming, DumpFormat (..) )
 import Exception
 
 import System.Directory
@@ -206,7 +206,7 @@ fromExposedModules :: Bool -> ModuleOrigin
 fromExposedModules e = ModOrigin (Just e) [] [] False
 
 -- | Smart constructor for a module which is in @reexported-modules@.  Takes
--- as an argument whether or not the reexporting package is expsed, and
+-- as an argument whether or not the reexporting package is exposed, and
 -- also its 'PackageConfig'.
 fromReexportedModules :: Bool -> PackageConfig -> ModuleOrigin
 fromReexportedModules True pkg = ModOrigin Nothing [pkg] [] False
@@ -428,9 +428,11 @@ extendPackageConfigMap (PackageConfigMap pkg_map closure) new_pkgs
 
 -- | Looks up the package with the given id in the package state, panicing if it is
 -- not found
-getPackageDetails :: DynFlags -> UnitId -> PackageConfig
+getPackageDetails :: HasDebugCallStack => DynFlags -> UnitId -> PackageConfig
 getPackageDetails dflags pid =
-    expectJust "getPackageDetails" (lookupPackage dflags pid)
+    case lookupPackage dflags pid of
+      Just config -> config
+      Nothing -> pprPanic "getPackageDetails" (ppr pid)
 
 lookupInstalledPackage :: DynFlags -> InstalledUnitId -> Maybe PackageConfig
 lookupInstalledPackage dflags uid = lookupInstalledPackage' (pkgIdMap (pkgState dflags)) uid
@@ -438,10 +440,11 @@ lookupInstalledPackage dflags uid = lookupInstalledPackage' (pkgIdMap (pkgState 
 lookupInstalledPackage' :: PackageConfigMap -> InstalledUnitId -> Maybe PackageConfig
 lookupInstalledPackage' (PackageConfigMap db _) uid = lookupUDFM db uid
 
-getInstalledPackageDetails :: DynFlags -> InstalledUnitId -> PackageConfig
+getInstalledPackageDetails :: HasDebugCallStack => DynFlags -> InstalledUnitId -> PackageConfig
 getInstalledPackageDetails dflags uid =
-    expectJust "getInstalledPackageDetails" $
-        lookupInstalledPackage dflags uid
+    case lookupInstalledPackage dflags uid of
+      Just config -> config
+      Nothing -> pprPanic "getInstalledPackageDetails" (ppr uid)
 
 -- | Get a list of entries from the package database.  NB: be careful with
 -- this function, although all packages in this map are "visible", this
@@ -566,7 +569,7 @@ readPackageConfig dflags conf_file = do
                       "can't find a package database at " ++ conf_file
 
   let
-      -- Fix #16360: remove trailing slash from conf_file before calculting pkgroot
+      -- Fix #16360: remove trailing slash from conf_file before calculating pkgroot
       conf_file' = dropTrailingPathSeparator conf_file
       top_dir = topDir dflags
       pkgroot = takeDirectory conf_file'
@@ -1441,7 +1444,7 @@ mkPackageState dflags dbs preload0 = do
           we build a mapping saying what every in scope module name points to.
 -}
 
-  -- This, and the other reverse's that you will see, are due to the face that
+  -- This, and the other reverse's that you will see, are due to the fact that
   -- packageFlags, pluginPackageFlags, etc. are all specified in *reverse* order
   -- than they are on the command line.
   let other_flags = reverse (packageFlags dflags)
@@ -1488,7 +1491,7 @@ mkPackageState dflags dbs preload0 = do
       -- When exposing units, we want to consider all of those in the most preferable
       -- packages. We can implement that by looking for units that are equi-preferable
       -- with the most preferable unit for package. Being equi-preferable means that
-      -- they must be in the same database, with the same version, and the same pacakge name.
+      -- they must be in the same database, with the same version, and the same package name.
       --
       -- We must take care to consider all these units and not just the most
       -- preferable one, otherwise we can end up with problems like #16228.
@@ -1601,8 +1604,8 @@ mkPackageState dflags dbs preload0 = do
       -- (NB: since this is only relevant for base/rts it doesn't matter
       -- that thisUnitIdInsts_ is not wired yet)
       --
-      preload3 = nub $ filter (/= thisPackage dflags)
-                     $ (basicLinkedPackages ++ preload2)
+      preload3 = ordNub $ filter (/= thisPackage dflags)
+                        $ (basicLinkedPackages ++ preload2)
 
   -- Close the preload packages with their dependencies
   dep_preload <- closeDeps dflags pkg_db (zip (map toInstalledUnitId preload3) (repeat Nothing))
@@ -1613,6 +1616,7 @@ mkPackageState dflags dbs preload0 = do
       mod_map = Map.union mod_map1 mod_map2
 
   dumpIfSet_dyn (dflags { pprCols = 200 }) Opt_D_dump_mod_map "Mod Map"
+    FormatText
     (pprModuleMap mod_map)
 
   -- Force pstate to avoid leaking the dflags0 passed to mkPackageState
@@ -1781,7 +1785,7 @@ getPackageIncludePath dflags pkgs =
   collectIncludeDirs `fmap` getPreloadPackagesAnd dflags pkgs
 
 collectIncludeDirs :: [PackageConfig] -> [FilePath]
-collectIncludeDirs ps = nub (filter notNull (concatMap includeDirs ps))
+collectIncludeDirs ps = ordNub (filter notNull (concatMap includeDirs ps))
 
 -- | Find all the library paths in these and the preload packages
 getPackageLibraryPath :: DynFlags -> [PreloadUnitId] -> IO [String]
@@ -1789,7 +1793,7 @@ getPackageLibraryPath dflags pkgs =
   collectLibraryPaths dflags `fmap` getPreloadPackagesAnd dflags pkgs
 
 collectLibraryPaths :: DynFlags -> [PackageConfig] -> [FilePath]
-collectLibraryPaths dflags = nub . filter notNull
+collectLibraryPaths dflags = ordNub . filter notNull
                            . concatMap (libraryDirsForWay dflags)
 
 -- | Find all the link options in these and the preload packages,
@@ -1810,7 +1814,7 @@ collectArchives dflags pc =
   filterM doesFileExist [ searchPath </> ("lib" ++ lib ++ ".a")
                         | searchPath <- searchPaths
                         , lib <- libs ]
-  where searchPaths = nub . filter notNull . libraryDirsForWay dflags $ pc
+  where searchPaths = ordNub . filter notNull . libraryDirsForWay dflags $ pc
         libs        = packageHsLibs dflags pc ++ extraLibraries pc
 
 getLibs :: DynFlags -> [PreloadUnitId] -> IO [(String,String)]
@@ -1885,7 +1889,7 @@ getPackageExtraCcOpts dflags pkgs = do
 getPackageFrameworkPath  :: DynFlags -> [PreloadUnitId] -> IO [String]
 getPackageFrameworkPath dflags pkgs = do
   ps <- getPreloadPackagesAnd dflags pkgs
-  return (nub (filter notNull (concatMap frameworkDirs ps)))
+  return (ordNub (filter notNull (concatMap frameworkDirs ps)))
 
 -- | Find all the package frameworks in these and the preload packages
 getPackageFrameworks  :: DynFlags -> [PreloadUnitId] -> IO [String]
@@ -2132,7 +2136,7 @@ isDllName dflags this_mod name
         -- On Windows the hack for #8696 makes it unlinkable.
         -- As the entire setup of the code from Cmm down to the RTS expects
         -- the use of trampolines for the imported functions only when
-        -- doing intra-package linking, e.g. refering to a symbol defined in the same
+        -- doing intra-package linking, e.g. referring to a symbol defined in the same
         -- package should not use a trampoline.
         -- I much rather have dynamic TH not supported than the entire Dynamic linking
         -- not due to a hack.

@@ -136,7 +136,7 @@ Library
         UnboxedTuples
         UndecidableInstances
 
-    Include-Dirs: . parser utils
+    Include-Dirs: . utils
 
     -- We need to set the unit id to ghc (without a version number)
     -- as it's magic.
@@ -154,9 +154,9 @@ Library
     Install-Includes: HsVersions.h
 
     c-sources:
-        parser/cutils.c
-        ghci/keepCAFsForGHCi.c
+        cbits/cutils.c
         cbits/genSym.c
+        ghci/keepCAFsForGHCi.c
 
     hs-source-dirs:
         .
@@ -173,33 +173,29 @@ Library
         parser
         prelude
         profiling
-        rename
         simplCore
-        simplStg
         specialise
-        stgSyn
         stranal
         typecheck
         types
         utils
-        hieFile
 
     -- we use an explicit Prelude
     Default-Extensions:
         NoImplicitPrelude
 
     Exposed-Modules:
-        HieTypes
-        HieDebug
-        HieBin
-        HieUtils
-        HieAst
+        GHC.Iface.Ext.Types
+        GHC.Iface.Ext.Debug
+        GHC.Iface.Ext.Binary
+        GHC.Iface.Ext.Utils
+        GHC.Iface.Ext.Ast
         Ar
         FileCleanup
         DriverBkp
         BkpSyn
         NameShape
-        RnModIface
+        GHC.Iface.Rename
         Avail
         AsmUtils
         BasicTypes
@@ -311,7 +307,6 @@ Library
         CoreArity
         CoreFVs
         CoreLint
-        CorePrep
         CoreSubst
         CoreOpt
         CoreSyn
@@ -358,16 +353,16 @@ Library
         GHC.Hs.Types
         GHC.Hs.Utils
         GHC.Hs.Dump
-        BinIface
+        GHC.Iface.Binary
         BinFingerprint
         BuildTyCl
-        IfaceEnv
-        IfaceSyn
-        IfaceType
-        ToIface
-        LoadIface
-        MkIface
-        TcIface
+        GHC.Iface.Env
+        GHC.Iface.Syntax
+        GHC.Iface.Type
+        GHC.CoreToIface
+        GHC.Iface.Load
+        GHC.Iface.Utils
+        GHC.IfaceToCore
         FlagChecker
         Annotations
         CmdLineParser
@@ -409,7 +404,7 @@ Library
         SysTools.Tasks
         SysTools.Settings
         Elf
-        TidyPgm
+        GHC.Iface.Tidy
         Ctype
         HaddockUtils
         Lexer
@@ -429,18 +424,18 @@ Library
         CostCentre
         CostCentreState
         ProfInit
-        RnBinds
-        RnEnv
-        RnExpr
-        RnHsDoc
-        RnNames
-        RnPat
-        RnSource
-        RnSplice
-        RnTypes
-        RnFixity
-        RnUtils
-        RnUnbound
+        GHC.Rename.Binds
+        GHC.Rename.Env
+        GHC.Rename.Expr
+        GHC.Rename.Doc
+        GHC.Rename.Names
+        GHC.Rename.Pat
+        GHC.Rename.Source
+        GHC.Rename.Splice
+        GHC.Rename.Types
+        GHC.Rename.Fixity
+        GHC.Rename.Utils
+        GHC.Rename.Unbound
         CoreMonad
         CSE
         FloatIn
@@ -454,23 +449,23 @@ Library
         SimplMonad
         SimplUtils
         Simplify
-        SimplStg
-        StgStats
-        StgCse
-        StgLiftLams
-        StgLiftLams.Analysis
-        StgLiftLams.LiftM
-        StgLiftLams.Transformation
-        StgSubst
-        UnariseStg
-        RepType
+        GHC.Stg.Pipeline
+        GHC.Stg.Stats
+        GHC.Stg.CSE
+        GHC.Stg.Lift
+        GHC.Stg.Lift.Analysis
+        GHC.Stg.Lift.Monad
+        GHC.Stg.Subst
+        GHC.Stg.Unarise
+        GHC.Stg.Lint
+        GHC.Stg.Syntax
+        GHC.Stg.FVs
+        GHC.CoreToStg
+        GHC.CoreToStg.Prep
+        GHC.Types.RepType
         Rules
         SpecConstr
         Specialise
-        CoreToStg
-        StgLint
-        StgSyn
-        StgFVs
         CallArity
         DmdAnal
         Exitify
@@ -586,8 +581,6 @@ Library
         Hoopl.Dataflow
         Hoopl.Graph
         Hoopl.Label
---        CgInfoTbls used in ghci/DebuggerUtils
---        CgHeapery  mkVirtHeapOffsets used in ghci
 
     Exposed-Modules:
             AsmCodeGen

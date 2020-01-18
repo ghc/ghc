@@ -21,7 +21,7 @@ import InstEnv( roughMatchTcs )
 import Coercion
 import CoreLint
 import TcEvidence
-import LoadIface
+import GHC.Iface.Load
 import TcRnMonad
 import SrcLoc
 import TyCon
@@ -142,7 +142,7 @@ addressed yet.
 * The call to checkFamConsistency for imported functions occurs very
   early (in tcRnImports) and that causes problems if the imported
   instances use type declared in the module being compiled.
-  See Note [Loading your own hi-boot file] in LoadIface.
+  See Note [Loading your own hi-boot file] in GHC.Iface.Load.
 -}
 
 {-
@@ -881,7 +881,7 @@ To do the injectivity check:
 
 1. We build VarUsages that represent the LHS (rather, the portion of the LHS
 that is flagged as injective); each usage on the LHS is NotPresent, because we
-hvae not yet looked at the RHS.
+have not yet looked at the RHS.
 
 2. We also build a VarUsage for the RHS, done by injTyVarUsages.
 
@@ -1042,7 +1042,7 @@ reportConflictInstErr fam_inst (match1 : _)
                , let ax = famInstAxiom fi ])
  where
    getSpan = getSrcLoc . famInstAxiom
-   -- The sortWith just arranges that instances are dislayed in order
+   -- The sortWith just arranges that instances are displayed in order
    -- of source location, which reduced wobbling in error messages,
    -- and is better for users
 

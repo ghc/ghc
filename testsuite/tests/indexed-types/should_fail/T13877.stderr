@@ -1,7 +1,7 @@
 
 T13877.hs:65:41: error:
     • Expecting one more argument to ‘p’
-      Expected kind ‘(-?>) [a] * (':->)’, but ‘p’ has kind ‘[a] ~> *’
+      Expected kind ‘(-?>) [a] (*) (':->)’, but ‘p’ has kind ‘[a] ~> *’
     • In the type ‘p’
       In the expression: listElimPoly @(:->) @a @p @l
       In an equation for ‘listElimTyFun’:

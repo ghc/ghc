@@ -414,7 +414,7 @@ readSymField fieldName readVal = do
 -- typecheck/TcGenDeriv.hs) would generate inline code for parsing fields;
 -- this, however, turned out to produce massive amounts of intermediate code,
 -- and produced a considerable performance hit in the code generator.
--- Since Read instances are not generally supposed to be perfomance critical,
+-- Since Read instances are not generally supposed to be performance critical,
 -- the readField and readSymField functions have been factored out, and the
 -- code generator now just generates calls rather than manually inlining the
 -- parsers. For large record types (e.g. 500 fields), this produces a

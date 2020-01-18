@@ -1333,7 +1333,7 @@ x86_complex_amode :: CmmExpr -> CmmExpr -> Integer -> Integer -> NatM Amode
 x86_complex_amode base index shift offset
   = do (x_reg, x_code) <- getNonClobberedReg base
         -- x must be in a temp, because it has to stay live over y_code
-        -- we could compre x_reg and y_reg and do something better here...
+        -- we could compare x_reg and y_reg and do something better here...
        (y_reg, y_code) <- getSomeReg index
        let
            code = x_code `appOL` y_code
@@ -2630,6 +2630,26 @@ genCCall' _ is32Bit target dest_regs args bid = do
                                 MOV format (OpReg rax) (OpReg reg_l)]
                return code
         _ -> panic "genCCall: Wrong number of arguments/results for mul2"
+    (PrimTarget (MO_S_Mul2 width), [res_c, res_h, res_l]) ->
+        case args of
+        [arg_x, arg_y] ->
+            do (y_reg, y_code) <- getRegOrMem arg_y
+               x_code <- getAnyReg arg_x
+               reg_tmp <- getNewRegNat II8
+               let format = intFormat width
+                   reg_h = getRegisterReg platform (CmmLocal res_h)
+                   reg_l = getRegisterReg platform (CmmLocal res_l)
+                   reg_c = getRegisterReg platform (CmmLocal res_c)
+                   code = y_code `appOL`
+                          x_code rax `appOL`
+                          toOL [ IMUL2 format y_reg
+                               , MOV format (OpReg rdx) (OpReg reg_h)
+                               , MOV format (OpReg rax) (OpReg reg_l)
+                               , SETCC CARRY (OpReg reg_tmp)
+                               , MOVZxL II8 (OpReg reg_tmp) (OpReg reg_c)
+                               ]
+               return code
+        _ -> panic "genCCall: Wrong number of arguments/results for imul2"
 
     _ -> if is32Bit
          then genCCall32' dflags target dest_regs args
@@ -3222,6 +3242,7 @@ outOfLineCmmOp bid mop res args
 
               MO_UF_Conv _ -> unsupported
 
+              MO_S_Mul2    {}  -> unsupported
               MO_S_QuotRem {}  -> unsupported
               MO_U_QuotRem {}  -> unsupported
               MO_U_QuotRem2 {} -> unsupported

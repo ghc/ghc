@@ -58,7 +58,7 @@ import Module
 import Name
 import Packages ( trusted, getPackageDetails, getInstalledPackageDetails,
                   listVisibleModuleNames, pprFlag )
-import IfaceSyn ( showToHeader )
+import GHC.Iface.Syntax ( showToHeader )
 import PprTyThing
 import PrelNames
 import RdrName ( getGRE_NameQualifier_maybes, getRdrName )
@@ -1605,7 +1605,7 @@ editFile str =
 -- XXX: Can we figure out what happened if the depndecy analysis fails
 --      (e.g., because the porgrammeer mistyped the name of a module)?
 -- XXX: Can we figure out the location of an error to pass to the editor?
--- XXX: if we could figure out the list of errors that occured during the
+-- XXX: if we could figure out the list of errors that occurred during the
 -- last load/reaload, then we could start the editor focused on the first
 -- of those.
 chooseEditFile :: GHC.GhcMonad m => m String
@@ -4027,7 +4027,7 @@ setBreakFlag toggle arr i = do
 --
 -- Bugfix: if the user closed stdout or stderr, the flushing will fail,
 -- raising another exception.  We therefore don't put the recursive
--- handler arond the flushing operation, so if stderr is closed
+-- handler around the flushing operation, so if stderr is closed
 -- GHCi will just die gracefully rather than going into an infinite loop.
 handler :: GhciMonad m => SomeException -> m Bool
 handler exception = do

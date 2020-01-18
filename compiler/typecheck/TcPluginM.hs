@@ -57,7 +57,7 @@ import qualified TcSMonad  as TcS
 import qualified TcEnv     as TcM
 import qualified TcMType   as TcM
 import qualified FamInst   as TcM
-import qualified IfaceEnv
+import qualified GHC.Iface.Env as IfaceEnv
 import qualified Finder
 
 import FamInstEnv ( FamInstEnv )

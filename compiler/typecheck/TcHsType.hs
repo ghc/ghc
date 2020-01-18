@@ -79,7 +79,7 @@ import TcEnv
 import TcMType
 import TcValidity
 import TcUnify
-import TcIface
+import GHC.IfaceToCore
 import TcSimplify
 import TcHsSyn
 import TyCoRep
@@ -265,7 +265,7 @@ tc_hs_sig_type :: SkolemInfo -> LHsSigType GhcRn
 -- Kind-checks/desugars an 'LHsSigType',
 --   solve equalities,
 --   and then kind-generalizes.
--- This will never emit constraints, as it uses solveEqualities interally.
+-- This will never emit constraints, as it uses solveEqualities internally.
 -- No validity checking or zonking
 -- Returns also a Bool indicating whether the type induced an insoluble constraint;
 -- True <=> constraint is insoluble
@@ -352,10 +352,10 @@ tcDerivStrategy ::
 tcDerivStrategy mb_lds
   = case mb_lds of
       Nothing -> boring_case Nothing
-      Just (dL->L loc ds) ->
+      Just (L loc ds) ->
         setSrcSpan loc $ do
           (ds', tvs) <- tc_deriv_strategy ds
-          pure (Just (cL loc ds'), tvs)
+          pure (Just (L loc ds'), tvs)
   where
     tc_deriv_strategy :: DerivStrategy GhcRn
                       -> TcM (DerivStrategy GhcTc, [TyVar])
@@ -634,7 +634,7 @@ tc_infer_hs_type mode (HsKindSig _ ty sig)
        ; ty' <- tc_lhs_type mode ty sig'
        ; return (ty', sig') }
 
--- HsSpliced is an annotation produced by 'RnSplice.rnSpliceType' to communicate
+-- HsSpliced is an annotation produced by 'GHC.Rename.Splice.rnSpliceType' to communicate
 -- the splice location to the typechecker. Here we skip over it in order to have
 -- the same kind inferred for a given expression whether it was produced from
 -- splices or not.
@@ -686,7 +686,7 @@ tc_hs_type _ ty@(HsRecTy {})      _
       -- signatures) should have been removed by now
     = failWithTc (text "Record syntax is illegal here:" <+> ppr ty)
 
--- HsSpliced is an annotation produced by 'RnSplice.rnSpliceType'.
+-- HsSpliced is an annotation produced by 'GHC.Rename.Splice.rnSpliceType'.
 -- Here we get rid of it and add the finalizers to the global environment
 -- while capturing the local environment.
 --
@@ -947,30 +947,34 @@ finish_tuple :: HsType GhcRn
              -> [TcKind]    -- ^ of these kinds
              -> TcKind      -- ^ expected kind of the whole tuple
              -> TcM TcType
-finish_tuple rn_ty tup_sort tau_tys tau_kinds exp_kind
-  = do { traceTc "finish_tuple" (ppr res_kind $$ ppr tau_kinds $$ ppr exp_kind)
-       ; let arg_tys  = case tup_sort of
-                   -- See also Note [Unboxed tuple RuntimeRep vars] in TyCon
-                 UnboxedTuple    -> tau_reps ++ tau_tys
-                 BoxedTuple      -> tau_tys
-                 ConstraintTuple -> tau_tys
-       ; tycon <- case tup_sort of
-           ConstraintTuple
-             | arity > mAX_CTUPLE_SIZE
-                         -> failWith (bigConstraintTuple arity)
-             | otherwise -> tcLookupTyCon (cTupleTyConName arity)
-           BoxedTuple    -> do { let tc = tupleTyCon Boxed arity
-                               ; checkWiredInTyCon tc
-                               ; return tc }
-           UnboxedTuple  -> return (tupleTyCon Unboxed arity)
-       ; checkExpectedKind rn_ty (mkTyConApp tycon arg_tys) res_kind exp_kind }
+finish_tuple rn_ty tup_sort tau_tys tau_kinds exp_kind = do
+  traceTc "finish_tuple" (ppr tup_sort $$ ppr tau_kinds $$ ppr exp_kind)
+  case tup_sort of
+    ConstraintTuple
+      |  [tau_ty] <- tau_tys
+         -- Drop any uses of 1-tuple constraints here.
+         -- See Note [Ignore unary constraint tuples]
+      -> check_expected_kind tau_ty constraintKind
+      |  arity > mAX_CTUPLE_SIZE
+      -> failWith (bigConstraintTuple arity)
+      |  otherwise
+      -> do tycon <- tcLookupTyCon (cTupleTyConName arity)
+            check_expected_kind (mkTyConApp tycon tau_tys) constraintKind
+    BoxedTuple -> do
+      let tycon = tupleTyCon Boxed arity
+      checkWiredInTyCon tycon
+      check_expected_kind (mkTyConApp tycon tau_tys) liftedTypeKind
+    UnboxedTuple ->
+      let tycon    = tupleTyCon Unboxed arity
+          tau_reps = map kindRep tau_kinds
+          -- See also Note [Unboxed tuple RuntimeRep vars] in TyCon
+          arg_tys  = tau_reps ++ tau_tys
+          res_kind = unboxedTupleKind tau_reps in
+      check_expected_kind (mkTyConApp tycon arg_tys) res_kind
   where
     arity = length tau_tys
-    tau_reps = map kindRep tau_kinds
-    res_kind = case tup_sort of
-                 UnboxedTuple    -> unboxedTupleKind tau_reps
-                 BoxedTuple      -> liftedTypeKind
-                 ConstraintTuple -> constraintKind
+    check_expected_kind ty act_kind =
+      checkExpectedKind rn_ty ty act_kind exp_kind
 
 bigConstraintTuple :: Arity -> MsgDoc
 bigConstraintTuple arity
@@ -978,6 +982,46 @@ bigConstraintTuple arity
           <+> parens (text "max arity =" <+> int mAX_CTUPLE_SIZE))
        2 (text "Instead, use a nested tuple")
 
+{-
+Note [Ignore unary constraint tuples]
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+GHC provides unary tuples and unboxed tuples (see Note [One-tuples] in
+TysWiredIn) but does *not* provide unary constraint tuples. Why? First,
+recall the definition of a unary tuple data type:
+
+  data Unit a = Unit a
+
+Note that `Unit a` is *not* the same thing as `a`, since Unit is boxed and
+lazy. Therefore, the presence of `Unit` matters semantically. On the other
+hand, suppose we had a unary constraint tuple:
+
+  class a => Unit% a
+
+This compiles down a newtype (i.e., a cast) in Core, so `Unit% a` is
+semantically equivalent to `a`. Therefore, a 1-tuple constraint would have
+no user-visible impact, nor would it allow you to express anything that
+you couldn't otherwise.
+
+We could simply add Unit% for consistency with tuples (Unit) and unboxed
+tuples (Unit#), but that would require even more magic to wire in another
+magical class, so we opt not to do so. We must be careful, however, since
+one can try to sneak in uses of unary constraint tuples through Template
+Haskell, such as in this program (from #17511):
+
+  f :: $(pure (ForallT [] [TupleT 1 `AppT` (ConT ''Show `AppT` ConT ''Int)]
+                       (ConT ''String)))
+  -- f :: Unit% (Show Int) => String
+  f = "abc"
+
+This use of `TupleT 1` will produce an HsBoxedOrConstraintTuple of arity 1,
+and since it is used in a Constraint position, GHC will attempt to treat
+it as thought it were a constraint tuple, which can potentially lead to
+trouble if one attempts to look up the name of a constraint tuple of arity
+1 (as it won't exist). To avoid this trouble, we simply take any unary
+constraint tuples discovered when typechecking and drop them—i.e., treat
+"Unit% a" as though the user had written "a". This is always safe to do
+since the two constraints should be semantically equivalent.
+-}
 
 {- *********************************************************************
 *                                                                      *
@@ -1126,7 +1170,7 @@ tcInferApps_nosat mode orig_hs_ty fun orig_hs_args
       (HsTypeArg _ ki_arg : _, Nothing) -> try_again_after_substing_or $
                                            ty_app_err ki_arg substed_fun_ki
 
-      ---------------- HsValArg: a nomal argument (fun ty)
+      ---------------- HsValArg: a normal argument (fun ty)
       (HsValArg arg : args, Just (ki_binder, inner_ki))
         -- next binder is invisible; need to instantiate it
         | isInvisibleBinder ki_binder   -- FunTy with InvisArg on LHS;
@@ -1323,7 +1367,7 @@ saturateFamApp :: TcType -> TcKind -> TcM (TcType, TcKind)
 -- Precondition for (saturateFamApp ty kind):
 --     tcTypeKind ty = kind
 --
--- If 'ty' is an unsaturated family application wtih trailing
+-- If 'ty' is an unsaturated family application with trailing
 -- invisible arguments, instanttiate them.
 -- See Note [saturateFamApp]
 
@@ -1559,7 +1603,7 @@ very convenient to typecheck instance types like any other HsSigType.
 Admittedly the '(Eq a => Eq [a]) => blah' case is erroneous, but it's
 better to reject in checkValidType.  If we say that the body kind
 should be '*' we risk getting TWO error messages, one saying that Eq
-[a] doens't have kind '*', and one saying that we need a Constraint to
+[a] doesn't have kind '*', and one saying that we need a Constraint to
 the left of the outer (=>).
 
 How do we figure out the right body kind?  Well, it's a bit of a
@@ -1726,7 +1770,7 @@ the surrounding context, we must obey the following dictum:
   Every metavariable in a type must either be
     (A) generalized, or
     (B) promoted, or        See Note [Promotion in signatures]
-    (C) zapped to Any       See Note [Naughty quantification candidates] in TcMType
+    (C) a cause to error    See Note [Naughty quantification candidates] in TcMType
 
 The kindGeneralize functions do not require pre-zonking; they zonk as they
 go.
@@ -1743,7 +1787,7 @@ Note [Promotion in signatures]
 If an unsolved metavariable in a signature is not generalized
 (because we're not generalizing the construct -- e.g., pattern
 sig -- or because the metavars are constrained -- see kindGeneralizeSome)
-we need to promote to maintain (MetaTvInv) of Note [TcLevel and untouchable type variables]
+we need to promote to maintain (WantedTvInv) of Note [TcLevel and untouchable type variables]
 in TcType. Note that promotion is identical in effect to generalizing
 and the reinstantiating with a fresh metavariable at the current level.
 So in some sense, we generalize *all* variables, but then re-instantiate
@@ -1760,7 +1804,7 @@ than the surrounding context.) This kappa cannot be solved for while checking
 the pattern signature (which is not kind-generalized). When we are checking
 the *body* of foo, though, we need to unify the type of x with the argument
 type of bar. At this point, the ambient TcLevel is 1, and spotting a
-matavariable with level 2 would violate the (MetaTvInv) invariant of
+matavariable with level 2 would violate the (WantedTvInv) invariant of
 Note [TcLevel and untouchable type variables]. So, instead of kind-generalizing,
 we promote the metavariable to level 1. This is all done in kindGeneralizeNone.
 
@@ -1941,7 +1985,8 @@ kcInferDeclHeader name flav
                       , hsq_explicit = hs_tvs }) kc_res_ki
   -- No standalane kind signature and no CUSK.
   -- See note [Required, Specified, and Inferred for types] in TcTyClsDecls
-  = do { (scoped_kvs, (tc_tvs, res_kind))
+  = addTyConFlavCtxt name flav $
+    do { (scoped_kvs, (tc_tvs, res_kind))
            -- Why bindImplicitTKBndrs_Q_Tv which uses newTyVarTyVar?
            -- See Note [Inferring kinds for type declarations] in TcTyClsDecls
            <- bindImplicitTKBndrs_Q_Tv kv_ns            $
@@ -2401,7 +2446,7 @@ This should not kind-check.  Polymorphic recursion is known to
 be a tough nut.
 
 Previously, we laboriously (with help from the renamer)
-tried to give T the polymoprhic kind
+tried to give T the polymorphic kind
    T :: forall ka -> ka -> kappa -> Type
 where kappa is a unification variable, even in the inferInitialKinds
 phase (which is what kcInferDeclHeader is all about).  But
@@ -2462,7 +2507,7 @@ What should be the kind of `T` in the following example? (#15591)
   class C (a :: Type) where
     type T (x :: f a)
 
-As per Note [Ordering of implicit variables] in RnTypes, we want to quantify
+As per Note [Ordering of implicit variables] in GHC.Rename.Types, we want to quantify
 the kind variables in left-to-right order of first occurrence in order to
 support visible kind application. But we cannot perform this analysis on just
 T alone, since its variable `a` actually occurs /before/ `f` if you consider
@@ -2707,7 +2752,7 @@ zonkAndScopedSort spec_tkvs
           -- Use zonkAndSkolemise because a skol_tv might be a TyVarTv
 
        -- Do a stable topological sort, following
-       -- Note [Ordering of implicit variables] in RnTypes
+       -- Note [Ordering of implicit variables] in GHC.Rename.Types
        ; return (scopedSort spec_tkvs) }
 
 -- | Generalize some of the free variables in the given type.
@@ -2996,7 +3041,7 @@ checkClassKindSig kind = checkTc (tcIsConstraintKind kind) err_msg
       text "unobscured by type families"
 
 tcbVisibilities :: TyCon -> [Type] -> [TyConBndrVis]
--- Result is in 1-1 correpondence with orig_args
+-- Result is in 1-1 correspondence with orig_args
 tcbVisibilities tc orig_args
   = go (tyConKind tc) init_subst orig_args
   where
@@ -3056,7 +3101,7 @@ for D, to fill out its kind.  Ideally we don't want this type variable
 to be 'a', because when pretty printing we'll get
             class C a b where
                data D b a0
-(NB: the tidying happens in the conversion to IfaceSyn, which happens
+(NB: the tidying happens in the conversion to Iface syntax, which happens
 as part of pretty-printing a TyThing.)
 
 That's why we look in the LocalRdrEnv to see what's in scope. This is
@@ -3147,7 +3192,7 @@ tcPartialContext hs_theta
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 See also Note [Recipe for checking a signature]
 
-When we have a parital signature like
+When we have a partial signature like
    f,g :: forall a. a -> _
 we do the following
 
@@ -3159,7 +3204,7 @@ we do the following
   call tchsPartialSig (defined near this Note).  It kind-checks the
   LHsSigWcType, creating fresh unification variables for each "_"
   wildcard.  It's important that the wildcards for f and g are distinct
-  becase they migh get instantiated completely differently.  E.g.
+  because they might get instantiated completely differently.  E.g.
      f,g :: forall a. a -> _
      f x = a
      g x = True
@@ -3202,7 +3247,7 @@ more.  So I use a HACK:
   TcBinds.chooseInferredQuantifiers. This is ill-kinded because
   ordinary tuples can't contain constraints, but it works fine. And for
   ordinary tuples we don't have the same limit as for constraint
-  tuples (which need selectors and an assocated class).
+  tuples (which need selectors and an associated class).
 
 * Because it is ill-kinded, it trips an assert in writeMetaTyVar,
   so now I disable the assertion if we are writing a type of

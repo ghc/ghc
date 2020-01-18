@@ -36,7 +36,7 @@ import FloatIn          ( floatInwards )
 import FloatOut         ( floatOutwards )
 import FamInstEnv
 import Id
-import ErrUtils         ( withTiming, withTimingD )
+import ErrUtils         ( withTiming, withTimingD, DumpFormat (..) )
 import BasicTypes       ( CompilerPhase(..), isDefaultInlinePragma, defaultInlinePragma )
 import VarSet
 import VarEnv
@@ -72,13 +72,13 @@ core2core hsc_env guts@(ModGuts { mg_module  = mod
                                 , mg_loc     = loc
                                 , mg_deps    = deps
                                 , mg_rdr_env = rdr_env })
-  = do { us <- mkSplitUniqSupply 's'
-       -- make sure all plugins are loaded
+  = do { -- make sure all plugins are loaded
 
        ; let builtin_passes = getCoreToDo dflags
              orph_mods = mkModuleSet (mod : dep_orphs deps)
+             uniq_mask = 's'
        ;
-       ; (guts2, stats) <- runCoreM hsc_env hpt_rule_base us mod
+       ; (guts2, stats) <- runCoreM hsc_env hpt_rule_base uniq_mask mod
                                     orph_mods print_unqual loc $
                            do { hsc_env' <- getHscEnv
                               ; dflags' <- liftIO $ initializePlugins hsc_env'
@@ -90,6 +90,7 @@ core2core hsc_env guts@(ModGuts { mg_module  = mod
 
        ; Err.dumpIfSet_dyn dflags Opt_D_dump_simpl_stats
              "Grand total simplifier statistics"
+             FormatText
              (pprSimplCount stats)
 
        ; return guts2 }
@@ -576,6 +577,7 @@ simplifyExpr dflags expr
                   "Simplifier statistics" (pprSimplCount counts)
 
         ; Err.dumpIfSet_dyn dflags Opt_D_dump_simpl "Simplified expression"
+                        FormatCore
                         (pprCoreExpr expr')
 
         ; return expr'
@@ -688,6 +690,7 @@ simplifyPgmIO pass@(CoreDoSimplify max_iterations mode)
                                      binds
                } ;
            Err.dumpIfSet_dyn dflags Opt_D_dump_occur_anal "Occurrence analysis"
+                     FormatCore
                      (pprCoreBindings tagged_binds);
 
                 -- Get any new rules, and extend the rule base
@@ -878,7 +881,7 @@ Hence,there's a possibility of leaving unchanged something like this:
 By the time we've thrown away the types in STG land this
 could be eliminated.  But I don't think it's very common
 and it's dangerous to do this fiddling in STG land
-because we might elminate a binding that's mentioned in the
+because we might eliminate a binding that's mentioned in the
 unfolding for something.
 
 Note [Indirection zapping and ticks]

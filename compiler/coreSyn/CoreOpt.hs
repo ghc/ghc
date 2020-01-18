@@ -138,7 +138,7 @@ simpleOptPgm :: DynFlags -> Module
 -- See Note [The simple optimiser]
 simpleOptPgm dflags this_mod binds rules
   = do { dumpIfSet_dyn dflags Opt_D_dump_occur_anal "Occurrence analysis"
-                       (pprCoreBindings occ_anald_binds $$ pprRules rules );
+            FormatCore (pprCoreBindings occ_anald_binds $$ pprRules rules );
 
        ; return (reverse binds', rules') }
   where
@@ -418,11 +418,12 @@ simple_bind_pair env@(SOE { soe_inl = inl_env, soe_subst = subst })
 
         -- Unconditionally safe to inline
     safe_to_inline :: OccInfo -> Bool
-    safe_to_inline (IAmALoopBreaker {}) = False
-    safe_to_inline IAmDead              = True
-    safe_to_inline occ@(OneOcc {})      =  not (occ_in_lam occ)
-                                        && occ_one_br occ
-    safe_to_inline (ManyOccs {})        = False
+    safe_to_inline IAmALoopBreaker{}                  = False
+    safe_to_inline IAmDead                            = True
+    safe_to_inline OneOcc{ occ_in_lam = NotInsideLam
+                         , occ_one_br = InOneBranch } = True
+    safe_to_inline OneOcc{}                           = False
+    safe_to_inline ManyOccs{}                         = False
 
 -------------------
 simple_out_bind :: TopLevelFlag
@@ -541,7 +542,7 @@ A program has the Let-Unfoldings property iff:
 
 - For every let-bound variable f, whether top-level or nested, whether
   recursive or not:
-  - Both the binding Id of f, and every occurence Id of f, has an idUnfolding.
+  - Both the binding Id of f, and every occurrence Id of f, has an idUnfolding.
   - For non-INLINE things, that unfolding will be f's right hand sids
   - For INLINE things (which have a "stable" unfolding) that unfolding is
     semantically equivalent to f's RHS, but derived from the original RHS of f
@@ -832,7 +833,7 @@ We need to be careful about UTF8 strings here. ""# contains a ByteString, so
 we must parse it back into a FastString to split off the first character.
 That way we can treat unpackCString# and unpackCStringUtf8# in the same way.
 
-We must also be caeful about
+We must also be careful about
    lvl = "foo"#
    ...(unpackCString# lvl)...
 to ensure that we see through the let-binding for 'lvl'.  Hence the
@@ -1137,7 +1138,7 @@ to compute the type arguments to the dictionary constructor.
 
 Note [DFun arity check]
 ~~~~~~~~~~~~~~~~~~~~~~~
-Here we check that the total number of supplied arguments (inclding
+Here we check that the total number of supplied arguments (including
 type args) matches what the dfun is expecting.  This may be *less*
 than the ordinary arity of the dfun: see Note [DFun unfoldings] in CoreSyn
 -}
@@ -1225,11 +1226,11 @@ Here we implement the "push rules" from FC papers:
       (fun |> co) arg
   and we want to transform it to
     (fun arg') |> co'
-  for some suitable co' and tranformed arg'.
+  for some suitable co' and transformed arg'.
 
 * The PushK rule for data constructors.  We have
        (K e1 .. en) |> co
-  and we want to tranform to
+  and we want to transform to
        (K e1' .. en')
   by pushing the coercion into the arguments
 -}
@@ -1277,7 +1278,8 @@ pushCoTyArg co ty
   | otherwise
   = Nothing
   where
-    Pair tyL tyR = coercionKind co
+    tyL = coercionLKind co
+    tyR = coercionRKind co
        -- co :: tyL ~ tyR
        -- tyL = forall (a1 :: k1). ty1
        -- tyR = forall (a2 :: k2). ty2

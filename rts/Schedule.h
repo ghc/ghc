@@ -95,7 +95,7 @@ extern volatile StgWord sched_state;
 
 /* Recent activity flag.
  * Locks required  : Transition from MAYBE_NO to INACTIVE
- * happens in the timer signal, so it is atomic.  Trnasition from
+ * happens in the timer signal, so it is atomic.  Transition from
  * INACTIVE to DONE_GC happens under sched_mutex.  No lock required
  * to set it to ACTIVITY_YES.
  */

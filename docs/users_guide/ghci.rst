@@ -2111,7 +2111,7 @@ libraries, in this order:
    systems may be overridden by setting the :envvar:`LD_LIBRARY_PATH`
    environment variable.
 
--  The linker standard library search can also be overriden on some systems using
+-  The linker standard library search can also be overridden on some systems using
    the :envvar:`LIBRARY_PATH` environment variable. Because of some
    implementation detail on Windows, setting ``LIBRARY_PATH`` will also extend
    the system loader path for any library it finds. So often setting
@@ -2121,7 +2121,7 @@ On systems with ``.dll``-style shared libraries, the actual library
 loaded will be ``lib.dll``, ``liblib.dll``. GHCi also has full support for
 import libraries, either Microsoft style ``.lib``, or GNU GCC style ``.a`` and
 ``.dll.a`` libraries. If you have an import library it is advisable to always
-specify the import libary instead of the ``.dll``. e.g. use ``-lgcc` instead of
+specify the import library instead of the ``.dll``. e.g. use ``-lgcc` instead of
 ``-llibgcc_s_seh-1``. Again, GHCi will signal an error if it can't find the
 library.
 
@@ -2387,7 +2387,7 @@ commonly used commands.
     Attempting to redefine an existing command name results in an error
     unless the ``:def!`` form is used, in which case the old command
     with that name is silently overwritten. However for builtin commands
-    the old command can still be used by preceeding the command name with
+    the old command can still be used by preceding the command name with
     a double colon (eg ``::load``).
     It's not possible to redefine the commands ``:{``, ``:}`` and ``:!``.
 

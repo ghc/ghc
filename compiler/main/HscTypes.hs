@@ -195,7 +195,7 @@ import DriverPhases     ( Phase, HscSource(..), hscSourceString
                         , isHsBootOrSig, isHsigFile )
 import qualified DriverPhases as Phase
 import BasicTypes
-import IfaceSyn
+import GHC.Iface.Syntax
 import Maybes
 import Outputable
 import SrcLoc
@@ -224,6 +224,8 @@ import System.FilePath
 import Control.Concurrent
 import System.Process   ( ProcessHandle )
 import Control.DeepSeq
+import Control.Monad.Trans.Reader
+import Control.Monad.Trans.Class
 
 -- -----------------------------------------------------------------------------
 -- Compilation state
@@ -232,19 +234,20 @@ import Control.DeepSeq
 -- | Status of a compilation to hard-code
 data HscStatus
     -- | Nothing to do.
-    = HscNotGeneratingCode ModIface
+    = HscNotGeneratingCode ModIface ModDetails
     -- | Nothing to do because code already exists.
-    | HscUpToDate ModIface
+    | HscUpToDate ModIface ModDetails
     -- | Update boot file result.
-    | HscUpdateBoot ModIface
+    | HscUpdateBoot ModIface ModDetails
     -- | Generate signature file (backpack)
-    | HscUpdateSig ModIface
+    | HscUpdateSig ModIface ModDetails
     -- | Recompile this module.
     | HscRecomp
         { hscs_guts       :: CgGuts
           -- ^ Information for the code generator.
         , hscs_mod_location :: !ModLocation
           -- ^ Module info
+        , hscs_mod_details :: !ModDetails
         , hscs_partial_iface  :: !PartialModIface
           -- ^ Partial interface
         , hscs_old_iface_hash :: !(Maybe Fingerprint)
@@ -385,7 +388,7 @@ handleFlagWarnings dflags warns = do
       -- It would be nicer if warns :: [Located MsgDoc], but that
       -- has circular import problems.
       bag = listToBag [ mkPlainWarnMsg dflags loc (text warn)
-                      | Warn _ (dL->L loc warn) <- warns' ]
+                      | Warn _ (L loc warn) <- warns' ]
 
   printOrThrowWarnings dflags bag
 
@@ -1058,7 +1061,7 @@ data ModIface_ (phase :: ModIfacePhase)
                 -- module is Safe (so doesn't require the package be trusted
                 -- itself) but imports some trustworthy modules from its own
                 -- package (which does require its own package be trusted).
-                -- See Note [RnNames . Trust Own Package]
+                -- See Note [Trust Own Package] in GHC.Rename.Names
         mi_complete_sigs :: [IfaceCompleteMatch],
 
         mi_doc_hdr :: Maybe HsDocString,
@@ -1432,7 +1435,8 @@ data ModGuts
         mg_safe_haskell :: SafeHaskellMode,     -- ^ Safe Haskell mode
         mg_trust_pkg    :: Bool,                -- ^ Do we need to trust our
                                                 -- own package for Safe Haskell?
-                                                -- See Note [RnNames . Trust Own Package]
+                                                -- See Note [Trust Own Package]
+                                                -- in GHC.Rename.Names
 
         mg_doc_hdr       :: !(Maybe HsDocString), -- ^ Module header.
         mg_decl_docs     :: !DeclDocMap,     -- ^ Docs on declarations.
@@ -1606,7 +1610,7 @@ Where do interactively-bound Ids come from?
     TcRnDriver.externaliseAndTidyId, so they get Names like Ghic4.foo.
 
   - Ids bound by the debugger etc have Names constructed by
-    IfaceEnv.newInteractiveBinder; at the call sites it is followed by
+    GHC.Iface.Env.newInteractiveBinder; at the call sites it is followed by
     mkVanillaGlobal or mkVanillaGlobalWithInfo.  So again, they are
     all Global, External.
 
@@ -1650,7 +1654,7 @@ It's exactly the same for type-family instances.  See #7102
 data InteractiveContext
   = InteractiveContext {
          ic_dflags     :: DynFlags,
-             -- ^ The 'DynFlags' used to evaluate interative expressions
+             -- ^ The 'DynFlags' used to evaluate interactive expressions
              -- and statements.
 
          ic_mod_index :: Int,
@@ -2041,9 +2045,9 @@ Examples:
 -- scope, just for a start!
 
 -- N.B. the set of TyThings returned here *must* match the set of
--- names returned by LoadIface.ifaceDeclImplicitBndrs, in the sense that
+-- names returned by GHC.Iface.Load.ifaceDeclImplicitBndrs, in the sense that
 -- TyThing.getOccName should define a bijection between the two lists.
--- This invariant is used in LoadIface.loadDecl (see note [Tricky iface loop])
+-- This invariant is used in GHC.Iface.Load.loadDecl (see note [Tricky iface loop])
 -- The order of the list does not matter.
 implicitTyThings :: TyThing -> [TyThing]
 implicitTyThings (AnId _)       = []
@@ -2322,6 +2326,10 @@ class Monad m => MonadThings m where
         lookupTyCon :: Name -> m TyCon
         lookupTyCon = liftM tyThingTyCon . lookupThing
 
+-- Instance used in DsMeta
+instance MonadThings m => MonadThings (ReaderT s m) where
+  lookupThing = lift . lookupThing
+
 {-
 ************************************************************************
 *                                                                      *
@@ -2466,7 +2474,7 @@ data Dependencies
                         --      or that are in the dep_pkgs of those modules
                         -- The bool indicates if the package is required to be
                         -- trusted when the module is imported as a safe import
-                        -- (Safe Haskell). See Note [RnNames . Tracking Trust Transitively]
+                        -- (Safe Haskell). See Note [Tracking Trust Transitively] in GHC.Rename.Names
 
          , dep_orphs  :: [Module]
                         -- ^ Transitive closure of orphan modules (whether
@@ -2489,7 +2497,7 @@ data Dependencies
                         -- ^ All the plugins used while compiling this module.
          }
   deriving( Eq )
-        -- Equality used only for old/new comparison in MkIface.addFingerprints
+        -- Equality used only for old/new comparison in GHC.Iface.Utils.addFingerprints
         -- See 'TcRnTypes.ImportAvails' for details on dependencies.
 
 instance Binary Dependencies where
@@ -3097,7 +3105,7 @@ instance Binary IfaceTrustInfo where
 -}
 
 data HsParsedModule = HsParsedModule {
-    hpm_module    :: Located (HsModule GhcPs),
+    hpm_module    :: Located HsModule,
     hpm_src_files :: [FilePath],
        -- ^ extra source files (e.g. from #includes).  The lexer collects
        -- these from '# <file> <line>' pragmas, which the C preprocessor

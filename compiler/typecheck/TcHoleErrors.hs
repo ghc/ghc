@@ -54,7 +54,7 @@ import ExtractDocs ( extractDocs )
 import qualified Data.Map as Map
 import GHC.Hs.Doc      ( unpackHDS, DeclDocMap(..) )
 import HscTypes        ( ModIface_(..) )
-import LoadIface       ( loadInterfaceForNameMaybe )
+import GHC.Iface.Load  ( loadInterfaceForNameMaybe )
 
 import PrelInfo (knownKeyNames)
 
@@ -980,7 +980,7 @@ tcCheckHoleFit (TyH {..}) hole_ty ty = discardErrs $
                ; traceTc "w_givens are: " $ ppr w_givens
                ; rem <- runTcSDeriveds $ simpl_top w_givens
                -- We don't want any insoluble or simple constraints left, but
-               -- solved implications are ok (and neccessary for e.g. undefined)
+               -- solved implications are ok (and necessary for e.g. undefined)
                ; traceTc "rems was:" $ ppr rem
                ; traceTc "}" empty
                ; return (isSolvedWC rem, wrp) } }

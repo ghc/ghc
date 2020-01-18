@@ -62,7 +62,13 @@ static void mark_PAP_payload (MarkQueue *queue,
  * collector and moved to nonmoving_large_objects during the next major GC.
  * When this happens the block gets its BF_NONMOVING_SWEEPING flag set to
  * indicate that it is part of the snapshot and consequently should be marked by
- * the nonmoving mark phase..
+ * the nonmoving mark phase.
+ *
+ * Note that pinned object blocks are treated as large objects containing only
+ * a single object. That is, the block has a single mark flag (BF_MARKED) and we
+ * consequently will trace the pointers of only one object per block. However,
+ * this is okay since the only type of pinned object supported by GHC is the
+ * pinned ByteArray#, which has no pointers.
  */
 
 bdescr *nonmoving_large_objects = NULL;
@@ -82,7 +88,7 @@ memcount n_nonmoving_marked_compact_blocks = 0;
  * move the same large object to nonmoving_marked_large_objects more than once.
  */
 static Mutex nonmoving_large_objects_mutex;
-// Note that we don't need a similar lock for compact objects becuase we never
+// Note that we don't need a similar lock for compact objects because we never
 // mark a compact object eagerly in a write barrier; all compact objects are
 // marked by the mark thread, so there can't be any races here.
 #endif
@@ -461,7 +467,7 @@ markQueuePushClosureGC (MarkQueue *q, StgClosure *p)
 
     MarkQueueEnt ent = {
         .mark_closure = {
-            .p = UNTAG_CLOSURE(p),
+            .p = TAG_CLOSURE(MARK_CLOSURE, UNTAG_CLOSURE(p)),
             .origin = NULL,
         }
     };
@@ -492,7 +498,7 @@ void push_closure (MarkQueue *q,
 
     MarkQueueEnt ent = {
         .mark_closure = {
-            .p = p,
+            .p = TAG_CLOSURE(MARK_CLOSURE, UNTAG_CLOSURE(p)),
             .origin = origin,
         }
     };
@@ -510,8 +516,8 @@ void push_array (MarkQueue *q,
 
     MarkQueueEnt ent = {
         .mark_array = {
-            .array = array,
-            .start_index = (start_index << 16) | 0x3,
+            .array = (const StgMutArrPtrs *) TAG_CLOSURE(MARK_ARRAY, UNTAG_CLOSURE((StgClosure *) array)),
+            .start_index = start_index,
         }
     };
     push(q, &ent);
@@ -567,9 +573,11 @@ inline void updateRemembSetPushThunk(Capability *cap, StgThunk *thunk)
 {
     const StgInfoTable *info;
     do {
-        info = get_volatile_itbl((StgClosure *) thunk);
-    } while (info->type == WHITEHOLE);
-    updateRemembSetPushThunkEager(cap, (StgThunkInfoTable *) info, thunk);
+        info = *(StgInfoTable* volatile*) &thunk->header.info;
+    } while (info == &stg_WHITEHOLE_info);
+
+    const StgThunkInfoTable *thunk_info = THUNK_INFO_PTR_TO_STRUCT(info);
+    updateRemembSetPushThunkEager(cap, thunk_info, thunk);
 }
 
 /* Push the free variables of a thunk to the update remembered set.
@@ -1158,6 +1166,7 @@ bump_static_flag(StgClosure **link_field, StgClosure *q STG_UNUSED)
     }
 }
 
+/* N.B. p0 may be tagged */
 static GNUC_ATTR_HOT void
 mark_closure (MarkQueue *queue, const StgClosure *p0, StgClosure **origin)
 {
@@ -1229,7 +1238,7 @@ mark_closure (MarkQueue *queue, const StgClosure *p0, StgClosure **origin)
             goto done;
 
         case WHITEHOLE:
-            while (get_volatile_itbl(p)->type == WHITEHOLE);
+            while (*(StgInfoTable* volatile*) &p->header.info == &stg_WHITEHOLE_info);
                 // busy_wait_nop(); // FIXME
             goto try_again;
 
@@ -1256,7 +1265,7 @@ mark_closure (MarkQueue *queue, const StgClosure *p0, StgClosure **origin)
     ASSERT(!IS_FORWARDING_PTR(p->header.info));
 
     // N.B. only the first block of a compact region is guaranteed to carry
-    // BF_NONMOVING; conseqently we must separately check for BF_COMPACT.
+    // BF_NONMOVING; consequently we must separately check for BF_COMPACT.
     if (bd->flags & (BF_COMPACT | BF_NONMOVING)) {
 
         if (bd->flags & BF_COMPACT) {
@@ -1278,9 +1287,6 @@ mark_closure (MarkQueue *queue, const StgClosure *p0, StgClosure **origin)
             if (bd->flags & BF_MARKED) {
                 goto done;
             }
-
-            // Mark contents
-            p = (StgClosure*)bd->start;
         } else {
             struct NonmovingSegment *seg = nonmovingGetSegment((StgPtr) p);
             nonmoving_block_idx block_idx = nonmovingGetBlockIdx((StgPtr) p);
@@ -1309,7 +1315,7 @@ mark_closure (MarkQueue *queue, const StgClosure *p0, StgClosure **origin)
     }
 
     // A pinned object that is still attached to a capability (because it's not
-    // filled yet). No need to trace it pinned objects can't contain poiners.
+    // filled yet). No need to trace it pinned objects can't contain pointers.
     else if (bd->flags & BF_PINNED) {
 #if defined(DEBUG)
         bool found_it = false;
@@ -1588,7 +1594,7 @@ mark_closure (MarkQueue *queue, const StgClosure *p0, StgClosure **origin)
     }
 
     case WHITEHOLE:
-        while (get_volatile_itbl(p)->type == WHITEHOLE);
+        while (*(StgInfoTable* volatile*) &p->header.info == &stg_WHITEHOLE_info);
         goto try_again;
 
     case COMPACT_NFDATA:
@@ -1677,11 +1683,13 @@ nonmovingMark (MarkQueue *queue)
             mark_closure(queue, ent.mark_closure.p, ent.mark_closure.origin);
             break;
         case MARK_ARRAY: {
-            const StgMutArrPtrs *arr = ent.mark_array.array;
-            StgWord start = ent.mark_array.start_index >> 16;
+            const StgMutArrPtrs *arr = (const StgMutArrPtrs *)
+                UNTAG_CLOSURE((StgClosure *) ent.mark_array.array);
+            StgWord start = ent.mark_array.start_index;
             StgWord end = start + MARK_ARRAY_CHUNK_LENGTH;
             if (end < arr->ptrs) {
-                markQueuePushArray(queue, ent.mark_array.array, end);
+                // There is more to be marked after this chunk.
+                markQueuePushArray(queue, arr, end);
             } else {
                 end = arr->ptrs;
             }

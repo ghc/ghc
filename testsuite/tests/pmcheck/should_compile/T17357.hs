@@ -35,7 +35,7 @@ pattern T <- (const True -> True)
 {-# COMPLETE T, F :: Void #-}
 
 -- | But we consider COMPLETE signatures to cover bottom. Hence the last clause
--- here should be redunant, not inaccessible RHS.
+-- here should be redundant, not inaccessible RHS.
 f3 :: Void -> ()
 f3 T  = ()
 f3 F  = ()

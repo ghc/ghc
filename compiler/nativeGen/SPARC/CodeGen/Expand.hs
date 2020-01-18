@@ -51,7 +51,7 @@ expandBlockInstrs (ii:is)
 
 
 -- | In the SPARC instruction set the FP register pairs that are used
---      to hold 64 bit floats are refered to by just the first reg
+--      to hold 64 bit floats are referred to by just the first reg
 --      of the pair. Remap our internal reg pairs to the appropriate reg.
 --
 --      For example:

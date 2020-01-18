@@ -400,7 +400,7 @@ must be True.
 
 See also:
  * [Injectivity annotation] in GHC.Hs.Decls
- * [Renaming injectivity annotation] in RnSource
+ * [Renaming injectivity annotation] in GHC.Rename.Source
  * [Verifying injectivity annotation] in FamInstEnv
  * [Type inference for type families with injectivity] in TcInteract
 
@@ -479,7 +479,7 @@ isInvisibleTyConBinder :: VarBndr tv TyConBndrVis -> Bool
 isInvisibleTyConBinder tcb = not (isVisibleTyConBinder tcb)
 
 -- Build the 'tyConKind' from the binders and the result kind.
--- Keep in sync with 'mkTyConKind' in iface/IfaceType.
+-- Keep in sync with 'mkTyConKind' in GHC.Iface.Type.
 mkTyConKind :: [TyConBinder] -> Kind -> Kind
 mkTyConKind bndrs res_kind = foldr mk res_kind bndrs
   where
@@ -1035,7 +1035,7 @@ mkDataTyConRhs cons
 -- constructor of 'PrimRep'. This data structure allows us to store this
 -- information right in the 'TyCon'. The other approach would be to look
 -- up things like @RuntimeRep@'s @PrimRep@ by known-key every time.
--- See also Note [Getting from RuntimeRep to PrimRep] in RepType
+-- See also Note [Getting from RuntimeRep to PrimRep] in GHC.Types.RepType
 data RuntimeRepInfo
   = NoRRI       -- ^ an ordinary promoted data con
   | RuntimeRep ([Type] -> [PrimRep])
@@ -1411,14 +1411,14 @@ On the other hand, CmmType includes some "nonsense" values, such as
 CmmType GcPtrCat W32 on a 64-bit machine.
 
 The PrimRep type is closely related to the user-visible RuntimeRep type.
-See Note [RuntimeRep and PrimRep] in RepType.
+See Note [RuntimeRep and PrimRep] in GHC.Types.RepType.
 
 -}
 
 -- | A 'PrimRep' is an abstraction of a type.  It contains information that
 -- the code generator needs in order to pass arguments, return results,
--- and store values of this type. See also Note [RuntimeRep and PrimRep] in RepType
--- and Note [VoidRep] in RepType.
+-- and store values of this type. See also Note [RuntimeRep and PrimRep] in
+-- GHC.Types.RepType and Note [VoidRep] in GHC.Types.RepType.
 data PrimRep
   = VoidRep
   | LiftedRep
@@ -1490,7 +1490,7 @@ primRepsCompatible dflags reps1 reps2 =
 -- fields. For instance, in @data Foo = Foo Float# Float#@ the two fields will
 -- take only 8 bytes, which for 64-bit arch will be equal to 1 word.
 -- See also mkVirtHeapOffsetsWithPadding for details of how data fields are
--- layed out.
+-- laid out.
 primRepSizeB :: DynFlags -> PrimRep -> Int
 primRepSizeB dflags IntRep           = wORD_SIZE dflags
 primRepSizeB dflags WordRep          = wORD_SIZE dflags
@@ -2526,7 +2526,7 @@ We used to pay linear cost per constructor, with each constructor looking up
 its relative index in the constructor list. That was quadratic and prohibitive
 for large data types with more than 10k constructors.
 
-The current strategy is to build a NameEnv with a mapping from costructor's
+The current strategy is to build a NameEnv with a mapping from constructor's
 Name to ConTag and pass it down to buildDataCon for efficient lookup.
 
 Relevant ticket: #14657

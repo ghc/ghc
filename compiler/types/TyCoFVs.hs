@@ -70,7 +70,7 @@ so we profiled several versions, exploring different implementation strategies.
    tyCoVarsOfType ty = fvVarSet $ tyCoFVsOfType ty
 
    This is not nice, because FV introduces some overhead to implement
-   determinism, and throught its "interesting var" function, neither of which
+   determinism, and through its "interesting var" function, neither of which
    we need here, so they are a complete waste.
 
 2. UnionVarSet version: instead of reusing the FV-based code, we simply used
@@ -84,7 +84,7 @@ so we profiled several versions, exploring different implementation strategies.
 
    This looks deceptively similar, but while FV internally builds a list- and
    set-generating function, the VarSet functions manipulate sets directly, and
-   the latter peforms a lot worse than the naive FV version.
+   the latter performs a lot worse than the naive FV version.
 
 3. Accumulator-style VarSet version: this is what we use now. We do use VarSet
    as our data structure, but delegate the actual work to a new
@@ -811,7 +811,7 @@ types/kinds are fully settled and zonked.
 --
 -- It is also meant to be stable: that is, variables should not
 -- be reordered unnecessarily. This is specified in Note [ScopedSort]
--- See also Note [Ordering of implicit variables] in RnTypes
+-- See also Note [Ordering of implicit variables] in GHC.Rename.Types
 
 scopedSort :: [TyCoVar] -> [TyCoVar]
 scopedSort = go [] []

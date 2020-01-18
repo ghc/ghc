@@ -1,7 +1,7 @@
 
 PluralS.hs:15:17: warning: [-Wtype-defaults (in -Wall)]
     • Defaulting the following constraint to type ‘Integer’
-        Num t0 arising from the literal ‘123’
+        Num a0 arising from the literal ‘123’
     • In the first argument of ‘seq’, namely ‘123’
       In the expression: 123 `seq` ()
       In an equation for ‘defaultingNum’: defaultingNum = 123 `seq` ()

@@ -66,20 +66,24 @@ genLlvmProc _ = panic "genLlvmProc: case that shouldn't reach here!"
 
 -- | Generate code for a list of blocks that make up a complete
 -- procedure. The first block in the list is expected to be the entry
--- point and will get the prologue.
+-- point.
 basicBlocksCodeGen :: LiveGlobalRegs -> [CmmBlock]
                       -> LlvmM ([LlvmBasicBlock], [LlvmCmmDecl])
 basicBlocksCodeGen _    []                     = panic "no entry block!"
-basicBlocksCodeGen live (entryBlock:cmmBlocks)
-  = do (prologue, prologueTops) <- funPrologue live (entryBlock:cmmBlocks)
+basicBlocksCodeGen live cmmBlocks
+  = do -- Emit the prologue
+       -- N.B. this must be its own block to ensure that the entry block of the
+       -- procedure has no predecessors, as required by the LLVM IR. See #17589
+       -- and #11649.
+       bid <- newBlockId
+       (prologue, prologueTops) <- funPrologue live cmmBlocks
+       let entryBlock = BasicBlock bid (fromOL prologue)
 
        -- Generate code
-       (BasicBlock bid entry, entryTops) <- basicBlockCodeGen entryBlock
        (blocks, topss) <- fmap unzip $ mapM basicBlockCodeGen cmmBlocks
 
        -- Compose
-       let entryBlock = BasicBlock bid (fromOL prologue ++ entry)
-       return (entryBlock : blocks, prologueTops ++ entryTops ++ concat topss)
+       return (entryBlock : blocks, prologueTops ++ concat topss)
 
 
 -- | Generate code for one block
@@ -841,6 +845,7 @@ cmmPrimOpFunctions mop = do
     MO_SubWordC w   -> fsLit $ "llvm.usub.with.overflow."
                              ++ showSDoc dflags (ppr $ widthToLlvmInt w)
 
+    MO_S_Mul2    {}  -> unsupported
     MO_S_QuotRem {}  -> unsupported
     MO_U_QuotRem {}  -> unsupported
     MO_U_QuotRem2 {} -> unsupported
@@ -1802,7 +1807,7 @@ genLit _ CmmHighStackMark
 
 -- | Find CmmRegs that get assigned and allocate them on the stack
 --
--- Any register that gets written needs to be allcoated on the
+-- Any register that gets written needs to be allocated on the
 -- stack. This avoids having to map a CmmReg to an equivalent SSA form
 -- and avoids having to deal with Phi node insertion.  This is also
 -- the approach recommended by LLVM developers.
@@ -1842,7 +1847,10 @@ funPrologue live cmmBlocks = do
         markStackReg r
         return $ toOL [alloc, Store rval reg]
 
-  return (concatOL stmtss, [])
+  return (concatOL stmtss `snocOL` jumpToEntry, [])
+  where
+    entryBlk : _ = cmmBlocks
+    jumpToEntry = Branch $ blockIdToLlvm (entryLabel entryBlk)
 
 -- | Function epilogue. Load STG variables to use as argument for call.
 -- STG Liveness optimisation done here.

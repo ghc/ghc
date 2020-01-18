@@ -61,7 +61,7 @@ import {-# SOURCE #-} Coercion ( mkCoVarCo, mkKindCo, mkNthCo, mkTransCo
                                , mkAxiomInstCo, mkAppCo, mkGReflCo
                                , mkInstCo, mkLRCo, mkTyConAppCo
                                , mkCoercionType
-                               , coercionKind, coVarKindsTypesRole )
+                               , coercionKind, coercionLKind, coVarKindsTypesRole )
 
 import TyCoRep
 import TyCoFVs
@@ -527,7 +527,7 @@ hole will remain. Then, when we're checking x's definition, we skolemise
 x's type (in order to, e.g., bring the scoped type variable `a` into scope).
 This requires performing a substitution for the fresh skolem variables.
 
-This subsitution needs to affect the kind of the coercion hole, too --
+This substitution needs to affect the kind of the coercion hole, too --
 otherwise, the kind will have an out-of-scope variable in it. More problematically
 in practice (we won't actually notice the out-of-scope variable ever), skolems
 in the kind might have too high a level, triggering a failure to uphold the
@@ -869,7 +869,7 @@ substForAllCoTyVarBndrUsing sym sco (TCvSubst in_scope tenv cenv) old_var old_ki
     new_kind_co | no_kind_change = old_kind_co
                 | otherwise      = sco old_kind_co
 
-    Pair new_ki1 _ = coercionKind new_kind_co
+    new_ki1 = coercionLKind new_kind_co
     -- We could do substitution to (tyVarKind old_var). We don't do so because
     -- we already substituted new_kind_co, which contains the kind information
     -- we want. We don't want to do substitution once more. Also, in most cases,

@@ -27,7 +27,7 @@ module DataCon (
         mkDataCon, buildAlgTyCon, buildSynTyCon, fIRST_TAG,
 
         -- ** Type deconstruction
-        dataConRepType, dataConSig, dataConInstSig, dataConFullSig,
+        dataConRepType, dataConInstSig, dataConFullSig,
         dataConName, dataConIdentity, dataConTag, dataConTagZ,
         dataConTyCon, dataConOrigTyCon,
         dataConUserType,
@@ -366,7 +366,7 @@ data DataCon
         dcExTyCoVars     :: [TyCoVar],
 
         -- INVARIANT: the UnivTyVars and ExTyCoVars all have distinct OccNames
-        -- Reason: less confusing, and easier to generate IfaceSyn
+        -- Reason: less confusing, and easier to generate Iface syntax
 
         -- The type/coercion vars in the order the user wrote them [c,y,x,b]
         -- INVARIANT: the set of tyvars in dcUserTyVarBinders is exactly the set
@@ -1206,22 +1206,6 @@ dataConImplBangs dc
 dataConBoxer :: DataCon -> Maybe DataConBoxer
 dataConBoxer (MkData { dcRep = DCR { dcr_boxer = boxer } }) = Just boxer
 dataConBoxer _ = Nothing
-
--- | The \"signature\" of the 'DataCon' returns, in order:
---
--- 1) The result of 'dataConUnivAndExTyCoVars',
---
--- 2) All the 'ThetaType's relating to the 'DataCon' (coercion, dictionary,
---    implicit parameter - whatever), including dependent GADT equalities.
---    Dependent GADT equalities are *also* listed in return value (1), so be
---    careful!
---
--- 3) The type arguments to the constructor
---
--- 4) The /original/ result type of the 'DataCon'
-dataConSig :: DataCon -> ([TyCoVar], ThetaType, [Type], Type)
-dataConSig con@(MkData {dcOrigArgTys = arg_tys, dcOrigResTy = res_ty})
-  = (dataConUnivAndExTyCoVars con, dataConTheta con, arg_tys, res_ty)
 
 dataConInstSig
   :: DataCon

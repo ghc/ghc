@@ -146,6 +146,7 @@ import Type
 import Coercion
 import Unify
 
+import ErrUtils
 import TcEvidence
 import Class
 import TyCon
@@ -154,7 +155,7 @@ import TcErrors   ( solverDepthErrorTcS )
 import Name
 import Module ( HasModule, getModule )
 import RdrName ( GlobalRdrEnv, GlobalRdrElt )
-import qualified RnEnv as TcM
+import qualified GHC.Rename.Env as TcM
 import Var
 import VarEnv
 import VarSet
@@ -474,7 +475,7 @@ creating a new EvVar when we have a new goal that we have solved in
 the past.
 
 But in particular, we can use it to create *recursive* dictionaries.
-The simplest, degnerate case is
+The simplest, degenerate case is
     instance C [a] => C [a] where ...
 If we have
     [W] d1 :: C [x]
@@ -514,7 +515,7 @@ VERY IMPORTANT INVARIANT:
      constraint led to the ability to define unsafeCoerce
      in #17267.
 
-   - Exception 2: the magic built-in instace for (~) has no
+   - Exception 2: the magic built-in instance for (~) has no
      such guarantee.  It behaves as if we had
          class    (a ~# b) => (a ~ b) where {}
          instance (a ~# b) => (a ~ b) where {}
@@ -706,7 +707,7 @@ data InertCans   -- See Note [Detailed InertCans Invariants] for more
 
        , inert_funeqs :: FunEqMap Ct
               -- All CFunEqCans; index is the whole family head type.
-              -- All Nominal (that's an invarint of all CFunEqCans)
+              -- All Nominal (that's an invariant of all CFunEqCans)
               -- LHS is fully rewritten (modulo eqCanRewrite constraints)
               --     wrt inert_eqs
               -- Can include all flavours, [G], [W], [WD], [D]
@@ -775,7 +776,7 @@ Note [EqualCtList invariants]
 
 From the fourth invariant it follows that the list is
    - A single [G], or
-   - Zero or one [D] or [WD], followd by any number of [W]
+   - Zero or one [D] or [WD], followed by any number of [W]
 
 The Wanteds can't rewrite anything which is why we put them last
 
@@ -790,7 +791,7 @@ live in three places
     the InertCans. They can be [G], [W], [WD], or [D].
 
   * The inert_flat_cache.  This is used when flattening, to get maximal
-    sharing. Everthing in the inert_flat_cache is [G] or [WD]
+    sharing. Everything in the inert_flat_cache is [G] or [WD]
 
     It contains lots of things that are still in the work-list.
     E.g Suppose we have (w1: F (G a) ~ Int), and (w2: H (G a) ~ Int) in the
@@ -1853,7 +1854,7 @@ Givens, to give as informative an error messasge as possible
 (#12468, #11325).
 
 Hence:
- * In the main simlifier loops in TcSimplify (solveWanteds,
+ * In the main simplifier loops in TcSimplify (solveWanteds,
    simpl_loop), we feed the insolubles in solveSimpleWanteds,
    so that they get rewritten (albeit not solved).
 
@@ -2113,7 +2114,7 @@ getNoGivenEqs tclvl skol_tvs
   where
     eqs_given_here :: EqualCtList -> Bool
     eqs_given_here [ct@(CTyEqCan { cc_tyvar = tv })]
-                              -- Givens are always a sigleton
+                              -- Givens are always a singleton
       = not (skolem_bound_here tv) && ct_given_here ct
     eqs_given_here _ = False
 
@@ -2733,7 +2734,10 @@ csTraceTcM mk_doc
        ; when (  dopt Opt_D_dump_cs_trace dflags
                   || dopt Opt_D_dump_tc_trace dflags )
               ( do { msg <- mk_doc
-                   ; TcM.traceTcRn Opt_D_dump_cs_trace msg }) }
+                   ; TcM.dumpTcRn False
+                       (dumpOptionsFromFlag Opt_D_dump_cs_trace)
+                       "" FormatText
+                       msg }) }
 
 runTcS :: TcS a                -- What to run
        -> TcM (a, EvBindMap)
@@ -2859,7 +2863,7 @@ implications.  Consider
    a ~ F b, forall c. b~Int => blah
 If we have F b ~ fsk in the flat-cache, and we push that into the
 nested implication, we might miss that F b can be rewritten to F Int,
-and hence perhpas solve it.  Moreover, the fsk from outside is
+and hence perhaps solve it.  Moreover, the fsk from outside is
 flattened out after solving the outer level, but and we don't
 do that flattening recursively.
 -}
@@ -2881,7 +2885,7 @@ nestTcS (TcS thing_inside)
 
        ; new_inerts <- TcM.readTcRef new_inert_var
 
-       -- we want to propogate the safe haskell failures
+       -- we want to propagate the safe haskell failures
        ; let old_ic = inert_cans inerts
              new_ic = inert_cans new_inerts
              nxt_ic = old_ic { inert_safehask = inert_safehask new_ic }
@@ -2978,7 +2982,7 @@ Consider
    forall b. empty =>  Eq [a]
 We solve the simple (Eq [a]), under nestTcS, and then turn our attention to
 the implications.  It's definitely fine to use the solved dictionaries on
-the inner implications, and it can make a signficant performance difference
+the inner implications, and it can make a significant performance difference
 if you do so.
 -}
 
@@ -3398,12 +3402,32 @@ setWantedEvTerm (HoleDest hole) tm
   = do { useVars (coVarsOfCo co)
        ; wrapTcS $ TcM.fillCoercionHole hole co }
   | otherwise
-  = do { let co_var = coHoleCoVar hole
+  = -- See Note [Yukky eq_sel for a HoleDest]
+    do { let co_var = coHoleCoVar hole
        ; setEvBind (mkWantedEvBind co_var tm)
        ; wrapTcS $ TcM.fillCoercionHole hole (mkTcCoVarCo co_var) }
 
 setWantedEvTerm (EvVarDest ev_id) tm
   = setEvBind (mkWantedEvBind ev_id tm)
+
+{- Note [Yukky eq_sel for a HoleDest]
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+How can it be that a Wanted with HoleDest gets evidence that isn't
+just a coercion? i.e. evTermCoercion_maybe returns Nothing.
+
+Consider [G] forall a. blah => a ~ T
+         [W] S ~# T
+
+Then doTopReactEqPred carefully looks up the (boxed) constraint (S ~
+T) in the quantified constraints, and wraps the (boxed) evidence it
+gets back in an eq_sel to extract the unboxed (S ~# T).  We can't put
+that term into a coercion, so we add a value binding
+    h = eq_sel (...)
+and the coercion variable h to fill the coercion hole.
+We even re-use the CoHole's Id for this binding!
+
+Yuk!
+-}
 
 setEvBindIfWanted :: CtEvidence -> EvTerm -> TcS ()
 setEvBindIfWanted ev tm

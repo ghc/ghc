@@ -256,7 +256,7 @@ We do not want to extend the substitution with (y -> x |> co); since y
 is of unlifted type, this would destroy the let/app invariant if (x |>
 co) was not ok-for-speculation.
 
-But surely (x |> co) is ok-for-speculation, becasue it's a trivial
+But surely (x |> co) is ok-for-speculation, because it's a trivial
 expression, and x's type is also unlifted, presumably.  Well, maybe
 not if you are using unsafe casts.  I actually found a case where we
 had
@@ -500,7 +500,7 @@ a SPECIALISE pragma.  Then CSE kicks in and notices that the RHSs of
 Now there is terrible danger that, in an importing module, we'll inline
 'g' before we have a chance to run its specialisation!
 
-Solution: during CSE, afer a "hit" in the CSE cache
+Solution: during CSE, after a "hit" in the CSE cache
   * when adding a binding
         g = f
   * for a top-level function g
@@ -540,7 +540,7 @@ very bad in TcFlatten.flatten_ty_con_app
      flatten_ty_con_app = \x y. let <stuff> in \z. blah
 * That allowed the float-out pass to put sguff between
   the \y and \z.
-* And that permanently stopped eta expasion of the function,
+* And that permanently stopped eta expansion of the function,
   even once <stuff> was simplified.
 
 -}
@@ -667,7 +667,7 @@ differ near the root, so it probably isn't expensive to compare the full
 alternative.  It seems like the same kind of thing that CSE is supposed
 to be doing, which is why I put it here.
 
-I acutally saw some examples in the wild, where some inlining made e1 too
+I actually saw some examples in the wild, where some inlining made e1 too
 big for cheapEqExpr to catch it.
 
 

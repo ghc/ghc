@@ -311,3 +311,4 @@ test('T17140',
 test('T17409',
      normal,
      makefile_test, ['T17409'])
+test('T17429', normal, compile, ['-dcore-lint -O2'])

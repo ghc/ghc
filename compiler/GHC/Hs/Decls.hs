@@ -383,7 +383,7 @@ Plan of attack:
    (See RnHiFiles.getSysBinders)
 
  - When typechecking the decl, we build the implicit TyCons and Ids.
-   When doing so we look them up in the name cache (RnEnv.lookupSysName),
+   When doing so we look them up in the name cache (GHC.Rename.Env.lookupSysName),
    to ensure correct module and provenance is set
 
 These are the two places that we have to conjure up the magic derived
@@ -907,8 +907,8 @@ Invariants
    depend on group_tyclds, or on earlier TyClGroups, but not on later
    ones.
 
-See Note [Dependency analsis of type, class, and instance decls]
-in RnSource for more info.
+See Note [Dependency analysis of type, class, and instance decls]
+in GHC.Rename.Source for more info.
 -}
 
 -- | Type or Class Group
@@ -1189,7 +1189,7 @@ data HsDataDefn pass   -- The payload of a data type defn
                      -- For @data T a where { T1 :: T a }@
                      --   the 'LConDecls' all have 'ConDeclGADT'.
 
-                 dd_derivs :: HsDeriving pass  -- ^ Optional 'deriving' claues
+                 dd_derivs :: HsDeriving pass  -- ^ Optional 'deriving' clause
 
              -- For details on above see note [Api annotations] in ApiAnnotation
    }
@@ -1412,7 +1412,7 @@ There's a wrinkle in ConDeclGADT
             con_args   = PrefixCon []
             con_res_ty = a :*: (b -> (a :*: (b -> (a :+: b))))
 
-       - In the renamer (RnSource.rnConDecl), we unravel it afer
+       - In the renamer (GHC.Rename.Source.rnConDecl), we unravel it after
          operator fixities are sorted. So we generate. So we end
          up with
             con_args   = PrefixCon [ a :*: b, a :*: b ]

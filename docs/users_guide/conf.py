@@ -53,7 +53,7 @@ rst_prolog = """
 
 # General information about the project.
 project = u'Glasgow Haskell Compiler'
-copyright = u'2015, GHC Team'
+copyright = u'2020, GHC Team'
 # N.B. version comes from ghc_config
 release = version  # The full version, including alpha/beta/rc tags.
 
@@ -72,7 +72,7 @@ exclude_patterns = ['.build']
 html_title = "Glasgow Haskell Compiler %s User's Guide" % release
 html_short_title = "GHC %s User's Guide" % release
 html_theme_path = ['.']
-html_theme = 'ghc-theme'
+html_theme = 'rtd-theme'
 html_logo = None
 html_static_path = ['images']
 # Convert quotes and dashes to typographically correct entities
@@ -107,6 +107,10 @@ latex_elements = {
 \setromanfont{DejaVu Serif}
 \setmonofont{DejaVu Sans Mono}
 \setlength{\\tymin}{45pt}
+
+% Avoid a torrent of over-full \hbox warnings
+\usepackage{microtype}
+\hbadness=99999
 ''',
 }
 

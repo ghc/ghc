@@ -132,6 +132,13 @@ packageArgs = do
           builder (Cabal Flags) ? arg "in-ghc-tree"
 
         ------------------------------- haskeline ------------------------------
+        -- Hadrian doesn't currently support packages containing both libraries
+        -- and executables. This flag disables the latter.
+        , package haskeline ?
+          builder (Cabal Flags) ? arg "-examples"
+        -- Don't depend upon terminfo when cross-compiling to avoid unnecessary
+        -- dependencies.
+        -- TODO: Perhaps the user should rather be responsible for this?
         , package haskeline ?
           builder (Cabal Flags) ? cross ? arg "-terminfo"
 
@@ -207,6 +214,7 @@ rtsPackageArgs = package rts ? do
           [ arg "-Irts"
           , arg $ "-I" ++ path
           , flag WithLibdw ? if not (null libdwIncludeDir) then arg ("-I" ++ libdwIncludeDir) else mempty
+          , flag WithLibdw ? if not (null libdwLibraryDir) then arg ("-L" ++ libdwLibraryDir) else mempty
           , arg $ "-DRtsWay=\"rts_" ++ show way ++ "\""
           -- Set the namespace for the rts fs functions
           , arg $ "-DFS_NAMESPACE=rts"
@@ -222,6 +230,7 @@ rtsPackageArgs = package rts ? do
     let cArgs = mconcat
           [ rtsWarnings
           , flag UseSystemFfi ? arg ("-I" ++ ffiIncludeDir)
+          , flag WithLibdw ? arg ("-I" ++ libdwIncludeDir)
           , arg "-fomit-frame-pointer"
           -- RTS *must* be compiled with optimisations. The INLINE_HEADER macro
           -- requires that functions are inlined to work as expected. Inlining
@@ -318,13 +327,14 @@ rtsPackageArgs = package rts ? do
         , builder (Ghc CompileCWithGhc) ? map ("-optc" ++) <$> cArgs
         , builder Ghc ? ghcArgs
 
-          , builder HsCpp ? pure
+        , builder HsCpp ? pure
           [ "-DTOP="             ++ show top
           , "-DFFI_INCLUDE_DIR=" ++ show ffiIncludeDir
           , "-DFFI_LIB_DIR="     ++ show ffiLibraryDir
           , "-DFFI_LIB="         ++ show libffiName
-          , "-DLIBDW_LIB_DIR="     ++ show libdwLibraryDir ]
+          , "-DLIBDW_LIB_DIR="   ++ show libdwLibraryDir ]
 
+        , builder HsCpp ? flag WithLibdw ? arg "-DUSE_LIBDW"
         , builder HsCpp ? flag HaveLibMingwEx ? arg "-DHAVE_LIBMINGWEX" ]
 
 -- Compile various performance-critical pieces *without* -fPIC -dynamic

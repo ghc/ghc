@@ -36,7 +36,7 @@ import Cmm
 import CmmInfo
 import CmmUtils
 import CLabel
-import StgSyn
+import GHC.Stg.Syntax
 import CostCentre
 import Id
 import IdInfo
@@ -180,7 +180,7 @@ cgBind (StgRec pairs)
      3. emit all the inits, and then all the bodies
 
    We'd rather not have separate functions to do steps 1 and 2 for
-   each binding, since in pratice they share a lot of code.  So we
+   each binding, since in practice they share a lot of code.  So we
    have just one function, cgRhs, that returns a pair of the CgIdInfo
    for step 1, and a monadic computation to generate the code in step
    2.
@@ -198,7 +198,7 @@ cgRhs :: Id
                  CgIdInfo         -- The info for this binding
                , FCode CmmAGraph  -- A computation which will generate the
                                   -- code for the binding, and return an
-                                  -- assignent of the form "x = Hp - n"
+                                  -- assignment of the form "x = Hp - n"
                                   -- (see above)
                )
 
@@ -206,7 +206,7 @@ cgRhs id (StgRhsCon cc con args)
   = withNewTickyCounterCon (idName id) $
     buildDynCon id True cc con (assertNonVoidStgArgs args)
       -- con args are always non-void,
-      -- see Note [Post-unarisation invariants] in UnariseStg
+      -- see Note [Post-unarisation invariants] in GHC.Stg.Unarise
 
 {- See Note [GC recovery] in compiler/GHC.StgToCmm/Closure.hs -}
 cgRhs id (StgRhsClosure fvs cc upd_flag args body)
@@ -275,7 +275,7 @@ mkRhsClosure    dflags bndr _cc
 
   , let (_, _, params_w_offsets) = mkVirtConstrOffsets dflags (addIdReps (assertNonVoidIds params))
                                    -- pattern binders are always non-void,
-                                   -- see Note [Post-unarisation invariants] in UnariseStg
+                                   -- see Note [Post-unarisation invariants] in GHC.Stg.Unarise
   , Just the_offset <- assocMaybe params_w_offsets (NonVoid selectee)
 
   , let offset_into_int = bytesToWordsRoundUp dflags the_offset

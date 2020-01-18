@@ -64,7 +64,7 @@ targetSupportsSMP :: Action Bool
 targetSupportsSMP = do
   unreg <- flag GhcUnregisterised
   armVer <- targetArmVersion
-  goodArch <- anyTargetArch ["i386", "x86_64", "sparc", "powerpc", "arm", "s390x"]
+  goodArch <- anyTargetArch ["i386", "x86_64", "sparc", "powerpc", "arm", "aarch64", "s390x"]
   if   -- The THREADED_RTS requires `BaseReg` to be in a register and the
        -- Unregisterised mode doesn't allow that.
      | unreg                -> return False

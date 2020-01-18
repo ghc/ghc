@@ -270,7 +270,7 @@ deSugarExpr hsc_env tc_expr = do {
        ; case mb_core_expr of
             Nothing   -> return ()
             Just expr -> dumpIfSet_dyn dflags Opt_D_dump_ds "Desugared"
-                         (pprCoreExpr expr)
+                         FormatCore (pprCoreExpr expr)
 
        ; return (msgs, mb_core_expr) }
 
@@ -369,13 +369,13 @@ Reason
 -}
 
 dsRule :: LRuleDecl GhcTc -> DsM (Maybe CoreRule)
-dsRule (dL->L loc (HsRule { rd_name = name
-                          , rd_act  = rule_act
-                          , rd_tmvs = vars
-                          , rd_lhs  = lhs
-                          , rd_rhs  = rhs }))
+dsRule (L loc (HsRule { rd_name = name
+                      , rd_act  = rule_act
+                      , rd_tmvs = vars
+                      , rd_lhs  = lhs
+                      , rd_rhs  = rhs }))
   = putSrcSpanDs loc $
-    do  { let bndrs' = [var | (dL->L _ (RuleBndr _ (dL->L _ var))) <- vars]
+    do  { let bndrs' = [var | L _ (RuleBndr _ (L _ var)) <- vars]
 
         ; lhs' <- unsetGOptM Opt_EnableRewriteRules $
                   unsetWOptM Opt_WarnIdentities $
@@ -412,8 +412,7 @@ dsRule (dL->L loc (HsRule { rd_name = name
 
         ; return (Just rule)
         } } }
-dsRule (dL->L _ (XRuleDecl nec)) = noExtCon nec
-dsRule _ = panic "dsRule: Impossible Match" -- due to #15884
+dsRule (L _ (XRuleDecl nec)) = noExtCon nec
 
 warnRuleShadowing :: RuleName -> Activation -> Id -> [Id] -> DsM ()
 -- See Note [Rules and inlining/other rules]
@@ -517,7 +516,7 @@ If you have
   {-# RULES "rule-for-f" forall x. f (g x) = ... #-}
 then there's a good chance that in a potential rule redex
     ...f (g e)...
-then 'f' or 'g' will inline befor the rule can fire.  Solution: add an
+then 'f' or 'g' will inline before the rule can fire.  Solution: add an
 INLINE [n] or NOINLINE [n] pragma to 'f' and 'g'.
 
 Note that this applies to all the free variables on the LHS, both the
@@ -528,7 +527,7 @@ In the above example, suppose we had
   {-# RULES "rule-for-g" forally. g [y] = ... #-}
 Then "rule-for-f" and "rule-for-g" would compete.  Better to add phase
 control, so "rule-for-f" has a chance to fire before "rule-for-g" becomes
-active; or perhpas after "rule-for-g" has become inactive. This is checked
+active; or perhaps after "rule-for-g" has become inactive. This is checked
 by 'competesWith'
 
 Class methods have a built-in RULE to select the method from the dictionary,

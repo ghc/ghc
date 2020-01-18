@@ -1,5 +1,5 @@
 
 T16821.hs:12:1: error:
     • Kind signature on newtype declaration has non-TYPE
-      return kind ‘Id *’
+      return kind ‘Id (*)’
     • In the newtype declaration for ‘T’

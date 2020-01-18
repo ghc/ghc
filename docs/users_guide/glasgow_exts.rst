@@ -1325,7 +1325,7 @@ like this ::
         pure = return
         x <*> y = do f <- x; a <- y; return (f a)
 
-will result in an infinte loop when ``<*>`` is called.
+will result in an infinite loop when ``<*>`` is called.
 
 Just as you wouldn't define a ``Monad`` instance using the do-notation, you
 shouldn't define ``Functor`` or ``Applicative`` instance using do-notation (when
@@ -6139,11 +6139,14 @@ a class: ::
         enum = []
 
 The type of the ``enum`` method is ``[a]``, and this is also the type of
-the default method. You can lift this restriction and give another type
-to the default method using the extension :extension:`DefaultSignatures`. For
-instance, if you have written a generic implementation of enumeration in
-a class ``GEnum`` with method ``genum`` in terms of ``GHC.Generics``,
-you can specify a default method that uses that generic implementation: ::
+the default method. You can change the type of the default method by
+requiring a different context using the extension
+:extension:`DefaultSignatures`. For instance, if you have written a
+generic implementation of enumeration in a class ``GEnum`` with method
+``genum``, you can specify a default method that uses that generic
+implementation. But your default implementation can only be used if the
+constraints are satisfied, therefore you need to change the type of the
+default method ::
 
       class Enum a where
         enum :: [a]
@@ -6956,7 +6959,7 @@ like this:
       client to deliberately override an instance from a library,
       without requiring a change to the library.)
 
--  If all the remaining candidates are incoherent, the search suceeds, returning
+-  If all the remaining candidates are incoherent, the search succeeds, returning
    an arbitrary surviving candidate.
 
 -  If more than one non-incoherent candidate remains, the search fails.
@@ -8308,7 +8311,7 @@ Note the following points:
    with a finite number of alternatives (unlike ``Type``).
 
 -  When :extension:`ExplicitForAll` is enabled, type and kind variables can be
-   explicily bound in associated data or type family instances in the same way
+   explicitly bound in associated data or type family instances in the same way
    (and with the same restrictions) as :ref:`data-instance-declarations` or
    :ref:`type-instance-declarations`. For example, adapting the above, the
    following is accepted: ::
@@ -8784,7 +8787,7 @@ injectivity of a type family:
 
 5. In a *closed type family* all equations are ordered and in one place.
    Equations are also checked pair-wise but this time an equation has to
-   be paired with all the preceeding equations. Of course a
+   be paired with all the preceding equations. Of course a
    single-equation closed type family is trivially injective (unless
    (1), (2) or (3) above holds).
 
@@ -10426,7 +10429,7 @@ Introducing quantified constraints offers two main benefits:
     class (forall m. Monad m => Monad (t m)) => Trans t where
       lift :: Monad m => m a -> (t m) a
 
-This idea is very old; see Seciton 7 of `Derivable type classes <https://www.microsoft.com/en-us/research/publication/derivable-type-classes/>`_.
+This idea is very old; see Section 7 of `Derivable type classes <https://www.microsoft.com/en-us/research/publication/derivable-type-classes/>`_.
 
 Syntax changes
 ----------------
@@ -10603,7 +10606,7 @@ if we called ``f Nothing``, then ``f`` is ``Maybe`` and the compiler must prove 
 call site) that ``forall a. Eq a => Eq (Maybe a)`` holds.  It can do this easily, by
 appealing to the existing instance declaration for ``Eq (Maybe a)``.
 
-In short, quantifed constraints do not introduce incoherence.
+In short, quantified constraints do not introduce incoherence.
 
 
 .. _extensions-to-type-signatures:
@@ -12126,7 +12129,7 @@ Here are some more details:
 
        f _x = _x + 1
 
-   does not elict any errors. Only a variable *that is not in scope*
+   does not elicit any errors. Only a variable *that is not in scope*
    (whether or not it starts with an underscore) is treated as an error
    (which it always was), albeit now with a more informative error
    message.
@@ -13108,14 +13111,13 @@ enable the quotation subset of Template Haskell (i.e. without splice syntax).
 The :extension:`TemplateHaskellQuotes` extension is considered safe under
 :ref:`safe-haskell` while :extension:`TemplateHaskell` is not.
 
--  A splice is written ``$x``, where ``x`` is an identifier, or
-   ``$(...)``, where the "..." is an arbitrary expression. There must be
-   no space between the "$" and the identifier or parenthesis. This use
-   of "$" overrides its meaning as an infix operator, just as "M.x"
+-  A splice is written ``$x``, where ``x`` is an arbitrary expression.
+   There must be no space between the "$" and the expression.
+   This use of "$" overrides its meaning as an infix operator, just as "M.x"
    overrides the meaning of "." as an infix operator. If you want the
    infix operator, put spaces around it.
 
-   A splice can occur in place of
+   A top-level splice can occur in place of
 
    -  an expression; the spliced expression must have type ``Q Exp``
 
@@ -13131,33 +13133,70 @@ The :extension:`TemplateHaskellQuotes` extension is considered safe under
    that declaration splices are not allowed anywhere except at top level
    (outside any other declarations).
 
+   The ``Q`` monad is a monad defined in ``Language.Haskell.TH.Syntax`` which
+   supports several useful operations during code generation such as reporting
+   errors or looking up identifiers in the environment.
+
 -  A expression quotation is written in Oxford brackets, thus:
 
    -  ``[| ... |]``, or ``[e| ... |]``, where the "..." is an
-      expression; the quotation has type ``Q Exp``.
+      expression; the quotation has type ``Quote m => m Exp``.
 
    -  ``[d| ... |]``, where the "..." is a list of top-level
-      declarations; the quotation has type ``Q [Dec]``.
+      declarations; the quotation has type ``Quote m => m [Dec]``.
 
    -  ``[t| ... |]``, where the "..." is a type; the quotation has type
-      ``Q Type``.
+      ``Quote m => m Type``.
 
    -  ``[p| ... |]``, where the "..." is a pattern; the quotation has
-      type ``Q Pat``.
+      type ``Quote m => m Pat``.
+
+   The ``Quote`` type class is the minimal interface necessary to implement
+   the desugaring of quotations. The ``Q`` monad is an instance of ``Quote`` but
+   contains many more operations which are not needed for defining quotations.
 
    See :ref:`pts-where` for using partial type signatures in quotations.
 
--  A *typed* expression splice is written ``$$x``, where ``x`` is an
-   identifier, or ``$$(...)``, where the "..." is an arbitrary
-   expression.
+-  Splices can be nested inside quotation brackets. For example the fragment
+   representing ``1 + 2`` can be constructed using nested splices::
 
-   A typed expression splice can occur in place of an expression; the
+    oneC, twoC, plusC  :: Quote m => m Exp
+    oneC = [| 1 |]
+
+    twoC = [| 2 |]
+
+    plusC = [| $oneC + $twoC |]
+
+- The precise type of a quotation depends on the types of the nested splices inside it::
+
+      -- Add a redundant constraint to demonstrate that constraints on the
+      -- monad used to build the representation are propagated when using nested
+      -- splices.
+      f :: (Quote m, C m) => m Exp
+      f = [| 5 | ]
+
+      -- f is used in a nested splice so the constraint on f, namely C, is propagated
+      -- to a constraint on the whole representation.
+      g :: (Quote m, C m) => m Exp
+      g = [| $f + $f |]
+
+   Remember, a top-level splice still requires its argument to be of type ``Q Exp``.
+   So then splicing in ``g`` will cause ``m`` to be instantiated to ``Q``::
+
+    h :: Int
+    h = $(g) -- m ~ Q
+
+
+-  A *typed* expression splice is written ``$$x``, where ``x`` is
+   is an arbitrary expression.
+
+   A top-level typed expression splice can occur in place of an expression; the
    spliced expression must have type ``Q (TExp a)``
 
 -  A *typed* expression quotation is written as ``[|| ... ||]``, or
    ``[e|| ... ||]``, where the "..." is an expression; if the "..."
    expression has type ``a``, then the quotation has type
-   ``Q (TExp a)``.
+   ``Quote m => m (TExp a)``.
 
    Values of type ``TExp a`` may be converted to values of type ``Exp``
    using the function ``unType :: TExp a -> Exp``.
@@ -13199,7 +13238,7 @@ The :extension:`TemplateHaskellQuotes` extension is considered safe under
 
        import Language.Haskell.TH
 
-       add1 :: Int -> Q Exp
+       add1 :: Quote m => Int -> m Exp
        add1 x = [| x + 1 |]
 
    Now consider a splice using ``add1`` in a separate
@@ -13214,13 +13253,14 @@ The :extension:`TemplateHaskellQuotes` extension is considered safe under
 
    Template Haskell cannot know what the argument to ``add1`` will be at the
    function's definition site, so a lifting mechanism is used to promote
-   ``x`` into a value of type ``Q Exp``. This functionality is exposed to the
+   ``x`` into a value of type ``Quote m => m Exp``. This functionality is exposed to the
    user as the ``Lift`` typeclass in the ``Language.Haskell.TH.Syntax``
    module. If a type has a ``Lift`` instance, then any of its values can be
    lifted to a Template Haskell expression: ::
 
        class Lift t where
-           lift :: t -> Q Exp
+           lift :: Quote m => t -> m Exp
+           liftTyped :: Quote m => t -> m (TExp t)
 
    In general, if GHC sees an expression within Oxford brackets (e.g., ``[|
    foo bar |]``, then GHC looks up each name within the brackets. If a name
@@ -13264,14 +13304,14 @@ The :extension:`TemplateHaskellQuotes` extension is considered safe under
    quotation bracket are *not* run at compile time; they are run when the
    bracket is spliced in, sometime later.  For example, ::
 
-       mkPat :: Q Pat
+       mkPat :: Quote m => m Pat
        mkPat = [p| (x, y) |]
 
        -- in another module:
        foo :: (Char, String) -> String
        foo $(mkPat) = x : z
 
-       bar :: Q Exp
+       bar :: Quote m => m Exp
        bar = [| \ $(mkPat) -> x : w |]
 
    will fail with ``z`` being out of scope in the definition of ``foo`` but it
@@ -13401,8 +13441,19 @@ The :extension:`TemplateHaskellQuotes` extension is considered safe under
 
 (Compared to the original paper, there are many differences of detail.
 The syntax for a declaration splice uses "``$``" not "``splice``". The type of
-the enclosed expression must be ``Q [Dec]``, not ``[Q Dec]``. Typed expression
+the enclosed expression must be ``Quote m => m [Dec]``, not ``[Q Dec]``. Typed expression
 splices and quotations are supported.)
+
+.. ghc-flag:: -fenable-th-splice-warnings
+    :shortdesc: Generate warnings for Template Haskell splices
+    :type: dynamic
+    :reverse: -fno-enable-th-splices
+    :category: warnings
+
+    Template Haskell splices won't be checked for warnings, because the code
+    causing the warning might originate from a third-party library and possibly
+    was not written by the user. If you want to have warnings for splices
+    anyway, pass :ghc-flag:`-fenable-th-splice-warnings`.
 
 .. _th-usage:
 
@@ -13526,14 +13577,14 @@ and :file:`Printf.hs`:
     -- Generate Haskell source code from a parsed representation
     -- of the format string.  This code will be spliced into
     -- the module which calls "pr", at compile time.
-    gen :: [Format] -> Q Exp
+    gen :: Quote m => [Format] -> m Exp
     gen [D]   = [| \n -> show n |]
     gen [S]   = [| \s -> s |]
     gen [L s] = stringE s
 
     -- Here we generate the Haskell code for the splice
     -- from an input format string.
-    pr :: String -> Q Exp
+    pr :: Quote m => String -> m Exp
     pr s = gen (parse s)
 
 Now run the compiler,
@@ -14312,12 +14363,15 @@ Note the following points:
 
     f !x = 3
 
-  Is this a definition of the infix function "``(!)``", or of the "``f``"
-  with a bang pattern? GHC resolves this ambiguity in favour of the
-  latter. If you want to define ``(!)`` with bang-patterns enabled, you
-  have to do so using prefix notation: ::
+  Is this a definition of the infix function "``(!)``", or of the "``f``" with
+  a bang pattern? GHC resolves this ambiguity by looking at the surrounding
+  whitespace: ::
 
-    (!) f x = 3
+    a ! b = ...   -- infix operator
+    a !b = ...    -- bang pattern
+
+  See `GHC Proposal #229 <https://github.com/ghc-proposals/ghc-proposals/blob/master/proposals/0229-whitespace-bang-patterns.rst>`__
+  for the precise rules.
 
 
 .. _strict-data:
@@ -14348,6 +14402,13 @@ we interpret it as if they had written ::
 
 The extension only affects definitions in this module.
 
+The ``~`` annotation must be written in prefix form::
+
+   data T = MkT ~Int   -- valid
+   data T = MkT ~ Int  -- invalid
+
+See `GHC Proposal #229 <https://github.com/ghc-proposals/ghc-proposals/blob/master/proposals/0229-whitespace-bang-patterns.rst>`__
+for the precise rules.
 
 .. _strict:
 
@@ -14382,7 +14443,7 @@ optionally had by adding ``!`` in front of a variable.
 
    Adding ``~`` in front of ``x`` gives the regular lazy behavior.
 
-   Turning patterns into irrefutable ones requires ``~(~p)`` or ``(~ ~p)`` when ``Strict`` is enabled.
+   Turning patterns into irrefutable ones requires ``~(~p)`` when ``Strict`` is enabled.
 
 
 

@@ -76,10 +76,10 @@ import Control.Monad (foldM)
   We have a CFG with edge weights based on which we try to place blocks next to
   each other.
 
-  Edge weights not only represent likelyhood of control transfer between blocks
+  Edge weights not only represent likelihood of control transfer between blocks
   but also how much a block would benefit from being placed sequentially after
   it's predecessor.
-  For example blocks which are preceeded by an info table are more likely to end
+  For example blocks which are preceded by an info table are more likely to end
   up in a different cache line than their predecessor and we can't eliminate the jump
   so there is less benefit to placing them sequentially.
 
@@ -342,7 +342,7 @@ takeL n (BlockChain blks) =
 -- We have the chains (A-B-C-D) and (E-F) and an Edge C->E.
 --
 -- While placing the latter after the former doesn't result in sequential
--- control flow it is still benefical. As block C and E might end
+-- control flow it is still beneficial. As block C and E might end
 -- up in the same cache line.
 --
 -- So we place these chains next to each other even if we can't fuse them.
@@ -359,7 +359,7 @@ takeL n (BlockChain blks) =
 -- While we could take into account the space between the two blocks which
 -- share an edge this blows up compile times quite a bit. It requires
 -- us to find all edges between two chains, check the distance for all edges,
--- rank them based on the distance and and only then we can select two chains
+-- rank them based on the distance and only then we can select two chains
 -- to combine. Which would add a lot of complexity for little gain.
 --
 -- So instead we just rank by the strength of the edge and use the first pair we
@@ -374,7 +374,7 @@ combineNeighbourhood  :: [CfgEdge] -- ^ Edges to consider
                       -- were used to fuse chains and as such no longer need to be
                       -- considered.
 combineNeighbourhood edges chains
-    = -- pprTraceIt "Neigbours" $
+    = -- pprTraceIt "Neighbours" $
     --   pprTrace "combineNeighbours" (ppr edges) $
       applyEdges edges endFrontier startFrontier (Set.empty)
     where
@@ -740,7 +740,7 @@ sequenceChain  info weights'     blocks@((BasicBlock entry _):_) =
             --pprTraceIt "placedBlocks" $
             -- ++ [] is stil kinda expensive
             if null unplaced then blockList else blockList ++ unplaced
-        getBlock bid = expectJust "Block placment" $ mapLookup bid blockMap
+        getBlock bid = expectJust "Block placement" $ mapLookup bid blockMap
     in
         --Assert we placed all blocks given as input
         ASSERT(all (\bid -> mapMember bid blockMap) placedBlocks)
@@ -891,4 +891,3 @@ lookupDeleteUFM :: Uniquable key => UniqFM elt -> key
 lookupDeleteUFM m k = do -- Maybe monad
     v <- lookupUFM m k
     return (v, delFromUFM m k)
-

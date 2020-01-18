@@ -462,6 +462,10 @@ else
 libraries/haskeline_CONFIGURE_OPTS += --flags=-terminfo
 endif
 
+# ghc-cabal doesn't currently support packages containing both libraries
+# and executables. This flag disables the latter.
+libraries/haskeline_CONFIGURE_OPTS += --flags=-examples
+
 PACKAGES_STAGE1 += stm
 PACKAGES_STAGE1 += exceptions
 PACKAGES_STAGE1 += haskeline

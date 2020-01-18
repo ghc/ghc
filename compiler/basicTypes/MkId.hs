@@ -67,7 +67,6 @@ import UniqSupply
 import PrelNames
 import BasicTypes       hiding ( SuccessFlag(..) )
 import Util
-import Pair
 import DynFlags
 import Outputable
 import FastString
@@ -363,8 +362,8 @@ The solution is simple, though: just make the newtype wrappers
 as ephemeral as the newtype workers. In other words, give the wrappers
 compulsory unfoldings and no bindings. The compulsory unfolding is given
 in wrap_unf in mkDataConRep, and the lack of a binding happens in
-TidyPgm.getTyConImplicitBinds, where we say that a newtype has no implicit
-bindings.
+GHC.Iface.Tidy.getTyConImplicitBinds, where we say that a newtype has no
+implicit bindings.
 
 ************************************************************************
 *                                                                      *
@@ -650,7 +649,7 @@ mkDataConRep dflags fam_envs wrap_name mb_bangs data_con
                          `setInlinePragInfo`    wrap_prag
                          `setUnfoldingInfo`     wrap_unf
                          `setStrictnessInfo`    wrap_sig
-                             -- We need to get the CAF info right here because TidyPgm
+                             -- We need to get the CAF info right here because GHC.Iface.Tidy
                              -- does not tidy the IdInfo of implicit bindings (like the wrapper)
                              -- so it not make sure that the CAF info is sane
                          `setLevityInfoWithType` wrap_ty
@@ -891,6 +890,8 @@ case of a newtype constructor, we simply hardcode its dcr_bangs field to
 newLocal :: Type -> UniqSM Var
 newLocal ty = do { uniq <- getUniqueM
                  ; return (mkSysLocalOrCoVar (fsLit "dt") uniq ty) }
+                 -- We should not have "OrCoVar" here, this is a bug (#17545)
+
 
 -- | Unpack/Strictness decisions from source module.
 --
@@ -962,7 +963,7 @@ dataConArgRep arg_ty (HsUnpack Nothing)
   = (rep_tys, wrappers)
 
 dataConArgRep _ (HsUnpack (Just co))
-  | let co_rep_ty = pSnd (coercionKind co)
+  | let co_rep_ty = coercionRKind co
   , (rep_tys, wrappers) <- dataConArgUnpack co_rep_ty
   = (rep_tys, wrapCo co co_rep_ty wrappers)
 
@@ -1177,7 +1178,7 @@ wrapNewTypeBody tycon args result_expr
 -- When unwrapping, we do *not* apply any family coercion, because this will
 -- be done via a CoPat by the type checker.  We have to do it this way as
 -- computing the right type arguments for the coercion requires more than just
--- a spliting operation (cf, TcPat.tcConPat).
+-- a splitting operation (cf, TcPat.tcConPat).
 
 unwrapNewTypeBody :: TyCon -> [Type] -> CoreExpr -> CoreExpr
 unwrapNewTypeBody tycon args result_expr
@@ -1392,7 +1393,6 @@ seqId = pcMiscPrelId seqName ty info
   where
     info = noCafIdInfo `setInlinePragInfo` inline_prag
                        `setUnfoldingInfo`  mkCompulsoryUnfolding rhs
-                       `setNeverLevPoly`   ty
 
     inline_prag
          = alwaysInlinePragma `setInlinePragmaActivation` ActiveAfter
@@ -1402,11 +1402,15 @@ seqId = pcMiscPrelId seqName ty info
                   -- LHS of rules.  That way we can have rules for 'seq';
                   -- see Note [seqId magic]
 
-    ty  = mkSpecForAllTys [alphaTyVar,betaTyVar]
-                          (mkVisFunTy alphaTy (mkVisFunTy betaTy betaTy))
+    -- seq :: forall (r :: RuntimeRep) a (b :: TYPE r). a -> b -> b
+    ty  =
+      mkInvForAllTy runtimeRep2TyVar
+      $ mkSpecForAllTys [alphaTyVar, openBetaTyVar]
+      $ mkVisFunTy alphaTy (mkVisFunTy openBetaTy openBetaTy)
 
-    [x,y] = mkTemplateLocals [alphaTy, betaTy]
-    rhs = mkLams [alphaTyVar,betaTyVar,x,y] (Case (Var x) x betaTy [(DEFAULT, [], Var y)])
+    [x,y] = mkTemplateLocals [alphaTy, openBetaTy]
+    rhs = mkLams ([runtimeRep2TyVar, alphaTyVar, openBetaTyVar, x, y]) $
+          Case (Var x) x openBetaTy [(DEFAULT, [], Var y)]
 
 ------------------------------------------------
 lazyId :: Id    -- See Note [lazyId magic]
@@ -1492,19 +1496,20 @@ Note [seqId magic]
 ~~~~~~~~~~~~~~~~~~
 'GHC.Prim.seq' is special in several ways.
 
-a) In source Haskell its second arg can have an unboxed type
-      x `seq` (v +# w)
-   But see Note [Typing rule for seq] in TcExpr, which
-   explains why we give seq itself an ordinary type
-         seq :: forall a b. a -> b -> b
-   and treat it as a language construct from a typing point of view.
+a) Its fixity is set in GHC.Iface.Load.ghcPrimIface
 
-b) Its fixity is set in LoadIface.ghcPrimIface
-
-c) It has quite a bit of desugaring magic.
+b) It has quite a bit of desugaring magic.
    See DsUtils.hs Note [Desugaring seq (1)] and (2) and (3)
 
-d) There is some special rule handing: Note [User-defined RULES for seq]
+c) There is some special rule handing: Note [User-defined RULES for seq]
+
+Historical note:
+    In TcExpr we used to need a special typing rule for 'seq', to handle calls
+    whose second argument had an unboxed type, e.g.  x `seq` 3#
+
+    However, with levity polymorphism we can now give seq the type seq ::
+    forall (r :: RuntimeRep) a (b :: TYPE r). a -> b -> b which handles this
+    case without special treatment in the typechecker.
 
 Note [User-defined RULES for seq]
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
@@ -1530,12 +1535,15 @@ If we wrote
   RULE "f/seq" forall n e.  seq (f n) e = seq n e
 with rule arity 2, then two bad things would happen:
 
-  - The magical desugaring done in Note [seqId magic] item (c)
+  - The magical desugaring done in Note [seqId magic] item (b)
     for saturated application of 'seq' would turn the LHS into
     a case expression!
 
   - The code in Simplify.rebuildCase would need to actually supply
     the value argument, which turns out to be awkward.
+
+See also: Note [User-defined RULES for seq] in Simplify.
+
 
 Note [lazyId magic]
 ~~~~~~~~~~~~~~~~~~~
@@ -1593,7 +1601,7 @@ running the simplifier.
 
 'noinline' needs to be wired-in because it gets inserted automatically
 when we serialize an expression to the interface format. See
-Note [Inlining and hs-boot files] in ToIface
+Note [Inlining and hs-boot files] in GHC.CoreToIface
 
 Note that noinline as currently implemented can hide some simplifications since
 it hides strictness from the demand analyser. Specifically, the demand analyser

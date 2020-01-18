@@ -1,5 +1,6 @@
 {-# LANGUAGE CPP #-}
 {-# LANGUAGE FlexibleInstances #-}
+{-# LANGUAGE RankNTypes #-}
 
 -------------------------------------------------------------------------------
 --
@@ -282,7 +283,8 @@ import ToolSettings
 import Foreign.C        ( CInt(..) )
 import System.IO.Unsafe ( unsafeDupablePerformIO )
 import {-# SOURCE #-} ErrUtils ( Severity(..), MsgDoc, mkLocMessageAnn
-                               , getCaretDiagnostic )
+                               , getCaretDiagnostic, DumpAction, TraceAction
+                               , defaultDumpAction, defaultTraceAction )
 import Json
 import SysTools.Terminal ( stderrSupportsAnsiColors )
 import SysTools.BaseDir ( expandToolDir, expandTopDir )
@@ -557,10 +559,11 @@ data GeneralFlag
    | Opt_UnboxSmallStrictFields
    | Opt_DictsCheap
    | Opt_EnableRewriteRules             -- Apply rewrite rules during simplification
+   | Opt_EnableThSpliceWarnings         -- Enable warnings for TH splices
    | Opt_RegsGraph                      -- do graph coloring register allocation
    | Opt_RegsIterative                  -- do iterative coalescing graph coloring register allocation
    | Opt_PedanticBottoms                -- Be picky about how we treat bottom
-   | Opt_LlvmTBAA                       -- Use LLVM TBAA infastructure for improving AA (hidden flag)
+   | Opt_LlvmTBAA                       -- Use LLVM TBAA infrastructure for improving AA (hidden flag)
    | Opt_LlvmFillUndefWithGarbage       -- Testing for undef bugs (hidden flag)
    | Opt_IrrefutableTuples
    | Opt_CmmSink
@@ -969,7 +972,7 @@ data DynFlags = DynFlags {
   rawSettings       :: [(String, String)],
 
   integerLibrary        :: IntegerLibrary,
-    -- ^ IntegerGMP or IntegerSimple. Set at configure time, but may be overriden
+    -- ^ IntegerGMP or IntegerSimple. Set at configure time, but may be overridden
     --   by GHC-API users. See Note [The integer library] in PrelNames
   llvmConfig            :: LlvmConfig,
     -- ^ N.B. It's important that this field is lazy since we load the LLVM
@@ -1103,7 +1106,7 @@ data DynFlags = DynFlags {
     -- they don't have to be loaded each time they are needed.  See
     -- 'DynamicLoading.initializePlugins'.
   staticPlugins            :: [StaticPlugin],
-    -- ^ staic plugins which do not need dynamic loading. These plugins are
+    -- ^ static plugins which do not need dynamic loading. These plugins are
     -- intended to be added by GHC API users directly to this list.
     --
     -- To add dynamically loaded plugins through the GHC API see
@@ -1210,6 +1213,8 @@ data DynFlags = DynFlags {
 
   -- | MsgDoc output action: use "ErrUtils" instead of this if you can
   log_action            :: LogAction,
+  dump_action           :: DumpAction,
+  trace_action          :: TraceAction,
   flushOut              :: FlushOut,
   flushErr              :: FlushErr,
 
@@ -2095,7 +2100,9 @@ defaultDynFlags mySettings llvmConfig =
 
         -- Logging
 
-        log_action = defaultLogAction,
+        log_action   = defaultLogAction,
+        dump_action  = defaultDumpAction,
+        trace_action = defaultTraceAction,
 
         flushOut = defaultFlushOut,
         flushErr = defaultFlushErr,
@@ -2998,7 +3005,7 @@ dynamic_flags_deps = [
                  Nothing -> upd (\d -> d { parMakeCount = Nothing })))
                  -- When the number of parallel builds
                  -- is omitted, it is the same
-                 -- as specifing that the number of
+                 -- as specifying that the number of
                  -- parallel builds is equal to the
                  -- result of getNumProcessors
   , make_ord_flag defFlag "instantiated-with"   (sepArg setUnitIdInsts)
@@ -4136,7 +4143,8 @@ wWarningFlagsDeps = [
   flagSpec "unrecognised-warning-flags"  Opt_WarnUnrecognisedWarningFlags,
   flagSpec "star-binder"                 Opt_WarnStarBinder,
   flagSpec "star-is-type"                Opt_WarnStarIsType,
-  flagSpec "missing-space-after-bang"    Opt_WarnSpaceAfterBang,
+  depFlagSpec "missing-space-after-bang" Opt_WarnSpaceAfterBang
+    "bang patterns can no longer be written with a space",
   flagSpec "partial-fields"              Opt_WarnPartialFields,
   flagSpec "prepositive-qualified-module"
                                          Opt_WarnPrepositiveQualifiedModule,
@@ -4208,6 +4216,7 @@ fFlagsDeps = [
   flagSpec "eager-blackholing"                Opt_EagerBlackHoling,
   flagSpec "embed-manifest"                   Opt_EmbedManifest,
   flagSpec "enable-rewrite-rules"             Opt_EnableRewriteRules,
+  flagSpec "enable-th-splice-warnings"        Opt_EnableThSpliceWarnings,
   flagSpec "error-spans"                      Opt_ErrorSpans,
   flagSpec "excess-precision"                 Opt_ExcessPrecision,
   flagSpec "expose-all-unfoldings"            Opt_ExposeAllUnfoldings,
@@ -4778,7 +4787,7 @@ didn't.  Reason was:
  * Eta reduction wasn't happening in the simplifier, but it was
    happening in CorePrep, on
         $fBla = MkDict (/\a. K a)
- * Result: rhsIsStatic told TidyPgm that $fBla might have CAF refs
+ * Result: rhsIsStatic told GHC.Iface.Tidy that $fBla might have CAF refs
    but the eta-reduced version (MkDict K) obviously doesn't
 Simple solution: just let the simplifier do eta-reduction even in -O0.
 After all, CorePrep does it unconditionally!  Not a big deal, but
@@ -5171,7 +5180,7 @@ setDumpFlag' dump_flag
                                              Opt_D_no_debug_output]
 
 forceRecompile :: DynP ()
--- Whenver we -ddump, force recompilation (by switching off the
+-- Whenever we -ddump, force recompilation (by switching off the
 -- recompilation checker), else you don't see the dump! However,
 -- don't switch it off in --make mode, else *everything* gets
 -- recompiled which probably isn't what you want

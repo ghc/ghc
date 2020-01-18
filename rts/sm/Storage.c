@@ -406,7 +406,7 @@ freeStorage (bool free_heap)
    but can assume only two bits are available in STATIC_LINK (due to 32-bit
    systems).
 
-   To accomodate this we move handling of static objects entirely to the
+   To accommodate this we move handling of static objects entirely to the
    oldest generation when the nonmoving collector is in use. To do this safely
    and efficiently we allocate the blackhole created by lockCAF() directly in
    the non-moving heap. This means that the moving collector can completely
@@ -477,7 +477,7 @@ lockCAF (StgRegTable *reg, StgIndStatic *caf)
     // Secondly I think static thunks can't have payload: anything that they
     // reference should be in SRTs
     ASSERT(orig_info_tbl->layout.payload.ptrs == 0);
-    // Becuase the payload is empty we just push the SRT
+    // Because the payload is empty we just push the SRT
     IF_NONMOVING_WRITE_BARRIER_ENABLED {
         StgThunkInfoTable *thunk_info = itbl_to_thunk_itbl(orig_info_tbl);
         if (thunk_info->i.srt) {

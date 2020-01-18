@@ -84,6 +84,8 @@ import qualified GHC.LanguageExtensions as LangExt
 import TcEvidence
 
 import Control.Monad    ( zipWithM )
+import Data.List.NonEmpty (NonEmpty(..))
+import qualified Data.List.NonEmpty as NEL
 
 {-
 ************************************************************************
@@ -186,9 +188,9 @@ worthy of a type synonym and a few handy functions.
 firstPat :: EquationInfo -> Pat GhcTc
 firstPat eqn = ASSERT( notNull (eqn_pats eqn) ) head (eqn_pats eqn)
 
-shiftEqns :: [EquationInfo] -> [EquationInfo]
+shiftEqns :: Functor f => f EquationInfo -> f EquationInfo
 -- Drop the first pattern in each equation
-shiftEqns eqns = [ eqn { eqn_pats = tail (eqn_pats eqn) } | eqn <- eqns ]
+shiftEqns = fmap $ \eqn -> eqn { eqn_pats = tail (eqn_pats eqn) }
 
 -- Functions on MatchResults
 
@@ -286,13 +288,13 @@ data CaseAlt a = MkCaseAlt{ alt_pat :: a,
                             alt_result :: MatchResult }
 
 mkCoAlgCaseMatchResult
-  :: Id                 -- Scrutinee
-  -> Type               -- Type of exp
-  -> [CaseAlt DataCon]  -- Alternatives (bndrs *include* tyvars, dicts)
+  :: Id -- ^ Scrutinee
+  -> Type -- ^ Type of exp
+  -> NonEmpty (CaseAlt DataCon) -- ^ Alternatives (bndrs *include* tyvars, dicts)
   -> MatchResult
 mkCoAlgCaseMatchResult var ty match_alts
   | isNewtype  -- Newtype case; use a let
-  = ASSERT( null (tail match_alts) && null (tail arg_ids1) )
+  = ASSERT( null match_alts_tail && null (tail arg_ids1) )
     mkCoLetMatchResult (NonRec arg_id1 newtype_rhs) match_result1
 
   | otherwise
@@ -303,8 +305,8 @@ mkCoAlgCaseMatchResult var ty match_alts
         -- [Interesting: because of GADTs, we can't rely on the type of
         --  the scrutinised Id to be sufficiently refined to have a TyCon in it]
 
-    alt1@MkCaseAlt{ alt_bndrs = arg_ids1, alt_result = match_result1 }
-      = ASSERT( notNull match_alts ) head match_alts
+    alt1@MkCaseAlt{ alt_bndrs = arg_ids1, alt_result = match_result1 } :| match_alts_tail
+      = match_alts
     -- Stuff for newtype
     arg_id1       = ASSERT( notNull arg_ids1 ) head arg_ids1
     var_ty        = idType var
@@ -314,9 +316,6 @@ mkCoAlgCaseMatchResult var ty match_alts
 
 mkCoSynCaseMatchResult :: Id -> Type -> CaseAlt PatSyn -> MatchResult
 mkCoSynCaseMatchResult var ty alt = MatchResult CanFail $ mkPatSynCase var ty alt
-
-sort_alts :: [CaseAlt DataCon] -> [CaseAlt DataCon]
-sort_alts = sortWith (dataConTag . alt_pat)
 
 mkPatSynCase :: Id -> Type -> CaseAlt PatSyn -> CoreExpr -> DsM CoreExpr
 mkPatSynCase var ty alt fail = do
@@ -337,17 +336,16 @@ mkPatSynCase var ty alt fail = do
     ensure_unstrict cont | needs_void_lam = Lam voidArgId cont
                          | otherwise      = cont
 
-mkDataConCase :: Id -> Type -> [CaseAlt DataCon] -> MatchResult
-mkDataConCase _   _  []            = panic "mkDataConCase: no alternatives"
-mkDataConCase var ty alts@(alt1:_) = MatchResult fail_flag mk_case
+mkDataConCase :: Id -> Type -> NonEmpty (CaseAlt DataCon) -> MatchResult
+mkDataConCase var ty alts@(alt1 :| _) = MatchResult fail_flag mk_case
   where
     con1          = alt_pat alt1
     tycon         = dataConTyCon con1
     data_cons     = tyConDataCons tycon
-    match_results = map alt_result alts
+    match_results = fmap alt_result alts
 
-    sorted_alts :: [CaseAlt DataCon]
-    sorted_alts  = sort_alts alts
+    sorted_alts :: NonEmpty (CaseAlt DataCon)
+    sorted_alts  = NEL.sortWith (dataConTag . alt_pat) alts
 
     var_ty       = idType var
     (_, ty_args) = tcSplitTyConApp var_ty -- Don't look through newtypes
@@ -356,7 +354,7 @@ mkDataConCase var ty alts@(alt1:_) = MatchResult fail_flag mk_case
     mk_case :: CoreExpr -> DsM CoreExpr
     mk_case fail = do
         alts <- mapM (mk_alt fail) sorted_alts
-        return $ mkWildCase (Var var) (idType var) ty (mk_default fail ++ alts)
+        return $ mkWildCase (Var var) (idType var) ty (mk_default fail ++ NEL.toList alts)
 
     mk_alt :: CoreExpr -> CaseAlt DataCon -> DsM CoreAlt
     mk_alt fail MkCaseAlt{ alt_pat = con,
@@ -376,11 +374,11 @@ mkDataConCase var ty alts@(alt1:_) = MatchResult fail_flag mk_case
 
     fail_flag :: CanItFail
     fail_flag | exhaustive_case
-              = foldr orFail CantFail [can_it_fail | MatchResult can_it_fail _ <- match_results]
+              = foldr orFail CantFail [can_it_fail | MatchResult can_it_fail _ <- NEL.toList match_results]
               | otherwise
               = CanFail
 
-    mentioned_constructors = mkUniqSet $ map alt_pat alts
+    mentioned_constructors = mkUniqSet $ map alt_pat $ NEL.toList alts
     un_mentioned_constructors
         = mkUniqSet data_cons `minusUniqSet` mentioned_constructors
     exhaustive_case = isEmptyUniqSet un_mentioned_constructors
@@ -408,82 +406,88 @@ mkErrorAppDs err_id ty msg = do
     return (mkApps (Var err_id) [Type (getRuntimeRep ty), Type ty, core_msg])
 
 {-
-'mkCoreAppDs' and 'mkCoreAppsDs' hand the special-case desugaring of 'seq'.
+'mkCoreAppDs' and 'mkCoreAppsDs' handle the special-case desugaring of 'seq'.
 
-Note [Desugaring seq (1)]  cf #1031
-~~~~~~~~~~~~~~~~~~~~~~~~~
-   f x y = x `seq` (y `seq` (# x,y #))
+Note [Desugaring seq]
+~~~~~~~~~~~~~~~~~~~~~
 
-The [CoreSyn let/app invariant] means that, other things being equal, because
-the argument to the outer 'seq' has an unlifted type, we'll use call-by-value thus:
+There are a few subtleties in the desugaring of `seq`:
 
-   f x y = case (y `seq` (# x,y #)) of v -> x `seq` v
+ 1. (as described in #1031)
 
-But that is bad for two reasons:
-  (a) we now evaluate y before x, and
-  (b) we can't bind v to an unboxed pair
+    Consider,
+       f x y = x `seq` (y `seq` (# x,y #))
 
-Seq is very, very special!  So we recognise it right here, and desugar to
-        case x of _ -> case y of _ -> (# x,y #)
+    The [CoreSyn let/app invariant] means that, other things being equal, because
+    the argument to the outer 'seq' has an unlifted type, we'll use call-by-value thus:
 
-Note [Desugaring seq (2)]  cf #2273
-~~~~~~~~~~~~~~~~~~~~~~~~~
-Consider
-   let chp = case b of { True -> fst x; False -> 0 }
-   in chp `seq` ...chp...
-Here the seq is designed to plug the space leak of retaining (snd x)
-for too long.
+       f x y = case (y `seq` (# x,y #)) of v -> x `seq` v
 
-If we rely on the ordinary inlining of seq, we'll get
-   let chp = case b of { True -> fst x; False -> 0 }
-   case chp of _ { I# -> ...chp... }
+    But that is bad for two reasons:
+      (a) we now evaluate y before x, and
+      (b) we can't bind v to an unboxed pair
 
-But since chp is cheap, and the case is an alluring contet, we'll
-inline chp into the case scrutinee.  Now there is only one use of chp,
-so we'll inline a second copy.  Alas, we've now ruined the purpose of
-the seq, by re-introducing the space leak:
-    case (case b of {True -> fst x; False -> 0}) of
-      I# _ -> ...case b of {True -> fst x; False -> 0}...
+    Seq is very, very special!  So we recognise it right here, and desugar to
+            case x of _ -> case y of _ -> (# x,y #)
 
-We can try to avoid doing this by ensuring that the binder-swap in the
-case happens, so we get his at an early stage:
-   case chp of chp2 { I# -> ...chp2... }
-But this is fragile.  The real culprit is the source program.  Perhaps we
-should have said explicitly
-   let !chp2 = chp in ...chp2...
+ 2. (as described in #2273)
 
-But that's painful.  So the code here does a little hack to make seq
-more robust: a saturated application of 'seq' is turned *directly* into
-the case expression, thus:
-   x  `seq` e2 ==> case x of x -> e2    -- Note shadowing!
-   e1 `seq` e2 ==> case x of _ -> e2
+    Consider
+       let chp = case b of { True -> fst x; False -> 0 }
+       in chp `seq` ...chp...
+    Here the seq is designed to plug the space leak of retaining (snd x)
+    for too long.
 
-So we desugar our example to:
-   let chp = case b of { True -> fst x; False -> 0 }
-   case chp of chp { I# -> ...chp... }
-And now all is well.
+    If we rely on the ordinary inlining of seq, we'll get
+       let chp = case b of { True -> fst x; False -> 0 }
+       case chp of _ { I# -> ...chp... }
 
-The reason it's a hack is because if you define mySeq=seq, the hack
-won't work on mySeq.
+    But since chp is cheap, and the case is an alluring contet, we'll
+    inline chp into the case scrutinee.  Now there is only one use of chp,
+    so we'll inline a second copy.  Alas, we've now ruined the purpose of
+    the seq, by re-introducing the space leak:
+        case (case b of {True -> fst x; False -> 0}) of
+          I# _ -> ...case b of {True -> fst x; False -> 0}...
 
-Note [Desugaring seq (3)] cf #2409
-~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
-The isLocalId ensures that we don't turn
-        True `seq` e
-into
-        case True of True { ... }
-which stupidly tries to bind the datacon 'True'.
+    We can try to avoid doing this by ensuring that the binder-swap in the
+    case happens, so we get his at an early stage:
+       case chp of chp2 { I# -> ...chp2... }
+    But this is fragile.  The real culprit is the source program.  Perhaps we
+    should have said explicitly
+       let !chp2 = chp in ...chp2...
+
+    But that's painful.  So the code here does a little hack to make seq
+    more robust: a saturated application of 'seq' is turned *directly* into
+    the case expression, thus:
+       x  `seq` e2 ==> case x of x -> e2    -- Note shadowing!
+       e1 `seq` e2 ==> case x of _ -> e2
+
+    So we desugar our example to:
+       let chp = case b of { True -> fst x; False -> 0 }
+       case chp of chp { I# -> ...chp... }
+    And now all is well.
+
+    The reason it's a hack is because if you define mySeq=seq, the hack
+    won't work on mySeq.
+
+ 3. (as described in #2409)
+
+    The isLocalId ensures that we don't turn
+            True `seq` e
+    into
+            case True of True { ... }
+    which stupidly tries to bind the datacon 'True'.
 -}
 
 -- NB: Make sure the argument is not levity polymorphic
 mkCoreAppDs  :: SDoc -> CoreExpr -> CoreExpr -> CoreExpr
-mkCoreAppDs _ (Var f `App` Type ty1 `App` Type ty2 `App` arg1) arg2
-  | f `hasKey` seqIdKey            -- Note [Desugaring seq (1), (2)]
+mkCoreAppDs _ (Var f `App` Type _r `App` Type ty1 `App` Type ty2 `App` arg1) arg2
+  | f `hasKey` seqIdKey            -- Note [Desugaring seq], points (1) and (2)
   = Case arg1 case_bndr ty2 [(DEFAULT,[],arg2)]
   where
     case_bndr = case arg1 of
                    Var v1 | isInternalName (idName v1)
-                          -> v1        -- Note [Desugaring seq (2) and (3)]
+                          -> v1        -- Note [Desugaring seq], points (2) and (3)
                    _      -> mkWildValBinder ty1
 
 mkCoreAppDs s fun arg = mkCoreApp s fun arg  -- The rest is done in MkCore
@@ -668,7 +672,7 @@ mkSelectorBinds :: [[Tickish Id]] -- ^ ticks to add, possibly
                 -- and all the desugared binds
 
 mkSelectorBinds ticks pat val_expr
-  | (dL->L _ (VarPat _ (dL->L _ v))) <- pat'     -- Special case (A)
+  | L _ (VarPat _ (L _ v)) <- pat'     -- Special case (A)
   = return (v, [(v, val_expr)])
 
   | is_flat_prod_lpat pat'           -- Special case (B)
@@ -715,9 +719,9 @@ mkSelectorBinds ticks pat val_expr
 
 strip_bangs :: LPat (GhcPass p) -> LPat (GhcPass p)
 -- Remove outermost bangs and parens
-strip_bangs (dL->L _ (ParPat _ p))  = strip_bangs p
-strip_bangs (dL->L _ (BangPat _ p)) = strip_bangs p
-strip_bangs lp                      = lp
+strip_bangs (L _ (ParPat _ p))  = strip_bangs p
+strip_bangs (L _ (BangPat _ p)) = strip_bangs p
+strip_bangs lp                  = lp
 
 is_flat_prod_lpat :: LPat (GhcPass p) -> Bool
 is_flat_prod_lpat = is_flat_prod_pat . unLoc
@@ -725,7 +729,7 @@ is_flat_prod_lpat = is_flat_prod_pat . unLoc
 is_flat_prod_pat :: Pat (GhcPass p) -> Bool
 is_flat_prod_pat (ParPat _ p)          = is_flat_prod_lpat p
 is_flat_prod_pat (TuplePat _ ps Boxed) = all is_triv_lpat ps
-is_flat_prod_pat (ConPatOut { pat_con  = (dL->L _ pcon)
+is_flat_prod_pat (ConPatOut { pat_con  = L _ pcon
                             , pat_args = ps})
   | RealDataCon con <- pcon
   , isProductTyCon (dataConTyCon con)
@@ -753,7 +757,7 @@ is_triv_pat _            = False
 mkLHsPatTup :: [LPat GhcTc] -> LPat GhcTc
 mkLHsPatTup []     = noLoc $ mkVanillaTuplePat [] Boxed
 mkLHsPatTup [lpat] = lpat
-mkLHsPatTup lpats  = cL (getLoc (head lpats)) $
+mkLHsPatTup lpats  = L (getLoc (head lpats)) $
                      mkVanillaTuplePat lpats Boxed
 
 mkVanillaTuplePat :: [OutPat GhcTc] -> Boxity -> Pat GhcTc
@@ -946,25 +950,25 @@ decideBangHood dflags lpat
   | otherwise   --  -XStrict
   = go lpat
   where
-    go lp@(dL->L l p)
+    go lp@(L l p)
       = case p of
-           ParPat x p    -> cL l (ParPat x (go p))
+           ParPat x p    -> L l (ParPat x (go p))
            LazyPat _ lp' -> lp'
            BangPat _ _   -> lp
-           _             -> cL l (BangPat noExtField lp)
+           _             -> L l (BangPat noExtField lp)
 
 -- | Unconditionally make a 'Pat' strict.
 addBang :: LPat GhcTc -- ^ Original pattern
         -> LPat GhcTc -- ^ Banged pattern
 addBang = go
   where
-    go lp@(dL->L l p)
+    go lp@(L l p)
       = case p of
-           ParPat x p    -> cL l (ParPat x (go p))
-           LazyPat _ lp' -> cL l (BangPat noExtField lp')
+           ParPat x p    -> L l (ParPat x (go p))
+           LazyPat _ lp' -> L l (BangPat noExtField lp')
                                   -- Should we bring the extension value over?
            BangPat _ _   -> lp
-           _             -> cL l (BangPat noExtField lp)
+           _             -> L l (BangPat noExtField lp)
 
 isTrueLHsExpr :: LHsExpr GhcTc -> Maybe (CoreExpr -> DsM CoreExpr)
 
@@ -974,24 +978,24 @@ isTrueLHsExpr :: LHsExpr GhcTc -> Maybe (CoreExpr -> DsM CoreExpr)
 --        * Trivial wappings of these
 -- The arguments to Just are any HsTicks that we have found,
 -- because we still want to tick then, even it they are always evaluated.
-isTrueLHsExpr (dL->L _ (HsVar _ (dL->L _ v)))
+isTrueLHsExpr (L _ (HsVar _ (L _ v)))
   |  v `hasKey` otherwiseIdKey
      || v `hasKey` getUnique trueDataConId
                                               = Just return
         -- trueDataConId doesn't have the same unique as trueDataCon
-isTrueLHsExpr (dL->L _ (HsConLikeOut _ con))
+isTrueLHsExpr (L _ (HsConLikeOut _ con))
   | con `hasKey` getUnique trueDataCon = Just return
-isTrueLHsExpr (dL->L _ (HsTick _ tickish e))
+isTrueLHsExpr (L _ (HsTick _ tickish e))
     | Just ticks <- isTrueLHsExpr e
     = Just (\x -> do wrapped <- ticks x
                      return (Tick tickish wrapped))
    -- This encodes that the result is constant True for Hpc tick purposes;
    -- which is specifically what isTrueLHsExpr is trying to find out.
-isTrueLHsExpr (dL->L _ (HsBinTick _ ixT _ e))
+isTrueLHsExpr (L _ (HsBinTick _ ixT _ e))
     | Just ticks <- isTrueLHsExpr e
     = Just (\x -> do e <- ticks x
                      this_mod <- getModule
                      return (Tick (HpcTick this_mod ixT) e))
 
-isTrueLHsExpr (dL->L _ (HsPar _ e))   = isTrueLHsExpr e
-isTrueLHsExpr _                       = Nothing
+isTrueLHsExpr (L _ (HsPar _ e))   = isTrueLHsExpr e
+isTrueLHsExpr _                   = Nothing

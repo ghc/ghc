@@ -165,6 +165,7 @@ void initRtsFlagsDefaults(void)
     RtsFlags.GcFlags.compactThreshold   = 30.0;
     RtsFlags.GcFlags.sweep              = false;
     RtsFlags.GcFlags.idleGCDelayTime    = USToTime(300000); // 300ms
+    RtsFlags.GcFlags.interIdleGCWait    = 0;
 #if defined(THREADED_RTS)
     RtsFlags.GcFlags.doIdleGC           = true;
 #else
@@ -552,7 +553,7 @@ char** getUTF8Args(int* argc)
 
     // We create two argument arrays, one which is later permutated by the RTS
     // instead of the main argv.
-    // The other one is used to free the allocted memory later.
+    // The other one is used to free the allocated memory later.
     char** argv = (char**) stgMallocBytes(sizeof(char*) * (*argc + 1),
                                           "getUTF8Args 1");
     win32_full_utf8_argv = (char**) stgMallocBytes(sizeof(char*) * (*argc + 1),
@@ -959,6 +960,11 @@ error = true;
                       printRtsInfo(rtsConfig);
                       stg_exit(0);
                   }
+                  else if (strequal("nonmoving-gc",
+                               &rts_argv[arg][2])) {
+                      OPTION_SAFE;
+                      RtsFlags.GcFlags.useNonmoving = true;
+                  }
 #if defined(THREADED_RTS)
 #if defined(mingw32_HOST_OS)
                   else if (!strncmp("io-manager-threads",
@@ -997,9 +1003,14 @@ error = true;
                       if (rts_argv[arg][6] == '=') {
                           mask = (StgWord)strtol(rts_argv[arg]+7,
                                                  (char **) NULL, 10);
-                      } else {
+                      } else if (rts_argv[arg][6] == '\0'){
                           mask = (StgWord)~0;
+                      } else {
+                          errorBelch("%s: unknown flag", rts_argv[arg]);
+                          error = true;
+                          break;
                       }
+
                       if (!osNumaAvailable()) {
                           errorBelch("%s: OS reports NUMA is not available",
                                      rts_argv[arg]);
@@ -1033,6 +1044,7 @@ error = true;
                           RtsFlags.GcFlags.numa = true;
                           RtsFlags.DebugFlags.numa = true;
                           RtsFlags.GcFlags.numaMask = (1<<nNodes) - 1;
+                          n_numa_nodes = nNodes;
                       }
                   }
 #endif
@@ -1221,19 +1233,33 @@ error = true;
                   break;
 
               case 'I': /* idle GC delay */
-                OPTION_UNSAFE;
-                if (rts_argv[arg][2] == '\0') {
-                  /* use default */
-                } else {
-                    Time t = fsecondsToTime(atof(rts_argv[arg]+2));
-                    if (t == 0) {
-                        RtsFlags.GcFlags.doIdleGC = false;
-                    } else {
-                        RtsFlags.GcFlags.doIdleGC = true;
-                        RtsFlags.GcFlags.idleGCDelayTime = t;
-                    }
-                }
-                break;
+                  OPTION_UNSAFE;
+                  switch (rts_argv[arg][2]) {
+                  /* minimum inter-idle GC wait time */
+                  case 'w':
+                      if (rts_argv[arg][3] == '\0') {
+                          /* use default */
+                      } else {
+                          RtsFlags.GcFlags.interIdleGCWait = fsecondsToTime(atof(rts_argv[arg]+3));
+                      }
+                      break;
+                  /* idle delay before GC */
+                  case '\0':
+                      /* use default */
+                      break;
+                  default:
+                      {
+                          Time t = fsecondsToTime(atof(rts_argv[arg]+2));
+                          if (t == 0) {
+                              RtsFlags.GcFlags.doIdleGC = false;
+                          } else {
+                              RtsFlags.GcFlags.doIdleGC = true;
+                              RtsFlags.GcFlags.idleGCDelayTime = t;
+                          }
+                      }
+                      break;
+                  }
+                  break;
 
               case 'T':
                   OPTION_SAFE;
@@ -1784,6 +1810,11 @@ static void normaliseRtsOpts (void)
 
     if (RtsFlags.GcFlags.useNonmoving && RtsFlags.GcFlags.generations == 1) {
         barf("The non-moving collector doesn't support -G1");
+    }
+
+    if (RtsFlags.ProfFlags.doHeapProfile != NO_HEAP_PROFILING &&
+            RtsFlags.GcFlags.useNonmoving) {
+        barf("The non-moving collector doesn't support profiling");
     }
 
     if (RtsFlags.GcFlags.compact && RtsFlags.GcFlags.useNonmoving) {

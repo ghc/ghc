@@ -8,7 +8,7 @@ Utility functions on @Core@ syntax
 
 {-# LANGUAGE CPP #-}
 
--- | Commonly useful utilites for manipulating the Core language
+-- | Commonly useful utilities for manipulating the Core language
 module CoreUtils (
         -- * Constructing expressions
         mkCast,
@@ -177,7 +177,7 @@ isExprLevPoly = go
    go_app (Lam _ e)       = go_app e
    go_app (Let _ e)       = go_app e
    go_app (Case _ _ ty _) = resultIsLevPoly ty
-   go_app (Cast _ co)     = resultIsLevPoly (pSnd $ coercionKind co)
+   go_app (Cast _ co)     = resultIsLevPoly (coercionRKind co)
    go_app (Tick _ e)      = go_app e
    go_app e@(Type {})     = pprPanic "isExprLevPoly app ty" (ppr e)
    go_app e@(Coercion {}) = pprPanic "isExprLevPoly app co" (ppr e)
@@ -267,15 +267,15 @@ mkCast e co
   = e
 
 mkCast (Coercion e_co) co
-  | isCoVarType (pSnd (coercionKind co))
+  | isCoVarType (coercionRKind co)
        -- The guard here checks that g has a (~#) on both sides,
        -- otherwise decomposeCo fails.  Can in principle happen
        -- with unsafeCoerce
   = Coercion (mkCoCast e_co co)
 
 mkCast (Cast expr co2) co
-  = WARN(let { Pair  from_ty  _to_ty  = coercionKind co;
-               Pair _from_ty2  to_ty2 = coercionKind co2} in
+  = WARN(let { from_ty = coercionLKind co;
+               to_ty2  = coercionRKind co2 } in
             not (from_ty `eqType` to_ty2),
              vcat ([ text "expr:" <+> ppr expr
                    , text "co2:" <+> ppr co2
@@ -286,7 +286,7 @@ mkCast (Tick t expr) co
    = Tick t (mkCast expr co)
 
 mkCast expr co
-  = let Pair from_ty _to_ty = coercionKind co in
+  = let from_ty = coercionLKind co in
     WARN( not (from_ty `eqType` exprType expr),
           text "Trying to coerce" <+> text "(" <> ppr expr
           $$ text "::" <+> ppr (exprType expr) <> text ")"
@@ -552,7 +552,7 @@ can be eliminated by expanding the synonym.
 
 Note [Binding coercions]
 ~~~~~~~~~~~~~~~~~~~~~~~~
-Consider binding a CoVar, c = e.  Then, we must atisfy
+Consider binding a CoVar, c = e.  Then, we must satisfy
 Note [CoreSyn type and coercion invariant] in CoreSyn,
 which allows only (Coercion co) on the RHS.
 
@@ -609,7 +609,7 @@ that cannot match.  For example:
 
 Suppose that for some silly reason, x isn't substituted in the case
 expression.  (Perhaps there's a NOINLINE on it, or profiling SCC stuff
-gets in the way; cf #3118.)  Then the full-lazines pass might produce
+gets in the way; cf #3118.)  Then the full-laziness pass might produce
 this
 
      x = Red
@@ -1622,7 +1622,7 @@ app_ok primop_ok fun args
 
 -----------------------------
 altsAreExhaustive :: [Alt b] -> Bool
--- True  <=> the case alternatives are definiely exhaustive
+-- True  <=> the case alternatives are definitely exhaustive
 -- False <=> they may or may not be
 altsAreExhaustive []
   = False    -- Should not happen
@@ -2379,6 +2379,8 @@ But the simplifier pushes those casts outwards, so we don't
 need to address that here.
 -}
 
+-- When updating this function, make sure to update
+-- CorePrep.tryEtaReducePrep as well!
 tryEtaReduce :: [Var] -> CoreExpr -> Maybe CoreExpr
 tryEtaReduce bndrs body
   = go (reverse bndrs) body (mkRepReflCo (exprType body))
@@ -2500,9 +2502,9 @@ rhsIsStatic
    -> (Name -> Bool)         -- Which names are dynamic
    -> (LitNumType -> Integer -> Maybe CoreExpr)
       -- Desugaring for some literals (disgusting)
-      -- C.f. Note [Disgusting computation of CafRefs] in TidyPgm
+      -- C.f. Note [Disgusting computation of CafRefs] in GHC.Iface.Tidy
    -> CoreExpr -> Bool
--- It's called (i) in TidyPgm.hasCafRefs to decide if the rhs is, or
+-- It's called (i) in GHC.Iface.Tidy.hasCafRefs to decide if the rhs is, or
 -- refers to, CAFs; (ii) in CoreToStg to decide whether to put an
 -- update flag on it and (iii) in DsExpr to decide how to expand
 -- list literals

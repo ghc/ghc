@@ -37,7 +37,6 @@ import Unique
 import DynFlags ( DynFlags, GeneralFlag(..), gopt )
 import Outputable
 import FastString
-import Pair
 import Util     ( debugIsOn )
 
 {-
@@ -98,7 +97,7 @@ exprArity e = go e
     go (Lam x e) | isId x          = go e + 1
                  | otherwise       = go e
     go (Tick t e) | not (tickishIsCode t) = go e
-    go (Cast e co)                 = trim_arity (go e) (pSnd (coercionKind co))
+    go (Cast e co)                 = trim_arity (go e) (coercionRKind co)
                                         -- Note [exprArity invariant]
     go (App e (Type _))            = go e
     go (App f a) | exprIsTrivial a = (go f - 1) `max` 0
@@ -175,13 +174,13 @@ exprArity has the following invariants:
       can get "n" manifest lambdas to the top.
 
 Why is this important?  Because
-  - In TidyPgm we use exprArity to fix the *final arity* of
+  - In GHC.Iface.Tidy we use exprArity to fix the *final arity* of
     each top-level Id, and in
   - In CorePrep we use etaExpand on each rhs, so that the visible lambdas
     actually match that arity, which in turn means
     that the StgRhs has the right number of lambdas
 
-An alternative would be to do the eta-expansion in TidyPgm, at least
+An alternative would be to do the eta-expansion in GHC.Iface.Tidy, at least
 for top-level bindings, in which case we would not need the trim_arity
 in exprArity.  That is a less local change, so I'm going to leave it for today!
 
@@ -268,7 +267,7 @@ Or, to put it another way
    there is no work lost in duplicating the partial
    application (e x1 .. x(n-1))
 
-In the divegent case, no work is lost by duplicating because if the thing
+In the divergent case, no work is lost by duplicating because if the thing
 is evaluated once, that's the end of the program.
 
 Or, to put it another way, in any context C
@@ -357,7 +356,7 @@ we want to get:                  coerce T (\x::[T] -> (coerce ([T]->Int) e) x)
   HOWEVER, note that if you use coerce bogusly you can ge
         coerce Int negate
   And since negate has arity 2, you might try to eta expand.  But you can't
-  decopose Int to a function type.   Hence the final case in eta_expand.
+  decompose Int to a function type.   Hence the final case in eta_expand.
 
 Note [The state-transformer hack]
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
@@ -744,7 +743,7 @@ arityType env (Cast e co)
       ABot n | co_arity < n -> ATop (replicate co_arity noOneShotInfo)
              | otherwise    -> ABot n
   where
-    co_arity = length (typeArity (pSnd (coercionKind co)))
+    co_arity = length (typeArity (coercionRKind co))
     -- See Note [exprArity invariant] (2); must be true of
     -- arityType too, since that is how we compute the arity
     -- of variables, and they in turn affect result of exprArity
@@ -856,7 +855,7 @@ returns a CoreExpr satisfying the same invariant. See Note [Eta
 expansion and the CorePrep invariants] in CorePrep.
 
 This means the eta-expander has to do a bit of on-the-fly
-simplification but it's not too hard.  The alernative, of relying on
+simplification but it's not too hard.  The alternative, of relying on
 a subsequent clean-up phase of the Simplifier to de-crapify the result,
 means you can't really use it in CorePrep, which is painful.
 
@@ -939,7 +938,7 @@ etaExpand :: Arity              -- ^ Result should have this number of value arg
 etaExpand n orig_expr
   = go n orig_expr
   where
-      -- Strip off existing lambdas and casts
+      -- Strip off existing lambdas and casts before handing off to mkEtaWW
       -- Note [Eta expansion and SCCs]
     go 0 expr = expr
     go n (Lam v body) | isTyVar v = Lam v (go n     body)
@@ -950,7 +949,7 @@ etaExpand n orig_expr
         retick $ etaInfoAbs etas (etaInfoApp subst' sexpr etas)
       where
           in_scope = mkInScopeSet (exprFreeVars expr)
-          (in_scope', etas) = mkEtaWW n orig_expr in_scope (exprType expr)
+          (in_scope', etas) = mkEtaWW n (ppr orig_expr) in_scope (exprType expr)
           subst' = mkEmptySubst in_scope'
 
           -- Find ticks behind type apps.
@@ -1038,17 +1037,30 @@ etaInfoAppTy :: Type -> [EtaInfo] -> Type
 -- then   etaInfoApp e eis :: etaInfoApp ty eis
 etaInfoAppTy ty []               = ty
 etaInfoAppTy ty (EtaVar v : eis) = etaInfoAppTy (applyTypeToArg ty (varToCoreExpr v)) eis
-etaInfoAppTy _  (EtaCo co : eis) = etaInfoAppTy (pSnd (coercionKind co)) eis
+etaInfoAppTy _  (EtaCo co : eis) = etaInfoAppTy (coercionRKind co) eis
 
 --------------
-mkEtaWW :: Arity -> CoreExpr -> InScopeSet -> Type
-        -> (InScopeSet, [EtaInfo])
-        -- EtaInfo contains fresh variables,
-        --   not free in the incoming CoreExpr
-        -- Outgoing InScopeSet includes the EtaInfo vars
-        --   and the original free vars
+-- | @mkEtaWW n _ fvs ty@ will compute the 'EtaInfo' necessary for eta-expanding
+-- an expression @e :: ty@ to take @n@ value arguments, where @fvs@ are the
+-- free variables of @e@.
+--
+-- Note that this function is entirely unconcerned about cost centres and other
+-- semantically-irrelevant source annotations, so call sites must take care to
+-- preserve that info. See Note [Eta expansion and SCCs].
+mkEtaWW
+  :: Arity
+  -- ^ How many value arguments to eta-expand
+  -> SDoc
+  -- ^ The pretty-printed original expression, for warnings.
+  -> InScopeSet
+  -- ^ A super-set of the free vars of the expression to eta-expand.
+  -> Type
+  -> (InScopeSet, [EtaInfo])
+  -- ^ The variables in 'EtaInfo' are fresh wrt. to the incoming 'InScopeSet'.
+  -- The outgoing 'InScopeSet' extends the incoming 'InScopeSet' with the
+  -- fresh variables in 'EtaInfo'.
 
-mkEtaWW orig_n orig_expr in_scope orig_ty
+mkEtaWW orig_n ppr_orig_expr in_scope orig_ty
   = go orig_n empty_subst orig_ty []
   where
     empty_subst = mkEmptyTCvSubst in_scope
@@ -1105,9 +1117,9 @@ mkEtaWW orig_n orig_expr in_scope orig_ty
        | otherwise       -- We have an expression of arity > 0,
                          -- but its type isn't a function, or a binder
                          -- is levity-polymorphic
-       = WARN( True, (ppr orig_n <+> ppr orig_ty) $$ ppr orig_expr )
+       = WARN( True, (ppr orig_n <+> ppr orig_ty) $$ ppr_orig_expr )
          (getTCvInScope subst, reverse eis)
-        -- This *can* legitmately happen:
+        -- This *can* legitimately happen:
         -- e.g.  coerce Int (\x. x) Essentially the programmer is
         -- playing fast and loose with types (Happy does this a lot).
         -- So we simply decline to eta-expand.  Otherwise we'd end up
@@ -1191,4 +1203,6 @@ freshEtaId n subst ty
         ty'     = Type.substTyUnchecked subst ty
         eta_id' = uniqAway (getTCvInScope subst) $
                   mkSysLocalOrCoVar (fsLit "eta") (mkBuiltinUnique n) ty'
+                  -- "OrCoVar" since this can be used to eta-expand
+                  -- coercion abstractions
         subst'  = extendTCvInScope subst eta_id'

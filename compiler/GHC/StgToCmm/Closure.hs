@@ -66,7 +66,7 @@ module GHC.StgToCmm.Closure (
 
 import GhcPrelude
 
-import StgSyn
+import GHC.Stg.Syntax
 import SMRep
 import Cmm
 import PprCmmExpr() -- For Outputable instances
@@ -82,7 +82,7 @@ import Type
 import TyCoRep
 import TcType
 import TyCon
-import RepType
+import GHC.Types.RepType
 import BasicTypes
 import Outputable
 import DynFlags
@@ -142,7 +142,7 @@ nonVoidIds ids = [NonVoid id | id <- ids, not (isVoidTy (idType id))]
 
 -- | Used in places where some invariant ensures that all these Ids are
 -- non-void; e.g. constructor field binders in case expressions.
--- See Note [Post-unarisation invariants] in UnariseStg.
+-- See Note [Post-unarisation invariants] in GHC.Stg.Unarise.
 assertNonVoidIds :: [Id] -> [NonVoid Id]
 assertNonVoidIds ids = ASSERT(not (any (isVoidTy . idType) ids))
                        coerce ids
@@ -152,7 +152,7 @@ nonVoidStgArgs args = [NonVoid arg | arg <- args, not (isVoidTy (stgArgType arg)
 
 -- | Used in places where some invariant ensures that all these arguments are
 -- non-void; e.g. constructor arguments.
--- See Note [Post-unarisation invariants] in UnariseStg.
+-- See Note [Post-unarisation invariants] in GHC.Stg.Unarise.
 assertNonVoidStgArgs :: [StgArg] -> [NonVoid StgArg]
 assertNonVoidStgArgs args = ASSERT(not (any (isVoidTy . stgArgType) args))
                             coerce args
@@ -169,7 +169,7 @@ assertNonVoidStgArgs args = ASSERT(not (any (isVoidTy . stgArgType) args))
 -- See Note [Post-unarisation invariants]
 idPrimRep :: Id -> PrimRep
 idPrimRep id = typePrimRep1 (idType id)
-    -- See also Note [VoidRep] in RepType
+    -- See also Note [VoidRep] in GHC.Types.RepType
 
 -- | Assumes that Ids have one PrimRep, which holds after unarisation.
 -- See Note [Post-unarisation invariants]
@@ -362,20 +362,19 @@ type DynTag = Int       -- The tag on a *pointer*
 --    * big, otherwise.
 --
 -- Small families can have the constructor tag in the tag bits.
--- Big families only use the tag value 1 to represent evaluatedness.
+-- Big families always use the tag values 1..mAX_PTR_TAG to represent
+-- evaluatedness, the last one lumping together all overflowing ones.
 -- We don't have very many tag bits: for example, we have 2 bits on
 -- x86-32 and 3 bits on x86-64.
+--
+-- Also see Note [Tagging big families] in GHC.StgToCmm.Expr
 
 isSmallFamily :: DynFlags -> Int -> Bool
 isSmallFamily dflags fam_size = fam_size <= mAX_PTR_TAG dflags
 
 tagForCon :: DynFlags -> DataCon -> DynTag
-tagForCon dflags con
-  | isSmallFamily dflags fam_size = con_tag
-  | otherwise                     = 1
-  where
-    con_tag  = dataConTag con -- NB: 1-indexed
-    fam_size = tyConFamilySize (dataConTyCon con)
+tagForCon dflags con = min (dataConTag con) (mAX_PTR_TAG dflags)
+-- NB: 1-indexed
 
 tagForArity :: DynFlags -> RepArity -> DynTag
 tagForArity dflags arity

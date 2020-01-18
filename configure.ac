@@ -13,7 +13,7 @@ dnl
 # see what flags are available. (Better yet, read the documentation!)
 #
 
-AC_INIT([The Glorious Glasgow Haskell Compilation System], [8.10.0], [glasgow-haskell-bugs@haskell.org], [ghc-AC_PACKAGE_VERSION])
+AC_INIT([The Glorious Glasgow Haskell Compilation System], [8.11.0], [glasgow-haskell-bugs@haskell.org], [ghc-AC_PACKAGE_VERSION])
 
 # Set this to YES for a released version, otherwise NO
 : ${RELEASE=NO}
@@ -311,9 +311,9 @@ FP_DEFAULT_CHOICE_OVERRIDE_CHECK(
   [tables next to code],
   [tables apart from code],
   [TablesNextToCode],
-  [Build a tool chain with info tables layed out next to code (enabled by default when using the registerised ABI, on platforms that support it)])
+  [Build a tool chain with info tables laid out next to code (enabled by default when using the registerised ABI, on platforms that support it)])
 if test x"$TablesNextToCode" = xYES; then
-   AC_DEFINE([TABLES_NEXT_TO_CODE], [1], [Define to 1 if info tables are layed out next to code])
+   AC_DEFINE([TABLES_NEXT_TO_CODE], [1], [Define to 1 if info tables are laid out next to code])
 fi
 AC_SUBST(TablesNextToCode)
 
@@ -477,7 +477,7 @@ dnl ** Building a cross compiler?
 dnl --------------------------------------------------------------
 CrossCompiling=NO
 # If 'host' and 'target' differ, then this means we are building a cross-compiler.
-if test "$TargetPlatform" != "$HostPlatform" ; then
+if test "$target" != "$host" ; then
     CrossCompiling=YES
     cross_compiling=yes   # This tells configure that it can accept just 'target',
                           # otherwise you get
@@ -542,7 +542,7 @@ AC_ARG_WITH([gcc],
         AC_MSG_ERROR([--with-gcc=$withval is obsolete (use './configure CC=$withval' or 'CC=$withval ./configure' instead)]))
 
 AC_ARG_WITH([clang],
-        AS_HELP_STRING([--with-clang=ARG], [Use ARG as the path to gcc (obsolete, use CC=ARG instead) [default=autodetect]]),
+        AS_HELP_STRING([--with-clang=ARG], [Use ARG as the path to clang (obsolete, use CC=ARG instead) [default=autodetect]]),
         AC_MSG_ERROR([--with-clang=$withval is obsolete (use './configure CC=$withval' or 'CC=$withval ./configure' instead)]))
 
 dnl detect compiler (prefer gcc over clang) and set $CC (unless CC already set),
@@ -598,7 +598,7 @@ AC_SUBST([NmCmd])
 if test "$TargetOS_CPP" = "darwin"
 then
     AC_MSG_CHECKING(whether nm program is broken)
-    # Some versions of XCode ship a broken version of `nm`. Detect and work
+    # Some versions of Xcode ship a broken version of `nm`. Detect and work
     # around this issue. See : https://gitlab.haskell.org/ghc/ghc/issues/11744
     nmver=$(${NM} --version | grep version | sed 's/ //g')
     case "$nmver" in
@@ -717,7 +717,7 @@ AC_SYS_INTERPRETER()
 
 dnl ** look for GCC and find out which version
 dnl     Figure out which C compiler to use.  Gcc is preferred.
-dnl     If gcc, make sure it's at least 3.0
+dnl     If gcc, make sure it's at least 4.6
 dnl
 FP_GCC_VERSION
 
@@ -727,7 +727,9 @@ FP_GCC_SUPPORTS_NO_PIE
 dnl ** Used to determine how to compile ghc-prim's atomics.c, used by
 dnl    unregisterised, Sparc, and PPC backends.
 FP_GCC_SUPPORTS__ATOMICS
-AC_DEFINE([HAVE_C11_ATOMICS], [$CONF_GCC_SUPPORTS__ATOMICS], [Does GCC support __atomic primitives?])
+if test $CONF_GCC_SUPPORTS__ATOMICS = YES ; then
+  AC_DEFINE([HAVE_C11_ATOMICS], [1], [Does GCC support __atomic primitives?])
+fi
 
 FP_GCC_EXTRA_FLAGS
 
@@ -864,6 +866,9 @@ AC_PATH_PROG(XELATEX,xelatex)
 
 dnl ** check for makeinfo
 AC_PATH_PROG(MAKEINFO,makeinfo)
+
+dnl ** check for Python for testsuite driver
+FIND_PYTHON
 
 dnl ** check for ghc-pkg command
 FP_PROG_GHC_PKG
@@ -1348,7 +1353,6 @@ dnl doc/users_guide/ghc_config.py.in.
 LIBRARY_VERSION(base)
 LIBRARY_VERSION(Cabal, Cabal/Cabal)
 LIBRARY_VERSION(template-haskell)
-LIBRARY_VERSION(parallel)
 LIBRARY_VERSION(array)
 LIBRARY_VERSION(ghc-prim)
 LIBRARY_VERSION(ghc-compact)
@@ -1414,7 +1418,7 @@ echo "\
       which is version   : $GhcVersion
 "
 
-if test "x$CC_LLVM_BACKEND" = "x1"; then
+if test "x$CcLlvmBackend" = "xYES"; then
     CompilerName="clang        "
 else
     CompilerName="gcc          "

@@ -176,7 +176,7 @@ isUserError          = isUserErrorType             . ioeGetErrorType
 -- | An error indicating that the operation failed because the
 -- resource vanished. See 'resourceVanishedErrorType'.
 --
--- @since 0.4.14.0
+-- @since 4.14.0.0
 isResourceVanishedError :: IOError -> Bool
 isResourceVanishedError = isResourceVanishedErrorType . ioeGetErrorType
 
@@ -224,7 +224,7 @@ userErrorType             = UserError
 -- This happens when, for example, attempting to write to a closed
 -- socket or attempting to write to a named pipe that was deleted.
 --
--- @since 0.4.14.0
+-- @since 4.14.0.0
 resourceVanishedErrorType :: IOErrorType
 resourceVanishedErrorType = ResourceVanished
 
@@ -279,7 +279,7 @@ isUserErrorType _ = False
 -- | I\/O error where the operation failed because the resource vanished.
 -- See 'resourceVanishedErrorType'.
 --
--- @since 0.4.14.0
+-- @since 4.14.0.0
 isResourceVanishedErrorType :: IOErrorType -> Bool
 isResourceVanishedErrorType ResourceVanished = True
 isResourceVanishedErrorType _ = False

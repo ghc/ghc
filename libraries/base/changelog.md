@@ -1,7 +1,7 @@
 # Changelog for [`base` package](http://hackage.haskell.org/package/base)
 
 ## 4.15.0.0 *TBA*
-  * Add `IsList` instance for `ZipList`.
+  * TODO
 
 ## 4.14.0.0 *TBA*
   * Bundled with GHC 8.10.1
@@ -45,6 +45,8 @@
   * Add `resizeSmallMutableArray#` to `GHC.Exts`.
 
   * Add a `Data` instance to `WrappedArrow`, `WrappedMonad`, and `ZipList`.
+
+  * Add `IsList` instance for `ZipList`.
 
 ## 4.13.0.0 *July 2019*
   * Bundled with GHC 8.8.1
@@ -293,7 +295,7 @@
     in constant space when applied to lists. (#10830)
 
   * `mkFunTy`, `mkAppTy`, and `mkTyConApp` from `Data.Typeable` no longer exist.
-    This functionality is superceded by the interfaces provided by
+    This functionality is superseded by the interfaces provided by
     `Type.Reflection`.
 
   * `mkTyCon3` is no longer exported by `Data.Typeable`. This function is

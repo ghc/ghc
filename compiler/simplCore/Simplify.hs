@@ -50,7 +50,6 @@ import Maybes           (  orElse )
 import Control.Monad
 import Outputable
 import FastString
-import Pair
 import Util
 import ErrUtils
 import Module          ( moduleName, pprModuleName )
@@ -261,7 +260,8 @@ simplRecOrTopPair env top_lvl is_rec mb_cont old_bndr new_bndr rhs
       | not (dopt Opt_D_verbose_core2core dflags)
       = thing_inside
       | otherwise
-      = pprTrace ("SimplBind " ++ what) (ppr old_bndr) thing_inside
+      = traceAction dflags ("SimplBind " ++ what)
+         (ppr old_bndr) thing_inside
 
 --------------------------
 simplLazyBind :: SimplEnv
@@ -440,7 +440,7 @@ prepareRhs :: SimplMode -> TopLevelFlag
 --            x = Just a
 -- See Note [prepareRhs]
 prepareRhs mode top_lvl occ info (Cast rhs co)  -- Note [Float coercions]
-  | Pair ty1 _ty2 <- coercionKind co         -- Do *not* do this if rhs has an unlifted type
+  | let ty1 = coercionLKind co         -- Do *not* do this if rhs has an unlifted type
   , not (isUnliftedType ty1)                 -- see Note [Float coercions (unlifted)]
   = do  { (floats, rhs') <- makeTrivialWithInfo mode top_lvl occ sanitised_info rhs
         ; return (floats, Cast rhs' co) }
@@ -579,7 +579,7 @@ makeTrivialWithInfo mode top_lvl occ_fs info expr
           else do
         { uniq <- getUniqueM
         ; let name = mkSystemVarName uniq occ_fs
-              var  = mkLocalIdOrCoVarWithInfo name expr_ty info
+              var  = mkLocalIdWithInfo name expr_ty info
 
         -- Now something very like completeBind,
         -- but without the postInlineUnconditinoally part
@@ -1308,7 +1308,7 @@ simplCast env body co0 cont0
             -- only needed by `sc_hole_ty` which is often not forced.
             -- Consequently it is worthwhile using a lazy pattern match here to
             -- avoid unnecessary coercionKind evaluations.
-          , ~(Pair hole_ty _) <- coercionKind co
+          , let hole_ty = coercionLKind co
           = {-#SCC "addCoerce-pushCoTyArg" #-}
             do { tail' <- addCoerceM m_co' tail
                ; return (cont { sc_arg_ty  = arg_ty'
@@ -1319,7 +1319,7 @@ simplCast env body co0 cont0
         addCoerce co cont@(ApplyToVal { sc_arg = arg, sc_env = arg_se
                                       , sc_dup = dup, sc_cont = tail })
           | Just (co1, m_co2) <- pushCoValArg co
-          , Pair _ new_ty <- coercionKind co1
+          , let new_ty = coercionRKind co1
           , not (isTypeLevPoly new_ty)  -- Without this check, we get a lev-poly arg
                                         -- See Note [Levity polymorphism invariants] in CoreSyn
                                         -- test: typecheck/should_run/EtaExpandLevPoly
@@ -1623,7 +1623,7 @@ wrapJoinCont env cont thing_inside
   = thing_inside env cont
 
   | not (sm_case_case (getMode env))
-    -- See Note [Join points wih -fno-case-of-case]
+    -- See Note [Join points with -fno-case-of-case]
   = do { (floats1, expr1) <- thing_inside env (mkBoringStop (contHoleType cont))
        ; let (floats2, expr2) = wrapJoinFloatsX floats1 expr1
        ; (floats3, expr3) <- rebuild (env `setInScopeFromF` floats2) expr2 cont
@@ -1691,7 +1691,7 @@ We need do make the continuation E duplicable (since we are duplicating it)
 with mkDuableCont.
 
 
-Note [Join points wih -fno-case-of-case]
+Note [Join points with -fno-case-of-case]
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 Supose case-of-case is switched off, and we are simplifying
 
@@ -1712,8 +1712,8 @@ case-of-case we may then end up with this totally bogus result
              C -> e) of <outer-alts>
 
 This would be OK in the language of the paper, but not in GHC: j is no longer
-a join point.  We can only do the "push contination into the RHS of the
-join point j" if we also push the contination right down to the /jumps/ to
+a join point.  We can only do the "push continuation into the RHS of the
+join point j" if we also push the continuation right down to the /jumps/ to
 j, so that it can evaporate there.  If we are doing case-of-case, we'll get to
 
     join x = case <j-rhs> of <outer-alts> in
@@ -1794,14 +1794,20 @@ completeCall env var cont
     interesting_cont = interestingCallContext env call_cont
     active_unf       = activeUnfolding (getMode env) var
 
+    log_inlining doc
+      = liftIO $ dumpAction dflags
+           (mkUserStyle dflags alwaysQualify AllTheWay)
+           (dumpOptionsFromFlag Opt_D_dump_inlinings)
+           "" FormatText doc
+
     dump_inline unfolding cont
       | not (dopt Opt_D_dump_inlinings dflags) = return ()
       | not (dopt Opt_D_verbose_core2core dflags)
       = when (isExternalName (idName var)) $
-            liftIO $ printOutputForUser dflags alwaysQualify $
+            log_inlining $
                 sep [text "Inlining done:", nest 4 (ppr var)]
       | otherwise
-      = liftIO $ printOutputForUser dflags alwaysQualify $
+      = liftIO $ log_inlining $
            sep [text "Inlining done: " <> ppr var,
                 nest 4 (vcat [text "Inlined fn: " <+> nest 2 (ppr unfolding),
                               text "Cont:  " <+> ppr cont])]
@@ -2066,17 +2072,21 @@ tryRules env rules fn args call_cont
 
     nodump
       | dopt Opt_D_dump_rule_rewrites dflags
-      = liftIO $ dumpSDoc dflags alwaysQualify Opt_D_dump_rule_rewrites "" empty
+      = liftIO $ do
+         touchDumpFile dflags (dumpOptionsFromFlag Opt_D_dump_rule_rewrites)
 
       | dopt Opt_D_dump_rule_firings dflags
-      = liftIO $ dumpSDoc dflags alwaysQualify Opt_D_dump_rule_firings "" empty
+      = liftIO $ do
+         touchDumpFile dflags (dumpOptionsFromFlag Opt_D_dump_rule_firings)
 
       | otherwise
       = return ()
 
     log_rule dflags flag hdr details
-      = liftIO . dumpSDoc dflags alwaysQualify flag "" $
-                   sep [text hdr, nest 4 details]
+      = liftIO $ do
+         let sty = mkDumpStyle dflags alwaysQualify
+         dumpAction dflags sty (dumpOptionsFromFlag flag) "" FormatText $
+           sep [text hdr, nest 4 details]
 
 trySeqRules :: SimplEnv
             -> OutExpr -> InExpr   -- Scrutinee and RHS
@@ -2090,11 +2100,16 @@ trySeqRules in_env scrut rhs cont
     no_cast_scrut = drop_casts scrut
     scrut_ty  = exprType no_cast_scrut
     seq_id_ty = idType seqId
+    res1_ty   = piResultTy seq_id_ty rhs_rep
+    res2_ty   = piResultTy res1_ty   scrut_ty
     rhs_ty    = substTy in_env (exprType rhs)
-    out_args  = [ TyArg { as_arg_ty  = scrut_ty
+    rhs_rep   = getRuntimeRep rhs_ty
+    out_args  = [ TyArg { as_arg_ty  = rhs_rep
                         , as_hole_ty = seq_id_ty }
+                , TyArg { as_arg_ty  = scrut_ty
+                        , as_hole_ty = res1_ty }
                 , TyArg { as_arg_ty  = rhs_ty
-                       , as_hole_ty  = piResultTy seq_id_ty scrut_ty }
+                        , as_hole_ty = res2_ty }
                 , ValArg no_cast_scrut]
     rule_cont = ApplyToVal { sc_dup = NoDup, sc_arg = rhs
                            , sc_env = in_env, sc_cont = cont }
@@ -2249,7 +2264,7 @@ Note that SimplUtils.mkCase combines identical RHSs.  So
            True  -> r
            False -> r
 
-Now again the case may be elminated by the CaseElim transformation.
+Now again the case may be eliminated by the CaseElim transformation.
 This includes things like (==# a# b#)::Bool so that we simplify
       case ==# a# b# of { True -> x; False -> x }
 to just
@@ -2784,8 +2799,8 @@ addEvals _scrut con vs = go vs the_strs
         where
           ppr_with_length list
             = ppr list <+> parens (text "length =" <+> ppr (length list))
-          strdisp MarkedStrict = "MarkedStrict"
-          strdisp NotMarkedStrict = "NotMarkedStrict"
+          strdisp MarkedStrict = text "MarkedStrict"
+          strdisp NotMarkedStrict = text "NotMarkedStrict"
 
 zapIdOccInfoAndSetEvald :: StrictnessMark -> Id -> Id
 zapIdOccInfoAndSetEvald str v =
@@ -2960,7 +2975,7 @@ knownCon env scrut dc_floats dc dc_ty_args dc_args bndr bs rhs cont
       | exprIsTrivial scrut = return (emptyFloats env
                                      , extendIdSubst env bndr (DoneEx scrut Nothing))
       | otherwise           = do { dc_args <- mapM (simplVar env) bs
-                                         -- dc_ty_args are aready OutTypes,
+                                         -- dc_ty_args are already OutTypes,
                                          -- but bs are InBndrs
                                  ; let con_app = Var (dataConWorkId dc)
                                                  `mkTyApps` dc_ty_args
@@ -3486,7 +3501,7 @@ mkLetUnfolding dflags top_lvl src id new_rhs
     return (mkUnfolding dflags src is_top_lvl is_bottoming new_rhs)
             -- We make an  unfolding *even for loop-breakers*.
             -- Reason: (a) It might be useful to know that they are WHNF
-            --         (b) In TidyPgm we currently assume that, if we want to
+            --         (b) In GHC.Iface.Tidy we currently assume that, if we want to
             --             expose the unfolding then indeed we *have* an unfolding
             --             to expose.  (We could instead use the RHS, but currently
             --             we don't.)  The simple thing is always to have one.

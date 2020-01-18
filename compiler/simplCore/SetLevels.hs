@@ -554,7 +554,7 @@ After floating we may have:
       {- some expression involving x and z -}
 
 When analysing <body involving...> we want to use the /ambient/ level,
-and /not/ the desitnation level of the 'case a of (x,-) ->' binding.
+and /not/ the destination level of the 'case a of (x,-) ->' binding.
 
 #16978 was caused by us setting the context level to the destination
 level of `x` when analysing <body>. This led us to conclude that we
@@ -777,7 +777,7 @@ Exammples:
 It's controlled by a flag (floatConsts), because doing this too
 early loses opportunities for RULES which (needless to say) are
 important in some nofib programs (gcd is an example).  [SPJ note:
-I think this is obselete; the flag seems always on.]
+I think this is obsolete; the flag seems always on.]
 
 Note [Floating join point bindings]
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
@@ -792,7 +792,7 @@ Here we may just as well produce
   f x = j x 0
 
 and now there is a chance that 'f' will be inlined at its call sites.
-It shouldn't make a lot of difference, but thes tests
+It shouldn't make a lot of difference, but these tests
   perf/should_run/MethSharing
   simplCore/should_compile/spec-inline
 and one nofib program, all improve if you do float to top, because
@@ -800,7 +800,7 @@ of the resulting inlining of f.  So ok, let's do it.
 
 Note [Free join points]
 ~~~~~~~~~~~~~~~~~~~~~~~
-We never float a MFE that has a free join-point variable.  You mght think
+We never float a MFE that has a free join-point variable.  You might think
 this can never occur.  After all, consider
      join j x = ...
      in ....(jump j x)....
@@ -1658,7 +1658,7 @@ newPolyBndrs dest_lvl
 
     mk_poly_bndr bndr uniq = transferPolyIdInfo bndr abs_vars $         -- Note [transferPolyIdInfo] in Id.hs
                              transfer_join_info bndr $
-                             mkSysLocalOrCoVar (mkFastString str) uniq poly_ty
+                             mkSysLocal (mkFastString str) uniq poly_ty
                            where
                              str     = "poly_" ++ occNameString (getOccName bndr)
                              poly_ty = mkLamTypes abs_vars (CoreSubst.substTy subst (idType bndr))
@@ -1693,7 +1693,7 @@ newLvlVar lvld_rhs join_arity_maybe is_mk_static
       = mkExportedVanillaId (mkSystemVarName uniq (mkFastString "static_ptr"))
                             rhs_ty
       | otherwise
-      = mkSysLocalOrCoVar (mkFastString "lvl") uniq rhs_ty
+      = mkSysLocal (mkFastString "lvl") uniq rhs_ty
 
 -- | Clone the binders bound by a single-alternative case.
 cloneCaseBndrs :: LevelEnv -> Level -> [Var] -> LvlM (LevelEnv, [Var])

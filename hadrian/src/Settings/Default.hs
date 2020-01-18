@@ -249,14 +249,14 @@ defaultBuilderArgs = mconcat
     , validateBuilderArgs
     , xelatexBuilderArgs
     -- Generic builders from the Hadrian library:
-    , builder (Ar Pack     ) ? Hadrian.Builder.Ar.args Pack
-    , builder (Ar Unpack   ) ? Hadrian.Builder.Ar.args Unpack
-    , builder (Sphinx Html ) ? Hadrian.Builder.Sphinx.args Html
-    , builder (Sphinx Latex) ? Hadrian.Builder.Sphinx.args Latex
-    , builder (Sphinx Man  ) ? Hadrian.Builder.Sphinx.args Man
-    , builder (Sphinx Info ) ? Hadrian.Builder.Sphinx.args Info
-    , builder (Tar Create  ) ? Hadrian.Builder.Tar.args Create
-    , builder (Tar Extract ) ? Hadrian.Builder.Tar.args Extract ]
+    , builder (Ar Pack         ) ? Hadrian.Builder.Ar.args Pack
+    , builder (Ar Unpack       ) ? Hadrian.Builder.Ar.args Unpack
+    , builder (Sphinx HtmlMode ) ? Hadrian.Builder.Sphinx.args HtmlMode
+    , builder (Sphinx LatexMode) ? Hadrian.Builder.Sphinx.args LatexMode
+    , builder (Sphinx ManMode  ) ? Hadrian.Builder.Sphinx.args ManMode
+    , builder (Sphinx InfoMode ) ? Hadrian.Builder.Sphinx.args InfoMode
+    , builder (Tar Create      ) ? Hadrian.Builder.Tar.args Create
+    , builder (Tar Extract     ) ? Hadrian.Builder.Tar.args Extract ]
 
 -- | All 'Package'-dependent command line arguments.
 defaultPackageArgs :: Args

@@ -23,10 +23,10 @@ def normalise_address(str):
                   str)
 
 test('derefnull',
-     [# LLVM Optimiser considers dereference of a null pointer
-      # undefined and marks the code as unreachable which means
-      # that later optimisations remove it altogether.
-      omit_ways(['optllvm']),
+     [# The LLVM backend in particular does not guarantee any particular
+      # behavior on null dereference (similar to #10332).
+      omit_ways(llvm_ways),
+      when(not(have_ncg()), skip),
       # SIGSEGV on Linux (which we make the default)
       exit_code(139),
       # Apparently the output can be different on different
@@ -46,6 +46,10 @@ test('derefnull',
 test('divbyzero',
      [# SIGFPE on Linux
       exit_code(136),
+      # The LLVM backend in particular does not guarantee any particular
+      # behavior on division-by-zero (#10332).
+      omit_ways(llvm_ways),
+      when(not(have_ncg()), skip),
       # Apparently the output can be different on different
       # Linux setups, so just ignore it. As long as we get
       # the right exit code we're OK.
@@ -406,3 +410,6 @@ test('T13676',
      [when(opsys('darwin') or opsys('mingw32'), expect_broken(17447)),
       extra_files(['T13676.hs'])],
      ghci_script, ['T13676.script'])
+test('InitEventLogging',
+     [only_ways(['normal']), extra_run_opts('+RTS -RTS')],
+     compile_and_run, ['-eventlog InitEventLogging_c.c'])

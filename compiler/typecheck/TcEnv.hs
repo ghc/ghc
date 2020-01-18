@@ -74,11 +74,11 @@ module TcEnv(
 import GhcPrelude
 
 import GHC.Hs
-import IfaceEnv
+import GHC.Iface.Env
 import TcRnMonad
 import TcMType
 import TcType
-import LoadIface
+import GHC.Iface.Load
 import PrelNames
 import TysWiredIn
 import Id
@@ -209,7 +209,7 @@ span of the Name.
 
 
 tcLookupLocatedGlobal :: Located Name -> TcM TyThing
--- c.f. IfaceEnvEnv.tcIfaceGlobal
+-- c.f. GHC.IfaceToCore.tcIfaceGlobal
 tcLookupLocatedGlobal name
   = addLocM tcLookupGlobal name
 
@@ -508,8 +508,8 @@ isTypeClosedLetBndr :: Id -> Bool
 isTypeClosedLetBndr = noFreeVarsOfType . idType
 
 tcExtendRecIds :: [(Name, TcId)] -> TcM a -> TcM a
--- Used for binding the recurive uses of Ids in a binding
--- both top-level value bindings and and nested let/where-bindings
+-- Used for binding the recursive uses of Ids in a binding
+-- both top-level value bindings and nested let/where-bindings
 -- Does not extend the TcBinderStack
 tcExtendRecIds pairs thing_inside
   = tc_extend_local_env NotTopLevel
@@ -533,7 +533,7 @@ tcExtendSigIds top_lvl sig_ids thing_inside
 
 tcExtendLetEnv :: TopLevelFlag -> TcSigFun -> IsGroupClosed
                   -> [TcId] -> TcM a -> TcM a
--- Used for both top-level value bindings and and nested let/where-bindings
+-- Used for both top-level value bindings and nested let/where-bindings
 -- Adds to the TcBinderStack too
 tcExtendLetEnv top_lvl sig_fn (IsGroupClosed fvs fv_type_closed)
                ids thing_inside
@@ -819,7 +819,7 @@ topIdLvl :: Id -> ThLevel
 -- E.g. this is bad:
 --      x = [| foo |]
 --      $( f x )
--- By the time we are prcessing the $(f x), the binding for "x"
+-- By the time we are processing the $(f x), the binding for "x"
 -- will be in the global env, not the local one.
 topIdLvl id | isLocalId id = outerLevel
             | otherwise    = impLevel
@@ -830,7 +830,7 @@ tcMetaTy :: Name -> TcM Type
 -- E.g. given the name "Expr" return the type "Expr"
 tcMetaTy tc_name = do
     t <- tcLookupTyCon tc_name
-    return (mkTyConApp t [])
+    return (mkTyConTy t)
 
 isBrackStage :: ThStage -> Bool
 isBrackStage (Brack {}) = True
@@ -877,7 +877,7 @@ tcGetDefaultTys
 {-
 Note [Extended defaults]
 ~~~~~~~~~~~~~~~~~~~~~
-In interative mode (or with -XExtendedDefaultRules) we add () as the first type we
+In interactive mode (or with -XExtendedDefaultRules) we add () as the first type we
 try when defaulting.  This has very little real impact, except in the following case.
 Consider:
         Text.Printf.printf "hello"

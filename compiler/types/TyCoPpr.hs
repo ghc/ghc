@@ -5,7 +5,7 @@ module TyCoPpr
         PprPrec(..), topPrec, sigPrec, opPrec, funPrec, appPrec, maybeParen,
 
         -- * Pretty-printing types
-        pprType, pprParendType, pprPrecType, pprPrecTypeX,
+        pprType, pprParendType, pprTidiedType, pprPrecType, pprPrecTypeX,
         pprTypeApp, pprTCvBndr, pprTCvBndrs,
         pprSigmaType,
         pprTheta, pprParendTheta, pprForAll, pprUserForAll,
@@ -27,8 +27,10 @@ module TyCoPpr
 
 import GhcPrelude
 
-import {-# SOURCE #-} ToIface( toIfaceTypeX, toIfaceTyLit, toIfaceForAllBndr
-                             , toIfaceTyCon, toIfaceTcArgs, toIfaceCoercionX )
+import {-# SOURCE #-} GHC.CoreToIface
+   ( toIfaceTypeX, toIfaceTyLit, toIfaceForAllBndr
+   , toIfaceTyCon, toIfaceTcArgs, toIfaceCoercionX )
+
 import {-# SOURCE #-} DataCon( dataConFullSig
                              , dataConUserTyVarBinders
                              , DataCon )
@@ -42,7 +44,7 @@ import TyCoFVs
 import Class
 import Var
 
-import IfaceType
+import GHC.Iface.Type
 
 import VarSet
 import VarEnv
@@ -68,7 +70,7 @@ parens around the type, except for the atomic cases.  @pprParendType@
 works just by setting the initial context precedence very high.
 
 Note that any function which pretty-prints a @Type@ first converts the @Type@
-to an @IfaceType@. See Note [IfaceType and pretty-printing] in IfaceType.
+to an @IfaceType@. See Note [IfaceType and pretty-printing] in GHC.Iface.Type.
 
 See Note [Precedence in types] in BasicTypes.
 -}
@@ -76,12 +78,15 @@ See Note [Precedence in types] in BasicTypes.
 --------------------------------------------------------
 -- When pretty-printing types, we convert to IfaceType,
 --   and pretty-print that.
--- See Note [Pretty printing via IfaceSyn] in PprTyThing
+-- See Note [Pretty printing via Iface syntax] in PprTyThing
 --------------------------------------------------------
 
-pprType, pprParendType :: Type -> SDoc
+pprType, pprParendType, pprTidiedType :: Type -> SDoc
 pprType       = pprPrecType topPrec
 pprParendType = pprPrecType appPrec
+
+-- already pre-tidied
+pprTidiedType = pprIfaceType . toIfaceTypeX emptyVarSet
 
 pprPrecType :: PprPrec -> Type -> SDoc
 pprPrecType = pprPrecTypeX emptyTidyEnv

@@ -596,7 +596,7 @@ GarbageCollect (uint32_t collect_gen,
 
         /* free old memory and shift to-space into from-space for all
          * the collected generations (except the allocation area).  These
-         * freed blocks will probaby be quickly recycled.
+         * freed blocks will probably be quickly recycled.
          */
         if (gen->mark)
         {
@@ -646,7 +646,7 @@ GarbageCollect (uint32_t collect_gen,
             ASSERT(countBlocks(gen->blocks) == gen->n_blocks);
             ASSERT(countOccupied(gen->blocks) == gen->n_words);
         }
-        else // not copacted
+        else // not compacted
         {
             freeChain(gen->old_blocks);
         }
@@ -743,7 +743,7 @@ GarbageCollect (uint32_t collect_gen,
   // oldest_gen->scavenged_large_objects back to oldest_gen->large_objects.
   ASSERT(oldest_gen->scavenged_large_objects == NULL);
   if (RtsFlags.GcFlags.useNonmoving && major_gc) {
-      // All threads in non-moving heap should be found to be alive, becuase
+      // All threads in non-moving heap should be found to be alive, because
       // threads in the non-moving generation's list should live in the
       // non-moving heap, and we consider non-moving objects alive during
       // preparation.

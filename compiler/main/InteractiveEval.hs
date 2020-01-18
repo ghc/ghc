@@ -56,12 +56,12 @@ import HscMain
 import GHC.Hs
 import HscTypes
 import InstEnv
-import IfaceEnv   ( newInteractiveBinder )
-import FamInstEnv ( FamInst )
-import CoreFVs    ( orphNamesOfFamInst )
+import GHC.Iface.Env   ( newInteractiveBinder )
+import FamInstEnv      ( FamInst )
+import CoreFVs         ( orphNamesOfFamInst )
 import TyCon
 import Type             hiding( typeKind )
-import RepType
+import GHC.Types.RepType
 import TcType
 import Constraint
 import TcOrigin
@@ -639,6 +639,7 @@ rttiEnvironment hsc_env@HscEnv{hsc_IC=ic} = do
                Just subst -> do
                  let dflags = hsc_dflags hsc_env
                  dumpIfSet_dyn dflags Opt_D_dump_rtti "RTTI"
+                   FormatText
                    (fsep [text "RTTI Improvement for", ppr id, equals,
                           ppr subst])
 

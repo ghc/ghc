@@ -348,7 +348,7 @@ data ForeignLabelSource
    --   external packages. It is safe to treat the RTS package as "external".
    | ForeignLabelInExternalPackage
 
-   -- | Label is in the package currenly being compiled.
+   -- | Label is in the package currently being compiled.
    --   This is only used for creating hacky tmp labels during code generation.
    --   Don't use it in any code that might be inlined across a package boundary
    --   (ie, core code) else the information will be wrong relative to the
@@ -803,7 +803,7 @@ maybeLocalBlockLabel _                     = Nothing
 
 
 -- | Check whether a label corresponds to a C function that has
---      a prototype in a system header somehere, or is built-in
+--      a prototype in a system header somewhere, or is built-in
 --      to the C compiler. For these labels we avoid generating our
 --      own C prototypes.
 isMathFun :: CLabel -> Bool
@@ -1474,7 +1474,7 @@ mayRedirectTo symbol target
 {-
 Note [emit-time elimination of static indirections]
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
-As described in #15155, certain static values are repesentationally
+As described in #15155, certain static values are representationally
 equivalent, e.g. 'cast'ed values (when created by 'newtype' wrappers).
 
              newtype A = A Int

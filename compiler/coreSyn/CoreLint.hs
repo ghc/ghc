@@ -47,7 +47,7 @@ import ErrUtils
 import Coercion
 import SrcLoc
 import Type
-import RepType
+import GHC.Types.RepType
 import TyCoRep       -- checks validity of types/coercions
 import TyCoSubst
 import TyCoFVs
@@ -63,7 +63,6 @@ import FastString
 import Util
 import InstEnv     ( instanceDFunId )
 import OptCoercion ( checkAxInstCo )
-import UniqSupply
 import CoreArity ( typeArity )
 import Demand ( splitStrictSig, isBotRes )
 
@@ -167,7 +166,7 @@ That is, use a type let.   See Note [Type let] in CoreSyn.
 
 However, when linting <body> we need to remember that a=Int, else we might
 reject a correct program.  So we carry a type substitution (in this example
-[a -> Int]) and apply this substitution before comparing types.  The functin
+[a -> Int]) and apply this substitution before comparing types.  The function
         lintInTy :: Type -> LintM (Type, Kind)
 returns a substituted type.
 
@@ -260,8 +259,10 @@ dumpPassResult :: DynFlags
                -> CoreProgram -> [CoreRule]
                -> IO ()
 dumpPassResult dflags unqual mb_flag hdr extra_info binds rules
-  = do { forM_ mb_flag $ \flag ->
-           Err.dumpSDoc dflags unqual flag (showSDoc dflags hdr) dump_doc
+  = do { forM_ mb_flag $ \flag -> do
+           let sty = mkDumpStyle dflags unqual
+           dumpAction dflags sty (dumpOptionsFromFlag flag)
+              (showSDoc dflags hdr) FormatCore dump_doc
 
          -- Report result size
          -- This has the side effect of forcing the intermediate to be evaluated
@@ -488,7 +489,7 @@ We use this to check all top-level unfoldings that come in from interfaces
 
 We do not need to call lintUnfolding on unfoldings that are nested within
 top-level unfoldings; they are linted when we lint the top-level unfolding;
-hence the `TopLevelFlag` on `tcPragExpr` in TcIface.
+hence the `TopLevelFlag` on `tcPragExpr` in GHC.IfaceToCore.
 
 -}
 
@@ -2368,7 +2369,7 @@ lookupIdInScope id_occ
                             2 (pprBndr LetBind id_occ)
     bad_global id_bnd = isGlobalId id_occ
                      && isLocalId id_bnd
-                     && not (isWiredInName (idName id_occ))
+                     && not (isWiredIn id_occ)
        -- 'bad_global' checks for the case where an /occurrence/ is
        -- a GlobalId, but there is an enclosing binding fora a LocalId.
        -- NB: the in-scope variables are mostly LocalIds, checked by lintIdBndr,
@@ -2778,8 +2779,9 @@ withoutAnnots pass guts = do
   dflags <- getDynFlags
   let removeFlag env = env{ hsc_dflags = dflags{ debugLevel = 0} }
       withoutFlag corem =
+          -- TODO: supply tag here as well ?
         liftIO =<< runCoreM <$> fmap removeFlag getHscEnv <*> getRuleBase <*>
-                                getUniqueSupplyM <*> getModule <*>
+                                getUniqMask <*> getModule <*>
                                 getVisibleOrphanMods <*>
                                 getPrintUnqualified <*> getSrcSpanM <*>
                                 pure corem

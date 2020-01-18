@@ -36,7 +36,7 @@ known at compile time, code like:
         m32_allocator_init();
 
 will be compiled to call to `m32_allocator_init` if  `RTS_LINKER_USE_MMAP` is
-true and will be optimised awat to nothing if `RTS_LINKER_USE_MMAP` is false.
+true and will be optimised away to nothing if `RTS_LINKER_USE_MMAP` is false.
 However, regardless of the value of `RTS_LINKER_USE_MMAP` the compiler will
 still check the call for syntax and correct function parameter types.
 
@@ -96,7 +96,7 @@ life-cycle it is in:
       allocation)
 
 Allocation (in the case of a small request) consists of walking the nursery to
-find a page that will accomodate the request. If none exists then we allocate a
+find a page that will accommodate the request. If none exists then we allocate a
 new nursery page (flushing an existing one to the filled list if the nursery is
 full).
 

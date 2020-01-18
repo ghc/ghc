@@ -22,7 +22,7 @@ import TcUnify( occCheckForErrors, MetaTyVarUpdateResult(..) )
 import TcEnv( tcInitTidyEnv )
 import TcType
 import TcOrigin
-import RnUnbound ( unknownNameSuggestions )
+import GHC.Rename.Unbound ( unknownNameSuggestions )
 import Type
 import TyCoRep
 import TyCoPpr          ( pprTyVars, pprWithExplicitKindsWhen, pprSourceTyCon, pprWithTYPE )
@@ -227,7 +227,7 @@ report_unsolved type_errors expr_holes
                             , cec_suppress = insolubleWC wanted
                                  -- See Note [Suppressing error messages]
                                  -- Suppress low-priority errors if there
-                                 -- are insolule errors anywhere;
+                                 -- are insoluble errors anywhere;
                                  -- See #15539 and c.f. setting ic_status
                                  -- in TcSimplify.setImplicationStatus
                             , cec_warn_redundant = warn_redundant
@@ -553,7 +553,7 @@ reportWanteds ctxt tc_lvl (WC { wc_simple = simples, wc_impl = implics })
     env = cec_tidy ctxt
     tidy_cts = bagToList (mapBag (tidyCt env) simples)
 
-    -- report1: ones that should *not* be suppresed by
+    -- report1: ones that should *not* be suppressed by
     --          an insoluble somewhere else in the tree
     -- It's crucial that anything that is considered insoluble
     -- (see TcRnTypes.insolubleCt) is caught here, otherwise
@@ -2359,7 +2359,7 @@ mk_dict_err ctxt@(CEC {cec_encl = implics}) (ct, (matches, unifiers, unsafe_over
         mb_patsyn_prov :: Maybe SDoc
         mb_patsyn_prov
           | not lead_with_ambig
-          , ProvCtxtOrigin PSB{ psb_def = (dL->L _ pat) } <- orig
+          , ProvCtxtOrigin PSB{ psb_def = L _ pat } <- orig
           = Just (vcat [ text "In other words, a successful match on the pattern"
                        , nest 2 $ ppr pat
                        , text "does not provide the constraint" <+> pprParendType pred ])
@@ -2488,7 +2488,7 @@ ctxtFixes has_ambig_tvs pred implics
 
 discardProvCtxtGivens :: CtOrigin -> [UserGiven] -> [UserGiven]
 discardProvCtxtGivens orig givens  -- See Note [discardProvCtxtGivens]
-  | ProvCtxtOrigin (PSB {psb_id = (dL->L _ name)}) <- orig
+  | ProvCtxtOrigin (PSB {psb_id = L _ name}) <- orig
   = filterOut (discard name) givens
   | otherwise
   = givens

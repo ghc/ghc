@@ -199,7 +199,7 @@ the two instances of +.sel weren't originally at the same type.
 Further notes on (b)
 
 * There are quite a few variations here.  For example, the defn of
-  +.sel could be floated ouside the \y, to attempt to gain laziness.
+  +.sel could be floated outside the \y, to attempt to gain laziness.
   It certainly mustn't be floated outside the \d because the d has to
   be in scope too.
 
@@ -576,7 +576,7 @@ Hence, the invariant is this:
 ************************************************************************
 -}
 
--- | Specialise calls to type-class overloaded functions occuring in a program.
+-- | Specialise calls to type-class overloaded functions occurring in a program.
 specProgram :: ModGuts -> CoreM ModGuts
 specProgram guts@(ModGuts { mg_module = this_mod
                           , mg_rules = local_rules
@@ -2107,7 +2107,7 @@ Consider
 We gather the call info for (f @T $df), and we don't want to drop it
 when we come across the binding for $df.  So we add $df to the floats
 and continue.  But then we have to add $c== to the floats, and so on.
-These all float above the binding for 'f', and and now we can
+These all float above the binding for 'f', and now we can
 successfully specialise 'f'.
 
 So the DictBinds in (ud_binds :: Bag DictBind) may contain
@@ -2158,7 +2158,7 @@ pprCallInfo fn (CI { ci_key = key })
   = ppr fn <+> ppr key
 
 ppr_call_key_ty :: SpecArg -> Maybe SDoc
-ppr_call_key_ty (SpecType ty) = Just $ char '@' <+> pprParendType ty
+ppr_call_key_ty (SpecType ty) = Just $ char '@' <> pprParendType ty
 ppr_call_key_ty UnspecType    = Just $ char '_'
 ppr_call_key_ty (SpecDict _)  = Nothing
 ppr_call_key_ty UnspecArg     = Nothing
@@ -2378,7 +2378,7 @@ pair_fvs (bndr, rhs) = exprSomeFreeVars interesting rhs
     interesting :: InterestingVarFun
     interesting v = isLocalVar v || (isId v && isDFunId v)
         -- Very important: include DFunIds /even/ if it is imported
-        -- Reason: See Note [Avoiding loops], the second exmaple
+        -- Reason: See Note [Avoiding loops], the second example
         --         involving an imported dfun.  We must know whether
         --         a dictionary binding depends on an imported dfun,
         --         in case we try to specialise that imported dfun
@@ -2635,7 +2635,7 @@ newDictBndr :: SpecEnv -> CoreBndr -> SpecM CoreBndr
 newDictBndr env b = do { uniq <- getUniqueM
                        ; let n   = idName b
                              ty' = substTy env (idType b)
-                       ; return (mkUserLocalOrCoVar (nameOccName n) uniq ty' (getSrcSpan n)) }
+                       ; return (mkUserLocal (nameOccName n) uniq ty' (getSrcSpan n)) }
 
 newSpecIdSM :: Id -> Type -> Maybe JoinArity -> SpecM Id
     -- Give the new Id a similar occurrence name to the old one
@@ -2643,7 +2643,7 @@ newSpecIdSM old_id new_ty join_arity_maybe
   = do  { uniq <- getUniqueM
         ; let name    = idName old_id
               new_occ = mkSpecOcc (nameOccName name)
-              new_id  = mkUserLocalOrCoVar new_occ uniq new_ty (getSrcSpan name)
+              new_id  = mkUserLocal new_occ uniq new_ty (getSrcSpan name)
                           `asJoinId_maybe` join_arity_maybe
         ; return new_id }
 

@@ -53,6 +53,8 @@ import qualified GHC.LanguageExtensions as LangExt
 
 import Control.Monad
 import Data.Int
+import Data.List.NonEmpty (NonEmpty(..))
+import qualified Data.List.NonEmpty as NEL
 import Data.Word
 import Data.Proxy
 
@@ -164,7 +166,7 @@ warnAboutOverflowedOverLit hsOverLit = do
   dflags <- getDynFlags
   warnAboutOverflowedLiterals dflags (getIntegralLit hsOverLit)
 
--- | Emit warnings on integral literals which overflow the boudns implied by
+-- | Emit warnings on integral literals which overflow the bounds implied by
 -- their type.
 warnAboutOverflowedLit :: HsLit GhcTc -> DsM ()
 warnAboutOverflowedLit hsLit = do
@@ -288,11 +290,11 @@ warnAboutEmptyEnumerations dflags fromExpr mThnExpr toExpr
 getLHsIntegralLit :: LHsExpr GhcTc -> Maybe (Integer, Name)
 -- ^ See if the expression is an 'Integral' literal.
 -- Remember to look through automatically-added tick-boxes! (#8384)
-getLHsIntegralLit (dL->L _ (HsPar _ e))            = getLHsIntegralLit e
-getLHsIntegralLit (dL->L _ (HsTick _ _ e))         = getLHsIntegralLit e
-getLHsIntegralLit (dL->L _ (HsBinTick _ _ _ e))    = getLHsIntegralLit e
-getLHsIntegralLit (dL->L _ (HsOverLit _ over_lit)) = getIntegralLit over_lit
-getLHsIntegralLit (dL->L _ (HsLit _ lit))          = getSimpleIntegralLit lit
+getLHsIntegralLit (L _ (HsPar _ e))            = getLHsIntegralLit e
+getLHsIntegralLit (L _ (HsTick _ _ e))         = getLHsIntegralLit e
+getLHsIntegralLit (L _ (HsBinTick _ _ _ e))    = getLHsIntegralLit e
+getLHsIntegralLit (L _ (HsOverLit _ over_lit)) = getIntegralLit over_lit
+getLHsIntegralLit (L _ (HsLit _ lit))          = getSimpleIntegralLit lit
 getLHsIntegralLit _ = Nothing
 
 -- | If 'Integral', extract the value and type name of the overloaded literal.
@@ -397,14 +399,13 @@ tidyNPat over_lit mb_neg eq outer_ty
 ************************************************************************
 -}
 
-matchLiterals :: [Id]
-              -> Type                   -- Type of the whole case expression
-              -> [[EquationInfo]]       -- All PgLits
+matchLiterals :: NonEmpty Id
+              -> Type -- ^ Type of the whole case expression
+              -> NonEmpty (NonEmpty EquationInfo) -- ^ All PgLits
               -> DsM MatchResult
 
-matchLiterals (var:vars) ty sub_groups
-  = ASSERT( notNull sub_groups && all notNull sub_groups )
-    do  {       -- Deal with each group
+matchLiterals (var :| vars) ty sub_groups
+  = do  {       -- Deal with each group
         ; alts <- mapM match_group sub_groups
 
                 -- Combine results.  For everything except String
@@ -415,14 +416,14 @@ matchLiterals (var:vars) ty sub_groups
                 ; mrs <- mapM (wrap_str_guard eq_str) alts
                 ; return (foldr1 combineMatchResults mrs) }
           else
-            return (mkCoPrimCaseMatchResult var ty alts)
+            return (mkCoPrimCaseMatchResult var ty $ NEL.toList alts)
         }
   where
-    match_group :: [EquationInfo] -> DsM (Literal, MatchResult)
-    match_group eqns
+    match_group :: NonEmpty EquationInfo -> DsM (Literal, MatchResult)
+    match_group eqns@(firstEqn :| _)
         = do { dflags <- getDynFlags
-             ; let LitPat _ hs_lit = firstPat (head eqns)
-             ; match_result <- match vars ty (shiftEqns eqns)
+             ; let LitPat _ hs_lit = firstPat firstEqn
+             ; match_result <- match vars ty (NEL.toList $ shiftEqns eqns)
              ; return (hsLitKey dflags hs_lit, match_result) }
 
     wrap_str_guard :: Id -> (Literal,MatchResult) -> DsM MatchResult
@@ -436,7 +437,6 @@ matchLiterals (var:vars) ty sub_groups
              ; return (mkGuardedMatchResult pred mr) }
     wrap_str_guard _ (l, _) = pprPanic "matchLiterals/wrap_str_guard" (ppr l)
 
-matchLiterals [] _ _ = panic "matchLiterals []"
 
 ---------------------------
 hsLitKey :: DynFlags -> HsLit GhcTc -> Literal
@@ -467,9 +467,9 @@ hsLitKey _      l                  = pprPanic "hsLitKey" (ppr l)
 ************************************************************************
 -}
 
-matchNPats :: [Id] -> Type -> [EquationInfo] -> DsM MatchResult
-matchNPats (var:vars) ty (eqn1:eqns)    -- All for the same literal
-  = do  { let NPat _ (dL->L _ lit) mb_neg eq_chk = firstPat eqn1
+matchNPats :: NonEmpty Id -> Type -> NonEmpty EquationInfo -> DsM MatchResult
+matchNPats (var :| vars) ty (eqn1 :| eqns)    -- All for the same literal
+  = do  { let NPat _ (L _ lit) mb_neg eq_chk = firstPat eqn1
         ; lit_expr <- dsOverLit lit
         ; neg_lit <- case mb_neg of
                             Nothing  -> return lit_expr
@@ -477,7 +477,6 @@ matchNPats (var:vars) ty (eqn1:eqns)    -- All for the same literal
         ; pred_expr <- dsSyntaxExpr eq_chk [Var var, neg_lit]
         ; match_result <- match vars ty (shiftEqns (eqn1:eqns))
         ; return (mkGuardedMatchResult pred_expr match_result) }
-matchNPats vars _ eqns = pprPanic "matchOneNPat" (ppr (vars, eqns))
 
 {-
 ************************************************************************
@@ -497,10 +496,10 @@ We generate:
 \end{verbatim}
 -}
 
-matchNPlusKPats :: [Id] -> Type -> [EquationInfo] -> DsM MatchResult
+matchNPlusKPats :: NonEmpty Id -> Type -> NonEmpty EquationInfo -> DsM MatchResult
 -- All NPlusKPats, for the *same* literal k
-matchNPlusKPats (var:vars) ty (eqn1:eqns)
-  = do  { let NPlusKPat _ (dL->L _ n1) (dL->L _ lit1) lit2 ge minus
+matchNPlusKPats (var :| vars) ty (eqn1 :| eqns)
+  = do  { let NPlusKPat _ (L _ n1) (L _ lit1) lit2 ge minus
                 = firstPat eqn1
         ; lit1_expr   <- dsOverLit lit1
         ; lit2_expr   <- dsOverLit lit2
@@ -513,9 +512,7 @@ matchNPlusKPats (var:vars) ty (eqn1:eqns)
                    adjustMatchResult (foldr1 (.) wraps)         $
                    match_result) }
   where
-    shift n1 eqn@(EqnInfo { eqn_pats = NPlusKPat _ (dL->L _ n) _ _ _ _ : pats })
+    shift n1 eqn@(EqnInfo { eqn_pats = NPlusKPat _ (L _ n) _ _ _ _ : pats })
         = (wrapBind n n1, eqn { eqn_pats = pats })
         -- The wrapBind is a no-op for the first equation
     shift _ e = pprPanic "matchNPlusKPats/shift" (ppr e)
-
-matchNPlusKPats vars _ eqns = pprPanic "matchNPlusKPats" (ppr (vars, eqns))

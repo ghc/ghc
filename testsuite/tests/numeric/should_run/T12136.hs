@@ -15,5 +15,5 @@ negativeBigInteger :: Integer
 negativeBigInteger = 1 - (1 `shiftL` (64 * 2))
 
 main = do
-    -- rigt shift by GMP_LIMB_BITS
+    -- right shift by GMP_LIMB_BITS
     print $ negativeBigInteger `shiftR` 64

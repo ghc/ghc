@@ -345,7 +345,7 @@ type instance XXHsBindsLR (GhcPass pL) (GhcPass pR) = NoExtCon
         --
         -- See Note [AbsBinds]
 
--- | Abtraction Bindings Export
+-- | Abstraction Bindings Export
 data ABExport p
   = ABE { abe_ext       :: XABE p
         , abe_poly      :: IdP p -- ^ Any INLINE pragma is attached to this Id
@@ -407,7 +407,7 @@ where 'BIND' binds the monomorphic Ids 'fm' and 'gm', means
 
         gp = ...same again, with gm instead of fm
 
-The 'fwrap' is an impedence-matcher that typically does nothing; see
+The 'fwrap' is an impedance-matcher that typically does nothing; see
 Note [ABExport wrapper].
 
 This is a pretty bad translation, because it duplicates all the bindings.
@@ -562,7 +562,7 @@ again we can desugar without a let:
   undef = /\ a. \ (d:HasCallStack) -> error a d "undef"
 
 The abs_sig field supports this direct desugaring, with no local
-let-bining.  When abs_sig = True
+let-binding.  When abs_sig = True
 
  * the abs_binds is single FunBind
 

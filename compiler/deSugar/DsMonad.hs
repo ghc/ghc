@@ -60,7 +60,7 @@ import CoreSyn
 import MkCore    ( unitExpr )
 import CoreUtils ( exprType, isExprLevPoly )
 import GHC.Hs
-import TcIface
+import GHC.IfaceToCore
 import TcMType ( checkForLevPolyX, formatLevPolyErr )
 import PrelNames
 import RdrName
@@ -349,8 +349,8 @@ duplicateLocalDs old_local
         ; return (setIdUnique old_local uniq) }
 
 newPredVarDs :: PredType -> DsM Var
-newPredVarDs pred
- = newSysLocalDs pred
+newPredVarDs
+ = mkSysLocalOrCoVarM (fsLit "ds")  -- like newSysLocalDs, but we allow covars
 
 newSysLocalDsNoLP, newSysLocalDs, newFailLocalDs :: Type -> DsM Id
 newSysLocalDsNoLP  = mk_local (fsLit "ds")
@@ -358,8 +358,8 @@ newSysLocalDsNoLP  = mk_local (fsLit "ds")
 -- this variant should be used when the caller can be sure that the variable type
 -- is not levity-polymorphic. It is necessary when the type is knot-tied because
 -- of the fixM used in DsArrows. See Note [Levity polymorphism checking]
-newSysLocalDs = mkSysLocalOrCoVarM (fsLit "ds")
-newFailLocalDs = mkSysLocalOrCoVarM (fsLit "fail")
+newSysLocalDs = mkSysLocalM (fsLit "ds")
+newFailLocalDs = mkSysLocalM (fsLit "fail")
   -- the fail variable is used only in a situation where we can tell that
   -- levity-polymorphism is impossible.
 
@@ -530,7 +530,7 @@ dsExtendMetaEnv menv thing_inside
 
 discardWarningsDs :: DsM a -> DsM a
 -- Ignore warnings inside the thing inside;
--- used to ignore inaccessable cases etc. inside generated code
+-- used to ignore inaccessible cases etc. inside generated code
 discardWarningsDs thing_inside
   = do  { env <- getGblEnv
         ; old_msgs <- readTcRef (ds_msgs env)

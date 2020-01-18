@@ -69,10 +69,8 @@ uint32_t numa_map[MAX_NUMA_NODES];
 
 /* Let foreign code get the current Capability -- assuming there is one!
  * This is useful for unsafe foreign calls because they are called with
- * the current Capability held, but they are not passed it. For example,
- * see see the integer-gmp package which calls allocate() in its
- * stgAllocForGMP() function (which gets called by gmp functions).
- * */
+ * the current Capability held, but they are not passed it.
+ */
 Capability * rts_unsafeGetMyCapability (void)
 {
 #if defined(THREADED_RTS)
@@ -352,6 +350,8 @@ void initCapabilities (void)
         for (i = 0; i < MAX_NUMA_NODES; i++) {
             numa_map[i] = 0;
         }
+    } else if (RtsFlags.DebugFlags.numa) {
+        // n_numa_nodes was set by RtsFlags.c
     } else {
         uint32_t nNodes = osNumaNodes();
         if (nNodes > MAX_NUMA_NODES) {
@@ -796,7 +796,7 @@ void waitForCapability (Capability **pCap, Task *task)
             }
         }
 
-        // record the Capability as the one this Task is now assocated with.
+        // record the Capability as the one this Task is now associated with.
         task->cap = cap;
 
     } else {

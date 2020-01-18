@@ -123,6 +123,7 @@ stopEventLogFileWriter(void)
 {
     if (event_log_file != NULL) {
         fclose(event_log_file);
+        event_log_file = NULL;
     }
 }
 

@@ -1318,19 +1318,25 @@ AC_DEFUN([FP_PROG_AR_NEEDS_RANLIB],[
 # (unsubstituted) output variable GccVersion.
 AC_DEFUN([FP_GCC_VERSION], [
   AC_REQUIRE([AC_PROG_CC])
-  if test -z "$CC"
-  then
-    AC_MSG_ERROR([gcc is required])
+  if test -z "$CC"; then
+    AC_MSG_ERROR([C compiler is required])
   fi
-  AC_CACHE_CHECK([version of gcc], [fp_cv_gcc_version],
-  [
-      # Be sure only to look at the first occurrence of the "version " string;
-      # Some Apple compilers emit multiple messages containing this string.
-      fp_cv_gcc_version="`$CC -v 2>&1 | sed -n -e '1,/version /s/.*version [[^0-9]]*\([[0-9.]]*\).*/\1/p'`"
-      FP_COMPARE_VERSIONS([$fp_cv_gcc_version], [-lt], [4.6],
-                          [AC_MSG_ERROR([Need at least gcc version 4.6 (4.7+ recommended)])])
-  ])
-  GccVersion="$fp_cv_gcc_version"
+
+  if $CC --version | grep --quiet gcc; then
+    AC_CACHE_CHECK([version of gcc], [fp_cv_gcc_version],
+    [
+        # Be sure only to look at the first occurrence of the "version " string;
+        # Some Apple compilers emit multiple messages containing this string.
+        AC_MSG_CHECKING([version of gcc])
+        fp_cv_gcc_version="`$CC -v 2>&1 | sed -n -e '1,/version /s/.*version [[^0-9]]*\([[0-9.]]*\).*/\1/p'`"
+        AC_MSG_RESULT([$fp_cv_gcc_version])
+        FP_COMPARE_VERSIONS([$fp_cv_gcc_version], [-lt], [4.6],
+                            [AC_MSG_ERROR([Need at least gcc version 4.6 (4.7+ recommended)])])
+    ])
+    AC_SUBST([GccVersion], [$fp_cv_gcc_version])
+  else
+    AC_MSG_NOTICE([\$CC is not gcc; assuming it's a reasonably new C compiler])
+  fi
 ])# FP_GCC_VERSION
 
 dnl Check to see if the C compiler is clang or llvm-gcc
@@ -1555,13 +1561,12 @@ AC_SUBST([GhcPkgCmd])
 AC_DEFUN([FP_GCC_EXTRA_FLAGS],
 [AC_REQUIRE([FP_GCC_VERSION])
 AC_CACHE_CHECK([for extra options to pass gcc when compiling via C], [fp_cv_gcc_extra_opts],
-[fp_cv_gcc_extra_opts=
- FP_COMPARE_VERSIONS([$fp_cv_gcc_version], [-ge], [3.4],
-  [fp_cv_gcc_extra_opts="$fp_cv_gcc_extra_opts -fwrapv"],
-  [])
- FP_COMPARE_VERSIONS([$fp_cv_gcc_version], [-ge], [4.0],
-  [fp_cv_gcc_extra_opts="$fp_cv_gcc_extra_opts -fno-builtin"],
-  [])
+[
+ if test "$Unregisterised" = "YES"; then
+   # These used to be conditioned on gcc version but we no longer support
+   # GCC versions which lack support for these flags
+   fp_cv_gcc_extra_opts="-fwrapv -fno-builtin"
+ fi
 ])
 AC_SUBST([GccExtraViaCOpts],$fp_cv_gcc_extra_opts)
 ])
@@ -1989,7 +1994,7 @@ case "$1" in
 
 # GHC_LLVM_TARGET(target_cpu, target_vendor, target_os, llvm_target_var)
 # --------------------------------
-# converts the canonicalized target into someting llvm can understand
+# converts the canonicalized target into something llvm can understand
 AC_DEFUN([GHC_LLVM_TARGET], [
   case "$2-$3" in
     *-freebsd*-gnueabihf)
@@ -2121,26 +2126,26 @@ AC_SUBST(LIBRARY_[]translit([$1], [-], [_])[]_VERSION)
 
 # XCODE_VERSION()
 # --------------------------------
-# Gets the version number of XCode, if on a Mac
+# Gets the version number of Xcode, if on a Mac
 AC_DEFUN([XCODE_VERSION],[
     if test "$TargetVendor_CPP" = "apple"
     then
-        AC_MSG_CHECKING(XCode version)
-        XCodeVersion=`xcodebuild -version | grep Xcode | sed "s/Xcode //"`
-        # Old XCode versions don't actually give the XCode version
-        if test "$XCodeVersion" = ""
+        AC_MSG_CHECKING(Xcode version)
+        XcodeVersion=`(xcode-select -p >& /dev/null && xcodebuild -version) | grep Xcode | sed "s/Xcode //"`
+        # Old Xcode versions don't actually give the Xcode version
+        if test "$XcodeVersion" = ""
         then
             AC_MSG_RESULT(not found (too old?))
-            XCodeVersion1=0
-            XCodeVersion2=0
+            XcodeVersion1=0
+            XcodeVersion2=0
         else
-            AC_MSG_RESULT($XCodeVersion)
-            XCodeVersion1=`echo "$XCodeVersion" | sed 's/\..*//'`
+            AC_MSG_RESULT($XcodeVersion)
+            XcodeVersion1=`echo "$XcodeVersion" | sed 's/\..*//'`
             changequote(, )dnl
-            XCodeVersion2=`echo "$XCodeVersion" | sed 's/[^.]*\.\([^.]*\).*/\1/'`
+            XcodeVersion2=`echo "$XcodeVersion" | sed 's/[^.]*\.\([^.]*\).*/\1/'`
             changequote([, ])dnl
-            AC_MSG_NOTICE(XCode version component 1: $XCodeVersion1)
-            AC_MSG_NOTICE(XCode version component 2: $XCodeVersion2)
+            AC_MSG_NOTICE(Xcode version component 1: $XcodeVersion1)
+            AC_MSG_NOTICE(Xcode version component 2: $XcodeVersion2)
         fi
     fi
 ])
@@ -2233,7 +2238,7 @@ EOF
 
 # FIND_GHC_BOOTSTRAP_PROG()
 # --------------------------------
-# Parse the bootstrap GHC's compier settings file for the location of things
+# Parse the bootstrap GHC's compiler settings file for the location of things
 # like the `llc` and `opt` commands.
 #
 # $1 = the variable to set
@@ -2506,6 +2511,17 @@ AC_DEFUN([FIND_LD],[
     fi
 
     CHECK_LD_COPY_BUG([$1])
+])
+
+# FIND_PYTHON
+# -----------
+# Find the version of `python` to use (for the testsuite driver)
+#
+AC_DEFUN([FIND_PYTHON],[
+    dnl Prefer the mingw64 distribution on Windows due to #17483.
+    AC_PATH_PROG([PYTHON], [python3], [], [/mingw64/bin $PATH])
+    PythonCmd="$PYTHON"
+    AC_SUBST([PythonCmd])
 ])
 
 # LocalWords:  fi

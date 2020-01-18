@@ -19,10 +19,11 @@ import collections
 import subprocess
 
 from testglobals import config, ghc_env, default_testopts, brokens, t, \
-                        TestRun, TestResult, TestOptions
+                        TestRun, TestResult, TestOptions, PerfMetric
 from testutil import strip_quotes, lndir, link_or_copy_file, passed, \
-                     failBecause, str_fail, str_pass, testing_metrics, \
+                     failBecause, testing_metrics, \
                      PassFail
+from term_color import Color, colored
 import testutil
 from cpu_features import have_cpu_feature
 import perf_notes as Perf
@@ -1184,7 +1185,7 @@ def ghci_script( name, way, script):
     # script can invoke the correct compiler by using ':! $HC $HC_OPTS'
     cmd = ('HC={{compiler}} HC_OPTS="{flags}" {{compiler}} {way_flags} {flags}'
           ).format(flags=flags, way_flags=way_flags)
-      # NB: put way_flags before flags so that flags in all.T can overrie others
+      # NB: put way_flags before flags so that flags in all.T can override others
 
     getTestOpts().stdin = script
     return simple_run( name, way, cmd, getTestOpts().extra_run_opts )
@@ -1218,6 +1219,9 @@ def multimod_compile( name, way, top_mod, extra_hc_opts ):
 
 def multimod_compile_fail( name, way, top_mod, extra_hc_opts ):
     return do_compile( name, way, True, top_mod, [], extra_hc_opts )
+
+def multimod_compile_filter( name, way, top_mod, extra_hc_opts, filter_with, suppress_stdout=True ):
+    return do_compile( name, way, False, top_mod, [], extra_hc_opts, filter_with=filter_with, suppress_stdout=suppress_stdout )
 
 def multi_compile( name, way, top_mod, extra_mods, extra_hc_opts ):
     return do_compile( name, way, False, top_mod, extra_mods, extra_hc_opts)
@@ -1379,7 +1383,7 @@ def metric_dict(name, way, metric, value) -> PerfStat:
 # way: the way.
 # stats_file: the path of the stats_file containing the stats for the test.
 # range_fields: see TestOptions.stats_range_fields
-# Returns a pass/fail object. Passes if the stats are withing the expected value ranges.
+# Returns a pass/fail object. Passes if the stats are within the expected value ranges.
 # This prints the results for the user.
 def check_stats(name: TestName,
                 way: WayName,
@@ -1428,7 +1432,7 @@ def check_stats(name: TestName,
                         tolerance_dev,
                         config.allowed_perf_changes,
                         config.verbose >= 4)
-                t.metrics.append((change, perf_stat, baseline))
+                t.metrics.append(PerfMetric(change=change, stat=perf_stat, baseline=baseline))
 
             # If any metric fails then the test fails.
             # Note, the remaining metrics are still run so that
@@ -1458,12 +1462,14 @@ def simple_build(name: Union[TestName, str],
                  top_mod: Optional[Path],
                  link: bool,
                  addsuf: bool,
-                 backpack: bool = False) -> Any:
+                 backpack: bool = False,
+                 suppress_stdout: bool = False,
+                 filter_with: str = '') -> Any:
     opts = getTestOpts()
 
     # Redirect stdout and stderr to the same file
     stdout = in_testdir(name, 'comp.stderr')
-    stderr = subprocess.STDOUT
+    stderr = subprocess.STDOUT if not suppress_stdout else None
 
     if top_mod is not None:
         srcname = top_mod
@@ -1513,6 +1519,9 @@ def simple_build(name: Union[TestName, str],
     cmd = ('cd "{opts.testdir}" && {cmd_prefix} '
            '{{compiler}} {to_do} {srcname} {flags} {extra_hc_opts}'
           ).format(**locals())
+
+    if filter_with != '':
+        cmd = cmd + ' | ' + filter_with
 
     exit_code = runCmd(cmd, None, stdout, stderr, opts.compile_timeout_multiplier)
 
@@ -2430,18 +2439,16 @@ def summary(t: TestRun, file: TextIO, short=False, color=False) -> None:
         # Only print the list of unexpected tests above.
         return
 
-    colorize = lambda s: s
-    if color:
-        if len(t.unexpected_failures) > 0 or \
-            len(t.unexpected_stat_failures) > 0 or \
-            len(t.unexpected_passes) > 0 or \
-            len(t.framework_failures) > 0:
-            colorize = str_fail
-        else:
-            colorize = str_pass
+    if len(t.unexpected_failures) > 0 or \
+        len(t.unexpected_stat_failures) > 0 or \
+        len(t.unexpected_passes) > 0 or \
+        len(t.framework_failures) > 0:
+        summary_color = Color.RED
+    else:
+        summary_color = Color.GREEN
 
     assert t.start_time is not None
-    file.write(colorize('SUMMARY') + ' for test run started at '
+    file.write(colored(summary_color, 'SUMMARY') + ' for test run started at '
                + t.start_time.strftime("%c %Z") + '\n'
                + str(datetime.datetime.now() - t.start_time).rjust(8)
                + ' spent to go through\n'

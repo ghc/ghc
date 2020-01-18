@@ -9,7 +9,7 @@ setTestOpts(no_lint)
 
 test('T1969',
      [# expect_broken(12437),
-      collect_compiler_residency(15),
+      collect_compiler_residency(20),
       collect_compiler_stats('bytes allocated', 1),
       only_ways(['normal']),
 

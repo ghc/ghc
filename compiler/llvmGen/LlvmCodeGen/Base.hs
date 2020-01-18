@@ -218,7 +218,7 @@ data LlvmEnv = LlvmEnv
   { envVersion :: LlvmVersion      -- ^ LLVM version
   , envDynFlags :: DynFlags        -- ^ Dynamic flags
   , envOutput :: BufHandle         -- ^ Output buffer
-  , envUniq :: UniqSupply          -- ^ Supply of unique values
+  , envMask :: !Char               -- ^ Mask for creating unique values
   , envFreshMeta :: MetaId         -- ^ Supply of fresh metadata IDs
   , envUniqMeta :: UniqFM MetaId   -- ^ Global metadata nodes
   , envFunMap :: LlvmEnvMap        -- ^ Global functions so far, with type
@@ -249,16 +249,12 @@ instance HasDynFlags LlvmM where
 
 instance MonadUnique LlvmM where
     getUniqueSupplyM = do
-        us <- getEnv envUniq
-        let (us1, us2) = splitUniqSupply us
-        modifyEnv (\s -> s { envUniq = us2 })
-        return us1
+        mask <- getEnv envMask
+        liftIO $! mkSplitUniqSupply mask
 
     getUniqueM = do
-        us <- getEnv envUniq
-        let (u,us') = takeUniqFromSupply us
-        modifyEnv (\s -> s { envUniq = us' })
-        return u
+        mask <- getEnv envMask
+        liftIO $! uniqFromMask mask
 
 -- | Lifting of IO actions. Not exported, as we want to encapsulate IO.
 liftIO :: IO a -> LlvmM a
@@ -266,8 +262,8 @@ liftIO m = LlvmM $ \env -> do x <- m
                               return (x, env)
 
 -- | Get initial Llvm environment.
-runLlvm :: DynFlags -> LlvmVersion -> BufHandle -> UniqSupply -> LlvmM a -> IO a
-runLlvm dflags ver out us m = do
+runLlvm :: DynFlags -> LlvmVersion -> BufHandle -> LlvmM a -> IO a
+runLlvm dflags ver out m = do
     (a, _) <- runLlvmM m env
     return a
   where env = LlvmEnv { envFunMap = emptyUFM
@@ -278,7 +274,7 @@ runLlvm dflags ver out us m = do
                       , envVersion = ver
                       , envDynFlags = dflags
                       , envOutput = out
-                      , envUniq = us
+                      , envMask = 'n'
                       , envFreshMeta = MetaId 0
                       , envUniqMeta = emptyUFM
                       }
@@ -341,10 +337,10 @@ getLlvmPlatform :: LlvmM Platform
 getLlvmPlatform = getDynFlag targetPlatform
 
 -- | Dumps the document if the corresponding flag has been set by the user
-dumpIfSetLlvm :: DumpFlag -> String -> Outp.SDoc -> LlvmM ()
-dumpIfSetLlvm flag hdr doc = do
+dumpIfSetLlvm :: DumpFlag -> String -> DumpFormat -> Outp.SDoc -> LlvmM ()
+dumpIfSetLlvm flag hdr fmt doc = do
   dflags <- getDynFlags
-  liftIO $ dumpIfSet_dyn dflags flag hdr doc
+  liftIO $ dumpIfSet_dyn dflags flag hdr fmt doc
 
 -- | Prints the given contents to the output handle
 renderLlvm :: Outp.SDoc -> LlvmM ()
@@ -357,7 +353,7 @@ renderLlvm sdoc = do
                (Outp.mkCodeStyle Outp.CStyle) sdoc
 
     -- Dump, if requested
-    dumpIfSetLlvm Opt_D_dump_llvm "LLVM Code" sdoc
+    dumpIfSetLlvm Opt_D_dump_llvm "LLVM Code" FormatLLVM sdoc
     return ()
 
 -- | Marks a variable as "used"
@@ -586,7 +582,7 @@ aliasify (LMGlobal var val) = do
 -- point of definition instead of the point of usage, as was previously
 -- done. See #9142 for details.
 --
--- Finally, case (1) is trival. As we already have a definition for
+-- Finally, case (1) is trivial. As we already have a definition for
 -- and therefore know the type of the referenced symbol, we can do
 -- away with casting the alias to the desired type in @getSymbolPtr@
 -- and instead just emit a reference to the definition symbol directly.

@@ -425,7 +425,7 @@ getRegister' dflags (CmmReg reg)
 getRegister' dflags tree@(CmmRegOff _ _)
   = getRegister' dflags (mangleIndexTree dflags tree)
 
-    -- for 32-bit architectuers, support some 64 -> 32 bit conversions:
+    -- for 32-bit architectures, support some 64 -> 32 bit conversions:
     -- TO_W_(x), TO_W_(x >> 32)
 
 getRegister' dflags (CmmMachOp (MO_UU_Conv W64 W32)
@@ -602,7 +602,7 @@ getRegister' _ (CmmMachOp mop [x, y]) -- dyadic PrimOps
           _ -> case x of
                  CmmLit (CmmInt imm _)
                    | Just _ <- makeImmediate rep True imm
-                   -- subfi ('substract from' with immediate) doesn't exist
+                   -- subfi ('subtract from' with immediate) doesn't exist
                    -> trivialCode rep True SUBFC y x
                  _ -> trivialCodeNoImm' (intFormat rep) SUBF y x
 
@@ -1690,7 +1690,7 @@ genCCall' dflags gcp target dest_regs args
                        `appOL`  codeAfter)
                      GCPAIX          -> return ( dynCode
                        -- AIX/XCOFF follows the PowerOPEN ABI
-                       -- which is quite similiar to LinuxPPC64/ELFv1
+                       -- which is quite similar to LinuxPPC64/ELFv1
                        `appOL`  codeBefore
                        `snocOL` ST spFormat toc (AddrRegImm sp (ImmInt 20))
                        `snocOL` LD II32 r11 (AddrRegImm dynReg (ImmInt 0))
@@ -2022,6 +2022,7 @@ genCCall' dflags gcp target dest_regs args
                     MO_AtomicRead _  -> unsupported
                     MO_AtomicWrite _ -> unsupported
 
+                    MO_S_Mul2    {}  -> unsupported
                     MO_S_QuotRem {}  -> unsupported
                     MO_U_QuotRem {}  -> unsupported
                     MO_U_QuotRem2 {} -> unsupported

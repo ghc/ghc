@@ -24,8 +24,11 @@ except:
 # is taken. We exploit this below.
 
 # TextIO is missing on some older Pythons.
-if 'TextIO' in globals():
-    TextIO = typing.TextIO
+if 'TextIO' not in globals():
+    try:
+        TextIO = typing.TextIO
+    except ImportError:
+        TextIO = None # type: ignore
 else:
     TextIO = None # type: ignore
 
@@ -39,7 +42,7 @@ OutputNormalizer = Callable[[str], str]
 IssueNumber = NewType("IssueNumber", int)
 
 # Used by perf_notes
-GitHash = NewType("GitHash", str)
+GitHash = NewType("GitHash", str) # a Git commit hash
 GitRef = NewType("GitRef", str)
 TestEnv = NewType("TestEnv", str)
 MetricName = NewType("MetricName", str)

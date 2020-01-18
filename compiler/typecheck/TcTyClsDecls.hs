@@ -43,7 +43,7 @@ import ClsInst( AssocInstInfo(..) )
 import TcMType
 import TysWiredIn ( unitTy, makeRecoveryTyCon )
 import TcType
-import RnEnv( lookupConstructorFields )
+import GHC.Rename.Env( lookupConstructorFields )
 import FamInst
 import FamInstEnv
 import Coercion
@@ -316,8 +316,8 @@ support making synonyms of types with higher-rank kinds.  But
 you can always specify a CUSK directly to make this work out.
 See tc269 for an example.
 
-Note [Skip decls with CUSKs in kcLTyClDecl]
-~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+Note [CUSKs and PolyKinds]
+~~~~~~~~~~~~~~~~~~~~~~~~~~
 Consider
 
     data T (a :: *) = MkT (S a)   -- Has CUSK
@@ -454,15 +454,15 @@ We do the following steps:
             B :-> TcTyCon <initial kind>
         (thereby overriding the B :-> TyConPE binding)
         and do kcLTyClDecl on each decl to get equality constraints on
-        all those inital kinds
+        all those initial kinds
 
-      - Generalise the inital kind, making a poly-kinded TcTyCon
+      - Generalise the initial kind, making a poly-kinded TcTyCon
 
   3. Back in tcTyDecls, extend the envt with bindings of the poly-kinded
      TcTyCons, again overriding the promotion-error bindings.
 
      But note that the data constructor promotion errors are still in place
-     so that (in our example) a use of MkB will sitll be signalled as
+     so that (in our example) a use of MkB will still be signalled as
      an error.
 
   4. Typecheck the decls.
@@ -530,7 +530,8 @@ kcTyClGroup kisig_env decls
           --    3. Generalise the inferred kinds
           -- See Note [Kind checking for type and class decls]
 
-        ; cusks_enabled <- xoptM LangExt.CUSKs
+        ; cusks_enabled <- xoptM LangExt.CUSKs <&&> xoptM LangExt.PolyKinds
+                    -- See Note [CUSKs and PolyKinds]
         ; let (kindless_decls, kinded_decls) = partitionWith get_kind decls
 
               get_kind d
@@ -559,10 +560,8 @@ kcTyClGroup kisig_env decls
                     -- NB: the environment extension overrides the tycon
                     --     promotion-errors bindings
                     --     See Note [Type environment evolution]
-                  ; poly_kinds  <- xoptM LangExt.PolyKinds
                   ; tcExtendKindEnvWithTyCons mono_tcs $
-                    mapM_ kcLTyClDecl (if poly_kinds then kindless_decls else decls)
-                    -- See Note [Skip decls with CUSKs in kcLTyClDecl]
+                    mapM_ kcLTyClDecl kindless_decls
 
                   ; return mono_tcs }
 
@@ -594,7 +593,7 @@ generaliseTcTyCon tc
              -- Running example in Note [Inferring kinds for type declarations]
              --    spec_req_prs = [ ("k1",kk1), ("a", (aa::kk1))
              --                   , ("k2",kk2), ("x", (xx::kk2))]
-             -- where "k1" dnotes the Name k1, and kk1, aa, etc are MetaTyVars,
+             -- where "k1" denotes the Name k1, and kk1, aa, etc are MetaTyVars,
              -- specifically TyVarTvs
 
        -- Step 0: zonk and skolemise the Specified and Required binders
@@ -838,7 +837,7 @@ We do kind inference as follows:
 
 * Step 1: inferInitialKinds, and in particular kcInferDeclHeader.
   Make a unification variable for each of the Required and Specified
-  type varialbes in the header.
+  type variables in the header.
 
   Record the connection between the Names the user wrote and the
   fresh unification variables in the tcTyConScopedTyVars field
@@ -863,7 +862,7 @@ We do kind inference as follows:
           S :: kk3 -> * -> kk4 -> *
 
 * Step 2: kcTyClDecl. Extend the environment with a TcTyCon for S and
-  T, with these monomophic kinds.  Now kind-check the declarations,
+  T, with these monomorphic kinds.  Now kind-check the declarations,
   and solve the resulting equalities.  The goal here is to discover
   constraints on all these unification variables.
 
@@ -974,7 +973,39 @@ time mapped to 'kb'.  That's how C and D end up with differently-named
 final TyVars despite the fact that we unified kka:=kkb
 
 zonkRecTyVarBndrs we need to do knot-tying because of the need to
-apply this same substitution to the kind of each.  -}
+apply this same substitution to the kind of each.
+
+Note [Inferring visible dependent quantification]
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+Consider
+
+  data T k :: k -> Type where
+    MkT1 :: T Type Int
+    MkT2 :: T (Type -> Type) Maybe
+
+This looks like it should work. However, it is polymorphically recursive,
+as the uses of T in the constructor types specialize the k in the kind
+of T. This trips up our dear users (#17131, #17541), and so we add
+a "landmark" context (which cannot be suppressed) whenever we
+spot inferred visible dependent quantification (VDQ).
+
+It's hard to know when we've actually been tripped up by polymorphic recursion
+specifically, so we just include a note to users whenever we infer VDQ. The
+testsuite did not show up a single spurious inclusion of this message.
+
+The context is added in addVDQNote, which looks for a visible TyConBinder
+that also appears in the TyCon's kind. (I first looked at the kind for
+a visible, dependent quantifier, but Note [No polymorphic recursion] in
+TcHsType defeats that approach.) addVDQNote is used in kcTyClDecl,
+which is used only when inferring the kind of a tycon (never with a CUSK or
+SAK).
+
+Once upon a time, I (Richard E) thought that the tycon-kind could
+not be a forall-type. But this is wrong: data T :: forall k. k -> Type
+(with -XNoCUSKs) could end up here. And this is all OK.
+
+
+-}
 
 --------------
 tcExtendKindEnvWithTyCons :: [TcTyCon] -> TcM a -> TcM a
@@ -997,15 +1028,15 @@ mk_prom_err_env (ClassDecl { tcdLName = L _ nm, tcdATs = ats })
   = unitNameEnv nm (APromotionErr ClassPE)
     `plusNameEnv`
     mkNameEnv [ (name, APromotionErr TyConPE)
-              | (dL->L _ (FamilyDecl { fdLName = (dL->L _ name) })) <- ats ]
+              | (L _ (FamilyDecl { fdLName = L _ name })) <- ats ]
 
-mk_prom_err_env (DataDecl { tcdLName = (dL->L _ name)
+mk_prom_err_env (DataDecl { tcdLName = L _ name
                           , tcdDataDefn = HsDataDefn { dd_cons = cons } })
   = unitNameEnv name (APromotionErr TyConPE)
     `plusNameEnv`
     mkNameEnv [ (con, APromotionErr RecDataConPE)
-              | (dL->L _ con') <- cons
-              , (dL->L _ con)  <- getConNames con' ]
+              | L _ con' <- cons
+              , L _ con  <- getConNames con' ]
 
 mk_prom_err_env decl
   = unitNameEnv (tcdName decl) (APromotionErr TyConPE)
@@ -1054,7 +1085,7 @@ getInitialKind :: InitialKindStrategy -> TyClDecl GhcRn -> TcM [TcTyCon]
 --
 -- No family instances are passed to checkInitialKinds/inferInitialKinds
 getInitialKind strategy
-    (ClassDecl { tcdLName = dL->L _ name
+    (ClassDecl { tcdLName = L _ name
                , tcdTyVars = ktvs
                , tcdATs = ats })
   = do { cls <- kcDeclHeader strategy name ClassFlavour ktvs $
@@ -1072,7 +1103,7 @@ getInitialKind strategy
         InitialKindCheck _ -> check_initial_kind_assoc_fam cls
 
 getInitialKind strategy
-    (DataDecl { tcdLName = dL->L _ name
+    (DataDecl { tcdLName = L _ name
               , tcdTyVars = ktvs
               , tcdDataDefn = HsDataDefn { dd_kindSig = m_sig
                                          , dd_ND = new_or_data } })
@@ -1105,7 +1136,7 @@ getInitialKind (InitialKindCheck msig) (FamDecl { tcdFam =
        ; return [tc] }
 
 getInitialKind strategy
-    (SynDecl { tcdLName = dL->L _ name
+    (SynDecl { tcdLName = L _ name
              , tcdTyVars = ktvs
              , tcdRhs = rhs })
   = do { let ctxt = TySynKindCtxt name
@@ -1124,14 +1155,14 @@ get_fam_decl_initial_kind
   -> FamilyDecl GhcRn
   -> TcM TcTyCon
 get_fam_decl_initial_kind mb_parent_tycon
-    FamilyDecl { fdLName     = (dL->L _ name)
+    FamilyDecl { fdLName     = L _ name
                , fdTyVars    = ktvs
-               , fdResultSig = (dL->L _ resultSig)
+               , fdResultSig = L _ resultSig
                , fdInfo      = info }
   = kcDeclHeader InitialKindInfer name flav ktvs $
     case resultSig of
-      KindSig _ ki                              -> TheKind <$> tcLHsKindSig ctxt ki
-      TyVarSig _ (dL->L _ (KindedTyVar _ _ ki)) -> TheKind <$> tcLHsKindSig ctxt ki
+      KindSig _ ki                          -> TheKind <$> tcLHsKindSig ctxt ki
+      TyVarSig _ (L _ (KindedTyVar _ _ ki)) -> TheKind <$> tcLHsKindSig ctxt ki
       _ -- open type families have * return kind by default
         | tcFlavourIsOpen flav              -> return (TheKind liftedTypeKind)
                -- closed type families have their return kind inferred
@@ -1258,30 +1289,32 @@ Therefore, 'mb_parent_tycon' of any closed type family has to be Nothing.
 ------------------------------------------------------------------------
 kcLTyClDecl :: LTyClDecl GhcRn -> TcM ()
   -- See Note [Kind checking for type and class decls]
-kcLTyClDecl (dL->L loc decl)
+  -- Called only for declarations without a signature (no CUSKs or SAKs here)
+kcLTyClDecl (L loc decl)
   = setSrcSpan loc $
-    tcAddDeclCtxt decl $
-    do { traceTc "kcTyClDecl {" (ppr tc_name)
-       ; kcTyClDecl decl
+    do { tycon <- kcLookupTcTyCon tc_name
+       ; traceTc "kcTyClDecl {" (ppr tc_name)
+       ; addVDQNote tycon $   -- See Note [Inferring visible dependent quantification]
+         addErrCtxt (tcMkDeclCtxt decl) $
+         kcTyClDecl decl tycon
        ; traceTc "kcTyClDecl done }" (ppr tc_name) }
   where
-    tc_name = tyClDeclLName decl
+    tc_name = tcdName decl
 
-kcTyClDecl :: TyClDecl GhcRn -> TcM ()
+kcTyClDecl :: TyClDecl GhcRn -> TcTyCon -> TcM ()
 -- This function is used solely for its side effect on kind variables
 -- NB kind signatures on the type variables and
 --    result kind signature have already been dealt with
 --    by inferInitialKind, so we can ignore them here.
 
-kcTyClDecl (DataDecl { tcdLName    = (dL->L _ name)
-                     , tcdDataDefn = defn })
-  | HsDataDefn { dd_cons = cons@((dL->L _ (ConDeclGADT {})) : _)
-               , dd_ctxt = (dL->L _ [])
+kcTyClDecl (DataDecl { tcdLName    = (L _ name)
+                     , tcdDataDefn = defn }) tyCon
+  | HsDataDefn { dd_cons = cons@((L _ (ConDeclGADT {})) : _)
+               , dd_ctxt = (L _ [])
                , dd_ND = new_or_data } <- defn
-  = do { tyCon <- kcLookupTcTyCon name
-         -- See Note [Implementation of UnliftedNewtypes] STEP 2
-       ; kcConDecls new_or_data (tyConResKind tyCon) cons
-       }
+  = -- See Note [Implementation of UnliftedNewtypes] STEP 2
+    kcConDecls new_or_data (tyConResKind tyCon) cons
+
     -- hs_tvs and dd_kindSig already dealt with in inferInitialKind
     -- This must be a GADT-style decl,
     --        (see invariants of DataDefn declaration)
@@ -1294,18 +1327,17 @@ kcTyClDecl (DataDecl { tcdLName    = (dL->L _ name)
                , dd_ND = new_or_data } <- defn
   = bindTyClTyVars name $ \ _ _ ->
     do { _ <- tcHsContext ctxt
-       ; tyCon <- kcLookupTcTyCon name
        ; kcConDecls new_or_data (tyConResKind tyCon) cons
        }
 
-kcTyClDecl (SynDecl { tcdLName = dL->L _ name, tcdRhs = rhs })
+kcTyClDecl (SynDecl { tcdLName = L _ name, tcdRhs = rhs }) _tycon
   = bindTyClTyVars name $ \ _ res_kind ->
     discardResult $ tcCheckLHsType rhs res_kind
         -- NB: check against the result kind that we allocated
         -- in inferInitialKinds.
 
-kcTyClDecl (ClassDecl { tcdLName = (dL->L _ name)
-                      , tcdCtxt = ctxt, tcdSigs = sigs })
+kcTyClDecl (ClassDecl { tcdLName = L _ name
+                      , tcdCtxt = ctxt, tcdSigs = sigs }) _tycon
   = bindTyClTyVars name $ \ _ _ ->
     do  { _ <- tcHsContext ctxt
         ; mapM_ (wrapLocM_ kc_sig) sigs }
@@ -1315,18 +1347,15 @@ kcTyClDecl (ClassDecl { tcdLName = (dL->L _ name)
 
     skol_info = TyConSkol ClassFlavour name
 
-kcTyClDecl (FamDecl _ (FamilyDecl { fdLName  = (dL->L _ fam_tc_name)
-                                  , fdInfo   = fd_info }))
+kcTyClDecl (FamDecl _ (FamilyDecl { fdInfo   = fd_info })) fam_tc
 -- closed type families look at their equations, but other families don't
 -- do anything here
   = case fd_info of
-      ClosedTypeFamily (Just eqns) ->
-        do { fam_tc <- kcLookupTcTyCon fam_tc_name
-           ; mapM_ (kcTyFamInstEqn fam_tc) eqns }
+      ClosedTypeFamily (Just eqns) -> mapM_ (kcTyFamInstEqn fam_tc) eqns
       _ -> return ()
-kcTyClDecl (FamDecl _ (XFamilyDecl nec))        = noExtCon nec
-kcTyClDecl (DataDecl _ _ _ _ (XHsDataDefn nec)) = noExtCon nec
-kcTyClDecl (XTyClDecl nec)                      = noExtCon nec
+kcTyClDecl (FamDecl _ (XFamilyDecl nec))        _ = noExtCon nec
+kcTyClDecl (DataDecl _ _ _ _ (XHsDataDefn nec)) _ = noExtCon nec
+kcTyClDecl (XTyClDecl nec)                      _ = noExtCon nec
 
 -------------------
 
@@ -1439,7 +1468,7 @@ I am a bit concerned about tycons with a declaration like
 It does not have a CUSK, so kcInferDeclHeader will make a TcTyCon
 with tyConResKind of Type -> forall k. k -> Type.  Even that is fine:
 the splitPiTys will look past the forall.  But I'm bothered about
-what if the type "in the corner" metions k?  This is incredibly
+what if the type "in the corner" mentions k?  This is incredibly
 obscure but something like this could be bad:
    data T a :: Type -> foral k. k -> TYPE (F k) where ...
 
@@ -1686,19 +1715,19 @@ the H98 syntax doesn't permit a kind signature on the newtype itself.
 
 There's also a change in the renamer:
 
-* In RnSource.rnTyClDecl, enabling UnliftedNewtypes changes what is means
+* In GHC.RenameSource.rnTyClDecl, enabling UnliftedNewtypes changes what is means
   for a newtype to have a CUSK. This is necessary since UnliftedNewtypes
   means that, for newtypes without kind signatures, we must use the field
   inside the data constructor to determine the result kind.
   See Note [Unlifted Newtypes and CUSKs] for more detail.
 
-For completeness, it was also neccessary to make coerce work on
+For completeness, it was also necessary to make coerce work on
 unlifted types, resolving #13595.
 
 -}
 
 tcTyClDecl :: RolesInfo -> LTyClDecl GhcRn -> TcM (TyCon, [DerivInfo])
-tcTyClDecl roles_info (dL->L loc decl)
+tcTyClDecl roles_info (L loc decl)
   | Just thing <- wiredInNameTyThing_maybe (tcdName decl)
   = case thing of -- See Note [Declarations for wired-in things]
       ATyCon tc -> return (tc, wiredInDerivInfo tc decl)
@@ -1735,7 +1764,7 @@ tcTyClDecl1 parent _roles_info (FamDecl { tcdFam = fd })
 
   -- "type" synonym declaration
 tcTyClDecl1 _parent roles_info
-            (SynDecl { tcdLName = (dL->L _ tc_name)
+            (SynDecl { tcdLName = L _ tc_name
                      , tcdRhs   = rhs })
   = ASSERT( isNothing _parent )
     fmap noDerivInfos $
@@ -1744,7 +1773,7 @@ tcTyClDecl1 _parent roles_info
 
   -- "data/newtype" declaration
 tcTyClDecl1 _parent roles_info
-            decl@(DataDecl { tcdLName = (dL->L _ tc_name)
+            decl@(DataDecl { tcdLName = L _ tc_name
                            , tcdDataDefn = defn })
   = ASSERT( isNothing _parent )
     bindTyClTyVars tc_name $ \ tycon_binders res_kind ->
@@ -1752,7 +1781,7 @@ tcTyClDecl1 _parent roles_info
                tycon_binders res_kind defn
 
 tcTyClDecl1 _parent roles_info
-            (ClassDecl { tcdLName = (dL->L _ class_name)
+            (ClassDecl { tcdLName = L _ class_name
                        , tcdCtxt = hs_ctxt
                        , tcdMeths = meths
                        , tcdFDs = fundeps
@@ -1853,10 +1882,10 @@ tcClassATs class_name cls ats at_defs
        ; mapM tc_at ats }
   where
     at_def_tycon :: LTyFamDefltDecl GhcRn -> Name
-    at_def_tycon (dL->L _ eqn) = tyFamInstDeclName eqn
+    at_def_tycon (L _ eqn) = tyFamInstDeclName eqn
 
     at_fam_name :: LFamilyDecl GhcRn -> Name
-    at_fam_name (dL->L _ decl) = unLoc (fdLName decl)
+    at_fam_name (L _ decl) = unLoc (fdLName decl)
 
     at_names = mkNameSet (map at_fam_name ats)
 
@@ -1885,7 +1914,7 @@ tcDefaultAssocDecl _ (d1:_:_)
                 <+> ppr (tyFamInstDeclName (unLoc d1)))
 
 tcDefaultAssocDecl fam_tc
-  [dL->L loc (TyFamInstDecl { tfid_eqn =
+  [L loc (TyFamInstDecl { tfid_eqn =
          HsIB { hsib_ext  = imp_vars
               , hsib_body = FamEqn { feqn_tycon = L _ tc_name
                                    , feqn_bndrs = mb_expl_bndrs
@@ -1983,8 +2012,9 @@ tcDefaultAssocDecl fam_tc
     suggestion :: SDoc
     suggestion = text "The arguments to" <+> quotes (ppr fam_tc)
              <+> text "must all be distinct type variables"
-tcDefaultAssocDecl _ [_]
-  = panic "tcDefaultAssocDecl: Impossible Match" -- due to #15884
+
+tcDefaultAssocDecl _ [L _ (TyFamInstDecl (HsIB _ (XFamEqn x)))] = noExtCon x
+tcDefaultAssocDecl _ [L _ (TyFamInstDecl (XHsImplicitBndrs x))] = noExtCon x
 
 
 {- Note [Type-checking default assoc decls]
@@ -2052,8 +2082,8 @@ delicate for my taste, but it works.
 
 tcFamDecl1 :: Maybe Class -> FamilyDecl GhcRn -> TcM TyCon
 tcFamDecl1 parent (FamilyDecl { fdInfo = fam_info
-                              , fdLName = tc_lname@(dL->L _ tc_name)
-                              , fdResultSig = (dL->L _ sig)
+                              , fdLName = tc_lname@(L _ tc_name)
+                              , fdResultSig = L _ sig
                               , fdInjectivityAnn = inj })
   | DataFamily <- fam_info
   = bindTyClTyVars tc_name $ \ binders res_kind -> do
@@ -2176,7 +2206,7 @@ tcInjectivity _ Nothing
   -- therefore we can always infer the result kind if we know the result type.
   -- But this does not seem to be useful in any way so we don't do it.  (Another
   -- reason is that the implementation would not be straightforward.)
-tcInjectivity tcbs (Just (dL->L loc (InjectivityAnn _ lInjNames)))
+tcInjectivity tcbs (Just (L loc (InjectivityAnn _ lInjNames)))
   = setSrcSpan loc $
     do { let tvs = binderVars tcbs
        ; dflags <- getDynFlags
@@ -2274,7 +2304,7 @@ tcDataDefn err_ctxt
     --
     -- Note that this is only a property that data type declarations possess,
     -- so one could not have, say, a data family instance in an hsig file that
-    -- has kind `Bool`. Therfore, this check need only occur in the code that
+    -- has kind `Bool`. Therefore, this check need only occur in the code that
     -- typechecks data type declarations.
     mk_permissive_kind HsigFile [] = True
     mk_permissive_kind _ _ = False
@@ -2300,11 +2330,11 @@ kcTyFamInstEqn :: TcTyCon -> LTyFamInstEqn GhcRn -> TcM ()
 -- Used for the equations of a closed type family only
 -- Not used for data/type instances
 kcTyFamInstEqn tc_fam_tc
-    (dL->L loc (HsIB { hsib_ext = imp_vars
-                     , hsib_body = FamEqn { feqn_tycon = dL->L _ eqn_tc_name
-                                          , feqn_bndrs = mb_expl_bndrs
-                                          , feqn_pats  = hs_pats
-                                          , feqn_rhs   = hs_rhs_ty }}))
+    (L loc (HsIB { hsib_ext = imp_vars
+                 , hsib_body = FamEqn { feqn_tycon = L _ eqn_tc_name
+                                      , feqn_bndrs = mb_expl_bndrs
+                                      , feqn_pats  = hs_pats
+                                      , feqn_rhs   = hs_rhs_ty }}))
   = setSrcSpan loc $
     do { traceTc "kcTyFamInstEqn" (vcat
            [ text "tc_name ="    <+> ppr eqn_tc_name
@@ -2325,14 +2355,13 @@ kcTyFamInstEqn tc_fam_tc
              --  type family Bar x y where
              --      Bar (x :: a) (y :: b) = Int
              --      Bar (x :: c) (y :: d) = Bool
-             -- During kind-checkig, a,b,c,d should be TyVarTvs and unify appropriately
+             -- During kind-checking, a,b,c,d should be TyVarTvs and unify appropriately
     }
   where
     vis_arity = length (tyConVisibleTyVars tc_fam_tc)
 
-kcTyFamInstEqn _ (dL->L _ (XHsImplicitBndrs nec)) = noExtCon nec
-kcTyFamInstEqn _ (dL->L _ (HsIB _ (XFamEqn nec))) = noExtCon nec
-kcTyFamInstEqn _ _ = panic "kcTyFamInstEqn: Impossible Match" -- due to #15884
+kcTyFamInstEqn _ (L _ (XHsImplicitBndrs nec)) = noExtCon nec
+kcTyFamInstEqn _ (L _ (HsIB _ (XFamEqn nec))) = noExtCon nec
 
 
 --------------------------
@@ -2342,7 +2371,7 @@ tcTyFamInstEqn :: TcTyCon -> AssocInstInfo -> LTyFamInstEqn GhcRn
 -- (typechecked here) have TyFamInstEqns
 
 tcTyFamInstEqn fam_tc mb_clsinfo
-    (dL->L loc (HsIB { hsib_ext = imp_vars
+    (L loc (HsIB { hsib_ext = imp_vars
                  , hsib_body = FamEqn { feqn_tycon  = L _ eqn_tc_name
                                       , feqn_bndrs  = mb_expl_bndrs
                                       , feqn_pats   = hs_pats
@@ -2416,10 +2445,10 @@ instances are not invoked directly in Haskell source code,
 so visible type application etc plays no role.
 
 So, the simple thing is
-   - gather candiates from [k, a, b] and pats
+   - gather candidates from [k, a, b] and pats
    - quantify over them
 
-Hence the sligtly mysterious call:
+Hence the slightly mysterious call:
     candidateQTyVarsOfTypes (pats ++ mkTyVarTys scoped_tvs)
 
 Simple, neat, but a little non-obvious!
@@ -2487,7 +2516,7 @@ tcFamTyPats fam_tc hs_pats
        ; (fam_app, res_kind) <- unsetWOptM Opt_WarnPartialTypeSignatures $
                                 setXOptM LangExt.PartialTypeSignatures $
                                 -- See Note [Wildcards in family instances] in
-                                -- RnSource.hs
+                                -- GHC.Rename.Source
                                 tcInferApps typeLevelMode lhs_fun fun_ty hs_pats
 
        ; traceTc "End tcFamTyPats }" $
@@ -2642,8 +2671,8 @@ dataDeclChecks tc_name new_or_data (L _ stupid_theta) cons
 
 -----------------------------------
 consUseGadtSyntax :: [LConDecl a] -> Bool
-consUseGadtSyntax ((dL->L _ (ConDeclGADT {})) : _) = True
-consUseGadtSyntax _                                = False
+consUseGadtSyntax (L _ (ConDeclGADT {}) : _) = True
+consUseGadtSyntax _                          = False
                  -- All constructors have same shape
 
 -----------------------------------
@@ -2734,7 +2763,7 @@ tcConDecl rep_tycon tag_map tmpl_bndrs res_kind res_tmpl new_or_data
            -- the universals followed by the existentials.
            -- See Note [DataCon user type variable binders] in DataCon.
            user_tvbs = univ_tvbs ++ ex_tvbs
-           buildOneDataCon (dL->L _ name) = do
+           buildOneDataCon (L _ name) = do
              { is_infix <- tcConIsInfixH98 name hs_args
              ; rep_nm   <- newTyConRepName name
 
@@ -2762,7 +2791,7 @@ tcConDecl rep_tycon tag_map tmpl_bndrs _res_kind res_tmpl new_or_data
            , hsq_explicit = explicit_tkv_nms } <- qtvs
   = addErrCtxt (dataConCtxtName names) $
     do { traceTc "tcConDecl 1 gadt" (ppr names)
-       ; let ((dL->L _ name) : _) = names
+       ; let (L _ name : _) = names
 
        ; (imp_tvs, (exp_tvs, (ctxt, arg_tys, res_ty, field_lbls, stricts)))
            <- pushTcLevelM_    $  -- We are going to generalise
@@ -2821,7 +2850,7 @@ tcConDecl rep_tycon tag_map tmpl_bndrs _res_kind res_tmpl new_or_data
        -- Can't print univ_tvs, arg_tys etc, because we are inside the knot here
        ; traceTc "tcConDecl 2" (ppr names $$ ppr field_lbls)
        ; let
-           buildOneDataCon (dL->L _ name) = do
+           buildOneDataCon (L _ name) = do
              { is_infix <- tcConIsInfixGADT name hs_args
              ; rep_nm   <- newTyConRepName name
 
@@ -2875,7 +2904,7 @@ tcConArgs (RecCon fields)
   = mapM tcConArg btys
   where
     -- We need a one-to-one mapping from field_names to btys
-    combined = map (\(dL->L _ f) -> (cd_fld_names f,cd_fld_type f))
+    combined = map (\(L _ f) -> (cd_fld_names f,cd_fld_type f))
                    (unLoc fields)
     explode (ns,ty) = zip ns (repeat ty)
     exploded = concatMap explode combined
@@ -3342,7 +3371,7 @@ Some notes:
 
   This is really bogus; now we have in scope a Class that is invalid
   in some way, with unknown downstream consequences.  A better
-  alterantive might be to make a fake class TyCon.  A job for another day.
+  alternative might be to make a fake class TyCon.  A job for another day.
 -}
 
 -------------------------
@@ -3364,6 +3393,12 @@ checkValidTyCon :: TyCon -> TcM ()
 checkValidTyCon tc
   | isPrimTyCon tc   -- Happens when Haddock'ing GHC.Prim
   = return ()
+
+  | isWiredIn tc     -- validity-checking wired-in tycons is a waste of
+                     -- time. More importantly, a wired-in tycon might
+                     -- violate assumptions. Example: (~) has a superclass
+                     -- mentioning (~#), which is ill-kinded in source Haskell
+  = traceTc "Skipping validity check for wired-in" (ppr tc)
 
   | otherwise
   = do { traceTc "checkValidTyCon" (ppr tc $$ ppr (tyConClass_maybe tc))
@@ -3438,7 +3473,7 @@ checkValidTyCon tc
                 -- NB: this check assumes that all the constructors of a given
                 -- data type use the same type variables
         where
-        (_, _, _, res1) = dataConSig con1
+        res1 = dataConOrigResTy con1
         fty1 = dataConFieldType con1 lbl
         lbl = flLabel label
 
@@ -3446,7 +3481,7 @@ checkValidTyCon tc
             = do { checkFieldCompat lbl con1 con2 res1 res2 fty1 fty2
                  ; checkFieldCompat lbl con2 con1 res2 res1 fty2 fty1 }
             where
-                (_, _, _, res2) = dataConSig con2
+                res2 = dataConOrigResTy con2
                 fty2 = dataConFieldType con2 lbl
 
 checkPartialRecordField :: [DataCon] -> FieldLabel -> TcM ()
@@ -3546,12 +3581,12 @@ checkValidDataCon dflags existential_ok tc con
                    user_tvbs_invariant
                      =    Set.fromList (filterEqSpec eq_spec univs ++ exs)
                        == Set.fromList user_tvs
-             ; WARN( not user_tvbs_invariant
+             ; MASSERT2( user_tvbs_invariant
                        , vcat ([ ppr con
                                , ppr univs
                                , ppr exs
                                , ppr eq_spec
-                               , ppr user_tvs ])) return () }
+                               , ppr user_tvs ])) }
 
         ; traceTc "Done validity of data con" $
           vcat [ ppr con
@@ -3932,7 +3967,7 @@ For instance, in the Enum class declaration:
 The default implementation for enum only works for types that are instances of
 Generic, and for which their generic Rep type is an instance of GEnum. But
 clearly enum doesn't _have_ to use this implementation, so naturally, the
-context for enum is allowed to be different to accomodate this. As a result,
+context for enum is allowed to be different to accommodate this. As a result,
 when we validity-check default type signatures, we ignore contexts completely.
 
 Note that when checking whether two type signatures match, we must take care to
@@ -4040,7 +4075,7 @@ checkValidRoleAnnots role_annots tc
 
     check_roles
       = whenIsJust role_annot_decl_maybe $
-          \decl@(dL->L loc (RoleAnnotDecl _ _ the_role_annots)) ->
+          \decl@(L loc (RoleAnnotDecl _ _ the_role_annots)) ->
           addRoleAnnotCtxt name $
           setSrcSpan loc $ do
           { role_annots_ok <- xoptM LangExt.RoleAnnotations
@@ -4064,11 +4099,10 @@ checkValidRoleAnnots role_annots tc
       = whenIsJust role_annot_decl_maybe illegalRoleAnnotDecl
 
 checkRoleAnnot :: TyVar -> Located (Maybe Role) -> Role -> TcM ()
-checkRoleAnnot _  (dL->L _ Nothing)   _  = return ()
-checkRoleAnnot tv (dL->L _ (Just r1)) r2
+checkRoleAnnot _  (L _ Nothing)   _  = return ()
+checkRoleAnnot tv (L _ (Just r1)) r2
   = when (r1 /= r2) $
     addErrTc $ badRoleAnnot (tyVarName tv) r1 r2
-checkRoleAnnot _ _ _ = panic "checkRoleAnnot: Impossible Match" -- due to #15884
 
 -- This is a double-check on the role inference algorithm. It is only run when
 -- -dcore-lint is enabled. See Note [Role inference] in TcTyDecls
@@ -4157,6 +4191,46 @@ checkValidRoles tc
 *                                                                      *
 ************************************************************************
 -}
+
+tcMkDeclCtxt :: TyClDecl GhcRn -> SDoc
+tcMkDeclCtxt decl = hsep [text "In the", pprTyClDeclFlavour decl,
+                      text "declaration for", quotes (ppr (tcdName decl))]
+
+addVDQNote :: TcTyCon -> TcM a -> TcM a
+-- See Note [Inferring visible dependent quantification]
+-- Only types without a signature (CUSK or SAK) here
+addVDQNote tycon thing_inside
+  | ASSERT2( isTcTyCon tycon, ppr tycon )
+    ASSERT2( not (tcTyConIsPoly tycon), ppr tycon $$ ppr tc_kind )
+    has_vdq
+  = addLandmarkErrCtxt vdq_warning thing_inside
+  | otherwise
+  = thing_inside
+  where
+      -- Check whether a tycon has visible dependent quantification.
+      -- This will *always* be a TcTyCon. Furthermore, it will *always*
+      -- be an ungeneralised TcTyCon, straight out of kcInferDeclHeader.
+      -- Thus, all the TyConBinders will be anonymous. Thus, the
+      -- free variables of the tycon's kind will be the same as the free
+      -- variables from all the binders.
+    has_vdq  = any is_vdq_tcb (tyConBinders tycon)
+    tc_kind  = tyConKind tycon
+    kind_fvs = tyCoVarsOfType tc_kind
+
+    is_vdq_tcb tcb = (binderVar tcb `elemVarSet` kind_fvs) &&
+                     isVisibleTyConBinder tcb
+
+    vdq_warning = vcat
+      [ text "NB: Type" <+> quotes (ppr tycon) <+>
+        text "was inferred to use visible dependent quantification."
+      , text "Most types with visible dependent quantification are"
+      , text "polymorphically recursive and need a standalone kind"
+      , text "signature. Perhaps supply one, with StandaloneKindSignatures."
+      ]
+
+tcAddDeclCtxt :: TyClDecl GhcRn -> TcM a -> TcM a
+tcAddDeclCtxt decl thing_inside
+  = addErrCtxt (tcMkDeclCtxt decl) thing_inside
 
 tcAddTyFamInstCtxt :: TyFamInstDecl GhcRn -> TcM a -> TcM a
 tcAddTyFamInstCtxt decl
@@ -4355,25 +4429,21 @@ badRoleAnnot var annot inferred
               , text "is required" ])
 
 wrongNumberOfRoles :: [a] -> LRoleAnnotDecl GhcRn -> SDoc
-wrongNumberOfRoles tyvars d@(dL->L _ (RoleAnnotDecl _ _ annots))
+wrongNumberOfRoles tyvars d@(L _ (RoleAnnotDecl _ _ annots))
   = hang (text "Wrong number of roles listed in role annotation;" $$
           text "Expected" <+> (ppr $ length tyvars) <> comma <+>
           text "got" <+> (ppr $ length annots) <> colon)
        2 (ppr d)
-wrongNumberOfRoles _ (dL->L _ (XRoleAnnotDecl nec)) = noExtCon nec
-wrongNumberOfRoles _ _ = panic "wrongNumberOfRoles: Impossible Match"
-                         -- due to #15884
+wrongNumberOfRoles _ (L _ (XRoleAnnotDecl nec)) = noExtCon nec
 
 
 illegalRoleAnnotDecl :: LRoleAnnotDecl GhcRn -> TcM ()
-illegalRoleAnnotDecl (dL->L loc (RoleAnnotDecl _ tycon _))
+illegalRoleAnnotDecl (L loc (RoleAnnotDecl _ tycon _))
   = setErrCtxt [] $
     setSrcSpan loc $
     addErrTc (text "Illegal role annotation for" <+> ppr tycon <> char ';' $$
               text "they are allowed only for datatypes and classes.")
-illegalRoleAnnotDecl (dL->L _ (XRoleAnnotDecl nec)) = noExtCon nec
-illegalRoleAnnotDecl _ = panic "illegalRoleAnnotDecl: Impossible Match"
-                         -- due to #15884
+illegalRoleAnnotDecl (L _ (XRoleAnnotDecl nec)) = noExtCon nec
 
 needXRoleAnnotations :: TyCon -> SDoc
 needXRoleAnnotations tc

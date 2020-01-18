@@ -225,7 +225,7 @@ But caching the type in the Case constructor
   exprType (Case scrut bndr ty alts) = ty
 is better for at least three reasons:
 
-* It works when there are no alternatives (see case invarant 1 above)
+* It works when there are no alternatives (see case invariant 1 above)
 
 * It might be faster in deeply-nested situations.
 
@@ -1042,7 +1042,7 @@ data TickishScoping =
     --     ==>
     --   tick<...> case foo of x -> bar
     --
-    -- While this is always leagl, we want to make a best effort to
+    -- While this is always legal, we want to make a best effort to
     -- only make us of this where it exposes transformation
     -- opportunities.
   | SoftScope
@@ -1227,7 +1227,7 @@ notOrphan _ = False
 chooseOrphanAnchor :: NameSet -> IsOrphan
 -- Something (rule, instance) is relate to all the Names in this
 -- list. Choose one of them to be an "anchor" for the orphan.  We make
--- the choice deterministic to avoid gratuitious changes in the ABI
+-- the choice deterministic to avoid gratuitous changes in the ABI
 -- hash (#4012).  Specifically, use lexicographic comparison of
 -- OccName rather than comparing Uniques
 --
@@ -1262,8 +1262,8 @@ its left hand side mentions nothing defined in this module.  Orphan-hood
 has two major consequences
 
  * A module that contains orphans is called an "orphan module".  If
-   the module being compiled depends (transitively) on an oprhan
-   module M, then M.hi is read in regardless of whether M is oherwise
+   the module being compiled depends (transitively) on an orphan
+   module M, then M.hi is read in regardless of whether M is otherwise
    needed. This is to ensure that we don't miss any instance decls in
    M.  But it's painful, because it means we need to keep track of all
    the orphan modules below us.
@@ -1273,12 +1273,12 @@ has two major consequences
    mentions on the LHS.  For example
       data T = T1 | T2
       instance Eq T where ....
-   The instance (Eq T) is incorprated as part of T's fingerprint.
+   The instance (Eq T) is incorporated as part of T's fingerprint.
 
    In contrast, orphans are all fingerprinted together in the
    mi_orph_hash field of the ModIface.
 
-   See MkIface.addFingerprints.
+   See GHC.Iface.Utils.addFingerprints.
 
 Orphan-hood is computed
   * For class instances:
@@ -1286,8 +1286,8 @@ Orphan-hood is computed
     (because it is needed during instance lookup)
 
   * For rules and family instances:
-       when we generate an IfaceRule (MkIface.coreRuleToIfaceRule)
-                     or IfaceFamInst (MkIface.instanceToIfaceInst)
+       when we generate an IfaceRule (GHC.Iface.Utils.coreRuleToIfaceRule)
+                     or IfaceFamInst (GHC.Iface.Utils.instanceToIfaceInst)
 -}
 
 {-
@@ -1351,7 +1351,7 @@ data CoreRule
         ru_auto :: Bool,   -- ^ @True@  <=> this rule is auto-generated
                            --               (notably by Specialise or SpecConstr)
                            --   @False@ <=> generated at the user's behest
-                           -- See Note [Trimming auto-rules] in TidyPgm
+                           -- See Note [Trimming auto-rules] in GHC.Iface.Tidy
                            -- for the sole purpose of this field.
 
         ru_origin :: !Module,   -- ^ 'Module' the rule was defined in, used
@@ -1447,7 +1447,7 @@ data Unfolding
 
   | BootUnfolding      -- ^ We have no information about the unfolding, because
                        -- this 'Id' came from an @hi-boot@ file.
-                       -- See Note [Inlining and hs-boot files] in ToIface
+                       -- See Note [Inlining and hs-boot files] in GHC.CoreToIface
                        -- for what this is used for.
 
   | OtherCon [AltCon]  -- ^ It ain't one of these constructors.
@@ -1559,7 +1559,7 @@ data UnfoldingGuidance
 
       ug_size :: Int,     -- The "size" of the unfolding.
 
-      ug_res :: Int       -- Scrutinee discount: the discount to substract if the thing is in
+      ug_res :: Int       -- Scrutinee discount: the discount to subtract if the thing is in
     }                     -- a context (case (thing args) of ...),
                           -- (where there are the right number of arguments.)
 

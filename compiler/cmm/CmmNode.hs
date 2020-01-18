@@ -669,7 +669,7 @@ scopeUniques (SubScope u _)        = [u]
 scopeUniques (CombinedScope s1 s2) = scopeUniques s1 ++ scopeUniques s2
 
 -- Equality and order is based on the head uniques defined above. We
--- take care to short-cut the (extremly) common cases.
+-- take care to short-cut the (extremely) common cases.
 instance Eq CmmTickScope where
   GlobalScope    == GlobalScope     = True
   GlobalScope    == _               = False
@@ -715,7 +715,7 @@ isTickSubScope = cmp
         cmp (SubScope u s) s'@(SubScope u' _)      = u == u' || cmp s s'
 
 -- | Combine two tick scopes. The new scope should be sub-scope of
--- both parameters. We simplfy automatically if one tick scope is a
+-- both parameters. We simplify automatically if one tick scope is a
 -- sub-scope of the other already.
 combineTickScopes :: CmmTickScope -> CmmTickScope -> CmmTickScope
 combineTickScopes s1 s2

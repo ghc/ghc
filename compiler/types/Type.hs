@@ -246,7 +246,8 @@ import {-# SOURCE #-} Coercion( mkNomReflCo, mkGReflCo, mkReflCo
                               , mkForAllCo, mkFunCo, mkAxiomInstCo, mkUnivCo
                               , mkSymCo, mkTransCo, mkNthCo, mkLRCo, mkInstCo
                               , mkKindCo, mkSubCo, mkFunCo, mkAxiomInstCo
-                              , decomposePiCos, coercionKind, coercionType
+                              , decomposePiCos, coercionKind, coercionLKind
+                              , coercionRKind, coercionType
                               , isReflexiveCo, seqCo )
 
 -- others
@@ -1127,7 +1128,7 @@ piResultTys ty orig_args@(arg:args)
       = -- We have not run out of arguments, but the function doesn't
         -- have the right kind to apply to them; so panic.
         -- Without the explicit isEmptyVarEnv test, an ill-kinded type
-        -- would give an infniite loop, which is very unhelpful
+        -- would give an infinite loop, which is very unhelpful
         -- c.f. #15473
         pprPanic "piResultTys2" (ppr ty $$ ppr orig_args $$ ppr all_args)
 
@@ -1158,7 +1159,7 @@ So
   T (forall b. b->b) * :: (b -> b)[ b :-> *]
                        :: * -> *
 
-In other words we must intantiate the forall!
+In other words we must instantiate the forall!
 
 Similarly (#15428)
    S :: forall k f. k -> f k
@@ -1169,7 +1170,7 @@ We have
               :: * -> * -> *
 So again we must instantiate.
 
-The same thing happens in ToIface.toIfaceAppArgsX.
+The same thing happens in GHC.CoreToIface.toIfaceAppArgsX.
 
 
 ---------------------------------------------------------------------
@@ -2433,13 +2434,13 @@ typeKind (TyConApp tc tys) = piResultTys (tyConKind tc) tys
 typeKind (LitTy l)         = typeLiteralKind l
 typeKind (FunTy {})        = liftedTypeKind
 typeKind (TyVarTy tyvar)   = tyVarKind tyvar
-typeKind (CastTy _ty co)   = pSnd $ coercionKind co
+typeKind (CastTy _ty co)   = coercionRKind co
 typeKind (CoercionTy co)   = coercionType co
 
 typeKind (AppTy fun arg)
   = go fun [arg]
   where
-    -- Accumulate the type arugments, so we can call piResultTys,
+    -- Accumulate the type arguments, so we can call piResultTys,
     -- rather than a succession of calls to piResultTy (which is
     -- asymptotically costly as the number of arguments increases)
     go (AppTy fun arg) args = go fun (arg:args)
@@ -2466,7 +2467,7 @@ tcTypeKind :: HasDebugCallStack => Type -> Kind
 tcTypeKind (TyConApp tc tys) = piResultTys (tyConKind tc) tys
 tcTypeKind (LitTy l)         = typeLiteralKind l
 tcTypeKind (TyVarTy tyvar)   = tyVarKind tyvar
-tcTypeKind (CastTy _ty co)   = pSnd $ coercionKind co
+tcTypeKind (CastTy _ty co)   = coercionRKind co
 tcTypeKind (CoercionTy co)   = coercionType co
 
 tcTypeKind (FunTy { ft_af = af, ft_res = res })
@@ -2479,7 +2480,7 @@ tcTypeKind (FunTy { ft_af = af, ft_res = res })
 tcTypeKind (AppTy fun arg)
   = go fun [arg]
   where
-    -- Accumulate the type arugments, so we can call piResultTys,
+    -- Accumulate the type arguments, so we can call piResultTys,
     -- rather than a succession of calls to piResultTy (which is
     -- asymptotically costly as the number of arguments increases)
     go (AppTy fun arg) args = go fun (arg:args)
@@ -2694,7 +2695,7 @@ occCheckExpand vs_to_avoid ty
     go_co cxt@(as, env) (ForAllCo tv kind_co body_co)
       = do { kind_co' <- go_co cxt kind_co
            ; let tv' = setVarType tv $
-                       pFst (coercionKind kind_co')
+                       coercionLKind kind_co'
                  env' = extendVarEnv env tv tv'
                  as'  = as `delVarSet` tv
            ; body' <- go_co (as', env') body_co
@@ -2936,7 +2937,7 @@ classifiesTypeWithValues k = isJust (kindRep_maybe k)
 %*                                                                      *
 %************************************************************************
 
-Most pretty-printing is either in TyCoRep or IfaceType.
+Most pretty-printing is either in TyCoRep or GHC.Iface.Type.
 
 -}
 

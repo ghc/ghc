@@ -48,7 +48,7 @@ import Cmm
 import CmmUtils
 import CmmInfo
 import CLabel
-import StgSyn
+import GHC.Stg.Syntax
 import Id
 import TyCon             ( PrimRep(..), primRepSizeB )
 import BasicTypes        ( RepArity )

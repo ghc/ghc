@@ -46,7 +46,6 @@ generally likely to indicate bugs in your program. These are:
     * :ghc-flag:`-Winaccessible-code`
     * :ghc-flag:`-Wstar-is-type`
     * :ghc-flag:`-Wstar-binder`
-    * :ghc-flag:`-Wspace-after-bang`
 
 The following flags are simple ways to select standard "packages" of warnings:
 
@@ -1280,12 +1279,6 @@ of ``-W(no-)*``.
     per-module basis with :ghc-flag:`-Wno-simplifiable-class-constraints
     <-Wsimplifiable-class-constraints>`.
 
-.. ghc-flag:: -Wspace-after-bang
-     :shortdesc: warn for missing space before the second argument
-        of an infix definition of ``(!)`` when
-        :extension:`BangPatterns` are not enabled
-     :type: dynamic
-     :reverse: -Wno-missing-space-after-bang
 .. ghc-flag:: -Wtabs
     :shortdesc: warn if there are tabs in the source file
     :type: dynamic
@@ -1740,7 +1733,7 @@ of ``-W(no-)*``.
 
     The option :ghc-flag:`-Wunused-packages` warns about packages, specified on
     command line via :ghc-flag:`-package ⟨pkg⟩` or
-    :ghc-flag:`-package-id ⟨unit-id⟩`, but were not loaded during compication.
+    :ghc-flag:`-package-id ⟨unit-id⟩`, but were not loaded during compilation.
     Usually it means that you have an unused dependency.
 
     You may want to enable this warning on a clean build or enable :ghc-flag:`-fforce-recomp`

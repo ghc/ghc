@@ -176,11 +176,9 @@ outputAsm dflags this_mod location filenm cmm_stream
 
 outputLlvm :: DynFlags -> FilePath -> Stream IO RawCmmGroup a -> IO a
 outputLlvm dflags filenm cmm_stream
-  = do ncg_uniqs <- mkSplitUniqSupply 'n'
-
-       {-# SCC "llvm_output" #-} doOutput filenm $
+  = do {-# SCC "llvm_output" #-} doOutput filenm $
            \f -> {-# SCC "llvm_CodeGen" #-}
-                 llvmCodeGen dflags f ncg_uniqs cmm_stream
+                 llvmCodeGen dflags f cmm_stream
 
 {-
 ************************************************************************
@@ -214,7 +212,9 @@ outputForeignStubs dflags mod location stubs
         createDirectoryIfMissing True (takeDirectory stub_h)
 
         dumpIfSet_dyn dflags Opt_D_dump_foreign
-                      "Foreign export header file" stub_h_output_d
+                      "Foreign export header file"
+                      FormatC
+                      stub_h_output_d
 
         -- we need the #includes from the rts package for the stub files
         let rts_includes =
@@ -232,7 +232,7 @@ outputForeignStubs dflags mod location stubs
                 ("#include <HsFFI.h>\n" ++ cplusplus_hdr) cplusplus_ftr
 
         dumpIfSet_dyn dflags Opt_D_dump_foreign
-                      "Foreign export stubs" stub_c_output_d
+                      "Foreign export stubs" FormatC stub_c_output_d
 
         stub_c_file_exists
            <- outputForeignStubs_help stub_c stub_c_output_w
@@ -262,4 +262,3 @@ outputForeignStubs_help _fname ""      _header _footer = return False
 outputForeignStubs_help fname doc_str header footer
    = do writeFile fname (header ++ doc_str ++ '\n':footer ++ "\n")
         return True
-

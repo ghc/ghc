@@ -15,7 +15,7 @@ module SMRep (
         StgHalfWord, fromStgHalfWord, toStgHalfWord,
         halfWordSize, halfWordSizeInBits,
 
-        -- * Closure repesentation
+        -- * Closure representation
         SMRep(..), -- CmmInfo sees the rep; no one else does
         IsStatic,
         ClosureTypeInfo(..), ArgDescr(..), Liveness,

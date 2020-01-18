@@ -84,7 +84,6 @@ import Name( Name, NamedThing(getName) )
 import RdrName ( RdrName )
 import DataCon( HsSrcBang(..), HsImplBang(..),
                 SrcStrictness(..), SrcUnpackedness(..) )
-import TysPrim( funTyConName )
 import TysWiredIn( mkTupleStr )
 import Type
 import GHC.Hs.Doc
@@ -145,7 +144,7 @@ Then we use a LHsBndrSig on the binder, so that the
 renamer can decorate it with the variables bound
 by the pattern ('a' in the first example, 'k' in the second),
 assuming that neither of them is in scope already
-See also Note [Kind and type-variable binders] in RnTypes
+See also Note [Kind and type-variable binders] in GHC.Rename.Types
 
 Note [HsType binders]
 ~~~~~~~~~~~~~~~~~~~~~
@@ -266,7 +265,7 @@ By "stable", we mean that any two variables who do not depend on each other
 preserve their existing left-to-right ordering.
 
 Implicitly bound variables are collected by the extract- family of functions
-(extractHsTysRdrTyVars, extractHsTyVarBndrsKVs, etc.) in RnTypes.
+(extractHsTysRdrTyVars, extractHsTyVarBndrsKVs, etc.) in GHC.Rename.Types.
 These functions thus promise to keep left-to-right ordering.
 Look for pointers to this note to see the places where the action happens.
 
@@ -369,7 +368,7 @@ data HsImplicitBndrs pass thing   -- See Note [HsType binders]
                                          -- Implicitly-bound kind & type vars
                                          -- Order is important; see
                                          -- Note [Ordering of implicit variables]
-                                         -- in RnTypes
+                                         -- in GHC.Rename.Types
 
          , hsib_body :: thing            -- Main payload (type or list of types)
     }
@@ -603,7 +602,8 @@ data HsType pass
 
   | HsParTy             (XParTy pass)
                         (LHsType pass)   -- See Note [Parens in HsSyn] in GHC.Hs.Expr
-        -- Parenthesis preserved for the precedence re-arrangement in RnTypes
+        -- Parenthesis preserved for the precedence re-arrangement in
+        -- GHC.Rename.Types
         -- It's important that a * (b + c) doesn't get rearranged to (a*b) + c!
       -- ^ - 'ApiAnnotation.AnnKeywordId' : 'ApiAnnotation.AnnOpen' @'('@,
       --         'ApiAnnotation.AnnClose' @')'@
@@ -674,7 +674,7 @@ data HsType pass
 
   | HsExplicitListTy       -- A promoted explicit list
         (XExplicitListTy pass)
-        PromotionFlag      -- whether explcitly promoted, for pretty printer
+        PromotionFlag      -- whether explicitly promoted, for pretty printer
         [LHsType pass]
       -- ^ - 'ApiAnnotation.AnnKeywordId' : 'ApiAnnotation.AnnOpen' @"'["@,
       --         'ApiAnnotation.AnnClose' @']'@
@@ -775,7 +775,7 @@ After renaming
 Qualified currently behaves exactly as Implicit,
 but it is deprecated to use it for implicit quantification.
 In this case, GHC 7.10 gives a warning; see
-Note [Context quantification] in RnTypes, and #4426.
+Note [Context quantification] in GHC.Rename.Types, and #4426.
 In GHC 8.0, Qualified will no longer bind variables
 and this will become an error.
 
@@ -888,7 +888,7 @@ type LConDeclField pass = Located (ConDeclField pass)
       -- For details on above see note [Api annotations] in ApiAnnotation
 
 -- | Constructor Declaration Field
-data ConDeclField pass  -- Record fields have Haddoc docs on them
+data ConDeclField pass  -- Record fields have Haddock docs on them
   = ConDeclField { cd_fld_ext  :: XConDeclField pass,
                    cd_fld_names :: [LFieldOcc pass],
                                    -- ^ See Note [ConDeclField passs]
@@ -958,7 +958,7 @@ gives
 hsWcScopedTvs :: LHsSigWcType GhcRn -> [Name]
 -- Get the lexically-scoped type variables of a HsSigType
 --  - the explicitly-given forall'd type variables
---  - the named wildcars; see Note [Scoping of named wildcards]
+--  - the named wildcards; see Note [Scoping of named wildcards]
 -- because they scope in the same way
 hsWcScopedTvs sig_ty
   | HsWC { hswc_ext = nwcs, hswc_body = sig_ty1 }  <- sig_ty
@@ -1064,14 +1064,14 @@ hsAllLTyVarNames (HsQTvs { hsq_ext = kvs
 hsAllLTyVarNames (XLHsQTyVars nec) = noExtCon nec
 
 hsLTyVarLocName :: LHsTyVarBndr (GhcPass p) -> Located (IdP (GhcPass p))
-hsLTyVarLocName = onHasSrcSpan hsTyVarName
+hsLTyVarLocName = mapLoc hsTyVarName
 
 hsLTyVarLocNames :: LHsQTyVars (GhcPass p) -> [Located (IdP (GhcPass p))]
 hsLTyVarLocNames qtvs = map hsLTyVarLocName (hsQTvExplicit qtvs)
 
 -- | Convert a LHsTyVarBndr to an equivalent LHsType.
 hsLTyVarBndrToType :: LHsTyVarBndr (GhcPass p) -> LHsType (GhcPass p)
-hsLTyVarBndrToType = onHasSrcSpan cvt
+hsLTyVarBndrToType = mapLoc cvt
   where cvt (UserTyVar _ n) = HsTyVar noExtField NotPromoted n
         cvt (KindedTyVar _ (L name_loc n) kind)
           = HsKindSig noExtField
@@ -1151,8 +1151,6 @@ mkHsAppKindTy ext ty k
 -- splitHsFunType decomposes a type (t1 -> t2 ... -> tn)
 -- Breaks up any parens in the result type:
 --      splitHsFunType (a -> (b -> c)) = ([a,b], c)
--- Also deals with (->) t1 t2; that is why it only works on LHsType Name
---   (see #9096)
 splitHsFunType :: LHsType GhcRn -> ([LHsType GhcRn], LHsType GhcRn)
 splitHsFunType (L _ (HsParTy _ ty))
   = splitHsFunType ty
@@ -1160,19 +1158,6 @@ splitHsFunType (L _ (HsParTy _ ty))
 splitHsFunType (L _ (HsFunTy _ x y))
   | (args, res) <- splitHsFunType y
   = (x:args, res)
-{- This is not so correct, because it won't work with visible kind app, in case
-  someone wants to write '(->) @k1 @k2 t1 t2'. Fixing this would require changing
-  ConDeclGADT abstract syntax -}
-splitHsFunType orig_ty@(L _ (HsAppTy _ t1 t2))
-  = go t1 [t2]
-  where  -- Look for (->) t1 t2, possibly with parenthesisation
-    go (L _ (HsTyVar _ _ (L _ fn))) tys | fn == funTyConName
-                                 , [t1,t2] <- tys
-                                 , (args, res) <- splitHsFunType t2
-                                 = (t1:args, res)
-    go (L _ (HsAppTy _ t1 t2)) tys = go t1 (t2:tys)
-    go (L _ (HsParTy _ ty))    tys = go ty tys
-    go _                       _   = ([], orig_ty)  -- Failure to match
 
 splitHsFunType other = ([], other)
 
@@ -1692,7 +1677,7 @@ hsTypeNeedsParens p = go
     go (HsExplicitTupleTy{}) = False
     go (HsTyLit{})           = False
     go (HsWildCardTy{})      = False
-    go (HsStarTy{})          = False
+    go (HsStarTy{})          = p >= starPrec
     go (HsAppTy{})           = p >= appPrec
     go (HsAppKindTy{})       = p >= appPrec
     go (HsOpTy{})            = p >= opPrec
@@ -1702,7 +1687,7 @@ hsTypeNeedsParens p = go
 
 maybeAddSpace :: [LHsType pass] -> SDoc -> SDoc
 -- See Note [Printing promoted type constructors]
--- in IfaceType.  This code implements the same
+-- in GHC.Iface.Type.  This code implements the same
 -- logic for printing HsType
 maybeAddSpace tys doc
   | (ty : _) <- tys

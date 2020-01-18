@@ -37,11 +37,11 @@ import TcHsType
 import TyCoRep
 import TyCoPpr    ( pprTyVars )
 
-import RnNames( extendGlobalRdrEnvRn )
-import RnBinds
-import RnEnv
-import RnUtils    ( bindLocalNamesFV )
-import RnSource   ( addTcgDUs )
+import GHC.Rename.Names  ( extendGlobalRdrEnvRn )
+import GHC.Rename.Binds
+import GHC.Rename.Env
+import GHC.Rename.Utils  ( bindLocalNamesFV )
+import GHC.Rename.Source ( addTcgDUs )
 import Avail
 
 import Unify( tcUnifyTy )
@@ -235,6 +235,7 @@ tcDeriving deriv_infos deriv_decls
 
         ; unless (isEmptyBag inst_info) $
              liftIO (dumpIfSet_dyn dflags Opt_D_dump_deriv "Derived instances"
+                        FormatHaskell
                         (ddump_deriving inst_info rn_binds famInsts))
 
         ; gbl_env <- tcExtendLocalInstEnv (map iSpec (bagToList inst_info))
@@ -369,7 +370,7 @@ the rest of the instance. The fact that it is suspended is important, because
 right now, we don't have ThetaTypes for the instances that use deriving clauses
 (only the standalone-derived ones).
 
-Now we can can collect the type family instances and extend the local instance
+Now we can collect the type family instances and extend the local instance
 environment. At this point, it is safe to run simplifyInstanceContexts on the
 deriving-clause instance specs, which gives us the ThetaTypes for the
 deriving-clause instances. Now we can feed all the ThetaTypes to the
@@ -550,7 +551,7 @@ is ill-kinded nonsense (#16923).
 
 To address both of these problems, GHC now uses this algorithm instead:
 
-1. Typecheck the `via` type and bring its boudn type variables into scope.
+1. Typecheck the `via` type and bring its bound type variables into scope.
 2. Take the first class in the `deriving` clause.
 3. Typecheck the class.
 4. Move on to the next class and repeat the process until all classes have been
@@ -1016,7 +1017,7 @@ a poly-kinded typeclass for a poly-kinded datatype. For example:
     class Category (cat :: k -> k -> *) where
     newtype T (c :: k -> k -> *) a b = MkT (c a b) deriving Category
 
-This case is suprisingly tricky. To see why, let's write out what instance GHC
+This case is surprisingly tricky. To see why, let's write out what instance GHC
 will attempt to derive (using -fprint-explicit-kinds syntax):
 
     instance Category k1 (T k2 c) where ...
@@ -1289,7 +1290,7 @@ When there are no type families, it's quite easy:
     instance Eq [a] => Eq (S a)         -- by coercion sym (Eq (:CoS a)) : Eq [a] ~ Eq (S a)
     instance Monad [] => Monad S        -- by coercion sym (Monad :CoS)  : Monad [] ~ Monad S
 
-When type familes are involved it's trickier:
+When type families are involved it's trickier:
 
     data family T a b
     newtype instance T Int a = MkT [a] deriving( Eq, Monad )
@@ -1915,7 +1916,7 @@ doDerivInstErrorChecks1 mechanism =
 
         rdr_env <- lift getGlobalRdrEnv
         let data_con_names = map dataConName (tyConDataCons rep_tc)
-            hidden_data_cons = not (isWiredInName (tyConName rep_tc)) &&
+            hidden_data_cons = not (isWiredIn rep_tc) &&
                                (isAbstractTyCon rep_tc ||
                                 any not_in_scope data_con_names)
             not_in_scope dc  = isNothing (lookupGRE_Name rdr_env dc)

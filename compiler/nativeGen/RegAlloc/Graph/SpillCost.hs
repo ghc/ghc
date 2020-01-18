@@ -38,7 +38,7 @@ import Data.Maybe
 import Control.Monad (join)
 
 
--- | Records the expected cost to spill some regster.
+-- | Records the expected cost to spill some register.
 type SpillCostRecord
  =      ( VirtualReg    -- register name
         , Int           -- number of writes to this reg
@@ -297,7 +297,7 @@ nodeDegree classOfVirtualReg graph reg
 
 
 -- | Show a spill cost record, including the degree from the graph
---   and final calulated spill cost.
+--   and final calculated spill cost.
 pprSpillCostRecord
         :: (VirtualReg -> RegClass)
         -> (Reg -> SDoc)

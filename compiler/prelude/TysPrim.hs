@@ -242,7 +242,7 @@ tVarPrimTyConName             = mkPrimTc (fsLit "TVar#") tVarPrimTyConKey tVarPr
 stablePtrPrimTyConName        = mkPrimTc (fsLit "StablePtr#") stablePtrPrimTyConKey stablePtrPrimTyCon
 stableNamePrimTyConName       = mkPrimTc (fsLit "StableName#") stableNamePrimTyConKey stableNamePrimTyCon
 compactPrimTyConName          = mkPrimTc (fsLit "Compact#") compactPrimTyConKey compactPrimTyCon
-bcoPrimTyConName              = mkPrimTc (fsLit "BCO#") bcoPrimTyConKey bcoPrimTyCon
+bcoPrimTyConName              = mkPrimTc (fsLit "BCO") bcoPrimTyConKey bcoPrimTyCon
 weakPrimTyConName             = mkPrimTc (fsLit "Weak#") weakPrimTyConKey weakPrimTyCon
 threadIdPrimTyConName         = mkPrimTc (fsLit "ThreadId#") threadIdPrimTyConKey threadIdPrimTyCon
 
@@ -445,7 +445,7 @@ So for example:
 We abbreviate '*' specially:
     type * = TYPE 'LiftedRep
 
-The 'rr' parameter tells us how the value is represented at runime.
+The 'rr' parameter tells us how the value is represented at runtime.
 
 Generally speaking, you can't be polymorphic in 'rr'.  E.g
    f :: forall (rr:RuntimeRep) (a:TYPE rr). a -> [a]
@@ -1069,10 +1069,13 @@ compactPrimTy = mkTyConTy compactPrimTyCon
 ************************************************************************
 -}
 
+-- Unlike most other primitive types, BCO is lifted. This is because in
+-- general a BCO may be a thunk for the reasons given in Note [Updatable CAF
+-- BCOs] in GHCi.CreateBCO.
 bcoPrimTy    :: Type
 bcoPrimTy    = mkTyConTy bcoPrimTyCon
 bcoPrimTyCon :: TyCon
-bcoPrimTyCon = pcPrimTyCon0 bcoPrimTyConName UnliftedRep
+bcoPrimTyCon = pcPrimTyCon0 bcoPrimTyConName LiftedRep
 
 {-
 ************************************************************************

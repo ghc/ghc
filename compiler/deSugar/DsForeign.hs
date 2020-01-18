@@ -31,7 +31,7 @@ import Literal
 import Module
 import Name
 import Type
-import RepType
+import GHC.Types.RepType
 import TyCon
 import Coercion
 import TcEnv
@@ -51,7 +51,6 @@ import FastString
 import DynFlags
 import GHC.Platform
 import OrdList
-import Pair
 import Util
 import Hooks
 import Encoding
@@ -97,7 +96,7 @@ dsForeigns' fos = do
              (vcat cs $$ vcat fe_init_code),
             foldr (appOL . toOL) nilOL bindss)
   where
-   do_ldecl (dL->L loc decl) = putSrcSpanDs loc (do_decl decl)
+   do_ldecl (L loc decl) = putSrcSpanDs loc (do_decl decl)
 
    do_decl (ForeignImport { fd_name = id, fd_i_ext = co, fd_fi = spec }) = do
       traceIf (text "fi start" <+> ppr id)
@@ -106,10 +105,10 @@ dsForeigns' fos = do
       traceIf (text "fi end" <+> ppr id)
       return (h, c, [], bs)
 
-   do_decl (ForeignExport { fd_name = (dL->L _ id)
+   do_decl (ForeignExport { fd_name = L _ id
                           , fd_e_ext = co
                           , fd_fe = CExport
-                              (dL->L _ (CExportStatic _ ext_nm cconv)) _ }) = do
+                              (L _ (CExportStatic _ ext_nm cconv)) _ }) = do
       (h, c, _, _) <- dsFExport id co ext_nm cconv False
       return (h, c, [id], [])
    do_decl (XForeignDecl nec) = noExtCon nec
@@ -156,7 +155,7 @@ dsCImport :: Id
           -> DsM ([Binding], SDoc, SDoc)
 dsCImport id co (CLabel cid) cconv _ _ = do
    dflags <- getDynFlags
-   let ty  = pFst $ coercionKind co
+   let ty  = coercionLKind co
        fod = case tyConAppTyCon_maybe (dropForAlls ty) of
              Just tycon
               | tyConUnique tycon == funPtrTyConKey ->
@@ -204,7 +203,7 @@ dsFCall :: Id -> Coercion -> ForeignCall -> Maybe Header
         -> DsM ([(Id, Expr TyVar)], SDoc, SDoc)
 dsFCall fn_id co fcall mDeclHeader = do
     let
-        ty                   = pFst $ coercionKind co
+        ty                   = coercionLKind co
         (tv_bndrs, rho)      = tcSplitForAllVarBndrs ty
         (arg_tys, io_res_ty) = tcSplitFunTys rho
 
@@ -305,7 +304,7 @@ dsPrimCall :: Id -> Coercion -> ForeignCall
            -> DsM ([(Id, Expr TyVar)], SDoc, SDoc)
 dsPrimCall fn_id co fcall = do
     let
-        ty                   = pFst $ coercionKind co
+        ty                   = coercionLKind co
         (tvs, fun_ty)        = tcSplitForAllTys ty
         (arg_tys, io_res_ty) = tcSplitFunTys fun_ty
 
@@ -355,7 +354,7 @@ dsFExport :: Id                 -- Either the exported Id,
 
 dsFExport fn_id co ext_name cconv isDyn = do
     let
-       ty                     = pSnd $ coercionKind co
+       ty                     = coercionRKind co
        (bndrs, orig_res_ty)   = tcSplitPiTys ty
        fe_arg_tys'            = mapMaybe binderRelevantType_maybe bndrs
        -- We must use tcSplits here, because we want to see
@@ -477,7 +476,7 @@ dsFExportDynamic id co0 cconv = do
     return ([fed], h_code, c_code)
 
  where
-  ty                       = pFst (coercionKind co0)
+  ty                       = coercionLKind co0
   (tvs,sans_foralls)       = tcSplitForAllTys ty
   ([arg_ty], fn_res_ty)    = tcSplitFunTys sans_foralls
   Just (io_tc, res_ty)     = tcSplitIOType_maybe fn_res_ty
