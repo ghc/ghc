@@ -2065,11 +2065,14 @@ AC_DEFUN([GHC_CONVERT_OS],[
       linux-*|linux)
         $3="linux"
         ;;
+      netbsd*)
+        $3="netbsd"
+        ;;
       openbsd*)
         $3="openbsd"
         ;;
       # As far as I'm aware, none of these have relevant variants
-      freebsd|netbsd|dragonfly|hpux|linuxaout|kfreebsdgnu|freebsd2|mingw32|darwin|nextstep2|nextstep3|sunos4|ultrix|haiku)
+      freebsd|dragonfly|hpux|linuxaout|kfreebsdgnu|freebsd2|mingw32|darwin|nextstep2|nextstep3|sunos4|ultrix|haiku)
         $3="$1"
         ;;
       msys)
