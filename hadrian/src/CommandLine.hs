@@ -143,6 +143,9 @@ readTestConfigFile filepath =
 readTestJUnit :: Maybe String -> Either String (CommandLineArgs -> CommandLineArgs)
 readTestJUnit filepath = Right $ \flags -> flags { testArgs = (testArgs flags) { testJUnit = filepath } }
 
+readTestMetrics :: Maybe String -> Either String (CommandLineArgs -> CommandLineArgs)
+readTestMetrics filepath = Right $ \flags -> flags { testArgs = (testArgs flags) { testMetrics = filepath } }
+
 readTestOnly :: Maybe String -> Either String (CommandLineArgs -> CommandLineArgs)
 readTestOnly tests = Right $ \flags ->
   flags { testArgs = (testArgs flags) { testOnly = tests'' flags } }
@@ -176,7 +179,7 @@ readTestSpeed ms =
     set flag flags = flags { testArgs = (testArgs flags) {testSpeed = flag} }
 
 readTestSummary :: Maybe String -> Either String (CommandLineArgs -> CommandLineArgs)
-readTestSummary filepath = Right $ \flags -> flags { testArgs = (testArgs flags) { testJUnit = filepath } }
+readTestSummary filepath = Right $ \flags -> flags { testArgs = (testArgs flags) { testSummary = filepath } }
 
 readTestVerbose :: Maybe String -> Either String (CommandLineArgs -> CommandLineArgs)
 readTestVerbose verbose = Right $ \flags -> flags { testArgs = (testArgs flags) { testVerbosity = verbose } }
@@ -240,6 +243,8 @@ optDescrs =
       "Configurations to run test, in key=value format."
     , Option [] ["summary-junit"] (OptArg readTestJUnit "TEST_SUMMARY_JUNIT")
       "Output testsuite summary in JUnit format."
+    , Option [] ["summary-metrics"] (OptArg readTestMetrics "METRICS_FILE")
+      "Output testsuite performance metrics summary."
     , Option [] ["only"] (OptArg readTestOnly "TESTS")
       "Test cases to run."
     , Option [] ["only-perf"] (NoArg readTestOnlyPerf)
