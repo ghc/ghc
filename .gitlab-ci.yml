@@ -124,8 +124,7 @@ typecheck-testsuite:
     - base="$(git merge-base FETCH_HEAD $CI_COMMIT_SHA)"
     - "echo Linting submodule changes between $base..$CI_COMMIT_SHA"
     - git submodule foreach git remote update
-      # TODO: Fix submodule linter
-    - submodchecker . $(git rev-list $base..$CI_COMMIT_SHA) || true
+    - submodchecker . $(git rev-list $base..$CI_COMMIT_SHA)
   dependencies: []
   tags:
     - lint
@@ -770,7 +769,6 @@ validate-x86_64-linux-fedora27:
   <<: *only-default
   before_script:
     - git clean -xdf
-    - git submodule foreach git clean -xdf
 
     # Use a local temporary directory to ensure that concurrent builds don't
     # interfere with one another
@@ -780,8 +778,13 @@ validate-x86_64-linux-fedora27:
       set TEMP=%cd%\tmp
 
     - set PATH=C:\msys64\usr\bin;%PATH%
-    - git submodule sync --recursive
-    - git submodule update --init --recursive
+    # On Windows submodules can inexplicably get into funky states where git
+    # believes that the submodule is initialized yet its associated repository
+    # is not valid. Avoid failing in this case with the following insanity.
+    - |
+      bash -c 'git submodule sync --recursive || git submodule deinit --force --all'
+      bash -c 'git submodule update --init --recursive'
+      git submodule foreach git clean -xdf
     - git checkout .gitmodules
     - "git fetch https://gitlab.haskell.org/ghc/ghc-performance-notes.git refs/notes/perf:refs/notes/perf || true"
     - bash .gitlab/win32-init.sh
