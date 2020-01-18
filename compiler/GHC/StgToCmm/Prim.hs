@@ -36,17 +36,17 @@ import GHC.StgToCmm.Prof ( costCentreFrom )
 import DynFlags
 import GHC.Platform
 import BasicTypes
-import BlockId
-import MkGraph
+import GHC.Cmm.BlockId
+import GHC.Cmm.Graph
 import GHC.Stg.Syntax
-import Cmm
+import GHC.Cmm
 import Module   ( rtsUnitId )
 import Type     ( Type, tyConAppTyCon )
 import TyCon
-import CLabel
-import CmmUtils
+import GHC.Cmm.CLabel
+import GHC.Cmm.Utils
 import PrimOp
-import SMRep
+import GHC.Runtime.Layout
 import FastString
 import Outputable
 import Util
@@ -1525,7 +1525,7 @@ emitPrimOp dflags = \case
   -- `quot` and `rem` with constant divisor can be implemented with fast bit-ops
   -- (shift, .&.).
   --
-  -- Currently we only support optimization (performed in CmmOpt) when the
+  -- Currently we only support optimization (performed in GHC.Cmm.Opt) when the
   -- constant is a power of 2. #9041 tracks the implementation of the general
   -- optimization.
   --

@@ -543,6 +543,19 @@ mk_strict_superclasses rec_clss ev tvs theta cls tys
       = do { sc_ev <- newDerivedNC loc sc_pred
            ; mk_superclasses rec_clss sc_ev [] [] sc_pred }
 
+{- Note [Improvement from Ground Wanteds]
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+Suppose class C b a => D a b
+and consider
+  [W] D Int Bool
+Is there any point in emitting [D] C Bool Int?  No!  The only point of
+emitting superclass constraints for W/D constraints is to get
+improvement, extra unifications that result from functional
+dependencies.  See Note [Why adding superclasses can help] above.
+
+But no variables means no improvement; case closed.
+-}
+
 mk_superclasses :: NameSet -> CtEvidence
                 -> [TyVar] -> ThetaType -> PredType -> TcS [Ct]
 -- Return this constraint, plus its superclasses, if any
@@ -2357,8 +2370,10 @@ rewriteEqEvidence old_ev swapped nlhs nrhs lhs_co rhs_co
        ; traceTcS "rewriteEqEvidence" (vcat [ppr old_ev, ppr nlhs, ppr nrhs, ppr co])
        ; return new_ev }
 
+#if __GLASGOW_HASKELL__ <= 810
   | otherwise
   = panic "rewriteEvidence"
+#endif
   where
     new_pred = mkTcEqPredLikeEv old_ev nlhs nrhs
 
