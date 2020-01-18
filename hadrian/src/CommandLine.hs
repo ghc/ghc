@@ -52,7 +52,7 @@ data TestArgs = TestArgs
     , testConfigFile :: String
     , testConfigs    :: [String]
     , testJUnit      :: Maybe FilePath
-    , testMetrics    :: Maybe FilePath
+    , testMetricsFile:: Maybe FilePath
     , testOnly       :: [String]
     , testOnlyPerf   :: Bool
     , testSkipPerf   :: Bool
@@ -72,7 +72,7 @@ defaultTestArgs = TestArgs
     , testConfigFile = "testsuite/config/ghc"
     , testConfigs    = []
     , testJUnit      = Nothing
-    , testMetrics    = Nothing
+    , testMetricsFile= Nothing
     , testOnly       = []
     , testOnlyPerf   = False
     , testSkipPerf   = False
@@ -146,7 +146,7 @@ readTestJUnit :: Maybe String -> Either String (CommandLineArgs -> CommandLineAr
 readTestJUnit filepath = Right $ \flags -> flags { testArgs = (testArgs flags) { testJUnit = filepath } }
 
 readTestMetrics :: Maybe String -> Either String (CommandLineArgs -> CommandLineArgs)
-readTestMetrics filepath = Right $ \flags -> flags { testArgs = (testArgs flags) { testMetrics = filepath } }
+readTestMetrics filepath = Right $ \flags -> flags { testArgs = (testArgs flags) { testMetricsFile = filepath } }
 
 readTestOnly :: Maybe String -> Either String (CommandLineArgs -> CommandLineArgs)
 readTestOnly tests = Right $ \flags ->
@@ -181,7 +181,7 @@ readTestSpeed ms =
     set flag flags = flags { testArgs = (testArgs flags) {testSpeed = flag} }
 
 readTestSummary :: Maybe String -> Either String (CommandLineArgs -> CommandLineArgs)
-readTestSummary filepath = Right $ \flags -> flags { testArgs = (testArgs flags) { testJUnit = filepath } }
+readTestSummary filepath = Right $ \flags -> flags { testArgs = (testArgs flags) { testSummary = filepath } }
 
 readTestVerbose :: Maybe String -> Either String (CommandLineArgs -> CommandLineArgs)
 readTestVerbose verbose = Right $ \flags -> flags { testArgs = (testArgs flags) { testVerbosity = verbose } }
