@@ -169,6 +169,9 @@ getTestArgs = do
         junitArg     = case testJUnit args of
                            Just filepath -> Just $ "--junit=" ++ filepath
                            Nothing -> Nothing
+        metricsArg   = case testMetricsFile args of
+                           Just filepath -> Just $ "--metrics-file=" ++ filepath
+                           Nothing -> Nothing
         configArgs   = concat [["-e", configArg] | configArg <- testConfigs args]
         verbosityArg = case testVerbosity args of
                            Nothing -> Just $ "--verbose=" ++ show (fromEnum globalVerbosity)
@@ -186,7 +189,7 @@ getTestArgs = do
 
     pure $  configFileArg ++ testOnlyArg ++ speedArg
          ++ catMaybes [ onlyPerfArg, skipPerfArg, summaryArg
-                      , junitArg, verbosityArg  ]
+                      , junitArg, metricsArg, verbosityArg  ]
          ++ configArgs ++ wayArgs ++  compilerArg ++ ghcPkgArg
          ++ haddockArg ++ hp2psArg ++ hpcArg ++ inTreeArg
 
