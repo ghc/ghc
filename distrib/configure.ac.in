@@ -62,12 +62,6 @@ dnl ** figure out how to do a BSD-ish install **
 AC_PROG_INSTALL
 
 #
-dnl ** find `find`, used by get-win32-tarballs.sh (see #12502)
-#
-FP_PROG_FIND()
-export FIND
-
-#
 dnl ** how to do symlinks **
 #
 AC_PROG_LN_S()
