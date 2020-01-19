@@ -1034,7 +1034,7 @@ source-tarball:
       - ghc-*.tar.xz
       - version
   script:
-    - mk/get-win32-tarballs.sh download all
+    - python3 mk/get-win32-tarballs.py download all
     - ./boot
     - ./configure
     - make sdist
