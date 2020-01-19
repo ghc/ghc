@@ -36,8 +36,8 @@ def fetch_arch(arch: str):
     verify(arch)
 
 def verify(arch: str):
-    subprocess.check_call(['sha256sum', '--quiet', '--check', '--ignore-missing', 'SHA256SUMS'],
-                          cwd=d)
+    cmd = ['sha256sum', '--quiet', '--check', '--ignore-missing', 'SHA256SUMS']
+    subprocess.check_call(cmd, cwd=DEST / arch)
 
 def main() -> None:
     parser = argparse.ArgumentParser()
