@@ -853,7 +853,9 @@ tcPatSynBuilderBind (PSB { psb_id = L loc name
        ; traceTc "tcPatSynBuilderBind }" $ ppr builder_binds
        ; return builder_binds } } }
 
+#if __GLASGOW_HASKELL__ <= 810
   | otherwise = panic "tcPatSynBuilderBind"  -- Both cases dealt with
+#endif
   where
     mb_match_group
        = case dir of

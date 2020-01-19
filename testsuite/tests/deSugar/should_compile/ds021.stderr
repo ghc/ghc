@@ -1,0 +1,4 @@
+
+ds021.hs:8:11: warning: [-Woverlapping-patterns (in -Wdefault)]
+    Pattern match is redundant
+    In an equation for ‘f’: f x y z | False = ...
