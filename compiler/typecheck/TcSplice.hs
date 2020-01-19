@@ -644,7 +644,7 @@ runAnnotation target expr = do
               ; wrapper <- instCall AnnOrigin [expr_ty] [mkClassPred data_class [expr_ty]]
               ; let specialised_to_annotation_wrapper_expr
                       = L loc (mkHsWrap wrapper
-                                 (HsVar noExtField (L loc to_annotation_wrapper_id)))
+                                 (HsVar noExtField (L (noAnnSrcSpan loc) to_annotation_wrapper_id)))
               ; return (L loc (HsApp noExtField
                                 specialised_to_annotation_wrapper_expr expr'))
                                 })

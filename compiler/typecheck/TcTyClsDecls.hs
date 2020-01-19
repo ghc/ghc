@@ -2526,7 +2526,7 @@ tcFamTyPats fam_tc hs_pats
   where
     fam_name  = tyConName fam_tc
     fam_arity = tyConArity fam_tc
-    lhs_fun   = noLoc (HsTyVar noExtField NotPromoted (noLoc fam_name))
+    lhs_fun   = noLoc (HsTyVar noExtField NotPromoted (noLocA fam_name))
 
 unravelFamInstPats :: TcType -> [TcType]
 -- Decompose fam_app to get the argument patterns
@@ -4275,7 +4275,7 @@ fieldTypeMisMatch field_name con1 con2
   = sep [text "Constructors" <+> ppr con1 <+> text "and" <+> ppr con2,
          text "give different types for field", quotes (ppr field_name)]
 
-dataConCtxtName :: [Located Name] -> SDoc
+dataConCtxtName :: [LocatedA Name] -> SDoc
 dataConCtxtName [con]
    = text "In the definition of data constructor" <+> quotes (ppr con)
 dataConCtxtName con

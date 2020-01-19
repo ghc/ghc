@@ -458,6 +458,9 @@ instance HasLoc thing => HasLoc (HsWildCardBndrs a thing) where
 instance HasLoc (Located a) where
   loc (L l _) = l
 
+instance HasLoc (LocatedA a) where
+  loc (L la _) = locA la
+
 instance HasLoc a => HasLoc [a] where
   loc [] = noSrcSpan
   loc xs = foldl1' combineSrcSpans $ map loc xs
@@ -485,7 +488,7 @@ original datacon name
 See also Note [Data Constructor Naming]
 -}
 class HasRealDataConName p where
-  getRealDataCon :: XRecordCon p -> Located (IdP p) -> Located (IdP p)
+  getRealDataCon :: XRecordCon p -> LocatedA (IdP p) -> LocatedA (IdP p)
 
 instance HasRealDataConName GhcRn where
   getRealDataCon _ n = n
@@ -559,6 +562,10 @@ instance ToHie (Context (Located Name)) where
             span
             []]
       _ -> pure []
+
+instance (ToHie (Context (Located a)))
+       => ToHie (Context (LocatedA a)) where
+  toHie (C ci (L la a)) = toHie (C ci (L (locA la) a))
 
 -- | Dummy instances - never called
 instance ToHie (TScoped (LHsSigWcType GhcTc)) where
@@ -652,6 +659,7 @@ instance HasType (LHsExpr GhcTc) where
         _              -> True
 
 instance ( ToHie (Context (Located (IdP a)))
+         , ToHie (Context (LocatedA (IdP a)))
          , ToHie (MatchGroup a (LHsExpr a))
          , ToHie (PScoped (LPat a))
          , ToHie (GRHSs a (LHsExpr a))
@@ -706,13 +714,13 @@ instance ( ToHie (Context (Located (IdP a)))
         ]
         where
           lhsScope = combineScopes varScope detScope
-          varScope = mkLScope var
+          varScope = mkLScopeA var
           detScope = case dets of
-            (PrefixCon args) -> foldr combineScopes NoScope $ map mkLScope args
-            (InfixCon a b) -> combineScopes (mkLScope a) (mkLScope b)
+            (PrefixCon args) -> foldr combineScopes NoScope $ map mkLScopeA args
+            (InfixCon a b) -> combineScopes (mkLScopeA a) (mkLScopeA b)
             (RecCon r) -> foldr go NoScope r
           go (RecordPatSynField a b) c = combineScopes c
-            $ combineScopes (mkLScope a) (mkLScope b)
+            $ combineScopes (mkLScopeA a) (mkLScopeA b)
           detSpan = case detScope of
             LocalScope a -> Just a
             _ -> Nothing
@@ -1339,7 +1347,7 @@ instance ToHie (RScoped (LFamilyResultSig GhcRn)) where
         ]
       XFamilyResultSig _ -> []
 
-instance ToHie (Located (FunDep (Located Name))) where
+instance ToHie (Located (FunDep (LocatedA Name))) where
   toHie (L span fd@(lhs, rhs)) = concatM $
     [ makeNode fd span
     , toHie $ map (C Use) lhs
@@ -1665,7 +1673,7 @@ instance ToHie PendingRnSplice where
 instance ToHie PendingTcSplice where
   toHie _ = pure []
 
-instance ToHie (LBooleanFormula (Located Name)) where
+instance ToHie (LBooleanFormula (LocatedA Name)) where
   toHie (L span form) = concatM $ makeNode form span : case form of
       Var a ->
         [ toHie $ C Use a

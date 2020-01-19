@@ -19,6 +19,7 @@ import TyCoRep
 import Type
 import Var
 import VarEnv
+import GHC.Hs.Extension
 
 import GHC.Iface.Ext.Types
 
@@ -417,6 +418,9 @@ mkScope _ = NoScope
 
 mkLScope :: Located a -> Scope
 mkLScope = mkScope . getLoc
+
+mkLScopeA :: LocatedA a -> Scope
+mkLScopeA = mkScope . locA . getLoc
 
 combineScopes :: Scope -> Scope -> Scope
 combineScopes ModuleScope _ = ModuleScope

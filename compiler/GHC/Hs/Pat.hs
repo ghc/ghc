@@ -87,7 +87,7 @@ data Pat p
 
        -- AZ:TODO above comment needs to be updated
   | VarPat      (XVarPat p)
-                (Located (IdP p))  -- ^ Variable Pattern
+                (LocatedA (IdP p))  -- ^ Variable Pattern
 
                              -- See Note [Located RdrNames] in GHC.Hs.Expr
   | LazyPat     (XLazyPat p)
@@ -97,7 +97,7 @@ data Pat p
     -- For details on above see note [Api annotations] in ApiAnnotation
 
   | AsPat       (XAsPat p)
-                (Located (IdP p)) (LPat p)    -- ^ As pattern
+                (LocatedA (IdP p)) (LPat p)   -- ^ As pattern
     -- ^ - 'ApiAnnotation.AnnKeywordId' : 'ApiAnnotation.AnnAt'
 
     -- For details on above see note [Api annotations] in ApiAnnotation
@@ -171,13 +171,13 @@ data Pat p
 
         ------------ Constructor patterns ---------------
   | ConPatIn    (XConPatIn p)
-                (Located (IdP p))
+                (LocatedA (IdP p))
                 (HsConPatDetails p)
     -- ^ Constructor Pattern In
 
   | ConPatOut {
         pat_o_ext   :: XConPatOut p,
-        pat_con     :: Located ConLike,
+        pat_con     :: LocatedA ConLike,
         pat_arg_tys :: [Type],          -- The universal arg types, 1-1 with the universal
                                         -- tyvars of the constructor/pattern synonym
                                         --   Use (conLikeResTy pat_con pat_arg_tys) to get
@@ -240,7 +240,7 @@ data Pat p
 
   -- For details on above see note [Api annotations] in ApiAnnotation
   | NPlusKPat       (XNPlusKPat p)           -- Type of overall pattern
-                    (Located (IdP p))        -- n+k pattern
+                    (LocatedA (IdP p))       -- n+k pattern
                     (Located (HsOverLit p))  -- It'll always be an HsIntegral
                     (HsOverLit p)       -- See Note [NPlusK patterns] in TcPat
                      -- NB: This could be (PostTc ...), but that induced a
@@ -616,7 +616,7 @@ mkPrefixConPat :: DataCon ->
 -- Make a vanilla Prefix constructor pattern
 mkPrefixConPat dc pats tys
   = noLoc $ ConPatOut { pat_o_ext = noExtField
-                      , pat_con = noLoc (RealDataCon dc)
+                      , pat_con = noLocA (RealDataCon dc)
                       , pat_tvs = []
                       , pat_dicts = []
                       , pat_binds = emptyTcEvBinds

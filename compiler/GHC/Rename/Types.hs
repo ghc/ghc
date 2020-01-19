@@ -151,7 +151,7 @@ rnHsWcType ctxt (HsWC { hswc_body = hs_ty })
        ; return (sig_ty', fvs) }
 rnHsWcType _ (XHsWildCardBndrs nec) = noExtCon nec
 
-rnWcBody :: HsDocContext -> [Located RdrName] -> LHsType GhcPs
+rnWcBody :: HsDocContext -> [LocatedA RdrName] -> LHsType GhcPs
          -> RnM ([Name], LHsType GhcRn, FreeVars)
 rnWcBody ctxt nwc_rdrs hs_ty
   = do { nwcs <- mapM newLocalBndrRn nwc_rdrs
@@ -266,7 +266,7 @@ extractFilteredRdrTyVarsDups hs_ty = filterInScopeM (extractHsTyRdrTyVarsDups hs
 -- FreeKiTyVars in the argument and returns them in a separate list.
 -- When the extension is disabled, the function returns the argument
 -- and empty list.  See Note [Renaming named wild cards]
-partition_nwcs :: FreeKiTyVars -> RnM ([Located RdrName], FreeKiTyVars)
+partition_nwcs :: FreeKiTyVars -> RnM ([LocatedA RdrName], FreeKiTyVars)
 partition_nwcs free_vars
   = do { wildcards_enabled <- xoptM LangExt.NamedWildCards
        ; return $
@@ -274,7 +274,7 @@ partition_nwcs free_vars
            then partition is_wildcard free_vars
            else ([], free_vars) }
   where
-     is_wildcard :: Located RdrName -> Bool
+     is_wildcard :: LocatedA RdrName -> Bool
      is_wildcard rdr = startsWithUnderscore (rdrNameOcc (unLoc rdr))
 
 {- Note [Renaming named wild cards]
@@ -335,7 +335,7 @@ rnImplicitBndrs bind_free_tvs
          vcat [ ppr fvs_with_dups, ppr fvs, ppr real_fvs ]
 
        ; loc <- getSrcSpanM
-       ; vars <- mapM (newLocalBndrRn . L loc . unLoc) real_fvs
+       ; vars <- mapM (newLocalBndrRn . L (noAnnSrcSpan loc) . unLoc) real_fvs
 
        ; bindLocalNamesFV vars $
          thing_inside vars }
@@ -515,7 +515,7 @@ rnHsTyKi env (HsTyVar _ ip (L loc rdr_name))
        ; return (HsTyVar noExtField ip (L loc name), unitFV name) }
 
 rnHsTyKi env ty@(HsOpTy _ ty1 l_op ty2)
-  = setSrcSpan (getLoc l_op) $
+  = setSrcSpan (getLocA l_op) $
     do  { (l_op', fvs1) <- rnHsTyOp env ty l_op
         ; fix   <- lookupTyFixityRn l_op'
         ; (ty1', fvs2) <- rnLHsTyKi env ty1
@@ -657,7 +657,7 @@ rnTyVar env rdr_name
        ; checkNamedWildCard env name
        ; return name }
 
-rnLTyVar :: Located RdrName -> RnM (Located Name)
+rnLTyVar :: LocatedA RdrName -> RnM (LocatedA Name)
 -- Called externally; does not deal with wildards
 rnLTyVar (L loc rdr_name)
   = do { tyvar <- lookupTypeOccRn rdr_name
@@ -665,8 +665,8 @@ rnLTyVar (L loc rdr_name)
 
 --------------
 rnHsTyOp :: Outputable a
-         => RnTyKiEnv -> a -> Located RdrName
-         -> RnM (Located Name, FreeVars)
+         => RnTyKiEnv -> a -> LocatedA RdrName
+         -> RnM (LocatedA Name, FreeVars)
 rnHsTyOp env overall_ty (L loc op)
   = do { ops_ok <- xoptM LangExt.TypeOperators
        ; op' <- rnTyVar env op
@@ -788,7 +788,7 @@ bindSigTyVarsFV tvs thing_inside
 -- | Simply bring a bunch of RdrNames into scope. No checking for
 -- validity, at all. The binding location is taken from the location
 -- on each name.
-bindLRdrNames :: [Located RdrName]
+bindLRdrNames :: [LocatedA RdrName]
               -> ([Name] -> RnM (a, FreeVars))
               -> RnM (a, FreeVars)
 bindLRdrNames rdrs thing_inside
@@ -802,7 +802,7 @@ bindHsQTyVars :: forall a b.
               -> Maybe SDoc         -- Just d => check for unused tvs
                                     --   d is a phrase like "in the type ..."
               -> Maybe a            -- Just _  => an associated type decl
-              -> [Located RdrName]  -- Kind variables from scope, no dups
+              -> [LocatedA RdrName] -- Kind variables from scope, no dups
               -> (LHsQTyVars GhcPs)
               -> (LHsQTyVars GhcRn -> Bool -> RnM (b, FreeVars))
                   -- The Bool is True <=> all kind variables used in the
@@ -823,7 +823,7 @@ bindHsQTyVars doc mb_in_doc mb_assoc body_kv_occs hsq_bndrs thing_inside
 
        ; let -- See Note [bindHsQTyVars examples] for what
              -- all these various things are doing
-             bndrs, kv_occs, implicit_kvs :: [Located RdrName]
+             bndrs, kv_occs, implicit_kvs :: [LocatedA RdrName]
              bndrs        = map hsLTyVarLocName hs_tv_bndrs
              kv_occs      = nubL (bndr_kv_occs ++ body_kv_occs)
                                  -- Make sure to list the binder kvs before the
@@ -850,9 +850,9 @@ bindHsQTyVars doc mb_in_doc mb_assoc body_kv_occs hsq_bndrs thing_inside
                       all_bound_on_lhs } }
 
   where
-    filter_occs :: [Located RdrName]   -- Bound here
-                -> [Located RdrName]   -- Potential implicit binders
-                -> [Located RdrName]   -- Final implicit binders
+    filter_occs :: [LocatedA RdrName]   -- Bound here
+                -> [LocatedA RdrName]   -- Potential implicit binders
+                -> [LocatedA RdrName]   -- Final implicit binders
     -- Filter out any potential implicit binders that are either
     -- already in scope, or are explicitly bound in the same HsQTyVars
     filter_occs bndrs occs
@@ -1007,7 +1007,7 @@ bindLHsTyVarBndr doc mb_assoc (L loc (KindedTyVar x lrdr@(L lv _) kind))
 
 bindLHsTyVarBndr _ _ (L _ (XTyVarBndr nec)) _ = noExtCon nec
 
-newTyVarNameRn :: Maybe a -> Located RdrName -> RnM Name
+newTyVarNameRn :: Maybe a -> LocatedA RdrName -> RnM Name
 newTyVarNameRn mb_assoc (L loc rdr)
   = do { rdr_env <- getLocalRdrEnv
        ; case (mb_assoc, lookupLocalRdrEnv rdr_env rdr) of
@@ -1246,7 +1246,7 @@ mkOpFormRn arg1 op fix arg2                     -- Default case, no rearrangment
 
 
 --------------------------------------
-mkConOpPatRn :: Located Name -> Fixity -> LPat GhcRn -> LPat GhcRn
+mkConOpPatRn :: LocatedA Name -> Fixity -> LPat GhcRn -> LPat GhcRn
              -> RnM (Pat GhcRn)
 
 mkConOpPatRn op2 fix2 p1@(L loc (ConPatIn x op1 (InfixCon p11 p12))) p2
@@ -1575,7 +1575,7 @@ type checking. While viable, this would mean we'd end up accepting this:
 -- These lists are guaranteed to preserve left-to-right ordering of
 -- the types the variables were extracted from. See also
 -- Note [Ordering of implicit variables].
-type FreeKiTyVars = [Located RdrName]
+type FreeKiTyVars = [LocatedA RdrName]
 
 -- | A 'FreeKiTyVars' list that is allowed to have duplicate variables.
 type FreeKiTyVarsWithDups = FreeKiTyVars
@@ -1661,7 +1661,7 @@ extractHsTyVarBndrsKVs tv_bndrs
 -- Returns the free kind variables in a type family result signature, returning
 -- variable occurrences in left-to-right order.
 -- See Note [Ordering of implicit variables].
-extractRdrKindSigVars :: LFamilyResultSig GhcPs -> [Located RdrName]
+extractRdrKindSigVars :: LFamilyResultSig GhcPs -> [LocatedA RdrName]
 extractRdrKindSigVars (L _ resultSig)
   | KindSig _ k                          <- resultSig = extractHsTyRdrTyVars k
   | TyVarSig _ (L _ (KindedTyVar _ _ k)) <- resultSig = extractHsTyRdrTyVars k
@@ -1751,7 +1751,7 @@ extract_hs_tv_bndrs tv_bndrs acc_vars body_vars
     bndr_vars = extract_hs_tv_bndrs_kvs tv_bndrs
     tv_bndr_rdrs = map hsLTyVarLocName tv_bndrs
 
-extract_hs_tv_bndrs_kvs :: [LHsTyVarBndr GhcPs] -> [Located RdrName]
+extract_hs_tv_bndrs_kvs :: [LHsTyVarBndr GhcPs] -> [LocatedA RdrName]
 -- Returns the free kind variables of any explicitly-kinded binders, returning
 -- variable occurrences in left-to-right order.
 -- See Note [Ordering of implicit variables].
@@ -1763,8 +1763,8 @@ extract_hs_tv_bndrs_kvs tv_bndrs =
     foldr extract_lty []
           [k | L _ (KindedTyVar _ _ k) <- tv_bndrs]
 
-extract_tv :: Located RdrName
-           -> [Located RdrName] -> [Located RdrName]
+extract_tv :: LocatedA RdrName
+           -> [LocatedA RdrName] -> [LocatedA RdrName]
 extract_tv tv acc =
   if isRdrTyVar (unLoc tv) then tv:acc else acc
 
@@ -1775,8 +1775,8 @@ extract_tv tv acc =
 -- relies on to maintain the left-to-right ordering of implicitly quantified
 -- type variables.
 -- See Note [Ordering of implicit variables].
-nubL :: Eq a => [Located a] -> [Located a]
+nubL :: Eq a => [GenLocated l a] -> [GenLocated l a]
 nubL = nubBy eqLocated
 
-elemRdr :: Located RdrName -> [Located RdrName] -> Bool
+elemRdr :: LocatedA RdrName -> [LocatedA RdrName] -> Bool
 elemRdr x = any (eqLocated x)

@@ -3210,7 +3210,7 @@ clean_pragma prag = canon_ws (map toLower (unprefix prag))
 --
 --   The usual way an 'AddApiAnn' is created is using the 'mj' ("make jump")
 --   function, and then it can be discharged using the 'ams' function.
-data AddApiAnn = AddApiAnn AnnKeywordId SrcSpan deriving (Data,Show,Eq)
+data AddApiAnn = AddApiAnn AnnKeywordId SrcSpan deriving (Data,Show,Eq,Ord)
 
 addAnnotationOnly :: SrcSpan -> AnnKeywordId -> SrcSpan -> P ()
 addAnnotationOnly l a v = P $ \s -> POk s {

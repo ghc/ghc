@@ -93,7 +93,7 @@ rnLExpr = wrapLocFstM rnExpr
 
 rnExpr :: HsExpr GhcPs -> RnM (HsExpr GhcRn, FreeVars)
 
-finishHsVar :: Located Name -> RnM (HsExpr GhcRn, FreeVars)
+finishHsVar :: LocatedA Name -> RnM (HsExpr GhcRn, FreeVars)
 -- Separated from rnExpr because it's also used
 -- when renaming infix expressions
 finishHsVar (L l name)
@@ -112,7 +112,7 @@ rnUnboundVar v
 
         else -- Fail immediately (qualified name)
              do { n <- reportUnboundName v
-                ; return (HsVar noExtField (noLoc n), emptyFVs) } }
+                ; return (HsVar noExtField (noLocA n), emptyFVs) } }
 
 rnExpr (HsVar _ (L l v))
   = do { opt_DuplicateRecordFields <- xoptM LangExt.DuplicateRecordFields
@@ -304,7 +304,7 @@ rnExpr (RecordCon { rcon_con_name = con_id
                            , rcon_con_name = con_lname, rcon_flds = rec_binds' }
                 , fvs `plusFV` plusFVs fvss `addOneFV` con_name) }
   where
-    mk_hs_var l n = HsVar noExtField (L l n)
+    mk_hs_var l n = HsVar noExtField (L (noAnnSrcSpan l) n)
     rn_field (L l fld) = do { (arg', fvs) <- rnLExpr (hsRecFieldArg fld)
                             ; return (L l (fld { hsRecFieldArg = arg' }), fvs) }
 
@@ -980,12 +980,12 @@ lookupStmtNamePoly ctxt name
   = do { rebindable_on <- xoptM LangExt.RebindableSyntax
        ; if rebindable_on
          then do { fm <- lookupOccRn (nameRdrName name)
-                 ; return (HsVar noExtField (noLoc fm), unitFV fm) }
+                 ; return (HsVar noExtField (noLocA fm), unitFV fm) }
          else not_rebindable }
   | otherwise
   = not_rebindable
   where
-    not_rebindable = return (HsVar noExtField (noLoc name), emptyFVs)
+    not_rebindable = return (HsVar noExtField (noLocA name), emptyFVs)
 
 -- | Is this a context where we respect RebindableSyntax?
 -- but ListComp are never rebindable
@@ -1748,7 +1748,7 @@ stmtTreeToStmts monad_names ctxt (StmtTreeApplicative trees) tail tail_fvs = do
              return (unLoc tup, emptyNameSet)
            | otherwise -> do
              ret <- lookupSyntaxName' returnMName
-             let expr = HsApp noExtField (noLoc (HsVar noExtField (noLoc ret))) tup
+             let expr = HsApp noExtField (noLoc (HsVar noExtField (noLocA ret))) tup
              return (expr, emptyFVs)
      return ( ApplicativeArgMany
               { xarg_app_arg_many = noExtField
@@ -2207,7 +2207,7 @@ getMonadFailOp
                       (nlHsApp (noLoc $ syn_expr fromStringExpr)
                                 (noLoc $ syn_expr arg_syn_expr))
         let failAfterFromStringExpr :: HsExpr GhcRn =
-              unLoc $ mkHsLam [noLoc $ VarPat noExtField $ noLoc arg_name] body
+              unLoc $ mkHsLam [noLoc $ VarPat noExtField $ noLocA arg_name] body
         let failAfterFromStringSynExpr :: SyntaxExpr GhcRn =
               mkSyntaxExpr failAfterFromStringExpr
         return (failAfterFromStringSynExpr, failFvs `plusFV` fromStringFvs)

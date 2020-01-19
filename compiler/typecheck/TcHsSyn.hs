@@ -348,7 +348,7 @@ zonkEnvIds (ZonkEnv { ze_id_env = id_env})
   -- It's OK to use nonDetEltsUFM here because we forget the ordering
   -- immediately by creating a TypeEnv
 
-zonkLIdOcc :: ZonkEnv -> Located TcId -> Located Id
+zonkLIdOcc :: ZonkEnv -> LocatedA TcId -> LocatedA Id
 zonkLIdOcc env = mapLoc (zonkIdOcc env)
 
 zonkIdOcc :: ZonkEnv -> TcId -> Id
@@ -658,8 +658,8 @@ zonk_bind _ (PatSynBind _ (XPatSynBind nec)) = noExtCon nec
 zonk_bind _ (XHsBindsLR nec)                 = noExtCon nec
 
 zonkPatSynDetails :: ZonkEnv
-                  -> HsPatSynDetails (Located TcId)
-                  -> HsPatSynDetails (Located Id)
+                  -> HsPatSynDetails (LocatedA TcId)
+                  -> HsPatSynDetails (LocatedA Id)
 zonkPatSynDetails env (PrefixCon as)
   = PrefixCon (map (zonkLIdOcc env) as)
 zonkPatSynDetails env (InfixCon a1 a2)

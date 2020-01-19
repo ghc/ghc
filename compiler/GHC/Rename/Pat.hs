@@ -136,7 +136,7 @@ wrapSrcSpanCps fn (L loc a)
                  unCpsRn (fn a) $ \v ->
                  k (L loc v))
 
-lookupConCps :: Located RdrName -> CpsRn (Located Name)
+lookupConCps :: LocatedA RdrName -> CpsRn (LocatedA Name)
 lookupConCps con_rdr
   = CpsRn (\k -> do { con_name <- lookupLocatedOccRn con_rdr
                     ; (r, fvs) <- k con_name
@@ -218,12 +218,12 @@ matchNameMaker ctxt = LamMk report_unused
 rnHsSigCps :: LHsSigWcType GhcPs -> CpsRn (LHsSigWcType GhcRn)
 rnHsSigCps sig = CpsRn (rnHsSigWcTypeScoped AlwaysBind PatCtx sig)
 
-newPatLName :: NameMaker -> Located RdrName -> CpsRn (Located Name)
+newPatLName :: NameMaker -> LocatedA RdrName -> CpsRn (LocatedA Name)
 newPatLName name_maker rdr_name@(L loc _)
   = do { name <- newPatName name_maker rdr_name
        ; return (L loc name) }
 
-newPatName :: NameMaker -> Located RdrName -> CpsRn Name
+newPatName :: NameMaker -> LocatedA RdrName -> CpsRn Name
 newPatName (LamMk report_unused) rdr_name
   = CpsRn (\ thing_inside ->
         do { name <- newLocalBndrRn rdr_name
@@ -342,7 +342,7 @@ rnPat :: HsMatchContext Name -- for error messages
 rnPat ctxt pat thing_inside
   = rnPats ctxt [pat] (\pats' -> let [pat'] = pats' in thing_inside pat')
 
-applyNameMaker :: NameMaker -> Located RdrName -> RnM (Located Name)
+applyNameMaker :: NameMaker -> LocatedA RdrName -> RnM (LocatedA Name)
 applyNameMaker mk rdr = do { (n, _fvs) <- runCps (newPatLName mk rdr)
                            ; return n }
 
@@ -392,7 +392,7 @@ rnPatAndThen mk (BangPat _ pat) = do { pat' <- rnLPatAndThen mk pat
                                      ; return (BangPat noExtField pat') }
 rnPatAndThen mk (VarPat x (L l rdr))
     = do { loc <- liftCps getSrcSpanM
-         ; name <- newPatName mk (L loc rdr)
+         ; name <- newPatName mk (L (noAnnSrcSpan loc) rdr)
          ; return (VarPat x (L l name)) }
      -- we need to bind pattern variables for view pattern expressions
      -- (e.g. in the pattern (x, x -> y) x needs to be bound in the rhs of the tuple)
@@ -445,8 +445,9 @@ rnPatAndThen mk (NPlusKPat _ rdr (L l lit) _ _ _ )
                                                 -- sense in n + k patterns
        ; minus <- liftCpsFV $ lookupSyntaxName minusName
        ; ge    <- liftCpsFV $ lookupSyntaxName geName
-       ; return (NPlusKPat noExtField (L (nameSrcSpan new_name) new_name)
-                                      (L l lit') lit' ge minus) }
+       ; return (NPlusKPat noExtField
+                              (L (noAnnSrcSpan $ nameSrcSpan new_name) new_name)
+                              (L l lit') lit' ge minus) }
                 -- The Report says that n+k patterns must be in Integral
 
 rnPatAndThen mk (AsPat _ rdr pat)
@@ -507,7 +508,7 @@ rnPatAndThen _ pat = pprPanic "rnLPatAndThen" (ppr pat)
 
 --------------------
 rnConPatAndThen :: NameMaker
-                -> Located RdrName    -- the constructor
+                -> LocatedA RdrName    -- the constructor
                 -> HsConPatDetails GhcPs
                 -> CpsRn (Pat GhcRn)
 
@@ -536,7 +537,7 @@ checkUnusedRecordWildcardCps loc dotdot_names =
                     return (r, fvs) )
 --------------------
 rnHsRecPatsAndThen :: NameMaker
-                   -> Located Name      -- Constructor
+                   -> LocatedA Name      -- Constructor
                    -> HsRecFields GhcPs (LPat GhcPs)
                    -> CpsRn (HsRecFields GhcRn (LPat GhcRn))
 rnHsRecPatsAndThen mk (L _ con)
@@ -547,7 +548,8 @@ rnHsRecPatsAndThen mk (L _ con)
        ; check_unused_wildcard (implicit_binders flds' <$> dd)
        ; return (HsRecFields { rec_flds = flds', rec_dotdot = dd }) }
   where
-    mkVarPat l n = VarPat noExtField (L l n)
+    mkVarPat :: SrcSpan -> IdP GhcPs -> Pat GhcPs -- AZ temp
+    mkVarPat l n = VarPat noExtField (L (noAnnSrcSpan l) n)
     rn_field (L l fld, n') =
       do { arg' <- rnLPatAndThen (nested_mk dd mk n') (hsRecFieldArg fld)
          ; return (L l (fld { hsRecFieldArg = arg' })) }
@@ -631,8 +633,7 @@ rnHsRecFields ctxt mk_arg (HsRecFields { rec_flds = flds, rec_dotdot = dotdot })
                              ; return (L loc (mk_arg loc arg_rdr)) }
                      else return arg
            ; return (L l (HsRecField
-                             { hsRecFieldLbl = (L loc (FieldOcc
-                                                          sel (L ll lbl)))
+                             { hsRecFieldLbl = (L loc (FieldOcc sel (L ll lbl)))
                              , hsRecFieldArg = arg'
                              , hsRecPun      = pun })) }
     rn_fld _ _ (L _ (HsRecField (L _ (XFieldOcc _)) _ _))
@@ -677,7 +678,8 @@ rnHsRecFields ctxt mk_arg (HsRecFields { rec_flds = flds, rec_dotdot = dotdot })
 
            ; addUsedGREs dot_dot_gres
            ; return [ L loc (HsRecField
-                        { hsRecFieldLbl = L loc (FieldOcc sel (L loc arg_rdr))
+                        { hsRecFieldLbl
+                           = L loc (FieldOcc sel (L (noAnnSrcSpan loc) arg_rdr))
                         , hsRecFieldArg = L loc (mk_arg loc arg_rdr)
                         , hsRecPun      = False })
                     | fl <- dot_dot_fields
@@ -744,7 +746,8 @@ rnHsRecUpdFields flds
                      then do { checkErr pun_ok (badPun (L loc lbl))
                                -- Discard any module qualifier (#11662)
                              ; let arg_rdr = mkRdrUnqual (rdrNameOcc lbl)
-                             ; return (L loc (HsVar noExtField (L loc arg_rdr))) }
+                             ; return (L loc (HsVar noExtField
+                                              (L (noAnnSrcSpan loc) arg_rdr))) }
                      else return arg
            ; (arg'', fvs) <- rnLExpr arg'
 
@@ -753,11 +756,12 @@ rnHsRecUpdFields flds
                           Right [sel_name] -> fvs `addOneFV` sel_name
                           Right _       -> fvs
                  lbl' = case sel of
-                          Left sel_name ->
-                                     L loc (Unambiguous sel_name   (L loc lbl))
-                          Right [sel_name] ->
-                                     L loc (Unambiguous sel_name   (L loc lbl))
-                          Right _ -> L loc (Ambiguous   noExtField (L loc lbl))
+                          Left sel_name -> L loc (Unambiguous sel_name
+                                                  (L (noAnnSrcSpan loc) lbl))
+                          Right [sel_name] -> L loc (Unambiguous sel_name
+                                                     (L (noAnnSrcSpan loc) lbl))
+                          Right _ -> L loc (Ambiguous   noExtField
+                                            (L (noAnnSrcSpan loc) lbl))
 
            ; return (L l (HsRecField { hsRecFieldLbl = lbl'
                                      , hsRecFieldArg = arg''

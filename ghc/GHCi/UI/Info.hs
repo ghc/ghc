@@ -326,7 +326,7 @@ processAllTypeCheckedModule tcm = do
     -- | Extract 'Id', 'SrcSpan', and 'Type' for 'LHsBind's
     getTypeLHsBind :: LHsBind GhcTc -> m (Maybe (Maybe Id,SrcSpan,Type))
     getTypeLHsBind (L _spn FunBind{fun_id = pid,fun_matches = MG _ _ _})
-        = pure $ Just (Just (unLoc pid),getLoc pid,varType (unLoc pid))
+        = pure $ Just (Just (unLoc pid),locA $ getLoc pid,varType (unLoc pid))
     getTypeLHsBind _ = pure Nothing
 
     -- | Extract 'Id', 'SrcSpan', and 'Type' for 'LHsExpr's

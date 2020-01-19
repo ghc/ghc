@@ -362,11 +362,12 @@ mkQuasiQuoteExpr :: UntypedSpliceFlavour -> Name -> SrcSpan -> FastString
 -- which is what we must run in a quasi-quote
 mkQuasiQuoteExpr flavour quoter q_span quote
   = L q_span $ HsApp noExtField (L q_span
-             $ HsApp noExtField (L q_span (HsVar noExtField (L q_span quote_selector)))
+             $ HsApp noExtField (L q_span
+                    (HsVar noExtField (L (noAnnSrcSpan q_span) quote_selector)))
                                 quoterExpr)
                     quoteExpr
   where
-    quoterExpr = L q_span $! HsVar noExtField $! (L q_span quoter)
+    quoterExpr = L q_span $! HsVar noExtField $! (L (noAnnSrcSpan q_span) quoter)
     quoteExpr  = L q_span $! HsLit noExtField $! HsString NoSourceText quote
     quote_selector = case flavour of
                        UntypedExpSplice  -> quoteExpName
@@ -379,19 +380,19 @@ rnSplice :: HsSplice GhcPs -> RnM (HsSplice GhcRn, FreeVars)
 -- Not exported...used for all
 rnSplice (HsTypedSplice x hasParen splice_name expr)
   = do  { loc  <- getSrcSpanM
-        ; n' <- newLocalBndrRn (L loc splice_name)
+        ; n' <- newLocalBndrRn (L (noAnnSrcSpan loc) splice_name)
         ; (expr', fvs) <- rnLExpr expr
         ; return (HsTypedSplice x hasParen n' expr', fvs) }
 
 rnSplice (HsUntypedSplice x hasParen splice_name expr)
   = do  { loc  <- getSrcSpanM
-        ; n' <- newLocalBndrRn (L loc splice_name)
+        ; n' <- newLocalBndrRn (L (noAnnSrcSpan loc) splice_name)
         ; (expr', fvs) <- rnLExpr expr
         ; return (HsUntypedSplice x hasParen n' expr', fvs) }
 
 rnSplice (HsQuasiQuote x splice_name quoter q_loc quote)
   = do  { loc  <- getSrcSpanM
-        ; splice_name' <- newLocalBndrRn (L loc splice_name)
+        ; splice_name' <- newLocalBndrRn (L (noAnnSrcSpan loc) splice_name)
 
           -- Rename the quoter; akin to the HsVar case of rnExpr
         ; quoter' <- lookupOccRn quoter

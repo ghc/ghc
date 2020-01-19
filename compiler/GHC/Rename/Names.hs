@@ -668,17 +668,17 @@ getLocalNonValBinders fixity_env
   where
     ValBinds _ _val_binds val_sigs = binds
 
-    for_hs_bndrs :: [Located RdrName]
+    for_hs_bndrs :: [LocatedA RdrName]
     for_hs_bndrs = hsForeignDeclsBinders foreign_decls
 
     -- In a hs-boot file, the value binders come from the
     --  *signatures*, and there should be no foreign binders
-    hs_boot_sig_bndrs = [ L decl_loc (unLoc n)
+    hs_boot_sig_bndrs = [ L (noAnnSrcSpan decl_loc) (unLoc n)
                         | L decl_loc (TypeSig _ ns _) <- val_sigs, n <- ns]
 
       -- the SrcSpan attached to the input should be the span of the
       -- declaration, not just the name
-    new_simple :: Located RdrName -> RnM AvailInfo
+    new_simple :: LocatedA RdrName -> RnM AvailInfo
     new_simple rdr_name = do{ nm <- newTopSrcBinder rdr_name
                             ; return (avail nm) }
 
@@ -750,7 +750,7 @@ getLocalNonValBinders fixity_env
              -- See (1) above
              L loc cls_rdr <- MaybeT $ pure $ getLHsInstDeclClass_maybe inst_ty
              -- See (2) above
-             MaybeT $ setSrcSpan loc $ lookupGlobalOccRn_maybe cls_rdr
+             MaybeT $ setSrcSpan (locA loc) $ lookupGlobalOccRn_maybe cls_rdr
            -- Assuming the previous step succeeded, process any associated data
            -- family instances. If the previous step failed, bail out.
            case mb_cls_nm of
@@ -784,7 +784,7 @@ getLocalNonValBinders _ (XHsGroup nec) = noExtCon nec
 newRecordSelector :: Bool -> [Name] -> LFieldOcc GhcPs -> RnM FieldLabel
 newRecordSelector _ [] _ = error "newRecordSelector: datatype has no constructors!"
 newRecordSelector _ _ (L _ (XFieldOcc nec)) = noExtCon nec
-newRecordSelector overload_ok (dc:_) (L loc (FieldOcc _ (L _ fld)))
+newRecordSelector overload_ok (dc:_) (L _ (FieldOcc _ (L loc fld)))
   = do { selName <- newTopSrcBinder $ L loc $ field
        ; return $ qualFieldLbl { flSelector = selName } }
   where
@@ -1147,7 +1147,7 @@ findChildren env n = lookupNameEnv env n `orElse` []
 
 lookupChildren :: [Either Name FieldLabel] -> [LIEWrappedName RdrName]
                -> MaybeErr [LIEWrappedName RdrName]   -- The ones for which the lookup failed
-                           ([Located Name], [Located FieldLabel])
+                           ([LocatedA Name], [Located FieldLabel])
 -- (lookupChildren all_kids rdr_items) maps each rdr_item to its
 -- corresponding Name all_kids, if the former exists
 -- The matching is done by FastString, not OccName, so that
@@ -1159,18 +1159,22 @@ lookupChildren all_kids rdr_items
   | null fails
   = Succeeded (fmap concat (partitionEithers oks))
        -- This 'fmap concat' trickily applies concat to the /second/ component
-       -- of the pair, whose type is ([Located Name], [[Located FieldLabel]])
+       -- of the pair, whose type is ([LocatedA Name], [[Located FieldLabel]])
   | otherwise
   = Failed fails
   where
     mb_xs = map doOne rdr_items
     fails = [ bad_rdr | Failed bad_rdr <- mb_xs ]
     oks   = [ ok      | Succeeded ok   <- mb_xs ]
-    oks :: [Either (Located Name) [Located FieldLabel]]
+    oks :: [Either (LocatedA Name) [Located FieldLabel]]
 
+    doOne :: Located (IEWrappedName RdrName)
+                      -> MaybeErr
+                           (Located (IEWrappedName RdrName))
+                           (Either (LocatedA Name) [Located FieldLabel]) -- AZ temp
     doOne item@(L l r)
        = case (lookupFsEnv kid_env . occNameFS . rdrNameOcc . ieWrappedName) r of
-           Just [Left n]            -> Succeeded (Left (L l n))
+           Just [Left n]            -> Succeeded (Left (L (noAnnSrcSpan l) n))
            Just rs | all isRight rs -> Succeeded (Right (map (L l) (rights rs)))
            _                        -> Failed    item
 
@@ -1536,26 +1540,27 @@ getMinimalImports = mapM mk_minimal
     -- we want to say "T(..)", but if we're importing only a subset we want
     -- to say "T(A,B,C)".  So we have to find out what the module exports.
     to_ie _ (Avail n)
-       = [IEVar noExtField (to_ie_post_rn $ noLoc n)]
+       = [IEVar noExtField (to_ie_post_rn $ noLocA n)]
     to_ie _ (AvailTC n [m] [])
-       | n==m = [IEThingAbs noExtField (to_ie_post_rn $ noLoc n)]
+       | n==m = [IEThingAbs noExtField (to_ie_post_rn $ noLocA n)]
     to_ie iface (AvailTC n ns fs)
       = case [(xs,gs) |  AvailTC x xs gs <- mi_exports iface
                  , x == n
                  , x `elem` xs    -- Note [Partial export]
                  ] of
-           [xs] | all_used xs -> [IEThingAll noExtField (to_ie_post_rn $ noLoc n)]
+           [xs] | all_used xs ->
+                   [IEThingAll noExtField (to_ie_post_rn $ noLocA n)]
                 | otherwise   ->
-                   [IEThingWith noExtField (to_ie_post_rn $ noLoc n) NoIEWildcard
-                                (map (to_ie_post_rn . noLoc) (filter (/= n) ns))
+                   [IEThingWith noExtField (to_ie_post_rn $ noLocA n) NoIEWildcard
+                                (map (to_ie_post_rn . noLocA) (filter (/= n) ns))
                                 (map noLoc fs)]
                                           -- Note [Overloaded field import]
            _other | all_non_overloaded fs
-                           -> map (IEVar noExtField . to_ie_post_rn_var . noLoc) $ ns
+                           -> map (IEVar noExtField . to_ie_post_rn_var . noLocA) $ ns
                                  ++ map flSelector fs
                   | otherwise ->
-                      [IEThingWith noExtField (to_ie_post_rn $ noLoc n) NoIEWildcard
-                                (map (to_ie_post_rn . noLoc) (filter (/= n) ns))
+                      [IEThingWith noExtField (to_ie_post_rn $ noLocA n) NoIEWildcard
+                                (map (to_ie_post_rn . noLocA) (filter (/= n) ns))
                                 (map noLoc fs)]
         where
 
@@ -1590,16 +1595,16 @@ printMinimalImports imports_w_usage
         basefn = moduleNameString (moduleName this_mod) ++ ".imports"
 
 
-to_ie_post_rn_var :: (HasOccName name) => Located name -> LIEWrappedName name
+to_ie_post_rn_var :: (HasOccName name) => LocatedA name -> LIEWrappedName name
 to_ie_post_rn_var (L l n)
-  | isDataOcc $ occName n = L l (IEPattern (L l n))
-  | otherwise             = L l (IEName    (L l n))
+  | isDataOcc $ occName n = L (locA l) (IEPattern (L l n))
+  | otherwise             = L (locA l) (IEName    (L l n))
 
 
-to_ie_post_rn :: (HasOccName name) => Located name -> LIEWrappedName name
+to_ie_post_rn :: (HasOccName name) => LocatedA name -> LIEWrappedName name
 to_ie_post_rn (L l n)
-  | isTcOcc occ && isSymOcc occ = L l (IEType (L l n))
-  | otherwise                   = L l (IEName (L l n))
+  | isTcOcc occ && isSymOcc occ = L (locA l) (IEType (L l n))
+  | otherwise                   = L (locA l) (IEName (L l n))
   where occ = occName n
 
 {-
@@ -1722,7 +1727,7 @@ dodgyMsgInsert :: forall p . IdP (GhcPass p) -> IE (GhcPass p)
 dodgyMsgInsert tc = IEThingAll noExtField ii
   where
     ii :: LIEWrappedName (IdP (GhcPass p))
-    ii = noLoc (IEName $ noLoc tc)
+    ii = noLoc (IEName $ noLocA tc)
 
 
 addDupDeclErr :: [GlobalRdrElt] -> TcRn ()

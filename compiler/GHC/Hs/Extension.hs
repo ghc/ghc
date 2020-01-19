@@ -27,7 +27,7 @@ import Name
 import RdrName
 import Var
 import Outputable
-import SrcLoc (Located)
+import SrcLoc (Located, GenLocated(..), SrcSpan, noSrcSpan)
 import Lexer (AddApiAnn)
 
 import Data.Kind
@@ -138,7 +138,39 @@ code that consumes unused extension constructors.
 data ApiAnn = ApiAnn [AddApiAnn] -- ^ Annotations added by the Parser
             | ApiAnnNotUsed      -- ^ No Annotation for generated code,
                                  -- e.g. from TH, deriving, etc.
-        deriving (Data, Show, Eq)
+        deriving (Data, Show, Eq, Ord)
+
+type LocatedA = GenLocated SrcSpanAnn
+
+data SrcSpanAnn = SrcSpanAnn { ann :: ApiAnn, locA :: SrcSpan }
+        deriving (Data, Show, Eq, Ord)
+
+instance Outputable SrcSpanAnn where
+  ppr (SrcSpanAnn a l) = text "SrcSpanAnn" <+> ppr a <+> ppr l
+
+reAnn :: [AddApiAnn] -> Located a -> LocatedA a
+reAnn anns (L l a) = L (SrcSpanAnn (ApiAnn anns) l) a
+
+noLocA :: a -> LocatedA a
+noLocA = L (SrcSpanAnn ApiAnnNotUsed noSrcSpan)
+
+getLocA :: LocatedA a -> SrcSpan
+getLocA (L (SrcSpanAnn _ l) _) = l
+
+getLocAnn :: Located a  -> SrcSpanAnn
+getLocAnn (L l _) = SrcSpanAnn ApiAnnNotUsed l
+
+noAnnSrcSpan :: SrcSpan -> SrcSpanAnn
+noAnnSrcSpan l = SrcSpanAnn ApiAnnNotUsed l
+
+noSrcSpanA :: SrcSpanAnn
+noSrcSpanA = noAnnSrcSpan noSrcSpan
+
+reLoc :: LocatedA a -> Located a
+reLoc (L (SrcSpanAnn _ l) a) = L l a
+
+reLocA :: Located a -> LocatedA a
+reLocA (L l a) = (L (SrcSpanAnn ApiAnnNotUsed l) a)
 
 noAnn :: ApiAnn
 noAnn = ApiAnnNotUsed

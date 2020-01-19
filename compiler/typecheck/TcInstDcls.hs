@@ -569,7 +569,7 @@ tcTyFamInstDecl mb_clsinfo (L loc decl@(TyFamInstDecl { tfid_eqn = eqn }))
 
          -- (1) do the work of verifying the synonym group
        ; co_ax_branch <- tcTyFamInstEqn fam_tc mb_clsinfo
-                                        (L (getLoc fam_lname) eqn)
+                                        (L (locA $ getLoc fam_lname) eqn)
 
 
          -- (2) check for validity
@@ -1172,7 +1172,7 @@ addDFunPrags dfun_id sc_meth_ids
    is_newtype  = isNewTyCon clas_tc
 
 wrapId :: HsWrapper -> IdP (GhcPass id) -> HsExpr (GhcPass id)
-wrapId wrapper id = mkHsWrap wrapper (HsVar noExtField (noLoc id))
+wrapId wrapper id = mkHsWrap wrapper (HsVar noExtField (noLocA id))
 
 {- Note [Typechecking plan for instance declarations]
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
@@ -1687,7 +1687,8 @@ tcMethodBody clas tyvars dfun_ev_vars inst_tys
                                             mkMethIds clas tyvars dfun_ev_vars
                                                       inst_tys sel_id
 
-       ; let lm_bind = meth_bind { fun_id = L bndr_loc (idName local_meth_id) }
+       ; let lm_bind = meth_bind { fun_id = L (noAnnSrcSpan bndr_loc)
+                                                        (idName local_meth_id) }
                        -- Substitute the local_meth_name for the binder
                        -- NB: the binding is always a FunBind
 
@@ -1910,7 +1911,7 @@ mkDefMethBind clas inst_tys sel_id dm_name
                  -- Copy the inline pragma (if any) from the default method
                  -- to this version. Note [INLINE and default methods]
 
-              fn   = noLoc (idName sel_id)
+              fn   = noLocA (idName sel_id)
               visible_inst_tys = [ ty | (tcb, ty) <- tyConBinders (classTyCon clas) `zip` inst_tys
                                       , tyConBinderArgFlag tcb /= Inferred ]
               rhs  = foldl' mk_vta (nlHsVar dm_name) visible_inst_tys

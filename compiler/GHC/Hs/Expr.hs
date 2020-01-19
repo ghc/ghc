@@ -132,7 +132,7 @@ mkSyntaxExpr expr = SyntaxExpr { syn_expr      = expr
 -- | Make a 'SyntaxExpr Name' (the "rn" is because this is used in the
 -- renamer), missing its HsWrappers.
 mkRnSyntaxExpr :: Name -> SyntaxExpr GhcRn
-mkRnSyntaxExpr name = mkSyntaxExpr $ HsVar noExtField $ noLoc name
+mkRnSyntaxExpr name = mkSyntaxExpr $ HsVar noExtField $ noLocA name
   -- don't care about filling in syn_arg_wraps because we're clearly
   -- not past the typechecker
 
@@ -191,7 +191,7 @@ is Less Cool because
 -- | A Haskell expression.
 data HsExpr p
   = HsVar     (XVar p)
-              (Located (IdP p)) -- ^ Variable
+              (LocatedA (IdP p)) -- ^ Variable
 
                              -- See Note [Located RdrNames]
 
@@ -388,7 +388,7 @@ data HsExpr p
   -- For details on above see note [Api annotations] in ApiAnnotation
   | RecordCon
       { rcon_ext      :: XRecordCon p
-      , rcon_con_name :: Located (IdP p)    -- The constructor name;
+      , rcon_con_name :: LocatedA (IdP p)   -- The constructor name;
                                             --  not used after type checking
       , rcon_flds     :: HsRecordBinds p }  -- The fields
 
@@ -2637,7 +2637,7 @@ pp_dotdot = text " .. "
 -- Context of a pattern match. This is more subtle than it would seem. See Note
 -- [Varieties of pattern matches].
 data HsMatchContext id -- Not an extensible tag
-  = FunRhs { mc_fun        :: Located id    -- ^ function binder of @f@
+  = FunRhs { mc_fun        :: LocatedA id   -- ^ function binder of @f@
            , mc_fixity     :: LexicalFixity -- ^ fixing of @f@
            , mc_strictness :: SrcStrictness -- ^ was @f@ banged?
                                             -- See Note [FunBind vs PatBind]

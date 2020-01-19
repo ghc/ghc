@@ -184,9 +184,9 @@ instance OutputableBndrId p
 -- primarily for accurate pretty printing of ParsedSource, and API Annotation
 -- placement.
 data IEWrappedName name
-  = IEName    (Located name)  -- ^ no extra
-  | IEPattern (Located name)  -- ^ pattern X
-  | IEType    (Located name)  -- ^ type (:+:)
+  = IEName    (LocatedA name)  -- ^ no extra
+  | IEPattern (LocatedA name)  -- ^ pattern X
+  | IEType    (LocatedA name)  -- ^ type (:+:)
   deriving (Eq,Data)
 
 -- | Located name with possible adornment
@@ -314,16 +314,20 @@ ieNames (IEDoc            {})     = []
 ieNames (IEDocNamed       {})     = []
 ieNames (XIE nec) = noExtCon nec
 
+ieWrappedLName :: IEWrappedName name -> LocatedA name
+ieWrappedLName (IEName    ln) = ln
+ieWrappedLName (IEPattern ln) = ln
+ieWrappedLName (IEType    ln) = ln
+
 ieWrappedName :: IEWrappedName name -> name
-ieWrappedName (IEName    (L _ n)) = n
-ieWrappedName (IEPattern (L _ n)) = n
-ieWrappedName (IEType    (L _ n)) = n
+ieWrappedName = unLoc . ieWrappedLName
+
 
 lieWrappedName :: LIEWrappedName name -> name
 lieWrappedName (L _ n) = ieWrappedName n
 
-ieLWrappedName :: LIEWrappedName name -> Located name
-ieLWrappedName (L l n) = L l (ieWrappedName n)
+ieLWrappedName :: LIEWrappedName name -> LocatedA name
+ieLWrappedName (L _ n) = ieWrappedLName n
 
 replaceWrappedName :: IEWrappedName name1 -> name2 -> IEWrappedName name2
 replaceWrappedName (IEName    (L l _)) n = IEName    (L l n)

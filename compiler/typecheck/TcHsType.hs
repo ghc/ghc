@@ -161,7 +161,7 @@ checking until step (3).
 ************************************************************************
 -}
 
-funsSigCtxt :: [Located Name] -> UserTypeCtxt
+funsSigCtxt :: [LocatedA Name] -> UserTypeCtxt
 -- Returns FunSigCtxt, with no redundant-context-reporting,
 -- form a list of located names
 funsSigCtxt (L _ name1 : _) = FunSigCtxt name1 False
@@ -193,7 +193,7 @@ tcHsSigWcType :: UserTypeCtxt -> LHsSigWcType GhcRn -> TcM Type
 -- already checked this, so we can simply ignore it.
 tcHsSigWcType ctxt sig_ty = tcHsSigType ctxt (dropWildCards sig_ty)
 
-kcClassSigType :: SkolemInfo -> [Located Name] -> LHsSigType GhcRn -> TcM ()
+kcClassSigType :: SkolemInfo -> [LocatedA Name] -> LHsSigType GhcRn -> TcM ()
 kcClassSigType skol_info names sig_ty
   = discardResult $
     tcClassSigType skol_info names sig_ty
@@ -207,7 +207,7 @@ kcClassSigType skol_info names sig_ty
   --     meth :: forall k. Proxy (a :: k) -> ()
   -- Note that k is local to meth -- this is hogwash.
 
-tcClassSigType :: SkolemInfo -> [Located Name] -> LHsSigType GhcRn -> TcM Type
+tcClassSigType :: SkolemInfo -> [LocatedA Name] -> LHsSigType GhcRn -> TcM Type
 -- Does not do validity checking
 tcClassSigType skol_info names sig_ty
   = addSigCtxt (funsSigCtxt names) (hsSigType sig_ty) $
@@ -1049,11 +1049,15 @@ splitHsAppTys hs_ty
     is_app (HsParTy _ (L _ ty))    = is_app ty
     is_app _                       = False
 
+    go :: LHsType GhcRn
+       -> [HsArg (LHsType GhcRn) (LHsKind GhcRn)]
+       -> (LHsType GhcRn,
+           [HsArg (LHsType GhcRn) (LHsKind GhcRn)]) -- AZ temp
     go (L _  (HsAppTy _ f a))      as = go f (HsValArg a : as)
     go (L _  (HsAppKindTy l ty k)) as = go ty (HsTypeArg l k : as)
     go (L sp (HsParTy _ f))        as = go f (HsArgPar sp : as)
     go (L _  (HsOpTy _ l op@(L sp _) r)) as
-      = ( L sp (HsTyVar noExtField NotPromoted op)
+      = ( L (locA sp) (HsTyVar noExtField NotPromoted op)
         , HsValArg l : HsValArg r : as )
     go f as = (f, as)
 
@@ -2708,7 +2712,7 @@ tcHsQTyVarBndr _ new_tv (KindedTyVar _ (L _ tv_nm) lhs_kind)
 
            _ -> new_tv tv_nm kind }
   where
-    hs_tv = HsTyVar noExtField NotPromoted (noLoc tv_nm)
+    hs_tv = HsTyVar noExtField NotPromoted (noLocA tv_nm)
             -- Used for error messages only
 
 tcHsQTyVarBndr _ _ (XTyVarBndr nec) = noExtCon nec

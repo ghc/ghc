@@ -143,7 +143,7 @@ getInstLoc :: InstDecl (GhcPass p) -> SrcSpan
 getInstLoc = \case
   ClsInstD _ (ClsInstDecl { cid_poly_ty = ty }) -> getLoc (hsSigType ty)
   DataFamInstD _ (DataFamInstDecl
-    { dfid_eqn = HsIB { hsib_body = FamEqn { feqn_tycon = L l _ }}}) -> l
+    { dfid_eqn = HsIB { hsib_body = FamEqn { feqn_tycon = L l _ }}}) -> locA l
   TyFamInstD _ (TyFamInstDecl
     -- Since CoAxioms' Names refer to the whole line for type family instances
     -- in particular, we need to dig a bit deeper to pull out the entire
@@ -168,7 +168,8 @@ subordinates instMap decl = case decl of
     DataFamInstDecl { dfid_eqn = HsIB { hsib_body =
       FamEqn { feqn_tycon = L l _
              , feqn_rhs   = defn }}} <- unLoc <$> cid_datafam_insts d
-    [ (n, [], M.empty) | Just n <- [M.lookup l instMap] ] ++ dataSubs defn
+    [ (n, [], M.empty)
+                      | Just n <- [M.lookup (locA l) instMap] ] ++ dataSubs defn
 
   InstD _ (DataFamInstD _ (DataFamInstDecl (HsIB { hsib_body = d })))
     -> dataSubs (feqn_rhs d)

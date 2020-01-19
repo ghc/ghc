@@ -72,7 +72,7 @@ so it must be prepared to use tcSkolemise to skolemise it.
 See Note [sig_tau may be polymorphic] in TcPat.
 -}
 
-tcMatchesFun :: Located Name
+tcMatchesFun :: LocatedA Name
              -> MatchGroup GhcRn (LHsExpr GhcRn)
              -> ExpSigmaType    -- Expected type of function
              -> TcM (HsWrapper, MatchGroup GhcTcId (LHsExpr GhcTcId))

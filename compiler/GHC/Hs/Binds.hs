@@ -224,7 +224,7 @@ data HsBindLR idL idR
                                 -- free variables of this defn.
                                 -- See Note [Bind free vars]
 
-        fun_id :: Located (IdP idL), -- Note [fun_id in Match] in GHC.Hs.Expr
+        fun_id :: LocatedA (IdP idL), -- Note [fun_id in Match] in GHC.Hs.Expr
 
         fun_matches :: MatchGroup idR (LHsExpr idR),  -- ^ The payload
 
@@ -371,8 +371,8 @@ type instance XXABExport (GhcPass p) = NoExtCon
 data PatSynBind idL idR
   = PSB { psb_ext  :: XPSB idL idR,            -- ^ Post renaming, FVs.
                                                -- See Note [Bind free vars]
-          psb_id   :: Located (IdP idL),       -- ^ Name of the pattern synonym
-          psb_args :: HsPatSynDetails (Located (IdP idR)),
+          psb_id   :: LocatedA (IdP idL),      -- ^ Name of the pattern synonym
+          psb_args :: HsPatSynDetails (LocatedA (IdP idR)),
                                                -- ^ Formal parameter names
           psb_def  :: LPat idR,                -- ^ Right-hand side
           psb_dir  :: HsPatSynDir idR          -- ^ Directionality
@@ -913,7 +913,7 @@ data Sig pass
       -- For details on above see note [Api annotations] in ApiAnnotation
     TypeSig
        (XTypeSig pass)
-       [Located (IdP pass)]  -- LHS of the signature; e.g.  f,g,h :: blah
+       [LocatedA (IdP pass)] -- LHS of the signature; e.g.  f,g,h :: blah
        (LHsSigWcType pass)   -- RHS of the signature; can have wildcards
 
       -- | A pattern synonym type signature
@@ -925,7 +925,7 @@ data Sig pass
       --           'ApiAnnotation.AnnDot','ApiAnnotation.AnnDarrow'
 
       -- For details on above see note [Api annotations] in ApiAnnotation
-  | PatSynSig (XPatSynSig pass) [Located (IdP pass)] (LHsSigType pass)
+  | PatSynSig (XPatSynSig pass) [LocatedA (IdP pass)] (LHsSigType pass)
       -- P :: forall a b. Req => Prov => ty
 
       -- | A signature for a class method
@@ -938,7 +938,7 @@ data Sig pass
       --
       --  - 'ApiAnnotation.AnnKeywordId' : 'ApiAnnotation.AnnDefault',
       --           'ApiAnnotation.AnnDcolon'
-  | ClassOpSig (XClassOpSig pass) Bool [Located (IdP pass)] (LHsSigType pass)
+  | ClassOpSig (XClassOpSig pass) Bool [LocatedA (IdP pass)] (LHsSigType pass)
 
         -- | A type signature in generated code, notably the code
         -- generated for record selectors.  We simply record
@@ -970,8 +970,8 @@ data Sig pass
 
         -- For details on above see note [Api annotations] in ApiAnnotation
   | InlineSig   (XInlineSig pass)
-                (Located (IdP pass)) -- Function name
-                InlinePragma         -- Never defaultInlinePragma
+                (LocatedA (IdP pass)) -- Function name
+                InlinePragma          -- Never defaultInlinePragma
 
         -- | A specialisation pragma
         --
@@ -986,7 +986,7 @@ data Sig pass
 
         -- For details on above see note [Api annotations] in ApiAnnotation
   | SpecSig     (XSpecSig pass)
-                (Located (IdP pass)) -- Specialise a function or datatype  ...
+                (LocatedA (IdP pass)) -- Specialise a function or datatype  ...
                 [LHsSigType pass]  -- ... to these types
                 InlinePragma       -- The pragma on SPECIALISE_INLINE form.
                                    -- If it's just defaultInlinePragma, then we said
@@ -1016,7 +1016,7 @@ data Sig pass
 
         -- For details on above see note [Api annotations] in ApiAnnotation
   | MinimalSig (XMinimalSig pass)
-               SourceText (LBooleanFormula (Located (IdP pass)))
+               SourceText (LBooleanFormula (LocatedA (IdP pass)))
                -- Note [Pragma source text] in BasicTypes
 
         -- | A "set cost centre" pragma for declarations
@@ -1029,7 +1029,7 @@ data Sig pass
 
   | SCCFunSig  (XSCCFunSig pass)
                SourceText      -- Note [Pragma source text] in BasicTypes
-               (Located (IdP pass))  -- Function name
+               (LocatedA (IdP pass))  -- Function name
                (Maybe (Located StringLiteral))
        -- | A complete match pragma
        --
@@ -1040,8 +1040,8 @@ data Sig pass
        -- synonym definitions.
   | CompleteMatchSig (XCompleteMatchSig pass)
                      SourceText
-                     (Located [Located (IdP pass)])
-                     (Maybe (Located (IdP pass)))
+                     (Located [LocatedA (IdP pass)])
+                     (Maybe (LocatedA (IdP pass)))
   | XSig (XXSig pass)
 
 type instance XTypeSig          (GhcPass p) = NoExtField
@@ -1061,7 +1061,7 @@ type instance XXSig             (GhcPass p) = NoExtCon
 type LFixitySig pass = Located (FixitySig pass)
 
 -- | Fixity Signature
-data FixitySig pass = FixitySig (XFixitySig pass) [Located (IdP pass)] Fixity
+data FixitySig pass = FixitySig (XFixitySig pass) [LocatedA (IdP pass)] Fixity
                     | XFixitySig (XXFixitySig pass)
 
 type instance XFixitySig  (GhcPass p) = NoExtField
@@ -1240,7 +1240,7 @@ instance Outputable TcSpecPrag where
     = text "SPECIALIZE" <+> pprSpec var (text "<type>") inl
 
 pprMinimalSig :: (OutputableBndr name)
-              => LBooleanFormula (Located name) -> SDoc
+              => LBooleanFormula (LocatedA name) -> SDoc
 pprMinimalSig (L _ bf) = ppr (fmap unLoc bf)
 
 {-

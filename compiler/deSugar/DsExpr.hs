@@ -696,7 +696,7 @@ ds_expr _ expr@(RecordUpd { rupd_expr = record_expr, rupd_flds = fields
                  req_wrap = dict_req_wrap <.> mkWpTyApps in_inst_tys
 
                  pat = noLoc $ ConPatOut { pat_o_ext = noExtField
-                                         , pat_con = noLoc con
+                                         , pat_con = noLocA con
                                          , pat_tvs = ex_tvs
                                          , pat_dicts = eqs_vars ++ theta_vars
                                          , pat_binds = emptyTcEvBinds

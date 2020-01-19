@@ -234,6 +234,7 @@ tcCompleteSigs sigs =
               AcceptAny -> failWithTc ambiguousError
               Fixed _ tc  -> return $ mkMatch cls tc
 
+          check_complete_match :: LocatedA Name -> TcM CompleteMatch -- AZ Temp
           check_complete_match tc_name = do
             ty_con <- tcLookupLocatedTyCon tc_name
             (_, cls) <- checkCLTypes (Fixed Nothing ty_con)
@@ -257,10 +258,10 @@ tcCompleteSigs sigs =
 
 
       -- See note [Typechecking Complete Matches]
-      checkCLType :: (CompleteSigType, [ConLike]) -> Located Name
+      checkCLType :: (CompleteSigType, [ConLike]) -> LocatedA Name
                   -> TcM (CompleteSigType, [ConLike])
       checkCLType (cst, cs) n = do
-        cl <- addLocM tcLookupConLike n
+        cl <- addLocMA tcLookupConLike n
         let   (_,_,_,_,_,_, res_ty) = conLikeFullSig cl
               res_ty_con = fst <$> splitTyConApp_maybe res_ty
         case (cst, res_ty_con) of
@@ -692,7 +693,7 @@ tcPolyCheck prag_fn
        ; (tv_prs, theta, tau) <- tcInstType tcInstSkolTyVars poly_id
                 -- See Note [Instantiate sig with fresh variables]
 
-       ; mono_name <- newNameAt (nameOccName name) nm_loc
+       ; mono_name <- newNameAt (nameOccName name) (locA nm_loc)
        ; ev_vars   <- newEvVars theta
        ; let mono_id   = mkLocalId mono_name tau
              skol_info = SigSkol ctxt (idType poly_id) tv_prs
@@ -710,7 +711,7 @@ tcPolyCheck prag_fn
        ; poly_id    <- addInlinePrags poly_id prag_sigs
 
        ; mod <- getModule
-       ; tick <- funBindTicks nm_loc mono_id mod prag_sigs
+       ; tick <- funBindTicks (locA nm_loc) mono_id mod prag_sigs
        ; let bind' = FunBind { fun_id      = L nm_loc mono_id
                              , fun_matches = matches'
                              , fun_co_fn   = co_fn
@@ -1342,7 +1343,7 @@ tcLhs sig_fn no_gen (FunBind { fun_id = L nm_loc name
     --           Just g = ...f...
     -- Hence always typechecked with InferGen
     do { mono_info <- tcLhsSigId no_gen (name, sig)
-       ; return (TcFunBind mono_info nm_loc matches) }
+       ; return (TcFunBind mono_info (locA nm_loc) matches) }
 
   | otherwise  -- No type signature
   = do { mono_ty <- newOpenFlexiTyVarTy
@@ -1350,7 +1351,7 @@ tcLhs sig_fn no_gen (FunBind { fun_id = L nm_loc name
        ; let mono_info = MBI { mbi_poly_name = name
                              , mbi_sig       = Nothing
                              , mbi_mono_id   = mono_id }
-       ; return (TcFunBind mono_info nm_loc matches) }
+       ; return (TcFunBind mono_info (locA nm_loc) matches) }
 
 tcLhs sig_fn no_gen (PatBind { pat_lhs = pat, pat_rhs = grhss })
   = -- See Note [Typechecking pattern bindings]
@@ -1420,9 +1421,9 @@ tcRhs (TcFunBind info@(MBI { mbi_sig = mb_sig, mbi_mono_id = mono_id })
   = tcExtendIdBinderStackForRhs [info]  $
     tcExtendTyVarEnvForRhs mb_sig       $
     do  { traceTc "tcRhs: fun bind" (ppr mono_id $$ ppr (idType mono_id))
-        ; (co_fn, matches') <- tcMatchesFun (L loc (idName mono_id))
+        ; (co_fn, matches') <- tcMatchesFun (L (noAnnSrcSpan loc) (idName mono_id))
                                  matches (mkCheckExpType $ idType mono_id)
-        ; return ( FunBind { fun_id = L loc mono_id
+        ; return ( FunBind { fun_id = L (noAnnSrcSpan loc) mono_id
                            , fun_matches = matches'
                            , fun_co_fn = co_fn
                            , fun_ext = placeHolderNamesTc

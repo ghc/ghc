@@ -489,11 +489,11 @@ instance OutputableBndr HsIPName where
 data HsTyVarBndr pass
   = UserTyVar        -- no explicit kinding
          (XUserTyVar pass)
-         (Located (IdP pass))
+         (LocatedA (IdP pass))
         -- See Note [Located RdrNames] in GHC.Hs.Expr
   | KindedTyVar
          (XKindedTyVar pass)
-         (Located (IdP pass))
+         (LocatedA (IdP pass))
          (LHsKind pass)  -- The user-supplied kind signature
         -- ^
         --  - 'ApiAnnotation.AnnKeywordId' : 'ApiAnnotation.AnnOpen',
@@ -546,7 +546,7 @@ data HsType pass
   | HsTyVar  (XTyVar pass)
               PromotionFlag    -- Whether explicitly promoted,
                                -- for the pretty printer
-             (Located (IdP pass))
+             (LocatedA (IdP pass))
                   -- Type variable, type constructor, or data constructor
                   -- see Note [Promotions (HsTyVar)]
                   -- See Note [Located RdrNames] in GHC.Hs.Expr
@@ -595,7 +595,7 @@ data HsType pass
     -- For details on above see note [Api annotations] in ApiAnnotation
 
   | HsOpTy              (XOpTy pass)
-                        (LHsType pass) (Located (IdP pass)) (LHsType pass)
+                        (LHsType pass) (LocatedA (IdP pass)) (LHsType pass)
       -- ^ - 'ApiAnnotation.AnnKeywordId' : None
 
       -- For details on above see note [Api annotations] in ApiAnnotation
@@ -1066,10 +1066,10 @@ hsAllLTyVarNames (HsQTvs { hsq_ext = kvs
   = kvs ++ hsLTyVarNames tvs
 hsAllLTyVarNames (XLHsQTyVars nec) = noExtCon nec
 
-hsLTyVarLocName :: LHsTyVarBndr (GhcPass p) -> Located (IdP (GhcPass p))
-hsLTyVarLocName = mapLoc hsTyVarName
+hsLTyVarLocName :: LHsTyVarBndr (GhcPass p) -> LocatedA (IdP (GhcPass p))
+hsLTyVarLocName (L l a) = L (noAnnSrcSpan l) (hsTyVarName a)
 
-hsLTyVarLocNames :: LHsQTyVars (GhcPass p) -> [Located (IdP (GhcPass p))]
+hsLTyVarLocNames :: LHsQTyVars (GhcPass p) -> [LocatedA (IdP (GhcPass p))]
 hsLTyVarLocNames qtvs = map hsLTyVarLocName (hsQTvExplicit qtvs)
 
 -- | Convert a LHsTyVarBndr to an equivalent LHsType.
@@ -1078,7 +1078,8 @@ hsLTyVarBndrToType = mapLoc cvt
   where cvt (UserTyVar _ n) = HsTyVar noExtField NotPromoted n
         cvt (KindedTyVar _ (L name_loc n) kind)
           = HsKindSig noExtField
-                   (L name_loc (HsTyVar noExtField NotPromoted (L name_loc n))) kind
+                   (L (locA name_loc)
+                           (HsTyVar noExtField NotPromoted (L name_loc n))) kind
         cvt (XTyVarBndr nec) = noExtCon nec
 
 -- | Convert a LHsTyVarBndrs to a list of types.
@@ -1125,7 +1126,7 @@ isLHsForAllTy _                     = False
 mkAnonWildCardTy :: HsType GhcPs
 mkAnonWildCardTy = HsWildCardTy noExtField
 
-mkHsOpTy :: LHsType (GhcPass p) -> Located (IdP (GhcPass p))
+mkHsOpTy :: LHsType (GhcPass p) -> LocatedA (IdP (GhcPass p))
          -> LHsType (GhcPass p) -> HsType (GhcPass p)
 mkHsOpTy ty1 op ty2 = HsOpTy noExtField ty1 op ty2
 
@@ -1169,7 +1170,7 @@ splitHsFunType other = ([], other)
 -- used to examine the result of a GADT-like datacon, so it doesn't handle
 -- *all* cases (like lists, tuples, (~), etc.)
 hsTyGetAppHead_maybe :: LHsType (GhcPass p)
-                     -> Maybe (Located (IdP (GhcPass p)))
+                     -> Maybe (LocatedA (IdP (GhcPass p)))
 hsTyGetAppHead_maybe = go
   where
     go (L _ (HsTyVar _ _ ln))          = Just ln
@@ -1183,7 +1184,7 @@ hsTyGetAppHead_maybe = go
 ------------------------------------------------------------
 -- Arguments in an expression/type after splitting
 data HsArg tm ty
-  = HsValArg tm   -- Argument is an ordinary expression     (f arg)
+  = HsValArg tm          -- Argument is an ordinary expression     (f arg)
   | HsTypeArg SrcSpan ty -- Argument is a visible type application (f @ty)
                          -- SrcSpan is location of the `@`
   | HsArgPar SrcSpan -- See Note [HsArgPar]
@@ -1336,7 +1337,7 @@ getLHsInstDeclHead inst_ty
   = body_ty
 
 getLHsInstDeclClass_maybe :: LHsSigType (GhcPass p)
-                          -> Maybe (Located (IdP (GhcPass p)))
+                          -> Maybe (LocatedA (IdP (GhcPass p)))
 -- Works on (HsSigType RdrName)
 getLHsInstDeclClass_maybe inst_ty
   = do { let head_ty = getLHsInstDeclHead inst_ty
@@ -1360,7 +1361,7 @@ type LFieldOcc pass = Located (FieldOcc pass)
 -- both the 'RdrName' the user originally wrote, and after the
 -- renamer, the selector function.
 data FieldOcc pass = FieldOcc { extFieldOcc     :: XCFieldOcc pass
-                              , rdrNameFieldOcc :: Located RdrName
+                              , rdrNameFieldOcc :: LocatedA RdrName
                                  -- ^ See Note [Located RdrNames] in GHC.Hs.Expr
                               }
 
@@ -1378,7 +1379,7 @@ type instance XXFieldOcc (GhcPass _) = NoExtCon
 instance Outputable (FieldOcc pass) where
   ppr = ppr . rdrNameFieldOcc
 
-mkFieldOcc :: Located RdrName -> FieldOcc GhcPs
+mkFieldOcc :: LocatedA RdrName -> FieldOcc GhcPs
 mkFieldOcc rdr = FieldOcc noExtField rdr
 
 
@@ -1395,8 +1396,8 @@ mkFieldOcc rdr = FieldOcc noExtField rdr
 -- Note [Disambiguating record fields] in TcExpr.
 -- See Note [Located RdrNames] in GHC.Hs.Expr
 data AmbiguousFieldOcc pass
-  = Unambiguous (XUnambiguous pass) (Located RdrName)
-  | Ambiguous   (XAmbiguous pass)   (Located RdrName)
+  = Unambiguous (XUnambiguous pass) (LocatedA RdrName)
+  | Ambiguous   (XAmbiguous pass)   (LocatedA RdrName)
   | XAmbiguousFieldOcc (XXAmbiguousFieldOcc pass)
 
 type instance XUnambiguous GhcPs = NoExtField
@@ -1416,7 +1417,7 @@ instance OutputableBndr (AmbiguousFieldOcc (GhcPass p)) where
   pprInfixOcc  = pprInfixOcc . rdrNameAmbiguousFieldOcc
   pprPrefixOcc = pprPrefixOcc . rdrNameAmbiguousFieldOcc
 
-mkAmbiguousFieldOcc :: Located RdrName -> AmbiguousFieldOcc GhcPs
+mkAmbiguousFieldOcc :: LocatedA RdrName -> AmbiguousFieldOcc GhcPs
 mkAmbiguousFieldOcc rdr = Unambiguous noExtField rdr
 
 rdrNameAmbiguousFieldOcc :: AmbiguousFieldOcc (GhcPass p) -> RdrName
