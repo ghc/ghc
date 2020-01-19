@@ -774,13 +774,11 @@ validate-x86_64-linux-fedora27:
   before_script:
     - git clean -xdf
 
-    # We are in a bare cmd.exe session; bring msys binaries into PATH
-    - set PATH=C:\msys64\usr\bin;%PATH%
-
     # Setup toolchain
     - bash .gitlab/win32-ci.sh setup
   after_script:
-    - robocopy /np /nfl /ndl /e "%APPDATA%\cabal" cabal-cache
+    - |
+      Copy-Item -Recurse -Path $Env:APPDATA\cabal -Destination cabal-cache
   dependencies: []
   variables:
     #FORCE_SYMLINKS: 1
