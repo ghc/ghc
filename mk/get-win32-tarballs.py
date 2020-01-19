@@ -33,20 +33,27 @@ def fetch_arch(arch: str):
         if not (d / fname).is_file():
             fetch(file_url(arch, fname), d / fname)
 
-    subprocess.check_call(['sha256sum', '--check', '--ignore-missing', 'SHA256SUMS'],
+    verify(arch)
+
+def verify(arch: str):
+    subprocess.check_call(['sha256sum', '--quiet', '--check', '--ignore-missing', 'SHA256SUMS'],
                           cwd=d)
 
 def main() -> None:
     parser = argparse.ArgumentParser()
-    parser.add_argument('arch', help="Architecture to fetch (either i686, x86_64, sources, or all)")
+    parser.add_argument('mode', choices=['verify', 'download'])
+    parser.add_argument(
+        'arch',
+        choices=ARCHS + ['all'],
+        help="Architecture to fetch (either i686, x86_64, sources, or all)")
     args = parser.parse_args()
+
+    action = fetch_arch if args.mode == 'download' else verify
     if args.arch == 'all':
         for arch in ARCHS:
-            fetch_arch(arch)
-    elif args.arch not in ARCHS:
-        raise ArgumentError("Unknown architecture {}".format(args.arch))
+            action(arch)
     else:
-        fetch_arch(args.arch)
+        action(args.arch)
 
 if __name__ == '__main__':
     main()
