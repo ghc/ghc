@@ -89,10 +89,10 @@ function setup() {
   if [ ! -e $toolchain/bin/ghc ]; then
       url="https://downloads.haskell.org/~ghc/${GHC_VERSION}/ghc-${GHC_VERSION}-${boot_triple}.tar.xz"
       info "Fetching GHC binary distribution from $url..."
-      curl $url | tar -xJ \
-        || fail "failed to fetch GHC binary distribution"
+      curl $url > ghc.tar.xz || fail "failed to fetch GHC binary distribution"
+      tar -xJf ghc.tar.xz || fail "failed to extract GHC binary distribution"
       cp -r ghc-${GHC_VERSION}/* toolchain
-      rm -Rf ghc-${GHC_VERSION}
+      rm -Rf ghc-${GHC_VERSION} ghc.tar.xz
   fi
 
   if [ ! -e $toolchain/bin/cabal ]; then
