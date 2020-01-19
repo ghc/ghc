@@ -60,7 +60,7 @@ toolArgsTarget = do
     -- Find out the arguments that are needed to load a module into the
     -- session
     arg_list <- interpret fake_target getArgs
-    liftIO $ putStrLn (intercalate " " arg_list)
+    liftIO $ putStrLn (intercalate "\n" arg_list)
 
 allStages :: [Stage]
 allStages = [minBound .. maxBound]
