@@ -78,10 +78,12 @@ import qualified GHC.LanguageExtensions as LangExt
 import Control.Monad
 import Data.Foldable
 import Data.Function ( on )
+import Data.Functor.Identity
 import Data.List
 import qualified Data.List.NonEmpty as NE
 import Data.List.NonEmpty ( NonEmpty(..) )
 import qualified Data.Set as Set
+import Data.Tuple( swap )
 
 {-
 ************************************************************************
@@ -681,16 +683,17 @@ generaliseTyClDecl inferred_tc_env (L _ decl)
 
     skolemise_tc_tycon :: Name -> TcM (TcTyCon, [(Name,TcTyVar)], TcKind)
     -- Zonk and skolemise the Specified and Required binders
-    -- It's essential that they are skolems, not MetaTyVars,
-    -- for Step 3 in generaliseTcTyCon to work right
     skolemise_tc_tycon tc_name
       = do { let tc = lookupNameEnv_NF inferred_tc_env tc_name
                       -- This lookup should not fail
            ; scoped_prs <- mapSndM zonkAndSkolemise (tcTyConScopedTyVars tc)
+           ; scoped_prs <- mapSndM zonkTcTyVarToTyVar scoped_prs
+                           -- This second zonk is needed to manifest the
+                           -- side-effects of skolemisation to the swizzler
+           ; res_kind   <- zonkTcType (tyConResKind tc)
            ; traceTc "skolemise_tc_ty_con" $
              vcat [ ppr tc, text "before" <+> pprScopedTyVars (tcTyConScopedTyVars tc)
                   , text "after" <+> pprScopedTyVars scoped_prs ]
-           ; res_kind   <- zonkTcType (tyConResKind tc)
            ; return (tc, scoped_prs, res_kind) }
 
 
@@ -709,9 +712,9 @@ swizzleTcTyConBndrs tc_infos
        ; unless (null err_prs) $
          do { mapM_ report_dup err_prs; failM }
 
-       ; return [ (tc, map subst_tv scoped_prs, substTyUnchecked subst kind)
-                       -- Again, we can get rid of Unchecked when
-                       -- we move to shallow fvs in substitution
+       ; let ((_,scoped_prs,k):_) = tc_infos
+       ; traceTc "swizzle" (pprTyVars (map swizzle_pr scoped_prs) $$ ppr (swizzle_ty k))
+       ; return [ (tc, map swizzle_pr scoped_prs, swizzle_ty kind)
                 | (tc, scoped_prs, kind) <- tc_infos ] }
 
   where
@@ -720,21 +723,7 @@ swizzleTcTyConBndrs tc_infos
     -- See Note [Generalising the kind of a TcTyCon]
     swizzle_prs = [ pr | (_, prs, _) <- tc_infos, pr <- prs ]
 
-    in_scope = mkInScopeSet $ mkVarSet $
-               [ tv | (nm,tv) <- swizzle_prs, tv <- [tv, tv `setTyVarName` nm] ]
-    subst = mkTvSubst in_scope $ mkVarEnv $
-            [ (tv, mkTyVarTy tv')
-            | (nm,tv) <- swizzle_prs
-            , let tv' = tv `setTyVarName` nm
-                           `setTyVarKind` substTyUnchecked subst (tyVarKind tv) ]
-              -- Unchecked because we'll get a loop if the ASSERT
-              -- looks deeply into the kinds of the domain of the subst!
-              -- We can change this when we move to checking just the
-              -- shallow tyvars
-
-    subst_tv (_, tv) = getTyVar_maybe (substTyVar subst tv)
-                       `orElse` pprPanic "swizzleTyConBndrs" (ppr tv)
-
+    -------------- Error reporting ------------
     err_prs :: [(Name,Name)]
     err_prs = [ (n1,n2)
               | pr :| prs <- findDupsEq eq_snd swizzle_prs
@@ -749,6 +738,39 @@ swizzleTcTyConBndrs tc_infos
     eq_snd (_,tv1) (_,tv2) = tv1 == tv2
     same_occ (n1,_) (n2,_) = nameOccName n1 == nameOccName n2
 
+    -------------- The swizzler ------------
+    -- This does a deep traverse, simply doing a
+    -- Name-to-Name change, governed by swizzle_env
+    swizzle_env = mkVarEnv (map swap swizzle_prs)
+
+    swizzleMapper :: TyCoMapper () Identity
+    swizzleMapper = TyCoMapper { tcm_tyvar = swizzle_tv
+                               , tcm_covar = swizzle_cv
+                               , tcm_hole  = swizzle_hole
+                               , tcm_tycobinder = swizzle_bndr
+                               , tcm_tycon      = swizzle_tycon }
+    swizzle_hole  _ hole = pprPanic "swizzle_hole" (ppr hole)
+       -- These types are pre-zonked
+    swizzle_tycon tc = pprPanic "swizzle_tc" (ppr tc)
+       -- TcTyCons can't appear in kinds (yet)
+    swizzle_tv _ tv = return (mkTyVarTy (swizzle_var tv))
+    swizzle_cv _ cv = return (mkCoVarCo (swizzle_var cv))
+
+    swizzle_bndr _ tcv _
+      = return ((), swizzle_var tcv)
+
+    swizzle_var :: Var -> Var
+    swizzle_var v
+      | Just nm <- lookupVarEnv swizzle_env v
+      = updateVarType swizzle_ty (v `setVarName` nm)
+      | otherwise
+      = updateVarType swizzle_ty v
+
+    swizzle_pr :: (Name, TcTyVar) -> TcTyVar
+    swizzle_pr (_, tv) = swizzle_var tv
+
+    swizzle_ty ty = runIdentity (mapType swizzleMapper () ty)
+
 
 generaliseTcTyCon :: (TcTyCon, [TcTyVar], TcKind) -> TcM TcTyCon
 generaliseTcTyCon (tc, spec_req_tvs, tc_res_kind)
@@ -759,7 +781,7 @@ generaliseTcTyCon (tc, spec_req_tvs, tc_res_kind)
          -- NB: spec_req_tvs = spec_tvs ++ req_tvs
          --     And req_tvs is 1-1 with tyConTyVars
          --     See Note [Scoped tyvars in a TcTyCon] in TyCon
-         let n_spec              = length spec_req_tvs - tyConArity tc
+       ; let n_spec              = length spec_req_tvs - tyConArity tc
              (spec_tvs, req_tvs) = splitAt n_spec spec_req_tvs
              sorted_spec_tvs     = scopedSort spec_tvs
                  -- NB: We can't do the sort until we've zonked
@@ -776,9 +798,11 @@ generaliseTcTyCon (tc, spec_req_tvs, tc_res_kind)
 
        ; traceTc "generaliseTcTyCon: pre zonk"
            (vcat [ text "spec_req_tvs =" <+> pprTyVars spec_req_tvs
+                 , text "res_kind =" <+> ppr tc_res_kind
+                 , text "ds1 =" <+> ppr dvs1
                  , text "inferred =" <+> pprTyVars inferred ])
 
-       -- Step 3: Final zonking (following kind generalisation)
+       -- Step 3: Final zonk (following kind generalisation)
        -- See Note [Generalising the kind of a TcTyCon]
        ; ze <- emptyZonkEnv
        ; (ze, inferred)        <- zonkTyBndrsX ze inferred
@@ -2938,7 +2962,7 @@ tcConDecl rep_tycon tag_map tmpl_bndrs _res_kind res_tmpl new_or_data
                  ; return (ctxt, final_arg_tys, res_ty, field_lbls, stricts)
                  }
        ; imp_tvs <- zonkAndScopedSort imp_tvs
-       ; let user_tvs      = imp_tvs ++ exp_tvs
+       ; let user_tvs = imp_tvs ++ exp_tvs
 
        ; tkvs <- kindGeneralizeAll (mkSpecForAllTys user_tvs $
                                     mkPhiTy ctxt $
