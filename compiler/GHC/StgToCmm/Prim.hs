@@ -1,5 +1,6 @@
 {-# LANGUAGE CPP #-}
 {-# LANGUAGE LambdaCase #-}
+{-# LANGUAGE MultiWayIf #-}
 
 #if __GLASGOW_HASKELL__ <= 808
 -- GHC 8.10 deprecates this flag, but GHC 8.8 needs it
@@ -86,33 +87,10 @@ cgOpApp (StgPrimOp primop) args res_ty = do
     dflags <- getDynFlags
     cmm_args <- getNonVoidArgAmodes args
     case emitPrimOp dflags primop cmm_args of
-        PrimopCmmEmit_External -> do  -- out-of-line
+        PrimopCmmEmit_Internal f -> emitReturn =<< f res_ty
+        PrimopCmmEmit_External -> do
           let fun = CmmLit (CmmLabel (mkRtsPrimOpLabel primop))
           emitCall (NativeNodeCall, NativeReturn) fun cmm_args
-
-        PrimopCmmEmit_Raw f -> do
-          exprs <- f res_ty
-          emitReturn exprs
-
-        PrimopCmmEmit_IntoRegs f  -- inline
-          | ReturnsPrim VoidRep <- result_info
-          -> do f []
-                emitReturn []
-
-          | ReturnsPrim rep <- result_info
-          -> do platform <- getPlatform
-                res <- newTemp (primRepCmmType platform rep)
-                f [res]
-                emitReturn [CmmReg (CmmLocal res)]
-
-          | ReturnsAlg tycon <- result_info, isUnboxedTupleTyCon tycon
-          -> do (regs, _hints) <- newUnboxedTupleRegs res_ty
-                f regs
-                emitReturn (map (CmmReg . CmmLocal) regs)
-
-          | otherwise -> panic "cgOpApp"
-          where
-             result_info = getPrimOpResultInfo primop
 
 cgOpApp (StgPrimCallOp primcall) args _res_ty
   = do  { cmm_args <- getNonVoidArgAmodes args
@@ -141,8 +119,7 @@ asUnsigned w n = n .&. (bit (widthInBits w) - 1)
 shouldInlinePrimOp :: DynFlags -> PrimOp -> [CmmExpr] -> Bool
 shouldInlinePrimOp dflags op args = case emitPrimOp dflags op args of
   PrimopCmmEmit_External -> False
-  PrimopCmmEmit_IntoRegs _ -> True
-  PrimopCmmEmit_Raw _ -> True
+  PrimopCmmEmit_Internal _ -> True
 
 -- TODO: Several primop implementations (e.g. 'doNewByteArrayOp') use
 -- ByteOff (or some other fixed width signed type) to represent
@@ -167,7 +144,7 @@ emitPrimOp
   -> PrimOp            -- ^ The primop
   -> [CmmExpr]         -- ^ The primop arguments
   -> PrimopCmmEmit
-emitPrimOp dflags = \case
+emitPrimOp dflags primop = case primop of
   NewByteArrayOp_Char -> \case
     [(CmmLit (CmmInt n w))]
       | asUnsigned w n <= fromIntegral (maxInlineAllocSize dflags)
@@ -1074,12 +1051,12 @@ emitPrimOp dflags = \case
   ChrOp           -> \args -> opNop args  -- Int# and Char# are rep'd the same
   OrdOp           -> \args -> opNop args
 
-  Narrow8IntOp   -> \args -> opNarrow platform args (MO_SS_Conv, W8)
-  Narrow16IntOp  -> \args -> opNarrow platform args (MO_SS_Conv, W16)
-  Narrow32IntOp  -> \args -> opNarrow platform args (MO_SS_Conv, W32)
-  Narrow8WordOp  -> \args -> opNarrow platform args (MO_UU_Conv, W8)
-  Narrow16WordOp -> \args -> opNarrow platform args (MO_UU_Conv, W16)
-  Narrow32WordOp -> \args -> opNarrow platform args (MO_UU_Conv, W32)
+  Narrow8IntOp   -> \args -> opNarrow args (MO_SS_Conv, W8)
+  Narrow16IntOp  -> \args -> opNarrow args (MO_SS_Conv, W16)
+  Narrow32IntOp  -> \args -> opNarrow args (MO_SS_Conv, W32)
+  Narrow8WordOp  -> \args -> opNarrow args (MO_UU_Conv, W8)
+  Narrow16WordOp -> \args -> opNarrow args (MO_UU_Conv, W16)
+  Narrow32WordOp -> \args -> opNarrow args (MO_UU_Conv, W32)
 
   DoublePowerOp  -> \args -> opCallish args MO_F64_Pwr
   DoubleSinOp    -> \args -> opCallish args MO_F64_Sin
@@ -1424,7 +1401,7 @@ emitPrimOp dflags = \case
 
   -- tagToEnum# is special: we need to pull the constructor
   -- out of the table, and perform an appropriate return.
-  TagToEnumOp -> \[amode] -> PrimopCmmEmit_Raw $ \res_ty -> do
+  TagToEnumOp -> \[amode] -> PrimopCmmEmit_Internal $ \res_ty -> do
     -- If you're reading this code in the attempt to figure
     -- out why the compiler panic'ed here, it is probably because
     -- you used tagToEnum# in a non-monomorphic setting, e.g.,
@@ -1527,6 +1504,62 @@ emitPrimOp dflags = \case
 
  where
   platform = targetPlatform dflags
+  result_info = getPrimOpResultInfo primop
+
+  opNop :: [CmmExpr] -> PrimopCmmEmit
+  opNop args = opAllDone $ \[res] -> emitAssign (CmmLocal res) arg
+    where [arg] = args
+
+  opNarrow
+    :: [CmmExpr]
+    -> (Width -> Width -> MachOp, Width)
+    -> PrimopCmmEmit
+  opNarrow args (mop, rep) = opAllDone $ \[res] -> emitAssign (CmmLocal res) $
+    CmmMachOp (mop rep (wordWidth dflags)) [CmmMachOp (mop (wordWidth dflags) rep) [arg]]
+    where [arg] = args
+
+  -- | These primops are implemented by CallishMachOps, because they sometimes
+  -- turn into foreign calls depending on the backend.
+  opCallish :: [CmmExpr] -> CallishMachOp -> PrimopCmmEmit
+  opCallish args prim = opAllDone $ \[res] -> emitPrimCall [res] prim args
+
+  opTranslate :: [CmmExpr] -> MachOp -> PrimopCmmEmit
+  opTranslate args mop = opAllDone $ \[res] -> do
+    let stmt = mkAssign (CmmLocal res) (CmmMachOp mop args)
+    emit stmt
+
+  -- | Basically a "manual" case, rather than one of the common repetitive forms
+  -- above. The results are a parameter to the returned function so we know the
+  -- choice of variant never depends on them.
+  opCallishHandledLater
+    :: [CmmExpr]
+    -> Either CallishMachOp GenericOp
+    -> PrimopCmmEmit
+  opCallishHandledLater args callOrNot = opAllDone $ \res0 -> case callOrNot of
+    Left op   -> emit $ mkUnsafeCall (PrimTarget op) res0 args
+    Right gen -> gen res0 args
+
+  opAllDone
+    :: ([LocalReg] -- where to put the results
+        -> FCode ())
+    -> PrimopCmmEmit
+  opAllDone f = PrimopCmmEmit_Internal $ \res_ty -> do
+    regs <- if
+      | ReturnsPrim VoidRep <- result_info
+      -> pure []
+
+      | ReturnsPrim rep <- result_info
+      -> do reg <- newTemp (primRepCmmType platform rep)
+            pure [reg]
+
+      | ReturnsAlg tycon <- result_info, isUnboxedTupleTyCon tycon
+      -> do (regs, _hints) <- newUnboxedTupleRegs res_ty
+            pure regs
+
+      | otherwise -> panic "cgOpApp"
+    f regs
+    pure $ map (CmmReg . CmmLocal) regs
+
   alwaysExternal = \_ -> PrimopCmmEmit_External
   -- Note [QuotRem optimization]
   -- ~~~~~~~~~~~~~~~~~~~~~~~~~~~
@@ -1563,54 +1596,12 @@ emitPrimOp dflags = \case
           _            -> False
 
 data PrimopCmmEmit
+  -- | Out of line fake primop that's actually just a foreign call to other
+  -- (presumably) C--.
   = PrimopCmmEmit_External
-  | PrimopCmmEmit_IntoRegs ([LocalReg] -- where to put the results
-                           -> FCode ())
-  -- | Manual escape hatch, this is just for the '@TagToEnum@'
-  -- primop for now. It would be nice to remove this special case but that is
-  -- future work.
-  | PrimopCmmEmit_Raw (Type -- the return type, some primops are specialized to it
-                       -> FCode [CmmExpr]) -- just for TagToEnum for now
-
-opNop :: [CmmExpr] -> PrimopCmmEmit
-opNop args = PrimopCmmEmit_IntoRegs $ \[res] -> emitAssign (CmmLocal res) arg
-  where [arg] = args
-
-opNarrow
-  :: Platform
-  -> [CmmExpr]
-  -> (Width -> Width -> MachOp, Width)
-  -> PrimopCmmEmit
-opNarrow platform args (mop, rep) = PrimopCmmEmit_IntoRegs $ \[res] -> emitAssign (CmmLocal res) $
-  CmmMachOp (mop rep (wordWidth platform)) [CmmMachOp (mop (wordWidth platform) rep) [arg]]
-  where [arg] = args
-
--- | These primops are implemented by CallishMachOps, because they sometimes
--- turn into foreign calls depending on the backend.
-opCallish :: [CmmExpr] -> CallishMachOp -> PrimopCmmEmit
-opCallish args prim = PrimopCmmEmit_IntoRegs $ \[res] -> emitPrimCall [res] prim args
-
-opTranslate :: [CmmExpr] -> MachOp -> PrimopCmmEmit
-opTranslate args mop = PrimopCmmEmit_IntoRegs $ \[res] -> do
-  let stmt = mkAssign (CmmLocal res) (CmmMachOp mop args)
-  emit stmt
-
--- | Basically a "manual" case, rather than one of the common repetitive forms
--- above. The results are a parameter to the returned function so we know the
--- choice of variant never depends on them.
-opCallishHandledLater
-  :: [CmmExpr]
-  -> Either CallishMachOp GenericOp
-  -> PrimopCmmEmit
-opCallishHandledLater args callOrNot = PrimopCmmEmit_IntoRegs $ \res0 -> case callOrNot of
-  Left op   -> emit $ mkUnsafeCall (PrimTarget op) res0 args
-  Right gen -> gen res0 args
-
-opAllDone
-  :: ([LocalReg] -- where to put the results
-      -> FCode ())
-  -> PrimopCmmEmit
-opAllDone f = PrimopCmmEmit_IntoRegs $ f
+  -- | Real primop turned into inline C--.
+  | PrimopCmmEmit_Internal (Type -- the return type, some primops are specialized to it
+                            -> FCode [CmmExpr]) -- just for TagToEnum for now
 
 type GenericOp = [CmmFormal] -> [CmmActual] -> FCode ()
 
