@@ -50,8 +50,6 @@ import MonadUtils (mapMaybeM)
 
 import Control.Monad
 import Data.Char
-import Data.Maybe
-
 
 
 ---------------------------------------------------------------
