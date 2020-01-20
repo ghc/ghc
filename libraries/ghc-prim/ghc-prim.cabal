@@ -53,6 +53,9 @@ Library
     virtual-modules:
         GHC.Prim
 
+    other-modules:
+        GHC.Intlike
+
     -- OS Specific
     if os(windows)
         -- Windows requires some extra libraries for linking because the RTS
