@@ -453,17 +453,34 @@ Now when quantifying, we'd like to end up with
    T :: forall k. k -> Type
    D :: forall j. j -> Type -> Constraint
 
-That is, we want to swizzle the representative to have the name given
-by the user. This is mainly for error messages, and output of :info in
-GHCi.
+That is, we want to swizzle the representative to have the Name given
+by the user. Partyly this is to improve error messages, and output of
+:info in GHCi.  But it is /also/ important beucase the code for a
+default method may mention the class variable(s), but at that point
+(tcClassDecl2), we only have the final class tyvars available.
+(Alternatively, we could record the scoped type variables in the
+TyCon, but it's a nuisance to do so.)
 
-* The mapping from representative TyVar back to the user-specified
-  Name is recorded in the tyConScopedTyVars of the TcTyCon.
+Notes:
+
+* The mapping between the user-specified Name and the representative
+  TyVar is recorded in the tyConScopedTyVars of the TcTyCon.
 
 * The swizzling is actually performed as we construct the final
   kind for the TyCon, by zonkSwizzleTyBndrsX.
 
-But there are errors to catch here.  Suppose we had
+* We must do the swizzling across the whole class decl. Consider
+     class C f where
+       type S (f :: k)
+       type T f
+  Here f's kind k is a parameter of C, and its identity is shared
+  with S and T.  So if we swizzle the representative k at all, we
+  must do so consistently for the entire declaration.
+
+  Hence the call to checkDuplicateTyConBinders is in generaliseTyClDecl,
+  rather than in generaliseTcTyCon.
+
+There are errors to catch here.  Suppose we had
    class E (f :: j) (g :: k) where
      op :: SameKind f g -> blah
 
@@ -475,14 +492,24 @@ the same representative k1.  So when swizzling, we check (in
 checkDuplicatedTyConBinders) that two distinct source names map
 to the same representative.
 
-We do this check across associated types within a class decl
-too.  So
-   class C (f :: k) x where
-      type T (f :: j)
-would elicit a complaint, because j and k end up with the
-same representative (since they are both f's kind.  Hence
-the call to checkDuplicateTyConBinders is in generaliseTyClDecl,
-rather than in generaliseTcTyCon.
+Here's an interesting case:
+    class C f where
+      type S (f :: k1)
+      type T (f :: k2)
+Here k1 and k2 are different Names, but they end up mapped to the
+same representative TyVar.  To make the swizzling consistent (remember
+we must have a single k across C, S and T) we reject the program.
+
+Another interesting case
+    class C f where
+      type S (f :: k) (p::Type)
+      type T (f :: k) (p::Type->Type)
+
+Here the two k's (and the two p's) get distinct Uniques, because they
+are seen by the renamer as locally bound in S and T resp.  But again
+the two (distinct) k's end up bound to the same representative TyVar.
+This time we /don't/ want to complain; so in checkDuplicateTyVar we
+check for distinct /OccNames/.
 
 
 Note [Type environment evolution]
@@ -623,15 +650,14 @@ kcTyClGroup kisig_env decls
         -- Finally, go through each tycon and give it its final kind,
         -- with all the required, specified, and inferred variables
         -- in order.
-        ; let inferred_tc_env =
-                mkNameEnv $ map (\tc -> (tyConName tc, tc)) inferred_tcs
-        ; generalized_tcs <-
-                concatMapM (generaliseTyClDecl inferred_tc_env) kindless_decls
+        ; let inferred_tc_env = mkNameEnv $
+                                map (\tc -> (tyConName tc, tc)) inferred_tcs
+        ; generalized_tcs <- concatMapM (generaliseTyClDecl inferred_tc_env)
+                                        kindless_decls
 
         ; let poly_tcs = checked_tcs ++ generalized_tcs
         ; traceTc "---- kcTyClGroup end ---- }" (ppr_tc_kinds poly_tcs)
         ; return poly_tcs }
-
   where
     ppr_tc_kinds tcs = vcat (map pp_tc tcs)
     pp_tc tc = ppr (tyConName tc) <+> dcolon <+> ppr (tyConKind tc)
@@ -645,15 +671,9 @@ generaliseTyClDecl inferred_tc_env (L _ decl)
              <- mapM skolemise_tc_tycon names_in_this_decl
 
        ; let swizzle_prs :: [(Name,TyVar)]
-             -- Maps the representative TyVar to the name to use in this decl
-             -- The 'nub' is because associated types share type variables
-             -- with the parent
-             -- e.g.  class C f a where { type T f b }
-             --       Scoped tyvars for C:   [("f",f),("a",a)]
-             --                     for T:   [("f",f),("b",b)]
-             --       Note the duplicated (f,f)
+             -- Pairs the user-specifed Name with its representative TyVar
              -- See Note [Generalising the kind of a TcTyCon]
-             swizzle_prs = nub $ concatMap snd tc_with_tvs
+             swizzle_prs = concatMap snd tc_with_tvs
 
          -- Check for duplicates
          -- E.g. data SameKind (a::k) (b::k)
@@ -666,7 +686,9 @@ generaliseTyClDecl inferred_tc_env (L _ decl)
        ; tcAddDeclCtxt decl $
          checkDuplicateTyConBinders swizzle_prs
 
-       ; let swizzle_env = mkVarEnv (map swap swizzle_prs)
+       ; let swizzle_env :: TyVarEnv Name
+             -- Maps the representative TyVar to the Name to use for it
+             swizzle_env = mkVarEnv (map swap swizzle_prs)
        ; mapAndReportM (generaliseTcTyCon swizzle_env) tc_with_tvs }
   where
     tycld_names :: TyClDecl GhcRn -> [Name]
@@ -779,16 +801,22 @@ generaliseTcTyCon swizzle_env (tc, spec_req_prs)
 
 checkDuplicateTyConBinders :: [(Name, TcTyVar)] -> TcM ()
 checkDuplicateTyConBinders spec_req_prs
-  | null dups = return ()
-  | otherwise = mapM_ report_dup dups >> failM
+  | null err_prs = return ()
+  | otherwise    = mapM_ report_dup err_prs >> failM
   where
-    dups :: [(Name,Name)]
-    dups = findDupTyVarTvs spec_req_prs
+    err_prs :: [(Name,Name)]
+    err_prs = [ (n1,n2)
+              | pr :| prs <- findDupsEq eq_snd spec_req_prs
+              , (n1,_):(n2,_):_ <- [nubBy same_occ (pr:prs)] ]
 
-    report_dup (n1, n2)
-      = setSrcSpan (getSrcSpan n2) $
-        addErrTc (text "Couldn't match" <+> quotes (ppr n1)
-                        <+> text "with" <+> quotes (ppr n2))
+    report_dup :: (Name,Name) -> TcM ()
+    report_dup (n1,n2)
+      = setSrcSpan (getSrcSpan n2) $ addErrTc $
+        text "Different names for the same type variable:" <+> quotes (ppr n1)
+             <+> text "and" <+> quotes (ppr n2)
+
+    eq_snd (_,tv1) (_,tv2) = tv1 == tv2
+    same_occ (n1,_) (n2,_) = nameOccName n1 == nameOccName n2
 
 {- Note [Required, Specified, and Inferred for types]
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
