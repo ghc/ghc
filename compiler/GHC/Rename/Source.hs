@@ -2059,7 +2059,7 @@ wrongTyFamName :: Name -> Name -> SDoc
 wrongTyFamName fam_tc_name eqn_tc_name
   = hang (text "Mismatched type name in type family instance.")
        2 (vcat [ text "Expected:" <+> ppr fam_tc_name
-               , text "  Actual:" <+> ppr eqn_tc_name ])
+               , text "Actual:  " <+> ppr eqn_tc_name ])
 
 -----------------
 rnConDecls :: [LConDecl GhcPs] -> RnM ([LConDecl GhcRn], FreeVars)

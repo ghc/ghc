@@ -72,7 +72,7 @@ checkResults test inputs expected actual =
         Just i -> error $
             "FAILED: " ++ test ++ " for input: " ++ show (inputs !! i)
               ++ " expected: " ++ show (expected !! i)
-              ++ " but got: " ++ show (actual !! i)
+              ++ " but got:  " ++ show (actual !! i)
 
 allWord8 :: [Word]
 allWord8 = [ minWord8 .. maxWord8 ]

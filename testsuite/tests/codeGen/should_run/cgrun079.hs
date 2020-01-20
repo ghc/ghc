@@ -50,7 +50,7 @@ checkImul2 x y = do
        , show x
        , " * "
        , show y
-       , "\n    Got: "
+       , "\n    Got:      "
        , show (c,h,l)
        , "\n    Expected: "
        , show (c',h',l')

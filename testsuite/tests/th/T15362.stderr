@@ -2,7 +2,7 @@
 T15362.hs:8:10: error:
     • Mismatched type name in type family instance.
         Expected: +
-          Actual: Maybe
+        Actual:   Maybe
       In the declaration for type family ‘+’
     • In the Template Haskell quotation
         [d| type family a + b where
