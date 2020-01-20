@@ -202,7 +202,7 @@ data Buffer e
         bufRaw    :: !(RawBuffer e),
         bufState  :: BufferState,
         bufSize   :: !Int,          -- in elements, not bytes
-        bufOffset :: !Word64,       -- start location for next read
+        bufOffset :: !Word64,       -- start location for next read/write
         bufL      :: !Int,          -- offset of first item in the buffer
         bufR      :: !Int           -- offset of last item + 1
   }
