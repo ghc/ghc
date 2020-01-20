@@ -73,7 +73,7 @@ import Packages
 import Panic (handleGhcException)
 import Module
 import FastString
-import qualified DynamicLoading
+import qualified GHC.Runtime.Loader
 
 --------------------------------------------------------------------------------
 -- * Exception handling
@@ -473,7 +473,7 @@ withGhc' libDir needHieFiles flags ghcActs = runGhc (Just libDir) $ do
   -- dynamic or static linking at all!
   _ <- setSessionDynFlags dynflags''
   hscenv <- GHC.getSession
-  dynflags''' <- liftIO (DynamicLoading.initializePlugins hscenv dynflags'')
+  dynflags''' <- liftIO (GHC.Runtime.Loader.initializePlugins hscenv dynflags'')
   _ <- setSessionDynFlags dynflags'''
   ghcActs dynflags'''
   where
