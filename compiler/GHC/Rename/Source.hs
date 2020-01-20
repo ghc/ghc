@@ -2008,8 +2008,8 @@ rnInjectivityAnn tvBndrs (L _ (TyVarSig _ resTv))
               ( vcat [ text $ "Incorrect type variable on the LHS of "
                            ++ "injectivity condition"
               , nest 5
-              ( vcat [ text "Expected :" <+> ppr resName
-                     , text "Actual   :" <+> ppr injFrom ])])
+              ( vcat [ text "Expected:" <+> ppr resName
+                     , text "Actual  :" <+> ppr injFrom ])])
 
    ; when (noRnErrors && not (Set.null rhsValid)) $
       do { let errorVars = Set.toList rhsValid
