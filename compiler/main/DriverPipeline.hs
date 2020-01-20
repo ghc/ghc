@@ -111,7 +111,7 @@ preprocess hsc_env input_fn mb_input_buf mb_phase =
   MASSERT(isNothing mb_iface)
   return (dflags, fp)
   where
-    srcspan = srcLocSpan $ mkSrcLoc (mkFastString input_fn) 1 1
+    srcspan = srcLocSpan $ mkSrcLoc 1 1 (mkFastString input_fn) 1 1
     handler (ProgramError msg) = return $ Left $ unitBag $
         mkPlainErrMsg (hsc_dflags hsc_env) srcspan $ text msg
     handler ex = throwGhcExceptionIO ex

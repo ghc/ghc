@@ -1681,7 +1681,7 @@ setLineAndFile code span buf len = do
               -- filenames and it does not remove duplicate
               -- backslashes after the drive letter (should it?).
   setAlrLastLoc $ alrInitialLoc file
-  setSrcLoc (mkRealSrcLoc file (fromIntegral linenum - 1) (srcSpanEndCol span))
+  setSrcLoc file (fromIntegral linenum - 1) (srcSpanEndCol span)
       -- subtract one: the line number refers to the *following* line
   addSrcFile file
   _ <- popLexState
@@ -1694,8 +1694,7 @@ setColumn span buf len = do
         case reads (lexemeToString buf len) of
           [(column, _)] -> column
           _ -> error "setColumn: expected integer" -- shouldn't happen
-  setSrcLoc (mkRealSrcLoc (srcSpanFile span) (srcSpanEndLine span)
-                          (fromIntegral (column :: Integer)))
+  setSrcLoc (srcSpanFile span) (srcSpanEndLine span) (fromIntegral (column :: Integer))
   _ <- popLexState
   lexToken
 
@@ -1703,7 +1702,7 @@ alrInitialLoc :: FastString -> RealSrcSpan
 alrInitialLoc file = mkRealSrcSpan loc loc
     where -- This is a hack to ensure that the first line in a file
           -- looks like it is after the initial location:
-          loc = mkRealSrcLoc file (-1) (-1)
+          loc = mkRealSrcLoc (-1) (-1) file (-1) (-1)
 
 -- -----------------------------------------------------------------------------
 -- Options, includes and language pragmas.
@@ -2194,8 +2193,14 @@ setExts f = P $ \s -> POk s {
     in  p { pExtsBitmap = f (pExtsBitmap p) }
   } ()
 
-setSrcLoc :: RealSrcLoc -> P ()
-setSrcLoc new_loc = P $ \s -> POk s{loc=new_loc} ()
+setSrcLoc :: FastString -> Int -> Int -> P ()
+setSrcLoc fname line col = P $ \s ->
+  let
+    rl = srcLocRawLine (loc s)
+    rc = srcLocRawCol (loc s)
+    new_loc = mkRealSrcLoc rl rc fname line col
+  in
+    POk s{loc=new_loc} ()
 
 getRealSrcLoc :: P RealSrcLoc
 getRealSrcLoc = P $ \s@(PState{ loc=loc }) -> POk s loc
@@ -3222,13 +3227,17 @@ mkParensApiAnn :: SrcSpan -> [AddAnn]
 mkParensApiAnn (UnhelpfulSpan _)  = []
 mkParensApiAnn s@(RealSrcSpan ss) = [AddAnn AnnOpenP lo,AddAnn AnnCloseP lc]
   where
+    rsl = srcSpanRawStartLine ss
+    rsc = srcSpanRawStartCol ss
+    rel = srcSpanRawEndLine ss
+    rec = srcSpanRawEndCol ss
     f = srcSpanFile ss
     sl = srcSpanStartLine ss
     sc = srcSpanStartCol ss
     el = srcSpanEndLine ss
     ec = srcSpanEndCol ss
-    lo = mkSrcSpan (srcSpanStart s)         (mkSrcLoc f sl (sc+1))
-    lc = mkSrcSpan (mkSrcLoc f el (ec - 1)) (srcSpanEnd s)
+    lo = mkSrcSpan (srcSpanStart s)         (mkSrcLoc rsl (rsc+1) f sl (sc+1))
+    lc = mkSrcSpan (mkSrcLoc rel (rec - 1) f el (ec - 1)) (srcSpanEnd s)
 
 queueComment :: Located Token -> P()
 queueComment c = P $ \s -> POk s {

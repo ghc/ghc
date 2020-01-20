@@ -1422,7 +1422,7 @@ parseCmmFile :: DynFlags -> FilePath -> IO (Messages, Maybe CmmGroup)
 parseCmmFile dflags filename = withTiming dflags (text "ParseCmm"<+>brackets (text filename)) (\_ -> ()) $ do
   buf <- hGetStringBuffer filename
   let
-        init_loc = mkRealSrcLoc (mkFastString filename) 1 1
+        init_loc = mkRealSrcLoc 1 1 (mkFastString filename) 1 1
         init_state = (mkPState dflags buf init_loc) { lex_state = [0] }
                 -- reset the lex_state: the Lexer monad leaves some stuff
                 -- in there we don't want.

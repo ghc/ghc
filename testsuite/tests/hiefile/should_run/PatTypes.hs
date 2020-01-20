@@ -50,7 +50,7 @@ selectPoint hf (sl,sc) = case M.toList (getAsts $ hie_asts hf) of
         Just ast' -> ast'
     _ -> error "map should only contain a single AST"
  where
-   sloc fs = mkRealSrcLoc fs sl sc
+   sloc fs = mkRealSrcLoc sl sc fs sl sc
    sp fs = mkRealSrcSpan (sloc fs) (sloc fs)
 
 main = do

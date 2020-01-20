@@ -14,9 +14,9 @@ import System.Environment( getArgs )
 main::IO()
 main = do
   let
-    loc1 = mkSrcLoc (mkFastString "filename") 1 3
-    loc2 = mkSrcLoc (mkFastString "filename") 1 5
-    loc3 = mkSrcLoc (mkFastString "filename") 10 1
+    loc1 = mkSrcLoc  1 3 (mkFastString "filename") 1 3
+    loc2 = mkSrcLoc  1 5 (mkFastString "filename") 1 5
+    loc3 = mkSrcLoc 10 1 (mkFastString "filename") 10 1
     badLoc = mkGeneralSrcLoc (mkFastString "bad loc")
 
     pointSpan = mkSrcSpan loc1 loc1

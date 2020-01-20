@@ -298,7 +298,7 @@ readerProc chan hdl filter_fn =
                     writeChan chan (BuildMsg (text l))
                     loop ls Nothing
                 Just (file, lineNum, colNum, msg) -> do
-                    let srcLoc = mkSrcLoc (mkFastString file) lineNum colNum
+                    let srcLoc = mkSrcLoc lineNum colNum (mkFastString file) lineNum colNum
                     loop ls (Just (BuildError srcLoc (text msg)))
 
         leading_whitespace []    = False

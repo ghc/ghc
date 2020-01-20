@@ -377,7 +377,7 @@ initTcInteractive hsc_env thing_inside
            (realSrcLocSpan interactive_src_loc)
            thing_inside
   where
-    interactive_src_loc = mkRealSrcLoc (fsLit "<interactive>") 1 1
+    interactive_src_loc = mkRealSrcLoc 1 1 (fsLit "<interactive>") 1 1
 
 {- Note [Default types]
 ~~~~~~~~~~~~~~~~~~~~~~~

@@ -11,7 +11,7 @@ main = do
     [libdir] <- getArgs
 
     let stringBuffer = stringToStringBuffer "-- $bar some\n-- named chunk"
-        loc = mkRealSrcLoc (mkFastString "Foo.hs") 1 1
+        loc = mkRealSrcLoc 1 1 (mkFastString "Foo.hs") 1 1
 
     token <- runGhc (Just libdir) $ do
         dflags <- getSessionDynFlags

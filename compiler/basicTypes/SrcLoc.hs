@@ -30,7 +30,8 @@ module SrcLoc (
         advanceSrcLoc,
 
         -- ** Unsafely deconstructing SrcLoc
-        -- These are dubious exports, because they crash on some inputs
+        srcLocRawLine,          -- return the raw line part
+        srcLocRawCol,           -- return the raw column part
         srcLocFile,             -- return the file name part
         srcLocLine,             -- return the line part
         srcLocCol,              -- return the column part
@@ -57,6 +58,8 @@ module SrcLoc (
         -- ** Unsafely deconstructing SrcSpan
         -- These are dubious exports, because they crash on some inputs
         srcSpanFile,
+        srcSpanRawStartLine, srcSpanRawEndLine,
+        srcSpanRawStartCol, srcSpanRawEndCol,
         srcSpanStartLine, srcSpanEndLine,
         srcSpanStartCol, srcSpanEndCol,
 
@@ -116,10 +119,20 @@ this is the obvious stuff:
 --
 -- Represents a single point within a file
 data RealSrcLoc
-  = SrcLoc      FastString              -- A precise location (file name)
+  = SrcLoc
+      -- Raw location in the StringBuffer
                 {-# UNPACK #-} !Int     -- line number, begins at 1
                 {-# UNPACK #-} !Int     -- column number, begins at 1
-  deriving (Eq, Ord)
+      -- Location adjusted for #line and {-# LINE ... #-} pragmas
+                FastString              -- file name
+                {-# UNPACK #-} !Int     -- line number, begins at 1
+                {-# UNPACK #-} !Int     -- column number, begins at 1
+  deriving Eq
+
+instance Ord RealSrcLoc where
+  compare (SrcLoc rl1 rc1 f1 l1 c1) (SrcLoc rl2 rc2 f2 l2 c2) =
+    compare (f1, l1, c1, rl1, rc1)
+            (f2, l2, c2, rl2, rc2)
 
 -- | Source Location
 data SrcLoc
@@ -135,11 +148,11 @@ data SrcLoc
 ************************************************************************
 -}
 
-mkSrcLoc :: FastString -> Int -> Int -> SrcLoc
-mkSrcLoc x line col = RealSrcLoc (mkRealSrcLoc x line col)
+mkSrcLoc :: Int -> Int -> FastString -> Int -> Int -> SrcLoc
+mkSrcLoc rawline rawcol fname line col = RealSrcLoc (mkRealSrcLoc rawline rawcol fname line col)
 
-mkRealSrcLoc :: FastString -> Int -> Int -> RealSrcLoc
-mkRealSrcLoc x line col = SrcLoc x line col
+mkRealSrcLoc :: Int -> Int -> FastString -> Int -> Int -> RealSrcLoc
+mkRealSrcLoc = SrcLoc
 
 -- | Built-in "bad" 'SrcLoc' values for particular locations
 noSrcLoc, generatedSrcLoc, interactiveSrcLoc :: SrcLoc
@@ -151,26 +164,37 @@ interactiveSrcLoc = UnhelpfulLoc (fsLit "<interactive>")
 mkGeneralSrcLoc :: FastString -> SrcLoc
 mkGeneralSrcLoc = UnhelpfulLoc
 
+srcLocRawLine :: RealSrcLoc -> Int
+srcLocRawLine (SrcLoc rl _ _ _ _) = rl
+
+srcLocRawCol :: RealSrcLoc -> Int
+srcLocRawCol (SrcLoc _ rc _ _ _) = rc
+
 -- | Gives the filename of the 'RealSrcLoc'
 srcLocFile :: RealSrcLoc -> FastString
-srcLocFile (SrcLoc fname _ _) = fname
+srcLocFile (SrcLoc _ _ fname _ _) = fname
 
--- | Raises an error when used on a "bad" 'SrcLoc'
 srcLocLine :: RealSrcLoc -> Int
-srcLocLine (SrcLoc _ l _) = l
+srcLocLine (SrcLoc _ _ _ l _) = l
 
--- | Raises an error when used on a "bad" 'SrcLoc'
 srcLocCol :: RealSrcLoc -> Int
-srcLocCol (SrcLoc _ _ c) = c
+srcLocCol (SrcLoc _ _ _ _ c) = c
 
 -- | Move the 'SrcLoc' down by one line if the character is a newline,
 -- to the next 8-char tabstop if it is a tab, and across by one
 -- character in any other case
 advanceSrcLoc :: RealSrcLoc -> Char -> RealSrcLoc
-advanceSrcLoc (SrcLoc f l _) '\n' = SrcLoc f  (l + 1) 1
-advanceSrcLoc (SrcLoc f l c) '\t' = SrcLoc f  l (((((c - 1) `shiftR` 3) + 1)
-                                                  `shiftL` 3) + 1)
-advanceSrcLoc (SrcLoc f l c) _    = SrcLoc f  l (c + 1)
+advanceSrcLoc (SrcLoc rawl _ f l _) '\n' =
+  SrcLoc (rawl + 1) 1
+       f    (l + 1) 1
+advanceSrcLoc (SrcLoc rawl rawc f l c) '\t' =
+  SrcLoc rawl (tab rawc)
+       f    l (tab    c)
+  where
+    tab x = ((((x - 1) `shiftR` 3) + 1) `shiftL` 3) + 1
+advanceSrcLoc (SrcLoc rawl rawc f l c) _ =
+  SrcLoc rawl (rawc + 1)
+       f    l    (c + 1)
 
 {-
 ************************************************************************
@@ -184,7 +208,7 @@ sortLocated :: [Located a] -> [Located a]
 sortLocated things = sortBy (comparing getLoc) things
 
 instance Outputable RealSrcLoc where
-    ppr (SrcLoc src_path src_line src_col)
+    ppr (SrcLoc _ _ src_path src_line src_col)
       = hcat [ pprFastFilePath src_path <> colon
              , int src_line <> colon
              , int src_col ]
@@ -237,7 +261,13 @@ span of (1,1)-(1,1) is zero characters long.
 -- | Real Source Span
 data RealSrcSpan
   = RealSrcSpan'
-        { srcSpanFile     :: !FastString,
+      -- Raw location in the StringBuffer
+        { srcSpanRawSLine :: {-# UNPACK #-} !Int,
+          srcSpanRawSCol  :: {-# UNPACK #-} !Int,
+          srcSpanRawELine :: {-# UNPACK #-} !Int,
+          srcSpanRawECol  :: {-# UNPACK #-} !Int,
+      -- Location adjusted for #line and {-# LINE ... #-} pragmas
+          srcSpanFile     :: !FastString,
           srcSpanSLine    :: {-# UNPACK #-} !Int,
           srcSpanSCol     :: {-# UNPACK #-} !Int,
           srcSpanELine    :: {-# UNPACK #-} !Int,
@@ -288,26 +318,27 @@ srcLocSpan (UnhelpfulLoc str) = UnhelpfulSpan str
 srcLocSpan (RealSrcLoc l) = RealSrcSpan (realSrcLocSpan l)
 
 realSrcLocSpan :: RealSrcLoc -> RealSrcSpan
-realSrcLocSpan (SrcLoc file line col) = RealSrcSpan' file line col line col
+realSrcLocSpan (SrcLoc rawline rawcol file line col) =
+  RealSrcSpan' rawline rawcol rawline rawcol
+          file    line    col    line    col
 
 -- | Create a 'SrcSpan' between two points in a file
 mkRealSrcSpan :: RealSrcLoc -> RealSrcLoc -> RealSrcSpan
-mkRealSrcSpan loc1 loc2 = RealSrcSpan' file line1 col1 line2 col2
+mkRealSrcSpan loc1 loc2 =
+    RealSrcSpan' rawline1 rawcol1 rawline2 rawcol2
+           file1    line1    col1    line2    col2
   where
-        line1 = srcLocLine loc1
-        line2 = srcLocLine loc2
-        col1 = srcLocCol loc1
-        col2 = srcLocCol loc2
-        file = srcLocFile loc1
+    SrcLoc rawline1 rawcol1  file1 line1 col1 = loc1
+    SrcLoc rawline2 rawcol2 _file2 line2 col2 = loc2
 
 -- | 'True' if the span is known to straddle only one line.
 isOneLineRealSpan :: RealSrcSpan -> Bool
-isOneLineRealSpan (RealSrcSpan' _ line1 _ line2 _)
+isOneLineRealSpan (RealSrcSpan' _ _ _ _ _ line1 _ line2 _)
   = line1 == line2
 
 -- | 'True' if the span is a single point
 isPointRealSpan :: RealSrcSpan -> Bool
-isPointRealSpan (RealSrcSpan' _ line1 col1 line2 col2)
+isPointRealSpan (RealSrcSpan' _ _ _ _ _ line1 col1 line2 col2)
   = line1 == line2 && col1 == col2
 
 -- | Create a 'SrcSpan' between two points in a file
@@ -330,22 +361,29 @@ combineSrcSpans (RealSrcSpan span1) (RealSrcSpan span2)
 -- | Combines two 'SrcSpan' into one that spans at least all the characters
 -- within both spans. Assumes the "file" part is the same in both inputs
 combineRealSrcSpans :: RealSrcSpan -> RealSrcSpan -> RealSrcSpan
-combineRealSrcSpans span1 span2
-  = RealSrcSpan' file line_start col_start line_end col_end
+combineRealSrcSpans span1 span2 =
+  RealSrcSpan' raw_line_start raw_col_start raw_line_end raw_col_end
+        file_1     line_start     col_start     line_end     col_end
   where
-    (line_start, col_start) = min (srcSpanStartLine span1, srcSpanStartCol span1)
-                                  (srcSpanStartLine span2, srcSpanStartCol span2)
-    (line_end, col_end)     = max (srcSpanEndLine span1, srcSpanEndCol span1)
-                                  (srcSpanEndLine span2, srcSpanEndCol span2)
-    file = srcSpanFile span1
+    RealSrcSpan' raw_line_start_1 raw_col_start_1 raw_line_end_1 raw_col_end_1
+          file_1     line_start_1     col_start_1     line_end_1     col_end_1
+      = span1
+    RealSrcSpan' raw_line_start_2 raw_col_start_2 raw_line_end_2 raw_col_end_2
+         _file_2     line_start_2     col_start_2     line_end_2     col_end_2
+      = span2
+    (    line_start,     col_start) = min     (line_start_1,     col_start_1)     (line_start_2,     col_start_2)
+    (raw_line_start, raw_col_start) = min (raw_line_start_1, raw_col_start_1) (raw_line_start_2, raw_col_start_2)
+
+    (    line_end,     col_end) = max     (line_end_1,     col_end_1)     (line_end_2,     col_end_2)
+    (raw_line_end, raw_col_end) = max (raw_line_end_1, raw_col_end_1) (raw_line_end_2, raw_col_end_2)
 
 -- | Convert a SrcSpan into one that represents only its first character
 srcSpanFirstCharacter :: SrcSpan -> SrcSpan
 srcSpanFirstCharacter l@(UnhelpfulSpan {}) = l
 srcSpanFirstCharacter (RealSrcSpan span) = RealSrcSpan $ mkRealSrcSpan loc1 loc2
   where
-    loc1@(SrcLoc f l c) = realSrcSpanStart span
-    loc2 = SrcLoc f l (c+1)
+    loc1@(SrcLoc rawl rawc f l c) = realSrcSpanStart span
+    loc2 = SrcLoc rawl (rawc+1) f l (c+1)
 
 {-
 ************************************************************************
@@ -385,10 +423,20 @@ containsSpan s1 s2
 ************************************************************************
 -}
 
+srcSpanRawStartLine :: RealSrcSpan -> Int
+srcSpanRawEndLine :: RealSrcSpan -> Int
+srcSpanRawStartCol :: RealSrcSpan -> Int
+srcSpanRawEndCol :: RealSrcSpan -> Int
+
 srcSpanStartLine :: RealSrcSpan -> Int
 srcSpanEndLine :: RealSrcSpan -> Int
 srcSpanStartCol :: RealSrcSpan -> Int
 srcSpanEndCol :: RealSrcSpan -> Int
+
+srcSpanRawStartLine RealSrcSpan'{ srcSpanRawSLine=l } = l
+srcSpanRawEndLine RealSrcSpan'{ srcSpanRawELine=l } = l
+srcSpanRawStartCol RealSrcSpan'{ srcSpanRawSCol=l } = l
+srcSpanRawEndCol RealSrcSpan'{ srcSpanRawECol=c } = c
 
 srcSpanStartLine RealSrcSpan'{ srcSpanSLine=l } = l
 srcSpanEndLine RealSrcSpan'{ srcSpanELine=l } = l
@@ -414,12 +462,16 @@ srcSpanEnd (UnhelpfulSpan str) = UnhelpfulLoc str
 srcSpanEnd (RealSrcSpan s) = RealSrcLoc (realSrcSpanEnd s)
 
 realSrcSpanStart :: RealSrcSpan -> RealSrcLoc
-realSrcSpanStart s = mkRealSrcLoc (srcSpanFile s)
+realSrcSpanStart s = mkRealSrcLoc (srcSpanRawStartLine s)
+                                  (srcSpanRawStartCol s)
+                                  (srcSpanFile s)
                                   (srcSpanStartLine s)
                                   (srcSpanStartCol s)
 
 realSrcSpanEnd :: RealSrcSpan -> RealSrcLoc
-realSrcSpanEnd s = mkRealSrcLoc (srcSpanFile s)
+realSrcSpanEnd s = mkRealSrcLoc (srcSpanRawEndLine s)
+                                (srcSpanRawEndCol s)
+                                (srcSpanFile s)
                                 (srcSpanEndLine s)
                                 (srcSpanEndCol s)
 
@@ -444,12 +496,12 @@ instance Ord RealSrcSpan where
      (realSrcSpanEnd   a `compare` realSrcSpanEnd   b)
 
 instance Show RealSrcLoc where
-  show (SrcLoc filename row col)
+  show (SrcLoc _ _ filename row col)
       = "SrcLoc " ++ show filename ++ " " ++ show row ++ " " ++ show col
 
 -- Show is used by Lexer.x, because we derive Show for Token
 instance Show RealSrcSpan where
-  show span@(RealSrcSpan' file sl sc el ec)
+  show span@(RealSrcSpan' _ _ _ _ file sl sc el ec)
     | isPointRealSpan span
     = "SrcSpanPoint " ++ show file ++ " " ++ intercalate " " (map show [sl,sc])
 
@@ -490,13 +542,13 @@ pprUserSpan _         (UnhelpfulSpan s) = ftext s
 pprUserSpan show_path (RealSrcSpan s)   = pprUserRealSpan show_path s
 
 pprUserRealSpan :: Bool -> RealSrcSpan -> SDoc
-pprUserRealSpan show_path span@(RealSrcSpan' src_path line col _ _)
+pprUserRealSpan show_path span@(RealSrcSpan' _ _ _ _ src_path line col _ _)
   | isPointRealSpan span
   = hcat [ ppWhen show_path (pprFastFilePath src_path <> colon)
          , int line <> colon
          , int col ]
 
-pprUserRealSpan show_path span@(RealSrcSpan' src_path line scol _ ecol)
+pprUserRealSpan show_path span@(RealSrcSpan' _ _ _ _ src_path line scol _ ecol)
   | isOneLineRealSpan span
   = hcat [ ppWhen show_path (pprFastFilePath src_path <> colon)
          , int line <> colon
@@ -505,7 +557,7 @@ pprUserRealSpan show_path span@(RealSrcSpan' src_path line scol _ ecol)
             -- For single-character or point spans, we just
             -- output the starting column number
 
-pprUserRealSpan show_path (RealSrcSpan' src_path sline scol eline ecol)
+pprUserRealSpan show_path (RealSrcSpan' _ _ _ _ src_path sline scol eline ecol)
   = hcat [ ppWhen show_path (pprFastFilePath src_path <> colon)
          , parens (int sline <> comma <> int scol)
          , char '-'
@@ -590,7 +642,7 @@ leftmost_largest a b = (srcSpanStart a `compare` srcSpanStart b)
 spans :: SrcSpan -> (Int, Int) -> Bool
 spans (UnhelpfulSpan _) _ = panic "spans UnhelpfulSpan"
 spans (RealSrcSpan span) (l,c) = realSrcSpanStart span <= loc && loc <= realSrcSpanEnd span
-   where loc = mkRealSrcLoc (srcSpanFile span) l c
+   where loc = mkRealSrcLoc l c (srcSpanFile span) l c
 
 -- | Determines whether a span is enclosed by another one
 isSubspanOf :: SrcSpan -- ^ The span that may be enclosed by the other
