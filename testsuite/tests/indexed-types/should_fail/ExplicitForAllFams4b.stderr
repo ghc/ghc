@@ -47,7 +47,7 @@ ExplicitForAllFams4b.hs:16:25: error:
 ExplicitForAllFams4b.hs:23:3: error:
     • Type indexes must match class instance head
       Expected: CT Int _
-        Actual: CT [a] (a, a)
+      Actual:   CT [a] (a, a)
     • In the type instance declaration for ‘CT’
       In the instance declaration for ‘C Int’
 
@@ -66,7 +66,7 @@ ExplicitForAllFams4b.hs:24:15: error:
 ExplicitForAllFams4b.hs:26:3: error:
     • Type indexes must match class instance head
       Expected: CD Int _
-        Actual: CD [a] (a, a)
+      Actual:   CD [a] (a, a)
     • In the data instance declaration for ‘CD’
       In the instance declaration for ‘C Int’
 

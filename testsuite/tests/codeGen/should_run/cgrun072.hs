@@ -4,7 +4,7 @@
    If you see output like
 
         Expected: 48042
-          Actual: 48042
+        Actual:   48042
 
    from this test, it means that the "actual" Word16 (or Word32)
    has higher bits that are nonzero, which is not allowed!

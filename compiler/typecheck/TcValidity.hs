@@ -2297,7 +2297,7 @@ checkConsistentFamInst (InClsInst { ai_class = clas
       = pprWithExplicitKindsWhen (isInvisibleArgFlag vis) $
         vcat [ text "Type indexes must match class instance head"
              , text "Expected:" <+> pp_expected_ty
-             , text "  Actual:" <+> pp_actual_ty ]
+             , text "Actual:  " <+> pp_actual_ty ]
 
     -- Fiddling around to arrange that wildcards unconditionally print as "_"
     -- We only need to print the LHS, not the RHS at all

@@ -2042,7 +2042,7 @@ lintCoercion this@(AxiomRuleCo co cs)
     | otherwise = err "Argument roles mismatch"
                       [ text "In argument:" <+> int (n+1)
                       , text "Expected:" <+> ppr e
-                      , text "Found:" <+> ppr r ]
+                      , text "Found:   " <+> ppr r ]
   lintRoles _ [] []  = return ()
   lintRoles n [] rs  = err "Too many coercion arguments"
                           [ text "Expected:" <+> int n

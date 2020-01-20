@@ -72,7 +72,7 @@ checkResults test inputs expected actual =
         Just i -> error $
             "FAILED: " ++ test ++ " for input: " ++ show (inputs !! i)
               ++ " expected: " ++ show (expected !! i)
-              ++ " but got: " ++ show (actual !! i)
+              ++ " but got:  " ++ show (actual !! i)
 
 -- testing across the entire Word16 range blows the memory,
 -- hence choosing a smaller range
