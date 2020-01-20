@@ -63,12 +63,24 @@ cgTopRhsCon :: DynFlags
             -> DataCon          -- Id
             -> [NonVoid StgArg] -- Args
             -> (CgIdInfo, FCode ())
-cgTopRhsCon dflags id con args =
-    -- See Note [Precomputed INTLIKE closures]
-    (fromMaybe dflt_id_Info intlike_info, unless skip_code gen_code)
+cgTopRhsCon dflags id con args
+  -- See Note [Precomputed INTLIKE closures]
+
+  -- Internal intlike replaceable value
+  | Just info <- intlike_info
+  , isInternalName name
+  = (info, pure ())
+
+  -- External intlike replaceable value
+  | Just info <- intlike_info
+  = (info, gen_code)
+
+  -- Any other value
+  | otherwise = (id_Info, gen_code)
+
   where
    intlike_info  = getPreComputedLFInfo dflags id con args
-   dflt_id_Info  = litIdInfo dflags id (mkConLFInfo con) (CmmLabel closure_label)
+   id_Info       = litIdInfo dflags id (mkConLFInfo con) (CmmLabel closure_label)
    name          = idName id
    skip_code     = isJust intlike_info && isInternalName name
    caffy         = idCafInfo id -- any stgArgHasCafRefs args
@@ -137,7 +149,6 @@ buildDynCon :: Id                 -- Name of the thing to which this constr will
                -- Return details about how to find it and initialization code
 buildDynCon binder actually_bound cc con args
     = do dflags <- getDynFlags
-        --  error "buildDynCon"
          buildDynCon' dflags (targetPlatform dflags) binder actually_bound cc con args
 
 
@@ -249,47 +260,52 @@ bindConArgs _other_con _base args
 {- Note [Precomputed INTLIKE closures]
    ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
-We can replace INTLIKE constructors with static preallocated ones in
-the RTS if:
+We can replace INTLIKE constructors with static preallocated ones
+built into the RTS if:
 
 * They have tag one
 * Their payload fits into mIN_INTLIKE <= val && val <= mAX_INTLIKE
 * Their payload is a single word.
 
-For such values we use a preallocated closure backed into the RTS.
+At compile time we do this replacement in thise module.
+At runtime this is done by GC.
 
-See also Note [INTLIKE closures] in StgMiscClosures.cmm
+`getPreComputedLFInfo` checks if a given con application is a valid
+for replacing it with RTS closures.
 
-We do this optimization for heap values during GC. We also want to
-do so at compile them when possible to avoid having many static closures
-representing the same value.
+We (can) only do this replacement at compile time for (module) internal references.
+Static closures of exported ids will be referenced by their label
+which is based on the Ids name.
+We could emit a indirection but it's more efficient to emit a intlike closure
+than to emit an indirection in that case.
+In order to change this we would have to export how id's should be referenced
+as part of interface files.
 
-For this reason we return a CgIdInfo containing the address of the static
-closure in the RTS whenever possible. This will be used whenever we reference
-this Id *from inside the current module*.
+If the RHS of a con is suitable for intlike replacement at compile
+time we:
 
-As a consequence we if the RHS is suitable for intlike replacement:
+* Omit the static closure for locally bound Ids.
+* Omit the static closure for top level Ids if they are internal.
+* Always reference the RTS closure when computing the location of the Id for
+  module internal references (cg_loc in CgIdInfo).
 
-* Omit the static closure for locally bound Ids completely.
-* Omit the static closure for top level Ids completely if they are internal.
-* Reference the RTS closure for top level exported Ids for better data locality.
+The effect of doing this is that we reduce binary size by avoiding
+redundant static closures.
+In some cases this can also help with cache pressure since we will
+reference the RTS closures more often instead of various static ones
+in generated code.
 
-We have to keep static closures to exported ids around since we can't share the
-CgIdInfo with all usesites. Other modules will reference `foo_closure`
-instead of the replacement address we computed.
-This happens because CgIdInfo is not exported via interface files.
-
-We don't support this optimisation when compiling into Windows DLLs yet
+We don't support this optimization when compiling into Windows DLLs yet
 because they don't support cross package data references well.
 
 TODO:
-Apply to float/double.
-
-See also Note [INTLIKE closures] in StgMiscClosures.cmm
+Since float (and double on x64) have the same heap layout we could apply the
+same logic.
 -}
 
 
-
+-- Determine if a given constructor application can be replaced with a reference
+-- to an RTS intlike closure.
 getPreComputedLFInfo :: DynFlags -> Id -> DataCon -> [NonVoid StgArg] -> Maybe CgIdInfo
 getPreComputedLFInfo dflags binder con [arg]
   | dataConTag con == 1
@@ -318,6 +334,7 @@ getPreComputedLFInfo dflags binder con [arg]
           LitNumWord64
             | wordWidth dflags == W64 -> Just val
           _ -> Nothing
+    -- Always <= WORD sized.
     isIntlikeLitArg (LitChar c) = Just (fromIntegral $ ord c)
     -- TODO: If we can compute their bits we can apply the same
     -- logic.
