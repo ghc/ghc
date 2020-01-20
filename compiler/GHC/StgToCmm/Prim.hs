@@ -1868,18 +1868,14 @@ genericWordMul2Op [res_h, res_l] [arg_x, arg_y]
 genericWordMul2Op _ _ = panic "genericWordMul2Op"
 
 genericIntMul2Op :: GenericOp
-genericIntMul2Op [res_c, res_h, res_l] [arg_x, arg_y]
+genericIntMul2Op [res_c, res_h, res_l] both_args@[arg_x, arg_y]
  = do dflags <- getDynFlags
       platform <- getPlatform
       -- Implement algorithm from Hacker's Delight, 2nd edition, p.174
       let t = cmmExprType platform arg_x
       p   <- newTemp t
       -- 1) compute the multiplication as if numbers were unsigned
-      let wordMul2 = case emitPrimOp dflags WordMul2Op [arg_x,arg_y] of
-            PrimopCmmEmit_External -> panic "Unsupported out-of-line WordMul2Op"
-            PrimopCmmEmit_IntoRegs f -> f
-            PrimopCmmEmit_Raw _ -> panic "Unsupported inline WordMul2Op"
-      wordMul2 [p,res_l]
+      genericWordMul2Op [p, res_l] both_args
       -- 2) correct the high bits of the unsigned result
       let carryFill x = CmmMachOp (MO_S_Shr ww) [x, wwm1]
           sub x y     = CmmMachOp (MO_Sub   ww) [x, y]
