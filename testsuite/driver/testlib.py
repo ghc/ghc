@@ -393,7 +393,7 @@ def extra_run_opts( val ):
     return lambda name, opts, v=val: _extra_run_opts(name, opts, v);
 
 def _extra_run_opts( name, opts, v ):
-    opts.extra_run_opts = v
+    opts.extra_run_opts += " " + v
 
 # -----
 
@@ -401,7 +401,7 @@ def extra_hc_opts( val ):
     return lambda name, opts, v=val: _extra_hc_opts(name, opts, v);
 
 def _extra_hc_opts( name, opts, v ):
-    opts.extra_hc_opts = v
+    opts.extra_hc_opts += " " + v
 
 # -----
 
@@ -567,13 +567,15 @@ def llvm_build ( ) -> bool:
 # appears to change (up or down) when the underlying profile hasn't
 # really changed. To further minimize this effect we run with a single
 # generation (meaning we get a residency sample on every GC) with a small
-# allocation area (as suggested in #17387).
+# allocation area (as suggested in #17387). That's what +RTS -h -i0 will do.
+# If you find that a test is flaky, sampling frequency can be adjusted by
+# shrinking the allocation area (+RTS -A64k, for example).
 #
 # However, please don't just ignore changes in residency.  If you see
 # a change in one of these figures, please check whether it is real or
 # not as follows:
 #
-#  * Run the test with old and new compilers, adding +RTS -h -i0.01
+#  * Run the test with old and new compilers, adding +RTS -h -i0.001
 #    (you don't need to compile anything for profiling or enable profiling
 #    libraries to get a heap profile).
 #  * view the heap profiles, read off the maximum residency.  If it has
