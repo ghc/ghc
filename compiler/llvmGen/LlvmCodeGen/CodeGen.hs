@@ -330,9 +330,34 @@ genCall (PrimTarget (MO_U_Mul2 w)) [dstH, dstL] [lhs, rhs] = runStmtsDecls $ do
     retV <- doExprW width2x $ LlvmOp LM_MO_Mul lhsExt rhsExt
     -- Extract the lower bits of the result into retL.
     retL <- doExprW width $ Cast LM_Trunc retV width
-    -- Now we right-shift the higher bits by width.
+    -- Now we unsigned right-shift the higher bits by width.
     let widthLlvmLit = LMLitVar $ LMIntLit (fromIntegral bitWidth) width
     retShifted <- doExprW width2x $ LlvmOp LM_MO_LShr retV widthLlvmLit
+    -- And extract them into retH.
+    retH <- doExprW width $ Cast LM_Trunc retShifted width
+    dstRegL <- getCmmRegW (CmmLocal dstL)
+    dstRegH <- getCmmRegW (CmmLocal dstH)
+    statement $ Store retL dstRegL
+    statement $ Store retH dstRegH
+
+genCall (PrimTarget (MO_S_Mul2 w)) [dstH, dstL] [lhs, rhs] = runStmtsDecls $ do
+    let width = widthToLlvmInt w
+        bitWidth = widthInBits w
+        width2x = LMInt (bitWidth * 2)
+    -- First sign-extend the operands ('mul' instruction requires the operands
+    -- and the result to be of the same type). Note that we don't use 'castVars'
+    -- because it tries to do LM_Sext.
+    lhsVar <- exprToVarW lhs
+    rhsVar <- exprToVarW rhs
+    lhsExt <- doExprW width2x $ Cast LM_Sext lhsVar width2x
+    rhsExt <- doExprW width2x $ Cast LM_Sext rhsVar width2x
+    -- Do the actual multiplication (note that the result is also 2x width).
+    retV <- doExprW width2x $ LlvmOp LM_MO_Mul lhsExt rhsExt
+    -- Extract the lower bits of the result into retL.
+    retL <- doExprW width $ Cast LM_Trunc retV width
+    -- Now we signed right-shift the higher bits by width.
+    let widthLlvmLit = LMLitVar $ LMIntLit (fromIntegral bitWidth) width
+    retShifted <- doExprW width2x $ LlvmOp LM_MO_AShr retV widthLlvmLit
     -- And extract them into retH.
     retH <- doExprW width $ Cast LM_Trunc retShifted width
     dstRegL <- getCmmRegW (CmmLocal dstL)

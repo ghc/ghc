@@ -1402,7 +1402,7 @@ emitPrimOp dflags = \case
     else Right genericWordMul2Op
 
   IntMul2Op  -> \args -> opCallishHandledLater args $
-    if ncg && x86ish
+    if ncg && x86ish || llvm
     then Left (MO_S_Mul2     (wordWidth dflags))
     else Right genericIntMul2Op
 
