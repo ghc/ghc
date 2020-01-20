@@ -857,10 +857,17 @@ bufWrite h_@Handle__{..} ptr count can_block =
                 -- if we can fit in the buffer, then just loop
                 if count < size
                    then bufWrite h_ ptr count can_block
-                   else if can_block
-                           then do writeChunk h_ (castPtr ptr) offset count
-                                   return count
-                           else writeChunkNonBlocking h_ (castPtr ptr) offset count
+                   else do
+                      !bytes <- if can_block
+                                  then do writeChunk h_ (castPtr ptr) offset count
+                                          return count
+                                  else writeChunkNonBlocking h_ (castPtr ptr) offset count
+                      -- Even if we bypass the buffer we must update the offset for the buffer
+                      -- for future writes.
+                      !buf <- readIORef haByteBuffer
+                      writeIORef haByteBuffer $! bufferAddOffset bytes buf
+                      return bytes
+
 
 writeChunk :: Handle__ -> Ptr Word8 -> Word64 -> Int -> IO ()
 writeChunk h_@Handle__{..} ptr offset bytes
