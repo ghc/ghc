@@ -50,7 +50,7 @@ import Coercion
 import TcOrigin
 import Type
 import TyCoRep   -- for checkValidRoles
-import TyCoPpr( pprTyVars, pprWithExplicitKindsWhen )
+import TyCoPpr( pprTyVars, pprTyVar, pprWithExplicitKindsWhen )
 import Class
 import CoAxiom
 import TyCon
@@ -82,7 +82,6 @@ import Data.List
 import qualified Data.List.NonEmpty as NE
 import Data.List.NonEmpty ( NonEmpty(..) )
 import qualified Data.Set as Set
-import Data.Tuple
 
 {-
 ************************************************************************
@@ -667,29 +666,11 @@ generaliseTyClDecl inferred_tc_env (L _ decl)
   = do { let names_in_this_decl :: [Name]
              names_in_this_decl = tycld_names decl
 
-       ; tc_with_tvs :: [(TcTyCon, [(Name,TcTyVar)])]
-             <- mapM skolemise_tc_tycon names_in_this_decl
+       ; tc_with_tvs  <- mapM skolemise_tc_tycon names_in_this_decl
+       ; swizzled_tcs <- tcAddDeclCtxt decl $
+                         swizzleTcTyConBndrs tc_with_tvs
 
-       ; let swizzle_prs :: [(Name,TyVar)]
-             -- Pairs the user-specifed Name with its representative TyVar
-             -- See Note [Generalising the kind of a TcTyCon]
-             swizzle_prs = concatMap snd tc_with_tvs
-
-         -- Check for duplicates
-         -- E.g. data SameKind (a::k) (b::k)
-         --      data T (a::k1) (b::k2) = MkT (SameKind a b)
-         -- Here k1 and k2 start as TyVarTvs, and get unified with each other
-         -- If this happens, things get very confused later, so fail fast
-       ; traceTc "generaliseTyClDecl" $
-         vcat [ ppr decl
-              , text "swizzle_prs" <+> ppr swizzle_prs ]
-       ; tcAddDeclCtxt decl $
-         checkDuplicateTyConBinders swizzle_prs
-
-       ; let swizzle_env :: TyVarEnv Name
-             -- Maps the representative TyVar to the Name to use for it
-             swizzle_env = mkVarEnv (map swap swizzle_prs)
-       ; mapAndReportM (generaliseTcTyCon swizzle_env) tc_with_tvs }
+       ; mapAndReportM generaliseTcTyCon swizzled_tcs }
   where
     tycld_names :: TyClDecl GhcRn -> [Name]
     tycld_names decl = tcdName decl : at_names decl
@@ -698,7 +679,7 @@ generaliseTyClDecl inferred_tc_env (L _ decl)
     at_names (ClassDecl { tcdATs = ats }) = map (familyDeclName . unLoc) ats
     at_names _ = []  -- Only class decls have associated types
 
-    skolemise_tc_tycon :: Name -> TcM (TcTyCon, [(Name,TcTyVar)])
+    skolemise_tc_tycon :: Name -> TcM (TcTyCon, [(Name,TcTyVar)], TcKind)
     -- Zonk and skolemise the Specified and Required binders
     -- It's essential that they are skolems, not MetaTyVars,
     -- for Step 3 in generaliseTcTyCon to work right
@@ -706,37 +687,87 @@ generaliseTyClDecl inferred_tc_env (L _ decl)
       = do { let tc = lookupNameEnv_NF inferred_tc_env tc_name
                       -- This lookup should not fail
            ; scoped_prs <- mapSndM zonkAndSkolemise (tcTyConScopedTyVars tc)
-           ; return (tc, scoped_prs) }
+           ; traceTc "skolemise_tc_ty_con" $
+             vcat [ ppr tc, text "before" <+> pprScopedTyVars (tcTyConScopedTyVars tc)
+                  , text "after" <+> pprScopedTyVars scoped_prs ]
+           ; res_kind   <- zonkTcType (tyConResKind tc)
+           ; return (tc, scoped_prs, res_kind) }
 
-generaliseTcTyCon :: TyVarEnv Name -> (TcTyCon, [(Name,TcTyVar)]) -> TcM TcTyCon
-generaliseTcTyCon swizzle_env (tc, spec_req_prs)
+
+pprScopedTyVars :: [(Name, TcTyVar)] -> SDoc
+pprScopedTyVars prs = sep [ parens (ppr nm <+> comma <+> pprTyVar tv)
+                          | (nm,tv) <- prs ]
+
+swizzleTcTyConBndrs :: [(TcTyCon, [(Name,TcTyVar)], TcKind)]
+                    -> TcM [(TcTyCon, [TcTyVar], TcKind)]
+swizzleTcTyConBndrs tc_infos
+  = do { -- Check for duplicates
+         -- E.g. data SameKind (a::k) (b::k)
+         --      data T (a::k1) (b::k2) = MkT (SameKind a b)
+         -- Here k1 and k2 start as TyVarTvs, and get unified with each other
+         -- If this happens, things get very confused later, so fail fast
+       ; unless (null err_prs) $
+         do { mapM_ report_dup err_prs; failM }
+
+       ; return [ (tc, map subst_tv scoped_prs, substTyUnchecked subst kind)
+                       -- Again, we can get rid of Unchecked when
+                       -- we move to shallow fvs in substitution
+                | (tc, scoped_prs, kind) <- tc_infos ] }
+
+  where
+    swizzle_prs :: [(Name,TyVar)]
+    -- Pairs the user-specifed Name with its representative TyVar
+    -- See Note [Generalising the kind of a TcTyCon]
+    swizzle_prs = [ pr | (_, prs, _) <- tc_infos, pr <- prs ]
+
+    in_scope = mkInScopeSet $ mkVarSet $
+               [ tv | (nm,tv) <- swizzle_prs, tv <- [tv, tv `setTyVarName` nm] ]
+    subst = mkTvSubst in_scope $ mkVarEnv $
+            [ (tv, mkTyVarTy tv')
+            | (nm,tv) <- swizzle_prs
+            , let tv' = tv `setTyVarName` nm
+                           `setTyVarKind` substTyUnchecked subst (tyVarKind tv) ]
+              -- Unchecked because we'll get a loop if the ASSERT
+              -- looks deeply into the kinds of the domain of the subst!
+              -- We can change this when we move to checking just the
+              -- shallow tyvars
+
+    subst_tv (_, tv) = getTyVar_maybe (substTyVar subst tv)
+                       `orElse` pprPanic "swizzleTyConBndrs" (ppr tv)
+
+    err_prs :: [(Name,Name)]
+    err_prs = [ (n1,n2)
+              | pr :| prs <- findDupsEq eq_snd swizzle_prs
+              , (n1,_):(n2,_):_ <- [nubBy same_occ (pr:prs)] ]
+
+    report_dup :: (Name,Name) -> TcM ()
+    report_dup (n1,n2)
+      = setSrcSpan (getSrcSpan n2) $ addErrTc $
+        text "Different names for the same type variable:" <+> quotes (ppr n1)
+             <+> text "and" <+> quotes (ppr n2)
+
+    eq_snd (_,tv1) (_,tv2) = tv1 == tv2
+    same_occ (n1,_) (n2,_) = nameOccName n1 == nameOccName n2
+
+
+generaliseTcTyCon :: (TcTyCon, [TcTyVar], TcKind) -> TcM TcTyCon
+generaliseTcTyCon (tc, spec_req_tvs, tc_res_kind)
   -- See Note [Required, Specified, and Inferred for types]
   = setSrcSpan (getSrcSpan tc) $
     addTyConCtxt tc $
-    do { let tc_name      = tyConName tc
-             tc_res_kind  = tyConResKind tc
-             spec_req_tvs = map snd spec_req_prs
-             -- NB: spec_req_tvs includes both Specified and Required
-             -- Running example in Note [Inferring kinds for type declarations]
-             --    spec_req_prs = [ ("k1",kk1), ("a", (aa::kk1))
-             --                   , ("k2",kk2), ("x", (xx::kk2))]
-             -- where "k1" denotes the Name k1, and kk1, aa, etc are MetaTyVars,
-             -- specifically TyVarTvs
-
-       -- Step 1: Find the Specified and Inferred variables
-       -- NB: spec_req_tvs = spec_tvs ++ req_tvs
-       --     And req_tvs is 1-1 with tyConTyVars
-       --     See Note [Scoped tyvars in a TcTyCon] in TyCon
-       ; let n_spec              = length spec_req_tvs - tyConArity tc
+    do { -- Step 1: Separate Specified from Required variables
+         -- NB: spec_req_tvs = spec_tvs ++ req_tvs
+         --     And req_tvs is 1-1 with tyConTyVars
+         --     See Note [Scoped tyvars in a TcTyCon] in TyCon
+         let n_spec              = length spec_req_tvs - tyConArity tc
              (spec_tvs, req_tvs) = splitAt n_spec spec_req_tvs
              sorted_spec_tvs     = scopedSort spec_tvs
                  -- NB: We can't do the sort until we've zonked
                  --     Maintain the L-R order of scoped_tvs
 
        -- Step 2a: find all the Inferred variables we want to quantify over
-       -- NB: candidateQTyVarsOfKinds zonks as it goes
        ; dvs1 <- candidateQTyVarsOfKinds $
-                (tc_res_kind : map tyVarKind spec_req_tvs)
+                 (tc_res_kind : map tyVarKind spec_req_tvs)
        ; let dvs2 = dvs1 `delCandidates` spec_req_tvs
 
        -- Step 2b: quantify, mainly meaning skolemise the free variables
@@ -747,26 +778,25 @@ generaliseTcTyCon swizzle_env (tc, spec_req_prs)
            (vcat [ text "spec_req_tvs =" <+> pprTyVars spec_req_tvs
                  , text "inferred =" <+> pprTyVars inferred ])
 
-       -- Step 3: final zonking
+       -- Step 3: Final zonking (following kind generalisation)
        -- See Note [Generalising the kind of a TcTyCon]
        ; ze <- emptyZonkEnv
-       ; (ze, inferred)        <- zonkSwizzleTyBndrsX swizzle_env ze inferred
-       ; (ze, sorted_spec_tvs) <- zonkSwizzleTyBndrsX swizzle_env ze sorted_spec_tvs
-       ; (ze, req_tvs)         <- zonkSwizzleTyBndrsX swizzle_env ze req_tvs
+       ; (ze, inferred)        <- zonkTyBndrsX ze inferred
+       ; (ze, sorted_spec_tvs) <- zonkTyBndrsX ze sorted_spec_tvs
+       ; (ze, req_tvs)         <- zonkTyBndrsX ze req_tvs
        ; tc_res_kind           <- zonkTcTypeToTypeX ze tc_res_kind
 
        ; traceTc "generaliseTcTyCon: post zonk" $
          vcat [ text "tycon =" <+> ppr tc
               , text "inferred =" <+> pprTyVars inferred
-              , text "spec_req_prs =" <+> ppr spec_req_prs
+              , text "ze =" <+> ppr ze
               , text "spec_req_tvs =" <+> pprTyVars spec_req_tvs
               , text "sorted_spec_tvs =" <+> pprTyVars sorted_spec_tvs
               , text "req_tvs =" <+> ppr req_tvs
               , text "zonk-env =" <+> ppr ze ]
 
        -- Step 4: Make the TyConBinders.
-       ; let to_user tv     = lookupTyVarOcc ze tv `orElse` tv
-             dep_fv_set     = mapVarSet to_user (candidateKindVars dvs1)
+       ; let dep_fv_set     = candidateKindVars dvs1
              inferred_tcbs  = mkNamedTyConBinders Inferred inferred
              specified_tcbs = mkNamedTyConBinders Specified sorted_spec_tvs
              required_tcbs  = map (mkRequiredTyConBinder dep_fv_set) req_tvs
@@ -777,7 +807,7 @@ generaliseTcTyCon swizzle_env (tc, spec_req_prs)
                                  , required_tcbs ]
 
        -- Step 6: Make the result TcTyCon
-             tycon = mkTcTyCon tc_name final_tcbs tc_res_kind
+             tycon = mkTcTyCon (tyConName tc) final_tcbs tc_res_kind
                             (mkTyVarNamePairs (sorted_spec_tvs ++ req_tvs))
                             True {- it's generalised now -}
                             (tyConFlavour tc)
@@ -797,25 +827,6 @@ generaliseTcTyCon swizzle_env (tc, spec_req_prs)
        ; checkTyConTelescope tycon
 
        ; return tycon }
-
-checkDuplicateTyConBinders :: [(Name, TcTyVar)] -> TcM ()
-checkDuplicateTyConBinders spec_req_prs
-  | null err_prs = return ()
-  | otherwise    = mapM_ report_dup err_prs >> failM
-  where
-    err_prs :: [(Name,Name)]
-    err_prs = [ (n1,n2)
-              | pr :| prs <- findDupsEq eq_snd spec_req_prs
-              , (n1,_):(n2,_):_ <- [nubBy same_occ (pr:prs)] ]
-
-    report_dup :: (Name,Name) -> TcM ()
-    report_dup (n1,n2)
-      = setSrcSpan (getSrcSpan n2) $ addErrTc $
-        text "Different names for the same type variable:" <+> quotes (ppr n1)
-             <+> text "and" <+> quotes (ppr n2)
-
-    eq_snd (_,tv1) (_,tv2) = tv1 == tv2
-    same_occ (n1,_) (n2,_) = nameOccName n1 == nameOccName n2
 
 {- Note [Required, Specified, and Inferred for types]
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
