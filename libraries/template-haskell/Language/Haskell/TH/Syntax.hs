@@ -1039,6 +1039,9 @@ rightName = mkNameG DataName "base" "Data.Either" "Right"
 nonemptyName :: Name
 nonemptyName = mkNameG DataName "base" "GHC.Base" ":|"
 
+oneName, manyName :: Name
+oneName  = mkNameG DataName "ghc-prim" "GHC.Types" "One"
+manyName = mkNameG DataName "ghc-prim" "GHC.Types" "Many"
 -----------------------------------------------------
 --
 --              Generic Lift implementations
@@ -2380,6 +2383,7 @@ data Type = ForallT [TyVarBndr] Cxt Type  -- ^ @forall \<vars\>. \<ctxt\> => \<t
           | UnboxedTupleT Int             -- ^ @(\#,\#), (\#,,\#), etc.@
           | UnboxedSumT SumArity          -- ^ @(\#|\#), (\#||\#), etc.@
           | ArrowT                        -- ^ @->@
+          | MulArrowT                     -- ^ @FUN@
           | EqualityT                     -- ^ @~@
           | ListT                         -- ^ @[]@
           | PromotedTupleT Int            -- ^ @'(), '(,), '(,,), etc.@

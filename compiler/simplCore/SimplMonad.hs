@@ -1,3 +1,4 @@
+{-# LANGUAGE PatternSynonyms #-}
 {-
 (c) The AQUA Project, Glasgow University, 1993-1998
 
@@ -26,7 +27,7 @@ import Var              ( Var, isId, mkLocalVar )
 import Name             ( mkSystemVarName )
 import Id               ( Id, mkSysLocalOrCoVar )
 import IdInfo           ( IdDetails(..), vanillaIdInfo, setArityInfo )
-import Type             ( Type, mkLamTypes )
+import Type             ( Type, mkLamTypes, Mult )
 import FamInstEnv       ( FamInstEnv )
 import CoreSyn          ( RuleEnv(..) )
 import UniqSupply
@@ -39,6 +40,7 @@ import ErrUtils as Err
 import Panic (throwGhcExceptionIO, GhcException (..))
 import BasicTypes          ( IntWithInf, treatZeroAsInf, mkIntWithInf )
 import Control.Monad       ( ap )
+import Multiplicity        ( pattern Many )
 
 {-
 ************************************************************************
@@ -177,9 +179,9 @@ getSimplRules = SM (\st_env us sc -> return (st_rules st_env, us, sc))
 getFamEnvs :: SimplM (FamInstEnv, FamInstEnv)
 getFamEnvs = SM (\st_env us sc -> return (st_fams st_env, us, sc))
 
-newId :: FastString -> Type -> SimplM Id
-newId fs ty = do uniq <- getUniqueM
-                 return (mkSysLocalOrCoVar fs uniq ty)
+newId :: FastString -> Mult -> Type -> SimplM Id
+newId fs w ty = do uniq <- getUniqueM
+                   return (mkSysLocalOrCoVar fs uniq w ty)
 
 newJoinId :: [Var] -> Type -> SimplM Id
 newJoinId bndrs body_ty
@@ -193,7 +195,7 @@ newJoinId bndrs body_ty
              id_info    = vanillaIdInfo `setArityInfo` arity
 --                                        `setOccInfo` strongLoopBreaker
 
-       ; return (mkLocalVar details name join_id_ty id_info) }
+       ; return (mkLocalVar details name Many join_id_ty id_info) }
 
 {-
 ************************************************************************

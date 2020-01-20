@@ -1,5 +1,6 @@
 {-# LANGUAGE CPP, TypeFamilies #-}
 {-# LANGUAGE FlexibleContexts #-}
+{-# LANGUAGE PatternSynonyms #-}
 {-# LANGUAGE ViewPatterns #-}
 
 -----------------------------------------------------------------------------
@@ -46,6 +47,7 @@ import NameEnv
 import TcType
 import TyCon
 import TysWiredIn
+import Multiplicity ( pattern Many )
 import CoreSyn
 import MkCore
 import CoreUtils
@@ -1136,9 +1138,10 @@ repTy ty@(HsForAllTy {hst_fvf = fvf}) = repForall fvf         ty
 repTy ty@(HsQualTy {})                = repForall ForallInvis ty
 
 repTy (HsTyVar _ _ (dL->L _ n))
-  | isLiftedTypeKindTyConName n       = repTStar
-  | n `hasKey` constraintKindTyConKey = repTConstraint
-  | n `hasKey` funTyConKey            = repArrowTyCon
+  | isLiftedTypeKindTyConName n        = repTStar
+  | n `hasKey` constraintKindTyConKey  = repTConstraint
+  | n `hasKey` unrestrictedFunTyConKey = repArrowTyCon
+  | n `hasKey` funTyConKey             = repMulArrowTyCon
   | isTvOcc occ   = do tv1 <- lookupOcc n
                        repTvar tv1
   | isDataOcc occ = do tc1 <- lookupOcc n
@@ -1157,11 +1160,16 @@ repTy (HsAppKindTy _ ty ki) = do
                                 ty1 <- repLTy ty
                                 ki1 <- repLTy ki
                                 repTappKind ty1 ki1
-repTy (HsFunTy _ f a)       = do
+repTy (HsFunTy _ w f a) | isUnrestricted w = do
                                 f1   <- repLTy f
                                 a1   <- repLTy a
                                 tcon <- repArrowTyCon
                                 repTapps tcon [f1, a1]
+repTy (HsFunTy _ w f a) = do w1   <- repLTy (arrowToHsType w)
+                             f1   <- repLTy f
+                             a1   <- repLTy a
+                             tcon <- repMulArrowTyCon
+                             repTapps tcon [w1, f1, a1]
 repTy (HsListTy _ t)        = do
                                 t1   <- repLTy t
                                 tcon <- repListTyCon
@@ -1884,7 +1892,7 @@ mkGenSyms :: [Name] -> DsM [GenSymBind]
 --
 -- Nevertheless, it's monadic because we have to generate nameTy
 mkGenSyms ns = do { var_ty <- lookupType nameTyConName
-                  ; return [(nm, mkLocalId (localiseName nm) var_ty) | nm <- ns] }
+                  ; return [(nm, mkLocalId (localiseName nm) Many var_ty) | nm <- ns] }
 
 
 addBinds :: [GenSymBind] -> DsM a -> DsM a
@@ -2410,11 +2418,11 @@ repConstr :: HsConDeclDetails GhcRn
           -> [Core TH.Name]
           -> DsM (Core TH.ConQ)
 repConstr (PrefixCon ps) Nothing [con]
-    = do arg_tys  <- repList bangTypeQTyConName repBangTy ps
+    = do arg_tys  <- repList bangTypeQTyConName repBangTy (map hsScaledThing ps)
          rep2 normalCName [unC con, unC arg_tys]
 
 repConstr (PrefixCon ps) (Just res_ty) cons
-    = do arg_tys     <- repList bangTypeQTyConName repBangTy ps
+    = do arg_tys     <- repList bangTypeQTyConName repBangTy (map hsScaledThing ps)
          res_ty' <- repLTy res_ty
          rep2 gadtCName [ unC (nonEmptyCoreList cons), unC arg_tys, unC res_ty']
 
@@ -2437,8 +2445,8 @@ repConstr (RecCon ips) resTy cons
                           ; rep2 varBangTypeName [v,ty] }
 
 repConstr (InfixCon st1 st2) Nothing [con]
-    = do arg1 <- repBangTy st1
-         arg2 <- repBangTy st2
+    = do arg1 <- repBangTy (hsScaledThing st1)
+         arg2 <- repBangTy (hsScaledThing st2)
          rep2 infixCName [unC arg1, unC con, unC arg2]
 
 repConstr (InfixCon {}) (Just _) _ =
@@ -2525,6 +2533,9 @@ repUnboxedSumTyCon arity = do dflags <- getDynFlags
 
 repArrowTyCon :: DsM (Core TH.TypeQ)
 repArrowTyCon = rep2 arrowTName []
+
+repMulArrowTyCon :: DsM (Core TH.TypeQ)
+repMulArrowTyCon = rep2 mulArrowTName []
 
 repListTyCon :: DsM (Core TH.TypeQ)
 repListTyCon = rep2 listTName []

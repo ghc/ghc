@@ -689,6 +689,9 @@ appKindT ty ki = do
 arrowT :: TypeQ
 arrowT = return ArrowT
 
+mulArrowT :: TypeQ
+mulArrowT = return MulArrowT
+
 listT :: TypeQ
 listT = return ListT
 

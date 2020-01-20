@@ -64,6 +64,7 @@ import TyCon
 import DataCon
 import PatSyn
 import Type
+import Multiplicity
 import Coercion
 import TysPrim
 import TysWiredIn
@@ -98,9 +99,9 @@ hand, which should indeed be bound to the pattern as a whole, then use it;
 otherwise, make one up.
 -}
 
-selectSimpleMatchVarL :: LPat GhcTc -> DsM Id
+selectSimpleMatchVarL :: Mult -> LPat GhcTc -> DsM Id
 -- Postcondition: the returned Id has an Internal Name
-selectSimpleMatchVarL pat = selectMatchVar (unLoc pat)
+selectSimpleMatchVarL w pat = selectMatchVar w (unLoc pat)
 
 -- (selectMatchVars ps tys) chooses variables of type tys
 -- to use for matching ps against.  If the pattern is a variable,
@@ -118,20 +119,25 @@ selectSimpleMatchVarL pat = selectMatchVar (unLoc pat)
 --    Then we must not choose (x::Int) as the matching variable!
 -- And nowadays we won't, because the (x::Int) will be wrapped in a CoPat
 
-selectMatchVars :: [Pat GhcTc] -> DsM [Id]
+selectMatchVars :: [(Mult, Pat GhcTc)] -> DsM [Id]
 -- Postcondition: the returned Ids have Internal Names
-selectMatchVars ps = mapM selectMatchVar ps
+selectMatchVars ps = mapM (uncurry selectMatchVar) ps
 
-selectMatchVar :: Pat GhcTc -> DsM Id
+selectMatchVar :: Mult -> Pat GhcTc -> DsM Id
 -- Postcondition: the returned Id has an Internal Name
-selectMatchVar (BangPat _ pat) = selectMatchVar (unLoc pat)
-selectMatchVar (LazyPat _ pat) = selectMatchVar (unLoc pat)
-selectMatchVar (ParPat _ pat)  = selectMatchVar (unLoc pat)
-selectMatchVar (VarPat _ var)  = return (localiseId (unLoc var))
+selectMatchVar w (BangPat _ pat) = selectMatchVar w (unLoc pat)
+selectMatchVar w (LazyPat _ pat) = selectMatchVar w (unLoc pat)
+selectMatchVar w (ParPat _ pat)  = selectMatchVar w (unLoc pat)
+selectMatchVar _w (VarPat _ var)  = return (localiseId (unLoc var))
                                   -- Note [Localise pattern binders]
-selectMatchVar (AsPat _ var _) = return (unLoc var)
-selectMatchVar other_pat       = newSysLocalDsNoLP (hsPatType other_pat)
-                                  -- OK, better make up one...
+                                  --
+                                  -- Remark: when the pattern is a variable (or
+                                  -- an @-pattern), then w is the same as the
+                                  -- multiplicity stored within the variable
+                                  -- itself. It's easier to pull it from the
+                                  -- variable, so we ignore the multiplicity.
+selectMatchVar _w (AsPat _ var _) = return (unLoc var)
+selectMatchVar w other_pat     = newSysLocalDsNoLP w (hsPatType other_pat)
 
 {- Note [Localise pattern binders]
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
@@ -356,7 +362,7 @@ mkDataConCase var ty alts@(alt1:_) = MatchResult fail_flag mk_case
     mk_case :: CoreExpr -> DsM CoreExpr
     mk_case fail = do
         alts <- mapM (mk_alt fail) sorted_alts
-        return $ mkWildCase (Var var) (idType var) ty (mk_default fail ++ alts)
+        return $ mkWildCase (Var var) (idScaledType var) ty (mk_default fail ++ alts)
 
     mk_alt :: CoreExpr -> CaseAlt DataCon -> DsM CoreAlt
     mk_alt fail MkCaseAlt{ alt_pat = con,
@@ -368,7 +374,8 @@ mkDataConCase var ty alts@(alt1:_) = MatchResult fail_flag mk_case
                 Just (DCB boxer) ->
         do { us <- newUniqueSupply
            ; let (rep_ids, binds) = initUs_ us (boxer ty_args args)
-           ; return (DataAlt con, rep_ids, mkLets binds body) } } }
+           ; let rep_ids' = map (\i -> scaleIdBy i (idMult var)) rep_ids
+           ; return (DataAlt con, rep_ids', mkLets binds body) } } }
 
     mk_default :: CoreExpr -> [CoreAlt]
     mk_default fail | exhaustive_case = []
@@ -484,9 +491,10 @@ mkCoreAppDs _ (Var f `App` Type ty1 `App` Type ty2 `App` arg1) arg2
     case_bndr = case arg1 of
                    Var v1 | isInternalName (idName v1)
                           -> v1        -- Note [Desugaring seq (2) and (3)]
-                   _      -> mkWildValBinder ty1
+                   _      -> mkWildValBinder Many ty1
+                             -- Remark: seq is unrestricted in its first argument
 
-mkCoreAppDs s fun arg = mkCoreApp s fun arg  -- The rest is done in MkCore
+mkCoreAppDs s fun arg = mkCoreApp (text "mkCoreAppDs" $$ s) fun arg  -- The rest is done in MkCore
 
 -- NB: No argument can be levity polymorphic
 mkCoreAppsDs :: SDoc -> CoreExpr -> [CoreExpr] -> CoreExpr
@@ -658,7 +666,8 @@ work out well:
      ; y = case v of K x y -> y }
   which is better.
 -}
-
+-- Remark: pattern selectors only occur in unrestricted patterns so we are free
+-- to select Many as the multiplicity of every let-expression introduced.
 mkSelectorBinds :: [[Tickish Id]] -- ^ ticks to add, possibly
                 -> LPat GhcTc     -- ^ The pattern
                 -> CoreExpr       -- ^ Expression to which the pattern is bound
@@ -673,7 +682,7 @@ mkSelectorBinds ticks pat val_expr
 
   | is_flat_prod_lpat pat'           -- Special case (B)
   = do { let pat_ty = hsLPatType pat'
-       ; val_var <- newSysLocalDsNoLP pat_ty
+       ; val_var <- newSysLocalDsNoLP Many pat_ty
 
        ; let mk_bind tick bndr_var
                -- (mk_bind sv bv)  generates  bv = case sv of { pat -> bv }
@@ -691,7 +700,7 @@ mkSelectorBinds ticks pat val_expr
        ; return ( val_var, (val_var, val_expr) : binds) }
 
   | otherwise                          -- General case (C)
-  = do { tuple_var  <- newSysLocalDs tuple_ty
+  = do { tuple_var  <- newSysLocalDs Many tuple_ty
        ; error_expr <- mkErrorAppDs pAT_ERROR_ID tuple_ty (ppr pat')
        ; tuple_expr <- matchSimply val_expr PatBindRhs pat
                                    local_tuple error_expr
@@ -845,8 +854,8 @@ mkFailurePair :: CoreExpr       -- Result type of the whole case expression
                       CoreExpr) -- Fail variable applied to realWorld#
 -- See Note [Failure thunks and CPR]
 mkFailurePair expr
-  = do { fail_fun_var <- newFailLocalDs (voidPrimTy `mkVisFunTy` ty)
-       ; fail_fun_arg <- newSysLocalDs voidPrimTy
+  = do { fail_fun_var <- newFailLocalDs Many (voidPrimTy `mkVisFunTyMany` ty)
+       ; fail_fun_arg <- newSysLocalDs Many voidPrimTy
        ; let real_arg = setOneShotLambda fail_fun_arg
        ; return (NonRec fail_fun_var (Lam real_arg expr),
                  App (Var fail_fun_var) (Var voidPrimId)) }
@@ -891,7 +900,7 @@ mkBinaryTickBox :: Int -> Int -> CoreExpr -> DsM CoreExpr
 mkBinaryTickBox ixT ixF e = do
        uq <- newUnique
        this_mod <- getModule
-       let bndr1 = mkSysLocal (fsLit "t1") uq boolTy
+       let bndr1 = mkSysLocal (fsLit "t1") uq One boolTy
        let
            falseBox = Tick (HpcTick this_mod ixF) (Var falseDataConId)
            trueBox  = Tick (HpcTick this_mod ixT) (Var trueDataConId)

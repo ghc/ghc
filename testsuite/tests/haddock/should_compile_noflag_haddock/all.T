@@ -47,4 +47,4 @@ test('haddockC038', normal, compile, [''])
 # The tests below this line are not duplicated in
 # should_compile_flag_haddock.
 
-test('haddockSimplUtilsBug', normal, compile, [''])
+test('haddockSimplUtilsBug', expect_broken(436), compile, [''])

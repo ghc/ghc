@@ -54,6 +54,7 @@ import DsMonad
 import Bag
 import TyCoRep
 import Type
+import Multiplicity
 import DsUtils       (isTrueLHsExpr)
 import Maybes
 import qualified GHC.LanguageExtensions as LangExt
@@ -667,7 +668,7 @@ translateConPatVec fam_insts  univ_tys  ex_tvs c (RecCon (HsRecFields fs _))
       return (arg_var_pats ++ guards)
   where
     -- The actual argument types (instantiated), with strictness marks
-    arg_tys     = conLikeInstOrigArgTys c (univ_tys ++ mkTyVarTys ex_tvs)
+    arg_tys     = map scaledThing $ conLikeInstOrigArgTys c (univ_tys ++ mkTyVarTys ex_tvs)
 
     -- Some label information
     orig_lbls    = map flSelector $ conLikeFieldLabels c
