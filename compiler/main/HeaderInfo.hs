@@ -67,7 +67,7 @@ getImports :: DynFlags
               -- ^ The source imports and normal imports (with optional package
               -- names from -XPackageImports), and the module name.
 getImports dflags buf filename source_filename = do
-  let loc  = mkRealSrcLoc (mkFastString filename) 1 1
+  let loc  = mkRealSrcLoc 1 1 (mkFastString filename) 1 1
   case unP parseHeader (mkPState dflags buf loc) of
     PFailed pst ->
         -- assuming we're not logging warnings here as per below
@@ -84,7 +84,7 @@ getImports dflags buf filename source_filename = do
           let   hsmod = unLoc rdr_module
                 mb_mod = hsmodName hsmod
                 imps = hsmodImports hsmod
-                main_loc = srcLocSpan (mkSrcLoc (mkFastString source_filename)
+                main_loc = srcLocSpan (mkSrcLoc 1 1 (mkFastString source_filename)
                                        1 1)
                 mod = mb_mod `orElse` L main_loc mAIN_NAME
                 (src_idecls, ord_idecls) = partition (ideclSource.unLoc) imps
@@ -175,7 +175,7 @@ lazyGetToks dflags filename handle = do
   buf <- hGetStringBufferBlock handle blockSize
   unsafeInterleaveIO $ lazyLexBuf handle (pragState dflags buf loc) False blockSize
  where
-  loc  = mkRealSrcLoc (mkFastString filename) 1 1
+  loc  = mkRealSrcLoc 1 1 (mkFastString filename) 1 1
 
   lazyLexBuf :: Handle -> PState -> Bool -> Int -> IO [Located Token]
   lazyLexBuf handle state eof size = do
@@ -211,7 +211,7 @@ lazyGetToks dflags filename handle = do
 getToks :: DynFlags -> FilePath -> StringBuffer -> [Located Token]
 getToks dflags filename buf = lexAll (pragState dflags buf loc)
  where
-  loc  = mkRealSrcLoc (mkFastString filename) 1 1
+  loc  = mkRealSrcLoc 1 1 (mkFastString filename) 1 1
 
   lexAll state = case unP (lexer False return) state of
                    POk _      t@(L _ ITeof) -> [t]

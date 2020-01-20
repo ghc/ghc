@@ -293,7 +293,7 @@ setLine :: Int -> Action
 setLine code span buf len = do
   let line = parseUnsignedInteger buf len 10 octDecDigit
   liftP $ do
-    setSrcLoc (mkRealSrcLoc (srcSpanFile span) (fromIntegral line - 1) 1)
+    setSrcLoc (srcSpanFile span) (fromIntegral line - 1) 1
           -- subtract one: the line number refers to the *following* line
     -- trace ("setLine "  ++ show line) $ do
     popLexState >> pushLexState code
@@ -303,7 +303,7 @@ setFile :: Int -> Action
 setFile code span buf len = do
   let file = lexemeToFastString (stepOn buf) (len-2)
   liftP $ do
-    setSrcLoc (mkRealSrcLoc file (srcSpanEndLine span) (srcSpanEndCol span))
+    setSrcLoc file (srcSpanEndLine span) (srcSpanEndCol span)
     popLexState >> pushLexState code
   lexToken
 

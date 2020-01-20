@@ -3969,7 +3969,7 @@ incorrect.
 fileSrcSpan :: P SrcSpan
 fileSrcSpan = do
   l <- getRealSrcLoc;
-  let loc = mkSrcLoc (srcLocFile l) 1 1;
+  let loc = mkSrcLoc 1 1 (srcLocFile l) 1 1;
   return (mkSrcSpan loc loc)
 
 -- Hint about the MultiWayIf extension

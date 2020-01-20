@@ -338,7 +338,7 @@ tcRnCheckUnitId hsc_env uid =
           HsigFile -- bogus
           False
           mAIN -- bogus
-          (realSrcLocSpan (mkRealSrcLoc (fsLit loc_str) 0 0)) -- bogus
+          (realSrcLocSpan (mkRealSrcLoc 0 0 (fsLit loc_str) 0 0)) -- bogus
     $ checkUnitId uid
   where
    dflags = hsc_dflags hsc_env

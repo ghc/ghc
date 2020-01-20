@@ -1363,7 +1363,7 @@ getModuleSourceAndFlags mod = do
 getTokenStream :: GhcMonad m => Module -> m [Located Token]
 getTokenStream mod = do
   (sourceFile, source, flags) <- getModuleSourceAndFlags mod
-  let startLoc = mkRealSrcLoc (mkFastString sourceFile) 1 1
+  let startLoc = mkRealSrcLoc 1 1 (mkFastString sourceFile) 1 1
   case lexTokenStream source startLoc flags of
     POk _ ts  -> return ts
     PFailed pst ->
@@ -1376,7 +1376,7 @@ getTokenStream mod = do
 getRichTokenStream :: GhcMonad m => Module -> m [(Located Token, String)]
 getRichTokenStream mod = do
   (sourceFile, source, flags) <- getModuleSourceAndFlags mod
-  let startLoc = mkRealSrcLoc (mkFastString sourceFile) 1 1
+  let startLoc = mkRealSrcLoc 1 1 (mkFastString sourceFile) 1 1
   case lexTokenStream source startLoc flags of
     POk _ ts -> return $ addSourceToTokens startLoc source ts
     PFailed pst ->
@@ -1413,7 +1413,7 @@ showRichTokenStream ts = go startLoc ts ""
           getFile [] = panic "showRichTokenStream: No source file found"
           getFile (UnhelpfulSpan _ : xs) = getFile xs
           getFile (RealSrcSpan s : _) = srcSpanFile s
-          startLoc = mkRealSrcLoc sourceFile 1 1
+          startLoc = mkRealSrcLoc 1 1 sourceFile 1 1
           go _ [] = id
           go loc ((L span _, str):ts)
               = case span of
@@ -1551,7 +1551,7 @@ parser :: String         -- ^ Haskell module source text (full Unicode is suppor
 
 parser str dflags filename =
    let
-       loc  = mkRealSrcLoc (mkFastString filename) 1 1
+       loc  = mkRealSrcLoc 1 1 (mkFastString filename) 1 1
        buf  = stringToStringBuffer str
    in
    case unP Parser.parseModule (mkPState dflags buf loc) of

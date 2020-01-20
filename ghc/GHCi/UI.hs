@@ -1124,7 +1124,7 @@ checkInputForLayout stmt getStmt = do
    let dflags = xopt_set dflags' LangExt.AlternativeLayoutRule
    st0 <- getGHCiState
    let buf'   =  stringToStringBuffer stmt
-       loc    = mkRealSrcLoc (fsLit (progname st0)) (line_number st0) 1
+       loc    = mkRealSrcLoc (line_number st0) 1 (fsLit (progname st0)) (line_number st0) 1
        pstate = Lexer.mkPState dflags buf' loc
    case Lexer.unP goToEnd pstate of
      (Lexer.POk _ False) -> return $ Just stmt
@@ -2182,10 +2182,10 @@ parseSpanArg s = do
         _  -> skipWs1 s4
 
     let fs    = mkFastString fp
-        span' = mkRealSrcSpan (mkRealSrcLoc fs sl sc)
+        span' = mkRealSrcSpan (mkRealSrcLoc sl sc fs sl sc)
                               -- End column of RealSrcSpan is the column
                               -- after the end of the span.
-                              (mkRealSrcLoc fs el (ec + 1))
+                              (mkRealSrcLoc el (ec + 1) fs el (ec + 1))
 
     return (span',trailer)
   where
@@ -3873,7 +3873,7 @@ listModuleLine modl line = do
      Nothing -> panic "listModuleLine"
      Just summ -> do
            let filename = expectJust "listModuleLine" (ml_hs_file (GHC.ms_location summ))
-               loc = mkRealSrcLoc (mkFastString (filename)) line 0
+               loc = mkRealSrcLoc line 0 (mkFastString (filename)) line 0
            listAround (realSrcLocSpan loc) False
 
 -- | list a section of a source file around a particular SrcSpan.

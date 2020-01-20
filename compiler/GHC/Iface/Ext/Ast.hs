@@ -250,7 +250,7 @@ enrichHie ts (hsGrp, imports, exports, _) = flip runReaderT initState $ do
     imps <- toHie $ filter (not . ideclImplicit . unLoc) imports
     exps <- toHie $ fmap (map $ IEC Export . fst) exports
     let spanFile children = case children of
-          [] -> mkRealSrcSpan (mkRealSrcLoc "" 1 1) (mkRealSrcLoc "" 1 1)
+          [] -> mkRealSrcSpan (mkRealSrcLoc 1 1 "" 1 1) (mkRealSrcLoc 1 1 "" 1 1)
           _ -> mkRealSrcSpan (realSrcSpanStart $ nodeSpan $ head children)
                              (realSrcSpanEnd   $ nodeSpan $ last children)
 

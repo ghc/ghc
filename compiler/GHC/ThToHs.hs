@@ -794,7 +794,7 @@ cvtPragmaD (AnnP target exp)
        }
 
 cvtPragmaD (LineP line file)
-  = do { setL (srcLocSpan (mkSrcLoc (fsLit file) line 1))
+  = do { setL (srcLocSpan (mkSrcLoc line 1 (fsLit file) line 1))
        ; return Nothing
        }
 cvtPragmaD (CompleteP cls mty)

@@ -1365,6 +1365,10 @@ instance Binary a => Binary (Located a) where
 
 instance Binary RealSrcSpan where
   put_ bh ss = do
+            put_ bh (srcSpanRawStartLine ss)
+            put_ bh (srcSpanRawStartCol ss)
+            put_ bh (srcSpanRawEndLine ss)
+            put_ bh (srcSpanRawEndCol ss)
             put_ bh (srcSpanFile ss)
             put_ bh (srcSpanStartLine ss)
             put_ bh (srcSpanStartCol ss)
@@ -1372,13 +1376,17 @@ instance Binary RealSrcSpan where
             put_ bh (srcSpanEndCol ss)
 
   get bh = do
+            rsl <- get bh
+            rsc <- get bh
+            rel <- get bh
+            rec <- get bh
             f <- get bh
             sl <- get bh
             sc <- get bh
             el <- get bh
             ec <- get bh
-            return (mkRealSrcSpan (mkRealSrcLoc f sl sc)
-                                  (mkRealSrcLoc f el ec))
+            return (mkRealSrcSpan (mkRealSrcLoc rsl rsc f sl sc)
+                                  (mkRealSrcLoc rel rec f el ec))
 
 instance Binary SrcSpan where
   put_ bh (RealSrcSpan ss) = do

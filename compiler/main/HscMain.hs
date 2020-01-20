@@ -345,7 +345,7 @@ hscParse' mod_summary
                Just b  -> return b
                Nothing -> liftIO $ hGetStringBuffer src_filename
 
-    let loc = mkRealSrcLoc (mkFastString src_filename) 1 1
+    let loc = mkRealSrcLoc 1 1 (mkFastString src_filename) 1 1
     let parseMod | HsigFile == ms_hsc_src mod_summary
                  = parseSignature
                  | otherwise = parseModule
@@ -476,7 +476,7 @@ hsc_typecheck keep_rn mod_summary mb_rdr_module = do
         outer_mod' = mkModule (thisPackage dflags) mod_name
         inner_mod = canonicalizeHomeModule dflags mod_name
         src_filename  = ms_hspp_file mod_summary
-        real_loc = realSrcLocSpan $ mkRealSrcLoc (mkFastString src_filename) 1 1
+        real_loc = realSrcLocSpan $ mkRealSrcLoc 1 1 (mkFastString src_filename) 1 1
         keep_rn' = gopt Opt_WriteHie dflags || keep_rn
     MASSERT( moduleUnitId outer_mod == thisPackage dflags )
     if hsc_src == HsigFile && not (isHoleModule inner_mod)
@@ -1854,7 +1854,8 @@ hscParseThingWithLocation source linenumber parser str
     dflags <- getDynFlags
 
     let buf = stringToStringBuffer str
-        loc = mkRealSrcLoc (fsLit source) linenumber 1
+        loc = mkRealSrcLoc linenumber 1 (fsLit source) linenumber 1
+                -- TODO (int-index): differentiate the raw and adjusted line numbers
 
     case unP parser (mkPState dflags buf loc) of
         PFailed pst -> do

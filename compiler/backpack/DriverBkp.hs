@@ -80,7 +80,7 @@ doBackpack [src_filename] = do
     -- TODO: Preprocessing not implemented
 
     buf <- liftIO $ hGetStringBuffer src_filename
-    let loc = mkRealSrcLoc (mkFastString src_filename) 1 1 -- TODO: not great
+    let loc = mkRealSrcLoc 1 1 (mkFastString src_filename) 1 1 -- TODO: not great
     case unP parseBackpack (mkPState dflags buf loc) of
         PFailed pst -> throwErrors (getErrorMessages pst dflags)
         POk _ pkgname_bkp -> do
@@ -675,7 +675,7 @@ summariseRequirement pn mod_name = do
     time <- liftIO $ getModificationUTCTime (bkp_filename env)
     hi_timestamp <- liftIO $ modificationTimeIfExists (ml_hi_file location)
     hie_timestamp <- liftIO $ modificationTimeIfExists (ml_hie_file location)
-    let loc = srcLocSpan (mkSrcLoc (mkFastString (bkp_filename env)) 1 1)
+    let loc = srcLocSpan (mkSrcLoc 1 1 (mkFastString (bkp_filename env)) 1 1)
 
     mod <- liftIO $ addHomeModuleToFinder hsc_env mod_name location
 

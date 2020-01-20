@@ -915,7 +915,7 @@ isDecl dflags stmt = do
 parseThing :: Lexer.P thing -> DynFlags -> String -> Lexer.ParseResult thing
 parseThing parser dflags stmt = do
   let buf = stringToStringBuffer stmt
-      loc = mkRealSrcLoc (fsLit "<interactive>") 1 1
+      loc = mkRealSrcLoc 1 1 (fsLit "<interactive>") 1 1
 
   Lexer.unP parser (Lexer.mkPState dflags buf loc)
 
