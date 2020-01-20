@@ -401,7 +401,7 @@ def extra_hc_opts( val ):
     return lambda name, opts, v=val: _extra_hc_opts(name, opts, v);
 
 def _extra_hc_opts( name, opts, v ):
-    opts.extra_hc_opts = v
+    opts.extra_hc_opts += " " + v
 
 # -----
 
