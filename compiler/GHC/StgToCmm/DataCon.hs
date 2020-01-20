@@ -82,7 +82,6 @@ cgTopRhsCon dflags id con args
    intlike_info  = getPreComputedLFInfo dflags id con args
    id_Info       = litIdInfo dflags id (mkConLFInfo con) (CmmLabel closure_label)
    name          = idName id
-   skip_code     = isJust intlike_info && isInternalName name
    caffy         = idCafInfo id -- any stgArgHasCafRefs args
    closure_label = mkClosureLabel name caffy
 
