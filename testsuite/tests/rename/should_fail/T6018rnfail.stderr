@@ -1,18 +1,18 @@
 
 T6018rnfail.hs:8:23:
     Incorrect type variable on the LHS of injectivity condition
-         Expected : r
-         Actual   : a
+         Expected: r
+         Actual:   a
 
 T6018rnfail.hs:9:24:
     Incorrect type variable on the LHS of injectivity condition
-         Expected : r
-         Actual   : a
+         Expected: r
+         Actual:   a
 
 T6018rnfail.hs:12:19:
     Incorrect type variable on the LHS of injectivity condition
-         Expected : r
-         Actual   : a
+         Expected: r
+         Actual:   a
 
 T6018rnfail.hs:15:19:
     Type variable ‘a’, naming a type family result,
