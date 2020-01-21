@@ -1,6 +1,6 @@
 
 T14066.hs:15:59: error:
-    • Expected kind ‘k’, but ‘b’ has kind ‘k1’
+    • Expected kind ‘k2’, but ‘b’ has kind ‘k3’
     • In the second argument of ‘SameKind’, namely ‘b’
       In the type signature: g :: forall k (b :: k). SameKind a b
       In the expression:

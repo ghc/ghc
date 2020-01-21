@@ -32,7 +32,7 @@ import CoreSyn (CoreExpr, Expr(Var,App))
 import FastString (unpackFS, lengthFS)
 import DynFlags
 import GHC.Hs
-import TcHsSyn
+import TcHsSyn   ( shortCutLit )
 import Id
 import ConLike
 import Name
@@ -45,7 +45,7 @@ import DataCon
 import TyCon
 import Var (EvVar)
 import Coercion
-import TcEvidence
+import TcEvidence ( HsWrapper(..), isIdHsWrapper )
 import TcType (evVarPred)
 import {-# SOURCE #-} DsExpr (dsExpr, dsLExpr, dsSyntaxExpr)
 import {-# SOURCE #-} DsBinds (dsHsWrapper)
@@ -972,7 +972,7 @@ checkGrdTree guards deltas = do
   tracePm "checkGrdTree {" $ vcat [ ppr guards
                                   , ppr deltas ]
   res <- checkGrdTree' guards deltas
-  tracePm "}:" (ppr res) -- braces are easier to match by tooling
+  tracePm "checkGrdTree }:" (ppr res) -- braces are easier to match by tooling
   return res
 
 -- ----------------------------------------------------------------------------

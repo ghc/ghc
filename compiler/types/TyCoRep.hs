@@ -39,7 +39,7 @@ module TyCoRep (
         -- * Coercions
         Coercion(..),
         UnivCoProvenance(..),
-        CoercionHole(..), coHoleCoVar, setCoHoleCoVar,
+        CoercionHole(..), BlockSubstFlag(..), coHoleCoVar, setCoHoleCoVar,
         CoercionN, CoercionR, CoercionP, KindCoercion,
         MCoercion(..), MCoercionR, MCoercionN,
 
@@ -1493,11 +1493,17 @@ instance Outputable UnivCoProvenance where
 
 -- | A coercion to be filled in by the type-checker. See Note [Coercion holes]
 data CoercionHole
-  = CoercionHole { ch_co_var :: CoVar
+  = CoercionHole { ch_co_var  :: CoVar
                        -- See Note [CoercionHoles and coercion free variables]
 
-                 , ch_ref    :: IORef (Maybe Coercion)
+                 , ch_blocker :: BlockSubstFlag  -- should this hole block substitution?
+                                                 -- See (2a) in TcCanonical
+                                                 -- Note [Equalities with incompatible kinds]
+                 , ch_ref     :: IORef (Maybe Coercion)
                  }
+
+data BlockSubstFlag = YesBlockSubst
+                    | NoBlockSubst
 
 coHoleCoVar :: CoercionHole -> CoVar
 coHoleCoVar = ch_co_var
@@ -1514,6 +1520,9 @@ instance Data.Data CoercionHole where
 instance Outputable CoercionHole where
   ppr (CoercionHole { ch_co_var = cv }) = braces (ppr cv)
 
+instance Outputable BlockSubstFlag where
+  ppr YesBlockSubst = text "YesBlockSubst"
+  ppr NoBlockSubst  = text "NoBlockSubst"
 
 {- Note [Phantom coercions]
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~
