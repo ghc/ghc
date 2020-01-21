@@ -1751,16 +1751,17 @@ skolemiseUnboundMetaTyVar :: TcTyVar -> TcM TyVar
 skolemiseUnboundMetaTyVar tv
   = ASSERT2( isMetaTyVar tv, ppr tv )
     do  { when debugIsOn (check_empty tv)
-        ; span <- getSrcSpanM    -- Get the location from "here"
+        ; here <- getSrcSpanM    -- Get the location from "here"
                                  -- ie where we are generalising
         ; kind <- zonkTcType (tyVarKind tv)
-        ; let uniq        = getUnique tv
-                -- NB: Use same Unique as original tyvar. This is
-                -- convenient in reading dumps, but is otherwise inessential.
-
-              tv_name     = getOccName tv
-              final_name  = mkInternalName uniq tv_name span
-              final_tv    = mkTcTyVar final_name kind details
+        ; let tv_name     = tyVarName tv
+              -- See Note [Skolemising and identity]
+              final_name | isSystemName tv_name
+                         = mkInternalName (nameUnique tv_name)
+                                          (nameOccName tv_name) here
+                         | otherwise
+                         = tv_name
+              final_tv = mkTcTyVar final_name kind details
 
         ; traceTc "Skolemising" (ppr tv <+> text ":=" <+> ppr final_tv)
         ; writeMetaTyVar tv (mkTyVarTy final_tv)
@@ -1873,9 +1874,29 @@ If we zonk `a' with a regular type variable, we will have this regular type
 variable now floating around in the simplifier, which in many places assumes to
 only see proper TcTyVars.
 
-We can avoid this problem by zonking with a skolem.  The skolem is rigid
-(which we require for a quantified variable), but is still a TcTyVar that the
-simplifier knows how to deal with.
+We can avoid this problem by zonking with a skolem TcTyVar.  The
+skolem is rigid (which we require for a quantified variable), but is
+still a TcTyVar that the simplifier knows how to deal with.
+
+Note [Skolemising and identity]
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+In some places, we make a TyVarTv for a binder. E.g.
+    class C a where ...
+As Note [Inferring kinds for type declarations] discusses,
+we make a TyVarTv for 'a'.  Later we skolemise it, and we'd
+like to retain its identity, location info etc.  (If we don't
+retain its identity we'll have to do some pointless swizzling;
+see TcTyClsDecls.swizzleTcTyConBndrs.  If we retain its identity
+but not its location we'll lose the detailed binding site info.
+
+Conclusion: use the Name of the TyVarTv.  But we don't want
+to do that when skolemising random unification variables;
+there the location we want is the skolemisation site.
+
+Fortunately we can tell the difference: random unification
+variables have System Names.  That's why final_name is
+set based on the isSystemName test.
+
 
 Note [Silly Type Synonyms]
 ~~~~~~~~~~~~~~~~~~~~~~~~~~
