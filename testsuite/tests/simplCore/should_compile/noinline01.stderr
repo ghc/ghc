@@ -1,4 +1,5 @@
 
+==================== STG: ====================
 Noinline01.f [InlPrag=INLINE (sat-args=1)]
   :: forall p. p -> GHC.Types.Bool
 [GblId, Arity=1, Caf=NoCafRefs, Str=<L,A>, Unf=OtherCon []] =
@@ -28,3 +29,5 @@ Noinline01.$trModule :: GHC.Types.Module
 [GblId, Caf=NoCafRefs, Cpr=m, Unf=OtherCon []] =
     CCS_DONT_CARE GHC.Types.Module! [Noinline01.$trModule3
                                      Noinline01.$trModule1];
+
+

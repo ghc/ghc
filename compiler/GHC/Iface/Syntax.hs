@@ -2518,6 +2518,7 @@ instance NFData IfaceInfoItem where
     HsUnfold b unf -> rnf b `seq` rnf unf
     HsNoCafRefs -> ()
     HsLevity -> ()
+    HsCpr cpr -> cpr `seq` ()
 
 instance NFData IfaceUnfolding where
   rnf = \case
