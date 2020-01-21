@@ -1,3 +1,4 @@
+
 {-
 (c) The University of Glasgow 2006
 (c) The GRASP/AQUA Project, Glasgow University, 1992-1998
@@ -58,6 +59,7 @@ import TcEvidence
 import BasicTypes
 -- others:
 import GHC.Core.Ppr ( {- instance OutputableBndr TyVar -} )
+import GHC.Driver.Session ( gopt, GeneralFlag(Opt_PrintTypecheckerElaboration) )
 import TysWiredIn
 import Var
 import RdrName ( RdrName )
@@ -526,10 +528,11 @@ pprPat (NPat _ l (Just _) _)    = char '-' <> ppr l
 pprPat (NPlusKPat _ n k _ _ _)  = hcat [ppr n, char '+', ppr k]
 pprPat (SplicePat _ splice)     = pprSplice splice
 pprPat (CoPat _ co pat _)       = pprIfTc @p $
-                                  pprHsWrapper co $ \parens
-                                              -> if parens
-                                                 then pprParendPat appPrec pat
-                                                 else pprPat pat
+                                  sdocWithDynFlags $ \ dflags ->
+                                  if gopt Opt_PrintTypecheckerElaboration dflags
+                                  then hang (text "CoPat" <+> parens (ppr co))
+                                          2 (pprParendPat appPrec pat)
+                                  else pprPat pat
 pprPat (SigPat _ pat ty)        = ppr pat <+> dcolon <+> ppr_ty
   where ppr_ty = case ghcPass @p of
                    GhcPs -> ppr ty

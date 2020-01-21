@@ -1089,9 +1089,8 @@ ppr_expr (XExpr x) = case ghcPass @p of
   GhcPs -> ppr x
   GhcRn -> ppr x
   GhcTc -> case x of
-    HsWrap co_fn e ->  pprHsWrapper co_fn (\parens -> if parens then pprExpr e
+    HsWrap co_fn e -> pprHsWrapper co_fn (\parens -> if parens then pprExpr e
                                                       else pprExpr e)
-
 
 ppr_infix_expr :: forall p. (OutputableBndrId p) => HsExpr (GhcPass p) -> Maybe SDoc
 ppr_infix_expr (HsVar _ (L _ v))    = Just (pprInfixOcc v)
@@ -1118,7 +1117,7 @@ ppr_apps fun args = hang (ppr_expr fun) 2 (fsep (map pp args))
     -- pp (Right (LHsWcTypeX (HsWC { hswc_body = L _ arg })))
     --   = char '@' <> pprHsType arg
     pp (Right arg)
-      = char '@' <> ppr arg
+      = text "@" <> ppr arg
 
 pprExternalSrcLoc :: (StringLiteral,(Int,Int),(Int,Int)) -> SDoc
 pprExternalSrcLoc (StringLiteral _ src,(n1,n2),(n3,n4))
@@ -1712,41 +1711,39 @@ pprPatBind pat (grhss)
 
 pprMatch :: (OutputableBndrId idR, Outputable body)
          => Match (GhcPass idR) body -> SDoc
-pprMatch match
+pprMatch (Match { m_pats = pats, m_ctxt = ctxt, m_grhss = grhss })
   = sep [ sep (herald : map (nest 2 . pprParendLPat appPrec) other_pats)
-        , nest 2 (pprGRHSs ctxt (m_grhss match)) ]
+        , nest 2 (pprGRHSs ctxt grhss) ]
   where
-    ctxt = m_ctxt match
     (herald, other_pats)
         = case ctxt of
             FunRhs {mc_fun=L _ fun, mc_fixity=fixity, mc_strictness=strictness}
-                | strictness == SrcStrict -> ASSERT(null $ m_pats match)
-                                             (char '!'<>pprPrefixOcc fun, m_pats match)
-                        -- a strict variable binding
-                | fixity == Prefix -> (pprPrefixOcc fun, m_pats match)
-                        -- f x y z = e
-                        -- Not pprBndr; the AbsBinds will
-                        -- have printed the signature
+                | SrcStrict <- strictness
+                -> ASSERT(null pats)     -- A strict variable binding
+                   (char '!'<>pprPrefixOcc fun, pats)
 
-                | null pats2 -> (pp_infix, [])
-                        -- x &&& y = e
+                | Prefix <- fixity
+                -> (pprPrefixOcc fun, pats) -- f x y z = e
+                                            -- Not pprBndr; the AbsBinds will
+                                            -- have printed the signature
+                | otherwise
+                -> case pats of
+                     (p1:p2:rest)
+                        | null rest -> (pp_infix, [])           -- x &&& y = e
+                        | otherwise -> (parens pp_infix, rest)  -- (x &&& y) z = e
+                        where
+                          pp_infix = pprParendLPat opPrec p1
+                                     <+> pprInfixOcc fun
+                                     <+> pprParendLPat opPrec p2
+                     _ -> pprPanic "pprMatch" (ppr ctxt $$ ppr pats)
 
-                | otherwise -> (parens pp_infix, pats2)
-                        -- (x &&& y) z = e
-                where
-                  pp_infix = pprParendLPat opPrec pat1
-                         <+> pprInfixOcc fun
-                         <+> pprParendLPat opPrec pat2
+            LambdaExpr -> (char '\\', pats)
 
-            LambdaExpr -> (char '\\', m_pats match)
-
-            _  -> if null (m_pats match)
-                     then (empty, [])
-                     else ASSERT2( null pats1, ppr ctxt $$ ppr pat1 $$ ppr pats1 )
-                          (ppr pat1, [])        -- No parens around the single pat
-
-    (pat1:pats1) = m_pats match
-    (pat2:pats2) = pats1
+            _ -> case pats of
+                   []    -> (empty, [])
+                   [pat] -> (ppr pat, [])  -- No parens around the single pat in a case
+                   _     -> pprPanic "pprMatch" (ppr ctxt $$ ppr pats)
+pprMatch (XMatch nec) = noExtCon nec
 
 pprGRHSs :: (OutputableBndrId idR, Outputable body)
          => HsMatchContext passL -> GRHSs (GhcPass idR) body -> SDoc
