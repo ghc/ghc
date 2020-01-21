@@ -1,6 +1,6 @@
 
 T7368a.hs:8:6: error:
-    • Couldn't match kind ‘*’ with ‘* -> *’
+    • Couldn't match kind ‘* -> *’ with ‘*’
       When matching types
         f :: * -> *
         Bad :: (* -> *) -> *
