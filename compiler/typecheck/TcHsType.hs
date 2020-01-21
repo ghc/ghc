@@ -2209,7 +2209,7 @@ kcCheckDeclHeader_sig kisig name flav ktvs kc_res_ki =
     -- similar to:  bindImplicitTKBndrs_Tv
     bind_implicit :: [Name] -> ([(Name,TcTyVar)] -> TcM a) -> TcM a
     bind_implicit tv_names thing_inside =
-      do { let new_tv name = do { tcv <- newFlexiKindedTyVarTyVar name
+      do { let new_tv name = do { tcv <- cloneFlexiKindedTyVarTyVar name
                                 ; return (name, tcv) }
          ; tcvs <- mapM new_tv tv_names
          ; tcExtendNameTyVarEnv tcvs (thing_inside tcvs) }
@@ -2576,6 +2576,31 @@ expectedKindInCtxt _                   = OpenKind
 *                                                                      *
 ********************************************************************* -}
 
+{- Note [Unification variables need fresh Names]
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+Whenever we allocate a unification variable (MetaTyVar) we give
+it a fresh name.   #16221 is a very tricky case that illustrates
+why this is important:
+
+   data SameKind :: k -> k -> *
+   data T0 a = forall k2 (b :: k2). MkT0 (SameKind a b) !Int
+
+When kind-checking T0, we give (a :: kappa1). Then, in kcConDecl
+we allocate a unification variable kappa2 for k2, and then we
+end up unifying kappa1 := kappa2 (because of the (SameKind a b).
+
+Now we generalise over kappa2; but if kappa2's Name is k2,
+we'll end up giving T0 the kind forall k2. k2 -> *.  Nothing
+directly wrong with that but when we typecheck the data constrautor
+we end up giving it the type
+  MkT0 :: forall k1 (a :: k1) k2 (b :: k2).
+          SameKind @k2 a b -> Int -> T0 @{k2} a
+which is bogus.  The result type should be T0 @{k1} a.
+
+And there no reason /not/ to clone the Name when making a
+unification variable.  So that's what we do.
+-}
+
 --------------------------------------
 -- Implicit binders
 --------------------------------------
@@ -2584,9 +2609,9 @@ bindImplicitTKBndrs_Skol, bindImplicitTKBndrs_Tv,
   bindImplicitTKBndrs_Q_Skol, bindImplicitTKBndrs_Q_Tv
   :: [Name] -> TcM a -> TcM ([TcTyVar], a)
 bindImplicitTKBndrs_Skol   = bindImplicitTKBndrsX newFlexiKindedSkolemTyVar
-bindImplicitTKBndrs_Tv     = bindImplicitTKBndrsX newFlexiKindedTyVarTyVar
+bindImplicitTKBndrs_Tv     = bindImplicitTKBndrsX cloneFlexiKindedTyVarTyVar
 bindImplicitTKBndrs_Q_Skol = bindImplicitTKBndrsX (newImplicitTyVarQ newFlexiKindedSkolemTyVar)
-bindImplicitTKBndrs_Q_Tv   = bindImplicitTKBndrsX (newImplicitTyVarQ newFlexiKindedTyVarTyVar)
+bindImplicitTKBndrs_Q_Tv   = bindImplicitTKBndrsX (newImplicitTyVarQ cloneFlexiKindedTyVarTyVar)
 
 bindImplicitTKBndrsX
    :: (Name -> TcM TcTyVar) -- new_tv function
@@ -2617,8 +2642,8 @@ newFlexiKindedTyVar new_tv name
 newFlexiKindedSkolemTyVar :: Name -> TcM TyVar
 newFlexiKindedSkolemTyVar = newFlexiKindedTyVar newSkolemTyVar
 
-newFlexiKindedTyVarTyVar :: Name -> TcM TyVar
-newFlexiKindedTyVarTyVar = newFlexiKindedTyVar newTyVarTyVar
+cloneFlexiKindedTyVarTyVar :: Name -> TcM TyVar
+cloneFlexiKindedTyVarTyVar = newFlexiKindedTyVar cloneTyVarTyVar
    -- See Note [Unification variables need fresh Names] in TcMType
 
 --------------------------------------
@@ -2631,7 +2656,8 @@ bindExplicitTKBndrs_Skol, bindExplicitTKBndrs_Tv
     -> TcM ([TcTyVar], a)
 
 bindExplicitTKBndrs_Skol = bindExplicitTKBndrsX (tcHsTyVarBndr newSkolemTyVar)
-bindExplicitTKBndrs_Tv   = bindExplicitTKBndrsX (tcHsTyVarBndr newTyVarTyVar)
+bindExplicitTKBndrs_Tv   = bindExplicitTKBndrsX (tcHsTyVarBndr cloneTyVarTyVar)
+   -- We must clone for _Tv; see Note [Unification variables need fresh Names]
 
 bindExplicitTKBndrs_Q_Skol, bindExplicitTKBndrs_Q_Tv
     :: ContextKind
@@ -2640,7 +2666,8 @@ bindExplicitTKBndrs_Q_Skol, bindExplicitTKBndrs_Q_Tv
     -> TcM ([TcTyVar], a)
 
 bindExplicitTKBndrs_Q_Skol ctxt_kind = bindExplicitTKBndrsX (tcHsQTyVarBndr ctxt_kind newSkolemTyVar)
-bindExplicitTKBndrs_Q_Tv   ctxt_kind = bindExplicitTKBndrsX (tcHsQTyVarBndr ctxt_kind newTyVarTyVar)
+bindExplicitTKBndrs_Q_Tv   ctxt_kind = bindExplicitTKBndrsX (tcHsQTyVarBndr ctxt_kind cloneTyVarTyVar)
+    -- The bound TcTyVar has the same name; no cloning
 
 bindExplicitTKBndrsX
     :: (HsTyVarBndr GhcRn -> TcM TcTyVar)
@@ -2668,7 +2695,6 @@ bindExplicitTKBndrsX tc_tv hs_tvs thing_inside
 -----------------
 tcHsTyVarBndr :: (Name -> Kind -> TcM TyVar)
               -> HsTyVarBndr GhcRn -> TcM TcTyVar
--- Returned TcTyVar has the same name; no cloning
 tcHsTyVarBndr new_tv (UserTyVar _ (L _ tv_nm))
   = do { kind <- newMetaKindVar
        ; new_tv tv_nm kind }

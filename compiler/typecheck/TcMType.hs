@@ -55,7 +55,8 @@ module TcMType (
   -- Instantiation
   newMetaTyVars, newMetaTyVarX, newMetaTyVarsX,
   newMetaTyVarTyVars, newMetaTyVarTyVarX,
-  newTyVarTyVar, newPatSigTyVar, newSkolemTyVar, newWildCardX,
+  newTyVarTyVar, cloneTyVarTyVar,
+  newPatSigTyVar, newSkolemTyVar, newWildCardX,
   tcInstType,
   tcInstSkolTyVars, tcInstSkolTyVarsX, tcInstSkolTyVarsAt,
   tcSkolDFunType, tcSuperSkolTyVars, tcInstSuperSkolTyVarsX,
@@ -705,30 +706,6 @@ cloneMetaTyVarName name
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 At the moment we give a unification variable a System Name, which
 influences the way it is tidied; see TypeRep.tidyTyVarBndr.
-
-Note [Unification variables need fresh Names]
-~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
-Whenever we allocate a unification variable (MetaTyVar) we give
-it a fresh name.   #16221 is a very tricky case that illustrates
-why this is important:
-
-   data SameKind :: k -> k -> *
-   data T0 a = forall k2 (b :: k2). MkT0 (SameKind a b) !Int
-
-When kind-checking T0, we give (a :: kappa1). Then, in kcConDecl
-we allocate a unification variable kappa2 for k2, and then we
-end up unifying kappa1 := kappa2 (because of the (SameKind a b).
-
-Now we generalise over kappa2; but if kappa2's Name is k2,
-we'll end up giving T0 the kind forall k2. k2 -> *.  Nothing
-directly wrong with that but when we typecheck the data constrautor
-we end up giving it the type
-  MkT0 :: forall k1 (a :: k1) k2 (b :: k2).
-          SameKind @k2 a b -> Int -> T0 @{k2} a
-which is bogus.  The result type should be T0 @{k1} a.
-
-And there no reason /not/ to clone the Name when making a
-unification variable.  So that's what we do.
 -}
 
 metaInfoToTyVarName :: MetaInfo -> FastString
@@ -760,8 +737,15 @@ newSkolemTyVar name kind
 
 newTyVarTyVar :: Name -> Kind -> TcM TcTyVar
 -- See Note [TyVarTv]
--- See Note [Unification variables need fresh Names]
 newTyVarTyVar name kind
+  = do { details <- newMetaDetails TyVarTv
+       ; let tyvar = mkTcTyVar name kind details
+       ; traceTc "newTyVarTyVar" (ppr tyvar)
+       ; return tyvar }
+
+cloneTyVarTyVar :: Name -> Kind -> TcM TcTyVar
+-- See Note [TyVarTv]
+cloneTyVarTyVar name kind
   = do { details <- newMetaDetails TyVarTv
        ; uniq <- newUnique
        ; let name' = name `setNameUnique` uniq
@@ -770,7 +754,7 @@ newTyVarTyVar name kind
          -- We want to keep the original more user-friendly Name
          -- In practical terms that means that in error messages,
          -- when the Name is tidied we get 'a' rather than 'a0'
-       ; traceTc "newTyVarTyVar" (ppr tyvar)
+       ; traceTc "cloneTyVarTyVar" (ppr tyvar)
        ; return tyvar }
 
 newPatSigTyVar :: Name -> Kind -> TcM TcTyVar
@@ -1313,11 +1297,11 @@ collect_cand_qtvs orig_ty is_dep bound dvs ty
     go dv (CoercionTy co)   = collect_cand_qtvs_co orig_ty bound dv co
 
     go dv (TyVarTy tv)
-      | is_bound tv      = return dv
-      | otherwise        = do { m_contents <- isFilledMetaTyVar_maybe tv
-                              ; case m_contents of
-                                  Just ind_ty -> go dv ind_ty
-                                  Nothing     -> go_tv dv tv }
+      | is_bound tv = return dv
+      | otherwise   = do { m_contents <- isFilledMetaTyVar_maybe tv
+                         ; case m_contents of
+                             Just ind_ty -> go dv ind_ty
+                             Nothing     -> go_tv dv tv }
 
     go dv (ForAllTy (Bndr tv _) ty)
       = do { dv1 <- collect_cand_qtvs orig_ty True bound dv (tyVarKind tv)
