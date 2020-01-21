@@ -4,7 +4,7 @@ T13482.hs:10:32: warning: [-Wpartial-type-signatures (in -Wdefault)]
       Where: ‘m’ is a rigid type variable bound by
                the inferred type of
                  minimal1_noksig :: (Eq m, Monoid m) => Int -> Bool
-               at T13482.hs:11:1-50
+               at T13482.hs:10:27
     • In the type signature:
         minimal1_noksig :: forall m. _ => Int -> Bool
 
@@ -12,20 +12,20 @@ T13482.hs:13:33: warning: [-Wpartial-type-signatures (in -Wdefault)]
     • Found type wildcard ‘_’ standing for ‘(Eq m, Monoid m)’
       Where: ‘m’ is a rigid type variable bound by
                the inferred type of minimal1 :: (Eq m, Monoid m) => Bool
-               at T13482.hs:14:1-41
+               at T13482.hs:13:21
     • In the type signature: minimal1 :: forall (m :: Type). _ => Bool
 
 T13482.hs:16:30: warning: [-Wpartial-type-signatures (in -Wdefault)]
     • Found type wildcard ‘_’ standing for ‘Monoid m’
       Where: ‘m’ is a rigid type variable bound by
                the inferred type of minimal2 :: (Eq m, Monoid m) => Bool
-               at T13482.hs:17:1-41
+               at T13482.hs:16:20
     • In the type signature: minimal2 :: forall m. (Eq m, _) => Bool
 
 T13482.hs:19:34: warning: [-Wpartial-type-signatures (in -Wdefault)]
     • Found type wildcard ‘_’ standing for ‘Eq m’
       Where: ‘m’ is a rigid type variable bound by
                the inferred type of minimal3 :: (Monoid m, Eq m) => Bool
-               at T13482.hs:20:1-41
+               at T13482.hs:19:20
     • In the type signature:
         minimal3 :: forall m. (Monoid m, _) => Bool
