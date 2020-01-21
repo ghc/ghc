@@ -1,13 +1,13 @@
 
 T8616.hs:8:16: error:
-    • Couldn't match kind ‘k’ with ‘*’
-      ‘k’ is a rigid type variable bound by
+    • Couldn't match kind ‘k1’ with ‘*’
+      ‘k1’ is a rigid type variable bound by
         the type signature for:
-          withSomeSing :: forall k (kproxy :: k). Proxy kproxy
+          withSomeSing :: forall k1 (kproxy :: k1). Proxy kproxy
         at T8616.hs:7:1-52
       When matching types
         a0 :: *
-        Any :: k
+        Any :: k1
     • In the expression: undefined :: (Any :: k)
       In an equation for ‘withSomeSing’:
           withSomeSing = undefined :: (Any :: k)
@@ -15,7 +15,7 @@ T8616.hs:8:16: error:
         withSomeSing :: Proxy kproxy (bound at T8616.hs:8:1)
 
 T8616.hs:8:30: error:
-    • Expected a type, but ‘Any :: k’ has kind ‘k’
+    • Expected a type, but ‘Any :: k’ has kind ‘k1’
     • In an expression type signature: (Any :: k)
       In the expression: undefined :: (Any :: k)
       In an equation for ‘withSomeSing’:

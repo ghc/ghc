@@ -104,9 +104,6 @@ Note [The flattening story]
                        then xis1 /= xis2
   i.e. at most one CFunEqCan with a particular LHS
 
-* Function applications can occur in the RHS of a CTyEqCan.  No reason
-  not allow this, and it reduces the amount of flattening that must occur.
-
 * Flattening a type (F xis):
     - If we are flattening in a Wanted/Derived constraint
       then create new [W] x : F xis ~ fmv
@@ -1801,7 +1798,7 @@ unflattenWanteds tv_eqs funeqs
                         --     bump the unification count; it is "improvement"
                         -- Note [Unflattening can force the solver to iterate]
       = ASSERT2( tyVarKind tv `eqType` tcTypeKind rhs, ppr ct )
-           -- CTyEqCan invariant should ensure this is true
+           -- CTyEqCan invariant (TyEq:K) should ensure this is true
         do { is_filled <- isFilledMetaTyVar tv
            ; elim <- case is_filled of
                False -> do { traceTcS "unflatten_eq 2" (ppr ct)

@@ -28,6 +28,7 @@ import TcType
 import TcOrigin
 import GHC.Rename.Unbound ( unknownNameSuggestions )
 import GHC.Core.Type
+import GHC.Core.Coercion
 import GHC.Core.TyCo.Rep
 import GHC.Core.TyCo.Ppr  ( pprTyVars, pprWithExplicitKindsWhen, pprSourceTyCon, pprWithTYPE )
 import GHC.Core.Unify     ( tcMatchTys )
@@ -61,7 +62,6 @@ import SrcLoc
 import GHC.Driver.Session
 import ListSetOps       ( equivClasses )
 import Maybes
-import Pair
 import qualified GHC.LanguageExtensions as LangExt
 import FV ( fvVarList, unionFV )
 
@@ -549,7 +549,7 @@ reportWanteds ctxt tc_lvl (WC { wc_simple = simples, wc_impl = implics })
             -- See Note [Do not report derived but soluble errors]
 
      ; mapBagM_ (reportImplic ctxt2) implics }
-            -- NB ctxt1: don't suppress inner insolubles if there's only a
+            -- NB ctxt2: don't suppress inner insolubles if there's only a
             -- wanted insoluble here; but do suppress inner insolubles
             -- if there's a *given* insoluble here (= inaccessible code)
  where
@@ -562,28 +562,35 @@ reportWanteds ctxt tc_lvl (WC { wc_simple = simples, wc_impl = implics })
     -- (see TcRnTypes.insolubleCt) is caught here, otherwise
     -- we might suppress its error message, and proceed on past
     -- type checking to get a Lint error later
-    report1 = [ ("Out of scope", is_out_of_scope,    True,  mkHoleReporter tidy_cts)
-              , ("Holes",        is_hole,            False, mkHoleReporter tidy_cts)
-              , ("custom_error", is_user_type_error, True,  mkUserTypeErrorReporter)
+    report1 = [ ("Out of scope", unblocked is_out_of_scope,    True,  mkHoleReporter tidy_cts)
+              , ("Holes",        unblocked is_hole,            False, mkHoleReporter tidy_cts)
+              , ("custom_error", unblocked is_user_type_error, True,  mkUserTypeErrorReporter)
 
               , given_eq_spec
-              , ("insoluble2",   utterly_wrong,  True, mkGroupReporter mkEqErr)
-              , ("skolem eq1",   very_wrong,     True, mkSkolReporter)
-              , ("skolem eq2",   skolem_eq,      True, mkSkolReporter)
-              , ("non-tv eq",    non_tv_eq,      True, mkSkolReporter)
+              , ("insoluble2",   unblocked utterly_wrong,  True, mkGroupReporter mkEqErr)
+              , ("skolem eq1",   unblocked very_wrong,     True, mkSkolReporter)
+              , ("skolem eq2",   unblocked skolem_eq,      True, mkSkolReporter)
+              , ("non-tv eq",    unblocked non_tv_eq,      True, mkSkolReporter)
 
                   -- The only remaining equalities are alpha ~ ty,
                   -- where alpha is untouchable; and representational equalities
                   -- Prefer homogeneous equalities over hetero, because the
                   -- former might be holding up the latter.
                   -- See Note [Equalities with incompatible kinds] in TcCanonical
-              , ("Homo eqs",      is_homo_equality, True,  mkGroupReporter mkEqErr)
-              , ("Other eqs",     is_equality,      False, mkGroupReporter mkEqErr) ]
+              , ("Homo eqs",      unblocked is_homo_equality, True,  mkGroupReporter mkEqErr)
+              , ("Other eqs",     unblocked is_equality,      True,  mkGroupReporter mkEqErr)
+              , ("Blocked eqs",   is_equality,           False, mkSuppressReporter mkBlockedEqErr)]
 
     -- report2: we suppress these if there are insolubles elsewhere in the tree
     report2 = [ ("Implicit params", is_ip,           False, mkGroupReporter mkIPErr)
               , ("Irreds",          is_irred,        False, mkGroupReporter mkIrredErr)
               , ("Dicts",           is_dict,         False, mkGroupReporter mkDictErr) ]
+
+    -- also checks to make sure the constraint isn't BlockedCIS
+    -- See TcCanonical Note [Equalities with incompatible kinds], (4)
+    unblocked :: (Ct -> Pred -> Bool) -> Ct -> Pred -> Bool
+    unblocked _ (CIrredCan { cc_status = BlockedCIS }) _ = False
+    unblocked checker ct pred = checker ct pred
 
     -- rigid_nom_eq, rigid_nom_tv_eq,
     is_hole, is_dict,
@@ -796,6 +803,11 @@ mkGroupReporter :: (ReportErrCtxt -> [Ct] -> TcM ErrMsg)
 mkGroupReporter mk_err ctxt cts
   = mapM_ (reportGroup mk_err ctxt . toList) (equivClasses cmp_loc cts)
 
+-- Like mkGroupReporter, but doesn't actually print error messages
+mkSuppressReporter :: (ReportErrCtxt -> [Ct] -> TcM ErrMsg) -> Reporter
+mkSuppressReporter mk_err ctxt cts
+  = mapM_ (suppressGroup mk_err ctxt . toList) (equivClasses cmp_loc cts)
+
 eq_lhs_type :: Ct -> Ct -> Bool
 eq_lhs_type ct1 ct2
   = case (classifyPredType (ctPred ct1), classifyPredType (ctPred ct2)) of
@@ -806,8 +818,7 @@ eq_lhs_type ct1 ct2
 cmp_loc :: Ct -> Ct -> Ordering
 cmp_loc ct1 ct2 = ctLocSpan (ctLoc ct1) `compare` ctLocSpan (ctLoc ct2)
 
-reportGroup :: (ReportErrCtxt -> [Ct] -> TcM ErrMsg) -> ReportErrCtxt
-            -> [Ct] -> TcM ()
+reportGroup :: (ReportErrCtxt -> [Ct] -> TcM ErrMsg) -> Reporter
 reportGroup mk_err ctxt cts =
   ASSERT( not (null cts))
   do { err <- mk_err ctxt cts
@@ -823,6 +834,14 @@ reportGroup mk_err ctxt cts =
          -- Redundant if we are going to abort compilation,
          -- but that's hard to know for sure, and if we don't
          -- abort, we need bindings for all (e.g. #12156)
+
+-- like reportGroup, but does not actually report messages. It still adds
+-- -fdefer-type-errors bindings, though.
+suppressGroup :: (ReportErrCtxt -> [Ct] -> TcM ErrMsg) -> Reporter
+suppressGroup mk_err ctxt cts
+ = do { err <- mk_err ctxt cts
+      ; traceTc "Suppressing errors for" (ppr cts)
+      ; mapM_ (addDeferredBinding ctxt err) cts }
 
 maybeReportHoleError :: ReportErrCtxt -> Ct -> ErrMsg -> TcM ()
 -- Unlike maybeReportError, these "hole" errors are
@@ -1439,10 +1458,10 @@ mkEqErr_help :: DynFlags -> ReportErrCtxt -> Report
              -> Maybe SwapFlag   -- Nothing <=> not sure
              -> TcType -> TcType -> TcM ErrMsg
 mkEqErr_help dflags ctxt report ct oriented ty1 ty2
-  | Just (tv1, co1) <- tcGetCastedTyVar_maybe ty1
-  = mkTyVarEqErr dflags ctxt report ct oriented tv1 co1 ty2
-  | Just (tv2, co2) <- tcGetCastedTyVar_maybe ty2
-  = mkTyVarEqErr dflags ctxt report ct swapped  tv2 co2 ty1
+  | Just (tv1, _) <- tcGetCastedTyVar_maybe ty1
+  = mkTyVarEqErr dflags ctxt report ct oriented tv1 ty2
+  | Just (tv2, _) <- tcGetCastedTyVar_maybe ty2
+  = mkTyVarEqErr dflags ctxt report ct swapped  tv2 ty1
   | otherwise
   = reportEqErr ctxt report ct oriented ty1 ty2
   where
@@ -1459,13 +1478,13 @@ reportEqErr ctxt report ct oriented ty1 ty2
 
 mkTyVarEqErr, mkTyVarEqErr'
   :: DynFlags -> ReportErrCtxt -> Report -> Ct
-             -> Maybe SwapFlag -> TcTyVar -> TcCoercionN -> TcType -> TcM ErrMsg
+             -> Maybe SwapFlag -> TcTyVar -> TcType -> TcM ErrMsg
 -- tv1 and ty2 are already tidied
-mkTyVarEqErr dflags ctxt report ct oriented tv1 co1 ty2
-  = do { traceTc "mkTyVarEqErr" (ppr ct $$ ppr tv1 $$ ppr co1 $$ ppr ty2)
-       ; mkTyVarEqErr' dflags ctxt report ct oriented tv1 co1 ty2 }
+mkTyVarEqErr dflags ctxt report ct oriented tv1 ty2
+  = do { traceTc "mkTyVarEqErr" (ppr ct $$ ppr tv1 $$ ppr ty2)
+       ; mkTyVarEqErr' dflags ctxt report ct oriented tv1 ty2 }
 
-mkTyVarEqErr' dflags ctxt report ct oriented tv1 co1 ty2
+mkTyVarEqErr' dflags ctxt report ct oriented tv1 ty2
   | not insoluble_occurs_check   -- See Note [Occurs check wins]
   , isUserSkolem ctxt tv1   -- ty2 won't be a meta-tyvar, or else the thing would
                             -- be oriented the other way round;
@@ -1513,23 +1532,6 @@ mkTyVarEqErr' dflags ctxt report ct oriented tv1 co1 ty2
        -- instead of augmenting it.  This is because the details are not likely
        -- to be helpful since this is just an unimplemented feature.
        ; mkErrorMsgFromCt ctxt ct $ report { report_important = [msg] } }
-
-   -- check for heterogeneous equality next; see Note [Equalities with incompatible kinds]
-   -- in TcCanonical
-  | not (k1 `tcEqType` k2)
-  = do { let main_msg = addArising (ctOrigin ct) $
-                        vcat [ hang (text "Kind mismatch: cannot unify" <+>
-                                     parens (ppr tv1 <+> dcolon <+> ppr (tyVarKind tv1)) <+>
-                                     text "with:")
-                                  2 (sep [ppr ty2, dcolon, ppr k2])
-                             , text "Their kinds differ." ]
-             cast_msg
-               | isTcReflexiveCo co1 = empty
-               | otherwise           = text "NB:" <+> ppr tv1 <+>
-                                       text "was casted to have kind" <+>
-                                       quotes (ppr k1)
-
-       ; mkErrorMsgFromCt ctxt ct (mconcat [important main_msg, important cast_msg, report]) }
 
   -- If the immediately-enclosing implication has 'tv' a skolem, and
   -- we know by now its an InferSkol kind of skolem, then presumably
@@ -1596,9 +1598,6 @@ mkTyVarEqErr' dflags ctxt report ct oriented tv1 co1 ty2
         -- Consider an ambiguous top-level constraint (a ~ F a)
         -- Not an occurs check, because F is a type function.
   where
-    Pair _ k1 = tcCoercionKind co1
-    k2        = tcTypeKind ty2
-
     ty1 = mkTyVarTy tv1
     occ_check_expand       = occCheckForErrors dflags tv1 ty2
     insoluble_occurs_check = isInsolubleOccursCheck (ctEqRel ct) tv1 ty2
@@ -1681,6 +1680,24 @@ pp_givens givens
                 2 (sep [ text "bound by" <+> ppr skol_info
                        , text "at" <+> ppr (tcl_loc (ic_env implic)) ])
 
+-- These are for the "blocked" equalities, as described in TcCanonical
+-- Note [Equalities with incompatible kinds], wrinkle (2). There should
+-- always be another unsolved wanted around, which will ordinarily suppress
+-- this message. But this can still be printed out with -fdefer-type-errors
+-- (sigh), so we must produce a message.
+mkBlockedEqErr :: ReportErrCtxt -> [Ct] -> TcM ErrMsg
+mkBlockedEqErr ctxt (ct:_) = mkErrorMsgFromCt ctxt ct report
+  where
+    report = important msg
+    msg = vcat [ hang (text "Cannot use equality for substitution:")
+                   2 (ppr (ctPred ct))
+               , text "Doing so would be ill-kinded." ]
+          -- This is a terrible message. Perhaps worse, if the user
+          -- has -fprint-explicit-kinds on, they will see that the two
+          -- sides have the same kind, as there is an invisible cast.
+          -- I really don't know how to do better.
+mkBlockedEqErr _ [] = panic "mkBlockedEqErr no constraints"
+
 {-
 Note [Suppress redundant givens during error reporting]
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
@@ -1724,9 +1741,9 @@ extraTyVarEqInfo :: ReportErrCtxt -> TcTyVar -> TcType -> SDoc
 extraTyVarEqInfo ctxt tv1 ty2
   = extraTyVarInfo ctxt tv1 $$ ty_extra ty2
   where
-    ty_extra ty = case tcGetTyVar_maybe ty of
-                    Just tv -> extraTyVarInfo ctxt tv
-                    Nothing -> empty
+    ty_extra ty = case tcGetCastedTyVar_maybe ty of
+                    Just (tv, _) -> extraTyVarInfo ctxt tv
+                    Nothing      -> empty
 
 extraTyVarInfo :: ReportErrCtxt -> TcTyVar -> SDoc
 extraTyVarInfo ctxt tv
@@ -2734,10 +2751,7 @@ mkAmbigMsg prepend_msg ct
 
       | otherwise -- "The type variable 't0' is ambiguous"
       = text "The" <+> what <+> text "variable" <> plural tkvs
-        <+> pprQuotedList tkvs <+> is_or_are tkvs <+> text "ambiguous"
-
-    is_or_are [_] = text "is"
-    is_or_are _   = text "are"
+        <+> pprQuotedList tkvs <+> isOrAre tkvs <+> text "ambiguous"
 
 pprSkols :: ReportErrCtxt -> [TcTyVar] -> SDoc
 pprSkols ctxt tvs
