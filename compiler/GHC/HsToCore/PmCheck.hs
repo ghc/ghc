@@ -32,7 +32,7 @@ import GHC.Core (CoreExpr, Expr(Var,App))
 import FastString (unpackFS, lengthFS)
 import GHC.Driver.Session
 import GHC.Hs
-import TcHsSyn
+import TcHsSyn   ( shortCutLit )
 import Id
 import GHC.Core.ConLike
 import Name
@@ -45,7 +45,7 @@ import GHC.Core.DataCon
 import GHC.Core.TyCon
 import Var (EvVar)
 import GHC.Core.Coercion
-import TcEvidence
+import TcEvidence ( HsWrapper(..), isIdHsWrapper )
 import TcType (evVarPred)
 import {-# SOURCE #-} GHC.HsToCore.Expr (dsExpr, dsLExpr, dsSyntaxExpr)
 import {-# SOURCE #-} GHC.HsToCore.Binds (dsHsWrapper)
@@ -999,7 +999,7 @@ checkGrdTree guards deltas = do
   tracePm "checkGrdTree {" $ vcat [ ppr guards
                                   , ppr deltas ]
   res <- checkGrdTree' guards deltas
-  tracePm "}:" (ppr res) -- braces are easier to match by tooling
+  tracePm "checkGrdTree }:" (ppr res) -- braces are easier to match by tooling
   return res
 
 -- ----------------------------------------------------------------------------
