@@ -1,7 +1,7 @@
 
 T15629.hs:26:37: error:
     • Expected kind ‘x1 ~> F x1 ab1’,
-        but ‘F1Sym :: x ~> F x z’ has kind ‘x1 ~> F x1 z’
+        but ‘F1Sym :: x ~> F x z’ has kind ‘x1 ~> F x1 z1’
     • In the first argument of ‘Comp’, namely ‘(F1Sym :: x ~> F x z)’
       In the first argument of ‘Proxy’, namely
         ‘((Comp (F1Sym :: x ~> F x z) F2Sym) :: F x ab ~> F x ab)’
@@ -10,18 +10,18 @@ T15629.hs:26:37: error:
              Proxy ((Comp (F1Sym :: x ~> F x z) F2Sym) :: F x ab ~> F x ab)
 
 T15629.hs:27:9: error:
-    • Couldn't match kind ‘ab1’ with ‘z’
-      ‘ab1’ is a rigid type variable bound by
+    • Couldn't match kind ‘z1’ with ‘ab1’
+      ‘z1’ is a rigid type variable bound by
         the type signature for:
           g :: forall z1 ab1. Proxy (Comp F1Sym F2Sym)
         at T15629.hs:26:5-84
-      ‘z’ is a rigid type variable bound by
+      ‘ab1’ is a rigid type variable bound by
         the type signature for:
           g :: forall z1 ab1. Proxy (Comp F1Sym F2Sym)
         at T15629.hs:26:5-84
       When matching types
         f0 :: x ~> F x ab
-        F1Sym :: TyFun x1 (F x1 z) -> *
+        F1Sym :: TyFun x1 (F x1 z1) -> *
       Expected type: Proxy (Comp F1Sym F2Sym)
         Actual type: Proxy (Comp f0 F2Sym)
     • In the expression: sg Proxy Proxy

@@ -7,7 +7,7 @@ T15807.hs:12:24: error:
       In the definition of data constructor ‘MkApp’
 
 T15807.hs:12:26: error:
-    • Couldn't match kind ‘*’ with ‘k0 -> *’
+    • Couldn't match kind ‘k0 -> *’ with ‘*’
       When matching kinds
         k0 :: *
         f :: k0 -> *
