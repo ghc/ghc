@@ -53,7 +53,7 @@ dmdAnalProgram dflags fam_envs binds
   = do {
         let { binds_plus_dmds = do_prog binds } ;
         dumpIfSet_dyn dflags Opt_D_dump_str_signatures
-            "Strictness signatures" FormatSTG
+            "Strictness signatures" FormatText
             (dumpStrSig binds_plus_dmds) ;
         -- See Note [Stamp out space leaks in demand analysis]
         seqBinds binds_plus_dmds `seq` return binds_plus_dmds
