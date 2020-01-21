@@ -644,8 +644,8 @@ They fit together like so:
   but it's enforced by etaExpandAlgTyCon
 -}
 
-instance Outputable tv => Outputable (VarBndr tv TyConBndrVis) where
-  ppr (Bndr v bi) = ppr_bi bi <+> parens (ppr v)
+instance OutputableBndr tv => Outputable (VarBndr tv TyConBndrVis) where
+  ppr (Bndr v bi) = ppr_bi bi <+> parens (pprBndr LetBind v)
     where
       ppr_bi (AnonTCB VisArg)     = text "anon-vis"
       ppr_bi (AnonTCB InvisArg)   = text "anon-invis"
