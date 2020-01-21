@@ -1,18 +1,18 @@
 
 <interactive>:10:23:
     Incorrect type variable on the LHS of injectivity condition
-         Expected : r
-         Actual   : a
+         Expected: r
+         Actual:   a
 
 <interactive>:11:24:
     Incorrect type variable on the LHS of injectivity condition
-         Expected : r
-         Actual   : a
+         Expected: r
+         Actual:   a
 
 <interactive>:12:37:
     Incorrect type variable on the LHS of injectivity condition
-         Expected : r
-         Actual   : a
+         Expected: r
+         Actual:   a
 
 <interactive>:15:19:
     Type variable ‘a’, naming a type family result,
