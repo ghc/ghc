@@ -3,7 +3,7 @@ InstantiatedNamedWildcardsInConstraints.hs:4:14: error:
     • Found type wildcard ‘_a’ standing for ‘b’
       Where: ‘b’ is a rigid type variable bound by
                the inferred type of foo :: (Enum b, Show b) => b -> (String, b)
-               at InstantiatedNamedWildcardsInConstraints.hs:5:1-26
+               at InstantiatedNamedWildcardsInConstraints.hs:4:1-40
       To use the inferred type, enable PartialTypeSignatures
     • In the type signature: foo :: (Enum _a, _) => _a -> (String, b)
 
@@ -11,6 +11,6 @@ InstantiatedNamedWildcardsInConstraints.hs:4:18: error:
     • Found type wildcard ‘_’ standing for ‘Show b’
       Where: ‘b’ is a rigid type variable bound by
                the inferred type of foo :: (Enum b, Show b) => b -> (String, b)
-               at InstantiatedNamedWildcardsInConstraints.hs:5:1-26
+               at InstantiatedNamedWildcardsInConstraints.hs:4:1-40
       To use the inferred type, enable PartialTypeSignatures
     • In the type signature: foo :: (Enum _a, _) => _a -> (String, b)
