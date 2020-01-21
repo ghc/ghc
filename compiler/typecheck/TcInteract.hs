@@ -15,6 +15,7 @@ import TcFlatten
 import TcUnify( canSolveByUnification )
 import VarSet
 import Type
+import Coercion ( BlockSubstFlag(..) )
 import InstEnv( DFunInstType )
 import CoAxiom( sfInteractTop, sfInteractInert )
 
@@ -2091,7 +2092,8 @@ shortCutReduction old_ev fsk ax_co fam_tc tc_args
                                        `mkTcTransCo` ctEvCoercion old_ev) )
 
            Wanted {} ->
-             do { (new_ev, new_co) <- newWantedEq deeper_loc Nominal
+             -- See TcCanonical Note [Equalities with incompatible kinds] about NoBlockSubst
+             do { (new_ev, new_co) <- newWantedEq_SI NoBlockSubst WDeriv deeper_loc Nominal
                                         (mkTyConApp fam_tc tc_args) (mkTyVarTy fsk)
                 ; setWantedEq (ctev_dest old_ev) $ ax_co `mkTcTransCo` new_co
                 ; return new_ev }

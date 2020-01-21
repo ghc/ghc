@@ -1,6 +1,6 @@
 
 T11399.hs:10:32: error:
-    • Couldn't match kind ‘*’ with ‘GHC.Types.RuntimeRep’
+    • Couldn't match kind ‘GHC.Types.RuntimeRep’ with ‘*’
       When matching kinds
         a :: * -> *
         TYPE :: GHC.Types.RuntimeRep -> *

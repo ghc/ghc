@@ -558,8 +558,6 @@ isDroppableCt ct
        = definitely_insoluble  -- Keep only definitely insoluble
        | otherwise
        = case orig of
-           KindEqOrigin {} -> True    -- See Note [Dropping derived constraints]
-
            -- See Note [Dropping derived constraints]
            -- For fundeps, drop wanted/wanted interactions
            FunDepOrigin2 {} -> True   -- Top-level/Wanted
@@ -608,12 +606,6 @@ But (tiresomely) we do keep *some* Derived constraints:
 
  * Type holes are derived constraints, because they have no evidence
    and we want to keep them, so we get the error report
-
- * Insoluble kind equalities (e.g. [D] * ~ (* -> *)), with
-   KindEqOrigin, may arise from a type equality a ~ Int#, say.  See
-   Note [Equalities with incompatible kinds] in TcCanonical.
-   Keeping these around produces better error messages, in practice.
-   E.g., test case dependent/should_fail/T11471
 
  * We keep most derived equalities arising from functional dependencies
       - Given/Given interactions (subset of FunDepOrigin1):
