@@ -50,7 +50,7 @@ import Coercion
 import TcOrigin
 import Type
 import TyCoRep   -- for checkValidRoles
-import TyCoPpr( pprTyVars, pprTyVar, pprWithExplicitKindsWhen )
+import TyCoPpr( pprTyVars, pprWithExplicitKindsWhen )
 import Class
 import CoAxiom
 import TyCon
@@ -467,8 +467,7 @@ Notes:
 * The mapping between the user-specified Name and the representative
   TyVar is recorded in the tyConScopedTyVars of the TcTyCon.
 
-* The swizzling is actually performed as we construct the final
-  kind for the TyCon, by zonkSwizzleTyBndrsX.
+* The swizzling is actually performed by swizzleTcTyConBndrs
 
 * We must do the swizzling across the whole class decl. Consider
      class C f where
@@ -663,16 +662,28 @@ kcTyClGroup kisig_env decls
     ppr_tc_kinds tcs = vcat (map pp_tc tcs)
     pp_tc tc = ppr (tyConName tc) <+> dcolon <+> ppr (tyConKind tc)
 
+type ScopedPairs = [(Name, TcTyVar)]
+
 generaliseTyClDecl :: NameEnv TcTyCon -> LTyClDecl GhcRn -> TcM [TcTyCon]
 generaliseTyClDecl inferred_tc_env (L _ decl)
   = do { let names_in_this_decl :: [Name]
              names_in_this_decl = tycld_names decl
 
+       -- Extract the specified/required binders and skolemise them
        ; tc_with_tvs  <- mapM skolemise_tc_tycon names_in_this_decl
-       ; swizzled_tcs <- tcAddDeclCtxt decl $
-                         swizzleTcTyConBndrs tc_with_tvs
 
-       ; mapAndReportM generaliseTcTyCon swizzled_tcs }
+       -- Zonk, to manifest the side-effects of skolemisation to the swizzler
+       -- NB: it's important to skolemise them all before this step. E.g.
+       --         class C f where { type T (f :: k) }
+       --     We only skolemise k when looking at T's binders,
+       --     but k appears in f's kind in C's binders.
+       ; tc_infos <- mapM zonk_tc_tycon tc_with_tvs
+
+       -- Swizzle
+       ; swizzled_infos <- tcAddDeclCtxt decl (swizzleTcTyConBndrs tc_infos)
+
+       -- And finally generalise
+       ; mapAndReportM generaliseTcTyCon swizzled_infos }
   where
     tycld_names :: TyClDecl GhcRn -> [Name]
     tycld_names decl = tcdName decl : at_names decl
@@ -681,27 +692,21 @@ generaliseTyClDecl inferred_tc_env (L _ decl)
     at_names (ClassDecl { tcdATs = ats }) = map (familyDeclName . unLoc) ats
     at_names _ = []  -- Only class decls have associated types
 
-    skolemise_tc_tycon :: Name -> TcM (TcTyCon, [(Name,TcTyVar)], TcKind)
+    skolemise_tc_tycon :: Name -> TcM (TcTyCon, ScopedPairs)
     -- Zonk and skolemise the Specified and Required binders
     skolemise_tc_tycon tc_name
       = do { let tc = lookupNameEnv_NF inferred_tc_env tc_name
                       -- This lookup should not fail
            ; scoped_prs <- mapSndM zonkAndSkolemise (tcTyConScopedTyVars tc)
-           ; scoped_prs <- mapSndM zonkTcTyVarToTyVar scoped_prs
-                           -- This second zonk is needed to manifest the
-                           -- side-effects of skolemisation to the swizzler
+           ; return (tc, scoped_prs) }
+
+    zonk_tc_tycon :: (TcTyCon, ScopedPairs) -> TcM (TcTyCon, ScopedPairs, TcKind)
+    zonk_tc_tycon (tc, scoped_prs)
+      = do { scoped_prs <- mapSndM zonkTcTyVarToTyVar scoped_prs
            ; res_kind   <- zonkTcType (tyConResKind tc)
-           ; traceTc "skolemise_tc_ty_con" $
-             vcat [ ppr tc, text "before" <+> pprScopedTyVars (tcTyConScopedTyVars tc)
-                  , text "after" <+> pprScopedTyVars scoped_prs ]
            ; return (tc, scoped_prs, res_kind) }
 
-
-pprScopedTyVars :: [(Name, TcTyVar)] -> SDoc
-pprScopedTyVars prs = sep [ parens (ppr nm <+> comma <+> pprTyVar tv)
-                          | (nm,tv) <- prs ]
-
-swizzleTcTyConBndrs :: [(TcTyCon, [(Name,TcTyVar)], TcKind)]
+swizzleTcTyConBndrs :: [(TcTyCon, ScopedPairs, TcKind)]
                     -> TcM [(TcTyCon, [TcTyVar], TcKind)]
 swizzleTcTyConBndrs tc_infos
   = do { -- Check for duplicates
@@ -712,12 +717,18 @@ swizzleTcTyConBndrs tc_infos
        ; unless (null err_prs) $
          do { mapM_ report_dup err_prs; failM }
 
-       ; let ((_,scoped_prs,k):_) = tc_infos
-       ; traceTc "swizzle" (pprTyVars (map swizzle_pr scoped_prs) $$ ppr (swizzle_ty k))
-       ; return [ (tc, map swizzle_pr scoped_prs, swizzle_ty kind)
-                | (tc, scoped_prs, kind) <- tc_infos ] }
+       ; traceTc "swizzleTcTyConBndrs" $
+         vcat [ ppr tc_infos
+              , text "swizzle_prs" <+> ppr swizzle_prs
+              , nest 2 (vcat [ ppr tc <+> pprTyVars tvs
+                             | (tc, tvs, _) <- swizzled_infos ]) ]
+
+       ; return swizzled_infos }
 
   where
+    swizzled_infos =  [ (tc, map swizzle_pr scoped_prs, swizzle_ty kind)
+                      | (tc, scoped_prs, kind) <- tc_infos ]
+
     swizzle_prs :: [(Name,TyVar)]
     -- Pairs the user-specifed Name with its representative TyVar
     -- See Note [Generalising the kind of a TcTyCon]
@@ -797,7 +808,8 @@ generaliseTcTyCon (tc, spec_req_tvs, tc_res_kind)
        ; inferred <- quantifyTyVars dvs2
 
        ; traceTc "generaliseTcTyCon: pre zonk"
-           (vcat [ text "spec_req_tvs =" <+> pprTyVars spec_req_tvs
+           (vcat [ text "tycon =" <+> ppr tc
+                 , text "spec_req_tvs =" <+> pprTyVars spec_req_tvs
                  , text "res_kind =" <+> ppr tc_res_kind
                  , text "ds1 =" <+> ppr dvs1
                  , text "inferred =" <+> pprTyVars inferred ])
@@ -2527,7 +2539,13 @@ tcTyFamInstEqn fam_tc mb_clsinfo
                                       , feqn_rhs    = hs_rhs_ty }}))
   = ASSERT( getName fam_tc == eqn_tc_name )
     setSrcSpan loc $
-    do {
+    do { traceTc "tcTyFamInstEqn" $
+         vcat [ ppr fam_tc <+> ppr hs_pats
+              , text "fam tc bndrs" <+> pprTyVars (tyConTyVars fam_tc)
+              , case mb_clsinfo of
+                  NotAssociated -> empty
+                  InClsInst { ai_class = cls } -> text "class" <+> ppr cls <+> pprTyVars (classTyVars cls) ]
+
        -- First, check the arity of visible arguments
        -- If we wait until validity checking, we'll get kind errors
        -- below when an arity error will be much easier to understand.
@@ -2611,7 +2629,7 @@ tcTyFamInstEqnGuts :: TyCon -> AssocInstInfo
                    -> TcM ([TyVar], [TcType], TcType)      -- (tyvars, pats, rhs)
 -- Used only for type families, not data families
 tcTyFamInstEqnGuts fam_tc mb_clsinfo imp_vars exp_bndrs hs_pats hs_rhs_ty
-  = do { traceTc "tcTyFamInstEqnGuts {" (vcat [ ppr fam_tc <+> ppr hs_pats ])
+  = do { traceTc "tcTyFamInstEqnGuts {" (ppr fam_tc)
 
        -- By now, for type families (but not data families) we should
        -- have checked that the number of patterns matches tyConArity
@@ -2639,6 +2657,13 @@ tcTyFamInstEqnGuts fam_tc mb_clsinfo imp_vars exp_bndrs hs_pats hs_rhs_ty
        ; let scoped_tvs = imp_tvs ++ exp_tvs
        ; dvs  <- candidateQTyVarsOfTypes (lhs_ty : mkTyVarTys scoped_tvs)
        ; qtvs <- quantifyTyVars dvs
+
+       ; traceTc "tcTyFamInstEqnGuts 2" $
+         vcat [ ppr fam_tc
+              , text "scoped_tvs" <+> pprTyVars scoped_tvs
+              , text "lhs_ty"     <+> ppr lhs_ty
+              , text "dvs"        <+> ppr dvs
+              , text "qtvs"       <+> pprTyVars qtvs ]
 
        ; (ze, qtvs) <- zonkTyBndrs qtvs
        ; lhs_ty     <- zonkTcTypeToTypeX ze lhs_ty

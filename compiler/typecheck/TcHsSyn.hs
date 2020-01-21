@@ -34,7 +34,7 @@ module TcHsSyn (
         zonkTopBndrs,
         ZonkEnv, ZonkFlexi(..), emptyZonkEnv, mkEmptyZonkEnv, initZonkEnv,
         zonkTyVarBinders, zonkTyVarBindersX, zonkTyVarBinderX,
-        zonkTyBndrs, zonkTyBndrsX, zonkSwizzleTyBndrsX,
+        zonkTyBndrs, zonkTyBndrsX, 
         zonkTcTypeToType,  zonkTcTypeToTypeX,
         zonkTcTypesToTypes, zonkTcTypesToTypesX,
         zonkTyVarOcc,
@@ -457,22 +457,6 @@ zonkTyVarBinderX :: ZonkEnv -> VarBndr TcTyVar vis
 zonkTyVarBinderX env (Bndr tv vis)
   = do { (env', tv') <- zonkTyBndrX env tv
        ; return (env', Bndr tv' vis) }
-
-zonkSwizzleTyBndrsX ::
-  TyVarEnv Name -> ZonkEnv -> [TcTyVar] -> TcM (ZonkEnv, [TyVar])
--- This rather specialised function is used in exactly one place.
--- See Note [Tricky scoping in generaliseTcTyCon] in TcTyClsDecls.
-zonkSwizzleTyBndrsX swizzle_env = mapAccumLM (zonkSwizzleTyBndrX swizzle_env)
-
-zonkSwizzleTyBndrX :: TyVarEnv Name -> ZonkEnv
-                   -> TcTyVar -> TcM (ZonkEnv, TyVar)
--- Like zonkTyBndrX, but swizzles the Name
-zonkSwizzleTyBndrX swizzle_env ze tv
-  = ASSERT2( isImmutableTyVar tv, ppr tv <+> dcolon <+> ppr (tyVarKind tv) )
-    do { ki <- zonkTcTypeToTypeX ze (tyVarKind tv)
-       ; let name' = lookupVarEnv swizzle_env tv `orElse` tyVarName tv
-             tv'   = mkTyVar name' ki
-       ; return (extendTyZonkEnv ze tv tv', tv') }
 
 zonkTopExpr :: HsExpr GhcTcId -> TcM (HsExpr GhcTc)
 zonkTopExpr e = initZonkEnv $ \ ze -> zonkExpr ze e
