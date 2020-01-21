@@ -6,5 +6,5 @@ T12844.hs:12:9: warning: [-Wpartial-type-signatures (in -Wdefault)]
                are rigid type variables bound by
                the inferred type of
                  bar :: (Foo rngs, Head rngs ~ '(r, r')) => FooData rngs
-               at T12844.hs:13:1-9
+               at T12844.hs:(12,1)-(13,9)
     • In the type signature: bar :: _ => FooData rngs
