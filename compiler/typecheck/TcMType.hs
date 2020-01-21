@@ -180,7 +180,7 @@ newWanted :: CtOrigin -> Maybe TypeOrKind -> PredType -> TcM CtEvidence
 -- Deals with both equality and non-equality predicates
 newWanted orig t_or_k pty
   = do loc <- getCtLocM orig t_or_k
-       d <- if isEqPrimPred pty then HoleDest  <$> newCoercionHole pty
+       d <- if isEqPrimPred pty then HoleDest  <$> newCoercionHole YesBlockSubst pty
                                 else EvVarDest <$> newEvVar pty
        return $ CtWanted { ctev_dest = d
                          , ctev_pred = pty
@@ -207,8 +207,8 @@ newHoleCt hole ev ty = do
 
 cloneWanted :: Ct -> TcM Ct
 cloneWanted ct
-  | ev@(CtWanted { ctev_dest = HoleDest {}, ctev_pred = pty }) <- ctEvidence ct
-  = do { co_hole <- newCoercionHole pty
+  | ev@(CtWanted { ctev_dest = HoleDest old_hole, ctev_pred = pty }) <- ctEvidence ct
+  = do { co_hole <- newCoercionHole (ch_blocker old_hole) pty
        ; return (mkNonCanonical (ev { ctev_dest = HoleDest co_hole })) }
   | otherwise
   = return ct
@@ -258,7 +258,7 @@ emitDerivedEqs origin pairs
 -- | Emits a new equality constraint
 emitWantedEq :: CtOrigin -> TypeOrKind -> Role -> TcType -> TcType -> TcM Coercion
 emitWantedEq origin t_or_k role ty1 ty2
-  = do { hole <- newCoercionHole pty
+  = do { hole <- newCoercionHole YesBlockSubst pty
        ; loc <- getCtLocM origin (Just t_or_k)
        ; emitSimple $ mkNonCanonical $
          CtWanted { ctev_pred = pty, ctev_dest = HoleDest hole
@@ -319,12 +319,16 @@ newImplication
 ************************************************************************
 -}
 
-newCoercionHole :: TcPredType -> TcM CoercionHole
-newCoercionHole pred_ty
+newCoercionHole :: BlockSubstFlag  -- should the presence of this hole block substitution?
+                                   -- See sub-wrinkle in TcCanonical
+                                   -- Note [Equalities with incompatible kinds]
+                -> TcPredType -> TcM CoercionHole
+newCoercionHole blocker pred_ty
   = do { co_var <- newEvVar pred_ty
-       ; traceTc "New coercion hole:" (ppr co_var)
+       ; traceTc "New coercion hole:" (ppr co_var <+> ppr blocker)
        ; ref <- newMutVar Nothing
-       ; return $ CoercionHole { ch_co_var = co_var, ch_ref = ref } }
+       ; return $ CoercionHole { ch_co_var = co_var, ch_blocker = blocker
+                               , ch_ref = ref } }
 
 -- | Put a value in a coercion hole
 fillCoercionHole :: CoercionHole -> Coercion -> TcM ()
@@ -2001,7 +2005,7 @@ zonkCt tries to maintain the canonical form of a Ct.  For example,
   - a CDictCan should stay a CDictCan;
   - a CTyEqCan should stay a CTyEqCan (if the LHS stays as a variable.).
   - a CHoleCan should stay a CHoleCan
-  - a CIrredCan should stay a CIrredCan with its cc_insol flag intact
+  - a CIrredCan should stay a CIrredCan with its cc_status flag intact
 
 Why?, for example:
 - For CDictCan, the @TcSimplify.expandSuperClasses@ step, which runs after the
@@ -2040,7 +2044,7 @@ zonkCt (CTyEqCan { cc_ev = ev })
   -- a CTyEqCan here. Besides, this will be canonicalized again anyway,
   -- so there is very little benefit in keeping the CTyEqCan constructor.
 
-zonkCt ct@(CIrredCan { cc_ev = ev }) -- Preserve the cc_insol flag
+zonkCt ct@(CIrredCan { cc_ev = ev }) -- Preserve the cc_status flag
   = do { ev' <- zonkCtEvidence ev
        ; return (ct { cc_ev = ev' }) }
 

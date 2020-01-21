@@ -1694,7 +1694,7 @@ uUnfilledVar2 origin t_or_k swapped tv1 ty2
   where
     go dflags cur_lvl
       | canSolveByUnification cur_lvl tv1 ty2
-      , Just ty2' <- metaTyVarUpdateOK dflags tv1 ty2
+      , MTVU_OK ty2' <- metaTyVarUpdateOK dflags tv1 ty2
       = do { co_k <- uType KindLevel kind_origin (tcTypeKind ty2') (tyVarKind tv1)
            ; traceTc "uUnfilledVar2 ok" $
              vcat [ ppr tv1 <+> dcolon <+> ppr (tyVarKind tv1)
@@ -2169,7 +2169,9 @@ with (forall k. k->*)
 
 data MetaTyVarUpdateResult a
   = MTVU_OK a
-  | MTVU_Bad     -- Forall, predicate, or type family
+  | MTVU_Bad          -- Forall, predicate, or type family
+  | MTVU_HoleBlocker  -- Blocking coercion hole
+        -- See Note [Equalities with incompatible kinds] in TcCanonical
   | MTVU_Occurs
     deriving (Functor)
 
@@ -2178,9 +2180,16 @@ instance Applicative MetaTyVarUpdateResult where
       (<*>) = ap
 
 instance Monad MetaTyVarUpdateResult where
-  MTVU_OK x    >>= k = k x
-  MTVU_Bad     >>= _ = MTVU_Bad
-  MTVU_Occurs  >>= _ = MTVU_Occurs
+  MTVU_OK x        >>= k = k x
+  MTVU_Bad         >>= _ = MTVU_Bad
+  MTVU_HoleBlocker >>= _ = MTVU_HoleBlocker
+  MTVU_Occurs      >>= _ = MTVU_Occurs
+
+instance Outputable a => Outputable (MetaTyVarUpdateResult a) where
+  ppr (MTVU_OK a)      = text "MTVU_OK" <+> ppr a
+  ppr MTVU_Bad         = text "MTVU_Bad"
+  ppr MTVU_HoleBlocker = text "MTVU_HoleBlocker"
+  ppr MTVU_Occurs      = text "MTVU_Occurs"
 
 occCheckForErrors :: DynFlags -> TcTyVar -> Type -> MetaTyVarUpdateResult ()
 -- Just for error-message generation; so we return MetaTyVarUpdateResult
@@ -2190,22 +2199,25 @@ occCheckForErrors :: DynFlags -> TcTyVar -> Type -> MetaTyVarUpdateResult ()
 --   b) there is a forall in the type (unless we have -XImpredicativeTypes)
 occCheckForErrors dflags tv ty
   = case preCheck dflags True tv ty of
-      MTVU_OK _   -> MTVU_OK ()
-      MTVU_Bad    -> MTVU_Bad
-      MTVU_Occurs -> case occCheckExpand [tv] ty of
-                       Nothing -> MTVU_Occurs
-                       Just _  -> MTVU_OK ()
+      MTVU_OK _        -> MTVU_OK ()
+      MTVU_Bad         -> MTVU_Bad
+      MTVU_HoleBlocker -> MTVU_HoleBlocker
+      MTVU_Occurs      -> case occCheckExpand [tv] ty of
+                            Nothing -> MTVU_Occurs
+                            Just _  -> MTVU_OK ()
 
 ----------------
 metaTyVarUpdateOK :: DynFlags
                   -> TcTyVar             -- tv :: k1
                   -> TcType              -- ty :: k2
-                  -> Maybe TcType        -- possibly-expanded ty
+                  -> MetaTyVarUpdateResult TcType        -- possibly-expanded ty
 -- (metaTyVarUpdateOK tv ty)
 -- We are about to update the meta-tyvar tv with ty
 -- Check (a) that tv doesn't occur in ty (occurs check)
 --       (b) that ty does not have any foralls
 --           (in the impredicative case), or type functions
+--       (c) that ty does not have any blocking coercion holes
+--           See Note [Equalities with incompatible kinds] in TcCanonical
 --
 -- We have two possible outcomes:
 -- (1) Return the type to update the type variable with,
@@ -2228,20 +2240,24 @@ metaTyVarUpdateOK dflags tv ty
   = case preCheck dflags False tv ty of
          -- False <=> type families not ok
          -- See Note [Prevent unification with type families]
-      MTVU_OK _   -> Just ty
-      MTVU_Bad    -> Nothing  -- forall, predicate, or type function
-      MTVU_Occurs -> occCheckExpand [tv] ty
+      MTVU_OK _        -> MTVU_OK ty
+      MTVU_Bad         -> MTVU_Bad          -- forall, predicate, type function
+      MTVU_HoleBlocker -> MTVU_HoleBlocker  -- coercion hole
+      MTVU_Occurs      -> case occCheckExpand [tv] ty of
+                            Just expanded_ty -> MTVU_OK expanded_ty
+                            Nothing          -> MTVU_Occurs
 
 preCheck :: DynFlags -> Bool -> TcTyVar -> TcType -> MetaTyVarUpdateResult ()
 -- A quick check for
 --   (a) a forall type (unless -XImpredicativeTypes)
 --   (b) a predicate type (unless -XImpredicativeTypes)
 --   (c) a type family
---   (d) an occurrence of the type variable (occurs check)
+--   (d) a blocking coercion hole
+--   (e) an occurrence of the type variable (occurs check)
 --
 -- For (a), (b), and (c) we check only the top level of the type, NOT
--- inside the kinds of variables it mentions.  But for (c) we do
--- look in the kinds of course.
+-- inside the kinds of variables it mentions.  For (d) we look deeply
+-- in coercions, and for (e) we do look in the kinds of course.
 
 preCheck dflags ty_fam_ok tv ty
   = fast_check ty
@@ -2283,10 +2299,13 @@ preCheck dflags ty_fam_ok tv ty
     fast_check_occ k | tv `elemVarSet` tyCoVarsOfType k = MTVU_Occurs
                      | otherwise                        = ok
 
-     -- For coercions, we are only doing an occurs check here;
      -- no bother about impredicativity in coercions, as they're
      -- inferred
-    fast_check_co co | tv `elemVarSet` tyCoVarsOfCo co = MTVU_Occurs
+    fast_check_co co | not (gopt Opt_DeferTypeErrors dflags)
+                     , badCoercionHoleCo co            = MTVU_HoleBlocker
+        -- Wrinkle (4b) in TcCanonical Note [Equalities with incompatible kinds]
+
+                     | tv `elemVarSet` tyCoVarsOfCo co = MTVU_Occurs
                      | otherwise                       = ok
 
     bad_tc :: TyCon -> Bool

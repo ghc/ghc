@@ -24,6 +24,7 @@ import TcType
 import TcOrigin
 import GHC.Rename.Unbound ( unknownNameSuggestions )
 import Type
+import Coercion
 import TyCoRep
 import TyCoPpr          ( pprTyVars, pprWithExplicitKindsWhen, pprSourceTyCon, pprWithTYPE )
 import Unify            ( tcMatchTys )
@@ -57,7 +58,6 @@ import SrcLoc
 import DynFlags
 import ListSetOps       ( equivClasses )
 import Maybes
-import Pair
 import qualified GHC.LanguageExtensions as LangExt
 import FV ( fvVarList, unionFV )
 
@@ -551,7 +551,16 @@ reportWanteds ctxt tc_lvl (WC { wc_simple = simples, wc_impl = implics })
             -- if there's a *given* insoluble here (= inaccessible code)
  where
     env = cec_tidy ctxt
-    tidy_cts = bagToList (mapBag (tidyCt env) simples)
+    tidy_cts = bagToList (mapBag (tidyCt env) $
+                          filterBag (not . blocked_on_coercion) simples)
+
+      -- is this blocked on a coercion hole? If so, then just drop the
+      -- constraint. The coercion hole constraint will be reported instead,
+      -- and that is more informative. Indeed, it's not clear what error
+      -- to report on a blocked constraint, anyway.
+      -- TcCanonical Note [Equalities with incompatible kinds], wrinkle (4)
+    blocked_on_coercion (CIrredCan { cc_status = BlockedCIS }) = True
+    blocked_on_coercion _                                      = False
 
     -- report1: ones that should *not* be suppresed by
     --          an insoluble somewhere else in the tree
@@ -1449,10 +1458,10 @@ mkEqErr_help :: DynFlags -> ReportErrCtxt -> Report
              -> Maybe SwapFlag   -- Nothing <=> not sure
              -> TcType -> TcType -> TcM ErrMsg
 mkEqErr_help dflags ctxt report ct oriented ty1 ty2
-  | Just (tv1, co1) <- tcGetCastedTyVar_maybe ty1
-  = mkTyVarEqErr dflags ctxt report ct oriented tv1 co1 ty2
-  | Just (tv2, co2) <- tcGetCastedTyVar_maybe ty2
-  = mkTyVarEqErr dflags ctxt report ct swapped  tv2 co2 ty1
+  | Just (tv1, _) <- tcGetCastedTyVar_maybe ty1
+  = mkTyVarEqErr dflags ctxt report ct oriented tv1 ty2
+  | Just (tv2, _) <- tcGetCastedTyVar_maybe ty2
+  = mkTyVarEqErr dflags ctxt report ct swapped  tv2 ty1
   | otherwise
   = reportEqErr ctxt report ct oriented ty1 ty2
   where
@@ -1469,13 +1478,13 @@ reportEqErr ctxt report ct oriented ty1 ty2
 
 mkTyVarEqErr, mkTyVarEqErr'
   :: DynFlags -> ReportErrCtxt -> Report -> Ct
-             -> Maybe SwapFlag -> TcTyVar -> TcCoercionN -> TcType -> TcM ErrMsg
+             -> Maybe SwapFlag -> TcTyVar -> TcType -> TcM ErrMsg
 -- tv1 and ty2 are already tidied
-mkTyVarEqErr dflags ctxt report ct oriented tv1 co1 ty2
-  = do { traceTc "mkTyVarEqErr" (ppr ct $$ ppr tv1 $$ ppr co1 $$ ppr ty2)
-       ; mkTyVarEqErr' dflags ctxt report ct oriented tv1 co1 ty2 }
+mkTyVarEqErr dflags ctxt report ct oriented tv1 ty2
+  = do { traceTc "mkTyVarEqErr" (ppr ct $$ ppr tv1 $$ ppr ty2)
+       ; mkTyVarEqErr' dflags ctxt report ct oriented tv1 ty2 }
 
-mkTyVarEqErr' dflags ctxt report ct oriented tv1 co1 ty2
+mkTyVarEqErr' dflags ctxt report ct oriented tv1 ty2
   | not insoluble_occurs_check   -- See Note [Occurs check wins]
   , isUserSkolem ctxt tv1   -- ty2 won't be a meta-tyvar, or else the thing would
                             -- be oriented the other way round;
@@ -1523,23 +1532,6 @@ mkTyVarEqErr' dflags ctxt report ct oriented tv1 co1 ty2
        -- instead of augmenting it.  This is because the details are not likely
        -- to be helpful since this is just an unimplemented feature.
        ; mkErrorMsgFromCt ctxt ct $ report { report_important = [msg] } }
-
-   -- check for heterogeneous equality next; see Note [Equalities with incompatible kinds]
-   -- in TcCanonical
-  | not (k1 `tcEqType` k2)
-  = do { let main_msg = addArising (ctOrigin ct) $
-                        vcat [ hang (text "Kind mismatch: cannot unify" <+>
-                                     parens (ppr tv1 <+> dcolon <+> ppr (tyVarKind tv1)) <+>
-                                     text "with:")
-                                  2 (sep [ppr ty2, dcolon, ppr k2])
-                             , text "Their kinds differ." ]
-             cast_msg
-               | isTcReflexiveCo co1 = empty
-               | otherwise           = text "NB:" <+> ppr tv1 <+>
-                                       text "was casted to have kind" <+>
-                                       quotes (ppr k1)
-
-       ; mkErrorMsgFromCt ctxt ct (mconcat [important main_msg, important cast_msg, report]) }
 
   -- If the immediately-enclosing implication has 'tv' a skolem, and
   -- we know by now its an InferSkol kind of skolem, then presumably
@@ -1606,9 +1598,6 @@ mkTyVarEqErr' dflags ctxt report ct oriented tv1 co1 ty2
         -- Consider an ambiguous top-level constraint (a ~ F a)
         -- Not an occurs check, because F is a type function.
   where
-    Pair _ k1 = tcCoercionKind co1
-    k2        = tcTypeKind ty2
-
     ty1 = mkTyVarTy tv1
     occ_check_expand       = occCheckForErrors dflags tv1 ty2
     insoluble_occurs_check = isInsolubleOccursCheck (ctEqRel ct) tv1 ty2
@@ -1734,9 +1723,9 @@ extraTyVarEqInfo :: ReportErrCtxt -> TcTyVar -> TcType -> SDoc
 extraTyVarEqInfo ctxt tv1 ty2
   = extraTyVarInfo ctxt tv1 $$ ty_extra ty2
   where
-    ty_extra ty = case tcGetTyVar_maybe ty of
-                    Just tv -> extraTyVarInfo ctxt tv
-                    Nothing -> empty
+    ty_extra ty = case tcGetCastedTyVar_maybe ty of
+                    Just (tv, _) -> extraTyVarInfo ctxt tv
+                    Nothing      -> empty
 
 extraTyVarInfo :: ReportErrCtxt -> TcTyVar -> SDoc
 extraTyVarInfo ctxt tv

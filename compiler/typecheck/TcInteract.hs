@@ -15,6 +15,7 @@ import TcFlatten
 import TcUnify( canSolveByUnification )
 import VarSet
 import Type
+import Coercion ( BlockSubstFlag(..) )
 import InstEnv( DFunInstType )
 import CoAxiom( sfInteractTop, sfInteractInert )
 
@@ -684,8 +685,9 @@ once had done). This problem can be tickled by typecheck/should_compile/holes.
 -- mean that (ty1 ~ ty2)
 interactIrred :: InertCans -> Ct -> TcS (StopOrContinue Ct)
 
-interactIrred inerts workItem@(CIrredCan { cc_ev = ev_w, cc_insol = insoluble })
-  | insoluble  -- For insolubles, don't allow the constaint to be dropped
+interactIrred inerts workItem@(CIrredCan { cc_ev = ev_w, cc_status = status })
+  | InsolubleCIS <- status
+               -- For insolubles, don't allow the constaint to be dropped
                -- which can happen with solveOneFromTheOther, so that
                -- we get distinct error messages with -fdefer-type-errors
                -- See Note [Do not add duplicate derived insolubles]
@@ -2091,7 +2093,8 @@ shortCutReduction old_ev fsk ax_co fam_tc tc_args
                                        `mkTcTransCo` ctEvCoercion old_ev) )
 
            Wanted {} ->
-             do { (new_ev, new_co) <- newWantedEq deeper_loc Nominal
+             -- See TcCanonical Note [Equalities with incompatible kinds] about NoBlockSubst
+             do { (new_ev, new_co) <- newWantedEq_SI NoBlockSubst WDeriv deeper_loc Nominal
                                         (mkTyConApp fam_tc tc_args) (mkTyVarTy fsk)
                 ; setWantedEq (ctev_dest old_ev) $ ax_co `mkTcTransCo` new_co
                 ; return new_ev }

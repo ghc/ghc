@@ -12,7 +12,7 @@ module Constraint (
         QCInst(..), isPendingScInst,
 
         -- Canonical constraints
-        Xi, Ct(..), Cts, emptyCts, andCts, andManyCts, pprCts,
+        Xi, Ct(..), Cts, CtIrredStatus(..), emptyCts, andCts, andManyCts, pprCts,
         singleCt, listToCts, ctsElts, consCts, snocCts, extendCtsList,
         isEmptyCts, isCTyEqCan, isCFunEqCan,
         isPendingScDict, superClassesMightHelp, getPendingWantedScs,
@@ -23,7 +23,7 @@ module Constraint (
         ctEvidence, ctLoc, setCtLoc, ctPred, ctFlavour, ctEqRel, ctOrigin,
         ctEvId, mkTcEqPredLikeEv,
         mkNonCanonical, mkNonCanonicalCt, mkGivens,
-        mkIrredCt, mkInsolubleCt,
+        mkIrredCt,
         ctEvPred, ctEvLoc, ctEvOrigin, ctEvEqRel,
         ctEvExpr, ctEvTerm, ctEvCoercion, ctEvEvId,
         tyCoVarsOfCt, tyCoVarsOfCts,
@@ -144,9 +144,8 @@ data Ct
     }
 
   | CIrredCan {  -- These stand for yet-unusable predicates
-      cc_ev    :: CtEvidence,   -- See Note [Ct/evidence invariant]
-      cc_insol :: Bool   -- True  <=> definitely an error, can never be solved
-                         -- False <=> might be soluble
+      cc_ev     :: CtEvidence,   -- See Note [Ct/evidence invariant]
+      cc_status :: CtIrredStatus
 
         -- For the might-be-soluble case, the ctev_pred of the evidence is
         -- of form   (tv xi1 xi2 ... xin)   with a tyvar at the head
@@ -239,6 +238,20 @@ data HoleSort = ExprHole
                  -- expression (TypedHoles)
               | TypeHole
                  -- ^ A hole in a type (PartialTypeSignatures)
+
+------------
+-- | Used to indicate extra information about why a CIrredCan is irreducible
+data CtIrredStatus
+  = InsolubleCIS   -- this constraint will never be solved
+  | BlockedCIS     -- this constraint is blocked on a coercion hole
+                   -- See Note [Equalities with incompatible kinds] in TcCanonical
+                   -- Wrinkle (4a)
+  | OtherCIS
+
+instance Outputable CtIrredStatus where
+  ppr InsolubleCIS = text "(insoluble)"
+  ppr BlockedCIS   = text "(blocked)"
+  ppr OtherCIS     = text "(soluble)"
 
 {- Note [Hole constraints]
 ~~~~~~~~~~~~~~~~~~~~~~~~~~
@@ -345,11 +358,8 @@ mkNonCanonical ev = CNonCanonical { cc_ev = ev }
 mkNonCanonicalCt :: Ct -> Ct
 mkNonCanonicalCt ct = CNonCanonical { cc_ev = cc_ev ct }
 
-mkIrredCt :: CtEvidence -> Ct
-mkIrredCt ev = CIrredCan { cc_ev = ev, cc_insol = False }
-
-mkInsolubleCt :: CtEvidence -> Ct
-mkInsolubleCt ev = CIrredCan { cc_ev = ev, cc_insol = True }
+mkIrredCt :: CtIrredStatus -> CtEvidence -> Ct
+mkIrredCt status ev = CIrredCan { cc_ev = ev, cc_status = status }
 
 mkGivens :: CtLoc -> [EvId] -> [Ct]
 mkGivens loc ev_ids
@@ -408,9 +418,7 @@ instance Outputable Ct where
          CDictCan { cc_pend_sc = pend_sc }
             | pend_sc   -> text "CDictCan(psc)"
             | otherwise -> text "CDictCan"
-         CIrredCan { cc_insol = insol }
-            | insol     -> text "CIrredCan(insol)"
-            | otherwise -> text "CIrredCan(sol)"
+         CIrredCan { cc_status = status } -> text "CIrredCan" <> ppr status
          CHoleCan { cc_occ = occ } -> text "CHoleCan:" <+> ppr occ
          CQuantCan (QCI { qci_pend_sc = pend_sc })
             | pend_sc   -> text "CQuantCan(psc)"
@@ -548,18 +556,15 @@ isDroppableCt ct
 
     keep_deriv
       = case ct of
-          CHoleCan {} -> True
-          CIrredCan { cc_insol = insoluble }
-                      -> keep_eq insoluble
-          _           -> keep_eq False
+          CHoleCan {}                            -> True
+          CIrredCan { cc_status = InsolubleCIS } -> keep_eq True
+          _                                      -> keep_eq False
 
     keep_eq definitely_insoluble
        | isGivenOrigin orig    -- Arising only from givens
        = definitely_insoluble  -- Keep only definitely insoluble
        | otherwise
        = case orig of
-           KindEqOrigin {} -> True    -- See Note [Dropping derived constraints]
-
            -- See Note [Dropping derived constraints]
            -- For fundeps, drop wanted/wanted interactions
            FunDepOrigin2 {} -> True   -- Top-level/Wanted
@@ -608,12 +613,6 @@ But (tiresomely) we do keep *some* Derived constraints:
 
  * Type holes are derived constraints, because they have no evidence
    and we want to keep them, so we get the error report
-
- * Insoluble kind equalities (e.g. [D] * ~ (* -> *)), with
-   KindEqOrigin, may arise from a type equality a ~ Int#, say.  See
-   Note [Equalities with incompatible kinds] in TcCanonical.
-   Keeping these around produces better error messages, in practice.
-   E.g., test case dependent/should_fail/T11471
 
  * We keep most derived equalities arising from functional dependencies
       - Given/Given interactions (subset of FunDepOrigin1):
@@ -989,8 +988,8 @@ insolubleEqCt :: Ct -> Bool
 --                   True for  Int ~ F a Int
 --               but False for  Maybe Int ~ F a Int Int
 --               (where F is an arity-1 type function)
-insolubleEqCt (CIrredCan { cc_insol = insol }) = insol
-insolubleEqCt _                                = False
+insolubleEqCt (CIrredCan { cc_status = InsolubleCIS }) = True
+insolubleEqCt _                                        = False
 
 instance Outputable WantedConstraints where
   ppr (WC {wc_simple = s, wc_impl = i})

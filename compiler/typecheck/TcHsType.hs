@@ -194,18 +194,30 @@ tcHsSigWcType :: UserTypeCtxt -> LHsSigWcType GhcRn -> TcM Type
 tcHsSigWcType ctxt sig_ty = tcHsSigType ctxt (dropWildCards sig_ty)
 
 kcClassSigType :: SkolemInfo -> [Located Name] -> LHsSigType GhcRn -> TcM ()
-kcClassSigType skol_info names sig_ty
-  = discardResult $
-    tcClassSigType skol_info names sig_ty
-  -- tcClassSigType does a fair amount of extra work that we don't need,
-  -- such as ordering quantified variables. But we absolutely do need
-  -- to push the level when checking method types and solve local equalities,
-  -- and so it seems easier just to call tcClassSigType than selectively
-  -- extract the lines of code from tc_hs_sig_type that we really need.
-  -- If we don't push the level, we get #16517, where GHC accepts
-  --   class C a where
-  --     meth :: forall k. Proxy (a :: k) -> ()
-  -- Note that k is local to meth -- this is hogwash.
+-- This is a special form of tcClassSigType that is used during the
+-- kind-checking phase to infer the kind of class variables. Cf. tc_hs_sig_type.
+-- Importantly, this does *not* kind-generalize. Consider
+--   class SC f where
+--     meth :: forall a (x :: f a). Proxy x -> ()
+-- When instantiating Proxy with kappa, we must unify kappa := f a. But we're
+-- still working out the kind of f, and thus f a will have a coercion in it.
+-- Coercions block unification (Note [Equalities with incompatible kinds] in
+-- TcCanonical) and so we fail to unify. If we try to kind-generalize, we'll
+-- end up promoting kappa to the top level (because kind-generalization is
+-- normally done right before adding a binding to the context), and then we
+-- can't set kappa := f a, because a is local.
+kcClassSigType skol_info names (HsIB { hsib_ext  = sig_vars
+                                     , hsib_body = hs_ty })
+  = addSigCtxt (funsSigCtxt names) hs_ty $
+    do { (tc_lvl, (wanted, (spec_tkvs, _)))
+           <- pushTcLevelM                           $
+              solveLocalEqualitiesX "kcClassSigType" $
+              bindImplicitTKBndrs_Skol sig_vars      $
+              tc_lhs_type typeLevelMode hs_ty liftedTypeKind
+
+       ; emitResidualTvConstraint skol_info Nothing spec_tkvs
+                                  tc_lvl wanted }
+kcClassSigType _ _ (XHsImplicitBndrs nec) = noExtCon nec
 
 tcClassSigType :: SkolemInfo -> [Located Name] -> LHsSigType GhcRn -> TcM Type
 -- Does not do validity checking
