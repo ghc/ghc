@@ -14,7 +14,7 @@ module Constraint (
         QCInst(..), isPendingScInst,
 
         -- Canonical constraints
-        Xi, Ct(..), Cts, emptyCts, andCts, andManyCts, pprCts,
+        Xi, Ct(..), Cts, CtIrredStatus(..), emptyCts, andCts, andManyCts, pprCts,
         singleCt, listToCts, ctsElts, consCts, snocCts, extendCtsList,
         isEmptyCts, isCTyEqCan, isCFunEqCan,
         isPendingScDict, superClassesMightHelp, getPendingWantedScs,
@@ -25,7 +25,7 @@ module Constraint (
         ctEvidence, ctLoc, setCtLoc, ctPred, ctFlavour, ctEqRel, ctOrigin,
         ctEvId, mkTcEqPredLikeEv,
         mkNonCanonical, mkNonCanonicalCt, mkGivens,
-        mkIrredCt, mkInsolubleCt,
+        mkIrredCt,
         ctEvPred, ctEvLoc, ctEvOrigin, ctEvEqRel,
         ctEvExpr, ctEvTerm, ctEvCoercion, ctEvEvId,
         tyCoVarsOfCt, tyCoVarsOfCts,
@@ -145,13 +145,12 @@ data Ct
     }
 
   | CIrredCan {  -- These stand for yet-unusable predicates
-      cc_ev    :: CtEvidence,   -- See Note [Ct/evidence invariant]
-      cc_insol :: Bool   -- True  <=> definitely an error, can never be solved
-                         -- False <=> might be soluble
+      cc_ev     :: CtEvidence,   -- See Note [Ct/evidence invariant]
+      cc_status :: CtIrredStatus
 
         -- For the might-be-soluble case, the ctev_pred of the evidence is
         -- of form   (tv xi1 xi2 ... xin)   with a tyvar at the head
-        --      or   (tv1 ~ ty2)   where the CTyEqCan  kind invariant fails
+        --      or   (tv1 ~ ty2)   where the CTyEqCan  kind invariant (TyEq:K) fails
         --      or   (F tys ~ ty)  where the CFunEqCan kind invariant fails
         -- See Note [CIrredCan constraints]
 
@@ -163,19 +162,21 @@ data Ct
   | CTyEqCan {  -- tv ~ rhs
        -- Invariants:
        --   * See Note [inert_eqs: the inert equalities] in TcSMonad
-       --   * tv not in tvs(rhs)   (occurs check)
-       --   * If tv is a TauTv, then rhs has no foralls
+       --   * (TyEq:OC) tv not in deep tvs(rhs)   (occurs check)
+       --   * (TyEq:F) If tv is a TauTv, then rhs has no foralls
        --       (this avoids substituting a forall for the tyvar in other types)
-       --   * tcTypeKind ty `tcEqKind` tcTypeKind tv; Note [Ct kind invariant]
-       --   * rhs may have at most one top-level cast
-       --   * rhs (perhaps under the one cast) is *almost function-free*,
+       --   * (TyEq:K) tcTypeKind ty `tcEqKind` tcTypeKind tv; Note [Ct kind invariant]
+       --   * (TyEq:AFF) rhs (perhaps under the one cast) is *almost function-free*,
        --       See Note [Almost function-free]
-       --   * If the equality is representational, rhs has no top-level newtype
+       --   * (TyEq:N) If the equality is representational, rhs has no top-level newtype
        --     See Note [No top-level newtypes on RHS of representational
        --     equalities] in TcCanonical
-       --   * If rhs (perhaps under the cast) is also a tv, then it is oriented
+       --   * (TyEq:TV) If rhs (perhaps under the cast) is also a tv, then it is oriented
        --     to give best chance of
        --     unification happening; eg if rhs is touchable then lhs is too
+       --     See TcCanonical Note [Canonical orientation for tyvar/tyvar equality constraints]
+       --   * (TyEq:H) The RHS has no blocking coercion holes. See TcCanonical
+       --     Note [Equalities with incompatible kinds], wrinkle (2)
       cc_ev     :: CtEvidence, -- See Note [Ct/evidence invariant]
       cc_tyvar  :: TcTyVar,
       cc_rhs    :: TcType,     -- Not necessarily function-free (hence not Xi)
@@ -241,6 +242,21 @@ data HoleSort = ExprHole
               | TypeHole
                  -- ^ A hole in a type (PartialTypeSignatures)
 
+------------
+-- | Used to indicate extra information about why a CIrredCan is irreducible
+data CtIrredStatus
+  = InsolubleCIS   -- this constraint will never be solved
+  | BlockedCIS     -- this constraint is blocked on a coercion hole
+                   -- The hole will appear in the ctEvPred of the constraint with this status
+                   -- See Note [Equalities with incompatible kinds] in TcCanonical
+                   -- Wrinkle (4a)
+  | OtherCIS
+
+instance Outputable CtIrredStatus where
+  ppr InsolubleCIS = text "(insoluble)"
+  ppr BlockedCIS   = text "(blocked)"
+  ppr OtherCIS     = text "(soluble)"
+
 {- Note [Hole constraints]
 ~~~~~~~~~~~~~~~~~~~~~~~~~~
 CHoleCan constraints are used for two kinds of holes,
@@ -296,7 +312,8 @@ responds True to isTypeFamilyTyCon), except (possibly)
  * under a forall, or
  * in a coercion (either in a CastTy or a CercionTy)
 
-The RHS of a CTyEqCan must be almost function-free. This is for two reasons:
+The RHS of a CTyEqCan must be almost function-free, invariant (TyEq:AFF).
+This is for two reasons:
 
 1. There cannot be a top-level function. If there were, the equality should
    really be a CFunEqCan, not a CTyEqCan.
@@ -346,11 +363,8 @@ mkNonCanonical ev = CNonCanonical { cc_ev = ev }
 mkNonCanonicalCt :: Ct -> Ct
 mkNonCanonicalCt ct = CNonCanonical { cc_ev = cc_ev ct }
 
-mkIrredCt :: CtEvidence -> Ct
-mkIrredCt ev = CIrredCan { cc_ev = ev, cc_insol = False }
-
-mkInsolubleCt :: CtEvidence -> Ct
-mkInsolubleCt ev = CIrredCan { cc_ev = ev, cc_insol = True }
+mkIrredCt :: CtIrredStatus -> CtEvidence -> Ct
+mkIrredCt status ev = CIrredCan { cc_ev = ev, cc_status = status }
 
 mkGivens :: CtLoc -> [EvId] -> [Ct]
 mkGivens loc ev_ids
@@ -409,9 +423,7 @@ instance Outputable Ct where
          CDictCan { cc_pend_sc = pend_sc }
             | pend_sc   -> text "CDictCan(psc)"
             | otherwise -> text "CDictCan"
-         CIrredCan { cc_insol = insol }
-            | insol     -> text "CIrredCan(insol)"
-            | otherwise -> text "CIrredCan(sol)"
+         CIrredCan { cc_status = status } -> text "CIrredCan" <> ppr status
          CHoleCan { cc_occ = occ } -> text "CHoleCan:" <+> ppr occ
          CQuantCan (QCI { qci_pend_sc = pend_sc })
             | pend_sc   -> text "CQuantCan(psc)"
@@ -439,14 +451,10 @@ tyCoVarsOfCtList = fvVarList . tyCoFVsOfCt
 -- | Returns free variables of constraints as a composable FV computation.
 -- See Note [Deterministic FV] in FV.
 tyCoFVsOfCt :: Ct -> FV
-tyCoFVsOfCt (CTyEqCan { cc_tyvar = tv, cc_rhs = xi })
-  = tyCoFVsOfType xi `unionFV` FV.unitFV tv
-                     `unionFV` tyCoFVsOfType (tyVarKind tv)
-tyCoFVsOfCt (CFunEqCan { cc_tyargs = tys, cc_fsk = fsk })
-  = tyCoFVsOfTypes tys `unionFV` FV.unitFV fsk
-                       `unionFV` tyCoFVsOfType (tyVarKind fsk)
-tyCoFVsOfCt (CDictCan { cc_tyargs = tys }) = tyCoFVsOfTypes tys
 tyCoFVsOfCt ct = tyCoFVsOfType (ctPred ct)
+  -- This must consult only the ctPred, so that it gets *tidied* fvs if the
+  -- constraint has been tidied. Tidying a constraint does not tidy the
+  -- fields of the Ct, only the predicate in the CtEvidence.
 
 -- | Returns free variables of a bag of constraints as a non-deterministic
 -- set. See Note [Deterministic FV] in FV.
@@ -549,18 +557,15 @@ isDroppableCt ct
 
     keep_deriv
       = case ct of
-          CHoleCan {} -> True
-          CIrredCan { cc_insol = insoluble }
-                      -> keep_eq insoluble
-          _           -> keep_eq False
+          CHoleCan {}                            -> True
+          CIrredCan { cc_status = InsolubleCIS } -> keep_eq True
+          _                                      -> keep_eq False
 
     keep_eq definitely_insoluble
        | isGivenOrigin orig    -- Arising only from givens
        = definitely_insoluble  -- Keep only definitely insoluble
        | otherwise
        = case orig of
-           KindEqOrigin {} -> True    -- See Note [Dropping derived constraints]
-
            -- See Note [Dropping derived constraints]
            -- For fundeps, drop wanted/wanted interactions
            FunDepOrigin2 {} -> True   -- Top-level/Wanted
@@ -610,12 +615,6 @@ But (tiresomely) we do keep *some* Derived constraints:
  * Type holes are derived constraints, because they have no evidence
    and we want to keep them, so we get the error report
 
- * Insoluble kind equalities (e.g. [D] * ~ (* -> *)), with
-   KindEqOrigin, may arise from a type equality a ~ Int#, say.  See
-   Note [Equalities with incompatible kinds] in TcCanonical.
-   Keeping these around produces better error messages, in practice.
-   E.g., test case dependent/should_fail/T11471
-
  * We keep most derived equalities arising from functional dependencies
       - Given/Given interactions (subset of FunDepOrigin1):
         The definitely-insoluble ones reflect unreachable code.
@@ -664,7 +663,6 @@ isDerivedCt = isDerived . ctEvidence
 
 isCTyEqCan :: Ct -> Bool
 isCTyEqCan (CTyEqCan {})  = True
-isCTyEqCan (CFunEqCan {}) = False
 isCTyEqCan _              = False
 
 isCDictCan_Maybe :: Ct -> Maybe Class
@@ -990,8 +988,8 @@ insolubleEqCt :: Ct -> Bool
 --                   True for  Int ~ F a Int
 --               but False for  Maybe Int ~ F a Int Int
 --               (where F is an arity-1 type function)
-insolubleEqCt (CIrredCan { cc_insol = insol }) = insol
-insolubleEqCt _                                = False
+insolubleEqCt (CIrredCan { cc_status = InsolubleCIS }) = True
+insolubleEqCt _                                        = False
 
 instance Outputable WantedConstraints where
   ppr (WC {wc_simple = s, wc_impl = i})

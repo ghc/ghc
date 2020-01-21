@@ -18,8 +18,9 @@ import TcFlatten
 import TcUnify( canSolveByUnification )
 import VarSet
 import GHC.Core.Type as Type
-import GHC.Core.InstEnv        ( DFunInstType )
-import GHC.Core.Coercion.Axiom ( sfInteractTop, sfInteractInert )
+import GHC.Core.Coercion        ( BlockSubstFlag(..) )
+import GHC.Core.InstEnv         ( DFunInstType )
+import GHC.Core.Coercion.Axiom  ( sfInteractTop, sfInteractInert )
 
 import Var
 import TcType
@@ -687,8 +688,9 @@ once had done). This problem can be tickled by typecheck/should_compile/holes.
 -- mean that (ty1 ~ ty2)
 interactIrred :: InertCans -> Ct -> TcS (StopOrContinue Ct)
 
-interactIrred inerts workItem@(CIrredCan { cc_ev = ev_w, cc_insol = insoluble })
-  | insoluble  -- For insolubles, don't allow the constraint to be dropped
+interactIrred inerts workItem@(CIrredCan { cc_ev = ev_w, cc_status = status })
+  | InsolubleCIS <- status
+               -- For insolubles, don't allow the constraint to be dropped
                -- which can happen with solveOneFromTheOther, so that
                -- we get distinct error messages with -fdefer-type-errors
                -- See Note [Do not add duplicate derived insolubles]
@@ -1639,9 +1641,9 @@ solveByUnification :: CtEvidence -> TcTyVar -> Xi -> TcS ()
 --        workItem = the new Given constraint
 --
 -- NB: No need for an occurs check here, because solveByUnification always
---     arises from a CTyEqCan, a *canonical* constraint.  Its invariants
---     say that in (a ~ xi), the type variable a does not appear in xi.
---     See TcRnTypes.Ct invariants.
+--     arises from a CTyEqCan, a *canonical* constraint.  Its invariant (TyEq:OC)
+--     says that in (a ~ xi), the type variable a does not appear in xi.
+--     See Constraint.Ct invariants.
 --
 -- Post: tv is unified (by side effect) with xi;
 --       we often write tv := xi
@@ -2102,7 +2104,8 @@ shortCutReduction old_ev fsk ax_co fam_tc tc_args
                                        `mkTcTransCo` ctEvCoercion old_ev) )
 
            Wanted {} ->
-             do { (new_ev, new_co) <- newWantedEq deeper_loc Nominal
+             -- See TcCanonical Note [Equalities with incompatible kinds] about NoBlockSubst
+             do { (new_ev, new_co) <- newWantedEq_SI NoBlockSubst WDeriv deeper_loc Nominal
                                         (mkTyConApp fam_tc tc_args) (mkTyVarTy fsk)
                 ; setWantedEq (ctev_dest old_ev) $ ax_co `mkTcTransCo` new_co
                 ; return new_ev }

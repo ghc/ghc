@@ -1,9 +1,21 @@
 
 T15685.hs:13:24: error:
-    • Kind mismatch: cannot unify (f :: a -> *) with:
+    • Couldn't match kind ‘a1’ with ‘[k0]’
+        ‘a1’ is untouchable
+          inside the constraints: as ~ (a2 : as1)
+          bound by a pattern with constructor:
+                     Here :: forall {a1} (f :: a1 -> *) (a2 :: a1) (as :: [a1]).
+                             f a2 -> NS f (a2 : as),
+                   in a pattern synonym declaration
+          at T15685.hs:13:19-26
+      ‘a1’ is a rigid type variable bound by
+        the inferred type of HereNil :: NS f as
+        at T15685.hs:13:9-15
+      Possible fix: add a type signature for ‘HereNil’
+      When matching types
+        f :: a1 -> *
         NP a0 :: [k0] -> *
-      Their kinds differ.
-      Expected type: f a1
+      Expected type: f a2
         Actual type: NP a0 b0
     • In the pattern: Nil
       In the pattern: Here Nil
