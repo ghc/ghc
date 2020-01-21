@@ -79,6 +79,7 @@ import Class
 import HscTypes
 import Outputable
 import Type
+import Coercion   ( BlockSubstFlag(..) )
 import Id
 import InstEnv
 import FastString
@@ -179,7 +180,7 @@ newEvVar = unsafeTcPluginTcM . TcM.newEvVar
 
 -- | Create a fresh coercion hole.
 newCoercionHole :: PredType -> TcPluginM CoercionHole
-newCoercionHole = unsafeTcPluginTcM . TcM.newCoercionHole
+newCoercionHole = unsafeTcPluginTcM . TcM.newCoercionHole YesBlockSubst
 
 -- | Bind an evidence variable.  This must not be invoked from
 -- 'tcPluginInit' or 'tcPluginStop', or it will panic.

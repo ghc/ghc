@@ -1,6 +1,6 @@
 
 BadTelescope5.hs:10:81: error:
-    • Expected kind ‘k’, but ‘d’ has kind ‘Proxy a’
+    • Expected kind ‘k1’, but ‘d’ has kind ‘Proxy a1’
     • In the second argument of ‘SameKind’, namely ‘d’
       In the type signature:
         bar :: forall a k (b :: k) (c :: Proxy b) (d :: Proxy a).

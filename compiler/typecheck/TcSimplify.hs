@@ -2432,7 +2432,6 @@ floatEqualities skols given_ids ev_binds_var no_given_eqs
     is_float_eq_candidate ct
       | pred <- ctPred ct
       , EqPred NomEq ty1 ty2 <- classifyPredType pred
-      , tcTypeKind ty1 `tcEqType` tcTypeKind ty2
       = case (tcGetTyVar_maybe ty1, tcGetTyVar_maybe ty2) of
           (Just tv1, _) -> float_tv_eq_candidate tv1 ty2
           (_, Just tv2) -> float_tv_eq_candidate tv2 ty1
@@ -2478,19 +2477,6 @@ happen.  In particular, float out equalities that are:
    * And 'alpha' is not a TyVarTv with 'ty' being a non-tyvar.  In that
      case, floating out won't help either, and it may affect grouping
      of error messages.
-
-* Homogeneous (both sides have the same kind). Why only homogeneous?
-  Because heterogeneous equalities have derived kind equalities.
-  See Note [Equalities with incompatible kinds] in TcCanonical.
-  If we float out a hetero equality, then it will spit out the same
-  derived kind equality again, which might create duplicate error
-  messages.
-
-  Instead, we do float out the kind equality (if it's worth floating
-  out, as above). If/when we solve it, we'll be able to rewrite the
-  original hetero equality to be homogeneous, and then perhaps make
-  progress / float it out. The duplicate error message was spotted in
-  typecheck/should_fail/T7368.
 
 * Nominal.  No point in floating (alpha ~R# ty), because we do not
   unify representational equalities even if alpha is touchable.

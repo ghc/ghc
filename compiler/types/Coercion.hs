@@ -12,7 +12,8 @@
 module Coercion (
         -- * Main data type
         Coercion, CoercionN, CoercionR, CoercionP, MCoercion(..), MCoercionR,
-        UnivCoProvenance, CoercionHole(..), coHoleCoVar, setCoHoleCoVar,
+        UnivCoProvenance, CoercionHole(..), BlockSubstFlag(..),
+        coHoleCoVar, setCoHoleCoVar,
         LeftOrRight(..),
         Var, CoVar, TyCoVar,
         Role(..), ltRole,
@@ -111,7 +112,9 @@ module Coercion (
         -- * Other
         promoteCoercion, buildCoercion,
 
-        simplifyArgsWorker
+        simplifyArgsWorker,
+
+        badCoercionHole, badCoercionHoleCo
        ) where
 
 #include "HsVersions.h"
@@ -2915,3 +2918,63 @@ simplifyArgsWorker orig_ki_binders orig_inner_ki orig_fvs
                     ppr (take 10 orig_roles), -- often infinite!
                     ppr orig_tys])
            -}
+
+{-
+%************************************************************************
+%*                                                                      *
+       Coercion holes
+%*                                                                      *
+%************************************************************************
+-}
+
+-- | Is there a blocking coercion hole in this type? See
+-- TcCanonical Note [Equalities with incompatible kinds]
+badCoercionHole :: Type -> Bool
+badCoercionHole = go
+  where
+    go (TyVarTy {})              = False
+    go (AppTy ty1 ty2)           = go ty1 || go ty2
+    go (TyConApp _ tys)          = any go tys
+    go (ForAllTy (Bndr tv _) ty) = go (tyVarKind tv) || go ty
+    go (FunTy _ arg res)         = go arg || go res
+    go (LitTy {})                = False
+    go (CastTy ty co)            = go ty || badCoercionHoleCo co
+    go (CoercionTy co)           = badCoercionHoleCo co
+
+-- | Is there a blocking coercion hole in this coercion? See
+-- TcCanonical Note [Equalities with incompatible kinds]
+badCoercionHoleCo :: Coercion -> Bool
+badCoercionHoleCo = go
+  where
+    -- the only interesting case:
+    go (HoleCo (CoercionHole { ch_blocker = YesBlockSubst })) = True
+    go (HoleCo {}) = False
+
+    -- and now, lots of boring cases:
+    go (Refl ty)               = badCoercionHole ty
+    go (GRefl _ ty m_co)       = badCoercionHole ty || go_mco m_co
+    go (TyConAppCo _ _ cos)    = any go cos
+    go (AppCo co1 co2)         = go co1 || go co2
+    go (ForAllCo _ kco co)     = go kco || go co
+    go (FunCo _ co1 co2)       = go co1 || go co2
+    go (CoVarCo {})            = False
+    go (AxiomInstCo _ _ cos)   = any go cos
+    go (AxiomRuleCo _ cos)     = any go cos
+    go (UnivCo prov _ ty1 ty2) = go_prov prov ||
+                                 badCoercionHole ty1 ||
+                                 badCoercionHole ty2
+    go (SymCo co)              = go co
+    go (TransCo co1 co2)       = go co1 || go co2
+    go (NthCo _ _ co)          = go co
+    go (LRCo _ co)             = go co
+    go (InstCo co1 co2)        = go co1 || go co2
+    go (KindCo co)             = go co
+    go (SubCo co)              = go co
+
+    go_mco MRefl = False
+    go_mco (MCo co) = go co
+
+    go_prov UnsafeCoerceProv    = False
+    go_prov (PhantomProv co)    = go co
+    go_prov (ProofIrrelProv co) = go co
+    go_prov (PluginProv {})     = False
