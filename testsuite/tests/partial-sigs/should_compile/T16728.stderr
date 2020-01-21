@@ -3,7 +3,7 @@ T16728.hs:8:37: warning: [-Wpartial-type-signatures (in -Wdefault)]
     • Found type wildcard ‘_’ standing for ‘k’
       Where: ‘k’ is a rigid type variable bound by
                the inferred type of f :: Proxy x
-               at T16728.hs:9:1-9
+               at T16728.hs:8:13
     • In the kind ‘_’
       In the first argument of ‘Proxy’, namely ‘(x :: _)’
       In the type ‘Proxy (x :: _)’
