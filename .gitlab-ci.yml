@@ -233,7 +233,7 @@ lint-release-changelogs:
 
 validate-x86_64-linux-deb9-hadrian:
   extends: .validate-linux-hadrian
-  stage: build
+  stage: test
 
 validate-x86_64-linux-deb9-unreg-hadrian:
   extends: .validate-linux-hadrian
@@ -301,7 +301,7 @@ hadrian-ghc-in-ghci:
 
 validate-x86_64-darwin:
   extends: .validate
-  stage: full-build
+  stage: test
   tags:
     - x86_64-darwin
   variables:
@@ -450,7 +450,7 @@ nightly-armv7-linux-deb9:
 
 .build-i386-linux-deb9:
   extends: .validate-linux
-  stage: full-build
+  stage: test
   image: "registry.gitlab.haskell.org/ghc/ci-images/i386-linux-deb9:$DOCKER_REV"
   variables:
     TEST_ENV: "i386-linux-deb9"
