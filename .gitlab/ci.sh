@@ -1,0 +1,336 @@
+#!/bin/bash
+
+# This is the primary driver of the GitLab CI infrastructure.
+
+set -e -o pipefail
+
+# Configuration:
+hackage_index_state="@1522046735"
+
+# Colors
+BLACK="0;30"
+GRAY="1;30"
+RED="0;31"
+LT_RED="1;31"
+BROWN="0;33"
+LT_BROWN="1;33"
+GREEN="0;32"
+LT_GREEN="1;32"
+BLUE="0;34"
+LT_BLUE="1;34"
+PURPLE="0;35"
+LT_PURPLE="1;35"
+CYAN="0;36"
+LT_CYAN="1;36"
+WHITE="1;37"
+LT_GRAY="0;37"
+
+echo_color() {
+  local color="$1"
+  local msg="$2"
+  echo -e "\e[${color}m${msg}\e[0m"
+}
+
+error() { echo_color "${RED}" "$1"; }
+warn() { echo_color "${LT_BROWN}" "$1"; }
+info() { echo_color "${LT_BLUE}" "$1"; }
+
+fail() { error "$1"; exit 1; }
+
+function run() {
+  info "Running $@..."
+  $@ || ( error "$@ failed"; return 1; )
+}
+
+if [ -z "$GHC_VERSION" ]; then
+  fail "GHC_VERSION not set"
+fi
+
+TOP="$(pwd)"
+
+function mingw_init() {
+  case "$MSYSTEM" in
+    MINGW32)
+      triple="i686-unknown-mingw32"
+      boot_triple="i386-unknown-mingw32" # triple of bootstrap GHC
+      cabal_arch="i386"
+      ;;
+    MINGW64)
+      triple="x86_64-unknown-mingw32"
+      boot_triple="x86_64-unknown-mingw32" # triple of bootstrap GHC
+      cabal_arch="x86_64"
+      ;;
+    *)
+      fail "win32-init: Unknown MSYSTEM $MSYSTEM"
+      ;;
+  esac
+
+  # Bring mingw toolchain into PATH.
+  # This is extracted from /etc/profile since this script inexplicably fails to
+  # run under gitlab-runner.
+  source /etc/msystem
+  MINGW_MOUNT_POINT="${MINGW_PREFIX}"
+  PATH="$MINGW_MOUNT_POINT/bin:$PATH"
+}
+
+# This will contain GHC's local native toolchain
+toolchain="$TOP/toolchain"
+mkdir -p $toolchain/bin
+PATH="$toolchain/bin:$PATH"
+
+export METRICS_FILE="$CI_PROJECT_DIR/performance-metrics.tsv"
+
+# Use a local temporary directory to ensure that concurrent builds don't
+# interfere with one another
+mkdir -p $TOP/tmp
+export TMP="$TOP/tmp"
+export TEMP="$TOP/tmp"
+
+function darwin_setup() {
+  # It looks like we already have python2 here and just installing python3
+  # does not work.
+  brew upgrade python
+  brew install ghc cabal-install ncurses gmp
+
+  pip3 install sphinx
+  # PDF documentation disabled as MacTeX apparently doesn't include xelatex.
+  #brew cask install mactex
+}
+
+function show_tool() {
+  tool="$1"
+  info "$tool = ${!tool}"
+  ${!tool} --version
+}
+
+# Extract GHC toolchain
+function setup() {
+  if [ -d "$TOP/cabal-cache" ]; then
+      info "Extracting cabal cache..."
+      cp -Rf cabal-cache $cabal_dir
+  fi
+
+  case $platform in
+    Darwin) darwin_setup; setup_toolchain ;;
+    MSYS_*) setup_toolchain ;;
+    Linux)
+      export GHC="/usr/local/bin/ghc"
+      export CABAL="/usr/local/bin/cabal"
+      export HAPPY="$HOME/.cabal/bin/happy"
+      export ALEX="$HOME/.cabal/bin/alex"
+      ;;
+    *) ;;
+  esac
+
+  # Make sure that git works
+  git config user.email "ghc-ci@gitlab-haskell.org"
+  git config user.name "GHC GitLab CI"
+
+  info "====================================================="
+  info "Toolchain versions"
+  info "====================================================="
+  show_tool GHC
+  show_tool CABAL
+  show_tool HAPPY
+  show_tool ALEX
+}
+
+function fetch_cabal() {
+  export CABAL=$toolchain/bin/cabal${exe}
+  if [ ! -e "$CABAL" ]; then
+      case "$(uname)" in
+        MSYS)
+          url="https://downloads.haskell.org/~cabal/cabal-install-$CABAL_INSTALL_VERSION/cabal-install-$CABAL_INSTALL_VERSION-$cabal_arch-unknown-mingw32.zip"
+          info "Fetching cabal binary distribution from $url..."
+          curl $url > $TMP/cabal.zip
+          unzip $TMP/cabal.zip
+          mv cabal.exe $CABAL
+          ;;
+        *)
+          url="https://downloads.haskell.org/~cabal/cabal-install-$CABAL_INSTALL_VERSION/cabal-install-$CABAL_INSTALL_VERSION-x86_64-apple-darwin-sierra.tar.xz"
+          echo "Fetching cabal-install from $cabal_tarball"
+          curl $cabal_tarball | tar -xz
+          mv cabal $toolchain/bin
+          ;;
+      esac
+  fi
+}
+
+# For non-Docker platforms we prepare the bootstrap toolchain
+# here. For Docker platforms this is done in the Docker image
+# build.
+function setup_toolchain() {
+  export GHC="$toolchain/bin/ghc"
+  if [ ! -e "$GHC" ]; then
+      url="https://downloads.haskell.org/~ghc/${GHC_VERSION}/ghc-${GHC_VERSION}-${boot_triple}.tar.xz"
+      info "Fetching GHC binary distribution from $url..."
+      curl $url > ghc.tar.xz || fail "failed to fetch GHC binary distribution"
+      tar -xJf ghc.tar.xz || fail "failed to extract GHC binary distribution"
+      cp -r ghc-${GHC_VERSION}/* toolchain
+      rm -Rf ghc-${GHC_VERSION} ghc.tar.xz
+  fi
+
+  cabal_install="cabal v2-install --index=state=$hackage_index_state --install-method=copy --installdir=$toolchain/bin"
+  export HAPPY="$toolchain/bin/happy"
+  if [ ! -e "$HAPPY" ]; then
+      info "Building happy..."
+      cabal update
+      $cabal_install happy
+  fi
+
+  export ALEX="$toolchain/bin/alex"
+  if [ ! -e "$ALEX" ]; then
+      info "Building alex..."
+      cabal update
+      $cabal_install alex
+  fi
+}
+
+function cleanup_submodules() {
+  # On Windows submodules can inexplicably get into funky states where git
+  # believes that the submodule is initialized yet its associated repository
+  # is not valid. Avoid failing in this case with the following insanity.
+  git submodule sync --recursive || git submodule deinit --force --all
+  git submodule update --init --recursive
+  git submodule foreach git clean -xdf
+}
+
+function prepare_build_mk() {
+  if [[ -z ${BUILD_SPHINX_HTML:-} ]]; then BUILD_SPHINX_HTML=YES; fi
+  if [[ -z ${BUILD_SPHINX_PDF:-} ]]; then BUILD_SPHINX_PDF=YES; fi
+  if [[ -z ${INTEGER_LIBRARY:-} ]]; then INTEGER_LIBRARY=integer-gmp; fi
+  if [[ -z ${BUILD_FLAVOUR:-} ]]; then BUILD_FLAVOUR=perf; fi
+
+  cat > mk/build.mk <<EOF
+V=1
+HADDOCK_DOCS=YES
+LATEX_DOCS=YES
+HSCOLOUR_SRCS=YES
+BUILD_SPHINX_HTML=$BUILD_SPHINX_HTML
+BUILD_SPHINX_PDF=$BUILD_SPHINX_PDF
+BeConservative=YES
+INTEGER_LIBRARY=$INTEGER_LIBRARY
+XZ_CMD=$XZ
+
+BuildFlavour=$BUILD_FLAVOUR
+ifneq "\$(BuildFlavour)" ""
+include mk/flavours/\$(BuildFlavour).mk
+endif
+GhcLibHcOpts+=-haddock
+EOF
+
+  if [ -n "$HADDOCK_HYPERLINKED_SOURCES" ]; then
+    echo "EXTRA_HADDOCK_OPTS += --hyperlinked-source --quickjump" >> mk/build.mk
+  fi
+
+  case "$(uname)" in
+    Darwin) echo "libraries/integer-gmp_CONFIGURE_OPTS += --configure-option=--with-intree-gmp" >> mk/build.mk ;;
+    *) ;;
+  esac
+
+  info "build.mk is:"
+  cat mk/build.mk
+}
+
+function configure() {
+  prepare_build_mk
+  run python boot
+  run ./configure \
+    --enable-tarballs-autodownload \
+    --target=$triple \
+    $CONFIGURE_ARGS \
+    GHC=$GHC \
+    HAPPY=$HAPPY \
+    ALEX=$ALEX \
+    || ( cat config.log; fail "configure failed" )
+}
+
+function build_make() {
+  if [ -z "$BUILD_FLAVOUR" ]; then
+    fail "BUILD_FLAVOUR not set"
+  fi
+
+  echo "include mk/flavours/${BUILD_FLAVOUR}.mk" > mk/build.mk
+  echo 'GhcLibHcOpts+=-haddock' >> mk/build.mk
+  run make -j$(mk/detect-cpu-count.sh) $MAKE_ARGS
+  run make -j$(mk/detect-cpu-count.sh) binary-dist TAR_COMP_OPTS=-1
+  ls -lh ghc.tar.xz
+}
+
+function fetch_perf_notes() {
+  info "Fetching perf notes..."
+  $TOP/.gitlab/test-metrics.sh pull
+}
+
+function push_perf_notes() {
+  info "Pushing perf notes..."
+  $TOP/.gitlab/test-metrics.sh push
+}
+
+function test_make() {
+  run make test_bindist TEST_PREP=YES
+  run make V=0 test \
+    THREADS=$(mk/detect-cpu-count.sh) \
+    JUNIT_FILE=../../junit.xml
+}
+
+function build_hadrian() {
+  if [ -z "$FLAVOUR" ]; then
+    fail "FLAVOUR not set"
+  fi
+
+  run hadrian/build.cabal.sh \
+    --flavour=$FLAVOUR \
+    -j$(mk/detect-cpu-count.sh) \
+    $HADRIAN_ARGS \
+    binary-dist
+
+  mv _build/bindist/ghc*.tar.xz ghc.tar.xz
+}
+
+function test_hadrian() {
+  cd _build/bindist/ghc-*/
+  run ./configure --prefix=$TOP/_build/install
+  run make install
+  cd ../../../
+
+  run hadrian/build.cabal.sh \
+    --flavour=$FLAVOUR \
+    -j$(mk/detect-cpu-count.sh) \
+    $HADRIAN_ARGS \
+    test \
+    --summary-junit=./junit.xml \
+    --test-compiler=$TOP/_build/install/bin/ghc
+}
+
+function clean() {
+  rm -R tmp
+  run make clean || true
+  run rm -Rf _build
+}
+
+# Determine Cabal data directory
+case "$(uname)" in
+  MSYS_*) cabal_dir="$APPDATA/cabal"; exe="exe" ;;
+  *) cabal_dir="$HOME/.cabal"; exe="" ;;
+esac
+
+# Platform-specific environment initialization
+case "$(uname)" in
+  MSYS_*) mingw_init ;;
+  Darwin) ;;
+  FreeBSD) ;;
+  Linux) ;;
+  *) fail "uname $(uname) is not supported" ;;
+esac
+
+case $1 in
+  setup) setup && cleanup_submodules ;;
+  configure) configure ;;
+  build_make) build_make ;;
+  test_make) fetch_perf_notes; test_make; push_perf_notes ;;
+  build_hadrian) build_hadrian ;;
+  test_hadrian) fetch_perf_notes; test_hadrian; push_perf_notes ;;
+  clean) clean ;;
+  *) fail "unknown mode $1" ;;
+esac

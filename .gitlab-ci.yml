@@ -198,26 +198,10 @@ lint-release-changelogs:
   variables:
     FLAVOUR: "validate"
   script:
-    - cabal update
-    - git clean -xdf && git submodule foreach git clean -xdf
-    - .gitlab/prepare-system.sh
-    - if [[ -d ./cabal-cache ]]; then cp -R ./.cabal-cache ~/.cabal-cache; fi
-    - ./boot
-    - ./configure $CONFIGURE_ARGS
-    - hadrian/build.cabal.sh --flavour=$FLAVOUR -j`mk/detect-cpu-count.sh` --docs=no-sphinx binary-dist
-    - mv _build/bindist/ghc*.tar.xz ghc.tar.xz
-    - export TOP=$(pwd)
-    - cd _build/bindist/ghc-*/ && ./configure --prefix=$TOP/_build/install && make install && cd ../../../
-    - |
-      # Prepare to push git notes.
-      export METRICS_FILE=$CI_PROJECT_DIR/performance-metrics.tsv
-      git config user.email "ben+ghc-ci@smart-cactus.org"
-      git config user.name "GHC GitLab CI"
-      .gitlab/test-metrics.sh pull
-    - hadrian/build.cabal.sh --flavour=$FLAVOUR -j`mk/detect-cpu-count.sh` --docs=no-sphinx test --summary-junit=./junit.xml --test-compiler=$TOP/_build/install/bin/ghc || (.gitlab/test-metrics.sh push && false)
-    - |
-      # Push git notes.
-      .gitlab/test-metrics.sh push
+    - .gitlab/ci.sh setup
+    - .gitlab/ci.sh configure
+    - .gitlab/ci.sh build_hadrian
+    - .gitlab/ci.sh test_hadrian
   cache:
     key: hadrian
     paths:
@@ -242,6 +226,8 @@ lint-release-changelogs:
     - git submodule update --init --recursive
     - git checkout .gitmodules
     - "git fetch https://gitlab.haskell.org/ghc/ghc-performance-notes.git refs/notes/perf:refs/notes/perf || true"
+  after_script:
+    - .gitlab/ci.sh clean
   tags:
     - x86_64-linux
 
@@ -293,28 +279,12 @@ hadrian-ghc-in-ghci:
   <<: *only-default
   variables:
     TEST_TYPE: test
-  before_script:
-    - git clean -xdf && git submodule foreach git clean -xdf
+    MAKE_ARGS: "-Werror"
   script:
-    - ./boot
-    - ./configure $CONFIGURE_ARGS
-    - |
-      THREADS=`mk/detect-cpu-count.sh`
-      make V=0 -j$THREADS WERROR=-Werror
-    - make binary-dist-prep TAR_COMP_OPTS="-1"
-    - make test_bindist TEST_PREP=YES
-    - |
-      # Prepare to push git notes.
-      METRICS_FILE=$CI_PROJECT_DIR/performance-metrics.tsv
-      git config user.email "ben+ghc-ci@smart-cactus.org"
-      git config user.name "GHC GitLab CI"
-      .gitlab/test-metrics.sh pull
-    - |
-      THREADS=`mk/detect-cpu-count.sh`
-      make $TEST_TYPE THREADS=$THREADS JUNIT_FILE=../../junit.xml METRICS_FILE=$METRICS_FILE || (METRICS_FILE=$METRICS_FILE .gitlab/test-metrics.sh push && false)
-    - |
-      # Push git notes.
-      METRICS_FILE=$METRICS_FILE .gitlab/test-metrics.sh push
+    - .gitlab/ci.sh setup
+    - .gitlab/ci.sh configure
+    - .gitlab/ci.sh build_make
+    - .gitlab/ci.sh test_make
   dependencies: []
   artifacts:
     reports:
@@ -342,19 +312,11 @@ validate-x86_64-darwin:
     # Only Sierra and onwards supports clock_gettime. See #12858
     ac_cv_func_clock_gettime: "no"
     LANG: "en_US.UTF-8"
-    CONFIGURE_ARGS: --with-intree-gmp
+    CONFIGURE_ARGS: "--with-intree-gmp"
     TEST_ENV: "x86_64-darwin"
-  before_script:
-    - git clean -xdf && git submodule foreach git clean -xdf
-    - git submodule sync --recursive
-    - git submodule update --init --recursive
-    - git checkout .gitmodules
-    - "git fetch https://gitlab.haskell.org/ghc/ghc-performance-notes.git refs/notes/perf:refs/notes/perf || true"
-
-    - bash .gitlab/darwin-init.sh
-    - PATH="`pwd`/toolchain/bin:$PATH"
   after_script:
     - cp -Rf $HOME/.cabal cabal-cache
+    - .gitlab/ci.sh clean
   artifacts:
     when: always
     expire_in: 2 week
@@ -378,26 +340,14 @@ validate-x86_64-darwin:
     CONFIGURE_ARGS: --with-intree-gmp
     TEST_ENV: "x86_64-darwin-hadrian"
     FLAVOUR: "validate"
-  before_script:
-    - git clean -xdf && git submodule foreach git clean -xdf
-    - git submodule sync --recursive
-    - git submodule update --init --recursive
-    - git checkout .gitmodules
-    - "git fetch https://gitlab.haskell.org/ghc/ghc-performance-notes.git refs/notes/perf:refs/notes/perf || true"
-
-    - bash .gitlab/darwin-init.sh
-    - PATH="`pwd`/toolchain/bin:$PATH"
   script:
-    - cabal update
-    - ./boot
-    - ./configure $CONFIGURE_ARGS
-    - hadrian/build.cabal.sh --flavour=$FLAVOUR -j`mk/detect-cpu-count.sh` --docs=no-sphinx binary-dist
-    - mv _build/bindist/ghc*.tar.xz ghc.tar.xz
-    - export TOP=$(pwd)
-    - cd _build/bindist/ghc-*/ && ./configure --prefix=$TOP/_build/install && make install && cd ../../../
-    - hadrian/build.cabal.sh --flavour=$FLAVOUR -j`mk/detect-cpu-count.sh` --docs=no-sphinx test --summary-junit=./junit.xml --test-compiler=$TOP/_build/install/bin/ghc
+    - .gitlab/ci.sh setup
+    - .gitlab/ci.sh configure
+    - .gitlab/ci.sh build
+    - .gitlab/ci.sh test
   after_script:
     - cp -Rf $HOME/.cabal cabal-cache
+    - .gitlab/ci.sh clean
   artifacts:
     when: always
     expire_in: 2 week
@@ -412,18 +362,12 @@ validate-x86_64-darwin:
   tags:
     - x86_64-linux
   before_script:
-    - git clean -xdf && git submodule foreach git clean -xdf
-    - git submodule sync --recursive
-    - git submodule update --init --recursive
-    - git checkout .gitmodules
-    - "git fetch https://gitlab.haskell.org/ghc/ghc-performance-notes.git refs/notes/perf:refs/notes/perf || true"
       # Build hyperlinked sources for documentation when building releases
     - |
       if [[ -n "$CI_COMMIT_TAG" ]]; then
-        echo "EXTRA_HADDOCK_OPTS += --hyperlinked-source --quickjump" >> mk/build.mk
+        HADDOCK_HYPERLINKED_SOURCES=1
       fi
 
-    - .gitlab/prepare-system.sh
     # workaround for docker permissions
     - sudo chown ghc:ghc -R .
   after_script:
@@ -779,11 +723,14 @@ validate-x86_64-linux-fedora27:
   after_script:
     - |
       Copy-Item -Recurse -Path $Env:APPDATA\cabal -Destination cabal-cache
+    - bash .gitlab/ci.sh clean
   dependencies: []
   variables:
     #FORCE_SYMLINKS: 1
     LANG: "en_US.UTF-8"
     SPHINXBUILD: "/mingw64/bin/sphinx-build.exe"
+    CABAL_INSTALL_VERSION: 2.4.1.0
+    GHC_VERSION: "8.6.5"
   cache:
     paths:
       - cabal-cache
@@ -794,14 +741,18 @@ validate-x86_64-linux-fedora27:
   extends: .build-windows
   stage: test
   variables:
-    GHC_VERSION: "8.6.5"
-    FLAVOUR: "validate"
+    FLAVOUR: "Quick"
+    # skipping perf tests for now since we build a quick-flavoured GHC,
+    # which might result in some broken perf tests?
+    HADRIAN_ARGS: "--docs=no-sphinx --skip-perf"
+
   # due to #16574 this currently fails
   allow_failure: true
+
   script:
-    - bash .gitlab/win32-ci.sh configure
-    - bash .gitlab/win32-ci.sh build_hadrian
-    - bash .gitlab/win32-ci.sh test_hadrian
+    - bash .gitlab/ci.sh configure
+    - bash .gitlab/ci.sh build_hadrian
+    - bash .gitlab/ci.sh test_hadrian
   tags:
     - x86_64-windows
     - test
@@ -838,12 +789,11 @@ nightly-i386-windows-hadrian:
   stage: test
   variables:
     BUILD_FLAVOUR: "quick"
-    GHC_VERSION: "8.6.5"
     BIN_DIST_PREP_TAR_COMP: "ghc-x86_64-mingw32.tar.xz"
   script:
-    - bash .gitlab/win32-ci.sh configure
-    - bash .gitlab/win32-ci.sh build_make
-    - bash .gitlab/win32-ci.sh test_make
+    - bash .gitlab/ci.sh configure
+    - bash .gitlab/ci.sh build_make
+    - bash .gitlab/ci.sh test_make
   tags:
     - x86_64-windows
     - test
