@@ -93,7 +93,7 @@ import Util             ( looksLikePackageName, fstOf3, sndOf3, thdOf3 )
 import GhcPrelude
 }
 
-%expect 254 -- shift/reduce conflicts -- GJ : TODO
+%expect 232 -- shift/reduce conflicts
 
 {- Last updated: 04 June 2018
 
@@ -1384,7 +1384,7 @@ opt_at_kind_inj_sig :: { Located ([AddAnn], ( LFamilyResultSig GhcPs
         :            { noLoc ([], (noLoc (NoSig noExtField), Nothing)) }
         | '::' kind  { sLL $1 $> ( [mu AnnDcolon $1]
                                  , (sLL $2 $> (KindSig noExtField $2), Nothing)) }
-        | '='  tv_bndr '|' injectivity_cond
+        | '='  tv_bndr_no_braces '|' injectivity_cond
                 {% do { tvb <- fromSpecTyVarBndr $2
                       ; return $ sLL $1 $> ([mj AnnEqual $1, mj AnnVbar $3]
                                            , (sLL $1 $2 (TyVarSig noExtField tvb), Just $4))} }
@@ -2146,13 +2146,16 @@ tv_bndrs :: { [LHsTyVarBndr Specificity GhcPs] }
          | {- empty -}                  { [] }
 
 tv_bndr :: { LHsTyVarBndr Specificity GhcPs }
-        : tyvar                         { sL1 $1 (UserTyVar noExtField SpecifiedSpec $1) }
+        : tv_bndr_no_braces             { $1 }
         | '{' tyvar '}'                 {% ams (sLL $1 $> (UserTyVar noExtField InferredSpec $2))
                                                [mop $1, mcp $3] }
-        | '(' tyvar '::' kind ')'       {% ams (sLL $1 $> (KindedTyVar noExtField SpecifiedSpec $2 $4))
+        | '{' tyvar '::' kind '}'       {% ams (sLL $1 $> (KindedTyVar noExtField InferredSpec $2 $4))
                                                [mop $1,mu AnnDcolon $3
                                                ,mcp $5] }
-        | '{' tyvar '::' kind '}'       {% ams (sLL $1 $> (KindedTyVar noExtField InferredSpec $2 $4))
+
+tv_bndr_no_braces :: { LHsTyVarBndr Specificity GhcPs }
+        : tyvar                         { sL1 $1 (UserTyVar noExtField SpecifiedSpec $1) }
+        | '(' tyvar '::' kind ')'       {% ams (sLL $1 $> (KindedTyVar noExtField SpecifiedSpec $2 $4))
                                                [mop $1,mu AnnDcolon $3
                                                ,mcp $5] }
 
