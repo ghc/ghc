@@ -760,7 +760,7 @@ validate-x86_64-linux-fedora27:
     - bash .gitlab/ci.sh build_hadrian
     - bash .gitlab/ci.sh test_hadrian
   tags:
-    - x86_64-windows
+    - new-x86_64-windows
     - test
   artifacts:
     reports:
@@ -801,7 +801,7 @@ nightly-i386-windows-hadrian:
     - bash .gitlab/ci.sh build_make
     - bash .gitlab/ci.sh test_make
   tags:
-    - x86_64-windows
+    - new-x86_64-windows
     - test
   artifacts:
     when: always

@@ -50,8 +50,8 @@ info() { echo_color "${LT_BLUE}" "$1"; }
 fail() { error "$1"; exit 1; }
 
 function run() {
-  info "Running $@..."
-  $@ || ( error "$@ failed"; return 1; )
+  info "Running $*..."
+  "$@" || ( error "$* failed"; return 1; )
 }
 
 if [ -z "$GHC_VERSION" ]; then
@@ -150,6 +150,7 @@ function setup() {
 function fetch_cabal() {
   export CABAL=$toolchain/bin/cabal${exe}
   if [ ! -e "$CABAL" ]; then
+      start_section "fetch GHC"
       case "$(uname)" in
         MSYS)
           url="https://downloads.haskell.org/~cabal/cabal-install-$CABAL_INSTALL_VERSION/cabal-install-$CABAL_INSTALL_VERSION-$cabal_arch-unknown-mingw32.zip"
@@ -159,12 +160,17 @@ function fetch_cabal() {
           mv cabal.exe $CABAL
           ;;
         *)
-          url="https://downloads.haskell.org/~cabal/cabal-install-$CABAL_INSTALL_VERSION/cabal-install-$CABAL_INSTALL_VERSION-x86_64-apple-darwin-sierra.tar.xz"
-          echo "Fetching cabal-install from $cabal_tarball"
-          curl $cabal_tarball | tar -xz
+          case "$(uname)" in
+            Darwin) cabal_triple="x86_64-apple-darwin-sierra" ;;
+            *) fail "don't know where to fetch cabal-install for $(uname)"
+          esac
+          local url="https://downloads.haskell.org/~cabal/cabal-install-$CABAL_INSTALL_VERSION/cabal-install-$CABAL_INSTALL_VERSION-$cabal_triple.tar.xz"
+          echo "Fetching cabal-install from $url"
+          curl $url | tar -xz
           mv cabal $toolchain/bin
           ;;
       esac
+      end_section "fetch GHC"
   fi
 }
 
@@ -174,15 +180,19 @@ function fetch_cabal() {
 function setup_toolchain() {
   export GHC="$toolchain/bin/ghc"
   if [ ! -e "$GHC" ]; then
+      start_section "fetch GHC"
       url="https://downloads.haskell.org/~ghc/${GHC_VERSION}/ghc-${GHC_VERSION}-${boot_triple}.tar.xz"
       info "Fetching GHC binary distribution from $url..."
       curl $url > ghc.tar.xz || fail "failed to fetch GHC binary distribution"
       tar -xJf ghc.tar.xz || fail "failed to extract GHC binary distribution"
       cp -r ghc-${GHC_VERSION}/* toolchain
       rm -Rf ghc-${GHC_VERSION} ghc.tar.xz
+      end_section "fetch GHC"
   fi
 
-  cabal_install="cabal v2-install --index=state=$hackage_index_state --install-method=copy --installdir=$toolchain/bin"
+  fetch_cabal
+  cabal_install="$CABAL v2-install --index=state=$hackage_index_state --install-method=copy --installdir=$toolchain/bin"
+
   export HAPPY="$toolchain/bin/happy"
   if [ ! -e "$HAPPY" ]; then
       info "Building happy..."
@@ -199,6 +209,7 @@ function setup_toolchain() {
 }
 
 function cleanup_submodules() {
+  start_section "clean submodules"
   info "Cleaning submodules..."
   # On Windows submodules can inexplicably get into funky states where git
   # believes that the submodule is initialized yet its associated repository
@@ -206,6 +217,7 @@ function cleanup_submodules() {
   git submodule sync --recursive || git submodule deinit --force --all
   git submodule update --init --recursive
   git submodule foreach git clean -xdf
+  end_section "clean submodules"
 }
 
 function prepare_build_mk() {
@@ -246,7 +258,11 @@ EOF
 }
 
 function configure() {
+  start_section "booting"
   run python3 boot
+  end_section "booting"
+
+  start_section "configuring"
   run ./configure \
     --enable-tarballs-autodownload \
     --target=$triple \
@@ -255,6 +271,7 @@ function configure() {
     HAPPY=$HAPPY \
     ALEX=$ALEX \
     || ( cat config.log; fail "configure failed" )
+  end_section "configuring"
 }
 
 function build_make() {
@@ -328,7 +345,7 @@ esac
 # Platform-specific environment initialization
 case "$(uname)" in
   MSYS_*) mingw_init ;;
-  Darwin) ;;
+  Darwin) boot_triple="x86_64-apple-darwin" ;;
   FreeBSD) ;;
   Linux) ;;
   *) fail "uname $(uname) is not supported" ;;
