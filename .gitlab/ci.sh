@@ -186,7 +186,8 @@ function fetch_cabal() {
           esac
           local url="https://downloads.haskell.org/~cabal/cabal-install-$CABAL_INSTALL_VERSION/cabal-install-$CABAL_INSTALL_VERSION-$cabal_triple.tar.xz"
           echo "Fetching cabal-install from $url"
-          curl $url | tar -xz
+          curl $url > cabal.tar.gz
+          tar -xzf cabal.tar.gz
           mv cabal $toolchain/bin
           ;;
       esac
