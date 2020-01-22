@@ -76,6 +76,7 @@ import qualified GHC.LanguageExtensions as LangExt
 import Control.Monad       ( when, ap, guard )
 import qualified Data.List.NonEmpty as NE
 import Data.Ratio
+import Data.Foldable       ( toList )
 
 {-
 *********************************************************
@@ -306,10 +307,12 @@ There are various entry points to renaming patterns, depending on
 --   * local namemaker
 --   * unused and duplicate checking
 --   * no fixities
-rnPats :: HsMatchContext Name -- for error messages
-       -> [LPat GhcPs]
-       -> ([LPat GhcRn] -> RnM (a, FreeVars))
-       -> RnM (a, FreeVars)
+rnPats
+  :: Traversable f
+  => HsMatchContext Name -- for error messages
+  -> f (LPat GhcPs)
+  -> (f (LPat GhcRn) -> RnM (a, FreeVars))
+  -> RnM (a, FreeVars)
 rnPats ctxt pats thing_inside
   = do  { envs_before <- getRdrEnvs
 
@@ -325,7 +328,7 @@ rnPats ctxt pats thing_inside
           --    complain *twice* about duplicates e.g. f (x,x) = ...
           --
           -- See note [Don't report shadowing for pattern synonyms]
-        ; let bndrs = collectPatsBinders pats'
+        ; let bndrs = collectPatsBinders $ toList pats'
         ; addErrCtxt doc_pat $
           if isPatSynCtxt ctxt
              then checkDupNames bndrs
@@ -372,7 +375,9 @@ rnBindPat name_maker pat = runCps (rnLPatAndThen name_maker pat)
 -- ----------- Entry point 3: rnLPatAndThen -------------------
 -- General version: parametrized by how you make new names
 
-rnLPatsAndThen :: NameMaker -> [LPat GhcPs] -> CpsRn [LPat GhcRn]
+rnLPatsAndThen
+  :: Traversable f
+  => NameMaker -> f (LPat GhcPs) -> CpsRn (f (LPat GhcRn))
 rnLPatsAndThen mk = mapM (rnLPatAndThen mk)
   -- Despite the map, the monad ensures that each pattern binds
   -- variables that may be mentioned in subsequent patterns in the list

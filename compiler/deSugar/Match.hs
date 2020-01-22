@@ -729,29 +729,36 @@ JJQC 30-Nov-1997
 matchWrapper ctxt mb_scr (MG { mg_alts = L _ matches
                              , mg_ext = MatchGroupTc arg_tys rhs_ty
                              , mg_origin = origin })
-  = do  { dflags <- getDynFlags
+  = do  { --let matches :: [Match' [] _ _]
+          --    matches = runIdentity $
+          --      (traverse . traverse)
+          --      (traverseMatch $ Identity . toList)
+          --      matches0
+        ; dflags <- getDynFlags
         ; locn   <- getSrcSpanDs
 
         ; new_vars    <- case matches of
                            []    -> mapM newSysLocalDsNoLP arg_tys
-                           (m:_) -> selectMatchVars (map unLoc (hsLMatchPats m))
+                           (m:_) -> selectMatchVars $ unLoc <$> hsLMatchPats m
+        ; let new_vars' = NEL.toList new_vars
 
         ; eqns_info   <- mapM (mk_eqn_info new_vars) matches
 
         -- Pattern match check warnings for /this match-group/
         ; when (isMatchContextPmChecked dflags origin ctxt) $
-            addScrutTmCs mb_scr new_vars $
+            addScrutTmCs mb_scr new_vars' $
             -- See Note [Type and Term Equality Propagation]
             checkMatches dflags (DsMatchContext ctxt locn) new_vars matches
 
         ; result_expr <- handleWarnings $
-                         matchEquations ctxt new_vars eqns_info rhs_ty
-        ; return (new_vars, result_expr) }
+                         matchEquations ctxt new_vars' eqns_info rhs_ty
+        ; return (new_vars', result_expr) }
   where
     -- Called once per equation in the match, or alternative in the case
-    mk_eqn_info vars (L _ (Match { m_pats = pats, m_grhss = grhss }))
+    mk_eqn_info vars1 (L _ (Match { m_pats = pats, m_grhss = grhss }))
       = do { dflags <- getDynFlags
-           ; let upats = map (unLoc . decideBangHood dflags) pats
+           ; let vars = NEL.toList vars1
+           ; let upats = map (unLoc . decideBangHood dflags) $ NEL.toList pats
                  dicts = collectEvVarsPats upats
 
            ; match_result <-
@@ -770,7 +777,7 @@ matchWrapper ctxt mb_scr (MG { mg_alts = L _ matches
     handleWarnings = if isGenerated origin
                      then discardWarningsDs
                      else id
-matchWrapper _ _ (XMatchGroup nec) = noExtCon nec
+matchWrapper _ _ (XMatchGroup nec) = noExtCon1 nec
 
 matchEquations  :: HsMatchContext Name
                 -> [MatchId] -> [EquationInfo] -> Type

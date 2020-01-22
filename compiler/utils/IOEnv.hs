@@ -64,6 +64,9 @@ instance Monad (IOEnv m) where
     fail   = MonadFail.fail
 #endif
 
+instance MonadFix (IOEnv m) where
+    mfix f = IOEnv $ \env -> mfix $ \a -> unIOEnv (f a) env
+
 instance MonadFail.MonadFail (IOEnv m) where
     fail _ = failM -- Ignore the string
 

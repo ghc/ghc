@@ -48,6 +48,7 @@ import qualified Data.ByteString as BS
 import qualified Data.Map as M
 import qualified Data.Set as S
 import Data.Data                  ( Data, Typeable )
+import Data.Foldable              ( toList )
 import Data.List                  ( foldl1' )
 import Data.Maybe                 ( listToMaybe )
 import Control.Monad.Trans.Reader
@@ -633,7 +634,7 @@ instance HasType (LHsExpr GhcTc) where
       fallback = makeNode e' spn
 
       matchGroupType :: MatchGroupTc -> Type
-      matchGroupType (MatchGroupTc args res) = mkVisFunTys args res
+      matchGroupType (MatchGroupTc args res) = mkVisFunTys (toList args) res
 
       -- | Skip desugaring of these expressions for performance reasons.
       --
@@ -683,8 +684,8 @@ instance ( ToHie (Context (Located (IdP a)))
         ]
       XHsBindsLR _ -> []
 
-instance ( ToHie (LMatch a body)
-         ) => ToHie (MatchGroup a body) where
+instance ( ToHie (LMatch' f a body)
+         ) => ToHie (MatchGroup' f a body) where
   toHie mg = concatM $ case mg of
     MG{ mg_alts = (L span alts) , mg_origin = FromSource } ->
       [ pure $ locOnly span
@@ -721,24 +722,25 @@ instance ( ToHie (Context (Located (IdP a)))
           toBind (RecCon r) = RecCon $ map (PSC detSpan) r
       XPatSynBind _ -> []
 
-instance ( ToHie (MatchGroup a (LHsExpr a))
+instance ( ToHie (MatchGroup' [] a (LHsExpr a))
          ) => ToHie (HsPatSynDir a) where
   toHie dir = case dir of
     ExplicitBidirectional mg -> toHie mg
     _ -> pure []
 
 instance ( a ~ GhcPass p
+         , Foldable f
          , ToHie body
          , ToHie (HsMatchContext (NameOrRdrName (IdP a)))
          , ToHie (PScoped (LPat a))
          , ToHie (GRHSs a body)
-         , Data (Match a body)
-         ) => ToHie (LMatch (GhcPass p) body) where
+         , Data (Match' f a body)
+         ) => ToHie (LMatch' f (GhcPass p) body) where
   toHie (L span m ) = concatM $ makeNode m span : case m of
     Match{m_ctxt=mctx, m_pats = pats, m_grhss =  grhss } ->
       [ toHie mctx
       , let rhsScope = mkScope $ grhss_span grhss
-          in toHie $ patScopes Nothing rhsScope NoScope pats
+          in toHie $ patScopes Nothing rhsScope NoScope $ toList pats
       , toHie grhss
       ]
     XMatch _ -> []

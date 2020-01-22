@@ -1,4 +1,6 @@
-{-# LANGUAGE ScopedTypeVariables, BangPatterns #-}
+{-# LANGUAGE BangPatterns #-}
+{-# LANGUAGE LambdaCase #-}
+{-# LANGUAGE ScopedTypeVariables #-}
 {-# LANGUAGE TypeFamilies #-}
 
 {-
@@ -892,28 +894,40 @@ rnMethodBindLHS :: Bool -> Name
                 -> LHsBindLR GhcPs GhcPs
                 -> LHsBindsLR GhcRn GhcPs
                 -> RnM (LHsBindsLR GhcRn GhcPs)
-rnMethodBindLHS _ cls (L loc bind@(FunBind { fun_id = name })) rest
-  = setSrcSpan loc $ do
-    do { sel_name <- wrapLocM (lookupInstDeclBndr cls (text "method")) name
-                     -- We use the selector name as the binder
-       ; let bind' = bind { fun_id = sel_name, fun_ext = noExtField }
-       ; return (L loc bind' `consBag` rest ) }
-
--- Report error for all other forms of bindings
--- This is why we use a fold rather than map
-rnMethodBindLHS is_cls_decl _ (L loc bind) rest
-  = do { addErrAt loc $
-         vcat [ what <+> text "not allowed in" <+> decl_sort
-              , nest 2 (ppr bind) ]
-       ; return rest }
+rnMethodBindLHS is_cls_decl cls (L loc bind) rest = case bind of
+  FunBind { fun_id = name } ->
+    mkValid name $ \name' -> bind { fun_id = name', fun_ext = noExtField }
+  PatBind { pat_lhs = L l (VarPat x name), pat_rhs = grhss } -> do
+    mod <- getModule
+    (_, rhs_fvs) <- rnGRHSs PatBindRhs rnLExpr grhss
+    let
+      all_fvs = rhs_fvs
+      fvs'    = filterNameSet (nameIsLocalOrFrom mod) all_fvs
+    mkValid name $ \name' -> bind { pat_lhs = L l $ VarPat x name'
+                                  , pat_ext = fvs'
+                                  }
+  _ -> do
+    let
+      decl_sort | is_cls_decl = text "class declaration:"
+                | otherwise   = text "instance declaration:"
+      what = case bind of
+                PatBind {}    -> text "Pattern bindings (except simple variables)"
+                PatSynBind {} -> text "Pattern synonyms"
+                                 -- Associated pattern synonyms are not implemented yet
+                _ -> pprPanic "rnMethodBind" (ppr bind)
+    addErrAt loc $
+       vcat [ what <+> text "not allowed in" <+> decl_sort
+            , nest 2 (ppr bind) ]
+    return rest
   where
-    decl_sort | is_cls_decl = text "class declaration:"
-              | otherwise   = text "instance declaration:"
-    what = case bind of
-              PatBind {}    -> text "Pattern bindings (except simple variables)"
-              PatSynBind {} -> text "Pattern synonyms"
-                               -- Associated pattern synonyms are not implemented yet
-              _ -> pprPanic "rnMethodBind" (ppr bind)
+    mkValid
+      :: Located RdrName
+      -> (Located Name -> HsBindLR GhcRn GhcPs)
+      -> RnM (LHsBindsLR GhcRn GhcPs)
+    mkValid name reBind = setSrcSpan loc $ do
+      sel_name <- wrapLocM (lookupInstDeclBndr cls (text "method")) name
+              -- We use the selector name as the binder
+      pure $ L loc (reBind sel_name) `consBag` rest
 
 {-
 ************************************************************************
@@ -1159,27 +1173,33 @@ checkDupMinimalSigs sigs
 ************************************************************************
 -}
 
-rnMatchGroup :: Outputable (body GhcPs) => HsMatchContext Name
-             -> (Located (body GhcPs) -> RnM (Located (body GhcRn), FreeVars))
-             -> MatchGroup GhcPs (Located (body GhcPs))
-             -> RnM (MatchGroup GhcRn (Located (body GhcRn)), FreeVars)
+rnMatchGroup
+  :: (Traversable f, Outputable (body GhcPs))
+  => HsMatchContext Name
+  -> (Located (body GhcPs) -> RnM (Located (body GhcRn), FreeVars))
+  -> MatchGroup' f GhcPs (Located (body GhcPs))
+  -> RnM (MatchGroup' f GhcRn (Located (body GhcRn)), FreeVars)
 rnMatchGroup ctxt rnBody (MG { mg_alts = L _ ms, mg_origin = origin })
   = do { empty_case_ok <- xoptM LangExt.EmptyCase
        ; when (null ms && not empty_case_ok) (addErr (emptyCaseErr ctxt))
        ; (new_ms, ms_fvs) <- mapFvRn (rnMatch ctxt rnBody) ms
        ; return (mkMatchGroup origin new_ms, ms_fvs) }
-rnMatchGroup _ _ (XMatchGroup nec) = noExtCon nec
+rnMatchGroup _ _ (XMatchGroup nec) = noExtCon1 nec
 
-rnMatch :: Outputable (body GhcPs) => HsMatchContext Name
-        -> (Located (body GhcPs) -> RnM (Located (body GhcRn), FreeVars))
-        -> LMatch GhcPs (Located (body GhcPs))
-        -> RnM (LMatch GhcRn (Located (body GhcRn)), FreeVars)
+rnMatch
+  :: (Traversable f, Outputable (body GhcPs))
+  => HsMatchContext Name
+  -> (Located (body GhcPs) -> RnM (Located (body GhcRn), FreeVars))
+  -> LMatch' f GhcPs (Located (body GhcPs))
+  -> RnM (LMatch' f GhcRn (Located (body GhcRn)), FreeVars)
 rnMatch ctxt rnBody = wrapLocFstM (rnMatch' ctxt rnBody)
 
-rnMatch' :: Outputable (body GhcPs) => HsMatchContext Name
-         -> (Located (body GhcPs) -> RnM (Located (body GhcRn), FreeVars))
-         -> Match GhcPs (Located (body GhcPs))
-         -> RnM (Match GhcRn (Located (body GhcRn)), FreeVars)
+rnMatch'
+  :: (Traversable f, Outputable (body GhcPs))
+  => HsMatchContext Name
+  -> (Located (body GhcPs) -> RnM (Located (body GhcRn), FreeVars))
+  -> Match' f GhcPs (Located (body GhcPs))
+  -> RnM (Match' f GhcRn (Located (body GhcRn)), FreeVars)
 rnMatch' ctxt rnBody (Match { m_ctxt = mf, m_pats = pats, m_grhss = grhss })
   = do  { -- Note that there are no local fixity decls for matches
         ; rnPats ctxt pats      $ \ pats' -> do

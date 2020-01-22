@@ -7,6 +7,7 @@
 
 {-# LANGUAGE CPP #-}
 {-# LANGUAGE FlexibleContexts #-}
+{-# LANGUAGE OverloadedLists #-}
 {-# LANGUAGE TypeFamilies #-}
 {-# LANGUAGE ViewPatterns #-}
 
@@ -54,9 +55,12 @@ import FieldLabel
 import Bag
 import Util
 import ErrUtils
+
+import Data.Coerce (coerce)
 import Data.Maybe( mapMaybe )
 import Control.Monad ( zipWithM )
 import Data.List( partition )
+import qualified Data.List.NonEmpty as NEL
 
 #include "HsVersions.h"
 
@@ -719,7 +723,7 @@ tcPatSynMatcher (L loc name) lpat
 
              fail' = nlHsApps fail [nlHsVar voidPrimId]
 
-             args = map nlVarPat [scrutinee, cont, fail]
+             args = fmap nlVarPat [scrutinee, cont, fail]
              lwpat = noLoc $ WildPat pat_ty
              cases = if isIrrefutableHsPat lpat
                      then [mkHsCaseAlt lpat  cont']
@@ -816,72 +820,96 @@ tcPatSynBuilderBind (PSB { psb_id = L loc name
                          , psb_def = lpat
                          , psb_dir = dir
                          , psb_args = details })
-  | isUnidirectional dir
-  = return emptyBag
+  = case mb_either_error_match_group of
+    -- unidirectional
+    Nothing -> return emptyBag
+    -- bidirectional
+    Just either_error_match_group -> do
+      patsyn <- tcLookupPatSyn name
+      case patSynBuilder patsyn of
+        Nothing -> return emptyBag
+          -- This case happens if we found a type error in the
+          -- pattern synonym, recovered, and put a placeholder
+          -- with patSynBuilder=Nothing in the environment
 
-  | Left why <- mb_match_group       -- Can't invert the pattern
-  = setSrcSpan (getLoc lpat) $ failWithTc $
-    vcat [ hang (text "Invalid right-hand side of bidirectional pattern synonym"
-                 <+> quotes (ppr name) <> colon)
-              2 why
-         , text "RHS pattern:" <+> ppr lpat ]
+        Just (builder_id, need_dummy_arg) -> case either_error_match_group of -- Normal case
+          Left why -> -- Can't invert the pattern
+            setSrcSpan (getLoc lpat) $ failWithTc $
+            vcat [ hang (text "Invalid right-hand side of bidirectional pattern synonym"
+                         <+> quotes (ppr name) <> colon)
+                      2 why
+                 , text "RHS pattern:" <+> ppr lpat ]
 
-  | Right match_group <- mb_match_group  -- Bidirectional
-  = do { patsyn <- tcLookupPatSyn name
-       ; case patSynBuilder patsyn of {
-           Nothing -> return emptyBag ;
-             -- This case happens if we found a type error in the
-             -- pattern synonym, recovered, and put a placeholder
-             -- with patSynBuilder=Nothing in the environment
+          Right match_group0 -> do -- Bidirectional, so patSynBuilder returns Just
+            let
+              lBuilderId = L loc $ idName builder_id
 
-           Just (builder_id, need_dummy_arg) ->  -- Normal case
-    do { -- Bidirectional, so patSynBuilder returns Just
-         let match_group' | need_dummy_arg = add_dummy_arg match_group
-                          | otherwise      = match_group
+              match_group0' = if need_dummy_arg
+                then add_dummy_arg match_group0
+                else match_group0
 
-             bind = FunBind { fun_ext = placeHolderNamesTc
-                            , fun_id      = L loc (idName builder_id)
-                            , fun_matches = match_group'
-                            , fun_co_fn   = idHsWrapper
-                            , fun_tick    = [] }
+              maybe_match_group1 = traverseMatchGroup
+                NEL.nonEmpty (Just . coerce) (Just . coerce)
+                match_group0'
 
-             sig = completeSigFromId (PatSynCtxt name) builder_id
+              bind = case maybe_match_group1 of
+                Nothing -> case unLoc $ mg_alts match_group0 of
+                  -- one 0-pat match, into pattern bind rather than fun bind
+                  (L l' lmatch : []) -> PatBind
+                    { pat_ext = placeHolderNamesTc
+                    , pat_lhs = L l' $ VarPat noExtField lBuilderId
+                    , pat_rhs = m_grhss lmatch
+                    , pat_ticks = ([], [])
+                    }
+                  (_ : _ : _) -> panic "tcPatSynBuilderBind: too many matches in match group or mixed arity"
+                  -- TODO should be [] not _ but OverloadedLists breaks pattern
+                  -- match exhaustive checks.
+                  _ -> panic "tcPatSynBuilderBind: empty match group should instead be parsed as unidirectional"
+                Just match_group1 -> FunBind
+                  { fun_ext = placeHolderNamesTc
+                  , fun_id = lBuilderId
+                  , fun_matches = match_group1
+                  , fun_co_fn = idHsWrapper
+                  , fun_tick = []
+                  }
 
-       ; traceTc "tcPatSynBuilderBind {" $
-         ppr patsyn $$ ppr builder_id <+> dcolon <+> ppr (idType builder_id)
-       ; (builder_binds, _) <- tcPolyCheck emptyPragEnv sig (noLoc bind)
-       ; traceTc "tcPatSynBuilderBind }" $ ppr builder_binds
-       ; return builder_binds } } }
+              sig = completeSigFromId (PatSynCtxt name) builder_id
 
-  | otherwise = panic "tcPatSynBuilderBind"  -- Both cases dealt with
+            traceTc "tcPatSynBuilderBind {" $
+              ppr patsyn $$ ppr builder_id <+> dcolon <+> ppr (idType builder_id)
+            (builder_binds, _) <- tcPolyCheck emptyPragEnv sig (noLoc bind)
+            traceTc "tcPatSynBuilderBind }" $ ppr builder_binds
+            return builder_binds
+
   where
-    mb_match_group
-       = case dir of
-           ExplicitBidirectional explicit_mg -> Right explicit_mg
-           ImplicitBidirectional -> fmap mk_mg (tcPatToExpr name args lpat)
-           Unidirectional -> panic "tcPatSynBuilderBind"
+    mb_either_error_match_group = case dir of
+      ExplicitBidirectional explicit_mg -> Just $ Right explicit_mg
+      ImplicitBidirectional -> Just $ fmap mk_mg (tcPatToExpr name args0 lpat)
+      Unidirectional -> Nothing
 
-    mk_mg :: LHsExpr GhcRn -> MatchGroup GhcRn (LHsExpr GhcRn)
+    mk_mg :: LHsExpr GhcRn -> MatchGroup' [] GhcRn (LHsExpr GhcRn)
     mk_mg body = mkMatchGroup Generated [builder_match]
           where
             builder_args  = [L loc (VarPat noExtField (L loc n))
-                            | L loc n <- args]
+                            | (L loc n) <- args0]
             builder_match = mkMatch (mkPrefixFunRhs (L loc name))
                                     builder_args body
-                                    (noLoc (EmptyLocalBinds noExtField))
+                                    (noLoc emptyLocalBinds)
 
-    args = case details of
+    args0 :: [Located Name]
+    args0 = case details of
               PrefixCon args     -> args
               InfixCon arg1 arg2 -> [arg1, arg2]
               RecCon args        -> map recordPatSynPatVar args
 
-    add_dummy_arg :: MatchGroup GhcRn (LHsExpr GhcRn)
-                  -> MatchGroup GhcRn (LHsExpr GhcRn)
+    add_dummy_arg :: MatchGroup' [] GhcRn (LHsExpr GhcRn)
+                  -> MatchGroup' [] GhcRn (LHsExpr GhcRn)
     add_dummy_arg mg@(MG { mg_alts =
                            (L l [L loc match@(Match { m_pats = pats })]) })
       = mg { mg_alts = L l [L loc (match { m_pats = nlWildPatName : pats })] }
     add_dummy_arg other_mg = pprPanic "add_dummy_arg" $
                              pprMatches other_mg
+
 tcPatSynBuilderBind (XPatSynBind nec) = noExtCon nec
 
 tcPatSynBuilderOcc :: PatSyn -> TcM (HsExpr GhcTcId, TcSigmaType)

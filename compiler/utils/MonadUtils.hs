@@ -32,6 +32,7 @@ import Control.Applicative
 import Control.Monad
 import Control.Monad.Fix
 import Control.Monad.IO.Class
+import Control.Monad.Trans.State (StateT(..))
 import Data.Foldable (sequenceA_, foldlM, foldrM)
 import Data.List (unzip4, unzip5, zipWith4)
 
@@ -139,16 +140,15 @@ mapAndUnzip5M :: Monad m => (a -> m (b,c,d,e,f)) -> [a] -> m ([b],[c],[d],[e],[f
 mapAndUnzip5M f xs =  unzip5 <$> traverse f xs
 
 -- | Monadic version of mapAccumL
-mapAccumLM :: Monad m
-            => (acc -> x -> m (acc, y)) -- ^ combining function
-            -> acc                      -- ^ initial state
-            -> [x]                      -- ^ inputs
-            -> m (acc, [y])             -- ^ final state, outputs
-mapAccumLM _ s []     = return (s, [])
-mapAccumLM f s (x:xs) = do
-    (s1, x')  <- f s x
-    (s2, xs') <- mapAccumLM f s1 xs
-    return    (s2, x' : xs')
+mapAccumLM
+  :: (Traversable f, Monad m)
+  => (acc -> x -> m (acc, y)) -- ^ combining function
+  -> acc                      -- ^ initial state
+  -> f x                      -- ^ inputs
+  -> m (acc, f y)             -- ^ final state, outputs
+mapAccumLM f a0 i0
+  = fmap commute $ runStateT (forM i0 $ \a -> StateT $ \s -> fmap commute $ f s a) a0
+  where commute (a, b) = (b, a)
 
 -- | Monadic version of mapSnd
 mapSndM :: Monad m => (b -> m c) -> [(a,b)] -> m [(a,c)]

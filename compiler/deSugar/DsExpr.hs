@@ -6,7 +6,10 @@
 Desugaring expressions.
 -}
 
-{-# LANGUAGE CPP, MultiWayIf #-}
+{-# LANGUAGE CPP #-}
+{-# LANGUAGE DeriveTraversable #-}
+{-# LANGUAGE MultiWayIf #-}
+{-# LANGUAGE OverloadedLists #-}
 {-# LANGUAGE TypeFamilies #-}
 {-# LANGUAGE ViewPatterns #-}
 
@@ -63,6 +66,9 @@ import Outputable
 import PatSyn
 
 import Control.Monad
+import Data.Foldable (toList)
+import Data.List.NonEmpty (NonEmpty (..))
+import qualified Data.List.NonEmpty as NEL
 
 {-
 ************************************************************************
@@ -222,6 +228,10 @@ dsUnliftedBind (PatBind {pat_lhs = pat, pat_rhs = grhss
 
 dsUnliftedBind bind body = pprPanic "dsLet: unlifted" (ppr bind $$ ppr body)
 
+-- | TODO 'Vec 2' someday
+data SamePair a = SamePair a a
+  deriving (Functor, Foldable, Traversable)
+
 {-
 ************************************************************************
 *                                                                      *
@@ -229,6 +239,7 @@ dsUnliftedBind bind body = pprPanic "dsLet: unlifted" (ppr bind $$ ppr body)
 *                                                                      *
 ************************************************************************
 -}
+
 
 dsLExpr :: LHsExpr GhcTc -> DsM CoreExpr
 
@@ -372,8 +383,8 @@ ds_expr _ e@(SectionR _ op expr) = do
     let (x_ty:y_ty:_, _) = splitFunTys (exprType core_op)
         -- See comment with SectionL
     y_core <- dsLExpr expr
-    dsWhenNoErrs (mapM newSysLocalDsNoLP [x_ty, y_ty])
-                 (\[x_id, y_id] -> bindNonRec y_id y_core $
+    dsWhenNoErrs (mapM newSysLocalDsNoLP $ SamePair x_ty y_ty)
+                 (\(SamePair x_id y_id) -> bindNonRec y_id y_core $
                                    Lam x_id (mkCoreAppsDs (text "sectionr" <+> ppr e)
                                                           core_op [Var x_id, Var y_id]))
 
@@ -922,36 +933,41 @@ dsDo stmts
             ; match_code <- dsHandleMonadicFailure pat match fail_op
             ; dsSyntaxExpr bind_op [rhs', Lam var match_code] }
 
-    go _ (ApplicativeStmt body_ty args mb_join) stmts
-      = do {
-             let
-               (pats, rhss) = unzip (map (do_arg . snd) args)
+    go _ (ApplicativeStmt body_ty args0 mb_join) stmts = do
+      expr <- case args0 of
+        [] ->
+          -- TODO Maybe 'ApplicativeStmt' should just have a non-empty list of args?
+          dsLExpr $ noLoc $ HsDo body_ty DoExpr $ noLoc stmts
+        (arg1 : args1) -> do
+          let
+            args = arg1 :| args1
+            (pats, rhss) = NEL.unzip $ do_arg . snd <$> args
 
-               do_arg (ApplicativeArgOne _ pat expr _ fail_op) =
-                 ((pat, fail_op), dsLExpr expr)
-               do_arg (ApplicativeArgMany _ stmts ret pat) =
-                 ((pat, noSyntaxExpr), dsDo (stmts ++ [noLoc $ mkLastStmt (noLoc ret)]))
-               do_arg (XApplicativeArg nec) = noExtCon nec
+            do_arg (ApplicativeArgOne _ pat expr _ fail_op) =
+              ((pat, fail_op), dsLExpr expr)
+            do_arg (ApplicativeArgMany _ stmts ret pat) =
+              ((pat, noSyntaxExpr), dsDo (stmts ++ [noLoc $ mkLastStmt (noLoc ret)]))
+            do_arg (XApplicativeArg nec) = noExtCon nec
 
-           ; rhss' <- sequence rhss
+          rhss' <- sequence rhss
 
-           ; body' <- dsLExpr $ noLoc $ HsDo body_ty DoExpr (noLoc stmts)
+          body' <- dsLExpr $ noLoc $ HsDo body_ty DoExpr (noLoc stmts)
 
-           ; let match_args (pat, fail_op) (vs,body)
-                   = do { var   <- selectSimpleMatchVarL pat
-                        ; match <- matchSinglePatVar var (StmtCtxt DoExpr) pat
-                                   body_ty (cantFailMatchResult body)
-                        ; match_code <- dsHandleMonadicFailure pat match fail_op
-                        ; return (var:vs, match_code)
-                        }
+          let match_args (pat, fail_op) (vs,body)
+                = do { var   <- selectSimpleMatchVarL pat
+                     ; match <- matchSinglePatVar var (StmtCtxt DoExpr) pat
+                                body_ty (cantFailMatchResult body)
+                     ; match_code <- dsHandleMonadicFailure pat match fail_op
+                     ; return (var:vs, match_code)
+                     }
 
-           ; (vars, body) <- foldrM match_args ([],body') pats
-           ; let fun' = mkLams vars body
-           ; let mk_ap_call l (op,r) = dsSyntaxExpr op [l,r]
-           ; expr <- foldlM mk_ap_call fun' (zip (map fst args) rhss')
-           ; case mb_join of
-               Nothing -> return expr
-               Just join_op -> dsSyntaxExpr join_op [expr] }
+          (vars, body) <- foldrM match_args ([],body') pats
+          let fun' = mkLams vars body
+          let mk_ap_call l (op,r) = dsSyntaxExpr op [l,r]
+          foldlM mk_ap_call fun' $ toList $ NEL.zip (fmap fst args) rhss'
+      case mb_join of
+        Nothing -> return expr
+        Just join_op -> dsSyntaxExpr join_op [expr]
 
     go loc (RecStmt { recS_stmts = rec_stmts, recS_later_ids = later_ids
                     , recS_rec_ids = rec_ids, recS_ret_fn = return_op
