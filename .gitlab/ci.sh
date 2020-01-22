@@ -114,7 +114,7 @@ function show_tool() {
 }
 
 function set_toolchain_paths() {
-  local needs_toolchain=1
+  needs_toolchain=1
   case "$(uname)" in
     Linux) needs_toolchain="" ;;
     *) ;;
@@ -141,10 +141,11 @@ function setup() {
       cp -Rf cabal-cache $cabal_dir
   fi
 
+  if [[ -n "$needs_toolchain" ]]; then
+    setup_toolchain
+  fi
   case "$(uname)" in
-    Darwin) darwin_setup; setup_toolchain ;;
-    MSYS_*|MINGW*) setup_toolchain ;;
-    Linux) ;;
+    Darwin) darwin_setup ;;
     *) ;;
   esac
 
