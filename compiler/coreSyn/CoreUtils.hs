@@ -24,7 +24,7 @@ module CoreUtils (
         -- * Properties of expressions
         exprType, coreAltType, coreAltsType, isExprLevPoly,
         exprIsDupable, exprIsTrivial, getIdFromTrivialExpr, exprIsBottom,
-        getIdFromTrivialExpr_maybe,
+        exprMightThrowPreciseException, getIdFromTrivialExpr_maybe,
         exprIsCheap, exprIsExpandable, exprIsCheapX, CheapAppFun,
         exprIsHNF, exprOkForSpeculation, exprOkForSideEffects, exprIsWorkFree,
         exprIsBig, exprIsConLike,
@@ -84,11 +84,12 @@ import TyCon
 import Unique
 import Outputable
 import TysPrim
+import TysWiredIn
 import DynFlags
 import FastString
 import Maybes
 import ListSetOps       ( minusList )
-import BasicTypes       ( Arity, isConLike )
+import BasicTypes       ( Arity, isConLike, Boxity(..) )
 import GHC.Platform
 import Util
 import Pair
@@ -1006,6 +1007,34 @@ exprIsTrivial (Tick t e)       = not (tickishIsCode t) && exprIsTrivial e
 exprIsTrivial (Cast e _)       = exprIsTrivial e
 exprIsTrivial (Case e _ _ [])  = exprIsTrivial e  -- See Note [Empty case is trivial]
 exprIsTrivial _                = False
+
+-- | Whether an expression might throw a precise exception when evaluated.
+-- Only true for an IO action that is not a 'PrimOp' application other than
+-- 'raiseIO#'.
+--
+-- See Note [Precise exceptions and strictness analysis] in DmdAnal.
+exprMightThrowPreciseException :: CoreExpr -> Bool
+exprMightThrowPreciseException e
+  | not (is_io_action e)
+  = False -- No precise exception without IO. We give no guarantees wrt. to
+          -- unsafePerformIO!
+  | (Var f, _) <- collectArgs e       -- The only IO PrimOp that throws a
+  , Just op    <- isPrimOpId_maybe f  -- precise exception is RaiseIOOp
+  = op /= RaiseIOOp
+  | otherwise                      -- A conservative default for all the other
+                                   -- cases
+  = True
+  where
+    is_io_action e
+      | Just (tc, [rw, _]) <- splitTyConApp_maybe (exprType e)
+      , Just dc <- tyConSingleAlgDataCon_maybe tc
+      , dc == tupleDataCon Unboxed 2
+      , rw `eqType` realWorldStatePrimTy
+      = True
+      | otherwise
+      = False
+
+
 
 {-
 Note [getIdFromTrivialExpr]
