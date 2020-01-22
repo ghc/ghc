@@ -1,3 +1,4 @@
+{-# LANGUAGE CPP #-}
 
 -- | Clean out unneeded spill\/reload instructions.
 --
@@ -34,15 +35,15 @@ import RegAlloc.Liveness
 import Instruction
 import Reg
 
-import BlockId
-import Cmm
+import GHC.Cmm.BlockId
+import GHC.Cmm
 import UniqSet
 import UniqFM
 import Unique
 import State
 import Outputable
 import GHC.Platform
-import Hoopl.Collections
+import GHC.Cmm.Dataflow.Collections
 
 import Data.List
 import Data.Maybe
@@ -393,9 +394,11 @@ cleanBackward' liveSlotsOnEntry reloadedBy noReloads acc (li : instrs)
 
                 cleanBackward liveSlotsOnEntry noReloads' (li : acc) instrs
 
+#if __GLASGOW_HASKELL__ <= 810
         -- some other instruction
         | otherwise
         = cleanBackward liveSlotsOnEntry noReloads (li : acc) instrs
+#endif
 
 
 -- | Combine the associations from all the inward control flow edges.
@@ -611,4 +614,3 @@ closeAssoc a assoc
 intersectAssoc :: Assoc a -> Assoc a -> Assoc a
 intersectAssoc a b
         = intersectUFM_C (intersectUniqSets) a b
-
