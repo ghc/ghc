@@ -338,7 +338,7 @@ function clean() {
 
 # Determine Cabal data directory
 case "$(uname)" in
-  MSYS_*|MINGW*) cabal_dir="$APPDATA/cabal"; exe="exe" ;;
+  MSYS_*|MINGW*) cabal_dir="$APPDATA/cabal"; exe=".exe" ;;
   *) cabal_dir="$HOME/.cabal"; exe="" ;;
 esac
 
