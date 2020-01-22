@@ -4,11 +4,12 @@ module GHC.Stg.DepAnal (depSortStgPgm) where
 
 import GhcPrelude
 
+import GHC.Stg.Syntax
 import Id
 import Name (Name)
 import NameEnv
 import Outputable
-import GHC.Stg.Syntax
+import UniqSet (nonDetEltsUniqSet)
 import VarSet
 
 import Data.Graph (SCC (..))
@@ -17,10 +18,10 @@ import Data.Graph (SCC (..))
 -- * Dependency analysis
 
 -- | Set of bound variables
-type BVs = DVarSet
+type BVs = VarSet
 
 -- | Set of free variables
-type FVs = DVarSet
+type FVs = VarSet
 
 -- | Dependency analysis on STG terms.
 --
@@ -38,10 +39,10 @@ annTopBindingsDeps bs = zip bs (map top_bind bs)
     top_bind :: StgTopBinding -> FVs
 
     top_bind StgTopStringLit{} =
-      emptyDVarSet
+      emptyVarSet
 
     top_bind (StgTopLifted bs) =
-      binding emptyDVarSet bs
+      binding emptyVarSet bs
 
     binding :: BVs -> StgBinding -> FVs
 
@@ -49,8 +50,8 @@ annTopBindingsDeps bs = zip bs (map top_bind bs)
       rhs bounds r
 
     binding bounds (StgRec bndrs) =
-      unionDVarSets $
-        map (bind_non_rec (extendDVarSetList bounds (map fst bndrs))) bndrs
+      unionVarSets $
+        map (bind_non_rec (extendVarSetList bounds (map fst bndrs))) bndrs
 
     bind_non_rec :: BVs -> (Id, StgRhs) -> FVs
     bind_non_rec bounds (_, r) =
@@ -59,33 +60,32 @@ annTopBindingsDeps bs = zip bs (map top_bind bs)
     rhs :: BVs -> StgRhs -> FVs
 
     rhs bounds (StgRhsClosure _ _ _ as e) =
-      expr (extendDVarSetList bounds as) e
+      expr (extendVarSetList bounds as) e
 
     rhs bounds (StgRhsCon _ _ as) =
       args bounds as
 
     var :: BVs -> Var -> FVs
     var bounds v
-      | not (elemDVarSet v bounds)
-      = unitDVarSet v
+      | not (elemVarSet v bounds)
+      = unitVarSet v
       | otherwise
-      = emptyDVarSet
+      = emptyVarSet
 
     arg :: BVs -> StgArg -> FVs
     arg bounds (StgVarArg v) = var bounds v
-    arg _ StgLitArg{}        = emptyDVarSet
+    arg _ StgLitArg{} = emptyVarSet
 
     args :: BVs -> [StgArg] -> FVs
-    args bounds as =
-      unionDVarSets (map (arg bounds) as)
+    args bounds as = unionVarSets (map (arg bounds) as)
 
     expr :: BVs -> StgExpr -> FVs
 
     expr bounds (StgApp f as) =
-      var bounds f `unionDVarSet` args bounds as
+      var bounds f `unionVarSet` args bounds as
 
     expr _ StgLit{} =
-      emptyDVarSet
+      emptyVarSet
 
     expr bounds (StgConApp _ as _) =
       args bounds as
@@ -97,26 +97,26 @@ annTopBindingsDeps bs = zip bs (map top_bind bs)
       pprPanic "annTopBindingsDeps" (text "Found lambda:" $$ ppr lam)
 
     expr bounds (StgCase scrut scrut_bndr _ as) =
-      expr bounds scrut `unionDVarSet`
-        alts (extendDVarSet bounds scrut_bndr) as
+      expr bounds scrut `unionVarSet`
+        alts (extendVarSet bounds scrut_bndr) as
 
     expr bounds (StgLet _ bs e) =
-      binding bounds bs `unionDVarSet`
-        expr (extendDVarSetList bounds (bindersOf bs)) e
+      binding bounds bs `unionVarSet`
+        expr (extendVarSetList bounds (bindersOf bs)) e
 
     expr bounds (StgLetNoEscape _ bs e) =
-      binding bounds bs `unionDVarSet`
-        expr (extendDVarSetList bounds (bindersOf bs)) e
+      binding bounds bs `unionVarSet`
+        expr (extendVarSetList bounds (bindersOf bs)) e
 
     expr bounds (StgTick _ e) =
       expr bounds e
 
     alts :: BVs -> [StgAlt] -> FVs
-    alts bounds = unionDVarSets . map (alt bounds)
+    alts bounds = unionVarSets . map (alt bounds)
 
     alt :: BVs -> StgAlt -> FVs
     alt bounds (_, bndrs, e) =
-      expr (extendDVarSetList bounds bndrs) e
+      expr (extendVarSetList bounds bndrs) e
 
 --------------------------------------------------------------------------------
 -- * Dependency sorting
@@ -139,7 +139,7 @@ depSort = concatMap get_binds . depAnal defs uses
     --       doesn't need any ordering.
 
     uses (StgTopStringLit{}, _) = []
-    uses (StgTopLifted{}, fvs)  = map idName (dVarSetElems fvs)
+    uses (StgTopLifted{}, fvs)  = map idName (nonDetEltsUniqSet fvs)
 
     defs (bind, _) = map idName (bindersOfTop bind)
 
