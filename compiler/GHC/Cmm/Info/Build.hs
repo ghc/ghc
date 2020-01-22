@@ -34,11 +34,10 @@ import GHC.StgToCmm.Heap
 import ErrUtils
 
 import Control.Monad
-import Data.Map (Map)
-import qualified Data.Map as Map
+import Data.Map.Strict (Map)
+import qualified Data.Map.Strict as Map
 import Data.Set (Set)
 import qualified Data.Set as Set
-import Data.Tuple
 import Control.Monad.Trans.State
 import Control.Monad.Trans.Class
 import Data.List (unzip4)
@@ -435,7 +434,7 @@ type CAFSet = Set CAFLabel
 type CAFEnv = LabelMap CAFSet
 
 mkCAFLabel :: CLabel -> CAFLabel
-mkCAFLabel lbl = CAFLabel (toClosureLbl lbl)
+mkCAFLabel lbl = CAFLabel $! toClosureLbl lbl
 
 -- This is a label that we can put in an SRT.  It *must* be a closure label,
 -- pointing to either a FUN_STATIC, THUNK_STATIC, or CONSTR.
@@ -605,7 +604,7 @@ emptySRT mod =
 -}
 
 data SomeLabel
-  = BlockLabel Label
+  = BlockLabel !Label
   | DeclLabel CLabel
   deriving (Eq, Ord)
 
@@ -630,12 +629,12 @@ getLabelledBlocks (CmmData _ (CmmStaticsRaw _ _)) =
 getLabelledBlocks (CmmData _ (CmmStatics lbl _ _ _)) =
   [ (DeclLabel lbl, mkCAFLabel lbl) ]
 getLabelledBlocks (CmmProc top_info _ _ _) =
-  [ (BlockLabel blockId, mkCAFLabel (cit_lbl info))
+  [ (BlockLabel blockId, caf_lbl)
   | (blockId, info) <- mapToList (info_tbls top_info)
   , let rep = cit_rep info
   , not (isStaticRep rep) || not (isThunkRep rep)
+  , let !caf_lbl = mkCAFLabel (cit_lbl info)
   ]
-
 
 -- | Put the labelled blocks that we will be annotating with SRTs into
 -- dependency order.  This is so that we can process them one at a
@@ -651,8 +650,10 @@ depAnalSRTs cafEnv cafEnv_static decls =
                            text "nodes:" <+> ppr (map node_payload nodes) $$
                            text "graph:" <+> ppr graph) graph
  where
+  labelledBlocks :: [(SomeLabel, CAFLabel)]
   labelledBlocks = concatMap getLabelledBlocks decls
-  labelToBlock = Map.fromList (map swap labelledBlocks)
+  labelToBlock :: Map CAFLabel SomeLabel
+  labelToBlock = foldl' (\m (v,k) -> Map.insert k v m) Map.empty labelledBlocks
 
   nodes :: [Node SomeLabel (SomeLabel, CAFLabel, Set CAFLabel)]
   nodes = [ DigraphNode (l,lbl,cafs') l
@@ -696,7 +697,7 @@ getStaticFuns decls =
   , Just (id, _) <- [cit_clo info]
   , let rep = cit_rep info
   , isStaticRep rep && isFunRep rep
-  , let lbl = mkLocalClosureLabel (idName id) (idCafInfo id)
+  , let !lbl = mkLocalClosureLabel (idName id) (idCafInfo id)
   ]
 
 
@@ -769,7 +770,7 @@ doSRTs dflags moduleSRTInfo procs data_ = do
   -- them.
   let
     sccs :: [SCC (SomeLabel, CAFLabel, Set CAFLabel)]
-    sccs = depAnalSRTs cafEnv static_data_env decls
+    sccs = {-# SCC depAnalSRTs #-} depAnalSRTs cafEnv static_data_env decls
 
     cafsWithSRTs :: [(Label, CAFLabel, Set CAFLabel)]
     cafsWithSRTs = getCAFs cafEnv decls
