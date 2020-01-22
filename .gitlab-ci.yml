@@ -5,7 +5,7 @@ variables:
   DOCKER_REV: 408eff66aef6ca2b44446c694c5a56d6ca0460cc
 
   # Sequential version number capturing the versions of all tools fetched by
-  # .gitlab/win32-ci.sh.
+  # .gitlab/ci.sh.
   WINDOWS_TOOLCHAIN_VERSION: 1
 
   # Disable shallow clones; they break our linting rules
@@ -725,7 +725,7 @@ validate-x86_64-linux-fedora27:
     - git clean -xdf
 
     # Setup toolchain
-    - bash .gitlab/win32-ci.sh setup
+    - bash .gitlab/ci.sh setup
   after_script:
     - |
       Copy-Item -Recurse -Path $Env:APPDATA\cabal -Destination cabal-cache

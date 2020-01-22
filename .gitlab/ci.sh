@@ -345,6 +345,7 @@ esac
 # Platform-specific environment initialization
 case "$(uname)" in
   MSYS_*) mingw_init ;;
+  MINGW*) mingw_init ;;
   Darwin) boot_triple="x86_64-apple-darwin" ;;
   FreeBSD) ;;
   Linux) ;;
