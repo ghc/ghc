@@ -34,7 +34,7 @@ type DecsQ               = Q [Dec]
 type ConQ                = Q Con
 type TypeQ               = Q Type
 type KindQ               = Q Kind
-type TyVarBndrQ          = Q TyVarBndr
+type TyVarBndrQ flag     = Q (TyVarBndr flag)
 type TyLitQ              = Q TyLit
 type CxtQ                = Q Cxt
 type PredQ               = Q Pred
@@ -382,14 +382,14 @@ funD nm cs =
     ; return (FunD nm cs1)
     }
 
-tySynD :: Name -> [TyVarBndrQ] -> TypeQ -> DecQ
+tySynD :: Name -> [TyVarBndrQ ()] -> TypeQ -> DecQ
 tySynD tc tvs rhs =
   do { tvs1 <- sequenceA tvs
      ; rhs1 <- rhs
      ; return (TySynD tc tvs1 rhs1)
      }
 
-dataD :: CxtQ -> Name -> [TyVarBndrQ] -> Maybe KindQ -> [ConQ]
+dataD :: CxtQ -> Name -> [TyVarBndrQ ()] -> Maybe KindQ -> [ConQ]
       -> [DerivClauseQ] -> DecQ
 dataD ctxt tc tvs ksig cons derivs =
   do
@@ -400,7 +400,7 @@ dataD ctxt tc tvs ksig cons derivs =
     derivs1 <- sequence derivs
     return (DataD ctxt1 tc tvs1 ksig1 cons1 derivs1)
 
-newtypeD :: CxtQ -> Name -> [TyVarBndrQ] -> Maybe KindQ -> ConQ
+newtypeD :: CxtQ -> Name -> [TyVarBndrQ ()] -> Maybe KindQ -> ConQ
          -> [DerivClauseQ] -> DecQ
 newtypeD ctxt tc tvs ksig con derivs =
   do
@@ -411,7 +411,7 @@ newtypeD ctxt tc tvs ksig con derivs =
     derivs1 <- sequence derivs
     return (NewtypeD ctxt1 tc tvs1 ksig1 con1 derivs1)
 
-classD :: CxtQ -> Name -> [TyVarBndrQ] -> [FunDep] -> [DecQ] -> DecQ
+classD :: CxtQ -> Name -> [TyVarBndrQ ()] -> [FunDep] -> [DecQ] -> DecQ
 classD ctxt cls tvs fds decs =
   do
     tvs1  <- sequenceA tvs
@@ -474,7 +474,7 @@ pragSpecInstD ty
       ty1    <- ty
       return $ PragmaD $ SpecialiseInstP ty1
 
-pragRuleD :: String -> Maybe [TyVarBndrQ] -> [RuleBndrQ] -> ExpQ -> ExpQ
+pragRuleD :: String -> Maybe [TyVarBndrQ ()] -> [RuleBndrQ] -> ExpQ -> ExpQ
           -> Phases -> DecQ
 pragRuleD n ty_bndrs tm_bndrs lhs rhs phases
   = do
@@ -496,7 +496,7 @@ pragLineD line file = return $ PragmaD $ LineP line file
 pragCompleteD :: [Name] -> Maybe Name -> DecQ
 pragCompleteD cls mty = return $ PragmaD $ CompleteP cls mty
 
-dataInstD :: CxtQ -> (Maybe [TyVarBndrQ]) -> TypeQ -> Maybe KindQ -> [ConQ]
+dataInstD :: CxtQ -> (Maybe [TyVarBndrQ ()]) -> TypeQ -> Maybe KindQ -> [ConQ]
           -> [DerivClauseQ] -> DecQ
 dataInstD ctxt mb_bndrs ty ksig cons derivs =
   do
@@ -508,7 +508,7 @@ dataInstD ctxt mb_bndrs ty ksig cons derivs =
     derivs1 <- sequenceA derivs
     return (DataInstD ctxt1 mb_bndrs1 ty1 ksig1 cons1 derivs1)
 
-newtypeInstD :: CxtQ -> (Maybe [TyVarBndrQ]) -> TypeQ -> Maybe KindQ -> ConQ
+newtypeInstD :: CxtQ -> (Maybe [TyVarBndrQ ()]) -> TypeQ -> Maybe KindQ -> ConQ
              -> [DerivClauseQ] -> DecQ
 newtypeInstD ctxt mb_bndrs ty ksig con derivs =
   do
@@ -526,20 +526,20 @@ tySynInstD eqn =
     eqn1 <- eqn
     return (TySynInstD eqn1)
 
-dataFamilyD :: Name -> [TyVarBndrQ] -> Maybe KindQ -> DecQ
+dataFamilyD :: Name -> [TyVarBndrQ ()] -> Maybe KindQ -> DecQ
 dataFamilyD tc tvs kind =
   do tvs'  <- sequenceA tvs
      kind' <- sequenceA kind
      return $ DataFamilyD tc tvs' kind'
 
-openTypeFamilyD :: Name -> [TyVarBndrQ] -> FamilyResultSigQ
+openTypeFamilyD :: Name -> [TyVarBndrQ ()] -> FamilyResultSigQ
                 -> Maybe InjectivityAnn -> DecQ
 openTypeFamilyD tc tvs res inj =
   do tvs' <- sequenceA tvs
      res' <- res
      return $ OpenTypeFamilyD (TypeFamilyHead tc tvs' res' inj)
 
-closedTypeFamilyD :: Name -> [TyVarBndrQ] -> FamilyResultSigQ
+closedTypeFamilyD :: Name -> [TyVarBndrQ ()] -> FamilyResultSigQ
                   -> Maybe InjectivityAnn -> [TySynEqnQ] -> DecQ
 closedTypeFamilyD tc tvs result injectivity eqns =
   do tvs1    <- sequenceA tvs
@@ -589,7 +589,7 @@ implicitParamBindD n e =
     e' <- e
     return $ ImplicitParamBindD n e'
 
-tySynEqn :: (Maybe [TyVarBndrQ]) -> TypeQ -> TypeQ -> TySynEqnQ
+tySynEqn :: (Maybe [TyVarBndrQ ()]) -> TypeQ -> TypeQ -> TySynEqnQ
 tySynEqn mb_bndrs lhs rhs =
   do
     mb_bndrs1 <- traverse sequence mb_bndrs
@@ -628,7 +628,7 @@ infixC st1 con st2 = do st1' <- st1
                         st2' <- st2
                         return $ InfixC st1' con st2'
 
-forallC :: [TyVarBndrQ] -> CxtQ -> ConQ -> ConQ
+forallC :: [TyVarBndrQ Specificity] -> CxtQ -> ConQ -> ConQ
 forallC ns ctxt con = do
   ns'   <- sequenceA ns
   ctxt' <- ctxt
@@ -644,14 +644,14 @@ recGadtC cons varstrtys ty = liftM2 (RecGadtC cons) (sequence varstrtys) ty
 -------------------------------------------------------------------------------
 -- *   Type
 
-forallT :: [TyVarBndrQ] -> CxtQ -> TypeQ -> TypeQ
+forallT :: [TyVarBndrQ Specificity] -> CxtQ -> TypeQ -> TypeQ
 forallT tvars ctxt ty = do
     tvars1 <- sequenceA tvars
     ctxt1  <- ctxt
     ty1    <- ty
     return $ ForallT tvars1 ctxt1 ty1
 
-forallVisT :: [TyVarBndrQ] -> TypeQ -> TypeQ
+forallVisT :: [TyVarBndrQ Specificity] -> TypeQ -> TypeQ
 forallVisT tvars ty = ForallVisT <$> sequenceA tvars <*> ty
 
 varT :: Name -> TypeQ
@@ -809,11 +809,11 @@ strTyLit s = return (StrTyLit s)
 -------------------------------------------------------------------------------
 -- *   Kind
 
-plainTV :: Name -> TyVarBndrQ
-plainTV = pure . PlainTV
+plainTV :: Name -> flag -> TyVarBndrQ flag
+plainTV n s = pure $ PlainTV n s
 
-kindedTV :: Name -> KindQ -> TyVarBndrQ
-kindedTV n = fmap (KindedTV n)
+kindedTV :: Name -> flag -> KindQ -> TyVarBndrQ flag
+kindedTV n s = fmap (KindedTV n s)
 
 varK :: Name -> Kind
 varK = VarT
@@ -848,7 +848,7 @@ noSig = pure NoSig
 kindSig :: KindQ -> FamilyResultSigQ
 kindSig = fmap KindSig
 
-tyVarSig :: TyVarBndrQ -> FamilyResultSigQ
+tyVarSig :: TyVarBndrQ () -> FamilyResultSigQ
 tyVarSig = fmap TyVarSig
 
 -------------------------------------------------------------------------------

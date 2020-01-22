@@ -900,12 +900,12 @@ mkRuleBndrs = fmap (fmap cvt_one)
           RuleBndrSig noExtField v (mkLHsSigWcType sig)
 
 -- turns RuleTyTmVars into HsTyVarBndrs - this is more interesting
-mkRuleTyVarBndrs :: [LRuleTyTmVar] -> [LHsTyVarBndr Specificity GhcPs]
+mkRuleTyVarBndrs :: [LRuleTyTmVar] -> [LHsTyVarBndr () GhcPs]
 mkRuleTyVarBndrs = fmap (fmap cvt_one)
   where cvt_one (RuleTyTmVar v Nothing)
-          = UserTyVar noExtField SpecifiedSpec (fmap tm_to_ty v)
+          = UserTyVar noExtField () (fmap tm_to_ty v)
         cvt_one (RuleTyTmVar v (Just sig))
-          = KindedTyVar noExtField SpecifiedSpec (fmap tm_to_ty v) sig
+          = KindedTyVar noExtField () (fmap tm_to_ty v) sig
     -- takes something in namespace 'varName' to something in namespace 'tvName'
         tm_to_ty (Unqual occ) = Unqual (setOccNameSpace tvName occ)
         tm_to_ty _ = panic "mkRuleTyVarBndrs"

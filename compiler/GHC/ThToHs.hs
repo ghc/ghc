@@ -6,15 +6,13 @@
 This module converts Template Haskell syntax into Hs syntax
 -}
 
--- GJ : TODO Atm no explicit specificity in template haskell
--- Temporary solution is just to make all the bound variables Specified.
--- GJ : TODO Update syntax file (Ask for feedback: flags or tuples in the MR)
-
 {-# LANGUAGE DeriveFunctor #-}
 {-# LANGUAGE FlexibleContexts #-}
 {-# LANGUAGE ScopedTypeVariables #-}
 {-# LANGUAGE TypeFamilies #-}
 {-# LANGUAGE ViewPatterns #-}
+{-# LANGUAGE MultiParamTypeClasses #-}
+{-# LANGUAGE FunctionalDependencies #-}
 
 module GHC.ThToHs
    ( convertToHsExpr
@@ -35,7 +33,7 @@ import Module
 import RdrHsSyn
 import OccName
 import SrcLoc
-import Type
+import Type as Hs
 import qualified Coercion ( Role(..) )
 import TysWiredIn
 import BasicTypes as Hs
@@ -477,7 +475,7 @@ cvt_ci_decs doc decs
         ; return (listToBag binds', sigs', fams', ats', adts') }
 
 ----------------
-cvt_tycl_hdr :: TH.Cxt -> TH.Name -> [TH.TyVarBndr]
+cvt_tycl_hdr :: TH.Cxt -> TH.Name -> [TH.TyVarBndr ()]
              -> CvtM ( LHsContext GhcPs
                      , Located RdrName
                      , LHsQTyVars GhcPs)
@@ -485,10 +483,10 @@ cvt_tycl_hdr cxt tc tvs
   = do { cxt' <- cvtContext funPrec cxt
        ; tc'  <- tconNameL tc
        ; tvs' <- cvtTvs tvs
-       ; return (cxt', tc', tvs')
+       ; return (cxt', tc', mkHsQTvs tvs')
        }
 
-cvt_datainst_hdr :: TH.Cxt -> Maybe [TH.TyVarBndr] -> TH.Type
+cvt_datainst_hdr :: TH.Cxt -> Maybe [TH.TyVarBndr ()] -> TH.Type
                -> CvtM ( LHsContext GhcPs
                        , Located RdrName
                        , Maybe [LHsTyVarBndr () GhcPs]
@@ -583,7 +581,7 @@ cvtConstr (InfixC st1 c st2)
         ; returnL $ mkConDeclH98 c' Nothing Nothing (InfixCon st1' st2') }
 
 cvtConstr (ForallC tvs ctxt con)
-  = do  { tvs'      <- cvtTvsSpec tvs
+  = do  { tvs'      <- cvtTvs tvs
         ; ctxt'     <- cvtContext funPrec ctxt
         ; L _ con'  <- cvtConstr con
         ; returnL $ add_forall tvs' ctxt' con' }
@@ -765,7 +763,7 @@ cvtPragmaD (SpecialiseInstP ty)
 cvtPragmaD (RuleP nm ty_bndrs tm_bndrs lhs rhs phases)
   = do { let nm' = mkFastString nm
        ; let act = cvtPhases phases AlwaysActive
-       ; ty_bndrs' <- traverse (mapM cvt_tv_spec) ty_bndrs
+       ; ty_bndrs' <- traverse cvtTvs ty_bndrs
        ; tm_bndrs' <- mapM cvtRuleBndr tm_bndrs
        ; lhs'   <- cvtl lhs
        ; rhs'   <- cvtl rhs
@@ -1325,29 +1323,29 @@ cvtOpAppP x op y
 -----------------------------------------------------------
 --      Types and type variables
 
-cvtTvs :: [TH.TyVarBndr] -> CvtM (LHsQTyVars GhcPs)
-cvtTvs tvs = do { tvs' <- mapM cvt_tv tvs; return (mkHsQTvs tvs') }
+class CvtFlag flag flag' | flag -> flag' where
+  cvtFlag :: flag -> flag'
 
-cvt_tv :: TH.TyVarBndr -> CvtM (LHsTyVarBndr () GhcPs)
-cvt_tv (TH.PlainTV nm)
+instance CvtFlag () () where
+  cvtFlag () = ()
+
+instance CvtFlag TH.Specificity Hs.Specificity where
+  cvtFlag TH.SpecifiedSpec = Hs.SpecifiedSpec
+  cvtFlag TH.InferredSpec  = Hs.InferredSpec
+
+cvtTvs :: CvtFlag flag flag' => [TH.TyVarBndr flag] -> CvtM [LHsTyVarBndr flag' GhcPs]
+cvtTvs tvs = mapM cvt_tv tvs
+
+cvt_tv :: CvtFlag flag flag' => (TH.TyVarBndr flag) -> CvtM (LHsTyVarBndr flag' GhcPs)
+cvt_tv (TH.PlainTV nm fl)
   = do { nm' <- tNameL nm
-       ; returnL $ UserTyVar noExtField () nm' }
-cvt_tv (TH.KindedTV nm ki)
+       ; let fl' = cvtFlag fl
+       ; returnL $ UserTyVar noExtField fl' nm' }
+cvt_tv (TH.KindedTV nm fl ki)
   = do { nm' <- tNameL nm
+       ; let fl' = cvtFlag fl
        ; ki' <- cvtKind ki
-       ; returnL $ KindedTyVar noExtField () nm' ki' }
-
-cvtTvsSpec :: [TH.TyVarBndr] -> CvtM [LHsTyVarBndr Specificity GhcPs]
-cvtTvsSpec = mapM cvt_tv_spec
-
-cvt_tv_spec :: TH.TyVarBndr -> CvtM (LHsTyVarBndr Specificity GhcPs)
-cvt_tv_spec (TH.PlainTV nm)
-  = do { nm' <- tNameL nm
-       ; returnL $ UserTyVar noExtField SpecifiedSpec nm' }
-cvt_tv_spec (TH.KindedTV nm ki)
-  = do { nm' <- tNameL nm
-       ; ki' <- cvtKind ki
-       ; returnL $ KindedTyVar noExtField SpecifiedSpec nm' ki' }
+       ; returnL $ KindedTyVar noExtField fl' nm' ki' }
 
 cvtRole :: TH.Role -> Maybe Coercion.Role
 cvtRole TH.NominalR          = Just Coercion.Nominal
@@ -1449,7 +1447,7 @@ cvtTypeKind ty_str ty
 
            ForallT tvs cxt ty
              | null tys'
-             -> do { tvs' <- cvtTvsSpec tvs
+             -> do { tvs' <- cvtTvs tvs
                    ; cxt' <- cvtContext funPrec cxt
                    ; ty'  <- cvtType ty
                    ; loc <- getL
@@ -1460,7 +1458,7 @@ cvtTypeKind ty_str ty
 
            ForallVisT tvs ty
              | null tys'
-             -> do { tvs' <- cvtTvsSpec tvs
+             -> do { tvs' <- cvtTvs tvs
                    ; ty'  <- cvtType ty
                    ; loc  <- getL
                    ; pure $ mkHsForAllTy tvs loc ForallVis tvs' ty' }
@@ -1699,7 +1697,7 @@ cvtPatSynSigTy (ForallT univs reqs (ForallT exis provs ty))
                                                         , hst_xqual = noExtField
                                                         , hst_body = ty' }) }
   | null reqs             = do { l      <- getL
-                               ; univs' <- cvtTvsSpec univs
+                               ; univs' <- cvtTvs univs
                                ; ty'    <- cvtType (ForallT exis provs ty)
                                ; let forTy = HsForAllTy
                                               { hst_fvf = ForallInvis
@@ -1752,7 +1750,7 @@ unboxedSumChecks alt arity
 -- | If passed an empty list of 'TH.TyVarBndr's, this simply returns the
 -- third argument (an 'LHsType'). Otherwise, return an 'HsForAllTy'
 -- using the provided 'LHsQTyVars' and 'LHsType'.
-mkHsForAllTy :: [TH.TyVarBndr]
+mkHsForAllTy :: [TH.TyVarBndr TH.Specificity]
              -- ^ The original Template Haskell type variable binders
              -> SrcSpan
              -- ^ The location of the returned 'LHsType' if it needs an
@@ -1760,7 +1758,7 @@ mkHsForAllTy :: [TH.TyVarBndr]
              -> ForallVisFlag
              -- ^ Whether this is @forall@ is visible (e.g., @forall a ->@)
              --   or invisible (e.g., @forall a.@)
-             -> [LHsTyVarBndr Specificity GhcPs]
+             -> [LHsTyVarBndr Hs.Specificity GhcPs]
              -- ^ The converted type variable binders
              -> LHsType GhcPs
              -- ^ The converted rho type

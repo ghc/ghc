@@ -2197,7 +2197,7 @@ data RuleDecl pass
        , rd_name :: Located (SourceText,RuleName)
            -- ^ Note [Pragma source text] in BasicTypes
        , rd_act  :: Activation
-       , rd_tyvs :: Maybe [LHsTyVarBndr Specificity (NoGhcTc pass)]
+       , rd_tyvs :: Maybe [LHsTyVarBndr () (NoGhcTc pass)]
            -- ^ Forall'd type vars
        , rd_tmvs :: [LRuleBndr pass]
            -- ^ Forall'd term vars, before typechecking; after typechecking
