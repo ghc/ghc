@@ -114,7 +114,7 @@ function setup() {
     Darwin) darwin_setup; setup_toolchain ;;
     MSYS_*) setup_toolchain ;;
     Linux)
-      export GHC="/usr/local/bin/ghc"
+      export GHC="$(which ghc)"
       export CABAL="/usr/local/bin/cabal"
       export HAPPY="$HOME/.cabal/bin/happy"
       export ALEX="$HOME/.cabal/bin/alex"
@@ -187,6 +187,7 @@ function setup_toolchain() {
 }
 
 function cleanup_submodules() {
+  info "Cleaning submodules..."
   # On Windows submodules can inexplicably get into funky states where git
   # believes that the submodule is initialized yet its associated repository
   # is not valid. Avoid failing in this case with the following insanity.
@@ -234,7 +235,7 @@ EOF
 
 function configure() {
   prepare_build_mk
-  run python boot
+  run python3 boot
   run ./configure \
     --enable-tarballs-autodownload \
     --target=$triple \
