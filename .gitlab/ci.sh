@@ -5,7 +5,7 @@
 set -e -o pipefail
 
 # Configuration:
-hackage_index_state="@1522046735"
+hackage_index_state="@1579718451"
 
 # Colors
 BLACK="0;30"
