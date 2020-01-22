@@ -29,12 +29,12 @@ LT_GRAY="0;37"
 # https://gitlab.com/gitlab-org/gitlab-foss/issues/14664
 start_section() {
   name="$1"
-  echo "section_start:$(date +%s):$name\r\033\[0K"
+  echo -e "section_start:$(date +%s):$name\r\033\[0K"
 }
 
 end_section() {
   name="$1"
-  echo "section_end:$(date +%s):$name\r\033\[0K"
+  echo -e "section_end:$(date +%s):$name\r\033\[0K"
 }
 
 echo_color() {
