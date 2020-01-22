@@ -29,7 +29,7 @@ module Demand (
         DmdEnv, emptyDmdEnv,
         peelFV, findIdDemand,
 
-        Divergence(..), lubDivergence, isBotDiv, isTopDiv, topDiv, botDiv,
+        Divergence(..), lubDivergence, isBotDiv, isTopDiv, topDiv, botDiv, exnDiv,
         appIsBottom, isBottomingSig, pprIfaceStrictSig,
         StrictSig(..), mkStrictSigForArity, mkClosedStrictSig,
         nopSig, botSig, cprProdSig,
@@ -41,7 +41,7 @@ module Demand (
 
         evalDmd, cleanEvalDmd, cleanEvalProdDmd, isStrictDmd,
         splitDmdTy, splitFVs,
-        deferAfterIO,
+        deferAfterPreciseException,
         postProcessUnsat, postProcessDmdType,
 
         splitProdDmd_maybe, peelCallDmd, peelManyCalls, mkCallDmd, mkCallDmds,
@@ -896,40 +896,55 @@ splitProdDmd_maybe (JD { sd = s, ud = u })
 {-
 ************************************************************************
 *                                                                      *
-                   Termination
+                   Divergence
 *                                                                      *
 ************************************************************************
-
-Divergence:     Dunno
-               /
-          Diverges
-
-In a fixpoint iteration, start from Diverges
 -}
 
+-- | Divergence lattice.
+--
+-- @
+--         Dunno
+--           |
+-- ThrowsExceptionOrDiverges
+--           |
+--        Diverges
+-- @
+--
+-- See Note [Precise exceptions and strictness analysis] for why we have that
+-- additional bottom-like element.
 data Divergence
-  = Diverges    -- Definitely diverges
-  | Dunno       -- Might diverge or converge
+  = Diverges -- ^ Definitely throws an imprecise exception or diverges.
+  | ExnOrDiv -- ^ Definitely throws a *precise* exception, an imprecise
+             --   exception or diverges.
+             --   See Note [Precise exceptions and strictness analysis].
+  | Dunno    -- ^ Might diverge or converge.
   deriving( Eq, Show )
 
 lubDivergence :: Divergence -> Divergence ->Divergence
 lubDivergence Diverges r        = r
 lubDivergence r        Diverges = r
-lubDivergence Dunno    Dunno    = Dunno
+lubDivergence Dunno    _        = Dunno
+lubDivergence _        Dunno    = Dunno
+lubDivergence ExnOrDiv ExnOrDiv = ExnOrDiv
 -- This needs to commute with defaultDmd, i.e.
 -- defaultDmd (r1 `lubDivergence` r2) = defaultDmd r1 `lubDmd` defaultDmd r2
 -- (See Note [Default demand on free variables] for why)
 
 bothDivergence :: Divergence -> Divergence -> Divergence
 -- See Note [Asymmetry of 'both' for DmdType and Divergence]
-bothDivergence _ Diverges = Diverges
-bothDivergence r Dunno    = r
+bothDivergence _        Diverges = Diverges
+bothDivergence Diverges _        = Diverges
+bothDivergence r        Dunno    = r
+bothDivergence Dunno    r        = r
+bothDivergence ExnOrDiv ExnOrDiv = ExnOrDiv
 -- This needs to commute with defaultDmd, i.e.
 -- defaultDmd (r1 `bothDivergence` r2) = defaultDmd r1 `bothDmd` defaultDmd r2
 -- (See Note [Default demand on free variables] for why)
 
 instance Outputable Divergence where
   ppr Diverges      = char 'b'
+  ppr ExnOrDiv      = char 'x'
   ppr Dunno         = empty
 
 ------------------------------------------------------------------------
@@ -938,8 +953,9 @@ instance Outputable Divergence where
 
 -- [cprRes] lets us switch off CPR analysis
 -- by making sure that everything uses TopRes
-topDiv, botDiv :: Divergence
+topDiv, exnDiv, botDiv :: Divergence
 topDiv = Dunno
+exnDiv = ExnOrDiv
 botDiv = Diverges
 
 isTopDiv :: Divergence -> Bool
@@ -949,13 +965,16 @@ isTopDiv _     = False
 -- | True if the result diverges or throws an exception
 isBotDiv :: Divergence -> Bool
 isBotDiv Diverges = True
+isBotDiv ExnOrDiv = True
 isBotDiv _        = False
 
 -- See Notes [Default demand on free variables]
 -- and [defaultDmd vs. resTypeArgDmd]
+-- and Scenario 2 in [Precise exceptions and strictness analysis]
 defaultDmd :: Divergence -> Demand
-defaultDmd Dunno = absDmd
-defaultDmd _     = botDmd  -- Diverges
+defaultDmd Dunno    = absDmd
+defaultDmd ExnOrDiv = absDmd -- This is the whole point of ExnOrDiv!
+defaultDmd Diverges = botDmd -- Diverges
 
 resTypeArgDmd :: Divergence -> Demand
 -- TopRes and BotRes are polymorphic, so that
@@ -1090,10 +1109,7 @@ mkBothDmdArg :: DmdEnv -> BothDmdArg
 mkBothDmdArg env = (env, Dunno)
 
 toBothDmdArg :: DmdType -> BothDmdArg
-toBothDmdArg (DmdType fv _ r) = (fv, go r)
-  where
-    go Dunno    = Dunno
-    go Diverges = Diverges
+toBothDmdArg (DmdType fv _ r) = (fv, r)
 
 bothDmdType :: DmdType -> BothDmdArg -> DmdType
 bothDmdType (DmdType fv1 ds1 r1) (fv2, t2)
@@ -1167,16 +1183,15 @@ splitDmdTy :: DmdType -> (Demand, DmdType)
 splitDmdTy (DmdType fv (dmd:dmds) res_ty) = (dmd, DmdType fv dmds res_ty)
 splitDmdTy ty@(DmdType _ [] res_ty)       = (resTypeArgDmd res_ty, ty)
 
--- When e is evaluated after executing an IO action, and d is e's demand, then
--- what of this demand should we consider, given that the IO action can cleanly
--- exit?
+-- When e is evaluated after executing an IO action that may throw a precise
+-- exception, and d is e's demand, then what of this demand should we consider?
 -- * We have to kill all strictness demands (i.e. lub with a lazy demand)
 -- * We can keep usage information (i.e. lub with an absent demand)
 -- * We have to kill definite divergence
 -- * We can keep CPR information.
--- See Note [IO hack in the demand analyser] in DmdAnal
-deferAfterIO :: DmdType -> DmdType
-deferAfterIO d@(DmdType _ _ res) =
+-- See Note [Precise exceptions and strictness analysis] in DmdAnal
+deferAfterPreciseException :: DmdType -> DmdType
+deferAfterPreciseException d@(DmdType _ _ res) =
     case d `lubDmdType` nopDmdType of
         DmdType fv ds _ -> DmdType fv ds (defer_res res)
   where
@@ -1997,9 +2012,11 @@ instance Binary DmdType where
 
 instance Binary Divergence where
   put_ bh Dunno    = putByte bh 0
-  put_ bh Diverges = putByte bh 1
+  put_ bh ExnOrDiv = putByte bh 1
+  put_ bh Diverges = putByte bh 2
 
   get bh = do { h <- getByte bh
               ; case h of
                   0 -> return Dunno
+                  1 -> return ExnOrDiv
                   _ -> return Diverges }
