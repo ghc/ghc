@@ -98,7 +98,7 @@ function darwin_setup() {
 }
 
 function show_tool() {
-  tool="$1"
+  local tool="$1"
   info "$tool = ${!tool}"
   ${!tool} --version
 }
@@ -110,7 +110,7 @@ function setup() {
       cp -Rf cabal-cache $cabal_dir
   fi
 
-  case $platform in
+  case "$(uname)" in
     Darwin) darwin_setup; setup_toolchain ;;
     MSYS_*) setup_toolchain ;;
     Linux)
