@@ -28,6 +28,8 @@ test('T8743', [], multimod_compile, ['T8743', '-v0'])
 # Set -dppr-cols to ensure output doesn't wrap
 test('T10482',  [ grep_errmsg(r'wfoo.*Int#') ], compile, ['-dppr-cols=200 -ddump-simpl'])
 test('T10482a', [ grep_errmsg(r'wf.*Int#') ],   compile, ['-dppr-cols=200 -ddump-simpl'])
+# T5775: There should be $wloop :: Int# -> Int# -> Int
+test('T5775',  [ grep_errmsg(r'wloop.*:: Int#.*:: Int#') ], compile, ['-dppr-cols=200 -ddump-simpl -dsuppress-idinfo -dsuppress-uniques'])
 
 test('T9208', when(compiler_debugged(), expect_broken(9208)), compile, [''])
 # T9208 fails (and should do so) if you have assertion checking on in the compiler

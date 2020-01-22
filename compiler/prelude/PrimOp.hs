@@ -337,7 +337,10 @@ A primop "has_side_effects" if it has some *write* effect, visible
 elsewhere
     - writing to the world (I/O)
     - writing to a mutable data structure (writeIORef)
-    - throwing a synchronous Haskell exception
+    - throwing a *precise* exception
+
+BUT since #3207, we also have to mark read effects as "has_side_effects".
+See NB3 below.
 
 Often such primops have a type like
    State -> input -> (State, output)
@@ -351,24 +354,29 @@ data dependencies of the state token to enforce write-effect ordering
    primops even if both their state and result is discarded.
 
  * NB2: We consider primops, such as raiseIO#, that can raise a
-   (Haskell) synchronous exception to "have_side_effects" but not
-   "can_fail".  We must be careful about not discarding such things;
+   precise exception to "have_side_effects" but not "can_fail".
+   We must be careful about not discarding such things;
    see the paper "A semantics for imprecise exceptions".
 
- * NB3: *Read* effects (like reading an IORef) don't count here,
-   because it doesn't matter if we don't do them, or do them more than
-   once.  *Sequencing* is maintained by the data dependency of the state
-   token.
+ * NB3: *Read* effects (like reading an IORef) shouldn't count here,
+   because it doesn't matter if we don't do them, or do them more than once.
+   *Sequencing* is maintained by the linear consumption of the state token.
+   However, duplicating a read-effect violates that premise. This happened in
+   #3207, where a write effect is then performed before the duplicated read
+   effect. A few alternatives to the current design of marking them as
+   "has_side_effects" are outlined in
+   https://gitlab.haskell.org/ghc/ghc/issues/3207#note_257470.
 
 ----------  can_fail ----------------------------
-A primop "can_fail" if it can fail with an *unchecked* exception on
+A primop "can_fail" if it can fail with an *imprecise* exception on
 some elements of its input domain. Main examples:
    division (fails on zero denominator)
    array indexing (fails if the index is out of bounds)
+   raise# (always throws an imprecise exception)
 
-An "unchecked exception" is one that is an outright error, (not
-turned into a Haskell exception,) such as seg-fault or
-divide-by-zero error.  Such can_fail primops are ALWAYS surrounded
+An "imprecise exception" is one that is an outright error, (which can't be
+reliably caught with 'catch#',) such as seg-fault or divide-by-zero error.
+Such can_fail primops are ALWAYS surrounded
 with a test that checks for the bad cases, but we need to be
 very careful about code motion that might move it out of
 the scope of the test.

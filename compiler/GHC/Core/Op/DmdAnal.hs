@@ -34,8 +34,6 @@ import GHC.Core.Coercion ( Coercion, coVarsOfCo )
 import GHC.Core.FamInstEnv
 import Util
 import Maybes           ( isJust )
-import TysWiredIn
-import TysPrim          ( realWorldStatePrimTy )
 import ErrUtils         ( dumpIfSet_dyn, DumpFormat (..) )
 import UniqSet
 
@@ -222,8 +220,9 @@ dmdAnal' env dmd (Case scrut case_bndr ty [(DataAlt dc, bndrs, rhs)])
         (alt_ty1, dmds)          = findBndrsDmds env rhs_ty bndrs
         (alt_ty2, case_bndr_dmd) = findBndrDmd env False alt_ty1 case_bndr
         id_dmds                  = addCaseBndrDmd case_bndr_dmd dmds
-        alt_ty3 | io_hack_reqd scrut dc bndrs = deferAfterIO alt_ty2
-                | otherwise                   = alt_ty2
+        -- See Note [Precise exceptions and strictness analysis] in Demand
+        alt_ty3 | exprMayThrowPreciseException scrut = deferAfterPreciseException alt_ty2
+                | otherwise                          = alt_ty2
 
         -- Compute demand on the scrutinee
         -- See Note [Demand on scrutinee of a product case]
@@ -314,19 +313,6 @@ dmdAnal' env dmd (Let (Rec pairs) body)
     body_ty2 `seq`
     (body_ty2,  Let (Rec pairs') body')
 
-io_hack_reqd :: CoreExpr -> DataCon -> [Var] -> Bool
--- See Note [IO hack in the demand analyser]
-io_hack_reqd scrut con bndrs
-  | (bndr:_) <- bndrs
-  , con == tupleDataCon Unboxed 2
-  , idType bndr `eqType` realWorldStatePrimTy
-  , (fun, _) <- collectArgs scrut
-  = case fun of
-      Var f -> not (isPrimOpId f)
-      _     -> True
-  | otherwise
-  = False
-
 dmdAnalAlt :: AnalEnv -> CleanDemand -> Id -> Alt Var -> (DmdType, Alt Var)
 dmdAnalAlt env dmd case_bndr (con,bndrs,rhs)
   | null bndrs    -- Literals, DEFAULT, and nullary constructors
@@ -341,103 +327,7 @@ dmdAnalAlt env dmd case_bndr (con,bndrs,rhs)
   = (alt_ty, (con, setBndrsDemandInfo bndrs id_dmds, rhs'))
 
 
-{- Note [IO hack in the demand analyser]
-~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
-There's a hack here for I/O operations.  Consider
-
-     case foo x s of { (# s', r #) -> y }
-
-Is this strict in 'y'? Often not! If foo x s performs some observable action
-(including raising an exception with raiseIO#, modifying a mutable variable, or
-even ending the program normally), then we must not force 'y' (which may fail
-to terminate) until we have performed foo x s.
-
-Hackish solution: spot the IO-like situation and add a virtual branch,
-as if we had
-     case foo x s of
-        (# s, r #) -> y
-        other      -> return ()
-So the 'y' isn't necessarily going to be evaluated
-
-A more complete example (#148, #1592) where this shows up is:
-     do { let len = <expensive> ;
-        ; when (...) (exitWith ExitSuccess)
-        ; print len }
-
-However, consider
-  f x s = case getMaskingState# s of
-            (# s, r #) ->
-          case x of I# x2 -> ...
-
-Here it is terribly sad to make 'f' lazy in 's'.  After all,
-getMaskingState# is not going to diverge or throw an exception!  This
-situation actually arises in GHC.IO.Handle.Internals.wantReadableHandle
-(on an MVar not an Int), and made a material difference.
-
-So if the scrutinee is a primop call, we *don't* apply the
-state hack:
-  - If it is a simple, terminating one like getMaskingState,
-    applying the hack is over-conservative.
-  - If the primop is raise# then it returns bottom, so
-    the case alternatives are already discarded.
-  - If the primop can raise a non-IO exception, like
-    divide by zero or seg-fault (eg writing an array
-    out of bounds) then we don't mind evaluating 'x' first.
-
-Note [Demand on the scrutinee of a product case]
-~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
-When figuring out the demand on the scrutinee of a product case,
-we use the demands of the case alternative, i.e. id_dmds.
-But note that these include the demand on the case binder;
-see Note [Demand on case-alternative binders] in Demand.hs.
-This is crucial. Example:
-   f x = case x of y { (a,b) -> k y a }
-If we just take scrut_demand = U(L,A), then we won't pass x to the
-worker, so the worker will rebuild
-     x = (a, absent-error)
-and that'll crash.
-
-Note [Aggregated demand for cardinality]
-~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
-We use different strategies for strictness and usage/cardinality to
-"unleash" demands captured on free variables by bindings. Let us
-consider the example:
-
-f1 y = let {-# NOINLINE h #-}
-           h = y
-       in  (h, h)
-
-We are interested in obtaining cardinality demand U1 on |y|, as it is
-used only in a thunk, and, therefore, is not going to be updated any
-more. Therefore, the demand on |y|, captured and unleashed by usage of
-|h| is U1. However, if we unleash this demand every time |h| is used,
-and then sum up the effects, the ultimate demand on |y| will be U1 +
-U1 = U. In order to avoid it, we *first* collect the aggregate demand
-on |h| in the body of let-expression, and only then apply the demand
-transformer:
-
-transf[x](U) = {y |-> U1}
-
-so the resulting demand on |y| is U1.
-
-The situation is, however, different for strictness, where this
-aggregating approach exhibits worse results because of the nature of
-|both| operation for strictness. Consider the example:
-
-f y c =
-  let h x = y |seq| x
-   in case of
-        True  -> h True
-        False -> y
-
-It is clear that |f| is strict in |y|, however, the suggested analysis
-will infer from the body of |let| that |h| is used lazily (as it is
-used in one branch only), therefore lazy demand will be put on its
-free variable |y|. Conversely, if the demand on |h| is unleashed right
-on the spot, we will get the desired result, namely, that |f| is
-strict in |y|.
-
-
+{-
 ************************************************************************
 *                                                                      *
                     Demand transformer
