@@ -336,7 +336,7 @@ function build_make() {
   echo "include mk/flavours/${BUILD_FLAVOUR}.mk" > mk/build.mk
   echo 'GhcLibHcOpts+=-haddock' >> mk/build.mk
   run $MAKE -j$(mk/detect-cpu-count.sh) $MAKE_ARGS
-  run $MAKE -j$(mk/detect-cpu-count.sh) binary-dist TAR_COMP_OPTS=-1
+  run $MAKE -j$(mk/detect-cpu-count.sh) binary-dist-prep TAR_COMP_OPTS=-1
   ls -lh ghc.tar.xz
 }
 
