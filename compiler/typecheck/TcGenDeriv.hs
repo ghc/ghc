@@ -15,6 +15,7 @@ This is where we do all the grimy bindings' generation.
 {-# LANGUAGE CPP, ScopedTypeVariables #-}
 {-# LANGUAGE FlexibleContexts #-}
 {-# LANGUAGE TypeFamilies #-}
+{-# LANGUAGE TypeApplications #-}
 
 module TcGenDeriv (
         BagDerivStuff, DerivStuff(..),
@@ -32,7 +33,10 @@ module TcGenDeriv (
         mkCoerceClassMethEqn,
         genAuxBinds,
         ordOpTbl, boxConTbl, litConTbl,
-        mkRdrFunBind, mkRdrFunBindEC, mkRdrFunBindSE, error_Expr
+        mkRdrFunBind, mkRdrFunBindEC, mkRdrFunBindSE, error_Expr,
+
+        -- TODO find a better home for this!
+        snocToNonEmpty
     ) where
 
 #include "HsVersions.h"
@@ -77,6 +81,7 @@ import Pair
 import Bag
 
 import Data.List  ( find, partition, intersperse )
+import Data.List.NonEmpty (NonEmpty (..))
 
 type BagDerivStuff = Bag DerivStuff
 
@@ -181,11 +186,11 @@ gen_Eq_binds loc tycon = do
           [_] -> []   -- One constructor; no fall-though case
           _   ->      -- Two or more constructors; add fall-through of
                       --       (==) _ _ = False
-                 [([nlWildPat, nlWildPat], false_Expr)]
+                 [(nlWildPat :| [nlWildPat], false_Expr)]
 
       | otherwise -- One or more tag_match cons; add fall-through of
                   -- extract tags compare for equality
-      = [([a_Pat, b_Pat],
+      = [(a_Pat :| [b_Pat],
          untag_Expr dflags tycon [(a_RDR,ah_RDR), (b_RDR,bh_RDR)]
                     (genPrimOpApp (nlHsVar ah_RDR) eqInt_RDR (nlHsVar bh_RDR)))]
 
@@ -209,7 +214,7 @@ gen_Eq_binds loc tycon = do
             bs_needed   = take con_arity bs_RDRs
             tys_needed  = dataConOrigArgTys data_con
         in
-        ([con1_pat, con2_pat], nested_eq_expr tys_needed as_needed bs_needed)
+        (con1_pat :| [con2_pat], nested_eq_expr tys_needed as_needed bs_needed)
       where
         nested_eq_expr []  [] [] = true_Expr
         nested_eq_expr tys as bs
@@ -358,11 +363,11 @@ gen_Ord_binds loc tycon = do
       = emptyBag
 
     negate_expr = nlHsApp (nlHsVar not_RDR)
-    lE = mkSimpleGeneratedFunBind loc le_RDR [a_Pat, b_Pat] $
+    lE = mkSimpleGeneratedFunBind loc le_RDR (a_Pat :| [b_Pat]) $
         negate_expr (nlHsApp (nlHsApp (nlHsVar lt_RDR) b_Expr) a_Expr)
-    gT = mkSimpleGeneratedFunBind loc gt_RDR [a_Pat, b_Pat] $
+    gT = mkSimpleGeneratedFunBind loc gt_RDR (a_Pat :| [b_Pat]) $
         nlHsApp (nlHsApp (nlHsVar lt_RDR) b_Expr) a_Expr
-    gE = mkSimpleGeneratedFunBind loc ge_RDR [a_Pat, b_Pat] $
+    gE = mkSimpleGeneratedFunBind loc ge_RDR (a_Pat :| [b_Pat]) $
         negate_expr (nlHsApp (nlHsApp (nlHsVar lt_RDR) a_Expr) b_Expr)
 
     get_tag con = dataConTag con - fIRST_TAG
@@ -381,7 +386,7 @@ gen_Ord_binds loc tycon = do
 
     mkOrdOp :: DynFlags -> OrdOp -> LHsBind GhcPs
     -- Returns a binding   op a b = ... compares a and b according to op ....
-    mkOrdOp dflags op = mkSimpleGeneratedFunBind loc (ordMethRdr op) [a_Pat, b_Pat]
+    mkOrdOp dflags op = mkSimpleGeneratedFunBind loc (ordMethRdr op) (a_Pat :| [b_Pat])
                                         (mkOrdOpRhs dflags op)
 
     mkOrdOpRhs :: DynFlags -> OrdOp -> LHsExpr GhcPs
@@ -597,7 +602,7 @@ gen_Enum_binds loc tycon = do
     occ_nm = getOccString tycon
 
     succ_enum dflags
-      = mkSimpleGeneratedFunBind loc succ_RDR [a_Pat] $
+      = mkSimpleGeneratedFunBind loc succ_RDR (pure @NonEmpty a_Pat) $
         untag_Expr dflags tycon [(a_RDR, ah_RDR)] $
         nlHsIf (nlHsApps eq_RDR [nlHsVar (maxtag_RDR dflags tycon),
                                nlHsVarApps intDataCon_RDR [ah_RDR]])
@@ -607,7 +612,7 @@ gen_Enum_binds loc tycon = do
                                         nlHsIntLit 1]))
 
     pred_enum dflags
-      = mkSimpleGeneratedFunBind loc pred_RDR [a_Pat] $
+      = mkSimpleGeneratedFunBind loc pred_RDR (pure @NonEmpty a_Pat) $
         untag_Expr dflags tycon [(a_RDR, ah_RDR)] $
         nlHsIf (nlHsApps eq_RDR [nlHsIntLit 0,
                                nlHsVarApps intDataCon_RDR [ah_RDR]])
@@ -619,7 +624,7 @@ gen_Enum_binds loc tycon = do
                                                 (mkIntegralLit (-1 :: Int)))]))
 
     to_enum dflags
-      = mkSimpleGeneratedFunBind loc toEnum_RDR [a_Pat] $
+      = mkSimpleGeneratedFunBind loc toEnum_RDR (pure @NonEmpty a_Pat) $
         nlHsIf (nlHsApps and_RDR
                 [nlHsApps ge_RDR [nlHsVar a_RDR, nlHsIntLit 0],
                  nlHsApps le_RDR [ nlHsVar a_RDR
@@ -628,7 +633,7 @@ gen_Enum_binds loc tycon = do
              (illegal_toEnum_tag occ_nm (maxtag_RDR dflags tycon))
 
     enum_from dflags
-      = mkSimpleGeneratedFunBind loc enumFrom_RDR [a_Pat] $
+      = mkSimpleGeneratedFunBind loc enumFrom_RDR (pure @NonEmpty a_Pat) $
           untag_Expr dflags tycon [(a_RDR, ah_RDR)] $
           nlHsApps map_RDR
                 [nlHsVar (tag2con_RDR dflags tycon),
@@ -637,7 +642,7 @@ gen_Enum_binds loc tycon = do
                             (nlHsVar (maxtag_RDR dflags tycon)))]
 
     enum_from_then dflags
-      = mkSimpleGeneratedFunBind loc enumFromThen_RDR [a_Pat, b_Pat] $
+      = mkSimpleGeneratedFunBind loc enumFromThen_RDR (a_Pat :| [b_Pat]) $
           untag_Expr dflags tycon [(a_RDR, ah_RDR), (b_RDR, bh_RDR)] $
           nlHsApp (nlHsVarApps map_RDR [tag2con_RDR dflags tycon]) $
             nlHsPar (enum_from_then_to_Expr
@@ -650,7 +655,7 @@ gen_Enum_binds loc tycon = do
                            ))
 
     from_enum dflags
-      = mkSimpleGeneratedFunBind loc fromEnum_RDR [a_Pat] $
+      = mkSimpleGeneratedFunBind loc fromEnum_RDR (pure @NonEmpty a_Pat) $
           untag_Expr dflags tycon [(a_RDR, ah_RDR)] $
           (nlHsVarApps intDataCon_RDR [ah_RDR])
 
@@ -766,7 +771,7 @@ gen_Ix_binds loc tycon = do
       ]
 
     enum_range dflags
-      = mkSimpleGeneratedFunBind loc range_RDR [nlTuplePat [a_Pat, b_Pat] Boxed] $
+      = mkSimpleGeneratedFunBind loc range_RDR (pure @NonEmpty $ nlTuplePat [a_Pat, b_Pat] Boxed) $
           untag_Expr dflags tycon [(a_RDR, ah_RDR)] $
           untag_Expr dflags tycon [(b_RDR, bh_RDR)] $
           nlHsApp (nlHsVarApps map_RDR [tag2con_RDR dflags tycon]) $
@@ -776,9 +781,9 @@ gen_Ix_binds loc tycon = do
 
     enum_index dflags
       = mkSimpleGeneratedFunBind loc unsafeIndex_RDR
-                [noLoc (AsPat noExtField (noLoc c_RDR)
-                           (nlTuplePat [a_Pat, nlWildPat] Boxed)),
-                                d_Pat] (
+           (noLoc (AsPat noExtField (noLoc c_RDR)
+                                    (nlTuplePat [a_Pat, nlWildPat] Boxed))
+            :| pure d_Pat) (
            untag_Expr dflags tycon [(a_RDR, ah_RDR)] (
            untag_Expr dflags tycon [(d_RDR, dh_RDR)] (
            let
@@ -792,7 +797,7 @@ gen_Ix_binds loc tycon = do
 
     -- This produces something like `(ch >= ah) && (ch <= bh)`
     enum_inRange dflags
-      = mkSimpleGeneratedFunBind loc inRange_RDR [nlTuplePat [a_Pat, b_Pat] Boxed, c_Pat] $
+      = mkSimpleGeneratedFunBind loc inRange_RDR (nlTuplePat [a_Pat, b_Pat] Boxed :| [c_Pat]) $
           untag_Expr dflags tycon [(a_RDR, ah_RDR)] (
           untag_Expr dflags tycon [(b_RDR, bh_RDR)] (
           untag_Expr dflags tycon [(c_RDR, ch_RDR)] (
@@ -826,7 +831,7 @@ gen_Ix_binds loc tycon = do
     --------------------------------------------------------------
     single_con_range
       = mkSimpleGeneratedFunBind loc range_RDR
-          [nlTuplePat [con_pat as_needed, con_pat bs_needed] Boxed] $
+          (pure @NonEmpty $ nlTuplePat [con_pat as_needed, con_pat bs_needed] Boxed) $
         noLoc (mkHsComp ListComp stmts con_expr)
       where
         stmts = zipWith3Equal "single_con_range" mk_qual as_needed bs_needed cs_needed
@@ -838,8 +843,8 @@ gen_Ix_binds loc tycon = do
     ----------------
     single_con_index
       = mkSimpleGeneratedFunBind loc unsafeIndex_RDR
-                [nlTuplePat [con_pat as_needed, con_pat bs_needed] Boxed,
-                 con_pat cs_needed]
+                (nlTuplePat [con_pat as_needed, con_pat bs_needed] Boxed
+                 :| [con_pat cs_needed])
         -- We need to reverse the order we consider the components in
         -- so that
         --     range (l,u) !! index (l,u) i == i   -- when i is in range
@@ -864,8 +869,8 @@ gen_Ix_binds loc tycon = do
     ------------------
     single_con_inRange
       = mkSimpleGeneratedFunBind loc inRange_RDR
-                [nlTuplePat [con_pat as_needed, con_pat bs_needed] Boxed,
-                 con_pat cs_needed] $
+                (nlTuplePat [con_pat as_needed, con_pat bs_needed] Boxed
+                 :| [con_pat cs_needed]) $
           if con_arity == 0
              -- If the product type has no fields, inRange is trivially true
              -- (see #12853).
@@ -1144,9 +1149,9 @@ gen_Show_binds get_fixity loc tycon
     pats_etc data_con
       | nullary_con =  -- skip the showParen junk...
          ASSERT(null bs_needed)
-         ([nlWildPat, con_pat], mk_showString_app op_con_str)
+         (nlWildPat :| [con_pat], mk_showString_app op_con_str)
       | otherwise   =
-         ([a_Pat, con_pat],
+         (a_Pat :| [con_pat],
           showParen_Expr (genOpApp a_Expr ge_RDR (nlHsLit
                          (HsInt noExtField (mkIntegralLit con_prec_plus_one))))
                          (nlHsPar (nested_compose_Expr show_thingies)))
@@ -1371,8 +1376,9 @@ gen_data dflags data_type_name constr_names loc rep_tc
     gfoldl_bind = mkFunBindEC 3 loc gfoldl_RDR id (map gfoldl_eqn data_cons)
 
     gfoldl_eqn con
-      = ([nlVarPat k_RDR, z_Pat, nlConVarPat con_name as_needed],
-                   foldl' mk_k_app (z_Expr `nlHsApp` nlHsVar con_name) as_needed)
+      = ( nlVarPat k_RDR :| [z_Pat, nlConVarPat con_name as_needed]
+        , foldl' mk_k_app (z_Expr `nlHsApp` nlHsVar con_name) as_needed
+        )
                    where
                      con_name ::  RdrName
                      con_name = getRdrName con
@@ -1382,7 +1388,7 @@ gen_data dflags data_type_name constr_names loc rep_tc
         ------------ gunfold
     gunfold_bind = mkSimpleGeneratedFunBind loc
                      gunfold_RDR
-                     [k_Pat, z_Pat, if one_constr then nlWildPat else c_Pat]
+                     (k_Pat :| [z_Pat, if one_constr then nlWildPat else c_Pat])
                      gunfold_rhs
 
     gunfold_rhs
@@ -1406,13 +1412,13 @@ gen_data dflags data_type_name constr_names loc rep_tc
         ------------ toConstr
     toCon_bind = mkFunBindEC 1 loc toConstr_RDR id
                      (zipWith to_con_eqn data_cons constr_names)
-    to_con_eqn dc con_name = ([nlWildConPat dc], nlHsVar con_name)
+    to_con_eqn dc con_name = (pure @NonEmpty $ nlWildConPat dc, nlHsVar con_name)
 
         ------------ dataTypeOf
     dataTypeOf_bind = mkSimpleGeneratedFunBind
                         loc
                         dataTypeOf_RDR
-                        [nlWildPat]
+                        (pure @NonEmpty nlWildPat)
                         (nlHsVar data_type_name)
 
         ------------ gcast1/2
@@ -1436,7 +1442,7 @@ gen_data dflags data_type_name constr_names loc rep_tc
                 | tycon_kind `tcEqKind` kind2 = mk_gcast dataCast2_RDR gcast2_RDR
                 | otherwise                 = emptyBag
     mk_gcast dataCast_RDR gcast_RDR
-      = unitBag (mkSimpleGeneratedFunBind loc dataCast_RDR [nlVarPat f_RDR]
+      = unitBag (mkSimpleGeneratedFunBind loc dataCast_RDR (pure @NonEmpty $ nlVarPat f_RDR)
                                  (nlHsVar gcast_RDR `nlHsApp` nlHsVar f_RDR))
 
 
@@ -1578,7 +1584,7 @@ gen_Lift_binds loc tycon = (listToBag [lift_bind, liftTyped_bind], emptyBag)
     data_cons = tyConDataCons tycon
 
     pats_etc mk_bracket data_con
-      = ([con_pat], lift_Expr)
+      = (pure @NonEmpty con_pat, lift_Expr)
        where
             con_pat      = nlConVarPat data_con_RDR as_needed
             data_con_RDR = getRdrName data_con
@@ -1806,9 +1812,7 @@ gen_Newtype_binds loc cls inst_tvs inst_tys rhs_ty
   where
     mk_bind :: Id -> LHsBind GhcPs
     mk_bind meth_id
-      = mkRdrFunBind (L loc meth_RDR) [mkSimpleMatch
-                                          (mkPrefixFunRhs (L loc meth_RDR))
-                                          [] rhs_expr]
+      = L loc $ mkHsVarBind0 (L loc meth_RDR) rhs_expr
       where
         Pair from_ty to_ty = mkCoerceClassMethEqn cls inst_tvs inst_tys rhs_ty meth_id
         (_, _, from_tau) = tcSplitSigmaTy from_ty
@@ -1915,8 +1919,9 @@ fiddling around.
 genAuxBindSpec :: DynFlags -> SrcSpan -> AuxBindSpec
                   -> (LHsBind GhcPs, LSig GhcPs)
 genAuxBindSpec dflags loc (DerivCon2Tag tycon)
-  = (mkFunBindSE 0 loc rdr_name eqns,
-     L loc (TypeSig noExtField [L loc rdr_name] sig_ty))
+  = ( mkFunBindSE 0 loc rdr_name eqns
+    , L loc (TypeSig noExtField [L loc rdr_name] sig_ty)
+    )
   where
     rdr_name = con2tag_RDR dflags tycon
 
@@ -1931,18 +1936,22 @@ genAuxBindSpec dflags loc (DerivCon2Tag tycon)
     eqns | lots_of_constructors = [get_tag_eqn]
          | otherwise = map mk_eqn (tyConDataCons tycon)
 
-    get_tag_eqn = ([nlVarPat a_RDR], nlHsApp (nlHsVar getTag_RDR) a_Expr)
+    get_tag_eqn = (pure @NonEmpty $ nlVarPat a_RDR, nlHsApp (nlHsVar getTag_RDR) a_Expr)
 
-    mk_eqn :: DataCon -> ([LPat GhcPs], LHsExpr GhcPs)
-    mk_eqn con = ([nlWildConPat con],
-                  nlHsLit (HsIntPrim NoSourceText
-                                    (toInteger ((dataConTag con) - fIRST_TAG))))
+    mk_eqn :: DataCon -> (NonEmpty (LPat GhcPs), LHsExpr GhcPs)
+    mk_eqn con =
+      ( pure @NonEmpty $ nlWildConPat con
+      , nlHsLit $ HsIntPrim NoSourceText $
+          toInteger (dataConTag con - fIRST_TAG)
+      )
 
 genAuxBindSpec dflags loc (DerivTag2Con tycon)
-  = (mkFunBindSE 0 loc rdr_name
-        [([nlConVarPat intDataCon_RDR [a_RDR]],
-           nlHsApp (nlHsVar tagToEnum_RDR) a_Expr)],
-     L loc (TypeSig noExtField [L loc rdr_name] sig_ty))
+  = ( mkFunBindSE 0 loc rdr_name $ pure @[]
+      ( pure @NonEmpty $ nlConVarPat intDataCon_RDR [a_RDR]
+      , nlHsApp (nlHsVar tagToEnum_RDR) a_Expr
+      )
+    , L loc $ TypeSig noExtField [L loc rdr_name] sig_ty
+    )
   where
     sig_ty = mkLHsSigWcType $ L loc $
              XHsType $ NHsCoreTy $ mkSpecForAllTys (tyConTyVars tycon) $
@@ -2006,13 +2015,13 @@ mkParentType tc
 -- | Make a function binding. If no equations are given, produce a function
 -- with the given arity that produces a stock error.
 mkFunBindSE :: Arity -> SrcSpan -> RdrName
-             -> [([LPat GhcPs], LHsExpr GhcPs)]
+             -> [(NonEmpty (LPat GhcPs), LHsExpr GhcPs)]
              -> LHsBind GhcPs
 mkFunBindSE arity loc fun pats_and_exprs
   = mkRdrFunBindSE arity (L loc fun) matches
   where
     matches = [mkMatch (mkPrefixFunRhs (L loc fun))
-                               (map (parenthesizePat appPrec) p) e
+                               (fmap (parenthesizePat appPrec) p) e
                                (noLoc emptyLocalBinds)
               | (p,e) <-pats_and_exprs]
 
@@ -2027,13 +2036,13 @@ mkRdrFunBind fun@(L loc _fun_rdr) matches
 -- side.
 mkFunBindEC :: Arity -> SrcSpan -> RdrName
             -> (LHsExpr GhcPs -> LHsExpr GhcPs)
-            -> [([LPat GhcPs], LHsExpr GhcPs)]
+            -> [(NonEmpty (LPat GhcPs), LHsExpr GhcPs)]
             -> LHsBind GhcPs
 mkFunBindEC arity loc fun catch_all pats_and_exprs
   = mkRdrFunBindEC arity catch_all (L loc fun) matches
   where
     matches = [ mkMatch (mkPrefixFunRhs (L loc fun))
-                                (map (parenthesizePat appPrec) p) e
+                                (fmap (parenthesizePat appPrec) p) e
                                 (noLoc emptyLocalBinds)
               | (p,e) <- pats_and_exprs ]
 
@@ -2060,10 +2069,15 @@ mkRdrFunBindEC arity catch_all
    -- See #4302
    matches' = if null matches
               then [mkMatch (mkPrefixFunRhs fun)
-                            (replicate (arity - 1) nlWildPat ++ [z_Pat])
+                            (snocToNonEmpty (replicate (arity - 1) nlWildPat) z_Pat)
                             (catch_all $ nlHsCase z_Expr [])
                             (noLoc emptyLocalBinds)]
               else matches
+
+snocToNonEmpty :: [a] -> a -> NonEmpty a
+snocToNonEmpty as0 a0 = case as0 of
+  [] -> a0 :| []
+  (a:as) -> a :| (as ++ [a0])
 
 -- | Produces a function binding. When there are no equations, it generates
 -- a binding with the given arity that produces an error based on the name of
@@ -2071,20 +2085,21 @@ mkRdrFunBindEC arity catch_all
 mkRdrFunBindSE :: Arity -> Located RdrName ->
                     [LMatch GhcPs (LHsExpr GhcPs)] -> LHsBind GhcPs
 mkRdrFunBindSE arity
-                 fun@(L loc fun_rdr) matches = L loc (mkFunBind Generated fun matches')
- where
-   -- Catch-all eqn looks like
-   --     compare _ _ = error "Void compare"
-   -- It's needed if there no data cons at all,
-   -- which can happen with -XEmptyDataDecls
-   -- See #4302
-   matches' = if null matches
-              then [mkMatch (mkPrefixFunRhs fun)
-                            (replicate arity nlWildPat)
-                            (error_Expr str) (noLoc emptyLocalBinds)]
-              else matches
-   str = "Void " ++ occNameString (rdrNameOcc fun_rdr)
-
+                 fun@(L loc fun_rdr) matches = case (matches, arity) of
+  ([], 0) -> L loc $ mkHsVarBind0 fun expr
+  -- Catch-all eqn looks like
+  --     compare _ _ = error "Void compare"
+  -- It's needed if there no data cons at all,
+  -- which can happen with -XEmptyDataDecls
+  -- See #4302
+  ([], _) -> L loc $ mkFunBind Generated fun $ pure @[] $ mkMatch
+    (mkPrefixFunRhs fun)
+    (nlWildPat :| replicate (arity - 1) nlWildPat)
+    expr (noLoc emptyLocalBinds)
+  (_ : _,  _) -> L loc $ mkFunBind Generated fun matches
+  where
+    expr = error_Expr str
+    str = "Void " ++ occNameString (rdrNameOcc fun_rdr)
 
 box ::         String           -- The class involved
             -> LHsExpr GhcPs    -- The argument

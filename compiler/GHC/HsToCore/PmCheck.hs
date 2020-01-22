@@ -5,11 +5,14 @@ Pattern Matching Coverage Checking.
 -}
 
 {-# LANGUAGE CPP            #-}
+{-# LANGUAGE DataKinds      #-}
 {-# LANGUAGE GADTs          #-}
+{-# LANGUAGE LambdaCase     #-}
+{-# LANGUAGE KindSignatures #-}
+{-# LANGUAGE MultiWayIf     #-}
+{-# LANGUAGE ScopedTypeVariables #-}
 {-# LANGUAGE TupleSections  #-}
 {-# LANGUAGE ViewPatterns   #-}
-{-# LANGUAGE MultiWayIf     #-}
-{-# LANGUAGE LambdaCase     #-}
 
 module GHC.HsToCore.PmCheck (
         -- Checking and printing
@@ -59,7 +62,9 @@ import Maybes
 import qualified GHC.LanguageExtensions as LangExt
 
 import Control.Monad (when, forM_, zipWithM)
-import Data.List (elemIndex)
+import Data.Foldable (toList)
+import Data.List     (elemIndex)
+import Data.Maybe    (isJust)
 import qualified Data.Semigroup as Semi
 
 {-
@@ -302,8 +307,10 @@ checkGuardMatches hs_ctx guards@(GRHSs _ grhss _) = do
 checkGuardMatches _ (XGRHSs nec) = noExtCon nec
 
 -- | Check a matchgroup (case, functions, etc.)
-checkMatches :: DynFlags -> DsMatchContext
-             -> [Id] -> [LMatch GhcTc (LHsExpr GhcTc)] -> DsM ()
+checkMatches
+  :: (Outputable (f Id), Foldable f)
+  => DynFlags -> DsMatchContext
+  -> f Id -> [LMatch' f GhcTc (LHsExpr GhcTc)] -> DsM ()
 checkMatches dflags ctxt vars matches = do
   tracePm "checkMatches" (hang (vcat [ppr ctxt
                                , ppr vars
@@ -311,30 +318,36 @@ checkMatches dflags ctxt vars matches = do
                                2
                                (vcat (map ppr matches)))
   res <- checkMatches' vars matches
-  dsPmWarn dflags ctxt vars res
+  dsPmWarn dflags ctxt (toList vars) res
 
 -- | Check a matchgroup (case, functions, etc.).
-checkMatches' :: [Id] -> [LMatch GhcTc (LHsExpr GhcTc)] -> DsM PmResult
+checkMatches'
+  :: forall f
+  .  Foldable f
+  => f Id -> [LMatch' f GhcTc (LHsExpr GhcTc)] -> DsM PmResult
 checkMatches' vars matches = do
   init_delta <- getPmDelta
+  let vars' = toList vars
   missing <- case matches of
     -- This must be an -XEmptyCase. See Note [Checking EmptyCase]
-    [] | [var] <- vars -> maybeToList <$> addTmCt init_delta (TmVarNonVoid var)
-    _                  -> pure [init_delta]
+    [] | [var] <- vars'
+      -> maybeToList <$> addTmCt init_delta (TmVarNonVoid var)
+    _
+      -> pure [init_delta]
   tracePm "checkMatches': missing" (ppr missing)
   (rs,us,ds,pc) <- go matches missing
   dflags <- getDynFlags
-  us' <- getNFirstUncovered vars (maxUncoveredPatterns dflags + 1) us
+  us' <- getNFirstUncovered vars' (maxUncoveredPatterns dflags + 1) us
   return $ PmResult {
-                pmresultRedundant    = map hsLMatchToLPats rs
+                pmresultRedundant    = fmap hsLMatchToLPats rs
               , pmresultUncovered    = us'
               , pmresultInaccessible = map hsLMatchToLPats ds
               , pmresultApproximate  = pc }
   where
-    go :: [LMatch GhcTc (LHsExpr GhcTc)] -> Uncovered
-       -> DsM ( [LMatch GhcTc (LHsExpr GhcTc)]
+    go :: [LMatch' f GhcTc (LHsExpr GhcTc)] -> Uncovered
+       -> DsM ( [LMatch' f GhcTc (LHsExpr GhcTc)]
               , Uncovered
-              , [LMatch GhcTc (LHsExpr GhcTc)]
+              , [LMatch' f GhcTc (LHsExpr GhcTc)]
               , Precision)
     go []     missing = return ([], missing, [], Precise)
     go (m:ms) missing = do
@@ -359,8 +372,8 @@ checkMatches' vars matches = do
         -- inaccessible
         (NotCovered, Diverged )   -> (rs, final_u, m:is, pc1 Semi.<> pc2)
 
-    hsLMatchToLPats :: LMatch id body -> Located [LPat id]
-    hsLMatchToLPats (L l (Match { m_pats = pats })) = L l pats
+    hsLMatchToLPats :: LMatch' f id body -> Located [LPat id]
+    hsLMatchToLPats (L l (Match { m_pats = pats })) = L l $ toList pats
     hsLMatchToLPats _                               = panic "checkMatches'"
 
 getNFirstUncovered :: [Id] -> Int -> [Delta] -> DsM [Delta]
@@ -655,20 +668,22 @@ translateConPatOut fam_insts x con univ_tys ex_tvs dicts = \case
       pure (con_grd : bang_grds ++ arg_grds)
 
 -- Translate a single match
-translateMatch :: FamInstEnvs -> [Id] -> LMatch GhcTc (LHsExpr GhcTc)
-               -> DsM (GrdVec, [GrdVec])
-translateMatch fam_insts vars (L _ (Match { m_pats = pats, m_grhss = grhss }))
-  = do
-      pats'   <- concat <$> zipWithM (translateLPat fam_insts) vars pats
-      guards' <- mapM (translateGuards fam_insts) guards
-      -- tracePm "translateMatch" (vcat [ppr pats, ppr pats', ppr guards, ppr guards'])
-      return (pats', guards')
-      where
-        extractGuards :: LGRHS GhcTc (LHsExpr GhcTc) -> [GuardStmt GhcTc]
-        extractGuards (L _ (GRHS _ gs _)) = map unLoc gs
-        extractGuards _                   = panic "translateMatch"
+translateMatch
+  :: Foldable f
+  => FamInstEnvs
+  -> f Id
+  -> LMatch' f GhcTc (LHsExpr GhcTc)
+  -> DsM (GrdVec, [GrdVec])
+translateMatch fam_insts vars (L _ (Match { m_pats = pats, m_grhss = grhss })) = do
+    pats'   <- concat <$> zipWithM (translateLPat fam_insts) (toList vars) (toList pats)
+    guards' <- mapM (translateGuards fam_insts) guards
+    return (pats', guards')
+  where
+    extractGuards :: LGRHS GhcTc (LHsExpr GhcTc) -> [GuardStmt GhcTc]
+    extractGuards (L _ (GRHS _ gs _)) = map unLoc gs
+    extractGuards _                   = panic "translateMatch"
 
-        guards = map extractGuards (grhssGRHSs grhss)
+    guards = map extractGuards (grhssGRHSs grhss)
 translateMatch _ _ _ = panic "translateMatch"
 
 -- -----------------------------------------------------------------------

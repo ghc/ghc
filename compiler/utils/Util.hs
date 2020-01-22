@@ -18,7 +18,7 @@ module Util (
         applyWhen, nTimes,
 
         -- * General list processing
-        zipEqual, zipWithEqual, zipWith3Equal, zipWith4Equal,
+        PartialZip (..),
         zipLazy, stretchZipWith, zipWithAndUnzip, zipAndUnzip,
 
         zipWithLazy, zipWith3Lazy,
@@ -38,7 +38,7 @@ module Util (
         lengthExceeds, lengthIs, lengthIsNot,
         lengthAtLeast, lengthAtMost, lengthLessThan,
         listLengthCmp, atLength,
-        equalLength, compareLength, leLength, ltLength,
+        leLength, ltLength,
 
         isSingleton, only, singleton,
         notNull, snocView,
@@ -304,41 +304,88 @@ chkAppend xs ys
   | null ys   = xs
   | otherwise = xs ++ ys
 
-{-
-A paranoid @zip@ (and some @zipWith@ friends) that checks the lists
-are of equal length.  Alastair Reid thinks this should only happen if
-DEBUGging on; hey, why not?
--}
+-- | A paranoid @zip@ (and some @zipWith@ friends) that checks the lists
+-- are of equal length.  Alastair Reid thinks this should only happen if
+-- DEBUGging on; hey, why not?
+--
+-- TODO use
+-- http://hackage.haskell.org/package/semialign/docs/Data-Align.html#t:Semialign
+-- someday.
+class PartialZip f where
+  compareLength :: f a -> f b -> Ordering
 
-zipEqual        :: String -> [a] -> [b] -> [(a,b)]
-zipWithEqual    :: String -> (a->b->c) -> [a]->[b]->[c]
-zipWith3Equal   :: String -> (a->b->c->d) -> [a]->[b]->[c]->[d]
-zipWith4Equal   :: String -> (a->b->c->d->e) -> [a]->[b]->[c]->[d]->[e]
+  -- | True if length xs == length ys
+  equalLength :: f a -> f b -> Bool
+  equalLength as bs = EQ == compareLength as bs
+
+  zipEqual        :: String -> f a -> f b -> f (a,b)
+  zipWithEqual    :: String -> (a->b->c) -> f a->f b->f c
+  zipWith3Equal   :: String -> (a->b->c->d) -> f a->f b->f c->f d
+  zipWith4Equal   :: String -> (a->b->c->d->e) -> f a->f b->f c->f d->f e
+
+instance PartialZip [] where
+  compareLength []     []     = EQ
+  compareLength (_:xs) (_:ys) = compareLength xs ys
+  compareLength []     _      = LT
+  compareLength _      []     = GT
+
+  equalLength []     []     = True
+  equalLength (_:xs) (_:ys) = equalLength xs ys
+  equalLength _      _      = False
 
 #if !defined(DEBUG)
-zipEqual      _ = zip
-zipWithEqual  _ = zipWith
-zipWith3Equal _ = zipWith3
-zipWith4Equal _ = zipWith4
+  zipEqual      _ = zip
+  zipWithEqual  _ = zipWith
+  zipWith3Equal _ = zipWith3
+  zipWith4Equal _ = zipWith4
 #else
-zipEqual _   []     []     = []
-zipEqual msg (a:as) (b:bs) = (a,b) : zipEqual msg as bs
-zipEqual msg _      _      = panic ("zipEqual: unequal lists:"++msg)
+  zipEqual _   []     []     = []
+  zipEqual msg (a:as) (b:bs) = (a,b) : zipEqual msg as bs
+  zipEqual msg _      _      = panic ("zipEqual: unequal lists:"++msg)
 
-zipWithEqual msg z (a:as) (b:bs)=  z a b : zipWithEqual msg z as bs
-zipWithEqual _   _ [] []        =  []
-zipWithEqual msg _ _ _          =  panic ("zipWithEqual: unequal lists:"++msg)
+  zipWithEqual msg z (a:as) (b:bs)=  z a b : zipWithEqual msg z as bs
+  zipWithEqual _   _ [] []        =  []
+  zipWithEqual msg _ _ _          =  panic ("zipWithEqual: unequal lists:"++msg)
 
-zipWith3Equal msg z (a:as) (b:bs) (c:cs)
-                                =  z a b c : zipWith3Equal msg z as bs cs
-zipWith3Equal _   _ [] []  []   =  []
-zipWith3Equal msg _ _  _   _    =  panic ("zipWith3Equal: unequal lists:"++msg)
+  zipWith3Equal msg z (a:as) (b:bs) (c:cs)
+                                  =  z a b c : zipWith3Equal msg z as bs cs
+  zipWith3Equal _   _ [] []  []   =  []
+  zipWith3Equal msg _ _  _   _    =  panic ("zipWith3Equal: unequal lists:"++msg)
 
-zipWith4Equal msg z (a:as) (b:bs) (c:cs) (d:ds)
-                                =  z a b c d : zipWith4Equal msg z as bs cs ds
-zipWith4Equal _   _ [] [] [] [] =  []
-zipWith4Equal msg _ _  _  _  _  =  panic ("zipWith4Equal: unequal lists:"++msg)
+  zipWith4Equal msg z (a:as) (b:bs) (c:cs) (d:ds)
+                                  =  z a b c d : zipWith4Equal msg z as bs cs ds
+  zipWith4Equal _   _ [] [] [] [] =  []
+  zipWith4Equal msg _ _  _  _  _  =  panic ("zipWith4Equal: unequal lists:"++msg)
 #endif
+
+instance PartialZip NonEmpty where
+  compareLength (_:|xs) (_:|ys) = compareLength xs ys
+
+  equalLength (_:|xs) (_:|ys) = equalLength xs ys
+
+  zipEqual msg (a:|as) (b:|bs) = (a,b) :| zipEqual msg as bs
+
+  zipWithEqual msg z (a:|as) (b:|bs)=  z a b :| zipWithEqual msg z as bs
+
+  zipWith3Equal msg z (a:|as) (b:|bs) (c:|cs)
+                                  =  z a b c :| zipWith3Equal msg z as bs cs
+
+  zipWith4Equal msg z (a:|as) (b:|bs) (c:|cs) (d:|ds)
+                                  =  z a b c d :| zipWith4Equal msg z as bs cs ds
+
+leLength :: PartialZip f => f a -> f b -> Bool
+-- ^ True if length xs <= length ys
+leLength xs ys = case compareLength xs ys of
+                   LT -> True
+                   EQ -> True
+                   GT -> False
+
+ltLength :: PartialZip f => f a -> f b -> Bool
+-- ^ True if length xs < length ys
+ltLength xs ys = case compareLength xs ys of
+                   LT -> True
+                   EQ -> False
+                   GT -> False
 
 -- | 'zipLazy' is a kind of 'zip' that is lazy in the second list (observe the ~)
 zipLazy :: [a] -> [b] -> [(a,b)]
@@ -526,32 +573,6 @@ listLengthCmp = atLength atLen atEnd
 
   atLen []     = EQ
   atLen _      = GT
-
-equalLength :: [a] -> [b] -> Bool
--- ^ True if length xs == length ys
-equalLength []     []     = True
-equalLength (_:xs) (_:ys) = equalLength xs ys
-equalLength _      _      = False
-
-compareLength :: [a] -> [b] -> Ordering
-compareLength []     []     = EQ
-compareLength (_:xs) (_:ys) = compareLength xs ys
-compareLength []     _      = LT
-compareLength _      []     = GT
-
-leLength :: [a] -> [b] -> Bool
--- ^ True if length xs <= length ys
-leLength xs ys = case compareLength xs ys of
-                   LT -> True
-                   EQ -> True
-                   GT -> False
-
-ltLength :: [a] -> [b] -> Bool
--- ^ True if length xs < length ys
-ltLength xs ys = case compareLength xs ys of
-                   LT -> True
-                   EQ -> False
-                   GT -> False
 
 ----------------------------
 singleton :: a -> [a]

@@ -23,7 +23,7 @@ module GHC.Hs.Binds where
 import GhcPrelude
 
 import {-# SOURCE #-} GHC.Hs.Expr ( pprExpr, LHsExpr,
-                                    MatchGroup, pprFunBind,
+                                    MatchGroup, MatchGroup', pprFunBind,
                                     GRHSs, pprPatBind )
 import {-# SOURCE #-} GHC.Hs.Pat  ( LPat )
 
@@ -158,13 +158,11 @@ type LHsBindLR  idL idR = Located (HsBindLR idL idR)
 
 {- Note [FunBind vs PatBind]
    ~~~~~~~~~~~~~~~~~~~~~~~~~
-The distinction between FunBind and PatBind is a bit subtle. FunBind covers
-patterns which resemble function bindings and simple variable bindings.
+The distinction between FunBind and PatBind matches the spec. FunBind covers
+patterns which resemble function bindings.
 
     f x = e
     f !x = e
-    f = e
-    !x = e          -- FunRhs has SrcStrict
     x `f` y = e     -- FunRhs has Infix
 
 The actual patterns and RHSs of a FunBind are encoding in fun_matches.
@@ -176,16 +174,16 @@ two bits of information about the match,
          f True False  = e1
          True `f` True = e2
 
-  * The mc_strictness field is used /only/ for nullary FunBinds: ones
-    with one Match, which has no pats. For these, it describes whether
-    the match is decorated with a bang (e.g. `!x = e`).
+By contrast, PatBind represents plain variable bindings, data constructor
+patterns, as well as a few other interesting cases. Namely,
 
-By contrast, PatBind represents data constructor patterns, as well as a few
-other interesting cases. Namely,
-
+    x = e
     Just x = e
     (x) = e
     x :: Ty = e
+
+VarBind also does `x = e` bindings, but only certain compiler-created ones. See
+that constructor's documentation for more info.
 -}
 
 -- | Haskell Binding with separate Left and Right id's
@@ -196,18 +194,8 @@ data HsBindLR idL idR
     -- and variables                          @f = \x -> e@
     -- and strict variables                   @!x = x + 1@
     --
-    -- Reason 1: Special case for type inference: see 'TcBinds.tcMonoBinds'.
-    --
-    -- Reason 2: Instance decls can only have FunBinds, which is convenient.
-    --           If you change this, you'll need to change e.g. rnMethodBinds
-    --
-    -- But note that the form                 @f :: a->a = ...@
-    -- parses as a pattern binding, just like
-    --                                        @(f :: a -> a) = ... @
-    --
-    -- Strict bindings have their strictness recorded in the 'SrcStrictness' of their
-    -- 'MatchContext'. See Note [FunBind vs PatBind] for
-    -- details about the relationship between FunBind and PatBind.
+    -- See Note [FunBind vs PatBind] for details about the relationship between
+    -- FunBind and PatBind.
     --
     --  'ApiAnnotation.AnnKeywordId's
     --
@@ -247,8 +235,6 @@ data HsBindLR idL idR
 
   -- | Pattern Binding
   --
-  -- The pattern is never a simple variable;
-  -- That case is done by FunBind.
   -- See Note [FunBind vs PatBind] for details about the
   -- relationship between FunBind and PatBind.
 
@@ -1307,4 +1293,4 @@ instance Traversable RecordPatSynField where
 data HsPatSynDir id
   = Unidirectional
   | ImplicitBidirectional
-  | ExplicitBidirectional (MatchGroup id (LHsExpr id))
+  | ExplicitBidirectional (MatchGroup' [] id (LHsExpr id))

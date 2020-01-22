@@ -6,14 +6,25 @@
 TcPat: Typechecking patterns
 -}
 
-{-# LANGUAGE CPP, RankNTypes, TupleSections #-}
+{-# LANGUAGE CPP #-}
+{-# LANGUAGE DefaultSignatures #-}
 {-# LANGUAGE FlexibleContexts #-}
+{-# LANGUAGE FlexibleInstances #-}
+{-# LANGUAGE RankNTypes #-}
+{-# LANGUAGE RecursiveDo #-}
+{-# LANGUAGE ScopedTypeVariables #-}
+{-# LANGUAGE MultiParamTypeClasses #-}
+{-# LANGUAGE TupleSections #-}
 {-# LANGUAGE TypeFamilies #-}
 {-# LANGUAGE ViewPatterns #-}
 
+-- {-# OPTIONS_GHC -freduction-depth=0 #-}
+
 module TcPat ( tcLetPat, newLetBndr, LetBndrSpec(..)
              , tcPat, tcPat_O, tcPats
-             , addDataConStupidTheta, badFieldCon, polyPatSig ) where
+             , addDataConStupidTheta, badFieldCon, polyPatSig
+             , FIFOTraversable (..)
+             ) where
 
 #include "HsVersions.h"
 
@@ -55,6 +66,10 @@ import qualified GHC.LanguageExtensions as LangExt
 import Control.Arrow  ( second )
 import ListSetOps ( getNth )
 
+import Control.Monad.Trans.Cont
+import Data.List.NonEmpty (NonEmpty (..))
+import Data.Traversable (for)
+
 {-
 ************************************************************************
 *                                                                      *
@@ -80,11 +95,19 @@ tcLetPat sig_fn no_gen pat pat_ty thing_inside
        ; tc_lpat pat pat_ty penv thing_inside }
 
 -----------------
-tcPats :: HsMatchContext Name
-       -> [LPat GhcRn]            -- Patterns,
-       -> [ExpSigmaType]         --   and their types
-       -> TcM a                  --   and the checker for the body
-       -> TcM ([LPat GhcTcId], a)
+
+tcPats
+  :: ( FIFOTraversable f TcM
+     , PartialZip f
+       -- TODO forall constraint
+     , Outputable (f (LPat GhcRn))
+     , Outputable (f ExpSigmaType)
+     )
+  => HsMatchContext Name
+  -> f (LPat GhcRn)         -- ^ Patterns,
+  -> f ExpSigmaType         -- ^   and their types
+  -> TcM a                  -- ^   and the checker for the body
+  -> TcM (f (LPat GhcTcId), a)
 
 -- This is the externally-callable wrapper function
 -- Typecheck the patterns, extend the environment to bind the variables,
@@ -272,30 +295,66 @@ Hence the getErrCtxt/setErrCtxt stuff in tcMultiple
 -}
 
 --------------------
+
 type Checker inp out =  forall r.
                           inp
                        -> PatEnv
                        -> TcM r
                        -> TcM (out, r)
 
-tcMultiple :: Checker inp out -> Checker [inp] [out]
-tcMultiple tc_pat args penv thing_inside
-  = do  { err_ctxt <- getErrCtxt
-        ; let loop _ []
-                = do { res <- thing_inside
-                     ; return ([], res) }
+-- | Used by 'tcMultiple', to avoid this crazy MonadFix + ContT thing being used
+-- for anything more than a reference. Can be moved to a new home instead if
+-- more things need it.
+class (Traversable f, Monad m) => FIFOTraversable f m where
+  traverseFIFO
+    :: (forall x. a -> m x -> m (b, x))
+    -> m r
+    -> f a
+    -> m (f b, r)
+  default traverseFIFO
+    :: MonadFix m
+    => (forall x. a -> m x -> m (b, x))
+    -> m r
+    -> f a
+    -> m (f b, r)
+  traverseFIFO f base_case t = do
+    let -- m :: ContT r m (f b)
+        m = for t $ \arg -> ContT $ \recur -> do
+          rec
+            (b, a) <- f arg $ recur b
+          pure a
+    runContT
+      m
+      (\t' -> (,) t' <$> base_case)
 
-              loop penv (arg:args)
-                = do { (p', (ps', res))
-                                <- tc_pat arg penv $
-                                   setErrCtxt err_ctxt $
-                                   loop penv args
-                -- setErrCtxt: restore context before doing the next pattern
-                -- See note [Nesting] above
+instance Monad m => FIFOTraversable [] m where
+  traverseFIFO f base_case t = do
+    let loop [] = do
+          res <- base_case
+          return ([], res)
+        loop (arg : args) = do
+          (p', (ps', res)) <- f arg $ loop args
+          return (p' : ps', res)
+    loop t
 
-                     ; return (p':ps', res) }
+instance Monad m => FIFOTraversable NonEmpty m where
+  traverseFIFO f base_case (arg :| args) = do
+    (p', (ps', res)) <- f arg $ traverseFIFO f base_case args
+    return (p' :| ps', res)
 
-        ; loop penv args }
+tcMultiple
+  :: forall f inp out
+  .  FIFOTraversable f TcM
+  => Checker inp out
+  -> Checker (f inp) (f out)
+tcMultiple tc_pat args penv (thing_inside :: TcM r) = do
+  err_ctxt <- getErrCtxt
+  let
+    -- | setErrCtxt: restore context before doing the next pattern. See note
+    -- [Nesting] above.
+    f :: forall x. inp -> TcM x -> TcM (out, x)
+    f arg recur = tc_pat arg penv $ setErrCtxt err_ctxt recur
+  traverseFIFO f thing_inside args
 
 --------------------
 tc_lpat :: LPat GhcRn
@@ -309,10 +368,18 @@ tc_lpat (L span pat) pat_ty penv thing_inside
                                           thing_inside
         ; return (L span pat', res) }
 
-tc_lpats :: PatEnv
-         -> [LPat GhcRn] -> [ExpSigmaType]
-         -> TcM a
-         -> TcM ([LPat GhcTcId], a)
+tc_lpats
+  :: ( FIFOTraversable f TcM
+     , PartialZip f
+       -- TODO forall constraint
+     , Outputable (f (LPat GhcRn))
+     , Outputable (f ExpSigmaType)
+     )
+  => PatEnv
+  -> f (LPat GhcRn)
+  -> f ExpSigmaType
+  -> TcM a
+  -> TcM (f (LPat GhcTcId), a)
 tc_lpats penv pats tys thing_inside
   = ASSERT2( equalLength pats tys, ppr pats $$ ppr tys )
     tcMultiple (\(p,t) -> tc_lpat p t)

@@ -38,6 +38,8 @@ import Outputable
 import Util
 
 import Control.Monad
+import Data.Foldable (toList)
+import Data.List.NonEmpty (NonEmpty (..))
 
 {-
 Note [Arrow overview]
@@ -252,13 +254,13 @@ tc_cmd env
 
                 -- Check the patterns, and the GRHSs inside
         ; (pats', grhss') <- setSrcSpan mtch_loc                                 $
-                             tcPats LambdaExpr pats (map mkCheckExpType arg_tys) $
+                             tcPats LambdaExpr pats (mkCheckExpType <$> arg_tys) $
                              tc_grhss grhss cmd_stk' (mkCheckExpType res_ty)
 
         ; let match' = L mtch_loc (Match { m_ext = noExtField
                                          , m_ctxt = LambdaExpr, m_pats = pats'
                                          , m_grhss = grhss' })
-              arg_tys = map hsLPatType pats'
+              arg_tys = fmap hsLPatType pats'
               cmd' = HsCmdLam x (MG { mg_alts = L l [match']
                                     , mg_ext = MatchGroupTc arg_tys res_ty
                                     , mg_origin = origin })
@@ -335,13 +337,17 @@ tc_cmd _ cmd _
                       text "was found where an arrow command was expected"])
 
 
-matchExpectedCmdArgs :: Arity -> TcType -> TcM (TcCoercionN, [TcType], TcType)
-matchExpectedCmdArgs 0 ty
-  = return (mkTcNomReflCo ty, [], ty)
+matchExpectedCmdArgs :: Arity -> TcType -> TcM (TcCoercionN, NonEmpty TcType, TcType)
 matchExpectedCmdArgs n ty
+  | n <= 0 = panic "arity should be > 0"
+  | otherwise
   = do { (co1, [ty1, ty2]) <- matchExpectedTyConApp pairTyCon ty
-       ; (co2, tys, res_ty) <- matchExpectedCmdArgs (n-1) ty2
-       ; return (mkTcTyConAppCo Nominal pairTyCon [co1, co2], ty1:tys, res_ty) }
+       ; (co2, tys, res_ty) <- case n - 1 of
+           0 -> pure (mkTcNomReflCo ty, [], ty)
+           n -> do
+             (co2, tys, res_ty) <- matchExpectedCmdArgs (n-1) ty2
+             pure $ (co2, toList tys, res_ty)
+       ; return (mkTcTyConAppCo Nominal pairTyCon [co1, co2], ty1 :| tys, res_ty) }
 
 {-
 ************************************************************************

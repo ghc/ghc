@@ -57,6 +57,8 @@ import Data.List
 import Util
 import UniqDSet
 
+import Data.Foldable
+
 data DsCmdEnv = DsCmdEnv {
         arr_id, compose_id, first_id, app_id, choice_id, loop_id :: CoreExpr
     }
@@ -478,7 +480,7 @@ dsCmd ids local_vars stack_ty res_ty
 
     fail_expr <- mkFailExpr LambdaExpr in_ty'
     -- match the patterns against the parameters
-    match_code <- matchSimplys (map Var param_ids) LambdaExpr pats core_expr
+    match_code <- matchSimplys (map Var param_ids) LambdaExpr (toList pats) core_expr
                     fail_expr
     -- match the parameters against the top of the old stack
     (stack_id, param_code) <- matchVarStack param_ids stack_id' match_code
@@ -1215,7 +1217,7 @@ these bindings.
 collectPatBinders :: LPat GhcTc -> [Id]
 collectPatBinders pat = collectl pat []
 
-collectPatsBinders :: [LPat GhcTc] -> [Id]
+collectPatsBinders :: Foldable f => f (LPat GhcTc) -> [Id]
 collectPatsBinders pats = foldr collectl [] pats
 
 ---------------------

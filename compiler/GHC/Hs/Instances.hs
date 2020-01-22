@@ -277,10 +277,20 @@ deriving instance (Data body) => Data (MatchGroup GhcPs body)
 deriving instance (Data body) => Data (MatchGroup GhcRn body)
 deriving instance (Data body) => Data (MatchGroup GhcTc body)
 
+-- deriving instance (DataIdLR p p,Data body) => Data (MatchGroup' [] p body)
+deriving instance (Data body) => Data (MatchGroup' [] GhcPs body)
+deriving instance (Data body) => Data (MatchGroup' [] GhcRn body)
+deriving instance (Data body) => Data (MatchGroup' [] GhcTc body)
+
 -- deriving instance (DataIdLR p p,Data body) => Data (Match      p body)
 deriving instance (Data body) => Data (Match      GhcPs body)
 deriving instance (Data body) => Data (Match      GhcRn body)
 deriving instance (Data body) => Data (Match      GhcTc body)
+
+-- deriving instance (DataIdLR p p,Data body) => Data (Match      p body)
+deriving instance (Data body) => Data (Match' []  GhcPs body)
+deriving instance (Data body) => Data (Match' []  GhcRn body)
+deriving instance (Data body) => Data (Match' []  GhcTc body)
 
 -- deriving instance (DataIdLR p p,Data body) => Data (GRHSs      p body)
 deriving instance (Data body) => Data (GRHSs     GhcPs body)

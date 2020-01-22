@@ -7,14 +7,17 @@ TcMatches: Typecheck some @Matches@
 -}
 
 {-# LANGUAGE CPP #-}
-{-# LANGUAGE RankNTypes #-}
-{-# LANGUAGE MultiWayIf #-}
-{-# LANGUAGE TupleSections #-}
 {-# LANGUAGE FlexibleContexts #-}
+{-# LANGUAGE LambdaCase #-}
+{-# LANGUAGE MultiWayIf #-}
+{-# LANGUAGE OverloadedLists #-}
+{-# LANGUAGE RankNTypes #-}
+{-# LANGUAGE ScopedTypeVariables #-}
+{-# LANGUAGE TupleSections #-}
 {-# LANGUAGE TypeFamilies #-}
 {-# LANGUAGE RecordWildCards #-}
 
-module TcMatches ( tcMatchesFun, tcGRHS, tcGRHSsPat, tcMatchesCase, tcMatchLambda,
+module TcMatches ( tcMatchesFun, tcGRHS, tcGRHSsVar, tcGRHSsPat, tcMatchesCase, tcMatchLambda,
                    TcMatchCtxt(..), TcStmtChecker, TcExprStmtChecker, TcCmdStmtChecker,
                    tcStmts, tcStmtsAndThen, tcDoStmts, tcBody,
                    tcDoStmt, tcGuardStmt
@@ -50,6 +53,7 @@ import MkCore
 
 import Control.Monad
 import Control.Arrow ( second )
+import Data.List.NonEmpty ( NonEmpty (..) )
 
 #include "HsVersions.h"
 
@@ -77,37 +81,29 @@ tcMatchesFun :: Located Name
              -> ExpSigmaType    -- Expected type of function
              -> TcM (HsWrapper, MatchGroup GhcTcId (LHsExpr GhcTcId))
                                 -- Returns type of body
-tcMatchesFun fn@(L _ fun_name) matches exp_ty
-  = do  {  -- Check that they all have the same no of arguments
-           -- Location is in the monad, set the caller so that
-           -- any inter-equation error messages get some vaguely
-           -- sensible location.        Note: we have to do this odd
-           -- ann-grabbing, because we don't always have annotations in
-           -- hand when we call tcMatchesFun...
-          traceTc "tcMatchesFun" (ppr fun_name $$ ppr exp_ty)
-        ; checkArgs fun_name matches
+tcMatchesFun fn@(L _ fun_name) matches exp_ty = do
+    -- Check that they all have the same no of arguments Location is in the
+    -- monad, set the caller so that any inter-equation error messages get some
+    -- vaguely sensible location. Note: we have to do this odd ann-grabbing,
+    -- because we don't always have annotations in hand when we call
+    -- tcMatchesFun...
+    traceTc "tcMatchesFun" (ppr fun_name $$ ppr exp_ty)
+    checkArgs fun_name matches
 
-        ; (wrap_gen, (wrap_fun, group))
-            <- tcSkolemiseET (FunSigCtxt fun_name True) exp_ty $ \ exp_rho ->
-                  -- Note [Polymorphic expected type for tcMatchesFun]
-               do { (matches', wrap_fun)
-                       <- matchExpectedFunTys herald arity exp_rho $
-                          \ pat_tys rhs_ty ->
-                          tcMatches match_ctxt pat_tys rhs_ty matches
-                  ; return (wrap_fun, matches') }
-        ; return (wrap_gen <.> wrap_fun, group) }
+    (wrap_gen, (group, wrap_fun))
+      <- tcSkolemiseET (FunSigCtxt fun_name True) exp_ty $ \ exp_rho -> do
+        MASSERT(arity >= 1)
+        -- Note [Polymorphic expected type for tcMatchesFun]
+        matchExpectedFunTys herald arity exp_rho $
+          \ (pat_ty : pat_tys) rhs_ty ->
+            tcMatches match_ctxt (pat_ty :| pat_tys) rhs_ty matches
+    return (wrap_gen <.> wrap_fun, group)
   where
     arity = matchGroupArity matches
     herald = text "The equation(s) for"
              <+> quotes (ppr fun_name) <+> text "have"
-    what = FunRhs { mc_fun = fn, mc_fixity = Prefix, mc_strictness = strictness }
+    what = FunRhs { mc_fun = fn, mc_fixity = Prefix }
     match_ctxt = MC { mc_what = what, mc_body = tcBody }
-    strictness
-      | [L _ match] <- unLoc $ mg_alts matches
-      , FunRhs{ mc_strictness = SrcStrict } <- m_ctxt match
-      = SrcStrict
-      | otherwise
-      = NoSrcStrict
 
 {-
 @tcMatchesCase@ doesn't do the argument-count check because the
@@ -131,19 +127,39 @@ tcMatchLambda :: SDoc -- see Note [Herald for matchExpectedFunTys] in TcUnify
               -> MatchGroup GhcRn (LHsExpr GhcRn)
               -> ExpRhoType   -- deeply skolemised
               -> TcM (MatchGroup GhcTcId (LHsExpr GhcTcId), HsWrapper)
-tcMatchLambda herald match_ctxt match res_ty
-  = matchExpectedFunTys herald n_pats res_ty $ \ pat_tys rhs_ty ->
-    tcMatches match_ctxt pat_tys rhs_ty match
+tcMatchLambda herald match_ctxt match res_ty = do
+    MASSERT(n_pats >= 1)
+    matchExpectedFunTys herald n_pats res_ty $ \ (pat_ty : pat_tys) rhs_ty ->
+      tcMatches match_ctxt (pat_ty :| pat_tys) rhs_ty match
   where
     n_pats | isEmptyMatchGroup match = 1   -- must be lambda-case
            | otherwise               = matchGroupArity match
 
--- @tcGRHSsPat@ typechecks @[GRHSs]@ that occur in a @PatMonoBind@.
-
-tcGRHSsPat :: GRHSs GhcRn (LHsExpr GhcRn) -> TcRhoType
-           -> TcM (GRHSs GhcTcId (LHsExpr GhcTcId))
+-- | @tcGRHSsPat@ typechecks @[GRHSs]@ that occur in a `f = ...` binding.
+tcGRHSsVar
+  :: Name
+  -> GRHSs GhcRn (LHsExpr GhcRn)
+  -> ExpSigmaType
+  -> TcM (HsWrapper, GRHSs GhcTcId (LHsExpr GhcTcId))
 -- Used for pattern bindings
-tcGRHSsPat grhss res_ty = tcGRHSs match_ctxt grhss (mkCheckExpType res_ty)
+tcGRHSsVar name grhss exp_ty =
+  tcSkolemiseET (FunSigCtxt name True) exp_ty $ \ exp_rho ->
+    tcGRHSsDefaultCtxt grhss exp_rho
+
+-- | @tcGRHSsPat@ typechecks @[GRHSs]@ that occur in a @PatMonoBind@.
+tcGRHSsPat
+  :: GRHSs GhcRn (LHsExpr GhcRn)
+  -> TcRhoType
+  -> TcM (GRHSs GhcTcId (LHsExpr GhcTcId))
+-- Used for pattern bindings
+tcGRHSsPat grhss res_ty = tcGRHSsDefaultCtxt grhss $ mkCheckExpType res_ty
+
+tcGRHSsDefaultCtxt
+  :: GRHSs GhcRn (LHsExpr GhcRn)
+  -> ExpRhoType
+  -> TcM (GRHSs GhcTcId (LHsExpr GhcTcId))
+-- Used for pattern bindings
+tcGRHSsDefaultCtxt grhss res_ty = tcGRHSs match_ctxt grhss res_ty
   where
     match_ctxt = MC { mc_what = PatBindRhs,
                       mc_body = tcBody }
@@ -189,19 +205,12 @@ still gets assigned a polytype.
 -- | When the MatchGroup has multiple RHSs, convert an Infer ExpType in the
 -- expected type into TauTvs.
 -- See Note [Case branches must never infer a non-tau type]
-tauifyMultipleMatches :: [LMatch id body]
-                      -> [ExpType] -> TcM [ExpType]
-tauifyMultipleMatches group exp_tys
-  | isSingletonMatchGroup group = return exp_tys
-  | otherwise                   = mapM tauifyExpType exp_tys
+tauifyMultipleMatches :: [LMatch' f id body]
+                      -> ExpType -> TcM ExpType
+tauifyMultipleMatches group exp_ty
+  | isSingletonMatchGroup group = return exp_ty
+  | otherwise                   = tauifyExpType exp_ty
   -- NB: In the empty-match case, this ensures we fill in the ExpType
-
--- | Type-check a MatchGroup.
-tcMatches :: (Outputable (body GhcRn)) => TcMatchCtxt body
-          -> [ExpSigmaType]      -- Expected pattern types
-          -> ExpRhoType          -- Expected result-type of the Match.
-          -> MatchGroup GhcRn (Located (body GhcRn))
-          -> TcM (MatchGroup GhcTcId (Located (body GhcTcId)))
 
 data TcMatchCtxt body   -- c.f. TcStmtCtxt, also in this module
   = MC { mc_what :: HsMatchContext Name,  -- What kind of thing this is
@@ -210,45 +219,64 @@ data TcMatchCtxt body   -- c.f. TcStmtCtxt, also in this module
                  -> ExpRhoType
                  -> TcM (Located (body GhcTcId)) }
 
+-- | Type-check a MatchGroup.
+tcMatches
+  :: forall body f
+  .  ( FIFOTraversable f TcM
+     , PartialZip f
+     , Outputable (f (LPat GhcRn))
+     , Outputable (f ExpSigmaType)
+     , Outputable (body GhcRn)
+     )
+  => TcMatchCtxt body
+  -> f ExpSigmaType -- Expected pattern types
+  -> ExpRhoType            -- Expected result-type of the Match.
+  -> MatchGroup' f GhcRn (Located (body GhcRn))
+  -> TcM (MatchGroup' f GhcTcId (Located (body GhcTcId)))
+
 tcMatches ctxt pat_tys rhs_ty (MG { mg_alts = L l matches
                                   , mg_origin = origin })
-  = do { rhs_ty:pat_tys <- tauifyMultipleMatches matches (rhs_ty:pat_tys)
+  = do { let tauify = tauifyMultipleMatches matches
+       ; rhs_ty <- tauify rhs_ty
+       ; pat_tys <- mapM tauify pat_tys
             -- See Note [Case branches must never infer a non-tau type]
 
        ; matches' <- mapM (tcMatch ctxt pat_tys rhs_ty) matches
-       ; pat_tys  <- mapM readExpType pat_tys
+       ; pat_tys :: f TcType <- mapM readExpType pat_tys
        ; rhs_ty   <- readExpType rhs_ty
        ; return (MG { mg_alts = L l matches'
                     , mg_ext = MatchGroupTc pat_tys rhs_ty
                     , mg_origin = origin }) }
-tcMatches _ _ _ (XMatchGroup nec) = noExtCon nec
+tcMatches _ _ _ (XMatchGroup nec) = noExtCon1 nec
 
 -------------
-tcMatch :: (Outputable (body GhcRn)) => TcMatchCtxt body
-        -> [ExpSigmaType]        -- Expected pattern types
-        -> ExpRhoType            -- Expected result-type of the Match.
-        -> LMatch GhcRn (Located (body GhcRn))
-        -> TcM (LMatch GhcTcId (Located (body GhcTcId)))
-
-tcMatch ctxt pat_tys rhs_ty match
-  = wrapLocM (tc_match ctxt pat_tys rhs_ty) match
-  where
-    tc_match ctxt pat_tys rhs_ty
-             match@(Match { m_pats = pats, m_grhss = grhss })
-      = add_match_ctxt match $
+tcMatch
+  :: ( FIFOTraversable f TcM
+     , PartialZip f
+     , Outputable (f (LPat GhcRn))
+     , Outputable (f ExpSigmaType)
+     , Outputable (body GhcRn)
+     )
+  => TcMatchCtxt body
+  -> f ExpSigmaType        -- Expected pattern types
+  -> ExpRhoType            -- Expected result-type of the Match.
+  -> LMatch' f GhcRn (Located (body GhcRn))
+  -> TcM (LMatch' f GhcTcId (Located (body GhcTcId)))
+tcMatch ctxt pat_tys rhs_ty = wrapLocM $ \case
+  match@(Match { m_pats = pats, m_grhss = grhss }) -> add_match_ctxt $
         do { (pats', grhss') <- tcPats (mc_what ctxt) pats pat_tys $
                                 tcGRHSs ctxt grhss rhs_ty
            ; return (Match { m_ext = noExtField
                            , m_ctxt = mc_what ctxt, m_pats = pats'
                            , m_grhss = grhss' }) }
-    tc_match  _ _ _ (XMatch nec) = noExtCon nec
-
-        -- For (\x -> e), tcExpr has already said "In the expression \x->e"
-        -- so we don't want to add "In the lambda abstraction \x->e"
-    add_match_ctxt match thing_inside
-        = case mc_what ctxt of
-            LambdaExpr -> thing_inside
-            _          -> addErrCtxt (pprMatchInCtxt match) thing_inside
+    where
+      -- For (\x -> e), tcExpr has already said "In the expression \x->e"
+      -- so we don't want to add "In the lambda abstraction \x->e"
+      add_match_ctxt thing_inside
+          = case mc_what ctxt of
+              LambdaExpr -> thing_inside
+              _          -> addErrCtxt (pprMatchInCtxt match) thing_inside
+  XMatch nec -> noExtCon nec
 
 -------------
 tcGRHSs :: TcMatchCtxt body -> GRHSs GhcRn (Located (body GhcRn)) -> ExpRhoType
@@ -1090,7 +1118,9 @@ the variables they bind into scope, and typecheck the thing_inside.
 number of args are used in each equation.
 -}
 
-checkArgs :: Name -> MatchGroup GhcRn body -> TcM ()
+checkArgs
+  :: forall f body. Foldable f
+  => Name -> MatchGroup' f GhcRn body -> TcM ()
 checkArgs _ (MG { mg_alts = L _ [] })
     = return ()
 checkArgs fun (MG { mg_alts = L _ (match1:matches) })
@@ -1105,7 +1135,7 @@ checkArgs fun (MG { mg_alts = L _ (match1:matches) })
     n_args1 = args_in_match match1
     bad_matches = [m | m <- matches, args_in_match m /= n_args1]
 
-    args_in_match :: LMatch GhcRn body -> Int
+    args_in_match :: LMatch' f GhcRn body -> Int
     args_in_match (L _ (Match { m_pats = pats })) = length pats
     args_in_match (L _ (XMatch nec)) = noExtCon nec
-checkArgs _ (XMatchGroup nec) = noExtCon nec
+checkArgs _ (XMatchGroup nec) = noExtCon1 nec

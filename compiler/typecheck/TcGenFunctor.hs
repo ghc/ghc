@@ -10,6 +10,7 @@ The deriving code for the Functor, Foldable, and Traversable classes
 {-# LANGUAGE TypeFamilies #-}
 {-# LANGUAGE FlexibleContexts #-}
 {-# LANGUAGE LambdaCase #-}
+{-# LANGUAGE OverloadedLists #-}
 
 module TcGenFunctor (
         FFoldType(..), functorLikeTraverse,
@@ -41,6 +42,7 @@ import MkId (coerceId)
 import TysWiredIn (true_RDR, false_RDR)
 
 import Data.Maybe (catMaybes, isJust)
+import qualified Data.List.NonEmpty as NEL
 
 {-
 ************************************************************************
@@ -478,7 +480,7 @@ mkSimpleConMatch ctxt fold extra_pats con insides = do
           else nlParPat bare_pat
     rhs <- fold con_name
                 (zipWith (\i v -> i `nlHsApp` nlHsVar v) insides vars_needed)
-    return $ mkMatch ctxt (extra_pats ++ [pat]) rhs
+    return $ mkMatch ctxt (snocToNonEmpty extra_pats pat) rhs
                      (noLoc emptyLocalBinds)
 
 -- "Con a1 a2 a3 -> fmap (\b2 -> Con a1 b2 a3) (traverse f a2)"
@@ -526,10 +528,13 @@ mkSimpleConMatch2 ctxt fold extra_pats con insides = do
           | otherwise =
               let bs   = filterByList  argTysTyVarInfo bs_RDRs
                   vars = filterByLists argTysTyVarInfo bs_Vars as_Vars
-              in mkHsLam (map nlVarPat bs) (nlHsApps con_name vars)
+                  body = nlHsApps con_name vars
+              in case NEL.nonEmpty $ bs of
+                Just bs' -> mkHsLam (fmap nlVarPat bs') body
+                Nothing -> body
 
     rhs <- fold con_expr exps
-    return $ mkMatch ctxt (extra_pats ++ [pat]) rhs
+    return $ mkMatch ctxt (snocToNonEmpty extra_pats pat) rhs
                      (noLoc emptyLocalBinds)
 
 -- "case x of (a1,a2,a3) -> fold [x1 a1, x2 a2, x3 a3]"

@@ -9,6 +9,7 @@
 {-# LANGUAGE FlexibleInstances #-}
 {-# LANGUAGE UndecidableInstances #-} -- Note [Pass sensitive types]
                                       -- in module GHC.Hs.PlaceHolder
+
 {-# LANGUAGE ConstraintKinds #-}
 {-# LANGUAGE ExistentialQuantification #-}
 {-# LANGUAGE DeriveFunctor #-}
@@ -49,6 +50,8 @@ import TcType (TcType)
 import {-# SOURCE #-} TcRnTypes (TcLclEnv)
 
 -- libraries:
+import Data.Foldable (toList)
+import Data.List.NonEmpty (NonEmpty (..))
 import Data.Data hiding (Fixity(..))
 import qualified Data.Data as Data (Fixity(..))
 import Data.Maybe (isNothing)
@@ -1470,39 +1473,51 @@ a function defined by pattern matching must have the same number of
 patterns in each equation.
 -}
 
-data MatchGroup p body
-  = MG { mg_ext     :: XMG p body -- Post-typechecker, types of args and result
-       , mg_alts    :: Located [LMatch p body]  -- The alternatives
+type MatchGroup = MatchGroup' NonEmpty
+
+data MatchGroup' f p body
+  = MG { mg_ext     :: XMG p body f -- Post-typechecker, types of args and result
+       , mg_alts    :: Located [LMatch' f p body]  -- The alternatives
        , mg_origin  :: Origin }
      -- The type is the type of the entire group
      --      t1 -> ... -> tn -> tr
      -- where there are n patterns
-  | XMatchGroup (XXMatchGroup p body)
+  | XMatchGroup (XXMatchGroup p body f)
 
-data MatchGroupTc
+type MatchGroupTc = MatchGroupTc' NonEmpty
+
+data MatchGroupTc' f
   = MatchGroupTc
-       { mg_arg_tys :: [Type]  -- Types of the arguments, t1..tn
-       , mg_res_ty  :: Type    -- Type of the result, tr
-       } deriving Data
+       { mg_arg_tys :: f Type  -- ^ Types of the arguments, t1..tn
+       , mg_res_ty  :: Type    -- ^ Type of the result, tr
+       }
 
-type instance XMG         GhcPs b = NoExtField
-type instance XMG         GhcRn b = NoExtField
-type instance XMG         GhcTc b = MatchGroupTc
+deriving instance (Typeable f, Data (f Type)) => Data (MatchGroupTc' f)
 
-type instance XXMatchGroup (GhcPass _) b = NoExtCon
+type instance XMG         GhcPs b = NoExtField1
+type instance XMG         GhcRn b = NoExtField1
+type instance XMG         GhcTc b = MatchGroupTc'
+
+type instance XXMatchGroup (GhcPass _) b = NoExtCon1
 
 -- | Located Match
 type LMatch id body = Located (Match id body)
 -- ^ May have 'ApiAnnotation.AnnKeywordId' : 'ApiAnnotation.AnnSemi' when in a
 --   list
-
+type LMatch' f id body = Located (Match' f id body)
 -- For details on above see note [Api annotations] in ApiAnnotation
-data Match p body
+
+type Match = Match' NonEmpty
+
+-- | The @f@ parameter is for the list type. It is usually non-empty list, except
+-- for pattern synnonyms for which it is list. Perhaps pattern synnonyms should
+-- not use this.
+data Match' f p body
   = Match {
         m_ext :: XCMatch p body,
         m_ctxt :: HsMatchContext (NameOrRdrName (IdP p)),
           -- See note [m_ctxt in Match]
-        m_pats :: [LPat p], -- The patterns
+        m_pats :: f (LPat p), -- The patterns
         m_grhss :: (GRHSs p body)
   }
   | XMatch (XXMatch p body)
@@ -1510,8 +1525,8 @@ data Match p body
 type instance XCMatch (GhcPass _) b = NoExtField
 type instance XXMatch (GhcPass _) b = NoExtCon
 
-instance (OutputableBndrId pr, Outputable body)
-            => Outputable (Match (GhcPass pr) body) where
+instance (Foldable f, OutputableBndrId pr, Outputable body)
+            => Outputable (Match' f (GhcPass pr) body) where
   ppr = pprMatch
 
 {-
@@ -1556,12 +1571,12 @@ isInfixMatch match = case m_ctxt match of
   FunRhs {mc_fixity = Infix} -> True
   _                          -> False
 
-isEmptyMatchGroup :: MatchGroup id body -> Bool
+isEmptyMatchGroup :: MatchGroup' f id body -> Bool
 isEmptyMatchGroup (MG { mg_alts = ms }) = null $ unLoc ms
 isEmptyMatchGroup (XMatchGroup {})      = False
 
 -- | Is there only one RHS in this list of matches?
-isSingletonMatchGroup :: [LMatch id body] -> Bool
+isSingletonMatchGroup :: [LMatch' f id body] -> Bool
 isSingletonMatchGroup matches
   | [L _ match] <- matches
   , Match { m_grhss = GRHSs { grhssGRHSs = [_] } } <- match
@@ -1569,15 +1584,18 @@ isSingletonMatchGroup matches
   | otherwise
   = False
 
-matchGroupArity :: MatchGroup (GhcPass id) body -> Arity
+matchGroupArity
+  :: Foldable f
+  => MatchGroup' f (GhcPass id) body
+  -> Arity
 -- Precondition: MatchGroup is non-empty
 -- This is called before type checking, when mg_arg_tys is not set
 matchGroupArity (MG { mg_alts = alts })
   | L _ (alt1:_) <- alts = length (hsLMatchPats alt1)
   | otherwise        = panic "matchGroupArity"
-matchGroupArity (XMatchGroup nec) = noExtCon nec
+matchGroupArity (XMatchGroup nec) = noExtCon1 nec
 
-hsLMatchPats :: LMatch (GhcPass id) body -> [LPat (GhcPass id)]
+hsLMatchPats :: LMatch' f (GhcPass id) body -> f (LPat (GhcPass id))
 hsLMatchPats (L _ (Match { m_pats = pats })) = pats
 hsLMatchPats (L _ (XMatch nec)) = noExtCon nec
 
@@ -1616,16 +1634,16 @@ type instance XXGRHS (GhcPass _) b = NoExtCon
 
 -- We know the list must have at least one @Match@ in it.
 
-pprMatches :: (OutputableBndrId idR, Outputable body)
-           => MatchGroup (GhcPass idR) body -> SDoc
+pprMatches :: (Foldable f, OutputableBndrId idR, Outputable body)
+           => MatchGroup' f (GhcPass idR) body -> SDoc
 pprMatches MG { mg_alts = matches }
-    = vcat (map pprMatch (map unLoc (unLoc matches)))
+    = vcat (map pprMatch (map unLoc (toList $ unLoc matches)))
       -- Don't print the type; it's only a place-holder before typechecking
 pprMatches (XMatchGroup x) = ppr x
 
 -- Exported to GHC.Hs.Binds, which can't see the defn of HsMatchContext
-pprFunBind :: (OutputableBndrId idR, Outputable body)
-           => MatchGroup (GhcPass idR) body -> SDoc
+pprFunBind :: (Foldable f, OutputableBndrId idR, Outputable body)
+           => MatchGroup' f (GhcPass idR) body -> SDoc
 pprFunBind matches = pprMatches matches
 
 -- Exported to GHC.Hs.Binds, which can't see the defn of HsMatchContext
@@ -1637,8 +1655,8 @@ pprPatBind pat (grhss)
  = sep [ppr pat,
        nest 2 (pprGRHSs (PatBindRhs :: HsMatchContext (IdP (GhcPass p))) grhss)]
 
-pprMatch :: (OutputableBndrId idR, Outputable body)
-         => Match (GhcPass idR) body -> SDoc
+pprMatch :: (Foldable f, OutputableBndrId idR, Outputable body)
+         => Match' f (GhcPass idR) body -> SDoc
 pprMatch match
   = sep [ sep (herald : map (nest 2 . pprParendLPat appPrec) other_pats)
         , nest 2 (pprGRHSs ctxt (m_grhss match)) ]
@@ -1646,11 +1664,8 @@ pprMatch match
     ctxt = m_ctxt match
     (herald, other_pats)
         = case ctxt of
-            FunRhs {mc_fun=L _ fun, mc_fixity=fixity, mc_strictness=strictness}
-                | strictness == SrcStrict -> ASSERT(null $ m_pats match)
-                                             (char '!'<>pprPrefixOcc fun, m_pats match)
-                        -- a strict variable binding
-                | fixity == Prefix -> (pprPrefixOcc fun, m_pats match)
+            FunRhs {mc_fun=L _ fun, mc_fixity=fixity}
+                | fixity == Prefix -> (pprPrefixOcc fun, pats)
                         -- f x y z = e
                         -- Not pprBndr; the AbsBinds will
                         -- have printed the signature
@@ -1665,14 +1680,15 @@ pprMatch match
                          <+> pprInfixOcc fun
                          <+> pprParendLPat opPrec pat2
 
-            LambdaExpr -> (char '\\', m_pats match)
+            LambdaExpr -> (char '\\', pats)
 
             _  -> if null (m_pats match)
                      then (empty, [])
                      else ASSERT2( null pats1, ppr ctxt $$ ppr pat1 $$ ppr pats1 )
                           (ppr pat1, [])        -- No parens around the single pat
 
-    (pat1:pats1) = m_pats match
+    pats = toList $ m_pats match
+    (pat1:pats1) = pats
     (pat2:pats2) = pats1
 
 pprGRHSs :: (OutputableBndrId idR, Outputable body)
@@ -2602,8 +2618,6 @@ pp_dotdot = text " .. "
 data HsMatchContext id -- Not an extensible tag
   = FunRhs { mc_fun        :: Located id    -- ^ function binder of @f@
            , mc_fixity     :: LexicalFixity -- ^ fixing of @f@
-           , mc_strictness :: SrcStrictness -- ^ was @f@ banged?
-                                            -- See Note [FunBind vs PatBind]
            }
                                 -- ^A pattern matching on an argument of a
                                 -- function binding
@@ -2795,11 +2809,14 @@ matchContextErrString (StmtCtxt MDoExpr)           = text "'mdo' block"
 matchContextErrString (StmtCtxt ListComp)          = text "list comprehension"
 matchContextErrString (StmtCtxt MonadComp)         = text "monad comprehension"
 
-pprMatchInCtxt :: (OutputableBndrId idR,
-                   -- TODO:AZ these constraints do not make sense
-                 Outputable (NameOrRdrName (NameOrRdrName (IdP (GhcPass idR)))),
-                 Outputable body)
-               => Match (GhcPass idR) body -> SDoc
+pprMatchInCtxt
+  :: ( Foldable f
+     , OutputableBndrId idR
+       -- TODO:AZ these constraints do not make sense
+     , Outputable (NameOrRdrName (NameOrRdrName (IdP (GhcPass idR))))
+     , Outputable body
+     )
+  => Match' f (GhcPass idR) body -> SDoc
 pprMatchInCtxt match  = hang (text "In" <+> pprMatchContext (m_ctxt match)
                                         <> colon)
                              4 (pprMatch match)
