@@ -44,7 +44,6 @@ import Name
 import UniqFM
 import UniqDFM
 import Maybes
-import NameSet
 
 {-
 ************************************************************************
