@@ -195,6 +195,11 @@ function setup_toolchain() {
 
   fetch_cabal
   cabal_install="$CABAL v2-install --index-state=$hackage_index_state --installdir=$toolchain/bin"
+  # Avoid symlinks on Windows
+  case "$(uname)" in
+    MSYS_*|MINGW*) cabal_install="$cabal_install --index-method=copy" ;;
+    *) ;;
+  esac
 
   export HAPPY="$toolchain/bin/happy"
   if [ ! -e "$HAPPY" ]; then
