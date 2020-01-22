@@ -73,6 +73,7 @@ module Language.Haskell.TH.Lib (
 
     -- *** Type variable binders
     plainTV, kindedTV,
+    specifiedSpec, inferredSpec, noFlag,
 
     -- *** Roles
     nominalR, representationalR, phantomR, inferR,
@@ -172,10 +173,10 @@ import Prelude
 -------------------------------------------------------------------------------
 -- *   Dec
 
-tySynD :: Name -> [TyVarBndr] -> TypeQ -> DecQ
+tySynD :: Name -> [TyVarBndr ()] -> TypeQ -> DecQ
 tySynD tc tvs rhs = do { rhs1 <- rhs; return (TySynD tc tvs rhs1) }
 
-dataD :: CxtQ -> Name -> [TyVarBndr] -> Maybe Kind -> [ConQ] -> [DerivClauseQ]
+dataD :: CxtQ -> Name -> [TyVarBndr ()] -> Maybe Kind -> [ConQ] -> [DerivClauseQ]
       -> DecQ
 dataD ctxt tc tvs ksig cons derivs =
   do
@@ -184,7 +185,7 @@ dataD ctxt tc tvs ksig cons derivs =
     derivs1 <- sequence derivs
     return (DataD ctxt1 tc tvs ksig cons1 derivs1)
 
-newtypeD :: CxtQ -> Name -> [TyVarBndr] -> Maybe Kind -> ConQ -> [DerivClauseQ]
+newtypeD :: CxtQ -> Name -> [TyVarBndr ()] -> Maybe Kind -> ConQ -> [DerivClauseQ]
          -> DecQ
 newtypeD ctxt tc tvs ksig con derivs =
   do
@@ -193,7 +194,7 @@ newtypeD ctxt tc tvs ksig con derivs =
     derivs1 <- sequence derivs
     return (NewtypeD ctxt1 tc tvs ksig con1 derivs1)
 
-classD :: CxtQ -> Name -> [TyVarBndr] -> [FunDep] -> [DecQ] -> DecQ
+classD :: CxtQ -> Name -> [TyVarBndr ()] -> [FunDep] -> [DecQ] -> DecQ
 classD ctxt cls tvs fds decs =
   do
     decs1 <- sequence decs
@@ -228,35 +229,35 @@ newtypeInstD ctxt tc tys ksig con derivs =
     derivs1 <- sequence derivs
     return (NewtypeInstD ctxt1 Nothing ty1 ksig con1 derivs1)
 
-dataFamilyD :: Name -> [TyVarBndr] -> Maybe Kind -> DecQ
+dataFamilyD :: Name -> [TyVarBndr ()] -> Maybe Kind -> DecQ
 dataFamilyD tc tvs kind
     = return $ DataFamilyD tc tvs kind
 
-openTypeFamilyD :: Name -> [TyVarBndr] -> FamilyResultSig
+openTypeFamilyD :: Name -> [TyVarBndr ()] -> FamilyResultSig
                 -> Maybe InjectivityAnn -> DecQ
 openTypeFamilyD tc tvs res inj
     = return $ OpenTypeFamilyD (TypeFamilyHead tc tvs res inj)
 
-closedTypeFamilyD :: Name -> [TyVarBndr] -> FamilyResultSig
+closedTypeFamilyD :: Name -> [TyVarBndr ()] -> FamilyResultSig
                   -> Maybe InjectivityAnn -> [TySynEqnQ] -> DecQ
 closedTypeFamilyD tc tvs result injectivity eqns =
   do eqns1 <- sequence eqns
      return (ClosedTypeFamilyD (TypeFamilyHead tc tvs result injectivity) eqns1)
 
-tySynEqn :: (Maybe [TyVarBndr]) -> TypeQ -> TypeQ -> TySynEqnQ
+tySynEqn :: (Maybe [TyVarBndr ()]) -> TypeQ -> TypeQ -> TySynEqnQ
 tySynEqn tvs lhs rhs =
   do
     lhs1 <- lhs
     rhs1 <- rhs
     return (TySynEqn tvs lhs1 rhs1)
 
-forallC :: [TyVarBndr] -> CxtQ -> ConQ -> ConQ
+forallC :: [TyVarBndr Specificity] -> CxtQ -> ConQ -> ConQ
 forallC ns ctxt con = liftM2 (ForallC ns) ctxt con
 
 -------------------------------------------------------------------------------
 -- *   Type
 
-forallT :: [TyVarBndr] -> CxtQ -> TypeQ -> TypeQ
+forallT :: [TyVarBndr Specificity] -> CxtQ -> TypeQ -> TypeQ
 forallT tvars ctxt ty = do
     ctxt1 <- ctxt
     ty1   <- ty
@@ -271,10 +272,10 @@ sigT t k
 -------------------------------------------------------------------------------
 -- *   Kind
 
-plainTV :: Name -> TyVarBndr
+plainTV :: Name -> flag -> TyVarBndr flag
 plainTV = PlainTV
 
-kindedTV :: Name -> Kind -> TyVarBndr
+kindedTV :: Name -> flag -> Kind -> TyVarBndr flag
 kindedTV = KindedTV
 
 starK :: Kind
@@ -282,6 +283,13 @@ starK = StarT
 
 constraintK :: Kind
 constraintK = ConstraintT
+
+specifiedSpec, inferredSpec :: Specificity
+specifiedSpec = SpecifiedSpec
+inferredSpec  = InferredSpec
+
+noFlag :: ()
+noFlag = ()
 
 -------------------------------------------------------------------------------
 -- *   Type family result
@@ -292,7 +300,7 @@ noSig = NoSig
 kindSig :: Kind -> FamilyResultSig
 kindSig = KindSig
 
-tyVarSig :: TyVarBndr -> FamilyResultSig
+tyVarSig :: TyVarBndr () -> FamilyResultSig
 tyVarSig = TyVarSig
 
 -------------------------------------------------------------------------------

@@ -46,7 +46,6 @@ import PrelNames        ( applicativeClassName, pureAName, thenAName
                         , semigroupClassName, sappendName
                         , monoidClassName, mappendName
                         )
-import Type             ( Specificity )
 import Name
 import NameSet
 import NameEnv
@@ -1057,8 +1056,8 @@ bindRuleTmVars doc tyvs vars names thing_inside
     bind_free_tvs = case tyvs of Nothing -> AlwaysBind
                                  Just _  -> NeverBind
 
-bindRuleTyVars :: HsDocContext -> SDoc -> Maybe [LHsTyVarBndr Specificity GhcPs]
-               -> (Maybe [LHsTyVarBndr Specificity GhcRn]  -> RnM (b, FreeVars))
+bindRuleTyVars :: HsDocContext -> SDoc -> Maybe [LHsTyVarBndr () GhcPs]
+               -> (Maybe [LHsTyVarBndr () GhcRn]  -> RnM (b, FreeVars))
                -> RnM (b, FreeVars)
 bindRuleTyVars doc in_doc (Just bndrs) thing_inside
   = bindLHsTyVarBndrs doc (Just in_doc) Nothing bndrs (thing_inside . Just)

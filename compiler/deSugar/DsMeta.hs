@@ -1,6 +1,8 @@
 {-# LANGUAGE CPP, TypeFamilies #-}
 {-# LANGUAGE FlexibleContexts #-}
 {-# LANGUAGE ViewPatterns #-}
+{-# LANGUAGE MultiParamTypeClasses #-}
+{-# LANGUAGE FunctionalDependencies #-}
 
 -----------------------------------------------------------------------------
 --
@@ -60,6 +62,7 @@ import ForeignCall
 import Util
 import Maybes
 import MonadUtils
+import Var ( Specificity(..) )
 
 import Data.ByteString ( unpack )
 import Control.Monad
@@ -358,9 +361,9 @@ repKiSigD (L loc kisig) =
 
 -------------------------
 repDataDefn :: Core TH.Name
-            -> Either (Core [TH.TyVarBndrQ])
+            -> Either (Core [TH.TyVarBndrQ ()])
                         -- the repTyClD case
-                      (Core (Maybe [TH.TyVarBndrQ]), Core TH.TypeQ)
+                      (Core (Maybe [TH.TyVarBndrQ ()]), Core TH.TypeQ)
                         -- the repDataFamInstD case
             -> HsDataDefn GhcRn
             -> DsM (Core TH.DecQ)
@@ -385,7 +388,7 @@ repDataDefn tc opts
        }
 repDataDefn _ _ (XHsDataDefn nec) = noExtCon nec
 
-repSynDecl :: Core TH.Name -> Core [TH.TyVarBndrQ]
+repSynDecl :: Core TH.Name -> Core [TH.TyVarBndrQ ()]
            -> LHsType GhcRn
            -> DsM (Core TH.DecQ)
 repSynDecl tc bndrs ty
@@ -1002,6 +1005,16 @@ rep_complete_sig (L _ cls) mty loc
 --                      Types
 -------------------------------------------------------
 
+class RepFlag flag flag' | flag -> flag' where
+    repFlag :: flag -> DsM (Core flag')
+
+instance RepFlag () () where
+    repFlag () = dsLookupGlobalId noFlagName >>= (return . MkC . Var)
+
+instance RepFlag Specificity TH.Specificity where
+    repFlag SpecifiedSpec = dsLookupGlobalId specifiedSpecName >>= (return . MkC . Var)
+    repFlag InferredSpec  = dsLookupGlobalId inferredSpecName  >>= (return . MkC . Var)
+
 addSimpleTyVarBinds :: [Name]                -- the binders to be added
                     -> DsM (Core (TH.Q a))   -- action in the ext env
                     -> DsM (Core (TH.Q a))
@@ -1010,8 +1023,9 @@ addSimpleTyVarBinds names thing_inside
        ; term <- addBinds fresh_names thing_inside
        ; wrapGenSyms fresh_names term }
 
-addHsTyVarBinds :: [LHsTyVarBndr flag GhcRn]  -- the binders to be added
-                -> (Core [TH.TyVarBndrQ] -> DsM (Core (TH.Q a)))  -- action in the ext env
+addHsTyVarBinds :: RepFlag flag flag'
+                => [LHsTyVarBndr flag GhcRn]                            -- the binders to be added
+                -> (Core [TH.TyVarBndrQ flag'] -> DsM (Core (TH.Q a)))  -- action in the ext env
                 -> DsM (Core (TH.Q a))
 addHsTyVarBinds exp_tvs thing_inside
   = do { fresh_exp_names <- mkGenSyms (hsLTyVarNames exp_tvs)
@@ -1023,8 +1037,8 @@ addHsTyVarBinds exp_tvs thing_inside
   where
     mk_tv_bndr (tv, (_,v)) = repTyVarBndrWithKind tv (coreVar v)
 
-addQTyVarBinds :: LHsQTyVars GhcRn                              -- the binders to be added
-               -> (Core [TH.TyVarBndrQ] -> DsM (Core (TH.Q a))) -- action in the ext env
+addQTyVarBinds :: LHsQTyVars GhcRn                                 -- the binders to be added
+               -> (Core [TH.TyVarBndrQ ()] -> DsM (Core (TH.Q a))) -- action in the ext env
                -> DsM (Core (TH.Q a))
 addQTyVarBinds (HsQTvs { hsq_ext = imp_tvs
                       , hsq_explicit = exp_tvs })
@@ -1032,9 +1046,10 @@ addQTyVarBinds (HsQTvs { hsq_ext = imp_tvs
   = addTyVarBinds exp_tvs imp_tvs thing_inside
 addQTyVarBinds (XLHsQTyVars nec) _ = noExtCon nec
 
-addTyVarBinds :: [LHsTyVarBndr flag GhcRn]                     -- the binders to be added
+addTyVarBinds :: RepFlag flag flag'
+              => [LHsTyVarBndr flag GhcRn]                           -- the binders to be added
               -> [Name]
-              -> (Core [TH.TyVarBndrQ] -> DsM (Core (TH.Q a))) -- action in the ext env
+              -> (Core [TH.TyVarBndrQ flag'] -> DsM (Core (TH.Q a))) -- action in the ext env
               -> DsM (Core (TH.Q a))
 -- gensym a list of type variables and enter them into the meta environment;
 -- the computations passed as the second argument is executed in that extended
@@ -1045,7 +1060,7 @@ addTyVarBinds exp_tvs imp_tvs thing_inside
     thing_inside
 
 addTyClTyVarBinds :: LHsQTyVars GhcRn
-                  -> (Core [TH.TyVarBndrQ] -> DsM (Core (TH.Q a)))
+                  -> (Core [TH.TyVarBndrQ ()] -> DsM (Core (TH.Q a)))
                   -> DsM (Core (TH.Q a))
 
 -- Used for data/newtype declarations, and family instances,
@@ -1067,29 +1082,35 @@ addTyClTyVarBinds tvs m
 
        ; wrapGenSyms freshNames term }
   where
-    mk_tv_bndr :: LHsTyVarBndr () GhcRn -> DsM (Core TH.TyVarBndrQ)
+    mk_tv_bndr :: LHsTyVarBndr () GhcRn -> DsM (Core (TH.TyVarBndrQ ()))
     mk_tv_bndr tv = do { v <- lookupBinder (hsLTyVarName tv)
                        ; repTyVarBndrWithKind tv v }
 
 -- Produce kinded binder constructors from the Haskell tyvar binders
 --
-repTyVarBndrWithKind :: LHsTyVarBndr flag GhcRn
-                     -> Core TH.Name -> DsM (Core TH.TyVarBndrQ)
-repTyVarBndrWithKind (L _ (UserTyVar _ _ _)) nm
-  = repPlainTV nm
-repTyVarBndrWithKind (L _ (KindedTyVar _ _ _ ki)) nm
-  = repLTy ki >>= repKindedTV nm
-repTyVarBndrWithKind (L _ (XTyVarBndr nec)) _ = noExtCon nec
+repTyVarBndrWithKind :: RepFlag flag flag' => LHsTyVarBndr flag GhcRn
+                     -> Core TH.Name -> DsM (Core (TH.TyVarBndrQ flag'))
+repTyVarBndrWithKind (L _ (UserTyVar _ fl _)) nm
+  = do { fl' <- repFlag fl
+       ; repPlainTV nm fl' }
+repTyVarBndrWithKind (L _ (KindedTyVar _ fl _ ki)) nm
+  = do { fl' <- repFlag fl
+       ; ki' <- repLTy ki
+       ; repKindedTV nm fl' ki' }
+repTyVarBndrWithKind (L _ (XTyVarBndr nec)) _ = noExtCon nex
 
 -- | Represent a type variable binder
-repTyVarBndr :: LHsTyVarBndr flag GhcRn -> DsM (Core TH.TyVarBndrQ)
-repTyVarBndr (L _ (UserTyVar _ _ (L _ nm)) )
+repTyVarBndr :: RepFlag flag flag'
+             => LHsTyVarBndr flag GhcRn -> DsM (Core (TH.TyVarBndrQ flag'))
+repTyVarBndr (L _ (UserTyVar _ fl (L _ nm)) )
   = do { nm' <- lookupBinder nm
-       ; repPlainTV nm' }
-repTyVarBndr (L _ (KindedTyVar _ _ (L _ nm) ki))
+       ; fl' <- repFlag fl
+       ; repPlainTV nm' fl' }
+repTyVarBndr (L _ (KindedTyVar _ fl (L _ nm) ki))
   = do { nm' <- lookupBinder nm
        ; ki' <- repLTy ki
-       ; repKindedTV nm' ki' }
+       ; fl' <- repFlag fl
+       ; repKindedTV nm' fl' ki' }
 repTyVarBndr (L _ (XTyVarBndr nec)) = noExtCon nec
 
 -- represent a type context
@@ -2226,8 +2247,8 @@ repFun :: Core TH.Name -> Core [TH.ClauseQ] -> DsM (Core TH.DecQ)
 repFun (MkC nm) (MkC b) = rep2 funDName [nm, b]
 
 repData :: Core TH.CxtQ -> Core TH.Name
-        -> Either (Core [TH.TyVarBndrQ])
-                  (Core (Maybe [TH.TyVarBndrQ]), Core TH.TypeQ)
+        -> Either (Core [TH.TyVarBndrQ ()])
+                  (Core (Maybe [TH.TyVarBndrQ ()]), Core TH.TypeQ)
         -> Core (Maybe TH.KindQ) -> Core [TH.ConQ] -> Core [TH.DerivClauseQ]
         -> DsM (Core TH.DecQ)
 repData (MkC cxt) (MkC nm) (Left (MkC tvs)) (MkC ksig) (MkC cons) (MkC derivs)
@@ -2237,8 +2258,8 @@ repData (MkC cxt) (MkC _) (Right (MkC mb_bndrs, MkC ty)) (MkC ksig) (MkC cons)
   = rep2 dataInstDName [cxt, mb_bndrs, ty, ksig, cons, derivs]
 
 repNewtype :: Core TH.CxtQ -> Core TH.Name
-           -> Either (Core [TH.TyVarBndrQ])
-                     (Core (Maybe [TH.TyVarBndrQ]), Core TH.TypeQ)
+           -> Either (Core [TH.TyVarBndrQ ()])
+                     (Core (Maybe [TH.TyVarBndrQ ()]), Core TH.TypeQ)
            -> Core (Maybe TH.KindQ) -> Core TH.ConQ -> Core [TH.DerivClauseQ]
            -> DsM (Core TH.DecQ)
 repNewtype (MkC cxt) (MkC nm) (Left (MkC tvs)) (MkC ksig) (MkC con)
@@ -2248,7 +2269,7 @@ repNewtype (MkC cxt) (MkC _) (Right (MkC mb_bndrs, MkC ty)) (MkC ksig) (MkC con)
            (MkC derivs)
   = rep2 newtypeInstDName [cxt, mb_bndrs, ty, ksig, con, derivs]
 
-repTySyn :: Core TH.Name -> Core [TH.TyVarBndrQ]
+repTySyn :: Core TH.Name -> Core [TH.TyVarBndrQ ()]
          -> Core TH.TypeQ -> DsM (Core TH.DecQ)
 repTySyn (MkC nm) (MkC tvs) (MkC rhs)
   = rep2 tySynDName [nm, tvs, rhs]
@@ -2303,7 +2324,7 @@ repOverlap mb =
   just    = coreJust overlapTyConName
 
 
-repClass :: Core TH.CxtQ -> Core TH.Name -> Core [TH.TyVarBndrQ]
+repClass :: Core TH.CxtQ -> Core TH.Name -> Core [TH.TyVarBndrQ ()]
          -> Core [TH.FunDep] -> Core [TH.DecQ]
          -> DsM (Core TH.DecQ)
 repClass (MkC cxt) (MkC cls) (MkC tvs) (MkC fds) (MkC ds)
@@ -2336,7 +2357,7 @@ repPragSpecInst (MkC ty) = rep2 pragSpecInstDName [ty]
 repPragComplete :: Core [TH.Name] -> Core (Maybe TH.Name) -> DsM (Core TH.DecQ)
 repPragComplete (MkC cls) (MkC mty) = rep2 pragCompleteDName [cls, mty]
 
-repPragRule :: Core String -> Core (Maybe [TH.TyVarBndrQ])
+repPragRule :: Core String -> Core (Maybe [TH.TyVarBndrQ ()])
             -> Core [TH.RuleBndrQ] -> Core TH.ExpQ -> Core TH.ExpQ
             -> Core TH.Phases -> DsM (Core TH.DecQ)
 repPragRule (MkC nm) (MkC ty_bndrs) (MkC tm_bndrs) (MkC lhs) (MkC rhs) (MkC phases)
@@ -2349,13 +2370,13 @@ repTySynInst :: Core TH.TySynEqnQ -> DsM (Core TH.DecQ)
 repTySynInst (MkC eqn)
     = rep2 tySynInstDName [eqn]
 
-repDataFamilyD :: Core TH.Name -> Core [TH.TyVarBndrQ]
+repDataFamilyD :: Core TH.Name -> Core [TH.TyVarBndrQ ()]
                -> Core (Maybe TH.KindQ) -> DsM (Core TH.DecQ)
 repDataFamilyD (MkC nm) (MkC tvs) (MkC kind)
     = rep2 dataFamilyDName [nm, tvs, kind]
 
 repOpenFamilyD :: Core TH.Name
-               -> Core [TH.TyVarBndrQ]
+               -> Core [TH.TyVarBndrQ ()]
                -> Core TH.FamilyResultSigQ
                -> Core (Maybe TH.InjectivityAnn)
                -> DsM (Core TH.DecQ)
@@ -2363,7 +2384,7 @@ repOpenFamilyD (MkC nm) (MkC tvs) (MkC result) (MkC inj)
     = rep2 openTypeFamilyDName [nm, tvs, result, inj]
 
 repClosedFamilyD :: Core TH.Name
-                 -> Core [TH.TyVarBndrQ]
+                 -> Core [TH.TyVarBndrQ ()]
                  -> Core TH.FamilyResultSigQ
                  -> Core (Maybe TH.InjectivityAnn)
                  -> Core [TH.TySynEqnQ]
@@ -2371,7 +2392,7 @@ repClosedFamilyD :: Core TH.Name
 repClosedFamilyD (MkC nm) (MkC tvs) (MkC res) (MkC inj) (MkC eqns)
     = rep2 closedTypeFamilyDName [nm, tvs, res, inj, eqns]
 
-repTySynEqn :: Core (Maybe [TH.TyVarBndrQ]) ->
+repTySynEqn :: Core (Maybe [TH.TyVarBndrQ ()]) ->
                Core TH.TypeQ -> Core TH.TypeQ -> DsM (Core TH.TySynEqnQ)
 repTySynEqn (MkC mb_bndrs) (MkC lhs) (MkC rhs)
   = rep2 tySynEqnName [mb_bndrs, lhs, rhs]
@@ -2454,12 +2475,12 @@ repConstr _ _ _ =
 
 ------------ Types -------------------
 
-repTForall :: Core [TH.TyVarBndrQ] -> Core TH.CxtQ -> Core TH.TypeQ
+repTForall :: Core [TH.TyVarBndrQ TH.Specificity] -> Core TH.CxtQ -> Core TH.TypeQ
            -> DsM (Core TH.TypeQ)
 repTForall (MkC tvars) (MkC ctxt) (MkC ty)
     = rep2 forallTName [tvars, ctxt, ty]
 
-repTForallVis :: Core [TH.TyVarBndrQ] -> Core TH.TypeQ
+repTForallVis :: Core [TH.TyVarBndrQ TH.Specificity] -> Core TH.TypeQ
               -> DsM (Core TH.TypeQ)
 repTForallVis (MkC tvars) (MkC ty) = rep2 forallVisTName [tvars, ty]
 
@@ -2550,11 +2571,11 @@ repPromotedConsTyCon = rep2 promotedConsTName []
 
 ------------ TyVarBndrs -------------------
 
-repPlainTV :: Core TH.Name -> DsM (Core TH.TyVarBndrQ)
-repPlainTV (MkC nm) = rep2 plainTVName [nm]
+repPlainTV :: Core TH.Name -> Core flag -> DsM (Core (TH.TyVarBndrQ flag))
+repPlainTV (MkC nm) (MkC fl) = rep2 plainTVName [nm, fl]
 
-repKindedTV :: Core TH.Name -> Core TH.KindQ -> DsM (Core TH.TyVarBndrQ)
-repKindedTV (MkC nm) (MkC ki) = rep2 kindedTVName [nm, ki]
+repKindedTV :: Core TH.Name -> Core flag -> Core TH.KindQ -> DsM (Core (TH.TyVarBndrQ flag))
+repKindedTV (MkC nm) (MkC fl) (MkC ki) = rep2 kindedTVName [nm, fl, ki]
 
 ----------------------------------------------------------
 --       Type family result signature
@@ -2565,7 +2586,7 @@ repNoSig = rep2 noSigName []
 repKindSig :: Core TH.KindQ -> DsM (Core TH.FamilyResultSigQ)
 repKindSig (MkC ki) = rep2 kindSigName [ki]
 
-repTyVarSig :: Core TH.TyVarBndrQ -> DsM (Core TH.FamilyResultSigQ)
+repTyVarSig :: Core (TH.TyVarBndrQ ()) -> DsM (Core TH.FamilyResultSigQ)
 repTyVarSig (MkC bndr) = rep2 tyVarSigName [bndr]
 
 ----------------------------------------------------------

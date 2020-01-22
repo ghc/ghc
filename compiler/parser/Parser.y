@@ -1710,7 +1710,7 @@ rule_explicit_activation :: { ([AddAnn]
                                 { ($2++[mos $1,mcs $3]
                                   ,NeverActive) }
 
-rule_foralls :: { ([AddAnn], Maybe [LHsTyVarBndr Specificity GhcPs], [LRuleBndr GhcPs]) }
+rule_foralls :: { ([AddAnn], Maybe [LHsTyVarBndr () GhcPs], [LRuleBndr GhcPs]) }
         : 'forall' rule_vars '.' 'forall' rule_vars '.'    {% let tyvs = mkRuleTyVarBndrs $2
                                                               in hintExplicitForall $1
                                                               >> checkRuleTyVarBndrNames (mkRuleTyVarBndrs $2)

@@ -15,7 +15,8 @@ module PatSyn (
         patSynName, patSynArity, patSynIsInfix,
         patSynArgs,
         patSynMatcher, patSynBuilder,
-        patSynUnivTyVarBinders, patSynExTyVars, patSynExTyVarBinders, patSynSig,
+        patSynUnivTyVarBinders, patSynExTyVars, patSynExTyVarBinders,
+        patSynSig, patSynSigBndr,
         patSynInstArgTys, patSynInstResTy, patSynFieldLabels,
         patSynFieldType,
 
@@ -420,11 +421,15 @@ patSynExTyVars ps = binderVars (psExTyVars ps)
 patSynExTyVarBinders :: PatSyn -> [InvisTVBinder]
 patSynExTyVarBinders = psExTyVars
 
-patSynSig :: PatSyn -> ([TyVar], ThetaType, [TyVar], ThetaType, [Type], Type)
-patSynSig (MkPatSyn { psUnivTyVars = univ_tvs, psExTyVars = ex_tvs
+patSynSigBndr :: PatSyn -> ([InvisTVBinder], ThetaType, [InvisTVBinder], ThetaType, [Type], Type)
+patSynSigBndr (MkPatSyn { psUnivTyVars = univ_tvs, psExTyVars = ex_tvs
                     , psProvTheta = prov, psReqTheta = req
                     , psArgs = arg_tys, psResultTy = res_ty })
-  = (binderVars univ_tvs, req, binderVars ex_tvs, prov, arg_tys, res_ty)
+  = (univ_tvs, req, ex_tvs, prov, arg_tys, res_ty)
+
+patSynSig :: PatSyn -> ([TyVar], ThetaType, [TyVar], ThetaType, [Type], Type)
+patSynSig ps = let (u_tvs, req, e_tvs, prov, arg_tys, res_ty) = patSynSigBndr ps
+               in (binderVars u_tvs, req, binderVars e_tvs, prov, arg_tys, res_ty)
 
 patSynMatcher :: PatSyn -> (Id,Bool)
 patSynMatcher = psMatcher

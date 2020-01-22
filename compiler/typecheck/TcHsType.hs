@@ -2662,9 +2662,10 @@ newFlexiKindedTyVarTyVar = newFlexiKindedTyVar newTyVarTyVar
 --------------------------------------
 
 bindExplicitTKBndrs_Skol, bindExplicitTKBndrs_Tv
-    :: [LHsTyVarBndr Specificity GhcRn]
+    :: (OutputableBndrFlag flag)
+    => [LHsTyVarBndr flag GhcRn]
     -> TcM a
-    -> TcM ([TcInvisTVBinder], a)
+    -> TcM ([VarBndr TyVar flag], a)
 
 bindExplicitTKBndrs_Skol = bindExplicitTKBndrsX (tcHsTyVarBndr newSkolemTyVar)
 bindExplicitTKBndrs_Tv   = bindExplicitTKBndrsX (tcHsTyVarBndr newTyVarTyVar)
