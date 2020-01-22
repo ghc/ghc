@@ -7,6 +7,7 @@
 -----------------------------------------------------------------------------
 
 {-# LANGUAGE CPP #-}
+{-# LANGUAGE BangPatterns #-}
 
 module GHC.Cmm.CLabel (
         CLabel, -- abstract type
@@ -468,7 +469,7 @@ mkRednCountsLabel       name    =
 mkLocalClosureLabel      :: Name -> CafInfo -> CLabel
 mkLocalInfoTableLabel    :: Name -> CafInfo -> CLabel
 mkLocalClosureTableLabel :: Name -> CafInfo -> CLabel
-mkLocalClosureLabel     name c  = IdLabel name  c Closure
+mkLocalClosureLabel   !name !c  = IdLabel name  c Closure
 mkLocalInfoTableLabel   name c  = IdLabel name  c LocalInfoTable
 mkLocalClosureTableLabel name c = IdLabel name  c ClosureTable
 
