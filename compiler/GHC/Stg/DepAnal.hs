@@ -11,7 +11,6 @@ import NameEnv
 import Outputable
 import UniqSet (nonDetEltsUniqSet)
 import VarSet
-import UniqSet (nonDetEltsUniqSet)
 import Module (Module)
 
 import Data.Graph (SCC (..))
