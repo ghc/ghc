@@ -197,10 +197,10 @@ function cleanup_submodules() {
 }
 
 function prepare_build_mk() {
+  if [ -z "$BUILD_FLAVOUR" ]; then fail "BUILD_FLAVOUR not set"; fi
   if [[ -z ${BUILD_SPHINX_HTML:-} ]]; then BUILD_SPHINX_HTML=YES; fi
   if [[ -z ${BUILD_SPHINX_PDF:-} ]]; then BUILD_SPHINX_PDF=YES; fi
   if [[ -z ${INTEGER_LIBRARY:-} ]]; then INTEGER_LIBRARY=integer-gmp; fi
-  if [[ -z ${BUILD_FLAVOUR:-} ]]; then BUILD_FLAVOUR=perf; fi
 
   cat > mk/build.mk <<EOF
 V=1
@@ -247,9 +247,7 @@ function configure() {
 }
 
 function build_make() {
-  if [ -z "$BUILD_FLAVOUR" ]; then
-    fail "BUILD_FLAVOUR not set"
-  fi
+  if [ -z "$BUILD_FLAVOUR" ]; then fail "BUILD_FLAVOUR not set"; fi
 
   echo "include mk/flavours/${BUILD_FLAVOUR}.mk" > mk/build.mk
   echo 'GhcLibHcOpts+=-haddock' >> mk/build.mk
