@@ -197,18 +197,18 @@ function setup_toolchain() {
   cabal_install="$CABAL v2-install --index-state=$hackage_index_state --installdir=$toolchain/bin"
   # Avoid symlinks on Windows
   case "$(uname)" in
-    MSYS_*|MINGW*) cabal_install="$cabal_install --index-method=copy" ;;
+    MSYS_*|MINGW*) cabal_install="$cabal_install --install-method=copy" ;;
     *) ;;
   esac
 
-  export HAPPY="$toolchain/bin/happy"
+  export HAPPY="$toolchain/bin/happy$exe"
   if [ ! -e "$HAPPY" ]; then
       info "Building happy..."
       cabal update
       $cabal_install happy
   fi
 
-  export ALEX="$toolchain/bin/alex"
+  export ALEX="$toolchain/bin/alex$exe"
   if [ ! -e "$ALEX" ]; then
       info "Building alex..."
       cabal update
