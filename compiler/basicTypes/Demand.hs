@@ -29,7 +29,7 @@ module Demand (
         DmdEnv, emptyDmdEnv,
         peelFV, findIdDemand,
 
-        Divergence(..), lubDivergence, isBotDiv, isTopDiv, topDiv, botDiv,
+        Divergence(..), lubDivergence, isBotDiv, isTopDiv, topDiv, botDiv, exnDiv,
         appIsBottom, isBottomingSig, pprIfaceStrictSig,
         StrictSig(..), mkStrictSigForArity, mkClosedStrictSig,
         nopSig, botSig, cprProdSig,
@@ -41,7 +41,7 @@ module Demand (
 
         evalDmd, cleanEvalDmd, cleanEvalProdDmd, isStrictDmd,
         splitDmdTy, splitFVs,
-        deferAfterIO,
+        deferAfterPreciseException,
         postProcessUnsat, postProcessDmdType,
 
         splitProdDmd_maybe, peelCallDmd, peelManyCalls, mkCallDmd, mkCallDmds,
@@ -180,6 +180,129 @@ is not strict in its argument: Just try this in GHCi
 
 Any analysis that assumes otherwise will be broken in some way or another
 (beyond `-fno-pendantic-bottoms`).
+
+But then #13380 and #17676 suggest (in Mar 20) that we need to re-introduce a
+subtly different variant of `ThrowsExn` (which we call `ExnOrDiv` now) that is
+only used by `raiseIO#` in order to preserve precise exceptions by strictness
+analysis, while not impacting the ability to eliminate dead code.
+See Note [Precise exceptions and strictness analysis].
+
+Note [Precise exceptions and strictness analysis]
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+We have to take care to preserve precise exception semantics (#17676).
+There are two scenarios that need careful hacks.
+
+Scenario 1: Precise exceptions in case scrutinees
+-------------------------------------------------
+Consider
+
+     case foo x s of { (# s', r #) -> y }
+
+Is this strict in 'y'? Often not! If @foo x s@ might throw a precise exception
+(ultimately via the 'raiseIO#' PrimOp), then we must not force 'y' (which may
+fail to terminate or throw an imprecise exception) until we have performed
+@foo x s@.
+
+Hackish solution: spot the exceptional situation and add a virtual branch,
+as if we had
+     case foo x s of
+        (# s, r #) -> y
+        other      -> return ()
+So the 'y' isn't necessarily going to be evaluated.
+
+The function that spots this situation is
+'CoreUtils.exprMayThrowPreciseException', and
+'Demand.deferAfterPreciseException' will lub with the strictness analysis
+results of the virtual branch.
+
+A more complete example (#148, #1592) where this shows up is:
+     do { let len = <expensive> ;
+        ; when (...) (exitWith ExitSuccess)
+        ; print len }
+Here, we want to defer, because @when (...) (exitWith ExitSuccess)@ might throw
+a precise exception.
+
+However, consider
+  f x s = case getMaskingState# s of
+            (# s, r #) ->
+          case x of I# x2 -> ...
+
+Here it is terribly sad to make 'f' lazy in 'x'.  After all,
+getMaskingState# is not going throw a precise exception! And
+'exprMayThrowPreciseException' recognises that.
+This situation actually arises in GHC.IO.Handle.Internals.wantReadableHandle
+(on an MVar not an Int), and made a material difference.
+
+Scenario 2: Precise exceptions in case alternatives
+---------------------------------------------------
+The motivating example for #13380 is the following:
+    f x y | x>0       = raiseIO blah
+          | y>0       = return 1
+          | otherwise = return 2
+If 'f' was inferred to be strict in 'y', WW would turn a precise into an
+imprecise exception in the call site @f 1 (error "boom")@.
+
+The solution is to give 'raiseIO#' 'topDiv' instead of 'botDiv', so that its
+'Demand.defaultDmd' is lazy. But then the simplifier fails to eliminate a lot of
+dead code, namely when 'raiseIO#' occurs in a case scrutinee. Hence we need to
+give it 'exnDiv', which was conceived entirely for this reason. The default
+demand of 'exnDiv' is lazy, but otherwise (in terms of 'Demand.isBotDiv') it
+behaves exactly as 'botDiv', so that dead code elimination works as expected.
+
+Note [Demand on the scrutinee of a product case]
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+When figuring out the demand on the scrutinee of a product case,
+we use the demands of the case alternative, i.e. id_dmds.
+But note that these include the demand on the case binder;
+see Note [Demand on case-alternative binders] in Demand.hs.
+This is crucial. Example:
+   f x = case x of y { (a,b) -> k y a }
+If we just take scrut_demand = U(L,A), then we won't pass x to the
+worker, so the worker will rebuild
+     x = (a, absent-error)
+and that'll crash.
+
+Note [Aggregated demand for cardinality]
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+We use different strategies for strictness and usage/cardinality to
+"unleash" demands captured on free variables by bindings. Let us
+consider the example:
+
+f1 y = let {-# NOINLINE h #-}
+           h = y
+       in  (h, h)
+
+We are interested in obtaining cardinality demand U1 on |y|, as it is
+used only in a thunk, and, therefore, is not going to be updated any
+more. Therefore, the demand on |y|, captured and unleashed by usage of
+|h| is U1. However, if we unleash this demand every time |h| is used,
+and then sum up the effects, the ultimate demand on |y| will be U1 +
+U1 = U. In order to avoid it, we *first* collect the aggregate demand
+on |h| in the body of let-expression, and only then apply the demand
+transformer:
+
+transf[x](U) = {y |-> U1}
+
+so the resulting demand on |y| is U1.
+
+The situation is, however, different for strictness, where this
+aggregating approach exhibits worse results because of the nature of
+|both| operation for strictness. Consider the example:
+
+f y c =
+  let h x = y |seq| x
+   in case of
+        True  -> h True
+        False -> y
+
+It is clear that |f| is strict in |y|, however, the suggested analysis
+will infer from the body of |let| that |h| is used lazily (as it is
+used in one branch only), therefore lazy demand will be put on its
+free variable |y|. Conversely, if the demand on |h| is unleashed right
+on the spot, we will get the desired result, namely, that |f| is
+strict in |y|.
+
+
 -}
 
 -- | Vanilla strictness domain
@@ -896,40 +1019,55 @@ splitProdDmd_maybe (JD { sd = s, ud = u })
 {-
 ************************************************************************
 *                                                                      *
-                   Termination
+                   Divergence
 *                                                                      *
 ************************************************************************
-
-Divergence:     Dunno
-               /
-          Diverges
-
-In a fixpoint iteration, start from Diverges
 -}
 
+-- | Divergence lattice.
+--
+-- @
+--         Dunno
+--           |
+-- ThrowsExceptionOrDiverges
+--           |
+--        Diverges
+-- @
+--
+-- See Note [Precise exceptions and strictness analysis] for why we have that
+-- additional bottom-like element.
 data Divergence
-  = Diverges    -- Definitely diverges
-  | Dunno       -- Might diverge or converge
+  = Diverges -- ^ Definitely throws an imprecise exception or diverges.
+  | ExnOrDiv -- ^ Definitely throws a *precise* exception, an imprecise
+             --   exception or diverges.
+             --   See Note [Precise exceptions and strictness analysis].
+  | Dunno    -- ^ Might diverge or converge.
   deriving( Eq, Show )
 
 lubDivergence :: Divergence -> Divergence ->Divergence
 lubDivergence Diverges r        = r
 lubDivergence r        Diverges = r
-lubDivergence Dunno    Dunno    = Dunno
+lubDivergence Dunno    _        = Dunno
+lubDivergence _        Dunno    = Dunno
+lubDivergence ExnOrDiv ExnOrDiv = ExnOrDiv
 -- This needs to commute with defaultDmd, i.e.
 -- defaultDmd (r1 `lubDivergence` r2) = defaultDmd r1 `lubDmd` defaultDmd r2
 -- (See Note [Default demand on free variables] for why)
 
 bothDivergence :: Divergence -> Divergence -> Divergence
 -- See Note [Asymmetry of 'both' for DmdType and Divergence]
-bothDivergence _ Diverges = Diverges
-bothDivergence r Dunno    = r
+bothDivergence _        Diverges = Diverges
+bothDivergence Diverges _        = Diverges
+bothDivergence r        Dunno    = r
+bothDivergence Dunno    r        = r
+bothDivergence ExnOrDiv ExnOrDiv = ExnOrDiv
 -- This needs to commute with defaultDmd, i.e.
 -- defaultDmd (r1 `bothDivergence` r2) = defaultDmd r1 `bothDmd` defaultDmd r2
 -- (See Note [Default demand on free variables] for why)
 
 instance Outputable Divergence where
   ppr Diverges      = char 'b'
+  ppr ExnOrDiv      = char 'x'
   ppr Dunno         = empty
 
 ------------------------------------------------------------------------
@@ -938,8 +1076,9 @@ instance Outputable Divergence where
 
 -- [cprRes] lets us switch off CPR analysis
 -- by making sure that everything uses TopRes
-topDiv, botDiv :: Divergence
+topDiv, exnDiv, botDiv :: Divergence
 topDiv = Dunno
+exnDiv = ExnOrDiv
 botDiv = Diverges
 
 isTopDiv :: Divergence -> Bool
@@ -949,13 +1088,16 @@ isTopDiv _     = False
 -- | True if the result diverges or throws an exception
 isBotDiv :: Divergence -> Bool
 isBotDiv Diverges = True
+isBotDiv ExnOrDiv = True
 isBotDiv _        = False
 
 -- See Notes [Default demand on free variables]
 -- and [defaultDmd vs. resTypeArgDmd]
+-- and Scenario 2 in [Precise exceptions and strictness analysis]
 defaultDmd :: Divergence -> Demand
-defaultDmd Dunno = absDmd
-defaultDmd _     = botDmd  -- Diverges
+defaultDmd Dunno    = absDmd
+defaultDmd ExnOrDiv = absDmd -- This is the whole point of ExnOrDiv!
+defaultDmd Diverges = botDmd -- Diverges
 
 resTypeArgDmd :: Divergence -> Demand
 -- TopRes and BotRes are polymorphic, so that
@@ -1090,10 +1232,7 @@ mkBothDmdArg :: DmdEnv -> BothDmdArg
 mkBothDmdArg env = (env, Dunno)
 
 toBothDmdArg :: DmdType -> BothDmdArg
-toBothDmdArg (DmdType fv _ r) = (fv, go r)
-  where
-    go Dunno    = Dunno
-    go Diverges = Diverges
+toBothDmdArg (DmdType fv _ r) = (fv, r)
 
 bothDmdType :: DmdType -> BothDmdArg -> DmdType
 bothDmdType (DmdType fv1 ds1 r1) (fv2, t2)
@@ -1167,16 +1306,15 @@ splitDmdTy :: DmdType -> (Demand, DmdType)
 splitDmdTy (DmdType fv (dmd:dmds) res_ty) = (dmd, DmdType fv dmds res_ty)
 splitDmdTy ty@(DmdType _ [] res_ty)       = (resTypeArgDmd res_ty, ty)
 
--- When e is evaluated after executing an IO action, and d is e's demand, then
--- what of this demand should we consider, given that the IO action can cleanly
--- exit?
+-- When e is evaluated after executing an IO action that may throw a precise
+-- exception, and d is e's demand, then what of this demand should we consider?
 -- * We have to kill all strictness demands (i.e. lub with a lazy demand)
 -- * We can keep usage information (i.e. lub with an absent demand)
 -- * We have to kill definite divergence
 -- * We can keep CPR information.
--- See Note [IO hack in the demand analyser] in DmdAnal
-deferAfterIO :: DmdType -> DmdType
-deferAfterIO d@(DmdType _ _ res) =
+-- See Note [Precise exceptions and strictness analysis] in Demand
+deferAfterPreciseException :: DmdType -> DmdType
+deferAfterPreciseException d@(DmdType _ _ res) =
     case d `lubDmdType` nopDmdType of
         DmdType fv ds _ -> DmdType fv ds (defer_res res)
   where
@@ -1997,9 +2135,11 @@ instance Binary DmdType where
 
 instance Binary Divergence where
   put_ bh Dunno    = putByte bh 0
-  put_ bh Diverges = putByte bh 1
+  put_ bh ExnOrDiv = putByte bh 1
+  put_ bh Diverges = putByte bh 2
 
   get bh = do { h <- getByte bh
               ; case h of
                   0 -> return Dunno
+                  1 -> return ExnOrDiv
                   _ -> return Diverges }

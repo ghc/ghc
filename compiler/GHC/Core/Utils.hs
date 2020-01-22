@@ -24,7 +24,7 @@ module GHC.Core.Utils (
         -- * Properties of expressions
         exprType, coreAltType, coreAltsType, isExprLevPoly,
         exprIsDupable, exprIsTrivial, getIdFromTrivialExpr, exprIsBottom,
-        getIdFromTrivialExpr_maybe,
+        exprMayThrowPreciseException, getIdFromTrivialExpr_maybe,
         exprIsCheap, exprIsExpandable, exprIsCheapX, CheapAppFun,
         exprIsHNF, exprOkForSpeculation, exprOkForSideEffects, exprIsWorkFree,
         exprIsConLike,
@@ -88,10 +88,11 @@ import Unique
 import Outputable
 import TysPrim
 import GHC.Driver.Session
+import TysWiredIn
 import FastString
 import Maybes
 import ListSetOps       ( minusList )
-import BasicTypes       ( Arity, isConLike )
+import BasicTypes       ( Arity, isConLike, Boxity(..) )
 import Util
 import Pair
 import Data.ByteString     ( ByteString )
@@ -1025,6 +1026,39 @@ exprIsTrivial (Tick t e)       = not (tickishIsCode t) && exprIsTrivial e
 exprIsTrivial (Cast e _)       = exprIsTrivial e
 exprIsTrivial (Case e _ _ [])  = exprIsTrivial e  -- See Note [Empty case is trivial]
 exprIsTrivial _                = False
+
+-- | Whether an expression might throw a precise exception when evaluated.
+-- Only true for an IO action that is not a 'PrimOp' application other than
+-- 'raiseIO#'.
+--
+-- See Note [Precise exceptions and strictness analysis] in Demand.
+exprMayThrowPreciseException :: CoreExpr -> Bool
+exprMayThrowPreciseException e
+  -- No precise exception without IO. We give no guarantees wrt. to
+  -- unsafePerformIO!
+  | not (is_io_action e)
+  = False
+
+  -- The only IO PrimOp that throws a precise exception is RaiseIOOp.
+  | (Var f, _) <- collectArgs e
+  , Just op    <- isPrimOpId_maybe f
+  = op == RaiseIOOp
+
+  -- A conservative default for all the other cases. Even a simple wrapper
+  -- around a non-RaiseIOOp will default to this! However, being more precise
+  -- would require a program analysis.
+  | otherwise
+  = True
+  where
+    is_io_action e
+      | Just (tc, [_rep1, _rep2, rw, _a]) <- splitTyConApp_maybe (exprType e)
+      , Just dc <- tyConSingleAlgDataCon_maybe tc
+      , dc == tupleDataCon Unboxed 2
+      , rw `eqType` realWorldStatePrimTy
+      = True
+      | otherwise
+      = False
+
 
 {-
 Note [getIdFromTrivialExpr]

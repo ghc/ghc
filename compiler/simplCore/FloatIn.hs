@@ -405,10 +405,15 @@ But there are wrinkles
 
 * Which unlifted cases do we float? See PrimOp.hs
   Note [PrimOp can_fail and has_side_effects] which explains:
-   - We can float-in can_fail primops, but we can't float them out.
+   - We can float-in can_fail primops (which concerns imprecise exceptions),
+     but we can't float them out.
    - But we can float a has_side_effects primop, but NOT inside a lambda,
-     so for now we don't float them at all.
-  Hence exprOkForSideEffects
+     so for now we don't float them at all. Hence exprOkForSideEffects.
+   - Throwing precise exceptions is a special case of the previous point: We
+     may /never/ float in a call to (something that ultimately calls)
+     'raiseIO#'. This can be detected with exprMayThrowPreciseException.
+     Note that exprOkForSideEffects implies @not exprMayThrowPreciseException@.
+
 
 * Because we can float can-fail primops (array indexing, division) inwards
   but not outwards, we must be careful not to transform
