@@ -47,7 +47,7 @@ error() { echo_color "${RED}" "$1"; }
 warn() { echo_color "${LT_BROWN}" "$1"; }
 info() { echo_color "${LT_BLUE}" "$1"; }
 
-fail() { error "$1"; exit 1; }
+fail() { error "error: $1"; exit 1; }
 
 function run() {
   info "Running $*..."
@@ -180,6 +180,7 @@ function fetch_cabal() {
         *)
           case "$(uname)" in
             Darwin) cabal_triple="x86_64-apple-darwin17.7.0" ;;
+            FreeBSD) cabal_triple="x86_64-portbld-freebsd" ;;
             *) fail "don't know where to fetch cabal-install for $(uname)"
           esac
           local url="https://downloads.haskell.org/~cabal/cabal-install-$CABAL_INSTALL_VERSION/cabal-install-$CABAL_INSTALL_VERSION-$cabal_triple.tar.xz"
@@ -241,7 +242,7 @@ function cleanup_submodules() {
 }
 
 function prepare_build_mk() {
-  if [ -z "$BUILD_FLAVOUR" ]; then fail "BUILD_FLAVOUR not set"; fi
+  if [[ -z "$BUILD_FLAVOUR" ]]; then fail "BUILD_FLAVOUR is not set"; fi
   if [[ -z ${BUILD_SPHINX_HTML:-} ]]; then BUILD_SPHINX_HTML=YES; fi
   if [[ -z ${BUILD_SPHINX_PDF:-} ]]; then BUILD_SPHINX_PDF=YES; fi
   if [[ -z ${INTEGER_LIBRARY:-} ]]; then INTEGER_LIBRARY=integer-gmp; fi
@@ -366,7 +367,7 @@ esac
 case "$(uname)" in
   MSYS_*|MINGW*) mingw_init ;;
   Darwin) boot_triple="x86_64-apple-darwin" ;;
-  FreeBSD) ;;
+  FreeBSD) boot_triple="x86_64-portbld-freebsd" ;;
   Linux) ;;
   *) fail "uname $(uname) is not supported" ;;
 esac
