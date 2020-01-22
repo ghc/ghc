@@ -1,0 +1,58 @@
+
+==================== Tidy Core ====================
+Result size of Tidy Core = {terms: 73, types: 66, coercions: 0, joins: 1/1}
+
+-- RHS size: {terms: 13, types: 16, coercions: 0, joins: 0/0}
+idx :: Addr# -> Int -> Int
+idx
+  = \ (a_atJ :: Addr#) (ds_d1mx :: Int) ->
+      case ds_d1mx of { I# i_atK ->
+      case readIntOffAddr# @RealWorld a_atJ i_atK realWorld# of { (# ipv_s1mT, ipv1_s1mU #) -> GHC.Types.I# ipv1_s1mU }
+      }
+
+-- RHS size: {terms: 1, types: 0, coercions: 0, joins: 0/0}
+U.$trModule4 :: Addr#
+U.$trModule4 = "main"#
+
+-- RHS size: {terms: 2, types: 0, coercions: 0, joins: 0/0}
+U.$trModule3 :: TrName
+U.$trModule3 = GHC.Types.TrNameS U.$trModule4
+
+-- RHS size: {terms: 1, types: 0, coercions: 0, joins: 0/0}
+U.$trModule2 :: Addr#
+U.$trModule2 = "U"#
+
+-- RHS size: {terms: 2, types: 0, coercions: 0, joins: 0/0}
+U.$trModule1 :: TrName
+U.$trModule1 = GHC.Types.TrNameS U.$trModule2
+
+-- RHS size: {terms: 3, types: 0, coercions: 0, joins: 0/0}
+U.$trModule :: Module
+U.$trModule = GHC.Types.Module U.$trModule3 U.$trModule1
+
+-- RHS size: {terms: 5, types: 2, coercions: 0, joins: 0/0}
+f :: Int -> Int -> Int
+f = \ (x_atM :: Int) (y_atN :: Int) -> GHC.Num.$fNumInt_$c+ y_atN x_atM
+
+-- RHS size: {terms: 38, types: 34, coercions: 0, joins: 1/1}
+foo :: Addr# -> Int -> Int
+foo
+  = \ (w_s1oZ :: Addr#) (w1_s1p0 :: Int) ->
+      case w1_s1p0 of { I# ww1_s1p3 ->
+      case readIntOffAddr# @RealWorld w_s1oZ 0# realWorld# of { (# ipv_s1mY, ipv1_s1mZ #) ->
+      joinrec {
+        $wloop_s1oY :: Int# -> Int# -> Int
+        $wloop (ww2 :: Int#) (ww3 :: Int#)
+          = case >=# ww3_s1oW ww1_s1p3 of {
+              __DEFAULT ->
+                case readIntOffAddr# @RealWorld w_s1oZ ww3_s1oW realWorld# of { (# ipv2_X2, ipv3_X3 #) ->
+                jump $wloop_s1oY (+# ipv3_X3 ww2_s1oS) (+# ww3_s1oW 1#)
+                };
+              1# -> GHC.Types.I# ww2_s1oS
+            }; } in
+      jump $wloop_s1oY ipv1_s1mZ 1#
+      }
+      }
+
+
+
