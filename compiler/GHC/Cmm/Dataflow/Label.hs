@@ -107,11 +107,14 @@ instance IsMap LabelMap where
   mapFoldlWithKey k z (LM m) =
       mapFoldlWithKey (\a v -> k a (mkHooplLabel v)) z m
   mapFoldMapWithKey f (LM m) = mapFoldMapWithKey (\k v -> f (mkHooplLabel k) v) m
+  {-# INLINEABLE mapFilter #-}
   mapFilter f (LM m) = LM (mapFilter f m)
+  {-# INLINEABLE mapFilterWithKey #-}
   mapFilterWithKey f (LM m) = LM (mapFilterWithKey (f . mkHooplLabel) m)
 
   mapElems (LM m) = mapElems m
   mapKeys (LM m) = map mkHooplLabel (mapKeys m)
+  {-# INLINEABLE mapToList #-}
   mapToList (LM m) = [(mkHooplLabel k, v) | (k, v) <- mapToList m]
   mapFromList assocs = LM (mapFromList [(lblToUnique k, v) | (k, v) <- assocs])
   mapFromListWith f assocs = LM (mapFromListWith f [(lblToUnique k, v) | (k, v) <- assocs])

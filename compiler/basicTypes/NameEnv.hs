@@ -6,6 +6,9 @@
 -}
 
 {-# LANGUAGE CPP #-}
+{-# LANGUAGE BangPatterns #-}
+{-# LANGUAGE ScopedTypeVariables #-}
+
 module NameEnv (
         -- * Var, Id and TyVar environments (maps)
         NameEnv,
@@ -60,7 +63,8 @@ deterministic even when the edges are not in deterministic order as explained
 in Note [Deterministic SCC] in Digraph.
 -}
 
-depAnal :: (node -> [Name])      -- Defs
+depAnal :: forall node.
+           (node -> [Name])      -- Defs
         -> (node -> [Name])      -- Uses
         -> [node]
         -> [SCC node]
@@ -69,11 +73,13 @@ depAnal :: (node -> [Name])      -- Defs
 --
 -- The get_defs and get_uses functions are called only once per node
 depAnal get_defs get_uses nodes
-  = stronglyConnCompFromEdgedVerticesUniq (map mk_node keyed_nodes)
+  = stronglyConnCompFromEdgedVerticesUniq graph_nodes
   where
+    graph_nodes = (map mk_node keyed_nodes) :: [Node Int node]
     keyed_nodes = nodes `zip` [(1::Int)..]
     mk_node (node, key) =
-      DigraphNode node key (mapMaybe (lookupNameEnv key_map) (get_uses node))
+      let !edges = (mapMaybe (lookupNameEnv key_map) (get_uses node))
+      in DigraphNode node key edges
 
     key_map :: NameEnv Int   -- Maps a Name to the key of the decl that defines it
     key_map = mkNameEnv [(name,key) | (node, key) <- keyed_nodes, name <- get_defs node]

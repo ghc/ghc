@@ -167,11 +167,14 @@ instance IsMap UniqueMap where
   mapFoldr k z (UM m) = M.foldr k z m
   mapFoldlWithKey k z (UM m) = M.foldlWithKey' k z m
   mapFoldMapWithKey f (UM m) = M.foldMapWithKey f m
+  {-# INLINEABLE mapFilter #-}
   mapFilter f (UM m) = UM (M.filter f m)
+  {-# INLINEABLE mapFilterWithKey #-}
   mapFilterWithKey f (UM m) = UM (M.filterWithKey f m)
 
   mapElems (UM m) = M.elems m
   mapKeys (UM m) = M.keys m
+  {-# INLINEABLE mapToList #-}
   mapToList (UM m) = M.toList m
   mapFromList assocs = UM (M.fromList assocs)
   mapFromListWith f assocs = UM (M.fromListWith f assocs)

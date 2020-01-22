@@ -6,11 +6,12 @@ import GhcPrelude
 
 import GHC.Stg.Syntax
 import Id
-import Name (Name)
+import Name (Name, nameIsLocalOrFrom)
 import NameEnv
 import Outputable
 import UniqSet (nonDetEltsUniqSet)
 import VarSet
+import Module (Module)
 
 import Data.Graph (SCC (..))
 
@@ -31,13 +32,13 @@ type FVs = VarSet
 -- of all bindings in the group.
 --
 -- Implementation: pass bound variables (BVs) to recursive calls, get free
--- variables (FVs) back.
+-- variables (FVs) back. We ignore imported FVs as they do not change the
+-- ordering but it improves performance.
 --
-annTopBindingsDeps :: [StgTopBinding] -> [(StgTopBinding, FVs)]
-annTopBindingsDeps bs = zip bs (map top_bind bs)
+annTopBindingsDeps :: Module -> [StgTopBinding] -> [(StgTopBinding, FVs)]
+annTopBindingsDeps this_mod bs = zip bs (map top_bind bs)
   where
     top_bind :: StgTopBinding -> FVs
-
     top_bind StgTopStringLit{} =
       emptyVarSet
 
@@ -45,10 +46,8 @@ annTopBindingsDeps bs = zip bs (map top_bind bs)
       binding emptyVarSet bs
 
     binding :: BVs -> StgBinding -> FVs
-
     binding bounds (StgNonRec _ r) =
       rhs bounds r
-
     binding bounds (StgRec bndrs) =
       unionVarSets $
         map (bind_non_rec (extendVarSetList bounds (map fst bndrs))) bndrs
@@ -58,7 +57,6 @@ annTopBindingsDeps bs = zip bs (map top_bind bs)
         rhs bounds r
 
     rhs :: BVs -> StgRhs -> FVs
-
     rhs bounds (StgRhsClosure _ _ _ as e) =
       expr (extendVarSetList bounds as) e
 
@@ -68,6 +66,7 @@ annTopBindingsDeps bs = zip bs (map top_bind bs)
     var :: BVs -> Var -> FVs
     var bounds v
       | not (elemVarSet v bounds)
+      , nameIsLocalOrFrom this_mod (idName v)
       = unitVarSet v
       | otherwise
       = emptyVarSet
@@ -80,7 +79,6 @@ annTopBindingsDeps bs = zip bs (map top_bind bs)
     args bounds as = unionVarSets (map (arg bounds) as)
 
     expr :: BVs -> StgExpr -> FVs
-
     expr bounds (StgApp f as) =
       var bounds f `unionVarSet` args bounds as
 
@@ -89,21 +87,16 @@ annTopBindingsDeps bs = zip bs (map top_bind bs)
 
     expr bounds (StgConApp _ as _) =
       args bounds as
-
     expr bounds (StgOpApp _ as _) =
       args bounds as
-
     expr _ lam@StgLam{} =
       pprPanic "annTopBindingsDeps" (text "Found lambda:" $$ ppr lam)
-
     expr bounds (StgCase scrut scrut_bndr _ as) =
       expr bounds scrut `unionVarSet`
         alts (extendVarSet bounds scrut_bndr) as
-
     expr bounds (StgLet _ bs e) =
       binding bounds bs `unionVarSet`
         expr (extendVarSetList bounds (bindersOf bs)) e
-
     expr bounds (StgLetNoEscape _ bs e) =
       binding bounds bs `unionVarSet`
         expr (extendVarSetList bounds (bindersOf bs)) e
@@ -122,8 +115,10 @@ annTopBindingsDeps bs = zip bs (map top_bind bs)
 -- * Dependency sorting
 
 -- | Dependency sort a STG program so that dependencies come before uses.
-depSortStgPgm :: [StgTopBinding] -> [StgTopBinding]
-depSortStgPgm = map fst . depSort . annTopBindingsDeps
+depSortStgPgm :: Module -> [StgTopBinding] -> [StgTopBinding]
+depSortStgPgm this_mod =
+    {-# SCC "STG.depSort" #-}
+    map fst . depSort . annTopBindingsDeps this_mod
 
 -- | Sort free-variable-annotated STG bindings so that dependencies come before
 -- uses.

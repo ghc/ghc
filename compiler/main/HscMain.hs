@@ -1542,6 +1542,24 @@ hscCompileCmmFile hsc_env filename output_filename = runHsc hsc_env $ do
 
 -------------------- Stuff for new code gen ---------------------
 
+{-
+Note [Forcing of stg_binds]
+~~~~~~~~~~~~~~~~~~~~~~~~~~~
+
+The two last steps in the STG pipeline are:
+
+* Sorting the bindings in dependency order.
+* Annotating them with free variables.
+
+We want to make sure we do not keep references to unannotated STG bindings
+alive, nor references to bindings which have already been compiled to Cmm.
+
+We explicitly force the bindings to avoid this.
+
+This reduces residency towards the end of the CodeGen phase significantly
+(5-10%).
+-}
+
 doCodeGen   :: HscEnv -> Module -> [TyCon]
             -> CollectedCCs
             -> [StgTopBinding]
@@ -1557,7 +1575,8 @@ doCodeGen hsc_env this_mod data_tycons
     let stg_binds_w_fvs = annTopBindingsFreeVars stg_binds
 
     let cmm_stream :: Stream IO CmmGroup ()
-        cmm_stream = {-# SCC "StgToCmm" #-}
+        -- See Note [Forcing of stg_binds]
+        cmm_stream = stg_binds_w_fvs `seqList` {-# SCC "StgToCmm" #-}
             lookupHook stgToCmmHook StgToCmm.codeGen dflags dflags this_mod data_tycons
                            cost_centre_info stg_binds_w_fvs hpc_info
 
