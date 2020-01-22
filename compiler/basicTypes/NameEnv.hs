@@ -45,7 +45,6 @@ import UniqFM
 import UniqDFM
 import Maybes
 import NameSet
-import Util (seqList)
 
 {-
 ************************************************************************
