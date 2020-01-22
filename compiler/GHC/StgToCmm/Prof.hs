@@ -28,12 +28,12 @@ import GhcPrelude
 import GHC.StgToCmm.Closure
 import GHC.StgToCmm.Utils
 import GHC.StgToCmm.Monad
-import SMRep
+import GHC.Runtime.Layout
 
-import MkGraph
-import Cmm
-import CmmUtils
-import CLabel
+import GHC.Cmm.Graph
+import GHC.Cmm
+import GHC.Cmm.Utils
+import GHC.Cmm.CLabel
 
 import CostCentre
 import DynFlags
