@@ -309,7 +309,7 @@ validate-x86_64-darwin:
     - x86_64-darwin
   variables:
     GHC_VERSION: 8.6.5
-    CABAL_INSTALL_VERSION: 2.4.1.0
+    CABAL_INSTALL_VERSION: 3.0.0.0
     BIN_DIST_PREP_TAR_COMP: "ghc-x86_64-apple-darwin.tar.xz"
     MACOSX_DEPLOYMENT_TARGET: "10.7"
     # Only Sierra and onwards supports clock_gettime. See #12858
@@ -735,7 +735,7 @@ validate-x86_64-linux-fedora27:
     #FORCE_SYMLINKS: 1
     LANG: "en_US.UTF-8"
     SPHINXBUILD: "/mingw64/bin/sphinx-build.exe"
-    CABAL_INSTALL_VERSION: 2.4.1.0
+    CABAL_INSTALL_VERSION: 3.0.0.0
     GHC_VERSION: "8.6.5"
   cache:
     paths:

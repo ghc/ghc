@@ -65,12 +65,10 @@ function mingw_init() {
     MINGW32)
       triple="i686-unknown-mingw32"
       boot_triple="i386-unknown-mingw32" # triple of bootstrap GHC
-      cabal_arch="i386"
       ;;
     MINGW64)
       triple="x86_64-unknown-mingw32"
       boot_triple="x86_64-unknown-mingw32" # triple of bootstrap GHC
-      cabal_arch="x86_64"
       ;;
     *)
       fail "win32-init: Unknown MSYSTEM $MSYSTEM"
@@ -153,6 +151,11 @@ function fetch_cabal() {
       start_section "fetch GHC"
       case "$(uname)" in
         MSYS_*|MINGW*)
+          case "$MSYSTEM" in
+            MINGW32) cabal_arch="i386" ;;
+            MINGW64) cabal_arch="x86_64" ;;
+            *) fail "unknown MSYSTEM $MSYSTEM" ;;
+          esac
           url="https://downloads.haskell.org/~cabal/cabal-install-$CABAL_INSTALL_VERSION/cabal-install-$CABAL_INSTALL_VERSION-$cabal_arch-unknown-mingw32.zip"
           info "Fetching cabal binary distribution from $url..."
           curl $url > $TMP/cabal.zip
@@ -161,7 +164,7 @@ function fetch_cabal() {
           ;;
         *)
           case "$(uname)" in
-            Darwin) cabal_triple="x86_64-apple-darwin-sierra" ;;
+            Darwin) cabal_triple="x86_64-apple-darwin17.7.0" ;;
             *) fail "don't know where to fetch cabal-install for $(uname)"
           esac
           local url="https://downloads.haskell.org/~cabal/cabal-install-$CABAL_INSTALL_VERSION/cabal-install-$CABAL_INSTALL_VERSION-$cabal_triple.tar.xz"
