@@ -1,4 +1,4 @@
-#!/bin/bash
+#!/usr/bin/env bash
 
 # This is the primary driver of the GitLab CI infrastructure.
 
