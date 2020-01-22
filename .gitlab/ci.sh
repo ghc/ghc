@@ -113,6 +113,27 @@ function show_tool() {
   ${!tool} --version
 }
 
+function set_toolchain_paths() {
+  local needs_toolchain=1
+  case "$(uname)" in
+    Linux) needs_toolchain="" ;;
+    *) ;;
+  esac
+
+  if [[ -n "$needs_toolchain" ]]; then
+      # These are populated by setup_toolchain
+      export GHC="$toolchain/bin/ghc"
+      export CABAL=$toolchain/bin/cabal${exe}
+      export HAPPY="$toolchain/bin/happy$exe"
+      export ALEX="$toolchain/bin/alex$exe"
+  else
+      export GHC="$(which ghc)"
+      export CABAL="/usr/local/bin/cabal"
+      export HAPPY="$HOME/.cabal/bin/happy"
+      export ALEX="$HOME/.cabal/bin/alex"
+  fi
+}
+
 # Extract GHC toolchain
 function setup() {
   if [ -d "$TOP/cabal-cache" ]; then
@@ -123,12 +144,7 @@ function setup() {
   case "$(uname)" in
     Darwin) darwin_setup; setup_toolchain ;;
     MSYS_*|MINGW*) setup_toolchain ;;
-    Linux)
-      export GHC="$(which ghc)"
-      export CABAL="/usr/local/bin/cabal"
-      export HAPPY="$HOME/.cabal/bin/happy"
-      export ALEX="$HOME/.cabal/bin/alex"
-      ;;
+    Linux) ;;
     *) ;;
   esac
 
@@ -146,7 +162,6 @@ function setup() {
 }
 
 function fetch_cabal() {
-  export CABAL=$toolchain/bin/cabal${exe}
   if [ ! -e "$CABAL" ]; then
       start_section "fetch GHC"
       case "$(uname)" in
@@ -181,7 +196,6 @@ function fetch_cabal() {
 # here. For Docker platforms this is done in the Docker image
 # build.
 function setup_toolchain() {
-  export GHC="$toolchain/bin/ghc"
   if [ ! -e "$GHC" ]; then
       start_section "fetch GHC"
       url="https://downloads.haskell.org/~ghc/${GHC_VERSION}/ghc-${GHC_VERSION}-${boot_triple}.tar.xz"
@@ -201,14 +215,12 @@ function setup_toolchain() {
     *) ;;
   esac
 
-  export HAPPY="$toolchain/bin/happy$exe"
   if [ ! -e "$HAPPY" ]; then
       info "Building happy..."
       cabal update
       $cabal_install happy
   fi
 
-  export ALEX="$toolchain/bin/alex$exe"
   if [ ! -e "$ALEX" ]; then
       info "Building alex..."
       cabal update
@@ -346,7 +358,7 @@ function clean() {
 
 # Determine Cabal data directory
 case "$(uname)" in
-  MSYS_*|MINGW*) cabal_dir="$APPDATA/cabal"; exe=".exe" ;;
+  MSYS_*|MINGW*) exe=".exe"; cabal_dir="$APPDATA/cabal" ;;
   *) cabal_dir="$HOME/.cabal"; exe="" ;;
 esac
 
@@ -358,6 +370,8 @@ case "$(uname)" in
   Linux) ;;
   *) fail "uname $(uname) is not supported" ;;
 esac
+
+set_toolchain_paths
 
 case $1 in
   setup) setup && cleanup_submodules ;;
