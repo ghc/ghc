@@ -163,30 +163,38 @@ function setup() {
 }
 
 function fetch_cabal() {
+  local v="$CABAL_INSTALL_VERSION"
+  if [[ -z "$v" ]]; then
+      fail "CABAL_INSTALL_VERSION is not set"
+  fi
+
   if [ ! -e "$CABAL" ]; then
       start_section "fetch GHC"
       case "$(uname)" in
+        # N.B. Windows uses zip whereas all others use .tar.xz
         MSYS_*|MINGW*)
           case "$MSYSTEM" in
             MINGW32) cabal_arch="i386" ;;
             MINGW64) cabal_arch="x86_64" ;;
             *) fail "unknown MSYSTEM $MSYSTEM" ;;
           esac
-          url="https://downloads.haskell.org/~cabal/cabal-install-$CABAL_INSTALL_VERSION/cabal-install-$CABAL_INSTALL_VERSION-$cabal_arch-unknown-mingw32.zip"
+          url="https://downloads.haskell.org/~cabal/cabal-install-$v/cabal-install-$v-$cabal_arch-unknown-mingw32.zip"
           info "Fetching cabal binary distribution from $url..."
           curl $url > $TMP/cabal.zip
           unzip $TMP/cabal.zip
           mv cabal.exe $CABAL
           ;;
         *)
+          local base_url="https://downloads.haskell.org/~cabal/cabal-install-$v/"
           case "$(uname)" in
-            Darwin) cabal_triple="x86_64-apple-darwin17.7.0" ;;
-            FreeBSD) cabal_triple="x86_64-portbld-freebsd" ;;
+            Darwin) cabal_url="$base_url/cabal-install-$v-x86_64-apple-darwin17.7.0.tar.xz" ;;
+            FreeBSD)
+              #cabal_url="$base_url/cabal-install-$v-x86_64-portbld-freebsd.tar.xz" ;;
+              cabal_url="https://home.smart-cactus.org/~ben/ghc/cabal-install-3.0.0.0-x86_64-portbld-freebsd.tar.xz" ;;
             *) fail "don't know where to fetch cabal-install for $(uname)"
           esac
-          local url="https://downloads.haskell.org/~cabal/cabal-install-$CABAL_INSTALL_VERSION/cabal-install-$CABAL_INSTALL_VERSION-$cabal_triple.tar.xz"
-          echo "Fetching cabal-install from $url"
-          curl $url > cabal.tar.xz
+          echo "Fetching cabal-install from $cabal_url"
+          curl $cabal_url > cabal.tar.xz
           tar -xJf cabal.tar.xz
           mv cabal $toolchain/bin
           ;;
