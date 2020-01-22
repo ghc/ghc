@@ -190,7 +190,7 @@ function fetch_cabal() {
             Darwin) cabal_url="$base_url/cabal-install-$v-x86_64-apple-darwin17.7.0.tar.xz" ;;
             FreeBSD)
               #cabal_url="$base_url/cabal-install-$v-x86_64-portbld-freebsd.tar.xz" ;;
-              cabal_url="https://home.smart-cactus.org/~ben/ghc/cabal-install-3.0.0.0-x86_64-portbld-freebsd.tar.xz" ;;
+              cabal_url="http://home.smart-cactus.org/~ben/ghc/cabal-install-3.0.0.0-x86_64-portbld-freebsd.tar.xz" ;;
             *) fail "don't know where to fetch cabal-install for $(uname)"
           esac
           echo "Fetching cabal-install from $cabal_url"
@@ -310,8 +310,8 @@ function build_make() {
 
   echo "include mk/flavours/${BUILD_FLAVOUR}.mk" > mk/build.mk
   echo 'GhcLibHcOpts+=-haddock' >> mk/build.mk
-  run make -j$(mk/detect-cpu-count.sh) $MAKE_ARGS
-  run make -j$(mk/detect-cpu-count.sh) binary-dist TAR_COMP_OPTS=-1
+  run $MAKE -j$(mk/detect-cpu-count.sh) $MAKE_ARGS
+  run $MAKE -j$(mk/detect-cpu-count.sh) binary-dist TAR_COMP_OPTS=-1
   ls -lh ghc.tar.xz
 }
 
@@ -326,8 +326,8 @@ function push_perf_notes() {
 }
 
 function test_make() {
-  run make test_bindist TEST_PREP=YES
-  run make V=0 test \
+  run $MAKE test_bindist TEST_PREP=YES
+  run $MAKE V=0 test \
     THREADS=$(mk/detect-cpu-count.sh) \
     JUNIT_FILE=../../junit.xml
 }
@@ -349,7 +349,7 @@ function build_hadrian() {
 function test_hadrian() {
   cd _build/bindist/ghc-*/
   run ./configure --prefix=$TOP/_build/install
-  run make install
+  run $MAKE install
   cd ../../../
 
   run hadrian/build.cabal.sh \
@@ -363,7 +363,7 @@ function test_hadrian() {
 
 function clean() {
   rm -R tmp
-  run make clean || true
+  run $MAKE clean || true
   run rm -Rf _build
 }
 
@@ -374,10 +374,14 @@ case "$(uname)" in
 esac
 
 # Platform-specific environment initialization
+MAKE="make"
 case "$(uname)" in
   MSYS_*|MINGW*) mingw_init ;;
   Darwin) boot_triple="x86_64-apple-darwin" ;;
-  FreeBSD) boot_triple="x86_64-portbld-freebsd" ;;
+  FreeBSD)
+    boot_triple="x86_64-portbld-freebsd"
+    MAKE="gmake"
+    ;;
   Linux) ;;
   *) fail "uname $(uname) is not supported" ;;
 esac
