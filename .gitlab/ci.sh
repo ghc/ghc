@@ -124,7 +124,7 @@ function setup() {
 
   case "$(uname)" in
     Darwin) darwin_setup; setup_toolchain ;;
-    MSYS_*) setup_toolchain ;;
+    MSYS_*|MINGW*) setup_toolchain ;;
     Linux)
       export GHC="$(which ghc)"
       export CABAL="/usr/local/bin/cabal"
@@ -152,7 +152,7 @@ function fetch_cabal() {
   if [ ! -e "$CABAL" ]; then
       start_section "fetch GHC"
       case "$(uname)" in
-        MSYS)
+        MSYS_*|MINGW*)
           url="https://downloads.haskell.org/~cabal/cabal-install-$CABAL_INSTALL_VERSION/cabal-install-$CABAL_INSTALL_VERSION-$cabal_arch-unknown-mingw32.zip"
           info "Fetching cabal binary distribution from $url..."
           curl $url > $TMP/cabal.zip
@@ -338,14 +338,13 @@ function clean() {
 
 # Determine Cabal data directory
 case "$(uname)" in
-  MSYS_*) cabal_dir="$APPDATA/cabal"; exe="exe" ;;
+  MSYS_*|MINGW*) cabal_dir="$APPDATA/cabal"; exe="exe" ;;
   *) cabal_dir="$HOME/.cabal"; exe="" ;;
 esac
 
 # Platform-specific environment initialization
 case "$(uname)" in
-  MSYS_*) mingw_init ;;
-  MINGW*) mingw_init ;;
+  MSYS_*|MINGW*) mingw_init ;;
   Darwin) boot_triple="x86_64-apple-darwin" ;;
   FreeBSD) ;;
   Linux) ;;
