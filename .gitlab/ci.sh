@@ -194,7 +194,7 @@ function setup_toolchain() {
   fi
 
   fetch_cabal
-  cabal_install="$CABAL v2-install --index=state=$hackage_index_state --installdir=$toolchain/bin"
+  cabal_install="$CABAL v2-install --index-state=$hackage_index_state --installdir=$toolchain/bin"
 
   export HAPPY="$toolchain/bin/happy"
   if [ ! -e "$HAPPY" ]; then
