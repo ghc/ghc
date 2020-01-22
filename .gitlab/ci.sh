@@ -25,6 +25,18 @@ LT_CYAN="1;36"
 WHITE="1;37"
 LT_GRAY="0;37"
 
+# GitLab Pipelines log section delimiters
+# https://gitlab.com/gitlab-org/gitlab-foss/issues/14664
+start_section() {
+  name="$1"
+  echo "section_start:$(date +%s):$name\r\033\[0K"
+}
+
+end_section() {
+  name="$1"
+  echo "section_end:$(date +%s):$name\r\033\[0K"
+}
+
 echo_color() {
   local color="$1"
   local msg="$2"
@@ -234,7 +246,6 @@ EOF
 }
 
 function configure() {
-  prepare_build_mk
   run python3 boot
   run ./configure \
     --enable-tarballs-autodownload \
@@ -247,7 +258,7 @@ function configure() {
 }
 
 function build_make() {
-  if [ -z "$BUILD_FLAVOUR" ]; then fail "BUILD_FLAVOUR not set"; fi
+  prepare_build_mk
 
   echo "include mk/flavours/${BUILD_FLAVOUR}.mk" > mk/build.mk
   echo 'GhcLibHcOpts+=-haddock' >> mk/build.mk
