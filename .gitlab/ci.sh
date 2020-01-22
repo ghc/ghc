@@ -122,8 +122,8 @@ function set_toolchain_paths() {
 
   if [[ -n "$needs_toolchain" ]]; then
       # These are populated by setup_toolchain
-      export GHC="$toolchain/bin/ghc"
-      export CABAL=$toolchain/bin/cabal${exe}
+      export GHC="$toolchain/bin/ghc$exe"
+      export CABAL="$toolchain/bin/cabal$exe"
       export HAPPY="$toolchain/bin/happy$exe"
       export ALEX="$toolchain/bin/alex$exe"
   else
@@ -160,6 +160,35 @@ function setup() {
   show_tool CABAL
   show_tool HAPPY
   show_tool ALEX
+}
+
+function fetch_ghc() {
+  local v="$GHC_VERSION"
+  if [[ -z "$v" ]]; then
+      fail "GHC_VERSION is not set"
+  fi
+
+  if [ ! -e "$GHC" ]; then
+      start_section "fetch GHC"
+      url="https://downloads.haskell.org/~ghc/${GHC_VERSION}/ghc-${GHC_VERSION}-${boot_triple}.tar.xz"
+      info "Fetching GHC binary distribution from $url..."
+      curl $url > ghc.tar.xz || fail "failed to fetch GHC binary distribution"
+      tar -xJf ghc.tar.xz || fail "failed to extract GHC binary distribution"
+      case "$(uname)" in
+        MSYS_*|MINGW*)
+          cp -r ghc-${GHC_VERSION}/* $toolchain
+          ;;
+        *)
+          pushd ghc-${GHC_VERSION}
+          ./configure --prefix=$toolchain
+          $MAKE install
+          popd
+          ;;
+      esac
+      rm -Rf ghc-${GHC_VERSION} ghc.tar.xz
+      end_section "fetch GHC"
+  fi
+
 }
 
 function fetch_cabal() {
@@ -207,17 +236,7 @@ function fetch_cabal() {
 # here. For Docker platforms this is done in the Docker image
 # build.
 function setup_toolchain() {
-  if [ ! -e "$GHC" ]; then
-      start_section "fetch GHC"
-      url="https://downloads.haskell.org/~ghc/${GHC_VERSION}/ghc-${GHC_VERSION}-${boot_triple}.tar.xz"
-      info "Fetching GHC binary distribution from $url..."
-      curl $url > ghc.tar.xz || fail "failed to fetch GHC binary distribution"
-      tar -xJf ghc.tar.xz || fail "failed to extract GHC binary distribution"
-      cp -r ghc-${GHC_VERSION}/* toolchain
-      rm -Rf ghc-${GHC_VERSION} ghc.tar.xz
-      end_section "fetch GHC"
-  fi
-
+  fetch_ghc
   fetch_cabal
   cabal_install="$CABAL v2-install --index-state=$hackage_index_state --installdir=$toolchain/bin"
   # Avoid symlinks on Windows
