@@ -482,7 +482,7 @@ mkVirtHeapOffsetsWithPadding dflags header things =
 
         with_padding field_off
             | padding == 0 = DL.singleton field_off
-            | otherwise    = DL.fromList 
+            | otherwise    = DL.fromList
                                [ Padding padding (hdr_bytes + bytes_so_far)
                                , field_off
                                ]

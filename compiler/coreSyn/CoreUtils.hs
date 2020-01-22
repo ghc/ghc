@@ -2257,7 +2257,7 @@ diffIdInfo env bndr1 bndr2
   = locBind "in unfolding of" bndr1 bndr2 $
     diffUnfold env (unfoldingInfo info1) (unfoldingInfo info2)
   | otherwise
-  = locBind "in Id info of" bndr1 bndr2 . DL.singleton $ 
+  = locBind "in Id info of" bndr1 bndr2 . DL.singleton $
     fsep [pprBndr LetBind bndr1, text "/=", pprBndr LetBind bndr2]
   where info1 = idInfo bndr1; info2 = idInfo bndr2
 

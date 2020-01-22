@@ -116,9 +116,9 @@ mkUsageInfo hsc_env this_mod dir_imp_mods used_names dependent_files merged
     let mod_usages = DL.fromList $ mk_mod_usage_info (eps_PIT eps) hsc_env
                                                      this_mod dir_imp_mods
                                                      used_names
-        usage_files = DL.fromList $ 
+        usage_files = DL.fromList $
                         uncurry UsageFile <$> zip dependent_files hashes
-        usage_mergedreqs = DL.fromList $ 
+        usage_mergedreqs = DL.fromList $
                              uncurry UsageMergedRequirement <$> merged
         usages = DL.toList $ mod_usages DL.++ usage_files DL.++ usage_mergedreqs
                                         DL.++ plugin_usages

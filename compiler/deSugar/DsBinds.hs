@@ -114,7 +114,7 @@ dsLHsBinds :: LHsBinds GhcTc -> DsM ([Id], [(Id,CoreExpr)])
 dsLHsBinds binds = do
   let bindsToDL (str, bnds) = (DL.fromList str, DL.fromList bnds)
   ds_bs <- mapBagM (fmap bindsToDL . dsLHsBind) binds
-  let 
+  let
     (strictDL, bindingDL) =
       foldBag (\(a, a') (b, b') -> (a DL.++ b, a' DL.++ b'))
               id (DL.empty, DL.empty) ds_bs
