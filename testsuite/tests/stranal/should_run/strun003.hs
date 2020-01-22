@@ -1,8 +1,9 @@
 -- This module should run fine with an empty argument list
--- But it won't if the strictness analyser thinks that 'len' is use
+-- But it won't if the strictness analyser thinks that 'len' is used
 -- strictly, which was the case in GHC 6.0
 
--- See the io_hack_reqd in DmdAnal.lhs
+-- See Note [Precise exceptions and strictness analysis] in DmdAnal.hs
+-- This is similar to T17676, but with an extra putStrLn.
 
 module Main where
 
