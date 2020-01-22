@@ -132,6 +132,12 @@ function set_toolchain_paths() {
       export HAPPY="$HOME/.cabal/bin/happy"
       export ALEX="$HOME/.cabal/bin/alex"
   fi
+
+  # FIXME: Temporarily use ghc from ports
+  case "$(uname)" in
+    FreeBSD) GHC="/usr/local/bin/ghc" ;;
+    *) ;;
+  esac
 }
 
 # Extract GHC toolchain
