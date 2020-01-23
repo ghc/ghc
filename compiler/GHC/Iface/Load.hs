@@ -525,8 +525,9 @@ loadInterface doc_str mod from
                                                    (length new_eps_insts)
                                                    (length new_eps_rules) }
 
-        ; -- invoke plugins
-          res <- withPlugins dflags interfaceLoadAction final_iface
+        ; -- invoke plugins with *full* interface, not final_iface, to ensure
+          -- that plugins have access to declarations, etc.
+          res <- withPlugins dflags interfaceLoadAction iface
         ; return (Succeeded res)
     }}}}
 
