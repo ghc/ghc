@@ -632,7 +632,7 @@ pprNameDefnLoc name
          -- nameSrcLoc rather than nameSrcSpan
          -- It seems less cluttered to show a location
          -- rather than a span for the definition point
-       RealSrcLoc s -> text "at" <+> ppr s
+       RealSrcLoc s _ -> text "at" <+> ppr s
        UnhelpfulLoc s
          | isInternalName name || isSystemName name
          -> text "at" <+> ftext s
