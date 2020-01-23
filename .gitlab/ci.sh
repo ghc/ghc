@@ -332,6 +332,9 @@ function configure() {
 
 function build_make() {
   prepare_build_mk
+  if [[ -z "$BIN_DIST_PREP_TAR_COMP" ]]; then
+    fail "BIN_DIST_PREP_TAR_COMP is not set"
+  fi
 
   echo "include mk/flavours/${BUILD_FLAVOUR}.mk" > mk/build.mk
   echo 'GhcLibHcOpts+=-haddock' >> mk/build.mk
