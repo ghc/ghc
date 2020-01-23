@@ -207,18 +207,18 @@ Furthermore GHC lets you specify the way event log data (see :rts-flag:`-l
 
 To use an :c:type:`EventLogWriter` the RTS API provides the following functions:
 
-.. c:func:: enum EventLogStatus eventLogStatus(void)
+.. c:function:: enum EventLogStatus eventLogStatus(void)
 
    Query whether the current runtime system supports the eventlog (e.g. whether
    the current executable was linked with :ghc-flag:`-eventlog`) and, if it
    is supported, whether it is currently logging.
 
-.. c:func:: bool startEventLogging(const EventLogWriter *writer)
+.. c:function:: bool startEventLogging(const EventLogWriter *writer)
 
    Start logging events to the given :c:type:`EventLogWriter`. Returns true on
    success or false is another writer has already been configured.
 
-.. c:func:: void endEventLogging()
+.. c:function:: void endEventLogging()
 
    Tear down the active :c:type:`EventLogWriter`.
 
