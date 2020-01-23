@@ -391,7 +391,7 @@ function test_hadrian() {
 
 function clean() {
   rm -R tmp
-  run $MAKE clean || true
+  run $MAKE --quiet clean || true
   run rm -Rf _build
 }
 
