@@ -2007,12 +2007,9 @@ kcInferDeclHeader name flav
                --
                -- mkAnonTyConBinder: see Note [No polymorphic recursion]
 
-             all_tv_prs = (kv_ns                `zip` scoped_kvs) ++
-                          (hsLTyVarNames hs_tvs `zip` tc_tvs)
-               -- NB: bindIplicitTKBndrs_Q_Tv makes /freshly-named/ unification
-               --     variables, hence the need to zip here.  Ditto bindExplicit..
-               -- See TcMType Note [Unification variables need fresh Names]
-
+             all_tv_prs = mkTyVarNamePairs (scoped_kvs ++ tc_tvs)
+               -- NB: bindExplicitTKBndrs_Q_Tv does not clone;
+               --     ditto Implicit
              tycon = mkTcTyCon name tc_binders res_kind all_tv_prs
                                False -- not yet generalised
                                flav
@@ -2209,7 +2206,7 @@ kcCheckDeclHeader_sig kisig name flav ktvs kc_res_ki =
     -- similar to:  bindImplicitTKBndrs_Tv
     bind_implicit :: [Name] -> ([(Name,TcTyVar)] -> TcM a) -> TcM a
     bind_implicit tv_names thing_inside =
-      do { let new_tv name = do { tcv <- newFlexiKindedTyVarTyVar name
+      do { let new_tv name = do { tcv <- cloneFlexiKindedTyVarTyVar name
                                 ; return (name, tcv) }
          ; tcvs <- mapM new_tv tv_names
          ; tcExtendNameTyVarEnv tcvs (thing_inside tcvs) }
@@ -2576,6 +2573,36 @@ expectedKindInCtxt _                   = OpenKind
 *                                                                      *
 ********************************************************************* -}
 
+{- Note [Cloning for tyvar binders]
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+bindExplicitTKBndrs_Tv does cloning, making up a Name with a fresh Unique,
+unlike bindExplicitTKBndrs_Q_Tv.  (Nor do the Skol variants clone.)
+And similarly for bindImplicit...
+
+This for a narrow and tricky reason which, alas, I couldn't find a
+simpler way round.  #16221 is the poster child:
+
+   data SameKind :: k -> k -> *
+   data T a = forall k2 (b :: k2). MkT (SameKind a b) !Int
+
+When kind-checking T, we give (a :: kappa1). Then, in kcConDecl we make
+a unification variable kappa2 for k2, via bindExplicitTKBndrs_Tv, and
+then we end up unifying kappa1 := kappa2 (because of the (SameKind a b)).
+
+Now we generalise over kappa2. But if kappa2's Name is precisely k2
+(i.e. we did not clone) we'll end up giving T the utterlly final kind
+  T :: forall k2. k2 -> *
+Nothing directly wrong with that but when we typecheck the data constrautor
+we have k2 in scope; but then it's brought into scope again when we find
+the forall k2.  This is chaotic, and we end up giving it the type
+  MkT :: forall k1 (a :: k1) k2 (b :: k2).
+         SameKind @k2 a b -> Int -> T0 @{k2} a
+which is bogus.  The result type should be T0 @{k1} a.
+
+And there no reason /not/ to clone the Name when making a unification
+variable.  So that's what we do.
+-}
+
 --------------------------------------
 -- Implicit binders
 --------------------------------------
@@ -2583,10 +2610,11 @@ expectedKindInCtxt _                   = OpenKind
 bindImplicitTKBndrs_Skol, bindImplicitTKBndrs_Tv,
   bindImplicitTKBndrs_Q_Skol, bindImplicitTKBndrs_Q_Tv
   :: [Name] -> TcM a -> TcM ([TcTyVar], a)
-bindImplicitTKBndrs_Skol   = bindImplicitTKBndrsX newFlexiKindedSkolemTyVar
-bindImplicitTKBndrs_Tv     = bindImplicitTKBndrsX newFlexiKindedTyVarTyVar
 bindImplicitTKBndrs_Q_Skol = bindImplicitTKBndrsX (newImplicitTyVarQ newFlexiKindedSkolemTyVar)
 bindImplicitTKBndrs_Q_Tv   = bindImplicitTKBndrsX (newImplicitTyVarQ newFlexiKindedTyVarTyVar)
+bindImplicitTKBndrs_Skol   = bindImplicitTKBndrsX newFlexiKindedSkolemTyVar
+bindImplicitTKBndrs_Tv     = bindImplicitTKBndrsX cloneFlexiKindedTyVarTyVar
+  -- cloneFlexiKindedTyVarTyVar: see Note [Cloning for tyvar binders]
 
 bindImplicitTKBndrsX
    :: (Name -> TcM TcTyVar) -- new_tv function
@@ -2619,7 +2647,10 @@ newFlexiKindedSkolemTyVar = newFlexiKindedTyVar newSkolemTyVar
 
 newFlexiKindedTyVarTyVar :: Name -> TcM TyVar
 newFlexiKindedTyVarTyVar = newFlexiKindedTyVar newTyVarTyVar
-   -- See Note [Unification variables need fresh Names] in TcMType
+
+cloneFlexiKindedTyVarTyVar :: Name -> TcM TyVar
+cloneFlexiKindedTyVarTyVar = newFlexiKindedTyVar cloneTyVarTyVar
+   -- See Note [Cloning for tyvar binders]
 
 --------------------------------------
 -- Explicit binders
@@ -2631,7 +2662,8 @@ bindExplicitTKBndrs_Skol, bindExplicitTKBndrs_Tv
     -> TcM ([TcTyVar], a)
 
 bindExplicitTKBndrs_Skol = bindExplicitTKBndrsX (tcHsTyVarBndr newSkolemTyVar)
-bindExplicitTKBndrs_Tv   = bindExplicitTKBndrsX (tcHsTyVarBndr newTyVarTyVar)
+bindExplicitTKBndrs_Tv   = bindExplicitTKBndrsX (tcHsTyVarBndr cloneTyVarTyVar)
+  -- cloneTyVarTyVar: see Note [Cloning for tyvar binders]
 
 bindExplicitTKBndrs_Q_Skol, bindExplicitTKBndrs_Q_Tv
     :: ContextKind
@@ -2641,6 +2673,7 @@ bindExplicitTKBndrs_Q_Skol, bindExplicitTKBndrs_Q_Tv
 
 bindExplicitTKBndrs_Q_Skol ctxt_kind = bindExplicitTKBndrsX (tcHsQTyVarBndr ctxt_kind newSkolemTyVar)
 bindExplicitTKBndrs_Q_Tv   ctxt_kind = bindExplicitTKBndrsX (tcHsQTyVarBndr ctxt_kind newTyVarTyVar)
+    -- The bound TcTyVar has the same name; no cloning
 
 bindExplicitTKBndrsX
     :: (HsTyVarBndr GhcRn -> TcM TcTyVar)
@@ -2660,7 +2693,7 @@ bindExplicitTKBndrsX tc_tv hs_tvs thing_inside
             -- is mentioned in the kind of a later binder
             --   e.g. forall k (a::k). blah
             -- NB: tv's Name may differ from hs_tv's
-            -- See TcMType Note [Unification variables need fresh Names]
+            -- See TcMType Note [Cloning for tyvar binders]
             ; (tvs,res) <- tcExtendNameTyVarEnv [(hsTyVarName hs_tv, tv)] $
                            go hs_tvs
             ; return (tv:tvs, res) }
@@ -2668,7 +2701,6 @@ bindExplicitTKBndrsX tc_tv hs_tvs thing_inside
 -----------------
 tcHsTyVarBndr :: (Name -> Kind -> TcM TyVar)
               -> HsTyVarBndr GhcRn -> TcM TcTyVar
--- Returned TcTyVar has the same name; no cloning
 tcHsTyVarBndr new_tv (UserTyVar _ (L _ tv_nm))
   = do { kind <- newMetaKindVar
        ; new_tv tv_nm kind }
