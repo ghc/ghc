@@ -650,8 +650,9 @@ instance Outputable tv => Outputable (VarBndr tv TyConBndrVis) where
       ppr_bi (AnonTCB VisArg)     = text "anon-vis"
       ppr_bi (AnonTCB InvisArg)   = text "anon-invis"
       ppr_bi (NamedTCB Required)  = text "req"
-      ppr_bi (NamedTCB Specified) = text "spec"
-      ppr_bi (NamedTCB Inferred)  = text "inf"
+      ppr_bi (NamedTCB (Invisible spec)) = case spec of -- GJ : TODO issue
+        SpecifiedSpec -> text "spec"
+        InferredSpec  -> text "inf"
 
 instance Binary TyConBndrVis where
   put_ bh (AnonTCB af)   = do { putByte bh 0; put_ bh af }

@@ -786,8 +786,9 @@ pprIfaceTyConBinders suppress_sig = sep . map go
           -- The above case is rare. (See Note [AnonTCB InvisArg] in TyCon.)
           -- Should we print these differently?
         NamedTCB Required  -> ppr_bndr (UseBndrParens True)
-        NamedTCB Specified -> char '@' <> ppr_bndr (UseBndrParens True)
-        NamedTCB Inferred  -> char '@' <> braces (ppr_bndr (UseBndrParens False))
+        NamedTCB (Invisible spec) -> case spec of -- GJ : TODO Issue
+          SpecifiedSpec    -> char '@' <> ppr_bndr (UseBndrParens True)
+          InferredSpec     -> char '@' <> braces (ppr_bndr (UseBndrParens False))
       where
         ppr_bndr = pprIfaceTvBndr bndr suppress_sig
 

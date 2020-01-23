@@ -2302,9 +2302,8 @@ zipBinders = zip_binders []
                       | otherwise = (ZippedBinder tb Nothing, b:bs)
             zippable =
               case tb of
-                Named (Bndr _ Specified) -> False
-                Named (Bndr _ Inferred)  -> False
-                Named (Bndr _ Required)  -> True
+                Named (Bndr _ (Invisible _)) -> False
+                Named (Bndr _ Required)      -> True
                 Anon InvisArg _ -> False
                 Anon VisArg   _ -> True
           in
