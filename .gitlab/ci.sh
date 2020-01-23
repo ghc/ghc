@@ -63,7 +63,7 @@ TOP="$(pwd)"
 function mingw_init() {
   case "$MSYSTEM" in
     MINGW32)
-      triple="i686-unknown-mingw32"
+      triple="i386-unknown-mingw32"
       boot_triple="i386-unknown-mingw32" # triple of bootstrap GHC
       ;;
     MINGW64)
