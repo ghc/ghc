@@ -181,46 +181,62 @@ Event log output
 ################
 
 Furthermore GHC lets you specify the way event log data (see :rts-flag:`-l
-⟨flags⟩`) is written through a custom :c:type:`EventLogWriter`:
+⟨flags⟩`) is written through a custom :cpp:struct:`EventLogWriter`:
 
-.. c:type:: EventLogWriter
+.. cpp:struct:: EventLogWriter
 
     A sink of event-log data.
 
-    .. c:member:: void initEventLogWriter(void)
+    .. cpp:member:: void initEventLogWriter(void)
 
-        Initializes your :c:type:`EventLogWriter`. This is optional.
+        Initializes your :cpp:struct:`EventLogWriter`. This is optional.
 
-    .. c:member:: bool writeEventLog(void *eventlog, size_t eventlog_size)
+    .. cpp:member:: bool writeEventLog(void *eventlog, size_t eventlog_size)
 
         Hands buffered event log data to your event log writer. Return true on success.
-        Required for a custom :c:type:`EventLogWriter`.
+        Required for a custom :cpp:struct:`EventLogWriter`.
 
-    .. c:member:: void flushEventLog(void)
+    .. cpp:member:: void flushEventLog(void)
 
-        Flush buffers (if any) of your custom :c:type:`EventLogWriter`. This can
+        Flush buffers (if any) of your custom :cpp:struct:`EventLogWriter`. This can
         be ``NULL``.
 
-    .. c:member:: void stopEventLogWriter(void)
+    .. cpp:member:: void stopEventLogWriter(void)
 
         Called when event logging is about to stop. This can be ``NULL``.
 
-To use an :c:type:`EventLogWriter` the RTS API provides the following functions:
+To use an :cpp:struct:`EventLogWriter` the RTS API provides the following functions:
 
-.. c:func:: enum EventLogStatus eventLogStatus(void)
+.. cpp:function:: EventLogStatus eventLogStatus(void)
 
    Query whether the current runtime system supports the eventlog (e.g. whether
    the current executable was linked with :ghc-flag:`-eventlog`) and, if it
    is supported, whether it is currently logging.
 
-.. c:func:: bool startEventLogging(const EventLogWriter *writer)
+.. cpp:function:: bool startEventLogging(const EventLogWriter *writer)
 
-   Start logging events to the given :c:type:`EventLogWriter`. Returns true on
+   Start logging events to the given :cpp:struct:`EventLogWriter`. Returns true on
    success or false is another writer has already been configured.
 
-.. c:func:: void endEventLogging()
+.. cpp:function:: void endEventLogging()
 
-   Tear down the active :c:type:`EventLogWriter`.
+   Tear down the active :cpp:struct:`EventLogWriter`.
+
+where the ``enum`` :cpp:enum:`EventLogStatus` is:
+
+.. cpp:enum:: EventLogStatus
+
+    .. cpp:enumerator:: EVENTLOG_NOT_SUPPORTED
+
+       The runtime system wasn't compiled with eventlog support.
+
+    .. cpp:enumerator:: EVENTLOG_NOT_CONFIGURED
+
+       An :cpp:struct:`EventLogWriter` has not yet been configured.
+
+    .. cpp:enumerator:: EVENTLOG_RUNNING
+
+       An :cpp:struct:`EventLogWriter` has been configured and is running.
 
 
 .. _rts-options-misc:
