@@ -39,6 +39,7 @@
 #include "Rts.h"
 
 #include "Ticker.h"
+#include "RtsUtils.h"
 #include "Proftimer.h"
 #include "Schedule.h"
 #include "posix/Clock.h"
@@ -127,8 +128,8 @@ static void *itimer_thread_func(void *_handle_tick)
                 }
             }
         } else {
-            if (usleep(TimeToUS(itimer_interval)) != 0 && errno != EINTR) {
-                sysErrorBelch("usleep(TimeToUS(itimer_interval) failed");
+            if (rtsSleep(itimer_interval) != 0) {
+                sysErrorBelch("ITimer: sleep failed: %s", strerror(errno));
             }
         }
 
