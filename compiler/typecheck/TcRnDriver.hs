@@ -60,7 +60,6 @@ import GHC.Rename.Types
 import GHC.Rename.Expr
 import GHC.Rename.Utils  ( HsDocContext(..) )
 import GHC.Rename.Fixity ( lookupFixityRn )
-import MkId
 import TysWiredIn ( unitTy, mkListTy )
 import Plugins
 import DynFlags

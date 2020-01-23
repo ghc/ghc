@@ -847,11 +847,6 @@ tupleParens ConstraintTuple p   -- In debug-style write (% Eq a, Ord b %)
   = ifPprDebug (text "(%" <+> p <+> ptext (sLit "%)"))
                (parens p)
 
-instance Outputable TupleSort where
-  ppr BoxedTuple      = text "boxed"
-  ppr UnboxedTuple    = text "unboxed"
-  ppr ConstraintTuple = text "constraint"
-
 {-
 ************************************************************************
 *                                                                      *

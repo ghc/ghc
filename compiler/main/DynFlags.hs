@@ -4736,6 +4736,7 @@ impliedXFlags
 -- Make sure to note whether a flag is implied by -O0, -O or -O2.
 
 optLevelFlags :: [([Int], GeneralFlag)]
+-- Default settings of flags, before any command-line overrides
 optLevelFlags -- see Note [Documenting optimisation flags]
   = [ ([0,1,2], Opt_DoLambdaEtaExpansion)
     , ([0,1,2], Opt_DoEtaReduction)       -- See Note [Eta-reduction in -O0]
@@ -4755,8 +4756,13 @@ optLevelFlags -- see Note [Documenting optimisation flags]
     , ([1,2],   Opt_CSE)
     , ([1,2],   Opt_StgCSE)
     , ([2],     Opt_StgLiftLams)
-    , ([1,2],   Opt_EnableRewriteRules)  -- Off for -O0; see Note [Scoping for Builtin rules]
-                                         --              in PrelRules
+
+    , ([1,2],   Opt_EnableRewriteRules)
+          -- Off for -O0.   Otherwise we desugar list literals
+          -- to 'build' but don't run the simplifier passes that
+          -- would rewrite them back to cons cells!  This seems
+          -- silly, and matters for the GHCi debugger.
+
     , ([1,2],   Opt_FloatIn)
     , ([1,2],   Opt_FullLaziness)
     , ([1,2],   Opt_IgnoreAsserts)

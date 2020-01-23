@@ -1884,7 +1884,7 @@ hscCompileCoreExpr' hsc_env srcspan ds_expr
     = do { let dflags = hsc_dflags hsc_env
 
            {- Simplify it -}
-         ; simpl_expr <- simplifyExpr dflags ds_expr
+         ; simpl_expr <- simplifyExpr hsc_env ds_expr
 
            {- Tidy it (temporary, until coreSat does cloning) -}
          ; let tidy_expr = tidyExpr emptyTidyEnv simpl_expr
