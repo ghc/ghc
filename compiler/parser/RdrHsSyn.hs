@@ -2918,7 +2918,7 @@ instance MonadP PV where
     PV $ \ctx acc ->
       let b = ext `xtest` pExtsBitmap (pv_options ctx) in
       PV_Ok acc $! b
-  addAnnotation (RealSrcSpan l) a (RealSrcSpan v) =
+  addAnnotation (RealSrcSpan l _) a (RealSrcSpan v _) =
     PV $ \_ acc ->
       let
         (comment_q', new_ann_comments) = allocateComments l (pv_comment_q acc)
