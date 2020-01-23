@@ -2109,7 +2109,7 @@ bindersOf (Rec pairs)       = [binder | (binder, _) <- pairs]
 
 -- | 'bindersOf' applied to a list of binding groups
 bindersOfBinds :: [Bind b] -> [b]
-bindersOfBinds = DL.toList . DL.concat . fmap (DL.fromList . bindersOf)
+bindersOfBinds binds = foldr ((++) . bindersOf) [] binds
 
 rhssOfBind :: Bind b -> [Expr b]
 rhssOfBind (NonRec _ rhs) = [rhs]
