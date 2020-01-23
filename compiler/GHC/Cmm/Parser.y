@@ -1356,7 +1356,7 @@ withSourceNote :: Located a -> Located b -> CmmParse c -> CmmParse c
 withSourceNote a b parse = do
   name <- getName
   case combineSrcSpans (getLoc a) (getLoc b) of
-    RealSrcSpan span -> code (emitTick (SourceNote span name)) >> parse
+    RealSrcSpan span _ -> code (emitTick (SourceNote span name)) >> parse
     _other           -> parse
 
 -- -----------------------------------------------------------------------------

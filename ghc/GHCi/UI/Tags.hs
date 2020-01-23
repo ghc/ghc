@@ -103,7 +103,7 @@ listModuleTags m = do
                      , let exported = GHC.modInfoIsExportedName mInfo name
                      , let kind = tyThing2TagKind tyThing
                      , let loc = srcSpanStart (nameSrcSpan name)
-                     , RealSrcLoc realLoc <- [loc]
+                     , RealSrcLoc realLoc _ <- [loc]
                      ]
 
   where
