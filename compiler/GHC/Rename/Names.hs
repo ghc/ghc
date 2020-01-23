@@ -1474,7 +1474,7 @@ mkImportMap gres
     add_one gre@(GRE { gre_imp = imp_specs }) imp_map =
       case srcSpanEnd (is_dloc (is_decl best_imp_spec)) of
                               -- For srcSpanEnd see Note [The ImportMap]
-       RealSrcLoc decl_loc -> Map.insertWith add decl_loc [gre] imp_map
+       RealSrcLoc decl_loc _ -> Map.insertWith add decl_loc [gre] imp_map
        UnhelpfulLoc _ -> imp_map
        where
           best_imp_spec = bestImport imp_specs

@@ -75,7 +75,7 @@ mkMaps instances decls =
              -> ( [(Name, HsDocString)]
                 , [(Name, Map Int (HsDocString))]
                 )
-    mappings (L (RealSrcSpan l) decl, docStrs) =
+    mappings (L (RealSrcSpan l _) decl, docStrs) =
            (dm, am)
       where
         doc = concatDocs docStrs
@@ -94,7 +94,7 @@ mkMaps instances decls =
     mappings (L (UnhelpfulSpan _) _, _) = ([], [])
 
     instanceMap :: Map RealSrcSpan Name
-    instanceMap = M.fromList [(l, n) | n <- instances, RealSrcSpan l <- [getSrcSpan n] ]
+    instanceMap = M.fromList [(l, n) | n <- instances, RealSrcSpan l _ <- [getSrcSpan n] ]
 
     names :: RealSrcSpan -> HsDecl GhcRn -> [Name]
     names l (InstD _ d) = maybeToList $ -- See Note [1].
