@@ -75,3 +75,8 @@ T14934:
 	$(RM) -f T14934a.o T14934a.hi T14934.o T14934.hi
 	'$(TEST_HC)' $(TEST_HC_OPTS) -c T14934a.hs -O
 	'$(TEST_HC)' $(TEST_HC_OPTS) -c T14934.hs  -O
+
+T17566:
+	$(RM) -f T17566a.o T17566a.hi T17566.o T17566.hi
+	'$(TEST_HC)' $(TEST_HC_OPTS) -c T17566a.hs
+	'$(TEST_HC)' $(TEST_HC_OPTS) -c T17566.hs
