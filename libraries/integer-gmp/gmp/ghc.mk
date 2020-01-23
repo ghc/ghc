@@ -59,7 +59,7 @@ ifneq "$(CLEANING)" "YES"
 endif
 
 gmp_CC_OPTS += $(addprefix -I,$(GMP_INCLUDE_DIRS))
-gmp_CC_OPTS += $(addprefix -L,$(GMP_LIB_DIRS))
+gmp_LD_OPTS += $(addprefix -L,$(GMP_LIB_DIRS))
 
 # Compile GMP only if we don't have it already
 #
