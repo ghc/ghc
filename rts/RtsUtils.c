@@ -153,6 +153,24 @@ reportHeapOverflow(void)
 }
 
 /* -----------------------------------------------------------------------------
+   Sleep for the given period of time.
+   -------------------------------------------------------------------------- */
+
+/* Returns -1 on failure but handles EINTR internally.
+ * N.B. usleep has been removed from POSIX 2008 */
+int rtsSleep(Time t)
+{
+    struct timespec req;
+    req.tv_sec = TimeToSeconds(t);
+    req.tv_nsec = TimeToNS(t - req.tv_sec * TIME_RESOLUTION);
+    int ret;
+    do {
+        ret = nanosleep(&req, &req);
+    } while (ret == -1 && errno == EINTR);
+    return ret;
+}
+
+/* -----------------------------------------------------------------------------
    Get the current time as a string.  Used in profiling reports.
    -------------------------------------------------------------------------- */
 
