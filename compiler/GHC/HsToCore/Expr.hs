@@ -488,7 +488,8 @@ dsExpr (HsStatic _ expr@(L loc _)) = do
 
     dflags <- getDynFlags
     let (line, col) = case loc of
-           RealSrcSpan r -> ( srcLocLine $ realSrcSpanStart r
+           RealSrcSpan r _ ->
+                            ( srcLocLine $ realSrcSpanStart r
                             , srcLocCol  $ realSrcSpanStart r
                             )
            _             -> (0, 0)

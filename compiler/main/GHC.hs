@@ -1397,7 +1397,7 @@ addSourceToTokens _ _ [] = []
 addSourceToTokens loc buf (t@(L span _) : ts)
     = case span of
       UnhelpfulSpan _ -> (t,"") : addSourceToTokens loc buf ts
-      RealSrcSpan s   -> (t,str) : addSourceToTokens newLoc newBuf ts
+      RealSrcSpan s _ -> (t,str) : addSourceToTokens newLoc newBuf ts
         where
           (newLoc, newBuf, str) = go "" loc buf
           start = realSrcSpanStart s
@@ -1417,13 +1417,13 @@ showRichTokenStream ts = go startLoc ts ""
     where sourceFile = getFile $ map (getLoc . fst) ts
           getFile [] = panic "showRichTokenStream: No source file found"
           getFile (UnhelpfulSpan _ : xs) = getFile xs
-          getFile (RealSrcSpan s : _) = srcSpanFile s
+          getFile (RealSrcSpan s _ : _) = srcSpanFile s
           startLoc = mkRealSrcLoc sourceFile 1 1
           go _ [] = id
           go loc ((L span _, str):ts)
               = case span of
                 UnhelpfulSpan _ -> go loc ts
-                RealSrcSpan s
+                RealSrcSpan s _
                  | locLine == tokLine -> ((replicate (tokCol - locCol) ' ') ++)
                                        . (str ++)
                                        . go tokEnd ts
