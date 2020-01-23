@@ -150,9 +150,7 @@ callbackTableVar mgr fd = emFds mgr ! hashFd fd
 
 haveOneShot :: Bool
 {-# INLINE haveOneShot #-}
-#if defined(darwin_HOST_OS) || defined(ios_HOST_OS)
-haveOneShot = False
-#elif defined(HAVE_EPOLL) || defined(HAVE_KQUEUE)
+#if defined(HAVE_EPOLL) || defined(HAVE_KQUEUE)
 haveOneShot = True
 #else
 haveOneShot = False
@@ -365,20 +363,9 @@ registerFd mgr cb fd evs lt = do
   return r
 {-# INLINE registerFd #-}
 
-{-
-    Building GHC with parallel IO manager on Mac freezes when
-    compiling the dph libraries in the phase 2. As workaround, we
-    don't use oneshot and we wake up an IO manager on Mac every time
-    when we register an event.
-
-    For more information, please read:
-        http://ghc.haskell.org/trac/ghc/ticket/7651
--}
 -- | Wake up the event manager.
 wakeManager :: EventManager -> IO ()
-#if defined(darwin_HOST_OS) || defined(ios_HOST_OS)
-wakeManager mgr = sendWakeup (emControl mgr)
-#elif defined(HAVE_EPOLL) || defined(HAVE_KQUEUE)
+#if defined(HAVE_EPOLL) || defined(HAVE_KQUEUE)
 wakeManager _ = return ()
 #else
 wakeManager mgr = sendWakeup (emControl mgr)
