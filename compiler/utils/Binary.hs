@@ -1380,10 +1380,29 @@ instance Binary RealSrcSpan where
             return (mkRealSrcSpan (mkRealSrcLoc f sl sc)
                                   (mkRealSrcLoc f el ec))
 
+instance Binary BufLoc where
+  put_ bh (BufLoc line col) = do
+    put_ bh line
+    put_ bh col
+  get bh = do
+    line <- get bh
+    col <- get bh
+    return (BufLoc line col)
+
+instance Binary BufSpan where
+  put_ bh (BufSpan start end) = do
+    put_ bh start
+    put_ bh end
+  get bh = do
+    start <- get bh
+    end <- get bh
+    return (BufSpan start end)
+
 instance Binary SrcSpan where
-  put_ bh (RealSrcSpan ss) = do
+  put_ bh (RealSrcSpan ss sb) = do
           putByte bh 0
           put_ bh ss
+          put_ bh sb
 
   put_ bh (UnhelpfulSpan s) = do
           putByte bh 1
@@ -1393,7 +1412,8 @@ instance Binary SrcSpan where
           h <- getByte bh
           case h of
             0 -> do ss <- get bh
-                    return (RealSrcSpan ss)
+                    sb <- get bh
+                    return (RealSrcSpan ss sb)
             _ -> do s <- get bh
                     return (UnhelpfulSpan s)
 

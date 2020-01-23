@@ -315,7 +315,7 @@ cmmlex :: (Located CmmToken -> PD a) -> PD a
 cmmlex cont = do
   (L span tok) <- lexToken
   --trace ("token: " ++ show tok) $ do
-  cont (L (RealSrcSpan span) tok)
+  cont (L (RealSrcSpan span Nothing) tok)
 
 lexToken :: PD (RealLocated CmmToken)
 lexToken = do
@@ -361,8 +361,8 @@ alexGetByte (loc,s)
         s'   = stepOn s
 
 getInput :: PD AlexInput
-getInput = PD $ \_ s@PState{ loc=l, buffer=b } -> POk s (l,b)
+getInput = PD $ \_ s@PState{ loc=l, buffer=b } -> POk s (psRealLoc l,b)
 
 setInput :: AlexInput -> PD ()
-setInput (l,b) = PD $ \_ s -> POk s{ loc=l, buffer=b } ()
+setInput (l,b) = PD $ \_ s@(PState{ loc = PsLoc _ bl }) -> POk s{ loc = PsLoc l bl, buffer=b } ()
 }

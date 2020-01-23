@@ -823,10 +823,10 @@ addDependentFiles fs = do
 
 getSrcSpanM :: TcRn SrcSpan
         -- Avoid clash with Name.getSrcLoc
-getSrcSpanM = do { env <- getLclEnv; return (RealSrcSpan (tcl_loc env)) }
+getSrcSpanM = do { env <- getLclEnv; return (RealSrcSpan (tcl_loc env) Nothing) }
 
 setSrcSpan :: SrcSpan -> TcRn a -> TcRn a
-setSrcSpan (RealSrcSpan real_loc) thing_inside
+setSrcSpan (RealSrcSpan real_loc _) thing_inside
     = updLclEnv (\env -> env { tcl_loc = real_loc }) thing_inside
 -- Don't overwrite useful info with useless:
 setSrcSpan (UnhelpfulSpan _) thing_inside = thing_inside
@@ -1668,7 +1668,7 @@ emitNamedWildCardHoleConstraints wcs
                   , cc_hole = TypeHole }
        where
          real_span = case nameSrcSpan name of
-                           RealSrcSpan span  -> span
+                           RealSrcSpan span _ -> span
                            UnhelpfulSpan str -> pprPanic "emitNamedWildCardHoleConstraints"
                                                       (ppr name <+> quotes (ftext str))
                -- Wildcards are defined locally, and so have RealSrcSpans
