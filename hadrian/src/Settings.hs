@@ -58,12 +58,14 @@ flavour :: Action Flavour
 flavour = do
     flavourName <- fromMaybe userDefaultFlavour <$> cmdFlavour
     kvs <- userSetting ([] :: [KeyVal])
-    let unknownFlavour = error $ "Unknown build flavour: " ++ flavourName
-        flavours = hadrianFlavours ++ userFlavours
+    let flavours = hadrianFlavours ++ userFlavours
         (_settingErrs, tweak) = applySettings kvs
 
-    return $ maybe unknownFlavour tweak $
-        find ((== flavourName) . name) flavours
+    return $
+      case filter (\fl -> name fl == flavourName) flavours of
+        []  -> error $ "Unknown build flavour: " ++ flavourName
+        [f] -> tweak f
+        _   -> error $ "Multiple build flavours named " ++ flavourName
 
 getIntegerPackage :: Expr Package
 getIntegerPackage = expr (integerLibrary =<< flavour)
