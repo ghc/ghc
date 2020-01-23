@@ -392,12 +392,12 @@ updPmDelta delta = updLclEnv (\env -> env { dsl_delta = delta })
 
 getSrcSpanDs :: DsM SrcSpan
 getSrcSpanDs = do { env <- getLclEnv
-                  ; return (RealSrcSpan (dsl_loc env)) }
+                  ; return (RealSrcSpan (dsl_loc env) Nothing) }
 
 putSrcSpanDs :: SrcSpan -> DsM a -> DsM a
 putSrcSpanDs (UnhelpfulSpan {}) thing_inside
   = thing_inside
-putSrcSpanDs (RealSrcSpan real_span) thing_inside
+putSrcSpanDs (RealSrcSpan real_span _) thing_inside
   = updLclEnv (\ env -> env {dsl_loc = real_span}) thing_inside
 
 -- | Emit a warning for the current source location

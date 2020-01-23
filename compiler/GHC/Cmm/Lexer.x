@@ -185,7 +185,7 @@ data CmmToken
 -- -----------------------------------------------------------------------------
 -- Lexer actions
 
-type Action = RealSrcSpan -> StringBuffer -> Int -> PD (RealLocated CmmToken)
+type Action = PsSpan -> StringBuffer -> Int -> PD (PsLocated CmmToken)
 
 begin :: Int -> Action
 begin code _span _str _len = do liftP (pushLexState code); lexToken
@@ -290,7 +290,7 @@ tok_string str = CmmT_String (read str)
 -- Line pragmas
 
 setLine :: Int -> Action
-setLine code span buf len = do
+setLine code (PsSpan span _) buf len = do
   let line = parseUnsignedInteger buf len 10 octDecDigit
   liftP $ do
     setSrcLoc (mkRealSrcLoc (srcSpanFile span) (fromIntegral line - 1) 1)
@@ -300,7 +300,7 @@ setLine code span buf len = do
   lexToken
 
 setFile :: Int -> Action
-setFile code span buf len = do
+setFile code (PsSpan span _) buf len = do
   let file = lexemeToFastString (stepOn buf) (len-2)
   liftP $ do
     setSrcLoc (mkRealSrcLoc file (srcSpanEndLine span) (srcSpanEndCol span))
@@ -315,23 +315,23 @@ cmmlex :: (Located CmmToken -> PD a) -> PD a
 cmmlex cont = do
   (L span tok) <- lexToken
   --trace ("token: " ++ show tok) $ do
-  cont (L (RealSrcSpan span) tok)
+  cont (L (mkSrcSpanPs span) tok)
 
-lexToken :: PD (RealLocated CmmToken)
+lexToken :: PD (PsLocated CmmToken)
 lexToken = do
   inp@(loc1,buf) <- getInput
   sc <- liftP getLexState
   case alexScan inp sc of
-    AlexEOF -> do let span = mkRealSrcSpan loc1 loc1
+    AlexEOF -> do let span = mkPsSpan loc1 loc1
                   liftP (setLastToken span 0)
                   return (L span CmmT_EOF)
-    AlexError (loc2,_) -> liftP $ failLocMsgP loc1 loc2 "lexical error"
+    AlexError (loc2,_) -> liftP $ failLocMsgP (psRealLoc loc1) (psRealLoc loc2) "lexical error"
     AlexSkip inp2 _ -> do
         setInput inp2
         lexToken
     AlexToken inp2@(end,_buf2) len t -> do
         setInput inp2
-        let span = mkRealSrcSpan loc1 end
+        let span = mkPsSpan loc1 end
         span `seq` liftP (setLastToken span len)
         t span buf len
 
@@ -339,7 +339,7 @@ lexToken = do
 -- Monad stuff
 
 -- Stuff that Alex needs to know about our input type:
-type AlexInput = (RealSrcLoc,StringBuffer)
+type AlexInput = (PsLoc,StringBuffer)
 
 alexInputPrevChar :: AlexInput -> Char
 alexInputPrevChar (_,s) = prevChar s '\n'
@@ -357,7 +357,7 @@ alexGetByte (loc,s)
   | otherwise = b `seq` loc' `seq` s' `seq` Just (b, (loc', s'))
   where c    = currentChar s
         b    = fromIntegral $ ord $ c
-        loc' = advanceSrcLoc loc c
+        loc' = advancePsLoc loc c
         s'   = stepOn s
 
 getInput :: PD AlexInput

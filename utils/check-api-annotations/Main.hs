@@ -82,7 +82,7 @@ testOneFile libdir fileName = do
       getAllSrcSpans ast = everything (++) ([] `mkQ` getSrcSpan) ast
         where
           getSrcSpan :: SrcSpan -> [RealSrcSpan]
-          getSrcSpan (RealSrcSpan ss) = [ss]
+          getSrcSpan (RealSrcSpan ss _) = [ss]
           getSrcSpan (UnhelpfulSpan _) = []
 
 
