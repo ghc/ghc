@@ -2128,7 +2128,7 @@ oneShotGroup env@(OccEnv { occ_one_shots = ctxt }) bndrs
     go :: [OneShotInfo] -> [Var] -> DL.DList Id -> (OccEnv, DL.DList Var)
     go ctxt [] rev_bndrs
       = ( env { occ_one_shots = ctxt, occ_encl = OccVanilla }
-        , rev_bndrs )
+        , DL.reverse rev_bndrs )
 
     go [] bndrs rev_bndrs
       = ( env { occ_one_shots = [], occ_encl = OccVanilla }
