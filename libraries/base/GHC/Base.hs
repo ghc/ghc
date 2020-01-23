@@ -1251,8 +1251,7 @@ augment g xs = g (:) xs
 -- > map f [x1, x2, ...] == [f x1, f x2, ...]
 --
 -- >>> map (+1) [1, 2, 3]
---- [2,3,4]
-
+-- [2,3,4]
 map :: (a -> b) -> [a] -> [b]
 {-# NOINLINE [0] map #-}
   -- We want the RULEs "map" and "map/coerce" to fire first.
