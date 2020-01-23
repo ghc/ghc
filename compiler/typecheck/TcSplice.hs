@@ -1079,7 +1079,7 @@ instance TH.Quasi TcM where
                  ; r <- case l of
                         UnhelpfulSpan _ -> pprPanic "qLocation: Unhelpful location"
                                                     (ppr l)
-                        RealSrcSpan s -> return s
+                        RealSrcSpan s _ -> return s
                  ; return (TH.Loc { TH.loc_filename = unpackFS (srcSpanFile r)
                                   , TH.loc_module   = moduleNameString (moduleName m)
                                   , TH.loc_package  = unitIdString (moduleUnitId m)
