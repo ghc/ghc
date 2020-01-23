@@ -106,6 +106,7 @@ data CoreToDo           -- These are diff core-to-core passes,
   | CoreDoCallArity
   | CoreDoExitify
   | CoreDoStrictness
+  | CoreDoCpr
   | CoreDoWorkerWrapper
   | CoreDoSpecialising
   | CoreDoSpecConstr
@@ -133,6 +134,7 @@ instance Outputable CoreToDo where
   ppr CoreDoCallArity          = text "Called arity analysis"
   ppr CoreDoExitify            = text "Exitification transformation"
   ppr CoreDoStrictness         = text "Demand analysis"
+  ppr CoreDoCpr                = text "Constructed Product Result analysis"
   ppr CoreDoWorkerWrapper      = text "Worker Wrapper binds"
   ppr CoreDoSpecialising       = text "Specialise"
   ppr CoreDoSpecConstr         = text "SpecConstr"

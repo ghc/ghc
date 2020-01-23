@@ -45,6 +45,7 @@ import SAT              ( doStaticArgs )
 import Specialise       ( specProgram)
 import SpecConstr       ( specConstrProgram)
 import DmdAnal          ( dmdAnalProgram )
+import CprAnal          ( cprAnalProgram )
 import CallArity        ( callArityAnalProgram )
 import Exitify          ( exitifyProgram )
 import WorkWrap         ( wwTopBinds )
@@ -176,8 +177,8 @@ getCoreToDo dflags
                           -- This makes full laziness work better
 
     strictness_pass = if ww_on
-                       then [CoreDoStrictness,CoreDoWorkerWrapper]
-                       else [CoreDoStrictness]
+                       then [CoreDoStrictness,CoreDoCpr,CoreDoWorkerWrapper]
+                       else [CoreDoStrictness,CoreDoCpr]
 
 
     -- New demand analyser
@@ -445,8 +446,11 @@ doCorePass CoreDoCallArity           = {-# SCC "CallArity" #-}
 doCorePass CoreDoExitify             = {-# SCC "Exitify" #-}
                                        doPass exitifyProgram
 
-doCorePass CoreDoStrictness          = {-# SCC "NewStranal" #-}
+doCorePass CoreDoStrictness          = {-# SCC "DmdAnal" #-}
                                        doPassDFM dmdAnalProgram
+
+doCorePass CoreDoCpr                 = {-# SCC "CprAnal" #-}
+                                       doPassF cprAnalProgram
 
 doCorePass CoreDoWorkerWrapper       = {-# SCC "WorkWrap" #-}
                                        doPassDFU wwTopBinds
@@ -514,6 +518,12 @@ doPassDU do_pass = doPassDUM (\dflags us -> return . do_pass dflags us)
 
 doPassU :: (UniqSupply -> CoreProgram -> CoreProgram) -> ModGuts -> CoreM ModGuts
 doPassU do_pass = doPassDU (const do_pass)
+
+doPassF :: (FamInstEnvs -> CoreProgram -> CoreProgram) -> ModGuts -> CoreM ModGuts
+doPassF do_pass guts = do
+    p_fam_env <- getPackageFamInstEnv
+    let fam_envs = (p_fam_env, mg_fam_inst_env guts)
+    doPassM (return . do_pass fam_envs) guts
 
 doPassDFM :: (DynFlags -> FamInstEnvs -> CoreProgram -> IO CoreProgram) -> ModGuts -> CoreM ModGuts
 doPassDFM do_pass guts = do
