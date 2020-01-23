@@ -71,6 +71,7 @@ import qualified GHC.LanguageExtensions as LangExt
 
 import Control.Monad
 import Maybes
+import Data.Tuple ( swap )
 import Data.List( mapAccumL )
 
 
