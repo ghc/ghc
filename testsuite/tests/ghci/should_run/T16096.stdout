@@ -16,7 +16,7 @@ GHC.Base.returnIO
   @[()]
   (GHC.Types.:
      @ ()
-     (GHC.Prim.unsafeCoerce#
+     (Unsafe.Coerce.unsafeCoerce#
         @ 'GHC.Types.LiftedRep
         @ 'GHC.Types.LiftedRep
         @ [GHC.Types.Int]
@@ -41,7 +41,7 @@ GHC.Base.returnIO
   @[()]
   (GHC.Types.:
      @ ()
-     (GHC.Prim.unsafeCoerce#
+     (Unsafe.Coerce.unsafeCoerce#
         @ 'GHC.Types.LiftedRep
         @ 'GHC.Types.LiftedRep
         @ [GHC.Types.Int]
