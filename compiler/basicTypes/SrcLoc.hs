@@ -64,9 +64,14 @@ module SrcLoc (
         isGoodSrcSpan, isOneLineSpan,
         containsSpan,
 
+        -- * StringBuffer locations
+        BufLoc(..),
+        BufSpan(..),
+
         -- * Located
         Located,
         RealLocated,
+        ParsedLocated,
         GenLocated(..),
 
         -- ** Constructing Located
@@ -120,6 +125,18 @@ data RealSrcLoc
                 {-# UNPACK #-} !Int     -- line number, begins at 1
                 {-# UNPACK #-} !Int     -- column number, begins at 1
   deriving (Eq, Ord)
+
+-- | Raw location in the StringBuffer.
+--
+-- Unlike 'RealSrcLoc', it is not affected by
+-- #line and {-# LINE ... #-} pragmas.
+--
+-- The parser guarantees that 'BufLoc' are monotonic.
+-- See #17632.
+data BufLoc
+  = BufLoc { bufLocLine, bufLocCol :: {-# UNPACK #-} !Int }
+             -- line and column numbers begin at 1
+  deriving (Eq, Ord, Show)
 
 -- | Source Location
 data SrcLoc
@@ -244,6 +261,11 @@ data RealSrcSpan
           srcSpanECol     :: {-# UNPACK #-} !Int
         }
   deriving Eq
+
+-- | StringBuffer Source Span
+data BufSpan =
+  BufSpan { bufSpanStart, bufSpanEnd :: {-# UNPACK #-} !BufLoc }
+  deriving (Eq, Ord, Show)
 
 -- | Source Span
 --
@@ -527,6 +549,7 @@ data GenLocated l e = L l e
 
 type Located = GenLocated SrcSpan
 type RealLocated = GenLocated RealSrcSpan
+type ParsedLocated = GenLocated (BufSpan, RealSrcSpan)
 
 mapLoc :: (a -> b) -> GenLocated l a -> GenLocated l b
 mapLoc = fmap
