@@ -95,6 +95,19 @@ static Condition start_cond;
 static Mutex mutex;
 static OSThreadId thread;
 
+/* N.B. usleep has been removed from POSIX 2008 */
+static int my_sleep(Time t)
+{
+    struct timespec req;
+    req.tv_sec = TimeToSeconds(t);
+    req.tv_nsec = (t - req.tv_sec * TIME_RESOLUTION);
+    int ret;
+    do {
+        ret = nanosleep(&req, &req);
+    } while (ret == -1 && errno == EINTR);
+    return ret;
+}
+
 static void *itimer_thread_func(void *_handle_tick)
 {
     TickProc handle_tick = _handle_tick;
@@ -127,8 +140,8 @@ static void *itimer_thread_func(void *_handle_tick)
                 }
             }
         } else {
-            if (usleep(TimeToUS(itimer_interval)) != 0 && errno != EINTR) {
-                sysErrorBelch("usleep(TimeToUS(itimer_interval) failed");
+            if (my_sleep(itimer_interval) != 0 && errno != EINTR) {
+                sysErrorBelch("ITimer: nanosleep failed");
             }
         }
 
