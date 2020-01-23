@@ -1091,7 +1091,7 @@ specifiedSpecKey = mkPreludeMiscIdUnique 498
 inferredSpecKey  = mkPreludeMiscIdUnique 499
 
 noFlagKey :: Unique
-noFlagKey = mkPreludeMiscIdUnique 500
+noFlagKey = mkPreludeMiscIdUnique 570 -- GJ : TODO This is not very nice
 
 {-
 ************************************************************************

@@ -2987,8 +2987,9 @@ tyConAppNeedsKindSig spec_inj_pos tc n_args
         _              -> emptyFV
 
     source_of_injectivity Required  = True
-    source_of_injectivity Specified = spec_inj_pos
-    source_of_injectivity Inferred  = False
+    source_of_injectivity (Invisible spec) = case spec of -- GJ : TODO Issue
+      SpecifiedSpec -> spec_inj_pos
+      InferredSpec  -> False
 
 {-
 Note [When does a tycon application need an explicit kind signature?]

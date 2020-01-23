@@ -629,8 +629,9 @@ data TyCoBinder
 instance Outputable TyCoBinder where
   ppr (Anon af ty) = ppr af <+> ppr ty
   ppr (Named (Bndr v Required))  = ppr v
-  ppr (Named (Bndr v Specified)) = char '@' <> ppr v
-  ppr (Named (Bndr v Inferred))  = braces (ppr v)
+  ppr (Named (Bndr v (Invisible spec))) = case spec of -- GJ : TODO Issue
+    SpecifiedSpec -> char '@' <> ppr v
+    InferredSpec  -> braces (ppr v)
 
 
 -- | 'TyBinder' is like 'TyCoBinder', but there can only be 'TyVarBinder'
