@@ -28,6 +28,7 @@ module SrcLoc (
         interactiveSrcLoc,      -- Code from an interactive session
 
         advanceSrcLoc,
+        advanceBufLoc,
 
         -- ** Unsafely deconstructing SrcLoc
         -- These are dubious exports, because they crash on some inputs
@@ -71,7 +72,6 @@ module SrcLoc (
         -- * Located
         Located,
         RealLocated,
-        ParsedLocated,
         GenLocated(..),
 
         -- ** Constructing Located
@@ -90,7 +90,17 @@ module SrcLoc (
         leftmost_smallest, leftmost_largest, rightmost,
         spans, isSubspanOf, sortLocated,
 
-        liftL
+        liftL,
+
+        -- * Parser locations
+        PsLoc(..),
+        PsSpan(..),
+        PsLocated,
+        advancePsLoc,
+        mkPsSpan,
+        psSpanStart,
+        psSpanEnd,
+
     ) where
 
 import GhcPrelude
@@ -185,9 +195,16 @@ srcLocCol (SrcLoc _ _ c) = c
 -- character in any other case
 advanceSrcLoc :: RealSrcLoc -> Char -> RealSrcLoc
 advanceSrcLoc (SrcLoc f l _) '\n' = SrcLoc f  (l + 1) 1
-advanceSrcLoc (SrcLoc f l c) '\t' = SrcLoc f  l (((((c - 1) `shiftR` 3) + 1)
-                                                  `shiftL` 3) + 1)
+advanceSrcLoc (SrcLoc f l c) '\t' = SrcLoc f  l (advance_tabstop c)
 advanceSrcLoc (SrcLoc f l c) _    = SrcLoc f  l (c + 1)
+
+advanceBufLoc :: BufLoc -> Char -> BufLoc
+advanceBufLoc (BufLoc l _) '\n' = BufLoc (l + 1) 1
+advanceBufLoc (BufLoc l c) '\t' = BufLoc l (advance_tabstop c)
+advanceBufLoc (BufLoc l c) _    = BufLoc l (c + 1)
+
+advance_tabstop :: Int -> Int
+advance_tabstop c = ((((c - 1) `shiftR` 3) + 1) `shiftL` 3) + 1
 
 {-
 ************************************************************************
@@ -549,7 +566,6 @@ data GenLocated l e = L l e
 
 type Located = GenLocated SrcSpan
 type RealLocated = GenLocated RealSrcSpan
-type ParsedLocated = GenLocated (BufSpan, RealSrcSpan)
 
 mapLoc :: (a -> b) -> GenLocated l a -> GenLocated l b
 mapLoc = fmap
@@ -634,3 +650,31 @@ getRealSrcSpan (L l _) = l
 
 unRealSrcSpan :: RealLocated a -> a
 unRealSrcSpan  (L _ e) = e
+
+
+-- | A location as produced by the parser. Consists of two components:
+--
+-- * The location in the file, adjusted for #line and {-# LINE ... #-} pragmas (RealSrcLoc)
+-- * The location in the string buffer (BufLoc) with monotonicity guarantees (see #17632)
+data PsLoc
+  = PsLoc { psRealLoc :: !RealSrcLoc, psBufLoc :: !BufLoc }
+  deriving (Eq, Ord, Show)
+
+data PsSpan
+  = PsSpan { psRealSpan :: !RealSrcSpan, psBufSpan :: !BufSpan }
+  deriving (Eq, Ord, Show)
+
+type PsLocated = GenLocated PsSpan
+
+advancePsLoc :: PsLoc -> Char -> PsLoc
+advancePsLoc (PsLoc real_loc buf_loc) c =
+  PsLoc (advanceSrcLoc real_loc c) (advanceBufLoc buf_loc c)
+
+mkPsSpan :: PsLoc -> PsLoc -> PsSpan
+mkPsSpan (PsLoc r1 b1) (PsLoc r2 b2) = PsSpan (mkRealSrcSpan r1 r2) (BufSpan b1 b2)
+
+psSpanStart :: PsSpan -> PsLoc
+psSpanStart (PsSpan r b) = PsLoc (realSrcSpanStart r) (bufSpanStart b)
+
+psSpanEnd :: PsSpan -> PsLoc
+psSpanEnd (PsSpan r b) = PsLoc (realSrcSpanEnd r) (bufSpanEnd b)
