@@ -365,7 +365,7 @@ validate-x86_64-darwin:
     LANG: "en_US.UTF-8"
     CONFIGURE_ARGS: "--with-intree-gmp"
     TEST_ENV: "x86_64-darwin"
-    BUILD_FLAVOUR: "validate"
+    BUILD_FLAVOUR: "perf"
   after_script:
     - cp -Rf $HOME/.cabal cabal-cache
     - .gitlab/ci.sh clean
@@ -795,7 +795,7 @@ validate-x86_64-linux-fedora27:
   extends: .build-windows
   stage: test
   variables:
-    FLAVOUR: "Quick"
+    FLAVOUR: "validate"
     # skipping perf tests for now since we build a quick-flavoured GHC,
     # which might result in some broken perf tests?
     HADRIAN_ARGS: "--docs=no-sphinx --skip-perf"
