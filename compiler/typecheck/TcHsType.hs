@@ -2009,11 +2009,10 @@ kcInferDeclHeader name flav
                --
                -- mkAnonTyConBinder: see Note [No polymorphic recursion]
 
-             all_tv_prs = (kv_ns                `zip` scoped_kvs) ++
-                          (hsLTyVarNames hs_tvs `zip` tc_tvs)
-               -- NB: bindIplicitTKBndrs_Q_Tv makes /freshly-named/ unification
-               --     variables, hence the need to zip here.  Ditto bindExplicit..
-               -- See TcMType Note [Unification variables need fresh Names]
+             all_tv_prs = mkTyVarNamePairs (scoped_kvs ++ tc_tvs)
+               -- NB: bindExplicitTKBndrs_Q_Tv does not clone;
+               --     ditto Implicit
+               -- See Note [Non-cloning for tyvar binders]
 
              tycon = mkTcTyCon name tc_binders res_kind all_tv_prs
                                False -- not yet generalised
@@ -2039,98 +2038,102 @@ kcCheckDeclHeader_sig
   -> LHsQTyVars GhcRn  -- ^ Binders in the header
   -> TcM ContextKind   -- ^ The result kind. AnyKind == no result signature
   -> TcM TcTyCon       -- ^ A suitably-kinded TcTyCon
-kcCheckDeclHeader_sig kisig name flav ktvs kc_res_ki =
-  addTyConFlavCtxt name flav $
-    pushTcLevelM_ $
-    solveEqualities $  -- #16687
-    bind_implicit (hsq_ext ktvs) $ \implicit_tcv_prs -> do
+kcCheckDeclHeader_sig kisig name flav
+          (HsQTvs { hsq_ext      = implicit_nms
+                  , hsq_explicit = explicit_nms }) kc_res_ki
+  = addTyConFlavCtxt name flav $
+    do {  -- Step 1: zip user-written binders with quantifiers from the kind signature.
+          -- For example:
+          --
+          --   type F :: forall k -> k -> forall j. j -> Type
+          --   data F i a b = ...
+          --
+          -- Results in the following 'zipped_binders':
+          --
+          --                   TyBinder      LHsTyVarBndr
+          --    ---------------------------------------
+          --    ZippedBinder   forall k ->   i
+          --    ZippedBinder   k ->          a
+          --    ZippedBinder   forall j.
+          --    ZippedBinder   j ->          b
+          --
+          let (zipped_binders, excess_bndrs, kisig') = zipBinders kisig explicit_nms
 
-      -- Step 1: zip user-written binders with quantifiers from the kind signature.
-      -- For example:
-      --
-      --   type F :: forall k -> k -> forall j. j -> Type
-      --   data F i a b = ...
-      --
-      -- Results in the following 'zipped_binders':
-      --
-      --                   TyBinder      LHsTyVarBndr
-      --    ---------------------------------------
-      --    ZippedBinder   forall k ->   i
-      --    ZippedBinder   k ->          a
-      --    ZippedBinder   forall j.
-      --    ZippedBinder   j ->          b
-      --
-      let (zipped_binders, excess_bndrs, kisig') = zipBinders kisig (hsq_explicit ktvs)
+          -- Report binders that don't have a corresponding quantifier.
+          -- For example:
+          --
+          --   type T :: Type -> Type
+          --   data T b1 b2 b3 = ...
+          --
+          -- Here, b1 is zipped with Type->, while b2 and b3 are excess binders.
+          --
+        ; unless (null excess_bndrs) $ failWithTc (tooManyBindersErr kisig' excess_bndrs)
 
-      -- Report binders that don't have a corresponding quantifier.
-      -- For example:
-      --
-      --   type T :: Type -> Type
-      --   data T b1 b2 b3 = ...
-      --
-      -- Here, b1 is zipped with Type->, while b2 and b3 are excess binders.
-      --
-      unless (null excess_bndrs) $ failWithTc (tooManyBindersErr kisig' excess_bndrs)
+          -- Convert each ZippedBinder to TyConBinder        for  tyConBinders
+          --                       and to [(Name, TcTyVar)]  for  tcTyConScopedTyVars
+        ; (vis_tcbs, concat -> explicit_tv_prs) <- mapAndUnzipM zipped_to_tcb zipped_binders
 
-      -- Convert each ZippedBinder to TyConBinder        for  tyConBinders
-      --                       and to [(Name, TcTyVar)]  for  tcTyConScopedTyVars
-      (vis_tcbs, concat -> explicit_tv_prs) <- mapAndUnzipM zipped_to_tcb zipped_binders
+        ; (implicit_tvs, (invis_binders, r_ki))
+             <- pushTcLevelM_ $
+                solveEqualities $  -- #16687
+                bindImplicitTKBndrs_Tv implicit_nms $
+                tcExtendNameTyVarEnv explicit_tv_prs  $
+                do { -- Check that inline kind annotations on binders are valid.
+                     -- For example:
+                     --
+                     --   type T :: Maybe k -> Type
+                     --   data T (a :: Maybe j) = ...
+                     --
+                     -- Here we unify   Maybe k ~ Maybe j
+                     mapM_ check_zipped_binder zipped_binders
 
-      tcExtendNameTyVarEnv explicit_tv_prs $ do
+                     -- Kind-check the result kind annotation, if present:
+                     --
+                     --    data T a b :: res_ki where
+                     --               ^^^^^^^^^
+                     -- We do it here because at this point the environment has been
+                     -- extended with both 'implicit_tcv_prs' and 'explicit_tv_prs'.
+                   ; ctx_k <- kc_res_ki
+                   ; m_res_ki <- case ctx_k of
+                                  AnyKind -> return Nothing
+                                  _ -> Just <$> newExpectedKind ctx_k
 
-        -- Check that inline kind annotations on binders are valid.
-        -- For example:
-        --
-        --   type T :: Maybe k -> Type
-        --   data T (a :: Maybe j) = ...
-        --
-        -- Here we unify   Maybe k ~ Maybe j
-        mapM_ check_zipped_binder zipped_binders
+                     -- Step 2: split off invisible binders.
+                     -- For example:
+                     --
+                     --   type F :: forall k1 k2. (k1, k2) -> Type
+                     --   type family F
+                     --
+                     -- Does 'forall k1 k2' become a part of 'tyConBinders' or 'tyConResKind'?
+                     -- See Note [Arity inference in kcCheckDeclHeader_sig]
+                   ; let (invis_binders, r_ki) = split_invis kisig' m_res_ki
 
-        -- Kind-check the result kind annotation, if present:
-        --
-        --    data T a b :: res_ki where
-        --               ^^^^^^^^^
-        -- We do it here because at this point the environment has been
-        -- extended with both 'implicit_tcv_prs' and 'explicit_tv_prs'.
-        m_res_ki <- kc_res_ki >>= \ctx_k ->
-          case ctx_k of
-            AnyKind -> return Nothing
-            _ -> Just <$> newExpectedKind ctx_k
+                     -- Check that the inline result kind annotation is valid.
+                     -- For example:
+                     --
+                     --   type T :: Type -> Maybe k
+                     --   type family T a :: Maybe j where
+                     --
+                     -- Here we unify   Maybe k ~ Maybe j
+                   ; whenIsJust m_res_ki $ \res_ki ->
+                      discardResult $ -- See Note [discardResult in kcCheckDeclHeader_sig]
+                      unifyKind Nothing r_ki res_ki
 
-        -- Step 2: split off invisible binders.
-        -- For example:
-        --
-        --   type F :: forall k1 k2. (k1, k2) -> Type
-        --   type family F
-        --
-        -- Does 'forall k1 k2' become a part of 'tyConBinders' or 'tyConResKind'?
-        -- See Note [Arity inference in kcCheckDeclHeader_sig]
-        let (invis_binders, r_ki) = split_invis kisig' m_res_ki
-
-        -- Convert each invisible TyCoBinder to TyConBinder for tyConBinders.
-        invis_tcbs <- mapM invis_to_tcb invis_binders
-
-        -- Check that the inline result kind annotation is valid.
-        -- For example:
-        --
-        --   type T :: Type -> Maybe k
-        --   type family T a :: Maybe j where
-        --
-        -- Here we unify   Maybe k ~ Maybe j
-        whenIsJust m_res_ki $ \res_ki ->
-          discardResult $ -- See Note [discardResult in kcCheckDeclHeader_sig]
-          unifyKind Nothing r_ki res_ki
+                   ; return (invis_binders, r_ki) }
 
         -- Zonk the implicitly quantified variables.
-        implicit_tv_prs <- mapSndM zonkTcTyVarToTyVar implicit_tcv_prs
+        ; implicit_tvs <- mapM zonkTcTyVarToTyVar implicit_tvs
+
+        -- Convert each invisible TyCoBinder to TyConBinder for tyConBinders.
+        ; invis_tcbs <- mapM invis_to_tcb invis_binders
 
         -- Build the final, generalized TcTyCon
-        let tcbs       = vis_tcbs ++ invis_tcbs
-            all_tv_prs = implicit_tv_prs ++ explicit_tv_prs
-            tc = mkTcTyCon name tcbs r_ki all_tv_prs True flav
+        ; let tcbs            = vis_tcbs ++ invis_tcbs
+              implicit_tv_prs = implicit_nms `zip` implicit_tvs
+              all_tv_prs      = implicit_tv_prs ++ explicit_tv_prs
+              tc = mkTcTyCon name tcbs r_ki all_tv_prs True flav
 
-        traceTc "kcCheckDeclHeader_sig done:" $ vcat
+        ; traceTc "kcCheckDeclHeader_sig done:" $ vcat
           [ text "tyConName = " <+> ppr (tyConName tc)
           , text "kisig =" <+> debugPprType kisig
           , text "tyConKind =" <+> debugPprType (tyConKind tc)
@@ -2138,7 +2141,7 @@ kcCheckDeclHeader_sig kisig name flav ktvs kc_res_ki =
           , text "tcTyConScopedTyVars" <+> ppr (tcTyConScopedTyVars tc)
           , text "tyConResKind" <+> debugPprType (tyConResKind tc)
           ]
-        return tc
+        ; return tc }
   where
     -- Consider this declaration:
     --
@@ -2208,14 +2211,6 @@ kcCheckDeclHeader_sig kisig name flav ktvs kc_res_ki =
       MASSERT(null stv)
       return tcb
 
-    -- similar to:  bindImplicitTKBndrs_Tv
-    bind_implicit :: [Name] -> ([(Name,TcTyVar)] -> TcM a) -> TcM a
-    bind_implicit tv_names thing_inside =
-      do { let new_tv name = do { tcv <- newFlexiKindedTyVarTyVar name
-                                ; return (name, tcv) }
-         ; tcvs <- mapM new_tv tv_names
-         ; tcExtendNameTyVarEnv tcvs (thing_inside tcvs) }
-
     -- Check that the inline kind annotation on a binder is valid
     -- by unifying it with the kind of the quantifier.
     check_zipped_binder :: ZippedBinder -> TcM ()
@@ -2244,6 +2239,8 @@ kcCheckDeclHeader_sig kisig name flav ktvs kc_res_ki =
           n_sig_invis_bndrs = invisibleTyBndrCount sig_ki
           n_inst = n_sig_invis_bndrs - n_res_invis_bndrs
       in splitPiTysInvisibleN n_inst sig_ki
+
+kcCheckDeclHeader_sig _ _ _ (XLHsQTyVars nec) _ = noExtCon nec
 
 -- A quantifier from a kind signature zipped with a user-written binder for it.
 data ZippedBinder =
@@ -2578,6 +2575,56 @@ expectedKindInCtxt _                   = OpenKind
 *                                                                      *
 ********************************************************************* -}
 
+{- Note [Non-cloning for tyvar binders]
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+bindExplictTKBndrs_Q_Skol, bindExplictTKBndrs_Skol, do not clone;
+and nor do the Implicit versions.  There is no need.
+
+bindExplictTKBndrs_Q_Tv does not clone; and similarly Implicit.
+We take advantage of this in kcInferDeclHeader:
+     all_tv_prs = mkTyVarNamePairs (scoped_kvs ++ tc_tvs)
+If we cloned, we'd need to take a bit more care here; not hard.
+
+The main payoff is that avoidng gratuitious cloning means that we can
+almost always take the fast path in swizzleTcTyConBndrs.  "Almost
+always" means not the case of mutual recursion with polymorphic kinds.
+
+
+Note [Cloning for tyvar binders]
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+bindExplicitTKBndrs_Tv does cloning, making up a Name with a fresh Unique,
+unlike bindExplicitTKBndrs_Q_Tv.  (Nor do the Skol variants clone.)
+And similarly for bindImplicit...
+
+This for a narrow and tricky reason which, alas, I couldn't find a
+simpler way round.  #16221 is the poster child:
+
+   data SameKind :: k -> k -> *
+   data T a = forall k2 (b :: k2). MkT (SameKind a b) !Int
+
+When kind-checking T, we give (a :: kappa1). Then:
+
+- In kcConDecl we make a TyVarTv unification variable kappa2 for k2
+  (as described in Note [Kind-checking for GADTs], even though this
+  example is an existential)
+- So we get (b :: kappa2) via bindExplicitTKBndrs_Tv
+- We end up unifying kappa1 := kappa2, because of the (SameKind a b)
+
+Now we generalise over kappa2. But if kappa2's Name is precisely k2
+(i.e. we did not clone) we'll end up giving T the utterlly final kind
+  T :: forall k2. k2 -> *
+Nothing directly wrong with that but when we typecheck the data constructor
+we have k2 in scope; but then it's brought into scope /again/ when we find
+the forall k2.  This is chaotic, and we end up giving it the type
+  MkT :: forall k2 (a :: k2) k2 (b :: k2).
+         SameKind @k2 a b -> Int -> T @{k2} a
+which is bogus -- because of the shadowing of k2, we can't
+apply T to the kind or a!
+
+And there no reason /not/ to clone the Name when making a unification
+variable.  So that's what we do.
+-}
+
 --------------------------------------
 -- Implicit binders
 --------------------------------------
@@ -2585,10 +2632,12 @@ expectedKindInCtxt _                   = OpenKind
 bindImplicitTKBndrs_Skol, bindImplicitTKBndrs_Tv,
   bindImplicitTKBndrs_Q_Skol, bindImplicitTKBndrs_Q_Tv
   :: [Name] -> TcM a -> TcM ([TcTyVar], a)
-bindImplicitTKBndrs_Skol   = bindImplicitTKBndrsX newFlexiKindedSkolemTyVar
-bindImplicitTKBndrs_Tv     = bindImplicitTKBndrsX newFlexiKindedTyVarTyVar
 bindImplicitTKBndrs_Q_Skol = bindImplicitTKBndrsX (newImplicitTyVarQ newFlexiKindedSkolemTyVar)
 bindImplicitTKBndrs_Q_Tv   = bindImplicitTKBndrsX (newImplicitTyVarQ newFlexiKindedTyVarTyVar)
+bindImplicitTKBndrs_Skol   = bindImplicitTKBndrsX newFlexiKindedSkolemTyVar
+bindImplicitTKBndrs_Tv     = bindImplicitTKBndrsX cloneFlexiKindedTyVarTyVar
+  -- newFlexiKinded...           see Note [Non-cloning for tyvar binders]
+  -- cloneFlexiKindedTyVarTyVar: see Note [Cloning for tyvar binders]
 
 bindImplicitTKBndrsX
    :: (Name -> TcM TcTyVar) -- new_tv function
@@ -2621,7 +2670,10 @@ newFlexiKindedSkolemTyVar = newFlexiKindedTyVar newSkolemTyVar
 
 newFlexiKindedTyVarTyVar :: Name -> TcM TyVar
 newFlexiKindedTyVarTyVar = newFlexiKindedTyVar newTyVarTyVar
-   -- See Note [Unification variables need fresh Names] in TcMType
+
+cloneFlexiKindedTyVarTyVar :: Name -> TcM TyVar
+cloneFlexiKindedTyVarTyVar = newFlexiKindedTyVar cloneTyVarTyVar
+   -- See Note [Cloning for tyvar binders]
 
 --------------------------------------
 -- Explicit binders
@@ -2633,7 +2685,9 @@ bindExplicitTKBndrs_Skol, bindExplicitTKBndrs_Tv
     -> TcM ([TcTyVar], a)
 
 bindExplicitTKBndrs_Skol = bindExplicitTKBndrsX (tcHsTyVarBndr newSkolemTyVar)
-bindExplicitTKBndrs_Tv   = bindExplicitTKBndrsX (tcHsTyVarBndr newTyVarTyVar)
+bindExplicitTKBndrs_Tv   = bindExplicitTKBndrsX (tcHsTyVarBndr cloneTyVarTyVar)
+  -- newSkolemTyVar:  see Note [Non-cloning for tyvar binders]
+  -- cloneTyVarTyVar: see Note [Cloning for tyvar binders]
 
 bindExplicitTKBndrs_Q_Skol, bindExplicitTKBndrs_Q_Tv
     :: ContextKind
@@ -2643,6 +2697,8 @@ bindExplicitTKBndrs_Q_Skol, bindExplicitTKBndrs_Q_Tv
 
 bindExplicitTKBndrs_Q_Skol ctxt_kind = bindExplicitTKBndrsX (tcHsQTyVarBndr ctxt_kind newSkolemTyVar)
 bindExplicitTKBndrs_Q_Tv   ctxt_kind = bindExplicitTKBndrsX (tcHsQTyVarBndr ctxt_kind newTyVarTyVar)
+  -- See Note [Non-cloning for tyvar binders]
+
 
 bindExplicitTKBndrsX
     :: (HsTyVarBndr GhcRn -> TcM TcTyVar)
@@ -2662,7 +2718,7 @@ bindExplicitTKBndrsX tc_tv hs_tvs thing_inside
             -- is mentioned in the kind of a later binder
             --   e.g. forall k (a::k). blah
             -- NB: tv's Name may differ from hs_tv's
-            -- See TcMType Note [Unification variables need fresh Names]
+            -- See TcMType Note [Cloning for tyvar binders]
             ; (tvs,res) <- tcExtendNameTyVarEnv [(hsTyVarName hs_tv, tv)] $
                            go hs_tvs
             ; return (tv:tvs, res) }
@@ -2670,7 +2726,6 @@ bindExplicitTKBndrsX tc_tv hs_tvs thing_inside
 -----------------
 tcHsTyVarBndr :: (Name -> Kind -> TcM TyVar)
               -> HsTyVarBndr GhcRn -> TcM TcTyVar
--- Returned TcTyVar has the same name; no cloning
 tcHsTyVarBndr new_tv (UserTyVar _ (L _ tv_nm))
   = do { kind <- newMetaKindVar
        ; new_tv tv_nm kind }
