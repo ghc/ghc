@@ -54,7 +54,7 @@ import Util
 import Outputable
 import GHC.Platform
 import FastString
-import Name             ( NamedThing(..), nameSrcSpan )
+import Name             ( NamedThing(..), nameSrcSpan, isInternalName )
 import SrcLoc           ( SrcSpan(..), realSrcLocSpan, mkRealSrcLoc )
 import Data.Bits
 import MonadUtils       ( mapAccumLM )
@@ -416,22 +416,24 @@ cpeBind :: TopLevelFlag -> CorePrepEnv -> CoreBind
                                    -- Nothing <=> added bind' to floats instead
 cpeBind top_lvl env (NonRec bndr rhs)
   | not (isJoinId bndr)
-  = do { (_, bndr1) <- cpCloneBndr env bndr
+  = do { (env1, bndr1) <- cpCloneBndr env bndr
        ; let dmd         = idDemandInfo bndr
              is_unlifted = isUnliftedType (idType bndr)
        ; (floats, rhs1) <- cpePair top_lvl NonRecursive
                                    dmd is_unlifted
                                    env bndr1 rhs
        -- See Note [Inlining in CorePrep]
-       ; if cpExprIsTrivial rhs1 && isNotTopLevel top_lvl
-            then return (extendCorePrepEnvExpr env bndr rhs1, floats, Nothing)
-            else do {
+       ; let triv_rhs = cpExprIsTrivial rhs1
+             env2    | triv_rhs  = extendCorePrepEnvExpr env1 bndr rhs1
+                     | otherwise = env1
+             floats1 | triv_rhs, isInternalName (idName bndr)
+                     = floats
+                     | otherwise
+                     = addFloat floats new_float
 
-       ; let new_float = mkFloat dmd is_unlifted bndr1 rhs1
+             new_float = mkFloat dmd is_unlifted bndr1 rhs1
 
-       ; return (extendCorePrepEnv env bndr bndr1,
-                 addFloat floats new_float,
-                 Nothing) }}
+       ; return (env2, floats1, Nothing) }
 
   | otherwise -- A join point; see Note [Join points and floating]
   = ASSERT(not (isTopLevel top_lvl)) -- can't have top-level join point
@@ -652,6 +654,18 @@ cpeRhsE env expr@(Lam {})
         ; return (emptyFloats, mkLams bndrs' body') }
 
 cpeRhsE env (Case scrut bndr ty alts)
+  | isUnsafeEqualityProof scrut
+  , [(con, bs, rhs)] <- alts
+  = do { (floats1, scrut') <- cpeBody env scrut
+       ; (env1, bndr')     <- cpCloneBndr env bndr
+       ; (env2, bs')       <- cpCloneBndrs env1 bs
+       ; (floats2, rhs')   <- cpeBody env2 rhs
+       ; let case_float = FloatCase scrut' bndr' con bs' True
+             floats'    = (floats1 `addFloat` case_float)
+                          `appendFloats` floats2
+       ; return (floats', rhs') }
+
+  | otherwise
   = do { (floats, scrut') <- cpeBody env scrut
        ; (env', bndr2) <- cpCloneBndr env bndr
        ; let alts'
@@ -668,6 +682,7 @@ cpeRhsE env (Case scrut bndr ty alts)
                where err = mkRuntimeErrorApp rUNTIME_ERROR_ID ty
                                              "Bottoming expression returned"
        ; alts'' <- mapM (sat_alt env') alts'
+
        ; return (floats, Case scrut' bndr2 ty alts'') }
   where
     sat_alt env (con, bs, rhs)
@@ -1026,11 +1041,19 @@ okCpeArg expr    = not (cpExprIsTrivial expr)
 
 cpExprIsTrivial :: CoreExpr -> Bool
 cpExprIsTrivial e
-  | Case scrut _ _ [(DataAlt k,_,rhs)] <- e
-  , getName k == unsafeReflDataConName
-  = cpExprIsTrivial scrut && cpExprIsTrivial rhs
+  | Case scrut _ _ alts <- e
+  , isUnsafeEqualityProof scrut
+  , [(_,_,rhs)] <- alts
+  = cpExprIsTrivial rhs
   | otherwise
   = exprIsTrivial e
+
+isUnsafeEqualityProof :: CoreExpr -> Bool
+isUnsafeEqualityProof e
+  | Var v `App` Type _ `App` Type _ `App` Type _ <- e
+  = idName v == unsafeEqualityProofName
+  | otherwise
+  = False
 
 -- This is where we arrange that a non-trivial argument is let-bound
 cpeArg :: CorePrepEnv -> Demand
@@ -1221,8 +1244,11 @@ data FloatingBind
                          -- unlifted ones are done with FloatCase
 
  | FloatCase
-      Id CpeBody
-      Bool              -- The bool indicates "ok-for-speculation"
+      CpeBody         -- Always ok-for-speculation
+      Id              -- Case binder
+      AltCon [Var]    -- Single alternative
+      Bool            -- Ok-for-speculation; False of a strict,
+                      -- but lifted binding
 
  -- | See Note [Floating Ticks in CorePrep]
  | FloatTick (Tickish Id)
@@ -1231,7 +1257,11 @@ data Floats = Floats OkToSpec (OrdList FloatingBind)
 
 instance Outputable FloatingBind where
   ppr (FloatLet b) = ppr b
-  ppr (FloatCase b r ok) = brackets (ppr ok) <+> ppr b <+> equals <+> ppr r
+  ppr (FloatCase r b k bs ok) = text "case" <> braces (ppr ok) <+> ppr r
+                                <+> text "of"<+> ppr b <> text "@"
+                                <> case bs of
+                                   [] -> ppr k
+                                   _  -> parens (ppr k <+> ppr bs)
   ppr (FloatTick t) = ppr t
 
 instance Outputable Floats where
@@ -1254,17 +1284,19 @@ data OkToSpec
 
 mkFloat :: Demand -> Bool -> Id -> CpeRhs -> FloatingBind
 mkFloat dmd is_unlifted bndr rhs
-  | use_case  = FloatCase bndr rhs (exprOkForSpeculation rhs)
+  | is_unlifted = ASSERT2( exprOkForSpeculation rhs, ppr rhs )
+                  FloatCase rhs bndr DEFAULT [] True
+  | is_strict
+  , not is_hnf  = FloatCase rhs bndr DEFAULT [] (exprOkForSpeculation rhs)
+    -- Don't make a case for a HNF binding, even if it's strict
+    -- Otherwise we get  case (\x -> e) of ...!
+
   | is_hnf    = FloatLet (NonRec bndr                       rhs)
   | otherwise = FloatLet (NonRec (setIdDemandInfo bndr dmd) rhs)
                    -- See Note [Pin demand info on floats]
   where
     is_hnf    = exprIsHNF rhs
     is_strict = isStrictDmd dmd
-    use_case  = is_unlifted || is_strict && not is_hnf
-                -- Don't make a case for a value binding,
-                -- even if it's strict.  Otherwise we get
-                --      case (\x -> e) of ...!
 
 emptyFloats :: Floats
 emptyFloats = Floats OkToSpec nilOL
@@ -1276,19 +1308,19 @@ wrapBinds :: Floats -> CpeBody -> CpeBody
 wrapBinds (Floats _ binds) body
   = foldrOL mk_bind body binds
   where
-    mk_bind (FloatCase bndr rhs _) body = mkDefaultCase rhs bndr body
-    mk_bind (FloatLet bind)        body = Let bind body
-    mk_bind (FloatTick tickish)    body = mkTick tickish body
+    mk_bind (FloatCase rhs bndr con bs _) body = Case rhs bndr (exprType body) [(con,bs,body)]
+    mk_bind (FloatLet bind)               body = Let bind body
+    mk_bind (FloatTick tickish)           body = mkTick tickish body
 
 addFloat :: Floats -> FloatingBind -> Floats
 addFloat (Floats ok_to_spec floats) new_float
   = Floats (combine ok_to_spec (check new_float)) (floats `snocOL` new_float)
   where
-    check (FloatLet _) = OkToSpec
-    check (FloatCase _ _ ok_for_spec)
-        | ok_for_spec  =  IfUnboxedOk
-        | otherwise    =  NotOkToSpec
-    check FloatTick{}  = OkToSpec
+    check (FloatLet {})  = OkToSpec
+    check (FloatCase _ _ _ _ ok_for_spec)
+      | ok_for_spec = IfUnboxedOk
+      | otherwise   = NotOkToSpec
+    check FloatTick{}    = OkToSpec
         -- The ok-for-speculation flag says that it's safe to
         -- float this Case out of a let, and thereby do it more eagerly
         -- We need the top-level flag because it's never ok to float
@@ -1317,8 +1349,8 @@ deFloatTop (Floats _ floats)
   = foldrOL get [] floats
   where
     get (FloatLet b) bs = occurAnalyseRHSs b : bs
-    get (FloatCase var body _) bs  =
-      occurAnalyseRHSs (NonRec var body) : bs
+    get (FloatCase body var _ _ _) bs
+      = occurAnalyseRHSs (NonRec var body) : bs
     get b _ = pprPanic "corePrepPgm" (ppr b)
 
     -- See Note [Dead code in CorePrep]
@@ -1411,65 +1443,67 @@ allLazyNested is_rec (Floats IfUnboxedOk _) = isNonRec is_rec
 --                      The environment
 -- ---------------------------------------------------------------------------
 
--- Note [Inlining in CorePrep]
--- ~~~~~~~~~~~~~~~~~~~~~~~~~~~
--- There is a subtle but important invariant that must be upheld in the output
--- of CorePrep: there are no "trivial" updatable thunks.  Thus, this Core
--- is impermissible:
---
---      let x :: ()
---          x = y
---
--- (where y is a reference to a GLOBAL variable).  Thunks like this are silly:
--- they can always be profitably replaced by inlining x with y. Consequently,
--- the code generator/runtime does not bother implementing this properly
--- (specifically, there is no implementation of stg_ap_0_upd_info, which is the
--- stack frame that would be used to update this thunk.  The "0" means it has
--- zero free variables.)
---
--- In general, the inliner is good at eliminating these let-bindings.  However,
--- there is one case where these trivial updatable thunks can arise: when
--- we are optimizing away 'lazy' (see Note [lazyId magic], and also
--- 'cpeRhsE'.)  Then, we could have started with:
---
---      let x :: ()
---          x = lazy @ () y
---
--- which is a perfectly fine, non-trivial thunk, but then CorePrep will
--- drop 'lazy', giving us 'x = y' which is trivial and impermissible.
--- The solution is CorePrep to have a miniature inlining pass which deals
--- with cases like this.  We can then drop the let-binding altogether.
---
--- Why does the removal of 'lazy' have to occur in CorePrep?
--- The gory details are in Note [lazyId magic] in MkId, but the
--- main reason is that lazy must appear in unfoldings (optimizer
--- output) and it must prevent call-by-value for catch# (which
--- is implemented by CorePrep.)
---
--- An alternate strategy for solving this problem is to have the
--- inliner treat 'lazy e' as a trivial expression if 'e' is trivial.
--- We decided not to adopt this solution to keep the definition
--- of 'exprIsTrivial' simple.
---
--- There is ONE caveat however: for top-level bindings we have
--- to preserve the binding so that we float the (hacky) non-recursive
--- binding for data constructors; see Note [Data constructor workers].
---
--- Note [CorePrep inlines trivial CoreExpr not Id]
--- ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
--- Why does cpe_env need to be an IdEnv CoreExpr, as opposed to an
--- IdEnv Id?  Naively, we might conjecture that trivial updatable thunks
--- as per Note [Inlining in CorePrep] always have the form
--- 'lazy @ SomeType gbl_id'.  But this is not true: the following is
--- perfectly reasonable Core:
---
---      let x :: ()
---          x = lazy @ (forall a. a) y @ Bool
---
--- When we inline 'x' after eliminating 'lazy', we need to replace
--- occurrences of 'x' with 'y @ bool', not just 'y'.  Situations like
--- this can easily arise with higher-rank types; thus, cpe_env must
--- map to CoreExprs, not Ids.
+{- Note [Inlining in CorePrep]
+~~~~~~~~~~~~~~~~~~~~~~~~~~~
+There is a subtle but important invariant that must be upheld in the output
+of CorePrep: there are no "trivial" updatable thunks.  Thus, this Core
+is impermissible:
+
+     let x :: ()
+         x = y
+
+(where y is a reference to a GLOBAL variable).  Thunks like this are silly:
+they can always be profitably replaced by inlining x with y. Consequently,
+the code generator/runtime does not bother implementing this properly
+(specifically, there is no implementation of stg_ap_0_upd_info, which is the
+stack frame that would be used to update this thunk.  The "0" means it has
+zero free variables.)
+
+In general, the inliner is good at eliminating these let-bindings.  However,
+there is one case where these trivial updatable thunks can arise: when
+we are optimizing away 'lazy' (see Note [lazyId magic], and also
+'cpeRhsE'.)  Then, we could have started with:
+
+     let x :: ()
+         x = lazy @ () y
+
+which is a perfectly fine, non-trivial thunk, but then CorePrep will
+drop 'lazy', giving us 'x = y' which is trivial and impermissible.
+The solution is CorePrep to have a miniature inlining pass which deals
+with cases like this.  We can then drop the let-binding altogether.
+
+Why does the removal of 'lazy' have to occur in CorePrep?
+The gory details are in Note [lazyId magic] in MkId, but the
+main reason is that lazy must appear in unfoldings (optimizer
+output) and it must prevent call-by-value for catch# (which
+is implemented by CorePrep.)
+
+An alternate strategy for solving this problem is to have the
+inliner treat 'lazy e' as a trivial expression if 'e' is trivial.
+We decided not to adopt this solution to keep the definition
+of 'exprIsTrivial' simple.
+
+There is ONE caveat however: for top-level bindings we have
+to preserve the binding so that we float the (hacky) non-recursive
+binding for data constructors; see Note [Data constructor workers].
+
+Note [CorePrep inlines trivial CoreExpr not Id]
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+Why does cpe_env need to be an IdEnv CoreExpr, as opposed to an
+IdEnv Id?  Naively, we might conjecture that trivial updatable thunks
+as per Note [Inlining in CorePrep] always have the form
+'lazy @ SomeType gbl_id'.  But this is not true: the following is
+perfectly reasonable Core:
+
+     let x :: ()
+         x = lazy @ (forall a. a) y @ Bool
+
+When we inline 'x' after eliminating 'lazy', we need to replace
+occurrences of 'x' with 'y @ bool', not just 'y'.  Situations like
+this can easily arise with higher-rank types; thus, cpe_env must
+map to CoreExprs, not Ids.
+
+-}
 
 data CorePrepEnv
   = CPE { cpe_dynFlags        :: DynFlags
@@ -1699,9 +1733,9 @@ wrapTicks (Floats flag floats0) expr =
         go (floats, ticks) f
           = (foldr wrap f (reverse ticks):floats, ticks)
 
-        wrap t (FloatLet bind)    = FloatLet (wrapBind t bind)
-        wrap t (FloatCase b r ok) = FloatCase b (mkTick t r) ok
-        wrap _ other              = pprPanic "wrapTicks: unexpected float!"
+        wrap t (FloatLet bind)           = FloatLet (wrapBind t bind)
+        wrap t (FloatCase r b con bs ok) = FloatCase (mkTick t r) b con bs ok
+        wrap _ other                     = pprPanic "wrapTicks: unexpected float!"
                                              (ppr other)
         wrapBind t (NonRec binder rhs) = NonRec binder (mkTick t rhs)
         wrapBind t (Rec pairs)         = Rec (mapSnd (mkTick t) pairs)
