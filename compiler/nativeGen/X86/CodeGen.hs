@@ -44,7 +44,7 @@ import X86.RegInfo
 
 import GHC.Platform.Regs
 import CPrim
-import Debug            ( DebugBlock(..), UnwindPoint(..), UnwindTable
+import GHC.Cmm.DebugBlock            ( DebugBlock(..), UnwindPoint(..), UnwindTable
                         , UnwindExpr(UwReg), toUnwindExpr )
 import Instruction
 import PIC
@@ -59,16 +59,16 @@ import GHC.Platform
 
 -- Our intermediate code:
 import BasicTypes
-import BlockId
+import GHC.Cmm.BlockId
 import Module           ( primUnitId )
-import CmmUtils
-import CmmSwitch
-import Cmm
-import Hoopl.Block
-import Hoopl.Collections
-import Hoopl.Graph
-import Hoopl.Label
-import CLabel
+import GHC.Cmm.Utils
+import GHC.Cmm.Switch
+import GHC.Cmm
+import GHC.Cmm.Dataflow.Block
+import GHC.Cmm.Dataflow.Collections
+import GHC.Cmm.Dataflow.Graph
+import GHC.Cmm.Dataflow.Label
+import GHC.Cmm.CLabel
 import CoreSyn          ( Tickish(..) )
 import SrcLoc           ( srcSpanFile, srcSpanStartLine, srcSpanStartCol )
 
@@ -360,7 +360,7 @@ stmtToInstrs bid stmt = do
       CmmBranch id          -> return $ genBranch id
 
       --We try to arrange blocks such that the likely branch is the fallthrough
-      --in CmmContFlowOpt. So we can assume the condition is likely false here.
+      --in GHC.Cmm.ContFlowOpt. So we can assume the condition is likely false here.
       CmmCondBranch arg true false _ -> genCondBranch bid true false arg
       CmmSwitch arg ids -> do dflags <- getDynFlags
                               genSwitch dflags arg ids

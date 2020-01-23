@@ -37,12 +37,12 @@ import Reg
 import Format
 import PprBase
 
-import Cmm hiding (topInfoTable)
-import PprCmm() -- For Outputable instances
-import BlockId
-import CLabel
-import Hoopl.Label
-import Hoopl.Collections
+import GHC.Cmm hiding (topInfoTable)
+import GHC.Cmm.Ppr() -- For Outputable instances
+import GHC.Cmm.BlockId
+import GHC.Cmm.CLabel
+import GHC.Cmm.Dataflow.Label
+import GHC.Cmm.Dataflow.Collections
 
 import Unique           ( pprUniqueAlways )
 import Outputable

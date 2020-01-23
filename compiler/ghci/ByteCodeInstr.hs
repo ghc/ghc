@@ -28,7 +28,7 @@ import Literal
 import DataCon
 import VarSet
 import PrimOp
-import SMRep
+import GHC.Runtime.Layout
 
 import Data.Word
 import GHC.Stack.CCS (CostCentre)
