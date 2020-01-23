@@ -81,7 +81,7 @@ module GHC.Hs.Decls (
   RoleAnnotDecl(..), LRoleAnnotDecl, roleAnnotDeclName,
   -- ** Injective type families
   FamilyResultSig(..), LFamilyResultSig, InjectivityAnn(..), LInjectivityAnn,
-  resultVariableName,
+  resultVariableName, familyDeclLName, familyDeclName,
 
   -- * Grouping
   HsGroup(..),  emptyRdrGroup, emptyRnGroup, appendGroups, hsGroupInstDecls,
@@ -708,11 +708,14 @@ tyFamInstDeclLName (TyFamInstDecl (HsIB _ (XFamEqn nec)))
 tyFamInstDeclLName (TyFamInstDecl (XHsImplicitBndrs nec))
   = noExtCon nec
 
-tyClDeclLName :: TyClDecl pass -> Located (IdP pass)
-tyClDeclLName (FamDecl { tcdFam = FamilyDecl { fdLName = ln } }) = ln
-tyClDeclLName decl = tcdLName decl
+tyClDeclLName :: TyClDecl (GhcPass p) -> Located (IdP (GhcPass p))
+tyClDeclLName (FamDecl { tcdFam = fd })     = familyDeclLName fd
+tyClDeclLName (SynDecl { tcdLName = ln })   = ln
+tyClDeclLName (DataDecl { tcdLName = ln })  = ln
+tyClDeclLName (ClassDecl { tcdLName = ln }) = ln
+tyClDeclLName (XTyClDecl nec) = noExtCon nec
 
-tcdName :: TyClDecl pass -> IdP pass
+tcdName :: TyClDecl (GhcPass p) -> IdP (GhcPass p)
 tcdName = unLoc . tyClDeclLName
 
 tyClDeclTyVars :: TyClDecl pass -> LHsQTyVars pass
@@ -1138,6 +1141,16 @@ data FamilyInfo pass
      -- said "type family Foo x where .."
   | ClosedTypeFamily (Maybe [LTyFamInstEqn pass])
 
+
+------------- Functions over FamilyDecls -----------
+
+familyDeclLName :: FamilyDecl (GhcPass p) -> Located (IdP (GhcPass p))
+familyDeclLName (FamilyDecl { fdLName = n }) = n
+familyDeclLName (XFamilyDecl nec) = noExtCon nec
+
+familyDeclName :: FamilyDecl (GhcPass p) -> IdP (GhcPass p)
+familyDeclName = unLoc . familyDeclLName
+
 famResultKindSignature :: FamilyResultSig (GhcPass p) -> Maybe (LHsKind (GhcPass p))
 famResultKindSignature (NoSig _) = Nothing
 famResultKindSignature (KindSig _ ki) = Just ki
@@ -1152,6 +1165,8 @@ famResultKindSignature (XFamilyResultSig nec) = noExtCon nec
 resultVariableName :: FamilyResultSig (GhcPass a) -> Maybe (IdP (GhcPass a))
 resultVariableName (TyVarSig _ sig) = Just $ hsLTyVarName sig
 resultVariableName _                = Nothing
+
+------------- Pretty printing FamilyDecls -----------
 
 instance OutputableBndrId p
        => Outputable (FamilyDecl (GhcPass p)) where
