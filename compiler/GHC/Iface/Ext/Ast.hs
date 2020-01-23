@@ -297,7 +297,7 @@ enrichHie ts (hsGrp, imports, exports, _) = flip runReaderT initState $ do
       ]
 
 getRealSpan :: SrcSpan -> Maybe Span
-getRealSpan (RealSrcSpan sp) = Just sp
+getRealSpan (RealSrcSpan sp _) = Just sp
 getRealSpan _ = Nothing
 
 grhss_span :: GRHSs p body -> SrcSpan
@@ -307,7 +307,7 @@ grhss_span (XGRHSs _) = panic "XGRHS has no span"
 bindingsOnly :: [Context Name] -> [HieAST a]
 bindingsOnly [] = []
 bindingsOnly (C c n : xs) = case nameSrcSpan n of
-  RealSrcSpan span -> Node nodeinfo span [] : bindingsOnly xs
+  RealSrcSpan span _ -> Node nodeinfo span [] : bindingsOnly xs
     where nodeinfo = NodeInfo S.empty [] (M.singleton (Right n) info)
           info = mempty{identInfo = S.singleton c}
   _ -> bindingsOnly xs
@@ -531,7 +531,7 @@ instance ToHie (TScoped NoExtField) where
   toHie _ = pure []
 
 instance ToHie (IEContext (Located ModuleName)) where
-  toHie (IEC c (L (RealSrcSpan span) mname)) =
+  toHie (IEC c (L (RealSrcSpan span _) mname)) =
       pure $ [Node (NodeInfo S.empty [] idents) span []]
     where details = mempty{identInfo = S.singleton (IEThing c)}
           idents = M.singleton (Left mname) details
@@ -539,7 +539,7 @@ instance ToHie (IEContext (Located ModuleName)) where
 
 instance ToHie (Context (Located Var)) where
   toHie c = case c of
-      C context (L (RealSrcSpan span) name')
+      C context (L (RealSrcSpan span _) name')
         -> do
         m <- asks name_remapping
         let name = case lookupNameEnv m (varName name') of
@@ -557,7 +557,7 @@ instance ToHie (Context (Located Var)) where
 
 instance ToHie (Context (Located Name)) where
   toHie c = case c of
-      C context (L (RealSrcSpan span) name') -> do
+      C context (L (RealSrcSpan span _) name') -> do
         m <- asks name_remapping
         let name = case lookupNameEnv m name' of
               Just var -> varName var
