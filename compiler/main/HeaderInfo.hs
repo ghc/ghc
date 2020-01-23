@@ -192,7 +192,7 @@ lazyGetToks dflags filename handle = do
                   _other -> do rest <- lazyLexBuf handle state' eof size
                                return (t : rest)
       _ | not eof   -> getMore handle state size
-        | otherwise -> return [L (RealSrcSpan (last_loc state)) ITeof]
+        | otherwise -> return [L (mkSrcSpanPs (last_loc state)) ITeof]
                          -- parser assumes an ITeof sentinel at the end
 
   getMore :: Handle -> PState -> Int -> IO [Located Token]
@@ -216,7 +216,7 @@ getToks dflags filename buf = lexAll (pragState dflags buf loc)
   lexAll state = case unP (lexer False return) state of
                    POk _      t@(L _ ITeof) -> [t]
                    POk state' t -> t : lexAll state'
-                   _ -> [L (RealSrcSpan (last_loc state)) ITeof]
+                   _ -> [L (mkSrcSpanPs (last_loc state)) ITeof]
 
 
 -- | Parse OPTIONS and LANGUAGE pragmas of the source file.
