@@ -41,13 +41,13 @@ import GHC.StgToCmm.Ticky
 import GHC.StgToCmm.Monad
 import GHC.StgToCmm.Utils
 
-import MkGraph
-import SMRep
-import BlockId
-import Cmm
-import CmmUtils
-import CmmInfo
-import CLabel
+import GHC.Cmm.Graph
+import GHC.Runtime.Layout
+import GHC.Cmm.BlockId
+import GHC.Cmm
+import GHC.Cmm.Utils
+import GHC.Cmm.Info
+import GHC.Cmm.CLabel
 import GHC.Stg.Syntax
 import Id
 import TyCon             ( PrimRep(..), primRepSizeB )
