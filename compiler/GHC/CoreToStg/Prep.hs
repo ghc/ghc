@@ -240,7 +240,7 @@ mkDataConWorkers dflags mod_loc data_tycons
    -- worker. This is useful, especially for heap profiling.
    tick_it name
      | debugLevel dflags == 0                = id
-     | RealSrcSpan span <- nameSrcSpan name  = tick span
+     | RealSrcSpan span _ <- nameSrcSpan name = tick span
      | Just file <- ml_hs_file mod_loc       = tick (span1 file)
      | otherwise                             = tick (span1 "???")
      where tick span  = Tick (SourceNote span $ showSDoc dflags (ppr name))

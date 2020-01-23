@@ -28,6 +28,7 @@ module SrcLoc (
         interactiveSrcLoc,      -- Code from an interactive session
 
         advanceSrcLoc,
+        advanceBufPos,
 
         -- ** Unsafely deconstructing SrcLoc
         -- These are dubious exports, because they crash on some inputs
@@ -64,6 +65,10 @@ module SrcLoc (
         isGoodSrcSpan, isOneLineSpan,
         containsSpan,
 
+        -- * StringBuffer locations
+        BufPos(..),
+        BufSpan(..),
+
         -- * Located
         Located,
         RealLocated,
@@ -87,7 +92,18 @@ module SrcLoc (
         sortRealLocated,
         lookupSrcLoc, lookupSrcSpan,
 
-        liftL
+        liftL,
+
+        -- * Parser locations
+        PsLoc(..),
+        PsSpan(..),
+        PsLocated,
+        advancePsLoc,
+        mkPsSpan,
+        psSpanStart,
+        psSpanEnd,
+        mkSrcSpanPs,
+
     ) where
 
 import GhcPrelude
@@ -98,6 +114,7 @@ import Outputable
 import FastString
 
 import Control.DeepSeq
+import Control.Applicative (liftA2)
 import Data.Bits
 import Data.Data
 import Data.List (sortBy, intercalate)
@@ -124,9 +141,19 @@ data RealSrcLoc
                 {-# UNPACK #-} !Int     -- column number, begins at 1
   deriving (Eq, Ord)
 
+-- | 0-based index identifying the raw location in the StringBuffer.
+--
+-- Unlike 'RealSrcLoc', it is not affected by #line and {-# LINE ... #-}
+-- pragmas. In particular, notice how 'setSrcLoc' and 'resetAlrLastLoc' in
+-- Lexer.x update 'PsLoc' preserving 'BufPos'.
+--
+-- The parser guarantees that 'BufPos' are monotonic. See #17632.
+newtype BufPos = BufPos { bufPos :: Int }
+  deriving (Eq, Ord, Show)
+
 -- | Source Location
 data SrcLoc
-  = RealSrcLoc {-# UNPACK #-}!RealSrcLoc
+  = RealSrcLoc !RealSrcLoc !(Maybe BufPos)  -- See Note [Why Maybe BufPos]
   | UnhelpfulLoc FastString     -- Just a general indication
   deriving (Eq, Show)
 
@@ -139,7 +166,7 @@ data SrcLoc
 -}
 
 mkSrcLoc :: FastString -> Int -> Int -> SrcLoc
-mkSrcLoc x line col = RealSrcLoc (mkRealSrcLoc x line col)
+mkSrcLoc x line col = RealSrcLoc (mkRealSrcLoc x line col) Nothing
 
 mkRealSrcLoc :: FastString -> Int -> Int -> RealSrcLoc
 mkRealSrcLoc x line col = SrcLoc x line col
@@ -171,9 +198,14 @@ srcLocCol (SrcLoc _ _ c) = c
 -- character in any other case
 advanceSrcLoc :: RealSrcLoc -> Char -> RealSrcLoc
 advanceSrcLoc (SrcLoc f l _) '\n' = SrcLoc f  (l + 1) 1
-advanceSrcLoc (SrcLoc f l c) '\t' = SrcLoc f  l (((((c - 1) `shiftR` 3) + 1)
-                                                  `shiftL` 3) + 1)
+advanceSrcLoc (SrcLoc f l c) '\t' = SrcLoc f  l (advance_tabstop c)
 advanceSrcLoc (SrcLoc f l c) _    = SrcLoc f  l (c + 1)
+
+advance_tabstop :: Int -> Int
+advance_tabstop c = ((((c - 1) `shiftR` 3) + 1) `shiftL` 3) + 1
+
+advanceBufPos :: BufPos -> BufPos
+advanceBufPos (BufPos i) = BufPos (i+1)
 
 {-
 ************************************************************************
@@ -190,11 +222,11 @@ sortRealLocated :: [RealLocated a] -> [RealLocated a]
 sortRealLocated = sortBy (compare `on` getLoc)
 
 lookupSrcLoc :: SrcLoc -> Map.Map RealSrcLoc a -> Maybe a
-lookupSrcLoc (RealSrcLoc l) = Map.lookup l
+lookupSrcLoc (RealSrcLoc l _) = Map.lookup l
 lookupSrcLoc (UnhelpfulLoc _) = const Nothing
 
 lookupSrcSpan :: SrcSpan -> Map.Map RealSrcSpan a -> Maybe a
-lookupSrcSpan (RealSrcSpan l) = Map.lookup l
+lookupSrcSpan (RealSrcSpan l _) = Map.lookup l
 lookupSrcSpan (UnhelpfulSpan _) = const Nothing
 
 instance Outputable RealSrcLoc where
@@ -214,7 +246,7 @@ instance Outputable RealSrcLoc where
 --                  char '\"', pprFastFilePath src_path, text " #-}"]
 
 instance Outputable SrcLoc where
-    ppr (RealSrcLoc l) = ppr l
+    ppr (RealSrcLoc l _) = ppr l
     ppr (UnhelpfulLoc s)  = ftext s
 
 instance Data RealSrcSpan where
@@ -259,21 +291,46 @@ data RealSrcSpan
         }
   deriving Eq
 
+-- | StringBuffer Source Span
+data BufSpan =
+  BufSpan { bufSpanStart, bufSpanEnd :: {-# UNPACK #-} !BufPos }
+  deriving (Eq, Ord, Show)
+
 -- | Source Span
 --
 -- A 'SrcSpan' identifies either a specific portion of a text file
 -- or a human-readable description of a location.
 data SrcSpan =
-    RealSrcSpan !RealSrcSpan
+    RealSrcSpan !RealSrcSpan !(Maybe BufSpan)  -- See Note [Why Maybe BufPos]
   | UnhelpfulSpan !FastString   -- Just a general indication
                                 -- also used to indicate an empty span
 
   deriving (Eq, Show) -- Show is used by Lexer.x, because we
                       -- derive Show for Token
 
+{- Note [Why Maybe BufPos]
+~~~~~~~~~~~~~~~~~~~~~~~~~~
+In SrcLoc we store (Maybe BufPos); in SrcSpan we store (Maybe BufSpan).
+Why the Maybe?
+
+Surely, the lexer can always fill in the buffer position, and it guarantees to do so.
+However, sometimes the SrcLoc/SrcSpan is constructed in a different context
+where the buffer location is not available, and then we use Nothing instead of
+a fake value like BufPos (-1).
+
+Perhaps the compiler could be re-engineered to pass around BufPos more
+carefully and never discard it, and this 'Maybe' could be removed. If you're
+interested in doing so, you may find this ripgrep query useful:
+
+  rg "RealSrc(Loc|Span).*?Nothing"
+
+For example, it is not uncommon to whip up source locations for e.g. error
+messages, constructing a SrcSpan without a BufSpan.
+-}
+
 instance ToJson SrcSpan where
   json (UnhelpfulSpan {} ) = JSNull --JSObject [( "type", "unhelpful")]
-  json (RealSrcSpan rss)  = json rss
+  json (RealSrcSpan rss _) = json rss
 
 instance ToJson RealSrcSpan where
   json (RealSrcSpan'{..}) = JSObject [ ("file", JSString (unpackFS srcSpanFile))
@@ -299,7 +356,7 @@ mkGeneralSrcSpan = UnhelpfulSpan
 -- | Create a 'SrcSpan' corresponding to a single point
 srcLocSpan :: SrcLoc -> SrcSpan
 srcLocSpan (UnhelpfulLoc str) = UnhelpfulSpan str
-srcLocSpan (RealSrcLoc l) = RealSrcSpan (realSrcLocSpan l)
+srcLocSpan (RealSrcLoc l mb) = RealSrcSpan (realSrcLocSpan l) (fmap (\b -> BufSpan b b) mb)
 
 realSrcLocSpan :: RealSrcLoc -> RealSrcSpan
 realSrcLocSpan (SrcLoc file line col) = RealSrcSpan' file line col line col
@@ -328,17 +385,17 @@ isPointRealSpan (RealSrcSpan' _ line1 col1 line2 col2)
 mkSrcSpan :: SrcLoc -> SrcLoc -> SrcSpan
 mkSrcSpan (UnhelpfulLoc str) _ = UnhelpfulSpan str
 mkSrcSpan _ (UnhelpfulLoc str) = UnhelpfulSpan str
-mkSrcSpan (RealSrcLoc loc1) (RealSrcLoc loc2)
-    = RealSrcSpan (mkRealSrcSpan loc1 loc2)
+mkSrcSpan (RealSrcLoc loc1 mbpos1) (RealSrcLoc loc2 mbpos2)
+    = RealSrcSpan (mkRealSrcSpan loc1 loc2) (liftA2 BufSpan mbpos1 mbpos2)
 
 -- | Combines two 'SrcSpan' into one that spans at least all the characters
 -- within both spans. Returns UnhelpfulSpan if the files differ.
 combineSrcSpans :: SrcSpan -> SrcSpan -> SrcSpan
 combineSrcSpans (UnhelpfulSpan _) r = r -- this seems more useful
 combineSrcSpans l (UnhelpfulSpan _) = l
-combineSrcSpans (RealSrcSpan span1) (RealSrcSpan span2)
+combineSrcSpans (RealSrcSpan span1 mbspan1) (RealSrcSpan span2 mbspan2)
   | srcSpanFile span1 == srcSpanFile span2
-      = RealSrcSpan (combineRealSrcSpans span1 span2)
+      = RealSrcSpan (combineRealSrcSpans span1 span2) (liftA2 combineBufSpans mbspan1 mbspan2)
   | otherwise = UnhelpfulSpan (fsLit "<combineSrcSpans: files differ>")
 
 -- | Combines two 'SrcSpan' into one that spans at least all the characters
@@ -353,13 +410,25 @@ combineRealSrcSpans span1 span2
                                   (srcSpanEndLine span2, srcSpanEndCol span2)
     file = srcSpanFile span1
 
+combineBufSpans :: BufSpan -> BufSpan -> BufSpan
+combineBufSpans span1 span2 = BufSpan start end
+  where
+    start = min (bufSpanStart span1) (bufSpanStart span2)
+    end   = max (bufSpanEnd   span1) (bufSpanEnd   span2)
+
+
 -- | Convert a SrcSpan into one that represents only its first character
 srcSpanFirstCharacter :: SrcSpan -> SrcSpan
 srcSpanFirstCharacter l@(UnhelpfulSpan {}) = l
-srcSpanFirstCharacter (RealSrcSpan span) = RealSrcSpan $ mkRealSrcSpan loc1 loc2
+srcSpanFirstCharacter (RealSrcSpan span mbspan) =
+    RealSrcSpan (mkRealSrcSpan loc1 loc2) (fmap mkBufSpan mbspan)
   where
     loc1@(SrcLoc f l c) = realSrcSpanStart span
     loc2 = SrcLoc f l (c+1)
+    mkBufSpan bspan =
+      let bpos1@(BufPos i) = bufSpanStart bspan
+          bpos2 = BufPos (i+1)
+      in BufSpan bpos1 bpos2
 
 {-
 ************************************************************************
@@ -371,13 +440,13 @@ srcSpanFirstCharacter (RealSrcSpan span) = RealSrcSpan $ mkRealSrcSpan loc1 loc2
 
 -- | Test if a 'SrcSpan' is "good", i.e. has precise location information
 isGoodSrcSpan :: SrcSpan -> Bool
-isGoodSrcSpan (RealSrcSpan _) = True
+isGoodSrcSpan (RealSrcSpan _ _) = True
 isGoodSrcSpan (UnhelpfulSpan _) = False
 
 isOneLineSpan :: SrcSpan -> Bool
 -- ^ True if the span is known to straddle only one line.
 -- For "bad" 'SrcSpan', it returns False
-isOneLineSpan (RealSrcSpan s) = srcSpanStartLine s == srcSpanEndLine s
+isOneLineSpan (RealSrcSpan s _) = srcSpanStartLine s == srcSpanEndLine s
 isOneLineSpan (UnhelpfulSpan _) = False
 
 -- | Tests whether the first span "contains" the other span, meaning
@@ -420,12 +489,12 @@ srcSpanEndCol RealSrcSpan'{ srcSpanECol=c } = c
 -- | Returns the location at the start of the 'SrcSpan' or a "bad" 'SrcSpan' if that is unavailable
 srcSpanStart :: SrcSpan -> SrcLoc
 srcSpanStart (UnhelpfulSpan str) = UnhelpfulLoc str
-srcSpanStart (RealSrcSpan s) = RealSrcLoc (realSrcSpanStart s)
+srcSpanStart (RealSrcSpan s b) = RealSrcLoc (realSrcSpanStart s) (fmap bufSpanStart b)
 
 -- | Returns the location at the end of the 'SrcSpan' or a "bad" 'SrcSpan' if that is unavailable
 srcSpanEnd :: SrcSpan -> SrcLoc
 srcSpanEnd (UnhelpfulSpan str) = UnhelpfulLoc str
-srcSpanEnd (RealSrcSpan s) = RealSrcLoc (realSrcSpanEnd s)
+srcSpanEnd (RealSrcSpan s b) = RealSrcLoc (realSrcSpanEnd s) (fmap bufSpanEnd b)
 
 realSrcSpanStart :: RealSrcSpan -> RealSrcLoc
 realSrcSpanStart s = mkRealSrcLoc (srcSpanFile s)
@@ -439,7 +508,7 @@ realSrcSpanEnd s = mkRealSrcLoc (srcSpanFile s)
 
 -- | Obtains the filename for a 'SrcSpan' if it is "good"
 srcSpanFileName_maybe :: SrcSpan -> Maybe FastString
-srcSpanFileName_maybe (RealSrcSpan s)   = Just (srcSpanFile s)
+srcSpanFileName_maybe (RealSrcSpan s _) = Just (srcSpanFile s)
 srcSpanFileName_maybe (UnhelpfulSpan _) = Nothing
 
 {-
@@ -501,7 +570,7 @@ instance Outputable SrcSpan where
 
 pprUserSpan :: Bool -> SrcSpan -> SDoc
 pprUserSpan _         (UnhelpfulSpan s) = ftext s
-pprUserSpan show_path (RealSrcSpan s)   = pprUserRealSpan show_path s
+pprUserSpan show_path (RealSrcSpan s _) = pprUserRealSpan show_path s
 
 pprUserRealSpan :: Bool -> RealSrcSpan -> SDoc
 pprUserRealSpan show_path span@(RealSrcSpan' src_path line col _ _)
@@ -602,22 +671,22 @@ leftmost_largest = compareSrcSpanBy $ \a b ->
   (realSrcSpanEnd b `compare` realSrcSpanEnd a)
 
 compareSrcSpanBy :: (RealSrcSpan -> RealSrcSpan -> Ordering) -> SrcSpan -> SrcSpan -> Ordering
-compareSrcSpanBy cmp (RealSrcSpan a)   (RealSrcSpan b)   = cmp a b
-compareSrcSpanBy _   (RealSrcSpan _)   (UnhelpfulSpan _) = LT
-compareSrcSpanBy _   (UnhelpfulSpan _) (RealSrcSpan _)   = GT
+compareSrcSpanBy cmp (RealSrcSpan a _) (RealSrcSpan b _) = cmp a b
+compareSrcSpanBy _   (RealSrcSpan _ _) (UnhelpfulSpan _) = LT
+compareSrcSpanBy _   (UnhelpfulSpan _) (RealSrcSpan _ _) = GT
 compareSrcSpanBy _   (UnhelpfulSpan _) (UnhelpfulSpan _) = EQ
 
 -- | Determines whether a span encloses a given line and column index
 spans :: SrcSpan -> (Int, Int) -> Bool
 spans (UnhelpfulSpan _) _ = panic "spans UnhelpfulSpan"
-spans (RealSrcSpan span) (l,c) = realSrcSpanStart span <= loc && loc <= realSrcSpanEnd span
+spans (RealSrcSpan span _) (l,c) = realSrcSpanStart span <= loc && loc <= realSrcSpanEnd span
    where loc = mkRealSrcLoc (srcSpanFile span) l c
 
 -- | Determines whether a span is enclosed by another one
 isSubspanOf :: SrcSpan -- ^ The span that may be enclosed by the other
             -> SrcSpan -- ^ The span it may be enclosed by
             -> Bool
-isSubspanOf (RealSrcSpan src) (RealSrcSpan parent) = isRealSubspanOf src parent
+isSubspanOf (RealSrcSpan src _) (RealSrcSpan parent _) = isRealSubspanOf src parent
 isSubspanOf _ _ = False
 
 -- | Determines whether a span is enclosed by another one
@@ -639,3 +708,34 @@ getRealSrcSpan (L l _) = l
 
 unRealSrcSpan :: RealLocated a -> a
 unRealSrcSpan  (L _ e) = e
+
+
+-- | A location as produced by the parser. Consists of two components:
+--
+-- * The location in the file, adjusted for #line and {-# LINE ... #-} pragmas (RealSrcLoc)
+-- * The location in the string buffer (BufPos) with monotonicity guarantees (see #17632)
+data PsLoc
+  = PsLoc { psRealLoc :: !RealSrcLoc, psBufPos :: !BufPos }
+  deriving (Eq, Ord, Show)
+
+data PsSpan
+  = PsSpan { psRealSpan :: !RealSrcSpan, psBufSpan :: !BufSpan }
+  deriving (Eq, Ord, Show)
+
+type PsLocated = GenLocated PsSpan
+
+advancePsLoc :: PsLoc -> Char -> PsLoc
+advancePsLoc (PsLoc real_loc buf_loc) c =
+  PsLoc (advanceSrcLoc real_loc c) (advanceBufPos buf_loc)
+
+mkPsSpan :: PsLoc -> PsLoc -> PsSpan
+mkPsSpan (PsLoc r1 b1) (PsLoc r2 b2) = PsSpan (mkRealSrcSpan r1 r2) (BufSpan b1 b2)
+
+psSpanStart :: PsSpan -> PsLoc
+psSpanStart (PsSpan r b) = PsLoc (realSrcSpanStart r) (bufSpanStart b)
+
+psSpanEnd :: PsSpan -> PsLoc
+psSpanEnd (PsSpan r b) = PsLoc (realSrcSpanEnd r) (bufSpanEnd b)
+
+mkSrcSpanPs :: PsSpan -> SrcSpan
+mkSrcSpanPs (PsSpan r b) = RealSrcSpan r (Just b)

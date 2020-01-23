@@ -133,7 +133,7 @@ similarNameSuggestions where_look dflags global_env
     pp_item (rdr, Left loc) = pp_ns rdr <+> quotes (ppr rdr) <+> loc' -- Locally defined
         where loc' = case loc of
                      UnhelpfulSpan l -> parens (ppr l)
-                     RealSrcSpan l -> parens (text "line" <+> int (srcSpanStartLine l))
+                     RealSrcSpan l _ -> parens (text "line" <+> int (srcSpanStartLine l))
     pp_item (rdr, Right is) = pp_ns rdr <+> quotes (ppr rdr) <+>   -- Imported
                               parens (text "imported from" <+> ppr (is_mod is))
 

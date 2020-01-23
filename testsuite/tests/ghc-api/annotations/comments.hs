@@ -52,7 +52,7 @@ testOneFile libdir fileName useHaddock = do
         ann_comments = apiAnnComments anns
         ann_rcomments = apiAnnRogueComments anns
         comments =
-          map (\(s,v) -> (RealSrcSpan s, v)) (Map.toList ann_comments)
+          map (\(s,v) -> (RealSrcSpan s Nothing, v)) (Map.toList ann_comments)
             ++
           [(noSrcSpan, ann_rcomments)]
 

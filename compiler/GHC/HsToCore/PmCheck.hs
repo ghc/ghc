@@ -174,8 +174,8 @@ data AnnotatedTree
   -- ^ Mirrors 'Empty' for preserving the skeleton of a 'GrdTree's.
 
 pprRhsInfo :: RhsInfo -> SDoc
-pprRhsInfo (L (RealSrcSpan rss) _) = ppr (srcSpanStartLine rss)
-pprRhsInfo (L s _)                 = ppr s
+pprRhsInfo (L (RealSrcSpan rss _) _) = ppr (srcSpanStartLine rss)
+pprRhsInfo (L s _)                   = ppr s
 
 instance Outputable GrdTree where
   ppr (Rhs info)      = text "->" <+> pprRhsInfo info

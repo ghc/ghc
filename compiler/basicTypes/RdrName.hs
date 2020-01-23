@@ -1306,7 +1306,7 @@ instance Outputable ImportSpec where
             | otherwise                  = empty
 
 pprLoc :: SrcSpan -> SDoc
-pprLoc (RealSrcSpan s)    = text "at" <+> ppr s
+pprLoc (RealSrcSpan s _)  = text "at" <+> ppr s
 pprLoc (UnhelpfulSpan {}) = empty
 
 -- | Display info about the treatment of '*' under NoStarIsType.
