@@ -46,6 +46,13 @@ infix  4 `elem`, `notElem`
 --------------------------------------------------------------
 
 -- | \(\mathcal{O}(1)\). Extract the first element of a list, which must be non-empty.
+--
+-- >>> head [1, 2, 3]
+-- 1
+-- >>> head [1..]
+-- 1
+-- >>> head []
+-- Exception: Prelude.head: empty list
 head                    :: [a] -> a
 head (x:_)              =  x
 head []                 =  badHead
@@ -63,23 +70,46 @@ badHead = errorEmptyList "head"
                 head (augment g xs) = g (\x _ -> x) (head xs)
  #-}
 
--- | \(\mathcal{O}(1)\). Decompose a list into its head and tail. If the list is
--- empty, returns 'Nothing'. If the list is non-empty, returns @'Just' (x, xs)@,
+-- | \(\mathcal{O}(1)\). Decompose a list into its head and tail.
+--
+-- * If the list is empty, returns 'Nothing'.
+-- * If the list is non-empty, returns @'Just' (x, xs)@,
 -- where @x@ is the head of the list and @xs@ its tail.
 --
 -- @since 4.8.0.0
+--
+-- >>> uncons []
+-- Nothing
+-- >>> uncons [1]
+-- Just (1,[])
+-- >>> uncons [1, 2, 3]
+-- Just (1,[2,3])
 uncons                  :: [a] -> Maybe (a, [a])
 uncons []               = Nothing
 uncons (x:xs)           = Just (x, xs)
 
 -- | \(\mathcal{O}(1)\). Extract the elements after the head of a list, which
 -- must be non-empty.
+--
+-- >>> tail [1, 2, 3]
+-- [2,3]
+-- >>> tail [1]
+-- []
+-- >>> tail []
+-- Exception: Prelude.tail: empty list
 tail                    :: [a] -> [a]
 tail (_:xs)             =  xs
 tail []                 =  errorEmptyList "tail"
 
 -- | \(\mathcal{O}(n)\). Extract the last element of a list, which must be
 -- finite and non-empty.
+--
+-- >>> last [1, 2, 3]
+-- 3
+-- >>> last [1..]
+-- * Hangs forever *
+-- >>> last []
+-- Exception: Prelude.last: empty list
 last                    :: [a] -> a
 #if defined(USE_REPORT_PRELUDE)
 last [x]                =  x
@@ -99,6 +129,13 @@ lastError = errorEmptyList "last"
 
 -- | \(\mathcal{O}(n)\). Return all the elements of a list except the last one.
 -- The list must be non-empty.
+--
+-- >>> init [1, 2, 3]
+-- [1,2]
+-- >>> init [1]
+-- []
+-- >>> init []
+-- Exception: Prelude.init: empty list
 init                    :: [a] -> [a]
 #if defined(USE_REPORT_PRELUDE)
 init [x]                =  []
@@ -113,6 +150,13 @@ init (x:xs)             =  init' x xs
 #endif
 
 -- | \(\mathcal{O}(1)\). Test whether a list is empty.
+--
+-- >>> null []
+-- True
+-- >>> null [1]
+-- False
+-- >>> null [1..]
+-- False
 null                    :: [a] -> Bool
 null []                 =  True
 null (_:_)              =  False
@@ -120,6 +164,13 @@ null (_:_)              =  False
 -- | \(\mathcal{O}(n)\). 'length' returns the length of a finite list as an
 -- 'Int'. It is an instance of the more general 'Data.List.genericLength', the
 -- result type of which may be any kind of number.
+--
+-- >>> length []
+-- 0
+-- >>> length ['a', 'b', 'c']
+-- 3
+-- length [1..]
+-- * Hangs forever *
 {-# NOINLINE [1] length #-}
 length                  :: [a] -> Int
 length xs               = lenAcc xs 0
@@ -150,7 +201,6 @@ idLength = id
 --
 -- >>> filter odd [1, 2, 3]
 -- [1,3]
-
 {-# NOINLINE [1] filter #-}
 filter :: (a -> Bool) -> [a] -> [a]
 filter _pred []    = []
@@ -186,7 +236,15 @@ filterFB c p x r | p x       = x `c` r
 -- > foldl f z [x1, x2, ..., xn] == (...((z `f` x1) `f` x2) `f`...) `f` xn
 --
 -- The list must be finite.
-
+--
+-- >>> foldl (+) 0 [1..4]
+-- 10
+-- >>> foldl (+) 42 []
+-- 42
+-- >>> foldl (-) 100 [1..4]
+-- 90
+-- >>> foldl (\reverseString nextChar -> nextChar : reverseString) "foo" ['a', 'b', 'c', 'd']
+-- "dcbafoo"
 foldl :: forall a b. (b -> a -> b) -> b -> [a] -> b
 {-# INLINE foldl #-}
 foldl k z0 xs =
@@ -918,6 +976,15 @@ concat = foldr (++) []
 -- | List index (subscript) operator, starting from 0.
 -- It is an instance of the more general 'Data.List.genericIndex',
 -- which takes an index of any integral type.
+--
+-- >>> ['a', 'b', 'c'] !! 0
+-- 'a'
+-- >>> ['a', 'b', 'c'] !! 2
+-- 'c'
+-- >>> ['a', 'b', 'c'] !! 3
+-- Exception: Prelude.!!: index too large
+-- >>> ['a', 'b', 'c'] !! (-1)
+-- Exception: Prelude.!!: negative index
 (!!)                    :: [a] -> Int -> a
 #if defined(USE_REPORT_PRELUDE)
 xs     !! n | n < 0 =  errorWithoutStackTrace "Prelude.!!: negative index"
