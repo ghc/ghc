@@ -170,7 +170,8 @@ unguardedRHS :: SrcSpan -> Located (body (GhcPass p))
              -> [LGRHS (GhcPass p) (Located (body (GhcPass p)))]
 unguardedRHS loc rhs = [L loc (GRHS noExtField [] rhs)]
 
-mkMatchGroup :: (XMG name (Located (body name)) ~ NoExtField)
+mkMatchGroup :: XMG name (Located (body name)) ~ NoExtField
+             => XRec name (Match name (Located (body name))) ~ Located (Match name (Located (body name)))
              => Origin -> [LMatch name (Located (body name))]
              -> MatchGroup name (Located (body name))
 mkMatchGroup origin matches = MG { mg_ext = noExtField
@@ -840,7 +841,7 @@ mkPatSynBind name details lpat dir = PatSynBind noExtField psb
 
 -- |If any of the matches in the 'FunBind' are infix, the 'FunBind' is
 -- considered infix.
-isInfixFunBind :: HsBindLR id1 id2 -> Bool
+isInfixFunBind :: HsBindLR id1 (GhcPass id2) -> Bool
 isInfixFunBind (FunBind _ _ (MG _ matches _) _ _)
   = any (isInfixMatch . unLoc) (unLoc matches)
 isInfixFunBind _ = False
@@ -976,7 +977,7 @@ collectHsIdBinders, collectHsValBinders
 collectHsIdBinders  = collect_hs_val_binders True
 collectHsValBinders = collect_hs_val_binders False
 
-collectHsBindBinders :: XRec pass Pat ~ Located (Pat pass) =>
+collectHsBindBinders :: XRec pass (Pat pass) ~ Located (Pat pass) =>
                         HsBindLR pass idR -> [IdP pass]
 -- ^ Collect both 'Id's and pattern-synonym binders
 collectHsBindBinders b = collect_bind False b []
@@ -1003,7 +1004,7 @@ collect_binds :: Bool -> LHsBindsLR (GhcPass p) idR ->
 -- ^ Collect 'Id's, or 'Id's + pattern synonyms, depending on boolean flag
 collect_binds ps binds acc = foldr (collect_bind ps . unLoc) acc binds
 
-collect_bind :: XRec pass Pat ~ Located (Pat pass) =>
+collect_bind :: XRec pass (Pat pass) ~ Located (Pat pass) =>
                 Bool -> HsBindLR pass idR ->
                 [IdP pass] -> [IdP pass]
 collect_bind _ (PatBind { pat_lhs = p })           acc = collect_lpat p acc
@@ -1068,7 +1069,7 @@ collectPatsBinders :: [LPat (GhcPass p)] -> [IdP (GhcPass p)]
 collectPatsBinders pats = foldr collect_lpat [] pats
 
 -------------
-collect_lpat :: XRec pass Pat ~ Located (Pat pass) =>
+collect_lpat :: XRec pass (Pat pass) ~ Located (Pat pass) =>
                 LPat pass -> [IdP pass] -> [IdP pass]
 collect_lpat p bndrs
   = go (unLoc p)
@@ -1188,7 +1189,8 @@ hsLTyClDeclBinders (L _ (XTyClDecl nec)) = noExtCon nec
 
 
 -------------------
-hsForeignDeclsBinders :: [LForeignDecl pass] -> [Located (IdP pass)]
+hsForeignDeclsBinders :: XRec pass (ForeignDecl pass) ~ Located (ForeignDecl pass)
+                      => [LForeignDecl pass] -> [Located (IdP pass)]
 -- ^ See Note [SrcSpan for binders]
 hsForeignDeclsBinders foreign_decls
   = [ L decl_loc n

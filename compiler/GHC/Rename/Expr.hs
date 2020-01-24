@@ -1862,7 +1862,7 @@ hasStrictPattern (StmtTreeBind a b) = hasStrictPattern a || hasStrictPattern b
 hasStrictPattern (StmtTreeApplicative trees) = any hasStrictPattern trees
 
 
-isLetStmt :: LStmt a b -> Bool
+isLetStmt :: LStmt (GhcPass a) b -> Bool
 isLetStmt (L _ LetStmt{}) = True
 isLetStmt _ = False
 

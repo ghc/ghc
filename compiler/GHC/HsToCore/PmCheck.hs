@@ -359,7 +359,7 @@ checkMatches' vars matches = do
         -- inaccessible
         (NotCovered, Diverged )   -> (rs, final_u, m:is, pc1 Semi.<> pc2)
 
-    hsLMatchToLPats :: LMatch id body -> Located [LPat id]
+    hsLMatchToLPats :: LMatch (GhcPass id) body -> Located [LPat (GhcPass id)]
     hsLMatchToLPats (L l (Match { m_pats = pats })) = L l pats
     hsLMatchToLPats _                               = panic "checkMatches'"
 

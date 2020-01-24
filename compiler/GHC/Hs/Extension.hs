@@ -147,8 +147,8 @@ type GhcTcId = GhcTc                -- Old 'TcId' type param
 -- | GHC's L prefixed variants wrap their vanilla variant in this type family,
 -- to add 'SrcLoc' info via 'Located'. Other passes than 'GhcPass' not
 -- interested in location information can define this instance as @f p@.
-type family XRec p (f :: * -> *) = r | r -> p f
-type instance XRec (GhcPass p) f = Located (f (GhcPass p))
+type family XRec p a
+type instance XRec (GhcPass p) a = Located a
 
 -- | Maps the "normal" id type for a given pass
 type family IdP p
