@@ -468,8 +468,10 @@ TyCon, but it's a nuisance to do so.)
 
 Notes:
 
-* The mapping between the user-specified Name and the representative
-  TyVar is recorded in the tyConScopedTyVars of the TcTyCon.
+* On the input to generaliseTyClDecl, the mapping between the
+  user-specified Name and the representative TyVar is recorded in the
+  tyConScopedTyVars of the TcTyCon.  NB: you first need to zonk to see
+  this representative TyVar.
 
 * The swizzling is actually performed by swizzleTcTyConBndrs
 
@@ -497,23 +499,39 @@ check_duplicate_tc_binders) that two distinct source names map
 to the same representative.
 
 Here's an interesting case:
-    class C f where
+    class C1 f where
       type S (f :: k1)
       type T (f :: k2)
 Here k1 and k2 are different Names, but they end up mapped to the
 same representative TyVar.  To make the swizzling consistent (remember
-we must have a single k across C, S and T) we reject the program.
+we must have a single k across C1, S and T) we reject the program.
 
 Another interesting case
-    class C f where
+    class C2 f where
       type S (f :: k) (p::Type)
       type T (f :: k) (p::Type->Type)
 
 Here the two k's (and the two p's) get distinct Uniques, because they
 are seen by the renamer as locally bound in S and T resp.  But again
 the two (distinct) k's end up bound to the same representative TyVar.
-This time we /don't/ want to complain; so in check_duplicate_tc_binders we
-check for distinct /OccNames/.
+You might argue that this should be accepted, but it's definitely
+rejected (via an entirely different code path) if you add a kind sig:
+    type C2' :: j -> Constraint
+    class C2' f where
+      type S (f :: k) (p::Type)
+We get
+    • Expected kind ‘j’, but ‘f’ has kind ‘k’
+    • In the associated type family declaration for ‘S’
+
+So we reject C2 too, even without the kind signature.  We have
+to do a bit of work to get a good error message, since both k's
+look the same to the user.
+
+Another case
+    class C3 (f :: k1) where
+      type S (f :: k2)
+
+This will be rejected too.
 
 
 Note [Type environment evolution]
@@ -672,6 +690,7 @@ type ScopedPairs = [(Name, TcTyVar)]
   -- You can distinguish them because there are tyConArity required-tvs
 
 generaliseTyClDecl :: NameEnv TcTyCon -> LTyClDecl GhcRn -> TcM [TcTyCon]
+-- See Note [Swizzling the tyvars before generaliseTcTyCon]
 generaliseTyClDecl inferred_tc_env (L _ decl)
   = do { let names_in_this_decl :: [Name]
              names_in_this_decl = tycld_names decl
@@ -710,6 +729,8 @@ generaliseTyClDecl inferred_tc_env (L _ decl)
     zonk_tc_tycon :: (TcTyCon, ScopedPairs) -> TcM (TcTyCon, ScopedPairs, TcKind)
     zonk_tc_tycon (tc, scoped_prs)
       = do { scoped_prs <- mapSndM zonkTcTyVarToTyVar scoped_prs
+                           -- We really have to do this again, even though
+                           -- we have just done zonkAndSkolemise
            ; res_kind   <- zonkTcType (tyConResKind tc)
            ; return (tc, scoped_prs, res_kind) }
 
@@ -717,6 +738,8 @@ swizzleTcTyConBndrs :: [(TcTyCon, ScopedPairs, TcKind)]
                 -> TcM [(TcTyCon, ScopedPairs, TcKind)]
 swizzleTcTyConBndrs tc_infos
   | all no_swizzle swizzle_prs
+    -- This fast path happens almost all the time
+    -- See Note [Non-cloning for tyvar binders] in TcHsType
   = do { traceTc "Skipping swizzleTcTyConBndrs for" (ppr (map fstOf3 tc_infos))
        ; return tc_infos }
 
@@ -758,21 +781,26 @@ swizzleTcTyConBndrs tc_infos
     -------------- Error reporting ------------
     err_prs :: [(Name,Name)]
     err_prs = [ (n1,n2)
-              | pr :| prs <- findDupsEq eq_snd swizzle_prs
-              , (n1,_):(n2,_):_ <- [nubBy same_occ (pr:prs)] ]
+              | pr :| prs <- findDupsEq ((==) `on` snd) swizzle_prs
+              , (n1,_):(n2,_):_ <- [nubBy ((==) `on` fst) (pr:prs)] ]
 
     report_dup :: (Name,Name) -> TcM ()
     report_dup (n1,n2)
       = setSrcSpan (getSrcSpan n2) $ addErrTc $
-        text "Different names for the same type variable:" <+> quotes (ppr n1)
-             <+> text "and" <+> quotes (ppr n2)
-
-    eq_snd (_,tv1) (_,tv2) = tv1 == tv2
-    same_occ (n1,_) (n2,_) = nameOccName n1 == nameOccName n2
+        hang (text "Different names for the same type variable:") 2 info
+      where
+        info | nameOccName n1 /= nameOccName n2
+             = quotes (ppr n1) <+> text "and" <+> quotes (ppr n2)
+             | otherwise -- Same OccNames! See C2 in
+                         -- Note [Swizzling the tyvars before generaliseTcTyCon]
+             = vcat [ ppr n1 <+> text "bound at" <+> ppr (getSrcLoc n1)
+                    , ppr n2 <+> text "bound at" <+> ppr (getSrcLoc n2) ]
 
     -------------- The swizzler ------------
     -- This does a deep traverse, simply doing a
     -- Name-to-Name change, governed by swizzle_env
+    -- The 'swap' is what gets from the representative TyVar
+    -- back to the original user-specified Name
     swizzle_env = mkVarEnv (map swap swizzle_prs)
 
     swizzleMapper :: TyCoMapper () Identity

@@ -737,6 +737,7 @@ newSkolemTyVar name kind
 
 newTyVarTyVar :: Name -> Kind -> TcM TcTyVar
 -- See Note [TyVarTv]
+-- Does not clone a fresh unique
 newTyVarTyVar name kind
   = do { details <- newMetaDetails TyVarTv
        ; let tyvar = mkTcTyVar name kind details
@@ -745,6 +746,7 @@ newTyVarTyVar name kind
 
 cloneTyVarTyVar :: Name -> Kind -> TcM TcTyVar
 -- See Note [TyVarTv]
+-- Clones a fresh unique
 cloneTyVarTyVar name kind
   = do { details <- newMetaDetails TyVarTv
        ; uniq <- newUnique

@@ -2010,6 +2010,8 @@ kcInferDeclHeader name flav
              all_tv_prs = mkTyVarNamePairs (scoped_kvs ++ tc_tvs)
                -- NB: bindExplicitTKBndrs_Q_Tv does not clone;
                --     ditto Implicit
+               -- See Note [Non-cloning for tyvar binders]
+
              tycon = mkTcTyCon name tc_binders res_kind all_tv_prs
                                False -- not yet generalised
                                flav
@@ -2118,6 +2120,7 @@ kcCheckDeclHeader_sig kisig name flav ktvs kc_res_ki =
           unifyKind Nothing r_ki res_ki
 
         -- Zonk the implicitly quantified variables.
+naughty naughty
         implicit_tv_prs <- mapSndM zonkTcTyVarToTyVar implicit_tcv_prs
 
         -- Build the final, generalized TcTyCon
@@ -2573,8 +2576,23 @@ expectedKindInCtxt _                   = OpenKind
 *                                                                      *
 ********************************************************************* -}
 
-{- Note [Cloning for tyvar binders]
-~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+{- Note [Non-cloning for tyvar binders]
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+bindExplictTKBndrs_Q_Skol, bindExplictTKBndrs_Skol, do not clone;
+and nor do the Implicit versions.  There is no need.
+
+bindExplictTKBndrs_Q_Tv does not clone; and similarly Implicit.
+We take advantage of this in kcInferDeclHeader:
+     all_tv_prs = mkTyVarNamePairs (scoped_kvs ++ tc_tvs)
+If we cloned, we'd need to take a bit more care here; not hard.
+
+The main payoff is that avoidng gratuitious cloning means that we can
+almost always take the fast path in swizzleTcTyConBndrs.  "Almost
+always" means not the case of mutual recursion with polymorphic kinds.
+
+
+Note [Cloning for tyvar binders]
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 bindExplicitTKBndrs_Tv does cloning, making up a Name with a fresh Unique,
 unlike bindExplicitTKBndrs_Q_Tv.  (Nor do the Skol variants clone.)
 And similarly for bindImplicit...
@@ -2585,19 +2603,24 @@ simpler way round.  #16221 is the poster child:
    data SameKind :: k -> k -> *
    data T a = forall k2 (b :: k2). MkT (SameKind a b) !Int
 
-When kind-checking T, we give (a :: kappa1). Then, in kcConDecl we make
-a unification variable kappa2 for k2, via bindExplicitTKBndrs_Tv, and
-then we end up unifying kappa1 := kappa2 (because of the (SameKind a b)).
+When kind-checking T, we give (a :: kappa1). Then:
+
+- In kcConDecl we make a TyVarTv unification variable kappa2 for k2
+  (as described in Note [Kind-checking for GADTs], even though this
+  example is an existential)
+- So we get (b :: kappa2) via bindExplicitTKBndrs_Tv
+- We end up unifying kappa1 := kappa2, because of the (SameKind a b)
 
 Now we generalise over kappa2. But if kappa2's Name is precisely k2
 (i.e. we did not clone) we'll end up giving T the utterlly final kind
   T :: forall k2. k2 -> *
-Nothing directly wrong with that but when we typecheck the data constrautor
-we have k2 in scope; but then it's brought into scope again when we find
+Nothing directly wrong with that but when we typecheck the data constructor
+we have k2 in scope; but then it's brought into scope /again/ when we find
 the forall k2.  This is chaotic, and we end up giving it the type
-  MkT :: forall k1 (a :: k1) k2 (b :: k2).
-         SameKind @k2 a b -> Int -> T0 @{k2} a
-which is bogus.  The result type should be T0 @{k1} a.
+  MkT :: forall k2 (a :: k2) k2 (b :: k2).
+         SameKind @k2 a b -> Int -> T @{k2} a
+which is bogus -- because of the shadowing of k2, we can't
+apply T to the kind or a!
 
 And there no reason /not/ to clone the Name when making a unification
 variable.  So that's what we do.
@@ -2614,6 +2637,7 @@ bindImplicitTKBndrs_Q_Skol = bindImplicitTKBndrsX (newImplicitTyVarQ newFlexiKin
 bindImplicitTKBndrs_Q_Tv   = bindImplicitTKBndrsX (newImplicitTyVarQ newFlexiKindedTyVarTyVar)
 bindImplicitTKBndrs_Skol   = bindImplicitTKBndrsX newFlexiKindedSkolemTyVar
 bindImplicitTKBndrs_Tv     = bindImplicitTKBndrsX cloneFlexiKindedTyVarTyVar
+  -- newFlexiKinded...           see Note [Non-cloning for tyvar binders]
   -- cloneFlexiKindedTyVarTyVar: see Note [Cloning for tyvar binders]
 
 bindImplicitTKBndrsX
@@ -2663,6 +2687,7 @@ bindExplicitTKBndrs_Skol, bindExplicitTKBndrs_Tv
 
 bindExplicitTKBndrs_Skol = bindExplicitTKBndrsX (tcHsTyVarBndr newSkolemTyVar)
 bindExplicitTKBndrs_Tv   = bindExplicitTKBndrsX (tcHsTyVarBndr cloneTyVarTyVar)
+  -- newSkolemTyVar:  see Note [Non-cloning for tyvar binders]
   -- cloneTyVarTyVar: see Note [Cloning for tyvar binders]
 
 bindExplicitTKBndrs_Q_Skol, bindExplicitTKBndrs_Q_Tv
@@ -2673,7 +2698,8 @@ bindExplicitTKBndrs_Q_Skol, bindExplicitTKBndrs_Q_Tv
 
 bindExplicitTKBndrs_Q_Skol ctxt_kind = bindExplicitTKBndrsX (tcHsQTyVarBndr ctxt_kind newSkolemTyVar)
 bindExplicitTKBndrs_Q_Tv   ctxt_kind = bindExplicitTKBndrsX (tcHsQTyVarBndr ctxt_kind newTyVarTyVar)
-    -- The bound TcTyVar has the same name; no cloning
+  -- See Note [Non-cloning for tyvar binders]
+
 
 bindExplicitTKBndrsX
     :: (HsTyVarBndr GhcRn -> TcM TcTyVar)
