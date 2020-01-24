@@ -1023,7 +1023,7 @@ exprMightThrowPreciseException e
           -- unsafePerformIO!
   | (Var f, _) <- collectArgs e       -- The only IO PrimOp that throws a
   , Just op    <- isPrimOpId_maybe f  -- precise exception is RaiseIOOp
-  = op /= RaiseIOOp
+  = op == RaiseIOOp
   | otherwise                      -- A conservative default for all the other
                                    -- cases
   = True
