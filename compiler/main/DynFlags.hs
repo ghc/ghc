@@ -1820,7 +1820,9 @@ wayOptl :: Platform -> Way -> [String]
 wayOptl _ (WayCustom {}) = []
 wayOptl platform WayThreaded =
         case platformOS platform of
-        OSFreeBSD  -> ["-pthread"]
+        -- N.B. FreeBSD cc throws a warning if we pass -pthread without
+        -- actually using any pthread symbols.
+        OSFreeBSD  -> ["-pthread", "-Wno-unused-command-line-argument"]
         OSOpenBSD  -> ["-pthread"]
         OSNetBSD   -> ["-pthread"]
         _          -> []
