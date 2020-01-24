@@ -2207,14 +2207,18 @@ def normalise_asm( s: str ) -> str:
           out.append(ins[0])
     return '\n'.join(out)
 
+def safe_print(s: str) -> None:
+    s2 = s.encode(sys.stdout.encoding, errors='replace')
+    print(s2)
+
 def if_verbose( n: int, s: str ) -> None:
     if config.verbose >= n:
-        print(s)
+        safe_print(s)
 
 def dump_file(f: Path):
     try:
         with f.open() as file:
-            print(file.read())
+            safe_print(file.read())
     except Exception:
         print('')
 
