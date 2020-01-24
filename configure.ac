@@ -840,8 +840,9 @@ changequote(, )dnl
 fi;
 changequote([, ])dnl
 ])
-FP_COMPARE_VERSIONS([$fp_cv_sphinx_version],-lt,1.0.0,
-    [AC_MSG_WARN([Sphinx version 1.0.0 or later is required to build documentation]); SPHINXBUILD=;])
+MIN_SPHINX_VERSION="2.3.1"
+FP_COMPARE_VERSIONS([$fp_cv_sphinx_version],-lt,$MIN_SPHINX_VERSION,
+    [AC_MSG_WARN([Sphinx version $MIN_SPHINX_VERSION or later is required to build documentation]); SPHINXBUILD=;])
 if test -n "$SPHINXBUILD"; then
   if "$SPHINXBUILD" -b text utils/check-sphinx utils/check-sphinx/dist > /dev/null 2>&1; then true; else
     AC_MSG_WARN([Sphinx for python3 is required to build documentation.])
