@@ -35,6 +35,14 @@ stages:
     - tags
     - web
 
+.nightly: &nightly
+  only:
+    variables:
+      - $NIGHTLY
+  artifacts:
+    when: always
+    expire_in: 8 weeks
+
 .release: &release
   variables:
     BUILD_FLAVOUR: "perf"
@@ -476,14 +484,10 @@ validate-aarch64-linux-deb9:
     expire_in: 2 week
 
 nightly-aarch64-linux-deb9:
+  <<: *nightly
   extends: .build-aarch64-linux-deb9
-  artifacts:
-    expire_in: 2 year
   variables:
     TEST_TYPE: slowtest
-  only:
-    variables:
-      - $NIGHTLY
 
 #################################
 # armv7-linux-deb9
@@ -509,14 +513,10 @@ validate-armv7-linux-deb9:
     expire_in: 2 week
 
 nightly-armv7-linux-deb9:
+  <<: *nightly
   extends: .build-armv7-linux-deb9
-  artifacts:
-    expire_in: 2 year
   variables:
     TEST_TYPE: slowtest
-  only:
-    variables:
-      - $NIGHTLY
 
 #################################
 # i386-linux-deb9
@@ -539,15 +539,10 @@ validate-i386-linux-deb9:
     expire_in: 2 week
 
 nightly-i386-linux-deb9:
+  <<: *nightly
   extends: .build-i386-linux-deb9
   variables:
     TEST_TYPE: slowtest
-  artifacts:
-    when: always
-    expire_in: 2 week
-  only:
-    variables:
-      - $NIGHTLY
 
 #################################
 # x86_64-linux-deb9
@@ -576,15 +571,11 @@ release-x86_64-linux-deb9:
   stage: full-build
 
 nightly-x86_64-linux-deb9:
+  <<: *nightly
   extends: .build-x86_64-linux-deb9
   stage: full-build
-  artifacts:
-    expire_in: 2 year
   variables:
     TEST_TYPE: slowtest
-  only:
-    variables:
-      - $NIGHTLY
 
 # N.B. Has DEBUG assertions enabled in stage2
 validate-x86_64-linux-deb9-debug:
@@ -612,14 +603,12 @@ validate-x86_64-linux-deb9-debug:
     TEST_ENV: "x86_64-linux-deb9-llvm"
 
 nightly-x86_64-linux-deb9-llvm:
+  <<: *nightly
   extends: .build-x86_64-linux-deb9
   stage: full-build
   variables:
     BUILD_FLAVOUR: perf-llvm
     TEST_ENV: "x86_64-linux-deb9-llvm"
-  only:
-    variables:
-      - $NIGHTLY
 
 validate-x86_64-linux-deb9-integer-simple:
   extends: .build-x86_64-linux-deb9
@@ -630,17 +619,13 @@ validate-x86_64-linux-deb9-integer-simple:
     BIN_DIST_PREP_TAR_COMP: "ghc-x86_64-deb9-linux-integer-simple.tar.xz"
 
 nightly-x86_64-linux-deb9-integer-simple:
+  <<: *nightly
   extends: .build-x86_64-linux-deb9
   stage: full-build
   variables:
     INTEGER_LIBRARY: integer-simple
     TEST_ENV: "x86_64-linux-deb9-integer-simple"
     TEST_TYPE: slowtest
-  artifacts:
-    expire_in: 2 year
-  only:
-    variables:
-      - $NIGHTLY
 
 validate-x86_64-linux-deb9-dwarf:
   extends: .build-x86_64-linux-deb9
@@ -671,14 +656,10 @@ validate-x86_64-linux-deb9-dwarf:
   stage: full-build
 
 nightly-x86_64-linux-deb10:
+  <<: *nightly
   extends: .build-x86_64-linux-deb10
-  artifacts:
-    expire_in: 2 weeks
   variables:
     TEST_TYPE: slowtest
-  only:
-    variables:
-      - $NIGHTLY
 
 release-x86_64-linux-deb10:
   <<: *release
@@ -736,10 +717,8 @@ release-x86_64-linux-alpine:
   extends: .build-x86_64-linux-alpine
 
 nightly-x86_64-linux-alpine:
+  <<: *nightly
   extends: .build-x86_64-linux-alpine
-  only:
-    variables:
-      - $NIGHTLY
 
 #################################
 # x86_64-linux-centos7
@@ -848,13 +827,11 @@ validate-x86_64-windows-hadrian:
     key: "x86_64-windows-hadrian-$WINDOWS_TOOLCHAIN_VERSION"
 
 nightly-i386-windows-hadrian:
+  <<: *nightly
   extends: .build-windows-hadrian
   variables:
     MSYSTEM: MINGW32
     TEST_ENV: "i386-windows-hadrian"
-  only:
-    variables:
-      - $NIGHTLY
   cache:
     key: "i386-windows-hadrian-$WINDOWS_TOOLCHAIN_VERSION"
 
@@ -894,13 +871,11 @@ validate-x86_64-windows:
   extends: .build-x86_64-windows-make
 
 nightly-x86_64-windows:
+  <<: *nightly
   extends: .build-x86_64-windows-make
   stage: full-build
   variables:
     BUILD_FLAVOUR: "validate"
-  only:
-    variables:
-      - $NIGHTLY
 
 # Normal Windows validate builds are profiled; that won't do for releases.
 release-x86_64-windows:
@@ -932,10 +907,8 @@ release-i386-windows:
     BUILD_FLAVOUR: "perf"
 
 nightly-i386-windows:
+  <<: *nightly
   extends: .build-i386-windows-make
-  only:
-    variables:
-      - $NIGHTLY
 
 ############################################################
 # Cleanup
@@ -1074,10 +1047,8 @@ hackage-label:
       - $CI_MERGE_REQUEST_LABELS =~ /.*user-facing.*/
 
 nightly-hackage:
+  <<: *nightly
   extends: .hackage
-  only:
-    variables:
-      - $NIGHTLY
 
 ############################################################
 # Nofib testing
