@@ -2819,7 +2819,7 @@ tcConDecl rep_tycon tag_map tmpl_bndrs _res_kind res_tmpl new_or_data
                                     mkVisFunTys arg_tys $
                                     res_ty)
 
-       ; let tvbndrs =  (mkTyVarBinders SpecifiedSpec tkvs)
+       ; let tvbndrs =  (mkTyVarBinders InferredSpec tkvs)
                      ++ (mkTyVarBinders SpecifiedSpec imp_tvs)
                      ++ exp_tvbndrs
 
