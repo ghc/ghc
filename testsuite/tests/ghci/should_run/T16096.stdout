@@ -15,14 +15,12 @@ letrec {
 GHC.Base.returnIO
   @[()]
   (GHC.Types.:
-     @ ()
+     @()
      (Unsafe.Coerce.unsafeCoerce#
-        @ 'GHC.Types.LiftedRep
-        @ 'GHC.Types.LiftedRep
-        @ [GHC.Types.Int]
-        @ ()
-        x)
-     (GHC.Types.[] @ ()))
+        @'GHC.Types.LiftedRep @'GHC.Types.LiftedRep @[GHC.Types.Int] @() x)
+     (GHC.Types.[] @()))
+
+
 
 ==================== Desugared ====================
 letrec {
@@ -40,13 +38,9 @@ letrec {
 GHC.Base.returnIO
   @[()]
   (GHC.Types.:
-     @ ()
+     @()
      (Unsafe.Coerce.unsafeCoerce#
-        @ 'GHC.Types.LiftedRep
-        @ 'GHC.Types.LiftedRep
-        @ [GHC.Types.Int]
-        @ ()
-        x)
-     (GHC.Types.[] @ ()))
+        @'GHC.Types.LiftedRep @'GHC.Types.LiftedRep @[GHC.Types.Int] @() x)
+     (GHC.Types.[] @()))
 
 
