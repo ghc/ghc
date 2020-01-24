@@ -9,7 +9,9 @@ setTestOpts(no_lint)
 
 test('T1969',
      [# expect_broken(12437),
-      collect_compiler_residency(20),
+      # we collect residency for reference only, hence the large acceptance window.
+      # We have seen >20% variations in this number.
+      collect_compiler_residency(50),
       collect_compiler_stats('bytes allocated', 1),
       only_ways(['normal']),
 
