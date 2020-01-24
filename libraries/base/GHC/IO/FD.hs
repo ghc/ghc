@@ -67,16 +67,13 @@ import System.Posix.Types
 c_DEBUG_DUMP :: Bool
 c_DEBUG_DUMP = False
 
--- Darwin limits the length of writes to 2GB. See
--- #17414.
+-- Darwin limits the length of writes to 2GB. See #17414.
+-- Moreover, Linux will only transfer up to 0x7ffff000 and interpreting the
+-- result of write/read is tricky above 2GB due to its signed type. For
+-- simplicity we therefore clamp on all platforms.
 clampWriteSize, clampReadSize :: Int -> Int
-#if defined(darwin_HOST_OS)
-clampWriteSize = min 0x7fffffff
-clampReadSize  = min 0x7fffffff
-#else
-clampWriteSize = id
-clampReadSize  = id
-#endif
+clampWriteSize = min 0x7ffff000
+clampReadSize  = min 0x7ffff000
 
 -- -----------------------------------------------------------------------------
 -- The file-descriptor IO device
