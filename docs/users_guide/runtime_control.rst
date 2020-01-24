@@ -207,20 +207,31 @@ Furthermore GHC lets you specify the way event log data (see :rts-flag:`-l
 
 To use an :c:type:`EventLogWriter` the RTS API provides the following functions:
 
-.. c:func:: enum EventLogStatus eventLogStatus(void)
+.. c:function:: EventLogStatus eventLogStatus(void)
 
    Query whether the current runtime system supports the eventlog (e.g. whether
    the current executable was linked with :ghc-flag:`-eventlog`) and, if it
    is supported, whether it is currently logging.
 
-.. c:func:: bool startEventLogging(const EventLogWriter *writer)
+.. c:function:: bool startEventLogging(const EventLogWriter *writer)
 
    Start logging events to the given :c:type:`EventLogWriter`. Returns true on
    success or false is another writer has already been configured.
 
-.. c:func:: void endEventLogging()
+.. c:function:: void endEventLogging()
 
    Tear down the active :c:type:`EventLogWriter`.
+
+where the ``enum`` :c:type:`EventLogStatus` is:
+
+.. c:type:: EventLogStatus
+
+    * ``EVENTLOG_NOT_SUPPORTED``: The runtime system wasn't compiled with
+      eventlog support.
+    * ``EVENTLOG_NOT_CONFIGURED``: An :c:type:`EventLogWriter` has not yet been
+      configured.
+    * ``EVENTLOG_RUNNING``: An :c:type:`EventLogWriter` has been configured and
+      is running.
 
 
 .. _rts-options-misc:
@@ -372,7 +383,7 @@ performance.
     collections. Under this collection strategy oldest-generation garbage
     collection can proceed concurrently with mutation.
 
-    Note that :rts-flag:`-nonmoving-gc` cannot be used with ``-G1``,
+    Note that :rts-flag:`--nonmoving-gc` cannot be used with ``-G1``,
     :rts-flag:`profiling <-hc>` nor :rts-flag:`-c`.
 
 .. rts-flag:: -xn
