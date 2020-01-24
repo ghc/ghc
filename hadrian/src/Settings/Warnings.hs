@@ -12,7 +12,9 @@ defaultGhcWarningsArgs :: Args
 defaultGhcWarningsArgs = mconcat
     [ notStage0 ? arg "-Wnoncanonical-monad-instances"
     , notM (flag CcLlvmBackend) ? arg "-optc-Wno-error=inline"
-    , flag CcLlvmBackend ? arg "-optc-Wno-unknown-pragmas" ]
+    , flag CcLlvmBackend ? arg "-optc-Wno-unknown-pragmas"
+    , arg "-Wincomplete-uni-patterns"
+    , arg "-Wincomplete-record-updates" ]
 
 -- | Package-specific warnings-related arguments, mostly suppressing various warnings.
 ghcWarningsArgs :: Args
