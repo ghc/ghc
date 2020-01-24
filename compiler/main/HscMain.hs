@@ -1516,7 +1516,16 @@ hscCompileCmmFile hsc_env filename output_filename = runHsc hsc_env $ do
             -- lest we reproduce #11784.
             mod_name = mkModuleName $ "Cmm$" ++ FilePath.takeFileName filename
             cmm_mod = mkModule (thisPackage dflags) mod_name
-        (_, cmmgroup) <- cmmPipeline hsc_env (emptySRT cmm_mod) cmm
+
+        -- Compile decls in Cmm files one decl at a time, to avoid re-ordering
+        -- them in SRT analysis.
+        --
+        -- Re-ordering here causes breakage when booting with C backend because
+        -- in C we must declare before use, but SRT algorithm is free to
+        -- re-order [A, B] (B refers to A) when A is not CAFFY and return [B, A]
+        cmmgroup <-
+          concatMapM (\cmm -> snd <$> cmmPipeline hsc_env (emptySRT cmm_mod) [cmm]) cmm
+
         unless (null cmmgroup) $
           dumpIfSet_dyn dflags Opt_D_dump_cmm "Output Cmm"
             FormatCMM (ppr cmmgroup)
