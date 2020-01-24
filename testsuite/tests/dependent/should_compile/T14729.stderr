@@ -1,6 +1,6 @@
 TYPE SIGNATURES
   x :: forall (x :: Bool). P (F Int) (x |> Sym (T14729.D:R:FInt[0]))
-  y :: forall (x :: Bool). P Bool x
+  y :: forall {x :: Bool}. P Bool x
 TYPE CONSTRUCTORS
   type family F{1} :: * -> *
     roles nominal
