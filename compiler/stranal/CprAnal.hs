@@ -7,29 +7,38 @@ module CprAnal ( cprAnalProgram ) where
 import GhcPrelude
 
 import WwLib            ( deepSplitProductType_maybe )
+import DynFlags
 import Demand
 import Cpr
 import CoreSyn
+import CoreSeq
 import Outputable
 import VarEnv
 import BasicTypes
 import Data.List
 import DataCon
 import Id
-import CoreUtils        ( exprIsHNF )
+import IdInfo
+import CoreUtils        ( exprIsHNF, dumpIdInfoOfProgram )
 import TyCon
 import Type
 import FamInstEnv
 import Util
+import ErrUtils         ( dumpIfSet_dyn, DumpFormat (..) )
 import Maybes           ( isJust )
 
 --
 -- * Analysing programs
 --
 
-cprAnalProgram :: FamInstEnvs -> CoreProgram -> CoreProgram
-cprAnalProgram fam_envs binds
-  = snd $ mapAccumL cprAnalTopBind (emptyAnalEnv fam_envs) binds
+cprAnalProgram :: DynFlags -> FamInstEnvs -> CoreProgram -> IO CoreProgram
+cprAnalProgram dflags fam_envs binds = do
+  let env            = emptyAnalEnv fam_envs
+  let binds_plus_cpr = snd $ mapAccumL cprAnalTopBind env binds
+  dumpIfSet_dyn dflags Opt_D_dump_cpr_signatures "Cpr signatures" FormatText $
+    dumpIdInfoOfProgram (ppr . cprInfo) binds_plus_cpr
+  -- See Note [Stamp out space leaks in demand analysis] in DmdAnal
+  seqBinds binds_plus_cpr `seq` return binds_plus_cpr
 
 -- Analyse a (group of) top-level binding(s)
 cprAnalTopBind :: AnalEnv

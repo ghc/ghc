@@ -26,7 +26,8 @@ import BasicTypes
 import Data.List
 import DataCon
 import Id
-import CoreUtils        ( exprIsHNF, exprType, exprIsTrivial, exprOkForSpeculation )
+import IdInfo
+import CoreUtils
 import TyCon
 import Type
 import Coercion         ( Coercion, coVarsOfCo )
@@ -36,8 +37,6 @@ import Maybes           ( isJust )
 import TysWiredIn
 import TysPrim          ( realWorldStatePrimTy )
 import ErrUtils         ( dumpIfSet_dyn, DumpFormat (..) )
-import Name             ( getName, stableNameCmp )
-import Data.Function    ( on )
 import UniqSet
 
 {-
@@ -53,7 +52,7 @@ dmdAnalProgram dflags fam_envs binds = do
   let env             = emptyAnalEnv dflags fam_envs
   let binds_plus_dmds = snd $ mapAccumL dmdAnalTopBind env binds
   dumpIfSet_dyn dflags Opt_D_dump_str_signatures "Strictness signatures" FormatText $
-    dumpStrSig binds_plus_dmds
+    dumpIdInfoOfProgram (pprIfaceStrictSig . strictnessInfo) binds_plus_dmds
   -- See Note [Stamp out space leaks in demand analysis]
   seqBinds binds_plus_dmds `seq` return binds_plus_dmds
 
@@ -1193,15 +1192,6 @@ findBndrDmd env arg_of_dfun dmd_ty id
 set_idStrictness :: AnalEnv -> Id -> StrictSig -> Id
 set_idStrictness env id sig
   = setIdStrictness id (killUsageSig (ae_dflags env) sig)
-
-dumpStrSig :: CoreProgram -> SDoc
-dumpStrSig binds = vcat (map printId ids)
-  where
-  ids = sortBy (stableNameCmp `on` getName) (concatMap getIds binds)
-  getIds (NonRec i _) = [ i ]
-  getIds (Rec bs)     = map fst bs
-  printId id | isExportedId id = ppr id <> colon <+> (pprIfaceStrictSig (idStrictness id))
-             | otherwise       = empty
 
 {- Note [Initialising strictness]
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~

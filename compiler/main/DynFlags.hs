@@ -464,6 +464,7 @@ data DumpFlag
    | Opt_D_dump_stranal
    | Opt_D_dump_str_signatures
    | Opt_D_dump_cpranal
+   | Opt_D_dump_cpr_signatures
    | Opt_D_dump_tc
    | Opt_D_dump_tc_ast
    | Opt_D_dump_types
@@ -3420,6 +3421,8 @@ dynamic_flags_deps = [
         (setDumpFlag Opt_D_dump_str_signatures)
   , make_ord_flag defGhcFlag "ddump-cpranal"
         (setDumpFlag Opt_D_dump_cpranal)
+  , make_ord_flag defGhcFlag "ddump-cpr-signatures"
+        (setDumpFlag Opt_D_dump_cpr_signatures)
   , make_ord_flag defGhcFlag "ddump-tc"
         (setDumpFlag Opt_D_dump_tc)
   , make_ord_flag defGhcFlag "ddump-tc-ast"
