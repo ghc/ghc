@@ -29,7 +29,7 @@ module Demand (
         DmdEnv, emptyDmdEnv,
         peelFV, findIdDemand,
 
-        Divergence(..), lubDivergence, isBotDiv, isTopDiv, topDiv, botDiv,
+        Divergence(..), lubDivergence, isBotDiv, isTopDiv, topDiv, botDiv, exnDiv,
         appIsBottom, isBottomingSig, pprIfaceStrictSig,
         StrictSig(..), mkStrictSigForArity, mkClosedStrictSig,
         nopSig, botSig, cprProdSig,
@@ -900,22 +900,40 @@ splitProdDmd_maybe (JD { sd = s, ud = u })
 *                                                                      *
 ************************************************************************
 
-Divergence:     Dunno
-               /
-          Diverges
+Divergence:  Dunno
+               |
+               |
+            Diverges
 
 In a fixpoint iteration, start from Diverges
 -}
 
+-- | Divergence lattice.
+--
+-- @
+--         Dunno
+--           |
+-- ThrowsExceptionOrDiverges
+--           |
+--        Diverges
+-- @
+--
+-- See Note [Precise exceptions and strictness analysis] for why we have that
+-- additional bottom-like element.
 data Divergence
-  = Diverges    -- Definitely diverges
-  | Dunno       -- Might diverge or converge
+  = Diverges -- ^ Definitely throws an imprecise exception or diverges.
+  | ExnOrDiv -- ^ Definitely throws a *precise* exception, an imprecise
+             --   exception or diverges.
+             --   See Note [Precise exceptions and strictness analysis].
+  | Dunno    -- ^ Might diverge or converge.
   deriving( Eq, Show )
 
 lubDivergence :: Divergence -> Divergence ->Divergence
 lubDivergence Diverges r        = r
 lubDivergence r        Diverges = r
-lubDivergence Dunno    Dunno    = Dunno
+lubDivergence Dunno    r        = Dunno
+lubDivergence r        Dunno    = Dunno
+lubDivergence ExnOrDiv ExnOrDiv = ExnOrDiv
 -- This needs to commute with defaultDmd, i.e.
 -- defaultDmd (r1 `lubDivergence` r2) = defaultDmd r1 `lubDmd` defaultDmd r2
 -- (See Note [Default demand on free variables] for why)
@@ -923,6 +941,7 @@ lubDivergence Dunno    Dunno    = Dunno
 bothDivergence :: Divergence -> Divergence -> Divergence
 -- See Note [Asymmetry of 'both' for DmdType and Divergence]
 bothDivergence _ Diverges = Diverges
+bothDivergence _ ExnOrDiv = ExnOrDiv
 bothDivergence r Dunno    = r
 -- This needs to commute with defaultDmd, i.e.
 -- defaultDmd (r1 `bothDivergence` r2) = defaultDmd r1 `bothDmd` defaultDmd r2
@@ -938,8 +957,9 @@ instance Outputable Divergence where
 
 -- [cprRes] lets us switch off CPR analysis
 -- by making sure that everything uses TopRes
-topDiv, botDiv :: Divergence
+topDiv, exnDiv, botDiv :: Divergence
 topDiv = Dunno
+exnDiv = ExnOrDiv
 botDiv = Diverges
 
 isTopDiv :: Divergence -> Bool
@@ -949,6 +969,7 @@ isTopDiv _     = False
 -- | True if the result diverges or throws an exception
 isBotDiv :: Divergence -> Bool
 isBotDiv Diverges = True
+isBotDiv ExnOrDiv = True
 isBotDiv _        = False
 
 -- See Notes [Default demand on free variables]
@@ -1090,10 +1111,7 @@ mkBothDmdArg :: DmdEnv -> BothDmdArg
 mkBothDmdArg env = (env, Dunno)
 
 toBothDmdArg :: DmdType -> BothDmdArg
-toBothDmdArg (DmdType fv _ r) = (fv, go r)
-  where
-    go Dunno    = Dunno
-    go Diverges = Diverges
+toBothDmdArg (DmdType fv _ r) = (fv, r)
 
 bothDmdType :: DmdType -> BothDmdArg -> DmdType
 bothDmdType (DmdType fv1 ds1 r1) (fv2, t2)
@@ -1997,9 +2015,11 @@ instance Binary DmdType where
 
 instance Binary Divergence where
   put_ bh Dunno    = putByte bh 0
-  put_ bh Diverges = putByte bh 1
+  put_ bh ExnOrDiv = putByte bh 1
+  put_ bh Diverges = putByte bh 2
 
   get bh = do { h <- getByte bh
               ; case h of
                   0 -> return Dunno
+                  1 -> return ExnOrDiv
                   _ -> return Diverges }
