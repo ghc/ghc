@@ -11,6 +11,7 @@ can be appended in linear time.
 {-# LANGUAGE DeriveFunctor #-}
 
 {-# LANGUAGE BangPatterns #-}
+{-# LANGUAGE TypeFamilies #-}
 
 module OrdList (
         OrdList,
@@ -19,6 +20,9 @@ module OrdList (
         mapOL, fromOL, toOL, foldrOL, foldlOL, reverseOL, fromOLReverse,
         strictlyEqOL, strictlyOrdOL
 ) where
+
+import qualified GHC.Exts as GE (IsList(..))
+import qualified Control.Monad.Zip as CMZ
 
 import GhcPrelude
 import Data.Foldable
@@ -43,6 +47,24 @@ data OrdList a
 
 instance Outputable a => Outputable (OrdList a) where
   ppr ol = ppr (fromOL ol)  -- Convert to list and print that
+
+instance GE.IsList (OrdList a) where
+  type instance Item (OrdList a) = a
+  fromList = toOL
+  toList   = fromOL
+
+
+instance Applicative OrdList where
+  pure = One
+  (<*>) = \ fs as ->  GE.fromList $ (GE.toList fs) <*> (GE.toList as)
+
+instance Monad OrdList where
+  (>>=) = \ ms fa ->  GE.fromList $ (GE.toList ms >>= ( GE.toList  . fa ) )
+
+instance CMZ.MonadZip OrdList where
+    mzip     = \ a b ->  GE.fromList $ zip  (GE.toList  a) (GE.toList b)
+    mzipWith = \ f a b -> GE.fromList $ zipWith f (GE.toList a) (GE.toList b)
+    munzip   =  \ls ->  case unzip $ GE.toList ls of (la,lb) -> (GE.fromList la, GE.fromList lb)
 
 instance Semigroup (OrdList a) where
   (<>) = appOL
