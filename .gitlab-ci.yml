@@ -333,6 +333,7 @@ validate-x86_64-freebsd-hadrian:
     - x86_64-freebsd
   variables:
     CONFIGURE_ARGS: "--with-gmp-includes=/usr/local/include --with-gmp-libraries=/usr/local/lib --with-iconv-includes=/usr/local/include --with-iconv-libraries=/usr/local/lib"
+    HADRIAN_ARGS: "--docs=no-sphinx"
     GHC_VERSION: 8.6.3
     CABAL_INSTALL_VERSION: 3.0.0.0
     BIN_DIST_PREP_TAR_COMP: "ghc-x86_64-portbld-freebsd.tar.xz"
