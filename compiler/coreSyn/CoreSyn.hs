@@ -541,7 +541,7 @@ substitutions until the next run of the simplifier.
 
 Note [CoreSyn case invariants]
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
-See #case_invariants#
+See Note [Case expression invariants]
 
 Note [Levity polymorphism invariants]
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
