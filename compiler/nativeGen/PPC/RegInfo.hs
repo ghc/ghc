@@ -23,9 +23,9 @@ import GhcPrelude
 
 import PPC.Instr
 
-import BlockId
-import Cmm
-import CLabel
+import GHC.Cmm.BlockId
+import GHC.Cmm
+import GHC.Cmm.CLabel
 
 import Unique
 import Outputable (ppr, text, Outputable, (<>))

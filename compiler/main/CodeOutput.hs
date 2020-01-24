@@ -18,10 +18,10 @@ import LlvmCodeGen      ( llvmCodeGen )
 import UniqSupply       ( mkSplitUniqSupply )
 
 import Finder           ( mkStubPaths )
-import PprC             ( writeC )
-import CmmLint          ( cmmLint )
+import GHC.CmmToC             ( writeC )
+import GHC.Cmm.Lint          ( cmmLint )
 import Packages
-import Cmm              ( RawCmmGroup )
+import GHC.Cmm              ( RawCmmGroup )
 import HscTypes
 import DynFlags
 import Stream           ( Stream )
