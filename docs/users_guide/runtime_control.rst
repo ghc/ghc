@@ -206,20 +206,31 @@ Furthermore GHC lets you specify the way event log data (see :rts-flag:`-l
 
 To use an :c:type:`EventLogWriter` the RTS API provides the following functions:
 
-.. c:func:: enum EventLogStatus eventLogStatus(void)
+.. c:function:: EventLogStatus eventLogStatus(void)
 
    Query whether the current runtime system supports the eventlog (e.g. whether
    the current executable was linked with :ghc-flag:`-eventlog`) and, if it
    is supported, whether it is currently logging.
 
-.. c:func:: bool startEventLogging(const EventLogWriter *writer)
+.. c:function:: bool startEventLogging(const EventLogWriter *writer)
 
    Start logging events to the given :c:type:`EventLogWriter`. Returns true on
    success or false is another writer has already been configured.
 
-.. c:func:: void endEventLogging()
+.. c:function:: void endEventLogging()
 
    Tear down the active :c:type:`EventLogWriter`.
+
+where the ``enum`` :c:type:`EventLogStatus` is:
+
+.. c:type:: EventLogStatus
+
+    * ``EVENTLOG_NOT_SUPPORTED``: The runtime system wasn't compiled with
+      eventlog support.
+    * ``EVENTLOG_NOT_CONFIGURED``: An :c:type:`EventLogWriter` has not yet been
+      configured.
+    * ``EVENTLOG_RUNNING``: An :c:type:`EventLogWriter` has been configured and
+      is running.
 
 
 .. _rts-options-misc:
@@ -246,7 +257,7 @@ Miscellaneous RTS options
     catch unhandled exceptions using the Windows exception handling mechanism.
     This option is primarily useful for when you are using the Haskell code as a
     DLL, and don't want the RTS to ungracefully terminate your application on
-    erros such as segfaults.
+    errors such as segfaults.
 
 .. rts-flag:: --generate-crash-dumps
 
@@ -371,8 +382,8 @@ performance.
     collections. Under this collection strategy oldest-generation garbage
     collection can proceed concurrently with mutation.
 
-    Note that :rts-flag:`--nonmoving-gc` cannot be used with ``-G1`` nor
-    :rts-flag:`-c`.
+    Note that :rts-flag:`--nonmoving-gc` cannot be used with ``-G1``,
+    :rts-flag:`profiling <-hc>` nor :rts-flag:`-c`.
 
 .. rts-flag:: -xn
 
@@ -652,6 +663,26 @@ performance.
     This is an experimental feature, please let us know if it causes
     problems and/or could benefit from further tuning.
 
+.. rts-flag:: -Iw ⟨seconds⟩
+
+    :default: 0 seconds
+
+    .. index::
+       single: idle GC
+
+    By default, if idle GC is enabled in the threaded runtime, a major
+    GC will be performed every time the process goes idle for a
+    sufficiently long duration (see :rts-flag:`-I ⟨seconds⟩`).  For
+    large server processes accepting regular but infrequent requests
+    (e.g., once per second), an expensive, major GC may run after
+    every request.  As an alternative to shutting off idle GC entirely
+    (with ``-I0``), a minimum wait time between idle GCs can be
+    specified with this flag.  For example, ``-Iw60`` will ensure that
+    an idle GC runs at most once per minute.
+
+    This is an experimental feature, please let us know if it causes
+    problems and/or could benefit from further tuning.
+
 .. rts-flag:: -ki ⟨size⟩
 
     :default: 1k
@@ -841,10 +872,10 @@ performance.
 
     By default, the flag will cause a warning to be emitted to stderr
     when the sync time exceeds the specified time.  This behaviour can
-    be overriden, however: the ``longGCSync()`` hook is called when
+    be overridden, however: the ``longGCSync()`` hook is called when
     the sync time is exceeded during the sync period, and the
     ``longGCSyncEnd()`` hook at the end. Both of these hooks can be
-    overriden in the ``RtsConfig`` when the runtime is started with
+    overridden in the ``RtsConfig`` when the runtime is started with
     ``hs_init_ghc()``. The default implementations of these hooks
     (``LongGcSync()`` and ``LongGCSyncEnd()`` respectively) print
     warnings to stderr.
@@ -1116,7 +1147,7 @@ When the program is linked with the :ghc-flag:`-eventlog` option
     logs a default set of events, suitable for use with tools like ThreadScope.
 
     Per default the events are written to :file:`{program}.eventlog` though
-    the mechanism for writing event log data can be overriden with a custom
+    the mechanism for writing event log data can be overridden with a custom
     `EventLogWriter`.
 
     For some special use cases you may want more control over which
@@ -1311,7 +1342,7 @@ recommended for everyday use!
 
 .. rts-flag:: -Z
 
-    Turn *off* "update-frame squeezing" at garbage-collection time.
+    Turn *off* update frame squeezing on context switch.
     (There's no particularly good reason to turn it off, except to
     ensure the accuracy of certain data collected regarding thunk entry
     counts.)
