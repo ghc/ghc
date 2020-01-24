@@ -1768,10 +1768,10 @@ def read_stdout( name: TestName ) -> str:
     return in_testdir(name, 'run.stdout').read_text(encoding='UTF-8')
 
 def dump_stdout( name: TestName ) -> None:
-    str = read_stdout(name).strip()
-    if str:
+    s = read_stdout(name).strip()
+    if s:
         print("Stdout (", name, "):")
-        print(str)
+        safe_print(s)
 
 def stderr_ok(name: TestName, way: WayName) -> bool:
    actual_stderr_file = add_suffix(name, 'run.stderr')
@@ -1786,10 +1786,10 @@ def read_stderr( name: TestName ) -> str:
     return in_testdir(name, 'run.stderr').read_text(encoding='UTF-8')
 
 def dump_stderr( name: TestName ) -> None:
-    str = read_stderr(name).strip()
-    if str:
+    s = read_stderr(name).strip()
+    if s:
         print("Stderr (", name, "):")
-        print(str)
+        safe_print(s)
 
 def read_no_crs(f: Path) -> str:
     s = ''
@@ -2207,14 +2207,18 @@ def normalise_asm( s: str ) -> str:
           out.append(ins[0])
     return '\n'.join(out)
 
+def safe_print(s: str) -> None:
+    s2 = s.encode(sys.stdout.encoding, errors='replace')
+    print(s2)
+
 def if_verbose( n: int, s: str ) -> None:
     if config.verbose >= n:
-        print(s)
+        safe_print(s)
 
 def dump_file(f: Path):
     try:
         with f.open() as file:
-            print(file.read())
+            safe_print(file.read())
     except Exception:
         print('')
 
