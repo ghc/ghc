@@ -28,7 +28,7 @@ import Outputable
 import Unique
 import UniqFM
 import UniqSupply
-import BlockId
+import GHC.Cmm.BlockId
 
 
 -- | Used to store the register assignment on entry to a basic block.

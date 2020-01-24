@@ -44,12 +44,12 @@ import GhcPrelude
 import Llvm
 import LlvmCodeGen.Regs
 
-import CLabel
+import GHC.Cmm.CLabel
 import GHC.Platform.Regs ( activeStgRegs )
 import DynFlags
 import FastString
-import Cmm              hiding ( succ )
-import CmmUtils ( regsOverlap )
+import GHC.Cmm              hiding ( succ )
+import GHC.Cmm.Utils (regsOverlap)
 import Outputable as Outp
 import GHC.Platform
 import UniqFM
