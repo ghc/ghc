@@ -197,6 +197,10 @@ charSize = 4
 -- intention is to support arbitrary async reads to anywhere at a much lower
 -- level.  As such we should explicitly keep track of the file offsets of the
 -- target in the buffer.  Any operation to seek should also update this entry.
+--
+-- In order to keep us sane we try to uphold the invariant that any function
+-- being passed a Handle is responsible for updating the handles offset unless
+-- other behaviour is documented.
 data Buffer e
   = Buffer {
         bufRaw    :: !(RawBuffer e),
