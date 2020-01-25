@@ -315,7 +315,7 @@ cmmlex :: (Located CmmToken -> PD a) -> PD a
 cmmlex cont = do
   (L span tok) <- lexToken
   --trace ("token: " ++ show tok) $ do
-  cont (L (RealSrcSpan span) tok)
+  cont (L (RealSrcSpan span Nothing) tok)
 
 lexToken :: PD (RealLocated CmmToken)
 lexToken = do

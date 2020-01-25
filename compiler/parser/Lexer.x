@@ -1053,7 +1053,7 @@ hopefully_open_brace span buf len
                  Layout prev_off _ : _ -> prev_off < offset
                  _                     -> True
       if isOK then pop_and open_brace span buf len
-              else addFatalError (RealSrcSpan (psRealSpan span)) (text "Missing block")
+              else addFatalError (mkSrcSpanPs span) (text "Missing block")
 
 pop_and :: Action -> Action
 pop_and act span buf len = do _ <- popLexState
@@ -1416,7 +1416,7 @@ varid span buf len =
           lambdaCase <- getBit LambdaCaseBit
           unless lambdaCase $ do
             pState <- getPState
-            addError (RealSrcSpan (last_loc pState)) $ text
+            addError (RealSrcSpan (last_loc pState) Nothing) $ text
                      "Illegal lambda-case (use LambdaCase)"
           return ITlcase
         _ -> return ITcase
@@ -1515,7 +1515,7 @@ tok_integral itint transint transbuf translen (radix,char_to_int) span buf len =
   let src = lexemeToString buf len
   when ((not numericUnderscores) && ('_' `elem` src)) $ do
     pState <- getPState
-    addError (RealSrcSpan (last_loc pState)) $ text
+    addError (RealSrcSpan (last_loc pState) Nothing) $ text
              "Use NumericUnderscores to allow underscores in integer literals"
   return $ L span $ itint (SourceText src)
        $! transint $ parseUnsignedInteger
@@ -1557,7 +1557,7 @@ tok_frac drop f span buf len = do
   let src = lexemeToString buf (len-drop)
   when ((not numericUnderscores) && ('_' `elem` src)) $ do
     pState <- getPState
-    addError (RealSrcSpan (last_loc pState)) $ text
+    addError (RealSrcSpan (last_loc pState) Nothing) $ text
              "Use NumericUnderscores to allow underscores in floating literals"
   return (L span $! (f $! src))
 
@@ -1766,7 +1766,7 @@ lex_string s = do
                 setInput i
                 when (any (> '\xFF') s') $ do
                   pState <- getPState
-                  addError (RealSrcSpan (last_loc pState)) $ text
+                  addError (RealSrcSpan (last_loc pState) Nothing) $ text
                      "primitive string literal must contain only characters <= \'\\xFF\'"
                 return (ITprimstring (SourceText s') (unsafeMkByteString s'))
               _other ->
@@ -2040,7 +2040,7 @@ warnTab srcspan _buf _len = do
 
 warnThen :: WarningFlag -> SDoc -> Action -> Action
 warnThen option warning action srcspan buf len = do
-    addWarning option (RealSrcSpan (psRealSpan srcspan)) warning
+    addWarning option (RealSrcSpan (psRealSpan srcspan) Nothing) warning
     action srcspan buf len
 
 -- -----------------------------------------------------------------------------
@@ -2173,11 +2173,11 @@ thenP :: P a -> (a -> P b) -> P b
 failMsgP :: String -> P a
 failMsgP msg = do
   pState <- getPState
-  addFatalError (RealSrcSpan (last_loc pState)) (text msg)
+  addFatalError (RealSrcSpan (last_loc pState) Nothing) (text msg)
 
 failLocMsgP :: RealSrcLoc -> RealSrcLoc -> String -> P a
 failLocMsgP loc1 loc2 str =
-  addFatalError (RealSrcSpan (mkRealSrcSpan loc1 loc2)) (text str)
+  addFatalError (RealSrcSpan (mkRealSrcSpan loc1 loc2) Nothing) (text str)
 
 getPState :: P PState
 getPState = P $ \s -> POk s s
@@ -2713,7 +2713,7 @@ mkTabWarning PState{tab_first=tf, tab_count=tc} d =
                 <> text "."
                 $+$ text "Please use spaces instead."
   in fmap (\s -> makeIntoWarning (Reason Opt_WarnTabs) $
-                 mkWarnMsg d (RealSrcSpan s) alwaysQualify message) tf
+                 mkWarnMsg d (RealSrcSpan s Nothing) alwaysQualify message) tf
 
 -- | Get a bag of the errors that have been accumulated so far.
 --   Does not take -Werror into account.
@@ -2743,7 +2743,7 @@ popContext = P $ \ s@(PState{ buffer = buf, options = o, context = ctx,
         (_:tl) ->
           POk s{ context = tl } ()
         []     ->
-          unP (addFatalError (RealSrcSpan last_loc) (srcParseErr o buf len)) s
+          unP (addFatalError (RealSrcSpan last_loc Nothing) (srcParseErr o buf len)) s
 
 -- Push a new layout context at the indentation of the last token read.
 pushCurrentContext :: GenSemic -> P ()
@@ -2803,7 +2803,7 @@ srcParseErr options buf len
 srcParseFail :: P a
 srcParseFail = P $ \s@PState{ buffer = buf, options = o, last_len = len,
                             last_loc = last_loc } ->
-    unP (addFatalError (RealSrcSpan last_loc) (srcParseErr o buf len)) s
+    unP (addFatalError (RealSrcSpan last_loc Nothing) (srcParseErr o buf len)) s
 
 -- A lexical error is reported at a particular position in the source file,
 -- not over a token range.
@@ -2822,20 +2822,20 @@ lexer, lexerDbg :: Bool -> (Located Token -> P a) -> P a
 lexer queueComments cont = do
   alr <- getBit AlternativeLayoutRuleBit
   let lexTokenFun = if alr then lexTokenAlr else lexToken
-  (L (PsSpan span _) tok) <- lexTokenFun
+  (L span tok) <- lexTokenFun
   --trace ("token: " ++ show tok) $ do
 
   case tok of
-    ITeof -> addAnnotationOnly noSrcSpan AnnEofPos (RealSrcSpan span)
+    ITeof -> addAnnotationOnly noSrcSpan AnnEofPos (mkSrcSpanPs span)
     _ -> return ()
 
   if (queueComments && isDocComment tok)
-    then queueComment (L (RealSrcSpan span) tok)
+    then queueComment (L (mkSrcSpanPs span) tok)
     else return ()
 
   if (queueComments && isComment tok)
-    then queueComment (L (RealSrcSpan span) tok) >> lexer queueComments cont
-    else cont (L (RealSrcSpan span) tok)
+    then queueComment (L (mkSrcSpanPs span) tok) >> lexer queueComments cont
+    else cont (L (mkSrcSpanPs span) tok)
 
 -- Use this instead of 'lexer' in Parser.y to dump the tokens for debugging.
 lexerDbg queueComments cont = lexer queueComments contDbg
@@ -2935,7 +2935,7 @@ alternativeLayoutRuleToken t
              (ITwhere, ALRLayout _ col : ls, _)
               | newLine && thisCol == col && transitional ->
                  do addWarning Opt_WarnAlternativeLayoutRuleTransitional
-                               (RealSrcSpan (psRealSpan thisLoc))
+                               (mkSrcSpanPs thisLoc)
                                (transitionalAlternativeLayoutWarning
                                     "`where' clause at the same depth as implicit layout block")
                     setALRContext ls
@@ -2947,7 +2947,7 @@ alternativeLayoutRuleToken t
              (ITvbar, ALRLayout _ col : ls, _)
               | newLine && thisCol == col && transitional ->
                  do addWarning Opt_WarnAlternativeLayoutRuleTransitional
-                               (RealSrcSpan (psRealSpan thisLoc))
+                               (mkSrcSpanPs thisLoc)
                                (transitionalAlternativeLayoutWarning
                                     "`|' at the same depth as implicit layout block")
                     setALRContext ls
@@ -3229,7 +3229,7 @@ addAnnotationOnly l a v = P $ \s -> POk s {
 -- and end of the span
 mkParensApiAnn :: SrcSpan -> [AddAnn]
 mkParensApiAnn (UnhelpfulSpan _)  = []
-mkParensApiAnn s@(RealSrcSpan ss) = [AddAnn AnnOpenP lo,AddAnn AnnCloseP lc]
+mkParensApiAnn s@(RealSrcSpan ss _) = [AddAnn AnnOpenP lo,AddAnn AnnCloseP lc]
   where
     f = srcSpanFile ss
     sl = srcSpanStartLine ss
