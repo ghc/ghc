@@ -1,3 +1,9 @@
+## 0.6.2 (edit as necessary)
+
+- Shipped with GHC 8.X
+
+- Add (non-exposed) Intlike module used by the GHC RTS.
+
 ## 0.6.1 (edit as necessary)
 
 - Shipped with GHC 8.10.1
