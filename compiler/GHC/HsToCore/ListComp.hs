@@ -266,7 +266,7 @@ deListComp (RecStmt {} : _) _ = panic "deListComp RecStmt"
 deListComp (ApplicativeStmt {} : _) _ =
   panic "deListComp ApplicativeStmt"
 
-deBindComp :: OutPat GhcTc
+deBindComp :: LPat GhcTc
            -> CoreExpr
            -> [ExprStmt GhcTc]
            -> CoreExpr

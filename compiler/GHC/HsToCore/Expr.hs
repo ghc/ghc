@@ -697,13 +697,16 @@ dsExpr expr@(RecordUpd { rupd_expr = record_expr, rupd_flds = fields
 
                  req_wrap = dict_req_wrap <.> mkWpTyApps in_inst_tys
 
-                 pat = noLoc $ ConPatOut { pat_con = noLoc con
-                                         , pat_tvs = ex_tvs
-                                         , pat_dicts = eqs_vars ++ theta_vars
-                                         , pat_binds = emptyTcEvBinds
-                                         , pat_args = PrefixCon $ map nlVarPat arg_ids
-                                         , pat_arg_tys = in_inst_tys
-                                         , pat_wrap = req_wrap }
+                 pat = noLoc $ ConPat { pat_con = noLoc con
+                                      , pat_args = PrefixCon $ map nlVarPat arg_ids
+                                      , pat_con_ext = ConPatTc
+                                        { cpt_tvs = ex_tvs
+                                        , cpt_dicts = eqs_vars ++ theta_vars
+                                        , cpt_binds = emptyTcEvBinds
+                                        , cpt_arg_tys = in_inst_tys
+                                        , cpt_wrap = req_wrap
+                                        }
+                                      }
            ; return (mkSimpleMatch RecUpd [pat] wrapped_rhs) }
 
 {- Note [Scrutinee in Record updates]
