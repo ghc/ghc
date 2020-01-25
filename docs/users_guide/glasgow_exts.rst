@@ -3958,7 +3958,7 @@ GHC extends this mechanism along several axes:
     declaration.
 
   The user can optionally declare the desired `deriving strategy
-  <#deriving-stragies>`__, especially if the compiler chooses the wrong
+  <#deriving-strategies>`__, especially if the compiler chooses the wrong
   one `by default <#default-deriving-strategy>`__.
 
 .. _empty-data-deriving:
