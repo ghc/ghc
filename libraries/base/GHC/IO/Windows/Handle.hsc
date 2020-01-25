@@ -482,6 +482,7 @@ hwndWriteNonBlocking hwnd ptr offset bytes
                              (startCB ptr) completionCB
        return $ fromIntegral $ ioValue val
   where
+    startCB :: Ptr a -> LPOVERLAPPED -> IO (Mgr.CbResult a1)
     startCB outBuf lpOverlapped = do
       debugIO ":: hwndWriteNonBlocking"
       -- See Note [ReadFile/WriteFile].
