@@ -765,6 +765,7 @@ instance ( ToHie (HsMatchContext a)
   toHie _ = pure []
 
 instance ( a ~ GhcPass p
+         , IsPass p
          , ToHie (Context (Located (IdP a)))
          , ToHie (RContext (HsRecFields a (PScoped (LPat a))))
          , ToHie (LHsExpr a)
@@ -807,12 +808,11 @@ instance ( a ~ GhcPass p
       SumPat _ pat _ _ ->
         [ toHie $ PS rsp scope pscope pat
         ]
-      ConPatIn c dets ->
-        [ toHie $ C Use c
-        , toHie $ contextify dets
-        ]
-      ConPatOut {pat_con = con, pat_args = dets}->
-        [ toHie $ C Use $ fmap conLikeName con
+      ConPat {pat_con = con, pat_args = dets}->
+        [ case ghcPass @p of
+            GhcPs -> toHie $ C Use $ con
+            GhcRn -> toHie $ C Use $ con
+            GhcTc -> toHie $ C Use $ fmap conLikeName con
         , toHie $ contextify dets
         ]
       ViewPat _ expr pat ->
@@ -836,8 +836,15 @@ instance ( a ~ GhcPass p
                        (protectSig @a cscope sig)
               -- See Note [Scoping Rules for SigPat]
         ]
-      CoPat _ _ _ _ ->
-        []
+      XPat e -> case ghcPass @p of
+#if __GLASGOW_HASKELL__ < 811
+        GhcPs -> noExtCon e
+        GhcRn -> noExtCon e
+#endif
+        GhcTc -> []
+          where
+            -- Make sure we get an error if this changes
+            _noWarn@(CoPat _ _ _) = e
     where
       contextify (PrefixCon args) = PrefixCon $ patScopes rsp scope pscope args
       contextify (InfixCon a b) = InfixCon a' b'
