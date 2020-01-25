@@ -145,9 +145,16 @@ matchOneConLike vars ty (eqn1 :| eqns)   -- All eqns for a single constructor
                      ; return $ foldr1 (.) wraps <$> match_result
                      }
 
-              shift (_, eqn@(EqnInfo { eqn_pats = ConPatOut{ pat_tvs = tvs, pat_dicts = ds,
-                                                             pat_binds = bind, pat_args = args
-                                                  } : pats }))
+              shift (_, eqn@(EqnInfo
+                             { eqn_pats = ConPat
+                               { pat_args = args
+                               , pat_con_ext = ConPatTc
+                                 { cpt_tvs = tvs
+                                 , cpt_dicts = ds
+                                 , cpt_binds = bind
+                                 }
+                               } : pats
+                             }))
                 = do ds_bind <- dsTcEvBinds bind
                      return ( wrapBinds (tvs `zip` tvs1)
                             . wrapBinds (ds  `zip` dicts1)
@@ -173,10 +180,15 @@ matchOneConLike vars ty (eqn1 :| eqns)   -- All eqns for a single constructor
                               alt_wrapper = wrapper1,
                               alt_result = foldr1 combineMatchResults match_results } }
   where
-    ConPatOut { pat_con = L _ con1
-              , pat_arg_tys = arg_tys, pat_wrap = wrapper1,
-                pat_tvs = tvs1, pat_dicts = dicts1, pat_args = args1 }
-              = firstPat eqn1
+    ConPat { pat_con = L _ con1
+           , pat_args = args1
+           , pat_con_ext = ConPatTc
+             { cpt_arg_tys = arg_tys
+             , cpt_wrap = wrapper1
+             , cpt_tvs = tvs1
+             , cpt_dicts = dicts1
+             }
+           } = firstPat eqn1
     fields1 = map flSelector (conLikeFieldLabels con1)
 
     ex_tvs = conLikeExTyCoVars con1

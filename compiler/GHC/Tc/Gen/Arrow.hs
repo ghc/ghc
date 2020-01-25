@@ -81,9 +81,9 @@ Note that
 ************************************************************************
 -}
 
-tcProc :: InPat GhcRn -> LHsCmdTop GhcRn        -- proc pat -> expr
+tcProc :: LPat GhcRn -> LHsCmdTop GhcRn         -- proc pat -> expr
        -> ExpRhoType                            -- Expected type of whole proc expression
-       -> TcM (OutPat GhcTcId, LHsCmdTop GhcTcId, TcCoercion)
+       -> TcM (LPat GhcTc, LHsCmdTop GhcTcId, TcCoercion)
 
 tcProc pat cmd exp_ty
   = newArrowScope $

@@ -2178,9 +2178,9 @@ tcDefaultAssocDecl fam_tc
            , text "pats"    <+> ppr pats
            , text "rhs_ty"  <+> ppr rhs_ty
            ])
-       ; pat_tvs <- zipWithM (extract_tv ppr_eqn) pats pats_vis
-       ; check_all_distinct_tvs ppr_eqn $ zip pat_tvs pats_vis
-       ; let subst = zipTvSubst pat_tvs (mkTyVarTys fam_tvs)
+       ; cpt_tvs <- zipWithM (extract_tv ppr_eqn) pats pats_vis
+       ; check_all_distinct_tvs ppr_eqn $ zip cpt_tvs pats_vis
+       ; let subst = zipTvSubst cpt_tvs (mkTyVarTys fam_tvs)
        ; pure $ Just (substTyUnchecked subst rhs_ty, loc)
            -- We also perform other checks for well-formedness and validity
            -- later, in checkValidClass
@@ -2217,8 +2217,8 @@ tcDefaultAssocDecl fam_tc
                             -- visibilities (the latter are only used for error
                             -- message purposes)
       -> TcM ()
-    check_all_distinct_tvs ppr_eqn pat_tvs_vis =
-      let dups = findDupsEq ((==) `on` fst) pat_tvs_vis in
+    check_all_distinct_tvs ppr_eqn cpt_tvs_vis =
+      let dups = findDupsEq ((==) `on` fst) cpt_tvs_vis in
       traverse_
         (\d -> let (pat_tv, pat_vis) = NE.head d in failWithTc $
                pprWithExplicitKindsWhen (isInvisibleArgFlag pat_vis) $

@@ -2155,8 +2155,8 @@ checkFamPatBinders fam_tc qtvs pats rhs
               , ppr (mkTyConApp fam_tc pats)
               , text "qtvs:" <+> ppr qtvs
               , text "rhs_tvs:" <+> ppr (fvVarSet rhs_fvs)
-              , text "pat_tvs:" <+> ppr pat_tvs
-              , text "inj_pat_tvs:" <+> ppr inj_pat_tvs ]
+              , text "cpt_tvs:" <+> ppr cpt_tvs
+              , text "inj_cpt_tvs:" <+> ppr inj_cpt_tvs ]
 
          -- Check for implicitly-bound tyvars, mentioned on the
          -- RHS but not bound on the LHS
@@ -2176,23 +2176,23 @@ checkFamPatBinders fam_tc qtvs pats rhs
                             (text "used in")
        }
   where
-    pat_tvs     = tyCoVarsOfTypes pats
-    inj_pat_tvs = fvVarSet $ injectiveVarsOfTypes False pats
+    cpt_tvs     = tyCoVarsOfTypes pats
+    inj_cpt_tvs = fvVarSet $ injectiveVarsOfTypes False pats
       -- The type variables that are in injective positions.
       -- See Note [Dodgy binding sites in type family instances]
       -- NB: The False above is irrelevant, as we never have type families in
       -- patterns.
       --
       -- NB: It's OK to use the nondeterministic `fvVarSet` function here,
-      -- since the order of `inj_pat_tvs` is never revealed in an error
+      -- since the order of `inj_cpt_tvs` is never revealed in an error
       -- message.
     rhs_fvs     = tyCoFVsOfType rhs
-    used_tvs    = pat_tvs `unionVarSet` fvVarSet rhs_fvs
+    used_tvs    = cpt_tvs `unionVarSet` fvVarSet rhs_fvs
     bad_qtvs    = filterOut (`elemVarSet` used_tvs) qtvs
                   -- Bound but not used at all
-    bad_rhs_tvs = filterOut (`elemVarSet` inj_pat_tvs) (fvVarList rhs_fvs)
+    bad_rhs_tvs = filterOut (`elemVarSet` inj_cpt_tvs) (fvVarList rhs_fvs)
                   -- Used on RHS but not bound on LHS
-    dodgy_tvs   = pat_tvs `minusVarSet` inj_pat_tvs
+    dodgy_tvs   = cpt_tvs `minusVarSet` inj_cpt_tvs
 
     check_tvs tvs what what2
       = unless (null tvs) $ addErrAt (getSrcSpan (head tvs)) $

@@ -716,14 +716,14 @@ strip_bangs (L _ (ParPat _ p))  = strip_bangs p
 strip_bangs (L _ (BangPat _ p)) = strip_bangs p
 strip_bangs lp                  = lp
 
-is_flat_prod_lpat :: LPat (GhcPass p) -> Bool
+is_flat_prod_lpat :: LPat GhcTc -> Bool
 is_flat_prod_lpat = is_flat_prod_pat . unLoc
 
-is_flat_prod_pat :: Pat (GhcPass p) -> Bool
+is_flat_prod_pat :: Pat GhcTc -> Bool
 is_flat_prod_pat (ParPat _ p)          = is_flat_prod_lpat p
 is_flat_prod_pat (TuplePat _ ps Boxed) = all is_triv_lpat ps
-is_flat_prod_pat (ConPatOut { pat_con  = L _ pcon
-                            , pat_args = ps})
+is_flat_prod_pat (ConPat { pat_con  = L _ pcon
+                         , pat_args = ps})
   | RealDataCon con <- pcon
   , isProductTyCon (dataConTyCon con)
   = all is_triv_lpat (hsConPatArgs ps)
@@ -753,7 +753,7 @@ mkLHsPatTup [lpat] = lpat
 mkLHsPatTup lpats  = L (getLoc (head lpats)) $
                      mkVanillaTuplePat lpats Boxed
 
-mkVanillaTuplePat :: [OutPat GhcTc] -> Boxity -> Pat GhcTc
+mkVanillaTuplePat :: [LPat GhcTc] -> Boxity -> Pat GhcTc
 -- A vanilla tuple pattern simply gets its type from its sub-patterns
 mkVanillaTuplePat pats box = TuplePat (map hsLPatType pats) pats box
 

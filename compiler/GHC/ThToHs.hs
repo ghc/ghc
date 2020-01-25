@@ -1268,12 +1268,22 @@ cvtp (UnboxedSumP p alt arity)
                             ; return $ SumPat noExtField p' alt arity }
 cvtp (ConP s ps)       = do { s' <- cNameL s; ps' <- cvtPats ps
                             ; let pps = map (parenthesizePat appPrec) ps'
-                            ; return $ ConPatIn s' (PrefixCon pps) }
+                            ; return $ ConPat
+                                { pat_con_ext = noExtField
+                                , pat_con = s'
+                                , pat_args = PrefixCon pps
+                                }
+                            }
 cvtp (InfixP p1 s p2)  = do { s' <- cNameL s; p1' <- cvtPat p1; p2' <- cvtPat p2
                             ; wrapParL (ParPat noExtField) $
-                              ConPatIn s' $
-                              InfixCon (parenthesizePat opPrec p1')
-                                       (parenthesizePat opPrec p2') }
+                              ConPat
+                                { pat_con_ext = NoExtField
+                                , pat_con = s'
+                                , pat_args = InfixCon
+                                    (parenthesizePat opPrec p1')
+                                    (parenthesizePat opPrec p2')
+                                }
+                            }
                             -- See Note [Operator association]
 cvtp (UInfixP p1 s p2) = do { p1' <- cvtPat p1; cvtOpAppP p1' s p2 } -- Note [Converting UInfix]
 cvtp (ParensP p)       = do { p' <- cvtPat p;
@@ -1286,8 +1296,12 @@ cvtp (TH.AsP s p)      = do { s' <- vNameL s; p' <- cvtPat p
                             ; return $ AsPat noExtField s' p' }
 cvtp TH.WildP          = return $ WildPat noExtField
 cvtp (RecP c fs)       = do { c' <- cNameL c; fs' <- mapM cvtPatFld fs
-                            ; return $ ConPatIn c'
-                                     $ Hs.RecCon (HsRecFields fs' Nothing) }
+                            ; return $ ConPat
+                                { pat_con_ext = noExtField
+                                , pat_con = c'
+                                , pat_args = Hs.RecCon $ HsRecFields fs' Nothing
+                                }
+                            }
 cvtp (ListP ps)        = do { ps' <- cvtPats ps
                             ; return
                                    $ ListPat noExtField ps'}
@@ -1317,7 +1331,12 @@ cvtOpAppP x op1 (UInfixP y op2 z)
 cvtOpAppP x op y
   = do { op' <- cNameL op
        ; y' <- cvtPat y
-       ; return (ConPatIn op' (InfixCon x y')) }
+       ; return $ ConPat
+          { pat_con_ext = noExtField
+          , pat_con = op'
+          , pat_args = InfixCon x y'
+          }
+       }
 
 -----------------------------------------------------------
 --      Types and type variables
