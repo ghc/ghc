@@ -11,6 +11,7 @@ module GHC.Cmm.Info.Build
 import GhcPrelude hiding (succ)
 
 import Id
+import IdInfo
 import GHC.Cmm.BlockId
 import GHC.Cmm.Dataflow.Block
 import GHC.Cmm.Dataflow.Graph
