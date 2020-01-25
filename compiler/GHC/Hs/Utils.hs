@@ -24,6 +24,9 @@ just attach noSrcSpan to everything.
 {-# LANGUAGE FlexibleContexts #-}
 {-# LANGUAGE TypeFamilies #-}
 {-# LANGUAGE ViewPatterns #-}
+{-# LANGUAGE TypeApplications #-}
+{-# LANGUAGE DataKinds #-}
+{-# LANGUAGE FlexibleInstances #-}
 
 {-# OPTIONS_GHC -Wno-incomplete-record-updates #-}
 
@@ -88,6 +91,7 @@ module GHC.Hs.Utils(
   collectPatBinders, collectPatsBinders,
   collectLStmtsBinders, collectStmtsBinders,
   collectLStmtBinders, collectStmtBinders,
+  XCollectPat(..),
 
   hsLTyClDeclBinders, hsTyClForeignBinders,
   hsPatSynSelectors, getPatSynBinds,
@@ -133,6 +137,7 @@ import Constants
 import Data.Either
 import Data.Function
 import Data.List
+import Data.Proxy
 
 {-
 ************************************************************************
@@ -195,8 +200,12 @@ mkHsAppType e t = addCLoc e t_body (HsAppType noExtField e paren_wct)
 mkHsAppTypes :: LHsExpr GhcRn -> [LHsWcType GhcRn] -> LHsExpr GhcRn
 mkHsAppTypes = foldl' mkHsAppType
 
-mkHsLam :: (XMG (GhcPass p) (LHsExpr (GhcPass p)) ~ NoExtField) =>
-  [LPat (GhcPass p)] -> LHsExpr (GhcPass p) -> LHsExpr (GhcPass p)
+mkHsLam
+  :: IsPass p
+  => (XMG (GhcPass p) (LHsExpr (GhcPass p)) ~ NoExtField)
+  => [LPat (GhcPass p)]
+  -> LHsExpr (GhcPass p)
+  -> LHsExpr (GhcPass p)
 mkHsLam pats body = mkHsPar (L (getLoc body) (HsLam noExtField matches))
   where
     matches = mkMatchGroup Generated
@@ -229,7 +238,7 @@ mkLHsPar le@(L loc e)
   | hsExprNeedsParens appPrec e = L loc (HsPar noExtField le)
   | otherwise                   = le
 
-mkParPat :: LPat (GhcPass name) -> LPat (GhcPass name)
+mkParPat :: IsPass p => LPat (GhcPass p) -> LPat (GhcPass p)
 mkParPat lp@(L loc p)
   | patNeedsParens appPrec p = L loc (ParPat noExtField lp)
   | otherwise                = lp
@@ -434,25 +443,39 @@ nlConVarPatName :: Name -> [Name] -> LPat GhcRn
 nlConVarPatName con vars = nlConPatName con (map nlVarPat vars)
 
 nlInfixConPat :: RdrName -> LPat GhcPs -> LPat GhcPs -> LPat GhcPs
-nlInfixConPat con l r = noLoc (ConPatIn (noLoc con)
-                              (InfixCon (parenthesizePat opPrec l)
-                                        (parenthesizePat opPrec r)))
+nlInfixConPat con l r = noLoc $ ConPat
+  (noLoc con)
+  (InfixCon (parenthesizePat opPrec l)
+            (parenthesizePat opPrec r))
+  noExtField
 
 nlConPat :: RdrName -> [LPat GhcPs] -> LPat GhcPs
-nlConPat con pats =
-  noLoc (ConPatIn (noLoc con) (PrefixCon (map (parenthesizePat appPrec) pats)))
+nlConPat con pats = noLoc $ ConPat
+  (noLoc con)
+  (PrefixCon (map (parenthesizePat appPrec) pats))
+  noExtField
 
 nlConPatName :: Name -> [LPat GhcRn] -> LPat GhcRn
-nlConPatName con pats =
-  noLoc (ConPatIn (noLoc con) (PrefixCon (map (parenthesizePat appPrec) pats)))
+nlConPatName con pats = noLoc $ ConPat
+  (noLoc con)
+  (PrefixCon (map (parenthesizePat appPrec) pats))
+  noExtField
 
-nlNullaryConPat :: IdP (GhcPass p) -> LPat (GhcPass p)
-nlNullaryConPat con = noLoc (ConPatIn (noLoc con) (PrefixCon []))
+nlNullaryConPat
+  :: ( XConPatCon (GhcPass p) ~ IdP (GhcPass p)
+     , XConPat (GhcPass p) ~ NoExtField
+     )
+  => IdP (GhcPass p)
+  -> LPat (GhcPass p)
+nlNullaryConPat con = noLoc $ ConPat (noLoc con) (PrefixCon []) noExtField
 
 nlWildConPat :: DataCon -> LPat GhcPs
-nlWildConPat con = noLoc (ConPatIn (noLoc (getRdrName con))
-                         (PrefixCon (replicate (dataConSourceArity con)
-                                             nlWildPat)))
+nlWildConPat con = noLoc $ ConPat
+  (noLoc $ getRdrName con)
+  (PrefixCon $
+     replicate (dataConSourceArity con)
+               nlWildPat)
+  noExtField
 
 -- | Wildcard pattern - after parsing
 nlWildPat :: LPat GhcPs
@@ -795,11 +818,11 @@ mkLHsCmdWrap w (L loc c) = L loc (mkHsCmdWrap w c)
 
 mkHsWrapPat :: HsWrapper -> Pat GhcTc -> Type -> Pat GhcTc
 mkHsWrapPat co_fn p ty | isIdHsWrapper co_fn = p
-                       | otherwise           = CoPat noExtField co_fn p ty
+                       | otherwise           = XPat $ CoPat co_fn p ty
 
 mkHsWrapPatCo :: TcCoercionN -> Pat GhcTc -> Type -> Pat GhcTc
 mkHsWrapPatCo co pat ty | isTcReflCo co = pat
-                        | otherwise    = CoPat noExtField (mkWpCastN co) pat ty
+                        | otherwise     = XPat $ CoPat (mkWpCastN co) pat ty
 
 mkHsDictLet :: TcEvBinds -> LHsExpr GhcTc -> LHsExpr GhcTc
 mkHsDictLet ev_binds expr = mkLHsWrap (mkWpLet ev_binds) expr
@@ -874,16 +897,21 @@ mkPrefixFunRhs n = FunRhs { mc_fun = n
                           , mc_strictness = NoSrcStrict }
 
 ------------
-mkMatch :: HsMatchContext (NoGhcTc (GhcPass p))
-        -> [LPat (GhcPass p)] -> LHsExpr (GhcPass p)
-        -> Located (HsLocalBinds (GhcPass p))
-        -> LMatch (GhcPass p) (LHsExpr (GhcPass p))
+mkMatch
+  :: forall p
+  .  IsPass p
+  => HsMatchContext (NoGhcTc (GhcPass p))
+  -> [LPat (GhcPass p)]
+  -> LHsExpr (GhcPass p)
+  -> Located (HsLocalBinds (GhcPass p))
+  -> LMatch (GhcPass p) (LHsExpr (GhcPass p))
 mkMatch ctxt pats expr lbinds
   = noLoc (Match { m_ext   = noExtField
                  , m_ctxt  = ctxt
                  , m_pats  = map paren pats
                  , m_grhss = GRHSs noExtField (unguardedRHS noSrcSpan expr) lbinds })
   where
+    paren :: Located (Pat (GhcPass p)) -> Located (Pat (GhcPass p))
     paren lp@(L l p)
       | patNeedsParens appPrec p = L l (ParPat noExtField lp)
       | otherwise                = lp
@@ -973,8 +1001,10 @@ isBangedHsBind (PatBind {pat_lhs = pat})
 isBangedHsBind _
   = False
 
-collectLocalBinders :: HsLocalBindsLR (GhcPass idL) (GhcPass idR)
-                    -> [IdP (GhcPass idL)]
+collectLocalBinders
+  :: XCollectPat (GhcPass idL)
+  => HsLocalBindsLR (GhcPass idL) (GhcPass idR)
+  -> [IdP (GhcPass idL)]
 collectLocalBinders (HsValBinds _ binds) = collectHsIdBinders binds
                                          -- No pattern synonyms here
 collectLocalBinders (HsIPBinds {})      = []
@@ -982,41 +1012,63 @@ collectLocalBinders (EmptyLocalBinds _) = []
 collectLocalBinders (XHsLocalBindsLR _) = []
 
 collectHsIdBinders, collectHsValBinders
-  :: HsValBindsLR (GhcPass idL) (GhcPass idR) -> [IdP (GhcPass idL)]
+  :: XCollectPat (GhcPass idL)
+  => HsValBindsLR (GhcPass idL) (GhcPass idR)
+  -> [IdP (GhcPass idL)]
 -- ^ Collect 'Id' binders only, or 'Id's + pattern synonyms, respectively
 collectHsIdBinders  = collect_hs_val_binders True
 collectHsValBinders = collect_hs_val_binders False
 
-collectHsBindBinders :: XRec pass Pat ~ Located (Pat pass) =>
-                        HsBindLR pass idR -> [IdP pass]
+collectHsBindBinders
+  :: XCollectPat p
+  => HsBindLR p idR -> [IdP p]
 -- ^ Collect both 'Id's and pattern-synonym binders
 collectHsBindBinders b = collect_bind False b []
 
-collectHsBindsBinders :: LHsBindsLR (GhcPass p) idR -> [IdP (GhcPass p)]
+collectHsBindsBinders
+  :: XCollectPat p
+  => LHsBindsLR p idR
+  -> [IdP p]
 collectHsBindsBinders binds = collect_binds False binds []
 
-collectHsBindListBinders :: [LHsBindLR (GhcPass p) idR] -> [IdP (GhcPass p)]
+collectHsBindListBinders
+  :: XCollectPat p
+  => [LHsBindLR p idR]
+  -> [IdP p]
 -- ^ Same as 'collectHsBindsBinders', but works over a list of bindings
 collectHsBindListBinders = foldr (collect_bind False . unLoc) []
 
-collect_hs_val_binders :: Bool -> HsValBindsLR (GhcPass idL) (GhcPass idR)
-                       -> [IdP (GhcPass idL)]
+collect_hs_val_binders
+  :: XCollectPat (GhcPass idL)
+  => Bool
+  -> HsValBindsLR (GhcPass idL) (GhcPass idR)
+  -> [IdP (GhcPass idL)]
 collect_hs_val_binders ps (ValBinds _ binds _) = collect_binds ps binds []
 collect_hs_val_binders ps (XValBindsLR (NValBinds binds _))
   = collect_out_binds ps binds
 
-collect_out_binds :: Bool -> [(RecFlag, LHsBinds (GhcPass p))] ->
-                     [IdP (GhcPass p)]
+collect_out_binds
+  :: XCollectPat p
+  => Bool
+  -> [(RecFlag, LHsBinds p)]
+  -> [IdP p]
 collect_out_binds ps = foldr (collect_binds ps . snd) []
 
-collect_binds :: Bool -> LHsBindsLR (GhcPass p) idR ->
-                 [IdP (GhcPass p)] -> [IdP (GhcPass p)]
+collect_binds
+  :: XCollectPat p
+  => Bool
+  -> LHsBindsLR p idR
+  -> [IdP p]
+  -> [IdP p]
 -- ^ Collect 'Id's, or 'Id's + pattern synonyms, depending on boolean flag
 collect_binds ps binds acc = foldr (collect_bind ps . unLoc) acc binds
 
-collect_bind :: XRec pass Pat ~ Located (Pat pass) =>
-                Bool -> HsBindLR pass idR ->
-                [IdP pass] -> [IdP pass]
+collect_bind
+  :: XCollectPat p
+  => Bool
+  -> HsBindLR p idR
+  -> [IdP p]
+  -> [IdP p]
 collect_bind _ (PatBind { pat_lhs = p })           acc = collect_lpat p acc
 collect_bind _ (FunBind { fun_id = L _ f })        acc = f : acc
 collect_bind _ (VarBind { var_id = f })            acc = f : acc
@@ -1040,20 +1092,25 @@ collectMethodBinders binds = foldr (get . unLoc) [] binds
        -- Someone else complains about non-FunBinds
 
 ----------------- Statements --------------------------
-collectLStmtsBinders :: [LStmtLR (GhcPass idL) (GhcPass idR) body]
+collectLStmtsBinders :: (XCollectPat (GhcPass idL))
+                     => [LStmtLR (GhcPass idL) (GhcPass idR) body]
                      -> [IdP (GhcPass idL)]
 collectLStmtsBinders = concatMap collectLStmtBinders
 
-collectStmtsBinders :: [StmtLR (GhcPass idL) (GhcPass idR) body]
+collectStmtsBinders :: (XCollectPat (GhcPass idL))
+                    => [StmtLR (GhcPass idL) (GhcPass idR) body]
                     -> [IdP (GhcPass idL)]
 collectStmtsBinders = concatMap collectStmtBinders
 
-collectLStmtBinders :: LStmtLR (GhcPass idL) (GhcPass idR) body
+collectLStmtBinders :: (XCollectPat (GhcPass idL))
+                    => LStmtLR (GhcPass idL) (GhcPass idR) body
                     -> [IdP (GhcPass idL)]
 collectLStmtBinders = collectStmtBinders . unLoc
 
-collectStmtBinders :: StmtLR (GhcPass idL) (GhcPass idR) body
-                   -> [IdP (GhcPass idL)]
+collectStmtBinders
+  :: (XCollectPat (GhcPass idL))
+  => StmtLR (GhcPass idL) (GhcPass idR) body
+  -> [IdP (GhcPass idL)]
   -- Id Binders for a Stmt... [but what about pattern-sig type vars]?
 collectStmtBinders (BindStmt _ pat _ _ _)  = collectPatBinders pat
 collectStmtBinders (LetStmt _  binds)      = collectLocalBinders (unLoc binds)
@@ -1072,44 +1129,59 @@ collectStmtBinders (XStmtLR nec) = noExtCon nec
 
 
 ----------------- Patterns --------------------------
-collectPatBinders :: LPat (GhcPass p) -> [IdP (GhcPass p)]
+collectPatBinders :: XCollectPat p => LPat p -> [IdP p]
 collectPatBinders pat = collect_lpat pat []
 
-collectPatsBinders :: [LPat (GhcPass p)] -> [IdP (GhcPass p)]
+collectPatsBinders :: XCollectPat p => [LPat p] -> [IdP p]
 collectPatsBinders pats = foldr collect_lpat [] pats
 
 -------------
-collect_lpat :: XRec pass Pat ~ Located (Pat pass) =>
-                LPat pass -> [IdP pass] -> [IdP pass]
-collect_lpat p bndrs
-  = go (unLoc p)
-  where
-    go (VarPat _ var)             = unLoc var : bndrs
-    go (WildPat _)                = bndrs
-    go (LazyPat _ pat)            = collect_lpat pat bndrs
-    go (BangPat _ pat)            = collect_lpat pat bndrs
-    go (AsPat _ a pat)            = unLoc a : collect_lpat pat bndrs
-    go (ViewPat _ _ pat)          = collect_lpat pat bndrs
-    go (ParPat _ pat)             = collect_lpat pat bndrs
+collect_lpat
+  :: forall pass.
+     (XCollectPat pass)
+  => LPat pass -> [IdP pass] -> [IdP pass]
+collect_lpat p bndrs = collect_pat (unLoc p) bndrs
 
-    go (ListPat _ pats)           = foldr collect_lpat bndrs pats
-    go (TuplePat _ pats _)        = foldr collect_lpat bndrs pats
-    go (SumPat _ pat _ _)         = collect_lpat pat bndrs
+collect_pat
+  :: forall p.
+     XCollectPat p
+  => Pat p
+  -> [IdP p]
+  -> [IdP p]
+collect_pat pat bndrs = case pat of
+  (VarPat _ var)          -> unLoc var : bndrs
+  (WildPat _)             -> bndrs
+  (LazyPat _ pat)         -> collect_lpat pat bndrs
+  (BangPat _ pat)         -> collect_lpat pat bndrs
+  (AsPat _ a pat)         -> unLoc a : collect_lpat pat bndrs
+  (ViewPat _ _ pat)       -> collect_lpat pat bndrs
+  (ParPat _ pat)          -> collect_lpat pat bndrs
+  (ListPat _ pats)        -> foldr collect_lpat bndrs pats
+  (TuplePat _ pats _)     -> foldr collect_lpat bndrs pats
+  (SumPat _ pat _ _)      -> collect_lpat pat bndrs
+  (ConPat {pat_args=ps})  -> foldr collect_lpat bndrs (hsConPatArgs ps)
+  -- See Note [Dictionary binders in ConPatOut]
+  (LitPat _ _)            -> bndrs
+  (NPat {})               -> bndrs
+  (NPlusKPat _ n _ _ _ _) -> unLoc n : bndrs
+  (SigPat _ pat _)        -> collect_lpat pat bndrs
+  (SplicePat _ (HsSpliced _ _ (HsSplicedPat pat)))
+                          -> collect_pat pat bndrs
+  (SplicePat _ _)         -> bndrs
+  (XPat ext)              -> collectPatX (Proxy @p) ext bndrs
 
-    go (ConPatIn _ ps)            = foldr collect_lpat bndrs (hsConPatArgs ps)
-    go (ConPatOut {pat_args=ps})  = foldr collect_lpat bndrs (hsConPatArgs ps)
-        -- See Note [Dictionary binders in ConPatOut]
-    go (LitPat _ _)               = bndrs
-    go (NPat {})                  = bndrs
-    go (NPlusKPat _ n _ _ _ _)    = unLoc n : bndrs
+class (XRec p Pat ~ Located (Pat p)) => XCollectPat p where
+  collectPatX :: Proxy p -> XXPat p -> [IdP p] -> [IdP p]
 
-    go (SigPat _ pat _)           = collect_lpat pat bndrs
+instance XCollectPat (GhcPass 'Parsed) where
+  collectPatX _ ext = noExtCon ext
 
-    go (SplicePat _ (HsSpliced _ _ (HsSplicedPat pat)))
-                                  = go pat
-    go (SplicePat _ _)            = bndrs
-    go (CoPat _ _ pat _)          = go pat
-    go (XPat {})                  = bndrs
+instance XCollectPat (GhcPass 'Renamed) where
+  collectPatX _ ext = noExtCon ext
+
+instance XCollectPat (GhcPass 'Typechecked) where
+  collectPatX _ (CoPat _ pat _) = collect_pat pat
+
 
 {-
 Note [Dictionary binders in ConPatOut] See also same Note in GHC.HsToCore.Arrows
@@ -1410,10 +1482,8 @@ lPatImplicits = hs_lpat
     hs_pat (TuplePat _ pats _)  = hs_lpats pats
 
     hs_pat (SigPat _ pat _)     = hs_lpat pat
-    hs_pat (CoPat _ _ pat _)    = hs_pat pat
 
-    hs_pat (ConPatIn n ps)           = details n ps
-    hs_pat (ConPatOut {pat_con=con, pat_args=ps}) = details (fmap conLikeName con) ps
+    hs_pat (ConPat {pat_con=con, pat_args=ps}) = details con ps
 
     hs_pat _ = []
 
