@@ -92,7 +92,7 @@ import SrcLoc
 import Outputable
 import FastString
 import Maybes( isJust )
-import Util ( count, debugIsOn )
+import Util ( count )
 
 import Data.Data hiding ( Fixity, Prefix, Infix )
 
@@ -965,9 +965,8 @@ hsWcScopedTvs sig_ty
   , HsIB { hsib_ext = vars
          , hsib_body = sig_ty2 } <- sig_ty1
   = case sig_ty2 of
-      L _ (HsForAllTy { hst_fvf = vis_flag
+      L _ (HsForAllTy { hst_fvf = ForallInvis -- See Note [hsScopedTvs vis_flag]
                       , hst_bndrs = tvs }) ->
-        ASSERT( vis_flag == ForallInvis ) -- See Note [hsScopedTvs vis_flag]
         vars ++ nwcs ++ hsLTyVarNames tvs
       _                                    -> nwcs
 hsWcScopedTvs (HsWC _ (XHsImplicitBndrs nec)) = noExtCon nec
@@ -978,10 +977,9 @@ hsScopedTvs :: LHsSigType GhcRn -> [Name]
 hsScopedTvs sig_ty
   | HsIB { hsib_ext = vars
          , hsib_body = sig_ty2 } <- sig_ty
-  , L _ (HsForAllTy { hst_fvf = vis_flag
+  , L _ (HsForAllTy { hst_fvf = ForallInvis -- See Note [hsScopedTvs vis_flag]
                     , hst_bndrs = tvs }) <- sig_ty2
-  = ASSERT( vis_flag == ForallInvis ) -- See Note [hsScopedTvs vis_flag]
-    vars ++ hsLTyVarNames tvs
+  = vars ++ hsLTyVarNames tvs
   | otherwise
   = []
 
@@ -1027,17 +1025,23 @@ The conclusion of these discussions can be summarized as follows:
   >     vfn :: forall x y -> tau(x,y)
   >     vfn x y = \a b -> ...         -- bad!
 
-At the moment, GHC does not support visible 'forall' in terms, so we simply cement
-our assumptions with an assert:
-
-    hsScopedTvs (HsForAllTy { hst_fvf = vis_flag, ... }) =
-      ASSERT( vis_flag == ForallInvis )
-      ...
-
-In the future, this assert can be safely turned into a pattern match to support
-visible forall in terms:
+We cement this design by pattern-matching on ForallInvis in hsScopedTvs:
 
     hsScopedTvs (HsForAllTy { hst_fvf = ForallInvis, ... }) = ...
+
+At the moment, GHC does not support visible 'forall' in terms. Nevertheless,
+it is still possible to write erroneous programs that use visible 'forall's in
+terms, such as this example:
+
+    x :: forall a -> a -> a
+    x = x
+
+If we do not pattern-match on ForallInvis in hsScopedTvs, then `a` would
+erroneously be brought into scope over the body of `x` when renaming it.
+Although the typechecker would later reject this (see `TcValidity.vdqAllowed`),
+it is still possible for this to wreak havoc in the renamer before it gets to
+that point (see #17687 for an example of this).
+Bottom line: nip problems in the bud by matching on ForallInvis from the start.
 -}
 
 ---------------------
