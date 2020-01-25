@@ -123,9 +123,10 @@ hFileSize handle =
               r <- IODevice.getSize dev
               debugIO $ "hFileSize: " ++ show r ++ " " ++ show handle
               if r /= -1
-                 then return r
-                 else ioException (IOError Nothing InappropriateType "hFileSize"
-                                   "not a regular file" Nothing Nothing)
+                then return r
+                else ioException (IOError Nothing InappropriateType "hFileSize"
+                                  "not a regular file" Nothing Nothing)
+
 
 
 -- | 'hSetFileSize' @hdl@ @size@ truncates the physical file with handle @hdl@ to @size@ bytes.
