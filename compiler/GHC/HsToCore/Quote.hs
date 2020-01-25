@@ -1914,7 +1914,7 @@ repP (TuplePat _ ps boxed)
   | otherwise           = do { qs <- repLPs ps; repPunboxedTup qs }
 repP (SumPat _ p alt arity) = do { p1 <- repLP p
                                  ; repPunboxedSum p1 alt arity }
-repP (ConPatIn dc details)
+repP (ConPat NoExtField dc details)
  = do { con_str <- lookupLOcc dc
       ; case details of
          PrefixCon ps -> do { qs <- repLPs ps; repPcon con_str qs }
