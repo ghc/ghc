@@ -51,7 +51,7 @@ module GHC.IO.Handle.Internals (
 
   HandleFinalizer, handleFinalizer,
 
-  debugIO,
+  debugIO, traceIO
  ) where
 
 import GHC.IO
@@ -268,7 +268,8 @@ checkWritableHandle act h_@Handle__{..}
 -- Wrapper for read operations.
 
 wantReadableHandle :: String -> Handle -> (Handle__ -> IO (Handle__,a)) -> IO a
-wantReadableHandle fun h act = withHandle fun h (checkReadableHandle act)
+wantReadableHandle fun h act =
+  withHandle fun h (checkReadableHandle act)
 
 wantReadableHandle_ :: String -> Handle -> (Handle__ -> IO a) -> IO a
 wantReadableHandle_ fun h@(FileHandle  _ m)   act
@@ -831,6 +832,13 @@ debugIO s
                   \(p, len) -> c_write 1 (castPtr p) (fromIntegral len)
          return ()
  | otherwise = return ()
+
+-- For development, like debugIO but always on.
+traceIO :: String -> IO ()
+traceIO s = do
+         _ <- withCStringLen (s ++ "\n") $
+                  \(p, len) -> c_write 1 (castPtr p) (fromIntegral len)
+         return ()
 
 -- ----------------------------------------------------------------------------
 -- Text input/output
