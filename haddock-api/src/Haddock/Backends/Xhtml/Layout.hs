@@ -166,7 +166,7 @@ subTableSrc pkg qual lnks splice decls = Just $ table << aboves (concatMap subRo
       : map (cell . (td <<)) subs
 
     linkHtml :: SrcSpan -> Maybe Module -> DocName -> Html
-    linkHtml loc@(RealSrcSpan _) mdl dn = links lnks loc splice mdl dn
+    linkHtml loc@(RealSrcSpan _ _) mdl dn = links lnks loc splice mdl dn
     linkHtml _ _ _ = noHtml
 
 subBlock :: [Html] -> Maybe Html
@@ -309,6 +309,6 @@ links ((_,_,sourceMap,lineMap), (_,_,maybe_wiki_url)) loc splice mdl' docName@(D
         origPkg = moduleUnitId origMod
 
         fname = case loc of
-          RealSrcSpan l -> unpackFS (srcSpanFile l)
+          RealSrcSpan l _ -> unpackFS (srcSpanFile l)
           UnhelpfulSpan _ -> error "links: UnhelpfulSpan"
 links _ _ _ _ _ = noHtml

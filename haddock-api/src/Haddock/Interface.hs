@@ -187,7 +187,7 @@ processModule verbosity modsum flags modMap instIfaceMap = do
           where
             formatName :: SrcSpan -> HsDecl GhcRn -> String
             formatName loc n = p (getMainDeclBinder n) ++ case loc of
-              RealSrcSpan rss -> " (" ++ unpackFS (srcSpanFile rss) ++ ":" ++ show (srcSpanStartLine rss) ++ ")"
+              RealSrcSpan rss _ -> " (" ++ unpackFS (srcSpanFile rss) ++ ":" ++ show (srcSpanStartLine rss) ++ ")"
               _ -> ""
 
             p [] = ""

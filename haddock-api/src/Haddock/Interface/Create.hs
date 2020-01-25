@@ -377,7 +377,7 @@ mkMaps dflags pkgName gre instances decls = do
                         , [(Name, Map Int (MDoc Name))]
                         , [(Name,  [LHsDecl GhcRn])]
                         )
-    mappings (ldecl@(L (RealSrcSpan l) decl), docStrs) = do
+    mappings (ldecl@(L (RealSrcSpan l _) decl), docStrs) = do
       let declDoc :: [HsDocString] -> Map Int HsDocString
                   -> ErrMsgM (Maybe (MDoc Name), Map Int (MDoc Name))
           declDoc strs m = do
@@ -409,7 +409,7 @@ mkMaps dflags pkgName gre instances decls = do
     mappings (L (UnhelpfulSpan _) _, _) = pure ([], [], [])
 
     instanceMap :: Map RealSrcSpan Name
-    instanceMap = M.fromList [(l, n) | n <- instances, RealSrcSpan l <- [getSrcSpan n] ]
+    instanceMap = M.fromList [(l, n) | n <- instances, RealSrcSpan l _ <- [getSrcSpan n] ]
 
     names :: RealSrcSpan -> HsDecl GhcRn -> [Name]
     names _ (InstD _ d) = maybeToList (SrcLoc.lookupSrcSpan loc instanceMap) -- See note [2].

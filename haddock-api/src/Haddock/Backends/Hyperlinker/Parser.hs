@@ -69,11 +69,11 @@ parse dflags fpath bs = case unP (go False []) initState of
     -- | Like 'Lexer.lexer', but slower, with a better API, and filtering out empty tokens
     wrappedLexer :: P (RealLocated Lexer.Token)
     wrappedLexer = Lexer.lexer False andThen
-      where andThen (L (RealSrcSpan s) t)
+      where andThen (L (RealSrcSpan s _) t)
               | srcSpanStartLine s /= srcSpanEndLine s ||
                 srcSpanStartCol s /= srcSpanEndCol s
               = pure (L s t)
-            andThen (L (RealSrcSpan s) ITeof) = pure (L s ITeof)
+            andThen (L (RealSrcSpan s _) ITeof) = pure (L s ITeof)
             andThen _ = wrappedLexer
 
     -- | Try to parse a CPP line (can fail)
@@ -96,9 +96,9 @@ parse dflags fpath bs = case unP (go False []) initState of
       (bEnd, _) <- lift getInput
       case sp of
         UnhelpfulSpan _ -> pure ([], False) -- pretend the token never existed
-        RealSrcSpan rsp -> do
+        RealSrcSpan rsp _ -> do
           let typ = if inPrag then TkPragma else classify tok
-              RealSrcLoc lStart = srcSpanStart sp -- safe since @sp@ is real
+              RealSrcLoc lStart _ = srcSpanStart sp -- safe since @sp@ is real
               (spaceBStr, bStart) = spanPosition lInit lStart bInit
               inPragDef = inPragma inPrag tok
 
@@ -153,11 +153,13 @@ parse dflags fpath bs = case unP (go False []) initState of
 
 -- | Get the input
 getInput :: P (StringBuffer, RealSrcLoc)
-getInput = P $ \p@PState { buffer = buf, loc = srcLoc } -> POk p (buf, srcLoc)
+getInput = P $ \p@PState { buffer = buf, loc = srcLoc } -> POk p (buf, psRealLoc srcLoc)
 
 -- | Set the input
 setInput :: (StringBuffer, RealSrcLoc) -> P ()
-setInput (buf, srcLoc) = P $ \p -> POk (p { buffer = buf, loc = srcLoc }) ()
+setInput (buf, srcLoc) =
+  P $ \p@PState{ loc = PsLoc _ buf_loc } ->
+    POk (p { buffer = buf, loc = PsLoc srcLoc buf_loc }) ()
 
 tryP :: P a -> MaybeT P a
 tryP (P f) = MaybeT $ P $ \s -> case f s of

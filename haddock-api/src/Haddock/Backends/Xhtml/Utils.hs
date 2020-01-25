@@ -75,7 +75,7 @@ spliceURL' maybe_file maybe_mod maybe_name maybe_loc = run
     Nothing -> ""
     Just span_ ->
       case span_ of
-      RealSrcSpan span__ ->
+      RealSrcSpan span__ _ ->
         show $ srcSpanStartLine span__
       UnhelpfulSpan _ -> ""
 
