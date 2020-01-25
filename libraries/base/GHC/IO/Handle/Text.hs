@@ -642,6 +642,7 @@ hPutChars :: Handle -> [Char] -> IO ()
 hPutChars _      [] = return ()
 hPutChars handle (c:cs) = hPutChar handle c >> hPutChars handle cs
 
+-- Buffer offset is always zero.
 getSpareBuffer :: Handle__ -> IO (BufferMode, CharBuffer)
 getSpareBuffer Handle__{haCharBuffer=ref,
                         haBuffers=spare_ref,
@@ -701,7 +702,6 @@ writeBlocks hdl line_buffered add_nl nl
 --
 -- Write the contents of the buffer 'buf' ('sz' bytes long, containing
 -- 'count' bytes of data) to handle (handle must be block or line buffered).
-
 commitBuffer
         :: Handle                       -- handle to commit to
         -> RawCharBuffer -> Int         -- address and size (in bytes) of buffer
@@ -814,64 +814,76 @@ hPutBuf' handle ptr count can_block
              _line_or_no_buffering -> do flushWriteBuffer h_
           return r
 
+-- TODO: Possible optimisation:
+--       If we know that `w + count > size`, we should write both the
+--       handle buffer and the `ptr` in a single `writev()` syscall.
 bufWrite :: Handle__-> Ptr Word8 -> Int -> Bool -> IO Int
-bufWrite h_@Handle__{..} ptr count can_block =
-  seq count $ do  -- strictness hack
-  old_buf@Buffer{ bufRaw=old_raw, bufR=w, bufSize=size, bufOffset=offset }
-     <- readIORef haByteBuffer
+bufWrite h_@Handle__{..} ptr !count can_block = do
+  -- Get buffer to determine size and free space in buffer
+  old_buf@Buffer{ bufR=w, bufSize=size }
+      <- readIORef haByteBuffer
 
-  -- TODO: Possible optimisation:
-  --       If we know that `w + count > size`, we should write both the
-  --       handle buffer and the `ptr` in a single `writev()` syscall.
-
-  -- Need to buffer and enough room in handle buffer?
-  -- There's no need to buffer if the data to be written is larger than
+  -- There's no need to buffer if the incoming data is larger than
   -- the handle buffer (`count >= size`).
-  if (count < size && count <= size - w)
-        -- We need to buffer and there's enough room in the buffer:
-        -- just copy the data in and update bufR.
-        then do debugIO ("hPutBuf: copying to buffer, w=" ++ show w)
-                copyToRawBuffer old_raw w ptr count
-                let copied_buf = old_buf{ bufR = w + count }
-                -- If the write filled the buffer completely, we need to flush,
-                -- to maintain the "INVARIANTS on Buffers" from
-                -- GHC.IO.Buffer.checkBuffer: "a write buffer is never full".
-                if (count == size - w)
-                  then do
-                    debugIO "hPutBuf: flushing full buffer after writing"
-                    flushed_buf <- Buffered.flushWriteBuffer haDevice copied_buf
-                            -- TODO: we should do a non-blocking flush here
-                    writeIORef haByteBuffer flushed_buf
-                  else do
-                    writeIORef haByteBuffer copied_buf
-                return count
+  -- Check if we can try to buffer the given chunk of data.
+  b <- if (count < size && count <= size - w)
+        then bufferChunk h_ old_buf ptr count
+        else do
+          -- The given data does not fit into the buffer.
+          -- Either because it's too large for the buffer
+          -- or the buffer is too full. Either way we need
+          -- to flush the buffered data first.
+          flushed_buf <- flushByteWriteBufferGiven h_ old_buf
+          if count < size
+              -- The data is small enough to be buffered.
+              then bufferChunk h_ flushed_buf ptr count
+              else do
+                let offset = bufOffset flushed_buf
+                !bytes <- if can_block
+                            then do writeChunk         h_ (castPtr ptr) offset count
+                            else writeChunkNonBlocking h_ (castPtr ptr) offset count
+                -- Update buffer with actual bytes written.
+                writeIORef haByteBuffer $! bufferAddOffset bytes flushed_buf
+                return bytes
+  debugIO "hPutBuf: done"
+  return b
 
-        -- else, we have to flush any existing handle buffer data
-        -- and can then write out the data in `ptr` directly.
-        else do -- No point flushing when there's nothing in the buffer.
-                when (w > 0) $ do
-                  debugIO "hPutBuf: flushing first"
-                  flushed_buf <- Buffered.flushWriteBuffer haDevice old_buf
-                          -- TODO: we should do a non-blocking flush here
-                  writeIORef haByteBuffer flushed_buf
-                -- if we can fit in the buffer, then just loop
-                if count < size
-                   then bufWrite h_ ptr count can_block
-                   else do
-                      !bytes <- if can_block
-                                  then do writeChunk h_ (castPtr ptr) offset count
-                                          return count
-                                  else writeChunkNonBlocking h_ (castPtr ptr) offset count
-                      -- Even if we bypass the buffer we must update the offset for the buffer
-                      -- for future writes.
-                      !buf <- readIORef haByteBuffer
-                      writeIORef haByteBuffer $! bufferAddOffset bytes buf
-                      return bytes
+-- Flush the given buffer via the handle, return the flushed buffer
+flushByteWriteBufferGiven :: Handle__ -> Buffer Word8 -> IO (Buffer Word8)
+flushByteWriteBufferGiven h_@Handle__{..} bbuf = do
+  if (not (isEmptyBuffer bbuf))
+    then do
+      bbuf' <- Buffered.flushWriteBuffer haDevice bbuf
+      debugIO ("flushByteWriteBufferGiven: bbuf=" ++ summaryBuffer bbuf')
+      writeIORef haByteBuffer bbuf'
+      return bbuf'
+    else
+      return bbuf
 
+-- Fill buffer and return bytes buffered/written.
+-- Flushes buffer if it's full after adding the data.
+bufferChunk :: Handle__ -> Buffer Word8 -> Ptr Word8 -> Int -> IO Int
+bufferChunk h_@Handle__{..} old_buf@Buffer{ bufRaw=raw, bufR=w, bufSize=size } ptr !count = do
+    debugIO ("hPutBuf: copying to buffer, w=" ++ show w)
+    copyToRawBuffer raw w ptr count
+    let copied_buf = old_buf{ bufR = w + count }
+    -- If the write filled the buffer completely, we need to flush,
+    -- to maintain the "INVARIANTS on Buffers" from
+    -- GHC.IO.Buffer.checkBuffer: "a write buffer is never full".
+    if isFullBuffer copied_buf
+      then do
+        -- TODO: we should do a non-blocking flush here
+        debugIO "hPutBuf: flushing full buffer after writing"
+        _ <- flushByteWriteBufferGiven h_ copied_buf
+        return ()
+      else do
+        writeIORef haByteBuffer copied_buf
+    return count
 
-writeChunk :: Handle__ -> Ptr Word8 -> Word64 -> Int -> IO ()
+writeChunk :: Handle__ -> Ptr Word8 -> Word64 -> Int -> IO Int
 writeChunk h_@Handle__{..} ptr offset bytes
-  = RawIO.write haDevice ptr offset bytes
+  = do RawIO.write haDevice ptr offset bytes
+       return bytes
 
 writeChunkNonBlocking :: Handle__ -> Ptr Word8 -> Word64 -> Int -> IO Int
 writeChunkNonBlocking h_@Handle__{..} ptr offset bytes
