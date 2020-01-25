@@ -1,4 +1,5 @@
 #!/usr/bin/env bash
+# shellcheck disable=SC2230
 
 # This is the primary driver of the GitLab CI infrastructure.
 
@@ -78,6 +79,7 @@ function mingw_init() {
   # Bring mingw toolchain into PATH.
   # This is extracted from /etc/profile since this script inexplicably fails to
   # run under gitlab-runner.
+  # shellcheck disable=SC1091
   source /etc/msystem
   MINGW_MOUNT_POINT="${MINGW_PREFIX}"
   PATH="$MINGW_MOUNT_POINT/bin:$PATH"
@@ -85,14 +87,16 @@ function mingw_init() {
 
 # This will contain GHC's local native toolchain
 toolchain="$TOP/toolchain"
-mkdir -p $toolchain/bin
+mkdir -p "$toolchain/bin"
 PATH="$toolchain/bin:$PATH"
 
 export METRICS_FILE="$CI_PROJECT_DIR/performance-metrics.tsv"
 
+cores="$(mk/detect-cpu-count.sh)"
+
 # Use a local temporary directory to ensure that concurrent builds don't
 # interfere with one another
-mkdir -p $TOP/tmp
+mkdir -p "$TOP/tmp"
 export TMP="$TOP/tmp"
 export TEMP="$TOP/tmp"
 
@@ -122,16 +126,20 @@ function set_toolchain_paths() {
 
   if [[ -n "$needs_toolchain" ]]; then
       # These are populated by setup_toolchain
-      export GHC="$toolchain/bin/ghc$exe"
-      export CABAL="$toolchain/bin/cabal$exe"
-      export HAPPY="$toolchain/bin/happy$exe"
-      export ALEX="$toolchain/bin/alex$exe"
+      GHC="$toolchain/bin/ghc$exe"
+      CABAL="$toolchain/bin/cabal$exe"
+      HAPPY="$toolchain/bin/happy$exe"
+      ALEX="$toolchain/bin/alex$exe"
   else
-      export GHC="$(which ghc)"
-      export CABAL="/usr/local/bin/cabal"
-      export HAPPY="$HOME/.cabal/bin/happy"
-      export ALEX="$HOME/.cabal/bin/alex"
+      GHC="$(which ghc)"
+      CABAL="/usr/local/bin/cabal"
+      HAPPY="$HOME/.cabal/bin/happy"
+      ALEX="$HOME/.cabal/bin/alex"
   fi
+  export GHC
+  export CABAL
+  export HAPPY
+  export ALEX
 
   # FIXME: Temporarily use ghc from ports
   case "$(uname)" in
@@ -144,7 +152,7 @@ function set_toolchain_paths() {
 function setup() {
   if [ -d "$TOP/cabal-cache" ]; then
       info "Extracting cabal cache..."
-      cp -Rf cabal-cache $cabal_dir
+      cp -Rf cabal-cache "$cabal_dir"
   fi
 
   if [[ -n "$needs_toolchain" ]]; then
@@ -178,20 +186,20 @@ function fetch_ghc() {
       start_section "fetch GHC"
       url="https://downloads.haskell.org/~ghc/${GHC_VERSION}/ghc-${GHC_VERSION}-${boot_triple}.tar.xz"
       info "Fetching GHC binary distribution from $url..."
-      curl $url > ghc.tar.xz || fail "failed to fetch GHC binary distribution"
+      curl "$url" > ghc.tar.xz || fail "failed to fetch GHC binary distribution"
       tar -xJf ghc.tar.xz || fail "failed to extract GHC binary distribution"
       case "$(uname)" in
         MSYS_*|MINGW*)
-          cp -r ghc-${GHC_VERSION}/* $toolchain
+          cp -r "ghc-${GHC_VERSION}"/* "$toolchain"
           ;;
         *)
-          pushd ghc-${GHC_VERSION}
-          ./configure --prefix=$toolchain
-          $MAKE install
+          pushd "ghc-${GHC_VERSION}"
+          ./configure --prefix="$toolchain"
+          "$MAKE" install
           popd
           ;;
       esac
-      rm -Rf ghc-${GHC_VERSION} ghc.tar.xz
+      rm -Rf "ghc-${GHC_VERSION}" ghc.tar.xz
       end_section "fetch GHC"
   fi
 
@@ -215,9 +223,9 @@ function fetch_cabal() {
           esac
           url="https://downloads.haskell.org/~cabal/cabal-install-$v/cabal-install-$v-$cabal_arch-unknown-mingw32.zip"
           info "Fetching cabal binary distribution from $url..."
-          curl $url > $TMP/cabal.zip
-          unzip $TMP/cabal.zip
-          mv cabal.exe $CABAL
+          curl "$url" > "$TMP/cabal.zip"
+          unzip "$TMP/cabal.zip"
+          mv cabal.exe "$CABAL"
           ;;
         *)
           local base_url="https://downloads.haskell.org/~cabal/cabal-install-$v/"
@@ -229,9 +237,9 @@ function fetch_cabal() {
             *) fail "don't know where to fetch cabal-install for $(uname)"
           esac
           echo "Fetching cabal-install from $cabal_url"
-          curl $cabal_url > cabal.tar.xz
+          curl "$cabal_url" > cabal.tar.xz
           tar -xJf cabal.tar.xz
-          mv cabal $toolchain/bin
+          mv cabal "$toolchain/bin"
           ;;
       esac
       end_section "fetch GHC"
@@ -318,14 +326,19 @@ function configure() {
   run python3 boot
   end_section "booting"
 
+  local target_args=""
+  if [[ -n "$triple" ]]; then
+    target_args="--target=$triple"
+  fi
+
   start_section "configuring"
   run ./configure \
     --enable-tarballs-autodownload \
-    --target=$triple \
+    $target_args \
     $CONFIGURE_ARGS \
-    GHC=$GHC \
-    HAPPY=$HAPPY \
-    ALEX=$ALEX \
+    GHC="$GHC" \
+    HAPPY="$HAPPY" \
+    ALEX="$ALEX" \
     || ( cat config.log; fail "configure failed" )
   end_section "configuring"
 }
@@ -338,25 +351,25 @@ function build_make() {
 
   echo "include mk/flavours/${BUILD_FLAVOUR}.mk" > mk/build.mk
   echo 'GhcLibHcOpts+=-haddock' >> mk/build.mk
-  run $MAKE -j$(mk/detect-cpu-count.sh) $MAKE_ARGS
-  run $MAKE -j$(mk/detect-cpu-count.sh) binary-dist-prep TAR_COMP_OPTS=-1
-  ls -lh $BIN_DIST_PREP_TAR_COMP
+  run "$MAKE" -j"$cores" $MAKE_ARGS
+  run "$MAKE" -j"$cores" binary-dist-prep TAR_COMP_OPTS=-1
+  ls -lh "$BIN_DIST_PREP_TAR_COMP"
 }
 
 function fetch_perf_notes() {
   info "Fetching perf notes..."
-  $TOP/.gitlab/test-metrics.sh pull
+  "$TOP/.gitlab/test-metrics.sh" pull
 }
 
 function push_perf_notes() {
   info "Pushing perf notes..."
-  $TOP/.gitlab/test-metrics.sh push
+  "$TOP/.gitlab/test-metrics.sh" push
 }
 
 function test_make() {
-  run $MAKE test_bindist TEST_PREP=YES
-  run $MAKE V=0 test \
-    THREADS=$(mk/detect-cpu-count.sh) \
+  run "$MAKE" test_bindist TEST_PREP=YES
+  run "$MAKE" V=0 test \
+    THREADS="$cores" \
     JUNIT_FILE=../../junit.xml
 }
 
@@ -366,8 +379,8 @@ function build_hadrian() {
   fi
 
   run hadrian/build.cabal.sh \
-    --flavour=$FLAVOUR \
-    -j$(mk/detect-cpu-count.sh) \
+    --flavour="$FLAVOUR" \
+    -j"$cores" \
     $HADRIAN_ARGS \
     binary-dist
 
@@ -376,22 +389,22 @@ function build_hadrian() {
 
 function test_hadrian() {
   cd _build/bindist/ghc-*/
-  run ./configure --prefix=$TOP/_build/install
-  run $MAKE install
+  run ./configure --prefix="$TOP"/_build/install
+  run "$MAKE" install
   cd ../../../
 
   run hadrian/build.cabal.sh \
-    --flavour=$FLAVOUR \
-    -j$(mk/detect-cpu-count.sh) \
+    --flavour="$FLAVOUR" \
+    -j"$cores" \
     $HADRIAN_ARGS \
     test \
     --summary-junit=./junit.xml \
-    --test-compiler=$TOP/_build/install/bin/ghc
+    --test-compiler="$TOP"/_build/install/bin/ghc
 }
 
 function clean() {
   rm -R tmp
-  run $MAKE --quiet clean || true
+  run "$MAKE" --quiet clean || true
   run rm -Rf _build
 }
 
