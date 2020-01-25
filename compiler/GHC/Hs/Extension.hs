@@ -663,6 +663,7 @@ type family XListPat   x
 type family XTuplePat  x
 type family XSumPat    x
 type family XConPat    x
+type family XConPatCon x
 type family XViewPat   x
 type family XSplicePat x
 type family XLitPat    x

@@ -116,7 +116,10 @@ user-written. This lets us relate Names (from ClsInsts) to comments
 (associated with InstDecls and DerivDecls).
 -}
 
-getMainDeclBinder :: HsDecl (GhcPass p) -> [IdP (GhcPass p)]
+getMainDeclBinder
+  :: IsPass p
+  => HsDecl (GhcPass p)
+  -> [IdP (GhcPass p)]
 getMainDeclBinder (TyClD _ d) = [tcdName d]
 getMainDeclBinder (ValD _ d) =
   case collectHsBindBinders d of

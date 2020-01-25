@@ -117,15 +117,16 @@ hsPatType (ListPat (ListPatTc _ (Just (ty,_))) _) = ty
 hsPatType (TuplePat tys _ bx)           = mkTupleTy1 bx tys
                   -- See Note [Don't flatten tuples from HsSyn] in MkCore
 hsPatType (SumPat tys _ _ _ )           = mkSumTy tys
-hsPatType (ConPatOut { pat_con = lcon
-                     , pat_arg_tys = tys })
+hsPatType (ConPat { pat_con = lcon
+                  , pat_con_ext = ConPatTc
+                    { pat_arg_tys = tys
+                    }
+                  })
                                         = conLikeResTy (unLoc lcon) tys
 hsPatType (SigPat ty _ _)               = ty
 hsPatType (NPat ty _ _ _)               = ty
 hsPatType (NPlusKPat ty _ _ _ _ _)      = ty
-hsPatType (CoPat _ _ _ ty)              = ty
-hsPatType (XPat n)                      = noExtCon n
-hsPatType ConPatIn{}                    = panic "hsPatType: ConPatIn"
+hsPatType (XPat (CoPat _ _ ty))         = ty
 hsPatType SplicePat{}                   = panic "hsPatType: SplicePat"
 
 hsLitType :: HsLit (GhcPass p) -> TcType
@@ -1372,13 +1373,16 @@ zonk_pat env (SumPat tys pat alt arity )
         ; (env', pat') <- zonkPat env pat
         ; return (env', SumPat tys' pat' alt arity) }
 
-zonk_pat env p@(ConPatOut { pat_arg_tys = tys
-                          , pat_tvs = tyvars
-                          , pat_dicts = evs
-                          , pat_binds = binds
-                          , pat_args = args
-                          , pat_wrap = wrapper
-                          , pat_con = L _ con })
+zonk_pat env p@(ConPat { pat_con = L _ con
+                       , pat_args = args
+                       , pat_con_ext = p'@(ConPatTc
+                         { pat_tvs = tyvars
+                         , pat_dicts = evs
+                         , pat_binds = binds
+                         , pat_wrap = wrapper
+                         , pat_arg_tys = tys
+                         })
+                       })
   = ASSERT( all isImmutableTyVar tyvars )
     do  { new_tys <- mapM (zonkTcTypeToTypeX env) tys
 
@@ -1398,12 +1402,19 @@ zonk_pat env p@(ConPatOut { pat_arg_tys = tys
         ; (env2, new_binds) <- zonkTcEvBinds env1 binds
         ; (env3, new_wrapper) <- zonkCoFn env2 wrapper
         ; (env', new_args) <- zonkConStuff env3 args
-        ; return (env', p { pat_arg_tys = new_tys,
-                            pat_tvs = new_tyvars,
-                            pat_dicts = new_evs,
-                            pat_binds = new_binds,
-                            pat_args = new_args,
-                            pat_wrap = new_wrapper}) }
+        ; pure ( env'
+               , p
+                 { pat_args = new_args
+                 , pat_con_ext = p'
+                   { pat_arg_tys = new_tys
+                   , pat_tvs = new_tyvars
+                   , pat_dicts = new_evs
+                   , pat_binds = new_binds
+                   , pat_wrap = new_wrapper
+                   }
+                 }
+               )
+        }
   where
     doc = text "In the type of an element of an unboxed tuple pattern:" $$ ppr p
 
@@ -1434,11 +1445,12 @@ zonk_pat env (NPlusKPat ty (L loc n) (L l lit1) lit2 e1 e2)
         ; return (extendIdZonkEnv env2 n',
                   NPlusKPat ty' (L loc n') (L l lit1') lit2' e1' e2') }
 
-zonk_pat env (CoPat x co_fn pat ty)
+zonk_pat env (XPat (CoPat co_fn pat ty))
   = do { (env', co_fn') <- zonkCoFn env co_fn
        ; (env'', pat') <- zonkPat env' (noLoc pat)
        ; ty' <- zonkTcTypeToTypeX env'' ty
-       ; return (env'', CoPat x co_fn' (unLoc pat') ty') }
+       ; return (env'', XPat $ CoPat co_fn' (unLoc pat') ty')
+       }
 
 zonk_pat _ pat = pprPanic "zonk_pat" (ppr pat)
 

@@ -942,7 +942,7 @@ tcPatToExpr name args pat = go pat
     go (L loc p) = L loc <$> go1 p
 
     go1 :: Pat GhcRn -> Either MsgDoc (HsExpr GhcRn)
-    go1 (ConPatIn con info)
+    go1 (ConPat con info NoExtField)
       = case info of
           PrefixCon ps  -> mkPrefixConExpr con ps
           InfixCon l r  -> mkPrefixConExpr con [l,r]
@@ -975,8 +975,6 @@ tcPatToExpr name args pat = go pat
                                     = return $ unLoc $ foldl' nlHsApp (noLoc neg)
                                                        [noLoc (HsOverLit noExtField n)]
         | otherwise                 = return $ HsOverLit noExtField n
-    go1 (ConPatOut{})               = panic "ConPatOut in output of renamer"
-    go1 (CoPat{})                   = panic "CoPat in output of renamer"
     go1 (SplicePat _ (HsSpliced _ _ (HsSplicedPat pat)))
                                     = go1 pat
     go1 (SplicePat _ (HsSpliced{})) = panic "Invalid splice variety"
@@ -1129,10 +1127,11 @@ tcCollectEx pat = go pat
     go1 (TuplePat _ ps _)  = mergeMany . map go $ ps
     go1 (SumPat _ p _ _)   = go p
     go1 (ViewPat _ _ p)    = go p
-    go1 con@ConPatOut{}    = merge (pat_tvs con, pat_dicts con) $
+    go1 con@ConPat{ pat_con_ext = con' }
+                           = merge (pat_tvs con', pat_dicts con') $
                               goConDetails $ pat_args con
     go1 (SigPat _ p _)     = go p
-    go1 (CoPat _ _ p _)    = go1 p
+    go1 (XPat (CoPat _ p _)) = go1 p
     go1 (NPlusKPat _ n k _ geq subtract)
       = pprPanic "TODO: NPlusKPat" $ ppr n $$ ppr k $$ ppr geq $$ ppr subtract
     go1 _                   = empty

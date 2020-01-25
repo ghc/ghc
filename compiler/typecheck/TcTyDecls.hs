@@ -896,7 +896,7 @@ mkOneRecordSelector all_cons idDetails fl
     mk_match con = mkSimpleMatch (mkPrefixFunRhs sel_lname)
                                  [L loc (mk_sel_pat con)]
                                  (L loc (HsVar noExtField (L loc field_var)))
-    mk_sel_pat con = ConPatIn (L loc (getName con)) (RecCon rec_fields)
+    mk_sel_pat con = ConPat (L loc (getName con)) (RecCon rec_fields) NoExtField
     rec_fields = HsRecFields { rec_flds = [rec_field], rec_dotdot = Nothing }
     rec_field  = noLoc (HsRecField
                         { hsRecFieldLbl

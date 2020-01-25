@@ -12,6 +12,7 @@ free variables.
 
 {-# LANGUAGE CPP #-}
 {-# LANGUAGE ScopedTypeVariables #-}
+{-# LANGUAGE FlexibleContexts #-}
 {-# LANGUAGE MultiWayIf #-}
 {-# LANGUAGE TypeFamilies #-}
 {-# LANGUAGE ViewPatterns #-}
@@ -1846,8 +1847,7 @@ isStrictPattern lpat =
     ListPat{}       -> True
     TuplePat{}      -> True
     SumPat{}        -> True
-    ConPatIn{}      -> True
-    ConPatOut{}     -> True
+    ConPat{}        -> True
     LitPat{}        -> True
     NPat{}          -> True
     NPlusKPat{}     -> True

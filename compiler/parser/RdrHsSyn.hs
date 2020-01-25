@@ -602,7 +602,7 @@ mkPatSynMatchGroup (L loc patsyn_name) (L _ decls) =
        ; return $ mkMatchGroup FromSource matches }
   where
     fromDecl (L loc decl@(ValD _ (PatBind _
-                         pat@(L _ (ConPatIn ln@(L _ name) details))
+                         pat@(L _ (ConPat ln@(L _ name) details NoExtField))
                                rhs _))) =
         do { unless (name == patsyn_name) $
                wrongNameBindingErr loc decl
@@ -1076,7 +1076,7 @@ checkLPat e@(L l _) = checkPat l e []
 checkPat :: SrcSpan -> Located (PatBuilder GhcPs) -> [LPat GhcPs]
          -> PV (LPat GhcPs)
 checkPat loc (L l e@(PatBuilderVar (L _ c))) args
-  | isRdrDataCon c = return (L loc (ConPatIn (L l c) (PrefixCon args)))
+  | isRdrDataCon c = return (L loc (ConPat (L l c) (PrefixCon args) NoExtField))
   | not (null args) && patIsRec c =
       localPV_msg (\_ -> text "Perhaps you intended to use RecursiveDo") $
       patFail l (ppr e)
@@ -1113,7 +1113,7 @@ checkAPat loc e0 = do
      | isRdrDataCon c -> do
          l <- checkLPat l
          r <- checkLPat r
-         return (ConPatIn (L cl c) (InfixCon l r))
+         return (ConPat (L cl c) (InfixCon l r) NoExtField)
 
    PatBuilderPar e    -> checkLPat e >>= (return . (ParPat noExtField))
    _           -> patFail loc (ppr e0)
@@ -2064,7 +2064,7 @@ mkPatRec ::
 mkPatRec (unLoc -> PatBuilderVar c) (HsRecFields fs dd)
   | isRdrDataCon (unLoc c)
   = do fs <- mapM checkPatField fs
-       return (PatBuilderPat (ConPatIn c (RecCon (HsRecFields fs dd))))
+       return $ PatBuilderPat $ ConPat c (RecCon (HsRecFields fs dd)) NoExtField
 mkPatRec p _ =
   addFatalError (getLoc p) $ text "Not a record constructor:" <+> ppr p
 

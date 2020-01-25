@@ -533,9 +533,11 @@ unliftedCompare lt_op eq_op a_expr b_expr lt eq gt
 
 nlConWildPat :: DataCon -> LPat GhcPs
 -- The pattern (K {})
-nlConWildPat con = noLoc (ConPatIn (noLoc (getRdrName con))
-                                   (RecCon (HsRecFields { rec_flds = []
-                                                        , rec_dotdot = Nothing })))
+nlConWildPat con = noLoc $ ConPat
+  (noLoc $ getRdrName con)
+  (RecCon $ HsRecFields { rec_flds = []
+                        , rec_dotdot = Nothing })
+  NoExtField
 
 {-
 ************************************************************************
