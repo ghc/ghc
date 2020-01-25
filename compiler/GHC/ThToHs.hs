@@ -46,6 +46,9 @@ import Outputable
 import MonadUtils ( foldrM )
 
 import qualified Data.ByteString as BS
+import Data.List.NonEmpty (NonEmpty (..))
+import qualified Data.List.NonEmpty as NEL
+import Data.Traversable (for)
 import Control.Monad( unless, ap )
 
 import Data.Maybe( catMaybes, isNothing )
@@ -151,33 +154,35 @@ cvtDecs :: [TH.Dec] -> CvtM [LHsDecl GhcPs]
 cvtDecs = fmap catMaybes . mapM cvtDec
 
 cvtDec :: TH.Dec -> CvtM (Maybe (LHsDecl GhcPs))
-cvtDec (TH.ValD pat body ds)
-  | TH.VarP s <- pat
-  = do  { s' <- vNameL s
-        ; cl' <- cvtClause (mkPrefixFunRhs s') (Clause [] body ds)
-        ; th_origin <- getOrigin
-        ; returnJustL $ Hs.ValD noExtField $ mkFunBind th_origin s' [cl'] }
+cvtDec (TH.ValD pat body ds) = do
+  pat' <- cvtPat pat
+  body' <- cvtRHS body ds
+  returnJustL $ Hs.ValD noExtField $
+    PatBind { pat_lhs = pat'
+            , pat_rhs = body'
+            , pat_ext = noExtField
+            , pat_ticks = ([],[])
+            }
 
-  | otherwise
-  = do  { pat' <- cvtPat pat
-        ; body' <- cvtGuard body
-        ; ds' <- cvtLocalDecs (text "a where clause") ds
-        ; returnJustL $ Hs.ValD noExtField $
-          PatBind { pat_lhs = pat'
-                  , pat_rhs = GRHSs noExtField body' (noLoc ds')
-                  , pat_ext = noExtField
-                  , pat_ticks = ([],[]) } }
-
-cvtDec (TH.FunD nm cls)
-  | null cls
-  = failWith (text "Function binding for"
-                 <+> quotes (text (TH.pprint nm))
-                 <+> text "has no equations")
-  | otherwise
-  = do  { nm' <- vNameL nm
-        ; cls' <- mapM (cvtClause (mkPrefixFunRhs nm')) cls
-        ; th_origin <- getOrigin
-        ; returnJustL $ Hs.ValD noExtField $ mkFunBind th_origin nm' cls' }
+cvtDec (TH.FunD nm cls) = case cls of
+  [] -> failWith $ text "Function binding for"
+        <+> quotes (text (TH.pprint nm))
+        <+> text "has no equations"
+  [(Clause [] body wheres)] -> cvtDec $ TH.ValD (TH.VarP nm) body wheres
+  _ -> case
+      for cls $ \(Clause ps body wheres) -> (,,) body wheres <$> NEL.nonEmpty ps
+    of
+      Just trueFunCls -> do
+        nm' <- vNameL nm
+        cls' <- for trueFunCls $ \(body, wheres, ps) -> do
+          ps' <- cvtPats ps
+          let pps = fmap (parenthesizePat appPrec) ps'
+          rhs <- cvtRHS body wheres
+          returnL $ Hs.Match noExtField (mkPrefixFunRhs nm') pps rhs
+        th_origin <- getOrigin
+        returnJustL $ Hs.ValD noExtField $ mkFunBind th_origin nm' cls'
+      Nothing -> failWith $ text "Mixes pattern and function binding for"
+        <+> quotes (text (TH.pprint nm)) <> text "."
 
 cvtDec (TH.SigD nm typ)
   = do  { nm' <- vNameL nm
@@ -850,14 +855,22 @@ cvtLocalDecs doc ds
       ((_:_), (_:_)) ->
         failWith (text "Implicit parameters mixed with other bindings")
 
+cvtWhereClause :: [Dec] -> CvtM (HsLocalBinds GhcPs)
+cvtWhereClause = cvtLocalDecs (text "a where clause")
+
+cvtRHS :: TH.Body -> [Dec] -> CvtM (GRHSs GhcPs (LHsExpr GhcPs))
+cvtRHS body wheres = do
+  g'  <- cvtGuard body
+  ds' <- cvtWhereClause wheres
+  pure $ GRHSs noExtField g' $ noLoc ds'
+
 cvtClause :: HsMatchContext RdrName
-          -> TH.Clause -> CvtM (Hs.LMatch GhcPs (LHsExpr GhcPs))
-cvtClause ctxt (Clause ps body wheres)
-  = do  { ps' <- cvtPats ps
-        ; let pps = map (parenthesizePat appPrec) ps'
-        ; g'  <- cvtGuard body
-        ; ds' <- cvtLocalDecs (text "a where clause") wheres
-        ; returnL $ Hs.Match noExtField ctxt pps (GRHSs noExtField g' (noLoc ds')) }
+          -> TH.Clause -> CvtM (Hs.LMatch0 GhcPs (LHsExpr GhcPs))
+cvtClause ctxt (Clause ps body wheres) = do
+  ps' <- cvtPats ps
+  let pps = map (parenthesizePat appPrec) ps'
+  rhs <- cvtRHS body wheres
+  returnL $ Hs.Match noExtField ctxt pps rhs
 
 cvtImplicitParamBind :: String -> TH.Exp -> CvtM (LIPBind GhcPs)
 cvtImplicitParamBind n e = do
@@ -903,8 +916,11 @@ cvtl e = wrapL (cvt e)
                                -- own expression to avoid pretty-printing
                                -- oddities that can result from zero-argument
                                -- lambda expressions. See #13856.
-    cvt (LamE ps e)    = do { ps' <- cvtPats ps; e' <- cvtl e
-                            ; let pats = map (parenthesizePat appPrec) ps'
+    cvt (LamE ps e)    = do { ps' <- case ps of
+                                [] -> failWith $ text "Lambda expression with no arguments"
+                                pp : pps -> cvtPats $ pp :| pps
+                            ; e' <- cvtl e
+                            ; let pats = parenthesizePat appPrec <$> ps'
                             ; th_origin <- getOrigin
                             ; return $ HsLam noExtField (mkMatchGroup th_origin
                                              [mkSimpleMatch LambdaExpr
@@ -1162,10 +1178,10 @@ cvtMatch ctxt (TH.Match p body decs)
   = do  { p' <- cvtPat p
         ; let lp = case p' of
                      (L loc SigPat{}) -> L loc (ParPat noExtField p') -- #14875
-                     _                -> p'
-        ; g' <- cvtGuard body
-        ; decs' <- cvtLocalDecs (text "a where clause") decs
-        ; returnL $ Hs.Match noExtField ctxt [lp] (GRHSs noExtField g' (noLoc decs')) }
+                     _                    -> p'
+        ; rhs <- cvtRHS body decs
+        ; returnL $ Hs.Match noExtField ctxt (lp :| []) rhs
+        }
 
 cvtGuard :: TH.Body -> CvtM [LGRHS GhcPs (LHsExpr GhcPs)]
 cvtGuard (GuardedB pairs) = mapM cvtpair pairs
@@ -1242,7 +1258,7 @@ cvtLit _ = panic "Convert.cvtLit: Unexpected literal"
 quotedSourceText :: String -> SourceText
 quotedSourceText s = SourceText $ "\"" ++ s ++ "\""
 
-cvtPats :: [TH.Pat] -> CvtM [Hs.LPat GhcPs]
+cvtPats :: Traversable t => t TH.Pat -> CvtM (t (Hs.LPat GhcPs))
 cvtPats pats = mapM cvtPat pats
 
 cvtPat :: TH.Pat -> CvtM (Hs.LPat GhcPs)

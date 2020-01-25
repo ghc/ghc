@@ -111,7 +111,6 @@ import CoAxiom          ( Role, fsFromRole )
 import RdrName
 import Name
 import BasicTypes
-import TcEvidence       ( idHsWrapper )
 import Lexer
 import Lexeme           ( isLexCon )
 import Type             ( TyThing(..), funTyCon )
@@ -137,6 +136,7 @@ import ErrUtils ( Messages )
 import Control.Monad
 import Text.ParserCombinators.ReadP as ReadP
 import Data.Char
+import Data.List.NonEmpty (NonEmpty (..))
 import qualified Data.Monoid as Monoid
 import Data.Data       ( dataTypeOf, fromConstr, dataTypeConstrs )
 
@@ -596,7 +596,7 @@ tyConToDataCon loc tc
 
 mkPatSynMatchGroup :: Located RdrName
                    -> Located (OrdList (LHsDecl GhcPs))
-                   -> P (MatchGroup GhcPs (LHsExpr GhcPs))
+                   -> P (MatchGroup0 GhcPs (LHsExpr GhcPs))
 mkPatSynMatchGroup (L loc patsyn_name) (L _ decls) =
     do { matches <- mapM fromDecl (fromOL decls)
        ; when (null matches) (wrongNumberErr loc)
@@ -609,12 +609,14 @@ mkPatSynMatchGroup (L loc patsyn_name) (L _ decls) =
                wrongNameBindingErr loc decl
            ; match <- case details of
                PrefixCon pats -> return $ Match { m_ext = noExtField
-                                                , m_ctxt = ctxt, m_pats = pats
-                                                , m_grhss = rhs }
+                                                , m_ctxt = ctxt
+                                                , m_pats = pats
+                                                , m_grhss = rhs
+                                                }
                    where
                      ctxt = FunRhs { mc_fun = ln
                                    , mc_fixity = Prefix
-                                   , mc_strictness = NoSrcStrict }
+                                   }
 
                InfixCon p1 p2 -> return $ Match { m_ext = noExtField
                                                 , m_ctxt = ctxt
@@ -623,7 +625,7 @@ mkPatSynMatchGroup (L loc patsyn_name) (L _ decls) =
                    where
                      ctxt = FunRhs { mc_fun = ln
                                    , mc_fixity = Infix
-                                   , mc_strictness = NoSrcStrict }
+                                   }
 
                RecCon{} -> recordPatSynErr loc pat
            ; return $ L loc match }
@@ -1157,21 +1159,20 @@ checkValDef lhs Nothing g@(L l (_,grhss))
   = do  { mb_fun <- isFunLhs lhs
         ; case mb_fun of
             Just (fun, is_infix, pats, ann) ->
-              checkFunBind NoSrcStrict ann (getLoc lhs)
+              checkFunBind ann (getLoc lhs)
                            fun is_infix pats (L l grhss)
             Nothing -> do
               lhs' <- checkPattern lhs
               checkPatBind lhs' g }
 
-checkFunBind :: SrcStrictness
-             -> [AddAnn]
+checkFunBind :: [AddAnn]
              -> SrcSpan
              -> Located RdrName
              -> LexicalFixity
-             -> [Located (PatBuilder GhcPs)]
+             -> NonEmpty (Located (PatBuilder GhcPs))
              -> Located (GRHSs GhcPs (LHsExpr GhcPs))
              -> P ([AddAnn],HsBind GhcPs)
-checkFunBind strictness ann lhs_loc fun is_infix pats (L rhs_span grhss)
+checkFunBind ann lhs_loc fun is_infix pats (L rhs_span grhss)
   = do  ps <- mapM checkPattern pats
         let match_span = combineSrcSpans lhs_loc rhs_span
         -- Add back the annotations stripped from any HsPar values in the lhs
@@ -1181,7 +1182,7 @@ checkFunBind strictness ann lhs_loc fun is_infix pats (L rhs_span grhss)
                                        , m_ctxt = FunRhs
                                            { mc_fun    = fun
                                            , mc_fixity = is_infix
-                                           , mc_strictness = strictness }
+                                           }
                                        , m_pats = ps
                                        , m_grhss = grhss })])
         -- The span of the match covers the entire equation.
@@ -1189,29 +1190,16 @@ checkFunBind strictness ann lhs_loc fun is_infix pats (L rhs_span grhss)
 
 makeFunBind :: Located RdrName -> [LMatch GhcPs (LHsExpr GhcPs)]
             -> HsBind GhcPs
--- Like GHC.Hs.Utils.mkFunBind, but we need to be able to set the fixity too
-makeFunBind fn ms
-  = FunBind { fun_ext = noExtField,
-              fun_id = fn,
-              fun_matches = mkMatchGroup FromSource ms,
-              fun_co_fn = idHsWrapper,
-              fun_tick = [] }
+makeFunBind fn ms = mkFunBind FromSource fn ms
 
 -- See Note [FunBind vs PatBind]
 checkPatBind :: LPat GhcPs
              -> Located (a,GRHSs GhcPs (LHsExpr GhcPs))
              -> P ([AddAnn],HsBind GhcPs)
-checkPatBind lhs (L match_span (_,grhss))
+checkPatBind lhs (L _ (_,grhss)) -- TODO use loc?
     | BangPat _ p <- unLoc lhs
     , VarPat _ v <- unLoc p
-    = return ([], makeFunBind v [L match_span (m v)])
-  where
-    m v = Match { m_ext = noExtField
-                , m_ctxt = FunRhs { mc_fun    = L (getLoc lhs) (unLoc v)
-                                  , mc_fixity = Prefix
-                                  , mc_strictness = SrcStrict }
-                , m_pats = []
-                , m_grhss = grhss }
+    = return ([], mkHsVarBind0' v grhss)
 
 checkPatBind lhs (L _ (_,grhss))
   = return ([],PatBind noExtField lhs grhss ([],[]))
@@ -1267,23 +1255,27 @@ checkDoAndIfThenElse guardExpr semiThen thenExpr semiElse elseExpr
                  text "else" <+> ppr elseExpr
 
 isFunLhs :: Located (PatBuilder GhcPs)
-      -> P (Maybe (Located RdrName, LexicalFixity, [Located (PatBuilder GhcPs)],[AddAnn]))
+      -> P (Maybe (Located RdrName, LexicalFixity, NonEmpty (Located (PatBuilder GhcPs)),[AddAnn]))
 -- A variable binding is parsed as a FunBind.
 -- Just (fun, is_infix, arg_pats) if e is a function LHS
 isFunLhs e = go e [] []
  where
    go (L loc (PatBuilderVar (L _ f))) es ann
-       | not (isRdrDataCon f)        = return (Just (L loc f, Prefix, es, ann))
+       | e : es <- es
+       , not (isRdrDataCon f)
+       = return (Just (L loc f, Prefix, e :| es, ann))
+       | otherwise
+       = return Nothing
    go (L _ (PatBuilderApp f e)) es       ann = go f (e:es) ann
    go (L l (PatBuilderPar e))   es@(_:_) ann = go e es (ann ++ mkParensApiAnn l)
    go (L loc (PatBuilderOpApp l (L loc' op) r)) es ann
         | not (isRdrDataCon op)         -- We have found the function!
-        = return (Just (L loc' op, Infix, (l:r:es), ann))
+        = return (Just (L loc' op, Infix, (l :| r : es), ann))
         | otherwise                     -- Infix data con; keep going
         = do { mb_l <- go l es ann
              ; case mb_l of
-                 Just (op', Infix, j : k : es', ann')
-                   -> return (Just (op', Infix, j : op_app : es', ann'))
+                 Just (op', Infix, j :| k : es', ann')
+                   -> return (Just (op', Infix, j :| op_app : es', ann'))
                    where
                      op_app = L loc (PatBuilderOpApp k
                                (L loc' op) r)

@@ -15,6 +15,7 @@ free variables.
 {-# LANGUAGE MultiWayIf #-}
 {-# LANGUAGE TypeFamilies #-}
 {-# LANGUAGE ViewPatterns #-}
+{-# LANGUAGE TypeApplications #-}
 
 module GHC.Rename.Expr (
         rnLExpr, rnExpr, rnStmts
@@ -62,6 +63,7 @@ import qualified GHC.LanguageExtensions as LangExt
 
 import Data.Ord
 import Data.Array
+import Data.List.NonEmpty (NonEmpty)
 import qualified Data.List.NonEmpty as NE
 
 import Unique           ( mkVarOccUnique )
@@ -560,7 +562,7 @@ methodNamesMatch (MG { mg_alts = L _ ms })
  where
     do_one (L _ (Match { m_grhss = grhss })) = methodNamesGRHSs grhss
     do_one (L _ (XMatch nec)) = noExtCon nec
-methodNamesMatch (XMatchGroup nec) = noExtCon nec
+methodNamesMatch (XMatchGroup nec) = noExtCon1 nec
 
 -------------------------------------------------
 -- gaw 2004
@@ -2203,7 +2205,7 @@ getMonadFailOp
                       (nlHsApp (noLoc $ syn_expr fromStringExpr)
                                 (noLoc $ syn_expr arg_syn_expr))
         let failAfterFromStringExpr :: HsExpr GhcRn =
-              unLoc $ mkHsLam [noLoc $ VarPat noExtField $ noLoc arg_name] body
+              unLoc $ mkHsLam (pure @NonEmpty $ noLoc $ VarPat noExtField $ noLoc arg_name) body
         let failAfterFromStringSynExpr :: SyntaxExpr GhcRn =
               mkSyntaxExpr failAfterFromStringExpr
         return (failAfterFromStringSynExpr, failFvs `plusFV` fromStringFvs)

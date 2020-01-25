@@ -2066,12 +2066,10 @@ tcUserStmt (L loc (BodyStmt _ expr _ _))
         ; uniq <- newUnique
         ; interPrintName <- getInteractivePrintName
         ; let fresh_it  = itName uniq loc
-              matches   = [mkMatch (mkPrefixFunRhs (L loc fresh_it)) [] rn_expr
-                                   (noLoc emptyLocalBinds)]
               -- [it = expr]
-              the_bind  = L loc $ (mkTopFunBind FromSource
-                                     (L loc fresh_it) matches)
-                                         { fun_ext = fvs }
+              the_bind  = L loc $
+                (mkTopHsVarBind0 (L loc fresh_it) rn_expr)
+                { pat_ext = fvs }
               -- Care here!  In GHCi the expression might have
               -- free variables, and they in turn may have free type variables
               -- (if we are at a breakpoint, say).  We must put those free vars

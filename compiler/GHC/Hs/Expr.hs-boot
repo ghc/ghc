@@ -10,6 +10,9 @@
 
 module GHC.Hs.Expr where
 
+import Data.Foldable (Foldable)
+import Data.List.NonEmpty (NonEmpty)
+
 import SrcLoc     ( Located )
 import Outputable ( SDoc, Outputable )
 import {-# SOURCE #-} GHC.Hs.Pat  ( LPat )
@@ -18,14 +21,17 @@ import GHC.Hs.Extension ( OutputableBndrId, GhcPass )
 
 type role HsExpr nominal
 type role HsCmd nominal
-type role MatchGroup nominal nominal
+-- TODO make first param (a functor) representational
+type role MatchGroup' nominal nominal nominal
 type role GRHSs nominal nominal
 type role HsSplice nominal
 type role SyntaxExpr nominal
 data HsExpr (i :: *)
 data HsCmd  (i :: *)
 data HsSplice (i :: *)
-data MatchGroup (a :: *) (body :: *)
+data MatchGroup' (f :: * -> *) (a :: *) (body :: *)
+type MatchGroup = MatchGroup' NonEmpty
+type MatchGroup0 = MatchGroup' []
 data GRHSs (a :: *) (body :: *)
 data SyntaxExpr (i :: *)
 
@@ -48,5 +54,5 @@ pprPatBind :: forall bndr p body. (OutputableBndrId bndr,
                                    Outputable body)
            => LPat (GhcPass bndr) -> GRHSs (GhcPass p) body -> SDoc
 
-pprFunBind :: (OutputableBndrId idR, Outputable body)
-           => MatchGroup (GhcPass idR) body -> SDoc
+pprFunBind :: (Foldable f, OutputableBndrId idR, Outputable body)
+           => MatchGroup' f (GhcPass idR) body -> SDoc

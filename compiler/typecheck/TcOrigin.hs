@@ -526,7 +526,7 @@ matchesCtOrigin (MG { mg_alts = alts })
 
   | otherwise
   = Shouldn'tHappenOrigin "multi-way match"
-matchesCtOrigin (XMatchGroup nec) = noExtCon nec
+matchesCtOrigin (XMatchGroup nec) = noExtCon1 nec
 
 -- | Extract a suitable CtOrigin from guarded RHSs
 grhssCtOrigin :: GRHSs GhcRn (LHsExpr GhcRn) -> CtOrigin

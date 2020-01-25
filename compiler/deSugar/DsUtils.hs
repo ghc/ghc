@@ -120,7 +120,7 @@ selectSimpleMatchVarL pat = selectMatchVar (unLoc pat)
 --    Then we must not choose (x::Int) as the matching variable!
 -- And nowadays we won't, because the (x::Int) will be wrapped in a CoPat
 
-selectMatchVars :: [Pat GhcTc] -> DsM [Id]
+selectMatchVars :: Traversable f => f (Pat GhcTc) -> DsM (f Id)
 -- Postcondition: the returned Ids have Internal Names
 selectMatchVars ps = mapM selectMatchVar ps
 

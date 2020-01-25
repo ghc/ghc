@@ -5,11 +5,14 @@ Pattern Matching Coverage Checking.
 -}
 
 {-# LANGUAGE CPP            #-}
+{-# LANGUAGE DataKinds      #-}
 {-# LANGUAGE GADTs          #-}
+{-# LANGUAGE LambdaCase     #-}
+{-# LANGUAGE KindSignatures #-}
+{-# LANGUAGE MultiWayIf     #-}
+{-# LANGUAGE ScopedTypeVariables #-}
 {-# LANGUAGE TupleSections  #-}
 {-# LANGUAGE ViewPatterns   #-}
-{-# LANGUAGE MultiWayIf     #-}
-{-# LANGUAGE LambdaCase     #-}
 
 module GHC.HsToCore.PmCheck (
         -- Checking and printing
@@ -61,7 +64,9 @@ import Maybes
 import qualified GHC.LanguageExtensions as LangExt
 
 import Control.Monad (when, forM_, zipWithM)
-import Data.List (elemIndex)
+import Data.Foldable (toList)
+import Data.List     (elemIndex)
+import Data.Maybe    (isJust)
 import qualified Data.Semigroup as Semi
 
 {-
@@ -296,8 +301,10 @@ checkGuardMatches hs_ctx guards@(GRHSs _ grhss _) = do
 checkGuardMatches _ (XGRHSs nec) = noExtCon nec
 
 -- | Check a matchgroup (case, functions, etc.)
-checkMatches :: DynFlags -> DsMatchContext
-             -> [Id] -> [LMatch GhcTc (LHsExpr GhcTc)] -> DsM ()
+checkMatches
+  :: (Outputable (f Id), Foldable f)
+  => DynFlags -> DsMatchContext
+  -> f Id -> [LMatch' f GhcTc (LHsExpr GhcTc)] -> DsM ()
 checkMatches dflags ctxt vars matches = do
   tracePm "checkMatches" (hang (vcat [ppr ctxt
                                , ppr vars
@@ -306,16 +313,19 @@ checkMatches dflags ctxt vars matches = do
                                (vcat (map ppr matches)))
 
   init_deltas <- MkDeltas . unitBag <$> getPmDelta
+  let vars' = toList vars
   missing <- case matches of
     -- This must be an -XEmptyCase. See Note [Checking EmptyCase]
-    [] | [var] <- vars -> addPmCtDeltas init_deltas (PmNotBotCt var)
-    _                  -> pure init_deltas
+    [] | [var] <- vars'
+      -> addPmCtDeltas init_deltas (PmNotBotCt var)
+    _
+      -> pure init_deltas
   tracePm "checkMatches: missing" (ppr missing)
   fam_insts <- dsGetFamInstEnvs
   grd_tree  <- mkGrdTreeMany [] <$> mapM (translateMatch fam_insts vars) matches
   res <- checkGrdTree grd_tree missing
 
-  dsPmWarn dflags ctxt vars res
+  dsPmWarn dflags ctxt vars' res
 
 {- Note [Checking EmptyCase]
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~
@@ -610,10 +620,14 @@ mkGrdTreeMany _    []    = Empty
 mkGrdTreeMany grds trees = foldr Guard (foldr1 Sequence trees) grds
 
 -- Translate a single match
-translateMatch :: FamInstEnvs -> [Id] -> LMatch GhcTc (LHsExpr GhcTc)
-               -> DsM GrdTree
+translateMatch
+  :: Foldable f
+  => FamInstEnvs
+  -> f Id
+  -> LMatch' f GhcTc (LHsExpr GhcTc)
+  -> DsM GrdTree
 translateMatch fam_insts vars (L match_loc (Match { m_pats = pats, m_grhss = grhss })) = do
-  pats'   <- concat <$> zipWithM (translateLPat fam_insts) vars pats
+  pats'   <- concat <$> zipWithM (translateLPat fam_insts) (toList vars) (toList pats)
   grhss' <- mapM (translateLGRHS fam_insts match_loc pats) (grhssGRHSs grhss)
   -- tracePm "translateMatch" (vcat [ppr pats, ppr pats', ppr grhss, ppr grhss'])
   return (mkGrdTreeMany pats' grhss')
@@ -623,14 +637,20 @@ translateMatch _ _ (L _ (XMatch _)) = panic "translateMatch"
 -- * Transform source guards (GuardStmt Id) to simpler PmGrds
 
 -- | Translate a guarded right-hand side to a single 'GrdTree'
-translateLGRHS :: FamInstEnvs -> SrcSpan -> [LPat GhcTc] -> LGRHS GhcTc (LHsExpr GhcTc) -> DsM GrdTree
+translateLGRHS
+  :: Foldable f
+  => FamInstEnvs
+  -> SrcSpan
+  -> f (LPat GhcTc)
+  -> LGRHS GhcTc (LHsExpr GhcTc)
+  -> DsM GrdTree
 translateLGRHS fam_insts match_loc pats (L _loc (GRHS _ gs _)) =
   -- _loc apparently points to the match separator that comes after the guards..
   mkGrdTreeRhs loc_sdoc . concat <$> mapM (translateGuard fam_insts . unLoc) gs
     where
       loc_sdoc
-        | null gs   = L match_loc (sep (map ppr pats))
-        | otherwise = L grd_loc   (sep (map ppr pats) <+> vbar <+> interpp'SP gs)
+        | null gs   = L match_loc (sep (map ppr $ toList pats))
+        | otherwise = L grd_loc   (sep (map ppr $ toList pats) <+> vbar <+> interpp'SP gs)
       L grd_loc _ = head gs
 translateLGRHS _ _ _ (L _ (XGRHS _)) = panic "translateLGRHS"
 

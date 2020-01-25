@@ -11,6 +11,12 @@ tcGRHSsPat    :: GRHSs GhcRn (LHsExpr GhcRn)
               -> TcRhoType
               -> TcM (GRHSs GhcTcId (LHsExpr GhcTcId))
 
+tcGRHSsVar
+  :: Name
+  -> GRHSs GhcRn (LHsExpr GhcRn)
+  -> ExpSigmaType
+  -> TcM (HsWrapper, GRHSs GhcTcId (LHsExpr GhcTcId))
+
 tcMatchesFun :: Located Name
              -> MatchGroup GhcRn (LHsExpr GhcRn)
              -> ExpSigmaType
