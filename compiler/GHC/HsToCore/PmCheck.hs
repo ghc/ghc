@@ -443,7 +443,7 @@ translatePat fam_insts x pat = case pat of
   -- See Note [Translate CoPats]
   -- Generally the translation is
   -- pat |> co   ===>   let y = x |> co, pat <- y  where y is a match var of pat
-  CoPat _ wrapper p _ty
+  XPat (CoPat wrapper p _ty)
     | isIdHsWrapper wrapper                   -> translatePat fam_insts x p
     | WpCast co <-  wrapper, isReflexiveCo co -> translatePat fam_insts x p
     | otherwise -> do
@@ -498,11 +498,14 @@ translatePat fam_insts x pat = case pat of
     --
     -- See #14547, especially comment#9 and comment#10.
 
-  ConPatOut { pat_con     = L _ con
-            , pat_arg_tys = arg_tys
-            , pat_tvs     = ex_tvs
-            , pat_dicts   = dicts
-            , pat_args    = ps } -> do
+  ConPat { pat_con     = L _ con
+         , pat_args    = ps
+         , pat_con_ext = ConPatTc
+           { cpt_arg_tys = arg_tys
+           , cpt_tvs     = ex_tvs
+           , cpt_dicts   = dicts
+           }
+         } -> do
     translateConPatOut fam_insts x con arg_tys ex_tvs dicts ps
 
   NPat ty (L _ olit) mb_neg _ -> do
@@ -544,7 +547,6 @@ translatePat fam_insts x pat = case pat of
 
   -- --------------------------------------------------------------------------
   -- Not supposed to happen
-  ConPatIn  {} -> panic "Check.translatePat: ConPatIn"
   SplicePat {} -> panic "Check.translatePat: SplicePat"
 
 -- | 'translatePat', but also select and return a new match var.

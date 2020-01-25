@@ -1191,7 +1191,7 @@ Note [Dictionary binders in ConPatOut] See also same Note in GHC.Hs.Utils
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 The following functions to collect value variables from patterns are
 copied from GHC.Hs.Utils, with one change: we also collect the dictionary
-bindings (pat_binds) from ConPatOut.  We need them for cases like
+bindings (cpt_binds) from ConPatOut.  We need them for cases like
 
 h :: Arrow a => Int -> a (Int,Int) Int
 h x = proc (y,z) -> case compare x y of
@@ -1231,8 +1231,8 @@ collectl (L _ pat) bndrs
     go (TuplePat _ pats _)        = foldr collectl bndrs pats
     go (SumPat _ pat _ _)         = collectl pat bndrs
 
-    go (ConPatIn _ ps)            = foldr collectl bndrs (hsConPatArgs ps)
-    go (ConPatOut {pat_args=ps, pat_binds=ds}) =
+    go (ConPat { pat_args = ps
+               , pat_con_ext = ConPatTc { cpt_binds = ds }}) =
                                     collectEvBinders ds
                                     ++ foldr collectl bndrs (hsConPatArgs ps)
     go (LitPat _ _)               = bndrs
@@ -1240,7 +1240,7 @@ collectl (L _ pat) bndrs
     go (NPlusKPat _ (L _ n) _ _ _ _) = n : bndrs
 
     go (SigPat _ pat _)           = collectl pat bndrs
-    go (CoPat _ _ pat _)          = collectl (noLoc pat) bndrs
+    go (XPat (CoPat _ pat _))     = collectl (noLoc pat) bndrs
     go (ViewPat _ _ pat)          = collectl pat bndrs
     go p@(SplicePat {})           = pprPanic "collectl/go" (ppr p)
 
