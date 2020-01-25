@@ -760,13 +760,14 @@ INFO_TABLE( stg_COMPACT_NFDATA_DIRTY, 0, 8, COMPACT_NFDATA, "COMPACT_NFDATA", "C
  */
 // #warning Is this correct? _imp is a pointer!
 #define Int_hash_con_info _imp__ghczmprim_GHCziTypes_Izh_con_info
-#define BWT_hash_con_info _imp__ghczmprim_GHCziTypes_BWTzh_con_info
+#define ConstILike_hash_con_info _imp__ghczmprim_GHCziIntlike_ConstILikezh_con_info
 #else
 #define Int_hash_con_info ghczmprim_GHCziTypes_Izh_con_info
-#define BWT_hash_con_info ghczmprim_GHCziTypes_BWTzh_con_info
+#define ConstILike_hash_con_info ghczmprim_GHCziIntlike_ConstILikezh_con_info
+
 #endif
 
-#define INTLIKE_HDR(n)   CLOSURE(BWT_hash_con_info, n)
+#define INTLIKE_HDR(n)   CLOSURE(ConstILike_hash_con_info, n)
 
 #if !(defined(COMPILING_WINDOWS_DLL))
 section "data" {
