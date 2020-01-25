@@ -1,7 +1,7 @@
 
-T13233.hs:14:11: error:
+T13233_elab.hs:17:11: error:
     Cannot use function with levity-polymorphic arguments:
-      (#,#) :: a -> a -> (# a, a #)
+      (#,#) @rep @rep @a @a :: a -> a -> (# a, a #)
     (Note that levity-polymorphic primops such as 'coerce' and unboxed tuples
     are eta-expanded internally because they must occur fully saturated.
     Use -fprint-typechecker-elaboration to display the full expression.)
@@ -9,11 +9,15 @@ T13233.hs:14:11: error:
       a :: TYPE rep
       a :: TYPE rep
 
-T13233.hs:22:16: error:
+T13233_elab.hs:25:16: error:
     Cannot use function with levity-polymorphic arguments:
-      (#,#) :: forall {rep1 :: RuntimeRep} {rep2 :: RuntimeRep}
-                      {a :: TYPE rep1} {b :: TYPE rep2}.
-               a -> b -> (# a, b #)
+      /\(@(rep1 :: RuntimeRep)).
+      /\(@(rep2 :: RuntimeRep)).
+      /\(@(a :: TYPE rep1)).
+      /\(@(b :: TYPE rep2)).
+      (#,#) @rep1 @rep2 @a @b :: forall {rep1 :: RuntimeRep}
+                                        {rep2 :: RuntimeRep} {a :: TYPE rep1} {b :: TYPE rep2}.
+                                 a -> b -> (# a, b #)
     (Note that levity-polymorphic primops such as 'coerce' and unboxed tuples
     are eta-expanded internally because they must occur fully saturated.
     Use -fprint-typechecker-elaboration to display the full expression.)
