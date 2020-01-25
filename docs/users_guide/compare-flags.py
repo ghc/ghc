@@ -71,15 +71,15 @@ def main() -> None:
 
     undocumented = ghc_flags - doc_flags
     if len(undocumented) > 0:
-        print(f'Found {len(undocumented)} flags not documented in the users guide:')
-        print('\n'.join(f'  {flag}' for flag in sorted(undocumented)))
+        print('Found {len_undoc} flags not documented in the users guide:')
+        print('\n'.join('  {}'.format(flag) for flag in sorted(undocumented)))
         print()
         failed = True
 
     now_documented = EXPECTED_UNDOCUMENTED.intersection(doc_flags)
     if len(now_documented) > 0:
-        print(f'Found flags that are documented yet listed in {EXPECTED_UNDOCUMENTED_PATH}:')
-        print('\n'.join(f'  {flag}' for flag in sorted(now_documented)))
+        print('Found flags that are documented yet listed in {}:'.format(EXPECTED_UNDOCUMENTED_PATH))
+        print('\n'.join('  {}'.format(flag) for flag in sorted(now_documented)))
         print()
         failed = True
 
