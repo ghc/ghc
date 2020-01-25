@@ -225,6 +225,11 @@ augmentIOError ioe@IOError{ ioe_filename = fp } fun h
 -- ---------------------------------------------------------------------------
 -- Wrapper for write operations.
 
+-- If we already have a writeable handle just run the action.
+-- If we have a read only handle we throw an exception.
+-- If we have a read/write handle in read mode we:
+-- * Seek to the unread (from the users PoV) position and
+--   change the handles buffer to a write buffer.
 wantWritableHandle :: String -> Handle -> (Handle__ -> IO a) -> IO a
 wantWritableHandle fun h@(FileHandle _ m) act
   = wantWritableHandle' fun h m act
@@ -256,7 +261,8 @@ checkWritableHandle act h_@Handle__{..}
            buf' <- Buffered.emptyWriteBuffer haDevice buf
            writeIORef haByteBuffer buf'
         act h_
-      _other               -> act h_
+      AppendHandle         -> act h_
+      WriteHandle          -> act h_
 
 -- ---------------------------------------------------------------------------
 -- Wrapper for read operations.
@@ -513,6 +519,7 @@ flushByteWriteBuffer h_@Handle__{..} = do
 -- write the contents of the CharBuffer to the Handle__.
 -- The data will be encoded and pushed to the byte buffer,
 -- flushing if the buffer becomes full.
+-- Data is written to the handles current buffer offset.
 writeCharBuffer :: Handle__ -> CharBuffer -> IO ()
 writeCharBuffer h_@Handle__{..} !cbuf = do
   --
