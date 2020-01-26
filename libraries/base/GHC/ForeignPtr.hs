@@ -38,6 +38,7 @@ module GHC.ForeignPtr
         addForeignPtrFinalizer,
         addForeignPtrFinalizerEnv,
         touchForeignPtr,
+        withForeignPtr,
         unsafeForeignPtrToPtr,
         castForeignPtr,
         plusForeignPtr,
@@ -415,6 +416,39 @@ touchForeignPtr (ForeignPtr _ r) = touch r
 
 touch :: ForeignPtrContents -> IO ()
 touch r = IO $ \s -> case touch# r s of s' -> (# s', () #)
+
+withForeignPtr :: ForeignPtr a -> (Ptr a -> IO b) -> IO b
+-- ^This is a way to look at the pointer living inside a
+-- foreign object.  This function takes a function which is
+-- applied to that pointer. The resulting 'IO' action is then
+-- executed. The foreign object is kept alive at least during
+-- the whole action, even if it is not used directly
+-- inside. Note that it is not safe to return the pointer from
+-- the action and use it after the action completes. All uses
+-- of the pointer should be inside the
+-- 'withForeignPtr' bracket.  The reason for
+-- this unsafeness is the same as for
+-- 'unsafeForeignPtrToPtr' below: the finalizer
+-- may run earlier than expected, because the compiler can only
+-- track usage of the 'ForeignPtr' object, not
+-- a 'Ptr' object made from it.
+--
+-- This function is normally used for marshalling data to
+-- or from the object pointed to by the
+-- 'ForeignPtr', using the operations from the
+-- 'Storable' class.
+withForeignPtr fo io
+  = let !ForeignPtr addr r = fo
+        IO fio             = io (Ptr addr)
+    in IO $ \s -> with# r fio s
+
+-- | `touch#` primop is unsafe (cf #14375 and #17746)). Use `with#` instead.
+with# :: a -> (State# RealWorld -> (# State# RealWorld, b #)) -> State# RealWorld -> (# State# RealWorld, b #)
+with# a m s =
+  case m s of
+    (# s', r #) -> (# touch# a s', r #)
+{-# NOINLINE with# #-}
+
 
 unsafeForeignPtrToPtr :: ForeignPtr a -> Ptr a
 -- ^This function extracts the pointer component of a foreign
