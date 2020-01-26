@@ -25,7 +25,7 @@ import BooleanFormula
 import Class                      ( FunDep )
 import CoreUtils                  ( exprType )
 import ConLike                    ( conLikeName )
-import Desugar                    ( deSugarExpr )
+import GHC.HsToCore               ( deSugarExpr )
 import FieldLabel
 import GHC.Hs
 import HscTypes

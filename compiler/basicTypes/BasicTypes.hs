@@ -1327,7 +1327,7 @@ if an Id has defaultInlinePragma it means the user didn't specify anything.
 
 If inl_inline = Inline or Inlineable, then the Id should have an InlineRule unfolding.
 
-If you want to know where InlinePragmas take effect: Look in DsBinds.makeCorePair
+If you want to know where InlinePragmas take effect: Look in GHC.HsToCore.Binds.makeCorePair
 
 Note [inl_inline and inl_act]
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
@@ -1526,7 +1526,7 @@ competesWith (ActiveAfter _ a) (ActiveAfter _ b) = a >= b
 {- Note [Competing activations]
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 Sometimes a RULE and an inlining may compete, or two RULES.
-See Note [Rules and inlining/other rules] in Desugar.
+See Note [Rules and inlining/other rules] in GHC.HsToCore.
 
 We say that act1 "competes with" act2 iff
    act1 is active in the phase when act2 *becomes* active
@@ -1615,7 +1615,7 @@ integralFractionalLit neg i = FL { fl_text = SourceText (show i),
                                    fl_value = fromInteger i }
 
 -- Comparison operations are needed when grouping literals
--- for compiling pattern-matching (module MatchLit)
+-- for compiling pattern-matching (module GHC.HsToCore.Match.Literal)
 
 instance Eq IntegralLit where
   (==) = (==) `on` il_value

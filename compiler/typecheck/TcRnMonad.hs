@@ -242,7 +242,7 @@ initTc hsc_env hsc_src keep_rn_syntax mod loc do_this
 
                   -- We want to serialize the documentation in the .hi-files,
                   -- and need to extract it from the renamed syntax first.
-                  -- See 'ExtractDocs.extractDocs'.
+                  -- See 'GHC.HsToCore.Docs.extractDocs'.
                 | gopt Opt_Haddock dflags       = Just empty_val
 
                 | keep_rn_syntax                = Just empty_val

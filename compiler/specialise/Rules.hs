@@ -75,7 +75,7 @@ Note [Overall plumbing for rules]
      locally-declared rules for imported Ids.
    - Locally-declared rules for locally-declared Ids are attached to
      the IdInfo for that Id.  See Note [Attach rules to local ids] in
-     DsBinds
+     GHC.HsToCore.Binds
 
 * GHC.Iface.Tidy strips off all the rules from local Ids and adds them to
   mg_rules, so that the ModGuts has *all* the locally-declared rules.

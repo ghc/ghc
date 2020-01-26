@@ -9,13 +9,15 @@ Desugaring foreign calls
 {-# LANGUAGE CPP #-}
 
 {-# OPTIONS_GHC -Wno-incomplete-uni-patterns #-}
-module DsCCall
-        ( dsCCall
-        , mkFCall
-        , unboxArg
-        , boxResult
-        , resultWrapper
-        ) where
+
+module GHC.HsToCore.Foreign.Call
+   ( dsCCall
+   , mkFCall
+   , unboxArg
+   , boxResult
+   , resultWrapper
+   )
+where
 
 #include "HsVersions.h"
 
@@ -24,13 +26,13 @@ import GhcPrelude
 
 import CoreSyn
 
-import DsMonad
+import GHC.HsToCore.Monad
 import CoreUtils
 import MkCore
 import MkId
 import ForeignCall
 import DataCon
-import DsUtils
+import GHC.HsToCore.Utils
 
 import TcType
 import Type

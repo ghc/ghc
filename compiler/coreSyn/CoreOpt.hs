@@ -669,7 +669,7 @@ When the user writes `RULES map coerce = coerce` as a rule, the rule
 will only ever match if simpleOptExpr replaces coerce by its unfolding
 on the LHS, because that is the core that the rule matching engine
 will find. So do that for everything that has a compulsory
-unfolding. Also see Note [Desugaring coerce as cast] in Desugar.
+unfolding. Also see Note [Desugaring coerce as cast] in GHC.HsToCore.
 
 However, we don't want to inline 'seq', which happens to also have a
 compulsory unfolding, so we only do this unfolding only for things

@@ -66,7 +66,7 @@ import Unify         (tcMatchTy)
 import TcRnTypes     (completeMatchConLikes)
 import Coercion
 import MonadUtils hiding (foldlM)
-import DsMonad hiding (foldlM)
+import GHC.HsToCore.Monad hiding (foldlM)
 import FamInst
 import FamInstEnv
 

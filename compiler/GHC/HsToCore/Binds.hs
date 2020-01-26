@@ -17,20 +17,22 @@ lower levels it is preserved with @let@/@letrec@s).
 
 {-# OPTIONS_GHC -Wno-incomplete-uni-patterns #-}
 
-module DsBinds ( dsTopLHsBinds, dsLHsBinds, decomposeRuleLhs, dsSpec,
-                 dsHsWrapper, dsTcEvBinds, dsTcEvBinds_s, dsEvBinds, dsMkUserRule
-  ) where
+module GHC.HsToCore.Binds
+   ( dsTopLHsBinds, dsLHsBinds, decomposeRuleLhs, dsSpec
+   , dsHsWrapper, dsTcEvBinds, dsTcEvBinds_s, dsEvBinds, dsMkUserRule
+   )
+where
 
 #include "HsVersions.h"
 
 import GhcPrelude
 
-import {-# SOURCE #-}   DsExpr( dsLExpr )
-import {-# SOURCE #-}   Match( matchWrapper )
+import {-# SOURCE #-}   GHC.HsToCore.Expr  ( dsLExpr )
+import {-# SOURCE #-}   GHC.HsToCore.Match ( matchWrapper )
 
-import DsMonad
-import DsGRHSs
-import DsUtils
+import GHC.HsToCore.Monad
+import GHC.HsToCore.GuardedRHSs
+import GHC.HsToCore.Utils
 import GHC.HsToCore.PmCheck ( needToRunPmCheck, addTyCsDs, checkGuardMatches )
 
 import GHC.Hs           -- lots of things
@@ -565,7 +567,7 @@ if there is no variable in the pattern desugaring looks like
   in x `seq` body
 
 In order to force the Ids in the binding group they are passed around
-in the dsHsBind family of functions, and later seq'ed in DsExpr.ds_val_bind.
+in the dsHsBind family of functions, and later seq'ed in GHC.HsToCore.Expr.ds_val_bind.
 
 Consider a recursive group like this
 
@@ -632,11 +634,11 @@ The restrictions are:
   2. Unlifted binds must also be banged. (There is no trouble to compile an unbanged
      unlifted bind, but an unbanged bind looks lazy, and we don't want users to be
      surprised by the strictness of an unlifted bind.) Checked in first clause
-     of DsExpr.ds_val_bind.
+     of GHC.HsToCore.Expr.ds_val_bind.
 
   3. Unlifted binds may not have polymorphism (#6078). (That is, no quantified type
      variables or constraints.) Checked in first clause
-     of DsExpr.ds_val_bind.
+     of GHC.HsToCore.Expr.ds_val_bind.
 
   4. Unlifted binds may not be recursive. Checked in second clause of ds_val_bind.
 

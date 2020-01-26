@@ -1594,8 +1594,9 @@ The hsSyn representation of parsed source explicitly contains all the original
 parens, as written in the source.
 
 When a Template Haskell (TH) splice is evaluated, the original splice is first
-renamed and type checked and then finally converted to core in DsMeta. This core
-is then run in the TH engine, and the result comes back as a TH AST.
+renamed and type checked and then finally converted to core in
+GHC.HsToCore.Quote. This core is then run in the TH engine, and the result
+comes back as a TH AST.
 
 In the process, all parens are stripped out, as they are not needed.
 
@@ -1996,11 +1997,11 @@ with the following parts:
 
 Due to the two forall quantifiers and constraint contexts (either of
 which might be empty), pattern synonym type signatures are treated
-specially in `deSugar/DsMeta.hs`, `hsSyn/Convert.hs`, and
+specially in `GHC.HsToCore.Quote`, `GHC.ThToHs`, and
 `typecheck/TcSplice.hs`:
 
    (a) When desugaring a pattern synonym from HsSyn to TH.Dec in
-       `deSugar/DsMeta.hs`, we represent its *full* type signature in TH, i.e.:
+       `GHC.HsToCore.Quote`, we represent its *full* type signature in TH, i.e.:
 
            ForallT univs reqs (ForallT exis provs ty)
               (where ty is the AST representation of t1 -> t2 -> ... -> tn -> t)

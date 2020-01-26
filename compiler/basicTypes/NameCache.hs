@@ -66,8 +66,8 @@ are two reasons why we might look up an Orig RdrName for built-in syntax,
     turned into an Orig RdrName.
 
   * Template Haskell turns a BuiltInSyntax Name into a TH.NameG
-    (DsMeta.globalVar), and parses a NameG into an Orig RdrName
-    (Convert.thRdrName).  So, e.g. $(do { reify '(,); ... }) will
+    (GHC.HsToCore.Quote.globalVar), and parses a NameG into an Orig RdrName
+    (GHC.ThToHs.thRdrName).  So, e.g. $(do { reify '(,); ... }) will
     go this route (#8954).
 
 -}

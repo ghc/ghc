@@ -3,14 +3,14 @@
 (c) The GRASP/AQUA Project, Glasgow University, 1992-1998
 
 
-@DsMonad@: monadery used in desugaring
+Monadery used in desugaring
 -}
 
 {-# LANGUAGE FlexibleInstances, FlexibleContexts #-}
 {-# OPTIONS_GHC -fno-warn-orphans #-}  -- instance MonadThings is necessarily an orphan
 {-# LANGUAGE ViewPatterns #-}
 
-module DsMonad (
+module GHC.HsToCore.Monad (
         DsM, mapM, mapAndUnzipM,
         initDs, initDsTc, initTcDsForSolver, initDsWithModGuts, fixDs,
         foldlM, foldrM, whenGOptM, unsetGOptM, unsetWOptM, xoptM,
@@ -108,7 +108,7 @@ data EquationInfo
               -- ^ The patterns for an equation
               --
               -- NB: We have /already/ applied 'decideBangHood' to
-              -- these patterns.  See Note [decideBangHood] in "DsUtils"
+              -- these patterns.  See Note [decideBangHood] in GHC.HsToCore.Utils
 
             , eqn_orig :: Origin
               -- ^ Was this equation present in the user source?
@@ -314,7 +314,7 @@ At one point, I (Richard) thought we could check in the zonker, but it's hard
 to know where precisely are the abstracted variables and the arguments. So
 we check in the desugarer, the only place where we can see the Core code and
 still report respectable syntax to the user. This covers the vast majority
-of cases; see calls to DsMonad.dsNoLevPoly and friends.
+of cases; see calls to GHC.HsToCore.Monad.dsNoLevPoly and friends.
 
 Levity polymorphism is also prohibited in the types of binders, and the
 desugarer checks for this in GHC-generated Ids. (The zonker handles
@@ -322,7 +322,7 @@ the user-writted ids in zonkIdBndr.) This is done in newSysLocalDsNoLP.
 The newSysLocalDs variant is used in the vast majority of cases where
 the binder is obviously not levity polymorphic, omitting the check.
 It would be nice to ASSERT that there is no levity polymorphism here,
-but we can't, because of the fixM in DsArrows. It's all OK, though:
+but we can't, because of the fixM in GHC.HsToCore.Arrows. It's all OK, though:
 Core Lint will catch an error here.
 
 However, the desugarer is the wrong place for certain checks. In particular,
@@ -357,7 +357,7 @@ newSysLocalDsNoLP  = mk_local (fsLit "ds")
 
 -- this variant should be used when the caller can be sure that the variable type
 -- is not levity-polymorphic. It is necessary when the type is knot-tied because
--- of the fixM used in DsArrows. See Note [Levity polymorphism checking]
+-- of the fixM used in GHC.HsToCore.Arrows. See Note [Levity polymorphism checking]
 newSysLocalDs = mkSysLocalM (fsLit "ds")
 newFailLocalDs = mkSysLocalM (fsLit "fail")
   -- the fail variable is used only in a situation where we can tell that

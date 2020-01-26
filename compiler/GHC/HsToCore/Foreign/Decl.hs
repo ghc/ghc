@@ -3,7 +3,7 @@
 (c) The AQUA Project, Glasgow University, 1998
 
 
-Desugaring foreign declarations (see also DsCCall).
+Desugaring foreign declarations (see also GHC.HsToCore.Foreign.Call).
 -}
 
 {-# LANGUAGE CPP #-}
@@ -13,7 +13,7 @@ Desugaring foreign declarations (see also DsCCall).
 
 {-# OPTIONS_GHC -Wno-incomplete-uni-patterns #-}
 
-module DsForeign ( dsForeigns ) where
+module GHC.HsToCore.Foreign.Decl ( dsForeigns ) where
 
 #include "HsVersions.h"
 import GhcPrelude
@@ -22,8 +22,8 @@ import TcRnMonad        -- temp
 
 import CoreSyn
 
-import DsCCall
-import DsMonad
+import GHC.HsToCore.Foreign.Call
+import GHC.HsToCore.Monad
 
 import GHC.Hs
 import DataCon
@@ -72,7 +72,7 @@ is the same as
   f :: prim_args -> IO prim_res
   f a1 ... an = _ccall_ nm cc a1 ... an
 \end{verbatim}
-so we reuse the desugaring code in @DsCCall@ to deal with these.
+so we reuse the desugaring code in @GHC.HsToCore.Foreign.Call@ to deal with these.
 -}
 
 type Binding = (Id, CoreExpr) -- No rec/nonrec structure;
@@ -739,7 +739,7 @@ typeTyCon ty
   | Just (tc, _) <- tcSplitTyConApp_maybe (unwrapType ty)
   = tc
   | otherwise
-  = pprPanic "DsForeign.typeTyCon" (ppr ty)
+  = pprPanic "GHC.HsToCore.Foreign.Decl.typeTyCon" (ppr ty)
 
 insertRetAddr :: DynFlags -> CCallConv
               -> [(SDoc, SDoc, Type, CmmType)]
@@ -793,7 +793,7 @@ getPrimTyOf ty
         ASSERT(dataConSourceArity data_con == 1)
         ASSERT2(isUnliftedType prim_ty, ppr prim_ty)
         prim_ty
-     _other -> pprPanic "DsForeign.getPrimTyOf" (ppr ty)
+     _other -> pprPanic "GHC.HsToCore.Foreign.Decl.getPrimTyOf" (ppr ty)
   where
         rep_ty = unwrapType ty
 

@@ -164,7 +164,6 @@ Library
         basicTypes
         cmm
         coreSyn
-        deSugar
         iface
         llvmGen
         main
@@ -324,22 +323,22 @@ Library
         GHC.HsToCore.PmCheck.Ppr
         GHC.HsToCore.PmCheck.Types
         GHC.HsToCore.PmCheck
-        Coverage
-        Desugar
-        DsArrows
-        DsBinds
-        DsCCall
-        DsExpr
-        DsForeign
-        DsGRHSs
-        DsListComp
-        DsMonad
-        DsUsage
-        DsUtils
-        ExtractDocs
-        Match
-        MatchCon
-        MatchLit
+        GHC.HsToCore.Coverage
+        GHC.HsToCore
+        GHC.HsToCore.Arrows
+        GHC.HsToCore.Binds
+        GHC.HsToCore.Foreign.Call
+        GHC.HsToCore.Expr
+        GHC.HsToCore.Foreign.Decl
+        GHC.HsToCore.GuardedRHSs
+        GHC.HsToCore.ListComp
+        GHC.HsToCore.Monad
+        GHC.HsToCore.Usage
+        GHC.HsToCore.Utils
+        GHC.HsToCore.Docs
+        GHC.HsToCore.Match
+        GHC.HsToCore.Match.Constructor
+        GHC.HsToCore.Match.Literal
         GHC.Hs
         GHC.Hs.Binds
         GHC.Hs.Decls
@@ -526,7 +525,7 @@ Library
         TcSplice
         Class
         Coercion
-        DsMeta
+        GHC.HsToCore.Quote
         THNames
         FamInstEnv
         FunDeps

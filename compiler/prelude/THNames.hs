@@ -24,7 +24,7 @@ import FastString
 
 templateHaskellNames :: [Name]
 -- The names that are implicitly mentioned by ``bracket''
--- Should stay in sync with the import list of DsMeta
+-- Should stay in sync with the import list of GHC.HsToCore.Quote
 
 templateHaskellNames = [
     returnQName, bindQName, sequenceQName, newNameName, liftName, liftTypedName,
@@ -562,7 +562,7 @@ decsQTyConName          = libTc (fsLit "DecsQ")          decsQTyConKey  -- Q [De
 typeQTyConName          = libTc (fsLit "TypeQ")          typeQTyConKey
 patQTyConName           = libTc (fsLit "PatQ")           patQTyConKey
 
--- These are used in DsMeta but always wrapped in a type variable
+-- These are used in GHC.HsToCore.Quote but always wrapped in a type variable
 stmtTyConName           = thTc (fsLit "Stmt")            stmtTyConKey
 conTyConName            = thTc (fsLit "Con")             conTyConKey
 bangTypeTyConName       = thTc (fsLit "BangType")      bangTypeTyConKey

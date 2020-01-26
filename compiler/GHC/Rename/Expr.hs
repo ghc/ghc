@@ -704,7 +704,7 @@ postProcessStmtsForApplicativeDo ctxt stmts
        ; let is_do_expr | DoExpr <- ctxt = True
                         | otherwise = False
        -- don't apply the transformation inside TH brackets, because
-       -- DsMeta does not handle ApplicativeDo.
+       -- GHC.HsToCore.Quote does not handle ApplicativeDo.
        ; in_th_bracket <- isBrackStage <$> getStage
        ; if ado_is_on && is_do_expr && not in_th_bracket
             then do { traceRn "ppsfa" (ppr stmts)
@@ -984,7 +984,7 @@ lookupStmtNamePoly ctxt name
 
 -- | Is this a context where we respect RebindableSyntax?
 -- but ListComp are never rebindable
--- Neither is ArrowExpr, which has its own desugarer in DsArrows
+-- Neither is ArrowExpr, which has its own desugarer in GHC.HsToCore.Arrows
 rebindableContext :: HsStmtContext GhcRn -> Bool
 rebindableContext ctxt = case ctxt of
   ListComp        -> False
@@ -1511,7 +1511,7 @@ ApplicativeDo touches a few phases in the compiler:
 
 * Desugarer: Any do-block which contains applicative statements is desugared
   as outlined above, to use the Applicative combinators.
-  Relevant module: DsExpr
+  Relevant module: GHC.HsToCore.Expr
 
 -}
 

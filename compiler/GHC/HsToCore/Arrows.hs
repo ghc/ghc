@@ -12,15 +12,15 @@ Desugaring arrow commands
 
 {-# OPTIONS_GHC -Wno-incomplete-record-updates #-}
 
-module DsArrows ( dsProcExpr ) where
+module GHC.HsToCore.Arrows ( dsProcExpr ) where
 
 #include "HsVersions.h"
 
 import GhcPrelude
 
-import Match
-import DsUtils
-import DsMonad
+import GHC.HsToCore.Match
+import GHC.HsToCore.Utils
+import GHC.HsToCore.Monad
 
 import GHC.Hs   hiding (collectPatBinders, collectPatsBinders,
                         collectLStmtsBinders, collectLStmtBinders,
@@ -33,8 +33,8 @@ import qualified GHC.Hs.Utils as HsUtils
 --     So WATCH OUT; check each use of split*Ty functions.
 -- Sigh.  This is a pain.
 
-import {-# SOURCE #-} DsExpr ( dsExpr, dsLExpr, dsLExprNoLP, dsLocalBinds,
-                               dsSyntaxExpr )
+import {-# SOURCE #-} GHC.HsToCore.Expr ( dsExpr, dsLExpr, dsLExprNoLP, dsLocalBinds,
+                                          dsSyntaxExpr )
 
 import TcType
 import Type ( splitPiTy )
@@ -43,7 +43,7 @@ import CoreSyn
 import CoreFVs
 import CoreUtils
 import MkCore
-import DsBinds (dsHsWrapper)
+import GHC.HsToCore.Binds (dsHsWrapper)
 
 import Id
 import ConLike

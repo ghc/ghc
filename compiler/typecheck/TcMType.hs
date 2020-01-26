@@ -2333,7 +2333,7 @@ tidySigSkol env cx ty tv_prs
 *                                                                       *
 *************************************************************************
 
-See Note [Levity polymorphism checking] in DsMonad
+See Note [Levity polymorphism checking] in GHC.HsToCore.Monad
 
 -}
 
@@ -2354,7 +2354,7 @@ ensureNotLevPoly ty doc
                    -- forall a. a. See, for example, test ghci/scripts/T9140
     checkForLevPoly doc ty
 
-  -- See Note [Levity polymorphism checking] in DsMonad
+  -- See Note [Levity polymorphism checking] in GHC.HsToCore.Monad
 checkForLevPoly :: SDoc -> Type -> TcM ()
 checkForLevPoly = checkForLevPolyX addErr
 

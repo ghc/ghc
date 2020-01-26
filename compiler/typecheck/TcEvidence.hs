@@ -212,7 +212,7 @@ data HsWrapper
        -- The TcType is the "from" type of the first wrapper
        -- The SDoc explains the circumstances under which we have created this
        -- WpFun, in case we run afoul of levity polymorphism restrictions in
-       -- the desugarer. See Note [Levity polymorphism checking] in DsMonad
+       -- the desugarer. See Note [Levity polymorphism checking] in GHC.HsToCore.Monad
 
   | WpCast TcCoercionR        -- A cast:  [] `cast` co
                               -- Guaranteed not the identity coercion
@@ -782,7 +782,7 @@ Important Details:
 
 - An EvCallStack term desugars to a CoreExpr of type `IP "some str" CallStack`.
   The desugarer will need to unwrap the IP newtype before pushing a new
-  call-site onto a given stack (See DsBinds.dsEvCallStack)
+  call-site onto a given stack (See GHC.HsToCore.Binds.dsEvCallStack)
 
 - When we emit a new wanted CallStack from rule (2) we set its origin to
   `IPOccOrigin ip_name` instead of the original `OccurrenceOf func`

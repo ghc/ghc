@@ -3956,7 +3956,7 @@ checkValidClass cls
            -- method in a dictionary
            -- example of what this prevents:
            --   class BoundedX (a :: TYPE r) where minBound :: a
-           -- See Note [Levity polymorphism checking] in DsMonad
+           -- See Note [Levity polymorphism checking] in GHC.HsToCore.Monad
         ; checkForLevPoly empty tau1
 
         ; unless constrained_class_methods $

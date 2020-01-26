@@ -47,16 +47,16 @@ import Var (EvVar)
 import Coercion
 import TcEvidence
 import TcType (evVarPred)
-import {-# SOURCE #-} DsExpr (dsExpr, dsLExpr, dsSyntaxExpr)
-import {-# SOURCE #-} DsBinds (dsHsWrapper)
-import DsUtils (selectMatchVar)
-import MatchLit (dsLit, dsOverLit)
-import DsMonad
+import {-# SOURCE #-} GHC.HsToCore.Expr (dsExpr, dsLExpr, dsSyntaxExpr)
+import {-# SOURCE #-} GHC.HsToCore.Binds (dsHsWrapper)
+import GHC.HsToCore.Utils (selectMatchVar)
+import GHC.HsToCore.Match.Literal (dsLit, dsOverLit)
+import GHC.HsToCore.Monad
 import Bag
 import OrdList
 import TyCoRep
 import Type
-import DsUtils       (isTrueLHsExpr)
+import GHC.HsToCore.Utils       (isTrueLHsExpr)
 import Maybes
 import qualified GHC.LanguageExtensions as LangExt
 
@@ -482,7 +482,7 @@ translatePat fam_insts x pat = case pat of
     translateConPatOut fam_insts x con arg_tys ex_tvs dicts ps
 
   NPat ty (L _ olit) mb_neg _ -> do
-    -- See Note [Literal short cut] in MatchLit.hs
+    -- See Note [Literal short cut] in GHC.HsToCore.Match.Literal.hs
     -- We inline the Literal short cut for @ty@ here, because @ty@ is more
     -- precise than the field of OverLitTc, which is all that dsOverLit (which
     -- normally does the literal short cut) can look at. Also @ty@ matches the
@@ -982,8 +982,8 @@ checkGrdTree guards deltas = do
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 When checking a match it would be great to have all type and term information
 available so we can get more precise results. For this reason we have functions
-`addDictsDs' and `addTmVarCsDs' in DsMonad that store in the environment type and
-term constraints (respectively) as we go deeper.
+`addDictsDs' and `addTmVarCsDs' in GHC.HsToCore.Monad that store in the
+environment type and term constraints (respectively) as we go deeper.
 
 The type constraints we propagate inwards are collected by `collectEvVarsPats'
 in GHC.Hs.Pat. This handles bug #4139 ( see example
