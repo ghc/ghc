@@ -574,7 +574,7 @@ let-binding.  When abs_sig = True
    and hence the abs_binds is non-recursive
    (it binds the mono_id but refers to the poly_id
 
-These properties are exploited in DsBinds.dsAbsBinds to
+These properties are exploited in GHC.HsToCore.Binds.dsAbsBinds to
 generate code without a let-binding.
 
 Note [ABExport wrapper]

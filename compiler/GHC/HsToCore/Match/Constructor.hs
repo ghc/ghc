@@ -12,21 +12,21 @@ Pattern-matching constructors
 
 {-# OPTIONS_GHC -Wno-incomplete-uni-patterns #-}
 
-module MatchCon ( matchConFamily, matchPatSyn ) where
+module GHC.HsToCore.Match.Constructor ( matchConFamily, matchPatSyn ) where
 
 #include "HsVersions.h"
 
 import GhcPrelude
 
-import {-# SOURCE #-} Match     ( match )
+import {-# SOURCE #-} GHC.HsToCore.Match ( match )
 
 import GHC.Hs
-import DsBinds
+import GHC.HsToCore.Binds
 import ConLike
 import BasicTypes ( Origin(..) )
 import TcType
-import DsMonad
-import DsUtils
+import GHC.HsToCore.Monad
+import GHC.HsToCore.Utils
 import MkCore   ( mkCoreLets )
 import Util
 import Id
