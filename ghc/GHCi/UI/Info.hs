@@ -32,7 +32,7 @@ import           Prelude           hiding (mod,(<>))
 import           System.Directory
 
 import qualified CoreUtils
-import           Desugar
+import           GHC.HsToCore
 import           DynFlags (HasDynFlags(..))
 import           FastString
 import           GHC

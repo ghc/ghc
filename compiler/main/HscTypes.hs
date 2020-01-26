@@ -2326,7 +2326,7 @@ class Monad m => MonadThings m where
         lookupTyCon :: Name -> m TyCon
         lookupTyCon = liftM tyThingTyCon . lookupThing
 
--- Instance used in DsMeta
+-- Instance used in GHC.HsToCore.Quote
 instance MonadThings m => MonadThings (ReaderT s m) where
   lookupThing = lift . lookupThing
 
@@ -3237,7 +3237,7 @@ for the same TyCon:
 
 And looking up the values in the CompleteMatchMap associated with Boolean
 would give you [CompleteMatch [F, T1] Boolean, CompleteMatch [F, T2] Boolean].
-dsGetCompleteMatches in DsMeta accomplishes this lookup.
+dsGetCompleteMatches in GHC.HsToCore.Quote accomplishes this lookup.
 
 Also see Note [Typechecking Complete Matches] in TcBinds for a more detailed
 explanation for how GHC ensures that all the conlikes in a COMPLETE set are

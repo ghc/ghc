@@ -10,7 +10,7 @@ The Desugarer: turning HsSyn into Core.
 {-# LANGUAGE TypeFamilies #-}
 {-# LANGUAGE ViewPatterns #-}
 
-module Desugar (
+module GHC.HsToCore (
     -- * Desugaring operations
     deSugar, deSugarExpr
     ) where
@@ -19,7 +19,7 @@ module Desugar (
 
 import GhcPrelude
 
-import DsUsage
+import GHC.HsToCore.Usage
 import DynFlags
 import HscTypes
 import GHC.Hs
@@ -34,10 +34,10 @@ import CoreSyn
 import CoreFVs     ( exprsSomeFreeVarsList )
 import CoreOpt     ( simpleOptPgm, simpleOptExpr )
 import PprCore
-import DsMonad
-import DsExpr
-import DsBinds
-import DsForeign
+import GHC.HsToCore.Monad
+import GHC.HsToCore.Expr
+import GHC.HsToCore.Binds
+import GHC.HsToCore.Foreign.Decl
 import PrelNames   ( coercibleTyConKey )
 import TysPrim     ( eqReprPrimTyCon )
 import Unique      ( hasKey )
@@ -57,11 +57,11 @@ import FastString
 import ErrUtils
 import Outputable
 import SrcLoc
-import Coverage
+import GHC.HsToCore.Coverage
 import Util
 import MonadUtils
 import OrdList
-import ExtractDocs
+import GHC.HsToCore.Docs
 
 import Data.List
 import Data.IORef
@@ -485,7 +485,7 @@ For the LHS of a RULE we do *not* want to desugar
     [x]   to    build (\cn. x `c` n)
 We want to leave explicit lists simply as chains
 of cons's. We can achieve that slightly indirectly by
-switching off EnableRewriteRules.  See DsExpr.dsExplicitList.
+switching off EnableRewriteRules.  See GHC.HsToCore.Expr.dsExplicitList.
 
 That keeps the desugaring of list comprehensions simple too.
 

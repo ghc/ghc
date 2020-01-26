@@ -354,7 +354,7 @@ argument is not levity-polymorphic (which it can't be, according to
 Note [Levity polymorphism invariants] in CoreSyn), and it's saturated,
 no levity-polymorphic code ends up in the code generator. The saturation
 condition is effectively checked by Note [Detecting forced eta expansion]
-in DsExpr.
+in GHC.HsToCore.Expr.
 
 However, if we make a *wrapper* for a newtype, we get into trouble.
 The saturation condition is no longer checked (because hasNoBinding
@@ -1510,7 +1510,7 @@ Note [seqId magic]
 a) Its fixity is set in GHC.Iface.Load.ghcPrimIface
 
 b) It has quite a bit of desugaring magic.
-   See DsUtils.hs Note [Desugaring seq (1)] and (2) and (3)
+   See GHC.HsToCore.Utils.hs Note [Desugaring seq (1)] and (2) and (3)
 
 c) There is some special rule handing: Note [User-defined RULES for seq]
 

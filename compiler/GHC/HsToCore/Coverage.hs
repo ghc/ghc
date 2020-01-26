@@ -10,7 +10,7 @@
 
 {-# OPTIONS_GHC -Wno-incomplete-record-updates #-}
 
-module Coverage (addTicksToBinds, hpcInitCode) where
+module GHC.HsToCore.Coverage (addTicksToBinds, hpcInitCode) where
 
 import GhcPrelude as Prelude
 

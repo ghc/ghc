@@ -565,7 +565,7 @@ lambdas if it is not applied to enough arguments; e.g. (#14561)
   bad :: forall (a :: TYPE r). a -> a
   bad = unsafeCoerce#
 
-The desugar has special magic to detect such cases: DsExpr.badUseOfLevPolyPrimop.
+The desugar has special magic to detect such cases: GHC.HsToCore.Expr.badUseOfLevPolyPrimop.
 And we want that magic to apply to levity-polymorphic compulsory-inline things.
 The easiest way to do this is for hasNoBinding to return True of all things
 that have compulsory unfolding.  Some Ids with a compulsory unfolding also
