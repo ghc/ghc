@@ -702,7 +702,7 @@ Note [One-tuples]
 GHC supports both boxed and unboxed one-tuples:
  - Unboxed one-tuples are sometimes useful when returning a
    single value after CPR analysis
- - A boxed one-tuple is used by DsUtils.mkSelectorBinds, when
+ - A boxed one-tuple is used by GHC.HsToCore.Utils.mkSelectorBinds, when
    there is just one binder
 Basically it keeps everything uniform.
 

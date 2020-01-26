@@ -120,7 +120,7 @@ import NameCache        ( initNameCache )
 import GHC.Iface.Load   ( ifaceStats, initExternalPackageState )
 import PrelInfo
 import GHC.Iface.Utils
-import Desugar
+import GHC.HsToCore
 import SimplCore
 import GHC.Iface.Tidy
 import GHC.CoreToStg.Prep

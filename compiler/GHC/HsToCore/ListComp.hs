@@ -10,28 +10,28 @@ Desugaring list comprehensions, monad comprehensions and array comprehensions
 {-# LANGUAGE TypeFamilies #-}
 {-# LANGUAGE ViewPatterns #-}
 
-module DsListComp ( dsListComp, dsMonadComp ) where
+module GHC.HsToCore.ListComp ( dsListComp, dsMonadComp ) where
 
 #include "HsVersions.h"
 
 import GhcPrelude
 
-import {-# SOURCE #-} DsExpr ( dsHandleMonadicFailure, dsExpr, dsLExpr, dsLExprNoLP, dsLocalBinds, dsSyntaxExpr )
+import {-# SOURCE #-} GHC.HsToCore.Expr ( dsHandleMonadicFailure, dsExpr, dsLExpr, dsLExprNoLP, dsLocalBinds, dsSyntaxExpr )
 
 import GHC.Hs
 import TcHsSyn
 import CoreSyn
 import MkCore
 
-import DsMonad          -- the monadery used in the desugarer
-import DsUtils
+import GHC.HsToCore.Monad          -- the monadery used in the desugarer
+import GHC.HsToCore.Utils
 
 import DynFlags
 import CoreUtils
 import Id
 import Type
 import TysWiredIn
-import Match
+import GHC.HsToCore.Match
 import PrelNames
 import SrcLoc
 import Outputable
@@ -154,7 +154,7 @@ dsTransStmt _ = panic "dsTransStmt: Not given a TransStmt"
 {-
 ************************************************************************
 *                                                                      *
-\subsection[DsListComp-ordinary]{Ordinary desugaring of list comprehensions}
+*           Ordinary desugaring of list comprehensions                 *
 *                                                                      *
 ************************************************************************
 
@@ -308,7 +308,7 @@ deBindComp pat core_list1 quals core_list2 = do
 {-
 ************************************************************************
 *                                                                      *
-\subsection[DsListComp-foldr-build]{Foldr/Build desugaring of list comprehensions}
+*           Foldr/Build desugaring of list comprehensions              *
 *                                                                      *
 ************************************************************************
 

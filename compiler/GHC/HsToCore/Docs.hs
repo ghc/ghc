@@ -6,7 +6,7 @@
 
 {-# OPTIONS_GHC -Wno-incomplete-record-updates #-}
 
-module ExtractDocs (extractDocs) where
+module GHC.HsToCore.Docs (extractDocs) where
 
 import GhcPrelude
 import Bag
