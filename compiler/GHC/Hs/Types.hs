@@ -56,8 +56,7 @@ module GHC.Hs.Types (
         hsLTyVarName, hsLTyVarNames, hsLTyVarLocName, hsExplicitLTyVarNames,
         splitLHsInstDeclTy, getLHsInstDeclHead, getLHsInstDeclClass_maybe,
         splitLHsPatSynTy,
-        splitLHsForAllTy, splitLHsForAllTyInvis,
-        splitLHsQualTy, splitLHsSigmaTy, splitLHsSigmaTyInvis,
+        splitLHsForAllTyInvis, splitLHsQualTy, splitLHsSigmaTyInvis,
         splitHsFunType, hsTyGetAppHead_maybe,
         mkHsOpTy, mkHsAppTy, mkHsAppTys, mkHsAppKindTy,
         ignoreParens, hsSigType, hsSigWcType,
@@ -92,7 +91,7 @@ import SrcLoc
 import Outputable
 import FastString
 import Maybes( isJust )
-import Util ( count, debugIsOn )
+import Util ( count )
 
 import Data.Data hiding ( Fixity, Prefix, Infix )
 
@@ -965,9 +964,8 @@ hsWcScopedTvs sig_ty
   , HsIB { hsib_ext = vars
          , hsib_body = sig_ty2 } <- sig_ty1
   = case sig_ty2 of
-      L _ (HsForAllTy { hst_fvf = vis_flag
+      L _ (HsForAllTy { hst_fvf = ForallInvis -- See Note [hsScopedTvs vis_flag]
                       , hst_bndrs = tvs }) ->
-        ASSERT( vis_flag == ForallInvis ) -- See Note [hsScopedTvs vis_flag]
         vars ++ nwcs ++ hsLTyVarNames tvs
       _                                    -> nwcs
 hsWcScopedTvs (HsWC _ (XHsImplicitBndrs nec)) = noExtCon nec
@@ -978,10 +976,9 @@ hsScopedTvs :: LHsSigType GhcRn -> [Name]
 hsScopedTvs sig_ty
   | HsIB { hsib_ext = vars
          , hsib_body = sig_ty2 } <- sig_ty
-  , L _ (HsForAllTy { hst_fvf = vis_flag
+  , L _ (HsForAllTy { hst_fvf = ForallInvis -- See Note [hsScopedTvs vis_flag]
                     , hst_bndrs = tvs }) <- sig_ty2
-  = ASSERT( vis_flag == ForallInvis ) -- See Note [hsScopedTvs vis_flag]
-    vars ++ hsLTyVarNames tvs
+  = vars ++ hsLTyVarNames tvs
   | otherwise
   = []
 
@@ -1027,17 +1024,23 @@ The conclusion of these discussions can be summarized as follows:
   >     vfn :: forall x y -> tau(x,y)
   >     vfn x y = \a b -> ...         -- bad!
 
-At the moment, GHC does not support visible 'forall' in terms, so we simply cement
-our assumptions with an assert:
-
-    hsScopedTvs (HsForAllTy { hst_fvf = vis_flag, ... }) =
-      ASSERT( vis_flag == ForallInvis )
-      ...
-
-In the future, this assert can be safely turned into a pattern match to support
-visible forall in terms:
+We cement this design by pattern-matching on ForallInvis in hsScopedTvs:
 
     hsScopedTvs (HsForAllTy { hst_fvf = ForallInvis, ... }) = ...
+
+At the moment, GHC does not support visible 'forall' in terms. Nevertheless,
+it is still possible to write erroneous programs that use visible 'forall's in
+terms, such as this example:
+
+    x :: forall a -> a -> a
+    x = x
+
+If we do not pattern-match on ForallInvis in hsScopedTvs, then `a` would
+erroneously be brought into scope over the body of `x` when renaming it.
+Although the typechecker would later reject this (see `TcValidity.vdqAllowed`),
+it is still possible for this to wreak havoc in the renamer before it gets to
+that point (see #17687 for an example of this).
+Bottom line: nip problems in the bud by matching on ForallInvis from the start.
 -}
 
 ---------------------
@@ -1233,21 +1236,9 @@ splitLHsPatSynTy ty = (univs, reqs, exis, provs, ty4)
     (provs, ty4) = splitLHsQualTy ty3
 
 -- | Decompose a sigma type (of the form @forall <tvs>. context => body@)
--- into its constituent parts.
---
--- Note that this function looks through parentheses, so it will work on types
--- such as @(forall a. <...>)@. The downside to this is that it is not
--- generally possible to take the returned types and reconstruct the original
--- type (parentheses and all) from them.
-splitLHsSigmaTy :: LHsType pass
-                -> ([LHsTyVarBndr pass], LHsContext pass, LHsType pass)
-splitLHsSigmaTy ty
-  | (tvs, ty1)  <- splitLHsForAllTy ty
-  , (ctxt, ty2) <- splitLHsQualTy ty1
-  = (tvs, ctxt, ty2)
-
--- | Like 'splitLHsSigmaTy', but only splits type variable binders that were
--- quantified invisibly (e.g., @forall a.@, with a dot).
+-- into its constituent parts. Note that only /invisible/ @forall@s
+-- (i.e., @forall a.@, with a dot) are split apart; /visible/ @forall@s
+-- (i.e., @forall a ->@, with an arrow) are left untouched.
 --
 -- This function is used to split apart certain types, such as instance
 -- declaration types, which disallow visible @forall@s. For instance, if GHC
@@ -1265,20 +1256,10 @@ splitLHsSigmaTyInvis ty
   , (ctxt, ty2) <- splitLHsQualTy ty1
   = (tvs, ctxt, ty2)
 
--- | Decompose a type of the form @forall <tvs>. body@) into its constituent
--- parts.
---
--- Note that this function looks through parentheses, so it will work on types
--- such as @(forall a. <...>)@. The downside to this is that it is not
--- generally possible to take the returned types and reconstruct the original
--- type (parentheses and all) from them.
-splitLHsForAllTy :: LHsType pass -> ([LHsTyVarBndr pass], LHsType pass)
-splitLHsForAllTy (L _ (HsParTy _ ty)) = splitLHsForAllTy ty
-splitLHsForAllTy (L _ (HsForAllTy { hst_bndrs = tvs, hst_body = body })) = (tvs, body)
-splitLHsForAllTy body              = ([], body)
-
--- | Like 'splitLHsForAllTy', but only splits type variable binders that
--- were quantified invisibly (e.g., @forall a.@, with a dot).
+-- | Decompose a type of the form @forall <tvs>. body@ into its constituent
+-- parts. Note that only /invisible/ @forall@s
+-- (i.e., @forall a.@, with a dot) are split apart; /visible/ @forall@s
+-- (i.e., @forall a ->@, with an arrow) are left untouched.
 --
 -- This function is used to split apart certain types, such as instance
 -- declaration types, which disallow visible @forall@s. For instance, if GHC
