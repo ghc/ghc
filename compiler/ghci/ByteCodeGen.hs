@@ -50,8 +50,8 @@ import FastString
 import Panic
 import GHC.StgToCmm.Closure    ( NonVoid(..), fromNonVoid, nonVoidIds )
 import GHC.StgToCmm.Layout
-import SMRep hiding (WordOff, ByteOff, wordsToBytes)
-import Bitmap
+import GHC.Runtime.Layout hiding (WordOff, ByteOff, wordsToBytes)
+import GHC.Data.Bitmap
 import OrdList
 import Maybes
 import VarEnv

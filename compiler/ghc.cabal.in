@@ -203,7 +203,7 @@ Library
         DataCon
         PatSyn
         Demand
-        Debug
+        GHC.Cmm.DebugBlock
         Exception
         FieldLabel
         GhcMonad
@@ -240,42 +240,42 @@ Library
         VarEnv
         VarSet
         UnVarGraph
-        BlockId
-        CLabel
-        Cmm
-        CmmBuildInfoTables
-        CmmPipeline
-        CmmCallConv
-        CmmCommonBlockElim
-        CmmImplementSwitchPlans
-        CmmContFlowOpt
-        CmmExpr
-        CmmInfo
-        CmmLex
-        CmmLint
-        CmmLive
-        CmmMachOp
-        CmmMonad
-        CmmSwitch
-        CmmNode
-        CmmOpt
-        CmmParse
-        CmmProcPoint
-        CmmSink
-        CmmType
-        CmmUtils
-        CmmLayoutStack
+        GHC.Cmm.BlockId
+        GHC.Cmm.CLabel
+        GHC.Cmm
+        GHC.Cmm.Info.Build
+        GHC.Cmm.Pipeline
+        GHC.Cmm.CallConv
+        GHC.Cmm.CommonBlockElim
+        GHC.Cmm.Switch.Implement
+        GHC.Cmm.ContFlowOpt
+        GHC.Cmm.Expr
+        GHC.Cmm.Info
+        GHC.Cmm.Lexer
+        GHC.Cmm.Lint
+        GHC.Cmm.Liveness
+        GHC.Cmm.MachOp
+        GHC.Cmm.Monad
+        GHC.Cmm.Switch
+        GHC.Cmm.Node
+        GHC.Cmm.Opt
+        GHC.Cmm.Parser
+        GHC.Cmm.ProcPoint
+        GHC.Cmm.Sink
+        GHC.Cmm.Type
+        GHC.Cmm.Utils
+        GHC.Cmm.LayoutStack
         CliOption
         EnumSet
         GhcNameVersion
         FileSettings
-        MkGraph
+        GHC.Cmm.Graph
         PprBase
-        PprC
-        PprCmm
-        PprCmmDecl
-        PprCmmExpr
-        Bitmap
+        GHC.CmmToC
+        GHC.Cmm.Ppr
+        GHC.Cmm.Ppr.Decl
+        GHC.Cmm.Ppr.Expr
+        GHC.Data.Bitmap
         GHC.Platform.Regs
         GHC.Platform.ARM
         GHC.Platform.ARM64
@@ -303,7 +303,7 @@ Library
         GHC.StgToCmm.Ticky
         GHC.StgToCmm.Utils
         GHC.StgToCmm.ExtCode
-        SMRep
+        GHC.Runtime.Layout
         CoreArity
         CoreFVs
         CoreLint
@@ -576,11 +576,11 @@ Library
         UniqMap
         UniqSet
         Util
-        Hoopl.Block
-        Hoopl.Collections
-        Hoopl.Dataflow
-        Hoopl.Graph
-        Hoopl.Label
+        GHC.Cmm.Dataflow
+        GHC.Cmm.Dataflow.Block
+        GHC.Cmm.Dataflow.Collections
+        GHC.Cmm.Dataflow.Graph
+        GHC.Cmm.Dataflow.Label
 
     Exposed-Modules:
             AsmCodeGen
