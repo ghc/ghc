@@ -105,6 +105,7 @@ stage1Packages = do
              , haskeline
              , hp2ps
              , hsc2hs
+             , integerGmp
              , pretty
              , process
              , rts
