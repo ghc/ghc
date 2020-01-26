@@ -82,7 +82,7 @@ main = do
             Rules.toolArgsTarget
 
     shakeArgsWith options CommandLine.optDescrs $ \_ targets -> do
-        let targets' = removeKVs targets
+        let targets' = filter (not . null) $ removeKVs targets
         Environment.setupEnvironment
         return . Just $ if null targets'
                         then rules
