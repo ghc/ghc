@@ -15,14 +15,17 @@ The @match@ function
 {-# OPTIONS_GHC -Wno-incomplete-uni-patterns   #-}
 {-# OPTIONS_GHC -Wno-incomplete-record-updates #-}
 
-module Match ( match, matchEquations, matchWrapper, matchSimply
-             , matchSinglePat, matchSinglePatVar ) where
+module GHC.HsToCore.Match
+   ( match, matchEquations, matchWrapper, matchSimply
+   , matchSinglePat, matchSinglePatVar
+   )
+where
 
 #include "HsVersions.h"
 
 import GhcPrelude
 
-import {-#SOURCE#-} DsExpr (dsLExpr, dsSyntaxExpr)
+import {-#SOURCE#-} GHC.HsToCore.Expr (dsLExpr, dsSyntaxExpr)
 
 import BasicTypes ( Origin(..) )
 import DynFlags
@@ -35,16 +38,16 @@ import CoreSyn
 import Literal
 import CoreUtils
 import MkCore
-import DsMonad
-import DsBinds
-import DsGRHSs
-import DsUtils
+import GHC.HsToCore.Monad
+import GHC.HsToCore.Binds
+import GHC.HsToCore.GuardedRHSs
+import GHC.HsToCore.Utils
 import Id
 import ConLike
 import DataCon
 import PatSyn
-import MatchCon
-import MatchLit
+import GHC.HsToCore.Match.Constructor
+import GHC.HsToCore.Match.Literal
 import Type
 import Coercion ( eqCoercion )
 import TyCon( isNewTyCon )
@@ -105,7 +108,7 @@ is an embryonic @CoreExpr@ with a ``hole'' at the end for the
 final ``else expression''.
 \end{itemize}
 
-There is a data type, @EquationInfo@, defined in module @DsMonad@.
+There is a data type, @EquationInfo@, defined in module @GHC.HsToCore.Monad@.
 
 An experiment with re-ordering this information about equations (in
 particular, having the patterns available in column-major order)
@@ -162,7 +165,7 @@ sometimes use that Id in a local binding or as a case binder.  So it
 should not have an External name; Lint rejects non-top-level binders
 with External names (#13043).
 
-See also Note [Localise pattern binders] in DsUtils
+See also Note [Localise pattern binders] in GHC.HsToCore.Utils
 -}
 
 type MatchId = Id   -- See Note [Match Ids]
@@ -717,7 +720,7 @@ matchWrapper
 \begin{itemize}
 \item @do@ patterns, but if the @do@ can fail
       it creates another equation if the match can fail
-      (see @DsExpr.doDo@ function)
+      (see @GHC.HsToCore.Expr.doDo@ function)
 \item @let@ patterns, are treated by @matchSimply@
    List Comprension Patterns, are treated by @matchSimply@ also
 \end{itemize}

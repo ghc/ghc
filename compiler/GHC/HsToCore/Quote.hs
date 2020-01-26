@@ -22,25 +22,25 @@
 -- a Royal Pain (triggers other recompilation).
 -----------------------------------------------------------------------------
 
-module DsMeta( dsBracket ) where
+module GHC.HsToCore.Quote( dsBracket ) where
 
 #include "HsVersions.h"
 
 import GhcPrelude
 
-import {-# SOURCE #-}   DsExpr ( dsExpr )
+import {-# SOURCE #-}   GHC.HsToCore.Expr ( dsExpr )
 
-import MatchLit
-import DsMonad
+import GHC.HsToCore.Match.Literal
+import GHC.HsToCore.Monad
 
 import qualified Language.Haskell.TH as TH
 
 import GHC.Hs
 import PrelNames
--- To avoid clashes with DsMeta.varName we must make a local alias for
--- OccName.varName we do this by removing varName from the import of
--- OccName above, making a qualified instance of OccName and using
--- OccNameAlias.varName where varName ws previously used in this file.
+-- To avoid clashes with GHC.HsToCore.Quote.varName we must make a local alias
+-- for OccName.varName. We do this by removing varName from the import of OccName
+-- above, making a qualified instance of OccName and using OccNameAlias.varName
+-- where varName ws previously used in this file.
 import qualified OccName( isDataOcc, isVarOcc, isTcOcc )
 
 import Module
@@ -72,7 +72,7 @@ import Class
 import HscTypes ( MonadThings )
 import DataCon
 import Var
-import DsBinds
+import GHC.HsToCore.Binds
 
 import GHC.TypeLits
 import Data.Kind (Constraint)
@@ -2105,7 +2105,7 @@ globalVar name
       mk_varg | OccName.isDataOcc name_occ = mkNameG_dName
               | OccName.isVarOcc  name_occ = mkNameG_vName
               | OccName.isTcOcc   name_occ = mkNameG_tcName
-              | otherwise                  = pprPanic "DsMeta.globalVar" (ppr name)
+              | otherwise                  = pprPanic "GHC.HsToCore.Quote.globalVar" (ppr name)
 
 lookupType :: Name      -- Name of type constructor (e.g. (M TH.Exp))
            -> MetaM Type  -- The type

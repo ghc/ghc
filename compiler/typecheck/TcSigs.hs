@@ -668,7 +668,7 @@ Note that
 
 
 
-From the TcSpecPrag, in DsBinds we generate a binding for f_spec and a RULE:
+From the TcSpecPrag, in GHC.HsToCore.Binds we generate a binding for f_spec and a RULE:
 
    f_spec :: Int -> b -> Int
    f_spec = wrap<f rhs>

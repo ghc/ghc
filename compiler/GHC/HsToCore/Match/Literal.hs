@@ -11,23 +11,25 @@ Pattern-matching literal patterns
 
 {-# OPTIONS_GHC -Wno-incomplete-uni-patterns #-}
 
-module MatchLit ( dsLit, dsOverLit, hsLitKey
-                , tidyLitPat, tidyNPat
-                , matchLiterals, matchNPlusKPats, matchNPats
-                , warnAboutIdentities
-                , warnAboutOverflowedOverLit, warnAboutOverflowedLit
-                , warnAboutEmptyEnumerations
-                ) where
+module GHC.HsToCore.Match.Literal
+   ( dsLit, dsOverLit, hsLitKey
+   , tidyLitPat, tidyNPat
+   , matchLiterals, matchNPlusKPats, matchNPats
+   , warnAboutIdentities
+   , warnAboutOverflowedOverLit, warnAboutOverflowedLit
+   , warnAboutEmptyEnumerations
+   )
+where
 
 #include "HsVersions.h"
 
 import GhcPrelude
 
-import {-# SOURCE #-} Match  ( match )
-import {-# SOURCE #-} DsExpr ( dsExpr, dsSyntaxExpr )
+import {-# SOURCE #-} GHC.HsToCore.Match ( match )
+import {-# SOURCE #-} GHC.HsToCore.Expr  ( dsExpr, dsSyntaxExpr )
 
-import DsMonad
-import DsUtils
+import GHC.HsToCore.Monad
+import GHC.HsToCore.Utils
 
 import GHC.Hs
 
@@ -64,8 +66,8 @@ import Data.Proxy
 ************************************************************************
 *                                                                      *
                 Desugaring literals
-        [used to be in DsExpr, but DsMeta needs it,
-         and it's nice to avoid a loop]
+ [used to be in GHC.HsToCore.Expr, but GHC.HsToCore.Quote needs it,
+  and it's nice to avoid a loop]
 *                                                                      *
 ************************************************************************
 

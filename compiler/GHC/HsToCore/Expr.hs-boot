@@ -1,8 +1,8 @@
-module DsExpr where
-import GHC.Hs      ( HsExpr, LHsExpr, LHsLocalBinds, LPat, SyntaxExpr )
-import DsMonad     ( DsM, MatchResult )
-import CoreSyn     ( CoreExpr )
-import GHC.Hs.Extension ( GhcTc)
+module GHC.HsToCore.Expr where
+import GHC.Hs             ( HsExpr, LHsExpr, LHsLocalBinds, LPat, SyntaxExpr )
+import GHC.HsToCore.Monad ( DsM, MatchResult )
+import CoreSyn            ( CoreExpr )
+import GHC.Hs.Extension   ( GhcTc)
 
 dsExpr  :: HsExpr GhcTc -> DsM CoreExpr
 dsLExpr, dsLExprNoLP :: LHsExpr GhcTc -> DsM CoreExpr

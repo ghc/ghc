@@ -759,7 +759,7 @@ mkLHsWrap :: HsWrapper -> LHsExpr GhcTc -> LHsExpr GhcTc
 mkLHsWrap co_fn (L loc e) = L loc (mkHsWrap co_fn e)
 
 -- | Avoid @'HsWrap' co1 ('HsWrap' co2 _)@ and @'HsWrap' co1 ('HsPar' _ _)@
--- See Note [Detecting forced eta expansion] in "DsExpr"
+-- See Note [Detecting forced eta expansion] in "GHC.HsToCore.Expr"
 mkHsWrap :: HsWrapper -> HsExpr GhcTc -> HsExpr GhcTc
 mkHsWrap co_fn e | isIdHsWrapper co_fn   = e
 mkHsWrap co_fn (XExpr (HsWrap co_fn' e)) = mkHsWrap (co_fn <.> co_fn') e
@@ -935,7 +935,7 @@ BUT we have a special case when abs_sig is true;
 -- | Should we treat this as an unlifted bind? This will be true for any
 -- bind that binds an unlifted variable, but we must be careful around
 -- AbsBinds. See Note [Unlifted id check in isUnliftedHsBind]. For usage
--- information, see Note [Strict binds check] is DsBinds.
+-- information, see Note [Strict binds check] is GHC.HsToCore.Binds.
 isUnliftedHsBind :: HsBind GhcTc -> Bool  -- works only over typechecked binds
 isUnliftedHsBind bind
   | AbsBinds { abs_exports = exports, abs_sig = has_sig } <- bind
@@ -1103,17 +1103,17 @@ collect_lpat p bndrs
     go (XPat {})                  = bndrs
 
 {-
-Note [Dictionary binders in ConPatOut] See also same Note in DsArrows
+Note [Dictionary binders in ConPatOut] See also same Note in GHC.HsToCore.Arrows
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 Do *not* gather (a) dictionary and (b) dictionary bindings as binders
 of a ConPatOut pattern.  For most calls it doesn't matter, because
 it's pre-typechecker and there are no ConPatOuts.  But it does matter
-more in the desugarer; for example, DsUtils.mkSelectorBinds uses
+more in the desugarer; for example, GHC.HsToCore.Utils.mkSelectorBinds uses
 collectPatBinders.  In a lazy pattern, for example f ~(C x y) = ...,
 we want to generate bindings for x,y but not for dictionaries bound by
 C.  (The type checker ensures they would not be used.)
 
-Desugaring of arrow case expressions needs these bindings (see DsArrows
+Desugaring of arrow case expressions needs these bindings (see GHC.HsToCore.Arrows
 and arrowcase1), but SPJ (Jan 2007) says it's safer for it to use its
 own pat-binder-collector:
 
@@ -1127,7 +1127,7 @@ f ~(C (n+1) m) = (n,m)
 Here, the pattern (C (n+1)) binds a hidden dictionary (d::Num a),
 and *also* uses that dictionary to match the (n+1) pattern.  Yet, the
 variables bound by the lazy pattern are n,m, *not* the dictionary d.
-So in mkSelectorBinds in DsUtils, we want just m,n as the variables bound.
+So in mkSelectorBinds in GHC.HsToCore.Utils, we want just m,n as the variables bound.
 -}
 
 hsGroupBinders :: HsGroup GhcRn -> [Name]

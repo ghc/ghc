@@ -13,27 +13,30 @@ Desugaring expressions.
 {-# OPTIONS_GHC -Wno-incomplete-uni-patterns   #-}
 {-# OPTIONS_GHC -Wno-incomplete-record-updates #-}
 
-module DsExpr ( dsExpr, dsLExpr, dsLExprNoLP, dsLocalBinds
-              , dsValBinds, dsLit, dsSyntaxExpr
-              , dsHandleMonadicFailure ) where
+module GHC.HsToCore.Expr
+   ( dsExpr, dsLExpr, dsLExprNoLP, dsLocalBinds
+   , dsValBinds, dsLit, dsSyntaxExpr
+   , dsHandleMonadicFailure
+   )
+where
 
 #include "HsVersions.h"
 
 import GhcPrelude
 
-import Match
-import MatchLit
-import DsBinds
-import DsGRHSs
-import DsListComp
-import DsUtils
-import DsArrows
-import DsMonad
+import GHC.HsToCore.Match
+import GHC.HsToCore.Match.Literal
+import GHC.HsToCore.Binds
+import GHC.HsToCore.GuardedRHSs
+import GHC.HsToCore.ListComp
+import GHC.HsToCore.Utils
+import GHC.HsToCore.Arrows
+import GHC.HsToCore.Monad
 import GHC.HsToCore.PmCheck ( checkGuardMatches )
 import Name
 import NameEnv
 import FamInstEnv( topNormaliseType )
-import DsMeta
+import GHC.HsToCore.Quote
 import GHC.Hs
 
 -- NB: The desugarer, which straddles the source and Core worlds, sometimes
@@ -119,7 +122,7 @@ ds_val_bind (NonRecursive, hsbinds) body
         --       below.  Then pattern-match would fail.  Urk.)
   , isUnliftedHsBind bind
   = putSrcSpanDs loc $
-     -- see Note [Strict binds checks] in DsBinds
+     -- see Note [Strict binds checks] in GHC.HsToCore.Binds
     if is_polymorphic bind
     then errDsCoreExpr (poly_bind_err bind)
             -- data Ptr a = Ptr Addr#
@@ -155,7 +158,7 @@ ds_val_bind (NonRecursive, hsbinds) body
         text "Probable fix: add a type signature"
 
 ds_val_bind (is_rec, binds) _body
-  | anyBag (isUnliftedHsBind . unLoc) binds  -- see Note [Strict binds checks] in DsBinds
+  | anyBag (isUnliftedHsBind . unLoc) binds  -- see Note [Strict binds checks] in GHC.HsToCore.Binds
   = ASSERT( isRec is_rec )
     errDsCoreExpr $
     hang (text "Recursive bindings for unlifted types aren't allowed:")
@@ -228,7 +231,7 @@ dsUnliftedBind bind body = pprPanic "dsLet: unlifted" (ppr bind $$ ppr body)
 {-
 ************************************************************************
 *                                                                      *
-\subsection[DsExpr-vars-and-cons]{Variables, constructors, literals}
+*              Variables, constructors, literals                       *
 *                                                                      *
 ************************************************************************
 -}
@@ -247,7 +250,7 @@ dsLExpr (L loc e)
 -- | Variant of 'dsLExpr' that ensures that the result is not levity
 -- polymorphic. This should be used when the resulting expression will
 -- be an argument to some other function.
--- See Note [Levity polymorphism checking] in DsMonad
+-- See Note [Levity polymorphism checking] in GHC.HsToCore.Monad
 -- See Note [Levity polymorphism invariants] in CoreSyn
 dsLExprNoLP :: LHsExpr GhcTc -> DsM CoreExpr
 dsLExprNoLP (L loc e)
@@ -875,7 +878,7 @@ dsExplicitList elt_ty Nothing xs
                 -- Don't generate builds when the [] constructor will do
          || not (gopt Opt_EnableRewriteRules dflags)  -- Rewrite rules off
                 -- Don't generate a build if there are no rules to eliminate it!
-                -- See Note [Desugaring RULE left hand sides] in Desugar
+                -- See Note [Desugaring RULE left hand sides] in GHC.HsToCore
          then return $ mkListExpr elt_ty xs'
          else mkBuildExpr elt_ty (mk_build_list xs') }
   where
@@ -910,7 +913,7 @@ dsArithSeq expr (FromThenTo from thn to)
 
 {-
 Desugar 'do' and 'mdo' expressions (NOT list comprehensions, they're
-handled in DsListComp).  Basically does the translation given in the
+handled in GHC.HsToCore.ListComp).  Basically does the translation given in the
 Haskell 98 report:
 -}
 
