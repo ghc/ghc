@@ -84,9 +84,17 @@
 // freely modified.
 
 #if !defined(CMINUSMINUS)
+
+
+struct NonmovingSegmentInfo {
+  StgWord8 log_block_size;
+  StgWord16 next_free_snap;
+};
+
 typedef struct bdescr_ {
 
     StgPtr start;              // [READ ONLY] start addr of memory
+
 
     union {
         StgPtr free;               // First free byte of memory.
@@ -100,10 +108,7 @@ typedef struct bdescr_ {
                                    // indicate that a block is unallocated.
                                    //
                                    // Unused by the non-moving allocator.
-        struct NonmovingSegmentInfo {
-            StgWord8 log_block_size;
-            StgWord16 next_free_snap;
-        } nonmoving_segment;
+        struct NonmovingSegmentInfo nonmoving_segment;
     };
 
     struct bdescr_ *link;      // used for chaining blocks together
