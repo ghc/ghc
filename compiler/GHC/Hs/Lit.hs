@@ -199,7 +199,7 @@ found to have.
 -}
 
 -- Comparison operations are needed when grouping literals
--- for compiling pattern-matching (module MatchLit)
+-- for compiling pattern-matching (module GHC.HsToCore.Match.Literal)
 instance (Eq (XXOverLit p)) => Eq (HsOverLit p) where
   (OverLit _ val1 _) == (OverLit _ val2 _) = val1 == val2
   (XOverLit  val1)   == (XOverLit  val2)   = val1 == val2

@@ -1093,7 +1093,7 @@ Note [Record PatSyn Desugaring]
 It is important that prov_theta comes before req_theta as this ordering is used
 when desugaring record pattern synonym updates.
 
-Any change to this ordering should make sure to change deSugar/DsExpr.hs if you
+Any change to this ordering should make sure to change GHC.HsToCore.Expr if you
 want to avoid difficult to decipher core lint errors!
  -}
 

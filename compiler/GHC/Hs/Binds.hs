@@ -240,7 +240,7 @@ data HsBindLR idL idR
           -- type         Int -> forall a'. a' -> a'
           -- Notice that the coercion captures the free a'.
 
-        fun_id :: Located (IdP idL), -- Note [fun_id in Match] in GHC.Hs.Expr
+        fun_id :: Located (IdP idL), -- Note [m_ctxt in Match] in GHC.Hs.Expr
 
         fun_matches :: MatchGroup idR (LHsExpr idR),  -- ^ The payload
 
@@ -574,7 +574,7 @@ let-binding.  When abs_sig = True
    and hence the abs_binds is non-recursive
    (it binds the mono_id but refers to the poly_id
 
-These properties are exploited in DsBinds.dsAbsBinds to
+These properties are exploited in GHC.HsToCore.Binds.dsAbsBinds to
 generate code without a let-binding.
 
 Note [ABExport wrapper]
