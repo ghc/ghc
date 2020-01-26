@@ -97,13 +97,14 @@ stage1Packages = do
              , exceptions
              , filepath
              , ghc
+             , ghcBignum
              , ghcCompact
              , ghcPkg
              , ghcPrim
              , haskeline
              , hp2ps
              , hsc2hs
-             , ghcBignum
+             , integerGmp
              , pretty
              , process
              , rts
