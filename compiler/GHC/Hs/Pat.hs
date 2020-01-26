@@ -727,7 +727,7 @@ looksLazyPat (VarPat {})   = False
 looksLazyPat (WildPat {})  = False
 looksLazyPat _             = True
 
-isIrrefutableHsPat :: (IsPass p, OutputableBndrId p) => LPat (GhcPass p) -> Bool
+isIrrefutableHsPat :: forall p. (IsPass p, OutputableBndrId p) => LPat (GhcPass p) -> Bool
 -- (isIrrefutableHsPat p) is true if matching against p cannot fail,
 -- in the sense of falling through to the next pattern.
 --      (NB: this is not quite the same as the (silly) defn
@@ -743,10 +743,10 @@ isIrrefutableHsPat :: (IsPass p, OutputableBndrId p) => LPat (GhcPass p) -> Bool
 isIrrefutableHsPat
   = goL
   where
-    goL :: forall p'. (IsPass p', OutputableBndrId p') => LPat (GhcPass p') -> Bool
+    goL :: LPat (GhcPass p) -> Bool
     goL = go . unLoc
 
-    go :: forall p'. (IsPass p', OutputableBndrId p') => Pat (GhcPass p') -> Bool
+    go :: Pat (GhcPass p) -> Bool
     go (WildPat {})        = True
     go (VarPat {})         = True
     go (LazyPat {})        = True
@@ -763,7 +763,7 @@ isIrrefutableHsPat
     go (ConPat
         { pat_con  = con
         , pat_args = details })
-                           = case pass @p' of
+                           = case pass @p of
        GhcPs -> False -- Conservative
        GhcRn -> False -- Conservative
        GhcTc -> case con of
@@ -781,7 +781,7 @@ isIrrefutableHsPat
     -- since we cannot know until the splice is evaluated.
     go (SplicePat {})      = False
 
-    go (XPat ext)          = case pass @p' of
+    go (XPat ext)          = case pass @p of
       GhcPs -> noExtCon ext
       GhcRn -> noExtCon ext
       GhcTc -> go pat
@@ -811,17 +811,17 @@ is the only thing that could possibly be matched!
 
 -- | @'patNeedsParens' p pat@ returns 'True' if the pattern @pat@ needs
 -- parentheses under precedence @p@.
-patNeedsParens :: IsGhcPass p => PprPrec -> Pat p -> Bool
+patNeedsParens :: forall p. IsGhcPass p => PprPrec -> Pat p -> Bool
 patNeedsParens p = go
   where
-    go :: forall p'. IsGhcPass p' => Pat p' -> Bool
+    go :: Pat p -> Bool
     go (NPlusKPat {})    = p > opPrec
     go (SplicePat {})    = False
     go (ConPat { pat_args = ds})
                          = conPatNeedsParens p ds
     go (SigPat {})       = p >= sigPrec
     go (ViewPat {})      = True
-    go (XPat ext)        = case ghcPass @p' of
+    go (XPat ext)        = case ghcPass @p of
       GhcPs -> noExtCon ext
       GhcRn -> noExtCon ext
       GhcTc -> go inner
