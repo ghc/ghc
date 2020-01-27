@@ -243,7 +243,7 @@ filterFB c p x r | p x       = x `c` r
 -- 42
 -- >>> foldl (-) 100 [1..4]
 -- 90
--- >>> foldl (\reverseString nextChar -> nextChar : reverseString) "foo" ['a', 'b', 'c', 'd']
+-- >>> foldl (\reversedString nextChar -> nextChar : reversedString) "foo" ['a', 'b', 'c', 'd']
 -- "dcbafoo"
 foldl :: forall a b. (b -> a -> b) -> b -> [a] -> b
 {-# INLINE foldl #-}
