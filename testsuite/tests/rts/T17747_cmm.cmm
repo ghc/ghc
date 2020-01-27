@@ -1,0 +1,13 @@
+#include "Cmm.h"
+
+/* Place a ByteArray# object header at the given address.
+
+   The caller must ensure that enough space is allocated so that we can use it.
+ */
+stg_placeByteArrayzh ( gcptr p, W_ n )
+{
+    SET_HDR(p, stg_ARR_WORDS_info, CCCS);
+    StgArrBytes_bytes(p) = n;
+    return (p);
+}
+
