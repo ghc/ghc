@@ -13,13 +13,13 @@ import GHC.Exts
 import GHC.Base (IO(IO))
 
 
--- | Test that we can allocate ByteArray#s outside of the @HEAP_ALLOCED()@
+-- | Test that we can allocate 'ByteArray#'s outside of the @HEAP_ALLOCED()@
 -- address space without upsetting the GC. To be extra sure we attach weak
 -- pointers with C finalizers to the 'ByteArray#'s. We keep them alive and run
 -- a major GC so that the GC has to trace the live 'ByteArray#'s.
 --
 -- On older GHC versions this upsets the GC because it does not expect heap
--- objects with closure type ARR_WORDS to exist outside the heap.
+-- objects with closure type @ARR_WORDS@ to exist outside the heap.
 --
 -- > internal error: evacuate(static): strange closure type 42
 --
@@ -40,7 +40,7 @@ main = do
 
 bytearrayTest :: IO ()
 bytearrayTest = do
-    
+
     -- malloc() a bunch of ByteArray#s on the C heap
     foreignBAs <- mapM newForeignHeapByteArray [0..99]
     n1 <- getMallocByteArrayCount
@@ -86,7 +86,7 @@ placeByteArray (Ptr addr#) (I# n#) =
     IO $ \s0 ->
       case placeByteArray# addr# n# s0 of
         (# s1, mba# #) -> (# s1, MutableByteArray mba# #)
-      
+
 fillAndFreezeByteArray :: MutableByteArray -> Int -> IO ByteArray
 fillAndFreezeByteArray (MutableByteArray mba#) (I# n#) =
     IO $ \s0 ->
