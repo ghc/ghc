@@ -1,11 +1,8 @@
 module GHC.Iface.Type
-   ( IfaceType, IfaceTyCon, IfaceForAllBndr
+   ( IfaceType, IfaceTyCon, IfaceBndr
    , IfaceCoercion, IfaceTyLit, IfaceAppArgs
    )
 where
-
-module IfaceType( IfaceType, IfaceTyCon, IfaceBndr
-                , IfaceCoercion, IfaceTyLit, IfaceAppArgs ) where
 
 data IfaceAppArgs
 

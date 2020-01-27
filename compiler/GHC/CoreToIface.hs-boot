@@ -1,8 +1,8 @@
 module GHC.CoreToIface where
 
 import {-# SOURCE #-} TyCoRep ( Type, TyLit, Coercion )
-import {-# SOURCE #-} IfaceType( IfaceType, IfaceTyCon, IfaceBndr
-                               , IfaceCoercion, IfaceTyLit, IfaceAppArgs )
+import {-# SOURCE #-} GHC.Iface.Type ( IfaceType, IfaceTyCon, IfaceBndr
+                                     , IfaceCoercion, IfaceTyLit, IfaceAppArgs )
 import Var ( VarBndr, TyCoVar )
 import VarEnv ( TidyEnv )
 import TyCon ( TyCon )
