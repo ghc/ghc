@@ -321,6 +321,9 @@ wanteds os = concat
           ,constantWord Both "TICKY_BIN_COUNT" "TICKY_BIN_COUNT"
            -- number of bins for histograms used in ticky code
 
+          ,constantWord Both "TSO_BLOCKEX" "TSO_BLOCKEX"
+          ,constantWord Both "TSO_INTERRUPTIBLE" "TSO_INTERRUPTIBLE"
+
           ,fieldOffset Both "StgRegTable" "rR1"
           ,fieldOffset Both "StgRegTable" "rR2"
           ,fieldOffset Both "StgRegTable" "rR3"
@@ -424,7 +427,7 @@ wanteds os = concat
           ,structField  Both "StgEntCounter" "entry_count"
 
           ,closureSize Both "StgUpdateFrame"
-          ,closureSize C    "StgCatchFrame"
+          ,closureSize Both "StgCatchFrame"
           ,closureSize C    "StgStopFrame"
 
           ,closureSize  Both "StgMutArrPtrs"
@@ -448,7 +451,7 @@ wanteds os = concat
           ,closureField  C    "StgTSO"      "cap"
           ,closureField  C    "StgTSO"      "saved_errno"
           ,closureField  C    "StgTSO"      "trec"
-          ,closureField  C    "StgTSO"      "flags"
+          ,closureField  Both "StgTSO"      "flags"
           ,closureField  C    "StgTSO"      "dirty"
           ,closureField  C    "StgTSO"      "bq"
           ,closureField  Both "StgTSO"      "alloc_limit"
@@ -464,8 +467,8 @@ wanteds os = concat
 
           ,closureField Both "StgUpdateFrame" "updatee"
 
-          ,closureField C "StgCatchFrame" "handler"
-          ,closureField C "StgCatchFrame" "exceptions_blocked"
+          ,closureField Both "StgCatchFrame" "handler"
+          ,closureField Both "StgCatchFrame" "exceptions_blocked"
 
           ,closureSize       C "StgPAP"
           ,closureField      C "StgPAP" "n_args"
@@ -973,4 +976,3 @@ execute verbose prog args
       ec <- rawSystem prog args
       unless (ec == ExitSuccess) $
           die ("Executing " ++ show prog ++ " failed")
-
