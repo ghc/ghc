@@ -1,0 +1,19 @@
+#include "Cmm.h"
+#include "sm/HeapAlloc.h" /* for HEAP_ALLOCED() */
+
+cmm_HEAP_ALLOCED ( W_ p )
+// Addr# -> Int#
+{
+#if defined(HEAP_ALLOCED)
+    if (HEAP_ALLOCED(p)) {
+#else
+    W_ result;
+    HEAP_ALLOCED_CALLISH(result, p)
+    if (result == 1) {
+#endif
+        return (1);
+    } else {
+        return (0);
+    }
+}
+
