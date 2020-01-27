@@ -1097,7 +1097,7 @@ repTyVarBndrWithKind (L _ (KindedTyVar _ fl _ ki)) nm
   = do { fl' <- repFlag fl
        ; ki' <- repLTy ki
        ; repKindedTV nm fl' ki' }
-repTyVarBndrWithKind (L _ (XTyVarBndr nec)) _ = noExtCon nex
+repTyVarBndrWithKind (L _ (XTyVarBndr nec)) _ = noExtCon nec
 
 -- | Represent a type variable binder
 repTyVarBndr :: RepFlag flag flag'
