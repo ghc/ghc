@@ -1353,10 +1353,8 @@ parseCfgWeights s oldWeights =
             , null rest
             = [s1]
             | (s1,rest) <- break (== ',') s
-            = [s1] ++ settings (drop 1 rest)
-#if __GLASGOW_HASKELL__ <= 810
-            | otherwise = panic $ "Invalid cfg parameters." ++ exampleString
-#endif
+            = s1 : settings (drop 1 rest)
+
         assignment as
             | (name, _:val) <- break (== '=') as
             = (name,read val)
