@@ -1,0 +1,5 @@
+malloc_count = 0
+malloc_count = 100
+byte arrays same = True
+malloc_count = 100
+malloc_count = 0

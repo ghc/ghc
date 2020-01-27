@@ -417,3 +417,5 @@ test('InitEventLogging',
 test('T17088',
      [only_ways(['normal']), extra_run_opts('+RTS -c -A256k -RTS')],
      compile_and_run, ['-rtsopts -O2'])
+
+test('T17747', [], makefile_test, ['T17747'])
