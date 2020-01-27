@@ -948,10 +948,7 @@ deepSplitCprType_maybe fam_envs con_tag ty
   , cons `lengthAtLeast` con_tag -- This might not be true if we import the
                                  -- type constructor via a .hs-bool file (#8743)
   , let con = cons `getNth` (con_tag - fIRST_TAG)
-  , null (dataConExTyCoVars con) -- We have no simple way to express
-                                 -- existentials. Omitting this triggers an
-                                 -- assertion in 'dataConInstArgTys'
-  , let arg_tys = dataConInstArgTys con tc_args
+        arg_tys = dataConInstArgTys con tc_args
         strict_marks = dataConRepStrictness con
   = Just (con, tc_args, zipEqual "dsct" arg_tys strict_marks, co)
 deepSplitCprType_maybe _ _ _ = Nothing
