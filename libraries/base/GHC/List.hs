@@ -200,7 +200,6 @@ idLength = id
 --
 -- >>> filter odd [1, 2, 3]
 -- [1,3]
-
 {-# NOINLINE [1] filter #-}
 filter :: (a -> Bool) -> [a] -> [a]
 filter _pred []    = []
@@ -236,7 +235,15 @@ filterFB c p x r | p x       = x `c` r
 -- > foldl f z [x1, x2, ..., xn] == (...((z `f` x1) `f` x2) `f`...) `f` xn
 --
 -- The list must be finite.
-
+-- 
+-- >>> foldl (+) 0 [1..4]
+-- 10
+-- >>> foldl (+) 42 []
+-- 42
+-- >>> foldl (-) 100 [1..4]
+-- 90
+-- >>> foldl (\reverseString nextChar -> nextChar : reverseString) "foo" ['a', 'b', 'c', 'd']
+-- "dcbafoo"
 foldl :: forall a b. (b -> a -> b) -> b -> [a] -> b
 {-# INLINE foldl #-}
 foldl k z0 xs =
