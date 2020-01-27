@@ -153,6 +153,20 @@ Language
   by the right-hand side of ``F2``\'s equation, this now needs ``-XUndecidableInstances``.
   The problem is very much akin to its need to detect some functional dependencies.
 
+- The pattern-match coverage checker received a number of improvements wrt.
+  correctness and performance.
+
+  Checking against user-defined COMPLETE pragmas
+  "just works" now, so that we could move away from the
+  `complicated procedure for disambiguation <https://downloads.haskell.org/~ghc/latest/docs/html/users_guide/glasgow_exts.html#disambiguating-between-multiple-complete-pragmas>`__
+  we had in place before.
+
+  Previously, the checker performed really badly on some inputs and had no
+  good story for graceful degradation in these situations. These situations
+  should occur much less frequently now and degradation happens much more
+  smoothly, while still producing useful, sound results (see
+  :ghc-flag:`-fmax-pmcheck-models`).
+
 Compiler
 ~~~~~~~~
 
