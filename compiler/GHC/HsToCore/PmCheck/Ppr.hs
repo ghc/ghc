@@ -1,5 +1,7 @@
 {-# LANGUAGE CPP, ViewPatterns #-}
 
+{-# OPTIONS_GHC -Wno-incomplete-uni-patterns #-}
+
 -- | Provides factilities for pretty-printing 'Delta's in a way appropriate for
 -- user facing pattern match warnings.
 module GHC.HsToCore.PmCheck.Ppr (

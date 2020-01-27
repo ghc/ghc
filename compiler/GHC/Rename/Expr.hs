@@ -16,6 +16,9 @@ free variables.
 {-# LANGUAGE TypeFamilies #-}
 {-# LANGUAGE ViewPatterns #-}
 
+{-# OPTIONS_GHC -Wno-incomplete-record-updates #-}
+{-# OPTIONS_GHC -Wno-incomplete-uni-patterns   #-}
+
 module GHC.Rename.Expr (
         rnLExpr, rnExpr, rnStmts
    ) where

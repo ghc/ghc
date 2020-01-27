@@ -12,6 +12,9 @@ The @match@ function
 {-# LANGUAGE TypeFamilies #-}
 {-# LANGUAGE ViewPatterns #-}
 
+{-# OPTIONS_GHC -Wno-incomplete-uni-patterns   #-}
+{-# OPTIONS_GHC -Wno-incomplete-record-updates #-}
+
 module Match ( match, matchEquations, matchWrapper, matchSimply
              , matchSinglePat, matchSinglePatVar ) where
 
