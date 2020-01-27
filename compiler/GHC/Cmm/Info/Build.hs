@@ -953,17 +953,20 @@ oneSRT dflags staticFuns lbls caf_lbls isCAF cafs static_data = do
       srtTrace "updateSRTMap"
         (ppr srtEntry <+> "isCAF:" <+> ppr isCAF <+>
          "isStaticFun:" <+> ppr isStaticFun) $
-      when (not isCAF && (not isStaticFun || isNothing srtEntry)) $ do
-        let newSRTMap = Map.fromList
-              [ (cafLbl, srtEntry)
-              | cafLbl@(CAFLabel clbl) <- caf_lbls
-                -- Only map static data to Nothing (== not CAFFY). For CAFFY
-                -- statics we refer to the static itself instead of a SRT.
-              , not (Set.member clbl static_data) || isNothing srtEntry
-              ]
-        srtTrace "newSRTMap" (ppr newSRTMap) $
-          modify' (\state -> state{ moduleSRTMap =
-                                    Map.union newSRTMap (moduleSRTMap state) })
+      when (not isCAF && (not isStaticFun || isNothing srtEntry)) $
+        modify' $ \state ->
+           let !srt_map =
+                 foldl' (\srt_map cafLbl@(CAFLabel clbl) ->
+                          -- Only map static data to Nothing (== not CAFFY). For CAFFY
+                          -- statics we refer to the static itself instead of a SRT.
+                          if not (Set.member clbl static_data) || isNothing srtEntry then
+                            Map.insert cafLbl srtEntry srt_map
+                          else
+                            srt_map)
+                        (moduleSRTMap state)
+                        caf_lbls
+           in
+               state{ moduleSRTMap = srt_map }
 
     this_mod = thisModule topSRT
 
