@@ -582,12 +582,21 @@ coreToStgArgs (arg : args) = do         -- Non-type argument
     (stg_args, ticks) <- coreToStgArgs args
     arg' <- coreToStgExpr arg
     let
+        arg_ty = exprType arg
         (aticks, arg'') = stripStgTicksTop tickishFloatable arg'
         stg_arg = case arg'' of
                        StgApp v []        -> StgVarArg v
                        StgConApp con [] _ -> StgVarArg (dataConWorkId con)
                        StgLit lit         -> StgLitArg lit
-                       _                  -> pprPanic "coreToStgArgs" (ppr arg)
+                       StgLam bndrs body  ->
+                         let
+                           bndr = case toList bndrs of
+                             [x] -> x
+                             xs  ->
+                               -- TODO: more informative error message
+                               pprPanic "coreToStgArgs" (ppr arg'')
+                         in StgContArg bndr body arg_ty
+                       _  -> pprPanic "coreToStgArgs" (ppr arg'')
 
         -- WARNING: what if we have an argument like (v `cast` co)
         --          where 'co' changes the representation type?
@@ -601,7 +610,7 @@ coreToStgArgs (arg : args) = do         -- Non-type argument
 
     dflags <- getDynFlags
     let
-        arg_rep = typePrimRep (exprType arg)
+        arg_rep = typePrimRep arg_ty
         stg_arg_rep = typePrimRep (stgArgType stg_arg)
         bad_args = not (primRepsCompatible dflags arg_rep stg_arg_rep)
 

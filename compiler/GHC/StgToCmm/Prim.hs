@@ -24,6 +24,8 @@ module GHC.StgToCmm.Prim (
 
 import GhcPrelude hiding ((<*>))
 
+import {-# SOURCE #-} StgCmmExpr ( cgExpr )
+
 import GHC.StgToCmm.Layout
 import GHC.StgToCmm.Foreign
 import GHC.StgToCmm.Env
@@ -79,6 +81,20 @@ cgOpApp :: StgOp        -- The op
 cgOpApp (StgFCallOp fcall ty) stg_args res_ty
   = cgForeignCall fcall ty stg_args res_ty
       -- Note [Foreign call results]
+
+cgOpApp (StgPrimOp CatchOp) (StgContArg _bndr body _ : handler : _) _res_ty = do
+  args' <- getNonVoidArgAmodes [handler]
+  let
+    handler_amode =
+      case args' of
+        [amode] -> amode
+        _       -> panic "CatchOp had void arg as handler"
+  emitCatchFrame handler_amode (cgExpr body)
+  -- TODO(hsyl20):
+  -- Shouldn't we substitute the binder in body with the real-world token
+  -- applied to catch#?
+  --
+  -- Shouldn't we emitReturn code just like the other inline primops?
 
 cgOpApp (StgPrimOp primop) args res_ty = do
     dflags <- getDynFlags
@@ -2993,6 +3009,35 @@ emitCtzCall res x width = do
         [ res ]
         (MO_Ctz width)
         [ x ]
+
+-----------------------------------------------------------------------------
+-- Setting up catch frames
+
+emitCatchFrame :: CmmExpr -> FCode a -> FCode a
+emitCatchFrame handler body
+  = do
+       updfr  <- getUpdFrameOff
+       dflags <- getDynFlags
+       let
+         hdr       = fixedHdrSize dflags
+         off_frame = updfr + hdr + sIZEOF_StgCatchFrame_NoHdr dflags
+         frame     = CmmStackSlot Old off_frame
+
+         off_handler     = hdr + oFFSET_StgCatchFrame_handler dflags
+         off_exc_blocked = hdr + oFFSET_StgCatchFrame_exceptions_blocked dflags
+
+         exc_blocked =
+           CmmMachOp
+             (mo_u_32ToWord dflags)
+             [CmmLoad (CmmRegOff currentTSOReg (oFFSET_StgTSO_flags dflags)) b32]
+
+       -- TODO(hsyl20): It seems like some masking is missing compared to stg_catch#: see
+       -- https://github.com/hsyl20/ghc/commit/c4aecdf75fb2b9fa809458da14b578fa5d41190f#diff-38e0a01473e008dd4172ab960702dcfaL2492
+       emitStore frame (mkLblExpr mkCatchInfoLabel)
+       emitStore (cmmOffset dflags frame off_exc_blocked) exc_blocked
+       emitStore (cmmOffset dflags frame off_handler) handler
+
+       withUpdFrameOff off_frame body
 
 ---------------------------------------------------------------------------
 -- Pushing to the update remembered set

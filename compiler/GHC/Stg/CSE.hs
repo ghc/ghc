@@ -116,10 +116,12 @@ instance TrieMap StgArgMap where
     type Key StgArgMap = StgArg
     emptyTM  = SAM { sam_var = emptyTM
                    , sam_lit = emptyTM }
-    lookupTM (StgVarArg var) = sam_var >.> lkDFreeVar var
-    lookupTM (StgLitArg lit) = sam_lit >.> lookupTM lit
+    lookupTM (StgVarArg var)  = sam_var >.> lkDFreeVar var
+    lookupTM (StgLitArg lit)  = sam_lit >.> lookupTM lit
+    lookupTM (StgContArg _ _ _) = const Nothing
     alterTM  (StgVarArg var) f m = m { sam_var = sam_var m |> xtDFreeVar var f }
     alterTM  (StgLitArg lit) f m = m { sam_lit = sam_lit m |> alterTM lit f }
+    alterTM  (StgContArg _ _ _) f m = m
     foldTM k m = foldTM k (sam_var m) . foldTM k (sam_lit m)
     mapTM f (SAM {sam_var = varm, sam_lit = litm}) =
         SAM { sam_var = mapTM f varm, sam_lit = mapTM f litm }
@@ -198,8 +200,9 @@ initEnv in_scope = CseEnv
 envLookup :: DataCon -> [OutStgArg] -> CseEnv -> Maybe OutId
 envLookup dataCon args env = lookupTM (dataCon, args') (ce_conAppMap env)
   where args' = map go args -- See Note [Trivial case scrutinee]
-        go (StgVarArg v  ) = StgVarArg (fromMaybe v $ lookupVarEnv (ce_bndrMap env) v)
-        go (StgLitArg lit) = StgLitArg lit
+        go (StgVarArg v  )  = StgVarArg (fromMaybe v $ lookupVarEnv (ce_bndrMap env) v)
+        go (StgLitArg lit)  = StgLitArg lit
+        go (StgContArg bndr body ty) = StgContArg bndr body ty
 
 addDataCon :: OutId -> DataCon -> [OutStgArg] -> CseEnv -> CseEnv
 -- do not bother with nullary data constructors, they are static anyways
@@ -224,8 +227,9 @@ substArgs :: CseEnv -> [InStgArg] -> [OutStgArg]
 substArgs env = map (substArg env)
 
 substArg :: CseEnv -> InStgArg -> OutStgArg
-substArg env (StgVarArg from) = StgVarArg (substVar env from)
-substArg _   (StgLitArg lit)  = StgLitArg lit
+substArg env (StgVarArg from)       = StgVarArg (substVar env from)
+substArg _   (StgLitArg lit)        = StgLitArg lit
+substArg env (StgContArg bndr body ty) = StgContArg bndr body ty
 
 substVar :: CseEnv -> InId -> OutId
 substVar env id = fromMaybe id $ lookupVarEnv (ce_subst env) id
