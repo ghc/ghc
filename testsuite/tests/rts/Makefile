@@ -130,3 +130,9 @@ EventlogOutput2:
 	"$(TEST_HC)" -eventlog -v0 EventlogOutput.hs
 	./EventlogOutput +RTS -l
 	ls EventlogOutput.eventlog >/dev/null
+
+.PHONY: T17747
+T17747:
+	$(RM) T17747_c.o T17747.o T17747.hi
+	'$(TEST_HC)' $(TEST_HC_OPTS) -v0 --make T17747 T17747_c.c T17747_cmm.cmm -I$(TOP)/../rts
+	./T17747
