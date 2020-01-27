@@ -659,7 +659,7 @@ lintLetBind top_lvl rec_flag binder rhs rhs_ty
                ppr binder)
            _ -> return ()
 
-       ; mapM_ (lintCoreRule binder binder_ty) (idCoreRules binder)
+       ; addLoc (RuleOf binder) $ mapM_ (lintCoreRule binder binder_ty) (idCoreRules binder)
 
        ; addLoc (UnfoldingOf binder) $
          lintIdUnfolding binder binder_ty (idUnfolding binder) }
@@ -2293,6 +2293,7 @@ data LintLocInfo
   = RhsOf Id            -- The variable bound
   | OccOf Id            -- Occurrence of id
   | LambdaBodyOf Id     -- The lambda-binder
+  | RuleOf Id           -- Rules attached to a binder
   | UnfoldingOf Id      -- Unfolding of a binder
   | BodyOfLetRec [Id]   -- One of the binders
   | CaseAlt CoreAlt     -- Case alternative
@@ -2510,6 +2511,9 @@ dumpLoc (OccOf v)
 
 dumpLoc (LambdaBodyOf b)
   = (getSrcLoc b, text "In the body of lambda with binder" <+> pp_binder b)
+
+dumpLoc (RuleOf b)
+  = (getSrcLoc b, text "In a rule attached to" <+> pp_binder b)
 
 dumpLoc (UnfoldingOf b)
   = (getSrcLoc b, text "In the unfolding of" <+> pp_binder b)
