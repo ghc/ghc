@@ -1758,7 +1758,7 @@ eitherTyConKey :: Unique
 eitherTyConKey                          = mkPreludeTyConUnique 84
 
 -- Kind constructors
-liftedTypeKindTyConKey, tYPETyConKey,
+liftedTypeKindTyConKey, tYPETyConKey, liftedRepTyConKey,
   constraintKindTyConKey, levityTyConKey, runtimeRepTyConKey,
   vecCountTyConKey, vecElemTyConKey :: Unique
 liftedTypeKindTyConKey                  = mkPreludeTyConUnique 87
@@ -1768,6 +1768,7 @@ levityTyConKey                          = mkPreludeTyConUnique 94
 runtimeRepTyConKey                      = mkPreludeTyConUnique 95
 vecCountTyConKey                        = mkPreludeTyConUnique 96
 vecElemTyConKey                         = mkPreludeTyConUnique 97
+liftedRepTyConKey                       = mkPreludeTyConUnique 98
 
 pluginTyConKey, frontendPluginTyConKey :: Unique
 pluginTyConKey                          = mkPreludeTyConUnique 102
@@ -2351,14 +2352,16 @@ mkTrFunKey            = mkPreludeMiscIdUnique 510
 
 -- Representations for primitive types
 trTYPEKey
-  ,trTYPE'PtrRepLiftedKey
+  , trTYPE'PtrRepLiftedKey
   , trRuntimeRepKey
   , tr'PtrRepLiftedKey
+  , trLiftedRepKey
   :: Unique
 trTYPEKey              = mkPreludeMiscIdUnique 511
 trTYPE'PtrRepLiftedKey = mkPreludeMiscIdUnique 512
 trRuntimeRepKey        = mkPreludeMiscIdUnique 513
 tr'PtrRepLiftedKey     = mkPreludeMiscIdUnique 514
+trLiftedRepKey         = mkPreludeMiscIdUnique 515
 
 -- KindReps for common cases
 starKindRepKey, starArrStarKindRepKey, starArrStarArrStarKindRepKey :: Unique

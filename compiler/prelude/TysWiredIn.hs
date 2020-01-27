@@ -94,8 +94,9 @@ module TysWiredIn (
         typeNatKindCon, typeNatKind, typeSymbolKindCon, typeSymbolKind,
         isLiftedTypeKindTyConName, liftedTypeKind,
         typeToTypeKind, constraintKind,
+        liftedRepTyCon,
         liftedTypeKindTyCon, constraintKindTyCon,  constraintKindTyConName,
-        liftedTypeKindTyConName,
+        liftedTypeKindTyConName, liftedRepTyConName,
 
         -- * Equality predicates
         heqTyCon, heqTyConName, heqClass, heqDataCon,
@@ -238,6 +239,7 @@ wiredInTyCons = [ -- Units are not treated like other tuples, because they
                 , vecElemTyCon
                 , constraintKindTyCon
                 , liftedTypeKindTyCon
+                , liftedRepTyCon
                 ]
 
 mkWiredInTyConName :: BuiltInSyntax -> Module -> FastString -> Unique -> TyCon -> Name
@@ -455,8 +457,9 @@ typeSymbolKindConName = mkWiredInTyConName UserSyntax gHC_TYPES (fsLit "Symbol")
 constraintKindTyConName :: Name
 constraintKindTyConName = mkWiredInTyConName UserSyntax gHC_TYPES (fsLit "Constraint") constraintKindTyConKey   constraintKindTyCon
 
-liftedTypeKindTyConName :: Name
+liftedTypeKindTyConName,liftedRepTyConName :: Name
 liftedTypeKindTyConName = mkWiredInTyConName UserSyntax gHC_TYPES (fsLit "Type") liftedTypeKindTyConKey liftedTypeKindTyCon
+liftedRepTyConName = mkWiredInTyConName UserSyntax gHC_TYPES (fsLit "LiftedRep") liftedRepTyConKey liftedRepTyCon
 
 runtimeRepTyConName, vecRepDataConName, tupleRepDataConName, sumRepDataConName, boxedRepDataConName :: Name
 runtimeRepTyConName = mkWiredInTyConName UserSyntax gHC_TYPES (fsLit "RuntimeRep") runtimeRepTyConKey runtimeRepTyCon
@@ -643,7 +646,7 @@ constraintKindTyCon :: TyCon
 constraintKindTyCon = pcTyCon constraintKindTyConName Nothing [] []
 
 liftedTypeKind, typeToTypeKind, constraintKind :: Kind
-liftedTypeKind   = tYPE liftedRepTy
+liftedTypeKind   = tYPE (mkTyConApp liftedRepTyCon [])
 typeToTypeKind   = liftedTypeKind `mkVisFunTy` liftedTypeKind
 constraintKind   = mkTyConApp constraintKindTyCon []
 
@@ -1176,11 +1179,13 @@ runtimeRepTy :: Type
 runtimeRepTy = mkTyConTy runtimeRepTyCon
 
 -- Type synonyms; see Note [TYPE and RuntimeRep] in TysPrim
--- type Type = tYPE 'LiftedRep
-liftedTypeKindTyCon :: TyCon
-liftedTypeKindTyCon   = buildSynTyCon liftedTypeKindTyConName
-                                       [] liftedTypeKind []
-                                       (tYPE liftedRepTy)
+-- type Type = TYPE ('BoxedRep 'Lifted)
+-- type LiftedRep = 'BoxedRep 'Lifted
+liftedTypeKindTyCon,liftedRepTyCon :: TyCon
+liftedTypeKindTyCon = buildSynTyCon
+  liftedTypeKindTyConName [] liftedTypeKind [] (tYPE (mkTyConApp liftedRepTyCon []))
+liftedRepTyCon = buildSynTyCon
+  liftedRepTyConName [] runtimeRepTy [] liftedRepTy
 
 runtimeRepTyCon :: TyCon
 runtimeRepTyCon = pcTyCon runtimeRepTyConName Nothing []

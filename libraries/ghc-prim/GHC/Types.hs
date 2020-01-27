@@ -34,7 +34,7 @@ module GHC.Types (
         Nat, Symbol,
         Any,
         type (~~), Coercible,
-        TYPE, RuntimeRep(..), Type, Constraint,
+        TYPE, RuntimeRep(..), LiftedRep, Type, Constraint,
           -- The historical type * should ideally be written as
           -- `type *`, without the parentheses. But that's a true
           -- pain to parse, and for little gain.
@@ -58,8 +58,11 @@ infixr 5 :
 -- | The kind of constraints, like @Show a@
 data Constraint
 
+-- | The runtime representation of lifted values.
+type LiftedRep = 'BoxedRep 'Lifted
+
 -- | The kind of types with lifted values. For example @Int :: Type@.
-type Type = TYPE ('BoxedRep 'Lifted)
+type Type = TYPE LiftedRep
 
 {- *********************************************************************
 *                                                                      *
