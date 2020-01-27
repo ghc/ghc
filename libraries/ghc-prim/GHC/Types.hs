@@ -163,7 +163,6 @@ data {-# CTYPE "HsFloat" #-} Float = F# Float#
 -- to the IEEE double-precision type.
 data {-# CTYPE "HsDouble" #-} Double = D# Double#
 
-
 {- *********************************************************************
 *                                                                      *
                     IO

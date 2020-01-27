@@ -40,9 +40,9 @@ import DataCon
 import DynFlags
 import FastString
 import Id
+import Name (isInternalName)
 import GHC.Types.RepType (countConRepArgs)
 import Literal
-import PrelInfo
 import Outputable
 import GHC.Platform
 import Util
@@ -50,7 +50,6 @@ import MonadUtils (mapMaybeM)
 
 import Control.Monad
 import Data.Char
-
 
 
 ---------------------------------------------------------------
@@ -62,10 +61,24 @@ cgTopRhsCon :: DynFlags
             -> DataCon          -- Id
             -> [NonVoid StgArg] -- Args
             -> (CgIdInfo, FCode ())
-cgTopRhsCon dflags id con args =
-    let id_info = litIdInfo dflags id (mkConLFInfo con) (CmmLabel closure_label)
-    in (id_info, gen_code)
+cgTopRhsCon dflags id con args
+  -- See Note [Precomputed INTLIKE closures]
+
+  -- Internal intlike replaceable value
+  | Just info <- intlike_info
+  , isInternalName name
+  = (info, pure ())
+
+  -- External intlike replaceable value
+  | Just info <- intlike_info
+  = (info, gen_code)
+
+  -- Any other value
+  | otherwise = (id_Info, gen_code)
+
   where
+   intlike_info  = getPreComputedLFInfo dflags id con args
+   id_Info       = litIdInfo dflags id (mkConLFInfo con) (CmmLabel closure_label)
    name          = idName id
    caffy         = idCafInfo id -- any stgArgHasCafRefs args
    closure_label = mkClosureLabel name caffy
@@ -171,59 +184,12 @@ buildDynCon' dflags _ binder _ _cc con []
                 (CmmLabel (mkClosureLabel (dataConName con) (idCafInfo binder))),
             return mkNop)
 
--------- buildDynCon': Charlike and Intlike constructors -----------
-{- The following three paragraphs about @Char@-like and @Int@-like
-closures are obsolete, but I don't understand the details well enough
-to properly word them, sorry. I've changed the treatment of @Char@s to
-be analogous to @Int@s: only a subset is preallocated, because @Char@
-has now 31 bits. Only literals are handled here. -- Qrczak
+-------- buildDynCon': Intlike constructors -----------
+-- See Note [Precomputed INTLIKE closures]
+buildDynCon' dflags _ binder _ _cc con [arg]
+  | Just lfInfo <- getPreComputedLFInfo dflags binder con [arg]
+  = return (lfInfo, return mkNop)
 
-Now for @Char@-like closures.  We generate an assignment of the
-address of the closure to a temporary.  It would be possible simply to
-generate no code, and record the addressing mode in the environment,
-but we'd have to be careful if the argument wasn't a constant --- so
-for simplicity we just always assign to a temporary.
-
-Last special case: @Int@-like closures.  We only special-case the
-situation in which the argument is a literal in the range
-@mIN_INTLIKE@..@mAX_INTLILKE@.  NB: for @Char@-like closures we can
-work with any old argument, but for @Int@-like ones the argument has
-to be a literal.  Reason: @Char@ like closures have an argument type
-which is guaranteed in range.
-
-Because of this, we use can safely return an addressing mode.
-
-We don't support this optimisation when compiling into Windows DLLs yet
-because they don't support cross package data references well.
--}
-
-buildDynCon' dflags platform binder _ _cc con [arg]
-  | maybeIntLikeCon con
-  , platformOS platform /= OSMinGW32 || not (positionIndependent dflags)
-  , NonVoid (StgLitArg (LitNumber LitNumInt val _)) <- arg
-  , val <= fromIntegral (mAX_INTLIKE dflags) -- Comparisons at type Integer!
-  , val >= fromIntegral (mIN_INTLIKE dflags) -- ...ditto...
-  = do  { let intlike_lbl   = mkCmmClosureLabel rtsUnitId (fsLit "stg_INTLIKE")
-              val_int = fromIntegral val :: Int
-              offsetW = (val_int - mIN_INTLIKE dflags) * (fixedHdrSizeW dflags + 1)
-                -- INTLIKE closures consist of a header and one word payload
-              intlike_amode = cmmLabelOffW dflags intlike_lbl offsetW
-        ; return ( litIdInfo dflags binder (mkConLFInfo con) intlike_amode
-                 , return mkNop) }
-
-buildDynCon' dflags platform binder _ _cc con [arg]
-  | maybeCharLikeCon con
-  , platformOS platform /= OSMinGW32 || not (positionIndependent dflags)
-  , NonVoid (StgLitArg (LitChar val)) <- arg
-  , let val_int = ord val :: Int
-  , val_int <= mAX_CHARLIKE dflags
-  , val_int >= mIN_CHARLIKE dflags
-  = do  { let charlike_lbl   = mkCmmClosureLabel rtsUnitId (fsLit "stg_CHARLIKE")
-              offsetW = (val_int - mIN_CHARLIKE dflags) * (fixedHdrSizeW dflags + 1)
-                -- CHARLIKE closures consist of a header and one word payload
-              charlike_amode = cmmLabelOffW dflags charlike_lbl offsetW
-        ; return ( litIdInfo dflags binder (mkConLFInfo con) charlike_amode
-                 , return mkNop) }
 
 -------- buildDynCon': the general case -----------
 buildDynCon' dflags _ binder actually_bound ccs con args
@@ -283,3 +249,93 @@ bindConArgs (DataAlt con) base args
 
 bindConArgs _other_con _base args
   = ASSERT( null args ) return []
+
+---------------------------------------------------------------
+--      Computing LFInfo for precomputed closures
+---------------------------------------------------------------
+
+{- Note [Precomputed INTLIKE closures]
+   ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+
+We can replace INTLIKE constructors with static preallocated ones
+built into the RTS if:
+
+* They have tag one
+* Their payload fits into mIN_INTLIKE <= val && val <= mAX_INTLIKE
+* Their payload is a single word.
+
+At compile time we do this replacement in thise module.
+At runtime this is done by GC.
+
+`getPreComputedLFInfo` checks if a given con application is a valid
+for replacing it with RTS closures.
+
+We (can) only do this replacement at compile time for (module) internal references.
+Static closures of exported ids will be referenced by their label
+which is based on the Ids name.
+We could emit a indirection but it's more efficient to emit a intlike closure
+than to emit an indirection in that case.
+In order to change this we would have to export how id's should be referenced
+as part of interface files.
+
+If the RHS of a con is suitable for intlike replacement at compile
+time we:
+
+* Omit the static closure for locally bound Ids.
+* Omit the static closure for top level Ids if they are internal.
+* Always reference the RTS closure when computing the location of the Id for
+  module internal references (cg_loc in CgIdInfo).
+
+The effect of doing this is that we reduce binary size by avoiding
+redundant static closures.
+In some cases this can also help with cache pressure since we will
+reference the RTS closures more often instead of various static ones
+in generated code.
+
+We don't support this optimization when compiling into Windows DLLs yet
+because they don't support cross package data references well.
+
+TODO:
+Since float (and double on x64) have the same heap layout we could apply the
+same logic.
+-}
+
+
+-- Determine if a given constructor application can be replaced with a reference
+-- to an RTS intlike closure.
+getPreComputedLFInfo :: DynFlags -> Id -> DataCon -> [NonVoid StgArg] -> Maybe CgIdInfo
+getPreComputedLFInfo dflags binder con [arg]
+  | dataConTag con == 1
+  , NonVoid (StgLitArg litArg) <- arg
+  , platformOS (targetPlatform dflags) /= OSMinGW32
+    || not (positionIndependent dflags)
+  , Just val <- isIntlikeLitArg litArg
+  , val <= fromIntegral (mAX_INTLIKE dflags) -- Comparisons at type Integer!
+  , val >= fromIntegral (mIN_INTLIKE dflags) -- ...ditto...
+  = let intlike_lbl   = mkCmmClosureLabel rtsUnitId (fsLit "stg_INTLIKE")
+        val_int = fromIntegral val :: Int
+        -- INTLIKE closures consist of a header and one word payload
+        offsetW = (val_int - mIN_INTLIKE dflags) * (fixedHdrSizeW dflags + 1)
+        intlike_amode = cmmLabelOffW dflags intlike_lbl offsetW
+    in  Just $! litIdInfo dflags binder (mkConLFInfo con) intlike_amode
+  where
+    isIntlikeLitArg (LitNullAddr) = Just 0
+    isIntlikeLitArg (LitNumber numKind val _) =
+      case numKind of
+          -- Always WORD sized
+          LitNumInt     -> Just val
+          LitNumWord    -> Just val
+          -- Only word sized if wordWidth == 8 bytes
+          LitNumInt64
+            | wordWidth dflags == W64 -> Just val
+          LitNumWord64
+            | wordWidth dflags == W64 -> Just val
+          _ -> Nothing
+    -- Always <= WORD sized.
+    isIntlikeLitArg (LitChar c) = Just (fromIntegral $ ord c)
+    -- TODO: If we can compute their bits we can apply the same
+    -- logic.
+    isIntlikeLitArg (LitFloat _f) = Nothing
+    isIntlikeLitArg (LitDouble _d) = Nothing
+    isIntlikeLitArg _ = Nothing
+getPreComputedLFInfo _ _ _ _ = Nothing
