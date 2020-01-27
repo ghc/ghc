@@ -1,0 +1,7 @@
+HEAP_ALLOCED  = True	(c_HEAP_ALLOCED ptr == cmm_HEAP_ALLOCED ptr)
+malloc_count  = 0
+malloc_count  = 100
+arrays equal  = True	(and (zipWith equalByteArrays foreignBAs nativeBAs))
+arrays pinned = True	(all isByteArrayPinned foreignBAs)
+malloc_count  = 100
+malloc_count  = 0

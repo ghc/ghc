@@ -418,3 +418,4 @@ test('T17088',
      compile_and_run, ['-rtsopts -O2'])
 
 test('T15427', normal, compile_and_run, [''])
+test('T17747', [], makefile_test, ['T17747'])
