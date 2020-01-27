@@ -17,7 +17,7 @@ EXPECTED_UNDOCUMENTED_PATH = \
     Path(__file__).parent / 'expected-undocumented-flags.txt'
 
 EXPECTED_UNDOCUMENTED = \
-    {line for line in open(EXPECTED_UNDOCUMENTED_PATH).read().split()}
+    {line for line in EXPECTED_UNDOCUMENTED_PATH.read_text().split()}
 
 def expected_undocumented(flag: str) -> bool:
     if flag in EXPECTED_UNDOCUMENTED:
