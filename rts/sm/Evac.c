@@ -626,6 +626,7 @@ loop:
       case CONSTR_0_1:
       case CONSTR_0_2:
       case CONSTR_NOCAF:
+      case ARR_WORDS:
           /* no need to put these on the static linked list, they don't need
            * to be scavenged.
            */
