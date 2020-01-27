@@ -112,7 +112,7 @@ documentationRules = do
         need $ map (root -/-) targets
 
         when (SphinxPDFs `Set.member` doctargets)
-          $ checkUserGuideFlags $ pdfRoot -/- "users_guide" -/- "ghc-flags.txt"
+          $ checkUserGuideFlags $ root -/- pdfRoot -/- "users_guide" -/- "ghc-flags.txt"
         when (SphinxHTML `Set.member` doctargets)
           $ checkUserGuideFlags $ root -/- htmlRoot -/- "users_guide" -/- "ghc-flags.txt"
 
