@@ -785,6 +785,18 @@ data ArgInfo = CpeApp  CoreArg
              | CpeCast Coercion
              | CpeTick (Tickish Id)
 
+
+data ArgForm = ArgCont
+             | ArgValue
+
+-- TODO: make this configurable in primops.pp.txt
+argForms :: Id -> [ArgForm]
+argForms f
+  | Just CatchOp <- isPrimOpId_maybe f
+  = [ ArgValue, ArgValue, ArgCont, ArgValue, ArgValue]
+argForms f
+  = repeat ArgValue
+
 {- Note [runRW arg]
 ~~~~~~~~~~~~~~~~~~~
 If we got, say
@@ -856,16 +868,47 @@ cpeApp top_env expr
         = case arg of
             Lam s body -> cpe_app (extendCorePrepEnv env s realWorldPrimId) body [] 0
             _          -> cpe_app env arg [CpeApp (Var realWorldPrimId)] 1
+{-
+    cpe_app env (Var f) [ CpeApp resTy@Type{}
+                        , CpeApp excTy@Type{}
+                        , CpeApp body
+                        , CpeApp handler
+                        , CpeApp rw
+                        ] _depth
+        | Just CatchOp <- isPrimOpId_maybe f
+        =
+
+
+        case body of
+            Lam s rhs -> do
+              rhs' <- cpeBodyNF env rhs
+              return (emptyFloats, mkApps (Var f) [ resTy
+                                                  , excTy
+                                                  , Lam s rhs'
+                                                  , handler
+                                                  , rw
+                                                  ])
+            _ -> do
+              body' <- cpeBodyNF env body
+              return (emptyFloats, mkApps (Var f) [ resTy
+                                                  , excTy
+                                                  , cpeEtaExpand 1 body'
+                                                  , handler
+                                                  , rw
+                                                  ])
+-}
     cpe_app env (Var v) args depth
       = do { v1 <- fiddleCCall v
-           ; let e2 = lookupCorePrepEnv env v1
-                 hd = getIdFromTrivialExpr_maybe e2
+           ; let e2  = lookupCorePrepEnv env v1
+                 hd  = getIdFromTrivialExpr_maybe e2
+                 afs = argForms v1
+
            -- NB: depth from collect_args is right, because e2 is a trivial expression
            -- and thus its embedded Id *must* be at the same depth as any
            -- Apps it is under are type applications only (c.f.
            -- exprIsTrivial).  But note that we need the type of the
            -- expression, not the id.
-           ; (app, floats) <- rebuild_app args e2 (exprType e2) emptyFloats stricts
+           ; (app, floats) <- rebuild_app args e2 (exprType e2) emptyFloats stricts afs
            ; mb_saturate hd app floats depth }
         where
           stricts = case idStrictness v of
@@ -885,10 +928,10 @@ cpeApp top_env expr
 
         -- N-variable fun, better let-bind it
     cpe_app env fun args depth
-      = do { (fun_floats, fun') <- cpeArg env evalDmd fun ty
+      = do { (fun_floats, fun') <- cpeArg env evalDmd fun ty ArgValue
                           -- The evalDmd says that it's sure to be evaluated,
                           -- so we'll end up case-binding it
-           ; (app, floats) <- rebuild_app args fun' ty fun_floats []
+           ; (app, floats) <- rebuild_app args fun' ty fun_floats [] []
            ; mb_saturate Nothing app floats depth }
         where
           ty = exprType fun
@@ -911,33 +954,37 @@ cpeApp top_env expr
         -> Type
         -> Floats
         -> [Demand]
+        -> [ArgForm]
         -> UniqSM (CpeApp, Floats)
-    rebuild_app [] app _ floats ss = do
+    rebuild_app [] app _ floats ss _ = do
       MASSERT(null ss) -- make sure we used all the strictness info
       return (app, floats)
-    rebuild_app (a : as) fun' fun_ty floats ss = case a of
+    rebuild_app (a : as) fun' fun_ty floats ss afs = case a of
       CpeApp arg@(Type arg_ty) ->
-        rebuild_app as (App fun' arg) (piResultTy fun_ty arg_ty) floats ss
+        rebuild_app as (App fun' arg) (piResultTy fun_ty arg_ty) floats ss afs_rest
       CpeApp arg@(Coercion {}) ->
-        rebuild_app as (App fun' arg) (funResultTy fun_ty) floats ss
+        rebuild_app as (App fun' arg) (funResultTy fun_ty) floats ss afs_rest
       CpeApp arg -> do
         let (ss1, ss_rest)  -- See Note [lazyId magic] in MkId
                = case (ss, isLazyExpr arg) of
                    (_   : ss_rest, True)  -> (topDmd, ss_rest)
                    (ss1 : ss_rest, False) -> (ss1,    ss_rest)
                    ([],            _)     -> (topDmd, [])
-            (arg_ty, res_ty) =
-              case splitFunTy_maybe fun_ty of
-                Just as -> as
-                Nothing -> pprPanic "cpeBody" (ppr fun_ty $$ ppr expr)
-        (fs, arg') <- cpeArg top_env ss1 arg arg_ty
-        rebuild_app as (App fun' arg') res_ty (fs `appendFloats` floats) ss_rest
+            (arg_ty, res_ty) = expectJust "cpeBody:collect_args" $
+                               splitFunTy_maybe fun_ty
+        (fs, arg') <- cpeArg top_env ss1 arg arg_ty arg_form
+        rebuild_app as (App fun' arg') res_ty (fs `appendFloats` floats) ss_rest afs_rest
       CpeCast co ->
-        let ty2 = coercionRKind co
-        in rebuild_app as (Cast fun' co) ty2 floats ss
+        let Pair _ty1 ty2 = coercionKind co
+        in rebuild_app as (Cast fun' co) ty2 floats ss afs_rest
       CpeTick tickish ->
         -- See [Floating Ticks in CorePrep]
-        rebuild_app as fun' fun_ty (addFloat floats (FloatTick tickish)) ss
+        rebuild_app as fun' fun_ty (addFloat floats (FloatTick tickish)) ss afs_rest
+      where
+        (arg_form, afs_rest)
+          = case afs of
+              []     -> (ArgValue, [])
+              (a:ax) -> (a, ax)
 
 isLazyExpr :: CoreExpr -> Bool
 -- See Note [lazyId magic] in MkId
@@ -1026,8 +1073,18 @@ okCpeArg expr    = not (exprIsTrivial expr)
 
 -- This is where we arrange that a non-trivial argument is let-bound
 cpeArg :: CorePrepEnv -> Demand
-       -> CoreArg -> Type -> UniqSM (Floats, CpeArg)
-cpeArg env dmd arg arg_ty
+       -> CoreArg -> Type -> ArgForm -> UniqSM (Floats, CpeArg)
+cpeArg env dmd arg arg_ty ArgCont = do
+  arg' <- case arg of
+    Lam s body -> do
+      body' <- cpeBodyNF env body
+      return (Lam s body')
+    _ -> do
+      body' <- cpeBodyNF env arg
+      return (cpeEtaExpand 1 body')
+  pure (emptyFloats, arg')
+
+cpeArg env dmd arg arg_ty arg_form
   = do { (floats1, arg1) <- cpeRhsE env arg     -- arg1 can be a lambda
        ; (floats2, arg2) <- if want_float floats1 arg1
                             then return (floats1, arg1)

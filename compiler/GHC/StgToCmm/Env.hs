@@ -158,6 +158,7 @@ cgLookupPanic id
 getArgAmode :: NonVoid StgArg -> FCode CmmExpr
 getArgAmode (NonVoid (StgVarArg var)) = idInfoToAmode <$> getCgIdInfo var
 getArgAmode (NonVoid (StgLitArg lit)) = CmmLit <$> cgLit lit
+getArgAmode (NonVoid arg) = pprPanic "getArgAmode" (ppr arg)
 
 getNonVoidArgAmodes :: [StgArg] -> FCode [CmmExpr]
 -- NB: Filters out void args,

@@ -506,7 +506,9 @@ isSimpleOp :: StgOp -> [StgArg] -> FCode Bool
 isSimpleOp (StgFCallOp (CCall (CCallSpec _ _ safe)) _) _ = return $! not (playSafe safe)
 -- dataToTag# evaluates its argument, see Note [dataToTag#] in primops.txt.pp
 isSimpleOp (StgPrimOp DataToTagOp) _ = return False
-isSimpleOp (StgPrimOp op) stg_args                  = do
+isSimpleOp (StgPrimOp op) stg_args = do
+  | any stgIsContArg stg_args = return False
+  | otherwise = do
     arg_exprs <- getNonVoidArgAmodes stg_args
     dflags <- getDynFlags
     -- See Note [Inlining out-of-line primops and heap checks]

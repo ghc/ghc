@@ -20,7 +20,7 @@ generation.
 {-# LANGUAGE ConstraintKinds #-}
 
 module GHC.Stg.Syntax (
-        StgArg(..),
+        StgArg(..), stgIsContArg,
 
         GenStgTopBinding(..), GenStgBinding(..), GenStgExpr(..), GenStgRhs(..),
         GenStgAlt, AltType(..),
@@ -116,9 +116,14 @@ StgArg
 ************************************************************************
 -}
 
-data StgArg
+data GenStgArg pass
   = StgVarArg  Id
   | StgLitArg  Literal
+  | StgContArg (BinderP pass) (GenStgExpr pass) Type
+
+stgIsContArg :: GenStgArg bndr occ -> Bool
+stgIsContArg StgContArg{} = True
+stgIsContArg _            = False
 
 -- | Does this constructor application refer to anything in a different
 -- *Windows* DLL?
@@ -165,6 +170,7 @@ isAddrRep _           = False
 stgArgType :: StgArg -> Type
 stgArgType (StgVarArg v)   = idType v
 stgArgType (StgLitArg lit) = literalType lit
+stgArgType (StgContArg _ _ ty) = ty
 
 
 -- | Strip ticks of a given type from an STG expression.
@@ -237,11 +243,11 @@ literals.
         -- StgConApp is vital for returning unboxed tuples or sums
         -- which can't be let-bound
   | StgConApp   DataCon
-                [StgArg] -- Saturated
+                [GenStgArg pass] -- Saturated
                 [Type]   -- See Note [Types in StgConApp] in GHC.Stg.Unarise
 
   | StgOpApp    StgOp    -- Primitive op or foreign call
-                [StgArg] -- Saturated.
+                [GenStgArg pass] -- Saturated.
                 Type     -- Result type
                          -- We need to know this so that we can
                          -- assign result registers
@@ -427,7 +433,7 @@ important):
                         -- from static closure.
         DataCon         -- Constructor. Never an unboxed tuple or sum, as those
                         -- are not allocated.
-        [StgArg]        -- Args
+        [GenStgArg pass] -- Args
 
 -- | Used as a data type index for the stgSyn AST
 data StgPass
@@ -538,9 +544,11 @@ rhsHasCafRefs (StgRhsCon _ _ args)
 altHasCafRefs :: GenStgAlt pass -> Bool
 altHasCafRefs (_, _, rhs) = exprHasCafRefs rhs
 
-stgArgHasCafRefs :: StgArg -> Bool
+stgArgHasCafRefs :: GenStgArg pass -> Bool
 stgArgHasCafRefs (StgVarArg id)
   = stgIdHasCafRefs id
+stgArgHasCafRefs (StgContArg _ e _)
+  = exprHasCafRefs e
 stgArgHasCafRefs _
   = False
 
@@ -591,6 +599,7 @@ The Plain STG parameterisation
 
 This happens to be the only one we use at the moment.
 -}
+type StgArg = GenStgArg 'Vanilla
 
 type StgTopBinding = GenStgTopBinding 'Vanilla
 type StgBinding    = GenStgBinding    'Vanilla
@@ -732,7 +741,7 @@ pprStgBinding = pprGenStgBinding
 pprStgTopBindings :: [StgTopBinding] -> SDoc
 pprStgTopBindings = pprGenStgTopBindings
 
-instance Outputable StgArg where
+instance OutputablePass pass => Outputable (GenStgArg pass) where
     ppr = pprStgArg
 
 instance OutputablePass pass => Outputable (GenStgTopBinding pass) where
@@ -747,9 +756,10 @@ instance OutputablePass pass => Outputable (GenStgExpr pass) where
 instance OutputablePass pass => Outputable (GenStgRhs pass) where
     ppr rhs = pprStgRhs rhs
 
-pprStgArg :: StgArg -> SDoc
+pprStgArg :: OutputablePass pass =>  GenStgArg pass -> SDoc
 pprStgArg (StgVarArg var) = ppr var
 pprStgArg (StgLitArg con) = ppr con
+pprStgArg (StgContArg bndr body _) = ppr body
 
 pprStgExpr :: OutputablePass pass => GenStgExpr pass -> SDoc
 -- special case
