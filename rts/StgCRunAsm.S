@@ -1,6 +1,8 @@
 #include "ghcconfig.h"
 #include "rts/Constants.h"
 
+/* If the RTS mini interpreter is used, e.g. for unregisterised builds,
+ * then functions StgRun/StgReturn are implemented in file StgCRun.c */
 #if !defined(USE_MINIINTERPRETER)
 
 #if defined(powerpc64le_HOST_ARCH)
