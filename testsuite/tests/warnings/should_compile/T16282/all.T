@@ -1,1 +1,1 @@
-test('T16282', normal, compile, ['-O2 -Wall-missed-specialisations'])
+test('T16282', [], multimod_compile, ['T16282', '-O2 -Wall-missed-specialisations'])
