@@ -1,10 +1,13 @@
+[1 of 2] Compiling T16282A          ( T16282A.hs, T16282A.o )
+[2 of 2] Compiling Main             ( T16282.hs, T16282.o )
 
 T16282.hs: warning: [-Wall-missed-specialisations]
-    Could not specialise imported function ‘Data.Foldable.$wmapM_’
-      when specialising ‘mapM_’
-    Probable fix: add INLINABLE pragma on ‘Data.Foldable.$wmapM_’
+    Could not specialise imported function ‘T16282A.$wmyMapM_’
+      when specialising ‘myMapM_’
+    Probable fix: add INLINABLE pragma on ‘T16282A.$wmyMapM_’
 
 T16282.hs: warning: [-Wall-missed-specialisations]
-    Could not specialise imported function ‘Data.Map.Internal.$w$cshowsPrec’
-      when specialising ‘Data.Map.Internal.$fShowMap_$cshowsPrec’
-    Probable fix: add INLINABLE pragma on ‘Data.Map.Internal.$w$cshowsPrec’
+    Could not specialise imported function ‘T16282A.$w$cshowsPrec’
+      when specialising ‘T16282A.$fShowMyMap_$cshowsPrec’
+    Probable fix: add INLINABLE pragma on ‘T16282A.$w$cshowsPrec’
+Linking T16282.exe ...
