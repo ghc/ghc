@@ -45,6 +45,7 @@ import GHC.Tc.Utils.Env
 import GHC.Tc.Utils.TcMType
 import GHC.Tc.Validity( arityErr )
 import GHC.Core.TyCo.Ppr ( pprTyVars )
+import GHC.Core.TyCo.Rep ( Type(..), TyBinder(..), TyCoBinder(..) )
 import GHC.Tc.Utils.TcType
 import GHC.Tc.Utils.Unify
 import GHC.Tc.Gen.HsType
@@ -63,9 +64,38 @@ import GHC.Types.Var.Set
 import GHC.Utils.Misc
 import GHC.Utils.Outputable as Outputable
 import qualified GHC.LanguageExtensions as LangExt
+import GHC.Data.List.SetOps ( getNth )
+
+import Control.Monad
 import Control.Arrow  ( second )
 import Control.Monad  ( when )
-import GHC.Data.List.SetOps ( getNth )
+import Data.Data (showConstr, toConstr, gmapQ, Data(..), Typeable, cast)
+
+-- | Generic show: an alternative to \"deriving Show\"
+gshow :: Data a => a -> String
+gshow x = gshows x ""
+
+-- | Generic shows
+gshows :: Data a => a -> ShowS
+
+-- This is a prefix-show using surrounding "(" and ")",
+-- where we recurse into subterms with gmapQ.
+gshows = ( \t ->
+                showChar '('
+              . (showString . showConstr . toConstr $ t)
+              . (foldr (.) id . gmapQ ((showChar ' ' .) . gshows) $ t)
+              . showChar ')'
+         ) `extQ` (shows :: String -> ShowS)
+
+extQ :: ( Typeable a
+        , Typeable b
+        )
+     => (a -> q)
+     -> (b -> q)
+     -> a
+     -> q
+extQ f g a = maybe (f a) g (cast a)
+
 
 {-
 ************************************************************************
@@ -520,8 +550,8 @@ tc_pat pat_ty penv ps_pat thing_inside = case ps_pat of
 
 ------------------------
 -- Data constructors
-  ConPat NoExtField con arg_pats ->
-    tcConPat penv con pat_ty arg_pats thing_inside
+  ConPat NoExtField con ty_arg_pats arg_pats ->
+    tcConPat penv con ty_arg_pats pat_ty arg_pats thing_inside
 
 ------------------------
 -- Literal patterns
@@ -804,121 +834,205 @@ to express the local scope of GADT refinements.
 -- MkT :: forall a b c. (a~[b]) => b -> c -> T a
 --       with scrutinee of type (T ty)
 
-tcConPat :: PatEnv -> Located Name
+tcConPat :: PatEnv
+         -> Located Name
+         -> [LHsSigWcType (NoGhcTc GhcRn)] -- Visible type arguments to data constructor
          -> ExpSigmaType           -- Type of the pattern
          -> HsConPatDetails GhcRn -> TcM a
          -> TcM (Pat GhcTcId, a)
-tcConPat penv con_lname@(L _ con_name) pat_ty arg_pats thing_inside
+tcConPat penv con_lname@(L _ con_name) type_args pat_ty arg_pats thing_inside
   = do  { con_like <- tcLookupConLike con_name
         ; case con_like of
-            RealDataCon data_con -> tcDataConPat penv con_lname data_con
+            RealDataCon data_con -> tcDataConPat penv con_lname data_con type_args
                                                  pat_ty arg_pats thing_inside
             PatSynCon pat_syn -> tcPatSynPat penv con_lname pat_syn
                                              pat_ty arg_pats thing_inside
         }
 
-tcDataConPat :: PatEnv -> Located Name -> DataCon
+tcDataConPat :: PatEnv
+             -> Located Name
+             -> DataCon
+             -> [LHsSigWcType (NoGhcTc GhcRn)] -- Visible type arguments to data constructor
              -> ExpSigmaType               -- Type of the pattern
-             -> HsConPatDetails GhcRn -> TcM a
-             -> TcM (Pat GhcTcId, a)
-tcDataConPat penv (L con_span con_name) data_con pat_ty
-             arg_pats thing_inside
-  = do  { let tycon = dataConTyCon data_con
-                  -- For data families this is the representation tycon
-              (univ_tvs, ex_tvs, eq_spec, theta, arg_tys, _)
-                = dataConFullSig data_con
-              header = L con_span (RealDataCon data_con)
+             -> HsConPatDetails GhcRn
+             -> TcM a -> TcM (Pat GhcTcId, a)
+tcDataConPat penv (L con_span con_name) data_con type_args pat_ty arg_pats thing_inside = do
+  let tycon = dataConTyCon data_con
+         -- For data families this is the representation tycon
 
-          -- Instantiate the constructor type variables [a->ty]
-          -- This may involve doing a family-instance coercion,
-          -- and building a wrapper
-        ; (wrap, ctxt_res_tys) <- matchExpectedConTy penv tycon pat_ty
-        ; pat_ty <- readExpType pat_ty
+      (univ_tvs, ex_tvs, eq_spec, theta, arg_tys, _)
+        = dataConFullSig data_con
+      header = L con_span (RealDataCon data_con)
 
-          -- Add the stupid theta
-        ; setSrcSpan con_span $ addDataConStupidTheta data_con ctxt_res_tys
+    -- Instantiate the constructor type variables [a->ty]
+    -- This may involve doing a family-instance coercion,
+    -- and building a wrapper
+  (wrap, ctxt_res_tys) <- matchExpectedConTy penv tycon pat_ty
+  pat_ty <- readExpType pat_ty
 
-        ; let all_arg_tys = eqSpecPreds eq_spec ++ theta ++ arg_tys
-        ; checkExistentials ex_tvs all_arg_tys penv
+    -- Add the stupid theta
+  setSrcSpan con_span $ addDataConStupidTheta data_con ctxt_res_tys
 
-        ; tenv <- instTyVarsWith PatOrigin univ_tvs ctxt_res_tys
-                  -- NB: Do not use zipTvSubst!  See #14154
-                  -- We want to create a well-kinded substitution, so
-                  -- that the instantiated type is well-kinded
+  let all_arg_tys = eqSpecPreds eq_spec ++ theta ++ arg_tys
+  checkExistentials ex_tvs all_arg_tys penv
 
-        ; (tenv, ex_tvs') <- tcInstSuperSkolTyVarsX tenv ex_tvs
-                     -- Get location from monad, not from ex_tvs
+  tenv' <- instTyVarsWith PatOrigin univ_tvs ctxt_res_tys
+    -- NB: Do not use zipTvSubst!  See #14154
+    -- We want to create a well-kinded substitution, so
+    -- that the instantiated type is well-kinded
 
-        ; let -- pat_ty' = mkTyConApp tycon ctxt_res_tys
-              -- pat_ty' is type of the actual constructor application
-              -- pat_ty' /= pat_ty iff coi /= IdCo
+  (tenv, ex_tvs') <- tcInstSuperSkolTyVarsX tenv' ex_tvs
+    -- Get location from monad, not from ex_tvs
 
-              arg_tys' = substTys tenv arg_tys
+  let -- pat_ty' = mkTyConApp tycon ctxt_res_tys
+      -- pat_ty' is type of the actual constructor application
+      -- pat_ty' /= pat_ty iff coi /= IdCo
 
-        ; traceTc "tcConPat" (vcat [ ppr con_name
-                                   , pprTyVars univ_tvs
-                                   , pprTyVars ex_tvs
-                                   , ppr eq_spec
-                                   , ppr theta
-                                   , pprTyVars ex_tvs'
-                                   , ppr ctxt_res_tys
-                                   , ppr arg_tys'
-                                   , ppr arg_pats ])
-        ; if null ex_tvs && null eq_spec && null theta
-          then do { -- The common case; no class bindings etc
-                    -- (see Note [Arrows and patterns])
-                    (arg_pats', res) <- tcConArgs (RealDataCon data_con) arg_tys'
-                                                  penv arg_pats thing_inside
-                  ; let res_pat = ConPat { pat_con = header
-                                         , pat_args = arg_pats'
-                                         , pat_con_ext = ConPatTc
-                                           { cpt_tvs = [], cpt_dicts = []
-                                           , cpt_binds = emptyTcEvBinds
-                                           , cpt_arg_tys = ctxt_res_tys
-                                           , cpt_wrap = idHsWrapper
-                                           }
-                                         }
+      arg_tys' = substTys tenv arg_tys
 
-                  ; return (mkHsWrapPat wrap res_pat pat_ty, res) }
+  (nonUserVarWrapper, remaining_user_data_con_ty) <-
+    topInstantiateInferred PatOrigin $ dataConUserType data_con
 
-          else do   -- The general case, with existential,
-                    -- and local equality constraints
-        { let theta'     = substTheta tenv (eqSpecPreds eq_spec ++ theta)
-                           -- order is *important* as we generate the list of
-                           -- dictionary binders from theta'
-              no_equalities = null eq_spec && not (any isEqPred theta)
-              skol_info = PatSkol (RealDataCon data_con) mc
-              mc = case pe_ctxt penv of
-                     LamPat mc -> mc
-                     LetPat {} -> PatBindRhs
+  (nonInferredTyVarBinders, data_con_subst_user_ret_ty) <- do
+    -- split out pi telescope.
+    let (bndrs, res_ty) = tcSplitPiTys $ remaining_user_data_con_ty
+    -- substitute both sides with fresh metavars
+    (userTenv, nonInferredTyVarBinders) <- mapAccumLM
+      (rebuildTyCoBinderX cloneTyVarTyVar) emptyTCvSubst bndrs
+    pure (nonInferredTyVarBinders, substTy userTenv res_ty)
 
-        ; gadts_on    <- xoptM LangExt.GADTs
-        ; families_on <- xoptM LangExt.TypeFamilies
-        ; checkTc (no_equalities || gadts_on || families_on)
-                  (text "A pattern match on a GADT requires the" <+>
-                   text "GADTs or TypeFamilies language extension")
-                  -- #2905 decided that a *pattern-match* of a GADT
-                  -- should require the GADT language flag.
-                  -- Re TypeFamilies see also #7156
+  let -- zip through invisible argument patterns, extending the name environment
+      -- with variables bound by each one in turn.
+      --
+      -- TODO(@Ericson2314) teach the arity error thing about visibility so we
+      -- can abstract over this and have nicer messages.
+      zipInvisPats :: [LHsSigWcType (NoGhcTc GhcRn)]
+                   -> [Type]
+                   -> [TyBinder]
+                   -> TcM [( Either Type (LHsSigWcType (NoGhcTc GhcRn))
+                           , TyBinder
+                           )]
+      zipInvisPats _ [] (_ : _) = failWithTc $
+        text "Too few regular argument patterns toy data constructor" <+> ppr data_con
+      zipInvisPats remaining_at remaining_reg [] = case (remaining_at, remaining_reg) of
+        ([], []) -> pure []
+        _ -> failWithTc $
+            text "Too many" <+> x <+> text "argument patterns to data constructor" <+> ppr data_con
+          where x = text $ case (remaining_at, remaining_reg) of
+                      ([], []) -> panic "impossible"
+                      ((_ : _), (_ : _)) -> "@ and regular"
+                      ([], (_ : _)) -> "regular"
+                      ((_ : _), []) -> "@"
+      zipInvisPats _ _ (Anon InvisArg _ : _) = failWithTc $
+        text "Shouldn't be constraint in the middle of constructor type" <+> ppr data_con
+      zipInvisPats invis_args (vis_arg_ty : vis_arg_tys) (Anon VisArg ty : vars) =
+        ((Left vis_arg_ty, Anon VisArg ty) :) <$> zipInvisPats invis_args vis_arg_tys vars
+      zipInvisPats _ _ (Named (Bndr _ Required) : _) = failWithTc $
+        text "forall -> not yet implemented for data constructors" <+> ppr data_con
+      zipInvisPats _ _ (Named (Bndr _ Inferred) : _) = failWithTc $
+        text "Inferred variables should have already been removed" <+> ppr data_con
+      zipInvisPats [] vis_arg_tys (Named (Bndr _ Specified) : vars) =
+        -- OK to skip @ pattern
+        zipInvisPats [] vis_arg_tys vars
+      zipInvisPats (invis_arg : invis_args) vis_arg_tys (Named var@(Bndr _ Specified) : vars) =
+        ((Right invis_arg, Named var) :) <$> zipInvisPats invis_args vis_arg_tys vars
 
-        ; given <- newEvVars theta'
-        ; (ev_binds, (arg_pats', res))
-             <- checkConstraints skol_info ex_tvs' given $
-                tcConArgs (RealDataCon data_con) arg_tys' penv arg_pats thing_inside
+  invisPairs <- zipInvisPats type_args arg_tys' nonInferredTyVarBinders
 
-        ; let res_pat = ConPat
-                { pat_con   = header
-                , pat_args  = arg_pats'
-                , pat_con_ext = ConPatTc
-                  { cpt_tvs   = ex_tvs'
-                  , cpt_dicts = given
-                  , cpt_binds = ev_binds
-                  , cpt_arg_tys = ctxt_res_tys
-                  , cpt_wrap  = idHsWrapper
-                  }
+  let -- Iterate through the visible type arguments, extending the name environment
+      -- with variables bound by each one in turn.
+      extendNamesByTyApp :: Checker
+        (Either Type (LHsSigWcType (NoGhcTc GhcRn)), TyBinder)
+        HsWrapper
+      extendNamesByTyApp _penv x thing_inside' = case x of
+        (Left _, _) -> do
+          -- will be checked below, we don't do interleaved visible and invisible yet
+          v <- thing_inside'
+          return (mempty, v)
+        (Right arg, data_con_quantifer_step) -> do
+          (sig_wcs, sig_ibs, arg_ty) <- tcHsPatSigType TypeAppCtxt arg
+          tcExtendNameTyVarEnv sig_wcs . tcExtendNameTyVarEnv sig_ibs $ do
+            let ty = case data_con_quantifer_step of
+                  Named (Bndr var _) -> TyVarTy var
+                  Anon _ ty          -> ty
+            c <- unifyType Nothing arg_ty ty
+            v <- thing_inside'
+            return (mkWpCastN c, v)
+
+  let tcBody = do
+        (wrappers, (ret_wrapper, res)) <- tcMultiple extendNamesByTyApp penv invisPairs $ do
+          ret_co <- unifyType Nothing data_con_subst_user_ret_ty pat_ty
+          res <- tcConArgs (RealDataCon data_con) arg_tys' penv arg_pats thing_inside
+          pure (mkWpCastN ret_co, res)
+        pure (nonUserVarWrapper <.> mconcat wrappers <.> ret_wrapper, res)
+
+  traceTc "tcConPat" (vcat [ ppr con_name
+                           , pprTyVars univ_tvs
+                           , pprTyVars ex_tvs
+                           , ppr eq_spec
+                           , ppr theta
+                           , pprTyVars ex_tvs'
+                           , ppr ctxt_res_tys
+                           , ppr arg_tys'
+                           , ppr arg_pats ])
+  if null ex_tvs && null eq_spec && null theta
+    then do
+      -- The common case; no class bindings etc
+      -- (see Note [Arrows and patterns])
+      (bodyWrap, (arg_pats', res)) <- tcBody
+      let res_pat = ConPat
+            { pat_con = header
+            , pat_ty_args = type_args
+            , pat_args = arg_pats'
+            , pat_con_ext = ConPatTc
+              { cpt_tvs = [], cpt_dicts = []
+              , cpt_binds = emptyTcEvBinds
+              , cpt_arg_tys = ctxt_res_tys
+              , cpt_wrap = idHsWrapper
+              }
+            }
+
+      return (mkHsWrapPat (bodyWrap <.> wrap) res_pat pat_ty, res)
+
+    else do
+      -- The general case, with existential,
+      -- and local equality constraints
+      let theta'     = substTheta tenv (eqSpecPreds eq_spec ++ theta)
+                         -- order is *important* as we generate the list of
+                         -- dictionary binders from theta'
+          no_equalities = null eq_spec && not (any isEqPred theta)
+          skol_info = PatSkol (RealDataCon data_con) mc
+          mc = case pe_ctxt penv of
+                 LamPat mc -> mc
+                 LetPat {} -> PatBindRhs
+
+      gadts_on    <- xoptM LangExt.GADTs
+      families_on <- xoptM LangExt.TypeFamilies
+      checkTc (no_equalities || gadts_on || families_on)
+                (text "A pattern match on a GADT requires the" <+>
+                 text "GADTs or TypeFamilies language extension")
+                -- #2905 decided that a *pattern-match* of a GADT
+                -- should require the GADT language flag.
+                -- Re TypeFamilies see also #7156
+
+      given <- newEvVars theta'
+      (ev_binds, (wrap, (arg_pats', res)))
+           <- checkConstraints skol_info ex_tvs' given $
+              tcBody
+
+      let res_pat = ConPat
+              { pat_con   = header
+              , pat_ty_args = type_args
+              , pat_args  = arg_pats'
+              , pat_con_ext = ConPatTc
+                { cpt_tvs   = ex_tvs'
+                , cpt_dicts = given
+                , cpt_binds = ev_binds
+                , cpt_arg_tys = ctxt_res_tys
+                , cpt_wrap  = idHsWrapper
                 }
-        ; return (mkHsWrapPat wrap res_pat pat_ty, res)
-        } }
+              }
+      return (mkHsWrapPat wrap res_pat pat_ty, res)
 
 tcPatSynPat :: PatEnv -> Located Name -> PatSyn
             -> ExpSigmaType                -- Type of the pattern
@@ -962,6 +1076,7 @@ tcPatSynPat penv (L con_span _) pat_syn pat_ty arg_pats thing_inside
 
         ; traceTc "checkConstraints }" (ppr ev_binds)
         ; let res_pat = ConPat { pat_con   = L con_span $ PatSynCon pat_syn
+                               , pat_ty_args = []
                                , pat_args  = arg_pats'
                                , pat_con_ext = ConPatTc
                                  { cpt_tvs   = ex_tvs'
