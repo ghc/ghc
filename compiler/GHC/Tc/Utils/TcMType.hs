@@ -4,7 +4,10 @@
 
 -}
 
-{-# LANGUAGE CPP, TupleSections, MultiWayIf #-}
+{-# LANGUAGE CPP #-}
+{-# LANGUAGE LambdaCase #-}
+{-# LANGUAGE MultiWayIf #-}
+{-# LANGUAGE TupleSections #-}
 
 {-# OPTIONS_GHC -Wno-incomplete-record-updates #-}
 
@@ -59,11 +62,14 @@ module GHC.Tc.Utils.TcMType (
   newMetaTyVarTyVars, newMetaTyVarTyVarX,
   newTyVarTyVar, cloneTyVarTyVar,
   newPatSigTyVar, newSkolemTyVar, newWildCardX,
+  newSkolemTyVarLvlOverlappable,
   tcInstType,
-  tcInstSkolTyVars, tcInstSkolTyVarsX, tcInstSkolTyVarsAt,
+  tcInstSkolTyVars, tcInstSkolTyVarsX,
   tcSkolDFunType, tcSuperSkolTyVars, tcInstSuperSkolTyVarsX,
 
-  freshenTyVarBndrs, freshenCoVarBndrsX,
+  freshenTyVarBndrs, freshenTyCoVarX,
+  freshenCoVarBndrsX, rebuildTyCoVarX,
+  rebuildTyCoVarBinderX, rebuildTyCoBinderX,
 
   --------------------------------
   -- Zonking and tidying
@@ -572,53 +578,56 @@ tcInstSkolTyVarsPushLevel :: Bool -> TCvSubst -> [TyVar]
 tcInstSkolTyVarsPushLevel overlappable subst tvs
   = do { tc_lvl <- getTcLevel
        ; let pushed_lvl = pushTcLevel tc_lvl
-       ; tcInstSkolTyVarsAt pushed_lvl overlappable subst tvs }
-
-tcInstSkolTyVarsAt :: TcLevel -> Bool
-                   -> TCvSubst -> [TyVar]
-                   -> TcM (TCvSubst, [TcTyVar])
-tcInstSkolTyVarsAt lvl overlappable subst tvs
-  = freshenTyCoVarsX new_skol_tv subst tvs
-  where
-    details = SkolemTv lvl overlappable
-    new_skol_tv name kind = mkTcTyVar name kind details
+       ; mapAccumLM
+           (freshenTyCoVarX $ newSkolemTyVarLvlOverlappable pushed_lvl overlappable)
+           subst tvs
+       }
 
 ------------------
 freshenTyVarBndrs :: [TyVar] -> TcM (TCvSubst, [TyVar])
 -- ^ Give fresh uniques to a bunch of TyVars, but they stay
 --   as TyVars, rather than becoming TcTyVars
 -- Used in GHC.Tc.Instance.Family.newFamInst, and Inst.newClsInst
-freshenTyVarBndrs = freshenTyCoVars mkTyVar
+freshenTyVarBndrs = mapAccumLM (freshenTyCoVarX mkTyVar) emptyTCvSubst
 
 freshenCoVarBndrsX :: TCvSubst -> [CoVar] -> TcM (TCvSubst, [CoVar])
 -- ^ Give fresh uniques to a bunch of CoVars
 -- Used in GHC.Tc.Instance.Family.newFamInst
-freshenCoVarBndrsX subst = freshenTyCoVarsX mkCoVar subst
+freshenCoVarBndrsX subst = mapAccumLM (freshenTyCoVarX mkCoVar) subst
 
 ------------------
-freshenTyCoVars :: (Name -> Kind -> TyCoVar)
-                -> [TyVar] -> TcM (TCvSubst, [TyCoVar])
-freshenTyCoVars mk_tcv = freshenTyCoVarsX mk_tcv emptyTCvSubst
 
-freshenTyCoVarsX :: (Name -> Kind -> TyCoVar)
-                 -> TCvSubst -> [TyCoVar]
-                 -> TcM (TCvSubst, [TyCoVar])
-freshenTyCoVarsX mk_tcv = mapAccumLM (freshenTyCoVarX mk_tcv)
-
-freshenTyCoVarX :: (Name -> Kind -> TyCoVar)
-                -> TCvSubst -> TyCoVar -> TcM (TCvSubst, TyCoVar)
--- This a complete freshening operation:
+-- | This a complete freshening operation:
 -- the skolems have a fresh unique, and a location from the monad
 -- See Note [Skolemising type variables]
-freshenTyCoVarX mk_tcv subst tycovar
-  = do { loc  <- getSrcSpanM
-       ; uniq <- newUnique
-       ; let old_name = tyVarName tycovar
-             new_name = mkInternalName uniq (getOccName old_name) loc
-             new_kind = substTyUnchecked subst (tyVarKind tycovar)
-             new_tcv  = mk_tcv new_name new_kind
-             subst1   = extendTCvSubstWithClone subst tycovar new_tcv
+freshenTyCoVarX :: (Name -> Kind -> TyCoVar)
+                -> TCvSubst -> TyCoVar -> TcM (TCvSubst, TyCoVar)
+freshenTyCoVarX mk_tcv  = rebuildTyCoVarX $ \old_name kind -> do
+  loc  <- getSrcSpanM
+  uniq <- newUnique
+  let new_name = mkInternalName uniq (getOccName old_name) loc
+  pure $ mk_tcv new_name kind
+
+-- | This doesn't do anything to the name, but does substitute the kind for sake
+-- of telescopes.
+rebuildTyCoVarX :: (Name -> Kind -> TcM TyCoVar)
+                -> TCvSubst -> TyCoVar -> TcM (TCvSubst, TyCoVar)
+rebuildTyCoVarX mk_tcv subst tycovar
+  = do { let new_kind = substTyUnchecked subst (tyVarKind tycovar)
+       ; new_tcv <- mk_tcv (tyVarName tycovar) new_kind
+       ; let subst1   = extendTCvSubstWithClone subst tycovar new_tcv
        ; return (subst1, new_tcv) }
+
+rebuildTyCoVarBinderX :: (Name -> Kind -> TcM TyCoVar)
+                      -> TCvSubst -> TyCoVarBinder -> TcM (TCvSubst, TyCoVarBinder)
+rebuildTyCoVarBinderX mk_tcv subst (Bndr v f) = (fmap . fmap) (\v' -> Bndr v' f) $
+  rebuildTyCoVarX mk_tcv subst v
+
+rebuildTyCoBinderX :: (Name -> Kind -> TcM TyCoVar)
+                   -> TCvSubst -> TyCoBinder -> TcM (TCvSubst, TyCoBinder)
+rebuildTyCoBinderX mk_tcv subst = \case
+  Named bndr -> (fmap . fmap) Named $ rebuildTyCoVarBinderX mk_tcv subst bndr
+  Anon flag ty -> pure (subst, Anon flag $ substTy subst ty)
 
 {- Note [Skolemising type variables]
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
@@ -731,9 +740,13 @@ newNamedAnonMetaTyVar tyvar_name meta_info kind
 
 -- makes a new skolem tv
 newSkolemTyVar :: Name -> Kind -> TcM TcTyVar
-newSkolemTyVar name kind
-  = do { lvl <- getTcLevel
-       ; return (mkTcTyVar name kind (SkolemTv lvl False)) }
+newSkolemTyVar name kind = do
+  lvl <- getTcLevel
+  pure $ newSkolemTyVarLvlOverlappable lvl False name kind
+
+newSkolemTyVarLvlOverlappable :: TcLevel -> Bool -> Name -> Kind -> TcTyVar
+newSkolemTyVarLvlOverlappable lvl overlaps name kind =
+  mkTcTyVar name kind $ SkolemTv lvl overlaps
 
 newTyVarTyVar :: Name -> Kind -> TcM TcTyVar
 -- See Note [TyVarTv]
