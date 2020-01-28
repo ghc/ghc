@@ -1,6 +1,8 @@
 #include "ghcconfig.h"
 #include "rts/Constants.h"
 
+#if !defined(USE_MINIINTERPRETER)
+
 #if defined(powerpc64le_HOST_ARCH)
 # if defined(linux_HOST_OS)
 # define STACK_FRAME_SIZE RESERVED_C_STACK_BYTES+304
@@ -273,3 +275,5 @@ StgReturn:
 
 	.section	.note.GNU-stack,"",@progbits
 #endif
+
+#endif /* !USE_MINIINTERPRETER */
