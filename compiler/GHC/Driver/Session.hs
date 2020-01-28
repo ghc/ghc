@@ -4039,6 +4039,7 @@ optLevelFlags -- see Note [Documenting optimisation flags]
     , ([0,1,2], Opt_DoEtaReduction)       -- See Note [Eta-reduction in -O0]
     , ([0,1,2], Opt_DmdTxDictSel)
     , ([0,1,2], Opt_LlvmTBAA)
+    , ([0,1,2], Opt_DictsStrict)
 
     , ([0],     Opt_IgnoreInterfacePragmas)
     , ([0],     Opt_OmitInterfacePragmas)
