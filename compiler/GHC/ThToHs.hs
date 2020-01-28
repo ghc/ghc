@@ -1267,10 +1267,11 @@ cvtp (UnboxedSumP p alt arity)
                             ; return $ SumPat noExtField p' alt arity }
 cvtp (ConP s ps)       = do { s' <- cNameL s; ps' <- cvtPats ps
                             ; let pps = map (parenthesizePat appPrec) ps'
-                            ; return $ ConPat s' (PrefixCon pps) NoExtField }
+                            ; return $ ConPat s' [] (PrefixCon pps) NoExtField }
 cvtp (InfixP p1 s p2)  = do { s' <- cNameL s; p1' <- cvtPat p1; p2' <- cvtPat p2
                             ; wrapParL (ParPat noExtField) $
                               ConPat s'
+                                []
                                 (InfixCon (parenthesizePat opPrec p1')
                                           (parenthesizePat opPrec p2'))
                                 NoExtField
@@ -1288,6 +1289,7 @@ cvtp (TH.AsP s p)      = do { s' <- vNameL s; p' <- cvtPat p
 cvtp TH.WildP          = return $ WildPat noExtField
 cvtp (RecP c fs)       = do { c' <- cNameL c; fs' <- mapM cvtPatFld fs
                             ; return $ ConPat c'
+                                []
                                 (Hs.RecCon $ HsRecFields fs' Nothing)
                                 NoExtField
                             }
@@ -1320,7 +1322,7 @@ cvtOpAppP x op1 (UInfixP y op2 z)
 cvtOpAppP x op y
   = do { op' <- cNameL op
        ; y' <- cvtPat y
-       ; return $ ConPat op' (InfixCon x y') NoExtField
+       ; return $ ConPat op' [] (InfixCon x y') NoExtField
        }
 
 -----------------------------------------------------------

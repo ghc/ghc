@@ -602,7 +602,7 @@ mkPatSynMatchGroup (L loc patsyn_name) (L _ decls) =
        ; return $ mkMatchGroup FromSource matches }
   where
     fromDecl (L loc decl@(ValD _ (PatBind _
-                         pat@(L _ (ConPat ln@(L _ name) details NoExtField))
+                         pat@(L _ (ConPat ln@(L _ name) [] details NoExtField))
                                rhs _))) =
         do { unless (name == patsyn_name) $
                wrongNameBindingErr loc decl
@@ -1071,23 +1071,24 @@ checkPattern_msg :: SDoc -> PV (Located (PatBuilder GhcPs)) -> P (LPat GhcPs)
 checkPattern_msg msg pp = runPV_msg msg (pp >>= checkLPat)
 
 checkLPat :: Located (PatBuilder GhcPs) -> PV (LPat GhcPs)
-checkLPat e@(L l _) = checkPat l e []
+checkLPat e@(L l _) = checkPat l e [] []
 
-checkPat :: SrcSpan -> Located (PatBuilder GhcPs) -> [LPat GhcPs]
+checkPat :: SrcSpan -> Located (PatBuilder GhcPs) -> [LHsWcType GhcPs] -> [LPat GhcPs]
          -> PV (LPat GhcPs)
-checkPat loc (L l e@(PatBuilderVar (L _ c))) args
-  | isRdrDataCon c = return (L loc (ConPat (L l c) (PrefixCon args) NoExtField))
+checkPat loc (L l e@(PatBuilderVar (L _ c))) tyargs args
+  | isRdrDataCon c = return (L loc (ConPat (L l c) tyargs (PrefixCon args) NoExtField))
   | not (null args) && patIsRec c =
       localPV_msg (\_ -> text "Perhaps you intended to use RecursiveDo") $
       patFail l (ppr e)
-checkPat loc (L _ (PatBuilderApp f e)) args
-  = do p <- checkLPat e
-       checkPat loc f (p : args)
-checkPat loc (L _ e) []
-  = do p <- checkAPat loc e
-       return (L loc p)
-checkPat loc e _
-  = patFail loc (ppr e)
+checkPat loc (L _ (PatBuilderAppType f t)) tyargs args = do
+  checkPat loc f (t : tyargs) args
+checkPat loc (L _ (PatBuilderApp f e)) [] args = do
+  p <- checkLPat e
+  checkPat loc f [] (p : args)
+checkPat loc (L _ e) [] [] = do
+  p <- checkAPat loc e
+  return (L loc p)
+checkPat loc e _ _ = patFail loc (ppr e)
 
 checkAPat :: SrcSpan -> PatBuilder GhcPs -> PV (Pat GhcPs)
 checkAPat loc e0 = do
@@ -1113,7 +1114,7 @@ checkAPat loc e0 = do
      | isRdrDataCon c -> do
          l <- checkLPat l
          r <- checkLPat r
-         return (ConPat (L cl c) (InfixCon l r) NoExtField)
+         return (ConPat (L cl c) [] (InfixCon l r) NoExtField)
 
    PatBuilderPar e    -> checkLPat e >>= (return . (ParPat noExtField))
    _           -> patFail loc (ppr e0)
@@ -1758,6 +1759,8 @@ class b ~ (Body b) GhcPs => DisambECP b where
   superFunArg :: (DisambECP (FunArg b) => PV (Located b)) -> PV (Located b)
   -- | Disambiguate "f x" (function application)
   mkHsAppPV :: SrcSpan -> Located b -> Located (FunArg b) -> PV (Located b)
+  -- | Disambiguate "f @t" (visible type applications)
+  mkHsAppTypePV :: SrcSpan -> Located b -> LHsType GhcPs -> PV (Located b)
   -- | Disambiguate "if ... then ... else ..."
   mkHsIfPV :: SrcSpan
          -> LHsExpr GhcPs
@@ -1871,6 +1874,7 @@ instance DisambECP (HsCmd GhcPs) where
     checkCmdBlockArguments c
     checkExpBlockArguments e
     return $ L l (HsCmdApp noExtField c e)
+  mkHsAppTypePV l c t = cmdFail l (ppr c <+> text "@" <> ppr t)
   mkHsIfPV l c semi1 a semi2 b = do
     checkDoAndIfThenElse c semi1 a semi2 b
     return $ L l (mkHsCmdIf c a b)
@@ -1927,6 +1931,9 @@ instance DisambECP (HsExpr GhcPs) where
     checkExpBlockArguments e1
     checkExpBlockArguments e2
     return $ L l (HsApp noExtField e1 e2)
+  mkHsAppTypePV l e t = do
+    checkExpBlockArguments e
+    return $ L l (HsAppType noExtField e (mkHsWildCardBndrs t))
   mkHsIfPV l c semi1 a semi2 b = do
     checkDoAndIfThenElse c semi1 a semi2 b
     return $ L l (mkHsIf c a b)
@@ -1977,6 +1984,7 @@ data PatBuilder p
   = PatBuilderPat (Pat p)
   | PatBuilderPar (Located (PatBuilder p))
   | PatBuilderApp (Located (PatBuilder p)) (Located (PatBuilder p))
+  | PatBuilderAppType (Located (PatBuilder p)) (LHsWcType GhcPs)
   | PatBuilderOpApp (Located (PatBuilder p)) (Located RdrName) (Located (PatBuilder p))
   | PatBuilderVar (Located RdrName)
   | PatBuilderOverLit (HsOverLit GhcPs)
@@ -1985,6 +1993,7 @@ instance Outputable (PatBuilder GhcPs) where
   ppr (PatBuilderPat p) = ppr p
   ppr (PatBuilderPar (L _ p)) = parens (ppr p)
   ppr (PatBuilderApp (L _ p1) (L _ p2)) = ppr p1 <+> ppr p2
+  ppr (PatBuilderAppType (L _ p) t) = ppr p <+> text "@" <> ppr t
   ppr (PatBuilderOpApp (L _ p1) op (L _ p2)) = ppr p1 <+> ppr op <+> ppr p2
   ppr (PatBuilderVar v) = ppr v
   ppr (PatBuilderOverLit l) = ppr l
@@ -2008,6 +2017,7 @@ instance DisambECP (PatBuilder GhcPs) where
   type FunArg (PatBuilder GhcPs) = PatBuilder GhcPs
   superFunArg m = m
   mkHsAppPV l p1 p2 = return $ L l (PatBuilderApp p1 p2)
+  mkHsAppTypePV l p t = return $ L l (PatBuilderAppType p (mkHsWildCardBndrs t))
   mkHsIfPV l _ _ _ _ _ = addFatalError l $ text "(if ... then ... else ...)-syntax in pattern"
   mkHsDoPV l _ = addFatalError l $ text "do-notation in pattern"
   mkHsParPV l p = return $ L l (PatBuilderPar p)
@@ -2064,7 +2074,7 @@ mkPatRec ::
 mkPatRec (unLoc -> PatBuilderVar c) (HsRecFields fs dd)
   | isRdrDataCon (unLoc c)
   = do fs <- mapM checkPatField fs
-       return $ PatBuilderPat $ ConPat c (RecCon (HsRecFields fs dd)) NoExtField
+       return $ PatBuilderPat $ ConPat c [] (RecCon (HsRecFields fs dd)) NoExtField
 mkPatRec p _ =
   addFatalError (getLoc p) $ text "Not a record constructor:" <+> ppr p
 

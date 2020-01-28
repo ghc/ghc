@@ -533,6 +533,7 @@ nlConWildPat :: DataCon -> LPat GhcPs
 -- The pattern (K {})
 nlConWildPat con = noLoc $ ConPat
   (noLoc $ getRdrName con)
+  []
   (RecCon $ HsRecFields { rec_flds = []
                         , rec_dotdot = Nothing })
   NoExtField

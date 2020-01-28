@@ -11,12 +11,13 @@ free variables.
 -}
 
 {-# LANGUAGE CPP #-}
+{-# LANGUAGE DeriveFunctor #-}
 {-# LANGUAGE FlexibleContexts #-}
-{-# LANGUAGE TypeFamilies #-}
+{-# LANGUAGE LambdaCase #-}
 {-# LANGUAGE RankNTypes #-}
 {-# LANGUAGE ScopedTypeVariables #-}
+{-# LANGUAGE TypeFamilies #-}
 {-# LANGUAGE ViewPatterns #-}
-{-# LANGUAGE DeriveFunctor #-}
 
 module GHC.Rename.Pat (-- main entry points
               rnPat, rnPats, rnBindPat, rnPatAndThen,
@@ -73,7 +74,7 @@ import TysWiredIn          ( nilDataCon )
 import DataCon
 import qualified GHC.LanguageExtensions as LangExt
 
-import Control.Monad       ( when, ap, guard )
+import Control.Monad       ( when, ap, guard, forM )
 import qualified Data.List.NonEmpty as NE
 import Data.Ratio
 
@@ -465,14 +466,14 @@ rnPatAndThen mk p@(ViewPat x expr pat)
        -- ; return (ViewPat expr' pat' ty) }
        ; return (ViewPat x expr' pat') }
 
-rnPatAndThen mk (ConPat con stuff NoExtField)
+rnPatAndThen mk (ConPat con tyargs stuff NoExtField)
    -- rnConPatAndThen takes care of reconstructing the pattern
    -- The pattern for the empty list needs to be replaced by an empty explicit list pattern when overloaded lists is turned on.
   = case unLoc con == nameRdrName (dataConName nilDataCon) of
       True    -> do { ol_flag <- liftCps $ xoptM LangExt.OverloadedLists
                     ; if ol_flag then rnPatAndThen mk (ListPat noExtField [])
-                                 else rnConPatAndThen mk con stuff}
-      False   -> rnConPatAndThen mk con stuff
+                                 else rnConPatAndThen mk con tyargs stuff}
+      False   -> rnConPatAndThen mk con tyargs stuff
 
 rnPatAndThen mk (ListPat _ pats)
   = do { opt_OverloadedLists <- liftCps $ xoptM LangExt.OverloadedLists
@@ -508,25 +509,29 @@ rnPatAndThen _ pat = pprPanic "rnLPatAndThen" (ppr pat)
 --------------------
 rnConPatAndThen :: NameMaker
                 -> Located RdrName    -- the constructor
+                -> [LHsWcType (NoGhcTc GhcPs)]
                 -> HsConPatDetails GhcPs
                 -> CpsRn (Pat GhcRn)
 
-rnConPatAndThen mk con (PrefixCon pats)
-  = do  { con' <- lookupConCps con
-        ; pats' <- rnLPatsAndThen mk pats
-        ; return (ConPat con' (PrefixCon pats') NoExtField) }
-
-rnConPatAndThen mk con (InfixCon pat1 pat2)
-  = do  { con' <- lookupConCps con
-        ; pat1' <- rnLPatAndThen mk pat1
-        ; pat2' <- rnLPatAndThen mk pat2
-        ; fixity <- liftCps $ lookupFixityRn (unLoc con')
-        ; liftCps $ mkConOpPatRn con' fixity pat1' pat2' }
-
-rnConPatAndThen mk con (RecCon rpats)
-  = do  { con' <- lookupConCps con
-        ; rpats' <- rnHsRecPatsAndThen mk con' rpats
-        ; return (ConPat con' (RecCon rpats') NoExtField) }
+rnConPatAndThen mk con tyargs = \case
+  PrefixCon pats -> do
+    con' <- lookupConCps con
+    tyargs' <- forM tyargs $ \t ->
+      liftCpsFV (rnHsWcType HsTypeCtx t)
+    pats' <- rnLPatsAndThen mk pats
+    return $ ConPat con' tyargs' (PrefixCon pats') NoExtField
+  InfixCon pat1 pat2 -> do
+    con' <- lookupConCps con
+    pat1' <- rnLPatAndThen mk pat1
+    pat2' <- rnLPatAndThen mk pat2
+    fixity <- liftCps $ lookupFixityRn (unLoc con')
+    liftCps $ mkConOpPatRn con' fixity pat1' pat2'
+  RecCon rpats -> do
+    con' <- lookupConCps con
+    tyargs' <- forM tyargs $ \t ->
+      liftCpsFV (rnHsWcType HsTypeCtx t)
+    rpats' <- rnHsRecPatsAndThen mk con' rpats
+    return $ ConPat con' tyargs' (RecCon rpats') NoExtField
 
 checkUnusedRecordWildcardCps :: SrcSpan -> Maybe [Name] -> CpsRn ()
 checkUnusedRecordWildcardCps loc dotdot_names =
