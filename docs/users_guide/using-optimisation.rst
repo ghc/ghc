@@ -335,7 +335,7 @@ by saying ``-fno-wombat``.
     :reverse: -fno-dicts-strict
     :category:
 
-    :default: off
+    :default: on
 
     Make dictionaries strict.
 
