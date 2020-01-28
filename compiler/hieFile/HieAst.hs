@@ -798,7 +798,8 @@ instance ( a ~ GhcPass p
       SumPat _ pat _ _ ->
         [ toHie $ PS rsp scope pscope pat
         ]
-      ConPatIn c dets ->
+      -- Con @a @b x (y :: a) z
+      ConPatIn c tyargs dets ->
         [ toHie $ C Use c
         , toHie $ contextify dets
         ]
@@ -827,6 +828,7 @@ instance ( a ~ GhcPass p
                        (protectSig @a cscope sig)
               -- See Note [Scoping Rules for SigPat]
         ]
+      
       CoPat _ _ _ _ ->
         []
       XPat _ -> []

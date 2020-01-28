@@ -1825,7 +1825,7 @@ repP (TuplePat _ ps boxed)
   | otherwise           = do { qs <- repLPs ps; repPunboxedTup qs }
 repP (SumPat _ p alt arity) = do { p1 <- repLP p
                                  ; repPunboxedSum p1 alt arity }
-repP (ConPatIn dc details)
+repP (ConPatIn dc [] details)
  = do { con_str <- lookupLOcc dc
       ; case details of
          PrefixCon ps -> do { qs <- repLPs ps; repPcon con_str qs }
@@ -1840,7 +1840,8 @@ repP (ConPatIn dc details)
    rep_fld (dL->L _ fld) = do { MkC v <- lookupLOcc (hsRecFieldSel fld)
                               ; MkC p <- repLP (hsRecFieldArg fld)
                               ; rep2 fieldPatName [v,p] }
-
+repP (ConPatIn dc tyargs details)
+ = panic "repP: Type applications in constructor patterns not yet implemented."
 repP (NPat _ (dL->L _ l) Nothing _) = do { a <- repOverloadedLiteral l
                                          ; repPlit a }
 repP (ViewPat _ e p) = do { e' <- repLE e; p' <- repLP p; repPview e' p' }

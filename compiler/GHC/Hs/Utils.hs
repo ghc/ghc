@@ -435,25 +435,25 @@ nlConVarPatName :: Name -> [Name] -> LPat GhcRn
 nlConVarPatName con vars = nlConPatName con (map nlVarPat vars)
 
 nlInfixConPat :: RdrName -> LPat GhcPs -> LPat GhcPs -> LPat GhcPs
-nlInfixConPat con l r = noLoc (ConPatIn (noLoc con)
-                              (InfixCon (parenthesizePat opPrec l)
-                                        (parenthesizePat opPrec r)))
+nlInfixConPat con l r = noLoc (ConPatIn (noLoc con) []
+                                (InfixCon (parenthesizePat opPrec l)
+                                          (parenthesizePat opPrec r)))
 
 nlConPat :: RdrName -> [LPat GhcPs] -> LPat GhcPs
 nlConPat con pats =
-  noLoc (ConPatIn (noLoc con) (PrefixCon (map (parenthesizePat appPrec) pats)))
+  noLoc (ConPatIn (noLoc con) [] (PrefixCon (map (parenthesizePat appPrec) pats)))
 
 nlConPatName :: Name -> [LPat GhcRn] -> LPat GhcRn
 nlConPatName con pats =
-  noLoc (ConPatIn (noLoc con) (PrefixCon (map (parenthesizePat appPrec) pats)))
+  noLoc (ConPatIn (noLoc con) [] (PrefixCon (map (parenthesizePat appPrec) pats)))
 
 nlNullaryConPat :: IdP (GhcPass p) -> LPat (GhcPass p)
-nlNullaryConPat con = noLoc (ConPatIn (noLoc con) (PrefixCon []))
+nlNullaryConPat con = noLoc (ConPatIn (noLoc con) [] (PrefixCon []))
 
 nlWildConPat :: DataCon -> LPat GhcPs
-nlWildConPat con = noLoc (ConPatIn (noLoc (getRdrName con))
-                         (PrefixCon (replicate (dataConSourceArity con)
-                                             nlWildPat)))
+nlWildConPat con = noLoc (ConPatIn (noLoc (getRdrName con)) []
+                           (PrefixCon (replicate (dataConSourceArity con)
+                                               nlWildPat)))
 
 -- | Wildcard pattern - after parsing
 nlWildPat :: LPat GhcPs
@@ -1080,7 +1080,7 @@ collect_lpat p bndrs
     go (TuplePat _ pats _)        = foldr collect_lpat bndrs pats
     go (SumPat _ pat _ _)         = collect_lpat pat bndrs
 
-    go (ConPatIn _ ps)            = foldr collect_lpat bndrs (hsConPatArgs ps)
+    go (ConPatIn _ _ ps)          = foldr collect_lpat bndrs (hsConPatArgs ps)
     go (ConPatOut {pat_args=ps})  = foldr collect_lpat bndrs (hsConPatArgs ps)
         -- See Note [Dictionary binders in ConPatOut]
     go (LitPat _ _)               = bndrs
@@ -1401,7 +1401,9 @@ lPatImplicits = hs_lpat
     hs_pat (SigPat _ pat _)     = hs_lpat pat
     hs_pat (CoPat _ _ pat _)    = hs_pat pat
 
-    hs_pat (ConPatIn n ps)           = details n ps
+    hs_pat (ConPatIn n _ ps)    = details n ps
+     -- TODO (Cale): Determine what lPatImplicits is computing, and whether it's correct to ignore
+     -- type arguments.
     hs_pat (ConPatOut {pat_con=con, pat_args=ps}) = details (fmap conLikeName con) ps
 
     hs_pat _ = []

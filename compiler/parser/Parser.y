@@ -2700,7 +2700,7 @@ fexp    :: { ECP }
         -- See Note [Whitespace-sensitive operator parsing] in Lexer.x
         | fexp PREFIX_AT atype       { ECP $
                                          do { $1 <- runECP_PV $1
-                                            ; x <- mkHsAppTypePV (comb2 $1 $>) noExtField $1 (mkHsWildCardBndrs $3)
+                                            ; x <- mkHsAppTypePV (comb2 $1 $>) $1 $3
                                             ; ams x [mj AnnAt $2] } }
 
         | 'static' aexp              {% runECP_P $2 >>= \ $2 ->

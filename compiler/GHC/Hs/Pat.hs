@@ -170,12 +170,14 @@ data Pat p
     -- For details on above see note [Api annotations] in ApiAnnotation
 
         ------------ Constructor patterns ---------------
-  | ConPatIn    (Located (IdP p))
-                (HsConPatDetails p)
+  | ConPatIn    (Located (IdP p))       -- Constructor name
+                [LHsWcType (NoGhcTc p)] -- Type arguments immediately following constructor
+                (HsConPatDetails p)     -- Arguments / record field matches
     -- ^ Constructor Pattern In
 
   | ConPatOut {
         pat_con     :: Located ConLike,
+        pat_ty_args :: [LHsWcType (NoGhcTc p)],
         pat_arg_tys :: [Type],          -- The universal arg types, 1-1 with the universal
                                         -- tyvars of the constructor/pattern synonym
                                         --   Use (conLikeResTy pat_con pat_arg_tys) to get
@@ -543,8 +545,9 @@ pprPat (TuplePat _ pats bx)
   | otherwise
   = tupleParens (boxityTupleSort bx) (pprWithCommas ppr pats)
 pprPat (SumPat _ pat alt arity) = sumParens (pprAlternative ppr pat alt arity)
-pprPat (ConPatIn con details)   = pprUserCon (unLoc con) details
+pprPat (ConPatIn con tyapps details)   = pprUserCon (unLoc con) tyapps details
 pprPat (ConPatOut { pat_con = con
+                  , pat_ty_args = tyargs
                   , pat_tvs = tvs
                   , pat_dicts = dicts
                   , pat_binds = binds
@@ -558,15 +561,17 @@ pprPat (ConPatOut { pat_con = con
           <> braces (sep [ hsep (map pprPatBndr (tvs ++ dicts))
                          , ppr binds])
           <+> pprConArgs details
-    else pprUserCon (unLoc con) details
+    else pprUserCon (unLoc con) tyargs details
 pprPat (AppTypePat _ pat ty)    = ppr pat <+> text "@" <> ppr ty
 pprPat (XPat n)                 = noExtCon n
 
-
 pprUserCon :: (OutputableBndr con, OutputableBndrId p)
-           => con -> HsConPatDetails (GhcPass p) -> SDoc
-pprUserCon c (InfixCon p1 p2) = ppr p1 <+> pprInfixOcc c <+> ppr p2
-pprUserCon c details          = pprPrefixOcc c <+> pprConArgs details
+           => con -> [LHsWcType (NoGhcTc (GhcPass p))] -> HsConPatDetails (GhcPass p) -> SDoc
+pprUserCon c _ (InfixCon p1 p2) = ppr p1 <+> pprInfixOcc c <+> ppr p2
+pprUserCon c tyargs details     = pprPrefixOcc c <+> pprTyArgs tyargs <+> pprConArgs details
+
+pprTyArgs :: (OutputableBndrId p) => [LHsWcType (GhcPass p)] -> SDoc
+pprTyArgs tyargs = fsep (map (\ty -> char '@' <> ppr ty) tyargs)
 
 pprConArgs :: (OutputableBndrId p)
            => HsConPatDetails (GhcPass p) -> SDoc
@@ -604,6 +609,7 @@ mkPrefixConPat :: DataCon ->
 -- Make a vanilla Prefix constructor pattern
 mkPrefixConPat dc pats tys
   = noLoc $ ConPatOut { pat_con = noLoc (RealDataCon dc)
+                      , pat_ty_args = []
                       , pat_tvs = []
                       , pat_dicts = []
                       , pat_binds = emptyTcEvBinds
@@ -767,8 +773,8 @@ patNeedsParens p = go
   where
     go (NPlusKPat {})    = p > opPrec
     go (SplicePat {})    = False
-    go (ConPatIn _ ds)   = conPatNeedsParens p ds
-    go cp@(ConPatOut {}) = conPatNeedsParens p (pat_args cp)
+    go (ConPatIn _ ts ds) = conPatNeedsParens p ts ds
+    go cp@(ConPatOut {}) = conPatNeedsParens p (pat_ty_args cp) (pat_args cp)
     go (SigPat {})       = p >= sigPrec
     go (ViewPat {})      = True
     go (CoPat _ _ p _)   = go p
@@ -788,12 +794,12 @@ patNeedsParens p = go
 
 -- | @'conPatNeedsParens' p cp@ returns 'True' if the constructor patterns @cp@
 -- needs parentheses under precedence @p@.
-conPatNeedsParens :: PprPrec -> HsConDetails a b -> Bool
+conPatNeedsParens :: PprPrec -> [t] -> HsConDetails a b -> Bool
 conPatNeedsParens p = go
   where
-    go (PrefixCon args) = p >= appPrec && not (null args)
-    go (InfixCon {})    = p >= opPrec
-    go (RecCon {})      = False
+    go ts (PrefixCon args) = p >= appPrec && (not (null args) || not (null ts))
+    go _  (InfixCon {})    = p >= opPrec -- type args should be empty in this case
+    go _  (RecCon {})      = p >= appPrec -- type args should be empty in this case
 
 -- | @'parenthesizePat' p pat@ checks if @'patNeedsParens' p pat@ is true, and
 -- if so, surrounds @pat@ with a 'ParPat'. Otherwise, it simply returns @pat@.
@@ -830,5 +836,5 @@ collectEvVarsPat pat =
                                    $ hsConPatArgs args
     SigPat  _ p _    -> collectEvVarsLPat p
     CoPat _ _ p _    -> collectEvVarsPat  p
-    ConPatIn _  _    -> panic "foldMapPatBag: ConPatIn"
+    ConPatIn {}      -> panic "foldMapPatBag: ConPatIn"
     _other_pat       -> emptyBag

@@ -606,7 +606,7 @@ mkPatSynMatchGroup (dL->L loc patsyn_name) (dL->L _ decls) =
        ; return $ mkMatchGroup FromSource matches }
   where
     fromDecl (dL->L loc decl@(ValD _ (PatBind _
-                             pat@(dL->L _ (ConPatIn ln@(dL->L _ name) details))
+                             pat@(dL->L _ (ConPatIn ln@(dL->L _ name) tyargs details))
                                    rhs _))) =
         do { unless (name == patsyn_name) $
                wrongNameBindingErr loc decl
@@ -1081,7 +1081,7 @@ checkLPat e@(dL->L l _) = checkPat l e []
 checkPat :: SrcSpan -> Located (PatBuilder GhcPs) -> [LPat GhcPs]
          -> PV (LPat GhcPs)
 checkPat loc (dL->L l e@(PatBuilderVar (dL->L _ c))) args
-  | isRdrDataCon c = return (cL loc (ConPatIn (cL l c) (PrefixCon args)))
+  | isRdrDataCon c = return (cL loc (ConPatIn (cL l c) [] (PrefixCon args)))
   | not (null args) && patIsRec c =
       localPV_msg (\_ -> text "Perhaps you intended to use RecursiveDo") $
       patFail l (ppr e)
@@ -1118,7 +1118,7 @@ checkAPat loc e0 = do
      | isRdrDataCon c -> do
          l <- checkLPat l
          r <- checkLPat r
-         return (ConPatIn (cL cl c) (InfixCon l r))
+         return (ConPatIn (cL cl c) [] (InfixCon l r))
 
    PatBuilderPar e    -> checkLPat e >>= (return . (ParPat noExtField))
    PatBuilderAppType p t -> do
@@ -1873,7 +1873,7 @@ class b ~ (Body b) GhcPs => DisambECP b where
   -- | Disambiguate tuple sections and unboxed sums
   mkSumOrTuplePV :: SrcSpan -> Boxity -> SumOrTuple b -> PV (Located b)
   -- | Disambiguate "e @t" type applications
-  mkHsAppTypePV :: SrcSpan -> NoExtField -> Located b -> LHsWcType GhcPs -> PV (Located b)
+  mkHsAppTypePV :: SrcSpan -> Located b -> LHsType GhcPs -> PV (Located b)
 
 {- Note [UndecidableSuperClasses for associated types]
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
@@ -1964,7 +1964,7 @@ instance p ~ GhcPs => DisambECP (HsCmd p) where
   mkHsBangPatPV l c = cmdFail l $
     text "!" <> ppr c
   mkSumOrTuplePV l boxity a = cmdFail l (pprSumOrTuple boxity a)
-  mkHsAppTypePV l _ c t = cmdFail l (ppr c <+> text "@" <> ppr t) -- TODO: Test this
+  mkHsAppTypePV l c t = cmdFail l (ppr c <+> text "@" <> ppr t) -- TODO: Test this
 
 cmdFail :: SrcSpan -> SDoc -> PV a
 cmdFail loc e = addFatalError loc $
@@ -2017,9 +2017,9 @@ instance p ~ GhcPs => DisambECP (HsExpr p) where
   mkHsBangPatPV l e = patSynErr "Bang pattern" l (text "!" <> ppr e) $
     text "Did you mean to add a space after the '!'?"
   mkSumOrTuplePV = mkSumOrTupleExpr
-  mkHsAppTypePV l x e t = do
+  mkHsAppTypePV l e t = do
     checkExpBlockArguments e
-    return $ cL l (HsAppType x e t)
+    return $ cL l (HsAppType noExtField e (mkHsWildCardBndrs t))
 
 patSynErr :: String -> SrcSpan -> SDoc -> SDoc -> PV (LHsExpr GhcPs)
 patSynErr item l e explanation =
@@ -2110,8 +2110,8 @@ instance DisambECP (PatBuilder GhcPs) where
     hintBangPat l pb
     return $ cL l (PatBuilderPat pb)
   mkSumOrTuplePV = mkSumOrTuplePat
-  mkHsAppTypePV l _ e t = do
-    return $ cL l (PatBuilderAppType e t)
+  mkHsAppTypePV l e t = do
+    return $ cL l (PatBuilderAppType e (mkHsWildCardBndrs t))
 
 checkUnboxedStringLitPat :: Located (HsLit GhcPs) -> PV ()
 checkUnboxedStringLitPat (dL->L loc lit) =
@@ -2127,7 +2127,7 @@ mkPatRec ::
 mkPatRec (unLoc -> PatBuilderVar c) (HsRecFields fs dd)
   | isRdrDataCon (unLoc c)
   = do fs <- mapM checkPatField fs
-       return (PatBuilderPat (ConPatIn c (RecCon (HsRecFields fs dd))))
+       return (PatBuilderPat (ConPatIn c [] (RecCon (HsRecFields fs dd))))
 mkPatRec p _ =
   addFatalError (getLoc p) $ text "Not a record constructor:" <+> ppr p
 
