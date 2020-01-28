@@ -35,7 +35,7 @@ type Decs                = [Dec] -- Defined as it is more convenient to wire-in
 type ConQ                = Q Con
 type TypeQ               = Q Type
 type KindQ               = Q Kind
-type TyVarBndrQ          = Q TyVarBndr
+type TyVarBndrQ flag     = Q (TyVarBndr flag)
 type TyLitQ              = Q TyLit
 type CxtQ                = Q Cxt
 type PredQ               = Q Pred
@@ -383,14 +383,14 @@ funD nm cs =
     ; pure (FunD nm cs1)
     }
 
-tySynD :: Quote m => Name -> [m TyVarBndr] -> m Type -> m Dec
+tySynD :: Quote m => Name -> [m (TyVarBndr ())] -> m Type -> m Dec
 tySynD tc tvs rhs =
   do { tvs1 <- sequenceA tvs
      ; rhs1 <- rhs
      ; pure (TySynD tc tvs1 rhs1)
      }
 
-dataD :: Quote m => m Cxt -> Name -> [m TyVarBndr] -> Maybe (m Kind) -> [m Con]
+dataD :: Quote m => m Cxt -> Name -> [m (TyVarBndr ())] -> Maybe (m Kind) -> [m Con]
       -> [m DerivClause] -> m Dec
 dataD ctxt tc tvs ksig cons derivs =
   do
@@ -401,7 +401,7 @@ dataD ctxt tc tvs ksig cons derivs =
     derivs1 <- sequenceA derivs
     pure (DataD ctxt1 tc tvs1 ksig1 cons1 derivs1)
 
-newtypeD :: Quote m => m Cxt -> Name -> [m TyVarBndr] -> Maybe (m Kind) -> m Con
+newtypeD :: Quote m => m Cxt -> Name -> [m (TyVarBndr ())] -> Maybe (m Kind) -> m Con
          -> [m DerivClause] -> m Dec
 newtypeD ctxt tc tvs ksig con derivs =
   do
@@ -412,7 +412,7 @@ newtypeD ctxt tc tvs ksig con derivs =
     derivs1 <- sequenceA derivs
     pure (NewtypeD ctxt1 tc tvs1 ksig1 con1 derivs1)
 
-classD :: Quote m => m Cxt -> Name -> [m TyVarBndr] -> [FunDep] -> [m Dec] -> m Dec
+classD :: Quote m => m Cxt -> Name -> [m (TyVarBndr ())] -> [FunDep] -> [m Dec] -> m Dec
 classD ctxt cls tvs fds decs =
   do
     tvs1  <- sequenceA tvs
@@ -475,7 +475,7 @@ pragSpecInstD ty
       ty1    <- ty
       pure $ PragmaD $ SpecialiseInstP ty1
 
-pragRuleD :: Quote m => String -> Maybe [m TyVarBndr] -> [m RuleBndr] -> m Exp -> m Exp
+pragRuleD :: Quote m => String -> Maybe [m (TyVarBndr ())] -> [m RuleBndr] -> m Exp -> m Exp
           -> Phases -> m Dec
 pragRuleD n ty_bndrs tm_bndrs lhs rhs phases
   = do
@@ -497,7 +497,7 @@ pragLineD line file = pure $ PragmaD $ LineP line file
 pragCompleteD :: Quote m => [Name] -> Maybe Name -> m Dec
 pragCompleteD cls mty = pure $ PragmaD $ CompleteP cls mty
 
-dataInstD :: Quote m => m Cxt -> (Maybe [m TyVarBndr]) -> m Type -> Maybe (m Kind) -> [m Con]
+dataInstD :: Quote m => m Cxt -> (Maybe [m (TyVarBndr ())]) -> m Type -> Maybe (m Kind) -> [m Con]
           -> [m DerivClause] -> m Dec
 dataInstD ctxt mb_bndrs ty ksig cons derivs =
   do
@@ -509,7 +509,7 @@ dataInstD ctxt mb_bndrs ty ksig cons derivs =
     derivs1 <- sequenceA derivs
     pure (DataInstD ctxt1 mb_bndrs1 ty1 ksig1 cons1 derivs1)
 
-newtypeInstD :: Quote m => m Cxt -> (Maybe [m TyVarBndr]) -> m Type -> Maybe (m Kind) -> m Con
+newtypeInstD :: Quote m => m Cxt -> (Maybe [m (TyVarBndr ())]) -> m Type -> Maybe (m Kind) -> m Con
              -> [m DerivClause] -> m Dec
 newtypeInstD ctxt mb_bndrs ty ksig con derivs =
   do
@@ -527,20 +527,20 @@ tySynInstD eqn =
     eqn1 <- eqn
     pure (TySynInstD eqn1)
 
-dataFamilyD :: Quote m => Name -> [m TyVarBndr] -> Maybe (m Kind) -> m Dec
+dataFamilyD :: Quote m => Name -> [m (TyVarBndr ())] -> Maybe (m Kind) -> m Dec
 dataFamilyD tc tvs kind =
   do tvs'  <- sequenceA tvs
      kind' <- sequenceA kind
      pure $ DataFamilyD tc tvs' kind'
 
-openTypeFamilyD :: Quote m => Name -> [m TyVarBndr] -> m FamilyResultSig
+openTypeFamilyD :: Quote m => Name -> [m (TyVarBndr ())] -> m FamilyResultSig
                 -> Maybe InjectivityAnn -> m Dec
 openTypeFamilyD tc tvs res inj =
   do tvs' <- sequenceA tvs
      res' <- res
      pure $ OpenTypeFamilyD (TypeFamilyHead tc tvs' res' inj)
 
-closedTypeFamilyD :: Quote m => Name -> [m TyVarBndr] -> m FamilyResultSig
+closedTypeFamilyD :: Quote m => Name -> [m (TyVarBndr ())] -> m FamilyResultSig
                   -> Maybe InjectivityAnn -> [m TySynEqn] -> m Dec
 closedTypeFamilyD tc tvs result injectivity eqns =
   do tvs1    <- sequenceA tvs
@@ -590,7 +590,7 @@ implicitParamBindD n e =
     e' <- e
     pure $ ImplicitParamBindD n e'
 
-tySynEqn :: Quote m => (Maybe [m TyVarBndr]) -> m Type -> m Type -> m TySynEqn
+tySynEqn :: Quote m => (Maybe [m (TyVarBndr ())]) -> m Type -> m Type -> m TySynEqn
 tySynEqn mb_bndrs lhs rhs =
   do
     mb_bndrs1 <- traverse sequenceA mb_bndrs
@@ -629,7 +629,7 @@ infixC st1 con st2 = do st1' <- st1
                         st2' <- st2
                         pure $ InfixC st1' con st2'
 
-forallC :: Quote m => [m TyVarBndr] -> m Cxt -> m Con -> m Con
+forallC :: Quote m => [m (TyVarBndr Specificity)] -> m Cxt -> m Con -> m Con
 forallC ns ctxt con = do
   ns'   <- sequenceA ns
   ctxt' <- ctxt
@@ -645,14 +645,14 @@ recGadtC cons varstrtys ty = liftA2 (RecGadtC cons) (sequenceA varstrtys) ty
 -------------------------------------------------------------------------------
 -- *   Type
 
-forallT :: Quote m => [m TyVarBndr] -> m Cxt -> m Type -> m Type
+forallT :: Quote m => [m (TyVarBndr Specificity)] -> m Cxt -> m Type -> m Type
 forallT tvars ctxt ty = do
     tvars1 <- sequenceA tvars
     ctxt1  <- ctxt
     ty1    <- ty
     pure $ ForallT tvars1 ctxt1 ty1
 
-forallVisT :: Quote m => [m TyVarBndr] -> m Type -> m Type
+forallVisT :: Quote m => [m (TyVarBndr Specificity)] -> m Type -> m Type
 forallVisT tvars ty = ForallVisT <$> sequenceA tvars <*> ty
 
 varT :: Quote m => Name -> m Type
@@ -813,11 +813,11 @@ strTyLit s = pure (StrTyLit s)
 -------------------------------------------------------------------------------
 -- *   Kind
 
-plainTV :: Quote m => Name -> m TyVarBndr
-plainTV = pure . PlainTV
+plainTV :: Quote m => Name -> flag -> m (TyVarBndr flag)
+plainTV n f = pure $ PlainTV n f
 
-kindedTV :: Quote m => Name -> m Kind -> m TyVarBndr
-kindedTV n = fmap (KindedTV n)
+kindedTV :: Quote m => Name -> flag -> m Kind -> m (TyVarBndr flag)
+kindedTV n f = fmap (KindedTV n f)
 
 varK :: Name -> Kind
 varK = VarT
@@ -852,7 +852,7 @@ noSig = pure NoSig
 kindSig :: Quote m => m Kind -> m FamilyResultSig
 kindSig = fmap KindSig
 
-tyVarSig :: Quote m => m TyVarBndr -> m FamilyResultSig
+tyVarSig :: Quote m => m (TyVarBndr ()) -> m FamilyResultSig
 tyVarSig = fmap TyVarSig
 
 -------------------------------------------------------------------------------

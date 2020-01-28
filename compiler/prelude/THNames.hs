@@ -105,6 +105,8 @@ templateHaskellNames = [
     numTyLitName, strTyLitName,
     -- TyVarBndr
     plainTVName, kindedTVName,
+    -- Specificity
+    inferredSpecName, specifiedSpecName, noFlagName,
     -- Role
     nominalRName, representationalRName, phantomRName, inferRName,
     -- Kind
@@ -471,6 +473,14 @@ strTyLitName = libFun (fsLit "strTyLit") strTyLitIdKey
 plainTVName, kindedTVName :: Name
 plainTVName  = libFun (fsLit "plainTV")  plainTVIdKey
 kindedTVName = libFun (fsLit "kindedTV") kindedTVIdKey
+
+-- data Specificity = ...
+specifiedSpecName, inferredSpecName :: Name
+specifiedSpecName = libFun (fsLit "specifiedSpec") specifiedSpecKey
+inferredSpecName  = libFun (fsLit "inferredSpec") inferredSpecKey
+
+noFlagName :: Name
+noFlagName = libFun (fsLit "noFlag") noFlagKey
 
 -- data Role = ...
 nominalRName, representationalRName, phantomRName, inferRName :: Name
@@ -1074,6 +1084,14 @@ stockStrategyIdKey    = mkPreludeDataConUnique 494
 anyclassStrategyIdKey = mkPreludeDataConUnique 495
 newtypeStrategyIdKey  = mkPreludeDataConUnique 496
 viaStrategyIdKey      = mkPreludeDataConUnique 497
+
+-- data Specificity = ...
+specifiedSpecKey, inferredSpecKey :: Unique
+specifiedSpecKey = mkPreludeMiscIdUnique 498
+inferredSpecKey  = mkPreludeMiscIdUnique 499
+
+noFlagKey :: Unique
+noFlagKey = mkPreludeMiscIdUnique 570 -- GJ : TODO This is not very nice
 
 {-
 ************************************************************************
