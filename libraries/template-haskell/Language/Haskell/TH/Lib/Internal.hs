@@ -35,7 +35,6 @@ type Decs                = [Dec] -- Defined as it is more convenient to wire-in
 type ConQ                = Q Con
 type TypeQ               = Q Type
 type KindQ               = Q Kind
-type TyVarBndrQ flag     = Q (TyVarBndr flag)
 type TyLitQ              = Q TyLit
 type CxtQ                = Q Cxt
 type PredQ               = Q Pred
@@ -64,6 +63,9 @@ type DerivStrategyQ      = Q DerivStrategy
 -- must be defined here for DsMeta to find it
 type Role                = TH.Role
 type InjectivityAnn      = TH.InjectivityAnn
+
+type TyVarBndrUnit       = TyVarBndr ()
+type TyVarBndrSpec       = TyVarBndr Specificity
 
 ----------------------------------------------------------
 -- * Lowercase pattern syntax functions
@@ -813,11 +815,23 @@ strTyLit s = pure (StrTyLit s)
 -------------------------------------------------------------------------------
 -- *   Kind
 
-plainTV :: Quote m => Name -> flag -> m (TyVarBndr flag)
-plainTV n f = pure $ PlainTV n f
+plainTV :: Quote m => Name -> m (TyVarBndr ())
+plainTV n = pure $ PlainTV n ()
 
-kindedTV :: Quote m => Name -> flag -> m Kind -> m (TyVarBndr flag)
-kindedTV n f = fmap (KindedTV n f)
+plainInvisTV :: Quote m => Name -> Specificity -> m (TyVarBndr Specificity)
+plainInvisTV n s = pure $ PlainTV n s
+
+kindedTV :: Quote m => Name -> m Kind -> m (TyVarBndr ())
+kindedTV n = fmap (KindedTV n ())
+
+kindedInvisTV :: Quote m => Name -> Specificity -> m Kind -> m (TyVarBndr Specificity)
+kindedInvisTV n s = fmap (KindedTV n s)
+
+specifiedSpec :: Specificity
+specifiedSpec = SpecifiedSpec
+
+inferredSpec :: Specificity
+inferredSpec = InferredSpec
 
 varK :: Name -> Kind
 varK = VarT
