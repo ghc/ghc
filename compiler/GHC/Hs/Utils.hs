@@ -445,6 +445,7 @@ nlConVarPatName con vars = nlConPatName con (map nlVarPat vars)
 nlInfixConPat :: RdrName -> LPat GhcPs -> LPat GhcPs -> LPat GhcPs
 nlInfixConPat con l r = noLoc $ ConPat
   (noLoc con)
+  []
   (InfixCon (parenthesizePat opPrec l)
             (parenthesizePat opPrec r))
   noExtField
@@ -452,12 +453,14 @@ nlInfixConPat con l r = noLoc $ ConPat
 nlConPat :: RdrName -> [LPat GhcPs] -> LPat GhcPs
 nlConPat con pats = noLoc $ ConPat
   (noLoc con)
+  []
   (PrefixCon (map (parenthesizePat appPrec) pats))
   noExtField
 
 nlConPatName :: Name -> [LPat GhcRn] -> LPat GhcRn
 nlConPatName con pats = noLoc $ ConPat
   (noLoc con)
+  []
   (PrefixCon (map (parenthesizePat appPrec) pats))
   noExtField
 
@@ -467,11 +470,12 @@ nlNullaryConPat
      )
   => IdP (GhcPass p)
   -> LPat (GhcPass p)
-nlNullaryConPat con = noLoc $ ConPat (noLoc con) (PrefixCon []) noExtField
+nlNullaryConPat con = noLoc $ ConPat (noLoc con) [] (PrefixCon []) noExtField
 
 nlWildConPat :: DataCon -> LPat GhcPs
 nlWildConPat con = noLoc $ ConPat
   (noLoc $ getRdrName con)
+  []
   (PrefixCon $
      replicate (dataConSourceArity con)
                nlWildPat)
@@ -1464,6 +1468,8 @@ lPatImplicits = hs_lpat
 
     hs_pat (SigPat _ pat _)     = hs_lpat pat
 
+    -- TODO (Cale): Determine what lPatImplicits is computing, and whether it's
+    -- correct to ignore type arguments.
     hs_pat (ConPat {pat_con=con, pat_args=ps}) = details con ps
 
     hs_pat _ = []

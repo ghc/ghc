@@ -493,9 +493,8 @@ tc_pat penv (SumPat _ pat alt arity ) pat_ty thing_inside
 
 ------------------------
 -- Data constructors
-tc_pat penv (ConPat con arg_pats NoExtField) pat_ty thing_inside
-  = tcConPat penv con pat_ty arg_pats thing_inside
-
+tc_pat penv (ConPat con ty_arg_pats arg_pats NoExtField) pat_ty thing_inside
+  = tcConPat penv con ty_arg_pats pat_ty arg_pats thing_inside
 ------------------------
 -- Literal patterns
 tc_pat penv (LitPat x simple_lit) pat_ty thing_inside
@@ -710,10 +709,11 @@ to express the local scope of GADT refinements.
 --       with scrutinee of type (T ty)
 
 tcConPat :: PatEnv -> Located Name
+         -> [LHsWcType (NoGhcTc GhcRn)]
          -> ExpSigmaType           -- Type of the pattern
          -> HsConPatDetails GhcRn -> TcM a
          -> TcM (Pat GhcTcId, a)
-tcConPat penv con_lname@(L _ con_name) pat_ty arg_pats thing_inside
+tcConPat penv con_lname@(L _ con_name) arg_types pat_ty arg_pats thing_inside
   = do  { con_like <- tcLookupConLike con_name
         ; case con_like of
             RealDataCon data_con -> tcDataConPat penv con_lname data_con
