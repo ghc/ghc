@@ -177,6 +177,7 @@
         [({ DumpParsedAst.hs:9:21-29 }
           (KindedTyVar
            (NoExtField)
+           (())
            ({ DumpParsedAst.hs:9:21-22 }
             (Unqual
              {OccName: as}))
@@ -215,12 +216,14 @@
        [({ DumpParsedAst.hs:14:8 }
          (UserTyVar
           (NoExtField)
+          (())
           ({ DumpParsedAst.hs:14:8 }
            (Unqual
             {OccName: f}))))
        ,({ DumpParsedAst.hs:14:11-16 }
          (KindedTyVar
           (NoExtField)
+          (())
           ({ DumpParsedAst.hs:14:11 }
            (Unqual
             {OccName: a}))
@@ -362,6 +365,7 @@
         [({ DumpParsedAst.hs:16:17-22 }
           (KindedTyVar
            (NoExtField)
+           (())
            ({ DumpParsedAst.hs:16:17 }
             (Unqual
              {OccName: a}))
@@ -375,6 +379,7 @@
         ,({ DumpParsedAst.hs:16:26-39 }
           (KindedTyVar
            (NoExtField)
+           (())
            ({ DumpParsedAst.hs:16:26 }
             (Unqual
              {OccName: f}))
