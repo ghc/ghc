@@ -1,4 +1,6 @@
 {-# LANGUAGE CPP #-}
+{-# OPTIONS -O -ddump-to-file -dumpdir datacondumps -ddump-simpl -ddump-stg #-}
+-- {-# OPTIONS -dsuppress-all #-}
 
 -----------------------------------------------------------------------------
 --
@@ -40,6 +42,8 @@ import GHC.Core.DataCon
 import GHC.Driver.Session
 import FastString
 import GHC.Types.Id
+import GHC.Types.Id.Info( CafInfo( NoCafRefs ) )
+import GHC.Types.Name (isInternalName)
 import GHC.Types.RepType (countConRepArgs)
 import GHC.Types.Literal
 import PrelInfo
@@ -51,8 +55,6 @@ import MonadUtils (mapMaybeM)
 import Control.Monad
 import Data.Char
 
-
-
 ---------------------------------------------------------------
 --      Top-level constructors
 ---------------------------------------------------------------
@@ -62,10 +64,24 @@ cgTopRhsCon :: DynFlags
             -> DataCon          -- Id
             -> [NonVoid StgArg] -- Args
             -> (CgIdInfo, FCode ())
-cgTopRhsCon dflags id con args =
-    let id_info = litIdInfo dflags id (mkConLFInfo con) (CmmLabel closure_label)
-    in (id_info, gen_code)
+cgTopRhsCon dflags id con args
+  | Just static_info <- precomputedStaticConInfo_maybe dflags id con args
+  , let static_code | isInternalName name = pure ()
+                    | otherwise           = gen_code
+  = -- There is a pre-allocated static closure available; use it
+    -- See Note [Precomputed static closures].
+    -- For External bindings we must keep the binding,
+    -- since importing modules will refer to it by name;
+    -- but for Internal ones we can drop it altogether
+    -- See Note [About the NameSorts] in Name.hs for Internal/External
+    (static_info, static_code)
+
+  -- Otherwise generate a closure for the constructor.
+  | otherwise
+  = (id_Info, gen_code)
+
   where
+   id_Info       = litIdInfo dflags id (mkConLFInfo con) (CmmLabel closure_label)
    name          = idName id
    caffy         = idCafInfo id -- any stgArgHasCafRefs args
    closure_label = mkClosureLabel name caffy
@@ -124,11 +140,10 @@ buildDynCon :: Id                 -- Name of the thing to which this constr will
                -- Return details about how to find it and initialization code
 buildDynCon binder actually_bound cc con args
     = do dflags <- getDynFlags
-         buildDynCon' dflags (targetPlatform dflags) binder actually_bound cc con args
+         buildDynCon' dflags binder actually_bound cc con args
 
 
 buildDynCon' :: DynFlags
-             -> Platform
              -> Id -> Bool
              -> CostCentreStack
              -> DataCon
@@ -146,78 +161,13 @@ the addr modes of the args is that we may be in a "knot", and
 premature looking at the args will cause the compiler to black-hole!
 -}
 
-
--------- buildDynCon': Nullary constructors --------------
--- First we deal with the case of zero-arity constructors.  They
--- will probably be unfolded, so we don't expect to see this case much,
--- if at all, but it does no harm, and sets the scene for characters.
---
--- In the case of zero-arity constructors, or, more accurately, those
--- which have exclusively size-zero (VoidRep) args, we generate no code
--- at all.
-
-buildDynCon' dflags _ binder _ _cc con []
-  | isNullaryRepDataCon con
-  = return (litIdInfo dflags binder (mkConLFInfo con)
-                (CmmLabel (mkClosureLabel (dataConName con) (idCafInfo binder))),
-            return mkNop)
-
--------- buildDynCon': Charlike and Intlike constructors -----------
-{- The following three paragraphs about @Char@-like and @Int@-like
-closures are obsolete, but I don't understand the details well enough
-to properly word them, sorry. I've changed the treatment of @Char@s to
-be analogous to @Int@s: only a subset is preallocated, because @Char@
-has now 31 bits. Only literals are handled here. -- Qrczak
-
-Now for @Char@-like closures.  We generate an assignment of the
-address of the closure to a temporary.  It would be possible simply to
-generate no code, and record the addressing mode in the environment,
-but we'd have to be careful if the argument wasn't a constant --- so
-for simplicity we just always assign to a temporary.
-
-Last special case: @Int@-like closures.  We only special-case the
-situation in which the argument is a literal in the range
-@mIN_INTLIKE@..@mAX_INTLILKE@.  NB: for @Char@-like closures we can
-work with any old argument, but for @Int@-like ones the argument has
-to be a literal.  Reason: @Char@ like closures have an argument type
-which is guaranteed in range.
-
-Because of this, we use can safely return an addressing mode.
-
-We don't support this optimisation when compiling into Windows DLLs yet
-because they don't support cross package data references well.
--}
-
-buildDynCon' dflags platform binder _ _cc con [arg]
-  | maybeIntLikeCon con
-  , platformOS platform /= OSMinGW32 || not (positionIndependent dflags)
-  , NonVoid (StgLitArg (LitNumber LitNumInt val _)) <- arg
-  , val <= fromIntegral (mAX_INTLIKE dflags) -- Comparisons at type Integer!
-  , val >= fromIntegral (mIN_INTLIKE dflags) -- ...ditto...
-  = do  { let intlike_lbl   = mkCmmClosureLabel rtsUnitId (fsLit "stg_INTLIKE")
-              val_int = fromIntegral val :: Int
-              offsetW = (val_int - mIN_INTLIKE dflags) * (fixedHdrSizeW dflags + 1)
-                -- INTLIKE closures consist of a header and one word payload
-              intlike_amode = cmmLabelOffW (targetPlatform dflags) intlike_lbl offsetW
-        ; return ( litIdInfo dflags binder (mkConLFInfo con) intlike_amode
-                 , return mkNop) }
-
-buildDynCon' dflags platform binder _ _cc con [arg]
-  | maybeCharLikeCon con
-  , platformOS platform /= OSMinGW32 || not (positionIndependent dflags)
-  , NonVoid (StgLitArg (LitChar val)) <- arg
-  , let val_int = ord val :: Int
-  , val_int <= mAX_CHARLIKE dflags
-  , val_int >= mIN_CHARLIKE dflags
-  = do  { let charlike_lbl   = mkCmmClosureLabel rtsUnitId (fsLit "stg_CHARLIKE")
-              offsetW = (val_int - mIN_CHARLIKE dflags) * (fixedHdrSizeW dflags + 1)
-                -- CHARLIKE closures consist of a header and one word payload
-              charlike_amode = cmmLabelOffW (targetPlatform dflags) charlike_lbl offsetW
-        ; return ( litIdInfo dflags binder (mkConLFInfo con) charlike_amode
-                 , return mkNop) }
+buildDynCon' dflags binder _ _cc con args
+  | Just cgInfo <- precomputedStaticConInfo_maybe dflags binder con args
+  -- , pprTrace "noCodeLocal:" (ppr (binder,con,args,cgInfo)) True
+  = return (cgInfo, return mkNop)
 
 -------- buildDynCon': the general case -----------
-buildDynCon' dflags _ binder actually_bound ccs con args
+buildDynCon' dflags binder actually_bound ccs con args
   = do  { (id_info, reg) <- rhsIdInfo binder lf_info
         ; return (id_info, gen_code reg)
         }
@@ -243,6 +193,149 @@ buildDynCon' dflags _ binder actually_bound ccs con args
 
       blame_cc = use_cc -- cost-centre on which to blame the alloc (same)
 
+{- Note [Precomputed static closures]
+   ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+
+For Char/Int closures there are some value closures
+built into the RTS. This is the case for all values in
+the range mINT_INTLIKE .. mAX_INTLIKE (or CHARLIKE).
+See Note [CHARLIKE and INTLIKE closures.] in the RTS code.
+
+Similarly zero-arity constructors have a closure
+in their defining Module we can use.
+
+If possible we prefer to refer to those existing
+closure instead of building new ones.
+
+This is true at compile time where we do this replacement
+in this module.
+But also at runtime where the GC does the same (but only for
+INT/CHAR closures).
+
+`precomputedStaticConInfo_maybe` checks if a given constructor application
+can be replaced with a reference to a existing static closure.
+
+If so the code will reference the existing closure when accessing
+the binding.
+Unless the binding is visible to other modules we also generate
+no code for the binding itself. We can do this since then we can
+always reference the existing closure.
+
+See Note [About the NameSorts] for the definition of external names.
+For external bindings we must still generate a closure,
+but won't use it inside this module.
+This can sometimes reduce cache pressure. Since:
+* If somebody uses the exported binding:
+  + This module will reference the existing closure.
+  + GC will reference the existing closure.
+  + The importing module will reference the built closure.
+* If nobody uses the exported binding:
+  + This module will reference the RTS closures.
+  + GC references the RTS closures
+
+In the later case we avoided loading the built closure into the cache which
+is what we optimize for here.
+
+Consider this example using Ints.
+
+    module M(externalInt, foo, bar) where
+
+    externalInt = 1 :: Int
+    internalInt = 1 :: Int
+    { -# NOINLINE foo #- }
+    foo = Just internalInt :: Maybe Int
+    bar = Just externalInt
+
+    ==================== STG: ====================
+    externalInt = I#! [1#];
+
+    bar = Just! [externalInt];
+
+    internalInt_rc = I#! [2#];
+
+    foo = Just! [internalInt_rc];
+
+For externally visible bindings we must generate closures
+since those may be referenced by their symbol `<name>_closure`
+when imported.
+
+`externalInt` is visible to other modules so we generate a closure:
+
+    [section ""data" . M.externalInt_closure" {
+        M.externalInt_closure:
+            const GHC.Types.I#_con_info;
+            const 1;
+    }]
+
+It will be referenced inside this module via `M.externalInt_closure+1`
+
+`internalInt` is however a internal name. As such we generate no code for
+it. References to it are replaced with references to the static closure as
+we can see in the closure built for `foo`:
+
+    [section ""data" . M.foo_closure" {
+        M.foo_closure:
+            const GHC.Maybe.Just_con_info;
+            const stg_INTLIKE_closure+289; // == I# 2
+            const 3;
+    }]
+
+This holds for both local and top level bindings.
+
+We don't support this optimization when compiling into Windows DLLs yet
+because they don't support cross package data references well.
+-}
+
+-- (precomputedStaticConInfo_maybe dflags id con args)
+--     returns (Just cg_id_info)
+-- if there is a precomputed static closure for (con args).
+-- In that case, cg_id_info addresses it.
+-- See Note [Precomputed static closures]
+precomputedStaticConInfo_maybe :: DynFlags -> Id -> DataCon -> [NonVoid StgArg] -> Maybe CgIdInfo
+precomputedStaticConInfo_maybe dflags binder con []
+-- Nullary constructors
+  | isNullaryRepDataCon con
+  = Just $ litIdInfo dflags binder (mkConLFInfo con)
+                (CmmLabel (mkClosureLabel (dataConName con) NoCafRefs))
+precomputedStaticConInfo_maybe dflags binder con [arg]
+  -- Int/Char values with existing closures in the RTS
+  | intClosure || charClosure
+  , platformOS platform /= OSMinGW32 || not (positionIndependent dflags)
+  , Just val <- getClosurePayload arg
+  , inRange val
+  = let intlike_lbl   = mkCmmClosureLabel rtsUnitId (fsLit label)
+        val_int = fromIntegral val :: Int
+        offsetW = (val_int - (fromIntegral min_static_range)) * (fixedHdrSizeW dflags + 1)
+                -- INTLIKE/CHARLIKE closures consist of a header and one word payload
+        static_amode = cmmLabelOffW platform intlike_lbl offsetW
+    in Just $ litIdInfo dflags binder (mkConLFInfo con) static_amode
+  where
+    platform = targetPlatform dflags
+    intClosure = maybeIntLikeCon con
+    charClosure = maybeCharLikeCon con
+    getClosurePayload (NonVoid (StgLitArg (LitNumber LitNumInt val _))) = Just val
+    getClosurePayload (NonVoid (StgLitArg (LitChar val))) = Just $ (fromIntegral . ord $ val)
+    getClosurePayload _ = Nothing
+    -- Avoid over/underflow by comparisons at type Integer!
+    inRange :: Integer -> Bool
+    inRange val
+      = val >= min_static_range && val <= max_static_range
+
+    min_static_range :: Integer
+    min_static_range
+      | intClosure = fromIntegral (mIN_INTLIKE dflags)
+      | charClosure = fromIntegral (mIN_CHARLIKE dflags)
+      | otherwise = panic "precomputedStaticConInfo_maybe: Unknown closure type"
+    max_static_range
+      | intClosure = fromIntegral (mAX_INTLIKE dflags)
+      | charClosure = fromIntegral (mAX_CHARLIKE dflags)
+      | otherwise = panic "precomputedStaticConInfo_maybe: Unknown closure type"
+    label
+      | intClosure = "stg_INTLIKE"
+      | charClosure =  "stg_CHARLIKE"
+      | otherwise = panic "precomputedStaticConInfo_maybe: Unknown closure type"
+
+precomputedStaticConInfo_maybe _ _ _ _ = Nothing
 
 ---------------------------------------------------------------
 --      Binding constructor arguments
