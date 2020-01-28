@@ -749,10 +749,9 @@ tcPatSynMatcher (L loc name) lpat
                     , mg_origin = Generated
                     }
 
-       ; let bind = FunBind{ fun_ext = emptyNameSet
-                           , fun_id = L loc matcher_id
+       ; let bind = FunBind{ fun_id = L loc matcher_id
                            , fun_matches = mg
-                           , fun_co_fn = idHsWrapper
+                           , fun_ext = idHsWrapper
                            , fun_tick = [] }
              matcher_bind = unitBag (noLoc bind)
 
@@ -839,10 +838,9 @@ tcPatSynBuilderBind (PSB { psb_id = L loc name
          let match_group' | need_dummy_arg = add_dummy_arg match_group
                           | otherwise      = match_group
 
-             bind = FunBind { fun_ext = placeHolderNamesTc
-                            , fun_id      = L loc (idName builder_id)
+             bind = FunBind { fun_id      = L loc (idName builder_id)
                             , fun_matches = match_group'
-                            , fun_co_fn   = idHsWrapper
+                            , fun_ext     = emptyNameSet
                             , fun_tick    = [] }
 
              sig = completeSigFromId (PatSynCtxt name) builder_id
@@ -942,7 +940,7 @@ tcPatToExpr name args pat = go pat
     go (L loc p) = L loc <$> go1 p
 
     go1 :: Pat GhcRn -> Either MsgDoc (HsExpr GhcRn)
-    go1 (ConPatIn con info)
+    go1 (ConPat con info NoExtField)
       = case info of
           PrefixCon ps  -> mkPrefixConExpr con ps
           InfixCon l r  -> mkPrefixConExpr con [l,r]
@@ -971,11 +969,10 @@ tcPatToExpr name args pat = go pat
                                          }
     go1 (LitPat _ lit)              = return $ HsLit noExtField lit
     go1 (NPat _ (L _ n) mb_neg _)
-        | Just neg <- mb_neg        = return $ unLoc $ nlHsSyntaxApps neg
-                                                     [noLoc (HsOverLit noExtField n)]
+        | Just (SyntaxExprRn neg) <- mb_neg
+                                    = return $ unLoc $ foldl' nlHsApp (noLoc neg)
+                                                       [noLoc (HsOverLit noExtField n)]
         | otherwise                 = return $ HsOverLit noExtField n
-    go1 (ConPatOut{})               = panic "ConPatOut in output of renamer"
-    go1 (CoPat{})                   = panic "CoPat in output of renamer"
     go1 (SplicePat _ (HsSpliced _ _ (HsSplicedPat pat)))
                                     = go1 pat
     go1 (SplicePat _ (HsSpliced{})) = panic "Invalid splice variety"
@@ -1128,10 +1125,11 @@ tcCollectEx pat = go pat
     go1 (TuplePat _ ps _)  = mergeMany . map go $ ps
     go1 (SumPat _ p _ _)   = go p
     go1 (ViewPat _ _ p)    = go p
-    go1 con@ConPatOut{}    = merge (pat_tvs con, pat_dicts con) $
+    go1 con@ConPat{ pat_con_ext = con' }
+                           = merge (pat_tvs con', pat_dicts con') $
                               goConDetails $ pat_args con
     go1 (SigPat _ p _)     = go p
-    go1 (CoPat _ _ p _)    = go1 p
+    go1 (XPat (CoPat _ p _)) = go1 p
     go1 (NPlusKPat _ n k _ geq subtract)
       = pprPanic "TODO: NPlusKPat" $ ppr n $$ ppr k $$ ppr geq $$ ppr subtract
     go1 _                   = empty

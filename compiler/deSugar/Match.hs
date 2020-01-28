@@ -259,7 +259,7 @@ matchBangs (var :| vars) ty eqns
 matchCoercion :: NonEmpty MatchId -> Type -> NonEmpty EquationInfo -> DsM MatchResult
 -- Apply the coercion to the match variable and then match that
 matchCoercion (var :| vars) ty (eqns@(eqn1 :| _))
-  = do  { let CoPat _ co pat _ = firstPat eqn1
+  = do  { let XPat (CoPat co pat _) = firstPat eqn1
         ; let pat_ty' = hsPatType pat
         ; var' <- newUniqueId var pat_ty'
         ; match_result <- match (var':vars) ty $ NEL.toList $
@@ -305,7 +305,7 @@ decomposeFirstPat extractpat (eqn@(EqnInfo { eqn_pats = pat : pats }))
 decomposeFirstPat _ _ = panic "decomposeFirstPat"
 
 getCoPat, getBangPat, getViewPat, getOLPat :: Pat GhcTc -> Pat GhcTc
-getCoPat (CoPat _ _ pat _)   = pat
+getCoPat (XPat (CoPat _ pat _)) = pat
 getCoPat _                   = panic "getCoPat"
 getBangPat (BangPat _ pat  ) = unLoc pat
 getBangPat _                 = panic "getBangPat"
@@ -504,8 +504,8 @@ tidy_bang_pat v o _ (SigPat _ (L l p) _) = tidy_bang_pat v o l p
 -- it may disappear next time
 tidy_bang_pat v o l (AsPat x v' p)
   = tidy1 v o (AsPat x v' (L l (BangPat noExtField p)))
-tidy_bang_pat v o l (CoPat x w p t)
-  = tidy1 v o (CoPat x w (BangPat noExtField (L l p)) t)
+tidy_bang_pat v o l (XPat (CoPat w p t))
+  = tidy1 v o (XPat $ CoPat w (BangPat noExtField (L l p)) t)
 
 -- Discard bang around strict pattern
 tidy_bang_pat v o _ p@(LitPat {})    = tidy1 v o p
@@ -514,9 +514,12 @@ tidy_bang_pat v o _ p@(TuplePat {})  = tidy1 v o p
 tidy_bang_pat v o _ p@(SumPat {})    = tidy1 v o p
 
 -- Data/newtype constructors
-tidy_bang_pat v o l p@(ConPatOut { pat_con = L _ (RealDataCon dc)
-                                 , pat_args = args
-                                 , pat_arg_tys = arg_tys })
+tidy_bang_pat v o l p@(ConPat { pat_con = L _ (RealDataCon dc)
+                              , pat_args = args
+                              , pat_con_ext = ConPatTc
+                                { pat_arg_tys = arg_tys
+                                }
+                              })
   -- Newtypes: push bang inwards (#9844)
   =
     if isNewTyCon (dataConTyCon dc)
@@ -1011,7 +1014,7 @@ viewLExprEq (e1,_) (e2,_) = lexp e1 e2
     exp e (HsPar _ (L _ e'))   = exp e e'
     -- because the expressions do not necessarily have the same type,
     -- we have to compare the wrappers
-    exp (HsWrap _ h e) (HsWrap _ h' e') = wrap h h' && exp e e'
+    exp (XExpr (HsWrap h e)) (XExpr (HsWrap  h' e')) = wrap h h' && exp e e'
     exp (HsVar _ i) (HsVar _ i') =  i == i'
     exp (HsConLikeOut _ c) (HsConLikeOut _ c') = c == c'
     -- the instance for IPName derives using the id, so this works if the
@@ -1050,15 +1053,17 @@ viewLExprEq (e1,_) (e2,_) = lexp e1 e2
 
     ---------
     syn_exp :: SyntaxExpr GhcTc -> SyntaxExpr GhcTc -> Bool
-    syn_exp (SyntaxExpr { syn_expr      = expr1
-                        , syn_arg_wraps = arg_wraps1
-                        , syn_res_wrap  = res_wrap1 })
-            (SyntaxExpr { syn_expr      = expr2
-                        , syn_arg_wraps = arg_wraps2
-                        , syn_res_wrap  = res_wrap2 })
+    syn_exp (SyntaxExprTc { syn_expr      = expr1
+                          , syn_arg_wraps = arg_wraps1
+                          , syn_res_wrap  = res_wrap1 })
+            (SyntaxExprTc { syn_expr      = expr2
+                          , syn_arg_wraps = arg_wraps2
+                          , syn_res_wrap  = res_wrap2 })
       = exp expr1 expr2 &&
         and (zipWithEqual "viewLExprEq" wrap arg_wraps1 arg_wraps2) &&
         wrap res_wrap1 res_wrap2
+    syn_exp NoSyntaxExprTc NoSyntaxExprTc = True
+    syn_exp _              _              = False
 
     ---------
     tup_arg (L _ (Present _ e1)) (L _ (Present _ e2)) = lexp e1 e2
@@ -1097,8 +1102,9 @@ viewLExprEq (e1,_) (e2,_) = lexp e1 e2
     eq_list eq (x:xs) (y:ys) = eq x y && eq_list eq xs ys
 
 patGroup :: DynFlags -> Pat GhcTc -> PatGroup
-patGroup _ (ConPatOut { pat_con = L _ con
-                      , pat_arg_tys = tys })
+patGroup _ (ConPat { pat_con = L _ con
+                   , pat_con_ext = ConPatTc { pat_arg_tys = tys }
+                   })
  | RealDataCon dcon <- con              = PgCon dcon
  | PatSynCon psyn <- con                = PgSyn psyn tys
 patGroup _ (WildPat {})                 = PgAny
@@ -1115,7 +1121,7 @@ patGroup _ (NPlusKPat _ _ (L _ (OverLit {ol_val=oval})) _ _ _) =
   case oval of
    HsIntegral i -> PgNpK (il_value i)
    _ -> pprPanic "patGroup NPlusKPat" (ppr oval)
-patGroup _ (CoPat _ _ p _)              = PgCo  (hsPatType p)
+patGroup _ (XPat (CoPat _ p _))         = PgCo  (hsPatType p)
                                                     -- Type of innelexp pattern
 patGroup _ (ViewPat _ expr p)           = PgView expr (hsPatType (unLoc p))
 patGroup _ (ListPat (ListPatTc _ (Just _)) _) = PgOverloadedList

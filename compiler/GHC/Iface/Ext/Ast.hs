@@ -640,16 +640,16 @@ instance HasType (LHsExpr GhcTc) where
       -- See impact on Haddock output (esp. missing type annotations or links)
       -- before marking more things here as 'False'. See impact on Haddock
       -- performance before marking more things as 'True'.
-      skipDesugaring :: HsExpr a -> Bool
+      skipDesugaring :: HsExpr GhcTc -> Bool
       skipDesugaring e = case e of
-        HsVar{}        -> False
-        HsUnboundVar{} -> False
-        HsConLikeOut{} -> False
-        HsRecFld{}     -> False
-        HsOverLabel{}  -> False
-        HsIPVar{}      -> False
-        HsWrap{}       -> False
-        _              -> True
+        HsVar{}          -> False
+        HsUnboundVar{}   -> False
+        HsConLikeOut{}   -> False
+        HsRecFld{}       -> False
+        HsOverLabel{}    -> False
+        HsIPVar{}        -> False
+        XExpr (HsWrap{}) -> False
+        _                -> True
 
 instance ( ToHie (Context (Located (IdP a)))
          , ToHie (MatchGroup a (LHsExpr a))
@@ -757,6 +757,7 @@ instance ( ToHie (HsMatchContext a)
   toHie _ = pure []
 
 instance ( a ~ GhcPass p
+         , IsPass p
          , ToHie (Context (Located (IdP a)))
          , ToHie (RContext (HsRecFields a (PScoped (LPat a))))
          , ToHie (LHsExpr a)
@@ -798,12 +799,11 @@ instance ( a ~ GhcPass p
       SumPat _ pat _ _ ->
         [ toHie $ PS rsp scope pscope pat
         ]
-      ConPatIn c dets ->
-        [ toHie $ C Use c
-        , toHie $ contextify dets
-        ]
-      ConPatOut {pat_con = con, pat_args = dets}->
-        [ toHie $ C Use $ fmap conLikeName con
+      ConPat {pat_con = con, pat_args = dets}->
+        [ case pass @p of
+            GhcPs -> toHie $ C Use $ con
+            GhcRn -> toHie $ C Use $ con
+            GhcTc -> toHie $ C Use $ fmap conLikeName con
         , toHie $ contextify dets
         ]
       ViewPat _ expr pat ->
@@ -827,9 +827,13 @@ instance ( a ~ GhcPass p
                        (protectSig @a cscope sig)
               -- See Note [Scoping Rules for SigPat]
         ]
-      CoPat _ _ _ _ ->
-        []
-      XPat _ -> []
+      XPat e -> case pass @p of
+        GhcPs -> noExtCon e
+        GhcRn -> noExtCon e
+        GhcTc -> []
+          where
+            -- Make sure we get an error if this changes
+            _noWarn@(CoPat _ _ _) = e
     where
       contextify (PrefixCon args) = PrefixCon $ patScopes rsp scope pscope args
       contextify (InfixCon a b) = InfixCon a' b'
@@ -882,6 +886,7 @@ instance ( a ~ GhcPass p
          , Data (HsTupArg a)
          , Data (AmbiguousFieldOcc a)
          , (HasRealDataConName a)
+         , IsPass p
          ) => ToHie (LHsExpr (GhcPass p)) where
   toHie e@(L mspan oexpr) = concatM $ getTypeNode e : case oexpr of
       HsVar _ (L _ var) ->
@@ -994,9 +999,6 @@ instance ( a ~ GhcPass p
       HsBinTick _ _ _ expr ->
         [ toHie expr
         ]
-      HsWrap _ _ a ->
-        [ toHie $ L mspan a
-        ]
       HsBracket _ b ->
         [ toHie b
         ]
@@ -1011,7 +1013,13 @@ instance ( a ~ GhcPass p
       HsSpliceE _ x ->
         [ toHie $ L mspan x
         ]
-      XExpr _ -> []
+      XExpr x
+        | GhcTc <- pass @p
+        , HsWrap _ a <- x
+        -> [ toHie $ L mspan a ]
+
+        | otherwise
+        -> []
 
 instance ( a ~ GhcPass p
          , ToHie (LHsExpr a)
@@ -1241,7 +1249,6 @@ instance ( a ~ GhcPass p
         [ pure $ locOnly ispan
         , toHie $ listScopes NoScope stmts
         ]
-      HsCmdWrap _ _ _ -> []
       XCmd _ -> []
 
 instance ToHie (TyClGroup GhcRn) where

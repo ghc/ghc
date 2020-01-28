@@ -528,11 +528,11 @@ dsCmd ids local_vars stack_ty res_ty (HsCmdIf _ mb_fun cond then_cmd else_cmd)
                        (buildEnvStack else_ids stack_id)
 
     core_if <- case mb_fun of
-       Just fun -> do { fun_apps <- dsSyntaxExpr fun
+       NoSyntaxExprTc  -> matchEnvStack env_ids stack_id $
+                          mkIfThenElse core_cond core_left core_right
+       _ -> do { fun_apps <- dsSyntaxExpr mb_fun
                                       [core_cond, core_left, core_right]
-                      ; matchEnvStack env_ids stack_id fun_apps }
-       Nothing  -> matchEnvStack env_ids stack_id $
-                   mkIfThenElse core_cond core_left core_right
+               ; matchEnvStack env_ids stack_id fun_apps }
 
     return (do_premap ids in_ty sum_ty res_ty
                 core_if
@@ -688,7 +688,7 @@ dsCmd _ local_vars _stack_ty _res_ty (HsCmdArrForm _ op _ _ args) env_ids = do
     return (mkApps (App core_op (Type env_ty)) core_args,
             unionDVarSets fv_sets)
 
-dsCmd ids local_vars stack_ty res_ty (HsCmdWrap _ wrap cmd) env_ids = do
+dsCmd ids local_vars stack_ty res_ty (XCmd (HsWrap wrap cmd)) env_ids = do
     (core_cmd, env_ids') <- dsCmd ids local_vars stack_ty res_ty cmd env_ids
     core_wrap <- dsHsWrapper wrap
     return (core_wrap core_cmd, env_ids')
@@ -1235,8 +1235,8 @@ collectl (L _ pat) bndrs
     go (TuplePat _ pats _)        = foldr collectl bndrs pats
     go (SumPat _ pat _ _)         = collectl pat bndrs
 
-    go (ConPatIn _ ps)            = foldr collectl bndrs (hsConPatArgs ps)
-    go (ConPatOut {pat_args=ps, pat_binds=ds}) =
+    go (ConPat { pat_args = ps
+               , pat_con_ext = ConPatTc { pat_binds = ds }}) =
                                     collectEvBinders ds
                                     ++ foldr collectl bndrs (hsConPatArgs ps)
     go (LitPat _ _)               = bndrs
@@ -1244,10 +1244,9 @@ collectl (L _ pat) bndrs
     go (NPlusKPat _ (L _ n) _ _ _ _) = n : bndrs
 
     go (SigPat _ pat _)           = collectl pat bndrs
-    go (CoPat _ _ pat _)          = collectl (noLoc pat) bndrs
+    go (XPat (CoPat _ pat _))     = collectl (noLoc pat) bndrs
     go (ViewPat _ _ pat)          = collectl pat bndrs
     go p@(SplicePat {})           = pprPanic "collectl/go" (ppr p)
-    go p@(XPat {})                = pprPanic "collectl/go" (ppr p)
 
 collectEvBinders :: TcEvBinds -> [Id]
 collectEvBinders (EvBinds bs)   = foldr add_ev_bndr [] bs
