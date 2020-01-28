@@ -1929,7 +1929,6 @@ repP (ConPat NoExtField dc details)
    rep_fld (L _ fld) = do { MkC v <- lookupLOcc (hsRecFieldSel fld)
                           ; MkC p <- repLP (hsRecFieldArg fld)
                           ; rep2 fieldPatName [v,p] }
-
 repP (NPat _ (L _ l) Nothing _) = do { a <- repOverloadedLiteral l
                                      ; repPlit a }
 repP (ViewPat _ e p) = do { e' <- repLE e; p' <- repLP p; repPview e' p' }

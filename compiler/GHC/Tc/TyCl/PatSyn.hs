@@ -923,18 +923,22 @@ tcPatToExpr name args pat = go pat
     lhsVars = mkNameSet (map unLoc args)
 
     -- Make a prefix con for prefix and infix patterns for simplicity
-    mkPrefixConExpr :: Located Name -> [LPat GhcRn]
+    mkPrefixConExpr :: Located Name
+                    -> [LPat GhcRn]
                     -> Either MsgDoc (HsExpr GhcRn)
-    mkPrefixConExpr lcon@(L loc _) pats
-      = do { exprs <- mapM go pats
-           ; return (foldl' (\x y -> HsApp noExtField (L loc x) y)
-                            (HsVar noExtField lcon) exprs) }
+    mkPrefixConExpr lcon@(L loc _) pats = do
+      exprs <- mapM go pats
+      return $ foldl'
+        (\x y -> HsApp noExtField (L loc x) y)
+        (HsVar noExtField lcon)
+        exprs
 
-    mkRecordConExpr :: Located Name -> HsRecFields GhcRn (LPat GhcRn)
+    mkRecordConExpr :: Located Name
+                    -> HsRecFields GhcRn (LPat GhcRn)
                     -> Either MsgDoc (HsExpr GhcRn)
-    mkRecordConExpr con fields
-      = do { exprFields <- mapM go fields
-           ; return (RecordCon noExtField con exprFields) }
+    mkRecordConExpr con fields = do
+      exprFields <- mapM go fields
+      return (RecordCon noExtField con exprFields)
 
     go :: LPat GhcRn -> Either MsgDoc (LHsExpr GhcRn)
     go (L loc p) = L loc <$> go1 p
