@@ -213,7 +213,7 @@ dmdAnal' env dmd (Lam var body)
           -- body_dmd: a demand to analyze the body
 
         (body_ty, body') = dmdAnal env body_dmd body
-        (lam_ty, var')   = annotateLamIdBndr env notArgOfDfun body_ty var
+        (lam_ty, var')   = annotateLamIdBndr env body_ty var
     in
     (postProcessUnsat defer_and_use lam_ty, Lam var' body')
 
@@ -224,7 +224,7 @@ dmdAnal' env dmd (Case scrut case_bndr ty [(DataAlt dc, bndrs, rhs)])
   = let
         (rhs_ty, rhs')           = dmdAnal env dmd rhs
         (alt_ty1, dmds)          = findBndrsDmds env rhs_ty bndrs
-        (alt_ty2, case_bndr_dmd) = findBndrDmd env False alt_ty1 case_bndr
+        (alt_ty2, case_bndr_dmd) = findBndrDmd env alt_ty1 case_bndr
         id_dmds                  = addCaseBndrDmd case_bndr_dmd dmds
         fam_envs                 = ae_fam_envs env
         alt_ty3
@@ -293,7 +293,7 @@ dmdAnal' env dmd (Let (NonRec id rhs) body)
   = (final_ty, Let (NonRec id' rhs') body')
   where
     (body_ty, body')   = dmdAnal env dmd body
-    (body_ty', id_dmd) = findBndrDmd env notArgOfDfun body_ty id
+    (body_ty', id_dmd) = findBndrDmd env body_ty id
     id'                = setIdDemandInfo id id_dmd
 
     (rhs_ty, rhs')     = dmdAnalStar env (dmdTransformThunkDmd rhs id_dmd) rhs
@@ -1065,14 +1065,6 @@ addLazyFVs dmd_ty lazy_fvs
         -- L demand doesn't get both'd with the Bot coming up from the inner
         -- call to f.  So we just get an L demand for x for g.
 
-{-
-Note [Do not strictify the argument dictionaries of a dfun]
-~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
-The typechecker can tie recursive knots involving dfuns, so we do the
-conservative thing and refrain from strictifying a dfun's argument
-dictionaries.
--}
-
 setBndrsDemandInfo :: [Var] -> [Demand] -> [Var]
 setBndrsDemandInfo (b:bs) (d:ds)
   | isTyVar b = b : setBndrsDemandInfo bs (d:ds)
@@ -1089,16 +1081,15 @@ annotateBndr env dmd_ty var
   | isId var  = (dmd_ty', setIdDemandInfo var dmd)
   | otherwise = (dmd_ty, var)
   where
-    (dmd_ty', dmd) = findBndrDmd env False dmd_ty var
+    (dmd_ty', dmd) = findBndrDmd env dmd_ty var
 
 annotateLamIdBndr :: AnalEnv
-                  -> DFunFlag   -- is this lambda at the top of the RHS of a dfun?
                   -> DmdType    -- Demand type of body
                   -> Id         -- Lambda binder
                   -> (DmdType,  -- Demand type of lambda
                       Id)       -- and binder annotated with demand
 
-annotateLamIdBndr env arg_of_dfun dmd_ty id
+annotateLamIdBndr env dmd_ty id
 -- For lambdas we add the demand to the argument demands
 -- Only called for Ids
   = ASSERT( isId id )
@@ -1113,7 +1104,7 @@ annotateLamIdBndr env arg_of_dfun dmd_ty id
                              (unf_ty, _) = dmdAnalStar env dmd unf
 
     main_ty = addDemand dmd dmd_ty'
-    (dmd_ty', dmd) = findBndrDmd env arg_of_dfun dmd_ty id
+    (dmd_ty', dmd) = findBndrDmd env dmd_ty id
 
 deleteFVs :: DmdType -> [Var] -> DmdType
 deleteFVs (DmdType fvs dmds res) bndrs
@@ -1230,10 +1221,6 @@ forget that fact, otherwise we might make 'x' absent when it isn't.
 ************************************************************************
 -}
 
-type DFunFlag = Bool  -- indicates if the lambda being considered is in the
-                      -- sequence of lambdas at the top of the RHS of a dfun
-notArgOfDfun :: DFunFlag
-notArgOfDfun = False
 
 {-  Note [dmdAnalEnv performance]
     ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
@@ -1317,13 +1304,13 @@ findBndrsDmds env dmd_ty bndrs
     go dmd_ty []  = (dmd_ty, [])
     go dmd_ty (b:bs)
       | isId b    = let (dmd_ty1, dmds) = go dmd_ty bs
-                        (dmd_ty2, dmd)  = findBndrDmd env False dmd_ty1 b
+                        (dmd_ty2, dmd)  = findBndrDmd env dmd_ty1 b
                     in (dmd_ty2, dmd : dmds)
       | otherwise = go dmd_ty bs
 
-findBndrDmd :: AnalEnv -> Bool -> DmdType -> Id -> (DmdType, Demand)
--- See Note [Trimming a demand to a type]
-findBndrDmd env arg_of_dfun dmd_ty id
+findBndrDmd :: AnalEnv -> DmdType -> Id -> (DmdType, Demand)
+-- See Note [Trimming a demand to a type] in GHC.Types.Demand
+findBndrDmd env dmd_ty id
   = (dmd_ty', dmd')
   where
     dmd' = strictify $
@@ -1334,19 +1321,46 @@ findBndrDmd env arg_of_dfun dmd_ty id
     id_ty = idType id
 
     strictify dmd
+      -- See Note [Making dictionaries strict]
       | gopt Opt_DictsStrict (ae_dflags env)
              -- We never want to strictify a recursive let. At the moment
              -- annotateBndr is only call for non-recursive lets; if that
              -- changes, we need a RecFlag parameter and another guard here.
-      , not arg_of_dfun -- See Note [Do not strictify the argument dictionaries of a dfun]
       = strictifyDictDmd id_ty dmd
       | otherwise
       = dmd
 
     fam_envs = ae_fam_envs env
 
-{- Note [Initialising strictness]
-~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+{- Note [Making dictionaries strict]
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+The Opt_DictsStrict flag makes GHC use call-by-value for dictionaries.  Why?
+
+* Generally CBV is more efficient.
+
+* Dictionaries are always non-bottom; and never take much work to
+  compute.  E.g. a dfun from an instance decl always returns a dicionary
+  record immediately.  See DFunUnfolding in CoreSyn.
+  See also Note [Recursive superclasses] in TcInstDcls.
+
+* The strictness analyser will then unbox dictionaries and pass the
+  methods individually, rather than in a bundle.  If there are a lot of
+  methods that might be bad; but worker/wrapper already does throttling.
+
+* A newtype dictionary is *not* always non-bottom.  E.g.
+      class C a where op :: a -> a
+      instance C Int where op = error "urk"
+  Now a value of type (C Int) is just a newtype wrapper (a cast) around
+  the error thunk.  Don't strictify these!
+
+See #17758 for more background and perf numbers.
+
+The implementation is extremly simple: just make the strictness
+analyser strictify the demand on a dictionary binder in
+'findBndrDmd'.
+
+Note [Initialising strictness]
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 See section 9.2 (Finding fixpoints) of the paper.
 
 Our basic plan is to initialise the strictness of each Id in a

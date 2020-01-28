@@ -343,7 +343,7 @@ by saying ``-fno-wombat``.
     seem cheap to the optimiser.
 
 .. ghc-flag:: -fdicts-strict
-    :shortdesc: Make dictionaries strict
+    :shortdesc: Make dictionaries strict. Implied by :ghc-flag:`-O2`.
     :type: dynamic
     :reverse: -fno-dicts-strict
     :category:
@@ -351,6 +351,15 @@ by saying ``-fno-wombat``.
     :default: off
 
     Make dictionaries strict.
+
+    This enables WW to fire on dictionary constraints which usually results
+    in better runtime. In niche cases it can lead to significant compile time
+    regressions because of changed inlining behaviour. Rarely this can also affect
+    runtime negatively.
+
+    If enabling this flag leads to regressions try increasing the unfolding
+    threshold using :ghc-flag:`-funfolding-use-threshold=⟨n⟩` by a modest amount (~30)
+    as this is likely a result of a known limitation described in `#18421`.
 
 .. ghc-flag:: -fdmd-tx-dict-sel
     :shortdesc: *(deprecated)* Use a special demand transformer for dictionary selectors.
