@@ -144,7 +144,7 @@ test('T7702',
       # a large effect on allocation which is hard to separate from the
       # allocation done by the plugin... but a regression allocates > 90mb
       collect_compiler_stats('peak_megabytes_allocated',70),
-      when(opsys('mingw'), expect_broken_for(16799, ['normal']))
+      when(opsys('mingw32'), fragile_for(16799, ['normal']))
      ],
      compile,
      ['-v0 -package-db T7702plugin/pkg.T7702/local.package.conf -fplugin T7702Plugin -package T7702plugin ' + config.plugin_way_flags])
