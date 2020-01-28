@@ -18,12 +18,13 @@ module Language.Haskell.TH.Lib (
 
     -- * Library functions
     -- ** Abbreviations
-        InfoQ, ExpQ, TExpQ, DecQ, DecsQ, ConQ, TypeQ, KindQ, TyVarBndrQ,
+        InfoQ, ExpQ, TExpQ, DecQ, DecsQ, ConQ, TypeQ, KindQ,
         TyLitQ, CxtQ, PredQ, DerivClauseQ, MatchQ, ClauseQ, BodyQ, GuardQ,
         StmtQ, RangeQ, SourceStrictnessQ, SourceUnpackednessQ, BangQ,
         BangTypeQ, VarBangTypeQ, StrictTypeQ, VarStrictTypeQ, FieldExpQ, PatQ,
         FieldPatQ, RuleBndrQ, TySynEqnQ, PatSynDirQ, PatSynArgsQ,
         FamilyResultSigQ, DerivStrategyQ,
+        TyVarBndrUnit, TyVarBndrSpec,
 
     -- ** Constructors lifted to 'Q'
     -- *** Literals
@@ -75,7 +76,8 @@ module Language.Haskell.TH.Lib (
 
     -- *** Type variable binders
     plainTV, kindedTV,
-    specifiedSpec, inferredSpec, noFlag,
+    plainInvisTV, kindedInvisTV,
+    specifiedSpec, inferredSpec,
 
     -- *** Roles
     nominalR, representationalR, phantomR, inferR,
@@ -144,6 +146,9 @@ import Language.Haskell.TH.Lib.Internal hiding
 
   , plainTV
   , kindedTV
+  -- GJ : TODO Can we remove this?
+  , plainInvisTV
+  , kindedInvisTV
   , starK
   , constraintK
 
@@ -274,24 +279,23 @@ sigT t k
 -------------------------------------------------------------------------------
 -- *   Kind
 
-plainTV :: Name -> flag -> TyVarBndr flag
-plainTV = PlainTV
+plainTV :: Name -> TyVarBndr ()
+plainTV n = PlainTV n ()
 
-kindedTV :: Name -> flag -> Kind -> TyVarBndr flag
-kindedTV = KindedTV
+plainInvisTV :: Name -> Specificity -> TyVarBndr Specificity
+plainInvisTV = PlainTV
+
+kindedTV :: Name -> Kind -> TyVarBndr ()
+kindedTV n k = KindedTV n () k
+
+kindedInvisTV :: Name -> Specificity -> Kind -> TyVarBndr Specificity
+kindedInvisTV = KindedTV
 
 starK :: Kind
 starK = StarT
 
 constraintK :: Kind
 constraintK = ConstraintT
-
-specifiedSpec, inferredSpec :: Specificity
-specifiedSpec = SpecifiedSpec
-inferredSpec  = InferredSpec
-
-noFlag :: ()
-noFlag = ()
 
 -------------------------------------------------------------------------------
 -- *   Type family result

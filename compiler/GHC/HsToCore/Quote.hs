@@ -697,7 +697,7 @@ repTyFamEqn (HsIB { hsib_ext = var_names
        ; let hs_tvs = HsQTvs { hsq_ext = var_names
                              , hsq_explicit = fromMaybe [] mb_bndrs }
        ; addTyClTyVarBinds hs_tvs $ \ _ ->
-         do { mb_bndrs1 <- repMaybeListM tyVarBndrTyConName
+         do { mb_bndrs1 <- repMaybeListM tyVarBndrUnitTyConName
                                         repTyVarBndr
                                         mb_bndrs
             ; tys1 <- case fixity of
@@ -736,7 +736,7 @@ repDataFamInstD (DataFamInstDecl { dfid_eqn =
        ; let hs_tvs = HsQTvs { hsq_ext = var_names
                              , hsq_explicit = fromMaybe [] mb_bndrs }
        ; addTyClTyVarBinds hs_tvs $ \ _ ->
-         do { mb_bndrs1 <- repMaybeListM tyVarBndrTyConName
+         do { mb_bndrs1 <- repMaybeListM tyVarBndrUnitTyConName
                                         repTyVarBndr
                                         mb_bndrs
             ; tys1 <- case fixity of
@@ -828,7 +828,7 @@ repRuleD (L loc (HsRule { rd_name = n
          do { let tm_bndr_names = concatMap ruleBndrNames tm_bndrs
             ; ss <- mkGenSyms tm_bndr_names
             ; rule <- addBinds ss $
-                      do { elt_ty <- wrapName tyVarBndrTyConName
+                      do { elt_ty <- wrapName tyVarBndrUnitTyConName
                          ; ty_bndrs' <- return $ case ty_bndrs of
                              Nothing -> coreNothing' (mkListTy elt_ty)
                              Just _  -> coreJust' (mkListTy elt_ty) ex_bndrs
@@ -1033,7 +1033,7 @@ rep_ty_sig mk_sig loc sig_ty nm
   = do { nm1 <- lookupLOcc nm
        ; let rep_in_scope_tv tv = do { name <- lookupBinder (hsLTyVarName tv)
                                      ; repTyVarBndrWithKind tv name }
-       ; th_explicit_tvs <- repListM tyVarBndrTyConName rep_in_scope_tv
+       ; th_explicit_tvs <- repListM tyVarBndrSpecTyConName rep_in_scope_tv
                                     explicit_tvs
 
          -- NB: Don't pass any implicit type variables to repList above
@@ -1062,8 +1062,8 @@ rep_patsyn_ty_sig loc sig_ty nm
   = do { nm1 <- lookupLOcc nm
        ; let rep_in_scope_tv tv = do { name <- lookupBinder (hsLTyVarName tv)
                                      ; repTyVarBndrWithKind tv name }
-       ; th_univs <- repListM tyVarBndrTyConName rep_in_scope_tv univs
-       ; th_exis  <- repListM tyVarBndrTyConName rep_in_scope_tv exis
+       ; th_univs <- repListM tyVarBndrSpecTyConName rep_in_scope_tv univs
+       ; th_exis  <- repListM tyVarBndrSpecTyConName rep_in_scope_tv exis
 
          -- NB: Don't pass any implicit type variables to repList above
          -- See Note [Don't quantify implicit type variables in quotes]
@@ -1150,15 +1150,27 @@ rep_complete_sig (L _ cls) mty loc
 --                      Types
 -------------------------------------------------------
 
-class RepFlag flag flag' | flag -> flag' where
-    repFlag :: flag -> MetaM (Core flag')
+class RepTV flag flag' | flag -> flag' where
+    tyVarBndrName :: [LHsTyVarBndr flag GhcRn] -> Name -- GJ : TODO There has to be a nicer way
+    repPlainTV  :: Core TH.Name -> flag -> MetaM (Core (M (TH.TyVarBndr flag')))
+    repKindedTV :: Core TH.Name -> flag -> Core (M TH.Kind)
+                -> MetaM (Core (M (TH.TyVarBndr flag')))
 
-instance RepFlag () () where
-    repFlag () = rep2_nw noFlagName []
+instance RepTV () () where
+    tyVarBndrName _ = tyVarBndrUnitTyConName
+    repPlainTV  (MkC nm) ()          = rep2 plainTVName  [nm]
+    repKindedTV (MkC nm) () (MkC ki) = rep2 kindedTVName [nm, ki]
 
-instance RepFlag Specificity TH.Specificity where
-    repFlag SpecifiedSpec = rep2_nw specifiedSpecName []
-    repFlag InferredSpec  = rep2_nw inferredSpecName  []
+instance RepTV Specificity TH.Specificity where
+    tyVarBndrName _ = tyVarBndrSpecTyConName
+    repPlainTV  (MkC nm) spec          = do { (MkC spec') <- rep_flag spec
+                                            ; rep2 plainInvisTVName  [nm, spec'] }
+    repKindedTV (MkC nm) spec (MkC ki) = do { (MkC spec') <- rep_flag spec
+                                            ; rep2 kindedInvisTVName [nm, spec', ki] }
+
+rep_flag :: Specificity -> MetaM (Core TH.Specificity)
+rep_flag SpecifiedSpec = rep2_nw specifiedSpecName []
+rep_flag InferredSpec  = rep2_nw inferredSpecName []
 
 addSimpleTyVarBinds :: [Name]                -- the binders to be added
                     -> MetaM (Core (M a))   -- action in the ext env
@@ -1168,14 +1180,14 @@ addSimpleTyVarBinds names thing_inside
        ; term <- addBinds fresh_names thing_inside
        ; wrapGenSyms fresh_names term }
 
-addHsTyVarBinds :: RepFlag flag flag'
+addHsTyVarBinds :: RepTV flag flag'
                 => [LHsTyVarBndr flag GhcRn]  -- the binders to be added
                 -> (Core [(M (TH.TyVarBndr flag'))] -> MetaM (Core (M a)))  -- action in the ext env
                 -> MetaM (Core (M a))
 addHsTyVarBinds exp_tvs thing_inside
   = do { fresh_exp_names <- mkGenSyms (hsLTyVarNames exp_tvs)
        ; term <- addBinds fresh_exp_names $
-                 do { kbs <- repListM tyVarBndrTyConName mk_tv_bndr
+                 do { kbs <- repListM (tyVarBndrName exp_tvs) mk_tv_bndr
                                      (exp_tvs `zip` fresh_exp_names)
                     ; thing_inside kbs }
        ; wrapGenSyms fresh_exp_names term }
@@ -1191,7 +1203,7 @@ addQTyVarBinds (HsQTvs { hsq_ext = imp_tvs
   = addTyVarBinds exp_tvs imp_tvs thing_inside
 addQTyVarBinds (XLHsQTyVars nec) _ = noExtCon nec
 
-addTyVarBinds :: RepFlag flag flag'
+addTyVarBinds :: RepTV flag flag'
               => [LHsTyVarBndr flag GhcRn]                           -- the binders to be added
               -> [Name]
               -> (Core [(M (TH.TyVarBndr flag'))] -> MetaM (Core (M a))) -- action in the ext env
@@ -1220,7 +1232,7 @@ addTyClTyVarBinds tvs m
             -- This makes things work for family declarations
 
        ; term <- addBinds freshNames $
-                 do { kbs <- repListM tyVarBndrTyConName mk_tv_bndr
+                 do { kbs <- repListM tyVarBndrUnitTyConName mk_tv_bndr
                                      (hsQTvExplicit tvs)
                     ; m kbs }
 
@@ -1232,29 +1244,25 @@ addTyClTyVarBinds tvs m
 
 -- Produce kinded binder constructors from the Haskell tyvar binders
 --
-repTyVarBndrWithKind :: RepFlag flag flag' => LHsTyVarBndr flag GhcRn
+repTyVarBndrWithKind :: RepTV flag flag' => LHsTyVarBndr flag GhcRn
                      -> Core TH.Name -> MetaM (Core (M (TH.TyVarBndr flag')))
 repTyVarBndrWithKind (L _ (UserTyVar _ fl _)) nm
-  = do { fl' <- repFlag fl
-       ; repPlainTV nm fl' }
+  = repPlainTV nm fl
 repTyVarBndrWithKind (L _ (KindedTyVar _ fl _ ki)) nm
-  = do { fl' <- repFlag fl
-       ; ki' <- repLTy ki
-       ; repKindedTV nm fl' ki' }
+  = do { ki' <- repLTy ki
+       ; repKindedTV nm fl ki' }
 repTyVarBndrWithKind (L _ (XTyVarBndr nec)) _ = noExtCon nec
 
 -- | Represent a type variable binder
-repTyVarBndr :: RepFlag flag flag'
+repTyVarBndr :: RepTV flag flag'
              => LHsTyVarBndr flag GhcRn -> MetaM (Core (M (TH.TyVarBndr flag')))
 repTyVarBndr (L _ (UserTyVar _ fl (L _ nm)) )
   = do { nm' <- lookupBinder nm
-       ; fl' <- repFlag fl
-       ; repPlainTV nm' fl' }
+       ; repPlainTV nm' fl }
 repTyVarBndr (L _ (KindedTyVar _ fl (L _ nm) ki))
   = do { nm' <- lookupBinder nm
        ; ki' <- repLTy ki
-       ; fl' <- repFlag fl
-       ; repKindedTV nm' fl' ki' }
+       ; repKindedTV nm' fl ki' }
 repTyVarBndr (L _ (XTyVarBndr nec)) = noExtCon nec
 
 -- represent a type context
@@ -2746,15 +2754,6 @@ repPromotedNilTyCon = rep2 promotedNilTName []
 
 repPromotedConsTyCon :: MetaM (Core (M TH.Type))
 repPromotedConsTyCon = rep2 promotedConsTName []
-
------------- TyVarBndrs -------------------
-
-repPlainTV :: Core TH.Name -> Core flag -> MetaM (Core (M (TH.TyVarBndr flag)))
-repPlainTV (MkC nm) (MkC fl) = rep2 plainTVName [nm, fl]
-
-repKindedTV :: Core TH.Name -> Core flag -> Core (M TH.Kind)
-            -> MetaM (Core (M (TH.TyVarBndr flag)))
-repKindedTV (MkC nm) (MkC fl) (MkC ki) = rep2 kindedTVName [nm, fl, ki]
 
 ----------------------------------------------------------
 --       Type family result signature
