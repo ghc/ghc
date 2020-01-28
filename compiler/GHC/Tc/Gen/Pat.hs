@@ -62,6 +62,7 @@ import GHC.Types.Var.Set
 import Util
 import Outputable
 import qualified GHC.LanguageExtensions as LangExt
+import Control.Monad
 import Control.Arrow  ( second )
 import ListSetOps ( getNth )
 
@@ -503,8 +504,8 @@ tc_pat penv (SumPat _ pat alt arity ) pat_ty thing_inside
 
 ------------------------
 -- Data constructors
-tc_pat penv (ConPat NoExtField con arg_pats) pat_ty thing_inside
-  = tcConPat penv con pat_ty arg_pats thing_inside
+tc_pat penv (ConPat NoExtField con ty_arg_pats arg_pats) pat_ty thing_inside
+  = tcConPat penv con ty_arg_pats pat_ty arg_pats thing_inside
 
 ------------------------
 -- Literal patterns
@@ -729,24 +730,29 @@ to express the local scope of GADT refinements.
 -- MkT :: forall a b c. (a~[b]) => b -> c -> T a
 --       with scrutinee of type (T ty)
 
-tcConPat :: PatEnv -> Located Name
+tcConPat :: PatEnv
+         -> Located Name
+         -> [LHsWcType (NoGhcTc GhcRn)] -- Visible type arguments to data constructor
          -> ExpSigmaType           -- Type of the pattern
          -> HsConPatDetails GhcRn -> TcM a
          -> TcM (Pat GhcTcId, a)
-tcConPat penv con_lname@(L _ con_name) pat_ty arg_pats thing_inside
+tcConPat penv con_lname@(L _ con_name) type_args pat_ty arg_pats thing_inside
   = do  { con_like <- tcLookupConLike con_name
         ; case con_like of
-            RealDataCon data_con -> tcDataConPat penv con_lname data_con
+            RealDataCon data_con -> tcDataConPat penv con_lname data_con type_args
                                                  pat_ty arg_pats thing_inside
             PatSynCon pat_syn -> tcPatSynPat penv con_lname pat_syn
                                              pat_ty arg_pats thing_inside
         }
 
-tcDataConPat :: PatEnv -> Located Name -> DataCon
+tcDataConPat :: PatEnv
+             -> Located Name
+             -> DataCon
+             -> [LHsWcType (NoGhcTc GhcRn)] -- Visible type arguments to data constructor
              -> ExpSigmaType               -- Type of the pattern
              -> HsConPatDetails GhcRn -> TcM a
              -> TcM (Pat GhcTcId, a)
-tcDataConPat penv (L con_span con_name) data_con pat_ty
+tcDataConPat penv (L con_span con_name) data_con type_args pat_ty
              arg_pats thing_inside
   = do  { let tycon = dataConTyCon data_con
                   -- For data families this is the representation tycon
@@ -766,12 +772,18 @@ tcDataConPat penv (L con_span con_name) data_con pat_ty
         ; let all_arg_tys = eqSpecPreds eq_spec ++ theta ++ arg_tys
         ; checkExistentials ex_tvs all_arg_tys penv
 
-        ; tenv <- instTyVarsWith PatOrigin univ_tvs ctxt_res_tys
+        ; type_args' <- zipWithM (\var arg -> tcHsTypeApp arg (varType var))
+                                 univ_tvs type_args
+        ; tenv' <- instTyVarsWith PatOrigin univ_tvs ctxt_res_tys
                   -- NB: Do not use zipTvSubst!  See #14154
                   -- We want to create a well-kinded substitution, so
                   -- that the instantiated type is well-kinded
+        ; forM_ (zip type_args' ctxt_res_tys) $ \(arg,ty) -> do
+            tcSubTypeET PatOrigin GenSigCtxt (Check ty) arg
+            -- TODO: Probably this Origin and Ctxt aren't quite right, maybe need new constructors there.
+            -- TODO: Can we use the wrapper result we get from this in some fashion?
 
-        ; (tenv, ex_tvs') <- tcInstSuperSkolTyVarsX tenv ex_tvs
+        ; (tenv, ex_tvs') <- tcInstSuperSkolTyVarsX tenv' ex_tvs
                      -- Get location from monad, not from ex_tvs
 
         ; let -- pat_ty' = mkTyConApp tycon ctxt_res_tys
@@ -795,6 +807,7 @@ tcDataConPat penv (L con_span con_name) data_con pat_ty
                     (arg_pats', res) <- tcConArgs (RealDataCon data_con) arg_tys'
                                                   arg_pats penv thing_inside
                   ; let res_pat = ConPat { pat_con = header
+                                         , pat_ty_args = type_args
                                          , pat_args = arg_pats'
                                          , pat_con_ext = ConPatTc
                                            { cpt_tvs = [], cpt_dicts = []
@@ -833,6 +846,7 @@ tcDataConPat penv (L con_span con_name) data_con pat_ty
 
         ; let res_pat = ConPat
                 { pat_con   = header
+                , pat_ty_args = type_args
                 , pat_args  = arg_pats'
                 , pat_con_ext = ConPatTc
                   { cpt_tvs   = ex_tvs'
@@ -887,6 +901,7 @@ tcPatSynPat penv (L con_span _) pat_syn pat_ty arg_pats thing_inside
 
         ; traceTc "checkConstraints }" (ppr ev_binds)
         ; let res_pat = ConPat { pat_con   = L con_span $ PatSynCon pat_syn
+                               , pat_ty_args = []
                                , pat_args  = arg_pats'
                                , pat_con_ext = ConPatTc
                                  { cpt_tvs   = ex_tvs'
