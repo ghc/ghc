@@ -1978,7 +1978,7 @@ repP (TuplePat _ ps boxed)
   | otherwise           = do { qs <- repLPs ps; repPunboxedTup qs }
 repP (SumPat _ p alt arity) = do { p1 <- repLP p
                                  ; repPunboxedSum p1 alt arity }
-repP (ConPat dc details NoExtField)
+repP (ConPat dc [] details NoExtField)
  = do { con_str <- lookupLOcc dc
       ; case details of
          PrefixCon ps -> do { qs <- repLPs ps; repPcon con_str qs }
@@ -1993,7 +1993,6 @@ repP (ConPat dc details NoExtField)
    rep_fld (L _ fld) = do { MkC v <- lookupLOcc (hsRecFieldSel fld)
                           ; MkC p <- repLP (hsRecFieldArg fld)
                           ; rep2 fieldPatName [v,p] }
-
 repP (NPat _ (L _ l) Nothing _) = do { a <- repOverloadedLiteral l
                                      ; repPlit a }
 repP (ViewPat _ e p) = do { e' <- repLE e; p' <- repLP p; repPview e' p' }
