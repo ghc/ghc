@@ -108,6 +108,7 @@ import BasicTypes
 import Coercion
 import ForeignCall
 import GHC.Hs.Extension
+import Name
 import NameSet
 
 -- others:
@@ -562,7 +563,7 @@ data TyClDecl pass
     -- For details on above see note [Api annotations] in ApiAnnotation
     SynDecl { tcdSExt   :: XSynDecl pass          -- ^ Post renameer, FVs
             , tcdLName  :: Located (IdP pass)     -- ^ Type constructor
-            , tcdTyVars :: LHsQTyVars pass        -- ^ Type variables; for an
+            , tcdTyVars :: LHsQTyVars pass     -- ^ Type variables; for an
                                                   -- associated type these
                                                   -- include outer binders
             , tcdFixity :: LexicalFixity    -- ^ Fixity used in the declaration
@@ -579,7 +580,7 @@ data TyClDecl pass
     -- For details on above see note [Api annotations] in ApiAnnotation
     DataDecl { tcdDExt     :: XDataDecl pass       -- ^ Post renamer, CUSK flag, FVs
              , tcdLName    :: Located (IdP pass)   -- ^ Type constructor
-             , tcdTyVars   :: LHsQTyVars pass      -- ^ Type variables
+             , tcdTyVars   :: LHsQTyVars pass   -- ^ Type variables
                               -- See Note [TyVar binders for associated declarations]
              , tcdFixity   :: LexicalFixity        -- ^ Fixity used in the declaration
              , tcdDataDefn :: HsDataDefn pass }
@@ -587,7 +588,7 @@ data TyClDecl pass
   | ClassDecl { tcdCExt    :: XClassDecl pass,         -- ^ Post renamer, FVs
                 tcdCtxt    :: LHsContext pass,         -- ^ Context...
                 tcdLName   :: Located (IdP pass),      -- ^ Name of the class
-                tcdTyVars  :: LHsQTyVars pass,         -- ^ Class type variables
+                tcdTyVars  :: LHsQTyVars pass,      -- ^ Class type variables
                 tcdFixity  :: LexicalFixity, -- ^ Fixity used in the declaration
                 tcdFDs     :: [LHsFunDep pass],         -- ^ Functional deps
                 tcdSigs    :: [LSig pass],              -- ^ Methods' signatures
@@ -1077,7 +1078,7 @@ data FamilyResultSig pass = -- see Note [FamilyResultSig]
 
   -- For details on above see note [Api annotations] in ApiAnnotation
 
-  | TyVarSig (XTyVarSig pass) (LHsTyVarBndr pass)
+  | TyVarSig (XTyVarSig pass) (LHsTyVarBndr () pass)
   -- ^ - 'ApiAnnotation.AnnKeywordId' :
   --             'ApiAnnotation.AnnOpenP','ApiAnnotation.AnnDcolon',
   --             'ApiAnnotation.AnnCloseP', 'ApiAnnotation.AnnEqual'
@@ -1160,8 +1161,8 @@ famResultKindSignature (NoSig _) = Nothing
 famResultKindSignature (KindSig _ ki) = Just ki
 famResultKindSignature (TyVarSig _ bndr) =
   case unLoc bndr of
-    UserTyVar _ _ -> Nothing
-    KindedTyVar _ _ ki -> Just ki
+    UserTyVar _ _ _ -> Nothing
+    KindedTyVar _ _ _ ki -> Just ki
     XTyVarBndr nec -> noExtCon nec
 famResultKindSignature (XFamilyResultSig nec) = noExtCon nec
 
@@ -1414,7 +1415,7 @@ data ConDecl pass
       -- AnnForall and AnnDot.
       , con_forall  :: Located Bool      -- ^ True <=> explicit forall
                                          --   False => hsq_explicit is empty
-      , con_qvars   :: LHsQTyVars pass
+      , con_qvars   :: [LHsTyVarBndr Specificity pass]
                        -- Whether or not there is an /explicit/ forall, we still
                        -- need to capture the implicitly-bound type/kind variables
 
@@ -1435,7 +1436,7 @@ data ConDecl pass
                               --     e.g. data T a = forall b. MkT b (b->a)
                               --     con_ex_tvs = {b}
                               -- False => con_ex_tvs is empty
-      , con_ex_tvs :: [LHsTyVarBndr pass]      -- ^ Existentials only
+      , con_ex_tvs :: [LHsTyVarBndr Specificity pass]      -- ^ Existentials only
       , con_mb_cxt :: Maybe (LHsContext pass)  -- ^ User-written context (if any)
       , con_args   :: HsConDeclDetails pass    -- ^ Arguments; can be InfixCon
 
@@ -1444,7 +1445,10 @@ data ConDecl pass
       }
   | XConDecl (XXConDecl pass)
 
-type instance XConDeclGADT (GhcPass _) = NoExtField
+type instance XConDeclGADT GhcPs = NoExtField
+type instance XConDeclGADT GhcRn = [Name] -- Implicitly bound type variables
+type instance XConDeclGADT GhcTc = NoExtField
+
 type instance XConDeclH98  (GhcPass _) = NoExtField
 type instance XXConDecl    (GhcPass _) = NoExtCon
 
@@ -1573,7 +1577,7 @@ pprConDecl (ConDeclGADT { con_names = cons, con_qvars = qvars
                         , con_mb_cxt = mcxt, con_args = args
                         , con_res_ty = res_ty, con_doc = doc })
   = ppr_mbDoc doc <+> ppr_con_names cons <+> dcolon
-    <+> (sep [pprHsForAll ForallInvis (hsq_explicit qvars) cxt,
+    <+> (sep [pprHsForAll ForallInvis qvars cxt,
               ppr_arrow_chain (get_args args ++ [ppr res_ty]) ])
   where
     get_args (PrefixCon args) = map ppr args
@@ -1724,7 +1728,7 @@ data FamEqn pass rhs
   = FamEqn
        { feqn_ext    :: XCFamEqn pass rhs
        , feqn_tycon  :: Located (IdP pass)
-       , feqn_bndrs  :: Maybe [LHsTyVarBndr pass] -- ^ Optional quantified type vars
+       , feqn_bndrs  :: Maybe [LHsTyVarBndr () pass] -- ^ Optional quantified type vars
        , feqn_pats   :: HsTyPats pass
        , feqn_fixity :: LexicalFixity -- ^ Fixity used in the declaration
        , feqn_rhs    :: rhs
@@ -1859,7 +1863,7 @@ pprDataFamInstFlavour (DataFamInstDecl (XHsImplicitBndrs x))
 
 pprHsFamInstLHS :: (OutputableBndrId p)
    => IdP (GhcPass p)
-   -> Maybe [LHsTyVarBndr (GhcPass p)]
+   -> Maybe [LHsTyVarBndr () (GhcPass p)]
    -> HsTyPats (GhcPass p)
    -> LexicalFixity
    -> LHsContext (GhcPass p)
@@ -2262,7 +2266,7 @@ data RuleDecl pass
        , rd_name :: Located (SourceText,RuleName)
            -- ^ Note [Pragma source text] in BasicTypes
        , rd_act  :: Activation
-       , rd_tyvs :: Maybe [LHsTyVarBndr (NoGhcTc pass)]
+       , rd_tyvs :: Maybe [LHsTyVarBndr () (NoGhcTc pass)]
            -- ^ Forall'd type vars
        , rd_tmvs :: [LRuleBndr pass]
            -- ^ Forall'd term vars, before typechecking; after typechecking

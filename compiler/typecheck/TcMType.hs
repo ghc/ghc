@@ -79,7 +79,7 @@ module TcMType (
   zonkAndSkolemise, skolemiseQuantifiedTyVar,
   defaultTyVar, quantifyTyVars, isQuantifiableTv,
   zonkTcType, zonkTcTypes, zonkCo,
-  zonkTyCoVarKind,
+  zonkTyCoVarKind, zonkTyCoVarKindBinder,
 
   zonkEvVar, zonkWC, zonkSimples,
   zonkId, zonkCoVar,
@@ -1974,6 +1974,10 @@ zonkTcTyVars tyvars = mapM zonkTcTyVar tyvars
 zonkTyCoVarKind :: TyCoVar -> TcM TyCoVar
 zonkTyCoVarKind tv = do { kind' <- zonkTcType (tyVarKind tv)
                         ; return (setTyVarKind tv kind') }
+
+zonkTyCoVarKindBinder :: (VarBndr TyCoVar fl) -> TcM (VarBndr TyCoVar fl)
+zonkTyCoVarKindBinder (Bndr tv fl) = do { kind' <- zonkTcType (tyVarKind tv)
+                                        ; return $ Bndr (setTyVarKind tv kind') fl }
 
 zonkTcTypes :: [TcType] -> TcM [TcType]
 zonkTcTypes tys = mapM zonkTcType tys
