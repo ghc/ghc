@@ -1164,8 +1164,7 @@ exprIsLambda_maybe will, given an expression `e`, try to turn it into the form
 casts (using the Push rule), and it unfolds function calls if the unfolding
 has a greater arity than arguments are present.
 
-Currently, it is used in Rules.match, and is required to make
-"map coerce = coerce" match.
+In Rules.match it's required to make "map coerce = coerce" match.
 -}
 
 exprIsLambda_maybe :: InScopeEnv -> CoreExpr

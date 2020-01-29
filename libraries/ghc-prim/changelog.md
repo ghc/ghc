@@ -1,3 +1,17 @@
+## 0.6.2 (edit as necessary)
+
+- Shipped with GHC 8.12.1
+
+- Added to `GHC.CString`:
+
+        unpackAppendCStringUtf8# :: Addr# -> [Char] -> [Char]
+        unpackFoldrCStringUtf8# :: Addr# -> (Char -> a -> a) -> a -> a
+        elemCString# :: Char# -> Addr# -> Bool
+        elemCStringUtf8# :: Char# -> Addr# -> Bool
+
+  `elemCString*#` is a version of `elem` specialized for operations
+  over GHC String literals.
+
 ## 0.6.1 (edit as necessary)
 
 - Shipped with GHC 8.10.1
