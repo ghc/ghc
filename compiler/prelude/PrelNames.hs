@@ -705,11 +705,12 @@ ioDataCon_RDR :: RdrName
 ioDataCon_RDR           = nameRdrName ioDataConName
 
 eqString_RDR, unpackCString_RDR, unpackCStringFoldr_RDR,
-    unpackCStringUtf8_RDR :: RdrName
+    unpackCStringFoldrUtf8_RDR, unpackCStringUtf8_RDR :: RdrName
 eqString_RDR            = nameRdrName eqStringName
 unpackCString_RDR       = nameRdrName unpackCStringName
 unpackCStringFoldr_RDR  = nameRdrName unpackCStringFoldrName
 unpackCStringUtf8_RDR   = nameRdrName unpackCStringUtf8Name
+unpackCStringFoldrUtf8_RDR  = nameRdrName unpackCStringFoldrUtf8Name
 
 newStablePtr_RDR :: RdrName
 newStablePtr_RDR        = nameRdrName newStablePtrName
@@ -1002,11 +1003,12 @@ modIntName = varQual gHC_CLASSES (fsLit "modInt#") modIntIdKey
 
 -- Base strings Strings
 unpackCStringName, unpackCStringFoldrName,
-    unpackCStringUtf8Name, eqStringName :: Name
+    unpackCStringUtf8Name, unpackCStringFoldrUtf8Name,eqStringName :: Name
 unpackCStringName       = varQual gHC_CSTRING (fsLit "unpackCString#") unpackCStringIdKey
 unpackCStringFoldrName  = varQual gHC_CSTRING (fsLit "unpackFoldrCString#") unpackCStringFoldrIdKey
 unpackCStringUtf8Name   = varQual gHC_CSTRING (fsLit "unpackCStringUtf8#") unpackCStringUtf8IdKey
 eqStringName            = varQual gHC_BASE (fsLit "eqString")  eqStringIdKey
+unpackCStringFoldrUtf8Name  = varQual gHC_CSTRING (fsLit "unpackFoldrCStringUtf8#") unpackCStringFoldrUtf8IdKey
 
 -- The 'inline' function
 inlineIdName :: Name
@@ -2081,7 +2083,8 @@ wildCardKey, absentErrorIdKey, augmentIdKey, appendIdKey,
     runtimeErrorIdKey, patErrorIdKey, voidPrimIdKey,
     realWorldPrimIdKey, recConErrorIdKey,
     unpackCStringUtf8IdKey, unpackCStringAppendIdKey,
-    unpackCStringFoldrIdKey, unpackCStringIdKey,
+    unpackCStringFoldrIdKey, unpackCStringFoldrUtf8IdKey,
+    unpackCStringIdKey,
     typeErrorIdKey, divIntIdKey, modIntIdKey,
     absentSumFieldErrorIdKey :: Unique
 
@@ -2105,11 +2108,12 @@ recConErrorIdKey              = mkPreludeMiscIdUnique 16
 unpackCStringUtf8IdKey        = mkPreludeMiscIdUnique 17
 unpackCStringAppendIdKey      = mkPreludeMiscIdUnique 18
 unpackCStringFoldrIdKey       = mkPreludeMiscIdUnique 19
-unpackCStringIdKey            = mkPreludeMiscIdUnique 20
-voidPrimIdKey                 = mkPreludeMiscIdUnique 21
-typeErrorIdKey                = mkPreludeMiscIdUnique 22
-divIntIdKey                   = mkPreludeMiscIdUnique 23
-modIntIdKey                   = mkPreludeMiscIdUnique 24
+unpackCStringFoldrUtf8IdKey   = mkPreludeMiscIdUnique 20
+unpackCStringIdKey            = mkPreludeMiscIdUnique 21
+voidPrimIdKey                 = mkPreludeMiscIdUnique 22
+typeErrorIdKey                = mkPreludeMiscIdUnique 23
+divIntIdKey                   = mkPreludeMiscIdUnique 24
+modIntIdKey                   = mkPreludeMiscIdUnique 25
 
 unsafeCoerceIdKey, concatIdKey, filterIdKey, zipIdKey, bindIOIdKey,
     returnIOIdKey, newStablePtrIdKey,
