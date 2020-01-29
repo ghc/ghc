@@ -919,7 +919,7 @@ elem _ []       = False
 elem x (y:ys)   = x==y || elem x ys
 {-# NOINLINE [1] elem #-}
 {-# RULES
-"elem/build"    forall x (g :: forall b . Eq a => (a -> b -> b) -> b -> b)
+"elem/build"    forall x (g :: forall b . (a -> b -> b) -> b -> b)
    . elem x (build g) = g (\ y r -> (x == y) || r) False
  #-}
 #endif
@@ -933,9 +933,35 @@ notElem _ []    =  True
 notElem x (y:ys)=  x /= y && notElem x ys
 {-# NOINLINE [1] notElem #-}
 {-# RULES
-"notElem/build" forall x (g :: forall b . Eq a => (a -> b -> b) -> b -> b)
+"notElem/build" forall x (g :: forall b . (a -> b -> b) -> b -> b)
    . notElem x (build g) = g (\ y r -> (x /= y) && r) True
  #-}
+#endif
+
+-- Rules for elem/notElem on known strings:
+#if defined(USE_REPORT_PRELUDE)
+#else
+{-# RULES
+"elem@CString/build"    forall (x :: Char) (addr :: Addr#)
+   . elem x (build ((unpackFoldrCString# addr)))
+   = case x of
+        C# c -> c `elemCString#` addr
+
+"elem@CStringUtf8/build"    forall (x :: Char) (addr :: Addr#)
+   . elem x (build ((unpackFoldrCStringUtf8# addr)))
+   = case x of
+        C# c -> c `elemCStringUtf8#` addr
+
+"notElem@CString/build"    forall (x :: Char) (addr :: Addr#)
+   . notElem x (build ((unpackFoldrCString# addr)))
+   = case x of
+        C# c -> not (c `elemCString#` addr)
+
+"notElem@CStringUtf8/build"    forall (x :: Char) (addr :: Addr#)
+   . notElem x (build ((unpackFoldrCStringUtf8# addr)))
+   = case x of
+        C# c -> not (c `elemCStringUtf8#` addr)
+#-}
 #endif
 
 -- | \(\mathcal{O}(n)\). 'lookup' @key assocs@ looks up a key in an association
