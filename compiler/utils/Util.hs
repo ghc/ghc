@@ -637,7 +637,6 @@ ordNub xs
       | Set.member x s = go s xs
       | otherwise = x : go (Set.insert x s) xs
 
-
 {-
 ************************************************************************
 *                                                                      *

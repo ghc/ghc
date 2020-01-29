@@ -1147,10 +1147,17 @@ elem x                  =  any (== x)
 #else
 elem _ []       = False
 elem x (y:ys)   = x==y || elem x ys
-{-# NOINLINE [1] elem #-}
+{-# NOINLINE elem #-}
 {-# RULES
-"elem/build"    forall x (g :: forall b . Eq a => (a -> b -> b) -> b -> b)
+"elem/build" forall x (g :: forall b . (a -> b -> b) -> b -> b)
    . elem x (build g) = g (\ y r -> (x == y) || r) False
+-- See Note [Compiling `elem` on Strings] in CString.hs
+"elem@CString/unpack" [0]   forall (x :: Char) (addr :: Addr#)
+   . elem x (unpackCString# addr)
+   = x `elemCString#` addr
+"elem@CStringUtf8/unpack" [0]   forall (x :: Char) (addr :: Addr#)
+   . elem x (unpackCStringUtf8# addr)
+   = x `elemCStringUtf8#` addr
  #-}
 #endif
 
@@ -1172,10 +1179,17 @@ notElem x               =  all (/= x)
 #else
 notElem _ []    =  True
 notElem x (y:ys)=  x /= y && notElem x ys
-{-# NOINLINE [1] notElem #-}
+{-# NOINLINE notElem #-}
 {-# RULES
-"notElem/build" forall x (g :: forall b . Eq a => (a -> b -> b) -> b -> b)
+"notElem/build" forall x (g :: forall b . (a -> b -> b) -> b -> b)
    . notElem x (build g) = g (\ y r -> (x /= y) && r) True
+-- See Note [Compiling `elem` on Strings] in CString.hs
+"notElem@CString/unpack" [0]   forall (x :: Char) (addr :: Addr#)
+   . notElem x (unpackCString# addr)
+   = not (x `elemCString#` addr)
+"notElem@CStringUtf8/unpack" [0]   forall (x :: Char) (addr :: Addr#)
+   . notElem x (unpackCStringUtf8# addr)
+   = not (x `elemCStringUtf8#` addr)
  #-}
 #endif
 
