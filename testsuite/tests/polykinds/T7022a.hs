@@ -9,5 +9,5 @@ makeSList :: Q [Dec]
 makeSList = do
    a <- newName "a"
    k <- newName "k"
-   return [TySynD (mkName "SList") [KindedTV a (AppT ListT (VarT k))]
+   return [TySynD (mkName "SList") [KindedTV a () (AppT ListT (VarT k))]
                   (AppT (ConT (mkName "Sing")) (VarT a))]
