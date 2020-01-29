@@ -48,10 +48,9 @@ def read_documented_flags(doc_flags) -> Set[str]:
             if line != ''}
 
 def read_ghc_flags(ghc_path: str) -> Set[str]:
-    ghc_output = subprocess.check_output([ghc_path, '--show-options'],
-                                         encoding='UTF-8')
+    ghc_output = subprocess.check_output([ghc_path, '--show-options'])
     return {flag
-            for flag in ghc_output.split('\n')
+            for flag in ghc_output.decode('UTF-8').split('\n')
             if not expected_undocumented(flag)
             if flag != ''}
 
