@@ -15,7 +15,7 @@ $(do gadtName   <- newName "GADT2"
      prefixName <- newName "Prefix2"
      infixName  <- newName ":****:"
      a          <- newName "a"
-     return [ DataD [] gadtName [KindedTV a StarT] Nothing
+     return [ DataD [] gadtName [KindedTV a () StarT] Nothing
               [ GadtC [prefixName]
                 [ (Bang NoSourceUnpackedness NoSourceStrictness,ConT ''Int)
                 , (Bang NoSourceUnpackedness NoSourceStrictness,ConT ''Int)
