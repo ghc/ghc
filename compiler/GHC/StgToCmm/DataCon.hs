@@ -1,4 +1,6 @@
 {-# LANGUAGE CPP #-}
+{-# OPTIONS -O -ddump-to-file -dumpdir datacondumps -ddump-simpl -ddump-stg #-}
+-- {-# OPTIONS -dsuppress-all #-}
 
 -----------------------------------------------------------------------------
 --
@@ -62,21 +64,25 @@ cgTopRhsCon :: DynFlags
             -> [NonVoid StgArg] -- Args
             -> (CgIdInfo, FCode ())
 cgTopRhsCon dflags id con args
-  -- See Note [Precomputed static closures]
 
   -- Internal: We always refer to the existing closure,
   --           no code needed
+  -- See Note [Precomputed static closures].
+  -- See Note [About the NameSorts] for what internal means.
   | Just info <- static_info
   , isInternalName name
   = (info, pure ())
 
-  -- External: Internally use existing closure,
-  --           but build closure for external users.
+  -- External: Refer to existing closure if possible,
+  --           code needed for importers of this binding.
+  -- See Note [Precomputed static closures].
+  -- See Note [About the NameSorts] for what internal means.
   | Just info <- static_info
   = (info, gen_code)
 
-  -- Any other value
-  | otherwise = (id_Info, gen_code)
+  -- Otherwise generate a closure for the constructor.
+  | otherwise
+  = (id_Info, gen_code)
 
   where
    static_info   = getStaticConInfo dflags id con args
@@ -171,6 +177,7 @@ premature looking at the args will cause the compiler to black-hole!
 
 buildDynCon' dflags binder _ _cc con args
   | Just cgInfo <- getStaticConInfo dflags binder con args
+  -- , pprTrace "noCodeLocal:" (ppr (binder,con,args,cgInfo)) True
   = return (cgInfo, return mkNop)
 
 -------- buildDynCon': the general case -----------
@@ -203,49 +210,97 @@ buildDynCon' dflags binder actually_bound ccs con args
 {- Note [Precomputed static closures]
    ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
-We can replace certain bindings with static ones
-which already exist. For Char/Int closures of certain
-these are built into the RTS.
-There we have Char/Int closures for all values
-in the range of mINT_INTLIKE .. mAX_INTLIKE (or CHARLIKE).
+For Char/Int closures there are some value closures
+built into the RTS. This is the case for all values in
+the range mINT_INTLIKE .. mAX_INTLIKE (or CHARLIKE).
 
-For zero-arity constructors we can reference the constructors
-single static closure in it's defining Module.
+Similarly zero-arity constructors have a closure
+in their defining Module we can use.
 
-At compile time we do this replacement in this module.
-At runtime this is done by GC.
+If possible we prefer to refer to those existing
+closure instead of building new ones.
+
+This is true at compile time where we do this replacement
+in this module.
+But also at runtime where the GC does the same.
 
 `getStaticConInfo` checks if a given constructor application
-can be replaced with a reference to a static closure in the RTS
+can be replaced with a reference to a existing static closure.
 
-There are three cases here:
-a)Bindings which we can "replace" with a reference to
-  an existing closure. Reference the replacement closure
-  when accessing the binding.
-  We generate not code for the binding in this case.
+If so the code will reference the existing closure when accessing
+the binding.
+Unless the binding is visible to other modules we also generate
+no code for the binding itself. We can do this since then we can
+always reference the existing closure.
 
-b)Bindings which we can "replace" as in a). But we still
-  generate a closure which will be referenced by modules
-  importing this binding.
+See Note [About the NameSorts] for the definition of external names.
+For external bindings we must still generate a closure,
+but won't use it inside this module.
+This can sometimes reduce cache pressure. Since:
+* If somebody uses the exported binding:
+  + This module will reference the existing closure.
+  + GC will reference the existing closure.
+  + The importing module will reference the built closure.
+* If nobody uses the exported binding:
+  + This module will reference the RTS closures.
+  + GC references the RTS closures
 
-c)For any other binding generate a closure. Then reference
-  this closure.
+In the later case we avoided loading the built closure into the cache which
+is what we optimize for here.
+
+Consider this example using Ints.
+
+    module M(externalInt, foo, bar) where
+
+    externalInt = 1 :: Int
+    internalInt = 1 :: Int
+    { -# NOINLINE foo #- }
+    foo = Just internalInt :: Maybe Int
+    bar = Just externalInt
+
+    ==================== STG: ====================
+    externalInt = I#! [1#];
+
+    bar = Just! [externalInt];
+
+    internalInt_rc = I#! [2#];
+
+    foo = Just! [internalInt_rc];
 
 For externally visible bindings we must generate closures
 since those may be referenced by their symbol `<name>_closure`
-when imported. But we still reference the existing closures
-for internal to the binding we compile to improve locality.
+when imported.
 
-Overall this means we have smaller code size and better locality.
+`externalInt` is visible to other modules so we generate a closure:
+
+    [section ""data" . M.externalInt_closure" {
+        M.externalInt_closure:
+            const GHC.Types.I#_con_info;
+            const 1;
+    }]
+
+It will be referenced inside this module via `M.externalInt_closure+1`
+
+`internalInt` is however a internal name. As such we generate no code for
+it. References to it are replaced with references to the static closure as
+we can see in the closure built for `foo`:
+
+    [section ""data" . M.foo_closure" {
+        M.foo_closure:
+            const GHC.Maybe.Just_con_info;
+            const stg_INTLIKE_closure+289; // == I# 2
+            const 3;
+    }]
+
+This holds for both local and top level bindings.
 
 We don't support this optimization when compiling into Windows DLLs yet
 because they don't support cross package data references well.
 -}
 
-{-# INLINE getStaticConInfo #-}
 getStaticConInfo :: DynFlags -> Id -> DataCon -> [NonVoid StgArg] -> Maybe CgIdInfo
 getStaticConInfo dflags binder con []
-  -- Nullary constructors
+-- Nullary constructors
   | isNullaryRepDataCon con
   = Just $ litIdInfo dflags binder (mkConLFInfo con)
                 (CmmLabel (mkClosureLabel (dataConName con) (idCafInfo binder)))
@@ -257,7 +312,7 @@ getStaticConInfo dflags binder con [arg]
   , inRange val
   = let intlike_lbl   = mkCmmClosureLabel rtsUnitId (fsLit label)
         val_int = fromIntegral val :: Int
-        offsetW = (val_int - min_static_range) * (fixedHdrSizeW dflags + 1)
+        offsetW = (val_int - (fromIntegral min_static_range)) * (fixedHdrSizeW dflags + 1)
                 -- INTLIKE/CHARLIKE closures consist of a header and one word payload
         static_amode = cmmLabelOffW dflags intlike_lbl offsetW
     in Just $ litIdInfo dflags binder (mkConLFInfo con) static_amode
@@ -273,7 +328,7 @@ getStaticConInfo dflags binder con [arg]
     inRange val
       = val >= min_static_range && val <= max_static_range
 
-    min_static_range :: Num a => a
+    min_static_range :: Integer
     min_static_range
       | intClosure = fromIntegral (mIN_INTLIKE dflags)
       | charClosure = fromIntegral (mIN_CHARLIKE dflags)
