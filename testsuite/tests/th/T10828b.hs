@@ -8,7 +8,7 @@ import System.IO
 -- attempting to mix GADT and normal constructors
 $( return
    [ DataD [] (mkName "T")
-           [ PlainTV (mkName "a") ]
+           [ PlainTV (mkName "a") () ]
            (Just StarT)
            [ NormalC
                (mkName "MkT")
@@ -19,7 +19,7 @@ $( return
                  , VarT (mkName "a")
                  )
                ]
-           , ForallC [PlainTV (mkName "a")]
+           , ForallC [PlainTV (mkName "a") SpecifiedSpec]
                      [AppT (AppT EqualityT (VarT $ mkName "a"  ) )
                                            (ConT $ mkName "Int") ] $
              RecGadtC

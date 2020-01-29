@@ -18,7 +18,7 @@ main = print
                      [ForallC con_tyvars _ _] _) <- reify ''(:~:)
 
        let tvbName :: TyVarBndr -> Name
-           tvbName (PlainTV  n)   = n
-           tvbName (KindedTV n _) = n
+           tvbName (PlainTV  n _)   = n
+           tvbName (KindedTV n _ _) = n
 
        lift $ and $ zipWith ((/=) `on` tvbName) tycon_tyvars con_tyvars)

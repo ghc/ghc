@@ -7,9 +7,9 @@ import Language.Haskell.TH
 $( return [ ClosedTypeFamilyD
               (TypeFamilyHead
                 (mkName "Equals")
-                [ KindedTV (mkName "a") (VarT (mkName "k"))
-                , KindedTV (mkName "b") (VarT (mkName "k")) ]
-                ( TyVarSig (KindedTV (mkName "r") (VarT (mkName "k"))))
+                [ KindedTV (mkName "a") () (VarT (mkName "k"))
+                , KindedTV (mkName "b") () (VarT (mkName "k")) ]
+                ( TyVarSig (KindedTV (mkName "r") () (VarT (mkName "k"))))
                 Nothing)
               [ TySynEqn Nothing
                          (AppT (AppT (ConT (mkName "Equals")) (VarT (mkName "a")))
@@ -29,7 +29,7 @@ b = False
 $( return [ ClosedTypeFamilyD
                (TypeFamilyHead
                 (mkName "Foo")
-                [ KindedTV (mkName "a") (VarT (mkName "k"))]
+                [ KindedTV (mkName "a") () (VarT (mkName "k"))]
                 (KindSig StarT ) Nothing )
                 [ TySynEqn Nothing
                            (AppT (AppKindT (ConT (mkName "Foo")) StarT)

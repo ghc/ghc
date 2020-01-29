@@ -15,7 +15,7 @@ genAnyClass name decls
   = DataD [] anyName [] Nothing [constructor] []
   where
     anyName = mkName ("Any" ++ nameBase name ++ "1111")
-    constructor = ForallC [PlainTV var_a] [AppT (ConT name) (VarT var_a)] $
+    constructor = ForallC [PlainTV var_a SpecifiedSpec] [AppT (ConT name) (VarT var_a)] $
                   NormalC anyName
                                 [(Bang NoSourceUnpackedness NoSourceStrictness, VarT var_a)]
     var_a = mkName "a"

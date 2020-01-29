@@ -33,7 +33,7 @@ main
 Bceomes
 
 
-[DataD [] Foo_0 [PlainTV a_2] Nothing
+[DataD [] Foo_0 [PlainTV a_2 ()] Nothing
   [NormalC Foo_1 [(Bang NoSourceUnpackedness NoSourceStrictness,VarT a_2)]]
   [DerivClause Nothing
       [AppT (AppT (ConT Main.C) (VarT y_6989586621679027885))
