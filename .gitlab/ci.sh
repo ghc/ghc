@@ -262,13 +262,13 @@ function setup_toolchain() {
   if [ ! -e "$HAPPY" ]; then
       info "Building happy..."
       cabal update
-      "$cabal_install" happy
+      $cabal_install happy
   fi
 
   if [ ! -e "$ALEX" ]; then
       info "Building alex..."
       cabal update
-      "$cabal_install" alex
+      $cabal_install alex
   fi
 }
 
@@ -326,10 +326,15 @@ function configure() {
   run python3 boot
   end_section "booting"
 
+  local target_args=""
+  if [[ -n "$triple" ]]; then
+    target_args="--target=$triple"
+  fi
+
   start_section "configuring"
   run ./configure \
     --enable-tarballs-autodownload \
-    --target=$triple \
+    "$target_args" \
     "$CONFIGURE_ARGS" \
     GHC="$GHC" \
     HAPPY="$HAPPY" \
