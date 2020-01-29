@@ -29,7 +29,7 @@ SplicesUsed.hs:10:16: warning: [-Wpartial-type-signatures (in -Wdefault)]
     • Found type wildcard ‘_’ standing for ‘(Char, a)’
       Where: ‘a’ is a rigid type variable bound by
                the inferred type of charA :: a -> (Char, a)
-               at SplicesUsed.hs:11:1-18
+               at SplicesUsed.hs:10:1-26
     • In the type ‘a -> (_)’
       In the type signature: charA :: a -> (_)
 
