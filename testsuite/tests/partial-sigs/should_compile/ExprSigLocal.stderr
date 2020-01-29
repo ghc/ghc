@@ -3,7 +3,7 @@ ExprSigLocal.hs:9:35: warning: [-Wpartial-type-signatures (in -Wdefault)]
     • Found type wildcard ‘_’ standing for ‘a’
       Where: ‘a’ is a rigid type variable bound by
                the inferred type of <expression> :: a -> a
-               at ExprSigLocal.hs:9:20-35
+               at ExprSigLocal.hs:9:27
     • In the type ‘a -> _’
       In an expression type signature: forall a. a -> _
       In the expression: (\ x -> x) :: forall a. a -> _
@@ -14,6 +14,6 @@ ExprSigLocal.hs:11:21: warning: [-Wpartial-type-signatures (in -Wdefault)]
     • Found type wildcard ‘_’ standing for ‘a’
       Where: ‘a’ is a rigid type variable bound by
                the inferred type of g :: a -> a
-               at ExprSigLocal.hs:12:1-7
+               at ExprSigLocal.hs:11:13
     • In the type ‘a -> _’
       In the type signature: g :: forall a. a -> _

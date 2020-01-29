@@ -8,6 +8,8 @@ Typecheck arrow notation
 {-# LANGUAGE RankNTypes, TupleSections #-}
 {-# LANGUAGE TypeFamilies #-}
 
+{-# OPTIONS_GHC -Wno-incomplete-record-updates #-}
+
 module TcArrows ( tcProc ) where
 
 import GhcPrelude

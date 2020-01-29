@@ -51,6 +51,6 @@ T15039a.hs:35:8: warning: [-Wpartial-type-signatures (in -Wdefault)]
     • Found type wildcard ‘_’ standing for ‘Coercible a b’
       Where: ‘a’, ‘b’ are rigid type variables bound by
                the inferred type of ex7 :: Coercible a b => Coercion a b
-               at T15039a.hs:36:1-14
+               at T15039a.hs:35:1-44
     • In the type signature:
         ex7 :: _ => Coercion (a :: Type) (b :: Type)

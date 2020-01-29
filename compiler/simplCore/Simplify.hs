@@ -6,6 +6,7 @@
 
 {-# LANGUAGE CPP #-}
 
+{-# OPTIONS_GHC -Wno-incomplete-record-updates #-}
 module Simplify ( simplTopBinds, simplExpr, simplRules ) where
 
 #include "HsVersions.h"

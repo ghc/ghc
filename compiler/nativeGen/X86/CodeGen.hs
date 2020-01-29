@@ -9,6 +9,8 @@
 {-# OPTIONS_GHC -fmax-pmcheck-iterations=10000000 #-}
 #endif
 
+{-# OPTIONS_GHC -Wno-incomplete-uni-patterns #-}
+
 -----------------------------------------------------------------------------
 --
 -- Generating machine code (instruction selection)
