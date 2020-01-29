@@ -144,9 +144,6 @@ import Language.Haskell.TH.Lib.Internal hiding
 
   , plainTV
   , kindedTV
-  -- GJ : TODO Can we remove this?
-  , plainInvisTV
-  , kindedInvisTV
   , starK
   , constraintK
 
@@ -280,14 +277,8 @@ sigT t k
 plainTV :: Name -> TyVarBndr ()
 plainTV n = PlainTV n ()
 
-plainInvisTV :: Name -> Specificity -> TyVarBndr Specificity
-plainInvisTV = PlainTV
-
 kindedTV :: Name -> Kind -> TyVarBndr ()
 kindedTV n k = KindedTV n () k
-
-kindedInvisTV :: Name -> Specificity -> Kind -> TyVarBndr Specificity
-kindedInvisTV = KindedTV
 
 starK :: Kind
 starK = StarT
