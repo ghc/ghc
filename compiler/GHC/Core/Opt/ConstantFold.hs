@@ -43,10 +43,13 @@ import GHC.Core.TyCon
    , isNewTyCon, unwrapNewTyCon_maybe, tyConDataCons
    , tyConFamilySize )
 import GHC.Core.DataCon ( dataConTagZ, dataConTyCon, dataConWrapId, dataConWorkId )
-import GHC.Core.Utils  ( cheapEqExpr, cheapEqExpr', exprIsHNF, exprType
+import GHC.Core.Utils  ( eqExpr, cheapEqExpr, exprIsHNF, exprType
                        , stripTicksTop, stripTicksTopT, mkTicks )
 import GHC.Core.Unfold ( exprIsConApp_maybe )
+import GHC.Core.FVs
 import GHC.Core.Type
+import GHC.Types.Var.Set
+import GHC.Types.Var.Env
 import GHC.Types.Name.Occurrence ( occNameFS )
 import GHC.Builtin.Names
 import GHC.Data.Maybe      ( orElse )
@@ -1255,7 +1258,10 @@ builtinRules :: [CoreRule]
 builtinRules
   = [BuiltinRule { ru_name = fsLit "AppendLitString",
                    ru_fn = unpackCStringFoldrName,
-                   ru_nargs = 4, ru_try = match_append_lit },
+                   ru_nargs = 4, ru_try = match_append_lit_C },
+     BuiltinRule { ru_name = fsLit "AppendLitStringUtf8",
+                   ru_fn = unpackCStringFoldrUtf8Name,
+                   ru_nargs = 4, ru_try = match_append_lit_utf8 },
      BuiltinRule { ru_name = fsLit "EqString", ru_fn = eqStringName,
                    ru_nargs = 2, ru_try = match_eq_string },
      BuiltinRule { ru_name = fsLit "CStringLength", ru_fn = cstringLengthName,
@@ -1433,11 +1439,22 @@ builtinNaturalRules =
 
 ---------------------------------------------------
 -- The rule is this:
---      unpackFoldrCString# "foo" c (unpackFoldrCString# "baz" c n)
---      =  unpackFoldrCString# "foobaz" c n
+--      unpackFoldrCString*# "foo"# c (unpackFoldrCString*# "baz"# c n)
+--      =  unpackFoldrCString*# "foobaz"# c n
+--
+-- See also Note [String literals in GHC] in CString.hs
 
-match_append_lit :: RuleFun
-match_append_lit _ id_unf _
+-- CString version
+match_append_lit_C :: RuleFun
+match_append_lit_C = match_append_lit unpackCStringFoldrIdKey
+
+-- CStringUTF8 version
+match_append_lit_utf8 :: RuleFun
+match_append_lit_utf8 = match_append_lit unpackCStringFoldrUtf8IdKey
+
+{-# INLINE match_append_lit #-}
+match_append_lit :: Unique -> RuleFun
+match_append_lit foldVariant _ id_unf _
         [ Type ty1
         , lit1
         , c1
@@ -1450,12 +1467,13 @@ match_append_lit _ id_unf _
                         `App` lit2
                         `App` c2
                         `App` n) <- stripTicksTop tickishFloatable e2
-  , unpk `hasKey` unpackCStringFoldrIdKey
-  , cheapEqExpr' tickishFloatable c1 c2
-  , (c1Ticks, c1') <- stripTicksTop tickishFloatable c1
-  , c2Ticks <- stripTicksTopT tickishFloatable c2
+  , unpk `hasKey` foldVariant
   , Just (LitString s1) <- exprIsLiteral_maybe id_unf lit1
   , Just (LitString s2) <- exprIsLiteral_maybe id_unf lit2
+  , let freeVars = (mkInScopeSet (exprFreeVars c1 `unionVarSet` exprFreeVars c2))
+    in eqExpr freeVars c1 c2
+  , (c1Ticks, c1') <- stripTicksTop tickishFloatable c1
+  , c2Ticks <- stripTicksTopT tickishFloatable c2
   = ASSERT( ty1 `eqType` ty2 )
     Just $ mkTicks strTicks
          $ Var unpk `App` Type ty1
@@ -1463,17 +1481,23 @@ match_append_lit _ id_unf _
                     `App` mkTicks (c1Ticks ++ c2Ticks) c1'
                     `App` n
 
-match_append_lit _ _ _ _ = Nothing
+match_append_lit _ _ _ _ _ = Nothing
 
 ---------------------------------------------------
 -- The rule is this:
 --      eqString (unpackCString# (Lit s1)) (unpackCString# (Lit s2)) = s1==s2
+-- Also  matches unpackCStringUtf8#
 
 match_eq_string :: RuleFun
 match_eq_string _ id_unf _
         [Var unpk1 `App` lit1, Var unpk2 `App` lit2]
-  | unpk1 `hasKey` unpackCStringIdKey
-  , unpk2 `hasKey` unpackCStringIdKey
+  | unpk_key1 <- getUnique unpk1
+  , unpk_key2 <- getUnique unpk2
+  , unpk_key1 == unpk_key2
+  -- For now we insist the literals have to agree in their encoding
+  -- to keep the rule simple. But we could check if the decoded strings
+  -- compare equal in here as well.
+  , unpk_key1 `elem` [unpackCStringUtf8IdKey, unpackCStringIdKey]
   , Just (LitString s1) <- exprIsLiteral_maybe id_unf lit1
   , Just (LitString s2) <- exprIsLiteral_maybe id_unf lit2
   = Just (if s1 == s2 then trueValBool else falseValBool)
