@@ -91,7 +91,7 @@ T14217.hs:32:11: error:
                             a62
                             a63
                           -> Bool
-               at T14217.hs:41:1-14
+               at T14217.hs:(32,1)-(40,13)
       To use the inferred type, enable PartialTypeSignatures
     • In the type signature:
         eqFoo :: _ =>
