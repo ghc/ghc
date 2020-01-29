@@ -34,7 +34,8 @@ import GHC.Core
 import GHC.Core.Make
 import GHC.Types.Id
 import GHC.Types.Literal
-import GHC.Core.SimpleOpt ( exprIsLiteral_maybe )
+import GHC.Core.SimpleOpt ( exprIsLiteral_maybe, exprIsLambda_maybe
+                          , exprIsStrippableLiteral_maybe )
 import PrimOp             ( PrimOp(..), tagToEnumKey )
 import TysWiredIn
 import TysPrim
@@ -57,6 +58,7 @@ import GHC.Types.Basic
 import GHC.Platform
 import Util
 import GHC.Core.Coercion   (mkUnbranchedAxInstCo,mkSymCo,Role(..))
+import Encoding (utf8DecodeByteString)
 
 import Control.Applicative ( Alternative(..) )
 
@@ -66,6 +68,7 @@ import qualified Data.ByteString as BS
 import Data.Int
 import Data.Ratio
 import Data.Word
+
 
 {-
 Note [Constant folding]
@@ -1254,11 +1257,18 @@ builtinRules :: [CoreRule]
 builtinRules
   = [BuiltinRule { ru_name = fsLit "AppendLitString",
                    ru_fn = unpackCStringFoldrName,
-                   ru_nargs = 4, ru_try = match_append_lit },
+                   ru_nargs = 4, ru_try = match_append_lit_C },
+     BuiltinRule { ru_name = fsLit "AppendLitStringUtf8",
+                   ru_fn = unpackCStringFoldrUtf8Name,
+                   ru_nargs = 4, ru_try = match_append_lit_utf8 },
      BuiltinRule { ru_name = fsLit "EqString", ru_fn = eqStringName,
                    ru_nargs = 2, ru_try = match_eq_string },
      BuiltinRule { ru_name = fsLit "Inline", ru_fn = inlineIdName,
                    ru_nargs = 2, ru_try = \_ _ _ -> match_inline },
+
+     -- See Note [Compiling `elem` applied to known strings]
+     BuiltinRule { ru_name = fsLit "ElemLitString", ru_fn = elemName,
+                   ru_nargs = 4, ru_try = match_elem },
      BuiltinRule { ru_name = fsLit "MagicDict", ru_fn = idName magicDictId,
                    ru_nargs = 4, ru_try = \_ _ _ -> match_magicDict },
 
@@ -1430,11 +1440,20 @@ builtinNaturalRules =
 
 ---------------------------------------------------
 -- The rule is this:
---      unpackFoldrCString# "foo" c (unpackFoldrCString# "baz" c n)
---      =  unpackFoldrCString# "foobaz" c n
+--      unpackFoldrCString*# "foo" c (unpackFoldrCString*# "baz" c n)
+--      =  unpackFoldrCString*# "foobaz" c n
 
-match_append_lit :: RuleFun
-match_append_lit _ id_unf _
+-- CString version
+match_append_lit_C :: RuleFun
+match_append_lit_C = match_append_lit unpackCStringFoldrIdKey
+
+-- CStringUTF8 version
+match_append_lit_utf8 :: RuleFun
+match_append_lit_utf8 = match_append_lit unpackCStringFoldrUtf8IdKey
+
+{-# INLINE match_append_lit #-}
+match_append_lit :: Unique -> RuleFun
+match_append_lit foldVariant _ id_unf _
         [ Type ty1
         , lit1
         , c1
@@ -1447,7 +1466,7 @@ match_append_lit _ id_unf _
                         `App` lit2
                         `App` c2
                         `App` n) <- stripTicksTop tickishFloatable e2
-  , unpk `hasKey` unpackCStringFoldrIdKey
+  , unpk `hasKey` foldVariant
   , cheapEqExpr' tickishFloatable c1 c2
   , (c1Ticks, c1') <- stripTicksTop tickishFloatable c1
   , c2Ticks <- stripTicksTopT tickishFloatable c2
@@ -1460,23 +1479,149 @@ match_append_lit _ id_unf _
                     `App` mkTicks (c1Ticks ++ c2Ticks) c1'
                     `App` n
 
-match_append_lit _ _ _ _ = Nothing
+match_append_lit _ _ _ _ _ = Nothing
 
 ---------------------------------------------------
 -- The rule is this:
 --      eqString (unpackCString# (Lit s1)) (unpackCString# (Lit s2)) = s1==s2
+-- Also  matches unpackCStringUtf8#
 
 match_eq_string :: RuleFun
 match_eq_string _ id_unf _
         [Var unpk1 `App` lit1, Var unpk2 `App` lit2]
-  | unpk1 `hasKey` unpackCStringIdKey
-  , unpk2 `hasKey` unpackCStringIdKey
+  | unpk_key1 <- getUnique unpk1
+  , unpk_key2 <- getUnique unpk2
+  , unpk_key1 == unpk_key2
+  , unpk_key1 `elem` [unpackCStringUtf8IdKey, unpackCStringIdKey]
   , Just (LitString s1) <- exprIsLiteral_maybe id_unf lit1
   , Just (LitString s2) <- exprIsLiteral_maybe id_unf lit2
   = Just (if s1 == s2 then trueValBool else falseValBool)
 
 match_eq_string _ _ _ _ = Nothing
 
+{- Note [Compiling `elem` applied to known strings]
+   ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+
+We start of with this userwritten code in haskell
+
+    elem x "<knownString>"
+
+which we would like to transform into:
+
+    case x of
+        'k' -> True
+        'k' -> True
+        '_' -> True
+
+For lists this would happen automatically via rules
+associated with elem. However these do not fire for
+string literals as we do not translate string literals
+into actual lists for performance reasons. (At least
+past a certain string size)
+
+For string literals what happens in abensence of any
+built in rules what would happen is:
+
+1) Start with:
+      elem x "<knownString>"
+2) Desugar:
+      elem x (unpackCString# "<knownString>"#)
+3) Apply "unpack" RULE in GHC.Base: [Phase 2 and earlier]
+      elem x (build (unpackFoldrCString# "<knownString>"#))
+3) Apply "build/elem" rule [Phase 2 and later]
+   + inline foldCString# [Phase 0]:
+
+      joinrec {
+        unpack_a1ui (nh_ayh :: Int#)
+          = case indexCharOffAddr# addr_ayd nh_ayh of ch_a1uv {
+              __DEFAULT ->
+                case x_ayj of { C# x1_a1Jr ->
+                case eqChar# x1_a1Jr ch_a1uv of {
+                  __DEFAULT -> jump unpack_a1ui (+# nh_ayh 1#);
+                  1# -> GHC.Types.True
+                }
+                };
+              '\NUL'# -> GHC.Types.False
+            }; } in
+      jump unpack_a1ui 0#
+      }
+
+Which is not *bad* we do not allocate, but we perform linear search
+on the string.
+
+So instead we use match_elem to look for applications of elem to known
+strings during all phases and transform them into case expressions
+explicitly. Depending on the content of the string we then end up
+with either a decision trees or lookup tables.
+
+Userwritten patterns of `elem x "<knownString>"` will all
+be caught during the initial phase since we match on both the
+desugared form and the form after applying the "unpack" rule.
+So it does not matter which rule ends up firing first.
+
+Should we get this pattern in a later pass it's a toin coss
+if we get a case statement or linear search. But linear search
+isn't bad enough to loose sleep over this scenario.
+
+The only exception is that we disable this rule for overly large
+strings (>= 500 bytes). This avoid code size blow up if we check
+for many sparse values.
+
+-}
+
+---------------------------------------------------
+-- The rule is this:
+--      elem x <knownString>
+--      = case x of C# x'
+--         case x' of -
+--          'a'# -> True
+--          'b'# -> True
+--          'c'# -> True
+--           _    -> False
+--
+-- Where knownString is one of:
+-- * (build ((unpackFoldrCString# "abc"#)
+-- * (unpackCString*# "abc"#)
+-- Limits matches to strings <=500 bytes.
+-- Also matches utf8 versions.
+
+-- See Note Note [Compiling `elem` applied to known strings]
+match_elem :: RuleFun
+match_elem _ id_unf _ [Type ty, _dict, x, xs]
+  -- elem on string
+  | ty `eqType` charTy
+  , ( xsTicks, xsApp) <- stripTicksTop tickishFloatable xs
+  -- Can we get the string
+  , Just (lam_ticks, litExpr) <- getLitStringExpr xsApp
+  , Just (LitString s1, litTicks) <- exprIsStrippableLiteral_maybe id_unf tickishFloatable litExpr
+  -- For really large strings we fall back to the default implementation.
+  , BS.length s1 <= 500
+  = let elem_string = nubSort $ utf8DecodeByteString s1 :: String
+        x_id = mkWildValBinder charTy :: Id
+        x_prim_id = mkWildValBinder charPrimTy :: Id
+        switch = Case (Var x_prim_id) x_prim_id boolTy
+                    ((DEFAULT, [], falseExpr):foldr mkCharAlt [] elem_string)
+        mkCharAlt :: Char -> [CoreAlt] -> [CoreAlt]
+        mkCharAlt c alts = (LitAlt (mkLitChar c), [], trueExpr):alts
+    in  Just $ mkTicks (xsTicks ++ lam_ticks ++ litTicks)
+             $ Case x x_id boolTy [(DataAlt charDataCon, [x_prim_id], switch)]
+  where
+    getLitStringExpr :: CoreExpr -> Maybe ([Tickish Id], CoreExpr)
+    getLitStringExpr app
+      -- (build ((unpackFoldrCString*# "abc"#)))
+      | (Var build `App` _char_ty `App` unf_str_app) <- app
+      , build `hasKey` buildIdKey
+      , Just (_arg, (Var unfold_str `App` _ty2 `App` lit1), lam_ticks)
+          <- exprIsLambda_maybe id_unf unf_str_app
+      , getUnique unfold_str `elem` [unpackCStringFoldrIdKey, unpackCStringFoldrUtf8IdKey]
+      = Just (lam_ticks, lit1)
+      -- (unpackCString*# "abc"#)
+      | (Var unpackVar `App` lit1) <- app
+      , getUnique unpackVar `elem` [unpackCStringIdKey, unpackCStringUtf8IdKey]
+      = Just ([], lit1)
+      | otherwise = Nothing
+
+match_elem _ _ _ _ = Nothing
 
 ---------------------------------------------------
 -- The rule is this:
