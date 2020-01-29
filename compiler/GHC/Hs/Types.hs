@@ -1227,24 +1227,9 @@ splitLHsPatSynTy ty = (univs, reqs, exis, provs, ty4)
     (exis,  ty3) = splitLHsForAllTyInvis ty2
     (provs, ty4) = splitLHsQualTy ty3
 
-  -- GJ : TODO Remove
--- -- | Decompose a sigma type (of the form @forall <tvs>. context => body@)
--- -- into its constituent parts. Note that only /invisible/ @forall@s
--- -- (i.e., @forall a.@, with a dot) are split apart; /visible/ @forall@s
--- -- (i.e., @forall a ->@, with an arrow) are left untouched.
--- --
--- -- Note that this function looks through parentheses, so it will work on types
--- -- such as @(forall a. <...>)@. The downside to this is that it is not
--- -- generally possible to take the returned types and reconstruct the original
--- -- type (parentheses and all) from them.
--- splitLHsSigmaTy :: LHsType pass
---                 -> ([LHsTyVarBndr Specificity pass], LHsContext pass, LHsType pass)
--- splitLHsSigmaTy ty
---   | (tvs, ty1)  <- splitLHsForAllTy ty
---   , (ctxt, ty2) <- splitLHsQualTy ty1
---   = (tvs, ctxt, ty2)
-
--- | Like 'splitLHsSigmaTy', but only splits type variable binders that were
+-- | Decompose a sigma type (of the form @forall <tvs>. context => body@)
+-- into its constituent parts.
+-- Only splits type variable binders that were
 -- quantified invisibly (e.g., @forall a.@, with a dot).
 --
 -- This function is used to split apart certain types, such as instance
@@ -1263,22 +1248,8 @@ splitLHsSigmaTyInvis ty
   , (ctxt, ty2) <- splitLHsQualTy ty1
   = (tvs, ctxt, ty2)
 
-  -- GJ : TODO Remove (keep the comments though)
--- -- | Decompose a type of the form @forall <tvs>. body@ into its constituent
--- -- parts. Note that only /invisible/ @forall@s
--- -- (i.e., @forall a.@, with a dot) are split apart; /visible/ @forall@s
--- -- (i.e., @forall a ->@, with an arrow) are left untouched.
--- --
--- -- Note that this function looks through parentheses, so it will work on types
--- -- such as @(forall a. <...>)@. The downside to this is that it is not
--- -- generally possible to take the returned types and reconstruct the original
--- -- type (parentheses and all) from them.
--- splitLHsForAllTy :: LHsType pass -> ([LHsTyVarBndr Specificity pass], LHsType pass)
--- splitLHsForAllTy (L _ (HsParTy _ ty)) = splitLHsForAllTy ty
--- splitLHsForAllTy (L _ (HsForAllTy { hst_bndrs = tvs, hst_body = body })) = (tvs, body)
--- splitLHsForAllTy body              = ([], body)
-
--- | Like 'splitLHsForAllTy', but only splits type variable binders that
+-- | Decompose a type of the form @forall <tvs>. body@ into its constituent
+-- parts. Only splits type variable binders that
 -- were quantified invisibly (e.g., @forall a.@, with a dot).
 --
 -- This function is used to split apart certain types, such as instance
