@@ -154,20 +154,20 @@ overLitType (XOverLit nec) = noExtCon nec
 -- | Convert a literal from one index type to another, updating the annotations
 -- according to the relevant 'Convertable' instance
 convertLit :: (ConvertIdX a b) => HsLit a -> HsLit b
-convertLit (HsChar a x)       = (HsChar (convert a) x)
-convertLit (HsCharPrim a x)   = (HsCharPrim (convert a) x)
-convertLit (HsString a x)     = (HsString (convert a) x)
-convertLit (HsStringPrim a x) = (HsStringPrim (convert a) x)
-convertLit (HsInt a x)        = (HsInt (convert a) x)
-convertLit (HsIntPrim a x)    = (HsIntPrim (convert a) x)
-convertLit (HsWordPrim a x)   = (HsWordPrim (convert a) x)
-convertLit (HsInt64Prim a x)  = (HsInt64Prim (convert a) x)
-convertLit (HsWord64Prim a x) = (HsWord64Prim (convert a) x)
-convertLit (HsInteger a x b)  = (HsInteger (convert a) x b)
-convertLit (HsRat a x b)      = (HsRat (convert a) x b)
-convertLit (HsFloatPrim a x)  = (HsFloatPrim (convert a) x)
-convertLit (HsDoublePrim a x) = (HsDoublePrim (convert a) x)
-convertLit (XLit a)           = (XLit (convert a))
+convertLit (HsChar a x)       = HsChar (convert a) x
+convertLit (HsCharPrim a x)   = HsCharPrim (convert a) x
+convertLit (HsString a x)     = HsString (convert a) x
+convertLit (HsStringPrim a x) = HsStringPrim (convert a) x
+convertLit (HsInt a x)        = HsInt (convert a) x
+convertLit (HsIntPrim a x)    = HsIntPrim (convert a) x
+convertLit (HsWordPrim a x)   = HsWordPrim (convert a) x
+convertLit (HsInt64Prim a x)  = HsInt64Prim (convert a) x
+convertLit (HsWord64Prim a x) = HsWord64Prim (convert a) x
+convertLit (HsInteger a x b)  = HsInteger (convert a) x b
+convertLit (HsRat a x b)      = HsRat (convert a) x b
+convertLit (HsFloatPrim a x)  = HsFloatPrim (convert a) x
+convertLit (HsDoublePrim a x) = HsDoublePrim (convert a) x
+convertLit (XLit a)           = XLit (convert a)
 
 {-
 Note [ol_rebindable]
