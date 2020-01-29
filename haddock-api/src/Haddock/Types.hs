@@ -741,6 +741,7 @@ type instance XDataDecl     DocNameI = NoExtField
 type instance XSynDecl      DocNameI = NoExtField
 type instance XFamDecl      DocNameI = NoExtField
 type instance XXFamilyDecl  DocNameI = NoExtCon
+type instance XXTyClDecl    DocNameI = NoExtCon
 
 type instance XHsIB             DocNameI _ = NoExtField
 type instance XHsWC             DocNameI _ = NoExtField
