@@ -704,7 +704,7 @@ INFO_TABLE( stg_COMPACT_NFDATA_DIRTY, 0, 8, COMPACT_NFDATA, "COMPACT_NFDATA", "C
 { foreign "C" barf("COMPACT_NFDATA_DIRTY object (%p) entered!", R1) never returns; }
 
 /* ----------------------------------------------------------------------------
-   CHARLIKE and INTLIKE closures.
+   Note [CHARLIKE and INTLIKE closures.]
 
    These are static representations of Chars and small Ints, so that
    we can remove dynamic Chars and Ints during garbage collection and

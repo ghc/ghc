@@ -75,6 +75,7 @@ cgTopRhsCon dflags id con args
 
   -- External: Refer to existing closure if possible,
   --           code needed for importers of this binding.
+  --           This optimizes for cache usage.
   -- See Note [Precomputed static closures].
   -- See Note [About the NameSorts] for what internal means.
   | Just info <- static_info
@@ -213,6 +214,7 @@ buildDynCon' dflags binder actually_bound ccs con args
 For Char/Int closures there are some value closures
 built into the RTS. This is the case for all values in
 the range mINT_INTLIKE .. mAX_INTLIKE (or CHARLIKE).
+See Note [CHARLIKE and INTLIKE closures.] in the RTS code.
 
 Similarly zero-arity constructors have a closure
 in their defining Module we can use.
