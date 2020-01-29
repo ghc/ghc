@@ -7,6 +7,7 @@
 -----------------------------------------------------------------------------
 
 {-# LANGUAGE CPP #-}
+{-# LANGUAGE BangPatterns #-}
 
 module GHC.Cmm.CLabel (
         CLabel, -- abstract type
@@ -106,7 +107,8 @@ module GHC.Cmm.CLabel (
 
         pprCLabel,
         isInfoTableLabel,
-        isConInfoTableLabel
+        isConInfoTableLabel,
+        isIdLabel
     ) where
 
 #include "HsVersions.h"
@@ -261,6 +263,10 @@ data CLabel
         {-# UNPACK #-} !Unique
 
   deriving Eq
+
+isIdLabel :: CLabel -> Bool
+isIdLabel IdLabel{} = True
+isIdLabel _ = False
 
 -- This is laborious, but necessary. We can't derive Ord because
 -- Unique doesn't have an Ord instance. Note nonDetCmpUnique in the
@@ -463,7 +469,7 @@ mkRednCountsLabel       name    =
 mkLocalClosureLabel      :: Name -> CafInfo -> CLabel
 mkLocalInfoTableLabel    :: Name -> CafInfo -> CLabel
 mkLocalClosureTableLabel :: Name -> CafInfo -> CLabel
-mkLocalClosureLabel     name c  = IdLabel name  c Closure
+mkLocalClosureLabel   !name !c  = IdLabel name  c Closure
 mkLocalInfoTableLabel   name c  = IdLabel name  c LocalInfoTable
 mkLocalClosureTableLabel name c = IdLabel name  c ClosureTable
 

@@ -54,13 +54,13 @@ import qualified Data.ByteString as BS
 
 
 pprCmms :: (Outputable info, Outputable g)
-        => [GenCmmGroup CmmStatics info g] -> SDoc
+        => [GenCmmGroup RawCmmStatics info g] -> SDoc
 pprCmms cmms = pprCode CStyle (vcat (intersperse separator $ map ppr cmms))
         where
           separator = space $$ text "-------------------" $$ space
 
 writeCmms :: (Outputable info, Outputable g)
-          => DynFlags -> Handle -> [GenCmmGroup CmmStatics info g] -> IO ()
+          => DynFlags -> Handle -> [GenCmmGroup RawCmmStatics info g] -> IO ()
 writeCmms dflags handle cmms = printForC dflags handle (pprCmms cmms)
 
 -----------------------------------------------------------------------------
@@ -71,6 +71,9 @@ instance (Outputable d, Outputable info, Outputable i)
 
 instance Outputable CmmStatics where
     ppr = pprStatics
+
+instance Outputable RawCmmStatics where
+    ppr = pprRawStatics
 
 instance Outputable CmmStatic where
     ppr = pprStatic
@@ -136,8 +139,14 @@ instance Outputable ForeignHint where
 --      Strings are printed as C strings, and we print them as I8[],
 --      following C--
 --
+
 pprStatics :: CmmStatics -> SDoc
-pprStatics (Statics lbl ds) = vcat ((ppr lbl <> colon) : map ppr ds)
+pprStatics (CmmStatics lbl itbl ccs payload) =
+  ppr lbl <> colon <+> ppr itbl <+> ppr ccs <+> ppr payload
+pprStatics (CmmStaticsRaw lbl ds) = pprRawStatics (RawCmmStatics lbl ds)
+
+pprRawStatics :: RawCmmStatics -> SDoc
+pprRawStatics (RawCmmStatics lbl ds) = vcat ((ppr lbl <> colon) : map ppr ds)
 
 pprStatic :: CmmStatic -> SDoc
 pprStatic s = case s of

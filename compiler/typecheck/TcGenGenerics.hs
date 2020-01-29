@@ -10,6 +10,8 @@ The deriving code for the Generic class
 {-# LANGUAGE FlexibleContexts #-}
 {-# LANGUAGE TypeFamilies #-}
 
+{-# OPTIONS_GHC -Wno-incomplete-uni-patterns #-}
+
 module TcGenGenerics (canDoGenerics, canDoGenerics1,
                       GenericKind(..),
                       gen_Generic_binds, get_gen1_constrained_tys) where
