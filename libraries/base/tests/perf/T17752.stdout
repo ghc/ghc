@@ -1,0 +1,25 @@
+[1 of 1] Compiling T17752           ( T17752.hs, T17752.o )
+GHC.CString.unpackFoldrCString#
+ case GHC.CString.unpackFoldrCString#
+case GHC.Prim.eqChar# x1 y1 of {
+ case GHC.Prim.eqChar# x1 y1 of {
+case x1 of {
+ __DEFAULT -> GHC.Types.False;
+ 'a'# -> GHC.Types.True;
+ 'b'# -> GHC.Types.True;
+ 'c'# -> GHC.Types.True
+ -- case x1 of {
+ __DEFAULT -> GHC.Types.False;
+ 'a'# -> GHC.Types.True;
+ 'b'# -> GHC.Types.True;
+ 'c'# -> GHC.Types.True
+ -- case x1 of {
+ __DEFAULT -> GHC.Types.False;
+ 'x'# -> GHC.Types.True;
+ 'y'# -> GHC.Types.True;
+ 'z'# -> GHC.Types.True
+ -- case x1 of {
+ __DEFAULT -> GHC.Types.False;
+ 'x'# -> GHC.Types.True;
+ 'y'# -> GHC.Types.True;
+ 'z'# -> GHC.Types.True
