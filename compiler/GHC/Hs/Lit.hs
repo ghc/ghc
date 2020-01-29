@@ -153,20 +153,20 @@ overLitType (XOverLit nec) = noExtCon nec
 
 -- | Convert a literal from one index type to another
 convertLit :: HsLit (GhcPass p1) -> HsLit (GhcPass p2)
-convertLit (HsChar a x)       = (HsChar a x)
-convertLit (HsCharPrim a x)   = (HsCharPrim a x)
-convertLit (HsString a x)     = (HsString a x)
-convertLit (HsStringPrim a x) = (HsStringPrim a x)
-convertLit (HsInt a x)        = (HsInt a x)
-convertLit (HsIntPrim a x)    = (HsIntPrim a x)
-convertLit (HsWordPrim a x)   = (HsWordPrim a x)
-convertLit (HsInt64Prim a x)  = (HsInt64Prim a x)
-convertLit (HsWord64Prim a x) = (HsWord64Prim a x)
-convertLit (HsInteger a x b)  = (HsInteger a x b)
-convertLit (HsRat a x b)      = (HsRat a x b)
-convertLit (HsFloatPrim a x)  = (HsFloatPrim a x)
-convertLit (HsDoublePrim a x) = (HsDoublePrim a x)
-convertLit (XLit a)           = (XLit a)
+convertLit (HsChar a x)       = HsChar a x
+convertLit (HsCharPrim a x)   = HsCharPrim a x
+convertLit (HsString a x)     = HsString a x
+convertLit (HsStringPrim a x) = HsStringPrim a x
+convertLit (HsInt a x)        = HsInt a x
+convertLit (HsIntPrim a x)    = HsIntPrim a x
+convertLit (HsWordPrim a x)   = HsWordPrim a x
+convertLit (HsInt64Prim a x)  = HsInt64Prim a x
+convertLit (HsWord64Prim a x) = HsWord64Prim a x
+convertLit (HsInteger a x b)  = HsInteger a x b
+convertLit (HsRat a x b)      = HsRat a x b
+convertLit (HsFloatPrim a x)  = HsFloatPrim a x
+convertLit (HsDoublePrim a x) = HsDoublePrim a x
+convertLit (XLit a)           = XLit a
 
 {-
 Note [ol_rebindable]
