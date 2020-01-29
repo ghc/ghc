@@ -13,6 +13,7 @@ module GHC.Core.SimpleOpt (
 
         -- ** Predicates on expressions
         exprIsConApp_maybe, exprIsLiteral_maybe, exprIsLambda_maybe,
+        exprIsStrippableLiteral_maybe,
 
         -- ** Coercions and casts
         pushCoArg, pushCoValArg, pushCoTyArg, collectBindersPushingCo
@@ -1154,6 +1155,20 @@ exprIsLiteral_maybe env@(_, id_unf) e
       Tick _ e' -> exprIsLiteral_maybe env e' -- dubious?
       Var v     | Just rhs <- expandUnfolding_maybe (id_unf v)
                 -> exprIsLiteral_maybe env rhs
+      _         -> Nothing
+
+exprIsStrippableLiteral_maybe :: InScopeEnv -> (Tickish Id -> Bool) -> CoreExpr -> Maybe (Literal, [Tickish Id])
+-- Similar to exprIsLiteral_maybe but fails instead of dropping ticks
+-- This means Tick t (Lit l) *can return Nothing*. So use with care
+exprIsStrippableLiteral_maybe (_, id_unf) strip expr
+  = go [] expr
+  where
+    go ts e = case e of
+      Lit l     -> Just (l,ts)
+      Tick t e'
+        | strip t -> go (t:ts) e'
+      Var v     | Just rhs <- expandUnfolding_maybe (id_unf v)
+                -> go ts rhs
       _         -> Nothing
 
 {-

@@ -13,6 +13,7 @@ module GHC.Core.Make (
         sortQuantVars, castBottomExpr,
 
         -- * Constructing boxed literals
+        trueExpr, falseExpr,
         mkWordExpr, mkWordExprWord,
         mkIntExpr, mkIntExprInt,
         mkIntegerExpr, mkNaturalExpr,
@@ -247,6 +248,10 @@ castBottomExpr e res_ty
 *                                                                      *
 ************************************************************************
 -}
+
+trueExpr, falseExpr :: CoreExpr
+trueExpr  = Var trueDataConId
+falseExpr = Var falseDataConId
 
 -- | Create a 'CoreExpr' which will evaluate to the given @Int@
 mkIntExpr :: Platform -> Integer -> CoreExpr        -- Result = I# i :: Int

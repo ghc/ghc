@@ -1,3 +1,13 @@
+## 0.6.2 (edit as necessary)
+
+- Shipped with GHC 8.12.1
+
+- In order to support unicode better the following functions in `GHC.CString`
+  gained UTF8 counterparts:
+
+        unpackAppendCStringUtf8# :: Addr# -> [Char] -> [Char]
+        unpackFoldrCStringUtf8# :: Addr# -> (Char -> a -> a) -> a -> a
+
 ## 0.6.1 (edit as necessary)
 
 - Shipped with GHC 8.10.1

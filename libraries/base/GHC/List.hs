@@ -1149,9 +1149,10 @@ elem _ []       = False
 elem x (y:ys)   = x==y || elem x ys
 {-# NOINLINE [1] elem #-}
 {-# RULES
-"elem/build"    forall x (g :: forall b . Eq a => (a -> b -> b) -> b -> b)
+"elem/build" [2] forall x (g :: forall b . (a -> b -> b) -> b -> b)
    . elem x (build g) = g (\ y r -> (x == y) || r) False
  #-}
+
 #endif
 
 -- | 'notElem' is the negation of 'elem'.
@@ -1174,7 +1175,7 @@ notElem _ []    =  True
 notElem x (y:ys)=  x /= y && notElem x ys
 {-# NOINLINE [1] notElem #-}
 {-# RULES
-"notElem/build" forall x (g :: forall b . Eq a => (a -> b -> b) -> b -> b)
+"notElem/build" [2] forall x (g :: forall b . (a -> b -> b) -> b -> b)
    . notElem x (build g) = g (\ y r -> (x /= y) && r) True
  #-}
 #endif
