@@ -13,13 +13,13 @@
 #define ASSERT(predicate) /*nothing*/
 
 #else
-void _ghcAssert PROTO((char *, unsigned int));
+void _stgAssert PROTO((char *, unsigned int));
 
 #define ASSERT(predicate)			\
 	if (predicate)				\
 	    /*null*/;				\
 	else					\
-	    _ghcAssert(__FILE__, __LINE__)
+	    _stgAssert(__FILE__, __LINE__)
 #endif
 
 /* partain: some ubiquitous types: floatish & intish.
