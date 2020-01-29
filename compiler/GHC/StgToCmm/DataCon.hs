@@ -52,8 +52,6 @@ import MonadUtils (mapMaybeM)
 import Control.Monad
 import Data.Char
 
-
-
 ---------------------------------------------------------------
 --      Top-level constructors
 ---------------------------------------------------------------
@@ -171,8 +169,8 @@ the addr modes of the args is that we may be in a "knot", and
 premature looking at the args will cause the compiler to black-hole!
 -}
 
-buildDynCon' dflags binder _ _cc con [arg]
-  | Just cgInfo <- getStaticConInfo dflags binder con [arg]
+buildDynCon' dflags binder _ _cc con args
+  | Just cgInfo <- getStaticConInfo dflags binder con args
   = return (cgInfo, return mkNop)
 
 -------- buildDynCon': the general case -----------
@@ -244,6 +242,7 @@ We don't support this optimization when compiling into Windows DLLs yet
 because they don't support cross package data references well.
 -}
 
+{-# INLINE getStaticConInfo #-}
 getStaticConInfo :: DynFlags -> Id -> DataCon -> [NonVoid StgArg] -> Maybe CgIdInfo
 getStaticConInfo dflags binder con []
   -- Nullary constructors
