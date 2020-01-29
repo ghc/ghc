@@ -16,6 +16,8 @@ GHC.Hs.Types: Abstract syntax: user-defined types
 {-# LANGUAGE ConstraintKinds #-}
 {-# LANGUAGE CPP #-}
 {-# LANGUAGE TypeFamilies #-}
+{-# LANGUAGE ScopedTypeVariables #-}
+{-# LANGUAGE TypeApplications #-}
 
 module GHC.Hs.Types (
         HsType(..), NewHsTypeX(..), LHsType, HsKind, LHsKind,
@@ -1439,8 +1441,8 @@ instance OutputableBndrId p
 
 instance OutputableBndrId p
        => Outputable (HsTyVarBndr (GhcPass p)) where
-    ppr (UserTyVar _ n)     = ppr n
-    ppr (KindedTyVar _ n k) = parens $ hsep [ppr n, dcolon, ppr k]
+    ppr (UserTyVar _ n)     = pprLIdP n
+    ppr (KindedTyVar _ n k) = parens $ hsep [pprLIdP n, dcolon, ppr k]
     ppr (XTyVarBndr nec)    = noExtCon nec
 
 instance Outputable thing
@@ -1554,7 +1556,7 @@ pprHsType ty = ppr_mono_ty ty
 ppr_mono_lty :: (OutputableBndrId p) => LHsType (GhcPass p) -> SDoc
 ppr_mono_lty ty = ppr_mono_ty (unLoc ty)
 
-ppr_mono_ty :: (OutputableBndrId p) => HsType (GhcPass p) -> SDoc
+ppr_mono_ty :: forall p. (OutputableBndrId p) => HsType (GhcPass p) -> SDoc
 ppr_mono_ty (HsForAllTy { hst_fvf = fvf, hst_bndrs = tvs, hst_body = ty })
   = sep [pprHsForAll fvf tvs noLHsContext, ppr_mono_lty ty]
 
@@ -1564,8 +1566,8 @@ ppr_mono_ty (HsQualTy { hst_ctxt = ctxt, hst_body = ty })
 ppr_mono_ty (HsBangTy _ b ty)   = ppr b <> ppr_mono_lty ty
 ppr_mono_ty (HsRecTy _ flds)      = pprConDeclFields flds
 ppr_mono_ty (HsTyVar _ prom (L _ name))
-  | isPromoted prom = quote (pprPrefixOcc name)
-  | otherwise       = pprPrefixOcc name
+  | isPromoted prom = withOutputableBndr @p $ quote (pprPrefixOcc name)
+  | otherwise       = withOutputableBndr @p $ pprPrefixOcc name
 ppr_mono_ty (HsFunTy _ ty1 ty2)   = ppr_fun_ty ty1 ty2
 ppr_mono_ty (HsTupleTy _ con tys)
     -- Special-case unary boxed tuples so that they are pretty-printed as
@@ -1605,7 +1607,8 @@ ppr_mono_ty (HsAppTy _ fun_ty arg_ty)
 ppr_mono_ty (HsAppKindTy _ ty k)
   = ppr_mono_lty ty <+> char '@' <> ppr_mono_lty k
 ppr_mono_ty (HsOpTy _ ty1 (L _ op) ty2)
-  = sep [ ppr_mono_lty ty1
+  = withOutputableBndr @p $
+    sep [ ppr_mono_lty ty1
         , sep [pprInfixOcc op, ppr_mono_lty ty2 ] ]
 
 ppr_mono_ty (HsParTy _ ty)

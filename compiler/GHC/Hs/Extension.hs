@@ -28,10 +28,10 @@ module GHC.Hs.Extension where
 import GhcPrelude
 
 import Data.Data hiding ( Fixity )
-import GHC.Hs.PlaceHolder
 import Name
 import RdrName
 import Var
+import PprCore ()    -- for instance OutputableBndr Var
 import Outputable
 import SrcLoc (Located)
 
@@ -222,9 +222,14 @@ pass = ghcPass @(GhcPass p)
 
 -- | Maps the "normal" id type for a given pass
 type family IdP p
-type instance IdP GhcPs = RdrName
-type instance IdP GhcRn = Name
-type instance IdP GhcTc = Id
+type instance IdP (GhcPass p) = IdGhcP p
+
+-- | Maps the "normal" id type for a GhcPass.
+type family IdGhcP p = r | r -> p where
+ -- injective to allow us to write pprIdP
+  IdGhcP 'Parsed      = RdrName
+  IdGhcP 'Renamed     = Name
+  IdGhcP 'Typechecked = Id
 
 type LIdP p = Located (IdP p)
 
@@ -720,11 +725,12 @@ type family XXIE               x
 -- |Constraint type to bundle up the requirement for 'OutputableBndr' on both
 -- the @id@ and the 'NameOrRdrName' type for it
 type OutputableBndrId pass =
-  ( OutputableBndr (NameOrRdrName (IdP (GhcPass pass)))
+  -- RAE: this change is just to minimise churn while experimenting
+  ( {- OutputableBndr (NameOrRdrName (IdP (GhcPass pass)))
   , OutputableBndr (IdP (GhcPass pass))
   , OutputableBndr (NameOrRdrName (IdP (NoGhcTc (GhcPass pass))))
   , OutputableBndr (IdP (NoGhcTc (GhcPass pass)))
-  , IsPass pass
+  , -} IsPass pass
   )
 
 -- useful helper functions:
@@ -739,3 +745,15 @@ pprIfRn pp = case pass @p of GhcRn -> pp
 pprIfTc :: forall p. IsPass p => (p ~ 'Typechecked => SDoc) -> SDoc
 pprIfTc pp = case pass @p of GhcTc -> pp
                              _     -> empty
+
+pprIdP :: forall p. IsPass p => IdGhcP p -> SDoc
+pprIdP var = withOutputableBndr @p $ ppr var
+
+pprLIdP :: forall p. IsPass p => Located (IdGhcP p) -> SDoc
+pprLIdP var = withOutputableBndr @p $ ppr var
+
+withOutputableBndr :: forall pass r. IsPass pass
+                   => (OutputableBndr (IdP (GhcPass pass)) => r) -> r
+withOutputableBndr k = case pass @pass of GhcPs -> k
+                                          GhcRn -> k
+                                          GhcTc -> k

@@ -13,6 +13,8 @@ GHC.Hs.ImpExp: Abstract syntax: imports, exports, interfaces
 {-# LANGUAGE TypeFamilies #-}
 {-# LANGUAGE UndecidableInstances #-} -- Note [Pass sensitive types]
                                       -- in module GHC.Hs.PlaceHolder
+{-# LANGUAGE TypeApplications #-}
+{-# LANGUAGE ScopedTypeVariables #-}
 
 module GHC.Hs.ImpExp where
 
@@ -324,14 +326,17 @@ replaceLWrappedName :: LIEWrappedName name1 -> name2 -> LIEWrappedName name2
 replaceLWrappedName (L l n) n' = L l (replaceWrappedName n n')
 
 instance OutputableBndrId p => Outputable (IE (GhcPass p)) where
-    ppr (IEVar       _     var) = ppr (unLoc var)
-    ppr (IEThingAbs  _   thing) = ppr (unLoc thing)
-    ppr (IEThingAll  _   thing) = hcat [ppr (unLoc thing), text "(..)"]
+    ppr (IEVar       _     var) = withOutputableBndr @p $ ppr (unLoc var)
+    ppr (IEThingAbs  _   thing) = withOutputableBndr @p $ ppr (unLoc thing)
+    ppr (IEThingAll  _   thing) = withOutputableBndr @p $ hcat [ppr (unLoc thing), text "(..)"]
     ppr (IEThingWith _ thing wc withs flds)
-        = ppr (unLoc thing) <> parens (fsep (punctuate comma
+        = withOutputableBndr @p $
+          ppr (unLoc thing) <> parens (fsep (punctuate comma
                                               (ppWiths ++
                                               map (ppr . flLabel . unLoc) flds)))
       where
+        ppWiths :: OutputableBndr (IdP (GhcPass p)) => [SDoc]
+          -- this type signature is necessary because of -XMonoLocalBinds
         ppWiths =
           case wc of
               NoIEWildcard ->
