@@ -7,7 +7,7 @@ $( do { cls_nm <- newName "C"
       ; a_nm   <- newName "a"
       ; k_nm   <- newName "k"
       ; f_nm   <- newName "F"
-      ; return [ClassD [] cls_nm [KindedTV a_nm (VarT k_nm)] []
+      ; return [ClassD [] cls_nm [KindedTV a_nm () (VarT k_nm)] []
                  [OpenTypeFamilyD
                    (TypeFamilyHead f_nm [] (KindSig (VarT k_nm)) Nothing)]]})
 
