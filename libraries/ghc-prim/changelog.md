@@ -1,4 +1,23 @@
-## 0.6.1
+## 0.6.2 (edit as necessary)
+
+- Shipped with GHC 8.12.1
+
+- Add known-key `cstringLength#` to `GHC.CString`. This is just the
+  C function `strlen`, but a built-in rewrite rule allows GHC to
+  compute the result at compile time when the argument is known.
+
+- In order to support unicode better the following functions in `GHC.CString`
+  gained UTF8 counterparts:
+
+        unpackAppendCStringUtf8# :: Addr# -> [Char] -> [Char]
+        unpackFoldrCStringUtf8# :: Addr# -> (Char -> a -> a) -> a -> a
+
+- unpackFoldrCString* variants can now inline in phase [0].
+
+  If the folding function is known this allows for unboxing of the
+  Char argument resulting in much faster code.
+
+## 0.6.1 (edit as necessary)
 
 - Shipped with GHC 8.10.1
 
