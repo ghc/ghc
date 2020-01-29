@@ -12,10 +12,9 @@ Main functions for .hie file generation
 {-# LANGUAGE AllowAmbiguousTypes #-}
 {-# LANGUAGE ViewPatterns #-}
 {-# LANGUAGE DeriveDataTypeable #-}
-
 {-# OPTIONS_GHC -Wno-incomplete-uni-patterns #-}
 
-module GHC.Iface.Ext.Ast ( mkHieFile ) where
+module GHC.Iface.Ext.Ast ( mkHieFile, mkHieFileWithSource, getCompressedAsts) where
 
 import GhcPrelude
 
@@ -42,6 +41,7 @@ import Var                        ( Id, Var, setVarName, varName, varType )
 import TcRnTypes
 import GHC.Iface.Utils            ( mkIfaceExports )
 import Panic
+import Maybes
 
 import GHC.Iface.Ext.Types
 import GHC.Iface.Ext.Utils
@@ -52,7 +52,6 @@ import qualified Data.Map as M
 import qualified Data.Set as S
 import Data.Data                  ( Data, Typeable )
 import Data.List                  ( foldl1' )
-import Data.Maybe                 ( listToMaybe )
 import Control.Monad.Trans.Reader
 import Control.Monad.Trans.Class  ( lift )
 
@@ -226,10 +225,20 @@ mkHieFile :: ModSummary
           -> TcGblEnv
           -> RenamedSource -> Hsc HieFile
 mkHieFile ms ts rs = do
+  let src_file = expectJust "mkHieFile" (ml_hs_file $ ms_location ms)
+  src <- liftIO $ BS.readFile src_file
+  mkHieFileWithSource src_file src ms ts rs
+
+-- | Construct an 'HieFile' from the outputs of the typechecker but don't
+-- read the source file again from disk.
+mkHieFileWithSource :: FilePath
+                    -> BS.ByteString
+                    -> ModSummary
+                    -> TcGblEnv
+                    -> RenamedSource -> Hsc HieFile
+mkHieFileWithSource src_file src ms ts rs = do
   let tc_binds = tcg_binds ts
   (asts', arr) <- getCompressedAsts tc_binds rs
-  let Just src_file = ml_hs_file $ ms_location ms
-  src <- liftIO $ BS.readFile src_file
   return $ HieFile
       { hie_hs_file = src_file
       , hie_module = ms_mod ms
