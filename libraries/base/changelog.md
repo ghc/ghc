@@ -9,6 +9,13 @@
   * Add `hGetContents'`, `getContents'`, and `readFile'` in `System.IO`:
     Strict IO variants of `hGetContents`, `getContents`, and `readFile`.
 
+  * Add rules `unpackUtf8`, `unpack-listUtf8` and `unpack-appendUtf8` to `GHC.Base`.
+    They correspond to their ascii versions and hopefully make it easier
+    to handle utf8 encoded strings efficiently.
+
+  * An issue with list fusion and `elem` was fixed. `elem` applied to known
+    small lists will now compile to a simple case statement as expected.
+   
 ## 4.14.0.0 *TBA*
   * Bundled with GHC 8.10.1
 
