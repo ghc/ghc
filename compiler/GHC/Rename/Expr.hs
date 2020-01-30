@@ -16,6 +16,9 @@ free variables.
 {-# LANGUAGE TypeFamilies #-}
 {-# LANGUAGE ViewPatterns #-}
 
+{-# OPTIONS_GHC -Wno-incomplete-record-updates #-}
+{-# OPTIONS_GHC -Wno-incomplete-uni-patterns   #-}
+
 module GHC.Rename.Expr (
         rnLExpr, rnExpr, rnStmts
    ) where
@@ -63,8 +66,6 @@ import qualified GHC.LanguageExtensions as LangExt
 import Data.Ord
 import Data.Array
 import qualified Data.List.NonEmpty as NE
-
-import Unique           ( mkVarOccUnique )
 
 {-
 ************************************************************************
@@ -2195,10 +2196,10 @@ getMonadFailOp
       | rebindableSyntax && overloadedStrings = do
         (failExpr, failFvs) <- lookupSyntaxName failMName
         (fromStringExpr, fromStringFvs) <- lookupSyntaxName fromStringName
-        let arg_lit = fsLit "arg"
-            arg_name = mkSystemVarName (mkVarOccUnique arg_lit) arg_lit
-            arg_syn_expr = mkRnSyntaxExpr arg_name
-        let body :: LHsExpr GhcRn =
+        let arg_lit = mkVarOcc "arg"
+        arg_name <- newSysName arg_lit
+        let arg_syn_expr = mkRnSyntaxExpr arg_name
+            body :: LHsExpr GhcRn =
               nlHsApp (noLoc $ syn_expr failExpr)
                       (nlHsApp (noLoc $ syn_expr fromStringExpr)
                                 (noLoc $ syn_expr arg_syn_expr))

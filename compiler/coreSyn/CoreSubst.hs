@@ -7,6 +7,7 @@ Utility functions on @Core@ syntax
 -}
 
 {-# LANGUAGE CPP #-}
+{-# OPTIONS_GHC -Wno-incomplete-record-updates #-}
 module CoreSubst (
         -- * Main data types
         Subst(..), -- Implementation exported for supercompiler's Renaming.hs only

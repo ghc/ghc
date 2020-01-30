@@ -1,6 +1,7 @@
 {-# LANGUAGE GADTs #-}
 {-# LANGUAGE BangPatterns #-}
 {-# OPTIONS_GHC -fno-warn-incomplete-patterns #-}
+{-# OPTIONS_GHC -Wno-incomplete-record-updates #-}
 module GHC.Cmm.ContFlowOpt
     ( cmmCfgOpts
     , cmmCfgOptsProc

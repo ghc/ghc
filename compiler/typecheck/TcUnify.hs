@@ -9,6 +9,9 @@ Type subsumption and unification
 {-# LANGUAGE CPP, DeriveFunctor, MultiWayIf, TupleSections,
     ScopedTypeVariables #-}
 
+{-# OPTIONS_GHC -Wno-incomplete-uni-patterns   #-}
+{-# OPTIONS_GHC -Wno-incomplete-record-updates #-}
+
 module TcUnify (
   -- Full-blown subsumption
   tcWrapResult, tcWrapResultO, tcSkolemise, tcSkolemiseET,
