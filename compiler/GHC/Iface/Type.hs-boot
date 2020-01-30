@@ -4,6 +4,9 @@ module GHC.Iface.Type
    )
 where
 
+-- GJ : TODO Add comment
+import GHC.Base ()
+
 data IfaceAppArgs
 
 data IfaceType
