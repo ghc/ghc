@@ -83,6 +83,9 @@ function mingw_init() {
   source /etc/msystem
   MINGW_MOUNT_POINT="${MINGW_PREFIX}"
   PATH="$MINGW_MOUNT_POINT/bin:$PATH"
+
+  # We always use mingw64 Python to avoid path length issues like #17483.
+  export PYTHON="/mingw64/bin/python3"
 }
 
 # This will contain GHC's local native toolchain
