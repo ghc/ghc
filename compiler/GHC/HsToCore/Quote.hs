@@ -6,6 +6,9 @@
 {-# LANGUAGE UndecidableInstances #-}
 {-# LANGUAGE MultiParamTypeClasses #-}
 {-# LANGUAGE FunctionalDependencies #-}
+{-# LANGUAGE ScopedTypeVariables #-}
+{-# LANGUAGE TypeApplications #-}
+{-# LANGUAGE AllowAmbiguousTypes #-}
 
 {-# OPTIONS_GHC -Wno-incomplete-uni-patterns #-}
 
@@ -1151,18 +1154,18 @@ rep_complete_sig (L _ cls) mty loc
 -------------------------------------------------------
 
 class RepTV flag flag' | flag -> flag' where
-    tyVarBndrName :: [LHsTyVarBndr flag GhcRn] -> Name -- GJ : TODO There has to be a nicer way
+    tyVarBndrName :: Name
     repPlainTV  :: Core TH.Name -> flag -> MetaM (Core (M (TH.TyVarBndr flag')))
     repKindedTV :: Core TH.Name -> flag -> Core (M TH.Kind)
                 -> MetaM (Core (M (TH.TyVarBndr flag')))
 
 instance RepTV () () where
-    tyVarBndrName _ = tyVarBndrUnitTyConName
+    tyVarBndrName = tyVarBndrUnitTyConName
     repPlainTV  (MkC nm) ()          = rep2 plainTVName  [nm]
     repKindedTV (MkC nm) () (MkC ki) = rep2 kindedTVName [nm, ki]
 
 instance RepTV Specificity TH.Specificity where
-    tyVarBndrName _ = tyVarBndrSpecTyConName
+    tyVarBndrName = tyVarBndrSpecTyConName
     repPlainTV  (MkC nm) spec          = do { (MkC spec') <- rep_flag spec
                                             ; rep2 plainInvisTVName  [nm, spec'] }
     repKindedTV (MkC nm) spec (MkC ki) = do { (MkC spec') <- rep_flag spec
@@ -1180,14 +1183,14 @@ addSimpleTyVarBinds names thing_inside
        ; term <- addBinds fresh_names thing_inside
        ; wrapGenSyms fresh_names term }
 
-addHsTyVarBinds :: RepTV flag flag'
+addHsTyVarBinds :: forall flag flag' a. RepTV flag flag'
                 => [LHsTyVarBndr flag GhcRn]  -- the binders to be added
                 -> (Core [(M (TH.TyVarBndr flag'))] -> MetaM (Core (M a)))  -- action in the ext env
                 -> MetaM (Core (M a))
 addHsTyVarBinds exp_tvs thing_inside
   = do { fresh_exp_names <- mkGenSyms (hsLTyVarNames exp_tvs)
        ; term <- addBinds fresh_exp_names $
-                 do { kbs <- repListM (tyVarBndrName exp_tvs) mk_tv_bndr
+                 do { kbs <- repListM (tyVarBndrName @flag @flag') mk_tv_bndr
                                      (exp_tvs `zip` fresh_exp_names)
                     ; thing_inside kbs }
        ; wrapGenSyms fresh_exp_names term }
