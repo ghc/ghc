@@ -67,12 +67,13 @@ onIOComplete(unsigned int reqID,
     dwRes = WaitForSingleObject(completed_table_sema, INFINITE);
     switch (dwRes) {
     case WAIT_OBJECT_0:
+    case WAIT_ABANDONED:
         break;
     default:
         /* Not likely */
         fprintf(stderr,
-                "onIOComplete: failed to grab table semaphore, "
-                "dropping request 0x%x\n", reqID);
+                "onIOComplete: failed to grab table semaphore (res=%d, err=%d), "
+                "dropping request 0x%x\n", reqID, dwRes, GetLastError());
         fflush(stderr);
         return;
     }
