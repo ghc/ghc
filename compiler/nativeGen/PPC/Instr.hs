@@ -1,5 +1,7 @@
 {-# LANGUAGE CPP #-}
 
+{-# OPTIONS_GHC -Wno-incomplete-uni-patterns #-}
+
 -----------------------------------------------------------------------------
 --
 -- Machine-dependent assembly language
@@ -188,7 +190,7 @@ data Instr
     -- some static data spat out during code
     -- generation.  Will be extracted before
     -- pretty-printing.
-    | LDATA   Section CmmStatics
+    | LDATA   Section RawCmmStatics
 
     -- start a new basic block.  Useful during
     -- codegen, removed later.  Preceding
@@ -680,7 +682,7 @@ ppc_takeRegRegMoveInstr _  = Nothing
 -- big, we have to work around this limitation.
 
 makeFarBranches
-        :: LabelMap CmmStatics
+        :: LabelMap RawCmmStatics
         -> [NatBasicBlock Instr]
         -> [NatBasicBlock Instr]
 makeFarBranches info_env blocks
