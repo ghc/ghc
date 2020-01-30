@@ -314,7 +314,9 @@ getCoreToDo dflags
                         -- reduce the possibility of shadowing
                         -- Reason: see Note [Shadowing] in SpecConstr.hs
 
-        runWhen spec_constr CoreDoSpecConstr,
+        runWhen spec_constr
+          (CoreDoPasses [ CoreDoSpecConstr
+                        , simpl_phase 0 ["post-spec-constr"] 1]),
 
         maybe_rule_check (Phase 0),
 
