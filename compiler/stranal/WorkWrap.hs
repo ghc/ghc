@@ -475,7 +475,8 @@ tryWW dflags fam_envs is_rec fn_id rhs
     cpr_ty       = getCprSig (cprInfo fn_info)
     -- Arity of the CPR sig should match idArity when it's not a join point.
     -- See Note [Arity trimming for CPR signatures] in CprAnal
-    cpr          = ASSERT( isJoinId fn_id || ct_arty cpr_ty == arityInfo fn_info )
+    cpr          = ASSERT2( isJoinId fn_id || cpr_ty == topCprType || ct_arty cpr_ty == arityInfo fn_info
+                          , ppr fn_id <> colon <+> text "ct_arty:" <+> int (ct_arty cpr_ty) <+> text "arityInfo:" <+> ppr (arityInfo fn_info))
                    ct_cpr cpr_ty
 
     new_fn_id = zapIdUsedOnceInfo (zapIdUsageEnvInfo fn_id)
