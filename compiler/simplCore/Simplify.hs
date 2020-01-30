@@ -36,7 +36,7 @@ import CoreMonad        ( Tick(..), SimplMode(..) )
 import CoreSyn
 import Demand           ( StrictSig(..), dmdTypeDepth, isStrictDmd
                         , mkClosedStrictSig, topDmd, botDiv )
-import Cpr              ( botCpr )
+import Cpr              ( mkCprSig, botCpr )
 import PprCore          ( pprCoreExpr )
 import CoreUnfold
 import CoreUtils
@@ -735,7 +735,7 @@ addLetBndrInfo new_bndr new_arity is_bot new_unf
     info4 | is_bot    = info3
                           `setStrictnessInfo`
                             mkClosedStrictSig (replicate new_arity topDmd) botDiv
-                          `setCprInfo` botCpr
+                          `setCprInfo` mkCprSig new_arity botCpr
           | otherwise = info3
 
      -- Zap call arity info. We have used it by now (via

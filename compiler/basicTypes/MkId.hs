@@ -410,7 +410,7 @@ mkDictSelId name clas
     base_info = noCafIdInfo
                 `setArityInfo`          1
                 `setStrictnessInfo`     strict_sig
-                `setCprInfo`            topCpr
+                `setCprInfo`            topCprSig
                 `setLevityInfoWithType` sel_ty
 
     info | new_tycon
@@ -507,7 +507,7 @@ mkDataConWorkId wkr_name data_con
     alg_wkr_info = noCafIdInfo
                    `setArityInfo`          wkr_arity
                    `setStrictnessInfo`     wkr_sig
-                   `setCprInfo`            dataConCPR data_con
+                   `setCprInfo`            mkCprSig wkr_arity (dataConCPR data_con)
                    `setUnfoldingInfo`      evaldUnfolding  -- Record that it's evaluated,
                                                            -- even if arity = 0
                    `setLevityInfoWithType` wkr_ty
@@ -652,7 +652,7 @@ mkDataConRep dflags fam_envs wrap_name mb_bangs data_con
                          `setInlinePragInfo`    wrap_prag
                          `setUnfoldingInfo`     wrap_unf
                          `setStrictnessInfo`    wrap_sig
-                         `setCprInfo`           dataConCPR data_con
+                         `setCprInfo`           mkCprSig wrap_arity (dataConCPR data_con)
                              -- We need to get the CAF info right here because GHC.Iface.Tidy
                              -- does not tidy the IdInfo of implicit bindings (like the wrapper)
                              -- so it not make sure that the CAF info is sane
@@ -1229,7 +1229,7 @@ mkPrimOpId prim_op
            `setRuleInfo`           mkRuleInfo (maybeToList $ primOpRules name prim_op)
            `setArityInfo`          arity
            `setStrictnessInfo`     strict_sig
-           `setCprInfo`            cpr
+           `setCprInfo`            mkCprSig arity cpr
            `setInlinePragInfo`     neverInlinePragma
            `setLevityInfoWithType` res_ty
                -- We give PrimOps a NOINLINE pragma so that we don't
@@ -1262,7 +1262,7 @@ mkFCallId dflags uniq fcall ty
     info = noCafIdInfo
            `setArityInfo`          arity
            `setStrictnessInfo`     strict_sig
-           `setCprInfo`            topCpr
+           `setCprInfo`            topCprSig
            `setLevityInfoWithType` ty
 
     (bndrs, _) = tcSplitPiTys ty

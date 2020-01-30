@@ -86,7 +86,7 @@ import UniqDSet         ( getUniqDSet )
 import VarEnv
 import Literal          ( litIsTrivial )
 import Demand           ( StrictSig, Demand, isStrictDmd, splitStrictSig, increaseStrictSigArity )
-import Cpr              ( botCpr )
+import Cpr              ( mkCprSig, botCpr )
 import Name             ( getOccName, mkSystemVarName )
 import OccName          ( occNameString )
 import Type             ( Type, mkLamTypes, splitTyConApp_maybe, tyCoVarsOfType
@@ -982,7 +982,7 @@ annotateBotStr id n_extra mb_str
       Nothing           -> id
       Just (arity, sig) -> id `setIdArity`      (arity + n_extra)
                               `setIdStrictness` (increaseStrictSigArity n_extra sig)
-                              `setIdCprInfo`    botCpr
+                              `setIdCprInfo`    mkCprSig (arity + n_extra) botCpr
 
 notWorthFloating :: CoreExpr -> [Var] -> Bool
 -- Returns True if the expression would be replaced by
