@@ -1,0 +1,4 @@
+:l T14628.hs
+:br 12 46
+:trace putArrayBytes stdout [['1'..'9'],['2'..'8'],['3'..'7']]
+snd $ runStateT _result 0

@@ -1762,8 +1762,7 @@ suggestAddSig ctxt ty1 ty2
     inferred_bndrs = nub (get_inf ty1 ++ get_inf ty2)
     get_inf ty | Just tv <- tcGetTyVar_maybe ty
                , isSkolemTyVar tv
-               , (implic, _) : _ <- getSkolemInfo (cec_encl ctxt) [tv]
-               , InferSkol prs <- ic_info implic
+               , ((InferSkol prs, _) : _) <- getSkolemInfo (cec_encl ctxt) [tv]
                = map fst prs
                | otherwise
                = []
@@ -2755,11 +2754,13 @@ pprSkols :: ReportErrCtxt -> [TcTyVar] -> SDoc
 pprSkols ctxt tvs
   = vcat (map pp_one (getSkolemInfo (cec_encl ctxt) tvs))
   where
-    pp_one (Implic { ic_info = skol_info }, tvs)
-      | UnkSkol <- skol_info
+    pp_one (UnkSkol, tvs)
       = hang (pprQuotedList tvs)
            2 (is_or_are tvs "an" "unknown")
-      | otherwise
+    pp_one (RuntimeUnkSkol, tvs)
+      = hang (pprQuotedList tvs)
+           2 (is_or_are tvs "an" "unknown runtime")
+    pp_one (skol_info, tvs)
       = vcat [ hang (pprQuotedList tvs)
                   2 (is_or_are tvs "a"  "rigid" <+> text "bound by")
              , nest 2 (pprSkolInfo skol_info)
@@ -2779,20 +2780,21 @@ getAmbigTkvs ct
     dep_tkv_set = tyCoVarsOfTypes (map tyVarKind tkvs)
 
 getSkolemInfo :: [Implication] -> [TcTyVar]
-              -> [(Implication, [TcTyVar])]
+              -> [(SkolemInfo, [TcTyVar])]                    -- #14628
 -- Get the skolem info for some type variables
--- from the implication constraints that bind them
+-- from the implication constraints that bind them.
 --
--- In the returned (implic, tvs) pairs, the 'tvs' part is non-empty
+-- In the returned (skolem, tvs) pairs, the 'tvs' part is non-empty
 getSkolemInfo _ []
   = []
 
 getSkolemInfo [] tvs
-  = pprPanic "No skolem info:" (ppr tvs)
+  | all isRuntimeUnkSkol tvs = [(RuntimeUnkSkol, tvs)]        -- #14628
+  | otherwise = pprPanic "No skolem info:" (ppr tvs)
 
 getSkolemInfo (implic:implics) tvs
-  | null tvs_here =                      getSkolemInfo implics tvs
-  | otherwise     = (implic, tvs_here) : getSkolemInfo implics tvs_other
+  | null tvs_here =                            getSkolemInfo implics tvs
+  | otherwise   = (ic_info implic, tvs_here) : getSkolemInfo implics tvs_other
   where
     (tvs_here, tvs_other) = partition (`elem` ic_skols implic) tvs
 
