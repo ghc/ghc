@@ -357,7 +357,10 @@ unblock:
 void
 migrateThread (Capability *from, StgTSO *tso, Capability *to)
 {
-    ASSERT_FULL_CAPABILITY_INVARIANTS(from, getTask());
+    // Sadly we can't assert this since migrateThread is called from
+    // scheduleDoGC, where we implicly own all capabilities.
+    //ASSERT_FULL_CAPABILITY_INVARIANTS(from, getTask());
+
     traceEventMigrateThread (from, tso, to->no);
     // ThreadMigrating tells the target cap that it needs to be added to
     // the run queue when it receives the MSG_TRY_WAKEUP.
