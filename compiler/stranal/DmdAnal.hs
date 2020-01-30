@@ -600,6 +600,8 @@ dmdAnalRhsLetDown rec_flag env let_dmd id rhs
       = mkRhsDmd env rhs_arity rhs
     (DmdType rhs_fv rhs_dmds rhs_div, rhs')
                    = dmdAnal env rhs_dmd rhs
+    -- TODO: Won't the following line unnecessarily trim down arity for join
+    --       points returning a lambda in a C(S) context?
     sig            = mkStrictSigForArity rhs_arity (mkDmdType sig_fv rhs_dmds rhs_div)
     id'            = set_idStrictness env id sig
         -- See Note [NOINLINE and strictness]

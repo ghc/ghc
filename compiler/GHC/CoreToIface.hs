@@ -71,7 +71,7 @@ import VarSet
 import TyCoRep
 import TyCoTidy ( tidyCo )
 import Demand ( isTopSig )
-import Cpr ( topCpr )
+import Cpr ( topCprSig )
 
 import Data.Maybe ( catMaybes )
 
@@ -469,8 +469,8 @@ toIfaceIdInfo id_info
 
     ------------  CPR --------------
     cpr_info = cprInfo id_info
-    cpr_hsinfo | cpr_info /= topCpr = Just (HsCpr cpr_info)
-               | otherwise          = Nothing
+    cpr_hsinfo | cpr_info /= topCprSig = Just (HsCpr cpr_info)
+               | otherwise             = Nothing
     ------------  Unfolding  --------------
     unfold_hsinfo = toIfUnfolding loop_breaker (unfoldingInfo id_info)
     loop_breaker  = isStrongLoopBreaker (occInfo id_info)

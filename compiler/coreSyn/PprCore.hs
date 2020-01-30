@@ -502,7 +502,7 @@ ppIdInfo id info
     has_str_info = not (isTopSig str_info)
 
     cpr_info = cprInfo info
-    has_cpr_info = cpr_info /= topCpr
+    has_cpr_info = cpr_info /= topCprSig
 
     unf_info = unfoldingInfo info
     has_unf = hasSomeUnfolding unf_info

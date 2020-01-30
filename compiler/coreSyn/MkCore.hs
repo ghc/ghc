@@ -799,7 +799,7 @@ aBSENT_SUM_FIELD_ERROR_ID
   = mkVanillaGlobalWithInfo absentSumFieldErrorName
       (mkSpecForAllTys [alphaTyVar] (mkTyVarTy alphaTyVar)) -- forall a . a
       (vanillaIdInfo `setStrictnessInfo` mkClosedStrictSig [] botDiv
-                     `setCprInfo` botCpr
+                     `setCprInfo` mkCprSig 0 botCpr
                      `setArityInfo` 0
                      `setCafInfo` NoCafRefs) -- #15038
 
@@ -814,7 +814,7 @@ mkRuntimeErrorId name
  = mkVanillaGlobalWithInfo name runtimeErrorTy bottoming_info
  where
     bottoming_info = vanillaIdInfo `setStrictnessInfo`    strict_sig
-                                   `setCprInfo`           botCpr
+                                   `setCprInfo`           mkCprSig 1 botCpr
                                    `setArityInfo`         1
                         -- Make arity and strictness agree
 
