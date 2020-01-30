@@ -113,6 +113,7 @@ test('T13825-debugger',
       [when(arch('powerpc64'), expect_broken(14455)),
        when(arch('arm'), fragile_for(17557, ['ghci-ext']))],
       ghci_script, ['T13825-debugger.script'])
+test('T14628', normal, ghci_script, ['T14628.script'])
 test('T14690', normal, ghci_script, ['T14690.script'])
 test('T16700', normal, ghci_script, ['T16700.script'])
 
