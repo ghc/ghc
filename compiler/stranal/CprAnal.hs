@@ -5,6 +5,8 @@
 -- said heap allocation by performing a worker/wrapper split.
 --
 -- See https://www.microsoft.com/en-us/research/publication/constructed-product-result-analysis-haskell/.
+-- CPR analysis should happen after strictness analysis, but before
+-- worker/wrapper. See Note [Phase ordering].
 module CprAnal ( cprAnalProgram ) where
 
 #include "HsVersions.h"
@@ -31,6 +33,18 @@ import FamInstEnv
 import Util
 import ErrUtils         ( dumpIfSet_dyn, DumpFormat (..) )
 import Maybes           ( isJust )
+
+{- Note [Phase ordering]
+~~~~~~~~~~~~~~~~~~~~~~~~
+We need to perform strictness analysis before CPR analysis, because of
+Note [CPR in a DataAlt case alternative] and Note [CPR for strict binders].
+The worker/wrapper transformation consumes both strictness and CPR information,
+so should happen after both. So the preferred pipeline becomes this:
+
+1. Strictness
+2. CPR
+3. Worker/Wrapper
+-}
 
 --
 -- * Analysing programs
