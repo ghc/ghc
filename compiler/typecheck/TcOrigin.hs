@@ -237,6 +237,8 @@ data SkolemInfo
   | QuantCtxtSkol       -- Quantified context, e.g.
                         --   f :: forall c. (forall a. c a => c [a]) => blah
 
+  | RuntimeUnkSkol      -- Runtime skolem from the GHCi debugger      #14628
+
   | UnkSkol             -- Unhelpful info (until I improve it)
 
 instance Outputable SkolemInfo where
@@ -267,6 +269,7 @@ pprSkolInfo (DataConSkol name)= text "the data constructor" <+> quotes (ppr name
 pprSkolInfo ReifySkol         = text "the type being reified"
 
 pprSkolInfo (QuantCtxtSkol {}) = text "a quantified context"
+pprSkolInfo RuntimeUnkSkol     = text "Unknown type from GHCi runtime"
 
 -- UnkSkol
 -- For type variables the others are dealt with by pprSkolTvBinding.
