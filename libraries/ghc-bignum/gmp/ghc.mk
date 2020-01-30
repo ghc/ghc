@@ -26,7 +26,6 @@ endif
 
 ifneq "$(NO_CLEAN_GMP)" "YES"
 $(eval $(call clean-target,gmp,,\
-  libraries/ghc-bignum/include/ghc-gmp.h \
   libraries/ghc-bignum/gmp/libgmp.a \
   libraries/ghc-bignum/gmp/gmp.h \
   libraries/ghc-bignum/gmp/gmpbuild \
@@ -92,19 +91,11 @@ endif
 endif
 
 ifeq "$(UseIntreeGmp)" "YES"
-$(libraries/ghc-bignum_dist-install_depfile_c_asm): libraries/ghc-bignum/gmp/gmp.h libraries/ghc-bignum/include/ghc-gmp.h
-
-libraries/ghc-bignum/include/ghc-gmp.h: libraries/ghc-bignum/gmp/gmp.h
-	$(CP) $< $@
+$(libraries/ghc-bignum_dist-install_depfile_c_asm): libraries/ghc-bignum/gmp/gmp.h
 
 gmp_CC_OPTS += -Ilibraries/ghc-bignum/gmp
 
 libraries/ghc-bignum_dist-install_EXTRA_OBJS += libraries/ghc-bignum/gmp/objs/*.o
-else
-$(libraries/ghc-bignum_dist-install_depfile_c_asm): libraries/ghc-bignum/include/ghc-gmp.h
-
-libraries/ghc-bignum/include/ghc-gmp.h: libraries/ghc-bignum/gmp/ghc-gmp.h
-	$(CP) $< $@
 endif
 
 libraries/ghc-bignum_dist-install_EXTRA_CC_OPTS += $(gmp_CC_OPTS)
