@@ -729,7 +729,9 @@ loop:
       StgClosure *e = (StgClosure*)UN_FORWARDING_PTR(info);
       RELAXED_STORE(p, TAG_CLOSURE(tag,e));
       if (gen_no < gct->evac_gen_no) {  // optimisation
-          // The ACQUIRE here is necessary to ensure that we 
+          // The ACQUIRE here is necessary to ensure that we see gen_no if the
+          // evacuted object lives in a block newly-allocated by a GC thread on
+          // another core.
           if (ACQUIRE_LOAD(&Bdescr((P_)e)->gen_no) < gct->evac_gen_no) {
               gct->failed_to_evac = true;
               TICK_GC_FAILED_PROMOTION();
