@@ -460,7 +460,7 @@ tryWW dflags fam_envs is_rec fn_id rhs
         -- See Note [Don't w/w inline small non-loop-breaker things]
 
   | is_fun && is_eta_exp
-  = splitFun dflags fam_envs new_fn_id fn_info wrap_dmds div cpr_info rhs
+  = splitFun dflags fam_envs new_fn_id fn_info wrap_dmds div cpr rhs
 
   | is_thunk                                   -- See Note [Thunk splitting]
   = splitThunk dflags fam_envs is_rec new_fn_id rhs
@@ -471,7 +471,12 @@ tryWW dflags fam_envs is_rec fn_id rhs
   where
     fn_info      = idInfo fn_id
     (wrap_dmds, div) = splitStrictSig (strictnessInfo fn_info)
-    cpr_info              = cprInfo fn_info
+
+    cpr_ty       = getCprSig (cprInfo fn_info)
+    -- Arity of the CPR sig should match idArity when it's not a join point.
+    -- See Note [Arity trimming for CPR signatures] in CprAnal
+    cpr          = ASSERT( isJoinId fn_id || ct_arty cpr_ty == arityInfo fn_info )
+                   ct_cpr cpr_ty
 
     new_fn_id = zapIdUsedOnceInfo (zapIdUsageEnvInfo fn_id)
         -- See Note [Zapping DmdEnv after Demand Analyzer] and
@@ -557,8 +562,8 @@ See https://gitlab.haskell.org/ghc/ghc/merge_requests/312#note_192064.
 ---------------------
 splitFun :: DynFlags -> FamInstEnvs -> Id -> IdInfo -> [Demand] -> Divergence -> CprResult -> CoreExpr
          -> UniqSM [(Id, CoreExpr)]
-splitFun dflags fam_envs fn_id fn_info wrap_dmds div cpr_info rhs
-  = WARN( not (wrap_dmds `lengthIs` arity), ppr fn_id <+> (ppr arity $$ ppr wrap_dmds $$ ppr cpr_info) ) do
+splitFun dflags fam_envs fn_id fn_info wrap_dmds div cpr rhs
+  = WARN( not (wrap_dmds `lengthIs` arity), ppr fn_id <+> (ppr arity $$ ppr wrap_dmds $$ ppr cpr) ) do
     -- The arity should match the signature
     stuff <- mkWwBodies dflags fam_envs rhs_fvs fn_id wrap_dmds use_cpr_info
     case stuff of
@@ -599,7 +604,7 @@ splitFun dflags fam_envs fn_id fn_info wrap_dmds div cpr_info rhs
                                 -- Even though we may not be at top level,
                                 -- it's ok to give it an empty DmdEnv
 
-                        `setIdCprInfo` work_cpr_info
+                        `setIdCprInfo` mkCprSig work_arity work_cpr_info
 
                         `setIdDemandInfo` worker_demand
 
@@ -654,8 +659,8 @@ splitFun dflags fam_envs fn_id fn_info wrap_dmds div cpr_info rhs
                     -- So it may be more than the number of top-level-visible lambdas
 
     use_cpr_info  | isJoinId fn_id = topCpr -- Note [Don't CPR join points]
-                  | otherwise      = cpr_info
-    work_cpr_info | isJoinId fn_id = cpr_info -- Worker remains CPR-able
+                  | otherwise      = cpr
+    work_cpr_info | isJoinId fn_id = cpr -- Worker remains CPR-able
                   | otherwise      = topCpr   -- Cpr stuff done by wrapper; kill it here
 
 

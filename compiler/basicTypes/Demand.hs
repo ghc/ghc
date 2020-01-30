@@ -1506,7 +1506,7 @@ yields a more precise demand type:
     ----------------------------------------------------
     <S           ,HU              >  |  <L,U><L,U>{}
     <C(C(S     )),C1(C1(U       ))>  |  <S,U><L,U>{}
-    <C(C(S(S,L))),C1(C1(U(1*U,A)))>  |  <S,1*HU><S,1*U>{}
+    <C(C(S(S,L))),C1(C1(U(1*U,A)))>  |  <S,1*HU><L,A>{}
 
 Note that in the first example, the depth of the demand type was *higher* than
 the arity of the incoming call demand due to the anonymous lambda.

@@ -40,7 +40,7 @@ import IdInfo
 import InstEnv
 import Type             ( tidyTopType )
 import Demand           ( appIsBottom, isTopSig, isBottomingSig )
-import Cpr              ( botCpr )
+import Cpr              ( mkCprSig, botCpr )
 import BasicTypes
 import Name hiding (varName)
 import NameSet
@@ -1185,7 +1185,7 @@ tidyTopIdInfo dflags rhs_tidy_env name orig_rhs tidy_rhs idinfo show_unfold
 
     cpr = cprInfo idinfo
     final_cpr | Just _ <- mb_bot_str
-              = botCpr
+              = mkCprSig arity botCpr
               | otherwise
               = cpr
 

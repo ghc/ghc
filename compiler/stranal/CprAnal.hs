@@ -1,5 +1,10 @@
 {-# LANGUAGE CPP #-}
 
+-- | Constructed Product Result analysis. Identifies functions that surely
+-- return heap-allocated records on every code path, so that we can eliminate
+-- said heap allocation by performing a worker/wrapper split.
+--
+-- See https://www.microsoft.com/en-us/research/publication/constructed-product-result-analysis-haskell/.
 module CprAnal ( cprAnalProgram ) where
 
 #include "HsVersions.h"
@@ -45,7 +50,7 @@ cprAnalTopBind :: AnalEnv
                -> CoreBind
                -> (AnalEnv, CoreBind)
 cprAnalTopBind env (NonRec id rhs)
-  = (extendAnalEnv env id' (get_idCprInfo id'), NonRec id' rhs')
+  = (extendAnalEnv env id' (idCprInfo id'), NonRec id' rhs')
   where
     (id', rhs') = cprAnalBind TopLevel env id rhs
 
@@ -122,7 +127,7 @@ cprAnal' env (Let (NonRec id rhs) body)
   = (body_ty, Let (NonRec id' rhs') body')
   where
     (id', rhs')      = cprAnalBind NotTopLevel env id rhs
-    env'             = extendAnalEnv env id' (get_idCprInfo id')
+    env'             = extendAnalEnv env id' (idCprInfo id')
     (body_ty, body') = cprAnal env' body
 
 cprAnal' env (Let (Rec pairs) body)
@@ -161,9 +166,9 @@ cprTransform env id
   where
     sig
       | isGlobalId id                   -- imported function or data con worker
-      = get_idCprInfo id
+      = getCprSig (idCprInfo id)
       | Just sig <- lookupSigEnv env id -- local let-bound
-      = sig
+      = getCprSig sig
       | otherwise
       = topCprType
 
@@ -180,8 +185,9 @@ cprFix :: TopLevelFlag
 cprFix top_lvl env orig_pairs
   = loop 1 initial_pairs
   where
+    bot_sig = mkCprSig 0 botCpr
     -- See Note [Initialising strictness] in DmdAnal.hs
-    initial_pairs | ae_virgin env = [(setIdCprInfo id botCpr, rhs) | (id, rhs) <- orig_pairs ]
+    initial_pairs | ae_virgin env = [(setIdCprInfo id bot_sig, rhs) | (id, rhs) <- orig_pairs ]
                   | otherwise     = orig_pairs
 
     -- The fixed-point varies the idCprInfo field of the binders, and terminates if that
@@ -211,7 +217,7 @@ cprFix top_lvl env orig_pairs
           = (env', (id', rhs'))
           where
             (id', rhs') = cprAnalBind top_lvl env id rhs
-            env'        = extendAnalEnv env id (get_idCprInfo id')
+            env'        = extendAnalEnv env id (idCprInfo id')
 
 -- | Process the RHS of the binding for a sensible arity, add the CPR signature
 -- to the Id, and augment the environment with the signature as well.
@@ -225,24 +231,12 @@ cprAnalBind top_lvl env id rhs
   = (id', rhs')
   where
     (rhs_ty, rhs')  = cprAnal env rhs
-    -- ct_arty rhs_ty might be greater than rhs_arty, so we have to trim it
-    -- down. The same situation occurs in DmdAnal; see
-    -- Note [Understanding DmdType and StrictSig] in Demand
-    -- TODO: Is this really the case? Well, we identify Tops of different
-    --       arities with topCprTy, which has arity 0. So, rhs_arty may in fact
-    --       be *greater* than ct_arty.
-    rhs_ty'
-      | isJoinId id
-      -- We don't WW join points (see Note [Don't CPR join points] in WorkWrap),
-      -- but still want to propagate CPR information.
-      -- TODO: Do we? Yes, we do. But we may just ignore trimming CPR for join
-      -- points... Or at least try doing so. Let's see what happens.
-      = rhs_ty
-      | otherwise
-      = ensureCprTyArity (idArity id) rhs_ty
+    -- See Note [Arity trimming for CPR signatures]
+    rhs_ty' | isJoinId id = rhs_ty
+            | otherwise   = ensureCprTyArity (idArity id) rhs_ty
     -- possibly trim thunk CPR info
-    sig_ty          = trimCprTy trim_all trim_sums rhs_ty'
-    id'             = set_idCprInfo id sig_ty
+    sig             = CprSig $ trimCprTy trim_all trim_sums rhs_ty'
+    id'             = setIdCprInfo id sig
 
     -- See Note [CPR for thunks]
     -- See Note [CPR for sum types]
@@ -250,6 +244,72 @@ cprAnalBind top_lvl env id rhs
     trim_sums = not (isTopLevel top_lvl)
     is_thunk = not (exprIsHNF rhs) && not (isJoinId id)
     not_strict = not (isStrictDmd (idDemandInfo id))
+
+{- Note [Arity trimming for CPR signatures]
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+Although it doesn't affect correctness of the analysis per se, we have to trim
+CPR signatures to idArity. Here's what might happen if we don't:
+
+  f x = if expensive
+          then \y. Box y
+          else \z. Box z
+  g a b = f a b
+
+The two lambdas will have a CPR type of @1m@ (so construct a product after
+applied to one argument). Thus, @f@ will have a CPR signature of @2m@
+(constructs a product after applied to two arguments).
+But WW will never eta-expand @f@! In this case that would amount to possibly
+duplicating @expensive@ work.
+
+(Side note: Even if @f@'s 'idArity' happened to be 2, it would not do so, see
+Note [Don't eta expand in w/w].)
+
+So @f@ will not be worker/wrappered. But @g@ also inherited its CPR signature
+from @f@'s, so it *will* be WW'd:
+
+  f x = if expensive
+          then \y. Box y
+          else \z. Box z
+  $wg a b = case f a b of Box x -> x
+  g a b = Box ($wg a b)
+
+And the case in @g@ can never cancel away, thus we introduced extra reboxing.
+Hence we always trim the CPR signature of a binding to idArity.
+
+BUT now imagine @f@ was a join point in g:
+
+  g a b =
+    join f x = if expensive
+                 then \y. Box y
+                 else \z. Box z
+    in f a b
+
+We never WW join points, so the signature isn't terribly important for WW'ing
+@f@ itself (except maybe for strictness purposes). In the example above where we
+WW'd @g@ but not @f@, we can just push the case on @f@ in @g@ into the
+definition of @f@! This is the gist of Note [Don't CPR join points] in WorkWrap.
+
+Hence, by *not trimming* @f@'s Cpr signature (and thus WW'ing @g@), we go from
+
+  $wg a b =
+    join f x = if expensive
+                 then \y. Box y
+                 else \z. Box z
+    in case f a b of Box x -> x
+  g a b = Box ($wg a b)
+
+to (by pushing the case into @f@ and eliminating case-of-known-constructor)
+
+  $wg a b =
+    join f x = if expensive
+                 then \y. y
+                 else \z. z
+    in f a b
+  g a b = Box ($wg a b)
+
+Which is far better than not doing the WW split. So we trim the CPR signature to
+idArity for non-join bindings only.
+-}
 
 data AnalEnv
   = AE
@@ -262,7 +322,7 @@ data AnalEnv
   -- ^ Needed when expanding type families and synonyms of product types.
   }
 
-type SigEnv = VarEnv CprType
+type SigEnv = VarEnv CprSig
 
 instance Outputable AnalEnv where
   ppr (AE { ae_sigs = env, ae_virgin = virgin })
@@ -283,13 +343,13 @@ extendAnalEnvs :: AnalEnv -> [Id] -> AnalEnv
 extendAnalEnvs env ids
   = env { ae_sigs = sigs' }
   where
-    sigs' = extendVarEnvList (ae_sigs env) [ (id, get_idCprInfo id) | id <- ids ]
+    sigs' = extendVarEnvList (ae_sigs env) [ (id, idCprInfo id) | id <- ids ]
 
-extendAnalEnv :: AnalEnv -> Id -> CprType -> AnalEnv
+extendAnalEnv :: AnalEnv -> Id -> CprSig -> AnalEnv
 extendAnalEnv env id sig
   = env { ae_sigs = extendVarEnv (ae_sigs env) id sig }
 
-lookupSigEnv :: AnalEnv -> Id -> Maybe CprType
+lookupSigEnv :: AnalEnv -> Id -> Maybe CprSig
 lookupSigEnv env id = lookupVarEnv (ae_sigs env) id
 
 nonVirgin :: AnalEnv -> AnalEnv
@@ -301,7 +361,7 @@ extendSigsWithLam env id
   | isId id
   , isStrictDmd (idDemandInfo id) -- See Note [CPR for strict binders]
   , Just (dc,_,_,_) <- deepSplitProductType_maybe (ae_fam_envs env) $ idType id
-  = extendAnalEnv env id (prodCprType (dataConRepArity dc))
+  = extendAnalEnv env id (CprSig (prodCprType (dataConRepArity dc)))
   | otherwise
   = env
 
@@ -310,14 +370,14 @@ extendEnvForDataAlt :: AnalEnv -> CoreExpr -> Id -> DataCon -> [Var] -> AnalEnv
 extendEnvForDataAlt env scrut case_bndr dc bndrs
   = foldl' do_con_arg env' ids_w_strs
   where
-    env' = extendAnalEnv env case_bndr case_bndr_sig
+    env' = extendAnalEnv env case_bndr (CprSig case_bndr_ty)
 
     ids_w_strs    = filter isId bndrs `zip` dataConRepStrictness dc
 
     tycon          = dataConTyCon dc
     is_product     = isJust (isDataProductTyCon_maybe tycon)
     is_sum         = isJust (isDataSumTyCon_maybe tycon)
-    case_bndr_sig
+    case_bndr_ty
       | is_product = prodCprType (dataConRepArity dc)
       | is_sum     = sumCprType  (dataConTag dc)
       -- Any of the constructors had existentials. This is a little too
@@ -336,7 +396,7 @@ extendEnvForDataAlt env scrut case_bndr dc bndrs
        , is_var_scrut && is_strict
        , let fam_envs = ae_fam_envs env
        , Just (dc,_,_,_) <- deepSplitProductType_maybe fam_envs $ idType id
-       = extendAnalEnv env id (prodCprType (dataConRepArity dc))
+       = extendAnalEnv env id (CprSig (prodCprType (dataConRepArity dc)))
        | otherwise
        = env
 
@@ -344,12 +404,6 @@ extendEnvForDataAlt env scrut case_bndr dc bndrs
     is_var (Cast e _) = is_var e
     is_var (Var v)    = isLocalId v
     is_var _          = False
-
-set_idCprInfo :: Id -> CprType -> Id
-set_idCprInfo id ty = setIdCprInfo id (ct_cpr ty)
-
-get_idCprInfo :: Id -> CprType
-get_idCprInfo id = CprType (idArity id) (idCprInfo id)
 
 {- Note [Safe abortion in the fixed-point iteration]
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~

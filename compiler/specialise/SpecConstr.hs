@@ -1727,7 +1727,7 @@ spec_one env fn arg_bndrs body (call_pat@(qvars, pats), rule_number)
                                      (mkLamTypes spec_lam_args body_ty)
                              -- See Note [Transfer strictness]
                              `setIdStrictness` spec_str
-                             `setIdCprInfo` topCpr
+                             `setIdCprInfo` topCprSig
                              `setIdArity` count isId spec_lam_args
                              `asJoinId_maybe` spec_join_arity
               spec_str   = calcSpecStrictness fn spec_lam_args pats

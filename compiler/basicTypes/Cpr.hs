@@ -1,7 +1,11 @@
+{-# LANGUAGE GeneralisedNewtypeDeriving #-}
+-- | Types for the Constructed Product Result lattice. "CprAnal" and "WwLib"
+-- are its primary customers via 'idCprInfo'.
 module Cpr (
-    CprResult, topCpr, botCpr, sumCpr, prodCpr, returnsCPR_maybe, seqCprResult,
+    CprResult, topCpr, botCpr, sumCpr, prodCpr, returnsCPR_maybe,
     CprType (..), topCprType, botCprType, prodCprType, sumCprType,
-    lubCprType, applyCprTy, abstractCprTy, ensureCprTyArity, trimCprTy
+    lubCprType, applyCprTy, abstractCprTy, ensureCprTyArity, trimCprTy,
+    CprSig (..), topCprSig, mkCprSig, seqCprSig
   ) where
 
 import GhcPrelude
@@ -62,9 +66,6 @@ returnsCPR_maybe RetProd     = Just fIRST_TAG
 returnsCPR_maybe NoCPR       = Nothing
 returnsCPR_maybe BotCPR      = Nothing
 
-seqCprResult :: CprResult -> ()
-seqCprResult cpr = cpr `seq` ()
-
 --
 -- * CprType
 --
@@ -72,7 +73,7 @@ seqCprResult cpr = cpr `seq` ()
 -- | The abstract domain \(A_t\) from the original 'CPR for Haskell' paper.
 data CprType
   = CprType
-  { ct_arty :: !Arity    -- ^ Number of arguments the denoted expression eats
+  { ct_arty :: !Arity     -- ^ Number of arguments the denoted expression eats
                           --   before returning the 'ct_cpr'
   , ct_cpr  :: !CprResult -- ^ 'CprResult' eventually unleashed when applied to
                           --   'ct_arty' arguments
@@ -123,6 +124,20 @@ ensureCprTyArity n ty@(CprType m _)
 trimCprTy :: Bool -> Bool -> CprType -> CprType
 trimCprTy trim_all trim_sums (CprType arty res) = CprType arty (trimCpr trim_all trim_sums res)
 
+-- | The arity of the wrapped 'CprType' is the arity at which it is safe
+-- to unleash. See Note [Understanding DmdType and StrictSig] in Demand
+newtype CprSig = CprSig { getCprSig :: CprType }
+  deriving (Eq, Binary)
+
+topCprSig :: CprSig
+topCprSig = CprSig topCprType
+
+mkCprSig :: Arity -> CprResult -> CprSig
+mkCprSig arty cpr = CprSig (CprType arty cpr)
+
+seqCprSig :: CprSig -> ()
+seqCprSig sig = sig `seq` ()
+
 instance Outputable CprResult where
   ppr NoCPR        = empty
   ppr (RetSum n)   = char 'm' <> int n
@@ -132,16 +147,26 @@ instance Outputable CprResult where
 instance Outputable CprType where
   ppr (CprType arty res) = ppr arty <> ppr res
 
-instance Binary CprResult where
-    put_ bh (RetSum n)   = do { putByte bh 0; put_ bh n }
-    put_ bh RetProd      = putByte bh 1
-    put_ bh NoCPR        = putByte bh 2
-    put_ bh BotCPR       = putByte bh 3
+-- | Only print the CPR result
+instance Outputable CprSig where
+  ppr (CprSig ty) = ppr (ct_cpr ty)
 
-    get  bh = do
-            h <- getByte bh
-            case h of
-              0 -> do { n <- get bh; return (RetSum n) }
-              1 -> return RetProd
-              2 -> return NoCPR
-              _ -> return BotCPR
+instance Binary CprResult where
+  put_ bh (RetSum n)   = do { putByte bh 0; put_ bh n }
+  put_ bh RetProd      = putByte bh 1
+  put_ bh NoCPR        = putByte bh 2
+  put_ bh BotCPR       = putByte bh 3
+
+  get  bh = do
+          h <- getByte bh
+          case h of
+            0 -> do { n <- get bh; return (RetSum n) }
+            1 -> return RetProd
+            2 -> return NoCPR
+            _ -> return BotCPR
+
+instance Binary CprType where
+  put_ bh (CprType arty cpr) = do
+    put_ bh arty
+    put_ bh cpr
+  get  bh = CprType <$> get bh <*> get bh
