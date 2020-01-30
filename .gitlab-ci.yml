@@ -893,6 +893,8 @@ release-x86_64-windows:
     # Due to #15934
     BUILD_PROF_LIBS: "NO"
     TEST_ENV: "i386-windows"
+  # Due to #17736
+  allow_failure: true
   cache:
     key: "i386-windows-$WINDOWS_TOOLCHAIN_VERSION"
 
