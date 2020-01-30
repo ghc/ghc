@@ -1,6 +1,8 @@
 {-# LANGUAGE CPP #-}
 {-# LANGUAGE LambdaCase #-}
 
+{-# OPTIONS_GHC -Wno-incomplete-record-updates #-}
+
 -- | This module implements interface renaming, which is
 -- used to rewrite interface files on the fly when we
 -- are doing indefinite typechecking and need instantiations

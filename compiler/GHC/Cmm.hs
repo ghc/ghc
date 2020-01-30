@@ -3,12 +3,11 @@
 
 module GHC.Cmm (
      -- * Cmm top-level datatypes
-     CmmProgram, CmmGroup, GenCmmGroup,
-     CmmDecl, GenCmmDecl(..),
+     CmmProgram, CmmGroup, CmmGroupSRTs, RawCmmGroup, GenCmmGroup,
+     CmmDecl, CmmDeclSRTs, GenCmmDecl(..),
      CmmGraph, GenCmmGraph(..),
-     CmmBlock,
-     RawCmmDecl, RawCmmGroup,
-     Section(..), SectionType(..), CmmStatics(..), CmmStatic(..),
+     CmmBlock, RawCmmDecl,
+     Section(..), SectionType(..), CmmStatics(..), RawCmmStatics(..), CmmStatic(..),
      isSecConstant,
 
      -- ** Blocks containing lists
@@ -56,8 +55,12 @@ import Data.ByteString (ByteString)
 type CmmProgram = [CmmGroup]
 
 type GenCmmGroup d h g = [GenCmmDecl d h g]
-type CmmGroup = GenCmmGroup CmmStatics CmmTopInfo CmmGraph
-type RawCmmGroup = GenCmmGroup CmmStatics (LabelMap CmmStatics) CmmGraph
+-- | Cmm group before SRT generation
+type CmmGroup     = GenCmmGroup CmmStatics    CmmTopInfo               CmmGraph
+-- | Cmm group with SRTs
+type CmmGroupSRTs = GenCmmGroup RawCmmStatics CmmTopInfo               CmmGraph
+-- | "Raw" cmm group (TODO (osa): not sure what that means)
+type RawCmmGroup  = GenCmmGroup RawCmmStatics (LabelMap RawCmmStatics) CmmGraph
 
 -----------------------------------------------------------------------------
 --  CmmDecl, GenCmmDecl
@@ -89,12 +92,13 @@ data GenCmmDecl d h g
         Section
         d
 
-type CmmDecl = GenCmmDecl CmmStatics CmmTopInfo CmmGraph
+type CmmDecl     = GenCmmDecl CmmStatics    CmmTopInfo CmmGraph
+type CmmDeclSRTs = GenCmmDecl RawCmmStatics CmmTopInfo CmmGraph
 
 type RawCmmDecl
    = GenCmmDecl
-        CmmStatics
-        (LabelMap CmmStatics)
+        RawCmmStatics
+        (LabelMap RawCmmStatics)
         CmmGraph
 
 -----------------------------------------------------------------------------
@@ -199,8 +203,20 @@ data CmmStatic
   | CmmString ByteString
         -- string of 8-bit values only, not zero terminated.
 
+-- Static data before SRT generation
 data CmmStatics
-   = Statics
+  = CmmStatics
+      CLabel       -- Label of statics
+      CmmInfoTable
+      CostCentreStack
+      [CmmLit]     -- Payload
+  | CmmStaticsRaw
+      CLabel       -- Label of statics
+      [CmmStatic]  -- The static data itself
+
+-- Static data, after SRTs are generated
+data RawCmmStatics
+   = RawCmmStatics
        CLabel      -- Label of statics
        [CmmStatic] -- The static data itself
 

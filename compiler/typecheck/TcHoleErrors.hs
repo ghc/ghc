@@ -1,5 +1,6 @@
 {-# LANGUAGE RecordWildCards #-}
 {-# LANGUAGE ExistentialQuantification #-}
+{-# OPTIONS_GHC -Wno-incomplete-record-updates #-}
 module TcHoleErrors ( findValidHoleFits, tcFilterHoleFits
                     , tcCheckHoleFit, tcSubsumes
                     , withoutUnification

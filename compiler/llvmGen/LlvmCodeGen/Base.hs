@@ -1,6 +1,8 @@
 {-# LANGUAGE CPP #-}
 {-# LANGUAGE DeriveFunctor #-}
 
+{-# OPTIONS_GHC -Wno-incomplete-uni-patterns #-}
+
 -- ----------------------------------------------------------------------------
 -- | Base LLVM Code Generation module
 --
@@ -70,7 +72,7 @@ import qualified Data.List.NonEmpty as NE
 -- * Some Data Types
 --
 
-type LlvmCmmDecl = GenCmmDecl [LlvmData] (Maybe CmmStatics) (ListGraph LlvmStatement)
+type LlvmCmmDecl = GenCmmDecl [LlvmData] (Maybe RawCmmStatics) (ListGraph LlvmStatement)
 type LlvmBasicBlock = GenBasicBlock LlvmStatement
 
 -- | Global registers live on proc entry
