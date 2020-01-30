@@ -594,6 +594,13 @@ data GeneralFlag
    | Opt_WriteInterface -- forces .hi files to be written even with -fno-code
    | Opt_WriteHie -- generate .hie files
 
+   -- Interface file extended fields
+   | Opt_InterfaceField_hie
+   | Opt_InterfaceField_parsed
+   | Opt_InterfaceField_rn
+   | Opt_InterfaceField_tc
+   | Opt_InterfaceField_ds
+
    -- profiling opts
    | Opt_AutoSccsOnIndividualCafs
    | Opt_ProfCountEntries
@@ -1340,15 +1347,12 @@ parseCfgWeights s oldWeights =
             = [s1]
             | (s1,rest) <- break (== ',') s
             = [s1] ++ settings (drop 1 rest)
-#if __GLASGOW_HASKELL__ <= 810
             | otherwise = panic $ "Invalid cfg parameters." ++ exampleString
-#endif
         assignment as
             | (name, _:val) <- break (== '=') as
             = (name,read val)
             | otherwise
             = panic $ "Invalid cfg parameters." ++ exampleString
-
         exampleString = "Example parameters: uncondWeight=1000," ++
             "condBranchWeight=800,switchWeight=0,callWeight=300" ++
             ",likelyCondWeight=900,unlikelyCondWeight=300" ++
@@ -1955,7 +1959,7 @@ defaultDynFlags mySettings llvmConfig =
         maxRefHoleFits     = Just 6,
         refLevelHoleFits   = Nothing,
         maxUncoveredPatterns    = 4,
-        maxPmCheckModels        = 30,
+        maxPmCheckModels        = 100,
         simplTickFactor         = 100,
         specConstrThreshold     = Just 2000,
         specConstrCount         = Just 3,
@@ -3024,6 +3028,8 @@ dynamic_flags_deps = [
     ------- ways ---------------------------------------------------------------
   , make_ord_flag defGhcFlag "prof"           (NoArg (addWay WayProf))
   , make_ord_flag defGhcFlag "eventlog"       (NoArg (addWay WayEventLog))
+  , make_dep_flag defGhcFlag "smp"
+      (NoArg $ addWay WayThreaded) "Use -threaded instead"
   , make_ord_flag defGhcFlag "debug"          (NoArg (addWay WayDebug))
   , make_ord_flag defGhcFlag "threaded"       (NoArg (addWay WayThreaded))
 
@@ -4163,6 +4169,11 @@ dFlagsDeps = [
 -- See Note [Updating flag description in the User's Guide]
 -- See Note [Supporting CLI completion]
 -- Please keep the list of flags below sorted alphabetically
+  flagSpec "field-ds"                   Opt_InterfaceField_ds,
+  flagSpec "field-hie"                  Opt_InterfaceField_hie,
+  flagSpec "field-parsed"               Opt_InterfaceField_parsed,
+  flagSpec "field-rn"                   Opt_InterfaceField_rn,
+  flagSpec "field-tc"                   Opt_InterfaceField_tc,
   flagSpec "ppr-case-as-let"            Opt_PprCaseAsLet,
   depFlagSpec' "ppr-ticks"              Opt_PprShowTicks
      (\turn_on -> useInstead "-d" "suppress-ticks" (not turn_on)),
