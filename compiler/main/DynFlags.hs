@@ -427,6 +427,7 @@ data DumpFlag
    | Opt_D_dump_cmm_split
    | Opt_D_dump_cmm_info
    | Opt_D_dump_cmm_cps
+   | Opt_D_dump_srts
    -- end cmm subflags
    | Opt_D_dump_cfg_weights -- ^ Dump the cfg used for block layout.
    | Opt_D_dump_asm
@@ -3358,6 +3359,8 @@ dynamic_flags_deps = [
         (setDumpFlag Opt_D_dump_cmm_info)
   , make_ord_flag defGhcFlag "ddump-cmm-cps"
         (setDumpFlag Opt_D_dump_cmm_cps)
+  , make_ord_flag defGhcFlag "ddump-srts"
+        (setDumpFlag Opt_D_dump_srts)
   , make_ord_flag defGhcFlag "ddump-cfg-weights"
         (setDumpFlag Opt_D_dump_cfg_weights)
   , make_ord_flag defGhcFlag "ddump-core-stats"
@@ -4790,20 +4793,6 @@ optLevelFlags -- see Note [Documenting optimisation flags]
 --  , ([2],     Opt_StaticArgumentTransformation)
 --   Static Argument Transformation needs investigation. See #9374
     ]
-
-{- Note [Eta-reduction in -O0]
-~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
-#11562 showed an example which tripped an ASSERT in CoreToStg; a
-function was marked as MayHaveCafRefs when in fact it obviously
-didn't.  Reason was:
- * Eta reduction wasn't happening in the simplifier, but it was
-   happening in CorePrep, on
-        $fBla = MkDict (/\a. K a)
- * Result: rhsIsStatic told GHC.Iface.Tidy that $fBla might have CAF refs
-   but the eta-reduced version (MkDict K) obviously doesn't
-Simple solution: just let the simplifier do eta-reduction even in -O0.
-After all, CorePrep does it unconditionally!  Not a big deal, but
-removes an assertion failure. -}
 
 
 -- -----------------------------------------------------------------------------

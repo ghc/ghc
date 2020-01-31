@@ -161,7 +161,7 @@ cmmDebugGen modLoc decls = map (blocksForScope Nothing) topScopes
                 = DebugBlock { dblProcedure    = g_entry graph
                              , dblLabel        = label
                              , dblCLabel       = case info of
-                                 Just (Statics infoLbl _)   -> infoLbl
+                                 Just (RawCmmStatics infoLbl _) -> infoLbl
                                  Nothing
                                    | g_entry graph == label -> entryLbl
                                    | otherwise              -> blockLbl label
