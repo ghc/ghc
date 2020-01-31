@@ -196,7 +196,9 @@ mkStaticClosureFields dflags info_tbl ccs caf_refs payload
         | otherwise = []
 
     static_link_field
-        | is_caf || staticClosureNeedsLink (mayHaveCafRefs caf_refs) info_tbl
+        | is_caf
+        = [mkIntCLit dflags 0]
+        | staticClosureNeedsLink (mayHaveCafRefs caf_refs) info_tbl
         = [static_link_value]
         | otherwise
         = []

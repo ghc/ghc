@@ -182,12 +182,12 @@ nativeCodeGen dflags this_mod modLoc h us cmms
       ArchUnknown   -> panic "nativeCodeGen: No NCG for unknown arch"
       ArchJavaScript-> panic "nativeCodeGen: No NCG for JavaScript"
 
-x86NcgImpl :: DynFlags -> NcgImpl (Alignment, CmmStatics)
+x86NcgImpl :: DynFlags -> NcgImpl (Alignment, RawCmmStatics)
                                   X86.Instr.Instr X86.Instr.JumpDest
 x86NcgImpl dflags
  = (x86_64NcgImpl dflags)
 
-x86_64NcgImpl :: DynFlags -> NcgImpl (Alignment, CmmStatics)
+x86_64NcgImpl :: DynFlags -> NcgImpl (Alignment, RawCmmStatics)
                                   X86.Instr.Instr X86.Instr.JumpDest
 x86_64NcgImpl dflags
  = NcgImpl {
@@ -208,7 +208,7 @@ x86_64NcgImpl dflags
    }
     where platform = targetPlatform dflags
 
-ppcNcgImpl :: DynFlags -> NcgImpl CmmStatics PPC.Instr.Instr PPC.RegInfo.JumpDest
+ppcNcgImpl :: DynFlags -> NcgImpl RawCmmStatics PPC.Instr.Instr PPC.RegInfo.JumpDest
 ppcNcgImpl dflags
  = NcgImpl {
         cmmTopCodeGen             = PPC.CodeGen.cmmTopCodeGen
@@ -228,7 +228,7 @@ ppcNcgImpl dflags
    }
     where platform = targetPlatform dflags
 
-sparcNcgImpl :: DynFlags -> NcgImpl CmmStatics SPARC.Instr.Instr SPARC.ShortcutJump.JumpDest
+sparcNcgImpl :: DynFlags -> NcgImpl RawCmmStatics SPARC.Instr.Instr SPARC.ShortcutJump.JumpDest
 sparcNcgImpl dflags
  = NcgImpl {
         cmmTopCodeGen             = SPARC.CodeGen.cmmTopCodeGen
@@ -748,7 +748,7 @@ cmmNativeGen dflags this_mod modLoc ncgImpl us fileIds dbgMap cmm count
                 {-# SCC "invertCondBranches" #-}
                 map invert sequenced
               where
-                invertConds :: LabelMap CmmStatics -> [NatBasicBlock instr]
+                invertConds :: LabelMap RawCmmStatics -> [NatBasicBlock instr]
                             -> [NatBasicBlock instr]
                 invertConds = invertCondBranches ncgImpl optimizedCFG
                 invert top@CmmData {} = top

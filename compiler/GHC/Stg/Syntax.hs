@@ -48,11 +48,12 @@ module GHC.Stg.Syntax (
         StgOp(..),
 
         -- utils
-        topStgBindHasCafRefs, stgArgHasCafRefs, stgRhsArity,
+        stgRhsArity,
         isDllConApp,
         stgArgType,
         stripStgTicksTop, stripStgTicksTopE,
         stgCaseBndrInScope,
+        bindersOf, bindersOfTop, bindersOfTopBinds,
 
         pprStgBinding, pprGenStgTopBindings, pprStgTopBindings
     ) where
@@ -70,7 +71,6 @@ import DataCon
 import DynFlags
 import ForeignCall ( ForeignCall )
 import Id
-import IdInfo      ( mayHaveCafRefs )
 import VarSet
 import Literal     ( Literal, literalType )
 import Module      ( Module )
@@ -475,82 +475,6 @@ stgRhsArity (StgRhsClosure _ _ _ bndrs _)
   -- The arity never includes type parameters, but they should have gone by now
 stgRhsArity (StgRhsCon _ _ _) = 0
 
--- Note [CAF consistency]
--- ~~~~~~~~~~~~~~~~~~~~~~
---
--- `topStgBindHasCafRefs` is only used by an assert (`consistentCafInfo` in
--- `CoreToStg`) to make sure CAF-ness predicted by `GHC.Iface.Tidy` is consistent with
--- reality.
---
--- Specifically, if the RHS mentions any Id that itself is marked
--- `MayHaveCafRefs`; or if the binding is a top-level updateable thunk; then the
--- `Id` for the binding should be marked `MayHaveCafRefs`. The potential trouble
--- is that `GHC.Iface.Tidy` computed the CAF info on the `Id` but some transformations
--- have taken place since then.
-
-topStgBindHasCafRefs :: GenStgTopBinding pass -> Bool
-topStgBindHasCafRefs (StgTopLifted (StgNonRec _ rhs))
-  = topRhsHasCafRefs rhs
-topStgBindHasCafRefs (StgTopLifted (StgRec binds))
-  = any topRhsHasCafRefs (map snd binds)
-topStgBindHasCafRefs StgTopStringLit{}
-  = False
-
-topRhsHasCafRefs :: GenStgRhs pass -> Bool
-topRhsHasCafRefs (StgRhsClosure _ _ upd _ body)
-  = -- See Note [CAF consistency]
-    isUpdatable upd || exprHasCafRefs body
-topRhsHasCafRefs (StgRhsCon _ _ args)
-  = any stgArgHasCafRefs args
-
-exprHasCafRefs :: GenStgExpr pass -> Bool
-exprHasCafRefs (StgApp f args)
-  = stgIdHasCafRefs f || any stgArgHasCafRefs args
-exprHasCafRefs StgLit{}
-  = False
-exprHasCafRefs (StgConApp _ args _)
-  = any stgArgHasCafRefs args
-exprHasCafRefs (StgOpApp _ args _)
-  = any stgArgHasCafRefs args
-exprHasCafRefs (StgLam _ body)
-  = exprHasCafRefs body
-exprHasCafRefs (StgCase scrt _ _ alts)
-  = exprHasCafRefs scrt || any altHasCafRefs alts
-exprHasCafRefs (StgLet _ bind body)
-  = bindHasCafRefs bind || exprHasCafRefs body
-exprHasCafRefs (StgLetNoEscape _ bind body)
-  = bindHasCafRefs bind || exprHasCafRefs body
-exprHasCafRefs (StgTick _ expr)
-  = exprHasCafRefs expr
-
-bindHasCafRefs :: GenStgBinding pass -> Bool
-bindHasCafRefs (StgNonRec _ rhs)
-  = rhsHasCafRefs rhs
-bindHasCafRefs (StgRec binds)
-  = any rhsHasCafRefs (map snd binds)
-
-rhsHasCafRefs :: GenStgRhs pass -> Bool
-rhsHasCafRefs (StgRhsClosure _ _ _ _ body)
-  = exprHasCafRefs body
-rhsHasCafRefs (StgRhsCon _ _ args)
-  = any stgArgHasCafRefs args
-
-altHasCafRefs :: GenStgAlt pass -> Bool
-altHasCafRefs (_, _, rhs) = exprHasCafRefs rhs
-
-stgArgHasCafRefs :: StgArg -> Bool
-stgArgHasCafRefs (StgVarArg id)
-  = stgIdHasCafRefs id
-stgArgHasCafRefs _
-  = False
-
-stgIdHasCafRefs :: Id -> Bool
-stgIdHasCafRefs id =
-  -- We are looking for occurrences of an Id that is bound at top level, and may
-  -- have CAF refs. At this point (after GHC.Iface.Tidy) top-level Ids (whether
-  -- imported or defined in this module) are GlobalIds, so the test is easy.
-  isGlobalId id && mayHaveCafRefs (idCafInfo id)
-
 {-
 ************************************************************************
 *                                                                      *
@@ -678,6 +602,25 @@ data StgOp
         -- itself, is needed by the stg-to-cmm pass to determine the offset to
         -- apply to unlifted boxed arguments in GHC.StgToCmm.Foreign. See Note
         -- [Unlifted boxed arguments to foreign calls]
+
+{-
+************************************************************************
+*                                                                      *
+Utilities
+*                                                                      *
+************************************************************************
+-}
+
+bindersOf :: BinderP a ~ Id => GenStgBinding a -> [Id]
+bindersOf (StgNonRec binder _) = [binder]
+bindersOf (StgRec pairs)       = [binder | (binder, _) <- pairs]
+
+bindersOfTop :: BinderP a ~ Id => GenStgTopBinding a -> [Id]
+bindersOfTop (StgTopLifted bind) = bindersOf bind
+bindersOfTop (StgTopStringLit binder _) = [binder]
+
+bindersOfTopBinds :: BinderP a ~ Id => [GenStgTopBinding a] -> [Id]
+bindersOfTopBinds = foldr ((++) . bindersOfTop) []
 
 {-
 ************************************************************************

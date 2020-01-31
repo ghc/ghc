@@ -23,12 +23,9 @@ import CoreUnfold
 import CoreFVs
 import CoreTidy
 import CoreMonad
-import GHC.CoreToStg.Prep
-import CoreUtils        (rhsIsStatic)
 import CoreStats        (coreBindsStats, CoreStats(..))
 import CoreSeq          (seqBinds)
 import CoreLint
-import Literal
 import Rules
 import PatSyn
 import ConLike
@@ -55,7 +52,6 @@ import DataCon
 import TyCon
 import Class
 import Module
-import Packages( isDllName )
 import HscTypes
 import Maybes
 import UniqSupply
@@ -119,7 +115,7 @@ Plan A: mkBootModDetails: omit pragmas, make interfaces small
 
 * Drop rules altogether
 
-* Tidy the bindings, to ensure that the Caf and Arity
+* Tidy the bindings, to ensure that the Arity
   information is correct for each top-level binder; the
   code generator needs it. And to ensure that local names have
   distinct OccNames in case of object-file splitting
@@ -217,7 +213,7 @@ globaliseAndTidyBootId :: Id -> Id
 -- makes it into a GlobalId
 --     * unchanged Name (might be Internal or External)
 --     * unchanged details
---     * VanillaIdInfo (makes a conservative assumption about Caf-hood and arity)
+--     * VanillaIdInfo (makes a conservative assumption about arity)
 --     * BootUnfolding (see Note [Inlining and hs-boot files] in GHC.CoreToIface)
 globaliseAndTidyBootId id
   = globaliseId id `setIdType`      tidyTopType (idType id)
@@ -316,8 +312,6 @@ binder
 
         * its arity, computed from the number of visible lambdas
 
-        * its CAF info, computed from what is free in its RHS
-
 
 Finally, substitute these new top-level binders consistently
 throughout, including in unfoldings.  We also tidy binders in
@@ -359,7 +353,7 @@ tidyProgram hsc_env  (ModGuts { mg_module    = mod
                     = findExternalRules omit_prags binds imp_rules unfold_env }
 
         ; (tidy_env, tidy_binds)
-                 <- tidyTopBinds hsc_env mod unfold_env tidy_occ_env trimmed_binds
+                 <- tidyTopBinds hsc_env unfold_env tidy_occ_env trimmed_binds
 
           -- See Note [Grand plan for static forms] in StaticPtrTable.
         ; (spt_entries, tidy_binds') <-
@@ -1070,22 +1064,13 @@ tidyTopName mod nc_var maybe_ref occ_env id
 --   * subst_env: A Var->Var mapping that substitutes the new Var for the old
 
 tidyTopBinds :: HscEnv
-             -> Module
              -> UnfoldEnv
              -> TidyOccEnv
              -> CoreProgram
              -> IO (TidyEnv, CoreProgram)
 
-tidyTopBinds hsc_env this_mod unfold_env init_occ_env binds
-  = do mkIntegerId <- lookupMkIntegerName dflags hsc_env
-       mkNaturalId <- lookupMkNaturalName dflags hsc_env
-       integerSDataCon <- lookupIntegerSDataConName dflags hsc_env
-       naturalSDataCon <- lookupNaturalSDataConName dflags hsc_env
-       let cvt_literal nt i = case nt of
-             LitNumInteger -> Just (cvtLitInteger dflags mkIntegerId integerSDataCon i)
-             LitNumNatural -> Just (cvtLitNatural dflags mkNaturalId naturalSDataCon i)
-             _             -> Nothing
-           result      = tidy cvt_literal init_env binds
+tidyTopBinds hsc_env unfold_env init_occ_env binds
+  = do let result = tidy init_env binds
        seqBinds (snd result) `seq` return result
        -- This seqBinds avoids a spike in space usage (see #13564)
   where
@@ -1093,35 +1078,28 @@ tidyTopBinds hsc_env this_mod unfold_env init_occ_env binds
 
     init_env = (init_occ_env, emptyVarEnv)
 
-    tidy cvt_literal = mapAccumL (tidyTopBind dflags this_mod cvt_literal unfold_env)
+    tidy = mapAccumL (tidyTopBind dflags unfold_env)
 
 ------------------------
 tidyTopBind  :: DynFlags
-             -> Module
-             -> (LitNumType -> Integer -> Maybe CoreExpr)
              -> UnfoldEnv
              -> TidyEnv
              -> CoreBind
              -> (TidyEnv, CoreBind)
 
-tidyTopBind dflags this_mod cvt_literal unfold_env
+tidyTopBind dflags unfold_env
             (occ_env,subst1) (NonRec bndr rhs)
   = (tidy_env2,  NonRec bndr' rhs')
   where
     Just (name',show_unfold) = lookupVarEnv unfold_env bndr
-    caf_info      = hasCafRefs dflags this_mod
-                               (subst1, cvt_literal)
-                               (idArity bndr) rhs
-    (bndr', rhs') = tidyTopPair dflags show_unfold tidy_env2 caf_info name'
-                                (bndr, rhs)
+    (bndr', rhs') = tidyTopPair dflags show_unfold tidy_env2 name' (bndr, rhs)
     subst2        = extendVarEnv subst1 bndr bndr'
     tidy_env2     = (occ_env, subst2)
 
-tidyTopBind dflags this_mod cvt_literal unfold_env
-            (occ_env, subst1) (Rec prs)
+tidyTopBind dflags unfold_env (occ_env, subst1) (Rec prs)
   = (tidy_env2, Rec prs')
   where
-    prs' = [ tidyTopPair dflags show_unfold tidy_env2 caf_info name' (id,rhs)
+    prs' = [ tidyTopPair dflags show_unfold tidy_env2 name' (id,rhs)
            | (id,rhs) <- prs,
              let (name',show_unfold) =
                     expectJust "tidyTopBind" $ lookupVarEnv unfold_env id
@@ -1132,21 +1110,11 @@ tidyTopBind dflags this_mod cvt_literal unfold_env
 
     bndrs = map fst prs
 
-        -- the CafInfo for a recursive group says whether *any* rhs in
-        -- the group may refer indirectly to a CAF (because then, they all do).
-    caf_info
-        | or [ mayHaveCafRefs (hasCafRefs dflags this_mod
-                                          (subst1, cvt_literal)
-                                          (idArity bndr) rhs)
-             | (bndr,rhs) <- prs ] = MayHaveCafRefs
-        | otherwise                = NoCafRefs
-
 -----------------------------------------------------------
 tidyTopPair :: DynFlags
             -> Bool  -- show unfolding
             -> TidyEnv  -- The TidyEnv is used to tidy the IdInfo
                         -- It is knot-tied: don't look at it!
-            -> CafInfo
             -> Name             -- New name
             -> (Id, CoreExpr)   -- Binder and RHS before tidying
             -> (Id, CoreExpr)
@@ -1156,7 +1124,7 @@ tidyTopPair :: DynFlags
         -- group, a variable late in the group might be mentioned
         -- in the IdInfo of one early in the group
 
-tidyTopPair dflags show_unfold rhs_tidy_env caf_info name' (bndr, rhs)
+tidyTopPair dflags show_unfold rhs_tidy_env name' (bndr, rhs)
   = (bndr1, rhs1)
   where
     bndr1    = mkGlobalId details name' ty' idinfo'
@@ -1164,28 +1132,22 @@ tidyTopPair dflags show_unfold rhs_tidy_env caf_info name' (bndr, rhs)
     ty'      = tidyTopType (idType bndr)
     rhs1     = tidyExpr rhs_tidy_env rhs
     idinfo'  = tidyTopIdInfo dflags rhs_tidy_env name' rhs rhs1 (idInfo bndr)
-                             show_unfold caf_info
+                             show_unfold
 
 -- tidyTopIdInfo creates the final IdInfo for top-level
--- binders.  There are two delicate pieces:
+-- binders.  The delicate piece:
 --
 --  * Arity.  After CoreTidy, this arity must not change any more.
 --      Indeed, CorePrep must eta expand where necessary to make
 --      the manifest arity equal to the claimed arity.
 --
---  * CAF info.  This must also remain valid through to code generation.
---      We add the info here so that it propagates to all
---      occurrences of the binders in RHSs, and hence to occurrences in
---      unfoldings, which are inside Ids imported by GHCi. Ditto RULES.
---      CoreToStg makes use of this when constructing SRTs.
 tidyTopIdInfo :: DynFlags -> TidyEnv -> Name -> CoreExpr -> CoreExpr
-              -> IdInfo -> Bool -> CafInfo -> IdInfo
-tidyTopIdInfo dflags rhs_tidy_env name orig_rhs tidy_rhs idinfo show_unfold caf_info
+              -> IdInfo -> Bool -> IdInfo
+tidyTopIdInfo dflags rhs_tidy_env name orig_rhs tidy_rhs idinfo show_unfold
   | not is_external     -- For internal Ids (not externally visible)
   = vanillaIdInfo       -- we only need enough info for code generation
                         -- Arity and strictness info are enough;
                         --      c.f. CoreTidy.tidyLetBndr
-        `setCafInfo`        caf_info
         `setArityInfo`      arity
         `setStrictnessInfo` final_sig
         `setUnfoldingInfo`  minimal_unfold_info  -- See note [Preserve evaluatedness]
@@ -1193,7 +1155,6 @@ tidyTopIdInfo dflags rhs_tidy_env name orig_rhs tidy_rhs idinfo show_unfold caf_
 
   | otherwise           -- Externally-visible Ids get the whole lot
   = vanillaIdInfo
-        `setCafInfo`           caf_info
         `setArityInfo`         arity
         `setStrictnessInfo`    final_sig
         `setOccInfo`           robust_occ_info
@@ -1253,137 +1214,6 @@ tidyTopIdInfo dflags rhs_tidy_env name orig_rhs tidy_rhs idinfo show_unfold caf_
     -- it to the top level. So it seems more robust just to
     -- fix it here.
     arity = exprArity orig_rhs
-
-{-
-************************************************************************
-*                                                                      *
-           Figuring out CafInfo for an expression
-*                                                                      *
-************************************************************************
-
-hasCafRefs decides whether a top-level closure can point into the dynamic heap.
-We mark such things as `MayHaveCafRefs' because this information is
-used to decide whether a particular closure needs to be referenced
-in an SRT or not.
-
-There are two reasons for setting MayHaveCafRefs:
-        a) The RHS is a CAF: a top-level updatable thunk.
-        b) The RHS refers to something that MayHaveCafRefs
-
-Possible improvement: In an effort to keep the number of CAFs (and
-hence the size of the SRTs) down, we could also look at the expression and
-decide whether it requires a small bounded amount of heap, so we can ignore
-it as a CAF.  In these cases however, we would need to use an additional
-CAF list to keep track of non-collectable CAFs.
-
-Note [Disgusting computation of CafRefs]
-~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
-We compute hasCafRefs here, because IdInfo is supposed to be finalised
-after tidying. But CorePrep does some transformations that affect CAF-hood.
-So we have to *predict* the result here, which is revolting.
-
-In particular CorePrep expands Integer and Natural literals. So in the
-prediction code here we resort to applying the same expansion (cvt_literal).
-There are also numerous other ways in which we can introduce inconsistencies
-between CorePrep and GHC.Iface.Tidy. See Note [CAFfyness inconsistencies due to
-eta expansion in TidyPgm] for one such example.
-
-Ugh! What ugliness we hath wrought.
-
-
-Note [CAFfyness inconsistencies due to eta expansion in TidyPgm]
-~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
-Eta expansion during CorePrep can have non-obvious negative consequences on
-the CAFfyness computation done by tidying (see Note [Disgusting computation of
-CafRefs] in GHC.Iface.Tidy). This late expansion happens/happened for a few
-reasons:
-
- * CorePrep previously eta expanded unsaturated primop applications, as
-   described in Note [Primop wrappers]).
-
- * CorePrep still does eta expand unsaturated data constructor applications.
-
-In particular, consider the program:
-
-    data Ty = Ty (RealWorld# -> (# RealWorld#, Int #))
-
-    -- Is this CAFfy?
-    x :: STM Int
-    x = Ty (retry# @Int)
-
-Consider whether x is CAFfy. One might be tempted to answer "no".
-Afterall, f obviously has no CAF references and the application (retry#
-@Int) is essentially just a variable reference at runtime.
-
-However, when CorePrep expanded the unsaturated application of 'retry#'
-it would rewrite this to
-
-    x = \u []
-       let sat = retry# @Int
-       in Ty sat
-
-This is now a CAF. Failing to handle this properly was the cause of
-#16846. We fixed this by eliminating the need to eta expand primops, as
-described in Note [Primop wrappers]), However we have not yet done the same for
-data constructor applications.
-
--}
-
-type CafRefEnv = (VarEnv Id, LitNumType -> Integer -> Maybe CoreExpr)
-  -- The env finds the Caf-ness of the Id
-  -- The LitNumType -> Integer -> CoreExpr is the desugaring functions for
-  -- Integer and Natural literals
-  -- See Note [Disgusting computation of CafRefs]
-
-hasCafRefs :: DynFlags -> Module
-           -> CafRefEnv -> Arity -> CoreExpr
-           -> CafInfo
-hasCafRefs dflags this_mod (subst, cvt_literal) arity expr
-  | is_caf || mentions_cafs = MayHaveCafRefs
-  | otherwise               = NoCafRefs
- where
-  mentions_cafs   = cafRefsE expr
-  is_dynamic_name = isDllName dflags this_mod
-  is_caf = not (arity > 0 || rhsIsStatic (targetPlatform dflags) is_dynamic_name
-                                         cvt_literal expr)
-
-  -- NB. we pass in the arity of the expression, which is expected
-  -- to be calculated by exprArity.  This is because exprArity
-  -- knows how much eta expansion is going to be done by
-  -- CorePrep later on, and we don't want to duplicate that
-  -- knowledge in rhsIsStatic below.
-
-  cafRefsE :: Expr a -> Bool
-  cafRefsE (Var id)            = cafRefsV id
-  cafRefsE (Lit lit)           = cafRefsL lit
-  cafRefsE (App f a)           = cafRefsE f || cafRefsE a
-  cafRefsE (Lam _ e)           = cafRefsE e
-  cafRefsE (Let b e)           = cafRefsEs (rhssOfBind b) || cafRefsE e
-  cafRefsE (Case e _ _ alts)   = cafRefsE e || cafRefsEs (rhssOfAlts alts)
-  cafRefsE (Tick _n e)         = cafRefsE e
-  cafRefsE (Cast e _co)        = cafRefsE e
-  cafRefsE (Type _)            = False
-  cafRefsE (Coercion _)        = False
-
-  cafRefsEs :: [Expr a] -> Bool
-  cafRefsEs []     = False
-  cafRefsEs (e:es) = cafRefsE e || cafRefsEs es
-
-  cafRefsL :: Literal -> Bool
-  -- Don't forget that mk_integer id might have Caf refs!
-  -- We first need to convert the Integer into its final form, to
-  -- see whether mkInteger is used. Same for LitNatural.
-  cafRefsL (LitNumber nt i _) = case cvt_literal nt i of
-    Just e  -> cafRefsE e
-    Nothing -> False
-  cafRefsL _                = False
-
-  cafRefsV :: Id -> Bool
-  cafRefsV id
-    | not (isLocalId id)                = mayHaveCafRefs (idCafInfo id)
-    | Just id' <- lookupVarEnv subst id = mayHaveCafRefs (idCafInfo id')
-    | otherwise                         = False
-
 
 {-
 ************************************************************************
