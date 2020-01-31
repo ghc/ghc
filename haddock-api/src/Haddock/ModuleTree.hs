@@ -17,8 +17,7 @@ import Haddock.Types ( MDoc )
 import GHC           ( Name )
 import Module        ( Module, moduleNameString, moduleName, moduleUnitId, unitIdString )
 import DynFlags      ( DynFlags )
-import Packages      ( lookupPackage )
-import PackageConfig ( sourcePackageIdString )
+import Packages      ( lookupUnit, sourcePackageIdString )
 
 import qualified Control.Applicative as A
 
@@ -33,7 +32,7 @@ mkModuleTree dflags showPkgs mods =
     modPkg mod_ | showPkgs = Just (unitIdString (moduleUnitId mod_))
                 | otherwise = Nothing
     modSrcPkg mod_ | showPkgs = fmap sourcePackageIdString
-                                     (lookupPackage dflags (moduleUnitId mod_))
+                                     (lookupUnit dflags (moduleUnitId mod_))
                    | otherwise = Nothing
     fn (m,mod_,pkg,srcPkg,short) = addToTrees mod_ m pkg srcPkg short
 
