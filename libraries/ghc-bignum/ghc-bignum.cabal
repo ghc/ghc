@@ -117,6 +117,14 @@ library
       other-modules:
          GHC.Num.BigNat.Check
 
+  -- GHC inserts reference to absentSumFieldError closure (defined in base
+  -- package) when we use unboxed sums. We tell the linker that the symbol is
+  -- external
+
+  if os(darwin) -- additional symbol prefix underscore
+      ld-options: "-Wl,-u,_base_ControlziExceptionziBase_absentSumFieldError_closure"
+  if !os(darwin)
+      ld-options: "-Wl,-u,base_ControlziExceptionziBase_absentSumFieldError_closure"
 
   exposed-modules:
     GHC.Num.Primitives
