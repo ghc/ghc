@@ -22,7 +22,6 @@ import GhcPrelude
 import BasicTypes
 import DynFlags
 import Id
-import IdInfo
 import GHC.Stg.FVs ( annBindingFreeVars )
 import GHC.Stg.Lift.Analysis
 import GHC.Stg.Lift.Monad
@@ -155,14 +154,9 @@ withLiftedBind
   -> (Maybe OutStgBinding -> LiftM a)
   -> LiftM a
 withLiftedBind top_lvl bind scope k
-  | isTopLevel top_lvl
-  = withCaffyness (is_caffy pairs) go
-  | otherwise
-  = go
+  = withLiftedBindPairs top_lvl rec pairs scope (k . fmap (mkStgBinding rec))
   where
     (rec, pairs) = decomposeStgBinding bind
-    is_caffy = any (mayHaveCafRefs . idCafInfo . binderInfoBndr . fst)
-    go = withLiftedBindPairs top_lvl rec pairs scope (k . fmap (mkStgBinding rec))
 
 withLiftedBindPairs
   :: TopLevelFlag
