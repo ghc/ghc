@@ -87,6 +87,7 @@ Dumping out compiler intermediate structures
     :type: dynamic
 
     Show allocation and runtime statistics for various stages of compilation.
+    Allocations are measured in bytes. Timings are measured in milliseconds.
 
 GHC is a large program consisting of a number of stages. You can tell GHC to
 dump information from various stages of compilation using the ``-ddump-⟨pass⟩``
