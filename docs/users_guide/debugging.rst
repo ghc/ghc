@@ -851,14 +851,21 @@ Checking for consistency
     However forcing larger alignments in general reduces performance.
 
 .. ghc-flag:: -fcatch-bottoms
-    :shortdesc: Insert ``error`` expressions after bottoming expressions; useful
-        when debugging the compiler.
+    :shortdesc: Add a default ``error`` alternative to case expressions without
+        a default alternative.
     :type: dynamic
 
-    Instructs the simplifier to emit ``error`` expressions in the continuation
-    of empty case analyses (which should bottom and consequently not return).
-    This is helpful when debugging demand analysis bugs which can sometimes
-    manifest as segmentation faults.
+    GHC generates case expressions without a default alternative in some cases:
+
+    - When the demand analysis thinks that the scrutinee does not return (i.e. a
+      bottoming expression)
+
+    - When the scrutinee is a GADT and its type rules out some constructors, and
+      others constructors are already handled by the case expression.
+
+    With this flag GHC generates a default alternative with ``error`` in these
+    cases. This is helpful when debugging demand analysis or type checker bugs
+    which can sometimes manifest as segmentation faults.
 
 .. _checking-determinism:
 
