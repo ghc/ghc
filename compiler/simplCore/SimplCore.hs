@@ -314,21 +314,13 @@ getCoreToDo dflags
                         -- reduce the possibility of shadowing
                         -- Reason: see Note [Shadowing] in SpecConstr.hs
 
-        runWhen spec_constr
-          (CoreDoPasses [ CoreDoSpecConstr
-                        , simpl_phase 0 ["post-spec-constr"] 1]),
+        runWhen spec_constr CoreDoSpecConstr,
 
         maybe_rule_check (Phase 0),
 
         runWhen late_specialise
           (CoreDoPasses [ CoreDoSpecialising
                         , simpl_phase 0 ["post-late-spec"] max_iter]),
-
-        -- LiberateCase can yield new CSE opportunities because it peels
-        -- off one layer of a recursive function (concretely, I saw this
-        -- in wheel-sieve1), and I'm guessing that SpecConstr can too
-        -- And CSE is a very cheap pass. So it seems worth doing here.
-        runWhen ((liberate_case || spec_constr) && cse) CoreCSE,
 
         -- Final clean-up simplification:
         simpl_phase 0 ["final"] max_iter,
