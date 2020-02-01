@@ -11,7 +11,7 @@ module GHC.Stg.Lift.Monad (
     -- $floats
     FloatLang (..), collectFloats, -- Exported just for the docs
     -- * Transformation monad
-    LiftM, runLiftM, withCaffyness,
+    LiftM, runLiftM,
     -- ** Adding bindings
     startBindingGroup, endBindingGroup, addTopStringLit, addLiftedBinding,
     -- ** Substitution and binders
@@ -29,7 +29,6 @@ import CostCentre ( isCurrentCCS, dontCareCCS )
 import DynFlags
 import FastString
 import Id
-import IdInfo
 import Name
 import Outputable
 import OrdList
@@ -81,14 +80,10 @@ data Env
   -- 'InId's to 'OutId's.
   --
   -- Invariant: 'Id's not present in this map won't be substituted.
-  , e_in_caffy_context :: !Bool
-  -- ^ Are we currently analysing within a caffy context (e.g. the containing
-  -- top-level binder's 'idCafInfo' is 'MayHaveCafRefs')? If not, we can safely
-  -- assume that functions we lift out aren't caffy either.
   }
 
 emptyEnv :: DynFlags -> Env
-emptyEnv dflags = Env dflags emptySubst emptyVarEnv False
+emptyEnv dflags = Env dflags emptySubst emptyVarEnv
 
 
 -- Note [Handling floats]
@@ -206,8 +201,7 @@ removeRhsCCCS rhs = rhs
 --
 --     * 'Env': Reader-like context. Contains a substitution, info about how
 --       how lifted identifiers are to be expanded into applications and details
---       such as 'DynFlags' and a flag helping with determining if a lifted
---       binding is caffy.
+--       such as 'DynFlags'.
 --
 --     * @'OrdList' 'FloatLang'@: Writer output for the resulting STG program.
 --
@@ -232,12 +226,6 @@ runLiftM :: DynFlags -> UniqSupply -> LiftM () -> [OutStgTopBinding]
 runLiftM dflags us (LiftM m) = collectFloats (fromOL floats)
   where
     (_, _, floats) = initUs_ us (runRWST m (emptyEnv dflags) ())
-
--- | Assumes a given caffyness for the execution of the passed action, which
--- influences the 'cafInfo' of lifted bindings.
-withCaffyness :: Bool -> LiftM a -> LiftM a
-withCaffyness caffy action
-  = LiftM (RWS.local (\e -> e { e_in_caffy_context = caffy }) (unwrapLiftM action))
 
 -- | Writes a plain 'StgTopStringLit' to the output.
 addTopStringLit :: OutId -> ByteString -> LiftM ()
@@ -276,26 +264,16 @@ withSubstBndrs = runContT . traverse (ContT . withSubstBndr)
 -- for) and a continuation in which that fresh, lifted binder is in scope.
 --
 -- It takes care of all the details involved with copying and adjusting the
--- binder, fresh name generation and caffyness.
+-- binder and fresh name generation.
 withLiftedBndr :: DIdSet -> Id -> (Id -> LiftM a) -> LiftM a
 withLiftedBndr abs_ids bndr inner = do
   uniq <- getUniqueM
   let str = "$l" ++ occNameString (getOccName bndr)
   let ty = mkLamTypes (dVarSetElems abs_ids) (idType bndr)
-  -- When the enclosing top-level binding is not caffy, then the lifted
-  -- binding will not be caffy either. If we don't recognize this, non-caffy
-  -- things call caffy things and then codegen screws up.
-  in_caffy_ctxt <- LiftM (RWS.asks e_in_caffy_context)
-  let caf_info = if in_caffy_ctxt then MayHaveCafRefs else NoCafRefs
   let bndr'
         -- See Note [transferPolyIdInfo] in Id.hs. We need to do this at least
         -- for arity information.
         = transferPolyIdInfo bndr (dVarSetElems abs_ids)
-        -- Otherwise we confuse code gen if bndr was not caffy: the new bndr is
-        -- assumed to be caffy and will need an SRT. Transitive call sites might
-        -- not be caffy themselves and subsequently will miss a static link
-        -- field in their closure. Chaos ensues.
-        . flip setIdCafInfo caf_info
         . mkSysLocal (mkFastString str) uniq
         $ ty
   LiftM $ RWS.local
