@@ -1,6 +1,6 @@
 
 T15881.hs:8:18: error:
-    • Occurs check: cannot construct the infinite kind: k0 ~ k0 -> *
+    • Expected kind ‘k0’, but ‘n’ has kind ‘k0 -> *’
     • In the first argument of ‘n’, namely ‘n’
       In the kind ‘n n’
       In the data type declaration for ‘A’

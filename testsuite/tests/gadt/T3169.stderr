@@ -1,8 +1,12 @@
 
 T3169.hs:13:22: error:
-    • Occurs check: cannot construct the infinite type: elt ~ Map b elt
-      Expected type: Map a (Map b elt)
-        Actual type: Map (a, b) elt
+    • Couldn't match type ‘elt’ with ‘Map b elt’
+      Expected: Map a (Map b elt)
+        Actual: Map (a, b) elt
+      ‘elt’ is a rigid type variable bound by
+        the type signature for:
+          lookup :: forall elt. (a, b) -> Map (a, b) elt -> Maybe elt
+        at T3169.hs:12:3-8
     • In the second argument of ‘lookup’, namely ‘m’
       In the expression: lookup a m :: Maybe (Map b elt)
       In the expression:

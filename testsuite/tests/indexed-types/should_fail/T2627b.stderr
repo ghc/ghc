@@ -1,8 +1,18 @@
 
 T2627b.hs:20:24: error:
-    • Occurs check: cannot construct the infinite type:
-        b0 ~ Dual (Dual b0)
+    • Could not deduce: Dual (Dual b0) ~ b0
         arising from a use of ‘conn’
+      from the context: (Dual a ~ b, Dual b ~ a)
+        bound by the type signature for:
+                   conn :: forall a b.
+                           (Dual a ~ b, Dual b ~ a) =>
+                           Comm a -> Comm b -> (Int, Int)
+        at T2627b.hs:19:1-66
+      or from: a ~ R c d
+        bound by a pattern with constructor:
+                   Rd :: forall c d. (c -> Comm d) -> Comm (R c d),
+                 in an equation for ‘conn’
+        at T2627b.hs:20:7-10
       The type variable ‘b0’ is ambiguous
     • In the expression: conn undefined undefined
       In an equation for ‘conn’:

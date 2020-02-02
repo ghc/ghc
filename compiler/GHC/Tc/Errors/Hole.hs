@@ -43,7 +43,7 @@ import Data.Graph       ( graphFromEdges, topSort )
 
 
 import GHC.Tc.Solver    ( simpl_top, runTcSDeriveds )
-import GHC.Tc.Utils.Unify ( tcSubType_NC )
+import GHC.Tc.Utils.Unify ( tcSubTypeSigma )
 
 import GHC.HsToCore.Docs ( extractDocs )
 import qualified Data.Map as Map
@@ -933,7 +933,7 @@ tcCheckHoleFit (TypedHole {..}) hole_ty ty = discardErrs $
                           -- imp is the innermost implication
                           (imp:_) -> return (ic_tclvl imp)
      ; (wrap, wanted) <- setTcLevel innermost_lvl $ captureConstraints $
-                         tcSubType_NC ExprSigCtxt ty hole_ty
+                         tcSubTypeSigma ExprSigCtxt ty hole_ty
      ; traceTc "Checking hole fit {" empty
      ; traceTc "wanteds are: " $ ppr wanted
      ; if isEmptyWC wanted && isEmptyBag th_relevant_cts

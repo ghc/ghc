@@ -11,7 +11,12 @@ T14584.hs:56:41: warning: [-Wdeferred-type-errors (in -Wdefault)]
         act @_ @_ @act (fromSing @m (sing @m @a :: Sing _))
 
 T14584.hs:56:50: warning: [-Wdeferred-type-errors (in -Wdefault)]
-    • Expected kind ‘m1’, but ‘a’ has kind ‘*’
+    • Could not deduce: m1 ~ *
+      from the context: (Action act, Monoid a, Good m1)
+        bound by the instance declaration at T14584.hs:54:10-89
+      ‘m1’ is a rigid type variable bound by
+        the instance declaration
+        at T14584.hs:54:10-89
     • In the type ‘a’
       In the second argument of ‘fromSing’, namely
         ‘(sing @m @a :: Sing _)’

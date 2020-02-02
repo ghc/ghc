@@ -89,6 +89,13 @@ Language
   This change prepares the way for `Quick Look impredicativity
   <https://gitlab.haskell.org/ghc/ghc/issues/18126>`_.
 
+* GHC now implements simplified subsumption, as described in `GHC Proposal #287 <https://github.com/ghc-proposals/ghc-proposals/blob/master/proposals/0287-simplify-subsumption.rst>`__.
+  This change simplifies the type system, and prevents the possiblity of GHC
+  silently changing the semantics of user programs, but it does mean that some libraries
+  may need eta-expansion to typecheck.  More info here: :ref:`simple-subsumption`.
+
+  This change also prepares the way for Quick Look impredicativity.
+
 * GHC now allows users to manually define the specificity of type variable
   binders. By marking a variable with braces ``{tyvar}`` or ``{tyvar :: kind}``,
   it becomes inferred despite appearing in a type signature. This feature

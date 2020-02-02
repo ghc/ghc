@@ -1,6 +1,8 @@
 
 T15370.hs:14:10: warning: [-Wdeferred-type-errors (in -Wdefault)]
     • Couldn't match type ‘n’ with ‘j’
+      Expected: n :~: j
+        Actual: n :~: n
       ‘n’ is a rigid type variable bound by
         the type signature for:
           mkRefl :: forall {k} (n :: k) (j :: k). n :~: j
@@ -9,8 +11,6 @@ T15370.hs:14:10: warning: [-Wdeferred-type-errors (in -Wdefault)]
         the type signature for:
           mkRefl :: forall {k} (n :: k) (j :: k). n :~: j
         at T15370.hs:13:1-17
-      Expected type: n :~: j
-        Actual type: n :~: n
     • In the expression: Refl
       In an equation for ‘mkRefl’: mkRefl = Refl
     • Relevant bindings include
@@ -18,8 +18,8 @@ T15370.hs:14:10: warning: [-Wdeferred-type-errors (in -Wdefault)]
 
 T15370.hs:20:13: warning: [-Wdeferred-type-errors (in -Wdefault)]
     • Couldn't match type ‘S r’ with ‘()’
-      Expected type: ()
-        Actual type: S r
+      Expected: ()
+        Actual: S r
     • In the expression: no + _
       In a case alternative: Refl -> no + _
       In the expression: case mkRefl @x @y of { Refl -> no + _ }
