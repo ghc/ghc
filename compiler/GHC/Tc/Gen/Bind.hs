@@ -23,8 +23,9 @@ where
 import GhcPrelude
 
 import {-# SOURCE #-} GHC.Tc.Gen.Match ( tcGRHSsPat, tcMatchesFun )
-import {-# SOURCE #-} GHC.Tc.Gen.Expr  ( tcMonoExpr )
+import {-# SOURCE #-} GHC.Tc.Gen.Expr  ( tcCheckMonoExpr )
 import {-# SOURCE #-} GHC.Tc.TyCl.PatSyn ( tcPatSynDecl, tcPatSynBuilderBind )
+
 import GHC.Core (Tickish (..))
 import GHC.Types.CostCentre (mkUserCC, CCFlavour(DeclCC))
 import GHC.Driver.Session
@@ -354,7 +355,7 @@ tcLocalBinds (HsIPBinds x (IPBinds _ ip_binds)) thing_inside
        = do { ty <- newOpenFlexiTyVarTy
             ; let p = mkStrLitTy $ hsIPNameFS ip
             ; ip_id <- newDict ipClass [ p, ty ]
-            ; expr' <- tcMonoExpr expr (mkCheckExpType ty)
+            ; expr' <- tcCheckMonoExpr expr ty
             ; let d = toDict ipClass p ty `fmap` expr'
             ; return (ip_id, (IPBind noExtField (Right ip_id) d)) }
     tc_ip_bind _ (IPBind _ (Right {}) _) = panic "tc_ip_bind"
