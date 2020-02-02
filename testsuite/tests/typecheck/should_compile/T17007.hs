@@ -10,4 +10,4 @@ get (x :: ItemColID a b) = x :: ItemColID a b
 type family ItemColID' a b where ItemColID' a b = Int  -- Discards a,b
 
 get' :: ItemColID' a b -> ItemColID' a b
-get' (x :: ItemColID' a b) = x :: ItemColID' a b
+get' (x :: ItemColID' p q) = x :: ItemColID' a b
