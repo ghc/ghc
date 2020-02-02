@@ -1,14 +1,8 @@
 
 T13381.hs:21:23: error:
     • Couldn't match type ‘Exp Int’ with ‘Int’
-      Expected type: Exp Int -> Iter (Exp Int) (Exp Char)
-        Actual type: Int -> Iter (Exp Int) (Exp Char)
+      Expected: Int -> Iter Int (Exp Char)
+        Actual: Int -> Iter (Exp Int) (Exp Char)
     • In the first argument of ‘iterLoop’, namely ‘f’
-      In the first argument of ‘fromExp’, namely ‘(iterLoop f init)’
-      In the expression: fromExp (iterLoop f init)
-
-T13381.hs:21:25: error:
-    • Couldn't match expected type ‘Exp Int’ with actual type ‘Int’
-    • In the second argument of ‘iterLoop’, namely ‘init’
       In the first argument of ‘fromExp’, namely ‘(iterLoop f init)’
       In the expression: fromExp (iterLoop f init)

@@ -39,7 +39,7 @@ module GHC.Builtin.Types (
 
         -- * Char
         charTyCon, charDataCon, charTyCon_RDR,
-        charTy, stringTy, charTyConName,
+        charTy, stringTy, charTyConName, stringTyCon_RDR,
 
         -- * Double
         doubleTyCon, doubleDataCon, doubleTy, doubleTyConName,
@@ -221,6 +221,7 @@ wiredInTyCons = [ -- Units are not treated like other tuples, because they
                 , anyTyCon
                 , boolTyCon
                 , charTyCon
+                , stringTyCon
                 , doubleTyCon
                 , floatTyCon
                 , intTyCon
@@ -301,11 +302,12 @@ coercibleTyConName   = mkWiredInTyConName   UserSyntax gHC_TYPES (fsLit "Coercib
 coercibleDataConName = mkWiredInDataConName UserSyntax gHC_TYPES (fsLit "MkCoercible") coercibleDataConKey coercibleDataCon
 coercibleSCSelIdName = mkWiredInIdName gHC_TYPES (fsLit "coercible_sel") coercibleSCSelIdKey coercibleSCSelId
 
-charTyConName, charDataConName, intTyConName, intDataConName :: Name
-charTyConName     = mkWiredInTyConName   UserSyntax gHC_TYPES (fsLit "Char") charTyConKey charTyCon
-charDataConName   = mkWiredInDataConName UserSyntax gHC_TYPES (fsLit "C#") charDataConKey charDataCon
-intTyConName      = mkWiredInTyConName   UserSyntax gHC_TYPES (fsLit "Int") intTyConKey   intTyCon
-intDataConName    = mkWiredInDataConName UserSyntax gHC_TYPES (fsLit "I#") intDataConKey  intDataCon
+charTyConName, charDataConName, intTyConName, intDataConName, stringTyConName :: Name
+charTyConName     = mkWiredInTyConName   UserSyntax gHC_TYPES (fsLit "Char")   charTyConKey charTyCon
+charDataConName   = mkWiredInDataConName UserSyntax gHC_TYPES (fsLit "C#")     charDataConKey charDataCon
+stringTyConName   = mkWiredInTyConName   UserSyntax gHC_BASE  (fsLit "String") stringTyConKey stringTyCon
+intTyConName      = mkWiredInTyConName   UserSyntax gHC_TYPES (fsLit "Int")    intTyConKey   intTyCon
+intDataConName    = mkWiredInDataConName UserSyntax gHC_TYPES (fsLit "I#")     intDataConKey  intDataCon
 
 boolTyConName, falseDataConName, trueDataConName :: Name
 boolTyConName     = mkWiredInTyConName   UserSyntax gHC_TYPES (fsLit "Bool") boolTyConKey boolTyCon
@@ -507,13 +509,14 @@ vecElemDataConNames = zipWith3Lazy mk_special_dc_name
 mk_special_dc_name :: FastString -> Unique -> DataCon -> Name
 mk_special_dc_name fs u dc = mkWiredInDataConName UserSyntax gHC_TYPES fs u dc
 
-boolTyCon_RDR, false_RDR, true_RDR, intTyCon_RDR, charTyCon_RDR,
+boolTyCon_RDR, false_RDR, true_RDR, intTyCon_RDR, charTyCon_RDR, stringTyCon_RDR,
     intDataCon_RDR, listTyCon_RDR, consDataCon_RDR :: RdrName
 boolTyCon_RDR   = nameRdrName boolTyConName
 false_RDR       = nameRdrName falseDataConName
 true_RDR        = nameRdrName trueDataConName
 intTyCon_RDR    = nameRdrName intTyConName
 charTyCon_RDR   = nameRdrName charTyConName
+stringTyCon_RDR = nameRdrName stringTyConName
 intDataCon_RDR  = nameRdrName intDataConName
 listTyCon_RDR   = nameRdrName listTyConName
 consDataCon_RDR = nameRdrName consDataConName
@@ -1402,7 +1405,15 @@ charDataCon :: DataCon
 charDataCon = pcDataCon charDataConName [] [charPrimTy] charTyCon
 
 stringTy :: Type
-stringTy = mkListTy charTy -- convenience only
+stringTy = mkTyConApp stringTyCon []
+
+stringTyCon :: TyCon
+-- We have this wired-in so that Haskell literal strings
+-- get type String (in hsLitType), which in turn influences
+-- inferred types and error messages
+stringTyCon = buildSynTyCon stringTyConName
+                            [] liftedTypeKind []
+                            (mkListTy charTy)
 
 intTy :: Type
 intTy = mkTyConTy intTyCon
