@@ -1,6 +1,7 @@
 
 T8030.hs:9:3: error:
-    • Couldn't match expected type ‘Pr a’ with actual type ‘Pr a0’
+    • Couldn't match expected type: Pr a
+                  with actual type: Pr a0
       NB: ‘Pr’ is a non-injective type family
       The type variable ‘a0’ is ambiguous
     • In the ambiguity check for ‘op1’
@@ -10,9 +11,10 @@ T8030.hs:9:3: error:
       In the class declaration for ‘C’
 
 T8030.hs:10:3: error:
-    • Couldn't match type ‘Pr a0’ with ‘Pr a’
-      Expected type: Pr a -> Pr a -> Pr a
-        Actual type: Pr a0 -> Pr a0 -> Pr a0
+    • Couldn't match type: Pr a0
+                     with: Pr a
+      Expected: Pr a -> Pr a -> Pr a
+        Actual: Pr a0 -> Pr a0 -> Pr a0
       NB: ‘Pr’ is a non-injective type family
       The type variable ‘a0’ is ambiguous
     • In the ambiguity check for ‘op2’

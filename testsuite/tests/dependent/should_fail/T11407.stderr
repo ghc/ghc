@@ -1,6 +1,6 @@
 
 T11407.hs:10:40: error:
-    • Occurs check: cannot construct the infinite kind: k0 ~ x a
+    • Expected kind ‘x a’, but ‘a’ has kind ‘k0’
     • In the second argument of ‘UhOh’, namely ‘(a :: x a)’
       In the data instance declaration for ‘UhOh’
     • Type variable kinds:
