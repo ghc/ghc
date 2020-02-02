@@ -75,6 +75,7 @@ import DynFlags
 import Unique
 import ConLike( ConLike(..) )
 import BasicTypes
+import PrelInfo ( wiredInNameTyThing_maybe )
 import qualified GHC.LanguageExtensions as LangExt
 
 import Control.Monad

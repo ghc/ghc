@@ -75,6 +75,7 @@ import Util
 import FastString
 import BasicTypes hiding ( SuccessFlag(..) )
 import ListSetOps
+import PrelInfo ( wiredInNameTyThing_maybe )
 import GHC.Fingerprint
 import qualified BooleanFormula as BF
 

@@ -63,7 +63,6 @@ module Name (
         isValName, isVarName,
         isWiredInName, isWiredIn, isBuiltInSyntax,
         isHoleName,
-        wiredInNameTyThing_maybe,
         nameIsLocalOrFrom, nameIsHomePackage,
         nameIsHomePackageImport, nameIsFromExternalPackage,
         stableNameCmp,
@@ -122,7 +121,7 @@ data Name = Name {
 data NameSort
   = External Module
 
-  | WiredIn Module TyThing BuiltInSyntax
+  | WiredIn Module !() BuiltInSyntax
         -- A variant of External, for wired-in things
 
   | Internal            -- A user-defined Id or TyVar
@@ -143,9 +142,6 @@ instance NFData Name where
 instance NFData NameSort where
   rnf (External m) = rnf m
   rnf (WiredIn m t b) = rnf m `seq` t `seq` b `seq` ()
-    -- XXX this is a *lie*, we're not going to rnf the TyThing, but
-    -- since the TyThings for WiredIn Names are all static they can't
-    -- be hiding space leaks or errors.
   rnf Internal = ()
   rnf System = ()
 
@@ -225,10 +221,6 @@ isWiredInName _                               = False
 
 isWiredIn :: NamedThing thing => thing -> Bool
 isWiredIn = isWiredInName . getName
-
-wiredInNameTyThing_maybe :: Name -> Maybe TyThing
-wiredInNameTyThing_maybe (Name {n_sort = WiredIn _ thing _}) = Just thing
-wiredInNameTyThing_maybe _                                   = Nothing
 
 isBuiltInSyntax :: Name -> Bool
 isBuiltInSyntax (Name {n_sort = WiredIn _ _ BuiltInSyntax}) = True
@@ -375,9 +367,9 @@ mkExternalName uniq mod occ loc
 
 -- | Create a name which is actually defined by the compiler itself
 mkWiredInName :: Module -> OccName -> Unique -> TyThing -> BuiltInSyntax -> Name
-mkWiredInName mod occ uniq thing built_in
+mkWiredInName mod occ uniq _t built_in
   = Name { n_uniq = uniq,
-           n_sort = WiredIn mod thing built_in,
+           n_sort = WiredIn mod () built_in,
            n_occ = occ, n_loc = wiredInSrcSpan }
 
 -- | Create a name brought into being by the compiler
