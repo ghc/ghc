@@ -768,19 +768,19 @@ typeErrorName :: Name
 absentSumFieldErrorName :: Name
 raiseOverflowName, raiseUnderflowName, raiseDivZeroName :: Name
 
-recSelErrorName     = err_nm "recSelError"     recSelErrorIdKey     rEC_SEL_ERROR_ID
-runtimeErrorName    = err_nm "runtimeError"    runtimeErrorIdKey    rUNTIME_ERROR_ID
-recConErrorName     = err_nm "recConError"     recConErrorIdKey     rEC_CON_ERROR_ID
-patErrorName        = err_nm "patError"        patErrorIdKey        pAT_ERROR_ID
-typeErrorName       = err_nm "typeError"       typeErrorIdKey       tYPE_ERROR_ID
+recSelErrorName     = err_nm "recSelError"     recSelErrorIdKey
+runtimeErrorName    = err_nm "runtimeError"    runtimeErrorIdKey
+recConErrorName     = err_nm "recConError"     recConErrorIdKey
+patErrorName        = err_nm "patError"        patErrorIdKey
+typeErrorName       = err_nm "typeError"       typeErrorIdKey
 
 noMethodBindingErrorName     = err_nm "noMethodBindingError"
-                                  noMethodBindingErrorIdKey nO_METHOD_BINDING_ERROR_ID
+                                  noMethodBindingErrorIdKey
 nonExhaustiveGuardsErrorName = err_nm "nonExhaustiveGuardsError"
-                                  nonExhaustiveGuardsErrorIdKey nON_EXHAUSTIVE_GUARDS_ERROR_ID
+                                  nonExhaustiveGuardsErrorIdKey
 
-err_nm :: String -> Unique -> Id -> Name
-err_nm str uniq id = mkWiredInIdName cONTROL_EXCEPTION_BASE (fsLit str) uniq id
+err_nm :: String -> Unique -> Name
+err_nm str uniq = mkWiredInIdName cONTROL_EXCEPTION_BASE (fsLit str) uniq
 
 rEC_SEL_ERROR_ID, rUNTIME_ERROR_ID, rEC_CON_ERROR_ID :: Id
 pAT_ERROR_ID, nO_METHOD_BINDING_ERROR_ID, nON_EXHAUSTIVE_GUARDS_ERROR_ID :: Id
@@ -857,35 +857,30 @@ absentSumFieldErrorName
       gHC_PRIM_PANIC
       (fsLit "absentSumFieldError")
       absentSumFieldErrorIdKey
-      aBSENT_SUM_FIELD_ERROR_ID
 
 absentErrorName
    = mkWiredInIdName
       gHC_PRIM_PANIC
       (fsLit "absentError")
       absentErrorIdKey
-      aBSENT_ERROR_ID
 
 raiseOverflowName
    = mkWiredInIdName
       gHC_PRIM_EXCEPTION
       (fsLit "raiseOverflow")
       raiseOverflowIdKey
-      rAISE_OVERFLOW_ID
 
 raiseUnderflowName
    = mkWiredInIdName
       gHC_PRIM_EXCEPTION
       (fsLit "raiseUnderflow")
       raiseUnderflowIdKey
-      rAISE_UNDERFLOW_ID
 
 raiseDivZeroName
    = mkWiredInIdName
       gHC_PRIM_EXCEPTION
       (fsLit "raiseDivZero")
       raiseDivZeroIdKey
-      rAISE_DIVZERO_ID
 
 aBSENT_SUM_FIELD_ERROR_ID = mkExceptionId absentSumFieldErrorName
 rAISE_OVERFLOW_ID         = mkExceptionId raiseOverflowName

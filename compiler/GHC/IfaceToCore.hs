@@ -103,6 +103,7 @@ import GHC.Types.Id.Info
 import GHC.Types.Tickish
 import GHC.Types.TyThing
 
+import GHC.Builtin.Utils ( wiredInNameTyThing_maybe )
 import GHC.Fingerprint
 import qualified GHC.Data.BooleanFormula as BF
 

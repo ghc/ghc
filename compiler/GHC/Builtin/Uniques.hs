@@ -10,6 +10,8 @@
 module GHC.Builtin.Uniques
     ( -- * Looking up known-key names
       knownUniqueName
+    , knownUniqueTyThing
+    , KnownUniqueLookup(..)
 
       -- * Getting the 'Unique's of 'Name's
       -- ** Anonymous sums
@@ -58,8 +60,8 @@ import GHC.Prelude
 import {-# SOURCE #-} GHC.Builtin.Types
 import {-# SOURCE #-} GHC.Core.TyCon
 import {-# SOURCE #-} GHC.Core.DataCon
-import {-# SOURCE #-} GHC.Types.Id
 import {-# SOURCE #-} GHC.Types.Name
+import {-# SOURCE #-} GHC.Types.TyThing
 import GHC.Types.Basic
 import GHC.Types.Unique
 import GHC.Data.FastString
@@ -70,25 +72,53 @@ import GHC.Utils.Panic
 
 import Data.Maybe
 
+data KnownUniqueLookup = KnownUniqueWiredIn TyThing | KnownUniqueName Name
+
+getNameFromKnownUnique :: KnownUniqueLookup -> Name
+getNameFromKnownUnique k =
+  case k of
+    KnownUniqueWiredIn t -> getName t
+    KnownUniqueName n -> n
+
 -- | Get the 'Name' associated with a known-key 'Unique'.
-knownUniqueName :: Unique -> Maybe Name
-knownUniqueName u =
+--
+-- Get the 'TyThing' for wired in names, otherwise just the 'Name'
+knownUniqueTyThing :: Unique -> Maybe KnownUniqueLookup
+knownUniqueTyThing u =
     case tag of
-      'z' -> Just $ getUnboxedSumName n
-      '4' -> Just $ getTupleTyConName Boxed n
-      '5' -> Just $ getTupleTyConName Unboxed n
-      '7' -> Just $ getTupleDataConName Boxed n
-      '8' -> Just $ getTupleDataConName Unboxed n
-      'j' -> Just $ getCTupleSelIdName n
-      'k' -> Just $ getCTupleTyConName n
-      'm' -> Just $ getCTupleDataConName n
+      'z' -> Just $ getUnboxedSumTyThing n
+      '4' -> Just $ getTupleTyConTyThing Boxed n
+      '5' -> Just $ getTupleTyConTyThing Unboxed n
+      '7' -> Just $ getTupleDataConTyThing Boxed n
+      '8' -> Just $ getTupleDataConTyThing Unboxed n
+      'j' -> Just $ KnownUniqueWiredIn $ getCTupleSelId n
+      'k' -> Just $ KnownUniqueName $ getCTupleTyConName n
+      'm' -> Just $ KnownUniqueName $ getCTupleDataConName n
       _   -> Nothing
   where
     (tag, n) = unpkUnique u
 
+knownUniqueName :: Unique -> Maybe Name
+knownUniqueName u = getNameFromKnownUnique <$> knownUniqueTyThing u
+
 {-
 Note [Unique layout for unboxed sums]
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+
+
+--------------------------------------------------
+-- Anonymous sums
+--
+-- Sum arities start from 2. The encoding is a bit funny: we break up the
+-- integral part into bitfields for the arity, an alternative index (which is
+-- taken to be 0xff in the case of the TyCon), and, in the case of a datacon, a
+-- tag (used to identify the sum's TypeRep binding).
+--
+-- This layout is chosen to remain compatible with the usual unique allocation
+-- for wired-in data constructors described in GHC.Types.Unique
+--
+-- TyCon for sum of arity k:
+--   00000000 kkkkkkkk 11111100
 
 Sum arities start from 2. The encoding is a bit funny: we break up the
 integral part into bitfields for the arity, an alternative index (which is
@@ -124,19 +154,19 @@ mkSumDataConUnique alt arity
   | otherwise
   = mkUnique 'z' (arity `shiftL` 8 + alt `shiftL` 2) {- skip the tycon -}
 
-getUnboxedSumName :: Int -> Name
-getUnboxedSumName n
+getUnboxedSumTyThing :: Int -> KnownUniqueLookup
+getUnboxedSumTyThing n
   | n .&. 0xfc == 0xfc
   = case tag of
-      0x0 -> tyConName $ sumTyCon arity
-      0x1 -> getRep $ sumTyCon arity
+      0x0 -> KnownUniqueWiredIn $ mkATyCon $ sumTyCon arity
+      0x1 -> KnownUniqueName $ getRep $ sumTyCon arity
       _   -> pprPanic "getUnboxedSumName: invalid tag" (ppr tag)
   | tag == 0x0
-  = dataConName $ sumDataCon (alt + 1) arity
+  = KnownUniqueWiredIn $ mkADataCon (sumDataCon (alt + 1) arity)
   | tag == 0x1
-  = getName $ dataConWrapId $ sumDataCon (alt + 1) arity
+  = KnownUniqueWiredIn $ mkAnId $ dataConWrapId $ sumDataCon (alt + 1) arity
   | tag == 0x2
-  = getRep $ promoteDataCon $ sumDataCon (alt + 1) arity
+  = KnownUniqueWiredIn $ mkATyCon $ promoteDataCon $ sumDataCon (alt + 1) arity
   | otherwise
   = pprPanic "getUnboxedSumName" (ppr n)
   where
@@ -238,8 +268,8 @@ getCTupleDataConName n =
       (arity,  2) -> mkPrelTyConRepName $ cTupleDataConName arity
       _           -> panic "getCTupleDataConName: impossible"
 
-getCTupleSelIdName :: Int -> Name
-getCTupleSelIdName n = cTupleSelIdName (sc_pos + 1) arity
+getCTupleSelId :: Int -> TyThing
+getCTupleSelId n = mkAnId (cTupleSelId (sc_pos + 1) arity)
   where
     arity  = n `shiftR` cTupleSelIdArityBits
     sc_pos = n .&. cTupleSelIdPosBitmask
@@ -271,20 +301,22 @@ mkTupleTyConUnique :: Boxity -> Arity -> Unique
 mkTupleTyConUnique Boxed           a  = mkUnique '4' (2*a)
 mkTupleTyConUnique Unboxed         a  = mkUnique '5' (2*a)
 
-getTupleTyConName :: Boxity -> Int -> Name
-getTupleTyConName boxity n =
+getTupleTyConTyThing :: Boxity -> Int -> KnownUniqueLookup
+getTupleTyConTyThing boxity n =
     case n `divMod` 2 of
-      (arity, 0) -> tyConName $ tupleTyCon boxity arity
-      (arity, 1) -> fromMaybe (panic "getTupleTyConName")
+      (arity, 0) -> KnownUniqueWiredIn $ mkATyCon $ tupleTyCon boxity arity
+      (arity, 1) -> KnownUniqueName
+                    $ fromMaybe (panic "getTupleTyConName")
                     $ tyConRepName_maybe $ tupleTyCon boxity arity
       _          -> panic "getTupleTyConName: impossible"
 
-getTupleDataConName :: Boxity -> Int -> Name
-getTupleDataConName boxity n =
+getTupleDataConTyThing :: Boxity -> Int -> KnownUniqueLookup
+getTupleDataConTyThing boxity n =
     case n `divMod` 3 of
-      (arity, 0) -> dataConName $ tupleDataCon boxity arity
-      (arity, 1) -> idName $ dataConWorkId $ tupleDataCon boxity arity
-      (arity, 2) -> fromMaybe (panic "getTupleDataCon")
+      (arity, 0) -> KnownUniqueWiredIn $ mkADataCon (tupleDataCon boxity arity)
+      (arity, 1) -> KnownUniqueWiredIn $ mkAnId $ dataConWorkId $ tupleDataCon boxity arity
+      (arity, 2) -> KnownUniqueName
+                    $ fromMaybe (panic "getTupleDataCon")
                     $ tyConRepName_maybe $ promotedTupleDataCon boxity arity
       _          -> panic "getTupleDataConName: impossible"
 

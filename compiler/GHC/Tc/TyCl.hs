@@ -81,6 +81,7 @@ import GHC.Types.SrcLoc
 import GHC.Types.SourceFile
 import GHC.Types.Unique
 import GHC.Types.Basic
+import GHC.Builtin.Utils ( wiredInNameTyThing_maybe )
 import qualified GHC.LanguageExtensions as LangExt
 
 import GHC.Data.FastString

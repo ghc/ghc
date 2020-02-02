@@ -6,6 +6,7 @@ import {-# SOURCE #-} GHC.Core.DataCon  ( DataCon )
 
 import GHC.Types.Basic (Arity, TupleSort, Boxity, ConTag)
 import {-# SOURCE #-} GHC.Types.Name (Name)
+import {-# SOURCE #-} GHC.Types.Var (Id)
 
 listTyCon :: TyCon
 typeSymbolKind :: Type
@@ -79,6 +80,7 @@ cTupleDataCon :: Arity -> DataCon
 cTupleDataConName :: Arity -> Name
 cTupleTyConName :: Arity -> Name
 cTupleSelIdName :: ConTag -> Arity -> Name
+cTupleSelId :: ConTag -> Arity -> Id
 
 sumDataCon :: ConTag -> Arity -> DataCon
 sumTyCon :: Arity -> TyCon

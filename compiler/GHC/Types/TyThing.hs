@@ -3,6 +3,7 @@ module GHC.Types.TyThing
    ( TyThing (..)
    , MonadThings (..)
    , mkATyCon
+   , mkADataCon
    , mkAnId
    , pprShortTyThing
    , pprTyThingCategory
@@ -80,6 +81,9 @@ instance NamedThing TyThing where       -- Can't put this with the type
 
 mkATyCon :: TyCon -> TyThing
 mkATyCon = ATyCon
+
+mkADataCon :: DataCon -> TyThing
+mkADataCon = AConLike . RealDataCon
 
 mkAnId :: Id -> TyThing
 mkAnId = AnId

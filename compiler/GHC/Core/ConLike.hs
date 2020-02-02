@@ -23,6 +23,7 @@ module GHC.Core.ConLike (
         , conLikesWithFields
         , conLikeIsInfix
         , conLikeHasBuilder
+        , mkRealDataCon
     ) where
 
 #include "HsVersions.h"
@@ -55,6 +56,9 @@ import qualified Data.Data as Data
 -- | A constructor-like thing
 data ConLike = RealDataCon DataCon
              | PatSynCon PatSyn
+
+mkRealDataCon :: DataCon -> ConLike
+mkRealDataCon = RealDataCon
 
 {-
 ************************************************************************

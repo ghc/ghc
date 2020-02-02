@@ -139,11 +139,12 @@ import GHC.Data.Maybe
 import GHC.Data.Bag
 import GHC.Utils.Misc
 import Data.Either
-import Data.List        ( findIndex )
 import Data.Foldable
 import GHC.Driver.Flags ( WarningFlag(..) )
 import qualified Data.Semigroup as Semi
 import GHC.Utils.Panic
+import Data.List
+import GHC.Builtin.Utils ( wiredInNameTyThing_maybe )
 
 import Control.Monad
 import Text.ParserCombinators.ReadP as ReadP

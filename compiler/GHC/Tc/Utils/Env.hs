@@ -131,6 +131,7 @@ import GHC.Types.Var.Env
 import GHC.Types.Name.Reader
 import GHC.Types.TyThing
 import qualified GHC.LanguageExtensions as LangExt
+import GHC.Builtin.Utils ( wiredInNameTyThing_maybe )
 
 import Data.IORef
 import Data.List (intercalate)
