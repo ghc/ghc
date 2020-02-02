@@ -73,12 +73,12 @@ module HscMain
     -- * Low-level exports for hooks
     , hscCompileCoreExpr'
       -- We want to make sure that we export enough to be able to redefine
-      -- hscFileFrontEnd in client code
+      -- hsc_typecheck in client code
     , hscParse', hscSimplify', hscDesugar', tcRnModule', doCodeGen
     , getHscEnv
     , hscSimpleIface'
     , oneShotMsg
-    , hscFileFrontEnd, genericHscFrontend, dumpIfaceStats
+    , dumpIfaceStats
     , ioMsgMaybe
     , showModuleIndex
     , hscAddSptEntries
@@ -452,23 +452,17 @@ extract_renamed_stuff mod_summary tc_result = do
 -- | Rename and typecheck a module, additionally returning the renamed syntax
 hscTypecheckRename :: HscEnv -> ModSummary -> HsParsedModule
                    -> IO (TcGblEnv, RenamedStuff)
-hscTypecheckRename hsc_env mod_summary rdr_module = runHsc hsc_env $ do
-    tc_result <- hsc_typecheck True mod_summary (Just rdr_module)
-    rn_info <- extract_renamed_stuff mod_summary tc_result
-    return (tc_result, rn_info)
+hscTypecheckRename hsc_env mod_summary rdr_module = runHsc hsc_env $
+    hsc_typecheck True mod_summary (Just rdr_module)
 
--- | Rename and typecheck a module, but don't return the renamed syntax
-hscTypecheck :: Bool -- ^ Keep renamed source?
-             -> ModSummary -> Maybe HsParsedModule
-             -> Hsc TcGblEnv
-hscTypecheck keep_rn mod_summary mb_rdr_module = do
-    tc_result <- hsc_typecheck keep_rn mod_summary mb_rdr_module
-    _ <- extract_renamed_stuff mod_summary tc_result
-    return tc_result
 
+-- | A bunch of logic piled around around @tcRnModule'@, concerning a) backpack
+-- b) concerning dumping rename info and hie files. It would be nice to further
+-- separate this stuff out, probably in conjunction better separating renaming
+-- and type checking (#17781).
 hsc_typecheck :: Bool -- ^ Keep renamed source?
               -> ModSummary -> Maybe HsParsedModule
-              -> Hsc TcGblEnv
+              -> Hsc (TcGblEnv, RenamedStuff)
 hsc_typecheck keep_rn mod_summary mb_rdr_module = do
     hsc_env <- getHscEnv
     let hsc_src = ms_hsc_src mod_summary
@@ -481,7 +475,7 @@ hsc_typecheck keep_rn mod_summary mb_rdr_module = do
         real_loc = realSrcLocSpan $ mkRealSrcLoc (mkFastString src_filename) 1 1
         keep_rn' = gopt Opt_WriteHie dflags || keep_rn
     MASSERT( moduleUnitId outer_mod == thisPackage dflags )
-    if hsc_src == HsigFile && not (isHoleModule inner_mod)
+    tc_result <- if hsc_src == HsigFile && not (isHoleModule inner_mod)
         then ioMsgMaybe $ tcRnInstantiateSignature hsc_env outer_mod' real_loc
         else
          do hpm <- case mb_rdr_module of
@@ -493,6 +487,10 @@ hsc_typecheck keep_rn mod_summary mb_rdr_module = do
                         ioMsgMaybe $
                             tcRnMergeSignatures hsc_env hpm tc_result0 iface
                 else return tc_result0
+    -- TODO are we extracting anything when we merely instantiate a signature?
+    -- If not, try to move this into the "else" case above.
+    rn_info <- extract_renamed_stuff mod_summary tc_result
+    return (tc_result, rn_info)
 
 -- wrapper around tcRnModule to handle safe haskell extras
 tcRnModule' :: ModSummary -> Bool -> HsParsedModule
@@ -656,8 +654,8 @@ hscIncrementalFrontend
 
         compile mb_old_hash reason = do
             liftIO $ msg reason
-            result <- genericHscFrontend mod_summary
-            return $ Right (result, mb_old_hash)
+            (tc_result, _) <- hsc_typecheck False mod_summary Nothing
+            return $ Right (FrontendTypecheck tc_result, mb_old_hash)
 
         stable = case source_modified of
                      SourceUnmodifiedAndStable -> True
@@ -703,14 +701,6 @@ hscIncrementalFrontend
                     Nothing -> compile mb_old_hash recomp_reqd
                     Just tc_result ->
                         return $ Right (FrontendTypecheck tc_result, mb_old_hash)
-
-genericHscFrontend :: ModSummary -> Hsc FrontendResult
-genericHscFrontend mod_summary =
-  getHooked hscFrontendHook genericHscFrontend' >>= ($ mod_summary)
-
-genericHscFrontend' :: ModSummary -> Hsc FrontendResult
-genericHscFrontend' mod_summary
-    = FrontendTypecheck `fmap` hscFileFrontEnd mod_summary
 
 --------------------------------------------------------------
 -- Compilers
@@ -918,15 +908,6 @@ batchMsg hsc_env mod_index recomp mod_summary =
             msg ++ showModMsg dflags (hscTarget dflags)
                               (recompileRequired recomp) mod_summary)
                 ++ reason
-
---------------------------------------------------------------
--- FrontEnds
---------------------------------------------------------------
-
--- | Given a 'ModSummary', parses and typechecks it, returning the
--- 'TcGblEnv' resulting from type-checking.
-hscFileFrontEnd :: ModSummary -> Hsc TcGblEnv
-hscFileFrontEnd mod_summary = hscTypecheck False mod_summary Nothing
 
 --------------------------------------------------------------
 -- Safe Haskell
