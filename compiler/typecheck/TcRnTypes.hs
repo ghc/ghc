@@ -343,11 +343,9 @@ data DsMetaVal
 ************************************************************************
 -}
 
--- | 'FrontendResult' describes the result of running the
--- frontend of a Haskell module.  Usually, you'll get
--- a 'FrontendTypecheck', since running the frontend involves
--- typechecking a program, but for an hs-boot merge you'll
--- just get a ModIface, since no actual typechecking occurred.
+-- | 'FrontendResult' describes the result of running the frontend of a Haskell
+-- module. Currently one always gets a 'FrontendTypecheck', since running the
+-- frontend involves typechecking a program. hs-sig merges are not handled here.
 --
 -- This data type really should be in HscTypes, but it needs
 -- to have a TcGblEnv which is only defined here.
