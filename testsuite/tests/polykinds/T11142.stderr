@@ -1,17 +1,10 @@
 
 T11142.hs:9:49: error:
-    • Expected kind ‘k1’, but ‘b’ has kind ‘k0’
+    • Expected kind ‘k’, but ‘b’ has kind ‘k0’
+        because kind variable ‘k’ would escape its scope
+      This (rigid, skolem) kind variable is bound by
+        ‘forall k (a :: k). SameKind a b’
+        at T11142.hs:9:19-49
     • In the second argument of ‘SameKind’, namely ‘b’
       In the type signature:
         foo :: forall b. (forall k (a :: k). SameKind a b) -> ()
-
-T11142.hs:10:7: error:
-    • Cannot instantiate unification variable ‘a0’
-      with a type involving polytypes:
-        (forall k1 (a :: k1). SameKind a b) -> ()
-        GHC doesn't yet support impredicative polymorphism
-    • In the expression: undefined
-      In an equation for ‘foo’: foo = undefined
-    • Relevant bindings include
-        foo :: (forall k1 (a :: k1). SameKind a b) -> ()
-          (bound at T11142.hs:10:1)

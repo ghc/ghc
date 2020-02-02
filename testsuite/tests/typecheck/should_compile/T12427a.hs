@@ -36,5 +36,6 @@ h2 y = case y of T1 _ v -> v
 -- Fails in 7.10  (head exploded)
 -- Fails in 8.0.1 (ditto)
 -- Succeeds in 8.2
+-- Fails in 8.12 (simple subsumption)
 x3 :: (forall a. a->a) -> Int
 T1 _ x3 = undefined

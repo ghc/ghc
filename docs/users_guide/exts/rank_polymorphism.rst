@@ -169,6 +169,48 @@ In the function ``h`` we use the record selectors ``return`` and
 ``MonadT`` data structure, rather than using pattern matching.
 
 
+.. _simple-subsumption:
+
+Subsumption
+-------------
+
+Suppose: ::
+
+  f1 :: (forall a b. Int -> a -> b -> b) -> Bool
+  g1 :: forall x y. Int -> y -> x -> x
+
+  f2 :: (forall a. (Eq a, Show a) => a -> a) -> Bool
+  g2 :: forall x. (Show x, Eq x) => Int -> a -> b -> b
+
+then ``f1 g1`` and ``f2 g2`` are both well typed, despite the
+different order of type variables and constraints.  What happens is that the
+argument is instantiated, and then re-generalised to match the type expected
+by the function.
+
+But this instantaition and re-generalisation happens only at the top level
+of a type. In particular, none of this happens if the foralls are underneath an arrow.
+For example: ::
+
+  f3 :: (Int -> forall a b. a -> b -> b) -> Bool
+  g3a :: Int -> forall x y. x -> y -> y
+  g3b :: forall x. Int -> forall y. x -> y -> y
+  g3c :: Int -> forall x y. y -> x -> x
+
+  f4 :: (Int -> forall a. (Eq a, Show a) => a -> a) -> Bool
+  g4 ::  Int -> forall x. (Show x, Eq x) => x -> x) -> Bool
+
+Then the application ``f3 g3a`` is well-typed, becuase ``g3a`` has a type that matches the type
+expected by ``f3``.  But ``f3 g3b`` is not well typed, because the foralls are in different places.
+Nor is ``f3 g3c``, where the foralls are in the same place but the variables are in a different order.
+Similarly ``f4 g4`` is not well typed, becuase the constraints appear in a different order.
+
+These examples can be made to typecheck by eta-expansion. For example ``f3 (\x -> g3b x)``
+is well typed, and similarly ``f3 (\x -> g3c x)`` and ``f4 (\x -> g4 x)``.
+
+Historical note.  Earlier versions of GHC allowed these now-rejected applications, by inserting
+automatic eta-expansions.  But doing so silently changes the language semantics, and was
+removed from the language by `GHC Proposal #287 <https://github.com/ghc-proposals/ghc-proposals/blob/master/proposals/0287-simplify-subsumption.rst>`__.  This proposal has many more examples.
+
 .. _higher-rank-type-inference:
 
 Type inference

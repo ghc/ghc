@@ -1,10 +1,10 @@
 
 T8227.hs:17:27: error:
-    • Couldn't match type ‘Scalar (V a)’
-                     with ‘Scalar (V a) -> Scalar (V a)’
-      Expected type: Scalar (V a)
-        Actual type: Scalar (V (Scalar (V a) -> Scalar (V a)))
-                     -> Scalar (V (Scalar (V a) -> Scalar (V a)))
+    • Couldn't match type: Scalar (V a)
+                     with: Scalar (V a) -> Scalar (V a)
+      Expected: Scalar (V a)
+        Actual: Scalar (V (Scalar (V a) -> Scalar (V a)))
+                -> Scalar (V (Scalar (V a) -> Scalar (V a)))
     • In the expression: arcLengthToParam eps eps
       In an equation for ‘absoluteToParam’:
           absoluteToParam eps seg = arcLengthToParam eps eps

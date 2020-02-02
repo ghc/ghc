@@ -1,7 +1,11 @@
 T7861: T7861.hs:10:5: error:
-    • Occurs check: cannot construct the infinite type: a ~ [a]
-      Expected type: (forall b. a) -> a
-        Actual type: (forall b. a) -> [a]
+    • Couldn't match type ‘a’ with ‘[a]’
+      Expected: (forall b. a) -> a
+        Actual: (forall b. a) -> [a]
+      ‘a’ is a rigid type variable bound by
+        the type signature for:
+          f :: forall a. (forall b. a) -> a
+        at T7861.hs:9:1-23
     • In the expression: doA
       In an equation for ‘f’: f = doA
     • Relevant bindings include

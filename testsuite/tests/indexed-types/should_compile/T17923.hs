@@ -38,7 +38,7 @@ data ShowCharSym0 :: E ~> E ~> E
 
 sShow_tuple :: SLambda Sym4
 sShow_tuple
-  = applySing (singFun2 @Sym3 und)
+  = applySing (singFun2 @Sym3 (\x -> und x))
           (und (singFun2 @Sym3
-                 (und (applySing (singFun2 @Sym3 und)
-                                 (applySing (singFun2 @ShowCharSym0 und) und)))))
+                     (\y -> und (applySing (singFun2 @Sym3 (\x -> und x))
+                                 (applySing (singFun2 @ShowCharSym0 (\x -> und x)) und)) y)))
