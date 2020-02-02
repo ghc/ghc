@@ -213,8 +213,8 @@ A wildcard in a type can be
   * An anonymous wildcard,
         written '_'
     In HsType this is represented by HsWildCardTy.
-    The renamer leaves it untouched, and it is later given fresh meta tyvars in
-    the typechecker.
+    The renamer leaves it untouched, and it is later given a fresh
+    meta tyvar in the typechecker.
 
   * A named wildcard,
         written '_a', '_foo', etc
@@ -597,6 +597,7 @@ data HsTyVarBndr flag pass
          flag
          (Located (IdP pass))
         -- See Note [Located RdrNames] in GHC.Hs.Expr
+
   | KindedTyVar
          (XKindedTyVar pass)
          flag
