@@ -74,6 +74,7 @@ import GHC.Utils.Misc
 import GHC.Data.FastString
 import GHC.Types.Basic hiding ( SuccessFlag(..) )
 import GHC.Data.List.SetOps
+import GHC.Builtin.Utils ( wiredInNameTyThing_maybe )
 import GHC.Fingerprint
 import qualified GHC.Data.BooleanFormula as BF
 

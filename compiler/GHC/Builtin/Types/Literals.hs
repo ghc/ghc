@@ -159,7 +159,7 @@ typeNatAddTyCon = mkTypeNatFunTyCon2 name
     }
   where
   name = mkWiredInTyConName UserSyntax gHC_TYPENATS (fsLit "+")
-            typeNatAddTyFamNameKey typeNatAddTyCon
+            typeNatAddTyFamNameKey
 
 typeNatSubTyCon :: TyCon
 typeNatSubTyCon = mkTypeNatFunTyCon2 name
@@ -170,7 +170,7 @@ typeNatSubTyCon = mkTypeNatFunTyCon2 name
     }
   where
   name = mkWiredInTyConName UserSyntax gHC_TYPENATS (fsLit "-")
-            typeNatSubTyFamNameKey typeNatSubTyCon
+            typeNatSubTyFamNameKey
 
 typeNatMulTyCon :: TyCon
 typeNatMulTyCon = mkTypeNatFunTyCon2 name
@@ -181,7 +181,7 @@ typeNatMulTyCon = mkTypeNatFunTyCon2 name
     }
   where
   name = mkWiredInTyConName UserSyntax gHC_TYPENATS (fsLit "*")
-            typeNatMulTyFamNameKey typeNatMulTyCon
+            typeNatMulTyFamNameKey
 
 typeNatDivTyCon :: TyCon
 typeNatDivTyCon = mkTypeNatFunTyCon2 name
@@ -192,7 +192,7 @@ typeNatDivTyCon = mkTypeNatFunTyCon2 name
     }
   where
   name = mkWiredInTyConName UserSyntax gHC_TYPENATS (fsLit "Div")
-            typeNatDivTyFamNameKey typeNatDivTyCon
+            typeNatDivTyFamNameKey
 
 typeNatModTyCon :: TyCon
 typeNatModTyCon = mkTypeNatFunTyCon2 name
@@ -203,7 +203,7 @@ typeNatModTyCon = mkTypeNatFunTyCon2 name
     }
   where
   name = mkWiredInTyConName UserSyntax gHC_TYPENATS (fsLit "Mod")
-            typeNatModTyFamNameKey typeNatModTyCon
+            typeNatModTyFamNameKey
 
 
 
@@ -218,7 +218,7 @@ typeNatExpTyCon = mkTypeNatFunTyCon2 name
     }
   where
   name = mkWiredInTyConName UserSyntax gHC_TYPENATS (fsLit "^")
-                typeNatExpTyFamNameKey typeNatExpTyCon
+                typeNatExpTyFamNameKey
 
 typeNatLogTyCon :: TyCon
 typeNatLogTyCon = mkTypeNatFunTyCon1 name
@@ -229,7 +229,7 @@ typeNatLogTyCon = mkTypeNatFunTyCon1 name
     }
   where
   name = mkWiredInTyConName UserSyntax gHC_TYPENATS (fsLit "Log2")
-            typeNatLogTyFamNameKey typeNatLogTyCon
+            typeNatLogTyFamNameKey
 
 
 
@@ -245,7 +245,7 @@ typeNatLeqTyCon =
 
   where
   name = mkWiredInTyConName UserSyntax gHC_TYPENATS (fsLit "<=?")
-                typeNatLeqTyFamNameKey typeNatLeqTyCon
+                typeNatLeqTyFamNameKey
   ops = BuiltInSynFamily
     { sfMatchFam      = matchFamLeq
     , sfInteractTop   = interactTopLeq
@@ -264,7 +264,7 @@ typeNatCmpTyCon =
 
   where
   name = mkWiredInTyConName UserSyntax gHC_TYPENATS (fsLit "CmpNat")
-                typeNatCmpTyFamNameKey typeNatCmpTyCon
+                typeNatCmpTyFamNameKey
   ops = BuiltInSynFamily
     { sfMatchFam      = matchFamCmpNat
     , sfInteractTop   = interactTopCmpNat
@@ -283,7 +283,7 @@ typeSymbolCmpTyCon =
 
   where
   name = mkWiredInTyConName UserSyntax gHC_TYPELITS (fsLit "CmpSymbol")
-                typeSymbolCmpTyFamNameKey typeSymbolCmpTyCon
+                typeSymbolCmpTyFamNameKey
   ops = BuiltInSynFamily
     { sfMatchFam      = matchFamCmpSymbol
     , sfInteractTop   = interactTopCmpSymbol
@@ -299,7 +299,7 @@ typeSymbolAppendTyCon = mkTypeSymbolFunTyCon2 name
     }
   where
   name = mkWiredInTyConName UserSyntax gHC_TYPELITS (fsLit "AppendSymbol")
-                typeSymbolAppendFamNameKey typeSymbolAppendTyCon
+                typeSymbolAppendFamNameKey
 
 
 

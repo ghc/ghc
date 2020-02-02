@@ -73,6 +73,7 @@ import GHC.Utils.Misc
 import GHC.Data.Maybe
 import GHC.Driver.Session
 import GHC.Data.FastString
+import GHC.Builtin.Utils ( wiredInNameTyThing_maybe )
 import Control.Monad
 import GHC.Data.List.SetOps ( minusList )
 import qualified GHC.LanguageExtensions as LangExt

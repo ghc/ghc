@@ -744,22 +744,21 @@ nonExhaustiveGuardsErrorName, noMethodBindingErrorName :: Name
 typeErrorName :: Name
 absentSumFieldErrorName :: Name
 
-recSelErrorName     = err_nm "recSelError"     recSelErrorIdKey     rEC_SEL_ERROR_ID
-absentErrorName     = err_nm "absentError"     absentErrorIdKey     aBSENT_ERROR_ID
+recSelErrorName     = err_nm "recSelError"     recSelErrorIdKey
+absentErrorName     = err_nm "absentError"     absentErrorIdKey
 absentSumFieldErrorName = err_nm "absentSumFieldError"  absentSumFieldErrorIdKey
-                            aBSENT_SUM_FIELD_ERROR_ID
-runtimeErrorName    = err_nm "runtimeError"    runtimeErrorIdKey    rUNTIME_ERROR_ID
-recConErrorName     = err_nm "recConError"     recConErrorIdKey     rEC_CON_ERROR_ID
-patErrorName        = err_nm "patError"        patErrorIdKey        pAT_ERROR_ID
-typeErrorName       = err_nm "typeError"       typeErrorIdKey       tYPE_ERROR_ID
+runtimeErrorName    = err_nm "runtimeError"    runtimeErrorIdKey
+recConErrorName     = err_nm "recConError"     recConErrorIdKey
+patErrorName        = err_nm "patError"        patErrorIdKey
+typeErrorName       = err_nm "typeError"       typeErrorIdKey
 
 noMethodBindingErrorName     = err_nm "noMethodBindingError"
-                                  noMethodBindingErrorIdKey nO_METHOD_BINDING_ERROR_ID
+                                  noMethodBindingErrorIdKey
 nonExhaustiveGuardsErrorName = err_nm "nonExhaustiveGuardsError"
-                                  nonExhaustiveGuardsErrorIdKey nON_EXHAUSTIVE_GUARDS_ERROR_ID
+                                  nonExhaustiveGuardsErrorIdKey
 
-err_nm :: String -> Unique -> Id -> Name
-err_nm str uniq id = mkWiredInIdName cONTROL_EXCEPTION_BASE (fsLit str) uniq id
+err_nm :: String -> Unique -> Name
+err_nm str uniq = mkWiredInIdName cONTROL_EXCEPTION_BASE (fsLit str) uniq
 
 rEC_SEL_ERROR_ID, rUNTIME_ERROR_ID, rEC_CON_ERROR_ID :: Id
 pAT_ERROR_ID, nO_METHOD_BINDING_ERROR_ID, nON_EXHAUSTIVE_GUARDS_ERROR_ID :: Id

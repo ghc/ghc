@@ -74,6 +74,7 @@ import GHC.Driver.Session
 import GHC.Types.Unique
 import GHC.Core.ConLike( ConLike(..) )
 import GHC.Types.Basic
+import GHC.Builtin.Utils ( wiredInNameTyThing_maybe )
 import qualified GHC.LanguageExtensions as LangExt
 
 import Control.Monad

@@ -1240,7 +1240,7 @@ mkPrimOpId prim_op
     ty   = mkSpecForAllTys tyvars (mkVisFunTys arg_tys res_ty)
     name = mkWiredInName gHC_PRIM (primOpOcc prim_op)
                          (mkPrimOpIdUnique (primOpTag prim_op))
-                         (AnId id) UserSyntax
+                         UserSyntax
     id   = mkGlobalId (PrimOpId prim_op) name ty info
 
     -- PrimOps don't ever construct a product, but we want to preserve bottoms
@@ -1353,19 +1353,19 @@ another gun with which to shoot yourself in the foot.
 nullAddrName, seqName,
    realWorldName, voidPrimIdName, coercionTokenName,
    magicDictName, coerceName, proxyName :: Name
-nullAddrName      = mkWiredInIdName gHC_PRIM  (fsLit "nullAddr#")      nullAddrIdKey      nullAddrId
-seqName           = mkWiredInIdName gHC_PRIM  (fsLit "seq")            seqIdKey           seqId
-realWorldName     = mkWiredInIdName gHC_PRIM  (fsLit "realWorld#")     realWorldPrimIdKey realWorldPrimId
-voidPrimIdName    = mkWiredInIdName gHC_PRIM  (fsLit "void#")          voidPrimIdKey      voidPrimId
-coercionTokenName = mkWiredInIdName gHC_PRIM  (fsLit "coercionToken#") coercionTokenIdKey coercionTokenId
-magicDictName     = mkWiredInIdName gHC_PRIM  (fsLit "magicDict")      magicDictKey       magicDictId
-coerceName        = mkWiredInIdName gHC_PRIM  (fsLit "coerce")         coerceKey          coerceId
-proxyName         = mkWiredInIdName gHC_PRIM  (fsLit "proxy#")         proxyHashKey       proxyHashId
+nullAddrName      = mkWiredInIdName gHC_PRIM  (fsLit "nullAddr#")      nullAddrIdKey
+seqName           = mkWiredInIdName gHC_PRIM  (fsLit "seq")            seqIdKey
+realWorldName     = mkWiredInIdName gHC_PRIM  (fsLit "realWorld#")     realWorldPrimIdKey
+voidPrimIdName    = mkWiredInIdName gHC_PRIM  (fsLit "void#")          voidPrimIdKey
+coercionTokenName = mkWiredInIdName gHC_PRIM  (fsLit "coercionToken#") coercionTokenIdKey
+magicDictName     = mkWiredInIdName gHC_PRIM  (fsLit "magicDict")      magicDictKey
+coerceName        = mkWiredInIdName gHC_PRIM  (fsLit "coerce")         coerceKey
+proxyName         = mkWiredInIdName gHC_PRIM  (fsLit "proxy#")         proxyHashKey
 
 lazyIdName, oneShotName, noinlineIdName :: Name
-lazyIdName        = mkWiredInIdName gHC_MAGIC (fsLit "lazy")           lazyIdKey          lazyId
-oneShotName       = mkWiredInIdName gHC_MAGIC (fsLit "oneShot")        oneShotKey         oneShotId
-noinlineIdName    = mkWiredInIdName gHC_MAGIC (fsLit "noinline")       noinlineIdKey      noinlineId
+lazyIdName        = mkWiredInIdName gHC_MAGIC (fsLit "lazy")           lazyIdKey
+oneShotName       = mkWiredInIdName gHC_MAGIC (fsLit "oneShot")        oneShotKey
+noinlineIdName    = mkWiredInIdName gHC_MAGIC (fsLit "noinline")       noinlineIdKey
 
 ------------------------------------------------
 proxyHashId :: Id

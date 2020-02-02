@@ -133,6 +133,7 @@ import GHC.Parser.Annotation
 import Data.List
 import GHC.Driver.Session ( WarningFlag(..), DynFlags )
 import GHC.Utils.Error ( Messages )
+import GHC.Builtin.Utils ( wiredInNameTyThing_maybe )
 
 import Control.Monad
 import Text.ParserCombinators.ReadP as ReadP

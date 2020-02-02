@@ -110,6 +110,7 @@ import GHC.Utils.Error
 import GHC.Data.Maybe( MaybeErr(..), orElse )
 import qualified GHC.LanguageExtensions as LangExt
 import GHC.Utils.Misc ( HasDebugCallStack )
+import GHC.Builtin.Utils ( wiredInNameTyThing_maybe )
 
 import Data.IORef
 import Data.List (intercalate)

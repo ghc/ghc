@@ -189,60 +189,58 @@ exposedPrimTyCons
 #include "primop-vector-tycons.hs-incl"
     ]
 
-mkPrimTc :: FastString -> Unique -> TyCon -> Name
-mkPrimTc fs unique tycon
+mkPrimTc :: FastString -> Unique -> Name
+mkPrimTc fs unique
   = mkWiredInName gHC_PRIM (mkTcOccFS fs)
                   unique
-                  (ATyCon tycon)        -- Relevant TyCon
                   UserSyntax
 
-mkBuiltInPrimTc :: FastString -> Unique -> TyCon -> Name
-mkBuiltInPrimTc fs unique tycon
+mkBuiltInPrimTc :: FastString -> Unique -> Name
+mkBuiltInPrimTc fs unique
   = mkWiredInName gHC_PRIM (mkTcOccFS fs)
                   unique
-                  (ATyCon tycon)        -- Relevant TyCon
                   BuiltInSyntax
 
 
 charPrimTyConName, intPrimTyConName, int8PrimTyConName, int16PrimTyConName, int32PrimTyConName, int64PrimTyConName, wordPrimTyConName, word32PrimTyConName, word8PrimTyConName, word16PrimTyConName, word64PrimTyConName, addrPrimTyConName, floatPrimTyConName, doublePrimTyConName, statePrimTyConName, proxyPrimTyConName, realWorldTyConName, arrayPrimTyConName, arrayArrayPrimTyConName, smallArrayPrimTyConName, byteArrayPrimTyConName, mutableArrayPrimTyConName, mutableByteArrayPrimTyConName, mutableArrayArrayPrimTyConName, smallMutableArrayPrimTyConName, mutVarPrimTyConName, mVarPrimTyConName, tVarPrimTyConName, stablePtrPrimTyConName, stableNamePrimTyConName, compactPrimTyConName, bcoPrimTyConName, weakPrimTyConName, threadIdPrimTyConName, eqPrimTyConName, eqReprPrimTyConName, eqPhantPrimTyConName, voidPrimTyConName :: Name
-charPrimTyConName             = mkPrimTc (fsLit "Char#") charPrimTyConKey charPrimTyCon
-intPrimTyConName              = mkPrimTc (fsLit "Int#") intPrimTyConKey  intPrimTyCon
-int8PrimTyConName             = mkPrimTc (fsLit "Int8#") int8PrimTyConKey int8PrimTyCon
-int16PrimTyConName            = mkPrimTc (fsLit "Int16#") int16PrimTyConKey int16PrimTyCon
-int32PrimTyConName            = mkPrimTc (fsLit "Int32#") int32PrimTyConKey int32PrimTyCon
-int64PrimTyConName            = mkPrimTc (fsLit "Int64#") int64PrimTyConKey int64PrimTyCon
-wordPrimTyConName             = mkPrimTc (fsLit "Word#") wordPrimTyConKey wordPrimTyCon
-word8PrimTyConName            = mkPrimTc (fsLit "Word8#") word8PrimTyConKey word8PrimTyCon
-word16PrimTyConName           = mkPrimTc (fsLit "Word16#") word16PrimTyConKey word16PrimTyCon
-word32PrimTyConName           = mkPrimTc (fsLit "Word32#") word32PrimTyConKey word32PrimTyCon
-word64PrimTyConName           = mkPrimTc (fsLit "Word64#") word64PrimTyConKey word64PrimTyCon
-addrPrimTyConName             = mkPrimTc (fsLit "Addr#") addrPrimTyConKey addrPrimTyCon
-floatPrimTyConName            = mkPrimTc (fsLit "Float#") floatPrimTyConKey floatPrimTyCon
-doublePrimTyConName           = mkPrimTc (fsLit "Double#") doublePrimTyConKey doublePrimTyCon
-statePrimTyConName            = mkPrimTc (fsLit "State#") statePrimTyConKey statePrimTyCon
-voidPrimTyConName             = mkPrimTc (fsLit "Void#") voidPrimTyConKey voidPrimTyCon
-proxyPrimTyConName            = mkPrimTc (fsLit "Proxy#") proxyPrimTyConKey proxyPrimTyCon
-eqPrimTyConName               = mkPrimTc (fsLit "~#") eqPrimTyConKey eqPrimTyCon
-eqReprPrimTyConName           = mkBuiltInPrimTc (fsLit "~R#") eqReprPrimTyConKey eqReprPrimTyCon
-eqPhantPrimTyConName          = mkBuiltInPrimTc (fsLit "~P#") eqPhantPrimTyConKey eqPhantPrimTyCon
-realWorldTyConName            = mkPrimTc (fsLit "RealWorld") realWorldTyConKey realWorldTyCon
-arrayPrimTyConName            = mkPrimTc (fsLit "Array#") arrayPrimTyConKey arrayPrimTyCon
-byteArrayPrimTyConName        = mkPrimTc (fsLit "ByteArray#") byteArrayPrimTyConKey byteArrayPrimTyCon
-arrayArrayPrimTyConName           = mkPrimTc (fsLit "ArrayArray#") arrayArrayPrimTyConKey arrayArrayPrimTyCon
-smallArrayPrimTyConName       = mkPrimTc (fsLit "SmallArray#") smallArrayPrimTyConKey smallArrayPrimTyCon
-mutableArrayPrimTyConName     = mkPrimTc (fsLit "MutableArray#") mutableArrayPrimTyConKey mutableArrayPrimTyCon
-mutableByteArrayPrimTyConName = mkPrimTc (fsLit "MutableByteArray#") mutableByteArrayPrimTyConKey mutableByteArrayPrimTyCon
-mutableArrayArrayPrimTyConName= mkPrimTc (fsLit "MutableArrayArray#") mutableArrayArrayPrimTyConKey mutableArrayArrayPrimTyCon
-smallMutableArrayPrimTyConName= mkPrimTc (fsLit "SmallMutableArray#") smallMutableArrayPrimTyConKey smallMutableArrayPrimTyCon
-mutVarPrimTyConName           = mkPrimTc (fsLit "MutVar#") mutVarPrimTyConKey mutVarPrimTyCon
-mVarPrimTyConName             = mkPrimTc (fsLit "MVar#") mVarPrimTyConKey mVarPrimTyCon
-tVarPrimTyConName             = mkPrimTc (fsLit "TVar#") tVarPrimTyConKey tVarPrimTyCon
-stablePtrPrimTyConName        = mkPrimTc (fsLit "StablePtr#") stablePtrPrimTyConKey stablePtrPrimTyCon
-stableNamePrimTyConName       = mkPrimTc (fsLit "StableName#") stableNamePrimTyConKey stableNamePrimTyCon
-compactPrimTyConName          = mkPrimTc (fsLit "Compact#") compactPrimTyConKey compactPrimTyCon
-bcoPrimTyConName              = mkPrimTc (fsLit "BCO") bcoPrimTyConKey bcoPrimTyCon
-weakPrimTyConName             = mkPrimTc (fsLit "Weak#") weakPrimTyConKey weakPrimTyCon
-threadIdPrimTyConName         = mkPrimTc (fsLit "ThreadId#") threadIdPrimTyConKey threadIdPrimTyCon
+charPrimTyConName             = mkPrimTc (fsLit "Char#") charPrimTyConKey
+intPrimTyConName              = mkPrimTc (fsLit "Int#") intPrimTyConKey
+int8PrimTyConName             = mkPrimTc (fsLit "Int8#") int8PrimTyConKey
+int16PrimTyConName            = mkPrimTc (fsLit "Int16#") int16PrimTyConKey
+int32PrimTyConName            = mkPrimTc (fsLit "Int32#") int32PrimTyConKey
+int64PrimTyConName            = mkPrimTc (fsLit "Int64#") int64PrimTyConKey
+wordPrimTyConName             = mkPrimTc (fsLit "Word#") wordPrimTyConKey
+word8PrimTyConName            = mkPrimTc (fsLit "Word8#") word8PrimTyConKey
+word16PrimTyConName           = mkPrimTc (fsLit "Word16#") word16PrimTyConKey
+word32PrimTyConName           = mkPrimTc (fsLit "Word32#") word32PrimTyConKey
+word64PrimTyConName           = mkPrimTc (fsLit "Word64#") word64PrimTyConKey
+addrPrimTyConName             = mkPrimTc (fsLit "Addr#") addrPrimTyConKey
+floatPrimTyConName            = mkPrimTc (fsLit "Float#") floatPrimTyConKey
+doublePrimTyConName           = mkPrimTc (fsLit "Double#") doublePrimTyConKey
+statePrimTyConName            = mkPrimTc (fsLit "State#") statePrimTyConKey
+voidPrimTyConName             = mkPrimTc (fsLit "Void#") voidPrimTyConKey
+proxyPrimTyConName            = mkPrimTc (fsLit "Proxy#") proxyPrimTyConKey
+eqPrimTyConName               = mkPrimTc (fsLit "~#") eqPrimTyConKey
+eqReprPrimTyConName           = mkBuiltInPrimTc (fsLit "~R#") eqReprPrimTyConKey
+eqPhantPrimTyConName          = mkBuiltInPrimTc (fsLit "~P#") eqPhantPrimTyConKey
+realWorldTyConName            = mkPrimTc (fsLit "RealWorld") realWorldTyConKey
+arrayPrimTyConName            = mkPrimTc (fsLit "Array#") arrayPrimTyConKey
+byteArrayPrimTyConName        = mkPrimTc (fsLit "ByteArray#") byteArrayPrimTyConKey
+arrayArrayPrimTyConName           = mkPrimTc (fsLit "ArrayArray#") arrayArrayPrimTyConKey
+smallArrayPrimTyConName       = mkPrimTc (fsLit "SmallArray#") smallArrayPrimTyConKey
+mutableArrayPrimTyConName     = mkPrimTc (fsLit "MutableArray#") mutableArrayPrimTyConKey
+mutableByteArrayPrimTyConName = mkPrimTc (fsLit "MutableByteArray#") mutableByteArrayPrimTyConKey
+mutableArrayArrayPrimTyConName= mkPrimTc (fsLit "MutableArrayArray#") mutableArrayArrayPrimTyConKey
+smallMutableArrayPrimTyConName= mkPrimTc (fsLit "SmallMutableArray#") smallMutableArrayPrimTyConKey
+mutVarPrimTyConName           = mkPrimTc (fsLit "MutVar#") mutVarPrimTyConKey
+mVarPrimTyConName             = mkPrimTc (fsLit "MVar#") mVarPrimTyConKey
+tVarPrimTyConName             = mkPrimTc (fsLit "TVar#") tVarPrimTyConKey
+stablePtrPrimTyConName        = mkPrimTc (fsLit "StablePtr#") stablePtrPrimTyConKey
+stableNamePrimTyConName       = mkPrimTc (fsLit "StableName#") stableNamePrimTyConKey
+compactPrimTyConName          = mkPrimTc (fsLit "Compact#") compactPrimTyConKey
+bcoPrimTyConName              = mkPrimTc (fsLit "BCO") bcoPrimTyConKey
+weakPrimTyConName             = mkPrimTc (fsLit "Weak#") weakPrimTyConKey
+threadIdPrimTyConName         = mkPrimTc (fsLit "ThreadId#") threadIdPrimTyConKey
 
 {-
 ************************************************************************
@@ -394,7 +392,7 @@ openBetaTy  = mkTyVarTy openBetaTyVar
 -}
 
 funTyConName :: Name
-funTyConName = mkPrimTyConName (fsLit "->") funTyConKey funTyCon
+funTyConName = mkPrimTyConName (fsLit "->") funTyConKey
 
 -- | The @(->)@ type constructor.
 --
@@ -512,16 +510,16 @@ tYPETyCon = mkKindTyCon tYPETyConName
 
 -- If you edit these, you may need to update the GHC formalism
 -- See Note [GHC Formalism] in GHC.Core.Lint
-tYPETyConName             = mkPrimTyConName (fsLit "TYPE") tYPETyConKey tYPETyCon
+tYPETyConName             = mkPrimTyConName (fsLit "TYPE") tYPETyConKey
 
-mkPrimTyConName :: FastString -> Unique -> TyCon -> Name
+mkPrimTyConName :: FastString -> Unique -> Name
 mkPrimTyConName = mkPrimTcName BuiltInSyntax
   -- All of the super kinds and kinds are defined in Prim,
   -- and use BuiltInSyntax, because they are never in scope in the source
 
-mkPrimTcName :: BuiltInSyntax -> FastString -> Unique -> TyCon -> Name
-mkPrimTcName built_in_syntax occ key tycon
-  = mkWiredInName gHC_PRIM (mkTcOccFS occ) key (ATyCon tycon) built_in_syntax
+mkPrimTcName :: BuiltInSyntax -> FastString -> Unique -> Name
+mkPrimTcName built_in_syntax occ key
+  = mkWiredInName gHC_PRIM (mkTcOccFS occ) key built_in_syntax
 
 -----------------------------
 -- | Given a RuntimeRep, applies TYPE to it.
