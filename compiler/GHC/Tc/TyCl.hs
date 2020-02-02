@@ -2315,18 +2315,18 @@ newtype instance T [a] :: <kind> where ...   -- See Point 5
 2. Where these kinds come from: Return kinds are processed through several
    different code paths:
 
-     data/newtypes: The return kind is part of the TyCon kind, gotten either
+   Data/newtypes: The return kind is part of the TyCon kind, gotten either
      by checkInitialKind (standalone kind signature / CUSK) or
      inferInitialKind. It is extracted by bindTyClTyVars in tcTyClDecl1. It is
      then passed to tcDataDefn.
 
-     families: The return kind is either written in a standalone signature
+   Families: The return kind is either written in a standalone signature
      or extracted from a family declaration in getInitialKind.
      If a family declaration is missing a result kind, it is assumed to be
      Type. This assumption is in getInitialKind for CUSKs or
      get_fam_decl_initial_kind for non-signature & non-CUSK cases.
 
-     instances: The data family already has a known kind. The return kind
+   Instances: The data family already has a known kind. The return kind
      of an instance is then calculated by applying the data family tycon
      to the patterns provided, as computed by the typeKind lhs_ty in the
      end of tcDataFamInstHeader. In the case of an instance written in GADT
@@ -2352,10 +2352,9 @@ newtype instance T [a] :: <kind> where ...   -- See Point 5
 4. Datatype return kind restriction: A data/data-instance return kind must end
    in a type that, after type-synonym expansion, yields `TYPE LiftedRep`. By
    "end in", we mean we strip any foralls and function arguments off before
-   checking: this remaining part of the type is returned from
-   etaExpandAlgTyCon. Note that we do *not* do type family reduction here.
-   Examples:
+   checking: this remaining part of the type is returned from etaExpandAlgTyCon.
 
+   Examples:
      data T1 :: Type                          -- good
      data T2 :: Bool -> Type                  -- good
      data T3 :: Bool -> forall k. Type        -- strange, but still accepted
@@ -2363,27 +2362,38 @@ newtype instance T [a] :: <kind> where ...   -- See Point 5
      data T5 :: Bool                          -- bad
      data T6 :: Type -> Bool                  -- bad
 
-     type Arrow = (->)
-     data T7 :: Arrow Bool Type               -- good
+   Exactly the same applies to data instance (but not data family)
+   declarations.  Examples
+     data instance D1 :: Type                 -- good
+     data instance D2 :: Boool -> Type        -- good
 
+   We can "look through" type synonyms
+     type Star = Type
+     data T7 :: Bool -> Star                  -- good (synonym expansion ok)
+     type Arrow = (->)
+     data T8 :: Arrow Bool Type               -- good (ditto)
+
+   But we specifically do *not* do type family reduction here.
      type family ARROW where
        ARROW = (->)
-     data T8 :: ARROW Bool Type               -- bad
-
-     type Star = Type
-     data T9 :: Bool -> Star                  -- good
+     data T9 :: ARROW Bool Type               -- bad
 
      type family F a where
        F Int  = Bool
        F Bool = Type
      data T10 :: Bool -> F Bool               -- bad
 
+   The /principle/ here is that in the TyCon for a data type or data instance,
+   we must be able to lay out all the type-variable binders, one by one, until
+   we reach (TYPE xx).  There is no place for a cast here.  We could add one,
+   but let's not!
+
    This check is done in checkDataKindSig. For data declarations, this
    call is in tcDataDefn; for data instances, this call is in tcDataFamInstDecl.
 
-   However, because data instances in GADT syntax can have two return kinds (see
-   point (2) above), we must check both return kinds. The user-written return
-   kind is checked in tc_kind_sig within tcDataFamInstHeader. Examples:
+4a  Because data instances in GADT syntax can have two return kinds (see
+    point (2) above), we must check both return kinds. The user-written return
+    kind is checked by the call to checkDataKindSig in tcDataFamInstHeader. Examples:
 
      data family D (a :: Nat) :: k     -- good (see Point 6)
 
@@ -2908,36 +2918,11 @@ tcTyFamInstEqnGuts fam_tc mb_clsinfo imp_vars exp_bndrs hs_pats hs_rhs_ty
        ; return (qtvs, pats, rhs_ty) }
 
 -----------------
-tcFamTyPats :: TyCon
-            -> HsTyPats GhcRn                -- Patterns
-            -> TcM (TcType, TcKind)          -- (lhs_type, lhs_kind)
--- Used for both type and data families
-tcFamTyPats fam_tc hs_pats
-  = do { traceTc "tcFamTyPats {" $
-         vcat [ ppr fam_tc, text "arity:" <+> ppr fam_arity ]
-
-       ; let fun_ty = mkTyConApp fam_tc []
-
-       ; (fam_app, res_kind) <- unsetWOptM Opt_WarnPartialTypeSignatures $
-                                setXOptM LangExt.PartialTypeSignatures $
-                                -- See Note [Wildcards in family instances] in
-                                -- GHC.Rename.Module
-                                tcInferApps typeLevelMode lhs_fun fun_ty hs_pats
-
-       ; traceTc "End tcFamTyPats }" $
-         vcat [ ppr fam_tc, text "res_kind:" <+> ppr res_kind ]
-
-       ; return (fam_app, res_kind) }
-  where
-    fam_name  = tyConName fam_tc
-    fam_arity = tyConArity fam_tc
-    lhs_fun   = noLoc (HsTyVar noExtField NotPromoted (noLoc fam_name))
-
 unravelFamInstPats :: TcType -> [TcType]
 -- Decompose fam_app to get the argument patterns
 --
 -- We expect fam_app to look like (F t1 .. tn)
--- tcInferApps is capable of returning ((F ty1 |> co) ty2),
+-- tcFamTyPats is capable of returning ((F ty1 |> co) ty2),
 -- but that can't happen here because we already checked the
 -- arity of F matches the number of pattern
 unravelFamInstPats fam_app

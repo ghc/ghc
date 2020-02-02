@@ -1,14 +1,14 @@
 
 T4174.hs:44:12: error:
     • Couldn't match type ‘b’ with ‘RtsSpinLock’
+      Expected: m (Field (Way (GHC6'8 minor) n t p) a b)
+        Actual: m (Field (WayOf m) SmStep RtsSpinLock)
       ‘b’ is a rigid type variable bound by
         the type signature for:
           testcase :: forall (m :: * -> *) minor n t p a b.
                       Monad m =>
                       m (Field (Way (GHC6'8 minor) n t p) a b)
         at T4174.hs:43:1-63
-      Expected type: m (Field (Way (GHC6'8 minor) n t p) a b)
-        Actual type: m (Field (WayOf m) SmStep RtsSpinLock)
     • In the expression: sync_large_objects
       In an equation for ‘testcase’: testcase = sync_large_objects
     • Relevant bindings include

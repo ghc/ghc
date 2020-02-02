@@ -1,6 +1,8 @@
 
 tcfail103.hs:15:13: error:
     • Couldn't match type ‘s’ with ‘t’
+      Expected: ST s Int
+        Actual: ST t Int
       ‘s’ is a rigid type variable bound by
         the type signature for:
           g :: forall s. ST s Int
@@ -9,8 +11,6 @@ tcfail103.hs:15:13: error:
         the type signature for:
           f :: forall t. ST t Int
         at tcfail103.hs:10:1-12
-      Expected type: ST s Int
-        Actual type: ST t Int
     • In the expression: readSTRef v
       In an equation for ‘g’: g = readSTRef v
       In the expression:

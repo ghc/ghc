@@ -123,9 +123,9 @@ rnHsSigWcType :: HsDocContext -> LHsSigWcType GhcPs
               -> RnM (LHsSigWcType GhcRn, FreeVars)
 rnHsSigWcType doc (HsWC { hswc_body = HsIB { hsib_body = hs_ty }})
   = rn_hs_sig_wc_type BindUnlessForall doc hs_ty $ \nwcs imp_tvs body ->
-    let ib_ty = HsIB { hsib_ext = imp_tvs, hsib_body = body  }
-        wc_ty = HsWC { hswc_ext = nwcs,    hswc_body = ib_ty } in
-    pure (wc_ty, emptyFVs)
+    let sig_ty' = HsWC { hswc_ext = nwcs,  hswc_body = ib_ty' }
+        ib_ty'  = HsIB { hsib_ext = imp_tvs, hsib_body = body } in
+    pure (sig_ty', emptyFVs)
 
 rnHsPatSigType :: HsSigWcTypeScoping
                -> HsDocContext -> HsPatSigType GhcPs

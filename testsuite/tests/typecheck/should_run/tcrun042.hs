@@ -5,6 +5,8 @@
 --          failing, which is OK.  We don't really support impredicative
 --          polymorphism!
 --
+-- Apr 20: Works again.  NB: the ImpredicativeTypes flag
+--
 -- The test was added by Max in 5e8ff849, apparently to test tuple sections
 
 module Main where

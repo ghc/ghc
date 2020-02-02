@@ -1,7 +1,7 @@
 
 T9318.hs:12:5: error:
     • Couldn't match type ‘Bool’ with ‘Char’
-      Expected type: F Int
-        Actual type: Char
+      Expected: F Int
+        Actual: Char
     • In the pattern: 'x'
       In an equation for ‘bar’: bar 'x' = ()
