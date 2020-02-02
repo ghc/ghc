@@ -1,7 +1,7 @@
 
 T10806.hs:11:32: error:
-    • Couldn't match expected type ‘Char -> Bool’
-                  with actual type ‘IO ()’
+    • Couldn't match expected type: Char -> Bool
+                  with actual type: IO ()
     • The function ‘print’ is applied to two value arguments,
         but its type ‘Char -> IO ()’ has only one
       In the expression: print 'x' 'y'

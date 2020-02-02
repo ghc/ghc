@@ -699,8 +699,10 @@ tcDataFamInstDecl mb_clsinfo tv_skol_env
        --     we did it before the "extra" tvs from etaExpandAlgTyCon
        --     would always be eta-reduced
        --
-       -- See also Note [Datatype return kinds] in GHC.Tc.TyCl
        ; (extra_tcbs, final_res_kind) <- etaExpandAlgTyCon full_tcbs res_kind
+
+       -- Check the result kind; it may come from a user-written signature.
+       -- See Note [Datatype return kinds] in GHC.Tc.TyCl point 4(a)
        ; checkDataKindSig (DataInstanceSort new_or_data) final_res_kind
        ; let extra_pats  = map (mkTyVarTy . binderVar) extra_tcbs
              all_pats    = pats `chkAppend` extra_pats
@@ -847,7 +849,8 @@ tcDataFamInstHeader
 -- Here the "header" is the bit before the "where"
 tcDataFamInstHeader mb_clsinfo fam_tc imp_vars mb_bndrs fixity
                     hs_ctxt hs_pats m_ksig hs_cons new_or_data
-  = do { (imp_tvs, (exp_tvs, (stupid_theta, lhs_ty, lhs_applied_kind)))
+  = do { traceTc "tcDataFamInstHeader {" (ppr fam_tc <+> ppr hs_pats)
+       ; (imp_tvs, (exp_tvs, (stupid_theta, lhs_ty, res_kind)))
             <- pushTcLevelM_                                $
                solveEqualities                              $
                bindImplicitTKBndrs_Q_Skol imp_vars          $
@@ -872,10 +875,15 @@ tcDataFamInstHeader mb_clsinfo fam_tc imp_vars mb_bndrs fixity
                   ; let lhs_applied_ty = lhs_ty `mkTcAppTys` lhs_extra_args
                         hs_lhs         = nlHsTyConApp fixity (getName fam_tc) hs_pats
                   ; _ <- unifyKind (Just (unLoc hs_lhs)) lhs_applied_kind res_kind
+                    -- Check that the result kind of the TyCon applied to its args
+                    -- is compatible with the explicit signature (or Type, if there
+                    -- is none)
 
+                  ; traceTc "tcDataFamInstHeader" $
+                    vcat [ ppr fam_tc, ppr m_ksig, ppr lhs_applied_kind, ppr res_kind ]
                   ; return ( stupid_theta
                            , lhs_applied_ty
-                           , lhs_applied_kind ) }
+                           , res_kind ) }
 
        -- See GHC.Tc.TyCl Note [Generalising in tcFamTyPatsGuts]
        -- This code (and the stuff immediately above) is very similar
@@ -888,10 +896,15 @@ tcDataFamInstHeader mb_clsinfo fam_tc imp_vars mb_bndrs fixity
        ; qtvs <- quantifyTyVars dvs
 
        -- Zonk the patterns etc into the Type world
-       ; (ze, qtvs)       <- zonkTyBndrs qtvs
-       ; lhs_ty           <- zonkTcTypeToTypeX ze lhs_ty
-       ; stupid_theta     <- zonkTcTypesToTypesX ze stupid_theta
-       ; lhs_applied_kind <- zonkTcTypeToTypeX ze lhs_applied_kind
+       ; (ze, qtvs)   <- zonkTyBndrs qtvs
+       ; lhs_ty       <- zonkTcTypeToTypeX ze lhs_ty
+       ; stupid_theta <- zonkTcTypesToTypesX ze stupid_theta
+       ; res_kind     <- zonkTcTypeToTypeX ze res_kind
+
+       -- We check that res_kind is OK with checkDataKindSig in
+       -- tcDataFamInstDecl, after eta-expansion.  We need to check that
+       -- it's ok because res_kind can come from a user-written kind signature.
+       -- See Note [Datatype return kinds], point (4a)
 
        -- Check that type patterns match the class instance head
        -- The call to splitTyConApp_maybe here is just an inlining of
@@ -899,7 +912,8 @@ tcDataFamInstHeader mb_clsinfo fam_tc imp_vars mb_bndrs fixity
        ; pats <- case splitTyConApp_maybe lhs_ty of
            Just (_, pats) -> pure pats
            Nothing -> pprPanic "tcDataFamInstHeader" (ppr lhs_ty)
-       ; return (qtvs, pats, lhs_applied_kind, stupid_theta) }
+
+       ; return (qtvs, pats, res_kind, stupid_theta) }
   where
     fam_name  = tyConName fam_tc
     data_ctxt = DataKindCtxt fam_name
@@ -920,11 +934,7 @@ tcDataFamInstHeader mb_clsinfo fam_tc imp_vars mb_bndrs fixity
            ; lvl <- getTcLevel
            ; (subst, _tvs') <- tcInstSkolTyVarsAt lvl False emptyTCvSubst tvs
              -- Perhaps surprisingly, we don't need the skolemised tvs themselves
-           ; let final_kind = substTy subst inner_kind
-           ; checkDataKindSig (DataInstanceSort new_or_data) $
-               snd $ tcSplitPiTys final_kind
-             -- See Note [Datatype return kinds], end of point (4)
-           ; return final_kind }
+           ; return (substTy subst inner_kind) }
 
 {- Note [Result kind signature for a data family instance]
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
@@ -932,7 +942,7 @@ The expected type might have a forall at the type. Normally, we
 can't skolemise in kinds because we don't have type-level lambda.
 But here, we're at the top-level of an instance declaration, so
 we actually have a place to put the regeneralised variables.
-Thus: skolemise away. cf. Inst.deeplySkolemise and GHC.Tc.Utils.Unify.tcSkolemise
+Thus: skolemise away. cf. GHC.Tc.Utils.Unify.tcSkolemise
 Examples in indexed-types/should_compile/T12369
 
 Note [Implementing eta reduction for data families]
@@ -1781,7 +1791,7 @@ tcMethodBodyHelp hs_sig_fn sel_id local_meth_id meth_bind
                                 -- The instance-sig is the focus here; the class-meth-sig
                                 -- is fixed (#18036)
                    ; hs_wrap <- addErrCtxtM (methSigCtxt sel_name sig_ty local_meth_ty) $
-                                tcSubType_NC ctxt sig_ty local_meth_ty
+                                tcSubTypeSigma ctxt sig_ty local_meth_ty
                    ; return (sig_ty, hs_wrap) }
 
        ; inner_meth_name <- newName (nameOccName sel_name)
