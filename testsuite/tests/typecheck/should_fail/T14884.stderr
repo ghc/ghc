@@ -1,6 +1,6 @@
 
 T14884.hs:4:5: error:
-    • Found hole: _ :: (a0 -> IO ()) -> [Char] -> IO ()
+    • Found hole: _ :: (a0 -> IO ()) -> String -> IO ()
       Where: ‘a0’ is an ambiguous type variable
     • In the expression: _
       In the expression: _ print "abc"
@@ -20,15 +20,15 @@ T14884.hs:4:5: error:
           (imported from ‘Prelude’ at T14884.hs:1:8-13
            (and originally defined in ‘Data.Foldable’))
         ($) :: forall a b. (a -> b) -> a -> b
-          with ($) @'GHC.Types.LiftedRep @[Char] @(IO ())
+          with ($) @'GHC.Types.LiftedRep @String @(IO ())
           (imported from ‘Prelude’ at T14884.hs:1:8-13
            (and originally defined in ‘GHC.Base’))
         ($!) :: forall a b. (a -> b) -> a -> b
-          with ($!) @'GHC.Types.LiftedRep @[Char] @(IO ())
+          with ($!) @'GHC.Types.LiftedRep @String @(IO ())
           (imported from ‘Prelude’ at T14884.hs:1:8-13
            (and originally defined in ‘GHC.Base’))
         id :: forall a. a -> a
-          with id @([Char] -> IO ())
+          with id @(String -> IO ())
           (imported from ‘Prelude’ at T14884.hs:1:8-13
            (and originally defined in ‘GHC.Base’))
 

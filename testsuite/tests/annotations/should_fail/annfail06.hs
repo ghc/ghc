@@ -11,8 +11,8 @@ import Data.Typeable
 deriving instance Typeable InstancesInWrongModule
 
 instance Data InstancesInWrongModule where
-    gfoldl = undefined
-    gunfold = undefined
+    gfoldl  k z = undefined
+    gunfold k z = undefined
 
 {-# ANN module InstancesInWrongModule #-}
 

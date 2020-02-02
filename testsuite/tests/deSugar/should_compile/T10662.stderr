@@ -1,5 +1,5 @@
 
 T10662.hs:3:3: warning: [-Wunused-do-bind (in -Wall)]
-    A do-notation statement discarded a result of type ‘[Char]’
+    A do-notation statement discarded a result of type ‘String’
     Suppress this warning by saying
       ‘_ <- return $ let a = "hello" in a’
