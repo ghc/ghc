@@ -709,7 +709,7 @@ Some wrinkles
           f_spec = <f rhs> Int dNumInt
 
           RULE: forall d. f Int d = f_spec
-      You can see this discarding happening in tcSpecPrag
+      You can see this discarding happening in tcSpecWrapper
 
 3. Note that the HsWrapper can transform *any* function with the right
    type prefix

@@ -283,7 +283,7 @@ So here's the plan:
 
   * If we succeed in floating all the equalities, promote them and
     re-emit them as flat constraint, not wrapped at all (since they
-    don't mention any of the quantified variables.
+    don't mention any of the quantified variables).
 
 * Note that this float-and-promote step means that anonymous
   wildcards get floated to top level, as we want; see
@@ -296,7 +296,7 @@ All this is done:
 
 * in GHC.Tc.Gen.HsType.tcHsSigType, where quantification intervenes.
 
-See also #18062, #11506
+See also #18062
 -}
 
 solveLocalEqualitiesX :: String -> TcM a -> TcM (WantedConstraints, a)
