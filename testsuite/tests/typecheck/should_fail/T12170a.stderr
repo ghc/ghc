@@ -1,9 +1,9 @@
 
-T12170a.hs:20:7: error:
+T12170a.hs:20:35: error:
     • Couldn't match type ‘Ref m0’ with ‘IORef’
-      Expected type: IO (Ref m0 (f0 ()))
-        Actual type: IO (Ref IO (f0 ()))
+      Expected: IORef (f0 ()) -> m0 (f0 ())
+        Actual: Ref m0 (f0 ()) -> m0 (f0 ())
       The type variable ‘m0’ is ambiguous
-    • In the first argument of ‘(>>=)’, namely ‘newRef (pure ())’
+    • In the second argument of ‘(.)’, namely ‘readRef’
+      In the second argument of ‘(>>=)’, namely ‘join . readRef’
       In the expression: newRef (pure ()) >>= join . readRef
-      In an equation for ‘foo’: foo = newRef (pure ()) >>= join . readRef

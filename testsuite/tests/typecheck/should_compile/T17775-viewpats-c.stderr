@@ -1,0 +1,11 @@
+
+T17775-viewpats-c.hs:8:28: error:
+    • Couldn't match type ‘Bool’ with ‘Eq a => Bool’
+      Expected: Int -> Eq a => Bool
+        Actual: Int -> Bool
+    • In the expression: const result
+      In an equation for ‘ex3’: ex3 x ((== x) -> result) = const result
+    • Relevant bindings include
+        x :: a (bound at T17775-viewpats-c.hs:8:5)
+        ex3 :: a -> a -> Int -> Eq a => Bool
+          (bound at T17775-viewpats-c.hs:8:1)

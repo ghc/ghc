@@ -30,7 +30,7 @@ where
 
 import GHC.Prelude
 
-import {-# SOURCE #-}   GHC.Tc.Gen.Expr( tcSyntaxOp, tcSyntaxOpGen, tcInferSigma )
+import {-# SOURCE #-}   GHC.Tc.Gen.Expr( tcSyntaxOp, tcSyntaxOpGen, tcInferRho )
 
 import GHC.Hs
 import GHC.Tc.Utils.Zonk
@@ -397,42 +397,50 @@ tc_pat pat_ty penv ps_pat thing_inside = case ps_pat of
                   res) }
 
   ViewPat _ expr pat -> do
-       {
-         -- We use tcInferRho here.
-         -- If we have a view function with types like:
-         --    blah -> forall b. burble
-         -- then simple-subsumption means that 'forall b' won't be instantiated
-         -- so we can typecheck the inner pattern with that type
-         -- An exotic example:
-         --    pair :: forall a. a -> forall b. b -> (a,b)
-         --    f (pair True -> x) = ...here (x :: forall b. b -> (Bool,b))
-         --
-         -- TEMPORARY: pending simple subsumption, use tcInferSigma
-         -- When removing this, remove it from Expr.hs-boot too
-        ; (expr',expr_ty) <- tcInferSigma expr
+        { (expr',expr_ty) <- tcInferRho expr
+               -- Note [View patterns and polymorphism]
 
          -- Expression must be a function
         ; let expr_orig = lexprCtOrigin expr
               herald    = text "A view pattern expression expects"
-        ; (expr_wrap1, [inf_arg_ty], inf_res_ty)
-            <- matchActualFunTys herald expr_orig (Just (unLoc expr)) 1 expr_ty
-            -- expr_wrap1 :: expr_ty "->" (inf_arg_ty -> inf_res_ty)
+        ; (expr_wrap1, inf_arg_ty, inf_res_sigma)
+            <- matchActualFunTySigma herald expr_orig (Just (unLoc expr)) (1,[]) expr_ty
+               -- See Note [View patterns and polymorphism]
+               -- expr_wrap1 :: expr_ty "->" (inf_arg_ty -> inf_res_sigma)
 
          -- Check that overall pattern is more polymorphic than arg type
         ; expr_wrap2 <- tc_sub_type penv pat_ty inf_arg_ty
             -- expr_wrap2 :: pat_ty "->" inf_arg_ty
 
-         -- Pattern must have inf_res_ty
-        ; (pat', res) <- tc_lpat (mkCheckExpType inf_res_ty) penv pat thing_inside
+         -- Pattern must have inf_res_sigma
+        ; (pat', res) <- tc_lpat (mkCheckExpType inf_res_sigma) penv pat thing_inside
 
         ; pat_ty <- readExpType pat_ty
         ; let expr_wrap2' = mkWpFun expr_wrap2 idHsWrapper
-                                    pat_ty inf_res_ty doc
-               -- expr_wrap2' :: (inf_arg_ty -> inf_res_ty) "->"
-               --                (pat_ty -> inf_res_ty)
+                                    pat_ty inf_res_sigma doc
+               -- expr_wrap2' :: (inf_arg_ty -> inf_res_sigma) "->"
+               --                (pat_ty -> inf_res_sigma)
               expr_wrap = expr_wrap2' <.> expr_wrap1
               doc = text "When checking the view pattern function:" <+> (ppr expr)
         ; return (ViewPat pat_ty (mkLHsWrap expr_wrap expr') pat', res)}
+
+{- Note [View patterns and polymorphism]
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+Consider this exotic example:
+   pair :: forall a. Bool -> a -> forall b. b -> (a,b)
+
+   f :: Int -> blah
+   f (pair True -> x) = ...here (x :: forall b. b -> (Int,b))
+
+The expresion (pair True) should have type
+    pair True :: Int -> forall b. b -> (Int,b)
+so that it is ready to consume the incoming Int. It should be an
+arrow type (t1 -> t2); hence using (tcInferRho expr).
+
+Then, when taking that arrow apart we want to get a *sigma* type
+(forall b. b->(Int,b)), because that's what we want to bind 'x' to.
+Fortunately that's what matchExpectedFunTySigma returns anyway.
+-}
 
 -- Type signatures in patterns
 -- See Note [Pattern coercions] below

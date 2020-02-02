@@ -635,6 +635,7 @@ to connect the two, something like
 This wrapper is put in the TcSpecPrag, in the ABExport record of
 the AbsBinds.
 
+
         f :: (Eq a, Ix b) => a -> b -> Bool
         {-# SPECIALISE f :: (Ix p, Ix q) => Int -> (p,q) -> Bool #-}
         f = <poly_rhs>
@@ -674,12 +675,13 @@ delicate, but works.
 
 Some wrinkles
 
-1. We don't use full-on tcSubType, because that does co and contra
-   variance and that in turn will generate too complex a LHS for the
-   RULE.  So we use a single invocation of skolemise /
-   topInstantiate in tcSpecWrapper.  (Actually I think that even
-   the "deeply" stuff may be too much, because it introduces lambdas,
-   though I think it can be made to work without too much trouble.)
+1. In tcSpecWrapper, rather than calling tcSubType, we directly call
+   skolemise/instantiate.  That is mainly because of wrinkle (2).
+
+   Historical note: in the past, tcSubType did co/contra stuff, which
+   could generate too complex a LHS for the RULE, which was another
+   reason for not using tcSubType.  But that reason has gone away
+   with simple subsumption (#17775).
 
 2. We need to take care with type families (#5821).  Consider
       type instance F Int = Bool
@@ -775,7 +777,7 @@ tcSpecWrapper :: UserTypeCtxt -> TcType -> TcType -> TcM HsWrapper
 -- See Note [Handling SPECIALISE pragmas], wrinkle 1
 tcSpecWrapper ctxt poly_ty spec_ty
   = do { (sk_wrap, inst_wrap)
-               <- tcSkolemise ctxt spec_ty $ \ _ spec_tau ->
+               <- tcSkolemise ctxt spec_ty $ \ spec_tau ->
                   do { (inst_wrap, tau) <- topInstantiate orig poly_ty
                      ; _ <- unifyType Nothing spec_tau tau
                             -- Deliberately ignore the evidence

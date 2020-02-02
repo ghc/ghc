@@ -1,12 +1,12 @@
 
 NamedWildcardExplicitForall.hs:8:7: error:
     • Couldn't match type ‘_a’ with ‘Bool’
+      Expected: _a -> _a
+        Actual: Bool -> Bool
       ‘_a’ is a rigid type variable bound by
         the type signature for:
           foo :: forall _a. _a -> _a
         at NamedWildcardExplicitForall.hs:7:1-27
-      Expected type: _a -> _a
-        Actual type: Bool -> Bool
     • In the expression: not
       In an equation for ‘foo’: foo = not
     • Relevant bindings include

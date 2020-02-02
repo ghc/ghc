@@ -1,9 +1,12 @@
 
 T4272.hs:15:26: error:
-    • Occurs check: cannot construct the infinite type:
-        a ~ TermFamily a a
-      Expected type: TermFamily a (TermFamily a a)
-        Actual type: TermFamily a a
+    • Couldn't match type ‘a’ with ‘TermFamily a a’
+      Expected: TermFamily a (TermFamily a a)
+        Actual: TermFamily a a
+      ‘a’ is a rigid type variable bound by
+        the type signature for:
+          laws :: forall a b. TermLike a => TermFamily a a -> b
+        at T4272.hs:14:1-53
     • In the first argument of ‘terms’, namely
         ‘(undefined :: TermFamily a a)’
       In the second argument of ‘prune’, namely

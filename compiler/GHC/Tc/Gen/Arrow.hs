@@ -14,7 +14,8 @@ module GHC.Tc.Gen.Arrow ( tcProc ) where
 
 import GHC.Prelude
 
-import {-# SOURCE #-}   GHC.Tc.Gen.Expr( tcLExpr, tcInferRho, tcSyntaxOp, tcCheckId, tcCheckExpr )
+import {-# SOURCE #-}   GHC.Tc.Gen.Expr( tcCheckMonoExpr, tcInferRho, tcSyntaxOp
+                                       , tcCheckId, tcCheckPolyExpr )
 
 import GHC.Hs
 import GHC.Tc.Gen.Match
@@ -161,7 +162,7 @@ tc_cmd env in_cmd@(HsCmdLamCase x matches) (stk, res_ty)
       return (mkHsCmdWrap (mkWpCastN co) (HsCmdLamCase x matches'))
 
 tc_cmd env (HsCmdIf x NoSyntaxExprRn pred b1 b2) res_ty    -- Ordinary 'if'
-  = do  { pred' <- tcLExpr pred (mkCheckExpType boolTy)
+  = do  { pred' <- tcCheckMonoExpr pred boolTy
         ; b1'   <- tcCmd env b1 res_ty
         ; b2'   <- tcCmd env b2 res_ty
         ; return (HsCmdIf x NoSyntaxExprTc pred' b1' b2')
@@ -179,7 +180,7 @@ tc_cmd env (HsCmdIf x fun@(SyntaxExprRn {}) pred b1 b2) res_ty -- Rebindable syn
         ; (pred', fun')
             <- tcSyntaxOp IfOrigin fun (map synKnownType [pred_ty, r_ty, r_ty])
                                        (mkCheckExpType r_ty) $ \ _ ->
-               tcLExpr pred (mkCheckExpType pred_ty)
+               tcCheckMonoExpr pred pred_ty
 
         ; b1'   <- tcCmd env b1 res_ty
         ; b2'   <- tcCmd env b2 res_ty
@@ -206,9 +207,9 @@ tc_cmd env cmd@(HsCmdArrApp _ fun arg ho_app lr) (_, res_ty)
   = addErrCtxt (cmdCtxt cmd)    $
     do  { arg_ty <- newOpenFlexiTyVarTy
         ; let fun_ty = mkCmdArrTy env arg_ty res_ty
-        ; fun' <- select_arrow_scope (tcLExpr fun (mkCheckExpType fun_ty))
+        ; fun' <- select_arrow_scope (tcCheckMonoExpr fun fun_ty)
 
-        ; arg' <- tcLExpr arg (mkCheckExpType arg_ty)
+        ; arg' <- tcCheckMonoExpr arg arg_ty
 
         ; return (HsCmdArrApp fun_ty fun' arg' ho_app lr) }
   where
@@ -233,7 +234,7 @@ tc_cmd env cmd@(HsCmdApp x fun arg) (cmd_stk, res_ty)
   = addErrCtxt (cmdCtxt cmd)    $
     do  { arg_ty <- newOpenFlexiTyVarTy
         ; fun'   <- tcCmd env fun (mkPairTy arg_ty cmd_stk, res_ty)
-        ; arg'   <- tcLExpr arg (mkCheckExpType arg_ty)
+        ; arg'   <- tcCheckMonoExpr arg arg_ty
         ; return (HsCmdApp x fun' arg') }
 
 -------------------------------------------
@@ -310,7 +311,7 @@ tc_cmd env cmd@(HsCmdArrForm x expr f fixity cmd_args) (cmd_stk, res_ty)
         ; let e_ty = mkInfForAllTy alphaTyVar $
                      mkVisFunTys cmd_tys $
                      mkCmdArrTy env (mkPairTy alphaTy cmd_stk) res_ty
-        ; expr' <- tcCheckExpr expr e_ty
+        ; expr' <- tcCheckPolyExpr expr e_ty
         ; return (HsCmdArrForm x expr' f fixity cmd_args') }
 
   where

@@ -13,6 +13,8 @@ T15695.hs:39:14: warning: [-Wdeferred-type-errors (in -Wdefault)]
                            a3 -> ApplyT kind a b,
                  in an equation for ‘from'’
         at T15695.hs:39:8-21
+      Expected: a4
+        Actual: Either (NA 'VO) a3
       ‘a2’ is a rigid type variable bound by
         a pattern with pattern synonym:
           ASSO :: forall kind (a :: kind) (b :: Ctx kind).
@@ -24,8 +26,6 @@ T15695.hs:39:14: warning: [-Wdeferred-type-errors (in -Wdefault)]
                   a3 -> ApplyT kind a b,
         in an equation for ‘from'’
         at T15695.hs:39:8-21
-      Expected type: a4
-        Actual type: Either (NA 'VO) a3
     • In the pattern: Left a
       In the pattern: ASSO (Left a)
       In an equation for ‘from'’: from' (ASSO (Left a)) = Here (a :* Nil)
@@ -34,9 +34,10 @@ T15695.hs:39:14: warning: [-Wdeferred-type-errors (in -Wdefault)]
           (bound at T15695.hs:39:1)
 
 T15695.hs:40:26: warning: [-Wdeferred-type-errors (in -Wdefault)]
-    • Couldn't match type ‘a0 : as0’ with ‘'[]’
-      Expected type: NS (NP NA) '[ '[ 'VO]]
-        Actual type: NS (NP NA) ('[ 'VO] : a0 : as0)
+    • Couldn't match type: a0 : as0
+                     with: '[]
+      Expected: NS (NP NA) '[ '[ 'VO]]
+        Actual: NS (NP NA) ('[ 'VO] : a0 : as0)
     • In the expression: There (Here undefined)
       In an equation for ‘from'’:
           from' (ASSO (Right b)) = There (Here undefined)

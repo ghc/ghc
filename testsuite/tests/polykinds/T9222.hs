@@ -10,5 +10,8 @@ import Data.Proxy
 -- So this program is erroneous.  (But the original ticket was
 -- a crash, and that's still fixed!)
 
+-- Apr 2020: with simple subsumption (#17775), the type isn't
+-- ambiguous any more
+
 data Want :: (i,j) -> Type where
   Want :: (a ~ '(b,c) => Proxy b) -> Want a

@@ -1,9 +1,8 @@
 
 T7354.hs:28:11: error:
-    • Occurs check: cannot construct the infinite type:
-        p ~ Base t (Prim [p] p)
-      Expected type: Prim [p] p -> Base t (Prim [p] p)
-        Actual type: Prim [p] p -> p
+    • Couldn't match type ‘p’ with ‘Base t (Prim [p] p)’
+      Expected: Prim [p] p -> Base t (Prim [p] p)
+        Actual: Prim [p] p -> p
     • In the first argument of ‘ana’, namely ‘alg’
       In the expression: ana alg
       In an equation for ‘foo’: foo = ana alg

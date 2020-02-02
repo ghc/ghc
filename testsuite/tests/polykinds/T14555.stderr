@@ -1,6 +1,7 @@
 
 T14555.hs:12:34: error:
-    • Expected kind ‘TYPE rep’, but ‘a -> b’ has kind ‘*’
+    • Couldn't match kind ‘rep’ with ‘'GHC.Types.LiftedRep’
+      Expected kind ‘TYPE rep’, but ‘a -> b’ has kind ‘*’
     • In the second argument of ‘Exp’, namely ‘(a -> b)’
       In the type ‘Exp xs (a -> b)’
       In the definition of data constructor ‘Lam’

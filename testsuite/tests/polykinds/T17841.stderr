@@ -1,6 +1,9 @@
 
 T17841.hs:7:45: error:
     • Expected a type, but ‘t’ has kind ‘k2’
+      ‘k2’ is a rigid type variable bound by
+        the class declaration for ‘Foo’
+        at T17841.hs:7:17
     • In the kind ‘t’
       In the first argument of ‘Proxy’, namely ‘(a :: t)’
       In the type signature: foo :: Proxy (a :: t)

@@ -4,7 +4,7 @@ T13530.hs:11:7: error:
       When matching types
         a0 :: *
         Int# :: TYPE 'IntRep
-      Expected type: (# Int#, Int# #)
-        Actual type: (# Int#, a0 #)
+      Expected: (# Int#, Int# #)
+        Actual: (# Int#, a0 #)
     • In the expression: g x
       In an equation for ‘f’: f x = g x

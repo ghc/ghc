@@ -45,11 +45,11 @@ simpleTF = id :: (forall b. b~Bool => b->b)
 
 -- Actually these two do not involve impredicative instantiation,
 -- so they now succeed
-complexFD = id :: (forall b. MyEq b Bool => b->b)
-               -> (forall c. MyEq c Bool => c->c)
+complexFD = (\x -> x) :: (forall b. MyEq b Bool => b->b)
+                      -> (forall c. MyEq c Bool => c->c)
 
-complexTF = id :: (forall b. b~Bool => b->b)
-               -> (forall c. c~Bool => c->c)
+complexTF = (\x -> x) :: (forall b. b~Bool => b->b)
+                      -> (forall c. c~Bool => c->c)
 
 {- For example, here is how the subsumption check works for complexTF
    when type-checking the expression

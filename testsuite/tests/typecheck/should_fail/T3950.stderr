@@ -4,8 +4,8 @@ T3950.hs:15:8: error:
       When matching types
         w :: (* -> * -> *) -> *
         Sealed :: (* -> *) -> *
-      Expected type: Maybe (w (Id p))
-        Actual type: Maybe (Sealed (Id p0 x0))
+      Expected: Maybe (w (Id p))
+        Actual: Maybe (Sealed (Id p0 x0))
     • In the expression: Just rp'
       In an equation for ‘rp’:
           rp _

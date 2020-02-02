@@ -1,8 +1,8 @@
 
 T9260.hs:12:14: error:
     • Couldn't match type ‘1’ with ‘0’
-      Expected type: Fin 0
-        Actual type: Fin (0 + 1)
+      Expected: Fin 0
+        Actual: Fin (0 + 1)
     • In the first argument of ‘Fsucc’, namely ‘Fzero’
       In the expression: Fsucc Fzero
       In an equation for ‘test’: test = Fsucc Fzero

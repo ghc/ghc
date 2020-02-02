@@ -29,7 +29,7 @@ module GHC.Tc.Types.Constraint (
 
         WantedConstraints(..), insolubleWC, emptyWC, isEmptyWC,
         isSolvedWC, andWC, unionsWC, mkSimpleWC, mkImplicWC,
-        addInsols, insolublesOnly, addSimples, addImplics, addHole,
+        addInsols, dropMisleading, addSimples, addImplics, addHoles,
         tyCoVarsOfWC, dropDerivedWC, dropDerivedSimples,
         tyCoVarsOfWCList, insolubleCt, insolubleEqCt,
         isDroppableCt, insolubleImplic,
@@ -961,19 +961,24 @@ addInsols :: WantedConstraints -> Bag Ct -> WantedConstraints
 addInsols wc cts
   = wc { wc_simple = wc_simple wc `unionBags` cts }
 
-addHole :: WantedConstraints -> Hole -> WantedConstraints
-addHole wc hole
-  = wc { wc_holes = hole `consBag` wc_holes wc }
+addHoles :: WantedConstraints -> Bag Hole -> WantedConstraints
+addHoles wc holes
+  = wc { wc_holes = holes `unionBags` wc_holes wc }
 
-insolublesOnly :: WantedConstraints -> WantedConstraints
--- Keep only the definitely-insoluble constraints
-insolublesOnly (WC { wc_simple = simples, wc_impl = implics, wc_holes = holes })
-  = WC { wc_simple = filterBag insolubleCt simples
-       , wc_impl   = mapBag implic_insols_only implics
+dropMisleading :: WantedConstraints -> WantedConstraints
+-- Drop misleading constraints; really just class constraints
+-- See Note [Constraints and errors] in GHC.Tc.Utils.Monad
+dropMisleading (WC { wc_simple = simples, wc_impl = implics, wc_holes = holes })
+  = WC { wc_simple = filterBag keep_ct simples
+       , wc_impl   = mapBag drop_implic implics
        , wc_holes  = filterBag isOutOfScopeHole holes }
   where
-    implic_insols_only implic
-      = implic { ic_wanted = insolublesOnly (ic_wanted implic) }
+    drop_implic implic
+      = implic { ic_wanted = dropMisleading (ic_wanted implic) }
+    keep_ct ct
+      = case classifyPredType (ctPred ct) of
+          ClassPred {} -> False
+          _ -> True
 
 isSolvedStatus :: ImplicStatus -> Bool
 isSolvedStatus (IC_Solved {}) = True
@@ -1100,9 +1105,6 @@ data Implication
       ic_info  :: SkolemInfo,    -- See Note [Skolems in an implication]
                                  -- See Note [Shadowing in a constraint]
 
-      ic_telescope :: Maybe SDoc,  -- User-written telescope, if there is one
-                                   -- See Note [Checking telescopes]
-
       ic_given  :: [EvVar],      -- Given evidence variables
                                  --   (order does not matter)
                                  -- See Invariant (GivenInv) in GHC.Tc.Utils.TcType
@@ -1153,7 +1155,6 @@ implicationPrototype
 
               -- The rest have sensible default values
             , ic_skols      = []
-            , ic_telescope  = Nothing
             , ic_given      = []
             , ic_wanted     = emptyWC
             , ic_no_eqs     = False
@@ -1228,17 +1229,18 @@ all at once, creating one implication constraint for the lot:
   variables (ic_skols).  This is done in setImplicationStatus.
 
 * This check is only necessary if the implication was born from a
-  user-written signature.  If, say, it comes from checking a pattern
-  match that binds existentials, where the type of the data constructor
-  is known to be valid (it in tcConPat), no need for the check.
+  'forall' in a user-written signature (the HsForAllTy case in
+  GHC.Tc.Gen.HsType.  If, say, it comes from checking a pattern match
+  that binds existentials, where the type of the data constructor is
+  known to be valid (it in tcConPat), no need for the check.
 
-  So the check is done if and only if ic_telescope is (Just blah).
+  So the check is done if and only if ic_info is ForAllSkol
 
-* If ic_telesope is (Just d), the d::SDoc displays the original,
-  user-written type variables.
+* If ic_info is (ForAllSkol dt dvs), the dvs::SDoc displays the
+  original, user-written type variables.
 
-* Be careful /NOT/ to discard an implication with non-Nothing
-  ic_telescope, even if ic_wanted is empty.  We must give the
+* Be careful /NOT/ to discard an implication with a ForAllSkol
+  ic_info, even if ic_wanted is empty.  We must give the
   constraint solver a chance to make that bad-telescope test!  Hence
   the extra guard in emitResidualTvConstraint; see #16247
 

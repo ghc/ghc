@@ -1,5 +1,7 @@
-UnliftedNewtypesInstanceFail.hs:13:3:
-     Expected kind ‘TYPE 'WordRep’,
+
+UnliftedNewtypesInstanceFail.hs:13:3: error:
+    • Couldn't match kind ‘'IntRep’ with ‘'WordRep’
+      Expected kind ‘TYPE 'WordRep’,
         but ‘Bar Bool’ has kind ‘TYPE 'IntRep’
-     In the newtype instance declaration for ‘Bar’
+    • In the newtype instance declaration for ‘Bar’
       In the instance declaration for ‘Foo Bool’

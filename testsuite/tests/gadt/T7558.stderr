@@ -1,6 +1,10 @@
 
 T7558.hs:8:18: error:
-    • Occurs check: cannot construct the infinite type: a ~ Maybe a
+    • Couldn't match expected type ‘a’ with actual type ‘Maybe a’
+      ‘a’ is a rigid type variable bound by
+        the type signature for:
+          f :: forall a. T a a -> Bool
+        at T7558.hs:7:1-18
     • In the expression: y
       In the first argument of ‘seq’, namely ‘[x, y]’
       In the expression: [x, y] `seq` True

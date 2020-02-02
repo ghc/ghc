@@ -1,8 +1,8 @@
 
 T9144.hs:34:26: error:
     • Couldn't match type ‘Integer’ with ‘FooTerm’
-      Expected type: DemoteRep @Nat ('KProxy @Nat)
-        Actual type: DemoteRep @Foo ('KProxy @Foo)
+      Expected: DemoteRep @Nat ('KProxy @Nat)
+        Actual: DemoteRep @Foo ('KProxy @Foo)
     • In the first argument of ‘toSing’, namely ‘n’
       In the expression: toSing n
       In the expression:

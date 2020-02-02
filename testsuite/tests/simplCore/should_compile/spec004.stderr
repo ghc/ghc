@@ -5,7 +5,7 @@ Result size of Specialise
 
 -- RHS size: {terms: 14, types: 12, coercions: 0, joins: 0/0}
 $sfoo [InlPrag=NOINLINE[0]] :: Int -> [Char]
-[LclId]
+[LclId, Arity=1]
 $sfoo
   = \ (y :: Int) ->
       GHC.Base.build
@@ -25,7 +25,7 @@ foo [InlPrag=NOINLINE[0]] :: forall a. () -> Show a => a -> String
  Unf=Unf{Src=<vanilla>, TopLvl=True, Value=True, ConLike=True,
          WorkFree=True, Expandable=True, Guidance=IF_ARGS [0 30 0] 150 40},
  RULES: "SPEC foo @Int" [0]
-            forall (dk :: ()) ($dShow :: Show Int). foo @Int dk $dShow = $sfoo]
+            forall (ds :: ()) ($dShow :: Show Int). foo @Int ds $dShow = $sfoo]
 foo
   = \ (@a) _ [Occ=Dead] ($dShow :: Show a) (y :: a) ->
       GHC.Base.build

@@ -1,8 +1,8 @@
 
 overloadedlistsfail05.hs:3:24: error:
     • Couldn't match type ‘Char’ with ‘Int’
-      Expected type: GHC.Exts.Item [Int]
-        Actual type: Char
+      Expected: GHC.Exts.Item [Int]
+        Actual: Char
     • In the expression: 'a'
       In the first argument of ‘length’, namely
         ‘(['a' .. (10 :: Int)] :: [Int])’

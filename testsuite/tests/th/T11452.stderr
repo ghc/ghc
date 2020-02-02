@@ -7,9 +7,13 @@ T11452.hs:6:12: error:
       In an equation for ‘impred’: impred = $$([|| \ _ -> () ||])
 
 T11452.hs:6:14: error:
-    • Cannot instantiate unification variable ‘p0’
+    • Couldn't match type ‘p0’ with ‘forall a. a -> a’
+      Expected: Language.Haskell.TH.Syntax.Q
+                  (Language.Haskell.TH.Syntax.TExp ((forall a. a -> a) -> ()))
+        Actual: Language.Haskell.TH.Syntax.Q
+                  (Language.Haskell.TH.Syntax.TExp (p0 -> ()))
+      Cannot instantiate unification variable ‘p0’
       with a type involving polytypes: forall a. a -> a
-        GHC doesn't yet support impredicative polymorphism
     • In the Template Haskell quotation [|| \ _ -> () ||]
       In the expression: [|| \ _ -> () ||]
       In the Template Haskell splice $$([|| \ _ -> () ||])

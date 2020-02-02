@@ -27,7 +27,7 @@ import GHC.Prelude
 import GHC.HsToCore.PmCheck.Types
 import GHC.HsToCore.PmCheck.Oracle
 import GHC.HsToCore.PmCheck.Ppr
-import GHC.Types.Basic (Origin, isGenerated)
+import GHC.Types.Basic (Origin(..), isGenerated)
 import GHC.Core (CoreExpr, Expr(Var,App))
 import GHC.Data.FastString (unpackFS, lengthFS)
 import GHC.Driver.Session

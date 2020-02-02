@@ -1,6 +1,6 @@
 
 T15321.hs:9:9: error:
-    • Found hole: _ :: [Char] -> Language.Haskell.TH.Lib.Internal.ExpQ
+    • Found hole: _ :: String -> Language.Haskell.TH.Lib.Internal.ExpQ
     • In the expression: _
       In the expression: _ "baz"
       In the untyped splice: $(_ "baz")

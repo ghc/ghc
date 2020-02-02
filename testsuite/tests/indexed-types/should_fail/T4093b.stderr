@@ -9,6 +9,8 @@ T4093b.hs:31:13: error:
                                        EitherCO x (A C C n) (A C O n) ~ A C x n) =>
                                       Block n e x -> A e x n
         at T4093b.hs:(19,1)-(22,26)
+      Expected: EitherCO e (A C O n) (A O O n)
+        Actual: (MaybeC C (n C O), MaybeC O (n O C))
       ‘e’ is a rigid type variable bound by
         the type signature for:
           blockToNodeList :: forall (n :: * -> * -> *) e x.
@@ -16,8 +18,6 @@ T4093b.hs:31:13: error:
                               EitherCO x (A C C n) (A C O n) ~ A C x n) =>
                              Block n e x -> A e x n
         at T4093b.hs:(19,1)-(22,26)
-      Expected type: EitherCO e (A C O n) (A O O n)
-        Actual type: (MaybeC C (n C O), MaybeC O (n O C))
     • In the expression: (JustC n, NothingC)
       In an equation for ‘f’: f n _ = (JustC n, NothingC)
       In an equation for ‘blockToNodeList’:

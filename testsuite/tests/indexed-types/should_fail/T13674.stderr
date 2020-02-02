@@ -1,8 +1,12 @@
 
 T13674.hs:56:21: error:
-    • Occurs check: cannot construct the infinite type: m ~ Lcm m m
-      Expected type: GF m
-        Actual type: GF (Lcm m m)
+    • Couldn't match type ‘m’ with ‘Lcm m m’
+      Expected: GF m
+        Actual: GF (Lcm m m)
+      ‘m’ is a rigid type variable bound by
+        the type signature for:
+          bar :: forall (m :: Nat). KnownNat m => GF m -> GF m -> GF m
+        at T13674.hs:55:1-44
     • In the first argument of ‘(-)’, namely ‘foo x y’
       In the expression:
         foo x y - foo y x \\ lcmNat @m @m \\ Sub @() (lcmIsIdempotent @m)
@@ -15,9 +19,13 @@ T13674.hs:56:21: error:
         bar :: GF m -> GF m -> GF m (bound at T13674.hs:56:1)
 
 T13674.hs:56:31: error:
-    • Occurs check: cannot construct the infinite type: m ~ Lcm m m
-      Expected type: GF m
-        Actual type: GF (Lcm m m)
+    • Couldn't match type ‘m’ with ‘Lcm m m’
+      Expected: GF m
+        Actual: GF (Lcm m m)
+      ‘m’ is a rigid type variable bound by
+        the type signature for:
+          bar :: forall (m :: Nat). KnownNat m => GF m -> GF m -> GF m
+        at T13674.hs:55:1-44
     • In the first argument of ‘(\\)’, namely ‘foo y x’
       In the first argument of ‘(\\)’, namely ‘foo y x \\ lcmNat @m @m’
       In the second argument of ‘(-)’, namely

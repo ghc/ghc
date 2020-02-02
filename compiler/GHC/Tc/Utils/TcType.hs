@@ -67,7 +67,7 @@ module GHC.Tc.Utils.TcType (
   tcSplitAppTy_maybe, tcSplitAppTy, tcSplitAppTys, tcRepSplitAppTy_maybe,
   tcRepGetNumAppTys,
   tcGetCastedTyVar_maybe, tcGetTyVar_maybe, tcGetTyVar,
-  tcSplitSigmaTy, tcSplitNestedSigmaTys, tcDeepSplitSigmaTy_maybe,
+  tcSplitSigmaTy, tcSplitNestedSigmaTys,
 
   ---------------------------------
   -- Predicates.
@@ -412,7 +412,7 @@ mkCheckExpType = Check
 -- This is defined here to avoid defining it in GHC.Tc.Gen.Expr boot file.
 data SyntaxOpType
   = SynAny     -- ^ Any type
-  | SynRho     -- ^ A rho type, deeply skolemised or instantiated as appropriate
+  | SynRho     -- ^ A rho type, skolemised or instantiated as appropriate
   | SynList    -- ^ A list type. You get back the element type of the list
   | SynFun SyntaxOpType SyntaxOpType
                -- ^ A function.
@@ -431,11 +431,12 @@ mkSynFunTys arg_tys res_ty = foldr SynFun (SynType res_ty) arg_tys
 {-
 Note [TcRhoType]
 ~~~~~~~~~~~~~~~~
-A TcRhoType has no foralls or contexts at the top, or to the right of an arrow
-  YES    (forall a. a->a) -> Int
+A TcRhoType has no foralls or contexts at the top
   NO     forall a. a ->  Int
   NO     Eq a => a -> a
-  NO     Int -> forall a. a -> Int
+  YES    a -> a
+  YES    (forall a. a->a) -> Int
+  YES    Int -> forall a. a -> Int
 
 
 ************************************************************************
@@ -1273,33 +1274,17 @@ tcSplitSigmaTy ty = case tcSplitForAllTys ty of
 -- if you instead called @tcSplitNestedSigmaTys@ on the type, it would return
 -- @([s,t,a,b,f], [Each s t a b, Applicative f], (a -> f b) -> s -> f t)@.
 tcSplitNestedSigmaTys :: Type -> ([TyVar], ThetaType, Type)
--- NB: This is basically a pure version of deeplyInstantiate (from Inst) that
+-- NB: This is basically a pure version of topInstantiate (from Inst) that
 -- doesn't compute an HsWrapper.
 tcSplitNestedSigmaTys ty
     -- If there's a forall, split it apart and try splitting the rho type
     -- underneath it.
-  | Just (arg_tys, tvs1, theta1, rho1) <- tcDeepSplitSigmaTy_maybe ty
+  | (tvs1, theta1, rho1) <- tcSplitSigmaTy ty
+  , not (null tvs1 && null theta1)
   = let (tvs2, theta2, rho2) = tcSplitNestedSigmaTys rho1
-    in (tvs1 ++ tvs2, theta1 ++ theta2, mkVisFunTys arg_tys rho2)
+    in (tvs1 ++ tvs2, theta1 ++ theta2, rho2)
     -- If there's no forall, we're done.
   | otherwise = ([], [], ty)
-
------------------------
-tcDeepSplitSigmaTy_maybe
-  :: TcSigmaType -> Maybe ([TcType], [TyVar], ThetaType, TcSigmaType)
--- Looks for a *non-trivial* quantified type, under zero or more function arrows
--- By "non-trivial" we mean either tyvars or constraints are non-empty
-
-tcDeepSplitSigmaTy_maybe ty
-  | Just (arg_ty, res_ty)           <- tcSplitFunTy_maybe ty
-  , Just (arg_tys, tvs, theta, rho) <- tcDeepSplitSigmaTy_maybe res_ty
-  = Just (arg_ty:arg_tys, tvs, theta, rho)
-
-  | (tvs, theta, rho) <- tcSplitSigmaTy ty
-  , not (null tvs && null theta)
-  = Just ([], tvs, theta, rho)
-
-  | otherwise = Nothing
 
 -----------------------
 tcTyConAppTyCon :: Type -> TyCon
@@ -1997,9 +1982,9 @@ isSigmaTy _                            = False
 
 isRhoTy :: TcType -> Bool   -- True of TcRhoTypes; see Note [TcRhoType]
 isRhoTy ty | Just ty' <- tcView ty = isRhoTy ty'
-isRhoTy (ForAllTy {})                          = False
-isRhoTy (FunTy { ft_af = VisArg, ft_res = r }) = isRhoTy r
-isRhoTy _                                      = True
+isRhoTy (ForAllTy {})                = False
+isRhoTy (FunTy { ft_af = InvisArg }) = False
+isRhoTy _                            = True
 
 -- | Like 'isRhoTy', but also says 'True' for 'Infer' types
 isRhoExpTy :: ExpType -> Bool

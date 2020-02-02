@@ -1,16 +1,18 @@
 
 <interactive>:1:2: error:
-    • Couldn't match type ‘IO String’ with ‘Int -> IO String’
-      Expected type: [String] -> Int -> IO String
-        Actual type: [String] -> IO String
+    • Couldn't match type: IO String
+                     with: Int -> IO String
+      Expected: [String] -> Int -> IO String
+        Actual: [String] -> IO String
     • In the expression: (two_args) :: [String] -> Int -> IO String
       In an equation for ‘_compileParsedExpr’:
           _compileParsedExpr = (two_args) :: [String] -> Int -> IO String
 
 <interactive>:1:2: error:
-    • Couldn't match type ‘IO String’ with ‘Int -> IO String’
-      Expected type: [String] -> Int -> IO String
-        Actual type: [String] -> IO String
+    • Couldn't match type: IO String
+                     with: Int -> IO String
+      Expected: [String] -> Int -> IO String
+        Actual: [String] -> IO String
     • In the expression: (two_args) :: [String] -> Int -> IO String
       In an equation for ‘_compileParsedExpr’:
           _compileParsedExpr = (two_args) :: [String] -> Int -> IO String

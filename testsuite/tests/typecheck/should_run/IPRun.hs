@@ -15,7 +15,7 @@ f2 () = let ?x = 5 in \() -> ?x
    -- should always return 5
 
 f3 :: () -> ((?x :: Int) => Int)
--- Deep skolemisation means that the local x=5 still wins
+-- Simple subsumption means that the x=0 from main wins
 f3 = let ?x = 5 in \() -> ?x
 
 main = let ?x = 0 in

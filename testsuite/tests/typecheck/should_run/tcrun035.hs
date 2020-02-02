@@ -6,11 +6,15 @@
 -- Now it breaks the impredicativity story
 --   (id {a}) . (id {a}) :: a -> a
 -- And (forall m. Monad m => m a) /~ IO a
+--
+-- Apr 20: with simple subsumption this fails.  So I
+-- I eta-expanded foo, but leaving the (id . id)
+-- composition.
 
 module Main(main) where
 
 foo :: (forall m. Monad m => m a) -> IO a
-foo = id . id
+foo x = (id . id) x
 
 main :: IO ()
 main = foo (return ())

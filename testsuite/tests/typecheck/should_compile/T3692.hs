@@ -7,5 +7,8 @@ type Foo a b = () -> (Bar a => a)
 
 class Bar a where {}
 
+boo :: Foo p q
+boo x = undefined
+
 foo :: Foo a b
-foo = id (undefined :: Foo p q)
+foo y = id (\x -> boo x) y

@@ -9,7 +9,7 @@ module ShouldCompile where
         -- implicit parameter to give
         --      r :: (?param::a) => a
     r :: Int -> ((?param :: a) => a)
-    r = error "urk"
+    r _ = error "urk"
 
         -- The unboxed tuple is OK because it is
         -- used on the right hand end of an arrow
