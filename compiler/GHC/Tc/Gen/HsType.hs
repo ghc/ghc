@@ -425,7 +425,6 @@ tcStandaloneKindSig (L _ kisig) = case kisig of
        ; checkValidType ctxt kind
        ; return (name, kind) }
 
-
 tcTopLHsType :: LHsSigType GhcRn -> ContextKind -> TcM Type
 tcTopLHsType hs_ty ctxt_kind
   = tc_top_lhs_type (mkMode TypeLevel) hs_ty ctxt_kind
@@ -1105,10 +1104,58 @@ tc_fun_type mode ty1 ty2 exp_kind = case mode_tyki mode of
        ; checkExpectedKind (HsFunTy noExtField ty1 ty2) (mkVisFunTy ty1' ty2')
                            liftedTypeKind exp_kind }
 
+<<<<<<< HEAD
 {- Note [Skolem escape and forall-types]
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 See also Note [Checking telescopes].
 
+||||||| merged common ancestors
+---------------------------
+tcAnonWildCardOcc :: HsType GhcRn -> Kind -> TcM TcType
+tcAnonWildCardOcc wc exp_kind
+  = do { wc_tv <- newWildTyVar  -- The wildcard's kind will be an un-filled-in meta tyvar
+
+       ; part_tysig <- xoptM LangExt.PartialTypeSignatures
+       ; warning <- woptM Opt_WarnPartialTypeSignatures
+
+       ; unless (part_tysig && not warning) $
+         emitAnonTypeHole wc_tv
+         -- Why the 'unless' guard?
+         -- See Note [Wildcards in visible kind application]
+
+       ; checkExpectedKind wc (mkTyVarTy wc_tv)
+                           (tyVarKind wc_tv) exp_kind }
+
+{- Note [Wildcards in visible kind application]
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+There are cases where users might want to pass in a wildcard as a visible kind
+argument, for instance:
+
+data T :: forall k1 k2. k1 → k2 → Type where
+  MkT :: T a b
+x :: T @_ @Nat False n
+x = MkT
+
+So we should allow '@_' without emitting any hole constraints, and
+regardless of whether PartialTypeSignatures is enabled or not. But how would
+the typechecker know which '_' is being used in VKA and which is not when it
+calls emitNamedTypeHole in tcHsPartialSigType on all HsWildCardBndrs?
+The solution then is to neither rename nor include unnamed wildcards in HsWildCardBndrs,
+but instead give every anonymous wildcard a fresh wild tyvar in tcAnonWildCardOcc.
+And whenever we see a '@', we automatically turn on PartialTypeSignatures and
+turn off hole constraint warnings, and do not call emitAnonTypeHole
+under these conditions.
+See related Note [Wildcards in visible type application] here and
+Note [The wildcard story for types] in GHC.Hs.Types
+
+Note [Skolem escape and forall-types]
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+=======
+{- Note [Skolem escape and forall-types]
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+See also Note [Checking telescopes].
+
+>>>>>>> Simple subsumption
 Consider
   f :: forall a. (forall kb (b :: kb). Proxy '[a, b]) -> ()
 
@@ -1928,6 +1975,7 @@ newNamedWildTyVar _name   -- Currently ignoring the "_x" wildcard name used in t
        ; traceTc "newWildTyVar" (ppr tyvar)
        ; return tyvar }
 
+<<<<<<< HEAD
 ---------------------------
 tcAnonWildCardOcc :: TcTyMode -> HsType GhcRn -> Kind -> TcM TcType
 tcAnonWildCardOcc (TcTyMode { mode_holes = Just (hole_lvl, hole_mode) })
@@ -2026,6 +2074,107 @@ See related Note [Wildcards in visible type application] here and
 Note [The wildcard story for types] in GHC.Hs.Type
 -}
 
+||||||| merged common ancestors
+=======
+---------------------------
+tcAnonWildCardOcc :: TcTyMode -> HsType GhcRn -> Kind -> TcM TcType
+tcAnonWildCardOcc (TcTyMode { mode_holes = Just (hole_lvl, hole_mode) })
+                  ty exp_kind
+    -- hole_lvl: see Note [Checking partial type signatures]
+    --           esp the bullet on nested forall types
+  = do { kv_details <- newTauTvDetailsAtLevel hole_lvl
+       ; kv_name    <- newMetaTyVarName (fsLit "k")
+       ; wc_details <- newTauTvDetailsAtLevel hole_lvl
+       ; wc_name    <- newMetaTyVarName (fsLit wc_nm)
+       ; let kv      = mkTcTyVar kv_name liftedTypeKind kv_details
+             wc_kind = mkTyVarTy kv
+             wc_tv   = mkTcTyVar wc_name wc_kind wc_details
+
+       ; traceTc "tcAnonWildCardOcc" (ppr hole_lvl <+> ppr emit_holes)
+       ; when emit_holes $
+         emitAnonTypeHole wc_tv
+         -- Why the 'when' guard?
+         -- See Note [Wildcards in visible kind application]
+
+       -- You might think that this would always just unify
+       -- wc_kind with exp_kind, so we could avoid even creating kv
+       -- But the level numbers might not allow that unification,
+       -- so we have to do it properly (T14140a)
+       ; checkExpectedKind ty (mkTyVarTy wc_tv) wc_kind exp_kind }
+  where
+     -- See Note [Wildcard names]
+     wc_nm = case hole_mode of
+               HM_Sig     -> "w"
+               HM_FamPat  -> "_"
+               HM_VTA     -> "w"
+
+     emit_holes = case hole_mode of
+                     HM_Sig     -> True
+                     HM_FamPat  -> False
+                     HM_VTA     -> False
+
+tcAnonWildCardOcc mode ty _
+-- mode_holes is Nothing.  Should not happen, because renamer
+-- should already have rejected holes in unexpected places
+  = pprPanic "tcWildCardOcc" (ppr mode $$ ppr ty)
+
+{- Note [Wildcard names]
+~~~~~~~~~~~~~~~~~~~~~~~~
+So we hackily use the mode_holes flag to control the name used
+for wildcards:
+
+* For proper holes (whether in a visible type application (VTA) or no),
+  we rename the '_' to 'w'. This is so that we see variables like 'w0'
+  or 'w1' in error messages, a vast improvement upon '_0' and '_1'. For
+  example, we prefer
+       Found type wildcard ‘_’ standing for ‘w0’
+  over
+       Found type wildcard ‘_’ standing for ‘_1’
+
+  Even in the VTA case, where we do not emit an error to be printed, we
+  want to do the renaming, as the variables may appear in other,
+  non-wildcard error messages.
+
+* However, holes in the left-hand sides of type families ("type
+  patterns") stand for type variables which we do not care to name --
+  much like the use of an underscore in an ordinary term-level
+  pattern. When we spot these, we neither wish to generate an error
+  message nor to rename the variable.  We don't rename the variable so
+  that we can pretty-print a type family LHS as, e.g.,
+    F _ Int _ = ...
+  and not
+     F w1 Int w2 = ...
+
+  See also Note [Wildcards in family instances] in
+  GHC.Rename.Module. The choice of HM_FamPat is made in
+  tcFamTyPats. There is also some unsavory magic, relying on that
+  underscore, in GHC.Core.Coercion.tidyCoAxBndrsForUser.
+
+Note [Wildcards in visible kind application]
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+There are cases where users might want to pass in a wildcard as a visible kind
+argument, for instance:
+
+data T :: forall k1 k2. k1 → k2 → Type where
+  MkT :: T a b
+x :: T @_ @Nat False n
+x = MkT
+
+So we should allow '@_' without emitting any hole constraints, and
+regardless of whether PartialTypeSignatures is enabled or not. But how
+would the typechecker know which '_' is being used in VKA and which is
+not when it calls emitNamedTypeHole in
+tcHsPartialSigType on all HsWildCardBndrs?  The solution is to neither
+rename nor include unnamed wildcards in HsWildCardBndrs, but instead
+give every anonymous wildcard a fresh wild tyvar in tcAnonWildCardOcc.
+
+And whenever we see a '@', we set mode_holes to HM_VKA, so that
+we do not call emitAnonTypeHole in tcAnonWildCardOcc.
+See related Note [Wildcards in visible type application] here and
+Note [The wildcard story for types] in GHC.Hs.Types
+-}
+
+>>>>>>> Simple subsumption
 {- *********************************************************************
 *                                                                      *
              Kind inference for type declarations
