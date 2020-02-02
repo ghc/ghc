@@ -1,11 +1,11 @@
 
 T13784.hs:29:28: error:
     • Couldn't match type ‘as’ with ‘a : Divide a as’
+      Expected: Product (Divide a (a : as))
+        Actual: Product as1
       ‘as’ is a rigid type variable bound by
         the instance declaration
         at T13784.hs:25:10-30
-      Expected type: Product (Divide a (a : as))
-        Actual type: Product as1
     • In the expression: as
       In the expression: (a, as)
       In an equation for ‘divide’: divide (a :* as) = (a, as)
@@ -14,10 +14,10 @@ T13784.hs:29:28: error:
           (bound at T13784.hs:29:5)
 
 T13784.hs:33:24: error:
-    • Couldn't match type ‘Product (a : as0)’
-                     with ‘(b, Product (Divide b (a : as)))’
-      Expected type: (b, Product (Divide b (a : as)))
-        Actual type: Product (a1 : as0)
+    • Couldn't match type: Product (a : as0)
+                     with: (b, Product (Divide b (a : as)))
+      Expected: (b, Product (Divide b (a : as)))
+        Actual: Product (a1 : as0)
     • In the expression: a :* divide as
       In an equation for ‘divide’: divide (a :* as) = a :* divide as
       In the instance declaration for ‘Divideable b (a : as)’
@@ -26,10 +26,10 @@ T13784.hs:33:24: error:
           (bound at T13784.hs:33:5)
 
 T13784.hs:33:29: error:
-    • Couldn't match type ‘(a0, Product (Divide a0 as))’
-                     with ‘Product as0’
-      Expected type: Product as0
-        Actual type: (a0, Product (Divide a0 as1))
+    • Couldn't match type: (a0, Product (Divide a0 as))
+                     with: Product as0
+      Expected: Product as0
+        Actual: (a0, Product (Divide a0 as1))
     • In the second argument of ‘(:*)’, namely ‘divide as’
       In the expression: a :* divide as
       In an equation for ‘divide’: divide (a :* as) = a :* divide as

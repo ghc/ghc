@@ -1,2 +1,2 @@
-'Proxy @_ :: forall {k} {_ :: k}. Proxy @{k} _
-= 'Proxy @{k} @_
+'Proxy @_ :: forall {k} {w :: k}. Proxy @{k} w
+= 'Proxy @{k} @w

@@ -541,11 +541,12 @@ is all about surface syntax. Therefore, they are kept as separate data types.
 -- Variable Binder
 --
 -- VarBndr is polymorphic in both var and visibility fields.
--- Currently there are six different uses of 'VarBndr':
---   * Var.TyVarBinder   = VarBndr TyVar ArgFlag
---   * Var.TyCoVarBinder = VarBndr TyCoVar ArgFlag
---   * TyCon.TyConBinder     = VarBndr TyVar TyConBndrVis
---   * TyCon.TyConTyCoBinder = VarBndr TyCoVar TyConBndrVis
+-- Currently there are sevenv different uses of 'VarBndr':
+--   * Var.TyVarBinder            = VarBndr TyVar ArgFlag
+--   * Var.InvisTVBinder          = VarBndr TyVar Specificity
+--   * Var.TyCoVarBinder          = VarBndr TyCoVar ArgFlag
+--   * TyCon.TyConBinder          = VarBndr TyVar TyConBndrVis
+--   * TyCon.TyConTyCoBinder      = VarBndr TyCoVar TyConBndrVis
 --   * IfaceType.IfaceForAllBndr  = VarBndr IfaceBndr ArgFlag
 --   * IfaceType.IfaceTyConBinder = VarBndr IfaceBndr TyConBndrVis
 data VarBndr var argf = Bndr var argf
@@ -559,8 +560,8 @@ data VarBndr var argf = Bndr var argf
 --
 -- A 'TyVarBinder' is a binder with only TyVar
 type TyCoVarBinder     = VarBndr TyCoVar ArgFlag
-type TyVarBinder       = VarBndr TyVar ArgFlag
-type InvisTVBinder     = VarBndr TyVar Specificity
+type TyVarBinder       = VarBndr TyVar   ArgFlag
+type InvisTVBinder     = VarBndr TyVar   Specificity
 
 tyVarSpecToBinders :: [VarBndr a Specificity] -> [VarBndr a ArgFlag]
 tyVarSpecToBinders = map tyVarSpecToBinder
