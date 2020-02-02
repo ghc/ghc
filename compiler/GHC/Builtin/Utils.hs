@@ -22,12 +22,13 @@ module GHC.Builtin.Utils (
         isKnownKeyName,
         lookupKnownKeyName,
         lookupKnownNameInfo,
+        wiredInNameTyThing_maybe,
 
         -- ** Internal use
         -- | 'knownKeyNames' is exported to seed the original name cache only;
         -- if you find yourself wanting to look at it you might consider using
         -- 'lookupKnownKeyName' or 'isKnownKeyName'.
-        knownKeyNames,
+        knownKeyNames, wiredInMap,
 
         -- * Miscellaneous
         wiredInIds, ghcPrimIds,
@@ -117,7 +118,8 @@ Note [About wired-in things]
 -- code, or in an interface file, you get a Name with the correct known key (See
 -- Note [Known-key names] in "GHC.Builtin.Names")
 knownKeyNames :: [Name]
-knownKeyNames
+wiredInMap :: NameEnv TyThing
+(knownKeyNames, wiredInMap)
   | debugIsOn
   , Just badNamesStr <- knownKeyNamesOkay all_names
   = panic ("badAllKnownKeyNames:\n" ++ badNamesStr)
@@ -126,7 +128,7 @@ knownKeyNames
        -- "<<details unavailable>>" error. (This seems to happen only in the
        -- stage 2 compiler, for reasons I [Richard] have no clue of.)
   | otherwise
-  = all_names
+  = (all_names, wired_map)
   where
     all_names =
       -- We exclude most tuples from this list—see
@@ -136,30 +138,36 @@ knownKeyNames
       -- See Note [One-tuples] (Wrinkle: Make boxed one-tuple names have known keys)
       -- in GHC.Builtin.Types.
       tupleTyConName BoxedTuple 1 : tupleDataConName Boxed 1 :
-      concat [ concatMap wired_tycon_kk_names primTyCons
+      concat
+                [ map (idName . primOpWrapperId) allThePrimOps
+                , basicKnownKeyNames
+                , templateHaskellNames] ++ map fst wired_all_names
+    wired_map = listToUFM wired_all_names
+    wired_all_names =
+      concat [ wired_tycon_kk_names funTyCon
+             , concatMap wired_tycon_kk_names primTyCons
              , concatMap wired_tycon_kk_names wiredInTyCons
              , concatMap wired_tycon_kk_names typeNatTyCons
-             , map idName wiredInIds
-             , map (idName . primOpId) allThePrimOps
-             , map (idName . primOpWrapperId) allThePrimOps
-             , basicKnownKeyNames
-             , templateHaskellNames
+             , map (\wid -> (idName wid, AnId wid)) wiredInIds
+             , map (\po -> let pid = primOpId po in (idName pid, AnId pid)) allThePrimOps
              ]
+
+
     -- All of the names associated with a wired-in TyCon.
     -- This includes the TyCon itself, its DataCons and promoted TyCons.
-    wired_tycon_kk_names :: TyCon -> [Name]
+    wired_tycon_kk_names :: TyCon -> [(Name, TyThing)]
     wired_tycon_kk_names tc =
-        tyConName tc : (rep_names tc ++ implicits)
+        (tyConName tc, ATyCon tc) : (rep_names tc ++ implicits)
       where implicits = concatMap thing_kk_names (implicitTyConThings tc)
 
-    wired_datacon_kk_names :: DataCon -> [Name]
+    wired_datacon_kk_names :: DataCon -> [(Name, TyThing)]
     wired_datacon_kk_names dc =
-      dataConName dc : rep_names (promoteDataCon dc)
+      (dataConName dc, AConLike (RealDataCon dc)) : rep_names (promoteDataCon dc)
 
-    thing_kk_names :: TyThing -> [Name]
+    thing_kk_names :: TyThing -> [(Name, TyThing)]
     thing_kk_names (ATyCon tc)                 = wired_tycon_kk_names tc
     thing_kk_names (AConLike (RealDataCon dc)) = wired_datacon_kk_names dc
-    thing_kk_names thing                       = [getName thing]
+    thing_kk_names thing                       = [(getName thing, thing)]
 
     -- The TyConRepName for a known-key TyCon has a known key,
     -- but isn't itself an implicit thing.  Yurgh.
@@ -167,8 +175,9 @@ knownKeyNames
     --     field names would be in a similar situation.  Ditto class ops.
     --     But it happens that there aren't any
     rep_names tc = case tyConRepName_maybe tc of
-                        Just n  -> [n]
+                        Just n  -> [(n, ATyCon tc)]
                         Nothing -> []
+
 
 -- | Check the known-key names list of consistency.
 knownKeyNamesOkay :: [Name] -> Maybe String
@@ -196,6 +205,18 @@ knownKeyNamesOkay all_names
                            ": [" ++
                            intercalate ", " (map (occNameString . nameOccName) ns) ++
                            "]"
+
+wiredInNameTyThing_maybe :: Name -> Maybe TyThing
+wiredInNameTyThing_maybe n
+  | isWiredInName n
+  = case knownUniqueTyThing (getUnique n) of
+      Just (KnownUniqueWiredIn n) -> Just n
+      -- If this happens, there is a wired in name which will not be in the
+      -- wiredInMap and so the function will fail. Best to catch it early.
+      Just {} -> pprPanic "wiredInNameTyThing_maybe" (ppr n)
+      Nothing -> lookupNameEnv wiredInMap n
+  | otherwise = Nothing
+
 
 -- | Given a 'Unique' lookup its associated 'Name' if it corresponds to a
 -- known-key thing.
