@@ -123,8 +123,7 @@ wiredInMap :: NameEnv TyThing
   = (all_names, wired_map)
   where
     all_names = concat
-                [ map (idName . primOpId) allThePrimOps
-                , map (idName . primOpWrapperId) allThePrimOps
+                [ map (idName . primOpWrapperId) allThePrimOps
                 , basicKnownKeyNames
                 , templateHaskellNames] ++ map fst wired_all_names
     wired_map = listToUFM wired_all_names
@@ -138,6 +137,8 @@ wiredInMap :: NameEnv TyThing
              , concatMap wired_tycon_kk_names typeNatTyCons
 
              , map (\wid -> (idName wid, AnId wid)) wiredInIds
+
+             , map (\po -> let pid = primOpId po in (idName pid, AnId pid)) allThePrimOps
              ]
 
 
