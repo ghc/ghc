@@ -4,8 +4,8 @@ T12373.hs:10:19: error:
       When matching types
         a0 :: *
         MVar# RealWorld a1 :: TYPE 'UnliftedRep
-      Expected type: (# State# RealWorld, a0 #)
-        Actual type: (# State# RealWorld, MVar# RealWorld a1 #)
+      Expected: (# State# RealWorld, a0 #)
+        Actual: (# State# RealWorld, MVar# RealWorld a1 #)
     • In the expression: newMVar# rw
       In the first argument of ‘IO’, namely ‘(\ rw -> newMVar# rw)’
       In the first argument of ‘(>>)’, namely ‘IO (\ rw -> newMVar# rw)’

@@ -1,10 +1,16 @@
 
 LevPolyBounded.hs:10:15: error:
     • Expected a type, but ‘a’ has kind ‘TYPE r’
+      ‘r’ is a rigid type variable bound by
+        the class declaration for ‘XBounded’
+        at LevPolyBounded.hs:9:27
     • In the type signature: LevPolyBounded.minBound :: a
       In the class declaration for ‘XBounded’
 
 LevPolyBounded.hs:11:15: error:
     • Expected a type, but ‘a’ has kind ‘TYPE r’
+      ‘r’ is a rigid type variable bound by
+        the class declaration for ‘XBounded’
+        at LevPolyBounded.hs:9:27
     • In the type signature: LevPolyBounded.maxBound :: a
       In the class declaration for ‘XBounded’

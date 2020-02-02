@@ -1,16 +1,12 @@
 
 T14618.hs:6:14: error:
-    • Couldn't match type ‘a’ with ‘b’
-      ‘a’ is a rigid type variable bound by
-        the type signature for:
-          safeCoerce :: forall a b. a -> b
-        at T14618.hs:5:1-20
+    • Couldn't match type ‘b’ with ‘forall c. a’
+      Expected: a -> b
+        Actual: a -> forall c. a
       ‘b’ is a rigid type variable bound by
         the type signature for:
           safeCoerce :: forall a b. a -> b
         at T14618.hs:5:1-20
-      Expected type: a -> b
-        Actual type: b -> b
     • In the expression: f'
       In an equation for ‘safeCoerce’:
           safeCoerce

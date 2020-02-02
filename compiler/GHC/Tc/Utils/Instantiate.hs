@@ -10,10 +10,9 @@
 {-# OPTIONS_GHC -Wno-incomplete-uni-patterns   #-}
 {-# OPTIONS_GHC -Wno-incomplete-record-updates #-}
 
--- | The @Inst@ type: dictionaries or method instances
 module GHC.Tc.Utils.Instantiate (
-       deeplySkolemise,
-       topInstantiate, topInstantiateInferred, deeplyInstantiate,
+       topSkolemise,
+       topInstantiate, topInstantiateInferred,
        instCall, instDFunType, instStupidTheta, instTyVarsWith,
        newWanted, newWanteds,
 
@@ -36,11 +35,10 @@ module GHC.Tc.Utils.Instantiate (
 
 import GHC.Prelude
 
-import {-# SOURCE #-}   GHC.Tc.Gen.Expr( tcCheckExpr, tcSyntaxOp )
+import {-# SOURCE #-}   GHC.Tc.Gen.Expr( tcCheckPolyExpr, tcSyntaxOp )
 import {-# SOURCE #-}   GHC.Tc.Utils.Unify( unifyType, unifyKind )
 
 import GHC.Types.Basic ( IntegralLit(..), SourceText(..) )
-import GHC.Data.FastString
 import GHC.Hs
 import GHC.Tc.Utils.Zonk
 import GHC.Tc.Utils.Monad
@@ -117,66 +115,62 @@ newMethodFromName origin name ty_args
 {-
 ************************************************************************
 *                                                                      *
-        Deep instantiation and skolemisation
+         Instantiation and skolemisation
 *                                                                      *
 ************************************************************************
 
-Note [Deep skolemisation]
-~~~~~~~~~~~~~~~~~~~~~~~~~
-deeplySkolemise decomposes and skolemises a type, returning a type
-with all its arrows visible (ie not buried under foralls)
+Note [Skolemisation]
+~~~~~~~~~~~~~~~~~~~~
+topSkolemise decomposes and skolemises a type, returning a type
+with no top level foralls or (=>)
 
 Examples:
 
-  deeplySkolemise (Int -> forall a. Ord a => blah)
-    =  ( wp, [a], [d:Ord a], Int -> blah )
-    where wp = \x:Int. /\a. \(d:Ord a). <hole> x
+  topSkolemise (forall a. Ord a => a -> a)
+    =  ( wp, [a], [d:Ord a], a->a )
+    where wp = /\a. \(d:Ord a). <hole> a d
 
-  deeplySkolemise  (forall a. Ord a => Maybe a -> forall b. Eq b => blah)
-    =  ( wp, [a,b], [d1:Ord a,d2:Eq b], Maybe a -> blah )
-    where wp = /\a.\(d1:Ord a).\(x:Maybe a)./\b.\(d2:Ord b). <hole> x
+  topSkolemise  (forall a. Ord a => forall b. Eq b => a->b->b)
+    =  ( wp, [a,b], [d1:Ord a,d2:Eq b], a->b->b )
+    where wp = /\a.\(d1:Ord a)./\b.\(d2:Ord b). <hole> a d1 b d2
+
+This second example is the reason for the recursive 'go'
+function in topSkolemise: we must remove successive layers
+of foralls and (=>).
 
 In general,
-  if      deeplySkolemise ty = (wrap, tvs, evs, rho)
+  if      topSkolemise ty = (wrap, tvs, evs, rho)
     and   e :: rho
   then    wrap e :: ty
-    and   'wrap' binds tvs, evs
+    and   'wrap' binds {tvs, evs}
 
-ToDo: this eta-abstraction plays fast and loose with termination,
-      because it can introduce extra lambdas.  Maybe add a `seq` to
-      fix this
 -}
 
-deeplySkolemise :: TcSigmaType
-                -> TcM ( HsWrapper
-                       , [(Name,TyVar)]     -- All skolemised variables
-                       , [EvVar]            -- All "given"s
-                       , TcRhoType )
-
-deeplySkolemise ty
-  = go init_subst ty
+topSkolemise :: TcSigmaType
+             -> TcM ( HsWrapper
+                    , [(Name,TyVar)]     -- All skolemised variables
+                    , [EvVar]            -- All "given"s
+                    , TcRhoType )
+-- See Note [Skolemisation]
+topSkolemise ty
+  = go init_subst idHsWrapper [] [] ty
   where
     init_subst = mkEmptyTCvSubst (mkInScopeSet (tyCoVarsOfType ty))
 
-    go subst ty
-      | Just (arg_tys, tvs, theta, ty') <- tcDeepSplitSigmaTy_maybe ty
-      = do { let arg_tys' = substTys subst arg_tys
-           ; ids1           <- newSysLocalIds (fsLit "dk") arg_tys'
-           ; (subst', tvs1) <- tcInstSkolTyVarsX subst tvs
+    -- Why recursive?  See Note [Skolemisation]
+    go subst wrap tv_prs ev_vars ty
+      | (tvs, theta, inner_ty) <- tcSplitSigmaTy ty
+      , not (null tvs && null theta)
+      = do { (subst', tvs1) <- tcInstSkolTyVarsX subst tvs
            ; ev_vars1       <- newEvVars (substTheta subst' theta)
-           ; (wrap, tvs_prs2, ev_vars2, rho) <- go subst' ty'
-           ; let tv_prs1 = map tyVarName tvs `zip` tvs1
-           ; return ( mkWpLams ids1
-                      <.> mkWpTyLams tvs1
-                      <.> mkWpLams ev_vars1
-                      <.> wrap
-                      <.> mkWpEvVarApps ids1
-                    , tv_prs1  ++ tvs_prs2
-                    , ev_vars1 ++ ev_vars2
-                    , mkVisFunTys arg_tys' rho ) }
+           ; go subst'
+                (wrap <.> mkWpTyLams tvs1 <.> mkWpLams ev_vars1)
+                (tv_prs ++ (map tyVarName tvs `zip` tvs1))
+                (ev_vars ++ ev_vars1)
+                inner_ty }
 
       | otherwise
-      = return (idHsWrapper, [], [], substTy subst ty)
+      = return (wrap, tv_prs, ev_vars, substTy subst ty)
         -- substTy is a quick no-op on an empty substitution
 
 -- | Instantiate all outer type variables
@@ -185,6 +179,7 @@ topInstantiate :: CtOrigin -> TcSigmaType -> TcM (HsWrapper, TcRhoType)
 -- if    topInstantiate ty = (wrap, rho)
 -- and   e :: ty
 -- then  wrap e :: rho  (that is, wrap :: ty "->" rho)
+-- NB: always returns a rho-type, with no top-level forall or (=>)
 topInstantiate = top_instantiate True
 
 -- | Instantiate all outer 'Inferred' binders
@@ -195,13 +190,16 @@ topInstantiateInferred :: CtOrigin -> TcSigmaType
 -- if    topInstantiate ty = (wrap, rho)
 -- and   e :: ty
 -- then  wrap e :: rho
+-- NB: may return a sigma-type
 topInstantiateInferred = top_instantiate False
 
 top_instantiate :: Bool   -- True  <=> instantiate *all* variables
                           -- False <=> instantiate only the inferred ones
                 -> CtOrigin -> TcSigmaType -> TcM (HsWrapper, TcRhoType)
 top_instantiate inst_all orig ty
-  | not (null binders && null theta)
+  | (binders, phi) <- tcSplitForAllVarBndrs ty
+  , (theta, rho)   <- tcSplitPhiTy phi
+  , not (null binders && null theta)
   = do { let (inst_bndrs, leave_bndrs) = span should_inst binders
              (inst_theta, leave_theta)
                | null leave_bndrs = (theta, [])
@@ -226,7 +224,7 @@ top_instantiate inst_all orig ty
                        , text "theta:" <+>  ppr inst_theta' ])
 
        ; (wrap2, rho2) <-
-           if null leave_bndrs
+           if null leave_bndrs   -- NB: if inst_all is True then leave_bndrs = []
 
          -- account for types like forall a. Num a => forall b. Ord b => ...
            then top_instantiate inst_all orig sigma'
@@ -238,66 +236,10 @@ top_instantiate inst_all orig ty
 
   | otherwise = return (idHsWrapper, ty)
   where
-    (binders, phi) = tcSplitForAllVarBndrs ty
-    (theta, rho)   = tcSplitPhiTy phi
 
     should_inst bndr
       | inst_all  = True
       | otherwise = binderArgFlag bndr == Inferred
-
-deeplyInstantiate :: CtOrigin -> TcSigmaType -> TcM (HsWrapper, TcRhoType)
---   Int -> forall a. a -> a  ==>  (\x:Int. [] x alpha) :: Int -> alpha
--- In general if
--- if    deeplyInstantiate ty = (wrap, rho)
--- and   e :: ty
--- then  wrap e :: rho
--- That is, wrap :: ty ~> rho
---
--- If you don't need the HsWrapper returned from this function, consider
--- using tcSplitNestedSigmaTys in GHC.Tc.Utils.TcType, which is a pure alternative that
--- only computes the returned TcRhoType.
-
-deeplyInstantiate orig ty =
-  deeply_instantiate orig
-                     (mkEmptyTCvSubst (mkInScopeSet (tyCoVarsOfType ty)))
-                     ty
-
-deeply_instantiate :: CtOrigin
-                   -> TCvSubst
-                   -> TcSigmaType -> TcM (HsWrapper, TcRhoType)
--- Internal function to deeply instantiate that builds on an existing subst.
--- It extends the input substitution and applies the final substitution to
--- the types on return.  See #12549.
-
-deeply_instantiate orig subst ty
-  | Just (arg_tys, tvs, theta, rho) <- tcDeepSplitSigmaTy_maybe ty
-  = do { (subst', tvs') <- newMetaTyVarsX subst tvs
-       ; let arg_tys' = substTys   subst' arg_tys
-             theta'   = substTheta subst' theta
-       ; ids1  <- newSysLocalIds (fsLit "di") arg_tys'
-       ; wrap1 <- instCall orig (mkTyVarTys tvs') theta'
-       ; traceTc "Instantiating (deeply)" (vcat [ text "origin" <+> pprCtOrigin orig
-                                                , text "type" <+> ppr ty
-                                                , text "with" <+> ppr tvs'
-                                                , text "args:" <+> ppr ids1
-                                                , text "theta:" <+>  ppr theta'
-                                                , text "subst:" <+> ppr subst'])
-       ; (wrap2, rho2) <- deeply_instantiate orig subst' rho
-       ; return (mkWpLams ids1
-                    <.> wrap2
-                    <.> wrap1
-                    <.> mkWpEvVarApps ids1,
-                 mkVisFunTys arg_tys' rho2) }
-
-  | otherwise
-  = do { let ty' = substTy subst ty
-       ; traceTc "deeply_instantiate final subst"
-                 (vcat [ text "origin:"   <+> pprCtOrigin orig
-                       , text "type:"     <+> ppr ty
-                       , text "new type:" <+> ppr ty'
-                       , text "subst:"    <+> ppr subst ])
-      ; return (idHsWrapper, ty') }
-
 
 instTyVarsWith :: CtOrigin -> [TyVar] -> [TcType] -> TcM TCvSubst
 -- Use this when you want to instantiate (forall a b c. ty) with
@@ -639,7 +581,7 @@ tcSyntaxName orig ty (std_nm, user_nm_expr) = do
         -- same type as the standard one.
         -- Tiresome jiggling because tcCheckSigma takes a located expression
      span <- getSrcSpanM
-     expr <- tcCheckExpr (L span user_nm_expr) sigma1
+     expr <- tcCheckPolyExpr (L span user_nm_expr) sigma1
      return (std_nm, unLoc expr)
 
 syntaxNameCtxt :: HsExpr GhcRn -> CtOrigin -> Type -> TidyEnv
