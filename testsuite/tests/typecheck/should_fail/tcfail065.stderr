@@ -1,14 +1,15 @@
 
 tcfail065.hs:29:18: error:
     • Couldn't match type ‘x1’ with ‘x’
+      Expected: X x
+        Actual: X x1
       ‘x1’ is a rigid type variable bound by
         the type signature for:
           setX :: forall x1. x1 -> X x -> X x
         at tcfail065.hs:29:3-6
       ‘x’ is a rigid type variable bound by
-        the instance declaration at tcfail065.hs:28:10-19
-      Expected type: X x
-        Actual type: X x1
+        the instance declaration
+        at tcfail065.hs:28:10-19
     • In the expression: X x
       In an equation for ‘setX’: setX x (X _) = X x
       In the instance declaration for ‘HasX (X x)’

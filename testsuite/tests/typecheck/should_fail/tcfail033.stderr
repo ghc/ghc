@@ -1,6 +1,6 @@
 
 tcfail033.hs:4:12: error:
-    • Occurs check: cannot construct the infinite type: a ~ (a, b)
+    • Couldn't match expected type ‘(a, b)’ with actual type ‘a’
     • In the expression: x
       In the expression: [x | (x, y) <- buglet]
       In an equation for ‘buglet’: buglet = [x | (x, y) <- buglet]
