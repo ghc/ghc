@@ -1,8 +1,8 @@
 
 <interactive>:1:7: error:
-    • Found type wildcard ‘_’ standing for ‘_0 :: k0’
+    • Found type wildcard ‘_’ standing for ‘w0 :: k0’
       Where: ‘k0’ is an ambiguous type variable
-             ‘_0’ is an ambiguous type variable
+             ‘w0’ is an ambiguous type variable
       To use the inferred type, enable PartialTypeSignatures
     • In the first argument of ‘Proxy’, namely ‘_’
       In the type ‘Proxy _’
@@ -15,16 +15,16 @@
       In the type ‘Proxy (Maybe :: _)’
 
 <interactive>:1:11: error:
-    • Found type wildcard ‘_’ standing for ‘_0’
-      Where: ‘_0’ is an ambiguous type variable
+    • Found type wildcard ‘_’ standing for ‘w0’
+      Where: ‘w0’ is an ambiguous type variable
       To use the inferred type, enable PartialTypeSignatures
     • In the first argument of ‘Dependent’, namely ‘_’
       In the type ‘Dependent _’
 
 <interactive>:1:7: warning: [-Wpartial-type-signatures (in -Wdefault)]
-    • Found type wildcard ‘_’ standing for ‘_0 :: k0’
+    • Found type wildcard ‘_’ standing for ‘w0 :: k0’
       Where: ‘k0’ is an ambiguous type variable
-             ‘_0’ is an ambiguous type variable
+             ‘w0’ is an ambiguous type variable
     • In the first argument of ‘Proxy’, namely ‘_’
       In the type ‘Proxy _’
 
@@ -35,7 +35,7 @@
       In the type ‘Proxy (Maybe :: _)’
 
 <interactive>:1:11: warning: [-Wpartial-type-signatures (in -Wdefault)]
-    • Found type wildcard ‘_’ standing for ‘_0’
-      Where: ‘_0’ is an ambiguous type variable
+    • Found type wildcard ‘_’ standing for ‘w0’
+      Where: ‘w0’ is an ambiguous type variable
     • In the first argument of ‘Dependent’, namely ‘_’
       In the type ‘Dependent _’

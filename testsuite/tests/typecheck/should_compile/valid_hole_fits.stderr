@@ -225,7 +225,7 @@ valid_hole_fits.hs:38:10: warning: [-Wtyped-holes (in -Wdefault)]
            (and originally defined in ‘GHC.Base’))
 
 valid_hole_fits.hs:41:8: warning: [-Wtyped-holes (in -Wdefault)]
-    • Found hole: _ :: [Char] -> IO ()
+    • Found hole: _ :: String -> IO ()
     • In the expression: _
       In the expression: _ "hello, world"
       In an equation for ‘main’: main = _ "hello, world"
@@ -242,7 +242,7 @@ valid_hole_fits.hs:41:8: warning: [-Wtyped-holes (in -Wdefault)]
           (imported from ‘Prelude’ at valid_hole_fits.hs:3:1-40
            (and originally defined in ‘System.IO’))
         print :: forall a. Show a => a -> IO ()
-          with print @[Char]
+          with print @String
           (imported from ‘Prelude’ at valid_hole_fits.hs:3:1-40
            (and originally defined in ‘System.IO’))
         fail :: forall (m :: * -> *) a. MonadFail m => String -> m a
@@ -250,6 +250,6 @@ valid_hole_fits.hs:41:8: warning: [-Wtyped-holes (in -Wdefault)]
           (imported from ‘Prelude’ at valid_hole_fits.hs:3:1-40
            (and originally defined in ‘Control.Monad.Fail’))
         mempty :: forall a. Monoid a => a
-          with mempty @([Char] -> IO ())
+          with mempty @(String -> IO ())
           (imported from ‘Prelude’ at valid_hole_fits.hs:3:1-40
            (and originally defined in ‘GHC.Base’))

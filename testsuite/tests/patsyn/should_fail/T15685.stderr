@@ -1,6 +1,11 @@
 
 T15685.hs:13:24: error:
     • Couldn't match kind ‘a1’ with ‘[k0]’
+      When matching types
+        f :: a1 -> *
+        NP a0 :: [k0] -> *
+      Expected: f a2
+        Actual: NP a0 b0
         ‘a1’ is untouchable
           inside the constraints: as ~ (a2 : as1)
           bound by a pattern with constructor:
@@ -12,11 +17,6 @@ T15685.hs:13:24: error:
         the inferred type of HereNil :: NS f as
         at T15685.hs:13:9-15
       Possible fix: add a type signature for ‘HereNil’
-      When matching types
-        f :: a1 -> *
-        NP a0 :: [k0] -> *
-      Expected type: f a2
-        Actual type: NP a0 b0
     • In the pattern: Nil
       In the pattern: Here Nil
       In the declaration for pattern synonym ‘HereNil’

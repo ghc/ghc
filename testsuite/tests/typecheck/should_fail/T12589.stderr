@@ -2,10 +2,11 @@
 T12589.hs:13:3: error: Variable not in scope: (&) :: t0 -> t1 -> t
 
 T12589.hs:13:5: error:
-    • Cannot instantiate unification variable ‘t1’
+    • Couldn't match expected type ‘t1’
+                  with actual type ‘(forall a. Bounded a => f0 a) -> h0 f0 xs0’
+      Cannot instantiate unification variable ‘t1’
       with a type involving polytypes:
         (forall a. Bounded a => f0 a) -> h0 f0 xs0
-        GHC doesn't yet support impredicative polymorphism
     • In the second argument of ‘(&)’, namely ‘hcpure (Proxy @Bounded)’
       In the expression: minBound & hcpure (Proxy @Bounded)
       In an equation for ‘a’: a = minBound & hcpure (Proxy @Bounded)

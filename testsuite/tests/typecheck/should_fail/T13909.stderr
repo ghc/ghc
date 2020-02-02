@@ -1,5 +1,7 @@
 
 T13909.hs:11:18: error:
     • Expected kind ‘k0’, but ‘Hm’ has kind ‘forall k -> k -> *’
+      Cannot instantiate unification variable ‘k0’
+      with a kind involving polytypes: forall k -> k -> *
     • In the first argument of ‘HasName’, namely ‘Hm’
       In the instance declaration for ‘HasName Hm’

@@ -112,7 +112,7 @@ module GHC.Core.Type (
         isCoercionTy_maybe, isForAllTy,
         isForAllTy_ty, isForAllTy_co,
         isPiTy, isTauTy, isFamFreeTy,
-        isCoVarType,
+        isCoVarType, isAtomicTy,
 
         isValidJoinPointType,
         tyConAppNeedsKindSig,
@@ -812,7 +812,7 @@ mkAppTy ty1               ty2 = AppTy ty1 ty2
         -- Here Id is partially applied in the type sig for Foo,
         -- but once the type synonyms are expanded all is well
         --
-        -- Moreover in GHC.Tc.Types.tcInferApps we build up a type
+        -- Moreover in GHC.Tc.Types.tcInferTyApps we build up a type
         --   (T t1 t2 t3) one argument at a type, thus forming
         --   (T t1), (T t1 t2), etc
 
@@ -1874,6 +1874,20 @@ isTauTy (FunTy af a b)    = case af of
 isTauTy (ForAllTy {})     = False
 isTauTy (CastTy ty _)     = isTauTy ty
 isTauTy (CoercionTy _)    = False  -- Not sure about this
+
+isAtomicTy :: Type -> Bool
+-- True if the type is just a single token, and can be printed compactly
+-- Used when deciding how to lay out type error messages; see the
+-- call in GHC.Tc.Errors
+isAtomicTy (TyVarTy {})    = True
+isAtomicTy (LitTy {})      = True
+isAtomicTy (TyConApp _ []) = True
+
+isAtomicTy ty | isLiftedTypeKind ty = True
+   -- 'Type' prints compactly as *
+   -- See GHC.Iface.Type.ppr_kind_type
+
+isAtomicTy _ = False
 
 {-
 %************************************************************************

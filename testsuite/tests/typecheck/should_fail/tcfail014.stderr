@@ -1,6 +1,6 @@
 
 tcfail014.hs:5:33: error:
-    • Occurs check: cannot construct the infinite type: t4 ~ t4 -> t5
+    • Couldn't match expected type ‘t4’ with actual type ‘t4 -> t5’
     • In the first argument of ‘z’, namely ‘z’
       In the expression: z z
       In an equation for ‘h’: h z = z z

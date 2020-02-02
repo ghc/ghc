@@ -1,7 +1,8 @@
 
 T13242a.hs:10:5: error:
     • Couldn't match expected type ‘a0’ with actual type ‘a’
-      ‘a’ is a rigid type variable bound by
+        because type variable ‘a’ would escape its scope
+      This (rigid, skolem) type variable is bound by
         a pattern with constructor: A :: forall a. Eq a => a -> T,
         in a pattern binding in
              a 'do' block

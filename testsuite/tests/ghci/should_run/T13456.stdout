@@ -3,8 +3,8 @@ macro 'type' overwrites builtin command.  Use ':def!' to overwrite.
 macro 'ty' overwrites builtin command.  Use ':def!' to overwrite.
 I'm a macro
 I'm a macro
-macro :: p -> IO [Char]
-macro :: p -> IO [Char]
+macro :: p -> IO String
+macro :: p -> IO String
 macro 'test' is already defined.  Use ':def!' to overwrite.
 the following macros are defined:
 test

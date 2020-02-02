@@ -7,8 +7,8 @@ DoParamM.hs:146:25: error:
 
 DoParamM.hs:286:28: error:
     • Couldn't match type ‘Unlocked’ with ‘Locked’
-      Expected type: LIO Locked Locked ()
-        Actual type: LIO Unlocked Locked ()
+      Expected: LIO Locked Locked ()
+        Actual: LIO Unlocked Locked ()
     • In a stmt of a 'do' block: tlock2_do
       In the expression:
         do tlock2_do
@@ -20,8 +20,8 @@ DoParamM.hs:286:28: error:
 
 DoParamM.hs:302:37: error:
     • Couldn't match type ‘Locked’ with ‘Unlocked’
-      Expected type: LIO Unlocked Unlocked ()
-        Actual type: LIO Locked Unlocked ()
+      Expected: LIO Unlocked Unlocked ()
+        Actual: LIO Locked Unlocked ()
     • In a stmt of a 'do' block: unlock
       In the expression:
         do tlock2_do

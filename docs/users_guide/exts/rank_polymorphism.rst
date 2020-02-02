@@ -112,23 +112,11 @@ example: ::
 Since GHC 8.0 declarations such as ``MkSwizzle'`` will cause an out-of-scope
 error.
 
-As for type signatures, implicit quantification happens for
-non-overloaded types too. So if you write this: ::
-
-      f :: (a -> a) -> a
-
-it's just as if you had written this: ::
-
-      f :: forall a. (a -> a) -> a
-
-That is, since the type variable ``a`` isn't in scope, it's implicitly
-universally quantified.
-
 You construct values of types ``T1, MonadT, Swizzle`` by applying the
 constructor to suitable values, just as usual. For example, ::
 
         a1 :: T Int
-        a1 = T1 (\xy->x) 3
+        a1 = T1 (\x y->x) 3
 
         a2, a3 :: Swizzle
         a2 = MkSwizzle sort
@@ -142,7 +130,7 @@ constructor to suitable values, just as usual. For example, ::
              in
              MkMonad r b
 
-        mkTs :: (forall b. b -> b -> b) -> a -> [T a]
+        mkTs :: (forall b. b -> b -> b) -> a -> a -> [T a]
         mkTs f x y = [T1 f x, T1 f y]
 
 The type of the argument can, as usual, be more general than the type
@@ -168,6 +156,52 @@ In the function ``h`` we use the record selectors ``return`` and
 ``bind`` to extract the polymorphic bind and return functions from the
 ``MonadT`` data structure, rather than using pattern matching.
 
+
+.. _simple-subsumption:
+
+Subsumption
+-------------
+
+Suppose: ::
+
+  f1 :: (forall a b. Int -> a -> b -> b) -> Bool
+  g1 :: forall x y. Int -> y -> x -> x
+
+  f2 :: (forall a. (Eq a, Show a) => a -> a) -> Bool
+  g2 :: forall x. (Show x, Eq x) => Int -> a -> b -> b
+
+then ``f1 g1`` and ``f2 g2`` are both well typed, despite the
+different order of type variables and constraints.  What happens is that the
+argument is instantiated, and then re-generalised to match the type expected
+by the function.
+
+But this instantiation and re-generalisation happens only at the top level
+of a type. In particular, none of this happens if the foralls are underneath an arrow.
+For example: ::
+
+  f3 :: (Int -> forall a b. a -> b -> b) -> Bool
+  g3a :: Int -> forall x y. x -> y -> y
+  g3b :: forall x. Int -> forall y. x -> y -> y
+  g3c :: Int -> forall x y. y -> x -> x
+
+  f4 :: (Int -> forall a. (Eq a, Show a) => a -> a) -> Bool
+  g4 ::  Int -> forall x. (Show x, Eq x) => x -> x) -> Bool
+
+Then the application ``f3 g3a`` is well-typed, becuase ``g3a`` has a type that matches the type
+expected by ``f3``.  But ``f3 g3b`` is not well typed, because the foralls are in different places.
+Nor is ``f3 g3c``, where the foralls are in the same place but the variables are in a different order.
+Similarly ``f4 g4`` is not well typed, becuase the constraints appear in a different order.
+
+These examples can be made to typecheck by eta-expansion. For example ``f3 (\x -> g3b x)``
+is well typed, and similarly ``f3 (\x -> g3c x)`` and ``f4 (\x -> g4 x)``.
+
+Historical note.  Earlier versions of GHC allowed these now-rejected applications, by inserting
+automatic eta-expansions, as described in Section 4.6 of `Practical type inference for arbitrary-aank types <https://www.microsoft.com/en-us/research/publication/practical-type-inference-for-arbitrary-rank-types/>`__, where it is
+called "deep skolemisation".
+But these automatic eta-expansions may silently change the semantics of the user's program,
+and deep skolemisation was removed from the language by
+`GHC Proposal #287 <https://github.com/ghc-proposals/ghc-proposals/blob/master/proposals/0287-simplify-subsumption.rst>`__.
+This proposal has many more examples.
 
 .. _higher-rank-type-inference:
 

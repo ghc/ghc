@@ -1,7 +1,7 @@
 
 ado002.hs:8:8: error:
-    • Couldn't match expected type ‘Char -> IO b0’
-                  with actual type ‘IO Char’
+    • Couldn't match expected type: Char -> IO b0
+                  with actual type: IO Char
     • The function ‘getChar’ is applied to one value argument,
         but its type ‘IO Char’ has none
       In a stmt of a 'do' block: y <- getChar 'a'
@@ -12,8 +12,8 @@ ado002.hs:8:8: error:
 
 ado002.hs:9:3: error:
     • Couldn't match type ‘()’ with ‘Int’
-      Expected type: IO Int
-        Actual type: IO ()
+      Expected: IO Int
+        Actual: IO ()
     • In a stmt of a 'do' block: print (x, y)
       In the expression:
         do x <- getChar
@@ -43,8 +43,8 @@ ado002.hs:15:13: error:
            return (y, x)
 
 ado002.hs:23:9: error:
-    • Couldn't match expected type ‘Char -> IO t0’
-                  with actual type ‘IO Char’
+    • Couldn't match expected type: Char -> IO a0
+                  with actual type: IO Char
     • The function ‘getChar’ is applied to one value argument,
         but its type ‘IO Char’ has none
       In a stmt of a 'do' block: x5 <- getChar x4

@@ -160,6 +160,7 @@ dsHsBind dflags b@(FunBind { fun_id = L loc fun
                           matchWrapper
                            (mkPrefixFunRhs (L loc (idName fun)))
                            Nothing matches
+
         ; core_wrap <- dsHsWrapper co_fn
         ; let body' = mkOptTickBox tick body
               rhs   = core_wrap (mkLams args body')
@@ -197,7 +198,11 @@ dsHsBind dflags (AbsBinds { abs_tvs = tyvars, abs_ev_vars = dicts
                           , abs_exports = exports
                           , abs_ev_binds = ev_binds
                           , abs_binds = binds, abs_sig = has_sig })
-  = do { ds_binds <- addTyCsDs FromSource (listToBag dicts) (dsLHsBinds binds)
+  = do { ds_binds <- addTyCsDs FromSource (listToBag dicts) $
+                     dsLHsBinds binds
+             -- addTyCsDs: push type constraints deeper
+             --            for inner pattern match check
+             -- See Check, Note [Type and Term Equality Propagation]
 
        ; ds_ev_binds <- dsTcEvBinds_s ev_binds
 

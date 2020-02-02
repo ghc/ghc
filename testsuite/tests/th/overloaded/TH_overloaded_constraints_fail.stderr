@@ -1,8 +1,8 @@
 
 TH_overloaded_constraints_fail.hs:20:14: error:
     • Couldn't match type ‘Identity’ with ‘Q’
-      Expected type: Q Exp
-        Actual type: Identity Exp
+      Expected: Q Exp
+        Actual: Identity Exp
     • In the expression: idQ
       In the expression:
         [| $(idQ) $(qq) |]

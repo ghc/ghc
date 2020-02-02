@@ -288,7 +288,7 @@ tcPendingSplice m_var (PendingRnSplice flavour splice_name expr)
   = do { meta_ty <- tcMetaTy meta_ty_name
          -- Expected type of splice, e.g. m Exp
        ; let expected_type = mkAppTy m_var meta_ty
-       ; expr' <- tcCheckExpr expr expected_type
+       ; expr' <- tcCheckPolyExpr expr expected_type
        ; return (PendingTcSplice splice_name expr') }
   where
      meta_ty_name = case flavour of
@@ -618,7 +618,7 @@ tcNestedSplice pop_stage (TcPending ps_var lie_var q@(QuoteWrapper _ m_var)) spl
        ; meta_exp_ty <- tcTExpTy m_var res_ty
        ; expr' <- setStage pop_stage $
                   setConstraintVar lie_var $
-                  tcLExpr expr (mkCheckExpType meta_exp_ty)
+                  tcCheckMonoExpr expr meta_exp_ty
        ; untypeq <- tcLookupId unTypeQName
        ; let expr'' = mkHsApp
                         (mkLHsWrap (applyQuoteWrapper q)
@@ -647,7 +647,7 @@ tcTopSplice expr res_ty
        -- Top level splices must still be of type Q (TExp a)
        ; meta_exp_ty <- tcTExpTy q_type res_ty
        ; q_expr <- tcTopSpliceExpr Typed $
-                          tcLExpr expr (mkCheckExpType meta_exp_ty)
+                   tcCheckMonoExpr expr meta_exp_ty
        ; lcl_env <- getLclEnv
        ; let delayed_splice
               = DelayedSplice lcl_env expr res_ty q_expr
@@ -684,7 +684,7 @@ runTopSplice (DelayedSplice lcl_env orig_expr res_ty q_expr)
             captureConstraints $
               addErrCtxt (spliceResultDoc zonked_q_expr) $ do
                 { (exp3, _fvs) <- rnLExpr expr2
-                ; tcLExpr exp3 (mkCheckExpType zonked_ty)}
+                ; tcCheckMonoExpr exp3 zonked_ty }
        ; ev <- simplifyTop wcs
        ; return $ unLoc (mkHsDictLet (EvBinds ev) res)
        }
@@ -717,7 +717,7 @@ tcTopSpliceExpr :: SpliceType -> TcM (LHsExpr GhcTc) -> TcM (LHsExpr GhcTc)
 -- Note that set the level to Splice, regardless of the original level,
 -- before typechecking the expression.  For example:
 --      f x = $( ...$(g 3) ... )
--- The recursive call to tcCheckExpr will simply expand the
+-- The recursive call to tcCheckPolyExpr will simply expand the
 -- inner escape before dealing with the outer one
 
 tcTopSpliceExpr isTypedSplice tc_action
@@ -1438,7 +1438,7 @@ reifyInstances th_nm th_tys
             <- pushTcLevelM_   $
                solveEqualities $ -- Avoid error cascade if there are unsolved
                bindImplicitTKBndrs_Skol tv_names $
-               fst <$> tcLHsType rn_ty
+               tcInferLHsType rn_ty
         ; ty <- zonkTcTypeToType ty
                 -- Substitute out the meta type variables
                 -- In particular, the type might have kind

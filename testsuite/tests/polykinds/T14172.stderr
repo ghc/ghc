@@ -11,12 +11,10 @@ T14172.hs:6:46: error:
       In the type ‘(a -> f b) -> g a -> f (h _)’
 
 T14172.hs:7:19: error:
-    • Occurs check: cannot construct the infinite type: a ~ g'0 a
-      Expected type: (f'0 a -> f (f'0 b))
-                     -> Compose f'0 g'0 a -> f (h a')
-        Actual type: (Unwrapped (Compose f'0 g'0 a)
-                      -> f (Unwrapped (h a')))
-                     -> Compose f'0 g'0 a -> f (h a')
+    • Couldn't match type ‘a’ with ‘g'0 a’
+      Expected: (f'0 a -> f (f'0 b)) -> Compose f'0 g'0 a -> f (h a')
+        Actual: (Unwrapped (Compose f'0 g'0 a) -> f (Unwrapped (h a')))
+                -> Compose f'0 g'0 a -> f (h a')
     • In the first argument of ‘(.)’, namely ‘_Wrapping Compose’
       In the expression: _Wrapping Compose . traverse
       In an equation for ‘traverseCompose’:

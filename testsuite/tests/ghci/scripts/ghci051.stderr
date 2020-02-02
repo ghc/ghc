@@ -1,10 +1,9 @@
 
 <interactive>:6:9: error:
-    Couldn't match type ‘T’
-                   with ‘Ghci1.T’
-    NB: ‘Ghci1.T’ is defined at <interactive>:2:1-14
-        ‘T’ is defined at <interactive>:5:1-16
-       Expected type: T'
-         Actual type: T
-    In the expression: C :: T'
-    In an equation for ‘c’: c = C :: T'
+    • Couldn't match type ‘T’ with ‘Ghci1.T’
+      Expected: T'
+        Actual: T
+      NB: ‘Ghci1.T’ is defined at <interactive>:2:1-14
+          ‘T’ is defined at <interactive>:5:1-16
+    • In the expression: C :: T'
+      In an equation for ‘c’: c = C :: T'

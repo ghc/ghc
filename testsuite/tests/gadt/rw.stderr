@@ -15,12 +15,12 @@ rw.hs:14:47: error:
 
 rw.hs:19:43: error:
     • Couldn't match type ‘a’ with ‘Bool’
+      Expected: a -> IO ()
+        Actual: Bool -> IO ()
       ‘a’ is a rigid type variable bound by
         the type signature for:
           readBool :: forall a. T a -> IORef a -> IO ()
         at rw.hs:16:1-34
-      Expected type: a -> IO ()
-        Actual type: Bool -> IO ()
     • In the second argument of ‘(>>=)’, namely ‘(print . not)’
       In the expression: readIORef ref >>= (print . not)
       In a case alternative: ~(Lb x) -> readIORef ref >>= (print . not)

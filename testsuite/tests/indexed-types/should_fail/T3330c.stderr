@@ -4,8 +4,8 @@ T3330c.hs:25:43: error:
       When matching types
         f1 :: * -> *
         f1 x :: *
-      Expected type: Der ((->) x) (f1 x)
-        Actual type: R f1
+      Expected: Der ((->) x) (f1 x)
+        Actual: R f1
     • In the first argument of ‘plug’, namely ‘rf’
       In the first argument of ‘Inl’, namely ‘(plug rf df x)’
       In the expression: Inl (plug rf df x)

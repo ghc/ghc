@@ -20,4 +20,4 @@ wrapIdComp f = runIdComp . f . liftOuter
 
 class Applicative p => ApplicativeFix p where
   afix :: (forall q. Applicative q => (Comp p q) a -> (Comp p q) a) -> p a
-  afix = wrapIdComp
+  afix f = wrapIdComp f

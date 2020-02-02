@@ -1,8 +1,8 @@
 
 Defer01.hs:11:40: warning: [-Wdeferred-type-errors (in -Wdefault)]
     • Couldn't match type ‘Char’ with ‘[Char]’
-      Expected type: String
-        Actual type: Char
+      Expected: String
+        Actual: Char
     • In the first argument of ‘putStr’, namely ‘','’
       In the second argument of ‘(>>)’, namely ‘putStr ','’
       In the expression: putStr "Hello World" >> putStr ','
@@ -60,16 +60,16 @@ Defer01.hs:47:7: warning: [-Wdeferred-type-errors (in -Wdefault)]
       In an equation for ‘k’: k x = x
 
 Defer01.hs:50:5: warning: [-Wdeferred-type-errors (in -Wdefault)]
-    • Couldn't match expected type ‘IO a0’
-                  with actual type ‘Char -> IO ()’
+    • Couldn't match expected type: IO a0
+                  with actual type: Char -> IO ()
     • Probable cause: ‘putChar’ is applied to too few arguments
       In the first argument of ‘(>>)’, namely ‘putChar’
       In the expression: putChar >> putChar 'p'
       In an equation for ‘l’: l = putChar >> putChar 'p'
 *** Exception: Defer01.hs:11:40: error:
     • Couldn't match type ‘Char’ with ‘[Char]’
-      Expected type: String
-        Actual type: Char
+      Expected: String
+        Actual: Char
     • In the first argument of ‘putStr’, namely ‘','’
       In the second argument of ‘(>>)’, namely ‘putStr ','’
       In the expression: putStr "Hello World" >> putStr ','
@@ -87,8 +87,8 @@ Defer01.hs:50:5: warning: [-Wdeferred-type-errors (in -Wdefault)]
 
 <interactive>:10:11: error:
     • Couldn't match type ‘Bool’ with ‘Int’
-      Expected type: C Int
-        Actual type: C Bool
+      Expected: C Int
+        Actual: C Bool
     • In the first argument of ‘c’, namely ‘(C2 True)’
       In the first argument of ‘print’, namely ‘(c (C2 True))’
       In the expression: print (c (C2 True))
@@ -140,8 +140,8 @@ Defer01.hs:50:5: warning: [-Wdeferred-type-errors (in -Wdefault)]
       In the expression: print (k 2)
       In an equation for ‘it’: it = print (k 2)
 *** Exception: Defer01.hs:50:5: error:
-    • Couldn't match expected type ‘IO a0’
-                  with actual type ‘Char -> IO ()’
+    • Couldn't match expected type: IO a0
+                  with actual type: Char -> IO ()
     • Probable cause: ‘putChar’ is applied to too few arguments
       In the first argument of ‘(>>)’, namely ‘putChar’
       In the expression: putChar >> putChar 'p'

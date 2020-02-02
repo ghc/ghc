@@ -1,8 +1,8 @@
 
 tcfail178.hs:15:7: error:
     • Couldn't match type ‘()’ with ‘[a]’
-      Expected type: Bool -> [a]
-        Actual type: Bool -> ()
+      Expected: Bool -> [a]
+        Actual: Bool -> ()
     • In the first argument of ‘a’, namely ‘y’
       In the expression: a y
       In an equation for ‘c’: c = a y

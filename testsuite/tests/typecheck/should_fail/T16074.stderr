@@ -1,6 +1,8 @@
 
 T16074.hs:10:7: error:
     • Couldn't match type ‘a’ with ‘b’
+      Expected: TYPE a :~: TYPE b
+        Actual: TYPE a :~: TYPE a
       ‘a’ is a rigid type variable bound by
         the type signature for:
           foo :: * :~: *
@@ -9,8 +11,6 @@ T16074.hs:10:7: error:
         the type signature for:
           foo :: * :~: *
         at T16074.hs:9:1-24
-      Expected type: TYPE a :~: TYPE b
-        Actual type: TYPE a :~: TYPE a
     • In the expression: Refl
       In an equation for ‘foo’: foo = Refl
     • Relevant bindings include

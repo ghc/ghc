@@ -1,7 +1,8 @@
 
 T17541.hs:20:17: error:
-    • Expected kind ‘TYPE (Rep rep)’,
-        but ‘Int#’ has kind ‘TYPE 'IntRep’
+    • Couldn't match kind ‘Rep rep’ with ‘'IntRep’
+      Expected kind ‘TYPE (Rep rep)’, but ‘Int#’ has kind ‘TYPE 'IntRep’
+      The type variable ‘rep’ is ambiguous
     • In the type ‘Int#’
       In the type family declaration for ‘Unboxed’
       NB: Type ‘Unboxed’ was inferred to use visible dependent quantification.

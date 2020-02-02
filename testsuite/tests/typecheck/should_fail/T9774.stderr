@@ -1,8 +1,8 @@
 
 T9774.hs:5:17: error:
     • Couldn't match type ‘Char’ with ‘[Char]’
-      Expected type: String
-        Actual type: Char
+      Expected: String
+        Actual: Char
     • In the first argument of ‘putStrLn’, namely ‘(assert True 'a')’
       In the expression: putStrLn (assert True 'a')
       In an equation for ‘foo’: foo = putStrLn (assert True 'a')

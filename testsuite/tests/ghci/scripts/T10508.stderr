@@ -1,8 +1,9 @@
 
 <interactive>:1:8: error:
-    • Couldn't match type ‘a0 -> a0’ with ‘[Char]’
-      Expected type: IO Prelude.String
-        Actual type: IO (a0 -> a0)
+    • Couldn't match type: a0 -> a0
+                     with: [Char]
+      Expected: IO Prelude.String
+        Actual: IO (a0 -> a0)
     • In the expression: return id
       In the second argument of ‘(.)’, namely ‘(\ _ -> return id)’
       In the expression:

@@ -1,31 +1,33 @@
 
 T18127a.hs:5:5: error:
-    • Cannot instantiate unification variable ‘a1’
+    • Couldn't match expected type ‘(forall a. a) -> ()’
+                  with actual type ‘a1’
+      Cannot instantiate unification variable ‘a1’
       with a type involving polytypes: (forall a. a) -> ()
-        GHC doesn't yet support impredicative polymorphism
     • In the expression: undefined
       In an equation for ‘a’: a = undefined
 
 T18127a.hs:8:5: error:
-    • Cannot instantiate unification variable ‘a3’
+    • Couldn't match expected type ‘(Show a => a) -> ()’
+                  with actual type ‘a3’
+      Cannot instantiate unification variable ‘a3’
       with a type involving polytypes: (Show a => a) -> ()
-        GHC doesn't yet support impredicative polymorphism
     • In the expression: undefined
       In an equation for ‘b’: b = undefined
     • Relevant bindings include
         b :: (Show a => a) -> () (bound at T18127a.hs:8:1)
 
 T18127a.hs:12:5: error:
-    • Cannot instantiate unification variable ‘a0’
+    • Couldn't match expected type ‘C -> ()’ with actual type ‘a0’
+      Cannot instantiate unification variable ‘a0’
       with a type involving polytypes: C -> ()
-        GHC doesn't yet support impredicative polymorphism
     • In the expression: undefined
       In an equation for ‘c’: c = undefined
 
 T18127a.hs:16:5: error:
-    • Cannot instantiate unification variable ‘a2’
+    • Couldn't match expected type ‘D a -> ()’ with actual type ‘a2’
+      Cannot instantiate unification variable ‘a2’
       with a type involving polytypes: D a -> ()
-        GHC doesn't yet support impredicative polymorphism
     • In the expression: undefined
       In an equation for ‘d’: d = undefined
     • Relevant bindings include

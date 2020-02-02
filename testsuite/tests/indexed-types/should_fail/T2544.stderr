@@ -1,8 +1,9 @@
 
 T2544.hs:19:18: error:
-    • Couldn't match type ‘IxMap i0’ with ‘IxMap l’
-      Expected type: IxMap l [Int]
-        Actual type: IxMap i0 [Int]
+    • Couldn't match type: IxMap i0
+                     with: IxMap l
+      Expected: IxMap l [Int]
+        Actual: IxMap i0 [Int]
       NB: ‘IxMap’ is a non-injective type family
       The type variable ‘i0’ is ambiguous
     • In the first argument of ‘BiApp’, namely ‘empty’

@@ -1781,11 +1781,11 @@ check_main dflags tcg_env explicit_mod_hdr export_ies
         ; res_ty <- newFlexiTyVarTy liftedTypeKind
         ; let io_ty = mkTyConApp ioTyCon [res_ty]
               skol_info = SigSkol (FunSigCtxt main_name False) io_ty []
+              main_expr_rn = L loc (HsVar noExtField (L loc main_name))
         ; (ev_binds, main_expr)
                <- checkConstraints skol_info [] [] $
                   addErrCtxt mainCtxt    $
-                  tcLExpr (L loc (HsVar noExtField (L loc main_name)))
-                          (mkCheckExpType io_ty)
+                  tcCheckMonoExpr main_expr_rn io_ty
 
                 -- See Note [Root-main Id]
                 -- Construct the binding
@@ -2476,6 +2476,7 @@ data TcRnExprMode = TM_Inst    -- ^ Instantiate the type fully (:type)
                   | TM_Default -- ^ Default the type eagerly (:type +d)
 
 -- | tcRnExpr just finds the type of an expression
+--   for :type
 tcRnExpr :: HscEnv
          -> TcRnExprMode
          -> LHsExpr GhcPs
@@ -2590,7 +2591,7 @@ tcRnType hsc_env flexi normalise rdr_type
                        solveEqualities       $
                        tcNamedWildCardBinders wcs $ \ wcs' ->
                        do { mapM_ emitNamedTypeHole wcs'
-                          ; tcLHsTypeUnsaturated rn_type }
+                          ; tcInferLHsTypeUnsaturated rn_type }
 
        -- Do kind generalisation; see Note [Kind-generalise in tcRnType]
        ; kvs <- kindGeneralizeAll kind
@@ -2623,7 +2624,7 @@ considers this example, with -fprint-explicit-foralls enabled:
 
   In this mode, we report the type that would be inferred if a variable
   were assigned to expression e, without applying the monomorphism restriction.
-  This means we deeply instantiate the type and then regeneralize, as discussed
+  This means we instantiate the type and then regeneralize, as discussed
   in #11376.
 
   > :type foo @Int

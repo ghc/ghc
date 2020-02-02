@@ -1,6 +1,8 @@
 
 T14066d.hs:11:35: error:
     • Couldn't match type ‘b1’ with ‘b’
+      Expected: (Proxy a, Proxy c, b1)
+        Actual: (Proxy a, Proxy c, b)
       ‘b1’ is a rigid type variable bound by
         a type expected by the context:
           forall c b1 (a :: c). (Proxy a, Proxy c, b1)
@@ -9,8 +11,6 @@ T14066d.hs:11:35: error:
         the type signature for:
           f :: forall b. b -> (Proxy Maybe, ())
         at T14066d.hs:10:1-37
-      Expected type: (Proxy a, Proxy c, b1)
-        Actual type: (Proxy a, Proxy c, b)
     • In the first argument of ‘g’, namely ‘y’
       In the expression: g y
       In the expression: (fstOf3 y :: Proxy Maybe, g y)

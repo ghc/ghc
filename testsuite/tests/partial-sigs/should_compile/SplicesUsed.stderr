@@ -7,9 +7,9 @@ SplicesUsed.hs:7:15: warning: [-Wpartial-type-signatures (in -Wdefault)]
       In the type signature: maybeBool :: (_)
 
 SplicesUsed.hs:8:14: warning: [-Wpartial-type-signatures (in -Wdefault)]
-    • Found type wildcard ‘_a’ standing for ‘_’
-      Where: ‘_’ is a rigid type variable bound by
-               the inferred type of <expression> :: _ -> _
+    • Found type wildcard ‘_a’ standing for ‘w’
+      Where: ‘w’ is a rigid type variable bound by
+               the inferred type of <expression> :: w -> w
                at SplicesUsed.hs:8:14-23
     • In an expression type signature: _a -> _a
       In the expression: id :: _a -> _a
@@ -72,9 +72,9 @@ SplicesUsed.hs:16:2: warning: [-Wpartial-type-signatures (in -Wdefault)]
     • In the type signature: foo :: _ => _
 
 SplicesUsed.hs:18:2: warning: [-Wpartial-type-signatures (in -Wdefault)]
-    • Found type wildcard ‘_b’ standing for ‘_’
-      Where: ‘_’ is a rigid type variable bound by
-               the inferred type of bar :: Bool -> _ -> (Bool, _)
+    • Found type wildcard ‘_b’ standing for ‘w’
+      Where: ‘w’ is a rigid type variable bound by
+               the inferred type of bar :: Bool -> w -> (Bool, w)
                at SplicesUsed.hs:18:2-11
     • In the type signature: bar :: _a -> _b -> (_a, _b)
 
