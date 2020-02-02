@@ -14,9 +14,10 @@ module Unsafe.Coerce
   , unsafeCoerce#
   ) where
 
+import GHC.Arr (amap) -- For amap/unsafeCoerce rule
+import GHC.Base
 import GHC.Integer () -- See Note [Depend on GHC.Integer] in GHC.Base
 import GHC.Natural () -- See Note [Depend on GHC.Natural] in GHC.Base
-import GHC.Base
 
 import GHC.Types  ( TYPE )
 
@@ -174,3 +175,10 @@ unsafeCoerce# :: forall (r1 :: RuntimeRep) (r2 :: RuntimeRep)
                         (a :: TYPE r1) (b :: TYPE r2).
                  a -> b
 unsafeCoerce# = error "GHC internal error: unsafeCoerce# not unfolded"
+
+{-# RULES
+-- unsafeCoerce version of the map/coerce rule defined in GHC.Base
+"map/unsafeCoerce" [1] map unsafeCoerce = unsafeCoerce
+-- unsafeCoerce version of the amap/coerce rule defined in GHC.ARr
+"amap/unsafeCoerce" amap unsafeCoerce = unsafeCoerce
+#-}
