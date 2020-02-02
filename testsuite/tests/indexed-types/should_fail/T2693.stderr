@@ -1,6 +1,7 @@
 
 T2693.hs:12:15: error:
-    • Couldn't match expected type ‘(a8, b1)’ with actual type ‘TFn a6’
+    • Couldn't match expected type: (a8, b1)
+                  with actual type: TFn a6
       The type variables ‘a6’, ‘a8’, ‘b1’ are ambiguous
     • In the first argument of ‘fst’, namely ‘x’
       In the first argument of ‘(+)’, namely ‘fst x’
@@ -8,7 +9,8 @@ T2693.hs:12:15: error:
     • Relevant bindings include n :: a8 (bound at T2693.hs:12:7)
 
 T2693.hs:12:23: error:
-    • Couldn't match expected type ‘(a8, b2)’ with actual type ‘TFn a7’
+    • Couldn't match expected type: (a8, b2)
+                  with actual type: TFn a7
       The type variables ‘a7’, ‘a8’, ‘b2’ are ambiguous
     • In the first argument of ‘fst’, namely ‘x’
       In the second argument of ‘(+)’, namely ‘fst x’
@@ -16,7 +18,8 @@ T2693.hs:12:23: error:
     • Relevant bindings include n :: a8 (bound at T2693.hs:12:7)
 
 T2693.hs:19:15: error:
-    • Couldn't match expected type ‘(a5, b0)’ with actual type ‘TFn a2’
+    • Couldn't match expected type: (a5, b0)
+                  with actual type: TFn a2
       The type variables ‘a2’, ‘a5’, ‘b0’ are ambiguous
     • In the first argument of ‘fst’, namely ‘x’
       In the first argument of ‘(+)’, namely ‘fst x’
@@ -24,7 +27,8 @@ T2693.hs:19:15: error:
     • Relevant bindings include n :: a5 (bound at T2693.hs:19:7)
 
 T2693.hs:19:23: error:
-    • Couldn't match expected type ‘(a4, a5)’ with actual type ‘TFn a3’
+    • Couldn't match expected type: (a4, a5)
+                  with actual type: TFn a3
       The type variables ‘a3’, ‘a4’, ‘a5’ are ambiguous
     • In the first argument of ‘snd’, namely ‘x’
       In the second argument of ‘(+)’, namely ‘snd x’
@@ -32,9 +36,10 @@ T2693.hs:19:23: error:
     • Relevant bindings include n :: a5 (bound at T2693.hs:19:7)
 
 T2693.hs:29:20: error:
-    • Couldn't match type ‘TFn a0’ with ‘PVR a1’
-      Expected type: () -> Maybe (PVR a1)
-        Actual type: () -> Maybe (TFn a0)
+    • Couldn't match type: TFn a0
+                     with: PVR a1
+      Expected: () -> Maybe (PVR a1)
+        Actual: () -> Maybe (TFn a0)
       The type variables ‘a0’, ‘a1’ are ambiguous
     • In the first argument of ‘mapM’, namely ‘g’
       In a stmt of a 'do' block: pvs <- mapM g undefined

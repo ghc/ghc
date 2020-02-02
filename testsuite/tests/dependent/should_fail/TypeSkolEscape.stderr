@@ -1,5 +1,9 @@
 
 TypeSkolEscape.hs:9:52: error:
     • Expected kind ‘k0’, but ‘a’ has kind ‘TYPE v’
+        because kind variable ‘v’ would escape its scope
+      This (rigid, skolem) kind variable is bound by
+        ‘forall (v :: RuntimeRep) (a :: TYPE v). a’
+        at TypeSkolEscape.hs:9:12-52
     • In the type ‘forall (v :: RuntimeRep) (a :: TYPE v). a’
       In the type declaration for ‘Bad’
