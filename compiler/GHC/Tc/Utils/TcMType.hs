@@ -27,7 +27,8 @@ module GHC.Tc.Utils.TcMType (
   newFmvTyVar, newFskTyVar,
 
   readMetaTyVar, writeMetaTyVar, writeMetaTyVarRef,
-  newMetaDetails, isFilledMetaTyVar_maybe, isFilledMetaTyVar, isUnfilledMetaTyVar,
+  newTauTvDetailsAtLevel, newMetaDetails, newMetaTyVarName,
+  isFilledMetaTyVar_maybe, isFilledMetaTyVar, isUnfilledMetaTyVar,
 
   --------------------------------
   -- Expected types
@@ -70,7 +71,7 @@ module GHC.Tc.Utils.TcMType (
   zonkTidyTcType, zonkTidyTcTypes, zonkTidyOrigin,
   tidyEvVar, tidyCt, tidyHole, tidySkolemInfo,
     zonkTcTyVar, zonkTcTyVars,
-  zonkTcTyVarToTyVar, zonkTyVarTyVarPairs,
+  zonkTcTyVarToTyVar, zonkInvisTVBinder,
   zonkTyCoVarsAndFV, zonkTcTypeAndFV, zonkDTyCoVarSetAndFV,
   zonkTyCoVarsAndFVList,
   candidateQTyVarsOfType,  candidateQTyVarsOfKind,
@@ -81,7 +82,7 @@ module GHC.Tc.Utils.TcMType (
   zonkTcType, zonkTcTypes, zonkCo,
   zonkTyCoVarKind, zonkTyCoVarKindBinder,
 
-  zonkEvVar, zonkWC, zonkSimples,
+  zonkEvVar, zonkWC, zonkImplication, zonkSimples,
   zonkId, zonkCoVar,
   zonkCt, zonkSkolemInfo,
 
@@ -119,7 +120,6 @@ import GHC.Builtin.Types
 import GHC.Builtin.Types.Prim
 import GHC.Types.Var.Env
 import GHC.Types.Name.Env
-import GHC.Builtin.Names
 import GHC.Utils.Misc
 import GHC.Utils.Outputable
 import GHC.Data.FastString
@@ -144,18 +144,13 @@ import qualified Data.Semigroup as Semi
 ************************************************************************
 -}
 
-mkKindName :: Unique -> Name
-mkKindName unique = mkSystemName unique kind_var_occ
-
-kind_var_occ :: OccName -- Just one for all MetaKindVars
-                        -- They may be jiggled by tidying
-kind_var_occ = mkOccName tvName "k"
-
 newMetaKindVar :: TcM TcKind
 newMetaKindVar
   = do { details <- newMetaDetails TauTv
-       ; uniq <- newUnique
-       ; let kv = mkTcTyVar (mkKindName uniq) liftedTypeKind details
+       ; name    <- newMetaTyVarName (fsLit "k")
+                    -- All MetaKindVars are called "k"
+                    -- They may be jiggled by tidying
+       ; let kv = mkTcTyVar name liftedTypeKind details
        ; traceTc "newMetaKindVar" (ppr kv)
        ; return (mkTyVarTy kv) }
 
@@ -834,6 +829,13 @@ newMetaDetails info
                         , mtv_ref = ref
                         , mtv_tclvl = tclvl }) }
 
+newTauTvDetailsAtLevel :: TcLevel -> TcM TcTyVarDetails
+newTauTvDetailsAtLevel tclvl
+  = do { ref <- newMutVar Flexi
+       ; return (MetaTv { mtv_info  = TauTv
+                        , mtv_ref   = ref
+                        , mtv_tclvl = tclvl }) }
+
 cloneMetaTyVar :: TcTyVar -> TcM TcTyVar
 cloneMetaTyVar tv
   = ASSERT( isTcTyVar tv )
@@ -1060,18 +1062,15 @@ new_meta_tv_x info subst tv
       -- is not yet fixed so leaving as unchecked for now.
       -- OLD NOTE:
       -- Unchecked because we call newMetaTyVarX from
-      -- tcInstTyBinder, which is called from tcInferApps
+      -- tcInstTyBinder, which is called from tcInferTyApps
       -- which does not yet take enough trouble to ensure
       -- the in-scope set is right; e.g. #12785 trips
       -- if we use substTy here
 
 newMetaTyVarTyAtLevel :: TcLevel -> TcKind -> TcM TcType
 newMetaTyVarTyAtLevel tc_lvl kind
-  = do  { ref  <- newMutVar Flexi
-        ; name <- newMetaTyVarName (fsLit "p")
-        ; let details = MetaTv { mtv_info  = TauTv
-                               , mtv_ref   = ref
-                               , mtv_tclvl = tc_lvl }
+  = do  { details <- newTauTvDetailsAtLevel tc_lvl
+        ; name    <- newMetaTyVarName (fsLit "p")
         ; return (mkTyVarTy (mkTcTyVar name kind details)) }
 
 {- *********************************************************************
@@ -1254,13 +1253,14 @@ instance Outputable CandidatesQTvs where
 candidateKindVars :: CandidatesQTvs -> TyVarSet
 candidateKindVars dvs = dVarSetToVarSet (dv_kvs dvs)
 
-partitionCandidates :: CandidatesQTvs -> (TyVar -> Bool) -> (DTyVarSet, CandidatesQTvs)
+partitionCandidates :: CandidatesQTvs -> (TyVar -> Bool) -> (TyVarSet, CandidatesQTvs)
+-- The selected TyVars are returned as a non-deterministic TyVarSet
 partitionCandidates dvs@(DV { dv_kvs = kvs, dv_tvs = tvs }) pred
   = (extracted, dvs { dv_kvs = rest_kvs, dv_tvs = rest_tvs })
   where
     (extracted_kvs, rest_kvs) = partitionDVarSet pred kvs
     (extracted_tvs, rest_tvs) = partitionDVarSet pred tvs
-    extracted = extracted_kvs `unionDVarSet` extracted_tvs
+    extracted = dVarSetToVarSet extracted_kvs `unionVarSet` dVarSetToVarSet extracted_tvs
 
 -- | Gathers free variables to use as quantification candidates (in
 -- 'quantifyTyVars'). This might output the same var
@@ -2218,12 +2218,9 @@ zonkTcTyVarToTyVar tv
                                           (ppr tv $$ ppr ty)
        ; return tv' }
 
-zonkTyVarTyVarPairs :: [(Name,VarBndr TcTyVar Specificity)] -> TcM [(Name,VarBndr TcTyVar Specificity)]
-zonkTyVarTyVarPairs prs
-  = mapM do_one prs
-  where
-    do_one (nm, Bndr tv spec) = do { tv' <- zonkTcTyVarToTyVar tv
-                                   ; return (nm, Bndr tv' spec) }
+zonkInvisTVBinder :: VarBndr TcTyVar spec -> TcM (VarBndr TyVar spec)
+zonkInvisTVBinder (Bndr tv spec) = do { tv' <- zonkTcTyVarToTyVar tv
+                                      ; return (Bndr tv' spec) }
 
 -- zonkId is used *during* typechecking just to zonk the Id's type
 zonkId :: TcId -> TcM TcId
@@ -2342,7 +2339,7 @@ tidySigSkol env cx ty tv_prs
       where
         (env', tv') = tidy_tv_bndr env tv
 
-    tidy_ty env ty@(FunTy _ arg res)
+    tidy_ty env ty@(FunTy InvisArg arg res) -- Look under  c => t
       = ty { ft_arg = tidyType env arg, ft_res = tidy_ty env res }
 
     tidy_ty env ty = tidyType env ty

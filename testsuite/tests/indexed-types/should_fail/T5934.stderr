@@ -1,7 +1,8 @@
 
 T5934.hs:12:7: error:
-    • Cannot instantiate unification variable ‘a0’
+    • Couldn't match expected type ‘(forall s. GenST s) -> Int’
+                  with actual type ‘a0’
+      Cannot instantiate unification variable ‘a0’
       with a type involving polytypes: (forall s. GenST s) -> Int
-        GHC doesn't yet support impredicative polymorphism
     • In the expression: 0
       In an equation for ‘run’: run = 0

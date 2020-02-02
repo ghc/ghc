@@ -6,4 +6,5 @@ import Data.Typeable (Typeable)
 import Control.Monad.ST (RealWorld)
 
 f :: forall a. (forall b. Typeable b => b -> a) -> a
-f = undefined :: (RealWorld -> a) -> a
+f x = (undefined :: (RealWorld -> a) -> a) x
+  -- Simple subsumption (#17775) requires eta expansion here

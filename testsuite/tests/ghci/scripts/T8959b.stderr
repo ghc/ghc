@@ -10,7 +10,7 @@ T8959b.hs:8:7: error:
       In an equation for ‘bar’: bar = proc x -> do return ⤙ x
 
 T8959b.hs:10:7: error:
-    • Couldn't match expected type ‘(∀ a2. a2 → a2) → a1’
+    • Couldn't match expected type ‘(∀ a. a → a) → a1’
                   with actual type ‘()’
     • In the expression: () ∷ (∀ a. a → a) → a
       In an equation for ‘baz’: baz = () ∷ (∀ a. a → a) → a
