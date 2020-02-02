@@ -15,9 +15,10 @@ T15368.hs:11:15: warning: [-Wtyped-holes (in -Wdefault)]
         trigger :: a -> b -> (F a b, F b a) (bound at T15368.hs:11:1)
 
 T15368.hs:11:15: warning: [-Wdeferred-type-errors (in -Wdefault)]
-    • Couldn't match type ‘F b a’ with ‘F b0 a0’
-      Expected type: (F a b, F b a)
-        Actual type: (F a b, F b0 a0)
+    • Couldn't match type: F b a
+                     with: F b0 a0
+      Expected: (F a b, F b a)
+        Actual: (F a b, F b0 a0)
       NB: ‘F’ is a non-injective type family
       The type variables ‘b0’, ‘a0’ are ambiguous
     • In the expression: _ `transitive` trigger _ _

@@ -1,7 +1,7 @@
 
 tcfail165.hs:19:23: error:
-    • Couldn't match expected type ‘forall a. Show a => a -> String’
-                  with actual type ‘b0 -> String’
+    • Couldn't match expected type: forall a. Show a => a -> String
+                  with actual type: b0 -> String
     • In the second argument of ‘putMVar’, namely
         ‘(show :: forall b. Show b => b -> String)’
       In a stmt of a 'do' block:

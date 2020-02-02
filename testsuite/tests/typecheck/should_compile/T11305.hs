@@ -54,4 +54,5 @@ instance ProfunctorComonad Tambara where
       yon    ~(x,~(y,z)) = ((x,y),z)
 
 instance Profunctor p => Strong (Tambara p) where
-  first' = runTambara . produplicate
+  first' = (\x -> runTambara x) . produplicate
+  -- Simple subsumption (#17775) requires eta expansion here

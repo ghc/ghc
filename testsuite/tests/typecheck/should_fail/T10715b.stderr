@@ -1,8 +1,12 @@
 
 T10715b.hs:7:7: error:
-    Occurs check: cannot construct the infinite type: b ~ [b]
-      arising from a use of ‘coerce’
-    In the first argument of ‘asTypeOf’, namely ‘coerce’
-    In the expression: coerce `asTypeOf` head
-    In an equation for ‘foo’: foo = coerce `asTypeOf` head
-    Relevant bindings include foo :: [b] -> b (bound at T10715b.hs:7:1)
+    • Couldn't match representation of type ‘b’ with that of ‘[b]’
+        arising from a use of ‘coerce’
+      ‘b’ is a rigid type variable bound by
+        the inferred type of foo :: [b] -> b
+        at T10715b.hs:7:1-28
+    • In the first argument of ‘asTypeOf’, namely ‘coerce’
+      In the expression: coerce `asTypeOf` head
+      In an equation for ‘foo’: foo = coerce `asTypeOf` head
+    • Relevant bindings include
+        foo :: [b] -> b (bound at T10715b.hs:7:1)
