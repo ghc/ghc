@@ -14,7 +14,7 @@ ToDo:
 
 {-# LANGUAGE CPP, RankNTypes, PatternSynonyms, ViewPatterns, RecordWildCards,
     DeriveFunctor #-}
-{-# OPTIONS_GHC -optc-DNON_POSIX_SOURCE #-}
+{-# OPTIONS_GHC -optc-DNON_POSIX_SOURCE -Wno-incomplete-uni-patterns #-}
 
 module PrelRules
    ( primOpRules
