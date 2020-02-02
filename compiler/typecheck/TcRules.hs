@@ -202,7 +202,7 @@ generateRuleConstraints ty_bndrs tm_bndrs lhs rhs
     do { -- See Note [Solve order for RULES]
          ((lhs', rule_ty), lhs_wanted) <- captureConstraints (tcInferRho lhs)
        ; (rhs',            rhs_wanted) <- captureConstraints $
-                                          tcMonoExpr rhs (mkCheckExpType rule_ty)
+                                          tcCheckMonoExpr rhs rule_ty
        ; let all_lhs_wanted = bndr_wanted `andWC` lhs_wanted
        ; return (id_bndrs, lhs', all_lhs_wanted, rhs', rhs_wanted, rule_ty) } }
 

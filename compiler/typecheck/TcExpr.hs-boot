@@ -6,7 +6,7 @@ import TcRnTypes( TcM )
 import TcOrigin ( CtOrigin )
 import GHC.Hs.Extension ( GhcRn, GhcTcId )
 
-tcPolyExpr ::
+tcCheckPolyExpr ::
           LHsExpr GhcRn
        -> TcSigmaType
        -> TcM (LHsExpr GhcTcId)
@@ -14,6 +14,10 @@ tcPolyExpr ::
 tcMonoExpr, tcMonoExprNC ::
           LHsExpr GhcRn
        -> ExpRhoType
+       -> TcM (LHsExpr GhcTcId)
+tcCheckMonoExpr, tcCheckMonoExprNC ::
+          LHsExpr GhcRn
+       -> TcRhoType
        -> TcM (LHsExpr GhcTcId)
 
 tcInferSigma ::
