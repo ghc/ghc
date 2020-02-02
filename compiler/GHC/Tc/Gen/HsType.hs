@@ -425,7 +425,6 @@ tcStandaloneKindSig (L _ kisig) = case kisig of
        ; checkValidType ctxt kind
        ; return (name, kind) }
 
-
 tcTopLHsType :: LHsSigType GhcRn -> ContextKind -> TcM Type
 tcTopLHsType hs_ty ctxt_kind
   = tc_top_lhs_type (mkMode TypeLevel) hs_ty ctxt_kind
