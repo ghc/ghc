@@ -1,7 +1,10 @@
 
 T17131.hs:12:34: error:
-    • Expected kind ‘TYPE ('TupleRep (TypeReps xs))’,
+    • Couldn't match kind: TypeReps xs
+                     with: '[ 'LiftedRep]
+      Expected kind ‘TYPE ('TupleRep (TypeReps xs))’,
         but ‘(# a #)’ has kind ‘TYPE ('TupleRep '[ 'LiftedRep])’
+      The type variable ‘xs’ is ambiguous
     • In the type ‘(# a #)’
       In the type family declaration for ‘Tuple#’
       NB: Type ‘Tuple#’ was inferred to use visible dependent quantification.

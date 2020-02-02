@@ -2,22 +2,22 @@
 T10403.hs:15:7: warning: [-Wpartial-type-signatures (in -Wdefault)]
     • Found type wildcard ‘_’ standing for ‘Functor f’
       Where: ‘f’ is a rigid type variable bound by
-               the inferred type of h1 :: Functor f => (a -> b) -> f a -> H f
+               the inferred type of h1 :: Functor f => (a -> a1) -> f a -> H f
                at T10403.hs:17:1-41
     • In the type signature: h1 :: _ => _
 
 T10403.hs:15:12: warning: [-Wpartial-type-signatures (in -Wdefault)]
-    • Found type wildcard ‘_’ standing for ‘(a -> b) -> f a -> H f’
-      Where: ‘b’, ‘a’, ‘f’ are rigid type variables bound by
-               the inferred type of h1 :: Functor f => (a -> b) -> f a -> H f
+    • Found type wildcard ‘_’ standing for ‘(a -> a1) -> f a -> H f’
+      Where: ‘a1’, ‘a’, ‘f’ are rigid type variables bound by
+               the inferred type of h1 :: Functor f => (a -> a1) -> f a -> H f
                at T10403.hs:17:1-41
     • In the type signature: h1 :: _ => _
 
 T10403.hs:19:7: warning: [-Wpartial-type-signatures (in -Wdefault)]
-    • Found type wildcard ‘_’ standing for ‘(a -> b) -> f0 a -> H f0’
+    • Found type wildcard ‘_’ standing for ‘(a -> a1) -> f0 a -> H f0’
       Where: ‘f0’ is an ambiguous type variable
-             ‘b’, ‘a’ are rigid type variables bound by
-               the inferred type of h2 :: (a -> b) -> f0 a -> H f0
+             ‘a1’, ‘a’ are rigid type variables bound by
+               the inferred type of h2 :: (a -> a1) -> f0 a -> H f0
                at T10403.hs:22:1-41
     • In the type signature: h2 :: _
 
@@ -26,7 +26,7 @@ T10403.hs:22:15: warning: [-Wdeferred-type-errors (in -Wdefault)]
       prevents the constraint ‘(Functor f0)’ from being solved.
       Relevant bindings include
         b :: f0 a (bound at T10403.hs:22:6)
-        h2 :: (a -> b) -> f0 a -> H f0 (bound at T10403.hs:22:1)
+        h2 :: (a -> a1) -> f0 a -> H f0 (bound at T10403.hs:22:1)
       Probable fix: use a type annotation to specify what ‘f0’ should be.
       These potential instances exist:
         instance Functor IO -- Defined in ‘GHC.Base’
@@ -41,13 +41,13 @@ T10403.hs:22:15: warning: [-Wdeferred-type-errors (in -Wdefault)]
 
 T10403.hs:28:8: warning: [-Wdeferred-type-errors (in -Wdefault)]
     • Couldn't match type ‘f0’ with ‘B t’
+      Expected: H (B t)
+        Actual: H f0
         because type variable ‘t’ would escape its scope
       This (rigid, skolem) type variable is bound by
         the type signature for:
           app2 :: forall t. H (B t)
         at T10403.hs:27:1-15
-      Expected type: H (B t)
-        Actual type: H f0
     • In the expression: h2 (H . I) (B ())
       In an equation for ‘app2’: app2 = h2 (H . I) (B ())
     • Relevant bindings include

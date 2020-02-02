@@ -10,7 +10,7 @@ module GHC.Tc.Types.Evidence (
   (<.>), mkWpTyApps, mkWpEvApps, mkWpEvVarApps, mkWpTyLams,
   mkWpLams, mkWpLet, mkWpCastN, mkWpCastR, collectHsWrapBinders,
   mkWpFun, idHsWrapper, isIdHsWrapper, isErasableHsWrapper,
-  pprHsWrapper,
+  pprHsWrapper, hsWrapDictBinders,
 
   -- * Evidence bindings
   TcEvBinds(..), EvBindsVar(..),
@@ -369,6 +369,25 @@ isErasableHsWrapper = go
     go WpTyLam{}               = True
     go WpTyApp{}               = True
     go WpLet{}                 = False
+
+hsWrapDictBinders :: HsWrapper -> Bag DictId
+-- Collects the given dict Ids, bound by the wrapper,
+-- that scope over the "hole" in the wrapper
+hsWrapDictBinders wrap = go wrap emptyBag
+ where
+   go WpHole acc = acc
+   go (w1 `WpCompose` w2) acc = go w1 (go w2 acc)
+   go (WpFun _ w2 _ _)    acc = go w2 acc
+   go (WpCast {})         acc = acc
+   go (WpEvLam dict_id)   acc = dict_id `consBag` acc
+   go (WpEvApp {})        acc = acc
+   go (WpTyLam {})        acc = acc
+   go (WpTyApp {})        acc = acc
+   go (WpLet binds)       acc = go_binds binds `unionBags` acc
+
+   go_binds (EvBinds bs)    = mapBag eb_lhs bs
+   go_binds (TcEvBinds ebv) = pprPanic "hsWrapperDictBinds" (ppr ebv)
+                              -- Should only be applied post zonking
 
 collectHsWrapBinders :: HsWrapper -> ([Var], HsWrapper)
 -- Collect the outer lambda binders of a HsWrapper,

@@ -27,7 +27,7 @@ import GHC.Prelude
 import GHC.HsToCore.PmCheck.Types
 import GHC.HsToCore.PmCheck.Oracle
 import GHC.HsToCore.PmCheck.Ppr
-import GHC.Types.Basic (Origin, isGenerated)
+import GHC.Types.Basic (Origin(..), isGenerated)
 import GHC.Core (CoreExpr, Expr(Var,App))
 import GHC.Data.FastString (unpackFS, lengthFS)
 import GHC.Driver.Session
@@ -1044,9 +1044,16 @@ locallyExtendPmDelta ext k = getPmDeltas >>= ext >>= \deltas -> do
     else k
 
 -- | Add in-scope type constraints
-addTyCsDs :: Bag EvVar -> DsM a -> DsM a
-addTyCsDs ev_vars =
-  locallyExtendPmDelta (\deltas -> addPmCtsDeltas deltas (PmTyCt . evVarPred <$> ev_vars))
+addTyCsDs :: DynFlags -> Bag EvVar -> DsM a -> DsM a
+addTyCsDs dflags ev_vars thing_inside
+  | needToRunPmCheck dflags FromSource
+    -- FromSource might not be accurate, but at worst
+    -- we do superfluous calls to the pattern match oracle.
+  = locallyExtendPmDelta extend_fn thing_inside
+  | otherwise
+  = thing_inside
+  where
+    extend_fn deltas = addPmCtsDeltas deltas (PmTyCt . evVarPred <$> ev_vars)
 
 -- | Add equalities for the scrutinee to the local 'DsM' environment when
 -- checking a case expression:

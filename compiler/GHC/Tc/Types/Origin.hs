@@ -125,7 +125,7 @@ data UserTypeCtxt
 pprUserTypeCtxt :: UserTypeCtxt -> SDoc
 pprUserTypeCtxt (FunSigCtxt n _)  = text "the type signature for" <+> quotes (ppr n)
 pprUserTypeCtxt (InfSigCtxt n)    = text "the inferred type for" <+> quotes (ppr n)
-pprUserTypeCtxt (RuleSigCtxt n)   = text "a RULE for" <+> quotes (ppr n)
+pprUserTypeCtxt (RuleSigCtxt n)   = text "the type signature for" <+> quotes (ppr n)
 pprUserTypeCtxt ExprSigCtxt       = text "an expression type signature"
 pprUserTypeCtxt KindSigCtxt       = text "a kind signature"
 pprUserTypeCtxt (StandaloneKindSigCtxt n) = text "a standalone kind signature for" <+> quotes (ppr n)
@@ -184,7 +184,10 @@ data SkolemInfo
                  -- like SigSkol, but when we're kind-checking the *type*
                  -- hence, we have less info
 
-  | ForAllSkol SDoc     -- Bound by a user-written "forall".
+  | ForAllSkol  -- Bound by a user-written "forall".
+       SDoc        -- Shows the entire forall type
+       SDoc        -- Shows just the binders, used when reporting a bad telescope
+                   -- See Note [Checking telescopes] in GHC.Tc.Types.Constraint
 
   | DerivSkol Type      -- Bound by a 'deriving' clause;
                         -- the type is the instance we are trying to derive
@@ -242,7 +245,7 @@ pprSkolInfo :: SkolemInfo -> SDoc
 -- Complete the sentence "is a rigid type variable bound by..."
 pprSkolInfo (SigSkol cx ty _) = pprSigSkolInfo cx ty
 pprSkolInfo (SigTypeSkol cx)  = pprUserTypeCtxt cx
-pprSkolInfo (ForAllSkol doc)  = quotes doc
+pprSkolInfo (ForAllSkol pt _) = quotes pt
 pprSkolInfo (IPSkol ips)      = text "the implicit-parameter binding" <> plural ips <+> text "for"
                                  <+> pprWithCommas ppr ips
 pprSkolInfo (DerivSkol pred)  = text "the deriving clause for" <+> quotes (ppr pred)

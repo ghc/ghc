@@ -1,6 +1,11 @@
 
 T14066e.hs:13:65: error:
     • Expected a type, but ‘c'’ has kind ‘k1’
+      ‘k1’ is a rigid type variable bound by
+        the type signature for:
+          j :: forall {k1} {k2} (c :: k1) (b :: k2).
+               Proxy a -> Proxy b -> Proxy c -> Proxy b
+        at T14066e.hs:12:5-61
     • In the kind ‘c'’
       In the first argument of ‘Proxy’, namely ‘(b' :: c')’
       In an expression type signature: Proxy (b' :: c')

@@ -1,9 +1,9 @@
 
-T2534.hs:3:13: error:
-    • Couldn't match type ‘[b]’ with ‘a0 -> [b]’
-      Expected type: [a0] -> [b] -> [b]
-        Actual type: [a0] -> (a0 -> [b]) -> [b]
-    • In the first argument of ‘foldr’, namely ‘(>>=)’
+T2534.hs:3:19: error:
+    • Couldn't match expected type: a -> a -> b
+                  with actual type: [a0]
+    • In the second argument of ‘foldr’, namely ‘[]’
       In the expression: foldr (>>=) [] []
       In an equation for ‘foo’: foo = foldr (>>=) [] []
-    • Relevant bindings include foo :: [b] (bound at T2534.hs:3:1)
+    • Relevant bindings include
+        foo :: a -> a -> b (bound at T2534.hs:3:1)

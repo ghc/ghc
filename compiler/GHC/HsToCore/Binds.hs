@@ -33,7 +33,7 @@ import {-# SOURCE #-}   GHC.HsToCore.Match ( matchWrapper )
 import GHC.HsToCore.Monad
 import GHC.HsToCore.GuardedRHSs
 import GHC.HsToCore.Utils
-import GHC.HsToCore.PmCheck ( needToRunPmCheck, addTyCsDs, checkGuardMatches )
+import GHC.HsToCore.PmCheck ( addTyCsDs, checkGuardMatches )
 
 import GHC.Hs             -- lots of things
 import GHC.Core           -- lots of things
@@ -145,13 +145,13 @@ dsHsBind dflags (VarBind { var_id = var
                           else []
         ; return (force_var, [core_bind]) }
 
-dsHsBind dflags b@(FunBind { fun_id = L _ fun
+dsHsBind dflags b@(FunBind { fun_id = L loc fun
                            , fun_matches = matches
                            , fun_ext = co_fn
                            , fun_tick = tick })
- = do   { (args, body) <- matchWrapper
-                           (mkPrefixFunRhs (noLoc $ idName fun))
-                           Nothing matches
+ = do   { (args, body) <- addTyCsDs dflags (hsWrapDictBinders co_fn) $
+                          matchWrapper (mkPrefixFunRhs (L loc (idName fun)))
+                                       Nothing matches
         ; core_wrap <- dsHsWrapper co_fn
         ; let body' = mkOptTickBox tick body
               rhs   = core_wrap (mkLams args body')
@@ -189,15 +189,11 @@ dsHsBind dflags (AbsBinds { abs_tvs = tyvars, abs_ev_vars = dicts
                           , abs_exports = exports
                           , abs_ev_binds = ev_binds
                           , abs_binds = binds, abs_sig = has_sig })
-  = do { ds_binds <- applyWhen (needToRunPmCheck dflags FromSource)
-                               -- FromSource might not be accurate, but at worst
-                               -- we do superfluous calls to the pattern match
-                               -- oracle.
-                               -- addTyCsDs: push type constraints deeper
-                               --            for inner pattern match check
-                               -- See Check, Note [Type and Term Equality Propagation]
-                               (addTyCsDs (listToBag dicts))
-                               (dsLHsBinds binds)
+  = do { ds_binds <- addTyCsDs dflags (listToBag dicts) $
+                     dsLHsBinds binds
+             -- addTyCsDs: push type constraints deeper
+             --            for inner pattern match check
+             -- See Check, Note [Type and Term Equality Propagation]
 
        ; ds_ev_binds <- dsTcEvBinds_s ev_binds
 

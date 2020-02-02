@@ -1,20 +1,45 @@
 
-T14040a.hs:21:18: error:
-    • Cannot generalise type; skolem ‘z’ would escape its scope
-      if I tried to quantify (_1 :: WeirdList z) in this type:
-        forall a1 (wl :: WeirdList a1)
-               (p :: forall x. x -> WeirdList x -> *).
-        Sing @(WeirdList a1) wl
-        -> (forall y. p @x0 _0 ('WeirdNil @x0))
-        -> (forall z (x :: z) (xs :: WeirdList (WeirdList z)).
-            Sing @z x
-            -> Sing @(WeirdList (WeirdList z)) xs
-            -> p @(WeirdList z) _1 xs
-            -> p @z _2 ('WeirdCons @z x xs))
-        -> p @a1 _3 wl
-      (Indeed, I sometimes struggle even printing this correctly,
-       due to its ill-scoped nature.)
-    • In the type signature:
+T14040a.hs:26:46: error:
+    • Couldn't match kind ‘k1’ with ‘WeirdList z’
+      Expected kind ‘WeirdList k1’,
+        but ‘xs’ has kind ‘WeirdList (WeirdList z)’
+        because kind variable ‘z’ would escape its scope
+      This (rigid, skolem) kind variable is bound by
+        ‘forall (z :: Type) (x :: z) (xs :: WeirdList (WeirdList z)).
+         Sing x -> Sing xs -> p _ xs -> p _ (WeirdCons x xs)’
+        at T14040a.hs:(25,19)-(27,41)
+    • In the second argument of ‘p’, namely ‘xs’
+      In the type ‘Sing wl
+                   -> (forall (y :: Type). p _ WeirdNil)
+                      -> (forall (z :: Type) (x :: z) (xs :: WeirdList (WeirdList z)).
+                          Sing x -> Sing xs -> p _ xs -> p _ (WeirdCons x xs))
+                         -> p _ wl’
+      In the type signature:
+        elimWeirdList :: forall (a :: Type)
+                                (wl :: WeirdList a)
+                                (p :: forall (x :: Type). x -> WeirdList x -> Type).
+                         Sing wl
+                         -> (forall (y :: Type). p _ WeirdNil)
+                            -> (forall (z :: Type) (x :: z) (xs :: WeirdList (WeirdList z)).
+                                Sing x -> Sing xs -> p _ xs -> p _ (WeirdCons x xs))
+                               -> p _ wl
+
+T14040a.hs:27:27: error:
+    • Couldn't match kind ‘k0’ with ‘z’
+      Expected kind ‘WeirdList k0’,
+        but ‘WeirdCons x xs’ has kind ‘WeirdList z’
+        because kind variable ‘z’ would escape its scope
+      This (rigid, skolem) kind variable is bound by
+        ‘forall (z :: Type) (x :: z) (xs :: WeirdList (WeirdList z)).
+         Sing x -> Sing xs -> p _ xs -> p _ (WeirdCons x xs)’
+        at T14040a.hs:(25,19)-(27,41)
+    • In the second argument of ‘p’, namely ‘(WeirdCons x xs)’
+      In the type ‘Sing wl
+                   -> (forall (y :: Type). p _ WeirdNil)
+                      -> (forall (z :: Type) (x :: z) (xs :: WeirdList (WeirdList z)).
+                          Sing x -> Sing xs -> p _ xs -> p _ (WeirdCons x xs))
+                         -> p _ wl’
+      In the type signature:
         elimWeirdList :: forall (a :: Type)
                                 (wl :: WeirdList a)
                                 (p :: forall (x :: Type). x -> WeirdList x -> Type).

@@ -1,8 +1,9 @@
 
 T8142.hs:6:10: error:
-    • Couldn't match type ‘Nu ((,) a0)’ with ‘c -> f c’
-      Expected type: (c -> f c) -> c -> f c
-        Actual type: Nu ((,) a0) -> Nu g0
+    • Couldn't match type: Nu ((,) a0)
+                     with: c -> f c
+      Expected: (c -> f c) -> c -> f c
+        Actual: Nu ((,) a0) -> Nu f0
       The type variable ‘a0’ is ambiguous
     • In the expression: h
       In an equation for ‘tracer’:
@@ -14,11 +15,12 @@ T8142.hs:6:10: error:
         tracer :: (c -> f c) -> c -> f c (bound at T8142.hs:6:1)
 
 T8142.hs:6:57: error:
-    • Couldn't match type ‘Nu ((,) a)’ with ‘g (Nu ((,) a))’
-      Expected type: Nu ((,) a) -> (a, g (Nu ((,) a)))
-        Actual type: Nu ((,) a) -> (a, Nu ((,) a))
+    • Couldn't match type: Nu ((,) a)
+                     with: f1 (Nu ((,) a))
+      Expected: Nu ((,) a) -> (a, f1 (Nu ((,) a)))
+        Actual: Nu ((,) a) -> (a, Nu ((,) a))
     • In the second argument of ‘(.)’, namely ‘out’
       In the expression: (\ (_, b) -> ((outI . fmap h) b)) . out
       In an equation for ‘h’: h = (\ (_, b) -> ((outI . fmap h) b)) . out
     • Relevant bindings include
-        h :: Nu ((,) a) -> Nu g (bound at T8142.hs:6:18)
+        h :: Nu ((,) a) -> Nu f1 (bound at T8142.hs:6:18)

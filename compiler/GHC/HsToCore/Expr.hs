@@ -280,7 +280,9 @@ dsExpr hswrap@(XExpr (HsWrap co_fn e))
                  HsConLikeOut _ (RealDataCon dc) -> return $ varToCoreExpr (dataConWrapId dc)
                  XExpr (HsWrap _ _) -> pprPanic "dsExpr: HsWrap inside HsWrap" (ppr hswrap)
                  HsPar _ _ -> pprPanic "dsExpr: HsPar inside HsWrap" (ppr hswrap)
-                 _ -> dsExpr e
+                 _ -> -- addTyCsDs (hsWrapDictBinders co_fn) $
+                      -- Omitting; part of !3087
+                      dsExpr e
                -- See Note [Detecting forced eta expansion]
        ; wrap' <- dsHsWrapper co_fn
        ; dflags <- getDynFlags

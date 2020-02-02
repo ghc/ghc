@@ -7,8 +7,8 @@ T2664.hs:31:9: error:
                                ((a :*: b) ~ Dual c, c ~ Dual (a :*: b)) =>
                                IO (PChan (a :*: b), PChan c)
         at T2664.hs:23:5-12
-      Expected type: IO (PChan (a :*: b), PChan c)
-        Actual type: IO (PChan (a :*: b), PChan (Dual b :+: Dual a))
+      Expected: IO (PChan (a :*: b), PChan c)
+        Actual: IO (PChan (a :*: b), PChan (Dual b :+: Dual a))
       NB: ‘Dual’ is a non-injective type family
     • In a stmt of a 'do' block:
         return
