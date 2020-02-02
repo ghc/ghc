@@ -122,7 +122,7 @@ data UnsafeEquality a b where
 unsafeEqualityProof :: forall a b . UnsafeEquality a b
 unsafeEqualityProof = case unsafeEqualityProof @a @b of UnsafeRefl -> UnsafeRefl
 
-{-# INLINE unsafeCoerce #-}
+{-# INLINE [1] unsafeCoerce #-}
 -- The INLINE will almost certainly happen automatically, but it's almost
 -- certain to generate (slightly) better code, so let's do it.  For example
 --
@@ -178,7 +178,7 @@ unsafeCoerce# = error "GHC internal error: unsafeCoerce# not unfolded"
 
 {-# RULES
 -- unsafeCoerce version of the map/coerce rule defined in GHC.Base
-"map/unsafeCoerce" [1] map unsafeCoerce = unsafeCoerce
+"map/unsafeCoerce" map unsafeCoerce = unsafeCoerce
 -- unsafeCoerce version of the amap/coerce rule defined in GHC.ARr
 "amap/unsafeCoerce" amap unsafeCoerce = unsafeCoerce
 #-}
