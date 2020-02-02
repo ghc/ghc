@@ -1,8 +1,9 @@
 
 NoMatchErr.hs:19:7: error:
-    • Couldn't match type ‘Memo d0’ with ‘Memo d’
-      Expected type: Memo d a -> Memo d a
-        Actual type: Memo d0 a -> Memo d0 a
+    • Couldn't match type: Memo d0
+                     with: Memo d
+      Expected: Memo d a -> Memo d a
+        Actual: Memo d0 a -> Memo d0 a
       NB: ‘Memo’ is a non-injective type family
       The type variable ‘d0’ is ambiguous
     • In the ambiguity check for ‘f’

@@ -6,5 +6,5 @@ T10072.hs:3:31: error:
                at T10072.hs:3:1-47
       To use the inferred type, enable PartialTypeSignatures
     • In the type ‘a -> _’
-      In a RULE for ‘f’: a -> _
+      In the type signature for ‘f’: a -> _
       When checking the transformation rule "map/empty"

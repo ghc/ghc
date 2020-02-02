@@ -6,6 +6,10 @@ T14584a.hs:12:5: warning: [-Wdeferred-type-errors (in -Wdefault)]
 
 T14584a.hs:12:9: warning: [-Wdeferred-type-errors (in -Wdefault)]
     • Expected a type, but ‘m’ has kind ‘k2’
+      ‘k2’ is a rigid type variable bound by
+        the type signature for:
+          f :: forall {k2} (m :: k2). ()
+        at T14584a.hs:11:1-17
     • In the type ‘m’
       In the expression: id @m :: _
       In an equation for ‘f’: f = id @m :: _
@@ -23,6 +27,10 @@ T14584a.hs:12:14: warning: [-Wpartial-type-signatures (in -Wdefault)]
 
 T14584a.hs:15:17: warning: [-Wdeferred-type-errors (in -Wdefault)]
     • Expected a type, but ‘m’ has kind ‘k2’
+      ‘k2’ is a rigid type variable bound by
+        the type signature for:
+          g :: forall {k2} (m :: k2). ()
+        at T14584a.hs:14:1-17
     • In the type ‘m’
       In the expression: id @m
       In an equation for ‘h’: h = id @m

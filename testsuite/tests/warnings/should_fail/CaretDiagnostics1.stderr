@@ -18,8 +18,8 @@ CaretDiagnostics1.hs:(5,3)-(7,16): error:
 
 CaretDiagnostics1.hs:8:3-45: error:
     • Couldn't match type ‘[Char]’ with ‘()’
-      Expected type: IO ()
-        Actual type: IO [Char]
+      Expected: IO ()
+        Actual: IO String
     • In a stmt of a 'do' block: pure ("this is not an IO" + ())
       In the expression:
         do 10000000000000000000000000000000000000 + 2 + (3 :: Int)
@@ -35,7 +35,9 @@ CaretDiagnostics1.hs:8:3-45: error:
   |   ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
 
 CaretDiagnostics1.hs:8:31-44: error:
-    • Couldn't match expected type ‘[Char]’ with actual type ‘()’
+    • Couldn't match type ‘()’ with ‘[Char]’
+      Expected: String
+        Actual: ()
     • In the second argument of ‘(+)’, namely ‘()’
       In the first argument of ‘pure’, namely
         ‘("this is not an IO" + ())’
@@ -45,7 +47,10 @@ CaretDiagnostics1.hs:8:31-44: error:
   |                               ^^^^^^^^^^^^^^
 
 CaretDiagnostics1.hs:13:7-11: error:
-    • Couldn't match expected type ‘a1 -> a1’ with actual type ‘[Char]’
+    • Couldn't match type: a1 -> a1
+                     with: [Char]
+      Expected: a1 -> a1
+        Actual: String
     • In the pattern: "γηξ"
       In a case alternative: "γηξ" -> () '0'
       In the expression: case id of { "γηξ" -> () '0' }

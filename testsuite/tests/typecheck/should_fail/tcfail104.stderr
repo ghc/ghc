@@ -1,8 +1,9 @@
 
 tcfail104.hs:14:12: error:
-    • Couldn't match type ‘forall a. a -> a’ with ‘Char -> Char’
-      Expected type: (Char -> Char) -> Char -> Char
-        Actual type: (forall a. a -> a) -> Char -> Char
+    • Couldn't match type: forall a. a -> a
+                     with: Char -> Char
+      Expected: (Char -> Char) -> Char -> Char
+        Actual: (forall a. a -> a) -> Char -> Char
     • In the expression: \ (x :: forall a. a -> a) -> x
       In the expression:
         if v then (\ (x :: forall a. a -> a) -> x) else (\ x -> x)
@@ -10,8 +11,8 @@ tcfail104.hs:14:12: error:
         (if v then (\ (x :: forall a. a -> a) -> x) else (\ x -> x)) id 'c'
 
 tcfail104.hs:22:15: error:
-    • Couldn't match expected type ‘Char -> Char’
-                  with actual type ‘forall a. a -> a’
+    • Couldn't match expected type: Char -> Char
+                  with actual type: forall a. a -> a
     • When checking that the pattern signature: forall a. a -> a
         fits the type of its context: Char -> Char
       In the pattern: x :: forall a. a -> a

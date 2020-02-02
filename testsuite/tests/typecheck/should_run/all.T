@@ -58,7 +58,7 @@ test('tcrun038', [extra_files(['TcRun038_B.hs'])], multimod_compile_and_run, ['t
 test('tcrun039', normal, compile_and_run, [''])
 test('tcrun040', normal, compile_and_run, [''])
 test('tcrun041', omit_ways(['ghci']), compile_and_run, [''])
-test('tcrun042', normal, compile_fail, [''])
+test('tcrun042', normal, compile, [''])
 test('tcrun043', normal, compile_and_run, [''])
 test('tcrun044', normal, compile_and_run, [''])
 test('tcrun045', normal, compile_fail, [''])

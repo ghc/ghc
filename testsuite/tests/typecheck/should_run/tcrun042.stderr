@@ -1,6 +1,0 @@
-
-tcrun042.hs:13:5: error:
-    • Couldn't match expected type ‘forall c. c -> c -> c’
-                  with actual type ‘b0 -> b0 -> b0’
-    • In the expression: (, "Hello" ++ "World",)
-      In an equation for ‘e’: e = (, "Hello" ++ "World",)

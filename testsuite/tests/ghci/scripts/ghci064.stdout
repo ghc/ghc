@@ -6,25 +6,25 @@ instance GHC.Base.MonadPlus Maybe -- Defined in ‘GHC.Base’
 instance MonadFail Maybe -- Defined in ‘Control.Monad.Fail’
 instance Foldable Maybe -- Defined in ‘Data.Foldable’
 instance Traversable Maybe -- Defined in ‘Data.Traversable’
-instance Eq _ => Eq (Maybe _) -- Defined in ‘GHC.Maybe’
-instance Semigroup _ => Monoid (Maybe _) -- Defined in ‘GHC.Base’
-instance Ord _ => Ord (Maybe _) -- Defined in ‘GHC.Maybe’
-instance Semigroup _ => Semigroup (Maybe _)
+instance Eq w => Eq (Maybe w) -- Defined in ‘GHC.Maybe’
+instance Semigroup w => Monoid (Maybe w) -- Defined in ‘GHC.Base’
+instance Ord w => Ord (Maybe w) -- Defined in ‘GHC.Maybe’
+instance Semigroup w => Semigroup (Maybe w)
   -- Defined in ‘GHC.Base’
-instance Show _ => Show (Maybe _) -- Defined in ‘GHC.Show’
-instance Read _ => Read (Maybe _) -- Defined in ‘GHC.Read’
-instance GHC.Generics.Generic (Maybe _)
+instance Show w => Show (Maybe w) -- Defined in ‘GHC.Show’
+instance Read w => Read (Maybe w) -- Defined in ‘GHC.Read’
+instance GHC.Generics.Generic (Maybe w)
   -- Defined in ‘GHC.Generics’
-instance GHC.Generics.SingKind _ => GHC.Generics.SingKind (Maybe _)
+instance GHC.Generics.SingKind w => GHC.Generics.SingKind (Maybe w)
   -- Defined in ‘GHC.Generics’
-instance Eq _ => Eq [_] -- Defined in ‘GHC.Classes’
-instance Monoid [_] -- Defined in ‘GHC.Base’
-instance Ord _ => Ord [_] -- Defined in ‘GHC.Classes’
-instance Semigroup [_] -- Defined in ‘GHC.Base’
-instance Show _ => Show [_] -- Defined in ‘GHC.Show’
-instance Read _ => Read [_] -- Defined in ‘GHC.Read’
-instance GHC.Generics.Generic [_] -- Defined in ‘GHC.Generics’
-instance [safe] MyShow _ => MyShow [_]
+instance Eq w => Eq [w] -- Defined in ‘GHC.Classes’
+instance Monoid [w] -- Defined in ‘GHC.Base’
+instance Ord w => Ord [w] -- Defined in ‘GHC.Classes’
+instance Semigroup [w] -- Defined in ‘GHC.Base’
+instance Show w => Show [w] -- Defined in ‘GHC.Show’
+instance Read w => Read [w] -- Defined in ‘GHC.Read’
+instance GHC.Generics.Generic [w] -- Defined in ‘GHC.Generics’
+instance [safe] MyShow w => MyShow [w]
   -- Defined at ghci064.hs:7:10
 instance Monoid [T] -- Defined in ‘GHC.Base’
 instance Semigroup [T] -- Defined in ‘GHC.Base’

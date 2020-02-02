@@ -125,16 +125,15 @@ rn_hs_sig_wc_type scoping ctxt
                   thing_inside
   = do { free_vars <- extractFilteredRdrTyVarsDups hs_ty
        ; (nwc_rdrs', tv_rdrs) <- partition_nwcs free_vars
-       ; let nwc_rdrs = nubL nwc_rdrs'
+       ; let nwc_rdrs = nubL nwc_rdrs'  -- Discard duplicates
              bind_free_tvs = case scoping of
                                AlwaysBind       -> True
                                BindUnlessForall -> not (isLHsForAllTy hs_ty)
                                NeverBind        -> False
        ; rnImplicitBndrs bind_free_tvs tv_rdrs $ \ vars ->
     do { (wcs, hs_ty', fvs1) <- rnWcBody ctxt nwc_rdrs hs_ty
-       ; let sig_ty' = HsWC { hswc_ext = wcs, hswc_body = ib_ty' }
-             ib_ty'  = HsIB { hsib_ext = vars
-                            , hsib_body = hs_ty' }
+       ; let sig_ty' = HsWC { hswc_ext = wcs,  hswc_body = ib_ty' }
+             ib_ty'  = HsIB { hsib_ext = vars, hsib_body = hs_ty' }
        ; (res, fvs2) <- thing_inside sig_ty'
        ; return (res, fvs1 `plusFV` fvs2) } }
 
@@ -973,12 +972,12 @@ bindLHsTyVarBndr _doc mb_assoc (L loc
 bindLHsTyVarBndr doc mb_assoc (L loc (KindedTyVar x lrdr@(L lv _) kind))
                  thing_inside
   = do { sig_ok <- xoptM LangExt.KindSignatures
-           ; unless sig_ok (badKindSigErr doc kind)
-           ; (kind', fvs1) <- rnLHsKind doc kind
-           ; tv_nm  <- newTyVarNameRn mb_assoc lrdr
-           ; (b, fvs2) <- bindLocalNamesFV [tv_nm]
-               $ thing_inside (L loc (KindedTyVar x (L lv tv_nm) kind'))
-           ; return (b, fvs1 `plusFV` fvs2) }
+       ; unless sig_ok (badKindSigErr doc kind)
+       ; (kind', fvs1) <- rnLHsKind doc kind
+       ; tv_nm  <- newTyVarNameRn mb_assoc lrdr
+       ; (b, fvs2) <- bindLocalNamesFV [tv_nm]
+           $ thing_inside (L loc (KindedTyVar x (L lv tv_nm) kind'))
+       ; return (b, fvs1 `plusFV` fvs2) }
 
 newTyVarNameRn :: Maybe a -> Located RdrName -> RnM Name
 newTyVarNameRn mb_assoc (L loc rdr)

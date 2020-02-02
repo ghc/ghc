@@ -1,8 +1,9 @@
 
 T8603.hs:33:17: error:
-    • Couldn't match type ‘RV a1’ with ‘StateT s RV a0’
-      Expected type: [a2] -> StateT s RV a0
-        Actual type: t0 ((->) [a1]) (RV a1)
+    • Couldn't match type: RV a1
+                     with: StateT s RV a0
+      Expected: [a2] -> StateT s RV a0
+        Actual: t0 ((->) [a1]) (RV a1)
     • The function ‘lift’ is applied to two value arguments,
         but its type ‘([a1] -> RV a1) -> t0 ((->) [a1]) (RV a1)’
         has only one
