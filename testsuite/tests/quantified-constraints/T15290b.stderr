@@ -1,7 +1,7 @@
 
 T15290b.hs:28:49: error:
-    • Couldn't match representation of type ‘f (m b)’
-                               with that of ‘f (T1 m b)’
+    • Couldn't match representation of type: f (m b)
+                               with that of: f (T1 m b)
         arising from the coercion of the method ‘traverse'’
           from type ‘forall (f :: * -> *) a b.
                      Applicative' f =>

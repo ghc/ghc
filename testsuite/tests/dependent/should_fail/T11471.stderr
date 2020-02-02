@@ -4,8 +4,8 @@ T11471.hs:15:10: error:
       When matching types
         a :: *
         Int# :: TYPE 'IntRep
-      Expected type: Proxy a
-        Actual type: Proxy Int#
+      Expected: Proxy a
+        Actual: Proxy Int#
     • In the first argument of ‘f’, namely ‘(undefined :: Proxy Int#)’
       In the expression: f (undefined :: Proxy Int#) 3#
       In an equation for ‘bad’: bad = f (undefined :: Proxy Int#) 3#
