@@ -1,6 +1,8 @@
 
 tcfail068.hs:14:9: error:
     • Couldn't match type ‘s1’ with ‘s’
+      Expected: GHC.ST.ST s1 (IndTree s a)
+        Actual: GHC.ST.ST s1 (STArray s1 (Int, Int) a)
       ‘s1’ is a rigid type variable bound by
         a type expected by the context:
           forall s1. GHC.ST.ST s1 (IndTree s a)
@@ -11,8 +13,6 @@ tcfail068.hs:14:9: error:
                    Constructed a =>
                    (Int, Int) -> a -> IndTree s a
         at tcfail068.hs:11:1-55
-      Expected type: GHC.ST.ST s1 (IndTree s a)
-        Actual type: GHC.ST.ST s1 (STArray s1 (Int, Int) a)
     • In the first argument of ‘runST’, namely
         ‘(newSTArray ((1, 1), n) x)’
       In the expression: runST (newSTArray ((1, 1), n) x)
@@ -24,6 +24,8 @@ tcfail068.hs:14:9: error:
 
 tcfail068.hs:19:9: error:
     • Couldn't match type ‘s1’ with ‘s’
+      Expected: GHC.ST.ST s1 (IndTree s a)
+        Actual: GHC.ST.ST s (IndTree s a)
       ‘s1’ is a rigid type variable bound by
         a type expected by the context:
           forall s1. GHC.ST.ST s1 (IndTree s a)
@@ -34,8 +36,6 @@ tcfail068.hs:19:9: error:
                    Constructed a =>
                    (Int, Int) -> (a -> a) -> IndTree s a -> IndTree s a
         at tcfail068.hs:16:1-75
-      Expected type: GHC.ST.ST s1 (IndTree s a)
-        Actual type: GHC.ST.ST s (IndTree s a)
     • In the first argument of ‘runST’, namely
         ‘(readSTArray arr i
             >>= \ val -> writeSTArray arr i (f val) >> return arr)’
@@ -55,6 +55,8 @@ tcfail068.hs:19:9: error:
 
 tcfail068.hs:24:36: error:
     • Couldn't match type ‘s1’ with ‘s’
+      Expected: GHC.ST.ST s1 (IndTree s a)
+        Actual: GHC.ST.ST s (IndTree s a)
       ‘s1’ is a rigid type variable bound by
         a type expected by the context:
           forall s1. GHC.ST.ST s1 (IndTree s a)
@@ -65,8 +67,6 @@ tcfail068.hs:24:36: error:
                    Constructed a =>
                    ((Int, Int), (Int, Int)) -> (a -> a) -> IndTree s a -> IndTree s a
         at tcfail068.hs:23:1-87
-      Expected type: GHC.ST.ST s1 (IndTree s a)
-        Actual type: GHC.ST.ST s (IndTree s a)
     • In the first argument of ‘runST’, namely ‘(itrap' i k)’
       In the expression: runST (itrap' i k)
       In an equation for ‘itrap’:
@@ -92,6 +92,8 @@ tcfail068.hs:24:36: error:
 
 tcfail068.hs:36:46: error:
     • Couldn't match type ‘s1’ with ‘s’
+      Expected: GHC.ST.ST s1 (c, IndTree s b)
+        Actual: GHC.ST.ST s (c, IndTree s b)
       ‘s1’ is a rigid type variable bound by
         a type expected by the context:
           forall s1. GHC.ST.ST s1 (c, IndTree s b)
@@ -108,8 +110,6 @@ tcfail068.hs:36:46: error:
                         -> IndTree s b
                         -> (c, IndTree s b)
         at tcfail068.hs:(34,1)-(35,62)
-      Expected type: GHC.ST.ST s1 (c, IndTree s b)
-        Actual type: GHC.ST.ST s (c, IndTree s b)
     • In the first argument of ‘runST’, namely ‘(itrapstate' i k s)’
       In the expression: runST (itrapstate' i k s)
       In an equation for ‘itrapstate’:

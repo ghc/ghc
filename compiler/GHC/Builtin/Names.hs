@@ -743,8 +743,7 @@ toInteger_RDR           = nameRdrName toIntegerName
 toRational_RDR          = nameRdrName toRationalName
 fromIntegral_RDR        = nameRdrName fromIntegralName
 
-stringTy_RDR, fromString_RDR :: RdrName
-stringTy_RDR            = tcQual_RDR gHC_BASE (fsLit "String")
+fromString_RDR :: RdrName
 fromString_RDR          = nameRdrName fromStringName
 
 fromList_RDR, fromListN_RDR, toList_RDR :: RdrName
@@ -1680,11 +1679,13 @@ addrPrimTyConKey, arrayPrimTyConKey, arrayArrayPrimTyConKey, boolTyConKey,
     mutableByteArrayPrimTyConKey, orderingTyConKey, mVarPrimTyConKey,
     ratioTyConKey, rationalTyConKey, realWorldTyConKey, stablePtrPrimTyConKey,
     stablePtrTyConKey, eqTyConKey, heqTyConKey,
-    smallArrayPrimTyConKey, smallMutableArrayPrimTyConKey :: Unique
+    smallArrayPrimTyConKey, smallMutableArrayPrimTyConKey,
+    stringTyConKey :: Unique
 addrPrimTyConKey                        = mkPreludeTyConUnique  1
 arrayPrimTyConKey                       = mkPreludeTyConUnique  3
 boolTyConKey                            = mkPreludeTyConUnique  4
 byteArrayPrimTyConKey                   = mkPreludeTyConUnique  5
+stringTyConKey                          = mkPreludeTyConUnique  6
 charPrimTyConKey                        = mkPreludeTyConUnique  7
 charTyConKey                            = mkPreludeTyConUnique  8
 doublePrimTyConKey                      = mkPreludeTyConUnique  9
