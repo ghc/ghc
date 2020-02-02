@@ -5,7 +5,7 @@
 module T2714 where
 
 f :: ((a -> b) -> b) -> (forall c. c -> a)
-f = ffmap
+f x = ffmap x
 
 ffmap :: Functor f => (p->q) -> f p -> f q
 ffmap = error "urk"

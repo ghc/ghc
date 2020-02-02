@@ -1,8 +1,8 @@
 
 ExpandSynsFail2.hs:19:37: error:
     • Couldn't match type ‘Int’ with ‘Bool’
-      Expected type: ST s Foo
-        Actual type: MyBarST s
+      Expected: ST s Foo
+        Actual: MyBarST s
       Type synonyms expanded:
       Expected type: ST s Int
         Actual type: ST s Bool

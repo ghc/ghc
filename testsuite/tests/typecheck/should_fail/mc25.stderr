@@ -1,8 +1,8 @@
 
 mc25.hs:9:46: error:
-    • Couldn't match type ‘a -> t1’ with ‘Int’
-      Expected type: (a -> t1) -> [a] -> [t a]
-        Actual type: Int -> [t a] -> [t a]
+    • Couldn't match type ‘Int’ with ‘a -> t1’
+      Expected: (a -> t1) -> [a] -> [t a]
+        Actual: Int -> [a] -> [a]
     • In the expression: take
       In a stmt of a monad comprehension: then group by x using take
       In the expression: [x | x <- [1 .. 10], then group by x using take]

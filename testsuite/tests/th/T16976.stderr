@@ -1,5 +1,5 @@
 T16976.aNumber :: forall {p_0 :: *} . GHC.Num.Num p_0 => p_0
-T16976.aString :: [GHC.Types.Char]
+T16976.aString :: GHC.Base.String
 T16976.MkT1 :: forall (s_0 :: *) . T16976.T s_0
 T16976.MkT2 :: forall (s_0 :: *) . T16976.T s_0
 T16976.T :: * -> *

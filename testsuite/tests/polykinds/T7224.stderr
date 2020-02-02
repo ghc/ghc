@@ -1,12 +1,18 @@
 
 T7224.hs:6:19: error:
     • Expected kind ‘i’, but ‘i’ has kind ‘*’
+      ‘i’ is a rigid type variable bound by
+        the class declaration for ‘PMonad'’
+        at T7224.hs:5:21
     • In the first argument of ‘m’, namely ‘i’
       In the type signature: ret' :: a -> m i i a
       In the class declaration for ‘PMonad'’
 
 T7224.hs:7:14: error:
     • Expected kind ‘i’, but ‘i’ has kind ‘*’
+      ‘i’ is a rigid type variable bound by
+        the class declaration for ‘PMonad'’
+        at T7224.hs:5:21
     • In the first argument of ‘m’, namely ‘i’
       In the type signature:
         bind' :: m i j a -> (a -> m j k b) -> m i k b

@@ -23,5 +23,7 @@ f :: (forall b. (C a b, TF b ~ Y) => b) -> X
 --               g = f
 -- Now we fail in all ways!
 
-f _ = undefined
+-- But with simple subsumption (#17775) we
+-- no longer get an ambiguity check here
 
+f _ = undefined

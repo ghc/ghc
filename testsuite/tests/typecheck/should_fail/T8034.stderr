@@ -1,8 +1,9 @@
 
 T8034.hs:6:3: error:
-    • Couldn't match type ‘F a0’ with ‘F a’
-      Expected type: F a -> F a
-        Actual type: F a0 -> F a0
+    • Couldn't match type: F a0
+                     with: F a
+      Expected: F a -> F a
+        Actual: F a0 -> F a0
       NB: ‘F’ is a non-injective type family
       The type variable ‘a0’ is ambiguous
     • In the ambiguity check for ‘foo’

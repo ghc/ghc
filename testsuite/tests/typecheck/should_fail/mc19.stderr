@@ -1,8 +1,12 @@
 
 mc19.hs:10:31: error:
-    • Occurs check: cannot construct the infinite type: a ~ [a]
-      Expected type: [a] -> [a]
-        Actual type: [a] -> [[a]]
+    • Couldn't match type ‘a’ with ‘[a]’
+      Expected: [a] -> [a]
+        Actual: [a] -> [[a]]
+      ‘a’ is a rigid type variable bound by
+        a type expected by the context:
+          forall {a}. [a] -> [a]
+        at mc19.hs:10:31-35
     • In the expression: inits
       In a stmt of a monad comprehension: then inits
       In the expression: [x | x <- [3, 2, 1], then inits]

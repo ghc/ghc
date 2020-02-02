@@ -1,17 +1,21 @@
 
-Simple14.hs:8:8: error:
-    • Couldn't match type ‘z0’ with ‘z’
+Simple14.hs:19:27: error:
+    • Couldn't match type ‘z0’ with ‘n’
+      Expected: EQ_ z0 z0
+        Actual: EQ_ m n
         ‘z0’ is untouchable
-          inside the constraints: x ~ y
+          inside the constraints: Maybe m ~ Maybe n
           bound by a type expected by the context:
-                     (x ~ y) => EQ_ z0 z0
-          at Simple14.hs:8:8-39
-      ‘z’ is a rigid type variable bound by
+                     (Maybe m ~ Maybe n) => EQ_ z0 z0
+          at Simple14.hs:19:26-41
+      ‘n’ is a rigid type variable bound by
         the type signature for:
-          eqE :: forall x y z p. EQ_ x y -> ((x ~ y) => EQ_ z z) -> p
-        at Simple14.hs:8:8-39
-      Expected type: EQ_ z0 z0
-        Actual type: EQ_ z z
-    • In the ambiguity check for ‘eqE’
-      To defer the ambiguity check to use sites, enable AllowAmbiguousTypes
-      In the type signature: eqE :: EQ_ x y -> (x ~ y => EQ_ z z) -> p
+          foo :: forall m n. EQ_ (Maybe m) (Maybe n)
+        at Simple14.hs:18:1-42
+    • In the second argument of ‘eqE’, namely ‘(eqI :: EQ_ m n)’
+      In the expression: x `eqE` (eqI :: EQ_ m n)
+      In the first argument of ‘ntI’, namely
+        ‘(\ x -> x `eqE` (eqI :: EQ_ m n))’
+    • Relevant bindings include
+        x :: EQ_ (Maybe m) (Maybe n) (bound at Simple14.hs:19:13)
+        foo :: EQ_ (Maybe m) (Maybe n) (bound at Simple14.hs:19:1)

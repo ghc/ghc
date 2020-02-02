@@ -1,21 +1,22 @@
 
 tcfail174.hs:9:5: error:
-    • Couldn't match type ‘a0 -> a0’ with ‘forall a. a -> a’
-      Expected type: Capture (forall a. a -> a)
-        Actual type: Capture (a0 -> a0)
+    • Couldn't match type: a0 -> a0
+                     with: forall a. a -> a
+      Expected: Capture (forall a. a -> a)
+        Actual: Capture (a0 -> a0)
     • In the expression: Base id
       In an equation for ‘g’: g = Base id
 
 tcfail174.hs:16:14: error:
     • Couldn't match type ‘a1’ with ‘a’
+      Expected: Capture (forall x. x -> a)
+        Actual: Capture (forall a. a -> a)
       ‘a1’ is a rigid type variable bound by
         the type a -> a
         at tcfail174.hs:16:1-14
       ‘a’ is a rigid type variable bound by
         the inferred type of h1 :: Capture a
         at tcfail174.hs:16:1-14
-      Expected type: Capture (forall x. x -> a)
-        Actual type: Capture (forall a. a -> a)
     • In the first argument of ‘Capture’, namely ‘g’
       In the expression: Capture g
       In an equation for ‘h1’: h1 = Capture g
@@ -24,6 +25,8 @@ tcfail174.hs:16:14: error:
 
 tcfail174.hs:19:14: error:
     • Couldn't match type ‘a’ with ‘b’
+      Expected: Capture (forall x. x -> b)
+        Actual: Capture (forall a. a -> a)
       ‘a’ is a rigid type variable bound by
         the type a -> a
         at tcfail174.hs:1:1
@@ -31,8 +34,6 @@ tcfail174.hs:19:14: error:
         the type signature for:
           h2 :: forall b. Capture b
         at tcfail174.hs:18:1-15
-      Expected type: Capture (forall x. x -> b)
-        Actual type: Capture (forall a. a -> a)
     • In the first argument of ‘Capture’, namely ‘g’
       In the expression: Capture g
       In an equation for ‘h2’: h2 = Capture g

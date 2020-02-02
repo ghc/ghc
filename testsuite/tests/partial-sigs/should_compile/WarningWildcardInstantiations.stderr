@@ -1,9 +1,9 @@
 TYPE SIGNATURES
-  bar :: forall {t} {_}. t -> (t -> _) -> _
+  bar :: forall {t} {w}. t -> (t -> w) -> w
   foo :: forall {a}. (Show a, Enum a) => a -> String
 Dependent modules: []
-Dependent packages: [base-4.13.0.0, ghc-prim-0.6.1,
-                     integer-gmp-1.0.2.0]
+Dependent packages: [base-4.14.0.0, ghc-prim-0.6.1,
+                     integer-gmp-1.0.3.0]
 
 WarningWildcardInstantiations.hs:5:14: warning: [-Wpartial-type-signatures (in -Wdefault)]
     • Found type wildcard ‘_a’ standing for ‘a’
@@ -27,23 +27,23 @@ WarningWildcardInstantiations.hs:5:30: warning: [-Wpartial-type-signatures (in -
 WarningWildcardInstantiations.hs:8:8: warning: [-Wpartial-type-signatures (in -Wdefault)]
     • Found type wildcard ‘_’ standing for ‘t’
       Where: ‘t’ is a rigid type variable bound by
-               the inferred type of bar :: t -> (t -> _) -> _
+               the inferred type of bar :: t -> (t -> w) -> w
                at WarningWildcardInstantiations.hs:9:1-13
     • In the type ‘_ -> _ -> _’
       In the type signature: bar :: _ -> _ -> _
 
 WarningWildcardInstantiations.hs:8:13: warning: [-Wpartial-type-signatures (in -Wdefault)]
-    • Found type wildcard ‘_’ standing for ‘t -> _’
-      Where: ‘t’, ‘_’ are rigid type variables bound by
-               the inferred type of bar :: t -> (t -> _) -> _
+    • Found type wildcard ‘_’ standing for ‘t -> w’
+      Where: ‘t’, ‘w’ are rigid type variables bound by
+               the inferred type of bar :: t -> (t -> w) -> w
                at WarningWildcardInstantiations.hs:9:1-13
     • In the type ‘_ -> _ -> _’
       In the type signature: bar :: _ -> _ -> _
 
 WarningWildcardInstantiations.hs:8:18: warning: [-Wpartial-type-signatures (in -Wdefault)]
-    • Found type wildcard ‘_’ standing for ‘_’
-      Where: ‘_’ is a rigid type variable bound by
-               the inferred type of bar :: t -> (t -> _) -> _
+    • Found type wildcard ‘_’ standing for ‘w’
+      Where: ‘w’ is a rigid type variable bound by
+               the inferred type of bar :: t -> (t -> w) -> w
                at WarningWildcardInstantiations.hs:9:1-13
     • In the type ‘_ -> _ -> _’
       In the type signature: bar :: _ -> _ -> _
