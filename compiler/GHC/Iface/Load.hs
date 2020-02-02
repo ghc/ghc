@@ -527,7 +527,7 @@ loadInterface doc_str mod from
 
         ; -- invoke plugins with *full* interface, not final_iface, to ensure
           -- that plugins have access to declarations, etc.
-          res <- withPlugins dflags interfaceLoadAction iface
+          res <- withPlugins dflags (\p -> interfaceLoadAction p) iface
         ; return (Succeeded res)
     }}}}
 
