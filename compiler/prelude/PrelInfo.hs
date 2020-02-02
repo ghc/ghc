@@ -196,7 +196,12 @@ knownKeyNamesOkay all_names
                            "]"
 
 wiredInNameTyThing_maybe :: Name -> Maybe TyThing
-wiredInNameTyThing_maybe = lookupNameEnv wiredInMap
+wiredInNameTyThing_maybe n
+  | isWiredIn n
+  = case isWiredInTuple n of
+      Just (ns, (b, a)) -> Just $ tupleTyThing ns b a
+      Nothing -> lookupNameEnv wiredInMap n
+  | otherwise = Nothing
 
 
 -- | Given a 'Unique' lookup its associated 'Name' if it corresponds to a

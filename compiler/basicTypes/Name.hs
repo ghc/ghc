@@ -9,6 +9,7 @@
 {-# LANGUAGE TypeFamilies #-}
 {-# LANGUAGE FlexibleInstances #-}
 {-# LANGUAGE PatternSynonyms #-}
+{-# LANGUAGE TupleSections #-}
 
 -- |
 -- #name_types#
@@ -46,7 +47,7 @@ module Name (
         mkInternalName, mkClonedInternalName, mkDerivedInternalName,
         mkSystemVarName, mkSysTvName,
         mkFCallName,
-        mkExternalName, mkWiredInName,
+        mkExternalName, mkWiredInName, mkWiredInNameTuple,
 
         -- ** Manipulating and deconstructing 'Name's
         nameUnique, setNameUnique,
@@ -62,7 +63,7 @@ module Name (
         isTyVarName, isTyConName, isDataConName,
         isValName, isVarName,
         isWiredInName, isWiredIn, isBuiltInSyntax,
-        isHoleName,
+        isHoleName, isWiredInTuple,
         nameIsLocalOrFrom, nameIsHomePackage,
         nameIsHomePackageImport, nameIsFromExternalPackage,
         stableNameCmp,
@@ -83,6 +84,7 @@ import GhcPrelude
 import {-# SOURCE #-} TyCoRep( TyThing )
 
 import OccName
+import BasicTypes
 import Module
 import SrcLoc
 import Unique
@@ -121,7 +123,7 @@ data Name = Name {
 data NameSort
   = External Module
 
-  | WiredIn Module !() BuiltInSyntax
+  | WiredIn Module !(Maybe (Boxity, Int))  BuiltInSyntax
         -- A variant of External, for wired-in things
 
   | Internal            -- A user-defined Id or TyVar
@@ -221,6 +223,11 @@ isWiredInName _                               = False
 
 isWiredIn :: NamedThing thing => thing -> Bool
 isWiredIn = isWiredInName . getName
+
+isWiredInTuple :: Name -> Maybe (NameSpace, (Boxity, Arity))
+isWiredInTuple (Name {n_sort = WiredIn _ i _
+                     ,n_occ = o}) = (occNameSpace o,) <$> i
+isWiredInTuple _ = Nothing
 
 isBuiltInSyntax :: Name -> Bool
 isBuiltInSyntax (Name {n_sort = WiredIn _ _ BuiltInSyntax}) = True
@@ -369,8 +376,15 @@ mkExternalName uniq mod occ loc
 mkWiredInName :: Module -> OccName -> Unique -> TyThing -> BuiltInSyntax -> Name
 mkWiredInName mod occ uniq _t built_in
   = Name { n_uniq = uniq,
-           n_sort = WiredIn mod () built_in,
+           n_sort = WiredIn mod Nothing built_in,
            n_occ = occ, n_loc = wiredInSrcSpan }
+
+mkWiredInNameTuple :: Boxity -> Arity -> Module -> OccName -> Unique -> Name
+mkWiredInNameTuple boxity arity mod occ uniq
+  = Name { n_uniq = uniq,
+           n_sort = WiredIn mod (Just (boxity, arity)) BuiltInSyntax,
+           n_occ = occ, n_loc = wiredInSrcSpan }
+
 
 -- | Create a name brought into being by the compiler
 mkSystemName :: Unique -> OccName -> Name

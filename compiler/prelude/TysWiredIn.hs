@@ -71,7 +71,7 @@ module TysWiredIn (
 
         -- * Tuples
         mkTupleTy, mkTupleTy1, mkBoxedTupleTy, mkTupleStr,
-        tupleTyCon, tupleDataCon, tupleTyConName,
+        tupleTyCon, tupleDataCon, tupleTyConName, tupleTyThing,
         promotedTupleDataCon,
         unitTyCon, unitDataCon, unitDataConId, unitTy, unitTyConKey,
         pairTyCon,
@@ -798,6 +798,13 @@ isBuiltInOcc_maybe occ =
       = choose_ns (getName (tupleTyCon   boxity arity))
                   (getName (tupleDataCon boxity arity))
 
+tupleTyThing :: NameSpace -> Boxity -> Arity -> TyThing
+tupleTyThing ns boxity arity
+  | isTcClsNameSpace ns   = ATyCon (tupleTyCon boxity arity)
+  | isDataConNameSpace ns = AConLike (RealDataCon (tupleDataCon boxity arity))
+  | otherwise = pprPanic "tupleTyThing" (ppr (boxity, arity))
+
+
 mkTupleOcc :: NameSpace -> Boxity -> Arity -> OccName
 -- No need to cache these, the caching is done in mk_tuple
 mkTupleOcc ns Boxed   ar = mkOccName ns (mkBoxedTupleStr   ar)
@@ -916,10 +923,9 @@ mk_tuple Boxed arity = (tycon, tuple_con)
 
     boxity  = Boxed
     modu    = gHC_TUPLE
-    tc_name = mkWiredInName modu (mkTupleOcc tcName boxity arity) tc_uniq
-                         (ATyCon tycon) BuiltInSyntax
-    dc_name = mkWiredInName modu (mkTupleOcc dataName boxity arity) dc_uniq
-                            (AConLike (RealDataCon tuple_con)) BuiltInSyntax
+    tc_name = mkWiredInNameTuple boxity arity modu (mkTupleOcc tcName boxity arity) tc_uniq
+    dc_name = mkWiredInNameTuple boxity arity modu (mkTupleOcc dataName boxity arity) dc_uniq
+
     tc_uniq = mkTupleTyConUnique   boxity arity
     dc_uniq = mkTupleDataConUnique boxity arity
 
@@ -944,10 +950,8 @@ mk_tuple Unboxed arity = (tycon, tuple_con)
 
     boxity  = Unboxed
     modu    = gHC_PRIM
-    tc_name = mkWiredInName modu (mkTupleOcc tcName boxity arity) tc_uniq
-                         (ATyCon tycon) BuiltInSyntax
-    dc_name = mkWiredInName modu (mkTupleOcc dataName boxity arity) dc_uniq
-                            (AConLike (RealDataCon tuple_con)) BuiltInSyntax
+    tc_name = mkWiredInNameTuple boxity arity modu (mkTupleOcc tcName boxity arity) tc_uniq
+    dc_name = mkWiredInNameTuple boxity arity modu (mkTupleOcc dataName boxity arity) dc_uniq
     tc_uniq = mkTupleTyConUnique   boxity arity
     dc_uniq = mkTupleDataConUnique boxity arity
 
