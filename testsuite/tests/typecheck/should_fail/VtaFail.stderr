@@ -13,66 +13,67 @@ VtaFail.hs:14:17: error:
       In an equation for ‘answer_lambda’:
           answer_lambda = (\ x -> x) @Int 12
 
-VtaFail.hs:19:5: error:
+VtaFail.hs:21:5: error:
     • Cannot apply expression of type ‘Int -> (a0, Int)’
       to a visible type argument ‘Bool’
     • In the expression: pair 3 @Int @Bool True
       In an equation for ‘a’: a = pair 3 @Int @Bool True
 
-VtaFail.hs:26:15: error:
+VtaFail.hs:28:15: error:
     • Expected kind ‘* -> *’, but ‘Int’ has kind ‘*’
     • In the type ‘Int’
       In the expression: first @Int F
       In an equation for ‘fInt’: fInt = first @Int F
 
-VtaFail.hs:33:18: error:
+VtaFail.hs:35:18: error:
     • Couldn't match type ‘Int’ with ‘Bool’
-      Expected type: Proxy Bool
-        Actual type: Proxy Int
+      Expected: Proxy Bool
+        Actual: Proxy Int
     • In the second argument of ‘foo’, namely ‘(P :: Proxy Int)’
       In the expression: foo @Bool (P :: Proxy Int)
       In an equation for ‘baz’: baz = foo @Bool (P :: Proxy Int)
 
-VtaFail.hs:40:17: error:
-    • Expected kind ‘* -> k0 -> *’, but ‘Maybe’ has kind ‘* -> *’
+VtaFail.hs:42:17: error:
+    • Couldn't match kind ‘*’ with ‘k0 -> *’
+      Expected kind ‘* -> k0 -> *’, but ‘Maybe’ has kind ‘* -> *’
     • In the type ‘Maybe’
       In the expression: too @Maybe T
       In an equation for ‘threeBad’: threeBad = too @Maybe T
 
-VtaFail.hs:41:27: error:
+VtaFail.hs:43:27: error:
     • Couldn't match type ‘Either’ with ‘(->)’
-      Expected type: Three (->)
-        Actual type: Three Either
+      Expected: Three (->)
+        Actual: Three Either
     • In the second argument of ‘too’, namely ‘(T :: Three Either)’
       In the expression: too @(->) (T :: Three Either)
       In an equation for ‘threeWorse’:
           threeWorse = too @(->) (T :: Three Either)
 
-VtaFail.hs:46:5: error:
+VtaFail.hs:48:5: error:
     • Cannot apply expression of type ‘Int -> Int -> Int’
       to a visible type argument ‘Int’
     • In the expression: plus @Int 5 7
       In an equation for ‘b’: b = plus @Int 5 7
 
-VtaFail.hs:47:5: error:
+VtaFail.hs:49:5: error:
     • Cannot apply expression of type ‘Int -> Int -> Int’
       to a visible type argument ‘Rational’
     • In the expression: plus @Rational 5 10
       In an equation for ‘c’: c = plus @Rational 5 10
 
-VtaFail.hs:48:5: error:
+VtaFail.hs:50:5: error:
     • Cannot apply expression of type ‘Int -> Int -> Int’
       to a visible type argument ‘Int’
     • In the expression: (+) @Int @Int @Int 12 14
       In an equation for ‘d’: d = (+) @Int @Int @Int 12 14
 
-VtaFail.hs:51:5: error:
+VtaFail.hs:53:5: error:
     • Cannot apply expression of type ‘Int -> String’
       to a visible type argument ‘Float’
     • In the expression: show @Int @Float (read "5")
       In an equation for ‘e’: e = show @Int @Float (read "5")
 
-VtaFail.hs:52:11: error:
+VtaFail.hs:54:11: error:
     • Cannot apply expression of type ‘String -> Int’
       to a visible type argument ‘Bool’
     • In the first argument of ‘show’, namely
@@ -80,7 +81,7 @@ VtaFail.hs:52:11: error:
       In the expression: show (read @Int @Bool @Float "3")
       In an equation for ‘f’: f = show (read @Int @Bool @Float "3")
 
-VtaFail.hs:57:12: error:
+VtaFail.hs:59:12: error:
     • Expecting one more argument to ‘Maybe’
       Expected a type, but ‘Maybe’ has kind ‘* -> *’
     • In the type ‘Maybe’

@@ -1,5 +1,8 @@
 
-tcfail199.hs:5:1:
-    Couldn't match expected type ‘IO t0’ with actual type ‘[Char]’
-    In the expression: main
-    When checking the type of the IO action ‘main’
+tcfail199.hs:5:1: error:
+    • Couldn't match type: [Char]
+                     with: IO t0
+      Expected: IO t0
+        Actual: String
+    • In the expression: main
+      When checking the type of the IO action ‘main’

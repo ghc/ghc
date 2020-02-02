@@ -3,8 +3,9 @@ T12906.hs:1:1: error:
     The IO action ‘main’ is not defined in module ‘Main’
 
 T12906.hs:2:7: error:
-    • Couldn't match type ‘IO ()’ with ‘[Char]’
-      Expected type: String
-        Actual type: IO ()
+    • Couldn't match type: IO ()
+                     with: [Char]
+      Expected: String
+        Actual: IO ()
     • In the expression: print (reverse s + 1)
       In an equation for ‘x’: x s = print (reverse s + 1)

@@ -28,7 +28,7 @@ where
 
 import GHC.Prelude
 
-import {-# SOURCE #-}   GHC.Tc.Gen.Expr( tcSyntaxOp, tcSyntaxOpGen, tcInferSigma )
+import {-# SOURCE #-}   GHC.Tc.Gen.Expr( tcSyntaxOp, tcSyntaxOpGen, tcInferRho )
 
 import GHC.Hs
 import GHC.Tc.Utils.Zonk
@@ -407,16 +407,13 @@ tc_pat penv (ViewPat _ expr pat) overall_pat_ty thing_inside
          -- An exotic example:
          --    pair :: forall a. a -> forall b. b -> (a,b)
          --    f (pair True -> x) = ...here (x :: forall b. b -> (Bool,b))
-         --
-         -- TEMPORARY: pending simple subsumption, use tcInferSigma
-         -- When removing this, remove it from Expr.hs-boot too
-        ; (expr',expr_ty) <- tcInferSigma expr
+        ; (expr',expr_ty) <- tcInferRho expr
 
          -- Expression must be a function
         ; let expr_orig = lexprCtOrigin expr
               herald    = text "A view pattern expression expects"
         ; (expr_wrap1, [inf_arg_ty], inf_res_ty)
-            <- matchActualFunTys herald expr_orig (Just (unLoc expr)) 1 expr_ty
+            <- matchActualFunTysRho herald expr_orig (Just (unLoc expr)) 1 expr_ty
             -- expr_wrap1 :: expr_ty "->" (inf_arg_ty -> inf_res_ty)
 
          -- Check that overall pattern is more polymorphic than arg type

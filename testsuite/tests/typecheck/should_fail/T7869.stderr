@@ -1,6 +1,8 @@
 
 T7869.hs:3:12: error:
     • Couldn't match type ‘b1’ with ‘b’
+      Expected: [a1] -> b1
+        Actual: [a] -> b
       ‘b1’ is a rigid type variable bound by
         an expression type signature:
           forall a1 b1. [a1] -> b1
@@ -8,8 +10,6 @@ T7869.hs:3:12: error:
       ‘b’ is a rigid type variable bound by
         the inferred type of f :: [a] -> b
         at T7869.hs:3:1-27
-      Expected type: [a1] -> b1
-        Actual type: [a] -> b
     • In the expression: f x
       In the expression: (\ x -> f x) :: [a] -> b
       In an equation for ‘f’: f = (\ x -> f x) :: [a] -> b

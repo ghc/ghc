@@ -429,11 +429,12 @@ mkSynFunTys arg_tys res_ty = foldr SynFun (SynType res_ty) arg_tys
 {-
 Note [TcRhoType]
 ~~~~~~~~~~~~~~~~
-A TcRhoType has no foralls or contexts at the top, or to the right of an arrow
-  YES    (forall a. a->a) -> Int
+A TcRhoType has no foralls or contexts at the top
   NO     forall a. a ->  Int
   NO     Eq a => a -> a
-  NO     Int -> forall a. a -> Int
+  YES    a -> a
+  YES    (forall a. a->a) -> Int
+  YES    Int -> forall a. a -> Int
 
 
 ************************************************************************
@@ -1992,9 +1993,9 @@ isSigmaTy _                            = False
 
 isRhoTy :: TcType -> Bool   -- True of TcRhoTypes; see Note [TcRhoType]
 isRhoTy ty | Just ty' <- tcView ty = isRhoTy ty'
-isRhoTy (ForAllTy {})                          = False
-isRhoTy (FunTy { ft_af = VisArg, ft_res = r }) = isRhoTy r
-isRhoTy _                                      = True
+isRhoTy (ForAllTy {})                = False
+isRhoTy (FunTy { ft_af = InvisArg }) = False
+isRhoTy _                            = True
 
 -- | Like 'isRhoTy', but also says 'True' for 'Infer' types
 isRhoExpTy :: ExpType -> Bool

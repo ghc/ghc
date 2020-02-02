@@ -6,8 +6,8 @@ T11254.hs:16:10: warning: [-Wdeferred-type-errors (in -Wdefault)]
 
 T11254.hs:18:12: warning: [-Wdeferred-type-errors (in -Wdefault)]
     • Couldn't match type ‘GHC.Real.Ratio Integer’ with ‘Int’
-      Expected type: Rational -> Frac Rational
-        Actual type: Rational -> Rational
+      Expected: Rational -> Frac Rational
+        Actual: Rational -> Rational
     • When checking that instance signature for ‘embed’
         is more general than its signature in the class
         Instance sig: Rational -> Rational

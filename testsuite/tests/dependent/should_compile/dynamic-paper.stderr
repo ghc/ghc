@@ -12,4 +12,4 @@ Simplifier ticks exhausted
   simplifier non-termination has been judged acceptable.
    
   To see detailed counts use -ddump-simpl-stats
-  Total ticks: 138082
+  Total ticks: 136724
