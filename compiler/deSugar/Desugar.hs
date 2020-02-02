@@ -10,6 +10,8 @@ The Desugarer: turning HsSyn into Core.
 {-# LANGUAGE TypeFamilies #-}
 {-# LANGUAGE ViewPatterns #-}
 
+{-# OPTIONS_GHC -Wno-incomplete-uni-patterns #-}
+
 module Desugar (
     -- * Desugaring operations
     deSugar, deSugarExpr
