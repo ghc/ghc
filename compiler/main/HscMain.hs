@@ -800,10 +800,45 @@ finish summary tc_result mb_old_hash = do
   let dflags = hsc_dflags hsc_env
       target = hscTarget dflags
       hsc_src = ms_hsc_src summary
-      should_desugar =
-        ms_mod summary /= gHC_PRIM && hsc_src == HsSrcFile
-      mk_simple_iface :: Hsc HscStatus
-      mk_simple_iface = do
+
+  -- Desugar, if appropriate
+  --
+  -- We usually desugar even when we are not generating code, otherwise we
+  -- would miss errors thrown by the desugaring (see #10600). The only
+  -- exceptions are when the Module is Ghc.Prim or when it is not a
+  -- HsSrcFile Module.
+  mb_desugar <-
+      if ms_mod summary /= gHC_PRIM && hsc_src == HsSrcFile
+      then Just <$> hscDesugar' (ms_location summary) tc_result
+      else pure Nothing
+
+  -- Simplify, if appropriate, and (whether we simplified or not) generate an
+  -- interface file.
+  case mb_desugar of
+      -- Just cause we desugared doesn't mean we are generating code, see above.
+      Just desugared_guts | target /= HscNothing -> do
+          plugins <- liftIO $ readIORef (tcg_th_coreplugins tc_result)
+          simplified_guts <- hscSimplify' plugins desugared_guts
+
+          (cg_guts, details) <- {-# SCC "CoreTidy" #-}
+              liftIO $ tidyProgram hsc_env simplified_guts
+
+          let !partial_iface =
+                {-# SCC "HscMain.mkPartialIface" #-}
+                -- This `force` saves 2M residency in test T10370
+                -- See Note [Avoiding space leaks in toIface*] for details.
+                force (mkPartialIface hsc_env details simplified_guts)
+
+          return HscRecomp { hscs_guts = cg_guts,
+                             hscs_mod_location = ms_location summary,
+                             hscs_mod_details = details,
+                             hscs_partial_iface = partial_iface,
+                             hscs_old_iface_hash = mb_old_hash,
+                             hscs_iface_dflags = dflags }
+
+      -- We are not generating code, so we can skip simplification
+      -- and generate a simple interface.
+      _ -> do
         (iface, mb_old_iface_hash, details) <- liftIO $
           hscSimpleIface hsc_env tc_result mb_old_hash
 
@@ -814,39 +849,6 @@ finish summary tc_result mb_old_hash = do
           (_, HsBootFile) -> HscUpdateBoot iface details
           (_, HsigFile) -> HscUpdateSig iface details
           _ -> panic "finish"
-
-  if should_desugar
-    then do
-      -- We usually desugar even when we are not generating code, otherwise we
-      -- would miss errors thrown by the desugaring (see #10600). The only
-      -- exceptions are when the Module is Ghc.Prim or when it is not a
-      -- HsSrcFile Module.
-      desugared_guts0 <- hscDesugar' (ms_location summary) tc_result
-      if target == HscNothing
-        -- We are not generating code, so we can skip simplification
-        -- and generate a simple interface.
-        then mk_simple_iface
-        else do
-          plugins <- liftIO $ readIORef (tcg_th_coreplugins tc_result)
-          desugared_guts <- hscSimplify' plugins desugared_guts0
-
-          (cg_guts, details) <- {-# SCC "CoreTidy" #-}
-              liftIO $ tidyProgram hsc_env desugared_guts
-
-          let !partial_iface =
-                {-# SCC "HscMain.mkPartialIface" #-}
-                -- This `force` saves 2M residency in test T10370
-                -- See Note [Avoiding space leaks in toIface*] for details.
-                force (mkPartialIface hsc_env details desugared_guts)
-
-          return HscRecomp { hscs_guts = cg_guts,
-                             hscs_mod_location = ms_location summary,
-                             hscs_mod_details = details,
-                             hscs_partial_iface = partial_iface,
-                             hscs_old_iface_hash = mb_old_hash,
-                             hscs_iface_dflags = dflags }
-    else mk_simple_iface
-
 
 {-
 Note [Writing interface files]
