@@ -78,3 +78,4 @@ test('T14394', normal, ghci_script, ['T14394.script'])
 test('T14498', normal, compile, [''])
 test('T16682', [extra_files(['T16682.hs', 'T16682a.hs'])],
                multimod_compile, ['T16682', '-v0 -fwarn-incomplete-patterns -fno-code'])
+test('T17775-singleton', normal, compile, [''])

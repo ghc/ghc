@@ -17,13 +17,13 @@ T5380.hs:7:27: error:
 
 T5380.hs:7:34: error:
     • Couldn't match type ‘not_unit’ with ‘()’
+      Expected: () -> not_unit
+        Actual: () -> ()
       ‘not_unit’ is a rigid type variable bound by
         the type signature for:
           testB :: forall not_bool not_unit.
                    not_bool -> (() -> ()) -> () -> not_unit
         at T5380.hs:6:1-49
-      Expected type: () -> not_unit
-        Actual type: () -> ()
     • In the expression: f
       In the command: f -< ()
       In the expression: proc () -> if b then f -< () else f -< ()

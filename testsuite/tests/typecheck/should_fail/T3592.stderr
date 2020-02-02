@@ -1,12 +1,14 @@
 
 T3592.hs:8:5: error:
-    • No instance for (Show a) arising from a use of ‘show’
-      Possible fix:
-        add (Show a) to the context of
-          the type signature for:
-            f :: forall a. T a -> String
+    • Couldn't match type ‘a0’ with ‘T a’
+      Expected: T a -> String
+        Actual: a0 -> String
+      Cannot instantiate unification variable ‘a0’
+      with a type involving polytypes: T a
     • In the expression: show
       In an equation for ‘f’: f = show
+    • Relevant bindings include
+        f :: T a -> String (bound at T3592.hs:8:1)
 
 T3592.hs:11:7: error:
     • No instance for (Show a) arising from a use of ‘show’

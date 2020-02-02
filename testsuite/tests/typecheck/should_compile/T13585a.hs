@@ -1,4 +1,4 @@
-{-# LANGUAGE KindSignatures, RankNTypes, TypeFamilies, MultiParamTypeClasses, FlexibleInstances,UndecidableInstances #-}
+{-# LANGUAGE ScopedTypeVariables, KindSignatures, RankNTypes, TypeFamilies, MultiParamTypeClasses, FlexibleInstances,UndecidableInstances #-}
 
 module T13585a where
 
@@ -78,5 +78,6 @@ au k = withIso k $ \ sa bt f -> fmap sa (f bt)
 {-# INLINE au #-}
 
 ala :: (Functor f, Rewrapping s t) => (Unwrapped s -> s) -> ((Unwrapped t -> t) -> f s) -> f (Unwrapped s)
-ala = au . _Wrapping
+ala = au . (\x -> _Wrapping x)
+  -- Simple subsumption (#17775) requires eta expansion here
 {-# INLINE ala #-}

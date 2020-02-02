@@ -1,7 +1,7 @@
 
 readFail003.hs:4:27: error:
-    • Occurs check: cannot construct the infinite type:
-        a ~ (a, [a1], [a2])
+    • Couldn't match expected type ‘(a, [a1], [a2])’
+                  with actual type ‘a’
     • In the expression: a
       In a pattern binding:
         ~(a, b, c)
