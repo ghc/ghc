@@ -1,39 +1,41 @@
 
 T17380.hs:9:7: error:
-    • Couldn't match expected type ‘Solo (Maybe String)’
-                  with actual type ‘Maybe [Char]’
+    • Couldn't match expected type: Solo (Maybe String)
+                  with actual type: Maybe String
     • In the expression: Just "wat"
       In an equation for ‘foo’: foo = Just "wat"
 
 T17380.hs:12:8: error:
-    • Couldn't match expected type ‘Maybe String’
-                  with actual type ‘Solo (Maybe [Char])’
+    • Couldn't match expected type: Maybe String
+                  with actual type: Solo (Maybe String)
     • In the expression: Solo Just "wat"
       In an equation for ‘bar’: bar = (Solo Just "wat")
 
 T17380.hs:15:6: error:
-    • Couldn't match expected type ‘Solo (Maybe String)’
-                  with actual type ‘Maybe [Char]’
+    • Couldn't match expected type: Solo (Maybe String)
+                  with actual type: Maybe String
     • In the pattern: Just "wat"
       In an equation for ‘baz’: baz (Just "wat") = Just "frerf"
 
 T17380.hs:18:7: error:
-    • Couldn't match expected type ‘Maybe String’
-                  with actual type ‘Solo (Maybe [Char])’
+    • Couldn't match expected type: Maybe String
+                  with actual type: Solo (Maybe String)
     • In the pattern: Solo(Just "wat")
       In an equation for ‘quux’: quux (Solo(Just "wat")) = Just "frerf"
 
 T17380.hs:21:8: error:
-    • Couldn't match type ‘Maybe String’ with ‘'Solo (Maybe String)’
-      Expected type: Proxy ('Solo (Maybe String))
-        Actual type: Proxy (Maybe String)
+    • Couldn't match type: Maybe String
+                     with: 'Solo (Maybe String)
+      Expected: Proxy ('Solo (Maybe String))
+        Actual: Proxy (Maybe String)
     • In the expression: Proxy :: Proxy (Maybe String)
       In an equation for ‘quuz’: quuz = Proxy :: Proxy (Maybe String)
 
 T17380.hs:24:8: error:
-    • Couldn't match type ‘'Solo (Maybe String)’ with ‘Maybe String’
-      Expected type: Proxy (Maybe String)
-        Actual type: Proxy ('Solo (Maybe String))
+    • Couldn't match type: 'Solo (Maybe String)
+                     with: Maybe String
+      Expected: Proxy (Maybe String)
+        Actual: Proxy ('Solo (Maybe String))
     • In the expression: Proxy :: Proxy ('Solo Maybe String)
       In an equation for ‘fred’:
           fred = Proxy :: Proxy ('Solo Maybe String)

@@ -738,8 +738,9 @@ ppr_monobind (AbsBinds { abs_tvs = tyvars, abs_ev_vars = dictvars
   = sdocOption sdocPrintTypecheckerElaboration $ \case
       False -> pprLHsBinds val_binds
       True  -> -- Show extra information (bug number: #10662)
-               hang (text "AbsBinds" <+> brackets (interpp'SP tyvars)
-                                             <+> brackets (interpp'SP dictvars))
+               hang (text "AbsBinds"
+                     <+> sep [ brackets (interpp'SP tyvars)
+                             , brackets (interpp'SP dictvars) ])
                   2 $ braces $ vcat
                [ text "Exports:" <+>
                    brackets (sep (punctuate comma (map ppr exports)))
@@ -751,7 +752,7 @@ ppr_monobind (AbsBinds { abs_tvs = tyvars, abs_ev_vars = dictvars
 
 instance OutputableBndrId p => Outputable (ABExport (GhcPass p)) where
   ppr (ABE { abe_wrap = wrap, abe_poly = gbl, abe_mono = lcl, abe_prags = prags })
-    = vcat [ ppr gbl <+> text "<=" <+> ppr lcl
+    = vcat [ sep [ ppr gbl, nest 2 (text "<=" <+> ppr lcl) ]
            , nest 2 (pprTcSpecPrags prags)
            , pprIfTc @p $ nest 2 (text "wrap:" <+> ppr wrap) ]
 

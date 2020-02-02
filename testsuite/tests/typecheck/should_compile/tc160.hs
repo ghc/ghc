@@ -7,8 +7,8 @@ module ShouldCompile where
 type Foo x = forall a. a -> x
 
 foo :: Foo (Foo ())
--- foo :: forall a b. a -> b -> ()
+-- foo :: forall a. a -> forall b. b -> ()
 --  NOT   forall a. a -> a -> ()
-foo =  undefined
+foo x = undefined
 
 baz = foo 'c' True
