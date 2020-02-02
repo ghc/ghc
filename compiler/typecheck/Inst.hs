@@ -13,8 +13,8 @@ The @Inst@ type: dictionaries or method instances
 {-# OPTIONS_GHC -Wno-incomplete-record-updates #-}
 
 module Inst (
-       deeplySkolemise,
-       topInstantiate, topInstantiateInferred, deeplyInstantiate,
+       topSkolemise,
+       topInstantiate, topInstantiateInferred,
        instCall, instDFunType, instStupidTheta, instTyVarsWith,
        newWanted, newWanteds,
 
@@ -37,11 +37,10 @@ module Inst (
 
 import GhcPrelude
 
-import {-# SOURCE #-}   TcExpr( tcPolyExpr, tcSyntaxOp )
+import {-# SOURCE #-}   TcExpr( tcCheckPolyExpr, tcSyntaxOp )
 import {-# SOURCE #-}   TcUnify( unifyType, unifyKind )
 
 import BasicTypes ( IntegralLit(..), SourceText(..) )
-import FastString
 import GHC.Hs
 import TcHsSyn
 import TcRnMonad
@@ -146,33 +145,34 @@ ToDo: this eta-abstraction plays fast and loose with termination,
       fix this
 -}
 
-deeplySkolemise :: TcSigmaType
-                -> TcM ( HsWrapper
-                       , [(Name,TyVar)]     -- All skolemised variables
-                       , [EvVar]            -- All "given"s
-                       , TcRhoType )
+topSkolemise :: TcSigmaType
+             -> TcM ( HsWrapper
+                    , [(Name,TyVar)]     -- All skolemised variables
+                    , [EvVar]            -- All "given"s
+                    , TcRhoType )
 
-deeplySkolemise ty
+topSkolemise ty
   = go init_subst ty
   where
     init_subst = mkEmptyTCvSubst (mkInScopeSet (tyCoVarsOfType ty))
 
     go subst ty
-      | Just (arg_tys, tvs, theta, ty') <- tcDeepSplitSigmaTy_maybe ty
-      = do { let arg_tys' = substTys subst arg_tys
-           ; ids1           <- newSysLocalIds (fsLit "dk") arg_tys'
-           ; (subst', tvs1) <- tcInstSkolTyVarsX subst tvs
+      | Just ty' <- tcView ty
+      = go subst ty'
+
+    go subst ty
+      | (tvs, theta, ty') <- tcSplitSigmaTy ty
+      , not (null tvs && null theta)
+      = do { (subst', tvs1) <- tcInstSkolTyVarsX subst tvs
            ; ev_vars1       <- newEvVars (substTheta subst' theta)
            ; (wrap, tvs_prs2, ev_vars2, rho) <- go subst' ty'
            ; let tv_prs1 = map tyVarName tvs `zip` tvs1
-           ; return ( mkWpLams ids1
-                      <.> mkWpTyLams tvs1
+           ; return ( mkWpTyLams tvs1
                       <.> mkWpLams ev_vars1
                       <.> wrap
-                      <.> mkWpEvVarApps ids1
                     , tv_prs1  ++ tvs_prs2
                     , ev_vars1 ++ ev_vars2
-                    , mkVisFunTys arg_tys' rho ) }
+                    , rho ) }
 
       | otherwise
       = return (idHsWrapper, [], [], substTy subst ty)
@@ -243,60 +243,6 @@ top_instantiate inst_all orig ty
     should_inst bndr
       | inst_all  = True
       | otherwise = binderArgFlag bndr == Inferred
-
-deeplyInstantiate :: CtOrigin -> TcSigmaType -> TcM (HsWrapper, TcRhoType)
---   Int -> forall a. a -> a  ==>  (\x:Int. [] x alpha) :: Int -> alpha
--- In general if
--- if    deeplyInstantiate ty = (wrap, rho)
--- and   e :: ty
--- then  wrap e :: rho
--- That is, wrap :: ty ~> rho
---
--- If you don't need the HsWrapper returned from this function, consider
--- using tcSplitNestedSigmaTys in TcType, which is a pure alternative that
--- only computes the returned TcRhoType.
-
-deeplyInstantiate orig ty =
-  deeply_instantiate orig
-                     (mkEmptyTCvSubst (mkInScopeSet (tyCoVarsOfType ty)))
-                     ty
-
-deeply_instantiate :: CtOrigin
-                   -> TCvSubst
-                   -> TcSigmaType -> TcM (HsWrapper, TcRhoType)
--- Internal function to deeply instantiate that builds on an existing subst.
--- It extends the input substitution and applies the final substitution to
--- the types on return.  See #12549.
-
-deeply_instantiate orig subst ty
-  | Just (arg_tys, tvs, theta, rho) <- tcDeepSplitSigmaTy_maybe ty
-  = do { (subst', tvs') <- newMetaTyVarsX subst tvs
-       ; let arg_tys' = substTys   subst' arg_tys
-             theta'   = substTheta subst' theta
-       ; ids1  <- newSysLocalIds (fsLit "di") arg_tys'
-       ; wrap1 <- instCall orig (mkTyVarTys tvs') theta'
-       ; traceTc "Instantiating (deeply)" (vcat [ text "origin" <+> pprCtOrigin orig
-                                                , text "type" <+> ppr ty
-                                                , text "with" <+> ppr tvs'
-                                                , text "args:" <+> ppr ids1
-                                                , text "theta:" <+>  ppr theta'
-                                                , text "subst:" <+> ppr subst'])
-       ; (wrap2, rho2) <- deeply_instantiate orig subst' rho
-       ; return (mkWpLams ids1
-                    <.> wrap2
-                    <.> wrap1
-                    <.> mkWpEvVarApps ids1,
-                 mkVisFunTys arg_tys' rho2) }
-
-  | otherwise
-  = do { let ty' = substTy subst ty
-       ; traceTc "deeply_instantiate final subst"
-                 (vcat [ text "origin:"   <+> pprCtOrigin orig
-                       , text "type:"     <+> ppr ty
-                       , text "new type:" <+> ppr ty'
-                       , text "subst:"    <+> ppr subst ])
-      ; return (idHsWrapper, ty') }
-
 
 instTyVarsWith :: CtOrigin -> [TyVar] -> [TcType] -> TcM TCvSubst
 -- Use this when you want to instantiate (forall a b c. ty) with
@@ -638,7 +584,7 @@ tcSyntaxName orig ty (std_nm, user_nm_expr) = do
         -- same type as the standard one.
         -- Tiresome jiggling because tcCheckSigma takes a located expression
      span <- getSrcSpanM
-     expr <- tcPolyExpr (L span user_nm_expr) sigma1
+     expr <- tcCheckPolyExpr (L span user_nm_expr) sigma1
      return (std_nm, unLoc expr)
 
 syntaxNameCtxt :: HsExpr GhcRn -> CtOrigin -> Type -> TidyEnv

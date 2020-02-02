@@ -18,7 +18,7 @@ module TcBinds ( tcLocalBinds, tcTopBinds, tcValBinds,
 import GhcPrelude
 
 import {-# SOURCE #-} TcMatches ( tcGRHSsPat, tcMatchesFun )
-import {-# SOURCE #-} TcExpr  ( tcMonoExpr )
+import {-# SOURCE #-} TcExpr  ( tcCheckMonoExpr )
 import {-# SOURCE #-} TcPatSyn ( tcPatSynDecl, tcPatSynBuilderBind )
 import CoreSyn (Tickish (..))
 import CostCentre (mkUserCC, CCFlavour(DeclCC))
@@ -349,7 +349,7 @@ tcLocalBinds (HsIPBinds x (IPBinds _ ip_binds)) thing_inside
        = do { ty <- newOpenFlexiTyVarTy
             ; let p = mkStrLitTy $ hsIPNameFS ip
             ; ip_id <- newDict ipClass [ p, ty ]
-            ; expr' <- tcMonoExpr expr (mkCheckExpType ty)
+            ; expr' <- tcCheckMonoExpr expr ty
             ; let d = toDict ipClass p ty `fmap` expr'
             ; return (ip_id, (IPBind noExtField (Right ip_id) d)) }
     tc_ip_bind _ (IPBind _ (Right {}) _) = panic "tc_ip_bind"

@@ -56,7 +56,7 @@ import GHC.Iface.Env     ( externaliseName )
 import TcHsType
 import TcValidity( checkValidType )
 import TcMatches
-import Inst( deeplyInstantiate )
+import Inst( topInstantiate )
 import TcUnify( checkConstraints )
 import GHC.Rename.Types
 import GHC.Rename.Expr
@@ -1748,11 +1748,11 @@ check_main dflags tcg_env explicit_mod_hdr
         ; res_ty <- newFlexiTyVarTy liftedTypeKind
         ; let io_ty = mkTyConApp ioTyCon [res_ty]
               skol_info = SigSkol (FunSigCtxt main_name False) io_ty []
+              main_expr_rn = L loc (HsVar noExtField (L loc main_name))
         ; (ev_binds, main_expr)
                <- checkConstraints skol_info [] [] $
                   addErrCtxt mainCtxt    $
-                  tcMonoExpr (L loc (HsVar noExtField (L loc main_name)))
-                             (mkCheckExpType io_ty)
+                  tcCheckMonoExpr main_expr_rn io_ty
 
                 -- See Note [Root-main Id]
                 -- Construct the binding
@@ -2381,7 +2381,7 @@ tcRnExpr hsc_env mode rdr_expr
              pushTcLevelM          $
              do { (_tc_expr, expr_ty) <- tcInferSigma rn_expr
                 ; if inst
-                  then snd <$> deeplyInstantiate orig expr_ty
+                  then snd <$> topInstantiate orig expr_ty
                   else return expr_ty } ;
 
     -- Generalise

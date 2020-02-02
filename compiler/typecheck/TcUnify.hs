@@ -15,8 +15,8 @@ Type subsumption and unification
 module TcUnify (
   -- Full-blown subsumption
   tcWrapResult, tcWrapResultO, tcSkolemise, tcSkolemiseET,
-  tcSubTypeHR, tcSubTypeO, tcSubType_NC, tcSubTypeDS,
-  tcSubTypeDS_NC_O, tcSubTypeET,
+  tcSubType, tcSubType_NC, tcSubTypeET, tcSubType_NC_O,
+  tcSubTypeHR, tcSubTypeO,
   checkConstraints, checkTvConstraints,
   buildImplicationFor, emitResidualTvConstraint,
 
@@ -140,34 +140,42 @@ passed in.
 -}
 
 -- Use this one when you have an "expected" type.
+-- This function skolemises at each polytype.
 matchExpectedFunTys :: forall a.
                        SDoc   -- See Note [Herald for matchExpectedFunTys]
+                    -> UserTypeCtxt
                     -> Arity
                     -> ExpRhoType  -- deeply skolemised
                     -> ([ExpSigmaType] -> ExpRhoType -> TcM a)
                           -- must fill in these ExpTypes here
-                    -> TcM (a, HsWrapper)
+                    -> TcM (HsWrapper, a)
 -- If    matchExpectedFunTys n ty = (_, wrap)
 -- then  wrap : (t1 -> ... -> tn -> ty_r) ~> ty,
 --   where [t1, ..., tn], ty_r are passed to the thing_inside
-matchExpectedFunTys herald arity orig_ty thing_inside
+matchExpectedFunTys herald ctx arity orig_ty thing_inside
   = case orig_ty of
       Check ty -> go [] arity ty
       _        -> defer [] arity orig_ty
   where
-    go acc_arg_tys 0 ty
-      = do { result <- thing_inside (reverse acc_arg_tys) (mkCheckExpType ty)
-           ; return (result, idHsWrapper) }
-
     go acc_arg_tys n ty
       | Just ty' <- tcView ty = go acc_arg_tys n ty'
 
+    go acc_arg_tys 0 ty
+      = do { result <- thing_inside (reverse acc_arg_tys) (mkCheckExpType ty)
+           ; return (idHsWrapper, result) }
+
+    go acc_arg_tys n ty
+      | (tvs, theta, _) <- tcSplitSigmaTy ty
+      , not (null tvs && null theta)
+      = do { (wrap_gen, (wrap_res, result)) <- tcSkolemise ctx ty $ \_ -> go acc_arg_tys n
+           ; return (wrap_gen <.> wrap_res, result) }
+
     go acc_arg_tys n (FunTy { ft_af = af, ft_arg = arg_ty, ft_res = res_ty })
       = ASSERT( af == VisArg )
-        do { (result, wrap_res) <- go (mkCheckExpType arg_ty : acc_arg_tys)
+        do { (wrap_res, result) <- go (mkCheckExpType arg_ty : acc_arg_tys)
                                       (n-1) res_ty
-           ; return ( result
-                    , mkWpFun idHsWrapper wrap_res arg_ty res_ty doc ) }
+           ; let fun_wrap = mkWpFun idHsWrapper wrap_res arg_ty res_ty doc
+           ; return ( fun_wrap, result ) }
       where
         doc = text "When inferring the argument type of a function with type" <+>
               quotes (ppr orig_ty)
@@ -198,7 +206,7 @@ matchExpectedFunTys herald arity orig_ty thing_inside
                           defer acc_arg_tys n (mkCheckExpType ty)
 
     ------------
-    defer :: [ExpSigmaType] -> Arity -> ExpRhoType -> TcM (a, HsWrapper)
+    defer :: [ExpSigmaType] -> Arity -> ExpRhoType -> TcM (HsWrapper, a)
     defer acc_arg_tys n fun_ty
       = do { more_arg_tys <- replicateM n newInferExpTypeNoInst
            ; res_ty       <- newInferExpTypeInst
@@ -206,9 +214,9 @@ matchExpectedFunTys herald arity orig_ty thing_inside
            ; more_arg_tys <- mapM readExpType more_arg_tys
            ; res_ty       <- readExpType res_ty
            ; let unif_fun_ty = mkVisFunTys more_arg_tys res_ty
-           ; wrap <- tcSubTypeDS AppOrigin GenSigCtxt unif_fun_ty fun_ty
+           ; wrap <- tcSubType AppOrigin GenSigCtxt unif_fun_ty fun_ty
                          -- Not a good origin at all :-(
-           ; return (result, wrap) }
+           ; return (wrap, result) }
 
     ------------
     mk_ctxt :: TidyEnv -> TcM (TidyEnv, MsgDoc)
@@ -224,6 +232,7 @@ matchExpectedFunTys herald arity orig_ty thing_inside
 
 -- Like 'matchExpectedFunTys', but used when you have an "actual" type,
 -- for example in function application
+-- This function instantiates at each poltype.
 matchActualFunTys :: SDoc   -- See Note [Herald for matchExpectedFunTys]
                   -> CtOrigin
                   -> Maybe (HsExpr GhcRn)   -- the thing with type TcSigmaType
@@ -281,15 +290,15 @@ matchActualFunTysPart herald ct_orig mb_thing arity orig_ty
     go 0 _ ty = return (idHsWrapper, [], ty)
 
     go n acc_args ty
+      | Just ty' <- tcView ty = go n acc_args ty'
+
+    go n acc_args ty
       | not (null tvs && null theta)
       = do { (wrap1, rho) <- topInstantiate ct_orig ty
            ; (wrap2, arg_tys, res_ty) <- go n acc_args rho
            ; return (wrap2 <.> wrap1, arg_tys, res_ty) }
       where
         (tvs, theta, _) = tcSplitSigmaTy ty
-
-    go n acc_args ty
-      | Just ty' <- tcView ty = go n acc_args ty'
 
     go n acc_args (FunTy { ft_af = af, ft_arg = arg_ty, ft_res = res_ty })
       = ASSERT( af == VisArg )
@@ -543,12 +552,11 @@ skolemising the type.
 -}
 
 
--- | Call this variant when you are in a higher-rank situation and
--- you know the right-hand type is deeply skolemised.
+-- | Call this variant when you are in a higher-rank situation
 tcSubTypeHR :: CtOrigin               -- ^ of the actual type
             -> Maybe (HsExpr GhcRn)   -- ^ If present, it has type ty_actual
             -> TcSigmaType -> ExpRhoType -> TcM HsWrapper
-tcSubTypeHR orig = tcSubTypeDS_NC_O orig GenSigCtxt
+tcSubTypeHR orig = tcSubType_NC_O orig GenSigCtxt
 
 ------------------------
 tcSubTypeET :: CtOrigin -> UserTypeCtxt
@@ -582,11 +590,11 @@ tcSubTypeO :: CtOrigin      -- ^ of the actual type
            -> TcM HsWrapper
 tcSubTypeO orig ctxt ty_actual ty_expected
   = addSubTypeCtxt ty_actual ty_expected $
-    do { traceTc "tcSubTypeDS_O" (vcat [ pprCtOrigin orig
-                                       , pprUserTypeCtxt ctxt
-                                       , ppr ty_actual
-                                       , ppr ty_expected ])
-       ; tcSubTypeDS_NC_O orig ctxt Nothing ty_actual ty_expected }
+    do { traceTc "tcSubTypeO" (vcat [ pprCtOrigin orig
+                                    , pprUserTypeCtxt ctxt
+                                    , ppr ty_actual
+                                    , ppr ty_expected ])
+       ; tcSubType_NC_O orig ctxt Nothing ty_actual ty_expected }
 
 addSubTypeCtxt :: TcType -> ExpType -> TcM a -> TcM a
 addSubTypeCtxt ty_actual ty_expected thing_inside
@@ -616,6 +624,12 @@ addSubTypeCtxt ty_actual ty_expected thing_inside
 -- The "_NC" variants do not add a typechecker-error context;
 -- the caller is assumed to do that
 
+tcSubType :: CtOrigin -> UserTypeCtxt -> TcSigmaType -> ExpRhoType -> TcM HsWrapper
+tcSubType orig ctxt ty_actual ty_expected
+  = addSubTypeCtxt ty_actual ty_expected $
+    do { traceTc "tcSubType" (vcat [pprUserTypeCtxt ctxt, ppr ty_actual, ppr ty_expected])
+       ; tcSubType_NC_O orig ctxt Nothing ty_actual ty_expected }
+
 tcSubType_NC :: UserTypeCtxt -> TcSigmaType -> TcSigmaType -> TcM HsWrapper
 -- Checks that actual <= expected
 -- Returns HsWrapper :: actual ~ expected
@@ -628,24 +642,14 @@ tcSubType_NC ctxt ty_actual ty_expected
                           , uo_thing    = Nothing
                           , uo_visible  = True }
 
-tcSubTypeDS :: CtOrigin -> UserTypeCtxt -> TcSigmaType -> ExpRhoType -> TcM HsWrapper
--- Just like tcSubType, but with the additional precondition that
--- ty_expected is deeply skolemised (hence "DS")
-tcSubTypeDS orig ctxt ty_actual ty_expected
-  = addSubTypeCtxt ty_actual ty_expected $
-    do { traceTc "tcSubTypeDS_NC" (vcat [pprUserTypeCtxt ctxt, ppr ty_actual, ppr ty_expected])
-       ; tcSubTypeDS_NC_O orig ctxt Nothing ty_actual ty_expected }
-
-tcSubTypeDS_NC_O :: CtOrigin   -- origin used for instantiation only
-                 -> UserTypeCtxt
-                 -> Maybe (HsExpr GhcRn)
-                 -> TcSigmaType -> ExpRhoType -> TcM HsWrapper
--- Just like tcSubType, but with the additional precondition that
--- ty_expected is deeply skolemised
-tcSubTypeDS_NC_O inst_orig ctxt m_thing ty_actual ty_expected
+tcSubType_NC_O :: CtOrigin   -- origin used for instantiation only
+               -> UserTypeCtxt
+               -> Maybe (HsExpr GhcRn)
+               -> TcSigmaType -> ExpRhoType -> TcM HsWrapper
+tcSubType_NC_O inst_orig ctxt m_thing ty_actual ty_expected
   = case ty_expected of
       Infer inf_res -> fillInferResult inst_orig ty_actual inf_res
-      Check ty      -> tc_sub_type_ds eq_orig inst_orig ctxt ty_actual ty
+      Check ty      -> tc_sub_tc_type eq_orig inst_orig ctxt ty_actual ty
          where
            eq_orig = TypeEqOrigin { uo_actual = ty_actual, uo_expected = ty
                                   , uo_thing  = ppr <$> m_thing
@@ -750,9 +754,9 @@ tc_sub_type_ds eq_orig inst_orig ctxt ty_actual ty_expected
       = do { lookup_res <- lookupTcTyVar tv_a
            ; case lookup_res of
                Filled ty_a' ->
-                 do { traceTc "tcSubTypeDS_NC_O following filled act meta-tyvar:"
+                 do { traceTc "tcSubType_NC_O following filled act meta-tyvar:"
                         (ppr tv_a <+> text "-->" <+> ppr ty_a')
-                    ; tc_sub_type_ds eq_orig inst_orig ctxt ty_a' ty_e }
+                    ; tc_sub_tc_type eq_orig inst_orig ctxt ty_a' ty_e }
                Unfilled _   -> unify }
 
     -- Historical note (Sept 16): there was a case here for
@@ -766,14 +770,12 @@ tc_sub_type_ds eq_orig inst_orig ctxt ty_actual ty_expected
     go (FunTy { ft_af = VisArg, ft_arg = act_arg, ft_res = act_res })
        (FunTy { ft_af = VisArg, ft_arg = exp_arg, ft_res = exp_res })
       = -- See Note [Co/contra-variance of subsumption checking]
-        do { res_wrap <- tc_sub_type_ds eq_orig inst_orig  ctxt       act_res exp_res
-           ; arg_wrap <- tc_sub_tc_type eq_orig given_orig GenSigCtxt exp_arg act_arg
-                         -- GenSigCtxt: See Note [Setting the argument context]
+        do { arg_wrap <- mkWpCastN <$> uType TypeLevel eq_orig exp_arg act_arg
+           ; res_wrap <- mkWpCastN <$> uType TypeLevel eq_orig act_res exp_res
            ; return (mkWpFun arg_wrap res_wrap exp_arg exp_res doc) }
                -- arg_wrap :: exp_arg ~> act_arg
                -- res_wrap :: act-res ~> exp_res
       where
-        given_orig = GivenOrigin (SigSkol GenSigCtxt exp_arg [])
         doc = text "When checking that" <+> quotes (ppr ty_actual) <+>
               text "is more polymorphic than" <+> quotes (ppr ty_expected)
 
@@ -781,7 +783,7 @@ tc_sub_type_ds eq_orig inst_orig ctxt ty_actual ty_expected
       | let (tvs, theta, _) = tcSplitSigmaTy ty_a
       , not (null tvs && null theta)
       = do { (in_wrap, in_rho) <- topInstantiate inst_orig ty_a
-           ; body_wrap <- tc_sub_type_ds
+           ; body_wrap <- tc_sub_tc_type
                             (eq_orig { uo_actual = in_rho
                                      , uo_expected = ty_expected })
                             inst_orig ctxt in_rho ty_e
@@ -796,7 +798,7 @@ tc_sub_type_ds eq_orig inst_orig ctxt ty_actual ty_expected
          --  a -> forall b. b -> b     <=   alpha beta gamma
          -- where we end up with alpha := (->)
 
-    inst_and_unify = do { (wrap, rho_a) <- deeplyInstantiate inst_orig ty_actual
+    inst_and_unify = do { (wrap, rho_a) <- topInstantiate inst_orig ty_actual
 
                            -- If we haven't recurred through an arrow, then
                            -- the eq_orig will list ty_actual. In this case,
@@ -858,8 +860,8 @@ tcWrapResultO :: CtOrigin -> HsExpr GhcRn -> HsExpr GhcTcId -> TcSigmaType -> Ex
 tcWrapResultO orig rn_expr expr actual_ty res_ty
   = do { traceTc "tcWrapResult" (vcat [ text "Actual:  " <+> ppr actual_ty
                                       , text "Expected:" <+> ppr res_ty ])
-       ; cow <- tcSubTypeDS_NC_O orig GenSigCtxt
-                                 (Just rn_expr) actual_ty res_ty
+       ; cow <- tcSubType_NC_O orig GenSigCtxt
+                               (Just rn_expr) actual_ty res_ty
        ; return (mkHsWrap cow expr) }
 
 
@@ -891,7 +893,7 @@ fillInferResult :: CtOrigin -> TcType -> InferResult -> TcM HsWrapper
 -- See Note [Deep instantiation of InferResult]
 fillInferResult orig ty inf_res@(IR { ir_inst = instantiate_me })
   | instantiate_me
-  = do { (wrap, rho) <- deeplyInstantiate orig ty
+  = do { (wrap, rho) <- topInstantiate orig ty
        ; co <- fill_infer_result rho inf_res
        ; return (mkWpCastN co <.> wrap) }
 
@@ -1129,7 +1131,7 @@ tcSkolemise ctxt expected_ty thing_inside
    -- We expect expected_ty to be a forall-type
    -- If not, the call is a no-op
   = do  { traceTc "tcSkolemise" Outputable.empty
-        ; (wrap, tv_prs, given, rho') <- deeplySkolemise expected_ty
+        ; (wrap, tv_prs, given, rho') <- topSkolemise expected_ty
 
         ; lvl <- getTcLevel
         ; when debugIsOn $
