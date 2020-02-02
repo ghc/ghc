@@ -1,0 +1,7 @@
+
+T17775.hs:15:5: error:
+    • Couldn't match type ‘Char’ with ‘Show Int => ()’
+      Expected: Int -> Show Int => ()
+        Actual: Int -> Char
+    • In the expression: g
+      In an equation for ‘f’: f = g

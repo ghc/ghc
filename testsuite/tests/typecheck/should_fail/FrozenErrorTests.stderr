@@ -1,7 +1,6 @@
 
 FrozenErrorTests.hs:26:9: error:
-    • Occurs check: cannot construct the infinite type: a ~ [a]
-        arising from a use of ‘goo1’
+    • Couldn't match type ‘a’ with ‘[a]’ arising from a use of ‘goo1’
     • In the expression: goo1 False undefined
       In an equation for ‘test1’: test1 = goo1 False undefined
     • Relevant bindings include
@@ -21,7 +20,8 @@ FrozenErrorTests.hs:30:9: error:
       In an equation for ‘test3’: test3 = goo1 False (goo2 undefined)
 
 FrozenErrorTests.hs:45:15: error:
-    • Couldn't match type ‘T2 c c’ with ‘M (T2 (T2 c c) c)’
+    • Couldn't match type: T2 c c
+                     with: M (T2 (T2 c c) c)
         arising from a use of ‘goo3’
     • In the first argument of ‘goo4’, namely ‘(goo3 False undefined)’
       In the expression: goo4 (goo3 False undefined)
@@ -30,7 +30,8 @@ FrozenErrorTests.hs:45:15: error:
         test4 :: T2 (T2 c c) c (bound at FrozenErrorTests.hs:45:1)
 
 FrozenErrorTests.hs:46:9: error:
-    • Couldn't match type ‘T2 c c’ with ‘M (T2 (T2 c c) c)’
+    • Couldn't match type: T2 c c
+                     with: M (T2 (T2 c c) c)
         arising from a use of ‘goo3’
     • In the expression: goo3 False (goo4 undefined)
       In an equation for ‘test5’: test5 = goo3 False (goo4 undefined)

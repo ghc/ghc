@@ -1,6 +1,6 @@
 
 tcfail002.hs:4:7: error:
-    • Occurs check: cannot construct the infinite type: p ~ [p]
+    • Couldn't match expected type ‘p’ with actual type ‘[p]’
     • In the expression: z
       In an equation for ‘c’: c z = z
     • Relevant bindings include

@@ -1,6 +1,7 @@
 
 T4099.hs:11:30: error:
-    • Couldn't match expected type ‘T a0’ with actual type ‘T b’
+    • Couldn't match expected type: T a0
+                  with actual type: T b
       NB: ‘T’ is a non-injective type family
       The type variable ‘a0’ is ambiguous
     • In the second argument of ‘foo’, namely ‘x’
@@ -12,7 +13,8 @@ T4099.hs:11:30: error:
         bar1 :: b -> T b -> Int (bound at T4099.hs:11:1)
 
 T4099.hs:14:30: error:
-    • Couldn't match expected type ‘T a1’ with actual type ‘Maybe b’
+    • Couldn't match expected type: T a1
+                  with actual type: Maybe b
       The type variable ‘a1’ is ambiguous
     • In the second argument of ‘foo’, namely ‘x’
       In the expression: foo (error "urk") x

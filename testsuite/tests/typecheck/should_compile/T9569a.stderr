@@ -1,0 +1,8 @@
+
+T9569a.hs:10:6: error:
+    • Couldn't match type: Int -> Int
+                     with: forall a. a -> a
+      Expected: (forall a. a -> a) -> Int
+        Actual: (Int -> Int) -> Int
+    • In the expression: g
+      In an equation for ‘f1’: f1 = g

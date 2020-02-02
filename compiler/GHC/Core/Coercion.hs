@@ -262,6 +262,7 @@ tidyCoAxBndrsForUser :: TidyEnv -> [Var] -> (TidyEnv, [Var])
 --     forall a _1 _2. F _1 [a] _2 = ...
 --
 -- This is a rather disgusting function
+-- See Note [Wildcard names] in GHC.Tc.Gen.HsType
 tidyCoAxBndrsForUser init_env tcvs
   = (tidy_env, reverse tidy_bndrs)
   where
