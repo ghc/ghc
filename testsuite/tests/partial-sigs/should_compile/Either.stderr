@@ -1,5 +1,5 @@
 TYPE SIGNATURES
-  barry :: forall _. _ -> (Either [Char] _, Either [Char] _)
+  barry :: forall {_}. _ -> (Either [Char] _, Either [Char] _)
 Dependent modules: []
 Dependent packages: [base-4.13.0.0, ghc-prim-0.6.1,
                      integer-gmp-1.0.2.0]
