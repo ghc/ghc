@@ -1,6 +1,7 @@
 -- (c) The University of Glasgow 2006
 
 {-# LANGUAGE CPP, DeriveDataTypeable #-}
+{-# LANGUAGE LambdaCase #-}
 
 module TcEvidence (
 
@@ -64,7 +65,6 @@ import TyCon
 import DataCon( DataCon, dataConWrapId )
 import Class( Class )
 import PrelNames
-import DynFlags   ( gopt, GeneralFlag(Opt_PrintTypecheckerElaboration) )
 import VarEnv
 import VarSet
 import Predicate
@@ -912,10 +912,9 @@ pprHsWrapper :: HsWrapper -> (Bool -> SDoc) -> SDoc
 -- The pp_thing_inside function takes Bool to say whether
 --    it's in a position that needs parens for a non-atomic thing
 pprHsWrapper wrap pp_thing_inside
-  = sdocWithDynFlags $ \ dflags ->
-    if gopt Opt_PrintTypecheckerElaboration dflags
-    then help pp_thing_inside wrap False
-    else pp_thing_inside False
+  = sdocOption sdocPrintTypecheckerElaboration $ \case
+      True  -> help pp_thing_inside wrap False
+      False -> pp_thing_inside False
   where
     help :: (Bool -> SDoc) -> HsWrapper -> Bool -> SDoc
     -- True  <=> appears in function application position
