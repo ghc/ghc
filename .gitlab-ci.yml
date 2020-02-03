@@ -769,6 +769,7 @@ validate-x86_64-linux-fedora27:
 
 .build-windows:
   <<: *only-default
+  # For the reasons given in #17777 this build isn't reliable.
   allow_failure: true
   before_script:
     - git clean -xdf
