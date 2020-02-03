@@ -106,9 +106,10 @@ getIfaceTopBndr bh = get bh
 putIfaceTopBndr :: BinHandle -> IfaceTopBndr -> IO ()
 putIfaceTopBndr bh name =
     case getUserData bh of
-      UserData{ ud_put_binding_name = put_binding_name } ->
+      WriteData{ ud_put_binding_name = put_binding_name } ->
           --pprTrace "putIfaceTopBndr" (ppr name) $
           put_binding_name bh name
+      _ -> panic "Binary.UserData: no put_binding_name"
 
 data IfaceDecl
   = IfaceId { ifName      :: IfaceTopBndr,

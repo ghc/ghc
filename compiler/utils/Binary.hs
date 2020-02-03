@@ -58,7 +58,7 @@ module Binary
 
    -- * User data
    UserData(..), getUserData, setUserData,
-   newReadState, newWriteState,
+   readState, writeState,
    putDictionary, getDictionary, putFS,
   ) where
 
@@ -1043,51 +1043,42 @@ lazyGet bh = do
 --   non-binding Name is serialized as the fingerprint of the thing they
 --   represent. See Note [Fingerprinting IfaceDecls] for further discussion.
 --
-data UserData =
-   UserData {
-        -- for *deserialising* only:
-        ud_get_name :: BinHandle -> IO Name,
-        ud_get_fs   :: BinHandle -> IO FastString,
-
-        -- for *serialising* only:
-        ud_put_nonbinding_name :: BinHandle -> Name -> IO (),
-        -- ^ serialize a non-binding 'Name' (e.g. a reference to another
-        -- binding).
-        ud_put_binding_name :: BinHandle -> Name -> IO (),
-        -- ^ serialize a binding 'Name' (e.g. the name of an IfaceDecl)
-        ud_put_fs   :: BinHandle -> FastString -> IO ()
-   }
-
-newReadState :: (BinHandle -> IO Name)   -- ^ how to deserialize 'Name's
-             -> (BinHandle -> IO FastString)
-             -> UserData
-newReadState get_name get_fs
-  = UserData { ud_get_name = get_name,
-               ud_get_fs   = get_fs,
-               ud_put_nonbinding_name = undef "put_nonbinding_name",
-               ud_put_binding_name    = undef "put_binding_name",
-               ud_put_fs   = undef "put_fs"
-             }
-
-newWriteState :: (BinHandle -> Name -> IO ())
-                 -- ^ how to serialize non-binding 'Name's
-              -> (BinHandle -> Name -> IO ())
-                 -- ^ how to serialize binding 'Name's
-              -> (BinHandle -> FastString -> IO ())
-              -> UserData
-newWriteState put_nonbinding_name put_binding_name put_fs
-  = UserData { ud_get_name = undef "get_name",
-               ud_get_fs   = undef "get_fs",
-               ud_put_nonbinding_name = put_nonbinding_name,
-               ud_put_binding_name    = put_binding_name,
-               ud_put_fs   = put_fs
-             }
+data UserData
+  = ReadData {
+      ud_get_name :: BinHandle -> IO Name,
+      ud_get_fs   :: BinHandle -> IO FastString
+    }
+  | WriteData {
+      ud_put_nonbinding_name :: BinHandle -> Name -> IO (),
+      -- ^ serialize a non-binding 'Name' (e.g. a reference to another
+      -- binding).
+      ud_put_binding_name :: BinHandle -> Name -> IO (),
+      -- ^ serialize a binding 'Name' (e.g. the name of an IfaceDecl)
+      ud_put_fs   :: BinHandle -> FastString -> IO ()
+    }
 
 noUserData :: a
 noUserData = undef "UserData"
 
 undef :: String -> a
 undef s = panic ("Binary.UserData: no " ++ s)
+
+writeState :: BinHandle
+           -> (BinHandle -> Name -> IO ())
+           -> (BinHandle -> Name -> IO ())
+           -> (BinHandle -> FastString -> IO ())
+           -> (BinHandle -> IO a)
+           -> IO a
+writeState bh put_nonbinding_name put_binding_name put_fs write = write $
+  setUserData bh (WriteData put_nonbinding_name put_binding_name put_fs)
+
+readState :: BinHandle
+          -> (BinHandle -> IO Name)
+          -> (BinHandle -> IO FastString)
+          -> (BinHandle -> IO a)
+          -> IO a
+readState bh get_name get_fs read = read $
+  setUserData bh (ReadData get_name get_fs)
 
 ---------------------------------------------------------
 -- The Dictionary
@@ -1149,11 +1140,13 @@ instance Binary ByteString where
 instance Binary FastString where
   put_ bh f =
     case getUserData bh of
-        UserData { ud_put_fs = put_fs } -> put_fs bh f
+        WriteData { ud_put_fs = put_fs } -> put_fs bh f
+        _ -> panic "Binary.UserData: no put_fs"
 
   get bh =
     case getUserData bh of
-        UserData { ud_get_fs = get_fs } -> get_fs bh
+        ReadData { ud_get_fs = get_fs } -> get_fs bh
+        _ -> panic "Binary.UserData: no get_fs"
 
 -- Here to avoid loop
 instance Binary LeftOrRight where

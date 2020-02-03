@@ -166,21 +166,15 @@ getWithUserData ncu bh = do
     seekBin bh data_p             -- Back to where we were before
 
     -- Initialise the user-data field of bh
-    bh <- do
-        bh <- return $ setUserData bh $ newReadState (error "getSymtabName")
-                                                     (getDictFastString dict)
-        symtab_p <- Binary.get bh     -- Get the symtab ptr
-        data_p <- tellBin bh          -- Remember where we are now
-        seekBin bh symtab_p
-        symtab <- getSymbolTable bh ncu
-        seekBin bh data_p             -- Back to where we were before
+    readState bh (error "getSymtabName") (getDictFastString dict) $ \bh -> do
+      symtab_p <- Binary.get bh     -- Get the symtab ptr
+      data_p <- tellBin bh          -- Remember where we are now
+      seekBin bh symtab_p
+      symtab <- getSymbolTable bh ncu
+      seekBin bh data_p             -- Back to where we were before
 
-        -- It is only now that we know how to get a Name
-        return $ setUserData bh $ newReadState (getSymtabName ncu dict symtab)
-                                               (getDictFastString dict)
-
-    -- Read the interface file
-    get bh
+      -- It is only now that we know how to get a Name
+      readState bh (getSymtabName ncu dict symtab) (getDictFastString dict) get
 
 -- | Write an interface file
 writeBinIface :: DynFlags -> FilePath -> ModIface -> IO ()
@@ -233,38 +227,39 @@ putWithUserData log_action bh payload = do
                        bin_dict_next = dict_next_ref,
                        bin_dict_map  = dict_map_ref }
 
-    -- Put the main thing,
-    bh <- return $ setUserData bh $ newWriteState (putName bin_dict bin_symtab)
-                                                  (putName bin_dict bin_symtab)
-                                                  (putFastString bin_dict)
-    put_ bh payload
+    writeState bh (putName bin_dict bin_symtab)
+                  (putName bin_dict bin_symtab)
+                  (putFastString bin_dict) $ \bh -> do
 
-    -- Write the symtab pointer at the front of the file
-    symtab_p <- tellBin bh        -- This is where the symtab will start
-    putAt bh symtab_p_p symtab_p  -- Fill in the placeholder
-    seekBin bh symtab_p           -- Seek back to the end of the file
+      -- Put the main thing,
+      put_ bh payload
 
-    -- Write the symbol table itself
-    symtab_next <- readFastMutInt symtab_next
-    symtab_map  <- readIORef symtab_map
-    putSymbolTable bh symtab_next symtab_map
-    log_action (text "writeBinIface:" <+> int symtab_next
-                                <+> text "Names")
+      -- Write the symtab pointer at the front of the file
+      symtab_p <- tellBin bh        -- This is where the symtab will start
+      putAt bh symtab_p_p symtab_p  -- Fill in the placeholder
+      seekBin bh symtab_p           -- Seek back to the end of the file
 
-    -- NB. write the dictionary after the symbol table, because
-    -- writing the symbol table may create more dictionary entries.
+      -- Write the symbol table itself
+      symtab_next <- readFastMutInt symtab_next
+      symtab_map  <- readIORef symtab_map
+      putSymbolTable bh symtab_next symtab_map
+      log_action (text "writeBinIface:" <+> int symtab_next
+                                  <+> text "Names")
 
-    -- Write the dictionary pointer at the front of the file
-    dict_p <- tellBin bh          -- This is where the dictionary will start
-    putAt bh dict_p_p dict_p      -- Fill in the placeholder
-    seekBin bh dict_p             -- Seek back to the end of the file
+      -- NB. write the dictionary after the symbol table, because
+      -- writing the symbol table may create more dictionary entries.
 
-    -- Write the dictionary itself
-    dict_next <- readFastMutInt dict_next_ref
-    dict_map  <- readIORef dict_map_ref
-    putDictionary bh dict_next dict_map
-    log_action (text "writeBinIface:" <+> int dict_next
-                                <+> text "dict entries")
+      -- Write the dictionary pointer at the front of the file
+      dict_p <- tellBin bh          -- This is where the dictionary will start
+      putAt bh dict_p_p dict_p      -- Fill in the placeholder
+      seekBin bh dict_p             -- Seek back to the end of the file
+
+      -- Write the dictionary itself
+      dict_next <- readFastMutInt dict_next_ref
+      dict_map  <- readIORef dict_map_ref
+      putDictionary bh dict_next dict_map
+      log_action (text "writeBinIface:" <+> int dict_next
+                                  <+> text "dict entries")
 
 
 
