@@ -42,8 +42,6 @@ import PatSyn
 import Module
 import Name
 import RdrName
-import qualified GHC.LanguageExtensions as LangExt
-import DynFlags
 
 import SrcLoc
 import FastString
@@ -606,13 +604,11 @@ pprCtOrigin (FailablePattern pat)
       text "(this will become an error in a future GHC release)"
 
 pprCtOrigin (Shouldn'tHappenOrigin note)
-  = sdocWithDynFlags $ \dflags ->
-    if xopt LangExt.ImpredicativeTypes dflags
-    then text "a situation created by impredicative types"
-    else
-    vcat [ text "<< This should not appear in error messages. If you see this"
-         , text "in an error message, please report a bug mentioning" <+> quotes (text note) <+> text "at"
-         , text "https://gitlab.haskell.org/ghc/ghc/wikis/report-a-bug >>" ]
+  = ppIfOption sdocImpredicativeTypes
+      (text "a situation created by impredicative types")
+      (vcat [ text "<< This should not appear in error messages. If you see this"
+            , text "in an error message, please report a bug mentioning" <+> quotes (text note) <+> text "at"
+            , text "https://gitlab.haskell.org/ghc/ghc/wikis/report-a-bug >>" ])
 
 pprCtOrigin (ProvCtxtOrigin PSB{ psb_id = (L _ name) })
   = hang (ctoHerald <+> text "the \"provided\" constraints claimed by")

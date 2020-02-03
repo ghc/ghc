@@ -1505,7 +1505,7 @@ genMachOp_slow opt op [x, y] = case op of
                     -- Error. Continue anyway so we can debug the generated ll file.
                     dflags <- getDynFlags
                     let style = mkCodeStyle CStyle
-                        toString doc = renderWithStyle dflags doc style
+                        toString doc = renderWithStyle (initSDocContext dflags style) doc
                         cmmToStr = (lines . toString . PprCmm.pprExpr)
                     statement $ Comment $ map fsLit $ cmmToStr x
                     statement $ Comment $ map fsLit $ cmmToStr y
