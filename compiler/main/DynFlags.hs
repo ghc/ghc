@@ -1203,7 +1203,6 @@ data DynFlags = DynFlags {
   ufUseThreshold        :: Int,
   ufFunAppDiscount      :: Int,
   ufDictDiscount        :: Int,
-  ufKeenessFactor       :: Float,
   ufDearOp              :: Int,
   ufVeryAggressive      :: Bool,
 
@@ -2088,12 +2087,11 @@ defaultDynFlags mySettings llvmConfig =
         -- into Csg.calc (The unfolding for sqr never makes it into the
         -- interface file.)
         ufCreationThreshold = 750,
-        ufUseThreshold      = 60,
+        ufUseThreshold      = 75,
         ufFunAppDiscount    = 60,
         -- Be fairly keen to inline a function if that means
         -- we'll be able to pick the right method from a dictionary
         ufDictDiscount      = 30,
-        ufKeenessFactor     = 1.5,
         ufDearOp            = 40,
         ufVeryAggressive    = False,
 
@@ -3701,8 +3699,9 @@ dynamic_flags_deps = [
       (intSuffix   (\n d -> d {ufFunAppDiscount = n}))
   , make_ord_flag defFlag "funfolding-dict-discount"
       (intSuffix   (\n d -> d {ufDictDiscount = n}))
-  , make_ord_flag defFlag "funfolding-keeness-factor"
-      (floatSuffix (\n d -> d {ufKeenessFactor = n}))
+  , make_dep_flag defFlag "funfolding-keeness-factor"
+      (floatSuffix (\_ d -> d))
+      "-funfolding-keeness-factor is no longer respected as of GHC 8.12"
   , make_ord_flag defFlag "fmax-worker-args"
       (intSuffix (\n d -> d {maxWorkerArgs = n}))
   , make_ord_flag defGhciFlag "fghci-hist-size"
