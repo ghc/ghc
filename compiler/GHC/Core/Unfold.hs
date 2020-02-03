@@ -1001,10 +1001,6 @@ ufUseThreshold
      At a call site, if the unfolding, less discounts, is smaller than
      this, then it's small enough inline
 
-ufKeenessFactor
-     Factor by which the discounts are multiplied before
-     subtracting from size
-
 ufDictDiscount
      The discount for each occurrence of a dictionary argument
      as an argument of a class method.  Should be pretty small
@@ -1021,6 +1017,22 @@ ufVeryAggressive
      If True, the compiler ignores all the thresholds and inlines very
      aggressively. It still adheres to arity, simplifier phase control and
      loop breakers.
+
+
+Historical Note: Before April 2020 we had another factor,
+ufKeenessFactor, which would scale the discounts before they were subtracted
+from the size. This was justified with the following comment:
+
+  -- We multiply the raw discounts (args_discount and result_discount)
+  -- ty opt_UnfoldingKeenessFactor because the former have to do with
+  --  *size* whereas the discounts imply that there's some extra
+  --  *efficiency* to be gained (e.g. beta reductions, case reductions)
+  -- by inlining.
+
+However, this is highly suspect since it means that we subtract a *scaled* size
+from an absolute size, resulting in crazy (e.g. negative) scores in some cases
+(#15304). We consequently killed off ufKeenessFactor and bumped up the
+ufUseThreshold to compensate.
 
 
 Note [Function applications]
@@ -1306,8 +1318,7 @@ tryUnfolding dflags id lone_variable
           extra_doc = text "discounted size =" <+> int discounted_size
           discounted_size = size - discount
           small_enough = discounted_size <= ufUseThreshold dflags
-          discount = computeDiscount dflags arg_discounts
-                                     res_discount arg_infos cont_info
+          discount = computeDiscount arg_discounts res_discount arg_infos cont_info
 
   where
     mk_doc some_benefit extra_doc yes_or_no
@@ -1552,14 +1563,9 @@ which Roman did.
 
 -}
 
-computeDiscount :: DynFlags -> [Int] -> Int -> [ArgSummary] -> CallCtxt
+computeDiscount :: [Int] -> Int -> [ArgSummary] -> CallCtxt
                 -> Int
-computeDiscount dflags arg_discounts res_discount arg_infos cont_info
-        -- We multiple the raw discounts (args_discount and result_discount)
-        -- ty opt_UnfoldingKeenessFactor because the former have to do with
-        --  *size* whereas the discounts imply that there's some extra
-        --  *efficiency* to be gained (e.g. beta reductions, case reductions)
-        -- by inlining.
+computeDiscount arg_discounts res_discount arg_infos cont_info
 
   = 10          -- Discount of 10 because the result replaces the call
                 -- so we count 10 for the function itself
@@ -1568,8 +1574,7 @@ computeDiscount dflags arg_discounts res_discount arg_infos cont_info
                -- Discount of 10 for each arg supplied,
                -- because the result replaces the call
 
-    + round (ufKeenessFactor dflags *
-             fromIntegral (total_arg_discount + res_discount'))
+    + total_arg_discount + res_discount'
   where
     actual_arg_discounts = zipWith mk_arg_discount arg_discounts arg_infos
     total_arg_discount   = sum actual_arg_discounts
