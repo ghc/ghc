@@ -1,5 +1,5 @@
 TYPE SIGNATURES
-  showTwo :: forall a. Show a => a -> String
+  showTwo :: forall {a}. Show a => a -> String
 Dependent modules: []
 Dependent packages: [base-4.13.0.0, ghc-prim-0.6.1,
                      integer-gmp-1.0.2.0]

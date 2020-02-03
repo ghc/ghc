@@ -3,10 +3,10 @@ tcfail080.hs:27:1: error:
     • Could not deduce (Collection c0 a)
       from the context: Collection c a
         bound by the inferred type for ‘q’:
-                   forall (c :: * -> *) a. Collection c a => a -> Bool
+                   forall {c :: * -> *} {a}. Collection c a => a -> Bool
         at tcfail080.hs:27:1-27
       The type variable ‘c0’ is ambiguous
     • In the ambiguity check for the inferred type for ‘q’
       To defer the ambiguity check to use sites, enable AllowAmbiguousTypes
       When checking the inferred type
-        q :: forall (c :: * -> *) a. Collection c a => a -> Bool
+        q :: forall {c :: * -> *} {a}. Collection c a => a -> Bool
