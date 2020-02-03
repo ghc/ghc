@@ -7,7 +7,7 @@ T14343.hs:10:9: error:
         test1 :: Proxy '[ 'True] (bound at T14343.hs:10:1)
       Valid hole fits include
         test1 :: Proxy '[ 'True] (defined at T14343.hs:10:1)
-        Proxy :: forall k1 (k2 :: k1). Proxy k2
+        Proxy :: forall {k1} (k2 :: k1). Proxy k2
           with Proxy @'[ 'True]
           (defined at T14343.hs:8:16)
 
@@ -19,7 +19,7 @@ T14343.hs:11:9: error:
         test2 :: Proxy '[ '[1]] (bound at T14343.hs:11:1)
       Valid hole fits include
         test2 :: Proxy '[ '[1]] (defined at T14343.hs:11:1)
-        Proxy :: forall k1 (k2 :: k1). Proxy k2
+        Proxy :: forall {k1} (k2 :: k1). Proxy k2
           with Proxy @'[ '[1]]
           (defined at T14343.hs:8:16)
 
@@ -31,6 +31,6 @@ T14343.hs:12:9: error:
         test3 :: Proxy '[ '("Symbol", 1)] (bound at T14343.hs:12:1)
       Valid hole fits include
         test3 :: Proxy '[ '("Symbol", 1)] (defined at T14343.hs:12:1)
-        Proxy :: forall k1 (k2 :: k1). Proxy k2
+        Proxy :: forall {k1} (k2 :: k1). Proxy k2
           with Proxy @'[ '("Symbol", 1)]
           (defined at T14343.hs:8:16)

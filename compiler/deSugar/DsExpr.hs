@@ -278,14 +278,15 @@ ds_expr _ (HsOverLit _ lit)
   = do { warnAboutOverflowedOverLit lit
        ; dsOverLit lit }
 
-ds_expr _ (HsWrap _ co_fn e)
+ds_expr _ hswrap@(HsWrap _ co_fn e)
   = do { e' <- ds_expr True e    -- This is the one place where we recurse to
                                  -- ds_expr (passing True), rather than dsExpr
        ; wrap' <- dsHsWrapper co_fn
        ; dflags <- getDynFlags
        ; let wrapped_e = wrap' e'
              wrapped_ty = exprType wrapped_e
-       ; checkForcedEtaExpansion e wrapped_ty -- See Note [Detecting forced eta expansion]
+       ; checkForcedEtaExpansion e (ppr hswrap) wrapped_ty -- See Note [Detecting forced eta expansion]
+         -- Pass HsWrap, so that the user can see entire expression with -fprint-typechecker-elaboration
        ; warnAboutIdentities dflags e' wrapped_ty
        ; return wrapped_e }
 
@@ -1022,14 +1023,8 @@ dsHsVar :: Bool  -- are we directly inside an HsWrap?
                  -- See Wrinkle in Note [Detecting forced eta expansion]
         -> Id -> DsM CoreExpr
 dsHsVar w var
-  | not w
-  , let bad_tys = badUseOfLevPolyPrimop var ty
-  , not (null bad_tys)
-  = do { levPolyPrimopErr var ty bad_tys
-       ; return unitExpr }  -- return something eminently safe
-
-  | otherwise
-  = return (varToCoreExpr var)   -- See Note [Desugaring vars]
+  = ASSERT2(w || null (badUseOfLevPolyPrimop var ty), ppr var $$ ppr ty)
+    return (varToCoreExpr var)   -- See Note [Desugaring vars]
 
   where
     ty = idType var
@@ -1129,30 +1124,32 @@ So, either way, we're good to reject.
 
 Wrinkle
 ~~~~~~~
-Not all polymorphic Ids are wrapped in
-HsWrap, due to the lazy instantiation of TypeApplications. (See "Visible type
-application", ESOP '16.) But if we spot a levity-polymorphic hasNoBinding Id
-without a wrapper, then that is surely problem and we can reject.
+Currently, all levity-polymorphic Ids are wrapped in HsWrap.
+
+However, this is not set in stone, in the future we might make
+instantiation more lazy.  (See "Visible type application", ESOP '16.)
+If we spot a levity-polymorphic hasNoBinding Id without a wrapper,
+then that is surely a problem.
 
 We thus have a parameter to `dsExpr` that tracks whether or not we are
 directly in an HsWrap. If we find a levity-polymorphic hasNoBinding Id when
-we're not directly in an HsWrap, reject.
-
+we're not directly in an HsWrap, we raise an assertion failure.
+This might be changed to a call to `levPolyPrimopErr` if it ever happens.
 -}
 
 -- | Takes an expression and its instantiated type. If the expression is an
 -- HsVar with a hasNoBinding primop and the type has levity-polymorphic arguments,
 -- issue an error. See Note [Detecting forced eta expansion]
-checkForcedEtaExpansion :: HsExpr GhcTc -> Type -> DsM ()
-checkForcedEtaExpansion expr ty
+checkForcedEtaExpansion :: HsExpr GhcTc -> SDoc -> Type -> DsM ()
+checkForcedEtaExpansion expr expr_doc ty
   | Just var <- case expr of
                   HsVar _ (L _ var)               -> Just var
                   HsConLikeOut _ (RealDataCon dc) -> Just (dataConWrapId dc)
                   _                               -> Nothing
   , let bad_tys = badUseOfLevPolyPrimop var ty
   , not (null bad_tys)
-  = levPolyPrimopErr var ty bad_tys
-checkForcedEtaExpansion _ _ = return ()
+  = levPolyPrimopErr expr_doc ty bad_tys
+checkForcedEtaExpansion _ _ _ = return ()
 
 -- | Is this a hasNoBinding Id with a levity-polymorphic type?
 -- Returns the arguments that are levity polymorphic if they are bad;
@@ -1168,11 +1165,17 @@ badUseOfLevPolyPrimop id ty
     (binders, _) = splitPiTys ty
     arg_tys      = mapMaybe binderRelevantType_maybe binders
 
-levPolyPrimopErr :: Id -> Type -> [Type] -> DsM ()
-levPolyPrimopErr primop ty bad_tys
+levPolyPrimopErr :: SDoc -> Type -> [Type] -> DsM ()
+levPolyPrimopErr expr_doc ty bad_tys
   = errDs $ vcat
     [ hang (text "Cannot use function with levity-polymorphic arguments:")
-         2 (ppr primop <+> dcolon <+> pprWithTYPE ty)
+         2 (expr_doc <+> dcolon <+> pprWithTYPE ty)
+    , sdocWithDynFlags $ \dflags ->
+      if not (gopt Opt_PrintTypecheckerElaboration dflags) then vcat
+        [ text "(Note that levity-polymorphic primops such as 'coerce' and unboxed tuples"
+        , text "are eta-expanded internally because they must occur fully saturated."
+        , text "Use -fprint-typechecker-elaboration to display the full expression.)"
+        ] else empty
     , hang (text "Levity-polymorphic arguments:")
          2 $ vcat $ map
            (\t -> pprWithTYPE t <+> dcolon <+> pprWithTYPE (typeKind t))
