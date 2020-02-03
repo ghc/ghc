@@ -143,35 +143,36 @@ writeHieFile hie_file_path hiefile = do
                       hie_dict_map  = dict_map_ref }
 
   -- put the main thing
-  let bh = setUserData bh0 $ newWriteState (putName hie_symtab)
-                                           (putName hie_symtab)
-                                           (putFastString hie_dict)
-  put_ bh hiefile
+  writeState bh0 (putName hie_symtab)
+                 (putName hie_symtab)
+                 (putFastString hie_dict) $ \bh -> do
 
-  -- write the symtab pointer at the front of the file
-  symtab_p <- tellBin bh
-  putAt bh symtab_p_p symtab_p
-  seekBin bh symtab_p
+    put_ bh hiefile
 
-  -- write the symbol table itself
-  symtab_next' <- readFastMutInt symtab_next
-  symtab_map'  <- readIORef symtab_map
-  putSymbolTable bh symtab_next' symtab_map'
+    -- write the symtab pointer at the front of the file
+    symtab_p <- tellBin bh
+    putAt bh symtab_p_p symtab_p
+    seekBin bh symtab_p
 
-  -- write the dictionary pointer at the front of the file
-  dict_p <- tellBin bh
-  putAt bh dict_p_p dict_p
-  seekBin bh dict_p
+    -- write the symbol table itself
+    symtab_next' <- readFastMutInt symtab_next
+    symtab_map'  <- readIORef symtab_map
+    putSymbolTable bh symtab_next' symtab_map'
 
-  -- write the dictionary itself
-  dict_next <- readFastMutInt dict_next_ref
-  dict_map  <- readIORef dict_map_ref
-  putDictionary bh dict_next dict_map
+    -- write the dictionary pointer at the front of the file
+    dict_p <- tellBin bh
+    putAt bh dict_p_p dict_p
+    seekBin bh dict_p
 
-  -- and send the result to the file
-  createDirectoryIfMissing True (takeDirectory hie_file_path)
-  writeBinMem bh hie_file_path
-  return ()
+    -- write the dictionary itself
+    dict_next <- readFastMutInt dict_next_ref
+    dict_map  <- readIORef dict_map_ref
+    putDictionary bh dict_next dict_map
+
+    -- and send the result to the file
+    createDirectoryIfMissing True (takeDirectory hie_file_path)
+    writeBinMem bh hie_file_path
+    return ()
 
 data HieFileResult
   = HieFileResult
@@ -256,19 +257,13 @@ readHieFileContents bh0 nc = do
 
   dict  <- get_dictionary bh0
 
-  -- read the symbol table so we are capable of reading the actual data
-  (bh1, nc') <- do
-      let bh1 = setUserData bh0 $ newReadState (error "getSymtabName")
-                                               (getDictFastString dict)
-      (nc', symtab) <- get_symbol_table bh1
-      let bh1' = setUserData bh1
-               $ newReadState (getSymTabName symtab)
-                              (getDictFastString dict)
-      return (bh1', nc')
+  readState bh0 (error "getSymtabName") (getDictFastString dict) $ \bh1 -> do
+    -- read the symbol table so we are capable of reading the actual data
+    (nc', symtab) <- get_symbol_table bh1
+    readState bh1 (getSymTabName symtab) (getDictFastString dict) $ \bh -> do
+      hiefile <- get bh
+      return (hiefile, nc')
 
-  -- load the actual data
-  hiefile <- get bh1
-  return (hiefile, nc')
   where
     get_dictionary bin_handle = do
       dict_p <- get bin_handle

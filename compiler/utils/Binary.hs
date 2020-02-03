@@ -58,7 +58,7 @@ module Binary
 
    -- * User data
    UserData(..), getUserData, setUserData,
-   newReadState, newWriteState,
+   readState, writeState,
    putDictionary, getDictionary, putFS,
   ) where
 
@@ -1058,30 +1058,32 @@ data UserData =
         ud_put_fs   :: BinHandle -> FastString -> IO ()
    }
 
-newReadState :: (BinHandle -> IO Name)   -- ^ how to deserialize 'Name's
-             -> (BinHandle -> IO FastString)
-             -> UserData
-newReadState get_name get_fs
-  = UserData { ud_get_name = get_name,
-               ud_get_fs   = get_fs,
-               ud_put_nonbinding_name = undef "put_nonbinding_name",
-               ud_put_binding_name    = undef "put_binding_name",
-               ud_put_fs   = undef "put_fs"
-             }
+readState :: BinHandle
+          -> (BinHandle -> IO Name)
+          -> (BinHandle -> IO FastString)
+          -> (BinHandle -> IO a)
+          -> IO a
+readState bh get_name get_fs read = read $ setUserData bh
+  UserData { ud_get_name = get_name,
+             ud_get_fs   = get_fs,
+             ud_put_nonbinding_name = undef "put_nonbinding_name",
+             ud_put_binding_name    = undef "put_binding_name",
+             ud_put_fs   = undef "put_fs"
+           }
 
-newWriteState :: (BinHandle -> Name -> IO ())
-                 -- ^ how to serialize non-binding 'Name's
-              -> (BinHandle -> Name -> IO ())
-                 -- ^ how to serialize binding 'Name's
-              -> (BinHandle -> FastString -> IO ())
-              -> UserData
-newWriteState put_nonbinding_name put_binding_name put_fs
-  = UserData { ud_get_name = undef "get_name",
-               ud_get_fs   = undef "get_fs",
-               ud_put_nonbinding_name = put_nonbinding_name,
-               ud_put_binding_name    = put_binding_name,
-               ud_put_fs   = put_fs
-             }
+writeState :: BinHandle
+           -> (BinHandle -> Name -> IO ())
+           -> (BinHandle -> Name -> IO ())
+           -> (BinHandle -> FastString -> IO ())
+           -> (BinHandle -> IO a)
+           -> IO a
+writeState bh put_nonbinding_name put_binding_name put_fs write = write $ setUserData bh
+  UserData { ud_get_name = undef "get_name",
+             ud_get_fs   = undef "get_fs",
+             ud_put_nonbinding_name = put_nonbinding_name,
+             ud_put_binding_name    = put_binding_name,
+             ud_put_fs   = put_fs
+           }
 
 noUserData :: a
 noUserData = undef "UserData"
