@@ -29,6 +29,13 @@
 #include "PosixSource.h"
 #include "ghcconfig.h"
 
+// Enable DWARF Call-Frame Information (used for stack unwinding) on Linux.
+// This is not supported on Darwin and SmartOS due to assembler differences
+// (#15207).
+#if defined(linux_HOST_OS)
+#define ENABLE_UNWINDING
+#endif
+
 #if defined(sparc_HOST_ARCH) || defined(USE_MINIINTERPRETER)
 /* include Stg.h first because we want real machine regs in here: we
  * have to get the value of R1 back from Stg land to C land intact.
@@ -405,7 +412,7 @@ StgRunIsImplementedInAssembler(void)
         "movq %%xmm15,136(%%rax)\n\t"
 #endif
 
-#if !defined(darwin_HOST_OS)
+#if defined(ENABLE_UNWINDING)
         /*
          * Let the unwinder know where we saved the registers
          * See Note [Unwinding foreign exports on x86-64].
@@ -444,7 +451,7 @@ StgRunIsImplementedInAssembler(void)
 #error "RSP_DELTA too big"
 #endif
           "\n\t"
-#endif /* !defined(darwin_HOST_OS) */
+#endif /* defined(ENABLE_UNWINDING) */
 
         /*
          * Set BaseReg
@@ -519,7 +526,7 @@ StgRunIsImplementedInAssembler(void)
           "i"(RESERVED_C_STACK_BYTES + STG_RUN_STACK_FRAME_SIZE
               /* rip relative to cfa */)
 
-#if !defined(darwin_HOST_OS)
+#if defined(ENABLE_UNWINDING)
           , "i"((RSP_DELTA & 127) | (128 * ((RSP_DELTA >> 7) > 0)))
             /* signed LEB128-encoded delta from rsp - byte 1 */
 #if (RSP_DELTA >> 7) > 0
@@ -538,7 +545,7 @@ StgRunIsImplementedInAssembler(void)
 #endif
 #undef RSP_DELTA
 
-#endif /* !defined(darwin_HOST_OS) */
+#endif /* defined(ENABLE_UNWINDING) */
 
         );
         /*
