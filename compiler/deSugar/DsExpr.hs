@@ -599,7 +599,10 @@ ds_expr _ expr@(RecordUpd { rupd_expr = record_expr, rupd_flds = fields
         -- and the right hand sides with applications of the wrapper Id
         -- so that everything works when we are doing fancy unboxing on the
         -- constructor arguments.
-        ; alts <- mapM (mk_alt upd_fld_env) cons_to_upd
+        ; let as_match_var (Var v)
+                | isInternalName (idName v) = Just v
+              as_match_var _                = Nothing
+        ; alts <- mapM (mk_alt (as_match_var record_expr') upd_fld_env) cons_to_upd
         ; ([discrim_var], matching_code)
                 <- matchWrapper RecUpd Nothing
                                       (MG { mg_alts = noLoc alts
@@ -635,7 +638,7 @@ ds_expr _ expr@(RecordUpd { rupd_expr = record_expr, rupd_flds = fields
         PatSynCon pat_syn ->
           ( patSynInstResTy pat_syn in_inst_tys
           , patSynInstResTy pat_syn out_inst_tys)
-    mk_alt upd_fld_env con
+    mk_alt mb_record_var upd_fld_env con
       = do { let (univ_tvs, ex_tvs, eq_spec,
                   prov_theta, _req_theta, arg_tys, _) = conLikeFullSig con
                  user_tvs =
@@ -698,13 +701,19 @@ ds_expr _ expr@(RecordUpd { rupd_expr = record_expr, rupd_flds = fields
 
                  req_wrap = dict_req_wrap <.> mkWpTyApps in_inst_tys
 
-                 pat = noLoc $ ConPatOut { pat_con = noLoc con
-                                         , pat_tvs = ex_tvs
-                                         , pat_dicts = eqs_vars ++ theta_vars
-                                         , pat_binds = emptyTcEvBinds
-                                         , pat_args = PrefixCon $ map nlVarPat arg_ids
-                                         , pat_arg_tys = in_inst_tys
-                                         , pat_wrap = req_wrap }
+                 con_pat = noLoc $ ConPatOut { pat_con = noLoc con
+                                             , pat_tvs = ex_tvs
+                                             , pat_dicts = eqs_vars ++ theta_vars
+                                             , pat_binds = emptyTcEvBinds
+                                             , pat_args = PrefixCon $ map nlVarPat arg_ids
+                                             , pat_arg_tys = in_inst_tys
+                                             , pat_wrap = req_wrap }
+                 -- Wrap an AsPat in case the record expr was a variable
+                 -- (as in `update r@Blah{} = r { b = True }`), for
+                 -- long distance info in -Wincomplete-record-updates checking.
+                 pat
+                   | Just v <- mb_record_var = noLoc $ AsPat noExtField (noLoc v) con_pat
+                   | otherwise               = con_pat
            ; return (mkSimpleMatch RecUpd [pat] wrapped_rhs) }
 
 -- Here is where we desugar the Template Haskell brackets and escapes
