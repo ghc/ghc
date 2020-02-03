@@ -317,7 +317,8 @@ data IfLclEnv
 -- frontend involves typechecking a program. hs-sig merges are not handled here.
 --
 -- This data type really should be in GHC.Driver.Env, but it needs
--- to have a TcGblEnv which is only defined here.
+-- to have a TcGblEnv which is only defined here. @HscFrontendStatus@ Probably
+-- would replace it in that case.
 data FrontendResult
         = FrontendTypecheck TcGblEnv
 
