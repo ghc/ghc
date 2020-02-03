@@ -6,6 +6,8 @@
 module GHC.Driver.Pipeline.Monad (
     CompPipeline(..), evalP
   , PhasePlus(..)
+  , HscPhase(..)
+  , HscFrontendStatus
   , PipeEnv(..), PipeState(..), PipelineOutput(..)
   , getPipeEnv, getPipeState, setDynFlags, setModLocation, setForeignOs, setIface
   , pipeStateDynFlags, pipeStateModIface
@@ -20,6 +22,7 @@ import GHC.Driver.Phases
 import GHC.Driver.Types
 import GHC.Unit.Module
 import GHC.SysTools.FileCleanup (TempFileLifetime)
+import GHC.Tc.Types (TcGblEnv)
 
 import Control.Monad
 
@@ -41,7 +44,14 @@ instance MonadIO CompPipeline where
     liftIO m = P $ \_env state -> do a <- m; return (state, a)
 
 data PhasePlus = RealPhase Phase
-               | HscOut HscSource ModuleName HscStatus
+               | HscOut HscSource ModuleName HscPhase
+
+-- TODO inline this into original
+type HscFrontendStatus = HscFrontendStatus' TcGblEnv
+
+data HscPhase
+ = HscPhase_FrontendOut HscFrontendStatus
+ | HscPhase_MiddleOut HscMiddleStatus
 
 instance Outputable PhasePlus where
     ppr (RealPhase p) = ppr p
