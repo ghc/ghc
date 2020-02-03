@@ -49,7 +49,7 @@ module Name (
         mkInternalName, mkClonedInternalName, mkDerivedInternalName,
         mkSystemVarName, mkSysTvName,
         mkFCallName,
-        mkExternalName, mkWiredInName, mkWiredInNameTuple,
+        mkExternalName, mkWiredInName,
 
         -- ** Manipulating and deconstructing 'Name's
         nameUnique, setNameUnique,
@@ -65,7 +65,7 @@ module Name (
         isTyVarName, isTyConName, isDataConName,
         isValName, isVarName,
         isWiredInName, isWiredIn, isBuiltInSyntax,
-        isHoleName, isWiredInTuple,
+        isHoleName,
         nameIsLocalOrFrom, nameIsHomePackage,
         nameIsHomePackageImport, nameIsFromExternalPackage,
         stableNameCmp,
@@ -86,10 +86,7 @@ module Name (
 
 import GhcPrelude
 
-import {-# SOURCE #-} TyCoRep( TyThing )
-
 import OccName
-import BasicTypes
 import Module
 import SrcLoc
 import Unique
@@ -128,7 +125,7 @@ data Name = Name {
 data NameSort
   = External Module
 
-  | WiredIn Module !(Maybe (Boxity, Int))  BuiltInSyntax
+  | WiredIn Module BuiltInSyntax
         -- A variant of External, for wired-in things
 
   | Internal            -- A user-defined Id or TyVar
@@ -138,17 +135,17 @@ data NameSort
                         -- OccName is very uninformative (like 's')
 
 instance Outputable NameSort where
-  ppr (External _)    = text "external"
-  ppr (WiredIn _ _ _) = text "wired-in"
-  ppr  Internal       = text "internal"
-  ppr  System         = text "system"
+  ppr (External {})  = text "external"
+  ppr (WiredIn {})   = text "wired-in"
+  ppr  Internal      = text "internal"
+  ppr  System        = text "system"
 
 instance NFData Name where
   rnf Name{..} = rnf n_sort
 
 instance NFData NameSort where
   rnf (External m) = rnf m
-  rnf (WiredIn m t b) = rnf m `seq` t `seq` b `seq` ()
+  rnf (WiredIn m b) = rnf m `seq` b `seq` ()
   rnf Internal = ()
   rnf System = ()
 
@@ -223,24 +220,19 @@ isExternalName    :: Name -> Bool
 isSystemName      :: Name -> Bool
 isWiredInName     :: Name -> Bool
 
-isWiredInName (Name {n_sort = WiredIn _ _ _}) = True
+isWiredInName (Name {n_sort = WiredIn {}}) = True
 isWiredInName _                               = False
 
 isWiredIn :: NamedThing thing => thing -> Bool
 isWiredIn = isWiredInName . getName
 
-isWiredInTuple :: Name -> Maybe (NameSpace, (Boxity, Arity))
-isWiredInTuple (Name {n_sort = WiredIn _ i _
-                     ,n_occ = o}) = (occNameSpace o,) <$> i
-isWiredInTuple _ = Nothing
-
 isBuiltInSyntax :: Name -> Bool
-isBuiltInSyntax (Name {n_sort = WiredIn _ _ BuiltInSyntax}) = True
+isBuiltInSyntax (Name {n_sort = WiredIn _ BuiltInSyntax}) = True
 isBuiltInSyntax _                                           = False
 
-isExternalName (Name {n_sort = External _})    = True
-isExternalName (Name {n_sort = WiredIn _ _ _}) = True
-isExternalName _                               = False
+isExternalName (Name {n_sort = External {}})  = True
+isExternalName (Name {n_sort = WiredIn {}})   = True
+isExternalName _                              = False
 
 isInternalName name = not (isExternalName name)
 
@@ -252,9 +244,9 @@ nameModule name =
   pprPanic "nameModule" (ppr (n_sort name) <+> ppr name)
 
 nameModule_maybe :: Name -> Maybe Module
-nameModule_maybe (Name { n_sort = External mod})    = Just mod
-nameModule_maybe (Name { n_sort = WiredIn mod _ _}) = Just mod
-nameModule_maybe _                                  = Nothing
+nameModule_maybe (Name { n_sort = External mod})  = Just mod
+nameModule_maybe (Name { n_sort = WiredIn mod _}) = Just mod
+nameModule_maybe _                                = Nothing
 
 nameIsLocalOrFrom :: Module -> Name -> Bool
 -- ^ Returns True if the name is
@@ -287,8 +279,8 @@ nameIsHomePackage :: Module -> Name -> Bool
 -- True if the Name is defined in module of this package
 nameIsHomePackage this_mod
   = \nm -> case n_sort nm of
-              External nm_mod    -> moduleUnitId nm_mod == this_pkg
-              WiredIn nm_mod _ _ -> moduleUnitId nm_mod == this_pkg
+              External nm_mod  -> moduleUnitId nm_mod == this_pkg
+              WiredIn nm_mod _ -> moduleUnitId nm_mod == this_pkg
               Internal -> True
               System   -> False
   where
@@ -378,18 +370,11 @@ mkExternalName uniq mod occ loc
            n_occ = occ, n_loc = loc }
 
 -- | Create a name which is actually defined by the compiler itself
-mkWiredInName :: HasCallStack => Module -> OccName -> Unique -> TyThing -> BuiltInSyntax -> Name
-mkWiredInName mod occ uniq _t built_in
+mkWiredInName :: HasCallStack => Module -> OccName -> Unique -> BuiltInSyntax -> Name
+mkWiredInName mod occ uniq built_in
   = Name { n_uniq = uniq,
-         n_sort = WiredIn mod Nothing built_in,
+         n_sort = WiredIn mod built_in,
          n_occ = occ, n_loc = wiredInSrcSpan }
-
-mkWiredInNameTuple :: Boxity -> Arity -> Module -> OccName -> Unique -> Name
-mkWiredInNameTuple boxity arity mod occ uniq
-  = Name { n_uniq = uniq,
-           n_sort = WiredIn mod (Just (boxity, arity)) BuiltInSyntax,
-           n_occ = occ, n_loc = wiredInSrcSpan }
-
 
 -- | Create a name brought into being by the compiler
 mkSystemName :: Unique -> OccName -> Name
@@ -456,7 +441,7 @@ stableNameCmp (Name { n_sort = s1, n_occ = occ1 })
     sort_cmp (External m1) (External m2)       = m1 `stableModuleCmp` m2
     sort_cmp (External {}) _                   = LT
     sort_cmp (WiredIn {}) (External {})        = GT
-    sort_cmp (WiredIn m1 _ _) (WiredIn m2 _ _) = m1 `stableModuleCmp` m2
+    sort_cmp (WiredIn m1 _) (WiredIn m2 _)     = m1 `stableModuleCmp` m2
     sort_cmp (WiredIn {})     _                = LT
     sort_cmp Internal         (External {})    = GT
     sort_cmp Internal         (WiredIn {})     = GT
@@ -545,10 +530,10 @@ pprName :: Name -> SDoc
 pprName (Name {n_sort = sort, n_uniq = uniq, n_occ = occ})
   = getPprStyle $ \ sty ->
     case sort of
-      WiredIn mod _ builtin   -> pprExternal sty uniq mod occ True  builtin
-      External mod            -> pprExternal sty uniq mod occ False UserSyntax
-      System                  -> pprSystem sty uniq occ
-      Internal                -> pprInternal sty uniq occ
+      WiredIn mod builtin   -> pprExternal sty uniq mod occ True  builtin
+      External mod          -> pprExternal sty uniq mod occ False UserSyntax
+      System                -> pprSystem sty uniq occ
+      Internal              -> pprInternal sty uniq occ
 
 -- | Print the string of Name unqualifiedly directly.
 pprNameUnqualified :: Name -> SDoc
@@ -671,7 +656,7 @@ nameSortStableString :: NameSort -> String
 nameSortStableString System = "$_sys"
 nameSortStableString Internal = "$_in"
 nameSortStableString (External mod) = moduleStableString mod
-nameSortStableString (WiredIn mod _ _) = moduleStableString mod
+nameSortStableString (WiredIn mod _) = moduleStableString mod
 
 {-
 ************************************************************************

@@ -692,7 +692,7 @@ gen_primop_vector_tys (Info _ entries)
     mkVecTypes :: Entry -> [String]
     mkVecTypes i =
         [ name_id ++ " :: Name"
-        , name_id ++ " = mkPrimTc (fsLit \"" ++ pprTy (ty i) ++ "\") " ++ key_id ++ " " ++ tycon_id
+        , name_id ++ " = mkPrimTc (fsLit \"" ++ pprTy (ty i) ++ "\") " ++ key_id
         , ty_id ++ " :: Type"
         , ty_id ++ " = mkTyConTy " ++ tycon_id
         , tycon_id ++ " :: TyCon"
