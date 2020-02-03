@@ -27,3 +27,4 @@ instance (Eq1 f) => Eq1 (G f) where
 
 foo :: G F Int -> G F Int -> Bool
 foo a b = eq1 a b
+{-# NOINLINE foo #-}
