@@ -3168,7 +3168,7 @@ tcHsPartialSigType
   -> LHsSigWcType GhcRn       -- The type signature
   -> TcM ( [(Name, TcTyVar)]  -- Wildcards
          , Maybe TcType       -- Extra-constraints wildcard
-         , [(Name,TcTyVar)]   -- Original tyvar names, in correspondence with
+         , [(Name,InvisTVBinder)] -- Original tyvar names, in correspondence with
                               --   the implicitly and explicitly bound type variables
          , TcThetaType        -- Theta part
          , TcType )           -- Tau part
@@ -3195,11 +3195,11 @@ tcHsPartialSigType ctxt sig_ty
 
                   ; return (wcs, wcx, theta, tau) }
 
-       ; let explicit_tvs = binderVars explicit_tvbndrs
+       ; let implicit_tvbndrs = map (mkTyVarBinder SpecifiedSpec) implicit_tvs
 
          -- No kind-generalization here:
-       ; kindGeneralizeNone (mkSpecForAllTys implicit_tvs $
-                             mkSpecForAllTys explicit_tvs $
+       ; kindGeneralizeNone (mkInvisForAllTys implicit_tvbndrs $
+                             mkInvisForAllTys explicit_tvbndrs $
                              mkPhiTy theta $
                              tau)
 
@@ -3208,11 +3208,11 @@ tcHsPartialSigType ctxt sig_ty
        -- See Note [Extra-constraint holes in partial type signatures]
        ; emitNamedWildCardHoleConstraints wcs
 
-         -- We return a proper (Name,TyVar) environment, to be sure that
+         -- We return a proper (Name,InvisTVBinder) environment, to be sure that
          -- we bring the right name into scope in the function body.
          -- Test case: partial-sigs/should_compile/LocalDefinitionBug
-       ; let tv_prs = (implicit_hs_tvs                  `zip` implicit_tvs)
-                      ++ (hsLTyVarNames explicit_hs_tvs `zip` explicit_tvs)
+       ; let tv_prs = (implicit_hs_tvs                  `zip` implicit_tvbndrs)
+                      ++ (hsLTyVarNames explicit_hs_tvs `zip` explicit_tvbndrs)
 
       -- NB: checkValidType on the final inferred type will be
       --     done later by checkInferredPolyId.  We can't do it

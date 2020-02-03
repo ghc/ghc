@@ -483,7 +483,7 @@ tcInstSig :: TcIdSigInfo -> TcM TcIdSigInst
 -- Instantiate a type signature; only used with plan InferGen
 tcInstSig sig@(CompleteSig { sig_bndr = poly_id, sig_loc = loc })
   = setSrcSpan loc $  -- Set the binding site of the tyvars
-    do { (tv_prs, theta, tau) <- tcInstType newMetaTyVarTyVars poly_id
+    do { (tv_prs, theta, tau) <- tcInstTypeBndrs newMetaTyVarTyVars poly_id
               -- See Note [Pattern bindings and complete signatures]
 
        ; return (TISI { sig_inst_sig   = sig
