@@ -208,7 +208,7 @@ import DataCon
 import FastString (FastString, mkFastString)
 import Id
 import Literal
-import MkCore (aBSENT_SUM_FIELD_ERROR_ID)
+--import MkCore (aBSENT_SUM_FIELD_ERROR_ID)
 import MkId (voidPrimId, voidArgId)
 import MonadUtils (mapAccumLM)
 import Outputable
@@ -580,7 +580,8 @@ mkUbxSum dc ty_args args0
         = slotRubbishArg slot : mkTupArgs (arg_idx + 1) slots_left arg_map
 
       slotRubbishArg :: SlotTy -> StgArg
-      slotRubbishArg PtrSlot    = StgVarArg aBSENT_SUM_FIELD_ERROR_ID
+      slotRubbishArg PtrSlot    = StgLitArg LitRubbish
+      --slotRubbishArg PtrSlot    = StgVarArg aBSENT_SUM_FIELD_ERROR_ID
                          -- See Note [aBSENT_SUM_FIELD_ERROR_ID] in MkCore
       slotRubbishArg WordSlot   = StgLitArg (LitNumber LitNumWord 0)
       slotRubbishArg Word64Slot = StgLitArg (LitNumber LitNumWord64 0)
