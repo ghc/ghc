@@ -601,7 +601,7 @@ ds_expr _ expr@(RecordUpd { rupd_expr = record_expr, rupd_flds = fields
         -- constructor arguments.
         ; alts <- mapM (mk_alt upd_fld_env) cons_to_upd
         ; ([discrim_var], matching_code)
-                <- matchWrapper RecUpd Nothing
+                <- matchWrapper RecUpd (Just record_expr) -- See Note [Scrutinee in Record updates]
                                       (MG { mg_alts = noLoc alts
                                           , mg_ext = MatchGroupTc [in_ty] out_ty
                                           , mg_origin = FromSource })
@@ -706,6 +706,24 @@ ds_expr _ expr@(RecordUpd { rupd_expr = record_expr, rupd_flds = fields
                                          , pat_arg_tys = in_inst_tys
                                          , pat_wrap = req_wrap }
            ; return (mkSimpleMatch RecUpd [pat] wrapped_rhs) }
+
+{- Note [Scrutinee in Record updates]
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+Consider #17783:
+
+  data PartialRec = No
+                  | Yes { a :: Int, b :: Bool }
+  update No = No
+  update r@(Yes {}) = r { b = False }
+
+In the context of pattern-match checking, the occurrence of @r@ in
+@r { b = False }@ is to be treated as if it was a scrutinee, as can be seen by
+the following desugaring:
+
+  r { b = False } ==> case r of Yes a b -> Yes a False
+
+Thus, we pass @r@ as the scrutinee expression to @matchWrapper@ above.
+-}
 
 -- Here is where we desugar the Template Haskell brackets and escapes
 
