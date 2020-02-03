@@ -6,7 +6,7 @@ Collecting type info for 3 module(s) ...
 %        ^~~~~~^
 > 
 % output:
-undefined :: forall a. a
+undefined :: forall {a}. a
 
 % executing: ":uses T16804a.hs  1  8  1 14"
 % file snippet:
@@ -22,7 +22,7 @@ undefined :: forall a. a
 %        ^~~^
 > 
 % output:
-undefined :: forall a. a
+undefined :: forall {a}. a
 
 % executing: ":type-at T16804a.hs  3  8  3 18 undefined"
 % file snippet:
@@ -31,7 +31,7 @@ undefined :: forall a. a
 %        ^~~~~~~~~~^
 > 
 % output:
-undefined :: forall a. a
+undefined :: forall {a}. a
 
 % executing: ":type-at T16804a.hs  3 13  3 18 undefined"
 % file snippet:
@@ -40,7 +40,7 @@ undefined :: forall a. a
 %             ^~~~~^
 > 
 % output:
-undefined :: forall a. a
+undefined :: forall {a}. a
 
 % executing: ":uses T16804a.hs  3  8  3 11"
 % file snippet:
@@ -73,7 +73,7 @@ undefined :: forall a. a
 %      ^~~^
 >   deriving (Show)
 % output:
-undefined :: forall a. a
+undefined :: forall {a}. a
 
 % executing: ":type-at T16804a.hs  5 13  5 13 undefined"
 % file snippet:
@@ -82,7 +82,7 @@ undefined :: forall a. a
 %             ^
 >   deriving (Show)
 % output:
-undefined :: forall a. a
+undefined :: forall {a}. a
 
 % executing: ":type-at T16804a.hs  5 15  5 15 undefined"
 % file snippet:
@@ -91,7 +91,7 @@ undefined :: forall a. a
 %               ^
 >   deriving (Show)
 % output:
-undefined :: forall a. a
+undefined :: forall {a}. a
 
 % executing: ":type-at T16804a.hs  5 17  5 17 undefined"
 % file snippet:
@@ -100,7 +100,7 @@ undefined :: forall a. a
 %                 ^
 >   deriving (Show)
 % output:
-undefined :: forall a. a
+undefined :: forall {a}. a
 
 % executing: ":type-at T16804a.hs  6 13  6 16 undefined"
 % file snippet:
@@ -160,7 +160,7 @@ T16804a.hs:(6,13)-(6,16)
 %          ^~~~~^
 >   mempty = A
 % output:
-undefined :: forall a. a
+undefined :: forall {a}. a
 
 % executing: ":type-at T16804a.hs  7 17  7 20 undefined"
 % file snippet:
@@ -169,7 +169,7 @@ undefined :: forall a. a
 %                 ^~~^
 >   mempty = A
 % output:
-undefined :: forall a. a
+undefined :: forall {a}. a
 
 % executing: ":type-at T16804a.hs  7 10  7 20 undefined"
 % file snippet:
@@ -249,7 +249,7 @@ T16804a.hs:(8,3)-(8,8)
 % ^~~~~~~~~~~^
 > testFunction A B = True
 % output:
-undefined :: forall a. a
+undefined :: forall {a}. a
 
 % executing: ":type-at T16804a.hs 13  1 13 12 undefined"
 % file snippet:
@@ -566,7 +566,7 @@ undefined :: Test
 >   B <> _   = B
 %     ^^
 % output:
-undefined :: forall a. a
+undefined :: forall {a}. a
 
 % executing: ":type-at T16804a.hs 29  8 29  8 undefined"
 % file snippet:

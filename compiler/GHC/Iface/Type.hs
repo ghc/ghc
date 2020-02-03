@@ -1102,10 +1102,7 @@ pprIfaceForAllBndr :: IfaceForAllBndr -> SDoc
 pprIfaceForAllBndr bndr =
   case bndr of
     Bndr (IfaceTvBndr tv) Inferred ->
-      sdocWithDynFlags $ \dflags ->
-        if gopt Opt_PrintExplicitForalls dflags
-        then braces $ pprIfaceTvBndr tv suppress_sig (UseBndrParens False)
-        else pprIfaceTvBndr tv suppress_sig (UseBndrParens True)
+      braces $ pprIfaceTvBndr tv suppress_sig (UseBndrParens False)
     Bndr (IfaceTvBndr tv) _ ->
       pprIfaceTvBndr tv suppress_sig (UseBndrParens True)
     Bndr (IfaceIdBndr idv) _ -> pprIfaceIdBndr idv
