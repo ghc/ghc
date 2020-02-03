@@ -167,7 +167,6 @@ test('plugin-recomp-flags',
 test('plugin-recomp-change',
      [extra_files(['plugin-recomp/', 'plugin-recomp-test.hs']),
       only_ways([config.ghc_plugin_way]),
-      when(compiler_debugged(), expect_broken_for(17308, ['dyn'])),
       pre_cmd('$MAKE -s --no-print-directory -C plugin-recomp package.plugins01 TOP={top}')
       ],
      makefile_test, [])
@@ -175,7 +174,6 @@ test('plugin-recomp-change',
 test('plugin-recomp-change-prof',
      [extra_files(['plugin-recomp/', 'plugin-recomp-test.hs']),
       only_ways([config.ghc_plugin_way]),
-      when(compiler_debugged(), expect_broken_for(17308, ['dyn'])),
       pre_cmd('$MAKE -s --no-print-directory -C plugin-recomp package.plugins01 TOP={top}'),
       when(not config.have_profiling,skip)
       ],
