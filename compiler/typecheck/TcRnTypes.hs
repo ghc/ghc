@@ -1510,7 +1510,7 @@ sig_extra_cts is Nothing.
 data TcIdSigInst
   = TISI { sig_inst_sig :: TcIdSigInfo
 
-         , sig_inst_skols :: [(Name, TcTyVar)]
+         , sig_inst_skols :: [(Name, InvisTVBinder)]
                -- Instantiated type and kind variables, TyVarTvs
                -- The Name is the Name that the renamer chose;
                --   but the TcTyVar may come from instantiating
