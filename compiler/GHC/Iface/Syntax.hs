@@ -47,7 +47,7 @@ import GhcPrelude
 import GHC.Iface.Type
 import BinFingerprint
 import CoreSyn( IsOrphan, isOrphan )
-import DynFlags( gopt, GeneralFlag (Opt_PrintAxiomIncomps) )
+import DynFlags( fromBool )
 import Demand
 import Class
 import FieldLabel
@@ -606,14 +606,13 @@ pprAxBranch pp_tc idx (IfaceAxBranch { ifaxbTyVars = tvs
 
     -- See Note [Displaying axiom incompatibilities]
     maybe_index
-      = sdocWithDynFlags $ \dflags ->
-        ppWhen (gopt Opt_PrintAxiomIncomps dflags) $
+      = ppWhenOption sdocPrintAxiomIncomps $
           text "{-" <+> (text "#" <> ppr idx) <+> text "-}"
     maybe_incomps
-      = sdocWithDynFlags $ \dflags ->
-        ppWhen (gopt Opt_PrintAxiomIncomps dflags && notNull incomps) $
-          text "--" <+> text "incompatible with:"
-          <+> pprWithCommas (\incomp -> text "#" <> ppr incomp) incomps
+      = ppWhenOption sdocPrintAxiomIncomps $
+          ppWhen (notNull incomps) $
+            text "--" <+> text "incompatible with:"
+            <+> pprWithCommas (\incomp -> text "#" <> ppr incomp) incomps
 
 instance Outputable IfaceAnnotation where
   ppr (IfaceAnnotation target value) = ppr target <+> colon <+> ppr value
@@ -959,9 +958,9 @@ pprIfaceDecl _ (IfacePatSyn { ifName = name,
                               ifPatProvCtxt = prov_ctxt, ifPatReqCtxt = req_ctxt,
                               ifPatArgs = arg_tys,
                               ifPatTy = pat_ty} )
-  = sdocWithDynFlags mk_msg
+  = sdocWithContext mk_msg
   where
-    mk_msg dflags
+    mk_msg sdocCtx
       = hang (text "pattern" <+> pprPrefixOcc name)
            2 (dcolon <+> sep [univ_msg
                              , pprIfaceContextArr req_ctxt
@@ -974,7 +973,7 @@ pprIfaceDecl _ (IfacePatSyn { ifName = name,
         ex_msg   = pprUserIfaceForAll ex_bndrs
 
         insert_empty_ctxt = null req_ctxt
-            && not (null prov_ctxt && isEmpty dflags ex_msg)
+            && not (null prov_ctxt && isEmpty sdocCtx ex_msg)
 
 pprIfaceDecl ss (IfaceId { ifName = var, ifType = ty,
                               ifIdDetails = details, ifIdInfo = info })
@@ -997,8 +996,8 @@ pprCType (Just cType) = text "C type:" <+> ppr cType
 pprRoles :: (Role -> Bool) -> SDoc -> [IfaceTyConBinder]
          -> [Role] -> SDoc
 pprRoles suppress_if tyCon bndrs roles
-  = sdocWithDynFlags $ \dflags ->
-      let froles = suppressIfaceInvisibles dflags bndrs roles
+  = sdocOption (fromBool . sdocPrintExplicitKinds) $ \printExplicitKinds ->
+      let froles = suppressIfaceInvisibles printExplicitKinds bndrs roles
       in ppUnless (all suppress_if froles || null froles) $
          text "type role" <+> tyCon <+> hsep (map ppr froles)
 
@@ -1060,11 +1059,11 @@ pprIfaceDeclHead :: SuppressBndrSig
                  -> [IfaceTyConBinder]   -- of the tycon, for invisible-suppression
                  -> SDoc
 pprIfaceDeclHead suppress_sig context ss tc_occ bndrs
-  = sdocWithDynFlags $ \ dflags ->
+  = sdocOption (fromBool . sdocPrintExplicitKinds) $ \printExplicitKinds ->
     sep [ pprIfaceContextArr context
         , pprPrefixIfDeclBndr (ss_how_much ss) (occName tc_occ)
           <+> pprIfaceTyConBinders suppress_sig
-                (suppressIfaceInvisibles dflags bndrs bndrs) ]
+                (suppressIfaceInvisibles printExplicitKinds bndrs bndrs) ]
 
 pprIfaceConDecl :: ShowSub -> Bool
                 -> IfaceTopBndr

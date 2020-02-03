@@ -1,3 +1,5 @@
+{-# LANGUAGE LambdaCase #-}
+
 {-
 (c) The University of Glasgow 2006-2012
 (c) The GRASP Project, Glasgow University, 1992-1998
@@ -34,6 +36,7 @@ module Outputable (
         sep, cat,
         fsep, fcat,
         hang, hangNotEmpty, punctuate, ppWhen, ppUnless,
+        ppIfOption, ppWhenOption, ppUnlessOption, ppCondOption,
         speakNth, speakN, speakNOf, plural, isOrAre, doOrDoes, itsOrTheir,
         unicodeSyntax,
 
@@ -68,14 +71,16 @@ module Outputable (
         neverQualify, neverQualifyNames, neverQualifyModules,
         alwaysQualifyPackages, neverQualifyPackages,
         QualifyName(..), queryQual,
-        sdocWithDynFlags, sdocWithPlatform,
+        sdocWithDynFlags, sdocWithPlatform, sdocOption,
         updSDocDynFlags,
-        getPprStyle, withPprStyle, withPprStyleDoc, setStyleColoured,
+        SDocContext (..), sdocWithContext,
+        getPprStyle, withPprStyle, setStyleColoured,
         pprDeeper, pprDeeperList, pprSetDepth,
         codeStyle, userStyle, debugStyle, dumpStyle, asmStyle,
         qualName, qualModule, qualPackage,
         mkErrStyle, defaultErrStyle, defaultDumpStyle, mkDumpStyle, defaultUserStyle,
         mkUserStyle, cmdlineParserStyle, Depth(..),
+        withUserStyle, withErrStyle,
 
         ifPprDebug, whenPprDebug, getPprDebug,
 
@@ -91,9 +96,8 @@ import GhcPrelude
 
 import {-# SOURCE #-}   DynFlags( DynFlags, hasPprDebug, hasNoDebugOutput,
                                   targetPlatform, pprUserLength, pprCols,
-                                  useUnicode, useUnicodeSyntax,
-                                  shouldUseColor, unsafeGlobalDynFlags,
-                                  shouldUseHexWordLiterals )
+                                  unsafeGlobalDynFlags,
+                                  initSDocContext)
 import {-# SOURCE #-}   Module( UnitId, Module, ModuleName, moduleName )
 import {-# SOURCE #-}   OccName( OccName )
 
@@ -281,6 +285,16 @@ mkUserStyle dflags unqual depth
    | hasPprDebug dflags = PprDebug
    | otherwise          = PprUser unqual depth Uncoloured
 
+withUserStyle :: PrintUnqualified -> Depth -> SDoc -> SDoc
+withUserStyle unqual depth doc = ppIfOption sdocPprDebug
+   (withPprStyle PprDebug doc)
+   (withPprStyle (PprUser unqual depth Uncoloured) doc)
+
+withErrStyle :: PrintUnqualified -> SDoc -> SDoc
+withErrStyle unqual doc =
+   sdocWithDynFlags $ \dflags ->
+   withPprStyle (mkErrStyle dflags unqual) doc
+
 setStyleColoured :: Bool -> PprStyle -> PprStyle
 setStyleColoured col style =
   case style of
@@ -320,10 +334,43 @@ code (either C or assembly), or generating interface files.
 newtype SDoc = SDoc { runSDoc :: SDocContext -> Doc }
 
 data SDocContext = SDC
-  { sdocStyle      :: !PprStyle
-  , sdocLastColour :: !Col.PprColour
-    -- ^ The most recently used colour.  This allows nesting colours.
-  , sdocDynFlags   :: !DynFlags
+  { sdocStyle                       :: !PprStyle
+  , sdocColScheme                   :: !Col.Scheme
+  , sdocLastColour                  :: !Col.PprColour
+      -- ^ The most recently used colour.
+      -- This allows nesting colours.
+  , sdocShouldUseColor              :: !Bool
+  , sdocLineLength                  :: !Int
+  , sdocCanUseUnicode               :: !Bool
+      -- ^ True if Unicode encoding is supported
+      -- and not disable by GHC_NO_UNICODE environment variable
+  , sdocHexWordLiterals             :: !Bool
+  , sdocDebugLevel                  :: !Int
+  , sdocPprDebug                    :: !Bool
+  , sdocPrintUnicodeSyntax          :: !Bool
+  , sdocPrintCaseAsLet              :: !Bool
+  , sdocPrintTypecheckerElaboration :: !Bool
+  , sdocPrintAxiomIncomps           :: !Bool
+  , sdocPrintExplicitKinds          :: !Bool
+  , sdocPrintExplicitCoercions      :: !Bool
+  , sdocPrintExplicitRuntimeReps    :: !Bool
+  , sdocPrintExplicitForalls        :: !Bool
+  , sdocPrintPotentialInstances     :: !Bool
+  , sdocPrintEqualityRelations      :: !Bool
+  , sdocSuppressTicks               :: !Bool
+  , sdocSuppressTypeSignatures      :: !Bool
+  , sdocSuppressTypeApplications    :: !Bool
+  , sdocSuppressIdInfo              :: !Bool
+  , sdocSuppressCoercions           :: !Bool
+  , sdocSuppressUnfoldings          :: !Bool
+  , sdocSuppressVarKinds            :: !Bool
+  , sdocSuppressUniques             :: !Bool
+  , sdocSuppressModulePrefixes      :: !Bool
+  , sdocSuppressStgExts             :: !Bool
+  , sdocErrorSpans                  :: !Bool
+  , sdocStarIsType                  :: !Bool
+  , sdocImpredicativeTypes          :: !Bool
+  , sdocDynFlags                    :: DynFlags -- TODO: remove
   }
 
 instance IsString SDoc where
@@ -333,21 +380,9 @@ instance IsString SDoc where
 instance Outputable SDoc where
   ppr = id
 
-initSDocContext :: DynFlags -> PprStyle -> SDocContext
-initSDocContext dflags sty = SDC
-  { sdocStyle = sty
-  , sdocLastColour = Col.colReset
-  , sdocDynFlags = dflags
-  }
 
 withPprStyle :: PprStyle -> SDoc -> SDoc
 withPprStyle sty d = SDoc $ \ctxt -> runSDoc d ctxt{sdocStyle=sty}
-
--- | This is not a recommended way to render 'SDoc', since it breaks the
--- abstraction layer of 'SDoc'.  Prefer to use 'printSDoc', 'printSDocLn',
--- 'bufLeftRenderSDoc', or 'renderWithStyle' instead.
-withPprStyleDoc :: DynFlags -> PprStyle -> SDoc -> Doc
-withPprStyleDoc dflags sty d = runSDoc d (initSDocContext dflags sty)
 
 pprDeeper :: SDoc -> SDoc
 pprDeeper d = SDoc $ \ctx -> case ctx of
@@ -388,6 +423,12 @@ sdocWithDynFlags f = SDoc $ \ctx -> runSDoc (f (sdocDynFlags ctx)) ctx
 
 sdocWithPlatform :: (Platform -> SDoc) -> SDoc
 sdocWithPlatform f = sdocWithDynFlags (f . targetPlatform)
+
+sdocWithContext :: (SDocContext -> SDoc) -> SDoc
+sdocWithContext f = SDoc $ \ctx -> runSDoc (f ctx) ctx
+
+sdocOption :: (SDocContext -> a) -> (a -> SDoc) -> SDoc
+sdocOption f g = sdocWithContext (g . f)
 
 updSDocDynFlags :: (DynFlags -> DynFlags) -> SDoc -> SDoc
 updSDocDynFlags upd doc
@@ -495,7 +536,7 @@ mkCodeStyle = PprCode
 -- However, Doc *is* an instance of Show
 -- showSDoc just blasts it out as a string
 showSDoc :: DynFlags -> SDoc -> String
-showSDoc dflags sdoc = renderWithStyle dflags sdoc (defaultUserStyle dflags)
+showSDoc dflags sdoc = renderWithStyle (initSDocContext dflags (defaultUserStyle dflags)) sdoc
 
 -- showSDocUnsafe is unsafe, because `unsafeGlobalDynFlags` might not be
 -- initialised yet.
@@ -512,19 +553,19 @@ showSDocUnqual dflags sdoc = showSDoc dflags sdoc
 showSDocForUser :: DynFlags -> PrintUnqualified -> SDoc -> String
 -- Allows caller to specify the PrintUnqualified to use
 showSDocForUser dflags unqual doc
- = renderWithStyle dflags doc (mkUserStyle dflags unqual AllTheWay)
+ = renderWithStyle (initSDocContext dflags (mkUserStyle dflags unqual AllTheWay)) doc
 
 showSDocDump :: DynFlags -> SDoc -> String
-showSDocDump dflags d = renderWithStyle dflags d (defaultDumpStyle dflags)
+showSDocDump dflags d = renderWithStyle (initSDocContext dflags (defaultDumpStyle dflags)) d
 
 showSDocDebug :: DynFlags -> SDoc -> String
-showSDocDebug dflags d = renderWithStyle dflags d PprDebug
+showSDocDebug dflags d = renderWithStyle (initSDocContext dflags PprDebug) d
 
-renderWithStyle :: DynFlags -> SDoc -> PprStyle -> String
-renderWithStyle dflags sdoc sty
-  = let s = Pretty.style{ Pretty.mode = PageMode,
-                          Pretty.lineLength = pprCols dflags }
-    in Pretty.renderStyle s $ runSDoc sdoc (initSDocContext dflags sty)
+renderWithStyle :: SDocContext -> SDoc -> String
+renderWithStyle ctx sdoc
+  = let s = Pretty.style{ Pretty.mode       = PageMode,
+                          Pretty.lineLength = sdocLineLength ctx }
+    in Pretty.renderStyle s $ runSDoc sdoc ctx
 
 -- This shows an SDoc, but on one line only. It's cheaper than a full
 -- showSDoc, designed for when we're getting results like "Foo.bar"
@@ -547,9 +588,8 @@ irrelevantNCols :: Int
 -- Used for OneLineMode and LeftMode when number of cols isn't used
 irrelevantNCols = 1
 
-isEmpty :: DynFlags -> SDoc -> Bool
-isEmpty dflags sdoc = Pretty.isEmpty $ runSDoc sdoc dummySDocContext
-   where dummySDocContext = initSDocContext dflags PprDebug
+isEmpty :: SDocContext -> SDoc -> Bool
+isEmpty ctx sdoc = Pretty.isEmpty $ runSDoc sdoc ctx
 
 docToSDoc :: Doc -> SDoc
 docToSDoc d = SDoc (\_ -> d)
@@ -581,11 +621,10 @@ integer n   = docToSDoc $ Pretty.integer n
 float n     = docToSDoc $ Pretty.float n
 double n    = docToSDoc $ Pretty.double n
 rational n  = docToSDoc $ Pretty.rational n
-word n      = sdocWithDynFlags $ \dflags ->
+word n      = ppIfOption sdocHexWordLiterals
     -- See Note [Print Hexadecimal Literals] in Pretty.hs
-    if shouldUseHexWordLiterals dflags
-        then docToSDoc $ Pretty.hex n
-        else docToSDoc $ Pretty.integer n
+               (docToSDoc $ Pretty.hex n)
+               (docToSDoc $ Pretty.integer n)
 
 -- | @doublePrec p n@ shows a floating point number @n@ with @p@
 -- digits of precision after the decimal point.
@@ -608,17 +647,16 @@ cparen b d = SDoc $ Pretty.maybeParens b . runSDoc d
 -- 'quotes' encloses something in single quotes...
 -- but it omits them if the thing begins or ends in a single quote
 -- so that we don't get `foo''.  Instead we just have foo'.
-quotes d =
-      sdocWithDynFlags $ \dflags ->
-      if useUnicode dflags
-      then char '‘' <> d <> char '’'
-      else SDoc $ \sty ->
-           let pp_d = runSDoc d sty
-               str  = show pp_d
-           in case (str, lastMaybe str) of
-             (_, Just '\'') -> pp_d
-             ('\'' : _, _)       -> pp_d
-             _other              -> Pretty.quotes pp_d
+quotes d = ppIfOption sdocCanUseUnicode
+   (char '‘' <> d <> char '’')
+   (SDoc $ \sty ->
+      let pp_d = runSDoc d sty
+          str  = show pp_d
+      in case (str, lastMaybe str) of
+        (_, Just '\'') -> pp_d
+        ('\'' : _, _)       -> pp_d
+        _other              -> Pretty.quotes pp_d
+   )
 
 semi, comma, colon, equals, space, dcolon, underscore, dot, vbar :: SDoc
 arrow, larrow, darrow, arrowt, larrowt, arrowtt, larrowtt :: SDoc
@@ -655,16 +693,15 @@ bullet :: SDoc
 bullet = unicode (char '•') (char '*')
 
 unicodeSyntax :: SDoc -> SDoc -> SDoc
-unicodeSyntax unicode plain = sdocWithDynFlags $ \dflags ->
-    if useUnicode dflags && useUnicodeSyntax dflags
+unicodeSyntax unicode plain =
+   sdocOption sdocCanUseUnicode $ \can_use_unicode ->
+   sdocOption sdocPrintUnicodeSyntax $ \print_unicode_syntax ->
+    if can_use_unicode && print_unicode_syntax
     then unicode
     else plain
 
 unicode :: SDoc -> SDoc -> SDoc
-unicode unicode plain = sdocWithDynFlags $ \dflags ->
-    if useUnicode dflags
-    then unicode
-    else plain
+unicode unicode plain = ppIfOption sdocCanUseUnicode unicode plain
 
 nest :: Int -> SDoc -> SDoc
 -- ^ Indent 'SDoc' some specified amount
@@ -737,14 +774,27 @@ ppWhen False _   = empty
 ppUnless True  _   = empty
 ppUnless False doc = doc
 
+ppWhenOption :: (SDocContext -> Bool) -> SDoc -> SDoc
+ppWhenOption f doc = ppIfOption f doc empty
+
+ppUnlessOption :: (SDocContext -> Bool) -> SDoc -> SDoc
+ppUnlessOption f doc = ppIfOption f empty doc
+
+ppIfOption :: (SDocContext -> Bool) -> SDoc -> SDoc -> SDoc
+ppIfOption f thendoc elsedoc = sdocOption f $ \case
+   True  -> thendoc
+   False -> elsedoc
+
+ppCondOption :: (SDocContext -> a) -> (a -> Bool) -> SDoc -> SDoc -> SDoc
+ppCondOption f p thendoc elsedoc = sdocOption f $ \x -> if p x then thendoc else elsedoc
+
 -- | Apply the given colour\/style for the argument.
 --
 -- Only takes effect if colours are enabled.
 coloured :: Col.PprColour -> SDoc -> SDoc
 coloured col sdoc =
-  sdocWithDynFlags $ \dflags ->
-    if shouldUseColor dflags
-    then SDoc $ \ctx@SDC{ sdocLastColour = lastCol } ->
+  ppIfOption sdocShouldUseColor
+    (SDoc $ \ctx@SDC{ sdocLastColour = lastCol } ->
          case ctx of
            SDC{ sdocStyle = PprUser _ _ Coloured } ->
              let ctx' = ctx{ sdocLastColour = lastCol `mappend` col } in
@@ -752,7 +802,8 @@ coloured col sdoc =
                Pretty.<> runSDoc sdoc ctx'
                Pretty.<> Pretty.zeroWidthText (Col.renderColourAfresh lastCol)
            _ -> runSDoc sdoc ctx
-    else sdoc
+    )
+    sdoc
 
 keyword :: SDoc -> SDoc
 keyword = coloured Col.colBold

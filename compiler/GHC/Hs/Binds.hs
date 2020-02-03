@@ -40,7 +40,6 @@ import Var
 import Bag
 import FastString
 import BooleanFormula (LBooleanFormula)
-import DynFlags
 
 import Data.Data hiding ( Fixity )
 import Data.List hiding ( foldr )
@@ -748,9 +747,8 @@ ppr_monobind (PatSynBind _ psb) = ppr psb
 ppr_monobind (AbsBinds { abs_tvs = tyvars, abs_ev_vars = dictvars
                        , abs_exports = exports, abs_binds = val_binds
                        , abs_ev_binds = ev_binds })
-  = sdocWithDynFlags $ \ dflags ->
-    if gopt Opt_PrintTypecheckerElaboration dflags then
-      -- Show extra information (bug number: #10662)
+  = ppIfOption sdocPrintTypecheckerElaboration
+      (-- Show extra information (bug number: #10662)
       hang (text "AbsBinds" <+> brackets (interpp'SP tyvars)
                                     <+> brackets (interpp'SP dictvars))
          2 $ braces $ vcat
@@ -760,8 +758,8 @@ ppr_monobind (AbsBinds { abs_tvs = tyvars, abs_ev_vars = dictvars
           vcat [pprBndr LetBind (abe_poly ex) | ex <- exports]
       , text "Binds:" <+> pprLHsBinds val_binds
       , text "Evidence:" <+> ppr ev_binds ]
-    else
-      pprLHsBinds val_binds
+      )
+      (pprLHsBinds val_binds)
 ppr_monobind (XHsBindsLR x) = ppr x
 
 instance OutputableBndrId p => Outputable (ABExport (GhcPass p)) where
