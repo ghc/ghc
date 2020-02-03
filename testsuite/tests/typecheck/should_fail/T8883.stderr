@@ -3,6 +3,6 @@ T8883.hs:20:1: error:
     • Non type-variable argument in the constraint: Functor (PF a)
       (Use FlexibleContexts to permit this)
     • When checking the inferred type
-        fold :: forall a b.
+        fold :: forall {a} {b}.
                 (Functor (PF a), Regular a) =>
                 (PF a b -> b) -> a -> b

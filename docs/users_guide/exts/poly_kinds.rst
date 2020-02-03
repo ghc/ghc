@@ -152,8 +152,7 @@ Note that ``k2`` is placed *before* ``k``, and that ``k`` is placed *before*
 type and kind variables that GHC generalises
 over, but not written in the original program, are not available for visible
 type application. (These are called *inferred* variables.)
-Such variables are written in braces with
-:ghc-flag:`-fprint-explicit-foralls` enabled.
+Such variables are written in braces.
 
 The general principle is this:
 
