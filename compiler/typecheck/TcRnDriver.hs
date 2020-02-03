@@ -1321,9 +1321,9 @@ missingBootThing is_boot name what
     <+> text "file, but not"
     <+> text what <+> text "the module"
 
-badReexportedBootThing :: DynFlags -> Bool -> Name -> Name -> SDoc
-badReexportedBootThing dflags is_boot name name'
-  = withPprStyle (mkUserStyle dflags alwaysQualify AllTheWay) $ vcat
+badReexportedBootThing :: Bool -> Name -> Name -> SDoc
+badReexportedBootThing is_boot name name'
+  = withUserStyle alwaysQualify AllTheWay $ vcat
         [ text "The" <+> (if is_boot then text "hs-boot" else text "hsig")
            <+> text "file (re)exports" <+> quotes (ppr name)
         , text "but the implementing module exports a different identifier" <+> quotes (ppr name')

@@ -31,8 +31,9 @@
 --
 -- A useful example pass over Cmm is in nativeGen/MachCodeGen.hs
 --
-
+{-# LANGUAGE LambdaCase #-}
 {-# OPTIONS_GHC -fno-warn-orphans #-}
+
 module GHC.Cmm.Ppr.Expr
     ( pprExpr, pprLit
     )
@@ -43,7 +44,6 @@ import GhcPrelude
 import GHC.Cmm.Expr
 
 import Outputable
-import DynFlags
 
 import Data.Maybe
 import Numeric ( fromRat )
@@ -227,18 +227,17 @@ pprReg r
 -- We only print the type of the local reg if it isn't wordRep
 --
 pprLocalReg :: LocalReg -> SDoc
-pprLocalReg (LocalReg uniq rep) = sdocWithDynFlags $ \dflags ->
+pprLocalReg (LocalReg uniq rep) =
 --   = ppr rep <> char '_' <> ppr uniq
 -- Temp Jan08
-    char '_' <> pprUnique dflags uniq <>
+    char '_' <> pprUnique uniq <>
        (if isWord32 rep -- && not (isGcPtrType rep) -- Temp Jan08               -- sigh
                     then dcolon <> ptr <> ppr rep
                     else dcolon <> ptr <> ppr rep)
    where
-     pprUnique dflags unique =
-        if gopt Opt_SuppressUniques dflags
-            then text "_locVar_"
-            else ppr unique
+     pprUnique unique = sdocOption sdocSuppressUniques $ \case
+       True  -> text "_locVar_"
+       False -> ppr unique
      ptr = empty
          --if isGcPtrType rep
          --      then doubleQuotes (text "ptr")

@@ -1,6 +1,7 @@
 {-# LANGUAGE CPP #-}
 {-# LANGUAGE ScopedTypeVariables #-}
 {-# LANGUAGE ViewPatterns #-}
+{-# LANGUAGE LambdaCase #-}
 
 {-# OPTIONS_GHC -Wno-incomplete-uni-patterns   #-}
 {-# OPTIONS_GHC -Wno-incomplete-record-updates #-}
@@ -1196,10 +1197,8 @@ mkHoleError tidy_simples ctxt ct@(CHoleCan { cc_occ = occ, cc_hole = hole_sort }
            MetaTv {} -> quotes (ppr tv) <+> text "is an ambiguous type variable"
            _         -> empty  -- Skolems dealt with already
        | otherwise  -- A coercion variable can be free in the hole type
-       = sdocWithDynFlags $ \dflags ->
-         if gopt Opt_PrintExplicitCoercions dflags
-         then quotes (ppr tv) <+> text "is a coercion variable"
-         else empty
+       = ppWhenOption sdocPrintExplicitCoercions $
+           quotes (ppr tv) <+> text "is a coercion variable"
 
 mkHoleError _ _ ct = pprPanic "mkHoleError" (ppr ct)
 
@@ -1353,10 +1352,10 @@ mkEqErr1 ctxt ct   -- Wanted or derived;
             where
               sub_what = case sub_t_or_k of Just KindLevel -> text "kinds"
                                             _              -> text "types"
-              msg1 = sdocWithDynFlags $ \dflags ->
+              msg1 = sdocOption sdocPrintExplicitCoercions $ \printExplicitCoercions ->
                      case mb_cty2 of
                        Just cty2
-                         |  gopt Opt_PrintExplicitCoercions dflags
+                         |  printExplicitCoercions
                          || not (cty1 `pickyEqType` cty2)
                          -> hang (text "When matching" <+> sub_what)
                                2 (vcat [ ppr cty1 <+> dcolon <+>
@@ -1921,10 +1920,9 @@ mkExpectedActualMsg ty1 ty2 ct@(TypeEqOrigin { uo_actual = act
 
                     -- TYPE t0
                   | Just arg <- kindRep_maybe exp
-                  , tcIsTyVarTy arg = sdocWithDynFlags $ \dflags ->
-                                      if gopt Opt_PrintExplicitRuntimeReps dflags
-                                      then text "kind" <+> quotes (ppr exp)
-                                      else text "a type"
+                  , tcIsTyVarTy arg = sdocOption sdocPrintExplicitRuntimeReps $ \case
+                                       True  -> text "kind" <+> quotes (ppr exp)
+                                       False -> text "a type"
 
                   | otherwise       = text "kind" <+> quotes (ppr exp)
 
@@ -2347,9 +2345,9 @@ mk_dict_err ctxt@(CEC {cec_encl = implics}) (ct, (matches, unifiers, unsafe_over
 
         potential_msg
           = ppWhen (not (null unifiers) && want_potential orig) $
-            sdocWithDynFlags $ \dflags ->
+            sdocOption sdocPrintPotentialInstances $ \print_insts ->
             getPprStyle $ \sty ->
-            pprPotentials dflags sty potential_hdr unifiers
+            pprPotentials (PrintPotentialInstances print_insts) sty potential_hdr unifiers
 
         potential_hdr
           = vcat [ ppWhen lead_with_ambig $
@@ -2408,9 +2406,9 @@ mk_dict_err ctxt@(CEC {cec_encl = implics}) (ct, (matches, unifiers, unsafe_over
                   sep [text "Matching givens (or their superclasses):"
                       , nest 2 (vcat matching_givens)]
 
-             ,  sdocWithDynFlags $ \dflags ->
+             ,  sdocOption sdocPrintPotentialInstances $ \print_insts ->
                 getPprStyle $ \sty ->
-                pprPotentials dflags sty (text "Matching instances:") $
+                pprPotentials (PrintPotentialInstances print_insts) sty (text "Matching instances:") $
                 ispecs ++ unifiers
 
              ,  ppWhen (null matching_givens && isSingleton matches && null unifiers) $
@@ -2599,9 +2597,13 @@ show_fixes []     = empty
 show_fixes (f:fs) = sep [ text "Possible fix:"
                         , nest 2 (vcat (f : map (text "or" <+>) fs))]
 
-pprPotentials :: DynFlags -> PprStyle -> SDoc -> [ClsInst] -> SDoc
+
+-- Avoid boolean blindness
+newtype PrintPotentialInstances = PrintPotentialInstances Bool
+
+pprPotentials :: PrintPotentialInstances -> PprStyle -> SDoc -> [ClsInst] -> SDoc
 -- See Note [Displaying potential instances]
-pprPotentials dflags sty herald insts
+pprPotentials (PrintPotentialInstances show_potentials) sty herald insts
   | null insts
   = empty
 
@@ -2620,7 +2622,6 @@ pprPotentials dflags sty herald insts
                , flag_hint ])
   where
     n_show = 3 :: Int
-    show_potentials = gopt Opt_PrintPotentialInstances dflags
 
     (in_scope, not_in_scope) = partition inst_in_scope insts
     sorted = sortBy fuzzyClsInstCmp in_scope

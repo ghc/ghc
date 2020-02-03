@@ -102,7 +102,6 @@ import Unique ( Uniquable, Unique, getKey, getUnique
               , mkUniqueGrimily, nonDetCmpUnique )
 import Util
 import Binary
-import DynFlags
 import Outputable
 
 import Data.Data
@@ -300,9 +299,9 @@ After CoreTidy, top-level LocalIds are turned into GlobalIds
 -}
 
 instance Outputable Var where
-  ppr var = sdocWithDynFlags $ \dflags ->
+  ppr var = sdocOption sdocSuppressVarKinds $ \supp_var_kinds ->
             getPprStyle $ \ppr_style ->
-            if |  debugStyle ppr_style && (not (gopt Opt_SuppressVarKinds dflags))
+            if |  debugStyle ppr_style && (not supp_var_kinds)
                  -> parens (ppr (varName var) <+> ppr_debug var ppr_style <+>
                           dcolon <+> pprKind (tyVarKind var))
                |  otherwise

@@ -11,7 +11,7 @@ import DynFlags                   ( DynFlags )
 import FastString                 ( FastString, mkFastString )
 import GHC.Iface.Type
 import Name hiding (varName)
-import Outputable                 ( renderWithStyle, ppr, defaultUserStyle )
+import Outputable                 ( renderWithStyle, ppr, defaultUserStyle, initSDocContext )
 import SrcLoc
 import GHC.CoreToIface
 import TyCon
@@ -44,7 +44,7 @@ generateReferencesMap = foldr (\ast m -> M.unionWith (++) (go ast) m) M.empty
         this = fmap (pure . (nodeSpan ast,)) $ nodeIdentifiers $ nodeInfo ast
 
 renderHieType :: DynFlags -> HieTypeFix -> String
-renderHieType df ht = renderWithStyle df (ppr $ hieTypeToIface ht) sty
+renderHieType df ht = renderWithStyle (initSDocContext df sty) (ppr $ hieTypeToIface ht)
   where sty = defaultUserStyle df
 
 resolveVisibility :: Type -> [Type] -> [(Bool,Type)]

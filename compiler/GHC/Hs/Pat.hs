@@ -19,6 +19,7 @@
 {-# LANGUAGE FlexibleInstances #-}
 {-# LANGUAGE ScopedTypeVariables #-}
 {-# LANGUAGE TypeApplications #-}
+{-# LANGUAGE LambdaCase #-}
 
 module GHC.Hs.Pat (
         Pat(..), InPat, OutPat, LPat,
@@ -67,7 +68,6 @@ import Outputable
 import Type
 import SrcLoc
 import Bag -- collect ev vars from pats
-import DynFlags( gopt, GeneralFlag(..) )
 import Maybes
 -- libraries:
 import Data.Data hiding (TyCon,Fixity)
@@ -498,13 +498,13 @@ pprParendLPat p = pprParendPat p . unLoc
 
 pprParendPat :: (OutputableBndrId p)
              => PprPrec -> Pat (GhcPass p) -> SDoc
-pprParendPat p pat = sdocWithDynFlags $ \ dflags ->
-                     if need_parens dflags pat
+pprParendPat p pat = sdocOption sdocPrintTypecheckerElaboration $ \print_tc_elab ->
+                     if need_parens print_tc_elab pat
                      then parens (pprPat pat)
                      else  pprPat pat
   where
-    need_parens dflags pat
-      | CoPat {} <- pat = gopt Opt_PrintTypecheckerElaboration dflags
+    need_parens print_tc_elab pat
+      | CoPat {} <- pat = print_tc_elab
       | otherwise       = patNeedsParens p pat
       -- For a CoPat we need parens if we are going to show it, which
       -- we do if -fprint-typechecker-elaboration is on (c.f. pprHsWrapper)
@@ -551,16 +551,15 @@ pprPat (ConPatOut { pat_con = con
                   , pat_dicts = dicts
                   , pat_binds = binds
                   , pat_args = details })
-  = sdocWithDynFlags $ \dflags ->
-       -- Tiresome; in TcBinds.tcRhs we print out a
-       -- typechecked Pat in an error message,
-       -- and we want to make sure it prints nicely
-    if gopt Opt_PrintTypecheckerElaboration dflags then
-        ppr con
-          <> braces (sep [ hsep (map pprPatBndr (tvs ++ dicts))
-                         , pprIfTc @p $ ppr binds ])
-          <+> pprConArgs details
-    else pprUserCon (unLoc con) details
+  = sdocOption sdocPrintTypecheckerElaboration $ \case
+      False -> pprUserCon (unLoc con) details
+      True  -> -- Tiresome; in TcBinds.tcRhs we print out a
+               -- typechecked Pat in an error message,
+               -- and we want to make sure it prints nicely
+               ppr con
+                  <> braces (sep [ hsep (map pprPatBndr (tvs ++ dicts))
+                                 , pprIfTc @p $ ppr binds ])
+                  <+> pprConArgs details
 pprPat (XPat n)                 = noExtCon n
 
 

@@ -18,6 +18,7 @@ generation.
 {-# LANGUAGE TypeFamilies #-}
 {-# LANGUAGE UndecidableInstances #-}
 {-# LANGUAGE ConstraintKinds #-}
+{-# LANGUAGE LambdaCase #-}
 
 module GHC.Stg.Syntax (
         StgArg(..),
@@ -756,10 +757,9 @@ pprStgExpr (StgLetNoEscape ext bind expr)
                 2 (ppr expr)]
 
 pprStgExpr (StgTick tickish expr)
-  = sdocWithDynFlags $ \dflags ->
-    if gopt Opt_SuppressTicks dflags
-    then pprStgExpr expr
-    else sep [ ppr tickish, pprStgExpr expr ]
+  = sdocOption sdocSuppressTicks $ \case
+      True  -> pprStgExpr expr
+      False -> sep [ ppr tickish, pprStgExpr expr ]
 
 
 -- Don't indent for a single case alternative.
@@ -804,8 +804,7 @@ pprStgRhs :: OutputablePass pass => GenStgRhs pass -> SDoc
 pprStgRhs (StgRhsClosure ext cc upd_flag args body)
   = sdocWithDynFlags $ \dflags ->
     hang (hsep [if gopt Opt_SccProfilingOn dflags then ppr cc else empty,
-                if not $ gopt Opt_SuppressStgExts dflags
-                  then ppr ext else empty,
+                ppUnlessOption sdocSuppressStgExts (ppr ext),
                 char '\\' <> ppr upd_flag, brackets (interppSP args)])
          4 (ppr body)
 

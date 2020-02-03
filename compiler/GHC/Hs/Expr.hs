@@ -38,7 +38,6 @@ import GHC.Hs.Binds
 -- others:
 import TcEvidence
 import CoreSyn
-import DynFlags ( gopt, GeneralFlag(Opt_PrintExplicitCoercions) )
 import Name
 import NameSet
 import BasicTypes
@@ -186,9 +185,9 @@ instance Outputable SyntaxExprTc where
   ppr (SyntaxExprTc { syn_expr      = expr
                     , syn_arg_wraps = arg_wraps
                     , syn_res_wrap  = res_wrap })
-    = sdocWithDynFlags $ \ dflags ->
+    = sdocOption sdocPrintExplicitCoercions $ \print_co ->
       getPprStyle $ \s ->
-      if debugStyle s || gopt Opt_PrintExplicitCoercions dflags
+      if debugStyle s || print_co
       then ppr expr <> braces (pprWithCommas ppr arg_wraps)
                     <> braces (ppr res_wrap)
       else ppr expr
