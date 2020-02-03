@@ -888,7 +888,9 @@ makeImportsDoc dflags imports
                 | otherwise
                 = Outputable.empty
 
-        doPpr lbl = (lbl, renderWithStyle dflags (pprCLabel dflags lbl) astyle)
+        doPpr lbl = (lbl, renderWithStyle
+                              (initSDocContext dflags astyle)
+                              (pprCLabel dflags lbl))
         astyle = mkCodeStyle AsmStyle
 
 -- -----------------------------------------------------------------------------

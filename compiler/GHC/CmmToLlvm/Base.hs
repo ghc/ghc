@@ -506,7 +506,9 @@ strCLabel_llvm :: CLabel -> LlvmM LMString
 strCLabel_llvm lbl = do
     dflags <- getDynFlags
     let sdoc = pprCLabel dflags lbl
-        str = Outp.renderWithStyle dflags sdoc (Outp.mkCodeStyle Outp.CStyle)
+        str = Outp.renderWithStyle
+                  (initSDocContext dflags (Outp.mkCodeStyle Outp.CStyle))
+                  sdoc
     return (fsLit str)
 
 strDisplayName_llvm :: CLabel -> LlvmM LMString
@@ -515,7 +517,7 @@ strDisplayName_llvm lbl = do
     let sdoc = pprCLabel dflags lbl
         depth = Outp.PartWay 1
         style = Outp.mkUserStyle dflags Outp.reallyAlwaysQualify depth
-        str = Outp.renderWithStyle dflags sdoc style
+        str = Outp.renderWithStyle (initSDocContext dflags style) sdoc
     return (fsLit (dropInfoSuffix str))
 
 dropInfoSuffix :: String -> String
@@ -532,7 +534,7 @@ strProcedureName_llvm lbl = do
     let sdoc = pprCLabel dflags lbl
         depth = Outp.PartWay 1
         style = Outp.mkUserStyle dflags Outp.neverQualify depth
-        str = Outp.renderWithStyle dflags sdoc style
+        str = Outp.renderWithStyle (initSDocContext dflags style) sdoc
     return (fsLit str)
 
 -- ----------------------------------------------------------------------------
