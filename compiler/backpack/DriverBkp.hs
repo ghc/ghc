@@ -538,8 +538,9 @@ msgUnitId pk = do
     dflags <- getDynFlags
     level <- getBkpLevel
     liftIO . backpackProgressMsg level dflags
-        $ "Instantiating " ++ renderWithStyle dflags (ppr pk)
-                                (backpackStyle dflags)
+        $ "Instantiating " ++ renderWithStyle
+                                (initSDocContext dflags (backpackStyle dflags))
+                                (ppr pk)
 
 -- | Message when we include a Backpack unit.
 msgInclude :: (Int,Int) -> UnitId -> BkpM ()
@@ -548,7 +549,8 @@ msgInclude (i,n) uid = do
     level <- getBkpLevel
     liftIO . backpackProgressMsg level dflags
         $ showModuleIndex (i, n) ++ "Including " ++
-          renderWithStyle dflags (ppr uid) (backpackStyle dflags)
+          renderWithStyle (initSDocContext dflags (backpackStyle dflags))
+            (ppr uid)
 
 -- ----------------------------------------------------------------------------
 -- Conversion from PackageName to HsComponentId

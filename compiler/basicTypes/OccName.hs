@@ -104,7 +104,6 @@ import GhcPrelude
 
 import Util
 import Unique
-import DynFlags
 import UniqFM
 import UniqSet
 import FastString
@@ -278,10 +277,9 @@ pprOccName (OccName sp occ)
     pp_debug sty | debugStyle sty = braces (pprNameSpaceBrief sp)
                  | otherwise      = empty
 
-    pp_occ = sdocWithDynFlags $ \dflags ->
-             if gopt Opt_SuppressUniques dflags
-             then text (strip_th_unique (unpackFS occ))
-             else ftext occ
+    pp_occ = ppIfOption sdocSuppressUniques
+               (text (strip_th_unique (unpackFS occ)))
+               (ftext occ)
 
         -- See Note [Suppressing uniques in OccNames]
     strip_th_unique ('[' : c : _) | isAlphaNum c = []
