@@ -3,4 +3,4 @@
     • Non type-variable argument in the constraint: HasField "name" r a
       (Use FlexibleContexts to permit this)
     • When checking the inferred type
-        foo :: forall r a. HasField "name" r a => r -> a
+        foo :: forall {r} {a}. HasField "name" r a => r -> a

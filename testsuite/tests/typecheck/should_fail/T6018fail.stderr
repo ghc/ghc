@@ -82,7 +82,7 @@ T6018fail.hs:68:15: error:
     Type family equation violates the family's injectivity annotation.
     Type/kind variable ‘k’ cannot be inferred from the right-hand side.
     In the type family equation:
-      forall k (a :: k) (b :: k).
+      forall {k} {a :: k} {b :: k}.
         Fc @k a b = Int -- Defined at T6018fail.hs:68:15
 
 T6018fail.hs:72:15: error:
@@ -90,7 +90,7 @@ T6018fail.hs:72:15: error:
     Type/kind variables ‘k’, ‘a’, ‘b’
     cannot be inferred from the right-hand side.
     In the type family equation:
-      forall k (a :: k) (b :: k).
+      forall {k} {a :: k} {b :: k}.
         Gc @k a b = Int -- Defined at T6018fail.hs:72:15
 
 T6018fail.hs:76:15: error:
@@ -151,7 +151,7 @@ T6018fail.hs:120:15: error:
     Type/kind variables ‘k’, ‘c’
     cannot be inferred from the right-hand side.
     In the type family equation:
-      forall k a b (c :: k).
+      forall {k} {a} {b} {c :: k}.
         G7 @k a b c = [G7a @k a b c] -- Defined at T6018fail.hs:120:15
 
 T6018fail.hs:131:1: error:
