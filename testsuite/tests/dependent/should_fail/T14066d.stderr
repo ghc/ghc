@@ -15,7 +15,7 @@ T14066d.hs:11:35: error:
       In the expression: g y
       In the expression: (fstOf3 y :: Proxy Maybe, g y)
     • Relevant bindings include
-        y :: forall k1 k2 (a :: k1) (c :: k2). (Proxy a, Proxy c, b)
+        y :: forall {k1} {k2} (a :: k1) (c :: k2). (Proxy a, Proxy c, b)
           (bound at T14066d.hs:15:5)
         x :: b (bound at T14066d.hs:11:3)
         f :: b -> (Proxy Maybe, ()) (bound at T14066d.hs:11:1)
