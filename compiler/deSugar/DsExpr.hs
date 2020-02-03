@@ -601,7 +601,7 @@ ds_expr _ expr@(RecordUpd { rupd_expr = record_expr, rupd_flds = fields
         -- constructor arguments.
         ; alts <- mapM (mk_alt upd_fld_env) cons_to_upd
         ; ([discrim_var], matching_code)
-                <- matchWrapper RecUpd Nothing
+                <- matchWrapper RecUpd (Just record_expr)
                                       (MG { mg_alts = noLoc alts
                                           , mg_ext = MatchGroupTc [in_ty] out_ty
                                           , mg_origin = FromSource })
