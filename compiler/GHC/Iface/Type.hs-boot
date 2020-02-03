@@ -4,7 +4,8 @@ module GHC.Iface.Type
    )
 where
 
--- GJ : TODO Add comment
+-- Empty import to influence the compilation ordering.
+-- See note [Depend on GHC.Integer] in GHC.Base
 import GHC.Base ()
 
 data IfaceAppArgs
