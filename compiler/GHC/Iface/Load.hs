@@ -135,7 +135,7 @@ importDecl :: Name -> IfM lcl (MaybeErr MsgDoc TyThing)
 -- Get the TyThing for this Name from an interface file
 -- It's not a wired-in thing -- the caller caught that
 importDecl name
-  = ASSERT( not (isWiredInName name) )
+  = ASSERT2( not (isWiredInName name), ppr name )
     do  { traceIf nd_doc
 
         -- Load the interface, which should populate the PTE

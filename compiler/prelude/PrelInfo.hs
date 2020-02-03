@@ -197,9 +197,12 @@ knownKeyNamesOkay all_names
 
 wiredInNameTyThing_maybe :: Name -> Maybe TyThing
 wiredInNameTyThing_maybe n
-  | isWiredIn n
-  = case isWiredInTuple n of
-      Just (ns, (b, a)) -> Just $ tupleTyThing ns b a
+  | isWiredInName n
+  = case knownUniqueTyThing (getUnique n) of
+      Just (KnownUniqueWiredIn n) -> Just n
+      -- If this happens, there is a wired in name which will not be in the
+      -- wiredInMap and so the function will fail. Best to catch it early.
+      Just {} -> pprPanic "wiredInNameTyThing_maybe" (ppr n)
       Nothing -> lookupNameEnv wiredInMap n
   | otherwise = Nothing
 

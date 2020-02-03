@@ -10,6 +10,8 @@
 {-# LANGUAGE FlexibleInstances #-}
 {-# LANGUAGE PatternSynonyms #-}
 {-# LANGUAGE TupleSections #-}
+{-# LANGUAGE CPP #-}
+
 
 -- |
 -- #name_types#
@@ -78,6 +80,9 @@ module Name (
         -- Re-export the OccName stuff
         module OccName
     ) where
+
+
+#include "HsVersions.h"
 
 import GhcPrelude
 
@@ -373,11 +378,11 @@ mkExternalName uniq mod occ loc
            n_occ = occ, n_loc = loc }
 
 -- | Create a name which is actually defined by the compiler itself
-mkWiredInName :: Module -> OccName -> Unique -> TyThing -> BuiltInSyntax -> Name
+mkWiredInName :: HasCallStack => Module -> OccName -> Unique -> TyThing -> BuiltInSyntax -> Name
 mkWiredInName mod occ uniq _t built_in
   = Name { n_uniq = uniq,
-           n_sort = WiredIn mod Nothing built_in,
-           n_occ = occ, n_loc = wiredInSrcSpan }
+         n_sort = WiredIn mod Nothing built_in,
+         n_occ = occ, n_loc = wiredInSrcSpan }
 
 mkWiredInNameTuple :: Boxity -> Arity -> Module -> OccName -> Unique -> Name
 mkWiredInNameTuple boxity arity mod occ uniq

@@ -10,6 +10,8 @@
 module KnownUniques
     ( -- * Looking up known-key names
       knownUniqueName
+    , knownUniqueTyThing
+    , KnownUniqueLookup(..)
 
       -- * Getting the 'Unique's of 'Name's
       -- ** Anonymous sums
@@ -31,30 +33,45 @@ import GhcPrelude
 import TysWiredIn
 import TyCon
 import DataCon
-import Id
 import BasicTypes
 import Outputable
 import Unique
 import Name
 import Util
+import TyCoRep
+import ConLike
 
 import Data.Bits
 import Data.Maybe
 
+data KnownUniqueLookup = KnownUniqueWiredIn TyThing | KnownUniqueName Name
+
+getNameFromKnownUnique :: KnownUniqueLookup -> Name
+getNameFromKnownUnique k =
+  case k of
+    KnownUniqueWiredIn t -> getName t
+    KnownUniqueName n -> n
+
 -- | Get the 'Name' associated with a known-key 'Unique'.
-knownUniqueName :: Unique -> Maybe Name
-knownUniqueName u =
+--
+-- Get the 'TyThing' for wired in names, otherwise just the 'Name'
+knownUniqueTyThing :: Unique -> Maybe KnownUniqueLookup
+knownUniqueTyThing u =
     case tag of
-      'z' -> Just $ getUnboxedSumName n
-      '4' -> Just $ getTupleTyConName Boxed n
-      '5' -> Just $ getTupleTyConName Unboxed n
-      '7' -> Just $ getTupleDataConName Boxed n
-      '8' -> Just $ getTupleDataConName Unboxed n
-      'k' -> Just $ getCTupleTyConName n
-      'm' -> Just $ getCTupleDataConUnique n
+      'z' -> Just $ getUnboxedSumTyThing n
+      '4' -> Just $ getTupleTyConTyThing Boxed n
+      '5' -> Just $ getTupleTyConTyThing Unboxed n
+      '7' -> Just $ getTupleDataConTyThing Boxed n
+      '8' -> Just $ getTupleDataConTyThing Unboxed n
+      'k' -> Just $ KnownUniqueName $ getCTupleTyConName n
+      'm' -> Just $ KnownUniqueName $ getCTupleDataConName n
       _   -> Nothing
   where
     (tag, n) = unpkUnique u
+
+knownUniqueName :: Unique -> Maybe Name
+knownUniqueName u = getNameFromKnownUnique <$> knownUniqueTyThing u
+
 
 --------------------------------------------------
 -- Anonymous sums
@@ -92,19 +109,19 @@ mkSumDataConUnique alt arity
   | otherwise
   = mkUnique 'z' (arity `shiftL` 8 + alt `shiftL` 2) {- skip the tycon -}
 
-getUnboxedSumName :: Int -> Name
-getUnboxedSumName n
+getUnboxedSumTyThing :: Int -> KnownUniqueLookup
+getUnboxedSumTyThing n
   | n .&. 0xfc == 0xfc
   = case tag of
-      0x0 -> tyConName $ sumTyCon arity
-      0x1 -> getRep $ sumTyCon arity
+      0x0 -> KnownUniqueWiredIn $ ATyCon $ sumTyCon arity
+      0x1 -> KnownUniqueName $ getRep $ sumTyCon arity
       _   -> pprPanic "getUnboxedSumName: invalid tag" (ppr tag)
   | tag == 0x0
-  = dataConName $ sumDataCon (alt + 1) arity
+  = KnownUniqueWiredIn $ AConLike (RealDataCon (sumDataCon (alt + 1) arity))
   | tag == 0x1
-  = getName $ dataConWrapId $ sumDataCon (alt + 1) arity
+  = KnownUniqueWiredIn $ AnId $ dataConWrapId $ sumDataCon (alt + 1) arity
   | tag == 0x2
-  = getRep $ promoteDataCon $ sumDataCon (alt + 1) arity
+  = KnownUniqueWiredIn $ ATyCon $ promoteDataCon $ sumDataCon (alt + 1) arity
   | otherwise
   = pprPanic "getUnboxedSumName" (ppr n)
   where
@@ -143,8 +160,8 @@ getCTupleTyConName n =
       (arity, 1) -> mkPrelTyConRepName $ cTupleTyConName arity
       _          -> panic "getCTupleTyConName: impossible"
 
-getCTupleDataConUnique :: Int -> Name
-getCTupleDataConUnique n =
+getCTupleDataConName :: Int -> Name
+getCTupleDataConName n =
     case n `divMod` 3 of
       (arity,  0) -> cTupleDataConName arity
       (_arity, 1) -> panic "getCTupleDataConName: no worker"
@@ -162,19 +179,21 @@ mkTupleTyConUnique :: Boxity -> Arity -> Unique
 mkTupleTyConUnique Boxed           a  = mkUnique '4' (2*a)
 mkTupleTyConUnique Unboxed         a  = mkUnique '5' (2*a)
 
-getTupleTyConName :: Boxity -> Int -> Name
-getTupleTyConName boxity n =
+getTupleTyConTyThing :: Boxity -> Int -> KnownUniqueLookup
+getTupleTyConTyThing boxity n =
     case n `divMod` 2 of
-      (arity, 0) -> tyConName $ tupleTyCon boxity arity
-      (arity, 1) -> fromMaybe (panic "getTupleTyConName")
+      (arity, 0) -> KnownUniqueWiredIn $ ATyCon $ tupleTyCon boxity arity
+      (arity, 1) -> KnownUniqueName
+                    $ fromMaybe (panic "getTupleTyConName")
                     $ tyConRepName_maybe $ tupleTyCon boxity arity
       _          -> panic "getTupleTyConName: impossible"
 
-getTupleDataConName :: Boxity -> Int -> Name
-getTupleDataConName boxity n =
+getTupleDataConTyThing :: Boxity -> Int -> KnownUniqueLookup
+getTupleDataConTyThing boxity n =
     case n `divMod` 3 of
-      (arity, 0) -> dataConName $ tupleDataCon boxity arity
-      (arity, 1) -> idName $ dataConWorkId $ tupleDataCon boxity arity
-      (arity, 2) -> fromMaybe (panic "getTupleDataCon")
+      (arity, 0) -> KnownUniqueWiredIn $ AConLike (RealDataCon (tupleDataCon boxity arity))
+      (arity, 1) -> KnownUniqueWiredIn $ AnId $ dataConWorkId $ tupleDataCon boxity arity
+      (arity, 2) -> KnownUniqueName
+                    $ fromMaybe (panic "getTupleDataCon")
                     $ tyConRepName_maybe $ promotedTupleDataCon boxity arity
       _          -> panic "getTupleDataConName: impossible"
