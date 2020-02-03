@@ -7,7 +7,10 @@ Printing of Core syntax
 -}
 
 {-# LANGUAGE MultiWayIf #-}
+{-# LANGUAGE BlockArguments #-}
+
 {-# OPTIONS_GHC -fno-warn-orphans #-}
+
 module PprCore (
         pprCoreExpr, pprParendExpr,
         pprCoreBinding, pprCoreBindings, pprCoreAlt,
@@ -29,7 +32,6 @@ import DataCon
 import TyCon
 import TyCoPpr
 import Coercion
-import DynFlags
 import BasicTypes
 import Maybes
 import Util
@@ -115,13 +117,11 @@ ppr_bind ann (Rec binds)           = vcat (map pp binds)
 
 ppr_binding :: OutputableBndr b => Annotation b -> (b, Expr b) -> SDoc
 ppr_binding ann (val_bdr, expr)
-  = sdocWithDynFlags $ \dflags ->
-      vcat [ ann expr
-           , if gopt Opt_SuppressTypeSignatures dflags
-               then empty
-               else pprBndr LetBind val_bdr
-           , pp_bind
-           ]
+  = vcat [ ann expr
+         , ppUnlessOption sdocSuppressTypeSignatures
+             (pprBndr LetBind val_bdr)
+         , pp_bind
+         ]
   where
     pp_bind = case bndrIsJoin_maybe val_bdr of
                 Nothing -> pp_normal_bind
@@ -155,10 +155,9 @@ noParens pp = pp
 
 pprOptCo :: Coercion -> SDoc
 -- Print a coercion optionally; i.e. honouring -dsuppress-coercions
-pprOptCo co = sdocWithDynFlags $ \dflags ->
-              if gopt Opt_SuppressCoercions dflags
-              then angleBrackets (text "Co:" <> int (coercionSize co))
-              else parens (sep [ppr co, dcolon <+> ppr (coercionType co)])
+pprOptCo co = ppIfOption sdocSuppressCoercions
+              (angleBrackets (text "Co:" <> int (coercionSize co)))
+              (sep [ppr co, dcolon <+> ppr (coercionType co)])
 
 ppr_expr :: OutputableBndr b => (SDoc -> SDoc) -> Expr b -> SDoc
         -- The function adds parens in context that need
@@ -183,15 +182,15 @@ ppr_expr add_par expr@(Lam _ _)
          2 (pprCoreExpr body)
 
 ppr_expr add_par expr@(App {})
-  = sdocWithDynFlags $ \dflags ->
+  = sdocOption sdocSuppressTypeApplications \supp_ty_app ->
     case collectArgs expr of { (fun, args) ->
     let
         pp_args     = sep (map pprArg args)
         val_args    = dropWhile isTypeArg args   -- Drop the type arguments for tuples
         pp_tup_args = pprWithCommas pprCoreExpr val_args
         args'
-          | gopt Opt_SuppressTypeApplications dflags = val_args
-          | otherwise = args
+         | supp_ty_app = val_args
+         | otherwise   = args
         parens
           | null args' = id
           | otherwise  = add_par
@@ -216,9 +215,8 @@ ppr_expr add_par expr@(App {})
     }
 
 ppr_expr add_par (Case expr var ty [(con,args,rhs)])
-  = sdocWithDynFlags $ \dflags ->
-    if gopt Opt_PprCaseAsLet dflags
-    then add_par $  -- See Note [Print case as let]
+  = ppIfOption sdocPrintCaseAsLet
+      (add_par $  -- See Note [Print case as let]
          sep [ sep [ text "let! {"
                      <+> ppr_case_pat con args
                      <+> text "~"
@@ -226,8 +224,8 @@ ppr_expr add_par (Case expr var ty [(con,args,rhs)])
                    , text "<-" <+> ppr_expr id expr
                      <+> text "} in" ]
              , pprCoreExpr rhs
-             ]
-    else add_par $
+             ])
+      (add_par $
          sep [sep [sep [ text "case" <+> pprCoreExpr expr
                        , whenPprDebug (text "return" <+> ppr ty)
                        , text "of" <+> ppr_bndr var
@@ -236,7 +234,7 @@ ppr_expr add_par (Case expr var ty [(con,args,rhs)])
                   ]
               , pprCoreExpr rhs
               , char '}'
-              ]
+              ])
   where
     ppr_bndr = pprBndr CaseBind
 
@@ -290,10 +288,9 @@ ppr_expr add_par (Let bind expr)
      | otherwise                   = text "letrec"
 
 ppr_expr add_par (Tick tickish expr)
-  = sdocWithDynFlags $ \dflags ->
-  if gopt Opt_SuppressTicks dflags
-  then ppr_expr add_par expr
-  else add_par (sep [ppr tickish, pprCoreExpr expr])
+  = ppIfOption sdocSuppressTicks
+      (ppr_expr add_par expr)
+      (add_par (sep [ppr tickish, pprCoreExpr expr]))
 
 pprCoreAlt :: OutputableBndr a => (AltCon, [a] , Expr a) -> SDoc
 pprCoreAlt (con, args, rhs)
@@ -316,10 +313,8 @@ ppr_case_pat con args
 -- | Pretty print the argument in a function application.
 pprArg :: OutputableBndr a => Expr a -> SDoc
 pprArg (Type ty)
- = sdocWithDynFlags $ \dflags ->
-   if gopt Opt_SuppressTypeApplications dflags
-   then empty
-   else text "@" <> pprParendType ty
+ = ppUnlessOption sdocSuppressTypeApplications
+      (text "@" <> pprParendType ty)
 pprArg (Coercion co) = text "@~" <> pprOptCo co
 pprArg expr          = pprParendExpr expr
 
@@ -387,7 +382,7 @@ pprUntypedBinder binder
 pprTypedLamBinder :: BindingSite -> Bool -> Var -> SDoc
 -- For lambda and case binders, show the unfolding info (usually none)
 pprTypedLamBinder bind_site debug_on var
-  = sdocWithDynFlags $ \dflags ->
+  = sdocOption sdocSuppressTypeSignatures $ \suppress_sigs ->
     case () of
     _
       | not debug_on            -- Show case-bound wild binders only if debug is on
@@ -404,7 +399,7 @@ pprTypedLamBinder bind_site debug_on var
       | not debug_on
       , CasePatBind <- bind_site    -> pprUntypedBinder var
 
-      | suppress_sigs dflags    -> pprUntypedBinder var
+      | suppress_sigs -> pprUntypedBinder var
 
       | isTyVar var  -> parens (pprKindedTyVarBndr var)
 
@@ -412,8 +407,6 @@ pprTypedLamBinder bind_site debug_on var
                                    2 (vcat [ dcolon <+> pprType (idType var)
                                            , pp_unf]))
   where
-    suppress_sigs = gopt Opt_SuppressTypeSignatures
-
     unf_info = unfoldingInfo (idInfo var)
     pp_unf | hasSomeUnfolding unf_info = text "Unf=" <> ppr unf_info
            | otherwise                 = empty
@@ -421,12 +414,12 @@ pprTypedLamBinder bind_site debug_on var
 pprTypedLetBinder :: Var -> SDoc
 -- Print binder with a type or kind signature (not paren'd)
 pprTypedLetBinder binder
-  = sdocWithDynFlags $ \dflags ->
+  = sdocOption sdocSuppressTypeSignatures $ \suppress_sigs ->
     case () of
     _
-      | isTyVar binder                         -> pprKindedTyVarBndr binder
-      | gopt Opt_SuppressTypeSignatures dflags -> pprIdBndr binder
-      | otherwise                              -> hang (pprIdBndr binder) 2 (dcolon <+> pprType (idType binder))
+      | isTyVar binder -> pprKindedTyVarBndr binder
+      | suppress_sigs  -> pprIdBndr binder
+      | otherwise      -> hang (pprIdBndr binder) 2 (dcolon <+> pprType (idType binder))
 
 pprKindedTyVarBndr :: TyVar -> SDoc
 -- Print a type variable binder with its kind (but not if *)
@@ -440,9 +433,8 @@ pprIdBndr id = ppr id <+> pprIdBndrInfo (idInfo id)
 
 pprIdBndrInfo :: IdInfo -> SDoc
 pprIdBndrInfo info
-  = sdocWithDynFlags $ \dflags ->
-    ppUnless (gopt Opt_SuppressIdInfo dflags) $
-    info `seq` doc -- The seq is useful for poking on black holes
+  = ppUnlessOption sdocSuppressIdInfo
+      (info `seq` doc) -- The seq is useful for poking on black holes
   where
     prag_info = inlinePragInfo info
     occ_info  = occInfo info
@@ -469,8 +461,7 @@ pprIdBndrInfo info
 
 ppIdInfo :: Id -> IdInfo -> SDoc
 ppIdInfo id info
-  = sdocWithDynFlags $ \dflags ->
-    ppUnless (gopt Opt_SuppressIdInfo dflags) $
+  = ppUnlessOption sdocSuppressIdInfo $
     showAttributes
     [ (True, pp_scope <> ppr (idDetails id))
     , (has_arity,        text "Arity=" <> int arity)
@@ -557,9 +548,8 @@ instance Outputable Unfolding where
                 , text "WorkFree="   <> ppr wf
                 , text "Expandable=" <> ppr exp
                 , text "Guidance="   <> ppr g ]
-      pp_tmpl = sdocWithDynFlags $ \dflags ->
-                ppUnless (gopt Opt_SuppressUnfoldings dflags) $
-                text "Tmpl=" <+> ppr rhs
+      pp_tmpl = ppUnlessOption sdocSuppressUnfoldings
+                  (text "Tmpl=" <+> ppr rhs)
       pp_rhs | isStableSource src = pp_tmpl
              | otherwise          = empty
             -- Don't print the RHS or we get a quadratic

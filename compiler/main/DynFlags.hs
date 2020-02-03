@@ -38,7 +38,6 @@ module DynFlags (
         xopt, xopt_set, xopt_unset,
         xopt_set_unlessExplSpec,
         lang_set,
-        useUnicodeSyntax,
         useStarIsType,
         whenGeneratingDynamicToo, ifGeneratingDynamicToo,
         whenCannotGenerateDynamicToo,
@@ -62,8 +61,6 @@ module DynFlags (
         wWarningFlags,
         dynFlagDependencies,
         makeDynFlagsConsistent,
-        shouldUseColor,
-        shouldUseHexWordLiterals,
         positionIndependent,
         optimisationFlags,
         setFlagsFromEnvFile,
@@ -241,6 +238,12 @@ module DynFlags (
         -- * Include specifications
         IncludeSpecs(..), addGlobalInclude, addQuoteInclude, flattenIncludes,
 
+        -- * SDoc
+        initSDocContext,
+        PrintExplicitKindsOption (..),
+        PrintExplicitCoercionsOption (..),
+        PrintPotentialInstancesOption (..),
+        BoolOption (..),
 
         -- * Make use of the Cmm CFG
         CfgWeights(..), backendMaintainsCfg
@@ -1707,13 +1710,6 @@ data RtsOptsEnabled
   | RtsOptsAll
   deriving (Show)
 
-shouldUseColor :: DynFlags -> Bool
-shouldUseColor dflags = overrideWith (canUseColor dflags) (useColor dflags)
-
-shouldUseHexWordLiterals :: DynFlags -> Bool
-shouldUseHexWordLiterals dflags =
-  Opt_HexWordLiterals `EnumSet.member` generalFlags dflags
-
 -- | Are we building with @-fPIE@ or @-fPIC@ enabled?
 positionIndependent :: DynFlags -> Bool
 positionIndependent dflags = gopt Opt_PIC dflags || gopt Opt_PIE dflags
@@ -1918,10 +1914,8 @@ initDynFlags dflags = do
                           do str' <- peekCString enc cstr
                              return (str == str'))
                          `catchIOError` \_ -> return False
- maybeGhcNoUnicodeEnv <- lookupEnv "GHC_NO_UNICODE"
- let adjustNoUnicode (Just _) = False
-     adjustNoUnicode Nothing = True
- let useUnicode' = (adjustNoUnicode maybeGhcNoUnicodeEnv) && canUseUnicode
+ ghcNoUnicodeEnv <- lookupEnv "GHC_NO_UNICODE"
+ let useUnicode' = isNothing ghcNoUnicodeEnv && canUseUnicode
  canUseColor <- stderrSupportsAnsiColors
  maybeGhcColorsEnv  <- lookupEnv "GHC_COLORS"
  maybeGhcColoursEnv <- lookupEnv "GHC_COLOURS"
@@ -2495,13 +2489,6 @@ lang_set dflags lang =
             language = lang,
             extensionFlags = flattenExtensionFlags lang (extensions dflags)
           }
-
--- | An internal helper to check whether to use unicode syntax for output.
---
--- Note: You should very likely be using 'Outputable.unicodeSyntax' instead
--- of this function.
-useUnicodeSyntax :: DynFlags -> Bool
-useUnicodeSyntax = gopt Opt_PrintUnicodeSyntax
 
 useStarIsType :: DynFlags -> Bool
 useStarIsType = xopt LangExt.StarIsType
@@ -5906,3 +5893,88 @@ data FilesToClean = FilesToClean {
 -- | An empty FilesToClean
 emptyFilesToClean :: FilesToClean
 emptyFilesToClean = FilesToClean Set.empty Set.empty
+
+
+
+initSDocContext :: DynFlags -> PprStyle -> SDocContext
+initSDocContext dflags style = SDC
+  { sdocStyle                       = style
+  , sdocColScheme                   = colScheme dflags
+  , sdocLastColour                  = Col.colReset
+  , sdocShouldUseColor              = overrideWith (canUseColor dflags) (useColor dflags)
+  , sdocLineLength                  = pprCols dflags
+  , sdocCanUseUnicode               = useUnicode dflags
+  , sdocHexWordLiterals             = gopt Opt_HexWordLiterals dflags
+  , sdocDebugLevel                  = debugLevel dflags
+  , sdocPprDebug                    = dopt Opt_D_ppr_debug dflags
+  , sdocPrintUnicodeSyntax          = gopt Opt_PrintUnicodeSyntax dflags
+  , sdocPrintCaseAsLet              = gopt Opt_PprCaseAsLet dflags
+  , sdocPrintTypecheckerElaboration = gopt Opt_PrintTypecheckerElaboration dflags
+  , sdocPrintAxiomIncomps           = gopt Opt_PrintAxiomIncomps dflags
+  , sdocPrintExplicitKinds          = gopt Opt_PrintExplicitKinds dflags
+  , sdocPrintExplicitCoercions      = gopt Opt_PrintExplicitCoercions dflags
+  , sdocPrintExplicitRuntimeReps    = gopt Opt_PrintExplicitRuntimeReps dflags
+  , sdocPrintExplicitForalls        = gopt Opt_PrintExplicitForalls dflags
+  , sdocPrintPotentialInstances     = gopt Opt_PrintPotentialInstances dflags
+  , sdocPrintEqualityRelations      = gopt Opt_PrintEqualityRelations dflags
+  , sdocSuppressTicks               = gopt Opt_SuppressTicks dflags
+  , sdocSuppressTypeSignatures      = gopt Opt_SuppressTypeSignatures dflags
+  , sdocSuppressTypeApplications    = gopt Opt_SuppressTypeApplications dflags
+  , sdocSuppressIdInfo              = gopt Opt_SuppressIdInfo dflags
+  , sdocSuppressCoercions           = gopt Opt_SuppressCoercions dflags
+  , sdocSuppressUnfoldings          = gopt Opt_SuppressUnfoldings dflags
+  , sdocSuppressVarKinds            = gopt Opt_SuppressVarKinds dflags
+  , sdocSuppressUniques             = gopt Opt_SuppressUniques dflags
+  , sdocSuppressModulePrefixes      = gopt Opt_SuppressModulePrefixes dflags
+  , sdocSuppressStgExts             = gopt Opt_SuppressStgExts dflags
+  , sdocErrorSpans                  = gopt Opt_ErrorSpans dflags
+  , sdocStarIsType                  = useStarIsType dflags
+  , sdocImpredicativeTypes          = xopt LangExt.ImpredicativeTypes dflags
+  , sdocDynFlags                    = dflags
+  }
+
+-- Avoid boolean blindness
+class BoolOption a where
+   fromBool :: Bool -> a
+   toBool   :: a -> Bool
+
+data PrintExplicitKindsOption
+   = DontPrintExplicitKinds
+   | PrintExplicitKinds
+
+instance BoolOption PrintExplicitKindsOption where
+   fromBool True  = PrintExplicitKinds
+   fromBool False = DontPrintExplicitKinds
+   toBool   PrintExplicitKinds     = True
+   toBool   DontPrintExplicitKinds = False
+
+data PrintTypecheckerElaborationOption
+   = DontPrintTypecheckerElaboration
+   | PrintTypecheckerElaboration
+
+instance BoolOption PrintTypecheckerElaborationOption where
+   fromBool True  = PrintTypecheckerElaboration
+   fromBool False = DontPrintTypecheckerElaboration
+   toBool   PrintTypecheckerElaboration     = True
+   toBool   DontPrintTypecheckerElaboration = False
+
+data PrintExplicitCoercionsOption
+   = DontPrintExplicitCoercions
+   | PrintExplicitCoercions
+
+instance BoolOption PrintExplicitCoercionsOption where
+   fromBool True  = PrintExplicitCoercions
+   fromBool False = DontPrintExplicitCoercions
+   toBool   PrintExplicitCoercions     = True
+   toBool   DontPrintExplicitCoercions = False
+
+data PrintPotentialInstancesOption
+   = DontPrintPotentialInstances
+   | PrintPotentialInstances
+
+instance BoolOption PrintPotentialInstancesOption where
+   fromBool True  = PrintPotentialInstances
+   fromBool False = DontPrintPotentialInstances
+   toBool   PrintPotentialInstances     = True
+   toBool   DontPrintPotentialInstances = False
+
