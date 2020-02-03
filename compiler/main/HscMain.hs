@@ -37,8 +37,11 @@ module HscMain
 
     -- * Compiling complete source files
     , Messager, batchMsg
-    , HscStatus (..)
-    , hscIncrementalCompile
+    , HscFrontendStatus
+    , HscFrontendStatus' (..)
+    , HscMiddleStatus (..)
+    , hscIncrementalCompileFrontend
+    , hscIncrementalCompileMiddle
     , hscMaybeWriteIface
     , hscCompileCmmFile
 
@@ -148,6 +151,7 @@ import TcEnv
 import PrelNames
 import Plugins
 import GHC.Runtime.Loader   ( initializePlugins )
+import PipelineMonad        ( HscFrontendStatus )
 
 import DynFlags
 import ErrUtils
@@ -711,16 +715,17 @@ hscIncrementalFrontend
 -- We return a interface if we already had an old one around and recompilation
 -- was not needed. Otherwise it will be created during later passes when we
 -- run the compilation pipeline.
-hscIncrementalCompile :: Bool
-                      -> Maybe TcGblEnv
-                      -> Maybe Messager
-                      -> HscEnv
-                      -> ModSummary
-                      -> SourceModified
-                      -> Maybe ModIface
-                      -> (Int,Int)
-                      -> IO (HscStatus, DynFlags)
-hscIncrementalCompile always_do_basic_recompilation_check m_tc_result
+hscIncrementalCompileFrontend
+  :: Bool
+  -> Maybe TcGblEnv
+  -> Maybe Messager
+  -> HscEnv
+  -> ModSummary
+  -> SourceModified
+  -> Maybe ModIface
+  -> (Int,Int)
+  -> IO (HscFrontendStatus, DynFlags)
+hscIncrementalCompileFrontend always_do_basic_recompilation_check m_tc_result
     mHscMessage hsc_env' mod_summary source_modified mb_old_iface mod_index
   = do
     dflags <- initializePlugins hsc_env' (hsc_dflags hsc_env')
@@ -760,14 +765,26 @@ hscIncrementalCompile always_do_basic_recompilation_check m_tc_result
                 -- in make mode, since this HMI will go into the HPT.
                 details <- genModDetails hsc_env' iface
                 return details
-            return (HscUpToDate iface details, dflags)
+            return (HscFrontendStatus_UpToDate iface details, dflags)
         -- We finished type checking.  (mb_old_hash is the hash of
         -- the interface that existed on disk; it's possible we had
         -- to retypecheck but the resulting interface is exactly
         -- the same.)
         Right (FrontendTypecheck tc_result, mb_old_hash) -> do
-            status <- finish mod_summary tc_result mb_old_hash
-            return (status, dflags)
+          (iface, mb_old_iface_hash, details) <- liftIO $
+            hscSimpleIface hsc_env tc_result mb_old_hash
+
+          -- We generate a simple interface for sake of downstream typechecking if
+          -- it wouldn't be made already in the next step
+          when (ms_hsc_src mod_summary /= HsSrcFile || ms_mod mod_summary == gHC_PRIM) $ do
+            liftIO $ hscMaybeWriteIface dflags iface mb_old_iface_hash (ms_location mod_summary)
+
+          let status = case ms_hsc_src mod_summary of
+                HsBootFile -> HscFrontendStatus_UpdateBoot iface details
+                HsigFile -> HscFrontendStatus_UpdateSig iface details
+                _ -> HscFrontendStatus_Recomp iface details mod_summary tc_result mb_old_hash
+
+          pure (status, dflags)
 
 -- Runs the post-typechecking frontend (desugar and simplify). We want to
 -- generate most of the interface as late as possible. This gets us up-to-date
@@ -781,15 +798,18 @@ hscIncrementalCompile always_do_basic_recompilation_check m_tc_result
 -- HscRecomp in turn will carry the information required to compute a interface
 -- when passed the result of the code generator. So all this can and is done at
 -- the call site of the backend code gen if it is run.
-finish :: ModSummary
-       -> TcGblEnv
-       -> Maybe Fingerprint
-       -> Hsc HscStatus
-finish summary tc_result mb_old_hash = do
+hscIncrementalCompileMiddle
+  :: ModSummary
+  -> TcGblEnv
+  -> Maybe Fingerprint
+  -> Hsc HscMiddleStatus
+hscIncrementalCompileMiddle summary tc_result mb_old_hash = do
   hsc_env <- getHscEnv
   let dflags = hsc_dflags hsc_env
       target = hscTarget dflags
       hsc_src = ms_hsc_src summary
+
+  MASSERT2(hsc_src == HsSrcFile, text "hscIncrementalCompileMiddle called with hs-boot or hs-sig.")
 
   -- Desugar, if appropriate
   --
@@ -798,7 +818,7 @@ finish summary tc_result mb_old_hash = do
   -- exceptions are when the Module is Ghc.Prim or when it is not a
   -- HsSrcFile Module.
   mb_desugar <-
-      if ms_mod summary /= gHC_PRIM && hsc_src == HsSrcFile
+      if ms_mod summary /= gHC_PRIM
       then Just <$> hscDesugar' (ms_location summary) tc_result
       else pure Nothing
 
@@ -819,26 +839,18 @@ finish summary tc_result mb_old_hash = do
                 -- See Note [Avoiding space leaks in toIface*] for details.
                 force (mkPartialIface hsc_env details simplified_guts)
 
-          return HscRecomp { hscs_guts = cg_guts,
-                             hscs_mod_location = ms_location summary,
-                             hscs_mod_details = details,
-                             hscs_partial_iface = partial_iface,
-                             hscs_old_iface_hash = mb_old_hash,
-                             hscs_iface_dflags = dflags }
+          return HscMiddleStatus_Recomp
+            { hscs_guts = cg_guts
+            , hscs_mod_location = ms_location summary
+            , hscs_mod_details = details
+            , hscs_partial_iface = partial_iface
+            , hscs_old_iface_hash = mb_old_hash
+            , hscs_iface_dflags = dflags
+            }
 
       -- We are not generating code, so we can skip simplification
       -- and generate a simple interface.
-      _ -> do
-        (iface, mb_old_iface_hash, details) <- liftIO $
-          hscSimpleIface hsc_env tc_result mb_old_hash
-
-        liftIO $ hscMaybeWriteIface dflags iface mb_old_iface_hash (ms_location summary)
-
-        return $ case (target, hsc_src) of
-          (HscNothing, _) -> HscNotGeneratingCode iface details
-          (_, HsBootFile) -> HscUpdateBoot iface details
-          (_, HsigFile) -> HscUpdateSig iface details
-          _ -> panic "finish"
+      _ -> pure $ HscMiddleStatus_NotGeneratingCode
 
 {-
 Note [Writing interface files]
