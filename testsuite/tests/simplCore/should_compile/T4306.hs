@@ -10,3 +10,4 @@ upd (UPD _ (D x _)) = sqrt $! (x*x + x*x + sin x + x*x + x*x + cos x + x*x + x*x
                                x*x + x*x + sin x + x*x + x*x + cos x + x*x + x*x + tan x +
                                x*x + x*x + sin x + x*x + x*x + cos x + x*x + x*x + tan x)
                                -- make the rhs large enough to be worker/wrapperred
+{-# NOINLINE upd #-}
