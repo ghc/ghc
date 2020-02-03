@@ -1159,7 +1159,7 @@ dsPmWarn dflags ctx@(DsMatchContext kind loc) vars result
   = when (flag_i || flag_u) $ do
       unc_examples <- getNFirstUncovered vars (maxPatterns + 1) uncovered
       let exists_r = flag_i && notNull redundant
-          exists_i = flag_i && notNull inaccessible && not is_rec_upd
+          exists_i = flag_i && notNull inaccessible
           exists_u = flag_u && notNull unc_examples
           approx   = precision == Approximate
 
@@ -1182,12 +1182,9 @@ dsPmWarn dflags ctx@(DsMatchContext kind loc) vars result
       , cr_approx  = precision } = result
     (redundant, inaccessible) = redundantAndInaccessibleRhss clauses
 
-    flag_i = wopt Opt_WarnOverlappingPatterns dflags
+    flag_i = overlapping dflags kind
     flag_u = exhaustive dflags kind
     flag_u_reason = maybe NoReason Reason (exhaustiveWarningFlag kind)
-
-    is_rec_upd = case kind of { RecUpd -> True; _ -> False }
-       -- See Note [Inaccessible warnings for record updates]
 
     maxPatterns = maxUncoveredPatterns dflags
 
@@ -1244,6 +1241,17 @@ it's impossible:
 
 We don't want to warn about the inaccessible branch because the programmer
 didn't put it there!  So we filter out the warning here.
+
+The same can happen for long distance term constraints instead of type
+constraints (#17783):
+
+  data T = A { x :: Int } | B { x :: Int }
+  f r@A{} = r { x = 3 }
+  f _     = B 0
+
+Here, the long distance info from the FunRhs match (@r ~ A x@) will make the
+clause matching on @B@ of the desugaring to @case@ redundant. It's generated
+code that we don't want to warn about.
 -}
 
 dots :: Int -> [a] -> SDoc
@@ -1259,6 +1267,12 @@ allPmCheckWarnings =
   , Opt_WarnIncompletePatternsRecUpd
   , Opt_WarnOverlappingPatterns
   ]
+
+-- | Check whether the redundancy checker should run (redundancy only)
+overlapping :: DynFlags -> HsMatchContext id -> Bool
+-- See Note [Inaccessible warnings for record updates]
+overlapping _      RecUpd = False
+overlapping dflags _      = wopt Opt_WarnOverlappingPatterns dflags
 
 -- | Check whether the exhaustiveness checker should run (exhaustiveness only)
 exhaustive :: DynFlags -> HsMatchContext id -> Bool
