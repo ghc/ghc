@@ -417,10 +417,10 @@ splitIfaceSigmaTy ty
         = case split_rho ty2 of { (ps, tau) -> (ty1:ps, tau) }
     split_rho tau = ([], tau)
 
-suppressIfaceInvisibles :: DynFlags -> [IfaceTyConBinder] -> [a] -> [a]
-suppressIfaceInvisibles dflags tys xs
-  | gopt Opt_PrintExplicitKinds dflags = xs
-  | otherwise = suppress tys xs
+suppressIfaceInvisibles :: PrintExplicitKinds -> [IfaceTyConBinder] -> [a] -> [a]
+suppressIfaceInvisibles (PrintExplicitKinds True) _tys xs = xs
+suppressIfaceInvisibles (PrintExplicitKinds False) tys xs
+  = suppress tys xs
     where
       suppress _       []      = []
       suppress []      a       = a
@@ -428,10 +428,10 @@ suppressIfaceInvisibles dflags tys xs
         | isInvisibleTyConBinder k =     suppress ks xs
         | otherwise                = x : suppress ks xs
 
-stripIfaceInvisVars :: DynFlags -> [IfaceTyConBinder] -> [IfaceTyConBinder]
-stripIfaceInvisVars dflags tyvars
-  | gopt Opt_PrintExplicitKinds dflags = tyvars
-  | otherwise = filterOut isInvisibleTyConBinder tyvars
+stripIfaceInvisVars :: PrintExplicitKinds -> [IfaceTyConBinder] -> [IfaceTyConBinder]
+stripIfaceInvisVars (PrintExplicitKinds True)  tyvars = tyvars
+stripIfaceInvisVars (PrintExplicitKinds False) tyvars
+  = filterOut isInvisibleTyConBinder tyvars
 
 -- | Extract an 'IfaceBndr' from an 'IfaceForAllBndr'.
 ifForAllBndrVar :: IfaceForAllBndr -> IfaceBndr
@@ -551,10 +551,9 @@ substIfaceTyVar env tv
 ************************************************************************
 -}
 
-stripInvisArgs :: DynFlags -> IfaceAppArgs -> IfaceAppArgs
-stripInvisArgs dflags tys
-  | gopt Opt_PrintExplicitKinds dflags = tys
-  | otherwise = suppress_invis tys
+stripInvisArgs :: PrintExplicitKinds -> IfaceAppArgs -> IfaceAppArgs
+stripInvisArgs (PrintExplicitKinds True)  tys = tys
+stripInvisArgs (PrintExplicitKinds False) tys = suppress_invis tys
     where
       suppress_invis c
         = case c of
@@ -687,10 +686,9 @@ if_print_coercions :: SDoc  -- ^ if printing coercions
                    -> SDoc  -- ^ otherwise
                    -> SDoc
 if_print_coercions yes no
-  = sdocWithDynFlags $ \dflags ->
+  = sdocOption sdocPrintExplicitCoercions $ \print_co ->
     getPprStyle $ \style ->
-    if gopt Opt_PrintExplicitCoercions dflags
-         || dumpStyle style || debugStyle style
+    if print_co || dumpStyle style || debugStyle style
     then yes
     else no
 
@@ -853,12 +851,13 @@ ppr_ty ctxt_prec (IfaceAppTy t ts)
       ppr_app_ty_no_casts
   where
     ppr_app_ty =
-        sdocWithDynFlags $ \dflags ->
-        pprIfacePrefixApp ctxt_prec
-                          (ppr_ty funPrec t)
-                          (map (ppr_app_arg appPrec) (tys_wo_kinds dflags))
+        sdocOption sdocPrintExplicitKinds $ \print_kinds ->
+        let tys_wo_kinds = appArgsIfaceTypesArgFlags $ stripInvisArgs
+                              (PrintExplicitKinds print_kinds) ts
+        in pprIfacePrefixApp ctxt_prec
+                             (ppr_ty funPrec t)
+                             (map (ppr_app_arg appPrec) tys_wo_kinds)
 
-    tys_wo_kinds dflags = appArgsIfaceTypesArgFlags $ stripInvisArgs dflags ts
 
     -- Strip any casts from the head of the application
     ppr_app_ty_no_casts =
@@ -1009,9 +1008,9 @@ defaultRuntimeRepVars ty = go False emptyFsEnv ty
 
 eliminateRuntimeRep :: (IfaceType -> SDoc) -> IfaceType -> SDoc
 eliminateRuntimeRep f ty
-  = sdocWithDynFlags $ \dflags ->
+  = sdocOption sdocPrintExplicitRuntimeReps $ \printExplicitRuntimeReps ->
     getPprStyle      $ \sty    ->
-    if userStyle sty && not (gopt Opt_PrintExplicitRuntimeReps dflags)
+    if userStyle sty && not printExplicitRuntimeReps
       then f (defaultRuntimeRepVars ty)
       else f ty
 
@@ -1032,9 +1031,8 @@ ppr_app_args ctx_prec = go
 -- See Note [Pretty-printing invisible arguments]
 ppr_app_arg :: PprPrec -> (IfaceType, ArgFlag) -> SDoc
 ppr_app_arg ctx_prec (t, argf) =
-  sdocWithDynFlags $ \dflags ->
-  let print_kinds = gopt Opt_PrintExplicitKinds dflags
-  in case argf of
+  sdocOption sdocPrintExplicitKinds $ \print_kinds ->
+  case argf of
        Required  -> ppr_ty ctx_prec t
        Specified |  print_kinds
                  -> char '@' <> ppr_ty appPrec t
@@ -1131,11 +1129,11 @@ pprIfaceSigmaType show_forall ty
 
 pprUserIfaceForAll :: [IfaceForAllBndr] -> SDoc
 pprUserIfaceForAll tvs
-   = sdocWithDynFlags $ \dflags ->
+   = sdocOption sdocPrintExplicitForalls $ \print_foralls ->
      -- See Note [When to print foralls] in this module.
      ppWhen (any tv_has_kind_var tvs
              || any tv_is_required tvs
-             || gopt Opt_PrintExplicitForalls dflags) $
+             || print_foralls) $
      pprIfaceForAll tvs
    where
      tv_has_kind_var (Bndr (IfaceTvBndr (_,kind)) _)
@@ -1282,13 +1280,13 @@ pprIfaceTypeApp prec tc args = pprTyTcApp prec tc args
 
 pprTyTcApp :: PprPrec -> IfaceTyCon -> IfaceAppArgs -> SDoc
 pprTyTcApp ctxt_prec tc tys =
-    sdocWithDynFlags $ \dflags ->
+    sdocOption sdocPrintExplicitKinds $ \print_kinds ->
     getPprStyle $ \style ->
-    pprTyTcApp' ctxt_prec tc tys dflags style
+    pprTyTcApp' ctxt_prec tc tys (PrintExplicitKinds print_kinds) style
 
 pprTyTcApp' :: PprPrec -> IfaceTyCon -> IfaceAppArgs
-            -> DynFlags -> PprStyle -> SDoc
-pprTyTcApp' ctxt_prec tc tys dflags style
+            -> PrintExplicitKinds -> PprStyle -> SDoc
+pprTyTcApp' ctxt_prec tc tys printExplicitKinds style
   | ifaceTyConName tc `hasKey` ipClassKey
   , IA_Arg (IfaceLitTy (IfaceStrTyLit n))
            Required (IA_Arg ty Required IA_Nil) <- tys
@@ -1304,7 +1302,7 @@ pprTyTcApp' ctxt_prec tc tys dflags style
   = pprSum arity (ifaceTyConIsPromoted info) tys
 
   | tc `ifaceTyConHasKey` consDataConKey
-  , not (gopt Opt_PrintExplicitKinds dflags)
+  , PrintExplicitKinds False <- printExplicitKinds
   , IA_Arg _ argf (IA_Arg ty1 Required (IA_Arg ty2 Required IA_Nil)) <- tys
   , isInvisibleArgFlag argf
   = pprIfaceTyList ctxt_prec ty1 ty2
@@ -1327,15 +1325,14 @@ pprTyTcApp' ctxt_prec tc tys dflags style
          -> ppr_iface_tc_app ppr_app_arg ctxt_prec tc tys_wo_kinds
   where
     info = ifaceTyConInfo tc
-    tys_wo_kinds = appArgsIfaceTypesArgFlags $ stripInvisArgs dflags tys
+    tys_wo_kinds = appArgsIfaceTypesArgFlags $ stripInvisArgs printExplicitKinds tys
 
 ppr_kind_type :: PprPrec -> SDoc
 ppr_kind_type ctxt_prec =
-  sdocWithDynFlags $ \dflags ->
-    if useStarIsType dflags
-    then maybeParen ctxt_prec starPrec $
-         unicodeSyntax (char '★') (char '*')
-    else text "Type"
+  ppIfOption sdocStarIsType
+    (maybeParen ctxt_prec starPrec $
+     unicodeSyntax (char '★') (char '*'))
+    (text "Type")
 
 -- | Pretty-print a type-level equality.
 -- Returns (Just doc) if the argument is a /saturated/ application
@@ -1378,11 +1375,13 @@ ppr_equality ctxt_prec tc args
     nominal_eq_tc = tc_name `hasKey` heqTyConKey       -- (~~)
                  || tc_name `hasKey` eqPrimTyConKey    -- (~#)
     print_equality args =
-        sdocWithDynFlags $ \dflags ->
+        sdocOption sdocPrintExplicitKinds $ \print_kinds ->
+        sdocOption sdocPrintEqualityRelations $ \print_eqs ->
         getPprStyle      $ \style  ->
-        print_equality' args style dflags
+        print_equality' args print_kinds
+          (print_eqs || dumpStyle style || debugStyle style)
 
-    print_equality' (ki1, ki2, ty1, ty2) style dflags
+    print_equality' (ki1, ki2, ty1, ty2) print_kinds print_eqs
       | -- If -fprint-equality-relations is on, just print the original TyCon
         print_eqs
       = ppr_infix_eq (ppr tc)
@@ -1416,10 +1415,6 @@ ppr_equality ctxt_prec tc args
               = parens (pp topPrec ty <+> dcolon <+> pp opPrec ki)
               | otherwise
               = pp opPrec ty
-
-        print_kinds = gopt Opt_PrintExplicitKinds dflags
-        print_eqs   = gopt Opt_PrintEqualityRelations dflags ||
-                      dumpStyle style || debugStyle style
 
 
 pprIfaceCoTcApp :: PprPrec -> IfaceTyCon -> [IfaceCoercion] -> SDoc

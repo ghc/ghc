@@ -45,7 +45,6 @@ import GHC.Cmm.CLabel
 import GHC.Cmm
 import GHC.Cmm.Utils
 import GHC.Cmm.Switch
-import DynFlags
 import FastString
 import Outputable
 import GHC.Cmm.Ppr.Decl
@@ -181,22 +180,19 @@ pprNode :: CmmNode e x -> SDoc
 pprNode node = pp_node <+> pp_debug
   where
     pp_node :: SDoc
-    pp_node = sdocWithDynFlags $ \dflags -> case node of
+    pp_node = case node of
       -- label:
-      CmmEntry id tscope -> lbl <> colon <+>
-         (sdocWithDynFlags $ \dflags ->
-           ppUnless (gopt Opt_SuppressTicks dflags) (text "//" <+> ppr tscope))
-          where
-            lbl = if gopt Opt_SuppressUniques dflags
-                then text "_lbl_"
-                else ppr id
+      CmmEntry id tscope ->
+         ppIfOption sdocSuppressUniques (text "_lbl_") (ppr id)
+         <> colon
+         <+> ppUnlessOption sdocSuppressTicks (text "//" <+> ppr tscope)
 
       -- // text
       CmmComment s -> text "//" <+> ftext s
 
       -- //tick bla<...>
-      CmmTick t -> ppUnless (gopt Opt_SuppressTicks dflags) $
-                   text "//tick" <+> ppr t
+      CmmTick t -> ppUnlessOption sdocSuppressTicks
+                     (text "//tick" <+> ppr t)
 
       -- unwind reg = expr;
       CmmUnwind regs ->

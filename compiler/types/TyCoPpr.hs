@@ -49,8 +49,6 @@ import GHC.Iface.Type
 import VarSet
 import VarEnv
 
-import DynFlags   ( gopt_set,
-                    GeneralFlag(Opt_PrintExplicitKinds, Opt_PrintExplicitRuntimeReps) )
 import Outputable
 import BasicTypes ( PprPrec(..), topPrec, sigPrec, opPrec
                   , funPrec, appPrec, maybeParen )
@@ -318,14 +316,14 @@ pprTypeApp tc tys
 -- See @Note [Kind arguments in error messages]@ in TcErrors.
 pprWithExplicitKindsWhen :: Bool -> SDoc -> SDoc
 pprWithExplicitKindsWhen b
-  = updSDocDynFlags $ \dflags ->
-      if b then gopt_set dflags Opt_PrintExplicitKinds
-           else dflags
+  = updSDocContext $ \ctx ->
+      if b then ctx { sdocPrintExplicitKinds = True }
+           else ctx
 
 -- | This variant preserves any use of TYPE in a type, effectively
 -- locally setting -fprint-explicit-runtime-reps.
 pprWithTYPE :: Type -> SDoc
-pprWithTYPE ty = updSDocDynFlags (flip gopt_set Opt_PrintExplicitRuntimeReps) $
+pprWithTYPE ty = updSDocContext (\ctx -> ctx { sdocPrintExplicitRuntimeReps = True }) $
                  ppr ty
 
 -- | Pretty prints a 'TyCon', using the family instance in case of a
