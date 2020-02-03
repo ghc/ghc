@@ -177,7 +177,7 @@ pprDwarfInfoOpen _ (DwarfSubprogram _ name label
   ppr (mkAsmTempDieLabel label) <> colon
   $$ pprAbbrev abbrev
   $$ pprString name
-  $$ pprString (renderWithStyle df (ppr label) (mkCodeStyle CStyle))
+  $$ pprString (renderWithStyle (initSDocContext df (mkCodeStyle CStyle)) (ppr label))
   $$ pprFlag (externallyVisibleCLabel label)
   $$ pprWord (ppr label)
   $$ pprWord (ppr $ mkAsmTempEndLabel label)
@@ -192,11 +192,11 @@ pprDwarfInfoOpen _ (DwarfSubprogram _ name label
 pprDwarfInfoOpen _ (DwarfBlock _ label Nothing) = sdocWithDynFlags $ \df ->
   ppr (mkAsmTempDieLabel label) <> colon
   $$ pprAbbrev DwAbbrBlockWithoutCode
-  $$ pprString (renderWithStyle df (ppr label) (mkCodeStyle CStyle))
+  $$ pprString (renderWithStyle (initSDocContext df (mkCodeStyle CStyle)) (ppr label))
 pprDwarfInfoOpen _ (DwarfBlock _ label (Just marker)) = sdocWithDynFlags $ \df ->
   ppr (mkAsmTempDieLabel label) <> colon
   $$ pprAbbrev DwAbbrBlock
-  $$ pprString (renderWithStyle df (ppr label) (mkCodeStyle CStyle))
+  $$ pprString (renderWithStyle (initSDocContext df (mkCodeStyle CStyle)) (ppr label))
   $$ pprWord (ppr marker)
   $$ pprWord (ppr $ mkAsmTempEndLabel marker)
 pprDwarfInfoOpen _ (DwarfSrcNote ss) =
