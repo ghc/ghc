@@ -1,4 +1,4 @@
 
 T12574.hs:3:1: warning: [-Wmissing-local-signatures]
     Polymorphic local binding with no type signature:
-      T12574.id :: forall p. p -> p
+      T12574.id :: forall {p}. p -> p

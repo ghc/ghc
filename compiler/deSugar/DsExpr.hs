@@ -257,64 +257,65 @@ dsLExprNoLP (L loc e)
        ; return e' }
 
 dsExpr :: HsExpr GhcTc -> DsM CoreExpr
-dsExpr = ds_expr False
+dsExpr (HsPar _ e)            = dsLExpr e
+dsExpr (ExprWithTySig _ e _)  = dsLExpr e
+dsExpr (HsVar _ (L _ var))    = dsHsVar var
+dsExpr (HsUnboundVar {})      = panic "dsExpr: HsUnboundVar" -- Typechecker eliminates them
+dsExpr (HsConLikeOut _ con)   = dsConLike con
+dsExpr (HsIPVar {})           = panic "dsExpr: HsIPVar"
+dsExpr (HsOverLabel{})        = panic "dsExpr: HsOverLabel"
 
-ds_expr :: Bool   -- are we directly inside an HsWrap?
-                  -- See Wrinkle in Note [Detecting forced eta expansion]
-        -> HsExpr GhcTc -> DsM CoreExpr
-ds_expr _ (HsPar _ e)            = dsLExpr e
-ds_expr _ (ExprWithTySig _ e _)  = dsLExpr e
-ds_expr w (HsVar _ (L _ var))    = dsHsVar w var
-ds_expr _ (HsUnboundVar {})      = panic "dsExpr: HsUnboundVar" -- Typechecker eliminates them
-ds_expr w (HsConLikeOut _ con)   = dsConLike w con
-ds_expr _ (HsIPVar {})           = panic "dsExpr: HsIPVar"
-ds_expr _ (HsOverLabel{})        = panic "dsExpr: HsOverLabel"
-
-ds_expr _ (HsLit _ lit)
+dsExpr (HsLit _ lit)
   = do { warnAboutOverflowedLit lit
        ; dsLit (convertLit lit) }
 
-ds_expr _ (HsOverLit _ lit)
+dsExpr (HsOverLit _ lit)
   = do { warnAboutOverflowedOverLit lit
        ; dsOverLit lit }
 
-ds_expr _ (XExpr (HsWrap co_fn e))
-  = do { e' <- ds_expr True e    -- This is the one place where we recurse to
-                                 -- ds_expr (passing True), rather than dsExpr
+dsExpr hswrap@(XExpr (HsWrap co_fn e))
+  = do { e' <- case e of
+                 HsVar _ (L _ var) -> return $ varToCoreExpr var
+                 HsConLikeOut _ (RealDataCon dc) -> return $ varToCoreExpr (dataConWrapId dc)
+                 XExpr (HsWrap _ _) -> pprPanic "dsExpr: HsWrap inside HsWrap" (ppr hswrap)
+                 HsPar _ _ -> pprPanic "dsExpr: HsPar inside HsWrap" (ppr hswrap)
+                 _ -> dsExpr e
+               -- See Note [Detecting forced eta expansion]
        ; wrap' <- dsHsWrapper co_fn
        ; dflags <- getDynFlags
        ; let wrapped_e = wrap' e'
              wrapped_ty = exprType wrapped_e
-       ; checkForcedEtaExpansion e wrapped_ty -- See Note [Detecting forced eta expansion]
+       ; checkForcedEtaExpansion e (ppr hswrap) wrapped_ty -- See Note [Detecting forced eta expansion]
+         -- Pass HsWrap, so that the user can see entire expression with -fprint-typechecker-elaboration
        ; warnAboutIdentities dflags e' wrapped_ty
        ; return wrapped_e }
 
-ds_expr _ (NegApp _ (L loc
-                      (HsOverLit _ lit@(OverLit { ol_val = HsIntegral i})))
-                  neg_expr)
+dsExpr (NegApp _ (L loc
+                    (HsOverLit _ lit@(OverLit { ol_val = HsIntegral i})))
+                neg_expr)
   = do { expr' <- putSrcSpanDs loc $ do
           { warnAboutOverflowedOverLit
               (lit { ol_val = HsIntegral (negateIntegralLit i) })
           ; dsOverLit lit }
        ; dsSyntaxExpr neg_expr [expr'] }
 
-ds_expr _ (NegApp _ expr neg_expr)
+dsExpr (NegApp _ expr neg_expr)
   = do { expr' <- dsLExpr expr
        ; dsSyntaxExpr neg_expr [expr'] }
 
-ds_expr _ (HsLam _ a_Match)
+dsExpr (HsLam _ a_Match)
   = uncurry mkLams <$> matchWrapper LambdaExpr Nothing a_Match
 
-ds_expr _ (HsLamCase _ matches)
+dsExpr (HsLamCase _ matches)
   = do { ([discrim_var], matching_code) <- matchWrapper CaseAlt Nothing matches
        ; return $ Lam discrim_var matching_code }
 
-ds_expr _ e@(HsApp _ fun arg)
+dsExpr e@(HsApp _ fun arg)
   = do { fun' <- dsLExpr fun
        ; dsWhenNoErrs (dsLExprNoLP arg)
                       (\arg' -> mkCoreAppDs (text "HsApp" <+> ppr e) fun' arg') }
 
-ds_expr _ (HsAppType _ e _)
+dsExpr (HsAppType _ e _)
     -- ignore type arguments here; they're in the wrappers instead at this point
   = dsLExpr e
 
@@ -357,19 +358,19 @@ If \tr{expr} is actually just a variable, say, then the simplifier
 will sort it out.
 -}
 
-ds_expr _ e@(OpApp _ e1 op e2)
+dsExpr e@(OpApp _ e1 op e2)
   = -- for the type of y, we need the type of op's 2nd argument
     do { op' <- dsLExpr op
        ; dsWhenNoErrs (mapM dsLExprNoLP [e1, e2])
                       (\exprs' -> mkCoreAppsDs (text "opapp" <+> ppr e) op' exprs') }
 
-ds_expr _ (SectionL _ expr op)       -- Desugar (e !) to ((!) e)
+dsExpr (SectionL _ expr op)       -- Desugar (e !) to ((!) e)
   = do { op' <- dsLExpr op
        ; dsWhenNoErrs (dsLExprNoLP expr)
                       (\expr' -> mkCoreAppDs (text "sectionl" <+> ppr expr) op' expr') }
 
 -- dsLExpr (SectionR op expr)   -- \ x -> op x expr
-ds_expr _ e@(SectionR _ op expr) = do
+dsExpr e@(SectionR _ op expr) = do
     core_op <- dsLExpr op
     -- for the type of x, we need the type of op's 2nd argument
     let (x_ty:y_ty:_, _) = splitFunTys (exprType core_op)
@@ -380,7 +381,7 @@ ds_expr _ e@(SectionR _ op expr) = do
                                    Lam x_id (mkCoreAppsDs (text "sectionr" <+> ppr e)
                                                           core_op [Var x_id, Var y_id]))
 
-ds_expr _ (ExplicitTuple _ tup_args boxity)
+dsExpr (ExplicitTuple _ tup_args boxity)
   = do { let go (lam_vars, args) (L _ (Missing ty))
                     -- For every missing expression, we need
                     -- another lambda in the desugaring.
@@ -391,7 +392,7 @@ ds_expr _ (ExplicitTuple _ tup_args boxity)
                     -- lambdas, just arguments.
                = do { core_expr <- dsLExprNoLP expr
                     ; return (lam_vars, core_expr : args) }
-             go _ _ = panic "ds_expr"
+             go _ _ = panic "dsExpr"
 
        ; dsWhenNoErrs (foldM go ([], []) (reverse tup_args))
                 -- The reverse is because foldM goes left-to-right
@@ -399,37 +400,37 @@ ds_expr _ (ExplicitTuple _ tup_args boxity)
                                             mkCoreTupBoxity boxity args) }
                         -- See Note [Don't flatten tuples from HsSyn] in MkCore
 
-ds_expr _ (ExplicitSum types alt arity expr)
+dsExpr (ExplicitSum types alt arity expr)
   = do { dsWhenNoErrs (dsLExprNoLP expr)
                       (\core_expr -> mkCoreConApps (sumDataCon alt arity)
                                      (map (Type . getRuntimeRep) types ++
                                       map Type types ++
                                       [core_expr]) ) }
 
-ds_expr _ (HsPragE _ prag expr) =
+dsExpr (HsPragE _ prag expr) =
   ds_prag_expr prag expr
 
-ds_expr _ (HsCase _ discrim matches)
+dsExpr (HsCase _ discrim matches)
   = do { core_discrim <- dsLExpr discrim
        ; ([discrim_var], matching_code) <- matchWrapper CaseAlt (Just discrim) matches
        ; return (bindNonRec discrim_var core_discrim matching_code) }
 
 -- Pepe: The binds are in scope in the body but NOT in the binding group
 --       This is to avoid silliness in breakpoints
-ds_expr _ (HsLet _ binds body) = do
+dsExpr (HsLet _ binds body) = do
     body' <- dsLExpr body
     dsLocalBinds binds body'
 
 -- We need the `ListComp' form to use `deListComp' (rather than the "do" form)
 -- because the interpretation of `stmts' depends on what sort of thing it is.
 --
-ds_expr _ (HsDo res_ty ListComp (L _ stmts)) = dsListComp stmts res_ty
-ds_expr _ (HsDo _ DoExpr        (L _ stmts)) = dsDo stmts
-ds_expr _ (HsDo _ GhciStmtCtxt  (L _ stmts)) = dsDo stmts
-ds_expr _ (HsDo _ MDoExpr       (L _ stmts)) = dsDo stmts
-ds_expr _ (HsDo _ MonadComp     (L _ stmts)) = dsMonadComp stmts
+dsExpr (HsDo res_ty ListComp (L _ stmts)) = dsListComp stmts res_ty
+dsExpr (HsDo _ DoExpr        (L _ stmts)) = dsDo stmts
+dsExpr (HsDo _ GhciStmtCtxt  (L _ stmts)) = dsDo stmts
+dsExpr (HsDo _ MDoExpr       (L _ stmts)) = dsDo stmts
+dsExpr (HsDo _ MonadComp     (L _ stmts)) = dsMonadComp stmts
 
-ds_expr _ (HsIf _ fun guard_expr then_expr else_expr)
+dsExpr (HsIf _ fun guard_expr then_expr else_expr)
   = do { pred <- dsLExpr guard_expr
        ; b1 <- dsLExpr then_expr
        ; b2 <- dsLExpr else_expr
@@ -437,7 +438,7 @@ ds_expr _ (HsIf _ fun guard_expr then_expr else_expr)
            (SyntaxExprTc {}) -> dsSyntaxExpr fun [pred, b1, b2]
            NoSyntaxExprTc    -> return $ mkIfThenElse pred b1 b2 }
 
-ds_expr _ (HsMultiIf res_ty alts)
+dsExpr (HsMultiIf res_ty alts)
   | null alts
   = mkErrorExpr
 
@@ -457,10 +458,10 @@ ds_expr _ (HsMultiIf res_ty alts)
              ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 -}
 
-ds_expr _ (ExplicitList elt_ty wit xs)
+dsExpr (ExplicitList elt_ty wit xs)
   = dsExplicitList elt_ty wit xs
 
-ds_expr _ (ArithSeq expr witness seq)
+dsExpr (ArithSeq expr witness seq)
   = case witness of
      Nothing -> dsArithSeq expr seq
      Just fl -> do { newArithSeq <- dsArithSeq expr seq
@@ -477,7 +478,7 @@ See Note [Grand plan for static forms] in StaticPtrTable for an overview.
     g = ... makeStatic loc f ...
 -}
 
-ds_expr _ (HsStatic _ expr@(L loc _)) = do
+dsExpr (HsStatic _ expr@(L loc _)) = do
     expr_ds <- dsLExprNoLP expr
     let ty = exprType expr_ds
     makeStaticId <- dsLookupGlobalId makeStaticName
@@ -519,9 +520,9 @@ We also handle @C{}@ as valid construction syntax for an unlabelled
 constructor @C@, setting all of @C@'s fields to bottom.
 -}
 
-ds_expr _ (RecordCon { rcon_flds = rbinds
-                     , rcon_ext = RecordConTc { rcon_con_expr = con_expr
-                                              , rcon_con_like = con_like }})
+dsExpr (RecordCon { rcon_flds = rbinds
+                  , rcon_ext = RecordConTc { rcon_con_expr = con_expr
+                                           , rcon_con_like = con_like }})
   = do { con_expr' <- dsExpr con_expr
        ; let
              (arg_tys, _) = tcSplitFunTys (exprType con_expr')
@@ -579,12 +580,12 @@ So we need to cast (T a Int) to (T a b).  Sigh.
 
 -}
 
-ds_expr _ expr@(RecordUpd { rupd_expr = record_expr, rupd_flds = fields
-                          , rupd_ext = RecordUpdTc
-                              { rupd_cons = cons_to_upd
-                              , rupd_in_tys = in_inst_tys
-                              , rupd_out_tys = out_inst_tys
-                              , rupd_wrap = dict_req_wrap }} )
+dsExpr expr@(RecordUpd { rupd_expr = record_expr, rupd_flds = fields
+                       , rupd_ext = RecordUpdTc
+                           { rupd_cons = cons_to_upd
+                           , rupd_in_tys = in_inst_tys
+                           , rupd_out_tys = out_inst_tys
+                           , rupd_wrap = dict_req_wrap }} )
   | null fields
   = dsLExpr record_expr
   | otherwise
@@ -729,16 +730,16 @@ Thus, we pass @r@ as the scrutinee expression to @matchWrapper@ above.
 
 -- Template Haskell stuff
 
-ds_expr _ (HsRnBracketOut _ _ _)  = panic "dsExpr HsRnBracketOut"
-ds_expr _ (HsTcBracketOut _ hs_wrapper x ps) = dsBracket hs_wrapper x ps
-ds_expr _ (HsSpliceE _ s)         = pprPanic "dsExpr:splice" (ppr s)
+dsExpr (HsRnBracketOut _ _ _)  = panic "dsExpr HsRnBracketOut"
+dsExpr (HsTcBracketOut _ hs_wrapper x ps) = dsBracket hs_wrapper x ps
+dsExpr (HsSpliceE _ s)         = pprPanic "dsExpr:splice" (ppr s)
 
 -- Arrow notation extension
-ds_expr _ (HsProc _ pat cmd) = dsProcExpr pat cmd
+dsExpr (HsProc _ pat cmd) = dsProcExpr pat cmd
 
 -- Hpc Support
 
-ds_expr _ (HsTick _ tickish e) = do
+dsExpr (HsTick _ tickish e) = do
   e' <- dsLExpr e
   return (Tick tickish e')
 
@@ -749,16 +750,16 @@ ds_expr _ (HsTick _ tickish e) = do
 -- (did you go here: YES or NO), but will effect accurate
 -- tick counting.
 
-ds_expr _ (HsBinTick _ ixT ixF e) = do
+dsExpr (HsBinTick _ ixT ixF e) = do
   e2 <- dsLExpr e
   do { ASSERT(exprType e2 `eqType` boolTy)
        mkBinaryTickBox ixT ixF e2
      }
 
 -- HsSyn constructs that just shouldn't be here:
-ds_expr _ (HsBracket     {})  = panic "dsExpr:HsBracket"
-ds_expr _ (HsDo          {})  = panic "dsExpr:HsDo"
-ds_expr _ (HsRecFld      {})  = panic "dsExpr:HsRecFld"
+dsExpr (HsBracket     {})  = panic "dsExpr:HsBracket"
+dsExpr (HsDo          {})  = panic "dsExpr:HsDo"
+dsExpr (HsRecFld      {})  = panic "dsExpr:HsRecFld"
 
 ds_prag_expr :: HsPragE GhcTc -> LHsExpr GhcTc -> DsM CoreExpr
 ds_prag_expr (HsPragSCC _ _ cc) expr = do
@@ -1036,26 +1037,18 @@ mk_fail_msg dflags pat = "Pattern match failure in do expression at " ++
 ************************************************************************
 -}
 
-dsHsVar :: Bool  -- are we directly inside an HsWrap?
-                 -- See Wrinkle in Note [Detecting forced eta expansion]
-        -> Id -> DsM CoreExpr
-dsHsVar w var
-  | not w
-  , let bad_tys = badUseOfLevPolyPrimop var ty
-  , not (null bad_tys)
-  = do { levPolyPrimopErr var ty bad_tys
-       ; return unitExpr }  -- return something eminently safe
-
-  | otherwise
-  = return (varToCoreExpr var)   -- See Note [Desugaring vars]
+dsHsVar :: Id -> DsM CoreExpr
+dsHsVar var
+               -- See Wrinkle in Note [Detecting forced eta expansion]
+  = ASSERT2(null (badUseOfLevPolyPrimop var ty), ppr var $$ ppr ty)
+    return (varToCoreExpr var)   -- See Note [Desugaring vars]
 
   where
     ty = idType var
 
-dsConLike :: Bool  -- as in dsHsVar
-          -> ConLike -> DsM CoreExpr
-dsConLike w (RealDataCon dc) = dsHsVar w (dataConWrapId dc)
-dsConLike _ (PatSynCon ps)   = return $ case patSynBuilder ps of
+dsConLike :: ConLike -> DsM CoreExpr
+dsConLike (RealDataCon dc) = dsHsVar (dataConWrapId dc)
+dsConLike (PatSynCon ps)   = return $ case patSynBuilder ps of
   Just (id, add_void)
     | add_void  -> mkCoreApp (text "dsConLike" <+> ppr ps) (Var id) (Var voidPrimId)
     | otherwise -> Var id
@@ -1131,7 +1124,8 @@ polymorphic. So the right spot seems to be to look after the Id has
 been applied to its type arguments. To make the algorithm efficient,
 it's important to be able to spot ((#,#) @a @b @c @d) without looking
 past all the type arguments. We thus require that
-  * The body of an HsWrap is not an HsWrap.
+  * The body of an HsWrap is not an HsWrap, nor an HsPar.
+This invariant is checked in dsExpr.
 With that representation invariant, we simply look inside every HsWrap
 to see if its body is an HsVar whose Id hasNoBinding. Then, we look
 at the wrapped type. If it has any levity polymorphic arguments, reject.
@@ -1147,30 +1141,33 @@ So, either way, we're good to reject.
 
 Wrinkle
 ~~~~~~~
-Not all polymorphic Ids are wrapped in
-HsWrap, due to the lazy instantiation of TypeApplications. (See "Visible type
-application", ESOP '16.) But if we spot a levity-polymorphic hasNoBinding Id
-without a wrapper, then that is surely problem and we can reject.
+Currently, all levity-polymorphic Ids are wrapped in HsWrap.
 
-We thus have a parameter to `dsExpr` that tracks whether or not we are
-directly in an HsWrap. If we find a levity-polymorphic hasNoBinding Id when
-we're not directly in an HsWrap, reject.
+However, this is not set in stone, in the future we might make
+instantiation more lazy.  (See "Visible type application", ESOP '16.)
+If we spot a levity-polymorphic hasNoBinding Id without a wrapper,
+then that is surely a problem. In this case, we raise an assertion failure.
+This failure can be changed to a call to `levPolyPrimopErr` in the future,
+if we decide to change instantiation.
 
+We can just check HsVar and HsConLikeOut for RealDataCon, since
+we don't have levity-polymorphic pattern synonyms. (This might change
+in the future.)
 -}
 
 -- | Takes an expression and its instantiated type. If the expression is an
 -- HsVar with a hasNoBinding primop and the type has levity-polymorphic arguments,
 -- issue an error. See Note [Detecting forced eta expansion]
-checkForcedEtaExpansion :: HsExpr GhcTc -> Type -> DsM ()
-checkForcedEtaExpansion expr ty
+checkForcedEtaExpansion :: HsExpr GhcTc -> SDoc -> Type -> DsM ()
+checkForcedEtaExpansion expr expr_doc ty
   | Just var <- case expr of
                   HsVar _ (L _ var)               -> Just var
                   HsConLikeOut _ (RealDataCon dc) -> Just (dataConWrapId dc)
                   _                               -> Nothing
   , let bad_tys = badUseOfLevPolyPrimop var ty
   , not (null bad_tys)
-  = levPolyPrimopErr var ty bad_tys
-checkForcedEtaExpansion _ _ = return ()
+  = levPolyPrimopErr expr_doc ty bad_tys
+checkForcedEtaExpansion _ _ _ = return ()
 
 -- | Is this a hasNoBinding Id with a levity-polymorphic type?
 -- Returns the arguments that are levity polymorphic if they are bad;
@@ -1186,11 +1183,17 @@ badUseOfLevPolyPrimop id ty
     (binders, _) = splitPiTys ty
     arg_tys      = mapMaybe binderRelevantType_maybe binders
 
-levPolyPrimopErr :: Id -> Type -> [Type] -> DsM ()
-levPolyPrimopErr primop ty bad_tys
+levPolyPrimopErr :: SDoc -> Type -> [Type] -> DsM ()
+levPolyPrimopErr expr_doc ty bad_tys
   = errDs $ vcat
     [ hang (text "Cannot use function with levity-polymorphic arguments:")
-         2 (ppr primop <+> dcolon <+> pprWithTYPE ty)
+         2 (expr_doc <+> dcolon <+> pprWithTYPE ty)
+    , sdocWithDynFlags $ \dflags ->
+      if not (gopt Opt_PrintTypecheckerElaboration dflags) then vcat
+        [ text "(Note that levity-polymorphic primops such as 'coerce' and unboxed tuples"
+        , text "are eta-expanded internally because they must occur fully saturated."
+        , text "Use -fprint-typechecker-elaboration to display the full expression.)"
+        ] else empty
     , hang (text "Levity-polymorphic arguments:")
          2 $ vcat $ map
            (\t -> pprWithTYPE t <+> dcolon <+> pprWithTYPE (typeKind t))

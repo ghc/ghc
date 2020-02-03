@@ -1,6 +1,6 @@
 TYPE SIGNATURES
-  bar :: forall t _. t -> (t -> _) -> _
-  foo :: forall a. (Show a, Enum a) => a -> String
+  bar :: forall {t} {_}. t -> (t -> _) -> _
+  foo :: forall {a}. (Show a, Enum a) => a -> String
 Dependent modules: []
 Dependent packages: [base-4.13.0.0, ghc-prim-0.6.1,
                      integer-gmp-1.0.2.0]

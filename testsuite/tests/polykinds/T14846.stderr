@@ -3,7 +3,7 @@ T14846.hs:38:8: error:
     • Couldn't match type ‘ríki’ with ‘Hom riki’
       ‘ríki’ is a rigid type variable bound by
         the type signature for:
-          i :: forall k5 k6 (cls2 :: k6 -> Constraint) (xx :: k5)
+          i :: forall {k5} {k6} {cls2 :: k6 -> Constraint} (xx :: k5)
                       (a :: Struct cls2) (ríki :: Struct cls2 -> Struct cls2 -> *).
                StructI xx a =>
                ríki a a
@@ -12,11 +12,11 @@ T14846.hs:38:8: error:
         Actual type: Hom riki a a
     • When checking that instance signature for ‘i’
         is more general than its signature in the class
-        Instance sig: forall k1 k2 (cls :: k2 -> Constraint) (xx :: k1)
+        Instance sig: forall {k1} {k2} {cls :: k2 -> Constraint} (xx :: k1)
                              (a :: Struct cls).
                       StructI xx a =>
                       Hom riki a a
-           Class sig: forall k1 k2 (cls :: k2 -> Constraint) (xx :: k1)
+           Class sig: forall {k1} {k2} {cls :: k2 -> Constraint} (xx :: k1)
                              (a :: Struct cls) (ríki :: Struct cls -> Struct cls -> *).
                       StructI xx a =>
                       ríki a a

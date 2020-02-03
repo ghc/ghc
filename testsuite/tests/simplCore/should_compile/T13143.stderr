@@ -6,7 +6,7 @@ Result size of Tidy Core
 Rec {
 -- RHS size: {terms: 4, types: 4, coercions: 0, joins: 0/0}
 T13143.$wf [InlPrag=NOINLINE, Occ=LoopBreaker]
-  :: forall a. GHC.Prim.Void# -> a
+  :: forall {a}. GHC.Prim.Void# -> a
 [GblId, Arity=1, Str=<B,A>b, Cpr=b, Unf=OtherCon []]
 T13143.$wf = \ (@a) _ [Occ=Dead] -> T13143.$wf @a GHC.Prim.void#
 end Rec }

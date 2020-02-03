@@ -14,7 +14,7 @@ T14584a.hs:12:14: warning: [-Wpartial-type-signatures (in -Wdefault)]
     • Found type wildcard ‘_’ standing for ‘m -> m’
       Where: ‘m’, ‘k’ are rigid type variables bound by
                the type signature for:
-                 f :: forall k2 (m :: k2). ()
+                 f :: forall {k2} (m :: k2). ()
                at T14584a.hs:11:1-17
     • In an expression type signature: _
       In the expression: id @m :: _

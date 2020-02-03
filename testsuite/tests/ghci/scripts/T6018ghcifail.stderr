@@ -59,7 +59,7 @@
     Type family equation violates the family's injectivity annotation.
     Type/kind variable ‘k’ cannot be inferred from the right-hand side.
     In the type family equation:
-      forall k (a :: k) (b :: k).
+      forall {k} {a :: k} {b :: k}.
         Fc @k a b = Int -- Defined at <interactive>:64:15
 
 <interactive>:68:15: error:
@@ -67,7 +67,7 @@
     Type/kind variables ‘k’, ‘a’, ‘b’
     cannot be inferred from the right-hand side.
     In the type family equation:
-      forall k (a :: k) (b :: k).
+      forall {k} {a :: k} {b :: k}.
         Gc @k a b = Int -- Defined at <interactive>:68:15
 
 <interactive>:81:15: error:

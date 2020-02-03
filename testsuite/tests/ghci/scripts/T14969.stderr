@@ -4,4 +4,4 @@
         in the constraint: Num (t2 -> t1 -> t3)
       (Use FlexibleContexts to permit this)
     • When checking the inferred type
-        it :: forall t1 t2 t3. (Num t1, Num (t2 -> t1 -> t3)) => t3
+        it :: forall {t1} {t2} {t3}. (Num t1, Num (t2 -> t1 -> t3)) => t3

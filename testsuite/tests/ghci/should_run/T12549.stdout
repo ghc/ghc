@@ -1,3 +1,3 @@
-f :: forall k1 k2 (a :: k1 -> k2 -> *) (b :: k1) (c :: k2).
+f :: forall {k1} {k2} {a :: k1 -> k2 -> *} {b :: k1} {c :: k2}.
      C a =>
      a b c

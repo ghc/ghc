@@ -3,4 +3,4 @@ T6022.hs:3:1: error:
     • Non type-variable argument in the constraint: Eq ([a] -> a)
       (Use FlexibleContexts to permit this)
     • When checking the inferred type
-        f :: forall a. Eq ([a] -> a) => ([a] -> a) -> Bool
+        f :: forall {a}. Eq ([a] -> a) => ([a] -> a) -> Bool

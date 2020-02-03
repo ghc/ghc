@@ -771,9 +771,6 @@ messages and in GHCi:
              (a Data.Type.Equality.:~: b) -> b Data.Type.Equality.:~: a
                    -- Defined in Data.Type.Equality
 
-    This flag also enables the printing of *inferred* type variables
-    inside braces. See :ref:`inferred-vs-specified`.
-
 .. ghc-flag:: -fprint-explicit-kinds
     :shortdesc: Print explicit kind foralls and kind arguments in types.
         See also :extension:`KindSignatures`

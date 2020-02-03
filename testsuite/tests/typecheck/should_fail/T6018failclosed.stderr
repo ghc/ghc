@@ -28,7 +28,7 @@ T6018failclosed.hs:25:5: error:
       Type/kind variables ‘k1’, ‘b’
       cannot be inferred from the right-hand side.
       In the type family equation:
-        forall k1 k2 (b :: k1) (c :: k2).
+        forall {k1} {k2} {b :: k1} {c :: k2}.
           JClosed @{k1} @{k2} Int b c = Char
             -- Defined at T6018failclosed.hs:25:5
     • In the equations for closed type family ‘JClosed’
@@ -45,7 +45,7 @@ T6018failclosed.hs:30:5: error:
 T6018failclosed.hs:35:5: error:
     • Type family equation violates the family's injectivity annotation.
       RHS of injective type family equation cannot be a type family:
-        forall k (a :: k).
+        forall {k} {a :: k}.
           LClosed a = MaybeSynClosed a -- Defined at T6018failclosed.hs:35:5
     • In the equations for closed type family ‘LClosed’
       In the type family declaration for ‘LClosed’
@@ -94,7 +94,7 @@ T6018failclosed.hs:66:5: error:
     • Type family equation violates the family's injectivity annotation.
       Type/kind variable ‘k’ cannot be inferred from the right-hand side.
       In the type family equation:
-        forall k (a :: k) (b :: k).
+        forall {k} {a :: k} {b :: k}.
           Gc @k a b = Int -- Defined at T6018failclosed.hs:66:5
     • In the equations for closed type family ‘Gc’
       In the type family declaration for ‘Gc’

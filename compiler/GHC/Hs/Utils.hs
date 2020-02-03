@@ -758,11 +758,12 @@ positions in the kind of the tycon.
 mkLHsWrap :: HsWrapper -> LHsExpr GhcTc -> LHsExpr GhcTc
 mkLHsWrap co_fn (L loc e) = L loc (mkHsWrap co_fn e)
 
--- | Avoid @'HsWrap' co1 ('HsWrap' co2 _)@.
+-- | Avoid @'HsWrap' co1 ('HsWrap' co2 _)@ and @'HsWrap' co1 ('HsPar' _ _)@
 -- See Note [Detecting forced eta expansion] in "DsExpr"
 mkHsWrap :: HsWrapper -> HsExpr GhcTc -> HsExpr GhcTc
 mkHsWrap co_fn e | isIdHsWrapper co_fn   = e
 mkHsWrap co_fn (XExpr (HsWrap co_fn' e)) = mkHsWrap (co_fn <.> co_fn') e
+mkHsWrap co_fn (HsPar x (L l e))         = HsPar x (L l (mkHsWrap co_fn e))
 mkHsWrap co_fn e                         = XExpr (HsWrap co_fn e)
 
 mkHsWrapCo :: TcCoercionN   -- A Nominal coercion  a ~N b

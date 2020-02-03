@@ -3,7 +3,7 @@ T15361.hs:13:13: error:
     • Could not deduce: a ~ c
       from the context: b ~ a
         bound by a pattern with constructor:
-                   HRefl :: forall k1 (a :: k1). a :~~: a,
+                   HRefl :: forall {k1} (a :: k1). a :~~: a,
                  in an equation for ‘foo’
         at T15361.hs:13:5-9
       ‘a’ is a rigid type variable bound by

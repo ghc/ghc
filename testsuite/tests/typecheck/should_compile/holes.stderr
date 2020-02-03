@@ -7,7 +7,7 @@ holes.hs:3:5: warning: [-Wtyped-holes (in -Wdefault)]
     • In the expression: _
       In an equation for ‘f’: f = _
     • Relevant bindings include f :: t (bound at holes.hs:3:1)
-      Valid hole fits include f :: forall t. t
+      Valid hole fits include f :: forall {t}. t
 
 holes.hs:6:7: warning: [-Wtyped-holes (in -Wdefault)]
     • Found hole: _ :: Char
@@ -17,7 +17,7 @@ holes.hs:6:7: warning: [-Wtyped-holes (in -Wdefault)]
         x :: Int (bound at holes.hs:6:3)
         g :: Int -> Char (bound at holes.hs:6:1)
       Valid hole fits include
-        f :: forall t. t
+        f :: forall {t}. t
         maxBound :: forall a. Bounded a => a
         minBound :: forall a. Bounded a => a
 
@@ -29,7 +29,7 @@ holes.hs:8:5: warning: [-Wtyped-holes (in -Wdefault)]
     • Relevant bindings include h :: [Char] (bound at holes.hs:8:1)
       Valid hole fits include
         h :: [Char]
-        f :: forall t. t
+        f :: forall {t}. t
         [] :: forall a. [a]
         mempty :: forall a. Monoid a => a
 
@@ -47,7 +47,7 @@ holes.hs:11:15: warning: [-Wtyped-holes (in -Wdefault)]
         z :: [a] -> [a]
         g :: Int -> Char
         h :: [Char]
-        f :: forall t. t
+        f :: forall {t}. t
         otherwise :: Bool
         False :: Bool
         True :: Bool

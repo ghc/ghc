@@ -3,7 +3,7 @@ T14066e.hs:13:59: error:
     • Couldn't match kind ‘k’ with ‘*’
       ‘k’ is a rigid type variable bound by
         the type signature for:
-          j :: forall k k1 (c :: k) (b :: k1).
+          j :: forall {k} {k1} (c :: k) (b :: k1).
                Proxy a -> Proxy b -> Proxy c -> Proxy b
         at T14066e.hs:12:5-61
       When matching kinds
