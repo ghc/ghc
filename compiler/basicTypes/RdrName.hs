@@ -1376,12 +1376,12 @@ pprLoc (UnhelpfulSpan {}) = empty
 --
 starInfo :: Bool -> RdrName -> SDoc
 starInfo star_is_type rdr_name =
-  -- One might ask: if can use sdocWithDynFlags here, why bother to take
-  -- star_is_type as input? Why not refactor?
+  -- One might ask: if can use `sdocOption sdocStarIsType` here, why bother to
+  -- take star_is_type as input? Why not refactor?
   --
-  -- The reason is that sdocWithDynFlags would provide DynFlags that are active
-  -- in the module that tries to load the problematic definition, not
-  -- in the module that is being loaded.
+  -- The reason is that `sdocOption sdocStarIsType` would indicate that
+  -- StarIsType is enabled in the module that tries to load the problematic
+  -- definition, not in the module that is being loaded.
   --
   -- So if we have 'data T :: *' in a module with NoStarIsType, then the hint
   -- must be displayed even if we load this definition from a module (or GHCi)
