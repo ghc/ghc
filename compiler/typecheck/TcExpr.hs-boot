@@ -2,6 +2,7 @@ module TcExpr where
 import Name
 import GHC.Hs    ( HsExpr, LHsExpr, SyntaxExpr )
 import TcType   ( TcRhoType, TcSigmaType, SyntaxOpType, ExpType, ExpRhoType )
+import Type ( Mult )
 import TcRnTypes( TcM )
 import TcOrigin ( CtOrigin )
 import GHC.Hs.Extension ( GhcRn, GhcTcId )
@@ -28,14 +29,14 @@ tcSyntaxOp :: CtOrigin
            -> SyntaxExpr GhcRn
            -> [SyntaxOpType]           -- ^ shape of syntax operator arguments
            -> ExpType                  -- ^ overall result type
-           -> ([TcSigmaType] -> TcM a) -- ^ Type check any arguments
+           -> ([TcSigmaType] -> [Mult] -> TcM a) -- ^ Type check any arguments
            -> TcM (a, SyntaxExpr GhcTcId)
 
 tcSyntaxOpGen :: CtOrigin
               -> SyntaxExpr GhcRn
               -> [SyntaxOpType]
               -> SyntaxOpType
-              -> ([TcSigmaType] -> TcM a)
+              -> ([TcSigmaType] -> [Mult] -> TcM a)
               -> TcM (a, SyntaxExpr GhcTcId)
 
 

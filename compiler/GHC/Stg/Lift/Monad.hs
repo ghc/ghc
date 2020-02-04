@@ -40,6 +40,7 @@ import UniqSupply
 import Util
 import VarEnv
 import VarSet
+import Multiplicity
 
 import Control.Arrow ( second )
 import Control.Monad.Trans.Class
@@ -296,7 +297,8 @@ withLiftedBndr abs_ids bndr inner = do
         -- not be caffy themselves and subsequently will miss a static link
         -- field in their closure. Chaos ensues.
         . flip setIdCafInfo caf_info
-        . mkSysLocal (mkFastString str) uniq
+        . mkSysLocal (mkFastString str) uniq Many
+            -- This is a toplevel binders, hence must be Many
         $ ty
   LiftM $ RWS.local
     (\e -> e

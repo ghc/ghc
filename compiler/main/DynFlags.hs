@@ -15,7 +15,8 @@
 --
 -------------------------------------------------------------------------------
 
-{-# OPTIONS_GHC -fno-cse #-}
+{-# OPTIONS_GHC -fno-cse -O0 #-}
+-- TODO remove -O0 before merging
 -- -fno-cse is needed for GLOBAL_VAR's to behave properly
 {-# OPTIONS_GHC -Wno-incomplete-uni-patterns #-}
 
@@ -508,6 +509,7 @@ data GeneralFlag
    | Opt_D_faststring_stats
    | Opt_D_dump_minimal_imports
    | Opt_DoCoreLinting
+   | Opt_DoLinearCoreLinting
    | Opt_DoStgLinting
    | Opt_DoCmmLinting
    | Opt_DoAsmLinting
@@ -3499,6 +3501,8 @@ dynamic_flags_deps = [
         (setDumpFlag Opt_D_dump_rtti)
   , make_ord_flag defGhcFlag "dcore-lint"
         (NoArg (setGeneralFlag Opt_DoCoreLinting))
+  , make_ord_flag defGhcFlag "dlinear-core-lint"
+        (NoArg (setGeneralFlag Opt_DoLinearCoreLinting))
   , make_ord_flag defGhcFlag "dstg-lint"
         (NoArg (setGeneralFlag Opt_DoStgLinting))
   , make_ord_flag defGhcFlag "dcmm-lint"
@@ -4505,6 +4509,7 @@ xFlagsDeps = [
   flagSpec "KindSignatures"                   LangExt.KindSignatures,
   flagSpec "LambdaCase"                       LangExt.LambdaCase,
   flagSpec "LiberalTypeSynonyms"              LangExt.LiberalTypeSynonyms,
+  flagSpec "LinearTypes"                      LangExt.LinearTypes,
   flagSpec "MagicHash"                        LangExt.MagicHash,
   flagSpec "MonadComprehensions"              LangExt.MonadComprehensions,
   depFlagSpec "MonadFailDesugaring"           LangExt.MonadFailDesugaring
@@ -4657,6 +4662,7 @@ default_PIC platform =
 impliedGFlags :: [(GeneralFlag, TurnOnFlag, GeneralFlag)]
 impliedGFlags = [(Opt_DeferTypeErrors, turnOn, Opt_DeferTypedHoles)
                 ,(Opt_DeferTypeErrors, turnOn, Opt_DeferOutOfScopeVariables)
+                ,(Opt_DoLinearCoreLinting, turnOn, Opt_DoCoreLinting)
                 ,(Opt_Strictness, turnOn, Opt_WorkerWrapper)
                 ] ++ validHoleFitsImpliedGFlags
 
