@@ -1,0 +1,19 @@
+
+acomp005.hs:7:19: error:
+    • Could not deduce (Monad f)
+         arising from a statement in a monad comprehension
+      from the context: Applicative f
+        bound by the type signature for:
+                   test :: forall (f :: * -> *).
+                           Applicative f =>
+                           (Int -> f Int) -> f Int
+        at acomp005.hs:6:1-48
+      Possible fix:
+        add (Monad f) to the context of
+          the type signature for:
+            test :: forall (f :: * -> *).
+                    Applicative f =>
+                    (Int -> f Int) -> f Int
+    • In a stmt of a monad comprehension: x <- f 3
+      In the expression: [x + y | x <- f 3, y <- f x]
+      In an equation for ‘test’: test f = [x + y | x <- f 3, y <- f x]

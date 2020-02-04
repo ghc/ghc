@@ -1,0 +1,14 @@
+TYPE SIGNATURES
+  test1 ::
+    forall (f :: * -> *). Applicative f => (Int -> f Int) -> f Int
+  test2 ::
+    forall (f :: * -> *) t b.
+    (Applicative f, Num t, Num b) =>
+    (t -> f b) -> f b
+  test2a ::
+    forall (f :: * -> *) t b.
+    (Functor f, Num t, Num b) =>
+    (t -> f b) -> f b
+Dependent modules: []
+Dependent packages: [base-4.13.0.0, ghc-prim-0.6.1,
+                     integer-gmp-1.0.2.0]
