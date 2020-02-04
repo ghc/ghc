@@ -296,11 +296,10 @@ cprAnalBind top_lvl env id rhs
   = (id', rhs')
   where
     (rhs_ty, rhs')  = cprAnal env rhs
-    -- See Note [Arity trimming for CPR signatures]
-    rhs_ty' | isJoinId id = rhs_ty
-            | otherwise   = ensureCprTyArity (idArity id) rhs_ty
     -- possibly trim thunk CPR info
-    sig             = CprSig $ trimCprTy trim_all trim_sums rhs_ty'
+    rhs_ty'         = trimCprTy trim_all trim_sums rhs_ty
+    -- See Note [Arity trimming for CPR signatures]
+    sig             = mkCprSigForArity (idArity id) rhs_ty'
     id'             = setIdCprInfo id sig
 
     -- See Note [CPR for thunks]
@@ -340,40 +339,6 @@ from @f@'s, so it *will* be WW'd:
 
 And the case in @g@ can never cancel away, thus we introduced extra reboxing.
 Hence we always trim the CPR signature of a binding to idArity.
-
-BUT now imagine @f@ was a join point in g:
-
-  g a b =
-    join f x = if expensive
-                 then \y. Box y
-                 else \z. Box z
-    in f a b
-
-We never WW join points, so the signature isn't terribly important for WW'ing
-@f@ itself (except maybe for strictness purposes). In the example above where we
-WW'd @g@ but not @f@, we can just push the case on @f@ in @g@ into the
-definition of @f@! This is the gist of Note [Don't CPR join points] in WorkWrap.
-
-Hence, by *not trimming* @f@'s Cpr signature (and thus WW'ing @g@), we go from
-
-  $wg a b =
-    join f x = if expensive
-                 then \y. Box y
-                 else \z. Box z
-    in case f a b of Box x -> x
-  g a b = Box ($wg a b)
-
-to (by pushing the case into @f@ and eliminating case-of-known-constructor)
-
-  $wg a b =
-    join f x = if expensive
-                 then \y. y
-                 else \z. z
-    in f a b
-  g a b = Box ($wg a b)
-
-Which is far better than not doing the WW split. So we trim the CPR signature to
-idArity for non-join bindings only.
 -}
 
 data AnalEnv
