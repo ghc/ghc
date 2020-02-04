@@ -1,0 +1,9 @@
+
+acomp003.hs:5:25: error:
+    Couldn't match expected type ‘Int’ with actual type ‘Char’
+    In the pattern: 'a'
+      In a stmt of a monad comprehension: 'a' <- pure (3 :: Int)
+    In the expression:
+        [() |
+           x <- getChar
+           'a' <- pure (3 :: Int)]
