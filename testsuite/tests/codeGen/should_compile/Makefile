@@ -58,3 +58,20 @@ T15155l:
 	'$(TEST_HC)' $(TEST_HC_OPTS) -c -O0 -ddump-llvm T15155l.hs 2>/dev/null \
 	| grep -F "= alias %T15155_" | grep -E "@T15155_[ab]_closure.def = " | grep -F "%T15155_a_closure_struct*" \
 	| wc -l | sed -e 's/ *//g' | grep "2"; echo $$?
+
+# Without -fcatch-bottoms `f` is non-CAFFY. With -fcatch-bottoms it becomes
+# CAFFY. Before CafInfo rework (c846618a) this used to cause incorrect CafInfo
+# attached to `f` in the interface file.
+T17648:
+	# -dno-typeable-binds is to make the iface simpler
+	#  -O is necessary as otherwise we don't write interface pragmas (e.g.
+	#  NoCafRefs) to the interface files.
+	'$(TEST_HC)' $(TEST_HC_OPTS) -dno-typeable-binds -O T17648.hs -v0
+	'$(TEST_HC)' --show-iface T17648.hi | tr -d '\n' | \
+		grep -F 'f :: T GHC.Types.Int -> ()  {- HasNoCafRefs, Arity' >/dev/null
+
+	# Second compilation with -fcatch-bottoms, f should be CAFFY
+	'$(TEST_HC)' $(TEST_HC_OPTS) -dno-typeable-binds -O \
+		-fcatch-bottoms T17648.hs -v0 -fforce-recomp
+	'$(TEST_HC)' --show-iface T17648.hi | tr -d '\n' | \
+		grep -F 'f :: T GHC.Types.Int -> ()  {- Arity: 1, Strictness' >/dev/null

@@ -89,3 +89,5 @@ switch_skeleton_and_entries_only = ('grep -e "switch \[" -e "case " -e "default:
 test('T14373d', [],
      multimod_compile_filter, ['T14373d', '-fasm -O2 -c -ddump-cmm-from-stg',
      switch_skeleton_and_entries_only])
+
+test('T17648', normal, makefile_test, [])
