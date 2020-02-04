@@ -29,6 +29,7 @@ import TcUnify( buildImplicationFor )
 import TcEvidence( mkTcCoVarCo )
 import Type
 import TyCon( isTypeFamilyTyCon )
+import Multiplicity
 import Id
 import Var( EvVar )
 import VarSet
@@ -189,7 +190,7 @@ tcRuleTmBndrs [] = return ([],[])
 tcRuleTmBndrs (L _ (RuleBndr _ (L _ name)) : rule_bndrs)
   = do  { ty <- newOpenFlexiTyVarTy
         ; (tyvars, tmvars) <- tcRuleTmBndrs rule_bndrs
-        ; return (tyvars, mkLocalId name ty : tmvars) }
+        ; return (tyvars, mkLocalId name Many ty : tmvars) }
 tcRuleTmBndrs (L _ (RuleBndrSig _ (L _ name) rn_ty) : rule_bndrs)
 --  e.g         x :: a->a
 --  The tyvar 'a' is brought into scope first, just as if you'd written
@@ -198,7 +199,7 @@ tcRuleTmBndrs (L _ (RuleBndrSig _ (L _ name) rn_ty) : rule_bndrs)
 --   error for each out-of-scope type variable used
   = do  { let ctxt = RuleSigCtxt name
         ; (_ , tvs, id_ty) <- tcHsPatSigType ctxt rn_ty
-        ; let id  = mkLocalId name id_ty
+        ; let id  = mkLocalId name Many id_ty
                     -- See Note [Pattern signature binders] in TcHsType
 
               -- The type variables scope over subsequent bindings; yuk
