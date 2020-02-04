@@ -5,8 +5,8 @@
 -- said heap allocation by performing a worker/wrapper split.
 --
 -- See https://www.microsoft.com/en-us/research/publication/constructed-product-result-analysis-haskell/.
--- CPR analysis should happen after strictness analysis, but before
--- worker/wrapper. See Note [Phase ordering].
+-- CPR analysis should happen after strictness analysis.
+-- See Note [Phase ordering].
 module CprAnal ( cprAnalProgram ) where
 
 #include "HsVersions.h"
@@ -34,16 +34,67 @@ import Util
 import ErrUtils         ( dumpIfSet_dyn, DumpFormat (..) )
 import Maybes           ( isJust )
 
-{- Note [Phase ordering]
-~~~~~~~~~~~~~~~~~~~~~~~~
-We need to perform strictness analysis before CPR analysis, because of
-Note [CPR in a DataAlt case alternative] and Note [CPR for strict binders].
-The worker/wrapper transformation consumes both strictness and CPR information,
-so should happen after both. So the preferred pipeline becomes this:
+{- Note [Constructed Product Result]
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+The goal of Constructed Product Result analysis is to identify functions that
+surely return heap-allocated records on every code path, so that we can
+eliminate said heap allocation by performing a worker/wrapper split.
+
+@swap@ below is such a function:
+
+  swap (a, b) = (b, a)
+
+A @case@ on an application of @swap@, like
+@case swap (10, 42) of (a, b) -> a + b@ could cancel away
+(by case-of-known-constructor) if we "inlined" @swap@ and simplified. We then
+say that @swap@ has the CPR property.
+
+We can't inline recursive functions, but similar reasoning applies there:
+
+  f x n = case n of
+    0 -> (x, 0)
+    _ -> f (x+1) (n-1)
+
+Inductively, @case f 1 2 of (a, b) -> a + b@ could cancel away the constructed
+product with the case. So @f@, too, has the CPR property. But we can't really
+"inline" @f@, because it's recursive. Also, non-recursive functions like @swap@
+might be too big to inline (or even marked NOINLINE). We still want to exploit
+the CPR property, and that is exactly what the worker/wrapper transformation
+can do for us:
+
+  $wf x n = case n of
+    0 -> case (x, 0) of -> (a, b) -> (# a, b #)
+    _ -> case f (x+1) (n-1) of (a, b) -> (# a, b #)
+  f x n = case $wf x n of (# a, b #) -> (a, b)
+
+where $wf readily simplifies (by case-of-known-constructor and inlining @f@) to:
+
+  $wf x n = case n of
+    0 -> (# x, 0 #)
+    _ -> $wf (x+1) (n-1)
+
+Now, a call site like @case f 1 2 of (a, b) -> a + b@ can inline @f@ and
+eliminate the heap-allocated pair constructor.
+
+Note [Phase ordering]
+~~~~~~~~~~~~~~~~~~~~~
+We need to perform strictness analysis before CPR analysis, because that might
+unbox some arguments, in turn leading to more constructed products.
+Ideally, we would want the following pipeline:
+
+1. Strictness
+2. worker/wrapper (for strictness)
+3. CPR
+4. worker/wrapper (for CPR)
+
+Currently, we omit 2. and anticipate the results of worker/wrapper.
+See Note [CPR in a DataAlt case alternative] and Note [CPR for strict binders].
+An additional w/w pass would simplify things, but probably add slight overhead.
+So currently we have
 
 1. Strictness
 2. CPR
-3. Worker/Wrapper
+3. worker/wrapper (for strictness and CPR)
 -}
 
 --
@@ -450,7 +501,8 @@ Specifically
    box.  If the wrapper doesn't cancel with its caller, we'll end up
    re-boxing something that we did have available in boxed form.
 
- * Any strict binders with product type, can use Note [CPR for strict binders].
+ * Any strict binders with product type, can use Note [CPR for strict binders]
+   to anticipate worker/wrappering for strictness info.
    But we can go a little further. Consider
 
       data T = MkT !Int Int
@@ -463,9 +515,9 @@ Specifically
    But then we don't want box it up again when returning it!  We want
    'f2' to have the CPR property, so we give 'x' the CPR property.
 
- * It's a bit delicate because if this case is scrutinising something other
-   than an argument the original function, we really don't have the unboxed
-   version available.  E.g
+ * It's a bit delicate because we're brittly anticipating worker/wrapper here.
+   If the case above is scrutinising something other than an argument the
+   original function, we really don't have the unboxed version available.  E.g
       g v = case foo v of
               MkT x y | y>0       -> ...
                       | otherwise -> x
@@ -478,9 +530,9 @@ Specifically
 
 Note [CPR for strict binders]
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
-If the binder is marked demanded with a strict demand, then give it a
-CPR signature. Here's a concrete example ('f1' in test T10482a),
-assuming h is strict:
+If a lambda-bound variable is marked demanded with a strict demand, then give it
+a CPR signature, anticipating the results of worker/wrapper. Here's a concrete
+example ('f1' in test T10482a), assuming h is strict:
 
   f1 :: Int -> Int
   f1 x = case h x of
