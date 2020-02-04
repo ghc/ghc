@@ -1,11 +1,12 @@
 module TcUnify where
 
 import GhcPrelude
-import TcType           ( TcTauType )
-import TcRnTypes        ( TcM )
-import TcEvidence       ( TcCoercion )
+import TcType      ( TcTauType )
+import TcRnTypes   ( TcM )
+import TcOrigin    ( CtOrigin )
+import TcEvidence  ( TcCoercion, HsWrapper )
 import GHC.Hs.Expr      ( HsExpr )
-import GHC.Hs.Types     ( HsType )
+import GHC.Hs.Types     ( HsType, Mult )
 import GHC.Hs.Extension ( GhcRn )
 
 -- This boot file exists only to tie the knot between
@@ -13,3 +14,5 @@ import GHC.Hs.Extension ( GhcRn )
 
 unifyType :: Maybe (HsExpr GhcRn) -> TcTauType -> TcTauType -> TcM TcCoercion
 unifyKind :: Maybe (HsType GhcRn) -> TcTauType -> TcTauType -> TcM TcCoercion
+
+tcSubMult :: CtOrigin -> Mult -> Mult -> TcM HsWrapper
