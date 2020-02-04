@@ -1481,8 +1481,8 @@ locateLib hsc_env is_hs lib_dirs gcc_dirs lib
 
   | otherwise
     -- use HSfoo.{o,p_o} if it exists, otherwise fallback to libHSfoo{,_p}.a
-  = findObject  `orElse`
-    findArchive `orElse`
+  = findArchive `orElse` -- FIXME: we read the archive first to avoid a linking bug
+    findObject  `orElse` -- (see #17791)
     assumeDll
 
    where
