@@ -1,0 +1,56 @@
+
+acomp002.hs:6:7: error:
+    • Couldn't match expected type ‘Int’ with actual type ‘Char’
+    • In the expression: y
+      In the expression: (y, x)
+      In the expression:
+        [(y, x) |
+           x <- getChar
+           y <- getChar]
+
+acomp002.hs:6:10: error:
+    • Couldn't match expected type ‘Int’ with actual type ‘Char’
+    • In the expression: x
+      In the expression: (y, x)
+      In the expression:
+        [(y, x) |
+           x <- getChar
+           y <- getChar]
+
+acomp002.hs:9:7: error:
+    • Couldn't match expected type ‘Int’ with actual type ‘Char’
+    • In the expression: x2
+      In the expression: (x2, x4)
+      In the expression:
+        [(x2, x4) |
+           x1 <- getChar
+           x2 <- getChar
+           x3 <- const (pure ()) x1
+           x4 <- getChar
+           x5 <- getChar x4]
+
+acomp002.hs:9:11: error:
+    • Couldn't match expected type ‘Int’ with actual type ‘Char’
+    • In the expression: x4
+      In the expression: (x2, x4)
+      In the expression:
+        [(x2, x4) |
+           x1 <- getChar
+           x2 <- getChar
+           x3 <- const (pure ()) x1
+           x4 <- getChar
+           x5 <- getChar x4]
+
+acomp002.hs:9:94: error:
+    • Couldn't match expected type ‘Char -> IO t0’
+                  with actual type ‘IO Char’
+    • The function ‘getChar’ is applied to one argument,
+      but its type ‘IO Char’ has none
+      In a stmt of a monad comprehension: x5 <- getChar x4
+      In the expression:
+        [(x2, x4) |
+           x1 <- getChar
+           x2 <- getChar
+           x3 <- const (pure ()) x1
+           x4 <- getChar
+           x5 <- getChar x4]
