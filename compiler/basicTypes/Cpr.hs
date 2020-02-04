@@ -5,7 +5,7 @@ module Cpr (
     CprResult, topCpr, botCpr, sumCpr, prodCpr, returnsCPR_maybe,
     CprType (..), topCprType, botCprType, prodCprType, sumCprType,
     lubCprType, applyCprTy, abstractCprTy, ensureCprTyArity, trimCprTy,
-    CprSig (..), topCprSig, mkCprSig, seqCprSig
+    CprSig (..), topCprSig, mkCprSigForArity, mkCprSig, seqCprSig
   ) where
 
 import GhcPrelude
@@ -128,6 +128,12 @@ trimCprTy trim_all trim_sums (CprType arty res) = CprType arty (trimCpr trim_all
 -- to unleash. See Note [Understanding DmdType and StrictSig] in Demand
 newtype CprSig = CprSig { getCprSig :: CprType }
   deriving (Eq, Binary)
+
+-- | Turns a 'CprType' computed for the particular 'Arity' into a 'CprSig'
+-- unleashable at that arity. See Note [Understanding DmdType and StrictSig] in
+-- Demand
+mkCprSigForArity :: Arity -> CprType -> CprSig
+mkCprSigForArity arty ty = CprSig (ensureCprTyArity arty ty)
 
 topCprSig :: CprSig
 topCprSig = CprSig topCprType
