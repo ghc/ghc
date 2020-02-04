@@ -347,7 +347,7 @@ set_up_tarballs() {
     else
         action="download"
     fi
-    mk/get-win32-tarballs.sh $action $HostArch > missing-win32-tarballs
+    $PYTHON mk/get-win32-tarballs.py $action $mingw_arch > missing-win32-tarballs
     case $? in
         0)
            rm missing-win32-tarballs
@@ -359,7 +359,7 @@ set_up_tarballs() {
            echo
            echo "  * run configure with the --enable-tarballs-autodownload option"
            echo
-           echo "  * run mk/get-win32-tarballs.sh download ${HostArch}"
+           echo "  * run mk/get-win32-tarballs.py download $mingw_arch"
            echo
            echo "  * manually download the files listed in ./missing-win32-tarballs and place"
            echo "    them in the ghc-tarballs directory."
@@ -836,7 +836,7 @@ AC_PATH_PROG(SPHINXBUILD,sphinx-build)
 AC_CACHE_CHECK([for version of sphinx-build], fp_cv_sphinx_version,
 changequote(, )dnl
 [if test -n "$SPHINXBUILD"; then
-  fp_cv_sphinx_version=`"$SPHINXBUILD" --version 2>&1 | sed 's/.* v\?\([0-9]\.[0-9]\.[0-9]\)/\1/' | head -n1`;
+  fp_cv_sphinx_version=`"$SPHINXBUILD" --version 2>&1 | sed 's/.* \([0-9]\.[0-9]\.[0-9]\)/\1/' | head -n1`;
 fi;
 changequote([, ])dnl
 ])

@@ -390,7 +390,10 @@ test('T13123', normal, compile, ['-v0'])
 test('T13098', normal, compile, ['-v0'])
 test('T11046', normal, multimod_compile, ['T11046','-v0'])
 test('T13366',
-     [expect_broken_for(13366, ['ghci']), when(opsys('darwin'), expect_broken(16083))],
+     [expect_broken_for(13366, ['ghci']),
+      # libstdc++ is named differently on FreeBSD
+      when(opsys('freebsd'), expect_broken(17739)),
+      when(opsys('darwin'), expect_broken(16083))],
      compile_and_run,
      ['-lstdc++ -v0'])
 test('T13473', normal, multimod_compile_and_run,
