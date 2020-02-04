@@ -73,8 +73,8 @@ returnsCPR_maybe BotCPR      = Nothing
 -- | The abstract domain \(A_t\) from the original 'CPR for Haskell' paper.
 data CprType
   = CprType
-  { ct_arty :: !Arity     -- ^ Number of arguments the denoted expression eats
-                          --   before returning the 'ct_cpr'
+  { ct_arty :: !Arity     -- ^ Number of value arguments the denoted expression
+                          --   eats before returning the 'ct_cpr'
   , ct_cpr  :: !CprResult -- ^ 'CprResult' eventually unleashed when applied to
                           --   'ct_arty' arguments
   }

@@ -1575,7 +1575,7 @@ arguments!
 
 Note [Do not eta-expand join points]
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
-Similarly to CPR (see Note [Don't CPR join points] in WorkWrap), a join point
+Similarly to CPR (see Note [Don't w/w join points for CPR] in WorkWrap), a join point
 stands well to gain from its outer binding's eta-expansion, and eta-expanding a
 join point is fraught with issues like how to deal with a cast:
 
