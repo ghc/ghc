@@ -337,13 +337,13 @@ There is an infelicity though.  We may get something like
 The code for f duplicates that for g, without any real benefit. It
 won't really be executed, because calls to f will go via the inlining.
 
-Note [Don't CPR join points]
-~~~~~~~~~~~~~~~~~~~~~~~~~~~~
-
-There's no point in doing CPR on a join point. If the whole function is getting
-CPR'd, then the case expression around the worker function will get pushed into
-the join point by the simplifier, which will have the same effect that CPR would
-have - the result will be returned in an unboxed tuple.
+Note [Don't w/w join points for CPR]
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+There's no point in exploiting CPR info on a join point. If the whole function
+is getting CPR'd, then the case expression around the worker function will get
+pushed into the join point by the simplifier, which will have the same effect
+that w/w'ing for CPR would have - the result will be returned in an unboxed
+tuple.
 
   f z = let join j x y = (x+1, y+1)
         in case z of A -> j 1 2
@@ -363,10 +363,13 @@ have - the result will be returned in an unboxed tuple.
           in case z of A -> j 1 2
                        B -> j 2 3
 
-Doing CPR on a join point would be tricky anyway, as the worker could not be
-a join point because it would not be tail-called. However, doing the *argument*
-part of W/W still works for join points, since the wrapper body will make a tail
-call:
+Note that we still want to give @j@ the CPR property, so that @f@ has it. So
+CPR *analyse* join points as regular functions, but don't *transform* them.
+
+Doing W/W for returned products on a join point would be tricky anyway, as the
+worker could not be a join point because it would not be tail-called. However,
+doing the *argument* part of W/W still works for join points, since the wrapper
+body will make a tail call:
 
   f z = let join j x y = x + y
         in ...
@@ -587,7 +590,7 @@ splitFun dflags fam_envs fn_id fn_info wrap_dmds div cpr rhs
             work_join_arity | isJoinId fn_id = Just join_arity
                             | otherwise      = Nothing
               -- worker is join point iff wrapper is join point
-              -- (see Note [Don't CPR join points])
+              -- (see Note [Don't w/w join points for CPR])
 
             work_id  = mkWorkerId work_uniq fn_id (exprType work_rhs)
                         `setIdOccInfo` occInfo fn_info
@@ -659,10 +662,16 @@ splitFun dflags fam_envs fn_id fn_info wrap_dmds div cpr rhs
                     -- The arity is set by the simplifier using exprEtaExpandArity
                     -- So it may be more than the number of top-level-visible lambdas
 
-    use_cpr_info  | isJoinId fn_id = topCpr -- Note [Don't CPR join points]
+    -- use_cpr_info is the CPR we w/w for. Note that we kill it for join points,
+    -- see Note [Don't w/w join points for CPR].
+    use_cpr_info  | isJoinId fn_id = topCpr
                   | otherwise      = cpr
-    work_cpr_info | isJoinId fn_id = cpr -- Worker remains CPR-able
-                  | otherwise      = topCpr   -- Cpr stuff done by wrapper; kill it here
+    -- Even if we don't w/w join points for CPR, we might still do so for
+    -- strictness. In which case a join point worker keeps its original CPR
+    -- property; see Note [Don't w/w join points for CPR]. Otherwise, the worker
+    -- doesn't have the CPR property anymore.
+    work_cpr_info | isJoinId fn_id = cpr
+                  | otherwise      = topCpr
 
 
 {-
