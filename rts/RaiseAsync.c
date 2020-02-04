@@ -133,6 +133,11 @@ throwToSelf (Capability *cap, StgTSO *tso, StgClosure *exception)
 
     m = throwTo(cap, tso, tso, exception);
 
+    // A thread sending a message (even to itself) must be blocked on the
+    // message.
+    tso->why_blocked = BlockedOnMsgThrowTo;
+    tso->block_info.throwto = m;
+
     if (m != NULL) {
         // throwTo leaves it locked
         unlockClosure((StgClosure*)m, &stg_MSG_THROWTO_info);
