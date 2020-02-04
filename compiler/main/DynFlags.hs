@@ -4426,6 +4426,7 @@ xFlagsDeps = [
   flagSpec "AlternativeLayoutRule"            LangExt.AlternativeLayoutRule,
   flagSpec "AlternativeLayoutRuleTransitional"
                                               LangExt.AlternativeLayoutRuleTransitional,
+  flagSpec "ApplicativeComprehensions"        LangExt.ApplicativeComprehensions,
   flagSpec "Arrows"                           LangExt.Arrows,
   depFlagSpecCond "AutoDeriveTypeable"        LangExt.AutoDeriveTypeable
     id
@@ -4711,6 +4712,8 @@ impliedXFlags
 
     , (LangExt.TemplateHaskell, turnOn, LangExt.TemplateHaskellQuotes)
     , (LangExt.Strict, turnOn, LangExt.StrictData)
+
+    , (LangExt.ApplicativeComprehensions, turnOn, LangExt.MonadComprehensions)
   ]
 
 -- Note [When is StarIsType enabled]
