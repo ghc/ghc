@@ -193,9 +193,11 @@ typedef StgWord8*          StgByteArray;
 typedef void  *(*(*StgFunPtr)(void))(void);
 typedef StgFunPtr StgFun(void);
 
-// Forward declarations for the unregisterised backend, which
-// only depends upon Stg.h and not the entirety of Rts.h, which
-// is where these are defined.
+/*
+ * Forward declarations for the unregisterised backend, which
+ * only depends upon Stg.h and not the entirety of Rts.h, which
+ * is where these are defined.
+ */
 struct StgClosure_;
 struct StgThunk_;
 struct Capability_;
