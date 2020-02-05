@@ -55,10 +55,6 @@ function run() {
   "$@" || ( error "$* failed"; return 1; )
 }
 
-if [ -z "$GHC_VERSION" ]; then
-  fail "GHC_VERSION not set"
-fi
-
 TOP="$(pwd)"
 
 function mingw_init() {
