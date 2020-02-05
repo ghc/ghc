@@ -65,7 +65,6 @@ dl :: Double -> Double
  Arity=1,
  Str=<S,1*U(U)>,
  Cpr=m,
->>>>>>> 6f77505c59... Separate CPR analysis from the Demand analyser
  Unf=Unf{Src=InlineStable, TopLvl=True, Value=True, ConLike=True,
          WorkFree=True, Expandable=True,
          Guidance=ALWAYS_IF(arity=1,unsat_ok=True,boring_ok=False)
@@ -106,3 +105,6 @@ fl :: Float -> Float
                  GHC.Types.F# (GHC.Prim.plusFloat# y y)
                  }}]
 fl = fr
+
+
+
