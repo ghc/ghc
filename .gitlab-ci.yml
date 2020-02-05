@@ -767,6 +767,7 @@ validate-x86_64-linux-fedora27:
 
 .build-windows:
   <<: *only-default
+  allow_failure: true
   before_script:
     - git clean -xdf
 
