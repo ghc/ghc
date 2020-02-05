@@ -91,12 +91,16 @@ wchar_t* FS(create_device_name) (const wchar_t* filename) {
 
   free (temp);
 
+  int startOffset = 0;
+  /* When remapping a network share, \\foo needs to become
+     \\?\UNC\foo and not \\?\\UNC\\foo which is an invalid path.  */
   if (wcsncmp (network_share, result, 2) == 0)
     {
       if (swprintf (ns, 10, L"%ls%ls", win32_file_namespace, unc_prefix) <= 0)
         {
           goto cleanup;
         }
+      startOffset = 2;
     }
   else if (swprintf (ns, 10, L"%ls", win32_file_namespace) <= 0)
     {
@@ -104,8 +108,8 @@ wchar_t* FS(create_device_name) (const wchar_t* filename) {
     }
 
   /* Create new string.  */
-  int bLen = wcslen (result) + wcslen (ns) + 1;
-  temp = _wcsdup (result);
+  int bLen = wcslen (result) + wcslen (ns) + 1 - startOffset;
+  temp = _wcsdup (result + startOffset);
   free (result);
   result = malloc (bLen * sizeof (wchar_t));
   if (swprintf (result, bLen, L"%ls%ls", ns, temp) <= 0)
