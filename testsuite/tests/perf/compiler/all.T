@@ -9,9 +9,10 @@ setTestOpts(no_lint)
 
 test('T1969',
      [# expect_broken(12437),
-      # we collect residency for reference only, hence the large acceptance window.
-      # We have seen >20% variations in this number.
-      collect_compiler_residency(50),
+      collect_compiler_residency(20),
+      extra_run_opts('+RTS -A64k -RTS'),
+          # The default RESIDENCY_OPTS is 256k and we need higher sampling
+          # frequency. Incurs a slow-down by about 2.
       collect_compiler_stats('bytes allocated', 1),
       only_ways(['normal']),
 
