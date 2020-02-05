@@ -190,6 +190,7 @@ void _assertFail(const char *filename, unsigned int linenum)
 
 /* Parallel information */
 #include "rts/OSThreads.h"
+#include "rts/TSANUtils.h"
 #include "rts/SpinLock.h"
 
 #include "rts/Messages.h"

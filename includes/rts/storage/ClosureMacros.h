@@ -46,10 +46,13 @@
    -------------------------------------------------------------------------- */
 
 INLINE_HEADER void SET_INFO(StgClosure *c, const StgInfoTable *info) {
-    c->header.info = info;
+    RELAXED_STORE(&c->header.info, info);
+}
+INLINE_HEADER void SET_INFO_RELEASE(StgClosure *c, const StgInfoTable *info) {
+    RELEASE_STORE(&c->header.info, info);
 }
 INLINE_HEADER const StgInfoTable *GET_INFO(StgClosure *c) {
-    return c->header.info;
+    return RELAXED_LOAD(&c->header.info);
 }
 
 #define GET_ENTRY(c)  (ENTRY_CODE(GET_INFO(c)))
@@ -83,28 +86,28 @@ INLINE_HEADER StgConInfoTable *itbl_to_con_itbl(const StgInfoTable *i) {return (
 EXTERN_INLINE const StgInfoTable *get_itbl(const StgClosure *c);
 EXTERN_INLINE const StgInfoTable *get_itbl(const StgClosure *c)
 {
-   return INFO_PTR_TO_STRUCT(c->header.info);
+    return INFO_PTR_TO_STRUCT(RELAXED_LOAD(&c->header.info));
 }
 
 EXTERN_INLINE const StgRetInfoTable *get_ret_itbl(const StgClosure *c);
 EXTERN_INLINE const StgRetInfoTable *get_ret_itbl(const StgClosure *c)
 {
-   return RET_INFO_PTR_TO_STRUCT(c->header.info);
+    return RET_INFO_PTR_TO_STRUCT(RELAXED_LOAD(&c->header.info));
 }
 
 INLINE_HEADER const StgFunInfoTable *get_fun_itbl(const StgClosure *c)
 {
-   return FUN_INFO_PTR_TO_STRUCT(c->header.info);
+    return FUN_INFO_PTR_TO_STRUCT(RELAXED_LOAD(&c->header.info));
 }
 
 INLINE_HEADER const StgThunkInfoTable *get_thunk_itbl(const StgClosure *c)
 {
-   return THUNK_INFO_PTR_TO_STRUCT(c->header.info);
+    return THUNK_INFO_PTR_TO_STRUCT(RELAXED_LOAD(&c->header.info));
 }
 
 INLINE_HEADER const StgConInfoTable *get_con_itbl(const StgClosure *c)
 {
-   return CON_INFO_PTR_TO_STRUCT((c)->header.info);
+    return CON_INFO_PTR_TO_STRUCT(RELAXED_LOAD(&c->header.info));
 }
 
 INLINE_HEADER StgHalfWord GET_TAG(const StgClosure *con)
@@ -139,7 +142,7 @@ INLINE_HEADER StgHalfWord GET_TAG(const StgClosure *con)
 
 #define SET_HDR(c,_info,ccs)                            \
    {                                                    \
-        (c)->header.info = _info;                       \
+        RELAXED_STORE(&(c)->header.info, _info);        \
         SET_PROF_HDR((StgClosure *)(c),ccs);            \
    }
 
@@ -253,8 +256,8 @@ INLINE_HEADER bool LOOKS_LIKE_INFO_PTR (StgWord p)
 
 INLINE_HEADER bool LOOKS_LIKE_CLOSURE_PTR (const void *p)
 {
-    return LOOKS_LIKE_INFO_PTR((StgWord)
-            (UNTAG_CONST_CLOSURE((const StgClosure *)(p)))->header.info);
+    const StgInfoTable *info = RELAXED_LOAD(&UNTAG_CONST_CLOSURE((const StgClosure *) (p))->header.info);
+    return LOOKS_LIKE_INFO_PTR((StgWord) info);
 }
 
 /* -----------------------------------------------------------------------------

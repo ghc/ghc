@@ -148,6 +148,7 @@ configurePackage context@Context {..} = do
     when (verbosity >= Loud) $
         putProgressInfo $ "| Package " ++ quote (pkgName package) ++ " configuration flags: " ++ unwords argList
     let v = if verbosity >= Loud then "-v3" else "-v0"
+    putLoud $ "| Package " ++ quote (pkgName package) ++ " flags: " ++ unwords flagList
     traced "cabal-configure" $
         C.defaultMainWithHooksNoReadArgs hooks gpd
             (argList ++ ["--flags=" ++ unwords flagList, v])
