@@ -304,10 +304,9 @@ ghciScriptWrapper = unlines
 --   explicitly and 'need' the result of building them.
 needIservBins :: Action ()
 needIservBins = do
-    when (not windowsHost) $ do
-        rtsways <- interpretInContext (vanillaContext Stage1 ghc) getRtsWays
-        need =<< traverse programPath
-                   [ Context Stage1 iserv w
-                   | w <- [vanilla, profiling, dynamic]
-                   , w `elem` rtsways
-                   ]
+  rtsways <- interpretInContext (vanillaContext Stage1 ghc) getRtsWays
+  need =<< traverse programPath
+      [ Context Stage1 iserv w
+      | w <- [vanilla, profiling, dynamic]
+      , w `elem` rtsways
+      ]
