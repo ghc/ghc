@@ -76,3 +76,6 @@ foo [InlPrag=NOUSERINLINE[0]] :: Int -> ()
                  case w of { GHC.Types.I# ww1 [Occ=Once] -> T3772.$wfoo ww1 }}]
 foo
   = \ (w :: Int) -> case w of { GHC.Types.I# ww1 -> T3772.$wfoo ww1 }
+
+
+
