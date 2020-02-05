@@ -344,10 +344,21 @@ parseError s0 = case breakColon s0 of
                     Nothing -> Nothing
                 Nothing -> Nothing
 
+-- | Break a line of an error message into a filename and the rest of the line,
+-- taking care to ignore colons in Windows drive letters (as noted in #17786).
+-- For instance,
+--
+-- * @"hi.c: ABCD"@ is mapped to @Just ("hi.c", "ABCD")@
+-- * @"C:\hi.c: ABCD"@ is mapped to @Just ("C:\hi.c", "ABCD")@
 breakColon :: String -> Maybe (String, String)
-breakColon xs = case break (':' ==) xs of
-                    (ys, _:zs) -> Just (ys, zs)
-                    _ -> Nothing
+breakColon = go []
+  where
+    -- Don't break on Windows drive letters (e.g. @C:\@ or @C:/@)
+    go accum  (':':'\\':rest) = go ('\\':':':accum) rest
+    go accum  (':':'/':rest)  = go ('/':':':accum) rest
+    go accum  (':':rest)      = Just (reverse accum, rest)
+    go accum  (c:rest)        = go (c:accum) rest
+    go _accum []              = Nothing
 
 breakIntColon :: String -> Maybe (Int, String)
 breakIntColon xs = case break (':' ==) xs of
