@@ -2272,12 +2272,8 @@ zonkTidyOrigin env orig = return (env, orig)
 ----------------
 tidyCt :: TidyEnv -> Ct -> Ct
 -- Used only in error reporting
--- Also converts it to non-canonical
 tidyCt env ct
-  = case ct of
-     CHoleCan { cc_ev = ev }
-       -> ct { cc_ev = tidy_ev env ev }
-     _ -> mkNonCanonical (tidy_ev env (ctEvidence ct))
+  = ct { cc_ev = tidy_ev env (ctEvidence ct) }
   where
     tidy_ev :: TidyEnv -> CtEvidence -> CtEvidence
      -- NB: we do not tidy the ctev_evar field because we don't

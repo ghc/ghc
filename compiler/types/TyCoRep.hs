@@ -1494,7 +1494,7 @@ data CoercionHole
                        -- See Note [CoercionHoles and coercion free variables]
 
                  , ch_blocker :: BlockSubstFlag  -- should this hole block substitution?
-                                                 -- See sub-wrinkle in TcCanonical
+                                                 -- See (2a) in TcCanonical
                                                  -- Note [Equalities with incompatible kinds]
                  , ch_ref     :: IORef (Maybe Coercion)
                  }

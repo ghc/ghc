@@ -408,7 +408,8 @@ reportImplic ctxt implic@(Implic { ic_skols = tvs, ic_telescope = m_telescope
                                  , ic_wanted = wanted, ic_binds = evb
                                  , ic_status = status, ic_info = info
                                  , ic_tclvl = tc_lvl })
-  | BracketSkol <- info
+  | BracketSkol <- pprTrace "RAE5" (ppr ctxt) $
+                   info
   , not insoluble
   = return ()        -- For Template Haskell brackets report only
                      -- definite errors. The whole thing will be re-checked
@@ -417,6 +418,7 @@ reportImplic ctxt implic@(Implic { ic_skols = tvs, ic_telescope = m_telescope
 
   | otherwise
   = do { traceTc "reportImplic" (ppr implic')
+       ; pprTraceM "RAE4" (ppr ctxt)
        ; reportWanteds ctxt' tc_lvl wanted
        ; when (cec_warn_redundant ctxt) $
          warnRedundantConstraints ctxt' tcl_env info' dead_givens
@@ -441,7 +443,9 @@ reportImplic ctxt implic@(Implic { ic_skols = tvs, ic_telescope = m_telescope
     ctxt' = ctxt1 { cec_tidy     = env1
                   , cec_encl     = implic' : cec_encl ctxt
 
-                  , cec_suppress = insoluble || cec_suppress ctxt
+                  , cec_suppress = pprTrace "RAE2" (ppr insoluble $$ ppr (cec_suppress ctxt)) $
+                                   pprTraceIt "RAE3" $
+                                   insoluble || cec_suppress ctxt
                         -- Suppress inessential errors if there
                         -- are insolubles anywhere in the
                         -- tree rooted here, or we've come across
@@ -548,22 +552,14 @@ reportWanteds ctxt tc_lvl (WC { wc_simple = simples, wc_impl = implics })
             -- to report unsolved Derived goals as errors
             -- See Note [Do not report derived but soluble errors]
 
+       ; pprTraceM "RAE1" (ppr ctxt2 $$ ppr implics)
      ; mapBagM_ (reportImplic ctxt2) implics }
-            -- NB ctxt1: don't suppress inner insolubles if there's only a
+            -- NB ctxt2: don't suppress inner insolubles if there's only a
             -- wanted insoluble here; but do suppress inner insolubles
             -- if there's a *given* insoluble here (= inaccessible code)
  where
     env = cec_tidy ctxt
-    tidy_cts = bagToList (mapBag (tidyCt env) $
-                          filterBag (not . blocked_on_coercion) simples)
-
-      -- is this blocked on a coercion hole? If so, then just drop the
-      -- constraint. The coercion hole constraint will be reported instead,
-      -- and that is more informative. Indeed, it's not clear what error
-      -- to report on a blocked constraint, anyway.
-      -- TcCanonical Note [Equalities with incompatible kinds], wrinkle (4)
-    blocked_on_coercion (CIrredCan { cc_status = BlockedCIS }) = True
-    blocked_on_coercion _                                      = False
+    tidy_cts = bagToList (mapBag (tidyCt env) simples)
 
     -- report1: ones that should *not* be suppressed by
     --          an insoluble somewhere else in the tree
@@ -571,28 +567,35 @@ reportWanteds ctxt tc_lvl (WC { wc_simple = simples, wc_impl = implics })
     -- (see TcRnTypes.insolubleCt) is caught here, otherwise
     -- we might suppress its error message, and proceed on past
     -- type checking to get a Lint error later
-    report1 = [ ("Out of scope", is_out_of_scope,    True,  mkHoleReporter tidy_cts)
-              , ("Holes",        is_hole,            False, mkHoleReporter tidy_cts)
-              , ("custom_error", is_user_type_error, True,  mkUserTypeErrorReporter)
+    report1 = [ ("Out of scope", unblocked is_out_of_scope,    True,  mkHoleReporter tidy_cts)
+              , ("Holes",        unblocked is_hole,            False, mkHoleReporter tidy_cts)
+              , ("custom_error", unblocked is_user_type_error, True,  mkUserTypeErrorReporter)
 
               , given_eq_spec
-              , ("insoluble2",   utterly_wrong,  True, mkGroupReporter mkEqErr)
-              , ("skolem eq1",   very_wrong,     True, mkSkolReporter)
-              , ("skolem eq2",   skolem_eq,      True, mkSkolReporter)
-              , ("non-tv eq",    non_tv_eq,      True, mkSkolReporter)
+              , ("insoluble2",   unblocked utterly_wrong,  True, mkGroupReporter mkEqErr)
+              , ("skolem eq1",   unblocked very_wrong,     True, mkSkolReporter)
+              , ("skolem eq2",   unblocked skolem_eq,      True, mkSkolReporter)
+              , ("non-tv eq",    unblocked non_tv_eq,      True, mkSkolReporter)
 
                   -- The only remaining equalities are alpha ~ ty,
                   -- where alpha is untouchable; and representational equalities
                   -- Prefer homogeneous equalities over hetero, because the
                   -- former might be holding up the latter.
                   -- See Note [Equalities with incompatible kinds] in TcCanonical
-              , ("Homo eqs",      is_homo_equality, True,  mkGroupReporter mkEqErr)
-              , ("Other eqs",     is_equality,      False, mkGroupReporter mkEqErr) ]
+              , ("Homo eqs",      unblocked is_homo_equality, True,  mkGroupReporter mkEqErr)
+              , ("Other eqs",     unblocked is_equality,      True,  mkGroupReporter mkEqErr)
+              , ("Blocked eqs",   is_equality,           False, mkGroupReporter mkBlockedEqErr)]
 
     -- report2: we suppress these if there are insolubles elsewhere in the tree
     report2 = [ ("Implicit params", is_ip,           False, mkGroupReporter mkIPErr)
               , ("Irreds",          is_irred,        False, mkGroupReporter mkIrredErr)
               , ("Dicts",           is_dict,         False, mkGroupReporter mkDictErr) ]
+
+    -- also checks to make sure the constraint isn't BlockedCIS
+    -- See TcCanonical Note [Equalities with incompatible kinds], (4)
+    unblocked :: (Ct -> Pred -> Bool) -> Ct -> Pred -> Bool
+    unblocked _ (CIrredCan { cc_status = BlockedCIS }) _ = False
+    unblocked checker ct pred = checker ct pred
 
     -- rigid_nom_eq, rigid_nom_tv_eq,
     is_hole, is_dict,
@@ -1682,6 +1685,24 @@ pp_givens givens
              -- for why we use mkMinimalBySCs above.
                 2 (sep [ text "bound by" <+> ppr skol_info
                        , text "at" <+> ppr (tcl_loc (ic_env implic)) ])
+
+-- These are for the "blocked" equalities, as described in TcCanonical
+-- Note [Equalities with incompatible kinds], wrinkle (2). There should
+-- always be another unsolved wanted around, which will ordinarily suppress
+-- this message. But this can still be printed out with -fdefer-type-errors
+-- (sigh), so we must produce a message.
+mkBlockedEqErr :: ReportErrCtxt -> [Ct] -> TcM ErrMsg
+mkBlockedEqErr ctxt (ct:_) = mkErrorMsgFromCt ctxt ct report
+  where
+    report = important msg
+    msg = vcat [ hang (text "Cannot use equality for substitution:")
+                   2 (ppr (ctPred ct))
+               , text "Doing so would be ill-kinded." ]
+          -- This is a terrible message. Perhaps worse, if the user
+          -- has -fprint-explicit-kinds on, they will see that the two
+          -- sides have the same kind, as there is an invisible cast.
+          -- I really don't know how to do better.
+mkBlockedEqErr _ [] = panic "mkBlockedEqErr no constraints"
 
 {-
 Note [Suppress redundant givens during error reporting]

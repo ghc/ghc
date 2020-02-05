@@ -916,10 +916,10 @@ can_eq_nc' _flat rdr_env envs ev eq_rel ty1 ps_ty1 ty2 ps_ty2
 
 -- Then, get rid of casts
 can_eq_nc' flat _rdr_env _envs ev eq_rel (CastTy ty1 co1) _ ty2 ps_ty2
-  | not (isTyVarTy ty2)  -- See Note [Equalities with incompatible kinds]
+  | not (isTyVarTy ty2)  -- See (3) in Note [Equalities with incompatible kinds]
   = canEqCast flat ev eq_rel NotSwapped ty1 co1 ty2 ps_ty2
 can_eq_nc' flat _rdr_env _envs ev eq_rel ty1 ps_ty1 (CastTy ty2 co2) _
-  | not (isTyVarTy ty1)  -- See Note [Equalities with incompatible kinds]
+  | not (isTyVarTy ty1)  -- See (3) in Note [Equalities with incompatible kinds]
   = canEqCast flat ev eq_rel IsSwapped ty2 co2 ty1 ps_ty1
 
 -- NB: pattern match on True: we want only flat types sent to canEqTyVar.
@@ -2082,61 +2082,66 @@ Wrinkles:
  (1) The noDerived step is because Derived equalities have no evidence.
      And yet we absolutely need evidence to be able to proceed here.
      Given evidence will use the KindCo coercion; Wanted evidence will
-     be a coercion hole.
+     be a coercion hole. Even a Derived hetero equality begets a Wanted
+     kind equality.
 
- (2) Though it would be sound to do so, we must not mark a Wanted
-     equality like this canonical. The problem is that using a Wanted
-     coercion to cast another Wanted is very much like wanteds-rewriting-wanteds.
-     See Note [Wanteds do not rewrite Wanteds] in Constraint; the problem
-     is about poor error messages. See #11198 for tales of destruction.
+ (2) Though it would be sound to do so, we must not mark the rewritten Wanted
+       [W] (tv :: k1) ~ ((rhs |> co) :: k1)
+     as canonical in the inert set. In particular, we must not unify tv.
+     If we did, the Wanted becomes a Given (effectively), and then can
+     rewrite other Wanteds. But that's bad: See Note [Wanteds to not rewrite Wanteds]
+     in Constraint. The problem is about poor error messages. See #11198 for
+     tales of destruction.
 
      So, we have an invariant on CTyEqCan that the RHS does not have
      any coercion holes. This is checked in metaTyVarUpdateOK. We also
      must be sure to kick out any constraints that mention coercion holes
      when those holes get filled in.
 
-     Sub-wrinkle: We don't want to do this for CoercionHoles that witness
-     CFunEqCans (that are produced by the flattener), as these will disappear
-     once we unflatten. So we remember in the CoercionHole structure
-     whether the presence of the hole should block substitution or not.
-     A bit gross, this.
+     (2a) We don't want to do this for CoercionHoles that witness
+          CFunEqCans (that are produced by the flattener), as these will disappear
+          once we unflatten. So we remember in the CoercionHole structure
+          whether the presence of the hole should block substitution or not.
+          A bit gross, this.
+
+     (2b) We must now absolutely make sure to kick out any constraints that
+          mention a newly-filled-in coercion hole. This is done in
+          kickOutAfterFillingCoercionHole.
 
  (3) Suppose we have [W] (a :: k1) ~ (rhs :: k2). We duly follow the
      algorithm detailed here, producing [W] co :: k2 ~ k1, and adding
      [W] (a :: k1) ~ ((rhs |> co) :: k1) to the irreducibles. Some time
      later, we solve co, and fill in co's coercion hole. This kicks out
-     the irreducible. But now, during canonicalization, we see the cast
-     and remove it. By the time we get into canEqTyVar, the equality
+     the irreducible as described in (2b).
+     But now, during canonicalization, we see the cast
+     and remove it, in canEqCast. By the time we get into canEqTyVar, the equality
      is heterogeneous again, and the process repeats.
 
      To avoid this, we don't strip casts off a type if the other type
      in the equality is a tyvar. And this is an improvement regardless:
      because tyvars can, generally, unify with casted types, there's no
      reason to go through the work of stripping off the cast when the
-     cast appears opposite a tyvar.
+     cast appears opposite a tyvar. This is implemented in the cast case
+     of can_eq_nc'.
 
  (4) Reporting an error for a constraint that is blocked only because
      of wrinkle (2) is hard: what would we say to users? And we don't
      really need to report, because if a constraint is blocked, then
      there is unsolved wanted blocking it; that unsolved wanted will
-     be reported. We thus filter out blocked constraints in
-     TcErrors.reportWanteds.
+     be reported. We thus push such errors to the bottom of the queue
+     in the error-reporting code; they should never be printed.
 
      (4a) It would seem possible to do this filtering just based on the
           presence of a blocking coercion hole. However, this is no good,
           as it suppresses e.g. no-instance-found errors. We thus record
           a CtIrredStatus in CIrredCan and filter based on this status.
-          This happened in T14584.
+          This happened in T14584. An alternative approach is to expressly
+          look for *equalities* with blocking coercion holes, but actually
+          recording the blockage in a status field seems nicer.
 
-     (4b) This filtering is disastrous in the presence of deferred type
-          errors, as the same code that does the reporting fills in
-          deferred type errors with the bottoming evidence. One alternative
-          would be to have another mechanism to suppress an error message,
-          but it also seems reasonable not to block if the user wants
-          deferred type errors. In a sense, this not-blocking means that
-          the kind error is ignored, allowing type-checking to continue.
-          This is somewhat like the fact that deferred type errors defers
-          type errors to runtime. This disaster was spotted in T14584.
+     (4b) The error message might be printed with -fdefer-type-errors,
+          so it still must exist. This is the only reason why there is
+          a message at all. Otherwise, we could simply do nothing.
 
 Historical note:
 
