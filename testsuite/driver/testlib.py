@@ -501,7 +501,18 @@ def fast() -> bool:
 def platform( plat: str ) -> bool:
     return config.platform == plat
 
+KNOWN_OPERATING_SYSTEMS = set([
+    'mingw32',
+    'freebsd',
+    'openbsd',
+    'aix',
+    'linux',
+    'darwin',
+    'solaris2',
+])
+
 def opsys( os: str ) -> bool:
+    assert os in KNOWN_OPERATING_SYSTEMS
     return config.os == os
 
 def arch( arch: str ) -> bool:
