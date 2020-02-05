@@ -1002,6 +1002,9 @@ okCpeArg expr    = not (cpExprIsTrivial expr)
 
 cpExprIsTrivial :: CoreExpr -> Bool
 cpExprIsTrivial e
+  | Tick t e <- e
+  , not (tickishIsCode t)
+  = cpExprIsTrivial e
   | Case scrut _ _ alts <- e
   , isUnsafeEqualityProof scrut
   , [(_,_,rhs)] <- alts
