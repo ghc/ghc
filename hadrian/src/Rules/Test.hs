@@ -180,16 +180,14 @@ stageOf _ = error "unexpected stage argument"
 
 needIservBins :: Action ()
 needIservBins = do
-    -- iserv is not supported under Windows
-    when (not windowsHost) $ do
-        testGhc <- testCompiler <$> userSetting defaultTestArgs
-        let stg = stageOf testGhc
-        rtsways <- interpretInContext (vanillaContext stg ghc) getRtsWays
-        need =<< traverse programPath
-            [ Context stg iserv w
-            | w <- [vanilla, profiling, dynamic]
-            , w `elem` rtsways
-            ]
+  testGhc <- testCompiler <$> userSetting defaultTestArgs
+  let stg = stageOf testGhc
+  rtsways <- interpretInContext (vanillaContext stg ghc) getRtsWays
+  need =<< traverse programPath
+      [ Context stg iserv w
+      | w <- [vanilla, profiling, dynamic]
+      , w `elem` rtsways
+      ]
 
 pkgFile :: Stage -> Package -> Action FilePath
 pkgFile stage pkg
