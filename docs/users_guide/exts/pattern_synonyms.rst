@@ -298,9 +298,11 @@ example: ::
 would bring into scope the data constructor ``Just`` from the ``Maybe``
 type, without also bringing the type constructor ``Maybe`` into scope.
 
-To bundle a pattern synonym with a type constructor, we list the pattern
-synonym in the export list of a module which exports the type constructor.
-For example, to bundle ``Zero`` with ``MyNum`` we could write the following: ::
+As of GHC 8.0.1 you may also "bundle" pattern synonyms with an exported type
+constructor, making that pattern appear as a data constructor of that type. To
+bundle a pattern synonym, we list the pattern synonym in the export list of a
+module which exports the type constructor.  For example, to bundle ``Zero``
+with ``MyNum`` we could write the following: ::
 
       module Example ( MyNum(Zero) ) where
 
