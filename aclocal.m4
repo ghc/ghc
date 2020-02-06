@@ -647,6 +647,7 @@ AC_DEFUN([FP_SET_CFLAGS_C99],
 # $5 is the name of the CPP flags variable
 AC_DEFUN([FPTOOLS_SET_C_LD_FLAGS],
 [
+    AC_REQUIRE([FP_PROG_LD_IS_GNU])
     AC_MSG_CHECKING([Setting up $2, $3, $4 and $5])
     case $$1 in
     i386-*)
@@ -663,10 +664,20 @@ AC_DEFUN([FPTOOLS_SET_C_LD_FLAGS],
         $2="$$2 -march=i686"
         ;;
     x86_64-unknown-solaris2)
+        # Solaris is a multi-lib platform, providing both 32- and 64-bit
+        # user-land. It appears to default to 32-bit builds but we of course want to
+        # compile for 64-bits on x86-64.
+        #
+        # On OpenSolaris uses gnu ld whereas SmartOS appears to use the Solaris
+        # implementation, which rather uses the -64 flag.
         $2="$$2 -m64"
         $3="$$3 -m64"
-        $4="$$4 -m64"
         $5="$$5 -m64"
+        if test "$fp_cv_gnu_ld" = "yes"; then
+            $4="$$4 -m64"
+        else
+            $4="$$4 -64"
+        fi
         ;;
     alpha-*)
         # For now, to suppress the gcc warning "call-clobbered
