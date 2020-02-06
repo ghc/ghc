@@ -251,19 +251,19 @@ associate( StgClosure *c, RetainerSet *s )
 {
     // StgWord has the same size as pointers, so the following type
     // casting is okay.
-    setTravData(&g_retainerTraverseState, c, (StgWord)s);
+    traverseSetClosureData(&g_retainerTraverseState, c, (StgWord)s);
 }
 
 bool isRetainerSetValid( const StgClosure *c )
 {
-    return isTravDataValid(&g_retainerTraverseState, c);
+    return traverseIsClosureDataValid(&g_retainerTraverseState, c);
 }
 
 inline RetainerSet*
 retainerSetOf( const StgClosure *c )
 {
     ASSERT(isRetainerSetValid(c));
-    return (RetainerSet*)getTravData(c);
+    return (RetainerSet*)traverseGetClosureData(c);
 }
 
 static bool
@@ -381,7 +381,7 @@ computeRetainerSet( traverseState *ts )
     StgWeak *weak;
     uint32_t g, n;
 
-    traverseInvalidateClosureData(ts);
+    traverseInvalidateAllClosureData(ts);
 
     markCapabilities(retainRoot, (void*)ts); // for scheduler roots
 
