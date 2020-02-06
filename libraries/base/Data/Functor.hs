@@ -125,6 +125,16 @@ infixl 1 <&>
 
 -- | Flipped version of '<$'.
 --
+-- Using @ApplicativeDo@: \'@as '$>' b@\' can be understood as the
+-- @do@ expression
+--
+-- @
+-- do as
+--    pure b
+-- @
+--
+-- with an inferred @Functor@ constraint.
+--
 -- @since 4.7.0.0
 --
 -- ==== __Examples__
@@ -161,6 +171,17 @@ infixl 1 <&>
 
 -- | @'void' value@ discards or ignores the result of evaluation, such
 -- as the return value of an 'System.IO.IO' action.
+--
+--
+-- Using @ApplicativeDo@: \'@'void' as@\' can be understood as the
+-- @do@ expression
+--
+-- @
+-- do as
+--    pure ()
+-- @
+--
+-- with an inferred @Functor@ constraint.
 --
 -- ==== __Examples__
 --

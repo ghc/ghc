@@ -566,7 +566,7 @@ instance Outputable LlvmFuncAttr where
   ppr OptSize            = text "optsize"
   ppr NoReturn           = text "noreturn"
   ppr NoUnwind           = text "nounwind"
-  ppr ReadNone           = text "readnon"
+  ppr ReadNone           = text "readnone"
   ppr ReadOnly           = text "readonly"
   ppr Ssp                = text "ssp"
   ppr SspReq             = text "ssqreq"
@@ -843,8 +843,10 @@ ppDouble d
                      [x,y] -> [x,y]
                      _     -> error "dToStr: too many hex digits for float"
 
-        str  = map toUpper $ concat $ fixEndian $ map hex bs
-    in  text "0x" <> text str
+    in sdocWithDynFlags (\dflags ->
+         let fixEndian = if wORDS_BIGENDIAN dflags then id else reverse
+             str       = map toUpper $ concat $ fixEndian $ map hex bs
+         in text "0x" <> text str)
 
 -- Note [LLVM Float Types]
 -- ~~~~~~~~~~~~~~~~~~~~~~~
@@ -873,14 +875,6 @@ widenFp = float2Double
 
 ppFloat :: Float -> SDoc
 ppFloat = ppDouble . widenFp
-
--- | Reverse or leave byte data alone to fix endianness on this target.
-fixEndian :: [a] -> [a]
-#if defined(WORDS_BIGENDIAN)
-fixEndian = id
-#else
-fixEndian = reverse
-#endif
 
 
 --------------------------------------------------------------------------------

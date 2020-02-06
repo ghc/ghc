@@ -3,3 +3,11 @@ T14773b.hs:4:10: warning: [-Wincomplete-patterns (in -Wextra)]
     Pattern match(es) are non-exhaustive
     In a pattern binding guards:
         Guards do not cover entire pattern space
+
+T14773b.hs:4:12: warning: [-Woverlapping-patterns (in -Wdefault)]
+    Pattern match is redundant
+    In a pattern binding guards: | False = ...
+
+T14773b.hs:7:12: warning: [-Woverlapping-patterns (in -Wdefault)]
+    Pattern match is redundant
+    In a pattern binding guards: | False = ...

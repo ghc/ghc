@@ -2,7 +2,7 @@
 (c) The University of Glasgow 2006
 (c) The GRASP/AQUA Project, Glasgow University, 1997-1998
 
-\section[BasicTypes]{Miscellanous types}
+\section[BasicTypes]{Miscellaneous types}
 
 This module defines a miscellaneously collection of very simple
 types that
@@ -15,6 +15,7 @@ types that
 -}
 
 {-# LANGUAGE DeriveDataTypeable #-}
+{-# OPTIONS_GHC -Wno-incomplete-record-updates #-}
 
 module BasicTypes(
         Version, bumpVersion, initialVersion,
@@ -51,7 +52,8 @@ module BasicTypes(
 
         Boxity(..), isBoxed,
 
-        PprPrec(..), topPrec, sigPrec, opPrec, funPrec, appPrec, maybeParen,
+        PprPrec(..), topPrec, sigPrec, opPrec, funPrec, starPrec, appPrec,
+        maybeParen,
 
         TupleSort(..), tupleSortBoxity, boxityTupleSort,
         tupleParens,
@@ -67,9 +69,9 @@ module BasicTypes(
         isDeadOcc, isStrongLoopBreaker, isWeakLoopBreaker, isManyOccs,
         strongLoopBreaker, weakLoopBreaker,
 
-        InsideLam, insideLam, notInsideLam,
-        OneBranch, oneBranch, notOneBranch,
-        InterestingCxt,
+        InsideLam(..),
+        OneBranch(..),
+        InterestingCxt(..),
         TailCallInfo(..), tailCallInfo, zapOccTailCallInfo,
         isAlwaysTailCalled,
 
@@ -106,7 +108,9 @@ module BasicTypes(
 
         IntWithInf, infinity, treatZeroAsInf, mkIntWithInf, intGtLimit,
 
-        SpliceExplicitFlag(..)
+        SpliceExplicitFlag(..),
+
+        TypeOrKind(..), isTypeLevel, isKindLevel
    ) where
 
 import GhcPrelude
@@ -117,6 +121,7 @@ import SrcLoc ( Located,unLoc )
 import Data.Data hiding (Fixity, Prefix, Infix)
 import Data.Function (on)
 import Data.Bits
+import qualified Data.Semigroup as Semi
 
 {-
 ************************************************************************
@@ -726,14 +731,16 @@ pprSafeOverlap False = empty
 newtype PprPrec = PprPrec Int deriving (Eq, Ord, Show)
 -- See Note [Precedence in types]
 
-topPrec, sigPrec, funPrec, opPrec, appPrec :: PprPrec
+topPrec, sigPrec, funPrec, opPrec, starPrec, appPrec :: PprPrec
 topPrec = PprPrec 0 -- No parens
 sigPrec = PprPrec 1 -- Explicit type signatures
 funPrec = PprPrec 2 -- Function args; no parens for constructor apps
                     -- See [Type operator precedence] for why both
                     -- funPrec and opPrec exist.
 opPrec  = PprPrec 2 -- Infix operator
-appPrec = PprPrec 3 -- Constructor args; no parens for atomic
+starPrec = PprPrec 3 -- Star syntax for the type of types, i.e. the * in (* -> *)
+                     -- See Note [Star kind precedence]
+appPrec  = PprPrec 4 -- Constructor args; no parens for atomic
 
 maybeParen :: PprPrec -> PprPrec -> SDoc -> SDoc
 maybeParen ctxt_prec inner_prec pretty
@@ -772,6 +779,33 @@ By treating opPrec = funPrec we end up with more parens
 
 But the two are different constructors of PprPrec so we could make
 (->) bind more or less tightly if we wanted.
+
+Note [Star kind precedence]
+~~~~~~~~~~~~~~~~~~~~~~~~~~~
+We parenthesize the (*) kind to avoid two issues:
+
+1. Printing invalid or incorrect code.
+   For example, instead of  type F @(*) x = x
+         GHC used to print  type F @*   x = x
+   However, (@*) is a type operator, not a kind application.
+
+2. Printing kinds that are correct but hard to read.
+   Should  Either * Int  be read as  Either (*) Int
+                              or as  (*) Either Int  ?
+   This depends on whether -XStarIsType is enabled, but it would be
+   easier if we didn't have to check for the flag when reading the code.
+
+At the same time, we cannot parenthesize (*) blindly.
+Consider this Haskell98 kind:          ((* -> *) -> *) -> *
+With parentheses, it is less readable: (((*) -> (*)) -> (*)) -> (*)
+
+The solution is to assign a special precedence to (*), 'starPrec', which is
+higher than 'funPrec' but lower than 'appPrec':
+
+   F * * *   becomes  F (*) (*) (*)
+   F A * B   becomes  F A (*) B
+   Proxy *   becomes  Proxy (*)
+   a * -> *  becomes  a (*) -> *
 -}
 
 {-
@@ -787,6 +821,13 @@ data TupleSort
   | UnboxedTuple
   | ConstraintTuple
   deriving( Eq, Data )
+
+instance Outputable TupleSort where
+  ppr ts = text $
+    case ts of
+      BoxedTuple      -> "BoxedTuple"
+      UnboxedTuple    -> "UnboxedTuple"
+      ConstraintTuple -> "ConstraintTuple"
 
 tupleSortBoxity :: TupleSort -> Boxity
 tupleSortBoxity BoxedTuple      = Boxed
@@ -895,7 +936,6 @@ data OccInfo
   | IAmALoopBreaker { occ_rules_only :: !RulesOnly
                     , occ_tail       :: !TailCallInfo }
                         -- Note [LoopBreaker OccInfo]
-
   deriving (Eq)
 
 type RulesOnly = Bool
@@ -924,25 +964,50 @@ seqOccInfo occ = occ `seq` ()
 
 -----------------
 -- | Interesting Context
-type InterestingCxt = Bool      -- True <=> Function: is applied
-                                --          Data value: scrutinised by a case with
-                                --                      at least one non-DEFAULT branch
+data InterestingCxt
+  = IsInteresting
+    -- ^ Function: is applied
+    --   Data value: scrutinised by a case with at least one non-DEFAULT branch
+  | NotInteresting
+  deriving (Eq)
+
+-- | If there is any 'interesting' identifier occurrence, then the
+-- aggregated occurrence info of that identifier is considered interesting.
+instance Semi.Semigroup InterestingCxt where
+  NotInteresting <> x = x
+  IsInteresting  <> _ = IsInteresting
+
+instance Monoid InterestingCxt where
+  mempty = NotInteresting
+  mappend = (Semi.<>)
 
 -----------------
 -- | Inside Lambda
-type InsideLam = Bool   -- True <=> Occurs inside a non-linear lambda
-                        -- Substituting a redex for this occurrence is
-                        -- dangerous because it might duplicate work.
-insideLam, notInsideLam :: InsideLam
-insideLam    = True
-notInsideLam = False
+data InsideLam
+  = IsInsideLam
+    -- ^ Occurs inside a non-linear lambda
+    -- Substituting a redex for this occurrence is
+    -- dangerous because it might duplicate work.
+  | NotInsideLam
+  deriving (Eq)
+
+-- | If any occurrence of an identifier is inside a lambda, then the
+-- occurrence info of that identifier marks it as occurring inside a lambda
+instance Semi.Semigroup InsideLam where
+  NotInsideLam <> x = x
+  IsInsideLam  <> _ = IsInsideLam
+
+instance Monoid InsideLam where
+  mempty = NotInsideLam
+  mappend = (Semi.<>)
 
 -----------------
-type OneBranch = Bool   -- True <=> Occurs in only one case branch
-                        --      so no code-duplication issue to worry about
-oneBranch, notOneBranch :: OneBranch
-oneBranch    = True
-notOneBranch = False
+data OneBranch
+  = InOneBranch
+    -- ^ One syntactic occurrence: Occurs in only one case branch
+    -- so no code-duplication issue to worry about
+  | MultipleBranches
+  deriving (Eq)
 
 -----------------
 data TailCallInfo = AlwaysTailCalled JoinArity -- See Note [TailCallInfo]
@@ -1003,15 +1068,15 @@ instance Outputable OccInfo where
           pp_ro | rule_only = char '!'
                 | otherwise = empty
   ppr (OneOcc inside_lam one_branch int_cxt tail_info)
-        = text "Once" <> pp_lam <> pp_br <> pp_args <> pp_tail
+        = text "Once" <> pp_lam inside_lam <> pp_br one_branch <> pp_args int_cxt <> pp_tail
         where
-          pp_lam | inside_lam = char 'L'
-                 | otherwise  = empty
-          pp_br  | one_branch = empty
-                 | otherwise  = char '*'
-          pp_args | int_cxt   = char '!'
-                  | otherwise = empty
-          pp_tail             = pprShortTailCallInfo tail_info
+          pp_lam IsInsideLam     = char 'L'
+          pp_lam NotInsideLam    = empty
+          pp_br MultipleBranches = char '*'
+          pp_br InOneBranch      = empty
+          pp_args IsInteresting  = char '!'
+          pp_args NotInteresting = empty
+          pp_tail                = pprShortTailCallInfo tail_info
 
 pprShortTailCallInfo :: TailCallInfo -> SDoc
 pprShortTailCallInfo (AlwaysTailCalled ar) = char 'T' <> brackets (int ar)
@@ -1211,7 +1276,7 @@ data Activation = NeverActive
                 | ActiveAfter SourceText PhaseNum
                   -- Active in this phase and later
                 deriving( Eq, Data )
-                  -- Eq used in comparing rules in HsDecls
+                  -- Eq used in comparing rules in GHC.Hs.Decls
 
 -- | Rule Match Information
 data RuleMatchInfo = ConLike                    -- See Note [CONLIKE pragma]
@@ -1644,3 +1709,25 @@ data SpliceExplicitFlag
           = ExplicitSplice | -- ^ <=> $(f x y)
             ImplicitSplice   -- ^ <=> f x y,  i.e. a naked top level expression
     deriving Data
+
+{- *********************************************************************
+*                                                                      *
+                        Types vs Kinds
+*                                                                      *
+********************************************************************* -}
+
+-- | Flag to see whether we're type-checking terms or kind-checking types
+data TypeOrKind = TypeLevel | KindLevel
+  deriving Eq
+
+instance Outputable TypeOrKind where
+  ppr TypeLevel = text "TypeLevel"
+  ppr KindLevel = text "KindLevel"
+
+isTypeLevel :: TypeOrKind -> Bool
+isTypeLevel TypeLevel = True
+isTypeLevel KindLevel = False
+
+isKindLevel :: TypeOrKind -> Bool
+isKindLevel TypeLevel = False
+isKindLevel KindLevel = True

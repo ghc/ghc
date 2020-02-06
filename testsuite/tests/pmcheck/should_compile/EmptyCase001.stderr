@@ -1,3 +1,4 @@
+
 EmptyCase001.hs:9:6: warning: [-Wincomplete-patterns (in -Wextra)]
     Pattern match(es) are non-exhaustive
     In a case alternative: Patterns not matched: _ :: Int

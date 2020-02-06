@@ -4,7 +4,7 @@
 {-# LANGUAGE PolyKinds #-}
 {-# LANGUAGE ScopedTypeVariables #-}
 
--- | Auxilary definitions for 'Semigroup'
+-- | Auxiliary definitions for 'Semigroup'
 --
 -- This module provides some @newtype@ wrappers and helpers which are
 -- reexported from the "Data.Semigroup" module or imported directly
@@ -284,6 +284,12 @@ instance Monad Product where
 
 
 -- | Monoid under '<|>'.
+--
+-- >>> getAlt (Alt (Just 12) <> Alt (Just 24))
+-- Just 12
+--
+-- >>> getAlt $ Alt Nothing <> Alt (Just 24)
+-- Just 24
 --
 -- @since 4.8.0.0
 newtype Alt f a = Alt {getAlt :: f a}

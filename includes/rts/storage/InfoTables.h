@@ -355,7 +355,7 @@ typedef struct StgConInfoTable_ {
  */
 #if defined(TABLES_NEXT_TO_CODE)
 #define GET_CON_DESC(info) \
-            ((const char *)((StgWord)((info)+1) + (info->con_desc)))
+            ((const char *)((StgWord)((info)+1) + ((info)->con_desc)))
 #else
 #define GET_CON_DESC(info) ((const char *)(info)->con_desc)
 #endif

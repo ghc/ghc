@@ -1,5 +1,4 @@
 packages: ./
-          ../libraries/Cabal/Cabal/
 
 package hadrian
     ghc-options: -Werror

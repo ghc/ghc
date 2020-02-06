@@ -34,3 +34,28 @@ libraries/ghc-boot/dist-boot/package-data.mk: \
 	libraries/ghc-boot/dist-boot/build/GHC/Version.hs
 libraries/ghc-boot/dist-install/package-data.mk: \
 	libraries/ghc-boot/dist-install/build/GHC/Version.hs
+
+libraries/ghc-boot/dist-boot/build/GHC/Platform/Host.hs \
+libraries/ghc-boot/dist-install/build/GHC/Platform/Host.hs: mk/project.mk | $$(dir $$@)/.
+	$(call removeFiles,$@)
+	@echo "module GHC.Platform.Host where"                              >> $@
+	@echo                                                               >> $@
+	@echo 'import GHC.Platform'                                         >> $@
+	@echo                                                               >> $@
+	@echo 'cHostPlatformArch   :: Arch'                                 >> $@
+	@echo 'cHostPlatformArch   = $(HaskellHostArch)'                    >> $@
+	@echo                                                               >> $@
+	@echo 'cHostPlatformOS     :: OS'                                   >> $@
+	@echo 'cHostPlatformOS     = $(HaskellHostOs)'                      >> $@
+	@echo                                                               >> $@
+	@echo 'cHostPlatformMini :: PlatformMini'                           >> $@
+	@echo 'cHostPlatformMini = PlatformMini'                            >> $@
+	@echo '  { platformMini_arch = cHostPlatformArch'                   >> $@
+	@echo '  , platformMini_os = cHostPlatformOS'                       >> $@
+	@echo '  }'                                                         >> $@
+	@echo done.
+
+libraries/ghc-boot/dist-boot/package-data.mk: \
+	libraries/ghc-boot/dist-boot/build/GHC/Platform/Host.hs
+libraries/ghc-boot/dist-install/package-data.mk: \
+	libraries/ghc-boot/dist-install/build/GHC/Platform/Host.hs

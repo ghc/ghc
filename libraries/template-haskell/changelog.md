@@ -1,5 +1,14 @@
 # Changelog for [`template-haskell` package](http://hackage.haskell.org/package/template-haskell)
 
+## 2.17.0.0
+
+  * Implement Overloaded Quotations (GHC Proposal #246). This patch modifies a
+     few fundamental things in the API. All the library combinators are generalised
+     to be in terms of a new minimal class `Quote`. The type of `lift` and `liftTyped`
+     are modified to return `m Exp` rather than `Q Exp`. Instances written in terms
+     of `Q` are now disallowed. The types of `unsafeTExpCoerce` and `unTypeQ`
+     are also generalised in terms of `Quote` rather than specific to `Q`.
+
 ## 2.16.0.0 *TBA*
 
   * Add support for tuple sections. (#15843) The type signatures of `TupE` and
@@ -19,7 +28,10 @@
   * Make the `Lift` typeclass levity-polymorphic and add instances for unboxed
     tuples, unboxed sums, `Int#`, `Word#`, `Addr#`, `Float#`, and `Double#`.
 
-## 2.15.0.0 *TBA*
+  * Introduce `reifyType` to reify the type or kind of a thing referenced by
+    `Name`.
+
+## 2.15.0.0 *May 2019*
 
   * In `Language.Haskell.TH.Syntax`, `DataInstD`, `NewTypeInstD`, `TySynEqn`,
     and `RuleP` now all have a `Maybe [TyVarBndr]` argument, which contains a
@@ -39,7 +51,9 @@
 
   * Add `Lift` instances for `NonEmpty` and `Void`
 
-## 2.14.0.0 *TBA*
+  * `addForeignFilePath` now support assembler sources (#16180).
+
+## 2.14.0.0 *September 2018*
 
   * Introduce an `addForeignFilePath` function, as well as a corresponding
     `qAddForeignFile` class method to `Quasi`. Unlike `addForeignFile`, which

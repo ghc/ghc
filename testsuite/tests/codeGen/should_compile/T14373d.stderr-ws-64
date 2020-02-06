@@ -1,0 +1,19 @@
+[T14373d.earlyDefault_entry() { //
+           switch [1 .. 7]
+               case 2 : goto
+               default: {goto
+           R1 = XYZ_closure+2;
+[T14373d.mixedDefault_entry() { //
+           switch [1 .. 7]
+               case 2 : goto
+               case 7 : goto
+               default: {goto
+           switch [6 .. 15]
+               case 15 : goto
+               default: {goto
+           R1 = XYZ_closure+2;
+[T14373d.lateDefault_entry() { //
+           switch [0 .. 15]
+               case 15 : goto
+               default: {goto
+           R1 = XYZ_closure+2;

@@ -1,6 +1,7 @@
+
 EmptyCase005.hs:24:8: warning: [-Wincomplete-patterns (in -Wextra)]
     Pattern match(es) are non-exhaustive
-    In a case alternative: Patterns not matched: (Void3 _)
+    In a case alternative: Patterns not matched: Void3 _
 
 EmptyCase005.hs:67:8: warning: [-Wincomplete-patterns (in -Wextra)]
     Pattern match(es) are non-exhaustive
@@ -13,20 +14,20 @@ EmptyCase005.hs:73:8: warning: [-Wincomplete-patterns (in -Wextra)]
     Pattern match(es) are non-exhaustive
     In a case alternative:
         Patterns not matched:
-            (MkTBool False)
-            (MkTBool True)
+            MkTBool False
+            MkTBool True
 
 EmptyCase005.hs:79:8: warning: [-Wincomplete-patterns (in -Wextra)]
     Pattern match(es) are non-exhaustive
-    In a case alternative: Patterns not matched: (MkTInt _)
+    In a case alternative: Patterns not matched: MkTInt _
 
 EmptyCase005.hs:91:8: warning: [-Wincomplete-patterns (in -Wextra)]
     Pattern match(es) are non-exhaustive
     In a case alternative:
         Patterns not matched:
-            (MkV False)
-            (MkV True)
+            MkV False
+            MkV True
 
 EmptyCase005.hs:101:8: warning: [-Wincomplete-patterns (in -Wextra)]
     Pattern match(es) are non-exhaustive
-    In a case alternative: Patterns not matched: _ :: H Char
+    In a case alternative: Patterns not matched: _ :: H Int

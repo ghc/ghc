@@ -31,6 +31,7 @@ Thumbs.db
 *.dyn_o
 *.dyn_hi
 __pycache__
+.mypy_cache
 *.SYMDEF*
 
 log
@@ -50,6 +51,9 @@ stage0
 stage1
 stage2
 _build
+*/generated/
+*/ghc-stage1
+.shake.*
 .hadrian_ghci
 
 # -----------------------------------------------------------------------------
@@ -69,6 +73,7 @@ _darcs/
 /driver/ghc/dist/
 /driver/haddock/dist/
 /driver/ghci/dist/
+/includes/dist/
 /includes/dist-*/
 /libffi/dist-install/
 /libraries/*/dist-boot/
@@ -102,6 +107,7 @@ _darcs/
 /distrib/ghc.iss
 /docs/man
 /docs/index.html
+/docs/users_guide/.log
 /docs/users_guide/users_guide
 /docs/users_guide/ghc.1
 /docs/users_guide/flags.pyc
@@ -124,9 +130,6 @@ _darcs/
 /ghc.spec
 /ghc/ghc-bin.cabal
 /includes/dist/
-/includes/ghcautoconf.h
-/includes/ghcplatform.h
-/includes/ghcversion.h
 /index.html
 /inplace/
 /libffi/build/
@@ -220,5 +223,12 @@ GIT_COMMIT_ID
 # ghc.nix
 ghc.nix/
 
-
+# gdb
 .gdb_history
+.gdbinit
+
+# Tooling - direnv
+.envrc
+
+# Tooling - vscode
+.vscode

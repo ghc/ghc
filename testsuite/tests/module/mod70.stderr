@@ -1,2 +1,4 @@
 
-mod70.hs:3:8: error: Pattern syntax in expression context: ~1
+mod70.hs:3:9: error:
+    Lazy pattern in expression context: ~1
+    Did you mean to add a space after the '~'?

@@ -1,5 +1,5 @@
 {-# LANGUAGE CPP #-}
 main = do
-#ifndef VERSION_containers
+#if !defined(VERSION_containers)
     putStrLn "OK"
 #endif

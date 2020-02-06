@@ -35,7 +35,7 @@ import Util
 import Maybes           ( isJust )
 import TysWiredIn
 import TysPrim          ( realWorldStatePrimTy )
-import ErrUtils         ( dumpIfSet_dyn )
+import ErrUtils         ( dumpIfSet_dyn, DumpFormat (..) )
 import Name             ( getName, stableNameCmp )
 import Data.Function    ( on )
 import UniqSet
@@ -53,8 +53,8 @@ dmdAnalProgram dflags fam_envs binds
   = do {
         let { binds_plus_dmds = do_prog binds } ;
         dumpIfSet_dyn dflags Opt_D_dump_str_signatures
-                      "Strictness signatures" $
-            dumpStrSig binds_plus_dmds ;
+            "Strictness signatures" FormatText
+            (dumpStrSig binds_plus_dmds) ;
         -- See Note [Stamp out space leaks in demand analysis]
         seqBinds binds_plus_dmds `seq` return binds_plus_dmds
     }
@@ -140,7 +140,7 @@ dmdTransformThunkDmd e
 -- See ↦* relation in the Cardinality Analysis paper
 dmdAnalStar :: AnalEnv
             -> Demand   -- This one takes a *Demand*
-            -> CoreExpr -- Should obey the let/app invariatn
+            -> CoreExpr -- Should obey the let/app invariant
             -> (BothDmdArg, CoreExpr)
 dmdAnalStar env dmd e
   | (dmd_shell, cd) <- toCleanDmd dmd
@@ -501,7 +501,7 @@ dmdFix :: TopLevelFlag
        -> AnalEnv                            -- Does not include bindings for this binding
        -> CleanDemand
        -> [(Id,CoreExpr)]
-       -> (AnalEnv, DmdEnv, [(Id,CoreExpr)]) -- Binders annotated with stricness info
+       -> (AnalEnv, DmdEnv, [(Id,CoreExpr)]) -- Binders annotated with strictness info
 
 dmdFix top_lvl env let_dmd orig_pairs
   = loop 1 initial_pairs
@@ -603,8 +603,8 @@ dmdAnalRhsLetDown top_lvl rec_flag env let_dmd id rhs
     rhs_arity      = idArity id
     rhs_dmd
       -- See Note [Demand analysis for join points]
-      -- See Note [idArity for join points] in SimplUtils
-      -- rhs_arity matches the join arity of the join point
+      -- See Note [Invariants on join points] invariant 2b, in CoreSyn
+      --     rhs_arity matches the join arity of the join point
       | isJoinId id
       = mkCallDmds rhs_arity let_dmd
       | otherwise
@@ -726,6 +726,21 @@ analyse its body with the demand from the entire join-binding (written
 let_dmd here).
 
 Another win for join points!  #13543.
+
+However, note that the strictness signature for a join point can
+look a little puzzling.  E.g.
+
+    (join j x = \y. error "urk")
+    (in case v of              )
+    (     A -> j 3             )  x
+    (     B -> j 4             )
+    (     C -> \y. blah        )
+
+The entire thing is in a C(S) context, so j's strictness signature
+will be    [A]b
+meaning one absent argument, returns bottom.  That seems odd because
+there's a \y inside.  But it's right because when consumed in a C(1)
+context the RHS of the join point is indeed bottom.
 
 Note [Demand signatures are computed for a threshold demand based on idArity]
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~

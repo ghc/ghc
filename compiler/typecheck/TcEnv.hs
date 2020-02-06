@@ -4,7 +4,7 @@
 {-# OPTIONS_GHC -fno-warn-orphans #-}  -- instance MonadThings is necessarily an
                                        -- orphan
 {-# LANGUAGE UndecidableInstances #-} -- Note [Pass sensitive types]
-                                      -- in module PlaceHolder
+                                      -- in module GHC.Hs.PlaceHolder
 {-# LANGUAGE TypeFamilies #-}
 
 module TcEnv(
@@ -25,6 +25,7 @@ module TcEnv(
         tcLookupLocatedGlobalId, tcLookupLocatedTyCon,
         tcLookupLocatedClass, tcLookupAxiom,
         lookupGlobal, ioLookupDataCon,
+        addTypecheckedBinds,
 
         -- Local environment
         tcExtendKindEnv, tcExtendKindEnvList,
@@ -36,6 +37,7 @@ module TcEnv(
 
         tcLookup, tcLookupLocated, tcLookupLocalIds,
         tcLookupId, tcLookupIdMaybe, tcLookupTyVar,
+        tcLookupTcTyCon,
         tcLookupLcl_maybe,
         getInLocalScope,
         wrongThingErr, pprBinders,
@@ -56,15 +58,12 @@ module TcEnv(
         -- Defaults
         tcGetDefaultTys,
 
-        -- Global type variables
-        tcGetGlobalTyCoVars,
-
         -- Template Haskell stuff
         checkWellStaged, tcMetaTy, thLevel,
         topIdLvl, isBrackStage,
 
         -- New Ids
-        newDFunName, newDFunName', newFamInstTyConName,
+        newDFunName, newFamInstTyConName,
         newFamInstAxiomName,
         mkStableIdFromString, mkStableIdFromName,
         mkWrapperName
@@ -74,17 +73,16 @@ module TcEnv(
 
 import GhcPrelude
 
-import HsSyn
-import IfaceEnv
+import GHC.Hs
+import GHC.Iface.Env
 import TcRnMonad
 import TcMType
 import TcType
-import LoadIface
+import GHC.Iface.Load
 import PrelNames
 import TysWiredIn
 import Id
 import Var
-import VarSet
 import RdrName
 import InstEnv
 import DataCon ( DataCon )
@@ -106,11 +104,12 @@ import Module
 import Outputable
 import Encoding
 import FastString
+import Bag
 import ListSetOps
 import ErrUtils
-import Util
 import Maybes( MaybeErr(..), orElse )
 import qualified GHC.LanguageExtensions as LangExt
+import Util ( HasDebugCallStack )
 
 import Data.IORef
 import Data.List
@@ -187,6 +186,15 @@ ioLookupDataCon_maybe hsc_env name = do
           pprTcTyThingCategory (AGlobal thing) <+> quotes (ppr name) <+>
                 text "used as a data constructor"
 
+addTypecheckedBinds :: TcGblEnv -> [LHsBinds GhcTc] -> TcGblEnv
+addTypecheckedBinds tcg_env binds
+  | isHsBootOrSig (tcg_src tcg_env) = tcg_env
+    -- Do not add the code for record-selector bindings
+    -- when compiling hs-boot files
+  | otherwise = tcg_env { tcg_binds = foldr unionBags
+                                            (tcg_binds tcg_env)
+                                            binds }
+
 {-
 ************************************************************************
 *                                                                      *
@@ -201,7 +209,7 @@ span of the Name.
 
 
 tcLookupLocatedGlobal :: Located Name -> TcM TyThing
--- c.f. IfaceEnvEnv.tcIfaceGlobal
+-- c.f. GHC.IfaceToCore.tcIfaceGlobal
 tcLookupLocatedGlobal name
   = addLocM tcLookupGlobal name
 
@@ -448,6 +456,13 @@ tcLookupLocalIds ns
                 Just (ATcId { tct_id = id }) ->  id
                 _ -> pprPanic "tcLookupLocalIds" (ppr name)
 
+tcLookupTcTyCon :: HasDebugCallStack => Name -> TcM TcTyCon
+tcLookupTcTyCon name = do
+    thing <- tcLookup name
+    case thing of
+        ATcTyCon tc -> return tc
+        _           -> pprPanic "tcLookupTcTyCon" (ppr name)
+
 getInLocalScope :: TcM (Name -> Bool)
 getInLocalScope = do { lcl_env <- getLclTypeEnv
                      ; return (`elemNameEnv` lcl_env) }
@@ -493,8 +508,8 @@ isTypeClosedLetBndr :: Id -> Bool
 isTypeClosedLetBndr = noFreeVarsOfType . idType
 
 tcExtendRecIds :: [(Name, TcId)] -> TcM a -> TcM a
--- Used for binding the recurive uses of Ids in a binding
--- both top-level value bindings and and nested let/where-bindings
+-- Used for binding the recursive uses of Ids in a binding
+-- both top-level value bindings and nested let/where-bindings
 -- Does not extend the TcBinderStack
 tcExtendRecIds pairs thing_inside
   = tc_extend_local_env NotTopLevel
@@ -518,7 +533,7 @@ tcExtendSigIds top_lvl sig_ids thing_inside
 
 tcExtendLetEnv :: TopLevelFlag -> TcSigFun -> IsGroupClosed
                   -> [TcId] -> TcM a -> TcM a
--- Used for both top-level value bindings and and nested let/where-bindings
+-- Used for both top-level value bindings and nested let/where-bindings
 -- Adds to the TcBinderStack too
 tcExtendLetEnv top_lvl sig_fn (IsGroupClosed fvs fv_type_closed)
                ids thing_inside
@@ -576,7 +591,7 @@ tc_extend_local_env top_lvl extra_env thing_inside
 -- as free in the types of extra_env.
   = do  { traceTc "tc_extend_local_env" (ppr extra_env)
         ; env0 <- getLclEnv
-        ; env1 <- tcExtendLocalTypeEnv env0 extra_env
+        ; let env1 = tcExtendLocalTypeEnv env0 extra_env
         ; stage <- getStage
         ; let env2 = extend_local_env (top_lvl, thLevel stage) extra_env env1
         ; setLclEnv env2 thing_inside }
@@ -594,52 +609,9 @@ tc_extend_local_env top_lvl extra_env thing_inside
             , tcl_th_bndrs = extendNameEnvList th_bndrs  -- We only track Ids in tcl_th_bndrs
                                  [(n, thlvl) | (n, ATcId {}) <- pairs] }
 
-tcExtendLocalTypeEnv :: TcLclEnv -> [(Name, TcTyThing)] -> TcM TcLclEnv
+tcExtendLocalTypeEnv :: TcLclEnv -> [(Name, TcTyThing)] -> TcLclEnv
 tcExtendLocalTypeEnv lcl_env@(TcLclEnv { tcl_env = lcl_type_env }) tc_ty_things
-  | isEmptyVarSet extra_tvs
-  = return (lcl_env { tcl_env = extendNameEnvList lcl_type_env tc_ty_things })
-  | otherwise
-  = do { global_tvs <- readMutVar (tcl_tyvars lcl_env)
-       ; new_g_var  <- newMutVar (global_tvs `unionVarSet` extra_tvs)
-       ; return (lcl_env { tcl_tyvars = new_g_var
-                         , tcl_env = extendNameEnvList lcl_type_env tc_ty_things } ) }
-  where
-    extra_tvs = foldr get_tvs emptyVarSet tc_ty_things
-
-    get_tvs (_, ATcId { tct_id = id, tct_info = closed }) tvs
-      = case closed of
-          ClosedLet -> ASSERT2( is_closed_type, ppr id $$ ppr (idType id) )
-                       tvs
-          _other    -> tvs `unionVarSet` id_tvs
-        where
-           id_ty          = idType id
-           id_tvs         = tyCoVarsOfType id_ty
-           id_co_tvs      = closeOverKinds (coVarsOfType id_ty)
-           is_closed_type = not (anyVarSet isTyVar (id_tvs `minusVarSet` id_co_tvs))
-           -- We only care about being closed wrt /type/ variables
-           -- E.g. a top-level binding might have a type like
-           --          foo :: t |> co
-           -- where co :: * ~ *
-           -- or some other as-yet-unsolved kind coercion
-
-    get_tvs (_, ATyVar _ tv) tvs          -- See Note [Global TyVars]
-      = tvs `unionVarSet` tyCoVarsOfType (tyVarKind tv) `extendVarSet` tv
-
-    get_tvs (_, ATcTyCon tc) tvs = tvs `unionVarSet` tyCoVarsOfType (tyConKind tc)
-
-    get_tvs (_, AGlobal {})       tvs = tvs
-    get_tvs (_, APromotionErr {}) tvs = tvs
-
-        -- Note [Global TyVars]
-        -- It's important to add the in-scope tyvars to the global tyvar set
-        -- as well.  Consider
-        --      f (_::r) = let g y = y::r in ...
-        -- Here, g mustn't be generalised.  This is also important during
-        -- class and instance decls, when we mustn't generalise the class tyvars
-        -- when typechecking the methods.
-        --
-        -- Nor must we generalise g over any kind variables free in r's kind
-
+  = lcl_env { tcl_env = extendNameEnvList lcl_type_env tc_ty_things }
 
 {- *********************************************************************
 *                                                                      *
@@ -847,7 +819,7 @@ topIdLvl :: Id -> ThLevel
 -- E.g. this is bad:
 --      x = [| foo |]
 --      $( f x )
--- By the time we are prcessing the $(f x), the binding for "x"
+-- By the time we are processing the $(f x), the binding for "x"
 -- will be in the global env, not the local one.
 topIdLvl id | isLocalId id = outerLevel
             | otherwise    = impLevel
@@ -858,7 +830,7 @@ tcMetaTy :: Name -> TcM Type
 -- E.g. given the name "Expr" return the type "Expr"
 tcMetaTy tc_name = do
     t <- tcLookupTyCon tc_name
-    return (mkTyConApp t [])
+    return (mkTyConTy t)
 
 isBrackStage :: ThStage -> Bool
 isBrackStage (Brack {}) = True
@@ -905,7 +877,7 @@ tcGetDefaultTys
 {-
 Note [Extended defaults]
 ~~~~~~~~~~~~~~~~~~~~~
-In interative mode (or with -XExtendedDefaultRules) we add () as the first type we
+In interactive mode (or with -XExtendedDefaultRules) we add () as the first type we
 try when defaulting.  This has very little real impact, except in the following case.
 Consider:
         Text.Printf.printf "hello"
@@ -970,11 +942,11 @@ data InstBindings a
            --          Used only to improve error messages
       }
 
-instance (OutputableBndrId (GhcPass a))
+instance (OutputableBndrId a)
        => Outputable (InstInfo (GhcPass a)) where
     ppr = pprInstInfoDetails
 
-pprInstInfoDetails :: (OutputableBndrId (GhcPass a))
+pprInstInfoDetails :: (OutputableBndrId a)
                    => InstInfo (GhcPass a) -> SDoc
 pprInstInfoDetails info
    = hang (pprInstanceHdr (iSpec info) <+> text "where")
@@ -1006,21 +978,6 @@ newDFunName clas tys loc
                             concatMap (occNameString.getDFunTyKey) tys
         ; dfun_occ <- chooseUniqueOccTc (mkDFunOcc info_string is_boot)
         ; newGlobalBinder mod dfun_occ loc }
-
--- | Special case of 'newDFunName' to generate dict fun name for a single TyCon.
-newDFunName' :: Class -> TyCon -> TcM Name
-newDFunName' clas tycon        -- Just a simple wrapper
-  = do { loc <- getSrcSpanM     -- The location of the instance decl,
-                                -- not of the tycon
-       ; newDFunName clas [mkTyConApp tycon []] loc }
-       -- The type passed to newDFunName is only used to generate
-       -- a suitable string; hence the empty type arg list
-
-{-
-Make a name for the representation tycon of a family instance.  It's an
-*external* name, like other top-level names, and hence must be made with
-newGlobalBinder.
--}
 
 newFamInstTyConName :: Located Name -> [Type] -> TcM Name
 newFamInstTyConName (L loc name) tys = mk_fam_inst_name id loc name [tys]

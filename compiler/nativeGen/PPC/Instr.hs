@@ -1,5 +1,7 @@
 {-# LANGUAGE CPP #-}
 
+{-# OPTIONS_GHC -Wno-incomplete-uni-patterns #-}
+
 -----------------------------------------------------------------------------
 --
 -- Machine-dependent assembly language
@@ -9,7 +11,6 @@
 -----------------------------------------------------------------------------
 
 #include "HsVersions.h"
-#include "nativeGen/NCG.h"
 
 module PPC.Instr (
     archWordFormat,
@@ -33,15 +34,15 @@ import TargetReg
 import RegClass
 import Reg
 
-import CodeGen.Platform
-import BlockId
-import Hoopl.Collections
-import Hoopl.Label
+import GHC.Platform.Regs
+import GHC.Cmm.BlockId
+import GHC.Cmm.Dataflow.Collections
+import GHC.Cmm.Dataflow.Label
 import DynFlags
-import Cmm
-import CmmInfo
+import GHC.Cmm
+import GHC.Cmm.Info
 import FastString
-import CLabel
+import GHC.Cmm.CLabel
 import Outputable
 import GHC.Platform
 import UniqFM (listToUFM, lookupUFM)
@@ -98,7 +99,7 @@ ppc_mkStackAllocInstr' platform amount
     , STU fmt r0 (AddrRegReg sp tmp)
     ]
   where
-    fmt = intFormat $ widthFromBytes (platformWordSize platform)
+    fmt = intFormat $ widthFromBytes (platformWordSizeInBytes platform)
     zero = ImmInt 0
     tmp = tmpReg platform
     immAmount = ImmInt amount
@@ -189,7 +190,7 @@ data Instr
     -- some static data spat out during code
     -- generation.  Will be extracted before
     -- pretty-printing.
-    | LDATA   Section CmmStatics
+    | LDATA   Section RawCmmStatics
 
     -- start a new basic block.  Useful during
     -- codegen, removed later.  Preceding
@@ -681,7 +682,7 @@ ppc_takeRegRegMoveInstr _  = Nothing
 -- big, we have to work around this limitation.
 
 makeFarBranches
-        :: LabelMap CmmStatics
+        :: LabelMap RawCmmStatics
         -> [NatBasicBlock Instr]
         -> [NatBasicBlock Instr]
 makeFarBranches info_env blocks

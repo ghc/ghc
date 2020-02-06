@@ -62,7 +62,9 @@ endif
 # We filter out -Werror from SRC_CC_OPTS, because when configure tests
 # for a feature it may not generate warning-free C code, and thus may
 # think that the feature doesn't exist if -Werror is on.
-$1_$2_CONFIGURE_CFLAGS = $$(filter-out -Werror,$$(SRC_CC_OPTS)) $$(CONF_CC_OPTS_STAGE$3) $$($1_CC_OPTS) $$($1_$2_CC_OPTS) $$(SRC_CC_WARNING_OPTS)
+#
+# Do `-iquote $(TOP)/$1` so package configure scripts can access their own source.
+$1_$2_CONFIGURE_CFLAGS = $$(filter-out -Werror,$$(SRC_CC_OPTS)) $$(CONF_CC_OPTS_STAGE$3) $$($1_CC_OPTS) $$($1_$2_CC_OPTS) $$(SRC_CC_WARNING_OPTS) -iquote $(TOP)/$1
 $1_$2_CONFIGURE_LDFLAGS = $$(SRC_LD_OPTS) $$($1_LD_OPTS) $$($1_$2_LD_OPTS)
 $1_$2_CONFIGURE_CPPFLAGS = $$(SRC_CPP_OPTS) $$(CONF_CPP_OPTS_STAGE$3) $$($1_CPP_OPTS) $$($1_$2_CPP_OPTS)
 

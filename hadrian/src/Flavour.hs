@@ -1,7 +1,10 @@
 module Flavour
   ( Flavour (..), werror
   , DocTargets, DocTarget(..)
+    -- * Flavour transformers
+  , addArgs
   , splitSections, splitSectionsIf
+  , enableDebugInfo, enableTickyGhc
   ) where
 
 import Expression
@@ -34,7 +37,7 @@ data Flavour = Flavour {
     ghciWithDebugger :: Bool,
     -- | Build profiled GHC.
     ghcProfiled :: Bool,
-    -- | Build GHC with debug information.
+    -- | Build GHC with debugging assertions.
     ghcDebugged :: Bool,
     -- | Whether to build docs and which ones
     --   (haddocks, user manual, haddock manual)
@@ -58,13 +61,35 @@ type DocTargets = Set DocTarget
 --   for e.g @sphinx-build@ or @xelatex@ and associated packages
 --   while still being able to build a(n almost) complete binary
 --   distribution.
-data DocTarget = Haddocks | SphinxHTML | SphinxPDFs | SphinxMan
+data DocTarget = Haddocks | SphinxHTML | SphinxPDFs | SphinxMan | SphinxInfo
   deriving (Eq, Ord, Show, Bounded, Enum)
+
+-- | Add arguments to the 'args' of a 'Flavour'.
+addArgs :: Args -> Flavour -> Flavour
+addArgs args' fl = fl { args = args fl <> args' }
 
 -- | Turn on -Werror for packages built with the stage1 compiler.
 -- It mimics the CI settings so is useful to turn on when developing.
 werror :: Flavour -> Flavour
-werror fl = fl { args = args fl <> (builder Ghc ? notStage0 ? arg "-Werror") }
+werror = addArgs (builder Ghc ? notStage0 ? arg "-Werror")
+
+-- | Build C and Haskell objects with debugging information.
+enableDebugInfo :: Flavour -> Flavour
+enableDebugInfo = addArgs $ mconcat
+    [ builder (Ghc CompileHs) ? notStage0 ? arg "-g3"
+    , builder (Cc CompileC) ? notStage0 ? arg "-g3"
+    ]
+
+-- | Enable the ticky-ticky profiler in stage2 GHC
+enableTickyGhc :: Flavour -> Flavour
+enableTickyGhc =
+    addArgs $ foldMap enableTickyFor [ghc, compiler, base]
+  where
+    enableTickyFor pkg = stage1 ? package pkg ? mconcat
+      [ builder (Ghc CompileHs) ? ticky
+      , builder (Ghc LinkHs) ? ticky
+      ]
+    ticky = arg "-ticky" <> arg "-ticky-allocd"
 
 -- | Transform the input 'Flavour' so as to build with
 --   @-split-sections@ whenever appropriate. You can
@@ -74,13 +99,11 @@ werror fl = fl { args = args fl <> (builder Ghc ? notStage0 ? arg "-Werror") }
 --   building it. If the given flavour doesn't build
 --   anything in a @dyn@-enabled way, then 'splitSections' is a no-op.
 splitSectionsIf :: (Package -> Bool) -> Flavour -> Flavour
-splitSectionsIf pkgPredicate fl = fl { args = args fl <> splitSectionsArg }
-
-  where splitSectionsArg = do
-          way <- getWay
-          pkg <- getPackage
-          (Dynamic `wayUnit` way) ? pkgPredicate pkg ?
-            builder (Ghc CompileHs) ? arg "-split-sections"
+splitSectionsIf pkgPredicate = addArgs $ do
+    way <- getWay
+    pkg <- getPackage
+    (Dynamic `wayUnit` way) ? pkgPredicate pkg ?
+        builder (Ghc CompileHs) ? arg "-split-sections"
 
 -- | Like 'splitSectionsIf', but with a fixed predicate: use
 --   split sections for all packages but the GHC library.

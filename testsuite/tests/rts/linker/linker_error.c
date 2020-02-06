@@ -1,7 +1,7 @@
 #include "ghcconfig.h"
+#include "Rts.h"
 #include <stdio.h>
 #include <stdlib.h>
-#include "Rts.h"
 #if defined(mingw32_HOST_OS)
 #include <malloc.h>
 #endif

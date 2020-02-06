@@ -72,6 +72,7 @@ import VarSet
 import Var
 import Type
 import TyCoRep
+import TyCoFVs
 import TyCon
 import CoAxiom
 import FamInstEnv
@@ -209,7 +210,7 @@ exprsSomeFreeVarsDSet :: InterestingVarFun -- ^ Says which 'Var's are interestin
 exprsSomeFreeVarsDSet fv_cand e =
   fvDVarSet $ filterFV fv_cand $ mapUnionFV expr_fvs e
 
---      Comment about obselete code
+--      Comment about obsolete code
 -- We used to gather the free variables the RULES at a variable occurrence
 -- with the following cryptic comment:
 --     "At a variable occurrence, add in any free variables of its rule rhss
@@ -495,7 +496,7 @@ ruleLhsFreeIds = fvVarSet . ruleLhsFVIds
 
 ruleLhsFreeIdsList :: CoreRule -> [Var]
 -- ^ This finds all locally-defined free Ids on the left hand side of a rule
--- and returns them as a determinisitcally ordered list
+-- and returns them as a deterministically ordered list
 ruleLhsFreeIdsList = fvVarList . ruleLhsFVIds
 
 ruleLhsFVIds :: CoreRule -> FV

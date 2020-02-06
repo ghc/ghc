@@ -1,0 +1,12 @@
+
+T14880.hs:12:5: error:
+    • Cannot generalise type; skolem ‘arg’ would escape its scope
+      if I tried to quantify (a0 :: arg) in this type:
+        forall x arg.
+        ((Foo arg @a0 :: (Proxy @{arg} a0 -> *))
+         ~ (Foo arg @a0 :: (Proxy @{arg} a0 -> *))) =>
+        Bar x
+      (Indeed, I sometimes struggle even printing this correctly,
+       due to its ill-scoped nature.)
+    • In the definition of data constructor ‘MkBar’
+      In the data declaration for ‘Bar’

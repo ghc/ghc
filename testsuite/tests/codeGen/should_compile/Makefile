@@ -9,13 +9,13 @@ debug:
 	# Without optimisations, we should get annotations for basically
 	# all expressions in the example program.
 	echo == Dbg ==
-	'$(TEST_HC)' $(TEST_HC_OPTS) debug -fforce-recomp -g -ddump-cmm-verbose \
+	'$(TEST_HC)' $(TEST_HC_OPTS) debug -fforce-recomp -g -ddump-cmm-verbose-by-proc \
 		| grep -o src\<debug.hs:.*\> | sort -u
 	./debug
 
 	# With optimisations we will get fewer annotations.
 	echo == Dbg -O2 ==
-	'$(TEST_HC)' $(TEST_HC_OPTS) debug -fforce-recomp -g -ddump-cmm-verbose -O2 \
+	'$(TEST_HC)' $(TEST_HC_OPTS) debug -fforce-recomp -g -ddump-cmm-verbose-by-proc -O2 \
 		> debug.cmm
 	cat debug.cmm | grep -o src\<debug.hs:.*\> | sort -u
 
@@ -34,7 +34,7 @@ debug:
 T14999:
 	'$(TEST_HC)' $(TEST_HC_OPTS) -O2 -g -c T14999.cmm -o T14999.o
 	gdb --batch -ex 'file T14999.o' -ex 'disassemble stg_catch_frame_info' --nx | tr -s '[[:blank:]\n]'
-	readelf --debug-dump=frames-interp T14999.o | tr -s '[[:blank:]\n]'
+	LANG=C readelf --debug-dump=frames-interp T14999.o | tr -s '[[:blank:]\n]'
 
 T15196:
 	'$(TEST_HC)' $(TEST_HC_OPTS) -c -O -ddump-asm T15196.hs | grep "jp " ; echo $$?

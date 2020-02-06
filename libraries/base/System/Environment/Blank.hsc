@@ -40,7 +40,7 @@ module System.Environment.Blank
   ) where
 
 import Foreign.C
-#ifdef mingw32_HOST_OS
+#if defined(mingw32_HOST_OS)
 import Foreign.Ptr
 import GHC.Windows
 import Control.Monad
@@ -61,7 +61,7 @@ import System.Environment
       withProgName,
       getEnvironment
   )
-#ifndef mingw32_HOST_OS
+#if !defined(mingw32_HOST_OS)
 import qualified System.Environment as Environment
 #endif
 
@@ -85,7 +85,7 @@ throwInvalidArgument from =
 
 -- | Similar to 'System.Environment.lookupEnv'.
 getEnv :: String -> IO (Maybe String)
-#ifdef mingw32_HOST_OS
+#if defined(mingw32_HOST_OS)
 getEnv = (<$> getEnvironment) . lookup
 #else
 getEnv = Environment.lookupEnv

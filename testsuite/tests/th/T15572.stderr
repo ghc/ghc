@@ -1,6 +1,6 @@
-T15572.hs:7:3-33: Splicing declarations
-    [d| type AbsoluteUnit1 =  '() |] ======> type AbsoluteUnit1 =  '()
-T15572.hs:8:3-54: Splicing declarations
+T15572.hs:7:2-34: Splicing declarations
+    [d| type AbsoluteUnit1 = '() |] ======> type AbsoluteUnit1 = '()
+T15572.hs:8:2-55: Splicing declarations
     pure [TySynD (mkName "AbsoluteUnit2") [] (ConT '())]
   ======>
-    type AbsoluteUnit2 =  '()
+    type AbsoluteUnit2 = '()

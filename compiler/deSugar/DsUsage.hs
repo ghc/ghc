@@ -2,8 +2,10 @@
 {-# LANGUAGE TupleSections #-}
 {-# LANGUAGE ViewPatterns #-}
 
+{-# OPTIONS_GHC -Wno-incomplete-uni-patterns #-}
+
 module DsUsage (
-    -- * Dependency/fingerprinting code (used by MkIface)
+    -- * Dependency/fingerprinting code (used by GHC.Iface.Utils)
     mkUsageInfo, mkUsedNames, mkDependencies
     ) where
 
@@ -38,7 +40,7 @@ import System.FilePath
 {- Note [Module self-dependency]
    ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
-RnNames.calculateAvails asserts the invariant that a module must not occur in
+GHC.Rename.Names.calculateAvails asserts the invariant that a module must not occur in
 its own dep_orphs or dep_finsts. However, if we aren't careful this can occur
 in the presence of hs-boot files: Consider that we have two modules, A and B,
 both with hs-boot files,
@@ -88,7 +90,7 @@ mkDependencies iuid pluginModules
                | otherwise = raw_pkgs
 
           -- Set the packages required to be Safe according to Safe Haskell.
-          -- See Note [RnNames . Tracking Trust Transitively]
+          -- See Note [Tracking Trust Transitively] in GHC.Rename.Names
           sorted_pkgs = sort (Set.toList pkgs)
           trust_pkgs  = imp_trust_pkgs imports
           dep_pkgs'   = map (\x -> (x, x `Set.member` trust_pkgs)) sorted_pkgs
@@ -314,15 +316,15 @@ mk_mod_usage_info pit hsc_env this_mod direct_imports used_names
                       usg_entities = Map.toList ent_hashs,
                       usg_safe     = imp_safe }
       where
-        maybe_iface  = lookupIfaceByModule dflags hpt pit mod
+        maybe_iface  = lookupIfaceByModule hpt pit mod
                 -- In one-shot mode, the interfaces for home-package
                 -- modules accumulate in the PIT not HPT.  Sigh.
 
         Just iface   = maybe_iface
-        finsts_mod   = mi_finsts    iface
-        hash_env     = mi_hash_fn   iface
-        mod_hash     = mi_mod_hash  iface
-        export_hash | depend_on_exports = Just (mi_exp_hash iface)
+        finsts_mod   = mi_finsts (mi_final_exts iface)
+        hash_env     = mi_hash_fn (mi_final_exts iface)
+        mod_hash     = mi_mod_hash (mi_final_exts iface)
+        export_hash | depend_on_exports = Just (mi_exp_hash (mi_final_exts iface))
                     | otherwise         = Nothing
 
         by_is_safe (ImportedByUser imv) = imv_is_safe imv

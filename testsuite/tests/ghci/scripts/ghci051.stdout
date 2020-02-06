@@ -1,9 +1,21 @@
-data T = C | D 	-- Defined at <interactive>:8:1
-type T' = Ghci1.T 	-- Defined at <interactive>:3:1
-data Ghci1.T = A | ... 	-- Defined at <interactive>:2:10
-data Ghci4.T = B | ... 	-- Defined at <interactive>:5:12
-data T = C | ... 	-- Defined at <interactive>:8:14
-data T = ... | D 	-- Defined at <interactive>:8:18
+type T :: *
+data T = C | D
+  	-- Defined at <interactive>:8:1
+type T' :: *
+type T' = Ghci1.T
+  	-- Defined at <interactive>:3:1
+type Ghci1.T :: *
+data Ghci1.T = A | ...
+  	-- Defined at <interactive>:2:10
+type Ghci4.T :: *
+data Ghci4.T = B | ...
+  	-- Defined at <interactive>:5:12
+type T :: *
+data T = C | ...
+  	-- Defined at <interactive>:8:14
+type T :: *
+data T = ... | D
+  	-- Defined at <interactive>:8:18
 b :: T' 	-- Defined at <interactive>:4:5
 c :: Ghci4.T 	-- Defined at <interactive>:7:5
 d :: T 	-- Defined at <interactive>:9:5

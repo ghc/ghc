@@ -35,7 +35,7 @@ module TcForeign
 
 import GhcPrelude
 
-import HsSyn
+import GHC.Hs
 
 import TcRnMonad
 import TcHsType

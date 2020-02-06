@@ -4,7 +4,7 @@ T9951b.hs:7:1: warning: [-Wincomplete-patterns (in -Wextra)]
     In an equation for ‘f’:
         Patterns not matched:
             []
-            (p:_) where p is not one of {'a'}
+            [p] where p is not one of {'a'}
+            (p:_:_) where p is not one of {'a'}
             ['a']
-            ('a':p:_) where p is not one of {'b'}
             ...

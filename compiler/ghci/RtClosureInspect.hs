@@ -33,7 +33,7 @@ import HscTypes
 
 import DataCon
 import Type
-import RepType
+import GHC.Types.RepType
 import qualified Unify as U
 import Var
 import TcRnMonad
@@ -47,7 +47,7 @@ import TyCon
 import Name
 import OccName
 import Module
-import IfaceEnv
+import GHC.Iface.Env
 import Util
 import VarSet
 import BasicTypes       ( Boxity(..) )
@@ -58,7 +58,7 @@ import DynFlags
 import Outputable as Ppr
 import GHC.Char
 import GHC.Exts.Heap
-import SMRep ( roundUpTo )
+import GHC.Runtime.Layout ( roundUpTo )
 
 import Control.Monad
 import Data.Maybe
@@ -856,7 +856,7 @@ extractSubTerms recurse clos = liftM thdOf3 . go 0 0
       | otherwise = do
           -- This is a bit involved since we allow packing multiple fields
           -- within a single word. See also
-          -- StgCmmLayout.mkVirtHeapOffsetsWithPadding
+          -- GHC.StgToCmm.Layout.mkVirtHeapOffsetsWithPadding
           dflags <- getDynFlags
           let word_size = wORD_SIZE dflags
               big_endian = wORDS_BIGENDIAN dflags
@@ -864,7 +864,7 @@ extractSubTerms recurse clos = liftM thdOf3 . go 0 0
               -- Align the start offset (eg, 2-byte value should be 2-byte
               -- aligned). But not more than to a word. The offset calculation
               -- should be the same with the offset calculation in
-              -- StgCmmLayout.mkVirtHeapOffsetsWithPadding.
+              -- GHC.StgToCmm.Layout.mkVirtHeapOffsetsWithPadding.
               !aligned_idx = roundUpTo arr_i (min word_size size_b)
               !new_arr_i = aligned_idx + size_b
               ws | size_b < word_size =

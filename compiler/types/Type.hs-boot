@@ -4,7 +4,6 @@ module Type where
 
 import GhcPrelude
 import TyCon
-import Var ( TyCoVar )
 import {-# SOURCE #-} TyCoRep( Type, Coercion )
 import Util
 
@@ -19,8 +18,9 @@ eqType :: Type -> Type -> Bool
 
 coreView :: Type -> Maybe Type
 tcView :: Type -> Maybe Type
+isRuntimeRepTy :: Type -> Bool
+isLiftedTypeKind :: Type -> Bool
 
-tyCoVarsOfTypesWellScoped :: [Type] -> [TyCoVar]
-tyCoVarsOfTypeWellScoped :: Type -> [TyCoVar]
-scopedSort :: [TyCoVar] -> [TyCoVar]
 splitTyConApp_maybe :: HasDebugCallStack => Type -> Maybe (TyCon, [Type])
+
+partitionInvisibleTypes :: TyCon -> [Type] -> ([Type], [Type])

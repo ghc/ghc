@@ -27,6 +27,7 @@
 #include "STM.h"
 #include "RtsUtils.h"
 #include "sm/OSMem.h"
+#include "sm/BlockAlloc.h" // for countBlocks()
 
 #if !defined(mingw32_HOST_OS)
 #include "rts/IOManager.h" // for setIOManagerControlFd()
@@ -68,10 +69,8 @@ uint32_t numa_map[MAX_NUMA_NODES];
 
 /* Let foreign code get the current Capability -- assuming there is one!
  * This is useful for unsafe foreign calls because they are called with
- * the current Capability held, but they are not passed it. For example,
- * see see the integer-gmp package which calls allocate() in its
- * stgAllocForGMP() function (which gets called by gmp functions).
- * */
+ * the current Capability held, but they are not passed it.
+ */
 Capability * rts_unsafeGetMyCapability (void)
 {
 #if defined(THREADED_RTS)
@@ -291,6 +290,11 @@ initCapability (Capability *cap, uint32_t i)
                                           RtsFlags.GcFlags.generations,
                                           "initCapability");
 
+
+    // At this point storage manager is not initialized yet, so this will be
+    // initialized in initStorage().
+    cap->upd_rem_set.queue.blocks = NULL;
+
     for (g = 0; g < RtsFlags.GcFlags.generations; g++) {
         cap->mut_lists[g] = NULL;
     }
@@ -346,6 +350,8 @@ void initCapabilities (void)
         for (i = 0; i < MAX_NUMA_NODES; i++) {
             numa_map[i] = 0;
         }
+    } else if (RtsFlags.DebugFlags.numa) {
+        // n_numa_nodes was set by RtsFlags.c
     } else {
         uint32_t nNodes = osNumaNodes();
         if (nNodes > MAX_NUMA_NODES) {
@@ -748,6 +754,8 @@ static Capability * waitForReturnCapability (Task *task)
  * result of the external call back to the Haskell thread that
  * made it.
  *
+ * pCap is strictly an output.
+ *
  * ------------------------------------------------------------------------- */
 
 void waitForCapability (Capability **pCap, Task *task)
@@ -788,7 +796,7 @@ void waitForCapability (Capability **pCap, Task *task)
             }
         }
 
-        // record the Capability as the one this Task is now assocated with.
+        // record the Capability as the one this Task is now associated with.
         task->cap = cap;
 
     } else {
@@ -840,9 +848,12 @@ void waitForCapability (Capability **pCap, Task *task)
  *      SYNC_GC_PAR), either to do a sequential GC, forkProcess, or
  *      setNumCapabilities.  We should give up the Capability temporarily.
  *
+ * When yieldCapability returns *pCap will have been updated to the new
+ * capability held by the caller.
+ *
  * ------------------------------------------------------------------------- */
 
-#if defined (THREADED_RTS)
+#if defined(THREADED_RTS)
 
 /* See Note [GC livelock] in Schedule.c for why we have gcAllowed
    and return the bool */
@@ -855,16 +866,27 @@ yieldCapability (Capability** pCap, Task *task, bool gcAllowed)
     {
         PendingSync *sync = pending_sync;
 
-        if (sync && sync->type == SYNC_GC_PAR) {
-            if (! sync->idle[cap->no]) {
-                traceEventGcStart(cap);
-                gcWorkerThread(cap);
-                traceEventGcEnd(cap);
-                traceSparkCounters(cap);
-                // See Note [migrated bound threads 2]
-                if (task->cap == cap) {
-                    return true;
+        if (sync) {
+            switch (sync->type) {
+            case SYNC_GC_PAR:
+                if (! sync->idle[cap->no]) {
+                    traceEventGcStart(cap);
+                    gcWorkerThread(cap);
+                    traceEventGcEnd(cap);
+                    traceSparkCounters(cap);
+                    // See Note [migrated bound threads 2]
+                    if (task->cap == cap) {
+                        return true;
+                    }
                 }
+                break;
+
+            case SYNC_FLUSH_UPD_REM_SET:
+                debugTrace(DEBUG_nonmoving_gc, "Flushing update remembered set blocks...");
+                break;
+
+            default:
+                break;
             }
         }
     }
@@ -948,7 +970,7 @@ yieldCapability (Capability** pCap, Task *task, bool gcAllowed)
  * get every Capability into the GC.
  * ------------------------------------------------------------------------- */
 
-#if defined (THREADED_RTS)
+#if defined(THREADED_RTS)
 
 void
 prodCapability (Capability *cap, Task *task)
@@ -970,7 +992,7 @@ prodCapability (Capability *cap, Task *task)
  *
  * ------------------------------------------------------------------------- */
 
-#if defined (THREADED_RTS)
+#if defined(THREADED_RTS)
 
 bool
 tryGrabCapability (Capability *cap, Task *task)

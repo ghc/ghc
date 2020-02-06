@@ -102,14 +102,13 @@ import GHC.Types
 -- it; if you have data that lives in two 'Compact's, each will have a
 -- separate copy of the data.
 --
--- The cost of compaction is similar to the cost of GC for the same
--- data, but it is performed only once.  However, because
--- "GHC.Compact.compact" does not stop-the-world, retaining internal
--- sharing during the compaction process is very costly. The user
--- can choose whether to 'compact' or 'compactWithSharing'.
+-- The cost of compaction is fully evaluating the data + copying it. However,
+-- because 'compact' does not stop-the-world, retaining internal sharing during
+-- the compaction process is very costly. The user can choose whether to
+-- 'compact' or 'compactWithSharing'.
 --
 -- When you have a @'Compact' a@, you can get a pointer to the actual object
--- in the region using "GHC.Compact.getCompact".  The 'Compact' type
+-- in the region using 'getCompact'.  The 'Compact' type
 -- serves as handle on the region itself; you can use this handle
 -- to add data to a specific 'Compact' with 'compactAdd' or
 -- 'compactAddWithSharing' (giving you a new handle which corresponds
@@ -134,7 +133,7 @@ import GHC.Types
 --   'GHC.Array.MutableArray') also cannot be compacted, because subsequent
 --   mutation would destroy the property that a compact is self-contained.
 --
--- If compaction encounters any of the above, a 'CompactionFailed'
+-- If compaction encounters any of the above, a 'Control.Exception.CompactionFailed'
 -- exception will be thrown by the compaction operation.
 --
 data Compact a = Compact Compact# a (MVar ())
@@ -155,12 +154,16 @@ mkCompact compact# a s =
  where
   unIO (IO a) = a
 
--- | Transfer @a@ into a new compact region, with a preallocated size,
--- possibly preserving sharing or not.  If you know how big the data
--- structure in question is, you can save time by picking an appropriate
--- block size for the compact region.
+-- | Transfer @a@ into a new compact region, with a preallocated size (in
+-- bytes), possibly preserving sharing or not.  If you know how big the data
+-- structure in question is, you can save time by picking an appropriate block
+-- size for the compact region.
 --
-compactSized :: Int -> Bool -> a -> IO (Compact a)
+compactSized
+    :: Int -- ^ Size of the compact region, in bytes
+    -> Bool -- ^ Whether to retain internal sharing
+    -> a
+    -> IO (Compact a)
 compactSized (I# size) share a = IO $ \s0 ->
   case compactNew# (int2Word# size) s0 of { (# s1, compact# #) ->
   case compactAddPrim compact# a s1 of { (# s2, pk #) ->
@@ -254,7 +257,7 @@ compactSize :: Compact a -> IO Word
 compactSize (Compact buffer _ lock) = withMVar lock $ \_ -> IO $ \s0 ->
    case compactSize# buffer s0 of (# s1, sz #) -> (# s1, W# sz #)
 
--- | *Experimental.*  This function doesn't actually resize a compact
+-- | __Experimental__  This function doesn't actually resize a compact
 -- region; rather, it changes the default block size which we allocate
 -- when the current block runs out of space, and also appends a block
 -- to the compact region.

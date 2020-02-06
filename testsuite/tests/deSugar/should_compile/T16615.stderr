@@ -1,0 +1,40 @@
+
+==================== Desugar (after optimization) ====================
+Result size of Desugar (after optimization)
+  = {terms: 36, types: 13, coercions: 0, joins: 0/0}
+
+-- RHS size: {terms: 5, types: 0, coercions: 0, joins: 0/0}
+T16615.$trModule :: GHC.Types.Module
+[LclIdX,
+ Unf=Unf{Src=<vanilla>, TopLvl=True, Value=True, ConLike=True,
+         WorkFree=True, Expandable=True, Guidance=IF_ARGS [] 80 30}]
+T16615.$trModule
+  = GHC.Types.Module
+      (GHC.Types.TrNameS "main"#) (GHC.Types.TrNameS "T16615"#)
+
+Rec {
+-- RHS size: {terms: 14, types: 4, coercions: 0, joins: 0/0}
+g :: Int -> Bool
+[LclIdX,
+ Unf=Unf{Src=<vanilla>, TopLvl=True, Value=True, ConLike=True,
+         WorkFree=True, Expandable=True, Guidance=IF_ARGS [0] 120 10}]
+g = \ (i :: Int) ->
+      case == @Int GHC.Classes.$fEqInt i (GHC.Types.I# 0#) of {
+        False -> f (pred @Int GHC.Enum.$fEnumInt i);
+        True -> GHC.Types.False
+      }
+
+-- RHS size: {terms: 14, types: 4, coercions: 0, joins: 0/0}
+f [Occ=LoopBreaker] :: Int -> Bool
+[LclIdX,
+ Unf=Unf{Src=<vanilla>, TopLvl=True, Value=True, ConLike=True,
+         WorkFree=True, Expandable=True, Guidance=IF_ARGS [0] 120 10}]
+f = \ (i :: Int) ->
+      case == @Int GHC.Classes.$fEqInt i (GHC.Types.I# 0#) of {
+        False -> g (pred @Int GHC.Enum.$fEnumInt i);
+        True -> GHC.Types.True
+      }
+end Rec }
+
+
+

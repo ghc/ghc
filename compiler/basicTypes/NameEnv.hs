@@ -6,12 +6,15 @@
 -}
 
 {-# LANGUAGE CPP #-}
+{-# LANGUAGE BangPatterns #-}
+{-# LANGUAGE ScopedTypeVariables #-}
+
 module NameEnv (
         -- * Var, Id and TyVar environments (maps)
         NameEnv,
 
         -- ** Manipulating these environments
-        mkNameEnv,
+        mkNameEnv, mkNameEnvWith,
         emptyNameEnv, isEmptyNameEnv,
         unitNameEnv, nameEnvElts,
         extendNameEnv_C, extendNameEnv_Acc, extendNameEnv,
@@ -25,9 +28,9 @@ module NameEnv (
 
         emptyDNameEnv,
         lookupDNameEnv,
-        delFromDNameEnv,
+        delFromDNameEnv, filterDNameEnv,
         mapDNameEnv,
-        alterDNameEnv,
+        adjustDNameEnv, alterDNameEnv, extendDNameEnv,
         -- ** Dependency analysis
         depAnal
     ) where
@@ -60,7 +63,8 @@ deterministic even when the edges are not in deterministic order as explained
 in Note [Deterministic SCC] in Digraph.
 -}
 
-depAnal :: (node -> [Name])      -- Defs
+depAnal :: forall node.
+           (node -> [Name])      -- Defs
         -> (node -> [Name])      -- Uses
         -> [node]
         -> [SCC node]
@@ -69,11 +73,13 @@ depAnal :: (node -> [Name])      -- Defs
 --
 -- The get_defs and get_uses functions are called only once per node
 depAnal get_defs get_uses nodes
-  = stronglyConnCompFromEdgedVerticesUniq (map mk_node keyed_nodes)
+  = stronglyConnCompFromEdgedVerticesUniq graph_nodes
   where
+    graph_nodes = (map mk_node keyed_nodes) :: [Node Int node]
     keyed_nodes = nodes `zip` [(1::Int)..]
     mk_node (node, key) =
-      DigraphNode node key (mapMaybe (lookupNameEnv key_map) (get_uses node))
+      let !edges = (mapMaybe (lookupNameEnv key_map) (get_uses node))
+      in DigraphNode node key edges
 
     key_map :: NameEnv Int   -- Maps a Name to the key of the decl that defines it
     key_map = mkNameEnv [(name,key) | (node, key) <- keyed_nodes, name <- get_defs node]
@@ -92,6 +98,7 @@ type NameEnv a = UniqFM a       -- Domain is Name
 emptyNameEnv       :: NameEnv a
 isEmptyNameEnv     :: NameEnv a -> Bool
 mkNameEnv          :: [(Name,a)] -> NameEnv a
+mkNameEnvWith      :: (a -> Name) -> [a] -> NameEnv a
 nameEnvElts        :: NameEnv a -> [a]
 alterNameEnv       :: (Maybe a-> Maybe a) -> NameEnv a -> Name -> NameEnv a
 extendNameEnv_C    :: (a->a->a) -> NameEnv a -> Name -> a -> NameEnv a
@@ -121,6 +128,7 @@ extendNameEnvList x l = addListToUFM x l
 lookupNameEnv x y     = lookupUFM x y
 alterNameEnv          = alterUFM
 mkNameEnv     l       = listToUFM l
+mkNameEnvWith f       = mkNameEnv . map (\a -> (f a, a))
 elemNameEnv x y          = elemUFM x y
 plusNameEnv x y          = plusUFM x y
 plusNameEnv_C f x y      = plusUFM_C f x y
@@ -151,8 +159,17 @@ lookupDNameEnv = lookupUDFM
 delFromDNameEnv :: DNameEnv a -> Name -> DNameEnv a
 delFromDNameEnv = delFromUDFM
 
+filterDNameEnv :: (a -> Bool) -> DNameEnv a -> DNameEnv a
+filterDNameEnv = filterUDFM
+
 mapDNameEnv :: (a -> b) -> DNameEnv a -> DNameEnv b
 mapDNameEnv = mapUDFM
 
+adjustDNameEnv :: (a -> a) -> DNameEnv a -> Name -> DNameEnv a
+adjustDNameEnv = adjustUDFM
+
 alterDNameEnv :: (Maybe a -> Maybe a) -> DNameEnv a -> Name -> DNameEnv a
 alterDNameEnv = alterUDFM
+
+extendDNameEnv :: DNameEnv a -> Name -> a -> DNameEnv a
+extendDNameEnv = addToUDFM

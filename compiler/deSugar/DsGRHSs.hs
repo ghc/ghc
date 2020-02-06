@@ -18,12 +18,14 @@ import GhcPrelude
 import {-# SOURCE #-} DsExpr  ( dsLExpr, dsLocalBinds )
 import {-# SOURCE #-} Match   ( matchSinglePatVar )
 
-import HsSyn
+import GHC.Hs
 import MkCore
 import CoreSyn
 import CoreUtils (bindNonRec)
 
-import Check (genCaseTmCs2)
+import BasicTypes (Origin(FromSource))
+import DynFlags
+import GHC.HsToCore.PmCheck (needToRunPmCheck, addTyCsDs, addPatTmCs, addScrutTmCs)
 import DsMonad
 import DsUtils
 import Type   ( Type )
@@ -68,10 +70,9 @@ dsGRHSs _ (XGRHSs nec) _ = noExtCon nec
 
 dsGRHS :: HsMatchContext Name -> Type -> LGRHS GhcTc (LHsExpr GhcTc)
        -> DsM MatchResult
-dsGRHS hs_ctx rhs_ty (dL->L _ (GRHS _ guards rhs))
+dsGRHS hs_ctx rhs_ty (L _ (GRHS _ guards rhs))
   = matchGuards (map unLoc guards) (PatGuard hs_ctx) rhs rhs_ty
-dsGRHS _ _ (dL->L _ (XGRHS nec)) = noExtCon nec
-dsGRHS _ _ _ = panic "dsGRHS: Impossible Match" -- due to #15884
+dsGRHS _ _ (L _ (XGRHS nec)) = noExtCon nec
 
 {-
 ************************************************************************
@@ -122,11 +123,16 @@ matchGuards (BindStmt _ pat bind_rhs _ _ : stmts) ctx rhs rhs_ty = do
     let upat = unLoc pat
         dicts = collectEvVarsPat upat
     match_var <- selectMatchVar upat
-    tm_cs <- genCaseTmCs2 (Just bind_rhs) [upat] [match_var]
-    match_result <- addDictsDs dicts $
-                    addTmCsDs tm_cs  $
-                      -- See Note [Type and Term Equality Propagation] in Check
-                    matchGuards stmts ctx rhs rhs_ty
+
+    dflags <- getDynFlags
+    match_result <-
+      -- See Note [Type and Term Equality Propagation] in Check
+      applyWhen (needToRunPmCheck dflags FromSource)
+                -- FromSource might not be accurate, but at worst
+                -- we do superfluous calls to the pattern match
+                -- oracle.
+                (addTyCsDs dicts . addScrutTmCs (Just bind_rhs) [match_var] . addPatTmCs [upat] [match_var])
+                (matchGuards stmts ctx rhs rhs_ty)
     core_rhs <- dsLExpr bind_rhs
     match_result' <- matchSinglePatVar match_var (StmtCtxt ctx) pat rhs_ty
                                        match_result

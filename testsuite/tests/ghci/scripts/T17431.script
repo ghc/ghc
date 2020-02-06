@@ -1,0 +1,4 @@
+:l T17431
+:br 5
+sort [3,2,1]
+:force x xs _result

@@ -214,6 +214,14 @@ StgMutArrPtrs *heap_view_closurePtrs(Capability *cap, StgClosure *closure) {
             ptrs[nptrs++] = ((StgMVar *)closure)->value;
             break;
 
+        case WEAK:
+            ptrs[nptrs++] = (StgClosure *)((StgWeak *)closure)->cfinalizers;
+            ptrs[nptrs++] = (StgClosure *)((StgWeak *)closure)->key;
+            ptrs[nptrs++] = (StgClosure *)((StgWeak *)closure)->value;
+            ptrs[nptrs++] = (StgClosure *)((StgWeak *)closure)->finalizer;
+            ptrs[nptrs++] = (StgClosure *)((StgWeak *)closure)->link;
+            break;
+
         default:
             fprintf(stderr,"closurePtrs: Cannot handle type %s yet\n",
                            closure_type_names[info->type]);

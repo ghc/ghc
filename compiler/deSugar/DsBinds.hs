@@ -15,6 +15,8 @@ lower levels it is preserved with @let@/@letrec@s).
 {-# LANGUAGE ViewPatterns #-}
 {-# LANGUAGE FlexibleContexts #-}
 
+{-# OPTIONS_GHC -Wno-incomplete-uni-patterns #-}
+
 module DsBinds ( dsTopLHsBinds, dsLHsBinds, decomposeRuleLhs, dsSpec,
                  dsHsWrapper, dsTcEvBinds, dsTcEvBinds_s, dsEvBinds, dsMkUserRule
   ) where
@@ -29,9 +31,9 @@ import {-# SOURCE #-}   Match( matchWrapper )
 import DsMonad
 import DsGRHSs
 import DsUtils
-import Check ( checkGuardMatches )
+import GHC.HsToCore.PmCheck ( needToRunPmCheck, addTyCsDs, checkGuardMatches )
 
-import HsSyn            -- lots of things
+import GHC.Hs           -- lots of things
 import CoreSyn          -- lots of things
 import CoreOpt          ( simpleOptExpr )
 import OccurAnal        ( occurAnalyseExpr )
@@ -41,6 +43,7 @@ import CoreArity ( etaExpand )
 import CoreUnfold
 import CoreFVs
 import Digraph
+import Predicate
 
 import PrelNames
 import TyCon
@@ -100,7 +103,7 @@ dsTopLHsBinds binds
     unlifted_binds = filterBag (isUnliftedHsBind . unLoc) binds
     bang_binds     = filterBag (isBangedHsBind   . unLoc) binds
 
-    top_level_err desc (dL->L loc bind)
+    top_level_err desc (L loc bind)
       = putSrcSpanDs loc $
         errDs (hang (text "Top-level" <+> text desc <+> text "aren't allowed:")
                   2 (ppr bind))
@@ -117,8 +120,8 @@ dsLHsBinds binds
 ------------------------
 dsLHsBind :: LHsBind GhcTc
           -> DsM ([Id], [(Id,CoreExpr)])
-dsLHsBind (dL->L loc bind) = do dflags <- getDynFlags
-                                putSrcSpanDs loc $ dsHsBind dflags bind
+dsLHsBind (L loc bind) = do dflags <- getDynFlags
+                            putSrcSpanDs loc $ dsHsBind dflags bind
 
 -- | Desugar a single binding (or group of recursive binds).
 dsHsBind :: DynFlags
@@ -142,7 +145,7 @@ dsHsBind dflags (VarBind { var_id = var
                           else []
         ; return (force_var, [core_bind]) }
 
-dsHsBind dflags b@(FunBind { fun_id = (dL->L _ fun)
+dsHsBind dflags b@(FunBind { fun_id = L _ fun
                            , fun_matches = matches
                            , fun_co_fn = co_fn
                            , fun_tick = tick })
@@ -186,11 +189,15 @@ dsHsBind dflags (AbsBinds { abs_tvs = tyvars, abs_ev_vars = dicts
                           , abs_exports = exports
                           , abs_ev_binds = ev_binds
                           , abs_binds = binds, abs_sig = has_sig })
-  = do { ds_binds <- addDictsDs (listToBag dicts) $
-                     dsLHsBinds binds
-                         -- addDictsDs: push type constraints deeper
-                         --             for inner pattern match check
-                         -- See Check, Note [Type and Term Equality Propagation]
+  = do { ds_binds <- applyWhen (needToRunPmCheck dflags FromSource)
+                               -- FromSource might not be accurate, but at worst
+                               -- we do superfluous calls to the pattern match
+                               -- oracle.
+                               -- addTyCsDs: push type constraints deeper
+                               --            for inner pattern match check
+                               -- See Check, Note [Type and Term Equality Propagation]
+                               (addTyCsDs (listToBag dicts))
+                               (dsLHsBinds binds)
 
        ; ds_ev_binds <- dsTcEvBinds_s ev_binds
 
@@ -362,7 +369,7 @@ dsAbsBinds dflags tyvars dicts exports
 --
 -- Other decisions about whether to inline are made in
 -- `calcUnfoldingGuidance` but the decision about whether to then expose
--- the unfolding in the interface file is made in `TidyPgm.addExternal`
+-- the unfolding in the interface file is made in `GHC.Iface.Tidy.addExternal`
 -- using this information.
 ------------------------
 makeCorePair :: DynFlags -> Id -> Bool -> Arity -> CoreExpr
@@ -614,9 +621,9 @@ We define an "unlifted bind" to be any bind that binds an unlifted id. Note that
   x :: Char
   (# True, x #) = blah
 
-is *not* an unlifted bind. Unlifted binds are detected by HsUtils.isUnliftedHsBind.
+is *not* an unlifted bind. Unlifted binds are detected by GHC.Hs.Utils.isUnliftedHsBind.
 
-Define a "banged bind" to have a top-level bang. Detected by HsPat.isBangedHsBind.
+Define a "banged bind" to have a top-level bang. Detected by GHC.Hs.Pat.isBangedHsBind.
 Define a "strict bind" to be either an unlifted bind or a banged bind.
 
 The restrictions are:
@@ -652,7 +659,7 @@ dsSpec :: Maybe CoreExpr        -- Just rhs => RULE is for a local binding
                                 --            rhs is in the Id's unfolding
        -> Located TcSpecPrag
        -> DsM (Maybe (OrdList (Id,CoreExpr), CoreRule))
-dsSpec mb_poly_rhs (dL->L loc (SpecPrag poly_id spec_co spec_inl))
+dsSpec mb_poly_rhs (L loc (SpecPrag poly_id spec_co spec_inl))
   | isJust (isClassOpId_maybe poly_id)
   = putSrcSpanDs loc $
     do { warnDs NoReason (text "Ignoring useless SPECIALISE pragma for class method selector"
@@ -787,7 +794,7 @@ From a user SPECIALISE pragma for f, we generate
 We need two pragma-like things:
 
 * spec_fn's inline pragma: inherited from f's inline pragma (ignoring
-                           activation on SPEC), unless overriden by SPEC INLINE
+                           activation on SPEC), unless overridden by SPEC INLINE
 
 * Activation of RULE: from SPECIALISE pragma (if activation given)
                       otherwise from f's inline pragma
@@ -1068,12 +1075,6 @@ simplOptExpr occurrence-analyses and simplifies the LHS:
        otherwise we don't match when given an argument like
           augment (\a. h a a) (build h)
 
-Note [Matching seqId]
-~~~~~~~~~~~~~~~~~~~
-The desugarer turns (seq e r) into (case e of _ -> r), via a special-case hack
-and this code turns it back into an application of seq!
-See Note [Rules for seq] in MkId for the details.
-
 Note [Unused spec binders]
 ~~~~~~~~~~~~~~~~~~~~~~~~~~
 Consider
@@ -1164,7 +1165,7 @@ mk_ev_binds ds_binds
   = map ds_scc (stronglyConnCompFromEdgedVerticesUniq edges)
   where
     edges :: [ Node EvVar (EvVar,CoreExpr) ]
-    edges = foldrBag ((:) . mk_node) [] ds_binds
+    edges = foldr ((:) . mk_node) [] ds_binds
 
     mk_node :: (Id, CoreExpr) -> Node EvVar (EvVar,CoreExpr)
     mk_node b@(var, rhs)

@@ -24,13 +24,36 @@ source_suffix = '.rst'
 source_encoding = 'utf-8-sig'
 master_doc = 'index'
 
+nitpick_ignore = [
+    ("envvar", "EDITOR"),
+    ("envvar", "HOME"),
+    ("envvar", "LD_LIBRARY_PATH"),
+    ("envvar", "LIBRARY_PATH"),
+    ("envvar", "PATH"),
+    ("envvar", "RPATH"),
+    ("envvar", "RUNPATH"),
+    ("envvar", "TMPDIR"),
+
+    ("c:type", "bool"),
+
+    # See #17314
+    ("ghc-flag", "-pgmo ⟨port⟩"),
+    ("ghc-flag", "-pgmo ⟨option⟩"),
+
+    ("extension", "DoAndIfThenElse"),
+    ("extension", "RelaxedPolyRec"),
+
+    # See #16629
+    ("extension", "UnliftedFFITypes"),
+]
+
 rst_prolog = """
 .. |llvm-version| replace:: {llvm_version}
 """.format(llvm_version=ghc_config.llvm_version)
 
 # General information about the project.
 project = u'Glasgow Haskell Compiler'
-copyright = u'2015, GHC Team'
+copyright = u'2020, GHC Team'
 # N.B. version comes from ghc_config
 release = version  # The full version, including alpha/beta/rc tags.
 
@@ -49,7 +72,7 @@ exclude_patterns = ['.build']
 html_title = "Glasgow Haskell Compiler %s User's Guide" % release
 html_short_title = "GHC %s User's Guide" % release
 html_theme_path = ['.']
-html_theme = 'ghc-theme'
+html_theme = 'rtd-theme'
 html_logo = None
 html_static_path = ['images']
 # Convert quotes and dashes to typographically correct entities
@@ -84,6 +107,10 @@ latex_elements = {
 \setromanfont{DejaVu Serif}
 \setmonofont{DejaVu Sans Mono}
 \setlength{\\tymin}{45pt}
+
+% Avoid a torrent of over-full \hbox warnings
+\usepackage{microtype}
+\hbadness=99999
 ''',
 }
 
@@ -147,14 +174,16 @@ def parse_ghci_cmd(env, sig, signode):
     return name
 
 def parse_pragma(env, sig, signode):
+    # Collect a prefix of alphabetical tokens to use as the pragma name
     parts = sig.split(' ')
-    idx = parts[0]
+    idx_parts = []
+    for part in parts:
+        if all(c.isalpha() or c == "_" for c in part):
+            idx_parts.append(part)
+        else:
+            break
+    idx = '-'.join(idx_parts)
 
-    # To avoid re-using the same HTTP anchor #pragma-SPECIALIZE in multiple
-    # places, we disambiguate the anchor by adding the second word after it (if
-    # one exists).
-    if idx == "SPECIALIZE" and 1 in parts and parts[1].isalpha():
-        idx += "-" + parts[1]
     name = '{-# ' + sig + ' #-}'
     signode += addnodes.desc_name(name, name)
     return idx

@@ -10,14 +10,13 @@ module ByteCodeInstr (
   ) where
 
 #include "HsVersions.h"
-#include "../includes/MachDeps.h"
 
 import GhcPrelude
 
 import ByteCodeTypes
 import GHCi.RemoteTypes
 import GHCi.FFI (C_ffi_cif)
-import StgCmmLayout     ( ArgRep(..) )
+import GHC.StgToCmm.Layout     ( ArgRep(..) )
 import PprCore
 import Outputable
 import FastString
@@ -29,7 +28,7 @@ import Literal
 import DataCon
 import VarSet
 import PrimOp
-import SMRep
+import GHC.Runtime.Layout
 
 import Data.Word
 import GHC.Stack.CCS (CostCentre)
@@ -45,7 +44,7 @@ data ProtoBCO a
         protoBCOBitmap     :: [StgWord],
         protoBCOBitmapSize :: Word16,
         protoBCOArity      :: Int,
-        -- what the BCO came from
+        -- what the BCO came from, for debugging only
         protoBCOExpr       :: Either  [AnnAlt Id DVarSet] (AnnExpr Id DVarSet),
         -- malloc'd pointers
         protoBCOFFIs       :: [FFIInfo]
@@ -69,7 +68,7 @@ data BCInstr
    | PUSH32 !Word16
 
    -- Push the specifiec local as a 8, 16, 32 bit value onto the stack, but the
-   -- value will take the whole word on the stack (i.e., the stack will gorw by
+   -- value will take the whole word on the stack (i.e., the stack will grow by
    -- a word)
    -- This is useful when extracting a packed constructor field for further use.
    -- Currently we expect all values on the stack to take full words, except for
@@ -179,7 +178,13 @@ data BCInstr
 -- Printing bytecode instructions
 
 instance Outputable a => Outputable (ProtoBCO a) where
-   ppr (ProtoBCO name instrs bitmap bsize arity origin ffis)
+   ppr (ProtoBCO { protoBCOName       = name
+                 , protoBCOInstrs     = instrs
+                 , protoBCOBitmap     = bitmap
+                 , protoBCOBitmapSize = bsize
+                 , protoBCOArity      = arity
+                 , protoBCOExpr       = origin
+                 , protoBCOFFIs       = ffis })
       = (text "ProtoBCO" <+> ppr name <> char '#' <> int arity
                 <+> text (show ffis) <> colon)
         $$ nest 3 (case origin of

@@ -5,9 +5,9 @@ import Var      ( Id )
 import TcType   ( Type )
 import DsMonad  ( DsM, EquationInfo, MatchResult )
 import CoreSyn  ( CoreExpr )
-import HsSyn    ( LPat, HsMatchContext, MatchGroup, LHsExpr )
+import GHC.Hs   ( LPat, HsMatchContext, MatchGroup, LHsExpr )
 import Name     ( Name )
-import HsExtension ( GhcTc )
+import GHC.Hs.Extension ( GhcTc )
 
 match   :: [Id]
         -> Type

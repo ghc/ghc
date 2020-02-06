@@ -98,11 +98,22 @@ def run_linters(linters: Sequence[Linter],
                 subdir: str = '.') -> None:
     import argparse
     parser = argparse.ArgumentParser()
-    parser.add_argument('base', help='Base commit')
-    parser.add_argument('head', help='Head commit')
+    subparsers = parser.add_subparsers()
+
+    subparser = subparsers.add_parser('commits', help='Lint a range of commits')
+    subparser.add_argument('base', help='Base commit')
+    subparser.add_argument('head', help='Head commit')
+    subparser.set_defaults(get_linted_files=lambda args:
+                            get_changed_files(args.base, args.head, subdir))
+
+    subparser = subparsers.add_parser('files', help='Lint a range of commits')
+    subparser.add_argument('file', nargs='+', help='File to lint')
+    subparser.set_defaults(get_linted_files=lambda args: args.file)
+
     args = parser.parse_args()
 
-    for path in get_changed_files(args.base, args.head, subdir):
+    linted_files = args.get_linted_files(args)
+    for path in linted_files:
         if path.startswith('.gitlab/linters'):
             continue
         for linter in linters:

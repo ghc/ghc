@@ -7,6 +7,8 @@
 {-# LANGUAGE CPP #-}
 {-# LANGUAGE OverloadedStrings #-}
 
+{-# OPTIONS_GHC -Wno-incomplete-uni-patterns #-}
+
 -- | This module is about types that can be defined in Haskell, but which
 --   must be wired into the compiler nonetheless.  C.f module TysPrim
 module TysWiredIn (
@@ -68,7 +70,7 @@ module TysWiredIn (
         justDataCon, justDataConName, promotedJustDataCon,
 
         -- * Tuples
-        mkTupleTy, mkBoxedTupleTy,
+        mkTupleTy, mkTupleTy1, mkBoxedTupleTy, mkTupleStr,
         tupleTyCon, tupleDataCon, tupleTyConName,
         promotedTupleDataCon,
         unitTyCon, unitDataCon, unitDataConId, unitTy, unitTyConKey,
@@ -92,8 +94,9 @@ module TysWiredIn (
 
         -- * Kinds
         typeNatKindCon, typeNatKind, typeSymbolKindCon, typeSymbolKind,
-        isLiftedTypeKindTyConName, liftedTypeKind, constraintKind,
-        liftedTypeKindTyCon, constraintKindTyCon,
+        isLiftedTypeKindTyConName, liftedTypeKind,
+        typeToTypeKind, constraintKind,
+        liftedTypeKindTyCon, constraintKindTyCon,  constraintKindTyConName,
         liftedTypeKindTyConName,
 
         -- * Equality predicates
@@ -108,9 +111,11 @@ module TysWiredIn (
 
         vecRepDataConTyCon, tupleRepDataConTyCon, sumRepDataConTyCon,
 
-        liftedRepDataConTy, unliftedRepDataConTy, intRepDataConTy, int8RepDataConTy,
-        int16RepDataConTy, word16RepDataConTy,
-        wordRepDataConTy, int64RepDataConTy, word8RepDataConTy, word64RepDataConTy,
+        liftedRepDataConTy, unliftedRepDataConTy,
+        intRepDataConTy,
+        int8RepDataConTy, int16RepDataConTy, int32RepDataConTy, int64RepDataConTy,
+        wordRepDataConTy,
+        word8RepDataConTy, word16RepDataConTy, word32RepDataConTy, word64RepDataConTy,
         addrRepDataConTy,
         floatRepDataConTy, doubleRepDataConTy,
 
@@ -125,7 +130,6 @@ module TysWiredIn (
     ) where
 
 #include "HsVersions.h"
-#include "MachDeps.h"
 
 import GhcPrelude
 
@@ -142,7 +146,7 @@ import Id
 import Constants        ( mAX_TUPLE_SIZE, mAX_CTUPLE_SIZE, mAX_SUM_SIZE )
 import Module           ( Module )
 import Type
-import RepType
+import GHC.Types.RepType
 import DataCon
 import {-# SOURCE #-} ConLike
 import TyCon
@@ -182,6 +186,8 @@ kept in sync with each other. The rule is this: use the order as declared
 in GHC.Types. All places where such lists exist should contain a reference
 to this Note, so a search for this Note's name should find all the lists.
 
+See also Note [Getting from RuntimeRep to PrimRep] in GHC.Types.RepType.
+
 ************************************************************************
 *                                                                      *
 \subsection{Wired in type constructors}
@@ -204,7 +210,7 @@ names in PrelNames, so they use wTcQual, wDataQual, etc
 -- See also Note [Known-key names]
 wiredInTyCons :: [TyCon]
 
-wiredInTyCons = [ -- Units are not treated like other tuples, because then
+wiredInTyCons = [ -- Units are not treated like other tuples, because they
                   -- are defined in GHC.Base, and there's only a few of them. We
                   -- put them in wiredInTyCons so that they will pre-populate
                   -- the name cache, so the parser in isBuiltInOcc_maybe doesn't
@@ -256,6 +262,27 @@ eqTyConName   = mkWiredInTyConName   UserSyntax gHC_TYPES (fsLit "~")   eqTyConK
 eqDataConName = mkWiredInDataConName UserSyntax gHC_TYPES (fsLit "Eq#") eqDataConKey eqDataCon
 eqSCSelIdName = mkWiredInIdName gHC_TYPES (fsLit "eq_sel") eqSCSelIdKey eqSCSelId
 
+{- Note [eqTyCon (~) is built-in syntax]
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+The (~) type operator used in equality constraints (a~b) is considered built-in
+syntax. This has a few consequences:
+
+* The user is not allowed to define their own type constructors with this name:
+
+    ghci> class a ~ b
+    <interactive>:1:1: error: Illegal binding of built-in syntax: ~
+
+* Writing (a ~ b) does not require enabling -XTypeOperators. It does, however,
+  require -XGADTs or -XTypeFamilies.
+
+* The (~) type operator is always in scope. It doesn't need to be be imported,
+  and it cannot be hidden.
+
+* We have a bunch of special cases in the compiler to arrange all of the above.
+
+There's no particular reason for (~) to be special, but fixing this would be a
+breaking change.
+-}
 eqTyCon_RDR :: RdrName
 eqTyCon_RDR = nameRdrName eqTyConName
 
@@ -402,7 +429,7 @@ makeRecoveryTyCon :: TyCon -> TyCon
 makeRecoveryTyCon tc
   = mkTcTyCon (tyConName tc)
               bndrs res_kind
-              []               -- No scoped vars
+              noTcTyConScopedTyVars
               True             -- Fully generalised
               flavour          -- Keep old flavour
   where
@@ -440,19 +467,13 @@ sumRepDataConName = mkWiredInDataConName UserSyntax gHC_TYPES (fsLit "SumRep") s
 runtimeRepSimpleDataConNames :: [Name]
 runtimeRepSimpleDataConNames
   = zipWith3Lazy mk_special_dc_name
-      [ fsLit "LiftedRep"
-      , fsLit "UnliftedRep"
+      [ fsLit "LiftedRep", fsLit "UnliftedRep"
       , fsLit "IntRep"
+      , fsLit "Int8Rep", fsLit "Int16Rep", fsLit "Int32Rep", fsLit "Int64Rep"
       , fsLit "WordRep"
-      , fsLit "Int8Rep"
-      , fsLit "Int16Rep"
-      , fsLit "Int64Rep"
-      , fsLit "Word8Rep"
-      , fsLit "Word16Rep"
-      , fsLit "Word64Rep"
+      , fsLit "Word8Rep", fsLit "Word16Rep", fsLit "Word32Rep", fsLit "Word64Rep"
       , fsLit "AddrRep"
-      , fsLit "FloatRep"
-      , fsLit "DoubleRep"
+      , fsLit "FloatRep", fsLit "DoubleRep"
       ]
       runtimeRepSimpleDataConKeys
       runtimeRepSimpleDataCons
@@ -615,8 +636,9 @@ typeSymbolKind = mkTyConTy typeSymbolKindCon
 constraintKindTyCon :: TyCon
 constraintKindTyCon = pcTyCon constraintKindTyConName Nothing [] []
 
-liftedTypeKind, constraintKind :: Kind
+liftedTypeKind, typeToTypeKind, constraintKind :: Kind
 liftedTypeKind   = tYPE liftedRepTy
+typeToTypeKind   = liftedTypeKind `mkVisFunTy` liftedTypeKind
 constraintKind   = mkTyConApp constraintKindTyCon []
 
 {-
@@ -660,12 +682,12 @@ Note [How tuples work]  See also Note [Known-key names] in PrelNames
       pretty-print saturated constraint tuples with round parens;
       see BasicTypes.tupleParens.
 
-* In quite a lot of places things are restrcted just to
+* In quite a lot of places things are restricted just to
   BoxedTuple/UnboxedTuple, and then we used BasicTypes.Boxity to distinguish
   E.g. tupleTyCon has a Boxity argument
 
 * When looking up an OccName in the original-name cache
-  (IfaceEnv.lookupOrigNameCache), we spot the tuple OccName to make sure
+  (GHC.Iface.Env.lookupOrigNameCache), we spot the tuple OccName to make sure
   we get the right wired-in name.  This guy can't tell the difference
   between BoxedTuple and ConstraintTuple (same OccName!), so tuples
   are not serialised into interface files using OccNames at all.
@@ -682,7 +704,7 @@ GHC supports both boxed and unboxed one-tuples:
    single value after CPR analysis
  - A boxed one-tuple is used by DsUtils.mkSelectorBinds, when
    there is just one binder
-Basically it keeps everythig uniform.
+Basically it keeps everything uniform.
 
 However the /naming/ of the type/data constructors for one-tuples is a
 bit odd:
@@ -697,9 +719,18 @@ for one-tuples.  So in ghc-prim:GHC.Tuple we see the declarations:
   data Unit a = Unit a
   data (a,b)  = (a,b)
 
-NB (Feb 16): for /constraint/ one-tuples I have 'Unit%' but no class
-decl in GHC.Classes, so I think this part may not work properly. But
-it's unused I think.
+There is no way to write a boxed one-tuple in Haskell, but it can be
+created in Template Haskell or in, e.g., `deriving` code. There is
+nothing special about one-tuples in Core; in particular, they have no
+custom pretty-printing, just using `Unit`.
+
+Note that there is *not* a unary constraint tuple, unlike for other forms of
+tuples. See [Ignore unary constraint tuples] in TcHsType for more
+details.
+
+See also Note [Flattening one-tuples] in MkCore and
+Note [Don't flatten tuples from HsSyn] in MkCore.
+
 -}
 
 -- | Built-in syntax isn't "in scope" so these OccNames map to wired-in Names
@@ -774,6 +805,10 @@ mkTupleOcc ns Unboxed ar = mkOccName ns (mkUnboxedTupleStr ar)
 
 mkCTupleOcc :: NameSpace -> Arity -> OccName
 mkCTupleOcc ns ar = mkOccName ns (mkConstraintTupleStr ar)
+
+mkTupleStr :: Boxity -> Arity -> String
+mkTupleStr Boxed   = mkBoxedTupleStr
+mkTupleStr Unboxed = mkUnboxedTupleStr
 
 mkBoxedTupleStr :: Arity -> String
 mkBoxedTupleStr 0  = "()"
@@ -1152,6 +1187,7 @@ vecRepDataCon = pcSpecialDataCon vecRepDataConName [ mkTyConTy vecCountTyCon
                                  runtimeRepTyCon
                                  (RuntimeRep prim_rep_fun)
   where
+    -- See Note [Getting from RuntimeRep to PrimRep] in GHC.Types.RepType
     prim_rep_fun [count, elem]
       | VecCount n <- tyConRuntimeRepInfo (tyConAppTyCon count)
       , VecElem  e <- tyConRuntimeRepInfo (tyConAppTyCon elem)
@@ -1166,6 +1202,7 @@ tupleRepDataCon :: DataCon
 tupleRepDataCon = pcSpecialDataCon tupleRepDataConName [ mkListTy runtimeRepTy ]
                                    runtimeRepTyCon (RuntimeRep prim_rep_fun)
   where
+    -- See Note [Getting from RuntimeRep to PrimRep] in GHC.Types.RepType
     prim_rep_fun [rr_ty_list]
       = concatMap (runtimeRepPrimRep doc) rr_tys
       where
@@ -1181,6 +1218,7 @@ sumRepDataCon :: DataCon
 sumRepDataCon = pcSpecialDataCon sumRepDataConName [ mkListTy runtimeRepTy ]
                                  runtimeRepTyCon (RuntimeRep prim_rep_fun)
   where
+    -- See Note [Getting from RuntimeRep to PrimRep] in GHC.Types.RepType
     prim_rep_fun [rr_ty_list]
       = map slotPrimRep (ubxSumRepType prim_repss)
       where
@@ -1194,12 +1232,19 @@ sumRepDataConTyCon :: TyCon
 sumRepDataConTyCon = promoteDataCon sumRepDataCon
 
 -- See Note [Wiring in RuntimeRep]
+-- See Note [Getting from RuntimeRep to PrimRep] in GHC.Types.RepType
 runtimeRepSimpleDataCons :: [DataCon]
 liftedRepDataCon :: DataCon
 runtimeRepSimpleDataCons@(liftedRepDataCon : _)
   = zipWithLazy mk_runtime_rep_dc
-    [ LiftedRep, UnliftedRep, IntRep, WordRep, Int8Rep, Int16Rep, Int64Rep
-    , Word8Rep, Word16Rep, Word64Rep, AddrRep, FloatRep, DoubleRep ]
+    [ LiftedRep, UnliftedRep
+    , IntRep
+    , Int8Rep, Int16Rep, Int32Rep, Int64Rep
+    , WordRep
+    , Word8Rep, Word16Rep, Word32Rep, Word64Rep
+    , AddrRep
+    , FloatRep, DoubleRep
+    ]
     runtimeRepSimpleDataConNames
   where
     mk_runtime_rep_dc primrep name
@@ -1207,13 +1252,20 @@ runtimeRepSimpleDataCons@(liftedRepDataCon : _)
 
 -- See Note [Wiring in RuntimeRep]
 liftedRepDataConTy, unliftedRepDataConTy,
-  intRepDataConTy, int8RepDataConTy, int16RepDataConTy, wordRepDataConTy, int64RepDataConTy,
-  word8RepDataConTy, word16RepDataConTy, word64RepDataConTy, addrRepDataConTy,
+  intRepDataConTy,
+  int8RepDataConTy, int16RepDataConTy, int32RepDataConTy, int64RepDataConTy,
+  wordRepDataConTy,
+  word8RepDataConTy, word16RepDataConTy, word32RepDataConTy, word64RepDataConTy,
+  addrRepDataConTy,
   floatRepDataConTy, doubleRepDataConTy :: Type
 [liftedRepDataConTy, unliftedRepDataConTy,
-   intRepDataConTy, wordRepDataConTy, int8RepDataConTy, int16RepDataConTy, int64RepDataConTy,
-   word8RepDataConTy, word16RepDataConTy, word64RepDataConTy,
-   addrRepDataConTy, floatRepDataConTy, doubleRepDataConTy]
+   intRepDataConTy,
+   int8RepDataConTy, int16RepDataConTy, int32RepDataConTy, int64RepDataConTy,
+   wordRepDataConTy,
+   word8RepDataConTy, word16RepDataConTy, word32RepDataConTy, word64RepDataConTy,
+   addrRepDataConTy,
+   floatRepDataConTy, doubleRepDataConTy
+   ]
   = map (mkTyConTy . promoteDataCon) runtimeRepSimpleDataCons
 
 vecCountTyCon :: TyCon
@@ -1290,7 +1342,7 @@ boxing_constr_env
 
 {- Note [Boxing primitive types]
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
-For a handful of primitive types (Int, Char, Word, Flaot, Double),
+For a handful of primitive types (Int, Char, Word, Float, Double),
 we can readily box and an unboxed version (Int#, Char# etc) using
 the corresponding data constructor.  This is useful in a couple
 of places, notably let-floating -}
@@ -1468,6 +1520,7 @@ listTyCon =
                 False
                 (VanillaAlgTyCon $ mkPrelTyConRepName listTyConName)
 
+-- See also Note [Empty lists] in GHC.Hs.Expr.
 nilDataCon :: DataCon
 nilDataCon  = pcDataCon nilDataConName alpha_tyvar [] listTyCon
 
@@ -1541,15 +1594,24 @@ done by enumeration\srcloc{lib/prelude/InTup?.hs}.
 -}
 
 -- | Make a tuple type. The list of types should /not/ include any
--- RuntimeRep specifications.
+-- RuntimeRep specifications. Boxed 1-tuples are flattened.
+-- See Note [One-tuples]
 mkTupleTy :: Boxity -> [Type] -> Type
 -- Special case for *boxed* 1-tuples, which are represented by the type itself
 mkTupleTy Boxed   [ty] = ty
-mkTupleTy Boxed   tys  = mkTyConApp (tupleTyCon Boxed (length tys)) tys
-mkTupleTy Unboxed tys  = mkTyConApp (tupleTyCon Unboxed (length tys))
-                                        (map getRuntimeRep tys ++ tys)
+mkTupleTy boxity  tys  = mkTupleTy1 boxity tys
+
+-- | Make a tuple type. The list of types should /not/ include any
+-- RuntimeRep specifications. Boxed 1-tuples are *not* flattened.
+-- See Note [One-tuples] and Note [Don't flatten tuples from HsSyn]
+-- in MkCore
+mkTupleTy1 :: Boxity -> [Type] -> Type
+mkTupleTy1 Boxed   tys  = mkTyConApp (tupleTyCon Boxed (length tys)) tys
+mkTupleTy1 Unboxed tys  = mkTyConApp (tupleTyCon Unboxed (length tys))
+                                         (map getRuntimeRep tys ++ tys)
 
 -- | Build the type of a small tuple that holds the specified type of thing
+-- Flattens 1-tuples. See Note [One-tuples].
 mkBoxedTupleTy :: [Type] -> Type
 mkBoxedTupleTy tys = mkTupleTy Boxed tys
 

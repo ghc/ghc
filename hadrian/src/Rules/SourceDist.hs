@@ -61,20 +61,20 @@ prepareTree dest = do
     cpFile a = copyFile a (dest -/- a)
     cpDir  a = copyDirectoryContents (Not excluded) a (dest -/- a)
     excluded = Or
-        [ Test "//.*"
-        , Test "//#*"
-        , Test "//*-SAVE"
-        , Test "//*.orig"
-        , Test "//*.rej"
-        , Test "//*~"
-        , Test "//autom4te*"
-        , Test "//dist"
-        , Test "//dist-install"
-        , Test "//log"
-        , Test "//stage0"
-        , Test "//stage1"
-        , Test "//stage2"
-        , Test "//stage3"
+        [ Test "**/.*"
+        , Test "**/#*"
+        , Test "**/*-SAVE"
+        , Test "**/*.orig"
+        , Test "**/*.rej"
+        , Test "**/*~"
+        , Test "**/autom4te*"
+        , Test "**/dist"
+        , Test "**/dist-install"
+        , Test "**/log"
+        , Test "**/stage0"
+        , Test "**/stage1"
+        , Test "**/stage2"
+        , Test "**/stage3"
         , Test "hadrian/.cabal-sandbox"
         , Test "hadrian/.stack-work"
         , Test "hadrian/UserSettings.hs"
@@ -83,16 +83,17 @@ prepareTree dest = do
         , Test "hadrian/bin"
         , Test "hadrian/dist"
         , Test "hadrian/dist-newstyle"
-        , Test "libraries//*.buildinfo"
-        , Test "libraries//GNUmakefile"
-        , Test "libraries//config.log"
-        , Test "libraries//config.status"
-        , Test "libraries//ghc.mk"
-        , Test "libraries//include/Hs*Config.h"
+        , Test "libraries/**/*.buildinfo"
+        , Test "libraries/**/GNUmakefile"
+        , Test "libraries/**/config.log"
+        , Test "libraries/**/config.status"
+        , Test "libraries/**/ghc.mk"
+        , Test "libraries/**/include/Hs*Config.h"
         , Test "libraries/dph"
         , Test "libraries/primitive"
         , Test "libraries/random"
         , Test "libraries/vector"
+        , Test "rts/rts.cabal"
         , Test "mk/build.mk" ]
     srcDirs =
         [ "bindisttest"
@@ -145,8 +146,8 @@ prepareTree dest = do
     -- files, which implements exactly the logic that we
     -- have for 'alexHappyFiles' above.
     alexHappyFiles =
-        [ (Stage0, compiler, "CmmParse.y", Just "cmm", "CmmParse.hs")
-        , (Stage0, compiler, "CmmLex.x", Just "cmm", "CmmLex.hs")
+        [ (Stage0, compiler, "Parser.y", Just ("GHC" -/- "Cmm"), "Parser.hs")
+        , (Stage0, compiler, "Lexer.x", Just ("GHC" -/- "Cmm"), "Lexer.hs")
         , (Stage0, compiler, "Parser.y", Just "parser", "Parser.hs")
         , (Stage0, compiler, "Lexer.x", Just "parser", "Lexer.hs")
         , (Stage0, hpcBin, "HpcParser.y", Nothing, "HpcParser.hs")

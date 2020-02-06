@@ -372,7 +372,7 @@ where the let shadows the lambda.  Really this means something like
 - Then that continuation gets pushed under the let
 
 - Finally we simplify 'arg'.  We want
-     - the static, lexical environment bindig x :-> x1
+     - the static, lexical environment binding x :-> x1
      - the in-scopeset from "here", under the 'let' which includes
        both x1 and x2
 
@@ -667,7 +667,9 @@ substId (SimplEnv { seInScope = in_scope, seIdSubst = ids }) v
 
         -- Get the most up-to-date thing from the in-scope set
         -- Even though it isn't in the substitution, it may be in
-        -- the in-scope set with better IdInfo
+        -- the in-scope set with better IdInfo.
+        --
+        -- See also Note [In-scope set as a substitution] in Simplify.
 
 refineFromInScope :: InScopeSet -> Var -> Var
 refineFromInScope in_scope v

@@ -17,16 +17,15 @@ module PPC.RegInfo (
 
 where
 
-#include "nativeGen/NCG.h"
 #include "HsVersions.h"
 
 import GhcPrelude
 
 import PPC.Instr
 
-import BlockId
-import Cmm
-import CLabel
+import GHC.Cmm.BlockId
+import GHC.Cmm
+import GHC.Cmm.CLabel
 
 import Unique
 import Outputable (ppr, text, Outputable, (<>))
@@ -48,9 +47,9 @@ shortcutJump _ other = other
 
 
 -- Here because it knows about JumpDest
-shortcutStatics :: (BlockId -> Maybe JumpDest) -> CmmStatics -> CmmStatics
-shortcutStatics fn (Statics lbl statics)
-  = Statics lbl $ map (shortcutStatic fn) statics
+shortcutStatics :: (BlockId -> Maybe JumpDest) -> RawCmmStatics -> RawCmmStatics
+shortcutStatics fn (RawCmmStatics lbl statics)
+  = RawCmmStatics lbl $ map (shortcutStatic fn) statics
   -- we need to get the jump tables, so apply the mapping to the entries
   -- of a CmmData too.
 

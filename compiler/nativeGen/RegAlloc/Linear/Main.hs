@@ -1,5 +1,7 @@
 {-# LANGUAGE BangPatterns, CPP, ScopedTypeVariables #-}
 
+{-# OPTIONS_GHC -Wno-incomplete-uni-patterns #-}
+
 -----------------------------------------------------------------------------
 --
 -- The register allocator
@@ -119,9 +121,9 @@ import RegAlloc.Liveness
 import Instruction
 import Reg
 
-import BlockId
-import Hoopl.Collections
-import Cmm hiding (RegSet)
+import GHC.Cmm.BlockId
+import GHC.Cmm.Dataflow.Collections
+import GHC.Cmm hiding (RegSet)
 
 import Digraph
 import DynFlags
@@ -211,6 +213,7 @@ linearRegAlloc dflags entry_ids block_live sccs
  = case platformArch platform of
       ArchX86        -> go $ (frInitFreeRegs platform :: X86.FreeRegs)
       ArchX86_64     -> go $ (frInitFreeRegs platform :: X86_64.FreeRegs)
+      ArchS390X      -> panic "linearRegAlloc ArchS390X"
       ArchSPARC      -> go $ (frInitFreeRegs platform :: SPARC.FreeRegs)
       ArchSPARC64    -> panic "linearRegAlloc ArchSPARC64"
       ArchPPC        -> go $ (frInitFreeRegs platform :: PPC.FreeRegs)
@@ -776,7 +779,7 @@ allocateRegsAndSpill reading keep spills alloc (r:rs)
                    -- NOTE: if the input to the NCG contains some
                    -- unreachable blocks with junk code, this panic
                    -- might be triggered.  Make sure you only feed
-                   -- sensible code into the NCG.  In CmmPipeline we
+                   -- sensible code into the NCG.  In GHC.Cmm.Pipeline we
                    -- call removeUnreachableBlocks at the end for this
                    -- reason.
 
@@ -884,10 +887,8 @@ allocRegsAndSpill_spill reading keep spills alloc r rs assig spill_loc
                         $ vcat
                                 [ text "allocating vreg:  " <> text (show r)
                                 , text "assignment:       " <> ppr assig
-                                , text "freeRegs:         " <> text (showRegs freeRegs)
-                                , text "initFreeRegs:     " <> text (showRegs (frInitFreeRegs platform `asTypeOf` freeRegs))
-                                ]
-                        where showRegs = show . map (\reg -> (reg, targetClassOfRealReg platform reg)) . allFreeRegs platform
+                                , text "freeRegs:         " <> text (show freeRegs)
+                                , text "initFreeRegs:     " <> text (show (frInitFreeRegs platform `asTypeOf` freeRegs)) ]
 
                 result
 

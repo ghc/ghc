@@ -1,0 +1,4 @@
+
+saks_fail004.hs:9:11: error:
+    • Illegal constraint in a kind: forall a. Eq a => *
+    • In a standalone kind signature for ‘Q’: Eq a => Type

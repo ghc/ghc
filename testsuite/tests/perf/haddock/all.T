@@ -15,7 +15,7 @@
 
 # We do not add peak_megabytes_allocated and max_bytes_used to these tests, as
 # they are somewhat unreliable, and it is harder to re-run these numbers to
-# detect outliers, as described in Note [residency]. See #9556.
+# detect outliers, as described in Note [Measuring residency]. See #9556.
 
 test('haddock.base',
      [unless(in_tree_compiler(), skip), req_haddock

@@ -8,4 +8,4 @@ newtype Main.Foo2 (a_0 :: *)
 newtype Main.Foo3
   = Main.Foo3 (Data.Proxy.Proxy (Main.Foo3Fam2 GHC.Types.Int :: *))
 newtype Main.Foo4
-  = Main.Foo4 (Data.Proxy.Proxy (Main.Foo4Fam2 GHC.Types.Int))
+  = Main.Foo4 (Data.Proxy.Proxy (Main.Foo4Fam2 GHC.Types.Int :: *))

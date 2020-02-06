@@ -1,10 +1,10 @@
 
-T3406.hs:11:6:
-    The type variables ‘a, b’
-    should be bound by the pattern signature ‘ItemColID a b’
-    but are actually discarded by a type synonym
-    To fix this, expand the type synonym
-    [Note: I hope to lift this restriction in due course]
-    In the pattern: x :: ItemColID a b
-    In an equation for ‘get’:
-        get (x :: ItemColID a b) = x :: ItemColID a b
+T3406.hs:11:28: error:
+    • Couldn't match type ‘Int’ with ‘a -> ItemColID a b’
+      Expected type: a -> ItemColID a b
+        Actual type: ItemColID a1 b1
+    • In the expression: x :: ItemColID a b
+      In an equation for ‘get’:
+          get (x :: ItemColID a b) = x :: ItemColID a b
+    • Relevant bindings include
+        get :: ItemColID a b -> a -> ItemColID a b (bound at T3406.hs:11:1)

@@ -33,7 +33,7 @@
 #
 # :extension:`extension`
 #
-# Language exensions can be listed:
+# Language extensions can be listed:
 #
 # .. extension-print::
 #     :type: table/list/summary (REQUIRED)
@@ -52,6 +52,8 @@ from sphinx.domains.std import GenericObject
 from sphinx.errors import SphinxError
 from distutils.version import LooseVersion
 from utils import build_table_from_list
+
+import os.path
 
 ### Settings
 
@@ -212,8 +214,10 @@ class Flag(GenericFlag):
         # Manually create references
         name_string = ", ".join([':ghc-flag:`'+n+'`' for n in self.names])
         reverse_string = ''
-        if 'reverse' in self.options and self.options['reverse'] != '':
-            reverse_string = ':ghc-flag:`' + self.options['reverse'] + '`'
+        reverse = self.options.get('reverse')
+        if reverse is not None and reverse != '':
+            reverse_string = ':ghc-flag:`' + reverse + '`'
+            self.names += [reverse]
 
         self.register_flag(
             self.names,
@@ -222,6 +226,17 @@ class Flag(GenericFlag):
             self.options['shortdesc'],
             self.options['type'],
             reverse_string)
+
+    # Add additional targets
+    def add_target_and_index(self, name, sig, signode):
+
+        GenericFlag.add_target_and_index(self, name, sig, signode)
+
+        reverse = self.options.get('reverse')
+        if reverse is not None and reverse != '':
+            # Make this also addressable via the reverse flag
+            self.env.domaindata['std']['objects']['ghc-flag', reverse] = \
+                self.env.docname, 'ghc-flag-%s' % name
 
 # This class inherits from Sphinx's internal GenericObject, which drives
 # the add_object_type() utility function. We want to keep that tooling,
@@ -577,15 +592,23 @@ class ExtensionPrintDirective(Directive):
 
 ### Additional processing
 
-# Convert every flagprint node into its output format
 def process_print_nodes(app, doctree, fromdocname):
 
+    # Convert every flagprint node into its output format
     for node in doctree.traverse(flagprint):
         node.generate_output(app, fromdocname)
 
     for node in doctree.traverse(extensionprint):
         node.generate_output(app, fromdocname)
 
+    # Write out file listing all documented flags
+    with open(os.path.join(app.outdir, 'ghc-flags.txt'), 'w', encoding='utf-8') as f:
+        flag_names = \
+            {name
+             for flag in app.env.all_flags
+             for name in flag['names']}
+
+        f.write('\n'.join(flag_names))
 
 # To avoid creating duplicates in the serialized environment, clear all
 # flags originating from a file before re-reading it.

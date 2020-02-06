@@ -17,7 +17,7 @@ we got this right.
 PS: this test used to have Typeable in the context too, but
     that's a redundant constraint, so I removed it
 
-PPS: the whole structre of tcSuperClasses has changed,
+PPS: the whole structure of tcSuperClasses has changed,
      so I'm no longer sure what is being tested here
 -}
 

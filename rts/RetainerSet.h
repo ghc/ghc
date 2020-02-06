@@ -52,30 +52,9 @@ typedef struct _RetainerSet {
   // do not put anything below here!
 } RetainerSet;
 
-/*
-  Note:
-    There are two ways of maintaining all retainer sets. The first is simply by
-    freeing all the retainer sets and re-initialize the hash table at each
-    retainer profiling. The second is by setting the cost field of each
-    retainer set. The second is preferred to the first if most retainer sets
-    are likely to be observed again during the next retainer profiling. Note
-    that in the first approach, we do not free the memory allocated for
-    retainer sets; we just invalidate all retainer sets.
- */
-#if defined(DEBUG_RETAINER)
-// In thise case, FIRST_APPROACH must be turned on because the memory pool
-// for retainer sets is freed each time.
-#define FIRST_APPROACH
-#else
-// #define FIRST_APPROACH
-#define SECOND_APPROACH
-#endif
 
 // Creates the first pool and initializes a hash table. Frees all pools if any.
 void initializeAllRetainerSet(void);
-
-// Refreshes all pools for reuse and initializes a hash table.
-void refreshAllRetainerSet(void);
 
 // Frees all pools.
 void closeAllRetainerSet(void);
@@ -138,25 +117,21 @@ isMember(retainer r, RetainerSet *rs)
 // Finds or creates a retainer set augmented with a new retainer.
 RetainerSet *addElement(retainer, RetainerSet *);
 
-#if defined(SECOND_APPROACH)
 // Prints a single retainer set.
-void printRetainerSetShort(FILE *, RetainerSet *, uint32_t);
-#endif
+void printRetainerSetShort(FILE *, RetainerSet *, W_, uint32_t);
 
 // Print the statistics on all the retainer sets.
 // store the sum of all costs and the number of all retainer sets.
 void outputRetainerSet(FILE *, uint32_t *, uint32_t *);
 
-#if defined(SECOND_APPROACH)
 // Print all retainer sets at the exit of the program.
 void outputAllRetainerSet(FILE *);
-#endif
 
 // Hashing functions
 /*
   Invariants:
-    Once either initializeAllRetainerSet() or refreshAllRetainerSet()
-    is called, there exists only one copy of any retainer set created
+    Once initializeAllRetainerSet() is called,
+    there exists only one copy of any retainer set created
     through singleton() and addElement().  The pool (the storage for
     retainer sets) is consumed linearly.  All the retainer sets of the
     same hash function value are linked together from an element in

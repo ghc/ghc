@@ -162,7 +162,7 @@ The interesting cases of the analysis:
    Return: C(e₁) ∪ (fv e₁) × {x} ∪ {(x,x)}
  * Let v = rhs in body:
    In addition to the results from the subexpressions, add all co-calls from
-   everything that the body calls together with v to everthing that is called
+   everything that the body calls together with v to everything that is called
    by v.
    Return: C'(rhs) ∪ C(body) ∪ (fv rhs) × {v'| {v,v'} ∈ C(body)}
  * Letrec v₁ = rhs₁ ... vₙ = rhsₙ in body
@@ -318,7 +318,7 @@ Note [Taking boring variables into account]
 If we decide that the variable bound in `let x = e1 in e2` is not interesting,
 the analysis of `e2` will not report anything about `x`. To ensure that
 `callArityBind` does still do the right thing we have to take that into account
-everytime we would be lookup up `x` in the analysis result of `e2`.
+every time we would be lookup up `x` in the analysis result of `e2`.
   * Instead of calling lookupCallArityRes, we return (0, True), indicating
     that this variable might be called many times with no arguments.
   * Instead of checking `calledWith x`, we assume that everything can be called

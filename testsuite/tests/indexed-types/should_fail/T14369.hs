@@ -6,6 +6,8 @@
 {-# LANGUAGE TypeFamilyDependencies #-}
 {-# LANGUAGE DataKinds, PolyKinds #-}
 {-# LANGUAGE TypeOperators #-}
+{-# LANGUAGE UndecidableInstances #-}
+
 module T14369 where
 
 data family Sing (a :: k)

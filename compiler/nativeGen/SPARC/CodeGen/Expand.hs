@@ -1,3 +1,5 @@
+{-# OPTIONS_GHC -Wno-incomplete-uni-patterns #-}
+
 -- | Expand out synthetic instructions into single machine instrs.
 module SPARC.CodeGen.Expand (
         expandTop
@@ -11,18 +13,17 @@ import SPARC.Instr
 import SPARC.Imm
 import SPARC.AddrMode
 import SPARC.Regs
-import SPARC.Ppr        ()
 import Instruction
 import Reg
 import Format
-import Cmm
+import GHC.Cmm
 
 
 import Outputable
 import OrdList
 
 -- | Expand out synthetic instructions in this top level thing
-expandTop :: NatCmmDecl CmmStatics Instr -> NatCmmDecl CmmStatics Instr
+expandTop :: NatCmmDecl RawCmmStatics Instr -> NatCmmDecl RawCmmStatics Instr
 expandTop top@(CmmData{})
         = top
 
@@ -52,7 +53,7 @@ expandBlockInstrs (ii:is)
 
 
 -- | In the SPARC instruction set the FP register pairs that are used
---      to hold 64 bit floats are refered to by just the first reg
+--      to hold 64 bit floats are referred to by just the first reg
 --      of the pair. Remap our internal reg pairs to the appropriate reg.
 --
 --      For example:

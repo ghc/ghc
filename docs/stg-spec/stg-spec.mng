@@ -131,7 +131,7 @@ acts as a pointer to the value on the heap.
 
 \gram{\ottheap}
 
-Execution procedes until a return value (a literal or a variable, i.e.
+Execution proceeds until a return value (a literal or a variable, i.e.
 pointer to the heap) is produced.  To accommodate for let-no-escape
 bindings, we also allow execution to terminate with a jump to a function
 application of a let-no-escape variable.
@@ -171,7 +171,7 @@ and over-saturated function application.
 The implementations of \textsc{App} rules are spread across two
 different calling conventions for functions: slow calls and
 direct calls.  Direct calls handle saturated and over-applied
-cases (\coderef{codeGen/StgCmmLayout.hs}{slowArgs}), while slow
+cases (\coderef{GHC/StgToCmm/Layout.hs}{slowArgs}), while slow
 calls handle all cases (\textit{utils/genapply/GenApply.hs});
 in particular, these cases ensure that the current cost-center
 reverts to the one originally at the call site.

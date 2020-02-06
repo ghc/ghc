@@ -23,7 +23,6 @@ module SPARC.Ppr (
 where
 
 #include "HsVersions.h"
-#include "nativeGen/NCG.h"
 
 import GhcPrelude
 
@@ -38,13 +37,14 @@ import Reg
 import Format
 import PprBase
 
-import Cmm hiding (topInfoTable)
-import PprCmm()
-import BlockId
-import CLabel
-import Hoopl.Label
-import Hoopl.Collections
+import GHC.Cmm hiding (topInfoTable)
+import GHC.Cmm.Ppr() -- For Outputable instances
+import GHC.Cmm.BlockId
+import GHC.Cmm.CLabel
+import GHC.Cmm.Dataflow.Label
+import GHC.Cmm.Dataflow.Collections
 
+import Unique           ( pprUniqueAlways )
 import Outputable
 import GHC.Platform
 import FastString
@@ -52,7 +52,7 @@ import FastString
 -- -----------------------------------------------------------------------------
 -- Printing this stuff out
 
-pprNatCmmDecl :: NatCmmDecl CmmStatics Instr -> SDoc
+pprNatCmmDecl :: NatCmmDecl RawCmmStatics Instr -> SDoc
 pprNatCmmDecl (CmmData section dats) =
   pprSectionAlign section $$ pprDatas dats
 
@@ -64,7 +64,7 @@ pprNatCmmDecl proc@(CmmProc top_info lbl _ (ListGraph blocks)) =
         pprLabel lbl $$ -- blocks guaranteed not null, so label needed
         vcat (map (pprBasicBlock top_info) blocks)
 
-    Just (Statics info_lbl _) ->
+    Just (RawCmmStatics info_lbl _) ->
       sdocWithPlatform $ \platform ->
       (if platformHasSubsectionsViaSymbols platform
           then pprSectionAlign dspSection $$
@@ -86,7 +86,7 @@ dspSection :: Section
 dspSection = Section Text $
     panic "subsections-via-symbols doesn't combine with split-sections"
 
-pprBasicBlock :: LabelMap CmmStatics -> NatBasicBlock Instr -> SDoc
+pprBasicBlock :: LabelMap RawCmmStatics -> NatBasicBlock Instr -> SDoc
 pprBasicBlock info_env (BasicBlock blockid instrs)
   = maybe_infotable $$
     pprLabel (blockLbl blockid) $$
@@ -94,15 +94,15 @@ pprBasicBlock info_env (BasicBlock blockid instrs)
   where
     maybe_infotable = case mapLookup blockid info_env of
        Nothing   -> empty
-       Just (Statics info_lbl info) ->
+       Just (RawCmmStatics info_lbl info) ->
            pprAlignForSection Text $$
            vcat (map pprData info) $$
            pprLabel info_lbl
 
 
-pprDatas :: CmmStatics -> SDoc
+pprDatas :: RawCmmStatics -> SDoc
 -- See note [emit-time elimination of static indirections] in CLabel.
-pprDatas (Statics alias [CmmStaticLit (CmmLabel lbl), CmmStaticLit ind, _, _])
+pprDatas (RawCmmStatics alias [CmmStaticLit (CmmLabel lbl), CmmStaticLit ind, _, _])
   | lbl == mkIndStaticInfoLabel
   , let labelInd (CmmLabelOff l _) = Just l
         labelInd (CmmLabel l) = Just l
@@ -111,7 +111,7 @@ pprDatas (Statics alias [CmmStaticLit (CmmLabel lbl), CmmStaticLit ind, _, _])
   , alias `mayRedirectTo` ind'
   = pprGloblDecl alias
     $$ text ".equiv" <+> ppr alias <> comma <> ppr (CmmLabel ind')
-pprDatas (Statics lbl dats) = vcat (pprLabel lbl : map pprData dats)
+pprDatas (RawCmmStatics lbl dats) = vcat (pprLabel lbl : map pprData dats)
 
 pprData :: CmmStatic -> SDoc
 pprData (CmmString str)          = pprBytes str
@@ -147,7 +147,12 @@ pprReg :: Reg -> SDoc
 pprReg reg
  = case reg of
         RegVirtual vr
-         -> ppr vr
+         -> case vr of
+                VirtualRegI   u -> text "%vI_"   <> pprUniqueAlways u
+                VirtualRegHi  u -> text "%vHi_"  <> pprUniqueAlways u
+                VirtualRegF   u -> text "%vF_"   <> pprUniqueAlways u
+                VirtualRegD   u -> text "%vD_"   <> pprUniqueAlways u
+
 
         RegReal rr
          -> case rr of
@@ -215,8 +220,7 @@ pprFormat x
         II32    -> sLit ""
         II64    -> sLit "d"
         FF32    -> sLit ""
-        FF64    -> sLit "d"
-        VecFormat _ _ _ -> panic "SPARC.Ppr.pprFormat: VecFormat")
+        FF64    -> sLit "d")
 
 
 -- | Pretty print a format for an instruction suffix.
@@ -230,8 +234,7 @@ pprStFormat x
         II32  -> sLit ""
         II64  -> sLit "x"
         FF32  -> sLit ""
-        FF64  -> sLit "d"
-        VecFormat _ _ _ -> panic "SPARC.Ppr.pprFormat: VecFormat")
+        FF64  -> sLit "d")
 
 
 

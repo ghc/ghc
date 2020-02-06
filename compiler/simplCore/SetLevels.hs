@@ -50,6 +50,8 @@
 -}
 
 {-# LANGUAGE CPP, MultiWayIf #-}
+
+{-# OPTIONS_GHC -Wno-incomplete-uni-patterns #-}
 module SetLevels (
         setLevels,
 
@@ -88,7 +90,8 @@ import Literal          ( litIsTrivial )
 import Demand           ( StrictSig, Demand, isStrictDmd, splitStrictSig, increaseStrictSigArity )
 import Name             ( getOccName, mkSystemVarName )
 import OccName          ( occNameString )
-import Type             ( Type, mkLamTypes, splitTyConApp_maybe, tyCoVarsOfType, closeOverKindsDSet )
+import Type             ( Type, mkLamTypes, splitTyConApp_maybe, tyCoVarsOfType
+                        , mightBeUnliftedType, closeOverKindsDSet )
 import BasicTypes       ( Arity, RecFlag(..), isRec )
 import DataCon          ( dataConOrigResTy )
 import TysWiredIn
@@ -503,7 +506,7 @@ Consider this:
 Here we can float the (case y ...) out, because y is sure
 to be evaluated, to give
   f x vs = case x of { MkT y ->
-           caes y of I# w ->
+           case y of I# w ->
              let f vs = ...(e)...f..
              in f vs
 
@@ -534,6 +537,32 @@ Things to note:
    If we floated the cases out we could eliminate one of them.
 
  * We only do this with a single-alternative case
+
+
+Note [Setting levels when floating single-alternative cases]
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+Handling level-setting when floating a single-alternative case binding
+is a bit subtle, as evidenced by #16978.  In particular, we must keep
+in mind that we are merely moving the case and its binders, not the
+body. For example, suppose 'a' is known to be evaluated and we have
+
+  \z -> case a of
+          (x,_) -> <body involving x and z>
+
+After floating we may have:
+
+  case a of
+    (x,_) -> \z -> <body involving x and z>
+      {- some expression involving x and z -}
+
+When analysing <body involving...> we want to use the /ambient/ level,
+and /not/ the destination level of the 'case a of (x,-) ->' binding.
+
+#16978 was caused by us setting the context level to the destination
+level of `x` when analysing <body>. This led us to conclude that we
+needed to quantify over some of its free variables (e.g. z), resulting
+in shadowing and very confusing Core Lint failures.
+
 
 Note [Check the output scrutinee for exprIsHNF]
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
@@ -750,7 +779,7 @@ Exammples:
 It's controlled by a flag (floatConsts), because doing this too
 early loses opportunities for RULES which (needless to say) are
 important in some nofib programs (gcd is an example).  [SPJ note:
-I think this is obselete; the flag seems always on.]
+I think this is obsolete; the flag seems always on.]
 
 Note [Floating join point bindings]
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
@@ -765,7 +794,7 @@ Here we may just as well produce
   f x = j x 0
 
 and now there is a chance that 'f' will be inlined at its call sites.
-It shouldn't make a lot of difference, but thes tests
+It shouldn't make a lot of difference, but these tests
   perf/should_run/MethSharing
   simplCore/should_compile/spec-inline
 and one nofib program, all improve if you do float to top, because
@@ -773,7 +802,7 @@ of the resulting inlining of f.  So ok, let's do it.
 
 Note [Free join points]
 ~~~~~~~~~~~~~~~~~~~~~~~
-We never float a MFE that has a free join-point variable.  You mght think
+We never float a MFE that has a free join-point variable.  You might think
 this can never occur.  After all, consider
      join j x = ...
      in ....(jump j x)....
@@ -1098,12 +1127,20 @@ lvlBind env (AnnRec pairs)
   |  floatTopLvlOnly env && not (isTopLvl dest_lvl)
          -- Only floating to the top level is allowed.
   || not (profitableFloat env dest_lvl)
-  = do { let bind_lvl       = incMinorLvl (le_ctxt_lvl env)
+  || (isTopLvl dest_lvl && any (mightBeUnliftedType . idType) bndrs)
+       -- This mightBeUnliftedType stuff is the same test as in the non-rec case
+       -- You might wonder whether we can have a recursive binding for
+       -- an unlifted value -- but we can if it's a /join binding/ (#16978)
+       -- (Ultimately I think we should not use SetLevels to
+       -- float join bindings at all, but that's another story.)
+  =    -- No float
+    do { let bind_lvl       = incMinorLvl (le_ctxt_lvl env)
              (env', bndrs') = substAndLvlBndrs Recursive env bind_lvl bndrs
              lvl_rhs (b,r)  = lvlRhs env' Recursive is_bot (isJoinId_maybe b) r
        ; rhss' <- mapM lvl_rhs pairs
        ; return (Rec (bndrs' `zip` rhss'), env') }
 
+  -- Otherwise we are going to float
   | null abs_vars
   = do { (new_env, new_bndrs) <- cloneLetVars Recursive env dest_lvl bndrs
        ; new_rhss <- mapM (do_rhs new_env) pairs
@@ -1623,7 +1660,7 @@ newPolyBndrs dest_lvl
 
     mk_poly_bndr bndr uniq = transferPolyIdInfo bndr abs_vars $         -- Note [transferPolyIdInfo] in Id.hs
                              transfer_join_info bndr $
-                             mkSysLocalOrCoVar (mkFastString str) uniq poly_ty
+                             mkSysLocal (mkFastString str) uniq poly_ty
                            where
                              str     = "poly_" ++ occNameString (getOccName bndr)
                              poly_ty = mkLamTypes abs_vars (CoreSubst.substTy subst (idType bndr))
@@ -1658,16 +1695,19 @@ newLvlVar lvld_rhs join_arity_maybe is_mk_static
       = mkExportedVanillaId (mkSystemVarName uniq (mkFastString "static_ptr"))
                             rhs_ty
       | otherwise
-      = mkSysLocalOrCoVar (mkFastString "lvl") uniq rhs_ty
+      = mkSysLocal (mkFastString "lvl") uniq rhs_ty
 
+-- | Clone the binders bound by a single-alternative case.
 cloneCaseBndrs :: LevelEnv -> Level -> [Var] -> LvlM (LevelEnv, [Var])
 cloneCaseBndrs env@(LE { le_subst = subst, le_lvl_env = lvl_env, le_env = id_env })
                new_lvl vs
   = do { us <- getUniqueSupplyM
        ; let (subst', vs') = cloneBndrs subst us vs
-             env' = env { le_ctxt_lvl  = new_lvl
-                        , le_join_ceil = new_lvl
-                        , le_lvl_env   = addLvls new_lvl lvl_env vs'
+             -- N.B. We are not moving the body of the case, merely its case
+             -- binders.  Consequently we should *not* set le_ctxt_lvl and
+             -- le_join_ceil.  See Note [Setting levels when floating
+             -- single-alternative cases].
+             env' = env { le_lvl_env   = addLvls new_lvl lvl_env vs'
                         , le_subst     = subst'
                         , le_env       = foldl' add_id id_env (vs `zip` vs') }
 

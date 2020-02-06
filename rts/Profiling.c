@@ -25,7 +25,7 @@
 #include <fs_rts.h>
 #include <string.h>
 
-#if defined(DEBUG)
+#if defined(DEBUG) || defined(PROFILING)
 #include "Trace.h"
 #endif
 
@@ -50,9 +50,6 @@ static unsigned int CCS_ID = 1;
  */
 static char *prof_filename; /* prof report file name = <program>.prof */
 FILE *prof_file;
-
-static char *hp_filename;       /* heap profile (hp2ps style) log file */
-FILE *hp_file;
 
 // List of all cost centres. Used for reporting.
 CostCentre      *CC_LIST  = NULL;
@@ -135,6 +132,19 @@ static  void              initProfilingLogFile ( void );
    Initialise the profiling environment
    -------------------------------------------------------------------------- */
 
+static void
+dumpCostCentresToEventLog(void)
+{
+#if defined(PROFILING)
+    CostCentre *cc, *next;
+    for (cc = CC_LIST; cc != NULL; cc = next) {
+        next = cc->link;
+        traceHeapProfCostCentre(cc->ccID, cc->label, cc->module,
+                                cc->srcloc, cc->is_caf);
+    }
+#endif
+}
+
 void initProfiling (void)
 {
     // initialise our arena
@@ -185,21 +195,21 @@ void initProfiling (void)
     CCS_MAIN->root = CCS_MAIN;
     ccsSetSelected(CCS_MAIN);
 
-    initProfiling2();
+    refreshProfilingCCSs();
 
     if (RtsFlags.CcFlags.doCostCentres) {
         initTimeProfiling();
     }
 
-    if (RtsFlags.ProfFlags.doHeapProfile) {
-        initHeapProfiling();
-    }
+    dumpCostCentresToEventLog();
 }
+
+
 
 //
 // Should be called after loading any new Haskell code.
 //
-void initProfiling2 (void)
+void refreshProfilingCCSs (void)
 {
     // make CCS_MAIN the parent of all the pre-defined CCSs.
     CostCentreStack *next;
@@ -270,7 +280,7 @@ initProfilingLogFile(void)
         sprintf(prof_filename, "%s.prof", stem);
 
         /* open the log file */
-        if ((prof_file = __rts_fopen(prof_filename, "w")) == NULL) {
+        if ((prof_file = __rts_fopen(prof_filename, "w+")) == NULL) {
             debugBelch("Can't open profiling report file %s\n", prof_filename);
             RtsFlags.CcFlags.doCostCentres = 0;
             // Retainer profiling (`-hr` or `-hr<cc> -h<x>`) writes to
@@ -280,24 +290,12 @@ initProfilingLogFile(void)
             }
         }
     }
-
-    if (RtsFlags.ProfFlags.doHeapProfile) {
-        /* Initialise the log file name */
-        hp_filename = arenaAlloc(prof_arena, strlen(stem) + 6);
-        sprintf(hp_filename, "%s.hp", stem);
-
-        /* open the log file */
-        if ((hp_file = __rts_fopen(hp_filename, "w")) == NULL) {
-            debugBelch("Can't open profiling report file %s\n",
-                       hp_filename);
-            RtsFlags.ProfFlags.doHeapProfile = 0;
-        }
-    }
 }
 
 void
 initTimeProfiling(void)
 {
+    traceProfBegin();
     /* Start ticking */
     startProfTimer();
 };
@@ -307,9 +305,6 @@ endProfiling ( void )
 {
     if (RtsFlags.CcFlags.doCostCentres) {
         stopProfTimer();
-    }
-    if (RtsFlags.ProfFlags.doHeapProfile) {
-        endHeapProfiling();
     }
 }
 
@@ -745,7 +740,7 @@ reportCCSProfiling( void )
 }
 
 /* -----------------------------------------------------------------------------
- * Accumulating total allocatinos and tick count
+ * Accumulating total allocations and tick count
    -------------------------------------------------------------------------- */
 
 /* Helper */

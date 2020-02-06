@@ -187,7 +187,7 @@ throwToSelf (Capability *cap, StgTSO *tso, StgClosure *exception)
    MessageThrowTo *   exception was not raised; the source TSO
                       should now put itself in the state
                       BlockedOnMsgThrowTo, and when it is ready
-                      it should unlock the mssage using
+                      it should unlock the message using
                       unlockClosure(msg, &stg_MSG_THROWTO_info);
                       If it decides not to raise the exception after
                       all, it can revoke it safely with
@@ -515,9 +515,9 @@ blockedThrowTo (Capability *cap, StgTSO *target, MessageThrowTo *msg)
 
     ASSERT(target->cap == cap);
 
+    dirty_TSO(cap,target); // we will modify the blocked_exceptions queue
     msg->link = target->blocked_exceptions;
     target->blocked_exceptions = msg;
-    dirty_TSO(cap,target); // we modified the blocked_exceptions queue
 }
 
 /* -----------------------------------------------------------------------------

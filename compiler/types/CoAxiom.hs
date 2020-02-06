@@ -31,7 +31,8 @@ module CoAxiom (
 
 import GhcPrelude
 
-import {-# SOURCE #-} TyCoRep ( Type, pprType )
+import {-# SOURCE #-} TyCoRep ( Type )
+import {-# SOURCE #-} TyCoPpr ( pprType )
 import {-# SOURCE #-} TyCon ( TyCon )
 import Outputable
 import FastString
@@ -231,7 +232,6 @@ data CoAxBranch
                                     -- in TcTyClsDecls
     , cab_roles    :: [Role]        -- See Note [CoAxBranch roles]
     , cab_lhs      :: [Type]        -- Type patterns to match against
-                                    -- See Note [CoAxiom saturation]
     , cab_rhs      :: Type          -- Right-hand side of the equality
     , cab_incomps  :: [CoAxBranch]  -- The previous incompatible branches
                                     -- See Note [Storing compatibility]
@@ -310,10 +310,7 @@ coAxBranchIncomps = cab_incomps
 placeHolderIncomps :: [CoAxBranch]
 placeHolderIncomps = panic "placeHolderIncomps"
 
-{- Note [CoAxiom saturation]
-~~~~~~~~~~~~~~~~~~~~~~~~~~~~
-* When co
-
+{-
 Note [CoAxBranch type variables]
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 In the case of a CoAxBranch of an associated type-family instance,

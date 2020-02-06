@@ -2,6 +2,7 @@
 {-# LANGUAGE DeriveFunctor #-}
 {-# LANGUAGE GeneralizedNewtypeDeriving #-}
 {-# OPTIONS_GHC -fprof-auto-top #-}
+{-# OPTIONS_GHC -Wno-incomplete-uni-patterns #-}
 --
 --  (c) The University of Glasgow 2002-2006
 --
@@ -27,6 +28,7 @@ import GHC.Platform
 import Name
 import MkId
 import Id
+import Var             ( updateVarType )
 import ForeignCall
 import HscTypes
 import CoreUtils
@@ -36,21 +38,21 @@ import Literal
 import PrimOp
 import CoreFVs
 import Type
-import RepType
-import Kind            ( isLiftedTypeKind )
+import GHC.Types.RepType
 import DataCon
 import TyCon
 import Util
 import VarSet
 import TysPrim
+import TyCoPpr         ( pprType )
 import ErrUtils
 import Unique
 import FastString
 import Panic
-import StgCmmClosure    ( NonVoid(..), fromNonVoid, nonVoidIds )
-import StgCmmLayout
-import SMRep hiding (WordOff, ByteOff, wordsToBytes)
-import Bitmap
+import GHC.StgToCmm.Closure    ( NonVoid(..), fromNonVoid, nonVoidIds )
+import GHC.StgToCmm.Layout
+import GHC.Runtime.Layout hiding (WordOff, ByteOff, wordsToBytes)
+import GHC.Data.Bitmap
 import OrdList
 import Maybes
 import VarEnv
@@ -62,7 +64,6 @@ import Data.Char
 
 import UniqSupply
 import Module
-import Control.Arrow ( second )
 
 import Control.Exception
 import Data.Array
@@ -86,12 +87,12 @@ byteCodeGen :: HscEnv
             -> Maybe ModBreaks
             -> IO CompiledByteCode
 byteCodeGen hsc_env this_mod binds tycs mb_modBreaks
-   = withTiming (pure dflags)
+   = withTiming dflags
                 (text "ByteCodeGen"<+>brackets (ppr this_mod))
                 (const ()) $ do
         -- Split top-level binds into strings and others.
         -- See Note [generating code for top-level string literal bindings].
-        let (strings, flatBinds) = partitionEithers $ do
+        let (strings, flatBinds) = partitionEithers $ do  -- list monad
                 (bndr, rhs) <- flattenBinds binds
                 return $ case exprIsTickedString_maybe rhs of
                     Just str -> Left (bndr, str)
@@ -107,7 +108,8 @@ byteCodeGen hsc_env this_mod binds tycs mb_modBreaks
              (panic "ByteCodeGen.byteCodeGen: missing final emitBc?")
 
         dumpIfSet_dyn dflags Opt_D_dump_BCOs
-           "Proto-BCOs" (vcat (intersperse (char ' ') (map ppr proto_bcos)))
+           "Proto-BCOs" FormatByteCode
+           (vcat (intersperse (char ' ') (map ppr proto_bcos)))
 
         cbc <- assembleBCOs hsc_env proto_bcos tycs (map snd stringPtrs)
           (case modBreaks of
@@ -158,53 +160,37 @@ coreExprToBCOs :: HscEnv
                -> CoreExpr
                -> IO UnlinkedBCO
 coreExprToBCOs hsc_env this_mod expr
- = withTiming (pure dflags)
+ = withTiming dflags
               (text "ByteCodeGen"<+>brackets (ppr this_mod))
               (const ()) $ do
       -- create a totally bogus name for the top-level BCO; this
       -- should be harmless, since it's never used for anything
       let invented_name  = mkSystemVarName (mkPseudoUniqueE 0) (fsLit "ExprTopLevel")
-          invented_id    = Id.mkLocalId invented_name (panic "invented_id's type")
 
       -- the uniques are needed to generate fresh variables when we introduce new
       -- let bindings for ticked expressions
       us <- mkSplitUniqSupply 'y'
       (BcM_State _dflags _us _this_mod _final_ctr mallocd _ _ _, proto_bco)
          <- runBc hsc_env us this_mod Nothing emptyVarEnv $
-              schemeTopBind (invented_id, simpleFreeVars expr)
+              schemeR [] (invented_name, simpleFreeVars expr)
 
       when (notNull mallocd)
            (panic "ByteCodeGen.coreExprToBCOs: missing final emitBc?")
 
-      dumpIfSet_dyn dflags Opt_D_dump_BCOs "Proto-BCOs" (ppr proto_bco)
+      dumpIfSet_dyn dflags Opt_D_dump_BCOs "Proto-BCOs" FormatByteCode
+         (ppr proto_bco)
 
       assembleOneBCO hsc_env proto_bco
   where dflags = hsc_dflags hsc_env
 
 -- The regular freeVars function gives more information than is useful to
--- us here. simpleFreeVars does the impedance matching.
+-- us here. We need only the free variables, not everything in an FVAnn.
+-- Historical note: At one point FVAnn was more sophisticated than just
+-- a set. Now it isn't. So this function is much simpler. Keeping it around
+-- so that if someone changes FVAnn, they will get a nice type error right
+-- here.
 simpleFreeVars :: CoreExpr -> AnnExpr Id DVarSet
-simpleFreeVars = go . freeVars
-  where
-    go :: AnnExpr Id FVAnn -> AnnExpr Id DVarSet
-    go (ann, e) = (freeVarsOfAnn ann, go' e)
-
-    go' :: AnnExpr' Id FVAnn -> AnnExpr' Id DVarSet
-    go' (AnnVar id)                  = AnnVar id
-    go' (AnnLit lit)                 = AnnLit lit
-    go' (AnnLam bndr body)           = AnnLam bndr (go body)
-    go' (AnnApp fun arg)             = AnnApp (go fun) (go arg)
-    go' (AnnCase scrut bndr ty alts) = AnnCase (go scrut) bndr ty (map go_alt alts)
-    go' (AnnLet bind body)           = AnnLet (go_bind bind) (go body)
-    go' (AnnCast expr (ann, co))     = AnnCast (go expr) (freeVarsOfAnn ann, co)
-    go' (AnnTick tick body)          = AnnTick tick (go body)
-    go' (AnnType ty)                 = AnnType ty
-    go' (AnnCoercion co)             = AnnCoercion co
-
-    go_alt (con, args, expr) = (con, args, go expr)
-
-    go_bind (AnnNonRec bndr rhs) = AnnNonRec bndr (go rhs)
-    go_bind (AnnRec pairs)       = AnnRec (map (second go) pairs)
+simpleFreeVars = freeVars
 
 -- -----------------------------------------------------------------------------
 -- Compilation schema for the bytecode generator
@@ -257,6 +243,7 @@ mkProtoBCO
    -> name
    -> BCInstrList
    -> Either  [AnnAlt Id DVarSet] (AnnExpr Id DVarSet)
+        -- ^ original expression; for debugging only
    -> Int
    -> Word16
    -> [StgWord]
@@ -336,7 +323,7 @@ schemeTopBind (id, rhs)
                        (Right rhs) 0 0 [{-no bitmap-}] False{-not alts-})
 
   | otherwise
-  = schemeR [{- No free variables -}] (id, rhs)
+  = schemeR [{- No free variables -}] (getName id, rhs)
 
 
 -- -----------------------------------------------------------------------------
@@ -348,13 +335,13 @@ schemeTopBind (id, rhs)
 -- removing the free variables and arguments.
 --
 -- Park the resulting BCO in the monad.  Also requires the
--- variable to which this value was bound, so as to give the
--- resulting BCO a name.
+-- name of the variable to which this value was bound,
+-- so as to give the resulting BCO a name.
 
 schemeR :: [Id]                 -- Free vars of the RHS, ordered as they
                                 -- will appear in the thunk.  Empty for
                                 -- top-level things, which have no free vars.
-        -> (Id, AnnExpr Id DVarSet)
+        -> (Name, AnnExpr Id DVarSet)
         -> BcM (ProtoBCO Name)
 schemeR fvs (nm, rhs)
 {-
@@ -369,6 +356,9 @@ schemeR fvs (nm, rhs)
 -}
    = schemeR_wrk fvs nm rhs (collect rhs)
 
+-- If an expression is a lambda (after apply bcView), return the
+-- list of arguments to the lambda (in R-to-L order) and the
+-- underlying expression
 collect :: AnnExpr Id DVarSet -> ([Var], AnnExpr' Id DVarSet)
 collect (_, e) = go [] e
   where
@@ -382,9 +372,9 @@ collect (_, e) = go [] e
 
 schemeR_wrk
     :: [Id]
-    -> Id
-    -> AnnExpr Id DVarSet
-    -> ([Var], AnnExpr' Var DVarSet)
+    -> Name
+    -> AnnExpr Id DVarSet             -- expression e, for debugging only
+    -> ([Var], AnnExpr' Var DVarSet)  -- result of collect on e
     -> BcM (ProtoBCO Name)
 schemeR_wrk fvs nm original_body (args, body)
    = do
@@ -408,7 +398,7 @@ schemeR_wrk fvs nm original_body (args, body)
          bitmap = mkBitmap dflags bits
      body_code <- schemeER_wrk sum_szsb_args p_init body
 
-     emitBc (mkProtoBCO dflags (getName nm) body_code (Right original_body)
+     emitBc (mkProtoBCO dflags nm body_code (Right original_body)
                  arity bitmap_size bitmap False{-not alts-})
 
 -- introduce break instructions for ticked expressions
@@ -432,8 +422,8 @@ schemeER_wrk d p rhs
         return $ breakInstr `consOL` code
    | otherwise = schemeE d 0 p rhs
 
-getVarOffSets :: DynFlags -> StackDepth -> BCEnv -> [Id] -> [(Id, Word16)]
-getVarOffSets dflags depth env = catMaybes . map getOffSet
+getVarOffSets :: DynFlags -> StackDepth -> BCEnv -> [Id] -> [Maybe (Id, Word16)]
+getVarOffSets dflags depth env = map getOffSet
   where
     getOffSet id = case lookupBCEnv_maybe id env of
         Nothing     -> Nothing
@@ -509,6 +499,8 @@ schemeE d s p e@(AnnLit lit)     = returnUnboxedAtom d s p e (typeArgRep (litera
 schemeE d s p e@(AnnCoercion {}) = returnUnboxedAtom d s p e V
 
 schemeE d s p e@(AnnVar v)
+      -- See Note [Not-necessarily-lifted join points], step 3.
+    | isNNLJoinPoint v          = doTailCall d s p (protectNNLJoinPointId v) [AnnVar voidPrimId]
     | isUnliftedType (idType v) = returnUnboxedAtom d s p e (bcIdArgRep v)
     | otherwise                 = schemeT d s p e
 
@@ -535,19 +527,22 @@ schemeE d s p (AnnLet binds (_,body)) = do
 
          fvss  = map (fvsToEnv p' . fst) rhss
 
+           -- See Note [Not-necessarily-lifted join points], step 2.
+         (xs',rhss') = zipWithAndUnzip protectNNLJoinPointBind xs rhss
+
          -- Sizes of free vars
          size_w = trunc16W . idSizeW dflags
          sizes = map (\rhs_fvs -> sum (map size_w rhs_fvs)) fvss
 
          -- the arity of each rhs
-         arities = map (genericLength . fst . collect) rhss
+         arities = map (genericLength . fst . collect) rhss'
 
          -- This p', d' defn is safe because all the items being pushed
          -- are ptrs, so all have size 1 word.  d' and p' reflect the stack
          -- after the closures have been allocated in the heap (but not
          -- filled in), and pointers to them parked on the stack.
          offsets = mkStackOffsets d (genericReplicate n_binds (wordSize dflags))
-         p' = Map.insertList (zipE xs offsets) p
+         p' = Map.insertList (zipE xs' offsets) p
          d' = d + wordsToBytes dflags n_binds
          zipE = zipEqual "schemeE"
 
@@ -582,13 +577,13 @@ schemeE d s p (AnnLet binds (_,body)) = do
                      _other -> False
 
          compile_bind d' fvs x rhs size arity off = do
-                bco <- schemeR fvs (x,rhs)
+                bco <- schemeR fvs (getName x,rhs)
                 build_thunk d' fvs size bco off arity
 
          compile_binds =
             [ compile_bind d' fvs x rhs size arity (trunc16W n)
             | (fvs, x, rhs, size, arity, n) <-
-                zip6 fvss xs rhss sizes arities [n_binds, n_binds-1 .. 1]
+                zip6 fvss xs' rhss' sizes arities [n_binds, n_binds-1 .. 1]
             ]
      body_code <- schemeE d' s p' body
      thunk_codes <- sequence compile_binds
@@ -682,6 +677,30 @@ schemeE _ _ _ expr
    = pprPanic "ByteCodeGen.schemeE: unhandled case"
                (pprCoreExpr (deAnnotate' expr))
 
+-- Is this Id a not-necessarily-lifted join point?
+-- See Note [Not-necessarily-lifted join points], step 1
+isNNLJoinPoint :: Id -> Bool
+isNNLJoinPoint x = isJoinId x &&
+                   Just True /= isLiftedType_maybe (idType x)
+
+-- If necessary, modify this Id and body to protect not-necessarily-lifted join points.
+-- See Note [Not-necessarily-lifted join points], step 2.
+protectNNLJoinPointBind :: Id -> AnnExpr Id DVarSet -> (Id, AnnExpr Id DVarSet)
+protectNNLJoinPointBind x rhs@(fvs, _)
+  | isNNLJoinPoint x
+  = (protectNNLJoinPointId x, (fvs, AnnLam voidArgId rhs))
+
+  | otherwise
+  = (x, rhs)
+
+-- Update an Id's type to take a Void# argument.
+-- Precondition: the Id is a not-necessarily-lifted join point.
+-- See Note [Not-necessarily-lifted join points]
+protectNNLJoinPointId :: Id -> Id
+protectNNLJoinPointId x
+  = ASSERT( isNNLJoinPoint x )
+    updateVarType (voidPrimTy `mkVisFunTy`) x
+
 {-
    Ticked Expressions
    ------------------
@@ -689,6 +708,64 @@ schemeE _ _ _ expr
   The idea is that the "breakpoint<n,fvs> E" is really just an annotation on
   the code. When we find such a thing, we pull out the useful information,
   and then compile the code as if it was just the expression E.
+
+Note [Not-necessarily-lifted join points]
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+A join point variable is essentially a goto-label: it is, for example,
+never used as an argument to another function, and it is called only
+in tail position. See Note [Join points] and Note [Invariants on join points],
+both in CoreSyn. Because join points do not compile to true, red-blooded
+variables (with, e.g., registers allocated to them), they are allowed
+to be levity-polymorphic. (See invariant #6 in Note [Invariants on join points]
+in CoreSyn.)
+
+However, in this byte-code generator, join points *are* treated just as
+ordinary variables. There is no check whether a binding is for a join point
+or not; they are all treated uniformly. (Perhaps there is a missed optimization
+opportunity here, but that is beyond the scope of my (Richard E's) Thursday.)
+
+We thus must have *some* strategy for dealing with levity-polymorphic and
+unlifted join points. Levity-polymorphic variables are generally not allowed
+(though levity-polymorphic join points *are*; see Note [Invariants on join points]
+in CoreSyn, point 6), and we don't wish to evaluate unlifted join points eagerly.
+The questionable join points are *not-necessarily-lifted join points*
+(NNLJPs). (Not having such a strategy led to #16509, which panicked in the
+isUnliftedType check in the AnnVar case of schemeE.) Here is the strategy:
+
+1. Detect NNLJPs. This is done in isNNLJoinPoint.
+
+2. When binding an NNLJP, add a `\ (_ :: Void#) ->` to its RHS, and modify the
+   type to tack on a `Void# ->`. (Void# is written voidPrimTy within GHC.)
+   Note that functions are never levity-polymorphic, so this transformation
+   changes an NNLJP to a non-levity-polymorphic join point. This is done
+   in protectNNLJoinPointBind, called from the AnnLet case of schemeE.
+
+3. At an occurrence of an NNLJP, add an application to void# (called voidPrimId),
+   being careful to note the new type of the NNLJP. This is done in the AnnVar
+   case of schemeE, with help from protectNNLJoinPointId.
+
+Here is an example. Suppose we have
+
+  f = \(r :: RuntimeRep) (a :: TYPE r) (x :: T).
+      join j :: a
+           j = error @r @a "bloop"
+      in case x of
+           A -> j
+           B -> j
+           C -> error @r @a "blurp"
+
+Our plan is to behave is if the code was
+
+  f = \(r :: RuntimeRep) (a :: TYPE r) (x :: T).
+      let j :: (Void# -> a)
+          j = \ _ -> error @r @a "bloop"
+      in case x of
+           A -> j void#
+           B -> j void#
+           C -> error @r @a "blurp"
+
+It's a bit hacky, but it works well in practice and is local. I suspect the
+Right Fix is to take advantage of join points as goto-labels.
 
 -}
 
@@ -921,7 +998,7 @@ doCase d s p (_,scrut) bndr alts is_unboxed_tuple
         ret_frame_size_b :: StackDepth
         ret_frame_size_b = 2 * wordSize dflags
 
-        -- The extra frame we push to save/restor the CCCS when profiling
+        -- The extra frame we push to save/restore the CCCS when profiling
         save_ccs_size_b | profiling = 2 * wordSize dflags
                         | otherwise = 0
 
@@ -1144,7 +1221,7 @@ generateCCall d0 s p (CCallSpec target cconv safety) fn args_r_to_l
          push_args    = concatOL pushs_arg
          !d_after_args = d0 + wordsToBytes dflags a_reps_sizeW
          a_reps_pushed_RAW
-            | null a_reps_pushed_r_to_l || head a_reps_pushed_r_to_l /= VoidRep
+            | null a_reps_pushed_r_to_l || not (isVoidRep (head a_reps_pushed_r_to_l))
             = panic "ByteCodeGen.generateCCall: missing or invalid World token?"
             | otherwise
             = reverse (tail a_reps_pushed_r_to_l)
@@ -1397,7 +1474,7 @@ The code we generate is this:
 The 'bogus-word' push is because TESTEQ_I expects the top of the stack
 to have an info-table, and the next word to have the value to be
 tested.  This is very weird, but it's the way it is right now.  See
-Interpreter.c.  We don't acutally need an info-table here; we just
+Interpreter.c.  We don't actually need an info-table here; we just
 need to have the argument to be one-from-top on the stack, hence pushing
 a 1-word null. See #8383.
 -}
@@ -1829,7 +1906,8 @@ atomPrimRep (AnnLit l)              = typePrimRep1 (literalType l)
 -- #12128:
 -- A case expression can be an atom because empty cases evaluate to bottom.
 -- See Note [Empty case alternatives] in coreSyn/CoreSyn.hs
-atomPrimRep (AnnCase _ _ ty _)      = ASSERT(typePrimRep ty == [LiftedRep]) LiftedRep
+atomPrimRep (AnnCase _ _ ty _)      =
+  ASSERT(case typePrimRep ty of [LiftedRep] -> True; _ -> False) LiftedRep
 atomPrimRep (AnnCoercion {})        = VoidRep
 atomPrimRep other = pprPanic "atomPrimRep" (ppr (deAnnotate' other))
 

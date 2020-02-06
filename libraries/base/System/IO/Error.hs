@@ -35,6 +35,7 @@ module System.IO.Error (
     isIllegalOperation,
     isPermissionError,
     isUserError,
+    isResourceVanishedError,
 
     -- ** Attributes of I\/O errors
     ioeGetErrorType,
@@ -60,6 +61,7 @@ module System.IO.Error (
     illegalOperationErrorType,
     permissionErrorType,
     userErrorType,
+    resourceVanishedErrorType,
 
     -- ** 'IOErrorType' predicates
     isAlreadyExistsErrorType,
@@ -70,6 +72,7 @@ module System.IO.Error (
     isIllegalOperationErrorType,
     isPermissionErrorType,
     isUserErrorType,
+    isResourceVanishedErrorType,
 
     -- * Throwing and catching I\/O errors
 
@@ -170,6 +173,13 @@ isPermissionError    = isPermissionErrorType       . ioeGetErrorType
 isUserError         :: IOError -> Bool
 isUserError          = isUserErrorType             . ioeGetErrorType
 
+-- | An error indicating that the operation failed because the
+-- resource vanished. See 'resourceVanishedErrorType'.
+--
+-- @since 4.14.0.0
+isResourceVanishedError :: IOError -> Bool
+isResourceVanishedError = isResourceVanishedErrorType . ioeGetErrorType
+
 -- -----------------------------------------------------------------------------
 -- IOErrorTypes
 
@@ -209,6 +219,14 @@ permissionErrorType       = PermissionDenied
 -- | I\/O error that is programmer-defined.
 userErrorType            :: IOErrorType
 userErrorType             = UserError
+
+-- | I\/O error where the operation failed because the resource vanished.
+-- This happens when, for example, attempting to write to a closed
+-- socket or attempting to write to a named pipe that was deleted.
+--
+-- @since 4.14.0.0
+resourceVanishedErrorType :: IOErrorType
+resourceVanishedErrorType = ResourceVanished
 
 -- -----------------------------------------------------------------------------
 -- IOErrorType predicates
@@ -257,6 +275,14 @@ isPermissionErrorType _ = False
 isUserErrorType :: IOErrorType -> Bool
 isUserErrorType UserError = True
 isUserErrorType _ = False
+
+-- | I\/O error where the operation failed because the resource vanished.
+-- See 'resourceVanishedErrorType'.
+--
+-- @since 4.14.0.0
+isResourceVanishedErrorType :: IOErrorType -> Bool
+isResourceVanishedErrorType ResourceVanished = True
+isResourceVanishedErrorType _ = False
 
 -- -----------------------------------------------------------------------------
 -- Miscellaneous

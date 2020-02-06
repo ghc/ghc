@@ -26,7 +26,7 @@ import Panic
 --      This gets hammered by scanGraph during register allocation,
 --      so needs to be fairly efficient.
 --
---      NOTE:   This only works for arcitectures with just RcInteger and RcDouble
+--      NOTE:   This only works for architectures with just RcInteger and RcDouble
 --              (which are disjoint) ie. x86, x86_64 and ppc
 --
 --      The number of allocatable regs is hard coded in here so we can do
@@ -119,6 +119,7 @@ trivColorable platform virtualRegSqueeze realRegSqueeze RcInteger conflicts excl
                             ArchAlpha     -> panic "trivColorable ArchAlpha"
                             ArchMipseb    -> panic "trivColorable ArchMipseb"
                             ArchMipsel    -> panic "trivColorable ArchMipsel"
+                            ArchS390X     -> panic "trivColorable ArchS390X"
                             ArchJavaScript-> panic "trivColorable ArchJavaScript"
                             ArchUnknown   -> panic "trivColorable ArchUnknown")
         , count2        <- accSqueeze 0 cALLOCATABLE_REGS_INTEGER
@@ -149,6 +150,7 @@ trivColorable platform virtualRegSqueeze realRegSqueeze RcFloat conflicts exclus
                             ArchAlpha     -> panic "trivColorable ArchAlpha"
                             ArchMipseb    -> panic "trivColorable ArchMipseb"
                             ArchMipsel    -> panic "trivColorable ArchMipsel"
+                            ArchS390X     -> panic "trivColorable ArchS390X"
                             ArchJavaScript-> panic "trivColorable ArchJavaScript"
                             ArchUnknown   -> panic "trivColorable ArchUnknown")
         , count2        <- accSqueeze 0 cALLOCATABLE_REGS_FLOAT
@@ -181,6 +183,7 @@ trivColorable platform virtualRegSqueeze realRegSqueeze RcDouble conflicts exclu
                             ArchAlpha     -> panic "trivColorable ArchAlpha"
                             ArchMipseb    -> panic "trivColorable ArchMipseb"
                             ArchMipsel    -> panic "trivColorable ArchMipsel"
+                            ArchS390X     -> panic "trivColorable ArchS390X"
                             ArchJavaScript-> panic "trivColorable ArchJavaScript"
                             ArchUnknown   -> panic "trivColorable ArchUnknown")
         , count2        <- accSqueeze 0 cALLOCATABLE_REGS_DOUBLE
@@ -192,6 +195,7 @@ trivColorable platform virtualRegSqueeze realRegSqueeze RcDouble conflicts exclu
                                 exclusions
 
         = count3 < cALLOCATABLE_REGS_DOUBLE
+
 
 
 

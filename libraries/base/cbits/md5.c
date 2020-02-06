@@ -20,9 +20,9 @@
 #include <string.h>
 
 void __hsbase_MD5Init(struct MD5Context *context);
-void __hsbase_MD5Update(struct MD5Context *context, byte const *buf, int len);
-void __hsbase_MD5Final(byte digest[16], struct MD5Context *context);
-void __hsbase_MD5Transform(word32 buf[4], word32 const in[16]);
+void __hsbase_MD5Update(struct MD5Context *context, uint8_t const *buf, int len);
+void __hsbase_MD5Final(uint8_t digest[16], struct MD5Context *context);
+void __hsbase_MD5Transform(uint32_t buf[4], uint32_t const in[16]);
 
 
 /*
@@ -30,12 +30,12 @@ void __hsbase_MD5Transform(word32 buf[4], word32 const in[16]);
  * MD5 spec.  Note: this code works regardless of the byte order.
  */
 static void
-byteSwap(word32 *buf, unsigned words)
+byteSwap(uint32_t *buf, unsigned words)
 {
-	byte *p = (byte *)buf;
+	uint8_t *p = (uint8_t *)buf;
 
 	do {
-		*buf++ = (word32)((unsigned)p[3] << 8 | p[2]) << 16 |
+		*buf++ = (uint32_t)((unsigned)p[3] << 8 | p[2]) << 16 |
 			((unsigned)p[1] << 8 | p[0]);
 		p += 4;
 	} while (--words);
@@ -62,9 +62,9 @@ __hsbase_MD5Init(struct MD5Context *ctx)
  * of bytes.
  */
 void
-__hsbase_MD5Update(struct MD5Context *ctx, byte const *buf, int len)
+__hsbase_MD5Update(struct MD5Context *ctx, uint8_t const *buf, int len)
 {
-	word32 t;
+	uint32_t t;
 
 	/* Update byte count */
 
@@ -74,11 +74,11 @@ __hsbase_MD5Update(struct MD5Context *ctx, byte const *buf, int len)
 
 	t = 64 - (t & 0x3f);	/* Space available in ctx->in (at least 1) */
 	if ((unsigned)t > len) {
-		memcpy((byte *)ctx->in + 64 - (unsigned)t, buf, len);
+		memcpy((uint8_t *)ctx->in + 64 - (unsigned)t, buf, len);
 		return;
 	}
 	/* First chunk is an odd size */
-	memcpy((byte *)ctx->in + 64 - (unsigned)t, buf, (unsigned)t);
+	memcpy((uint8_t *)ctx->in + 64 - (unsigned)t, buf, (unsigned)t);
 	byteSwap(ctx->in, 16);
         __hsbase_MD5Transform(ctx->buf, ctx->in);
 	buf += (unsigned)t;
@@ -102,10 +102,10 @@ __hsbase_MD5Update(struct MD5Context *ctx, byte const *buf, int len)
  * 1 0* (64-bit count of bits processed, MSB-first)
  */
 void
-__hsbase_MD5Final(byte digest[16], struct MD5Context *ctx)
+__hsbase_MD5Final(uint8_t digest[16], struct MD5Context *ctx)
 {
 	int count = (int)(ctx->bytes[0] & 0x3f); /* Bytes in ctx->in */
-	byte *p = (byte *)ctx->in + count;	/* First unused byte */
+	uint8_t *p = (uint8_t *)ctx->in + count;	/* First unused byte */
 
 	/* Set the first char of padding to 0x80.  There is always room. */
 	*p++ = 0x80;
@@ -117,7 +117,7 @@ __hsbase_MD5Final(byte digest[16], struct MD5Context *ctx)
 		memset(p, 0, count+8);
 		byteSwap(ctx->in, 16);
                 __hsbase_MD5Transform(ctx->buf, ctx->in);
-		p = (byte *)ctx->in;
+		p = (uint8_t *)ctx->in;
 		count = 56;
 	}
 	memset(p, 0, count+8);
@@ -153,9 +153,9 @@ __hsbase_MD5Final(byte digest[16], struct MD5Context *ctx)
  */
 
 void
-__hsbase_MD5Transform(word32 buf[4], word32 const in[16])
+__hsbase_MD5Transform(uint32_t buf[4], uint32_t const in[16])
 {
-	register word32 a, b, c, d;
+	register uint32_t a, b, c, d;
 
 	a = buf[0];
 	b = buf[1];

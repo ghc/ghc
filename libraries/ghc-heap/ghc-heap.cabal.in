@@ -1,4 +1,4 @@
-cabal-version:  2.1
+cabal-version:  3.0
 name:           ghc-heap
 version:        @ProjectVersionMunged@
 license:        BSD-3-Clause

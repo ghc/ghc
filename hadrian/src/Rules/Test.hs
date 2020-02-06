@@ -12,6 +12,7 @@ import Packages
 import Settings
 import Settings.Default
 import Settings.Builders.RunTest
+import Settings.Program (programContext)
 import Target
 import Utilities
 
@@ -46,7 +47,9 @@ testRules = do
     -- Using program shipped with testsuite to generate ghcconfig file.
     root -/- ghcConfigProgPath %> \_ -> do
         ghc0Path <- (<.> exe) <$> getCompilerPath "stage0"
-        cmd [ghc0Path] [ghcConfigHsPath, "-o" , root -/- ghcConfigProgPath]
+        -- Invoke via bash to work around #17362.
+        -- Reasons why this is required are not entirely clear.
+        cmd ["bash"] ["-c", ghc0Path ++ " " ++ ghcConfigHsPath ++ " -o " ++ (root -/- ghcConfigProgPath)]
 
     -- Rules for building check-ppr and check-ppr-annotations with the compiler
     -- we are going to test (in-tree or out-of-tree).
@@ -77,7 +80,7 @@ testRules = do
     "test" ~> do
         needTestBuilders
 
-        -- TODO : Should we remove the previosly generated config file?
+        -- TODO : Should we remove the previously generated config file?
         -- Prepare Ghc configuration file for input compiler.
         need [root -/- ghcConfigPath, root -/- timeoutPath]
 
@@ -162,9 +165,10 @@ needTestsuitePackages = do
         allpkgs   <- packages <$> flavour
         stgpkgs   <- allpkgs (succ stg)
         testpkgs  <- testsuitePackages
-        targets <- mapM (needFile stg) (stgpkgs ++ testpkgs)
+        let pkgs = filter (\p -> not $ "iserv" `isInfixOf` pkgName p)
+                          (stgpkgs ++ testpkgs)
+        need =<< mapM (pkgFile stg) pkgs
         needIservBins
-        need targets
 
 -- stage 1 ghc lives under stage0/bin,
 -- stage 2 ghc lives under stage1/bin, etc
@@ -187,7 +191,7 @@ needIservBins = do
             , w `elem` rtsways
             ]
 
-needFile :: Stage -> Package -> Action FilePath
-needFile stage pkg
+pkgFile :: Stage -> Package -> Action FilePath
+pkgFile stage pkg
     | isLibrary pkg = pkgConfFile (Context stage pkg profilingDynamic)
     | otherwise     = programPath =<< programContext stage pkg

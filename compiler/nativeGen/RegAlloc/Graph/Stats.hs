@@ -1,5 +1,7 @@
 {-# LANGUAGE BangPatterns, CPP #-}
 
+{-# OPTIONS_GHC -Wno-incomplete-uni-patterns #-}
+
 -- | Carries interesting info for debugging / profiling of the
 --   graph coloring register allocator.
 module RegAlloc.Graph.Stats (
@@ -14,8 +16,6 @@ module RegAlloc.Graph.Stats (
         countSRMs, addSRM
 ) where
 
-#include "nativeGen/NCG.h"
-
 import GhcPrelude
 
 import qualified GraphColor as Color
@@ -28,7 +28,6 @@ import RegClass
 import Reg
 import TargetReg
 
-import PprCmm()
 import Outputable
 import UniqFM
 import UniqSet

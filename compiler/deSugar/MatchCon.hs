@@ -10,6 +10,8 @@ Pattern-matching constructors
 {-# LANGUAGE TypeFamilies #-}
 {-# LANGUAGE ViewPatterns #-}
 
+{-# OPTIONS_GHC -Wno-incomplete-uni-patterns #-}
+
 module MatchCon ( matchConFamily, matchPatSyn ) where
 
 #include "HsVersions.h"
@@ -18,7 +20,7 @@ import GhcPrelude
 
 import {-# SOURCE #-} Match     ( match )
 
-import HsSyn
+import GHC.Hs
 import DsBinds
 import ConLike
 import BasicTypes ( Origin(..) )
@@ -34,6 +36,7 @@ import SrcLoc
 import Outputable
 import Control.Monad(liftM)
 import Data.List (groupBy)
+import Data.List.NonEmpty (NonEmpty(..))
 
 {-
 We are confronted with the first column of patterns in a set of
@@ -88,40 +91,38 @@ have-we-used-all-the-constructors? question; the local function
 @match_cons_used@ does all the real work.
 -}
 
-matchConFamily :: [Id]
+matchConFamily :: NonEmpty Id
                -> Type
-               -> [[EquationInfo]]
+               -> NonEmpty (NonEmpty EquationInfo)
                -> DsM MatchResult
 -- Each group of eqns is for a single constructor
-matchConFamily (var:vars) ty groups
+matchConFamily (var :| vars) ty groups
   = do alts <- mapM (fmap toRealAlt . matchOneConLike vars ty) groups
        return (mkCoAlgCaseMatchResult var ty alts)
   where
     toRealAlt alt = case alt_pat alt of
         RealDataCon dcon -> alt{ alt_pat = dcon }
         _ -> panic "matchConFamily: not RealDataCon"
-matchConFamily [] _ _ = panic "matchConFamily []"
 
-matchPatSyn :: [Id]
+matchPatSyn :: NonEmpty Id
             -> Type
-            -> [EquationInfo]
+            -> NonEmpty EquationInfo
             -> DsM MatchResult
-matchPatSyn (var:vars) ty eqns
+matchPatSyn (var :| vars) ty eqns
   = do alt <- fmap toSynAlt $ matchOneConLike vars ty eqns
        return (mkCoSynCaseMatchResult var ty alt)
   where
     toSynAlt alt = case alt_pat alt of
         PatSynCon psyn -> alt{ alt_pat = psyn }
         _ -> panic "matchPatSyn: not PatSynCon"
-matchPatSyn _ _ _ = panic "matchPatSyn []"
 
 type ConArgPats = HsConDetails (LPat GhcTc) (HsRecFields GhcTc (LPat GhcTc))
 
 matchOneConLike :: [Id]
                 -> Type
-                -> [EquationInfo]
+                -> NonEmpty EquationInfo
                 -> DsM (CaseAlt ConLike)
-matchOneConLike vars ty (eqn1 : eqns)   -- All eqns for a single constructor
+matchOneConLike vars ty (eqn1 :| eqns)   -- All eqns for a single constructor
   = do  { let inst_tys = ASSERT( all tcIsTcTyVar ex_tvs )
                            -- ex_tvs can only be tyvars as data types in source
                            -- Haskell cannot mention covar yet (Aug 2018).
@@ -170,7 +171,7 @@ matchOneConLike vars ty (eqn1 : eqns)   -- All eqns for a single constructor
                               alt_wrapper = wrapper1,
                               alt_result = foldr1 combineMatchResults match_results } }
   where
-    ConPatOut { pat_con = (dL->L _ con1)
+    ConPatOut { pat_con = L _ con1
               , pat_arg_tys = arg_tys, pat_wrap = wrapper1,
                 pat_tvs = tvs1, pat_dicts = dicts1, pat_args = args1 }
               = firstPat eqn1
@@ -192,10 +193,9 @@ matchOneConLike vars ty (eqn1 : eqns)   -- All eqns for a single constructor
       = arg_vars
       where
         fld_var_env = mkNameEnv $ zipEqual "get_arg_vars" fields1 arg_vars
-        lookup_fld (dL->L _ rpat) = lookupNameEnv_NF fld_var_env
+        lookup_fld (L _ rpat) = lookupNameEnv_NF fld_var_env
                                             (idName (unLoc (hsRecFieldId rpat)))
     select_arg_vars _ [] = panic "matchOneCon/select_arg_vars []"
-matchOneConLike _ _ [] = panic "matchOneCon []"
 
 -----------------
 compatible_pats :: (ConArgPats,a) -> (ConArgPats,a) -> Bool
@@ -209,7 +209,7 @@ compatible_pats _                 _                 = True -- Prefix or infix co
 same_fields :: HsRecFields GhcTc (LPat GhcTc) -> HsRecFields GhcTc (LPat GhcTc)
             -> Bool
 same_fields flds1 flds2
-  = all2 (\(dL->L _ f1) (dL->L _ f2)
+  = all2 (\(L _ f1) (L _ f2)
                           -> unLoc (hsRecFieldId f1) == unLoc (hsRecFieldId f2))
          (rec_flds flds1) (rec_flds flds2)
 
@@ -253,7 +253,7 @@ Now consider:
 
 In the first we must test y first; in the second we must test x
 first.  So we must divide even the equations for a single constructor
-T into sub-goups, based on whether they match the same field in the
+T into sub-groups, based on whether they match the same field in the
 same order.  That's what the (groupBy compatible_pats) grouping.
 
 All non-record patterns are "compatible" in this sense, because the

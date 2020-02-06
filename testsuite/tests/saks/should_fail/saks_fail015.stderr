@@ -1,0 +1,2 @@
+
+saks_fail015.hs:11:29: error: Not in scope: type variable ‘k’

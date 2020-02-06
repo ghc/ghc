@@ -12,11 +12,6 @@ module CoreMonad ( CoreToDo, CoreM ) where
 import GhcPrelude
 
 import IOEnv ( IOEnv )
-import UniqSupply ( UniqSupply )
-
-newtype CoreState = CoreState {
-        cs_uniq_supply :: UniqSupply
-}
 
 type CoreIOEnv = IOEnv CoreReader
 
@@ -28,9 +23,7 @@ newtype CoreWriter = CoreWriter {
 
 data SimplCount
 
-newtype CoreM a
-          = CoreM { unCoreM :: CoreState
-                                 -> CoreIOEnv (a, CoreState, CoreWriter) }
+newtype CoreM a = CoreM { unCoreM :: CoreIOEnv (a, CoreWriter) }
 
 instance Monad CoreM
 

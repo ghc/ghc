@@ -24,9 +24,12 @@ import traceback
 import subprocess
 
 from testutil import getStdout, Watcher, str_warn, str_info
-from testglobals import getConfig, ghc_env, getTestRun, TestConfig, TestOptions, brokens
-from perf_notes import MetricChange, inside_git_repo, is_worktree_dirty
+from testglobals import getConfig, ghc_env, getTestRun, TestConfig, \
+                        TestOptions, brokens, PerfMetric
+from perf_notes import MetricChange, inside_git_repo, is_worktree_dirty, format_perf_stat
 from junit import junit
+import term_color
+from term_color import Color, colored
 import cpu_features
 
 # Readline sometimes spews out ANSI escapes for some values of TERM,
@@ -213,6 +216,7 @@ def supports_colors():
     return True
 
 config.supports_colors = supports_colors()
+term_color.enable_color = config.supports_colors
 
 # This has to come after arg parsing as the args can change the compiler
 get_compiler_info()
@@ -295,9 +299,9 @@ print('Found', len(t_files), '.T files...')
 t = getTestRun() # type: TestRun
 
 # Avoid cmd.exe built-in 'date' command on Windows
-t.start_time = time.localtime()
+t.start_time = datetime.datetime.now()
 
-print('Beginning test run at', time.strftime("%c %Z",t.start_time))
+print('Beginning test run at', t.start_time.strftime("%c %Z"))
 
 # For reference
 try:
@@ -329,6 +333,26 @@ def cleanup_and_exit(exitcode):
     if config.cleanup and tempdir:
         shutil.rmtree(tempdir, ignore_errors=True)
     exit(exitcode)
+
+def tabulate_metrics(metrics: List[PerfMetric]) -> None:
+    for metric in sorted(metrics, key=lambda m: (m.stat.test, m.stat.way)):
+        print("{test:24}  {metric:40}  {value:15.3f}".format(
+            test = "{}({})".format(metric.stat.test, metric.stat.way),
+            metric = metric.stat.metric,
+            value = metric.stat.value
+        ))
+        if metric.baseline is not None:
+            val0 = metric.baseline.perfStat.value
+            val1 = metric.stat.value
+            rel = 100 * (val1 - val0) / val0
+            print("{space:24}  {herald:40}  {value:15.3f}  [{direction} {rel:2.1f}%]".format(
+                space = "",
+                herald = "(baseline @ HEAD~{depth})".format(
+                    depth = metric.baseline.commitDepth),
+                value = val0,
+                direction = metric.change,
+                rel = abs(rel)
+            ))
 
 # First collect all the tests to be run
 t_files_ok = True
@@ -392,6 +416,14 @@ else:
     # flush everything before we continue
     sys.stdout.flush()
 
+    # Dump metrics data.
+    print("\nPerformance Metrics (test environment: {}):\n".format(config.test_env))
+    if any(t.metrics):
+        tabulate_metrics(t.metrics)
+    else:
+        print("\nNone collected.")
+    print("")
+
     # Warn if had to force skip perf tests (see Note force skip perf tests).
     spacing = "       "
     if forceSkipPerfTests and not args.skip_perf_tests:
@@ -401,7 +433,7 @@ else:
         print(spacing + 'You can still run the tests without git by specifying an output file with --metrics-file FILE.')
 
     # Warn of new metrics.
-    new_metrics = [metric for (change, metric) in t.metrics if change == MetricChange.NewMetric]
+    new_metrics = [metric for (change, metric, baseline) in t.metrics if change == MetricChange.NewMetric]
     if any(new_metrics):
         if inside_git_repo():
             reason = 'a baseline (expected value) cannot be recovered from' + \
@@ -435,13 +467,13 @@ else:
         print(str_info("Some stats have changed") + " If this is expected, " + \
             "allow changes by appending the git commit message with this:")
         print('-' * 25)
-        print(Perf.allow_changes_string(t.metrics))
+        print(Perf.allow_changes_string([(m.change, m.stat) for m in t.metrics]))
         print('-' * 25)
 
     summary(t, sys.stdout, config.no_print_summary, config.supports_colors)
 
     # Write perf stats if any exist or if a metrics file is specified.
-    stats = [stat for (_, stat) in t.metrics]
+    stats = [stat for (_, stat, __) in t.metrics]
     if hasMetricsFile:
         print('Appending ' + str(len(stats)) + ' stats to file: ' + config.metrics_file)
         with open(config.metrics_file, 'a') as f:

@@ -25,7 +25,7 @@ StgEntCounter *ticky_entry_ctrs = NULL; /* root of list of them */
 /* We want Haskell code compiled with -ticky to be linkable with any
  * version of the RTS, so we have to make sure all the symbols that
  * ticky-compiled code may refer to are defined by every RTS. (#3439)
- * Hence the #ifdef is here, rather than up above.
+ * Hence the #if defined(is) here, rather than up above.
  */
 #if defined(TICKY_TICKY)
 

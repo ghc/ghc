@@ -1,4 +1,4 @@
-#ifndef ElfTypes_h
+#if !defined(ElfTypes_h)
 #define ElfTypes_h
 
 #if defined(OBJFORMAT_ELF)

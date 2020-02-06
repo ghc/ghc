@@ -12,7 +12,6 @@ data A = A (Array# Int)
 data MA = MA (MutableArray# RealWorld Int)
 data BA = BA ByteArray#
 data MBA = MBA (MutableByteArray# RealWorld)
-data B = B BCO#
 data APC a = APC a
 
 

@@ -56,7 +56,7 @@ infixr 5 :
 -- | The kind of constraints, like @Show a@
 data Constraint
 
--- | The kind of types with values. For example @Int :: Type@.
+-- | The kind of types with lifted values. For example @Int :: Type@.
 type Type = TYPE 'LiftedRep
 
 {- *********************************************************************
@@ -396,15 +396,19 @@ data RuntimeRep = VecRep VecCount VecElem   -- ^ a SIMD vector type
                 | IntRep          -- ^ signed, word-sized value
                 | Int8Rep         -- ^ signed,  8-bit value
                 | Int16Rep        -- ^ signed, 16-bit value
+                | Int32Rep        -- ^ signed, 32-bit value
                 | Int64Rep        -- ^ signed, 64-bit value (on 32-bit only)
                 | WordRep         -- ^ unsigned, word-sized value
                 | Word8Rep        -- ^ unsigned,  8-bit value
                 | Word16Rep       -- ^ unsigned, 16-bit value
+                | Word32Rep       -- ^ unsigned, 32-bit value
                 | Word64Rep       -- ^ unsigned, 64-bit value (on 32-bit only)
                 | AddrRep         -- ^ A pointer, but /not/ to a Haskell value
                 | FloatRep        -- ^ a 32-bit floating point number
                 | DoubleRep       -- ^ a 64-bit floating point number
 
+-- RuntimeRep is intimately tied to TyCon.RuntimeRep (in GHC proper). See
+-- Note [RuntimeRep and PrimRep] in RepType.
 -- See also Note [Wiring in RuntimeRep] in TysWiredIn
 
 -- | Length of a SIMD vector type

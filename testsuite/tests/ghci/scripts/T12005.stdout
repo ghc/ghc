@@ -1,4 +1,5 @@
-class Defer (p :: Constraint) where
+type Defer :: Constraint -> Constraint
+class Defer p where
   defer :: (p => r) -> r
   {-# MINIMAL defer #-}
   	-- Defined at <interactive>:5:1

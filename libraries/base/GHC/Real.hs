@@ -134,7 +134,7 @@ class  (Num a, Ord a) => Real a  where
 --
 -- The Haskell Report defines no laws for 'Integral'. However, 'Integral'
 -- instances are customarily expected to define a Euclidean domain and have the
--- following properties for the `div`\/`mod` and `quot`\/`rem` pairs, given
+-- following properties for the 'div'\/'mod' and 'quot'\/'rem' pairs, given
 -- suitable Euclidean functions @f@ and @g@:
 --
 -- * @x@ = @y * quot x y + rem x y@ with @rem x y@ = @fromInteger 0@ or
@@ -142,7 +142,7 @@ class  (Num a, Ord a) => Real a  where
 -- * @x@ = @y * div x y + mod x y@ with @mod x y@ = @fromInteger 0@ or
 -- @f (mod x y)@ < @f y@
 --
--- An example of a suitable Euclidean function, for `Integer`'s instance, is
+-- An example of a suitable Euclidean function, for 'Integer'\'s instance, is
 -- 'abs'.
 class  (Real a, Enum a) => Integral a  where
     -- | integer division truncated toward zero
@@ -508,6 +508,16 @@ instance  (Integral a)  => RealFrac (Ratio a)  where
     {-# SPECIALIZE instance RealFrac Rational #-}
     properFraction (x:%y) = (fromInteger (toInteger q), r:%y)
                           where (q,r) = quotRem x y
+    round r =
+      let
+        (n, f) = properFraction r
+        x = if r < 0 then -1 else 1
+      in
+        case (compare (abs f) 0.5, odd n) of
+          (LT, _) -> n
+          (EQ, False) -> n
+          (EQ, True) -> n + x
+          (GT, _) -> n + x
 
 -- | @since 2.0.1
 instance  (Show a)  => Show (Ratio a)  where

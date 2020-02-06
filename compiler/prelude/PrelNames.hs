@@ -64,8 +64,8 @@ This is accomplished through a combination of mechanisms:
   2. The knownKeyNames (which consist of the basicKnownKeyNames from
      the module, and those names reachable via the wired-in stuff from
      TysWiredIn) are used to initialise the "OrigNameCache" in
-     IfaceEnv.  This initialization ensures that when the type checker
-     or renamer (both of which use IfaceEnv) look up an original name
+     GHC.Iface.Env.  This initialization ensures that when the type checker
+     or renamer (both of which use GHC.Iface.Env) look up an original name
      (i.e. a pair of a Module and an OccName) for a known-key name
      they get the correct Unique.
 
@@ -95,17 +95,17 @@ things,
      looked up in the orig-name cache)
 
   b) The known infinite families of names are specially serialised by
-     BinIface.putName, with that special treatment detected when we read back to
-     ensure that we get back to the correct uniques. See Note [Symbol table
-     representation of names] in BinIface and Note [How tuples work] in
-     TysWiredIn.
+     GHC.Iface.Binary.putName, with that special treatment detected when we read
+     back to ensure that we get back to the correct uniques. See Note [Symbol
+     table representation of names] in GHC.Iface.Binary and Note [How tuples
+     work] in TysWiredIn.
 
 Most of the infinite families cannot occur in source code, so mechanisms (a) and (b)
 suffice to ensure that they always have the right Unique. In particular,
 implicit param TyCon names, constraint tuples and Any TyCons cannot be mentioned
 by the user. For those things that *can* appear in source programs,
 
-  c) IfaceEnv.lookupOrigNameCache uses isBuiltInOcc_maybe to map built-in syntax
+  c) GHC.Iface.Env.lookupOrigNameCache uses isBuiltInOcc_maybe to map built-in syntax
      directly onto the corresponding name, rather than trying to find it in the
      original-name cache.
 
@@ -143,6 +143,7 @@ Note [Wired-in packages] in Module. This is done in Packages.findWiredInPackages
 -}
 
 {-# LANGUAGE CPP #-}
+{-# OPTIONS_GHC -Wno-incomplete-uni-patterns   #-}
 
 module PrelNames (
         Unique, Uniquable(..), hasKey,  -- Re-exported for convenience
@@ -504,7 +505,7 @@ gHC_PRIM, gHC_TYPES, gHC_GENERICS, gHC_MAGIC,
     gHC_LIST, gHC_TUPLE, dATA_TUPLE, dATA_EITHER, dATA_STRING,
     dATA_FOLDABLE, dATA_TRAVERSABLE,
     gHC_CONC, gHC_IO, gHC_IO_Exception,
-    gHC_ST, gHC_ARR, gHC_STABLE, gHC_PTR, gHC_ERR, gHC_REAL,
+    gHC_ST, gHC_IX, gHC_STABLE, gHC_PTR, gHC_ERR, gHC_REAL,
     gHC_FLOAT, gHC_TOP_HANDLER, sYSTEM_IO, dYNAMIC,
     tYPEABLE, tYPEABLE_INTERNAL, gENERICS,
     rEAD_PREC, lEX, gHC_INT, gHC_WORD, mONAD, mONAD_FIX, mONAD_ZIP, mONAD_FAIL,
@@ -540,7 +541,7 @@ gHC_CONC        = mkBaseModule (fsLit "GHC.Conc")
 gHC_IO          = mkBaseModule (fsLit "GHC.IO")
 gHC_IO_Exception = mkBaseModule (fsLit "GHC.IO.Exception")
 gHC_ST          = mkBaseModule (fsLit "GHC.ST")
-gHC_ARR         = mkBaseModule (fsLit "GHC.Arr")
+gHC_IX          = mkBaseModule (fsLit "GHC.Ix")
 gHC_STABLE      = mkBaseModule (fsLit "GHC.Stable")
 gHC_PTR         = mkBaseModule (fsLit "GHC.Ptr")
 gHC_ERR         = mkBaseModule (fsLit "GHC.Err")
@@ -750,11 +751,11 @@ succ_RDR                = varQual_RDR gHC_ENUM (fsLit "succ")
 pred_RDR                = varQual_RDR gHC_ENUM (fsLit "pred")
 minBound_RDR            = varQual_RDR gHC_ENUM (fsLit "minBound")
 maxBound_RDR            = varQual_RDR gHC_ENUM (fsLit "maxBound")
-range_RDR               = varQual_RDR gHC_ARR (fsLit "range")
-inRange_RDR             = varQual_RDR gHC_ARR (fsLit "inRange")
-index_RDR               = varQual_RDR gHC_ARR (fsLit "index")
-unsafeIndex_RDR         = varQual_RDR gHC_ARR (fsLit "unsafeIndex")
-unsafeRangeSize_RDR     = varQual_RDR gHC_ARR (fsLit "unsafeRangeSize")
+range_RDR               = varQual_RDR gHC_IX (fsLit "range")
+inRange_RDR             = varQual_RDR gHC_IX (fsLit "inRange")
+index_RDR               = varQual_RDR gHC_IX (fsLit "index")
+unsafeIndex_RDR         = varQual_RDR gHC_IX (fsLit "unsafeIndex")
+unsafeRangeSize_RDR     = varQual_RDR gHC_IX (fsLit "unsafeRangeSize")
 
 readList_RDR, readListDefault_RDR, readListPrec_RDR, readListPrecDefault_RDR,
     readPrec_RDR, parens_RDR, choose_RDR, lexP_RDR, expectP_RDR :: RdrName
@@ -1214,7 +1215,7 @@ rationalToDoubleName = varQual gHC_FLOAT (fsLit "rationalToDouble") rationalToDo
 
 -- Class Ix
 ixClassName :: Name
-ixClassName = clsQual gHC_ARR (fsLit "Ix") ixClassKey
+ixClassName = clsQual gHC_IX (fsLit "Ix") ixClassKey
 
 -- Typeable representation types
 trModuleTyConName
@@ -2024,7 +2025,7 @@ sumRepDataConKey                        = mkPreludeDataConUnique 73
 runtimeRepSimpleDataConKeys, unliftedSimpleRepDataConKeys, unliftedRepDataConKeys :: [Unique]
 liftedRepDataConKey :: Unique
 runtimeRepSimpleDataConKeys@(liftedRepDataConKey : unliftedSimpleRepDataConKeys)
-  = map mkPreludeDataConUnique [74..86]
+  = map mkPreludeDataConUnique [74..88]
 
 unliftedRepDataConKeys = vecRepDataConKey :
                          tupleRepDataConKey :
@@ -2034,29 +2035,29 @@ unliftedRepDataConKeys = vecRepDataConKey :
 -- See Note [Wiring in RuntimeRep] in TysWiredIn
 -- VecCount
 vecCountDataConKeys :: [Unique]
-vecCountDataConKeys = map mkPreludeDataConUnique [87..92]
+vecCountDataConKeys = map mkPreludeDataConUnique [89..94]
 
 -- See Note [Wiring in RuntimeRep] in TysWiredIn
 -- VecElem
 vecElemDataConKeys :: [Unique]
-vecElemDataConKeys = map mkPreludeDataConUnique [93..102]
+vecElemDataConKeys = map mkPreludeDataConUnique [95..104]
 
 -- Typeable things
 kindRepTyConAppDataConKey, kindRepVarDataConKey, kindRepAppDataConKey,
     kindRepFunDataConKey, kindRepTYPEDataConKey,
     kindRepTypeLitSDataConKey, kindRepTypeLitDDataConKey
     :: Unique
-kindRepTyConAppDataConKey = mkPreludeDataConUnique 103
-kindRepVarDataConKey      = mkPreludeDataConUnique 104
-kindRepAppDataConKey      = mkPreludeDataConUnique 105
-kindRepFunDataConKey      = mkPreludeDataConUnique 106
-kindRepTYPEDataConKey     = mkPreludeDataConUnique 107
-kindRepTypeLitSDataConKey = mkPreludeDataConUnique 108
-kindRepTypeLitDDataConKey = mkPreludeDataConUnique 109
+kindRepTyConAppDataConKey = mkPreludeDataConUnique 105
+kindRepVarDataConKey      = mkPreludeDataConUnique 106
+kindRepAppDataConKey      = mkPreludeDataConUnique 107
+kindRepFunDataConKey      = mkPreludeDataConUnique 108
+kindRepTYPEDataConKey     = mkPreludeDataConUnique 109
+kindRepTypeLitSDataConKey = mkPreludeDataConUnique 110
+kindRepTypeLitDDataConKey = mkPreludeDataConUnique 111
 
 typeLitSymbolDataConKey, typeLitNatDataConKey :: Unique
-typeLitSymbolDataConKey   = mkPreludeDataConUnique 110
-typeLitNatDataConKey      = mkPreludeDataConUnique 111
+typeLitSymbolDataConKey   = mkPreludeDataConUnique 112
+typeLitNatDataConKey      = mkPreludeDataConUnique 113
 
 
 ---------------- Template Haskell -------------------
@@ -2092,6 +2093,7 @@ errorIdKey                    = mkPreludeMiscIdUnique  5
 foldrIdKey                    = mkPreludeMiscIdUnique  6
 recSelErrorIdKey              = mkPreludeMiscIdUnique  7
 seqIdKey                      = mkPreludeMiscIdUnique  8
+absentSumFieldErrorIdKey      = mkPreludeMiscIdUnique  9
 eqStringIdKey                 = mkPreludeMiscIdUnique 10
 noMethodBindingErrorIdKey     = mkPreludeMiscIdUnique 11
 nonExhaustiveGuardsErrorIdKey = mkPreludeMiscIdUnique 12
@@ -2107,7 +2109,6 @@ voidPrimIdKey                 = mkPreludeMiscIdUnique 21
 typeErrorIdKey                = mkPreludeMiscIdUnique 22
 divIntIdKey                   = mkPreludeMiscIdUnique 23
 modIntIdKey                   = mkPreludeMiscIdUnique 24
-absentSumFieldErrorIdKey      = mkPreludeMiscIdUnique 9
 
 unsafeCoerceIdKey, concatIdKey, filterIdKey, zipIdKey, bindIOIdKey,
     returnIOIdKey, newStablePtrIdKey,

@@ -1,5 +1,8 @@
 {-# LANGUAGE CPP #-}
 
+{-# OPTIONS_GHC -Wno-incomplete-record-updates #-}
+{-# OPTIONS_GHC -Wno-incomplete-uni-patterns   #-}
+
 module TcInteract (
      solveSimpleGivens,   -- Solves [Ct]
      solveSimpleWanteds,  -- Solves Cts
@@ -35,6 +38,9 @@ import TcEvidence
 import Outputable
 
 import TcRnTypes
+import Constraint
+import Predicate
+import TcOrigin
 import TcSMonad
 import Bag
 import MonadUtils ( concatMapM, foldlM )
@@ -71,7 +77,7 @@ Note [Basic Simplifier Plan]
       - canonicalization
       - inert reactions
       - spontaneous reactions
-      - top-level intreactions
+      - top-level interactions
    Each stage returns a StopOrContinue and may have sideffected
    the inerts or worklist.
 
@@ -223,7 +229,7 @@ solveSimples :: Cts -> TcS ()
 
 solveSimples cts
   = {-# SCC "solveSimples" #-}
-    do { updWorkListTcS (\wl -> foldrBag extendWorkListCt wl cts)
+    do { updWorkListTcS (\wl -> foldr extendWorkListCt wl cts)
        ; solve_loop }
   where
     solve_loop
@@ -559,9 +565,10 @@ solveOneFromTheOther ev_i ev_w
      ev_id_w = ctEvEvId ev_w
 
      different_level_strategy  -- Both Given
-       | isIPPred pred, lvl_w > lvl_i = KeepWork
-       | lvl_w < lvl_i                = KeepWork
-       | otherwise                    = KeepInert
+       | isIPPred pred = if lvl_w > lvl_i then KeepWork  else KeepInert
+       | otherwise     = if lvl_w > lvl_i then KeepInert else KeepWork
+       -- See Note [Replacement vs keeping] (the different-level bullet)
+       -- For the isIPPred case see Note [Shadowing of Implicit Parameters]
 
      same_level_strategy binds -- Both Given
        | GivenOrigin (InstSC s_i) <- ctLocOrigin loc_i
@@ -600,7 +607,7 @@ we keep?  More subtle than you might think!
         and can be reported as redundant.  See Note [Tracking redundant constraints]
         in TcSimplify.
 
-        It transpires that using the outermost one is reponsible for an
+        It transpires that using the outermost one is responsible for an
         8% performance improvement in nofib cryptarithm2, compared to
         just rolling the dice.  I didn't investigate why.
 
@@ -681,7 +688,7 @@ once had done). This problem can be tickled by typecheck/should_compile/holes.
 interactIrred :: InertCans -> Ct -> TcS (StopOrContinue Ct)
 
 interactIrred inerts workItem@(CIrredCan { cc_ev = ev_w, cc_insol = insoluble })
-  | insoluble  -- For insolubles, don't allow the constaint to be dropped
+  | insoluble  -- For insolubles, don't allow the constraint to be dropped
                -- which can happen with solveOneFromTheOther, so that
                -- we get distinct error messages with -fdefer-type-errors
                -- See Note [Do not add duplicate derived insolubles]
@@ -992,7 +999,7 @@ Note that:
 
 * The CtEvidence is the goal to be solved
 
-* The MaybeT anages early failure if we find a subgoal that
+* The MaybeT manages early failure if we find a subgoal that
   cannot be solved from instances.
 
 * The (EvBindMap, DictMap CtEvidence) is an accumulating purely-functional
@@ -1180,8 +1187,12 @@ addFunDepWork inerts work_ev cls
         inert_loc  = ctEvLoc inert_ev
         derived_loc = work_loc { ctl_depth  = ctl_depth work_loc `maxSubGoalDepth`
                                               ctl_depth inert_loc
-                               , ctl_origin = FunDepOrigin1 work_pred  work_loc
-                                                            inert_pred inert_loc }
+                               , ctl_origin = FunDepOrigin1 work_pred
+                                                            (ctLocOrigin work_loc)
+                                                            (ctLocSpan work_loc)
+                                                            inert_pred
+                                                            (ctLocOrigin inert_loc)
+                                                            (ctLocSpan inert_loc) }
 
 {-
 **********************************************************************
@@ -1245,6 +1256,9 @@ This should probably be well typed, with
    g :: Bool -> (Int, Bool)
 
 So the inner binding for ?x::Bool *overrides* the outer one.
+
+See ticket #17104 for a rather tricky example of this overriding
+behaviour.
 
 All this works for the normal cases but it has an odd side effect in
 some pathological programs like this:
@@ -1332,59 +1346,61 @@ improveLocalFunEqs work_ev inerts fam_tc args fsk
     || not (isImprovable work_ev)
   = return ()
 
-  | not (null improvement_eqns)
-  = do { traceTcS "interactFunEq improvements: " $
-         vcat [ text "Eqns:" <+> ppr improvement_eqns
-              , text "Candidates:" <+> ppr funeqs_for_tc
-              , text "Inert eqs:" <+> ppr ieqs ]
-       ; emitFunDepDeriveds improvement_eqns }
-
   | otherwise
-  = return ()
+  = do { eqns <- improvement_eqns
+       ; if not (null eqns)
+         then do { traceTcS "interactFunEq improvements: " $
+                   vcat [ text "Eqns:" <+> ppr eqns
+                        , text "Candidates:" <+> ppr funeqs_for_tc
+                        , text "Inert eqs:" <+> ppr (inert_eqs inerts) ]
+                 ; emitFunDepDeriveds eqns }
+         else return () }
 
   where
-    ieqs          = inert_eqs inerts
     funeqs        = inert_funeqs inerts
     funeqs_for_tc = findFunEqsByTyCon funeqs fam_tc
-    rhs           = lookupFlattenTyVar ieqs fsk
     work_loc      = ctEvLoc work_ev
     work_pred     = ctEvPred work_ev
     fam_inj_info  = tyConInjectivityInfo fam_tc
 
     --------------------
-    improvement_eqns :: [FunDepEqn CtLoc]
+    improvement_eqns :: TcS [FunDepEqn CtLoc]
     improvement_eqns
       | Just ops <- isBuiltInSynFamTyCon_maybe fam_tc
       =    -- Try built-in families, notably for arithmethic
-         concatMap (do_one_built_in ops) funeqs_for_tc
+        do { rhs <- rewriteTyVar fsk
+           ; concatMapM (do_one_built_in ops rhs) funeqs_for_tc }
 
       | Injective injective_args <- fam_inj_info
       =    -- Try improvement from type families with injectivity annotations
-        concatMap (do_one_injective injective_args) funeqs_for_tc
+        do { rhs <- rewriteTyVar fsk
+           ; concatMapM (do_one_injective injective_args rhs) funeqs_for_tc }
 
       | otherwise
-      = []
+      = return []
 
     --------------------
-    do_one_built_in ops (CFunEqCan { cc_tyargs = iargs, cc_fsk = ifsk, cc_ev = inert_ev })
-      = mk_fd_eqns inert_ev (sfInteractInert ops args rhs iargs
-                                             (lookupFlattenTyVar ieqs ifsk))
+    do_one_built_in ops rhs (CFunEqCan { cc_tyargs = iargs, cc_fsk = ifsk, cc_ev = inert_ev })
+      = do { inert_rhs <- rewriteTyVar ifsk
+           ; return $ mk_fd_eqns inert_ev (sfInteractInert ops args rhs iargs inert_rhs) }
 
-    do_one_built_in _ _ = pprPanic "interactFunEq 1" (ppr fam_tc)
+    do_one_built_in _ _ _ = pprPanic "interactFunEq 1" (ppr fam_tc)
 
     --------------------
     -- See Note [Type inference for type families with injectivity]
-    do_one_injective inj_args (CFunEqCan { cc_tyargs = inert_args
-                                         , cc_fsk = ifsk, cc_ev = inert_ev })
+    do_one_injective inj_args rhs (CFunEqCan { cc_tyargs = inert_args
+                                             , cc_fsk = ifsk, cc_ev = inert_ev })
       | isImprovable inert_ev
-      , rhs `tcEqType` lookupFlattenTyVar ieqs ifsk
-      = mk_fd_eqns inert_ev $
-            [ Pair arg iarg
-            | (arg, iarg, True) <- zip3 args inert_args inj_args ]
+      = do { inert_rhs <- rewriteTyVar ifsk
+           ; return $ if rhs `tcEqType` inert_rhs
+                      then mk_fd_eqns inert_ev $
+                             [ Pair arg iarg
+                             | (arg, iarg, True) <- zip3 args inert_args inj_args ]
+                      else [] }
       | otherwise
-      = []
+      = return []
 
-    do_one_injective _ _ = pprPanic "interactFunEq 2" (ppr fam_tc)
+    do_one_injective _ _ _ = pprPanic "interactFunEq 2" (ppr fam_tc)
 
     --------------------
     mk_fd_eqns :: CtEvidence -> [TypeEqn] -> [FunDepEqn CtLoc]
@@ -1435,7 +1451,7 @@ gives rise to
    [W] F Int b ~ Bool
 from which we can derive b.  This requires looking at the defining equations of
 a type family, ie. finding equation with a matching RHS (Bool in this example)
-and infering values of type variables (b in this example) from the LHS patterns
+and inferring values of type variables (b in this example) from the LHS patterns
 of the matching equation.  For closed type families we have to perform
 additional apartness check for the selected equation to check that the selected
 is guaranteed to fire for given LHS arguments.
@@ -1493,7 +1509,7 @@ Notice the orientation (xi_w ~ xi_i) NOT (xi_i ~ xi_w):
     new_work :: xi_w ~ xi_i
     cw := ci ; sym new_work
 Why?  Consider the simplest case when xi1 is a type variable.  If
-we generate xi1~xi2, porcessing that constraint will kick out 'ci'.
+we generate xi1~xi2, processing that constraint will kick out 'ci'.
 If we generate xi2~xi1, there is less chance of that happening.
 Of course it can and should still happen if xi1=a, xi1=Int, say.
 But we want to avoid it happening needlessly.
@@ -1569,7 +1585,7 @@ inertsCanDischarge inerts tv rhs fr
     keep_deriv ev_i
       | Wanted WOnly  <- ctEvFlavour ev_i  -- inert is [W]
       , (Wanted WDeriv, _) <- fr           -- work item is [WD]
-      = True   -- Keep a derived verison of the work item
+      = True   -- Keep a derived version of the work item
       | otherwise
       = False  -- Work item is fully discharged
 
@@ -1820,27 +1836,35 @@ doTopReactOther work_item
   = continueWith work_item
 
   | EqPred eq_rel t1 t2 <- classifyPredType pred
-  = -- See Note [Looking up primitive equalities in quantified constraints]
-    case boxEqPred eq_rel t1 t2 of
-      Nothing -> continueWith work_item
-      Just (cls, tys)
-        -> do { res <- matchLocalInst (mkClassPred cls tys) loc
-              ; case res of
-                  OneInst { cir_mk_ev = mk_ev }
-                    -> chooseInstance work_item
-                           (res { cir_mk_ev = mk_eq_ev cls tys mk_ev })
-                    where
-                  _ -> continueWith work_item }
+  = doTopReactEqPred work_item eq_rel t1 t2
 
   | otherwise
   = do { res <- matchLocalInst pred loc
        ; case res of
            OneInst {} -> chooseInstance work_item res
            _          -> continueWith work_item }
+
   where
-    ev = ctEvidence work_item
+    ev   = ctEvidence work_item
     loc  = ctEvLoc ev
     pred = ctEvPred ev
+
+doTopReactEqPred :: Ct -> EqRel -> TcType -> TcType -> TcS (StopOrContinue Ct)
+doTopReactEqPred work_item eq_rel t1 t2
+  -- See Note [Looking up primitive equalities in quantified constraints]
+  | Just (cls, tys) <- boxEqPred eq_rel t1 t2
+  = do { res <- matchLocalInst (mkClassPred cls tys) loc
+       ; case res of
+           OneInst { cir_mk_ev = mk_ev }
+             -> chooseInstance work_item
+                    (res { cir_mk_ev = mk_eq_ev cls tys mk_ev })
+           _ -> continueWith work_item }
+
+  | otherwise
+  = continueWith work_item
+  where
+    ev   = ctEvidence work_item
+    loc = ctEvLoc ev
 
     mk_eq_ev cls tys mk_ev evs
       = case (mk_ev evs) of
@@ -1856,9 +1880,66 @@ selection. This avoids having to support quantified constraints whose
 kind is not Constraint, such as (forall a. F a ~# b)
 
 See
- * Note [Evidence for quantified constraints] in Type
+ * Note [Evidence for quantified constraints] in Predicate
  * Note [Equality superclasses in quantified constraints]
    in TcCanonical
+
+Note [Flatten when discharging CFunEqCan]
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+We have the following scenario (#16512):
+
+type family LV (as :: [Type]) (b :: Type) = (r :: Type) | r -> as b where
+  LV (a ': as) b = a -> LV as b
+
+[WD] w1 :: LV as0 (a -> b) ~ fmv1 (CFunEqCan)
+[WD] w2 :: fmv1 ~ (a -> fmv2) (CTyEqCan)
+[WD] w3 :: LV as0 b ~ fmv2 (CFunEqCan)
+
+We start with w1. Because LV is injective, we wish to see if the RHS of the
+equation matches the RHS of the CFunEqCan. The RHS of a CFunEqCan is always an
+fmv, so we "look through" to get (a -> fmv2). Then we run tcUnifyTyWithTFs.
+That performs the match, but it allows a type family application (such as the
+LV in the RHS of the equation) to match with anything. (See "Injective type
+families" by Stolarek et al., HS'15, Fig. 2) The matching succeeds, which
+means we can improve as0 (and b, but that's not interesting here). However,
+because the RHS of w1 can't see through fmv2 (we have no way of looking up a
+LHS of a CFunEqCan from its RHS, and this use case isn't compelling enough),
+we invent a new unification variable here. We thus get (as0 := a : as1).
+Rewriting:
+
+[WD] w1 :: LV (a : as1) (a -> b) ~ fmv1
+[WD] w2 :: fmv1 ~ (a -> fmv2)
+[WD] w3 :: LV (a : as1) b ~ fmv2
+
+We can now reduce both CFunEqCans, using the equation for LV. We get
+
+[WD] w2 :: (a -> LV as1 (a -> b)) ~ (a -> a -> LV as1 b)
+
+Now we decompose (and flatten) to
+
+[WD] w4 :: LV as1 (a -> b) ~ fmv3
+[WD] w5 :: fmv3 ~ (a -> fmv1)
+[WD] w6 :: LV as1 b ~ fmv4
+
+which is exactly where we started. These goals really are insoluble, but
+we would prefer not to loop. We thus need to find a way to bump the reduction
+depth, so that we can detect the loop and abort.
+
+The key observation is that we are performing a reduction. We thus wish
+to bump the level when discharging a CFunEqCan. Where does this bumped
+level go, though? It can't just go on the reduct, as that's a type. Instead,
+it must go on any CFunEqCans produced after flattening. We thus flatten
+when discharging, making sure that the level is bumped in the new
+fun-eqs. The flattening happens in reduce_top_fun_eq and the level
+is bumped when setting up the FlatM monad in TcFlatten.runFlatten.
+(This bumping will happen for call sites other than this one, but that
+makes sense -- any constraints emitted by the flattener are offshoots
+the work item and should have a higher level. We don't have any test
+cases that require the bumping in this other cases, but it's convenient
+and causes no harm to bump at every flatten.)
+
+Test case: typecheck/should_fail/T16512a
+
 -}
 
 --------------------
@@ -1887,6 +1968,7 @@ reduce_top_fun_eq :: CtEvidence -> TcTyVar -> (TcCoercion, TcType)
                   -> TcS (StopOrContinue Ct)
 -- We have found an applicable top-level axiom: use it to reduce
 -- Precondition: fsk is not free in rhs_ty
+-- ax_co :: F tys ~ rhs_ty, where F tys is the LHS of the old_ev
 reduce_top_fun_eq old_ev fsk (ax_co, rhs_ty)
   | not (isDerived old_ev)  -- Precondition of shortCutReduction
   , Just (tc, tc_args) <- tcSplitTyConApp_maybe rhs_ty
@@ -1901,7 +1983,11 @@ reduce_top_fun_eq old_ev fsk (ax_co, rhs_ty)
   = ASSERT2( not (fsk `elemVarSet` tyCoVarsOfType rhs_ty)
            , ppr old_ev $$ ppr rhs_ty )
            -- Guaranteed by Note [FunEq occurs-check principle]
-    do { dischargeFunEq old_ev fsk ax_co rhs_ty
+    do { (rhs_xi, flatten_co) <- flatten FM_FlattenAll old_ev rhs_ty
+             -- flatten_co :: rhs_xi ~ rhs_ty
+             -- See Note [Flatten when discharging CFunEqCan]
+       ; let total_co = ax_co `mkTcTransCo` mkTcSymCo flatten_co
+       ; dischargeFunEq old_ev fsk total_co rhs_xi
        ; traceTcS "doTopReactFunEq" $
          vcat [ text "old_ev:" <+> ppr old_ev
               , nest 2 (text ":=") <+> ppr ax_co ]
@@ -1915,16 +2001,16 @@ improveTopFunEqs ev fam_tc args fsk
   = return ()
 
   | otherwise
-  = do { ieqs <- getInertEqs
-       ; fam_envs <- getFamInstEnvs
-       ; eqns <- improve_top_fun_eqs fam_envs fam_tc args
-                                    (lookupFlattenTyVar ieqs fsk)
-       ; traceTcS "improveTopFunEqs" (vcat [ ppr fam_tc <+> ppr args <+> ppr fsk
+  = do { fam_envs <- getFamInstEnvs
+       ; rhs <- rewriteTyVar fsk
+       ; eqns <- improve_top_fun_eqs fam_envs fam_tc args rhs
+       ; traceTcS "improveTopFunEqs" (vcat [ ppr fam_tc <+> ppr args <+> ppr rhs
                                           , ppr eqns ])
        ; mapM_ (unifyDerived loc Nominal) eqns }
   where
-    loc = ctEvLoc ev  -- ToDo: this location is wrong; it should be FunDepOrigin2
-                      -- See #14778
+    loc = bumpCtLocDepth (ctEvLoc ev)
+        -- ToDo: this location is wrong; it should be FunDepOrigin2
+        -- See #14778
 
 improve_top_fun_eqs :: FamInstEnvs
                     -> TyCon -> [TcType] -> TcType
@@ -2127,7 +2213,7 @@ we do *not* need to expand type synonyms because the matcher will do that for us
 Note [Improvement orientation]
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 A very delicate point is the orientation of derived equalities
-arising from injectivity improvement (#12522).  Suppse we have
+arising from injectivity improvement (#12522).  Suppose we have
   type family F x = t | t -> x
   type instance F (a, Int) = (Int, G a)
 where G is injective; and wanted constraints
@@ -2248,9 +2334,8 @@ doTopReactDict inerts work_item@(CDictCan { cc_ev = ev, cc_class = cls
         ; lkup_res <- matchClassInst dflags inerts cls xis dict_loc
         ; case lkup_res of
                OneInst { cir_what = what }
-                  -> do { unless (safeOverlap what) $
-                          insertSafeOverlapFailureTcS work_item
-                        ; when (isWanted ev) $ addSolvedDict ev cls xis
+                  -> do { insertSafeOverlapFailureTcS what work_item
+                        ; addSolvedDict what ev cls xis
                         ; chooseInstance work_item lkup_res }
                _  ->  -- NoInstance or NotSure
                      do { when (isImprovable ev) $
@@ -2421,7 +2506,7 @@ Example, from the OutsideIn(X) paper:
        g :: forall a. Q [a] => [a] -> Int
        g x = wob x
 
-From 'g' we get the impliation constraint:
+From 'g' we get the implication constraint:
             forall a. Q [a] => (Q [beta], R beta [a])
 If we react (Q [beta]) with its top-level axiom, we end up with a
 (P beta), which we have no way of discharging. On the other hand,
@@ -2606,4 +2691,3 @@ matchLocalInst pred loc
         qtv_set = mkVarSet qtvs
         this_unif = mightMatchLater qpred (ctEvLoc ev) pred loc
         (matches, unif) = match_local_inst qcis
-

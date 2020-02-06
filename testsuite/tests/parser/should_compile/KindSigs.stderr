@@ -339,14 +339,12 @@
               {OccName: qux}))
             (Prefix)
             (NoSrcStrict))
-           [(XPat
-             ({ KindSigs.hs:23:5 }
-              (WildPat
-               (NoExtField))))
-           ,(XPat
-             ({ KindSigs.hs:23:7 }
-              (WildPat
-               (NoExtField))))]
+           [({ KindSigs.hs:23:5 }
+             (WildPat
+              (NoExtField)))
+           ,({ KindSigs.hs:23:7 }
+             (WildPat
+              (NoExtField)))]
            (GRHSs
             (NoExtField)
             [({ KindSigs.hs:23:9-12 }

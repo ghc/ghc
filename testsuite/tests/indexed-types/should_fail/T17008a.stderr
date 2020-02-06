@@ -1,0 +1,7 @@
+
+T17008a.hs:11:21: error:
+    • Type variable ‘a1’ is mentioned in the RHS,
+        but not bound on the LHS of the family instance
+        The real LHS (expanding synonyms) is: F @a2 x
+    • In the equations for closed type family ‘F’
+      In the type family declaration for ‘F’

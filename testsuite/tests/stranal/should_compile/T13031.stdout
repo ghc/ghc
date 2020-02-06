@@ -1,4 +1,2 @@
-echo hello
 hello
-'/5playpen/simonpj/HEAD-4/inplace/test   spaces/ghc-stage2' -dcore-lint -dcmm-lint -no-user-package-db -rtsopts  -fno-warn-missed-specialisations -fshow-warning-groups -fdiagnostics-color=never -dno-debug-output -c -fforce-recomp T13031.hs -ddump-simpl | grep 'Arity='
-[GblId, Arity=1, Caf=NoCafRefs]
+[GblId, Arity=1, Unf=OtherCon []]

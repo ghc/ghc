@@ -11,6 +11,8 @@ Haskell. [WDP 94/11])
 {-# LANGUAGE CPP #-}
 {-# LANGUAGE FlexibleContexts #-}
 
+{-# OPTIONS_GHC -Wno-incomplete-record-updates #-}
+
 module IdInfo (
         -- * The IdDetails type
         IdDetails(..), pprIdDetails, coVarDetails, isCoVarDetails,
@@ -54,8 +56,7 @@ module IdInfo (
         isDeadOcc, isStrongLoopBreaker, isWeakLoopBreaker,
         occInfo, setOccInfo,
 
-        InsideLam, OneBranch,
-        insideLam, notInsideLam, oneBranch, notOneBranch,
+        InsideLam(..), OneBranch(..),
 
         TailCallInfo(..),
         tailCallInfo, isAlwaysTailCalled,
@@ -251,7 +252,7 @@ data IdInfo
         oneShotInfo     :: OneShotInfo,
         -- ^ Info about a lambda-bound variable, if the 'Id' is one
         inlinePragInfo  :: InlinePragma,
-        -- ^ Any inline pragma atached to the 'Id'
+        -- ^ Any inline pragma attached to the 'Id'
         occInfo         :: OccInfo,
         -- ^ How the 'Id' occurs in the program
         strictnessInfo  :: StrictSig,
@@ -403,14 +404,14 @@ But we don't do that for instance declarations and so we just treat
 them all uniformly.
 
 The EXCEPTION is PrimOpIds, which do have rules in their IdInfo. That is
-jsut for convenience really.
+just for convenience really.
 
 However, LocalIds may have non-empty RuleInfo.  We treat them
 differently because:
   a) they might be nested, in which case a global table won't work
   b) the RULE might mention free variables, which we use to keep things alive
 
-In TidyPgm, when the LocalId becomes a GlobalId, its RULES are stripped off
+In GHC.Iface.Tidy, when the LocalId becomes a GlobalId, its RULES are stripped off
 and put in the global list.
 -}
 
@@ -426,7 +427,7 @@ data RuleInfo
                         -- ru_fn though.
                         -- Note [Rule dependency info] in OccurAnal
 
--- | Assume that no specilizations exist: always safe
+-- | Assume that no specializations exist: always safe
 emptyRuleInfo :: RuleInfo
 emptyRuleInfo = RuleInfo [] emptyDVarSet
 
@@ -508,12 +509,12 @@ zapLamInfo info@(IdInfo {occInfo = occ, demandInfo = demand})
   where
         -- The "unsafe" occ info is the ones that say I'm not in a lambda
         -- because that might not be true for an unsaturated lambda
-    is_safe_occ occ | isAlwaysTailCalled occ     = False
-    is_safe_occ (OneOcc { occ_in_lam = in_lam }) = in_lam
-    is_safe_occ _other                           = True
+    is_safe_occ occ | isAlwaysTailCalled occ           = False
+    is_safe_occ (OneOcc { occ_in_lam = NotInsideLam }) = False
+    is_safe_occ _other                                 = True
 
     safe_occ = case occ of
-                 OneOcc{} -> occ { occ_in_lam = True
+                 OneOcc{} -> occ { occ_in_lam = IsInsideLam
                                  , occ_tail   = NoTailCallInfo }
                  IAmALoopBreaker{}
                           -> occ { occ_tail   = NoTailCallInfo }

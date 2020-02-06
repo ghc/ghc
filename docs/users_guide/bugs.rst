@@ -26,8 +26,8 @@ Divergence from Haskell 98 and Haskell 2010
 
 By default, GHC mainly aims to behave (mostly) like a Haskell 2010
 compiler, although you can tell it to try to behave like a particular
-version of the language with the :ghc-flag:`-XHaskell98` and
-:ghc-flag:`-XHaskell2010` flags. The known deviations from the standards are
+version of the language with the :extension:`Haskell98` and
+:extension:`Haskell2010` flags. The known deviations from the standards are
 described below. Unless otherwise stated, the deviation applies in Haskell 98,
 Haskell 2010 and the default modes.
 
@@ -45,9 +45,48 @@ Lexical syntax
 -  ``forall`` is always a reserved keyword at the type level, contrary
    to the Haskell Report, which allows type variables to be named ``forall``.
    Note that this does not imply that GHC always enables the
-   :ghc-flag:`-XExplicitForAll` extension. Even without this extension enabled,
+   :extension:`ExplicitForAll` extension. Even without this extension enabled,
    reserving ``forall`` as a keyword has significance. For instance, GHC will
    not parse the type signature ``foo :: forall x``.
+
+-  The ``(!)`` operator, when written in prefix form (preceded by whitespace
+   and not followed by whitespace, as in ``f !x = ...``), is interpreted as a
+   bang pattern, contrary to the Haskell Report, which prescribes to treat ``!``
+   as an operator regardless of surrounding whitespace. Note that this does not
+   imply that GHC always enables :extension:`BangPatterns`. Without the
+   extension, GHC will issue a parse error on ``f !x``, asking to enable the
+   extension.
+
+-  Irrefutable patterns must be written in prefix form::
+
+     f ~a ~b = ...    -- accepted by both GHC and the Haskell Report
+     f ~ a ~ b = ...  -- accepted by the Haskell Report but not GHC
+
+   When written in non-prefix form, ``(~)`` is treated by GHC as a regular
+   infix operator.
+
+   See `GHC Proposal #229 <https://github.com/ghc-proposals/ghc-proposals/blob/master/proposals/0229-whitespace-bang-patterns.rst>`__
+   for the precise rules.
+
+-  Strictness annotations in data declarations must be written in prefix form::
+
+     data T = MkT !Int   -- accepted by both GHC and the Haskell Report
+     data T = MkT ! Int  -- accepted by the Haskell Report but not GHC
+
+   See `GHC Proposal #229 <https://github.com/ghc-proposals/ghc-proposals/blob/master/proposals/0229-whitespace-bang-patterns.rst>`__
+   for the precise rules.
+
+-  As-patterns must not be surrounded by whitespace::
+
+     f p@(x, y, z) = ...    -- accepted by both GHC and the Haskell Report
+     f p @ (x, y, z) = ...  -- accepted by the Haskell Report but not GHC
+
+   When surrounded by whitespace, ``(@)`` is treated by GHC as a regular infix
+   operator.
+
+   See `GHC Proposal #229 <https://github.com/ghc-proposals/ghc-proposals/blob/master/proposals/0229-whitespace-bang-patterns.rst>`__
+   for the precise rules.
+
 
 .. _infelicities-syntax:
 
@@ -68,8 +107,15 @@ Context-free syntax
                  ps <- mapM process args
                  mapM print ps
 
-   This behaviour is controlled by the ``NondecreasingIndentation``
+   This behaviour is controlled by the :extension:`NondecreasingIndentation`
    extension.
+
+.. extension:: NondecreasingIndentation
+    :shortdesc: Allow nested contexts to be at the same indentation level as
+      its enclosing context.
+
+    Allow nested contexts to be at the same indentation level as
+    its enclosing context.
 
 -  GHC doesn't do the fixity resolution in expressions during parsing as
    required by Haskell 98 (but not by Haskell 2010). For example,
@@ -277,7 +323,7 @@ Numbers, basic types, and built-in classes
 ``Read`` class methods
     The ``Read`` class has two extra methods, ``readPrec`` and
     ``readListPrec``, that are not found in the Haskell 2010 since they rely
-    on the ``ReadPrec`` data type, which requires the :ghc-flag:`-XRankNTypes`
+    on the ``ReadPrec`` data type, which requires the :extension:`RankNTypes`
     extension. GHC also derives ``Read`` instances by implementing ``readPrec``
     instead of ``readsPrec``, and relies on a default implementation of
     ``readsPrec`` that is defined in terms of ``readPrec``. GHC adds these two

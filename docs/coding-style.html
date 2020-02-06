@@ -88,7 +88,7 @@ together implement a subsystem which is described by a single external
 header file).
 
 <p><li>We use the following GCC extensions, but surround them with
-<tt>#ifdef __GNUC__</tt>:
+<tt>#if defined(__GNUC__)</tt>:
 
 <ul>
 <li>Function attributes (mostly just <code>no_return</code> and
@@ -169,7 +169,7 @@ Instead, add an appropriate test to the configure.ac script and use
 the result of that test instead.
 
 <pre>
-  #ifdef HAVE_BSD_H
+  #if defined(HAVE_BSD_H)
   // use a BSD library
   #endif
 </pre>
@@ -192,10 +192,10 @@ than trying to find a bug which only shows up when running GHC on
 itself and doesn't manifest itself until 10 seconds after the actual
 cause of the problem.
 
-<p>We put all our debugging code inside <tt>#ifdef DEBUG</tt>.  The
+<p>We put all our debugging code inside <tt>#if defined(DEBUG)</tt>.  The
 general policy is we don't ship code with debugging checks and
 assertions in it, but we do run with those checks in place when
-developing and testing.  Anything inside <tt>#ifdef DEBUG</tt> should
+developing and testing.  Anything inside <tt>#if defined(DEBUG)</tt> should
 not slow down the code by more than a factor of 2.
 
 <p>We also have more expensive "sanity checking" code for hardcore
@@ -332,7 +332,7 @@ can be "polymorphic" as these examples show:
 Inline functions should be "static inline" because:
 <ul>
 <li>
-gcc will delete static inlines if not used or theyre always inlined.
+gcc will delete static inlines if not used or they're always inlined.
 
 <li>
   if they're externed, we could get conflicts between 2 copies of the
@@ -472,7 +472,7 @@ and by keeping it to 80 columns we can ensure that code looks OK on
 everyone's screen.  Long lines are hard to read, and a sign that the
 code needs to be restructured anyway.
 
-<li> When commenting out large chunks of code, use <code>#ifdef 0
+<li> When commenting out large chunks of code, use <code>#if defined(0)
 ... #endif</code> rather than <code>/* ... */</code> because C doesn't
 have nested comments.
 

@@ -55,7 +55,7 @@ ifneq "$(findstring $(TargetArch_CPP), i386 powerpc powerpc64)" ""
 rts_S_SRCS += rts/AdjustorAsm.S
 endif
 # this matches substrings of powerpc64le, including "powerpc" and "powerpc64"
-ifneq "$(findstring $(TargetArch_CPP), powerpc64le)" ""
+ifneq "$(findstring $(TargetArch_CPP), powerpc64le s390x)" ""
 # unregisterised builds use the mini interpreter
 ifneq "$(GhcUnregisterised)" "YES"
 rts_S_SRCS += rts/StgCRunAsm.S
@@ -190,8 +190,12 @@ ifeq "$(NEED_DTRACE_PROBES_OBJ)" "YES"
 rts_$1_DTRACE_OBJS = rts/dist/build/RtsProbes.$$($1_osuf)
 
 $$(rts_$1_DTRACE_OBJS) : $$(rts_$1_OBJS)
-	$(DTRACE) -G -C $$(addprefix -I,$$(GHC_INCLUDE_DIRS)) -DDTRACE -s rts/RtsProbes.d -o \
-		$$@ $$(rts_$1_OBJS)
+	$(DTRACE) -G -C \
+		$$(addprefix -I,$$(GHC_INCLUDE_DIRS)) \
+		-I$$(BUILD_1_INCLUDE_DIR) \
+		-DDTRACE -s rts/RtsProbes.d \
+		-o $$@ \
+		$$(rts_$1_OBJS)
 endif
 endif
 
@@ -333,9 +337,8 @@ WARNING_OPTS += -Wpointer-arith
 WARNING_OPTS += -Wmissing-noreturn
 WARNING_OPTS += -Wnested-externs
 WARNING_OPTS += -Wredundant-decls
-ifeq "$(GccLT46)" "NO"
-WARNING_OPTS += -Wundef
-endif
+# Some gccs annoyingly enable this archaic specimen by default
+WARNING_OPTS += -Wno-aggregate-return
 
 # These ones are hard to avoid:
 #WARNING_OPTS += -Wconversion
@@ -352,7 +355,12 @@ endif
 # support for registerised builds on this arch. -- BL 2010/02/03
 # WARNING_OPTS += -Wcast-align
 
-STANDARD_OPTS += $(addprefix -I,$(GHC_INCLUDE_DIRS)) -Irts -Irts/dist/build
+STANDARD_OPTS += \
+	$(addprefix -I,$(GHC_INCLUDE_DIRS)) \
+	-I$(BUILD_1_INCLUDE_DIR) \
+	-Irts \
+	-Irts/dist/build
+
 # COMPILING_RTS is only used when building Win32 DLL support.
 STANDARD_OPTS += -DCOMPILING_RTS -DFS_NAMESPACE=rts
 
@@ -418,7 +426,7 @@ rts/RtsUtils_CC_OPTS += -DTargetOS=\"$(TargetOS_CPP)\"
 rts/RtsUtils_CC_OPTS += -DTargetVendor=\"$(TargetVendor_CPP)\"
 #
 rts/RtsUtils_CC_OPTS += -DGhcUnregisterised=\"$(GhcUnregisterised)\"
-rts/RtsUtils_CC_OPTS += -DGhcEnableTablesNextToCode=\"$(GhcEnableTablesNextToCode)\"
+rts/RtsUtils_CC_OPTS += -DTablesNextToCode=\"$(TablesNextToCode)\"
 #
 rts/xxhash_CC_OPTS += -O3 -ffast-math -ftree-vectorize
 
@@ -504,7 +512,6 @@ rts/sm/Compact_CC_OPTS += -Wno-inline
 # emits warnings about call-clobbered registers on x86_64
 rts/StgCRun_CC_OPTS += -w
 
-rts/RetainerProfile_CC_OPTS += -w
 # On Windows:
 rts/win32/ConsoleHandler_CC_OPTS += -w
 rts/win32/ThrIOManager_CC_OPTS += -w
@@ -515,7 +522,7 @@ rts/win32/ThrIOManager_CC_OPTS += -w
 # for details
 
 # Without this, thread_obj will not be inlined (at least on x86 with GCC 4.1.0)
-ifneq "$(CC_CLANG_BACKEND)" "1"
+ifneq "$(CcLlvmBackend)" "YES"
 rts/sm/Compact_CC_OPTS += -finline-limit=2500
 endif
 
@@ -539,6 +546,14 @@ rts_PACKAGE_CPP_OPTS += -DFFI_INCLUDE_DIR=
 rts_PACKAGE_CPP_OPTS += -DFFI_LIB_DIR=
 rts_PACKAGE_CPP_OPTS += '-DFFI_LIB="C$(LIBFFI_NAME)"'
 
+endif
+
+ifeq "$(UseLibdw)" "YES"
+rts_PACKAGE_CPP_OPTS += -DLIBDW_INCLUDE_DIR=$(LibdwIncludeDir)
+rts_PACKAGE_CPP_OPTS += -DLIBDW_LIB_DIR=$(LibdwLibDir)
+else
+rts_PACKAGE_CPP_OPTS += -DLIBDW_INCLUDE_DIR=
+rts_PACKAGE_CPP_OPTS += -DLIBDW_LIB_DIR=
 endif
 
 # -----------------------------------------------------------------------------
@@ -569,6 +584,10 @@ endif
 
 $(eval $(call dependencies,rts,dist,1))
 
+$(rts_dist_depfile_c_asm) : $(includes_dist_H_CONFIG)
+$(rts_dist_depfile_c_asm) : $(includes_dist_H_PLATFORM)
+$(rts_dist_depfile_c_asm) : $(includes_dist_H_VERSION)
+
 $(rts_dist_depfile_c_asm) : $(DTRACEPROBES_H)
 ifneq "$(UseSystemLibFFI)" "YES"
 $(rts_dist_depfile_c_asm) : $(libffi_HEADERS)
@@ -595,7 +614,7 @@ DTRACE_FLAGS = -x cpppath=$(CC)
 endif
 
 DTRACEPROBES_SRC = rts/RtsProbes.d
-$(DTRACEPROBES_H): $(DTRACEPROBES_SRC) includes/ghcplatform.h | $$(dir $$@)/.
+$(DTRACEPROBES_H): $(DTRACEPROBES_SRC) $(includes_1_H_PLATFORM) | $$(dir $$@)/.
 	"$(DTRACE)" $(filter -I%,$(rts_CC_OPTS)) -C $(DTRACE_FLAGS) -h -o $@ -s $<
 endif
 
@@ -611,9 +630,9 @@ ifeq "$(HaveLibMingwEx)" "YES"
 rts_PACKAGE_CPP_OPTS += -DHAVE_LIBMINGWEX
 endif
 
-$(eval $(call manual-package-config,rts))
+$(eval $(call manual-package-config,rts,1))
 
-rts/package.conf.inplace : $(includes_H_CONFIG) $(includes_H_PLATFORM)
+rts/dist/package.conf.inplace : $(includes_1_H_CONFIG) $(includes_1_H_PLATFORM) $(includes_1_H_VERSION)
 
 # -----------------------------------------------------------------------------
 # installing

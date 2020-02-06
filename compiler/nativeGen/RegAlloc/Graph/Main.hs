@@ -1,3 +1,4 @@
+{-# LANGUAGE CPP #-}
 {-# LANGUAGE ScopedTypeVariables #-}
 
 -- | Graph coloring register allocator.
@@ -83,7 +84,7 @@ regAlloc dflags regsFree slotsFree slotsCount code cfg
 
 -- | Perform solver iterations for the graph coloring allocator.
 --
---   We extract a register confict graph from the provided cmm code,
+--   We extract a register conflict graph from the provided cmm code,
 --   and try to colour it. If that works then we use the solution rewrite
 --   the code with real hregs. If coloring doesn't work we add spill code
 --   and try to colour it again. After `maxSpinCount` iterations we give up.
@@ -310,7 +311,7 @@ buildGraph code
         -- Add the reg-reg conflicts to the graph.
         let conflictBag         = unionManyBags conflictList
         let graph_conflict
-                = foldrBag graphAddConflictSet Color.initGraph conflictBag
+                = foldr graphAddConflictSet Color.initGraph conflictBag
 
         -- Add the coalescences edges to the graph.
         let moveBag
@@ -318,7 +319,7 @@ buildGraph code
                             (unionManyBags moveList)
 
         let graph_coalesce
-                = foldrBag graphAddCoalesce graph_conflict moveBag
+                = foldr graphAddCoalesce graph_conflict moveBag
 
         return  graph_coalesce
 
@@ -376,8 +377,10 @@ graphAddCoalesce (r1, r2) graph
         , RegReal _             <- r2
         = graph
 
+#if __GLASGOW_HASKELL__ <= 810
         | otherwise
         = panic "graphAddCoalesce"
+#endif
 
 
 -- | Patch registers in code using the reg -> reg mapping in this graph.

@@ -1,5 +1,6 @@
 {-# LANGUAGE CPP #-}
 {-# LANGUAGE FlexibleInstances #-}
+{-# LANGUAGE RankNTypes #-}
 
 -------------------------------------------------------------------------------
 --
@@ -16,6 +17,7 @@
 
 {-# OPTIONS_GHC -fno-cse #-}
 -- -fno-cse is needed for GLOBAL_VAR's to behave properly
+{-# OPTIONS_GHC -Wno-incomplete-uni-patterns #-}
 
 module DynFlags (
         -- * Dynamic flags and associated configuration types
@@ -53,18 +55,18 @@ module DynFlags (
         PackageFlag(..), PackageArg(..), ModRenaming(..),
         packageFlagsChanged,
         IgnorePackageFlag(..), TrustFlag(..),
-        PackageDBFlag(..), PkgConfRef(..),
+        PackageDBFlag(..), PkgDbRef(..),
         Option(..), showOpt,
         DynLibLoader(..),
         fFlags, fLangFlags, xFlags,
         wWarningFlags,
         dynFlagDependencies,
-        tablesNextToCode,
         makeDynFlagsConsistent,
         shouldUseColor,
         shouldUseHexWordLiterals,
         positionIndependent,
         optimisationFlags,
+        setFlagsFromEnvFile,
 
         Way(..), mkBuildTag, wayRTSOnly, addWay', updateWays,
         wayGeneralFlags, wayUnsetGeneralFlags,
@@ -83,7 +85,7 @@ module DynFlags (
         unsafeFlags, unsafeFlagsForInfer,
 
         -- ** LLVM Targets
-        LlvmTarget(..), LlvmTargets, LlvmPasses, LlvmConfig,
+        LlvmTarget(..), LlvmConfig(..),
 
         -- ** System tool settings and locations
         Settings(..),
@@ -94,7 +96,7 @@ module DynFlags (
         sToolDir,
         sTopDir,
         sTmpDir,
-        sSystemPackageConfig,
+        sGlobalPackageDatabasePath,
         sLdSupportsCompactUnwind,
         sLdSupportsBuildId,
         sLdSupportsFilelist,
@@ -150,14 +152,15 @@ module DynFlags (
         settings,
         programName, projectVersion,
         ghcUsagePath, ghciUsagePath, topDir, tmpDir,
-        versionedAppDir,
-        extraGccViaCFlags, systemPackageConfig,
+        versionedAppDir, versionedFilePath,
+        extraGccViaCFlags, globalPackageDatabasePath,
         pgm_L, pgm_P, pgm_F, pgm_c, pgm_a, pgm_l, pgm_dll, pgm_T,
         pgm_windres, pgm_libtool, pgm_ar, pgm_ranlib, pgm_lo, pgm_lc,
         pgm_lcc, pgm_i,
         opt_L, opt_P, opt_F, opt_c, opt_cxx, opt_a, opt_l, opt_i,
         opt_P_signature,
         opt_windres, opt_lo, opt_lc, opt_lcc,
+        tablesNextToCode,
 
         -- ** Manipulating DynFlags
         addPluginModuleName,
@@ -178,7 +181,6 @@ module DynFlags (
         updOptLevel,
         setTmpDir,
         setUnitId,
-        interpretPackageEnv,
         canonicalizeHomeModule,
         canonicalizeModuleIfHome,
 
@@ -219,7 +221,6 @@ module DynFlags (
         -- * SSE and AVX
         isSseEnabled,
         isSse2Enabled,
-        isSse4_1Enabled,
         isSse4_2Enabled,
         isBmiEnabled,
         isBmi2Enabled,
@@ -253,11 +254,10 @@ import GHC.Platform
 import GHC.UniqueSubdir (uniqueSubdir)
 import PlatformConstants
 import Module
-import PackageConfig
 import {-# SOURCE #-} Plugins
 import {-# SOURCE #-} Hooks
 import {-# SOURCE #-} PrelNames ( mAIN )
-import {-# SOURCE #-} Packages (PackageState, emptyPackageState)
+import {-# SOURCE #-} Packages (PackageState, emptyPackageState, PackageDatabase)
 import DriverPhases     ( Phase(..), phaseInputExt )
 import Config
 import CliOption
@@ -283,7 +283,8 @@ import ToolSettings
 import Foreign.C        ( CInt(..) )
 import System.IO.Unsafe ( unsafeDupablePerformIO )
 import {-# SOURCE #-} ErrUtils ( Severity(..), MsgDoc, mkLocMessageAnn
-                               , getCaretDiagnostic )
+                               , getCaretDiagnostic, DumpAction, TraceAction
+                               , defaultDumpAction, defaultTraceAction )
 import Json
 import SysTools.Terminal ( stderrSupportsAnsiColors )
 import SysTools.BaseDir ( expandToolDir, expandTopDir )
@@ -296,7 +297,6 @@ import Control.Monad.Trans.Class
 import Control.Monad.Trans.Writer
 import Control.Monad.Trans.Reader
 import Control.Monad.Trans.Except
-import Control.Exception (throwIO)
 
 import Data.Ord
 import Data.Bits
@@ -310,7 +310,7 @@ import qualified Data.Set as Set
 import Data.Word
 import System.FilePath
 import System.Directory
-import System.Environment (getEnv, lookupEnv)
+import System.Environment (lookupEnv)
 import System.IO
 import System.IO.Error
 import Text.ParserCombinators.ReadP hiding (char)
@@ -322,7 +322,7 @@ import qualified EnumSet
 import GHC.Foreign (withCString, peekCString)
 import qualified GHC.LanguageExtensions as LangExt
 
-#if STAGE >= 2
+#if GHC_STAGE >= 2
 -- used by SHARED_GLOBAL_VAR
 import Foreign (Ptr)
 #endif
@@ -409,10 +409,13 @@ data DumpFlag
    = Opt_D_dump_cmm
    | Opt_D_dump_cmm_from_stg
    | Opt_D_dump_cmm_raw
-   | Opt_D_dump_cmm_verbose
+   | Opt_D_dump_cmm_verbose_by_proc
    -- All of the cmm subflags (there are a lot!) automatically
-   -- enabled if you run -ddump-cmm-verbose
+   -- enabled if you run -ddump-cmm-verbose-by-proc
    -- Each flag corresponds to exact stage of Cmm pipeline.
+   | Opt_D_dump_cmm_verbose
+   -- same as -ddump-cmm-verbose-by-proc but writes each stage
+   -- to a separate file (if used with -ddump-to-file)
    | Opt_D_dump_cmm_cfg
    | Opt_D_dump_cmm_cbe
    | Opt_D_dump_cmm_switch
@@ -424,6 +427,7 @@ data DumpFlag
    | Opt_D_dump_cmm_split
    | Opt_D_dump_cmm_info
    | Opt_D_dump_cmm_cps
+   | Opt_D_dump_srts
    -- end cmm subflags
    | Opt_D_dump_cfg_weights -- ^ Dump the cfg used for block layout.
    | Opt_D_dump_asm
@@ -449,13 +453,13 @@ data DumpFlag
    | Opt_D_dump_parsed_ast
    | Opt_D_dump_rn
    | Opt_D_dump_rn_ast
-   | Opt_D_dump_shape
    | Opt_D_dump_simpl
    | Opt_D_dump_simpl_iterations
    | Opt_D_dump_spec
    | Opt_D_dump_prep
-   | Opt_D_dump_stg
-   | Opt_D_dump_stg_final
+   | Opt_D_dump_stg -- CoreToStg output
+   | Opt_D_dump_stg_unarised -- STG after unarise
+   | Opt_D_dump_stg_final -- STG after stg2stg
    | Opt_D_dump_call_arity
    | Opt_D_dump_exitify
    | Opt_D_dump_stranal
@@ -508,8 +512,9 @@ data GeneralFlag
    | Opt_DoCmmLinting
    | Opt_DoAsmLinting
    | Opt_DoAnnotationLinting
-   | Opt_NoLlvmMangler                 -- hidden flag
-   | Opt_FastLlvm                      -- hidden flag
+   | Opt_NoLlvmMangler                  -- hidden flag
+   | Opt_FastLlvm                       -- hidden flag
+   | Opt_NoTypeableBinds
 
    | Opt_WarnIsError                    -- -Werror; makes warnings fatal
    | Opt_ShowWarnGroups                 -- Show the group a warning belongs to
@@ -520,6 +525,7 @@ data GeneralFlag
    | Opt_PrintExplicitCoercions
    | Opt_PrintExplicitRuntimeReps
    | Opt_PrintEqualityRelations
+   | Opt_PrintAxiomIncomps
    | Opt_PrintUnicodeSyntax
    | Opt_PrintExpandedSynonyms
    | Opt_PrintPotentialInstances
@@ -554,10 +560,11 @@ data GeneralFlag
    | Opt_UnboxSmallStrictFields
    | Opt_DictsCheap
    | Opt_EnableRewriteRules             -- Apply rewrite rules during simplification
+   | Opt_EnableThSpliceWarnings         -- Enable warnings for TH splices
    | Opt_RegsGraph                      -- do graph coloring register allocation
    | Opt_RegsIterative                  -- do iterative coalescing graph coloring register allocation
    | Opt_PedanticBottoms                -- Be picky about how we treat bottom
-   | Opt_LlvmTBAA                       -- Use LLVM TBAA infastructure for improving AA (hidden flag)
+   | Opt_LlvmTBAA                       -- Use LLVM TBAA infrastructure for improving AA (hidden flag)
    | Opt_LlvmFillUndefWithGarbage       -- Testing for undef bugs (hidden flag)
    | Opt_IrrefutableTuples
    | Opt_CmmSink
@@ -651,6 +658,8 @@ data GeneralFlag
    -- response file and as such breaking apart.
    | Opt_SingleLibFolder
    | Opt_KeepCAFs
+   | Opt_KeepGoing
+   | Opt_ByteCode
 
    -- output style opts
    | Opt_ErrorSpans -- Include full span info in error messages,
@@ -917,6 +926,7 @@ data WarningFlag =
    | Opt_WarnUnusedPackages               -- Since 8.10
    | Opt_WarnInferredSafeImports          -- Since 8.10
    | Opt_WarnMissingSafeHaskellMode       -- Since 8.10
+   | Opt_WarnDerivingDefaults
    deriving (Eq, Show, Enum)
 
 data Language = Haskell98 | Haskell2010
@@ -963,16 +973,16 @@ data DynFlags = DynFlags {
   rawSettings       :: [(String, String)],
 
   integerLibrary        :: IntegerLibrary,
-    -- ^ IntegerGMP or IntegerSimple. Set at configure time, but may be overriden
+    -- ^ IntegerGMP or IntegerSimple. Set at configure time, but may be overridden
     --   by GHC-API users. See Note [The integer library] in PrelNames
-  llvmTargets           :: LlvmTargets,
-  llvmPasses            :: LlvmPasses,
+  llvmConfig            :: LlvmConfig,
+    -- ^ N.B. It's important that this field is lazy since we load the LLVM
+    -- configuration lazily. See Note [LLVM Configuration] in SysTools.
   verbosity             :: Int,         -- ^ Verbosity level: see Note [Verbosity levels]
   optLevel              :: Int,         -- ^ Optimisation level
   debugLevel            :: Int,         -- ^ How much debug information to produce
   simplPhases           :: Int,         -- ^ Number of simplifier phases
   maxSimplIterations    :: Int,         -- ^ Max simplifier iterations
-  maxPmCheckIterations  :: Int,         -- ^ Max no iterations for pm checking
   ruleCheck             :: Maybe String,
   inlineCheck           :: Maybe String, -- ^ A prefix to report inlining decisions about
   strictnessBefore      :: [Int],       -- ^ Additional demand analysis
@@ -996,6 +1006,10 @@ data DynFlags = DynFlags {
                                         --   error messages
   maxUncoveredPatterns  :: Int,         -- ^ Maximum number of unmatched patterns to show
                                         --   in non-exhaustiveness warnings
+  maxPmCheckModels      :: Int,         -- ^ Soft limit on the number of models
+                                        --   the pattern match checker checks
+                                        --   a pattern against. A safe guard
+                                        --   against exponential blow-up.
   simplTickFactor       :: Int,         -- ^ Multiplier for simplifier ticks
   specConstrThreshold   :: Maybe Int,   -- ^ Threshold for SpecConstr
   specConstrCount       :: Maybe Int,   -- ^ Max number of specialisations for any one function
@@ -1093,7 +1107,7 @@ data DynFlags = DynFlags {
     -- they don't have to be loaded each time they are needed.  See
     -- 'DynamicLoading.initializePlugins'.
   staticPlugins            :: [StaticPlugin],
-    -- ^ staic plugins which do not need dynamic loading. These plugins are
+    -- ^ static plugins which do not need dynamic loading. These plugins are
     -- intended to be added by GHC API users directly to this list.
     --
     -- To add dynamically loaded plugins through the GHC API see
@@ -1132,11 +1146,23 @@ data DynFlags = DynFlags {
   packageEnv            :: Maybe FilePath,
         -- ^ Filepath to the package environment file (if overriding default)
 
-  -- Package state
-  -- NB. do not modify this field, it is calculated by
-  -- Packages.initPackages
-  pkgDatabase           :: Maybe [(FilePath, [PackageConfig])],
+  pkgDatabase           :: Maybe [PackageDatabase],
+        -- ^ Stack of package databases for the target platform.
+        --
+        -- A "package database" is a misleading name as it is really a Unit
+        -- database (cf Note [The identifier lexicon]).
+        --
+        -- This field is populated by `initPackages`.
+        --
+        -- 'Nothing' means the databases have never been read from disk. If
+        -- `initPackages` is called again, it doesn't reload the databases from
+        -- disk.
+
   pkgState              :: PackageState,
+        -- ^ Consolidated unit database built by 'initPackages' from the package
+        -- databases in 'pkgDatabase' and flags ('-ignore-package', etc.).
+        --
+        -- It also contains mapping from module names to actual Modules.
 
   -- Temporary files
   -- These have to be IORefs, because the defaultCleanupHandler needs to
@@ -1200,6 +1226,8 @@ data DynFlags = DynFlags {
 
   -- | MsgDoc output action: use "ErrUtils" instead of this if you can
   log_action            :: LogAction,
+  dump_action           :: DumpAction,
+  trace_action          :: TraceAction,
   flushOut              :: FlushOut,
   flushErr              :: FlushErr,
 
@@ -1325,12 +1353,15 @@ parseCfgWeights s oldWeights =
             = [s1]
             | (s1,rest) <- break (== ',') s
             = [s1] ++ settings (drop 1 rest)
+#if __GLASGOW_HASKELL__ <= 810
             | otherwise = panic $ "Invalid cfg parameters." ++ exampleString
+#endif
         assignment as
             | (name, _:val) <- break (== '=') as
             = (name,read val)
             | otherwise
             = panic $ "Invalid cfg parameters." ++ exampleString
+
         exampleString = "Example parameters: uncondWeight=1000," ++
             "condBranchWeight=800,switchWeight=0,callWeight=300" ++
             ",likelyCondWeight=900,unlikelyCondWeight=300" ++
@@ -1383,9 +1414,10 @@ data LlvmTarget = LlvmTarget
   , lAttributes :: [String]
   }
 
-type LlvmTargets = [(String, LlvmTarget)]
-type LlvmPasses = [(Int, String)]
-type LlvmConfig = (LlvmTargets, LlvmPasses)
+-- | See Note [LLVM Configuration] in SysTools.
+data LlvmConfig = LlvmConfig { llvmTargets :: [(String, LlvmTarget)]
+                             , llvmPasses  :: [(Int, String)]
+                             }
 
 -----------------------------------------------------------------------------
 -- Accessessors from 'DynFlags'
@@ -1420,8 +1452,8 @@ tmpDir                :: DynFlags -> String
 tmpDir dflags = fileSettings_tmpDir $ fileSettings dflags
 extraGccViaCFlags     :: DynFlags -> [String]
 extraGccViaCFlags dflags = toolSettings_extraGccViaCFlags $ toolSettings dflags
-systemPackageConfig   :: DynFlags -> FilePath
-systemPackageConfig dflags = fileSettings_systemPackageConfig $ fileSettings dflags
+globalPackageDatabasePath   :: DynFlags -> FilePath
+globalPackageDatabasePath dflags = fileSettings_globalPackageDatabase $ fileSettings dflags
 pgm_L                 :: DynFlags -> String
 pgm_L dflags = toolSettings_pgm_L $ toolSettings dflags
 pgm_P                 :: DynFlags -> (String,[Option])
@@ -1491,6 +1523,9 @@ opt_lc dflags= toolSettings_opt_lc $ toolSettings dflags
 opt_i                 :: DynFlags -> [String]
 opt_i dflags= toolSettings_opt_i $ toolSettings dflags
 
+tablesNextToCode :: DynFlags -> Bool
+tablesNextToCode = platformMisc_tablesNextToCode . platformMisc
+
 -- | The directory for this version of ghc in the user's app directory
 -- (typically something like @~/.ghc/x86_64-linux-7.6.3@)
 --
@@ -1501,7 +1536,7 @@ versionedAppDir dflags = do
   return $ appdir </> versionedFilePath dflags
 
 versionedFilePath :: DynFlags -> FilePath
-versionedFilePath dflags = uniqueSubdir $ targetPlatform dflags
+versionedFilePath dflags = uniqueSubdir $ platformMini $ targetPlatform dflags
 
 -- | The target code type of the compilation (if any).
 --
@@ -1624,7 +1659,7 @@ data PackageFlag
   deriving (Eq) -- NB: equality instance is used by packageFlagsChanged
 
 data PackageDBFlag
-  = PackageDB PkgConfRef
+  = PackageDB PkgDbRef
   | NoUserPackageDB
   | NoGlobalPackageDB
   | ClearPackageDBs
@@ -1661,15 +1696,6 @@ defaultObjectTarget :: DynFlags -> HscTarget
 defaultObjectTarget dflags = defaultHscTarget
   (targetPlatform dflags)
   (platformMisc dflags)
-
--- Determines whether we will be compiling
--- info tables that reside just before the entry code, or with an
--- indirection to the entry code.  See TABLES_NEXT_TO_CODE in
--- includes/rts/storage/InfoTables.h.
-tablesNextToCode :: DynFlags -> Bool
-tablesNextToCode dflags =
-    not (platformUnregisterised $ targetPlatform dflags) &&
-    platformMisc_tablesNextToCode (platformMisc dflags)
 
 data DynLibLoader
   = Deployable
@@ -1892,6 +1918,10 @@ initDynFlags dflags = do
                           do str' <- peekCString enc cstr
                              return (str == str'))
                          `catchIOError` \_ -> return False
+ maybeGhcNoUnicodeEnv <- lookupEnv "GHC_NO_UNICODE"
+ let adjustNoUnicode (Just _) = False
+     adjustNoUnicode Nothing = True
+ let useUnicode' = (adjustNoUnicode maybeGhcNoUnicodeEnv) && canUseUnicode
  canUseColor <- stderrSupportsAnsiColors
  maybeGhcColorsEnv  <- lookupEnv "GHC_COLORS"
  maybeGhcColoursEnv <- lookupEnv "GHC_COLOURS"
@@ -1907,7 +1937,7 @@ initDynFlags dflags = do
         dirsToClean    = refDirsToClean,
         generatedDumps = refGeneratedDumps,
         nextWrapperNum = wrapperNum,
-        useUnicode    = canUseUnicode,
+        useUnicode    = useUnicode',
         useColor      = useColor',
         canUseColor   = canUseColor,
         colScheme     = colScheme',
@@ -1918,7 +1948,7 @@ initDynFlags dflags = do
 -- | The normal 'DynFlags'. Note that they are not suitable for use in this form
 -- and must be fully initialized by 'GHC.runGhc' first.
 defaultDynFlags :: Settings -> LlvmConfig -> DynFlags
-defaultDynFlags mySettings (myLlvmTargets, myLlvmPasses) =
+defaultDynFlags mySettings llvmConfig =
 -- See Note [Updating flag description in the User's Guide]
      DynFlags {
         ghcMode                 = CompManager,
@@ -1930,7 +1960,6 @@ defaultDynFlags mySettings (myLlvmTargets, myLlvmPasses) =
         debugLevel              = 0,
         simplPhases             = 2,
         maxSimplIterations      = 4,
-        maxPmCheckIterations    = 2000000,
         ruleCheck               = Nothing,
         inlineCheck             = Nothing,
         binBlobThreshold        = 500000, -- 500K is a good default (see #16190)
@@ -1939,6 +1968,7 @@ defaultDynFlags mySettings (myLlvmTargets, myLlvmPasses) =
         maxRefHoleFits     = Just 6,
         refLevelHoleFits   = Nothing,
         maxUncoveredPatterns    = 4,
+        maxPmCheckModels        = 30,
         simplTickFactor         = 100,
         specConstrThreshold     = Just 2000,
         specConstrCount         = Just 3,
@@ -2015,7 +2045,6 @@ defaultDynFlags mySettings (myLlvmTargets, myLlvmPasses) =
         trustFlags              = [],
         packageEnv              = Nothing,
         pkgDatabase             = Nothing,
-        -- This gets filled in with GHC.setSessionDynFlags
         pkgState                = emptyPackageState,
         ways                    = defaultWays mySettings,
         buildTag                = mkBuildTag (defaultWays mySettings),
@@ -2029,8 +2058,8 @@ defaultDynFlags mySettings (myLlvmTargets, myLlvmPasses) =
         platformConstants = sPlatformConstants mySettings,
         rawSettings = sRawSettings mySettings,
 
-        llvmTargets             = myLlvmTargets,
-        llvmPasses              = myLlvmPasses,
+        -- See Note [LLVM configuration].
+        llvmConfig              = llvmConfig,
 
         -- ghc -M values
         depMakefile       = "Makefile",
@@ -2086,7 +2115,9 @@ defaultDynFlags mySettings (myLlvmTargets, myLlvmPasses) =
 
         -- Logging
 
-        log_action = defaultLogAction,
+        log_action   = defaultLogAction,
+        dump_action  = defaultDumpAction,
+        trace_action = defaultTraceAction,
 
         flushOut = defaultFlushOut,
         flushErr = defaultFlushErr,
@@ -2288,6 +2319,9 @@ flattenExtensionFlags ml = foldr f defaultExtensionFlags
           f (Off f) flags = EnumSet.delete f flags
           defaultExtensionFlags = EnumSet.fromList (languageExtensions ml)
 
+-- | The language extensions implied by the various language variants.
+-- When updating this be sure to update the flag documentation in
+-- @docs/users-guide/glasgow_exts.rst@.
 languageExtensions :: Maybe Language -> [LangExt.Extension]
 
 languageExtensions Nothing
@@ -2356,7 +2390,6 @@ dopt f dflags = (f `EnumSet.member` dumpFlags dflags)
           enableIfVerbose Opt_D_dump_vt_trace               = False
           enableIfVerbose Opt_D_dump_tc                     = False
           enableIfVerbose Opt_D_dump_rn                     = False
-          enableIfVerbose Opt_D_dump_shape                  = False
           enableIfVerbose Opt_D_dump_rn_stats               = False
           enableIfVerbose Opt_D_dump_hi_diffs               = False
           enableIfVerbose Opt_D_verbose_core2core           = False
@@ -2987,7 +3020,7 @@ dynamic_flags_deps = [
                  Nothing -> upd (\d -> d { parMakeCount = Nothing })))
                  -- When the number of parallel builds
                  -- is omitted, it is the same
-                 -- as specifing that the number of
+                 -- as specifying that the number of
                  -- parallel builds is equal to the
                  -- result of getNumProcessors
   , make_ord_flag defFlag "instantiated-with"   (sepArg setUnitIdInsts)
@@ -3003,8 +3036,6 @@ dynamic_flags_deps = [
     ------- ways ---------------------------------------------------------------
   , make_ord_flag defGhcFlag "prof"           (NoArg (addWay WayProf))
   , make_ord_flag defGhcFlag "eventlog"       (NoArg (addWay WayEventLog))
-  , make_dep_flag defGhcFlag "smp"
-      (NoArg $ addWay WayThreaded) "Use -threaded instead"
   , make_ord_flag defGhcFlag "debug"          (NoArg (addWay WayDebug))
   , make_ord_flag defGhcFlag "threaded"       (NoArg (addWay WayThreaded))
 
@@ -3020,7 +3051,7 @@ dynamic_flags_deps = [
   , make_ord_flag defGhcFlag "rdynamic" $ noArg $
 #if defined(linux_HOST_OS)
                               addOptl "-rdynamic"
-#elif defined (mingw32_HOST_OS)
+#elif defined(mingw32_HOST_OS)
                               addOptl "-Wl,--export-all-symbols"
 #else
     -- ignored for compat w/ gcc:
@@ -3103,9 +3134,9 @@ dynamic_flags_deps = [
   , make_ord_flag defGhcFlag "split-sections"
       (noArgM (\dflags -> do
         if platformHasSubsectionsViaSymbols (targetPlatform dflags)
-          then do addErr $
+          then do addWarn $
                     "-split-sections is not useful on this platform " ++
-                    "since it always uses subsections via symbols."
+                    "since it always uses subsections via symbols. Ignoring."
                   return dflags
           else return (gopt_set dflags Opt_SplitSections)))
 
@@ -3304,6 +3335,8 @@ dynamic_flags_deps = [
         (setDumpFlag Opt_D_dump_cmm_raw)
   , make_ord_flag defGhcFlag "ddump-cmm-verbose"
         (setDumpFlag Opt_D_dump_cmm_verbose)
+  , make_ord_flag defGhcFlag "ddump-cmm-verbose-by-proc"
+        (setDumpFlag Opt_D_dump_cmm_verbose_by_proc)
   , make_ord_flag defGhcFlag "ddump-cmm-cfg"
         (setDumpFlag Opt_D_dump_cmm_cfg)
   , make_ord_flag defGhcFlag "ddump-cmm-cbe"
@@ -3326,6 +3359,8 @@ dynamic_flags_deps = [
         (setDumpFlag Opt_D_dump_cmm_info)
   , make_ord_flag defGhcFlag "ddump-cmm-cps"
         (setDumpFlag Opt_D_dump_cmm_cps)
+  , make_ord_flag defGhcFlag "ddump-srts"
+        (setDumpFlag Opt_D_dump_srts)
   , make_ord_flag defGhcFlag "ddump-cfg-weights"
         (setDumpFlag Opt_D_dump_cfg_weights)
   , make_ord_flag defGhcFlag "ddump-core-stats"
@@ -3384,6 +3419,8 @@ dynamic_flags_deps = [
         (setDumpFlag Opt_D_dump_prep)
   , make_ord_flag defGhcFlag "ddump-stg"
         (setDumpFlag Opt_D_dump_stg)
+  , make_ord_flag defGhcFlag "ddump-stg-unarised"
+        (setDumpFlag Opt_D_dump_stg_unarised)
   , make_ord_flag defGhcFlag "ddump-stg-final"
         (setDumpFlag Opt_D_dump_stg_final)
   , make_ord_flag defGhcFlag "ddump-call-arity"
@@ -3408,8 +3445,6 @@ dynamic_flags_deps = [
         (setDumpFlag Opt_D_dump_worker_wrapper)
   , make_ord_flag defGhcFlag "ddump-rn-trace"
         (setDumpFlag Opt_D_dump_rn_trace)
-  , make_ord_flag defGhcFlag "ddump-shape"
-        (setDumpFlag Opt_D_dump_shape)
   , make_ord_flag defGhcFlag "ddump-if-trace"
         (setDumpFlag Opt_D_dump_if_trace)
   , make_ord_flag defGhcFlag "ddump-cs-trace"
@@ -3480,6 +3515,8 @@ dynamic_flags_deps = [
         (NoArg (setGeneralFlag Opt_NoLlvmMangler)) -- hidden flag
   , make_ord_flag defGhcFlag "fast-llvm"
         (NoArg (setGeneralFlag Opt_FastLlvm)) -- hidden flag
+  , make_ord_flag defGhcFlag "dno-typeable-binds"
+        (NoArg (setGeneralFlag Opt_NoTypeableBinds))
   , make_ord_flag defGhcFlag "ddump-debug"
         (setDumpFlag Opt_D_dump_debug)
   , make_ord_flag defGhcFlag "ddump-json"
@@ -3602,12 +3639,16 @@ dynamic_flags_deps = [
             "vectors registers are now passed in registers by default."
   , make_ord_flag defFlag "fmax-uncovered-patterns"
       (intSuffix (\n d -> d { maxUncoveredPatterns = n }))
+  , make_ord_flag defFlag "fmax-pmcheck-models"
+      (intSuffix (\n d -> d { maxPmCheckModels = n }))
   , make_ord_flag defFlag "fsimplifier-phases"
       (intSuffix (\n d -> d { simplPhases = n }))
   , make_ord_flag defFlag "fmax-simplifier-iterations"
       (intSuffix (\n d -> d { maxSimplIterations = n }))
-  , make_ord_flag defFlag "fmax-pmcheck-iterations"
-      (intSuffix (\n d -> d{ maxPmCheckIterations = n }))
+  , (Deprecated, defFlag "fmax-pmcheck-iterations"
+      (intSuffixM (\_ d ->
+       do { deprecate $ "use -fmax-pmcheck-models instead"
+          ; return d })))
   , make_ord_flag defFlag "fsimpl-tick-factor"
       (intSuffix (\n d -> d { simplTickFactor = n }))
   , make_ord_flag defFlag "fspec-constr-threshold"
@@ -3738,7 +3779,10 @@ dynamic_flags_deps = [
 
   , make_ord_flag defFlag "fno-code"         (NoArg ((upd $ \d ->
                   d { ghcLink=NoLink }) >> setTarget HscNothing))
-  , make_ord_flag defFlag "fbyte-code"       (NoArg (setTarget HscInterpreted))
+  , make_ord_flag defFlag "fbyte-code"
+      (noArgM $ \dflags -> do
+        setTarget HscInterpreted
+        pure $ gopt_set dflags Opt_ByteCode)
   , make_ord_flag defFlag "fobject-code"     $ NoArg $ do
       dflags <- liftEwM getCmdLineState
       setTarget $ defaultObjectTarget dflags
@@ -3825,19 +3869,19 @@ package_flags_deps :: [(Deprecation, Flag (CmdLineP DynFlags))]
 package_flags_deps = [
         ------- Packages ----------------------------------------------------
     make_ord_flag defFlag "package-db"
-      (HasArg (addPkgConfRef . PkgConfFile))
-  , make_ord_flag defFlag "clear-package-db"      (NoArg clearPkgConf)
-  , make_ord_flag defFlag "no-global-package-db"  (NoArg removeGlobalPkgConf)
-  , make_ord_flag defFlag "no-user-package-db"    (NoArg removeUserPkgConf)
+      (HasArg (addPkgDbRef . PkgDbPath))
+  , make_ord_flag defFlag "clear-package-db"      (NoArg clearPkgDb)
+  , make_ord_flag defFlag "no-global-package-db"  (NoArg removeGlobalPkgDb)
+  , make_ord_flag defFlag "no-user-package-db"    (NoArg removeUserPkgDb)
   , make_ord_flag defFlag "global-package-db"
-      (NoArg (addPkgConfRef GlobalPkgConf))
+      (NoArg (addPkgDbRef GlobalPkgDb))
   , make_ord_flag defFlag "user-package-db"
-      (NoArg (addPkgConfRef UserPkgConf))
+      (NoArg (addPkgDbRef UserPkgDb))
     -- backwards compat with GHC<=7.4 :
   , make_dep_flag defFlag "package-conf"
-      (HasArg $ addPkgConfRef . PkgConfFile) "Use -package-db instead"
+      (HasArg $ addPkgDbRef . PkgDbPath) "Use -package-db instead"
   , make_dep_flag defFlag "no-user-package-conf"
-      (NoArg removeUserPkgConf)              "Use -no-user-package-db instead"
+      (NoArg removeUserPkgDb)              "Use -no-user-package-db instead"
   , make_ord_flag defGhcFlag "package-name"       (HasArg $ \name -> do
                                       upd (setUnitId name))
                                       -- TODO: Since we JUST deprecated
@@ -4028,6 +4072,7 @@ wWarningFlagsDeps = [
                                          Opt_WarnDeferredOutOfScopeVariables,
   flagSpec "deprecations"                Opt_WarnWarningsDeprecations,
   flagSpec "deprecated-flags"            Opt_WarnDeprecatedFlags,
+  flagSpec "deriving-defaults"           Opt_WarnDerivingDefaults,
   flagSpec "deriving-typeable"           Opt_WarnDerivingTypeable,
   flagSpec "dodgy-exports"               Opt_WarnDodgyExports,
   flagSpec "dodgy-foreign-imports"       Opt_WarnDodgyForeignImports,
@@ -4037,7 +4082,8 @@ wWarningFlagsDeps = [
     "it is subsumed by -Wredundant-constraints",
   flagSpec "redundant-constraints"       Opt_WarnRedundantConstraints,
   flagSpec "duplicate-exports"           Opt_WarnDuplicateExports,
-  flagSpec "hi-shadowing"                Opt_WarnHiShadows,
+  depFlagSpec "hi-shadowing"                Opt_WarnHiShadows
+    "it is not used, and was never implemented",
   flagSpec "inaccessible-code"           Opt_WarnInaccessibleCode,
   flagSpec "implicit-prelude"            Opt_WarnImplicitPrelude,
   depFlagSpec "implicit-kind-vars"       Opt_WarnImplicitKindVars
@@ -4112,7 +4158,8 @@ wWarningFlagsDeps = [
   flagSpec "unrecognised-warning-flags"  Opt_WarnUnrecognisedWarningFlags,
   flagSpec "star-binder"                 Opt_WarnStarBinder,
   flagSpec "star-is-type"                Opt_WarnStarIsType,
-  flagSpec "missing-space-after-bang"    Opt_WarnSpaceAfterBang,
+  depFlagSpec "missing-space-after-bang" Opt_WarnSpaceAfterBang
+    "bang patterns can no longer be written with a space",
   flagSpec "partial-fields"              Opt_WarnPartialFields,
   flagSpec "prepositive-qualified-module"
                                          Opt_WarnPrepositiveQualifiedModule,
@@ -4184,6 +4231,7 @@ fFlagsDeps = [
   flagSpec "eager-blackholing"                Opt_EagerBlackHoling,
   flagSpec "embed-manifest"                   Opt_EmbedManifest,
   flagSpec "enable-rewrite-rules"             Opt_EnableRewriteRules,
+  flagSpec "enable-th-splice-warnings"        Opt_EnableThSpliceWarnings,
   flagSpec "error-spans"                      Opt_ErrorSpans,
   flagSpec "excess-precision"                 Opt_ExcessPrecision,
   flagSpec "expose-all-unfoldings"            Opt_ExposeAllUnfoldings,
@@ -4209,6 +4257,7 @@ fFlagsDeps = [
   flagSpec "ignore-interface-pragmas"         Opt_IgnoreInterfacePragmas,
   flagGhciSpec "implicit-import-qualified"    Opt_ImplicitImportQualified,
   flagSpec "irrefutable-tuples"               Opt_IrrefutableTuples,
+  flagSpec "keep-going"                       Opt_KeepGoing,
   flagSpec "kill-absence"                     Opt_KillAbsence,
   flagSpec "kill-one-shot"                    Opt_KillOneShot,
   flagSpec "late-dmd-anal"                    Opt_LateDmdAnal,
@@ -4232,6 +4281,7 @@ fFlagsDeps = [
   flagSpec "print-explicit-coercions"         Opt_PrintExplicitCoercions,
   flagSpec "print-explicit-runtime-reps"      Opt_PrintExplicitRuntimeReps,
   flagSpec "print-equality-relations"         Opt_PrintEqualityRelations,
+  flagSpec "print-axiom-incomps"              Opt_PrintAxiomIncomps,
   flagSpec "print-unicode-syntax"             Opt_PrintUnicodeSyntax,
   flagSpec "print-expanded-synonyms"          Opt_PrintExpandedSynonyms,
   flagSpec "print-potential-instances"        Opt_PrintPotentialInstances,
@@ -4342,26 +4392,25 @@ supportedLanguages = map (flagSpecName . snd) languageFlagsDeps
 supportedLanguageOverlays :: [String]
 supportedLanguageOverlays = map (flagSpecName . snd) safeHaskellFlagsDeps
 
-supportedExtensions :: [String]
-supportedExtensions = concatMap toFlagSpecNamePair xFlags
+supportedExtensions :: PlatformMini -> [String]
+supportedExtensions targetPlatformMini = concatMap toFlagSpecNamePair xFlags
   where
     toFlagSpecNamePair flg
-#if !defined(HAVE_INTERPRETER)
       -- IMPORTANT! Make sure that `ghc --supported-extensions` omits
       -- "TemplateHaskell"/"QuasiQuotes" when it's known not to work out of the
       -- box. See also GHC #11102 and #16331 for more details about
       -- the rationale
-      | flagSpecFlag flg == LangExt.TemplateHaskell  = [noName]
-      | flagSpecFlag flg == LangExt.QuasiQuotes      = [noName]
-#endif
+      | isAIX, flagSpecFlag flg == LangExt.TemplateHaskell  = [noName]
+      | isAIX, flagSpecFlag flg == LangExt.QuasiQuotes      = [noName]
       | otherwise = [name, noName]
       where
+        isAIX = platformMini_os targetPlatformMini == OSAIX
         noName = "No" ++ name
         name = flagSpecName flg
 
-supportedLanguagesAndExtensions :: [String]
-supportedLanguagesAndExtensions =
-    supportedLanguages ++ supportedLanguageOverlays ++ supportedExtensions
+supportedLanguagesAndExtensions :: PlatformMini -> [String]
+supportedLanguagesAndExtensions targetPlatformMini =
+    supportedLanguages ++ supportedLanguageOverlays ++ supportedExtensions targetPlatformMini
 
 -- | These -X<blah> flags cannot be reversed with -XNo<blah>
 languageFlagsDeps :: [(Deprecation, FlagSpec Language)]
@@ -4517,6 +4566,7 @@ xFlagsDeps = [
   flagSpec' "TemplateHaskell"                 LangExt.TemplateHaskell
                                               checkTemplateHaskellOk,
   flagSpec "TemplateHaskellQuotes"            LangExt.TemplateHaskellQuotes,
+  flagSpec "StandaloneKindSignatures"         LangExt.StandaloneKindSignatures,
   flagSpec "TraditionalRecordSyntax"          LangExt.TraditionalRecordSyntax,
   flagSpec "TransformListComp"                LangExt.TransformListComp,
   flagSpec "TupleSections"                    LangExt.TupleSections,
@@ -4644,6 +4694,9 @@ impliedXFlags
     , (LangExt.TypeInType,       turnOn, LangExt.PolyKinds)
     , (LangExt.TypeInType,       turnOn, LangExt.KindSignatures)
 
+    -- Standalone kind signatures are a replacement for CUSKs.
+    , (LangExt.StandaloneKindSignatures, turnOff, LangExt.CUSKs)
+
     -- AutoDeriveTypeable is not very useful without DeriveDataTypeable
     , (LangExt.AutoDeriveTypeable, turnOn, LangExt.DeriveDataTypeable)
 
@@ -4741,20 +4794,6 @@ optLevelFlags -- see Note [Documenting optimisation flags]
 --   Static Argument Transformation needs investigation. See #9374
     ]
 
-{- Note [Eta-reduction in -O0]
-~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
-#11562 showed an example which tripped an ASSERT in CoreToStg; a
-function was marked as MayHaveCafRefs when in fact it obviously
-didn't.  Reason was:
- * Eta reduction wasn't happening in the simplifier, but it was
-   happening in CorePrep, on
-        $fBla = MkDict (/\a. K a)
- * Result: rhsIsStatic told TidyPgm that $fBla might have CAF refs
-   but the eta-reduced version (MkDict K) obviously doesn't
-Simple solution: just let the simplifier do eta-reduction even in -O0.
-After all, CorePrep does it unconditionally!  Not a big deal, but
-removes an assertion failure. -}
-
 
 -- -----------------------------------------------------------------------------
 -- Standard sets of warning options
@@ -4824,6 +4863,7 @@ standardWarnings -- see Note [Documenting warning flags]
         Opt_WarnPartialTypeSignatures,
         Opt_WarnUnrecognisedPragmas,
         Opt_WarnDuplicateExports,
+        Opt_WarnDerivingDefaults,
         Opt_WarnOverflowedLiterals,
         Opt_WarnEmptyEnumerations,
         Opt_WarnMissingFields,
@@ -5141,7 +5181,7 @@ setDumpFlag' dump_flag
                                              Opt_D_no_debug_output]
 
 forceRecompile :: DynP ()
--- Whenver we -ddump, force recompilation (by switching off the
+-- Whenever we -ddump, force recompilation (by switching off the
 -- recompilation checker), else you don't see the dump! However,
 -- don't switch it off in --make mode, else *everything* gets
 -- recompiled which probably isn't what you want
@@ -5160,26 +5200,26 @@ setVerbosity mb_n = upd (\dfs -> dfs{ verbosity = mb_n `orElse` 3 })
 setDebugLevel :: Maybe Int -> DynP ()
 setDebugLevel mb_n = upd (\dfs -> dfs{ debugLevel = mb_n `orElse` 2 })
 
-data PkgConfRef
-  = GlobalPkgConf
-  | UserPkgConf
-  | PkgConfFile FilePath
+data PkgDbRef
+  = GlobalPkgDb
+  | UserPkgDb
+  | PkgDbPath FilePath
   deriving Eq
 
-addPkgConfRef :: PkgConfRef -> DynP ()
-addPkgConfRef p = upd $ \s ->
+addPkgDbRef :: PkgDbRef -> DynP ()
+addPkgDbRef p = upd $ \s ->
   s { packageDBFlags = PackageDB p : packageDBFlags s }
 
-removeUserPkgConf :: DynP ()
-removeUserPkgConf = upd $ \s ->
+removeUserPkgDb :: DynP ()
+removeUserPkgDb = upd $ \s ->
   s { packageDBFlags = NoUserPackageDB : packageDBFlags s }
 
-removeGlobalPkgConf :: DynP ()
-removeGlobalPkgConf = upd $ \s ->
+removeGlobalPkgDb :: DynP ()
+removeGlobalPkgDb = upd $ \s ->
  s { packageDBFlags = NoGlobalPackageDB : packageDBFlags s }
 
-clearPkgConf :: DynP ()
-clearPkgConf = upd $ \s ->
+clearPkgDb :: DynP ()
+clearPkgDb = upd $ \s ->
   s { packageDBFlags = ClearPackageDBs : packageDBFlags s }
 
 parsePackageFlag :: String                 -- the flag
@@ -5266,170 +5306,6 @@ canonicalizeModuleIfHome dflags mod
                       then canonicalizeHomeModule dflags (moduleName mod)
                       else mod
 
-
--- -----------------------------------------------------------------------------
--- | Find the package environment (if one exists)
---
--- We interpret the package environment as a set of package flags; to be
--- specific, if we find a package environment file like
---
--- > clear-package-db
--- > global-package-db
--- > package-db blah/package.conf.d
--- > package-id id1
--- > package-id id2
---
--- we interpret this as
---
--- > [ -hide-all-packages
--- > , -clear-package-db
--- > , -global-package-db
--- > , -package-db blah/package.conf.d
--- > , -package-id id1
--- > , -package-id id2
--- > ]
---
--- There's also an older syntax alias for package-id, which is just an
--- unadorned package id
---
--- > id1
--- > id2
---
-interpretPackageEnv :: DynFlags -> IO DynFlags
-interpretPackageEnv dflags = do
-    mPkgEnv <- runMaybeT $ msum $ [
-                   getCmdLineArg >>= \env -> msum [
-                       probeNullEnv env
-                     , probeEnvFile env
-                     , probeEnvName env
-                     , cmdLineError env
-                     ]
-                 , getEnvVar >>= \env -> msum [
-                       probeNullEnv env
-                     , probeEnvFile env
-                     , probeEnvName env
-                     , envError     env
-                     ]
-                 , notIfHideAllPackages >> msum [
-                       findLocalEnvFile >>= probeEnvFile
-                     , probeEnvName defaultEnvName
-                     ]
-                 ]
-    case mPkgEnv of
-      Nothing ->
-        -- No environment found. Leave DynFlags unchanged.
-        return dflags
-      Just "-" -> do
-        -- Explicitly disabled environment file. Leave DynFlags unchanged.
-        return dflags
-      Just envfile -> do
-        content <- readFile envfile
-        putLogMsg dflags NoReason SevInfo noSrcSpan
-             (defaultUserStyle dflags)
-             (text ("Loaded package environment from " ++ envfile))
-        let setFlags :: DynP ()
-            setFlags = do
-              setGeneralFlag Opt_HideAllPackages
-              parseEnvFile envfile content
-
-            (_, dflags') = runCmdLine (runEwM setFlags) dflags
-
-        return dflags'
-  where
-    -- Loading environments (by name or by location)
-
-    namedEnvPath :: String -> MaybeT IO FilePath
-    namedEnvPath name = do
-     appdir <- versionedAppDir dflags
-     return $ appdir </> "environments" </> name
-
-    probeEnvName :: String -> MaybeT IO FilePath
-    probeEnvName name = probeEnvFile =<< namedEnvPath name
-
-    probeEnvFile :: FilePath -> MaybeT IO FilePath
-    probeEnvFile path = do
-      guard =<< liftMaybeT (doesFileExist path)
-      return path
-
-    probeNullEnv :: FilePath -> MaybeT IO FilePath
-    probeNullEnv "-" = return "-"
-    probeNullEnv _   = mzero
-
-    parseEnvFile :: FilePath -> String -> DynP ()
-    parseEnvFile envfile = mapM_ parseEntry . lines
-      where
-        parseEntry str = case words str of
-          ("package-db": _)     -> addPkgConfRef (PkgConfFile (envdir </> db))
-            -- relative package dbs are interpreted relative to the env file
-            where envdir = takeDirectory envfile
-                  db     = drop 11 str
-          ["clear-package-db"]  -> clearPkgConf
-          ["global-package-db"] -> addPkgConfRef GlobalPkgConf
-          ["user-package-db"]   -> addPkgConfRef UserPkgConf
-          ["package-id", pkgid] -> exposePackageId pkgid
-          (('-':'-':_):_)       -> return () -- comments
-          -- and the original syntax introduced in 7.10:
-          [pkgid]               -> exposePackageId pkgid
-          []                    -> return ()
-          _                     -> throwGhcException $ CmdLineError $
-                                        "Can't parse environment file entry: "
-                                     ++ envfile ++ ": " ++ str
-
-    -- Various ways to define which environment to use
-
-    getCmdLineArg :: MaybeT IO String
-    getCmdLineArg = MaybeT $ return $ packageEnv dflags
-
-    getEnvVar :: MaybeT IO String
-    getEnvVar = do
-      mvar <- liftMaybeT $ try $ getEnv "GHC_ENVIRONMENT"
-      case mvar of
-        Right var -> return var
-        Left err  -> if isDoesNotExistError err then mzero
-                                                else liftMaybeT $ throwIO err
-
-    notIfHideAllPackages :: MaybeT IO ()
-    notIfHideAllPackages =
-      guard (not (gopt Opt_HideAllPackages dflags))
-
-    defaultEnvName :: String
-    defaultEnvName = "default"
-
-    -- e.g. .ghc.environment.x86_64-linux-7.6.3
-    localEnvFileName :: FilePath
-    localEnvFileName = ".ghc.environment" <.> versionedFilePath dflags
-
-    -- Search for an env file, starting in the current dir and looking upwards.
-    -- Fail if we get to the users home dir or the filesystem root. That is,
-    -- we don't look for an env file in the user's home dir. The user-wide
-    -- env lives in ghc's versionedAppDir/environments/default
-    findLocalEnvFile :: MaybeT IO FilePath
-    findLocalEnvFile = do
-        curdir  <- liftMaybeT getCurrentDirectory
-        homedir <- tryMaybeT getHomeDirectory
-        let probe dir | isDrive dir || dir == homedir
-                      = mzero
-            probe dir = do
-              let file = dir </> localEnvFileName
-              exists <- liftMaybeT (doesFileExist file)
-              if exists
-                then return file
-                else probe (takeDirectory dir)
-        probe curdir
-
-    -- Error reporting
-
-    cmdLineError :: String -> MaybeT IO a
-    cmdLineError env = liftMaybeT . throwGhcExceptionIO . CmdLineError $
-      "Package environment " ++ show env ++ " not found"
-
-    envError :: String -> MaybeT IO a
-    envError env = liftMaybeT . throwGhcExceptionIO . CmdLineError $
-         "Package environment "
-      ++ show env
-      ++ " (specified in GHC_ENVIRONMENT) not found"
-
-
 -- If we're linking a binary, then only targets that produce object
 -- code are allowed (requests for other target types are ignored).
 setTarget :: HscTarget -> DynP ()
@@ -5477,6 +5353,35 @@ setMainIs arg
 
 addLdInputs :: Option -> DynFlags -> DynFlags
 addLdInputs p dflags = dflags{ldInputs = ldInputs dflags ++ [p]}
+
+-- -----------------------------------------------------------------------------
+-- Load dynflags from environment files.
+
+setFlagsFromEnvFile :: FilePath -> String -> DynP ()
+setFlagsFromEnvFile envfile content = do
+  setGeneralFlag Opt_HideAllPackages
+  parseEnvFile envfile content
+
+parseEnvFile :: FilePath -> String -> DynP ()
+parseEnvFile envfile = mapM_ parseEntry . lines
+  where
+    parseEntry str = case words str of
+      ("package-db": _)     -> addPkgDbRef (PkgDbPath (envdir </> db))
+        -- relative package dbs are interpreted relative to the env file
+        where envdir = takeDirectory envfile
+              db     = drop 11 str
+      ["clear-package-db"]  -> clearPkgDb
+      ["global-package-db"] -> addPkgDbRef GlobalPkgDb
+      ["user-package-db"]   -> addPkgDbRef UserPkgDb
+      ["package-id", pkgid] -> exposePackageId pkgid
+      (('-':'-':_):_)       -> return () -- comments
+      -- and the original syntax introduced in 7.10:
+      [pkgid]               -> exposePackageId pkgid
+      []                    -> return ()
+      _                     -> throwGhcException $ CmdLineError $
+                                    "Can't parse environment file entry: "
+                                 ++ envfile ++ ": " ++ str
+
 
 -----------------------------------------------------------------------------
 -- Paths & Libraries
@@ -5694,10 +5599,10 @@ compilerInfo dflags
        ("GHC Dynamic",                 showBool dynamicGhc),
        -- Whether or not GHC was compiled using -prof
        ("GHC Profiled",                showBool rtsIsProfiled),
-       ("Debug on",                    show debugIsOn),
+       ("Debug on",                    showBool debugIsOn),
        ("LibDir",                      topDir dflags),
        -- The path of the global package database used by GHC
-       ("Global Package DB",           systemPackageConfig dflags)
+       ("Global Package DB",           globalPackageDatabasePath dflags)
       ]
   where
     showBool True  = "YES"
@@ -5728,19 +5633,16 @@ mAX_PTR_TAG = tAG_MASK
 tARGET_MIN_INT, tARGET_MAX_INT, tARGET_MAX_WORD :: DynFlags -> Integer
 tARGET_MIN_INT dflags
     = case platformWordSize (targetPlatform dflags) of
-      4 -> toInteger (minBound :: Int32)
-      8 -> toInteger (minBound :: Int64)
-      w -> panic ("tARGET_MIN_INT: Unknown platformWordSize: " ++ show w)
+      PW4 -> toInteger (minBound :: Int32)
+      PW8 -> toInteger (minBound :: Int64)
 tARGET_MAX_INT dflags
     = case platformWordSize (targetPlatform dflags) of
-      4 -> toInteger (maxBound :: Int32)
-      8 -> toInteger (maxBound :: Int64)
-      w -> panic ("tARGET_MAX_INT: Unknown platformWordSize: " ++ show w)
+      PW4 -> toInteger (maxBound :: Int32)
+      PW8 -> toInteger (maxBound :: Int64)
 tARGET_MAX_WORD dflags
     = case platformWordSize (targetPlatform dflags) of
-      4 -> toInteger (maxBound :: Word32)
-      8 -> toInteger (maxBound :: Word64)
-      w -> panic ("tARGET_MAX_WORD: Unknown platformWordSize: " ++ show w)
+      PW4 -> toInteger (maxBound :: Word32)
+      PW8 -> toInteger (maxBound :: Word64)
 
 
 {- -----------------------------------------------------------------------------
@@ -5847,13 +5749,12 @@ makeDynFlagsConsistent dflags
 -- initialized.
 defaultGlobalDynFlags :: DynFlags
 defaultGlobalDynFlags =
-    (defaultDynFlags settings (llvmTargets, llvmPasses)) { verbosity = 2 }
+    (defaultDynFlags settings llvmConfig) { verbosity = 2 }
   where
     settings = panic "v_unsafeGlobalDynFlags: settings not initialised"
-    llvmTargets = panic "v_unsafeGlobalDynFlags: llvmTargets not initialised"
-    llvmPasses = panic "v_unsafeGlobalDynFlags: llvmPasses not initialised"
+    llvmConfig = panic "v_unsafeGlobalDynFlags: llvmConfig not initialised"
 
-#if STAGE < 2
+#if GHC_STAGE < 2
 GLOBAL_VAR(v_unsafeGlobalDynFlags, defaultGlobalDynFlags, DynFlags)
 #else
 SHARED_GLOBAL_VAR( v_unsafeGlobalDynFlags
@@ -5903,8 +5804,6 @@ isSse2Enabled dflags = case platformArch (targetPlatform dflags) of
     ArchX86    -> True
     _          -> False
 
-isSse4_1Enabled :: DynFlags -> Bool
-isSse4_1Enabled dflags = sseVersion dflags >= Just SSE4
 
 isSse4_2Enabled :: DynFlags -> Bool
 isSse4_2Enabled dflags = sseVersion dflags >= Just SSE42

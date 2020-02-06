@@ -34,8 +34,14 @@ instance Ix key => Mark (ST s) (STUArray s key Bool) key where
      seen  s   = liftM (map fst . filter snd) (getAssocs s)
 
 -- traversing the hull suc^*(start) with loop detection
+-- trav :: forall f f2 m store key.
+--        (Foldable f, Foldable f2, Mark m store key, Monad m)
+--     => (key -> f key) -> f2 key -> (key, key) -> m store
 trav suc start i = new i >>= \ c -> mapM_ (compo c) start >> return c
-     where compo c x = markQ c x >>= flip unless (visit c x)
+     where -- compo :: (Monad m, Mark m store' key) => store' -> key -> m ()
+           compo c x = markQ c x >>= flip unless (visit c x)
+
+           -- visit :: (Monad m, Mark m store' key) => store' -> key -> m ()
            visit c x = mark c x >> mapM_ (compo c) (suc x)
 
 -- sample graph

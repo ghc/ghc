@@ -1,6 +1,7 @@
 {-# LANGUAGE TypeFamilyDependencies #-}
 {-# LANGUAGE FlexibleInstances #-}
 {-# LANGUAGE AllowAmbiguousTypes #-}
+{-# LANGUAGE UndecidableInstances #-}
 
 module T12522 where
 

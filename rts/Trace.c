@@ -30,6 +30,7 @@
 // events
 int TRACE_sched;
 int TRACE_gc;
+int TRACE_nonmoving_gc;
 int TRACE_spark_sampled;
 int TRACE_spark_full;
 int TRACE_user;
@@ -39,21 +40,12 @@ int TRACE_cap;
 static Mutex trace_utx;
 #endif
 
-static bool eventlog_enabled;
-
 /* ---------------------------------------------------------------------------
    Starting up / shutting down the tracing facilities
  --------------------------------------------------------------------------- */
 
-static const EventLogWriter *getEventLogWriter(void)
-{
-    return rtsConfig.eventlog_writer;
-}
-
 void initTracing (void)
 {
-    const EventLogWriter *eventlog_writer = getEventLogWriter();
-
 #if defined(THREADED_RTS)
     initMutex(&trace_utx);
 #endif
@@ -71,6 +63,9 @@ void initTracing (void)
     if (TRACE_gc && RtsFlags.GcFlags.giveStats == NO_GC_STATS) {
         RtsFlags.GcFlags.giveStats = COLLECT_GC_STATS;
     }
+
+    TRACE_nonmoving_gc =
+        RtsFlags.TraceFlags.nonmoving_gc;
 
     TRACE_spark_sampled =
         RtsFlags.TraceFlags.sparks_sampled;
@@ -91,15 +86,14 @@ void initTracing (void)
         TRACE_spark_full ||
         TRACE_user;
 
-    eventlog_enabled = RtsFlags.TraceFlags.tracing == TRACE_EVENTLOG &&
-                        eventlog_writer != NULL;
-
     /* Note: we can have any of the TRACE_* flags turned on even when
        eventlog_enabled is off. In the DEBUG way we may be tracing to stderr.
      */
+    initEventLogging();
 
-    if (eventlog_enabled) {
-        initEventLogging(eventlog_writer);
+    if (RtsFlags.TraceFlags.tracing == TRACE_EVENTLOG
+            && rtsConfig.eventlog_writer != NULL) {
+        startEventLogging(rtsConfig.eventlog_writer);
     }
 }
 
@@ -117,17 +111,10 @@ void freeTracing (void)
     }
 }
 
+// Used to reset tracing in a forked child
 void resetTracing (void)
 {
-    const EventLogWriter *eventlog_writer;
-    eventlog_writer = getEventLogWriter();
-
-    if (eventlog_enabled) {
-        abortEventLogging(); // abort eventlog inherited from parent
-        if (eventlog_writer != NULL) {
-            initEventLogging(eventlog_writer); // child starts its own eventlog
-        }
-    }
+    restartEventLogging();
 }
 
 void flushTrace (void)
@@ -458,7 +445,7 @@ void traceOSProcessInfo_(void) {
                         CAPSET_OSPROCESS_DEFAULT,
                         getpid());
 
-#if !defined (mingw32_HOST_OS)
+#if !defined(mingw32_HOST_OS)
 /* Windows has no strong concept of process hierarchy, so no getppid().
  * In any case, this trace event is mainly useful for tracing programs
  * that use 'forkProcess' which Windows doesn't support anyway.
@@ -615,6 +602,12 @@ void traceHeapProfBegin(StgWord8 profile_id)
         postHeapProfBegin(profile_id);
     }
 }
+void traceHeapBioProfSampleBegin(StgInt era, StgWord64 time)
+{
+    if (eventlog_enabled) {
+        postHeapBioProfSampleBegin(era, time);
+    }
+}
 
 void traceHeapProfSampleBegin(StgInt era)
 {
@@ -650,11 +643,27 @@ void traceHeapProfCostCentre(StgWord32 ccID,
     }
 }
 
+// This one is for .hp samples
 void traceHeapProfSampleCostCentre(StgWord8 profile_id,
                                    CostCentreStack *stack, StgWord residency)
 {
     if (eventlog_enabled) {
         postHeapProfSampleCostCentre(profile_id, stack, residency);
+    }
+}
+
+// This one is for .prof samples
+void traceProfSampleCostCentre(Capability *cap,
+                               CostCentreStack *stack, StgWord tick)
+{
+    if (eventlog_enabled) {
+        postProfSampleCostCentre(cap, stack, tick);
+    }
+}
+void traceProfBegin(void)
+{
+    if (eventlog_enabled) {
+        postProfBegin();
     }
 }
 #endif
@@ -794,6 +803,55 @@ void traceThreadLabel_(Capability *cap,
     {
         postThreadLabel(cap, tso->id, label);
     }
+}
+
+void traceConcMarkBegin()
+{
+    if (eventlog_enabled)
+        postEventNoCap(EVENT_CONC_MARK_BEGIN);
+}
+
+void traceConcMarkEnd(StgWord32 marked_obj_count)
+{
+    if (eventlog_enabled)
+        postConcMarkEnd(marked_obj_count);
+}
+
+void traceConcSyncBegin()
+{
+    if (eventlog_enabled)
+        postEventNoCap(EVENT_CONC_SYNC_BEGIN);
+}
+
+void traceConcSyncEnd()
+{
+    if (eventlog_enabled)
+        postEventNoCap(EVENT_CONC_SYNC_END);
+}
+
+void traceConcSweepBegin()
+{
+    if (eventlog_enabled)
+        postEventNoCap(EVENT_CONC_SWEEP_BEGIN);
+}
+
+void traceConcSweepEnd()
+{
+    if (eventlog_enabled)
+        postEventNoCap(EVENT_CONC_SWEEP_END);
+}
+
+void traceConcUpdRemSetFlush(Capability *cap)
+{
+    if (eventlog_enabled)
+        postConcUpdRemSetFlush(cap);
+}
+
+void traceNonmovingHeapCensus(uint32_t log_blk_size,
+                              const struct NonmovingAllocCensus *census)
+{
+    if (eventlog_enabled && TRACE_nonmoving_gc)
+        postNonmovingHeapCensus(log_blk_size, census);
 }
 
 void traceThreadStatus_ (StgTSO *tso USED_IF_DEBUG)

@@ -1,0 +1,6 @@
+
+T17218.hs:11:1: warning: [-Wincomplete-patterns (in -Wextra)]
+    Pattern match(es) are non-exhaustive
+    In an equation for ‘f’:
+        Patterns not matched:
+            C

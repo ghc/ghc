@@ -12,7 +12,7 @@ i1 :: T a -> a -> Int
 i1 t y = (\t1 y1 -> case t1 of K -> y1) t y
 
 -- No type signature; should not type-check,
--- because we can't unify under the equalty constraint for K
+-- because we can't unify under the equality constraint for K
 i1b t y = (\t1 y1 -> case t1 of K -> y1) t y
 
 i2 :: T a -> a -> Int

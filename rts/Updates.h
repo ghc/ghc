@@ -50,6 +50,9 @@
                                                                 \
     prim_write_barrier;                                         \
     OVERWRITING_CLOSURE(p1);                                    \
+    IF_NONMOVING_WRITE_BARRIER_ENABLED {                        \
+      ccall updateRemembSetPushThunk_(BaseReg, p1 "ptr");       \
+    }                                                           \
     StgInd_indirectee(p1) = p2;                                 \
     prim_write_barrier;                                         \
     SET_INFO(p1, stg_BLACKHOLE_info);                           \
@@ -62,7 +65,7 @@
     } else {                                                    \
       TICK_UPD_NEW_IND();                                       \
       and_then;                                                 \
-  }
+    }
 
 #else /* !CMINUSMINUS */
 
@@ -78,6 +81,9 @@ INLINE_HEADER void updateWithIndirection (Capability *cap,
     /* See Note [Heap memory barriers] in SMP.h */
     write_barrier();
     OVERWRITING_CLOSURE(p1);
+    IF_NONMOVING_WRITE_BARRIER_ENABLED {
+        updateRemembSetPushThunk(cap, (StgThunk*)p1);
+    }
     ((StgInd *)p1)->indirectee = p2;
     write_barrier();
     SET_INFO(p1, &stg_BLACKHOLE_info);

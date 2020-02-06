@@ -93,7 +93,7 @@ currently supported: `default`, `quick`, `quickest`, `perf`, `prof`, `devel1`
 and `devel2`. As an example, the `quickest` flavour adds `-O0` flag to all GHC
 invocations and builds libraries only in the `vanilla` way, which speeds up
 builds by 3-4x. Build flavours are documented
-[here](https://github.com/snowleopard/hadrian/blob/master/doc/flavours.md).
+[here](https://gitlab.haskell.org/ghc/ghc/blob/master/hadrian/doc/flavours.md).
 
 * `--freeze1`: freeze Stage1 GHC, i.e. do not rebuild it even if some of its
 source files are out-of-date. This allows to significantly reduce the rebuild
@@ -104,10 +104,9 @@ simply drop the `--freeze1` flag and Hadrian will rebuild all out-of-date files.
 * `--integer-simple`: build GHC using the `integer-simple` integer library
 (instead of `integer-gmp`).
 
-* `--progress-colour=MODE`: choose whether to use colours when printing build
-progress info. There are three settings: `never` (do not use colours), `auto`
-(attempt to detect whether the console supports colours; this is the default
-setting), and `always` (use colours).
+* `--color` and `--no-color`: choose whether to use colors when printing build
+progress info. By default, Hadrian tries to determine if the terminal supports
+colored output, and proceeds accordingly.
 
 * `--progress-info=STYLE`: choose how build progress info is printed. There are
 four settings: `none`, `brief` (one line per build command; this is the default
@@ -121,6 +120,11 @@ messages by Shake oracles.
 build to check that the build system is well formed. Note that the Lint check
 currently fails under certain circumstances, as discussed in
 [this ticket](https://gitlab.haskell.org/ghc/ghc/issues/15971).
+
+#### Expressions
+
+Hadrian expressions are used extensively for specifying build settings. For an
+explanation of how they work, see the [documentation](doc/expressions.md).
 
 #### User settings
 
@@ -178,6 +182,14 @@ The first time this command is run hadrian will need to compile a few dependenci
 which will take 1-2 minutes. Loading GHC into GHCi itself takes about 30 seconds and
 reloads after that take in the region of 1-5 seconds depending on which modules
 need to be recompiled.
+
+You can further speed up the script by passing `-j` as an argument. This will
+have the effect of passing `-j` to both hadrian and ghci so they will both
+build in parallel.
+
+```
+./hadrian/ghci.sh -j8
+```
 
 #### Testing
 
@@ -274,20 +286,20 @@ Here are a few simple suggestions that might help you fix the build:
 
 * If Hadrian fails with the message
   `Configuration file hadrian/cfg/system.config is missing`, you have probably
-  forgotten to pass the `--configure` flag during the first build. 
+  forgotten to pass the `--configure` flag during the first build.
 
-* With the `--configure` (`-c`) flag, Hadrian sometimes fetches a wrong 
+* With the `--configure` (`-c`) flag, Hadrian sometimes fetches a wrong
   Happy saying something like: `HappyTemplate-arrays-coerce: openFile: does not exist`
-  (as mentioned [here](https://github.com/haskell/cabal/issues/5867)), in 
+  (as mentioned [here](https://github.com/haskell/cabal/issues/5867)), in
   which case you might be better off running `./configure` manually before Hadrian.
 
-* The call to `build test` sometimes fails with 
-  `libCffi_p.a: copyFile: does not exist` (as noticed 
-  [here](https://gitlab.haskell.org/ghc/ghc/issues/15877#note_166739)). 
-  The workaround is to `rm _build/stage1/libffi/build/inst/lib/libffi.a` and 
+* The call to `build test` sometimes fails with
+  `libCffi_p.a: copyFile: does not exist` (as noticed
+  [here](https://gitlab.haskell.org/ghc/ghc/issues/15877#note_166739)).
+  The workaround is to `rm _build/stage1/libffi/build/inst/lib/libffi.a` and
   start over.
 
-If you need help in debugging Hadrian, read the 
+If you need help in debugging Hadrian, read the
 [wiki](https://github.com/snowleopard/hadrian/wiki)
 and Shake's [debugging tutorial](https://shakebuild.com/debugging).
 If nothing helps, don't hesitate to create a GHC issue.
@@ -295,7 +307,6 @@ If nothing helps, don't hesitate to create a GHC issue.
 Current limitations
 -------------------
 The new build system still lacks many important features:
-* Validation is not implemented: [#187][validation-issue].
 * Dynamic linking on Windows is not supported [#343][dynamic-windows-issue].
 
 How to contribute
@@ -333,7 +344,6 @@ projects), as well as Well-Typed.
 [ghc-windows-quick-build]: https://gitlab.haskell.org/ghc/ghc/wikis/building/preparation/windows#AQuickBuild
 [windows-build]: https://gitlab.haskell.org/ghc/ghc/blob/master/hadrian/doc/windows.md
 [test-issue]: https://github.com/snowleopard/hadrian/issues/197
-[validation-issue]: https://github.com/snowleopard/hadrian/issues/187
 [dynamic-windows-issue]: https://github.com/snowleopard/hadrian/issues/343
 [bin-dist-issue]: https://github.com/snowleopard/hadrian/issues/219
 [contributors]: https://github.com/snowleopard/hadrian/graphs/contributors

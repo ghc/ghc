@@ -1,6 +1,6 @@
 {-# OPTIONS_GHC -fwarn-unused-matches #-}
 {-# LANGUAGE MonadComprehensions, ParallelListComp #-}
--- Test for parallel list comp should work for monad comp aswell:
+-- Test for parallel list comp should work for monad comp as well:
 --
 -- GHC 6.4 erroneously reported that the 
 -- bindings for q and z were unused

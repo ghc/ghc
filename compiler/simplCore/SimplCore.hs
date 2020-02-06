@@ -36,7 +36,7 @@ import FloatIn          ( floatInwards )
 import FloatOut         ( floatOutwards )
 import FamInstEnv
 import Id
-import ErrUtils         ( withTiming )
+import ErrUtils         ( withTiming, withTimingD, DumpFormat (..) )
 import BasicTypes       ( CompilerPhase(..), isDefaultInlinePragma, defaultInlinePragma )
 import VarSet
 import VarEnv
@@ -72,13 +72,13 @@ core2core hsc_env guts@(ModGuts { mg_module  = mod
                                 , mg_loc     = loc
                                 , mg_deps    = deps
                                 , mg_rdr_env = rdr_env })
-  = do { us <- mkSplitUniqSupply 's'
-       -- make sure all plugins are loaded
+  = do { -- make sure all plugins are loaded
 
        ; let builtin_passes = getCoreToDo dflags
              orph_mods = mkModuleSet (mod : dep_orphs deps)
+             uniq_mask = 's'
        ;
-       ; (guts2, stats) <- runCoreM hsc_env hpt_rule_base us mod
+       ; (guts2, stats) <- runCoreM hsc_env hpt_rule_base uniq_mask mod
                                     orph_mods print_unqual loc $
                            do { hsc_env' <- getHscEnv
                               ; dflags' <- liftIO $ initializePlugins hsc_env'
@@ -90,6 +90,7 @@ core2core hsc_env guts@(ModGuts { mg_module  = mod
 
        ; Err.dumpIfSet_dyn dflags Opt_D_dump_simpl_stats
              "Grand total simplifier statistics"
+             FormatText
              (pprSimplCount stats)
 
        ; return guts2 }
@@ -410,10 +411,9 @@ runCorePasses passes guts
   where
     do_pass guts CoreDoNothing = return guts
     do_pass guts (CoreDoPasses ps) = runCorePasses ps guts
-    do_pass guts pass
-       = withTiming getDynFlags
-                    (ppr pass <+> brackets (ppr mod))
-                    (const ()) $ do
+    do_pass guts pass = do
+       withTimingD (ppr pass <+> brackets (ppr mod))
+                   (const ()) $ do
             { guts' <- lintAnnots (ppr pass) (doCorePass pass) guts
             ; endPass pass (mg_binds guts') (mg_rules guts')
             ; return guts' }
@@ -462,11 +462,7 @@ doCorePass (CoreDoRuleCheck phase pat)  = ruleCheckPass phase pat
 doCorePass CoreDoNothing                = return
 doCorePass (CoreDoPasses passes)        = runCorePasses passes
 
-#if defined(HAVE_INTERPRETER)
 doCorePass (CoreDoPluginPass _ pass) = {-# SCC "Plugin" #-} pass
-#else
-doCorePass pass@CoreDoPluginPass {}  = pprPanic "doCorePass" (ppr pass)
-#endif
 
 doCorePass pass@CoreDesugar          = pprPanic "doCorePass" (ppr pass)
 doCorePass pass@CoreDesugarOpt       = pprPanic "doCorePass" (ppr pass)
@@ -488,9 +484,8 @@ printCore dflags binds
 
 ruleCheckPass :: CompilerPhase -> String -> ModGuts -> CoreM ModGuts
 ruleCheckPass current_phase pat guts =
-    withTiming getDynFlags
-               (text "RuleCheck"<+>brackets (ppr $ mg_module guts))
-               (const ()) $ do
+    withTimingD (text "RuleCheck"<+>brackets (ppr $ mg_module guts))
+                (const ()) $ do
     { rb <- getRuleBase
     ; dflags <- getDynFlags
     ; vis_orphs <- getVisibleOrphanMods
@@ -568,7 +563,7 @@ simplifyExpr :: DynFlags -- includes spec of what core-to-core passes to do
 --
 -- Also used by Template Haskell
 simplifyExpr dflags expr
-  = withTiming (pure dflags) (text "Simplify [expr]") (const ()) $
+  = withTiming dflags (text "Simplify [expr]") (const ()) $
     do  {
         ; us <-  mkSplitUniqSupply 's'
 
@@ -582,6 +577,7 @@ simplifyExpr dflags expr
                   "Simplifier statistics" (pprSimplCount counts)
 
         ; Err.dumpIfSet_dyn dflags Opt_D_dump_simpl "Simplified expression"
+                        FormatCore
                         (pprCoreExpr expr')
 
         ; return expr'
@@ -694,6 +690,7 @@ simplifyPgmIO pass@(CoreDoSimplify max_iterations mode)
                                      binds
                } ;
            Err.dumpIfSet_dyn dflags Opt_D_dump_occur_anal "Occurrence analysis"
+                     FormatCore
                      (pprCoreBindings tagged_binds);
 
                 -- Get any new rules, and extend the rule base
@@ -746,7 +743,9 @@ simplifyPgmIO pass@(CoreDoSimplify max_iterations mode)
                 -- Loop
            do_iteration us2 (iteration_no + 1) (counts1:counts_so_far) binds2 rules1
            } }
+#if __GLASGOW_HASKELL__ <= 810
       | otherwise = panic "do_iteration"
+#endif
       where
         (us1, us2) = splitUniqSupply us
 
@@ -884,7 +883,7 @@ Hence,there's a possibility of leaving unchanged something like this:
 By the time we've thrown away the types in STG land this
 could be eliminated.  But I don't think it's very common
 and it's dangerous to do this fiddling in STG land
-because we might elminate a binding that's mentioned in the
+because we might eliminate a binding that's mentioned in the
 unfolding for something.
 
 Note [Indirection zapping and ticks]

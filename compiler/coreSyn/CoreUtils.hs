@@ -8,13 +8,13 @@ Utility functions on @Core@ syntax
 
 {-# LANGUAGE CPP #-}
 
--- | Commonly useful utilites for manipulating the Core language
+-- | Commonly useful utilities for manipulating the Core language
 module CoreUtils (
         -- * Constructing expressions
         mkCast,
         mkTick, mkTicks, mkTickNoHNF, tickHNFArgs,
         bindNonRec, needsCaseBinding,
-        mkAltExpr,
+        mkAltExpr, mkDefaultCase, mkSingleAltCase,
 
         -- * Taking expressions apart
         findDefault, addDefault, findAlt, isDefaultAlt,
@@ -28,7 +28,7 @@ module CoreUtils (
         exprIsCheap, exprIsExpandable, exprIsCheapX, CheapAppFun,
         exprIsHNF, exprOkForSpeculation, exprOkForSideEffects, exprIsWorkFree,
         exprIsBig, exprIsConLike,
-        rhsIsStatic, isCheapApp, isExpandableApp,
+        isCheapApp, isExpandableApp,
         exprIsTickedString, exprIsTickedString_maybe,
         exprIsTopLevelBindable,
         altsAreExhaustive,
@@ -77,6 +77,7 @@ import Id
 import IdInfo
 import PrelNames( absentErrorIdKey )
 import Type
+import Predicate
 import TyCoRep( TyCoBinder(..), TyBinder )
 import Coercion
 import TyCon
@@ -88,7 +89,6 @@ import FastString
 import Maybes
 import ListSetOps       ( minusList )
 import BasicTypes       ( Arity, isConLike )
-import GHC.Platform
 import Util
 import Pair
 import Data.ByteString     ( ByteString )
@@ -176,7 +176,7 @@ isExprLevPoly = go
    go_app (Lam _ e)       = go_app e
    go_app (Let _ e)       = go_app e
    go_app (Case _ _ ty _) = resultIsLevPoly ty
-   go_app (Cast _ co)     = resultIsLevPoly (pSnd $ coercionKind co)
+   go_app (Cast _ co)     = resultIsLevPoly (coercionRKind co)
    go_app (Tick _ e)      = go_app e
    go_app e@(Type {})     = pprPanic "isExprLevPoly app ty" (ppr e)
    go_app e@(Coercion {}) = pprPanic "isExprLevPoly app co" (ppr e)
@@ -266,15 +266,15 @@ mkCast e co
   = e
 
 mkCast (Coercion e_co) co
-  | isCoVarType (pSnd (coercionKind co))
+  | isCoVarType (coercionRKind co)
        -- The guard here checks that g has a (~#) on both sides,
        -- otherwise decomposeCo fails.  Can in principle happen
        -- with unsafeCoerce
   = Coercion (mkCoCast e_co co)
 
 mkCast (Cast expr co2) co
-  = WARN(let { Pair  from_ty  _to_ty  = coercionKind co;
-               Pair _from_ty2  to_ty2 = coercionKind co2} in
+  = WARN(let { from_ty = coercionLKind co;
+               to_ty2  = coercionRKind co2 } in
             not (from_ty `eqType` to_ty2),
              vcat ([ text "expr:" <+> ppr expr
                    , text "co2:" <+> ppr co2
@@ -285,7 +285,7 @@ mkCast (Tick t expr) co
    = Tick t (mkCast expr co)
 
 mkCast expr co
-  = let Pair from_ty _to_ty = coercionKind co in
+  = let from_ty = coercionLKind co in
     WARN( not (from_ty `eqType` exprType expr),
           text "Trying to coerce" <+> text "(" <> ppr expr
           $$ text "::" <+> ppr (exprType expr) <> text ")"
@@ -488,7 +488,7 @@ bindNonRec bndr rhs body
   | needsCaseBinding (idType bndr) rhs = case_bind
   | otherwise                          = let_bind
   where
-    case_bind = Case rhs bndr (exprType body) [(DEFAULT, [], body)]
+    case_bind = mkDefaultCase rhs bndr body
     let_bind  = Let (NonRec bndr rhs) body
 
 -- | Tests whether we have to use a @case@ rather than @let@ binding for this expression
@@ -512,9 +512,46 @@ mkAltExpr (LitAlt lit) [] []
 mkAltExpr (LitAlt _) _ _ = panic "mkAltExpr LitAlt"
 mkAltExpr DEFAULT _ _ = panic "mkAltExpr DEFAULT"
 
-{- Note [Binding coercions]
-~~~~~~~~~~~~~~~~~~~~~~~~~~~
-Consider binding a CoVar, c = e.  Then, we must atisfy
+mkDefaultCase :: CoreExpr -> Id -> CoreExpr -> CoreExpr
+-- Make (case x of y { DEFAULT -> e }
+mkDefaultCase scrut case_bndr body
+  = Case scrut case_bndr (exprType body) [(DEFAULT, [], body)]
+
+mkSingleAltCase :: CoreExpr -> Id -> AltCon -> [Var] -> CoreExpr -> CoreExpr
+-- Use this function if possible, when building a case,
+-- because it ensures that the type on the Case itself
+-- doesn't mention variables bound by the case
+-- See Note [Care with the type of a case expression]
+mkSingleAltCase scrut case_bndr con bndrs body
+  = Case scrut case_bndr case_ty [(con,bndrs,body)]
+  where
+    body_ty = exprType body
+
+    case_ty -- See Note [Care with the type of a case expression]
+      | Just body_ty' <- occCheckExpand bndrs body_ty
+      = body_ty'
+
+      | otherwise
+      = pprPanic "mkSingleAltCase" (ppr scrut $$ ppr bndrs $$ ppr body_ty)
+
+{- Note [Care with the type of a case expression]
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+Consider a phantom type synonym
+   type S a = Int
+and we want to form the case expression
+   case x of K (a::*) -> (e :: S a)
+
+We must not make the type field of the case-expression (S a) because
+'a' isn't in scope.  Hence the call to occCheckExpand.  This caused
+issue #17056.
+
+NB: this situation can only arise with type synonyms, which can
+falsely "mention" type variables that aren't "really there", and which
+can be eliminated by expanding the synonym.
+
+Note [Binding coercions]
+~~~~~~~~~~~~~~~~~~~~~~~~
+Consider binding a CoVar, c = e.  Then, we must satisfy
 Note [CoreSyn type and coercion invariant] in CoreSyn,
 which allows only (Coercion co) on the RHS.
 
@@ -571,7 +608,7 @@ that cannot match.  For example:
 
 Suppose that for some silly reason, x isn't substituted in the case
 expression.  (Perhaps there's a NOINLINE on it, or profiling SCC stuff
-gets in the way; cf #3118.)  Then the full-lazines pass might produce
+gets in the way; cf #3118.)  Then the full-laziness pass might produce
 this
 
      x = Red
@@ -1584,7 +1621,7 @@ app_ok primop_ok fun args
 
 -----------------------------
 altsAreExhaustive :: [Alt b] -> Bool
--- True  <=> the case alternatives are definiely exhaustive
+-- True  <=> the case alternatives are definitely exhaustive
 -- False <=> they may or may not be
 altsAreExhaustive []
   = False    -- Should not happen
@@ -1880,7 +1917,9 @@ exprIsTopLevelBindable :: CoreExpr -> Type -> Bool
 -- Top-level literal strings can't even be wrapped in ticks
 --   see Note [CoreSyn top-level string literals] in CoreSyn
 exprIsTopLevelBindable expr ty
-  = not (isUnliftedType ty)
+  = not (mightBeUnliftedType ty)
+    -- Note that 'expr' may be levity polymorphic here consequently we must use
+    -- 'mightBeUnliftedType' rather than 'isUnliftedType' as the latter would panic.
   || exprIsTickedString expr
 
 -- | Check if the expression is zero or more Ticks wrapped around a literal
@@ -2339,6 +2378,8 @@ But the simplifier pushes those casts outwards, so we don't
 need to address that here.
 -}
 
+-- When updating this function, make sure to update
+-- CorePrep.tryEtaReducePrep as well!
 tryEtaReduce :: [Var] -> CoreExpr -> Maybe CoreExpr
 tryEtaReduce bndrs body
   = go (reverse bndrs) body (mkRepReflCo (exprType body))
@@ -2451,128 +2492,6 @@ labels in other DLLs).
 If this happens we simply make the RHS into an updatable thunk,
 and 'execute' it rather than allocating it statically.
 -}
-
--- | This function is called only on *top-level* right-hand sides.
--- Returns @True@ if the RHS can be allocated statically in the output,
--- with no thunks involved at all.
-rhsIsStatic
-   :: Platform
-   -> (Name -> Bool)         -- Which names are dynamic
-   -> (LitNumType -> Integer -> Maybe CoreExpr)
-      -- Desugaring for some literals (disgusting)
-      -- C.f. Note [Disgusting computation of CafRefs] in TidyPgm
-   -> CoreExpr -> Bool
--- It's called (i) in TidyPgm.hasCafRefs to decide if the rhs is, or
--- refers to, CAFs; (ii) in CoreToStg to decide whether to put an
--- update flag on it and (iii) in DsExpr to decide how to expand
--- list literals
---
--- The basic idea is that rhsIsStatic returns True only if the RHS is
---      (a) a value lambda
---      (b) a saturated constructor application with static args
---
--- BUT watch out for
---  (i) Any cross-DLL references kill static-ness completely
---      because they must be 'executed' not statically allocated
---      ("DLL" here really only refers to Windows DLLs, on other platforms,
---      this is not necessary)
---
--- (ii) We treat partial applications as redexes, because in fact we
---      make a thunk for them that runs and builds a PAP
---      at run-time.  The only applications that are treated as
---      static are *saturated* applications of constructors.
-
--- We used to try to be clever with nested structures like this:
---              ys = (:) w ((:) w [])
--- on the grounds that CorePrep will flatten ANF-ise it later.
--- But supporting this special case made the function much more
--- complicated, because the special case only applies if there are no
--- enclosing type lambdas:
---              ys = /\ a -> Foo (Baz ([] a))
--- Here the nested (Baz []) won't float out to top level in CorePrep.
---
--- But in fact, even without -O, nested structures at top level are
--- flattened by the simplifier, so we don't need to be super-clever here.
---
--- Examples
---
---      f = \x::Int. x+7        TRUE
---      p = (True,False)        TRUE
---
---      d = (fst p, False)      FALSE because there's a redex inside
---                              (this particular one doesn't happen but...)
---
---      h = D# (1.0## /## 2.0##)        FALSE (redex again)
---      n = /\a. Nil a                  TRUE
---
---      t = /\a. (:) (case w a of ...) (Nil a)  FALSE (redex)
---
---
--- This is a bit like CoreUtils.exprIsHNF, with the following differences:
---    a) scc "foo" (\x -> ...) is updatable (so we catch the right SCC)
---
---    b) (C x xs), where C is a constructor is updatable if the application is
---         dynamic
---
---    c) don't look through unfolding of f in (f x).
-
-rhsIsStatic platform is_dynamic_name cvt_literal rhs = is_static False rhs
-  where
-  is_static :: Bool     -- True <=> in a constructor argument; must be atomic
-            -> CoreExpr -> Bool
-
-  is_static False  (Lam b e)              = isRuntimeVar b || is_static False e
-  is_static in_arg (Tick n e)             = not (tickishIsCode n)
-                                              && is_static in_arg e
-  is_static in_arg (Cast e _)             = is_static in_arg e
-  is_static _      (Coercion {})          = True   -- Behaves just like a literal
-  is_static in_arg (Lit (LitNumber nt i _)) = case cvt_literal nt i of
-    Just e  -> is_static in_arg e
-    Nothing -> True
-  is_static _      (Lit (LitLabel {}))    = False
-  is_static _      (Lit _)                = True
-        -- A LitLabel (foreign import "&foo") in an argument
-        -- prevents a constructor application from being static.  The
-        -- reason is that it might give rise to unresolvable symbols
-        -- in the object file: under Linux, references to "weak"
-        -- symbols from the data segment give rise to "unresolvable
-        -- relocation" errors at link time This might be due to a bug
-        -- in the linker, but we'll work around it here anyway.
-        -- SDM 24/2/2004
-
-  is_static in_arg other_expr = go other_expr 0
-   where
-    go (Var f) n_val_args
-        | (platformOS platform /= OSMinGW32) ||
-          not (is_dynamic_name (idName f))
-        =  saturated_data_con f n_val_args
-        || (in_arg && n_val_args == 0)
-                -- A naked un-applied variable is *not* deemed a static RHS
-                -- E.g.         f = g
-                -- Reason: better to update so that the indirection gets shorted
-                --         out, and the true value will be seen
-                -- NB: if you change this, you'll break the invariant that THUNK_STATICs
-                --     are always updatable.  If you do so, make sure that non-updatable
-                --     ones have enough space for their static link field!
-
-    go (App f a) n_val_args
-        | isTypeArg a                    = go f n_val_args
-        | not in_arg && is_static True a = go f (n_val_args + 1)
-        -- The (not in_arg) checks that we aren't in a constructor argument;
-        -- if we are, we don't allow (value) applications of any sort
-        --
-        -- NB. In case you wonder, args are sometimes not atomic.  eg.
-        --   x = D# (1.0## /## 2.0##)
-        -- can't float because /## can fail.
-
-    go (Tick n f) n_val_args = not (tickishIsCode n) && go f n_val_args
-    go (Cast e _) n_val_args = go e n_val_args
-    go _          _          = False
-
-    saturated_data_con f n_val_args
-        = case isDataConWorkId_maybe f of
-            Just dc -> n_val_args == dataConRepArity dc
-            Nothing -> False
 
 {-
 ************************************************************************

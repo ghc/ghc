@@ -9,11 +9,13 @@ Typechecking class declarations
 {-# LANGUAGE CPP #-}
 {-# LANGUAGE TypeFamilies #-}
 
+{-# OPTIONS_GHC -Wno-incomplete-record-updates #-}
+
 module TcClassDcl ( tcClassSigs, tcClassDecl2,
                     findMethodBind, instantiateMethod,
                     tcClassMinimalDef,
                     HsSigFun, mkHsSigFun,
-                    tcMkDeclCtxt, tcAddDeclCtxt, badMethodErr,
+                    badMethodErr,
                     instDeclCtxt1, instDeclCtxt2, instDeclCtxt3,
                     tcATDefault
                   ) where
@@ -22,7 +24,7 @@ module TcClassDcl ( tcClassSigs, tcClassDecl2,
 
 import GhcPrelude
 
-import HsSyn
+import GHC.Hs
 import TcEnv
 import TcSigs
 import TcEvidence ( idHsWrapper )
@@ -30,7 +32,9 @@ import TcBinds
 import TcUnify
 import TcHsType
 import TcMType
-import Type     ( getClassPredTys_maybe, piResultTys )
+import Type     ( piResultTys )
+import Predicate
+import TcOrigin
 import TcType
 import TcRnMonad
 import DriverPhases (HscSource(..))
@@ -76,7 +80,7 @@ would implicitly declare
                              (forall b. Ord b => a -> b -> b)
 
 (We could use a record decl, but that means changing more of the existing apparatus.
-One step at at time!)
+One step at a time!)
 
 For classes with just one superclass+method, we use a newtype decl instead:
 
@@ -224,7 +228,7 @@ tcDefMeth clas tyvars this_dict binds_in hs_sig_fn prag_fn
           (sel_id, Just (dm_name, dm_spec))
   | Just (L bind_loc dm_bind, bndr_loc, prags) <- findMethodBind sel_name binds_in prag_fn
   = do { -- First look up the default method; it should be there!
-         -- It can be the orinary default method
+         -- It can be the ordinary default method
          -- or the generic-default method.  E.g of the latter
          --      class C a where
          --        op :: a -> a -> Bool
@@ -369,7 +373,7 @@ findMethodBind  :: Name                 -- Selector
                 -- site of the method binder, and any inline or
                 -- specialisation pragmas
 findMethodBind sel_name binds prag_fn
-  = foldlBag mplus Nothing (mapBag f binds)
+  = foldl' mplus Nothing (mapBag f binds)
   where
     prags    = lookupPragEnv prag_fn sel_name
 
@@ -420,14 +424,6 @@ This makes the error messages right.
 *                                                                      *
 ************************************************************************
 -}
-
-tcMkDeclCtxt :: TyClDecl GhcRn -> SDoc
-tcMkDeclCtxt decl = hsep [text "In the", pprTyClDeclFlavour decl,
-                      text "declaration for", quotes (ppr (tcdName decl))]
-
-tcAddDeclCtxt :: TyClDecl GhcRn -> TcM a -> TcM a
-tcAddDeclCtxt decl thing_inside
-  = addErrCtxt (tcMkDeclCtxt decl) thing_inside
 
 badMethodErr :: Outputable a => a -> Name -> SDoc
 badMethodErr clas op

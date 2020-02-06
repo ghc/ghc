@@ -4,7 +4,7 @@ WerrorFail2.hs:15:1: warning: [-Wmissing-signatures (in -Wall)]
 
 WerrorFail2.hs:15:10: error: [-Wincomplete-patterns (in -Wextra), -Werror=incomplete-patterns]
     Pattern match(es) are non-exhaustive
-    In a case alternative: Patterns not matched: (C2 _)
+    In a case alternative: Patterns not matched: C2 _
 
 WerrorFail2.hs:19:1: warning: [-Wmissing-signatures (in -Wall)]
     Top-level binding with no type signature: printRec :: IO ()

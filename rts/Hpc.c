@@ -39,7 +39,7 @@ static pid_t hpc_pid = 0;               // pid of this process at hpc-boot time.
 static FILE *tixFile;                   // file being read/written
 static int tix_ch;                      // current char
 
-static HashTable * moduleHash = NULL;   // module name -> HpcModuleInfo
+static StrHashTable * moduleHash = NULL;   // module name -> HpcModuleInfo
 
 HpcModuleInfo *modules = 0;
 
@@ -152,11 +152,11 @@ readTix(void) {
     expect(']');
     ws();
 
-    lookup = lookupHashTable(moduleHash, (StgWord)tmpModule->modName);
+    lookup = lookupStrHashTable(moduleHash, tmpModule->modName);
     if (lookup == NULL) {
         debugTrace(DEBUG_hpc,"readTix: new HpcModuleInfo for %s",
                    tmpModule->modName);
-        insertHashTable(moduleHash, (StgWord)tmpModule->modName, tmpModule);
+        insertStrHashTable(moduleHash, tmpModule->modName, tmpModule);
     } else {
         ASSERT(lookup->tixArr != 0);
         ASSERT(!strcmp(tmpModule->modName, lookup->modName));
@@ -265,7 +265,7 @@ hs_hpc_module(char *modName,
       moduleHash = allocStrHashTable();
   }
 
-  tmpModule = lookupHashTable(moduleHash, (StgWord)modName);
+  tmpModule = lookupStrHashTable(moduleHash, modName);
   if (tmpModule == NULL)
   {
       // Did not find entry so add one on.
@@ -282,7 +282,7 @@ hs_hpc_module(char *modName,
       tmpModule->next = modules;
       tmpModule->from_file = false;
       modules = tmpModule;
-      insertHashTable(moduleHash, (StgWord)modName, tmpModule);
+      insertStrHashTable(moduleHash, modName, tmpModule);
   }
   else
   {
@@ -373,7 +373,7 @@ freeHpcModuleInfo (HpcModuleInfo *mod)
 }
 
 /* Called at the end of execution, to write out the Hpc *.tix file
- * for this exection. Safe to call, even if coverage is not used.
+ * for this execution. Safe to call, even if coverage is not used.
  */
 void
 exitHpc(void) {
@@ -385,14 +385,14 @@ exitHpc(void) {
 
   // Only write the tix file if you are the original process.
   // Any sub-process from use of fork from inside Haskell will
-  // not clober the .tix file.
+  // not clobber the .tix file.
 
   if (hpc_pid == getpid()) {
-    FILE *f = __rts_fopen(tixFilename,"w");
+    FILE *f = __rts_fopen(tixFilename,"w+");
     writeTix(f);
   }
 
-  freeHashTable(moduleHash, (void (*)(void *))freeHpcModuleInfo);
+  freeStrHashTable(moduleHash, (void (*)(void *))freeHpcModuleInfo);
   moduleHash = NULL;
 
   stgFree(tixFilename);

@@ -12,7 +12,10 @@ test('testmblockalloc',
 
 # See bug #101, test requires +RTS -c (or equivalently +RTS -M<something>)
 # only GHCi triggers the bug, but we run the test all ways for completeness.
-test('bug1010', normal, compile_and_run, ['+RTS -c -RTS'])
+test('bug1010',
+     # Non-moving GC doesn't support -c
+     omit_ways(['nonmoving', 'nonmoving_thr', 'nonmoving_thr_ghc']),
+     compile_and_run, ['+RTS -c -RTS'])
 
 def normalise_address(str):
     return re.sub('Access violation in generated code when reading [0]+',
@@ -20,10 +23,10 @@ def normalise_address(str):
                   str)
 
 test('derefnull',
-     [# LLVM Optimiser considers dereference of a null pointer
-      # undefined and marks the code as unreachable which means
-      # that later optimisations remove it altogether.
-      omit_ways(['optllvm']),
+     [# The LLVM backend in particular does not guarantee any particular
+      # behavior on null dereference (similar to #10332).
+      omit_ways(llvm_ways),
+      when(not(have_ncg()), skip),
       # SIGSEGV on Linux (which we make the default)
       exit_code(139),
       # Apparently the output can be different on different
@@ -43,6 +46,10 @@ test('derefnull',
 test('divbyzero',
      [# SIGFPE on Linux
       exit_code(136),
+      # The LLVM backend in particular does not guarantee any particular
+      # behavior on division-by-zero (#10332).
+      omit_ways(llvm_ways),
+      when(not(have_ncg()), skip),
       # Apparently the output can be different on different
       # Linux setups, so just ignore it. As long as we get
       # the right exit code we're OK.
@@ -67,8 +74,12 @@ test('outofmem', when(opsys('darwin'), skip),
                  makefile_test, ['outofmem'])
 test('outofmem2', normal, makefile_test, ['outofmem2'])
 
-test('T2047', [ignore_stdout, extra_run_opts('+RTS -c -RTS')],
-              compile_and_run, ['-package containers'])
+test('T2047',
+     [ignore_stdout,
+      extra_run_opts('+RTS -c -RTS'),
+      # Non-moving collector doesn't support -c
+      omit_ways(['nonmoving', 'nonmoving_thr', 'nonmoving_thr_ghc'])],
+     compile_and_run, ['-package containers'])
 
 # Blackhole-detection test.
 # Skip GHCi due to #2786
@@ -183,7 +194,7 @@ test('T6006', [ omit_ways(prof_ways + ['ghci']),
 test('T7037', [], makefile_test, ['T7037'])
 
 test('T7087', exit_code(1), compile_and_run, [''])
-test('T7160', normal, compile_and_run, [''])
+test('T7160', omit_ways(['nonmoving_thr', 'nonmoving_thr_ghc']), compile_and_run, [''])
 
 test('T7040', [omit_ways(['ghci'])], compile_and_run, ['T7040_c.c'])
 
@@ -388,7 +399,21 @@ test('keep-cafs',
     when(opsys('mingw32'), expect_broken (5987)),
     when(platform('powerpc64le-unknown-linux'), expect_broken(11261)),
     when(opsys('freebsd'), expect_broken(16035)),
+    req_rts_linker
   ],
   makefile_test, ['KeepCafs'])
 
 test('T16514', unless(opsys('mingw32'), skip), compile_and_run, ['T16514_c.cpp -lstdc++'])
+test('test-zeroongc', extra_run_opts('-DZ'), compile_and_run, ['-debug'])
+
+test('T13676',
+     [when(opsys('darwin') or opsys('mingw32'), expect_broken(17447)),
+      extra_files(['T13676.hs'])],
+     ghci_script, ['T13676.script'])
+test('InitEventLogging',
+     [only_ways(['normal']), extra_run_opts('+RTS -RTS')],
+     compile_and_run, ['-eventlog InitEventLogging_c.c'])
+
+test('T17088',
+     [only_ways(['normal']), extra_run_opts('+RTS -c -A256k -RTS')],
+     compile_and_run, ['-rtsopts -O2'])

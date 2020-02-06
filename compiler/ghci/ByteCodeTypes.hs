@@ -35,6 +35,7 @@ import Data.Array.Base  ( UArray(..) )
 import Data.ByteString (ByteString)
 import Data.IntMap (IntMap)
 import qualified Data.IntMap as IntMap
+import Data.Maybe (catMaybes)
 import GHC.Exts.Heap
 import GHC.Stack.CCS
 
@@ -110,14 +111,15 @@ instance NFData BCONPtr where
 -- | Information about a breakpoint that we know at code-generation time
 data CgBreakInfo
    = CgBreakInfo
-   { cgb_vars   :: [(Id,Word16)]
+   { cgb_vars   :: [Maybe (Id,Word16)]
    , cgb_resty  :: Type
    }
+-- See Note [Syncing breakpoint info] in compiler/main/InteractiveEval.hs
 
 -- Not a real NFData instance because we can't rnf Id or Type
 seqCgBreakInfo :: CgBreakInfo -> ()
 seqCgBreakInfo CgBreakInfo{..} =
-  rnf (map snd cgb_vars) `seq`
+  rnf (map snd (catMaybes (cgb_vars))) `seq`
   seqType cgb_resty
 
 instance Outputable UnlinkedBCO where

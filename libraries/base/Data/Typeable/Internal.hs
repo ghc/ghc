@@ -18,6 +18,7 @@
 {-# LANGUAGE UndecidableInstances #-}
 {-# LANGUAGE TypeApplications #-}
 {-# LANGUAGE TypeFamilies #-}
+{-# LANGUAGE StandaloneKindSignatures #-}
 
 -----------------------------------------------------------------------------
 -- |
@@ -178,7 +179,8 @@ rnfTyCon (TyCon _ _ m n _ k) = rnfModule m `seq` rnfTrName n `seq` rnfKindRep k
 
 -- | A concrete representation of a (monomorphic) type.
 -- 'TypeRep' supports reasonably efficient equality.
-data TypeRep (a :: k) where
+type TypeRep :: k -> Type
+data TypeRep a where
     -- The TypeRep of Type. See Note [Kind caching], Wrinkle 2
     TrType :: TypeRep Type
     TrTyCon :: { -- See Note [TypeRep fingerprints]
@@ -666,10 +668,12 @@ runtimeRepTypeRep r =
       IntRep      -> rep @'IntRep
       Int8Rep     -> rep @'Int8Rep
       Int16Rep    -> rep @'Int16Rep
+      Int32Rep    -> rep @'Int32Rep
       Int64Rep    -> rep @'Int64Rep
       WordRep     -> rep @'WordRep
       Word8Rep    -> rep @'Word8Rep
       Word16Rep   -> rep @'Word16Rep
+      Word32Rep   -> rep @'Word32Rep
       Word64Rep   -> rep @'Word64Rep
       AddrRep     -> rep @'AddrRep
       FloatRep    -> rep @'FloatRep

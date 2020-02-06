@@ -9,6 +9,9 @@ The @Inst@ type: dictionaries or method instances
 {-# LANGUAGE CPP, MultiWayIf, TupleSections #-}
 {-# LANGUAGE FlexibleContexts #-}
 
+{-# OPTIONS_GHC -Wno-incomplete-uni-patterns   #-}
+{-# OPTIONS_GHC -Wno-incomplete-record-updates #-}
+
 module Inst (
        deeplySkolemise,
        topInstantiate, topInstantiateInferred, deeplyInstantiate,
@@ -39,9 +42,12 @@ import {-# SOURCE #-}   TcUnify( unifyType, unifyKind )
 
 import BasicTypes ( IntegralLit(..), SourceText(..) )
 import FastString
-import HsSyn
+import GHC.Hs
 import TcHsSyn
 import TcRnMonad
+import Constraint
+import Predicate
+import TcOrigin
 import TcEnv
 import TcEvidence
 import InstEnv
@@ -51,6 +57,7 @@ import FunDeps
 import TcMType
 import Type
 import TyCoRep
+import TyCoPpr     ( debugPprType )
 import TcType
 import HscTypes
 import Class( Class )
@@ -66,6 +73,7 @@ import SrcLoc
 import DynFlags
 import Util
 import Outputable
+import BasicTypes ( TypeOrKind(..) )
 import qualified GHC.LanguageExtensions as LangExt
 
 import Control.Monad( unless )
@@ -257,7 +265,7 @@ deeply_instantiate :: CtOrigin
                    -> TCvSubst
                    -> TcSigmaType -> TcM (HsWrapper, TcRhoType)
 -- Internal function to deeply instantiate that builds on an existing subst.
--- It extends the input substitution and applies the final subtitution to
+-- It extends the input substitution and applies the final substitution to
 -- the types on return.  See #12549.
 
 deeply_instantiate orig subst ty
@@ -608,7 +616,7 @@ tcSyntaxName :: CtOrigin
              -> TcM (Name, HsExpr GhcTcId)
                                        -- ^ (Standard name, suitable expression)
 -- USED ONLY FOR CmdTop (sigh) ***
--- See Note [CmdSyntaxTable] in HsExpr
+-- See Note [CmdSyntaxTable] in GHC.Hs.Expr
 
 tcSyntaxName orig ty (std_nm, HsVar _ (L _ user_nm))
   | std_nm == user_nm
@@ -837,6 +845,6 @@ addClsInstsErr herald ispecs
     addErr (hang herald 2 (pprInstances sorted))
  where
    sorted = sortWith getSrcLoc ispecs
-   -- The sortWith just arranges that instances are dislayed in order
+   -- The sortWith just arranges that instances are displayed in order
    -- of source location, which reduced wobbling in error messages,
    -- and is better for users

@@ -37,7 +37,7 @@ void
 initUserSignals(void)
 {
     console_handler = STG_SIG_DFL;
-#if !defined (THREADED_RTS)
+#if !defined(THREADED_RTS)
     stg_pending_events = 0;
     if (hConsoleEvent == INVALID_HANDLE_VALUE) {
         hConsoleEvent =
@@ -59,7 +59,7 @@ freeSignalHandlers(void) {
 void
 finiUserSignals(void)
 {
-#if !defined (THREADED_RTS)
+#if !defined(THREADED_RTS)
     if (hConsoleEvent != INVALID_HANDLE_VALUE) {
         CloseHandle(hConsoleEvent);
     }
@@ -162,7 +162,7 @@ void awaitUserSignals(void)
 }
 
 
-#if !defined (THREADED_RTS)
+#if !defined(THREADED_RTS)
 /*
  * Function: startSignalHandlers()
  *

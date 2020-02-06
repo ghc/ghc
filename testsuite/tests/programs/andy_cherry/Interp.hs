@@ -93,7 +93,7 @@
        | head tag == '(' && take 2 (reverse tag) == ":)" && length rest > 1 =
        getCurrColour                           `thenP` \ col ->
        let 
-           invert Black r   = r -- because the move has *already* happend
+           invert Black r   = r -- because the move has *already* happened
            invert _ "0.00"  = "0.00"   -- don't negate 0
            invert _ ('-':r) = r
            invert _ r       = '-':r

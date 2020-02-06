@@ -1,4 +1,4 @@
-#ifndef _T10272_H_
+#if !defined(_T10272_H_)
 #define _T10272_H_
 
 #include <stdint.h>

@@ -1,0 +1,10 @@
+
+T17541b.hs:8:20: error:
+    • Expected kind ‘k’, but ‘Int’ has kind ‘*’
+    • In the second argument of ‘T’, namely ‘Int’
+      In the type ‘T Type Int’
+      In the definition of data constructor ‘MkT1’
+      NB: Type ‘T’ was inferred to use visible dependent quantification.
+      Most types with visible dependent quantification are
+      polymorphically recursive and need a standalone kind
+      signature. Perhaps supply one, with StandaloneKindSignatures.

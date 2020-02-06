@@ -60,14 +60,14 @@ import Reg
 import NCGMonad
 
 
-import Hoopl.Collections
-import Cmm
-import CLabel           ( CLabel, ForeignLabelSource(..), pprCLabel,
+import GHC.Cmm.Dataflow.Collections
+import GHC.Cmm
+import GHC.Cmm.CLabel           ( CLabel, ForeignLabelSource(..), pprCLabel,
                           mkDynamicLinkerLabel, DynamicLinkerLabelInfo(..),
                           dynamicLinkerLabelInfo, mkPicBaseLabel,
                           labelDynamic, externallyVisibleCLabel )
 
-import CLabel           ( mkForeignLabel )
+import GHC.Cmm.CLabel           ( mkForeignLabel )
 
 
 import BasicTypes
@@ -217,7 +217,7 @@ howToAccessLabel
 
 -- Windows
 -- In Windows speak, a "module" is a set of objects linked into the
--- same Portable Exectuable (PE) file. (both .exe and .dll files are PEs).
+-- same Portable Executable (PE) file. (both .exe and .dll files are PEs).
 --
 -- If we're compiling a multi-module program then symbols from other modules
 -- are accessed by a symbol pointer named __imp_SYMBOL. At runtime we have the
@@ -420,7 +420,7 @@ picRelative dflags arch OSDarwin lbl
 
 -- On AIX we use an indirect local TOC anchored by 'gotLabel'.
 -- This way we use up only one global TOC entry per compilation-unit
--- (this is quite similiar to GCC's @-mminimal-toc@ compilation mode)
+-- (this is quite similar to GCC's @-mminimal-toc@ compilation mode)
 picRelative dflags _ OSAIX lbl
         = CmmLabelDiffOff lbl gotLabel 0 (wordWidth dflags)
 
@@ -565,7 +565,7 @@ pprGotDeclaration _ _ _
 --
 
 pprImportedSymbol :: DynFlags -> Platform -> CLabel -> SDoc
-pprImportedSymbol dflags (Platform { platformArch = ArchX86, platformOS = OSDarwin }) importedLbl
+pprImportedSymbol dflags (Platform { platformMini = PlatformMini { platformMini_arch = ArchX86, platformMini_os = OSDarwin } }) importedLbl
         | Just (CodeStub, lbl) <- dynamicLinkerLabelInfo importedLbl
         = case positionIndependent dflags of
            False ->
@@ -618,12 +618,12 @@ pprImportedSymbol dflags (Platform { platformArch = ArchX86, platformOS = OSDarw
         = empty
 
 
-pprImportedSymbol _ (Platform { platformOS = OSDarwin }) _
+pprImportedSymbol _ (Platform { platformMini = PlatformMini { platformMini_os = OSDarwin } }) _
         = empty
 
 -- XCOFF / AIX
 --
--- Similiar to PPC64 ELF v1, there's dedicated TOC register (r2). To
+-- Similar to PPC64 ELF v1, there's dedicated TOC register (r2). To
 -- workaround the limitation of a global TOC we use an indirect TOC
 -- with the label `ghc_toc_table`.
 --
@@ -632,7 +632,7 @@ pprImportedSymbol _ (Platform { platformOS = OSDarwin }) _
 --
 -- NB: No DSO-support yet
 
-pprImportedSymbol dflags (Platform { platformOS = OSAIX }) importedLbl
+pprImportedSymbol dflags (Platform { platformMini = PlatformMini { platformMini_os = OSAIX } }) importedLbl
         = case dynamicLinkerLabelInfo importedLbl of
             Just (SymbolPtr, lbl)
               -> vcat [
@@ -669,7 +669,7 @@ pprImportedSymbol dflags (Platform { platformOS = OSAIX }) importedLbl
 -- the NCG will keep track of all DynamicLinkerLabels it uses
 -- and output each of them using pprImportedSymbol.
 
-pprImportedSymbol dflags platform@(Platform { platformArch = ArchPPC_64 _ })
+pprImportedSymbol dflags platform@(Platform { platformMini = PlatformMini { platformMini_arch = ArchPPC_64 _ } })
                   importedLbl
         | osElfTarget (platformOS platform)
         = case dynamicLinkerLabelInfo importedLbl of
@@ -730,8 +730,8 @@ pprImportedSymbol _ _ _
 
 initializePicBase_ppc
         :: Arch -> OS -> Reg
-        -> [NatCmmDecl CmmStatics PPC.Instr]
-        -> NatM [NatCmmDecl CmmStatics PPC.Instr]
+        -> [NatCmmDecl RawCmmStatics PPC.Instr]
+        -> NatM [NatCmmDecl RawCmmStatics PPC.Instr]
 
 initializePicBase_ppc ArchPPC os picReg
     (CmmProc info lab live (ListGraph blocks) : statics)
@@ -805,8 +805,8 @@ initializePicBase_ppc _ _ _ _
 
 initializePicBase_x86
         :: Arch -> OS -> Reg
-        -> [NatCmmDecl (Alignment, CmmStatics) X86.Instr]
-        -> NatM [NatCmmDecl (Alignment, CmmStatics) X86.Instr]
+        -> [NatCmmDecl (Alignment, RawCmmStatics) X86.Instr]
+        -> NatM [NatCmmDecl (Alignment, RawCmmStatics) X86.Instr]
 
 initializePicBase_x86 ArchX86 os picReg
         (CmmProc info lab live (ListGraph blocks) : statics)

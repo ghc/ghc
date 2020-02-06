@@ -8,11 +8,12 @@ Functions for working with the typechecker environment (setters, getters...).
 {-# LANGUAGE CPP, ExplicitForAll, FlexibleInstances, BangPatterns #-}
 {-# LANGUAGE RecordWildCards #-}
 {-# OPTIONS_GHC -fno-warn-orphans #-}
+{-# OPTIONS_GHC -Wno-incomplete-record-updates #-}
 {-# LANGUAGE ViewPatterns #-}
 
 
 module TcRnMonad(
-  -- * Initalisation
+  -- * Initialisation
   initTc, initTcWithGbl, initTcInteractive, initTcRnIf,
 
   -- * Simple accessors
@@ -42,8 +43,8 @@ module TcRnMonad(
   newTcRef, readTcRef, writeTcRef, updTcRef,
 
   -- * Debugging
-  traceTc, traceRn, traceOptTcRn, traceTcRn, traceTcRnForUser,
-  traceTcRnWithStyle,
+  traceTc, traceRn, traceOptTcRn, dumpOptTcRn,
+  dumpTcRn,
   getPrintUnqualified,
   printForUserTcRn,
   traceIf, traceHiDiffs, traceOptIf,
@@ -107,8 +108,8 @@ module TcRnMonad(
   emitNamedWildCardHoleConstraints, emitAnonWildCardHoleConstraint,
 
   -- * Template Haskell context
-  recordThUse, recordThSpliceUse, recordTopLevelSpliceLoc,
-  getTopLevelSpliceLocs, keepAlive, getStage, getStageAndBindLevel, setStage,
+  recordThUse, recordThSpliceUse,
+  keepAlive, getStage, getStageAndBindLevel, setStage,
   addModFinalizersWithLclEnv,
 
   -- * Safe Haskell context
@@ -146,9 +147,11 @@ import GhcPrelude
 
 import TcRnTypes        -- Re-export all
 import IOEnv            -- Re-export all
+import Constraint
 import TcEvidence
+import TcOrigin
 
-import HsSyn hiding (LIE)
+import GHC.Hs hiding (LIE)
 import HscTypes
 import Module
 import RdrName
@@ -175,7 +178,7 @@ import FastString
 import Panic
 import Util
 import Annotations
-import BasicTypes( TopLevelFlag )
+import BasicTypes( TopLevelFlag, TypeOrKind(..) )
 import Maybes
 import CostCentreState
 
@@ -183,8 +186,6 @@ import qualified GHC.LanguageExtensions as LangExt
 
 import Data.IORef
 import Control.Monad
-import Data.Set ( Set )
-import qualified Data.Set as Set
 
 import {-# SOURCE #-} TcEnv    ( tcInitTidyEnv )
 
@@ -214,7 +215,6 @@ initTc hsc_env hsc_src keep_rn_syntax mod loc do_this
         used_gre_var <- newIORef [] ;
         th_var       <- newIORef False ;
         th_splice_var<- newIORef False ;
-        th_locs_var  <- newIORef Set.empty ;
         infer_var    <- newIORef (True, emptyBag) ;
         dfun_n_var   <- newIORef emptyOccSet ;
         type_env_var <- case hsc_type_env_var hsc_env of {
@@ -274,8 +274,6 @@ initTc hsc_env hsc_src keep_rn_syntax mod loc do_this
                 tcg_ann_env        = emptyAnnEnv,
                 tcg_th_used        = th_var,
                 tcg_th_splice_used = th_splice_var,
-                tcg_th_top_level_locs
-                                   = th_locs_var,
                 tcg_exports        = [],
                 tcg_imports        = emptyImportAvails,
                 tcg_used_gres     = used_gre_var,
@@ -331,8 +329,7 @@ initTcWithGbl :: HscEnv
               -> TcM r
               -> IO (Messages, Maybe r)
 initTcWithGbl hsc_env gbl_env loc do_this
- = do { tvs_var      <- newIORef emptyVarSet
-      ; lie_var      <- newIORef emptyWC
+ = do { lie_var      <- newIORef emptyWC
       ; errs_var     <- newIORef (emptyBag, emptyBag)
       ; let lcl_env = TcLclEnv {
                 tcl_errs       = errs_var,
@@ -344,7 +341,6 @@ initTcWithGbl hsc_env gbl_env loc do_this
                 tcl_arrow_ctxt = NoArrowCtxt,
                 tcl_env        = emptyNameEnv,
                 tcl_bndrs      = [],
-                tcl_tyvars     = tvs_var,
                 tcl_lie        = lie_var,
                 tcl_tclvl      = topTcLevel
                 }
@@ -402,17 +398,14 @@ an actual crash (attempting to look up the Integer type).
 ************************************************************************
 -}
 
-initTcRnIf :: Char              -- Tag for unique supply
+initTcRnIf :: Char              -- ^ Mask for unique supply
            -> HscEnv
            -> gbl -> lcl
            -> TcRnIf gbl lcl a
            -> IO a
-initTcRnIf uniq_tag hsc_env gbl_env lcl_env thing_inside
-   = do { us     <- mkSplitUniqSupply uniq_tag ;
-        ; us_var <- newIORef us ;
-
-        ; let { env = Env { env_top = hsc_env,
-                            env_us  = us_var,
+initTcRnIf uniq_mask hsc_env gbl_env lcl_env thing_inside
+   = do { let { env = Env { env_top = hsc_env,
+                            env_um  = uniq_mask,
                             env_gbl = gbl_env,
                             env_lcl = lcl_env} }
 
@@ -600,27 +593,15 @@ escapeArrowScope
 
 newUnique :: TcRnIf gbl lcl Unique
 newUnique
- = do { env <- getEnv ;
-        let { u_var = env_us env } ;
-        us <- readMutVar u_var ;
-        case takeUniqFromSupply us of { (uniq, us') -> do {
-        writeMutVar u_var us' ;
-        return $! uniq }}}
-   -- NOTE 1: we strictly split the supply, to avoid the possibility of leaving
-   -- a chain of unevaluated supplies behind.
-   -- NOTE 2: we use the uniq in the supply from the MutVar directly, and
-   -- throw away one half of the new split supply.  This is safe because this
-   -- is the only place we use that unique.  Using the other half of the split
-   -- supply is safer, but slower.
+ = do { env <- getEnv
+      ; let mask = env_um env
+      ; liftIO $! uniqFromMask mask }
 
 newUniqueSupply :: TcRnIf gbl lcl UniqSupply
 newUniqueSupply
- = do { env <- getEnv ;
-        let { u_var = env_us env } ;
-        us <- readMutVar u_var ;
-        case splitUniqSupply us of { (us1,us2) -> do {
-        writeMutVar u_var us1 ;
-        return us2 }}}
+ = do { env <- getEnv
+      ; let mask = env_um env
+      ; liftIO $! mkSplitUniqSupply mask }
 
 cloneLocalName :: Name -> TcM Name
 -- Make a fresh Internal name with the same OccName and SrcSpan
@@ -643,12 +624,12 @@ newSysName occ
 newSysLocalId :: FastString -> TcType -> TcRnIf gbl lcl TcId
 newSysLocalId fs ty
   = do  { u <- newUnique
-        ; return (mkSysLocalOrCoVar fs u ty) }
+        ; return (mkSysLocal fs u ty) }
 
 newSysLocalIds :: FastString -> [TcType] -> TcRnIf gbl lcl [TcId]
 newSysLocalIds fs tys
   = do  { us <- newUniqueSupply
-        ; return (zipWith (mkSysLocalOrCoVar fs) (uniqsFromSupply us) tys) }
+        ; return (zipWith (mkSysLocal fs) (uniqsFromSupply us) tys) }
 
 instance MonadUnique (IOEnv (Env gbl lcl)) where
         getUniqueM = newUnique
@@ -704,58 +685,48 @@ labelledTraceOptTcRn flag herald doc = do
 formatTraceMsg :: String -> SDoc -> SDoc
 formatTraceMsg herald doc = hang (text herald) 2 doc
 
--- | Output a doc if the given 'DumpFlag' is set.
---
--- By default this logs to stdout
--- However, if the `-ddump-to-file` flag is set,
--- then this will dump output to a file
---
--- Just a wrapper for 'dumpSDoc'
+-- | Trace if the given 'DumpFlag' is set.
 traceOptTcRn :: DumpFlag -> SDoc -> TcRn ()
-traceOptTcRn flag doc
-  = do { dflags <- getDynFlags
-       ; when (dopt flag dflags)
-              (traceTcRn flag doc)
-       }
+traceOptTcRn flag doc = do
+  dflags <- getDynFlags
+  when (dopt flag dflags) $
+    dumpTcRn False (dumpOptionsFromFlag flag) "" FormatText doc
 
+-- | Dump if the given 'DumpFlag' is set.
+dumpOptTcRn :: DumpFlag -> String -> DumpFormat -> SDoc -> TcRn ()
+dumpOptTcRn flag title fmt doc = do
+  dflags <- getDynFlags
+  when (dopt flag dflags) $
+    dumpTcRn False (dumpOptionsFromFlag flag) title fmt doc
+
+-- | Unconditionally dump some trace output
+--
 -- Certain tests (T3017, Roles3, T12763 etc.) expect part of the
 -- output generated by `-ddump-types` to be in 'PprUser' style. However,
 -- generally we want all other debugging output to use 'PprDump'
--- style. 'traceTcRn' and 'traceTcRnForUser' help us accomplish this.
-
--- | A wrapper around 'traceTcRnWithStyle' which uses 'PprDump' style.
-traceTcRn :: DumpFlag -> SDoc -> TcRn ()
-traceTcRn flag doc
-  = do { dflags  <- getDynFlags
-       ; printer <- getPrintUnqualified dflags
-       ; let dump_style = mkDumpStyle dflags printer
-       ; traceTcRnWithStyle dump_style dflags flag doc }
-
--- | A wrapper around 'traceTcRnWithStyle' which uses 'PprUser' style.
-traceTcRnForUser :: DumpFlag -> SDoc -> TcRn ()
--- Used by 'TcRnDriver.tcDump'.
-traceTcRnForUser flag doc
-  = do { dflags  <- getDynFlags
-       ; printer <- getPrintUnqualified dflags
-       ; let user_style = mkUserStyle dflags printer AllTheWay
-       ; traceTcRnWithStyle user_style dflags flag doc }
-
-traceTcRnWithStyle :: PprStyle -> DynFlags -> DumpFlag -> SDoc -> TcRn ()
--- ^ Unconditionally dump some trace output
+-- style. We 'PprUser' style if 'useUserStyle' is True.
 --
--- The DumpFlag is used only to set the output filename
--- for --dump-to-file, not to decide whether or not to output
--- That part is done by the caller
-traceTcRnWithStyle sty dflags flag doc
-  = do { real_doc <- prettyDoc dflags doc
-       ; liftIO $ dumpSDocWithStyle sty dflags flag "" real_doc }
-  where
-    -- Add current location if -dppr-debug
-    prettyDoc :: DynFlags -> SDoc -> TcRn SDoc
-    prettyDoc dflags doc = if hasPprDebug dflags
-       then do { loc  <- getSrcSpanM; return $ mkLocMessage SevOutput loc doc }
-       else return doc -- The full location is usually way too much
+dumpTcRn :: Bool -> DumpOptions -> String -> DumpFormat -> SDoc -> TcRn ()
+dumpTcRn useUserStyle dumpOpt title fmt doc = do
+  dflags <- getDynFlags
+  printer <- getPrintUnqualified dflags
+  real_doc <- wrapDocLoc doc
+  let sty = if useUserStyle
+              then mkUserStyle dflags printer AllTheWay
+              else mkDumpStyle dflags printer
+  liftIO $ dumpAction dflags sty dumpOpt title fmt real_doc
 
+-- | Add current location if -dppr-debug
+-- (otherwise the full location is usually way too much)
+wrapDocLoc :: SDoc -> TcRn SDoc
+wrapDocLoc doc = do
+  dflags <- getDynFlags
+  if hasPprDebug dflags
+    then do
+      loc <- getSrcSpanM
+      return (mkLocMessage SevOutput loc doc)
+    else
+      return doc
 
 getPrintUnqualified :: DynFlags -> TcRn PrintUnqualified
 getPrintUnqualified dflags
@@ -860,31 +831,28 @@ setSrcSpan (RealSrcSpan real_loc) thing_inside
 -- Don't overwrite useful info with useless:
 setSrcSpan (UnhelpfulSpan _) thing_inside = thing_inside
 
-addLocM :: HasSrcSpan a => (SrcSpanLess a -> TcM b) -> a -> TcM b
-addLocM fn (dL->L loc a) = setSrcSpan loc $ fn a
+addLocM :: (a -> TcM b) -> Located a -> TcM b
+addLocM fn (L loc a) = setSrcSpan loc $ fn a
 
-wrapLocM :: (HasSrcSpan a, HasSrcSpan b) =>
-            (SrcSpanLess a -> TcM (SrcSpanLess b)) -> a -> TcM b
+wrapLocM :: (a -> TcM b) -> Located a -> TcM (Located b)
 -- wrapLocM :: (a -> TcM b) -> Located a -> TcM (Located b)
-wrapLocM fn (dL->L loc a) = setSrcSpan loc $ do { b <- fn a
-                                                ; return (cL loc b) }
-wrapLocFstM :: (HasSrcSpan a, HasSrcSpan b) =>
-               (SrcSpanLess a -> TcM (SrcSpanLess b,c)) -> a -> TcM (b, c)
-wrapLocFstM fn (dL->L loc a) =
+wrapLocM fn (L loc a) = setSrcSpan loc $ do { b <- fn a
+                                                ; return (L loc b) }
+
+wrapLocFstM :: (a -> TcM (b,c)) -> Located a -> TcM (Located b, c)
+wrapLocFstM fn (L loc a) =
   setSrcSpan loc $ do
     (b,c) <- fn a
-    return (cL loc b, c)
+    return (L loc b, c)
 
-wrapLocSndM :: (HasSrcSpan a, HasSrcSpan c) =>
-               (SrcSpanLess a -> TcM (b, SrcSpanLess c)) -> a -> TcM (b, c)
-wrapLocSndM fn (dL->L loc a) =
+wrapLocSndM :: (a -> TcM (b, c)) -> Located a -> TcM (b, Located c)
+wrapLocSndM fn (L loc a) =
   setSrcSpan loc $ do
     (b,c) <- fn a
-    return (b, cL loc c)
+    return (b, L loc c)
 
-wrapLocM_ :: HasSrcSpan a =>
-             (SrcSpanLess a -> TcM ()) -> a -> TcM ()
-wrapLocM_ fn (dL->L loc a) = setSrcSpan loc (fn a)
+wrapLocM_ :: (a -> TcM ()) -> Located a -> TcM ()
+wrapLocM_ fn (L loc a) = setSrcSpan loc (fn a)
 
 -- Reporting errors
 
@@ -1239,7 +1207,7 @@ mapAndRecoverM f xs
 
 -- | Apply the function to all elements on the input list
 -- If all succeed, return the list of results
--- Othewise fail, propagating all errors
+-- Otherwise fail, propagating all errors
 mapAndReportM :: (a -> TcRn b) -> [a] -> TcRn [b]
 mapAndReportM f xs
   = do { mb_rs <- mapM (attemptM . f) xs
@@ -1288,7 +1256,7 @@ tryTcDiscardingErrs recover thing_inside
         ; case mb_res of
             Just res | not (errorsFound dflags msgs)
                      , not (insolubleWC lie)
-              -> -- 'main' succeeed with no errors
+              -> -- 'main' succeeded with no errors
                  do { addMessages msgs  -- msgs might still have warnings
                     ; emitConstraints lie
                     ; return res }
@@ -1667,8 +1635,7 @@ setLclTypeEnv :: TcLclEnv -> TcM a -> TcM a
 setLclTypeEnv lcl_env thing_inside
   = updLclEnv upd thing_inside
   where
-    upd env = env { tcl_env = tcl_env lcl_env,
-                    tcl_tyvars = tcl_tyvars lcl_env }
+    upd env = env { tcl_env = tcl_env lcl_env }
 
 traceTcConstraints :: String -> TcM ()
 traceTcConstraints msg
@@ -1684,7 +1651,8 @@ emitAnonWildCardHoleConstraint tv
        ; emitInsolubles $ unitBag $
          CHoleCan { cc_ev = CtDerived { ctev_pred = mkTyVarTy tv
                                       , ctev_loc  = ct_loc }
-                  , cc_hole = TypeHole (mkTyVarOcc "_") } }
+                  , cc_occ = mkTyVarOcc "_"
+                  , cc_hole = TypeHole } }
 
 emitNamedWildCardHoleConstraints :: [(Name, TcTyVar)] -> TcM ()
 emitNamedWildCardHoleConstraints wcs
@@ -1696,7 +1664,8 @@ emitNamedWildCardHoleConstraints wcs
     do_one ct_loc (name, tv)
        = CHoleCan { cc_ev = CtDerived { ctev_pred = mkTyVarTy tv
                                       , ctev_loc  = ct_loc' }
-                  , cc_hole = TypeHole (occName name) }
+                  , cc_occ = occName name
+                  , cc_hole = TypeHole }
        where
          real_span = case nameSrcSpan name of
                            RealSrcSpan span  -> span
@@ -1737,8 +1706,8 @@ constraints might be "variable out of scope" Hole constraints, and that
 might have been the actual original cause of the exception!  For
 example (#12529):
    f = p @ Int
-Here 'p' is out of scope, so we get an insolube Hole constraint. But
-the visible type application fails in the monad (thows an exception).
+Here 'p' is out of scope, so we get an insoluble Hole constraint. But
+the visible type application fails in the monad (throws an exception).
 We must not discard the out-of-scope error.
 
 So we /retain the insoluble constraints/ if there is an exception.
@@ -1770,22 +1739,6 @@ recordThUse = do { env <- getGblEnv; writeTcRef (tcg_th_used env) True }
 
 recordThSpliceUse :: TcM ()
 recordThSpliceUse = do { env <- getGblEnv; writeTcRef (tcg_th_splice_used env) True }
-
--- | When generating an out-of-scope error message for a variable matching a
--- binding in a later inter-splice group, the typechecker uses the splice
--- locations to provide details in the message about the scope of that binding.
-recordTopLevelSpliceLoc :: SrcSpan -> TcM ()
-recordTopLevelSpliceLoc (RealSrcSpan real_loc)
-  = do { env <- getGblEnv
-       ; let locs_var = tcg_th_top_level_locs env
-       ; locs0 <- readTcRef locs_var
-       ; writeTcRef locs_var (Set.insert real_loc locs0) }
-recordTopLevelSpliceLoc (UnhelpfulSpan _) = return ()
-
-getTopLevelSpliceLocs :: TcM (Set RealSrcSpan)
-getTopLevelSpliceLocs
-  = do { env <- getGblEnv
-       ; readTcRef (tcg_th_top_level_locs env) }
 
 keepAlive :: Name -> TcRn ()     -- Record the name in the keep-alive set
 keepAlive name
@@ -1964,12 +1917,8 @@ forkM_maybe :: SDoc -> IfL a -> IfL (Maybe a)
 -- signatures, which is pretty benign
 
 forkM_maybe doc thing_inside
- -- NB: Don't share the mutable env_us with the interleaved thread since env_us
- --     does not get updated atomically (e.g. in newUnique and newUniqueSupply).
- = do { child_us <- newUniqueSupply
-      ; child_env_us <- newMutVar child_us
-        -- see Note [Masking exceptions in forkM_maybe]
-      ; unsafeInterleaveM $ uninterruptibleMaskM_ $ updEnv (\env -> env { env_us = child_env_us }) $
+ = do { -- see Note [Masking exceptions in forkM_maybe]
+      ; unsafeInterleaveM $ uninterruptibleMaskM_ $
         do { traceIf (text "Starting fork {" <+> doc)
            ; mb_res <- tryM $
                        updLclEnv (\env -> env { if_loc = if_loc env $$ doc }) $

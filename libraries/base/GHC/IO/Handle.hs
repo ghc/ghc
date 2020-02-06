@@ -676,21 +676,23 @@ This can be used to retarget the standard Handles, for example:
 hDuplicateTo :: Handle -> Handle -> IO ()
 hDuplicateTo h1@(FileHandle path m1) h2@(FileHandle _ m2)  = do
  withHandle__' "hDuplicateTo" h2 m2 $ \h2_ -> do
-   _ <- hClose_help h2_
+   try $ flushWriteBuffer h2_
    withHandle_' "hDuplicateTo" h1 m1 $ \h1_ -> do
      dupHandleTo path h1 Nothing h2_ h1_ (Just handleFinalizer)
 hDuplicateTo h1@(DuplexHandle path r1 w1) h2@(DuplexHandle _ r2 w2)  = do
  withHandle__' "hDuplicateTo" h2 w2  $ \w2_ -> do
-   _ <- hClose_help w2_
+   try $ flushWriteBuffer w2_
    withHandle_' "hDuplicateTo" h1 w1 $ \w1_ -> do
      dupHandleTo path h1 Nothing w2_ w1_ (Just handleFinalizer)
  withHandle__' "hDuplicateTo" h2 r2  $ \r2_ -> do
-   _ <- hClose_help r2_
+   try $ flushWriteBuffer r2_
    withHandle_' "hDuplicateTo" h1 r1 $ \r1_ -> do
      dupHandleTo path h1 (Just w1) r2_ r1_ Nothing
 hDuplicateTo h1 _ =
   ioe_dupHandlesNotCompatible h1
 
+try :: IO () -> IO ()
+try io = io `catchException` (const (pure ()) :: SomeException -> IO ())
 
 ioe_dupHandlesNotCompatible :: Handle -> IO a
 ioe_dupHandlesNotCompatible h =

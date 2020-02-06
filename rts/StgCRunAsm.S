@@ -1,8 +1,12 @@
 #include "ghcconfig.h"
 #include "rts/Constants.h"
 
+/* If the RTS mini interpreter is used, e.g. for unregisterised builds,
+ * then functions StgRun/StgReturn are implemented in file StgCRun.c */
+#if !defined(USE_MINIINTERPRETER)
+
 #if defined(powerpc64le_HOST_ARCH)
-# ifdef linux_HOST_OS
+# if defined(linux_HOST_OS)
 # define STACK_FRAME_SIZE RESERVED_C_STACK_BYTES+304
 	.file	"StgCRun.c"
 	.abiversion 2
@@ -180,4 +184,98 @@ StgReturn:
 	blr
 
 # endif // aix_HOST_OS
+
+#elif defined(s390x_HOST_ARCH)
+# define STACK_FRAME_SIZE (RESERVED_C_STACK_BYTES+160)
+	.text
+	.align 8
+	.globl StgRun
+	.type StgRun, @function
+StgRun:
+	.cfi_startproc
+	/* save callee-saved registers */
+	stmg %r6,%r14,16(%r15)
+	std  %f8,     88(%r15)
+	std  %f9,     96(%r15)
+	std  %f10,   104(%r15)
+	std  %f11,   112(%r15)
+	std  %f12,   120(%r15)
+	std  %f13,   128(%r15)
+	std  %f14,   136(%r15)
+	std  %f15,   144(%r15)
+	.cfi_offset  6, -144
+	.cfi_offset  7, -136
+	.cfi_offset  8, -128
+	.cfi_offset  9, -120
+	.cfi_offset 10, -112
+	.cfi_offset 11, -104
+	.cfi_offset 12,  -96
+	.cfi_offset 13,  -88
+	.cfi_offset 14,  -80
+	.cfi_offset 15,  -72
+	.cfi_offset 24,  -64
+	.cfi_offset 28,  -56
+	.cfi_offset 25,  -48
+	.cfi_offset 29,  -40
+	.cfi_offset 26,  -32
+	.cfi_offset 30,  -24
+	.cfi_offset 27,  -16
+	.cfi_offset 31,   -8
+	/* allocate stack frame */
+	aghi %r15,-STACK_FRAME_SIZE
+	.cfi_def_cfa_offset -(STACK_FRAME_SIZE+160)
+	/* set STGs BaseReg from S390Xs r3 */
+	lgr  %r7,%r3
+	/* jump to STG function */
+	br   %r2
+	.cfi_endproc
+	.size StgRun, .-StgRun
+
+	.text
+	.align 8
+	.globl StgReturn
+	.type StgReturn, @function
+StgReturn:
+	.cfi_startproc
+	/* set return value from STGs R1 (S390Xs r11) */
+	lgr  %r2,%r11
+	/* deallocate stack frame */
+	aghi %r15,STACK_FRAME_SIZE
+	.cfi_def_cfa_offset (STACK_FRAME_SIZE+160)
+	/* restore callee-saved registers */
+	lmg  %r6,%r14, 16(%r15)
+	ld   %f8,      88(%r15)
+	ld   %f9,      96(%r15)
+	ld   %f10,    104(%r15)
+	ld   %f11,    112(%r15)
+	ld   %f12,    120(%r15)
+	ld   %f13,    128(%r15)
+	ld   %f14,    136(%r15)
+	ld   %f15,    144(%r15)
+	.cfi_restore  6
+	.cfi_restore  7
+	.cfi_restore  8
+	.cfi_restore  9
+	.cfi_restore 10
+	.cfi_restore 11
+	.cfi_restore 12
+	.cfi_restore 13
+	.cfi_restore 14
+	.cfi_restore 24
+	.cfi_restore 28
+	.cfi_restore 25
+	.cfi_restore 29
+	.cfi_restore 26
+	.cfi_restore 30
+	.cfi_restore 27
+	.cfi_restore 31
+	.cfi_def_cfa 15, 160
+	/* jump back to caller of StgRun() */
+	br   %r14
+	.cfi_endproc
+	.size StgReturn, .-StgReturn
+
+	.section	.note.GNU-stack,"",@progbits
 #endif
+
+#endif /* !USE_MINIINTERPRETER */

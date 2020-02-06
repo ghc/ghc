@@ -10,6 +10,8 @@
 {-# LANGUAGE FlexibleContexts #-}
 {-# LANGUAGE TypeFamilies #-}
 
+{-# OPTIONS_GHC -Wno-incomplete-uni-patterns   #-}
+
 module TcExpr ( tcPolyExpr, tcMonoExpr, tcMonoExprNC,
                 tcInferSigma, tcInferSigmaNC, tcInferRho, tcInferRhoNC,
                 tcSyntaxOp, tcSyntaxOpGen, SyntaxOpType(..), synKnownType,
@@ -24,7 +26,8 @@ import GhcPrelude
 import {-# SOURCE #-}   TcSplice( tcSpliceExpr, tcTypedBracket, tcUntypedBracket )
 import THNames( liftStringName, liftName )
 
-import HsSyn
+import GHC.Hs
+import Constraint       ( HoleSort(..) )
 import TcHsSyn
 import TcRnMonad
 import TcUnify
@@ -35,8 +38,8 @@ import TcSigs           ( tcUserTypeSig, tcInstSig )
 import TcSimplify       ( simplifyInfer, InferMode(..) )
 import FamInst          ( tcGetFamInstEnvs, tcLookupDataFamInst )
 import FamInstEnv       ( FamInstEnvs )
-import RnEnv            ( addUsedGRE )
-import RnUtils          ( addNameClashErrRn, unknownSubordinateErr )
+import GHC.Rename.Env   ( addUsedGRE )
+import GHC.Rename.Utils ( addNameClashErrRn, unknownSubordinateErr )
 import TcEnv
 import TcArrows
 import TcMatches
@@ -44,6 +47,7 @@ import TcHsType
 import TcPatSyn( tcPatSynBuilderOcc, nonBidirectionalErr )
 import TcPat
 import TcMType
+import TcOrigin
 import TcType
 import Id
 import IdInfo
@@ -56,12 +60,13 @@ import NameSet
 import RdrName
 import TyCon
 import TyCoRep
+import TyCoPpr
+import TyCoSubst (substTyWithInScope)
 import Type
 import TcEvidence
 import VarSet
-import MkId( seqId )
 import TysWiredIn
-import TysPrim( intPrimTy, mkTemplateTyVars, tYPE )
+import TysPrim( intPrimTy )
 import PrimOp( tagToEnumKey )
 import PrelNames
 import DynFlags
@@ -178,17 +183,15 @@ tcExpr e@(HsLit x lit) res_ty
 tcExpr (HsPar x expr) res_ty = do { expr' <- tcMonoExprNC expr res_ty
                                   ; return (HsPar x expr') }
 
-tcExpr (HsSCC x src lbl expr) res_ty
+tcExpr (HsPragE x prag expr) res_ty
   = do { expr' <- tcMonoExpr expr res_ty
-       ; return (HsSCC x src lbl expr') }
-
-tcExpr (HsTickPragma x src info srcInfo expr) res_ty
-  = do { expr' <- tcMonoExpr expr res_ty
-       ; return (HsTickPragma x src info srcInfo expr') }
-
-tcExpr (HsCoreAnn x src lbl expr) res_ty
-  = do  { expr' <- tcMonoExpr expr res_ty
-        ; return (HsCoreAnn x src lbl expr') }
+       ; return (HsPragE x (tc_prag prag) expr') }
+  where
+    tc_prag :: HsPragE GhcRn -> HsPragE GhcTc
+    tc_prag (HsPragSCC x1 src ann) = HsPragSCC x1 src ann
+    tc_prag (HsPragCore x1 src lbl) = HsPragCore x1 src lbl
+    tc_prag (HsPragTick x1 src info srcInfo) = HsPragTick x1 src info srcInfo
+    tc_prag (XHsPragE x) = noExtCon x
 
 tcExpr (HsOverLit x lit) res_ty
   = do  { lit' <- newOverloadedLit lit res_ty
@@ -331,39 +334,9 @@ rule just for saturated applications of ($).
   * Decompose it; should be of form (arg2_ty -> res_ty),
        where arg2_ty might be a polytype
   * Use arg2_ty to typecheck arg2
-
-Note [Typing rule for seq]
-~~~~~~~~~~~~~~~~~~~~~~~~~~
-We want to allow
-       x `seq` (# p,q #)
-which suggests this type for seq:
-   seq :: forall (a:*) (b:Open). a -> b -> b,
-with (b:Open) meaning that be can be instantiated with an unboxed
-tuple.  The trouble is that this might accept a partially-applied
-'seq', and I'm just not certain that would work.  I'm only sure it's
-only going to work when it's fully applied, so it turns into
-    case x of _ -> (# p,q #)
-
-So it seems more uniform to treat 'seq' as if it was a language
-construct.
-
-See also Note [seqId magic] in MkId
 -}
 
 tcExpr expr@(OpApp fix arg1 op arg2) res_ty
-  | (L loc (HsVar _ (L lv op_name))) <- op
-  , op_name `hasKey` seqIdKey           -- Note [Typing rule for seq]
-  = do { arg1_ty <- newFlexiTyVarTy liftedTypeKind
-       ; let arg2_exp_ty = res_ty
-       ; arg1' <- tcArg op arg1 arg1_ty 1
-       ; arg2' <- addErrCtxt (funAppCtxt op arg2 2) $
-                  tc_poly_expr_nc arg2 arg2_exp_ty
-       ; arg2_ty <- readExpType arg2_exp_ty
-       ; op_id <- tcLookupId op_name
-       ; let op' = L loc (mkHsWrap (mkWpTyApps [arg1_ty, arg2_ty])
-                                   (HsVar noExtField (L lv op_id)))
-       ; return $ OpApp fix arg1' op' arg2' }
-
   | (L loc (HsVar _ (L lv op_name))) <- op
   , op_name `hasKey` dollarIdKey        -- Note [Typing rule for ($)]
   = do { traceTc "Application rule" (ppr op)
@@ -466,6 +439,8 @@ tcExpr expr@(ExplicitTuple x tup_args boxity) res_ty
   | all tupArgPresent tup_args
   = do { let arity  = length tup_args
              tup_tc = tupleTyCon boxity arity
+               -- NB: tupleTyCon doesn't flatten 1-tuples
+               -- See Note [Don't flatten tuples from HsSyn] in MkCore
        ; res_ty <- expTypeToType res_ty
        ; (coi, arg_tys) <- matchExpectedTyConApp tup_tc res_ty
                            -- Unboxed tuples have RuntimeRep vars, which we
@@ -485,7 +460,8 @@ tcExpr expr@(ExplicitTuple x tup_args boxity) res_ty
            ; Unboxed -> replicateM arity newOpenFlexiTyVarTy }
        ; let actual_res_ty
                  = mkVisFunTys [ty | (ty, (L _ (Missing _))) <- arg_tys `zip` tup_args]
-                            (mkTupleTy boxity arg_tys)
+                            (mkTupleTy1 boxity arg_tys)
+                   -- See Note [Don't flatten tuples from HsSyn] in MkCore
 
        ; wrap <- tcSubTypeHR (Shouldn'tHappenOrigin "ExpTuple")
                              (Just expr)
@@ -505,6 +481,8 @@ tcExpr (ExplicitSum _ alt arity expr) res_ty
        ; expr' <- tcPolyExpr expr (arg_tys' `getNth` (alt - 1))
        ; return $ mkHsWrapCo coi (ExplicitSum arg_tys' alt arity expr' ) }
 
+-- This will see the empty list only when -XOverloadedLists.
+-- See Note [Empty lists] in GHC.Hs.Expr.
 tcExpr (ExplicitList _ witness exprs) res_ty
   = case witness of
       Nothing   -> do  { res_ty <- expTypeToType res_ty
@@ -992,10 +970,10 @@ tcExpr (ArithSeq _ witness seq) res_ty
 ************************************************************************
 -}
 
--- HsSpliced is an annotation produced by 'RnSplice.rnSpliceExpr'.
+-- HsSpliced is an annotation produced by 'GHC.Rename.Splice.rnSpliceExpr'.
 -- Here we get rid of it and add the finalizers to the global environment.
 --
--- See Note [Delaying modFinalizers in untyped splices] in RnSplice.
+-- See Note [Delaying modFinalizers in untyped splices] in GHC.Rename.Splice.
 tcExpr (HsSpliceE _ (HsSpliced _ mod_finalizers (HsSplicedExpr expr)))
        res_ty
   = do addModFinalizersWithLclEnv mod_finalizers
@@ -1087,7 +1065,7 @@ arithSeqEltType (Just fl) res_ty
 ************************************************************************
 -}
 
--- HsArg is defined in HsTypes.hs
+-- HsArg is defined in GHC.Hs.Types
 
 wrapHsArgs :: (NoGhcTc (GhcPass id) ~ GhcRn)
            => LHsExpr (GhcPass id)
@@ -1102,6 +1080,10 @@ isHsValArg :: HsArg tm ty -> Bool
 isHsValArg (HsValArg {})  = True
 isHsValArg (HsTypeArg {}) = False
 isHsValArg (HsArgPar {})  = False
+
+isHsTypeArg :: HsArg tm ty -> Bool
+isHsTypeArg (HsTypeArg {}) = True
+isHsTypeArg _              = False
 
 isArgPar :: HsArg tm ty -> Bool
 isArgPar (HsArgPar {})  = True
@@ -1148,38 +1130,13 @@ tcApp m_herald fun@(L loc (HsRecFld _ fld_lbl)) args res_ty
        ; (tc_fun, fun_ty) <- tcInferRecSelId (Unambiguous sel_name lbl)
        ; tcFunApp m_herald fun (L loc tc_fun) fun_ty args res_ty }
 
-tcApp m_herald fun@(L loc (HsVar _ (L _ fun_id))) args res_ty
+tcApp _m_herald (L loc (HsVar _ (L _ fun_id))) args res_ty
   -- Special typing rule for tagToEnum#
   | fun_id `hasKey` tagToEnumKey
   , n_val_args == 1
   = tcTagToEnum loc fun_id args res_ty
-
-  -- Special typing rule for 'seq'
-  -- In the saturated case, behave as if seq had type
-  --    forall a (b::TYPE r). a -> b -> b
-  -- for some type r.  See Note [Typing rule for seq]
-  | fun_id `hasKey` seqIdKey
-  , n_val_args == 2
-  = do { rep <- newFlexiTyVarTy runtimeRepTy
-       ; let [alpha, beta] = mkTemplateTyVars [liftedTypeKind, tYPE rep]
-             seq_ty = mkSpecForAllTys [alpha,beta]
-                      (mkTyVarTy alpha `mkVisFunTy` mkTyVarTy beta `mkVisFunTy` mkTyVarTy beta)
-             seq_fun = L loc (HsVar noExtField (L loc seqId))
-             -- seq_ty = forall (a:*) (b:TYPE r). a -> b -> b
-             -- where 'r' is a meta type variable
-        ; tcFunApp m_herald fun seq_fun seq_ty args res_ty }
   where
     n_val_args = count isHsValArg args
-
-tcApp _ (L loc (ExplicitList _ Nothing [])) [HsTypeArg _ ty_arg] res_ty
-  -- See Note [Visible type application for the empty list constructor]
-  = do { ty_arg' <- tcHsTypeApp ty_arg liftedTypeKind
-       ; let list_ty = TyConApp listTyCon [ty_arg']
-       ; _ <- tcSubTypeDS (OccurrenceOf nilDataConName) GenSigCtxt
-                          list_ty res_ty
-       ; let expr :: LHsExpr GhcTcId
-             expr = L loc $ ExplicitList ty_arg' Nothing []
-       ; return (idHsWrapper, expr, []) }
 
 tcApp m_herald fun args res_ty
   = do { (tc_fun, fun_ty) <- tcInferFun fun
@@ -1232,26 +1189,6 @@ mk_app_msg fun args = sep [ text "The" <+> text what <+> quotes (ppr expr)
 mk_op_msg :: LHsExpr GhcRn -> SDoc
 mk_op_msg op = text "The operator" <+> quotes (ppr op) <+> text "takes"
 
-{-
-Note [Visible type application for the empty list constructor]
-~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
-Getting the expression [] @Int to typecheck is slightly tricky since [] isn't
-an ordinary data constructor. By default, when tcExpr typechecks a list
-expression, it wraps the expression in a coercion, which gives it a type to the
-effect of p[a]. It isn't until later zonking that the type becomes
-forall a. [a], but that's too late for visible type application.
-
-The workaround is to check for empty list expressions that have a visible type
-argument in tcApp, and if so, directly typecheck [] @ty data constructor name.
-This avoids the intermediate coercion and produces an expression of type [ty],
-as one would intuitively expect.
-
-Unfortunately, this workaround isn't terribly robust, since more involved
-expressions such as (let in []) @Int won't work. Until a more elegant fix comes
-along, however, this at least allows direct type application on [] to work,
-which is better than before.
--}
-
 ----------------
 tcInferFun :: LHsExpr GhcRn -> TcM (LHsExpr GhcTcId, TcSigmaType)
 -- Infer type of a function
@@ -1282,6 +1219,14 @@ tcArgs :: LHsExpr GhcRn   -- ^ The function itself (for err msgs only)
        -> TcM (HsWrapper, [LHsExprArgOut], TcSigmaType)
           -- ^ (a wrapper for the function, the tc'd args, result type)
 tcArgs fun orig_fun_ty fun_orig orig_args herald
+  | fun_is_out_of_scope
+  , any isHsTypeArg orig_args
+  = failM  -- See Note [VTA for out-of-scope functions]
+    -- We have /already/ emitted a CHoleCan constraint (in tcInferFun),
+    -- which will later cough up a "Variable not in scope error", so
+    -- we can simply fail now, avoiding a confusing error cascade
+
+  | otherwise
   = go [] 1 orig_fun_ty orig_args
   where
     -- Don't count visible type arguments when determining how many arguments
@@ -1289,6 +1234,11 @@ tcArgs fun orig_fun_ty fun_orig orig_args herald
     -- arguments reported as a part of the expression herald itself.
     -- See Note [Herald for matchExpectedFunTys] in TcUnify.
     orig_expr_args_arity = count isHsValArg orig_args
+
+    fun_is_out_of_scope  -- See Note [VTA for out-of-scope functions]
+      = case fun of
+          L _ (HsUnboundVar {}) -> True
+          _                     -> False
 
     go _ _ fun_ty [] = return (idHsWrapper, [], fun_ty)
 
@@ -1372,6 +1322,33 @@ GHCs we had an ASSERT that Required could not occur here.
 
 The ice is thin; c.f. Note [No Required TyCoBinder in terms]
 in TyCoRep.
+
+Note [VTA for out-of-scope functions]
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+Suppose 'wurble' is not in scope, and we have
+   (wurble @Int @Bool True 'x')
+
+Then the renamer will make (HsUnboundVar "wurble) for 'wurble',
+and the typechecker will typecheck it with tcUnboundId, giving it
+a type 'alpha', and emitting a deferred CHoleCan constraint, to
+be reported later.
+
+But then comes the visible type application. If we do nothing, we'll
+generate an immediate failure (in tc_app_err), saying that a function
+of type 'alpha' can't be applied to Bool.  That's insane!  And indeed
+users complain bitterly (#13834, #17150.)
+
+The right error is the CHoleCan, which reports 'wurble' as out of
+scope, and tries to give its type.
+
+Fortunately in tcArgs we still have access to the function, so
+we can check if it is a HsUnboundVar.  If so, we simply fail
+immediately.  We've already inferred the type of the function,
+so we'll /already/ have emitted a CHoleCan constraint; failing
+preserves that constraint.
+
+A mild shortcoming of this approach is that we thereby
+don't typecheck any of the arguments, but so be it.
 
 Note [Visible type application zonk]
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
@@ -1828,7 +1805,7 @@ tc_infer_id lbl id_name
       | otherwise                  = return ()
 
 
-tcUnboundId :: HsExpr GhcRn -> UnboundVar -> ExpRhoType -> TcM (HsExpr GhcTcId)
+tcUnboundId :: HsExpr GhcRn -> OccName -> ExpRhoType -> TcM (HsExpr GhcTcId)
 -- Typecheck an occurrence of an unbound Id
 --
 -- Some of these started life as a true expression hole "_".
@@ -1837,15 +1814,14 @@ tcUnboundId :: HsExpr GhcRn -> UnboundVar -> ExpRhoType -> TcM (HsExpr GhcTcId)
 -- We turn all of them into HsVar, since HsUnboundVar can't contain an
 -- Id; and indeed the evidence for the CHoleCan does bind it, so it's
 -- not unbound any more!
-tcUnboundId rn_expr unbound res_ty
+tcUnboundId rn_expr occ res_ty
  = do { ty <- newOpenFlexiTyVarTy  -- Allow Int# etc (#12531)
-      ; let occ = unboundVarOcc unbound
       ; name <- newSysName occ
       ; let ev = mkLocalId name ty
-      ; can <- newHoleCt (ExprHole unbound) ev ty
+      ; can <- newHoleCt ExprHole ev ty
       ; emitInsoluble can
-      ; tcWrapResultO (UnboundOccurrenceOf occ) rn_expr (HsVar noExtField (noLoc ev))
-                                                                          ty res_ty }
+      ; tcWrapResultO (UnboundOccurrenceOf occ) rn_expr
+          (HsVar noExtField (noLoc ev)) ty res_ty }
 
 
 {-
@@ -1983,6 +1959,9 @@ too_many_args fun args
 -}
 
 checkThLocalId :: Id -> TcM ()
+-- The renamer has already done checkWellStaged,
+--   in RnSplice.checkThLocalName, so don't repeat that here.
+-- Here we just just add constraints fro cross-stage lifting
 checkThLocalId id
   = do  { mb_local_use <- getStageAndBindLevel (idName id)
         ; case mb_local_use of
@@ -1999,15 +1978,14 @@ checkCrossStageLifting :: TopLevelFlag -> Id -> ThStage -> TcM ()
 -- we must check whether there's a cross-stage lift to do
 -- Examples   \x -> [|| x ||]
 --            [|| map ||]
--- There is no error-checking to do, because the renamer did that
 --
--- This is similar to checkCrossStageLifting in RnSplice, but
+-- This is similar to checkCrossStageLifting in GHC.Rename.Splice, but
 -- this code is applied to *typed* brackets.
 
-checkCrossStageLifting top_lvl id (Brack _ (TcPending ps_var lie_var))
+checkCrossStageLifting top_lvl id (Brack _ (TcPending ps_var lie_var q))
   | isTopLevel top_lvl
   = when (isExternalName id_name) (keepAlive id_name)
-    -- See Note [Keeping things alive for Template Haskell] in RnSplice
+    -- See Note [Keeping things alive for Template Haskell] in GHC.Rename.Splice
 
   | otherwise
   =     -- Nested identifiers, such as 'x' in
@@ -2041,7 +2019,8 @@ checkCrossStageLifting top_lvl id (Brack _ (TcPending ps_var lie_var))
                    -- Update the pending splices
         ; ps <- readMutVar ps_var
         ; let pending_splice = PendingTcSplice id_name
-                                 (nlHsApp (noLoc lift) (nlHsVar id))
+                                 (nlHsApp (mkLHsWrap (applyQuoteWrapper q) (noLoc lift))
+                                          (nlHsVar id))
         ; writeMutVar ps_var (pending_splice : ps)
 
         ; return () }
@@ -2192,7 +2171,7 @@ particular update is sufficiently obvious for the signature to be
 omitted. Moreover, this might change the behaviour of typechecker in
 non-obvious ways.
 
-See also Note [HsRecField and HsRecUpdField] in HsPat.
+See also Note [HsRecField and HsRecUpdField] in GHC.Hs.Pat.
 -}
 
 -- Given a RdrName that refers to multiple record fields, and the type
@@ -2509,7 +2488,7 @@ addExprErrCtxt expr = addErrCtxt (exprCtxt expr)
 
 exprCtxt :: LHsExpr GhcRn -> SDoc
 exprCtxt expr
-  = hang (text "In the expression:") 2 (ppr expr)
+  = hang (text "In the expression:") 2 (ppr (stripParensHsExpr expr))
 
 fieldCtxt :: FieldLabelString -> SDoc
 fieldCtxt field_name

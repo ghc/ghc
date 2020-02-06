@@ -18,11 +18,11 @@ import GhcPrelude
 
 import Reg
 
-import BlockId
-import Hoopl.Collections
-import Hoopl.Label
+import GHC.Cmm.BlockId
+import GHC.Cmm.Dataflow.Collections
+import GHC.Cmm.Dataflow.Label
 import DynFlags
-import Cmm hiding (topInfoTable)
+import GHC.Cmm hiding (topInfoTable)
 import GHC.Platform
 
 -- | Holds a list of source and destination registers used by a
@@ -46,14 +46,14 @@ noUsage  = RU [] []
 -- Type synonyms for Cmm populated with native code
 type NatCmm instr
         = GenCmmGroup
-                CmmStatics
-                (LabelMap CmmStatics)
+                RawCmmStatics
+                (LabelMap RawCmmStatics)
                 (ListGraph instr)
 
 type NatCmmDecl statics instr
         = GenCmmDecl
                 statics
-                (LabelMap CmmStatics)
+                (LabelMap RawCmmStatics)
                 (ListGraph instr)
 
 

@@ -1,0 +1,4 @@
+
+T13363b.hs:17:1: warning: [-Woverlapping-patterns (in -Wdefault)]
+    Pattern match is redundant
+    In an equation for ‘f’: f _ = ...

@@ -4,16 +4,18 @@
 {-# LANGUAGE FlexibleContexts #-}
 {-# LANGUAGE ViewPatterns #-}
 
+{-# OPTIONS_GHC -Wno-incomplete-record-updates #-}
+
 module ExtractDocs (extractDocs) where
 
 import GhcPrelude
 import Bag
-import HsBinds
-import HsDoc
-import HsDecls
-import HsExtension
-import HsTypes
-import HsUtils
+import GHC.Hs.Binds
+import GHC.Hs.Doc
+import GHC.Hs.Decls
+import GHC.Hs.Extension
+import GHC.Hs.Types
+import GHC.Hs.Utils
 import Name
 import NameSet
 import SrcLoc
@@ -141,13 +143,13 @@ getInstLoc :: InstDecl (GhcPass p) -> SrcSpan
 getInstLoc = \case
   ClsInstD _ (ClsInstDecl { cid_poly_ty = ty }) -> getLoc (hsSigType ty)
   DataFamInstD _ (DataFamInstDecl
-    { dfid_eqn = HsIB { hsib_body = FamEqn { feqn_tycon = (dL->L l _) }}}) -> l
+    { dfid_eqn = HsIB { hsib_body = FamEqn { feqn_tycon = L l _ }}}) -> l
   TyFamInstD _ (TyFamInstDecl
     -- Since CoAxioms' Names refer to the whole line for type family instances
     -- in particular, we need to dig a bit deeper to pull out the entire
     -- equation. This does not happen for data family instances, for some
     -- reason.
-    { tfid_eqn = HsIB { hsib_body = FamEqn { feqn_rhs = (dL->L l _) }}}) -> l
+    { tfid_eqn = HsIB { hsib_body = FamEqn { feqn_rhs = L l _ }}}) -> l
   ClsInstD _ (XClsInstDecl _) -> error "getInstLoc"
   DataFamInstD _ (DataFamInstDecl (HsIB _ (XFamEqn _))) -> error "getInstLoc"
   TyFamInstD _ (TyFamInstDecl (HsIB _ (XFamEqn _))) -> error "getInstLoc"
@@ -164,7 +166,7 @@ subordinates :: Map SrcSpan Name
 subordinates instMap decl = case decl of
   InstD _ (ClsInstD _ d) -> do
     DataFamInstDecl { dfid_eqn = HsIB { hsib_body =
-      FamEqn { feqn_tycon = (dL->L l _)
+      FamEqn { feqn_tycon = L l _
              , feqn_rhs   = defn }}} <- unLoc <$> cid_datafam_insts d
     [ (n, [], M.empty) | Just n <- [M.lookup l instMap] ] ++ dataSubs defn
 
@@ -175,7 +177,7 @@ subordinates instMap decl = case decl of
   _ -> []
   where
     classSubs dd = [ (name, doc, declTypeDocs d)
-                   | (dL->L _ d, doc) <- classDecls dd
+                   | (L _ d, doc) <- classDecls dd
                    , name <- getMainDeclBinder d, not (isValD d)
                    ]
     dataSubs :: HsDataDefn GhcRn
@@ -189,8 +191,8 @@ subordinates instMap decl = case decl of
                   | c <- cons, cname <- getConNames c ]
         fields  = [ (extFieldOcc n, maybeToList $ fmap unLoc doc, M.empty)
                   | RecCon flds <- map getConArgs cons
-                  , (dL->L _ (ConDeclField _ ns _ doc)) <- (unLoc flds)
-                  , (dL->L _ n) <- ns ]
+                  , (L _ (ConDeclField _ ns _ doc)) <- (unLoc flds)
+                  , (L _ n) <- ns ]
         derivs  = [ (instName, [unLoc doc], M.empty)
                   | (l, doc) <- mapMaybe (extract_deriv_ty . hsib_body) $
                                 concatMap (unLoc . deriv_clause_tys . unLoc) $
@@ -198,15 +200,15 @@ subordinates instMap decl = case decl of
                   , Just instName <- [M.lookup l instMap] ]
 
         extract_deriv_ty :: LHsType GhcRn -> Maybe (SrcSpan, LHsDocString)
-        extract_deriv_ty ty =
-          case dL ty of
+        extract_deriv_ty (L l ty) =
+          case ty of
             -- deriving (forall a. C a {- ^ Doc comment -})
-            L l (HsForAllTy{ hst_fvf = ForallInvis
-                           , hst_body = dL->L _ (HsDocTy _ _ doc) })
-                                  -> Just (l, doc)
+            HsForAllTy{ hst_fvf = ForallInvis
+                      , hst_body = L _ (HsDocTy _ _ doc) }
+                            -> Just (l, doc)
             -- deriving (C a {- ^ Doc comment -})
-            L l (HsDocTy _ _ doc) -> Just (l, doc)
-            _                     -> Nothing
+            HsDocTy _ _ doc -> Just (l, doc)
+            _               -> Nothing
 
 -- | Extract constructor argument docs from inside constructor decls.
 conArgDocs :: ConDecl GhcRn -> Map Int (HsDocString)
@@ -289,7 +291,7 @@ ungroup group_ =
   mkDecls (typesigs . hs_valds)  (SigD noExtField)   group_ ++
   mkDecls (valbinds . hs_valds)  (ValD noExtField)   group_
   where
-    typesigs (XValBindsLR (NValBinds _ sigs)) = filter (isUserSig . unLoc) sigs
+    typesigs (XValBindsLR (NValBinds _ sig)) = filter (isUserSig . unLoc) sig
     typesigs ValBinds{} = error "expected XValBindsLR"
 
     valbinds (XValBindsLR (NValBinds binds _)) =

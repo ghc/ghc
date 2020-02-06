@@ -61,7 +61,7 @@
 # define _DEFAULT_SOURCE
 #endif
 
-#if IN_STG_CODE == 0 || defined(llvm_CC_FLAVOR)
+#if IN_STG_CODE == 0 || defined(CC_LLVM_BACKEND)
 // C compilers that use an LLVM back end (clang or llvm-gcc) do not
 // correctly support global register variables so we make sure that
 // we do not declare them for these compilers.
@@ -314,7 +314,7 @@ external prototype return neither of these types to workaround #11395.
    -------------------------------------------------------------------------- */
 
 #include "stg/DLL.h"
-#include "stg/RtsMachRegs.h"
+#include "stg/MachRegsForHost.h"
 #include "stg/Regs.h"
 #include "stg/Ticky.h"
 
@@ -597,3 +597,4 @@ typedef union {
   c;                                            \
 })
 #endif
+

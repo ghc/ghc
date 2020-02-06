@@ -14,7 +14,7 @@
 # 	- config.mk is auto-generated from config.mk.in by configure.
 #	  If you edit config.mk your changes will be spammed.
 #
-#	- Settings in this file may be overriden by giving replacement
+#	- Settings in this file may be overridden by giving replacement
 #	  definitions in build.mk.  See build.mk.sample for a good
 #	  starting point for a build.mk file.
 #
@@ -192,7 +192,7 @@ ifeq "$(TargetArch_CPP)" "arm"
 # We don't support load/store barriers pre-ARMv7. See #10433.
 ArchSupportsSMP=$(if $(filter $(ARM_ISA),ARMv5 ARMv6),NO,YES)
 else
-ArchSupportsSMP=$(strip $(patsubst $(TargetArch_CPP), YES, $(findstring $(TargetArch_CPP), i386 x86_64 sparc powerpc powerpc64 powerpc64le aarch64)))
+ArchSupportsSMP=$(strip $(patsubst $(TargetArch_CPP), YES, $(findstring $(TargetArch_CPP), i386 x86_64 sparc powerpc powerpc64 powerpc64le s390x aarch64)))
 endif
 
 # The THREADED_RTS requires `BaseReg` to be in a register and the
@@ -209,17 +209,6 @@ ifeq "$(OsSupportsGHCi)$(ArchSupportsGHCi)" "YESYES"
 GhcWithInterpreter=YES
 else
 GhcWithInterpreter=$(if $(findstring YES,$(DYNAMIC_GHC_PROGRAMS)),YES,NO)
-endif
-
-# GhcEnableTablesNextToCode tells us whether the target architecture
-# supports placing info tables directly before the entry code
-# (see TABLES_NEXT_TO_CODE in the RTS).  Whether we actually compile for
-# TABLES_NEXT_TO_CODE depends on whether we're building unregisterised
-# code or not, which may be decided by options to the compiler later.
-ifneq "$(findstring $(TargetArch_CPP)X, ia64X powerpc64X powerpc64leX)" ""
-GhcEnableTablesNextToCode=NO
-else
-GhcEnableTablesNextToCode=YES
 endif
 
 # Whether to use libffi for adjustors (foreign import "wrapper") or
@@ -374,9 +363,13 @@ UseSystemLibFFI=@UseSystemLibFFI@
 FFILibDir=@FFILibDir@
 FFIIncludeDir=@FFIIncludeDir@
 
+UseLibdw=@UseLibdw@
+LibdwLibDir=@LibdwLibDir@
+LibdwIncludeDir=@LibdwIncludeDir@
+
 # GHC needs arch-specific tweak at least in
 #     rts/Libdw.c:set_initial_registers()
-GhcRtsWithLibdw=$(strip $(if $(filter $(TargetArch_CPP),i386 x86_64),@UseLibdw@,NO))
+GhcRtsWithLibdw=$(strip $(if $(filter $(TargetArch_CPP),i386 x86_64 s390x),@UseLibdw@,NO))
 
 ################################################################################
 #
@@ -451,7 +444,8 @@ EXECUTABLE_FILE = chmod +x
 
 # $(GHC) points to installed version of the compiler.
 #
-# NOTE: Don't override $(GHC) in build.mk, use configure --with-ghc instead
+# NOTE: Don't override $(GHC) in build.mk, use
+# `./configure GHC=...` instead
 # (because the version numbers have to be calculated).
 
 GHC := @WithGhc@
@@ -485,8 +479,6 @@ else
 GhcCanonVersion = $(GhcMajVersion)$(GhcMinVersion)
 endif
 
-GHC_PACKAGE_DB_FLAG = @GHC_PACKAGE_DB_FLAG@
-
 #-----------------------------------------------------------------------------
 # Settings
 
@@ -497,14 +489,16 @@ GHC_PACKAGE_DB_FLAG = @GHC_PACKAGE_DB_FLAG@
 GccExtraViaCOpts = @GccExtraViaCOpts@
 LdHasFilelist = @LdHasFilelist@
 ArArgs = @ArArgs@
+HaskellHostOs = @HaskellHostOs@
+HaskellHostArch = @HaskellHostArch@
 HaskellTargetOs = @HaskellTargetOs@
 HaskellTargetArch = @HaskellTargetArch@
 TargetWordSize = @TargetWordSize@
-HaskellHaveGnuNonexecStack = @HaskellHaveGnuNonexecStack@
-HaskellHaveIdentDirective = @HaskellHaveIdentDirective@
-HaskellHaveSubsectionsViaSymbols = @HaskellHaveSubsectionsViaSymbols@
-HaskellHaveRTSLinker = @HaskellHaveRTSLinker@
-Unregisterised = @Unregisterised@
+TargetHasGnuNonexecStack = @TargetHasGnuNonexecStack@
+TargetHasIdentDirective = @TargetHasIdentDirective@
+TargetHasSubsectionsViaSymbols = @TargetHasSubsectionsViaSymbols@
+TargetHasRTSLinker = @TargetHasRTSLinker@
+TablesNextToCode = @TablesNextToCode@
 
 SettingsCCompilerCommand = @SettingsCCompilerCommand@
 SettingsHaskellCPPCommand = @SettingsHaskellCPPCommand@
@@ -532,13 +526,12 @@ SettingsOptCommand = @SettingsOptCommand@
 # the flag CC=<blah> instead.  The reason is that the configure script
 # needs to know which gcc you're using in order to perform its tests.
 
-GccVersion            = @GccVersion@
-
 # TargetPlatformFull retains the string passed to configure so we have it in
 # the necessary format to pass to libffi's configure.
 TargetPlatformFull    = @TargetPlatformFull@
-GccLT46         = @GccLT46@
-GccIsClang      = @GccIsClang@
+
+# Do we have a C compiler using an LLVM back end?
+CcLlvmBackend   = @CcLlvmBackend@
 
 CC              = @CC@
 CC_STAGE0       = @CC_STAGE0@
@@ -885,14 +878,6 @@ endif
 
 # Build and install the "extra" packages (see ./packages)?
 BUILD_EXTRA_PKGS = NO
-
-################################################################################
-#
-#    Library configure arguments
-#
-################################################################################
-
-CONFIGURE_ARGS = @CONFIGURE_ARGS@
 
 ################################################################################
 #

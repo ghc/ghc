@@ -48,21 +48,25 @@ packageArgs = do
           [ builder Alex ? arg "--latin1"
 
           , builder (Ghc CompileHs) ? mconcat
-            [ inputs ["//GHC.hs", "//GhcMake.hs"] ? arg "-fprof-auto"
-            , input "//Parser.hs" ?
-              pure ["-fno-ignore-interface-pragmas", "-fcmm-sink" ] ]
+            [ inputs ["**/GHC.hs", "**/GhcMake.hs"] ? arg "-fprof-auto"
+            , input "**/Parser.hs" ?
+              pure ["-fno-ignore-interface-pragmas", "-fcmm-sink"]
+            -- These files take a very long time to compile with -O1,
+            -- so we use -O0 for them just in Stage0 to speed up the
+            -- build but not affect Stage1+ executables
+            , inputs ["**/HsInstances.hs", "**/DynFlags.hs"] ? stage0 ?
+              pure ["-O0"] ]
 
           , builder (Cabal Setup) ? mconcat
-            [ arg $ "--ghc-option=-DSTAGE=" ++ show (fromEnum stage + 1)
-            , arg "--disable-library-for-ghci"
+            [ arg "--disable-library-for-ghci"
             , anyTargetOs ["openbsd"] ? arg "--ld-options=-E"
             , flag GhcUnregisterised ? arg "--ghc-option=-DNO_REGS"
-            , notM ghcWithSMP ? arg "--ghc-option=-DNOSMP"
-            , notM ghcWithSMP ? arg "--ghc-option=-optc-DNOSMP"
+            , notM targetSupportsSMP ? arg "--ghc-option=-DNOSMP"
+            , notM targetSupportsSMP ? arg "--ghc-option=-optc-DNOSMP"
             , (any (wayUnit Threaded) rtsWays) ?
               notStage0 ? arg "--ghc-option=-optc-DTHREADED_RTS"
             , ghcWithInterpreter ?
-              ghcEnableTablesNextToCode ?
+              flag TablesNextToCode ?
               notM (flag GhcUnregisterised) ?
               notStage0 ? arg "--ghc-option=-DGHCI_TABLES_NEXT_TO_CODE"
             , ghcWithInterpreter ?
@@ -71,10 +75,9 @@ packageArgs = do
             , ghcProfiled <$> flavour ?
               notStage0 ? arg "--ghc-pkg-option=--force" ]
 
-         , builder (Cabal Flags) ? mconcat
+          , builder (Cabal Flags) ? mconcat
             [ ghcWithNativeCodeGen ? arg "ncg"
             , ghcWithInterpreter ? notStage0 ? arg "ghci"
-            , notStage0 ? not windowsHost ? notM cross ? arg "ext-interp"
             , cross ? arg "-terminfo"
             , notStage0 ? intLib == integerGmp ?
               arg "integer-gmp"
@@ -89,7 +92,6 @@ packageArgs = do
 
           , builder (Cabal Flags) ? mconcat
             [ ghcWithInterpreter ? notStage0 ? arg "ghci"
-            , notStage0 ? not windowsHost ? notM cross ? arg "ext-interp"
             , cross ? arg "-terminfo"
             -- the 'threaded' flag is True by default, but
             -- let's record explicitly that we link all ghc
@@ -104,8 +106,8 @@ packageArgs = do
         , package ghcPrim ? mconcat
           [ builder (Cabal Flags) ? arg "include-ghc-prim"
 
-          , builder (Cc CompileC) ? (not <$> flag GccIsClang) ?
-            input "//cbits/atomic.c"  ? arg "-Wno-sync-nand" ]
+          , builder (Cc CompileC) ? (not <$> flag CcLlvmBackend) ?
+            input "**/cbits/atomic.c"  ? arg "-Wno-sync-nand" ]
 
         --------------------------------- ghci ---------------------------------
         -- TODO: This should not be @not <$> flag CrossCompiling@. Instead we
@@ -123,8 +125,6 @@ packageArgs = do
         -- behind the @-fghci@ flag.
         , package ghci ? mconcat
           [ notStage0 ? builder (Cabal Flags) ? arg "ghci"
-          , notStage0 ? builder (Cabal Flags) ? not windowsHost ? notM cross
-                      ? arg "ext-interp"
           , cross ? stage0 ? builder (Cabal Flags) ? arg "ghci" ]
 
         -------------------------------- haddock -------------------------------
@@ -132,6 +132,13 @@ packageArgs = do
           builder (Cabal Flags) ? arg "in-ghc-tree"
 
         ------------------------------- haskeline ------------------------------
+        -- Hadrian doesn't currently support packages containing both libraries
+        -- and executables. This flag disables the latter.
+        , package haskeline ?
+          builder (Cabal Flags) ? arg "-examples"
+        -- Don't depend upon terminfo when cross-compiling to avoid unnecessary
+        -- dependencies.
+        -- TODO: Perhaps the user should rather be responsible for this?
         , package haskeline ?
           builder (Cabal Flags) ? cross ? arg "-terminfo"
 
@@ -158,7 +165,7 @@ packageArgs = do
 
         -------------------------------- runGhc --------------------------------
         , package runGhc ?
-          builder Ghc ? input "//Main.hs" ?
+          builder Ghc ? input "**/Main.hs" ?
           (\version -> ["-cpp", "-DVERSION=" ++ show version]) <$> getSetting ProjectVersion
 
         --------------------------------- text ---------------------------------
@@ -172,7 +179,7 @@ packageArgs = do
         -- in Stage1, and at that point the configuration is just wrong.
         , package text ?
           builder (Cabal Flags) ? notStage0 ? intLib == integerSimple ?
-          pure [ "+integer-simple", "-bytestring-builder"] ]
+          pure ["+integer-simple", "-bytestring-builder"] ]
 
 -- | RTS-specific command line arguments.
 rtsPackageArgs :: Args
@@ -191,7 +198,7 @@ rtsPackageArgs = package rts ? do
     targetOs       <- getSetting TargetOs
     targetVendor   <- getSetting TargetVendor
     ghcUnreg       <- expr $ yesNo <$> flag GhcUnregisterised
-    ghcEnableTNC   <- expr $ yesNo <$> ghcEnableTablesNextToCode
+    ghcEnableTNC   <- expr $ yesNo <$> flag TablesNextToCode
     rtsWays        <- getRtsWays
     way            <- getWay
     path           <- getBuildPath
@@ -199,15 +206,32 @@ rtsPackageArgs = package rts ? do
     libffiName     <- expr libffiLibraryName
     ffiIncludeDir  <- getSetting FfiIncludeDir
     ffiLibraryDir  <- getSetting FfiLibDir
-    let cArgs = mconcat
+    libdwIncludeDir   <- getSetting LibdwIncludeDir
+    libdwLibraryDir   <- getSetting LibdwLibDir
+
+    -- Arguments passed to GHC when compiling C and .cmm sources.
+    let ghcArgs = mconcat
           [ arg "-Irts"
-          , rtsWarnings
           , arg $ "-I" ++ path
-          , flag UseSystemFfi ? arg ("-I" ++ ffiIncludeDir)
+          , flag WithLibdw ? if not (null libdwIncludeDir) then arg ("-I" ++ libdwIncludeDir) else mempty
+          , flag WithLibdw ? if not (null libdwLibraryDir) then arg ("-L" ++ libdwLibraryDir) else mempty
           , arg $ "-DRtsWay=\"rts_" ++ show way ++ "\""
           -- Set the namespace for the rts fs functions
           , arg $ "-DFS_NAMESPACE=rts"
           , arg $ "-DCOMPILING_RTS"
+          , notM targetSupportsSMP           ? arg "-DNOSMP"
+          , way `elem` [debug, debugDynamic] ? arg "-DTICKY_TICKY"
+          , Profiling `wayUnit` way          ? arg "-DPROFILING"
+          , Threaded  `wayUnit` way          ? arg "-DTHREADED_RTS"
+          , notM targetSupportsSMP           ? pure [ "-DNOSMP"
+                                                    , "-optc-DNOSMP" ]
+          ]
+
+    let cArgs = mconcat
+          [ rtsWarnings
+          , flag UseSystemFfi ? arg ("-I" ++ ffiIncludeDir)
+          , flag WithLibdw ? arg ("-I" ++ libdwIncludeDir)
+          , arg "-fomit-frame-pointer"
           -- RTS *must* be compiled with optimisations. The INLINE_HEADER macro
           -- requires that functions are inlined to work as expected. Inlining
           -- only happens for optimised builds. Otherwise we can assume that
@@ -215,20 +239,22 @@ rtsPackageArgs = package rts ? do
           -- provide non-inlined alternatives and hence needs the function to
           -- be inlined. See https://github.com/snowleopard/hadrian/issues/90.
           , arg "-O2"
-          , arg "-fomit-frame-pointer"
           , arg "-g"
+
+          , arg "-Irts"
+          , arg $ "-I" ++ path
 
           , Debug     `wayUnit` way          ? pure [ "-DDEBUG"
                                                     , "-fno-omit-frame-pointer"
-                                                    , "-g" ]
-          , way `elem` [debug, debugDynamic] ? arg "-DTICKY_TICKY"
-          , Profiling `wayUnit` way          ? arg "-DPROFILING"
-          , Threaded  `wayUnit` way          ? arg "-DTHREADED_RTS"
+                                                    , "-g3"
+                                                    , "-O0" ]
 
-          , inputs ["//RtsMessages.c", "//Trace.c"] ?
+          , useLibFFIForAdjustors            ? arg "-DUSE_LIBFFI_FOR_ADJUSTORS"
+
+          , inputs ["**/RtsMessages.c", "**/Trace.c"] ?
             arg ("-DProjectVersion=" ++ show projectVersion)
 
-          , input "//RtsUtils.c" ? pure
+          , input "**/RtsUtils.c" ? pure
             [ "-DProjectVersion="            ++ show projectVersion
             , "-DHostPlatform="              ++ show hostPlatform
             , "-DHostArch="                  ++ show hostArch
@@ -243,50 +269,51 @@ rtsPackageArgs = package rts ? do
             , "-DTargetOS="                  ++ show targetOs
             , "-DTargetVendor="              ++ show targetVendor
             , "-DGhcUnregisterised="         ++ show ghcUnreg
-            , "-DGhcEnableTablesNextToCode=" ++ show ghcEnableTNC ]
+            , "-DTablesNextToCode="          ++ show ghcEnableTNC
+            ]
 
           -- We're after pur performance here. So make sure fast math and
           -- vectorization is enabled.
-          , input "//xxhash.c" ? pure
+          , input "**/xxhash.c" ? pure
             [ "-O3"
             , "-ffast-math"
             , "-ftree-vectorize" ]
 
-            , inputs ["//Evac.c", "//Evac_thr.c"] ? arg "-funroll-loops"
+            , inputs ["**/Evac.c", "**/Evac_thr.c"] ? arg "-funroll-loops"
 
             , speedHack ?
-              inputs [ "//Evac.c", "//Evac_thr.c"
-                     , "//Scav.c", "//Scav_thr.c"
-                     , "//Compact.c", "//GC.c" ] ? arg "-fno-PIC"
+              inputs [ "**/Evac.c", "**/Evac_thr.c"
+                     , "**/Scav.c", "**/Scav_thr.c"
+                     , "**/Compact.c", "**/GC.c" ] ? arg "-fno-PIC"
             -- @-static@ is necessary for these bits, as otherwise the NCG
             -- generates dynamic references.
             , speedHack ?
-              inputs [ "//Updates.c", "//StgMiscClosures.c"
-                     , "//PrimOps.c", "//Apply.c"
-                     , "//AutoApply.c" ] ? pure ["-fno-PIC", "-static"]
+              inputs [ "**/Updates.c", "**/StgMiscClosures.c"
+                     , "**/PrimOps.c", "**/Apply.c"
+                     , "**/AutoApply.c" ] ? pure ["-fno-PIC", "-static"]
 
             -- inlining warnings happen in Compact
-            , inputs ["//Compact.c"] ? arg "-Wno-inline"
+            , inputs ["**/Compact.c"] ? arg "-Wno-inline"
 
             -- emits warnings about call-clobbered registers on x86_64
-            , inputs [ "//RetainerProfile.c", "//StgCRun.c"
-                     , "//win32/ConsoleHandler.c", "//win32/ThrIOManager.c"] ? arg "-w"
+            , inputs [ "**/StgCRun.c"
+                     , "**/win32/ConsoleHandler.c", "**/win32/ThrIOManager.c"] ? arg "-w"
             -- The above warning suppression flags are a temporary kludge.
             -- While working on this module you are encouraged to remove it and fix
             -- any warnings in the module. See:
             -- https://gitlab.haskell.org/ghc/ghc/wikis/working-conventions#Warnings
 
-            , (not <$> flag GccIsClang) ?
-              inputs ["//Compact.c"] ? arg "-finline-limit=2500"
+            , (not <$> flag CcLlvmBackend) ?
+              inputs ["**/Compact.c"] ? arg "-finline-limit=2500"
 
-            , input "//RetainerProfile.c" ? flag GccIsClang ?
+            , input "**/RetainerProfile.c" ? flag CcLlvmBackend ?
               arg "-Wno-incompatible-pointer-types"
             , windowsHost ? arg ("-DWINVER=" ++ windowsVersion)
 
             -- libffi's ffi.h triggers various warnings
-            , inputs [ "//Interpreter.c", "//Storage.c", "//Adjustor.c" ] ?
+            , inputs [ "**/Interpreter.c", "**/Storage.c", "**/Adjustor.c" ] ?
               arg "-Wno-strict-prototypes"
-            , inputs ["//Interpreter.c", "//Adjustor.c", "//sm/Storage.c"] ?
+            , inputs ["**/Interpreter.c", "**/Adjustor.c", "**/sm/Storage.c"] ?
               anyTargetArch ["powerpc"] ? arg "-Wno-undef" ]
 
     mconcat
@@ -299,14 +326,16 @@ rtsPackageArgs = package rts ? do
           ]
         , builder (Cc FindCDependencies) ? cArgs
         , builder (Ghc CompileCWithGhc) ? map ("-optc" ++) <$> cArgs
-        , builder Ghc ? arg "-Irts"
+        , builder Ghc ? ghcArgs
 
-          , builder HsCpp ? pure
+        , builder HsCpp ? pure
           [ "-DTOP="             ++ show top
           , "-DFFI_INCLUDE_DIR=" ++ show ffiIncludeDir
           , "-DFFI_LIB_DIR="     ++ show ffiLibraryDir
-          , "-DFFI_LIB="         ++ show libffiName ]
+          , "-DFFI_LIB="         ++ show libffiName
+          , "-DLIBDW_LIB_DIR="   ++ show libdwLibraryDir ]
 
+        , builder HsCpp ? flag WithLibdw ? arg "-DUSE_LIBDW"
         , builder HsCpp ? flag HaveLibMingwEx ? arg "-DHAVE_LIBMINGWEX" ]
 
 -- Compile various performance-critical pieces *without* -fPIC -dynamic
@@ -354,7 +383,6 @@ rtsWarnings = mconcat
     , arg "-Wmissing-prototypes"
     , arg "-Wmissing-declarations"
     , arg "-Winline"
-    , arg "-Waggregate-return"
     , arg "-Wpointer-arith"
     , arg "-Wmissing-noreturn"
     , arg "-Wnested-externs"

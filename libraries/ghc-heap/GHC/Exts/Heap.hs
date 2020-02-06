@@ -114,11 +114,7 @@ getClosureRaw x = do
 -- This is a hack to cover the bootstrap compiler using the old version of
 -- 'unpackClosure'. The new 'unpackClosure' return values are not merely
 -- a reordering, so using the old version would not work.
-#if MIN_VERSION_ghc_prim(0,5,3)
         (# iptr, dat, pointers #) -> do
-#else
-        (# iptr, pointers, dat #) -> do
-#endif
             let nelems = (I# (sizeofByteArray# dat)) `div` wORD_SIZE
                 end = fromIntegral nelems - 1
                 rawWds = [W# (indexWordArray# dat i) | I# i <- [0.. end] ]
@@ -270,6 +266,17 @@ getClosure x = do
 
         --  pure $ OtherClosure itbl pts wds
         --
+
+        WEAK ->
+            pure $ WeakClosure
+                { info = itbl
+                , cfinalizers = pts !! 0
+                , key = pts !! 1
+                , value = pts !! 2
+                , finalizer = pts !! 3
+                , link = pts !! 4
+                }
+
         _ ->
             pure $ UnsupportedClosure itbl
 

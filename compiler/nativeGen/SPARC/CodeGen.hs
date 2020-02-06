@@ -18,8 +18,6 @@ module SPARC.CodeGen (
 where
 
 #include "HsVersions.h"
-#include "nativeGen/NCG.h"
-#include "../includes/MachDeps.h"
 
 -- NCG stuff:
 import GhcPrelude
@@ -31,7 +29,6 @@ import SPARC.CodeGen.CondCode
 import SPARC.CodeGen.Gen64
 import SPARC.CodeGen.Gen32
 import SPARC.CodeGen.Base
-import SPARC.Ppr        ()
 import SPARC.Instr
 import SPARC.Imm
 import SPARC.AddrMode
@@ -42,15 +39,15 @@ import Format
 import NCGMonad   ( NatM, getNewRegNat, getNewLabelNat )
 
 -- Our intermediate code:
-import BlockId
-import Cmm
-import CmmUtils
-import CmmSwitch
-import Hoopl.Block
-import Hoopl.Graph
+import GHC.Cmm.BlockId
+import GHC.Cmm
+import GHC.Cmm.Utils
+import GHC.Cmm.Switch
+import GHC.Cmm.Dataflow.Block
+import GHC.Cmm.Dataflow.Graph
 import PIC
 import Reg
-import CLabel
+import GHC.Cmm.CLabel
 import CPrim
 
 -- The rest:
@@ -65,7 +62,7 @@ import Control.Monad    ( mapAndUnzipM )
 
 -- | Top level code generation
 cmmTopCodeGen :: RawCmmDecl
-              -> NatM [NatCmmDecl CmmStatics Instr]
+              -> NatM [NatCmmDecl RawCmmStatics Instr]
 
 cmmTopCodeGen (CmmProc info lab live graph)
  = do let blocks = toBlockListEntryFirst graph
@@ -87,7 +84,7 @@ cmmTopCodeGen (CmmData sec dat) = do
 --      LDATAs here too.
 basicBlockCodeGen :: CmmBlock
                   -> NatM ( [NatBasicBlock Instr]
-                          , [NatCmmDecl CmmStatics Instr])
+                          , [NatCmmDecl RawCmmStatics Instr])
 
 basicBlockCodeGen block = do
   let (_, nodes, tail)  = blockSplit block
@@ -342,10 +339,10 @@ genSwitch dflags expr targets
   where (offset, ids) = switchTargetsToTable targets
 
 generateJumpTableForInstr :: DynFlags -> Instr
-                          -> Maybe (NatCmmDecl CmmStatics Instr)
+                          -> Maybe (NatCmmDecl RawCmmStatics Instr)
 generateJumpTableForInstr dflags (JMP_TBL _ ids label) =
   let jumpTable = map (jumpTableEntry dflags) ids
-  in Just (CmmData (Section ReadOnlyData label) (Statics label jumpTable))
+  in Just (CmmData (Section ReadOnlyData label) (RawCmmStatics label jumpTable))
 generateJumpTableForInstr _ _ = Nothing
 
 
@@ -684,6 +681,7 @@ outOfLineMachOp_table mop
         MO_AtomicRead w -> fsLit $ atomicReadLabel w
         MO_AtomicWrite w -> fsLit $ atomicWriteLabel w
 
+        MO_S_Mul2    {}  -> unsupported
         MO_S_QuotRem {}  -> unsupported
         MO_U_QuotRem {}  -> unsupported
         MO_U_QuotRem2 {} -> unsupported

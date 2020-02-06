@@ -8,4 +8,3 @@ printStuff = do
   print (testFunction2 True)
   print (testFunction2 False)
   print niceValue
-  print niceValue2

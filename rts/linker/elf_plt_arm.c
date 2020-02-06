@@ -1,8 +1,10 @@
+#include "Rts.h"
+#include "elf_compat.h"
+
 #include <stdbool.h>
 #include <stdint.h>
 #include <stdlib.h>
-#include "elf_compat.h"
-#include "ghcplatform.h"
+
 #if defined(arm_HOST_ARCH)
 
 #include "Elf.h"

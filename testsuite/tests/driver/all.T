@@ -130,8 +130,7 @@ test('dynHelloWorld',
      [''])
 
 test('T5313',
-     [ when(arch('powerpc64') or arch('powerpc64le'), expect_broken(11259)),
-       extra_run_opts('"' + config.libdir + '"')],
+     [ req_rts_linker, extra_run_opts('"' + config.libdir + '"')],
      compile_and_run,
      ['-package ghc'])
 
@@ -142,7 +141,8 @@ test('rtsopts001', [extra_files(['rtsOpts.hs'])], makefile_test, [])
 test('rtsopts002', normal, makefile_test, [])
 
 test('withRtsOpts', [], makefile_test, [])
-test('T3389', normal, compile_and_run, [''])
+
+test('T3389', when(arch('i386'), expect_broken_for(17256, ['hpc'] + prof_ways)), compile_and_run, [''])
 test('T3364', normalise_fun(normalise_errmsg), makefile_test, [])
 
 # T4437: A test to ensure that Cabal's language extension list remains
@@ -276,3 +276,5 @@ test('T16737',
       req_th,
       expect_broken_for(16541, ['ghci'])],
      compile_and_run, ['-optP=-isystem -optP=T16737include'])
+
+test('T17143', exit_code(1), run_command, ['{compiler} T17143.hs -S -fno-code'])

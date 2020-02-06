@@ -1,0 +1,11 @@
+type E :: * -> * -> *
+type family E a b where
+    E a a = ()
+    E a b = Bool
+  	-- Defined at <interactive>:2:1
+type E :: * -> * -> *
+type family E a b where
+  {- #0 -} E a a = ()
+  {- #1 -} E a b = Bool
+      -- incompatible with: #0
+  	-- Defined at <interactive>:2:1

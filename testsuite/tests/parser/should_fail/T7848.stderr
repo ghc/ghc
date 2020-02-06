@@ -5,7 +5,7 @@ T7848.hs:10:9: error:
         the type signature for:
           (&) :: forall a. a
         at T7848.hs:10:9-35
-    • In the SPECIALISE pragma {-# SPECIALIZE (&) :: a #-}
+    • In the pragma: {-# SPECIALIZE (&) :: a #-}
       In an equation for ‘x’:
           x (+) ((&)@z) ((:&&) a b) (c :&& d) (e `A` f) (A g h)
             = y

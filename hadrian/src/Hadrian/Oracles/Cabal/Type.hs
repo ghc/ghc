@@ -9,7 +9,7 @@
 --
 -- This module defines the types of keys used by the /Cabal oracles/. See the
 -- module "Hadrian.Oracles.Cabal" for supported Cabal oracle queries, and the
--- module "Hadrian.Oracles.Cabal.Rules" for the corresponing Shake rules.
+-- module "Hadrian.Oracles.Cabal.Rules" for the corresponding Shake rules.
 -----------------------------------------------------------------------------
 module Hadrian.Oracles.Cabal.Type where
 

@@ -24,9 +24,9 @@ module Dwarf.Types
 
 import GhcPrelude
 
-import Debug
-import CLabel
-import CmmExpr         ( GlobalReg(..) )
+import GHC.Cmm.DebugBlock
+import GHC.Cmm.CLabel
+import GHC.Cmm.Expr         ( GlobalReg(..) )
 import Encoding
 import FastString
 import Outputable
@@ -46,7 +46,7 @@ import qualified Data.Map as Map
 import Data.Word
 import Data.Char
 
-import CodeGen.Platform
+import GHC.Platform.Regs
 
 -- | Individual dwarf records. Each one will be encoded as an entry in
 -- the @.debug_info@ section.
@@ -224,13 +224,14 @@ data DwarfARange
 -- address table entry.
 pprDwarfARanges :: [DwarfARange] -> Unique -> SDoc
 pprDwarfARanges arngs unitU = sdocWithPlatform $ \plat ->
-  let wordSize = platformWordSize plat
+  let wordSize = platformWordSizeInBytes plat
       paddingSize = 4 :: Int
       -- header is 12 bytes long.
       -- entry is 8 bytes (32-bit platform) or 16 bytes (64-bit platform).
       -- pad such that first entry begins at multiple of entry size.
       pad n = vcat $ replicate n $ pprByte 0
-      initialLength = 8 + paddingSize + 2*2*wordSize
+      -- Fix for #17428
+      initialLength = 8 + paddingSize + (1 + length arngs) * 2 * wordSize
   in pprDwWord (ppr initialLength)
      $$ pprHalf 2
      $$ sectionOffset (ppr $ mkAsmTempLabel $ unitU)
@@ -283,7 +284,7 @@ instance Outputable DwarfFrameBlock where
   ppr (DwarfFrameBlock hasInfo unwinds) = braces $ ppr hasInfo <+> ppr unwinds
 
 -- | Header for the @.debug_frame@ section. Here we emit the "Common
--- Information Entry" record that etablishes general call frame
+-- Information Entry" record that establishes general call frame
 -- parameters and the default stack layout.
 pprDwarfFrame :: DwarfFrame -> SDoc
 pprDwarfFrame DwarfFrame{dwCieLabel=cieLabel,dwCieInit=cieInit,dwCieProcs=procs}
@@ -293,7 +294,7 @@ pprDwarfFrame DwarfFrame{dwCieLabel=cieLabel,dwCieInit=cieInit,dwCieProcs=procs}
         length      = ppr cieEndLabel <> char '-' <> ppr cieStartLabel
         spReg       = dwarfGlobalRegNo plat Sp
         retReg      = dwarfReturnRegNo plat
-        wordSize    = platformWordSize plat
+        wordSize    = platformWordSizeInBytes plat
         pprInit :: (GlobalReg, Maybe UnwindExpr) -> SDoc
         pprInit (g, uw) = pprSetUnwind plat g (Nothing, uw)
 
@@ -454,9 +455,9 @@ pprSetUnwind plat Sp (_, Just (UwReg s' o'))
 pprSetUnwind _    Sp (_, Just uw)
   = pprByte dW_CFA_def_cfa_expression $$ pprUnwindExpr False uw
 pprSetUnwind plat g  (_, Just (UwDeref (UwReg Sp o)))
-  | o < 0 && ((-o) `mod` platformWordSize plat) == 0 -- expected case
+  | o < 0 && ((-o) `mod` platformWordSizeInBytes plat) == 0 -- expected case
   = pprByte (dW_CFA_offset + dwarfGlobalRegNo plat g) $$
-    pprLEBWord (fromIntegral ((-o) `div` platformWordSize plat))
+    pprLEBWord (fromIntegral ((-o) `div` platformWordSizeInBytes plat))
   | otherwise
   = pprByte dW_CFA_offset_extended_sf $$
     pprLEBRegNo plat g $$
@@ -517,10 +518,9 @@ wordAlign :: SDoc
 wordAlign = sdocWithPlatform $ \plat ->
   text "\t.align " <> case platformOS plat of
     OSDarwin -> case platformWordSize plat of
-      8      -> text "3"
-      4      -> text "2"
-      _other -> error "wordAlign: Unsupported word size!"
-    _other   -> ppr (platformWordSize plat)
+      PW8 -> char '3'
+      PW4 -> char '2'
+    _other   -> ppr (platformWordSizeInBytes plat)
 
 -- | Assembly for a single byte of constant DWARF data
 pprByte :: Word8 -> SDoc
@@ -552,10 +552,8 @@ pprDwWord = pprData4'
 pprWord :: SDoc -> SDoc
 pprWord s = (<> s) . sdocWithPlatform $ \plat ->
   case platformWordSize plat of
-    4 -> text "\t.long "
-    8 -> text "\t.quad "
-    n -> panic $ "pprWord: Unsupported target platform word length " ++
-                 show n ++ "!"
+    PW4 -> text "\t.long "
+    PW8 -> text "\t.quad "
 
 -- | Prints a number in "little endian base 128" format. The idea is
 -- to optimize for small numbers by stopping once all further bytes

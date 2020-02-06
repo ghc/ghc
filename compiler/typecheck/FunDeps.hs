@@ -24,14 +24,17 @@ import GhcPrelude
 import Name
 import Var
 import Class
+import Predicate
 import Type
 import TcType( transSuperClasses )
 import CoAxiom( TypeEqn )
 import Unify
-import FamInst( injTyVarsOfTypes )
 import InstEnv
 import VarSet
 import VarEnv
+import TyCoFVs
+import TyCoPpr( pprWithExplicitKindsWhen )
+import FV
 import Outputable
 import ErrUtils( Validity(..), allValid )
 import SrcLoc
@@ -318,7 +321,7 @@ improveClsFD clas_tvs fd
                         --
                         -- But note (a) we get them from the dfun_id, so they are *in order*
                         --              because the kind variables may be mentioned in the
-                        --              type variabes' kinds
+                        --              type variables' kinds
                         --          (b) we must apply 'subst' to the kinds, in case we have
                         --              matched out a kind variable, but not a type variable
                         --              whose kind mentions that kind variable!
@@ -549,7 +552,7 @@ oclose preds fixed_tvs
             -- closeOverKinds: see Note [Closing over kinds in coverage]
 
     tv_fds  :: [(TyCoVarSet,TyCoVarSet)]
-    tv_fds  = [ (tyCoVarsOfTypes ls, injTyVarsOfTypes rs)
+    tv_fds  = [ (tyCoVarsOfTypes ls, fvVarSet $ injectiveVarsOfTypes True rs)
                   -- See Note [Care with type functions]
               | pred <- preds
               , pred' <- pred : transSuperClasses pred
@@ -603,7 +606,7 @@ Note [Bogus consistency check]
 In checkFunDeps we check that a new ClsInst is consistent with all the
 ClsInsts in the environment.
 
-The bogus aspect is discussed in #10675. Currenty it if the two
+The bogus aspect is discussed in #10675. Currently it if the two
 types are *contradicatory*, using (isNothing . tcUnifyTys).  But all
 the papers say we should check if the two types are *equal* thus
    not (substTys subst rtys1 `eqTypes` substTys subst rtys2)

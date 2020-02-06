@@ -3,7 +3,7 @@
  * (c) The GHC Team 1995-2002
  *
  * Support for concurrent non-blocking I/O and thread waiting in the
- * non-threaded RTS.  In the threded RTS, this file is not used at
+ * non-threaded RTS.  In the threaded RTS, this file is not used at
  * all, instead we use the IO manager thread implemented in Haskell in
  * the base package.
  *
@@ -23,11 +23,11 @@
 #include "Stats.h"
 #include "GetTime.h"
 
-# ifdef HAVE_SYS_SELECT_H
+# if defined(HAVE_SYS_SELECT_H)
 #  include <sys/select.h>
 # endif
 
-# ifdef HAVE_SYS_TYPES_H
+# if defined(HAVE_SYS_TYPES_H)
 #  include <sys/types.h>
 # endif
 
