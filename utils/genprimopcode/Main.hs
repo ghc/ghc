@@ -890,6 +890,7 @@ ppType (TyApp (TyCon "MVar#") [x,y])     = "mkMVarPrimTy " ++ ppType x
                                            ++ " " ++ ppType y
 ppType (TyApp (TyCon "TVar#") [x,y])     = "mkTVarPrimTy " ++ ppType x
                                            ++ " " ++ ppType y
+ppType (TyApp (TyCon "Void#") [])        = "voidPrimTy"
 
 ppType (TyApp (VecTyCon _ pptc) [])      = pptc
 
