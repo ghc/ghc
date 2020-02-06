@@ -81,11 +81,16 @@ occurAnalysePgm this_mod active_unf active_rule imp_rules binds
     (final_usage, occ_anald_binds) = go init_env binds
     (_, occ_anald_glommed_binds)   = occAnalRecBind init_env TopLevel
                                                     imp_rule_edges
-                                                    (flattenBinds occ_anald_binds)
+                                                    (flattenBinds binds)
                                                     initial_uds
           -- It's crucial to re-analyse the glommed-together bindings
           -- so that we establish the right loop breakers. Otherwise
           -- we can easily create an infinite loop (#9583 is an example)
+          --
+          -- Also crucial to re-analyse the /original/ bindings
+          -- in case the first pass accidentally discarded as dead code
+          -- a binding that was actually needed (albeit before its
+          -- definition site).  #17724 threw this up.
 
     initial_uds = addManyOccsSet emptyDetails
                             (rulesFreeVars imp_rules)
