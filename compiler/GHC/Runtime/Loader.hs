@@ -1,7 +1,7 @@
 {-# LANGUAGE CPP, MagicHash #-}
 
 -- | Dynamically lookup up values from modules and loading them.
-module DynamicLoading (
+module GHC.Runtime.Loader (
         initializePlugins,
         -- * Loading plugins
         loadFrontendPlugin,
@@ -23,8 +23,8 @@ module DynamicLoading (
 import GhcPrelude
 import DynFlags
 
-import Linker           ( linkModule, getHValue )
-import GHCi             ( wormhole )
+import GHC.Runtime.Linker      ( linkModule, getHValue )
+import GHC.Runtime.Interpreter ( wormhole )
 import SrcLoc           ( noSrcSpan )
 import Finder           ( findPluginModule, cannotFindModule )
 import TcRnMonad        ( initTcInteractive, initIfaceTcRn )
