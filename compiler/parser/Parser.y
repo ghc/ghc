@@ -37,6 +37,7 @@ import GHC.Exts
 import Data.Char
 import Control.Monad    ( mplus )
 import Control.Applicative ((<$))
+import qualified Prelude
 
 -- compiler/hsSyn
 import HsSyn
