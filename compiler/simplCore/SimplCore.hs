@@ -318,15 +318,17 @@ getCoreToDo dflags
 
         maybe_rule_check (Phase 0),
 
-        runWhen late_specialise
-          (CoreDoPasses [ CoreDoSpecialising
-                        , simpl_phase 0 ["post-late-spec"] max_iter]),
+        runWhen late_specialise CoreDoSpecialising,
 
         -- LiberateCase can yield new CSE opportunities because it peels
         -- off one layer of a recursive function (concretely, I saw this
         -- in wheel-sieve1), and I'm guessing that SpecConstr can too
         -- And CSE is a very cheap pass. So it seems worth doing here.
+        -- This helps shake out any effect of liberate_case/spec_constr.
+        -- It also puts bindings in dependency order, which helps with CSE.
         runWhen ((liberate_case || spec_constr) && cse) CoreCSE,
+            ( CoreDoPasses [ simpl_phase 0 ["pre-late-cse"] max_iter
+                           , CoreCSE ]),
 
         -- Final clean-up simplification:
         simpl_phase 0 ["final"] max_iter,
