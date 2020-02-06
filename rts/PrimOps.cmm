@@ -2606,3 +2606,19 @@ stg_setThreadAllocationCounterzh ( I64 counter )
     StgTSO_alloc_limit(CurrentTSO) = counter + TO_I64(offset);
     return ();
 }
+
+
+stg_raiseDivZZerozh ()
+{
+    jump stg_raisezh(base_GHCziExceptionziType_divZZeroException_closure);
+}
+
+stg_raiseUnderflowzh ()
+{
+    jump stg_raisezh(base_GHCziExceptionziType_underflowException_closure);
+}
+
+stg_raiseOverflowzh ()
+{
+    jump stg_raisezh(base_GHCziExceptionziType_overflowException_closure);
+}
