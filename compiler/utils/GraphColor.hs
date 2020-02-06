@@ -3,6 +3,8 @@
 --      the node keys, nodes and colors.
 --
 
+{-# OPTIONS_GHC -Wno-incomplete-uni-patterns #-}
+
 module GraphColor (
         module GraphBase,
         module GraphOps,
@@ -76,7 +78,7 @@ colorGraph iterative spinCount colors triv spill graph0
         --      We need to apply all the coalescences found by the scanner to the original
         --      graph before doing assignColors.
         --
-        --      Because we've got the whole, non-pruned graph here we turn on aggressive coalecing
+        --      Because we've got the whole, non-pruned graph here we turn on aggressive coalescing
         --      to force all the (conservative) coalescences found during scanning.
         --
         (graph_scan_coalesced, _)

@@ -113,7 +113,7 @@ After inlining and simplification, this ends up looking something like this:
 
 `KnownNat` is the constructor for dictionaries for the class `KnownNat`.
 See Note [magicDictId magic] in "basicType/MkId.hs" for details on how
-we actually construct the dictionry.
+we actually construct the dictionary.
 
 Note that using `Any Nat` is not really correct, as multilple calls to
 `someNatVal` would violate coherence:
@@ -223,7 +223,7 @@ type family Log2 (m :: Nat) :: Nat
 --
 -- @since 4.7.0.0
 sameNat :: (KnownNat a, KnownNat b) =>
-           Proxy a -> Proxy b -> Maybe (a :~: b)
+           proxy1 a -> proxy2 b -> Maybe (a :~: b)
 sameNat x y
   | natVal x == natVal y = Just (unsafeCoerce Refl)
   | otherwise            = Nothing

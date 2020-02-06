@@ -19,23 +19,25 @@ module TcBackpack (
 
 import GhcPrelude
 
-import BasicTypes (defaultFixity)
+import BasicTypes (defaultFixity, TypeOrKind(..))
 import Packages
 import TcRnExports
 import DynFlags
-import HsSyn
+import GHC.Hs
 import RdrName
 import TcRnMonad
 import TcTyDecls
 import InstEnv
 import FamInstEnv
 import Inst
-import TcIface
+import GHC.IfaceToCore
 import TcMType
 import TcType
 import TcSimplify
-import LoadIface
-import RnNames
+import Constraint
+import TcOrigin
+import GHC.Iface.Load
+import GHC.Rename.Names
 import ErrUtils
 import Id
 import Module
@@ -48,11 +50,11 @@ import HscTypes
 import Outputable
 import Type
 import FastString
-import RnFixity ( lookupFixityRn )
+import GHC.Rename.Fixity ( lookupFixityRn )
 import Maybes
 import TcEnv
 import Var
-import IfaceSyn
+import GHC.Iface.Syntax
 import PrelNames
 import qualified Data.Map as Map
 
@@ -61,7 +63,7 @@ import UniqDSet
 import NameShape
 import TcErrors
 import TcUnify
-import RnModIface
+import GHC.Iface.Rename
 import Util
 
 import Control.Monad
@@ -91,7 +93,7 @@ checkHsigDeclM sig_iface sig_thing real_thing = do
     -- implementation cases.
     checkBootDeclM False sig_thing real_thing
     real_fixity <- lookupFixityRn name
-    let sig_fixity = case mi_fix_fn sig_iface (occName name) of
+    let sig_fixity = case mi_fix_fn (mi_final_exts sig_iface) (occName name) of
                         Nothing -> defaultFixity
                         Just f -> f
     when (real_fixity /= sig_fixity) $
@@ -329,7 +331,7 @@ tcRnCheckUnitId ::
     HscEnv -> UnitId ->
     IO (Messages, Maybe ())
 tcRnCheckUnitId hsc_env uid =
-   withTiming (pure dflags)
+   withTiming dflags
               (text "Check unit id" <+> ppr uid)
               (const ()) $
    initTc hsc_env
@@ -349,7 +351,7 @@ tcRnCheckUnitId hsc_env uid =
 tcRnMergeSignatures :: HscEnv -> HsParsedModule -> TcGblEnv {- from local sig -} -> ModIface
                     -> IO (Messages, Maybe TcGblEnv)
 tcRnMergeSignatures hsc_env hpm orig_tcg_env iface =
-  withTiming (pure dflags)
+  withTiming dflags
              (text "Signature merging" <+> brackets (ppr this_mod))
              (const ()) $
   initTc hsc_env HsigFile False this_mod real_loc $
@@ -460,7 +462,7 @@ inheritedSigPvpWarning =
 --    to 'Name's, so this case needs to be handled specially.
 --
 --    The details are in the documentation for 'typecheckIfacesForMerging'.
---    and the Note [Resolving never-exported Names in TcIface].
+--    and the Note [Resolving never-exported Names] in GHC.IfaceToCore.
 --
 --  * When we rename modules and signatures, we use the export lists to
 --    decide how the declarations should be renamed.  However, this
@@ -469,7 +471,7 @@ inheritedSigPvpWarning =
 --    *consistently*, so that 'typecheckIfacesForMerging' can wire them
 --    up as needed.
 --
---    The details are in Note [rnIfaceNeverExported] in 'RnModIface'.
+--    The details are in Note [rnIfaceNeverExported] in 'GHC.Iface.Rename'.
 --
 -- The root cause for all of these complications is the fact that these
 -- logically "implicit" entities are defined indirectly in an interface
@@ -521,7 +523,6 @@ mergeSignatures
         -- tcg_dus?
         -- tcg_th_used           = tcg_th_used orig_tcg_env,
         -- tcg_th_splice_used    = tcg_th_splice_used orig_tcg_env
-        -- tcg_th_top_level_locs = tcg_th_top_level_locs orig_tcg_env
        }) $ do
     tcg_env <- getGblEnv
 
@@ -686,7 +687,7 @@ mergeSignatures
         --     final test of the export list.)
         tcg_rdr_env = rdr_env `plusGlobalRdrEnv` tcg_rdr_env orig_tcg_env,
         -- Inherit imports from the local signature, so that module
-        -- rexports are picked up correctly
+        -- reexports are picked up correctly
         tcg_imports = tcg_imports orig_tcg_env,
         tcg_exports = exports,
         tcg_dus     = usesOnly (availsToNameSetWithSelectors exports),
@@ -832,7 +833,7 @@ mergeSignatures
             -- This is a HACK to prevent calculateAvails from including imp_mod
             -- in the listing.  We don't want it because a module is NOT
             -- supposed to include itself in its dep_orphs/dep_finsts.  See #13214
-            iface' = iface { mi_orphan = False, mi_finsts = False }
+            iface' = iface { mi_final_exts = (mi_final_exts iface){ mi_orphan = False, mi_finsts = False } }
             avails = plusImportAvails (tcg_imports tcg_env) $
                         calculateAvails dflags iface' False False ImportedBySystem
         return tcg_env {
@@ -843,7 +844,7 @@ mergeSignatures
                 if outer_mod == mi_module iface
                     -- Don't add ourselves!
                     then tcg_merged tcg_env
-                    else (mi_module iface, mi_mod_hash iface) : tcg_merged tcg_env
+                    else (mi_module iface, mi_mod_hash (mi_final_exts iface)) : tcg_merged tcg_env
             }
 
     -- Note [Signature merging DFuns]
@@ -858,7 +859,7 @@ mergeSignatures
     -- when we have a ClsInst, we can pull up the correct DFun to check if
     -- the types match.
     --
-    -- See also Note [rnIfaceNeverExported] in RnModIface
+    -- See also Note [rnIfaceNeverExported] in GHC.Iface.Rename
     dfun_insts <- forM (tcg_insts tcg_env) $ \inst -> do
         n <- newDFunName (is_cls inst) (is_tys inst) (nameSrcSpan (is_dfun_name inst))
         let dfun = setVarName (is_dfun inst) n
@@ -878,7 +879,7 @@ tcRnInstantiateSignature ::
     HscEnv -> Module -> RealSrcSpan ->
     IO (Messages, Maybe TcGblEnv)
 tcRnInstantiateSignature hsc_env this_mod real_loc =
-   withTiming (pure dflags)
+   withTiming dflags
               (text "Signature instantiation"<+>brackets (ppr this_mod))
               (const ()) $
    initTc hsc_env HsigFile False this_mod real_loc $ instantiateSignature

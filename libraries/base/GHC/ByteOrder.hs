@@ -17,6 +17,9 @@
 
 module GHC.ByteOrder where
 
+-- Required for WORDS_BIGENDIAN
+#include <ghcautoconf.h>
+
 -- | Byte ordering.
 data ByteOrder
     = BigEndian    -- ^ most-significant-byte occurs in lowest address.

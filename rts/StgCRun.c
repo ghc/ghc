@@ -131,7 +131,7 @@ STG_NO_OPTIMIZE StgWord8 *win32AllocStack(void)
  * ABI requires this (x64, Mac OSX 32bit/64bit) as well as interfacing with
  * other libraries through the FFI.
  *
- * As part of this arrangment we must maintain the stack at a 16-byte boundary
+ * As part of this arrangement we must maintain the stack at a 16-byte boundary
  * - word_size-bytes (so 16n - 4 for i386 and 16n - 8 for x64) on entry to a
  * procedure since both GCC and LLVM expect this. This is because the stack
  * should have been 16-byte boundary aligned and then a call made which pushes
@@ -140,7 +140,7 @@ STG_NO_OPTIMIZE StgWord8 *win32AllocStack(void)
  * alignment for these jumps.
  *
  * This gives us binary compatibility with LLVM and GCC as well as dealing
- * with the FFI. Previously we just maintianed a 16n byte alignment for
+ * with the FFI. Previously we just maintained a 16n byte alignment for
  * procedure entry and calls, which led to bugs (see #4211 and #5250).
  *
  * To change this convention you need to change the code here, and in

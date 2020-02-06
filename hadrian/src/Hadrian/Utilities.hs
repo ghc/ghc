@@ -21,7 +21,7 @@ module Hadrian.Utilities (
     moveDirectory, removeDirectory,
 
     -- * Diagnostic info
-    UseColour (..), Colour (..), ANSIColour (..), putColoured,
+    Colour (..), ANSIColour (..), putColoured, shouldUseColor,
     BuildProgressColour, mkBuildProgressColour, putBuild,
     SuccessColour, mkSuccessColour, putSuccess,
     ProgressInfo (..), putProgressInfo,
@@ -212,9 +212,9 @@ makeRelativeNoSysLink a b
         isDot _ = False
 
 -- | Like Shake's '%>' but gives higher priority to longer patterns. Useful
--- in situations when a family of build rules, e.g. @"//*.a"@ and @"//*_p.a"@
+-- in situations when a family of build rules, e.g. @"**/*.a"@ and @"**/*_p.a"@
 -- can be matched by the same file, such as @library_p.a@. We break the tie
--- by preferring longer matches, which correpond to longer patterns.
+-- by preferring longer matches, which correspond to longer patterns.
 (%%>) :: FilePattern -> (FilePath -> Action ()) -> Rules ()
 p %%> a = priority (fromIntegral (length p) + 1) $ p %> a
 
@@ -304,21 +304,24 @@ isGeneratedSource file = buildRoot <&> (`isPrefixOf` file)
 -- | Link a file tracking the link target. Create the target directory if
 -- missing.
 createFileLink :: FilePath -> FilePath -> Action ()
-createFileLink linkTarget link = do
+createFileLink linkTarget link
+  | windowsHost = copyFile' source link
+  | otherwise   = do
     -- TODO `disableHistory` is a temporary fix (see issue #16866). Remove
     -- `disableHistory` when shake issue is fixed: https://github.com/ndmitchell/shake/issues/683.
     historyDisable
 
-    let source = if isAbsolute linkTarget
-                    then linkTarget
-                    else takeDirectory link -/- linkTarget
     need [source]
-    let dir = takeDirectory link
+
     liftIO $ IO.createDirectoryIfMissing True dir
     putProgressInfo =<< renderCreateFileLink linkTarget link
     quietly . liftIO $ do
         IO.removeFile link <|> return ()
         IO.createFileLink linkTarget link
+
+  where dir = takeDirectory link
+        source | isAbsolute linkTarget = linkTarget
+               | otherwise             = takeDirectory link -/- linkTarget
 
 -- | Copy a file tracking the source. Create the target directory if missing.
 copyFile :: FilePath -> FilePath -> Action ()
@@ -390,8 +393,6 @@ removeDirectory dir = do
     putProgressInfo $ "| Remove directory " ++ dir
     liftIO . whenM (IO.doesDirectoryExist dir) $ IO.removeDirectoryRecursive dir
 
-data UseColour = Never | Auto | Always deriving (Eq, Show, Typeable)
-
 -- | Terminal output colours
 data Colour
     = Dull ANSIColour   -- ^ 8-bit ANSI colours
@@ -431,20 +432,23 @@ mkColour (Extended code) = "38;5;" ++ code
 -- | A more colourful version of Shake's 'putNormal'.
 putColoured :: String -> String -> Action ()
 putColoured code msg = do
-    useColour <- userSetting Never
-    supported <- liftIO $ (&&) <$> IO.hIsTerminalDevice IO.stdout
-                               <*> (not <$> isDumb)
-    let c Never  = False
-        c Auto   = supported || IO.isWindows -- Colours do work on Windows
-        c Always = True
-    if c useColour
+    useColour <- shakeColor <$> getShakeOptions
+    if useColour
         then putNormal $ "\ESC[" ++ code ++ "m" ++ msg ++ "\ESC[0m"
         else putNormal msg
-  where
-    isDumb = maybe False (== "dumb") <$> lookupEnv "TERM"
 
 newtype BuildProgressColour = BuildProgressColour String
     deriving Typeable
+
+-- | By default, Hadrian tries to figure out if the current terminal
+--   supports colors using this function. The default can be overridden
+--   by suppling @--[no-]color@.
+shouldUseColor :: IO Bool
+shouldUseColor =
+  (&&) <$> IO.hIsTerminalDevice IO.stdout
+       <*> (not <$> isDumb)
+  where
+    isDumb = maybe False (== "dumb") <$> lookupEnv "TERM"
 
 -- | Generate an encoded colour for progress output from names.
 mkBuildProgressColour :: Colour -> BuildProgressColour

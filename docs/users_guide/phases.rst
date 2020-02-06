@@ -81,11 +81,11 @@ given compilation phase:
     Use ⟨cmd⟩ as the DLL generator.
 
 .. ghc-flag:: -pgmF ⟨cmd⟩
-    :shortdesc: Use ⟨cmd⟩ as the pre-processor (with ``-F`` only)
+    :shortdesc: Use ⟨cmd⟩ as the pre-processor (with :ghc-flag:`-F` only)
     :type: dynamic
     :category: phase-programs
 
-    Use ⟨cmd⟩ as the pre-processor (with ``-F`` only).
+    Use ⟨cmd⟩ as the pre-processor (with :ghc-flag:`-F` only).
 
 .. ghc-flag:: -pgmwindres ⟨cmd⟩
     :shortdesc: Use ⟨cmd⟩ as the program for embedding manifests on Windows.
@@ -98,20 +98,20 @@ given compilation phase:
     :ref:`options-linker`.
 
 .. ghc-flag:: -pgmlibtool ⟨cmd⟩
-    :shortdesc: Use ⟨cmd⟩ as the command for libtool (with ``-staticlib`` only).
+    :shortdesc: Use ⟨cmd⟩ as the command for libtool (with :ghc-flag:`-staticlib` only).
     :type: dynamic
     :category: phase-programs
 
-    Use ⟨cmd⟩ as the libtool command (when using ``-staticlib`` only).
+    Use ⟨cmd⟩ as the libtool command (when using :ghc-flag:`-staticlib` only).
 
 .. ghc-flag:: -pgmi ⟨cmd⟩
     :shortdesc: Use ⟨cmd⟩ as the external interpreter command.
     :type: dynamic
     :category: phase-programs
 
-    Use ⟨cmd⟩ as the external interpreter command (see:
+    Use ⟨cmd⟩ as the external interpreter command (see
     :ref:`external-interpreter`).  Default: ``ghc-iserv-prof`` if
-    ``-prof`` is enabled, ``ghc-iserv-dyn`` if ``-dynamic`` is
+    :ghc-flag:`-prof` is enabled, ``ghc-iserv-dyn`` if :ghc-flag:`-dynamic` is
     enabled, or ``ghc-iserv`` otherwise.
 
 .. _forcing-options-through:
@@ -233,6 +233,19 @@ Options affecting the C pre-processor
 
     :since: 6.8.1
 
+    The :extension:`CPP` language extension enables the C pre-processor.
+    This can be turned into a command-line flag by prefixing it with
+    ``-X``; For example:
+
+    .. code-block:: sh
+
+        $ ghc -XCPP foo.hs
+
+    The :extension:`CPP` language extension can also be enabled using
+    the :ref:`LANGUAGE <language-pragma>` pragma; For example: ::
+
+        {-# LANGUAGE CPP #-}
+
 .. index::
    single: pre-processing: cpp
    single: C pre-processor options
@@ -243,8 +256,8 @@ Options affecting the C pre-processor
     :type: dynamic
     :category: cpp
 
-    The C pre-processor :command:`cpp` is run over your Haskell code only if
-    the ``-cpp`` option -cpp option is given. Unless you are building a
+    The C pre-processor :command:`cpp` is run over your Haskell code if
+    the ``-cpp`` option or ``-XCPP`` extension are given. Unless you are building a
     large system with significant doses of conditional compilation, you
     really shouldn't need it.
 

@@ -3,6 +3,8 @@
 {-# LANGUAGE ScopedTypeVariables #-}
 {-# LANGUAGE TypeFamilies #-}
 
+{-# OPTIONS_GHC -Wno-incomplete-uni-patterns #-}
+
 -----------------------------------------------------------------------------
 --
 -- The register liveness determinator
@@ -40,12 +42,11 @@ import GhcPrelude
 import Reg
 import Instruction
 
-import BlockId
+import GHC.Cmm.BlockId
 import CFG
-import Hoopl.Collections
-import Hoopl.Label
-import Cmm hiding (RegSet, emptyRegSet)
-import PprCmm()
+import GHC.Cmm.Dataflow.Collections
+import GHC.Cmm.Dataflow.Label
+import GHC.Cmm hiding (RegSet, emptyRegSet)
 
 import Digraph
 import DynFlags
@@ -175,7 +176,7 @@ data Liveness
 -- | Stash regs live on entry to each basic block in the info part of the cmm code.
 data LiveInfo
         = LiveInfo
-                (LabelMap CmmStatics)     -- cmm info table static stuff
+                (LabelMap RawCmmStatics)  -- cmm info table static stuff
                 [BlockId]                 -- entry points (first one is the
                                           -- entry point for the proc).
                 (BlockMap RegSet)         -- argument locals live on entry to this block
@@ -706,8 +707,8 @@ sccBlocks blocks entries mcfg = map (fmap node_payload) sccs
         reachable :: LabelSet
         reachable
             | Just cfg <- mcfg
-            -- Our CFG only contains reachable nodes by construction.
-            = getCfgNodes cfg
+            -- Our CFG only contains reachable nodes by construction at this point.
+            = setFromList $ getCfgNodes cfg
             | otherwise
             = setFromList $ [ node_key node | node <- reachablesG g1 roots ]
 

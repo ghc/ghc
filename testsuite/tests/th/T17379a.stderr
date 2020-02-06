@@ -1,0 +1,4 @@
+
+T17379a.hs:8:2: error:
+    GadtC must have at least one constructor name
+    When splicing a TH declaration: data T where :: T

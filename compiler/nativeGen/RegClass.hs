@@ -1,27 +1,24 @@
 -- | An architecture independent description of a register's class.
 module RegClass
-        ( RegClass(..)
-        , allRegClasses
-        ) where
+        ( RegClass (..) )
+
+where
 
 import GhcPrelude
 
 import  Outputable
 import  Unique
 
+
 -- | The class of a register.
 --      Used in the register allocator.
---      We treat all registers in a class as being interchangable.
+--      We treat all registers in a class as being interchangeable.
 --
 data RegClass
         = RcInteger
         | RcFloat
         | RcDouble
-        deriving (Eq, Show)
-
-allRegClasses :: [RegClass]
-allRegClasses =
-    [ RcInteger, RcFloat, RcDouble ]
+        deriving Eq
 
 
 instance Uniquable RegClass where
@@ -30,6 +27,6 @@ instance Uniquable RegClass where
     getUnique RcDouble  = mkRegClassUnique 2
 
 instance Outputable RegClass where
-    ppr RcInteger         = Outputable.text "I"
-    ppr RcFloat           = Outputable.text "F"
-    ppr RcDouble          = Outputable.text "D"
+    ppr RcInteger       = Outputable.text "I"
+    ppr RcFloat         = Outputable.text "F"
+    ppr RcDouble        = Outputable.text "D"

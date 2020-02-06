@@ -369,16 +369,22 @@ STG representation
 These flags dump various phases of GHC's STG pipeline.
 
 .. ghc-flag:: -ddump-stg
-    :shortdesc: Dump final STG
+    :shortdesc: Show CoreToStg output
     :type: dynamic
 
-    Dump output of STG-to-STG passes
+    Show the output of CoreToStg pass.
 
 .. ghc-flag:: -dverbose-stg2stg
     :shortdesc: Show output from each STG-to-STG pass
     :type: dynamic
 
     Show the output of the intermediate STG-to-STG pass. (*lots* of output!)
+
+.. ghc-flag:: -ddump-stg-unarised
+    :shortdesc: Show unarised STG
+    :type: dynamic
+
+    Show the output of the unarise pass.
 
 .. ghc-flag:: -ddump-stg-final
     :shortdesc: Show output of last STG pass.
@@ -391,8 +397,8 @@ C-\\- representation
 
 These flags dump various phases of GHC's C-\\- pipeline.
 
-.. ghc-flag:: -ddump-cmm-verbose
-    :shortdesc: Show output from main C-\\- pipeline passes
+.. ghc-flag:: -ddump-cmm-verbose-by-proc
+    :shortdesc: Show output from main C-\\- pipeline passes (grouped by proc)
     :type: dynamic
 
     Dump output from main C-\\- pipeline stages. In case of
@@ -403,6 +409,13 @@ These flags dump various phases of GHC's C-\\- pipeline.
 
     Cmm dumps don't include unreachable blocks since we print
     blocks in reverse post-order.
+
+.. ghc-flag:: -ddump-cmm-verbose
+    :shortdesc: Write output from main C-\\- pipeline passes to files
+    :type: dynamic
+
+    If used in conjunction with :ghc-flag:`-ddump-to-file`, writes dump
+    output from main C-\\- pipeline stages to files (each stage per file).
 
 .. ghc-flag:: -ddump-cmm-from-stg
     :shortdesc: Dump STG-to-C-\\- output
@@ -838,14 +851,21 @@ Checking for consistency
     However forcing larger alignments in general reduces performance.
 
 .. ghc-flag:: -fcatch-bottoms
-    :shortdesc: Insert ``error`` expressions after bottoming expressions; useful
-        when debugging the compiler.
+    :shortdesc: Add a default ``error`` alternative to case expressions without
+        a default alternative.
     :type: dynamic
 
-    Instructs the simplifier to emit ``error`` expressions in the continuation
-    of empty case analyses (which should bottom and consequently not return).
-    This is helpful when debugging demand analysis bugs which can sometimes
-    manifest as segmentation faults.
+    GHC generates case expressions without a default alternative in some cases:
+
+    - When the demand analysis thinks that the scrutinee does not return (i.e. a
+      bottoming expression)
+
+    - When the scrutinee is a GADT and its type rules out some constructors, and
+      others constructors are already handled by the case expression.
+
+    With this flag GHC generates a default alternative with ``error`` in these
+    cases. This is helpful when debugging demand analysis or type checker bugs
+    which can sometimes manifest as segmentation faults.
 
 .. _checking-determinism:
 
@@ -878,3 +898,15 @@ Checking for determinism
       generates in decreasing order
     * ``-dinitial-unique=1 -dunique-increment=PRIME`` - where PRIME big enough
       to overflow often - nonsequential order
+
+Other
+-----
+
+.. ghc-flag:: -dno-typeable-binds
+    :shortdesc: Don't generate bindings for Typeable methods
+    :type: dynamic
+
+    This avoid generating Typeable-related bindings for modules and types. This
+    is useful when debugging because it gives smaller modules and dumps, but the
+    compiler will panic if you try to use Typeable instances of things that you
+    built with this flag.

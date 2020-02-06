@@ -3,8 +3,8 @@ module Packages (
     -- * GHC packages
     array, base, binary, bytestring, cabal, checkApiAnnotations, checkPpr,
     compareSizes, compiler, containers, deepseq, deriveConstants, directory,
-    filepath, genapply, genprimopcode, ghc, ghcBoot, ghcBootTh, ghcCompact,
-    ghcHeap, ghci, ghcPkg, ghcPrim, haddock, haskeline,
+    exceptions, filepath, genapply, genprimopcode, ghc, ghcBoot, ghcBootTh,
+    ghcCompact, ghcHeap, ghci, ghcPkg, ghcPrim, haddock, haskeline,
     hsc2hs, hp2ps, hpc, hpcBin, integerGmp, integerSimple, iserv, iservProxy,
     libffi, libiserv, mtl, parsec, pretty, primitive, process, remoteIserv, rts,
     runGhc, stm, templateHaskell, terminfo, text, time, timeout, touchy,
@@ -13,7 +13,7 @@ module Packages (
     -- * Package information
     programName, nonHsMainPackage, autogenPath, programPath, timeoutPath,
     rtsContext, rtsBuildPath, libffiBuildPath, libffiLibraryName,
-    generatedGhcDependencies, ensureConfigured
+    ensureConfigured
     ) where
 
 import Hadrian.Package
@@ -33,9 +33,9 @@ ghcPackages :: [Package]
 ghcPackages =
     [ array, base, binary, bytestring, cabal, checkPpr, checkApiAnnotations
     , compareSizes, compiler, containers, deepseq, deriveConstants, directory
-    , filepath, genapply, genprimopcode, ghc, ghcBoot, ghcBootTh, ghcCompact
-    , ghcHeap, ghci, ghcPkg, ghcPrim, haddock, haskeline, hsc2hs, hp2ps
-    , hpc, hpcBin, integerGmp, integerSimple, iserv, libffi, libiserv, mtl
+    , exceptions, filepath, genapply, genprimopcode, ghc, ghcBoot, ghcBootTh
+    , ghcCompact, ghcHeap, ghci, ghcPkg, ghcPrim, haddock, haskeline, hsc2hs
+    , hp2ps, hpc, hpcBin, integerGmp, integerSimple, iserv, libffi, libiserv, mtl
     , parsec, pretty, process, rts, runGhc, stm, templateHaskell
     , terminfo, text, time, touchy, transformers, unlit, unix, win32, xhtml
     , timeout ]
@@ -58,6 +58,7 @@ containers          = lib  "containers"      `setPath` "libraries/containers/con
 deepseq             = lib  "deepseq"
 deriveConstants     = util "deriveConstants"
 directory           = lib  "directory"
+exceptions          = lib  "exceptions"
 filepath            = lib  "filepath"
 genapply            = util "genapply"
 genprimopcode       = util "genprimopcode"
@@ -216,12 +217,3 @@ libffiLibraryName = do
         (True , False) -> "ffi"
         (False, False) -> "Cffi"
         (_    , True ) -> "Cffi-6"
-
--- | Generated header files required by GHC in runtime.
-generatedGhcDependencies :: Stage -> Action [FilePath]
-generatedGhcDependencies stage = do
-    let context = vanillaContext stage compiler
-    bh <- buildPath   context <&> (-/- "ghc_boot_platform.h")
-    ch <- contextPath context <&> (-/- "ghc_boot_platform.h")
-    is <- includesDependencies
-    return $ is ++ [bh, ch]

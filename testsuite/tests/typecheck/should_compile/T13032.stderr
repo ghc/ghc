@@ -5,13 +5,18 @@ Result size of Desugar (after optimization)
 
 -- RHS size: {terms: 6, types: 11, coercions: 0, joins: 0/0}
 f :: forall a b. (a ~ b) => a -> b -> Bool
-[LclIdX]
-f = \ (@ a) (@ b) _ [Occ=Dead] _ [Occ=Dead] _ [Occ=Dead] ->
+[LclIdX,
+ Unf=Unf{Src=<vanilla>, TopLvl=True, Value=True, ConLike=True,
+         WorkFree=True, Expandable=True,
+         Guidance=ALWAYS_IF(arity=3,unsat_ok=True,boring_ok=True)}]
+f = \ (@a) (@b) _ [Occ=Dead] _ [Occ=Dead] _ [Occ=Dead] ->
       GHC.Types.True
 
 -- RHS size: {terms: 5, types: 0, coercions: 0, joins: 0/0}
 T13032.$trModule :: GHC.Types.Module
-[LclIdX]
+[LclIdX,
+ Unf=Unf{Src=<vanilla>, TopLvl=True, Value=True, ConLike=True,
+         WorkFree=True, Expandable=True, Guidance=IF_ARGS [] 80 30}]
 T13032.$trModule
   = GHC.Types.Module
       (GHC.Types.TrNameS "main"#) (GHC.Types.TrNameS "T13032"#)

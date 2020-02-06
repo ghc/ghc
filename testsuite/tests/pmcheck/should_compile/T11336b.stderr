@@ -1,0 +1,4 @@
+
+T11336b.hs:25:1: warning: [-Wincomplete-patterns (in -Wextra)]
+    Pattern match(es) are non-exhaustive
+    In an equation for ‘fun’: Patterns not matched: Proxy

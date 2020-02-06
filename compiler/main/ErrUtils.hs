@@ -7,6 +7,7 @@
 {-# LANGUAGE CPP #-}
 {-# LANGUAGE BangPatterns #-}
 {-# LANGUAGE RecordWildCards #-}
+{-# LANGUAGE RankNTypes #-}
 
 module ErrUtils (
         -- * Basic types
@@ -41,8 +42,10 @@ module ErrUtils (
 
         -- * Dump files
         dumpIfSet, dumpIfSet_dyn, dumpIfSet_dyn_printer,
-        mkDumpDoc, dumpSDoc, dumpSDocForUser,
-        dumpSDocWithStyle,
+        dumpOptionsFromFlag, DumpOptions (..),
+        DumpFormat (..), DumpAction, dumpAction, defaultDumpAction,
+        TraceAction, traceAction, defaultTraceAction,
+        touchDumpFile,
 
         -- * Issuing messages during compilation
         putMsg, printInfoForUser, printOutputForUser,
@@ -50,7 +53,8 @@ module ErrUtils (
         errorMsg, warningMsg,
         fatalErrorMsg, fatalErrorMsg'',
         compilationProgressMsg,
-        showPass, withTiming,
+        showPass,
+        withTiming, withTimingSilent, withTimingD, withTimingSilentD,
         debugTraceMsg,
         ghcExit,
         prettyPrintGhcErrors,
@@ -441,23 +445,23 @@ dumpIfSet dflags flag hdr doc
                             (defaultDumpStyle dflags)
                             (mkDumpDoc hdr doc)
 
--- | a wrapper around 'dumpSDoc'.
+-- | a wrapper around 'dumpAction'.
 -- First check whether the dump flag is set
 -- Do nothing if it is unset
-dumpIfSet_dyn :: DynFlags -> DumpFlag -> String -> SDoc -> IO ()
-dumpIfSet_dyn dflags flag hdr doc
-  = when (dopt flag dflags) $ dumpSDoc dflags alwaysQualify flag hdr doc
+dumpIfSet_dyn :: DynFlags -> DumpFlag -> String -> DumpFormat -> SDoc -> IO ()
+dumpIfSet_dyn = dumpIfSet_dyn_printer alwaysQualify
 
--- | a wrapper around 'dumpSDoc'.
+-- | a wrapper around 'dumpAction'.
 -- First check whether the dump flag is set
 -- Do nothing if it is unset
 --
--- Unlike 'dumpIfSet_dyn',
--- has a printer argument but no header argument
-dumpIfSet_dyn_printer :: PrintUnqualified
-                      -> DynFlags -> DumpFlag -> SDoc -> IO ()
-dumpIfSet_dyn_printer printer dflags flag doc
-  = when (dopt flag dflags) $ dumpSDoc dflags printer flag "" doc
+-- Unlike 'dumpIfSet_dyn', has a printer argument
+dumpIfSet_dyn_printer :: PrintUnqualified -> DynFlags -> DumpFlag -> String
+                         -> DumpFormat -> SDoc -> IO ()
+dumpIfSet_dyn_printer printer dflags flag hdr fmt doc
+  = when (dopt flag dflags) $ do
+      let sty = mkDumpStyle dflags printer
+      dumpAction dflags sty (dumpOptionsFromFlag flag) hdr fmt doc
 
 mkDumpDoc :: String -> SDoc -> SDoc
 mkDumpDoc hdr doc
@@ -468,11 +472,16 @@ mkDumpDoc hdr doc
      where
         line = text (replicate 20 '=')
 
+
+-- | Ensure that a dump file is created even if it stays empty
+touchDumpFile :: DynFlags -> DumpOptions -> IO ()
+touchDumpFile dflags dumpOpt = withDumpFileHandle dflags dumpOpt (const (return ()))
+
 -- | Run an action with the handle of a 'DumpFlag' if we are outputting to a
 -- file, otherwise 'Nothing'.
-withDumpFileHandle :: DynFlags -> DumpFlag -> (Maybe Handle -> IO ()) -> IO ()
-withDumpFileHandle dflags flag action = do
-    let mFile = chooseDumpFile dflags flag
+withDumpFileHandle :: DynFlags -> DumpOptions -> (Maybe Handle -> IO ()) -> IO ()
+withDumpFileHandle dflags dumpOpt action = do
+    let mFile = chooseDumpFile dflags dumpOpt
     case mFile of
       Just fileName -> do
         let gdref = generatedDumps dflags
@@ -493,31 +502,15 @@ withDumpFileHandle dflags flag action = do
       Nothing -> action Nothing
 
 
-dumpSDoc, dumpSDocForUser
-  :: DynFlags -> PrintUnqualified -> DumpFlag -> String -> SDoc -> IO ()
-
--- | A wrapper around 'dumpSDocWithStyle' which uses 'PprDump' style.
-dumpSDoc dflags print_unqual
-  = dumpSDocWithStyle dump_style dflags
-  where dump_style = mkDumpStyle dflags print_unqual
-
--- | A wrapper around 'dumpSDocWithStyle' which uses 'PprUser' style.
-dumpSDocForUser dflags print_unqual
-  = dumpSDocWithStyle user_style dflags
-  where user_style = mkUserStyle dflags print_unqual AllTheWay
-
 -- | Write out a dump.
 -- If --dump-to-file is set then this goes to a file.
 -- otherwise emit to stdout.
 --
 -- When @hdr@ is empty, we print in a more compact format (no separators and
 -- blank lines)
---
--- The 'DumpFlag' is used only to choose the filename to use if @--dump-to-file@
--- is used; it is not used to decide whether to dump the output
-dumpSDocWithStyle :: PprStyle -> DynFlags -> DumpFlag -> String -> SDoc -> IO ()
-dumpSDocWithStyle sty dflags flag hdr doc =
-    withDumpFileHandle dflags flag writeDump
+dumpSDocWithStyle :: PprStyle -> DynFlags -> DumpOptions -> String -> SDoc -> IO ()
+dumpSDocWithStyle sty dflags dumpOpt hdr doc =
+    withDumpFileHandle dflags dumpOpt writeDump
   where
     -- write dump to file
     writeDump (Just handle) = do
@@ -543,12 +536,12 @@ dumpSDocWithStyle sty dflags flag hdr doc =
 
 -- | Choose where to put a dump file based on DynFlags
 --
-chooseDumpFile :: DynFlags -> DumpFlag -> Maybe FilePath
-chooseDumpFile dflags flag
+chooseDumpFile :: DynFlags -> DumpOptions -> Maybe FilePath
+chooseDumpFile dflags dumpOpt
 
-        | gopt Opt_DumpToFile dflags || flag == Opt_D_th_dec_file
+        | gopt Opt_DumpToFile dflags || dumpForcedToFile dumpOpt
         , Just prefix <- getPrefix
-        = Just $ setDir (prefix ++ (beautifyDumpName flag))
+        = Just $ setDir (prefix ++ dumpSuffix dumpOpt)
 
         | otherwise
         = Nothing
@@ -568,16 +561,39 @@ chooseDumpFile dflags flag
                          Just d  -> d </> f
                          Nothing ->       f
 
--- | Build a nice file name from name of a 'DumpFlag' constructor
-beautifyDumpName :: DumpFlag -> String
-beautifyDumpName Opt_D_th_dec_file = "th.hs"
-beautifyDumpName flag
- = let str = show flag
-       suff = case stripPrefix "Opt_D_" str of
-              Just x -> x
-              Nothing -> panic ("Bad flag name: " ++ str)
-       dash = map (\c -> if c == '_' then '-' else c) suff
-   in dash
+-- | Dump options
+--
+-- Dumps are printed on stdout by default except when the `dumpForcedToFile`
+-- field is set to True.
+--
+-- When `dumpForcedToFile` is True or when `-ddump-to-file` is set, dumps are
+-- written into a file whose suffix is given in the `dumpSuffix` field.
+--
+data DumpOptions = DumpOptions
+   { dumpForcedToFile :: Bool   -- ^ Must be dumped into a file, even if
+                                --   -ddump-to-file isn't set
+   , dumpSuffix       :: String -- ^ Filename suffix used when dumped into
+                                --   a file
+   }
+
+-- | Create dump options from a 'DumpFlag'
+dumpOptionsFromFlag :: DumpFlag -> DumpOptions
+dumpOptionsFromFlag Opt_D_th_dec_file =
+   DumpOptions                        -- -dth-dec-file dumps expansions of TH
+      { dumpForcedToFile = True       -- splices into MODULE.th.hs even when
+      , dumpSuffix       = "th.hs"    -- -ddump-to-file isn't set
+      }
+dumpOptionsFromFlag flag =
+   DumpOptions
+      { dumpForcedToFile = False
+      , dumpSuffix       = suffix -- build a suffix from the flag name
+      }                           -- e.g. -ddump-asm => ".dump-asm"
+   where
+      str  = show flag
+      suff = case stripPrefix "Opt_D_" str of
+             Just x  -> x
+             Nothing -> panic ("Bad flag name: " ++ str)
+      suffix = map (\c -> if c == '_' then '-' else c) suff
 
 
 -- -----------------------------------------------------------------------------
@@ -619,11 +635,15 @@ showPass dflags what
   = ifVerbose dflags 2 $
     logInfo dflags (defaultUserStyle dflags) (text "***" <+> text what <> colon)
 
+data PrintTimings = PrintTimings | DontPrintTimings
+  deriving (Eq, Show)
+
 -- | Time a compilation phase.
 --
 -- When timings are enabled (e.g. with the @-v2@ flag), the allocations
 -- and CPU time used by the phase will be reported to stderr. Consider
--- a typical usage: @withTiming getDynFlags (text "simplify") force pass@.
+-- a typical usage:
+-- @withTiming getDynFlags (text "simplify") force PrintTimings pass@.
 -- When timings are enabled the following costs are included in the
 -- produced accounting,
 --
@@ -640,32 +660,89 @@ showPass dflags what
 --
 -- To avoid adversely affecting compiler performance when timings are not
 -- requested, the result is only forced when timings are enabled.
+--
+-- See Note [withTiming] for more.
 withTiming :: MonadIO m
-           => m DynFlags  -- ^ A means of getting a 'DynFlags' (often
-                          -- 'getDynFlags' will work here)
-           -> SDoc        -- ^ The name of the phase
-           -> (a -> ())   -- ^ A function to force the result
-                          -- (often either @const ()@ or 'rnf')
-           -> m a         -- ^ The body of the phase to be timed
+           => DynFlags     -- ^ DynFlags
+           -> SDoc         -- ^ The name of the phase
+           -> (a -> ())    -- ^ A function to force the result
+                           -- (often either @const ()@ or 'rnf')
+           -> m a          -- ^ The body of the phase to be timed
            -> m a
-withTiming getDFlags what force_result action
-  = do dflags <- getDFlags
-       if verbosity dflags >= 2 || dopt Opt_D_dump_timings dflags
-          then do liftIO $ logInfo dflags (defaultUserStyle dflags)
-                         $ text "***" <+> what <> colon
-                  liftIO $ traceEventIO $ showSDocOneLine dflags $ text "GHC:started:" <+> what
+withTiming dflags what force action =
+  withTiming' dflags what force PrintTimings action
+
+-- | Like withTiming but get DynFlags from the Monad.
+withTimingD :: (MonadIO m, HasDynFlags m)
+           => SDoc         -- ^ The name of the phase
+           -> (a -> ())    -- ^ A function to force the result
+                           -- (often either @const ()@ or 'rnf')
+           -> m a          -- ^ The body of the phase to be timed
+           -> m a
+withTimingD what force action = do
+  dflags <- getDynFlags
+  withTiming' dflags what force PrintTimings action
+
+
+-- | Same as 'withTiming', but doesn't print timings in the
+--   console (when given @-vN@, @N >= 2@ or @-ddump-timings@).
+--
+--   See Note [withTiming] for more.
+withTimingSilent
+  :: MonadIO m
+  => DynFlags   -- ^ DynFlags
+  -> SDoc       -- ^ The name of the phase
+  -> (a -> ())  -- ^ A function to force the result
+                -- (often either @const ()@ or 'rnf')
+  -> m a        -- ^ The body of the phase to be timed
+  -> m a
+withTimingSilent dflags what force action =
+  withTiming' dflags what force DontPrintTimings action
+
+-- | Same as 'withTiming', but doesn't print timings in the
+--   console (when given @-vN@, @N >= 2@ or @-ddump-timings@)
+--   and gets the DynFlags from the given Monad.
+--
+--   See Note [withTiming] for more.
+withTimingSilentD
+  :: (MonadIO m, HasDynFlags m)
+  => SDoc       -- ^ The name of the phase
+  -> (a -> ())  -- ^ A function to force the result
+                -- (often either @const ()@ or 'rnf')
+  -> m a        -- ^ The body of the phase to be timed
+  -> m a
+withTimingSilentD what force action = do
+  dflags <- getDynFlags
+  withTiming' dflags what force DontPrintTimings action
+
+-- | Worker for 'withTiming' and 'withTimingSilent'.
+withTiming' :: MonadIO m
+            => DynFlags   -- ^ A means of getting a 'DynFlags' (often
+                            -- 'getDynFlags' will work here)
+            -> SDoc         -- ^ The name of the phase
+            -> (a -> ())    -- ^ A function to force the result
+                            -- (often either @const ()@ or 'rnf')
+            -> PrintTimings -- ^ Whether to print the timings
+            -> m a          -- ^ The body of the phase to be timed
+            -> m a
+withTiming' dflags what force_result prtimings action
+  = do if verbosity dflags >= 2 || dopt Opt_D_dump_timings dflags
+          then do whenPrintTimings $
+                    logInfo dflags (defaultUserStyle dflags) $
+                      text "***" <+> what <> colon
+                  eventBegins dflags what
                   alloc0 <- liftIO getAllocationCounter
                   start <- liftIO getCPUTime
                   !r <- action
                   () <- pure $ force_result r
-                  liftIO $ traceEventIO $ showSDocOneLine dflags $ text "GHC:finished:" <+> what
+                  eventEnds dflags what
                   end <- liftIO getCPUTime
                   alloc1 <- liftIO getAllocationCounter
                   -- recall that allocation counter counts down
                   let alloc = alloc0 - alloc1
                       time = realToFrac (end - start) * 1e-9
 
-                  when (verbosity dflags >= 2)
+                  when (verbosity dflags >= 2 && prtimings == PrintTimings)
                       $ liftIO $ logInfo dflags (defaultUserStyle dflags)
                           (text "!!!" <+> what <> colon <+> text "finished in"
                            <+> doublePrec 2 time
@@ -675,14 +752,26 @@ withTiming getDFlags what force_result action
                            <+> doublePrec 3 (realToFrac alloc / 1024 / 1024)
                            <+> text "megabytes")
 
-                  liftIO $ dumpIfSet_dyn dflags Opt_D_dump_timings ""
-                      $ text $ showSDocOneLine dflags
-                      $ hsep [ what <> colon
-                             , text "alloc=" <> ppr alloc
-                             , text "time=" <> doublePrec 3 time
-                             ]
+                  whenPrintTimings $
+                      dumpIfSet_dyn dflags Opt_D_dump_timings "" FormatText
+                          $ text $ showSDocOneLine dflags
+                          $ hsep [ what <> colon
+                                 , text "alloc=" <> ppr alloc
+                                 , text "time=" <> doublePrec 3 time
+                                 ]
                   pure r
            else action
+
+    where whenPrintTimings = liftIO . when (prtimings == PrintTimings)
+          eventBegins dflags w = do
+            whenPrintTimings $ traceMarkerIO (eventBeginsDoc dflags w)
+            liftIO $ traceEventIO (eventEndsDoc dflags w)
+          eventEnds dflags w = do
+            whenPrintTimings $ traceMarkerIO (eventEndsDoc dflags w)
+            liftIO $ traceEventIO (eventEndsDoc dflags w)
+
+          eventBeginsDoc dflags w = showSDocOneLine dflags $ text "GHC:started:" <+> w
+          eventEndsDoc dflags w = showSDocOneLine dflags $ text "GHC:finished:" <+> w
 
 debugTraceMsg :: DynFlags -> Int -> MsgDoc -> IO ()
 debugTraceMsg dflags val msg = ifVerbose dflags val $
@@ -749,3 +838,139 @@ traceCmd dflags phase_name cmd_line action
                                  <+> text cmd_line
                                  <+> text (show exn))
                               ; throwGhcExceptionIO (ProgramError (show exn))}
+
+{- Note [withTiming]
+~~~~~~~~~~~~~~~~~~~~
+
+For reference:
+
+  withTiming
+    :: MonadIO
+    => m DynFlags   -- how to get the DynFlags
+    -> SDoc         -- label for the computation we're timing
+    -> (a -> ())    -- how to evaluate the result
+    -> PrintTimings -- whether to report the timings when passed
+                    -- -v2 or -ddump-timings
+    -> m a          -- computation we're timing
+    -> m a
+
+withTiming lets you run an action while:
+
+(1) measuring the CPU time it took and reporting that on stderr
+    (when PrintTimings is passed),
+(2) emitting start/stop events to GHC's event log, with the label
+    given as an argument.
+
+Evaluation of the result
+------------------------
+
+'withTiming' takes as an argument a function of type 'a -> ()', whose purpose is
+to evaluate the result "sufficiently". A given pass might return an 'm a' for
+some monad 'm' and result type 'a', but where the 'a' is complex enough
+that evaluating it to WHNF barely scratches its surface and leaves many
+complex and time-consuming computations unevaluated. Those would only be
+forced by the next pass, and the time needed to evaluate them would be
+mis-attributed to that next pass. A more appropriate function would be
+one that deeply evaluates the result, so as to assign the time spent doing it
+to the pass we're timing.
+
+Note: as hinted at above, the time spent evaluating the application of the
+forcing function to the result is included in the timings reported by
+'withTiming'.
+
+How we use it
+-------------
+
+We measure the time and allocations of various passes in GHC's pipeline by just
+wrapping the whole pass with 'withTiming'. This also materializes by having
+a label for each pass in the eventlog, where each pass is executed in one go,
+during a continuous time window.
+
+However, from STG onwards, the pipeline uses streams to emit groups of
+STG/Cmm/etc declarations one at a time, and process them until we get to
+assembly code generation. This means that the execution of those last few passes
+is interleaved and that we cannot measure how long they take by just wrapping
+the whole thing with 'withTiming'. Instead we wrap the processing of each
+individual stream element, all along the codegen pipeline, using the appropriate
+label for the pass to which this processing belongs. That generates a lot more
+data but allows us to get fine-grained timings about all the passes and we can
+easily compute totals with tools like ghc-events-analyze (see below).
+
+
+Producing an eventlog for GHC
+-----------------------------
+
+To actually produce the eventlog, you need an eventlog-capable GHC build:
+
+  With Hadrian:
+  $ hadrian/build.sh -j "stage1.ghc-bin.ghc.link.opts += -eventlog"
+
+  With Make:
+  $ make -j GhcStage2HcOpts+=-eventlog
+
+You can then produce an eventlog when compiling say hello.hs by simply
+doing:
+
+  If GHC was built by Hadrian:
+  $ _build/stage1/bin/ghc -ddump-timings hello.hs -o hello +RTS -l
+
+  If GHC was built with Make:
+  $ inplace/bin/ghc-stage2 -ddump-timing hello.hs -o hello +RTS -l
+
+You could alternatively use -v<N> (with N >= 2) instead of -ddump-timings,
+to ask GHC to report timings (on stderr and the eventlog).
+
+This will write the eventlog to ./ghc.eventlog in both cases. You can then
+visualize it or look at the totals for each label by using ghc-events-analyze,
+threadscope or any other eventlog consumer. Illustrating with
+ghc-events-analyze:
+
+  $ ghc-events-analyze --timed --timed-txt --totals \
+                       --start "GHC:started:" --stop "GHC:finished:" \
+                       ghc.eventlog
+
+This produces ghc.timed.txt (all event timestamps), ghc.timed.svg (visualisation
+of the execution through the various labels) and ghc.totals.txt (total time
+spent in each label).
+
+-}
+
+
+-- | Format of a dump
+--
+-- Dump formats are loosely defined: dumps may contain various additional
+-- headers and annotations and they may be partial. 'DumpFormat' is mainly a hint
+-- (e.g. for syntax highlighters).
+data DumpFormat
+   = FormatHaskell   -- ^ Haskell
+   | FormatCore      -- ^ Core
+   | FormatSTG       -- ^ STG
+   | FormatByteCode  -- ^ ByteCode
+   | FormatCMM       -- ^ Cmm
+   | FormatASM       -- ^ Assembly code
+   | FormatC         -- ^ C code/header
+   | FormatLLVM      -- ^ LLVM bytecode
+   | FormatText      -- ^ Unstructured dump
+   deriving (Show,Eq)
+
+type DumpAction = DynFlags -> PprStyle -> DumpOptions -> String
+                  -> DumpFormat -> SDoc -> IO ()
+
+type TraceAction = forall a. DynFlags -> String -> SDoc -> a -> a
+
+-- | Default action for 'dumpAction' hook
+defaultDumpAction :: DumpAction
+defaultDumpAction dflags sty dumpOpt title _fmt doc = do
+   dumpSDocWithStyle sty dflags dumpOpt title doc
+
+-- | Default action for 'traceAction' hook
+defaultTraceAction :: TraceAction
+defaultTraceAction dflags title doc = pprTraceWithFlags dflags title doc
+
+-- | Helper for `dump_action`
+dumpAction :: DumpAction
+dumpAction dflags = dump_action dflags dflags
+
+-- | Helper for `trace_action`
+traceAction :: TraceAction
+traceAction dflags = trace_action dflags dflags

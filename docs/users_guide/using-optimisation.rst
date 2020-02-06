@@ -383,7 +383,7 @@ by saying ``-fno-wombat``.
     a shared-memory
     multiprocessor <http://community.haskell.org/~simonmar/papers/multiproc.pdf>`__.
 
-    See :ref:`parallel-compile-options` for a dicussion on its use.
+    See :ref:`parallel-compile-options` for a discussion on its use.
 
 .. ghc-flag:: -fexcess-precision
     :shortdesc: Enable excess intermediate precision
@@ -459,13 +459,12 @@ by saying ``-fno-wombat``.
     residency.
 
     .. note::
-       GHC doesn't implement complete full-laziness. When
-       optimisation in on, and ``-fno-full-laziness`` is not given, some
-       transformations that increase sharing are performed, such as
-       extracting repeated computations from a loop. These are the same
-       transformations that a fully lazy implementation would do, the
-       difference is that GHC doesn't consistently apply full-laziness, so
-       don't rely on it.
+        GHC doesn't implement complete full laziness. Although GHC's
+        full-laziness optimisation does enable some transformations
+        which would be performed by a fully lazy implementation (such as
+        extracting repeated computations from loops), these
+        transformations are not applied consistently, so don't rely on
+        them.
 
 .. ghc-flag:: -ffun-to-thunk
     :shortdesc: Allow worker-wrapper to convert a function closure into a thunk
@@ -609,7 +608,7 @@ by saying ``-fno-wombat``.
     :shortdesc: *default: 6.* Set the maximum number of bindings to display in
         type error messages.
     :type: dynamic
-    :reverse: -fno-max-relevant-bindings
+    :reverse: -fno-max-relevant-binds
     :category: verbosity
 
     :default: 6
@@ -617,9 +616,9 @@ by saying ``-fno-wombat``.
     The type checker sometimes displays a fragment of the type
     environment in error messages, but only up to some maximum number,
     set by this flag. Turning it off with
-    ``-fno-max-relevant-bindings`` gives an unlimited number.
+    ``-fno-max-relevant-binds`` gives an unlimited number.
     Syntactically top-level bindings are also usually excluded (since
-    they may be numerous), but ``-fno-max-relevant-bindings`` includes
+    they may be numerous), but ``-fno-max-relevant-binds`` includes
     them too.
 
 .. ghc-flag:: -fmax-uncovered-patterns=⟨n⟩
@@ -1249,6 +1248,17 @@ by saying ``-fno-wombat``.
     if a function definition will be inlined *at a call site*. The other option
     determines if a function definition will be kept around at all for
     potential inlining.
+
+.. ghc-flag:: -fworker-wrapper
+    :shortdesc: Enable the worker-wrapper transformation.
+    :type: dynamic
+    :category:
+
+    Enable the worker-wrapper transformation after a strictness
+    analysis pass. Implied by :ghc-flag:`-O`, and by :ghc-flag:`-fstrictness`.
+    Disabled by :ghc-flag:`-fno-strictness`. Enabling :ghc-flag:`-fworker-wrapper`
+    while strictness analysis is disabled (by :ghc-flag:`-fno-strictness`)
+    has no effect.
 
 .. ghc-flag:: -fbinary-blob-threshold=⟨n⟩
     :shortdesc: *default: 500K.* Tweak assembly generator for binary blobs.

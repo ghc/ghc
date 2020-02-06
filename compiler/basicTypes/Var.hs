@@ -6,6 +6,8 @@
 -}
 
 {-# LANGUAGE CPP, FlexibleContexts, MultiWayIf, FlexibleInstances, DeriveDataTypeable #-}
+{-# OPTIONS_GHC -Wno-incomplete-uni-patterns   #-}
+{-# OPTIONS_GHC -Wno-incomplete-record-updates #-}
 
 -- |
 -- #name_types#
@@ -89,7 +91,8 @@ module Var (
 
 import GhcPrelude
 
-import {-# SOURCE #-}   TyCoRep( Type, Kind, pprKind )
+import {-# SOURCE #-}   TyCoRep( Type, Kind )
+import {-# SOURCE #-}   TyCoPpr( pprKind )
 import {-# SOURCE #-}   TcType( TcTyVarDetails, pprTcTyVarDetails, vanillaSkolemTv )
 import {-# SOURCE #-}   IdInfo( IdDetails, IdInfo, coVarDetails, isCoVarDetails,
                                 vanillaIdInfo, pprIdDetails )

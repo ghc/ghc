@@ -1,5 +1,5 @@
 
-TH_implicitParamsErr2.hs:5:10: error:
+TH_implicitParamsErr2.hs:5:9: error:
     • Implicit parameters mixed with other bindings
       When splicing a TH expression: let {?x = 1; y = 2}
  in y

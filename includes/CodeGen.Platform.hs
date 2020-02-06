@@ -1,12 +1,11 @@
 
-import CmmExpr
+import GHC.Cmm.Expr
 #if !(defined(MACHREGS_i386) || defined(MACHREGS_x86_64) \
     || defined(MACHREGS_sparc) || defined(MACHREGS_powerpc))
 import PlainPanic
 #endif
 import Reg
 
-#include "ghcautoconf.h"
 #include "stg/MachRegs.h"
 
 #if defined(MACHREGS_i386) || defined(MACHREGS_x86_64)
@@ -345,6 +344,42 @@ import Reg
 # define f30 62
 # define f31 63
 
+#elif defined(MACHREGS_s390x)
+
+# define r0   0
+# define r1   1
+# define r2   2
+# define r3   3
+# define r4   4
+# define r5   5
+# define r6   6
+# define r7   7
+# define r8   8
+# define r9   9
+# define r10 10
+# define r11 11
+# define r12 12
+# define r13 13
+# define r14 14
+# define r15 15
+
+# define f0  16
+# define f1  17
+# define f2  18
+# define f3  19
+# define f4  20
+# define f5  21
+# define f6  22
+# define f7  23
+# define f8  24
+# define f9  25
+# define f10 26
+# define f11 27
+# define f12 28
+# define f13 29
+# define f14 30
+# define f15 31
+
 #endif
 
 callerSaves :: GlobalReg -> Bool
@@ -495,13 +530,13 @@ activeStgRegs = [
     ,DoubleReg 1
 #endif
 #if defined(REG_XMM1)
-    ,XmmReg 1 2 W64 Integer
+    ,XmmReg 1
 #endif
 #if defined(REG_YMM1)
-    ,YmmReg 1 4 W64 Integer
+    ,YmmReg 1
 #endif
 #if defined(REG_ZMM1)
-    ,ZmmReg 1 8 W64 Integer
+    ,ZmmReg 1
 #endif
 #if defined(REG_F2)
     ,FloatReg 2
@@ -510,13 +545,13 @@ activeStgRegs = [
     ,DoubleReg 2
 #endif
 #if defined(REG_XMM2)
-    ,XmmReg 2 2 W64 Integer
+    ,XmmReg 2
 #endif
 #if defined(REG_YMM2)
-    ,YmmReg 2 4 W64 Integer
+    ,YmmReg 2
 #endif
 #if defined(REG_ZMM2)
-    ,ZmmReg 2 8 W64 Integer
+    ,ZmmReg 2
 #endif
 #if defined(REG_F3)
     ,FloatReg 3
@@ -525,13 +560,13 @@ activeStgRegs = [
     ,DoubleReg 3
 #endif
 #if defined(REG_XMM3)
-    ,XmmReg 3 2 W64 Integer
+    ,XmmReg 3
 #endif
 #if defined(REG_YMM3)
-    ,YmmReg 3 4 W64 Integer
+    ,YmmReg 3
 #endif
 #if defined(REG_ZMM3)
-    ,ZmmReg 3 8 W64 Integer
+    ,ZmmReg 3
 #endif
 #if defined(REG_F4)
     ,FloatReg 4
@@ -540,13 +575,13 @@ activeStgRegs = [
     ,DoubleReg 4
 #endif
 #if defined(REG_XMM4)
-    ,XmmReg 4 2 W64 Integer
+    ,XmmReg 4
 #endif
 #if defined(REG_YMM4)
-    ,YmmReg 4 4 W64 Integer
+    ,YmmReg 4
 #endif
 #if defined(REG_ZMM4)
-    ,ZmmReg 4 8 W64 Integer
+    ,ZmmReg 4
 #endif
 #if defined(REG_F5)
     ,FloatReg 5
@@ -555,13 +590,13 @@ activeStgRegs = [
     ,DoubleReg 5
 #endif
 #if defined(REG_XMM5)
-    ,XmmReg 5 2 W64 Integer
+    ,XmmReg 5
 #endif
 #if defined(REG_YMM5)
-    ,YmmReg 5 4 W64 Integer
+    ,YmmReg 5
 #endif
 #if defined(REG_ZMM5)
-    ,ZmmReg 5 8 W64 Integer
+    ,ZmmReg 5
 #endif
 #if defined(REG_F6)
     ,FloatReg 6
@@ -570,13 +605,13 @@ activeStgRegs = [
     ,DoubleReg 6
 #endif
 #if defined(REG_XMM6)
-    ,XmmReg 6 2 W64 Integer
+    ,XmmReg 6
 #endif
 #if defined(REG_YMM6)
-    ,YmmReg 6 4 W64 Integer
+    ,YmmReg 6
 #endif
 #if defined(REG_ZMM6)
-    ,ZmmReg 6 8 W64 Integer
+    ,ZmmReg 6
 #endif
 #else /* MAX_REAL_XMM_REG == 0 */
 #if defined(REG_F1)
@@ -631,7 +666,8 @@ haveRegBase = False
 globalRegMaybe :: GlobalReg -> Maybe RealReg
 #if defined(MACHREGS_i386) || defined(MACHREGS_x86_64) \
     || defined(MACHREGS_sparc) || defined(MACHREGS_powerpc) \
-    || defined(MACHREGS_arm) || defined(MACHREGS_aarch64)
+    || defined(MACHREGS_arm) || defined(MACHREGS_aarch64) \
+    || defined(MACHREGS_s390x)
 # if defined(REG_Base)
 globalRegMaybe BaseReg                  = Just (RealRegSingle REG_Base)
 # endif
@@ -733,62 +769,62 @@ globalRegMaybe (DoubleReg 6)            =
 # endif
 # if MAX_REAL_XMM_REG != 0
 #  if defined(REG_XMM1)
-globalRegMaybe (XmmReg 1 _ _ _)         = Just (RealRegSingle REG_XMM1)
+globalRegMaybe (XmmReg 1)               = Just (RealRegSingle REG_XMM1)
 #  endif
 #  if defined(REG_XMM2)
-globalRegMaybe (XmmReg 2 _ _ _)         = Just (RealRegSingle REG_XMM2)
+globalRegMaybe (XmmReg 2)               = Just (RealRegSingle REG_XMM2)
 #  endif
 #  if defined(REG_XMM3)
-globalRegMaybe (XmmReg 3 _ _ _)         = Just (RealRegSingle REG_XMM3)
+globalRegMaybe (XmmReg 3)               = Just (RealRegSingle REG_XMM3)
 #  endif
 #  if defined(REG_XMM4)
-globalRegMaybe (XmmReg 4 _ _ _)         = Just (RealRegSingle REG_XMM4)
+globalRegMaybe (XmmReg 4)               = Just (RealRegSingle REG_XMM4)
 #  endif
 #  if defined(REG_XMM5)
-globalRegMaybe (XmmReg 5 _ _ _)         = Just (RealRegSingle REG_XMM5)
+globalRegMaybe (XmmReg 5)               = Just (RealRegSingle REG_XMM5)
 #  endif
 #  if defined(REG_XMM6)
-globalRegMaybe (XmmReg 6 _ _ _)         = Just (RealRegSingle REG_XMM6)
+globalRegMaybe (XmmReg 6)               = Just (RealRegSingle REG_XMM6)
 #  endif
 # endif
 # if defined(MAX_REAL_YMM_REG) && MAX_REAL_YMM_REG != 0
 #  if defined(REG_YMM1)
-globalRegMaybe (YmmReg 1 _ _ _)         = Just (RealRegSingle REG_YMM1)
+globalRegMaybe (YmmReg 1)               = Just (RealRegSingle REG_YMM1)
 #  endif
 #  if defined(REG_YMM2)
-globalRegMaybe (YmmReg 2 _ _ _)         = Just (RealRegSingle REG_YMM2)
+globalRegMaybe (YmmReg 2)               = Just (RealRegSingle REG_YMM2)
 #  endif
 #  if defined(REG_YMM3)
-globalRegMaybe (YmmReg 3 _ _ _)         = Just (RealRegSingle REG_YMM3)
+globalRegMaybe (YmmReg 3)               = Just (RealRegSingle REG_YMM3)
 #  endif
 #  if defined(REG_YMM4)
-globalRegMaybe (YmmReg 4 _ _ _)         = Just (RealRegSingle REG_YMM4)
+globalRegMaybe (YmmReg 4)               = Just (RealRegSingle REG_YMM4)
 #  endif
 #  if defined(REG_YMM5)
-globalRegMaybe (YmmReg 5 _ _ _)         = Just (RealRegSingle REG_YMM5)
+globalRegMaybe (YmmReg 5)               = Just (RealRegSingle REG_YMM5)
 #  endif
 #  if defined(REG_YMM6)
-globalRegMaybe (YmmReg 6 _ _ _)         = Just (RealRegSingle REG_YMM6)
+globalRegMaybe (YmmReg 6)               = Just (RealRegSingle REG_YMM6)
 #  endif
 # endif
 # if defined(MAX_REAL_ZMM_REG) && MAX_REAL_ZMM_REG != 0
 #  if defined(REG_ZMM1)
-globalRegMaybe (ZmmReg 1 _ _ _)         = Just (RealRegSingle REG_ZMM1)
+globalRegMaybe (ZmmReg 1)               = Just (RealRegSingle REG_ZMM1)
 #  endif
 #  if defined(REG_ZMM2)
-globalRegMaybe (ZmmReg 2 _ _ _)         = Just (RealRegSingle REG_ZMM2)
+globalRegMaybe (ZmmReg 2)               = Just (RealRegSingle REG_ZMM2)
 #  endif
 #  if defined(REG_ZMM3)
-globalRegMaybe (ZmmReg 3 _ _ _)         = Just (RealRegSingle REG_ZMM3)
+globalRegMaybe (ZmmReg 3)               = Just (RealRegSingle REG_ZMM3)
 #  endif
 #  if defined(REG_ZMM4)
-globalRegMaybe (ZmmReg 4 _ _ _)         = Just (RealRegSingle REG_ZMM4)
+globalRegMaybe (ZmmReg 4)               = Just (RealRegSingle REG_ZMM4)
 #  endif
 #  if defined(REG_ZMM5)
-globalRegMaybe (ZmmReg 5 _ _ _)         = Just (RealRegSingle REG_ZMM5)
+globalRegMaybe (ZmmReg 5)               = Just (RealRegSingle REG_ZMM5)
 #  endif
 #  if defined(REG_ZMM6)
-globalRegMaybe (ZmmReg 6 _ _ _)         = Just (RealRegSingle REG_ZMM6)
+globalRegMaybe (ZmmReg 6)               = Just (RealRegSingle REG_ZMM6)
 #  endif
 # endif
 # if defined(REG_Sp)

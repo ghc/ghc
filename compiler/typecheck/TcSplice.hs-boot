@@ -5,13 +5,13 @@ module TcSplice where
 
 import GhcPrelude
 import Name
-import HsExpr   ( PendingRnSplice, DelayedSplice )
+import GHC.Hs.Expr ( PendingRnSplice, DelayedSplice )
 import TcRnTypes( TcM , SpliceType )
 import TcType   ( ExpRhoType )
 import Annotations ( Annotation, CoreAnnTarget )
-import HsExtension ( GhcTcId, GhcRn, GhcPs, GhcTc )
+import GHC.Hs.Extension ( GhcTcId, GhcRn, GhcPs, GhcTc )
 
-import HsSyn      ( HsSplice, HsBracket, HsExpr, LHsExpr, LHsType, LPat,
+import GHC.Hs     ( HsSplice, HsBracket, HsExpr, LHsExpr, LHsType, LPat,
                     LHsDecl, ThModFinalizers )
 import qualified Language.Haskell.TH as TH
 

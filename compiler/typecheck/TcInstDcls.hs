@@ -10,13 +10,16 @@ TcInstDecls: Typechecking instance declarations
 {-# LANGUAGE FlexibleContexts #-}
 {-# LANGUAGE TypeFamilies #-}
 
+{-# OPTIONS_GHC -Wno-incomplete-uni-patterns   #-}
+{-# OPTIONS_GHC -Wno-incomplete-record-updates #-}
+
 module TcInstDcls ( tcInstDecls1, tcInstDeclsDeriv, tcInstDecls2 ) where
 
 #include "HsVersions.h"
 
 import GhcPrelude
 
-import HsSyn
+import GHC.Hs
 import TcBinds
 import TcTyClsDecls
 import TcTyDecls ( addTyConsToGblEnv )
@@ -29,6 +32,8 @@ import TcValidity
 import TcHsSyn
 import TcMType
 import TcType
+import Constraint
+import TcOrigin
 import BuildTyCl
 import Inst
 import ClsInst( AssocInstInfo(..), isNotAssociated )
@@ -746,6 +751,7 @@ tcDataFamInstDecl mb_clsinfo
                L _ []    -> Nothing
                L _ preds ->
                  Just $ DerivInfo { di_rep_tc  = rep_tc
+                                  , di_scoped_tvs = mkTyVarNamePairs (tyConTyVars rep_tc)
                                   , di_clauses = preds
                                   , di_ctxt    = tcMkDataFamInstCtxt decl }
 
@@ -820,7 +826,7 @@ tcDataFamInstHeader mb_clsinfo fam_tc imp_vars mb_bndrs fixity
        -- check there too!
        ; let scoped_tvs = imp_tvs ++ exp_tvs
        ; dvs  <- candidateQTyVarsOfTypes (lhs_ty : mkTyVarTys scoped_tvs)
-       ; qtvs <- quantifyTyVars emptyVarSet dvs
+       ; qtvs <- quantifyTyVars dvs
 
        -- Zonk the patterns etc into the Type world
        ; (ze, qtvs)   <- zonkTyBndrs qtvs
@@ -919,11 +925,11 @@ except that we'll eta-reduce the axiom to
   axiom AxDrep forall a b. D [(a,b]] = Drep a b
 There are several fiddly subtleties lurking here
 
-* The representation tycon Drep is parameerised over the free
+* The representation tycon Drep is parameterised over the free
   variables of the pattern, in no particular order. So there is no
   guarantee that 'p' and 'q' will come last in Drep's parameters, and
   in the right order.  So, if the /patterns/ of the family insatance
-  are eta-redcible, we re-order Drep's parameters to put the
+  are eta-reducible, we re-order Drep's parameters to put the
   eta-reduced type variables last.
 
 * Although we eta-reduce the axiom, we eta-/expand/ the representation
@@ -938,7 +944,7 @@ There are several fiddly subtleties lurking here
 
   So in type-checking the LHS (DP Int) we need to check that it is
   more polymorphic than the signature.  To do that we must skolemise
-  the siganture and istantiate the call of DP.  So we end up with
+  the signature and instantiate the call of DP.  So we end up with
      data instance DP [b] @(k1,k2) (z :: (k1,k2)) where
 
   Note that we must parameterise the representation tycon DPrep over
@@ -975,7 +981,7 @@ There are several fiddly subtleties lurking here
   tricky to sort out.  Consider
       data family D k :: k
   Then consider D (forall k2. k2 -> k2) Type Type
-  The visibilty flags on an application of D may affected by the arguments
+  The visibility flags on an application of D may affected by the arguments
   themselves.  Heavy sigh.  But not truly hard; that's what tcbVisibilities
   does.
 
@@ -1440,7 +1446,7 @@ NB2: the silent-superclass solution introduced new problems
 NB3: the silent-superclass solution also generated tons of
      extra dictionaries.  For example, in monad-transformer
      code, when constructing a Monad dictionary you had to pass
-     an Applicative dictionary; and to construct that you neede
+     an Applicative dictionary; and to construct that you need
      a Functor dictionary. Yet these extra dictionaries were
      often never used.  Test T3064 compiled *far* faster after
      silent superclasses were eliminated.
@@ -1659,10 +1665,8 @@ Instead, we take the much simpler approach of always disabling
 
 1. In tcMethods (which typechecks method bindings), disable
    -Winaccessible-code.
-2. When creating Implications during typechecking, record the Env
-   (through ic_env) at the time of creation. Since the Env also stores
-   DynFlags, this will remember that -Winaccessible-code was disabled over
-   the scope of that implication.
+2. When creating Implications during typechecking, record this flag
+   (in ic_warn_inaccessible) at the time of creation.
 3. After typechecking comes error reporting, where GHC must decide how to
    report inaccessible code to the user, on an Implication-by-Implication
    basis. If an Implication's DynFlags indicate that -Winaccessible-code was
@@ -1917,6 +1921,7 @@ mkDefMethBind clas inst_tys sel_id dm_name
                              [mkSimpleMatch (mkPrefixFunRhs fn) [] rhs]
 
         ; liftIO (dumpIfSet_dyn dflags Opt_D_dump_deriv "Filling in method body"
+                   FormatHaskell
                    (vcat [ppr clas <+> ppr inst_tys,
                           nest 2 (ppr sel_id <+> equals <+> ppr rhs)]))
 
@@ -2132,7 +2137,7 @@ tcSpecInst dfun_id prag@(SpecInstSig _ _ hs_ty)
         ; co_fn <- tcSpecWrapper SpecInstCtxt (idType dfun_id) spec_dfun_ty
         ; return (SpecPrag dfun_id co_fn defaultInlinePragma) }
   where
-    spec_ctxt prag = hang (text "In the SPECIALISE pragma") 2 (ppr prag)
+    spec_ctxt prag = hang (text "In the pragma:") 2 (ppr prag)
 
 tcSpecInst _  _ = panic "tcSpecInst"
 

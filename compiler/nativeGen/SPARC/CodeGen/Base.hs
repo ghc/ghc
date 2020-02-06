@@ -22,10 +22,10 @@ import SPARC.Regs
 import Format
 import Reg
 
-import CodeGen.Platform
+import GHC.Platform.Regs
 import DynFlags
-import Cmm
-import PprCmmExpr ()
+import GHC.Cmm
+import GHC.Cmm.Ppr.Expr () -- For Outputable instances
 import GHC.Platform
 
 import Outputable

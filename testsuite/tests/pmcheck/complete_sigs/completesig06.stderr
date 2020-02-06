@@ -18,12 +18,12 @@ completesig06.hs:23:1: warning: [-Wincomplete-patterns (in -Wextra)]
     Pattern match(es) are non-exhaustive
     In an equation for ‘m4’:
         Patterns not matched:
-            B D
             A D
+            B D
 
 completesig06.hs:29:1: warning: [-Wincomplete-patterns (in -Wextra)]
     Pattern match(es) are non-exhaustive
     In an equation for ‘m5’:
         Patterns not matched:
-            A _
-            B _
+            A D
+            B D

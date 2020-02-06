@@ -1,17 +1,14 @@
 test('ghcApi', normal, compile_and_run, ['-package ghc'])
 test('T6145', normal, makefile_test, ['T6145'])
-test('T8639_api', when(arch('powerpc64') or arch('powerpc64le'),
-                       expect_broken(11259)),
+test('T8639_api', req_rts_linker,
               makefile_test, ['T8639_api'])
-test('T8628', when(arch('powerpc64') or arch('powerpc64le'),
-                   expect_broken(11259)),
+test('T8628', req_rts_linker,
               makefile_test, ['T8628'])
 test('T9595', extra_run_opts('"' + config.libdir + '"'),
               compile_and_run,
               ['-package ghc'])
 test('T10508_api', [ extra_run_opts('"' + config.libdir + '"'),
-                     when(arch('powerpc64') or arch('powerpc64le'),
-                          expect_broken(11259))],
+                     req_rts_linker ],
                    compile_and_run,
                    ['-package ghc'])
 test('T10942', extra_run_opts('"' + config.libdir + '"'),

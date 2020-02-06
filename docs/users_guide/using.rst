@@ -99,7 +99,7 @@ to the files ``Foo.hs`` and ``Bar.hs``.
 
     ``-fno-specialise -O1``
 
-        ``-fspecialise`` will be enabled as the ``-fno-specialise`` is overriden
+        ``-fspecialise`` will be enabled as the ``-fno-specialise`` is overridden
         by the ``-O1``.
 
     ``-O1 -fno-specialise``
@@ -714,13 +714,13 @@ messages and in GHCi:
 
 .. ghc-flag:: -fprint-unicode-syntax
     :shortdesc: Use unicode syntax when printing expressions, types and kinds.
-        See also :ghc-flag:`-XUnicodeSyntax`
+        See also :extension:`UnicodeSyntax`
     :type: dynamic
     :reverse: -fno-print-unicode-syntax
     :category: verbosity
 
     When enabled GHC prints type signatures using the unicode symbols from the
-    :ghc-flag:`-XUnicodeSyntax` extension. For instance,
+    :extension:`UnicodeSyntax` extension. For instance,
 
     .. code-block:: none
 
@@ -732,7 +732,7 @@ messages and in GHCi:
 
 .. ghc-flag:: -fprint-explicit-foralls
     :shortdesc: Print explicit ``forall`` quantification in types.
-        See also :ghc-flag:`-XExplicitForAll`
+        See also :extension:`ExplicitForAll`
     :type: dynamic
     :reverse: -fno-print-explicit-foralls
     :category: verbosity
@@ -776,7 +776,7 @@ messages and in GHCi:
 
 .. ghc-flag:: -fprint-explicit-kinds
     :shortdesc: Print explicit kind foralls and kind arguments in types.
-        See also :ghc-flag:`-XKindSignatures`
+        See also :extension:`KindSignatures`
     :type: dynamic
     :reverse: -fno-print-explicit-kinds
     :category: verbosity
@@ -820,6 +820,37 @@ messages and in GHCi:
     types. When trying to prove the equality between types of different
     kinds, GHC uses type-level coercions. Users will rarely need to
     see these, as they are meant to be internal.
+
+.. ghc-flag:: -fprint-axiom-incomps
+    :shortdesc: Display equation incompatibilities in closed type families
+    :type: dynamic
+    :reverse: -fno-print-axiom-incomps
+    :category: verbosity
+
+    Using :ghc-flag:`-fprint-axiom-incomps` tells GHC to display
+    incompatibilities between closed type families' equations, whenever they
+    are printed by :ghci-cmd:`:info` or :ghc-flag:`--show-iface ⟨file⟩`.
+
+    .. code-block:: none
+
+        ghci> :i Data.Type.Equality.==
+        type family (==) (a :: k) (b :: k) :: Bool
+          where
+              (==) (f a) (g b) = (f == g) && (a == b)
+              (==) a a = 'True
+              (==) _1 _2 = 'False
+        ghci> :set -fprint-axiom-incomps
+        ghci> :i Data.Type.Equality.==
+        type family (==) (a :: k) (b :: k) :: Bool
+          where
+              {- #0 -} (==) (f a) (g b) = (f == g) && (a == b)
+              {- #1 -} (==) a a = 'True
+                  -- incompatible with: #0
+              {- #2 -} (==) _1 _2 = 'False
+                  -- incompatible with: #1, #0
+
+    The equations are numbered starting from 0, and the comment after each
+    equation refers to all preceding equations it is incompatible with.
 
 .. ghc-flag:: -fprint-equality-relations
     :shortdesc: Distinguish between equality relations when printing
@@ -1010,6 +1041,18 @@ messages and in GHCi:
     start at zero. This choice was made to follow existing convention
     (i.e. this is how Emacs does it).
 
+.. ghc-flag:: -fkeep-going
+    :shortdesc: Continue compilation as far as possible on errors
+    :type: dynamic
+    :category: verbosity
+
+    :since: 8.10.1
+
+    Causes GHC to continue the compilation if a module has an error.
+    Any reverse dependencies are pruned immediately and the whole
+    compilation is still flagged as an error.  This option has no
+    effect if parallel compilation (:ghc-flag:`-j[⟨n⟩]`) is in use.
+
 .. ghc-flag:: -freverse-errors
     :shortdesc: Output errors in reverse order
     :type: dynamic
@@ -1110,3 +1153,14 @@ Some flags only make sense for a particular use case.
     included. This option can be used to specify the path to the
     ``ghcversions.h`` file to be included. This is primarily intended to be
     used by GHC's build system.
+
+Other environment variables
+~~~~~~~~~~~~~~~~~~~~~~~~~~~
+
+.. index::
+   single: environment variables
+
+GHC can also be configured using environment variables. Currently the only
+variable it supports is ``GHC_NO_UNICODE``, which, when set, disables Unicode
+output regardless of locale settings. ``GHC_NO_UNICODE`` can be set to anything
++(event an empty string) to trigger this behaviour.

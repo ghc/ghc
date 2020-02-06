@@ -1,5 +1,4 @@
-#ifndef RTS_LINKER_UTIL_H
-#define RTS_LINKER_UTIL_H
+#pragma once
 
 #include <stdint.h>
 #include <stdbool.h>
@@ -26,5 +25,3 @@ isInt64(uint32_t bits, int64_t x) {
     return bits > 64 || (-((int64_t)1 << (bits-1)) <= x
                          && x < ((int64_t)1 << (bits-1)));
 }
-
-#endif //RTS_LINKER_UTIL_H

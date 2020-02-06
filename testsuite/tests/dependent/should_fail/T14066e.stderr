@@ -12,7 +12,7 @@ T14066e.hs:13:59: error:
       Expected kind ‘c’, but ‘b'’ has kind ‘k1’
     • In the first argument of ‘Proxy’, namely ‘(b' :: c')’
       In an expression type signature: Proxy (b' :: c')
-      In the expression: (p1 :: Proxy (b' :: c'))
+      In the expression: p1 :: Proxy (b' :: c')
     • Relevant bindings include
         p2 :: Proxy c (bound at T14066e.hs:13:27)
         p1 :: Proxy b (bound at T14066e.hs:13:10)

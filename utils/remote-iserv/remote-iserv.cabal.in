@@ -9,7 +9,7 @@ License: BSD3
 -- XXX License-File: LICENSE
 Author: Moritz Angermann <moritz.angermann@gmail.com>
 Maintainer: Moritz Angermann <moritz.angermann@gmail.com>
-Synopsis: iserv allows GHC to delegate Tempalte Haskell computations
+Synopsis: iserv allows GHC to delegate Template Haskell computations
 Description:
   This is a very simple remote runner for iserv, to be used together
   with iserv-proxy.  The foundamental idea is that this this wrapper

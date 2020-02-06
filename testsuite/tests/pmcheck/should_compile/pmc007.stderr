@@ -2,16 +2,16 @@
 pmc007.hs:7:1: warning: [-Wincomplete-patterns (in -Wextra)]
     Pattern match(es) are non-exhaustive
     In an equation for ‘f’:
-        Patterns not matched: p where p is not one of {"ac", "ab"}
+        Patterns not matched: p where p is not one of {"ab", "ac"}
 
 pmc007.hs:12:1: warning: [-Wincomplete-patterns (in -Wextra)]
     Pattern match(es) are non-exhaustive
     In an equation for ‘g’:
         Patterns not matched:
             []
-            (p:_) where p is not one of {'a'}
+            [p] where p is not one of {'a'}
+            (p:_:_) where p is not one of {'a'}
             ['a']
-            ('a':p:_) where p is not one of {'c', 'b'}
             ...
 
 pmc007.hs:18:11: warning: [-Wincomplete-patterns (in -Wextra)]
@@ -19,7 +19,7 @@ pmc007.hs:18:11: warning: [-Wincomplete-patterns (in -Wextra)]
     In a case alternative:
         Patterns not matched:
             []
-            (p:_) where p is not one of {'a'}
+            [p] where p is not one of {'a'}
+            (p:_:_) where p is not one of {'a'}
             ['a']
-            ('a':p:_) where p is not one of {'c', 'b'}
             ...

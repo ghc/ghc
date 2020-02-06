@@ -1,3 +1,4 @@
+{-# LANGUAGE CPP #-}
 -- !!! Bug # 7600.
 -- The LLVM backend can be tricky to get right with floating point constants
 -- and GHC. See Note [LLVM Float Types] in compiler/llvmGen/Llvm/Types.hs for
@@ -15,6 +16,9 @@
 -- 
 -- Also worth looking at ticket # 3676 about issues with 'realToFrac'.
 module Main (main) where
+
+-- Required for WORDS_BIGENDIAN
+#include <ghcautoconf.h>
 
 import T7600_A
 
@@ -103,7 +107,7 @@ main = test_run float_number double_number
 --     in  "0x" ++ str
 -- 
 -- fixEndian :: [a] -> [a]
--- -- #ifdef WORDS_BIGENDIAN
+-- -- #if defined(WORDS_BIGENDIAN)
 -- -- fixEndian = id
 -- -- #else
 -- fixEndian = reverse

@@ -26,7 +26,8 @@ of arguments of combining function.
 
 module UniqFM (
         -- * Unique-keyed mappings
-        UniqFM,       -- abstract type
+        UniqFM,           -- abstract type
+        NonDetUniqFM(..), -- wrapper for opting into nondeterminism
 
         -- ** Manipulating those mappings
         emptyUFM,
@@ -84,9 +85,8 @@ import Data.Functor.Classes (Eq1 (..))
 
 newtype UniqFM ele = UFM (M.IntMap ele)
   deriving (Data, Eq, Functor)
-  -- We used to derive Traversable and Foldable, but they were nondeterministic
-  -- and not obvious at the call site. You can use explicit nonDetEltsUFM
-  -- and fold a list if needed.
+  -- Nondeterministic Foldable and Traversable instances are accessible through
+  -- use of the 'NonDetUniqFM' wrapper.
   -- See Note [Deterministic UniqFM] in UniqDFM to learn about determinism.
 
 emptyUFM :: UniqFM elt
@@ -332,6 +332,29 @@ nonDetFoldUFM_Directly k z (UFM m) = M.foldrWithKey (k . getUnique) z m
 -- nondeterminism.
 nonDetUFMToList :: UniqFM elt -> [(Unique, elt)]
 nonDetUFMToList (UFM m) = map (\(k, v) -> (getUnique k, v)) $ M.toList m
+
+-- | A wrapper around 'UniqFM' with the sole purpose of informing call sites
+-- that the provided 'Foldable' and 'Traversable' instances are
+-- nondeterministic.
+-- If you use this please provide a justification why it doesn't introduce
+-- nondeterminism.
+-- See Note [Deterministic UniqFM] in UniqDFM to learn about determinism.
+newtype NonDetUniqFM ele = NonDetUniqFM { getNonDet :: UniqFM ele }
+  deriving (Functor)
+
+-- | Inherently nondeterministic.
+-- If you use this please provide a justification why it doesn't introduce
+-- nondeterminism.
+-- See Note [Deterministic UniqFM] in UniqDFM to learn about determinism.
+instance Foldable NonDetUniqFM where
+  foldr f z (NonDetUniqFM (UFM m)) = foldr f z m
+
+-- | Inherently nondeterministic.
+-- If you use this please provide a justification why it doesn't introduce
+-- nondeterminism.
+-- See Note [Deterministic UniqFM] in UniqDFM to learn about determinism.
+instance Traversable NonDetUniqFM where
+  traverse f (NonDetUniqFM (UFM m)) = NonDetUniqFM . UFM <$> traverse f m
 
 ufmToIntMap :: UniqFM elt -> M.IntMap elt
 ufmToIntMap (UFM m) = m

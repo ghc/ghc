@@ -1,7 +1,5 @@
 {-# LANGUAGE CPP, NondecreasingIndentation, TupleSections, RecordWildCards #-}
 {-# LANGUAGE BangPatterns #-}
-{-# OPTIONS_GHC -fno-cse #-}
--- -fno-cse is needed for GLOBAL_VAR's to behave properly
 
 --
 --  (c) The University of Glasgow 2002-2006
@@ -26,7 +24,7 @@ import GhcPrelude
 
 import GHCi
 import GHCi.RemoteTypes
-import LoadIface
+import GHC.Iface.Load
 import ByteCodeLink
 import ByteCodeAsm
 import ByteCodeTypes
@@ -1141,7 +1139,8 @@ unload_wkr hsc_env keep_linkables pls@PersistentLinkerState{..}  = do
 
       -- Code unloading currently disabled due to instability.
       -- See #16841.
-      | False -- otherwise
+      -- id False, so that the pattern-match checker doesn't complain
+      | id False -- otherwise
       = mapM_ (unloadObj hsc_env) [f | DotO f <- linkableUnlinked lnk]
                 -- The components of a BCO linkable may contain
                 -- dot-o files.  Which is very confusing.
@@ -1177,6 +1176,13 @@ data LibrarySpec
                         -- (ends with .dll or .so).
 
    | Framework String   -- Only used for darwin, but does no harm
+
+instance Outputable LibrarySpec where
+  ppr (Objects objs) = text "Objects" <+> ppr objs
+  ppr (Archive a) = text "Archive" <+> text a
+  ppr (DLL s) = text "DLL" <+> text s
+  ppr (DLLPath f) = text "DLLPath" <+> text f
+  ppr (Framework s) = text "Framework" <+> text s
 
 -- If this package is already part of the GHCi binary, we'll already
 -- have the right DLLs for this package loaded, so don't try to
@@ -1249,7 +1255,7 @@ linkPackages' hsc_env new_pks pls = do
         = throwGhcExceptionIO (CmdLineError ("unknown package: " ++ unpackFS (installedUnitIdFS new_pkg)))
 
 
-linkPackage :: HscEnv -> PackageConfig -> IO ()
+linkPackage :: HscEnv -> UnitInfo -> IO ()
 linkPackage hsc_env pkg
    = do
         let dflags    = hsc_dflags hsc_env
@@ -1402,7 +1408,7 @@ load_dyn hsc_env crash_early dll = do
       , "(the package DLL is loaded by the system linker"
       , " which manages dependencies by itself)." ]
 
-loadFrameworks :: HscEnv -> Platform -> PackageConfig -> IO ()
+loadFrameworks :: HscEnv -> Platform -> UnitInfo -> IO ()
 loadFrameworks hsc_env platform pkg
     = when (platformUsesFrameworks platform) $ mapM_ load frameworks
   where
@@ -1524,10 +1530,25 @@ locateLib hsc_env is_hs lib_dirs gcc_dirs lib
                         in apply (map implib import_libs)
                        _         -> return Nothing
 
-     assumeDll   = return (DLL lib)
+     -- TH Makes use of the interpreter so this failure is not obvious.
+     -- So we are nice and warn/inform users why we fail before we do.
+     -- But only for haskell libraries, as C libraries don't have a
+     -- profiling/non-profiling distinction to begin with.
+     assumeDll
+      | is_hs
+      , not loading_dynamic_hs_libs
+      , interpreterProfiled dflags
+      = do
+          warningMsg dflags
+            (text "Interpreter failed to load profiled static library" <+> text lib <> char '.' $$
+              text " \tTrying dynamic library instead. If this fails try to rebuild" <+>
+              text "libraries with profiling support.")
+          return (DLL lib)
+      | otherwise = return (DLL lib)
      infixr `orElse`
      f `orElse` g = f >>= maybe g return
 
+     apply :: [IO (Maybe a)] -> IO (Maybe a)
      apply []     = return Nothing
      apply (x:xs) = do x' <- x
                        if isJust x'

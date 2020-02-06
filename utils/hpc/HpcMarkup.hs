@@ -7,14 +7,12 @@ module HpcMarkup (markup_plugin) where
 
 import Trace.Hpc.Mix
 import Trace.Hpc.Tix
-import Trace.Hpc.Util
+import Trace.Hpc.Util (HpcPos, fromHpcPos, writeFileUtf8)
 
 import HpcFlags
 import HpcUtils
 
-import System.Directory
 import System.FilePath
-import System.IO (localeEncoding)
 import Data.List
 import Data.Maybe(fromJust)
 import Data.Semigroup as Semi
@@ -82,10 +80,10 @@ markup_main flags (prog:modNames) = do
         unless (verbosity flags < Normal) $
             putStrLn $ "Writing: " ++ (filename <.> "html")
 
-        writeFileUsing (dest_dir </> filename <.> "html") $
+        writeFileUtf8 (dest_dir </> filename <.> "html") $
             "<html>" ++
             "<head>" ++
-            charEncodingTag ++
+            "<meta http-equiv=\"Content-Type\" content=\"text/html; charset=UTF-8\">" ++
             "<style type=\"text/css\">" ++
             "table.bar { background-color: #f25913; }\n" ++
             "td.bar { background-color: #60de51;  }\n" ++
@@ -138,11 +136,6 @@ markup_main flags (prog:modNames) = do
 
 markup_main _ []
     = hpcError markup_plugin $ "no .tix file or executable name specified"
-
-charEncodingTag :: String
-charEncodingTag =
-    "<meta http-equiv=\"Content-Type\" " ++
-          "content=\"text/html; " ++ "charset=" ++ show localeEncoding ++ "\">"
 
 -- Add characters to the left of a string until it is at least as
 -- large as requested.
@@ -229,10 +222,10 @@ genHtmlFromMod dest_dir flags tix theFunTotals invertOutput = do
   let fileName = modName0 <.> "hs" <.> "html"
   unless (verbosity flags < Normal) $
             putStrLn $ "Writing: " ++ fileName
-  writeFileUsing (dest_dir </> fileName) $
+  writeFileUtf8 (dest_dir </> fileName) $
             unlines ["<html>",
                      "<head>",
-                     charEncodingTag,
+                     "<meta http-equiv=\"Content-Type\" content=\"text/html; charset=UTF-8\">",
                      "<style type=\"text/css\">",
                      "span.lineno { color: white; background: #aaaaaa; border-right: solid white 12px }",
                      if invertOutput
@@ -484,20 +477,7 @@ instance Monoid ModuleSummary where
   mappend = (<>)
 
 ------------------------------------------------------------------------------
-
-writeFileUsing :: String -> String -> IO ()
-writeFileUsing filename text = do
--- We need to check for the dest_dir each time, because we use sub-dirs for
--- packages, and a single .tix file might contain information about
--- many package.
-
-  -- create the dest_dir if needed
-  createDirectoryIfMissing True (takeDirectory filename)
-
-  writeFile filename text
-
-------------------------------------------------------------------------------
--- global color pallete
+-- global color palette
 
 red,green,yellow :: String
 red    = "#f20913"

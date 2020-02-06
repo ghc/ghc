@@ -41,6 +41,7 @@ module TyCon(
         mkFamilyTyCon,
         mkPromotedDataCon,
         mkTcTyCon,
+        noTcTyConScopedTyVars,
 
         -- ** Predicates on TyCons
         isAlgTyCon, isVanillaAlgTyCon,
@@ -121,6 +122,8 @@ module TyCon(
         primRepSizeB,
         primElemRepSizeB,
         primRepIsFloat,
+        primRepsCompatible,
+        primRepCompatible,
 
         -- * Recursion breaking
         RecTcChecker, initRecTc, defaultRecTcMaxBound,
@@ -132,7 +135,8 @@ module TyCon(
 
 import GhcPrelude
 
-import {-# SOURCE #-} TyCoRep    ( Kind, Type, PredType, pprType, mkForAllTy, mkFunTy )
+import {-# SOURCE #-} TyCoRep    ( Kind, Type, PredType, mkForAllTy, mkFunTy )
+import {-# SOURCE #-} TyCoPpr    ( pprType )
 import {-# SOURCE #-} TysWiredIn ( runtimeRepTyCon, constraintKind
                                  , vecCountTyCon, vecElemTyCon, liftedTypeKind )
 import {-# SOURCE #-} DataCon    ( DataCon, dataConExTyCoVars, dataConFieldLabels
@@ -395,8 +399,8 @@ invariant that if `famTcInj` is a Just then at least one element in the list
 must be True.
 
 See also:
- * [Injectivity annotation] in HsDecls
- * [Renaming injectivity annotation] in RnSource
+ * [Injectivity annotation] in GHC.Hs.Decls
+ * [Renaming injectivity annotation] in GHC.Rename.Source
  * [Verifying injectivity annotation] in FamInstEnv
  * [Type inference for type families with injectivity] in TcInteract
 
@@ -474,6 +478,8 @@ isInvisibleTyConBinder :: VarBndr tv TyConBndrVis -> Bool
 -- Works for IfaceTyConBinder too
 isInvisibleTyConBinder tcb = not (isVisibleTyConBinder tcb)
 
+-- Build the 'tyConKind' from the binders and the result kind.
+-- Keep in sync with 'mkTyConKind' in GHC.Iface.Type.
 mkTyConKind :: [TyConBinder] -> Kind -> Kind
 mkTyConKind bndrs res_kind = foldr mk res_kind bndrs
   where
@@ -638,8 +644,8 @@ They fit together like so:
   but it's enforced by etaExpandAlgTyCon
 -}
 
-instance Outputable tv => Outputable (VarBndr tv TyConBndrVis) where
-  ppr (Bndr v bi) = ppr_bi bi <+> parens (ppr v)
+instance OutputableBndr tv => Outputable (VarBndr tv TyConBndrVis) where
+  ppr (Bndr v bi) = ppr_bi bi <+> parens (pprBndr LetBind v)
     where
       ppr_bi (AnonTCB VisArg)     = text "anon-vis"
       ppr_bi (AnonTCB InvisArg)   = text "anon-invis"
@@ -986,7 +992,7 @@ data AlgTyConRhs
                         -- shorter than the declared arity of the 'TyCon'.
 
                         -- See Note [Newtype eta]
-        nt_co :: CoAxiom Unbranched
+        nt_co :: CoAxiom Unbranched,
                              -- The axiom coercion that creates the @newtype@
                              -- from the representation 'Type'.
 
@@ -995,6 +1001,16 @@ data AlgTyConRhs
                              -- See Note [Newtype eta]
                              -- Watch out!  If any newtypes become transparent
                              -- again check #1072.
+        nt_lev_poly :: Bool
+                        -- 'True' if the newtype can be levity polymorphic when
+                        -- fully applied to its arguments, 'False' otherwise.
+                        -- This can only ever be 'True' with UnliftedNewtypes.
+                        --
+                        -- Invariant: nt_lev_poly nt = isTypeLevPoly (nt_rhs nt)
+                        --
+                        -- This is cached to make it cheaper to check if a
+                        -- variable binding is levity polymorphic, as used by
+                        -- isTcLevPoly.
     }
 
 mkSumTyConRhs :: [DataCon] -> AlgTyConRhs
@@ -1019,6 +1035,7 @@ mkDataTyConRhs cons
 -- constructor of 'PrimRep'. This data structure allows us to store this
 -- information right in the 'TyCon'. The other approach would be to look
 -- up things like @RuntimeRep@'s @PrimRep@ by known-key every time.
+-- See also Note [Getting from RuntimeRep to PrimRep] in GHC.Types.RepType
 data RuntimeRepInfo
   = NoRRI       -- ^ an ordinary promoted data con
   | RuntimeRep ([Type] -> [PrimRep])
@@ -1392,28 +1409,35 @@ This means to turn an ArgRep/PrimRep into a CmmType requires DynFlags.
 
 On the other hand, CmmType includes some "nonsense" values, such as
 CmmType GcPtrCat W32 on a 64-bit machine.
+
+The PrimRep type is closely related to the user-visible RuntimeRep type.
+See Note [RuntimeRep and PrimRep] in GHC.Types.RepType.
+
 -}
 
 -- | A 'PrimRep' is an abstraction of a type.  It contains information that
 -- the code generator needs in order to pass arguments, return results,
--- and store values of this type.
+-- and store values of this type. See also Note [RuntimeRep and PrimRep] in
+-- GHC.Types.RepType and Note [VoidRep] in GHC.Types.RepType.
 data PrimRep
   = VoidRep
   | LiftedRep
   | UnliftedRep   -- ^ Unlifted pointer
   | Int8Rep       -- ^ Signed, 8-bit value
   | Int16Rep      -- ^ Signed, 16-bit value
-  | IntRep        -- ^ Signed, word-sized value
-  | WordRep       -- ^ Unsigned, word-sized value
+  | Int32Rep      -- ^ Signed, 32-bit value
   | Int64Rep      -- ^ Signed, 64 bit value (with 32-bit words only)
+  | IntRep        -- ^ Signed, word-sized value
   | Word8Rep      -- ^ Unsigned, 8 bit value
-  | Word16Rep      -- ^ Unsigned, 16 bit value
+  | Word16Rep     -- ^ Unsigned, 16 bit value
+  | Word32Rep     -- ^ Unsigned, 32 bit value
   | Word64Rep     -- ^ Unsigned, 64 bit value (with 32-bit words only)
+  | WordRep       -- ^ Unsigned, word-sized value
   | AddrRep       -- ^ A pointer, but /not/ to a Haskell value (use '(Un)liftedRep')
   | FloatRep
   | DoubleRep
   | VecRep Int PrimElemRep  -- ^ A vector
-  deriving( Eq, Show )
+  deriving( Show )
 
 data PrimElemRep
   = Int8ElemRep
@@ -1443,21 +1467,40 @@ isGcPtrRep LiftedRep   = True
 isGcPtrRep UnliftedRep = True
 isGcPtrRep _           = False
 
+-- A PrimRep is compatible with another iff one can be coerced to the other.
+-- See Note [bad unsafe coercion] in CoreLint for when are two types coercible.
+primRepCompatible :: DynFlags -> PrimRep -> PrimRep -> Bool
+primRepCompatible dflags rep1 rep2 =
+    (isUnboxed rep1 == isUnboxed rep2) &&
+    (primRepSizeB dflags rep1 == primRepSizeB dflags rep2) &&
+    (primRepIsFloat rep1 == primRepIsFloat rep2)
+  where
+    isUnboxed = not . isGcPtrRep
+
+-- More general version of `primRepCompatible` for types represented by zero or
+-- more than one PrimReps.
+primRepsCompatible :: DynFlags -> [PrimRep] -> [PrimRep] -> Bool
+primRepsCompatible dflags reps1 reps2 =
+    length reps1 == length reps2 &&
+    and (zipWith (primRepCompatible dflags) reps1 reps2)
+
 -- | The size of a 'PrimRep' in bytes.
 --
 -- This applies also when used in a constructor, where we allow packing the
 -- fields. For instance, in @data Foo = Foo Float# Float#@ the two fields will
 -- take only 8 bytes, which for 64-bit arch will be equal to 1 word.
 -- See also mkVirtHeapOffsetsWithPadding for details of how data fields are
--- layed out.
+-- laid out.
 primRepSizeB :: DynFlags -> PrimRep -> Int
 primRepSizeB dflags IntRep           = wORD_SIZE dflags
 primRepSizeB dflags WordRep          = wORD_SIZE dflags
 primRepSizeB _      Int8Rep          = 1
 primRepSizeB _      Int16Rep         = 2
+primRepSizeB _      Int32Rep         = 4
 primRepSizeB _      Int64Rep         = wORD64_SIZE
 primRepSizeB _      Word8Rep         = 1
 primRepSizeB _      Word16Rep        = 2
+primRepSizeB _      Word32Rep        = 4
 primRepSizeB _      Word64Rep        = wORD64_SIZE
 primRepSizeB _      FloatRep         = fLOAT_SIZE
 primRepSizeB dflags DoubleRep        = dOUBLE_SIZE dflags
@@ -1671,6 +1714,10 @@ mkTcTyCon name binders res_kind scoped_tvs poly flav
             , tcTyConScopedTyVars = scoped_tvs
             , tcTyConIsPoly       = poly
             , tcTyConFlavour      = flav }
+
+-- | No scoped type variables (to be used with mkTcTyCon).
+noTcTyConScopedTyVars :: [(Name, TcTyVar)]
+noTcTyConScopedTyVars = []
 
 -- | Create an unlifted primitive 'TyCon', such as @Int#@.
 mkPrimTyCon :: Name -> [TyConBinder]
@@ -2167,7 +2214,7 @@ isLiftedTypeKindTyConName = (`hasKey` liftedTypeKindTyConKey)
 --   (similar to a @dfun@ does that for a class instance).
 --
 -- * Tuples are implicit iff they have a wired-in name
---   (namely: boxed and unboxed tupeles are wired-in and implicit,
+--   (namely: boxed and unboxed tuples are wired-in and implicit,
 --            but constraint tuples are not)
 isImplicitTyCon :: TyCon -> Bool
 isImplicitTyCon (FunTyCon {})        = True
@@ -2204,8 +2251,13 @@ setTcTyConKind tc              _    = pprPanic "setTcTyConKind" (ppr tc)
 -- Precondition: The fully-applied TyCon has kind (TYPE blah)
 isTcLevPoly :: TyCon -> Bool
 isTcLevPoly FunTyCon{}           = False
-isTcLevPoly (AlgTyCon { algTcParent = UnboxedAlgTyCon _ }) = True
-isTcLevPoly AlgTyCon{}           = False
+isTcLevPoly (AlgTyCon { algTcParent = parent, algTcRhs = rhs })
+  | UnboxedAlgTyCon _ <- parent
+  = True
+  | NewTyCon { nt_lev_poly = lev_poly } <- rhs
+  = lev_poly -- Newtypes can be levity polymorphic with UnliftedNewtypes (#17360)
+  | otherwise
+  = False
 isTcLevPoly SynonymTyCon{}       = True
 isTcLevPoly FamilyTyCon{}        = True
 isTcLevPoly PrimTyCon{}          = False
@@ -2474,7 +2526,7 @@ We used to pay linear cost per constructor, with each constructor looking up
 its relative index in the constructor list. That was quadratic and prohibitive
 for large data types with more than 10k constructors.
 
-The current strategy is to build a NameEnv with a mapping from costructor's
+The current strategy is to build a NameEnv with a mapping from constructor's
 Name to ConTag and pass it down to buildDataCon for efficient lookup.
 
 Relevant ticket: #14657

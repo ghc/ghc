@@ -68,8 +68,8 @@
 
 defaults
    has_side_effects = False
-   out_of_line      = False   -- See Note Note [PrimOp can_fail and has_side_effects] in PrimOp
-   can_fail         = False   -- See Note Note [PrimOp can_fail and has_side_effects] in PrimOp
+   out_of_line      = False   -- See Note [When do out-of-line primops go in primops.txt.pp]
+   can_fail         = False   -- See Note [PrimOp can_fail and has_side_effects] in PrimOp
    commutable       = False
    code_size        = { primOpCodeSizeDefault }
    strictness       = { \ arity -> mkClosedStrictSig (replicate arity topDmd) topRes }
@@ -78,14 +78,47 @@ defaults
    vector           = []
    deprecated_msg   = {}      -- A non-empty message indicates deprecation
 
+
+-- Note [When do out-of-line primops go in primops.txt.pp]
+-- ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+--
+-- Out of line primops are those with a C-- implementation. But that
+-- doesn't mean they *just* have an C-- implementation. As mentioned in
+-- Note [Inlining out-of-line primops and heap checks], some out-of-line
+-- primops also have additional internal implementations under certain
+-- conditions. Now that `foreign import prim` exists, only those primops
+-- which have both internal and external implementations ought to be
+-- this file. The rest aren't really primops, since they don't need
+-- bespoke compiler support but just a general way to interface with
+-- C--. They are just foreign calls.
+--
+-- Unfortunately, for the time being most of the primops which should be
+-- moved according to the previous paragraph can't yet. There are some
+-- superficial restrictions in `foreign import prim` which mus be fixed
+-- first. Specifically, `foreign import prim` always requires:
+--
+--   - No polymorphism in type
+--   - `strictness       = <default>`
+--   - `can_fail         = False`
+--   - `has_side_effects = True`
+--
+-- https://gitlab.haskell.org/ghc/ghc/issues/16929 tracks this issue,
+-- and has a table of which external-only primops are blocked by which
+-- of these. Hopefully those restrictions are relaxed so the rest of
+-- those can be moved over.
+--
+-- 'module GHC.Prim.Ext is a temporarily "holding ground" for primops
+-- that were formally in here, until they can be given a better home.
+-- Likewise, their underlying C-- implementation need not live in the
+-- RTS either. Best case (in my view), both the C-- and `foreign import
+-- prim` can be moved to a small library tailured to the features being
+-- implemented and dependencies of those features.
+
 -- Currently, documentation is produced using latex, so contents of
 -- description fields should be legal latex. Descriptions can contain
 -- matched pairs of embedded curly brackets.
 
 #include "MachDeps.h"
-
--- We need platform defines (tests for mingw32 below).
-#include "ghc_boot_platform.h"
 
 section "The word size story."
         {Haskell98 specifies that signed integers (type {\tt Int})
@@ -171,7 +204,7 @@ primtype (->) a b
   }
   with fixity = infixr -1
          -- This fixity is only the one picked up by Haddock. If you
-         -- change this, do update 'ghcPrimIface' in 'LoadIface.hs'.
+         -- change this, do update 'ghcPrimIface' in 'GHC.Iface.Load'.
 
 ------------------------------------------------------------------------
 section "Char#"
@@ -196,152 +229,6 @@ primop   CharLeOp  "leChar#"   Compare   Char# -> Char# -> Int#
 
 primop   OrdOp   "ord#"  GenPrimOp   Char# -> Int#
    with code_size = 0
-
-------------------------------------------------------------------------
-section "Int#"
-        {Operations on native-size integers (32+ bits).}
-------------------------------------------------------------------------
-
-primtype Int#
-
-primop   IntAddOp    "+#"    Dyadic
-   Int# -> Int# -> Int#
-   with commutable = True
-        fixity = infixl 6
-
-primop   IntSubOp    "-#"    Dyadic   Int# -> Int# -> Int#
-   with fixity = infixl 6
-
-primop   IntMulOp    "*#"
-   Dyadic   Int# -> Int# -> Int#
-   {Low word of signed integer multiply.}
-   with commutable = True
-        fixity = infixl 7
-
-primop   IntMulMayOfloOp  "mulIntMayOflo#"
-   Dyadic   Int# -> Int# -> Int#
-   {Return non-zero if there is any possibility that the upper word of a
-    signed integer multiply might contain useful information.  Return
-    zero only if you are completely sure that no overflow can occur.
-    On a 32-bit platform, the recommended implementation is to do a
-    32 x 32 -> 64 signed multiply, and subtract result[63:32] from
-    (result[31] >>signed 31).  If this is zero, meaning that the
-    upper word is merely a sign extension of the lower one, no
-    overflow can occur.
-
-    On a 64-bit platform it is not always possible to
-    acquire the top 64 bits of the result.  Therefore, a recommended
-    implementation is to take the absolute value of both operands, and
-    return 0 iff bits[63:31] of them are zero, since that means that their
-    magnitudes fit within 31 bits, so the magnitude of the product must fit
-    into 62 bits.
-
-    If in doubt, return non-zero, but do make an effort to create the
-    correct answer for small args, since otherwise the performance of
-    \texttt{(*) :: Integer -> Integer -> Integer} will be poor.
-   }
-   with commutable = True
-
-primop   IntQuotOp    "quotInt#"    Dyadic
-   Int# -> Int# -> Int#
-   {Rounds towards zero. The behavior is undefined if the second argument is
-    zero.
-   }
-   with can_fail = True
-
-primop   IntRemOp    "remInt#"    Dyadic
-   Int# -> Int# -> Int#
-   {Satisfies \texttt{(quotInt\# x y) *\# y +\# (remInt\# x y) == x}. The
-    behavior is undefined if the second argument is zero.
-   }
-   with can_fail = True
-
-primop   IntQuotRemOp "quotRemInt#"    GenPrimOp
-   Int# -> Int# -> (# Int#, Int# #)
-   {Rounds towards zero.}
-   with can_fail = True
-
-primop   AndIOp   "andI#"   Dyadic    Int# -> Int# -> Int#
-   {Bitwise "and".}
-   with commutable = True
-
-primop   OrIOp   "orI#"     Dyadic    Int# -> Int# -> Int#
-   {Bitwise "or".}
-   with commutable = True
-
-primop   XorIOp   "xorI#"   Dyadic    Int# -> Int# -> Int#
-   {Bitwise "xor".}
-   with commutable = True
-
-primop   NotIOp   "notI#"   Monadic   Int# -> Int#
-   {Bitwise "not", also known as the binary complement.}
-
-primop   IntNegOp    "negateInt#"    Monadic   Int# -> Int#
-   {Unary negation.
-    Since the negative {\tt Int#} range extends one further than the
-    positive range, {\tt negateInt#} of the most negative number is an
-    identity operation. This way, {\tt negateInt#} is always its own inverse.}
-
-primop   IntAddCOp   "addIntC#"    GenPrimOp   Int# -> Int# -> (# Int#, Int# #)
-         {Add signed integers reporting overflow.
-          First member of result is the sum truncated to an {\tt Int#};
-          second member is zero if the true sum fits in an {\tt Int#},
-          nonzero if overflow occurred (the sum is either too large
-          or too small to fit in an {\tt Int#}).}
-   with code_size = 2
-        commutable = True
-
-primop   IntSubCOp   "subIntC#"    GenPrimOp   Int# -> Int# -> (# Int#, Int# #)
-         {Subtract signed integers reporting overflow.
-          First member of result is the difference truncated to an {\tt Int#};
-          second member is zero if the true difference fits in an {\tt Int#},
-          nonzero if overflow occurred (the difference is either too large
-          or too small to fit in an {\tt Int#}).}
-   with code_size = 2
-
-primop   IntGtOp  ">#"   Compare   Int# -> Int# -> Int#
-   with fixity = infix 4
-
-primop   IntGeOp  ">=#"   Compare   Int# -> Int# -> Int#
-   with fixity = infix 4
-
-primop   IntEqOp  "==#"   Compare
-   Int# -> Int# -> Int#
-   with commutable = True
-        fixity = infix 4
-
-primop   IntNeOp  "/=#"   Compare
-   Int# -> Int# -> Int#
-   with commutable = True
-        fixity = infix 4
-
-primop   IntLtOp  "<#"   Compare   Int# -> Int# -> Int#
-   with fixity = infix 4
-
-primop   IntLeOp  "<=#"   Compare   Int# -> Int# -> Int#
-   with fixity = infix 4
-
-primop   ChrOp   "chr#"   GenPrimOp   Int# -> Char#
-   with code_size = 0
-
-primop   Int2WordOp "int2Word#" GenPrimOp Int# -> Word#
-   with code_size = 0
-
-primop   Int2FloatOp   "int2Float#"      GenPrimOp  Int# -> Float#
-primop   Int2DoubleOp   "int2Double#"          GenPrimOp  Int# -> Double#
-
-primop   Word2FloatOp   "word2Float#"      GenPrimOp  Word# -> Float#
-primop   Word2DoubleOp   "word2Double#"          GenPrimOp  Word# -> Double#
-
-primop   ISllOp   "uncheckedIShiftL#" GenPrimOp  Int# -> Int# -> Int#
-         {Shift left.  Result undefined if shift amount is not
-          in the range 0 to word size - 1 inclusive.}
-primop   ISraOp   "uncheckedIShiftRA#" GenPrimOp Int# -> Int# -> Int#
-         {Shift right arithmetic.  Result undefined if shift amount is not
-          in the range 0 to word size - 1 inclusive.}
-primop   ISrlOp   "uncheckedIShiftRL#" GenPrimOp Int# -> Int# -> Int#
-         {Shift right logical.  Result undefined if shift amount is not
-          in the range 0 to word size - 1 inclusive.}
 
 ------------------------------------------------------------------------
 section "Int8#"
@@ -507,6 +394,180 @@ primop Word16LeOp "leWord16#" Compare Word16# -> Word16# -> Int#
 primop Word16LtOp "ltWord16#" Compare Word16# -> Word16# -> Int#
 primop Word16NeOp "neWord16#" Compare Word16# -> Word16# -> Int#
 
+#if WORD_SIZE_IN_BITS < 64
+------------------------------------------------------------------------
+section "Int64#"
+        {Operations on 64-bit unsigned words. This type is only used
+         if plain {\tt Int\#} has less than 64 bits. In any case, the operations
+         are not primops; they are implemented (if needed) as ccalls instead.}
+------------------------------------------------------------------------
+
+primtype Int64#
+
+------------------------------------------------------------------------
+section "Word64#"
+        {Operations on 64-bit unsigned words. This type is only used
+         if plain {\tt Word\#} has less than 64 bits. In any case, the operations
+         are not primops; they are implemented (if needed) as ccalls instead.}
+------------------------------------------------------------------------
+
+primtype Word64#
+
+#endif
+
+------------------------------------------------------------------------
+section "Int#"
+        {Operations on native-size integers (32+ bits).}
+------------------------------------------------------------------------
+
+primtype Int#
+
+primop   IntAddOp    "+#"    Dyadic
+   Int# -> Int# -> Int#
+   with commutable = True
+        fixity = infixl 6
+
+primop   IntSubOp    "-#"    Dyadic   Int# -> Int# -> Int#
+   with fixity = infixl 6
+
+primop   IntMulOp    "*#"
+   Dyadic   Int# -> Int# -> Int#
+   {Low word of signed integer multiply.}
+   with commutable = True
+        fixity = infixl 7
+
+primop   IntMul2Op    "timesInt2#" GenPrimOp
+   Int# -> Int# -> (# Int#, Int#, Int# #)
+   {Return a triple (isHighNeeded,high,low) where high and low are respectively
+   the high and low bits of the double-word result. isHighNeeded is a cheap way
+   to test if the high word is a sign-extension of the low word (isHighNeeded =
+   0#) or not (isHighNeeded = 1#).}
+
+primop   IntMulMayOfloOp  "mulIntMayOflo#"
+   Dyadic   Int# -> Int# -> Int#
+   {Return non-zero if there is any possibility that the upper word of a
+    signed integer multiply might contain useful information.  Return
+    zero only if you are completely sure that no overflow can occur.
+    On a 32-bit platform, the recommended implementation is to do a
+    32 x 32 -> 64 signed multiply, and subtract result[63:32] from
+    (result[31] >>signed 31).  If this is zero, meaning that the
+    upper word is merely a sign extension of the lower one, no
+    overflow can occur.
+
+    On a 64-bit platform it is not always possible to
+    acquire the top 64 bits of the result.  Therefore, a recommended
+    implementation is to take the absolute value of both operands, and
+    return 0 iff bits[63:31] of them are zero, since that means that their
+    magnitudes fit within 31 bits, so the magnitude of the product must fit
+    into 62 bits.
+
+    If in doubt, return non-zero, but do make an effort to create the
+    correct answer for small args, since otherwise the performance of
+    \texttt{(*) :: Integer -> Integer -> Integer} will be poor.
+   }
+   with commutable = True
+
+primop   IntQuotOp    "quotInt#"    Dyadic
+   Int# -> Int# -> Int#
+   {Rounds towards zero. The behavior is undefined if the second argument is
+    zero.
+   }
+   with can_fail = True
+
+primop   IntRemOp    "remInt#"    Dyadic
+   Int# -> Int# -> Int#
+   {Satisfies \texttt{(quotInt\# x y) *\# y +\# (remInt\# x y) == x}. The
+    behavior is undefined if the second argument is zero.
+   }
+   with can_fail = True
+
+primop   IntQuotRemOp "quotRemInt#"    GenPrimOp
+   Int# -> Int# -> (# Int#, Int# #)
+   {Rounds towards zero.}
+   with can_fail = True
+
+primop   AndIOp   "andI#"   Dyadic    Int# -> Int# -> Int#
+   {Bitwise "and".}
+   with commutable = True
+
+primop   OrIOp   "orI#"     Dyadic    Int# -> Int# -> Int#
+   {Bitwise "or".}
+   with commutable = True
+
+primop   XorIOp   "xorI#"   Dyadic    Int# -> Int# -> Int#
+   {Bitwise "xor".}
+   with commutable = True
+
+primop   NotIOp   "notI#"   Monadic   Int# -> Int#
+   {Bitwise "not", also known as the binary complement.}
+
+primop   IntNegOp    "negateInt#"    Monadic   Int# -> Int#
+   {Unary negation.
+    Since the negative {\tt Int#} range extends one further than the
+    positive range, {\tt negateInt#} of the most negative number is an
+    identity operation. This way, {\tt negateInt#} is always its own inverse.}
+
+primop   IntAddCOp   "addIntC#"    GenPrimOp   Int# -> Int# -> (# Int#, Int# #)
+         {Add signed integers reporting overflow.
+          First member of result is the sum truncated to an {\tt Int#};
+          second member is zero if the true sum fits in an {\tt Int#},
+          nonzero if overflow occurred (the sum is either too large
+          or too small to fit in an {\tt Int#}).}
+   with code_size = 2
+        commutable = True
+
+primop   IntSubCOp   "subIntC#"    GenPrimOp   Int# -> Int# -> (# Int#, Int# #)
+         {Subtract signed integers reporting overflow.
+          First member of result is the difference truncated to an {\tt Int#};
+          second member is zero if the true difference fits in an {\tt Int#},
+          nonzero if overflow occurred (the difference is either too large
+          or too small to fit in an {\tt Int#}).}
+   with code_size = 2
+
+primop   IntGtOp  ">#"   Compare   Int# -> Int# -> Int#
+   with fixity = infix 4
+
+primop   IntGeOp  ">=#"   Compare   Int# -> Int# -> Int#
+   with fixity = infix 4
+
+primop   IntEqOp  "==#"   Compare
+   Int# -> Int# -> Int#
+   with commutable = True
+        fixity = infix 4
+
+primop   IntNeOp  "/=#"   Compare
+   Int# -> Int# -> Int#
+   with commutable = True
+        fixity = infix 4
+
+primop   IntLtOp  "<#"   Compare   Int# -> Int# -> Int#
+   with fixity = infix 4
+
+primop   IntLeOp  "<=#"   Compare   Int# -> Int# -> Int#
+   with fixity = infix 4
+
+primop   ChrOp   "chr#"   GenPrimOp   Int# -> Char#
+   with code_size = 0
+
+primop   Int2WordOp "int2Word#" GenPrimOp Int# -> Word#
+   with code_size = 0
+
+primop   Int2FloatOp   "int2Float#"      GenPrimOp  Int# -> Float#
+primop   Int2DoubleOp   "int2Double#"          GenPrimOp  Int# -> Double#
+
+primop   Word2FloatOp   "word2Float#"      GenPrimOp  Word# -> Float#
+primop   Word2DoubleOp   "word2Double#"          GenPrimOp  Word# -> Double#
+
+primop   ISllOp   "uncheckedIShiftL#" GenPrimOp  Int# -> Int# -> Int#
+         {Shift left.  Result undefined if shift amount is not
+          in the range 0 to word size - 1 inclusive.}
+primop   ISraOp   "uncheckedIShiftRA#" GenPrimOp Int# -> Int# -> Int#
+         {Shift right arithmetic.  Result undefined if shift amount is not
+          in the range 0 to word size - 1 inclusive.}
+primop   ISrlOp   "uncheckedIShiftRL#" GenPrimOp Int# -> Int# -> Int#
+         {Shift right logical.  Result undefined if shift amount is not
+          in the range 0 to word size - 1 inclusive.}
+
 ------------------------------------------------------------------------
 section "Word#"
         {Operations on native-sized unsigned words (32+ bits).}
@@ -557,10 +618,10 @@ primop   WordQuotRemOp "quotRemWord#" GenPrimOp
    Word# -> Word# -> (# Word#, Word# #)
    with can_fail = True
 
--- Takes high word of dividend, then low word of dividend, then divisor.
--- Requires that high word is not divisible by divisor.
 primop   WordQuotRem2Op "quotRemWord2#" GenPrimOp
    Word# -> Word# -> Word# -> (# Word#, Word# #)
+         { Takes high word of dividend, then low word of dividend, then divisor.
+           Requires that high word < divisor.}
    with can_fail = True
 
 primop   AndOp   "and#"   Dyadic   Word# -> Word# -> Word#
@@ -677,28 +738,6 @@ primop   Narrow32IntOp     "narrow32Int#"     Monadic   Int# -> Int#
 primop   Narrow8WordOp     "narrow8Word#"     Monadic   Word# -> Word#
 primop   Narrow16WordOp    "narrow16Word#"    Monadic   Word# -> Word#
 primop   Narrow32WordOp    "narrow32Word#"    Monadic   Word# -> Word#
-
-
-#if WORD_SIZE_IN_BITS < 64
-------------------------------------------------------------------------
-section "Int64#"
-        {Operations on 64-bit unsigned words. This type is only used
-         if plain {\tt Int\#} has less than 64 bits. In any case, the operations
-         are not primops; they are implemented (if needed) as ccalls instead.}
-------------------------------------------------------------------------
-
-primtype Int64#
-
-------------------------------------------------------------------------
-section "Word64#"
-        {Operations on 64-bit unsigned words. This type is only used
-         if plain {\tt Word\#} has less than 64 bits. In any case, the operations
-         are not primops; they are implemented (if needed) as ccalls instead.}
-------------------------------------------------------------------------
-
-primtype Word64#
-
-#endif
 
 ------------------------------------------------------------------------
 section "Double#"
@@ -1211,6 +1250,14 @@ primop  NewSmallArrayOp "newSmallArray#" GenPrimOp
 primop  SameSmallMutableArrayOp "sameSmallMutableArray#" GenPrimOp
    SmallMutableArray# s a -> SmallMutableArray# s a -> Int#
 
+primop  ShrinkSmallMutableArrayOp_Char "shrinkSmallMutableArray#" GenPrimOp
+   SmallMutableArray# s a -> Int# -> State# s -> State# s
+   {Shrink mutable array to new specified size, in
+    the specified state thread. The new size argument must be less than or
+    equal to the current size as reported by {\tt sizeofSmallMutableArray\#}.}
+   with out_of_line = True
+        has_side_effects = True
+
 primop  ReadSmallArrayOp "readSmallArray#" GenPrimOp
    SmallMutableArray# s a -> Int# -> State# s -> (# State# s, a #)
    {Read from specified index of mutable array. Result is not yet evaluated.}
@@ -1231,6 +1278,13 @@ primop  SizeofSmallArrayOp "sizeofSmallArray#" GenPrimOp
 
 primop  SizeofSmallMutableArrayOp "sizeofSmallMutableArray#" GenPrimOp
    SmallMutableArray# s a -> Int#
+   {Return the number of elements in the array. Note that this is deprecated
+   as it is unsafe in the presence of resize operations on the
+   same byte array.}
+   with deprecated_msg = { Use 'getSizeofSmallMutableArray#' instead }
+
+primop  GetSizeofSmallMutableArrayOp "getSizeofSmallMutableArray#" GenPrimOp
+   SmallMutableArray# s a -> State# s -> (# State# s, Int# #)
    {Return the number of elements in the array.}
 
 primop  IndexSmallArrayOp "indexSmallArray#" GenPrimOp
@@ -1397,7 +1451,7 @@ primop  ShrinkMutableByteArrayOp_Char "shrinkMutableByteArray#" GenPrimOp
    MutableByteArray# s -> Int# -> State# s -> State# s
    {Shrink mutable byte array to new specified size (in bytes), in
     the specified state thread. The new size argument must be less than or
-    equal to the current size as reported by {\tt sizeofMutableArray\#}.}
+    equal to the current size as reported by {\tt sizeofMutableByteArray\#}.}
    with out_of_line = True
         has_side_effects = True
 
@@ -1430,7 +1484,7 @@ primop  SizeofByteArrayOp "sizeofByteArray#" GenPrimOp
 primop  SizeofMutableByteArrayOp "sizeofMutableByteArray#" GenPrimOp
    MutableByteArray# s -> Int#
    {Return the size of the array in bytes. Note that this is deprecated as it is
-   unsafe in the presence of concurrent resize operations on the same byte
+   unsafe in the presence of resize operations on the same byte
    array.}
    with deprecated_msg = { Use 'getSizeofMutableByteArray#' instead }
 
@@ -2009,7 +2063,7 @@ primop FetchAddByteArrayOp_Int "fetchAddIntArray#" GenPrimOp
 primop FetchSubByteArrayOp_Int "fetchSubIntArray#" GenPrimOp
    MutableByteArray# s -> Int# -> Int# -> State# s -> (# State# s, Int# #)
    {Given an array, and offset in machine words, and a value to subtract,
-    atomically substract the value to the element. Returns the value of
+    atomically subtract the value to the element. Returns the value of
     the element before the operation. Implies a full memory barrier.}
    with has_side_effects = True
         can_fail = True
@@ -2797,30 +2851,6 @@ primop  WaitWriteOp "waitWrite#" GenPrimOp
    has_side_effects = True
    out_of_line      = True
 
-#if defined(mingw32_TARGET_OS)
-primop  AsyncReadOp "asyncRead#" GenPrimOp
-   Int# -> Int# -> Int# -> Addr# -> State# RealWorld-> (# State# RealWorld, Int#, Int# #)
-   {Asynchronously read bytes from specified file descriptor.}
-   with
-   has_side_effects = True
-   out_of_line      = True
-
-primop  AsyncWriteOp "asyncWrite#" GenPrimOp
-   Int# -> Int# -> Int# -> Addr# -> State# RealWorld-> (# State# RealWorld, Int#, Int# #)
-   {Asynchronously write bytes from specified file descriptor.}
-   with
-   has_side_effects = True
-   out_of_line      = True
-
-primop  AsyncDoProcOp "asyncDoProc#" GenPrimOp
-   Addr# -> Addr# -> State# RealWorld-> (# State# RealWorld, Int#, Int# #)
-   {Asynchronously perform procedure (first arg), passing it 2nd arg.}
-   with
-   has_side_effects = True
-   out_of_line      = True
-
-#endif
-
 ------------------------------------------------------------------------
 section "Concurrency primitives"
 ------------------------------------------------------------------------
@@ -3218,7 +3248,7 @@ section "Bytecode operations"
         contain a list of instructions and data needed by these instructions.}
 ------------------------------------------------------------------------
 
-primtype BCO#
+primtype BCO
    { Primitive bytecode type. }
 
 primop   AddrToAnyOp "addrToAny#" GenPrimOp
@@ -3243,14 +3273,14 @@ primop   AnyToAddrOp "anyToAddr#" GenPrimOp
    code_size = 0
 
 primop   MkApUpd0_Op "mkApUpd0#" GenPrimOp
-   BCO# -> (# a #)
+   BCO -> (# a #)
    { Wrap a BCO in a {\tt AP_UPD} thunk which will be updated with the value of
      the BCO when evaluated. }
    with
    out_of_line = True
 
 primop  NewBCOOp "newBCO#" GenPrimOp
-   ByteArray# -> ByteArray# -> Array# a -> Int# -> ByteArray# -> State# s -> (# State# s, BCO# #)
+   ByteArray# -> ByteArray# -> Array# a -> Int# -> ByteArray# -> State# s -> (# State# s, BCO #)
    { {\tt newBCO\# instrs lits ptrs arity bitmap} creates a new bytecode object. The
      resulting object encodes a function of the given arity with the instructions
      encoded in {\tt instrs}, and a static reference table usage bitmap given by
@@ -3337,7 +3367,7 @@ pseudoop   "seq"
      you must use the function {\tt pseq} from the "parallel" package. }
    with fixity = infixr 0
          -- This fixity is only the one picked up by Haddock. If you
-         -- change this, do update 'ghcPrimIface' in 'LoadIface.hs'.
+         -- change this, do update 'ghcPrimIface' in 'GHC.Iface.Load'.
 
 pseudoop   "unsafeCoerce#"
    a -> b
@@ -3409,13 +3439,6 @@ primop  TraceMarkerOp "traceMarker#" GenPrimOp
      of the event is the zero-terminated byte string passed as the first
      argument.  The event will be emitted either to the {\tt .eventlog} file,
      or to stderr, depending on the runtime RTS flags. }
-   with
-   has_side_effects = True
-   out_of_line      = True
-
-primop  GetThreadAllocationCounter "getThreadAllocationCounter#" GenPrimOp
-   State# RealWorld -> (# State# RealWorld, INT64 #)
-   { Retrieves the allocation counter for the current thread. }
    with
    has_side_effects = True
    out_of_line      = True

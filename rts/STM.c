@@ -182,7 +182,8 @@ static void unlock_stm(StgTRecHeader *trec STG_UNUSED) {
   TRACE("%p : unlock_stm()", trec);
 }
 
-static StgClosure *lock_tvar(StgTRecHeader *trec STG_UNUSED,
+static StgClosure *lock_tvar(Capability *cap STG_UNUSED,
+                             StgTRecHeader *trec STG_UNUSED,
                              StgTVar *s STG_UNUSED) {
   StgClosure *result;
   TRACE("%p : lock_tvar(%p)", trec, s);
@@ -197,12 +198,14 @@ static void unlock_tvar(Capability *cap,
                         StgBool force_update) {
   TRACE("%p : unlock_tvar(%p)", trec, s);
   if (force_update) {
+    StgClosure *old_value = s -> current_value;
     s -> current_value = c;
-    dirty_TVAR(cap,s);
+    dirty_TVAR(cap, s, old_value);
   }
 }
 
-static StgBool cond_lock_tvar(StgTRecHeader *trec STG_UNUSED,
+static StgBool cond_lock_tvar(Capability *cap STG_UNUSED,
+                              StgTRecHeader *trec STG_UNUSED,
                               StgTVar *s STG_UNUSED,
                               StgClosure *expected) {
   StgClosure *result;
@@ -231,7 +234,8 @@ static void unlock_stm(StgTRecHeader *trec STG_UNUSED) {
   smp_locked = 0;
 }
 
-static StgClosure *lock_tvar(StgTRecHeader *trec STG_UNUSED,
+static StgClosure *lock_tvar(Capability *cap STG_UNUSED,
+                             StgTRecHeader *trec STG_UNUSED,
                              StgTVar *s STG_UNUSED) {
   StgClosure *result;
   TRACE("%p : lock_tvar(%p)", trec, s);
@@ -248,12 +252,14 @@ static void *unlock_tvar(Capability *cap,
   TRACE("%p : unlock_tvar(%p, %p)", trec, s, c);
   ASSERT(smp_locked == trec);
   if (force_update) {
+    StgClosure *old_value = s -> current_value;
     s -> current_value = c;
-    dirty_TVAR(cap,s);
+    dirty_TVAR(cap, s, old_value);
   }
 }
 
-static StgBool cond_lock_tvar(StgTRecHeader *trec STG_UNUSED,
+static StgBool cond_lock_tvar(Capability *cap STG_UNUSED,
+                              StgTRecHeader *trec STG_UNUSED,
                                StgTVar *s STG_UNUSED,
                                StgClosure *expected) {
   StgClosure *result;
@@ -279,7 +285,8 @@ static void unlock_stm(StgTRecHeader *trec STG_UNUSED) {
   TRACE("%p : unlock_stm()", trec);
 }
 
-static StgClosure *lock_tvar(StgTRecHeader *trec,
+static StgClosure *lock_tvar(Capability *cap,
+                             StgTRecHeader *trec,
                              StgTVar *s STG_UNUSED) {
   StgClosure *result;
   TRACE("%p : lock_tvar(%p)", trec, s);
@@ -289,6 +296,12 @@ static StgClosure *lock_tvar(StgTRecHeader *trec,
     } while (GET_INFO(UNTAG_CLOSURE(result)) == &stg_TREC_HEADER_info);
   } while (cas((void *)&(s -> current_value),
                (StgWord)result, (StgWord)trec) != (StgWord)result);
+
+
+  IF_NONMOVING_WRITE_BARRIER_ENABLED {
+      if (result)
+          updateRemembSetPushClosure(cap, result);
+  }
   return result;
 }
 
@@ -300,10 +313,11 @@ static void unlock_tvar(Capability *cap,
   TRACE("%p : unlock_tvar(%p, %p)", trec, s, c);
   ASSERT(s -> current_value == (StgClosure *)trec);
   s -> current_value = c;
-  dirty_TVAR(cap,s);
+  dirty_TVAR(cap, s, (StgClosure *) trec);
 }
 
-static StgBool cond_lock_tvar(StgTRecHeader *trec,
+static StgBool cond_lock_tvar(Capability *cap,
+                              StgTRecHeader *trec,
                               StgTVar *s,
                               StgClosure *expected) {
   StgClosure *result;
@@ -311,6 +325,10 @@ static StgBool cond_lock_tvar(StgTRecHeader *trec,
   TRACE("%p : cond_lock_tvar(%p, %p)", trec, s, expected);
   w = cas((void *)&(s -> current_value), (StgWord)expected, (StgWord)trec);
   result = (StgClosure *)w;
+  IF_NONMOVING_WRITE_BARRIER_ENABLED {
+      if (result)
+          updateRemembSetPushClosure(cap, expected);
+  }
   TRACE("%p : %s", trec, result ? "success" : "failure");
   return (result == expected);
 }
@@ -525,7 +543,7 @@ static void build_watch_queue_entries_for_trec(Capability *cap,
     }
     s -> first_watch_queue_entry = q;
     e -> new_value = (StgClosure *) q;
-    dirty_TVAR(cap,s); // we modified first_watch_queue_entry
+    dirty_TVAR(cap, s, (StgClosure *) fq); // we modified first_watch_queue_entry
   });
 }
 
@@ -545,7 +563,7 @@ static void remove_watch_queue_entries_for_trec(Capability *cap,
     StgTVarWatchQueue *q;
     StgClosure *saw;
     s = e -> tvar;
-    saw = lock_tvar(trec, s);
+    saw = lock_tvar(cap, trec, s);
     q = (StgTVarWatchQueue *) (e -> new_value);
     TRACE("%p : removing tso=%p from watch queue for tvar=%p",
           trec,
@@ -562,7 +580,7 @@ static void remove_watch_queue_entries_for_trec(Capability *cap,
     } else {
       ASSERT(s -> first_watch_queue_entry == q);
       s -> first_watch_queue_entry = nq;
-      dirty_TVAR(cap,s); // we modified first_watch_queue_entry
+      dirty_TVAR(cap, s, (StgClosure *) q); // we modified first_watch_queue_entry
     }
     free_stg_tvar_watch_queue(cap, q);
     unlock_tvar(cap, trec, s, saw, false);
@@ -773,7 +791,7 @@ static StgBool validate_and_acquire_ownership (Capability *cap,
       s = e -> tvar;
       if (acquire_all || entry_is_update(e)) {
         TRACE("%p : trying to acquire %p", trec, s);
-        if (!cond_lock_tvar(trec, s, e -> expected_value)) {
+        if (!cond_lock_tvar(cap, trec, s, e -> expected_value)) {
           TRACE("%p : failed to acquire %p", trec, s);
           result = false;
           BREAK_FOR_EACH;
@@ -810,7 +828,7 @@ static StgBool validate_and_acquire_ownership (Capability *cap,
 // check_read_only : check that we've seen an atomic snapshot of the
 // non-updated TVars accessed by a trec.  This checks that the last TRec to
 // commit an update to the TVar is unchanged since the value was stashed in
-// validate_and_acquire_ownership.  If no udpate is seen to any TVar than
+// validate_and_acquire_ownership.  If no update is seen to any TVar than
 // all of them contained their expected values at the start of the call to
 // check_read_only.
 //
@@ -1234,7 +1252,7 @@ StgBool stmReWait(Capability *cap, StgTSO *tso) {
     park_tso(tso);
     revert_ownership(cap, trec, true);
   } else {
-    // The transcation has become invalid.  We can now remove it from the wait
+    // The transaction has become invalid.  We can now remove it from the wait
     // queues.
     if (trec -> state != TREC_CONDEMNED) {
       remove_watch_queue_entries_for_trec (cap, trec);

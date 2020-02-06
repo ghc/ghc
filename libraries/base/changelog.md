@@ -1,7 +1,10 @@
 # Changelog for [`base` package](http://hackage.haskell.org/package/base)
 
+## 4.15.0.0 *TBA*
+  * TODO
+
 ## 4.14.0.0 *TBA*
-  * Bundled with GHC *TBA*
+  * Bundled with GHC 8.10.1
 
   * Add a `TestEquality` instance for the `Compose` newtype.
 
@@ -21,8 +24,32 @@
     The type argument `r` is marked as `Inferred` to prevent it from
     interfering with visible type application.
 
-## 4.13.0.0 *TBA*
-  * Bundled with GHC *TBA*
+  * Make `Fixed` and `HasResolution` poly-kinded.
+
+  * Add `HasResolution` instances for `Nat`s.
+
+  * Add `Functor`, `Applicative`, `Monad`, `Alternative`, `MonadPlus`,
+    `Generic` and `Generic1` instances to `Kleisli`
+
+  * `openTempFile` is now fully atomic and thread-safe on Windows.
+
+  * Add `isResourceVanishedError`, `resourceVanishedErrorType`, and
+    `isResourceVanishedErrorType` to `System.IO.Error`.
+
+  * Add newtypes for `CSocklen` (`socklen_t`) and `CNfds` (`nfds_t`) to
+    `System.Posix.Types`.
+
+  * Add `Functor`, `Applicative` and `Monad` instances to `(,,) a b`
+    and `(,,,) a b c`.
+
+  * Add `resizeSmallMutableArray#` to `GHC.Exts`.
+
+  * Add a `Data` instance to `WrappedArrow`, `WrappedMonad`, and `ZipList`.
+
+  * Add `IsList` instance for `ZipList`.
+
+## 4.13.0.0 *July 2019*
+  * Bundled with GHC 8.8.1
 
   * The final phase of the `MonadFail` proposal has been implemented:
 
@@ -49,6 +76,8 @@
   * The `shiftL` and `shiftR` methods in the `Bits` instances of `Int`, `IntN`,
     `Word`, and `WordN` now throw an overflow exception for negative shift
     values (instead of being undefined behaviour).
+
+  * `scanr` no longer crashes when passed a fusable, infinite list. (#16943)
 
 ## 4.12.0.0 *21 September 2018*
   * Bundled with GHC 8.6.1
@@ -266,7 +295,7 @@
     in constant space when applied to lists. (#10830)
 
   * `mkFunTy`, `mkAppTy`, and `mkTyConApp` from `Data.Typeable` no longer exist.
-    This functionality is superceded by the interfaces provided by
+    This functionality is superseded by the interfaces provided by
     `Type.Reflection`.
 
   * `mkTyCon3` is no longer exported by `Data.Typeable`. This function is

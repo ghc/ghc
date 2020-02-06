@@ -3,7 +3,8 @@
 -- NB: this module is SOURCE-imported by DynFlags, and should primarily
 --     refer to *types*, rather than *code*
 
-{-# LANGUAGE CPP #-}
+{-# LANGUAGE CPP, RankNTypes #-}
+
 module Hooks ( Hooks
              , emptyHooks
              , lookupHook
@@ -21,6 +22,8 @@ module Hooks ( Hooks
              , runRnSpliceHook
              , getValueSafelyHook
              , createIservProcessHook
+             , stgToCmmHook
+             , cmmToRawCmmHook
              ) where
 
 import GhcPrelude
@@ -28,9 +31,9 @@ import GhcPrelude
 import DynFlags
 import PipelineMonad
 import HscTypes
-import HsDecls
-import HsBinds
-import HsExpr
+import GHC.Hs.Decls
+import GHC.Hs.Binds
+import GHC.Hs.Expr
 import OrdList
 import TcRnTypes
 import Bag
@@ -43,7 +46,13 @@ import SrcLoc
 import Type
 import System.Process
 import BasicTypes
-import HsExtension
+import Module
+import TyCon
+import CostCentre
+import GHC.Stg.Syntax
+import Stream
+import GHC.Cmm
+import GHC.Hs.Extension
 
 import Data.Maybe
 
@@ -73,6 +82,8 @@ emptyHooks = Hooks
   , runRnSpliceHook        = Nothing
   , getValueSafelyHook     = Nothing
   , createIservProcessHook = Nothing
+  , stgToCmmHook           = Nothing
+  , cmmToRawCmmHook        = Nothing
   }
 
 data Hooks = Hooks
@@ -95,6 +106,10 @@ data Hooks = Hooks
   , getValueSafelyHook     :: Maybe (HscEnv -> Name -> Type
                                                           -> IO (Maybe HValue))
   , createIservProcessHook :: Maybe (CreateProcess -> IO ProcessHandle)
+  , stgToCmmHook           :: Maybe (DynFlags -> Module -> [TyCon] -> CollectedCCs
+                                 -> [CgStgTopBinding] -> HpcInfo -> Stream IO CmmGroup ())
+  , cmmToRawCmmHook        :: forall a . Maybe (DynFlags -> Maybe Module -> Stream IO CmmGroupSRTs a
+                                 -> IO (Stream IO RawCmmGroup a))
   }
 
 getHooked :: (Functor f, HasDynFlags f) => (Hooks -> Maybe a) -> a -> f a

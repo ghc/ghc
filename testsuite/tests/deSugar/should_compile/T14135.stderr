@@ -1,4 +1,4 @@
 
 T14135.hs:16:1: warning: [-Wincomplete-patterns (in -Wextra)]
     Pattern match(es) are non-exhaustive
-    In an equation for ‘f’: Patterns not matched: (Foo2 _)
+    In an equation for ‘f’: Patterns not matched: Foo2 _

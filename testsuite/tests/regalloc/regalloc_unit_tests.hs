@@ -24,15 +24,15 @@ import qualified RegAlloc.Graph.Stats as Color
 import qualified RegAlloc.Linear.Base as Linear
 import qualified X86.Instr
 import HscMain
-import CgUtils
+import GHC.StgToCmm.CgUtils
 import AsmCodeGen
-import CmmBuildInfoTables
-import CmmPipeline
-import CmmParse
-import CmmInfo
-import Cmm
+import GHC.Cmm.Info.Build
+import GHC.Cmm.Pipeline
+import GHC.Cmm.Parser
+import GHC.Cmm.Info
+import GHC.Cmm
 import Module
-import Debug
+import GHC.Cmm.DebugBlock
 import GHC
 import GhcMonad
 import UniqFM
@@ -98,9 +98,9 @@ compileCmmForRegAllocStats ::
     DynFlags ->
     FilePath ->
     (DynFlags ->
-        NcgImpl (Alignment, CmmStatics) X86.Instr.Instr X86.Instr.JumpDest) ->
+        NcgImpl (Alignment, RawCmmStatics) X86.Instr.Instr X86.Instr.JumpDest) ->
     UniqSupply ->
-    IO [( Maybe [Color.RegAllocStats (Alignment, CmmStatics) X86.Instr.Instr]
+    IO [( Maybe [Color.RegAllocStats (Alignment, RawCmmStatics) X86.Instr.Instr]
         , Maybe [Linear.RegAllocStats])]
 compileCmmForRegAllocStats dflags' cmmFile ncgImplF us = do
     let ncgImpl = ncgImplF dflags

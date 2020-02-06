@@ -20,9 +20,9 @@ typedef struct {
  */
 
 /*
- * Thread IDs are 32 bits.
+ * Thread IDs are 64 bits.
  */
-typedef StgWord32 StgThreadID;
+typedef StgWord64 StgThreadID;
 
 #define tsoLocked(tso) ((tso)->flags & TSO_LOCKED)
 
@@ -185,10 +185,66 @@ typedef struct StgTSO_ {
 
 } *StgTSOPtr; // StgTSO defined in rts/Types.h
 
+/* Note [StgStack dirtiness flags and concurrent marking]
+ * ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+ *
+ * Without concurrent collection by the nonmoving collector the stack dirtiness story
+ * is quite simple: The stack is either STACK_DIRTY (meaning it has been added to mut_list)
+ * or not.
+ *
+ * However, things are considerably more complicated with concurrent collection
+ * (namely, when nonmoving_write_barrier_enabled is set): In addition to adding
+ * the stack to mut_list and flagging it as STACK_DIRTY, we also must ensure
+ * that stacks are marked in accordance with the nonmoving collector's snapshot
+ * invariant. This is: every stack alive at the time the snapshot is taken must
+ * be marked at some point after the moment the snapshot is taken and before it
+ * is mutated or the commencement of the sweep phase.
+ *
+ * This marking may be done by the concurrent mark phase (in the case of a
+ * thread that never runs during the concurrent mark) or by the mutator when
+ * dirtying the stack. However, it is unsafe for the concurrent collector to
+ * traverse the stack while it is under mutation. Consequently, the following
+ * handshake is obeyed by the mutator's write barrier and the concurrent mark to
+ * ensure this doesn't happen:
+ *
+ * 1. The entity seeking to mark first checks that the stack lives in the nonmoving
+ *    generation; if not then the stack was not alive at the time the snapshot
+ *    was taken and therefore we need not mark it.
+ *
+ * 2. The entity seeking to mark checks the stack's mark bit. If it is set then
+ *    no mark is necessary.
+ *
+ * 3. The entity seeking to mark tries to lock the stack for marking by
+ *    atomically setting its `marking` field to the current non-moving mark
+ *    epoch:
+ *
+ *    a. If the mutator finds the concurrent collector has already locked the
+ *       stack then it waits until it is finished (indicated by the mark bit
+ *       being set) before proceeding with execution.
+ *
+ *    b. If the concurrent collector finds that the mutator has locked the stack
+ *       then it moves on, leaving the mutator to mark it. There is no need to wait;
+ *       the mark is guaranteed to finish before sweep due to the post-mark
+ *       synchronization with mutators.
+ *
+ *    c. Whoever succeeds in locking the stack is responsible for marking it and
+ *       setting the stack's mark bit (either the BF_MARKED bit for large objects
+ *       or otherwise its bit in its segment's mark bitmap).
+ *
+ * To ensure that mutation does not proceed until the stack is fully marked the
+ * mark phase must not set the mark bit until it has finished tracing.
+ *
+ */
+
+#define STACK_DIRTY 1
+// used by sanity checker to verify that all dirty stacks are on the mutable list
+#define STACK_SANE 64
+
 typedef struct StgStack_ {
     StgHeader  header;
     StgWord32  stack_size;     // stack size in *words*
-    StgWord32  dirty;          // non-zero => dirty
+    StgWord8   dirty;          // non-zero => dirty
+    StgWord8   marking;        // non-zero => someone is currently marking the stack
     StgPtr     sp;             // current stack pointer
     StgWord    stack[];
 } StgStack;

@@ -32,7 +32,7 @@ import Control.Applicative
 import Control.Monad
 import Control.Monad.Fix
 import Control.Monad.IO.Class
-import Data.Foldable (sequenceA_)
+import Data.Foldable (sequenceA_, foldlM, foldrM)
 import Data.List (unzip4, unzip5, zipWith4)
 
 -------------------------------------------------------------------------------
@@ -190,18 +190,9 @@ allM f (b:bs) = (f b) >>= (\bv -> if bv then allM f bs else return False)
 orM :: Monad m => m Bool -> m Bool -> m Bool
 orM m1 m2 = m1 >>= \x -> if x then return True else m2
 
--- | Monadic version of foldl
-foldlM :: (Monad m) => (a -> b -> m a) -> a -> [b] -> m a
-foldlM = foldM
-
 -- | Monadic version of foldl that discards its result
-foldlM_ :: (Monad m) => (a -> b -> m a) -> a -> [b] -> m ()
+foldlM_ :: (Monad m, Foldable t) => (a -> b -> m a) -> a -> t b -> m ()
 foldlM_ = foldM_
-
--- | Monadic version of foldr
-foldrM        :: (Monad m) => (b -> a -> m a) -> a -> [b] -> m a
-foldrM _ z []     = return z
-foldrM k z (x:xs) = do { r <- foldrM k z xs; k x r }
 
 -- | Monadic version of fmap specialised for Maybe
 maybeMapM :: Monad m => (a -> m b) -> (Maybe a -> m (Maybe b))

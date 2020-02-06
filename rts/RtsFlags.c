@@ -134,6 +134,9 @@ void initRtsFlagsDefaults(void)
     // if getPhysicalMemorySize fails just move along with an 8MB limit
     if (maxStkSize == 0)
         maxStkSize = 8 * 1024 * 1024;
+    // GcFlags.maxStkSiz is 32-bit, so we need to cap to prevent overflow (#17019)
+    else if (maxStkSize > UINT32_MAX * sizeof(W_))
+        maxStkSize = UINT32_MAX * sizeof(W_);
 
     RtsFlags.GcFlags.statsFile          = NULL;
     RtsFlags.GcFlags.giveStats          = NO_GC_STATS;
@@ -153,12 +156,15 @@ void initRtsFlagsDefaults(void)
     RtsFlags.GcFlags.heapSizeSuggestionAuto = false;
     RtsFlags.GcFlags.pcFreeHeap         = 3;    /* 3% */
     RtsFlags.GcFlags.oldGenFactor       = 2;
+    RtsFlags.GcFlags.useNonmoving       = false;
+    RtsFlags.GcFlags.nonmovingSelectorOpt = false;
     RtsFlags.GcFlags.generations        = 2;
     RtsFlags.GcFlags.squeezeUpdFrames   = true;
     RtsFlags.GcFlags.compact            = false;
     RtsFlags.GcFlags.compactThreshold   = 30.0;
     RtsFlags.GcFlags.sweep              = false;
     RtsFlags.GcFlags.idleGCDelayTime    = USToTime(300000); // 300ms
+    RtsFlags.GcFlags.interIdleGCWait    = 0;
 #if defined(THREADED_RTS)
     RtsFlags.GcFlags.doIdleGC           = true;
 #else
@@ -176,8 +182,10 @@ void initRtsFlagsDefaults(void)
     RtsFlags.DebugFlags.weak            = false;
     RtsFlags.DebugFlags.gccafs          = false;
     RtsFlags.DebugFlags.gc              = false;
+    RtsFlags.DebugFlags.nonmoving_gc    = false;
     RtsFlags.DebugFlags.block_alloc     = false;
     RtsFlags.DebugFlags.sanity          = false;
+    RtsFlags.DebugFlags.zero_on_gc      = false;
     RtsFlags.DebugFlags.stable          = false;
     RtsFlags.DebugFlags.stm             = false;
     RtsFlags.DebugFlags.prof            = false;
@@ -216,6 +224,7 @@ void initRtsFlagsDefaults(void)
     RtsFlags.TraceFlags.timestamp     = false;
     RtsFlags.TraceFlags.scheduler     = false;
     RtsFlags.TraceFlags.gc            = false;
+    RtsFlags.TraceFlags.nonmoving_gc  = false;
     RtsFlags.TraceFlags.sparks_sampled= false;
     RtsFlags.TraceFlags.sparks_full   = false;
     RtsFlags.TraceFlags.user          = false;
@@ -235,6 +244,7 @@ void initRtsFlagsDefaults(void)
     RtsFlags.MiscFlags.generate_stack_trace    = true;
     RtsFlags.MiscFlags.generate_dump_file      = false;
     RtsFlags.MiscFlags.machineReadable         = false;
+    RtsFlags.MiscFlags.disableDelayedOsMemoryReturn = false;
     RtsFlags.MiscFlags.internalCounters        = false;
     RtsFlags.MiscFlags.linkerAlwaysPic         = DEFAULT_LINKER_ALWAYS_PIC;
     RtsFlags.MiscFlags.linkerMemBase           = 0;
@@ -295,6 +305,7 @@ usage_text[] = {
 "  -xb<addr> Sets the address from which a suitable start for the heap memory",
 "            will be searched from. This is useful if the default address",
 "            clashes with some third-party library.",
+"  -xn       Use the non-moving collector for the old generation.",
 "  -m<n>     Minimum % of heap which must be available (default 3%)",
 "  -G<n>     Number of generations (default: 2)",
 "  -c<n>     Use in-place compaction instead of copying in the oldest generation",
@@ -313,7 +324,7 @@ usage_text[] = {
 "  -S[<file>] Detailed GC statistics (if <file> omitted, uses stderr)",
 "",
 "",
-"  -Z         Don't squeeze out update frames on stack overflow",
+"  -Z         Don't squeeze out update frames on context switch",
 "  -B         Sound the bell at the start of each garbage collection",
 #if defined(PROFILING)
 "",
@@ -400,8 +411,10 @@ usage_text[] = {
 "  -Dw  DEBUG: weak",
 "  -DG  DEBUG: gccafs",
 "  -Dg  DEBUG: gc",
+"  -Dn  DEBUG: non-moving gc",
 "  -Db  DEBUG: block",
 "  -DS  DEBUG: sanity",
+"  -DZ  DEBUG: zero freed memory during GC",
 "  -Dt  DEBUG: stable",
 "  -Dp  DEBUG: prof",
 "  -Da  DEBUG: apply",
@@ -522,7 +535,7 @@ char** getUTF8Args(int* argc)
 
     // We create two argument arrays, one which is later permutated by the RTS
     // instead of the main argv.
-    // The other one is used to free the allocted memory later.
+    // The other one is used to free the allocated memory later.
     char** argv = (char**) stgMallocBytes(sizeof(char*) * (*argc + 1),
                                           "getUTF8Args 1");
     win32_full_utf8_argv = (char**) stgMallocBytes(sizeof(char*) * (*argc + 1),
@@ -903,6 +916,11 @@ error = true;
                       OPTION_UNSAFE;
                       RtsFlags.MiscFlags.machineReadable = true;
                   }
+                  else if (strequal("disable-delayed-os-memory-return",
+                               &rts_argv[arg][2])) {
+                      OPTION_UNSAFE;
+                      RtsFlags.MiscFlags.disableDelayedOsMemoryReturn = true;
+                  }
                   else if (strequal("internal-counters",
                                     &rts_argv[arg][2])) {
                       OPTION_SAFE;
@@ -913,6 +931,11 @@ error = true;
                       OPTION_SAFE;
                       printRtsInfo(rtsConfig);
                       stg_exit(0);
+                  }
+                  else if (strequal("nonmoving-gc",
+                               &rts_argv[arg][2])) {
+                      OPTION_SAFE;
+                      RtsFlags.GcFlags.useNonmoving = true;
                   }
 #if defined(THREADED_RTS)
                   else if (!strncmp("numa", &rts_argv[arg][2], 4)) {
@@ -927,9 +950,14 @@ error = true;
                       if (rts_argv[arg][6] == '=') {
                           mask = (StgWord)strtol(rts_argv[arg]+7,
                                                  (char **) NULL, 10);
-                      } else {
+                      } else if (rts_argv[arg][6] == '\0'){
                           mask = (StgWord)~0;
+                      } else {
+                          errorBelch("%s: unknown flag", rts_argv[arg]);
+                          error = true;
+                          break;
                       }
+
                       if (!osNumaAvailable()) {
                           errorBelch("%s: OS reports NUMA is not available",
                                      rts_argv[arg]);
@@ -963,6 +991,7 @@ error = true;
                           RtsFlags.GcFlags.numa = true;
                           RtsFlags.DebugFlags.numa = true;
                           RtsFlags.GcFlags.numaMask = (1<<nNodes) - 1;
+                          n_numa_nodes = nNodes;
                       }
                   }
 #endif
@@ -1041,7 +1070,7 @@ error = true;
               case 'K':
                   OPTION_UNSAFE;
                   RtsFlags.GcFlags.maxStkSize =
-                      decodeSize(rts_argv[arg], 2, 0, HS_WORD_MAX)
+                      decodeSize(rts_argv[arg], 2, 0, UINT32_MAX)
                       / sizeof(W_);
                   break;
 
@@ -1151,19 +1180,33 @@ error = true;
                   break;
 
               case 'I': /* idle GC delay */
-                OPTION_UNSAFE;
-                if (rts_argv[arg][2] == '\0') {
-                  /* use default */
-                } else {
-                    Time t = fsecondsToTime(atof(rts_argv[arg]+2));
-                    if (t == 0) {
-                        RtsFlags.GcFlags.doIdleGC = false;
-                    } else {
-                        RtsFlags.GcFlags.doIdleGC = true;
-                        RtsFlags.GcFlags.idleGCDelayTime = t;
-                    }
-                }
-                break;
+                  OPTION_UNSAFE;
+                  switch (rts_argv[arg][2]) {
+                  /* minimum inter-idle GC wait time */
+                  case 'w':
+                      if (rts_argv[arg][3] == '\0') {
+                          /* use default */
+                      } else {
+                          RtsFlags.GcFlags.interIdleGCWait = fsecondsToTime(atof(rts_argv[arg]+3));
+                      }
+                      break;
+                  /* idle delay before GC */
+                  case '\0':
+                      /* use default */
+                      break;
+                  default:
+                      {
+                          Time t = fsecondsToTime(atof(rts_argv[arg]+2));
+                          if (t == 0) {
+                              RtsFlags.GcFlags.doIdleGC = false;
+                          } else {
+                              RtsFlags.GcFlags.doIdleGC = true;
+                              RtsFlags.GcFlags.idleGCDelayTime = t;
+                          }
+                      }
+                      break;
+                  }
+                  break;
 
               case 'T':
                   OPTION_SAFE;
@@ -1528,6 +1571,16 @@ error = true;
                     break;
 #endif
 
+                case 'n':
+                    OPTION_SAFE;
+                    RtsFlags.GcFlags.useNonmoving = true;
+                    unchecked_arg_start++;
+                    if (rts_argv[arg][3] == 's') {
+                        RtsFlags.GcFlags.nonmovingSelectorOpt = true;
+                        unchecked_arg_start++;
+                    }
+                    break;
+
                 case 'c': /* Debugging tool: show current cost centre on
                            an exception */
                     OPTION_SAFE;
@@ -1701,6 +1754,21 @@ static void normaliseRtsOpts (void)
     if (RtsFlags.MiscFlags.generate_dump_file) {
         RtsFlags.MiscFlags.install_seh_handlers = true;
     }
+
+    if (RtsFlags.GcFlags.useNonmoving && RtsFlags.GcFlags.generations == 1) {
+        barf("The non-moving collector doesn't support -G1");
+    }
+
+    if (RtsFlags.ProfFlags.doHeapProfile != NO_HEAP_PROFILING &&
+            RtsFlags.GcFlags.useNonmoving) {
+        barf("The non-moving collector doesn't support profiling");
+    }
+
+    if (RtsFlags.GcFlags.compact && RtsFlags.GcFlags.useNonmoving) {
+        errorBelch("The non-moving collector cannot be used in conjunction with\n"
+                   "the compacting collector.");
+        errorUsage();
+    }
 }
 
 static void errorUsage (void)
@@ -1745,7 +1813,7 @@ openStatsFile (char *filename,           // filename, or NULL
         f = NULL; /* NULL means use debugBelch */
     } else {
         if (*filename != '\0') {  /* stats file specified */
-            f = __rts_fopen (filename,"w");
+            f = __rts_fopen (filename,"w+");
         } else {
             if (filename_fmt == NULL) {
                 errorBelch("Invalid stats filename format (NULL)\n");
@@ -1755,7 +1823,7 @@ openStatsFile (char *filename,           // filename, or NULL
             char stats_filename[STATS_FILENAME_MAXLEN];
             snprintf(stats_filename, STATS_FILENAME_MAXLEN, filename_fmt,
                 prog_name);
-            f = __rts_fopen (stats_filename,"w");
+            f = __rts_fopen (stats_filename,"w+");
         }
         if (f == NULL) {
             errorBelch("Can't open stats file %s\n", filename);
@@ -1772,16 +1840,30 @@ openStatsFile (char *filename,           // filename, or NULL
  * and the arguments it was invoked with.
 -------------------------------------------------------------------------- */
 
+// stats_fprintf augmented with Bash-compatible escaping. See #13676
+static void stats_fprintf_escape (FILE *f, char*s)
+{
+  stats_fprintf(f, "'");
+  while (*s != '\0') {
+    switch (*s) {
+      case '\'': stats_fprintf(f, "'\\''");  break;
+      default:   stats_fprintf(f, "%c", *s); break;
+    }
+    ++s;
+  }
+  stats_fprintf(f, "' ");
+}
+
 static void initStatsFile (FILE *f)
 {
     /* Write prog_argv and rts_argv into start of stats file */
     int count;
     for (count = 0; count < prog_argc; count++) {
-        stats_fprintf(f, "%s ", prog_argv[count]);
+        stats_fprintf_escape(f, prog_argv[count]);
     }
     stats_fprintf(f, "+RTS ");
     for (count = 0; count < rts_argc; count++)
-        stats_fprintf(f, "%s ", rts_argv[count]);
+        stats_fprintf_escape(f, rts_argv[count]);
     stats_fprintf(f, "\n");
 }
 
@@ -1852,11 +1934,17 @@ static void read_debug_flags(const char* arg)
         case 'g':
             RtsFlags.DebugFlags.gc = true;
             break;
+        case 'n':
+            RtsFlags.DebugFlags.nonmoving_gc = true;
+            break;
         case 'b':
             RtsFlags.DebugFlags.block_alloc = true;
             break;
         case 'S':
             RtsFlags.DebugFlags.sanity = true;
+            break;
+        case 'Z':
+            RtsFlags.DebugFlags.zero_on_gc = true;
             break;
         case 't':
             RtsFlags.DebugFlags.stable = true;
@@ -1892,6 +1980,12 @@ static void read_debug_flags(const char* arg)
     // -Dx also turns on -v.  Use -l to direct trace
     // events to the .eventlog file instead.
     RtsFlags.TraceFlags.tracing = TRACE_STDERR;
+
+   // sanity implies zero_on_gc
+   if(RtsFlags.DebugFlags.sanity){
+        RtsFlags.DebugFlags.zero_on_gc = true;
+   }
+
 }
 #endif
 
@@ -2078,6 +2172,10 @@ static void read_trace_flags(const char *arg)
             break;
         case 'g':
             RtsFlags.TraceFlags.gc        = enabled;
+            enabled = true;
+            break;
+        case 'n':
+            RtsFlags.TraceFlags.nonmoving_gc = enabled;
             enabled = true;
             break;
         case 'u':

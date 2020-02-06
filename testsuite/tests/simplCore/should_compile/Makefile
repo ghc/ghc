@@ -2,6 +2,11 @@ TOP=../../..
 include $(TOP)/mk/boilerplate.mk
 include $(TOP)/mk/test.mk
 
+T17409:
+	$(RM) -f T17409.o T17409.hi
+	- '$(TEST_HC)' $(TEST_HC_OPTS) -O -c -dverbose-core2core -dsuppress-uniques T17409.hs 2> /dev/null | grep '\<id\>'
+        # Expecting 'id' to be inlined in the 'gentle' pass
+
 T14978:
 	$(RM) -f T14978.o T14978.hi
 	-'$(TEST_HC)' $(TEST_HC_OPTS) -O -c -ddump-simpl T14978.hs -dsuppress-coercions | grep 'foo'
@@ -257,3 +262,7 @@ T15631:
 	$(RM) -f T15631.o T15631.hi
 	'$(TEST_HC)' $(TEST_HC_OPTS) -O -c -ddump-simpl -dsuppress-uniques -dsuppress-ticks T15631.hs | grep 'case'
 # Expecting one fewwer case expressions after fixing #15631
+
+T17140:
+	$(RM) -f T17140*.hi T17140*.o
+	'$(TEST_HC)' $(TEST_HC_OPTS) --make -O T17140 T17140a -v0

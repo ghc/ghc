@@ -99,13 +99,13 @@ You can combine several custom command line settings using `mconcat`:
 userArgs :: Args
 userArgs = mconcat
     [ builder Ghc ? package cabal ? arg "-O0"
-    , package rts ? input "//PrimOps.c" ? pure ["-fno-PIC", "-static"] ]
+    , package rts ? input "**/PrimOps.c" ? pure ["-fno-PIC", "-static"] ]
 ```
 You can match any combination of the `builder`, `stage`, `package`, `way`, `input`
 and `output` predicates when specifying custom command line arguments. File
-patterns such as `"//Prelude.*"` can be used when matching input and output files,
-where `//` matches an arbitrary number of path components and `*` matches an entire
-path component, excluding any separators.
+patterns such as `"**/Prelude.*"` can be used when matching input and output files,
+where `**` matches an arbitrary number of path components, but not absolute path 
+prefixes, and `*` matches an entire path component, excluding any separators.
 
 #### Enabling -Werror
 
@@ -166,7 +166,7 @@ userPackage = library "user-package"
 You will also need to add `userPackage` to a specific build stage by modifying
 the `packages` setting of the user flavour as otherwise it will not be built.
 
-You can choose which integer library to use when builing GHC using the
+You can choose which integer library to use when building GHC using the
 `integerLibrary` setting of the build flavour. Possible values are: `integerGmp`
 (default) and `integerSimple`.
 ```haskell
@@ -245,7 +245,7 @@ verboseCommand = builder (Ghc Link)
 verboseCommand = builder (Gcc Compile) &&^ package compiler
 
 -- Use patterns when matching files:
-verboseCommand = output "//rts/sm/*" &&^ way threaded
+verboseCommand = output "**/rts/sm/*" &&^ way threaded
 
 -- Print all commands:
 verboseCommand = return True

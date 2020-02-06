@@ -12,8 +12,10 @@
 bkpfail10.bkp:8:9: error:
     • Type constructor ‘H’ has conflicting definitions in the module
       and its hsig file
-      Main module: data H a = H a
-      Hsig file:  data H
+      Main module: type H :: * -> *
+                   data H a = H a
+      Hsig file:  type H :: *
+                  data H
       The types have different kinds
     • while checking that q:H implements signature H in p[H=q:H]
 

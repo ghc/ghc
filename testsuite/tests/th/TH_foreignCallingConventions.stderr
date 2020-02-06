@@ -8,20 +8,20 @@ foreign import stdcall safe "bay" bay :: (GHC.Types.Int ->
                                          GHC.Types.IO GHC.Types.Int
 foreign import javascript unsafe "bax" bax :: GHC.Ptr.Ptr GHC.Types.Int ->
                                               GHC.Types.IO GHC.Base.String
-TH_foreignCallingConventions.hs:(13,4)-(23,25): Splicing declarations
+TH_foreignCallingConventions.hs:(13,2)-(24,2): Splicing declarations
     do let fi cconv safety lbl name ty
              = ForeignD (ImportF cconv safety lbl name ty)
        dec1 <- fi CCall Interruptible "&" (mkName "foo") <$> [t| Ptr () |]
        dec2 <- fi Prim Safe "bar" (mkName "bar") <$> [t| Int# -> Int# |]
        dec3 <- fi CApi Unsafe "baz" (mkName "baz")
-               <$> [t| Double -> IO () |]
+                 <$> [t| Double -> IO () |]
        dec4 <- fi StdCall Safe "bay" (mkName "bay")
-               <$> [t| (Int -> Bool) -> IO Int |]
+                 <$> [t| (Int -> Bool) -> IO Int |]
        dec5 <- fi JavaScript Unsafe "bax" (mkName "bax")
-               <$> [t| Ptr Int -> IO String |]
+                 <$> [t| Ptr Int -> IO String |]
        runIO
-       $ mapM_ (putStrLn . pprint) [dec1, dec2, dec3, dec4, dec5]
-         >> hFlush stdout
+         $ mapM_ (putStrLn . pprint) [dec1, dec2, dec3, dec4, dec5]
+             >> hFlush stdout
        return [dec1, dec2]
   ======>
     foreign import ccall interruptible "&" foo :: Ptr ()

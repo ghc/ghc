@@ -7,14 +7,14 @@ def f( name, opts ):
 
 setTestOpts(f)
 
-# Tests that should compile fine as they should be infered safe
+# Tests that should compile fine as they should be inferred safe
 test('SafeInfered01', [], multimod_compile, ['SafeInfered01', ''])
 test('SafeInfered02', [], multimod_compile, ['SafeInfered02', ''])
 test('SafeInfered03', [], multimod_compile, ['SafeInfered03', ''])
 test('SafeInfered04', [], multimod_compile, ['SafeInfered04', ''])
 test('SafeInfered05', [], multimod_compile, ['SafeInfered05', ''])
 
-# Tests that should fail to compile as they should be infered unsafe
+# Tests that should fail to compile as they should be inferred unsafe
 test('UnsafeInfered01', [], multimod_compile_fail, ['UnsafeInfered01', ''])
 test('UnsafeInfered02', [], multimod_compile_fail, ['UnsafeInfered02', ''])
 test('UnsafeInfered03', [], multimod_compile_fail, ['UnsafeInfered03', ''])
@@ -61,7 +61,7 @@ test('UnsafeWarn05', normal, compile, [''])
 test('UnsafeWarn06', normal, compile, [''])
 test('UnsafeWarn07', normal, compile, [''])
 
-# Chck -fwa-safe works
+# Check -fwa-safe works
 test('SafeWarn01', normal, compile, [''])
 
 test('T16689', normal, compile, ['-Wsafe'])

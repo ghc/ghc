@@ -1,0 +1,4 @@
+At (22,6), got type: Maybe Char
+At (24,5), got type: Maybe Char
+At (24,11), got type: Char
+At (26,5), got type: Maybe Char

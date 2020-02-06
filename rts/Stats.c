@@ -515,10 +515,7 @@ stat_startRP(void)
 void
 stat_endRP(
   uint32_t retainerGeneration,
-#if defined(DEBUG_RETAINER)
-  uint32_t maxCStackSize,
   int maxStackSize,
-#endif
   double averageNumVisit)
 {
     Time user, elapsed;
@@ -529,10 +526,7 @@ stat_endRP(
 
     fprintf(prof_file, "Retainer Profiling: %d, at %f seconds\n",
       retainerGeneration, mut_user_time_during_RP());
-#if defined(DEBUG_RETAINER)
-    fprintf(prof_file, "\tMax C stack size = %u\n", maxCStackSize);
     fprintf(prof_file, "\tMax auxiliary stack size = %u\n", maxStackSize);
-#endif
     fprintf(prof_file, "\tAverage number of visits per object = %f\n",
             averageNumVisit);
 }
@@ -623,7 +617,7 @@ There are currently three reporting functions:
   * report_machine_readable:
       Responsible for producing '+RTS -t --machine-readable' output.
   * report_one_line:
-      Responsible for productin '+RTS -t' output
+      Responsible for producing '+RTS -t' output
 
 Stats are accumulated into the global variable 'stats' as the program runs, then
 in 'stat_exit' we do the following:
@@ -685,9 +679,9 @@ static void report_summary(const RTSSummaryStats* sum)
     showStgWord64(stats.max_slop_bytes, temp, true/*commas*/);
     statsPrintf("%16s bytes maximum slop\n", temp);
 
-    statsPrintf("%16" FMT_Word64 " MB total memory in use (%"
+    statsPrintf("%16" FMT_Word64 " MiB total memory in use (%"
                 FMT_Word64 " MB lost due to fragmentation)\n\n",
-                stats.max_live_bytes  / (1024 * 1024),
+                stats.max_mem_in_use_bytes  / (1024 * 1024),
                 sum->fragmentation_bytes / (1024 * 1024));
 
     /* Print garbage collections in each gen */

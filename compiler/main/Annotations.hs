@@ -21,12 +21,14 @@ module Annotations (
 import GhcPrelude
 
 import Binary
-import Module           ( Module )
+import Module           ( Module
+                        , ModuleEnv, emptyModuleEnv, extendModuleEnvWith
+                        , plusModuleEnv_C, lookupWithDefaultModuleEnv
+                        , mapModuleEnv )
+import NameEnv
 import Name
 import Outputable
 import GHC.Serialized
-import UniqFM
-import Unique
 
 import Control.Monad
 import Data.Maybe
@@ -60,11 +62,6 @@ getAnnTargetName_maybe :: AnnTarget name -> Maybe name
 getAnnTargetName_maybe (NamedTarget nm) = Just nm
 getAnnTargetName_maybe _                = Nothing
 
-instance Uniquable name => Uniquable (AnnTarget name) where
-    getUnique (NamedTarget nm) = getUnique nm
-    getUnique (ModuleTarget mod) = deriveUnique (getUnique mod) 0
-    -- deriveUnique prevents OccName uniques clashing with NamedTarget
-
 instance Outputable name => Outputable (AnnTarget name) where
     ppr (NamedTarget nm) = text "Named target" <+> ppr nm
     ppr (ModuleTarget mod) = text "Module target" <+> ppr mod
@@ -86,12 +83,13 @@ instance Outputable Annotation where
     ppr ann = ppr (ann_target ann)
 
 -- | A collection of annotations
--- Can't use a type synonym or we hit bug #2412 due to source import
-newtype AnnEnv = MkAnnEnv (UniqFM [AnnPayload])
+data AnnEnv = MkAnnEnv { ann_mod_env :: !(ModuleEnv [AnnPayload])
+                       , ann_name_env :: !(NameEnv [AnnPayload])
+                       }
 
 -- | An empty annotation environment.
 emptyAnnEnv :: AnnEnv
-emptyAnnEnv = MkAnnEnv emptyUFM
+emptyAnnEnv = MkAnnEnv emptyModuleEnv emptyNameEnv
 
 -- | Construct a new annotation environment that contains the list of
 -- annotations provided.
@@ -100,33 +98,51 @@ mkAnnEnv = extendAnnEnvList emptyAnnEnv
 
 -- | Add the given annotation to the environment.
 extendAnnEnvList :: AnnEnv -> [Annotation] -> AnnEnv
-extendAnnEnvList (MkAnnEnv env) anns
-  = MkAnnEnv $ addListToUFM_C (++) env $
-    map (\ann -> (getUnique (ann_target ann), [ann_value ann])) anns
+extendAnnEnvList env =
+  foldl' extendAnnEnv env
+
+extendAnnEnv :: AnnEnv -> Annotation -> AnnEnv
+extendAnnEnv (MkAnnEnv mod_env name_env) (Annotation tgt payload) =
+  case tgt of
+    NamedTarget name -> MkAnnEnv mod_env (extendNameEnv_C (++) name_env name [payload])
+    ModuleTarget mod -> MkAnnEnv (extendModuleEnvWith (++) mod_env mod [payload]) name_env
 
 -- | Union two annotation environments.
 plusAnnEnv :: AnnEnv -> AnnEnv -> AnnEnv
-plusAnnEnv (MkAnnEnv env1) (MkAnnEnv env2) = MkAnnEnv $ plusUFM_C (++) env1 env2
+plusAnnEnv a b =
+  MkAnnEnv { ann_mod_env = plusModuleEnv_C (++) (ann_mod_env a) (ann_mod_env b)
+           , ann_name_env = plusNameEnv_C (++) (ann_name_env a) (ann_name_env b)
+           }
 
 -- | Find the annotations attached to the given target as 'Typeable'
 --   values of your choice. If no deserializer is specified,
 --   only transient annotations will be returned.
 findAnns :: Typeable a => ([Word8] -> a) -> AnnEnv -> CoreAnnTarget -> [a]
-findAnns deserialize (MkAnnEnv ann_env)
-  = (mapMaybe (fromSerialized deserialize))
-    . (lookupWithDefaultUFM ann_env [])
+findAnns deserialize env
+  = mapMaybe (fromSerialized deserialize) . findAnnPayloads env
 
 -- | Find the annotations attached to the given target as 'Typeable'
 --   values of your choice. If no deserializer is specified,
 --   only transient annotations will be returned.
 findAnnsByTypeRep :: AnnEnv -> CoreAnnTarget -> TypeRep -> [[Word8]]
-findAnnsByTypeRep (MkAnnEnv ann_env) target tyrep
-  = [ ws | Serialized tyrep' ws <- lookupWithDefaultUFM ann_env [] target
+findAnnsByTypeRep env target tyrep
+  = [ ws | Serialized tyrep' ws <- findAnnPayloads env target
     , tyrep' == tyrep ]
+
+-- | Find payloads for the given 'CoreAnnTarget' in an 'AnnEnv'.
+findAnnPayloads :: AnnEnv -> CoreAnnTarget -> [AnnPayload]
+findAnnPayloads env target =
+  case target of
+    ModuleTarget mod -> lookupWithDefaultModuleEnv (ann_mod_env env) [] mod
+    NamedTarget name -> fromMaybe [] $ lookupNameEnv (ann_name_env env) name
 
 -- | Deserialize all annotations of a given type. This happens lazily, that is
 --   no deserialization will take place until the [a] is actually demanded and
 --   the [a] can also be empty (the UniqFM is not filtered).
-deserializeAnns :: Typeable a => ([Word8] -> a) -> AnnEnv -> UniqFM [a]
-deserializeAnns deserialize (MkAnnEnv ann_env)
-  = mapUFM (mapMaybe (fromSerialized deserialize)) ann_env
+deserializeAnns :: Typeable a => ([Word8] -> a) -> AnnEnv -> (ModuleEnv [a], NameEnv [a])
+deserializeAnns deserialize env
+  = ( mapModuleEnv deserAnns (ann_mod_env env)
+    , mapNameEnv deserAnns (ann_name_env env)
+    )
+  where deserAnns = mapMaybe (fromSerialized deserialize)
+

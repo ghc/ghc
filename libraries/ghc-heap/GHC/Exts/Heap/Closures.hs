@@ -70,9 +70,7 @@ instance Show Box where
        ptr  = W# (aToWord# a)
        tag  = ptr .&. fromIntegral tAG_MASK -- ((1 `shiftL` TAG_BITS) -1)
        addr = ptr - tag
-        -- want 0s prefixed to pad it out to a fixed length.
-       pad_out ls =
-          '0':'x':(replicate (2*wORD_SIZE - length ls) '0') ++ ls
+       pad_out ls = '0':'x':ls
 
 -- |This takes an arbitrary value and puts it into a box.
 -- Note that calls like
@@ -253,6 +251,15 @@ data GenClosure b
         , queue      :: !b              -- ^ ??
         }
 
+  | WeakClosure
+        { info        :: !StgInfoTable
+        , cfinalizers :: !b
+        , key         :: !b
+        , value       :: !b
+        , finalizer   :: !b
+        , link        :: !b -- ^ next weak pointer for the capability, can be NULL.
+        }
+
     ------------------------------------------------------------
     -- Unboxed unlifted closures
 
@@ -335,6 +342,7 @@ allClosures (MutVarClosure {..}) = [var]
 allClosures (MVarClosure {..}) = [queueHead,queueTail,value]
 allClosures (FunClosure {..}) = ptrArgs
 allClosures (BlockingQueueClosure {..}) = [link, blackHole, owner, queue]
+allClosures (WeakClosure {..}) = [cfinalizers, key, value, finalizer, link]
 allClosures (OtherClosure {..}) = hvalues
 allClosures _ = []
 

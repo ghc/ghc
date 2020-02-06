@@ -11,6 +11,8 @@ TcPat: Typechecking patterns
 {-# LANGUAGE TypeFamilies #-}
 {-# LANGUAGE ViewPatterns #-}
 
+{-# OPTIONS_GHC -Wno-incomplete-uni-patterns #-}
+
 module TcPat ( tcLetPat, newLetBndr, LetBndrSpec(..)
              , tcPat, tcPat_O, tcPats
              , addDataConStupidTheta, badFieldCon, polyPatSig ) where
@@ -21,7 +23,7 @@ import GhcPrelude
 
 import {-# SOURCE #-}   TcExpr( tcSyntaxOp, tcSyntaxOpGen, tcInferSigma )
 
-import HsSyn
+import GHC.Hs
 import TcHsSyn
 import TcSigs( TcPragEnv, lookupPragEnv, addInlinePrags )
 import TcRnMonad
@@ -33,12 +35,13 @@ import RdrName
 import TcEnv
 import TcMType
 import TcValidity( arityErr )
-import Type ( pprTyVars )
+import TyCoPpr ( pprTyVars )
 import TcType
 import TcUnify
 import TcHsType
 import TysWiredIn
 import TcEvidence
+import TcOrigin
 import TyCon
 import DataCon
 import PatSyn
@@ -210,7 +213,8 @@ tcPatBndr penv@(PE { pe_ctxt = LetPat { pc_lvl    = bind_lvl
 tcPatBndr _ bndr_name pat_ty
   = do { pat_ty <- expTypeToType pat_ty
        ; traceTc "tcPatBndr(not let)" (ppr bndr_name $$ ppr pat_ty)
-       ; return (idHsWrapper, mkLocalId bndr_name pat_ty) }
+       ; return (idHsWrapper, mkLocalIdOrCoVar bndr_name pat_ty) }
+               -- We should not have "OrCoVar" here, this is a bug (#17545)
                -- Whether or not there is a sig is irrelevant,
                -- as this is local
 
@@ -301,11 +305,11 @@ tc_lpat :: LPat GhcRn
         -> PatEnv
         -> TcM a
         -> TcM (LPat GhcTcId, a)
-tc_lpat (dL->L span pat) pat_ty penv thing_inside
+tc_lpat (L span pat) pat_ty penv thing_inside
   = setSrcSpan span $
     do  { (pat', res) <- maybeWrapPatCtxt pat (tc_pat penv pat pat_ty)
                                           thing_inside
-        ; return (cL span pat', res) }
+        ; return (L span pat', res) }
 
 tc_lpats :: PatEnv
          -> [LPat GhcRn] -> [ExpSigmaType]
@@ -325,11 +329,11 @@ tc_pat  :: PatEnv
         -> TcM (Pat GhcTcId,    -- Translated pattern
                 a)              -- Result of thing inside
 
-tc_pat penv (VarPat x (dL->L l name)) pat_ty thing_inside
+tc_pat penv (VarPat x (L l name)) pat_ty thing_inside
   = do  { (wrap, id) <- tcPatBndr penv name pat_ty
         ; res <- tcExtendIdEnv1 name id thing_inside
         ; pat_ty <- readExpType pat_ty
-        ; return (mkHsWrapPat wrap (VarPat x (cL l id)) pat_ty, res) }
+        ; return (mkHsWrapPat wrap (VarPat x (L l id)) pat_ty, res) }
 
 tc_pat penv (ParPat x pat) pat_ty thing_inside
   = do  { (pat', res) <- tc_lpat pat pat_ty penv thing_inside
@@ -360,7 +364,7 @@ tc_pat _ (WildPat _) pat_ty thing_inside
         ; pat_ty <- expTypeToType pat_ty
         ; return (WildPat pat_ty, res) }
 
-tc_pat penv (AsPat x (dL->L nm_loc name) pat) pat_ty thing_inside
+tc_pat penv (AsPat x (L nm_loc name) pat) pat_ty thing_inside
   = do  { (wrap, bndr_id) <- setSrcSpan nm_loc (tcPatBndr penv name pat_ty)
         ; (pat', res) <- tcExtendIdEnv1 name bndr_id $
                          tc_lpat pat (mkCheckExpType $ idType bndr_id)
@@ -373,7 +377,7 @@ tc_pat penv (AsPat x (dL->L nm_loc name) pat) pat_ty thing_inside
             --
             -- If you fix it, don't forget the bindInstsOfPatIds!
         ; pat_ty <- readExpType pat_ty
-        ; return (mkHsWrapPat wrap (AsPat x (cL nm_loc bndr_id) pat') pat_ty,
+        ; return (mkHsWrapPat wrap (AsPat x (L nm_loc bndr_id) pat') pat_ty,
                   res) }
 
 tc_pat penv (ViewPat _ expr pat) overall_pat_ty thing_inside
@@ -446,6 +450,8 @@ tc_pat penv (ListPat (Just e) pats) pat_ty thing_inside
 tc_pat penv (TuplePat _ pats boxity) pat_ty thing_inside
   = do  { let arity = length pats
               tc = tupleTyCon boxity arity
+              -- NB: tupleTyCon does not flatten 1-tuples
+              -- See Note [Don't flatten tuples from HsSyn] in MkCore
         ; (coi, arg_tys) <- matchExpectedPatTy (matchExpectedTyConApp tc)
                                                penv pat_ty
                      -- Unboxed tuples have RuntimeRep vars, which we discard:
@@ -520,7 +526,7 @@ tc_pat penv (LitPat x simple_lit) pat_ty thing_inside
 -- where lit_ty is the type of the overloaded literal 5.
 --
 -- When there is no negation, neg_lit_ty and lit_ty are the same
-tc_pat _ (NPat _ (dL->L l over_lit) mb_neg eq) pat_ty thing_inside
+tc_pat _ (NPat _ (L l over_lit) mb_neg eq) pat_ty thing_inside
   = do  { let orig = LiteralOrigin over_lit
         ; ((lit', mb_neg'), eq')
             <- tcSyntaxOp orig eq [SynType pat_ty, SynAny]
@@ -538,7 +544,7 @@ tc_pat _ (NPat _ (dL->L l over_lit) mb_neg eq) pat_ty thing_inside
 
         ; res <- thing_inside
         ; pat_ty <- readExpType pat_ty
-        ; return (NPat pat_ty (cL l lit') mb_neg' eq', res) }
+        ; return (NPat pat_ty (L l lit') mb_neg' eq', res) }
 
 {-
 Note [NPlusK patterns]
@@ -569,8 +575,8 @@ AST is used for the subtraction operation.
 -}
 
 -- See Note [NPlusK patterns]
-tc_pat penv (NPlusKPat _ (dL->L nm_loc name)
-               (dL->L loc lit) _ ge minus) pat_ty
+tc_pat penv (NPlusKPat _ (L nm_loc name)
+               (L loc lit) _ ge minus) pat_ty
               thing_inside
   = do  { pat_ty <- expTypeToType pat_ty
         ; let orig = LiteralOrigin lit
@@ -600,14 +606,14 @@ tc_pat penv (NPlusKPat _ (dL->L nm_loc name)
 
         ; let minus'' = minus' { syn_res_wrap =
                                     minus_wrap <.> syn_res_wrap minus' }
-              pat' = NPlusKPat pat_ty (cL nm_loc bndr_id) (cL loc lit1') lit2'
+              pat' = NPlusKPat pat_ty (L nm_loc bndr_id) (L loc lit1') lit2'
                                ge' minus''
         ; return (pat', res) }
 
--- HsSpliced is an annotation produced by 'RnSplice.rnSplicePat'.
+-- HsSpliced is an annotation produced by 'GHC.Rename.Splice.rnSplicePat'.
 -- Here we get rid of it and add the finalizers to the global environment.
 --
--- See Note [Delaying modFinalizers in untyped splices] in RnSplice.
+-- See Note [Delaying modFinalizers in untyped splices] in GHC.Rename.Splice.
 tc_pat penv (SplicePat _ (HsSpliced _ mod_finalizers (HsSplicedPat pat)))
             pat_ty thing_inside
   = do addModFinalizersWithLclEnv mod_finalizers
@@ -709,7 +715,7 @@ tcConPat :: PatEnv -> Located Name
          -> ExpSigmaType           -- Type of the pattern
          -> HsConPatDetails GhcRn -> TcM a
          -> TcM (Pat GhcTcId, a)
-tcConPat penv con_lname@(dL->L _ con_name) pat_ty arg_pats thing_inside
+tcConPat penv con_lname@(L _ con_name) pat_ty arg_pats thing_inside
   = do  { con_like <- tcLookupConLike con_name
         ; case con_like of
             RealDataCon data_con -> tcDataConPat penv con_lname data_con
@@ -722,13 +728,13 @@ tcDataConPat :: PatEnv -> Located Name -> DataCon
              -> ExpSigmaType               -- Type of the pattern
              -> HsConPatDetails GhcRn -> TcM a
              -> TcM (Pat GhcTcId, a)
-tcDataConPat penv (dL->L con_span con_name) data_con pat_ty
+tcDataConPat penv (L con_span con_name) data_con pat_ty
              arg_pats thing_inside
   = do  { let tycon = dataConTyCon data_con
                   -- For data families this is the representation tycon
               (univ_tvs, ex_tvs, eq_spec, theta, arg_tys, _)
                 = dataConFullSig data_con
-              header = cL con_span (RealDataCon data_con)
+              header = L con_span (RealDataCon data_con)
 
           -- Instantiate the constructor type variables [a->ty]
           -- This may involve doing a family-instance coercion,
@@ -818,7 +824,7 @@ tcPatSynPat :: PatEnv -> Located Name -> PatSyn
             -> ExpSigmaType                -- Type of the pattern
             -> HsConPatDetails GhcRn -> TcM a
             -> TcM (Pat GhcTcId, a)
-tcPatSynPat penv (dL->L con_span _) pat_syn pat_ty arg_pats thing_inside
+tcPatSynPat penv (L con_span _) pat_syn pat_ty arg_pats thing_inside
   = do  { let (univ_tvs, req_theta, ex_tvs, prov_theta, arg_tys, ty) = patSynSig pat_syn
 
         ; (subst, univ_tvs') <- newMetaTyVars univ_tvs
@@ -855,7 +861,7 @@ tcPatSynPat penv (dL->L con_span _) pat_syn pat_ty arg_pats thing_inside
                 tcConArgs (PatSynCon pat_syn) arg_tys' arg_pats penv thing_inside
 
         ; traceTc "checkConstraints }" (ppr ev_binds)
-        ; let res_pat = ConPatOut { pat_con   = cL con_span $ PatSynCon pat_syn,
+        ; let res_pat = ConPatOut { pat_con   = L con_span $ PatSynCon pat_syn,
                                     pat_tvs   = ex_tvs',
                                     pat_dicts = prov_dicts',
                                     pat_binds = ev_binds,
@@ -985,19 +991,16 @@ tcConArgs con_like arg_tys (RecCon (HsRecFields rpats dd)) penv thing_inside
   where
     tc_field :: Checker (LHsRecField GhcRn (LPat GhcRn))
                         (LHsRecField GhcTcId (LPat GhcTcId))
-    tc_field (dL->L l (HsRecField (dL->L loc
-                                    (FieldOcc sel (dL->L lr rdr))) pat pun))
+    tc_field (L l (HsRecField (L loc (FieldOcc sel (L lr rdr))) pat pun))
              penv thing_inside
       = do { sel'   <- tcLookupId sel
            ; pat_ty <- setSrcSpan loc $ find_field_ty sel
                                           (occNameFS $ rdrNameOcc rdr)
            ; (pat', res) <- tcConArg (pat, pat_ty) penv thing_inside
-           ; return (cL l (HsRecField (cL loc (FieldOcc sel' (cL lr rdr))) pat'
+           ; return (L l (HsRecField (L loc (FieldOcc sel' (L lr rdr))) pat'
                                                                     pun), res) }
-    tc_field (dL->L _ (HsRecField (dL->L _ (XFieldOcc _)) _ _)) _ _
+    tc_field (L _ (HsRecField (L _ (XFieldOcc _)) _ _)) _ _
            = panic "tcConArgs"
-    tc_field _ _ _ = panic "tc_field: Impossible Match"
-                             -- due to #15884
 
 
     find_field_ty :: Name -> FieldLabelString -> TcM TcType
@@ -1098,7 +1101,7 @@ So for now I'm just insisting on type *equality* in patterns.  No subsumption.
 
 Old notes about desugaring, at a time when pattern coercions were handled:
 
-A SigPat is a type coercion and must be handled one at at time.  We can't
+A SigPat is a type coercion and must be handled one at a time.  We can't
 combine them unless the type of the pattern inside is identical, and we don't
 bother to check for that.  For example:
 

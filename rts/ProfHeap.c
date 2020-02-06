@@ -26,6 +26,9 @@
 #include <fs_rts.h>
 #include <string.h>
 
+FILE *hp_file;
+static char *hp_filename; /* heap profile (hp2ps style) log file */
+
 /* -----------------------------------------------------------------------------
  * era stores the current time period.  It is the same as the
  * number of censuses that have been performed.
@@ -78,6 +81,10 @@ initLDVCtr( counter *ctr )
 
 typedef struct {
     double      time;    // the time in MUT time when the census is made
+    StgWord64   rtime;   // The eventlog time the census was made. This is used
+                         // for the LDV profiling events because they are all
+                         // emitted at the end of compilation so we need to know
+                         // when the sample actually took place.
     HashTable * hash;
     counter   * ctrs;
     Arena     * arena;
@@ -123,7 +130,7 @@ closureIdentity( const StgClosure *p )
     case HEAP_BY_RETAINER:
         // AFAIK, the only closures in the heap which might not have a
         // valid retainer set are DEAD_WEAK closures.
-        if (isRetainerSetFieldValid(p))
+        if (isTravDataValid(p))
             return retainerSetOf(p);
         else
             return NULL;
@@ -311,57 +318,6 @@ nextEra( void )
  * Heap profiling by info table
  * ------------------------------------------------------------------------- */
 
-#if !defined(PROFILING)
-FILE *hp_file;
-static char *hp_filename;
-
-void freeProfiling (void)
-{
-}
-
-void initProfiling (void)
-{
-    char *prog;
-
-    prog = stgMallocBytes(strlen(prog_name) + 1, "initProfiling2");
-    strcpy(prog, prog_name);
-#if defined(mingw32_HOST_OS)
-    // on Windows, drop the .exe suffix if there is one
-    {
-        char *suff;
-        suff = strrchr(prog,'.');
-        if (suff != NULL && !strcmp(suff,".exe")) {
-            *suff = '\0';
-        }
-    }
-#endif
-
-  if (RtsFlags.ProfFlags.doHeapProfile) {
-    /* Initialise the log file name */
-    hp_filename = stgMallocBytes(strlen(prog) + 6, "hpFileName");
-    sprintf(hp_filename, "%s.hp", prog);
-
-    /* open the log file */
-    if ((hp_file = __rts_fopen(hp_filename, "w")) == NULL) {
-      debugBelch("Can't open profiling report file %s\n",
-              hp_filename);
-      RtsFlags.ProfFlags.doHeapProfile = 0;
-      stgFree(prog);
-      return;
-    }
-  }
-
-  stgFree(prog);
-
-  initHeapProfiling();
-}
-
-void endProfiling( void )
-{
-  endHeapProfiling();
-}
-#endif /* !PROFILING */
-
 static void
 printEscapedString(const char* string)
 {
@@ -385,28 +341,52 @@ printSample(bool beginSample, StgDouble sampleValue)
     }
 }
 
-static void
-dumpCostCentresToEventLog(void)
+
+void freeHeapProfiling (void)
 {
-#if defined(PROFILING)
-    CostCentre *cc, *next;
-    for (cc = CC_LIST; cc != NULL; cc = next) {
-        next = cc->link;
-        traceHeapProfCostCentre(cc->ccID, cc->label, cc->module,
-                                cc->srcloc, cc->is_caf);
-    }
-#endif
 }
 
 /* --------------------------------------------------------------------------
  * Initialize the heap profilier
  * ----------------------------------------------------------------------- */
-uint32_t
+void
 initHeapProfiling(void)
 {
     if (! RtsFlags.ProfFlags.doHeapProfile) {
-        return 0;
+        return;
     }
+
+    char *prog;
+
+    prog = stgMallocBytes(strlen(prog_name) + 1, "initHeapProfiling");
+    strcpy(prog, prog_name);
+#if defined(mingw32_HOST_OS)
+    // on Windows, drop the .exe suffix if there is one
+    {
+        char *suff;
+        suff = strrchr(prog,'.');
+        if (suff != NULL && !strcmp(suff,".exe")) {
+            *suff = '\0';
+        }
+    }
+#endif
+
+  if (RtsFlags.ProfFlags.doHeapProfile) {
+    /* Initialise the log file name */
+    hp_filename = stgMallocBytes(strlen(prog) + 6, "hpFileName");
+    sprintf(hp_filename, "%s.hp", prog);
+
+    /* open the log file */
+    if ((hp_file = __rts_fopen(hp_filename, "w+")) == NULL) {
+      debugBelch("Can't open profiling report file %s\n",
+              hp_filename);
+      RtsFlags.ProfFlags.doHeapProfile = 0;
+      stgFree(prog);
+      return;
+    }
+  }
+
+  stgFree(prog);
 
 #if defined(PROFILING)
     if (doingLDVProfiling() && doingRetainerProfiling()) {
@@ -474,9 +454,6 @@ initHeapProfiling(void)
 #endif
 
     traceHeapProfBegin(0);
-    dumpCostCentresToEventLog();
-
-    return 0;
 }
 
 void
@@ -648,7 +625,7 @@ closureSatisfiesConstraints( const StgClosure* p )
        // reason it might not be valid is if this closure is a
        // a newly deceased weak pointer (i.e. a DEAD_WEAK), since
        // these aren't reached by the retainer profiler's traversal.
-       if (isRetainerSetFieldValid((StgClosure *)p)) {
+       if (isTravDataValid((StgClosure *)p)) {
            rs = retainerSetOf((StgClosure *)p);
            if (rs != NULL) {
                for (i = 0; i < rs->num; i++) {
@@ -783,9 +760,18 @@ dumpCensus( Census *census )
     ssize_t count;
 
     printSample(true, census->time);
-    traceHeapProfSampleBegin(era);
+
+
+    if (RtsFlags.ProfFlags.doHeapProfile == HEAP_BY_LDV) {
+      traceHeapBioProfSampleBegin(era, census->rtime);
+    } else {
+      traceHeapProfSampleBegin(era);
+    }
+
+
 
 #if defined(PROFILING)
+
     /* change typecast to uint64_t to remove
      * print formatting warning. See #12636 */
     if (RtsFlags.ProfFlags.doHeapProfile == HEAP_BY_LDV) {
@@ -802,6 +788,23 @@ dumpCensus( Census *census )
                 (uint64_t)(census->prim * sizeof(W_)));
         fprintf(hp_file, "DRAG\t%" FMT_Word64 "\n",
                 (uint64_t)(census->drag_total * sizeof(W_)));
+
+
+        // Eventlog
+        traceHeapProfSampleString(0, "VOID",
+                (census->void_total * sizeof(W_)));
+        traceHeapProfSampleString(0, "LAG",
+                ((census->not_used - census->void_total) *
+                                     sizeof(W_)));
+        traceHeapProfSampleString(0, "USE",
+                ((census->used - census->drag_total) *
+                                     sizeof(W_)));
+        traceHeapProfSampleString(0, "INHERENT_USE",
+                (census->prim * sizeof(W_)));
+        traceHeapProfSampleString(0, "DRAG",
+                (census->drag_total * sizeof(W_)));
+
+        traceHeapProfSampleEnd(era);
         printSample(false, census->time);
         return;
     }
@@ -870,7 +873,8 @@ dumpCensus( Census *census )
                 rs->id = -(rs->id);
 
             // report in the unit of bytes: * sizeof(StgWord)
-            printRetainerSetShort(hp_file, rs, RtsFlags.ProfFlags.ccsLength);
+            printRetainerSetShort(hp_file, rs, (W_)count * sizeof(W_)
+                                             , RtsFlags.ProfFlags.ccsLength);
             break;
         }
 #endif
@@ -1006,6 +1010,22 @@ heapCensusChain( Census *census, bdescr *bd )
         }
 
         p = bd->start;
+
+        // When we shrink a large ARR_WORDS, we do not adjust the free pointer
+        // of the associated block descriptor, thus introducing slop at the end
+        // of the object.  This slop remains after GC, violating the assumption
+        // of the loop below that all slop has been eliminated (#11627).
+        // The slop isn't always zeroed (e.g. in non-profiling mode, cf
+        // OVERWRITING_CLOSURE_OFS).
+        // Consequently, we handle large ARR_WORDS objects as a special case.
+        if (bd->flags & BF_LARGE
+            && get_itbl((StgClosure *)p)->type == ARR_WORDS) {
+            size = arr_words_sizeW((StgArrBytes *)p);
+            prim = true;
+            heapProfObject(census, (StgClosure *)p, size, prim);
+            continue;
+        }
+
 
         while (p < bd->free) {
             info = get_itbl((const StgClosure *)p);
@@ -1170,6 +1190,8 @@ void heapCensus (Time t)
 
   census = &censuses[era];
   census->time  = mut_user_time_until(t);
+  census->rtime = TimeToNS(stat_getElapsedTime());
+
 
   // calculate retainer sets if necessary
 #if defined(PROFILING)

@@ -84,19 +84,32 @@
 // freely modified.
 
 #if !defined(CMINUSMINUS)
+
+
+struct NonmovingSegmentInfo {
+  StgWord8 log_block_size;
+  StgWord16 next_free_snap;
+};
+
 typedef struct bdescr_ {
 
     StgPtr start;              // [READ ONLY] start addr of memory
 
-    StgPtr free;               // First free byte of memory.
-                               // allocGroup() sets this to the value of start.
-                               // NB. during use this value should lie
-                               // between start and start + blocks *
-                               // BLOCK_SIZE.  Values outside this
-                               // range are reserved for use by the
-                               // block allocator.  In particular, the
-                               // value (StgPtr)(-1) is used to
-                               // indicate that a block is unallocated.
+
+    union {
+        StgPtr free;               // First free byte of memory.
+                                   // allocGroup() sets this to the value of start.
+                                   // NB. during use this value should lie
+                                   // between start and start + blocks *
+                                   // BLOCK_SIZE.  Values outside this
+                                   // range are reserved for use by the
+                                   // block allocator.  In particular, the
+                                   // value (StgPtr)(-1) is used to
+                                   // indicate that a block is unallocated.
+                                   //
+                                   // Unused by the non-moving allocator.
+        struct NonmovingSegmentInfo nonmoving_segment;
+    };
 
     struct bdescr_ *link;      // used for chaining blocks together
 
@@ -141,7 +154,8 @@ typedef struct bdescr_ {
 #define BF_LARGE     2
 /* Block is pinned */
 #define BF_PINNED    4
-/* Block is to be marked, not copied */
+/* Block is to be marked, not copied. Also used for marked large objects in
+ * non-moving heap. */
 #define BF_MARKED    8
 /* Block is executable */
 #define BF_EXEC      32
@@ -153,6 +167,12 @@ typedef struct bdescr_ {
 #define BF_SWEPT     256
 /* Block is part of a Compact */
 #define BF_COMPACT   512
+/* A non-moving allocator segment (see NonMoving.c) */
+#define BF_NONMOVING 1024
+/* A large object which has been moved to off of oldest_gen->large_objects and
+ * onto nonmoving_large_objects. The mark phase ignores objects which aren't
+ * so-flagged */
+#define BF_NONMOVING_SWEEPING 2048
 /* Maximum flag value (do not define anything higher than this!) */
 #define BF_FLAG_MAX  (1 << 15)
 
@@ -289,6 +309,13 @@ EXTERN_INLINE bdescr* allocBlock(void)
 }
 
 bdescr *allocGroupOnNode(uint32_t node, W_ n);
+
+// Allocate n blocks, aligned at n-block boundary. The returned bdescr will
+// have this invariant
+//
+//     bdescr->start % BLOCK_SIZE*n == 0
+//
+bdescr *allocAlignedGroupOnNode(uint32_t node, W_ n);
 
 EXTERN_INLINE bdescr* allocBlockOnNode(uint32_t node);
 EXTERN_INLINE bdescr* allocBlockOnNode(uint32_t node)

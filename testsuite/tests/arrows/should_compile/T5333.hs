@@ -7,7 +7,7 @@ import Control.Arrow
 cc1 :: a e b -> a e b -> a e b
 cc1 = undefined
 
--- With GHC < 7.10.1, the following compile failures occured:
+-- With GHC < 7.10.1, the following compile failures occurred:
 --
 -- ghc: panic! (the 'impossible' happened)
 --  (GHC version 7.8.4 for x86_64-unknown-linux):

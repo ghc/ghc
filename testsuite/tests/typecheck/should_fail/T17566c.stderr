@@ -1,0 +1,6 @@
+
+T17566c.hs:11:23: error:
+    • Different names for the same type variable:
+        ‘k’ bound at T17566c.hs:10:17
+        ‘k’ bound at T17566c.hs:11:23
+    • In the class declaration for ‘C2’

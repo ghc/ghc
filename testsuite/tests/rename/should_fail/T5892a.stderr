@@ -4,4 +4,4 @@ T5892a.hs:12:8: error: [-Wmissing-fields (in -Wdefault), -Werror=missing-fields]
     • In the expression: Node {..}
       In the expression: let rootLabel = [] in Node {..}
       In an equation for ‘foo’:
-          foo (Node {..}) = let rootLabel = ... in Node {..}
+          foo (Node {..}) = let rootLabel = [] in Node {..}

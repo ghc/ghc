@@ -524,12 +524,12 @@ compareWord# x# y#
 
 -- Boolean functions
 
--- | Boolean \"and\"
+-- | Boolean \"and\", lazy in the second argument
 (&&)                    :: Bool -> Bool -> Bool
 True  && x              =  x
 False && _              =  False
 
--- | Boolean \"or\"
+-- | Boolean \"or\", lazy in the second argument
 (||)                    :: Bool -> Bool -> Bool
 True  || _              =  True
 False || x              =  x

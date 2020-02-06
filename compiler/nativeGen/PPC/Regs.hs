@@ -47,7 +47,6 @@ module PPC.Regs (
 
 where
 
-#include "nativeGen/NCG.h"
 #include "HsVersions.h"
 
 import GhcPrelude
@@ -56,11 +55,11 @@ import Reg
 import RegClass
 import Format
 
-import Cmm
-import CLabel           ( CLabel )
+import GHC.Cmm
+import GHC.Cmm.CLabel           ( CLabel )
 import Unique
 
-import CodeGen.Platform
+import GHC.Platform.Regs
 import DynFlags
 import Outputable
 import GHC.Platform

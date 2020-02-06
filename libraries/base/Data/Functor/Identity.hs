@@ -41,7 +41,7 @@ import Data.Coerce
 import Data.Foldable
 import Data.Functor.Utils ((#.))
 import Foreign.Storable (Storable)
-import GHC.Arr (Ix)
+import GHC.Ix (Ix)
 import GHC.Base ( Applicative(..), Eq(..), Functor(..), Monad(..)
                 , Semigroup, Monoid, Ord(..), ($), (.) )
 import GHC.Enum (Bounded, Enum)

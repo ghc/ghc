@@ -18,7 +18,7 @@ Derived class instances:
           (GHC.Generics.R1 (GHC.Generics.M1 (GHC.Generics.M1 (GHC.Generics.K1 g1))))
             -> T10604_deriving.Starify2 g1
   
-  instance GHC.Generics.Generic1 @* T10604_deriving.Starify where
+  instance GHC.Generics.Generic1 @(*) T10604_deriving.Starify where
     GHC.Generics.from1 x
       = GHC.Generics.M1
           (case x of
@@ -140,7 +140,7 @@ Derived class instances:
           (GHC.Generics.M1 (GHC.Generics.M1 g1))
             -> T10604_deriving.Wrap (GHC.Generics.unRec1 g1) }
   
-  instance GHC.Base.Functor (T10604_deriving.Proxy @*) where
+  instance GHC.Base.Functor (T10604_deriving.Proxy @(*)) where
     GHC.Base.fmap _ = GHC.Prim.coerce
   
   instance forall k (a :: k).
@@ -183,7 +183,7 @@ Derived type family instances:
                                                            "main"
                                                            'GHC.Types.False)
                                                         ((GHC.Generics.:+:)
-                                                           @*
+                                                           @(*)
                                                            (GHC.Generics.C1
                                                               @{*}
                                                               ('GHC.Generics.MetaCons
@@ -215,46 +215,41 @@ Derived type family instances:
                                                                     'GHC.Generics.DecidedLazy)
                                                                  (GHC.Generics.Rec0
                                                                     @{*} GHC.Types.Int))))
-  type GHC.Generics.Rep1 @* T10604_deriving.Starify = GHC.Generics.D1
-                                                        @{*}
-                                                        ('GHC.Generics.MetaData
-                                                           "Starify"
-                                                           "T10604_deriving"
-                                                           "main"
-                                                           'GHC.Types.False)
-                                                        ((GHC.Generics.:+:)
-                                                           @*
-                                                           (GHC.Generics.C1
-                                                              @{*}
-                                                              ('GHC.Generics.MetaCons
-                                                                 "Starify1"
-                                                                 'GHC.Generics.PrefixI
-                                                                 'GHC.Types.False)
-                                                              (GHC.Generics.S1
-                                                                 @{*}
-                                                                 ('GHC.Generics.MetaSel
-                                                                    ('GHC.Maybe.Nothing
-                                                                       @GHC.Types.Symbol)
-                                                                    'GHC.Generics.NoSourceUnpackedness
-                                                                    'GHC.Generics.NoSourceStrictness
-                                                                    'GHC.Generics.DecidedLazy)
-                                                                 GHC.Generics.Par1))
-                                                           (GHC.Generics.C1
-                                                              @{*}
-                                                              ('GHC.Generics.MetaCons
-                                                                 "Starify2"
-                                                                 'GHC.Generics.PrefixI
-                                                                 'GHC.Types.False)
-                                                              (GHC.Generics.S1
-                                                                 @{*}
-                                                                 ('GHC.Generics.MetaSel
-                                                                    ('GHC.Maybe.Nothing
-                                                                       @GHC.Types.Symbol)
-                                                                    'GHC.Generics.NoSourceUnpackedness
-                                                                    'GHC.Generics.NoSourceStrictness
-                                                                    'GHC.Generics.DecidedLazy)
-                                                                 (GHC.Generics.Rec0
-                                                                    @{*} GHC.Types.Int))))
+  type GHC.Generics.Rep1
+         @(*) T10604_deriving.Starify = GHC.Generics.D1
+                                          @{*}
+                                          ('GHC.Generics.MetaData
+                                             "Starify" "T10604_deriving" "main" 'GHC.Types.False)
+                                          ((GHC.Generics.:+:)
+                                             @(*)
+                                             (GHC.Generics.C1
+                                                @{*}
+                                                ('GHC.Generics.MetaCons
+                                                   "Starify1"
+                                                   'GHC.Generics.PrefixI
+                                                   'GHC.Types.False)
+                                                (GHC.Generics.S1
+                                                   @{*}
+                                                   ('GHC.Generics.MetaSel
+                                                      ('GHC.Maybe.Nothing @GHC.Types.Symbol)
+                                                      'GHC.Generics.NoSourceUnpackedness
+                                                      'GHC.Generics.NoSourceStrictness
+                                                      'GHC.Generics.DecidedLazy)
+                                                   GHC.Generics.Par1))
+                                             (GHC.Generics.C1
+                                                @{*}
+                                                ('GHC.Generics.MetaCons
+                                                   "Starify2"
+                                                   'GHC.Generics.PrefixI
+                                                   'GHC.Types.False)
+                                                (GHC.Generics.S1
+                                                   @{*}
+                                                   ('GHC.Generics.MetaSel
+                                                      ('GHC.Maybe.Nothing @GHC.Types.Symbol)
+                                                      'GHC.Generics.NoSourceUnpackedness
+                                                      'GHC.Generics.NoSourceStrictness
+                                                      'GHC.Generics.DecidedLazy)
+                                                   (GHC.Generics.Rec0 @{*} GHC.Types.Int))))
   type GHC.Generics.Rep
          (T10604_deriving.SumOfProducts @{k} a) = GHC.Generics.D1
                                                     @{*}
@@ -264,7 +259,7 @@ Derived type family instances:
                                                        "main"
                                                        'GHC.Types.False)
                                                     ((GHC.Generics.:+:)
-                                                       @*
+                                                       @(*)
                                                        (GHC.Generics.C1
                                                           @{*}
                                                           ('GHC.Generics.MetaCons
@@ -272,7 +267,7 @@ Derived type family instances:
                                                              'GHC.Generics.PrefixI
                                                              'GHC.Types.False)
                                                           ((GHC.Generics.:*:)
-                                                             @*
+                                                             @(*)
                                                              (GHC.Generics.S1
                                                                 @{*}
                                                                 ('GHC.Generics.MetaSel
@@ -302,7 +297,7 @@ Derived type family instances:
                                                              'GHC.Generics.PrefixI
                                                              'GHC.Types.False)
                                                           ((GHC.Generics.:*:)
-                                                             @*
+                                                             @(*)
                                                              (GHC.Generics.S1
                                                                 @{*}
                                                                 ('GHC.Generics.MetaSel
@@ -412,7 +407,7 @@ Derived type family instances:
                                                 (GHC.Generics.Rec0
                                                    @{*}
                                                    (T10604_deriving.Proxy
-                                                      @* (T10604_deriving.Proxy @(k -> *) a)))))
+                                                      @(*) (T10604_deriving.Proxy @(k -> *) a)))))
   type GHC.Generics.Rep1
          @(k -> *) (T10604_deriving.Wrap2 @k) = GHC.Generics.D1
                                                   @{k -> *}
@@ -435,9 +430,9 @@ Derived type family instances:
                                                            'GHC.Generics.NoSourceStrictness
                                                            'GHC.Generics.DecidedLazy)
                                                         ((GHC.Generics.:.:)
-                                                           @*
+                                                           @(*)
                                                            @(k -> *)
-                                                           (T10604_deriving.Proxy @*)
+                                                           (T10604_deriving.Proxy @(*))
                                                            (GHC.Generics.Rec1
                                                               @(k -> *)
                                                               (T10604_deriving.Proxy @(k -> *))))))
@@ -491,7 +486,7 @@ Derived type family instances:
                                              @{*}
                                              ('GHC.Generics.MetaCons
                                                 "Proxy" 'GHC.Generics.PrefixI 'GHC.Types.False)
-                                             (GHC.Generics.U1 @*))
+                                             (GHC.Generics.U1 @(*)))
   type GHC.Generics.Rep1
          @k (T10604_deriving.Proxy @k) = GHC.Generics.D1
                                            @{k}
@@ -509,7 +504,7 @@ Derived type family instances:
                                                          "T10604_deriving"
                                                          "main"
                                                          'GHC.Types.False)
-                                                      (GHC.Generics.V1 @*)
+                                                      (GHC.Generics.V1 @(*))
   type GHC.Generics.Rep1
          @GHC.Types.Bool T10604_deriving.Empty = GHC.Generics.D1
                                                    @{GHC.Types.Bool}
@@ -523,7 +518,7 @@ Derived type family instances:
 
 
 ==================== Filling in method body ====================
-GHC.Base.Functor [T10604_deriving.Proxy @*]
-  GHC.Base.<$ = GHC.Base.$dm<$ @(T10604_deriving.Proxy @*)
+GHC.Base.Functor [T10604_deriving.Proxy @(*)]
+  GHC.Base.<$ = GHC.Base.$dm<$ @(T10604_deriving.Proxy @(*))
 
 

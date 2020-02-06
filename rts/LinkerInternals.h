@@ -10,6 +10,7 @@
 
 #include "Rts.h"
 #include "Hash.h"
+#include "linker/M32Alloc.h"
 
 #if RTS_LINKER_USE_MMAP
 #include <sys/mman.h>
@@ -129,7 +130,7 @@ typedef struct _Segment {
     SegmentProt prot;           /* mem protection to set after all symbols were
                                  * resolved */
 
-    int *sections_idx;       /* an array of section indexes assigned to this segment */
+    int *sections_idx;          /* an array of section indexes assigned to this segment */
     int n_sections;
 } Segment;
 
@@ -242,8 +243,14 @@ typedef struct _ObjectCode {
 
     /* Holds the list of symbols in the .o file which
        require extra information.*/
-    HashTable *extraInfos;
+    StrHashTable *extraInfos;
 
+#if RTS_LINKER_USE_MMAP == 1
+    /* The m32 allocators used for allocating small sections and symbol extras
+     * during loading. We have two: one for (writeable) data and one for
+     * (read-only/executable) code. */
+    m32_allocator *rw_m32, *rx_m32;
+#endif
 } ObjectCode;
 
 #define OC_INFORMATIVE_FILENAME(OC)             \
@@ -287,6 +294,7 @@ void freeObjectCode (ObjectCode *oc);
 SymbolAddr* loadSymbol(SymbolName *lbl, RtsSymbolInfo *pinfo);
 
 void *mmapForLinker (size_t bytes, uint32_t flags, int fd, int offset);
+void mmapForLinkerMarkExecutable (void *start, size_t len);
 
 void addProddableBlock ( ObjectCode* oc, void* start, int size );
 void checkProddableBlock (ObjectCode *oc, void *addr, size_t size );
@@ -296,12 +304,12 @@ void addSection (Section *s, SectionKind kind, SectionAlloc alloc,
                  void* start, StgWord size, StgWord mapped_offset,
                  void* mapped_start, StgWord mapped_size);
 
-HsBool ghciLookupSymbolInfo(HashTable *table,
+HsBool ghciLookupSymbolInfo(StrHashTable *table,
                             const SymbolName* key, RtsSymbolInfo **result);
 
 int ghciInsertSymbolTable(
     pathchar* obj_name,
-    HashTable *table,
+    StrHashTable *table,
     const SymbolName* key,
     SymbolAddr* data,
     HsBool weak,
@@ -310,7 +318,7 @@ int ghciInsertSymbolTable(
 /* lock-free version of lookupSymbol */
 SymbolAddr* lookupSymbol_ (SymbolName* lbl);
 
-extern /*Str*/HashTable *symhash;
+extern StrHashTable *symhash;
 
 pathchar*
 resolveSymbolAddr (pathchar* buffer, int size,
@@ -353,7 +361,7 @@ void freeSegments(ObjectCode *oc);
 #define MAP_ANONYMOUS MAP_ANON
 #endif
 
-/* Which object file format are we targetting? */
+/* Which object file format are we targeting? */
 #if defined(linux_HOST_OS) || defined(solaris2_HOST_OS) \
 || defined(linux_android_HOST_OS) \
 || defined(freebsd_HOST_OS) || defined(kfreebsdgnu_HOST_OS) \
@@ -361,7 +369,7 @@ void freeSegments(ObjectCode *oc);
 || defined(openbsd_HOST_OS) || defined(gnu_HOST_OS)
 #  define OBJFORMAT_ELF
 #  include "linker/ElfTypes.h"
-#elif defined (mingw32_HOST_OS)
+#elif defined(mingw32_HOST_OS)
 #  define OBJFORMAT_PEi386
 #  include "linker/PEi386Types.h"
 #elif defined(darwin_HOST_OS) || defined(ios_HOST_OS)

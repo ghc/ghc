@@ -21,13 +21,11 @@ module PPC.CodeGen (
 where
 
 #include "HsVersions.h"
-#include "nativeGen/NCG.h"
-#include "../includes/MachDeps.h"
 
 -- NCG stuff:
 import GhcPrelude
 
-import CodeGen.Platform
+import GHC.Platform.Regs
 import PPC.Instr
 import PPC.Cond
 import PPC.Regs
@@ -44,14 +42,14 @@ import TargetReg
 import GHC.Platform
 
 -- Our intermediate code:
-import BlockId
-import PprCmm           ( pprExpr )
-import Cmm
-import CmmUtils
-import CmmSwitch
-import CLabel
-import Hoopl.Block
-import Hoopl.Graph
+import GHC.Cmm.BlockId
+import GHC.Cmm.Ppr           ( pprExpr )
+import GHC.Cmm
+import GHC.Cmm.Utils
+import GHC.Cmm.Switch
+import GHC.Cmm.CLabel
+import GHC.Cmm.Dataflow.Block
+import GHC.Cmm.Dataflow.Graph
 
 -- The rest:
 import OrdList
@@ -76,7 +74,7 @@ import Util
 
 cmmTopCodeGen
         :: RawCmmDecl
-        -> NatM [NatCmmDecl CmmStatics Instr]
+        -> NatM [NatCmmDecl RawCmmStatics Instr]
 
 cmmTopCodeGen (CmmProc info lab live graph) = do
   let blocks = toBlockListEntryFirst graph
@@ -117,7 +115,7 @@ cmmTopCodeGen (CmmData sec dat) = do
 basicBlockCodeGen
         :: Block CmmNode C C
         -> NatM ( [NatBasicBlock Instr]
-                , [NatCmmDecl CmmStatics Instr])
+                , [NatCmmDecl RawCmmStatics Instr])
 
 basicBlockCodeGen block = do
   let (_, nodes, tail)  = blockSplit block
@@ -427,7 +425,7 @@ getRegister' dflags (CmmReg reg)
 getRegister' dflags tree@(CmmRegOff _ _)
   = getRegister' dflags (mangleIndexTree dflags tree)
 
-    -- for 32-bit architectuers, support some 64 -> 32 bit conversions:
+    -- for 32-bit architectures, support some 64 -> 32 bit conversions:
     -- TO_W_(x), TO_W_(x >> 32)
 
 getRegister' dflags (CmmMachOp (MO_UU_Conv W64 W32)
@@ -604,7 +602,7 @@ getRegister' _ (CmmMachOp mop [x, y]) -- dyadic PrimOps
           _ -> case x of
                  CmmLit (CmmInt imm _)
                    | Just _ <- makeImmediate rep True imm
-                   -- subfi ('substract from' with immediate) doesn't exist
+                   -- subfi ('subtract from' with immediate) doesn't exist
                    -> trivialCode rep True SUBFC y x
                  _ -> trivialCodeNoImm' (intFormat rep) SUBF y x
 
@@ -671,7 +669,7 @@ getRegister' _ (CmmLit (CmmFloat f frep)) = do
     let format = floatFormat frep
         code dst =
             LDATA (Section ReadOnlyData lbl)
-                  (Statics lbl [CmmStaticLit (CmmFloat f frep)])
+                  (RawCmmStatics lbl [CmmStaticLit (CmmFloat f frep)])
             `consOL` (addr_code `snocOL` LD format dst addr)
     return (Any format code)
 
@@ -692,7 +690,7 @@ getRegister' dflags (CmmLit lit)
        let rep = cmmLitType dflags lit
            format = cmmTypeFormat rep
            code dst =
-            LDATA (Section ReadOnlyData lbl) (Statics lbl [CmmStaticLit lit])
+            LDATA (Section ReadOnlyData lbl) (RawCmmStatics lbl [CmmStaticLit lit])
             `consOL` (addr_code `snocOL` LD format dst addr)
        return (Any format code)
 
@@ -1692,7 +1690,7 @@ genCCall' dflags gcp target dest_regs args
                        `appOL`  codeAfter)
                      GCPAIX          -> return ( dynCode
                        -- AIX/XCOFF follows the PowerOPEN ABI
-                       -- which is quite similiar to LinuxPPC64/ELFv1
+                       -- which is quite similar to LinuxPPC64/ELFv1
                        `appOL`  codeBefore
                        `snocOL` ST spFormat toc (AddrRegImm sp (ImmInt 20))
                        `snocOL` LD II32 r11 (AddrRegImm dynReg (ImmInt 0))
@@ -1909,8 +1907,6 @@ genCCall' dflags gcp target dest_regs args
                           FF32 -> (1, 1, 4, fprs)
                           FF64 -> (2, 1, 8, fprs)
                           II64 -> panic "genCCall' passArguments II64"
-                          VecFormat {}
-                               -> panic "genCCall' passArguments vector format"
 
                       GCP32ELF ->
                           case cmmTypeFormat rep of
@@ -1921,8 +1917,6 @@ genCCall' dflags gcp target dest_regs args
                           FF32 -> (0, 1, 4, fprs)
                           FF64 -> (0, 1, 8, fprs)
                           II64 -> panic "genCCall' passArguments II64"
-                          VecFormat {}
-                               -> panic "genCCall' passArguments vector format"
                       GCP64ELF _ ->
                           case cmmTypeFormat rep of
                           II8  -> (1, 0, 8, gprs)
@@ -1934,8 +1928,6 @@ genCCall' dflags gcp target dest_regs args
                           -- the FPRs.
                           FF32 -> (1, 1, 8, fprs)
                           FF64 -> (1, 1, 8, fprs)
-                          VecFormat {}
-                               -> panic "genCCall' passArguments vector format"
 
         moveResult reduceToFF32 =
             case dest_regs of
@@ -2029,6 +2021,7 @@ genCCall' dflags gcp target dest_regs args
                     MO_AtomicRead _  -> unsupported
                     MO_AtomicWrite _ -> unsupported
 
+                    MO_S_Mul2    {}  -> unsupported
                     MO_S_QuotRem {}  -> unsupported
                     MO_U_QuotRem {}  -> unsupported
                     MO_U_QuotRem2 {} -> unsupported
@@ -2102,7 +2095,7 @@ genSwitch dflags expr targets
   where (offset, ids) = switchTargetsToTable targets
 
 generateJumpTableForInstr :: DynFlags -> Instr
-                          -> Maybe (NatCmmDecl CmmStatics Instr)
+                          -> Maybe (NatCmmDecl RawCmmStatics Instr)
 generateJumpTableForInstr dflags (BCTR ids (Just lbl) _) =
     let jumpTable
             | (positionIndependent dflags)
@@ -2115,7 +2108,7 @@ generateJumpTableForInstr dflags (BCTR ids (Just lbl) _) =
                         = CmmStaticLit (CmmLabelDiffOff blockLabel lbl 0
                                          (wordWidth dflags))
                             where blockLabel = blockLbl blockid
-    in Just (CmmData (Section ReadOnlyData lbl) (Statics lbl jumpTable))
+    in Just (CmmData (Section ReadOnlyData lbl) (RawCmmStatics lbl jumpTable))
 generateJumpTableForInstr _ _ = Nothing
 
 -- -----------------------------------------------------------------------------
@@ -2344,7 +2337,7 @@ coerceInt2FP' ArchPPC fromRep toRep x = do
     Amode addr addr_code <- getAmode D dynRef
     let
         code' dst = code `appOL` maybe_exts `appOL` toOL [
-                LDATA (Section ReadOnlyData lbl) $ Statics lbl
+                LDATA (Section ReadOnlyData lbl) $ RawCmmStatics lbl
                                  [CmmStaticLit (CmmInt 0x43300000 W32),
                                   CmmStaticLit (CmmInt 0x80000000 W32)],
                 XORIS itmp src (ImmInt 0x8000),

@@ -17,7 +17,7 @@ import FastString
 import ForeignCall
 import MonadUtils
 import Outputable
-import HsDecls
+import GHC.Hs.Decls
 import Bag (filterBag,isEmptyBag)
 import System.Directory (removeFile)
 import System.Environment( getArgs )
@@ -67,7 +67,7 @@ testOneFile libdir fileName = do
      doRuleDecl (HsRule _ _ _ _ _ _ _) = []
 
      doHsExpr :: HsExpr GhcPs -> [(String,[String])]
-     doHsExpr (HsTickPragma _ src (_,_,_) ss _) = [("tp",[show ss])]
+     doHsExpr (HsPragE _ (HsPragTick _ src (_,_,_) ss) _) = [("tp",[show ss])]
      doHsExpr _ = []
 
      doInline (InlinePragma _ _ _ (ActiveBefore (SourceText ss) _) _)

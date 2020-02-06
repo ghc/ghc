@@ -2,7 +2,7 @@
 
 module T9032 where
 
-#ifdef ERR
+#if defined(ERR)
 import T9032
 #endif
 

@@ -1,5 +1,5 @@
 
-#ifndef ELF_RELOC
+#if !defined(ELF_RELOC)
 #error "ELF_RELOC must be defined"
 #endif
 

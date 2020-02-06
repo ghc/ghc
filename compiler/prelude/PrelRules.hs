@@ -24,7 +24,6 @@ module PrelRules
 where
 
 #include "HsVersions.h"
-#include "../includes/MachDeps.h"
 
 import GhcPrelude
 
@@ -192,29 +191,35 @@ primOpRules nm Int2WordOp     = mkPrimOpRule nm 1 [ liftLitDynFlags int2WordLit
 primOpRules nm Narrow8IntOp   = mkPrimOpRule nm 1 [ liftLit narrow8IntLit
                                                   , subsumedByPrimOp Narrow8IntOp
                                                   , Narrow8IntOp `subsumesPrimOp` Narrow16IntOp
-                                                  , Narrow8IntOp `subsumesPrimOp` Narrow32IntOp ]
+                                                  , Narrow8IntOp `subsumesPrimOp` Narrow32IntOp
+                                                  , narrowSubsumesAnd AndIOp Narrow8IntOp 8 ]
 primOpRules nm Narrow16IntOp  = mkPrimOpRule nm 1 [ liftLit narrow16IntLit
                                                   , subsumedByPrimOp Narrow8IntOp
                                                   , subsumedByPrimOp Narrow16IntOp
-                                                  , Narrow16IntOp `subsumesPrimOp` Narrow32IntOp ]
+                                                  , Narrow16IntOp `subsumesPrimOp` Narrow32IntOp
+                                                  , narrowSubsumesAnd AndIOp Narrow16IntOp 16 ]
 primOpRules nm Narrow32IntOp  = mkPrimOpRule nm 1 [ liftLit narrow32IntLit
                                                   , subsumedByPrimOp Narrow8IntOp
                                                   , subsumedByPrimOp Narrow16IntOp
                                                   , subsumedByPrimOp Narrow32IntOp
-                                                  , removeOp32 ]
+                                                  , removeOp32
+                                                  , narrowSubsumesAnd AndIOp Narrow32IntOp 32 ]
 primOpRules nm Narrow8WordOp  = mkPrimOpRule nm 1 [ liftLit narrow8WordLit
                                                   , subsumedByPrimOp Narrow8WordOp
                                                   , Narrow8WordOp `subsumesPrimOp` Narrow16WordOp
-                                                  , Narrow8WordOp `subsumesPrimOp` Narrow32WordOp ]
+                                                  , Narrow8WordOp `subsumesPrimOp` Narrow32WordOp
+                                                  , narrowSubsumesAnd AndOp Narrow8WordOp 8 ]
 primOpRules nm Narrow16WordOp = mkPrimOpRule nm 1 [ liftLit narrow16WordLit
                                                   , subsumedByPrimOp Narrow8WordOp
                                                   , subsumedByPrimOp Narrow16WordOp
-                                                  , Narrow16WordOp `subsumesPrimOp` Narrow32WordOp ]
+                                                  , Narrow16WordOp `subsumesPrimOp` Narrow32WordOp
+                                                  , narrowSubsumesAnd AndOp Narrow16WordOp 16 ]
 primOpRules nm Narrow32WordOp = mkPrimOpRule nm 1 [ liftLit narrow32WordLit
                                                   , subsumedByPrimOp Narrow8WordOp
                                                   , subsumedByPrimOp Narrow16WordOp
                                                   , subsumedByPrimOp Narrow32WordOp
-                                                  , removeOp32 ]
+                                                  , removeOp32
+                                                  , narrowSubsumesAnd AndOp Narrow32WordOp 32 ]
 primOpRules nm OrdOp          = mkPrimOpRule nm 1 [ liftLit char2IntLit
                                                   , inversePrimOp ChrOp ]
 primOpRules nm ChrOp          = mkPrimOpRule nm 1 [ do [Lit lit] <- getArgs
@@ -433,10 +438,10 @@ shiftRightLogical :: DynFlags -> Integer -> Int -> Integer
 -- Shift right, putting zeros in rather than sign-propagating as Bits.shiftR would do
 -- Do this by converting to Word and back.  Obviously this won't work for big
 -- values, but its ok as we use it here
-shiftRightLogical dflags x n
-  | wordSizeInBits dflags == 32 = fromIntegral (fromInteger x `shiftR` n :: Word32)
-  | wordSizeInBits dflags == 64 = fromIntegral (fromInteger x `shiftR` n :: Word64)
-  | otherwise = panic "shiftRightLogical: unsupported word size"
+shiftRightLogical dflags x n =
+    case platformWordSize (targetPlatform dflags) of
+      PW4 -> fromIntegral (fromInteger x `shiftR` n :: Word32)
+      PW8 -> fromIntegral (fromInteger x `shiftR` n :: Word64)
 
 --------------------------
 retLit :: (DynFlags -> Literal) -> RuleM CoreExpr
@@ -489,7 +494,7 @@ shiftRule shift_op
            _ -> mzero }
 
 wordSizeInBits :: DynFlags -> Integer
-wordSizeInBits dflags = toInteger (platformWordSize (targetPlatform dflags) `shiftL` 3)
+wordSizeInBits dflags = toInteger (platformWordSizeInBits (targetPlatform dflags))
 
 --------------------------
 floatOp2 :: (Rational -> Rational -> Rational)
@@ -650,6 +655,26 @@ subsumedByPrimOp primop = do
   matchPrimOpId primop primop_id
   return e
 
+-- | narrow subsumes bitwise `and` with full mask (cf #16402):
+--
+--       narrowN (x .&. m)
+--       m .&. (2^N-1) = 2^N-1
+--       ==> narrowN x
+--
+-- e.g.  narrow16 (x .&. 0xFFFF)
+--       ==> narrow16 x
+--
+narrowSubsumesAnd :: PrimOp -> PrimOp -> Int -> RuleM CoreExpr
+narrowSubsumesAnd and_primop narrw n = do
+  [Var primop_id `App` x `App` y] <- getArgs
+  matchPrimOpId and_primop primop_id
+  let mask = bit n -1
+      g v (Lit (LitNumber _ m _)) = do
+         guard (m .&. mask == mask)
+         return (Var (mkPrimOpId narrw) `App` v)
+      g _ _ = mzero
+  g x y <|> g y x
+
 idempotent :: RuleM CoreExpr
 idempotent = do [e1, e2] <- getArgs
                 guard $ cheapEqExpr e1 e2
@@ -697,7 +722,7 @@ Shift.$wgo = \ (w_sCS :: GHC.Prim.Int#) (w1_sCT :: [GHC.Types.Bool]) ->
 Note the massive shift on line "!!!!".  It can't happen, because we've checked
 that w < 64, but the optimiser didn't spot that. We DO NOT want to constant-fold this!
 Moreover, if the programmer writes (n `uncheckedShiftL` 9223372036854775807), we
-can't constant fold it, but if it gets to the assember we get
+can't constant fold it, but if it gets to the assembler we get
      Error: operand type mismatch for `shl'
 
 So the best thing to do is to rewrite the shift with a call to error,
@@ -734,8 +759,8 @@ There are two cases:
   from the 'integer' library.   These are handled by rule_shift_op,
   and match_Integer_shift_op.
 
-  Here we could in principle shift by any amount, but we arbitary
-  limit the shift to 4 bits; in particualr we do not want shift by a
+  Here we could in principle shift by any amount, but we arbitrary
+  limit the shift to 4 bits; in particular we do not want shift by a
   huge amount, which can happen in code like that above.
 
 The two cases are more different in their code paths that is comfortable,
@@ -802,11 +827,12 @@ liftLitDynFlags f = do
 removeOp32 :: RuleM CoreExpr
 removeOp32 = do
   dflags <- getDynFlags
-  if wordSizeInBits dflags == 32
-  then do
-    [e] <- getArgs
-    return e
-  else mzero
+  case platformWordSize (targetPlatform dflags) of
+    PW4 -> do
+      [e] <- getArgs
+      return e
+    PW8 ->
+      mzero
 
 getArgs :: RuleM [CoreExpr]
 getArgs = RuleM $ \_ _ args -> Just args
@@ -855,7 +881,7 @@ leftIdentityDynFlags id_lit = do
   return e2
 
 -- | Left identity rule for PrimOps like 'IntAddC' and 'WordAddC', where, in
--- addition to the result, we have to indicate that no carry/overflow occured.
+-- addition to the result, we have to indicate that no carry/overflow occurred.
 leftIdentityCDynFlags :: (DynFlags -> Literal) -> RuleM CoreExpr
 leftIdentityCDynFlags id_lit = do
   dflags <- getDynFlags
@@ -872,7 +898,7 @@ rightIdentityDynFlags id_lit = do
   return e1
 
 -- | Right identity rule for PrimOps like 'IntSubC' and 'WordSubC', where, in
--- addition to the result, we have to indicate that no carry/overflow occured.
+-- addition to the result, we have to indicate that no carry/overflow occurred.
 rightIdentityCDynFlags :: (DynFlags -> Literal) -> RuleM CoreExpr
 rightIdentityCDynFlags id_lit = do
   dflags <- getDynFlags
@@ -886,7 +912,7 @@ identityDynFlags lit =
   leftIdentityDynFlags lit `mplus` rightIdentityDynFlags lit
 
 -- | Identity rule for PrimOps like 'IntAddC' and 'WordAddC', where, in addition
--- to the result, we have to indicate that no carry/overflow occured.
+-- to the result, we have to indicate that no carry/overflow occurred.
 identityCDynFlags :: (DynFlags -> Literal) -> RuleM CoreExpr
 identityCDynFlags lit =
   leftIdentityCDynFlags lit `mplus` rightIdentityCDynFlags lit
@@ -1078,7 +1104,7 @@ is:
   regardless of the evaluated-ness of their argument.
   See CoreUtils Note [exprOkForSpeculation and SeqOp/DataToTagOp]
 
-* There is a special case for DataToTagOp in StgCmmExpr.cgExpr,
+* There is a special case for DataToTagOp in GHC.StgToCmm.Expr.cgExpr,
   that evaluates its argument and then extracts the tag from
   the returned value.
 
@@ -1145,7 +1171,7 @@ Implementing seq#.  The compiler has magic for SeqOp in
 
 - PrelRules.seqRule: eliminate (seq# <whnf> s)
 
-- StgCmmExpr.cgExpr, and cgCase: special case for seq#
+- GHC.StgToCmm.Expr.cgExpr, and cgCase: special case for seq#
 
 - CoreUtils.exprOkForSpeculation;
   see Note [exprOkForSpeculation and SeqOp/DataToTagOp] in CoreUtils
@@ -1556,7 +1582,7 @@ match_bitInteger dflags id_unf fn [arg]
   | Just (LitNumber LitNumInt x _) <- exprIsLiteral_maybe id_unf arg
   , x >= 0
   , x <= (wordSizeInBits dflags - 1)
-    -- Make sure x is small enough to yield a decently small iteger
+    -- Make sure x is small enough to yield a decently small integer
     -- Attempting to construct the Integer for
     --    (bitInteger 9223372036854775807#)
     -- would be a bad idea (#14959)
@@ -2191,7 +2217,7 @@ Take care if we see something like
     -1# -> e2
     100 -> e3
 because there isn't a data constructor with tag -1 or 100. In this case the
-out-of-range alterantive is dead code -- we know the range of tags for x.
+out-of-range alternative is dead code -- we know the range of tags for x.
 
 Hence caseRules returns (AltCon -> Maybe AltCon), with Nothing indicating
 an alternative that is unreachable.

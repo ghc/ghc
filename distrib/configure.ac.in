@@ -18,14 +18,18 @@ FP_GMP
 dnl Various things from the source distribution configure
 bootstrap_target=@TargetPlatform@
 
-HaskellHaveRTSLinker=@HaskellHaveRTSLinker@
-AC_SUBST(HaskellHaveRTSLinker)
+TargetHasRTSLinker=@TargetHasRTSLinker@
+AC_SUBST(TargetHasRTSLinker)
 
 FFIIncludeDir=@FFIIncludeDir@
 FFILibDir=@FFILibDir@
 AC_SUBST(FFILibDir)
 AC_SUBST(FFIIncludeDir)
 
+LibdwIncludeDir=@LibdwIncludeDir@
+LibdwLibDir=@LibdwLibDir@
+AC_SUBST(LibdwLibDir)
+AC_SUBST(LibdwIncludeDir)
 
 # We have to run these unconditionally as FPTOOLS_SET_PLATFORM_VARS wants the
 # values it computes.
@@ -42,10 +46,12 @@ FP_FIND_ROOT
 CrossCompiling=NO
 CrossCompilePrefix=""
 TargetPlatformFull="${target}"
+TablesNextToCode="@TablesNextToCode@"
 
 AC_SUBST(CrossCompiling)
 AC_SUBST(CrossCompilePrefix)
 AC_SUBST(TargetPlatformFull)
+AC_SUBST(TablesNextToCode)
 
 Unregisterised="@Unregisterised@"
 AC_SUBST(Unregisterised)
@@ -70,6 +76,9 @@ AC_PROG_LN_S()
 dnl ** Find the path to sed **
 #
 AC_PATH_PROG(SedCmd,gsed sed,sed)
+
+dnl ** check for Python for testsuite driver
+FIND_PYTHON
 
 XCODE_VERSION()
 
@@ -186,13 +195,14 @@ dnl ** Have libdw?
 dnl --------------------------------------------------------------
 dnl Check for a usable version of libdw/elfutils
 dnl Currently we need 0.158 or newer.
-BinDistNeedsLibdw=@UseLibdw@
-if test "x$BinDistNeedsLibdw" = "xYES" ; then
+UseLibdw=@UseLibdw@
+if test "x$UseLibdw" = "xYES" ; then
   AC_CHECK_LIB(dw, dwfl_attach_state,
     [UseLibdw=YES],
     [AC_MSG_ERROR([Binary distribution was built with libdw support but target system doesn't have supported libdw version (needs at least 0.158)])]
   )
 fi
+AC_SUBST(UseLibdw)
 
 FP_SETTINGS
 

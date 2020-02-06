@@ -18,7 +18,7 @@ f x = do
 
 foreign export ccall "f" f :: Int -> IO ()
 
-#ifdef mingw32_HOST_OS
+#if defined(mingw32_HOST_OS)
 # if defined(i386_HOST_ARCH)
 #  define WINDOWS_CCONV stdcall
 # elif defined(x86_64_HOST_ARCH)

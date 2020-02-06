@@ -7,6 +7,8 @@
 {-# LANGUAGE CPP #-}
 {-# LANGUAGE DeriveFunctor #-}
 {-# LANGUAGE ViewPatterns #-}
+
+{-# OPTIONS_GHC -Wno-incomplete-uni-patterns #-}
 module Specialise ( specProgram, specUnfolding ) where
 
 #include "HsVersions.h"
@@ -16,6 +18,7 @@ import GhcPrelude
 import Id
 import TcType hiding( substTy )
 import Type   hiding( substTy, extendTvSubstList )
+import Predicate
 import Module( Module, HasModule(..) )
 import Coercion( Coercion )
 import CoreMonad
@@ -198,7 +201,7 @@ the two instances of +.sel weren't originally at the same type.
 Further notes on (b)
 
 * There are quite a few variations here.  For example, the defn of
-  +.sel could be floated ouside the \y, to attempt to gain laziness.
+  +.sel could be floated outside the \y, to attempt to gain laziness.
   It certainly mustn't be floated outside the \d because the d has to
   be in scope too.
 
@@ -575,7 +578,7 @@ Hence, the invariant is this:
 ************************************************************************
 -}
 
--- | Specialise calls to type-class overloaded functions occuring in a program.
+-- | Specialise calls to type-class overloaded functions occurring in a program.
 specProgram :: ModGuts -> CoreM ModGuts
 specProgram guts@(ModGuts { mg_module = this_mod
                           , mg_rules = local_rules
@@ -2106,7 +2109,7 @@ Consider
 We gather the call info for (f @T $df), and we don't want to drop it
 when we come across the binding for $df.  So we add $df to the floats
 and continue.  But then we have to add $c== to the floats, and so on.
-These all float above the binding for 'f', and and now we can
+These all float above the binding for 'f', and now we can
 successfully specialise 'f'.
 
 So the DictBinds in (ud_binds :: Bag DictBind) may contain
@@ -2157,7 +2160,7 @@ pprCallInfo fn (CI { ci_key = key })
   = ppr fn <+> ppr key
 
 ppr_call_key_ty :: SpecArg -> Maybe SDoc
-ppr_call_key_ty (SpecType ty) = Just $ char '@' <+> pprParendType ty
+ppr_call_key_ty (SpecType ty) = Just $ char '@' <> pprParendType ty
 ppr_call_key_ty UnspecType    = Just $ char '_'
 ppr_call_key_ty (SpecDict _)  = Nothing
 ppr_call_key_ty UnspecArg     = Nothing
@@ -2181,7 +2184,7 @@ callDetailsFVs calls =
 
 callInfoFVs :: CallInfoSet -> VarSet
 callInfoFVs (CIS _ call_info) =
-  foldrBag (\(CI { ci_fvs = fv }) vs -> unionVarSet fv vs) emptyVarSet call_info
+  foldr (\(CI { ci_fvs = fv }) vs -> unionVarSet fv vs) emptyVarSet call_info
 
 computeArity :: [SpecArg] -> Int
 computeArity = length . filter isValueArg . dropWhileEndLE isUnspecArg
@@ -2350,7 +2353,7 @@ plusUDs (MkUD {ud_binds = db1, ud_calls = calls1})
 
 -----------------------------
 _dictBindBndrs :: Bag DictBind -> [Id]
-_dictBindBndrs dbs = foldrBag ((++) . bindersOf . fst) [] dbs
+_dictBindBndrs dbs = foldr ((++) . bindersOf . fst) [] dbs
 
 -- | Construct a 'DictBind' from a 'CoreBind'
 mkDB :: CoreBind -> DictBind
@@ -2377,7 +2380,7 @@ pair_fvs (bndr, rhs) = exprSomeFreeVars interesting rhs
     interesting :: InterestingVarFun
     interesting v = isLocalVar v || (isId v && isDFunId v)
         -- Very important: include DFunIds /even/ if it is imported
-        -- Reason: See Note [Avoiding loops], the second exmaple
+        -- Reason: See Note [Avoiding loops], the second example
         --         involving an imported dfun.  We must know whether
         --         a dictionary binding depends on an imported dfun,
         --         in case we try to specialise that imported dfun
@@ -2389,7 +2392,7 @@ recWithDumpedDicts :: [(Id,CoreExpr)] -> Bag DictBind ->DictBind
 recWithDumpedDicts pairs dbs
   = (Rec bindings, fvs)
   where
-    (bindings, fvs) = foldrBag add
+    (bindings, fvs) = foldr add
                                ([], emptyVarSet)
                                (dbs `snocBag` mkDB (Rec pairs))
     add (NonRec b r, fvs') (pairs, fvs) =
@@ -2413,13 +2416,13 @@ snocDictBind uds bind = uds { ud_binds = ud_binds uds `snocBag` bind }
 
 wrapDictBinds :: Bag DictBind -> [CoreBind] -> [CoreBind]
 wrapDictBinds dbs binds
-  = foldrBag add binds dbs
+  = foldr add binds dbs
   where
     add (bind,_) binds = bind : binds
 
 wrapDictBindsE :: Bag DictBind -> CoreExpr -> CoreExpr
 wrapDictBindsE dbs expr
-  = foldrBag add expr dbs
+  = foldr add expr dbs
   where
     add (bind,_) expr = Let bind expr
 
@@ -2478,7 +2481,7 @@ filterCalls :: CallInfoSet -> Bag DictBind -> [CallInfo]
 filterCalls (CIS fn call_bag) dbs
   = filter ok_call (bagToList call_bag)
   where
-    dump_set = foldlBag go (unitVarSet fn) dbs
+    dump_set = foldl' go (unitVarSet fn) dbs
       -- This dump-set could also be computed by splitDictBinds
       --   (_,_,dump_set) = splitDictBinds dbs {fn}
       -- But this variant is shorter
@@ -2498,8 +2501,8 @@ splitDictBinds :: Bag DictBind -> IdSet -> (Bag DictBind, Bag DictBind, IdSet)
 --   * free_dbs does not depend on bndrs
 --   * dump_set = bndrs `union` bndrs(dump_dbs)
 splitDictBinds dbs bndr_set
-   = foldlBag split_db (emptyBag, emptyBag, bndr_set) dbs
-                -- Important that it's foldl not foldr;
+   = foldl' split_db (emptyBag, emptyBag, bndr_set) dbs
+                -- Important that it's foldl' not foldr;
                 -- we're accumulating the set of dumped ids in dump_set
    where
     split_db (free_dbs, dump_dbs, dump_idset) db@(bind, fvs)
@@ -2634,7 +2637,7 @@ newDictBndr :: SpecEnv -> CoreBndr -> SpecM CoreBndr
 newDictBndr env b = do { uniq <- getUniqueM
                        ; let n   = idName b
                              ty' = substTy env (idType b)
-                       ; return (mkUserLocalOrCoVar (nameOccName n) uniq ty' (getSrcSpan n)) }
+                       ; return (mkUserLocal (nameOccName n) uniq ty' (getSrcSpan n)) }
 
 newSpecIdSM :: Id -> Type -> Maybe JoinArity -> SpecM Id
     -- Give the new Id a similar occurrence name to the old one
@@ -2642,7 +2645,7 @@ newSpecIdSM old_id new_ty join_arity_maybe
   = do  { uniq <- getUniqueM
         ; let name    = idName old_id
               new_occ = mkSpecOcc (nameOccName name)
-              new_id  = mkUserLocalOrCoVar new_occ uniq new_ty (getSrcSpan name)
+              new_id  = mkUserLocal new_occ uniq new_ty (getSrcSpan name)
                           `asJoinId_maybe` join_arity_maybe
         ; return new_id }
 

@@ -1,3 +1,0 @@
-
--- | awlkdajsads
-main=undefined

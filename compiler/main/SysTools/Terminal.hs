@@ -4,27 +4,24 @@ module SysTools.Terminal (stderrSupportsAnsiColors) where
 
 import GhcPrelude
 
-#if defined MIN_VERSION_terminfo
+#if defined(MIN_VERSION_terminfo)
 import Control.Exception (catch)
 import Data.Maybe (fromMaybe)
 import System.Console.Terminfo (SetupTermError, Terminal, getCapability,
                                 setupTermFromEnv, termColors)
 import System.Posix (queryTerminal, stdError)
-#elif defined mingw32_HOST_OS
+#elif defined(mingw32_HOST_OS)
 import Control.Exception (catch, try)
 import Data.Bits ((.|.), (.&.))
-import Data.List (isInfixOf, isPrefixOf, isSuffixOf)
-import Foreign (FunPtr, Ptr, allocaBytes, castPtrToFunPtr,
-                peek, plusPtr, sizeOf, with)
-import Foreign.C (CInt(..), CWchar, peekCWStringLen)
+import Foreign (Ptr, peek, with)
 import qualified Graphics.Win32 as Win32
 import qualified System.Win32 as Win32
 #endif
 
-#if defined mingw32_HOST_OS && !defined WINAPI
-# if defined i386_HOST_ARCH
+#if defined(mingw32_HOST_OS) && !defined(WINAPI)
+# if defined(i386_HOST_ARCH)
 #  define WINAPI stdcall
-# elif defined x86_64_HOST_ARCH
+# elif defined(x86_64_HOST_ARCH)
 #  define WINAPI ccall
 # else
 #  error unknown architecture
@@ -34,7 +31,7 @@ import qualified System.Win32 as Win32
 -- | Check if ANSI escape sequences can be used to control color in stderr.
 stderrSupportsAnsiColors :: IO Bool
 stderrSupportsAnsiColors = do
-#if defined MIN_VERSION_terminfo
+#if defined(MIN_VERSION_terminfo)
   queryTerminal stdError `andM` do
     (termSupportsColors <$> setupTermFromEnv)
       `catch` \ (_ :: SetupTermError) ->
@@ -52,7 +49,7 @@ stderrSupportsAnsiColors = do
     termSupportsColors :: Terminal -> Bool
     termSupportsColors term = fromMaybe 0 (getCapability term termColors) > 0
 
-#elif defined mingw32_HOST_OS
+#elif defined(mingw32_HOST_OS)
   h <- Win32.getStdHandle Win32.sTD_ERROR_HANDLE
          `catch` \ (_ :: IOError) ->
            pure Win32.nullHANDLE
@@ -61,25 +58,14 @@ stderrSupportsAnsiColors = do
     else do
       eMode <- try (getConsoleMode h)
       case eMode of
-        Left (_ :: IOError) -> queryCygwinTerminal h
+        Left (_ :: IOError) -> Win32.isMinTTYHandle h
+                                 -- Check if the we're in a MinTTY terminal
+                                 -- (e.g., Cygwin or MSYS2)
         Right mode
           | modeHasVTP mode -> pure True
           | otherwise       -> enableVTP h mode
 
   where
-
-    queryCygwinTerminal :: Win32.HANDLE -> IO Bool
-    queryCygwinTerminal h = do
-        fileType <- Win32.getFileType h
-        if fileType /= Win32.fILE_TYPE_PIPE
-          then pure False
-          else do
-            fn <- getFileNameByHandle h
-            pure (("\\cygwin-" `isPrefixOf` fn || "\\msys-" `isPrefixOf` fn) &&
-                  "-pty" `isInfixOf` fn &&
-                  "-master" `isSuffixOf` fn)
-      `catch` \ (_ :: IOError) ->
-        pure False
 
     enableVTP :: Win32.HANDLE -> Win32.DWORD -> IO Bool
     enableVTP h mode = do
@@ -111,42 +97,6 @@ foreign import WINAPI unsafe "windows.h GetConsoleMode" c_GetConsoleMode
 
 foreign import WINAPI unsafe "windows.h SetConsoleMode" c_SetConsoleMode
   :: Win32.HANDLE -> Win32.DWORD -> IO Win32.BOOL
-
-fileNameInfo :: CInt
-fileNameInfo = 2
-
-mAX_PATH :: Num a => a
-mAX_PATH = 260
-
-getFileNameByHandle :: Win32.HANDLE -> IO String
-getFileNameByHandle h = do
-  let sizeOfDWORD = sizeOf (undefined :: Win32.DWORD)
-  let sizeOfWchar = sizeOf (undefined :: CWchar)
-  -- note: implicitly assuming that DWORD has stronger alignment than wchar_t
-  let bufSize = sizeOfDWORD + mAX_PATH * sizeOfWchar
-  allocaBytes bufSize $ \ buf -> do
-    getFileInformationByHandleEx h fileNameInfo buf (fromIntegral bufSize)
-    len :: Win32.DWORD <- peek buf
-    let len' = fromIntegral len `div` sizeOfWchar
-    peekCWStringLen (buf `plusPtr` sizeOfDWORD, min len' mAX_PATH)
-
-getFileInformationByHandleEx
-  :: Win32.HANDLE -> CInt -> Ptr a -> Win32.DWORD -> IO ()
-getFileInformationByHandleEx h cls buf bufSize = do
-  lib <- Win32.getModuleHandle (Just "kernel32.dll")
-  ptr <- Win32.getProcAddress lib "GetFileInformationByHandleEx"
-  let c_GetFileInformationByHandleEx =
-        mk_GetFileInformationByHandleEx (castPtrToFunPtr ptr)
-  Win32.failIfFalse_ "getFileInformationByHandleEx"
-    (c_GetFileInformationByHandleEx h cls buf bufSize)
-
-type F_GetFileInformationByHandleEx a =
-  Win32.HANDLE -> CInt -> Ptr a -> Win32.DWORD -> IO Win32.BOOL
-
-foreign import WINAPI "dynamic"
-  mk_GetFileInformationByHandleEx
-  :: FunPtr (F_GetFileInformationByHandleEx a)
-  -> F_GetFileInformationByHandleEx a
 
 #else
    pure False

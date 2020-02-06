@@ -1,6 +1,8 @@
 {-# LANGUAGE CPP #-}
 {-# LANGUAGE DeriveFunctor #-}
 
+{-# OPTIONS_GHC -Wno-incomplete-uni-patterns #-}
+
 -- ----------------------------------------------------------------------------
 -- | Base LLVM Code Generation module
 --
@@ -13,7 +15,8 @@ module LlvmCodeGen.Base (
         LiveGlobalRegs,
         LlvmUnresData, LlvmData, UnresLabel, UnresStatic,
 
-        LlvmVersion (..), supportedLlvmVersion, llvmVersionStr,
+        LlvmVersion, supportedLlvmVersion, llvmVersionSupported, parseLlvmVersion,
+        llvmVersionStr, llvmVersionList,
 
         LlvmM,
         runLlvm, liftStream, withClearVars, varLookup, varInsert,
@@ -27,7 +30,7 @@ module LlvmCodeGen.Base (
 
         cmmToLlvmType, widthToLlvmFloat, widthToLlvmInt, llvmFunTy,
         llvmFunSig, llvmFunArgs, llvmStdFunAttrs, llvmFunAlign, llvmInfAlign,
-        llvmPtrBits, tysToParams, llvmFunSection,
+        llvmPtrBits, tysToParams, llvmFunSection, padLiveArgs, isFPR,
 
         strCLabel_llvm, strDisplayName_llvm, strProcedureName_llvm,
         getGlobalPtr, generateExternDecls,
@@ -43,11 +46,12 @@ import GhcPrelude
 import Llvm
 import LlvmCodeGen.Regs
 
-import CLabel
-import CodeGen.Platform ( activeStgRegs )
+import GHC.Cmm.CLabel
+import GHC.Platform.Regs ( activeStgRegs )
 import DynFlags
 import FastString
-import Cmm              hiding ( succ )
+import GHC.Cmm              hiding ( succ )
+import GHC.Cmm.Utils (regsOverlap)
 import Outputable as Outp
 import GHC.Platform
 import UniqFM
@@ -60,12 +64,15 @@ import qualified Stream
 
 import Data.Maybe (fromJust)
 import Control.Monad (ap)
+import Data.Char (isDigit)
+import Data.List (sort, groupBy, intercalate)
+import qualified Data.List.NonEmpty as NE
 
 -- ----------------------------------------------------------------------------
 -- * Some Data Types
 --
 
-type LlvmCmmDecl = GenCmmDecl [LlvmData] (Maybe CmmStatics) (ListGraph LlvmStatement)
+type LlvmCmmDecl = GenCmmDecl [LlvmData] (Maybe RawCmmStatics) (ListGraph LlvmStatement)
 type LlvmBasicBlock = GenBasicBlock LlvmStatement
 
 -- | Global registers live on proc entry
@@ -148,16 +155,109 @@ llvmFunSection dflags lbl
 -- | A Function's arguments
 llvmFunArgs :: DynFlags -> LiveGlobalRegs -> [LlvmVar]
 llvmFunArgs dflags live =
-    map (lmGlobalRegArg dflags) (filter isPassed (activeStgRegs platform))
+    map (lmGlobalRegArg dflags) (filter isPassed allRegs)
     where platform = targetPlatform dflags
-          isLive r = not (isSSE r) || r `elem` alwaysLive || r `elem` live
-          isPassed r = not (isSSE r) || isLive r
-          isSSE (FloatReg _)      = True
-          isSSE (DoubleReg _)     = True
-          isSSE (XmmReg _ _ _ _ ) = True
-          isSSE (YmmReg _ _ _ _ ) = True
-          isSSE (ZmmReg _ _ _ _ ) = True
-          isSSE _                 = False
+          allRegs = activeStgRegs platform
+          paddedLive = map (\(_,r) -> r) $ padLiveArgs dflags live
+          isLive r = r `elem` alwaysLive || r `elem` paddedLive
+          isPassed r = not (isFPR r) || isLive r
+
+
+isFPR :: GlobalReg -> Bool
+isFPR (FloatReg _)  = True
+isFPR (DoubleReg _) = True
+isFPR (XmmReg _)    = True
+isFPR (YmmReg _)    = True
+isFPR (ZmmReg _)    = True
+isFPR _             = False
+
+sameFPRClass :: GlobalReg -> GlobalReg -> Bool
+sameFPRClass (FloatReg _)  (FloatReg _) = True
+sameFPRClass (DoubleReg _) (DoubleReg _) = True
+sameFPRClass (XmmReg _)    (XmmReg _) = True
+sameFPRClass (YmmReg _)    (YmmReg _) = True
+sameFPRClass (ZmmReg _)    (ZmmReg _) = True
+sameFPRClass _             _          = False
+
+normalizeFPRNum :: GlobalReg -> GlobalReg
+normalizeFPRNum (FloatReg _)  = FloatReg 1
+normalizeFPRNum (DoubleReg _) = DoubleReg 1
+normalizeFPRNum (XmmReg _)    = XmmReg 1
+normalizeFPRNum (YmmReg _)    = YmmReg 1
+normalizeFPRNum (ZmmReg _)    = ZmmReg 1
+normalizeFPRNum _ = error "normalizeFPRNum expected only FPR regs"
+
+getFPRCtor :: GlobalReg -> Int -> GlobalReg
+getFPRCtor (FloatReg _)  = FloatReg
+getFPRCtor (DoubleReg _) = DoubleReg
+getFPRCtor (XmmReg _)    = XmmReg
+getFPRCtor (YmmReg _)    = YmmReg
+getFPRCtor (ZmmReg _)    = ZmmReg
+getFPRCtor _ = error "getFPRCtor expected only FPR regs"
+
+fprRegNum :: GlobalReg -> Int
+fprRegNum (FloatReg i)  = i
+fprRegNum (DoubleReg i) = i
+fprRegNum (XmmReg i)    = i
+fprRegNum (YmmReg i)    = i
+fprRegNum (ZmmReg i)    = i
+fprRegNum _ = error "fprRegNum expected only FPR regs"
+
+-- | Input: dynflags, and the list of live registers
+--
+-- Output: An augmented list of live registers, where padding was
+-- added to the list of registers to ensure the calling convention is
+-- correctly used by LLVM.
+--
+-- Each global reg in the returned list is tagged with a bool, which
+-- indicates whether the global reg was added as padding, or was an original
+-- live register.
+--
+-- That is, True => padding, False => a real, live global register.
+--
+-- Also, the returned list is not sorted in any particular order.
+--
+padLiveArgs :: DynFlags -> LiveGlobalRegs -> [(Bool, GlobalReg)]
+padLiveArgs dflags live =
+      if platformUnregisterised plat
+        then taggedLive -- not using GHC's register convention for platform.
+        else padding ++ taggedLive
+  where
+    taggedLive = map (\x -> (False, x)) live
+    plat = targetPlatform dflags
+
+    fprLive = filter isFPR live
+    padding = concatMap calcPad $ groupBy sharesClass fprLive
+
+    sharesClass :: GlobalReg -> GlobalReg -> Bool
+    sharesClass a b = sameFPRClass a b || overlappingClass
+      where
+        overlappingClass = regsOverlap dflags (norm a) (norm b)
+        norm = CmmGlobal . normalizeFPRNum
+
+    calcPad :: [GlobalReg] -> [(Bool, GlobalReg)]
+    calcPad rs = getFPRPadding (getFPRCtor $ head rs) rs
+
+getFPRPadding :: (Int -> GlobalReg) -> LiveGlobalRegs -> [(Bool, GlobalReg)]
+getFPRPadding paddingCtor live = padding
+    where
+        fprRegNums = sort $ map fprRegNum live
+        (_, padding) = foldl assignSlots (1, []) $ fprRegNums
+
+        assignSlots (i, acc) regNum
+            | i == regNum = -- don't need padding here
+                  (i+1, acc)
+            | i < regNum = let -- add padding for slots i .. regNum-1
+                  numNeeded = regNum-i
+                  acc' = genPad i numNeeded ++ acc
+                in
+                  (regNum+1, acc')
+            | otherwise = error "padLiveArgs -- i > regNum ??"
+
+        genPad start n =
+            take n $ flip map (iterate (+1) start) (\i ->
+                (True, paddingCtor i))
+
 
 -- | Llvm standard fun attributes
 llvmStdFunAttrs :: [LlvmFuncAttr]
@@ -176,26 +276,35 @@ llvmPtrBits dflags = widthInBits $ typeWidth $ gcWord dflags
 -- * Llvm Version
 --
 
--- | LLVM Version Number
-data LlvmVersion
-    = LlvmVersion Int
-    | LlvmVersionOld Int Int
-    deriving Eq
+-- Newtype to avoid using the Eq instance!
+newtype LlvmVersion = LlvmVersion { llvmVersionNE :: NE.NonEmpty Int }
 
--- Custom show instance for backwards compatibility.
-instance Show LlvmVersion where
-  show (LlvmVersion maj) = show maj
-  show (LlvmVersionOld maj min) = show maj ++ "." ++ show min
+parseLlvmVersion :: String -> Maybe LlvmVersion
+parseLlvmVersion =
+    fmap LlvmVersion . NE.nonEmpty . go [] . dropWhile (not . isDigit)
+  where
+    go vs s
+      | null ver_str
+      = reverse vs
+      | '.' : rest' <- rest
+      = go (read ver_str : vs) rest'
+      | otherwise
+      = reverse (read ver_str : vs)
+      where
+        (ver_str, rest) = span isDigit s
 
 -- | The LLVM Version that is currently supported.
 supportedLlvmVersion :: LlvmVersion
-supportedLlvmVersion = LlvmVersion sUPPORTED_LLVM_VERSION
+supportedLlvmVersion = LlvmVersion (sUPPORTED_LLVM_VERSION NE.:| [])
+
+llvmVersionSupported :: LlvmVersion -> Bool
+llvmVersionSupported (LlvmVersion v) = NE.head v == sUPPORTED_LLVM_VERSION
 
 llvmVersionStr :: LlvmVersion -> String
-llvmVersionStr v =
-  case v of
-    LlvmVersion maj -> show maj
-    LlvmVersionOld maj min -> show maj ++ "." ++ show min
+llvmVersionStr = intercalate "." . map show . llvmVersionList
+
+llvmVersionList :: LlvmVersion -> [Int]
+llvmVersionList = NE.toList . llvmVersionNE
 
 -- ----------------------------------------------------------------------------
 -- * Environment Handling
@@ -205,7 +314,7 @@ data LlvmEnv = LlvmEnv
   { envVersion :: LlvmVersion      -- ^ LLVM version
   , envDynFlags :: DynFlags        -- ^ Dynamic flags
   , envOutput :: BufHandle         -- ^ Output buffer
-  , envUniq :: UniqSupply          -- ^ Supply of unique values
+  , envMask :: !Char               -- ^ Mask for creating unique values
   , envFreshMeta :: MetaId         -- ^ Supply of fresh metadata IDs
   , envUniqMeta :: UniqFM MetaId   -- ^ Global metadata nodes
   , envFunMap :: LlvmEnvMap        -- ^ Global functions so far, with type
@@ -236,16 +345,12 @@ instance HasDynFlags LlvmM where
 
 instance MonadUnique LlvmM where
     getUniqueSupplyM = do
-        us <- getEnv envUniq
-        let (us1, us2) = splitUniqSupply us
-        modifyEnv (\s -> s { envUniq = us2 })
-        return us1
+        mask <- getEnv envMask
+        liftIO $! mkSplitUniqSupply mask
 
     getUniqueM = do
-        us <- getEnv envUniq
-        let (u,us') = takeUniqFromSupply us
-        modifyEnv (\s -> s { envUniq = us' })
-        return u
+        mask <- getEnv envMask
+        liftIO $! uniqFromMask mask
 
 -- | Lifting of IO actions. Not exported, as we want to encapsulate IO.
 liftIO :: IO a -> LlvmM a
@@ -253,10 +358,10 @@ liftIO m = LlvmM $ \env -> do x <- m
                               return (x, env)
 
 -- | Get initial Llvm environment.
-runLlvm :: DynFlags -> LlvmVersion -> BufHandle -> UniqSupply -> LlvmM () -> IO ()
-runLlvm dflags ver out us m = do
-    _ <- runLlvmM m env
-    return ()
+runLlvm :: DynFlags -> LlvmVersion -> BufHandle -> LlvmM a -> IO a
+runLlvm dflags ver out m = do
+    (a, _) <- runLlvmM m env
+    return a
   where env = LlvmEnv { envFunMap = emptyUFM
                       , envVarMap = emptyUFM
                       , envStackRegs = []
@@ -265,7 +370,7 @@ runLlvm dflags ver out us m = do
                       , envVersion = ver
                       , envDynFlags = dflags
                       , envOutput = out
-                      , envUniq = us
+                      , envMask = 'n'
                       , envFreshMeta = MetaId 0
                       , envUniqMeta = emptyUFM
                       }
@@ -328,10 +433,10 @@ getLlvmPlatform :: LlvmM Platform
 getLlvmPlatform = getDynFlag targetPlatform
 
 -- | Dumps the document if the corresponding flag has been set by the user
-dumpIfSetLlvm :: DumpFlag -> String -> Outp.SDoc -> LlvmM ()
-dumpIfSetLlvm flag hdr doc = do
+dumpIfSetLlvm :: DumpFlag -> String -> DumpFormat -> Outp.SDoc -> LlvmM ()
+dumpIfSetLlvm flag hdr fmt doc = do
   dflags <- getDynFlags
-  liftIO $ dumpIfSet_dyn dflags flag hdr doc
+  liftIO $ dumpIfSet_dyn dflags flag hdr fmt doc
 
 -- | Prints the given contents to the output handle
 renderLlvm :: Outp.SDoc -> LlvmM ()
@@ -344,7 +449,7 @@ renderLlvm sdoc = do
                (Outp.mkCodeStyle Outp.CStyle) sdoc
 
     -- Dump, if requested
-    dumpIfSetLlvm Opt_D_dump_llvm "LLVM Code" sdoc
+    dumpIfSetLlvm Opt_D_dump_llvm "LLVM Code" FormatLLVM sdoc
     return ()
 
 -- | Marks a variable as "used"
@@ -573,7 +678,7 @@ aliasify (LMGlobal var val) = do
 -- point of definition instead of the point of usage, as was previously
 -- done. See #9142 for details.
 --
--- Finally, case (1) is trival. As we already have a definition for
+-- Finally, case (1) is trivial. As we already have a definition for
 -- and therefore know the type of the referenced symbol, we can do
 -- away with casting the alias to the desired type in @getSymbolPtr@
 -- and instead just emit a reference to the definition symbol directly.

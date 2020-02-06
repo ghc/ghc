@@ -1,0 +1,19 @@
+
+T16181.hs:13:13: error:
+    • Cannot eta-reduce to an instance of form
+        instance (...) => Show1 (FlipConst a)
+    • In the newtype declaration for ‘FlipConst’
+
+T16181.hs:13:20: error:
+    • Cannot eta-reduce to an instance of form
+        instance (...) => Eq1 (FlipConst a)
+    • In the newtype declaration for ‘FlipConst’
+
+T16181.hs:18:14: error:
+    • Cannot eta-reduce to an instance of form
+        instance (...) => MonadTrans (Q x)
+    • In the newtype declaration for ‘Q’
+
+T16181.hs:25:12: error:
+    • Cannot eta-reduce to an instance of form instance (...) => C T
+    • In the data declaration for ‘T’

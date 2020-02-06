@@ -87,10 +87,10 @@ import Unique           ( Unique, Uniquable(..) )
 import FastString
 import Data.Maybe
 
-import IfaceEnv         ( lookupOrigIO )
+import GHC.Iface.Env    ( lookupOrigIO )
 import GhcPrelude
 import MonadUtils       ( mapMaybeM )
-import Convert          ( thRdrNameGuesses )
+import GHC.ThToHs       ( thRdrNameGuesses )
 import TcEnv            ( lookupGlobal )
 
 import qualified Language.Haskell.TH as TH

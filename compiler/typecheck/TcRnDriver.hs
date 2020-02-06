@@ -17,6 +17,8 @@ https://gitlab.haskell.org/ghc/ghc/wikis/commentary/compiler/type-checker
 {-# LANGUAGE FlexibleContexts #-}
 {-# LANGUAGE ViewPatterns #-}
 
+{-# OPTIONS_GHC -Wno-incomplete-record-updates #-}
+
 module TcRnDriver (
         tcRnStmt, tcRnExpr, TcRnExprMode(..), tcRnType,
         tcRnImportDecls,
@@ -49,24 +51,24 @@ module TcRnDriver (
 import GhcPrelude
 
 import {-# SOURCE #-} TcSplice ( finishTH, runRemoteModFinalizers )
-import RnSplice ( rnTopSpliceDecls, traceSplice, SpliceInfo(..) )
-import IfaceEnv( externaliseName )
+import GHC.Rename.Splice ( rnTopSpliceDecls, traceSplice, SpliceInfo(..) )
+import GHC.Iface.Env     ( externaliseName )
 import TcHsType
 import TcValidity( checkValidType )
 import TcMatches
 import Inst( deeplyInstantiate )
 import TcUnify( checkConstraints )
-import RnTypes
-import RnExpr
-import RnUtils ( HsDocContext(..) )
-import RnFixity ( lookupFixityRn )
+import GHC.Rename.Types
+import GHC.Rename.Expr
+import GHC.Rename.Utils  ( HsDocContext(..) )
+import GHC.Rename.Fixity ( lookupFixityRn )
 import MkId
 import TysWiredIn ( unitTy, mkListTy )
 import Plugins
 import DynFlags
-import HsSyn
-import IfaceSyn ( ShowSub(..), showToHeader )
-import IfaceType( ShowForAllFlag(..) )
+import GHC.Hs
+import GHC.Iface.Syntax ( ShowSub(..), showToHeader )
+import GHC.Iface.Type   ( ShowForAllFlag(..) )
 import PatSyn( pprPatSynType )
 import PrelNames
 import PrelInfo
@@ -76,6 +78,8 @@ import TcExpr
 import TcRnMonad
 import TcRnExports
 import TcEvidence
+import Constraint
+import TcOrigin
 import qualified BooleanFormula as BF
 import PprTyThing( pprTyThingInContext )
 import CoreFVs( orphNamesOfFamInst )
@@ -85,24 +89,24 @@ import FamInstEnv( FamInst, pprFamInst, famInstsRepTyCons
                  , famInstEnvElts, extendFamInstEnvList, normaliseType )
 import TcAnnotations
 import TcBinds
-import MkIface          ( coAxiomToIfaceDecl )
+import GHC.Iface.Utils  ( coAxiomToIfaceDecl )
 import HeaderInfo       ( mkPrelImports )
 import TcDefaults
 import TcEnv
 import TcRules
 import TcForeign
 import TcInstDcls
-import TcIface
+import GHC.IfaceToCore
 import TcMType
 import TcType
 import TcSimplify
 import TcTyClsDecls
 import TcTypeable ( mkTypeableBinds )
 import TcBackpack
-import LoadIface
-import RnNames
-import RnEnv
-import RnSource
+import GHC.Iface.Load
+import GHC.Rename.Names
+import GHC.Rename.Env
+import GHC.Rename.Source
 import ErrUtils
 import Id
 import IdInfo( IdDetails(..) )
@@ -134,7 +138,7 @@ import Bag
 import Inst (tcGetInsts)
 import qualified GHC.LanguageExtensions as LangExt
 import Data.Data ( Data )
-import HsDumpAst
+import GHC.Hs.Dump
 import qualified Data.Set as S
 
 import Control.DeepSeq
@@ -161,9 +165,9 @@ tcRnModule :: HscEnv
            -> IO (Messages, Maybe TcGblEnv)
 
 tcRnModule hsc_env mod_sum save_rn_syntax
-   parsedModule@HsParsedModule {hpm_module= (dL->L loc this_module)}
+   parsedModule@HsParsedModule {hpm_module= L loc this_module}
  | RealSrcSpan real_loc <- loc
- = withTiming (pure dflags)
+ = withTiming dflags
               (text "Renamer/typechecker"<+>brackets (ppr this_mod))
               (const ()) $
    initTc hsc_env hsc_src save_rn_syntax this_mod real_loc $
@@ -184,7 +188,7 @@ tcRnModule hsc_env mod_sum save_rn_syntax
 
     pair :: (Module, SrcSpan)
     pair@(this_mod,_)
-      | Just (dL->L mod_loc mod) <- hsmodName this_module
+      | Just (L mod_loc mod) <- hsmodName this_module
       = (mkModule this_pkg mod, mod_loc)
 
       | otherwise   -- 'module M where' is omitted
@@ -203,7 +207,7 @@ tcRnModuleTcRnM :: HscEnv
 tcRnModuleTcRnM hsc_env mod_sum
                 (HsParsedModule {
                    hpm_module =
-                      (dL->L loc (HsModule maybe_mod export_ies
+                      (L loc (HsModule maybe_mod export_ies
                                        import_decls local_decls mod_deprec
                                        maybe_doc_hdr)),
                    hpm_src_files = src_files
@@ -230,7 +234,7 @@ tcRnModuleTcRnM hsc_env mod_sum
                 addWarn (Reason Opt_WarnImplicitPrelude) (implicitPreludeWarn)
 
         ; -- TODO This is a little skeevy; maybe handle a bit more directly
-          let { simplifyImport (dL->L _ idecl) =
+          let { simplifyImport (L _ idecl) =
                   ( fmap sl_fs (ideclPkgQual idecl) , ideclName idecl)
               }
         ; raw_sig_imports <- liftIO
@@ -240,7 +244,7 @@ tcRnModuleTcRnM hsc_env mod_sum
                              $ implicitRequirements hsc_env
                                 (map simplifyImport (prel_imports
                                                      ++ import_decls))
-        ; let { mkImport (Nothing, dL->L _ mod_name) = noLoc
+        ; let { mkImport (Nothing, L _ mod_name) = noLoc
                 $ (simpleImportDecl mod_name)
                   { ideclHiding = Just (False, noLoc [])}
               ; mkImport _ = panic "mkImport" }
@@ -254,7 +258,7 @@ tcRnModuleTcRnM hsc_env mod_sum
           -- (via mod_deprec) record that in tcg_warns. If we do thereby add
           -- a WarnAll, it will override any subsequent deprecations added to tcg_warns
           let { tcg_env1 = case mod_deprec of
-                             Just (dL->L _ txt) ->
+                             Just (L _ txt) ->
                                tcg_env {tcg_warns = WarnAll txt}
                              Nothing            -> tcg_env
               }
@@ -271,8 +275,10 @@ tcRnModuleTcRnM hsc_env mod_sum
                       ; tcg_env <- tcRnExports explicit_mod_hdr export_ies
                                      tcg_env
                       ; traceRn "rn4b: after exports" empty
-                      ; -- Check main is exported(must be after tcRnExports)
-                        checkMainExported tcg_env
+                      ; -- When a module header is specified,
+                        -- check that the main module exports a main function.
+                        -- (must be after tcRnExports)
+                        when explicit_mod_hdr $ checkMainExported tcg_env
                       ; -- Compare hi-boot iface (if any) with the real thing
                         -- Must be done after processing the exports
                         tcg_env <- checkHiBootIface tcg_env boot_info
@@ -292,7 +298,7 @@ tcRnModuleTcRnM hsc_env mod_sum
                         -- Do this /after/ typeinference, so that when reporting
                         -- a function with no type signature we can give the
                         -- inferred type
-                        reportUnusedNames export_ies tcg_env
+                        reportUnusedNames tcg_env
                       ; -- add extra source files to tcg_dependent_files
                         addDependentFiles src_files
                       ; tcg_env <- runTypecheckerPlugin mod_sum hsc_env tcg_env
@@ -548,7 +554,7 @@ tc_rn_src_decls ds
             else do { (th_group, th_group_tail) <- findSplice th_ds
                     ; case th_group_tail of
                         { Nothing -> return ()
-                        ; Just (SpliceDecl _ (dL->L loc _) _, _) ->
+                        ; Just (SpliceDecl _ (L loc _) _, _) ->
                             setSrcSpan loc
                             $ addErr (text
                                 ("Declaration splices are not "
@@ -584,8 +590,11 @@ tc_rn_src_decls ds
           { Nothing -> return (tcg_env, tcl_env, lie1)
 
             -- If there's a splice, we must carry on
-          ; Just (SpliceDecl _ (dL->L loc splice) _, rest_ds) ->
-            do { recordTopLevelSpliceLoc loc
+          ; Just (SpliceDecl _ (L _ splice) _, rest_ds) ->
+            do {
+                 -- We need to simplify any constraints from the previous declaration
+                 -- group, or else we might reify metavariables, as in #16980.
+               ; ev_binds1 <- simplifyTop lie1
 
                  -- Rename the splice expression, and get its supporting decls
                ; (spliced_decls, splice_fvs) <- rnTopSpliceDecls splice
@@ -593,9 +602,10 @@ tc_rn_src_decls ds
                  -- Glue them on the front of the remaining decls and loop
                ; (tcg_env, tcl_env, lie2) <-
                    setGblEnv (tcg_env `addTcgDUs` usesOnly splice_fvs) $
+                   addTopEvBinds ev_binds1 $
                    tc_rn_src_decls (spliced_decls ++ rest_ds)
 
-               ; return (tcg_env, tcl_env, lie1 `andWC` lie2)
+               ; return (tcg_env, tcl_env, lie2)
                }
           ; Just (XSpliceDecl nec, _) -> noExtCon nec
           }
@@ -625,7 +635,7 @@ tcRnHsBootDecls hsc_src decls
               <- rnTopSrcDecls first_group
 
         -- The empty list is for extra dependencies coming from .hs-boot files
-        -- See Note [Extra dependencies from .hs-boot files] in RnSource
+        -- See Note [Extra dependencies from .hs-boot files] in GHC.Rename.Source
 
         ; (gbl_env, lie) <- setGblEnv tcg_env $ captureTopConstraints $ do {
               -- NB: setGblEnv **before** captureTopConstraints so that
@@ -673,7 +683,7 @@ tcRnHsBootDecls hsc_src decls
    ; traceTc "boot" (ppr lie); return gbl_env }
 
 badBootDecl :: HscSource -> String -> Located decl -> TcM ()
-badBootDecl hsc_src what (dL->L loc _)
+badBootDecl hsc_src what (L loc _)
   = addErrAt loc (char 'A' <+> text what
       <+> text "declaration is not (currently) allowed in a"
       <+> (case hsc_src of
@@ -727,7 +737,9 @@ checkHiBootIface tcg_env boot_info
              -- TODO: Maybe setGlobalTypeEnv should be strict.
           setGlobalTypeEnv tcg_env_w_binds type_env' }
 
+#if __GLASGOW_HASKELL__ <= 810
   | otherwise = panic "checkHiBootIface: unreachable code"
+#endif
 
 {- Note [DFun impedance matching]
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
@@ -759,7 +771,7 @@ the new tycons and ids.
 
 This most works well, but there is one problem: DFuns!  We do not want
 to look at the mb_insts of the ModDetails in SelfBootInfo, because a
-dfun in one of those ClsInsts is gotten (in TcIface.tcIfaceInst) by a
+dfun in one of those ClsInsts is gotten (in GHC.IfaceToCore.tcIfaceInst) by a
 (lazily evaluated) lookup in the if_rec_types.  We could extend the
 type env, do a setGloblaTypeEnv etc; but that all seems very indirect.
 It is much more directly simply to extract the DFunIds from the
@@ -866,7 +878,7 @@ checkHiBootIface'
           --    that modifying boot_dfun, to make local_boot_fun.
 
       | otherwise
-      = setSrcSpan (getLoc (getName boot_dfun)) $
+      = setSrcSpan (nameSrcSpan (getName boot_dfun)) $
         do { traceTc "check_cls_inst" $ vcat
                 [ text "local_insts"  <+>
                      vcat (map (ppr . idType . instanceDFunId) local_insts)
@@ -1189,7 +1201,7 @@ checkBootTyCon is_boot tc1 tc2
     -- It would have been best if this was purely a question of defaults
     -- (i.e., a user could explicitly ask for one behavior or another) but
     -- the current role system isn't expressive enough to do this.
-    -- Having explict proj-roles would solve this problem.
+    -- Having explicit proj-roles would solve this problem.
 
     rolesSubtypeOf [] [] = True
     -- NB: this relation is the OPPOSITE of the subroling relation
@@ -1458,7 +1470,7 @@ tcTopSrcDecls (HsGroup { hs_tyclds = tycl_decls,
                           foe_binds
 
             ; fo_gres = fi_gres `unionBags` foe_gres
-            ; fo_fvs = foldrBag (\gre fvs -> fvs `addOneFV` gre_name gre)
+            ; fo_fvs = foldr (\gre fvs -> fvs `addOneFV` gre_name gre)
                                 emptyFVs fo_gres
 
             ; sig_names = mkNameSet (collectHsValBinders hs_val_binds)
@@ -1739,7 +1751,7 @@ check_main dflags tcg_env explicit_mod_hdr
         ; (ev_binds, main_expr)
                <- checkConstraints skol_info [] [] $
                   addErrCtxt mainCtxt    $
-                  tcMonoExpr (cL loc (HsVar noExtField (cL loc main_name)))
+                  tcMonoExpr (L loc (HsVar noExtField (L loc main_name)))
                              (mkCheckExpType io_ty)
 
                 -- See Note [Root-main Id]
@@ -1801,11 +1813,10 @@ checkMainExported tcg_env
       Just main_name ->
          do { dflags <- getDynFlags
             ; let main_mod = mainModIs dflags
-            ; when (ghcLink dflags /= LinkInMemory) $      -- #11647
-                checkTc (main_name `elem`
+            ; checkTc (main_name `elem`
                            concatMap availNames (tcg_exports tcg_env)) $
-                   text "The" <+> ppMainFn (nameRdrName main_name) <+>
-                   text "is not exported by module" <+> quotes (ppr main_mod) }
+                text "The" <+> ppMainFn (nameRdrName main_name) <+>
+                text "is not exported by module" <+> quotes (ppr main_mod) }
 
 ppMainFn :: RdrName -> SDoc
 ppMainFn main_fn
@@ -1827,7 +1838,7 @@ being called "Main.main".  That's why root_main_id has a fixed module
 ":Main".)
 
 This is unusual: it's a LocalId whose Name has a Module from another
-module.  Tiresomely, we must filter it out again in MkIface, les we
+module. Tiresomely, we must filter it out again in GHC.Iface.Utils, less we
 get two defns for 'main' in the interface file!
 
 
@@ -1888,7 +1899,8 @@ runTcInteractive hsc_env thing_inside
                          , tcg_imports      = imports
                          }
 
-       ; lcl_env' <- tcExtendLocalTypeEnv lcl_env lcl_ids
+             lcl_env' = tcExtendLocalTypeEnv lcl_env lcl_ids
+
        ; setEnvs (gbl_env', lcl_env') thing_inside }
   where
     (home_insts, home_fam_insts) = hptInstances hsc_env (\_ -> True)
@@ -1930,9 +1942,8 @@ types have free RuntimeUnk skolem variables, standing for unknown
 types.  If we don't register these free TyVars as global TyVars then
 the typechecker will try to quantify over them and fall over in
 skolemiseQuantifiedTyVar. so we must add any free TyVars to the
-typechecker's global TyVar set.  That is most conveniently by using
-tcExtendLocalTypeEnv, which automatically extends the global TyVar
-set.
+typechecker's global TyVar set.  That is done by using
+tcExtendLocalTypeEnv.
 
 We do this by splitting out the Ids with open types, using 'is_closed'
 to do the partition.  The top-level things go in the global TypeEnv;
@@ -2050,53 +2061,53 @@ runPlans (p:ps) = tryTcDiscardingErrs (runPlans ps) p
 tcUserStmt :: GhciLStmt GhcPs -> TcM (PlanResult, FixityEnv)
 
 -- An expression typed at the prompt is treated very specially
-tcUserStmt (dL->L loc (BodyStmt _ expr _ _))
+tcUserStmt (L loc (BodyStmt _ expr _ _))
   = do  { (rn_expr, fvs) <- checkNoErrs (rnLExpr expr)
                -- Don't try to typecheck if the renamer fails!
         ; ghciStep <- getGhciStepIO
         ; uniq <- newUnique
         ; interPrintName <- getInteractivePrintName
         ; let fresh_it  = itName uniq loc
-              matches   = [mkMatch (mkPrefixFunRhs (cL loc fresh_it)) [] rn_expr
+              matches   = [mkMatch (mkPrefixFunRhs (L loc fresh_it)) [] rn_expr
                                    (noLoc emptyLocalBinds)]
               -- [it = expr]
-              the_bind  = cL loc $ (mkTopFunBind FromSource
-                                     (cL loc fresh_it) matches)
+              the_bind  = L loc $ (mkTopFunBind FromSource
+                                     (L loc fresh_it) matches)
                                          { fun_ext = fvs }
               -- Care here!  In GHCi the expression might have
               -- free variables, and they in turn may have free type variables
               -- (if we are at a breakpoint, say).  We must put those free vars
 
               -- [let it = expr]
-              let_stmt  = cL loc $ LetStmt noExtField $ noLoc $ HsValBinds noExtField
+              let_stmt  = L loc $ LetStmt noExtField $ noLoc $ HsValBinds noExtField
                            $ XValBindsLR
                                (NValBinds [(NonRecursive,unitBag the_bind)] [])
 
               -- [it <- e]
-              bind_stmt = cL loc $ BindStmt noExtField
-                                       (cL loc (VarPat noExtField (cL loc fresh_it)))
+              bind_stmt = L loc $ BindStmt noExtField
+                                       (L loc (VarPat noExtField (L loc fresh_it)))
                                        (nlHsApp ghciStep rn_expr)
                                        (mkRnSyntaxExpr bindIOName)
                                        noSyntaxExpr
 
               -- [; print it]
-              print_it  = cL loc $ BodyStmt noExtField
+              print_it  = L loc $ BodyStmt noExtField
                                            (nlHsApp (nlHsVar interPrintName)
                                            (nlHsVar fresh_it))
                                            (mkRnSyntaxExpr thenIOName)
                                                   noSyntaxExpr
 
               -- NewA
-              no_it_a = cL loc $ BodyStmt noExtField (nlHsApps bindIOName
+              no_it_a = L loc $ BodyStmt noExtField (nlHsApps bindIOName
                                        [rn_expr , nlHsVar interPrintName])
                                        (mkRnSyntaxExpr thenIOName)
                                        noSyntaxExpr
 
-              no_it_b = cL loc $ BodyStmt noExtField (rn_expr)
+              no_it_b = L loc $ BodyStmt noExtField (rn_expr)
                                        (mkRnSyntaxExpr thenIOName)
                                        noSyntaxExpr
 
-              no_it_c = cL loc $ BodyStmt noExtField
+              no_it_c = L loc $ BodyStmt noExtField
                                       (nlHsApp (nlHsVar interPrintName) rn_expr)
                                       (mkRnSyntaxExpr thenIOName)
                                       noSyntaxExpr
@@ -2158,7 +2169,7 @@ two redundant type-error warnings, one from each plan.
 #14963 reveals another bug that when deferred type errors is enabled
 in GHCi, any reference of imported/loaded variables (directly or indirectly)
 in interactively issued naked expressions will cause ghc panic. See more
-detailed dicussion in #14963.
+detailed discussion in #14963.
 
 The interactively issued declarations, statements, as well as the modules
 loaded into GHCi, are not affected. That means, for declaration, you could
@@ -2196,7 +2207,7 @@ But for naked expressions, you will have
           In an equation for ‘x’: x = putStrLn True
 -}
 
-tcUserStmt rdr_stmt@(dL->L loc _)
+tcUserStmt rdr_stmt@(L loc _)
   = do { (([rn_stmt], fix_env), fvs) <- checkNoErrs $
            rnStmts GhciStmtCtxt rnLExpr [rdr_stmt] $ \_ -> do
              fix_env <- getFixityEnv
@@ -2207,8 +2218,8 @@ tcUserStmt rdr_stmt@(dL->L loc _)
 
        ; ghciStep <- getGhciStepIO
        ; let gi_stmt
-               | (dL->L loc (BindStmt ty pat expr op1 op2)) <- rn_stmt
-                     = cL loc $ BindStmt ty pat (nlHsApp ghciStep expr) op1 op2
+               | (L loc (BindStmt ty pat expr op1 op2)) <- rn_stmt
+                     = L loc $ BindStmt ty pat (nlHsApp ghciStep expr) op1 op2
                | otherwise = rn_stmt
 
        ; opt_pr_flag <- goptM Opt_PrintBindResult
@@ -2230,7 +2241,7 @@ tcUserStmt rdr_stmt@(dL->L loc _)
            ; when (isUnitTy v_ty || not (isTauTy v_ty)) failM
            ; return stuff }
       where
-        print_v  = cL loc $ BodyStmt noExtField (nlHsApp (nlHsVar printName)
+        print_v  = L loc $ BodyStmt noExtField (nlHsApp (nlHsVar printName)
                                     (nlHsVar v))
                                     (mkRnSyntaxExpr thenIOName) noSyntaxExpr
 
@@ -2432,6 +2443,8 @@ tcRnType hsc_env flexi normalise rdr_type
                   -- generalisation; e.g.   :kind (T _)
        ; failIfErrsM
 
+        -- We follow Note [Recipe for checking a signature] in TcHsType here
+
         -- Now kind-check the type
         -- It can have any rank or kind
         -- First bring into scope any wildcards
@@ -2445,8 +2458,7 @@ tcRnType hsc_env flexi normalise rdr_type
                           ; tcLHsTypeUnsaturated rn_type }
 
        -- Do kind generalisation; see Note [Kind-generalise in tcRnType]
-       ; kind <- zonkTcType kind
-       ; kvs <- kindGeneralize kind
+       ; kvs <- kindGeneralizeAll kind
        ; e <- mkEmptyZonkEnv flexi
 
        ; ty  <- zonkTcTypeToTypeX e ty
@@ -2586,7 +2598,7 @@ getModuleInterface hsc_env mod
 tcRnLookupRdrName :: HscEnv -> Located RdrName
                   -> IO (Messages, Maybe [Name])
 -- ^ Find all the Names that this RdrName could mean, in GHCi
-tcRnLookupRdrName hsc_env (dL->L loc rdr_name)
+tcRnLookupRdrName hsc_env (L loc rdr_name)
   = runTcInteractive hsc_env $
     setSrcSpan loc           $
     do {   -- If the identifier is a constructor (begins with an
@@ -2703,9 +2715,9 @@ loadUnqualIfaces hsc_env ictxt
 ************************************************************************
 -}
 
+-- | Dump, with a banner, if -ddump-rn
 rnDump :: (Outputable a, Data a) => a -> TcRn ()
--- Dump, with a banner, if -ddump-rn
-rnDump rn = do { traceOptTcRn Opt_D_dump_rn (mkDumpDoc "Renamer" (ppr rn)) }
+rnDump rn = dumpOptTcRn Opt_D_dump_rn "Renamer" FormatHaskell (ppr rn)
 
 tcDump :: TcGblEnv -> TcRn ()
 tcDump env
@@ -2713,13 +2725,14 @@ tcDump env
 
         -- Dump short output if -ddump-types or -ddump-tc
         when (dopt Opt_D_dump_types dflags || dopt Opt_D_dump_tc dflags)
-          (traceTcRnForUser Opt_D_dump_types short_dump) ;
+          (dumpTcRn True (dumpOptionsFromFlag Opt_D_dump_types)
+            "" FormatText short_dump) ;
 
         -- Dump bindings if -ddump-tc
-        traceOptTcRn Opt_D_dump_tc (mkDumpDoc "Typechecker" full_dump);
+        dumpOptTcRn Opt_D_dump_tc "Typechecker" FormatHaskell full_dump;
 
         -- Dump bindings as an hsSyn AST if -ddump-tc-ast
-        traceOptTcRn Opt_D_dump_tc_ast (mkDumpDoc "Typechecker" ast_dump)
+        dumpOptTcRn Opt_D_dump_tc_ast "Typechecker AST" FormatHaskell ast_dump
    }
   where
     short_dump = pprTcGblEnv env
@@ -2773,7 +2786,7 @@ ppr_types debug type_env
                          _            -> False
              -- Data cons (workers and wrappers), pattern synonyms,
              -- etc are suppressed (unless -dppr-debug),
-             -- because they appear elsehwere
+             -- because they appear elsewhere
 
     ppr_sig id = hang (ppr id <+> dcolon) 2 (ppr (tidyTopType (idType id)))
 
@@ -2804,7 +2817,7 @@ ppr_tycons debug fam_insts type_env
          roles = tyConRoles tc
          boring_role | isClassTyCon tc = Nominal
                      | otherwise       = Representational
-            -- Matches the choice in IfaceSyn, calls to pprRoles
+            -- Matches the choice in GHC.Iface.Syntax, calls to pprRoles
 
     ppr_ax ax = ppr (coAxiomToIfaceDecl ax)
       -- We go via IfaceDecl rather than using pprCoAxiom

@@ -1,5 +1,10 @@
 {-# LANGUAGE RankNTypes #-}
 {-# LANGUAGE CPP #-}
+
+-- | Definitions for writing /plugins/ for GHC. Plugins can hook into
+-- several areas of the compiler. See the 'Plugin' type. These plugins
+-- include type-checker plugins, source plugins, and core-to-core plugins.
+
 module Plugins (
       -- * Plugins
       Plugin(..)
@@ -48,7 +53,7 @@ import {-# SOURCE #-} CoreMonad ( CoreToDo, CoreM )
 import qualified TcRnTypes
 import TcRnTypes ( TcGblEnv, IfM, TcM, tcg_rn_decls, tcg_rn_exports  )
 import TcHoleFitTypes ( HoleFitPluginR )
-import HsSyn
+import GHC.Hs
 import DynFlags
 import HscTypes
 import GhcMonad
@@ -87,6 +92,13 @@ data Plugin = Plugin {
   , holeFitPlugin :: HoleFitPlugin
     -- ^ An optional plugin to handle hole fits, which may re-order
     --   or change the list of valid hole fits and refinement hole fits.
+  , dynflagsPlugin :: [CommandLineOption] -> DynFlags -> IO DynFlags
+    -- ^ An optional plugin to update 'DynFlags', right after
+    --   plugin loading. This can be used to register hooks
+    --   or tweak any field of 'DynFlags' before doing
+    --   actual work on a module.
+    --
+    --   @since 8.10.1
   , pluginRecompile :: [CommandLineOption] -> IO PluginRecompile
     -- ^ Specify how the plugin should affect recompilation.
   , parsedResultAction :: [CommandLineOption] -> ModSummary -> HsParsedModule
@@ -107,7 +119,7 @@ data Plugin = Plugin {
   , interfaceLoadAction :: forall lcl . [CommandLineOption] -> ModIface
                                           -> IfM lcl ModIface
     -- ^ Modify an interface that have been loaded. This is called by
-    -- LoadIface when an interface is successfully loaded. Not applied to
+    -- GHC.Iface.Load when an interface is successfully loaded. Not applied to
     -- the loading of the plugin interface. Tools that rely on information from
     -- modules other than the currently compiled one should implement this
     -- function.
@@ -189,13 +201,14 @@ flagRecompile =
 
 -- | Default plugin: does nothing at all, except for marking that safe
 -- inference has failed unless @-fplugin-trustworthy@ is passed. For
--- compatibility reaso you should base all your plugin definitions on this
+-- compatibility reason you should base all your plugin definitions on this
 -- default value.
 defaultPlugin :: Plugin
 defaultPlugin = Plugin {
         installCoreToDos      = const return
       , tcPlugin              = const Nothing
       , holeFitPlugin         = const Nothing
+      , dynflagsPlugin        = const return
       , pluginRecompile       = impurePlugin
       , renamedResultAction   = \_ env grp -> return (env, grp)
       , parsedResultAction    = \_ _ -> return

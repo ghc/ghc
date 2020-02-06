@@ -10,13 +10,10 @@
 --
 module GHCi.InfoTable
   (
-#if defined(HAVE_INTERPRETER)
     mkConInfoTable
-#endif
   ) where
 
 import Prelude -- See note [Why do we import Prelude here?]
-#if defined(HAVE_INTERPRETER)
 import Foreign
 import Foreign.C
 import GHC.Ptr
@@ -24,7 +21,6 @@ import GHC.Exts
 import GHC.Exts.Heap
 import Data.ByteString (ByteString)
 import qualified Data.ByteString as BS
-#endif
 
 ghciTablesNextToCode :: Bool
 #if defined(TABLES_NEXT_TO_CODE)
@@ -33,7 +29,6 @@ ghciTablesNextToCode = True
 ghciTablesNextToCode = False
 #endif
 
-#if defined(HAVE_INTERPRETER) /* To end */
 -- NOTE: Must return a pointer acceptable for use in the header of a closure.
 -- If tables_next_to_code is enabled, then it must point the the 'code' field.
 -- Otherwise, it should point to the start of the StgInfoTable.
@@ -81,6 +76,7 @@ data Arch = ArchSPARC
           | ArchARM64
           | ArchPPC64
           | ArchPPC64LE
+          | ArchS390X
           | ArchUnknown
  deriving Show
 
@@ -104,6 +100,8 @@ platform =
        ArchPPC64
 #elif defined(powerpc64le_HOST_ARCH)
        ArchPPC64LE
+#elif defined(s390x_HOST_ARCH)
+       ArchS390X
 #else
 #    if defined(TABLES_NEXT_TO_CODE)
 #        error Unimplemented architecture
@@ -273,6 +271,20 @@ mkJumpToAddr a = case platform of
                    0x618C0000 .|. lo16 w32,
                    0x7D8903A6, 0x4E800420 ]
 
+    ArchS390X ->
+        -- Let 0xAABBCCDDEEFFGGHH be the address to jump to.
+        -- The following code loads the address into scratch
+        -- register r1 and jumps to it.
+        --
+        --    0:   C0 1E AA BB CC DD       llihf   %r1,0xAABBCCDD
+        --    6:   C0 19 EE FF GG HH       iilf    %r1,0xEEFFGGHH
+        --   12:   07 F1                   br      %r1
+
+        let w64 = fromIntegral (funPtrToInt a) :: Word64
+        in Left [ 0xC0, 0x1E, byte7 w64, byte6 w64, byte5 w64, byte4 w64,
+                  0xC0, 0x19, byte3 w64, byte2 w64, byte1 w64, byte0 w64,
+                  0x07, 0xF1 ]
+
     -- This code must not be called. You either need to
     -- add your architecture as a distinct case or
     -- use non-TABLES_NEXT_TO_CODE mode
@@ -387,4 +399,3 @@ wORD_SIZE = (#const SIZEOF_HSINT)
 
 conInfoTableSizeB :: Int
 conInfoTableSizeB = wORD_SIZE + itblSize
-#endif /* HAVE_INTERPRETER */

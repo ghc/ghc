@@ -16,6 +16,8 @@ This is where we do all the grimy bindings' generation.
 {-# LANGUAGE FlexibleContexts #-}
 {-# LANGUAGE TypeFamilies #-}
 
+{-# OPTIONS_GHC -Wno-incomplete-uni-patterns #-}
+
 module TcGenDeriv (
         BagDerivStuff, DerivStuff(..),
 
@@ -40,7 +42,7 @@ module TcGenDeriv (
 import GhcPrelude
 
 import TcRnMonad
-import HsSyn
+import GHC.Hs
 import RdrName
 import BasicTypes
 import DataCon
@@ -358,11 +360,11 @@ gen_Ord_binds loc tycon = do
       = emptyBag
 
     negate_expr = nlHsApp (nlHsVar not_RDR)
-    lE = mk_easy_FunBind loc le_RDR [a_Pat, b_Pat] $
+    lE = mkSimpleGeneratedFunBind loc le_RDR [a_Pat, b_Pat] $
         negate_expr (nlHsApp (nlHsApp (nlHsVar lt_RDR) b_Expr) a_Expr)
-    gT = mk_easy_FunBind loc gt_RDR [a_Pat, b_Pat] $
+    gT = mkSimpleGeneratedFunBind loc gt_RDR [a_Pat, b_Pat] $
         nlHsApp (nlHsApp (nlHsVar lt_RDR) b_Expr) a_Expr
-    gE = mk_easy_FunBind loc ge_RDR [a_Pat, b_Pat] $
+    gE = mkSimpleGeneratedFunBind loc ge_RDR [a_Pat, b_Pat] $
         negate_expr (nlHsApp (nlHsApp (nlHsVar lt_RDR) a_Expr) b_Expr)
 
     get_tag con = dataConTag con - fIRST_TAG
@@ -381,7 +383,7 @@ gen_Ord_binds loc tycon = do
 
     mkOrdOp :: DynFlags -> OrdOp -> LHsBind GhcPs
     -- Returns a binding   op a b = ... compares a and b according to op ....
-    mkOrdOp dflags op = mk_easy_FunBind loc (ordMethRdr op) [a_Pat, b_Pat]
+    mkOrdOp dflags op = mkSimpleGeneratedFunBind loc (ordMethRdr op) [a_Pat, b_Pat]
                                         (mkOrdOpRhs dflags op)
 
     mkOrdOpRhs :: DynFlags -> OrdOp -> LHsExpr GhcPs
@@ -515,7 +517,7 @@ unliftedOrdOp ty op a b
    b_expr = nlHsVar b
 
 unliftedCompare :: RdrName -> RdrName
-                -> LHsExpr GhcPs -> LHsExpr GhcPs   -- What to cmpare
+                -> LHsExpr GhcPs -> LHsExpr GhcPs   -- What to compare
                 -> LHsExpr GhcPs -> LHsExpr GhcPs -> LHsExpr GhcPs
                                                     -- Three results
                 -> LHsExpr GhcPs
@@ -597,7 +599,7 @@ gen_Enum_binds loc tycon = do
     occ_nm = getOccString tycon
 
     succ_enum dflags
-      = mk_easy_FunBind loc succ_RDR [a_Pat] $
+      = mkSimpleGeneratedFunBind loc succ_RDR [a_Pat] $
         untag_Expr dflags tycon [(a_RDR, ah_RDR)] $
         nlHsIf (nlHsApps eq_RDR [nlHsVar (maxtag_RDR dflags tycon),
                                nlHsVarApps intDataCon_RDR [ah_RDR]])
@@ -607,7 +609,7 @@ gen_Enum_binds loc tycon = do
                                         nlHsIntLit 1]))
 
     pred_enum dflags
-      = mk_easy_FunBind loc pred_RDR [a_Pat] $
+      = mkSimpleGeneratedFunBind loc pred_RDR [a_Pat] $
         untag_Expr dflags tycon [(a_RDR, ah_RDR)] $
         nlHsIf (nlHsApps eq_RDR [nlHsIntLit 0,
                                nlHsVarApps intDataCon_RDR [ah_RDR]])
@@ -619,7 +621,7 @@ gen_Enum_binds loc tycon = do
                                                 (mkIntegralLit (-1 :: Int)))]))
 
     to_enum dflags
-      = mk_easy_FunBind loc toEnum_RDR [a_Pat] $
+      = mkSimpleGeneratedFunBind loc toEnum_RDR [a_Pat] $
         nlHsIf (nlHsApps and_RDR
                 [nlHsApps ge_RDR [nlHsVar a_RDR, nlHsIntLit 0],
                  nlHsApps le_RDR [ nlHsVar a_RDR
@@ -628,7 +630,7 @@ gen_Enum_binds loc tycon = do
              (illegal_toEnum_tag occ_nm (maxtag_RDR dflags tycon))
 
     enum_from dflags
-      = mk_easy_FunBind loc enumFrom_RDR [a_Pat] $
+      = mkSimpleGeneratedFunBind loc enumFrom_RDR [a_Pat] $
           untag_Expr dflags tycon [(a_RDR, ah_RDR)] $
           nlHsApps map_RDR
                 [nlHsVar (tag2con_RDR dflags tycon),
@@ -637,7 +639,7 @@ gen_Enum_binds loc tycon = do
                             (nlHsVar (maxtag_RDR dflags tycon)))]
 
     enum_from_then dflags
-      = mk_easy_FunBind loc enumFromThen_RDR [a_Pat, b_Pat] $
+      = mkSimpleGeneratedFunBind loc enumFromThen_RDR [a_Pat, b_Pat] $
           untag_Expr dflags tycon [(a_RDR, ah_RDR), (b_RDR, bh_RDR)] $
           nlHsApp (nlHsVarApps map_RDR [tag2con_RDR dflags tycon]) $
             nlHsPar (enum_from_then_to_Expr
@@ -650,7 +652,7 @@ gen_Enum_binds loc tycon = do
                            ))
 
     from_enum dflags
-      = mk_easy_FunBind loc fromEnum_RDR [a_Pat] $
+      = mkSimpleGeneratedFunBind loc fromEnum_RDR [a_Pat] $
           untag_Expr dflags tycon [(a_RDR, ah_RDR)] $
           (nlHsVarApps intDataCon_RDR [ah_RDR])
 
@@ -766,7 +768,7 @@ gen_Ix_binds loc tycon = do
       ]
 
     enum_range dflags
-      = mk_easy_FunBind loc range_RDR [nlTuplePat [a_Pat, b_Pat] Boxed] $
+      = mkSimpleGeneratedFunBind loc range_RDR [nlTuplePat [a_Pat, b_Pat] Boxed] $
           untag_Expr dflags tycon [(a_RDR, ah_RDR)] $
           untag_Expr dflags tycon [(b_RDR, bh_RDR)] $
           nlHsApp (nlHsVarApps map_RDR [tag2con_RDR dflags tycon]) $
@@ -775,7 +777,7 @@ gen_Ix_binds loc tycon = do
                         (nlHsVarApps intDataCon_RDR [bh_RDR]))
 
     enum_index dflags
-      = mk_easy_FunBind loc unsafeIndex_RDR
+      = mkSimpleGeneratedFunBind loc unsafeIndex_RDR
                 [noLoc (AsPat noExtField (noLoc c_RDR)
                            (nlTuplePat [a_Pat, nlWildPat] Boxed)),
                                 d_Pat] (
@@ -792,7 +794,7 @@ gen_Ix_binds loc tycon = do
 
     -- This produces something like `(ch >= ah) && (ch <= bh)`
     enum_inRange dflags
-      = mk_easy_FunBind loc inRange_RDR [nlTuplePat [a_Pat, b_Pat] Boxed, c_Pat] $
+      = mkSimpleGeneratedFunBind loc inRange_RDR [nlTuplePat [a_Pat, b_Pat] Boxed, c_Pat] $
           untag_Expr dflags tycon [(a_RDR, ah_RDR)] (
           untag_Expr dflags tycon [(b_RDR, bh_RDR)] (
           untag_Expr dflags tycon [(c_RDR, ch_RDR)] (
@@ -825,7 +827,7 @@ gen_Ix_binds loc tycon = do
 
     --------------------------------------------------------------
     single_con_range
-      = mk_easy_FunBind loc range_RDR
+      = mkSimpleGeneratedFunBind loc range_RDR
           [nlTuplePat [con_pat as_needed, con_pat bs_needed] Boxed] $
         noLoc (mkHsComp ListComp stmts con_expr)
       where
@@ -837,7 +839,7 @@ gen_Ix_binds loc tycon = do
 
     ----------------
     single_con_index
-      = mk_easy_FunBind loc unsafeIndex_RDR
+      = mkSimpleGeneratedFunBind loc unsafeIndex_RDR
                 [nlTuplePat [con_pat as_needed, con_pat bs_needed] Boxed,
                  con_pat cs_needed]
         -- We need to reverse the order we consider the components in
@@ -863,7 +865,7 @@ gen_Ix_binds loc tycon = do
 
     ------------------
     single_con_inRange
-      = mk_easy_FunBind loc inRange_RDR
+      = mkSimpleGeneratedFunBind loc inRange_RDR
                 [nlTuplePat [con_pat as_needed, con_pat bs_needed] Boxed,
                  con_pat cs_needed] $
           if con_arity == 0
@@ -1380,7 +1382,7 @@ gen_data dflags data_type_name constr_names loc rep_tc
                      mk_k_app e v = nlHsPar (nlHsOpApp e k_RDR (nlHsVar v))
 
         ------------ gunfold
-    gunfold_bind = mk_easy_FunBind loc
+    gunfold_bind = mkSimpleGeneratedFunBind loc
                      gunfold_RDR
                      [k_Pat, z_Pat, if one_constr then nlWildPat else c_Pat]
                      gunfold_rhs
@@ -1409,7 +1411,7 @@ gen_data dflags data_type_name constr_names loc rep_tc
     to_con_eqn dc con_name = ([nlWildConPat dc], nlHsVar con_name)
 
         ------------ dataTypeOf
-    dataTypeOf_bind = mk_easy_FunBind
+    dataTypeOf_bind = mkSimpleGeneratedFunBind
                         loc
                         dataTypeOf_RDR
                         [nlWildPat]
@@ -1436,12 +1438,12 @@ gen_data dflags data_type_name constr_names loc rep_tc
                 | tycon_kind `tcEqKind` kind2 = mk_gcast dataCast2_RDR gcast2_RDR
                 | otherwise                 = emptyBag
     mk_gcast dataCast_RDR gcast_RDR
-      = unitBag (mk_easy_FunBind loc dataCast_RDR [nlVarPat f_RDR]
+      = unitBag (mkSimpleGeneratedFunBind loc dataCast_RDR [nlVarPat f_RDR]
                                  (nlHsVar gcast_RDR `nlHsApp` nlHsVar f_RDR))
 
 
 kind1, kind2 :: Kind
-kind1 = liftedTypeKind `mkVisFunTy` liftedTypeKind
+kind1 = typeToTypeKind
 kind2 = liftedTypeKind `mkVisFunTy` kind1
 
 gfoldl_RDR, gunfold_RDR, toConstr_RDR, dataTypeOf_RDR, mkConstr_RDR,
@@ -1973,11 +1975,11 @@ genAuxBinds dflags loc b = genAuxBinds' b2 where
   splitDerivAuxBind (DerivAuxBind x) = Left x
   splitDerivAuxBind  x               = Right x
 
-  rm_dups = foldrBag dup_check emptyBag
+  rm_dups = foldr dup_check emptyBag
   dup_check a b = if anyBag (== a) b then b else consBag a b
 
   genAuxBinds' :: BagDerivStuff -> SeparateBagsDerivStuff
-  genAuxBinds' = foldrBag f ( mapBag (genAuxBindSpec dflags loc) (rm_dups b1)
+  genAuxBinds' = foldr f ( mapBag (genAuxBindSpec dflags loc) (rm_dups b1)
                             , emptyBag )
   f :: DerivStuff -> SeparateBagsDerivStuff -> SeparateBagsDerivStuff
   f (DerivAuxBind _) = panic "genAuxBinds'" -- We have removed these before
@@ -2019,7 +2021,7 @@ mkFunBindSE arity loc fun pats_and_exprs
 mkRdrFunBind :: Located RdrName -> [LMatch GhcPs (LHsExpr GhcPs)]
              -> LHsBind GhcPs
 mkRdrFunBind fun@(L loc _fun_rdr) matches
-  = L loc (mkFunBind fun matches)
+  = L loc (mkFunBind Generated fun matches)
 
 -- | Make a function binding. If no equations are given, produce a function
 -- with the given arity that uses an empty case expression for the last
@@ -2047,7 +2049,7 @@ mkRdrFunBindEC :: Arity
                -> [LMatch GhcPs (LHsExpr GhcPs)]
                -> LHsBind GhcPs
 mkRdrFunBindEC arity catch_all
-                 fun@(L loc _fun_rdr) matches = L loc (mkFunBind fun matches')
+                 fun@(L loc _fun_rdr) matches = L loc (mkFunBind Generated fun matches')
  where
    -- Catch-all eqn looks like
    --     fmap _ z = case z of {}
@@ -2071,7 +2073,7 @@ mkRdrFunBindEC arity catch_all
 mkRdrFunBindSE :: Arity -> Located RdrName ->
                     [LMatch GhcPs (LHsExpr GhcPs)] -> LHsBind GhcPs
 mkRdrFunBindSE arity
-                 fun@(L loc fun_rdr) matches = L loc (mkFunBind fun matches')
+                 fun@(L loc fun_rdr) matches = L loc (mkFunBind Generated fun matches')
  where
    -- Catch-all eqn looks like
    --     compare _ _ = error "Void compare"
@@ -2369,7 +2371,7 @@ mkAuxBinderName dflags parent occ_fun
 {-
 Note [Auxiliary binders]
 ~~~~~~~~~~~~~~~~~~~~~~~~
-We often want to make a top-level auxiliary binding.  E.g. for comparison we haev
+We often want to make a top-level auxiliary binding.  E.g. for comparison we have
 
   instance Ord T where
     compare a b = $con2tag a `compare` $con2tag b

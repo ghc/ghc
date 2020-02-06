@@ -152,7 +152,7 @@ ar = AR_TOOL_BIN
 -- dll is 2^16-1, however Microsoft's lib.exe for some reason refuses to link
 -- up to this amount. The reason is likely that it adds some extra symbols in
 -- the generated dll, such as dllmain etc. So we reserve some space in the
--- symbol table to accomodate this. This number is just purely randomly chosen.
+-- symbol table to accommodate this. This number is just purely randomly chosen.
 #define SYMBOL_PADDING 10
 
 usage :: IO ()
@@ -453,7 +453,7 @@ execLibTool input_def output_lib =
 -- This function is called always and decided internally
 -- what to do.
 build_delay_import_lib :: String -- ^ input def file
-                       -> String -- ^ ouput import delayed import lib
+                       -> String -- ^ output import delayed import lib
                        -> String -- ^ flag to indicate if delay import
                                  --   lib should be created
                        -> IO ()
@@ -471,7 +471,7 @@ build_import_lib base dll_name defFile objs
 
        -- This split is important because for DATA entries the compiler should not generate
        -- a trampoline since CONTS DATA is directly referenced and not executed. This is not very
-       -- important for mingw-w64 which would generate both the trampoline and direct referecne
+       -- important for mingw-w64 which would generate both the trampoline and direct reference
        -- by default, but for libtool is it and even for mingw-w64 we can trim the output.
        _ <- withFile defFile WriteMode $ \hDef -> do
               hPutStrLn hDef $ unlines $ ["LIBRARY " ++ show dll_name

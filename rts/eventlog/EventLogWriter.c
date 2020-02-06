@@ -82,7 +82,7 @@ initEventLogFileWriter(void)
     char *event_log_filename = outputFileName();
 
     /* Open event log file for writing. */
-    if ((event_log_file = __rts_fopen(event_log_filename, "wb")) == NULL) {
+    if ((event_log_file = __rts_fopen(event_log_filename, "wb+")) == NULL) {
         sysErrorBelch(
             "initEventLogFileWriter: can't open %s", event_log_filename);
         stg_exit(EXIT_FAILURE);
@@ -122,6 +122,7 @@ stopEventLogFileWriter(void)
 {
     if (event_log_file != NULL) {
         fclose(event_log_file);
+        event_log_file = NULL;
     }
 }
 

@@ -1,9 +1,10 @@
+{-# OPTIONS_GHC -Wno-incomplete-record-updates #-}
 
 module HaddockUtils where
 
 import GhcPrelude
 
-import HsSyn
+import GHC.Hs
 import SrcLoc
 
 import Control.Monad

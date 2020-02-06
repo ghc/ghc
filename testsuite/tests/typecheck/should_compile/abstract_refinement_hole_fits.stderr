@@ -108,10 +108,10 @@ abstract_refinement_hole_fits.hs:4:5: warning: [-Wtyped-holes (in -Wdefault)]
           where fst :: forall a b. (a, b) -> a
         snd (_ :: (a0, [Integer] -> Integer))
           where snd :: forall a b. (a, b) -> b
-        seq (_ :: a13) (_ :: [Integer] -> Integer)
-          where seq :: forall a b. a -> b -> b
         const (_ :: [Integer] -> Integer) (_ :: b6)
           where const :: forall a b. a -> b -> a
+        seq (_ :: a13) (_ :: [Integer] -> Integer)
+          where seq :: forall a b. a -> b -> b
         ($) (_ :: a5 -> [Integer] -> Integer) (_ :: a5)
           where ($) :: forall a b. (a -> b) -> a -> b
         return (_ :: [Integer] -> Integer) (_ :: t1)
@@ -228,10 +228,10 @@ abstract_refinement_hole_fits.hs:7:5: warning: [-Wtyped-holes (in -Wdefault)]
           where fst :: forall a b. (a, b) -> a
         snd (_ :: (a0, Integer -> [Integer] -> Integer))
           where snd :: forall a b. (a, b) -> b
-        seq (_ :: a13) (_ :: Integer -> [Integer] -> Integer)
-          where seq :: forall a b. a -> b -> b
         const (_ :: Integer -> [Integer] -> Integer) (_ :: b6)
           where const :: forall a b. a -> b -> a
+        seq (_ :: a13) (_ :: Integer -> [Integer] -> Integer)
+          where seq :: forall a b. a -> b -> b
         ($) (_ :: a5 -> Integer -> [Integer] -> Integer) (_ :: a5)
           where ($) :: forall a b. (a -> b) -> a -> b
         return (_ :: Integer -> [Integer] -> Integer) (_ :: t1)

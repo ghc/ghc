@@ -7,8 +7,8 @@
 -- -----------------------------------------------------------------------------
 module Stream (
     Stream(..), yield, liftIO,
-    collect, fromList,
-    Stream.map, Stream.mapM, Stream.mapAccumL
+    collect, collect_, consume, fromList,
+    Stream.map, Stream.mapM, Stream.mapAccumL, Stream.mapAccumL_
   ) where
 
 import GhcPrelude
@@ -71,6 +71,25 @@ collect str = go str []
       Left () -> return (reverse acc)
       Right (a, str') -> go str' (a:acc)
 
+-- | Turn a Stream into an ordinary list, by demanding all the elements.
+collect_ :: Monad m => Stream m a r -> m ([a], r)
+collect_ str = go str []
+ where
+  go str acc = do
+    r <- runStream str
+    case r of
+      Left r -> return (reverse acc, r)
+      Right (a, str') -> go str' (a:acc)
+
+consume :: Monad m => Stream m a b -> (a -> m ()) -> m b
+consume str f = do
+    r <- runStream str
+    case r of
+      Left ret -> return ret
+      Right (a, str') -> do
+        f a
+        consume str' f
+
 -- | Turn a list into a 'Stream', by yielding each element in turn.
 fromList :: Monad m => [a] -> Stream m a ()
 fromList = mapM_ yield
@@ -104,3 +123,13 @@ mapAccumL f c str = Stream $ do
     Right (a, str') -> do
       (c',b) <- f c a
       return (Right (b, mapAccumL f c' str'))
+
+mapAccumL_ :: Monad m => (c -> a -> m (c,b)) -> c -> Stream m a r
+           -> Stream m b (c, r)
+mapAccumL_ f c str = Stream $ do
+  r <- runStream str
+  case r of
+    Left  r -> return (Left (c, r))
+    Right (a, str') -> do
+      (c',b) <- f c a
+      return (Right (b, mapAccumL_ f c' str'))

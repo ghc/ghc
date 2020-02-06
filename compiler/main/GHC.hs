@@ -34,6 +34,7 @@ module GHC (
         getSessionDynFlags, setSessionDynFlags,
         getProgramDynFlags, setProgramDynFlags, setLogAction,
         getInteractiveDynFlags, setInteractiveDynFlags,
+        interpretPackageEnv,
 
         -- * Targets
         Target(..), TargetId(..), Phase,
@@ -80,11 +81,12 @@ module GHC (
         modInfoIsExportedName,
         modInfoLookupName,
         modInfoIface,
+        modInfoRdrEnv,
         modInfoSafe,
         lookupGlobalName,
         findGlobalAnns,
         mkPrintUnqualifiedForModule,
-        ModIface(..),
+        ModIface, ModIface_(..),
         SafeHaskellMode(..),
 
         -- * Querying the environment
@@ -195,7 +197,7 @@ module GHC (
 
         -- ** Data constructors
         DataCon,
-        dataConSig, dataConType, dataConTyCon, dataConFieldLabels,
+        dataConType, dataConTyCon, dataConFieldLabels,
         dataConIsInfix, isVanillaDataCon, dataConUserType,
         dataConSrcBangs,
         StrictnessMark(..), isMarkedStrict,
@@ -226,7 +228,7 @@ module GHC (
         TyThing(..),
 
         -- ** Syntax
-        module HsSyn, -- ToDo: remove extraneous bits
+        module GHC.Hs, -- ToDo: remove extraneous bits
 
         -- ** Fixities
         FixityDirection(..),
@@ -255,9 +257,6 @@ module GHC (
         -- *** Deconstructing Located
         getLoc, unLoc,
         getRealSrcSpan, unRealSrcSpan,
-
-        -- ** HasSrcSpan
-        HasSrcSpan(..), SrcSpanLess, dL, cL,
 
         -- *** Combining and comparing Located values
         eqLocated, cmpLocated, combineLocs, addCLoc,
@@ -308,17 +307,19 @@ import GhcMake
 import DriverPipeline   ( compileOne' )
 import GhcMonad
 import TcRnMonad        ( finalSafeMode, fixSafeInstances, initIfaceTcRn )
-import LoadIface        ( loadSysInterface )
+import GHC.Iface.Load   ( loadSysInterface )
 import TcRnTypes
+import Predicate
 import Packages
 import NameSet
 import RdrName
-import HsSyn
+import GHC.Hs
 import Type     hiding( typeKind )
 import TcType
 import Id
 import TysPrim          ( alphaTyVars )
 import TyCon
+import TyCoPpr          ( pprForAll )
 import Class
 import DataCon
 import Name             hiding ( varName )
@@ -327,7 +328,7 @@ import InstEnv
 import FamInstEnv ( FamInst )
 import SrcLoc
 import CoreSyn
-import TidyPgm
+import GHC.Iface.Tidy
 import DriverPhases     ( Phase(..), isHaskellSrcFilename )
 import Finder
 import HscTypes
@@ -346,7 +347,6 @@ import Util
 import StringBuffer
 import Outputable
 import BasicTypes
-import Maybes           ( expectJust )
 import FastString
 import qualified Parser
 import Lexer
@@ -364,7 +364,6 @@ import Data.Foldable
 import qualified Data.Map.Strict as Map
 import Data.Set (Set)
 import qualified Data.Sequence as Seq
-import System.Directory ( doesFileExist )
 import Data.Maybe
 import Data.Time
 import Data.Typeable    ( Typeable )
@@ -374,6 +373,11 @@ import System.Exit      ( exitWith, ExitCode(..) )
 import Exception
 import Data.IORef
 import System.FilePath
+
+import Maybes
+import System.IO.Error  ( isDoesNotExistError )
+import System.Environment ( getEnv )
+import System.Directory
 
 
 -- %************************************************************************
@@ -504,7 +508,7 @@ initGhcMonad mb_top_dir
   = do { env <- liftIO $
                 do { top_dir <- findTopDir mb_top_dir
                    ; mySettings <- initSysTools top_dir
-                   ; myLlvmConfig <- initLlvmConfig top_dir
+                   ; myLlvmConfig <- lazyInitLlvmConfig top_dir
                    ; dflags <- initDynFlags (defaultDynFlags mySettings myLlvmConfig)
                    ; checkBrokenTablesNextToCode dflags
                    ; setUnsafeGlobalDynFlags dflags
@@ -588,9 +592,10 @@ checkBrokenTablesNextToCode' dflags
 setSessionDynFlags :: GhcMonad m => DynFlags -> m [InstalledUnitId]
 setSessionDynFlags dflags = do
   dflags' <- checkNewDynFlags dflags
-  (dflags'', preload) <- liftIO $ initPackages dflags'
-  modifySession $ \h -> h{ hsc_dflags = dflags''
-                         , hsc_IC = (hsc_IC h){ ic_dflags = dflags'' } }
+  dflags'' <- liftIO $ interpretPackageEnv dflags'
+  (dflags''', preload) <- liftIO $ initPackages dflags''
+  modifySession $ \h -> h{ hsc_dflags = dflags'''
+                         , hsc_IC = (hsc_IC h){ ic_dflags = dflags''' } }
   invalidateModSummaryCache
   return preload
 
@@ -638,7 +643,7 @@ setProgramDynFlags_ invalidate_needed dflags = do
 -- that the next downsweep will think that all the files have changed
 -- and preprocess them again.  This won't necessarily cause everything
 -- to be recompiled, because by the time we check whether we need to
--- recopmile a module, we'll have re-summarised the module and have a
+-- recompile a module, we'll have re-summarised the module and have a
 -- correct ModSummary.
 --
 invalidateModSummaryCache :: GhcMonad m => m ()
@@ -857,7 +862,7 @@ instance TypecheckedMod DesugaredModule where
 instance DesugaredMod DesugaredModule where
   coreModule m = dm_core_module m
 
-type ParsedSource      = Located (HsModule GhcPs)
+type ParsedSource      = Located HsModule
 type RenamedSource     = (HsGroup GhcRn, [LImportDecl GhcRn], Maybe [(LIE GhcRn, Avails)],
                           Maybe LHsDocString)
 type TypecheckedSource = LHsBinds GhcTc
@@ -1221,6 +1226,9 @@ modInfoLookupName minf name = withSession $ \hsc_env -> do
 modInfoIface :: ModuleInfo -> Maybe ModIface
 modInfoIface = minf_iface
 
+modInfoRdrEnv :: ModuleInfo -> Maybe GlobalRdrEnv
+modInfoRdrEnv = minf_rdr_env
+
 -- | Retrieve module safe haskell mode
 modInfoSafe :: ModuleInfo -> SafeHaskellMode
 modInfoSafe = minf_safe
@@ -1303,7 +1311,7 @@ packageDbModules :: GhcMonad m =>
                  -> m [Module]
 packageDbModules only_exposed = do
    dflags <- getSessionDynFlags
-   let pkgs = eltsUFM (pkgIdMap (pkgState dflags))
+   let pkgs = eltsUFM (unitInfoMap (pkgState dflags))
    return $
      [ mkModule pid modname
      | p <- pkgs
@@ -1332,7 +1340,7 @@ pprParenSymName a = parenSymOcc (getOccName a) (ppr (getName a))
 -- ToDo: check for small transformations that happen to the syntax in
 -- the typechecker (eg. -e ==> negate e, perhaps for fromIntegral)
 
--- ToDo: maybe use TH syntax instead of IfaceSyn?  There's already a way
+-- ToDo: maybe use TH syntax instead of Iface syntax?  There's already a way
 -- to get from TyCons, Ids etc. to TH syntax (reify).
 
 -- :browse will use either lm_toplev or inspect lm_interface, depending
@@ -1386,7 +1394,7 @@ getRichTokenStream mod = do
 addSourceToTokens :: RealSrcLoc -> StringBuffer -> [Located Token]
                   -> [(Located Token, String)]
 addSourceToTokens _ _ [] = []
-addSourceToTokens loc buf (t@(dL->L span _) : ts)
+addSourceToTokens loc buf (t@(L span _) : ts)
     = case span of
       UnhelpfulSpan _ -> (t,"") : addSourceToTokens loc buf ts
       RealSrcSpan s   -> (t,str) : addSourceToTokens newLoc newBuf ts
@@ -1412,7 +1420,7 @@ showRichTokenStream ts = go startLoc ts ""
           getFile (RealSrcSpan s : _) = srcSpanFile s
           startLoc = mkRealSrcLoc sourceFile 1 1
           go _ [] = id
-          go loc ((dL->L span _, str):ts)
+          go loc ((L span _, str):ts)
               = case span of
                 UnhelpfulSpan _ -> go loc ts
                 RealSrcSpan s
@@ -1544,7 +1552,7 @@ lookupName name =
 parser :: String         -- ^ Haskell module source text (full Unicode is supported)
        -> DynFlags       -- ^ the flags
        -> FilePath       -- ^ the filename (for source locations)
-       -> (WarningMessages, Either ErrorMessages (Located (HsModule GhcPs)))
+       -> (WarningMessages, Either ErrorMessages (Located HsModule))
 
 parser str dflags filename =
    let
@@ -1560,3 +1568,138 @@ parser str dflags filename =
      POk pst rdr_module ->
          let (warns,_) = getMessages pst dflags in
          (warns, Right rdr_module)
+
+-- -----------------------------------------------------------------------------
+-- | Find the package environment (if one exists)
+--
+-- We interpret the package environment as a set of package flags; to be
+-- specific, if we find a package environment file like
+--
+-- > clear-package-db
+-- > global-package-db
+-- > package-db blah/package.conf.d
+-- > package-id id1
+-- > package-id id2
+--
+-- we interpret this as
+--
+-- > [ -hide-all-packages
+-- > , -clear-package-db
+-- > , -global-package-db
+-- > , -package-db blah/package.conf.d
+-- > , -package-id id1
+-- > , -package-id id2
+-- > ]
+--
+-- There's also an older syntax alias for package-id, which is just an
+-- unadorned package id
+--
+-- > id1
+-- > id2
+--
+interpretPackageEnv :: DynFlags -> IO DynFlags
+interpretPackageEnv dflags = do
+    mPkgEnv <- runMaybeT $ msum $ [
+                   getCmdLineArg >>= \env -> msum [
+                       probeNullEnv env
+                     , probeEnvFile env
+                     , probeEnvName env
+                     , cmdLineError env
+                     ]
+                 , getEnvVar >>= \env -> msum [
+                       probeNullEnv env
+                     , probeEnvFile env
+                     , probeEnvName env
+                     , envError     env
+                     ]
+                 , notIfHideAllPackages >> msum [
+                       findLocalEnvFile >>= probeEnvFile
+                     , probeEnvName defaultEnvName
+                     ]
+                 ]
+    case mPkgEnv of
+      Nothing ->
+        -- No environment found. Leave DynFlags unchanged.
+        return dflags
+      Just "-" -> do
+        -- Explicitly disabled environment file. Leave DynFlags unchanged.
+        return dflags
+      Just envfile -> do
+        content <- readFile envfile
+        compilationProgressMsg dflags ("Loaded package environment from " ++ envfile)
+        let (_, dflags') = runCmdLine (runEwM (setFlagsFromEnvFile envfile content)) dflags
+
+        return dflags'
+  where
+    -- Loading environments (by name or by location)
+
+    namedEnvPath :: String -> MaybeT IO FilePath
+    namedEnvPath name = do
+     appdir <- versionedAppDir dflags
+     return $ appdir </> "environments" </> name
+
+    probeEnvName :: String -> MaybeT IO FilePath
+    probeEnvName name = probeEnvFile =<< namedEnvPath name
+
+    probeEnvFile :: FilePath -> MaybeT IO FilePath
+    probeEnvFile path = do
+      guard =<< liftMaybeT (doesFileExist path)
+      return path
+
+    probeNullEnv :: FilePath -> MaybeT IO FilePath
+    probeNullEnv "-" = return "-"
+    probeNullEnv _   = mzero
+
+    -- Various ways to define which environment to use
+
+    getCmdLineArg :: MaybeT IO String
+    getCmdLineArg = MaybeT $ return $ packageEnv dflags
+
+    getEnvVar :: MaybeT IO String
+    getEnvVar = do
+      mvar <- liftMaybeT $ try $ getEnv "GHC_ENVIRONMENT"
+      case mvar of
+        Right var -> return var
+        Left err  -> if isDoesNotExistError err then mzero
+                                                else liftMaybeT $ throwIO err
+
+    notIfHideAllPackages :: MaybeT IO ()
+    notIfHideAllPackages =
+      guard (not (gopt Opt_HideAllPackages dflags))
+
+    defaultEnvName :: String
+    defaultEnvName = "default"
+
+    -- e.g. .ghc.environment.x86_64-linux-7.6.3
+    localEnvFileName :: FilePath
+    localEnvFileName = ".ghc.environment" <.> versionedFilePath dflags
+
+    -- Search for an env file, starting in the current dir and looking upwards.
+    -- Fail if we get to the users home dir or the filesystem root. That is,
+    -- we don't look for an env file in the user's home dir. The user-wide
+    -- env lives in ghc's versionedAppDir/environments/default
+    findLocalEnvFile :: MaybeT IO FilePath
+    findLocalEnvFile = do
+        curdir  <- liftMaybeT getCurrentDirectory
+        homedir <- tryMaybeT getHomeDirectory
+        let probe dir | isDrive dir || dir == homedir
+                      = mzero
+            probe dir = do
+              let file = dir </> localEnvFileName
+              exists <- liftMaybeT (doesFileExist file)
+              if exists
+                then return file
+                else probe (takeDirectory dir)
+        probe curdir
+
+    -- Error reporting
+
+    cmdLineError :: String -> MaybeT IO a
+    cmdLineError env = liftMaybeT . throwGhcExceptionIO . CmdLineError $
+      "Package environment " ++ show env ++ " not found"
+
+    envError :: String -> MaybeT IO a
+    envError env = liftMaybeT . throwGhcExceptionIO . CmdLineError $
+         "Package environment "
+      ++ show env
+      ++ " (specified in GHC_ENVIRONMENT) not found"

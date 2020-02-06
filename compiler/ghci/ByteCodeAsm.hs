@@ -29,8 +29,8 @@ import NameSet
 import Literal
 import TyCon
 import FastString
-import StgCmmLayout     ( ArgRep(..) )
-import SMRep
+import GHC.StgToCmm.Layout     ( ArgRep(..) )
+import GHC.Runtime.Layout
 import DynFlags
 import Outputable
 import GHC.Platform
@@ -156,7 +156,11 @@ assembleOneBCO hsc_env pbco = do
   return ubco'
 
 assembleBCO :: DynFlags -> ProtoBCO Name -> IO UnlinkedBCO
-assembleBCO dflags (ProtoBCO nm instrs bitmap bsize arity _origin _malloced) = do
+assembleBCO dflags (ProtoBCO { protoBCOName       = nm
+                             , protoBCOInstrs     = instrs
+                             , protoBCOBitmap     = bitmap
+                             , protoBCOBitmapSize = bsize
+                             , protoBCOArity      = arity }) = do
   -- pass 1: collect up the offsets of the local labels.
   let asm = mapM_ (assembleI dflags) instrs
 

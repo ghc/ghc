@@ -27,7 +27,7 @@ if [ ! -e $toolchain/bin/ghc ]; then
 fi
 
 if [ ! -e $toolchain/bin/cabal ]; then
-    url="https://downloads.haskell.org/~cabal/cabal-install-latest/cabal-install-2.4.1.0-x86_64-unknown-mingw32.zip"
+    url="https://downloads.haskell.org/~cabal/cabal-install-2.4.1.0/cabal-install-2.4.1.0-x86_64-unknown-mingw32.zip"
     curl $url > /tmp/cabal.zip
     unzip /tmp/cabal.zip
     mv cabal.exe $toolchain/bin

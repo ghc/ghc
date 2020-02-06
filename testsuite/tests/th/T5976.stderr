@@ -4,4 +4,4 @@ T5976.hs:1:1: error:
       bar
 CallStack (from HasCallStack):
   error, called at T5976.hs:3:21 in main:Main
-    Code: error ("foo " ++ error "bar")
+    Code: (error ("foo " ++ error "bar"))

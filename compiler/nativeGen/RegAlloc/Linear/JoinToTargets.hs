@@ -1,3 +1,4 @@
+{-# OPTIONS_GHC -Wno-incomplete-uni-patterns #-}
 
 -- | Handles joining of a jump instruction to its targets.
 
@@ -18,8 +19,8 @@ import RegAlloc.Liveness
 import Instruction
 import Reg
 
-import BlockId
-import Hoopl.Collections
+import GHC.Cmm.BlockId
+import GHC.Cmm.Dataflow.Collections
 import Digraph
 import DynFlags
 import Outputable

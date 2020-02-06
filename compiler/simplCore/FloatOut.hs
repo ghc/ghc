@@ -19,7 +19,7 @@ import CoreArity        ( etaExpand )
 import CoreMonad        ( FloatOutSwitches(..) )
 
 import DynFlags
-import ErrUtils         ( dumpIfSet_dyn )
+import ErrUtils         ( dumpIfSet_dyn, DumpFormat (..) )
 import Id               ( Id, idArity, idType, isBottomingId,
                           isJoinId, isJoinId_maybe )
 import SetLevels
@@ -174,11 +174,13 @@ floatOutwards float_sws dflags us pgm
             } ;
 
         dumpIfSet_dyn dflags Opt_D_verbose_core2core "Levels added:"
+                  FormatCore
                   (vcat (map ppr annotated_w_levels));
 
         let { (tlets, ntlets, lams) = get_stats (sum_stats fss) };
 
         dumpIfSet_dyn dflags Opt_D_dump_simpl_stats "FloatOut stats:"
+                FormatText
                 (hcat [ int tlets,  text " Lets floated to top level; ",
                         int ntlets, text " Lets floated elsewhere; from ",
                         int lams,   text " Lambda groups"]);
@@ -527,7 +529,7 @@ from the body of the let that depend on the staying-put bindings.
 
 We used instead to do the partitionByMajorLevel on the RHS of an '=',
 in floatRhs.  But that was quite tiresome.  We needed to test for
-values or trival rhss, because (in particular) we don't want to insert
+values or trivial rhss, because (in particular) we don't want to insert
 new bindings between the "=" and the "\".  E.g.
         f = \x -> let <bind> in <body>
 We do not want
@@ -629,7 +631,7 @@ flattenTopFloats (FB tops ceils defs)
 
 addTopFloatPairs :: Bag CoreBind -> [(Id,CoreExpr)] -> [(Id,CoreExpr)]
 addTopFloatPairs float_bag prs
-  = foldrBag add prs float_bag
+  = foldr add prs float_bag
   where
     add (NonRec b r) prs  = (b,r):prs
     add (Rec prs1)   prs2 = prs1 ++ prs2
@@ -673,7 +675,7 @@ plusMinor = M.unionWith unionBags
 
 install :: Bag FloatBind -> CoreExpr -> CoreExpr
 install defn_groups expr
-  = foldrBag wrapFloat expr defn_groups
+  = foldr wrapFloat expr defn_groups
 
 partitionByLevel
         :: Level                -- Partitioning level

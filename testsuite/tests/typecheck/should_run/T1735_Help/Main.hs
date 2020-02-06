@@ -42,7 +42,7 @@ mkMyListConstr = mkConstr myListDataType "MkMyList" [] Prefix
 myListDataType :: DataType
 myListDataType = mkDataType "MyList" [mkMyListConstr]
 
-#ifdef FOO
+#if defined(FOO)
 rigidTests :: Maybe (Maybe [YesNo])
 rigidTests =
  mkTest [Elem "No"  []] (Just [No])

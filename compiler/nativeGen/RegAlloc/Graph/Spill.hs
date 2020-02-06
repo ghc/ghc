@@ -12,9 +12,9 @@ import GhcPrelude
 import RegAlloc.Liveness
 import Instruction
 import Reg
-import Cmm hiding (RegSet)
-import BlockId
-import Hoopl.Collections
+import GHC.Cmm hiding (RegSet)
+import GHC.Cmm.BlockId
+import GHC.Cmm.Dataflow.Collections
 
 import MonadUtils
 import State
@@ -297,7 +297,7 @@ patchInstr
 patchInstr reg instr
  = do   nUnique         <- newUnique
 
-        -- The register we're rewriting is suppoed to be virtual.
+        -- The register we're rewriting is supposed to be virtual.
         -- If it's not then something has gone horribly wrong.
         let nReg
              = case reg of

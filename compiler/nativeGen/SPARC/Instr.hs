@@ -8,7 +8,6 @@
 --
 -----------------------------------------------------------------------------
 #include "HsVersions.h"
-#include "nativeGen/NCG.h"
 
 module SPARC.Instr (
         RI(..),
@@ -39,11 +38,11 @@ import RegClass
 import Reg
 import Format
 
-import CLabel
-import CodeGen.Platform
-import BlockId
+import GHC.Cmm.CLabel
+import GHC.Platform.Regs
+import GHC.Cmm.BlockId
 import DynFlags
-import Cmm
+import GHC.Cmm
 import FastString
 import Outputable
 import GHC.Platform
@@ -118,7 +117,7 @@ data Instr
 
         -- some static data spat out during code generation.
         -- Will be extracted before pretty-printing.
-        | LDATA   Section CmmStatics
+        | LDATA   Section RawCmmStatics
 
         -- Start a new basic block.  Useful during codegen, removed later.
         -- Preceding instruction should be a jump, as per the invariants

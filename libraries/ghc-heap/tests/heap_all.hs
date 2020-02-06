@@ -14,6 +14,7 @@ import GHC.IORef
 import GHC.MVar
 import GHC.Stack
 import GHC.STRef
+import GHC.Weak
 import GHC.Word
 import System.Environment
 import System.Mem
@@ -147,6 +148,16 @@ exBlockingQClosure = BlockingQueueClosure
     , queue = asBox []
     }
 
+exWeakClosure :: Closure
+exWeakClosure = WeakClosure
+    { info = exItbl{tipe=WEAK}
+    , cfinalizers = asBox []
+    , key = asBox []
+    , value = asBox []
+    , finalizer = asBox []
+    , link = asBox []
+    }
+
 exIntClosure :: Closure
 exIntClosure = IntClosure
     { ptipe = PInt, intVal = 42 }
@@ -186,7 +197,6 @@ data A = A (Array# Int)
 data MA = MA (MutableArray# RealWorld Int)
 data BA = BA ByteArray#
 data MBA = MBA (MutableByteArray# RealWorld)
-data B = B BCO#
 data APC a = APC a
 
 main :: IO ()
@@ -209,9 +219,8 @@ main = do
             (# s1, x #) ->
                 case unsafeFreezeByteArray# x s1 of
                     (# s2, y #) -> (# s2, BA y #)
-    B bco <- IO $ \s ->
-        case newBCO# ba ba a 0# ba s of
-            (# s1, x #) -> (# s1, B x #)
+    bco <- IO $ \s ->
+        newBCO# ba ba a 0# ba s
     APC apc <- IO $ \s ->
         case mkApUpd0# bco of
             (# x #) -> (# s, APC x #)
@@ -286,6 +295,12 @@ main = do
     -- Blocking queue
     -- getClosureData (Just 1) >>=
     --    assertClosuresEq exBlockingQClosure
+
+    -- Weak pointer
+    Weak wk <- mkWeak (1 :: Int) (1 :: Int) Nothing
+
+    getClosureData wk >>=
+        assertClosuresEq exWeakClosure
 
     -----------------------------------------------------
     -- Unboxed unlifted types
@@ -378,6 +393,7 @@ compareClosures expected actual =
                     MVarClosure{}           -> [ sEq (tipe . info) ]
                     MutVarClosure{}         -> [ sEq (tipe . info) ]
                     BlockingQueueClosure{}  -> [ sEq (tipe . info) ]
+                    WeakClosure{}           -> [ sEq (tipe . info) ]
                     IntClosure{}            -> [ sEq ptipe
                                                , sEq intVal    ]
                     WordClosure{}           -> [ sEq ptipe

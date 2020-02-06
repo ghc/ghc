@@ -205,10 +205,22 @@ The syntax of a cost centre annotation for expressions is ::
 
 where ``"name"`` is an arbitrary string, that will become the name of
 your cost centre as it appears in the profiling output, and
-``<expression>`` is any Haskell expression. An ``SCC`` annotation
-extends as far to the right as possible when parsing. (SCC stands for
-"Set Cost Centre"). The double quotes can be omitted if ``name`` is a
-Haskell identifier, for example: ::
+``<expression>`` is any Haskell expression. An ``SCC`` annotation extends as
+far to the right as possible when parsing, having the same precedence as lambda
+abstractions, let expressions, and conditionals. Additionally, an annotation
+may not appear in a position where it would change the grouping of
+subexpressions::
+
+  a = 1 / 2 / 2                          -- accepted (a=0.25)
+  b = 1 / {-# SCC "name" #-} / 2 / 2     -- rejected (instead of b=1.0)
+
+This restriction is required to maintain the property that inserting a pragma,
+just like inserting a comment, does not have unintended effects on the
+semantics of the program, in accordance with `GHC Proposal #176
+<https://github.com/ghc-proposals/ghc-proposals/blob/master/proposals/0176-scc-parsing.rst>`__.
+
+SCC stands for "Set Cost Centre". The double quotes can be omitted if ``name``
+is a Haskell identifier, for example: ::
 
     {-# SCC id #-} <expression>
 
@@ -235,9 +247,9 @@ Here is an example of a program with a couple of SCCs: ::
     main = do let xs = [1..1000000]
               let ys = [1..2000000]
               print $ {-# SCC last_xs #-} last xs
-              print $ {-# SCC last_init_xs #-} last $ init xs
+              print $ {-# SCC last_init_xs #-} last (init xs)
               print $ {-# SCC last_ys #-} last ys
-              print $ {-# SCC last_init_ys #-} last $ init ys
+              print $ {-# SCC last_init_ys #-} last (init ys)
 
 which gives this profile when run:
 
@@ -524,7 +536,7 @@ has the following properties,
     The profile tree itself
 
 Each entry in ``cost_centres`` is an object describing a cost-centre of the
-program having the following properies,
+program having the following properties,
 
 ``id`` (integral number)
     A unique identifier used to refer to the cost-centre
@@ -658,7 +670,7 @@ To generate a heap profile from your program:
    :rts-flag:`-h` for a basic producer profile). This generates the file
    :file:`{prog}.hp`.
 
-   If the :ref:`event log <rts-eventlog>` is enabled (with the :rts-flag:`-l`
+   If the :ref:`event log <rts-eventlog>` is enabled (with the :rts-flag:`-l ⟨flags⟩`
    runtime system flag) heap samples will additionally be emitted to the GHC
    event log (see :ref:`heap-profiler-events` for details about event format).
 
@@ -694,7 +706,7 @@ following RTS options select which break-down to use:
 .. rts-flag:: -hc
               -h
 
-    *Requires :ghc-flag:`-prof`.* Breaks down the graph by the cost-centre stack
+    *Requires* :ghc-flag:`-prof`. Breaks down the graph by the cost-centre stack
     which produced the data.
 
     .. note:: The meaning of the shortened :rts-flag:`-h` is dependent on whether
@@ -704,34 +716,33 @@ following RTS options select which break-down to use:
 
 .. rts-flag:: -hm
 
-    *Requires :ghc-flag:`-prof`.* Break down the live heap by the module
+    *Requires* :ghc-flag:`-prof`. Break down the live heap by the module
     containing the code which produced the data.
 
 .. rts-flag:: -hd
 
-    *Requires :ghc-flag:`-prof`.* Breaks down the graph by closure description.
+    *Requires* :ghc-flag:`-prof`. Breaks down the graph by closure description.
     For actual data, the description is just the constructor name, for other
     closures it is a compiler-generated string identifying the closure.
 
 .. rts-flag:: -hy
 
-    *Requires :ghc-flag:`-prof`.* Breaks down the graph by type. For closures
+    *Requires* :ghc-flag:`-prof`. Breaks down the graph by type. For closures
     which have function type or unknown/polymorphic type, the string will
     represent an approximation to the actual type.
 
 .. rts-flag:: -hr
 
-    *Requires :ghc-flag:`-prof`.* Break down the graph by retainer set. Retainer
+    *Requires* :ghc-flag:`-prof`. Break down the graph by retainer set. Retainer
     profiling is described in more detail below (:ref:`retainer-prof`).
 
 .. rts-flag:: -hb
 
-    *Requires :ghc-flag:`-prof`.* Break down the graph by biography.
+    *Requires* :ghc-flag:`-prof`. Break down the graph by biography.
     Biographical profiling is described in more detail below
     (:ref:`biography-prof`).
 
 .. rts-flag:: -l
-
     :noindex:
 
     .. index::

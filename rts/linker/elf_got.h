@@ -1,7 +1,6 @@
 #pragma once
 
 #include "LinkerInternals.h"
-#include "ghcplatform.h"
 
 #include <stdbool.h>
 #include <linker/ElfTypes.h>

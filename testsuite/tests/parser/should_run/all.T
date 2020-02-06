@@ -14,3 +14,7 @@ test('NegativeZero', normal, compile_and_run, [''])
 test('HexFloatLiterals', normal, compile_and_run, [''])
 test('NumericUnderscores0', normal, compile_and_run, [''])
 test('NumericUnderscores1', normal, compile_and_run, [''])
+test('CountParserDeps',
+     [ only_ways(['normal']), extra_run_opts('"' + config.libdir + '"') ],
+     compile_and_run,
+     ['-package ghc'])

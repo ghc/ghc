@@ -1,6 +1,6 @@
 module CommandLine (
     optDescrs, cmdLineArgsMap, cmdFlavour, lookupFreeze1, cmdIntegerSimple,
-    cmdProgressColour, cmdProgressInfo, cmdConfigure, cmdCompleteSetting,
+    cmdProgressInfo, cmdConfigure, cmdCompleteSetting,
     cmdDocsArgs, lookupBuildRoot, TestArgs(..), TestSpeed(..), defaultTestArgs
     ) where
 
@@ -25,7 +25,6 @@ data CommandLineArgs = CommandLineArgs
     , flavour        :: Maybe String
     , freeze1        :: Bool
     , integerSimple  :: Bool
-    , progressColour :: UseColour
     , progressInfo   :: ProgressInfo
     , buildRoot      :: BuildRoot
     , testArgs       :: TestArgs
@@ -40,7 +39,6 @@ defaultCommandLineArgs = CommandLineArgs
     , flavour        = Nothing
     , freeze1        = False
     , integerSimple  = False
-    , progressColour = Auto
     , progressInfo   = Brief
     , buildRoot      = BuildRoot "_build"
     , testArgs       = defaultTestArgs
@@ -103,18 +101,6 @@ readFreeze1 = Right $ \flags -> flags { freeze1 = True }
 
 readIntegerSimple :: Either String (CommandLineArgs -> CommandLineArgs)
 readIntegerSimple = Right $ \flags -> flags { integerSimple = True }
-
-readProgressColour :: Maybe String -> Either String (CommandLineArgs -> CommandLineArgs)
-readProgressColour ms =
-    maybe (Left "Cannot parse progress-colour") (Right . set) (go =<< lower <$> ms)
-  where
-    go :: String -> Maybe UseColour
-    go "never"   = Just Never
-    go "auto"    = Just Auto
-    go "always"  = Just Always
-    go _         = Nothing
-    set :: UseColour -> CommandLineArgs -> CommandLineArgs
-    set flag flags = flags { progressColour = flag }
 
 readProgressInfo :: Maybe String -> Either String (CommandLineArgs -> CommandLineArgs)
 readProgressInfo ms =
@@ -216,9 +202,11 @@ readDocsArg ms = maybe (Left "Cannot parse docs argument") (Right . set) (go =<<
     go "no-sphinx-html" = Just (Set.delete SphinxHTML)
     go "no-sphinx-pdfs" = Just (Set.delete SphinxPDFs)
     go "no-sphinx-man"  = Just (Set.delete SphinxMan)
+    go "no-sphinx-info" = Just (Set.delete SphinxInfo)
     go "no-sphinx"      = Just (Set.delete SphinxHTML
                               . Set.delete SphinxPDFs
-                              . Set.delete SphinxMan)
+                              . Set.delete SphinxMan
+                              . Set.delete SphinxInfo)
     go _                = Nothing
 
     set :: (DocTargets -> DocTargets) -> CommandLineArgs -> CommandLineArgs
@@ -238,8 +226,6 @@ optDescrs =
       "Freeze Stage1 GHC."
     , Option [] ["integer-simple"] (NoArg readIntegerSimple)
       "Build GHC with integer-simple library."
-    , Option [] ["progress-colour"] (OptArg readProgressColour "MODE")
-      "Use colours in progress info (Never, Auto or Always)."
     , Option [] ["progress-info"] (OptArg readProgressInfo "STYLE")
       "Progress info style (None, Brief, Normal or Unicorn)."
     , Option [] ["docs"] (OptArg readDocsArg "TARGET")
@@ -307,8 +293,7 @@ cmdLineArgsMap = do
         else return []
     let allSettings = cliSettings ++ fileSettings
 
-    return $ insertExtra (progressColour args) -- Accessed by Hadrian.Utilities
-           $ insertExtra (progressInfo   args) -- Accessed by Hadrian.Utilities
+    return $ insertExtra (progressInfo   args) -- Accessed by Hadrian.Utilities
            $ insertExtra (buildRoot      args) -- Accessed by Hadrian.Utilities
            $ insertExtra (testArgs       args) -- Accessed by Settings.Builders.RunTest
            $ insertExtra allSettings           -- Accessed by Settings
@@ -334,9 +319,6 @@ lookupFreeze1 = freeze1 . lookupExtra defaultCommandLineArgs
 
 cmdIntegerSimple :: Action Bool
 cmdIntegerSimple = integerSimple <$> cmdLineArgs
-
-cmdProgressColour :: Action UseColour
-cmdProgressColour = progressColour <$> cmdLineArgs
 
 cmdProgressInfo :: Action ProgressInfo
 cmdProgressInfo = progressInfo <$> cmdLineArgs

@@ -6,6 +6,7 @@
 
 {-# LANGUAGE CPP #-}
 
+{-# OPTIONS_GHC -Wno-incomplete-record-updates #-}
 module Simplify ( simplTopBinds, simplExpr, simplRules ) where
 
 #include "HsVersions.h"
@@ -50,7 +51,6 @@ import Maybes           (  orElse )
 import Control.Monad
 import Outputable
 import FastString
-import Pair
 import Util
 import ErrUtils
 import Module          ( moduleName, pprModuleName )
@@ -117,6 +117,40 @@ If the \x was on the RHS of a let, we'd eta expand to bring the two
 lambdas together.  And in general that's a good thing to do.  Perhaps
 we should eta expand wherever we find a (value) lambda?  Then the eta
 expansion at a let RHS can concentrate solely on the PAP case.
+
+Note [In-scope set as a substitution]
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+As per Note [Lookups in in-scope set], an in-scope set can act as
+a substitution. Specifically, it acts as a substitution from variable to
+variables /with the same unique/.
+
+Why do we need this? Well, during the course of the simplifier, we may want to
+adjust inessential properties of a variable. For instance, when performing a
+beta-reduction, we change
+
+    (\x. e) u ==> let x = u in e
+
+We typically want to add an unfolding to `x` so that it inlines to (the
+simplification of) `u`.
+
+We do that by adding the unfolding to the binder `x`, which is added to the
+in-scope set. When simplifying occurrences of `x` (every occurrence!), they are
+replaced by their “updated” version from the in-scope set, hence inherit the
+unfolding. This happens in `SimplEnv.substId`.
+
+Another example. Consider
+
+   case x of y { Node a b -> ...y...
+               ; Leaf v   -> ...y... }
+
+In the Node branch want y's unfolding to be (Node a b); in the Leaf branch we
+want y's unfolding to be (Leaf v). We achieve this by adding the appropriate
+unfolding to y, and re-adding it to the in-scope set. See the calls to
+`addBinderUnfolding` in `Simplify.addAltUnfoldings` and elsewhere.
+
+It's quite convenient. This way we don't need to manipulate the substitution all
+the time: every update to a binder is automatically reflected to its bound
+occurrences.
 
 ************************************************************************
 *                                                                      *
@@ -227,7 +261,8 @@ simplRecOrTopPair env top_lvl is_rec mb_cont old_bndr new_bndr rhs
       | not (dopt Opt_D_verbose_core2core dflags)
       = thing_inside
       | otherwise
-      = pprTrace ("SimplBind " ++ what) (ppr old_bndr) thing_inside
+      = traceAction dflags ("SimplBind " ++ what)
+         (ppr old_bndr) thing_inside
 
 --------------------------
 simplLazyBind :: SimplEnv
@@ -406,7 +441,7 @@ prepareRhs :: SimplMode -> TopLevelFlag
 --            x = Just a
 -- See Note [prepareRhs]
 prepareRhs mode top_lvl occ info (Cast rhs co)  -- Note [Float coercions]
-  | Pair ty1 _ty2 <- coercionKind co         -- Do *not* do this if rhs has an unlifted type
+  | let ty1 = coercionLKind co         -- Do *not* do this if rhs has an unlifted type
   , not (isUnliftedType ty1)                 -- see Note [Float coercions (unlifted)]
   = do  { (floats, rhs') <- makeTrivialWithInfo mode top_lvl occ sanitised_info rhs
         ; return (floats, Cast rhs' co) }
@@ -545,7 +580,7 @@ makeTrivialWithInfo mode top_lvl occ_fs info expr
           else do
         { uniq <- getUniqueM
         ; let name = mkSystemVarName uniq occ_fs
-              var  = mkLocalIdOrCoVarWithInfo name expr_ty info
+              var  = mkLocalIdWithInfo name expr_ty info
 
         -- Now something very like completeBind,
         -- but without the postInlineUnconditinoally part
@@ -659,6 +694,7 @@ completeBind env top_lvl mb_cont old_bndr new_bndr new_rhs
                                            final_rhs (idType new_bndr) old_unf
 
       ; let final_bndr = addLetBndrInfo new_bndr new_arity is_bot new_unfolding
+        -- See Note [In-scope set as a substitution]
 
       ; if postInlineUnconditionally env top_lvl final_bndr occ_info final_rhs
 
@@ -1269,14 +1305,22 @@ simplCast env body co0 cont0
 
         addCoerce co cont@(ApplyToTy { sc_arg_ty = arg_ty, sc_cont = tail })
           | Just (arg_ty', m_co') <- pushCoTyArg co arg_ty
+            -- N.B. As mentioned in Note [The hole type in ApplyToTy] this is
+            -- only needed by `sc_hole_ty` which is often not forced.
+            -- Consequently it is worthwhile using a lazy pattern match here to
+            -- avoid unnecessary coercionKind evaluations.
+          , let hole_ty = coercionLKind co
           = {-#SCC "addCoerce-pushCoTyArg" #-}
             do { tail' <- addCoerceM m_co' tail
-               ; return (cont { sc_arg_ty = arg_ty', sc_cont = tail' }) }
+               ; return (cont { sc_arg_ty  = arg_ty'
+                              , sc_hole_ty = hole_ty  -- NB!  As the cast goes past, the
+                                                      -- type of the hole changes (#16312)
+                              , sc_cont    = tail' }) }
 
         addCoerce co cont@(ApplyToVal { sc_arg = arg, sc_env = arg_se
                                       , sc_dup = dup, sc_cont = tail })
           | Just (co1, m_co2) <- pushCoValArg co
-          , Pair _ new_ty <- coercionKind co1
+          , let new_ty = coercionRKind co1
           , not (isTypeLevPoly new_ty)  -- Without this check, we get a lev-poly arg
                                         -- See Note [Levity polymorphism invariants] in CoreSyn
                                         -- test: typecheck/should_run/EtaExpandLevPoly
@@ -1580,7 +1624,7 @@ wrapJoinCont env cont thing_inside
   = thing_inside env cont
 
   | not (sm_case_case (getMode env))
-    -- See Note [Join points wih -fno-case-of-case]
+    -- See Note [Join points with -fno-case-of-case]
   = do { (floats1, expr1) <- thing_inside env (mkBoringStop (contHoleType cont))
        ; let (floats2, expr2) = wrapJoinFloatsX floats1 expr1
        ; (floats3, expr3) <- rebuild (env `setInScopeFromF` floats2) expr2 cont
@@ -1648,7 +1692,7 @@ We need do make the continuation E duplicable (since we are duplicating it)
 with mkDuableCont.
 
 
-Note [Join points wih -fno-case-of-case]
+Note [Join points with -fno-case-of-case]
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 Supose case-of-case is switched off, and we are simplifying
 
@@ -1669,8 +1713,8 @@ case-of-case we may then end up with this totally bogus result
              C -> e) of <outer-alts>
 
 This would be OK in the language of the paper, but not in GHC: j is no longer
-a join point.  We can only do the "push contination into the RHS of the
-join point j" if we also push the contination right down to the /jumps/ to
+a join point.  We can only do the "push continuation into the RHS of the
+join point j" if we also push the continuation right down to the /jumps/ to
 j, so that it can evaporate there.  If we are doing case-of-case, we'll get to
 
     join x = case <j-rhs> of <outer-alts> in
@@ -1751,14 +1795,20 @@ completeCall env var cont
     interesting_cont = interestingCallContext env call_cont
     active_unf       = activeUnfolding (getMode env) var
 
+    log_inlining doc
+      = liftIO $ dumpAction dflags
+           (mkUserStyle dflags alwaysQualify AllTheWay)
+           (dumpOptionsFromFlag Opt_D_dump_inlinings)
+           "" FormatText doc
+
     dump_inline unfolding cont
       | not (dopt Opt_D_dump_inlinings dflags) = return ()
       | not (dopt Opt_D_verbose_core2core dflags)
       = when (isExternalName (idName var)) $
-            liftIO $ printOutputForUser dflags alwaysQualify $
+            log_inlining $
                 sep [text "Inlining done:", nest 4 (ppr var)]
       | otherwise
-      = liftIO $ printOutputForUser dflags alwaysQualify $
+      = liftIO $ log_inlining $
            sep [text "Inlining done: " <> ppr var,
                 nest 4 (vcat [text "Inlined fn: " <+> nest 2 (ppr unfolding),
                               text "Cont:  " <+> ppr cont])]
@@ -2023,17 +2073,21 @@ tryRules env rules fn args call_cont
 
     nodump
       | dopt Opt_D_dump_rule_rewrites dflags
-      = liftIO $ dumpSDoc dflags alwaysQualify Opt_D_dump_rule_rewrites "" empty
+      = liftIO $ do
+         touchDumpFile dflags (dumpOptionsFromFlag Opt_D_dump_rule_rewrites)
 
       | dopt Opt_D_dump_rule_firings dflags
-      = liftIO $ dumpSDoc dflags alwaysQualify Opt_D_dump_rule_firings "" empty
+      = liftIO $ do
+         touchDumpFile dflags (dumpOptionsFromFlag Opt_D_dump_rule_firings)
 
       | otherwise
       = return ()
 
     log_rule dflags flag hdr details
-      = liftIO . dumpSDoc dflags alwaysQualify flag "" $
-                   sep [text hdr, nest 4 details]
+      = liftIO $ do
+         let sty = mkDumpStyle dflags alwaysQualify
+         dumpAction dflags sty (dumpOptionsFromFlag flag) "" FormatText $
+           sep [text hdr, nest 4 details]
 
 trySeqRules :: SimplEnv
             -> OutExpr -> InExpr   -- Scrutinee and RHS
@@ -2047,11 +2101,16 @@ trySeqRules in_env scrut rhs cont
     no_cast_scrut = drop_casts scrut
     scrut_ty  = exprType no_cast_scrut
     seq_id_ty = idType seqId
+    res1_ty   = piResultTy seq_id_ty rhs_rep
+    res2_ty   = piResultTy res1_ty   scrut_ty
     rhs_ty    = substTy in_env (exprType rhs)
-    out_args  = [ TyArg { as_arg_ty  = scrut_ty
+    rhs_rep   = getRuntimeRep rhs_ty
+    out_args  = [ TyArg { as_arg_ty  = rhs_rep
                         , as_hole_ty = seq_id_ty }
+                , TyArg { as_arg_ty  = scrut_ty
+                        , as_hole_ty = res1_ty }
                 , TyArg { as_arg_ty  = rhs_ty
-                       , as_hole_ty  = piResultTy seq_id_ty scrut_ty }
+                        , as_hole_ty = res2_ty }
                 , ValArg no_cast_scrut]
     rule_cont = ApplyToVal { sc_dup = NoDup, sc_arg = rhs
                            , sc_env = in_env, sc_cont = cont }
@@ -2206,7 +2265,7 @@ Note that SimplUtils.mkCase combines identical RHSs.  So
            True  -> r
            False -> r
 
-Now again the case may be elminated by the CaseElim transformation.
+Now again the case may be eliminated by the CaseElim transformation.
 This includes things like (==# a# b#)::Bool so that we simplify
       case ==# a# b# of { True -> x; False -> x }
 to just
@@ -2741,8 +2800,8 @@ addEvals _scrut con vs = go vs the_strs
         where
           ppr_with_length list
             = ppr list <+> parens (text "length =" <+> ppr (length list))
-          strdisp MarkedStrict = "MarkedStrict"
-          strdisp NotMarkedStrict = "NotMarkedStrict"
+          strdisp MarkedStrict = text "MarkedStrict"
+          strdisp NotMarkedStrict = text "NotMarkedStrict"
 
 zapIdOccInfoAndSetEvald :: StrictnessMark -> Id -> Id
 zapIdOccInfoAndSetEvald str v =
@@ -2917,7 +2976,7 @@ knownCon env scrut dc_floats dc dc_ty_args dc_args bndr bs rhs cont
       | exprIsTrivial scrut = return (emptyFloats env
                                      , extendIdSubst env bndr (DoneEx scrut Nothing))
       | otherwise           = do { dc_args <- mapM (simplVar env) bs
-                                         -- dc_ty_args are aready OutTypes,
+                                         -- dc_ty_args are already OutTypes,
                                          -- but bs are InBndrs
                                  ; let con_app = Var (dataConWorkId dc)
                                                  `mkTyApps` dc_ty_args
@@ -3443,7 +3502,7 @@ mkLetUnfolding dflags top_lvl src id new_rhs
     return (mkUnfolding dflags src is_top_lvl is_bottoming new_rhs)
             -- We make an  unfolding *even for loop-breakers*.
             -- Reason: (a) It might be useful to know that they are WHNF
-            --         (b) In TidyPgm we currently assume that, if we want to
+            --         (b) In GHC.Iface.Tidy we currently assume that, if we want to
             --             expose the unfolding then indeed we *have* an unfolding
             --             to expose.  (We could instead use the RHS, but currently
             --             we don't.)  The simple thing is always to have one.

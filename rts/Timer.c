@@ -28,8 +28,58 @@
 /* ticks left before next pre-emptive context switch */
 static int ticks_to_ctxt_switch = 0;
 
-/* idle ticks left before we perform a GC */
-static int ticks_to_gc = 0;
+
+/*
+ Note [GC During Idle Time]
+ --------------------------
+
+ In the threaded RTS, a major GC can be performed during idle time (i.e., when
+ no Haskell computations are ready to run).  This can be beneficial for two
+ reasons.  First, running the GC during idle time makes it less likely that a GC
+ will be triggered when the process is active, increasing apparent
+ responsiveness.  Second, these idle time GCs allow finalizers to run,
+ preventing resources from being held indefinitely when the process is otherwise
+ idle for extended periods.
+
+ There are two runtime RTS options to control idle time GC timing.  The primary
+ control is set by `-I<n>`, which specifies the minimum period of time the
+ process must be idle before a GC is automatically triggered.  It defaults to
+ 0.3 seconds for the threaded runtime and 0 (which disables idle GC entirely)
+ for the non-threaded runtime.  For certain workflows, the 0.3 second delay for
+ the threaded RTS may be too small.  If an application must process an extended
+ burst of short-lived requests occurring a couple of times a second, it may go
+ idle for >0.3 seconds frequently, resulting in potentially dozens of major
+ GCs triggered every minute (and resulting heavy CPU load) while the burst
+ lasts.  Setting the `-I<n>` value higher will prevent this flurry of major GCs,
+ though there is a danger that setting the value too high will prevent automatic
+ GCs entirely, if the process never gets a chance to go idle for long enough to
+ meet the larger threshold.
+
+ In this case, the second control, set by `-Iw<n>` may be helpful.  For example,
+ setting `-I0.3 -Iw30` triggers automatic GCs after only 0.3 seconds of idle
+ time, but subject to a minimum delay *between* automatic GCs of at least 30
+ seconds.  This is likely to work well for applications that must process a
+ nearly constant stream of frequent, short-lived requests, ensuring that
+ automatic GCs are triggered promptly when the process goes idle while limiting
+ the overall frequency of such GCs.  (The default is `-Iw0`, meaning no limit on
+ frequency of GCs.)
+
+ Automatic GC timing is implemented below using two count-down timers.  The
+ `idle_ticks_to_gc` timer counts down the `-I<n>` setting: it is initialized
+ when the process goes idle and counts down idle time before an automatic GC
+ becomes possible.  The `inter_gc_ticks_to_gc` counts down the `-Iw<n>` setting:
+ it is initialized when an automatic GC is actually performed, and holds off the
+ next automatic GC until its count expires, limiting the overall frequency of
+ automatic GCs.  Both timers must expire before an automatic GC is triggered.
+
+ See issue #11134 for additional detail.
+*/
+
+/* - countdown for minimum idle time before we start a GC (set by -I) */
+static int idle_ticks_to_gc = 0;
+
+/* - countdown for minimum time *between* idle GCs (set by -Iw) */
+static int inter_gc_ticks_to_gc = 0;
 
 /*
  * Function: handle_tick()
@@ -53,18 +103,21 @@ handle_tick(int unused STG_UNUSED)
   /*
    * If we've been inactive for idleGCDelayTime (set by +RTS
    * -I), tell the scheduler to wake up and do a GC, to check
-   * for threads that are deadlocked.
+   * for threads that are deadlocked.  However, ensure we wait
+   * at least interIdleGCWait (+RTS -Iw) between idle GCs.
    */
   switch (recent_activity) {
   case ACTIVITY_YES:
       recent_activity = ACTIVITY_MAYBE_NO;
-      ticks_to_gc = RtsFlags.GcFlags.idleGCDelayTime /
-                    RtsFlags.MiscFlags.tickInterval;
+      idle_ticks_to_gc = RtsFlags.GcFlags.idleGCDelayTime /
+                         RtsFlags.MiscFlags.tickInterval;
       break;
   case ACTIVITY_MAYBE_NO:
-      if (ticks_to_gc == 0) {
+      if (idle_ticks_to_gc == 0 && inter_gc_ticks_to_gc == 0) {
           if (RtsFlags.GcFlags.doIdleGC) {
               recent_activity = ACTIVITY_INACTIVE;
+              inter_gc_ticks_to_gc = RtsFlags.GcFlags.interIdleGCWait /
+                                     RtsFlags.MiscFlags.tickInterval;
 #if defined(THREADED_RTS)
               wakeUpRts();
               // The scheduler will call stopTimer() when it has done
@@ -86,7 +139,8 @@ handle_tick(int unused STG_UNUSED)
 #endif
           }
       } else {
-          ticks_to_gc--;
+          if (idle_ticks_to_gc) idle_ticks_to_gc--;
+          if (inter_gc_ticks_to_gc) inter_gc_ticks_to_gc--;
       }
       break;
   default:

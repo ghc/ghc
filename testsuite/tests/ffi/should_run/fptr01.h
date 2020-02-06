@@ -1,4 +1,4 @@
-#ifndef FPTR01_H_INCLUDED
+#if !defined(FPTR01_H_INCLUDED)
 #define FPTR01_H_INCLUDED
 
 void f( HsInt * );

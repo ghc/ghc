@@ -47,17 +47,16 @@ module X86.Regs (
 
 where
 
-#include "nativeGen/NCG.h"
 #include "HsVersions.h"
 
 import GhcPrelude
 
-import CodeGen.Platform
+import GHC.Platform.Regs
 import Reg
 import RegClass
 
-import Cmm
-import CLabel           ( CLabel )
+import GHC.Cmm
+import GHC.Cmm.CLabel           ( CLabel )
 import DynFlags
 import Outputable
 import GHC.Platform
@@ -84,7 +83,6 @@ virtualRegSqueeze cls vr
          -> case vr of
                 VirtualRegD{}           -> 1
                 VirtualRegF{}           -> 0
-                VirtualRegVec{}         -> 1
                 _other                  -> 0
 
 

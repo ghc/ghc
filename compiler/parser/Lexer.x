@@ -44,12 +44,17 @@
 {-# LANGUAGE CPP #-}
 {-# LANGUAGE BangPatterns #-}
 {-# LANGUAGE LambdaCase #-}
+{-# LANGUAGE MultiWayIf #-}
 
 {-# OPTIONS_GHC -funbox-strict-fields #-}
+{-# OPTIONS_GHC -Wno-incomplete-uni-patterns #-}
 
 module Lexer (
-   Token(..), lexer, pragState, mkPState, mkPStatePure, PState(..),
-   P(..), ParseResult(..), mkParserFlags, mkParserFlags', ParserFlags,
+   Token(..), lexer, lexerDbg, pragState, mkPState, mkPStatePure, PState(..),
+   P(..), ParseResult(..), mkParserFlags, mkParserFlags', ParserFlags(..),
+   appendWarning,
+   appendError,
+   allocateComments,
    MonadP(..),
    getRealSrcLoc, getPState, withThisPackage,
    failLocMsgP, srcParseFail,
@@ -58,8 +63,10 @@ module Lexer (
    activeContext, nextIsEOF,
    getLexState, popLexState, pushLexState,
    ExtBits(..),
+   xtest,
    lexTokenStream,
-   AddAnn,mkParensApiAnn,
+   AddAnn(..),mkParensApiAnn,
+   addAnnsAt,
    commentToAnnotation
   ) where
 
@@ -371,10 +378,6 @@ $tab          { warnTab }
   "[t|"       / { ifExtension ThQuotesBit } { token ITopenTypQuote }
   "|]"        / { ifExtension ThQuotesBit } { token (ITcloseQuote NormalSyntax) }
   "||]"       / { ifExtension ThQuotesBit } { token ITcloseTExpQuote }
-  \$ @varid   / { ifExtension ThBit }       { skip_one_varid ITidEscape }
-  "$$" @varid / { ifExtension ThBit }       { skip_two_varid ITidTyEscape }
-  "$("        / { ifExtension ThBit }       { token ITparenEscape }
-  "$$("       / { ifExtension ThBit }       { token ITparenTyEscape }
 
   "[" @varid "|"  / { ifExtension QqBit }   { lex_quasiquote_tok }
 
@@ -391,14 +394,6 @@ $tab          { warnTab }
         ifExtension UnicodeSyntaxBit `alexAndPred`
         ifExtension ThQuotesBit }
     { token (ITcloseQuote UnicodeSyntax) }
-}
-
-  -- See Note [Lexing type applications]
-<0> {
-    [^ $idchar \) ] ^
-  "@"
-    / { ifExtension TypeApplicationsBit `alexAndPred` notFollowedBySymbol }
-    { token ITtypeApp }
 }
 
 <0> {
@@ -466,12 +461,20 @@ $tab          { warnTab }
   @conid "#"+       / { ifExtension MagicHashBit } { idtoken conid }
 }
 
+-- Operators classified into prefix, suffix, tight infix, and loose infix.
+-- See Note [Whitespace-sensitive operator parsing]
+<0> {
+  @varsym / { precededByClosingToken `alexAndPred` followedByOpeningToken } { varsym_tight_infix }
+  @varsym / { followedByOpeningToken }  { varsym_prefix }
+  @varsym / { precededByClosingToken }  { varsym_suffix }
+  @varsym                               { varsym_loose_infix }
+}
+
 -- ToDo: - move `var` and (sym) into lexical syntax?
 --       - remove backquote from $special?
 <0> {
   @qvarsym                                         { idtoken qvarsym }
   @qconsym                                         { idtoken qconsym }
-  @varsym                                          { varsym }
   @consym                                          { consym }
 }
 
@@ -545,32 +548,114 @@ $tab          { warnTab }
   \"                            { lex_string_tok }
 }
 
--- Note [Lexing type applications]
--- ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
--- The desired syntax for type applications is to prefix the type application
--- with '@', like this:
+-- Note [Whitespace-sensitive operator parsing]
+-- ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+-- In accord with GHC Proposal #229 https://github.com/ghc-proposals/ghc-proposals/blob/master/proposals/0229-whitespace-bang-patterns.rst
+-- we classify operator occurrences into four categories:
 --
---   foo @Int @Bool baz bum
+--     a ! b   -- a loose infix occurrence
+--     a!b     -- a tight infix occurrence
+--     a !b    -- a prefix occurrence
+--     a! b    -- a suffix occurrence
 --
--- This, of course, conflicts with as-patterns. The conflict arises because
--- expressions and patterns use the same parser, and also because we want
--- to allow type patterns within expression patterns.
+-- The rules are a bit more elaborate than simply checking for whitespace, in
+-- order to accommodate the following use cases:
 --
--- Disambiguation is accomplished by requiring *something* to appear between
--- type application and the preceding token. This something must end with
--- a character that cannot be the end of the variable bound in an as-pattern.
--- Currently (June 2015), this means that the something cannot end with a
--- $idchar or a close-paren. (The close-paren is necessary if the as-bound
--- identifier is symbolic.)
+--     f (!a) = ...    -- prefix occurrence
+--     g (a !)         -- loose infix occurrence
+--     g (! a)         -- loose infix occurrence
 --
--- Note that looking for whitespace before the '@' is insufficient, because
--- of this pathological case:
+-- The precise rules are as follows:
 --
---   foo {- hi -}@Int
+--  * Identifiers, literals, and opening brackets (, (#, [, [|, [||, [p|, [e|,
+--    [t|, {, are considered "opening tokens". The function followedByOpeningToken
+--    tests whether the next token is an opening token.
 --
--- This design is predicated on the fact that as-patterns are generally
--- whitespace-free, and also that this whole thing is opt-in, with the
--- TypeApplications extension.
+--  * Identifiers, literals, and closing brackets ), #), ], |], },
+--    are considered "closing tokens". The function precededByClosingToken tests
+--    whether the previous token is a closing token.
+--
+--  * Whitespace, comments, separators, and other tokens, are considered
+--    neither opening nor closing.
+--
+--  * Any unqualified operator occurrence is classified as prefix, suffix, or
+--    tight/loose infix, based on preceding and following tokens:
+--
+--       precededByClosingToken | followedByOpeningToken | Occurrence
+--      ------------------------+------------------------+------------
+--       False                  | True                   | prefix
+--       True                   | False                  | suffix
+--       True                   | True                   | tight infix
+--       False                  | False                  | loose infix
+--      ------------------------+------------------------+------------
+--
+-- A loose infix occurrence is always considered an operator. Other types of
+-- occurrences may be assigned a special per-operator meaning override:
+--
+--   Operator |  Occurrence   | Token returned
+--  ----------+---------------+------------------------------------------
+--    !       |  prefix       | ITbang
+--            |               |   strictness annotation or bang pattern,
+--            |               |   e.g.  f !x = rhs, data T = MkT !a
+--            |  not prefix   | ITvarsym "!"
+--            |               |   ordinary operator or type operator,
+--            |               |   e.g.  xs ! 3, (! x), Int ! Bool
+--  ----------+---------------+------------------------------------------
+--    ~       |  prefix       | ITtilde
+--            |               |   laziness annotation or lazy pattern,
+--            |               |   e.g.  f ~x = rhs, data T = MkT ~a
+--            |  not prefix   | ITvarsym "~"
+--            |               |   ordinary operator or type operator,
+--            |               |   e.g.  xs ~ 3, (~ x), Int ~ Bool
+--  ----------+---------------+------------------------------------------
+--    $  $$   |  prefix       | ITdollar, ITdollardollar
+--            |               |   untyped or typed Template Haskell splice,
+--            |               |   e.g.  $(f x), $$(f x), $$"str"
+--            |  not prefix   | ITvarsym "$", ITvarsym "$$"
+--            |               |   ordinary operator or type operator,
+--            |               |   e.g.  f $ g x, a $$ b
+--  ----------+---------------+------------------------------------------
+--    @       |  prefix       | ITtypeApp
+--            |               |   type application, e.g.  fmap @Maybe
+--            |  tight infix  | ITat
+--            |               |   as-pattern, e.g.  f p@(a,b) = rhs
+--            |  suffix       | parse error
+--            |               |   e.g. f p@ x = rhs
+--            |  loose infix  | ITvarsym "@"
+--            |               |   ordinary operator or type operator,
+--            |               |   e.g.  f @ g, (f @)
+--  ----------+---------------+------------------------------------------
+--
+-- Also, some of these overrides are guarded behind language extensions.
+-- According to the specification, we must determine the occurrence based on
+-- surrounding *tokens* (see the proposal for the exact rules). However, in
+-- the implementation we cheat a little and do the classification based on
+-- characters, for reasons of both simplicity and efficiency (see
+-- 'followedByOpeningToken' and 'precededByClosingToken')
+--
+-- When an operator is subject to a meaning override, it is mapped to special
+-- token: ITbang, ITtilde, ITat, ITdollar, ITdollardollar. Otherwise, it is
+-- returned as ITvarsym.
+--
+-- For example, this is how we process the (!):
+--
+--    precededByClosingToken | followedByOpeningToken | Token
+--   ------------------------+------------------------+-------------
+--    False                  | True                   | ITbang
+--    True                   | False                  | ITvarsym "!"
+--    True                   | True                   | ITvarsym "!"
+--    False                  | False                  | ITvarsym "!"
+--   ------------------------+------------------------+-------------
+--
+-- And this is how we process the (@):
+--
+--    precededByClosingToken | followedByOpeningToken | Token
+--   ------------------------+------------------------+-------------
+--    False                  | True                   | ITtypeApp
+--    True                   | False                  | parse error
+--    True                   | True                   | ITat
+--    False                  | False                  | ITvarsym "@"
+--   ------------------------+------------------------+-------------
 
 -- -----------------------------------------------------------------------------
 -- Alex "Haskell code fragment bottom"
@@ -675,11 +760,12 @@ data Token
   | ITvbar
   | ITlarrow            IsUnicodeSyntax
   | ITrarrow            IsUnicodeSyntax
-  | ITat
-  | ITtilde
   | ITdarrow            IsUnicodeSyntax
   | ITminus
-  | ITbang
+  | ITbang     -- Prefix (!) only, e.g. f !x = rhs
+  | ITtilde    -- Prefix (~) only, e.g. f ~x = rhs
+  | ITat       -- Tight infix (@) only, e.g. f x@pat = rhs
+  | ITtypeApp  -- Prefix (@) only, e.g. f @t
   | ITstar              IsUnicodeSyntax
   | ITdot
 
@@ -735,10 +821,8 @@ data Token
   | ITcloseQuote IsUnicodeSyntax        --  |]
   | ITopenTExpQuote HasE                --  [|| or [e||
   | ITcloseTExpQuote                    --  ||]
-  | ITidEscape   FastString             --  $x
-  | ITparenEscape                       --  $(
-  | ITidTyEscape   FastString           --  $$x
-  | ITparenTyEscape                     --  $$(
+  | ITdollar                            --  prefix $
+  | ITdollardollar                      --  prefix $$
   | ITtyQuote                           --  ''
   | ITquasiQuote (FastString,FastString,RealSrcSpan)
     -- ITquasiQuote(quoter, quote, loc)
@@ -758,11 +842,6 @@ data Token
   | ITrarrowtail IsUnicodeSyntax -- ^ @>-@
   | ITLarrowtail IsUnicodeSyntax -- ^ @-<<@
   | ITRarrowtail IsUnicodeSyntax -- ^ @>>-@
-
-  -- | Type application '@' (lexed differently than as-pattern '@',
-  -- due to checking for preceding whitespace)
-  | ITtypeApp
-
 
   | ITunknown String             -- ^ Used when the lexer can't make sense of it
   | ITeof                        -- ^ end of file token
@@ -884,11 +963,8 @@ reservedSymsFM = listToUFM $
        ,("|",   ITvbar,                     NormalSyntax,  0 )
        ,("<-",  ITlarrow NormalSyntax,      NormalSyntax,  0 )
        ,("->",  ITrarrow NormalSyntax,      NormalSyntax,  0 )
-       ,("@",   ITat,                       NormalSyntax,  0 )
-       ,("~",   ITtilde,                    NormalSyntax,  0 )
        ,("=>",  ITdarrow NormalSyntax,      NormalSyntax,  0 )
        ,("-",   ITminus,                    NormalSyntax,  0 )
-       ,("!",   ITbang,                     NormalSyntax,  0 )
 
        ,("*",   ITstar NormalSyntax,        NormalSyntax,  xbit StarIsTypeBit)
 
@@ -982,6 +1058,32 @@ hopefully_open_brace span buf len
 pop_and :: Action -> Action
 pop_and act span buf len = do _ <- popLexState
                               act span buf len
+
+-- See Note [Whitespace-sensitive operator parsing]
+followedByOpeningToken :: AlexAccPred ExtsBitmap
+followedByOpeningToken _ _ _ (AI _ buf)
+  | atEnd buf = False
+  | otherwise =
+      case nextChar buf of
+        ('{', buf') -> nextCharIsNot buf' (== '-')
+        ('(', _) -> True
+        ('[', _) -> True
+        ('\"', _) -> True
+        ('\'', _) -> True
+        ('_', _) -> True
+        (c, _) -> isAlphaNum c
+
+-- See Note [Whitespace-sensitive operator parsing]
+precededByClosingToken :: AlexAccPred ExtsBitmap
+precededByClosingToken _ (AI _ buf) _ _ =
+  case prevChar buf '\n' of
+    '}' -> decodePrevNChars 1 buf /= "-"
+    ')' -> True
+    ']' -> True
+    '\"' -> True
+    '\'' -> True
+    '_' -> True
+    c -> isAlphaNum c
 
 {-# INLINE nextCharIs #-}
 nextCharIs :: StringBuffer -> (Char -> Bool) -> Bool
@@ -1343,11 +1445,40 @@ qvarsym, qconsym :: StringBuffer -> Int -> Token
 qvarsym buf len = ITqvarsym $! splitQualName buf len False
 qconsym buf len = ITqconsym $! splitQualName buf len False
 
-varsym, consym :: Action
-varsym = sym ITvarsym
-consym = sym ITconsym
+-- See Note [Whitespace-sensitive operator parsing]
+varsym_prefix :: Action
+varsym_prefix = sym $ \exts s ->
+  if | TypeApplicationsBit `xtest` exts, s == fsLit "@"
+     -> return ITtypeApp
+     | ThBit `xtest` exts, s == fsLit "$"
+     -> return ITdollar
+     | ThBit `xtest` exts, s == fsLit "$$"
+     -> return ITdollardollar
+     | s == fsLit "!" -> return ITbang
+     | s == fsLit "~" -> return ITtilde
+     | otherwise -> return (ITvarsym s)
 
-sym :: (FastString -> Token) -> Action
+-- See Note [Whitespace-sensitive operator parsing]
+varsym_suffix :: Action
+varsym_suffix = sym $ \_ s ->
+  if | s == fsLit "@"
+     -> failMsgP "Suffix occurrence of @. For an as-pattern, remove the leading whitespace."
+     | otherwise -> return (ITvarsym s)
+
+-- See Note [Whitespace-sensitive operator parsing]
+varsym_tight_infix :: Action
+varsym_tight_infix = sym $ \_ s ->
+  if | s == fsLit "@" -> return ITat
+     | otherwise -> return (ITvarsym s)
+
+-- See Note [Whitespace-sensitive operator parsing]
+varsym_loose_infix :: Action
+varsym_loose_infix = sym (\_ s -> return $ ITvarsym s)
+
+consym :: Action
+consym = sym (\_exts s -> return $ ITconsym s)
+
+sym :: (ExtsBitmap -> FastString -> P Token) -> Action
 sym con span buf len =
   case lookupUFM reservedSymsFM fs of
     Just (keyword, NormalSyntax, 0) ->
@@ -1356,19 +1487,20 @@ sym con span buf len =
       exts <- getExts
       if exts .&. i /= 0
         then return $ L span keyword
-        else return $ L span (con fs)
+        else L span <$!> con exts fs
     Just (keyword, UnicodeSyntax, 0) -> do
       exts <- getExts
       if xtest UnicodeSyntaxBit exts
         then return $ L span keyword
-        else return $ L span (con fs)
+        else L span <$!> con exts fs
     Just (keyword, UnicodeSyntax, i) -> do
       exts <- getExts
       if exts .&. i /= 0 && xtest UnicodeSyntaxBit exts
         then return $ L span keyword
-        else return $ L span (con fs)
-    Nothing ->
-      return $ L span $! con fs
+        else L span <$!> con exts fs
+    Nothing -> do
+      exts <- getExts
+      L span <$!> con exts fs
   where
     !fs = lexemeToFastString buf len
 
@@ -2503,40 +2635,55 @@ class Monad m => MonadP m where
   -- | Check if a given flag is currently set in the bitmap.
   getBit :: ExtBits -> m Bool
   -- | Given a location and a list of AddAnn, apply them all to the location.
-  addAnnsAt :: SrcSpan -> [AddAnn] -> m ()
   addAnnotation :: SrcSpan          -- SrcSpan of enclosing AST construct
                 -> AnnKeywordId     -- The first two parameters are the key
                 -> SrcSpan          -- The location of the keyword itself
                 -> m ()
 
+appendError
+  :: SrcSpan
+  -> SDoc
+  -> (DynFlags -> Messages)
+  -> (DynFlags -> Messages)
+appendError srcspan msg m =
+  \d ->
+    let (ws, es) = m d
+        errormsg = mkErrMsg d srcspan alwaysQualify msg
+        es' = es `snocBag` errormsg
+    in (ws, es')
+
+appendWarning
+  :: ParserFlags
+  -> WarningFlag
+  -> SrcSpan
+  -> SDoc
+  -> (DynFlags -> Messages)
+  -> (DynFlags -> Messages)
+appendWarning o option srcspan warning m =
+  \d ->
+    let (ws, es) = m d
+        warning' = makeIntoWarning (Reason option) $
+           mkWarnMsg d srcspan alwaysQualify warning
+        ws' = if warnopt option o then ws `snocBag` warning' else ws
+    in (ws', es)
+
 instance MonadP P where
   addError srcspan msg
    = P $ \s@PState{messages=m} ->
-         let
-             m' d =
-                 let (ws, es) = m d
-                     errormsg = mkErrMsg d srcspan alwaysQualify msg
-                     es' = es `snocBag` errormsg
-                 in (ws, es')
-         in POk s{messages=m'} ()
+             POk s{messages=appendError srcspan msg m} ()
   addWarning option srcspan warning
    = P $ \s@PState{messages=m, options=o} ->
-         let
-             m' d =
-                 let (ws, es) = m d
-                     warning' = makeIntoWarning (Reason option) $
-                        mkWarnMsg d srcspan alwaysQualify warning
-                     ws' = if warnopt option o then ws `snocBag` warning' else ws
-                 in (ws', es)
-         in POk s{messages=m'} ()
+             POk s{messages=appendWarning o option srcspan warning m} ()
   addFatalError span msg =
     addError span msg >> P PFailed
   getBit ext = P $ \s -> let b =  ext `xtest` pExtsBitmap (options s)
                          in b `seq` POk s b
-  addAnnsAt loc anns = mapM_ (\a -> a loc) anns
   addAnnotation l a v = do
     addAnnotationOnly l a v
-    allocateComments l
+    allocateCommentsP l
+
+addAnnsAt :: MonadP m => SrcSpan -> [AddAnn] -> m ()
+addAnnsAt l = mapM_ (\(AddAnn a v) -> addAnnotation l a v)
 
 addTabWarning :: RealSrcSpan -> P ()
 addTabWarning srcspan
@@ -2662,7 +2809,8 @@ lexError str = do
 -- This is the top-level function: called from the parser each time a
 -- new token is to be read from the input.
 
-lexer :: Bool -> (Located Token -> P a) -> P a
+lexer, lexerDbg :: Bool -> (Located Token -> P a) -> P a
+
 lexer queueComments cont = do
   alr <- getBit AlternativeLayoutRuleBit
   let lexTokenFun = if alr then lexTokenAlr else lexToken
@@ -2680,6 +2828,11 @@ lexer queueComments cont = do
   if (queueComments && isComment tok)
     then queueComment (L (RealSrcSpan span) tok) >> lexer queueComments cont
     else cont (L (RealSrcSpan span) tok)
+
+-- Use this instead of 'lexer' in Parser.y to dump the tokens for debugging.
+lexerDbg queueComments cont = lexer queueComments contDbg
+  where
+    contDbg tok = trace ("token: " ++ show (unLoc tok)) (cont tok)
 
 lexTokenAlr :: P (RealLocated Token)
 lexTokenAlr = do mPending <- popPendingImplicitToken
@@ -2869,8 +3022,6 @@ isALRopen ITobrack        = True
 isALRopen ITocurly        = True
 -- GHC Extensions:
 isALRopen IToubxparen     = True
-isALRopen ITparenEscape   = True
-isALRopen ITparenTyEscape = True
 isALRopen _               = False
 
 isALRclose :: Token -> Bool
@@ -2925,12 +3076,9 @@ lexToken = do
         let bytes = byteDiff buf buf2
         span `seq` setLastToken span bytes
         lt <- t span buf bytes
-        case unRealSrcSpan lt of
-          ITlineComment _  -> return lt
-          ITblockComment _ -> return lt
-          lt' -> do
-            setLastTk lt'
-            return lt
+        let lt' = unRealSrcSpan lt
+        unless (isComment lt') (setLastTk lt')
+        return lt
 
 reportLexError :: RealSrcLoc -> RealSrcLoc -> StringBuffer -> [Char] -> P a
 reportLexError loc1 loc2 buf str
@@ -3061,7 +3209,7 @@ clean_pragma prag = canon_ws (map toLower (unprefix prag))
 --
 --   The usual way an 'AddAnn' is created is using the 'mj' ("make jump")
 --   function, and then it can be discharged using the 'ams' function.
-type AddAnn = SrcSpan -> P ()
+data AddAnn = AddAnn AnnKeywordId SrcSpan
 
 addAnnotationOnly :: SrcSpan -> AnnKeywordId -> SrcSpan -> P ()
 addAnnotationOnly l a v = P $ \s -> POk s {
@@ -3073,9 +3221,8 @@ addAnnotationOnly l a v = P $ \s -> POk s {
 -- and end of the span
 mkParensApiAnn :: SrcSpan -> [AddAnn]
 mkParensApiAnn (UnhelpfulSpan _)  = []
-mkParensApiAnn s@(RealSrcSpan ss) = [mj AnnOpenP lo,mj AnnCloseP lc]
+mkParensApiAnn s@(RealSrcSpan ss) = [AddAnn AnnOpenP lo,AddAnn AnnCloseP lc]
   where
-    mj a l = (\s -> addAnnotation s a l)
     f = srcSpanFile ss
     sl = srcSpanStartLine ss
     sc = srcSpanStartCol ss
@@ -3091,19 +3238,28 @@ queueComment c = P $ \s -> POk s {
 
 -- | Go through the @comment_q@ in @PState@ and remove all comments
 -- that belong within the given span
-allocateComments :: SrcSpan -> P ()
-allocateComments ss = P $ \s ->
+allocateCommentsP :: SrcSpan -> P ()
+allocateCommentsP ss = P $ \s ->
+  let (comment_q', newAnns) = allocateComments ss (comment_q s) in
+    POk s {
+       comment_q = comment_q'
+     , annotations_comments = newAnns ++ (annotations_comments s)
+     } ()
+
+allocateComments
+  :: SrcSpan
+  -> [Located AnnotationComment]
+  -> ([Located AnnotationComment], [(SrcSpan,[Located AnnotationComment])])
+allocateComments ss comment_q =
   let
-    (before,rest)  = break (\(L l _) -> isSubspanOf l ss) (comment_q s)
+    (before,rest)  = break (\(L l _) -> isSubspanOf l ss) comment_q
     (middle,after) = break (\(L l _) -> not (isSubspanOf l ss)) rest
     comment_q' = before ++ after
     newAnns = if null middle then []
                              else [(ss,middle)]
   in
-    POk s {
-       comment_q = comment_q'
-     , annotations_comments = newAnns ++ (annotations_comments s)
-     } ()
+    (comment_q', newAnns)
+
 
 commentToAnnotation :: Located Token -> Located AnnotationComment
 commentToAnnotation (L l (ITdocCommentNext s))  = L l (AnnDocCommentNext s)

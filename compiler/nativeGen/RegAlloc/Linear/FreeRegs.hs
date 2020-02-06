@@ -2,7 +2,6 @@
 
 module RegAlloc.Linear.FreeRegs (
     FR(..),
-    allFreeRegs,
     maxSpillSlots
 )
 
@@ -70,16 +69,13 @@ instance FR SPARC.FreeRegs where
     frInitFreeRegs = SPARC.initFreeRegs
     frReleaseReg   = SPARC.releaseReg
 
--- | For debugging output.
-allFreeRegs :: FR freeRegs => Platform -> freeRegs -> [RealReg]
-allFreeRegs plat fr = foldMap (\rcls -> frGetFreeRegs plat rcls fr) allRegClasses
-
 maxSpillSlots :: DynFlags -> Int
 maxSpillSlots dflags
               = case platformArch (targetPlatform dflags) of
                 ArchX86       -> X86.Instr.maxSpillSlots dflags
                 ArchX86_64    -> X86.Instr.maxSpillSlots dflags
                 ArchPPC       -> PPC.Instr.maxSpillSlots dflags
+                ArchS390X     -> panic "maxSpillSlots ArchS390X"
                 ArchSPARC     -> SPARC.Instr.maxSpillSlots dflags
                 ArchSPARC64   -> panic "maxSpillSlots ArchSPARC64"
                 ArchARM _ _ _ -> panic "maxSpillSlots ArchARM"

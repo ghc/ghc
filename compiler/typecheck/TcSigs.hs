@@ -27,10 +27,11 @@ module TcSigs(
 
 import GhcPrelude
 
-import HsSyn
+import GHC.Hs
 import TcHsType
 import TcRnTypes
 import TcRnMonad
+import TcOrigin
 import TcType
 import TcMType
 import TcValidity ( checkValidType )
@@ -45,7 +46,6 @@ import Var      ( TyVar, tyVarKind )
 import Id       ( Id, idName, idType, idInlinePragma, setInlinePragma, mkLocalId )
 import PrelNames( mkUnboundName )
 import BasicTypes
-import Bag( foldrBag )
 import Module( getModule )
 import Name
 import NameEnv
@@ -123,7 +123,7 @@ for two reasons:
   may actually give rise to
     f :: forall k. forall (f::k -> *) (a:k). f a -> f a
   So the sig_tvs will be [k,f,a], but only f,a are scoped.
-  NB: the scoped ones are not necessarily the *inital* ones!
+  NB: the scoped ones are not necessarily the *initial* ones!
 
 * Even aside from kind polymorphism, there may be more instantiated
   type variables than lexically-scoped ones.  For example:
@@ -397,7 +397,7 @@ tcPatSynSig name sig_ty
                                                  req ex_tvs prov body_ty
 
        -- Kind generalisation
-       ; kvs <- kindGeneralize ungen_patsyn_ty
+       ; kvs <- kindGeneralizeAll ungen_patsyn_ty
        ; traceTc "tcPatSynSig" (ppr ungen_patsyn_ty)
 
        -- These are /signatures/ so we zonk to squeeze out any kind
@@ -577,7 +577,7 @@ mkPragEnv sigs binds
 
     -- ar_env maps a local to the arity of its definition
     ar_env :: NameEnv Arity
-    ar_env = foldrBag lhsBindArity emptyNameEnv binds
+    ar_env = foldr lhsBindArity emptyNameEnv binds
 
 lhsBindArity :: LHsBind GhcRn -> NameEnv Arity -> NameEnv Arity
 lhsBindArity (L _ (FunBind { fun_id = id, fun_matches = ms })) env
@@ -766,7 +766,7 @@ tcSpecPrag poly_id prag@(SpecSig _ fun_name hs_tys inl)
   where
     name      = idName poly_id
     poly_ty   = idType poly_id
-    spec_ctxt prag = hang (text "In the SPECIALISE pragma") 2 (ppr prag)
+    spec_ctxt prag = hang (text "In the pragma:") 2 (ppr prag)
 
     tc_one hs_ty
       = do { spec_ty <- tcHsSigType   (FunSigCtxt name False) hs_ty

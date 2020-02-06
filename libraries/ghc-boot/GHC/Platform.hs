@@ -1,9 +1,11 @@
-{-# LANGUAGE LambdaCase #-}
+{-# LANGUAGE LambdaCase, ScopedTypeVariables #-}
 
 -- | A description of the platform we're compiling for.
 --
 module GHC.Platform (
-        Platform(..),
+        PlatformMini(..),
+        PlatformWordSize(..),
+        Platform(..), platformArch, platformOS,
         Arch(..),
         OS(..),
         ArmISA(..),
@@ -17,6 +19,8 @@ module GHC.Platform (
         osMachOTarget,
         osSubsectionsViaSymbols,
         platformUsesFrameworks,
+        platformWordSizeInBytes,
+        platformWordSizeInBits,
 
         PlatformMisc(..),
         IntegerLibrary(..),
@@ -28,16 +32,26 @@ module GHC.Platform (
 where
 
 import Prelude -- See Note [Why do we import Prelude here?]
+import GHC.Read
+
+-- | Contains the bare-bones arch and os information. This isn't enough for
+-- code gen, but useful for tasks where we can fall back upon the host
+-- platform, as this is all we know about the host platform.
+data PlatformMini
+  = PlatformMini
+    { platformMini_arch :: Arch
+    , platformMini_os :: OS
+    }
+    deriving (Read, Show, Eq)
 
 -- | Contains enough information for the native code generator to emit
 --      code for this platform.
 data Platform
         = Platform {
-              platformArch                     :: Arch,
-              platformOS                       :: OS,
+              platformMini                     :: PlatformMini,
               -- Word size in bytes (i.e. normally 4 or 8,
               -- for 32bit and 64bit platforms respectively)
-              platformWordSize                 :: {-# UNPACK #-} !Int,
+              platformWordSize                 :: PlatformWordSize,
               platformUnregisterised           :: Bool,
               platformHasGnuNonexecStack       :: Bool,
               platformHasIdentDirective        :: Bool,
@@ -46,6 +60,39 @@ data Platform
           }
         deriving (Read, Show, Eq)
 
+data PlatformWordSize
+  = PW4 -- ^ A 32-bit platform
+  | PW8 -- ^ A 64-bit platform
+  deriving (Eq)
+
+instance Show PlatformWordSize where
+  show PW4 = "4"
+  show PW8 = "8"
+
+instance Read PlatformWordSize where
+  readPrec = do
+    i :: Int <- readPrec
+    case i of
+      4 -> return PW4
+      8 -> return PW8
+      other -> fail ("Invalid PlatformWordSize: " ++ show other)
+
+platformWordSizeInBytes :: Platform -> Int
+platformWordSizeInBytes p =
+    case platformWordSize p of
+      PW4 -> 4
+      PW8 -> 8
+
+platformWordSizeInBits :: Platform -> Int
+platformWordSizeInBits p = platformWordSizeInBytes p * 8
+
+-- | Legacy accessor
+platformArch :: Platform -> Arch
+platformArch = platformMini_arch . platformMini
+
+-- | Legacy accessor
+platformOS :: Platform -> OS
+platformOS = platformMini_os . platformMini
 
 -- | Architectures that the native code generator knows about.
 --      TODO: It might be nice to extend these constructors with information
@@ -59,6 +106,7 @@ data Arch
         | ArchPPC_64
           { ppc_64ABI :: PPC_64ABI
           }
+        | ArchS390X
         | ArchSPARC
         | ArchSPARC64
         | ArchARM
@@ -98,6 +146,7 @@ stringEncodeArch = \case
   ArchPPC_64 { ppc_64ABI = abi } -> case abi of
     ELF_V1 -> "powerpc64"
     ELF_V2 -> "powerpc64le"
+  ArchS390X -> "s390x"
   ArchSPARC -> "sparc"
   ArchSPARC64 -> "sparc64"
   ArchARM { armISA = isa, armISAExt = _, armABI = _ } -> "arm" ++ vsuf
@@ -185,7 +234,10 @@ data PPC_64ABI
 
 -- | This predicate tells us whether the platform is 32-bit.
 target32Bit :: Platform -> Bool
-target32Bit p = platformWordSize p == 4
+target32Bit p =
+    case platformWordSize p of
+      PW4 -> True
+      PW8 -> False
 
 -- | This predicate tells us whether the OS supports ELF-like shared libraries.
 osElfTarget :: OS -> Bool
@@ -237,12 +289,16 @@ data PlatformMisc = PlatformMisc
   , platformMisc_ghcWithNativeCodeGen :: Bool
   , platformMisc_ghcWithSMP           :: Bool
   , platformMisc_ghcRTSWays           :: String
+  -- | Determines whether we will be compiling info tables that reside just
+  --   before the entry code, or with an indirection to the entry code. See
+  --   TABLES_NEXT_TO_CODE in includes/rts/storage/InfoTables.h.
   , platformMisc_tablesNextToCode     :: Bool
   , platformMisc_leadingUnderscore    :: Bool
   , platformMisc_libFFI               :: Bool
   , platformMisc_ghcThreaded          :: Bool
   , platformMisc_ghcDebugged          :: Bool
   , platformMisc_ghcRtsWithLibdw      :: Bool
+  , platformMisc_llvmTarget           :: String
   }
 
 data IntegerLibrary

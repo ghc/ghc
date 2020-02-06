@@ -1,5 +1,5 @@
 
-T10828b.hs:9:4:
+T10828b.hs:9:2: error:
     Cannot mix GADT constructors with Haskell 98 constructors
     When splicing a TH declaration:
       data T a :: *

@@ -1,5 +1,7 @@
 {-# LANGUAGE CPP, DeriveFunctor, TypeFamilies #-}
 
+{-# OPTIONS_GHC -Wno-incomplete-record-updates #-}
+
 -- Type definitions for the constraint solver
 module TcSMonad (
 
@@ -19,7 +21,7 @@ module TcSMonad (
     nestTcS, nestImplicTcS, setEvBindsTcS,
     checkConstraintsTcS, checkTvConstraintsTcS,
 
-    runTcPluginTcS, addUsedGRE, addUsedGREs,
+    runTcPluginTcS, addUsedGRE, addUsedGREs, keepAlive,
     matchGlobalInst, TcM.ClsInstResult(..),
 
     QCInst(..),
@@ -79,7 +81,7 @@ module TcSMonad (
 
     -- Inert CTyEqCans
     EqualCtList, findTyEqs, foldTyEqs, isInInertEqs,
-    lookupFlattenTyVar, lookupInertTyVar,
+    lookupInertTyVar,
 
     -- Inert solved dictionaries
     addSolvedDict, lookupSolvedDict,
@@ -139,14 +141,14 @@ import qualified TcMType as TcM
 import qualified ClsInst as TcM( matchGlobalInst, ClsInstResult(..) )
 import qualified TcEnv as TcM
        ( checkWellStaged, tcGetDefaultTys, tcLookupClass, tcLookupId, topIdLvl )
-import ClsInst( InstanceWhat(..) )
-import Kind
+import ClsInst( InstanceWhat(..), safeOverlap, instanceReturnsDictCon )
 import TcType
 import DynFlags
 import Type
 import Coercion
 import Unify
 
+import ErrUtils
 import TcEvidence
 import Class
 import TyCon
@@ -155,7 +157,7 @@ import TcErrors   ( solverDepthErrorTcS )
 import Name
 import Module ( HasModule, getModule )
 import RdrName ( GlobalRdrEnv, GlobalRdrElt )
-import qualified RnEnv as TcM
+import qualified GHC.Rename.Env as TcM
 import Var
 import VarEnv
 import VarSet
@@ -164,6 +166,9 @@ import Bag
 import UniqSupply
 import Util
 import TcRnTypes
+import TcOrigin
+import Constraint
+import Predicate
 
 import Unique
 import UniqFM
@@ -230,7 +235,7 @@ It's very important to process equalities /first/:
 * (Kick-out) We want to apply this priority scheme to kicked-out
   constraints too (see the call to extendWorkListCt in kick_out_rewritable
   E.g. a CIrredCan can be a hetero-kinded (t1 ~ t2), which may become
-  homo-kinded when kicked out, and hence we want to priotitise it.
+  homo-kinded when kicked out, and hence we want to prioritise it.
 
 * (Derived equalities) Originally we tried to postpone processing
   Derived equalities, in the hope that we might never need to deal
@@ -254,6 +259,7 @@ So we arrange to put these particular class constraints in the wl_eqs.
   NB: since we do not currently apply the substitution to the
   inert_solved_dicts, the knot-tying still seems a bit fragile.
   But this makes it better.
+
 -}
 
 -- See Note [WorkList priorities]
@@ -471,7 +477,7 @@ creating a new EvVar when we have a new goal that we have solved in
 the past.
 
 But in particular, we can use it to create *recursive* dictionaries.
-The simplest, degnerate case is
+The simplest, degenerate case is
     instance C [a] => C [a] where ...
 If we have
     [W] d1 :: C [x]
@@ -483,6 +489,63 @@ Now 'd1' goes in inert_solved_dicts, and we can solve d2 directly from d1.
     d2 = d1
 
 See Note [Example of recursive dictionaries]
+
+VERY IMPORTANT INVARIANT:
+
+ (Solved Dictionary Invariant)
+    Every member of the inert_solved_dicts is the result
+    of applying an instance declaration that "takes a step"
+
+    An instance "takes a step" if it has the form
+        dfunDList d1 d2 = MkD (...) (...) (...)
+    That is, the dfun is lazy in its arguments, and guarantees to
+    immediately return a dictionary constructor.  NB: all dictionary
+    data constructors are lazy in their arguments.
+
+    This property is crucial to ensure that all dictionaries are
+    non-bottom, which in turn ensures that the whole "recursive
+    dictionary" idea works at all, even if we get something like
+        rec { d = dfunDList d dx }
+    See Note [Recursive superclasses] in TcInstDcls.
+
+ Reason:
+   - All instances, except two exceptions listed below, "take a step"
+     in the above sense
+
+   - Exception 1: local quantified constraints have no such guarantee;
+     indeed, adding a "solved dictionary" when appling a quantified
+     constraint led to the ability to define unsafeCoerce
+     in #17267.
+
+   - Exception 2: the magic built-in instance for (~) has no
+     such guarantee.  It behaves as if we had
+         class    (a ~# b) => (a ~ b) where {}
+         instance (a ~# b) => (a ~ b) where {}
+     The "dfun" for the instance is strict in the coercion.
+     Anyway there's no point in recording a "solved dict" for
+     (t1 ~ t2); it's not going to allow a recursive dictionary
+     to be constructed.  Ditto (~~) and Coercible.
+
+THEREFORE we only add a "solved dictionary"
+  - when applying an instance declaration
+  - subject to Exceptions 1 and 2 above
+
+In implementation terms
+  - TcSMonad.addSolvedDict adds a new solved dictionary,
+    conditional on the kind of instance
+
+  - It is only called when applying an instance decl,
+    in TcInteract.doTopReactDict
+
+  - ClsInst.InstanceWhat says what kind of instance was
+    used to solve the constraint.  In particular
+      * LocalInstance identifies quantified constraints
+      * BuiltinEqInstance identifies the strange built-in
+        instances for equality.
+
+  - ClsInst.instanceReturnsDictCon says which kind of
+    instance guarantees to return a dictionary constructor
+
 Other notes about solved dictionaries
 
 * See also Note [Do not add superclasses of solved dictionaries]
@@ -490,7 +553,7 @@ Other notes about solved dictionaries
 * The inert_solved_dicts field is not rewritten by equalities,
   so it may get out of date.
 
-* THe inert_solved_dicts are all Wanteds, never givens
+* The inert_solved_dicts are all Wanteds, never givens
 
 * We only cache dictionaries from top-level instances, not from
   local quantified constraints.  Reason: if we cached the latter
@@ -500,8 +563,8 @@ Other notes about solved dictionaries
 
 Note [Do not add superclasses of solved dictionaries]
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
-Every member of inert_solved_dicts is the result of applying a dictionary
-function, NOT of applying superclass selection to anything.
+Every member of inert_solved_dicts is the result of applying a
+dictionary function, NOT of applying superclass selection to anything.
 Consider
 
         class Ord a => C a where
@@ -646,7 +709,7 @@ data InertCans   -- See Note [Detailed InertCans Invariants] for more
 
        , inert_funeqs :: FunEqMap Ct
               -- All CFunEqCans; index is the whole family head type.
-              -- All Nominal (that's an invarint of all CFunEqCans)
+              -- All Nominal (that's an invariant of all CFunEqCans)
               -- LHS is fully rewritten (modulo eqCanRewrite constraints)
               --     wrt inert_eqs
               -- Can include all flavours, [G], [W], [WD], [D]
@@ -703,8 +766,7 @@ The InertCans represents a collection of constraints with the following properti
     to the CTyEqCan equalities (modulo canRewrite of course;
     eg a wanted cannot rewrite a given)
 
-  * CTyEqCan equalities: see Note [Applying the inert substitution]
-                         in TcFlatten
+  * CTyEqCan equalities: see Note [inert_eqs: the inert equalities]
 
 Note [EqualCtList invariants]
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
@@ -716,7 +778,7 @@ Note [EqualCtList invariants]
 
 From the fourth invariant it follows that the list is
    - A single [G], or
-   - Zero or one [D] or [WD], followd by any number of [W]
+   - Zero or one [D] or [WD], followed by any number of [W]
 
 The Wanteds can't rewrite anything which is why we put them last
 
@@ -731,7 +793,7 @@ live in three places
     the InertCans. They can be [G], [W], [WD], or [D].
 
   * The inert_flat_cache.  This is used when flattening, to get maximal
-    sharing. Everthing in the inert_flat_cache is [G] or [WD]
+    sharing. Everything in the inert_flat_cache is [G] or [WD]
 
     It contains lots of things that are still in the work-list.
     E.g Suppose we have (w1: F (G a) ~ Int), and (w2: H (G a) ~ Int) in the
@@ -1043,7 +1105,7 @@ instance Outputable InertCans where
 Note [The improvement story and derived shadows]
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 Because Wanteds cannot rewrite Wanteds (see Note [Wanteds do not
-rewrite Wanteds] in TcRnTypes), we may miss some opportunities for
+rewrite Wanteds] in Constraint), we may miss some opportunities for
 solving.  Here's a classic example (indexed-types/should_fail/T4093a)
 
     Ambiguity check for f: (Foo e ~ Maybe e) => Foo e
@@ -1459,25 +1521,6 @@ lookupInertTyVar ieqs tv
       Just (CTyEqCan { cc_rhs = rhs, cc_eq_rel = NomEq } : _ ) -> Just rhs
       _                                                        -> Nothing
 
-lookupFlattenTyVar :: InertEqs -> TcTyVar -> TcType
--- See Note [lookupFlattenTyVar]
-lookupFlattenTyVar ieqs ftv
-  = lookupInertTyVar ieqs ftv `orElse` mkTyVarTy ftv
-
-{- Note [lookupFlattenTyVar]
-~~~~~~~~~~~~~~~~~~~~~~~~~~~~
-Suppose we have an injective function F and
-  inert_funeqs:   F t1 ~ fsk1
-                  F t2 ~ fsk2
-  inert_eqs:      fsk1 ~ fsk2
-
-We never rewrite the RHS (cc_fsk) of a CFunEqCan.  But we /do/ want to
-get the [D] t1 ~ t2 from the injectiveness of F.  So we look up the
-cc_fsk of CFunEqCans in the inert_eqs when trying to find derived
-equalities arising from injectivity.
--}
-
-
 {- *********************************************************************
 *                                                                      *
                    Inert instances: inert_insts
@@ -1663,12 +1706,12 @@ kick_out_rewritable new_fr new_tv
 
     kicked_out :: WorkList
     -- NB: use extendWorkList to ensure that kicked-out equalities get priority
-    -- See Note [Prioritise equality constraints] (Kick-out).
+    -- See Note [Prioritise equalities] (Kick-out).
     -- The irreds may include non-canonical (hetero-kinded) equality
     -- constraints, which perhaps may have become soluble after new_tv
     -- is substituted; ditto the dictionaries, which may include (a~b)
     -- or (a~~b) constraints.
-    kicked_out = foldrBag extendWorkListCt
+    kicked_out = foldr extendWorkListCt
                           (emptyWorkList { wl_eqs    = tv_eqs_out
                                          , wl_funeqs = feqs_out })
                           ((dicts_out `andCts` irs_out)
@@ -1813,7 +1856,7 @@ Givens, to give as informative an error messasge as possible
 (#12468, #11325).
 
 Hence:
- * In the main simlifier loops in TcSimplify (solveWanteds,
+ * In the main simplifier loops in TcSimplify (solveWanteds,
    simpl_loop), we feed the insolubles in solveSimpleWanteds,
    so that they get rewritten (albeit not solved).
 
@@ -1834,10 +1877,11 @@ addInertSafehask ics item@(CDictCan { cc_class = cls, cc_tyargs = tys })
 addInertSafehask _ item
   = pprPanic "addInertSafehask: can't happen! Inserting " $ ppr item
 
-insertSafeOverlapFailureTcS :: Ct -> TcS ()
+insertSafeOverlapFailureTcS :: InstanceWhat -> Ct -> TcS ()
 -- See Note [Safe Haskell Overlapping Instances Implementation] in TcSimplify
-insertSafeOverlapFailureTcS item
-  = updInertCans (\ics -> addInertSafehask ics item)
+insertSafeOverlapFailureTcS what item
+  | safeOverlap what = return ()
+  | otherwise        = updInertCans (\ics -> addInertSafehask ics item)
 
 getSafeOverlapFailures :: TcS Cts
 -- See Note [Safe Haskell Overlapping Instances Implementation] in TcSimplify
@@ -1846,16 +1890,17 @@ getSafeOverlapFailures
       ; return $ foldDicts consCts safehask emptyCts }
 
 --------------
-addSolvedDict :: CtEvidence -> Class -> [Type] -> TcS ()
--- Add a new item in the solved set of the monad
+addSolvedDict :: InstanceWhat -> CtEvidence -> Class -> [Type] -> TcS ()
+-- Conditionally add a new item in the solved set of the monad
 -- See Note [Solved dictionaries]
-addSolvedDict item cls tys
-  | isIPPred (ctEvPred item)    -- Never cache "solved" implicit parameters (not sure why!)
-  = return ()
-  | otherwise
+addSolvedDict what item cls tys
+  | isWanted item
+  , instanceReturnsDictCon what
   = do { traceTcS "updSolvedSetTcs:" $ ppr item
        ; updInertTcS $ \ ics ->
              ics { inert_solved_dicts = addDict (inert_solved_dicts ics) cls tys item } }
+  | otherwise
+  = return ()
 
 getSolvedDicts :: TcS (DictMap CtEvidence)
 getSolvedDicts = do { ics <- getTcSInerts; return (inert_solved_dicts ics) }
@@ -2054,7 +2099,7 @@ getNoGivenEqs :: TcLevel          -- TcLevel of this implication
 getNoGivenEqs tclvl skol_tvs
   = do { inerts@(IC { inert_eqs = ieqs, inert_irreds = irreds })
               <- getInertCans
-       ; let has_given_eqs = foldrBag ((||) . ct_given_here) False irreds
+       ; let has_given_eqs = foldr ((||) . ct_given_here) False irreds
                           || anyDVarEnv eqs_given_here ieqs
              insols = filterBag insolubleEqCt irreds
                       -- Specifically includes ones that originated in some
@@ -2071,7 +2116,7 @@ getNoGivenEqs tclvl skol_tvs
   where
     eqs_given_here :: EqualCtList -> Bool
     eqs_given_here [ct@(CTyEqCan { cc_tyvar = tv })]
-                              -- Givens are always a sigleton
+                              -- Givens are always a singleton
       = not (skolem_bound_here tv) && ct_given_here ct
     eqs_given_here _ = False
 
@@ -2317,7 +2362,7 @@ lookupSolvedDict (IS { inert_solved_dicts = solved }) loc cls tys
 ********************************************************************* -}
 
 foldIrreds :: (Ct -> b -> b) -> Cts -> b -> b
-foldIrreds k irreds z = foldrBag k z irreds
+foldIrreds k irreds z = foldr k z irreds
 
 
 {- *********************************************************************
@@ -2467,7 +2512,7 @@ addDict m cls tys item = insertTcApp m (getUnique cls) tys item
 
 addDictsByClass :: DictMap Ct -> Class -> Bag Ct -> DictMap Ct
 addDictsByClass m cls items
-  = addToUDFM m cls (foldrBag add emptyTM items)
+  = addToUDFM m cls (foldr add emptyTM items)
   where
     add ct@(CDictCan { cc_tyargs = tys }) tm = insertTM tys ct tm
     add ct _ = pprPanic "addDictsByClass" (ppr ct)
@@ -2691,7 +2736,10 @@ csTraceTcM mk_doc
        ; when (  dopt Opt_D_dump_cs_trace dflags
                   || dopt Opt_D_dump_tc_trace dflags )
               ( do { msg <- mk_doc
-                   ; TcM.traceTcRn Opt_D_dump_cs_trace msg }) }
+                   ; TcM.dumpTcRn False
+                       (dumpOptionsFromFlag Opt_D_dump_cs_trace)
+                       "" FormatText
+                       msg }) }
 
 runTcS :: TcS a                -- What to run
        -> TcM (a, EvBindMap)
@@ -2817,7 +2865,7 @@ implications.  Consider
    a ~ F b, forall c. b~Int => blah
 If we have F b ~ fsk in the flat-cache, and we push that into the
 nested implication, we might miss that F b can be rewritten to F Int,
-and hence perhpas solve it.  Moreover, the fsk from outside is
+and hence perhaps solve it.  Moreover, the fsk from outside is
 flattened out after solving the outer level, but and we don't
 do that flattening recursively.
 -}
@@ -2839,7 +2887,7 @@ nestTcS (TcS thing_inside)
 
        ; new_inerts <- TcM.readTcRef new_inert_var
 
-       -- we want to propogate the safe haskell failures
+       -- we want to propagate the safe haskell failures
        ; let old_ic = inert_cans inerts
              new_ic = inert_cans new_inerts
              nxt_ic = old_ic { inert_safehask = inert_safehask new_ic }
@@ -2872,7 +2920,7 @@ checkTvConstraintsTcS skol_info skol_tvs (TcS thing_inside)
 
        ; unless (null wanteds) $
          do { ev_binds_var <- TcM.newNoTcEvBinds
-            ; imp <- newImplication
+            ; imp <- TcM.newImplication
             ; let wc = emptyWC { wc_simple = wanteds }
                   imp' = imp { ic_tclvl  = new_tclvl
                              , ic_skols  = skol_tvs
@@ -2911,7 +2959,7 @@ checkConstraintsTcS skol_info skol_tvs given (TcS thing_inside)
                                         thing_inside new_tcs_env
 
        ; ev_binds_var <- TcM.newTcEvBinds
-       ; imp <- newImplication
+       ; imp <- TcM.newImplication
        ; let wc = emptyWC { wc_simple = wanteds }
              imp' = imp { ic_tclvl  = new_tclvl
                         , ic_skols  = skol_tvs
@@ -2936,7 +2984,7 @@ Consider
    forall b. empty =>  Eq [a]
 We solve the simple (Eq [a]), under nestTcS, and then turn our attention to
 the implications.  It's definitely fine to use the solved dictionaries on
-the inner implications, and it can make a signficant performance difference
+the inner implications, and it can make a significant performance difference
 if you do so.
 -}
 
@@ -3066,6 +3114,8 @@ addUsedGREs gres = wrapTcS  $ TcM.addUsedGREs gres
 addUsedGRE :: Bool -> GlobalRdrElt -> TcS ()
 addUsedGRE warn_if_deprec gre = wrapTcS $ TcM.addUsedGRE warn_if_deprec gre
 
+keepAlive :: Name -> TcS ()
+keepAlive = wrapTcS . TcM.keepAlive
 
 -- Various smaller utilities [TODO, maybe will be absorbed in the instance matcher]
 -- ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
@@ -3225,6 +3275,7 @@ dischargeFunEq :: CtEvidence -> TcTyVar -> TcCoercion -> TcType -> TcS ()
 --       - co :: F tys ~ xi
 --       - fmv/fsk `notElem` xi
 --       - fmv not filled (for Wanteds)
+--       - xi is flattened (and obeys Note [Almost function-free] in TcRnTypes)
 --
 -- Then for [W] or [WD], we actually fill in the fmv:
 --      set fmv := xi,
@@ -3353,12 +3404,32 @@ setWantedEvTerm (HoleDest hole) tm
   = do { useVars (coVarsOfCo co)
        ; wrapTcS $ TcM.fillCoercionHole hole co }
   | otherwise
-  = do { let co_var = coHoleCoVar hole
+  = -- See Note [Yukky eq_sel for a HoleDest]
+    do { let co_var = coHoleCoVar hole
        ; setEvBind (mkWantedEvBind co_var tm)
        ; wrapTcS $ TcM.fillCoercionHole hole (mkTcCoVarCo co_var) }
 
 setWantedEvTerm (EvVarDest ev_id) tm
   = setEvBind (mkWantedEvBind ev_id tm)
+
+{- Note [Yukky eq_sel for a HoleDest]
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+How can it be that a Wanted with HoleDest gets evidence that isn't
+just a coercion? i.e. evTermCoercion_maybe returns Nothing.
+
+Consider [G] forall a. blah => a ~ T
+         [W] S ~# T
+
+Then doTopReactEqPred carefully looks up the (boxed) constraint (S ~
+T) in the quantified constraints, and wraps the (boxed) evidence it
+gets back in an eq_sel to extract the unboxed (S ~# T).  We can't put
+that term into a coercion, so we add a value binding
+    h = eq_sel (...)
+and the coercion variable h to fill the coercion hole.
+We even re-use the CoHole's Id for this binding!
+
+Yuk!
+-}
 
 setEvBindIfWanted :: CtEvidence -> EvTerm -> TcS ()
 setEvBindIfWanted ev tm
@@ -3379,7 +3450,7 @@ newGivenEvVar :: CtLoc -> (TcPredType, EvTerm) -> TcS CtEvidence
 -- Make a new variable of the given PredType,
 -- immediately bind it to the given term
 -- and return its CtEvidence
--- See Note [Bind new Givens immediately] in TcRnTypes
+-- See Note [Bind new Givens immediately] in Constraint
 newGivenEvVar loc (pred, rhs)
   = do { new_ev <- newBoundEvVarId pred rhs
        ; return (CtGiven { ctev_pred = pred, ctev_evar = new_ev, ctev_loc = loc }) }
@@ -3504,11 +3575,12 @@ checkReductionDepth loc ty
          wrapErrTcS $
          solverDepthErrorTcS loc ty }
 
-matchFam :: TyCon -> [Type] -> TcS (Maybe (Coercion, TcType))
+matchFam :: TyCon -> [Type] -> TcS (Maybe (CoercionN, TcType))
+-- Given (F tys) return (ty, co), where co :: F tys ~N ty
 matchFam tycon args = wrapTcS $ matchFamTcM tycon args
 
-matchFamTcM :: TyCon -> [Type] -> TcM (Maybe (Coercion, TcType))
--- Given (F tys) return (ty, co), where co :: F tys ~ ty
+matchFamTcM :: TyCon -> [Type] -> TcM (Maybe (CoercionN, TcType))
+-- Given (F tys) return (ty, co), where co :: F tys ~N ty
 matchFamTcM tycon args
   = do { fam_envs <- FamInst.tcGetFamInstEnvs
        ; let match_fam_result

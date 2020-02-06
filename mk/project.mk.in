@@ -142,7 +142,7 @@ else
 Windows_Host=NO
 endif
 
-# Windows_Target=YES if we are targetting a Windows platform
+# Windows_Target=YES if we are targeting a Windows platform
 ifneq "$(findstring $(TargetOS_CPP), mingw32)" ""
 Windows_Target=YES
 else
@@ -152,10 +152,6 @@ endif
 # In case of Solaris OS, does it provide broken shared libs
 # linker or not?
 SOLARIS_BROKEN_SHLD=@SOLARIS_BROKEN_SHLD@
-
-# Do we have a C compiler using an LLVM back end?
-CC_LLVM_BACKEND  = @CC_LLVM_BACKEND@
-CC_CLANG_BACKEND = @CC_CLANG_BACKEND@
 
 # Is the stage0 compiler affected by Bug #9439?
 GHC_LLVM_AFFECTED_BY_9439 = @GHC_LLVM_AFFECTED_BY_9439@

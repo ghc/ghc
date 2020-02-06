@@ -21,15 +21,15 @@ import Reg
 import RegClass
 import TargetReg
 
-import Cmm hiding (topInfoTable)
-import Hoopl.Collections
-import Hoopl.Label
+import GHC.Cmm hiding (topInfoTable)
+import GHC.Cmm.Dataflow.Collections
+import GHC.Cmm.Dataflow.Label
 
-import BlockId
-import CLabel
-import PprCmmExpr ()
+import GHC.Cmm.BlockId
+import GHC.Cmm.CLabel
+import GHC.Cmm.Ppr.Expr () -- For Outputable instances
 
-import Unique                ( getUnique )
+import Unique                ( pprUniqueAlways, getUnique )
 import GHC.Platform
 import FastString
 import Outputable
@@ -42,7 +42,7 @@ import Data.Bits
 -- -----------------------------------------------------------------------------
 -- Printing this stuff out
 
-pprNatCmmDecl :: NatCmmDecl CmmStatics Instr -> SDoc
+pprNatCmmDecl :: NatCmmDecl RawCmmStatics Instr -> SDoc
 pprNatCmmDecl (CmmData section dats) =
   pprSectionAlign section $$ pprDatas dats
 
@@ -59,7 +59,7 @@ pprNatCmmDecl proc@(CmmProc top_info lbl _ (ListGraph blocks)) =
                                      -- so label needed
          vcat (map (pprBasicBlock top_info) blocks)
 
-    Just (Statics info_lbl _) ->
+    Just (RawCmmStatics info_lbl _) ->
       sdocWithPlatform $ \platform ->
       pprSectionAlign (Section Text info_lbl) $$
       (if platformHasSubsectionsViaSymbols platform
@@ -104,7 +104,7 @@ pprFunctionPrologue lab =  pprGloblDecl lab
                         $$ text "\t.localentry\t" <> ppr lab
                         <> text ",.-" <> ppr lab
 
-pprBasicBlock :: LabelMap CmmStatics -> NatBasicBlock Instr -> SDoc
+pprBasicBlock :: LabelMap RawCmmStatics -> NatBasicBlock Instr -> SDoc
 pprBasicBlock info_env (BasicBlock blockid instrs)
   = maybe_infotable $$
     pprLabel (blockLbl blockid) $$
@@ -112,16 +112,16 @@ pprBasicBlock info_env (BasicBlock blockid instrs)
   where
     maybe_infotable = case mapLookup blockid info_env of
        Nothing   -> empty
-       Just (Statics info_lbl info) ->
+       Just (RawCmmStatics info_lbl info) ->
            pprAlignForSection Text $$
            vcat (map pprData info) $$
            pprLabel info_lbl
 
 
 
-pprDatas :: CmmStatics -> SDoc
+pprDatas :: RawCmmStatics -> SDoc
 -- See note [emit-time elimination of static indirections] in CLabel.
-pprDatas (Statics alias [CmmStaticLit (CmmLabel lbl), CmmStaticLit ind, _, _])
+pprDatas (RawCmmStatics alias [CmmStaticLit (CmmLabel lbl), CmmStaticLit ind, _, _])
   | lbl == mkIndStaticInfoLabel
   , let labelInd (CmmLabelOff l _) = Just l
         labelInd (CmmLabel l) = Just l
@@ -130,7 +130,7 @@ pprDatas (Statics alias [CmmStaticLit (CmmLabel lbl), CmmStaticLit ind, _, _])
   , alias `mayRedirectTo` ind'
   = pprGloblDecl alias
     $$ text ".equiv" <+> ppr alias <> comma <> ppr (CmmLabel ind')
-pprDatas (Statics lbl dats) = vcat (pprLabel lbl : map pprData dats)
+pprDatas (RawCmmStatics lbl dats) = vcat (pprLabel lbl : map pprData dats)
 
 pprData :: CmmStatic -> SDoc
 pprData (CmmString str)          = pprBytes str
@@ -168,7 +168,10 @@ pprReg r
   = case r of
       RegReal    (RealRegSingle i) -> ppr_reg_no i
       RegReal    (RealRegPair{})   -> panic "PPC.pprReg: no reg pairs on this arch"
-      RegVirtual v                 -> ppr v
+      RegVirtual (VirtualRegI  u)  -> text "%vI_"   <> pprUniqueAlways u
+      RegVirtual (VirtualRegHi u)  -> text "%vHi_"  <> pprUniqueAlways u
+      RegVirtual (VirtualRegF  u)  -> text "%vF_"   <> pprUniqueAlways u
+      RegVirtual (VirtualRegD  u)  -> text "%vD_"   <> pprUniqueAlways u
 
   where
     ppr_reg_no :: Int -> SDoc
@@ -187,8 +190,7 @@ pprFormat x
                 II32 -> sLit "w"
                 II64 -> sLit "d"
                 FF32 -> sLit "fs"
-                FF64 -> sLit "fd"
-                VecFormat _ _ _ -> panic "PPC.Ppr.pprFormat: VecFormat")
+                FF64 -> sLit "fd")
 
 
 pprCond :: Cond -> SDoc
@@ -373,7 +375,6 @@ pprInstr (LD fmt reg addr) = hcat [
             II64 -> sLit "d"
             FF32 -> sLit "fs"
             FF64 -> sLit "fd"
-            VecFormat _ _ _ -> panic "PPC.Ppr.pprInstr: VecFormat"
             ),
         case addr of AddrRegImm _ _ -> empty
                      AddrRegReg _ _ -> char 'x',
@@ -413,7 +414,6 @@ pprInstr (LA fmt reg addr) = hcat [
             II64 -> sLit "d"
             FF32 -> sLit "fs"
             FF64 -> sLit "fd"
-            VecFormat _ _ _ -> panic "PPC.Ppr.pprInstr: VecFormat"
             ),
         case addr of AddrRegImm _ _ -> empty
                      AddrRegReg _ _ -> char 'x',
@@ -846,7 +846,7 @@ pprInstr (FCMP reg1 reg2) = hcat [
             -- Note: we're using fcmpu, not fcmpo
             -- The difference is with fcmpo, compare with NaN is an invalid operation.
             -- We don't handle invalid fp ops, so we don't care.
-            -- Morever, we use `fcmpu 0, ...` rather than `fcmpu cr0, ...` for
+            -- Moreover, we use `fcmpu 0, ...` rather than `fcmpu cr0, ...` for
             -- better portability since some non-GNU assembler (such as
             -- IBM's `as`) tend not to support the symbolic register name cr0.
             -- This matches the syntax that GCC seems to emit for PPC targets.

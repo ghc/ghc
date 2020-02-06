@@ -13,7 +13,7 @@ dnl
 # see what flags are available. (Better yet, read the documentation!)
 #
 
-AC_INIT([The Glorious Glasgow Haskell Compilation System], [8.9.0], [glasgow-haskell-bugs@haskell.org], [ghc-AC_PACKAGE_VERSION])
+AC_INIT([The Glorious Glasgow Haskell Compilation System], [8.11.0], [glasgow-haskell-bugs@haskell.org], [ghc-AC_PACKAGE_VERSION])
 
 # Set this to YES for a released version, otherwise NO
 : ${RELEASE=NO}
@@ -30,8 +30,6 @@ if test ! -f mk/config.h.in; then
    echo "mk/config.h.in doesn't exist: perhaps you haven't run 'python3 boot'?"
    exit 1
 fi
-
-AC_SUBST([CONFIGURE_ARGS], [$ac_configure_args])
 
 dnl this makes sure `./configure --target=<cross-compile-target>`
 dnl works as expected, since we're slightly modifying how Autoconf
@@ -94,10 +92,6 @@ AC_ARG_WITH([ghc],
         AC_MSG_ERROR([--with-ghc=$withval is obsolete (use './configure GHC=$withval' or 'GHC=$withval ./configure' instead)]))
 AC_SUBST(WithGhc,$GHC)
 
-dnl ** Tell the make system which OS we are using
-dnl $OSTYPE is set by the operating system to "msys" or "cygwin" or something
-AC_SUBST(OSTYPE)
-
 AC_ARG_ENABLE(bootstrap-with-devel-snapshot,
 [AC_HELP_STRING([--enable-bootstrap-with-devel-snapshot],
                 [Allow bootstrapping using a development snapshot of GHC.  This is not guaranteed to work.])],
@@ -157,8 +151,8 @@ if test "$WithGhc" = ""
 then
     AC_MSG_ERROR([GHC is required.])
 fi
-FP_COMPARE_VERSIONS([$GhcVersion],[-lt],[8.4],
-    [AC_MSG_ERROR([GHC version 8.4 or later is required to compile GHC.])])
+FP_COMPARE_VERSIONS([$GhcVersion],[-lt],[8.6],
+    [AC_MSG_ERROR([GHC version 8.6 or later is required to compile GHC.])])
 
 if test `expr $GhcMinVersion % 2` = "1"
 then
@@ -171,9 +165,6 @@ then
      or 'GHC=' to specify a different GHC to use.])
     fi
 fi
-
-GHC_PACKAGE_DB_FLAG=package-db
-AC_SUBST(GHC_PACKAGE_DB_FLAG)
 
 # GHC is passed to Cabal, so we need a native path
 if test "${WithGhc}" != ""
@@ -250,47 +241,84 @@ AC_SUBST(SOLARIS_BROKEN_SHLD)
 
 dnl ** Do an unregisterised build?
 dnl --------------------------------------------------------------
+
+AC_MSG_CHECKING(whether target supports a registerised ABI)
 case "$TargetArch" in
-    i386|x86_64|powerpc|powerpc64|powerpc64le|arm|aarch64)
+    i386|x86_64|powerpc|powerpc64|powerpc64le|s390x|arm|aarch64)
         UnregisterisedDefault=NO
+        AC_MSG_RESULT([yes])
         ;;
     *)
         UnregisterisedDefault=YES
+        AC_MSG_RESULT([no])
         ;;
 esac
-AC_ARG_ENABLE(unregisterised,
-[AC_HELP_STRING([--enable-unregisterised],
-[Build an unregisterised compiler (enabled by default on platforms without registerised support) [default="$UnregisterisedDefault"]])],
-[ if test x"$enableval" = x"yes"; then
-        Unregisterised=YES
-  else
-        Unregisterised=NO
-  fi
-],
-[Unregisterised="$UnregisterisedDefault"]
-)
+FP_DEFAULT_CHOICE_OVERRIDE_CHECK(
+  [unregisterised],
+  [unregisterised],
+  [registerised],
+  [Unregisterised],
+  [Build a toolchain with the unregisterised ABI (disabled by default on platforms with registerised support)],
+  [NO],
+  [YES],
+  [no])
 AC_SUBST(Unregisterised)
+
+dnl ** Do a build with tables next to code?
+dnl
+dnl Whether the target architecture supports placing info tables
+dnl directly before the entry code (see TABLES_NEXT_TO_CODE in the RTS).
+dnl Whether we actually compile for TABLES_NEXT_TO_CODE depends on
+dnl whether we're building unregisterised code or not, which may be
+dnl decided by options to the compiler later.
+dnl
+dnl See https://gitlab.haskell.org/ghc/ghc/wikis/commentary/rts/storage/heap-objects#tables_next_to_code
+dnl --------------------------------------------------------------
+
+AC_MSG_CHECKING(whether target supports tables next to code)
+case "$Unregisterised" in
+    NO)
+        case "$TargetArch" in
+            ia64|powerpc64|powerpc64le|s390x)
+                TablesNextToCodeDefault=NO
+                AC_MSG_RESULT([no])
+                ;;
+            *)
+                TablesNextToCodeDefault=YES
+                AC_MSG_RESULT([yes])
+                ;;
+        esac
+        ;;
+    YES)
+        TablesNextToCodeDefault=NO
+        AC_MSG_RESULT([no])
+        ;;
+esac
+FP_DEFAULT_CHOICE_OVERRIDE_CHECK(
+  [tables-next-to-code],
+  [tables next to code],
+  [tables apart from code],
+  [TablesNextToCode],
+  [Build a tool chain with info tables laid out next to code (enabled by default when using the registerised ABI, on platforms that support it)])
+if test x"$TablesNextToCode" = xYES; then
+   AC_DEFINE([TABLES_NEXT_TO_CODE], [1], [Define to 1 if info tables are laid out next to code])
+fi
+AC_SUBST(TablesNextToCode)
 
 dnl ** Does target have runtime linker support?
 dnl --------------------------------------------------------------
 case "$target" in
-    powerpc64-*|powerpc64le-*|powerpc-ibm-aix*)
-        HaskellHaveRTSLinker=NO
+    powerpc64-*|powerpc64le-*|powerpc-ibm-aix*|s390x-ibm-linux)
+        TargetHasRTSLinker=NO
         ;;
     *)
-        HaskellHaveRTSLinker=YES
+        TargetHasRTSLinker=YES
         ;;
 esac
-AC_SUBST(HaskellHaveRTSLinker)
+AC_SUBST(TargetHasRTSLinker)
 
 # Requires FPTOOLS_SET_PLATFORM_VARS to be run first.
 FP_FIND_ROOT
-
-fail() {
-    echo >&2
-    echo "$1" >&2
-    exit 1
-}
 
 
 if test "$HostOS" = "mingw32"
@@ -301,7 +329,7 @@ then
     if test "$HostArch" = "i386"
     then
         mingw_arch="i686"
-        tarball_dest_dir="mingw-w64/x86"
+        tarball_dest_dir="mingw-w64/i686"
         tarball_mingw_dir="mingw32"
     else
         mingw_arch="x86_64"
@@ -355,7 +383,7 @@ set_up_tarballs() {
         find "${base_dir}" -name "*.tar.xz" -exec tar xfJ {} \; &&
         rm ".MTREE" &&
         rm ".PKGINFO" &&
-        cd .. ) || fail "Error: Could not extract Windows toolchains."
+        cd .. ) || AC_MSG_ERROR([Could not extract Windows toolchains.])
 
         mv "inplace/${tarball_mingw_dir}" inplace/mingw &&
         touch inplace/mingw
@@ -437,7 +465,7 @@ dnl ** Building a cross compiler?
 dnl --------------------------------------------------------------
 CrossCompiling=NO
 # If 'host' and 'target' differ, then this means we are building a cross-compiler.
-if test "$TargetPlatform" != "$HostPlatform" ; then
+if test "$target" != "$host" ; then
     CrossCompiling=YES
     cross_compiling=yes   # This tells configure that it can accept just 'target',
                           # otherwise you get
@@ -502,7 +530,7 @@ AC_ARG_WITH([gcc],
         AC_MSG_ERROR([--with-gcc=$withval is obsolete (use './configure CC=$withval' or 'CC=$withval ./configure' instead)]))
 
 AC_ARG_WITH([clang],
-        AS_HELP_STRING([--with-clang=ARG], [Use ARG as the path to gcc (obsolete, use CC=ARG instead) [default=autodetect]]),
+        AS_HELP_STRING([--with-clang=ARG], [Use ARG as the path to clang (obsolete, use CC=ARG instead) [default=autodetect]]),
         AC_MSG_ERROR([--with-clang=$withval is obsolete (use './configure CC=$withval' or 'CC=$withval ./configure' instead)]))
 
 dnl detect compiler (prefer gcc over clang) and set $CC (unless CC already set),
@@ -558,7 +586,7 @@ AC_SUBST([NmCmd])
 if test "$TargetOS_CPP" = "darwin"
 then
     AC_MSG_CHECKING(whether nm program is broken)
-    # Some versions of XCode ship a broken version of `nm`. Detect and work
+    # Some versions of Xcode ship a broken version of `nm`. Detect and work
     # around this issue. See : https://gitlab.haskell.org/ghc/ghc/issues/11744
     nmver=$(${NM} --version | grep version | sed 's/ //g')
     case "$nmver" in
@@ -628,7 +656,7 @@ AC_SUBST([LibtoolCmd])
 # tools we are looking for. In the past, GHC supported a number of
 # versions of LLVM simultaneously, but that stopped working around
 # 3.5/3.6 release of LLVM.
-LlvmVersion=7
+LlvmVersion=9
 AC_SUBST([LlvmVersion])
 sUPPORTED_LLVM_VERSION=$(echo \($LlvmVersion\) | sed 's/\./,/')
 AC_DEFINE_UNQUOTED([sUPPORTED_LLVM_VERSION], ${sUPPORTED_LLVM_VERSION}, [The supported LLVM version number])
@@ -672,20 +700,12 @@ dnl --------------------------------------------------------------
 dnl ** Can the unix package be built?
 dnl --------------------------------------------------------------
 
-if test "$TargetOS" = "mingw32"
-then
-    GhcLibsWithUnix=NO
-else
-    GhcLibsWithUnix=YES
-fi
-AC_SUBST([GhcLibsWithUnix])
-
 dnl ** does #! work?
 AC_SYS_INTERPRETER()
 
 dnl ** look for GCC and find out which version
 dnl     Figure out which C compiler to use.  Gcc is preferred.
-dnl     If gcc, make sure it's at least 3.0
+dnl     If gcc, make sure it's at least 4.6
 dnl
 FP_GCC_VERSION
 
@@ -695,7 +715,9 @@ FP_GCC_SUPPORTS_NO_PIE
 dnl ** Used to determine how to compile ghc-prim's atomics.c, used by
 dnl    unregisterised, Sparc, and PPC backends.
 FP_GCC_SUPPORTS__ATOMICS
-AC_DEFINE([HAVE_C11_ATOMICS], [$CONF_GCC_SUPPORTS__ATOMICS], [Does GCC support __atomic primitives?])
+if test $CONF_GCC_SUPPORTS__ATOMICS = YES ; then
+  AC_DEFINE([HAVE_C11_ATOMICS], [1], [Does GCC support __atomic primitives?])
+fi
 
 FP_GCC_EXTRA_FLAGS
 
@@ -820,9 +842,21 @@ changequote([, ])dnl
 ])
 FP_COMPARE_VERSIONS([$fp_cv_sphinx_version],-lt,1.0.0,
     [AC_MSG_WARN([Sphinx version 1.0.0 or later is required to build documentation]); SPHINXBUILD=;])
+if test -n "$SPHINXBUILD"; then
+  if "$SPHINXBUILD" -b text utils/check-sphinx utils/check-sphinx/dist > /dev/null 2>&1; then true; else
+    AC_MSG_WARN([Sphinx for python3 is required to build documentation.])
+    SPHINXBUILD=;
+  fi
+fi
 
 dnl ** check for xelatex
 AC_PATH_PROG(XELATEX,xelatex)
+
+dnl ** check for makeinfo
+AC_PATH_PROG(MAKEINFO,makeinfo)
+
+dnl ** check for Python for testsuite driver
+FIND_PYTHON
 
 dnl ** check for ghc-pkg command
 FP_PROG_GHC_PKG
@@ -963,7 +997,6 @@ AC_ARG_WITH([system-libffi],
 AS_IF([test "x$with_system_libffi" = "xyes"],
   [UseSystemLibFFI="YES"], [UseSystemLibFFI="NO"]
 )
-
 
 AC_SUBST(UseSystemLibFFI)
 
@@ -1199,16 +1232,48 @@ AC_DEFINE_UNQUOTED([RTS_LINKER_USE_MMAP], [$RtsLinkerUseMmap],
 
 dnl ** Have libdw?
 dnl --------------------------------------------------------------
+AC_ARG_WITH([libdw-libraries],
+  [AC_HELP_STRING([--with-libdw-libraries=ARG],
+    [Find libraries for libdw in ARG [default=system default]])
+  ],
+  [
+    LibdwLibDir="$withval"
+    LIBDW_LDFLAGS="-L$withval"
+  ])
+
+AC_SUBST(LibdwLibDir)
+
+AC_ARG_WITH([libdw-includes],
+  [AC_HELP_STRING([--with-libdw-includes=ARG],
+    [Find includes for libdw in ARG [default=system default]])
+  ],
+  [
+    LibdwIncludeDir="$withval"
+    LIBDW_CFLAGS="-I$withval"
+  ])
+
+AC_SUBST(LibdwIncludeDir)
+
 UseLibdw=NO
 USE_LIBDW=0
 AC_ARG_ENABLE(dwarf-unwind,
     [AC_HELP_STRING([--enable-dwarf-unwind],
-        [Enable DWARF unwinding support in the runtime system via elfutils' libdw [default=no]])],
-    [AC_CHECK_LIB(dw, dwfl_attach_state,
-      [UseLibdw=YES],
-      [AC_MSG_ERROR([Cannot find system libdw (required by --enable-dwarf-unwind)])])],
-    [UseLibdw=NO]
-)
+        [Enable DWARF unwinding support in the runtime system via elfutils' libdw [default=no]])])
+if test "$enable_dwarf_unwind" = "yes" ; then
+  CFLAGS2="$CFLAGS"
+  CFLAGS="$LIBDW_CFLAGS $CFLAGS"
+  LDFLAGS2="$LDFLAGS"
+  LDFLAGS="$LIBDW_LDFLAGS $LDFLAGS"
+
+  AC_CHECK_LIB(dw, dwfl_attach_state,
+      [AC_CHECK_HEADERS([elfutils/libdw.h], [break], [])
+       UseLibdw=YES],
+      [AC_MSG_ERROR([Cannot find system libdw (required by --enable-dwarf-unwind)])])
+
+  CFLAGS="$CFLAGS2"
+  LDFLAGS="$LDFLAGS2"
+fi
+
 AC_SUBST(UseLibdw)
 if test $UseLibdw = "YES" ; then
 	USE_LIBDW=1
@@ -1221,11 +1286,22 @@ AC_DEFINE_UNQUOTED([USE_LIBDW], [$USE_LIBDW], [Set to 1 to use libdw])
 dnl ** Have libnuma?
 dnl --------------------------------------------------------------
 HaveLibNuma=0
-AC_CHECK_HEADERS([numa.h numaif.h])
+AC_ARG_ENABLE(numa,
+    [AC_HELP_STRING([--enable-numa],
+        [Enable NUMA memory policy and thread affinity support in the
+         runtime system via numactl's libnuma [default=auto]])])
 
-if test "$ac_cv_header_numa_h$ac_cv_header_numaif_h" = "yesyes" ; then
+if test "$enable_numa" != "no" ; then
+  AC_CHECK_HEADERS([numa.h numaif.h])
+
+  if test "$ac_cv_header_numa_h$ac_cv_header_numaif_h" = "yesyes" ; then
     AC_CHECK_LIB(numa, numa_available,HaveLibNuma=1)
+  fi
+  if test "$enable_numa:$HaveLibNuma" = "yes:0" ; then
+      AC_MSG_ERROR([Cannot find system libnuma (required by --enable-numa)])]
+  fi
 fi
+
 AC_DEFINE_UNQUOTED([HAVE_LIBNUMA], [$HaveLibNuma], [Define to 1 if you have libnuma])
 if test $HaveLibNuma = "1" ; then
   AC_SUBST([CabalHaveLibNuma],[True])
@@ -1244,17 +1320,28 @@ if test -n "$SPHINXBUILD"; then
     else
         BUILD_SPHINX_PDF=NO
     fi
+    if test -n "$MAKEINFO"; then
+        BUILD_SPHINX_INFO=YES
+    else
+        BUILD_SPHINX_INFO=NO
+    fi
 else
     BUILD_MAN=NO
     BUILD_SPHINX_HTML=NO
     BUILD_SPHINX_PDF=NO
+    BUILD_SPHINX_INFO=NO
 fi
 AC_SUBST(BUILD_MAN)
 AC_SUBST(BUILD_SPHINX_HTML)
 AC_SUBST(BUILD_SPHINX_PDF)
 
+dnl ** Determine library versions
+dnl The packages below should include all packages needed by
+dnl doc/users_guide/ghc_config.py.in.
 LIBRARY_VERSION(base)
 LIBRARY_VERSION(Cabal, Cabal/Cabal)
+LIBRARY_VERSION(template-haskell)
+LIBRARY_VERSION(array)
 LIBRARY_VERSION(ghc-prim)
 LIBRARY_VERSION(ghc-compact)
 LIBRARY_ghc_VERSION="$ProjectVersion"
@@ -1319,12 +1406,8 @@ echo "\
       which is version   : $GhcVersion
 "
 
-if test "x$CC_LLVM_BACKEND" = "x1"; then
-    if test "x$CC_CLANG_BACKEND" = "x1"; then
-        CompilerName="clang        "
-    else
-        CompilerName="llvm-gcc     "
-    fi
+if test "x$CcLlvmBackend" = "xYES"; then
+    CompilerName="clang        "
 else
     CompilerName="gcc          "
 fi
@@ -1335,6 +1418,7 @@ echo "\
       which is version       : $GccVersion
    Building a cross compiler : $CrossCompiling
    Unregisterised            : $Unregisterised
+   TablesNextToCode          : $TablesNextToCode
    hs-cpp       : $HaskellCPPCmd
    hs-cpp-flags : $HaskellCPPArgs
    ar           : $ArCmd
@@ -1350,6 +1434,7 @@ echo "\
    Alex         : $AlexCmd ($AlexVersion)
    sphinx-build : $SPHINXBUILD
    xelatex      : $XELATEX
+   makeinfo     : $MAKEINFO
 
    Using LLVM tools
       clang : $ClangCmd
@@ -1368,7 +1453,8 @@ fi
 
 echo "\
    Tools to build Sphinx HTML documentation available: $BUILD_SPHINX_HTML
-   Tools to build Sphinx PDF documentation available: $BUILD_SPHINX_PDF"
+   Tools to build Sphinx PDF documentation available: $BUILD_SPHINX_PDF
+   Tools to build Sphinx INFO documentation available: $BUILD_SPHINX_INFO"
 
 echo "----------------------------------------------------------------------
 "

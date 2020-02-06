@@ -1,0 +1,6 @@
+
+T17171b.hs:4:1: warning: [-Wunused-top-binds]
+    Defined but not used: ‘main’
+  |
+4 | main = putStrLn "NoMain"
+  | ^^^^

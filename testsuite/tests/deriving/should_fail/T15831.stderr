@@ -1,0 +1,6 @@
+
+T15831.hs:9:12: error:
+    • Type variable ‘k’ is bound in the ‘via’ type ‘Const
+                                                      @{k} Int (Any @k)’
+      but is not mentioned in the derived class ‘Eq’, which is illegal
+    • In the newtype declaration for ‘Age’

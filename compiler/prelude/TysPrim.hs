@@ -6,6 +6,7 @@
 -}
 
 {-# LANGUAGE CPP #-}
+{-# OPTIONS_GHC -Wno-incomplete-uni-patterns #-}
 
 -- | This module defines TyCons that can't be expressed in Haskell.
 --   They are all, therefore, wired-in TyCons.  C.f module TysWiredIn
@@ -81,6 +82,7 @@ module TysPrim(
         eqPrimTyCon,            -- ty1 ~# ty2
         eqReprPrimTyCon,        -- ty1 ~R# ty2  (at role Representational)
         eqPhantPrimTyCon,       -- ty1 ~P# ty2  (at role Phantom)
+        equalityTyCon,
 
         -- * SIMD
 #include "primop-vector-tys-exports.hs-incl"
@@ -93,9 +95,11 @@ import GhcPrelude
 import {-# SOURCE #-} TysWiredIn
   ( runtimeRepTy, unboxedTupleKind, liftedTypeKind
   , vecRepDataConTyCon, tupleRepDataConTyCon
-  , liftedRepDataConTy, unliftedRepDataConTy, intRepDataConTy, int8RepDataConTy
-  , int16RepDataConTy, word16RepDataConTy
-  , wordRepDataConTy, int64RepDataConTy, word8RepDataConTy, word64RepDataConTy
+  , liftedRepDataConTy, unliftedRepDataConTy
+  , intRepDataConTy
+  , int8RepDataConTy, int16RepDataConTy, int32RepDataConTy, int64RepDataConTy
+  , wordRepDataConTy
+  , word16RepDataConTy, word8RepDataConTy, word32RepDataConTy, word64RepDataConTy
   , addrRepDataConTy
   , floatRepDataConTy, doubleRepDataConTy
   , vec2DataConTy, vec4DataConTy, vec8DataConTy, vec16DataConTy, vec32DataConTy
@@ -236,7 +240,7 @@ tVarPrimTyConName             = mkPrimTc (fsLit "TVar#") tVarPrimTyConKey tVarPr
 stablePtrPrimTyConName        = mkPrimTc (fsLit "StablePtr#") stablePtrPrimTyConKey stablePtrPrimTyCon
 stableNamePrimTyConName       = mkPrimTc (fsLit "StableName#") stableNamePrimTyConKey stableNamePrimTyCon
 compactPrimTyConName          = mkPrimTc (fsLit "Compact#") compactPrimTyConKey compactPrimTyCon
-bcoPrimTyConName              = mkPrimTc (fsLit "BCO#") bcoPrimTyConKey bcoPrimTyCon
+bcoPrimTyConName              = mkPrimTc (fsLit "BCO") bcoPrimTyConKey bcoPrimTyCon
 weakPrimTyConName             = mkPrimTc (fsLit "Weak#") weakPrimTyConKey weakPrimTyCon
 threadIdPrimTyConName         = mkPrimTc (fsLit "ThreadId#") threadIdPrimTyConKey threadIdPrimTyCon
 
@@ -439,7 +443,7 @@ So for example:
 We abbreviate '*' specially:
     type * = TYPE 'LiftedRep
 
-The 'rr' parameter tells us how the value is represented at runime.
+The 'rr' parameter tells us how the value is represented at runtime.
 
 Generally speaking, you can't be polymorphic in 'rr'.  E.g
    f :: forall (rr:RuntimeRep) (a:TYPE rr). a -> [a]
@@ -549,10 +553,12 @@ primRepToRuntimeRep rep = case rep of
   IntRep        -> intRepDataConTy
   Int8Rep       -> int8RepDataConTy
   Int16Rep      -> int16RepDataConTy
-  WordRep       -> wordRepDataConTy
+  Int32Rep      -> int32RepDataConTy
   Int64Rep      -> int64RepDataConTy
+  WordRep       -> wordRepDataConTy
   Word8Rep      -> word8RepDataConTy
   Word16Rep     -> word16RepDataConTy
+  Word32Rep     -> word32RepDataConTy
   Word64Rep     -> word64RepDataConTy
   AddrRep       -> addrRepDataConTy
   FloatRep      -> floatRepDataConTy
@@ -607,7 +613,7 @@ int16PrimTyCon = pcPrimTyCon0 int16PrimTyConName Int16Rep
 int32PrimTy :: Type
 int32PrimTy     = mkTyConTy int32PrimTyCon
 int32PrimTyCon :: TyCon
-int32PrimTyCon  = pcPrimTyCon0 int32PrimTyConName IntRep
+int32PrimTyCon  = pcPrimTyCon0 int32PrimTyConName Int32Rep
 
 int64PrimTy :: Type
 int64PrimTy     = mkTyConTy int64PrimTyCon
@@ -632,7 +638,7 @@ word16PrimTyCon = pcPrimTyCon0 word16PrimTyConName Word16Rep
 word32PrimTy :: Type
 word32PrimTy    = mkTyConTy word32PrimTyCon
 word32PrimTyCon :: TyCon
-word32PrimTyCon = pcPrimTyCon0 word32PrimTyConName WordRep
+word32PrimTyCon = pcPrimTyCon0 word32PrimTyConName Word32Rep
 
 word64PrimTy :: Type
 word64PrimTy    = mkTyConTy word64PrimTyCon
@@ -915,6 +921,12 @@ eqPhantPrimTyCon = mkPrimTyCon eqPhantPrimTyConName binders res_kind roles
     res_kind = unboxedTupleKind []
     roles    = [Nominal, Nominal, Phantom, Phantom]
 
+-- | Given a Role, what TyCon is the type of equality predicates at that role?
+equalityTyCon :: Role -> TyCon
+equalityTyCon Nominal          = eqPrimTyCon
+equalityTyCon Representational = eqReprPrimTyCon
+equalityTyCon Phantom          = eqPhantPrimTyCon
+
 {- *********************************************************************
 *                                                                      *
              The primitive array types
@@ -1041,10 +1053,13 @@ compactPrimTy = mkTyConTy compactPrimTyCon
 ************************************************************************
 -}
 
+-- Unlike most other primitive types, BCO is lifted. This is because in
+-- general a BCO may be a thunk for the reasons given in Note [Updatable CAF
+-- BCOs] in GHCi.CreateBCO.
 bcoPrimTy    :: Type
 bcoPrimTy    = mkTyConTy bcoPrimTyCon
 bcoPrimTyCon :: TyCon
-bcoPrimTyCon = pcPrimTyCon0 bcoPrimTyConName UnliftedRep
+bcoPrimTyCon = pcPrimTyCon0 bcoPrimTyConName LiftedRep
 
 {-
 ************************************************************************

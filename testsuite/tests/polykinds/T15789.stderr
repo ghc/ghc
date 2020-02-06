@@ -4,3 +4,4 @@ T15789.hs:10:80: error:
     • In the first argument of ‘Cat’, namely ‘(forall b. cat b u)’
       In the kind ‘forall (cat :: forall xx. xx -> Type) a.
                    forall b. Cat (forall b. cat b u)’
+      In the data type declaration for ‘Zero’
