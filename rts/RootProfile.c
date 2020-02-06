@@ -135,10 +135,10 @@ rootVisit(StgClosure *c, const StgClosure *cp,
         debug(2, "  bin %s (%lu) += %lu\n",
               i2b(1ul<<current_root), ps->sizes[1ul<<current_root], sizeW);
         ps->sizes[1ul<<current_root] += sizeW;
-        traverseSetClosureData(ts, c, (1ul<<current_root)<<1);
+        traverseSetClosureData(ts, c, (1ul<<current_root)<<2);
         return true;
     } else {
-        StgWord bin_idx = traverseGetClosureData(c)>>1;
+        StgWord bin_idx = traverseGetClosureData(c)>>2;
         if((bin_idx & (1ul<<current_root))) {
             return false;
         } else {
@@ -150,7 +150,7 @@ rootVisit(StgClosure *c, const StgClosure *cp,
                   i2b(new_bin), ps->sizes[new_bin], sizeW);
             ps->sizes[bin_idx] -= sizeW;
             ps->sizes[new_bin] += sizeW;
-            traverseSetClosureData(ts, c, new_bin<<1);
+            traverseSetClosureData(ts, c, new_bin<<2);
             return true; // have to update the children's bin_idx too
         }
     }
