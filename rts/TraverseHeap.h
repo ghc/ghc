@@ -97,31 +97,17 @@ typedef struct stackElement_ {
 typedef struct traverseState_ {
     /** Note [Profiling heap traversal visited bit]
      *
-     * If the RTS is compiled with profiling enabled StgProfHeader can be used
-     * by profiling code to store per-heap object information. Specifically the
-     * 'hp_hdr' field is used to store heap profiling information.
-     *
-     * The generic heap traversal code reserves the least significant bit of the
-     * heap profiling word to decide whether we've already visited a given
-     * closure in the current pass or not. The rest of the field is free to be
-     * used by the calling profiler.
-     *
-     * By doing things this way we implicitly assume that the LSB is not used by
-     * the user. This is true at least for the word aligned pointers which the
-     * retainer profiler currently stores there and should be maintained by new
-     * users for example by shifting the real data up by one bit.
+     * In the profiling way each closure has a StgProfHeader which we use to
+     * store per-closure data. The generic heap traversal code reserves the two
+     * least significant bits of the heap profiling word to decide whether we've
+     * already visited a given closure in the current pass or not. The rest of
+     * the field is free to be used by the calling profiler.
      *
      * Since we don't want to have to scan the entire heap a second time just to
-     * reset the per-object visitied bit before/after the real traversal we make
-     * the interpretation of this bit dependent on the value of a global
-     * variable, 'flip' and "flip" this variable when we want to invalidate all
-     * objects.
-     *
-     * When the visited bit is equal to the value of 'flip' the closure data is
-     * valid otherwise not (see isTravDataValid). Both the value of the closure
-     * and global 'flip' value start out as zero, so all closures are considered
-     * valid. Before every traversal we invert the value of 'flip' (see
-     * traverseInvalidateClosureData) invalidating all closures.
+     * reset the per-closure visitied bit after the real traversal we make the
+     * interpretation of these bits depend on the value of a global variable,
+     * 'flip' and "flip" this variable when we want to invalidate all closures
+     * at once instead of iterating over all closures.
      *
      * There are some complications with this approach, namely: static objects
      * and mutable data. There we do just go over all existing objects to reset
@@ -218,19 +204,70 @@ typedef bool (*visitClosure_cb) (
     stackAccum *accum,
     stackData *child_data);
 
+/**
+ * Get data stored in closure header. The two lowest bits are always returned as
+ * zero. The closure must have been visited, i.e. traverseIsClosureDataValid
+ * must return true otherwise this is an error. Note that the closure data is
+ * reset to zero on the first visit in this pass by 'traverseWorkStack'.
+ */
 StgWord traverseGetClosureData(const StgClosure *c);
+
+/**
+ * Set the data in the closure header and mark the closure as visited. The
+ * lowest two bits are reserved for the generic heap traversal code and will be
+ * ignored if set.
+ *
+ * See Note [Profiling heap traversal visited bit]
+ */
 void traverseSetClosureData(const traverseState *ts, StgClosure *c, StgWord w);
+
+/**
+ * Check if closure was visited in the current pass, i.e. if the data in the
+ * closure header is valid. All newly-allocated closures start out as
+ * "unvisited". Setting the closure data with traverseSetClosureData makes them
+ * "visited". Calling 'traverseInvalidateClosureData' inverts the meaning of the
+ * visited bit, making all "visited" closures which ever had their closure data
+ * set after allocation "unvisited" and vice-versa.
+ *
+ * See Note [Profiling heap traversal visited bit]
+ */
 bool traverseIsClosureDataValid(const traverseState *ts, const StgClosure *c);
+
+/**
+ * Ensure the closure's profiling data is initialized to zero if has not been
+ * visited yet. If the closure was already visited this function has no
+ * effect. True is returned if the closure was originally unvisited, False
+ * otherwise.
+ *
+ * See Note [Profiling heap traversal visited bit].
+ */
+bool traverseMaybeInitClosureData(const traverseState* ts, StgClosure *c);
+
+/**
+ * Flip the interpretation of visited/unvisited in all closure's profiling
+ * headers. See 'traverseIsClosureDataValid' for details.
+ */
+void traverseInvalidateAllClosureData(traverseState* ts);
 
 void traverseWorkStack(traverseState *ts, visitClosure_cb visit_cb);
 void traversePushRoot(traverseState *ts, StgClosure *c, StgClosure *cp, stackData data);
 void traversePushClosure(traverseState *ts, StgClosure *c, StgClosure *cp, stackElement *sep, stackData data);
-bool traverseMaybeInitClosureData(const traverseState* ts, StgClosure *c);
-void traverseInvalidateAllClosureData(traverseState* ts);
 
+
+/**
+ * Allocate and reset the traversal stack. Note that this will not reset the
+ * interpretation of the closure data visited bit, see
+ * 'traverseIsClosureDataValid'.
+ */
 void initializeTraverseStack(traverseState *ts);
+
+/**
+ * Free the traversal stack.
+ */
 void closeTraverseStack(traverseState *ts);
+
 int getTraverseStackMaxSize(traverseState *ts);
+
 
 // for GC.c
 W_ traverseWorkStackBlocks(traverseState *ts);
