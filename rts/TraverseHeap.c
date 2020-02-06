@@ -18,18 +18,18 @@
 
 const stackData nullStackData;
 
-StgWord getTravData(const StgClosure *c)
+StgWord traverseGetClosureData(const StgClosure *c)
 {
     const StgWord hp_hdr = c->header.prof.hp.trav;
     return hp_hdr & (STG_WORD_MAX ^ 1);
 }
 
-void setTravData(const traverseState *ts, StgClosure *c, StgWord w)
+void traverseSetClosureData(const traverseState *ts, StgClosure *c, StgWord w)
 {
     c->header.prof.hp.trav = w | ts->flip;
 }
 
-bool isTravDataValid(const traverseState *ts, const StgClosure *c)
+bool traverseIsClosureDataValid(const traverseState *ts, const StgClosure *c)
 {
     return (c->header.prof.hp.trav & 1) == ts->flip;
 }
@@ -865,8 +865,8 @@ out:
 bool
 traverseMaybeInitClosureData(const traverseState* ts, StgClosure *c)
 {
-    if (!isTravDataValid(ts, c)) {
-        setTravData(ts, c, 0);
+    if (!traverseIsClosureDataValid(ts, c)) {
+        traverseSetClosureData(ts, c, 0);
         return true;
     }
     return false;
@@ -1337,7 +1337,7 @@ inner_loop:
  * visited bit].
  */
 void
-traverseInvalidateClosureData(traverseState* ts)
+traverseInvalidateAllClosureData(traverseState* ts)
 {
     // First make sure any unvisited mutable objects are valid so they're
     // invalidated by the flip below
