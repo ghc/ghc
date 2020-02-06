@@ -129,6 +129,14 @@ node3(2000,
   2003);
 
 
+/*
+  3.0) Some new closures which show up with zeroed prof header but when
+  flip=1. Note: We check that we get the first_visit value right by observing
+  that n3001 gets visited.
+ */
+node0(3001);
+node1(3000, 3001);
+
 static void
 testReturn(StgClosure *c, const stackAccum acc,
            StgClosure *c_parent, stackAccum *acc_parent)
@@ -213,6 +221,24 @@ void traverseHeapRunTests(void)
 
         closeTraverseStack(ts);
 
+    }
+
+    {
+        printf("\n\n\n\nnew closures\n");
+
+        initializeTraverseStack(ts);
+        traverseInvalidateAllClosureData(ts);
+
+        if(ts->flip != 1)
+            abort();
+
+        struct node *n = &n3000;
+
+        printf("\n\npush   %u\n", n->id);
+        traversePushClosure(ts, &n->u.cls, &n->u.cls, NULL, nullStackData);
+        traverseWorkStack(ts, &testVisit);
+
+        closeTraverseStack(ts);
     }
 }
 

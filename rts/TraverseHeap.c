@@ -21,17 +21,18 @@ const stackData nullStackData;
 StgWord traverseGetClosureData(const StgClosure *c)
 {
     const StgWord hp_hdr = c->header.prof.hp.trav;
-    return hp_hdr & (STG_WORD_MAX ^ 1);
+    return hp_hdr & (STG_WORD_MAX ^ 0b11);
 }
 
 void traverseSetClosureData(const traverseState *ts, StgClosure *c, StgWord w)
 {
-    c->header.prof.hp.trav = w | ts->flip;
+    ASSERT((w & 0b11) == 0);
+    c->header.prof.hp.trav = (w & ~0b11) | 0b10 | ts->flip;
 }
 
 bool traverseIsClosureDataValid(const traverseState *ts, const StgClosure *c)
 {
-    return (c->header.prof.hp.trav & 1) == ts->flip;
+    return (c->header.prof.hp.trav & 0b11) == (0b10 | ts->flip);
 }
 
 #if defined(DEBUG)
@@ -856,12 +857,6 @@ out:
 
 }
 
-/**
- * Make sure a closure's profiling data is initialized to zero if it does not
- * conform to the current value of the flip bit, returns true in this case.
- *
- * See Note [Profiling heap traversal visited bit].
- */
 bool
 traverseMaybeInitClosureData(const traverseState* ts, StgClosure *c)
 {
