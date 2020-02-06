@@ -218,15 +218,15 @@ typedef bool (*visitClosure_cb) (
     stackAccum *accum,
     stackData *child_data);
 
-StgWord getTravData(const StgClosure *c);
-void setTravData(const traverseState *ts, StgClosure *c, StgWord w);
-bool isTravDataValid(const traverseState *ts, const StgClosure *c);
+StgWord traverseGetClosureData(const StgClosure *c);
+void traverseSetClosureData(const traverseState *ts, StgClosure *c, StgWord w);
+bool traverseIsClosureDataValid(const traverseState *ts, const StgClosure *c);
 
 void traverseWorkStack(traverseState *ts, visitClosure_cb visit_cb);
 void traversePushRoot(traverseState *ts, StgClosure *c, StgClosure *cp, stackData data);
 void traversePushClosure(traverseState *ts, StgClosure *c, StgClosure *cp, stackElement *sep, stackData data);
 bool traverseMaybeInitClosureData(const traverseState* ts, StgClosure *c);
-void traverseInvalidateClosureData(traverseState* ts);
+void traverseInvalidateAllClosureData(traverseState* ts);
 
 void initializeTraverseStack(traverseState *ts);
 void closeTraverseStack(traverseState *ts);

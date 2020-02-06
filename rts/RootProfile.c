@@ -135,10 +135,10 @@ rootVisit(StgClosure *c, const StgClosure *cp,
         debug(2, "  bin %s (%lu) += %lu\n",
               i2b(1ul<<current_root), ps->sizes[1ul<<current_root], sizeW);
         ps->sizes[1ul<<current_root] += sizeW;
-        setTravData(ts, c, (1ul<<current_root)<<1);
+        traverseSetClosureData(ts, c, (1ul<<current_root)<<1);
         return true;
     } else {
-        StgWord bin_idx = getTravData(c)>>1;
+        StgWord bin_idx = traverseGetClosureData(c)>>1;
         if((bin_idx & (1ul<<current_root))) {
             return false;
         } else {
@@ -150,7 +150,7 @@ rootVisit(StgClosure *c, const StgClosure *cp,
                   i2b(new_bin), ps->sizes[new_bin], sizeW);
             ps->sizes[bin_idx] -= sizeW;
             ps->sizes[new_bin] += sizeW;
-            setTravData(ts, c, new_bin<<1);
+            traverseSetClosureData(ts, c, new_bin<<1);
             return true; // have to update the children's bin_idx too
         }
     }
@@ -222,7 +222,7 @@ rootProfile(Time t, Census *census)
 
     debug(2, "\n=== root profile ===\n");
 
-    traverseInvalidateClosureData(ts);
+    traverseInvalidateAllClosureData(ts);
     for(StgWord i = 0; i < ps->n_roots; i++) {
         StgClosure *c = (StgClosure*)deRefStablePtr(ps->roots[i]);
         debug(2, "\npush %s, root=%lu, %p\n", ps->descs[i], i, c);
@@ -232,7 +232,7 @@ rootProfile(Time t, Census *census)
         traverseWorkStack(ts, &rootVisit);
     }
 
-    traverseInvalidateClosureData(ts);
+    traverseInvalidateAllClosureData(ts);
     for(StgWord i = 0; i < ps->n_roots; i++) {
         StgClosure *c = (StgClosure*)deRefStablePtr(ps->roots[i]);
         traversePushClosure(ts, c, c, NULL, nullStackData);
