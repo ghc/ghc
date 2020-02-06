@@ -42,6 +42,7 @@ import Data.Char
 import Data.Maybe       ( maybeToList )
 import Control.Monad    ( mplus )
 import Control.Applicative ((<$))
+import qualified Prelude
 
 -- compiler/hsSyn
 import GHC.Hs
