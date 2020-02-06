@@ -327,6 +327,7 @@ the program; it's a kind of synthetic key for recursive bindings.
 ************************************************************************
 -}
 
+-- | Requires bindings to be in dependency order.
 cseProgram :: CoreProgram -> CoreProgram
 cseProgram binds = snd (mapAccumL (cseBind TopLevel) emptyCSEnv binds)
 
