@@ -17,6 +17,12 @@ GhcRtsHcOpts    += -Wcpp-undef
 GhcStage1HcOpts += -Wcpp-undef
 GhcStage2HcOpts += -Wcpp-undef
 
+# clang fails when the "-nopie" is unused. The configure step currently checks
+# that -nopie is supported but that doesn't tell us when it will actually be used.
+ifeq "$(GccIsClang)" "YES"
+	SRC_CC_WARNING_OPTS += -Wno-error=unused-command-line-argument
+endif
+
 ifneq "$(GccIsClang)" "YES"
 
 # Debian doesn't turn -Werror=unused-but-set-variable on by default, so
