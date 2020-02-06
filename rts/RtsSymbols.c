@@ -728,6 +728,9 @@
       SymI_HasProto(prog_argv)                                          \
       SymI_HasProto(stg_putMVarzh)                                      \
       SymI_HasProto(stg_raisezh)                                        \
+      SymI_HasProto(stg_raiseDivZZerozh)                                \
+      SymI_HasProto(stg_raiseUnderflowzh)                               \
+      SymI_HasProto(stg_raiseOverflowzh)                                \
       SymI_HasProto(stg_raiseIOzh)                                      \
       SymI_HasProto(stg_readTVarzh)                                     \
       SymI_HasProto(stg_readTVarIOzh)                                   \
