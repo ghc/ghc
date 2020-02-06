@@ -121,20 +121,24 @@ newMethodFromName origin name ty_args
 *                                                                      *
 ************************************************************************
 
-Note [Deep skolemisation]
-~~~~~~~~~~~~~~~~~~~~~~~~~
-deeplySkolemise decomposes and skolemises a type, returning a type
-with all its arrows visible (ie not buried under foralls)
+Note [Skolemisation]
+~~~~~~~~~~~~~~~~~~~~
+topSkolemise decomposes and skolemises a type, returning a type
+with no top level foralls or (=>)
 
 Examples:
 
-  deeplySkolemise (Int -> forall a. Ord a => blah)
-    =  ( wp, [a], [d:Ord a], Int -> blah )
-    where wp = \x:Int. /\a. \(d:Ord a). <hole> x
+  topSkolemise (forall a. Ord a => a -> a)
+    =  ( wp, [a], [d:Ord a], a->a )
+    where wp = /\a. \(d:Ord a). <hole> a d
 
-  deeplySkolemise  (forall a. Ord a => Maybe a -> forall b. Eq b => blah)
-    =  ( wp, [a,b], [d1:Ord a,d2:Eq b], Maybe a -> blah )
-    where wp = /\a.\(d1:Ord a).\(x:Maybe a)./\b.\(d2:Ord b). <hole> x
+  topSkolemise  (forall a. Ord a => forall b. Eq b => a->b->b)
+    =  ( wp, [a,b], [d1:Ord a,d2:Eq b], a->b->b )
+    where wp = /\a.\(d1:Ord a)./\b.\(d2:Ord b). <hole> a d1 b d2
+
+This second example is the reason for the recursive 'go'
+function in topSkolemise: we must remove successive layers
+of foralls and (=>).
 
 In general,
   if      deeplySkolemise ty = (wrap, tvs, evs, rho)
@@ -142,9 +146,6 @@ In general,
   then    wrap e :: ty
     and   'wrap' binds tvs, evs
 
-ToDo: this eta-abstraction plays fast and loose with termination,
-      because it can introduce extra lambdas.  Maybe add a `seq` to
-      fix this
 -}
 
 topSkolemise :: TcSigmaType
@@ -152,16 +153,13 @@ topSkolemise :: TcSigmaType
                     , [(Name,TyVar)]     -- All skolemised variables
                     , [EvVar]            -- All "given"s
                     , TcRhoType )
-
+-- See Note [Skolemisation]
 topSkolemise ty
   = go init_subst ty
   where
     init_subst = mkEmptyTCvSubst (mkInScopeSet (tyCoVarsOfType ty))
 
-    go subst ty
-      | Just ty' <- tcView ty
-      = go subst ty'
-
+    -- Why recursive?  See Note [Skolemisation]
     go subst ty
       | (tvs, theta, ty') <- tcSplitSigmaTy ty
       , not (null tvs && null theta)
@@ -186,6 +184,7 @@ topInstantiate :: CtOrigin -> TcSigmaType -> TcM (HsWrapper, TcRhoType)
 -- if    topInstantiate ty = (wrap, rho)
 -- and   e :: ty
 -- then  wrap e :: rho  (that is, wrap :: ty "->" rho)
+-- NB: always returns a rho-type, with no top-level forall or (=>)
 topInstantiate = top_instantiate True
 
 -- | Instantiate all outer 'Inferred' binders
@@ -196,13 +195,16 @@ topInstantiateInferred :: CtOrigin -> TcSigmaType
 -- if    topInstantiate ty = (wrap, rho)
 -- and   e :: ty
 -- then  wrap e :: rho
+-- NB: may return a sigma-type
 topInstantiateInferred = top_instantiate False
 
 top_instantiate :: Bool   -- True  <=> instantiate *all* variables
                           -- False <=> instantiate only the inferred ones
                 -> CtOrigin -> TcSigmaType -> TcM (HsWrapper, TcRhoType)
 top_instantiate inst_all orig ty
-  | not (null binders && null theta)
+  | (binders, phi) <- tcSplitForAllVarBndrs ty
+  , (theta, rho)   <- tcSplitPhiTy phi
+  , not (null binders && null theta)
   = do { let (inst_bndrs, leave_bndrs) = span should_inst binders
              (inst_theta, leave_theta)
                | null leave_bndrs = (theta, [])
@@ -227,7 +229,7 @@ top_instantiate inst_all orig ty
                        , text "theta:" <+>  ppr inst_theta' ])
 
        ; (wrap2, rho2) <-
-           if null leave_bndrs
+           if null leave_bndrs   -- NB: if inst_all is True then leave_bndrs = []
 
          -- account for types like forall a. Num a => forall b. Ord b => ...
            then top_instantiate inst_all orig sigma'
@@ -239,8 +241,6 @@ top_instantiate inst_all orig ty
 
   | otherwise = return (idHsWrapper, ty)
   where
-    (binders, phi) = tcSplitForAllVarBndrs ty
-    (theta, rho)   = tcSplitPhiTy phi
 
     should_inst bndr
       | inst_all  = True

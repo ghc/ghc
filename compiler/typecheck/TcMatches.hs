@@ -68,17 +68,11 @@ import Control.Arrow ( second )
 @FunMonoBind@.  The second argument is the name of the function, which
 is used in error messages.  It checks that all the equations have the
 same number of arguments before using @tcMatches@ to do the work.
-
-Note [Polymorphic expected type for tcMatchesFun]
-~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
-tcMatchesFun may be given a *sigma* (polymorphic) type
-so it must be prepared to use tcSkolemise to skolemise it.
-See Note [sig_tau may be polymorphic] in TcPat.
 -}
 
 tcMatchesFun :: Located Name
              -> MatchGroup GhcRn (LHsExpr GhcRn)
-             -> ExpSigmaType    -- Expected type of function
+             -> ExpRhoType    -- Expected type of function
              -> TcM (HsWrapper, MatchGroup GhcTcId (LHsExpr GhcTcId))
                                 -- Returns type of body
 tcMatchesFun fn@(L _ fun_name) matches exp_ty
@@ -92,6 +86,8 @@ tcMatchesFun fn@(L _ fun_name) matches exp_ty
         ; checkArgs fun_name matches
 
         ; matchExpectedFunTys herald ctxt arity exp_ty $ \ pat_tys rhs_ty ->
+             -- NB: exp_type may be polymoprhic, but
+             --     matchExpectedFunTys can cope with that
           tcMatches match_ctxt pat_tys rhs_ty matches }
   where
     arity  = matchGroupArity matches
@@ -127,7 +123,7 @@ tcMatchesCase ctxt scrut_ty matches res_ty
 tcMatchLambda :: SDoc -- see Note [Herald for matchExpectedFunTys] in TcUnify
               -> TcMatchCtxt HsExpr
               -> MatchGroup GhcRn (LHsExpr GhcRn)
-              -> ExpRhoType   -- deeply skolemised
+              -> ExpRhoType
               -> TcM (HsWrapper, MatchGroup GhcTcId (LHsExpr GhcTcId))
 tcMatchLambda herald match_ctxt match res_ty
   = matchExpectedFunTys herald GenSigCtxt n_pats res_ty $ \ pat_tys rhs_ty ->

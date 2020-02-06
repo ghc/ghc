@@ -431,9 +431,9 @@ tcCheckPatSynDecl psb@PSB{ psb_id = lname@(L _ name), psb_args = details
       = do {   -- Look up the variable actually bound by lpat
                -- and check that it has the expected type
              arg_id <- tcLookupId arg_name
-           ; wrap <- tcSubType_NC GenSigCtxt
-                                 (idType arg_id)
-                                 (substTyUnchecked subst arg_ty)
+           ; wrap <- tcSubTypeSigma GenSigCtxt
+                                    (idType arg_id)
+                                    (substTyUnchecked subst arg_ty)
                 -- Why do we need tcSubType here?
                 -- See Note [Pattern synonyms and higher rank types]
            ; return (mkLHsWrap wrap $ nlHsVar arg_id) }

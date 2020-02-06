@@ -2478,6 +2478,7 @@ data TcRnExprMode = TM_Inst    -- ^ Instantiate the type fully (:type)
                   | TM_Default -- ^ Default the type eagerly (:type +d)
 
 -- | tcRnExpr just finds the type of an expression
+--   for :type
 tcRnExpr :: HscEnv
          -> TcRnExprMode
          -> LHsExpr GhcPs

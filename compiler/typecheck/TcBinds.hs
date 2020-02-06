@@ -689,21 +689,29 @@ tcPolyCheck prag_fn
                             , fun_matches = matches }))
   = setSrcSpan sig_loc $
     do { traceTc "tcPolyCheck" (ppr poly_id $$ ppr sig_loc)
-       ; (tv_prs, theta, tau) <- tcInstType tcInstSkolTyVars poly_id
+--       ; (tv_prs, theta, tau) <- tcInstType tcInstSkolTyVars poly_id
                 -- See Note [Instantiate sig with fresh variables]
 
        ; mono_name <- newNameAt (nameOccName name) nm_loc
-       ; ev_vars   <- newEvVars theta
-       ; let mono_id   = mkLocalId mono_name tau
-             skol_info = SigSkol ctxt (idType poly_id) tv_prs
-             skol_tvs  = map snd tv_prs
+       ; let rhs_ty  = idType poly_id
+             mono_id = mkLocalId mono_name rhs_ty
+--       ; ev_vars   <- newEvVars theta
+--       ; let mono_id   = mkLocalId mono_name tau
+--             skol_info = SigSkol ctxt (idType poly_id) tv_prs
+--             skol_tvs  = map snd tv_prs
+--
+--       ; (ev_binds, (co_fn, matches'))
+--            <- checkConstraints skol_info skol_tvs ev_vars $
+--               tcExtendBinderStack [TcIdBndr mono_id NotTopLevel]  $
+--               tcExtendNameTyVarEnv tv_prs $
+--               setSrcSpan loc           $
+--               tcMatchesFun (L nm_loc mono_name) matches (mkCheckExpType tau)
 
-       ; (ev_binds, (co_fn, matches'))
-            <- checkConstraints skol_info skol_tvs ev_vars $
-               tcExtendBinderStack [TcIdBndr mono_id NotTopLevel]  $
-               tcExtendNameTyVarEnv tv_prs $
-               setSrcSpan loc           $
-               tcMatchesFun (L nm_loc mono_name) matches (mkCheckExpType tau)
+       ; (wrap_gen, (wrap_res, matches'))
+             <- tcExtendBinderStack [TcIdBndr poly_id NotTopLevel]  $
+                tcSkolemise ctxt rhs_ty $ \_ rho_ty ->
+                tcMatchesFun (L nm_loc mono_name) matches
+                             (mkCheckExpType rho_ty)
 
        ; let prag_sigs = lookupPragEnv prag_fn name
        ; spec_prags <- tcSpecPrags poly_id prag_sigs
@@ -713,7 +721,7 @@ tcPolyCheck prag_fn
        ; tick <- funBindTicks nm_loc mono_id mod prag_sigs
        ; let bind' = FunBind { fun_id      = L nm_loc mono_id
                              , fun_matches = matches'
-                             , fun_ext     = co_fn
+                             , fun_co_fn   = wrap_gen <.> wrap_res
                              , fun_tick    = tick }
 
              export = ABE { abe_ext   = noExtField
@@ -724,9 +732,9 @@ tcPolyCheck prag_fn
 
              abs_bind = L loc $
                         AbsBinds { abs_ext      = noExtField
-                                 , abs_tvs      = skol_tvs
-                                 , abs_ev_vars  = ev_vars
-                                 , abs_ev_binds = [ev_binds]
+                                 , abs_tvs      = []
+                                 , abs_ev_vars  = []
+                                 , abs_ev_binds = []
                                  , abs_exports  = [export]
                                  , abs_binds    = unitBag (L loc bind')
                                  , abs_sig      = True }
@@ -861,7 +869,7 @@ mkExport prag_fn insoluble qtvs theta
                                            -- an ambiguous type and have AllowAmbiguousType
                                            -- e..g infer  x :: forall a. F a -> Int
                   else addErrCtxtM (mk_impedance_match_msg mono_info sel_poly_ty poly_ty) $
-                       tcSubType_NC sig_ctxt sel_poly_ty poly_ty
+                       tcSubTypeSigma sig_ctxt sel_poly_ty poly_ty
 
         ; warn_missing_sigs <- woptM Opt_WarnMissingLocalSignatures
         ; when warn_missing_sigs $
