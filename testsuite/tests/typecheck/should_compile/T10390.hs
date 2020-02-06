@@ -6,7 +6,7 @@ class ApPair r where
   apPair :: (forall a . (ApPair a, Num a) => Maybe a) -> Maybe r
 
 instance (ApPair a, ApPair b) => ApPair (a,b) where
-  apPair = apPair'
+  apPair x = apPair' x
 
 apPair' :: (ApPair b, ApPair c)
         => (forall a . (Num a, ApPair a) => Maybe a) -> Maybe (b,c)

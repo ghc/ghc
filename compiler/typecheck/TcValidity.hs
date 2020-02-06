@@ -27,7 +27,7 @@ import GhcPrelude
 import Maybes
 
 -- friends:
-import TcUnify    ( tcSubType_NC )
+import TcUnify    ( tcSubTypeSigma )
 import TcSimplify ( simplifyAmbiguityCheck )
 import ClsInst    ( matchGlobalInst, ClsInstResult(..), InstanceWhat(..), AssocInstInfo(..) )
 import TyCoFVs
@@ -216,7 +216,7 @@ checkAmbiguity ctxt ty
        ; allow_ambiguous <- xoptM LangExt.AllowAmbiguousTypes
        ; (_wrap, wanted) <- addErrCtxt (mk_msg allow_ambiguous) $
                             captureConstraints $
-                            tcSubType_NC ctxt ty ty
+                            tcSubTypeSigma ctxt ty ty
        ; simplifyAmbiguityCheck ty wanted
 
        ; traceTc "Done ambiguity check for" (ppr ty) }

@@ -49,7 +49,7 @@ import Data.Graph       ( graphFromEdges, topSort )
 
 
 import TcSimplify    ( simpl_top, runTcSDeriveds )
-import TcUnify       ( tcSubType_NC )
+import TcUnify       ( tcSubTypeSigma )
 
 import GHC.HsToCore.Docs ( extractDocs )
 import qualified Data.Map as Map
@@ -194,7 +194,7 @@ So when we run the check, we need to make sure that the
 Constraint gets solved. When we now check for whether `x :: a0_a1pd[tau:2]` fits
 the hole in `tcCheckHoleFit`, the call to `tcSubType` will end up writing the
 meta type variable `a0_a1pd[tau:2] := a_a1pa[sk:2]`. By wrapping the wanted
-constraints needed by tcSubType_NC and the relevant constraints (see
+constraints needed by tcSubTypeSigma and the relevant constraints (see
 Note [Relevant Constraints] for more details) in the nested implications, we
 can pass the information in the givens along to the simplifier. For our example,
 we end up needing to check whether the following constraints are soluble.
@@ -959,7 +959,7 @@ tcCheckHoleFit (TyH {..}) hole_ty ty = discardErrs $
                           -- imp is the innermost implication
                           (imp:_) -> return (ic_tclvl imp)
      ; (wrp, wanted) <- setTcLevel innermost_lvl $ captureConstraints $
-                          tcSubType_NC ExprSigCtxt ty hole_ty
+                          tcSubTypeSigma ExprSigCtxt ty hole_ty
      ; traceTc "Checking hole fit {" empty
      ; traceTc "wanteds are: " $ ppr wanted
      ; if isEmptyWC wanted && isEmptyBag tyHRelevantCts

@@ -1520,8 +1520,7 @@ mkTyVarEqErr' dflags ctxt report ct oriented tv1 co1 ty2
   | MTVU_Bad <- occ_check_expand
   = do { let msg = vcat [ text "Cannot instantiate unification variable"
                           <+> quotes (ppr tv1)
-                        , hang (text "with a" <+> what <+> text "involving polytypes:") 2 (ppr ty2)
-                        , nest 2 (text "GHC doesn't yet support impredicative polymorphism") ]
+                        , hang (text "with a" <+> what <+> text "involving polytypes:") 2 (ppr ty2) ]
        -- Unlike the other reports, this discards the old 'report_important'
        -- instead of augmenting it.  This is because the details are not likely
        -- to be helpful since this is just an unimplemented feature.

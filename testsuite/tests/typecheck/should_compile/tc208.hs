@@ -11,4 +11,4 @@ module ShouldCompile where
 type PPDoc = (?env :: Int) => Char
 
 f :: Char -> PPDoc
-f  = succ
+f x = succ x
