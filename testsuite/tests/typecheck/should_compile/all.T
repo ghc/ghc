@@ -558,9 +558,9 @@ test('T13248', expect_broken(13248), compile, [''])
 test('T11525', [unless(have_dynamic(), expect_broken(10301))], multi_compile,
      [None, [('T11525_Plugin.hs', '-package ghc'), ('T11525.hs', '')],
       '-dynamic'])
-test('T12923', normal, compile, [''])
-test('T12924', normal, compile, [''])
-test('T12926', normal, compile, [''])
+test('T12923_1', normal, compile, [''])
+test('T12923_2', normal, compile, [''])
+test('T12923_3', normal, compile, [''])
 test('T13381', normal, compile_fail, [''])
 test('T13337', normal, compile, [''])
 test('T13343', normal, compile, [''])
