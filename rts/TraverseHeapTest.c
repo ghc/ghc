@@ -179,7 +179,7 @@ void traverseHeapRunTests(void)
         state.return_cb = &testReturn;
 
         initializeTraverseStack(ts);
-        traverseInvalidateClosureData(ts);
+        traverseInvalidateAllClosureData(ts);
 
         for(size_t i=0; i < (sizeof(g_tests)/sizeof(*g_tests)); i++) {
             struct node *n = g_tests[i];
@@ -201,7 +201,7 @@ void traverseHeapRunTests(void)
         state.return_cb = NULL;
 
         initializeTraverseStack(ts);
-        traverseInvalidateClosureData(ts);
+        traverseInvalidateAllClosureData(ts);
 
         for(size_t i=0; i < (sizeof(g_tests)/sizeof(*g_tests)); i++) {
             struct node *n = g_tests[i];
