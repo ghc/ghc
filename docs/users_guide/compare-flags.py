@@ -54,6 +54,9 @@ def read_ghc_flags(ghc_path: str) -> Set[str]:
             if not expected_undocumented(flag)
             if flag != ''}
 
+def error(s: str):
+    print(s, file=sys.stderr)
+
 def main() -> None:
     import argparse
     parser = argparse.ArgumentParser()
@@ -70,16 +73,16 @@ def main() -> None:
 
     undocumented = ghc_flags - doc_flags
     if len(undocumented) > 0:
-        print('Found {len_undoc} flags not documented in the users guide:')
-        print('\n'.join('  {}'.format(flag) for flag in sorted(undocumented)))
-        print()
+        error('Found {len_undoc} flags not documented in the users guide:'.format(len_undoc=len(undocumented)), )
+        error('\n'.join('  {}'.format(flag) for flag in sorted(undocumented)))
+        error('')
         failed = True
 
     now_documented = EXPECTED_UNDOCUMENTED.intersection(doc_flags)
     if len(now_documented) > 0:
-        print('Found flags that are documented yet listed in {}:'.format(EXPECTED_UNDOCUMENTED_PATH))
-        print('\n'.join('  {}'.format(flag) for flag in sorted(now_documented)))
-        print()
+        error('Found flags that are documented yet listed in {}:'.format(EXPECTED_UNDOCUMENTED_PATH))
+        error('\n'.join('  {}'.format(flag) for flag in sorted(now_documented)))
+        error('')
         failed = True
 
     if failed:
