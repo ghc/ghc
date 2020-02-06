@@ -2,11 +2,11 @@
 module Test where
 
 foo :: () -> forall b. b
-foo = undefined
+foo x = undefined
 
-works = id foo
+works = id (\x -> foo x)
 
-fails = (id) foo
+fails = (id) (\x -> foo x)
 
 -- works type checks, but fails fails with the following error
 -- message:
