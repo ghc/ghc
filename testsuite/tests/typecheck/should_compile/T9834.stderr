@@ -1,29 +1,22 @@
 
-T9834.hs:23:10: warning: [-Wdeferred-type-errors (in -Wdefault)]
+T9834.hs:23:12: warning: [-Wdeferred-type-errors (in -Wdefault)]
     • Occurs check: cannot construct the infinite type: p ~ (->) (p a0)
-      Expected type: (forall (q :: * -> *).
-                      Applicative q =>
-                      Comp p q a -> Comp p q a)
-                     -> p a
-        Actual type: (forall (q :: * -> *).
-                      Applicative q =>
-                      Nat (Comp p q) (Comp p q))
-                     -> p a0 -> p a0
-    • In the expression: wrapIdComp
-      In an equation for ‘afix’: afix = wrapIdComp
+      Expected type: p a
+        Actual type: p a0 -> p a0
+    • In the expression: wrapIdComp f
+      In an equation for ‘afix’: afix f = wrapIdComp f
     • Relevant bindings include
-        afix :: (forall (q :: * -> *).
-                 Applicative q =>
-                 Comp p q a -> Comp p q a)
-                -> p a
-          (bound at T9834.hs:23:3)
+        f :: forall (q :: * -> *).
+             Applicative q =>
+             Comp p q a -> Comp p q a
+          (bound at T9834.hs:23:8)
 
-T9834.hs:23:10: warning: [-Wdeferred-type-errors (in -Wdefault)]
+T9834.hs:23:23: warning: [-Wdeferred-type-errors (in -Wdefault)]
     • Couldn't match type ‘a1’ with ‘a’
       ‘a1’ is a rigid type variable bound by
         a type expected by the context:
           forall (q :: * -> *). Applicative q => Nat (Comp p q) (Comp p q)
-        at T9834.hs:23:10-19
+        at T9834.hs:23:23
       ‘a’ is a rigid type variable bound by
         the type signature for:
           afix :: forall a.
@@ -32,11 +25,11 @@ T9834.hs:23:10: warning: [-Wdeferred-type-errors (in -Wdefault)]
         at T9834.hs:22:11-74
       Expected type: Comp p q a1 -> Comp p q a1
         Actual type: Comp p q a -> Comp p q a
-    • In the expression: wrapIdComp
-      In an equation for ‘afix’: afix = wrapIdComp
+    • In the first argument of ‘wrapIdComp’, namely ‘f’
+      In the expression: wrapIdComp f
+      In an equation for ‘afix’: afix f = wrapIdComp f
     • Relevant bindings include
-        afix :: (forall (q :: * -> *).
-                 Applicative q =>
-                 Comp p q a -> Comp p q a)
-                -> p a
-          (bound at T9834.hs:23:3)
+        f :: forall (q :: * -> *).
+             Applicative q =>
+             Comp p q a -> Comp p q a
+          (bound at T9834.hs:23:8)

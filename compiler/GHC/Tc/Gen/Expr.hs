@@ -436,7 +436,7 @@ tcExpr expr@(SectionR x op arg2) res_ty
   = do { (op', op_ty) <- tcInferRhoNC op
        ; (wrap_fun, [arg1_ty, arg2_ty], op_res_ty)
                   <- matchActualFunTys (mk_op_msg op) fn_orig (Just (unLoc op)) 2 op_ty
-       ; wrap_res <- tcSubTypeHR SectionOrigin (Just expr)
+       ; wrap_res <- tcSubTypeHR SectionOrigin expr
                                  (mkVisFunTy arg1_ty op_res_ty) res_ty
        ; arg2' <- tcArg (unLoc op) arg2 arg2_ty 2
        ; return ( mkHsWrap wrap_res $
@@ -456,7 +456,7 @@ tcExpr expr@(SectionL x arg1 op) res_ty
        ; (wrap_fn, (arg1_ty:arg_tys), op_res_ty)
            <- matchActualFunTys (mk_op_msg op) fn_orig (Just (unLoc op))
                                 n_reqd_args op_ty
-       ; wrap_res <- tcSubTypeHR SectionOrigin (Just expr)
+       ; wrap_res <- tcSubTypeHR SectionOrigin expr
                                  (mkVisFunTys arg_tys op_res_ty) res_ty
        ; arg1' <- tcArg (unLoc op) arg1 arg1_ty 1
        ; return ( mkHsWrap wrap_res $
@@ -495,8 +495,7 @@ tcExpr expr@(ExplicitTuple x tup_args boxity) res_ty
                             (mkTupleTy1 boxity arg_tys)
                    -- See Note [Don't flatten tuples from HsSyn] in GHC.Core.Make
 
-       ; wrap <- tcSubTypeHR (Shouldn'tHappenOrigin "ExpTuple")
-                             (Just expr)
+       ; wrap <- tcSubTypeHR (Shouldn'tHappenOrigin "ExpTuple") expr
                              actual_res_ty res_ty
 
        -- Handle tuple sections where
@@ -557,6 +556,13 @@ tcExpr (HsCase x scrut matches) res_ty
            --
            -- But now, in the GADT world, we need to typecheck the scrutinee
            -- first, to get type info that may be refined in the case alternatives
+
+          -- Typecheck the scrutinee.  We use tcInferRho but tcInferSigma
+          -- would also be possible (tcMatchesCase accepts sigma-types)
+          -- Interesting litmus test: do these two behave the same?
+          --     case id        of {..}
+          --     case (\v -> v) of {..}
+          -- This design choice is discussed in #17790
           (scrut', scrut_ty) <- tcInferRho scrut
 
         ; traceTc "HsCase" (ppr scrut_ty)
@@ -677,7 +683,7 @@ tcExpr expr@(RecordCon { rcon_con_name = L loc con_name
                Nothing -> nonBidirectionalErr (conLikeName con_like)
                Just con_id -> do {
                   res_wrap <- tcSubTypeHR (Shouldn'tHappenOrigin "RecordCon")
-                                          (Just expr) actual_res_ty res_ty
+                                          expr actual_res_ty res_ty
                 ; rbinds' <- tcRecordBinds con_like arg_tys rbinds
                 ; return $
                   mkHsWrap res_wrap $
@@ -936,8 +942,8 @@ tcExpr expr@(RecordUpd { rupd_expr = record_expr, rupd_flds = rbnds }) res_ty
               scrut_ty      = TcType.substTy scrut_subst  con1_res_ty
               con1_arg_tys' = map (TcType.substTy result_subst) con1_arg_tys
 
-        ; wrap_res <- tcSubTypeHR (exprCtOrigin expr)
-                                  (Just expr) rec_res_ty res_ty
+        ; wrap_res <- tcSubTypeHR (exprCtOrigin expr) expr
+                                  rec_res_ty res_ty
         ; co_scrut <- unifyType (Just (unLoc record_expr)) record_rho scrut_ty
                 -- NB: normal unification is OK here (as opposed to subsumption),
                 -- because for this to work out, both record_rho and scrut_ty have
@@ -1307,7 +1313,7 @@ tcFunApp m_herald rn_fun tc_fun fun_sigma rn_args res_ty
             -- this is just like tcWrapResult, but the types don't line
             -- up to call that function
        ; wrap_res <- addFunResCtxt True (unLoc rn_fun) actual_res_ty res_ty $
-                     tcSubType_NC_O orig GenSigCtxt
+                     tcSubTypeNC orig GenSigCtxt
                        (Just $ unLoc $ wrapHsArgs rn_fun rn_args)
                        actual_res_ty res_ty
 
@@ -1719,7 +1725,7 @@ tcSynArgA orig sigma_ty arg_shapes res_shape thing_inside
     tc_syn_arg _ (SynFun {}) _
       = pprPanic "tcSynArgA hits a SynFun" (ppr orig)
     tc_syn_arg res_ty (SynType the_ty) thing_inside
-      = do { wrap   <- tcSubTypeO orig GenSigCtxt res_ty the_ty
+      = do { wrap   <- tcSubType orig GenSigCtxt res_ty the_ty
            ; result <- thing_inside []
            ; return (result, wrap) }
 
@@ -1806,7 +1812,7 @@ tcExprSig expr sig@(PartialSig { psig_name = name, sig_loc = loc })
                  then return idHsWrapper  -- Fast path; also avoids complaint when we infer
                                           -- an ambiguous type and have AllowAmbiguousType
                                           -- e..g infer  x :: forall a. F a -> Int
-                 else tcSubType_NC ExprSigCtxt inferred_sigma my_sigma
+                 else tcSubTypeSigma ExprSigCtxt inferred_sigma my_sigma
 
        ; traceTc "tcExpSig" (ppr qtvs $$ ppr givens $$ ppr inferred_sigma $$ ppr my_sigma)
        ; let poly_wrap = wrap

@@ -1731,7 +1731,7 @@ tcMethodBodyHelp hs_sig_fn sel_id local_meth_id meth_bind
                                 -- The instance-sig is the focus here; the class-meth-sig
                                 -- is fixed (#18036)
                    ; hs_wrap <- addErrCtxtM (methSigCtxt sel_name sig_ty local_meth_ty) $
-                                tcSubType_NC ctxt sig_ty local_meth_ty
+                                tcSubTypeSigma ctxt sig_ty local_meth_ty
                    ; return (sig_ty, hs_wrap) }
 
        ; inner_meth_name <- newName (nameOccName sel_name)

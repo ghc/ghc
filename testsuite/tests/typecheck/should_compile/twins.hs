@@ -22,7 +22,7 @@ gzip f x y
     else Nothing
 
 gzipWithM :: Monad m => GenericQ (GenericM m) -> GenericQ (GenericM m)
-gzipWithM _ = error "urk"
+gzipWithM _ _ = error "urk"
 
 orElse :: Maybe a -> Maybe a -> Maybe a
 orElse = error "urk"
