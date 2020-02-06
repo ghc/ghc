@@ -66,8 +66,6 @@ stg2stg dflags this_mod binds
           -- preserve the order or only create minimal recursive groups, so a
           -- sorting pass is necessary.
         ; let binds_sorted = depSortStgPgm this_mod binds'
-        ; dump_when Opt_D_dump_stg_final "Final STG:" binds_sorted
-
         ; return binds_sorted
    }
 

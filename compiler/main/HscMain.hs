@@ -1557,6 +1557,8 @@ doCodeGen hsc_env this_mod data_tycons
 
     let stg_binds_w_fvs = annTopBindingsFreeVars stg_binds
 
+    dumpIfSet_dyn dflags Opt_D_dump_stg_final "Final STG:" FormatSTG (pprGenStgTopBindings stg_binds_w_fvs)
+
     let cmm_stream :: Stream IO CmmGroup ()
         -- See Note [Forcing of stg_binds]
         cmm_stream = stg_binds_w_fvs `seqList` {-# SCC "StgToCmm" #-}
@@ -1587,7 +1589,6 @@ doCodeGen hsc_env this_mod data_tycons
           return a
 
     return (Stream.mapM dump2 pipeline_stream)
-
 
 myCoreToStg :: DynFlags -> Module -> CoreProgram
             -> IO ( [StgTopBinding] -- output program
