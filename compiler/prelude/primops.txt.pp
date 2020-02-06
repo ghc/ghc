@@ -2601,6 +2601,30 @@ primop  RaiseOp "raise#" GenPrimOp
      -- returns bottom independently ensures that we are careful not to discard
      -- it.  But still, it's better to say the Right Thing.
 
+primop  RaiseDivZeroOp "raiseDivZero#" GenPrimOp
+   Void# -> o
+      -- NB: the type variable "o" is "a", but with OpenKind
+   with
+   strictness  = { \ _arity -> mkClosedStrictSig [topDmd] botRes }
+   out_of_line = True
+   has_side_effects = True
+
+primop  RaiseUnderflowOp "raiseUnderflow#" GenPrimOp
+   Void# -> o
+      -- NB: the type variable "o" is "a", but with OpenKind
+   with
+   strictness  = { \ _arity -> mkClosedStrictSig [topDmd] botRes }
+   out_of_line = True
+   has_side_effects = True
+
+primop  RaiseOverflowOp "raiseOverflow#" GenPrimOp
+   Void# -> o
+      -- NB: the type variable "o" is "a", but with OpenKind
+   with
+   strictness  = { \ _arity -> mkClosedStrictSig [topDmd] botRes }
+   out_of_line = True
+   has_side_effects = True
+
 -- raiseIO# needs to be a primop, because exceptions in the IO monad
 -- must be *precise* - we don't want the strictness analyser turning
 -- one kind of bottom into another, as it is allowed to do in pure code.
