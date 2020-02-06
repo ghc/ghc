@@ -2601,6 +2601,49 @@ primop  RaiseOp "raise#" GenPrimOp
      -- returns bottom independently ensures that we are careful not to discard
      -- it.  But still, it's better to say the Right Thing.
 
+-- Note [Arithmetic exception primops]
+-- ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+--
+-- The RTS provides several primops to raise specific exceptions (raiseDivZero#,
+-- raiseUnderflow#, raiseOverflow#). These primops are meant to be used by the
+-- package implementing arbitrary precision numbers (Natural,Integer). It can't
+-- depend on `base` package to raise exceptions in a normal way because it would
+-- create a package dependency circle (base <-> bignum package).
+--
+-- See #14664
+
+primtype Void#
+
+primop  RaiseDivZeroOp "raiseDivZero#" GenPrimOp
+   Void# -> o
+   {Raise a 'DivideByZero' arithmetic exception.}
+      -- NB: the type variable "o" is "a", but with OpenKind
+      -- See Note [Arithmetic exception primops]
+   with
+   strictness  = { \ _arity -> mkClosedStrictSig [topDmd] botRes }
+   out_of_line = True
+   has_side_effects = True
+
+primop  RaiseUnderflowOp "raiseUnderflow#" GenPrimOp
+   Void# -> o
+   {Raise an 'Underflow' arithmetic exception.}
+      -- NB: the type variable "o" is "a", but with OpenKind
+      -- See Note [Arithmetic exception primops]
+   with
+   strictness  = { \ _arity -> mkClosedStrictSig [topDmd] botRes }
+   out_of_line = True
+   has_side_effects = True
+
+primop  RaiseOverflowOp "raiseOverflow#" GenPrimOp
+   Void# -> o
+   {Raise an 'Overflow' arithmetic exception.}
+      -- NB: the type variable "o" is "a", but with OpenKind
+      -- See Note [Arithmetic exception primops]
+   with
+   strictness  = { \ _arity -> mkClosedStrictSig [topDmd] botRes }
+   out_of_line = True
+   has_side_effects = True
+
 -- raiseIO# needs to be a primop, because exceptions in the IO monad
 -- must be *precise* - we don't want the strictness analyser turning
 -- one kind of bottom into another, as it is allowed to do in pure code.

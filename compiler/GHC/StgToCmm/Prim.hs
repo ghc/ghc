@@ -1453,6 +1453,9 @@ emitPrimOp dflags = \case
   CasMutVarOp -> alwaysExternal
   CatchOp -> alwaysExternal
   RaiseOp -> alwaysExternal
+  RaiseDivZeroOp -> alwaysExternal
+  RaiseUnderflowOp -> alwaysExternal
+  RaiseOverflowOp -> alwaysExternal
   RaiseIOOp -> alwaysExternal
   MaskAsyncExceptionsOp -> alwaysExternal
   MaskUninterruptibleOp -> alwaysExternal

@@ -31,6 +31,9 @@ import pthread_mutex_unlock;
 #endif
 import CLOSURE base_ControlziExceptionziBase_nestedAtomically_closure;
 import CLOSURE base_GHCziIOziException_heapOverflow_closure;
+import CLOSURE base_GHCziExceptionziType_divZZeroException_closure;
+import CLOSURE base_GHCziExceptionziType_underflowException_closure;
+import CLOSURE base_GHCziExceptionziType_overflowException_closure;
 import EnterCriticalSection;
 import LeaveCriticalSection;
 import CLOSURE ghczmprim_GHCziTypes_False_closure;
@@ -2605,4 +2608,20 @@ stg_setThreadAllocationCounterzh ( I64 counter )
     offset = Hp - bdescr_start(CurrentNursery);
     StgTSO_alloc_limit(CurrentTSO) = counter + TO_I64(offset);
     return ();
+}
+
+
+stg_raiseDivZZerozh ()
+{
+    jump stg_raisezh(base_GHCziExceptionziType_divZZeroException_closure);
+}
+
+stg_raiseUnderflowzh ()
+{
+    jump stg_raisezh(base_GHCziExceptionziType_underflowException_closure);
+}
+
+stg_raiseOverflowzh ()
+{
+    jump stg_raisezh(base_GHCziExceptionziType_overflowException_closure);
 }
