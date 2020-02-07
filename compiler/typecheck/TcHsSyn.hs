@@ -1463,9 +1463,12 @@ zonk_pat env (CoPat x co_fn pat ty)
 zonk_pat _ pat = pprPanic "zonk_pat" (ppr pat)
 
 ---------------------------
-zonkConStuff :: ZonkEnv
-             -> HsConDetails (OutPat GhcTcId) (HsRecFields id (OutPat GhcTcId))
-             -> TcM (ZonkEnv,
+zonkConStuff :: ( XRec id (HsRecField id (Located (Pat GhcTc)))
+                    ~ Located (HsRecField' id0 (Located (Pat GhcTc)))
+                )
+                => ZonkEnv
+                -> HsConDetails (OutPat GhcTcId) (HsRecFields id (OutPat GhcTcId))
+                -> TcM (ZonkEnv,
                     HsConDetails (OutPat GhcTc) (HsRecFields id (OutPat GhcTc)))
 zonkConStuff env (PrefixCon pats)
   = do  { (env', pats') <- zonkPats env pats

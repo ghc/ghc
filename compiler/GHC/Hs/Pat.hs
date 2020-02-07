@@ -87,7 +87,7 @@ data Pat p
 
        -- AZ:TODO above comment needs to be updated
   | VarPat      (XVarPat p)
-                (Located (IdP p))  -- ^ Variable Pattern
+                (XRec p (IdP p))  -- ^ Variable Pattern
 
                              -- See Note [Located RdrNames] in GHC.Hs.Expr
   | LazyPat     (XLazyPat p)
@@ -97,7 +97,7 @@ data Pat p
     -- For details on above see note [Api annotations] in ApiAnnotation
 
   | AsPat       (XAsPat p)
-                (Located (IdP p)) (LPat p)    -- ^ As pattern
+                (XRec p (IdP p)) (LPat p)    -- ^ As pattern
     -- ^ - 'ApiAnnotation.AnnKeywordId' : 'ApiAnnotation.AnnAt'
 
     -- For details on above see note [Api annotations] in ApiAnnotation
@@ -170,12 +170,12 @@ data Pat p
     -- For details on above see note [Api annotations] in ApiAnnotation
 
         ------------ Constructor patterns ---------------
-  | ConPatIn    (Located (IdP p))
+  | ConPatIn    (XRec p (IdP p))
                 (HsConPatDetails p)
     -- ^ Constructor Pattern In
 
   | ConPatOut {
-        pat_con     :: Located ConLike,
+        pat_con     :: XRec p ConLike,
         pat_arg_tys :: [Type],          -- The universal arg types, 1-1 with the universal
                                         -- tyvars of the constructor/pattern synonym
                                         --   Use (conLikeResTy pat_con pat_arg_tys) to get
@@ -226,7 +226,7 @@ data Pat p
                     (XNPat p)            -- Overall type of pattern. Might be
                                          -- different than the literal's type
                                          -- if (==) or negate changes the type
-                    (Located (HsOverLit p))     -- ALWAYS positive
+                    (XRec p (HsOverLit p))     -- ALWAYS positive
                     (Maybe (SyntaxExpr p)) -- Just (Name of 'negate') for
                                            -- negative patterns, Nothing
                                            -- otherwise
@@ -238,8 +238,8 @@ data Pat p
 
   -- For details on above see note [Api annotations] in ApiAnnotation
   | NPlusKPat       (XNPlusKPat p)           -- Type of overall pattern
-                    (Located (IdP p))        -- n+k pattern
-                    (Located (HsOverLit p))  -- It'll always be an HsIntegral
+                    (XRec p (IdP p))        -- n+k pattern
+                    (XRec p (HsOverLit p))  -- It'll always be an HsIntegral
                     (HsOverLit p)       -- See Note [NPlusK patterns] in TcPat
                      -- NB: This could be (PostTc ...), but that induced a
                      -- a new hs-boot file. Not worth it.
@@ -754,7 +754,7 @@ is the only thing that could possibly be matched!
 
 -- | @'patNeedsParens' p pat@ returns 'True' if the pattern @pat@ needs
 -- parentheses under precedence @p@.
-patNeedsParens :: PprPrec -> Pat p -> Bool
+patNeedsParens :: PprPrec -> Pat (GhcPass p) -> Bool
 patNeedsParens p = go
   where
     go (NPlusKPat {})    = p > opPrec
