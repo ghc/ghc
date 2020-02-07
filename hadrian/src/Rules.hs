@@ -49,13 +49,12 @@ toolArgsTarget = do
     includesDependencies Stage0 >>= need
     interpret fake_target Rules.Generate.compilerDependencies >>= need
 
-    root <- buildRoot
-    let dir = buildDir (vanillaContext Stage0 compiler)
-    need [ root -/- dir -/- "Config.hs" ]
-    need [ root -/- dir -/- "Parser.hs" ]
-    need [ root -/- dir -/- "Lexer.hs" ]
-    need [ root -/- dir -/- "GHC" -/- "Cmm" -/- "Parser.hs" ]
-    need [ root -/- dir -/- "GHC" -/- "Cmm" -/- "Lexer.hs"  ]
+    dir <- buildPath (vanillaContext Stage0 compiler)
+    need [ dir -/- "Config.hs" ]
+    need [ dir -/- "Parser.hs" ]
+    need [ dir -/- "Lexer.hs" ]
+    need [ dir -/- "GHC" -/- "Cmm" -/- "Parser.hs" ]
+    need [ dir -/- "GHC" -/- "Cmm" -/- "Lexer.hs"  ]
 
     -- Find out the arguments that are needed to load a module into the
     -- session
