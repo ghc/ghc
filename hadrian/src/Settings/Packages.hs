@@ -151,6 +151,7 @@ packageArgs = do
         ------------------------------ integerGmp ------------------------------
         , package integerGmp ? mconcat
           [ builder Cc ? arg includeGmp
+          , builder (Ghc CompileCWithGhc) ? arg includeGmp
 
           , builder (Cabal Setup) ? mconcat
             [ flag GmpInTree ? arg "--configure-option=--with-intree-gmp"
