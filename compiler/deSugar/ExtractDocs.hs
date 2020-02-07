@@ -117,7 +117,7 @@ user-written. This lets us relate Names (from ClsInsts) to comments
 -}
 
 getMainDeclBinder
-  :: IsPass p
+  :: (XCollectPat (GhcPass p))
   => HsDecl (GhcPass p)
   -> [IdP (GhcPass p)]
 getMainDeclBinder (TyClD _ d) = [tcdName d]
