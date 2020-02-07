@@ -7,7 +7,7 @@
 
 module Main where
 
-import Data.List
+import Data.List ()
 import Data.Map
 
 class (Ord oid) => Object o oid | o -> oid where

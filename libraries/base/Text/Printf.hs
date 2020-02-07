@@ -94,7 +94,7 @@ module Text.Printf(
 
 import Data.Char
 import Data.Int
-import Data.List
+import Data.List (stripPrefix)
 import Data.Word
 import Numeric
 import Numeric.Natural

@@ -71,7 +71,7 @@ import NameEnv
 import SrcLoc
 import Data.Bifunctor ( bimap )
 import ErrUtils (dumpAction)
-import Data.List
+import Data.List (intersperse, groupBy, sortBy)
 import Data.Ord
 import Data.Dynamic
 import Data.IORef

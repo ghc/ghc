@@ -98,7 +98,7 @@ import FastString
 import Control.DeepSeq
 import Data.Bits
 import Data.Data
-import Data.List
+import Data.List (sortBy, intercalate)
 import Data.Ord
 
 {-

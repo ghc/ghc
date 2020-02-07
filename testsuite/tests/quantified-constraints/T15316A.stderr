@@ -1,0 +1,11 @@
+
+T15316A.hs:15:23:
+     Reduction stack overflow; size = 201
+      When simplifying the following type: Class a
+      Use -freduction-depth=0 to disable this check
+      (any upper bound you could choose might fail unpredictably with
+       minor updates to GHC, so disabling the check is recommended if
+       you're sure that type checking should terminate)
+     In the third argument of ‘subsume’, namely ‘method’
+      In the expression: subsume p p method
+      In an equation for ‘value’: value p = subsume p p method

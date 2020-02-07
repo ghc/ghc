@@ -12,10 +12,9 @@ Main functions for .hie file generation
 {-# LANGUAGE AllowAmbiguousTypes #-}
 {-# LANGUAGE ViewPatterns #-}
 {-# LANGUAGE DeriveDataTypeable #-}
-
 {-# OPTIONS_GHC -Wno-incomplete-uni-patterns #-}
 
-module GHC.Iface.Ext.Ast ( mkHieFile ) where
+module GHC.Iface.Ext.Ast ( mkHieFile, mkHieFileWithSource, getCompressedAsts) where
 
 import GhcPrelude
 
@@ -42,6 +41,7 @@ import Var                        ( Id, Var, setVarName, varName, varType )
 import TcRnTypes
 import GHC.Iface.Utils            ( mkIfaceExports )
 import Panic
+import Maybes
 
 import GHC.Iface.Ext.Types
 import GHC.Iface.Ext.Utils
@@ -52,7 +52,6 @@ import qualified Data.Map as M
 import qualified Data.Set as S
 import Data.Data                  ( Data, Typeable )
 import Data.List                  ( foldl1' )
-import Data.Maybe                 ( listToMaybe )
 import Control.Monad.Trans.Reader
 import Control.Monad.Trans.Class  ( lift )
 
@@ -226,10 +225,20 @@ mkHieFile :: ModSummary
           -> TcGblEnv
           -> RenamedSource -> Hsc HieFile
 mkHieFile ms ts rs = do
+  let src_file = expectJust "mkHieFile" (ml_hs_file $ ms_location ms)
+  src <- liftIO $ BS.readFile src_file
+  mkHieFileWithSource src_file src ms ts rs
+
+-- | Construct an 'HieFile' from the outputs of the typechecker but don't
+-- read the source file again from disk.
+mkHieFileWithSource :: FilePath
+                    -> BS.ByteString
+                    -> ModSummary
+                    -> TcGblEnv
+                    -> RenamedSource -> Hsc HieFile
+mkHieFileWithSource src_file src ms ts rs = do
   let tc_binds = tcg_binds ts
   (asts', arr) <- getCompressedAsts tc_binds rs
-  let Just src_file = ml_hs_file $ ms_location ms
-  src <- liftIO $ BS.readFile src_file
   return $ HieFile
       { hie_hs_file = src_file
       , hie_module = ms_mod ms
@@ -643,16 +652,16 @@ instance HasType (LHsExpr GhcTc) where
       -- See impact on Haddock output (esp. missing type annotations or links)
       -- before marking more things here as 'False'. See impact on Haddock
       -- performance before marking more things as 'True'.
-      skipDesugaring :: HsExpr a -> Bool
+      skipDesugaring :: HsExpr GhcTc -> Bool
       skipDesugaring e = case e of
-        HsVar{}        -> False
-        HsUnboundVar{} -> False
-        HsConLikeOut{} -> False
-        HsRecFld{}     -> False
-        HsOverLabel{}  -> False
-        HsIPVar{}      -> False
-        HsWrap{}       -> False
-        _              -> True
+        HsVar{}          -> False
+        HsUnboundVar{}   -> False
+        HsConLikeOut{}   -> False
+        HsRecFld{}       -> False
+        HsOverLabel{}    -> False
+        HsIPVar{}        -> False
+        XExpr (HsWrap{}) -> False
+        _                -> True
 
 instance ( ToHie (Context (Located (IdP a)))
          , ToHie (MatchGroup a (LHsExpr a))
@@ -732,7 +741,7 @@ instance ( ToHie (MatchGroup a (LHsExpr a))
 
 instance ( a ~ GhcPass p
          , ToHie body
-         , ToHie (HsMatchContext (NameOrRdrName (IdP a)))
+         , ToHie (HsMatchContext (NoGhcTc a))
          , ToHie (PScoped (LPat a))
          , ToHie (GRHSs a body)
          , Data (Match a body)
@@ -746,7 +755,7 @@ instance ( a ~ GhcPass p
       ]
     XMatch _ -> []
 
-instance ( ToHie (Context (Located a))
+instance ( ToHie (Context (Located (IdP a)))
          ) => ToHie (HsMatchContext a) where
   toHie (FunRhs{mc_fun=name}) = toHie $ C MatchBind name
   toHie (StmtCtxt a) = toHie a
@@ -885,6 +894,7 @@ instance ( a ~ GhcPass p
          , Data (HsTupArg a)
          , Data (AmbiguousFieldOcc a)
          , (HasRealDataConName a)
+         , IsPass p
          ) => ToHie (LHsExpr (GhcPass p)) where
   toHie e@(L mspan oexpr) = concatM $ getTypeNode e : case oexpr of
       HsVar _ (L _ var) ->
@@ -997,9 +1007,6 @@ instance ( a ~ GhcPass p
       HsBinTick _ _ _ expr ->
         [ toHie expr
         ]
-      HsWrap _ _ a ->
-        [ toHie $ L mspan a
-        ]
       HsBracket _ b ->
         [ toHie b
         ]
@@ -1014,7 +1021,13 @@ instance ( a ~ GhcPass p
       HsSpliceE _ x ->
         [ toHie $ L mspan x
         ]
-      XExpr _ -> []
+      XExpr x
+        | GhcTc <- ghcPass @p
+        , HsWrap _ a <- x
+        -> [ toHie $ L mspan a ]
+
+        | otherwise
+        -> []
 
 instance ( a ~ GhcPass p
          , ToHie (LHsExpr a)
@@ -1244,7 +1257,6 @@ instance ( a ~ GhcPass p
         [ pure $ locOnly ispan
         , toHie $ listScopes NoScope stmts
         ]
-      HsCmdWrap _ _ _ -> []
       XCmd _ -> []
 
 instance ToHie (TyClGroup GhcRn) where

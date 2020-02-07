@@ -11,12 +11,14 @@
 {-# LANGUAGE DeriveTraversable #-}
 {-# LANGUAGE StandaloneDeriving #-}
 {-# LANGUAGE FlexibleContexts #-}
-{-# LANGUAGE UndecidableInstances #-} -- Note [Pass sensitive types]
-                                      -- in module GHC.Hs.PlaceHolder
+{-# LANGUAGE UndecidableInstances #-} -- Wrinkle in Note [Trees That Grow]
+                                      -- in module GHC.Hs.Extension
 {-# LANGUAGE ConstraintKinds #-}
 {-# LANGUAGE TypeFamilies #-}
 {-# LANGUAGE ViewPatterns      #-}
 {-# LANGUAGE FlexibleInstances #-}
+{-# LANGUAGE ScopedTypeVariables #-}
+{-# LANGUAGE TypeApplications #-}
 
 module GHC.Hs.Pat (
         Pat(..), InPat, OutPat, LPat,
@@ -31,6 +33,7 @@ module GHC.Hs.Pat (
 
         mkPrefixConPat, mkCharLitPat, mkNilPat,
 
+        isSimplePat,
         looksLazyPatBind,
         isBangedLPat,
         patNeedsParens, parenthesizePat,
@@ -155,9 +158,7 @@ data Pat p
     --            'ApiAnnotation.AnnOpen' @'('@ or @'(#'@,
     --            'ApiAnnotation.AnnClose' @')'@ or  @'#)'@
 
-  | SumPat      (XSumPat p)        -- GHC.Hs.PlaceHolder before typechecker, filled in
-                                   -- afterwards with the types of the
-                                   -- alternative
+  | SumPat      (XSumPat p)        -- after typechecker, types of the alternative
                 (LPat p)           -- Sum sub-pattern
                 ConTag             -- Alternative (one-based)
                 Arity              -- Arity (INVARIANT: ≥ 2)
@@ -245,7 +246,7 @@ data Pat p
                      -- a new hs-boot file. Not worth it.
 
                     (SyntaxExpr p)   -- (>=) function, of type t1->t2->Bool
-                    (SyntaxExpr p)   -- Name of '-' (see GHC.Rename.Env.lookupSyntaxName)
+                    (SyntaxExpr p)   -- Name of '-' (see GHC.Rename.Env.lookupSyntax)
   -- ^ n+k pattern
 
         ------------ Pattern type signatures ---------------
@@ -273,6 +274,7 @@ data Pat p
   -- | Trees that Grow extension point for new constructors
   | XPat
       (XXPat p)
+
 
 -- ---------------------------------------------------------------------
 
@@ -509,7 +511,7 @@ pprParendPat p pat = sdocWithDynFlags $ \ dflags ->
       -- But otherwise the CoPat is discarded, so it
       -- is the pattern inside that matters.  Sigh.
 
-pprPat :: (OutputableBndrId p) => Pat (GhcPass p) -> SDoc
+pprPat :: forall p. (OutputableBndrId p) => Pat (GhcPass p) -> SDoc
 pprPat (VarPat _ lvar)          = pprPatBndr (unLoc lvar)
 pprPat (WildPat _)              = char '_'
 pprPat (LazyPat _ pat)          = char '~' <> pprParendLPat appPrec pat
@@ -523,11 +525,16 @@ pprPat (NPat _ l Nothing  _)    = ppr l
 pprPat (NPat _ l (Just _) _)    = char '-' <> ppr l
 pprPat (NPlusKPat _ n k _ _ _)  = hcat [ppr n, char '+', ppr k]
 pprPat (SplicePat _ splice)     = pprSplice splice
-pprPat (CoPat _ co pat _)       = pprHsWrapper co $ \parens
-                                            -> if parens
+pprPat (CoPat _ co pat _)       = pprIfTc @p $
+                                  pprHsWrapper co $ \parens
+                                              -> if parens
                                                  then pprParendPat appPrec pat
                                                  else pprPat pat
-pprPat (SigPat _ pat ty)        = ppr pat <+> dcolon <+> ppr ty
+pprPat (SigPat _ pat ty)        = ppr pat <+> dcolon <+> ppr_ty
+  where ppr_ty = case ghcPass @p of
+                   GhcPs -> ppr ty
+                   GhcRn -> ppr ty
+                   GhcTc -> ppr ty
 pprPat (ListPat _ pats)         = brackets (interpp'SP pats)
 pprPat (TuplePat _ pats bx)
     -- Special-case unary boxed tuples so that they are pretty-printed as
@@ -551,7 +558,7 @@ pprPat (ConPatOut { pat_con = con
     if gopt Opt_PrintTypecheckerElaboration dflags then
         ppr con
           <> braces (sep [ hsep (map pprPatBndr (tvs ++ dicts))
-                         , ppr binds])
+                         , pprIfTc @p $ ppr binds ])
           <+> pprConArgs details
     else pprUserCon (unLoc con) details
 pprPat (XPat n)                 = noExtCon n
@@ -729,6 +736,23 @@ isIrrefutableHsPat
     go (SplicePat {})      = False
 
     go (XPat {})           = False
+
+-- | Is the pattern any of combination of:
+--
+-- - (pat)
+-- - pat :: Type
+-- - ~pat
+-- - !pat
+-- - x (variable)
+isSimplePat :: LPat (GhcPass x) -> Maybe (IdP (GhcPass x))
+isSimplePat p = case unLoc p of
+  ParPat _ x -> isSimplePat x
+  SigPat _ x _ -> isSimplePat x
+  LazyPat _ x -> isSimplePat x
+  BangPat _ x -> isSimplePat x
+  VarPat _ x -> Just (unLoc x)
+  _ -> Nothing
+
 
 {- Note [Unboxed sum patterns aren't irrefutable]
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~

@@ -336,7 +336,12 @@ addTickLHsBind (L pos (funBind@(FunBind { fun_id = L _ id }))) = do
 -- TODO: Revisit this
 addTickLHsBind (L pos (pat@(PatBind { pat_lhs = lhs
                                     , pat_rhs = rhs }))) = do
-  let name = "(...)"
+
+  let simplePatId = isSimplePat lhs
+
+  -- TODO: better name for rhs's for non-simple patterns?
+  let name = maybe "(...)" getOccString simplePatId
+
   (fvs, rhs') <- getFreeVars $ addPathEntry name $ addTickGRHSs False False rhs
   let pat' = pat { pat_rhs = rhs'}
 
@@ -348,23 +353,30 @@ addTickLHsBind (L pos (pat@(PatBind { pat_lhs = lhs
     then return (L pos pat')
     else do
 
-    -- Allocate the ticks
-    rhs_tick <- bindTick density name pos fvs
-    let patvars = map getOccString (collectPatBinders lhs)
-    patvar_ticks <- mapM (\v -> bindTick density v pos fvs) patvars
-
-    -- Add to pattern
     let mbCons = maybe id (:)
-        rhs_ticks = rhs_tick `mbCons` fst (pat_ticks pat')
-        patvar_tickss = zipWith mbCons patvar_ticks
-                        (snd (pat_ticks pat') ++ repeat [])
+
+    let (initial_rhs_ticks, initial_patvar_tickss) = pat_ticks pat'
+
+    -- Allocate the ticks
+
+    rhs_tick <- bindTick density name pos fvs
+    let rhs_ticks = rhs_tick `mbCons` initial_rhs_ticks
+
+    patvar_tickss <- case simplePatId of
+      Just{} -> return initial_patvar_tickss
+      Nothing -> do
+        let patvars = map getOccString (collectPatBinders lhs)
+        patvar_ticks <- mapM (\v -> bindTick density v pos fvs) patvars
+        return
+          (zipWith mbCons patvar_ticks
+                          (initial_patvar_tickss ++ repeat []))
+
     return $ L pos $ pat' { pat_ticks = (rhs_ticks, patvar_tickss) }
 
 -- Only internal stuff, not from source, uses VarBind, so we ignore it.
 addTickLHsBind var_bind@(L _ (VarBind {})) = return var_bind
 addTickLHsBind patsyn_bind@(L _ (PatSynBind {})) = return patsyn_bind
 addTickLHsBind bind@(L _ (XHsBindsLR {})) = return bind
-
 
 bindTick
   :: TickDensity -> String -> SrcSpan -> FreeVars -> TM (Maybe (Tickish Id))
@@ -621,10 +633,10 @@ addTickHsExpr (HsProc x pat cmdtop) =
         liftM2 (HsProc x)
                 (addTickLPat pat)
                 (liftL (addTickHsCmdTop) cmdtop)
-addTickHsExpr (HsWrap x w e) =
-        liftM2 (HsWrap x)
-                (return w)
-                (addTickHsExpr e)       -- Explicitly no tick on inside
+addTickHsExpr (XExpr (HsWrap w e)) =
+        liftM XExpr $
+        liftM (HsWrap w)
+              (addTickHsExpr e)        -- Explicitly no tick on inside
 
 -- Others should never happen in expression content.
 addTickHsExpr e  = pprPanic "addTickHsExpr" (ppr e)
@@ -822,9 +834,11 @@ addTickIPBind (XIPBind x) = return (XIPBind x)
 
 -- There is no location here, so we might need to use a context location??
 addTickSyntaxExpr :: SrcSpan -> SyntaxExpr GhcTc -> TM (SyntaxExpr GhcTc)
-addTickSyntaxExpr pos syn@(SyntaxExpr { syn_expr = x }) = do
+addTickSyntaxExpr pos syn@(SyntaxExprTc { syn_expr = x }) = do
         x' <- fmap unLoc (addTickLHsExpr (L pos x))
         return $ syn { syn_expr = x' }
+addTickSyntaxExpr _ NoSyntaxExprTc = return NoSyntaxExprTc
+
 -- we do not walk into patterns.
 addTickLPat :: LPat GhcTc -> TM (LPat GhcTc)
 addTickLPat pat = return pat
@@ -887,10 +901,9 @@ addTickHsCmd (HsCmdArrForm x e f fix cmdtop) =
                (return fix)
                (mapM (liftL (addTickHsCmdTop)) cmdtop)
 
-addTickHsCmd (HsCmdWrap x w cmd)
-  = liftM2 (HsCmdWrap x) (return w) (addTickHsCmd cmd)
-
-addTickHsCmd (XCmd nec) = noExtCon nec
+addTickHsCmd (XCmd (HsWrap w cmd)) =
+  liftM XCmd $
+  liftM (HsWrap w) (addTickHsCmd cmd)
 
 -- Others should never happen in a command context.
 --addTickHsCmd e  = pprPanic "addTickHsCmd" (ppr e)

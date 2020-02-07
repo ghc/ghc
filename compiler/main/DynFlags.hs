@@ -926,6 +926,7 @@ data WarningFlag =
    | Opt_WarnUnusedPackages               -- Since 8.10
    | Opt_WarnInferredSafeImports          -- Since 8.10
    | Opt_WarnMissingSafeHaskellMode       -- Since 8.10
+   | Opt_WarnCompatUnqualifiedImports     -- Since 8.10
    | Opt_WarnDerivingDefaults
    deriving (Eq, Show, Enum)
 
@@ -1352,10 +1353,8 @@ parseCfgWeights s oldWeights =
             , null rest
             = [s1]
             | (s1,rest) <- break (== ',') s
-            = [s1] ++ settings (drop 1 rest)
-#if __GLASGOW_HASKELL__ <= 810
-            | otherwise = panic $ "Invalid cfg parameters." ++ exampleString
-#endif
+            = s1 : settings (drop 1 rest)
+
         assignment as
             | (name, _:val) <- break (== '=') as
             = (name,read val)
@@ -4163,7 +4162,8 @@ wWarningFlagsDeps = [
   flagSpec "partial-fields"              Opt_WarnPartialFields,
   flagSpec "prepositive-qualified-module"
                                          Opt_WarnPrepositiveQualifiedModule,
-  flagSpec "unused-packages"             Opt_WarnUnusedPackages
+  flagSpec "unused-packages"             Opt_WarnUnusedPackages,
+  flagSpec "compat-unqualified-imports"  Opt_WarnCompatUnqualifiedImports
  ]
 
 -- | These @-\<blah\>@ flags can all be reversed with @-no-\<blah\>@
@@ -4931,6 +4931,7 @@ minusWcompatOpts
       , Opt_WarnSemigroup
       , Opt_WarnNonCanonicalMonoidInstances
       , Opt_WarnStarIsType
+      , Opt_WarnCompatUnqualifiedImports
       ]
 
 enableUnusedBinds :: DynP ()

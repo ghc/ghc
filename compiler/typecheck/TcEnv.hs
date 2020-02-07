@@ -3,8 +3,8 @@
 {-# LANGUAGE FlexibleContexts #-}
 {-# OPTIONS_GHC -fno-warn-orphans #-}  -- instance MonadThings is necessarily an
                                        -- orphan
-{-# LANGUAGE UndecidableInstances #-} -- Note [Pass sensitive types]
-                                      -- in module GHC.Hs.PlaceHolder
+{-# LANGUAGE UndecidableInstances #-} -- Wrinkle in Note [Trees That Grow]
+                                      -- in module GHC.Hs.Extension
 {-# LANGUAGE TypeFamilies #-}
 
 module TcEnv(
@@ -112,7 +112,7 @@ import qualified GHC.LanguageExtensions as LangExt
 import Util ( HasDebugCallStack )
 
 import Data.IORef
-import Data.List
+import Data.List (intercalate)
 import Control.Monad
 
 {- *********************************************************************
