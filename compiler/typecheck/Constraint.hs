@@ -1175,8 +1175,16 @@ like this one:
 
 The kind of 'a' mentions 'k' which is bound after 'a'.  Oops.
 
-Knowing this means that unification etc must have happened, so it's
-convenient to detect it in the constraint solver:
+One approach to doing this would be to bring each of a, k, and b into
+scope, one at a time, creating a separate implication constraint for
+each one, and bumping the TcLevel. This would work, because the kind
+of, say, a would be untouchable when k is in scope (and the constraint
+couldn't float out because k blocks it). However, it leads to terrible
+error messages, complaining about skolem escape. While it is indeed a
+problem of skolem escape, we can do better.
+
+Instead, our approach is to bring the block of variables into scope
+all at once, creating one implication constraint for the lot:
 
 * We make a single implication constraint when kind-checking
   the 'forall' in Foo's kind, something like
@@ -1200,8 +1208,6 @@ convenient to detect it in the constraint solver:
   ic_telescope, even if ic_wanted is empty.  We must give the
   constraint solver a chance to make that bad-telescope test!  Hence
   the extra guard in emitResidualTvConstraint; see #16247
-
-See also TcHsType Note [Keeping scoped variables in order: Explicit]
 
 Note [Needed evidence variables]
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
