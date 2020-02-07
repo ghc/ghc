@@ -62,7 +62,8 @@ lookupDependencies :: FilePath -> FilePath -> Action (FilePath, [FilePath])
 lookupDependencies depFile file = do
     deps <- lookupValues depFile file
     case deps of
-        Nothing -> error $ "No dependencies found for file " ++ quote file
+        Nothing -> error $ "No dependencies found for file " ++ quote file ++ ".\n"
+                        ++ " (looking for dependencies in " ++ quote depFile ++ ")"
         Just [] -> error $ "No source file found for file " ++ quote file
         Just (source : files) -> return (source, files)
 
