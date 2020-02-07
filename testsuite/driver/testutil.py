@@ -82,7 +82,24 @@ def testing_metrics():
 #
 # We define the following function to make this magic more
 # explicit/discoverable. You are encouraged to use it instead of os.symlink.
-if os.name == 'nt' and os.getenv('FORCE_SYMLINKS') == None:
+def symlinks_work() -> bool:
+    if os.getenv('FORCE_SYMLINKS') is not None:
+        return True
+    elif os.name == 'nt':
+        # On Windows we try to create a symlink to test whether symlinks are
+        # usable.
+        try:
+            os.symlink('symlink-test', '__symlink-test')
+        except OSError as e:
+            return False
+        finally:
+            os.unlink('__symlink-test')
+
+        return True
+    else:
+        return True
+
+if symlinks_work():
     def link_or_copy_file(src: Path, dst: Path):
         shutil.copyfile(str(src), str(dst))
 else:
