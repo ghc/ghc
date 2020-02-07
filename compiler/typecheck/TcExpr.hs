@@ -1247,6 +1247,10 @@ tcArgs fun orig_fun_ty fun_orig orig_args herald
            }
 
     go acc_args n fun_ty (HsTypeArg l hs_ty_arg : args)
+      | fun_is_out_of_scope   -- See Note [VTA for out-of-scope functions]
+      = go acc_args (n+1) fun_ty args
+
+      | otherwise
       = do { (wrap1, upsilon_ty) <- topInstantiateInferred fun_orig fun_ty
                -- wrap1 :: fun_ty "->" upsilon_ty
            ; case tcSplitForAllTy_maybe upsilon_ty of
@@ -1337,17 +1341,23 @@ generate an immediate failure (in tc_app_err), saying that a function
 of type 'alpha' can't be applied to Bool.  That's insane!  And indeed
 users complain bitterly (#13834, #17150.)
 
-The right error is the CHoleCan, which reports 'wurble' as out of
-scope, and tries to give its type.
+The right error is the CHoleCan, which has /already/ been emitted by
+tcUnboundId.  It later reports 'wurble' as out of scope, and tries to
+give its type.
 
-Fortunately in tcArgs we still have acces to the function, so
-we can check if it is a HsUnboundVar.  If so, we simply fail
-immediately.  We've already inferred the type of the function,
-so we'll /already/ have emitted a CHoleCan constraint; failing
-preserves that constraint.
+Fortunately in tcArgs we still have access to the function, so we can
+check if it is a HsUnboundVar.  We use this info to simply skip over
+any visible type arguments.  We've already inferred the type of the
+function, so we'll /already/ have emitted a CHoleCan constraint;
+failing preserves that constraint.
 
-A mild shortcoming of this approach is that we thereby
-don't typecheck any of the arguments, but so be it.
+We do /not/ want to fail altogether in this case (via failM) becuase
+that may abandon an entire instance decl, which (in the presence of
+-fdefer-type-errors) leads to leading to #17792.
+
+Downside; the typechecked term has lost its visible type arguments; we
+don't even kind-check them.  But let's jump that bridge if we come to
+it.  Meanwhile, let's not crash!
 
 Note [Visible type application zonk]
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
