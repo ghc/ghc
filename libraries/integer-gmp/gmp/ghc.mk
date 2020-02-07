@@ -131,7 +131,7 @@ libraries/integer-gmp/gmp/libgmp.a libraries/integer-gmp/gmp/gmp.h:
 	#       run is the 'target' platform of the compiler we're building.
 	cd libraries/integer-gmp/gmp/gmpbuild; \
 	    CC=$(CCX) CXX=$(CCX) NM=$(NM) AR=$(AR_STAGE1) ./configure \
-	          --enable-shared=no \
+	          --enable-shared=no --with-pic=yes \
 	          --host=$(TARGETPLATFORM) --build=$(BUILDPLATFORM)
 	$(MAKE) -C libraries/integer-gmp/gmp/gmpbuild MAKEFLAGS=
 	$(CP) libraries/integer-gmp/gmp/gmpbuild/gmp.h libraries/integer-gmp/gmp/
