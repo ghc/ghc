@@ -874,7 +874,7 @@ GarbageCollect (uint32_t collect_gen,
       need_prealloc += arenaBlocks();
 #if defined(PROFILING)
       if (RtsFlags.ProfFlags.doHeapProfile == HEAP_BY_RETAINER) {
-          need_prealloc = retainerStackBlocks();
+          need_prealloc += retainerStackBlocks();
       }
 #endif
 
