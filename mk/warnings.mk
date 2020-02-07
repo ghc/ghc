@@ -19,7 +19,7 @@ GhcStage2HcOpts += -Wcpp-undef -Wincomplete-uni-patterns -Wincomplete-record-upd
 
 # clang fails when the "-nopie" is unused. The configure step currently checks
 # that -nopie is supported but that doesn't tell us when it will actually be used.
-ifeq "$(GccIsClang)" "YES"
+ifeq "$(CcLlvmBackend)" "YES"
 	SRC_CC_WARNING_OPTS += -Wno-error=unused-command-line-argument
 endif
 
