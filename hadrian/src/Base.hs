@@ -23,7 +23,7 @@ module Base (
 
     -- * Paths
     hadrianPath, configPath, configFile, sourcePath, shakeFilesDir,
-    stageBinPath, stageLibPath, templateHscPath,
+    stagePath, stageBinPath, stageLibPath, templateHscPath,
     ghcBinDeps, ghcLibDeps, includesDependencies, haddockDeps,
     relativePackageDbPath, packageDbPath, packageDbStamp, mingwStamp,
     ) where
@@ -92,11 +92,15 @@ packageDbStamp = ".stamp"
 
 -- | @bin@ directory for the given 'Stage' (including the build root)
 stageBinPath :: Stage -> Action FilePath
-stageBinPath stage = buildRoot <&> (-/- stageString stage -/- "bin")
+stageBinPath stage = stagePath stage <&> (-/- "bin")
 
 -- | @lib@ directory for the given 'Stage' (including the build root)
 stageLibPath :: Stage -> Action FilePath
-stageLibPath stage = buildRoot <&> (-/- stageString stage -/- "lib")
+stageLibPath stage = stagePath stage <&> (-/- "lib")
+
+-- | @stage@ directory for the given 'Stage' (including the build root)
+stagePath :: Stage -> Action FilePath
+stagePath stage = buildRoot <&> (-/- stageString stage)
 
 -- | Files the GHC library depends on
 ghcLibDeps :: Stage -> Action [FilePath]

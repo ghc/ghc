@@ -1,6 +1,6 @@
 module Context.Path where
 
-import Base
+import Base hiding (stagePath)
 import Context.Type
 import Hadrian.Expression
 

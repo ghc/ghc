@@ -37,7 +37,7 @@ gmpContext = vanillaContext Stage1 integerGmp
 -- more precise to avoid such spurious matching.
 -- | Build directory for in-tree GMP library.
 gmpBuildPath :: Action FilePath
-gmpBuildPath = buildRoot <&> (-/- stageString (stage gmpContext) -/- "gmp")
+gmpBuildPath = stagePath (stage gmpContext) <&> (-/- "gmp")
 
 -- | Like 'gmpBuildPath' but in the 'Rules' monad.
 gmpBuildPathRules :: Rules FilePath

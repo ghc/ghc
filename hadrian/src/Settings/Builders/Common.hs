@@ -31,6 +31,7 @@ cIncludeArgs = do
     ffiIncludeDir   <- getSetting FfiIncludeDir
     libdwIncludeDir   <- getSetting FfiIncludeDir
     libPath <- expr $ stageLibPath stage
+    stagePath <- expr $ stagePath stage
     mconcat [ notStage0 ||^ package compiler ? arg "-Iincludes"
             , arg $ "-I" ++ libPath
             , arg $ "-I" ++ path
@@ -43,7 +44,9 @@ cIncludeArgs = do
             -- Add @incDirs@ in the package directory for include files shipped
             -- with the package.
             , pure [ "-I" ++ pkgPath pkg -/- dir | dir <- incDirs ]
-            , pure [ "-I" ++       unifyPath dir | dir <- depDirs ] ]
+            , pure [ "-I" ++       unifyPath dir | dir <- depDirs ]
+            , package integerGmp ? flag GmpInTree ? arg ("-I"++ stagePath -/- "gmp")
+            ]
 
 ldArgs :: Args
 ldArgs = mempty
