@@ -51,7 +51,7 @@ compilePackage rs = do
       -- When building dynamically we depend on the static rule if shared libs
       -- are supported, because it will add the -dynamic-too flag when
       -- compiling to build the dynamic files alongside the static files
-      [ root -/- "**/build/**/*.dyn_o", root -/- "**/build/**/*.dyn_hi" ]
+      [ root -/- "**/build/hs/**/*.dyn_o", root -/- "**/build/hs/**/*.dyn_hi" ]
         &%> \ [dyn_o, _dyn_hi] -> do
           p <- platformSupportsSharedLibs
           if p
@@ -59,8 +59,8 @@ compilePackage rs = do
             else compileHsObjectAndHi rs dyn_o
 
       forM_ ((,) <$> hsExts <*> wayPats) $ \ ((oExt, hiExt), wayPat) ->
-        [ root -/- "**/build/**/*." ++ wayPat ++ oExt
-        , root -/- "**/build/**/*." ++ wayPat ++ hiExt ]
+        [ root -/- "**/build/hs/**/*." ++ wayPat ++ oExt
+        , root -/- "**/build/hs/**/*." ++ wayPat ++ hiExt ]
           &%> \ [o, _hi] -> compileHsObjectAndHi rs o
   where
     hsExts = [ ("o", "hi")
