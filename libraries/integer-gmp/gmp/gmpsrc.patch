@@ -1,6 +1,6 @@
 diff -Naur gmp-6.1.2/configure gmpbuild/configure
---- gmp-6.1.2/configure	2016-12-16 10:45:32.000000000 -0500
-+++ gmpbuild/configure	2017-01-29 15:18:01.037775639 -0500
+--- gmp-6.1.2/configure	2016-12-16 16:45:32.000000000 +0100
++++ gmpbuild/configure	2020-02-07 12:55:27.853718384 +0100
 @@ -4087,8 +4087,8 @@
  #
  cclist="gcc cc"
@@ -12,17 +12,17 @@ diff -Naur gmp-6.1.2/configure gmpbuild/configure
  cc_cflags="-O"
  cc_64_cflags="-O"
  
-@@ -27273,6 +27273,9 @@
- 	  case $host in
- 	    *-*-darwin*)
+@@ -27270,6 +27270,9 @@
+ 
+           $as_echo "#define HAVE_HOST_CPU_FAMILY_x86_64 1" >>confdefs.h
  
 +echo "define(<PIC_ALWAYS>,<yes>)" >> $gmp_tmpconfigm4
 +
 +
- echo "include_mpn(\`x86_64/darwin.m4')" >> $gmp_tmpconfigm4i
-  ;;
- 	    *-*-mingw* | *-*-cygwin)
-@@ -28181,7 +28181,7 @@
+ 	  case $host in
+ 	    *-*-darwin*)
+ 
+@@ -28181,7 +28184,7 @@
  # FIXME: Upcoming version of autoconf/automake may not like broken lines.
  #        Right now automake isn't accepting the new AC_CONFIG_FILES scheme.
  
@@ -31,7 +31,7 @@ diff -Naur gmp-6.1.2/configure gmpbuild/configure
  
  cat >confcache <<\_ACEOF
  # This file is a shell script that caches the results of configure
-@@ -29325,7 +29325,6 @@
+@@ -29325,7 +29328,6 @@
      "tests/rand/Makefile") CONFIG_FILES="$CONFIG_FILES tests/rand/Makefile" ;;
      "tests/misc/Makefile") CONFIG_FILES="$CONFIG_FILES tests/misc/Makefile" ;;
      "tests/cxx/Makefile") CONFIG_FILES="$CONFIG_FILES tests/cxx/Makefile" ;;
@@ -39,9 +39,20 @@ diff -Naur gmp-6.1.2/configure gmpbuild/configure
      "tune/Makefile") CONFIG_FILES="$CONFIG_FILES tune/Makefile" ;;
      "demos/Makefile") CONFIG_FILES="$CONFIG_FILES demos/Makefile" ;;
      "demos/calc/Makefile") CONFIG_FILES="$CONFIG_FILES demos/calc/Makefile" ;;
+diff -Naur gmp-6.1.2/configure.ac gmpbuild/configure.ac
+--- gmp-6.1.2/configure.ac	2016-12-16 16:45:27.000000000 +0100
++++ gmpbuild/configure.ac	2020-02-07 12:55:27.853718384 +0100
+@@ -3696,6 +3696,7 @@
+         64|x32)
+           GMP_INCLUDE_MPN(x86_64/x86_64-defs.m4)
+           AC_DEFINE(HAVE_HOST_CPU_FAMILY_x86_64)
++	  GMP_DEFINE_RAW(["define(<PIC_ALWAYS>,<yes>)"])
+ 	  case $host in
+ 	    *-*-darwin*)
+ 	      GMP_INCLUDE_MPN(x86_64/darwin.m4) ;;
 diff -Naur gmp-6.1.2/Makefile.am gmpbuild/Makefile.am
---- gmp-6.1.2/Makefile.am	2016-12-16 10:45:27.000000000 -0500
-+++ gmpbuild/Makefile.am	2017-01-29 15:14:20.764370926 -0500
+--- gmp-6.1.2/Makefile.am	2016-12-16 16:45:27.000000000 +0100
++++ gmpbuild/Makefile.am	2020-02-07 12:55:27.853718384 +0100
 @@ -110,7 +110,7 @@
  LIBGMPXX_LT_AGE      = 5
  
@@ -52,8 +63,8 @@ diff -Naur gmp-6.1.2/Makefile.am gmpbuild/Makefile.am
  EXTRA_DIST = configfsf.guess configfsf.sub .gdbinit INSTALL.autoconf \
  	     COPYING.LESSERv3 COPYINGv2 COPYINGv3
 diff -Naur gmp-6.1.2/Makefile.in gmpbuild/Makefile.in
---- gmp-6.1.2/Makefile.in	2016-12-16 10:45:34.000000000 -0500
-+++ gmpbuild/Makefile.in	2017-01-29 15:14:32.596446554 -0500
+--- gmp-6.1.2/Makefile.in	2016-12-16 16:45:34.000000000 +0100
++++ gmpbuild/Makefile.in	2020-02-07 12:55:27.853718384 +0100
 @@ -566,7 +566,7 @@
  LIBGMPXX_LT_CURRENT = 9
  LIBGMPXX_LT_REVISION = 2
@@ -63,21 +74,9 @@ diff -Naur gmp-6.1.2/Makefile.in gmpbuild/Makefile.in
  
  # The "test -f" support for srcdir!=builddir is similar to the automake .c.o
  # etc rules, but with each foo.c explicitly, since $< is not portable
-diff -Naur gmp-6.1.2/configure.ac gmpbuild/configure.ac
---- gmp-6.1.2/configure.ac	2016-12-16 10:45:27.000000000 -0500
-+++ gmpbuild/configure.ac	2017-01-29 22:47:28.469558006 -0500
-@@ -3698,7 +3698,8 @@
-           AC_DEFINE(HAVE_HOST_CPU_FAMILY_x86_64)
- 	  case $host in
- 	    *-*-darwin*)
-+	      GMP_DEFINE_RAW(["define(<PIC_ALWAYS>,<yes>)"])
- 	      GMP_INCLUDE_MPN(x86_64/darwin.m4) ;;
- 	    *-*-mingw* | *-*-cygwin)
- 	      GMP_INCLUDE_MPN(x86_64/dos64.m4) ;;
- 	    *-openbsd*)
 diff -Naur gmp-6.1.2/mpn/asm-defs.m4 gmpbuild/mpn/asm-defs.m4
---- gmp-6.1.2/mpn/asm-defs.m4	2016-12-16 10:45:27.000000000 -0500
-+++ gmpbuild/mpn/asm-defs.m4	2017-01-29 22:46:26.025176258 -0500
+--- gmp-6.1.2/mpn/asm-defs.m4	2016-12-16 16:45:27.000000000 +0100
++++ gmpbuild/mpn/asm-defs.m4	2020-02-07 12:55:27.853718384 +0100
 @@ -1051,7 +1051,7 @@
  dnl  systems which are always PIC.  PIC_ALWAYS established in config.m4
  dnl  identifies these for us.
