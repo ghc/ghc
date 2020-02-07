@@ -67,6 +67,7 @@ stage0Packages = do
              , ghcHeap
              , ghci
              , ghcPkg
+             , haddock
              , hsc2hs
              , hpc
              , mtl
@@ -74,7 +75,8 @@ stage0Packages = do
              , templateHaskell
              , text
              , transformers
-             , unlit                         ]
+             , unlit
+             ]
           ++ [ terminfo | not windowsHost, not cross ]
           ++ [ timeout  | windowsHost                ]
           ++ [ touchy   | windowsHost                ]
