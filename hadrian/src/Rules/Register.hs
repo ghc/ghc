@@ -11,7 +11,6 @@ import Hadrian.Expression
 import Hadrian.Haskell.Cabal
 import Oracles.Setting
 import Packages
-import Rules.Gmp
 import Rules.Rts
 import {-# SOURCE #-} Rules.Library (needLibrary)
 import Settings
@@ -40,6 +39,9 @@ configurePackageRules = do
         (stage, path) <- parsePath (parseSetupConfig root) "<setup config path parser>" out
         let pkg = unsafeFindPackageByPath path
         let ctx = Context stage pkg vanilla
+        buildP <- buildPath ctx
+        when (pkg == integerGmp) $
+          need [buildP -/- "include/ghc-gmp.h"]
         needLibrary =<< contextDependencies ctx
         Cabal.configurePackage ctx
 
@@ -127,7 +129,9 @@ buildConf _ context@Context {..} conf = do
              , path -/- "ghcplatform.h"
              , path -/- "ghcversion.h" ]
 
-    when (package == integerGmp) $ need [path -/- gmpLibraryH]
+    -- we need to generate this file for GMP
+    when (package == integerGmp) $
+        need [path -/- "include/ghc-gmp.h"]
 
     -- Copy and register the package.
     Cabal.copyPackage context

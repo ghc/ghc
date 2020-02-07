@@ -10,7 +10,8 @@ import CommandLine
 makeBuilderArgs :: Args
 makeBuilderArgs = do
     threads    <- shakeThreads <$> expr getShakeOptions
-    gmpPath    <- expr gmpBuildPath
+    stage      <- getStage
+    gmpPath    <- expr (gmpBuildPath stage)
     libffiPaths <- forM [Stage1 ..] $ \s -> expr (libffiBuildPath s)
     let t = show $ max 4 (threads - 2) -- Don't use all Shake's threads
     mconcat $
