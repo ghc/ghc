@@ -15,7 +15,6 @@ import Oracles.Flag
 import Oracles.ModuleFiles
 import Oracles.Setting
 import Packages
-import Rules.Gmp
 import Rules.Libffi
 import Settings
 import Settings.Builders.DeriveConstants (deriveConstantsPairs)
@@ -53,11 +52,11 @@ compilerDependencies = do
     stage   <- getStage
     isGmp   <- (== integerGmp) <$> getIntegerPackage
     ghcPath <- expr $ buildPath (vanillaContext stage compiler)
-    gmpPath <- expr gmpBuildPath
+    gmpPath <- expr $ buildPath (vanillaContext stage integerGmp)
     rtsPath <- expr (rtsBuildPath stage)
     libDir <- expr $ stageLibPath stage
     mconcat [ return $ (libDir -/-) <$> derivedConstantsFiles
-            , notStage0 ? isGmp ? return [gmpPath -/- gmpLibraryH]
+            , notStage0 ? isGmp ? return [gmpPath -/- "include/ghc-gmp.h"]
             , notStage0 ? return ((rtsPath -/-) <$> libffiHeaderFiles)
             , return $ fmap (ghcPath -/-)
                   [ "primop-can-fail.hs-incl"

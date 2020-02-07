@@ -1,129 +1,158 @@
-module Rules.Gmp (gmpRules, gmpBuildPath, gmpObjects, gmpLibraryH) where
+module Rules.Gmp (gmpRules, gmpBuildPath, gmpObjects) where
 
 import Base
 import Context
 import Oracles.Setting
+import Oracles.Flag
 import Packages
 import Target
 import Utilities
+import Hadrian.BuildPath
 
 -- | Build GMP library objects and return their paths.
-gmpObjects :: Action [FilePath]
-gmpObjects = do
-    gmpPath <- gmpBuildPath
-    need [gmpPath -/- gmpLibraryH]
-    -- The line below causes a Shake Lint failure on Windows, which forced us to
-    -- disable Lint by default. See more details here:
-    -- https://gitlab.haskell.org/ghc/ghc/issues/15971.
-    map (unifyPath . (gmpPath -/-)) <$>
-        liftIO (getDirectoryFilesIO gmpPath [gmpObjectsDir -/- "*.o"])
+gmpObjects :: Stage -> Action [FilePath]
+gmpObjects s = do
+  isInTree <- flag GmpInTree
+  if not isInTree
+    then return []
+    else do
+      -- Indirectly ensure object creation
+      let ctx = vanillaContext s integerGmp
+      integerGmpPath <- buildPath ctx
+      need [integerGmpPath -/- "include/ghc-gmp.h"]
+
+      -- The line below causes a Shake Lint failure on Windows, which forced
+      -- us to disable Lint by default. See more details here:
+      -- https://gitlab.haskell.org/ghc/ghc/issues/15971.
+      gmpPath <- gmpIntreePath s
+      map (unifyPath . (gmpPath -/-)) <$>
+          liftIO (getDirectoryFilesIO gmpPath [gmpObjectsDir -/- "*.o"])
 
 gmpBase :: FilePath
 gmpBase = pkgPath integerGmp -/- "gmp"
-
-gmpLibraryInTreeH :: FilePath
-gmpLibraryInTreeH = "include/gmp.h"
-
-gmpLibrary :: FilePath
-gmpLibrary = ".libs/libgmp.a"
 
 -- | GMP is considered a Stage1 package. This determines GMP build directory.
 gmpContext :: Context
 gmpContext = vanillaContext Stage1 integerGmp
 
--- TODO: Location of 'gmpBuildPath' is important: it should be outside any
--- package build directory, as otherwise GMP's object files will match build
--- patterns of 'compilePackage' rules. We could make 'compilePackage' rules
--- more precise to avoid such spurious matching.
 -- | Build directory for in-tree GMP library.
-gmpBuildPath :: Action FilePath
-gmpBuildPath = buildRoot <&> (-/- stageString (stage gmpContext) -/- "gmp")
+gmpBuildPath :: Stage -> Action FilePath
+gmpBuildPath s = gmpIntreePath s <&> (-/- "gmpbuild")
 
--- | Like 'gmpBuildPath' but in the 'Rules' monad.
-gmpBuildPathRules :: Rules FilePath
-gmpBuildPathRules = buildRootRules <&> (-/- stageString (stage gmpContext) -/- "gmp")
+gmpIntreePath :: Stage -> Action FilePath
+gmpIntreePath s = buildRoot <&> (-/- stageString s -/- "gmp")
 
--- | GMP library header, relative to 'gmpBuildPath'.
-gmpLibraryH :: FilePath
-gmpLibraryH = "include/ghc-gmp.h"
-
--- | Directory for GMP library object files, relative to 'gmpBuildPath'.
+-- | Directory for GMP library object files, relative to 'gmpIntreePath'.
 gmpObjectsDir :: FilePath
 gmpObjectsDir = "objs"
 
-configureEnvironment :: Action [CmdOption]
-configureEnvironment = sequence [ builderEnvironment "CC" $ Cc CompileC Stage1
-                                , builderEnvironment "AR" (Ar Unpack Stage1)
-                                , builderEnvironment "NM" Nm ]
+configureEnvironment :: Stage -> Action [CmdOption]
+configureEnvironment s = sequence [ builderEnvironment "CC" $ Cc CompileC s
+                                  , builderEnvironment "AR" (Ar Unpack s)
+                                  , builderEnvironment "NM" Nm ]
 
 gmpRules :: Rules ()
 gmpRules = do
-    -- Copy appropriate GMP header and object files
-    gmpPath <- gmpBuildPathRules
-    gmpPath -/- gmpLibraryH %> \header -> do
-        configMk <- readFile' =<< (buildPath gmpContext <&> (-/- "config.mk"))
-        if not windowsHost && -- TODO: We don't use system GMP on Windows. Fix?
-           any (`isInfixOf` configMk) [ "HaveFrameworkGMP = YES", "HaveLibGmp = YES" ]
+    root <- buildRootRules
+
+    -- Build in-tree gmp if necessary
+    -- Produce: integer-gmp/build/include/ghc-gmp.h
+    --   In-tree: copy gmp.h from in-tree build
+    --   External: copy ghc-gmp.h from base sources
+    root -/- "stage*/libraries/integer-gmp/build/include/ghc-gmp.h" %> \header -> do
+        let includeP   = takeDirectory header
+            buildP     = takeDirectory includeP
+            packageP   = takeDirectory buildP
+            librariesP = takeDirectory packageP
+            stageP     = takeDirectory librariesP
+
+        isInTree <- flag GmpInTree
+
+        if windowsHost || isInTree  -- TODO: We don't use system GMP on Windows. Fix?
         then do
+            putBuild "| No GMP library/framework detected; in tree GMP will be built"
+            let intreeHeader = stageP -/- "gmp/gmp.h"
+            need [intreeHeader]
+            copyFile intreeHeader header
+        else do
             putBuild "| GMP library/framework detected and will be used"
             copyFile (gmpBase -/- "ghc-gmp.h") header
-        else do
-            putBuild "| No GMP library/framework detected; in tree GMP will be built"
-            need [gmpPath -/- gmpLibrary]
-            createDirectory (gmpPath -/- gmpObjectsDir)
+
+    -- Build in-tree GMP library for the current stage, prioritised so that it
+    -- matches "before" the generic @.a@ library rule in 'Rules.Library'.
+    priority 2.0 $ do
+
+        let
+          -- parse a path of the form "//stage*/gmp/xxx" and returns a vanilla
+          -- context from it for integer-gmp package.
+          makeGmpPathContext gmpP = do
+               let
+                   stageP   = takeDirectory gmpP
+                   stageS   = takeFileName stageP
+               stage <- parsePath parseStage "<stage>" stageS
+               pure (vanillaContext stage integerGmp)
+
+          gmpPath = root -/- "stage*/gmp"
+
+        -- Build in-tree gmp. Produce:
+        --  - <root>/stageN/gmp/gmp.h
+        --  - <root>/stageN/gmp/libgmp.a
+        --  - <root>/stageN/gmp/objs/*.o (unpacked objects from libgmp.a)
+        [gmpPath -/- "libgmp.a", gmpPath -/- "gmp.h"] &%> \[lib,header] -> do
+            let gmpP = takeDirectory lib
+            ctx <- makeGmpPathContext gmpP
+            -- build libgmp.a via gmp's Makefile
+            build $ target ctx (Make (gmpP -/- "gmpbuild")) [gmpP -/- "gmpbuild/Makefile"] []
+            -- copy header and lib to their final destination
+            copyFileUntracked (gmpP -/- "gmpbuild/.libs/libgmp.a") lib
+            copyFileUntracked (gmpP -/- "gmpbuild/gmp.h")          header
+            -- we also unpack objects from libgmp.a into "objs" directory
+            createDirectory (gmpP -/- gmpObjectsDir)
             top <- topDirectory
-            build $ target gmpContext (Ar Unpack Stage1)
-                [top -/- gmpPath -/- gmpLibrary] [gmpPath -/- gmpObjectsDir]
-            objs <- liftIO $ getDirectoryFilesIO "." [gmpPath -/- gmpObjectsDir -/- "*"]
+            build $ target ctx (Ar Unpack (stage ctx))
+                [top -/- gmpP -/- "libgmp.a"] [gmpP -/- gmpObjectsDir]
+            objs <- liftIO $ getDirectoryFilesIO "." [gmpP -/- gmpObjectsDir -/- "*"]
             produces objs
-            copyFileUntracked (gmpPath -/- "gmp.h") header
+            putSuccess "| Successfully built custom library 'gmp'"
 
-    -- Build in-tree GMP library, prioritised so that it matches "before"
-    -- the generic @.a@ library rule in 'Rules.Library'.
-    priority 2.0 $ gmpPath -/- gmpLibrary %> \lib -> do
-        build $ target gmpContext (Make gmpPath) [gmpPath -/- "Makefile"] [lib]
-        putSuccess "| Successfully built custom library 'gmp'"
+        -- Run GMP's configure script. Produce:
+        --  - <root>/stageN/gmp/gmpbuild/Makefile
+        gmpPath -/- "gmpbuild/Makefile" %> \mk -> do
+            let gmpBuildP = takeDirectory mk
+                gmpP      = takeDirectory gmpBuildP
+            ctx <- makeGmpPathContext gmpP
+            env <- configureEnvironment (stage ctx)
+            need [mk <.> "in"]
+            buildWithCmdOptions env $
+                target gmpContext (Configure gmpBuildP) [mk <.> "in"] [mk]
 
-    gmpPath -/- gmpLibraryInTreeH %> copyFile (gmpPath -/- gmpLibraryH)
+        -- Extract in-tree GMP sources and apply patches. Produce
+        --  - <root>/stageN/gmp/gmpbuild/Makefile.in
+        --  - <root>/stageN/gmp/gmpbuild/configure
+        [gmpPath -/- "gmpbuild/Makefile.in", gmpPath -/- "gmpbuild/configure"] &%> \[mkIn,_] -> do
+            top <- topDirectory
+            let destPath = takeDirectory mkIn
+            removeDirectory destPath
+            -- Note: We use a tarball like gmp-4.2.4-nodoc.tar.bz2, which is
+            -- gmp-4.2.4.tar.bz2 repacked without the doc/ directory contents.
+            -- That's because the doc/ directory contents are under the GFDL,
+            -- which causes problems for Debian.
+            tarball <- unifyPath . fromSingleton "Exactly one GMP tarball is expected"
+                   <$> getDirectoryFiles top [gmpBase -/- "gmp-tarballs/gmp*.tar.bz2"]
 
-    root <- buildRootRules
-    root -/- buildDir gmpContext -/- gmpLibraryH %>
-        copyFile (gmpPath -/- gmpLibraryH)
+            withTempDir $ \dir -> do
+                let tmp = unifyPath dir
+                need [top -/- tarball]
+                build $ target gmpContext (Tar Extract) [top -/- tarball] [tmp]
 
-    -- This file is created when 'integerGmp' is configured.
-    gmpPath -/- "config.mk" %> \_ -> ensureConfigured gmpContext
+                let patch     = gmpBase -/- "gmpsrc.patch"
+                    patchName = takeFileName patch
+                copyFile patch $ tmp -/- patchName
+                applyPatch tmp patchName
 
-    -- Run GMP's configure script
-    gmpPath -/- "Makefile" %> \mk -> do
-        env <- configureEnvironment
-        need [mk <.> "in"]
-        buildWithCmdOptions env $
-            target gmpContext (Configure gmpPath) [mk <.> "in"] [mk]
+                let name    = dropExtension . dropExtension $ takeFileName tarball
+                    unpack  = fromMaybe . error $ "gmpRules: expected suffix "
+                        ++ "-nodoc (found: " ++ name ++ ")."
+                    libName = unpack $ stripSuffix "-nodoc" name
 
-    -- Extract in-tree GMP sources and apply patches
-    fmap (gmpPath -/-) ["Makefile.in", "configure"] &%> \_ -> do
-        top <- topDirectory
-        removeDirectory gmpPath
-        -- Note: We use a tarball like gmp-4.2.4-nodoc.tar.bz2, which is
-        -- gmp-4.2.4.tar.bz2 repacked without the doc/ directory contents.
-        -- That's because the doc/ directory contents are under the GFDL,
-        -- which causes problems for Debian.
-        tarball <- unifyPath . fromSingleton "Exactly one GMP tarball is expected"
-               <$> getDirectoryFiles top [gmpBase -/- "gmp-tarballs/gmp*.tar.bz2"]
-
-        withTempDir $ \dir -> do
-            let tmp = unifyPath dir
-            need [top -/- tarball]
-            build $ target gmpContext (Tar Extract) [top -/- tarball] [tmp]
-
-            let patch     = gmpBase -/- "gmpsrc.patch"
-                patchName = takeFileName patch
-            copyFile patch $ tmp -/- patchName
-            applyPatch tmp patchName
-
-            let name    = dropExtension . dropExtension $ takeFileName tarball
-                unpack  = fromMaybe . error $ "gmpRules: expected suffix "
-                    ++ "-nodoc (found: " ++ name ++ ")."
-                libName = unpack $ stripSuffix "-nodoc" name
-
-            moveDirectory (tmp -/- libName) gmpPath
+                moveDirectory (tmp -/- libName) destPath
