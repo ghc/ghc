@@ -409,7 +409,7 @@ coreToStgExpr e0@(Case scrut bndr _ alts) = do
     alts2 <- extendVarEnvCts [(bndr, LambdaBound)] (mapM vars_alt alts)
     scrut2 <- coreToStgExpr scrut
     let stg = StgCase scrut2 bndr (mkStgAltType bndr alts) alts2
-    -- See Note [unsafeCoerce magic] in Unsafe.Coerce
+    -- See (U2) in Note [Implementing unsafeCoerce] in base:Unsafe.Coerce
     case scrut2 of
       StgApp id [] | idName id == unsafeEqualityProofName ->
         case alts2 of

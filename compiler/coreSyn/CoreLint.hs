@@ -712,7 +712,10 @@ We ordinarily want to check for bad levity polymorphism. See
 Note [Levity polymorphism invariants] in CoreSyn. However, we do *not*
 want to do this in a compulsory unfolding. Compulsory unfoldings arise
 only internally, for things like newtype wrappers, dictionaries, and
-(notably) unsafeCoerce#. These might legitimately be levity-polymorphic.
+(notably) unsafeCoerce#. These might legitimately be levity-polymorphic;
+indeed levity-polyorphic unfoldings are a primary reason for the
+very existence of compulsory unfoldings (we can't compile code for
+the original, levity-poly, binding).
 
 It is vitally important that we do levity-polymorphism checks *after*
 performing the unfolding, but not beforehand. This is all safe because
