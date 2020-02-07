@@ -184,6 +184,13 @@ module DynFlags (
         canonicalizeHomeModule,
         canonicalizeModuleIfHome,
 
+        TurnOnFlag,
+        turnOn,
+        turnOff,
+        impliedGFlags,
+        impliedOffGFlags,
+        impliedXFlags,
+
         -- ** Parsing DynFlags
         parseDynamicFlagsCmdLine,
         parseDynamicFilePragma,
