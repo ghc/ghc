@@ -512,7 +512,7 @@ For that we replace any forall'ed `c :: Coercible a b` value in a RULE by
 corresponding `co :: a ~#R b` and wrap the LHS and the RHS in
 `let c = MkCoercible co in ...`. This is later simplified to the desired form
 by simpleOptExpr (for the LHS) resp. the simplifiers (for the RHS).
-See also Note [Getting the map/coerce RULE to work] in CoreSubst.
+See also Note [Getting the map/coerce RULE to work] in CoreOpt.
 
 Note [Rules and inlining/other rules]
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
@@ -561,20 +561,29 @@ Note [Patching magic definitions]
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 We sometimes need to have access to defined Ids in pure contexts. Usually, we
 simply "wire in" these entities, as we do for types in TysWiredIn and for Ids
-in MkId. However, it is sometimes *much* easier to define entities in Haskell,
-even if we need pure access; note that wiring-in an Id requires all entities
-used in its definition *also* to be wired in, transitively and recursively.
-This can be a pain.
+in MkId. See Note [Wired-in Ids] in MkId.
 
-The little trick documented here allows us to have the best of both worlds.
+However, it is sometimes *much* easier to define entities in Haskell,
+even if we need pure access; note that wiring-in an Id requires all
+entities used in its definition *also* to be wired in, transitively
+and recursively.  This can be a huge pain.  The little trick
+documented here allows us to have the best of both worlds.
 
 Motivating example: unsafeCoerce#. See [Wiring in unsafeCoerce#] for the
 details.
 
-The trick is to define the known-key Id normally and then magically update its
-definition here in the desugarer, in patchMagicDefns. This update can be done
-with full access to the DsM monad, and hence, dsLookupGlobal. We thus do not
-have to wire in all the entities used internally, a potentially big win.
+The trick is to
+
+* Define the known-key Id in a library module, with a stub definition,
+     unsafeCoerce# :: ..a suitable type signature..
+     unsafeCoerce# = error "urk"
+
+* Magically over-write its RHS here in the desugarer, in
+  patchMagicDefns.  This update can be done with full access to the
+  DsM monad, and hence, dsLookupGlobal. We thus do not have to wire in
+  all the entities used internally, a potentially big win.
+
+  This step should not change the Name or type of the Id.
 
 Because an Id stores its unfolding directly (as opposed to in the second
 component of a (Id, CoreExpr) pair), the patchMagicDefns function returns
@@ -663,8 +672,11 @@ patchMagicDefn :: (Id, CoreExpr) -> DsM (Id, CoreExpr)
 patchMagicDefn orig_pair@(orig_id, orig_rhs)
   | Just mk_magic_pair <- lookupNameEnv magicDefnsEnv (getName orig_id)
   = do { magic_pair@(magic_id, _) <- mk_magic_pair orig_id orig_rhs
+
+       -- Patching should not change the Name or the type of the Id
        ; MASSERT( getUnique magic_id == getUnique orig_id )
        ; MASSERT( varType magic_id `eqType` varType orig_id )
+
        ; return magic_pair }
   | otherwise
   = return orig_pair
@@ -681,6 +693,7 @@ magicDefnModules :: ModuleSet
 magicDefnModules = mkModuleSet $ map (nameModule . getName . fst) magicDefns
 
 mkUnsafeCoercePrimPair :: Id -> CoreExpr -> DsM (Id, CoreExpr)
+-- See Note [Wiring in unsafeCoerce#] for the defn we are creating here
 mkUnsafeCoercePrimPair _old_id old_expr
   = do { unsafe_equality_proof_id <- dsLookupGlobalId unsafeEqualityProofName
        ; unsafe_equality_tc       <- dsLookupTyCon unsafeEqualityTyConName
@@ -734,10 +747,11 @@ mkUnsafeCoercePrimPair _old_id old_expr
              info = noCafIdInfo `setInlinePragInfo` alwaysInlinePragma
                                 `setUnfoldingInfo` mkCompulsoryUnfolding rhs
 
+             ty = mkSpecForAllTys [ runtimeRep1TyVar, runtimeRep2TyVar
+                                  , openAlphaTyVar, openBetaTyVar ] $
+                  mkVisFunTy openAlphaTy openBetaTy
+
              id   = mkExportedVanillaId unsafeCoercePrimName ty `setIdInfo` info
        ; return (id, old_expr) }
 
   where
-    ty = mkSpecForAllTys [ runtimeRep1TyVar, runtimeRep2TyVar
-                         , openAlphaTyVar, openBetaTyVar ] $
-         mkVisFunTy openAlphaTy openBetaTy
