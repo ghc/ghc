@@ -5,10 +5,10 @@
 
 {-# LANGUAGE Unsafe, NoImplicitPrelude, MagicHash, GADTs, TypeApplications,
              ScopedTypeVariables, TypeOperators, KindSignatures, PolyKinds,
-             StandaloneKindSignatures #-}
+             StandaloneKindSignatures, DataKinds #-}
 
 module Unsafe.Coerce
-  ( unsafeCoerce
+  ( unsafeCoerce, unsafeCoerceUnlifted, unsafeCoerceAddr
   , unsafeEqualityProof
   , UnsafeEquality (..)
   , unsafeCoerce#
@@ -19,7 +19,7 @@ import GHC.Base
 import GHC.Integer () -- See Note [Depend on GHC.Integer] in GHC.Base
 import GHC.Natural () -- See Note [Depend on GHC.Natural] in GHC.Base
 
-import GHC.Types  ( TYPE )
+import GHC.Types
 
 {- Note [Implementing unsafeCoerce]
 
@@ -272,6 +272,14 @@ unsafeEqualityProof = case unsafeEqualityProof @a @b of UnsafeRefl -> UnsafeRefl
 --      into perpetuity.
 unsafeCoerce :: forall (a :: Type) (b :: Type) . a -> b
 unsafeCoerce x = case unsafeEqualityProof @a @b of UnsafeRefl -> x
+
+unsafeCoerceUnlifted :: forall (a :: TYPE 'UnliftedRep) (b :: TYPE 'UnliftedRep) . a -> b
+-- Kind-homogeneous, but levity monomorphic (TYPE UnliftedRep)
+unsafeCoerceUnlifted x = case unsafeEqualityProof @a @b of UnsafeRefl -> x
+
+unsafeCoerceAddr :: forall (a :: TYPE 'AddrRep) (b :: TYPE 'AddrRep) . a -> b
+-- Kind-homogeneous, but levity monomorphic (TYPE AddrRep)
+unsafeCoerceAddr x = case unsafeEqualityProof @a @b of UnsafeRefl -> x
 
 -- | Highly, terribly dangerous coercion from one representation type
 -- to another. Misuse of this function can invite the garbage collector
