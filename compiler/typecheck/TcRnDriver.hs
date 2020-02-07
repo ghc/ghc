@@ -2290,22 +2290,29 @@ tcGhciStmts stmts
       ; const_binds <- checkNoErrs (simplifyInteractive lie)
                 -- checkNoErrs ensures that the plan fails if context redn fails
 
+
       ; traceTc "TcRnDriver.tcGhciStmts: done" empty
+
+      -- rec_expr is the expression
+      --      returnIO @ [()] [unsafeCoerce# () x, ..,  unsafeCorece# () z]
+      --
+      -- Despite the inconvenience of building the type applications etc,
+      -- this *has* to be done in type-annotated post-typecheck form
+      -- because we are going to return a list of *polymorphic* values
+      -- coerced to type (). If we built a *source* stmt
+      --      return [coerce x, ..., coerce z]
+      -- then the type checker would instantiate x..z, and we wouldn't
+      -- get their *polymorphic* values.  (And we'd get ambiguity errs
+      -- if they were overloaded, since they aren't applied to anything.)
+
       ; AnId unsafe_coerce_id <- tcLookupGlobal unsafeCoercePrimName
-      ; let     -- mk_return builds the expression
-                --      returnIO @ [()] [coerce () x, ..,  coerce () z]
-                --
-                -- Despite the inconvenience of building the type applications etc,
-                -- this *has* to be done in type-annotated post-typecheck form
-                -- because we are going to return a list of *polymorphic* values
-                -- coerced to type (). If we built a *source* stmt
-                --      return [coerce x, ..., coerce z]
-                -- then the type checker would instantiate x..z, and we wouldn't
-                -- get their *polymorphic* values.  (And we'd get ambiguity errs
-                -- if they were overloaded, since they aren't applied to anything.)
-            ret_expr = nlHsApp (nlHsTyApp ret_id [ret_ty])
-                       (noLoc $ ExplicitList unitTy Nothing
-                                                            (map mk_item ids))
+           -- We use unsafeCoerce# here because of (U11) in
+           -- Note [Implementing unsafeCoerce] in base:Unsafe.Coerce
+
+      ; let ret_expr = nlHsApp (nlHsTyApp ret_id [ret_ty]) $
+                       noLoc $ ExplicitList unitTy Nothing $
+                       map mk_item ids
+
             mk_item id = unsafe_coerce_id `nlHsTyApp` [ getRuntimeRep (idType id)
                                                       , getRuntimeRep unitTy
                                                       , idType id, unitTy]

@@ -1013,6 +1013,8 @@ cpExprIsTrivial e
   = exprIsTrivial e
 
 isUnsafeEqualityProof :: CoreExpr -> Bool
+-- See (U3) and (U4) in
+-- Note [Implementing unsafeCoerce] in base:Unsafe.Coerce
 isUnsafeEqualityProof e
   | Var v `App` Type _ `App` Type _ `App` Type _ <- e
   = idName v == unsafeEqualityProofName
