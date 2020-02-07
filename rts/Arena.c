@@ -82,7 +82,7 @@ arenaAlloc( Arena *arena, size_t size )
         // allocate a fresh block...
         req_blocks =  (W_)BLOCK_ROUND_UP(size) / BLOCK_SIZE;
         bd = allocGroup_lock(req_blocks);
-        arena_blocks += req_blocks;
+        arena_blocks += bd->blocks;
 
         bd->gen_no  = 0;
         bd->gen     = NULL;
