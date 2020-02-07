@@ -1,6 +1,7 @@
 import os
 import subprocess
 import shutil
+import tempfile
 from pathlib import Path, PurePath
 from term_color import Color, colored
 
@@ -82,7 +83,28 @@ def testing_metrics():
 #
 # We define the following function to make this magic more
 # explicit/discoverable. You are encouraged to use it instead of os.symlink.
-if os.name == 'nt' and os.getenv('FORCE_SYMLINKS') == None:
+def symlinks_work() -> bool:
+    if os.getenv('FORCE_SYMLINKS') is not None:
+        return True
+    elif os.name == 'nt':
+        # On Windows we try to create a symlink to test whether symlinks are
+        # usable.
+        works = False
+        with tempfile.NamedTemporaryFile() as tmp:
+            try:
+                tmp.write('hello')
+                os.symlink(tmp.name, '__symlink-test')
+                works = True
+            except OSError as e:
+                print('Saw {} during symlink test; assuming symlinks do not work.'.format(e))
+            finally:
+                os.unlink('__symlink-test')
+
+        return works
+    else:
+        return True
+
+if not symlinks_work():
     def link_or_copy_file(src: Path, dst: Path):
         shutil.copyfile(str(src), str(dst))
 else:
