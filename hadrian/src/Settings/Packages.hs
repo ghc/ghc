@@ -156,6 +156,7 @@ packageArgs = do
           , case bignum of
                "gmp" -> mconcat
                   [ builder Cc ? arg includeGmp
+                  , builder (Ghc CompileCWithGhc) ? arg includeGmp
                   , builder (Cabal Setup) ? mconcat
                      [ arg "--configure-option=--with-gmp"
                      , flag GmpInTree ?  arg "--configure-option=--with-intree-gmp"
