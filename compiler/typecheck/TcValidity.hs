@@ -2712,7 +2712,7 @@ datatype declarations.  This checks for
 
 See also
   * Note [Required, Specified, and Inferred for types] in TcTyClsDecls.
-  * Note [Keeping scoped variables in order: Explicit] discusses how
+  * Note [Checking telescopes] in Constraint discusses how
     this check works for `forall x y z.` written in a type.
 
 Note [Ambiguous kind vars]
