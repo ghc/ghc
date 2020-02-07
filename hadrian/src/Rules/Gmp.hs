@@ -77,14 +77,13 @@ gmpRules = do
             objs <- liftIO $ getDirectoryFilesIO "." [gmpPath -/- gmpObjectsDir -/- "*"]
             produces objs
             copyFileUntracked (gmpPath -/- "gmp.h") header
+            copyFileUntracked (gmpPath -/- "gmp.h") (gmpPath -/- gmpLibraryInTreeH)
 
     -- Build in-tree GMP library, prioritised so that it matches "before"
     -- the generic @.a@ library rule in 'Rules.Library'.
     priority 2.0 $ gmpPath -/- gmpLibrary %> \lib -> do
         build $ target gmpContext (Make gmpPath) [gmpPath -/- "Makefile"] [lib]
         putSuccess "| Successfully built custom library 'gmp'"
-
-    gmpPath -/- gmpLibraryInTreeH %> copyFile (gmpPath -/- gmpLibraryH)
 
     root <- buildRootRules
     root -/- buildDir gmpContext -/- gmpLibraryH %>
