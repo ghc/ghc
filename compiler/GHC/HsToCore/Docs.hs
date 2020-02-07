@@ -117,7 +117,9 @@ user-written. This lets us relate Names (from ClsInsts) to comments
 (associated with InstDecls and DerivDecls).
 -}
 
-getMainDeclBinder :: (CollectPass (GhcPass p))
+getMainDeclBinder :: ( CollectPass (GhcPass p)
+                     , XRec (GhcPass p) (IdP (GhcPass p)) ~ Located (IdP (GhcPass p))
+                     )
                   => HsDecl (GhcPass p)
                   -> [IdP (GhcPass p)]
 getMainDeclBinder (TyClD _ d) = [tcdName d]
@@ -130,7 +132,9 @@ getMainDeclBinder (ForD _ (ForeignImport _ name _ _)) = [unLoc name]
 getMainDeclBinder (ForD _ (ForeignExport _ _ _ _)) = []
 getMainDeclBinder _ = []
 
-sigNameNoLoc :: Sig pass -> [IdP pass]
+
+sigNameNoLoc :: ( XRec pass (IdP pass) ~ Located (IdP pass)
+                ) => Sig pass -> [IdP pass]
 sigNameNoLoc (TypeSig    _   ns _)         = map unLoc ns
 sigNameNoLoc (ClassOpSig _ _ ns _)         = map unLoc ns
 sigNameNoLoc (PatSynSig  _   ns _)         = map unLoc ns
@@ -333,7 +337,9 @@ filterDecls = filter (isHandled . unLoc . fst)
 
 
 -- | Go through all class declarations and filter their sub-declarations
-filterClasses :: XRec p (HsDecl p) ~ Located (HsDecl p) =>
+filterClasses :: ( XRec p (HsDecl p) ~ Located (HsDecl p)
+                 , XRec p (Sig p) ~ Located (Sig p)
+                 ) =>
                  [(LHsDecl p, doc)] -> [(LHsDecl p, doc)]
 filterClasses = map (first (mapLoc filterClass))
   where

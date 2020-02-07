@@ -385,7 +385,9 @@ rnImportDecl this_mod
     warnUnqualifiedImport decl iface
 
     let new_imp_decl = L loc (decl { ideclExt = noExtField, ideclSafe = mod_safe'
-                                   , ideclHiding = new_imp_details })
+                                   , ideclHiding = new_imp_details
+                                   , ideclName = ideclName decl
+                                   , ideclAs = ideclAs decl })
 
     return (new_imp_decl, gbl_env, imports, mi_hpc iface)
 

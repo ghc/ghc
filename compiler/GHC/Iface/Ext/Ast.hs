@@ -1210,7 +1210,7 @@ instance ( ToHie (Located body)
         HieTc -> makeNode stmt span
         HieRn -> makeNode stmt span
 
-instance HiePass p => ToHie (RScoped (LHsLocalBinds (GhcPass p))) where
+instance HiePass p => ToHie (RScoped (Located (HsLocalBinds (GhcPass p)))) where
   toHie (RS scope (L sp binds)) = concatM $ makeNode binds sp : case binds of
       EmptyLocalBinds _ -> []
       HsIPBinds _ ipbinds -> case ipbinds of
@@ -1581,7 +1581,7 @@ instance ToHie (StandaloneKindSig GhcRn) where
       , toHie $ TS (ResolvedScopes []) typ
       ]
 
-instance HiePass p => ToHie (SigContext (LSig (GhcPass p))) where
+instance HiePass p => ToHie (SigContext (Located (Sig (GhcPass p)))) where
   toHie (SC (SI styp msp) (L sp sig)) =
     case hiePass @p of
       HieTc -> pure []
@@ -1863,7 +1863,7 @@ instance ToHie (Located (DerivDecl GhcRn)) where
         , toHie overlap
         ]
 
-instance ToHie (LFixitySig GhcRn) where
+instance ToHie (Located (FixitySig GhcRn)) where
   toHie (L span sig) = concatM $ makeNode sig span : case sig of
       FixitySig _ vars _ ->
         [ toHie $ map (C Use) vars

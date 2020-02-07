@@ -239,7 +239,7 @@ is Less Cool because
 -- | A Haskell expression.
 data HsExpr p
   = HsVar     (XVar p)
-              (Located (IdP p)) -- ^ Variable
+              (XRec p (IdP p)) -- ^ Variable
 
                              -- See Note [Located RdrNames]
 
@@ -416,7 +416,7 @@ data HsExpr p
                 (HsStmtContext GhcRn)    -- The parameterisation is unimportant
                                          -- because in this context we never use
                                          -- the PatGuard or ParStmt variant
-                (Located [ExprLStmt p]) -- "do":one or more stmts
+                (XRec p [ExprLStmt p]) -- "do":one or more stmts
 
   -- | Syntactic list: [a,b,c,...]
   --
@@ -439,7 +439,7 @@ data HsExpr p
   -- For details on above see note [Api annotations] in GHC.Parser.Annotation
   | RecordCon
       { rcon_ext      :: XRecordCon p
-      , rcon_con_name :: Located (IdP p)    -- The constructor name;
+      , rcon_con_name :: XRec p (IdP p)    -- The constructor name;
                                             --  not used after type checking
       , rcon_flds     :: HsRecordBinds p }  -- The fields
 
@@ -745,7 +745,6 @@ type instance XXTupArg         (GhcPass _) = NoExtCon
 tupArgPresent :: LHsTupArg (GhcPass p) -> Bool
 tupArgPresent (L _ (Present {})) = True
 tupArgPresent (L _ (Missing {})) = False
-tupArgPresent (L _ (XTupArg {})) = False
 
 {-
 Note [Parens in HsSyn]
@@ -1361,7 +1360,7 @@ data HsCmd id
     -- For details on above see note [Api annotations] in GHC.Parser.Annotation
 
   | HsCmdDo     (XCmdDo id)                     -- Type of the whole expression
-                (Located [CmdLStmt id])
+                (XRec id [CmdLStmt id])
     -- ^ - 'ApiAnnotation.AnnKeywordId' : 'ApiAnnotation.AnnDo',
     --             'ApiAnnotation.AnnOpen', 'ApiAnnotation.AnnSemi',
     --             'ApiAnnotation.AnnVbar',
@@ -1564,7 +1563,7 @@ patterns in each equation.
 
 data MatchGroup p body
   = MG { mg_ext     :: XMG p body -- Post-typechecker, types of args and result
-       , mg_alts    :: Located [LMatch p body]  -- The alternatives
+       , mg_alts    :: XRec p [LMatch p body]  -- The alternatives
        , mg_origin  :: Origin }
      -- The type is the type of the entire group
      --      t1 -> ... -> tn -> tr
@@ -1648,9 +1647,8 @@ isInfixMatch match = case m_ctxt match of
   FunRhs {mc_fixity = Infix} -> True
   _                          -> False
 
-isEmptyMatchGroup :: MatchGroup id body -> Bool
+isEmptyMatchGroup :: MatchGroup (GhcPass p) body -> Bool
 isEmptyMatchGroup (MG { mg_alts = ms }) = null $ unLoc ms
-isEmptyMatchGroup (XMatchGroup {})      = False
 
 -- | Is there only one RHS in this list of matches?
 isSingletonMatchGroup :: [LMatch (GhcPass p) body] -> Bool
@@ -2245,7 +2243,6 @@ instance (Outputable (StmtLR (GhcPass idL) (GhcPass idL) (LHsExpr (GhcPass idL))
           Outputable (XXParStmtBlock (GhcPass idL) (GhcPass idR)))
         => Outputable (ParStmtBlock (GhcPass idL) (GhcPass idR)) where
   ppr (ParStmtBlock _ stmts _ _) = interpp'SP stmts
-  ppr (XParStmtBlock x)          = ppr x
 
 instance (OutputableBndrId pl, OutputableBndrId pr,
           Outputable body)
