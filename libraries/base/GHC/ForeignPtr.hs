@@ -55,7 +55,7 @@ import GHC.IORef
 import GHC.STRef        ( STRef(..) )
 import GHC.Ptr          ( Ptr(..), FunPtr(..) )
 
-import Unsafe.Coerce    ( unsafeCoerce# )
+import Unsafe.Coerce    ( unsafeCoerce, unsafeCoerceUnlifted )
 
 -- |The type 'ForeignPtr' represents references to objects that are
 -- maintained in a foreign language, i.e., that are not part of the
@@ -167,7 +167,7 @@ mallocForeignPtr = doMalloc undefined
           r <- newIORef NoFinalizers
           IO $ \s ->
             case newAlignedPinnedByteArray# size align s of { (# s', mbarr# #) ->
-             (# s', ForeignPtr (byteArrayContents# (unsafeCoerce# mbarr#))
+             (# s', ForeignPtr (byteArrayContents# (unsafeCoerceUnlifted mbarr#))
                                (MallocPtr mbarr# r) #)
             }
             where !(I# size)  = sizeOf a
@@ -182,7 +182,7 @@ mallocForeignPtrBytes (I# size) = do
   r <- newIORef NoFinalizers
   IO $ \s ->
      case newPinnedByteArray# size s      of { (# s', mbarr# #) ->
-       (# s', ForeignPtr (byteArrayContents# (unsafeCoerce# mbarr#))
+       (# s', ForeignPtr (byteArrayContents# (unsafeCoerceUnlifted mbarr#))
                          (MallocPtr mbarr# r) #)
      }
 
@@ -196,7 +196,7 @@ mallocForeignPtrAlignedBytes (I# size) (I# align) = do
   r <- newIORef NoFinalizers
   IO $ \s ->
      case newAlignedPinnedByteArray# size align s of { (# s', mbarr# #) ->
-       (# s', ForeignPtr (byteArrayContents# (unsafeCoerce# mbarr#))
+       (# s', ForeignPtr (byteArrayContents# (unsafeCoerceUnlifted mbarr#))
                          (MallocPtr mbarr# r) #)
      }
 
@@ -220,7 +220,7 @@ mallocPlainForeignPtr = doMalloc undefined
           | I# size < 0 = errorWithoutStackTrace "mallocForeignPtr: size must be >= 0"
           | otherwise = IO $ \s ->
             case newAlignedPinnedByteArray# size align s of { (# s', mbarr# #) ->
-             (# s', ForeignPtr (byteArrayContents# (unsafeCoerce# mbarr#))
+             (# s', ForeignPtr (byteArrayContents# (unsafeCoerceUnlifted mbarr#))
                                (PlainPtr mbarr#) #)
             }
             where !(I# size)  = sizeOf a
@@ -235,7 +235,7 @@ mallocPlainForeignPtrBytes size | size < 0 =
   errorWithoutStackTrace "mallocPlainForeignPtrBytes: size must be >= 0"
 mallocPlainForeignPtrBytes (I# size) = IO $ \s ->
     case newPinnedByteArray# size s      of { (# s', mbarr# #) ->
-       (# s', ForeignPtr (byteArrayContents# (unsafeCoerce# mbarr#))
+       (# s', ForeignPtr (byteArrayContents# (unsafeCoerceUnlifted mbarr#))
                          (PlainPtr mbarr#) #)
      }
 
@@ -248,7 +248,7 @@ mallocPlainForeignPtrAlignedBytes size _align | size < 0 =
   errorWithoutStackTrace "mallocPlainForeignPtrAlignedBytes: size must be >= 0"
 mallocPlainForeignPtrAlignedBytes (I# size) (I# align) = IO $ \s ->
     case newAlignedPinnedByteArray# size align s of { (# s', mbarr# #) ->
-       (# s', ForeignPtr (byteArrayContents# (unsafeCoerce# mbarr#))
+       (# s', ForeignPtr (byteArrayContents# (unsafeCoerceUnlifted mbarr#))
                          (PlainPtr mbarr#) #)
      }
 
@@ -352,7 +352,7 @@ ensureCFinalizerWeak ref@(IORef (STRef r#)) value = do
       CFinalizers weak -> return (MyWeak weak)
       HaskellFinalizers{} -> noMixingError
       NoFinalizers -> IO $ \s ->
-          case mkWeakNoFinalizer# r# (unsafeCoerce# value) s of { (# s1, w #) ->
+          case mkWeakNoFinalizer# r# (unsafeCoerce value) s of { (# s1, w #) ->
              -- See Note [MallocPtr finalizers] (#10904)
           case atomicModifyMutVar2# r# (update w) s1 of
               { (# s2, _, (_, (weak, needKill )) #) ->
