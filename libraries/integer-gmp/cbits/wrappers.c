@@ -12,6 +12,7 @@
 #include "HsFFI.h"
 #include "MachDeps.h"
 #include "HsIntegerGmp.h"
+#include "ghc-gmp.h"
 
 #include <assert.h>
 #include <stdbool.h>
@@ -22,7 +23,6 @@
 #include <float.h>
 #include <stdio.h>
 
-#include <gmp.h>
 
 
 // GMP 4.x compatibility
