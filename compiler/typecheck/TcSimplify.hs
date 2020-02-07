@@ -1799,7 +1799,7 @@ setImplicationStatus implic@(Implic { ic_status     = status
 
 checkBadTelescope :: Implication -> TcS Bool
 -- True <=> the skolems form a bad telescope
--- See Note [Keeping scoped variables in order: Explicit] in TcHsType
+-- See Note [Checking telescopes] in Constraint
 checkBadTelescope (Implic { ic_telescope  = m_telescope
                           , ic_skols      = skols })
   | isJust m_telescope

@@ -1701,33 +1701,8 @@ addTypeCtxt (L _ ty) thing
 %*                                                                      *
 %************************************************************************
 
-Note [Keeping scoped variables in order: Explicit]
-~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
-When the user writes `forall a b c. blah`, we bring a, b, and c into
-scope and then check blah. In the process of checking blah, we might
-learn the kinds of a, b, and c, and these kinds might indicate that
-b depends on c, and thus that we should reject the user-written type.
-
-One approach to doing this would be to bring each of a, b, and c into
-scope, one at a time, creating an implication constraint and
-bumping the TcLevel for each one. This would work, because the kind
-of, say, b would be untouchable when c is in scope (and the constraint
-couldn't float out because c blocks it). However, it leads to terrible
-error messages, complaining about skolem escape. While it is indeed
-a problem of skolem escape, we can do better.
-
-Instead, our approach is to bring the block of variables into scope
-all at once, creating one implication constraint for the lot. The
-user-written variables are skolems in the implication constraint. In
-TcSimplify.setImplicationStatus, we check to make sure that the ordering
-is correct, choosing ImplicationStatus IC_BadTelescope if they aren't.
-Then, in TcErrors, we report if there is a bad telescope. This way,
-we can report a suggested ordering to the user if there is a problem.
-
-See also Note [Checking telescopes] in Constraint
-
-Note [Keeping scoped variables in order: Implicit]
-~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+Note [Keeping implicitly quantified variables in order]
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 When the user implicitly quantifies over variables (say, in a type
 signature), we need to come up with some ordering on these variables.
 This is done by bumping the TcLevel, bringing the tyvars into scope,
@@ -1758,10 +1733,10 @@ There may be some surprises in here:
 
 Step 2 is necessary for two reasons: most signatures also bring
 implicitly quantified variables into scope, and solving is necessary
-to get these in the right order (see Note [Keeping scoped variables in
-order: Implicit]). Additionally, solving is necessary in order to
-kind-generalize correctly: otherwise, we do not know which metavariables
-are left unsolved.
+to get these in the right order (see Note [Keeping implicitly
+quantified variables in order]). Additionally, solving is necessary in
+order to kind-generalize correctly: otherwise, we do not know which
+metavariables are left unsolved.
 
 Step 3 is done by a call to candidateQTyVarsOfType, followed by a call to
 kindGeneralize{All,Some,None}. Here, we have to deal with the fact that
