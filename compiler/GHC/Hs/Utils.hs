@@ -178,10 +178,13 @@ unguardedRHS :: SrcSpan -> Located (body (GhcPass p))
              -> [LGRHS (GhcPass p) (Located (body (GhcPass p)))]
 unguardedRHS loc rhs = [L loc (GRHS noExtField [] rhs)]
 
-mkMatchGroup :: XMG name (Located (body name)) ~ NoExtField
-             => XRec name (Match name (Located (body name))) ~ Located (Match name (Located (body name)))
-             => Origin -> [LMatch name (Located (body name))]
-             -> MatchGroup name (Located (body name))
+mkMatchGroup :: ( XMG name (Located (body name)) ~ NoExtField
+                , XRec name (Match name (Located (body name))) ~ Located (Match name (Located (body name)))
+                , XRec name [Located (Match name (Located (body name)))]
+                    ~ Located [Located (Match name (Located (body name)))]
+                )
+                => Origin -> [LMatch name (Located (body name))]
+                -> MatchGroup name (Located (body name))
 mkMatchGroup origin matches = MG { mg_ext = noExtField
                                  , mg_alts = mkLocatedList matches
                                  , mg_origin = origin }
@@ -1026,18 +1029,24 @@ collectHsValBinders :: CollectPass (GhcPass idL)
                     -> [IdP (GhcPass idL)]
 collectHsValBinders = collect_hs_val_binders False
 
-collectHsBindBinders :: CollectPass p
+collectHsBindBinders :: (CollectPass p, XRec p (IdP p) ~ Located (IdP p))
                      => HsBindLR p idR
                      -> [IdP p]
 -- ^ Collect both 'Id's and pattern-synonym binders
 collectHsBindBinders b = collect_bind False b []
 
-collectHsBindsBinders :: CollectPass p
+collectHsBindsBinders :: ( CollectPass p
+                         , XRec p (IdP p) ~ Located (IdP p)
+                         , XRec p (HsBindLR p idR) ~ Located (HsBindLR p idR)
+                         )
                       => LHsBindsLR p idR
                       -> [IdP p]
 collectHsBindsBinders binds = collect_binds False binds []
 
-collectHsBindListBinders :: CollectPass p
+collectHsBindListBinders :: ( CollectPass p
+                            , XRec p (HsBindLR p idR) ~ Located (HsBindLR p idR)
+                            , XRec p (IdP p) ~ Located (IdP p)
+                            )
                          => [LHsBindLR p idR]
                          -> [IdP p]
 -- ^ Same as 'collectHsBindsBinders', but works over a list of bindings
@@ -1051,13 +1060,19 @@ collect_hs_val_binders ps (ValBinds _ binds _) = collect_binds ps binds []
 collect_hs_val_binders ps (XValBindsLR (NValBinds binds _))
   = collect_out_binds ps binds
 
-collect_out_binds :: CollectPass p
+collect_out_binds :: ( CollectPass p
+                     , XRec p (HsBindLR p p) ~ Located (HsBindLR p p)
+                     , XRec p (IdP p) ~ Located (IdP p)
+                     )
                   => Bool
                   -> [(RecFlag, LHsBinds p)]
                   -> [IdP p]
 collect_out_binds ps = foldr (collect_binds ps . snd) []
 
-collect_binds :: CollectPass p
+collect_binds :: ( CollectPass p
+                 , XRec p (IdP p) ~ Located (IdP p)
+                 , XRec p (HsBindLR p idR) ~ Located (HsBindLR p idR)
+                 )
               => Bool
               -> LHsBindsLR p idR
               -> [IdP p]
@@ -1065,7 +1080,8 @@ collect_binds :: CollectPass p
 -- ^ Collect 'Id's, or 'Id's + pattern synonyms, depending on boolean flag
 collect_binds ps binds acc = foldr (collect_bind ps . unLoc) acc binds
 
-collect_bind :: CollectPass p
+collect_bind :: ( CollectPass p
+               , XRec p (IdP p) ~ Located (IdP p))
              => Bool
              -> HsBindLR p idR
              -> [IdP p]
@@ -1083,7 +1099,10 @@ collect_bind omitPatSyn (PatSynBind _ (PSB { psb_id = L _ ps })) acc
 collect_bind _ (PatSynBind _ (XPatSynBind _)) acc = acc
 collect_bind _ (XHsBindsLR _) acc = acc
 
-collectMethodBinders :: LHsBindsLR idL idR -> [Located (IdP idL)]
+collectMethodBinders :: ( XRec idL (IdP idL) ~ Located (IdP idL)
+                        , XRec idL (HsBindLR idL idR) ~ Located (HsBindLR idL idR)
+                        )
+                        => LHsBindsLR idL idR -> [Located (IdP idL)]
 -- ^ Used exclusively for the bindings of an instance decl which are all
 -- 'FunBinds'
 collectMethodBinders binds = foldr (get . unLoc) [] binds
@@ -1128,18 +1147,32 @@ collectStmtBinders (ApplicativeStmt _ args _) = concatMap collectArgBinders args
 
 
 ----------------- Patterns --------------------------
-collectPatBinders :: CollectPass p => LPat p -> [IdP p]
+collectPatBinders ::
+   ( CollectPass p
+   , XRec p (IdP p) ~ Located (IdP p)
+   )
+   => LPat p -> [IdP p]
 collectPatBinders pat = collect_lpat pat []
 
-collectPatsBinders :: CollectPass p => [LPat p] -> [IdP p]
+collectPatsBinders ::
+   ( CollectPass p
+   , XRec p (IdP p) ~ Located (IdP p)
+   )
+   => [LPat p] -> [IdP p]
 collectPatsBinders pats = foldr collect_lpat [] pats
 
 -------------
-collect_lpat :: forall pass. (CollectPass pass)
+collect_lpat :: forall pass.
+             ( CollectPass pass
+             , XRec pass (IdP pass) ~ Located (IdP pass)
+             )
              => LPat pass -> [IdP pass] -> [IdP pass]
 collect_lpat p bndrs = collect_pat (unLoc p) bndrs
 
-collect_pat :: forall p. CollectPass p
+collect_pat :: forall p.
+            ( CollectPass p
+            , XRec p (IdP p) ~ Located (IdP p)
+            )
             => Pat p
             -> [IdP p]
             -> [IdP p]
@@ -1268,8 +1301,9 @@ hsLTyClDeclBinders (L loc (DataDecl    { tcdLName = (L _ name)
 
 
 -------------------
-hsForeignDeclsBinders :: XRec pass (ForeignDecl pass) ~ Located (ForeignDecl pass)
-                      => [LForeignDecl pass] -> [Located (IdP pass)]
+hsForeignDeclsBinders :: ( XRec pass (ForeignDecl pass) ~ Located (ForeignDecl pass)
+                         , XRec pass (IdP pass) ~ Located (IdP pass)
+                         ) => [LForeignDecl pass] -> [Located (IdP pass)]
 -- ^ See Note [SrcSpan for binders]
 hsForeignDeclsBinders foreign_decls
   = [ L decl_loc n
@@ -1285,13 +1319,16 @@ hsPatSynSelectors (ValBinds _ _ _) = panic "hsPatSynSelectors"
 hsPatSynSelectors (XValBindsLR (NValBinds binds _))
   = foldr addPatSynSelector [] . unionManyBags $ map snd binds
 
-addPatSynSelector:: LHsBind p -> [IdP p] -> [IdP p]
+addPatSynSelector :: ( XRec p (HsBindLR p p) ~ Located (HsBindLR p p)
+                     , XRec p (IdP p) ~ Located (IdP p)
+                     ) => LHsBind p -> [IdP p] -> [IdP p]
 addPatSynSelector bind sels
   | PatSynBind _ (PSB { psb_args = RecCon as }) <- unLoc bind
   = map (unLoc . recordPatSynSelectorId) as ++ sels
   | otherwise = sels
 
-getPatSynBinds :: [(RecFlag, LHsBinds id)] -> [PatSynBind id id]
+getPatSynBinds :: ( XRec id (HsBindLR id id) ~ Located (HsBindLR id id)
+                  ) => [(RecFlag, LHsBinds id)] -> [PatSynBind id id]
 getPatSynBinds binds
   = [ psb | (_, lbinds) <- binds
           , L _ (PatSynBind _ psb) <- bagToList lbinds ]

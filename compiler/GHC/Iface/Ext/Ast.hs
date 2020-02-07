@@ -576,15 +576,15 @@ instance ToHie (TScoped (HsWildCardBndrs GhcTc (HsImplicitBndrs GhcTc (Located (
 -- instance ToHie (TScoped (LHsWcType GhcTc)) where
 instance ToHie (TScoped (HsWildCardBndrs GhcTc (Located (HsType GhcTc)))) where
   toHie _ = pure []
-instance ToHie (SigContext (LSig GhcTc)) where
+instance ToHie (SigContext (Located (Sig GhcTc))) where
   toHie _ = pure []
 instance ToHie (TScoped Type) where
   toHie _ = pure []
 
-instance HasType (LHsBind GhcRn) where
+instance HasType (Located (HsBind GhcRn)) where
   getTypeNode (L spn bind) = makeNode bind spn
 
-instance HasType (LHsBind GhcTc) where
+instance HasType (Located (HsBind GhcTc)) where
   getTypeNode (L spn bind) = case bind of
       FunBind{fun_id = name} -> makeTypeNode bind spn (varType $ unLoc name)
       _ -> makeNode bind spn
@@ -662,7 +662,8 @@ instance HasType (Located (HsExpr GhcTc)) where
         XExpr (HsWrap{}) -> False
         _                -> True
 
-instance ( ToHie (Context (Located (IdP a)))
+instance ( a ~ GhcPass p
+         , ToHie (Context (Located (IdP a)))
          , ToHie (MatchGroup a (LHsExpr a))
          , ToHie (PScoped (LPat a))
          , ToHie (GRHSs a (LHsExpr a))
@@ -671,7 +672,7 @@ instance ( ToHie (Context (Located (IdP a)))
          , HasType (LHsBind a)
          , ModifyState (IdP a)
          , Data (HsBind a)
-         ) => ToHie (BindContext (LHsBind a)) where
+         ) => ToHie (BindContext (Located (HsBind a))) where
   toHie (BC context scope b@(L span bind)) =
     concatM $ getTypeNode b : case bind of
       FunBind{fun_id = name, fun_matches = matches} ->
@@ -694,8 +695,8 @@ instance ( ToHie (Context (Located (IdP a)))
         ]
       XHsBindsLR _ -> []
 
-instance ( ToHie (LMatch a body)
-         ) => ToHie (MatchGroup a body) where
+instance ( ToHie (Located (Match (GhcPass p) body))
+         ) => ToHie (MatchGroup (GhcPass p) body) where
   toHie mg = concatM $ case mg of
     MG{ mg_alts = (L span alts) , mg_origin = FromSource } ->
       [ pure $ locOnly span
@@ -704,7 +705,8 @@ instance ( ToHie (LMatch a body)
     MG{} -> []
     XMatchGroup _ -> []
 
-instance ( ToHie (Context (Located (IdP a)))
+instance ( a ~ GhcPass p
+         , ToHie (Context (Located (IdP a)))
          , ToHie (PScoped (LPat a))
          , ToHie (HsPatSynDir a)
          ) => ToHie (Located (PatSynBind a a)) where
@@ -848,6 +850,12 @@ instance ( a ~ GhcPass p
             -- Make sure we get an error if this changes
             _noWarn@(CoPat _ _ _) = e
     where
+      contextify :: HsConDetails
+                      (LPat (GhcPass p))
+                      (HsRecFields (GhcPass p) (LPat (GhcPass p)))
+                 -> HsConDetails
+                      (PScoped (LPat (GhcPass p)))
+                      (RContext (HsRecFields (GhcPass p) (PScoped (LPat (GhcPass p)))))
       contextify (PrefixCon args) = PrefixCon $ patScopes rsp scope pscope args
       contextify (InfixCon a b) = InfixCon a' b'
         where [a', b'] = patScopes rsp scope pscope [a,b]
@@ -1091,7 +1099,7 @@ instance ( ToHie (LHsExpr a)
          , ToHie (SigContext (LSig a))
          , ToHie (RScoped (HsValBindsLR a a))
          , Data (HsLocalBinds a)
-         ) => ToHie (RScoped (LHsLocalBinds a)) where
+         ) => ToHie (RScoped (Located (HsLocalBinds a))) where
   toHie (RS scope (L sp binds)) = concatM $ makeNode binds sp : case binds of
       EmptyLocalBinds _ -> []
       HsIPBinds _ _ -> []
@@ -1123,8 +1131,8 @@ instance ToHie (RScoped (NHsValBindsLR GhcRn)) where
     , toHie $ fmap (SC (SI BindSig Nothing)) sigs
     ]
 
-instance ( ToHie (RContext (LHsRecField a arg))
-         ) => ToHie (RContext (HsRecFields a arg)) where
+instance ( ToHie (RContext (LHsRecField (GhcPass p) arg))
+         ) => ToHie (RContext (HsRecFields (GhcPass p) arg)) where
   toHie (RC c (HsRecFields fields _)) = toHie $ map (RC c) fields
 
 instance ( ToHie (RFContext (Located label))
@@ -1475,7 +1483,7 @@ instance ToHie (StandaloneKindSig GhcRn) where
       , toHie $ TS (ResolvedScopes []) typ
       ]
 
-instance ToHie (SigContext (LSig GhcRn)) where
+instance ToHie (SigContext (Located (Sig GhcRn))) where
   toHie (SC (SI styp msp) (L sp sig)) = concatM $ makeNode sig sp : case sig of
       TypeSig _ names typ ->
         [ toHie $ map (C TyDecl) names
@@ -1758,7 +1766,7 @@ instance ToHie (Located (DerivDecl GhcRn)) where
         , toHie overlap
         ]
 
-instance ToHie (LFixitySig GhcRn) where
+instance ToHie (Located (FixitySig GhcRn)) where
   toHie (L span sig) = concatM $ makeNode sig span : case sig of
       FixitySig _ vars _ ->
         [ toHie $ map (C Use) vars

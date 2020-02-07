@@ -26,7 +26,7 @@ import GHC.Hs.Types
 import GHC.Hs.Pat
 import GHC.Hs.ImpExp
 
-import SrcLoc ( Located )
+import GHC.Types.SrcLoc ( Located )
 
 -- ---------------------------------------------------------------------
 -- Data derivations from GHC.Hs-----------------------------------------

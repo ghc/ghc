@@ -485,11 +485,11 @@ instance OutputableBndr HsIPName where
 data HsTyVarBndr pass
   = UserTyVar        -- no explicit kinding
          (XUserTyVar pass)
-         (Located (IdP pass))
+         (XRec pass (IdP pass))
         -- See Note [Located RdrNames] in GHC.Hs.Expr
   | KindedTyVar
          (XKindedTyVar pass)
-         (Located (IdP pass))
+         (XRec pass (IdP pass))
          (LHsKind pass)  -- The user-supplied kind signature
         -- ^
         --  - 'ApiAnnotation.AnnKeywordId' : 'ApiAnnotation.AnnOpen',
@@ -541,7 +541,7 @@ data HsType pass
   | HsTyVar  (XTyVar pass)
               PromotionFlag    -- Whether explicitly promoted,
                                -- for the pretty printer
-             (Located (IdP pass))
+             (XRec pass (IdP pass))
                   -- Type variable, type constructor, or data constructor
                   -- see Note [Promotions (HsTyVar)]
                   -- See Note [Located RdrNames] in GHC.Hs.Expr
@@ -590,7 +590,7 @@ data HsType pass
     -- For details on above see note [Api annotations] in GHC.Parser.Annotation
 
   | HsOpTy              (XOpTy pass)
-                        (LHsType pass) (Located (IdP pass)) (LHsType pass)
+                        (LHsType pass) (XRec pass (IdP pass)) (LHsType pass)
       -- ^ - 'ApiAnnotation.AnnKeywordId' : None
 
       -- For details on above see note [Api annotations] in GHC.Parser.Annotation
@@ -606,7 +606,7 @@ data HsType pass
       -- For details on above see note [Api annotations] in GHC.Parser.Annotation
 
   | HsIParamTy          (XIParamTy pass)
-                        (Located HsIPName) -- (?x :: ty)
+                        (XRec pass HsIPName) -- (?x :: ty)
                         (LHsType pass)   -- Implicit parameters as they occur in
                                          -- contexts
       -- ^

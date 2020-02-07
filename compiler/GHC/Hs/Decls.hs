@@ -381,7 +381,7 @@ type LSpliceDecl pass = XRec pass (SpliceDecl pass)
 data SpliceDecl p
   = SpliceDecl                  -- Top level splice
         (XSpliceDecl p)
-        (Located (HsSplice p))
+        (XRec p (HsSplice p))
         SpliceExplicitFlag
   | XSpliceDecl !(XXSpliceDecl p)
 
@@ -556,7 +556,7 @@ data TyClDecl pass
 
     -- For details on above see note [Api annotations] in GHC.Parser.Annotation
     SynDecl { tcdSExt   :: XSynDecl pass          -- ^ Post renameer, FVs
-            , tcdLName  :: Located (IdP pass)     -- ^ Type constructor
+            , tcdLName  :: XRec pass (IdP pass)     -- ^ Type constructor
             , tcdTyVars :: LHsQTyVars pass        -- ^ Type variables; for an
                                                   -- associated type these
                                                   -- include outer binders
@@ -573,7 +573,7 @@ data TyClDecl pass
 
     -- For details on above see note [Api annotations] in GHC.Parser.Annotation
     DataDecl { tcdDExt     :: XDataDecl pass       -- ^ Post renamer, CUSK flag, FVs
-             , tcdLName    :: Located (IdP pass)   -- ^ Type constructor
+             , tcdLName    :: XRec pass (IdP pass)   -- ^ Type constructor
              , tcdTyVars   :: LHsQTyVars pass      -- ^ Type variables
                               -- See Note [TyVar binders for associated declarations]
              , tcdFixity   :: LexicalFixity        -- ^ Fixity used in the declaration
@@ -581,7 +581,7 @@ data TyClDecl pass
 
   | ClassDecl { tcdCExt    :: XClassDecl pass,         -- ^ Post renamer, FVs
                 tcdCtxt    :: LHsContext pass,         -- ^ Context...
-                tcdLName   :: Located (IdP pass),      -- ^ Name of the class
+                tcdLName   :: XRec pass (IdP pass),      -- ^ Name of the class
                 tcdTyVars  :: LHsQTyVars pass,         -- ^ Class type variables
                 tcdFixity  :: LexicalFixity, -- ^ Fixity used in the declaration
                 tcdFDs     :: [LHsFunDep pass],         -- ^ Functional deps
@@ -601,7 +601,7 @@ data TyClDecl pass
         -- For details on above see note [Api annotations] in GHC.Parser.Annotation
   | XTyClDecl !(XXTyClDecl pass)
 
-type LHsFunDep pass = XRec pass (FunDep (Located (IdP pass)))
+type LHsFunDep pass = XRec pass (FunDep (XRec pass (IdP pass)))
 
 data DataDeclRn = DataDeclRn
              { tcdDataCusk :: Bool    -- ^ does this have a CUSK?
@@ -709,6 +709,8 @@ tyClDeclLName (SynDecl { tcdLName = ln })   = ln
 tyClDeclLName (DataDecl { tcdLName = ln })  = ln
 tyClDeclLName (ClassDecl { tcdLName = ln }) = ln
 
+-- FIXME: tcdName is commonly used by both GHC and third-party tools, so it
+-- needs to be polymorphic in the pass
 tcdName :: TyClDecl (GhcPass p) -> IdP (GhcPass p)
 tcdName = unLoc . tyClDeclLName
 
@@ -1078,7 +1080,7 @@ type LFamilyDecl pass = XRec pass (FamilyDecl pass)
 data FamilyDecl pass = FamilyDecl
   { fdExt            :: XCFamilyDecl pass
   , fdInfo           :: FamilyInfo pass              -- type/data, closed/open
-  , fdLName          :: Located (IdP pass)           -- type constructor
+  , fdLName          :: XRec pass (IdP pass)           -- type constructor
   , fdTyVars         :: LHsQTyVars pass              -- type variables
                        -- See Note [TyVar binders for associated declarations]
   , fdFixity         :: LexicalFixity                -- Fixity used in the declaration
@@ -1111,7 +1113,7 @@ type LInjectivityAnn pass = XRec pass (InjectivityAnn pass)
 --
 -- This will be represented as "InjectivityAnn `r` [`a`, `c`]"
 data InjectivityAnn pass
-  = InjectivityAnn (Located (IdP pass)) [Located (IdP pass)]
+  = InjectivityAnn (XRec pass (IdP pass)) [XRec pass (IdP pass)]
   -- ^ - 'ApiAnnotation.AnnKeywordId' :
   --             'ApiAnnotation.AnnRarrow', 'ApiAnnotation.AnnVbar'
 
@@ -1264,7 +1266,7 @@ data HsDerivingClause pass
     , deriv_clause_strategy :: Maybe (LDerivStrategy pass)
       -- ^ The user-specified strategy (if any) to use when deriving
       -- 'deriv_clause_tys'.
-    , deriv_clause_tys :: Located [LHsSigType pass]
+    , deriv_clause_tys :: XRec pass [LHsSigType pass]
       -- ^ The types to derive.
       --
       -- It uses 'LHsSigType's because, with @-XGeneralizedNewtypeDeriving@,
@@ -1307,7 +1309,7 @@ type LStandaloneKindSig pass = XRec pass (StandaloneKindSig pass)
 
 data StandaloneKindSig pass
   = StandaloneKindSig (XStandaloneKindSig pass)
-      (Located (IdP pass))  -- Why a single binder? See #16754
+      (XRec pass (IdP pass))  -- Why a single binder? See #16754
       (LHsSigType pass)     -- Why not LHsSigWcType? See Note [Wildcards in standalone kind signatures]
   | XStandaloneKindSig !(XXStandaloneKindSig pass)
 
@@ -1459,7 +1461,7 @@ There's a wrinkle in ConDeclGADT
 
 -- | Haskell data Constructor Declaration Details
 type HsConDeclDetails pass
-   = HsConDetails (LBangType pass) (Located [LConDeclField pass])
+   = HsConDetails (LBangType pass) (XRec pass [LConDeclField pass])
 
 getConNames :: ConDecl (GhcPass p) -> [Located (IdP (GhcPass p))]
 getConNames ConDeclH98  {con_name  = name}  = [name]
@@ -1690,7 +1692,7 @@ type FamInstEqn pass rhs = HsImplicitBndrs pass (FamEqn pass rhs)
 data FamEqn pass rhs
   = FamEqn
        { feqn_ext    :: XCFamEqn pass rhs
-       , feqn_tycon  :: Located (IdP pass)
+       , feqn_tycon  :: XRec pass (IdP pass)
        , feqn_bndrs  :: Maybe [LHsTyVarBndr pass] -- ^ Optional quantified type vars
        , feqn_pats   :: HsTyPats pass
        , feqn_fixity :: LexicalFixity -- ^ Fixity used in the declaration
@@ -1721,7 +1723,7 @@ data ClsInstDecl pass
       , cid_sigs          :: [LSig pass]         -- User-supplied pragmatic info
       , cid_tyfam_insts   :: [LTyFamInstDecl pass]   -- Type family instances
       , cid_datafam_insts :: [LDataFamInstDecl pass] -- Data family instances
-      , cid_overlap_mode  :: Maybe (Located OverlapMode)
+      , cid_overlap_mode  :: Maybe (XRec pass OverlapMode)
          -- ^ - 'ApiAnnotation.AnnKeywordId' : 'ApiAnnotation.AnnOpen',
          --                                    'ApiAnnotation.AnnClose',
 
@@ -1916,7 +1918,7 @@ data DerivDecl pass = DerivDecl
           -- See Note [Inferring the instance context] in GHC.Tc.Deriv.Infer.
 
         , deriv_strategy     :: Maybe (LDerivStrategy pass)
-        , deriv_overlap_mode :: Maybe (Located OverlapMode)
+        , deriv_overlap_mode :: Maybe (XRec pass OverlapMode)
          -- ^ - 'ApiAnnotation.AnnKeywordId' : 'ApiAnnotation.AnnDeriving',
          --        'ApiAnnotation.AnnInstance', 'ApiAnnotation.AnnStock',
          --        'ApiAnnotation.AnnAnyClass', 'Api.AnnNewtype',
@@ -2055,13 +2057,13 @@ type LForeignDecl pass = XRec pass (ForeignDecl pass)
 data ForeignDecl pass
   = ForeignImport
       { fd_i_ext  :: XForeignImport pass   -- Post typechecker, rep_ty ~ sig_ty
-      , fd_name   :: Located (IdP pass)    -- defines this name
+      , fd_name   :: XRec pass (IdP pass)    -- defines this name
       , fd_sig_ty :: LHsSigType pass       -- sig_ty
       , fd_fi     :: ForeignImport }
 
   | ForeignExport
       { fd_e_ext  :: XForeignExport pass   -- Post typechecker, rep_ty ~ sig_ty
-      , fd_name   :: Located (IdP pass)    -- uses this name
+      , fd_name   :: XRec pass (IdP pass)    -- uses this name
       , fd_sig_ty :: LHsSigType pass       -- sig_ty
       , fd_fe     :: ForeignExport }
         -- ^
@@ -2206,7 +2208,7 @@ data RuleDecl pass
   = HsRule -- Source rule
        { rd_ext  :: XHsRule pass
            -- ^ After renamer, free-vars from the LHS and RHS
-       , rd_name :: Located (SourceText,RuleName)
+       , rd_name :: XRec pass (SourceText,RuleName)
            -- ^ Note [Pragma source text] in GHC.Types.Basic
        , rd_act  :: Activation
        , rd_tyvs :: Maybe [LHsTyVarBndr (NoGhcTc pass)]
@@ -2214,8 +2216,8 @@ data RuleDecl pass
        , rd_tmvs :: [LRuleBndr pass]
            -- ^ Forall'd term vars, before typechecking; after typechecking
            --    this includes all forall'd vars
-       , rd_lhs  :: Located (HsExpr pass)
-       , rd_rhs  :: Located (HsExpr pass)
+       , rd_lhs  :: XRec pass (HsExpr pass)
+       , rd_rhs  :: XRec pass (HsExpr pass)
        }
     -- ^
     --  - 'ApiAnnotation.AnnKeywordId' :
@@ -2243,8 +2245,8 @@ type LRuleBndr pass = XRec pass (RuleBndr pass)
 
 -- | Rule Binder
 data RuleBndr pass
-  = RuleBndr (XCRuleBndr pass)  (Located (IdP pass))
-  | RuleBndrSig (XRuleBndrSig pass) (Located (IdP pass)) (LHsSigWcType pass)
+  = RuleBndr (XCRuleBndr pass)  (XRec pass (IdP pass))
+  | RuleBndrSig (XRuleBndrSig pass) (XRec pass (IdP pass)) (LHsSigWcType pass)
   | XRuleBndr !(XXRuleBndr pass)
         -- ^
         --  - 'ApiAnnotation.AnnKeywordId' : 'ApiAnnotation.AnnOpen',
@@ -2346,7 +2348,7 @@ type instance XXWarnDecls    (GhcPass _) = NoExtCon
 type LWarnDecl pass = XRec pass (WarnDecl pass)
 
 -- | Warning pragma Declaration
-data WarnDecl pass = Warning (XWarning pass) [Located (IdP pass)] WarningTxt
+data WarnDecl pass = Warning (XWarning pass) [XRec pass (IdP pass)] WarningTxt
                    | XWarnDecl !(XXWarnDecl pass)
 
 type instance XWarning      (GhcPass _) = NoExtField
@@ -2380,7 +2382,7 @@ type LAnnDecl pass = XRec pass (AnnDecl pass)
 data AnnDecl pass = HsAnnotation
                       (XHsAnnotation pass)
                       SourceText -- Note [Pragma source text] in GHC.Types.Basic
-                      (AnnProvenance (IdP pass)) (Located (HsExpr pass))
+                      (AnnProvenance (IdP pass)) (XRec pass (HsExpr pass))
       -- ^ - 'ApiAnnotation.AnnKeywordId' : 'ApiAnnotation.AnnOpen',
       --           'ApiAnnotation.AnnType'
       --           'ApiAnnotation.AnnModule'
@@ -2433,8 +2435,8 @@ type LRoleAnnotDecl pass = XRec pass (RoleAnnotDecl pass)
 -- | Role Annotation Declaration
 data RoleAnnotDecl pass
   = RoleAnnotDecl (XCRoleAnnotDecl pass)
-                  (Located (IdP pass))   -- type constructor
-                  [Located (Maybe Role)] -- optional annotations
+                  (XRec pass (IdP pass))   -- type constructor
+                  [XRec pass (Maybe Role)] -- optional annotations
       -- ^ - 'ApiAnnotation.AnnKeywordId' : 'ApiAnnotation.AnnType',
       --           'ApiAnnotation.AnnRole'
 
