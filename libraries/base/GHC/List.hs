@@ -938,6 +938,32 @@ notElem x (y:ys)=  x /= y && notElem x ys
  #-}
 #endif
 
+-- Rules for elem/notElem on known strings:
+#if defined(USE_REPORT_PRELUDE)
+#else
+{-# RULES
+"elem@CString/build"    forall (x :: Char) (addr :: Addr#)
+   . elem x (build ((unpackFoldrCString# addr)))
+   = case x of
+        C# c -> c `elemCString#` addr
+
+"elem@CStringUtf8/build"    forall (x :: Char) (addr :: Addr#)
+   . elem x (build ((unpackFoldrCStringUtf8# addr)))
+   = case x of
+        C# c -> c `elemCStringUtf8#` addr
+
+"notElem@CString/build"    forall (x :: Char) (addr :: Addr#)
+   . notElem x (build ((unpackFoldrCString# addr)))
+   = case x of
+        C# c -> not (c `elemCString#` addr)
+
+"notElem@CStringUtf8/build"    forall (x :: Char) (addr :: Addr#)
+   . notElem x (build ((unpackFoldrCStringUtf8# addr)))
+   = case x of
+        C# c -> not (c `elemCStringUtf8#` addr)
+#-}
+#endif
+
 -- | \(\mathcal{O}(n)\). 'lookup' @key assocs@ looks up a key in an association
 -- list.
 --

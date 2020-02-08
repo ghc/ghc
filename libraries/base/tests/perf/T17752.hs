@@ -79,6 +79,4 @@ isNotElemList
         'z'# -> True
       }
       }
-
-
 -}
