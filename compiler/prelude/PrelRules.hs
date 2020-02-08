@@ -1233,6 +1233,9 @@ builtinRules
   = [BuiltinRule { ru_name = fsLit "AppendLitString",
                    ru_fn = unpackCStringFoldrName,
                    ru_nargs = 4, ru_try = match_append_lit },
+     BuiltinRule { ru_name = fsLit "AppendLitStringUtf8",
+                   ru_fn = unpackCStringFoldrUtf8Name,
+                   ru_nargs = 4, ru_try = match_append_lit_utf8 },
      BuiltinRule { ru_name = fsLit "EqString", ru_fn = eqStringName,
                    ru_nargs = 2, ru_try = match_eq_string },
      BuiltinRule { ru_name = fsLit "Inline", ru_fn = inlineIdName,
@@ -1438,13 +1441,53 @@ match_append_lit _ _ _ _ = Nothing
 
 ---------------------------------------------------
 -- The rule is this:
+--      unpackFoldrCStringUtf8# "foo" c (unpackFoldrCStringUtf8# "baz" c n)
+--      =  unpackFoldrCStringUtf8# "foobaz" c n
+match_append_lit_utf8 :: RuleFun
+match_append_lit_utf8 _ id_unf _
+        [ Type ty1
+        , lit1
+        , c1
+        , e2
+        ]
+  -- N.B. Ensure that we strip off any ticks (e.g. source notes) from the
+  -- `lit` and `c` arguments, lest this may fail to fire when building with
+  -- -g3. See #16740.
+  | (strTicks, Var unpk `App` Type ty2
+                        `App` lit2
+                        `App` c2
+                        `App` n) <- stripTicksTop tickishFloatable e2
+  , unpk `hasKey` unpackCStringFoldrUtf8IdKey
+  , cheapEqExpr' tickishFloatable c1 c2
+  , (c1Ticks, c1') <- stripTicksTop tickishFloatable c1
+  , c2Ticks <- stripTicksTopT tickishFloatable c2
+  , Just (LitString s1) <- exprIsLiteral_maybe id_unf lit1
+  , Just (LitString s2) <- exprIsLiteral_maybe id_unf lit2
+  = ASSERT( ty1 `eqType` ty2 )
+    Just $ mkTicks strTicks
+         $ Var unpk `App` Type ty1
+                    `App` Lit (LitString (s1 `BS.append` s2))
+                    `App` mkTicks (c1Ticks ++ c2Ticks) c1'
+                    `App` n
+
+match_append_lit_utf8 _ _ _ _ = Nothing
+
+---------------------------------------------------
+-- The rule is this:
 --      eqString (unpackCString# (Lit s1)) (unpackCString# (Lit s2)) = s1==s2
+-- Also  matches unpackCStringUtf8#
 
 match_eq_string :: RuleFun
 match_eq_string _ id_unf _
         [Var unpk1 `App` lit1, Var unpk2 `App` lit2]
   | unpk1 `hasKey` unpackCStringIdKey
   , unpk2 `hasKey` unpackCStringIdKey
+  , Just (LitString s1) <- exprIsLiteral_maybe id_unf lit1
+  , Just (LitString s2) <- exprIsLiteral_maybe id_unf lit2
+  = Just (if s1 == s2 then trueValBool else falseValBool)
+
+  | unpk1 `hasKey` unpackCStringUtf8IdKey
+  , unpk2 `hasKey` unpackCStringUtf8IdKey
   , Just (LitString s1) <- exprIsLiteral_maybe id_unf lit1
   , Just (LitString s2) <- exprIsLiteral_maybe id_unf lit2
   = Just (if s1 == s2 then trueValBool else falseValBool)
