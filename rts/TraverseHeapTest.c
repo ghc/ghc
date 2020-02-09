@@ -150,8 +150,6 @@ void traverseHeapRunTests(void)
     {
         printf("with return\n");
 
-        state.return_cb = &testReturn;
-
         initializeTraverseStack(ts);
         traverseInvalidateAllClosureData(ts);
 
@@ -161,7 +159,7 @@ void traverseHeapRunTests(void)
 
             printf("\n\npush   %lu\n", synthClosureId(&sh, tests[i]));
             traversePushClosure(ts, tests[i], tests[i], &se, nullStackData);
-            traverseWorkStack(ts, &testVisit);
+            traverseWorkStack(ts, &testVisit, &testReturn);
         }
 
         closeTraverseStack(ts);
@@ -170,15 +168,13 @@ void traverseHeapRunTests(void)
     {
         printf("\n\n\n\njust visit\n");
 
-        state.return_cb = NULL;
-
         initializeTraverseStack(ts);
         traverseInvalidateAllClosureData(ts);
 
         for(size_t i=0; i < (sizeof(tests)/sizeof(*tests)); i++) {
             printf("\n\npush   %lu\n", synthClosureId(&sh, tests[i]));
             traversePushClosure(ts, tests[i], tests[i], NULL, nullStackData);
-            traverseWorkStack(ts, &testVisit);
+            traverseWorkStack(ts, &testVisit, NULL);
         }
 
         closeTraverseStack(ts);
@@ -196,7 +192,7 @@ void traverseHeapRunTests(void)
 
         printf("\n\npush   %lu\n", synthClosureId(&sh, c30));
         traversePushClosure(ts, c30, c30, NULL, nullStackData);
-        traverseWorkStack(ts, &testVisit);
+        traverseWorkStack(ts, &testVisit, NULL);
 
         closeTraverseStack(ts);
     }
