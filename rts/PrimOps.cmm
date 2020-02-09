@@ -24,6 +24,7 @@
 #include "Cmm.h"
 #include "MachDeps.h"
 #include "SMPClosureOps.h"
+#include "sm/HeapAlloc.h" /* for HEAP_ALLOCED() */
 
 #if defined(__PIC__)
 import pthread_mutex_lock;
@@ -153,13 +154,26 @@ stg_isByteArrayPinnedzh ( gcptr ba )
 // ByteArray# s -> Int#
 {
     W_ bd, flags;
-    bd = Bdescr(ba);
-    // Pinned byte arrays live in blocks with the BF_PINNED flag set.
-    // We also consider BF_LARGE objects to be immovable. See #13894.
-    // See the comment in Storage.c:allocatePinned.
-    // We also consider BF_COMPACT objects to be immovable. See #14900.
-    flags = TO_W_(bdescr_flags(bd));
-    return (flags & (BF_PINNED | BF_LARGE | BF_COMPACT) != 0);
+#if defined(HEAP_ALLOCED)
+    if (HEAP_ALLOCED(ba)) {
+#else
+    W_ result;
+    HEAP_ALLOCED_CALLISH(result, ba)
+    if (result == 1) {
+#endif
+        // Safe to look up the block descriptor when the object is in the heap.
+        bd = Bdescr(ba);
+        // Pinned byte arrays live in blocks with the BF_PINNED flag set.
+        // We also consider BF_LARGE objects to be immovable. See #13894.
+        // See the comment in Storage.c:allocatePinned.
+        // We also consider BF_COMPACT objects to be immovable. See #14900.
+        flags = TO_W_(bdescr_flags(bd));
+        return (flags & (BF_PINNED | BF_LARGE | BF_COMPACT) != 0);
+    } else {
+        // If it's not in the heap at all then we GC will not move it, so we
+        // can report to application code that it is pinned.
+        return (1);
+    }
 }
 
 stg_isMutableByteArrayPinnedzh ( gcptr mba )
