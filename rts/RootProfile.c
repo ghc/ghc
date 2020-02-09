@@ -229,7 +229,7 @@ rootProfile(Time t, Census *census)
 
         current_root = i;
         traversePushClosure(ts, c, c, NULL, nullStackData);
-        traverseWorkStack(ts, &rootVisit);
+        traverseWorkStack(ts, &rootVisit, NULL);
     }
 
     traverseInvalidateAllClosureData(ts);
@@ -238,7 +238,7 @@ rootProfile(Time t, Census *census)
         traversePushClosure(ts, c, c, NULL, nullStackData);
     }
 
-    traverseWorkStack(ts, NULL);
+    traverseWorkStack(ts, NULL, NULL);
 
 
     debug(2, "\n\n\n=== result ===\n");
