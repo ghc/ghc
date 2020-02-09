@@ -160,6 +160,7 @@ typedef struct _PROFILING_FLAGS {
     const char*         ccsSelector;
     const char*         retainerSelector;
     const char*         bioSelector;
+    bool                rootSelector;
 
 } PROFILING_FLAGS;
 
