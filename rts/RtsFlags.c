@@ -22,6 +22,7 @@
 #endif
 
 #include <string.h>
+// #include <errno.h>
 
 #if defined(HAVE_UNISTD_H)
 #include <unistd.h>
@@ -1326,8 +1327,15 @@ error = true;
                 if (rts_argv[arg][2] == '\0') {
                   /* use default */
                 } else {
+                    char *endptr;
+                    double intervalSeconds = strtod(rts_argv[arg]+2, &endptr);
+
+                    if (intervalSeconds <= 0.0 && (errno != 0 || endptr == rts_argv[arg]+2)) {
+                        errorBelch("bad value for -i");
+                        error = true;
+                    }
                     RtsFlags.ProfFlags.heapProfileInterval =
-                        fsecondsToTime(atof(rts_argv[arg]+2));
+                        fsecondsToTime(intervalSeconds);
                 }
                 break;
 
@@ -1337,8 +1345,15 @@ error = true;
                 if (rts_argv[arg][2] == '\0')
                     RtsFlags.ConcFlags.ctxtSwitchTime = 0;
                 else {
+                    char *endptr;
+                    double intervalSeconds = strtod(rts_argv[arg]+2, &endptr);
+
+                    if (intervalSeconds <= 0.0 && (errno != 0 || endptr == rts_argv[arg]+2)) {
+                        errorBelch("bad value for -C");
+                        error = true;
+                    }
                     RtsFlags.ConcFlags.ctxtSwitchTime =
-                        fsecondsToTime(atof(rts_argv[arg]+2));
+                        fsecondsToTime(intervalSeconds);
                 }
                 break;
 
@@ -1348,8 +1363,15 @@ error = true;
                     // turns off ticks completely
                     RtsFlags.MiscFlags.tickInterval = 0;
                 } else {
+                    char *endptr;
+                    double intervalSeconds = strtod(rts_argv[arg]+2, &endptr);
+
+                    if (intervalSeconds <= 0.0 && (errno != 0 || endptr == rts_argv[arg]+2)) {
+                        errorBelch("bad value for -V");
+                        error = true;
+                    }
                     RtsFlags.MiscFlags.tickInterval =
-                        fsecondsToTime(atof(rts_argv[arg]+2));
+                        fsecondsToTime(intervalSeconds);
                 }
                 break;
 
