@@ -306,6 +306,7 @@ data ProfFlags = ProfFlags
     , ccsSelector              :: Maybe String
     , retainerSelector         :: Maybe String
     , bioSelector              :: Maybe String
+    , rootSelector             :: Bool -- ^ @since 4.16.0.0
     } deriving ( Show -- ^ @since 4.8.0.0
                , Generic -- ^ @since 4.15.0.0
                )
@@ -605,6 +606,7 @@ getProfFlags = do
             <*> (peekCStringOpt =<< #{peek PROFILING_FLAGS, ccsSelector} ptr)
             <*> (peekCStringOpt =<< #{peek PROFILING_FLAGS, retainerSelector} ptr)
             <*> (peekCStringOpt =<< #{peek PROFILING_FLAGS, bioSelector} ptr)
+            <*> (toBool <$> (#{peek PROFILING_FLAGS, rootSelector} ptr :: IO CBool))
 
 getTraceFlags :: IO TraceFlags
 getTraceFlags = do
