@@ -376,6 +376,7 @@ usage_text[] = {
 "    -hy<typ>...  closures with specified type descriptions",
 "    -hr<cc>...   closures with specified retainers",
 "    -hb<bio>...  closures with specified biographies (lag,drag,void,use)",
+"    -hO          closures reachable from root objects selected by program",
 "",
 "  -R<size>       Set the maximum retainer set size (default: 8)",
 "",
@@ -2128,6 +2129,7 @@ static bool read_heap_profiling_flag(const char *arg)
     case 'b':
     case 'T':
     case 'o':
+    case 'O':
         if (arg[2] != '\0' && arg[3] != '\0') {
             {
                 const char *left  = strchr(arg, '{');
@@ -2176,6 +2178,9 @@ static bool read_heap_profiling_flag(const char *arg)
                     free(selector);
                 }
             }
+            break;
+        } else if (arg[2] == 'O') { // root select
+            RtsFlags.ProfFlags.rootSelector = true;
             break;
         }
 
