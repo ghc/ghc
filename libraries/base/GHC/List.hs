@@ -169,7 +169,7 @@ null (_:_)              =  False
 -- 0
 -- >>> length ['a', 'b', 'c']
 -- 3
--- length [1..]
+-- >>> length [1..]
 -- * Hangs forever *
 {-# NOINLINE [1] length #-}
 length                  :: [a] -> Int
@@ -245,6 +245,8 @@ filterFB c p x r | p x       = x `c` r
 -- 90
 -- >>> foldl (\reversedString nextChar -> nextChar : reversedString) "foo" ['a', 'b', 'c', 'd']
 -- "dcbafoo"
+-- >>> foldl (+) 0 [1..]
+-- * Hangs forever *
 foldl :: forall a b. (b -> a -> b) -> b -> [a] -> b
 {-# INLINE foldl #-}
 foldl k z0 xs =
@@ -298,12 +300,25 @@ foldl' k z0 xs =
   -- See Note [Left folds via right fold]
 
 -- | 'foldl1' is a variant of 'foldl' that has no starting value argument,
--- and thus must be applied to non-empty lists.
+-- and thus must be applied to non-empty lists. Note that unlike 'foldl', the accumulated value must be of the same type as the list elements.
+--
+-- >>> foldl1 (+) [1..4]
+-- 10
+-- >>> foldl1 (+) []
+-- Exception: Prelude.foldl1: empty list
+-- >>> foldl1 (-) [1..4]
+-- -8
+-- >>> foldl1 (&&) [True, False, True, True]
+-- False
+-- >>> foldl1 (||) [False, False, True, True]
+-- True
+-- >>> foldl1 (+) [1..]
+-- * Hangs forever *
 foldl1                  :: (a -> a -> a) -> [a] -> a
 foldl1 f (x:xs)         =  foldl f x xs
 foldl1 _ []             =  errorEmptyList "foldl1"
 
--- | A strict version of 'foldl1'
+-- | A strict version of 'foldl1'.
 foldl1'                  :: (a -> a -> a) -> [a] -> a
 foldl1' f (x:xs)         =  foldl' f x xs
 foldl1' _ []             =  errorEmptyList "foldl1'"
@@ -312,11 +327,33 @@ foldl1' _ []             =  errorEmptyList "foldl1'"
 -- List sum and product
 
 -- | The 'sum' function computes the sum of a finite list of numbers.
+--
+-- >>> sum []
+-- 0
+-- >>> sum [42]
+-- 42
+-- >>> sum [1..10]
+-- 55
+-- >>> sum [4.1, 2.0, 1.7]
+-- 7.8
+-- >>> sum [1..]
+-- * Hangs forever *
 sum                     :: (Num a) => [a] -> a
 {-# INLINE sum #-}
 sum                     =  foldl (+) 0
 
 -- | The 'product' function computes the product of a finite list of numbers.
+--
+-- >>> product []
+-- 1
+-- >>> product [42]
+-- 42
+-- >>> product [1..10]
+-- 3628800
+-- >>> product [4.1, 2.0, 1.7]
+-- 13.939999999999998
+-- >>> product [1..]
+-- * Hangs forever *
 product                 :: (Num a) => [a] -> a
 {-# INLINE product #-}
 product                 =  foldl (*) 1
@@ -328,7 +365,18 @@ product                 =  foldl (*) 1
 --
 -- Note that
 --
--- > last (scanl f z xs) == foldl f z xs.
+-- > last (scanl f z xs) == foldl f z xs
+--
+-- >>> scanl (+) 0 [1..4]
+-- [0,1,3,6,10]
+-- >>> scanl (+) 42 []
+-- [42]
+-- >>> scanl (-) 100 [1..4]
+-- [100,99,97,94,90]
+-- >>> scanl (\reversedString nextChar -> nextChar : reversedString) "foo" ['a', 'b', 'c', 'd']
+-- ["foo","afoo","bafoo","cbafoo","dcbafoo"]
+-- >>> scanl (+) 0 [1..]
+-- * Hangs forever *
 
 -- This peculiar arrangement is necessary to prevent scanl being rewritten in
 -- its own right-hand side.
@@ -363,12 +411,24 @@ constScanl = const
 -- value argument:
 --
 -- > scanl1 f [x1, x2, ...] == [x1, x1 `f` x2, ...]
-
+--
+-- >>> scanl1 (+) [1..4]
+-- [1,3,6,10]
+-- >>> scanl1 (+) []
+-- []
+-- >>> scanl1 (-) [1..4]
+-- [1,-1,-4,-8]
+-- >>> scanl1 (&&) [True, False, True, True]
+-- [True,False,False,False]
+-- >>> scanl1 (||) [False, False, True, True]
+-- [False,False,True,True]
+-- >>> scanl1 (+) [1..]
+-- * Hangs forever *
 scanl1                  :: (a -> a -> a) -> [a] -> [a]
 scanl1 f (x:xs)         =  scanl f x xs
 scanl1 _ []             =  []
 
--- | \(\mathcal{O}(n)\). A strictly accumulating version of 'scanl'
+-- | \(\mathcal{O}(n)\). A strict version of 'scanl'.
 {-# NOINLINE [1] scanl' #-}
 scanl'           :: (b -> a -> b) -> b -> [a] -> [b]
 -- This peculiar form is needed to prevent scanl' from being rewritten
@@ -431,8 +491,20 @@ match on everything past the :, which is just the tail of scanl.
 -- above functions.
 
 -- | 'foldr1' is a variant of 'foldr' that has no starting value argument,
--- and thus must be applied to non-empty lists.
-
+-- and thus must be applied to non-empty lists. Note that unlike 'foldr', the accumulated value must be of the same type as the list elements.
+--
+-- >>> foldr1 (+) [1..4]
+-- 10
+-- >>> foldr1 (+) []
+-- Exception: Prelude.foldr1: empty list
+-- >>> foldr1 (-) [1..4]
+-- -2
+-- >>> foldr1 (&&) [True, False, True, True]
+-- False
+-- >>> foldr1 (||) [False, False, True, True]
+-- True
+-- >>> foldr1 (+) [1..]
+-- * Hangs forever *
 foldr1                  :: (a -> a -> a) -> [a] -> a
 foldr1 f = go
   where go [x]            =  x
@@ -440,10 +512,21 @@ foldr1 f = go
         go []             =  errorEmptyList "foldr1"
 {-# INLINE [0] foldr1 #-}
 
--- | \(\mathcal{O}(n)\). 'scanr' is the right-to-left dual of 'scanl'.
--- Note that
+-- | \(\mathcal{O}(n)\). 'scanr' is the right-to-left dual of 'scanl'. Note that the order of parameters on the accumulating function are reversed compared to 'scanl'.
+-- Also note that
 --
 -- > head (scanr f z xs) == foldr f z xs.
+--
+-- >>> scanr (+) 0 [1..4]
+-- [10,9,7,4,0]
+-- >>> scanr (+) 42 []
+-- [42]
+-- >>> scanr (-) 100 [1..4]
+-- [98,-97,99,-96,100]
+-- >>> scanr (\nextChar reversedString -> nextChar : reversedString) "foo" ['a', 'b', 'c', 'd']
+-- ["abcdfoo","bcdfoo","cdfoo","dfoo","foo"]
+-- >>> scanr (+) 0 [1..]
+-- * Hangs forever *
 {-# NOINLINE [1] scanr #-}
 scanr                   :: (a -> b -> b) -> b -> [a] -> [b]
 scanr _ q0 []           =  [q0]
@@ -496,6 +579,19 @@ remove the cause for the chain of evaluations, and all is well.
 
 -- | \(\mathcal{O}(n)\). 'scanr1' is a variant of 'scanr' that has no starting
 -- value argument.
+--
+-- >>> scanr1 (+) [1..4]
+-- [10,9,7,4]
+-- >>> scanr1 (+) []
+-- []
+-- >>> scanr1 (-) [1..4]
+-- [-2,3,-1,4]
+-- >>> scanr1 (&&) [True, False, True, True]
+-- [False,False,True,True]
+-- >>> scanr1 (||) [True, True, False, False]
+-- [True,True,False,False]
+-- >>> scanr1 (+) [1..]
+-- * Hangs forever *
 scanr1                  :: (a -> a -> a) -> [a] -> [a]
 scanr1 _ []             =  []
 scanr1 _ [x]            =  [x]
@@ -506,6 +602,15 @@ scanr1 f (x:xs)         =  f x q : qs
 -- which must be non-empty, finite, and of an ordered type.
 -- It is a special case of 'Data.List.maximumBy', which allows the
 -- programmer to supply their own comparison function.
+--
+-- >>> maximum []
+-- Exception: Prelude.maximum: empty list
+-- >>> maximum [42]
+-- 42
+-- >>> maximum [55, -12, 7, 0, -89]
+-- 55
+-- >>> maximum [1..]
+-- * Hangs forever *
 maximum                 :: (Ord a) => [a] -> a
 {-# INLINABLE maximum #-}
 maximum []              =  errorEmptyList "maximum"
@@ -521,6 +626,15 @@ maximum xs              =  foldl1 max xs
 -- which must be non-empty, finite, and of an ordered type.
 -- It is a special case of 'Data.List.minimumBy', which allows the
 -- programmer to supply their own comparison function.
+--
+-- >>> minimum []
+-- Exception: Prelude.minimum: empty list
+-- >>> minimum [42]
+-- 42
+-- >>> minimum [55, -12, 7, 0, -89]
+-- -89
+-- >>> minimum [1..]
+-- * Hangs forever *
 minimum                 :: (Ord a) => [a] -> a
 {-# INLINABLE minimum #-}
 minimum []              =  errorEmptyList "minimum"
@@ -538,6 +652,11 @@ minimum xs              =  foldl1 min xs
 -- Note that 'iterate' is lazy, potentially leading to thunk build-up if
 -- the consumer doesn't force each iterate. See 'iterate'' for a strict
 -- variant of this function.
+--
+-- >>> iterate not True
+-- [True,False,True,False...
+-- >>> iterate (+3) 42
+-- [42,45,48,51,54,57,60,63...
 {-# NOINLINE [1] iterate #-}
 iterate :: (a -> a) -> a -> [a]
 iterate f x =  x : iterate f (f x)
@@ -555,8 +674,9 @@ iterateFB c f x0 = go x0
 
 -- | 'iterate'' is the strict version of 'iterate'.
 --
--- It ensures that the result of each application of force to weak head normal
--- form before proceeding.
+-- It forces the result of each application of the function to weak head normal
+-- form (WHNF)
+-- before proceeding.
 {-# NOINLINE [1] iterate' #-}
 iterate' :: (a -> a) -> a -> [a]
 iterate' f x =
@@ -577,6 +697,9 @@ iterate'FB c f x0 = go x0
 
 
 -- | 'repeat' @x@ is an infinite list, with @x@ the value of every element.
+--
+-- >>> repeat 17
+--[17,17,17,17,17,17,17,17,17...
 repeat :: a -> [a]
 {-# INLINE [0] repeat #-}
 -- The pragma just gives the rules more chance to fire
@@ -596,6 +719,13 @@ repeatFB c x = xs where xs = x `c` xs
 -- every element.
 -- It is an instance of the more general 'Data.List.genericReplicate',
 -- in which @n@ may be of any integral type.
+--
+-- >>> replicate 0 True
+-- []
+-- >>> replicate (-1) True
+-- []
+-- >>> replicate 4 True
+-- [True,True,True,True]
 {-# INLINE replicate #-}
 replicate               :: Int -> a -> [a]
 replicate n x           =  take n (repeat x)
@@ -603,19 +733,26 @@ replicate n x           =  take n (repeat x)
 -- | 'cycle' ties a finite list into a circular one, or equivalently,
 -- the infinite repetition of the original list.  It is the identity
 -- on infinite lists.
-
+--
+-- >>> cycle []
+-- Exception: Prelude.cycle: empty list
+-- >>> cycle [42]
+-- [42,42,42,42,42,42,42,42,42,42...
+-- >>> cycle [2, 5, 7]
+-- [2,5,7,2,5,7,2,5,7,2,5,7...
 cycle                   :: [a] -> [a]
 cycle []                = errorEmptyList "cycle"
 cycle xs                = xs' where xs' = xs ++ xs'
 
 -- | 'takeWhile', applied to a predicate @p@ and a list @xs@, returns the
--- longest prefix (possibly empty) of @xs@ of elements that satisfy @p@:
+-- longest prefix (possibly empty) of @xs@ of elements that satisfy @p@.
 --
--- > takeWhile (< 3) [1,2,3,4,1,2,3,4] == [1,2]
--- > takeWhile (< 9) [1,2,3] == [1,2,3]
--- > takeWhile (< 0) [1,2,3] == []
---
-
+-- >>> takeWhile (< 3) [1,2,3,4,1,2,3,4]
+-- [1,2]
+-- >>> takeWhile (< 9) [1,2,3]
+-- [1,2,3]
+-- >>> takeWhile (< 0) [1,2,3]
+-- []
 {-# NOINLINE [1] takeWhile #-}
 takeWhile               :: (a -> Bool) -> [a] -> [a]
 takeWhile _ []          =  []
@@ -642,13 +779,14 @@ takeWhileFB p c n = \x r -> if p x then x `c` r else n
                         takeWhileFB (\x -> q x && p x) c n
  #-}
 
--- | 'dropWhile' @p xs@ returns the suffix remaining after 'takeWhile' @p xs@:
+-- | 'dropWhile' @p xs@ returns the suffix remaining after 'takeWhile' @p xs@.
 --
--- > dropWhile (< 3) [1,2,3,4,5,1,2,3] == [3,4,5,1,2,3]
--- > dropWhile (< 9) [1,2,3] == []
--- > dropWhile (< 0) [1,2,3] == [1,2,3]
---
-
+-- >>> dropWhile (< 3) [1,2,3,4,5,1,2,3]
+-- [3,4,5,1,2,3]
+-- >>> dropWhile (< 9) [1,2,3]
+-- []
+-- >>> dropWhile (< 0) [1,2,3]
+-- [1,2,3]
 dropWhile               :: (a -> Bool) -> [a] -> [a]
 dropWhile _ []          =  []
 dropWhile p xs@(x:xs')
@@ -656,14 +794,20 @@ dropWhile p xs@(x:xs')
             | otherwise =  xs
 
 -- | 'take' @n@, applied to a list @xs@, returns the prefix of @xs@
--- of length @n@, or @xs@ itself if @n > 'length' xs@:
+-- of length @n@, or @xs@ itself if @n > 'length' xs@.
 --
--- > take 5 "Hello World!" == "Hello"
--- > take 3 [1,2,3,4,5] == [1,2,3]
--- > take 3 [1,2] == [1,2]
--- > take 3 [] == []
--- > take (-1) [1,2] == []
--- > take 0 [1,2] == []
+-- >>> take 5 "Hello World!"
+-- "Hello"
+-- >>> take 3 [1,2,3,4,5]
+-- [1,2,3]
+-- >>> take 3 [1,2]
+-- [1,2]
+-- >>> take 3 []
+-- []
+-- >>> take (-1) [1,2]
+-- []
+-- >>> take 0 [1,2]
+-- []
 --
 -- It is an instance of the more general 'Data.List.genericTake',
 -- in which @n@ may be of any integral type.
@@ -723,14 +867,20 @@ takeFB c n x xs
 #endif
 
 -- | 'drop' @n xs@ returns the suffix of @xs@
--- after the first @n@ elements, or @[]@ if @n > 'length' xs@:
+-- after the first @n@ elements, or @[]@ if @n > 'length' xs@.
 --
--- > drop 6 "Hello World!" == "World!"
--- > drop 3 [1,2,3,4,5] == [4,5]
--- > drop 3 [1,2] == []
--- > drop 3 [] == []
--- > drop (-1) [1,2] == [1,2]
--- > drop 0 [1,2] == [1,2]
+-- >>> drop 6 "Hello World!"
+-- "World!"
+-- >>> drop 3 [1,2,3,4,5]
+-- [4,5]
+-- >>> drop 3 [1,2]
+-- []
+-- >>> drop 3 []
+-- []
+-- >>> drop (-1) [1,2]
+-- [1,2]
+-- >>> drop 0 [1,2]
+-- [1,2]
 --
 -- It is an instance of the more general 'Data.List.genericDrop',
 -- in which @n@ may be of any integral type.
@@ -756,13 +906,20 @@ drop n ls
 -- | 'splitAt' @n xs@ returns a tuple where first element is @xs@ prefix of
 -- length @n@ and second element is the remainder of the list:
 --
--- > splitAt 6 "Hello World!" == ("Hello ","World!")
--- > splitAt 3 [1,2,3,4,5] == ([1,2,3],[4,5])
--- > splitAt 1 [1,2,3] == ([1],[2,3])
--- > splitAt 3 [1,2,3] == ([1,2,3],[])
--- > splitAt 4 [1,2,3] == ([1,2,3],[])
--- > splitAt 0 [1,2,3] == ([],[1,2,3])
--- > splitAt (-1) [1,2,3] == ([],[1,2,3])
+-- >>> splitAt 6 "Hello World!"
+-- ("Hello ","World!")
+-- >>> splitAt 3 [1,2,3,4,5]
+-- ([1,2,3],[4,5])
+-- >>> splitAt 1 [1,2,3]
+-- ([1],[2,3])
+-- >>> splitAt 3 [1,2,3]
+-- ([1,2,3],[])
+-- >>> splitAt 4 [1,2,3]
+-- ([1,2,3],[])
+-- >>> splitAt 0 [1,2,3]
+-- ([],[1,2,3])
+-- >>> splitAt (-1) [1,2,3]
+-- ([],[1,2,3])
 --
 -- It is equivalent to @('take' n xs, 'drop' n xs)@ when @n@ is not @_|_@
 -- (@splitAt _|_ xs = _|_@).
@@ -789,12 +946,14 @@ splitAt n ls
 -- first element is longest prefix (possibly empty) of @xs@ of elements that
 -- satisfy @p@ and second element is the remainder of the list:
 --
--- > span (< 3) [1,2,3,4,1,2,3,4] == ([1,2],[3,4,1,2,3,4])
--- > span (< 9) [1,2,3] == ([1,2,3],[])
--- > span (< 0) [1,2,3] == ([],[1,2,3])
+-- >>> span (< 3) [1,2,3,4,1,2,3,4]
+-- ([1,2],[3,4,1,2,3,4])
+-- >>> span (< 9) [1,2,3]
+-- ([1,2,3],[])
+-- >>> span (< 0) [1,2,3]
+-- ([],[1,2,3])
 --
 -- 'span' @p xs@ is equivalent to @('takeWhile' p xs, 'dropWhile' p xs)@
-
 span                    :: (a -> Bool) -> [a] -> ([a],[a])
 span _ xs@[]            =  (xs, xs)
 span p xs@(x:xs')
@@ -805,12 +964,14 @@ span p xs@(x:xs')
 -- first element is longest prefix (possibly empty) of @xs@ of elements that
 -- /do not satisfy/ @p@ and second element is the remainder of the list:
 --
--- > break (> 3) [1,2,3,4,1,2,3,4] == ([1,2,3],[4,1,2,3,4])
--- > break (< 9) [1,2,3] == ([],[1,2,3])
--- > break (> 9) [1,2,3] == ([1,2,3],[])
+-- >>> break (> 3) [1,2,3,4,1,2,3,4]
+-- ([1,2,3],[4,1,2,3,4])
+-- >>> break (< 9) [1,2,3]
+-- ([],[1,2,3])
+-- >>> break (> 9) [1,2,3]
+-- ([1,2,3],[])
 --
 -- 'break' @p@ is equivalent to @'span' ('not' . p)@.
-
 break                   :: (a -> Bool) -> [a] -> ([a],[a])
 #if defined(USE_REPORT_PRELUDE)
 break p                 =  span (not . p)
@@ -824,6 +985,15 @@ break p xs@(x:xs')
 
 -- | 'reverse' @xs@ returns the elements of @xs@ in reverse order.
 -- @xs@ must be finite.
+--
+-- >>> reverse []
+-- []
+-- >>> reverse [42]
+-- [42]
+-- >>> reverse [2,5,7]
+-- [7,5,2]
+-- >>> reverse [1..]
+-- * Hangs forever *
 reverse                 :: [a] -> [a]
 #if defined(USE_REPORT_PRELUDE)
 reverse                 =  foldl (flip (:)) []
@@ -834,9 +1004,22 @@ reverse l =  rev l []
     rev (x:xs) a = rev xs (x:a)
 #endif
 
--- | 'and' returns the conjunction of a Boolean list.  For the result to be
+-- | 'and' returns the conjunction of a Boolean list. For the result to be
 -- 'True', the list must be finite; 'False', however, results from a 'False'
 -- value at a finite index of a finite or infinite list.
+--
+-- >>> and []
+-- True
+-- >>> and [True]
+-- True
+-- >>> and [False]
+-- False
+-- >>> and [True, True, False]
+-- False
+-- >>> and (False : repeat True) -- Infinite list [False,True,True,True,True,True,True...
+-- False
+-- >>> and (repeat True)
+-- * Hangs forever *
 and                     :: [Bool] -> Bool
 #if defined(USE_REPORT_PRELUDE)
 and                     =  foldr (&&) True
@@ -851,9 +1034,22 @@ and (x:xs)      =  x && and xs
  #-}
 #endif
 
--- | 'or' returns the disjunction of a Boolean list.  For the result to be
+-- | 'or' returns the disjunction of a Boolean list. For the result to be
 -- 'False', the list must be finite; 'True', however, results from a 'True'
 -- value at a finite index of a finite or infinite list.
+--
+-- >>> or []
+-- False
+-- >>> or [True]
+-- True
+-- >>> or [False]
+-- False
+-- >>> or [True, True, False]
+-- True
+-- >>> or (True : repeat False) -- Infinite list [True,False,False,False,False,False,False...
+-- True
+-- >>> or (repeat False)
+-- * Hangs forever *
 or                      :: [Bool] -> Bool
 #if defined(USE_REPORT_PRELUDE)
 or                      =  foldr (||) False
@@ -869,11 +1065,22 @@ or (x:xs)       =  x || or xs
 #endif
 
 -- | Applied to a predicate and a list, 'any' determines if any element
--- of the list satisfies the predicate.  For the result to be
+-- of the list satisfies the predicate. For the result to be
 -- 'False', the list must be finite; 'True', however, results from a 'True'
--- value for the predicate applied to an element at a finite index of a finite or infinite list.
+-- value for the predicate applied to an element at a finite index of a finite
+-- or infinite list.
+--
+-- >>> any (> 3) []
+-- False
+-- >>> any (> 3) [1,2]
+-- False
+-- >>> any (> 3) [1,2,3,4,5]
+-- True
+-- >>> any (> 3) [1..]
+-- True
+-- >>> any (> 3) [0, -1..]
+-- * Hangs forever *
 any                     :: (a -> Bool) -> [a] -> Bool
-
 #if defined(USE_REPORT_PRELUDE)
 any p                   =  or . map p
 #else
@@ -891,7 +1098,19 @@ any p (x:xs)    = p x || any p xs
 -- | Applied to a predicate and a list, 'all' determines if all elements
 -- of the list satisfy the predicate. For the result to be
 -- 'True', the list must be finite; 'False', however, results from a 'False'
--- value for the predicate applied to an element at a finite index of a finite or infinite list.
+-- value for the predicate applied to an element at a finite index of a finite
+-- or infinite list.
+--
+-- >>> all (> 3) []
+-- True
+-- >>> all (> 3) [1,2]
+-- False
+-- >>> all (> 3) [1,2,3,4,5]
+-- False
+-- >>> all (> 3) [1..]
+-- False
+-- >>> all (> 3) [4..]
+-- * Hangs forever *
 all                     :: (a -> Bool) -> [a] -> Bool
 #if defined(USE_REPORT_PRELUDE)
 all p                   =  and . map p
@@ -911,6 +1130,17 @@ all p (x:xs)    =  p x && all p xs
 -- e.g., @x \`elem\` xs@.  For the result to be
 -- 'False', the list must be finite; 'True', however, results from an element
 -- equal to @x@ found at a finite index of a finite or infinite list.
+--
+-- >>> 3 `elem` []
+-- False
+-- >>> 3 `elem` [1,2]
+-- False
+-- >>> 3 `elem` [1,2,3,4,5]
+-- True
+-- >>> 3 `elem` [1..]
+-- True
+-- >>> 3 `elem` [4..]
+-- * Hangs forever *
 elem                    :: (Eq a) => a -> [a] -> Bool
 #if defined(USE_REPORT_PRELUDE)
 elem x                  =  any (== x)
@@ -925,6 +1155,17 @@ elem x (y:ys)   = x==y || elem x ys
 #endif
 
 -- | 'notElem' is the negation of 'elem'.
+--
+-- >>> 3 `notElem` []
+-- True
+-- >>> 3 `notElem` [1,2]
+-- True
+-- >>> 3 `notElem` [1,2,3,4,5]
+-- False
+-- >>> 3 `notElem` [1..]
+-- False
+-- >>> 3 `notElem` [4..]
+-- * Hangs forever *
 notElem                 :: (Eq a) => a -> [a] -> Bool
 #if defined(USE_REPORT_PRELUDE)
 notElem x               =  all (/= x)
@@ -941,6 +1182,10 @@ notElem x (y:ys)=  x /= y && notElem x ys
 -- | \(\mathcal{O}(n)\). 'lookup' @key assocs@ looks up a key in an association
 -- list.
 --
+-- >>> lookup 2 []
+-- Nothing
+-- >>> lookup 2 [(1, "first")]
+-- Nothing
 -- >>> lookup 2 [(1, "first"), (2, "second"), (3, "third")]
 -- Just "second"
 lookup                  :: (Eq a) => a -> [(a,b)] -> Maybe b
@@ -949,7 +1194,15 @@ lookup  key ((x,y):xys)
     | key == x           =  Just y
     | otherwise         =  lookup key xys
 
--- | Map a function over a list and concatenate the results.
+-- | Map a function returning a list over a list and concatenate the results.
+-- 'concatMap' can be seen as the composition of 'concat' and 'map'.
+--
+-- > concatMap f xs == (concat . map f) xs
+--
+-- >>> concatMap (\i -> [-i,i]) []
+-- []
+-- >>> concatMap (\i -> [-i,i]) [1,2,3]
+-- [-1,1,-2,2,-3,3]
 concatMap               :: (a -> [b]) -> [a] -> [b]
 concatMap f             =  foldr ((++) . f) []
 
@@ -962,6 +1215,13 @@ concatMap f             =  foldr ((++) . f) []
 
 
 -- | Concatenate a list of lists.
+--
+-- >>> concat []
+-- []
+-- >>> concat [[42]]
+-- [42]
+-- >>> concat [[1,2,3], [4,5], [6], []]
+-- [1,2,3,4,5,6]
 concat :: [[a]] -> [a]
 concat = foldr (++) []
 
@@ -1111,18 +1371,27 @@ NB: Zips for larger tuples are in the List module.
 -- | \(\mathcal{O}(\min(m,n))\). 'zip' takes two lists and returns a list of
 -- corresponding pairs.
 --
--- > zip [1, 2] ['a', 'b'] = [(1, 'a'), (2, 'b')]
+-- >>> zip [1, 2] ['a', 'b']
+-- [(1, 'a'), (2, 'b')]
 --
--- If one input list is short, excess elements of the longer list are
--- discarded:
+-- If one input list is shorter than the other, excess elements of the longer
+-- list are discarded, even if one of the lists is infinite:
 --
--- > zip [1] ['a', 'b'] = [(1, 'a')]
--- > zip [1, 2] ['a'] = [(1, 'a')]
+-- >>> zip [1] ['a', 'b']
+-- [(1, 'a')]
+-- >>> zip [1, 2] ['a']
+-- [(1, 'a')]
+-- >>> zip [] [1..]
+-- []
+-- >>> zip [1..] []
+-- []
 --
 -- 'zip' is right-lazy:
 --
--- > zip [] _|_ = []
--- > zip _|_ [] = _|_
+-- >>> zip [] _|_
+-- []
+-- >>> zip _|_ []
+-- _|_
 --
 -- 'zip' is capable of list fusion, but it is restricted to its
 -- first list argument and its resulting list.
@@ -1167,8 +1436,12 @@ zip3FB cons = \a b c r -> (a,b,c) `cons` r
 
 ----------------------------------------------
 -- | \(\mathcal{O}(\min(m,n))\). 'zipWith' generalises 'zip' by zipping with the
--- function given as the first argument, instead of a tupling function. For
--- example, @'zipWith' (+)@ is applied to two lists to produce the list of
+-- function given as the first argument, instead of a tupling function.
+--
+-- > zipWith (,) xs ys == zip xs ys
+-- > zipWith f [x1,x2,x3..] [y1,y2,y3..] == [f x1 y1, f x2 y2, f x3 y3..]
+--
+-- For example, @'zipWith' (+)@ is applied to two lists to produce the list of
 -- corresponding sums:
 --
 -- >>> zipWith (+) [1, 2, 3] [4, 5, 6]
@@ -1176,7 +1449,8 @@ zip3FB cons = \a b c r -> (a,b,c) `cons` r
 --
 -- 'zipWith' is right-lazy:
 --
--- > zipWith f [] _|_ = []
+-- >>> zipWith f [] _|_
+-- []
 --
 -- 'zipWith' is capable of list fusion, but it is restricted to its
 -- first list argument and its resulting list.
@@ -1200,10 +1474,13 @@ zipWithFB c f = \x y r -> (x `f` y) `c` r
   #-}
 
 -- | The 'zipWith3' function takes a function which combines three
--- elements, as well as three lists and returns a list of their point-wise
--- combination, analogous to 'zipWith'.
+-- elements, as well as three lists and returns a list of the function applied
+-- to corresponding elements, analogous to 'zipWith'.
 -- It is capable of list fusion, but it is restricted to its
 -- first list argument and its resulting list.
+--
+-- > zipWith3 (,,) xs ys zs == zip3 xs ys zs
+-- > zipWith3 f [x1,x2,x3..] [y1,y2,y3..] [z1,z2,z3..] == [f x1 y1 z1, f x2 y2 z2, f x3 y3 z3..]
 {-# NOINLINE [1] zipWith3 #-}
 zipWith3                :: (a->b->c->d) -> [a]->[b]->[c]->[d]
 zipWith3 z = go
@@ -1222,6 +1499,11 @@ zipWith3FB cons func = \a b c r -> (func a b c) `cons` r
 
 -- | 'unzip' transforms a list of pairs into a list of first components
 -- and a list of second components.
+--
+-- >>> unzip []
+-- ([],[])
+-- >>> unzip [(1, 'a'), (2, 'b')]
+-- ([1,2],"ab")
 unzip    :: [(a,b)] -> ([a],[b])
 {-# INLINE unzip #-}
 -- Inline so that fusion `foldr` has an opportunity to fire.
@@ -1230,6 +1512,11 @@ unzip    =  foldr (\(a,b) ~(as,bs) -> (a:as,b:bs)) ([],[])
 
 -- | The 'unzip3' function takes a list of triples and returns three
 -- lists, analogous to 'unzip'.
+--
+-- >>> unzip3 []
+-- ([],[],[])
+-- >>> unzip3 [(1, 'a', True), (2, 'b', False)]
+-- ([1,2],"ab",[True,False])
 unzip3   :: [(a,b,c)] -> ([a],[b],[c])
 {-# INLINE unzip3 #-}
 -- Inline so that fusion `foldr` has an opportunity to fire.
