@@ -225,7 +225,8 @@ doingRetainerProfiling( void )
 STATIC_INLINE bool
 doingRootProfiling( void )
 {
-    return RtsFlags.ProfFlags.doHeapProfile == HEAP_BY_ROOT;
+    return RtsFlags.ProfFlags.doHeapProfile == HEAP_BY_ROOT
+        || RtsFlags.ProfFlags.rootSelector;
 }
 #endif /* PROFILING */
 
@@ -662,6 +663,10 @@ closureSatisfiesConstraints( const StgClosure* p )
    // deselected by not being mentioned in the module, CC, or CCS
    // selectors.
    if (!p->header.prof.ccs->selected) {
+       return false;
+   }
+
+   if(RtsFlags.ProfFlags.rootSelector && !rootProfileWasClosureVisited(p)) {
        return false;
    }
 
@@ -1264,10 +1269,14 @@ void heapCensus (Time t)
   census->rtime = TimeToNS(stat_getElapsedTime());
 
 
-  // calculate retainer sets if necessary
 #if defined(PROFILING)
+  // calculate retainer sets if necessary
   if (doingRetainerProfiling()) {
       retainerProfile();
+  }
+
+  if(doingRootProfiling()) {
+      rootProfile( t, census );
   }
 #endif
 
@@ -1276,9 +1285,7 @@ void heapCensus (Time t)
 #endif
 
 #if defined(PROFILING)
-  if(RtsFlags.ProfFlags.doHeapProfile == HEAP_BY_ROOT) {
-      rootProfile( t, census );
-  } else
+  if(RtsFlags.ProfFlags.doHeapProfile != HEAP_BY_ROOT)
 #endif
   {
       // Traverse the heap, collecting the census info
@@ -1297,6 +1304,12 @@ void heapCensus (Time t)
           }
       }
   }
+
+#if defined(PROFILING)
+  // reset visited bits
+  if(doingRootProfiling())
+      endRootProfiling();
+#endif
 
   // dump out the census info
 #if defined(PROFILING)
