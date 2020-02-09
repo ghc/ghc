@@ -301,9 +301,10 @@ traversePushRoot(traverseState *ts, StgClosure *c, StgClosure *cp, stackData dat
  * When return_cb is NULL this function does nothing.
  */
 STATIC_INLINE stackElement *
-traversePushReturn(traverseState *ts, StgClosure *c, stackAccum acc, stackElement *sep)
+traversePushReturn(traverseState *ts, returnClosure_cb return_cb,
+                   StgClosure *c, stackAccum acc, stackElement *sep)
 {
-    if(!ts->return_cb)
+    if(!return_cb)
         return sep;
 
     stackElement se;
@@ -600,7 +601,7 @@ popStackElement(traverseState *ts) {
 }
 
 /**
- *  callReturnAndPopStackElement(): Call 'traversalState.return_cb' and remove a
+ *  callReturnAndPopStackElement(): Call 'return_cb' and remove a
  *  depleted stackElement from the top of the traversal work-stack.
  *
  *  Invariants:
@@ -608,13 +609,12 @@ popStackElement(traverseState *ts) {
  *    empty, in which case popStackElement() is not allowed.
  */
 static void
-callReturnAndPopStackElement(traverseState *ts)
+callReturnAndPopStackElement(traverseState *ts, returnClosure_cb return_cb)
 {
     stackElement *se = ts->stackTop;
 
-    if(ts->return_cb)
-        ts->return_cb(se->c, se->accum,
-                      se->sep->c, &se->sep->accum);
+    if(return_cb)
+        return_cb(se->c, se->accum, se->sep->c, &se->sep->accum);
 
     popStackElement(ts);
 }
@@ -641,7 +641,9 @@ callReturnAndPopStackElement(traverseState *ts)
  *    It is okay to call this function even when the work-stack is empty.
  */
 STATIC_INLINE void
-traversePop(traverseState *ts, StgClosure **c, StgClosure **cp, stackData *data, stackElement **sep)
+traversePop(traverseState *ts, returnClosure_cb return_cb,
+            StgClosure **c, StgClosure **cp,
+            stackData *data, stackElement **sep)
 {
     stackElement *se;
 
@@ -673,7 +675,7 @@ traversePop(traverseState *ts, StgClosure **c, StgClosure **cp, stackData *data,
             popStackElement(ts);
             return;
         } else if (se->info.type == posTypeEmpty) {
-            callReturnAndPopStackElement(ts);
+            callReturnAndPopStackElement(ts, return_cb);
             continue;
         }
 
@@ -848,7 +850,7 @@ out:
     *data = se->data;
     *sep = se;
 
-    if(last && ts->return_cb)
+    if(last && return_cb)
         se->info.type = posTypeEmpty;
     else if(last)
         popStackElement(ts);
@@ -1100,12 +1102,10 @@ resetMutableObjects(traverseState* ts)
     }
 }
 
-/**
- * Traverse all closures on the traversal work-stack, calling 'visit_cb' on each
- * closure. See 'visitClosure_cb' for details.
- */
 void
-traverseWorkStack(traverseState *ts, visitClosure_cb visit_cb)
+traverseWorkStack(traverseState *ts,
+                  visitClosure_cb visit_cb,
+                  returnClosure_cb return_cb)
 {
     // first_child = first child of c
     StgClosure *c, *cp, *first_child;
@@ -1120,7 +1120,7 @@ traverseWorkStack(traverseState *ts, visitClosure_cb visit_cb)
     // child_data = data to associate with current closure's children
 
 loop:
-    traversePop(ts, &c, &cp, &data, &sep);
+    traversePop(ts, return_cb, &c, &cp, &data, &sep);
 
     if (c == NULL) {
         debug("maxStackSize= %d\n", ts->maxStackSize);
@@ -1216,7 +1216,7 @@ inner_loop:
     // would be hard.
     switch (typeOfc) {
     case STACK:
-        sep = traversePushReturn(ts, c, accum, sep);
+        sep = traversePushReturn(ts, return_cb, c, accum, sep);
         traversePushStack(ts, c, sep, child_data,
                     ((StgStack *)c)->sp,
                     ((StgStack *)c)->stack + ((StgStack *)c)->stack_size);
@@ -1226,7 +1226,7 @@ inner_loop:
     {
         StgTSO *tso = (StgTSO *)c;
 
-        sep = traversePushReturn(ts, c, accum, sep);
+        sep = traversePushReturn(ts, return_cb, c, accum, sep);
 
         traversePushClosure(ts, (StgClosure *) tso->stackobj, c, sep, child_data);
         traversePushClosure(ts, (StgClosure *) tso->blocked_exceptions, c, sep, child_data);
@@ -1247,7 +1247,7 @@ inner_loop:
     {
         StgBlockingQueue *bq = (StgBlockingQueue *)c;
 
-        sep = traversePushReturn(ts, c, accum, sep);
+        sep = traversePushReturn(ts, return_cb, c, accum, sep);
 
         traversePushClosure(ts, (StgClosure *) bq->link, c, sep, child_data);
         traversePushClosure(ts, (StgClosure *) bq->bh, c, sep, child_data);
@@ -1259,7 +1259,7 @@ inner_loop:
     {
         StgPAP *pap = (StgPAP *)c;
 
-        sep = traversePushReturn(ts, c, accum, sep);
+        sep = traversePushReturn(ts, return_cb, c, accum, sep);
 
         traversePAP(ts, c, sep, child_data, pap->fun, pap->payload, pap->n_args);
         goto loop;
@@ -1269,14 +1269,14 @@ inner_loop:
     {
         StgAP *ap = (StgAP *)c;
 
-        sep = traversePushReturn(ts, c, accum, sep);
+        sep = traversePushReturn(ts, return_cb, c, accum, sep);
 
         traversePAP(ts, c, sep, child_data, ap->fun, ap->payload, ap->n_args);
         goto loop;
     }
 
     case AP_STACK:
-        sep = traversePushReturn(ts, c, accum, sep);
+        sep = traversePushReturn(ts, return_cb, c, accum, sep);
 
         traversePushClosure(ts, ((StgAP_STACK *)c)->fun, c, sep, child_data);
         traversePushStack(ts, c, sep, child_data,
@@ -1292,12 +1292,12 @@ inner_loop:
     // If first_child is null, c has no child.
     // If first_child is not null, the top stack element points to the next
     // object.
-    if(first_child == NULL && ts->return_cb) { // no children
+    if(first_child == NULL && return_cb) { // no children
         // This is only true when we're pushing additional return frames onto
         // the stack due to return_cb, so don't get any funny ideas about
         // replacing 'cp' by sep.
         ASSERT(sep->c == cp);
-        ts->return_cb(c, accum, cp, &sep->accum);
+        return_cb(c, accum, cp, &sep->accum);
         goto loop;
     } else if (first_child == NULL) { // no children
         goto loop;
@@ -1310,7 +1310,7 @@ inner_loop:
         // See Haskell model code here:
         //
         //     https://gitlab.haskell.org/ghc/ghc/snippets/1461
-        sep = traversePushReturn(ts, c, accum, sep);
+        sep = traversePushReturn(ts, return_cb, c, accum, sep);
     } else {                          // many children
         se.sep = sep;
         se.data = child_data;
