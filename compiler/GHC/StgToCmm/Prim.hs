@@ -1436,6 +1436,7 @@ emitPrimOp dflags = \case
   CasArrayOp -> alwaysExternal
   UnsafeThawSmallArrayOp -> alwaysExternal
   CasSmallArrayOp -> alwaysExternal
+  PlaceByteArrayOp_Char -> alwaysExternal
   NewPinnedByteArrayOp_Char -> alwaysExternal
   NewAlignedPinnedByteArrayOp_Char -> alwaysExternal
   MutableByteArrayIsPinnedOp -> alwaysExternal
