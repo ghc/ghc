@@ -364,6 +364,7 @@ RTS_FUN_DECL(stg_decodeDoublezuInt64zh);
 RTS_FUN_DECL(stg_unsafeThawArrayzh);
 RTS_FUN_DECL(stg_casArrayzh);
 RTS_FUN_DECL(stg_newByteArrayzh);
+RTS_FUN_DECL(stg_placeByteArrayzh);
 RTS_FUN_DECL(stg_newPinnedByteArrayzh);
 RTS_FUN_DECL(stg_newAlignedPinnedByteArrayzh);
 RTS_FUN_DECL(stg_isByteArrayPinnedzh);

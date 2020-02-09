@@ -72,6 +72,17 @@ stg_newByteArrayzh ( W_ n )
     return (p);
 }
 
+stg_placeByteArrayzh ( W_ addr, W_ n )
+{
+    /* Place an ARR_WORDS object header at the given address outside the heap.
+       The caller must arrange for space for the heap object header. */
+    gcptr p;
+    p = addr;
+    SET_HDR(p, stg_ARR_WORDS_info, CCCS);
+    StgArrBytes_bytes(p) = n;
+    return (p);
+}
+
 #define BA_ALIGN 16
 #define BA_MASK  (BA_ALIGN-1)
 

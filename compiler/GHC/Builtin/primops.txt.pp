@@ -1415,6 +1415,13 @@ primop  NewByteArrayOp_Char "newByteArray#" GenPrimOp
    with out_of_line = True
         has_side_effects = True
 
+primop  PlaceByteArrayOp_Char "placeByteArray#" GenPrimOp
+   Addr# -> Int# -> State# s -> (# State# s, MutableByteArray# s #)
+   {Place a new byte array header for the specified size (in bytes), at the
+    specified address outside of the heap, in the specified state thread.}
+   with out_of_line = True
+        has_side_effects = True
+
 primop  NewPinnedByteArrayOp_Char "newPinnedByteArray#" GenPrimOp
    Int# -> State# s -> (# State# s, MutableByteArray# s #)
    {Create a mutable byte array that the GC guarantees not to move.}
