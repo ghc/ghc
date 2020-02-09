@@ -50,6 +50,9 @@
 
 #if defined(USE_LARGE_ADDRESS_SPACE)
 
+#if !defined(CMINUSMINUS)
+
+// If this struct is changed, the CMM macro below must be adjusted to match.
 struct mblock_address_range {
     W_ begin, end;
     W_ padding[6];  // ensure nothing else inhabits this cache line
@@ -60,7 +63,19 @@ extern struct mblock_address_range mblock_address_space;
                                  (W_)(p) < (mblock_address_space.end))
 # define HEAP_ALLOCED_GC(p)     HEAP_ALLOCED(p)
 
+#else /* defined(CMINUSMINUS) */
+
+import mblock_address_space;
+
+# define HEAP_ALLOCED(p)        ((p) >= W_[mblock_address_space + WDS(0)] && \
+                                 (p) <  W_[mblock_address_space + WDS(1)])
+
+#endif
+
 #elif SIZEOF_VOID_P == 4
+
+#if !defined(CMINUSMINUS)
+
 extern StgWord8 mblock_map[];
 
 /* On a 32-bit machine a 4KB table is always sufficient */
@@ -68,6 +83,15 @@ extern StgWord8 mblock_map[];
 # define MBLOCK_MAP_ENTRY(p)    ((StgWord)(p) >> MBLOCK_SHIFT)
 # define HEAP_ALLOCED(p)        mblock_map[MBLOCK_MAP_ENTRY(p)]
 # define HEAP_ALLOCED_GC(p)     HEAP_ALLOCED(p)
+
+#else /* defined(CMINUSMINUS) */
+
+import mblock_map;
+
+# define MBLOCK_MAP_ENTRY(p)    ((p) >> MBLOCK_SHIFT)
+# define HEAP_ALLOCED(p)        I8[mblock_map + MBLOCK_MAP_ENTRY(p)]
+
+#endif
 
 /* -----------------------------------------------------------------------------
    HEAP_ALLOCED for 64-bit machines (without LARGE_ADDRESS_SPACE).
@@ -130,6 +154,11 @@ extern StgWord8 mblock_map[];
 #define MBC_LINE_BITS 0
 #define MBC_TAG_BITS 15
 
+#define MBC_SHIFT      (48 - MBLOCK_SHIFT - MBC_LINE_BITS - MBC_TAG_BITS)
+#define MBC_ENTRIES    (1<<MBC_SHIFT)
+
+#if !defined(CMINUSMINUS)
+
 #if defined(x86_64_HOST_ARCH)
 // 32bits are enough for 'entry' as modern amd64 boxes have
 // only 48bit sized virtual address.
@@ -145,8 +174,6 @@ typedef StgWord8  MBlockMapLine;
 #define MBLOCK_MAP_LINE(p)  (((StgWord)p & 0xffffffff) >> (MBLOCK_SHIFT + MBC_LINE_BITS))
 
 #define MBC_LINE_SIZE  (1<<MBC_LINE_BITS)
-#define MBC_SHIFT      (48 - MBLOCK_SHIFT - MBC_LINE_BITS - MBC_TAG_BITS)
-#define MBC_ENTRIES    (1<<MBC_SHIFT)
 
 extern MbcCacheLine mblock_cache[];
 
@@ -216,6 +243,39 @@ StgBool HEAP_ALLOCED_GC(const void *p)
         return b;
     }
 }
+
+#else /* defined(CMINUSMINUS) */
+
+// See comments about MbcCacheLine above
+#if defined(x86_64_HOST_ARCH)
+#define MbcCacheLine I32
+#else
+#define MbcCacheLine I64
+#endif
+
+import mblock_cache;
+
+// This is a CMM translation of the HEAP_ALLOCED C function above.
+// Since it is big and compilicated it does not fit into an CMM expression
+// context like the HEAP_ALLOCED macro versions elsewhere in this file.
+// So we define it to be used in a statement "callish op" style.
+#define HEAP_ALLOCED_CALLISH(result, p)                             \
+    W_ mblock, entry_no, value;                                     \
+    MbcCacheLine entry;                                             \
+    CInt r;                                                         \
+                                                                    \
+    mblock   = p >> MBLOCK_SHIFT;                                   \
+    entry_no = mblock & (MBC_ENTRIES-1);                            \
+    entry    = MbcCacheLine[mblock_cache + (entry_no >> 2)];        \
+    value    = TO_W_(entry) ^ (mblock << 1);                        \
+    if (value <= 1) {                                               \
+        result = value;                                             \
+    } else {                                                        \
+        (r) = ccall HEAP_ALLOCED_miss(mblock, p "ptr");             \
+        result = TO_W_(r);                                          \
+    }
+
+#endif
 
 #else
 # error HEAP_ALLOCED not defined
