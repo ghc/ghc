@@ -99,6 +99,9 @@ static int  openStatsFile (
 static StgWord64 decodeSize (
     const char *flag, uint32_t offset, StgWord64 min, StgWord64 max);
 
+static bool checkDouble (
+    const char *orig, char *endptr);
+
 static void bad_option (const char *s);
 
 #if defined(DEBUG)
@@ -1330,7 +1333,7 @@ error = true;
                     char *endptr;
                     double intervalSeconds = strtod(rts_argv[arg]+2, &endptr);
 
-                    if (intervalSeconds <= 0.0 && (errno != 0 || endptr == rts_argv[arg]+2)) {
+                    if (errno != 0 || !checkDouble(rts_argv[arg]+2, endptr)) {
                         errorBelch("bad value for -i");
                         error = true;
                     }
@@ -1348,7 +1351,7 @@ error = true;
                     char *endptr;
                     double intervalSeconds = strtod(rts_argv[arg]+2, &endptr);
 
-                    if (intervalSeconds <= 0.0 && (errno != 0 || endptr == rts_argv[arg]+2)) {
+                    if (errno != 0 || !checkDouble(rts_argv[arg]+2, endptr)) {
                         errorBelch("bad value for -C");
                         error = true;
                     }
@@ -1366,7 +1369,7 @@ error = true;
                     char *endptr;
                     double intervalSeconds = strtod(rts_argv[arg]+2, &endptr);
 
-                    if (intervalSeconds <= 0.0 && (errno != 0 || endptr == rts_argv[arg]+2)) {
+                    if (errno != 0 || !checkDouble(rts_argv[arg]+2, endptr)) {
                         errorBelch("bad value for -V");
                         error = true;
                     }
@@ -1932,6 +1935,24 @@ decodeSize(const char *flag, uint32_t offset, StgWord64 min, StgWord64 max)
     }
 
     return val;
+}
+
+/* -----------------------------------------------------------------------------
+ * checkDouble: check whether argument passed in is a valid double literal
+-------------------------------------------------------------------------- */
+
+static bool
+checkDouble(const char *orig, char *endptr)
+{
+    if (endptr == orig) {
+        return false;
+    }
+
+    while (isspace((unsigned char)*endptr)) {
+        ++endptr;
+    }
+
+    return (*endptr == 0);
 }
 
 #if defined(DEBUG)
