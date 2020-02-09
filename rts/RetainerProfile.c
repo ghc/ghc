@@ -408,7 +408,7 @@ computeRetainerSet( traverseState *ts )
     // Remember old stable name addresses.
     rememberOldStableNameAddresses ();
 
-    traverseWorkStack(ts, &retainVisitClosure);
+    traverseWorkStack(ts, &retainVisitClosure, NULL);
 }
 
 /* -----------------------------------------------------------------------------

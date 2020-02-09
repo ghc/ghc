@@ -164,24 +164,6 @@ typedef struct traverseState_ {
      *   some value no greater than the actual depth of the graph.
      */
     int stackSize, maxStackSize;
-
-    /**
-     * Callback called when processing of a closure 'c' is complete, i.e. when
-     * all it's children have been processed. Note: This includes leaf nodes
-     * without children.
-     *
-     * @param c     The closure who's processing just completed.
-     * @param acc   The current value of the accumulator for 'c' on the
-     *              stack. It's about to be removed, hence the 'const'
-     *              qualifier. This is the same accumulator 'visit_cb' got
-     *              passed when 'c' was visited.
-     *
-     * @param c_parent    The parent closure of 'c'
-     * @param acc_parent  The accumulator associated with 'c_parent', currently
-     *                    on the stack.
-     */
-    void (*return_cb)(StgClosure *c, const stackAccum acc,
-                      StgClosure *c_parent, stackAccum *acc_parent);
 } traverseState;
 
 /**
@@ -203,6 +185,27 @@ typedef bool (*visitClosure_cb) (
     const bool first_visit,
     stackAccum *accum,
     stackData *child_data);
+
+/**
+ * Callback called when processing of a closure 'c' is complete, i.e. when
+ * all it's children have been processed. Note: This includes leaf nodes
+ * without children.
+ *
+ * @param c     The closure who's processing just completed.
+ * @param acc   The current value of the accumulator for 'c' on the
+ *              stack. It's about to be removed, hence the 'const'
+ *              qualifier. This is the same accumulator 'visit_cb' got
+ *              passed when 'c' was visited.
+ *
+ * @param c_parent    The parent closure of 'c'
+ * @param acc_parent  The accumulator associated with 'c_parent', currently
+ *                    on the stack.
+ */
+typedef void (*returnClosure_cb) (
+    StgClosure *c,
+    const stackAccum acc,
+    StgClosure *c_parent, \
+    stackAccum *acc_parent);
 
 /**
  * Get data stored in closure header. The two lowest bits are always returned as
@@ -249,7 +252,18 @@ bool traverseMaybeInitClosureData(const traverseState* ts, StgClosure *c);
  */
 void traverseInvalidateAllClosureData(traverseState* ts);
 
-void traverseWorkStack(traverseState *ts, visitClosure_cb visit_cb);
+/**
+ * Traverse all closures on the traversal work-stack as well as their children,
+ * calling 'visit_cb' each time a closure is visited. See 'visitClosure_cb' for
+ * details. When a all of a closures children have been processed and
+ * 'return_cb' is non-NULL 'return_cb' is called. See 'returnClosure_cb' for
+ * details.
+ */
+void traverseWorkStack(
+    traverseState *ts,
+    visitClosure_cb visit_cb,
+    returnClosure_cb return_cb);
+
 void traversePushRoot(traverseState *ts, StgClosure *c, StgClosure *cp, stackData data);
 void traversePushClosure(traverseState *ts, StgClosure *c, StgClosure *cp, stackElement *sep, stackData data);
 
