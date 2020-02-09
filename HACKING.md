@@ -12,7 +12,7 @@ The home for GHC hackers is our GitLab instance, located here:
 
 <https://gitlab.haskell.org/ghc/ghc>
 
-From here, you can file bugs (or look them up,) use the wiki, view the
+From here, you can file bugs (or look them up), use the wiki, view the
 `git` history, among other things. Of particular note is the building
 page, which has the high level overview of the build process and how
 to get the source:
@@ -34,7 +34,7 @@ $ git clone --recursive git@gitlab.haskell.org:ghc/ghc.git
 ```
 
 On Windows, you need an extra repository containing some build tools.
-These can be downloaded for you by configure. This only needs to be done once by running:
+These can be downloaded for you by `configure`. This only needs to be done once by running:
 
 ```
 $ ./configure --enable-tarballs-autodownload
@@ -50,7 +50,7 @@ $ ... double-check mk/build.mk ...
 ```
 
 Now build. The convenient `validate` script will build the tree in a way which
-is both quick to build and consistent with our testsuite,
+is both quick to build and consistent with our testsuite:
 
 ```
 $ ./validate --build-only
@@ -62,15 +62,15 @@ newly built compiler.
 Now, hack on your copy and rebuild (with `make`) as necessary.
 
 Then start by making your commits however you want. When you're done, you can submit
- a pull request on Github for small changes. For larger changes the patch needs to be
- submitted to [GitLab](https://gitlab.haskell.org/ghc/ghc/merge_requests) for code review.
- The GHC Wiki has a good summary for the [overall process](https://gitlab.haskell.org/ghc/ghc/wikis/working-conventions/fixing-bugs).
+a pull request on Github for small changes. For larger changes the patch needs to be
+submitted to [GitLab](https://gitlab.haskell.org/ghc/ghc/merge_requests) for code review.
+The GHC Wiki has a good summary for the [overall process](https://gitlab.haskell.org/ghc/ghc/wikis/working-conventions/fixing-bugs). One or several reviewers will review your PR, and when they are ok with your changes, they will assign the PR to [Marge Bot](https://gitlab.haskell.org/marge-bot) which will automatically rebase, batch and then merge your PR (assuming the build passes).
 
 
 Useful links:
 =============
 
-An overview of things like using git, the release process, filing bugs
+An overview of things like using Git, the release process, filing bugs
 and more can be located here:
 
 <https://gitlab.haskell.org/ghc/ghc/wikis/contributing>
@@ -93,8 +93,6 @@ and type information of the GHC sources is available at:
 
 Look for `GHC` in `Package-name`. For example, here is the link to
 [GHC-8.6.5](https://haskell-code-explorer.mfix.io/package/ghc-8.6.5).
-
-
 
 If you want to watch issues and code review activities, the following page is a good start:
 
