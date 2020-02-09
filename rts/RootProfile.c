@@ -14,6 +14,7 @@
 #include "PosixSource.h"
 #include "Rts.h"
 
+#include "RtsFlags.h"
 #include "Profiling.h"
 #include "TraverseHeap.h"
 #include "ProfHeapInternal.h"
@@ -180,6 +181,29 @@ StgWord setRootProfPtrs(StgWord n, HsStablePtr *sps, const char** descs)
     return 0;
 }
 
+static void
+rootProfileVisitRoots(visitClosure_cb visit_cb, returnClosure_cb return_cb)
+{
+    traverseState *ts = &g_rootTraverseState;
+    struct rootProfState *ps = &g_rootProfState;
+
+    traverseInvalidateAllClosureData(ts);
+    for(StgWord i = 0; i < ps->n_roots; i++) {
+        StgClosure *c = (StgClosure*)deRefStablePtr(ps->roots[i]);
+        debug(2, "\npush %s, root=%lu, %p\n", ps->descs[i], i, c);
+
+        current_root = i;
+        traversePushClosure(ts, c, c, NULL, nullStackData);
+        traverseWorkStack(ts, visit_cb, return_cb);
+    }
+}
+
+bool rootProfileWasClosureVisited(const StgClosure *c)
+{
+    traverseState *ts = &g_rootTraverseState;
+    return traverseIsClosureDataValid(ts, c);
+}
+
 /**
  * Perform root profiling.
  *
@@ -191,9 +215,8 @@ void
 rootProfile(Time t, Census *census)
 {
     (void) t;
-    traverseState *ts = &g_rootTraverseState;
     struct rootProfState *ps = &g_rootProfState;
-    initializeTraverseStack(ts);
+    initializeTraverseStack(&g_rootTraverseState);
 
     if(ps->n_roots == 0)
         return;
@@ -222,24 +245,7 @@ rootProfile(Time t, Census *census)
 
     debug(2, "\n=== root profile ===\n");
 
-    traverseInvalidateAllClosureData(ts);
-    for(StgWord i = 0; i < ps->n_roots; i++) {
-        StgClosure *c = (StgClosure*)deRefStablePtr(ps->roots[i]);
-        debug(2, "\npush %s, root=%lu, %p\n", ps->descs[i], i, c);
-
-        current_root = i;
-        traversePushClosure(ts, c, c, NULL, nullStackData);
-        traverseWorkStack(ts, &rootVisit, NULL);
-    }
-
-    traverseInvalidateAllClosureData(ts);
-    for(StgWord i = 0; i < ps->n_roots; i++) {
-        StgClosure *c = (StgClosure*)deRefStablePtr(ps->roots[i]);
-        traversePushClosure(ts, c, c, NULL, nullStackData);
-    }
-
-    traverseWorkStack(ts, NULL, NULL);
-
+    rootProfileVisitRoots(&rootVisit, NULL);
 
     debug(2, "\n\n\n=== result ===\n");
 
@@ -253,16 +259,22 @@ rootProfile(Time t, Census *census)
 
         debug(1, "bin %s = %lu\n", identity, ps->sizes[i]);
 
-        counter *ctr = lookupHashTable(census->hash, i);
-        if(!ctr) {
-            ctr = heapInsertNewCounter(census, i);
-            ctr->identity = identity;
+        if(RtsFlags.ProfFlags.doHeapProfile == HEAP_BY_ROOT) {
+            counter *ctr = lookupHashTable(census->hash, i);
+            if(!ctr) {
+                ctr = heapInsertNewCounter(census, i);
+                ctr->identity = identity;
+            }
+
+            ctr->c.resid = ps->sizes[i];
         }
-
-        ctr->c.resid = ps->sizes[i];
     }
+}
 
-    closeTraverseStack(ts);
+void endRootProfiling(void)
+{
+    rootProfileVisitRoots(NULL, NULL);
+    closeTraverseStack(&g_rootTraverseState);
 }
 
 #endif /* PROFILING */
