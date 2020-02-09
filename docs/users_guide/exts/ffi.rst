@@ -768,6 +768,37 @@ the different kinds of allocation perform with GHC.
     more efficient. We do plan to provide an improved-performance
     implementation of Pools in the future, however.
 
+Foreign allocation of native byte arrays
+^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+
+GHC allows ``ByteArray#`` and ``MutableByteArray#`` to be allocated
+outside of the GHC heap. This enables manually allocated data to be
+represented as these native types. It is also possible to attach weak
+pointers with finalisers to these byte array types. For example, in
+principle it is possible to arrange for a memory mapped file to be
+presented as a byte array, including a weak pointer finaliser to unmap
+the file after it is no longer referenced. This can be useful because
+these native types are used directly or indirectly by many libraries.
+It does however require some care and attention.
+
+The in-memory representation of ``ByteArray#`` and ``MutableByteArray#``
+are exactly the same whether inside or outside the heap. In particular
+they use a few prefix words for the object header and array size field.
+Note that the object header size is different for normal and profiling
+builds. When allocating in foreign memory, space must be made available
+for this in the memory layout immediately before the data payload.
+
+In C code, ``#include "rts.h"`` and use ``sizeOf(StgArrBytes)`` or
+``sizeOfW(StgArrBytes)`` to get the size of a byte array heap object
+header in bytes or words respectively. This is the space that must be
+reserved at the memory location immediately before the intended payload.
+Then use the primop ``placeByteArray#`` to place the heap object header
+at the intended location with the appropriate payload size in bytes.
+
+To add a finaliser, use GHC's weak pointer support. If appropriate make
+use of the ability to use C functions for finalisers.
+
+
 .. _ffi-threads:
 
 Multi-threading and the FFI
