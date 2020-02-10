@@ -1,3 +1,4 @@
+{-# LANGUAGE Safe #-}
 -----------------------------------------------------------------------------
 -- |
 -- Module      :  Language.Haskell.TH.LanguageExtensions

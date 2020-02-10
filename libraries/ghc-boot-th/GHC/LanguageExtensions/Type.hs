@@ -8,7 +8,7 @@
 --
 -- A data type defining the language extensions supported by GHC.
 --
-{-# LANGUAGE DeriveGeneric #-}
+{-# LANGUAGE DeriveGeneric, Safe #-}
 module GHC.LanguageExtensions.Type ( Extension(..) ) where
 
 import Prelude -- See note [Why do we import Prelude here?]
