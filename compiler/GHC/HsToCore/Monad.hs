@@ -6,9 +6,13 @@
 Monadery used in desugaring
 -}
 
-{-# LANGUAGE FlexibleInstances, FlexibleContexts #-}
-{-# OPTIONS_GHC -fno-warn-orphans #-}  -- instance MonadThings is necessarily an orphan
+{-# LANGUAGE DeriveFunctor #-}
+{-# LANGUAGE FlexibleContexts #-}
+{-# LANGUAGE FlexibleInstances #-}
+{-# LANGUAGE LambdaCase #-}
 {-# LANGUAGE ViewPatterns #-}
+
+{-# OPTIONS_GHC -fno-warn-orphans #-}  -- instance MonadThings is necessarily an orphan
 
 module GHC.HsToCore.Monad (
         DsM, mapM, mapAndUnzipM,
@@ -42,8 +46,7 @@ module GHC.HsToCore.Monad (
 
         -- Data types
         DsMatchContext(..),
-        EquationInfo(..), MatchResult(..), DsWrapper, idDsWrapper,
-        CanItFail(..), orFail,
+        EquationInfo(..), MatchResult'(..), MatchResult, runMatchResult, DsWrapper, idDsWrapper,
 
         -- Levity polymorphism
         dsNoLevPoly, dsNoLevPolyExpr, dsWhenNoErrs,
@@ -134,21 +137,37 @@ idDsWrapper e = e
 --      \fail. wrap (case vs of { pats -> rhs fail })
 -- where vs are not bound by wrap
 
+-- | This is a value of type a with potentially a CoreExpr-shaped hole in it.
+-- This is used to deal with cases where we are potentially handling pattern
+-- match failure, and want to later specify how failure is handled.
+data MatchResult' a
+  -- | We represent the case where there is no hole without a function from
+  -- 'CoreExpr', like this, because sometimes we have nothing to put in the
+  -- hole and so want to be sure there is in fact no hole.
+  = MR_Infallible (DsM a)
+  | MR_Fallible (CoreExpr -> DsM a)
+  deriving (Functor)
 
--- A MatchResult is an expression with a hole in it
-data MatchResult
-  = MatchResult
-        CanItFail       -- Tells whether the failure expression is used
-        (CoreExpr -> DsM CoreExpr)
-                        -- Takes a expression to plug in at the
-                        -- failure point(s). The expression should
-                        -- be duplicatable!
+-- | Product is an "or" on falliblity---the combined match result is infallible
+-- only if the left and right argument match results both were.
+--
+-- This is useful for combining a bunch of alternatives together and then
+-- getting the overall falliblity of the entire group. See 'mkDataConCase' for
+-- an example.
+instance Applicative MatchResult' where
+  pure v = MR_Infallible (pure v)
+  MR_Infallible f <*> MR_Infallible x = MR_Infallible (f <*> x)
+  f <*> x = MR_Fallible $ \fail -> runMatchResult fail f <*> runMatchResult fail x
 
-data CanItFail = CanFail | CantFail
+-- This is a CoreExpr with potentially a CoreExpr hole in it, which is the most common case.
+type MatchResult = MatchResult' CoreExpr
 
-orFail :: CanItFail -> CanItFail -> CanItFail
-orFail CantFail CantFail = CantFail
-orFail _        _        = CanFail
+-- Given a fail expression to use, and a MatchResult, compute the filled CoreExpr whether
+-- the MatchResult was failable or not.
+runMatchResult :: CoreExpr -> MatchResult' a -> DsM a
+runMatchResult fail = \case
+  MR_Infallible body -> body
+  MR_Fallible body_fn -> body_fn fail
 
 {-
 ************************************************************************
