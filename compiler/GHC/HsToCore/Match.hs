@@ -248,7 +248,7 @@ match (v:vs) ty eqns    -- Eqns *can* be empty
 matchEmpty :: MatchId -> Type -> DsM (NonEmpty MatchResult)
 -- See Note [Empty case expressions]
 matchEmpty var res_ty
-  = return [MatchResult CanFail mk_seq]
+  = return [MR_Fallible mk_seq]
   where
     mk_seq fail = return $ mkWildCase (Var var) (idType var) res_ty
                                       [(DEFAULT, [], fail)]
