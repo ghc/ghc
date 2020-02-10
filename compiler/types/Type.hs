@@ -2965,11 +2965,21 @@ tyConAppNeedsKindSig spec_inj_pos tc n_args
         _              -> emptyFV
 
     source_of_injectivity Required  = True
-    source_of_injectivity (Invisible spec) = case spec of -- GJ : TODO Issue
+    -- See Note [Explicit Case Statement for Specificity]
+    source_of_injectivity (Invisible spec) = case spec of
       SpecifiedSpec -> spec_inj_pos
       InferredSpec  -> False
 
 {-
+Note [Explicit Case Statement for Specificity]
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+When pattern matching against an `ArgFlag`, you should not pattern match against
+the pattern synonyms 'Specified' or 'Inferred', as this results in a
+non-exhaustive pattern match warning.
+Instead, pattern match against 'Invisible spec' and do another case analysis on
+this specificity argument.
+GJ : TODO Link a bug report for this.
+
 Note [When does a tycon application need an explicit kind signature?]
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 There are a couple of places in GHC where we convert Core Types into forms that
