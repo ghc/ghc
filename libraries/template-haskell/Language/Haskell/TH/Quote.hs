@@ -1,4 +1,4 @@
-{-# LANGUAGE RankNTypes, ScopedTypeVariables #-}
+{-# LANGUAGE RankNTypes, ScopedTypeVariables, Safe #-}
 {- |
 Module : Language.Haskell.TH.Quote
 Description : Quasi-quoting support for Template Haskell
