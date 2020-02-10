@@ -650,7 +650,8 @@ instance Outputable tv => Outputable (VarBndr tv TyConBndrVis) where
       ppr_bi (AnonTCB VisArg)     = text "anon-vis"
       ppr_bi (AnonTCB InvisArg)   = text "anon-invis"
       ppr_bi (NamedTCB Required)  = text "req"
-      ppr_bi (NamedTCB (Invisible spec)) = case spec of -- GJ : TODO issue
+      -- See Note [Explicit Case Statement for Specificity]
+      ppr_bi (NamedTCB (Invisible spec)) = case spec of
         SpecifiedSpec -> text "spec"
         InferredSpec  -> text "inf"
 

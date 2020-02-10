@@ -629,7 +629,8 @@ data TyCoBinder
 instance Outputable TyCoBinder where
   ppr (Anon af ty) = ppr af <+> ppr ty
   ppr (Named (Bndr v Required))  = ppr v
-  ppr (Named (Bndr v (Invisible spec))) = case spec of -- GJ : TODO Issue
+  -- See Note [Explicit Case Statement for Specificity]
+  ppr (Named (Bndr v (Invisible spec))) = case spec of
     SpecifiedSpec -> char '@' <> ppr v
     InferredSpec  -> braces (ppr v)
 
