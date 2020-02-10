@@ -89,7 +89,7 @@ extern StgWord8 mblock_map[];
 import mblock_map;
 
 # define MBLOCK_MAP_ENTRY(p)    ((p) >> MBLOCK_SHIFT)
-# define HEAP_ALLOCED(p)        I8[mblock_map + MBLOCK_MAP_ENTRY(p)]
+# define HEAP_ALLOCED(p)        (TO_W_(I8[mblock_map + MBLOCK_MAP_ENTRY(p)]) != 0)
 
 #endif
 
