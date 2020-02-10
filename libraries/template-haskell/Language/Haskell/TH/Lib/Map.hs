@@ -1,4 +1,5 @@
 {-# LANGUAGE BangPatterns #-}
+{-# LANGUAGE Safe #-}
 
 -- This is a non-exposed internal module
 --
