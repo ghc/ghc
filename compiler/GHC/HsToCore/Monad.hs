@@ -6,11 +6,16 @@
 Monadery used in desugaring
 -}
 
-{-# LANGUAGE FlexibleInstances, FlexibleContexts #-}
-{-# OPTIONS_GHC -fno-warn-orphans #-}  -- instance MonadThings is necessarily an orphan
+{-# LANGUAGE DeriveFunctor #-}
+{-# LANGUAGE FlexibleContexts #-}
+{-# LANGUAGE FlexibleInstances #-}
+{-# LANGUAGE LambdaCase #-}
 {-# LANGUAGE ViewPatterns #-}
 
+{-# OPTIONS_GHC -fno-warn-orphans #-}  -- instance MonadThings is necessarily an orphan
 module GHC.HsToCore.Monad (
+
+module DsMonad (
         DsM, mapM, mapAndUnzipM,
         initDs, initDsTc, initTcDsForSolver, initDsWithModGuts, fixDs,
         foldlM, foldrM, whenGOptM, unsetGOptM, unsetWOptM, xoptM,
@@ -42,8 +47,7 @@ module GHC.HsToCore.Monad (
 
         -- Data types
         DsMatchContext(..),
-        EquationInfo(..), MatchResult(..), DsWrapper, idDsWrapper,
-        CanItFail(..), orFail,
+        EquationInfo(..), MatchResult'(..), MatchResult, runMatchResult, DsWrapper, idDsWrapper,
 
         -- Levity polymorphism
         dsNoLevPoly, dsNoLevPolyExpr, dsWhenNoErrs,
@@ -134,21 +138,28 @@ idDsWrapper e = e
 --      \fail. wrap (case vs of { pats -> rhs fail })
 -- where vs are not bound by wrap
 
+-- This is a value of type a with potentially a CoreExpr-shaped hole in it. We explicitly represent
+-- the case where there is no hole. This is used to deal with cases where we are potentially handling
+-- pattern match failure, and want to later specify how failure is handled.
+data MatchResult' a
+  = MatchResult_Unfailable (DsM a)
+  | MatchResult_Failable (CoreExpr -> DsM a)
+  deriving (Functor)
 
--- A MatchResult is an expression with a hole in it
-data MatchResult
-  = MatchResult
-        CanItFail       -- Tells whether the failure expression is used
-        (CoreExpr -> DsM CoreExpr)
-                        -- Takes a expression to plug in at the
-                        -- failure point(s). The expression should
-                        -- be duplicatable!
+instance Applicative MatchResult' where
+  pure v = MatchResult_Unfailable (pure v)
+  MatchResult_Unfailable f <*> MatchResult_Unfailable x = MatchResult_Unfailable (f <*> x)
+  f <*> x = MatchResult_Failable $ \fail -> runMatchResult fail f <*> runMatchResult fail x
 
-data CanItFail = CanFail | CantFail
+-- This is a CoreExpr with potentially a CoreExpr hole in it, which is the most common case.
+type MatchResult = MatchResult' CoreExpr
 
-orFail :: CanItFail -> CanItFail -> CanItFail
-orFail CantFail CantFail = CantFail
-orFail _        _        = CanFail
+-- Given a fail expression to use, and a MatchResult, compute the filled CoreExpr whether
+-- the MatchResult was failable or not.
+runMatchResult :: CoreExpr -> MatchResult' a -> DsM a
+runMatchResult fail = \case
+  MatchResult_Unfailable body -> body
+  MatchResult_Failable body_fn -> body_fn fail
 
 {-
 ************************************************************************
