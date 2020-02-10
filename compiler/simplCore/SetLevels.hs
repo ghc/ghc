@@ -1007,18 +1007,17 @@ notWorthFloating e abs_vars
     go (Tick t e) n  = not (tickishIsCode t) && go e n
     go (Cast e _)  n = go e n
     go (App e arg) n
-       | Type {}     <- arg = go e n
-       | Coercion {} <- arg = go e n
-       | n==0               = False
-       | is_triv arg        = go e (n-1)
-       | otherwise          = False
-    go _ _                  = False
+       -- See Note [Floating applications to coercions]
+       | Type {} <- arg = go e n
+       | n==0           = False
+       | is_triv arg    = go e (n-1)
+       | otherwise      = False
+    go _ _              = False
 
     is_triv (Lit {})              = True        -- Treat all literals as trivial
     is_triv (Var {})              = True        -- (ie not worth floating)
     is_triv (Cast e _)            = is_triv e
-    is_triv (App e (Type {}))     = is_triv e
-    is_triv (App e (Coercion {})) = is_triv e
+    is_triv (App e (Type {}))     = is_triv e   -- See Note [Floating applications to coercions]
     is_triv (Tick t e)            = not (tickishIsCode t) && is_triv e
     is_triv _                     = False
 
@@ -1032,6 +1031,14 @@ Hence the litIsTrivial.
 Ditto literal strings (LitString), which we'd like to float to top
 level, which is now possible.
 
+Note [Floating applications to coercions]
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+We don’t float out variables applied only to type arguments, since the
+extra binding would be pointless: type arguments are completely erased.
+But *coercion* arguments aren’t (see Note [Coercion tokens] in
+CoreToStg.hs and Note [Count coercion arguments in boring contexts] in
+CoreUnfold.hs), so we still want to float out variables applied only to
+coercion arguments.
 
 Note [Escaping a value lambda]
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
