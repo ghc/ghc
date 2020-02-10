@@ -2,6 +2,11 @@ TOP=../../..
 include $(TOP)/mk/boilerplate.mk
 include $(TOP)/mk/test.mk
 
+T17787:
+	$(RM) -f T17787.o T17787.hi
+	'$(TEST_HC)' $(TEST_HC_OPTS) -O -c -ddump-simpl -dsuppress-uniques T17787.hs 2> /dev/null | grep 'foo'
+	# Expecting $WC to not be inlined so the closure is shared
+
 T17409:
 	$(RM) -f T17409.o T17409.hi
 	- '$(TEST_HC)' $(TEST_HC_OPTS) -O -c -dverbose-core2core -dsuppress-uniques T17409.hs 2> /dev/null | grep '\<id\>'

@@ -444,8 +444,9 @@ inlineBoringOk e
     go :: Int -> CoreExpr -> Bool
     go credit (Lam x e) | isId x           = go (credit+1) e
                         | otherwise        = go credit e
-    go credit (App f a) | isTyCoArg a      = go credit f
-                        | credit > 0
+        -- See Note [Count coercion arguments in boring contexts]
+    go credit (App f (Type {}))            = go credit f
+    go credit (App f a) | credit > 0
                         , exprIsTrivial a  = go (credit-1) f
     go credit (Tick _ e)                   = go credit e -- dubious
     go credit (Cast e _)                   = go credit e
@@ -591,6 +592,29 @@ Things to note:
     NB: you might think that PostInlineUnconditionally would do this
     but it doesn't fire for top-level things; see SimplUtils
     Note [Top level and postInlineUnconditionally]
+
+Note [Count coercion arguments in boring contexts]
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+In inlineBoringOK, we ignore type arguments when deciding whether an
+expression is okay to inline into boring contexts. This is good, since
+if we have a definition like
+
+  let y = x @Int in f y y
+
+there’s no reason not to inline y at both use sites — no work is
+actually duplicated. It may seem like the same reasoning applies to
+coercion arguments, and indeed, in #17182 we changed inlineBoringOK to
+treat coercions the same way.
+
+However, this isn’t a good idea: unlike type arguments, which have
+no runtime representation, coercion arguments *do* have a runtime
+representation (albeit the zero-width VoidRep, see Note [Coercion tokens]
+in CoreToStg.hs). This caused trouble in #17787 for DataCon wrappers for
+nullary GADT constructors: the wrappers would be inlined and each use of
+the constructor would lead to a separate allocation instead of just
+sharing the wrapper closure.
+
+The solution: don’t ignore coercion arguments after all.
 -}
 
 uncondInline :: CoreExpr -> Arity -> Int -> Bool
