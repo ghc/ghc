@@ -1,3 +1,4 @@
+{-# LANGUAGE Safe #-}
 -- | contains a prettyprinter for the
 -- Template Haskell datatypes
 
