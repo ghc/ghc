@@ -5,9 +5,6 @@ module ExplicitSpecificity where
 import Data.Proxy
 import Data.Kind
 
--- GJ : Write tests that fail
--- should also include tests for {} in kind families, etc
-
 foo1 :: a -> a
 foo1 x = x
 

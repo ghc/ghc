@@ -698,7 +698,8 @@ typeToLHsType ty
       foldl' (\f (arg, flag) ->
                let arg' = go arg in
                case flag of
-                 Invisible spec -> case spec of -- GJ : TODO Issue
+                 -- See Note [Explicit Case Statement for Specificity]
+                 Invisible spec -> case spec of
                    InferredSpec  -> f
                    SpecifiedSpec -> f `nlHsAppKindTy` arg'
                  Required  -> f `nlHsAppTy`     arg')
