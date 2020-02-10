@@ -982,10 +982,9 @@ do_push_closure (StgClosure **p, void *user)
 static void
 mark_large_bitmap (MarkQueue *queue,
                    StgClosure **p,
-                   StgLargeBitmap *large_bitmap,
-                   StgWord size)
+                   StgLargeBitmap *large_bitmap)
 {
-    walk_large_bitmap(do_push_closure, p, large_bitmap, size, queue);
+    walk_large_bitmap(do_push_closure, p, large_bitmap, queue);
 }
 
 static void
@@ -1018,10 +1017,14 @@ void mark_PAP_payload (MarkQueue *queue,
         bitmap = BITMAP_BITS(fun_info->f.b.bitmap);
         goto small_bitmap;
     case ARG_GEN_BIG:
-        mark_large_bitmap(queue, payload, GET_FUN_LARGE_BITMAP(fun_info), size);
+    {
+        ASSERT(GET_FUN_LARGE_BITMAP(fun_info)->size == size);
+        mark_large_bitmap(queue, payload, GET_FUN_LARGE_BITMAP(fun_info));
         break;
+    }
     case ARG_BCO:
-        mark_large_bitmap(queue, payload, BCO_BITMAP(fun), size);
+        ASSERT(BCO_BITMAP(fun)->size == size);
+        mark_large_bitmap(queue, payload, BCO_BITMAP(fun));
         break;
     default:
         bitmap = BITMAP_BITS(stg_arg_bitmaps[fun_info->f.fun_type]);
@@ -1044,10 +1047,12 @@ mark_arg_block (MarkQueue *queue, const StgFunInfoTable *fun_info, StgClosure **
         size = BITMAP_SIZE(fun_info->f.b.bitmap);
         goto small_bitmap;
     case ARG_GEN_BIG:
-        size = GET_FUN_LARGE_BITMAP(fun_info)->size;
-        mark_large_bitmap(queue, (StgClosure**)p, GET_FUN_LARGE_BITMAP(fun_info), size);
-        p += size;
+    {
+        StgLargeBitmap *large_bitmap = GET_FUN_LARGE_BITMAP(fun_info);
+        mark_large_bitmap(queue, (StgClosure**)p, large_bitmap);
+        p += large_bitmap->size;
         break;
+    }
     default:
         bitmap = BITMAP_BITS(stg_arg_bitmaps[fun_info->f.fun_type]);
         size = BITMAP_SIZE(stg_arg_bitmaps[fun_info->f.fun_type]);
@@ -1104,21 +1109,19 @@ mark_stack_ (MarkQueue *queue, StgPtr sp, StgPtr spBottom)
             markQueuePushClosure_(queue, *(StgClosure**)sp);
             StgBCO *bco = (StgBCO *)*sp;
             sp++;
-            StgWord size = BCO_BITMAP_SIZE(bco);
-            mark_large_bitmap(queue, (StgClosure **) sp, BCO_BITMAP(bco), size);
-            sp += size;
+            StgLargeBitmap *bitmap = BCO_BITMAP(bco);
+            mark_large_bitmap(queue, (StgClosure **) sp, bitmap);
+            sp += bitmap->size;
             continue;
         }
 
           // large bitmap (> 32 entries, or > 64 on a 64-bit machine)
         case RET_BIG:
         {
-            StgWord size;
-
-            size = GET_LARGE_BITMAP(&info->i)->size;
+            StgLargeBitmap *bitmap = GET_LARGE_BITMAP(&info->i);
             sp++;
-            mark_large_bitmap(queue, (StgClosure **) sp, GET_LARGE_BITMAP(&info->i), size);
-            sp += size;
+            mark_large_bitmap(queue, (StgClosure **) sp, bitmap);
+            sp += bitmap->size;
             // and don't forget to follow the SRT
             goto follow_srt;
         }

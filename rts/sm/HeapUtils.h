@@ -14,10 +14,10 @@ INLINE_HEADER void
 walk_large_bitmap(walk_closures_cb *cb,
                   StgClosure **p,
                   StgLargeBitmap *large_bitmap,
-                  StgWord size,
                   void *user)
 {
     uint32_t b = 0;
+    StgWord size = large_bitmap->size;
 
     for (uint32_t i = 0; i < size; b++) {
         StgWord bitmap = large_bitmap->bitmap[b];
