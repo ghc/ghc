@@ -109,9 +109,9 @@ utf8DecodeChar# indexWord8# =
         -- confusing parse error later on.  Instead we use '\0' which
         -- will signal a lexer error immediately.
 
-utf8DecodeCharAddr# :: Addr# -> (# Char#, Int# #)
-utf8DecodeCharAddr# a# =
-    utf8DecodeChar# (indexWord8OffAddr# a#)
+utf8DecodeCharAddr# :: Addr# -> Int# -> (# Char#, Int# #)
+utf8DecodeCharAddr# a# off# =
+    utf8DecodeChar# (\i# -> indexWord8OffAddr# a# (i# +# off#))
 
 utf8DecodeCharByteArray# :: ByteArray# -> Int# -> (# Char#, Int# #)
 utf8DecodeCharByteArray# ba# off# =
@@ -119,7 +119,7 @@ utf8DecodeCharByteArray# ba# off# =
 
 utf8DecodeChar :: Ptr Word8 -> (Char, Int)
 utf8DecodeChar !(Ptr a#) =
-  case utf8DecodeCharAddr# a# of
+  case utf8DecodeCharAddr# a# 0# of
     (# c#, nBytes# #) -> ( C# c#, I# nBytes# )
 
 -- UTF-8 is cleverly designed so that we can always figure out where
@@ -137,14 +137,14 @@ utf8CharStart p = go p
                         else return p
 
 {-# INLINE utf8DecodeLazy# #-}
-utf8DecodeLazy# :: (IO ()) -> (Int# -> Word#) -> Int# -> IO [Char]
-utf8DecodeLazy# retain indexWord8# len#
+utf8DecodeLazy# :: (IO ()) -> (Int# -> (# Char#, Int# #)) -> Int# -> IO [Char]
+utf8DecodeLazy# retain decodeChar# len#
   = unpack 0#
   where
     unpack i#
         | isTrue# (i# >=# len#) = retain >> return []
         | otherwise =
-            case utf8DecodeChar# (\j# -> indexWord8# (i# +# j#)) of
+            case decodeChar# i# of
               (# c#, nBytes# #) -> do
                 rest <- unsafeDupableInterleaveIO $ unpack (i# +# nBytes#)
                 return (C# c# : rest)
@@ -156,16 +156,14 @@ utf8DecodeByteString (BS.PS fptr offset len)
 utf8DecodeStringLazy :: ForeignPtr Word8 -> Int -> Int -> [Char]
 utf8DecodeStringLazy fp offset (I# len#)
   = unsafeDupablePerformIO $ withForeignPtr fp $ \ptr ->
-      let !(Ptr a#) = ptr `plusPtr` offset
-          index# = indexWord8OffAddr# a# in
-      utf8DecodeLazy# (touchForeignPtr fp) index# len#
+      let !(Ptr a#) = ptr `plusPtr` offset in
+      utf8DecodeLazy# (touchForeignPtr fp) (utf8DecodeCharAddr# a#) len#
 
 utf8DecodeShortByteString :: ShortByteString -> [Char]
 utf8DecodeShortByteString (SBS ba#)
   = unsafeDupablePerformIO $
-      let index# = indexWord8Array# ba#
-          len# = sizeofByteArray# ba# in
-      utf8DecodeLazy# (return ()) index# len#
+      let len# = sizeofByteArray# ba# in
+      utf8DecodeLazy# (return ()) (utf8DecodeCharByteArray# ba#) len#
 
 countUTF8Chars :: ShortByteString -> IO Int
 countUTF8Chars (SBS ba) = go 0# 0#
