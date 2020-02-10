@@ -23,7 +23,7 @@ import CoreSeq          ( seqBinds )
 import Outputable
 import VarEnv
 import BasicTypes
-import Data.List        ( mapAccumL, sortBy )
+import Data.List        ( mapAccumL )
 import DataCon
 import Id
 import IdInfo

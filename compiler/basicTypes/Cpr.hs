@@ -2,8 +2,8 @@
 -- | Types for the Constructed Product Result lattice. "CprAnal" and "WwLib"
 -- are its primary customers via 'idCprInfo'.
 module Cpr (
-    CprResult, topCpr, botCpr, sumCpr, prodCpr, returnsCPR_maybe,
-    CprType (..), topCprType, botCprType, prodCprType, sumCprType,
+    CprResult, topCpr, botCpr, conCpr, asConCpr,
+    CprType (..), topCprType, botCprType, conCprType,
     lubCprType, applyCprTy, abstractCprTy, ensureCprTyArity, trimCprTy,
     CprSig (..), topCprSig, mkCprSigForArity, mkCprSig, seqCprSig
   ) where
@@ -22,21 +22,19 @@ import Binary
 --
 -- @
 --                    NoCPR
---                    /    \
---             RetProd    RetSum ConTag
---                    \    /
+--                      |
+--                 ConCPR ConTag
+--                      |
 --                    BotCPR
 -- @
 data CprResult = NoCPR          -- ^ Top of the lattice
-               | RetProd        -- ^ Returns a constructor from a product type
-               | RetSum !ConTag -- ^ Returns a constructor from a data type
+               | ConCPR !ConTag -- ^ Returns a constructor from a data type
                | BotCPR         -- ^ Bottom of the lattice
                deriving( Eq, Show )
 
 lubCpr :: CprResult -> CprResult -> CprResult
-lubCpr (RetSum t1) (RetSum t2)
-  | t1 == t2               = RetSum t1
-lubCpr RetProd     RetProd = RetProd
+lubCpr (ConCPR t1) (ConCPR t2)
+  | t1 == t2               = ConCPR t1
 lubCpr BotCPR      cpr     = cpr
 lubCpr cpr         BotCPR  = cpr
 lubCpr _           _       = NoCPR
@@ -47,24 +45,17 @@ topCpr = NoCPR
 botCpr :: CprResult
 botCpr = BotCPR
 
-sumCpr :: ConTag -> CprResult
-sumCpr = RetSum
+conCpr :: ConTag -> CprResult
+conCpr = ConCPR
 
-prodCpr :: CprResult
-prodCpr = RetProd
+trimCpr :: CprResult -> CprResult
+trimCpr ConCPR{} = NoCPR
+trimCpr cpr      = cpr
 
-trimCpr :: Bool -> Bool -> CprResult -> CprResult
-trimCpr trim_all trim_sums RetSum{}
-  | trim_all || trim_sums      = NoCPR
-trimCpr trim_all _         RetProd
-  | trim_all                   = NoCPR
-trimCpr _        _         cpr = cpr
-
-returnsCPR_maybe :: CprResult -> Maybe ConTag
-returnsCPR_maybe (RetSum t)  = Just t
-returnsCPR_maybe RetProd     = Just fIRST_TAG
-returnsCPR_maybe NoCPR       = Nothing
-returnsCPR_maybe BotCPR      = Nothing
+asConCpr :: CprResult -> Maybe ConTag
+asConCpr (ConCPR t)  = Just t
+asConCpr NoCPR       = Nothing
+asConCpr BotCPR      = Nothing
 
 --
 -- * CprType
@@ -89,11 +80,8 @@ topCprType = CprType 0 topCpr
 botCprType :: CprType
 botCprType = CprType 0 botCpr -- TODO: Figure out if arity 0 does what we want... Yes it does: arity zero means we may unleash it under any number of incoming arguments
 
-prodCprType :: Arity -> CprType
-prodCprType _con_arty = CprType 0 prodCpr
-
-sumCprType :: ConTag -> CprType
-sumCprType con_tag = CprType 0 (sumCpr con_tag)
+conCprType :: ConTag -> CprType
+conCprType con_tag = CprType 0 (conCpr con_tag)
 
 lubCprType :: CprType -> CprType -> CprType
 lubCprType ty1@(CprType n1 cpr1) ty2@(CprType n2 cpr2)
@@ -121,8 +109,8 @@ ensureCprTyArity n ty@(CprType m _)
   | n == m    = ty
   | otherwise = topCprType
 
-trimCprTy :: Bool -> Bool -> CprType -> CprType
-trimCprTy trim_all trim_sums (CprType arty res) = CprType arty (trimCpr trim_all trim_sums res)
+trimCprTy :: CprType -> CprType
+trimCprTy (CprType arty res) = CprType arty (trimCpr res)
 
 -- | The arity of the wrapped 'CprType' is the arity at which it is safe
 -- to unleash. See Note [Understanding DmdType and StrictSig] in Demand
@@ -146,8 +134,7 @@ seqCprSig sig = sig `seq` ()
 
 instance Outputable CprResult where
   ppr NoCPR        = empty
-  ppr (RetSum n)   = char 'm' <> int n
-  ppr RetProd      = char 'm'
+  ppr (ConCPR n)   = char 'm' <> int n
   ppr BotCPR       = char 'b'
 
 instance Outputable CprType where
@@ -158,17 +145,15 @@ instance Outputable CprSig where
   ppr (CprSig ty) = ppr (ct_cpr ty)
 
 instance Binary CprResult where
-  put_ bh (RetSum n)   = do { putByte bh 0; put_ bh n }
-  put_ bh RetProd      = putByte bh 1
-  put_ bh NoCPR        = putByte bh 2
-  put_ bh BotCPR       = putByte bh 3
+  put_ bh (ConCPR n)   = do { putByte bh 0; put_ bh n }
+  put_ bh NoCPR        = putByte bh 1
+  put_ bh BotCPR       = putByte bh 2
 
   get  bh = do
           h <- getByte bh
           case h of
-            0 -> do { n <- get bh; return (RetSum n) }
-            1 -> return RetProd
-            2 -> return NoCPR
+            0 -> do { n <- get bh; return (ConCPR n) }
+            1 -> return NoCPR
             _ -> return BotCPR
 
 instance Binary CprType where

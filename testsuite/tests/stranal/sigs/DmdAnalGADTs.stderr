@@ -14,16 +14,16 @@ DmdAnalGADTs.hasStrSig: <S,1*U(U)>
 
 
 ==================== Cpr signatures ====================
-DmdAnalGADTs.$tc'A: m
-DmdAnalGADTs.$tc'B: m
-DmdAnalGADTs.$tcD: m
-DmdAnalGADTs.$trModule: m
+DmdAnalGADTs.$tc'A: m1
+DmdAnalGADTs.$tc'B: m1
+DmdAnalGADTs.$tcD: m1
+DmdAnalGADTs.$trModule: m1
 DmdAnalGADTs.diverges: b
 DmdAnalGADTs.f:
-DmdAnalGADTs.f': m
+DmdAnalGADTs.f': m1
 DmdAnalGADTs.g:
-DmdAnalGADTs.hasCPR: m
-DmdAnalGADTs.hasStrSig: m
+DmdAnalGADTs.hasCPR: m1
+DmdAnalGADTs.hasStrSig: m1
 
 
 

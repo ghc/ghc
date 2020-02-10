@@ -32,7 +32,7 @@ import Type
 import FamInstEnv
 import Util
 import ErrUtils         ( dumpIfSet_dyn, DumpFormat (..) )
-import Maybes           ( isJust )
+import Maybes           ( isJust, isNothing )
 
 {- Note [Constructed Product Result]
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
@@ -297,17 +297,24 @@ cprAnalBind top_lvl env id rhs
   where
     (rhs_ty, rhs')  = cprAnal env rhs
     -- possibly trim thunk CPR info
-    rhs_ty'         = trimCprTy trim_all trim_sums rhs_ty
+    rhs_ty'
+      -- See Note [CPR for thunks]
+      | stays_thunk = trimCprTy rhs_ty
+      -- See Note [CPR for sum types]
+      | returns_sum = trimCprTy rhs_ty
+      | otherwise   = rhs_ty
     -- See Note [Arity trimming for CPR signatures]
     sig             = mkCprSigForArity (idArity id) rhs_ty'
     id'             = setIdCprInfo id sig
 
     -- See Note [CPR for thunks]
+    stays_thunk = is_thunk && not_strict
+    is_thunk    = not (exprIsHNF rhs) && not (isJoinId id)
+    not_strict  = not (isStrictDmd (idDemandInfo id))
     -- See Note [CPR for sum types]
-    trim_all  = is_thunk && not_strict
-    trim_sums = not (isTopLevel top_lvl)
-    is_thunk = not (exprIsHNF rhs) && not (isJoinId id)
-    not_strict = not (isStrictDmd (idDemandInfo id))
+    (_, ret_ty) = splitPiTys (idType id)
+    not_a_prod  = isNothing (deepSplitProductType_maybe (ae_fam_envs env) ret_ty)
+    returns_sum = not (isTopLevel top_lvl) && not_a_prod
 
 {- Note [Arity trimming for CPR signatures]
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
@@ -391,7 +398,7 @@ extendSigsWithLam env id
   | isId id
   , isStrictDmd (idDemandInfo id) -- See Note [CPR for strict binders]
   , Just (dc,_,_,_) <- deepSplitProductType_maybe (ae_fam_envs env) $ idType id
-  = extendAnalEnv env id (CprSig (prodCprType (dataConRepArity dc)))
+  = extendAnalEnv env id (CprSig (conCprType (dataConTag dc)))
   | otherwise
   = env
 
@@ -408,12 +415,11 @@ extendEnvForDataAlt env scrut case_bndr dc bndrs
     is_product     = isJust (isDataProductTyCon_maybe tycon)
     is_sum         = isJust (isDataSumTyCon_maybe tycon)
     case_bndr_ty
-      | is_product = prodCprType (dataConRepArity dc)
-      | is_sum     = sumCprType  (dataConTag dc)
+      | is_product || is_sum = conCprType  (dataConTag dc)
       -- Any of the constructors had existentials. This is a little too
       -- conservative (after all, we only care about the particular data con),
       -- but there is no easy way to write is_sum and this won't happen much.
-      | otherwise  = topCprType
+      | otherwise            = topCprType
 
     -- We could have much deeper CPR info here with Nested CPR, which could
     -- propagate available unboxed things from the scrutinee, getting rid of
@@ -426,7 +432,7 @@ extendEnvForDataAlt env scrut case_bndr dc bndrs
        , is_var_scrut && is_strict
        , let fam_envs = ae_fam_envs env
        , Just (dc,_,_,_) <- deepSplitProductType_maybe fam_envs $ idType id
-       = extendAnalEnv env id (CprSig (prodCprType (dataConRepArity dc)))
+       = extendAnalEnv env id (CprSig (conCprType (dataConTag dc)))
        | otherwise
        = env
 

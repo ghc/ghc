@@ -1005,7 +1005,7 @@ mkWWcpr opt_CprAnal fam_envs body_ty cpr
   | not opt_CprAnal = return (False, id, id, body_ty)
     -- CPR is turned on by default for -O and O2
   | otherwise
-  = case returnsCPR_maybe cpr of
+  = case asConCpr cpr of
        Nothing      -> return (False, id, id, body_ty)  -- No CPR info
        Just con_tag | Just stuff <- deepSplitCprType_maybe fam_envs con_tag body_ty
                     -> mkWWcpr_help stuff

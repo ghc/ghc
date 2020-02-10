@@ -562,12 +562,10 @@ dataConCPR con
   , null (dataConExTyCoVars con)  -- No existentials
   , wkr_arity > 0
   , wkr_arity <= mAX_CPR_SIZE
-  = if is_prod then prodCpr
-               else sumCpr (dataConTag con)
+  = conCpr (dataConTag con)
   | otherwise
   = topCpr
   where
-    is_prod   = isProductTyCon tycon
     tycon     = dataConTyCon con
     wkr_arity = dataConRepArity con
 
