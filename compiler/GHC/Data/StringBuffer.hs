@@ -200,7 +200,7 @@ nextChar (StringBuffer buf len (I# cur#)) =
   -- Getting our fingers dirty a little here, but this is performance-critical
   inlinePerformIO $ do
     withForeignPtr buf $ \(Ptr a#) -> do
-        case utf8DecodeCharAddr# (a# `plusAddr#` cur#) of
+        case utf8DecodeCharAddr# (a# `plusAddr#` cur#) 0# of
           (# c#, nBytes# #) ->
              let cur' = I# (cur# +# nBytes#) in
              return (C# c#, StringBuffer buf len cur')
