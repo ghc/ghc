@@ -3,6 +3,7 @@ module Rules.Gmp (gmpRules, gmpBuildPath, gmpObjects, gmpLibraryH) where
 import Base
 import Context
 import Oracles.Setting
+import Oracles.Flag
 import Packages
 import Target
 import Utilities
@@ -12,7 +13,11 @@ import Hadrian.BuildPath
 gmpObjects :: Context -> Action [FilePath]
 gmpObjects ctx = do
     gmpBuildP <- gmpBuildPath ctx
-    need [gmpBuildP -/- gmpLibraryH]
+
+    -- Indirectly force object creation (if in-tree GMP enabled)
+    root <- buildRoot
+    need [root -/- stageString (stage ctx) -/- "libraries/ghc-bignum/build/include/ghc-gmp.h"]
+
     -- The line below causes a Shake Lint failure on Windows, which forced us to
     -- disable Lint by default. See more details here:
     -- https://gitlab.haskell.org/ghc/ghc/issues/15971.
@@ -42,10 +47,11 @@ gmpLibraryH = "include/ghc-gmp.h"
 gmpObjectsDir :: FilePath
 gmpObjectsDir = "objs"
 
-configureEnvironment :: Action [CmdOption]
-configureEnvironment = sequence [ builderEnvironment "CC" $ Cc CompileC Stage1
-                                , builderEnvironment "AR" (Ar Unpack Stage1)
-                                , builderEnvironment "NM" Nm ]
+configureEnvironment :: Stage -> Action [CmdOption]
+configureEnvironment stage = sequence
+   [ builderEnvironment "CC" $ Cc CompileC stage
+   , builderEnvironment "AR" (Ar Unpack stage)
+   , builderEnvironment "NM" Nm ]
 
 gmpRules :: Rules ()
 gmpRules = do
@@ -60,25 +66,22 @@ gmpRules = do
             bignumP    = takeDirectory buildP
             librariesP = takeDirectory bignumP
             stageP     = takeDirectory librariesP
-        configMk <- readFile' (buildP -/- "config.mk") -- TODO: we need ghc-bignum to be configured
-                                                       -- ensureConfigured ghcBignumCtx
-        if not windowsHost && -- TODO: We don't use system GMP on Windows. Fix?
-           any (`isInfixOf` configMk) [ "HaveFrameworkGMP = YES", "HaveLibGmp = YES" ]
+        isInTree <- flag GmpInTree
+        if isInTree || windowsHost -- TODO: We don't use system GMP on Windows. Fix?
         then do
-            putBuild "| GMP library/framework detected and will be used"
-            copyFile (gmpBase -/- "ghc-gmp.h") header
-        else do
             putBuild "| No GMP library/framework detected; in tree GMP will be built"
-            let intreeHeader = stageP -/- "gmp/ghc.h"
+            let intreeHeader = stageP -/- "gmp/gmp.h"
             need [intreeHeader]
             copyFile          intreeHeader header
             -- gmp_wrappers.c needs to find gmp.h so we copy it there too
             copyFileUntracked intreeHeader (includeP -/- "gmp.h")
+        else do
+            putBuild "| GMP library/framework detected and will be used"
+            copyFile (gmpBase -/- "ghc-gmp.h") header
 
     -- Build in-tree GMP
-    root -/- "stage*/gmp/ghc.h" %> \header -> do
-        let includeP = takeDirectory header
-            gmpP     = takeDirectory includeP
+    root -/- "stage*/gmp/gmp.h" %> \header -> do
+        let gmpP     = takeDirectory header
             stageP   = takeDirectory gmpP
             stageS   = takeFileName stageP
         stage <- parsePath parseStage "<stage>" stageS
@@ -88,11 +91,11 @@ gmpRules = do
         -- unpack objects from libgmp.a into "objs" directory
         createDirectory (gmpP -/- gmpObjectsDir)
         top <- topDirectory
-        build $ target dummyContext (Ar Unpack Stage1)
+        build $ target dummyContext (Ar Unpack stage)
             [top -/- gmpP -/- "libgmp.a"] [gmpP -/- gmpObjectsDir]
         objs <- liftIO $ getDirectoryFilesIO "." [gmpP -/- gmpObjectsDir -/- "*"]
         produces objs
-        -- at this point it should have produced ghc.h too
+        -- at this point it should have produced gmp.h too
 
     -- Build in-tree GMP library, prioritised so that it matches "before"
     -- the generic @.a@ library rule in 'Rules.Library'.
@@ -103,7 +106,7 @@ gmpRules = do
         stage <- parsePath parseStage "<stage>" stageS
         let dummyContext = vanillaContext stage ghcBignum
         build $ target dummyContext (Make gmpP) [gmpP -/- "Makefile"] [lib]
-        copyFileUntracked ".libs/libgmp.a" lib
+        copyFileUntracked (gmpP -/- ".libs/libgmp.a") lib
         putSuccess "| Successfully built custom library 'gmp'"
 
     -- Run GMP's configure script
@@ -112,7 +115,7 @@ gmpRules = do
             stageP = takeDirectory gmpP
             stageS = takeFileName stageP
         stage <- parsePath parseStage "<stage>" stageS
-        env <- configureEnvironment
+        env <- configureEnvironment stage
         need [mk <.> "in"]
         let dummyContext = vanillaContext stage ghcBignum
         buildWithCmdOptions env $
