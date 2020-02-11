@@ -94,7 +94,7 @@ config.way_flags = {
     'prof_hd'      : ['-O', '-prof', '-static', '-fprof-auto'],
     'prof_hy'      : ['-O', '-prof', '-static', '-fprof-auto'],
     'prof_hr'      : ['-O', '-prof', '-static', '-fprof-auto'],
-    'prof_ho'      : ['-O', '-prof', '-static', '-fprof-auto'],
+    'prof_ho'      : ['-O0', '-prof', '-static' ],
     'dyn'          : ['-O', '-dynamic'],
     'static'       : ['-O', '-static'],
     'debug'        : ['-O', '-g', '-dannot-lint'],
