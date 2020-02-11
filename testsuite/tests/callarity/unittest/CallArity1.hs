@@ -204,7 +204,7 @@ mkRFun :: Id -> [Id] -> CoreExpr -> CoreExpr -> CoreExpr
 mkRFun v xs rhs body = mkRLet v (mkLams xs rhs) body
 
 mkLit :: Integer -> CoreExpr
-mkLit i = Lit (mkLitInteger i intTy)
+mkLit i = mkUncheckedIntExpr i
 
 -- Collects all let-bound IDs
 allBoundIds :: CoreExpr -> VarSet
