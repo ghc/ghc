@@ -244,8 +244,8 @@ ExtraMakefileSanityChecks = NO
 #------------------------------------------------------------------------------
 # Options for Libraries
 
-# Which directory (in libraries/) contains the integer library?
-INTEGER_LIBRARY=integer-gmp
+# Backend to use in ghc-bignum (gmp, native, etc.)
+BIGNUM_BACKEND=gmp
 
 # We build the libraries at least the "vanilla" way (way "v")
 # Technically we don't need the v way if DYNAMIC_GHC_PROGRAMS is YES,
