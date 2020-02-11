@@ -4,12 +4,12 @@
 module Main (main) where
 
 import GHC.Base
-import GHC.Integer
+import GHC.Num.Integer
 
 main :: IO ()
 main = case i of
        I# i# ->
-           print (gcd (smallInteger i#) (smallInteger i#))
+           print (gcd (IS i#) (IS i#))
 
 {-# NOINLINE i #-}
 i :: Int

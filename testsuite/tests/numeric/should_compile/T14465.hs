@@ -4,7 +4,7 @@
 module M where
 
 import Numeric.Natural
-import GHC.Natural
+import GHC.Num.Natural
 
 -- test Natural literals
 one :: Natural
@@ -15,7 +15,7 @@ plusOne n = n + 1
 
 -- a built-in rule should convert this unfolding into a Natural literal in Core
 ten :: Natural
-ten = wordToNatural 10
+ten = naturalFromWord 10
 
 -- test basic constant folding for Natural
 twoTimesTwo :: Natural

@@ -5,7 +5,7 @@ def f( name, opts ):
 
 setTestOpts(f)
 
-# test('T5486', reqlib('integer-gmp'), compile, [''])
+# test('T5486', normal, compile, [''])
 test('T5681', normal, compile, [''])
 test('T6158', [reqlib('vector'), reqlib('primitive')], compile, ['-package vector -package primitive'])
 test('T7571', cmm_src, compile, [''])
