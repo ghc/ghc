@@ -8,8 +8,7 @@ interfacePlugin: Language.Haskell.TH.Syntax
 typeCheckPlugin (rn)
 interfacePlugin: GHC.Types
 typeCheckPlugin (tc)
-interfacePlugin: GHC.Integer.Type
-interfacePlugin: GHC.Natural
+interfacePlugin: GHC.Num.BigNat
 parsePlugin(a)
 typeCheckPlugin (rn)
 interfacePlugin: Language.Haskell.TH.Lib.Internal

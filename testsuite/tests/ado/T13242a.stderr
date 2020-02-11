@@ -27,11 +27,10 @@ T13242a.hs:13:13: error:
       Probable fix: use a type annotation to specify what ‘a0’ should be.
       These potential instances exist:
         instance Eq Ordering -- Defined in ‘GHC.Classes’
-        instance Eq Integer
-          -- Defined in ‘integer-gmp-1.0.3.0:GHC.Integer.Type’
+        instance Eq Integer -- Defined in ‘GHC.Num.Integer’
         instance Eq () -- Defined in ‘GHC.Classes’
         ...plus 21 others
-        ...plus six instances involving out-of-scope types
+        ...plus five instances involving out-of-scope types
         (use -fprint-potential-instances to see them all)
     • In a stmt of a 'do' block: return (x == x)
       In the expression:

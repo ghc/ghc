@@ -4,11 +4,11 @@
 module Q where
 
 import GHC.Exts
-import GHC.Integer
+import GHC.Num.Integer
 
 v :: Int
-v = I# (integerToInt (smallInteger 3#))
+v = I# (integerToInt# (IS 3#))
 
 w :: Word
-w = W# (integerToWord (wordToInteger 3##))
+w = W# (integerToWord# (integerFromWord# 3##))
 

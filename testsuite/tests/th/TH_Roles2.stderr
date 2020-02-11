@@ -3,7 +3,7 @@ TYPE CONSTRUCTORS
     roles nominal representational
 Dependent modules: []
 Dependent packages: [array-0.5.4.0, base-4.14.0.0, deepseq-1.4.4.0,
-                     ghc-boot-th-8.11.0.20200416, ghc-prim-0.6.1, integer-gmp-1.0.3.0,
+                     ghc-bignum-1.0, ghc-boot-th-8.9.0.20191106, ghc-prim-0.6.1,
                      pretty-1.1.3.6, template-haskell-2.16.0.0]
 
 ==================== Typechecker ====================

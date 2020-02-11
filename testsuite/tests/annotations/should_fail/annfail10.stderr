@@ -8,7 +8,8 @@ annfail10.hs:9:1: error:
                  Data.Data.Data (Either a b)
           -- Defined in ‘Data.Data’
         instance Data.Data.Data Ordering -- Defined in ‘Data.Data’
-        instance Data.Data.Data Integer -- Defined in ‘Data.Data’
+        instance Data.Data.Data a => Data.Data.Data (Maybe a)
+          -- Defined in ‘Data.Data’
         ...plus 15 others
         ...plus 47 instances involving out-of-scope types
         (use -fprint-potential-instances to see them all)

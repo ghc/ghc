@@ -40,7 +40,7 @@ T14884.hs:4:7: error:
         instance (Show a, Show b) => Show (Either a b)
           -- Defined in ‘Data.Either’
         instance Show Ordering -- Defined in ‘GHC.Show’
-        instance Show Integer -- Defined in ‘GHC.Show’
+        instance Show a => Show (Maybe a) -- Defined in ‘GHC.Show’
         ...plus 23 others
         ...plus 67 instances involving out-of-scope types
         (use -fprint-potential-instances to see them all)

@@ -10,20 +10,20 @@ import Unsafe.Coerce (unsafeCoerce#)
 
 import GHC.Word
 import GHC.Base
-import GHC.Integer.GMP.Internals (Integer(S#,Jp#,Jn#))
-import qualified GHC.Integer.GMP.Internals as I
+import GHC.Num.Integer
+import qualified GHC.Num.Integer as I
 
 exportInteger :: Integer -> MutableByteArray# RealWorld -> Word# -> Int# -> IO Word
-exportInteger = I.exportIntegerToMutableByteArray
+exportInteger = I.integerToMutableByteArray
 
 exportIntegerAddr :: Integer -> Addr# -> Int# -> IO Word
-exportIntegerAddr = I.exportIntegerToAddr
+exportIntegerAddr = I.integerToAddr
 
 importInteger :: ByteArray# -> Word# -> Word# -> Int# -> Integer
-importInteger = I.importIntegerFromByteArray
+importInteger ba off sz = I.integerFromByteArray sz ba off
 
 importIntegerAddr :: Addr# -> Word# -> Int# -> IO Integer
-importIntegerAddr a l e = I.importIntegerFromAddr a l e
+importIntegerAddr a l = I.integerFromAddr l a
 
 -- helpers
 data MBA = MBA { unMBA :: !(MutableByteArray# RealWorld) }
@@ -57,8 +57,8 @@ freezeByteArray arr = IO $ \s -> case unsafeFreezeByteArray# arr s of (# s, arr 
 main :: IO ()
 main = do
     -- import/export primitives
-    print $ [ W# (I.sizeInBaseInteger x 2#)   | x <- [b1024,b*e,b,e,m,x,y,-1,0,1] ]
-    print $ [ W# (I.sizeInBaseInteger x 256#) | x <- [b1024,b*e,b,e,m,x,y,-1,0,1] ]
+    print $ [ W# (I.integerSizeInBase# 2## x)   | x <- [b1024,b*e,b,e,m,x,y,-1,0,1] ]
+    print $ [ W# (I.integerSizeInBase# 256## x) | x <- [b1024,b*e,b,e,m,x,y,-1,0,1] ]
 
     BA ba <- do
         MBA mba <- newByteArray 128##

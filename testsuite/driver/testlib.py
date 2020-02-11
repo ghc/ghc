@@ -563,11 +563,11 @@ def have_gdb( ) -> bool:
 def have_readelf( ) -> bool:
     return config.have_readelf
 
-def integer_gmp( ) -> bool:
-    return have_library("integer-gmp")
+def have_fast_bignum( ) -> bool:
+    return config.have_fast_bignum
 
-def integer_simple( ) -> bool:
-    return have_library("integer-simple")
+def have_slow_bignum( ) -> bool:
+    return not(have_fast_bignum())
 
 def llvm_build ( ) -> bool:
     return config.ghc_built_by_llvm
@@ -2143,11 +2143,11 @@ def normalise_errmsg(s: str) -> str:
     # collisions, so we need to normalise that to just "ghc"
     s = re.sub('ghc-stage[123]', 'ghc', s)
 
-    # Error messages sometimes contain integer implementation package
-    s = re.sub('integer-(gmp|simple)-[0-9.]+', 'integer-<IMPL>-<VERSION>', s)
+    # Error messages sometimes contain ghc-bignum implementation package
+    s = re.sub('ghc-bignum-[0-9.]+', 'ghc-bignum-<VERSION>', s)
 
     # Error messages sometimes contain this blurb which can vary
-    # spuriously depending upon build configuration (e.g. based on integer
+    # spuriously depending upon build configuration (e.g. based on bignum
     # backend)
     s = re.sub('...plus ([a-z]+|[0-9]+) instances involving out-of-scope types',
                  '...plus N instances involving out-of-scope types', s)

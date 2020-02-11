@@ -11,8 +11,7 @@ interfacePlugin: GHC.Types
 interfacePlugin: GHC.TopHandler
 typeCheckPlugin (tc)
 interfacePlugin: GHC.CString
-interfacePlugin: GHC.Integer.Type
-interfacePlugin: GHC.Natural
+interfacePlugin: GHC.Num.BigNat
 ==pure.1
 ==fp0.0
 parsePlugin()
