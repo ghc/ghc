@@ -4,5 +4,5 @@ newtype A = A Int
 newtype B = B A
 
 {-# NOINLINE a #-}
-a = A 42
+a = A 42000
 b = B a
