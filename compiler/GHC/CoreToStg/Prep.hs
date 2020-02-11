@@ -9,15 +9,17 @@ Core pass to saturate constructors and PrimOps
 
 {-# OPTIONS_GHC -Wno-incomplete-uni-patterns #-}
 
-module GHC.CoreToStg.Prep (
-      corePrepPgm, corePrepExpr, cvtLitInteger, cvtLitNatural,
-      lookupMkIntegerName, lookupIntegerSDataConName,
-      lookupMkNaturalName, lookupNaturalSDataConName
-  ) where
+module GHC.CoreToStg.Prep
+   ( corePrepPgm
+   , corePrepExpr
+   , mkConvertNumLiteral
+   )
+where
 
 #include "HsVersions.h"
 
 import GhcPrelude
+import GHC.Platform     ( platformWordSizeInBits )
 
 import OccurAnal
 
@@ -58,6 +60,7 @@ import Name             ( NamedThing(..), nameSrcSpan, isInternalName )
 import SrcLoc           ( SrcSpan(..), realSrcLocSpan, mkRealSrcLoc )
 import Data.Bits
 import MonadUtils       ( mapAccumLM )
+import Data.List        ( unfoldr )
 import Control.Monad
 import CostCentre       ( CostCentre, ccFromThisModule )
 import qualified Data.Set as S
@@ -113,19 +116,14 @@ The goal of this pass is to prepare for code generation.
 9.  Replace (lazy e) by e.  See Note [lazyId magic] in MkId.hs
     Also replace (noinline e) by e.
 
-10. Convert (LitInteger i t) into the core representation
-    for the Integer i. Normally this uses mkInteger, but if
-    we are using the integer-gmp implementation then there is a
-    special case where we use the S# constructor for Integers that
-    are in the range of Int.
+10. Convert bignum literals (LitNatural and LitInteger) into their
+    core representation.
 
-11. Same for LitNatural.
-
-12. Uphold tick consistency while doing this: We move ticks out of
+11. Uphold tick consistency while doing this: We move ticks out of
     (non-type) applications where we can, and make sure that we
     annotate according to scoping rules when floating.
 
-13. Collect cost centres (including cost centres in unfoldings) if we're in
+12. Collect cost centres (including cost centres in unfoldings) if we're in
     profiling mode. We have to do this here beucase we won't have unfoldings
     after this pass (see `zapUnfolding` and Note [Drop unfoldings and rules].
 
@@ -572,12 +570,10 @@ cpeRhsE :: CorePrepEnv -> CoreExpr -> UniqSM (Floats, CpeRhs)
 
 cpeRhsE _env expr@(Type {})      = return (emptyFloats, expr)
 cpeRhsE _env expr@(Coercion {})  = return (emptyFloats, expr)
-cpeRhsE env (Lit (LitNumber LitNumInteger i _))
-    = cpeRhsE env (cvtLitInteger (cpe_dynFlags env) (getMkIntegerId env)
-                   (cpe_integerSDataCon env) i)
-cpeRhsE env (Lit (LitNumber LitNumNatural i _))
-    = cpeRhsE env (cvtLitNatural (cpe_dynFlags env) (getMkNaturalId env)
-                   (cpe_naturalSDataCon env) i)
+cpeRhsE env expr@(Lit (LitNumber nt i))
+   = case cpe_convertNumLit env nt i of
+      Nothing -> return (emptyFloats, expr)
+      Just e  -> cpeRhsE env e
 cpeRhsE _env expr@(Lit {}) = return (emptyFloats, expr)
 cpeRhsE env expr@(Var {})  = cpeApp env expr
 cpeRhsE env expr@(App {}) = cpeApp env expr
@@ -650,46 +646,6 @@ cpeRhsE env (Case scrut bndr ty alts)
        = do { (env2, bs') <- cpCloneBndrs env bs
             ; rhs' <- cpeBodyNF env2 rhs
             ; return (con, bs', rhs') }
-
-cvtLitInteger :: DynFlags -> Id -> Maybe DataCon -> Integer -> CoreExpr
--- Here we convert a literal Integer to the low-level
--- representation. Exactly how we do this depends on the
--- library that implements Integer.  If it's GMP we
--- use the S# data constructor for small literals.
--- See Note [Integer literals] in Literal
-cvtLitInteger dflags _ (Just sdatacon) i
-  | inIntRange dflags i -- Special case for small integers
-    = mkConApp sdatacon [Lit (mkLitInt dflags i)]
-
-cvtLitInteger dflags mk_integer _ i
-    = mkApps (Var mk_integer) [isNonNegative, ints]
-  where isNonNegative = if i < 0 then mkConApp falseDataCon []
-                                 else mkConApp trueDataCon  []
-        ints = mkListExpr intTy (f (abs i))
-        f 0 = []
-        f x = let low  = x .&. mask
-                  high = x `shiftR` bits
-              in mkConApp intDataCon [Lit (mkLitInt dflags low)] : f high
-        bits = 31
-        mask = 2 ^ bits - 1
-
-cvtLitNatural :: DynFlags -> Id -> Maybe DataCon -> Integer -> CoreExpr
--- Here we convert a literal Natural to the low-level
--- representation.
--- See Note [Natural literals] in Literal
-cvtLitNatural dflags _ (Just sdatacon) i
-  | inWordRange dflags i -- Special case for small naturals
-    = mkConApp sdatacon [Lit (mkLitWord dflags i)]
-
-cvtLitNatural dflags mk_natural _ i
-    = mkApps (Var mk_natural) [words]
-  where words = mkListExpr wordTy (f i)
-        f 0 = []
-        f x = let low  = x .&. mask
-                  high = x `shiftR` bits
-              in mkConApp wordDataCon [Lit (mkLitWord dflags low)] : f high
-        bits = 32
-        mask = 2 ^ bits - 1
 
 -- ---------------------------------------------------------------------------
 --              CpeBody: produces a result satisfying CpeBody
@@ -1455,72 +1411,98 @@ data CorePrepEnv
         --      3. To let us inline trivial RHSs of non top-level let-bindings,
         --      see Note [lazyId magic], Note [Inlining in CorePrep]
         --      and Note [CorePrep inlines trivial CoreExpr not Id] (#12076)
-        , cpe_mkIntegerId     :: Id
-        , cpe_mkNaturalId     :: Id
-        , cpe_integerSDataCon :: Maybe DataCon
-        , cpe_naturalSDataCon :: Maybe DataCon
+
+        , cpe_convertNumLit   :: LitNumType -> Integer -> Maybe CoreExpr
+        -- ^ Convert some numeric literals (Integer, Natural) into their
+        -- final Core form
     }
 
-lookupMkIntegerName :: DynFlags -> HscEnv -> IO Id
-lookupMkIntegerName dflags hsc_env
-    = guardIntegerUse dflags $ liftM tyThingId $
-      lookupGlobal hsc_env mkIntegerName
+-- | Create a function that converts Bignum literals into their final CoreExpr
+mkConvertNumLiteral
+   :: DynFlags
+   -> HscEnv
+   -> IO (LitNumType -> Integer -> Maybe CoreExpr)
+mkConvertNumLiteral dflags hsc_env = do
+   let
+      guardBignum act
+         | thisPackage dflags == primUnitId
+         = return $ panic "Bignum literals are not supported in ghc-prim"
+         | thisPackage dflags == bignumUnitId
+         = return $ panic "Bignum literals are not supported in ghc-bignum"
+         | otherwise = act
 
-lookupMkNaturalName :: DynFlags -> HscEnv -> IO Id
-lookupMkNaturalName dflags hsc_env
-    = guardNaturalUse dflags $ liftM tyThingId $
-      lookupGlobal hsc_env mkNaturalName
+      lookupBignumId n      = guardBignum (tyThingId <$> lookupGlobal hsc_env n)
 
--- See Note [The integer library] in PrelNames
-lookupIntegerSDataConName :: DynFlags -> HscEnv -> IO (Maybe DataCon)
-lookupIntegerSDataConName dflags hsc_env = case integerLibrary dflags of
-    IntegerGMP -> guardIntegerUse dflags $ liftM (Just . tyThingDataCon) $
-                  lookupGlobal hsc_env integerSDataConName
-    IntegerSimple -> return Nothing
+   -- The lookup is done here but the failure (panic) is reported lazily when we
+   -- try to access the `bigNatFromWordList` function.
+   --
+   -- If we ever get built-in ByteArray# literals, we could avoid the lookup by
+   -- directly using the Integer/Natural wired-in constructors for big numbers.
 
-lookupNaturalSDataConName :: DynFlags -> HscEnv -> IO (Maybe DataCon)
-lookupNaturalSDataConName dflags hsc_env = case integerLibrary dflags of
-    IntegerGMP -> guardNaturalUse dflags $ liftM (Just . tyThingDataCon) $
-                  lookupGlobal hsc_env naturalSDataConName
-    IntegerSimple -> return Nothing
+   bignatFromWordListId <- lookupBignumId bignatFromWordListName
 
--- | Helper for 'lookupMkIntegerName', 'lookupIntegerSDataConName'
-guardIntegerUse :: DynFlags -> IO a -> IO a
-guardIntegerUse dflags act
-  | thisPackage dflags == primUnitId
-  = return $ panic "Can't use Integer in ghc-prim"
-  | thisPackage dflags == integerUnitId
-  = return $ panic "Can't use Integer in integer-*"
-  | otherwise = act
+   let
+      convertNumLit nt i = case nt of
+         LitNumInteger -> Just (convertInteger i)
+         LitNumNatural -> Just (convertNatural i)
+         _             -> Nothing
 
--- | Helper for 'lookupMkNaturalName', 'lookupNaturalSDataConName'
---
--- Just like we can't use Integer literals in `integer-*`, we can't use Natural
--- literals in `base`. If we do, we get interface loading error for GHC.Natural.
-guardNaturalUse :: DynFlags -> IO a -> IO a
-guardNaturalUse dflags act
-  | thisPackage dflags == primUnitId
-  = return $ panic "Can't use Natural in ghc-prim"
-  | thisPackage dflags == integerUnitId
-  = return $ panic "Can't use Natural in integer-*"
-  | thisPackage dflags == baseUnitId
-  = return $ panic "Can't use Natural in base"
-  | otherwise = act
+      convertInteger i
+         | inIntRange dflags i -- fit in a Int#
+         = mkConApp integerISDataCon [Lit (mkLitInt dflags i)]
+
+         | otherwise -- build a BigNat and embed into IN or IP
+         = let con = if i > 0 then integerIPDataCon else integerINDataCon
+           in mkConApp con [ convertBignatPrim (abs i) ]
+
+      convertNatural i
+         | inWordRange dflags i -- fit in a Word#
+         = mkConApp naturalNSDataCon [Lit (mkLitWord dflags i)]
+
+         | otherwise --build a BigNat and embed into NB
+         = mkConApp naturalNBDataCon [ convertBignatPrim i ]
+
+      convertBignatPrim i =
+         let
+            target    = targetPlatform dflags
+
+            -- ByteArray# literals aren't supported (yet). Were they supported,
+            -- we would use them directly. We would need to handle
+            -- wordSize/endianness conversion between host and target
+            -- wordSize  = platformWordSize target
+            -- bigEndian = wORDS_BIGENDIAN dflags
+
+            -- TODO: even without ByteArray# literals, we could build an
+            -- expression `bigNatFromAddr# literal_string#` because literals
+            -- string bytes are stored unmodified and the literal value is
+            -- replaced by an `Addr#` value.
+            --
+            -- But for now we build a list of Words and we produce
+            -- `bigNatFromWordList list_of_words`
+
+            words = mkListExpr wordTy (reverse (unfoldr f i))
+               where
+                  f 0 = Nothing
+                  f x = let low  = x .&. mask
+                            high = x `shiftR` bits
+                        in Just (mkConApp wordDataCon [Lit (mkLitWord dflags low)], high)
+                  bits = platformWordSizeInBits target
+                  mask = 2 ^ bits - 1
+
+         in mkApps (Var bignatFromWordListId) [words]
+
+
+   return convertNumLit
+
 
 mkInitialCorePrepEnv :: DynFlags -> HscEnv -> IO CorePrepEnv
-mkInitialCorePrepEnv dflags hsc_env
-    = do mkIntegerId <- lookupMkIntegerName dflags hsc_env
-         mkNaturalId <- lookupMkNaturalName dflags hsc_env
-         integerSDataCon <- lookupIntegerSDataConName dflags hsc_env
-         naturalSDataCon <- lookupNaturalSDataConName dflags hsc_env
-         return $ CPE {
-                      cpe_dynFlags = dflags,
-                      cpe_env = emptyVarEnv,
-                      cpe_mkIntegerId = mkIntegerId,
-                      cpe_mkNaturalId = mkNaturalId,
-                      cpe_integerSDataCon = integerSDataCon,
-                      cpe_naturalSDataCon = naturalSDataCon
-                  }
+mkInitialCorePrepEnv dflags hsc_env = do
+   convertNumLit <- mkConvertNumLiteral dflags hsc_env
+   return $ CPE
+      { cpe_dynFlags = dflags
+      , cpe_env = emptyVarEnv
+      , cpe_convertNumLit = convertNumLit
+      }
 
 extendCorePrepEnv :: CorePrepEnv -> Id -> Id -> CorePrepEnv
 extendCorePrepEnv cpe id id'
@@ -1540,12 +1522,6 @@ lookupCorePrepEnv cpe id
   = case lookupVarEnv (cpe_env cpe) id of
         Nothing  -> Var id
         Just exp -> exp
-
-getMkIntegerId :: CorePrepEnv -> Id
-getMkIntegerId = cpe_mkIntegerId
-
-getMkNaturalId :: CorePrepEnv -> Id
-getMkNaturalId = cpe_mkNaturalId
 
 ------------------------------------------------------------------------------
 -- Cloning binders
