@@ -100,6 +100,10 @@ HAVE_PROFILING := $(shell if [ -f $(subst \,/,$(GHC_PRIM_LIBDIR))/GHC/PrimopWrap
 HAVE_GDB := $(shell if gdb --version > /dev/null 2> /dev/null; then echo YES; else echo NO; fi)
 HAVE_READELF := $(shell if readelf --version > /dev/null 2> /dev/null; then echo YES; else echo NO; fi)
 
+# we need a better way to find which backend is selected and if --check flag is
+# used
+BIGNUM_GMP := $(shell "$(GHC_PKG)" field ghc-bignum exposed-modules | grep GMP)
+
 ifeq "$(HAVE_VANILLA)" "YES"
 RUNTEST_OPTS += -e config.have_vanilla=True
 else
@@ -154,6 +158,12 @@ ifeq "$(HAVE_READELF)" "YES"
 RUNTEST_OPTS += -e config.have_readelf=True
 else
 RUNTEST_OPTS += -e config.have_readelf=False
+endif
+
+ifeq "$(BIGNUM_GMP)" ""
+RUNTEST_OPTS += -e config.have_fast_bignum=False
+else
+RUNTEST_OPTS += -e config.have_fast_bignum=True
 endif
 
 ifeq "$(GhcDynamicByDefault)" "YES"
