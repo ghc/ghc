@@ -75,7 +75,7 @@ module GHC.Types.Module
         -- * Wired-in UnitIds
         -- $wired_in_packages
         primUnitId,
-        integerUnitId,
+        bignumUnitId,
         baseUnitId,
         rtsUnitId,
         thUnitId,
@@ -1098,18 +1098,13 @@ The affected packages are compiled with, e.g., @-this-unit-id base@, so that
 the symbols in the object files have the unversioned unit id in their name.
 
 Make sure you change 'Packages.findWiredInPackages' if you add an entry here.
-
-For `integer-gmp`/`integer-simple` we also change the base name to
-`integer-wired-in`, but this is fundamentally no different.
-See Note [The integer library] in PrelNames.
 -}
 
-integerUnitId, primUnitId,
+bignumUnitId, primUnitId,
   baseUnitId, rtsUnitId,
   thUnitId, mainUnitId, thisGhcUnitId, interactiveUnitId  :: UnitId
 primUnitId        = fsToUnitId (fsLit "ghc-prim")
-integerUnitId     = fsToUnitId (fsLit "integer-wired-in")
-   -- See Note [The integer library] in PrelNames
+bignumUnitId      = fsToUnitId (fsLit "ghc-bignum")
 baseUnitId        = fsToUnitId (fsLit "base")
 rtsUnitId         = fsToUnitId (fsLit "rts")
 thUnitId          = fsToUnitId (fsLit "template-haskell")
@@ -1155,12 +1150,13 @@ isHoleModule :: Module -> Bool
 isHoleModule mod = moduleUnitId mod == holeUnitId
 
 wiredInUnitIds :: [UnitId]
-wiredInUnitIds = [ primUnitId,
-                       integerUnitId,
-                       baseUnitId,
-                       rtsUnitId,
-                       thUnitId,
-                       thisGhcUnitId ]
+wiredInUnitIds = [ primUnitId
+                 , bignumUnitId
+                 , baseUnitId
+                 , rtsUnitId
+                 , thUnitId
+                 , thisGhcUnitId
+                 ]
 
 {-
 ************************************************************************
