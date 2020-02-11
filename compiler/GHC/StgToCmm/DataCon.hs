@@ -64,29 +64,22 @@ cgTopRhsCon :: DynFlags
             -> [NonVoid StgArg] -- Args
             -> (CgIdInfo, FCode ())
 cgTopRhsCon dflags id con args
-
-  -- Internal: We always refer to the existing closure,
-  --           no code needed
-  -- See Note [Precomputed static closures].
-  -- See Note [About the NameSorts] for what internal means.
-  | Just info <- static_info
-  , isInternalName name
-  = (info, pure ())
-
-  -- External: Refer to existing closure if possible,
-  --           code needed for importers of this binding.
-  --           This optimizes for cache usage.
-  -- See Note [Precomputed static closures].
-  -- See Note [About the NameSorts] for what internal means.
-  | Just info <- static_info
-  = (info, gen_code)
+  | Just static_info <- precomputedStaticConInfo_maybe dflags id con args
+  , let static_code | isInternalName = pure ()
+                    | otherwise      = gen_code
+  = -- There is a pre-allocated static closure available; use it
+    -- See Note [Precomputed static closures].
+    -- For External bindings we must keep the binding,
+    -- since importing modules will refer to it by name;
+    -- but for Internal ones we can drop it altogether
+    -- See Note [About the NameSorts] in Name.hs for Internal/External
+    (static_info, static_code)
 
   -- Otherwise generate a closure for the constructor.
   | otherwise
   = (id_Info, gen_code)
 
   where
-   static_info   = getStaticConInfo dflags id con args
    id_Info       = litIdInfo dflags id (mkConLFInfo con) (CmmLabel closure_label)
    name          = idName id
    caffy         = idCafInfo id -- any stgArgHasCafRefs args
@@ -177,7 +170,7 @@ premature looking at the args will cause the compiler to black-hole!
 -}
 
 buildDynCon' dflags binder _ _cc con args
-  | Just cgInfo <- getStaticConInfo dflags binder con args
+  | Just cgInfo <- precomputedStaticConInfo_maybe dflags binder con args
   -- , pprTrace "noCodeLocal:" (ppr (binder,con,args,cgInfo)) True
   = return (cgInfo, return mkNop)
 
@@ -224,9 +217,10 @@ closure instead of building new ones.
 
 This is true at compile time where we do this replacement
 in this module.
-But also at runtime where the GC does the same.
+But also at runtime where the GC does the same (but only for
+INT/CHAR closures).
 
-`getStaticConInfo` checks if a given constructor application
+`precomputedStaticConInfo_maybe` checks if a given constructor application
 can be replaced with a reference to a existing static closure.
 
 If so the code will reference the existing closure when accessing
@@ -300,13 +294,18 @@ We don't support this optimization when compiling into Windows DLLs yet
 because they don't support cross package data references well.
 -}
 
-getStaticConInfo :: DynFlags -> Id -> DataCon -> [NonVoid StgArg] -> Maybe CgIdInfo
-getStaticConInfo dflags binder con []
+-- (precomputedStaticConInfo_maybe dflags id con args)
+--     returns (Just cg_id_info)
+-- if there is a precomputed static closure for (con args).
+-- In that case, cg_id_info addresses it.
+-- See Note [Precomputed static closures]
+precomputedStaticConInfo_maybe :: DynFlags -> Id -> DataCon -> [NonVoid StgArg] -> Maybe CgIdInfo
+precomputedStaticConInfo_maybe dflags binder con []
 -- Nullary constructors
   | isNullaryRepDataCon con
   = Just $ litIdInfo dflags binder (mkConLFInfo con)
-                (CmmLabel (mkClosureLabel (dataConName con) (idCafInfo binder)))
-getStaticConInfo dflags binder con [arg]
+                (CmmLabel (mkClosureLabel (dataConName con) NoCafRefs))
+precomputedStaticConInfo_maybe dflags binder con [arg]
   -- Int/Char values with existing closures in the RTS
   | intClosure || charClosure
   , platformOS platform /= OSMinGW32 || not (positionIndependent dflags)
@@ -334,17 +333,17 @@ getStaticConInfo dflags binder con [arg]
     min_static_range
       | intClosure = fromIntegral (mIN_INTLIKE dflags)
       | charClosure = fromIntegral (mIN_CHARLIKE dflags)
-      | otherwise = panic "getStaticConInfo: Unknown closure type"
+      | otherwise = panic "precomputedStaticConInfo_maybe: Unknown closure type"
     max_static_range
       | intClosure = fromIntegral (mAX_INTLIKE dflags)
       | charClosure = fromIntegral (mAX_CHARLIKE dflags)
-      | otherwise = panic "getStaticConInfo: Unknown closure type"
+      | otherwise = panic "precomputedStaticConInfo_maybe: Unknown closure type"
     label
       | intClosure = "stg_INTLIKE"
       | charClosure =  "stg_CHARLIKE"
-      | otherwise = panic "getStaticConInfo: Unknown closure type"
+      | otherwise = panic "precomputedStaticConInfo_maybe: Unknown closure type"
 
-getStaticConInfo _ _ _ _ = Nothing
+precomputedStaticConInfo_maybe _ _ _ _ = Nothing
 
 ---------------------------------------------------------------
 --      Binding constructor arguments
