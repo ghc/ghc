@@ -36,7 +36,7 @@ module GHC.List (
 import Data.Maybe
 import GHC.Base
 import GHC.Num (Num(..))
-import GHC.Integer (Integer)
+import GHC.Num.Integer (Integer)
 
 infixl 9  !!
 infix  4 `elem`, `notElem`
