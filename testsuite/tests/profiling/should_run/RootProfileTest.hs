@@ -1,40 +1,23 @@
-{-# LANGUAGE ForeignFunctionInterface, ExistentialQuantification #-}
+{-# LANGUAGE ForeignFunctionInterface #-}
+{-# LANGUAGE MagicHash #-}
 
 import Control.Monad
 import Control.Exception (evaluate)
 
-import Foreign.C.String
 import Foreign.C.Types
-import Foreign.Marshal.Array
 import Foreign.Ptr
-import Foreign.StablePtr
 import Foreign.Storable
 
 import System.IO
 import System.Mem
 
-import Unsafe.Coerce
-
-foreign import ccall unsafe "setRootProfPtrs" c_setRootProfPtrs
-  :: CInt -> Ptr (StablePtr a) -> Ptr CString -> IO ()
+import GHC.Profiling
+import GHC.Exts
 
 foreign import ccall "&g_rootProfileDebugLevel" g_rootProfileDebugLevel
   :: Ptr CInt
 
-data Root = forall a. Root
-  { rootDescr   :: String
-  , rootClosure :: a
-  }
-
-setHeapRoots :: [Root] -> IO ()
-setHeapRoots xs = do
-  descs <- mapM (newCString . rootDescr) xs
-  sps   <- forM xs $ \(Root _ a) ->
-    newStablePtr =<< evaluate (unsafeCoerce a :: a)
-  withArray descs $ \descs_arr ->
-    withArray sps $ \sps_arr ->
-      c_setRootProfPtrs (fromIntegral (length xs)) sps_arr descs_arr
-
+main :: IO ()
 main = do
   poke g_rootProfileDebugLevel 1
   hSetBuffering stdout NoBuffering
@@ -42,14 +25,19 @@ main = do
   putStrLn "\n\n\n\n= sharing =" >> sharing
   poke g_rootProfileDebugLevel 0
 
+go :: Int# -> [Int]
+go x = I# x : go (x +# 1#)
+
+simple :: IO ()
 simple = do
-  let go x = x : go (x + 1)
-  let xs = go 0; xs :: [Word]
-  setHeapRoots [Root "xs" xs]
+  let xs = go 0#; xs :: [Int]
+  setHeapProfilingRoots [Root "xs" xs]
+  performMajorGC
   forM_ [0..10] $ \i -> do
-    evaluate (xs !! i)
+    _ <- evaluate (xs !! i)
     performMajorGC
 
+sharing :: IO ()
 sharing = do
   let x1 = 1 : x2
       x2 = 2 : x3
@@ -60,7 +48,7 @@ sharing = do
       x7 = []
       x7 :: [Word]
 
-  setHeapRoots
+  setHeapProfilingRoots
     [ Root "1" x1
     , Root "2" x2
     , Root "3" x3
