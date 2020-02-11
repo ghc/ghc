@@ -94,17 +94,6 @@ time you fire up a build. This is not possible with the Make build system.
   ```
   See [flavours documentation](https://gitlab.haskell.org/ghc/ghc/blob/master/hadrian/doc/flavours.md) for info on flavours.
 
-- Building with `integer-simple` as the integer library
-
-  ``` sh
-  # Make
-  echo "INTEGER_LIBRARY=integer-simple" >> mk/build.mk
-  make
-
-  # Hadrian
-  build --integer-simple
-  ```
-
 - Freezing the stage 1 GHC compiler
 
   ``` sh
