@@ -845,6 +845,7 @@ cmmPrimOpFunctions mop = do
     MO_ReadBarrier   -> unsupported
     MO_WriteBarrier  -> unsupported
     MO_Touch         -> unsupported
+    MO_With          -> unsupported
     MO_UF_Conv _     -> unsupported
 
     MO_AtomicRead _  -> unsupported

@@ -348,6 +348,10 @@ emitPrimOp dflags = \case
   TouchOp -> \args@[_] -> opAllDone $ \res@[] -> do
     emitPrimCall res MO_Touch args
 
+--  #define withzh(o)                  /* nothing */
+  WithOp -> \args@[_,_] -> opAllDone $ \res@[_] -> do
+    emitPrimCall res MO_With args
+
 --  #define byteArrayContentszh(r,a) r = BYTE_ARR_CTS(a)
   ByteArrayContents_Char -> \[arg] -> opAllDone $ \[res] -> do
     emitAssign (CmmLocal res) (cmmOffsetB dflags arg (arrWordsHdrSize dflags))
