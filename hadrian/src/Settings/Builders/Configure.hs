@@ -1,13 +1,13 @@
 module Settings.Builders.Configure (configureBuilderArgs) where
 
 import Packages
-import Rules.Gmp
 import Settings.Builders.Common
 
 configureBuilderArgs :: Args
 configureBuilderArgs = do
-    gmpPath    <- expr gmpBuildPath
+    root       <- getBuildRoot
     stage      <- getStage
+    let gmpPath = root -/- stageString stage -/- "gmp/"
     libffiPath <- expr (libffiBuildPath stage)
     mconcat [ builder (Configure gmpPath) ? do
                 targetPlatform <- getSetting TargetPlatform

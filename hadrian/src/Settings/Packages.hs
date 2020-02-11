@@ -5,7 +5,6 @@ import Flavour
 import Oracles.Setting
 import Oracles.Flag
 import Packages
-import Rules.Gmp
 import Settings
 
 -- | Package-specific command-line arguments.
@@ -17,9 +16,7 @@ packageArgs = do
     bignum       <- getBignumBackend
     bignumCheck  <- getBignumCheck
     compilerPath <- expr $ buildPath (vanillaContext stage compiler)
-    gmpBuildPath <- expr gmpBuildPath
-    let includeGmp = "-I" ++ gmpBuildPath -/- "include"
-        -- Do not bind the result to a Boolean: this forces the configure rule
+    let -- Do not bind the result to a Boolean: this forces the configure rule
         -- immediately and may lead to cyclic dependencies.
         -- See: https://gitlab.haskell.org/ghc/ghc/issues/16809.
         cross = flag CrossCompiling
@@ -155,9 +152,7 @@ packageArgs = do
             -- backend specific
           , case bignum of
                "gmp" -> mconcat
-                  [ builder Cc ? arg includeGmp
-                  , builder (Ghc CompileCWithGhc) ? arg includeGmp
-                  , builder (Cabal Setup) ? mconcat
+                  [ builder (Cabal Setup) ? mconcat
                      [ arg "--configure-option=--with-gmp"
                      , flag GmpInTree ?  arg "--configure-option=--with-intree-gmp"
                      -- Windows is always built with inplace GMP until we have dynamic
@@ -165,8 +160,6 @@ packageArgs = do
                      , windowsHost?  arg "--configure-option=--with-intree-gmp"
                      , flag GmpFrameworkPref ?
                        arg "--configure-option=--with-gmp-framework-preferred"
-                     , arg ("--configure-option=CFLAGS=" ++ includeGmp)
-                     , arg ("--gcc-options="             ++ includeGmp)
                      ]
                   ]
                _ -> mempty
