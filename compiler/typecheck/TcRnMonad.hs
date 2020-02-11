@@ -265,6 +265,7 @@ initTc hsc_env hsc_src keep_rn_syntax mod loc do_this
                 tcg_fix_env        = emptyNameEnv,
                 tcg_field_env      = emptyNameEnv,
                 tcg_default        = if moduleUnitId mod == primUnitId
+                                     || moduleUnitId mod == bignumUnitId
                                      then Just []  -- See Note [Default types]
                                      else Nothing,
                 tcg_type_env       = emptyNameEnv,
@@ -382,10 +383,10 @@ initTcInteractive hsc_env thing_inside
 
 {- Note [Default types]
 ~~~~~~~~~~~~~~~~~~~~~~~
-The Integer type is simply not available in package ghc-prim (it is
-declared in integer-gmp).  So we set the defaulting types to (Just
-[]), meaning there are no default types, rather then Nothing, which
-means "use the default default types of Integer, Double".
+The Integer type is simply not available in ghc-prim and ghc-bignum packages (it
+is declared in ghc-bignum). So we set the defaulting types to (Just []), meaning
+there are no default types, rather then Nothing, which means "use the default
+default types of Integer, Double".
 
 If you don't do this, attempted defaulting in package ghc-prim causes
 an actual crash (attempting to look up the Integer type).

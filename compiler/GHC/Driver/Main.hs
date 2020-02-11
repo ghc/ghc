@@ -194,7 +194,7 @@ import GHC.Iface.Ext.Debug  ( diffFile, validateScopes )
 
 newHscEnv :: DynFlags -> IO HscEnv
 newHscEnv dflags = do
-    eps_var <- newIORef initExternalPackageState
+    eps_var <- newIORef (initExternalPackageState dflags)
     us      <- mkSplitUniqSupply 'r'
     nc_var  <- newIORef (initNameCache us knownKeyNames)
     fc_var  <- newIORef emptyInstalledModuleEnv
