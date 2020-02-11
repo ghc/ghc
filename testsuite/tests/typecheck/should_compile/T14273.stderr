@@ -10,7 +10,7 @@ T14273.hs:7:27: warning: [-Wdeferred-type-errors (in -Wdefault)]
         instance (Show a, Show b) => Show (Either a b)
           -- Defined in ‘Data.Either’
         instance Show Ordering -- Defined in ‘GHC.Show’
-        instance Show Integer -- Defined in ‘GHC.Show’
+        instance Show a => Show (Maybe a) -- Defined in ‘GHC.Show’
         ...plus 23 others
         ...plus 70 instances involving out-of-scope types
         (use -fprint-potential-instances to see them all)
@@ -64,7 +64,7 @@ T14273.hs:13:10: warning: [-Wdeferred-type-errors (in -Wdefault)]
         instance (Show a, Show b) => Show (Either a b)
           -- Defined in ‘Data.Either’
         instance Show Ordering -- Defined in ‘GHC.Show’
-        instance Show Integer -- Defined in ‘GHC.Show’
+        instance Show a => Show (Maybe a) -- Defined in ‘GHC.Show’
         ...plus 23 others
         ...plus 70 instances involving out-of-scope types
         (use -fprint-potential-instances to see them all)
