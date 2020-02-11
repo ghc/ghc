@@ -9,8 +9,8 @@ import Control.Monad
 
 import GHC.Word
 import GHC.Base
-import GHC.Integer.GMP.Internals (Integer(S#,Jp#,Jn#))
-import qualified GHC.Integer.GMP.Internals as I
+import GHC.Num.Integer
+import qualified GHC.Num.Integer as I
 
 recipModInteger :: Integer -> Integer -> Integer
 recipModInteger = I.recipModInteger
