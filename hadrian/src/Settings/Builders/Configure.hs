@@ -7,7 +7,7 @@ configureBuilderArgs :: Args
 configureBuilderArgs = do
     root       <- getBuildRoot
     stage      <- getStage
-    let gmpPath = root -/- stageString stage -/- "gmp/"
+    let gmpPath = root -/- stageString stage -/- "gmp"
     libffiPath <- expr (libffiBuildPath stage)
     mconcat [ builder (Configure gmpPath) ? do
                 targetPlatform <- getSetting TargetPlatform
