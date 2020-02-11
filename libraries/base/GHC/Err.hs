@@ -26,11 +26,7 @@ module GHC.Err( absentErr, error, errorWithoutStackTrace, undefined ) where
 import GHC.Types (Char, RuntimeRep)
 import GHC.Stack.Types
 import GHC.Prim
-import GHC.Integer ()   -- Make sure Integer and Natural are compiled first
-import GHC.Natural ()   -- because GHC depends on it in a wired-in way
-                        -- so the build system doesn't see the dependency.
-                        -- See Note [Depend on GHC.Integer] and
-                        -- Note [Depend on GHC.Natural] in GHC.Base.
+import GHC.Num.Integer ()   -- See Note [Depend on GHC.Num.Integer] in GHC.Base
 import {-# SOURCE #-} GHC.Exception
   ( errorCallWithCallStackException
   , errorCallException )

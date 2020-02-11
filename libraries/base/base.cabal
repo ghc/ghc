@@ -44,16 +44,6 @@ source-repository head
     location: https://gitlab.haskell.org/ghc/ghc.git
     subdir:   libraries/base
 
-Flag integer-simple
-    Description: Use integer-simple
-    Manual: True
-    Default: False
-
-Flag integer-gmp
-    Description: Use integer-gmp
-    Manual: True
-    Default: False
-
 Library
     default-language: Haskell2010
     other-extensions:
@@ -95,17 +85,10 @@ Library
         UnliftedFFITypes
         Unsafe
 
-    build-depends: rts == 1.0, ghc-prim >= 0.5.1.0 && < 0.7
-
-    -- sanity-check to ensure exactly one flag is set
-    if !((flag(integer-gmp) && !flag(integer-simple)) || (!flag(integer-gmp) && flag(integer-simple)))
-        build-depends: invalid-cabal-flag-settings<0
-
-    if flag(integer-simple)
-        build-depends: integer-simple ^>= 0.1.1
-
-    if flag(integer-gmp)
-        build-depends: integer-gmp ^>= 1.0.1
+    build-depends:
+        rts == 1.0,
+        ghc-prim >= 0.5.1.0 && < 0.7,
+        ghc-bignum >= 1.0 && < 2.0
 
     exposed-modules:
         Control.Applicative
@@ -258,6 +241,8 @@ Library
         GHC.IOArray
         GHC.IORef
         GHC.Int
+        GHC.Integer
+        GHC.Integer.Logarithms
         GHC.Ix
         GHC.List
         GHC.Maybe
@@ -319,6 +304,11 @@ Library
         Type.Reflection
         Type.Reflection.Unsafe
         Unsafe.Coerce
+
+    reexported-modules:
+          GHC.Num.Integer
+        , GHC.Num.Natural
+        , GHC.Num.BigNat
 
     other-modules:
         Control.Monad.ST.Imp

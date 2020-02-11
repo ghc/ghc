@@ -54,7 +54,7 @@ module GHC.Float.RealFracMethods
     , int2Float
     ) where
 
-import GHC.Integer
+import GHC.Num.Integer
 
 import GHC.Base
 import GHC.Num ()
@@ -63,15 +63,15 @@ import GHC.Num ()
 
 import GHC.IntWord64
 
-#define TO64 integerToInt64
-#define FROM64 int64ToInteger
+#define TO64 integerToInt64#
+#define FROM64 integerFromInt64#
 #define MINUS64 minusInt64#
 #define NEGATE64 negateInt64#
 
 #else
 
-#define TO64 integerToInt
-#define FROM64 smallInteger
+#define TO64 integerToInt#
+#define FROM64 IS
 #define MINUS64 ( -# )
 #define NEGATE64 negateInt#
 
@@ -140,15 +140,15 @@ properFractionFloatInteger v@(F# x) =
             s | isTrue# (s ># 23#) -> (0, v)
               | isTrue# (m <#  0#) ->
                 case negateInt# (negateInt# m `uncheckedIShiftRA#` s) of
-                  k -> (smallInteger k,
+                  k -> (IS k,
                             case m -# (k `uncheckedIShiftL#` s) of
-                              r -> F# (encodeFloatInteger (smallInteger r) e))
+                              r -> F# (integerEncodeFloat# (IS r) e))
               | otherwise           ->
                 case m `uncheckedIShiftRL#` s of
-                  k -> (smallInteger k,
+                  k -> (IS k,
                             case m -# (k `uncheckedIShiftL#` s) of
-                              r -> F# (encodeFloatInteger (smallInteger r) e))
-        | otherwise -> (shiftLInteger (smallInteger m) e, F# 0.0#)
+                              r -> F# (integerEncodeFloat# (IS r) e))
+        | otherwise -> (integerShiftL# (IS m) (int2Word# e), F# 0.0#)
 
 {-# INLINE truncateFloatInteger #-}
 truncateFloatInteger :: Float -> Integer
@@ -166,8 +166,8 @@ floorFloatInteger (F# x) =
         | isTrue# (e <# 0#) ->
           case negateInt# e of
             s | isTrue# (s ># 23#) -> if isTrue# (m <# 0#) then (-1) else 0
-              | otherwise          -> smallInteger (m `uncheckedIShiftRA#` s)
-        | otherwise -> shiftLInteger (smallInteger m) e
+              | otherwise          -> IS (m `uncheckedIShiftRA#` s)
+        | otherwise -> integerShiftL# (IS m) (int2Word# e)
 
 -- ceiling x = -floor (-x)
 -- If giving this its own implementation is faster at all,
@@ -175,7 +175,7 @@ floorFloatInteger (F# x) =
 {-# INLINE ceilingFloatInteger #-}
 ceilingFloatInteger :: Float -> Integer
 ceilingFloatInteger (F# x) =
-    negateInteger (floorFloatInteger (F# (negateFloat# x)))
+    integerNegate (floorFloatInteger (F# (negateFloat# x)))
 
 {-# INLINE roundFloatInteger #-}
 roundFloatInteger :: Float -> Integer
@@ -231,28 +231,28 @@ roundDoubleInt x = double2Int (c_rintDouble x)
 {-# INLINE properFractionDoubleInteger #-}
 properFractionDoubleInteger :: Double -> (Integer, Double)
 properFractionDoubleInteger v@(D# x) =
-    case decodeDoubleInteger x of
+    case integerDecodeDouble# x of
       (# m, e #)
         | isTrue# (e <# 0#) ->
           case negateInt# e of
             s | isTrue# (s ># 52#) -> (0, v)
               | m < 0                 ->
-                case TO64 (negateInteger m) of
+                case TO64 (integerNegate m) of
                   n ->
                     case n `uncheckedIShiftRA64#` s of
                       k ->
                         (FROM64 (NEGATE64 k),
                           case MINUS64 n (k `uncheckedIShiftL64#` s) of
                             r ->
-                              D# (encodeDoubleInteger (FROM64 (NEGATE64 r)) e))
+                              D# (integerEncodeDouble# (FROM64 (NEGATE64 r)) e))
               | otherwise           ->
                 case TO64 m of
                   n ->
                     case n `uncheckedIShiftRA64#` s of
                       k -> (FROM64 k,
                             case MINUS64 n (k `uncheckedIShiftL64#` s) of
-                              r -> D# (encodeDoubleInteger (FROM64 r) e))
-        | otherwise -> (shiftLInteger m e, D# 0.0##)
+                              r -> D# (integerEncodeDouble# (FROM64 r) e))
+        | otherwise -> (integerShiftL# m (int2Word# e), D# 0.0##)
 
 {-# INLINE truncateDoubleInteger #-}
 truncateDoubleInteger :: Double -> Integer
@@ -265,7 +265,7 @@ truncateDoubleInteger x =
 {-# INLINE floorDoubleInteger #-}
 floorDoubleInteger :: Double -> Integer
 floorDoubleInteger (D# x) =
-    case decodeDoubleInteger x of
+    case integerDecodeDouble# x of
       (# m, e #)
         | isTrue# (e <# 0#) ->
           case negateInt# e of
@@ -273,12 +273,12 @@ floorDoubleInteger (D# x) =
               | otherwise          ->
                 case TO64 m of
                   n -> FROM64 (n `uncheckedIShiftRA64#` s)
-        | otherwise -> shiftLInteger m e
+        | otherwise -> integerShiftL# m (int2Word# e)
 
 {-# INLINE ceilingDoubleInteger #-}
 ceilingDoubleInteger :: Double -> Integer
 ceilingDoubleInteger (D# x) =
-    negateInteger (floorDoubleInteger (D# (negateDouble# x)))
+    integerNegate (floorDoubleInteger (D# (negateDouble# x)))
 
 {-# INLINE roundDoubleInteger #-}
 roundDoubleInteger :: Double -> Integer
@@ -310,20 +310,20 @@ int2Float (I# i) = F# (int2Float# i)
 {-# INLINE double2Integer #-}
 double2Integer :: Double -> Integer
 double2Integer (D# x) =
-    case decodeDoubleInteger x of
+    case integerDecodeDouble# x of
       (# m, e #)
         | isTrue# (e <# 0#) ->
           case TO64 m of
             n -> FROM64 (n `uncheckedIShiftRA64#` negateInt# e)
-        | otherwise -> shiftLInteger m e
+        | otherwise -> integerShiftL# m (int2Word# e)
 
 {-# INLINE float2Integer #-}
 float2Integer :: Float -> Integer
 float2Integer (F# x) =
     case decodeFloat_Int# x of
       (# m, e #)
-        | isTrue# (e <# 0#) -> smallInteger (m `uncheckedIShiftRA#` negateInt# e)
-        | otherwise         -> shiftLInteger (smallInteger m) e
+        | isTrue# (e <# 0#) -> IS (m `uncheckedIShiftRA#` negateInt# e)
+        | otherwise         -> integerShiftL# (IS m) (int2Word# e)
 
 -- Foreign imports, the rounding is done faster in C when the value
 -- isn't integral, so we call out for rounding. For values of large

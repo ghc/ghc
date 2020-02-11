@@ -21,4 +21,4 @@ module Numeric.Natural
     ( Natural
     ) where
 
-import GHC.Natural
+import GHC.Num.Natural

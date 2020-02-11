@@ -470,6 +470,7 @@ itos n# cs
 
 -- | @since 2.01
 instance Show Integer where
+    showsPrec p (IS i) r = showsPrec p (I# i) r
     showsPrec p n r
         | p > 6 && n < 0 = '(' : integerToString n (')' : r)
         -- Minor point: testing p first gives better code
@@ -480,10 +481,8 @@ instance Show Integer where
 
 -- | @since 4.8.0.0
 instance Show Natural where
-#if defined(MIN_VERSION_integer_gmp)
-    showsPrec p (NatS# w#) = showsPrec p (W# w#)
-#endif
-    showsPrec p i          = showsPrec p (naturalToInteger i)
+    showsPrec p (NS w) = showsPrec p (W# w)
+    showsPrec p n      = showsPrec p (integerFromNatural n)
 
 -- Divide and conquer implementation of string conversion
 integerToString :: Integer -> String -> String
@@ -508,7 +507,7 @@ integerToString n0 cs0
 
     jsplith :: Integer -> [Integer] -> [Integer]
     jsplith p (n:ns) =
-        case n `quotRemInteger` p of
+        case n `integerQuotRem#` p of
         (# q, r #) ->
             if q > 0 then q : r : jsplitb p ns
                      else     r : jsplitb p ns
@@ -516,7 +515,7 @@ integerToString n0 cs0
 
     jsplitb :: Integer -> [Integer] -> [Integer]
     jsplitb _ []     = []
-    jsplitb p (n:ns) = case n `quotRemInteger` p of
+    jsplitb p (n:ns) = case n `integerQuotRem#` p of
                        (# q, r #) ->
                            q : r : jsplitb p ns
 
@@ -525,7 +524,7 @@ integerToString n0 cs0
     -- that all fit into a machine word.
     jprinth :: [Integer] -> String -> String
     jprinth (n:ns) cs =
-        case n `quotRemInteger` BASE of
+        case n `integerQuotRem#` BASE of
         (# q', r' #) ->
             let q = fromInteger q'
                 r = fromInteger r'
@@ -535,7 +534,7 @@ integerToString n0 cs0
 
     jprintb :: [Integer] -> String -> String
     jprintb []     cs = cs
-    jprintb (n:ns) cs = case n `quotRemInteger` BASE of
+    jprintb (n:ns) cs = case n `integerQuotRem#` BASE of
                         (# q', r' #) ->
                             let q = fromInteger q'
                                 r = fromInteger r'

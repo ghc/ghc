@@ -33,7 +33,7 @@ module GHC.Enum(
 
 import GHC.Base hiding ( many )
 import GHC.Char
-import GHC.Integer
+import GHC.Num.Integer
 import GHC.Num
 import GHC.Show
 default ()              -- Double isn't available yet
@@ -842,8 +842,8 @@ efdtWordDnFB c n x1 x2 y    -- Be careful about underflow!
 instance  Enum Integer  where
     succ x               = x + 1
     pred x               = x - 1
-    toEnum (I# n)        = smallInteger n
-    fromEnum n           = I# (integerToInt n)
+    toEnum (I# n)        = IS n
+    fromEnum n           = integerToInt n
 
     -- See Note [Stable Unfolding for list producers]
     {-# INLINE enumFrom #-}
@@ -961,29 +961,25 @@ dn_list x0 delta lim = go (x0 :: Integer)
 
 -- | @since 4.8.0.0
 instance Enum Natural where
-    succ n = n `plusNatural`  wordToNaturalBase 1##
-    pred n = n `minusNatural` wordToNaturalBase 1##
+    succ n = n + 1
+    pred n = n - 1
+    toEnum i
+      | i >= 0    = naturalFromIntUnsafe i
+      | otherwise = errorWithoutStackTrace "toEnum: unexpected negative Int"
 
-    toEnum = intToNatural
-
-#if defined(MIN_VERSION_integer_gmp)
-    -- This is the integer-gmp special case. The general case is after the endif.
-    fromEnum (NatS# w)
+    fromEnum (NS w)
       | i >= 0    = i
       | otherwise = errorWithoutStackTrace "fromEnum: out of Int range"
       where
         i = I# (word2Int# w)
-#endif
-    fromEnum n = fromEnum (naturalToInteger n)
+    fromEnum n = fromEnum (integerFromNatural n)
 
-    enumFrom x        = enumDeltaNatural      x (wordToNaturalBase 1##)
-
+    enumFrom x        = enumDeltaNatural      x 1
     enumFromThen x y
       | x <= y        = enumDeltaNatural      x (y-x)
-      | otherwise     = enumNegDeltaToNatural x (x-y) (wordToNaturalBase 0##)
+      | otherwise     = enumNegDeltaToNatural x (x-y) 0
 
-    enumFromTo x lim  = enumDeltaToNatural    x (wordToNaturalBase 1##) lim
-
+    enumFromTo x lim  = enumDeltaToNatural    x 1 lim
     enumFromThenTo x y lim
       | x <= y        = enumDeltaToNatural    x (y-x) lim
       | otherwise     = enumNegDeltaToNatural x (x-y) lim

@@ -730,7 +730,7 @@ module GHC.Generics  (
 import Data.Either ( Either (..) )
 import Data.Maybe  ( Maybe(..), fromMaybe )
 import Data.Ord    ( Down(..) )
-import GHC.Integer ( Integer, integerToInt )
+import GHC.Num.Integer ( Integer, integerToInt )
 import GHC.Prim    ( Addr#, Char#, Double#, Float#, Int#, Word# )
 import GHC.Ptr     ( Ptr )
 import GHC.Types
@@ -1571,7 +1571,7 @@ instance (SingI a, KnownNat n) => SingI ('InfixI a n) where
 instance SingKind FixityI where
   type DemoteRep FixityI = Fixity
   fromSing SPrefix      = Prefix
-  fromSing (SInfix a n) = Infix (fromSing a) (I# (integerToInt n))
+  fromSing (SInfix a n) = Infix (fromSing a) (integerToInt n)
 
 -- Singleton Associativity
 data instance Sing (a :: Associativity) where
