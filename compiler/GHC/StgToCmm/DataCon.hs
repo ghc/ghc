@@ -311,7 +311,7 @@ precomputedStaticConInfo_maybe dflags binder con [arg]
     platform = targetPlatform dflags
     intClosure = maybeIntLikeCon con
     charClosure = maybeCharLikeCon con
-    getClosurePayload (NonVoid (StgLitArg (LitNumber LitNumInt val _))) = Just val
+    getClosurePayload (NonVoid (StgLitArg (LitNumber LitNumInt val))) = Just val
     getClosurePayload (NonVoid (StgLitArg (LitChar val))) = Just $ (fromIntegral . ord $ val)
     getClosurePayload _ = Nothing
     -- Avoid over/underflow by comparisons at type Integer!

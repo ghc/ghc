@@ -55,8 +55,6 @@ module GHC.Settings
   , sOpt_i
   , sExtraGccViaCFlags
   , sTargetPlatformString
-  , sIntegerLibrary
-  , sIntegerLibraryType
   , sGhcWithInterpreter
   , sGhcWithNativeCodeGen
   , sGhcWithSMP
@@ -262,10 +260,6 @@ sExtraGccViaCFlags = toolSettings_extraGccViaCFlags . sToolSettings
 
 sTargetPlatformString :: Settings -> String
 sTargetPlatformString = platformMisc_targetPlatformString . sPlatformMisc
-sIntegerLibrary :: Settings -> String
-sIntegerLibrary = platformMisc_integerLibrary . sPlatformMisc
-sIntegerLibraryType :: Settings -> IntegerLibrary
-sIntegerLibraryType = platformMisc_integerLibraryType . sPlatformMisc
 sGhcWithInterpreter :: Settings -> Bool
 sGhcWithInterpreter = platformMisc_ghcWithInterpreter . sPlatformMisc
 sGhcWithNativeCodeGen :: Settings -> Bool

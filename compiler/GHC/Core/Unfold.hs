@@ -807,8 +807,8 @@ sizeExpr dflags bOMB_OUT_SIZE top_args expr
 -- | Finds a nominal size of a string literal.
 litSize :: Literal -> Int
 -- Used by GHC.Core.Unfold.sizeExpr
-litSize (LitNumber LitNumInteger _ _) = 100   -- Note [Size of literal integers]
-litSize (LitNumber LitNumNatural _ _) = 100
+litSize (LitNumber LitNumInteger _) = 100   -- Note [Size of literal integers]
+litSize (LitNumber LitNumNatural _) = 100
 litSize (LitString str) = 10 + 10 * ((BS.length str + 3) `div` 4)
         -- If size could be 0 then @f "x"@ might be too small
         -- [Sept03: make literal strings a bit bigger to avoid fruitless
@@ -958,10 +958,10 @@ Conclusion:
 Note [Literal integer size]
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~
 Literal integers *can* be big (mkInteger [...coefficients...]), but
-need not be (S# n).  We just use an arbitrary big-ish constant here
+need not be (IS n).  We just use an arbitrary big-ish constant here
 so that, in particular, we don't inline top-level defns like
-   n = S# 5
-There's no point in doing so -- any optimisations will see the S#
+   n = IS 5
+There's no point in doing so -- any optimisations will see the IS
 through n's unfolding.  Nor will a big size inhibit unfoldings functions
 that mention a literal Integer, because the float-out pass will float
 all those constants to top level.

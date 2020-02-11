@@ -288,7 +288,7 @@ literalToPmLit ty l = PmLit ty <$> go l
     go (LitFloat r)      = Just (PmLitRat r)
     go (LitDouble r)     = Just (PmLitRat r)
     go (LitString s)     = Just (PmLitString (mkFastStringByteString s))
-    go (LitNumber _ i _) = Just (PmLitInt i)
+    go (LitNumber _ i)   = Just (PmLitInt i)
     go _                 = Nothing
 
 negatePmLit :: PmLit -> Maybe PmLit

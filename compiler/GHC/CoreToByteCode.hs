@@ -1091,8 +1091,8 @@ doCase d s p (_,scrut) bndr alts is_unboxed_tuple
            | otherwise
            = DiscrP (fromIntegral (dataConTag dc - fIRST_TAG))
         my_discr (LitAlt l, _, _)
-           = case l of LitNumber LitNumInt i  _  -> DiscrI (fromInteger i)
-                       LitNumber LitNumWord w _  -> DiscrW (fromInteger w)
+           = case l of LitNumber LitNumInt i  -> DiscrI (fromInteger i)
+                       LitNumber LitNumWord w -> DiscrW (fromInteger w)
                        LitFloat r   -> DiscrF (fromRational r)
                        LitDouble r  -> DiscrD (fromRational r)
                        LitChar i    -> DiscrI (ord i)
@@ -1619,14 +1619,14 @@ pushAtom _ _ (AnnLit lit) = do
                            wordsToBytes platform size_words)
 
      case lit of
-        LitLabel _ _ _   -> code N
-        LitFloat _       -> code F
-        LitDouble _      -> code D
-        LitChar _        -> code N
-        LitNullAddr      -> code N
-        LitString _      -> code N
-        LitRubbish       -> code N
-        LitNumber nt _ _ -> case nt of
+        LitLabel _ _ _  -> code N
+        LitFloat _      -> code F
+        LitDouble _     -> code D
+        LitChar _       -> code N
+        LitNullAddr     -> code N
+        LitString _     -> code N
+        LitRubbish      -> code N
+        LitNumber nt _  -> case nt of
           LitNumInt     -> code N
           LitNumWord    -> code N
           LitNumInt64   -> code L

@@ -453,7 +453,7 @@ assembleI platform i = case i of
     literal (LitChar c)       = int (ord c)
     literal (LitString bs)    = lit [BCONPtrStr bs]
        -- LitString requires a zero-terminator when emitted
-    literal (LitNumber nt i _) = case nt of
+    literal (LitNumber nt i) = case nt of
       LitNumInt     -> int (fromIntegral i)
       LitNumWord    -> int (fromIntegral i)
       LitNumInt64   -> int64 (fromIntegral i)

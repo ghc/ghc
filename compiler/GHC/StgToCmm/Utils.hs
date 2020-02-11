@@ -103,10 +103,10 @@ mkSimpleLit platform = \case
    (LitChar   c)                -> CmmInt (fromIntegral (ord c))
                                           (wordWidth platform)
    LitNullAddr                  -> zeroCLit platform
-   (LitNumber LitNumInt i _)    -> CmmInt i (wordWidth platform)
-   (LitNumber LitNumInt64 i _)  -> CmmInt i W64
-   (LitNumber LitNumWord i _)   -> CmmInt i (wordWidth platform)
-   (LitNumber LitNumWord64 i _) -> CmmInt i W64
+   (LitNumber LitNumInt i)      -> CmmInt i (wordWidth platform)
+   (LitNumber LitNumInt64 i)    -> CmmInt i W64
+   (LitNumber LitNumWord i)     -> CmmInt i (wordWidth platform)
+   (LitNumber LitNumWord64 i)   -> CmmInt i W64
    (LitFloat r)                 -> CmmFloat r W32
    (LitDouble r)                -> CmmFloat r W64
    (LitLabel fs ms fod)
@@ -495,7 +495,7 @@ emitCmmLitSwitch scrut  branches deflt = do
 
     -- We find the necessary type information in the literals in the branches
     let signed = case head branches of
-                    (LitNumber nt _ _, _) -> litNumIsSigned nt
+                    (LitNumber nt _, _) -> litNumIsSigned nt
                     _ -> False
 
     let range | signed    = (platformMinInt platform, platformMaxInt platform)

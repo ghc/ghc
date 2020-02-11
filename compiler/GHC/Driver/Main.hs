@@ -193,7 +193,7 @@ import GHC.Iface.Ext.Debug  ( diffFile, validateScopes )
 
 newHscEnv :: DynFlags -> IO HscEnv
 newHscEnv dflags = do
-    eps_var <- newIORef initExternalPackageState
+    eps_var <- newIORef (initExternalPackageState dflags)
     us      <- mkSplitUniqSupply 'r'
     nc_var  <- newIORef (initNameCache us knownKeyNames)
     fc_var  <- newIORef emptyInstalledModuleEnv
@@ -1888,16 +1888,14 @@ hscCompileCoreExpr hsc_env =
 
 hscCompileCoreExpr' :: HscEnv -> SrcSpan -> CoreExpr -> IO ForeignHValue
 hscCompileCoreExpr' hsc_env srcspan ds_expr
-    = do { let dflags = hsc_dflags hsc_env
-
-           {- Simplify it -}
-         ; simpl_expr <- simplifyExpr hsc_env ds_expr
+    = do { {- Simplify it -}
+           simpl_expr <- simplifyExpr hsc_env ds_expr
 
            {- Tidy it (temporary, until coreSat does cloning) -}
          ; let tidy_expr = tidyExpr emptyTidyEnv simpl_expr
 
            {- Prepare for codegen -}
-         ; prepd_expr <- corePrepExpr dflags hsc_env tidy_expr
+         ; prepd_expr <- corePrepExpr hsc_env tidy_expr
 
            {- Lint if necessary -}
          ; lintInteractiveExpr "hscCompileExpr" hsc_env prepd_expr
