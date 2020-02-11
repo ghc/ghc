@@ -24,7 +24,6 @@ module Data.Unique (
 
 import System.IO.Unsafe (unsafePerformIO)
 
-import GHC.Base
 import GHC.Num
 import Data.IORef
 
@@ -77,4 +76,4 @@ newUnique = do
 -- same value, although in practice this is unlikely.  The 'Int'
 -- returned makes a good hash key.
 hashUnique :: Unique -> Int
-hashUnique (Unique i) = I# (hashInteger i)
+hashUnique (Unique i) = integerToInt i
