@@ -99,9 +99,9 @@ endif
 # https://gitlab.haskell.org/ghc/ghc/wikis/building/running-tests/running#additional-packages
 #BUILD_EXTRA_PKGS=YES
 
-# Uncomment the following to force `integer-gmp` to use the in-tree GMP 6.1.2
+# Uncomment the following to force `ghc-bignum` to use the in-tree GMP 6.1.2
 # (other sometimes useful configure-options: `--with-gmp-{includes,libraries}`)
-#libraries/integer-gmp_CONFIGURE_OPTS += --configure-option=--with-intree-gmp
+#libraries/ghc-bignum_CONFIGURE_OPTS += --configure-option=--with-intree-gmp
 
 # Enable pretty hyperlinked sources
 #HADDOCK_DOCS = YES
