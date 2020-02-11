@@ -16,8 +16,7 @@ CLASS INSTANCES
     -- Defined at T8958.hs:10:10
   instance [incoherent] Nominal a -- Defined at T8958.hs:7:10
 Dependent modules: []
-Dependent packages: [base-4.14.0.0, ghc-prim-0.6.1,
-                     integer-gmp-1.0.3.0]
+Dependent packages: [base-4.14.0.0, ghc-bignum-1.0, ghc-prim-0.6.1]
 
 ==================== Typechecker ====================
 T8958.$tcMap
