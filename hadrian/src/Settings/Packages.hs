@@ -13,7 +13,6 @@ packageArgs = do
     stage        <- getStage
     rtsWays      <- getRtsWays
     path         <- getBuildPath
-    intLib       <- getIntegerPackage
     compilerPath <- expr $ buildPath (vanillaContext stage compiler)
     let -- Do not bind the result to a Boolean: this forces the configure rule
         -- immediately and may lead to cyclic dependencies.
@@ -27,15 +26,11 @@ packageArgs = do
     mconcat
         --------------------------------- base ---------------------------------
         [ package base ? mconcat
-          [ builder (Cabal Flags) ? notStage0 ? arg (pkgName intLib)
+          [ builder (Cabal Flags) ? notStage0 ? arg (pkgName ghcBignum)
 
           -- This fixes the 'unknown symbol stat' issue.
           -- See: https://github.com/snowleopard/hadrian/issues/259.
           , builder (Ghc CompileCWithGhc) ? arg "-optc-O2" ]
-
-        ------------------------------ bytestring ------------------------------
-        , package bytestring ?
-          builder (Cabal Flags) ? intLib == integerSimple ? arg "integer-simple"
 
         --------------------------------- cabal --------------------------------
         -- Cabal is a large library and slow to compile. Moreover, we build it
@@ -81,10 +76,7 @@ packageArgs = do
             [ ghcWithNativeCodeGen ? arg "ncg"
             , ghcWithInterpreter ? notStage0 ? arg "ghci"
             , cross ? arg "-terminfo"
-            , notStage0 ? intLib == integerGmp ?
-              arg "integer-gmp"
-            , notStage0 ? intLib == integerSimple ?
-              arg "integer-simple" ]
+            ]
 
           , builder (Haddock BuildPackage) ? arg ("--optghc=-I" ++ path) ]
 
@@ -193,8 +185,8 @@ packageArgs = do
         , package hsc2hs ?
           builder (Cabal Flags) ? arg "in-ghc-tree"
 
-        ------------------------------ integerGmp ------------------------------
-        , gmpPackageArgs
+        ------------------------------ ghc-bignum ------------------------------
+        , ghcBignumArgs
 
         ---------------------------------- rts ---------------------------------
         , package rts ? rtsPackageArgs -- RTS deserves a separate function
@@ -203,40 +195,50 @@ packageArgs = do
         , package runGhc ?
           builder Ghc ? input "**/Main.hs" ?
           (\version -> ["-cpp", "-DVERSION=" ++ show version]) <$> getSetting ProjectVersion
+        ]
 
-        --------------------------------- text ---------------------------------
-        -- The package @text@ is rather tricky. It's a boot library, and it
-        -- tries to determine on its own if it should link against @integer-gmp@
-        -- or @integer-simple@. For Stage0, we need to use the integer library
-        -- that the bootstrap compiler has (since @interger@ is not a boot
-        -- library) and therefore we copy it over into the Stage0 package-db.
-        -- Maybe we should stop doing this? And subsequently @text@ for Stage1
-        -- detects the same integer library again, even though we don't build it
-        -- in Stage1, and at that point the configuration is just wrong.
-        , package text ?
-          builder (Cabal Flags) ? notStage0 ? intLib == integerSimple ?
-          pure ["+integer-simple", "-bytestring-builder"] ]
+ghcBignumArgs :: Args
+ghcBignumArgs = package ghcBignum ? do
+    -- These are only used for non-in-tree builds.
+    librariesGmp <- getSetting GmpLibDir
+    includesGmp <- getSetting GmpIncludeDir
 
-gmpPackageArgs :: Args
-gmpPackageArgs = do
-    package integerGmp ? do
-        -- These are only used for non-in-tree builds.
-        librariesGmp <- getSetting GmpLibDir
-        includesGmp  <- getSetting GmpIncludeDir
+    backend <- getBignumBackend
+    check   <- getBignumCheck
 
-        mconcat
-          [ builder (Cabal Setup) ? mconcat
-            [ flag GmpInTree ? arg "--configure-option=--with-intree-gmp"
-            , flag GmpFrameworkPref ?
-              arg "--configure-option=--with-gmp-framework-preferred"
+    mconcat
+          [ -- select BigNum backend
+            builder (Cabal Flags) ? arg backend
 
-              -- Ensure that the integer-gmp package registration includes
-              -- knowledge of the system gmp's library and include directories.
-            , notM (flag GmpInTree) ? mconcat
-              [ if not (null librariesGmp) then arg ("--extra-lib-dirs=" ++ librariesGmp) else mempty
-              , if not (null includesGmp) then arg ("--extra-include-dirs=" ++ includesGmp) else mempty
-              ]
-            ]
+          , -- check the selected backend against native backend
+            builder (Cabal Flags) ? check ? arg "check"
+
+            -- backend specific
+          , case backend of
+               "gmp" -> mconcat
+                   [ builder (Cabal Setup) ? mconcat
+
+                       -- enable GMP backend: configure script will produce
+                       -- `ghc-bignum.buildinfo` and `include/HsIntegerGmp.h`
+                     [ arg "--configure-option=--with-gmp"
+
+                       -- enable in-tree support: don't depend on external "gmp"
+                       -- library
+                     , flag GmpInTree ? arg "--configure-option=--with-intree-gmp"
+
+                       -- prefer framework over library (on Darwin)
+                     , flag GmpFrameworkPref ?
+                       arg "--configure-option=--with-gmp-framework-preferred"
+
+                       -- Ensure that the ghc-bignum package registration includes
+                       -- knowledge of the system gmp's library and include directories.
+                     , notM (flag GmpInTree) ? mconcat
+                       [ if not (null librariesGmp) then arg ("--extra-lib-dirs=" ++ librariesGmp) else mempty
+                       , if not (null includesGmp) then arg ("--extra-include-dirs=" ++ includesGmp) else mempty
+                       ]
+                     ]
+                  ]
+               _ -> mempty
           ]
 
 -- | RTS-specific command line arguments.

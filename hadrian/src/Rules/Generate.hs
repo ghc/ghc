@@ -50,13 +50,13 @@ derivedConstantsFiles =
 compilerDependencies :: Expr [FilePath]
 compilerDependencies = do
     stage   <- getStage
-    isGmp   <- (== integerGmp) <$> getIntegerPackage
+    isGmp   <- (== "gmp") <$> getBignumBackend
     ghcPath <- expr $ buildPath (vanillaContext stage compiler)
-    gmpPath <- expr $ buildPath (vanillaContext stage integerGmp)
+    ghcBignumPath <- expr $ buildPath (vanillaContext stage ghcBignum)
     rtsPath <- expr (rtsBuildPath stage)
     libDir <- expr $ stageLibPath stage
     mconcat [ return $ (libDir -/-) <$> derivedConstantsFiles
-            , notStage0 ? isGmp ? return [gmpPath -/- "include/ghc-gmp.h"]
+            , notStage0 ? isGmp ? return [ghcBignumPath -/- "include/ghc-gmp.h"]
             , notStage0 ? return ((rtsPath -/-) <$> libffiHeaderFiles)
             , return $ fmap (ghcPath -/-)
                   [ "primop-can-fail.hs-incl"
@@ -316,7 +316,7 @@ generateSettings = do
         , ("LLVM opt command", expr $ settingsFileSetting SettingsFileSetting_OptCommand)
         , ("LLVM clang command", expr $ settingsFileSetting SettingsFileSetting_ClangCommand)
 
-        , ("integer library", pkgName <$> getIntegerPackage)
+        , ("BigNum backend", getBignumBackend)
         , ("Use interpreter", expr $ yesNo <$> ghcWithInterpreter)
         , ("Use native code generator", expr $ yesNo <$> ghcWithNativeCodeGen)
         , ("Support SMP", expr $ yesNo <$> targetSupportsSMP)
