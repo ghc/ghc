@@ -104,10 +104,10 @@ mkSimpleLit :: DynFlags -> Literal -> CmmLit
 mkSimpleLit dflags (LitChar   c)                = CmmInt (fromIntegral (ord c))
                                                          (wordWidth dflags)
 mkSimpleLit dflags LitNullAddr                  = zeroCLit dflags
-mkSimpleLit dflags (LitNumber LitNumInt i _)    = CmmInt i (wordWidth dflags)
-mkSimpleLit _      (LitNumber LitNumInt64 i _)  = CmmInt i W64
-mkSimpleLit dflags (LitNumber LitNumWord i _)   = CmmInt i (wordWidth dflags)
-mkSimpleLit _      (LitNumber LitNumWord64 i _) = CmmInt i W64
+mkSimpleLit dflags (LitNumber LitNumInt i)      = CmmInt i (wordWidth dflags)
+mkSimpleLit _      (LitNumber LitNumInt64 i)    = CmmInt i W64
+mkSimpleLit dflags (LitNumber LitNumWord i)     = CmmInt i (wordWidth dflags)
+mkSimpleLit _      (LitNumber LitNumWord64 i)   = CmmInt i W64
 mkSimpleLit _      (LitFloat r)                 = CmmFloat r W32
 mkSimpleLit _      (LitDouble r)                = CmmFloat r W64
 mkSimpleLit _      (LitLabel fs ms fod)
@@ -524,7 +524,7 @@ emitCmmLitSwitch scrut  branches deflt = do
 
     -- We find the necessary type information in the literals in the branches
     let signed = case head branches of
-                    (LitNumber nt _ _, _) -> litNumIsSigned nt
+                    (LitNumber nt _, _) -> litNumIsSigned nt
                     _ -> False
 
     let range | signed    = (tARGET_MIN_INT dflags, tARGET_MAX_INT dflags)
