@@ -5,8 +5,7 @@ test('space_leak_001',
      # 5% possible deviation.
      [collect_stats(['peak_megabytes_allocated','bytes allocated'],5),
       collect_runtime_residency(15),
-      omit_ways(['profasm','profthreaded','threaded1','threaded2','nonmoving_thr']),
-      reqlib('integer-gmp')
+      omit_ways(['profasm','profthreaded','threaded1','threaded2','nonmoving_thr'])
       ],
      compile_and_run,
      [''])
