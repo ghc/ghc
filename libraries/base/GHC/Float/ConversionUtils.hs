@@ -22,7 +22,7 @@
 module GHC.Float.ConversionUtils ( elimZerosInteger, elimZerosInt# ) where
 
 import GHC.Base
-import GHC.Integer
+import GHC.Num.Integer
 #if WORD_SIZE_IN_BITS < 64
 import GHC.IntWord64
 #endif
@@ -31,7 +31,7 @@ default ()
 
 #if WORD_SIZE_IN_BITS < 64
 
-#define TO64    integerToInt64
+#define TO64    integerToInt64#
 
 toByte64# :: Int64# -> Int#
 toByte64# i = word2Int# (and# 255## (int2Word# (int64ToInt# i)))
@@ -40,13 +40,13 @@ toByte64# i = word2Int# (and# 255## (int2Word# (int64ToInt# i)))
 elim64# :: Int64# -> Int# -> (# Integer, Int# #)
 elim64# n e =
     case zeroCount (toByte64# n) of
-      t | isTrue# (e <=# t) -> (# int64ToInteger (uncheckedIShiftRA64# n e), 0# #)
-        | isTrue# (t <# 8#) -> (# int64ToInteger (uncheckedIShiftRA64# n t), e -# t #)
+      t | isTrue# (e <=# t) -> (# integerFromInt64# (uncheckedIShiftRA64# n e), 0# #)
+        | isTrue# (t <# 8#) -> (# integerFromInt64# (uncheckedIShiftRA64# n t), e -# t #)
         | otherwise         -> elim64# (uncheckedIShiftRA64# n 8#) (e -# 8#)
 
 #else
 
-#define TO64    integerToInt
+#define TO64    integerToInt#
 
 -- Double mantissae fit it Int#
 elim64# :: Int# -> Int# -> (# Integer, Int# #)
@@ -61,8 +61,8 @@ elimZerosInteger m e = elim64# (TO64 m) e
 elimZerosInt# :: Int# -> Int# -> (# Integer, Int# #)
 elimZerosInt# n e =
     case zeroCount (toByte# n) of
-      t | isTrue# (e <=# t) -> (# smallInteger (uncheckedIShiftRA# n e), 0# #)
-        | isTrue# (t <# 8#) -> (# smallInteger (uncheckedIShiftRA# n t), e -# t #)
+      t | isTrue# (e <=# t) -> (# IS (uncheckedIShiftRA# n e), 0# #)
+        | isTrue# (t <# 8#) -> (# IS (uncheckedIShiftRA# n t), e -# t #)
         | otherwise         -> elimZerosInt# (uncheckedIShiftRA# n 8#) (e -# 8#)
 
 {-# INLINE zeroCount #-}
