@@ -3,7 +3,6 @@ module Settings.Flavours.GhcInGhci (ghcInGhciFlavour) where
 import Expression
 import Flavour
 import {-# SOURCE #-} Settings.Default
-import Settings.Flavours.Common
 
 -- Please update doc/flavours.md when changing this file.
 ghcInGhciFlavour :: Flavour
@@ -21,7 +20,6 @@ ghciArgs :: Args
 ghciArgs = sourceArgs SourceArgs
     { hsDefault  = mconcat $
         [ pure ["-O0", "-H64m"]
-        , naturalInBaseFixArgs
         ]
     , hsLibrary  = mempty
     , hsCompiler = mempty
