@@ -134,7 +134,16 @@ module GHC.Builtin.Types (
         oneDataConTyCon, manyDataConTyCon,
         multMulTyCon,
 
-        unrestrictedFunTyCon, unrestrictedFunTyConName
+        unrestrictedFunTyCon, unrestrictedFunTyConName,
+
+        -- * Bignum
+        integerTy, integerTyCon, integerTyConName,
+        integerISDataCon, integerISDataConName,
+        integerIPDataCon, integerIPDataConName,
+        integerINDataCon, integerINDataConName,
+        naturalTy, naturalTyCon, naturalTyConName,
+        naturalNSDataCon, naturalNSDataConName,
+        naturalNBDataCon, naturalNBDataConName
 
     ) where
 
@@ -252,6 +261,8 @@ wiredInTyCons = [ -- Units are not treated like other tuples, because they
                 , constraintKindTyCon
                 , liftedTypeKindTyCon
                 , multiplicityTyCon
+                , naturalTyCon
+                , integerTyCon
                 ]
 
 mkWiredInTyConName :: BuiltInSyntax -> Module -> FastString -> Unique -> TyCon -> Name
@@ -1827,3 +1838,98 @@ extractPromotedList tys = go tys
 
       | otherwise
       = pprPanic "extractPromotedList" (ppr tys)
+
+
+
+---------------------------------------
+-- ghc-bignum
+---------------------------------------
+
+integerTyConName
+   , integerISDataConName
+   , integerIPDataConName
+   , integerINDataConName
+   :: Name
+integerTyConName
+   = mkWiredInTyConName
+      UserSyntax
+      gHC_NUM_INTEGER
+      (fsLit "Integer")
+      integerTyConKey
+      integerTyCon
+integerISDataConName
+   = mkWiredInDataConName
+      UserSyntax
+      gHC_NUM_INTEGER
+      (fsLit "IS")
+      integerISDataConKey
+      integerISDataCon
+integerIPDataConName
+   = mkWiredInDataConName
+      UserSyntax
+      gHC_NUM_INTEGER
+      (fsLit "IP")
+      integerIPDataConKey
+      integerIPDataCon
+integerINDataConName
+   = mkWiredInDataConName
+      UserSyntax
+      gHC_NUM_INTEGER
+      (fsLit "IN")
+      integerINDataConKey
+      integerINDataCon
+
+integerTy :: Type
+integerTy = mkTyConTy integerTyCon
+
+integerTyCon :: TyCon
+integerTyCon = pcTyCon integerTyConName Nothing []
+                  [integerISDataCon, integerIPDataCon, integerINDataCon]
+
+integerISDataCon :: DataCon
+integerISDataCon = pcDataCon integerISDataConName [] [intPrimTy] integerTyCon
+
+integerIPDataCon :: DataCon
+integerIPDataCon = pcDataCon integerIPDataConName [] [byteArrayPrimTy] integerTyCon
+
+integerINDataCon :: DataCon
+integerINDataCon = pcDataCon integerINDataConName [] [byteArrayPrimTy] integerTyCon
+
+naturalTyConName
+   , naturalNSDataConName
+   , naturalNBDataConName
+   :: Name
+naturalTyConName
+   = mkWiredInTyConName
+      UserSyntax
+      gHC_NUM_NATURAL
+      (fsLit "Natural")
+      naturalTyConKey
+      naturalTyCon
+naturalNSDataConName
+   = mkWiredInDataConName
+      UserSyntax
+      gHC_NUM_NATURAL
+      (fsLit "NS")
+      naturalNSDataConKey
+      naturalNSDataCon
+naturalNBDataConName
+   = mkWiredInDataConName
+      UserSyntax
+      gHC_NUM_NATURAL
+      (fsLit "NB")
+      naturalNBDataConKey
+      naturalNBDataCon
+
+naturalTy :: Type
+naturalTy = mkTyConTy naturalTyCon
+
+naturalTyCon :: TyCon
+naturalTyCon = pcTyCon naturalTyConName Nothing []
+                  [naturalNSDataCon, naturalNBDataCon]
+
+naturalNSDataCon :: DataCon
+naturalNSDataCon = pcDataCon naturalNSDataConName [] [wordPrimTy] naturalTyCon
+
+naturalNBDataCon :: DataCon
+naturalNBDataCon = pcDataCon naturalNBDataConName [] [byteArrayPrimTy] naturalTyCon

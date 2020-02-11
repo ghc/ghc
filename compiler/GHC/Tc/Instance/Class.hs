@@ -354,9 +354,7 @@ matchKnownNat :: DynFlags
                            -- See Note [Shortcut solving: overlap]
               -> Class -> [Type] -> TcM ClsInstResult
 matchKnownNat _ _ clas [ty]     -- clas = KnownNat
-  | Just n <- isNumLitTy ty = do
-        et <- mkNaturalExpr n
-        makeLitDict clas ty et
+  | Just n <- isNumLitTy ty  = makeLitDict clas ty (mkNaturalExpr n)
 matchKnownNat df sc clas tys = matchInstEnv df sc clas tys
  -- See Note [Fabricating Evidence for Literals in Backpack] for why
  -- this lookup into the instance environment is required.
