@@ -118,6 +118,8 @@ dnl--------------------------------------------------------------------
    AC_CONFIG_FILES([ghc-bignum.buildinfo include/HsIntegerGmp.h])
 fi
 
+AC_SUBST(GMP_ENABLED)
+
 AC_CONFIG_FILES([config.mk])
 
 dnl--------------------------------------------------------------------
