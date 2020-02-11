@@ -14,7 +14,7 @@ module MkCore (
 
         -- * Constructing boxed literals
         mkWordExpr, mkWordExprWord,
-        mkIntExpr, mkIntExprInt,
+        mkIntExpr, mkIntExprInt, mkUncheckedIntExpr,
         mkIntegerExpr, mkNaturalExpr,
         mkFloatExpr, mkDoubleExpr,
         mkCharExpr, mkStringExpr, mkStringExprFS, mkStringExprFSWith,
@@ -254,6 +254,10 @@ mkIntExpr :: DynFlags -> Integer -> CoreExpr        -- Result = I# i :: Int
 mkIntExpr dflags i = mkCoreConApps intDataCon  [mkIntLit dflags i]
 
 -- | Create a 'CoreExpr' which will evaluate to the given @Int@
+mkUncheckedIntExpr :: Integer -> CoreExpr        -- Result = I# i :: Int
+mkUncheckedIntExpr i = mkCoreConApps intDataCon  [Lit (mkLitIntUnchecked i)]
+
+-- | Create a 'CoreExpr' which will evaluate to the given @Int@
 mkIntExprInt :: DynFlags -> Int -> CoreExpr         -- Result = I# i :: Int
 mkIntExprInt dflags i = mkCoreConApps intDataCon  [mkIntLitInt dflags i]
 
@@ -266,14 +270,12 @@ mkWordExprWord :: DynFlags -> Word -> CoreExpr
 mkWordExprWord dflags w = mkCoreConApps wordDataCon [mkWordLitWord dflags w]
 
 -- | Create a 'CoreExpr' which will evaluate to the given @Integer@
-mkIntegerExpr  :: MonadThings m => Integer -> m CoreExpr  -- Result :: Integer
-mkIntegerExpr i = do t <- lookupTyCon integerTyConName
-                     return (Lit (mkLitInteger i (mkTyConTy t)))
+mkIntegerExpr  :: Integer -> CoreExpr  -- Result :: Integer
+mkIntegerExpr i = Lit (mkLitInteger i)
 
 -- | Create a 'CoreExpr' which will evaluate to the given @Natural@
-mkNaturalExpr  :: MonadThings m => Integer -> m CoreExpr
-mkNaturalExpr i = do t <- lookupTyCon naturalTyConName
-                     return (Lit (mkLitNatural i (mkTyConTy t)))
+mkNaturalExpr  :: Integer -> CoreExpr
+mkNaturalExpr i = Lit (mkLitNatural i)
 
 -- | Create a 'CoreExpr' which will evaluate to the given @Float@
 mkFloatExpr :: Float -> CoreExpr
