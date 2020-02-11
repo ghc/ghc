@@ -121,8 +121,7 @@ import GHC.Maybe
 import {-# SOURCE #-} GHC.IO (mkUserError, mplusIO)
 
 import GHC.Tuple ()              -- Note [Depend on GHC.Tuple]
-import GHC.Integer ()            -- Note [Depend on GHC.Integer]
-import GHC.Natural ()            -- Note [Depend on GHC.Natural]
+import GHC.Num.Integer ()        -- Note [Depend on GHC.Num.Integer]
 
 -- for 'class Semigroup'
 import {-# SOURCE #-} GHC.Real (Integral)
@@ -144,29 +143,32 @@ infixl 4 <*>, <*, *>, <**>
 default ()              -- Double isn't available yet
 
 {-
-Note [Depend on GHC.Integer]
-~~~~~~~~~~~~~~~~~~~~~~~~~~~~
-The Integer type is special because GHC.Iface.Tidy uses
-GHC.Integer.Type.mkInteger to construct Integer literal values
-Currently it reads the interface file whether or not the current
-module *has* any Integer literals, so it's important that
-GHC.Integer.Type (in package integer-gmp or integer-simple) is
-compiled before any other module.  (There's a hack in GHC to disable
-this for packages ghc-prim, integer-gmp, integer-simple, which aren't
-allowed to contain any Integer literals.)
+Note [Depend on GHC.Num.Integer]
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
-Likewise we implicitly need Integer when deriving things like Eq
-instances.
+The Integer type is special because GHC.Iface.Tidy uses constructors in
+GHC.Num.Integer to construct Integer literal values. Currently it reads the
+interface file whether or not the current module *has* any Integer literals, so
+it's important that GHC.Num.Integer is compiled before any other module.
+
+(There's a hack in GHC to disable this for packages ghc-prim and ghc-bignum
+which aren't allowed to contain any Integer literals.)
+
+Likewise we implicitly need Integer when deriving things like Eq instances.
 
 The danger is that if the build system doesn't know about the dependency
-on Integer, it'll compile some base module before GHC.Integer.Type,
+on Integer, it'll compile some base module before GHC.Num.Integer,
 resulting in:
-  Failed to load interface for ‘GHC.Integer.Type’
-    There are files missing in the ‘integer-gmp’ package,
+  Failed to load interface for ‘GHC.Num.Integer’
+    There are files missing in the ‘ghc-bignum’ package,
 
-Bottom line: we make GHC.Base depend on GHC.Integer; and everything
+Bottom line: we make GHC.Base depend on GHC.Num.Integer; and everything
 else either depends on GHC.Base, or does not have NoImplicitPrelude
 (and hence depends on Prelude).
+
+Note: this is only a problem with the make-based build system. Hadrian doesn't
+seem to interleave compilation of modules from separate packages and respects
+the dependency between `base` and `ghc-bignum`.
 
 Note [Depend on GHC.Tuple]
 ~~~~~~~~~~~~~~~~~~~~~~~~~~
@@ -175,9 +177,6 @@ GHC.Tuple, so we use the same rule as for Integer --- see Note [Depend on
 GHC.Integer] --- to explain this to the build system.  We make GHC.Base
 depend on GHC.Tuple, and everything else depends on GHC.Base or Prelude.
 
-Note [Depend on GHC.Natural]
-~~~~~~~~~~~~~~~~~~~~~~~~~~
-Similar to GHC.Integer.
 -}
 
 #if 0
