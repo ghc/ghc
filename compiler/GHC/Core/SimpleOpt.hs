@@ -4,6 +4,8 @@
 -}
 
 {-# LANGUAGE CPP #-}
+{-# LANGUAGE MultiWayIf #-}
+
 module GHC.Core.SimpleOpt (
         -- ** Simple expression optimiser
         simpleOptPgm, simpleOptExpr, simpleOptExprWith,
@@ -32,7 +34,7 @@ import {-# SOURCE #-} GHC.Core.Unfold( mkUnfolding )
 import GHC.Core.Make ( FloatBind(..) )
 import GHC.Core.Ppr  ( pprCoreBindings, pprRules )
 import GHC.Core.Opt.OccurAnal( occurAnalyseExpr, occurAnalysePgm )
-import GHC.Types.Literal  ( Literal(LitString) )
+import GHC.Types.Literal
 import GHC.Types.Id
 import GHC.Types.Id.Info  ( unfoldingInfo, setUnfoldingInfo, setRuleInfo, IdInfo (..) )
 import GHC.Types.Var      ( isNonCoVarId )
@@ -1241,8 +1243,18 @@ exprIsLiteral_maybe env@(_, id_unf) e
   = case e of
       Lit l     -> Just l
       Tick _ e' -> exprIsLiteral_maybe env e' -- dubious?
-      Var v     | Just rhs <- expandUnfolding_maybe (id_unf v)
-                -> exprIsLiteral_maybe env rhs
+      Var v
+         | Just rhs <- expandUnfolding_maybe (id_unf v)
+         , Just l   <- exprIsLiteral_maybe env rhs
+         -> Just l
+      Var v
+         | Just rhs <- expandUnfolding_maybe (id_unf v)
+         , Just (_env,_fb,dc,_tys,[arg]) <- exprIsConApp_maybe env rhs
+         , Just (LitNumber _ i) <- exprIsLiteral_maybe env arg
+         -> if
+            | dc == naturalNSDataCon -> Just (mkLitNatural i)
+            | dc == integerISDataCon -> Just (mkLitInteger i)
+            | otherwise              -> Nothing
       _         -> Nothing
 
 {-

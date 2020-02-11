@@ -76,7 +76,8 @@ module GHC.Tc.Utils.TcType (
   pickyEqType, tcEqType, tcEqKind, tcEqTypeNoKindCheck, tcEqTypeVis,
   isSigmaTy, isRhoTy, isRhoExpTy, isOverloadedTy,
   isFloatingTy, isDoubleTy, isFloatTy, isIntTy, isWordTy, isStringTy,
-  isIntegerTy, isBoolTy, isUnitTy, isCharTy, isCallStackTy, isCallStackPred,
+  isIntegerTy, isNaturalTy,
+  isBoolTy, isUnitTy, isCharTy, isCallStackTy, isCallStackPred,
   hasIPPred, isTauTy, isTauTyCon, tcIsTyVarTy, tcIsForAllTy,
   isPredTy, isTyVarClassPred, isTyVarHead, isInsolubleOccursCheck,
   checkValidClsArgs, hasTyVarHead,
@@ -2014,11 +2015,13 @@ isOverloadedTy (ForAllTy _  ty)             = isOverloadedTy ty
 isOverloadedTy (FunTy { ft_af = InvisArg }) = True
 isOverloadedTy _                            = False
 
-isFloatTy, isDoubleTy, isIntegerTy, isIntTy, isWordTy, isBoolTy,
+isFloatTy, isDoubleTy, isIntegerTy, isNaturalTy,
+    isIntTy, isWordTy, isBoolTy,
     isUnitTy, isCharTy, isAnyTy :: Type -> Bool
 isFloatTy      = is_tc floatTyConKey
 isDoubleTy     = is_tc doubleTyConKey
 isIntegerTy    = is_tc integerTyConKey
+isNaturalTy    = is_tc naturalTyConKey
 isIntTy        = is_tc intTyConKey
 isWordTy       = is_tc wordTyConKey
 isBoolTy       = is_tc boolTyConKey
