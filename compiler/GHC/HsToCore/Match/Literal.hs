@@ -101,13 +101,13 @@ dsLit l = do
     HsDoublePrim _ d -> return (Lit (LitDouble (fl_value d)))
     HsChar _ c       -> return (mkCharExpr c)
     HsString _ str   -> mkStringExprFS str
-    HsInteger _ i _  -> mkIntegerExpr i
+    HsInteger _ i _  -> return (mkIntegerExpr i)
     HsInt _ i        -> return (mkIntExpr platform (il_value i))
     HsRat _ (FL _ _ val) ty -> do
-      num   <- mkIntegerExpr (numerator val)
-      denom <- mkIntegerExpr (denominator val)
       return (mkCoreConApps ratio_data_con [Type integer_ty, num, denom])
       where
+        num   = mkIntegerExpr (numerator val)
+        denom = mkIntegerExpr (denominator val)
         (ratio_data_con, integer_ty)
             = case tcSplitTyConApp ty of
                     (tycon, [i_ty]) -> ASSERT(isIntegerTy i_ty && tycon `hasKey` ratioTyConKey)
