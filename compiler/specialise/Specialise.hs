@@ -1438,7 +1438,7 @@ specCalls mb_mod env existing_rules calls_for_me fn rhs
                  (lam_extra_args, app_args)     -- See Note [Specialisations Must Be Lifted]
                    | isUnliftedType body_ty     -- C.f. WwLib.mkWorkerArgs
                    , not (isJoinId fn)
-                   = ([voidArgId], unspec_bndrs ++ [voidPrimId])
+                   = ([voidArgId], voidPrimId : unspec_bndrs)
                    | otherwise = ([], unspec_bndrs)
                  join_arity_change = length app_args - length rule_args
                  spec_join_arity | Just orig_join_arity <- isJoinId_maybe fn
