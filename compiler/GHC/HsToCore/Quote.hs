@@ -1357,8 +1357,7 @@ repTy (HsIParamTy _ n t) = do
 repTy ty                      = notHandled "Exotic form of type" (ppr ty)
 
 repTyLit :: HsTyLit -> MetaM (Core (M TH.TyLit))
-repTyLit (HsNumTy _ i) = do iExpr <- mkIntegerExpr i
-                            rep2 numTyLitName [iExpr]
+repTyLit (HsNumTy _ i) = rep2 numTyLitName [mkIntegerExpr i]
 repTyLit (HsStrTy _ s) = do { s' <- mkStringExprFS s
                             ; rep2 strTyLitName [s']
                             }
@@ -2745,8 +2744,7 @@ repLiteral lit
                  _                -> Nothing
 
 mk_integer :: Integer -> MetaM (HsLit GhcRn)
-mk_integer  i = do integer_ty <- lookupType integerTyConName
-                   return $ HsInteger NoSourceText i integer_ty
+mk_integer  i = return $ HsInteger NoSourceText i integerTy
 
 mk_rational :: FractionalLit -> MetaM (HsLit GhcRn)
 mk_rational r = do rat_ty <- lookupType rationalTyConName
@@ -2903,7 +2901,7 @@ coreIntLit i = do platform <- getPlatform
                   return (MkC (mkIntExprInt platform i))
 
 coreIntegerLit :: MonadThings m => Integer -> m (Core Integer)
-coreIntegerLit i = fmap MkC (mkIntegerExpr i)
+coreIntegerLit i = pure (MkC (mkIntegerExpr i))
 
 coreVar :: Id -> Core TH.Name   -- The Id has type Name
 coreVar id = MkC (Var id)

@@ -58,7 +58,7 @@ unboxing any boxed primitive arguments and boxing the result if
 desired.
 
 The state stuff just consists of adding in
-@PrimIO (\ s -> case s of { S# s# -> ... })@ in an appropriate place.
+@PrimIO (\ s -> case s of { State# s# -> ... })@ in an appropriate place.
 
 The unboxing is straightforward, as all information needed to unbox is
 available from the type.  For each boxed-primitive argument, we
