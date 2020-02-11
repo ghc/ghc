@@ -128,8 +128,6 @@ module GHC.Driver.Session (
         sOpt_i,
         sExtraGccViaCFlags,
         sTargetPlatformString,
-        sIntegerLibrary,
-        sIntegerLibraryType,
         sGhcWithInterpreter,
         sGhcWithNativeCodeGen,
         sGhcWithSMP,
@@ -140,7 +138,6 @@ module GHC.Driver.Session (
         sGhcThreaded,
         sGhcDebugged,
         sGhcRtsWithLibdw,
-        IntegerLibrary(..),
         GhcNameVersion(..),
         FileSettings(..),
         PlatformMisc(..),
@@ -455,9 +452,6 @@ data DynFlags = DynFlags {
   platformConstants :: PlatformConstants,
   rawSettings       :: [(String, String)],
 
-  integerLibrary        :: IntegerLibrary,
-    -- ^ IntegerGMP or IntegerSimple. Set at configure time, but may be overridden
-    --   by GHC-API users. See Note [The integer library] in PrelNames
   llvmConfig            :: LlvmConfig,
     -- ^ N.B. It's important that this field is lazy since we load the LLVM
     -- configuration lazily. See Note [LLVM Configuration] in SysTools.
@@ -1283,7 +1277,6 @@ defaultDynFlags mySettings llvmConfig =
         ghcMode                 = CompManager,
         ghcLink                 = LinkBinary,
         hscTarget               = defaultHscTarget (sTargetPlatform mySettings) (sPlatformMisc mySettings),
-        integerLibrary          = sIntegerLibraryType mySettings,
         verbosity               = 0,
         optLevel                = 0,
         debugLevel              = 0,
