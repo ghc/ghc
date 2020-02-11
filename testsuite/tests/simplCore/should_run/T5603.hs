@@ -4,13 +4,13 @@
 module Main (main) where
 
 import GHC.Base
-import GHC.Integer.GMP.Internals
+import GHC.Num.Integer
 
 main :: IO ()
 main = (encodeDouble 0 :: Double) `seq` return ()
 
 {-# INLINE encodeDouble #-}
 encodeDouble :: Integer -> Double
-encodeDouble (S# _)   = D# 3.0##
-encodeDouble (Jp# _)  = D# 4.0##
-encodeDouble (Jn# _)  = D# 5.0##
+encodeDouble (IS _) = D# 3.0##
+encodeDouble (IP _) = D# 4.0##
+encodeDouble (IN _) = D# 5.0##
