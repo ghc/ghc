@@ -39,8 +39,10 @@ configurePackageRules = do
         let pkg = unsafeFindPackageByPath path
         let ctx = Context stage pkg vanilla
         buildP <- buildPath ctx
-        when (pkg == integerGmp) $
-          need [buildP -/- "include/ghc-gmp.h"]
+        when (pkg == ghcBignum) $ do
+          isGmp <- (== "gmp") <$> interpretInContext ctx getBignumBackend
+          when isGmp $
+            need [buildP -/- "include/ghc-gmp.h"]
         needLibrary =<< contextDependencies ctx
         Cabal.configurePackage ctx
 
@@ -129,8 +131,10 @@ buildConf _ context@Context {..} _conf = do
              , path -/- "ghcversion.h" ]
 
     -- we need to generate this file for GMP
-    when (package == integerGmp) $
-        need [path -/- "include/ghc-gmp.h"]
+    when (package == ghcBignum) $ do
+        bignum <- interpretInContext context getBignumBackend
+        when (bignum == "gmp") $
+            need [path -/- "include/ghc-gmp.h"]
 
     -- Copy and register the package.
     Cabal.copyPackage context
