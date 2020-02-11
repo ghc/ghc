@@ -54,7 +54,6 @@ import GHC.Core.Class
 import GHC.Core.TyCon
 import GHC.Core.ConLike
 import GHC.Core.DataCon
-import PrelNames
 import TysWiredIn
 import Literal
 import Var
@@ -1382,18 +1381,6 @@ tcIfaceTickish (IfaceSource src name)   = return (SourceNote src name)
 
 -------------------------
 tcIfaceLit :: Literal -> IfL Literal
--- Integer literals deserialise to (LitInteger i <error thunk>)
--- so tcIfaceLit just fills in the type.
--- See Note [Integer literals] in Literal
-tcIfaceLit (LitNumber LitNumInteger i _)
-  = do t <- tcIfaceTyConByName integerTyConName
-       return (mkLitInteger i (mkTyConTy t))
--- Natural literals deserialise to (LitNatural i <error thunk>)
--- so tcIfaceLit just fills in the type.
--- See Note [Natural literals] in Literal
-tcIfaceLit (LitNumber LitNumNatural i _)
-  = do t <- tcIfaceTyConByName naturalTyConName
-       return (mkLitNatural i (mkTyConTy t))
 tcIfaceLit lit = return lit
 
 -------------------------
@@ -1687,11 +1674,6 @@ tcIfaceGlobal name
 -- to see how this could happen, especially because the reference to
 -- the constructor (A and B) means that GHC will always typecheck
 -- this expression *after* typechecking T.
-
-tcIfaceTyConByName :: IfExtName -> IfL TyCon
-tcIfaceTyConByName name
-  = do { thing <- tcIfaceGlobal name
-       ; return (tyThingTyCon thing) }
 
 tcIfaceTyCon :: IfaceTyCon -> IfL TyCon
 tcIfaceTyCon (IfaceTyCon name info)
