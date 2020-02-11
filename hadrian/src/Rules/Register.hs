@@ -113,6 +113,7 @@ buildConf _ context@Context {..} conf = do
     need =<< mapM (\pkgId -> packageDbPath stage <&> (-/- pkgId <.> "conf")) depPkgIds
 
     ways <- interpretInContext context (getLibraryWays <> if package == rts then getRtsWays else mempty)
+    bignum <- interpretInContext context getBignumBackend
     need =<< concatMapM (libraryTargets True) [ context { way = w } | w <- ways ]
 
     -- We might need some package-db resource to limit read/write, see packageRules.
@@ -127,7 +128,8 @@ buildConf _ context@Context {..} conf = do
              , path -/- "ghcplatform.h"
              , path -/- "ghcversion.h" ]
 
-    when (package == integerGmp) $ need [path -/- gmpLibraryH]
+    when (package == ghcBignum && bignum == "gmp") $
+        need [path -/- gmpLibraryH]
 
     -- Copy and register the package.
     Cabal.copyPackage context
