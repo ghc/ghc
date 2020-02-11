@@ -15,7 +15,7 @@ module Literal
         , LitNumType(..)
 
         -- ** Creating Literals
-        , mkLitInt, mkLitIntWrap, mkLitIntWrapC
+        , mkLitInt, mkLitIntWrap, mkLitIntWrapC, mkLitIntUnchecked
         , mkLitWord, mkLitWordWrap, mkLitWordWrapC
         , mkLitInt64, mkLitInt64Wrap
         , mkLitWord64, mkLitWord64Wrap
@@ -53,6 +53,7 @@ module Literal
 import GhcPrelude
 
 import TysPrim
+import {-# SOURCE #-} TysWiredIn
 import PrelNames
 import Type
 import TyCon
@@ -109,11 +110,9 @@ data Literal
   = LitChar    Char             -- ^ @Char#@ - at least 31 bits. Create with
                                 -- 'mkLitChar'
 
-  | LitNumber !LitNumType !Integer Type
+  | LitNumber !LitNumType !Integer
                                 -- ^ Any numeric literal that can be
                                 -- internally represented with an Integer.
-                                -- See Note [Types of LitNumbers] below for the
-                                -- Type field.
 
   | LitString  ByteString       -- ^ A string-literal: stored and emitted
                                 -- UTF-8 encoded, we'll arrange to decode it
@@ -151,8 +150,8 @@ data Literal
 
 -- | Numeric literal type
 data LitNumType
-  = LitNumInteger -- ^ @Integer@ (see Note [Integer literals])
-  | LitNumNatural -- ^ @Natural@ (see Note [Natural literals])
+  = LitNumInteger -- ^ @Integer@ (see Note [BigNum literals])
+  | LitNumNatural -- ^ @Natural@ (see Note [BigNum literals])
   | LitNumInt     -- ^ @Int#@ - according to target machine
   | LitNumInt64   -- ^ @Int64#@ - exactly 64 bits
   | LitNumWord    -- ^ @Word#@ - according to target machine
@@ -170,26 +169,19 @@ litNumIsSigned nt = case nt of
   LitNumWord64  -> False
 
 {-
-Note [Integer literals]
-~~~~~~~~~~~~~~~~~~~~~~~
-An Integer literal is represented using, well, an Integer, to make it
-easier to write RULEs for them. They also contain the Integer type, so
-that e.g. literalType can return the right Type for them.
+Note [BigNum literals]
+~~~~~~~~~~~~~~~~~~~~~~
 
-They only get converted into real Core,
-    mkInteger [c1, c2, .., cn]
-during the CorePrep phase, although GHC.Iface.Tidy looks ahead at what the
-core will be, so that it can see whether it involves CAFs.
+GHC supports 2 kinds of arbitrary precision integers (a.k.a BigNum):
 
-When we initially build an Integer literal, notably when
-deserialising it from an interface file (see the Binary instance
-below), we don't have convenient access to the mkInteger Id.  So we
-just use an error thunk, and fill in the real Id when we do tcIfaceLit
-in GHC.IfaceToCore.
+   * Natural: natural represented as a Word# or as a BigNat
 
-Note [Natural literals]
-~~~~~~~~~~~~~~~~~~~~~~~
-Similar to Integer literals.
+   * Integer: integer represented a an Int# or as a BigNat (Integer's
+   constructors indicate the sign)
+
+BigNum literal instances are removed from Core during the CorePrep phase. They
+are replaced with expression to build them at runtime from machine literals
+(Word#, Int#, etc.) or from a list of Word#s.
 
 Note [String literals]
 ~~~~~~~~~~~~~~~~~~~~~~
@@ -224,7 +216,7 @@ instance Binary Literal where
              put_ bh aj
              put_ bh mb
              put_ bh fod
-    put_ bh (LitNumber nt i _)
+    put_ bh (LitNumber nt i)
         = do putByte bh 6
              put_ bh nt
              put_ bh i
@@ -254,19 +246,7 @@ instance Binary Literal where
               6 -> do
                     nt <- get bh
                     i  <- get bh
-                    -- Note [Types of LitNumbers]
-                    let t = case nt of
-                            LitNumInt     -> intPrimTy
-                            LitNumInt64   -> int64PrimTy
-                            LitNumWord    -> wordPrimTy
-                            LitNumWord64  -> word64PrimTy
-                            -- See Note [Integer literals]
-                            LitNumInteger ->
-                              panic "Evaluated the place holder for mkInteger"
-                            -- and Note [Natural literals]
-                            LitNumNatural ->
-                              panic "Evaluated the place holder for mkNatural"
-                    return (LitNumber nt i t)
+                    return (LitNumber nt i)
               _ -> do
                     return (LitRubbish)
 
@@ -306,22 +286,22 @@ Int/Word range.
 
 -- | Wrap a literal number according to its type
 wrapLitNumber :: DynFlags -> Literal -> Literal
-wrapLitNumber dflags v@(LitNumber nt i t) = case nt of
+wrapLitNumber dflags v@(LitNumber nt i) = case nt of
   LitNumInt -> case platformWordSize (targetPlatform dflags) of
-    PW4 -> LitNumber nt (toInteger (fromIntegral i :: Int32)) t
-    PW8 -> LitNumber nt (toInteger (fromIntegral i :: Int64)) t
+    PW4 -> LitNumber nt (toInteger (fromIntegral i :: Int32))
+    PW8 -> LitNumber nt (toInteger (fromIntegral i :: Int64))
   LitNumWord -> case platformWordSize (targetPlatform dflags) of
-    PW4 -> LitNumber nt (toInteger (fromIntegral i :: Word32)) t
-    PW8 -> LitNumber nt (toInteger (fromIntegral i :: Word64)) t
-  LitNumInt64   -> LitNumber nt (toInteger (fromIntegral i :: Int64)) t
-  LitNumWord64  -> LitNumber nt (toInteger (fromIntegral i :: Word64)) t
+    PW4 -> LitNumber nt (toInteger (fromIntegral i :: Word32))
+    PW8 -> LitNumber nt (toInteger (fromIntegral i :: Word64))
+  LitNumInt64   -> LitNumber nt (toInteger (fromIntegral i :: Int64))
+  LitNumWord64  -> LitNumber nt (toInteger (fromIntegral i :: Word64))
   LitNumInteger -> v
   LitNumNatural -> v
 wrapLitNumber _ x = x
 
 -- | Create a numeric 'Literal' of the given type
-mkLitNumberWrap :: DynFlags -> LitNumType -> Integer -> Type -> Literal
-mkLitNumberWrap dflags nt i t = wrapLitNumber dflags (LitNumber nt i t)
+mkLitNumberWrap :: DynFlags -> LitNumType -> Integer -> Literal
+mkLitNumberWrap dflags nt i = wrapLitNumber dflags (LitNumber nt i)
 
 -- | Check that a given number is in the range of a numeric literal
 litNumCheckRange :: DynFlags -> LitNumType -> Integer -> Bool
@@ -334,10 +314,10 @@ litNumCheckRange dflags nt i = case nt of
      LitNumInteger -> True
 
 -- | Create a numeric 'Literal' of the given type
-mkLitNumber :: DynFlags -> LitNumType -> Integer -> Type -> Literal
-mkLitNumber dflags nt i t =
+mkLitNumber :: DynFlags -> LitNumType -> Integer -> Literal
+mkLitNumber dflags nt i =
   ASSERT2(litNumCheckRange dflags nt i, integer i)
-  (LitNumber nt i t)
+  (LitNumber nt i)
 
 -- | Creates a 'Literal' of type @Int#@
 mkLitInt :: DynFlags -> Integer -> Literal
@@ -352,7 +332,7 @@ mkLitIntWrap dflags i = wrapLitNumber dflags $ mkLitIntUnchecked i
 
 -- | Creates a 'Literal' of type @Int#@ without checking its range.
 mkLitIntUnchecked :: Integer -> Literal
-mkLitIntUnchecked i = LitNumber LitNumInt i intPrimTy
+mkLitIntUnchecked i = LitNumber LitNumInt i
 
 -- | Creates a 'Literal' of type @Int#@, as well as a 'Bool'ean flag indicating
 --   overflow. That is, if the argument is out of the (target-dependent) range
@@ -361,7 +341,7 @@ mkLitIntUnchecked i = LitNumber LitNumInt i intPrimTy
 mkLitIntWrapC :: DynFlags -> Integer -> (Literal, Bool)
 mkLitIntWrapC dflags i = (n, i /= i')
   where
-    n@(LitNumber _ i' _) = mkLitIntWrap dflags i
+    n@(LitNumber _ i') = mkLitIntWrap dflags i
 
 -- | Creates a 'Literal' of type @Word#@
 mkLitWord :: DynFlags -> Integer -> Literal
@@ -376,7 +356,7 @@ mkLitWordWrap dflags i = wrapLitNumber dflags $ mkLitWordUnchecked i
 
 -- | Creates a 'Literal' of type @Word#@ without checking its range.
 mkLitWordUnchecked :: Integer -> Literal
-mkLitWordUnchecked i = LitNumber LitNumWord i wordPrimTy
+mkLitWordUnchecked i = LitNumber LitNumWord i
 
 -- | Creates a 'Literal' of type @Word#@, as well as a 'Bool'ean flag indicating
 --   carry. That is, if the argument is out of the (target-dependent) range
@@ -385,7 +365,7 @@ mkLitWordUnchecked i = LitNumber LitNumWord i wordPrimTy
 mkLitWordWrapC :: DynFlags -> Integer -> (Literal, Bool)
 mkLitWordWrapC dflags i = (n, i /= i')
   where
-    n@(LitNumber _ i' _) = mkLitWordWrap dflags i
+    n@(LitNumber _ i') = mkLitWordWrap dflags i
 
 -- | Creates a 'Literal' of type @Int64#@
 mkLitInt64 :: Integer -> Literal
@@ -398,7 +378,7 @@ mkLitInt64Wrap dflags i = wrapLitNumber dflags $ mkLitInt64Unchecked i
 
 -- | Creates a 'Literal' of type @Int64#@ without checking its range.
 mkLitInt64Unchecked :: Integer -> Literal
-mkLitInt64Unchecked i = LitNumber LitNumInt64 i int64PrimTy
+mkLitInt64Unchecked i = LitNumber LitNumInt64 i
 
 -- | Creates a 'Literal' of type @Word64#@
 mkLitWord64 :: Integer -> Literal
@@ -411,7 +391,7 @@ mkLitWord64Wrap dflags i = wrapLitNumber dflags $ mkLitWord64Unchecked i
 
 -- | Creates a 'Literal' of type @Word64#@ without checking its range.
 mkLitWord64Unchecked :: Integer -> Literal
-mkLitWord64Unchecked i = LitNumber LitNumWord64 i word64PrimTy
+mkLitWord64Unchecked i = LitNumber LitNumWord64 i
 
 -- | Creates a 'Literal' of type @Float#@
 mkLitFloat :: Rational -> Literal
@@ -431,12 +411,12 @@ mkLitString :: String -> Literal
 -- stored UTF-8 encoded
 mkLitString s = LitString (bytesFS $ mkFastString s)
 
-mkLitInteger :: Integer -> Type -> Literal
-mkLitInteger x ty = LitNumber LitNumInteger x ty
+mkLitInteger :: Integer -> Literal
+mkLitInteger x = LitNumber LitNumInteger x
 
-mkLitNatural :: Integer -> Type -> Literal
-mkLitNatural x ty = ASSERT2( inNaturalRange x,  integer x )
-                    (LitNumber LitNumNatural x ty)
+mkLitNatural :: Integer -> Literal
+mkLitNatural x = ASSERT2( inNaturalRange x,  integer x )
+                    (LitNumber LitNumNatural x)
 
 inIntRange, inWordRange :: DynFlags -> Integer -> Bool
 inIntRange  dflags x = x >= tARGET_MIN_INT dflags && x <= tARGET_MAX_INT dflags
@@ -456,10 +436,10 @@ inCharRange c =  c >= '\0' && c <= chr tARGET_MAX_CHAR
 
 -- | Tests whether the literal represents a zero of whatever type it is
 isZeroLit :: Literal -> Bool
-isZeroLit (LitNumber _ 0 _) = True
-isZeroLit (LitFloat  0)     = True
-isZeroLit (LitDouble 0)     = True
-isZeroLit _                 = False
+isZeroLit (LitNumber _ 0) = True
+isZeroLit (LitFloat  0)   = True
+isZeroLit (LitDouble 0)   = True
+isZeroLit _               = False
 
 -- | Returns the 'Integer' contained in the 'Literal', for when that makes
 -- sense, i.e. for 'Char', 'Int', 'Word', 'LitInteger' and 'LitNatural'.
@@ -472,7 +452,7 @@ litValue l = case isLitValue_maybe l of
 -- sense, i.e. for 'Char' and numbers.
 isLitValue_maybe  :: Literal -> Maybe Integer
 isLitValue_maybe (LitChar   c)     = Just $ toInteger $ ord c
-isLitValue_maybe (LitNumber _ i _) = Just i
+isLitValue_maybe (LitNumber _ i)   = Just i
 isLitValue_maybe _                 = Nothing
 
 -- | Apply a function to the 'Integer' contained in the 'Literal', for when that
@@ -481,11 +461,10 @@ isLitValue_maybe _                 = Nothing
 -- with the semantics of the target type.
 -- See Note [Word/Int underflow/overflow]
 mapLitValue  :: DynFlags -> (Integer -> Integer) -> Literal -> Literal
-mapLitValue _      f (LitChar   c)      = mkLitChar (fchar c)
+mapLitValue _      f (LitChar   c)    = mkLitChar (fchar c)
    where fchar = chr . fromInteger . f . toInteger . ord
-mapLitValue dflags f (LitNumber nt i t) = wrapLitNumber dflags
-                                                        (LitNumber nt (f i) t)
-mapLitValue _      _ l                  = pprPanic "mapLitValue" (ppr l)
+mapLitValue dflags f (LitNumber nt i) = wrapLitNumber dflags (LitNumber nt (f i))
+mapLitValue _      _ l                = pprPanic "mapLitValue" (ppr l)
 
 -- | Indicate if the `Literal` contains an 'Integer' value, e.g. 'Char',
 -- 'Int', 'Word', 'LitInteger' and 'LitNatural'.
@@ -505,7 +484,7 @@ narrow8IntLit, narrow16IntLit, narrow32IntLit,
   :: Literal -> Literal
 
 word2IntLit, int2WordLit :: DynFlags -> Literal -> Literal
-word2IntLit dflags (LitNumber LitNumWord w _)
+word2IntLit dflags (LitNumber LitNumWord w)
   -- Map Word range [max_int+1, max_word]
   -- to Int range   [min_int  , -1]
   -- Range [0,max_int] has the same representation with both Int and Word
@@ -513,7 +492,7 @@ word2IntLit dflags (LitNumber LitNumWord w _)
   | otherwise                 = mkLitInt dflags w
 word2IntLit _ l = pprPanic "word2IntLit" (ppr l)
 
-int2WordLit dflags (LitNumber LitNumInt i _)
+int2WordLit dflags (LitNumber LitNumInt i)
   -- Map Int range [min_int  , -1]
   -- to Word range [max_int+1, max_word]
   -- Range [0,max_int] has the same representation with both Int and Word
@@ -523,8 +502,8 @@ int2WordLit _ l = pprPanic "int2WordLit" (ppr l)
 
 -- | Narrow a literal number (unchecked result range)
 narrowLit :: forall a. Integral a => Proxy a -> Literal -> Literal
-narrowLit _ (LitNumber nt i t) = LitNumber nt (toInteger (fromInteger i :: a)) t
-narrowLit _ l                  = pprPanic "narrowLit" (ppr l)
+narrowLit _ (LitNumber nt i) = LitNumber nt (toInteger (fromInteger i :: a))
+narrowLit _ l                = pprPanic "narrowLit" (ppr l)
 
 narrow8IntLit   = narrowLit (Proxy :: Proxy Int8)
 narrow16IntLit  = narrowLit (Proxy :: Proxy Int16)
@@ -535,17 +514,17 @@ narrow32WordLit = narrowLit (Proxy :: Proxy Word32)
 
 char2IntLit (LitChar c)       = mkLitIntUnchecked (toInteger (ord c))
 char2IntLit l                 = pprPanic "char2IntLit" (ppr l)
-int2CharLit (LitNumber _ i _) = LitChar (chr (fromInteger i))
+int2CharLit (LitNumber _ i)   = LitChar (chr (fromInteger i))
 int2CharLit l                 = pprPanic "int2CharLit" (ppr l)
 
 float2IntLit (LitFloat f)      = mkLitIntUnchecked (truncate f)
 float2IntLit l                 = pprPanic "float2IntLit" (ppr l)
-int2FloatLit (LitNumber _ i _) = LitFloat (fromInteger i)
+int2FloatLit (LitNumber _ i)   = LitFloat (fromInteger i)
 int2FloatLit l                 = pprPanic "int2FloatLit" (ppr l)
 
 double2IntLit (LitDouble f)     = mkLitIntUnchecked (truncate f)
 double2IntLit l                 = pprPanic "double2IntLit" (ppr l)
-int2DoubleLit (LitNumber _ i _) = LitDouble (fromInteger i)
+int2DoubleLit (LitNumber _ i)   = LitDouble (fromInteger i)
 int2DoubleLit l                 = pprPanic "int2DoubleLit" (ppr l)
 
 float2DoubleLit (LitFloat  f) = LitDouble f
@@ -600,8 +579,8 @@ rubbishLit = LitRubbish
 -- user code. One approach to this is described in #8472.
 litIsTrivial :: Literal -> Bool
 --      c.f. CoreUtils.exprIsTrivial
-litIsTrivial (LitString _)      = False
-litIsTrivial (LitNumber nt _ _) = case nt of
+litIsTrivial (LitString _)    = False
+litIsTrivial (LitNumber nt _) = case nt of
   LitNumInteger -> False
   LitNumNatural -> False
   LitNumInt     -> True
@@ -613,10 +592,10 @@ litIsTrivial _                  = True
 -- | True if code space does not go bad if we duplicate this literal
 litIsDupable :: DynFlags -> Literal -> Bool
 --      c.f. CoreUtils.exprIsDupable
-litIsDupable _      (LitString _)      = False
-litIsDupable dflags (LitNumber nt i _) = case nt of
+litIsDupable _      (LitString _)    = False
+litIsDupable dflags (LitNumber nt i) = case nt of
   LitNumInteger -> inIntRange dflags i
-  LitNumNatural -> inIntRange dflags i
+  LitNumNatural -> inWordRange dflags i
   LitNumInt     -> True
   LitNumInt64   -> True
   LitNumWord    -> True
@@ -624,12 +603,12 @@ litIsDupable dflags (LitNumber nt i _) = case nt of
 litIsDupable _      _                  = True
 
 litFitsInChar :: Literal -> Bool
-litFitsInChar (LitNumber _ i _) = i >= toInteger (ord minBound)
-                               && i <= toInteger (ord maxBound)
-litFitsInChar _                 = False
+litFitsInChar (LitNumber _ i) = i >= toInteger (ord minBound)
+                              && i <= toInteger (ord maxBound)
+litFitsInChar _               = False
 
 litIsLifted :: Literal -> Bool
-litIsLifted (LitNumber nt _ _) = case nt of
+litIsLifted (LitNumber nt _) = case nt of
   LitNumInteger -> True
   LitNumNatural -> True
   LitNumInt     -> False
@@ -641,26 +620,6 @@ litIsLifted _                  = False
 {-
         Types
         ~~~~~
-
-Note [Types of LitNumbers]
-~~~~~~~~~~~~~~~~~~~~~~~~~~
-
-A LitNumber's type is always known from its LitNumType:
-
-  LitNumInteger -> Integer
-  LitNumNatural -> Natural
-  LitNumInt     -> Int# (intPrimTy)
-  LitNumInt64   -> Int64# (int64PrimTy)
-  LitNumWord    -> Word# (wordPrimTy)
-  LitNumWord64  -> Word64# (word64PrimTy)
-
-The reason why we have a Type field is because Integer and Natural types live
-outside of GHC (in the libraries), so we have to get the actual Type via
-lookupTyCon, tcIfaceTyConByName etc. that's too inconvenient in the call sites
-of literalType, so we do that when creating these literals, and literalType
-simply reads the field.
-
-(But see also Note [Integer literals] and Note [Natural literals])
 -}
 
 -- | Find the Haskell 'Type' the literal occupies
@@ -671,7 +630,13 @@ literalType (LitString  _)    = addrPrimTy
 literalType (LitFloat _)      = floatPrimTy
 literalType (LitDouble _)     = doublePrimTy
 literalType (LitLabel _ _ _)  = addrPrimTy
-literalType (LitNumber _ _ t) = t -- Note [Types of LitNumbers]
+literalType (LitNumber lt _)  = case lt of
+   LitNumInteger -> integerTy
+   LitNumNatural -> naturalTy
+   LitNumInt     -> intPrimTy
+   LitNumInt64   -> int64PrimTy
+   LitNumWord    -> wordPrimTy
+   LitNumWord64  -> word64PrimTy
 literalType (LitRubbish)      = mkForAllTy a Inferred (mkTyVarTy a)
   where
     a = alphaTyVarUnliftedRep
@@ -707,7 +672,7 @@ cmpLit (LitNullAddr)        (LitNullAddr)         = EQ
 cmpLit (LitFloat     a)     (LitFloat      b)     = a `compare` b
 cmpLit (LitDouble    a)     (LitDouble     b)     = a `compare` b
 cmpLit (LitLabel     a _ _) (LitLabel      b _ _) = a `compare` b
-cmpLit (LitNumber nt1 a _)  (LitNumber nt2  b _)
+cmpLit (LitNumber nt1 a)    (LitNumber nt2  b)
   | nt1 == nt2 = a   `compare` b
   | otherwise  = nt1 `compare` nt2
 cmpLit (LitRubbish)         (LitRubbish)          = EQ
@@ -737,7 +702,7 @@ pprLiteral _       (LitString s)   = pprHsBytes s
 pprLiteral _       (LitNullAddr)   = text "__NULL"
 pprLiteral _       (LitFloat f)    = float (fromRat f) <> primFloatSuffix
 pprLiteral _       (LitDouble d)   = double (fromRat d) <> primDoubleSuffix
-pprLiteral add_par (LitNumber nt i _)
+pprLiteral add_par (LitNumber nt i)
    = case nt of
        LitNumInteger -> pprIntegerVal add_par i
        LitNumNatural -> pprIntegerVal add_par i
