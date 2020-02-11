@@ -14,7 +14,7 @@ module GHC.Core.Make (
 
         -- * Constructing boxed literals
         mkWordExpr, mkWordExprWord,
-        mkIntExpr, mkIntExprInt,
+        mkIntExpr, mkIntExprInt, mkUncheckedIntExpr,
         mkIntegerExpr, mkNaturalExpr,
         mkFloatExpr, mkDoubleExpr,
         mkCharExpr, mkStringExpr, mkStringExprFS, mkStringExprFSWith,
@@ -252,6 +252,11 @@ castBottomExpr e res_ty
 mkIntExpr :: Platform -> Integer -> CoreExpr        -- Result = I# i :: Int
 mkIntExpr platform i = mkCoreConApps intDataCon  [mkIntLit platform i]
 
+-- | Create a 'CoreExpr' which will evaluate to the given @Int@. Don't check
+-- that the number is in the range of the target platform @Int@
+mkUncheckedIntExpr :: Integer -> CoreExpr        -- Result = I# i :: Int
+mkUncheckedIntExpr i = mkCoreConApps intDataCon  [Lit (mkLitIntUnchecked i)]
+
 -- | Create a 'CoreExpr' which will evaluate to the given @Int@
 mkIntExprInt :: Platform -> Int -> CoreExpr         -- Result = I# i :: Int
 mkIntExprInt platform i = mkCoreConApps intDataCon  [mkIntLitInt platform i]
@@ -265,14 +270,12 @@ mkWordExprWord :: Platform -> Word -> CoreExpr
 mkWordExprWord platform w = mkCoreConApps wordDataCon [mkWordLitWord platform w]
 
 -- | Create a 'CoreExpr' which will evaluate to the given @Integer@
-mkIntegerExpr  :: MonadThings m => Integer -> m CoreExpr  -- Result :: Integer
-mkIntegerExpr i = do t <- lookupTyCon integerTyConName
-                     return (Lit (mkLitInteger i (mkTyConTy t)))
+mkIntegerExpr  :: Integer -> CoreExpr  -- Result :: Integer
+mkIntegerExpr i = Lit (mkLitInteger i)
 
 -- | Create a 'CoreExpr' which will evaluate to the given @Natural@
-mkNaturalExpr  :: MonadThings m => Integer -> m CoreExpr
-mkNaturalExpr i = do t <- lookupTyCon naturalTyConName
-                     return (Lit (mkLitNatural i (mkTyConTy t)))
+mkNaturalExpr  :: Integer -> CoreExpr
+mkNaturalExpr i = Lit (mkLitNatural i)
 
 -- | Create a 'CoreExpr' which will evaluate to the given @Float@
 mkFloatExpr :: Float -> CoreExpr

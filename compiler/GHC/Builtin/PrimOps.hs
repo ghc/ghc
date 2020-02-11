@@ -453,7 +453,7 @@ Duplicate      YES           NO
   just look at Control.Monad.ST.Lazy.Imp.strictToLazy!  We get
   something like this
         p = case readMutVar# s v of
-              (# s', r #) -> (S# s', r)
+              (# s', r #) -> (State# s', r)
         s' = case p of (s', r) -> s'
         r  = case p of (s', r) -> r
 

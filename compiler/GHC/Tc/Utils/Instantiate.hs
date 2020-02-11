@@ -50,7 +50,7 @@ import GHC.Tc.Types.Origin
 import GHC.Tc.Utils.Env
 import GHC.Tc.Types.Evidence
 import GHC.Core.InstEnv
-import GHC.Builtin.Types  ( heqDataCon, eqDataCon )
+import GHC.Builtin.Types  ( heqDataCon, eqDataCon, integerTyConName )
 import GHC.Core    ( isOrphan )
 import GHC.Tc.Instance.FunDeps
 import GHC.Tc.Utils.TcMType
