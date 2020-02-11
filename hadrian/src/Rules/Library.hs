@@ -137,7 +137,7 @@ extraObjects :: Context -> Action [FilePath]
 extraObjects context
     | package context == ghcBignum = do
          interpretInContext context getBignumBackend >>= \case
-            "gmp" -> gmpObjects
+            "gmp" -> gmpObjects context
             _     -> return []
 
     | otherwise = return []
