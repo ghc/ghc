@@ -12,6 +12,7 @@ import Oracles.ModuleFiles
 import Packages
 import Rules.Gmp
 import Rules.Register
+import Settings
 import Target
 import Utilities
 
@@ -131,11 +132,15 @@ cObjects context = do
 
 -- | Return extra object files needed to build the given library context. The
 -- resulting list is currently non-empty only when the package from the
--- 'Context' is @integer-gmp@.
+-- 'Context' is @ghc-bignum@ built with in-tree GMP backend.
 extraObjects :: Context -> Action [FilePath]
 extraObjects context
-    | package context == integerGmp = gmpObjects (stage context)
-    | otherwise                     = return []
+    | package context == ghcBignum = do
+         interpretInContext context getBignumBackend >>= \case
+            "gmp" -> gmpObjects (stage context)
+            _     -> return []
+
+    | otherwise = return []
 
 -- | Return all the object files to be put into the library we're building for
 -- the given 'Context'.

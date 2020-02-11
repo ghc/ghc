@@ -17,9 +17,9 @@ gmpObjects s = do
     then return []
     else do
       -- Indirectly ensure object creation
-      let ctx = vanillaContext s integerGmp
-      integerGmpPath <- buildPath ctx
-      need [integerGmpPath -/- "include/ghc-gmp.h"]
+      let ctx = vanillaContext s ghcBignum
+      ghcBignumPath <- buildPath ctx
+      need [ghcBignumPath -/- "include/ghc-gmp.h"]
 
       -- The line below causes a Shake Lint failure on Windows, which forced
       -- us to disable Lint by default. See more details here:
@@ -29,11 +29,11 @@ gmpObjects s = do
           liftIO (getDirectoryFilesIO gmpPath [gmpObjectsDir -/- "*.o"])
 
 gmpBase :: FilePath
-gmpBase = pkgPath integerGmp -/- "gmp"
+gmpBase = pkgPath ghcBignum -/- "gmp"
 
 -- | GMP is considered a Stage1 package. This determines GMP build directory.
 gmpContext :: Context
-gmpContext = vanillaContext Stage1 integerGmp
+gmpContext = vanillaContext Stage1 ghcBignum
 
 -- | Build directory for in-tree GMP library.
 gmpBuildPath :: Stage -> Action FilePath
@@ -56,10 +56,10 @@ gmpRules = do
     root <- buildRootRules
 
     -- Build in-tree gmp if necessary
-    -- Produce: integer-gmp/build/include/ghc-gmp.h
+    -- Produce: ghc-bignum/build/include/ghc-gmp.h
     --   In-tree: copy gmp.h from in-tree build
     --   External: copy ghc-gmp.h from base sources
-    root -/- "stage*/libraries/integer-gmp/build/include/ghc-gmp.h" %> \header -> do
+    root -/- "stage*/libraries/ghc-bignum/build/include/ghc-gmp.h" %> \header -> do
         let includeP   = takeDirectory header
             buildP     = takeDirectory includeP
             packageP   = takeDirectory buildP
@@ -84,13 +84,13 @@ gmpRules = do
 
         let
           -- parse a path of the form "//stage*/gmp/xxx" and returns a vanilla
-          -- context from it for integer-gmp package.
+          -- context from it for ghc-bignum package.
           makeGmpPathContext gmpP = do
                let
                    stageP   = takeDirectory gmpP
                    stageS   = takeFileName stageP
                stage <- parsePath parseStage "<stage>" stageS
-               pure (vanillaContext stage integerGmp)
+               pure (vanillaContext stage ghcBignum)
 
           gmpPath = root -/- "stage*/gmp"
 
@@ -124,7 +124,7 @@ gmpRules = do
             env <- configureEnvironment (stage ctx)
             need [mk <.> "in"]
             buildWithCmdOptions env $
-                target gmpContext (Configure gmpBuildP) [mk <.> "in"] [mk]
+                target ctx (Configure gmpBuildP) [mk <.> "in"] [mk]
 
         -- Extract in-tree GMP sources and apply patches. Produce
         --  - <root>/stageN/gmp/gmpbuild/Makefile.in
