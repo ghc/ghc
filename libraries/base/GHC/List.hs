@@ -245,6 +245,8 @@ filterFB c p x r | p x       = x `c` r
 -- 90
 -- >>> foldl (\reversedString nextChar -> nextChar : reversedString) "foo" ['a', 'b', 'c', 'd']
 -- "dcbafoo"
+-- >>> foldl (+) 0 [1..]
+-- * Hangs forever *
 foldl :: forall a b. (b -> a -> b) -> b -> [a] -> b
 {-# INLINE foldl #-}
 foldl k z0 xs =
@@ -298,12 +300,31 @@ foldl' k z0 xs =
   -- See Note [Left folds via right fold]
 
 -- | 'foldl1' is a variant of 'foldl' that has no starting value argument,
--- and thus must be applied to non-empty lists.
+-- and thus must be applied to non-empty lists. Note that unlike 'foldl', the accumulated value must be of the same type as the list elements.
+--
+-- >>> foldl1 (+) [1..4]
+-- 10
+-- >>> foldl1 (+) []
+-- Exception: Prelude.foldl1: empty list
+-- >>> foldl1 (-) [1..4]
+-- -8
+-- >>> foldl1 (-) []
+-- Exception: Prelude.foldl1: empty list
+-- >>> foldl1 (&&) [True, False, True, True]
+-- False
+-- >>> foldl1 (&&) []
+-- Exception: Prelude.foldl1: empty list
+-- >>> foldl1 (||) [False, False, True, True]
+-- True
+-- >>> foldl1 (||) []
+-- Exception: Prelude.foldl1: empty list
+-- >>> foldl1 (+) [1..]
+-- * Hangs forever *
 foldl1                  :: (a -> a -> a) -> [a] -> a
 foldl1 f (x:xs)         =  foldl f x xs
 foldl1 _ []             =  errorEmptyList "foldl1"
 
--- | A strict version of 'foldl1'
+-- | A strict version of 'foldl1'.
 foldl1'                  :: (a -> a -> a) -> [a] -> a
 foldl1' f (x:xs)         =  foldl' f x xs
 foldl1' _ []             =  errorEmptyList "foldl1'"
@@ -312,11 +333,33 @@ foldl1' _ []             =  errorEmptyList "foldl1'"
 -- List sum and product
 
 -- | The 'sum' function computes the sum of a finite list of numbers.
+--
+-- >>> sum []
+-- 0
+-- >>> sum [42]
+-- 42
+-- >>> sum [1..10]
+-- 55
+-- >>> sum [4.1, 2.0, 1.7]
+-- 7.8
+-- >>> sum [1..]
+-- * Hangs forever *
 sum                     :: (Num a) => [a] -> a
 {-# INLINE sum #-}
 sum                     =  foldl (+) 0
 
 -- | The 'product' function computes the product of a finite list of numbers.
+--
+-- >>> product []
+-- 1
+-- >>> product [42]
+-- 42
+-- >>> product [1..10]
+-- 3628800
+-- >>> product [4.1, 2.0, 1.7]
+-- 13.939999999999998
+-- >>> product [1..]
+-- * Hangs forever *
 product                 :: (Num a) => [a] -> a
 {-# INLINE product #-}
 product                 =  foldl (*) 1
@@ -329,6 +372,17 @@ product                 =  foldl (*) 1
 -- Note that
 --
 -- > last (scanl f z xs) == foldl f z xs.
+--
+-- >>> scanl (+) 0 [1..4]
+-- [0,1,3,6,10]
+-- >>> scanl (+) 42 []
+-- [42]
+-- >>> scanl (-) 100 [1..4]
+-- [100,99,97,94,90]
+-- >>> scanl (\reversedString nextChar -> nextChar : reversedString) "foo" ['a', 'b', 'c', 'd']
+-- ["foo","afoo","bafoo","cbafoo","dcbafoo"]
+-- >>> scanl (+) 0 [1..]
+-- * Hangs forever *
 
 -- This peculiar arrangement is necessary to prevent scanl being rewritten in
 -- its own right-hand side.
@@ -363,12 +417,30 @@ constScanl = const
 -- value argument:
 --
 -- > scanl1 f [x1, x2, ...] == [x1, x1 `f` x2, ...]
-
+--
+-- >>> scanl1 (+) [1..4]
+-- [1,3,6,10]
+-- >>> scanl1 (+) []
+-- []
+-- >>> scanl1 (-) [1..4]
+-- [1,-1,-4,-8]
+-- >>> scanl1 (-) []
+-- []
+-- >>> scanl1 (&&) [True, False, True, True]
+-- [True,False,False,False]
+-- >>> scanl1 (&&) []
+-- []
+-- >>> scanl1 (||) [False, False, True, True]
+-- [False,False,True,True]
+-- >>> scanl1 (||) []
+-- []
+-- >>> scanl1 (+) [1..]
+-- * Hangs forever *
 scanl1                  :: (a -> a -> a) -> [a] -> [a]
 scanl1 f (x:xs)         =  scanl f x xs
 scanl1 _ []             =  []
 
--- | \(\mathcal{O}(n)\). A strictly accumulating version of 'scanl'
+-- | \(\mathcal{O}(n)\). A strict version of 'scanl'.
 {-# NOINLINE [1] scanl' #-}
 scanl'           :: (b -> a -> b) -> b -> [a] -> [b]
 -- This peculiar form is needed to prevent scanl' from being rewritten
@@ -431,8 +503,26 @@ match on everything past the :, which is just the tail of scanl.
 -- above functions.
 
 -- | 'foldr1' is a variant of 'foldr' that has no starting value argument,
--- and thus must be applied to non-empty lists.
-
+-- and thus must be applied to non-empty lists. Note that unlike 'foldr', the accumulated value must be of the same type as the list elements.
+--
+-- >>> foldr1 (+) [1..4]
+-- 10
+-- >>> foldr1 (+) []
+-- Exception: Prelude.foldr1: empty list
+-- >>> foldr1 (-) [1..4]
+-- -2
+-- >>> foldr1 (-) []
+-- Exception: Prelude.foldr1: empty list
+-- >>> foldr1 (&&) [True, False, True, True]
+-- False
+-- >>> foldr1 (&&) []
+-- Exception: Prelude.foldr1: empty list
+-- >>> foldr1 (||) [False, False, True, True]
+-- True
+-- >>> foldr1 (||) []
+-- Exception: Prelude.foldr1: empty list
+-- >>> foldr1 (+) [1..]
+-- * Hangs forever *
 foldr1                  :: (a -> a -> a) -> [a] -> a
 foldr1 f = go
   where go [x]            =  x
@@ -440,10 +530,21 @@ foldr1 f = go
         go []             =  errorEmptyList "foldr1"
 {-# INLINE [0] foldr1 #-}
 
--- | \(\mathcal{O}(n)\). 'scanr' is the right-to-left dual of 'scanl'.
--- Note that
+-- | \(\mathcal{O}(n)\). 'scanr' is the right-to-left dual of 'scanl'. Note that the order of parameters on the accumulating function are reversed compared to 'scanl'.
+-- Also note that
 --
 -- > head (scanr f z xs) == foldr f z xs.
+--
+-- >>> scanr (+) 0 [1..4]
+-- [10,9,7,4,0]
+-- >>> scanr (+) 42 []
+-- [42]
+-- >>> scanr (-) 100 [1..4]
+-- [98,-97,99,-96,100]
+-- >>> scanr (\nextChar reversedString -> nextChar : reversedString) "foo" ['a', 'b', 'c', 'd']
+-- ["abcdfoo","bcdfoo","cdfoo","dfoo","foo"]
+-- >>> scanr (+) 0 [1..]
+-- * Hangs forever *
 {-# NOINLINE [1] scanr #-}
 scanr                   :: (a -> b -> b) -> b -> [a] -> [b]
 scanr _ q0 []           =  [q0]
@@ -496,6 +597,25 @@ remove the cause for the chain of evaluations, and all is well.
 
 -- | \(\mathcal{O}(n)\). 'scanr1' is a variant of 'scanr' that has no starting
 -- value argument.
+--
+-- >>> scanr1 (+) [1..4]
+-- [10,9,7,4]
+-- >>> scanr1 (+) []
+-- []
+-- >>> scanr1 (-) [1..4]
+-- [-2,3,-1,4]
+-- >>> scanr1 (-) []
+-- []
+-- >>> scanr1 (&&) [True, False, True, True]
+-- [False,False,True,True]
+-- >>> scanr1 (&&) []
+-- []
+-- >>> scanr1 (||) [True, True, False, False]
+-- [True,True,False,False]
+-- >>> scanr1 (||) []
+-- []
+-- >>> scanr1 (+) [1..]
+-- * Hangs forever *
 scanr1                  :: (a -> a -> a) -> [a] -> [a]
 scanr1 _ []             =  []
 scanr1 _ [x]            =  [x]
