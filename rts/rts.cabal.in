@@ -145,6 +145,7 @@ library
                       rts/Parallel.h
                       rts/PrimFloat.h
                       rts/Profiling.h
+                      rts/RootProfile.h
                       rts/Signals.h
                       rts/SpinLock.h
                       rts/StableName.h
