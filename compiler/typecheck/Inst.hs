@@ -51,7 +51,7 @@ import TcOrigin
 import TcEnv
 import TcEvidence
 import GHC.Core.InstEnv
-import TysWiredIn  ( heqDataCon, eqDataCon )
+import TysWiredIn  ( heqDataCon, eqDataCon, integerTyConName )
 import GHC.Core    ( isOrphan )
 import FunDeps
 import TcMType
