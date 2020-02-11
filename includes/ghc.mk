@@ -247,7 +247,7 @@ $(includes_SETTINGS) : includes/Makefile | $$(dir $$@)/.
 	@echo ',("LLVM opt command", "$(SettingsOptCommand)")' >> $@
 	@echo ',("LLVM clang command", "$(SettingsClangCommand)")' >> $@
 	@echo
-	@echo ',("integer library", "$(INTEGER_LIBRARY)")' >> $@
+	@echo ',("bignum backend", "$(BIGNUM_BACKEND)")' >> $@
 	@echo ',("Use interpreter", "$(GhcWithInterpreter)")' >> $@
 	@echo ',("Use native code generator", "$(GhcWithNativeCodeGen)")' >> $@
 	@echo ',("Support SMP", "$(GhcWithSMP)")' >> $@

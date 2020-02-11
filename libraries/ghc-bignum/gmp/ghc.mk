@@ -83,11 +83,10 @@ UseIntreeGmp = YES
 endif
 endif
 
-# wrappers.c includes "ghc-gmp.h"
-libraries/integer-gmp/cbits/wrappers.c: libraries/integer-gmp/include/ghc-gmp.h
+# gmp_wrappers.c includes "ghc-gmp.h"
+libraries/ghc-bignum/cbits/gmp_wrappers.c: libraries/ghc-bignum/include/ghc-gmp.h
 
 ifeq "$(UseIntreeGmp)" "YES"
-
 # Copy header from in-tree build (gmp.h => ghc-gmp.h)
 libraries/ghc-bignum/include/ghc-gmp.h: libraries/ghc-bignum/gmp/gmp.h
 	$(CP) $< $@
