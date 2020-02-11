@@ -21,8 +21,10 @@ data Flavour = Flavour {
     args :: Args,
     -- | Build these packages.
     packages :: Stage -> Action [Package],
-    -- | Either 'integerGmp' or 'integerSimple'.
-    integerLibrary :: Action Package,
+    -- | Bignum backend: 'native', 'gmp', 'ffi', etc.
+    bignumBackend :: String,
+    -- | Check bignum backend against native
+    bignumCheck :: Bool,
     -- | Build libraries these ways.
     libraryWays :: Ways,
     -- | Build RTS these ways.
@@ -168,12 +170,12 @@ userPackage = library "user-package"
 You will also need to add `userPackage` to a specific build stage by modifying
 the `packages` setting of the user flavour as otherwise it will not be built.
 
-You can choose which integer library to use when building GHC using the
-`integerLibrary` setting of the build flavour. Possible values are: `integerGmp`
-(default) and `integerSimple`.
+You can choose which Bignum backend to use when buidling GHC using the
+`bignumBackend` setting of the build flavour. Possible values are: `gmp`
+(default), `native` or `ffi`.
 ```haskell
 userFlavour :: Flavour
-userFlavour = defaultFlavour { name = "user", integerLibrary = pure integerSimple }
+userFlavour = defaultFlavour { name = "user", bignumBackend = "native" }
 ```
 
 #### Specifying the final stage to build
