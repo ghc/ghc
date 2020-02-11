@@ -101,7 +101,7 @@ instance Num Int8 where
     signum x | x > 0       = 1
     signum 0               = 0
     signum _               = -1
-    fromInteger i          = I8# (narrow8Int# (integerToInt i))
+    fromInteger i          = I8# (narrow8Int# (integerToInt# i))
 
 -- | @since 2.01
 instance Real Int8 where
@@ -155,7 +155,7 @@ instance Integral Int8 where
                                        (# d, m #) ->
                                            (I8# (narrow8Int# d),
                                             I8# (narrow8Int# m))
-    toInteger (I8# x#)               = smallInteger x#
+    toInteger (I8# x#)               = IS x#
 
 -- | @since 2.01
 instance Bounded Int8 where
@@ -308,7 +308,7 @@ instance Num Int16 where
     signum x | x > 0       = 1
     signum 0               = 0
     signum _               = -1
-    fromInteger i          = I16# (narrow16Int# (integerToInt i))
+    fromInteger i          = I16# (narrow16Int# (integerToInt# i))
 
 -- | @since 2.01
 instance Real Int16 where
@@ -362,7 +362,7 @@ instance Integral Int16 where
                                        (# d, m #) ->
                                            (I16# (narrow16Int# d),
                                             I16# (narrow16Int# m))
-    toInteger (I16# x#)              = smallInteger x#
+    toInteger (I16# x#)              = IS x#
 
 -- | @since 2.01
 instance Bounded Int16 where
@@ -520,7 +520,7 @@ instance Num Int32 where
     signum x | x > 0       = 1
     signum 0               = 0
     signum _               = -1
-    fromInteger i          = I32# (narrow32Int# (integerToInt i))
+    fromInteger i          = I32# (narrow32Int# (integerToInt# i))
 
 -- | @since 2.01
 instance Enum Int32 where
@@ -582,7 +582,7 @@ instance Integral Int32 where
                                        (# d, m #) ->
                                            (I32# (narrow32Int# d),
                                             I32# (narrow32Int# m))
-    toInteger (I32# x#)              = smallInteger x#
+    toInteger (I32# x#)              = IS x#
 
 -- | @since 2.01
 instance Read Int32 where
@@ -743,7 +743,7 @@ instance Num Int64 where
     signum x | x > 0       = 1
     signum 0               = 0
     signum _               = -1
-    fromInteger i          = I64# (integerToInt64 i)
+    fromInteger i          = I64# (integerToInt64# i)
 
 -- | @since 2.01
 instance Enum Int64 where
@@ -799,7 +799,7 @@ instance Integral Int64 where
         | y == (-1) && x == minBound = (overflowError, 0)
         | otherwise                  = (I64# (x# `divInt64#` y#),
                                         I64# (x# `modInt64#` y#))
-    toInteger (I64# x)               = int64ToInteger x
+    toInteger (I64# x)               = integerFromInt64# x
 
 
 divInt64#, modInt64# :: Int64# -> Int64# -> Int64#
@@ -948,7 +948,7 @@ instance Num Int64 where
     signum x | x > 0       = 1
     signum 0               = 0
     signum _               = -1
-    fromInteger i          = I64# (integerToInt i)
+    fromInteger i          = I64# (integerToInt# i)
 
 -- | @since 2.01
 instance Enum Int64 where
@@ -1001,7 +1001,7 @@ instance Integral Int64 where
         | otherwise                  = case x# `divModInt#` y# of
                                        (# d, m #) ->
                                            (I64# d, I64# m)
-    toInteger (I64# x#)              = smallInteger x#
+    toInteger (I64# x#)              = IS x#
 
 -- | @since 2.01
 instance Read Int64 where
@@ -1128,11 +1128,11 @@ instance Ix Int64 where
 
 {-# RULES
 "fromIntegral/Int8->Natural"
-    fromIntegral = intToNatural  . (fromIntegral :: Int8  -> Int)
+    fromIntegral = naturalFromIntUnsafe  . (fromIntegral :: Int8  -> Int)
 "fromIntegral/Int16->Natural"
-    fromIntegral = intToNatural  . (fromIntegral :: Int16 -> Int)
+    fromIntegral = naturalFromIntUnsafe  . (fromIntegral :: Int16 -> Int)
 "fromIntegral/Int32->Natural"
-    fromIntegral = intToNatural  . (fromIntegral :: Int32 -> Int)
+    fromIntegral = naturalFromIntUnsafe  . (fromIntegral :: Int32 -> Int)
   #-}
 
 #if WORD_SIZE_IN_BITS == 64
@@ -1141,7 +1141,7 @@ instance Ix Int64 where
 "fromIntegral/Natural->Int64"
     fromIntegral = (fromIntegral :: Int -> Int64) . naturalToInt
 "fromIntegral/Int64->Natural"
-    fromIntegral = intToNatural . (fromIntegral :: Int64 -> Int)
+    fromIntegral = naturalFromIntUnsafe . (fromIntegral :: Int64 -> Int)
   #-}
 #endif
 
