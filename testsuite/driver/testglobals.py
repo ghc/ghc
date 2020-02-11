@@ -139,6 +139,9 @@ class TestConfig:
         # Is readelf available?
         self.have_readelf = False
 
+        # Do we use a fast backend for bignum (e.g. GMP)
+        self.have_fast_bignum = True
+
         # Are we testing an in-tree compiler?
         self.in_tree_compiler = True
 
