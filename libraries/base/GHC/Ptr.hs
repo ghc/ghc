@@ -168,7 +168,7 @@ castPtrToFunPtr (Ptr addr) = FunPtr addr
 
 -- | @since 2.01
 instance Show (Ptr a) where
-   showsPrec _ (Ptr a) rs = pad_out (showHex (wordToInteger(int2Word#(addr2Int# a))) "")
+   showsPrec _ (Ptr a) rs = pad_out (showHex (integerFromWord#(int2Word#(addr2Int# a))) "")
      where
         -- want 0s prefixed to pad it out to a fixed length.
        pad_out ls =
