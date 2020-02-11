@@ -626,6 +626,15 @@ scanr1 f (x:xs)         =  f x q : qs
 -- which must be non-empty, finite, and of an ordered type.
 -- It is a special case of 'Data.List.maximumBy', which allows the
 -- programmer to supply their own comparison function.
+--
+-- >>> maximum []
+-- Exception: Prelude.maximum: empty list
+-- >>> maximum [42]
+-- 42
+-- >>> maximum [55, -12, 7, 0, -89]
+-- 55
+-- >>> maximum [1..]
+-- * Hangs forever *
 maximum                 :: (Ord a) => [a] -> a
 {-# INLINABLE maximum #-}
 maximum []              =  errorEmptyList "maximum"
@@ -641,6 +650,15 @@ maximum xs              =  foldl1 max xs
 -- which must be non-empty, finite, and of an ordered type.
 -- It is a special case of 'Data.List.minimumBy', which allows the
 -- programmer to supply their own comparison function.
+--
+-- >>> minimum []
+-- Exception: Prelude.minimum: empty list
+-- >>> minimum [42]
+-- 42
+-- >>> minimum [55, -12, 7, 0, -89]
+-- -89
+-- >>> minimum [1..]
+-- * Hangs forever *
 minimum                 :: (Ord a) => [a] -> a
 {-# INLINABLE minimum #-}
 minimum []              =  errorEmptyList "minimum"
@@ -658,6 +676,11 @@ minimum xs              =  foldl1 min xs
 -- Note that 'iterate' is lazy, potentially leading to thunk build-up if
 -- the consumer doesn't force each iterate. See 'iterate'' for a strict
 -- variant of this function.
+--
+-- >>> iterate not True
+-- [True,False,True,False...
+-- >>> iterate (+3) 42
+-- [42,45,48,51,54,57,60,63...
 {-# NOINLINE [1] iterate #-}
 iterate :: (a -> a) -> a -> [a]
 iterate f x =  x : iterate f (f x)
@@ -675,8 +698,8 @@ iterateFB c f x0 = go x0
 
 -- | 'iterate'' is the strict version of 'iterate'.
 --
--- It ensures that the result of each application of force to weak head normal
--- form before proceeding.
+-- It forces the result of each application of the function to weak head normal form (WHNF)
+-- before proceeding.
 {-# NOINLINE [1] iterate' #-}
 iterate' :: (a -> a) -> a -> [a]
 iterate' f x =
