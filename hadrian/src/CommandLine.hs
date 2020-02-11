@@ -1,6 +1,6 @@
 module CommandLine (
     optDescrs, cmdLineArgsMap, cmdFlavour, lookupFreeze1, lookupFreeze2,
-    cmdIntegerSimple, cmdProgressInfo, cmdConfigure, cmdCompleteSetting,
+    cmdBignum, cmdBignumCheck, cmdProgressInfo, cmdConfigure, cmdCompleteSetting,
     cmdDocsArgs, lookupBuildRoot, TestArgs(..), TestSpeed(..), defaultTestArgs,
     cmdPrefix
     ) where
@@ -26,7 +26,8 @@ data CommandLineArgs = CommandLineArgs
     , flavour        :: Maybe String
     , freeze1        :: Bool
     , freeze2        :: Bool
-    , integerSimple  :: Bool
+    , bignum         :: Maybe String
+    , bignumCheck    :: Bool
     , progressInfo   :: ProgressInfo
     , buildRoot      :: BuildRoot
     , testArgs       :: TestArgs
@@ -42,7 +43,8 @@ defaultCommandLineArgs = CommandLineArgs
     , flavour        = Nothing
     , freeze1        = False
     , freeze2        = False
-    , integerSimple  = False
+    , bignum         = Nothing
+    , bignumCheck    = False
     , progressInfo   = Brief
     , buildRoot      = BuildRoot "_build"
     , testArgs       = defaultTestArgs
@@ -96,6 +98,13 @@ readConfigure = Right $ \flags -> flags { configure = True }
 readFlavour :: Maybe String -> Either String (CommandLineArgs -> CommandLineArgs)
 readFlavour ms = Right $ \flags -> flags { flavour = lower <$> ms }
 
+readBignum :: Maybe String -> Either String (CommandLineArgs -> CommandLineArgs)
+readBignum Nothing   = Right id
+readBignum (Just ms) = Right $ \flags -> case break (== '-') (lower ms) of
+   (backend,"")          -> flags { bignum = Just backend }
+   ("check",'-':backend) -> flags { bignum = Just backend, bignumCheck = True }
+   _                     -> flags { bignum = Just (lower ms) }
+
 readBuildRoot :: Maybe FilePath -> Either String (CommandLineArgs -> CommandLineArgs)
 readBuildRoot ms =
     maybe (Left "Cannot parse build-root") (Right . set) (go =<< ms)
@@ -108,9 +117,6 @@ readBuildRoot ms =
 readFreeze1, readFreeze2 :: Either String (CommandLineArgs -> CommandLineArgs)
 readFreeze1 = Right $ \flags -> flags { freeze1 = True }
 readFreeze2 = Right $ \flags -> flags { freeze1 = True, freeze2 = True }
-
-readIntegerSimple :: Either String (CommandLineArgs -> CommandLineArgs)
-readIntegerSimple = Right $ \flags -> flags { integerSimple = True }
 
 readProgressInfo :: Maybe String -> Either String (CommandLineArgs -> CommandLineArgs)
 readProgressInfo ms =
@@ -250,8 +256,8 @@ optDescrs =
       "Freeze Stage1 GHC."
     , Option [] ["freeze2"] (NoArg readFreeze2)
       "Freeze Stage2 GHC."
-    , Option [] ["integer-simple"] (NoArg readIntegerSimple)
-      "Build GHC with integer-simple library."
+    , Option [] ["bignum"] (OptArg readBignum "BIGNUM")
+      "Select GHC BigNum backend: native, gmp, ffi."
     , Option [] ["progress-info"] (OptArg readProgressInfo "STYLE")
       "Progress info style (None, Brief, Normal or Unicorn)."
     , Option [] ["docs"] (OptArg readDocsArg "TARGET")
@@ -355,8 +361,11 @@ lookupFreeze1 = freeze1 . lookupExtra defaultCommandLineArgs
 lookupFreeze2 :: Map.HashMap TypeRep Dynamic -> Bool
 lookupFreeze2 = freeze2 . lookupExtra defaultCommandLineArgs
 
-cmdIntegerSimple :: Action Bool
-cmdIntegerSimple = integerSimple <$> cmdLineArgs
+cmdBignum :: Action (Maybe String)
+cmdBignum = bignum <$> cmdLineArgs
+
+cmdBignumCheck :: Action Bool
+cmdBignumCheck = bignumCheck <$> cmdLineArgs
 
 cmdProgressInfo :: Action ProgressInfo
 cmdProgressInfo = progressInfo <$> cmdLineArgs

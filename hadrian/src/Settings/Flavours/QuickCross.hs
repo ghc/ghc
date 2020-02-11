@@ -4,7 +4,6 @@ import Expression
 import Flavour
 import Oracles.Flag
 import {-# SOURCE #-} Settings.Default
-import Settings.Flavours.Common
 
 -- Please update doc/flavours.md when changing this file.
 quickCrossFlavour :: Flavour
@@ -28,7 +27,6 @@ quickCrossArgs :: Args
 quickCrossArgs = sourceArgs SourceArgs
     { hsDefault  = mconcat $
         [ pure ["-O0", "-H64m"]
-        , naturalInBaseFixArgs
         ]
     , hsLibrary  = notStage0 ? mconcat [ arg "-O", arg "-fllvm" ]
     , hsCompiler = stage0 ? arg "-O2"
