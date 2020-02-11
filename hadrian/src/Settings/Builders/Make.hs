@@ -2,7 +2,6 @@ module Settings.Builders.Make (makeBuilderArgs, validateBuilderArgs) where
 
 import Oracles.Setting
 import Packages
-import Rules.Gmp
 import Settings.Builders.Common
 import Settings.Program (programContext)
 import CommandLine
@@ -10,7 +9,9 @@ import CommandLine
 makeBuilderArgs :: Args
 makeBuilderArgs = do
     threads    <- shakeThreads <$> expr getShakeOptions
-    gmpPath    <- expr gmpBuildPath
+    root       <- getBuildRoot
+    stage      <- getStage
+    let gmpPath = root -/- stageString stage -/- "gmp/"
     libffiPaths <- forM [Stage1 ..] $ \s -> expr (libffiBuildPath s)
     let t = show $ max 4 (threads - 2) -- Don't use all Shake's threads
     mconcat $
