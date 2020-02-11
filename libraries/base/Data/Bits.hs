@@ -533,17 +533,19 @@ instance FiniteBits Word where
 
 -- | @since 2.01
 instance Bits Integer where
-   (.&.) = andInteger
-   (.|.) = orInteger
-   xor = xorInteger
-   complement = complementInteger
-   shift x i@(I# i#) | i >= 0    = shiftLInteger x i#
-                     | otherwise = shiftRInteger x (negateInt# i#)
-   testBit x (I# i) = testBitInteger x i
-   zeroBits   = 0
+   (.&.)      = integerAnd
+   (.|.)      = integerOr
+   xor        = integerXor
+   complement = integerComplement
+   shiftR x i = integerShiftR x (fromIntegral i)
+   shiftL x i = integerShiftL x (fromIntegral i)
+   shift x i | i >= 0    = integerShiftL x (fromIntegral i)
+             | otherwise = integerShiftR x (fromIntegral (negate i))
+   testBit x i = integerTestBit x (fromIntegral i)
+   zeroBits    = integerZero
 
-   bit (I# i#) = bitInteger i#
-   popCount x  = I# (popCountInteger x)
+   bit (I# i)  = integerBit# (int2Word# i)
+   popCount x  = I# (integerPopCount# x)
 
    rotate x i = shift x i   -- since an Integer never wraps around
 
@@ -553,20 +555,22 @@ instance Bits Integer where
 
 -- | @since 4.8.0
 instance Bits Natural where
-   (.&.) = andNatural
-   (.|.) = orNatural
-   xor = xorNatural
-   complement _ = errorWithoutStackTrace
+   (.&.)         = naturalAnd
+   (.|.)         = naturalOr
+   xor           = naturalXor
+   complement _  = errorWithoutStackTrace
                     "Bits.complement: Natural complement undefined"
+   shiftR x i    = naturalShiftR x (fromIntegral i)
+   shiftL x i    = naturalShiftL x (fromIntegral i)
    shift x i
-     | i >= 0    = shiftLNatural x i
-     | otherwise = shiftRNatural x (negate i)
-   testBit x i   = testBitNatural x i
-   zeroBits      = wordToNaturalBase 0##
+     | i >= 0    = naturalShiftL x (fromIntegral i)
+     | otherwise = naturalShiftR x (fromIntegral (negate i))
+   testBit x i   = naturalTestBit x (fromIntegral i)
+   zeroBits      = naturalZero
    clearBit x i  = x `xor` (bit i .&. x)
 
-   bit (I# i#) = bitNatural i#
-   popCount x  = popCountNatural x
+   bit (I# i)  = naturalBit# (int2Word# i)
+   popCount x  = I# (word2Int# (naturalPopCount# x))
 
    rotate x i = shift x i   -- since an Natural never wraps around
 
