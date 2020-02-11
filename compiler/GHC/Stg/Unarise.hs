@@ -215,7 +215,7 @@ import GHC.Utils.Outputable
 import GHC.Types.RepType
 import GHC.Stg.Syntax
 import GHC.Core.Type
-import GHC.Builtin.Types.Prim (intPrimTy,wordPrimTy,word64PrimTy)
+import GHC.Builtin.Types.Prim (intPrimTy)
 import GHC.Builtin.Types
 import GHC.Types.Unique.Supply
 import GHC.Utils.Misc
@@ -481,7 +481,7 @@ unariseSumAlt rho _ (DEFAULT, _, e)
 unariseSumAlt rho args (DataAlt sumCon, bs, e)
   = do let rho' = mapSumIdBinders bs args rho
        e' <- unariseExpr rho' e
-       return ( LitAlt (LitNumber LitNumInt (fromIntegral (dataConTag sumCon)) intPrimTy), [], e' )
+       return ( LitAlt (LitNumber LitNumInt (fromIntegral (dataConTag sumCon))), [], e' )
 
 unariseSumAlt _ scrt alt
   = pprPanic "unariseSumAlt" (ppr scrt $$ ppr alt)
@@ -567,7 +567,7 @@ mkUbxSum dc ty_args args0
       tag = dataConTag dc
 
       layout'  = layoutUbxSum sum_slots (mapMaybe (typeSlotTy . stgArgType) args0)
-      tag_arg  = StgLitArg (LitNumber LitNumInt (fromIntegral tag) intPrimTy)
+      tag_arg  = StgLitArg (LitNumber LitNumInt (fromIntegral tag))
       arg_idxs = IM.fromList (zipEqual "mkUbxSum" layout' args0)
 
       mkTupArgs :: Int -> [SlotTy] -> IM.IntMap StgArg -> [StgArg]
@@ -592,8 +592,8 @@ mkUbxSum dc ty_args args0
 --
 ubxSumRubbishArg :: SlotTy -> StgArg
 ubxSumRubbishArg PtrSlot    = StgVarArg aBSENT_SUM_FIELD_ERROR_ID
-ubxSumRubbishArg WordSlot   = StgLitArg (LitNumber LitNumWord 0 wordPrimTy)
-ubxSumRubbishArg Word64Slot = StgLitArg (LitNumber LitNumWord64 0 word64PrimTy)
+ubxSumRubbishArg WordSlot   = StgLitArg (LitNumber LitNumWord 0)
+ubxSumRubbishArg Word64Slot = StgLitArg (LitNumber LitNumWord64 0)
 ubxSumRubbishArg FloatSlot  = StgLitArg (LitFloat 0)
 ubxSumRubbishArg DoubleSlot = StgLitArg (LitDouble 0)
 
