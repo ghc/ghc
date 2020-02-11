@@ -167,6 +167,7 @@ library
                       rts/PrimFloat.h
                       rts/Profiling.h
                       rts/IPE.h
+                      rts/RootProfile.h
                       rts/Signals.h
                       rts/SpinLock.h
                       rts/StableName.h
