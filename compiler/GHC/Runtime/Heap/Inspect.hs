@@ -54,7 +54,6 @@ import GHC.Utils.Misc
 import GHC.Types.Var.Set
 import GHC.Types.Basic ( Boxity(..) )
 import GHC.Builtin.Types.Prim
-import GHC.Builtin.Names
 import GHC.Builtin.Types
 import GHC.Driver.Session
 import GHC.Utils.Outputable as Ppr
@@ -65,20 +64,12 @@ import GHC.IO (throwIO)
 
 import Control.Monad
 import Data.Maybe
-import Data.List ((\\))
-#if defined(INTEGER_GMP)
+import Data.List
 import GHC.Exts
-import Data.Array.Base
-import GHC.Integer.GMP.Internals
-#elif defined(INTEGER_SIMPLE)
-import GHC.Exts
-import GHC.Integer.Simple.Internals
-#endif
 import qualified Data.Sequence as Seq
 import Data.Sequence (viewl, ViewL(..))
 import Foreign
 import System.IO.Unsafe
-
 
 ---------------------------------------------
 -- * A representation of semi evaluated Terms
@@ -329,11 +320,12 @@ cPprTermBase y =
                                       . subTerms)
   , ifTerm (\t -> isTyCon listTyCon (ty t) && subTerms t `lengthIs` 2)
            ppr_list
-  , ifTerm' (isTyCon intTyCon    . ty) ppr_int
-  , ifTerm' (isTyCon charTyCon   . ty) ppr_char
-  , ifTerm' (isTyCon floatTyCon  . ty) ppr_float
-  , ifTerm' (isTyCon doubleTyCon . ty) ppr_double
-  , ifTerm' (isIntegerTy         . ty) ppr_integer
+  , ifTerm' (isTyCon intTyCon     . ty) ppr_int
+  , ifTerm' (isTyCon charTyCon    . ty) ppr_char
+  , ifTerm' (isTyCon floatTyCon   . ty) ppr_float
+  , ifTerm' (isTyCon doubleTyCon  . ty) ppr_double
+  , ifTerm' (isTyCon integerTyCon . ty) ppr_integer
+  , ifTerm' (isTyCon naturalTyCon . ty) ppr_natural
   ]
  where
    ifTerm :: (Term -> Bool)
@@ -355,10 +347,6 @@ cPprTermBase y =
    isTyCon a_tc ty = fromMaybe False $ do
      (tc,_) <- tcSplitTyConApp_maybe ty
      return (a_tc == tc)
-
-   isIntegerTy ty = fromMaybe False $ do
-     (tc,_) <- tcSplitTyConApp_maybe ty
-     return (tyConName tc == integerTyConName)
 
    ppr_int, ppr_char, ppr_float, ppr_double
       :: Precedence -> Term -> m (Maybe SDoc)
@@ -392,62 +380,52 @@ cPprTermBase y =
       return (Just (Ppr.double f))
    ppr_double _ _ = return Nothing
 
-   ppr_integer :: Precedence -> Term -> m (Maybe SDoc)
-#if defined(INTEGER_GMP)
-   -- Reconstructing Integers is a bit of a pain. This depends deeply
-   -- on the integer-gmp representation, so it'll break if that
-   -- changes (but there are several tests in
-   -- tests/ghci.debugger/scripts that will tell us if this is wrong).
+   ppr_bignat :: Bool -> Precedence -> [Word] -> m (Maybe SDoc)
+   ppr_bignat sign _ ws = do
+      let
+         wordSize = finiteBitSize (0 :: Word) -- does the word size depend on the target?
+         makeInteger n _ []     = n
+         makeInteger n s (x:xs) = makeInteger (n + (fromIntegral x `shiftL` s)) (s + wordSize) xs
+         signf = case sign of
+                  False -> 1
+                  True  -> -1
+      return $ Just $ Ppr.integer $ signf * (makeInteger 0 0 ws)
+
+   -- Reconstructing Bignums is a bit of a pain. This depends deeply on their
+   -- representation, so it'll break if that changes (but there are several
+   -- tests in tests/ghci.debugger/scripts that will tell us if this is wrong).
    --
    --   data Integer
-   --     = S# Int#
-   --     | Jp# {-# UNPACK #-} !BigNat
-   --     | Jn# {-# UNPACK #-} !BigNat
+   --     = IS !Int#
+   --     | IP !BigNat
+   --     | IN !BigNat
    --
-   --   data BigNat = BN# ByteArray#
+   --   data Natural
+   --     = NS !Word#
+   --     | NB !BigNat
    --
-   ppr_integer _ Term{subTerms=[Prim{valRaw=[W# w]}]} =
-      return (Just (Ppr.integer (S# (word2Int# w))))
-   ppr_integer _ Term{dc=Right con,
-                      subTerms=[Term{subTerms=[Prim{valRaw=ws}]}]} = do
-      -- We don't need to worry about sizes that are not an integral
-      -- number of words, because luckily GMP uses arrays of words
-      -- (see GMP_LIMB_SHIFT).
-      let
-        !(UArray _ _ _ arr#) = listArray (0,length ws-1) ws
-        constr
-          | "Jp#" <- getOccString (dataConName con) = Jp#
-          | otherwise = Jn#
-      return (Just (Ppr.integer (constr (BN# arr#))))
-#elif defined(INTEGER_SIMPLE)
-   -- As with the GMP case, this depends deeply on the integer-simple
-   -- representation.
-   --
-   -- @
-   -- data Integer = Positive !Digits | Negative !Digits | Naught
-   --
-   -- data Digits = Some !Word# !Digits
-   --             | None
-   -- @
-   --
-   -- NB: the above has some type synonyms expanded out for the sake of brevity
-   ppr_integer _ Term{subTerms=[]} =
-      return (Just (Ppr.integer Naught))
-   ppr_integer _ Term{dc=Right con, subTerms=[digitTerm]}
-        | Just digits <- get_digits digitTerm
-        = return (Just (Ppr.integer (constr digits)))
-      where
-        get_digits :: Term -> Maybe Digits
-        get_digits Term{subTerms=[]} = Just None
-        get_digits Term{subTerms=[Prim{valRaw=[W# w]},t]}
-          = Some w <$> get_digits t
-        get_digits _ = Nothing
+   --   type BigNat = ByteArray#
 
-        constr
-          | "Positive" <- getOccString (dataConName con) = Positive
-          | otherwise = Negative
-#endif
+   ppr_integer :: Precedence -> Term -> m (Maybe SDoc)
+   ppr_integer _ Term{dc=Right con, subTerms=[Prim{valRaw=ws}]}
+      | con == integerISDataCon
+      , [W# w] <- ws
+      = return (Just (Ppr.integer (fromIntegral (I# (word2Int# w)))))
+   ppr_integer p Term{dc=Right con, subTerms=[Term{subTerms=[Prim{valRaw=ws}]}]}
+      | con == integerIPDataCon = ppr_bignat False p ws
+      | con == integerINDataCon = ppr_bignat True  p ws
+      | otherwise = panic "Unexpected Integer constructor"
    ppr_integer _ _ = return Nothing
+
+   ppr_natural :: Precedence -> Term -> m (Maybe SDoc)
+   ppr_natural _ Term{dc=Right con, subTerms=[Prim{valRaw=ws}]}
+      | con == naturalNSDataCon
+      , [w] <- ws
+      = return (Just (Ppr.integer (fromIntegral w)))
+   ppr_natural p Term{dc=Right con, subTerms=[Term{subTerms=[Prim{valRaw=ws}]}]}
+      | con == naturalNBDataCon = ppr_bignat False p ws
+      | otherwise = panic "Unexpected Natural constructor"
+   ppr_natural _ _ = return Nothing
 
    --Note pprinting of list terms is not lazy
    ppr_list :: Precedence -> Term -> m SDoc
