@@ -1,5 +1,5 @@
 import Numeric
-import GHC.Natural
+import GHC.Num.Natural
 
 main = do
    -- test that GHC correctly compiles big Natural literals
