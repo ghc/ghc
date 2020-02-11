@@ -542,7 +542,8 @@
       SymI_HasProto(mkCostCentre)               \
       SymI_HasProto(registerCcList)             \
       SymI_HasProto(registerCcsList)            \
-      SymI_HasProto(era)
+      SymI_HasProto(era)                        \
+      SymI_HasProto(setRootProfPtrs)
 #else
 #define RTS_PROF_SYMBOLS /* empty */
 #endif
