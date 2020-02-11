@@ -55,7 +55,7 @@ module GHC.Unit.Types
 
      -- * Wired-in units
    , primUnitId
-   , integerUnitId
+   , bignumUnitId
    , baseUnitId
    , rtsUnitId
    , thUnitId
@@ -64,7 +64,7 @@ module GHC.Unit.Types
    , interactiveUnitId
 
    , primUnit
-   , integerUnit
+   , bignumUnit
    , baseUnit
    , rtsUnit
    , thUnit
@@ -603,19 +603,16 @@ the symbols in the object files have the unversioned unit id in their name.
 
 Make sure you change 'GHC.Unit.State.findWiredInUnits' if you add an entry here.
 
-For `integer-gmp`/`integer-simple` we also change the base name to
-`integer-wired-in`, but this is fundamentally no different.
-See Note [The integer library] in "GHC.Builtin.Names".
 -}
 
-integerUnitId, primUnitId, baseUnitId, rtsUnitId,
+bignumUnitId, primUnitId, baseUnitId, rtsUnitId,
   thUnitId, mainUnitId, thisGhcUnitId, interactiveUnitId  :: UnitId
 
-integerUnit, primUnit, baseUnit, rtsUnit,
+bignumUnit, primUnit, baseUnit, rtsUnit,
   thUnit, mainUnit, thisGhcUnit, interactiveUnit  :: Unit
 
 primUnitId        = UnitId (fsLit "ghc-prim")
-integerUnitId     = UnitId (fsLit "integer-wired-in")
+bignumUnitId      = UnitId (fsLit "ghc-bignum")
 baseUnitId        = UnitId (fsLit "base")
 rtsUnitId         = UnitId (fsLit "rts")
 thisGhcUnitId     = UnitId (fsLit "ghc")
@@ -624,7 +621,7 @@ thUnitId          = UnitId (fsLit "template-haskell")
 
 thUnit            = RealUnit (Definite thUnitId)
 primUnit          = RealUnit (Definite primUnitId)
-integerUnit       = RealUnit (Definite integerUnitId)
+bignumUnit        = RealUnit (Definite bignumUnitId)
 baseUnit          = RealUnit (Definite baseUnitId)
 rtsUnit           = RealUnit (Definite rtsUnitId)
 thisGhcUnit       = RealUnit (Definite thisGhcUnitId)
@@ -642,7 +639,7 @@ isInteractiveModule mod = moduleUnit mod == interactiveUnit
 wiredInUnitIds :: [UnitId]
 wiredInUnitIds =
    [ primUnitId
-   , integerUnitId
+   , bignumUnitId
    , baseUnitId
    , rtsUnitId
    , thUnitId
