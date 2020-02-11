@@ -5,5 +5,4 @@ interfacePlugin: GHC.Base
 typeCheckPlugin (rn)
 interfacePlugin: GHC.Types
 typeCheckPlugin (tc)
-interfacePlugin: GHC.Integer.Type
-interfacePlugin: GHC.Natural
+interfacePlugin: GHC.Num.BigNat
