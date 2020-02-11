@@ -1,7 +1,7 @@
 module Settings.Default (
     SourceArgs (..), sourceArgs, defaultBuilderArgs, defaultPackageArgs,
     defaultArgs, defaultLibraryWays, defaultRtsWays,
-    defaultFlavour
+    defaultFlavour, defaultBignumBackend
     ) where
 
 import Flavour
@@ -18,3 +18,4 @@ sourceArgs :: SourceArgs -> Args
 defaultBuilderArgs, defaultPackageArgs, defaultArgs :: Args
 defaultLibraryWays, defaultRtsWays :: Ways
 defaultFlavour :: Flavour
+defaultBignumBackend :: String

@@ -3,7 +3,6 @@ module Settings.Warnings (defaultGhcWarningsArgs, ghcWarningsArgs) where
 import Expression
 import Oracles.Flag
 import Packages
-import Settings
 
 -- See @mk/warnings.mk@ for warning-related arguments in the Make build system.
 
@@ -17,7 +16,6 @@ defaultGhcWarningsArgs = mconcat
 -- | Package-specific warnings-related arguments, mostly suppressing various warnings.
 ghcWarningsArgs :: Args
 ghcWarningsArgs = do
-    isIntegerSimple <- (== integerSimple) <$> getIntegerPackage
     mconcat
         [ stage0 ? mconcat
         [ libraryPackage       ? pure [ "-fno-warn-deprecated-flags" ]
@@ -47,8 +45,6 @@ ghcWarningsArgs = do
                                       , "-Wno-deprecations" ]
         , package rts          ? pure [ "-Wcpp-undef" ]
         , package terminfo     ? pure [ "-Wno-unused-imports" ]
-        , isIntegerSimple      ?
-          package text         ? pure [ "-Wno-unused-imports" ]
         , package transformers ? pure [ "-Wno-unused-matches"
                                       , "-Wno-unused-imports"
                                       , "-Wno-redundant-constraints"
