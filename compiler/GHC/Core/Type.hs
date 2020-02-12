@@ -82,7 +82,7 @@ module GHC.Core.Type (
         modifyJoinResTy, setJoinResTy,
 
         -- ** Analyzing types
-        TyCoMapper(..), mapType, mapCoercion,
+        TyCoMapper(..), mapTyCo, mapTyCoX,
         TyCoFolder(..), foldTyCo,
 
         -- (Newtypes)
@@ -565,7 +565,7 @@ isRuntimeRepVar = isRuntimeRepTy . tyVarKind
 These functions do a map-like operation over types, performing some operation
 on all variables and binding sites. Primarily used for zonking.
 
-Note [Efficiency for mapCoercion ForAllCo case]
+Note [Efficiency for ForAllCo case of mapTyCoX]
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 As noted in Note [Forall coercions] in GHC.Core.TyCo.Rep, a ForAllCo is a bit redundant.
 It stores a TyCoVar and a Coercion, where the kind of the TyCoVar always matches
@@ -587,12 +587,15 @@ for now.
 
 Note [Specialising mappers]
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~
-These INLINABLE pragmas are indispensable. mapType/mapCoercion are used
+These INLINE pragmas are indispensable. mapTyCo and mapTyCoX are used
 to implement zonking, and it's vital that they get specialised to the TcM
-monad. This specialisation happens automatically (that is, without a
-SPECIALISE pragma) as long as the definitions are INLINABLE. For example,
-this one change made a 20% allocation difference in perf/compiler/T5030.
+monad and the particular mapper in use.
 
+Even specialising to the monad alone made a 20% allocation difference
+in perf/compiler/T5030.
+
+See Note [Specialising foldType] in TyCoRep for more details of this
+idiom.
 -}
 
 -- | This describes how a "map" operation over a type/coercion should behave
@@ -615,88 +618,104 @@ data TyCoMapper env m
           --    in TcTyClsDecls
       }
 
-{-# INLINABLE mapType #-}  -- See Note [Specialising mappers]
-mapType :: Monad m => TyCoMapper env m -> env -> Type -> m Type
-mapType mapper@(TyCoMapper { tcm_tyvar = tyvar
-                           , tcm_tycobinder = tycobinder
-                           , tcm_tycon = tycon })
-        env ty
-  = go ty
-  where
-    go (TyVarTy tv)    = tyvar env tv
-    go (AppTy t1 t2)   = mkAppTy <$> go t1 <*> go t2
-    go ty@(LitTy {})   = return ty
-    go (CastTy ty co)  = mkCastTy <$> go ty <*> mapCoercion mapper env co
-    go (CoercionTy co) = CoercionTy <$> mapCoercion mapper env co
+{-# INLINE mapTyCo #-}  -- See Note [Specialising mappers]
+mapTyCo :: Monad m => TyCoMapper () m
+         -> ( Type       -> m Type
+            , [Type]     -> m [Type]
+            , Coercion   -> m Coercion
+            , [Coercion] -> m[Coercion])
+mapTyCo mapper
+  = case mapTyCoX mapper of
+     (go_ty, go_tys, go_co, go_cos)
+        -> (go_ty (), go_tys (), go_co (), go_cos ())
 
-    go ty@(FunTy _ arg res)
-      = do { arg' <- go arg; res' <- go res
+{-# INLINE mapTyCoX #-}  -- See Note [Specialising mappers]
+mapTyCoX :: Monad m => TyCoMapper env m
+         -> ( env -> Type       -> m Type
+            , env -> [Type]     -> m [Type]
+            , env -> Coercion   -> m Coercion
+            , env -> [Coercion] -> m[Coercion])
+mapTyCoX (TyCoMapper { tcm_tyvar = tyvar
+                     , tcm_tycobinder = tycobinder
+                     , tcm_tycon = tycon
+                     , tcm_covar = covar
+                     , tcm_hole = cohole })
+  = (go_ty, go_tys, go_co, go_cos)
+  where
+    go_tys _   []       = return []
+    go_tys env (ty:tys) = (:) <$> go_ty env ty <*> go_tys env tys
+
+    go_ty env (TyVarTy tv)    = tyvar env tv
+    go_ty env (AppTy t1 t2)   = mkAppTy <$> go_ty env t1 <*> go_ty env t2
+    go_ty _   ty@(LitTy {})   = return ty
+    go_ty env (CastTy ty co)  = mkCastTy <$> go_ty env ty <*> go_co env co
+    go_ty env (CoercionTy co) = CoercionTy <$> go_co env co
+
+    go_ty env ty@(FunTy _ arg res)
+      = do { arg' <- go_ty env arg; res' <- go_ty env res
            ; return (ty { ft_arg = arg', ft_res = res' }) }
 
-    go ty@(TyConApp tc tys)
+    go_ty env ty@(TyConApp tc tys)
       | isTcTyCon tc
       = do { tc' <- tycon tc
-           ; mkTyConApp tc' <$> mapM go tys }
+           ; mkTyConApp tc' <$> go_tys env tys }
 
       -- Not a TcTyCon
       | null tys    -- Avoid allocation in this very
       = return ty   -- common case (E.g. Int, LiftedRep etc)
 
       | otherwise
-      = mkTyConApp tc <$> mapM go tys
+      = mkTyConApp tc <$> go_tys env tys
 
-    go (ForAllTy (Bndr tv vis) inner)
+    go_ty env (ForAllTy (Bndr tv vis) inner)
       = do { (env', tv') <- tycobinder env tv vis
-           ; inner' <- mapType mapper env' inner
+           ; inner' <- go_ty env' inner
            ; return $ ForAllTy (Bndr tv' vis) inner' }
 
-{-# INLINABLE mapCoercion #-}  -- See Note [Specialising mappers]
-mapCoercion :: Monad m
-            => TyCoMapper env m -> env -> Coercion -> m Coercion
-mapCoercion mapper@(TyCoMapper { tcm_covar = covar
-                               , tcm_hole = cohole
-                               , tcm_tycobinder = tycobinder
-                               , tcm_tycon = tycon })
-            env co
-  = go co
-  where
-    go_mco MRefl    = return MRefl
-    go_mco (MCo co) = MCo <$> (go co)
+    go_cos _   []       = return []
+    go_cos env (co:cos) = (:) <$> go_co env co <*> go_cos env cos
 
-    go (Refl ty) = Refl <$> mapType mapper env ty
-    go (GRefl r ty mco) = mkGReflCo r <$> mapType mapper env ty <*> (go_mco mco)
-    go (TyConAppCo r tc args)
-      = do { tc' <- if isTcTyCon tc
-                    then tycon tc
-                    else return tc
-           ; mkTyConAppCo r tc' <$> mapM go args }
-    go (AppCo c1 c2) = mkAppCo <$> go c1 <*> go c2
-    go (ForAllCo tv kind_co co)
-      = do { kind_co' <- go kind_co
+    go_mco _   MRefl    = return MRefl
+    go_mco env (MCo co) = MCo <$> (go_co env co)
+
+    go_co env (Refl ty)           = Refl <$> go_ty env ty
+    go_co env (GRefl r ty mco)    = mkGReflCo r <$> go_ty env ty <*> go_mco env mco
+    go_co env (AppCo c1 c2)       = mkAppCo <$> go_co env c1 <*> go_co env c2
+    go_co env (FunCo r c1 c2)     = mkFunCo r <$> go_co env c1 <*> go_co env c2
+    go_co env (CoVarCo cv)        = covar env cv
+    go_co env (HoleCo hole)       = cohole env hole
+    go_co env (UnivCo p r t1 t2)  = mkUnivCo <$> go_prov env p <*> pure r
+                                    <*> go_ty env t1 <*> go_ty env t2
+    go_co env (SymCo co)          = mkSymCo <$> go_co env co
+    go_co env (TransCo c1 c2)     = mkTransCo <$> go_co env c1 <*> go_co env c2
+    go_co env (AxiomRuleCo r cos) = AxiomRuleCo r <$> go_cos env cos
+    go_co env (NthCo r i co)      = mkNthCo r i <$> go_co env co
+    go_co env (LRCo lr co)        = mkLRCo lr <$> go_co env co
+    go_co env (InstCo co arg)     = mkInstCo <$> go_co env co <*> go_co env arg
+    go_co env (KindCo co)         = mkKindCo <$> go_co env co
+    go_co env (SubCo co)          = mkSubCo <$> go_co env co
+    go_co env (AxiomInstCo ax i cos) = mkAxiomInstCo ax i <$> go_cos env cos
+    go_co env co@(TyConAppCo r tc cos)
+      | isTcTyCon tc
+      = do { tc' <- tycon tc
+           ; mkTyConAppCo r tc' <$> go_cos env cos }
+
+      -- Not a TcTyCon
+      | null cos    -- Avoid allocation in this very
+      = return co   -- common case (E.g. Int, LiftedRep etc)
+
+      | otherwise
+      = mkTyConAppCo r tc <$> go_cos env cos
+    go_co env (ForAllCo tv kind_co co)
+      = do { kind_co' <- go_co env kind_co
            ; (env', tv') <- tycobinder env tv Inferred
-           ; co' <- mapCoercion mapper env' co
+           ; co' <- go_co env' co
            ; return $ mkForAllCo tv' kind_co' co' }
-        -- See Note [Efficiency for mapCoercion ForAllCo case]
-    go (FunCo r c1 c2) = mkFunCo r <$> go c1 <*> go c2
-    go (CoVarCo cv) = covar env cv
-    go (AxiomInstCo ax i args)
-      = mkAxiomInstCo ax i <$> mapM go args
-    go (HoleCo hole) = cohole env hole
-    go (UnivCo p r t1 t2)
-      = mkUnivCo <$> go_prov p <*> pure r
-                 <*> mapType mapper env t1 <*> mapType mapper env t2
-    go (SymCo co) = mkSymCo <$> go co
-    go (TransCo c1 c2) = mkTransCo <$> go c1 <*> go c2
-    go (AxiomRuleCo r cos) = AxiomRuleCo r <$> mapM go cos
-    go (NthCo r i co)      = mkNthCo r i <$> go co
-    go (LRCo lr co)        = mkLRCo lr <$> go co
-    go (InstCo co arg)     = mkInstCo <$> go co <*> go arg
-    go (KindCo co)         = mkKindCo <$> go co
-    go (SubCo co)          = mkSubCo <$> go co
+        -- See Note [Efficiency for ForAllCo case of mapTyCoX]
 
-    go_prov (PhantomProv co)    = PhantomProv <$> go co
-    go_prov (ProofIrrelProv co) = ProofIrrelProv <$> go co
-    go_prov p@(PluginProv _)    = return p
+    go_prov env (PhantomProv co)    = PhantomProv <$> go_co env co
+    go_prov env (ProofIrrelProv co) = ProofIrrelProv <$> go_co env co
+    go_prov _   p@(PluginProv _)    = return p
 
 
 {-
