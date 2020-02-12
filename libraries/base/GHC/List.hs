@@ -169,7 +169,7 @@ null (_:_)              =  False
 -- 0
 -- >>> length ['a', 'b', 'c']
 -- 3
--- length [1..]
+-- >>> length [1..]
 -- * Hangs forever *
 {-# NOINLINE [1] length #-}
 length                  :: [a] -> Int
@@ -308,16 +308,10 @@ foldl' k z0 xs =
 -- Exception: Prelude.foldl1: empty list
 -- >>> foldl1 (-) [1..4]
 -- -8
--- >>> foldl1 (-) []
--- Exception: Prelude.foldl1: empty list
 -- >>> foldl1 (&&) [True, False, True, True]
 -- False
--- >>> foldl1 (&&) []
--- Exception: Prelude.foldl1: empty list
 -- >>> foldl1 (||) [False, False, True, True]
 -- True
--- >>> foldl1 (||) []
--- Exception: Prelude.foldl1: empty list
 -- >>> foldl1 (+) [1..]
 -- * Hangs forever *
 foldl1                  :: (a -> a -> a) -> [a] -> a
@@ -424,16 +418,10 @@ constScanl = const
 -- []
 -- >>> scanl1 (-) [1..4]
 -- [1,-1,-4,-8]
--- >>> scanl1 (-) []
--- []
 -- >>> scanl1 (&&) [True, False, True, True]
 -- [True,False,False,False]
--- >>> scanl1 (&&) []
--- []
 -- >>> scanl1 (||) [False, False, True, True]
 -- [False,False,True,True]
--- >>> scanl1 (||) []
--- []
 -- >>> scanl1 (+) [1..]
 -- * Hangs forever *
 scanl1                  :: (a -> a -> a) -> [a] -> [a]
@@ -511,16 +499,10 @@ match on everything past the :, which is just the tail of scanl.
 -- Exception: Prelude.foldr1: empty list
 -- >>> foldr1 (-) [1..4]
 -- -2
--- >>> foldr1 (-) []
--- Exception: Prelude.foldr1: empty list
 -- >>> foldr1 (&&) [True, False, True, True]
 -- False
--- >>> foldr1 (&&) []
--- Exception: Prelude.foldr1: empty list
 -- >>> foldr1 (||) [False, False, True, True]
 -- True
--- >>> foldr1 (||) []
--- Exception: Prelude.foldr1: empty list
 -- >>> foldr1 (+) [1..]
 -- * Hangs forever *
 foldr1                  :: (a -> a -> a) -> [a] -> a
@@ -604,16 +586,10 @@ remove the cause for the chain of evaluations, and all is well.
 -- []
 -- >>> scanr1 (-) [1..4]
 -- [-2,3,-1,4]
--- >>> scanr1 (-) []
--- []
 -- >>> scanr1 (&&) [True, False, True, True]
 -- [False,False,True,True]
--- >>> scanr1 (&&) []
--- []
 -- >>> scanr1 (||) [True, True, False, False]
 -- [True,True,False,False]
--- >>> scanr1 (||) []
--- []
 -- >>> scanr1 (+) [1..]
 -- * Hangs forever *
 scanr1                  :: (a -> a -> a) -> [a] -> [a]
