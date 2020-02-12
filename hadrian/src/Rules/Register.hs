@@ -39,6 +39,9 @@ configurePackageRules = do
         (stage, path) <- parsePath (parseSetupConfig root) "<setup config path parser>" out
         let pkg = unsafeFindPackageByPath path
         let ctx = Context stage pkg vanilla
+        buildP <- buildPath ctx
+        when (pkg == integerGmp) $
+          need [buildP -/- "include/ghc-gmp.h"]
         needLibrary =<< contextDependencies ctx
         Cabal.configurePackage ctx
 

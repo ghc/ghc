@@ -55,17 +55,6 @@ gmpRules :: Rules ()
 gmpRules = do
     root <- buildRootRules
 
-    -- This file is created when 'integerGmp' is configured.
-    root -/- "stage*/libraries/integer-gmp/build/config.mk" %> \mk -> do
-        let buildP     = takeDirectory mk
-            packageP   = takeDirectory buildP
-            librariesP = takeDirectory packageP
-            stageP     = takeDirectory librariesP
-            stageS   = takeFileName stageP
-        stage <- parsePath parseStage "<stage>" stageS
-        ensureConfigured (vanillaContext stage integerGmp)
-
-    -- Read config.mk produced by integer-gmp's configure
     -- Build in-tree gmp if necessary
     -- Produce: integer-gmp/build/include/ghc-gmp.h
     --   In-tree: copy gmp.h from in-tree build
@@ -77,19 +66,17 @@ gmpRules = do
             librariesP = takeDirectory packageP
             stageP     = takeDirectory librariesP
 
-        need [buildP -/- "config.mk"]
-        configMk <- readFile' (buildP -/- "config.mk")
+        isInTree <- flag GmpInTree
 
-        if not windowsHost && -- TODO: We don't use system GMP on Windows. Fix?
-           any (`isInfixOf` configMk) [ "HaveFrameworkGMP = YES", "HaveLibGmp = YES" ]
+        if windowsHost || isInTree  -- TODO: We don't use system GMP on Windows. Fix?
         then do
-            putBuild "| GMP library/framework detected and will be used"
-            copyFile (gmpBase -/- "ghc-gmp.h") header
-        else do
             putBuild "| No GMP library/framework detected; in tree GMP will be built"
             let intreeHeader = stageP -/- "gmp/gmp.h"
             need [intreeHeader]
             copyFile intreeHeader header
+        else do
+            putBuild "| GMP library/framework detected and will be used"
+            copyFile (gmpBase -/- "ghc-gmp.h") header
 
     -- Build in-tree GMP library for the current stage, prioritised so that it
     -- matches "before" the generic @.a@ library rule in 'Rules.Library'.
