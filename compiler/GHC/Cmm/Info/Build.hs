@@ -31,7 +31,6 @@ import GHC.Runtime.Heap.Layout
 import UniqSupply
 import CostCentre
 import GHC.StgToCmm.Heap
-import ErrUtils
 
 import Control.Monad
 import Data.Map.Strict (Map)
@@ -801,9 +800,6 @@ doSRTs dflags moduleSRTInfo procs data_ = do
 
       (srt_declss, pairs, funSRTs, has_caf_refs) = unzip4 result
       srt_decls = concat srt_declss
-
-  unless (null srt_decls) $
-    dumpIfSet_dyn dflags Opt_D_dump_srts "SRTs" FormatCMM (ppr srt_decls)
 
   -- Next, update the info tables with the SRTs
   let
