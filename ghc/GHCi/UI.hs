@@ -37,6 +37,7 @@ import GHC.Runtime.Debugger
 
 -- The GHC interface
 import GHC.Runtime.Interpreter
+import GHC.Runtime.Eval.Types( SetImpred(..))
 import GHCi.RemoteTypes
 import GHCi.BreakArray
 import DynFlags
@@ -3438,9 +3439,11 @@ completeExpression = completeQuotedWord (Just '\\') "\"" listFiles
 -- commands for debugger
 
 sprintCmd, printCmd, forceCmd :: GHC.GhcMonad m => String -> m ()
-sprintCmd = pprintClosureCommand False False
-printCmd  = pprintClosureCommand True False
-forceCmd  = pprintClosureCommand False True
+sprintCmd = pprintClosureCommand False False SetImpredNo
+printCmd  = pprintClosureCommand True  False SetImpredYes
+forceCmd  = pprintClosureCommand False True  SetImpredNo
+  -- See Note [Setting ImpredicativeTypes for :print command]
+  --     in GHC.Runtime.Eval.hs
 
 stepCmd :: GhciMonad m => String -> m ()
 stepCmd arg = withSandboxOnly ":step" $ step arg

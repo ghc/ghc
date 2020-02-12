@@ -18,6 +18,7 @@ import GhcPrelude
 
 import GHC.Runtime.Linker
 import GHC.Runtime.Heap.Inspect
+import GHC.Runtime.Eval.Types( SetImpred(..) )
 
 import GHC.Runtime.Interpreter
 import GHCi.RemoteTypes
@@ -47,8 +48,9 @@ import Data.IORef
 -------------------------------------
 -- | The :print & friends commands
 -------------------------------------
-pprintClosureCommand :: GhcMonad m => Bool -> Bool -> String -> m ()
-pprintClosureCommand bindThings force str = do
+pprintClosureCommand :: GhcMonad m => Bool -> Bool -> SetImpred
+                        -> String -> m ()
+pprintClosureCommand bindThings force impred str = do
   tythings <- (catMaybes . concat) `liftM`
                  mapM (\w -> GHC.parseName w >>=
                                 mapM GHC.lookupName)
@@ -76,7 +78,7 @@ pprintClosureCommand bindThings force str = do
    go subst id = do
        let id_ty' = substTy subst (idType id)
            id'    = id `setIdType` id_ty'
-       term_    <- GHC.obtainTermFromId maxBound force id'
+       term_    <- GHC.obtainTermFromId maxBound force id' impred
        term     <- tidyTermTyVars term_
        term'    <- if bindThings
                      then bindSuspensions term
@@ -228,7 +230,7 @@ pprTypeAndContents id = do
       let depthBound = 100
       -- If the value is an exception, make sure we catch it and
       -- show the exception, rather than propagating the exception out.
-      e_term <- gtry $ GHC.obtainTermFromId depthBound False id
+      e_term <- gtry $ GHC.obtainTermFromId depthBound False id SetImpredNo
       docs_term <- case e_term of
                       Right term -> showTerm term
                       Left  exn  -> return (text "*** Exception:" <+>

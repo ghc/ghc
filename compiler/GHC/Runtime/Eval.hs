@@ -41,6 +41,7 @@ module GHC.Runtime.Eval (
         parseExpr, compileParsedExpr,
         compileExpr, dynCompileExpr,
         compileExprRemote, compileParsedExprRemote,
+        SetImpred(..),
         Term(..), obtainTermFromId, obtainTermFromVal, reconstructType
         ) where
 
@@ -78,6 +79,7 @@ import VarEnv
 import GHC.ByteCode.Types
 import GHC.Runtime.Linker as Linker
 import DynFlags
+import GHC.LanguageExtensions
 import Unique
 import UniqSupply
 import MonadUtils
@@ -1256,10 +1258,15 @@ obtainTermFromVal hsc_env bound force ty x
   | otherwise
   = cvObtainTerm hsc_env bound force ty (unsafeCoerce# x)
 
-obtainTermFromId :: HscEnv -> Int -> Bool -> Id -> IO Term
-obtainTermFromId hsc_env bound force id =  do
+obtainTermFromId :: HscEnv -> Int -> Bool -> Id -> SetImpred -> IO Term
+obtainTermFromId hsc_env bound force id impred=  do
   hv <- Linker.getHValue hsc_env (varName id)
-  cvObtainTerm hsc_env bound force (idType id) hv
+  cvObtainTerm (updEnv hsc_env) bound force (idType id) hv
+ where updEnv env = case impred of
+         SetImpredNo  -> env                                   -- #14828
+         SetImpredYes -> env {hsc_dflags =
+            xopt_set (hsc_dflags env) ImpredicativeTypes}
+         -- See Note [Setting ImpredicativeTypes for :print command]
 
 -- Uses RTTI to reconstruct the type of an Id, making it less polymorphic
 reconstructType :: HscEnv -> Int -> Id -> IO (Maybe Type)
@@ -1269,3 +1276,31 @@ reconstructType hsc_env bound id = do
 
 mkRuntimeUnkTyVar :: Name -> Kind -> TyVar
 mkRuntimeUnkTyVar name kind = mkTcTyVar name kind RuntimeUnk
+
+
+{-
+Note [Setting ImpredicativeTypes for :print command]
+
+All the functions that are defined in a `class` definition are stored
+with a `forall` clause, even if no `forall` is witten in the source code:
+
+    class  Foo f  where
+      foo :: forall a b. (a -> b) -> f a -> f b
+
+If we write this `forall` clause ourselfs, the type checker refuses to
+compile, unless we activate the `ImpredicativeTypes` language extension.
+This happens in `./compiler/typecheck/TcUnify.hs` function `preCheck`.
+
+To process a GHCi `:print <term>` command the system uses a method called `RTTI`
+(*Run-time type inference*) to get the type of the `<term>`. RTTI works with
+the standard GHC type-checker.
+If <term> is a function name defined in a class and we do `:print <term>`
+without the `ImpredicativeTypes` extension, type checking will fail, and
+hence `RTTI` will fail too. We get the unhelpful result `<term> = (_t1::t1)`.
+
+All terms of a `:print` command, were already successfully type-checked at the
+time the module was loaded into GHCi or at compilation time. Hence RTTI knows
+that the `<term>` type checks and it needs type-inference and it has no need
+for effective type-checking. This allows us to specify `ImpredicativeTypes`
+during processing of a `:print` command without danger.
+-}

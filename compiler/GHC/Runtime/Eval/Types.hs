@@ -9,7 +9,7 @@
 module GHC.Runtime.Eval.Types (
         Resume(..), History(..), ExecResult(..),
         SingleStep(..), isStep, ExecOptions(..),
-        BreakInfo(..)
+        BreakInfo(..), SetImpred(..)
         ) where
 
 import GhcPrelude
@@ -87,3 +87,6 @@ data History
         historyBreakInfo :: BreakInfo,
         historyEnclosingDecls :: [String]  -- declarations enclosing the breakpoint
    }
+
+-- | Set temporary the `ImpredicativeTypes` language extension
+data SetImpred = SetImpredYes | SetImpredNo

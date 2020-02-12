@@ -1532,9 +1532,9 @@ obtainTermFromVal :: GhcMonad m => Int ->  Bool -> Type -> a -> m Term
 obtainTermFromVal bound force ty a = withSession $ \hsc_env ->
     liftIO $ GHC.Runtime.Eval.obtainTermFromVal hsc_env bound force ty a
 
-obtainTermFromId :: GhcMonad m => Int -> Bool -> Id -> m Term
-obtainTermFromId bound force id = withSession $ \hsc_env ->
-    liftIO $ GHC.Runtime.Eval.obtainTermFromId hsc_env bound force id
+obtainTermFromId :: GhcMonad m => Int -> Bool -> Id -> SetImpred -> m Term
+obtainTermFromId bound force id impred = withSession $ \hsc_env ->
+    liftIO $ GHC.Runtime.Eval.obtainTermFromId hsc_env bound force id impred
 
 
 -- | Returns the 'TyThing' for a 'Name'.  The 'Name' may refer to any
