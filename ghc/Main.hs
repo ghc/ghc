@@ -33,10 +33,10 @@ import GHCi.UI          ( interactiveUI, ghciWelcomeMsg, defaultGhciSettings )
 #endif
 
 -- Frontend plugins
-import DynamicLoading   ( loadFrontendPlugin )
+import GHC.Runtime.Loader   ( loadFrontendPlugin )
 import Plugins
 #if defined(HAVE_INTERNAL_INTERPRETER)
-import DynamicLoading   ( initializePlugins )
+import GHC.Runtime.Loader   ( initializePlugins )
 #endif
 import Module           ( ModuleName )
 

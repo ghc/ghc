@@ -156,7 +156,7 @@ Library
     c-sources:
         cbits/cutils.c
         cbits/genSym.c
-        ghci/keepCAFsForGHCi.c
+        cbits/keepCAFsForGHCi.c
 
     hs-source-dirs:
         .
@@ -165,7 +165,6 @@ Library
         cmm
         coreSyn
         deSugar
-        ghci
         iface
         llvmGen
         main
@@ -304,7 +303,7 @@ Library
         GHC.StgToCmm.Ticky
         GHC.StgToCmm.Utils
         GHC.StgToCmm.ExtCode
-        GHC.Runtime.Layout
+        GHC.Runtime.Heap.Layout
         CoreArity
         CoreFVs
         CoreLint
@@ -380,13 +379,13 @@ Library
         GhcMake
         GhcPlugins
         GhcPrelude
-        DynamicLoading
         HeaderInfo
         HscMain
         HscStats
         HscTypes
-        InteractiveEval
-        InteractiveEvalTypes
+        GHC.Runtime.Eval
+        GHC.Runtime.Eval.Types
+        GHC.Runtime.Loader
         UnitInfo
         Packages
         PlatformConstants
@@ -650,14 +649,14 @@ Library
             Dwarf.Types
             Dwarf.Constants
             GHC.ThToHs
-            ByteCodeTypes
-            ByteCodeAsm
-            ByteCodeGen
-            ByteCodeInstr
-            ByteCodeItbls
-            ByteCodeLink
-            Debugger
-            LinkerTypes
-            Linker
-            RtClosureInspect
-            GHCi
+            GHC.ByteCode.Types
+            GHC.ByteCode.Asm
+            GHC.ByteCode.Instr
+            GHC.ByteCode.InfoTable
+            GHC.ByteCode.Linker
+            GHC.CoreToByteCode
+            GHC.Runtime.Debugger
+            GHC.Runtime.Linker.Types
+            GHC.Runtime.Linker
+            GHC.Runtime.Heap.Inspect
+            GHC.Runtime.Interpreter

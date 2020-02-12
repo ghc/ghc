@@ -8,6 +8,5 @@ SafeLang12_B.hs:2:14: warning:
 [2 of 3] Compiling SafeLang12_B     ( SafeLang12_B.hs, SafeLang12_B.o )
 [3 of 3] Compiling Main             ( SafeLang12.hs, SafeLang12.o )
 
-SafeLang12.hs:8:1: error:
-    parse error on input ‘$’
-    Perhaps you intended to use TemplateHaskell
+SafeLang12.hs:1:1: error:
+    Top-level splices are not permitted without TemplateHaskell

@@ -48,7 +48,7 @@ import TyCon
 import GHC.Cmm.CLabel
 import GHC.Cmm.Utils
 import PrimOp
-import GHC.Runtime.Layout
+import GHC.Runtime.Heap.Layout
 import FastString
 import Outputable
 import Util
@@ -1453,6 +1453,9 @@ emitPrimOp dflags = \case
   CasMutVarOp -> alwaysExternal
   CatchOp -> alwaysExternal
   RaiseOp -> alwaysExternal
+  RaiseDivZeroOp -> alwaysExternal
+  RaiseUnderflowOp -> alwaysExternal
+  RaiseOverflowOp -> alwaysExternal
   RaiseIOOp -> alwaysExternal
   MaskAsyncExceptionsOp -> alwaysExternal
   MaskUninterruptibleOp -> alwaysExternal

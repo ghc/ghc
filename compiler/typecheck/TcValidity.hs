@@ -1931,7 +1931,7 @@ checkInstTermination theta head_pred
                                -- See Note [Invisible arguments and termination]
 
          ForAllPred tvs _ head_pred'
-           -> check (foralld_tvs `extendVarSetList` binderVars tvs) head_pred'
+           -> check (foralld_tvs `extendVarSetList` tvs) head_pred'
               -- Termination of the quantified predicate itself is checked
               -- when the predicates are individually checked for validity
 
@@ -2712,7 +2712,7 @@ datatype declarations.  This checks for
 
 See also
   * Note [Required, Specified, and Inferred for types] in TcTyClsDecls.
-  * Note [Keeping scoped variables in order: Explicit] discusses how
+  * Note [Checking telescopes] in Constraint discusses how
     this check works for `forall x y z.` written in a type.
 
 Note [Ambiguous kind vars]

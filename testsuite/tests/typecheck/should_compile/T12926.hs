@@ -1,23 +1,36 @@
-{-# LANGUAGE ExtendedDefaultRules #-}
+{-# LANGUAGE TypeFamilies #-}
 {-# LANGUAGE MultiParamTypeClasses #-}
-{-# LANGUAGE FlexibleInstances #-}
-{-# LANGUAGE DataKinds #-}
-{-# LANGUAGE KindSignatures #-}
 
-module T12926 where
+module A where
 
-import GHC.TypeLits
+import GHC.Base
+import qualified Data.Vector.Unboxed.Base
+import qualified Data.Vector.Generic.Base
+import Data.Vector.Generic.Mutable
+import qualified Data.Vector.Generic.Mutable.Base
+import Data.Vector.Generic (fromList)
 
-data A (b :: [Symbol]) = A deriving Show
+data A = A Int Int Int
 
-class Works a (b :: [Symbol]) where
-   works :: a -> A b
+instance Data.Vector.Unboxed.Base.Unbox A
 
-instance Works Integer a where
-   works _ = A
+newtype instance Data.Vector.Unboxed.Base.MVector s_a4iX A
+  = MV_A (Data.Vector.Unboxed.Base.MVector s_a4iX (Int, Int, Int))
 
-addA :: A a -> A a -> A a
-addA A A = A
+instance MVector Data.Vector.Unboxed.Base.MVector A where
+  basicLength (MV_A v) =
+    basicLength v
+  basicUnsafeSlice idx len (MV_A v) =
+    MV_A (basicUnsafeSlice idx len v)
+  basicUnsafeNew len =
+    MV_A `liftM` (basicUnsafeNew len)
+  basicUnsafeWrite (MV_A v) idx val_a4iW =
+    basicUnsafeWrite v idx ((\ (A a_a4iT b_a4iU c_a4iV) -> (a_a4iT, b_a4iU, c_a4iV)) val_a4iW)
 
-test2 :: A x -- Note this is able to have a polymorphic type
-test2 = addA (works 5) (works 5)
+newtype instance Data.Vector.Unboxed.Base.Vector A =
+  V_A (Data.Vector.Unboxed.Base.Vector (Int, Int, Int))
+
+instance Data.Vector.Generic.Base.Vector Data.Vector.Unboxed.Base.Vector A where
+
+mkA :: Data.Vector.Unboxed.Base.Vector A
+mkA = fromList []

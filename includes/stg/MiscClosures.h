@@ -72,7 +72,7 @@ RTS_RET(stg_restore_cccs_eval);
 // RTS_FUN(stg_interp_constr6_entry);
 // RTS_FUN(stg_interp_constr7_entry);
 //
-// This is referenced using the FFI in the compiler (ByteCodeItbls),
+// This is referenced using the FFI in the compiler (GHC.ByteCode.InfoTable),
 // so we can't give it the correct type here because the prototypes
 // would clash (FFI references are always declared with type StgWord[]
 // in the generated C code).
@@ -415,6 +415,9 @@ RTS_FUN_DECL(stg_asyncDoProczh);
 
 RTS_FUN_DECL(stg_catchzh);
 RTS_FUN_DECL(stg_raisezh);
+RTS_FUN_DECL(stg_raiseDivZZerozh);
+RTS_FUN_DECL(stg_raiseUnderflowzh);
+RTS_FUN_DECL(stg_raiseOverflowzh);
 RTS_FUN_DECL(stg_raiseIOzh);
 
 RTS_FUN_DECL(stg_makeStableNamezh);

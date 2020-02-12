@@ -31,6 +31,9 @@ import pthread_mutex_unlock;
 #endif
 import CLOSURE base_ControlziExceptionziBase_nestedAtomically_closure;
 import CLOSURE base_GHCziIOziException_heapOverflow_closure;
+import CLOSURE base_GHCziExceptionziType_divZZeroException_closure;
+import CLOSURE base_GHCziExceptionziType_underflowException_closure;
+import CLOSURE base_GHCziExceptionziType_overflowException_closure;
 import EnterCriticalSection;
 import LeaveCriticalSection;
 import CLOSURE ghczmprim_GHCziTypes_False_closure;
@@ -2106,7 +2109,7 @@ stg_mkApUpd0zh ( P_ bco )
     W_ ap;
 
     // This function is *only* used to wrap zero-arity BCOs in an
-    // updatable wrapper (see ByteCodeLink.hs).  An AP thunk is always
+    // updatable wrapper (see GHC.ByteCode.Linker).  An AP thunk is always
     // saturated and always points directly to a FUN or BCO.
     ASSERT(%INFO_TYPE(%GET_STD_INFO(bco)) == HALF_W_(BCO) &&
            StgBCO_arity(bco) == HALF_W_(0));
@@ -2605,4 +2608,20 @@ stg_setThreadAllocationCounterzh ( I64 counter )
     offset = Hp - bdescr_start(CurrentNursery);
     StgTSO_alloc_limit(CurrentTSO) = counter + TO_I64(offset);
     return ();
+}
+
+
+stg_raiseDivZZerozh ()
+{
+    jump stg_raisezh(base_GHCziExceptionziType_divZZeroException_closure);
+}
+
+stg_raiseUnderflowzh ()
+{
+    jump stg_raisezh(base_GHCziExceptionziType_underflowException_closure);
+}
+
+stg_raiseOverflowzh ()
+{
+    jump stg_raisezh(base_GHCziExceptionziType_overflowException_closure);
 }
