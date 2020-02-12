@@ -64,7 +64,6 @@
 -ddump-debug
 -ddump-exitify
 -ddump-simpl-trace
--ddump-srts
 -ddump-view-pattern-commoning
 -ddump-vt-trace
 -dppr-ticks
