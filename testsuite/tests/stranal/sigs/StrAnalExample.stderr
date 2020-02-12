@@ -1,12 +1,18 @@
 
 ==================== Strictness signatures ====================
-StrAnalExample.$trModule: m
+StrAnalExample.$trModule:
 StrAnalExample.foo: <S,1*U>
 
 
 
+==================== Cpr signatures ====================
+StrAnalExample.$trModule: m1
+StrAnalExample.foo:
+
+
+
 ==================== Strictness signatures ====================
-StrAnalExample.$trModule: m
+StrAnalExample.$trModule:
 StrAnalExample.foo: <S,1*U>
 
 

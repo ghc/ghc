@@ -499,7 +499,7 @@ mkArgInfo env fun rules n_val_args call_cont
                         -- top-level bindings for (say) strings into
                         -- calls to error.  But now we are more careful about
                         -- inlining lone variables, so its ok (see SimplUtils.analyseCont)
-                   if isBotRes result_info then
+                   if isBotDiv result_info then
                         map isStrictDmd demands         -- Finite => result is bottom
                    else
                         map isStrictDmd demands ++ vanilla_stricts
@@ -1575,7 +1575,7 @@ arguments!
 
 Note [Do not eta-expand join points]
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
-Similarly to CPR (see Note [Don't CPR join points] in WorkWrap), a join point
+Similarly to CPR (see Note [Don't w/w join points for CPR] in WorkWrap), a join point
 stands well to gain from its outer binding's eta-expansion, and eta-expanding a
 join point is fraught with issues like how to deal with a cast:
 
