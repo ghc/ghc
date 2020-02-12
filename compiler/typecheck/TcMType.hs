@@ -1974,9 +1974,6 @@ zonkTyCoVarKind :: TyCoVar -> TcM TyCoVar
 zonkTyCoVarKind tv = do { kind' <- zonkTcType (tyVarKind tv)
                         ; return (setTyVarKind tv kind') }
 
-zonkTcTypes :: [TcType] -> TcM [TcType]
-zonkTcTypes tys = mapM zonkTcType tys
-
 {-
 ************************************************************************
 *                                                                      *
@@ -2110,14 +2107,15 @@ zonkSkolemInfo skol_info = return skol_info
 
 -}
 
--- zonkId is used *during* typechecking just to zonk the Id's type
-zonkId :: TcId -> TcM TcId
-zonkId id
-  = do { ty' <- zonkTcType (idType id)
-       ; return (Id.setIdType id ty') }
+-- For unbound, mutable tyvars, zonkType uses the function given to it
+-- For tyvars bound at a for-all, zonkType zonks them to an immutable
+--      type variable and zonks the kind too
+zonkTcType  :: TcType -> TcM TcType
+zonkTcTypes :: [TcType] -> TcM [TcType]
+zonkCo      :: Coercion -> TcM Coercion
 
-zonkCoVar :: CoVar -> TcM CoVar
-zonkCoVar = zonkId
+(zonkTcType, zonkTcTypes, zonkCo, _)
+  = mapTyCo zonkTcTypeMapper
 
 -- | A suitable TyCoMapper for zonking a type during type-checking,
 -- before all metavars are filled in.
@@ -2146,16 +2144,6 @@ zonkTcTyCon tc
  | tcTyConIsPoly tc = return tc
  | otherwise        = do { tck' <- zonkTcType (tyConKind tc)
                          ; return (setTcTyConKind tc tck') }
-
--- For unbound, mutable tyvars, zonkType uses the function given to it
--- For tyvars bound at a for-all, zonkType zonks them to an immutable
---      type variable and zonks the kind too
-zonkTcType :: TcType -> TcM TcType
-zonkTcType = mapType zonkTcTypeMapper ()
-
--- | "Zonk" a coercion -- really, just zonk any types in the coercion
-zonkCo :: Coercion -> TcM Coercion
-zonkCo = mapCoercion zonkTcTypeMapper ()
 
 zonkTcTyVar :: TcTyVar -> TcM TcType
 -- Simply look through all Flexis
@@ -2196,6 +2184,15 @@ zonkTyVarTyVarPairs prs
   where
     do_one (nm, tv) = do { tv' <- zonkTcTyVarToTyVar tv
                          ; return (nm, tv') }
+
+-- zonkId is used *during* typechecking just to zonk the Id's type
+zonkId :: TcId -> TcM TcId
+zonkId id
+  = do { ty' <- zonkTcType (idType id)
+       ; return (Id.setIdType id ty') }
+
+zonkCoVar :: CoVar -> TcM CoVar
+zonkCoVar = zonkId
 
 {- Note [Sharing in zonking]
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~
