@@ -427,7 +427,6 @@ data DumpFlag
    | Opt_D_dump_cmm_split
    | Opt_D_dump_cmm_info
    | Opt_D_dump_cmm_cps
-   | Opt_D_dump_srts
    -- end cmm subflags
    | Opt_D_dump_cfg_weights -- ^ Dump the cfg used for block layout.
    | Opt_D_dump_asm
@@ -3360,8 +3359,6 @@ dynamic_flags_deps = [
         (setDumpFlag Opt_D_dump_cmm_info)
   , make_ord_flag defGhcFlag "ddump-cmm-cps"
         (setDumpFlag Opt_D_dump_cmm_cps)
-  , make_ord_flag defGhcFlag "ddump-srts"
-        (setDumpFlag Opt_D_dump_srts)
   , make_ord_flag defGhcFlag "ddump-cfg-weights"
         (setDumpFlag Opt_D_dump_cfg_weights)
   , make_ord_flag defGhcFlag "ddump-core-stats"
