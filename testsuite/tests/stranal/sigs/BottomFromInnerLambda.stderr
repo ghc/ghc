@@ -1,14 +1,21 @@
 
 ==================== Strictness signatures ====================
-BottomFromInnerLambda.$trModule: m
-BottomFromInnerLambda.expensive: <S(S),1*U(U)>m
+BottomFromInnerLambda.$trModule:
+BottomFromInnerLambda.expensive: <S(S),1*U(U)>
 BottomFromInnerLambda.f: <S(S),1*U(U)>
 
 
 
+==================== Cpr signatures ====================
+BottomFromInnerLambda.$trModule: m1
+BottomFromInnerLambda.expensive: m1
+BottomFromInnerLambda.f:
+
+
+
 ==================== Strictness signatures ====================
-BottomFromInnerLambda.$trModule: m
-BottomFromInnerLambda.expensive: <S(S),1*U(1*U)>m
+BottomFromInnerLambda.$trModule:
+BottomFromInnerLambda.expensive: <S(S),1*U(1*U)>
 BottomFromInnerLambda.f: <S(S),1*U(1*U)>
 
 

@@ -16,17 +16,18 @@ module DmdAnal ( dmdAnalProgram ) where
 import GhcPrelude
 
 import DynFlags
-import WwLib            ( findTypeShape, deepSplitProductType_maybe )
+import WwLib            ( findTypeShape )
 import Demand   -- All of it
 import CoreSyn
 import CoreSeq          ( seqBinds )
 import Outputable
 import VarEnv
 import BasicTypes
-import Data.List        ( mapAccumL, sortBy )
+import Data.List        ( mapAccumL )
 import DataCon
 import Id
-import CoreUtils        ( exprIsHNF, exprType, exprIsTrivial, exprOkForSpeculation )
+import IdInfo
+import CoreUtils
 import TyCon
 import Type
 import Coercion         ( Coercion, coVarsOfCo )
@@ -36,8 +37,6 @@ import Maybes           ( isJust )
 import TysWiredIn
 import TysPrim          ( realWorldStatePrimTy )
 import ErrUtils         ( dumpIfSet_dyn, DumpFormat (..) )
-import Name             ( getName, stableNameCmp )
-import Data.Function    ( on )
 import UniqSet
 
 {-
@@ -49,32 +48,22 @@ import UniqSet
 -}
 
 dmdAnalProgram :: DynFlags -> FamInstEnvs -> CoreProgram -> IO CoreProgram
-dmdAnalProgram dflags fam_envs binds
-  = do {
-        let { binds_plus_dmds = do_prog binds } ;
-        dumpIfSet_dyn dflags Opt_D_dump_str_signatures
-            "Strictness signatures" FormatText
-            (dumpStrSig binds_plus_dmds) ;
-        -- See Note [Stamp out space leaks in demand analysis]
-        seqBinds binds_plus_dmds `seq` return binds_plus_dmds
-    }
-  where
-    do_prog :: CoreProgram -> CoreProgram
-    do_prog binds = snd $ mapAccumL dmdAnalTopBind (emptyAnalEnv dflags fam_envs) binds
+dmdAnalProgram dflags fam_envs binds = do
+  let env             = emptyAnalEnv dflags fam_envs
+  let binds_plus_dmds = snd $ mapAccumL dmdAnalTopBind env binds
+  dumpIfSet_dyn dflags Opt_D_dump_str_signatures "Strictness signatures" FormatText $
+    dumpIdInfoOfProgram (pprIfaceStrictSig . strictnessInfo) binds_plus_dmds
+  -- See Note [Stamp out space leaks in demand analysis]
+  seqBinds binds_plus_dmds `seq` return binds_plus_dmds
 
 -- Analyse a (group of) top-level binding(s)
 dmdAnalTopBind :: AnalEnv
                -> CoreBind
                -> (AnalEnv, CoreBind)
 dmdAnalTopBind env (NonRec id rhs)
-  = (extendAnalEnv TopLevel env id2 (idStrictness id2), NonRec id2 rhs2)
+  = (extendAnalEnv TopLevel env id' (idStrictness id'), NonRec id' rhs')
   where
-    ( _, _,   rhs1) = dmdAnalRhsLetDown TopLevel Nothing env             cleanEvalDmd id rhs
-    ( _, id2, rhs2) = dmdAnalRhsLetDown TopLevel Nothing (nonVirgin env) cleanEvalDmd id rhs1
-        -- Do two passes to improve CPR information
-        -- See Note [CPR for thunks]
-        -- See Note [Optimistic CPR in the "virgin" case]
-        -- See Note [Initial CPR for strict binders]
+    ( _, id', rhs') = dmdAnalRhsLetDown Nothing env cleanEvalDmd id rhs
 
 dmdAnalTopBind env (Rec pairs)
   = (env', Rec pairs')
@@ -217,8 +206,7 @@ dmdAnal' env dmd (Lam var body)
   = let (body_dmd, defer_and_use) = peelCallDmd dmd
           -- body_dmd: a demand to analyze the body
 
-        env'             = extendSigsWithLam env var
-        (body_ty, body') = dmdAnal env' body_dmd body
+        (body_ty, body') = dmdAnal env body_dmd body
         (lam_ty, var')   = annotateLamIdBndr env notArgOfDfun body_ty var
     in
     (postProcessUnsat defer_and_use lam_ty, Lam var' body')
@@ -229,8 +217,7 @@ dmdAnal' env dmd (Case scrut case_bndr ty [(DataAlt dc, bndrs, rhs)])
   , isJust (isDataProductTyCon_maybe tycon)
   , Just rec_tc' <- checkRecTc (ae_rec_tc env) tycon
   = let
-        env_w_tc                 = env { ae_rec_tc = rec_tc' }
-        env_alt                  = extendEnvForProdAlt env_w_tc scrut case_bndr dc bndrs
+        env_alt                  = env { ae_rec_tc = rec_tc' }
         (rhs_ty, rhs')           = dmdAnal env_alt dmd rhs
         (alt_ty1, dmds)          = findBndrsDmds env rhs_ty bndrs
         (alt_ty2, case_bndr_dmd) = findBndrDmd env False alt_ty1 case_bndr
@@ -298,7 +285,7 @@ dmdAnal' env dmd (Let (NonRec id rhs) body)
 dmdAnal' env dmd (Let (NonRec id rhs) body)
   = (body_ty2, Let (NonRec id2 rhs') body')
   where
-    (lazy_fv, id1, rhs') = dmdAnalRhsLetDown NotTopLevel Nothing env dmd id rhs
+    (lazy_fv, id1, rhs') = dmdAnalRhsLetDown Nothing env dmd id rhs
     env1                 = extendAnalEnv NotTopLevel env id1 (idStrictness id1)
     (body_ty, body')     = dmdAnal env1 dmd body
     (body_ty1, id2)      = annotateBndr env body_ty id1
@@ -474,8 +461,8 @@ dmdTransform env var dmd
   = dmdTransformDictSelSig (idStrictness var) dmd
 
   | isGlobalId var                               -- Imported function
-  = let res = dmdTransformSig (idStrictness var) dmd in
---    pprTrace "dmdTransform" (vcat [ppr var, ppr (idStrictness var), ppr dmd, ppr res])
+  , let res = dmdTransformSig (idStrictness var) dmd
+  = -- pprTrace "dmdTransform" (vcat [ppr var, ppr (idStrictness var), ppr dmd, ppr res])
     res
 
   | Just (sig, top_lvl) <- lookupSigEnv env var  -- Local letrec bound thing
@@ -552,7 +539,7 @@ dmdFix top_lvl env let_dmd orig_pairs
         my_downRhs (env, lazy_fv) (id,rhs)
           = ((env', lazy_fv'), (id', rhs'))
           where
-            (lazy_fv1, id', rhs') = dmdAnalRhsLetDown top_lvl (Just bndrs) env let_dmd id rhs
+            (lazy_fv1, id', rhs') = dmdAnalRhsLetDown (Just bndrs) env let_dmd id rhs
             lazy_fv'              = plusVarEnv_C bothDmd lazy_fv lazy_fv1
             env'                  = extendAnalEnv top_lvl env id (idStrictness id')
 
@@ -590,14 +577,14 @@ environment, which effectively assigns them 'nopSig' (see "getStrictness")
 -- Local non-recursive definitions without a lambda are handled with LetUp.
 --
 -- This is the LetDown rule in the paper “Higher-Order Cardinality Analysis”.
-dmdAnalRhsLetDown :: TopLevelFlag
-           -> Maybe [Id]   -- Just bs <=> recursive, Nothing <=> non-recursive
-           -> AnalEnv -> CleanDemand
-           -> Id -> CoreExpr
-           -> (DmdEnv, Id, CoreExpr)
+dmdAnalRhsLetDown
+  :: Maybe [Id]   -- Just bs <=> recursive, Nothing <=> non-recursive
+  -> AnalEnv -> CleanDemand
+  -> Id -> CoreExpr
+  -> (DmdEnv, Id, CoreExpr)
 -- Process the RHS of the binding, add the strictness signature
 -- to the Id, and augment the environment with the signature as well.
-dmdAnalRhsLetDown top_lvl rec_flag env let_dmd id rhs
+dmdAnalRhsLetDown rec_flag env let_dmd id rhs
   = (lazy_fv, id', rhs')
   where
     rhs_arity      = idArity id
@@ -611,9 +598,11 @@ dmdAnalRhsLetDown top_lvl rec_flag env let_dmd id rhs
       -- NB: rhs_arity
       -- See Note [Demand signatures are computed for a threshold demand based on idArity]
       = mkRhsDmd env rhs_arity rhs
-    (DmdType rhs_fv rhs_dmds rhs_res, rhs')
+    (DmdType rhs_fv rhs_dmds rhs_div, rhs')
                    = dmdAnal env rhs_dmd rhs
-    sig            = mkStrictSigForArity rhs_arity (mkDmdType sig_fv rhs_dmds rhs_res')
+    -- TODO: Won't the following line unnecessarily trim down arity for join
+    --       points returning a lambda in a C(S) context?
+    sig            = mkStrictSigForArity rhs_arity (mkDmdType sig_fv rhs_dmds rhs_div)
     id'            = set_idStrictness env id sig
         -- See Note [NOINLINE and strictness]
 
@@ -625,18 +614,7 @@ dmdAnalRhsLetDown top_lvl rec_flag env let_dmd id rhs
 
     -- See Note [Lazy and unleashable free variables]
     (lazy_fv, sig_fv) = splitFVs is_thunk rhs_fv1
-
-    rhs_res'  = trimCPRInfo trim_all trim_sums rhs_res
-    trim_all  = is_thunk && not_strict
-    trim_sums = not (isTopLevel top_lvl) -- See Note [CPR for sum types]
-
-    -- See Note [CPR for thunks]
     is_thunk = not (exprIsHNF rhs) && not (isJoinId id)
-    not_strict
-       =  isTopLevel top_lvl  -- Top level and recursive things don't
-       || isJust rec_flag     -- get their demandInfo set at all
-       || not (isStrictDmd (idDemandInfo id) || ae_virgin env)
-          -- See Note [Optimistic CPR in the "virgin" case]
 
 -- | @mkRhsDmd env rhs_arity rhs@ creates a 'CleanDemand' for
 -- unleashing on the given function's @rhs@, by creating a call demand of
@@ -911,7 +889,7 @@ a product type.
 -}
 
 unitDmdType :: DmdEnv -> DmdType
-unitDmdType dmd_env = DmdType dmd_env [] topRes
+unitDmdType dmd_env = DmdType dmd_env [] topDiv
 
 coercionDmdEnv :: Coercion -> DmdEnv
 coercionDmdEnv co = mapVarEnv (const topDmd) (getUniqSet $ coVarsOfCo co)
@@ -1003,119 +981,6 @@ deleteFVs (DmdType fvs dmds res) bndrs
   = DmdType (delVarEnvList fvs bndrs) dmds res
 
 {-
-Note [CPR for sum types]
-~~~~~~~~~~~~~~~~~~~~~~~~
-At the moment we do not do CPR for let-bindings that
-   * non-top level
-   * bind a sum type
-Reason: I found that in some benchmarks we were losing let-no-escapes,
-which messed it all up.  Example
-   let j = \x. ....
-   in case y of
-        True  -> j False
-        False -> j True
-If we w/w this we get
-   let j' = \x. ....
-   in case y of
-        True  -> case j' False of { (# a #) -> Just a }
-        False -> case j' True of { (# a #) -> Just a }
-Notice that j' is not a let-no-escape any more.
-
-However this means in turn that the *enclosing* function
-may be CPR'd (via the returned Justs).  But in the case of
-sums, there may be Nothing alternatives; and that messes
-up the sum-type CPR.
-
-Conclusion: only do this for products.  It's still not
-guaranteed OK for products, but sums definitely lose sometimes.
-
-Note [CPR for thunks]
-~~~~~~~~~~~~~~~~~~~~~
-If the rhs is a thunk, we usually forget the CPR info, because
-it is presumably shared (else it would have been inlined, and
-so we'd lose sharing if w/w'd it into a function).  E.g.
-
-        let r = case expensive of
-                  (a,b) -> (b,a)
-        in ...
-
-If we marked r as having the CPR property, then we'd w/w into
-
-        let $wr = \() -> case expensive of
-                            (a,b) -> (# b, a #)
-            r = case $wr () of
-                  (# b,a #) -> (b,a)
-        in ...
-
-But now r is a thunk, which won't be inlined, so we are no further ahead.
-But consider
-
-        f x = let r = case expensive of (a,b) -> (b,a)
-              in if foo r then r else (x,x)
-
-Does f have the CPR property?  Well, no.
-
-However, if the strictness analyser has figured out (in a previous
-iteration) that it's strict, then we DON'T need to forget the CPR info.
-Instead we can retain the CPR info and do the thunk-splitting transform
-(see WorkWrap.splitThunk).
-
-This made a big difference to PrelBase.modInt, which had something like
-        modInt = \ x -> let r = ... -> I# v in
-                        ...body strict in r...
-r's RHS isn't a value yet; but modInt returns r in various branches, so
-if r doesn't have the CPR property then neither does modInt
-Another case I found in practice (in Complex.magnitude), looks like this:
-                let k = if ... then I# a else I# b
-                in ... body strict in k ....
-(For this example, it doesn't matter whether k is returned as part of
-the overall result; but it does matter that k's RHS has the CPR property.)
-Left to itself, the simplifier will make a join point thus:
-                let $j k = ...body strict in k...
-                if ... then $j (I# a) else $j (I# b)
-With thunk-splitting, we get instead
-                let $j x = let k = I#x in ...body strict in k...
-                in if ... then $j a else $j b
-This is much better; there's a good chance the I# won't get allocated.
-
-The difficulty with this is that we need the strictness type to
-look at the body... but we now need the body to calculate the demand
-on the variable, so we can decide whether its strictness type should
-have a CPR in it or not.  Simple solution:
-        a) use strictness info from the previous iteration
-        b) make sure we do at least 2 iterations, by doing a second
-           round for top-level non-recs.  Top level recs will get at
-           least 2 iterations except for totally-bottom functions
-           which aren't very interesting anyway.
-
-NB: strictly_demanded is never true of a top-level Id, or of a recursive Id.
-
-Note [Optimistic CPR in the "virgin" case]
-~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
-Demand and strictness info are initialized by top elements. However,
-this prevents from inferring a CPR property in the first pass of the
-analyser, so we keep an explicit flag ae_virgin in the AnalEnv
-datatype.
-
-We can't start with 'not-demanded' (i.e., top) because then consider
-        f x = let
-                  t = ... I# x
-              in
-              if ... then t else I# y else f x'
-
-In the first iteration we'd have no demand info for x, so assume
-not-demanded; then we'd get TopRes for f's CPR info.  Next iteration
-we'd see that t was demanded, and so give it the CPR property, but by
-now f has TopRes, so it will stay TopRes.  Instead, by checking the
-ae_virgin flag at the first time round, we say 'yes t is demanded' the
-first time.
-
-However, this does mean that for non-recursive bindings we must
-iterate twice to be sure of not getting over-optimistic CPR info,
-in the case where t turns out to be not-demanded.  This is handled
-by dmdAnalTopBind.
-
-
 Note [NOINLINE and strictness]
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 The strictness analyser used to have a HACK which ensured that NOINLNE
@@ -1289,43 +1154,6 @@ lookupSigEnv env id = lookupVarEnv (ae_sigs env) id
 nonVirgin :: AnalEnv -> AnalEnv
 nonVirgin env = env { ae_virgin = False }
 
-extendSigsWithLam :: AnalEnv -> Id -> AnalEnv
--- Extend the AnalEnv when we meet a lambda binder
-extendSigsWithLam env id
-  | isId id
-  , isStrictDmd (idDemandInfo id) || ae_virgin env
-       -- See Note [Optimistic CPR in the "virgin" case]
-       -- See Note [Initial CPR for strict binders]
-  , Just (dc,_,_,_) <- deepSplitProductType_maybe (ae_fam_envs env) $ idType id
-  = extendAnalEnv NotTopLevel env id (cprProdSig (dataConRepArity dc))
-
-  | otherwise
-  = env
-
-extendEnvForProdAlt :: AnalEnv -> CoreExpr -> Id -> DataCon -> [Var] -> AnalEnv
--- See Note [CPR in a product case alternative]
-extendEnvForProdAlt env scrut case_bndr dc bndrs
-  = foldl' do_con_arg env1 ids_w_strs
-  where
-    env1 = extendAnalEnv NotTopLevel env case_bndr case_bndr_sig
-
-    ids_w_strs    = filter isId bndrs `zip` dataConRepStrictness dc
-    case_bndr_sig = cprProdSig (dataConRepArity dc)
-    fam_envs      = ae_fam_envs env
-
-    do_con_arg env (id, str)
-       | let is_strict = isStrictDmd (idDemandInfo id) || isMarkedStrict str
-       , ae_virgin env || (is_var_scrut && is_strict)  -- See Note [CPR in a product case alternative]
-       , Just (dc,_,_,_) <- deepSplitProductType_maybe fam_envs $ idType id
-       = extendAnalEnv NotTopLevel env id (cprProdSig (dataConRepArity dc))
-       | otherwise
-       = env
-
-    is_var_scrut = is_var scrut
-    is_var (Cast e _) = is_var e
-    is_var (Var v)    = isLocalId v
-    is_var _          = False
-
 findBndrsDmds :: AnalEnv -> DmdType -> [Var] -> (DmdType, [Demand])
 -- Return the demands on the Ids in the [Var]
 findBndrsDmds env dmd_ty bndrs
@@ -1367,158 +1195,8 @@ set_idStrictness :: AnalEnv -> Id -> StrictSig -> Id
 set_idStrictness env id sig
   = setIdStrictness id (killUsageSig (ae_dflags env) sig)
 
-dumpStrSig :: CoreProgram -> SDoc
-dumpStrSig binds = vcat (map printId ids)
-  where
-  ids = sortBy (stableNameCmp `on` getName) (concatMap getIds binds)
-  getIds (NonRec i _) = [ i ]
-  getIds (Rec bs)     = map fst bs
-  printId id | isExportedId id = ppr id <> colon <+> pprIfaceStrictSig (idStrictness id)
-             | otherwise       = empty
-
-{- Note [CPR in a product case alternative]
-~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
-In a case alternative for a product type, we want to give some of the
-binders the CPR property.  Specifically
-
- * The case binder; inside the alternative, the case binder always has
-   the CPR property, meaning that a case on it will successfully cancel.
-   Example:
-        f True  x = case x of y { I# x' -> if x' ==# 3
-                                           then y
-                                           else I# 8 }
-        f False x = I# 3
-
-   By giving 'y' the CPR property, we ensure that 'f' does too, so we get
-        f b x = case fw b x of { r -> I# r }
-        fw True  x = case x of y { I# x' -> if x' ==# 3 then x' else 8 }
-        fw False x = 3
-
-   Of course there is the usual risk of re-boxing: we have 'x' available
-   boxed and unboxed, but we return the unboxed version for the wrapper to
-   box.  If the wrapper doesn't cancel with its caller, we'll end up
-   re-boxing something that we did have available in boxed form.
-
- * Any strict binders with product type, can use
-   Note [Initial CPR for strict binders].  But we can go a little
-   further. Consider
-
-      data T = MkT !Int Int
-
-      f2 (MkT x y) | y>0       = f2 (MkT x (y-1))
-                   | otherwise = x
-
-   For $wf2 we are going to unbox the MkT *and*, since it is strict, the
-   first argument of the MkT; see Note [Add demands for strict constructors]
-   in WwLib. But then we don't want box it up again when returning it! We want
-   'f2' to have the CPR property, so we give 'x' the CPR property.
-
- * It's a bit delicate because if this case is scrutinising something other
-   than an argument the original function, we really don't have the unboxed
-   version available.  E.g
-      g v = case foo v of
-              MkT x y | y>0       -> ...
-                      | otherwise -> x
-   Here we don't have the unboxed 'x' available.  Hence the
-   is_var_scrut test when making use of the strictness annotation.
-   Slightly ad-hoc, because even if the scrutinee *is* a variable it
-   might not be a onre of the arguments to the original function, or a
-   sub-component thereof.  But it's simple, and nothing terrible
-   happens if we get it wrong.  e.g. #10694.
-
-
-Note [Initial CPR for strict binders]
-~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
-CPR is initialized for a lambda binder in an optimistic manner, i.e,
-if the binder is used strictly and at least some of its components as
-a product are used, which is checked by the value of the absence
-demand.
-
-If the binder is marked demanded with a strict demand, then give it a
-CPR signature. Here's a concrete example ('f1' in test T10482a),
-assuming h is strict:
-
-  f1 :: Int -> Int
-  f1 x = case h x of
-          A -> x
-          B -> f1 (x-1)
-          C -> x+1
-
-If we notice that 'x' is used strictly, we can give it the CPR
-property; and hence f1 gets the CPR property too.  It's sound (doesn't
-change strictness) to give it the CPR property because by the time 'x'
-is returned (case A above), it'll have been evaluated (by the wrapper
-of 'h' in the example).
-
-Moreover, if f itself is strict in x, then we'll pass x unboxed to
-f1, and so the boxed version *won't* be available; in that case it's
-very helpful to give 'x' the CPR property.
-
-Note that
-
-  * We only want to do this for something that definitely
-    has product type, else we may get over-optimistic CPR results
-    (e.g. from \x -> x!).
-
-  * See Note [CPR examples]
-
-Note [CPR examples]
-~~~~~~~~~~~~~~~~~~~~
-Here are some examples (stranal/should_compile/T10482a) of the
-usefulness of Note [CPR in a product case alternative].  The main
-point: all of these functions can have the CPR property.
-
-    ------- f1 -----------
-    -- x is used strictly by h, so it'll be available
-    -- unboxed before it is returned in the True branch
-
-    f1 :: Int -> Int
-    f1 x = case h x x of
-            True  -> x
-            False -> f1 (x-1)
-
-
-    ------- f2 -----------
-    -- x is a strict field of MkT2, so we'll pass it unboxed
-    -- to $wf2, so it's available unboxed.  This depends on
-    -- the case expression analysing (a subcomponent of) one
-    -- of the original arguments to the function, so it's
-    -- a bit more delicate.
-
-    data T2 = MkT2 !Int Int
-
-    f2 :: T2 -> Int
-    f2 (MkT2 x y) | y>0       = f2 (MkT2 x (y-1))
-                  | otherwise = x
-
-
-    ------- f3 -----------
-    -- h is strict in x, so x will be unboxed before it
-    -- is rerturned in the otherwise case.
-
-    data T3 = MkT3 Int Int
-
-    f1 :: T3 -> Int
-    f1 (MkT3 x y) | h x y     = f3 (MkT3 x (y-1))
-                  | otherwise = x
-
-
-    ------- f4 -----------
-    -- Just like f2, but MkT4 can't unbox its strict
-    -- argument automatically, as f2 can
-
-    data family Foo a
-    newtype instance Foo Int = Foo Int
-
-    data T4 a = MkT4 !(Foo a) Int
-
-    f4 :: T4 Int -> Int
-    f4 (MkT4 x@(Foo v) y) | y>0       = f4 (MkT4 x (y-1))
-                          | otherwise = v
-
-
-Note [Initialising strictness]
-~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+{- Note [Initialising strictness]
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 See section 9.2 (Finding fixpoints) of the paper.
 
 Our basic plan is to initialise the strictness of each Id in a

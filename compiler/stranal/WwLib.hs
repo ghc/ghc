@@ -21,6 +21,7 @@ import Id
 import IdInfo           ( JoinArity )
 import DataCon
 import Demand
+import Cpr
 import MkCore           ( mkAbsentErrorApp, mkCoreUbxTup
                         , mkCoreApp, mkCoreLet )
 import MkId             ( voidArgId, voidPrimId )
@@ -126,7 +127,7 @@ mkWwBodies :: DynFlags
                              -- See Note [Freshen WW arguments]
            -> Id             -- The original function
            -> [Demand]       -- Strictness of original function
-           -> DmdResult      -- Info about function result
+           -> CprResult      -- Info about function result
            -> UniqSM (Maybe WwResult)
 
 -- wrap_fn_args E       = \x y -> E
@@ -140,7 +141,7 @@ mkWwBodies :: DynFlags
 --                        let x = (a,b) in
 --                        E
 
-mkWwBodies dflags fam_envs rhs_fvs fun_id demands res_info
+mkWwBodies dflags fam_envs rhs_fvs fun_id demands cpr_info
   = do  { let empty_subst = mkEmptyTCvSubst (mkInScopeSet rhs_fvs)
                 -- See Note [Freshen WW arguments]
 
@@ -151,7 +152,7 @@ mkWwBodies dflags fam_envs rhs_fvs fun_id demands res_info
 
         -- Do CPR w/w.  See Note [Always do CPR w/w]
         ; (useful2, wrap_fn_cpr, work_fn_cpr, cpr_res_ty)
-              <- mkWWcpr (gopt Opt_CprAnal dflags) fam_envs res_ty res_info
+              <- mkWWcpr (gopt Opt_CprAnal dflags) fam_envs res_ty cpr_info
 
         ; let (work_lam_args, work_call_args) = mkWorkerArgs dflags work_args cpr_res_ty
               worker_args_dmds = [idDemandInfo v | v <- work_call_args, isId v]
@@ -993,18 +994,18 @@ left-to-right traversal of the result structure.
 mkWWcpr :: Bool
         -> FamInstEnvs
         -> Type                              -- function body type
-        -> DmdResult                         -- CPR analysis results
+        -> CprResult                         -- CPR analysis results
         -> UniqSM (Bool,                     -- Is w/w'ing useful?
                    CoreExpr -> CoreExpr,     -- New wrapper
                    CoreExpr -> CoreExpr,     -- New worker
                    Type)                     -- Type of worker's body
 
-mkWWcpr opt_CprAnal fam_envs body_ty res
+mkWWcpr opt_CprAnal fam_envs body_ty cpr
     -- CPR explicitly turned off (or in -O0)
   | not opt_CprAnal = return (False, id, id, body_ty)
     -- CPR is turned on by default for -O and O2
   | otherwise
-  = case returnsCPR_maybe res of
+  = case asConCpr cpr of
        Nothing      -> return (False, id, id, body_ty)  -- No CPR info
        Just con_tag | Just stuff <- deepSplitCprType_maybe fam_envs con_tag body_ty
                     -> mkWWcpr_help stuff
@@ -1084,6 +1085,9 @@ after all, the analysis is not really wrong), so we simply do nothing here in
 mkWWcpr. But we still want to emit warning with -DDEBUG, to hopefully catch
 other cases where something went avoidably wrong.
 
+This warning also triggers for the stream fusion library within `text`.
+We can'easily W/W constructed results like `Stream` because we have no simple
+way to express existential types in the worker's type signature.
 
 Note [Profiling and unpacking]
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
@@ -1170,7 +1174,7 @@ mk_absent_let dflags arg
   = WARN( True, text "No absent value for" <+> ppr arg_ty )
     Nothing -- Can happen for 'State#' and things of 'VecRep'
   where
-    lifted_arg   = arg `setIdStrictness` botSig
+    lifted_arg   = arg `setIdStrictness` botSig `setIdCprInfo` mkCprSig 0 botCpr
               -- Note in strictness signature that this is bottoming
               -- (for the sake of the "empty case scrutinee not known to
               -- diverge for sure lint" warning)
