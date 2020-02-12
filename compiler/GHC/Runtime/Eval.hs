@@ -79,6 +79,7 @@ import VarEnv
 import GHC.ByteCode.Types
 import GHC.Runtime.Linker as Linker
 import GHC.Driver.Session
+import GHC.LanguageExtensions
 import Unique
 import UniqSupply
 import MonadUtils
@@ -1256,7 +1257,10 @@ obtainTermFromVal hsc_env _bound _force _ty _x = withInterp hsc_env $ \case
 obtainTermFromId :: HscEnv -> Int -> Bool -> Id -> IO Term
 obtainTermFromId hsc_env bound force id =  do
   hv <- Linker.getHValue hsc_env (varName id)
-  cvObtainTerm hsc_env bound force (idType id) hv
+  cvObtainTerm (updEnv hsc_env) bound force (idType id) hv
+ where updEnv env = env {hsc_dflags =                             -- #14828
+            xopt_set (hsc_dflags env) ImpredicativeTypes}
+         -- See Note [Setting ImpredicativeTypes for :print command]
 
 -- Uses RTTI to reconstruct the type of an Id, making it less polymorphic
 reconstructType :: HscEnv -> Int -> Id -> IO (Maybe Type)
@@ -1266,3 +1270,39 @@ reconstructType hsc_env bound id = do
 
 mkRuntimeUnkTyVar :: Name -> Kind -> TyVar
 mkRuntimeUnkTyVar name kind = mkTcTyVar name kind RuntimeUnk
+
+
+{-
+Note [Setting ImpredicativeTypes for :print command]
+
+If ImpredicativeTypes is not enabled, then `:print <term>` will fail if the
+type of <term> has nested `forall`s or `=>`s.
+This is because the GHCi debugger's internals will attempt to unify a
+metavariable with the type of <term> and then display the result, but if the
+type has nested `forall`s or `=>`s, then unification will fail.
+As a result, `:print` will bail out and the unhelpful result will be
+`<term> = (_t1::t1)` (where `t1` is a metavariable).
+
+Beware: <term> can have nested `forall`s even if its definition doesn't use
+RankNTypes! Here is an example from #14828:
+
+  class Functor f where
+    fmap :: (a -> b) -> f a -> f b
+
+Somewhat surprisingly, `:print fmap` considers the type of fmap to have
+nested foralls. This is because the GHCi debugger sees the type
+`fmap :: forall f. Functor f => forall a b. (a -> b) -> f a -> f b`.
+We could envision deeply instantiating this type to get the type
+`forall f a b. Functor f => (a -> b) -> f a -> f b`,
+but this trick wouldn't work for higher-rank types.
+
+Instead, we adopt a simpler fix: enable `ImpredicativeTypes` when using
+`:print` and friends in the GHCi debugger. This allows metavariables
+to unify with types that have nested (or higher-rank) `forall`s/`=>`s,
+which makes `:print fmap` display as
+`fmap = (_t1::forall a b. Functor f => (a -> b) -> f a -> f b)`, as expected.
+
+Although ImpredicativeTypes is a somewhat unpredictable from a type inference
+perspective, there is no danger in using it in the GHCi debugger, since all
+of the terms that the GHCi debugger deals with have already been typechecked.
+-}
