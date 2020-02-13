@@ -106,7 +106,7 @@ userArgs = mconcat
 You can match any combination of the `builder`, `stage`, `package`, `way`, `input`
 and `output` predicates when specifying custom command line arguments. File
 patterns such as `"**/Prelude.*"` can be used when matching input and output files,
-where `**` matches an arbitrary number of path components, but not absolute path 
+where `**` matches an arbitrary number of path components, but not absolute path
 prefixes, and `*` matches an entire path component, excluding any separators.
 
 #### Enabling -Werror
@@ -368,7 +368,7 @@ the stage.
 We could equivalently specify those settings on the command-line:
 
 ``` sh
-$ hadrian/build.sh "stage1.ghc-bin.ghc.link.opts += -eventlog" \
+$ hadrian/build "stage1.ghc-bin.ghc.link.opts += -eventlog" \
                    "*.base.ghc.*.opts += -v3"
 ```
 
@@ -388,7 +388,7 @@ the right names for them:
   when building all known packages, if the Hadrian command ever gets them to be
   built;
 - the remaining slots specify the builder and how it was invoked,
-  
+
   * `ghc` refers to GHC commands; the final slot refers to how GHC is invoked:
 
     * `c.opts` for commands that build C files with GHC
@@ -397,7 +397,7 @@ the right names for them:
 	  * `deps.opts` for commands that figure out dependencies between Haskell modules
 	    (with `ghc -M`)
 	  * `toolargs.opts` for GHC commands that are used to generate the right ghci
-	    argument for `hadrian/ghci.sh` to work
+	    argument for `hadrian/ghci` to work
 
   * `cc` refers to C compiler commands
 
@@ -426,15 +426,15 @@ that takes an (optional) argument, `--complete-setting=<some string>`, and
 prints on stdout all the setting keys that have the given string as a prefix.
 
 There is a `hadrian/completion.sh` script that makes use of this rule to
-install Bash completions for `hadrian/build.sh` and `hadrian/build.cabal.sh`.
+install Bash completions for `hadrian/build` and `hadrian/build-cabal`.
 You can try it out by doing:
 
 ``` sh
 $ source hadrian/completion.sh
-$ hadrian/build.sh <TAB>
-$ hadrian/build.sh stage1.ba<TAB>
-$ hadrian/build.sh "stage1.base.ghc.<TAB>
-$ hadrian/build.sh "*.*.ghc.*.opts += -v3" "stage0.ghc-bin.ghc.lin<TAB>
+$ hadrian/build <TAB>
+$ hadrian/build stage1.ba<TAB>
+$ hadrian/build "stage1.base.ghc.<TAB>
+$ hadrian/build "*.*.ghc.*.opts += -v3" "stage0.ghc-bin.ghc.lin<TAB>
 ```
 
 [split-sections]: https://downloads.haskell.org/~ghc/latest/docs/html/users_guide/phases.html#ghc-flag--split-sections
