@@ -271,7 +271,7 @@ hadrian-ghc-in-ghci:
     - ./boot
     - ./configure $CONFIGURE_ARGS
     # Load ghc-in-ghci then immediately exit and check the modules loaded
-    - echo ":q" | hadrian/ghci.sh -j`mk/detect-cpu-count.sh`| tail -n2 | grep "Ok,"
+    - echo ":q" | hadrian/ghci -j`mk/detect-cpu-count.sh`| tail -n2 | grep "Ok,"
   cache:
     key: hadrian-ghci
     paths:
