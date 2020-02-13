@@ -1404,6 +1404,53 @@ section "Byte Arrays"
 
 ------------------------------------------------------------------------
 
+-- Note [Byte arrays outside of the HEAP_ALLOCED space]
+-- ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+--
+-- It is useful to be able to allocate byte arrays outside of the heap,
+-- i.e. outside of the memory space covered by the HEAP_ALLOCED() test.
+--
+-- There are two major use cases:
+--
+--  1. Having foreign memory appear as a normal GHC byte array. This
+--     are use cases similar to the use of a ForeignPtr, but where it
+--     is useful to have the representation be a byte array type, for
+--     easier interoperability with existing libraries.
+--
+--  2. Static byte arrays in object files for constant values.
+--
+-- The second is not yet available as it requires additional support
+-- from the code gen.
+--
+-- A concrete use-case in the first category is to memory map a file
+-- but have it appear as a ByteArray# rather than a ForeignPtr. Doing
+-- so of course requires that space is reserved immediatly before the
+-- file data for the byte array heap object header.
+--
+-- To have the first use-case work requires a few things:
+--
+-- * For the GC to not fail when it encounters byte arrays outside of
+--   the HEAP_ALLOCED space. This is straightforward because the GC
+--   has support for a number of different closure types to appear
+--   outside the heap (primarily for statically allocated values), and
+--   byte arrays are easy because they contain no heap pointers.
+--
+-- * For other primops to not fail when encountering byte arrays
+--   outside of the heap. Specifically isByteArrayPinned# requires
+--   special support. This is currently the only primop that needs
+--   special support.
+--
+-- * A mechanism to set up the heap object header for a byte array at
+--   an address outside of the HEAP_ALLOCED space. This is needed to
+--   make the foreign allocated memory look like a byte array. This is
+--   provided by the placeByteArray# primop.
+--
+-- A concrete use case is to memory map a file but have it appear as a
+-- ByteArray# rather than a ForeignPtr. Doing so of course requires
+-- that space is reserved immediatly before the file data for the byte
+-- array heap object header.
+
+
 primtype ByteArray#
 
 primtype MutableByteArray# s
@@ -1415,6 +1462,7 @@ primop  NewByteArrayOp_Char "newByteArray#" GenPrimOp
    with out_of_line = True
         has_side_effects = True
 
+-- See [Byte arrays outside of the HEAP_ALLOCED space]
 primop  PlaceByteArrayOp_Char "placeByteArray#" GenPrimOp
    Addr# -> Int# -> State# s -> (# State# s, MutableByteArray# s #)
    {Place a new byte array header for the specified size (in bytes), at the

@@ -87,6 +87,7 @@ stg_placeByteArrayzh ( W_ addr, W_ n )
 #define BA_ALIGN 16
 #define BA_MASK  (BA_ALIGN-1)
 
+// See Note [Byte arrays outside of the HEAP_ALLOCED space]
 stg_newPinnedByteArrayzh ( W_ n )
 {
     W_ words, bytes, payload_words;
@@ -154,6 +155,8 @@ stg_isByteArrayPinnedzh ( gcptr ba )
 // ByteArray# s -> Int#
 {
     W_ bd, flags;
+
+// See Note [Byte arrays outside of the HEAP_ALLOCED space]
 #if defined(HEAP_ALLOCED)
     if (HEAP_ALLOCED(ba)) {
 #else

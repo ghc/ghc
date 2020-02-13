@@ -65,6 +65,8 @@ extern struct mblock_address_range mblock_address_space;
 
 #else /* defined(CMINUSMINUS) */
 
+/* See Note [Byte arrays outside of the HEAP_ALLOCED space] */
+
 import mblock_address_space;
 
 # define HEAP_ALLOCED(p)        ((p) >= W_[mblock_address_space + WDS(0)] && \
@@ -85,6 +87,8 @@ extern StgWord8 mblock_map[];
 # define HEAP_ALLOCED_GC(p)     HEAP_ALLOCED(p)
 
 #else /* defined(CMINUSMINUS) */
+
+/* See Note [Byte arrays outside of the HEAP_ALLOCED space] */
 
 import mblock_map;
 
@@ -245,6 +249,8 @@ StgBool HEAP_ALLOCED_GC(const void *p)
 }
 
 #else /* defined(CMINUSMINUS) */
+
+/* See Note [Byte arrays outside of the HEAP_ALLOCED space] */
 
 // See comments about MbcCacheLine above
 #if defined(x86_64_HOST_ARCH)
