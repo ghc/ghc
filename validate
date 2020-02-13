@@ -163,7 +163,7 @@ else
     # Just build hadrian.
     if [ "$use_stack" = "NO" ]
     then
-        hadrian/build.sh --help > /dev/null
+        hadrian/build --help > /dev/null
         cd hadrian
         hadrian_cmd=$(cabal new-exec -- which hadrian)
     else
