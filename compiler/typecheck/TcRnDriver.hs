@@ -1390,7 +1390,7 @@ rnTopSrcDecls group
                 | otherwise
                    = tcg_env };
 
-                -- Dump trace of renaming part
+        -- Dump trace of renaming part
         rnDump rn_decls ;
         return (tcg_env', rn_decls)
    }
@@ -1971,6 +1971,9 @@ tcRnStmt hsc_env rdr_stmt
 
     -- The real work is done here
     ((bound_ids, tc_expr), fix_env) <- tcUserStmt rdr_stmt ;
+    dumpOptTcRn Opt_D_dump_tc_ast "Typechecker AST" FormatHaskell
+      (showAstData NoBlankSrcSpan tc_expr) ;
+
     zonked_expr <- zonkTopLExpr tc_expr ;
     zonked_ids  <- zonkTopBndrs bound_ids ;
 
@@ -2064,6 +2067,7 @@ tcUserStmt :: GhciLStmt GhcPs -> TcM (PlanResult, FixityEnv)
 tcUserStmt (L loc (BodyStmt _ expr _ _))
   = do  { (rn_expr, fvs) <- checkNoErrs (rnLExpr expr)
                -- Don't try to typecheck if the renamer fails!
+        ; rnDump rn_expr
         ; ghciStep <- getGhciStepIO
         ; uniq <- newUnique
         ; interPrintName <- getInteractivePrintName
@@ -2717,7 +2721,10 @@ loadUnqualIfaces hsc_env ictxt
 
 -- | Dump, with a banner, if -ddump-rn
 rnDump :: (Outputable a, Data a) => a -> TcRn ()
-rnDump rn = dumpOptTcRn Opt_D_dump_rn "Renamer" FormatHaskell (ppr rn)
+rnDump rn = do
+    dumpOptTcRn Opt_D_dump_rn "Renamer" FormatHaskell (ppr rn)
+    dumpOptTcRn Opt_D_dump_rn_ast "Renamer AST" FormatHaskell
+        (showAstData NoBlankSrcSpan rn)
 
 tcDump :: TcGblEnv -> TcRn ()
 tcDump env
