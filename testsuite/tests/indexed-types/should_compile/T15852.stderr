@@ -6,7 +6,7 @@ COERCION AXIOMS
     forall k1 k2 (j :: k1) (c :: k2).
       DF (Proxy c) = T15852.R:DFProxyProxy k1 k2 j c
 FAMILY INSTANCES
-  data instance forall k1 k2 (j :: k1) (c :: k2).
+  data instance forall {k1} {k2} {j :: k1} {c :: k2}.
                   DF (Proxy c) -- Defined at T15852.hs:10:15
 Dependent modules: []
 Dependent packages: [base-4.14.0.0, ghc-prim-0.6.1,

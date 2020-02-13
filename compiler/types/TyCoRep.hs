@@ -815,10 +815,8 @@ See also Note [Required, Specified, and Inferred for types] in TcTyClsDecls
  Specified: a list of Specified binders is written between `forall` and `.`:
                const :: forall a b. a -> b -> a
 
- Inferred:  with -fprint-explicit-foralls, Inferred binders are written
-            in braces:
+ Inferred: like Specified, but every binder is written in braces:
                f :: forall {k} (a:k). S k a -> Int
-            Otherwise, they are printed like Specified binders.
 
  Required: binders are put between `forall` and `->`:
               T :: forall k -> *
