@@ -4,6 +4,7 @@ For other documentation, refer to:
 <http://www.haskell.org/haskellwiki/Template_Haskell>
 
 -}
+{-# LANGUAGE Safe #-}
 module Language.Haskell.TH(
         -- * The monad and its operations
         Q,
