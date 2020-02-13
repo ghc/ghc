@@ -165,7 +165,7 @@ Language
   good story for graceful degradation in these situations. These situations
   should occur much less frequently now and degradation happens much more
   smoothly, while still producing useful, sound results (see
-  :ghc-flag:`-fmax-pmcheck-models`).
+  :ghc-flag:`-fmax-pmcheck-models=⟨n⟩`).
 
 Compiler
 ~~~~~~~~
