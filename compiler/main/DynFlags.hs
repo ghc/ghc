@@ -451,7 +451,6 @@ data DumpFlag
    | Opt_D_dump_occur_anal
    | Opt_D_dump_parsed
    | Opt_D_dump_parsed_ast
-   | Opt_D_dump_rn
    | Opt_D_dump_rn_ast
    | Opt_D_dump_simpl
    | Opt_D_dump_simpl_iterations
@@ -2390,7 +2389,6 @@ dopt f dflags = (f `EnumSet.member` dumpFlags dflags)
           enableIfVerbose Opt_D_dump_if_trace               = False
           enableIfVerbose Opt_D_dump_vt_trace               = False
           enableIfVerbose Opt_D_dump_tc                     = False
-          enableIfVerbose Opt_D_dump_rn                     = False
           enableIfVerbose Opt_D_dump_rn_stats               = False
           enableIfVerbose Opt_D_dump_hi_diffs               = False
           enableIfVerbose Opt_D_verbose_core2core           = False
@@ -3406,8 +3404,6 @@ dynamic_flags_deps = [
         (setDumpFlag Opt_D_dump_parsed)
   , make_ord_flag defGhcFlag "ddump-parsed-ast"
         (setDumpFlag Opt_D_dump_parsed_ast)
-  , make_ord_flag defGhcFlag "ddump-rn"
-        (setDumpFlag Opt_D_dump_rn)
   , make_ord_flag defGhcFlag "ddump-rn-ast"
         (setDumpFlag Opt_D_dump_rn_ast)
   , make_ord_flag defGhcFlag "ddump-simpl"
