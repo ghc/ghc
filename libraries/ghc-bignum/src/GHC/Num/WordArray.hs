@@ -337,27 +337,29 @@ mwaSubInplaceWord# mwa ii iw s1 = case mwaSize# mwa s1 of
 
 
 -- | Trim `a` of `k` less significant limbs and then compare the result with `b`
+--
+-- "mwa" doesn't need to be trimmed
 mwaTrimCompare :: Int# -> MutableWordArray# s -> WordArray# -> State# s -> (# State# s, Ordering #)
 mwaTrimCompare k mwa wb s1
    | (# s, szA #) <- mwaSize# mwa s1
    , szB <- wordArraySize# wb
    =
      let
-      go i  j  s
+      go i s
          | isTrue# (i <# 0#) = (# s, EQ #)
-         | isTrue# (j <# 0#) = (# s, EQ #)
-         | True = case readWordArray# mwa i s of
+         | True = case readWordArray# mwa (i +# k) s of
             (# s2, ai #) ->
-               let bj = indexWordArray# wb j
-               in if | isTrue# (ai `gtWord#` bj) -> (# s2, GT #)
-                     | isTrue# (bj `gtWord#` ai) -> (# s2, LT #)
-                     | True                      -> go (i -# 1#) (j -# 1#) s2
+               let bi = if isTrue# (i >=# szB)
+                           then 0##
+                           else indexWordArray# wb i
+               in if | isTrue# (ai `gtWord#` bi) -> (# s2, GT #)
+                     | isTrue# (bi `gtWord#` ai) -> (# s2, LT #)
+                     | True                      -> go (i -# 1#) s2
 
       szTrimA = szA -# k
 
      in if | isTrue# (szTrimA <# szB) -> (# s, LT #)
-           | isTrue# (szTrimA ># szB) -> (# s, GT #)
-           | True                     -> go (szA -# 1#) (szB -# 1#) s
+           | True                     -> go (szA -# k -# 1#) s
 
 
 -- | Sub array inplace (at the specified offset) in the mwa with carry propagation.
@@ -426,3 +428,5 @@ mwaReadOrZero mwa i s = case mwaSize# mwa s of
       | isTrue# (i <# 0#)  -> (# s2, 0## #)
       | True               -> readWordArray# mwa i s2
 
+mwaRead# :: MutableWordArray# s -> Int# -> State# s -> (# State# s, Word# #)
+mwaRead# = readWordArray#
