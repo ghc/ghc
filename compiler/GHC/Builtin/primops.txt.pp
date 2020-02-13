@@ -1449,6 +1449,16 @@ section "Byte Arrays"
 -- ByteArray# rather than a ForeignPtr. Doing so of course requires
 -- that space is reserved immediatly before the file data for the byte
 -- array heap object header.
+--
+-- The special support in the isByteArrayPinned# primop is that it
+-- needs to be able to test if the byte array is HEAP_ALLOCED or not
+-- and if not then it is certainly pinned. This requires CMM support
+-- for the HEAP_ALLOCED test, which is otherwise only called from C
+-- code in the RTS. The current design is to provide full CMM
+-- implementations of the code to implement HEAP_ALLOCED. This is fast
+-- but essentially duplicates what is already a complex implementation.
+-- An alternative would be to use a CMM C call to a C function that use
+-- the existing C implementation of HEAP_ALLOCED.
 
 
 primtype ByteArray#
