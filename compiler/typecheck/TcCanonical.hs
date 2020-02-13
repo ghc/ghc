@@ -2152,36 +2152,8 @@ canEqReflexive ev eq_rel ty
                                mkTcReflCo (eqRelRole eq_rel) ty)
        ; stopWith ev "Solved by reflexivity" }
 
-{-
-Note [Canonical orientation for tyvar/tyvar equality constraints]
-~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
-When we have a ~ b where both 'a' and 'b' are TcTyVars, which way
-round should be oriented in the CTyEqCan?  The rules, implemented by
-canEqTyVarTyVar, are these
-
- * If either is a flatten-meta-variables, it goes on the left.
-
- * Put a meta-tyvar on the left if possible
-       alpha[3] ~ r
-
- * If both are meta-tyvars, put the more touchable one (deepest level
-   number) on the left, so there is the best chance of unifying it
-        alpha[3] ~ beta[2]
-
- * If both are meta-tyvars and both at the same level, put a TyVarTv
-   on the right if possible
-        alpha[2] ~ beta[2](sig-tv)
-   That way, when we unify alpha := beta, we don't lose the TyVarTv flag.
-
- * Put a meta-tv with a System Name on the left if possible so it
-   gets eliminated (improves error messages)
-
- * If one is a flatten-skolem, put it on the left so that it is
-   substituted out  Note [Eliminate flat-skols] in TcUinfy
-        fsk ~ a
-
-Note [Equalities with incompatible kinds]
-~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+{- Note [Equalities with incompatible kinds]
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 What do we do when we have an equality
 
   (tv :: k1) ~ (rhs :: k2)
