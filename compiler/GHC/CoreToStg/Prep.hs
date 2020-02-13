@@ -1250,13 +1250,13 @@ data OkToSpec
 
 mkFloat :: Demand -> Bool -> Id -> CpeRhs -> FloatingBind
 mkFloat dmd is_unlifted bndr rhs
-  | is_unlifted = ASSERT2( exprOkForSpeculation rhs, ppr rhs )
-                  FloatCase rhs bndr DEFAULT [] True
   | is_strict
   , not is_hnf  = FloatCase rhs bndr DEFAULT [] (exprOkForSpeculation rhs)
     -- Don't make a case for a HNF binding, even if it's strict
     -- Otherwise we get  case (\x -> e) of ...!
 
+  | is_unlifted = ASSERT2( exprOkForSpeculation rhs, ppr rhs )
+                  FloatCase rhs bndr DEFAULT [] True
   | is_hnf    = FloatLet (NonRec bndr                       rhs)
   | otherwise = FloatLet (NonRec (setIdDemandInfo bndr dmd) rhs)
                    -- See Note [Pin demand info on floats]
