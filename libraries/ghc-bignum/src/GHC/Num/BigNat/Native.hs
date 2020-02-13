@@ -270,6 +270,7 @@ bignat_shiftr mwa wa n s1
       !sz           = szA -# nw
       !sh           = WORD_SIZE_IN_BITS# -# nb
 
+      -- Bit granularity (c is the carry from the previous shift)
       mwaBitShift i c s
          | isTrue# (i <# 0#) = s
          | True =
@@ -378,72 +379,53 @@ bignat_quotrem
    -> WordArray#
    -> State# s
    -> State# s
-bignat_quotrem mwq mwr uwa uwb s1 =
-   case normalizeA s1     of { (# s2, mwa #) ->
-   case mwaSize# mwq s2   of { (# s3, szQ #) ->
-   -- normalized quotrem
-   case bignat_quotrem_normalized mwq szQ mwa (normalizeB uwb) s3 of { s4 ->
-   -- copy and denormalize remainder from mwa to mwr
-   -- mwq is already not normalized
-   denormalizeR mwr mwa s4
-   }}}
+bignat_quotrem mwq mwr uwa uwb s0 =
+   -- Normalization consists in left-shifting bits in B and A so that the
+   -- most-significant bit of the most-significant word of B is 1. It makes
+   -- quotient prediction much more efficient as we only use the two most
+   -- significant words of A and the most significant word of B to make the
+   -- prediction.
 
-   where
-      -- Normalization consists in left-shifting bits in B and A so that the
-      -- most-significant bit of the most-significant word of B is 1. It makes
-      -- quotient prediction much more efficient as we only use the most
-      -- significant words to make the prediction.
-      --
-      -- We also remove the common trailing zero Words in `a` and `b`
-      -- during the normalization
-      shl = clz# (indexWordArray# uwb (wordArraySize# uwb -# 1#))
+   -- we will left-shift A and B of "clzb" bits for normalization
+   let !clzb  = clz# (indexWordArray# uwb (wordArraySize# uwb -# 1#))
+      
+   -- we use a single array initially containing A (normalized) and
+   -- returning the remainder (normalized): mnwa (for "mutable normalized
+   -- wordarray A")
+   --
+   -- We allocate it here with an additionnal Word compared to A because
+   -- normalizing can left shift at most (N-1) bits (on N-bit arch).
+   in case newWordArray# (wordArraySize# uwa +# 1#) s0 of { (# s1, mnwa #) ->
 
-      -- common number of zero less-significant bits (round to lower word size)
-      shrW = minW# (bigNatCtz# uwa) (bigNatCtz# uwb)
-               `and#` (not# WORD_SIZE_BITS_MASK##)
+   -- normalized A in mnwa
+   let normalizeA s = case mwaWrite# mnwa (wordArraySize# uwa) 0## s of -- init potential carry
+                         s -> case bignat_shiftl mnwa uwa clzb s of     -- left shift
+                            s -> mwaTrimZeroes# mnwa s                  -- remove null carry if any
+   in case normalizeA s1 of { s2 ->
+   
+   -- normalize B. We don't do it in a MutableWordArray because it will remain
+   -- constant during the whole computation.
+   let !nwb = bigNatShiftL# uwb clzb in
 
-      isLeftShift  = isTrue# (shrW `eqWord#` 0##)
+   -- if normalized A and A have the same size, we need to write the 0 carry in
+   -- the quotient. We write it unconditionally for now.
+   case mwaSize# mwq s2 of { (# s3, szQ #) ->
+   case mwaFill# mwq 0## 0## (int2Word# szQ) s3 of { s4 -> 
 
-      -- right shift amount in bits if isLeftShift == False
-      shr = shrW `minusWord#` shl
-      !(# nw, nb #)  = count_words_bits_int shr
+   -- perform quotrem on normalized inputs
+   case bignat_quotrem_normalized mwq mnwa nwb s4 of { s5 ->
 
-      normalizeB ws
-         | isLeftShift = bigNatShiftL# ws shl
-         | True        = bigNatShiftR# ws shr
+   -- denormalize the remainder now stored in mnwa. We just have to right shift
+   -- of "clzb" bits. We copy the result into "mwr" array.
+   let denormalizeR s = case mwaTrimZeroes# mnwa s of
+                         s -> case unsafeFreezeByteArray# mnwa s of
+                            (# s, wr #) -> case mwaSetSize# mwr (wordArraySize# wr) s of
+                               s -> case bignat_shiftr mwr wr clzb s of
+                                 s -> mwaTrimZeroes# mwr s
+   in denormalizeR s5
+   }}}}}
 
-      normalizeA s
-         | isLeftShift
-         , 0## <- shl
-         = let szna = wordArraySize# uwa
-           in case newWordArray# szna s of
-               (# s, mwa #) -> case mwaArrayCopy# mwa 0# uwa 0# szna s of
-                  s -> (# s, mwa #)
 
-         | isLeftShift
-         = let szna = wordArraySize# uwa +# 1# -- Normalizing A can add a newer higher limb
-           in case newWordArray# szna s of
-               (# s, mwa #) -> case bignat_shiftl mwa uwa shl s of
-                     s -> (# s, mwa #)
-
-         | True
-         = let szna = wordArraySize# uwa -# nw
-           in case newWordArray# szna s of
-               (# s, mwa #) -> case bignat_shiftr mwa uwa shr s of
-                     s -> case mwaTrimZeroes# mwa s of
-                        s -> (# s, mwa #)
-
-      denormalizeR mwr mws s
-         = case mwaTrimZeroes# mws s of
-            s -> case unsafeFreezeByteArray# mws s of
-               (# s, ws #) -> if
-                  | isLeftShift -> case mwaSetSize# mwr (wordArraySize# ws) s of
-                                    s -> case bignat_shiftr mwr ws shl s of
-                                       s -> mwaTrimZeroes# mwr s
-                  | True        -> let sz = wordArraySize# ws +# nw +# (nb /=# 0#)
-                                   in case mwaSetSize# mwr sz s of
-                                    s -> case bignat_shiftl mwr ws shr s of
-                                       s -> mwaTrimZeroes# mwr s
 
 bignat_quot
    :: MutableWordArray# RealWorld
@@ -473,138 +455,94 @@ bignat_rem mwr wa wb s =
    szB = wordArraySize# wb
    szQ = 1# +# szA -# szB
 
--- | On input:
---    - B is normalized
---    - A is trimed
---    - A > B
+-- | Perform quotRem on normalized inputs:
+--    * highest bit of B is set
+--    * A is trimmed
+--    * A >= B
 bignat_quotrem_normalized
    :: MutableWordArray# s
-   -> Int#
    -> MutableWordArray# s
    -> WordArray#
    -> State# s
    -> State# s
-bignat_quotrem_normalized mwq szQ mwa b s =
-   case computeQMax s of
-      s -> loop (szQ -# 1#) s
-   where
-      szB = wordArraySize# b
+bignat_quotrem_normalized mwq mwa b s0 =
+   
+   -- n is the size of B
+   let !n = wordArraySize# b
 
-      -- Compute and store highest quotient word QMax. As B is normalized,
-      -- QMax=0 or QMax=1.
-      --
-      --    Proof: if QMax>=2, then QMax*B has a least one additional
-      --    higher limb compared to B because B is normalized (higher bit of higher
-      --    word is set). Hence size(QMax*B)+size(A)-size(B) > size(A) (i.e.
-      --    QMax*B shifted appropriately is greater than A). So QMax is too
-      --    large to be a valid quotient.
-      --
-      -- We need to adjust the remainder depending on QMax:
-      --    QMax=1: remainder = subtract B shifted appropriately from A
-      --    QMax=0: remainder = A
+   -- m+n is the size of A (m >= 0)
+   in case mwaSize# mwa s0 of { (# s1, szA #) ->
+   let !m = szA -# n in
 
-      computeQMax s =
-         case mwaSize# mwa s of
-            (# s, szA #) -> if
-               -- szQ is equal to szA-szB+1 BEFORE normalization. Hence, the
-               -- actual szA can be larger by 1 word. In this case, the
-               -- additional higher word of A is < higher word of B by
-               -- construction. Hence we don't have to store do anything as
-               -- don't even have a slot to store the corresponding 0 quotient
-               -- word.
-               | isTrue# (szQ +# 1# /=# szA -# szB) -> s
-               | True -> case mwaTrimCompare (szQ -# 1#) mwa b s of
-                  (# s, prefixCmp #) ->
-                     let
-                        qmax    = case prefixCmp of
-                                    LT -> 0##
-                                    _  -> 1##
-                     in case mwaWrite# mwq (szQ -# 1#) qmax s of
-                           s -> updateR (szQ -# 1#) b prefixCmp s
+   -- Perform a prefix comparison to compute the most-significant Q word (Qm).
+   -- Thanks to normalization Qm can only be 0 or 1.
+   --
+   --    Proof: if Qm>=2, then Qm*B has a least one additional
+   --    limb compared to B because B is normalized (higher bit of higher
+   --    word is set). Hence size(Qm*B)+size(A)-size(B) > size(A) (i.e.
+   --    Qm*B shifted appropriately is greater than A). So Qm is too
+   --    large to be a valid quotient.
+   --
+   -- If A >= (B << m words)
+   --    then Qm = 1
+   --         A := A - (B << m words)
+   --    else Qm = 0
+   --         A unchanged
+   let computeQm s = case mwaTrimCompare m mwa b s of
+         (# s, LT #) -> (# s, 0## #)
+         (# s, _  #) -> (# s, 1## #)
 
-      updateR k qb c s = case c of
-         LT -> s
-         EQ -> mwaShrink# mwa (wordArraySize# qb) s
-         GT -> mwaSubInplaceArrayTrim mwa k qb s
+       updateQj j qj qjb s = case mwaWrite# mwq j qj s of -- write Qj
+               s | 0## <- qj -> s
+                 | True      -> case mwaSubInplaceArray mwa j qjb s of -- subtract (qjB << j words)
+                                 (# s, _ #) -> s
 
-      -- szQ-1 (the difference between the limb counts of A and B) gives the number of
-      -- steps of the algorithm. For each step k from szQ-1 to 0 we compare the
-      -- remainder (= A at the beginning) with B left-shifted of k limbs and we
-      -- find how many shifted Bs can be subtracted from the remainder: this is
-      -- qk (the k-th limb of the quotient).
+       updateQm s = case computeQm s of
+            (# s, qm #) -> updateQj m qm b s
 
-      loop k s
-         | isTrue# (k <# 0#) = s
-         | True              = case computeQuot k s of
-                                 s -> loop (k -# 1#) s
+   in case updateQm s1 of { s2 ->
 
 
-      -- Now the loop per se. Note that if A and B have the same number of
-      -- limbs, the loop isn't executed at all.
-      -- We have k iterating from (szQ-2) to 0. Each time we get qk and an
-      -- updated R.
-      -- First we compute an upper bound qMax for qk: qk <= qMax
-      -- Then the idea is to iterate qe from qMax to 0 until
-      --    qe*B k-left-shifted <= R
-      --  or equivalently:
-      --    qe*B <= R k-right-shifted
-      --
-      -- As multiplication is costly, we implement it as follows:
-      --    qe = qMax
-      --    c  = qe*B
-      --    while c > R k-right-shifted do -- we don't perform the right-shift,
-      --       c  -= B                     -- we have a dedicated "compare" op
-      --       qe -= 1
-      --    qk = qe
-      --
-      -- To determine qMax we compute:
-      --    (qMaxCarry,qMax') = (R{k+szB},R{k+szB-1}) `div` B{szB-1}
-      --    If qMaxCarry /= 0 then
-      --       qMax = maxWordValue
-      --    else
-      --       qMax = qMax'
-      -- qk can only be a single digit number because q(k+1) is already computed
-      -- and the prefix of R is < B after the previous step.
+   -- main loop: for j from (m-1) downto 0
+   --    We estimate a one Word quotient qj:
+   --       e1e0 <- a(n+j)a(n+j-1) `div` b(n-1)
+   --       qj | e1 == 0   = e0
+   --          | otherwise = maxBound
+   --    We loop until we find the real quotient:
+   --       while (A < ((qj*B) << j words)) qj--
+   --    We update A and Qj:
+   --       Qj := qj
+   --       A  := A - (qj*B << j words)
 
-      estimateQKMax k s =
-            case mwaReadOrZero mwa (szB +# k) s of
-               (# s2, ro1 #) -> case mwaReadOrZero mwa (szB +# k -# 1#) s2 of
-                  (# s3, ro2 #) ->
-                     -- most significant limb of b
-                     let bmsw = wordArrayLast# b
-                     in case quotRemWord3# (# ro1, ro2 #) bmsw of
-                        (# (# qMaxCarry, qMax' #), _ #) -> case qMaxCarry of
-                           0## -> (# s3, qMax'           #)
-                           _   -> (# s3, WORD_MAXBOUND## #)
+   let bmsw = wordArrayLast# b -- most significant word of B
+
+       estimateQj j s = 
+         case mwaRead# mwa (n +# j) s of
+           (# s, a1 #) -> case mwaRead# mwa (n +# j -# 1#) s of
+             (# s, a0 #) -> case quotRemWord3# (# a1, a0 #) bmsw of
+               (# (# 0##, qj #), _ #) -> (# s,              qj #)
+               (# (#   _,  _ #), _ #) -> (# s, WORD_MAXBOUND## #)
+
+       -- we perform the qj*B multiplication once and then we subtract B from
+       -- qj*B as much as needed until (qj'*B << j words) <= A
+       findRealQj j qj s = findRealQj' j qj (bigNatMulWord# b qj) s
+
+       findRealQj' j qj qjB s = case mwaTrimCompare j mwa qjB s of
+         (# s, LT #) -> findRealQj' j (qj `minusWord#` 1##) (bigNatSubUnsafe qjB b) s
+                                                            -- TODO: we could do the sub inplace to
+                                                            -- reduce allocations
+         (# s, _  #) -> (# s, qj, qjB #)
+
+       loop j s = case estimateQj j s of
+         (# s, qj #) -> case findRealQj j qj s of
+            (# s, qj, qjB #) -> case updateQj j qj qjB s of
+               s | 0# <- j -> s
+                 | True    -> loop (j -# 1#) s
 
 
-
-      -- compute qj and adjust the remainder
-      computeQuot k s =
-         case estimateQKMax k s of
-            (# s, qe #) ->
-               let
-                  -- Now we can compute qe*b and check whether it is < (a >> k
-                  -- limbs) If not, it means we need to decrease qe and recheck
-                  -- until it is true.
-                  -- Note: we only compute qe*b once and then we subtract b from
-                  -- it.
-                  vinit = bigNatMulWord# b qe
-
-                  go qc c s = case mwaTrimCompare k mwa c s of
-
-                     (# s, LT #)->
-                        -- retry with a smaller quotient:
-                        --    q <- q-1
-                        --    c <- c-b
-                        -- TODO: we could do the sub inplace
-                        go (qc `minusWord#` 1##) (bigNatSubUnsafe c b) s
-
-                     (# s, cmp #)-> case updateR k c cmp s of
-                        s -> (# s, qc #)
-
-               in case go qe vinit s of
-                     (# s, q #) -> mwaWrite# mwq k q s
+   in if | 0# <- m -> s2
+         | True    -> loop (m -# 1#) s2
+   }}
 
 bignat_quotrem_word
    :: MutableWordArray# s -- ^ Quotient
