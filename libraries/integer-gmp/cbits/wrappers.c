@@ -22,7 +22,7 @@
 #include <float.h>
 #include <stdio.h>
 
-#include <gmp.h>
+#include "ghc-gmp.h"
 
 
 // GMP 4.x compatibility
