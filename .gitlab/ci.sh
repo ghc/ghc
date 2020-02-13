@@ -402,7 +402,7 @@ function clean() {
 }
 
 function run_hadrian() {
-  run hadrian/build.cabal.sh \
+  run hadrian/build-cabal \
     --flavour="$FLAVOUR" \
     -j"$cores" \
     --broken-test="$BROKEN_TESTS" \

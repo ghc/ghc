@@ -6,7 +6,7 @@ The simplest way to run the testsuite is
 
 ``` sh
 # assuming 'build' is the build script you're using
-# (hadrian/build.sh, hadrian/build.bat, ...)
+# (hadrian/build, hadrian/build.bat, ...)
 build test
 ```
 

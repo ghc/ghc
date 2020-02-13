@@ -105,7 +105,7 @@ It now also offers a more "old-school" interface, in the form of
 @foo.bar.baz = v@ or @foo.bar.baz += v@ expressions, that one can
 pass on the command line that invokes hadrian:
 
-> $ hadrian/build.sh --flavour=quickest -j "stage1.ghc-bin.ghc.link.opts += -v3"
+> $ hadrian/build --flavour=quickest -j "stage1.ghc-bin.ghc.link.opts += -v3"
 
 or in a file at <build root>/hadrian.settings, where <build root>
 is the build root to be used for the build, which is _build by default.
@@ -117,7 +117,7 @@ following contents:
 
 and issue:
 
-> $ hadrian/build.sh
+> $ hadrian/build
 
 Hadrian would pick up the settings given in _build/hadrian.settings (as well as
 any settings that you may additionally be passing on the command line) and
@@ -254,7 +254,7 @@ data BuilderMode = BM_Ghc (Wildcard GhcMode)
 --     - @<ghc mode>@ is one of @c@ (building C files), @hs@ (building Haskell
 --       modules), @link@ (linking object files), @deps@ (finding Haskell
 --       dependencies with @ghc -M@) or @toolargs@ (getting necessary flags to
---       make hadrian/ghci.sh work;
+--       make hadrian/ghci work;
 --     - @<cc mode>@ is one of @c@ (building C files) or @deps@ (finding C
 --       dependencies);
 --     - locations that support a wildcard (@*@) entry are here to avoid

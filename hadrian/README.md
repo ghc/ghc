@@ -21,7 +21,7 @@ tree:
 
 ```
 ./boot && ./configure
-hadrian/build.sh -j
+hadrian/build -j
 ```
 
 or on Windows:
@@ -39,8 +39,8 @@ or simply `-c`. See the overview of command line flags below.
 Notes:
 
 * If the default build script doesn't work, you might want to try another one,
-e.g. based on Cabal sandboxes (`build.cabal.*`), Stack (`build.stack.*`) or Nix
-(`build.stack.nix.*`).
+e.g. based on Cabal sandboxes (`build-cabal.*`), Stack (`build-stack.*`) or Nix
+(`build-stack-nix.*`).
 
 * On Windows, if you do not want to install MSYS, you can use the Stack-based
 build script (Stack provides a managed MSYS environment), as described in
@@ -164,18 +164,18 @@ build stage1:exe:haddock
 
 #### Fast feedback using ghci
 
-Running the `./hadrian/ghci.sh` script will load the main compiler into
+Running the `./hadrian/ghci` script will load the main compiler into
 a ghci session. This is intended for fast development feedback, modules are only
 typechecked so it isn't possible to run any functions in the repl.
 
 ```
-./hadrian/ghci.sh
+./hadrian/ghci
 ```
 
 You can also use this target with `ghcid`.
 
 ```
-ghcid --command="./hadrian/ghci.sh"
+ghcid --command="./hadrian/ghci"
 ```
 
 The first time this command is run hadrian will need to compile a few dependencies
@@ -188,7 +188,7 @@ have the effect of passing `-j` to both hadrian and ghci so they will both
 build in parallel.
 
 ```
-./hadrian/ghci.sh -j8
+./hadrian/ghci -j8
 ```
 
 #### Testing
@@ -272,12 +272,12 @@ a GHC API session with the correct environment to load a module into your own
 GHC session. This is how `haskell-ide-engine` is able to support hadrian.
 
 ```
-> ./hadrian/build.sh tool-args
+> ./hadrian/build tool-args
 -hide-all-packages -no-user-package-db -package-db _build/stage0/lib/packag...
 ```
 
 
-The `./hadrian/ghci.sh` script is implemented using this target.
+The `./hadrian/ghci` script is implemented using this target.
 
 Troubleshooting
 ---------------

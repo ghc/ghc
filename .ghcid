@@ -1,4 +1,4 @@
---command sh ./hadrian/ghci.sh
+--command sh ./hadrian/ghci
 --reload compiler
 --reload ghc
 --reload includes

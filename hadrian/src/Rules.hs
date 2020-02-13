@@ -34,7 +34,7 @@ import UserSettings
 -- run, the target prints out the arguments that would be passed to @ghc@
 -- during normal compilation to @stdout@.
 --
--- This target is called by the `ghci.sh` script in order to load all of GHC's
+-- This target is called by the `ghci` script in order to load all of GHC's
 -- modules into GHCi.
 toolArgsTarget :: Rules ()
 toolArgsTarget = do

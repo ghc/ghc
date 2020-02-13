@@ -902,7 +902,7 @@ Producing an eventlog for GHC
 To actually produce the eventlog, you need an eventlog-capable GHC build:
 
   With Hadrian:
-  $ hadrian/build.sh -j "stage1.ghc-bin.ghc.link.opts += -eventlog"
+  $ hadrian/build -j "stage1.ghc-bin.ghc.link.opts += -eventlog"
 
   With Make:
   $ make -j GhcStage2HcOpts+=-eventlog

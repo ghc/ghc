@@ -163,14 +163,14 @@ else
     # Just build hadrian.
     if [ "$use_stack" = "NO" ]
     then
-        hadrian/build.sh --help > /dev/null
+        hadrian/build --help > /dev/null
         cd hadrian
         hadrian_cmd=$(cabal new-exec -- which hadrian)
     else
         if [ $no_clean -eq 0 ]; then
             rm -rf hadrian/.stack-work
         fi
-        hadrian/build.stack.sh --help > /dev/null
+        hadrian/build-stack --help > /dev/null
         cd hadrian
         hadrian_cmd=$(stack exec -- which hadrian)
     fi
