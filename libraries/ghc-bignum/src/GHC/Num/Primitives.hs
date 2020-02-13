@@ -212,7 +212,7 @@ plusWord3# a b c = (# r1, r0 #)
       !r1           = plusWord# t1 t2
 
 
--- | 2-by-1 large division (a1 >= b0)
+-- | 2-by-1 large division
 --
 -- Requires:
 --    b0 /= 0
