@@ -931,8 +931,8 @@ data Divergence
 lubDivergence :: Divergence -> Divergence ->Divergence
 lubDivergence Diverges r        = r
 lubDivergence r        Diverges = r
-lubDivergence Dunno    r        = Dunno
-lubDivergence r        Dunno    = Dunno
+lubDivergence Dunno    _        = Dunno
+lubDivergence _        Dunno    = Dunno
 lubDivergence ExnOrDiv ExnOrDiv = ExnOrDiv
 -- This needs to commute with defaultDmd, i.e.
 -- defaultDmd (r1 `lubDivergence` r2) = defaultDmd r1 `lubDmd` defaultDmd r2
@@ -949,6 +949,7 @@ bothDivergence r Dunno    = r
 
 instance Outputable Divergence where
   ppr Diverges      = char 'b'
+  ppr ExnOrDiv      = char 'x'
   ppr Dunno         = empty
 
 ------------------------------------------------------------------------
