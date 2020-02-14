@@ -710,7 +710,7 @@ tcPolyCheck prag_fn
        ; tick <- funBindTicks nm_loc mono_id mod prag_sigs
        ; let bind' = FunBind { fun_id      = L nm_loc mono_id
                              , fun_matches = matches'
-                             , fun_co_fn   = wrap_gen <.> wrap_res
+                             , fun_ext     = wrap_gen <.> wrap_res
                              , fun_tick    = tick }
 
              export = ABE { abe_ext   = noExtField
