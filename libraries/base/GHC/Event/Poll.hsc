@@ -6,7 +6,8 @@
 
 module GHC.Event.Poll
     (
-      new
+      Poll
+    , new
     , available
     ) where
 
