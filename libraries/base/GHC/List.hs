@@ -674,7 +674,7 @@ iterateFB c f x0 = go x0
 
 -- | 'iterate'' is the strict version of 'iterate'.
 --
--- It forces the result of each application of the function to weak head normal 
+-- It forces the result of each application of the function to weak head normal
 -- form (WHNF)
 -- before proceeding.
 {-# NOINLINE [1] iterate' #-}
@@ -1046,7 +1046,7 @@ and (x:xs)      =  x && and xs
 -- False
 -- >>> or [True, True, False]
 -- True
--- >>> or (True : repeat False) -- Infinite list [True,False,False,False,False...
+-- >>> or (True : repeat False) -- Infinite list [True,False,False,False,False,False,False...
 -- True
 -- >>> or (repeat False)
 -- * Hangs forever *
@@ -1067,7 +1067,7 @@ or (x:xs)       =  x || or xs
 -- | Applied to a predicate and a list, 'any' determines if any element
 -- of the list satisfies the predicate. For the result to be
 -- 'False', the list must be finite; 'True', however, results from a 'True'
--- value for the predicate applied to an element at a finite index of a finite 
+-- value for the predicate applied to an element at a finite index of a finite
 -- or infinite list.
 --
 -- >>> any (> 3) []
@@ -1098,7 +1098,7 @@ any p (x:xs)    = p x || any p xs
 -- | Applied to a predicate and a list, 'all' determines if all elements
 -- of the list satisfy the predicate. For the result to be
 -- 'True', the list must be finite; 'False', however, results from a 'False'
--- value for the predicate applied to an element at a finite index of a finite 
+-- value for the predicate applied to an element at a finite index of a finite
 -- or infinite list.
 --
 -- >>> all (> 3) []
@@ -1374,7 +1374,7 @@ NB: Zips for larger tuples are in the List module.
 -- >>> zip [1, 2] ['a', 'b']
 -- [(1, 'a'), (2, 'b')]
 --
--- If one input list is shorter than the other, excess elements of the longer 
+-- If one input list is shorter than the other, excess elements of the longer
 -- list are discarded, even if one of the lists is infinite:
 --
 -- >>> zip [1] ['a', 'b']
@@ -1474,7 +1474,7 @@ zipWithFB c f = \x y r -> (x `f` y) `c` r
   #-}
 
 -- | The 'zipWith3' function takes a function which combines three
--- elements, as well as three lists and returns a list of the function applied 
+-- elements, as well as three lists and returns a list of the function applied
 -- to corresponding elements, analogous to 'zipWith'.
 -- It is capable of list fusion, but it is restricted to its
 -- first list argument and its resulting list.
