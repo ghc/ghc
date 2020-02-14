@@ -10,16 +10,12 @@
 -- ----------------------------------------------------------------------------
 
 module GHC.Event
-    ( -- * Types
-      EventManager
-    , TimerManager
-
-      -- * Creation
-    , getSystemEventManager
-    , new
-    , getSystemTimerManager
+    (
+      Poll
+    , PSQ
 
       -- * Registering interest in I/O events
+    , EventManager
     , Event
     , evtRead
     , evtWrite
@@ -30,17 +26,38 @@ module GHC.Event
     , unregisterFd
     , unregisterFd_
     , closeFd
+    , new
+    , loop
+    , emState
 
       -- * Registering interest in timeout events
+    , newWith
+    , newDefaultBackend
+    , registerTimeout
     , TimeoutCallback
     , TimeoutKey
-    , registerTimeout
     , updateTimeout
     , unregisterTimeout
+    , TimerManager
+    , timeLoop
+
+    -- * Threads
+    , getSystemEventManager
+    , getSystemTimerManager
+    , ensureIOManagerIsRunning
+    , threadDelay
+    , threadWaitRead
+    , threadWaitWrite
     ) where
 
-import GHC.Event.Manager
-import GHC.Event.TimerManager (TimeoutCallback, TimeoutKey, registerTimeout,
-                               updateTimeout, unregisterTimeout, TimerManager)
-import GHC.Event.Thread (getSystemEventManager, getSystemTimerManager)
-
+import GHC.Event.Poll hiding (new)
+import GHC.Event.PSQ
+import GHC.Event.Manager (EventManager, Event, evtRead, evtWrite, IOCallback,
+                          FdKey(keyFd), Lifetime(..), registerFd, unregisterFd,
+                          unregisterFd_, closeFd, new, loop, emState)
+import GHC.Event.TimerManager (newWith, newDefaultBackend, TimeoutCallback,
+                               TimeoutKey, registerTimeout, updateTimeout,
+                               unregisterTimeout, TimerManager, timeLoop)
+import GHC.Event.Thread (ensureIOManagerIsRunning, getSystemEventManager,
+                         getSystemTimerManager, threadDelay,
+                         threadWaitRead, threadWaitWrite)
