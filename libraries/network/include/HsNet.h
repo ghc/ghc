@@ -74,8 +74,8 @@
 extern int   initWinSock ();
 extern const char* getWSErrorDescr(int err);
 extern void* newAcceptParams(int sock,
-			     int sz,
-			     void* sockaddr);
+                             int sz,
+                             void* sockaddr);
 extern int   acceptNewSock(void* d);
 extern int   acceptDoProc(void* param);
 #else  /* _WIN32 */
@@ -97,7 +97,7 @@ hsnet_inet_ntoa(
 #else
              unsigned long addr
 #endif
-	    )
+    )
 {
     struct in_addr a;
     a.s_addr = addr;
@@ -117,7 +117,7 @@ hsnet_getnameinfo(const struct sockaddr* a,socklen_t b, char* c,
 
 INLINE int
 hsnet_getaddrinfo(const char *hostname, const char *servname,
-		  const struct addrinfo *hints, struct addrinfo **res)
+                  const struct addrinfo *hints, struct addrinfo **res)
 {
     return getaddrinfo(hostname, servname, hints, res);
 }

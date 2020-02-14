@@ -3,9 +3,9 @@
  */
 
 #ifdef aix_HOST_OS
-#define _LINUX_SOURCE_COMPAT 
+#define _LINUX_SOURCE_COMPAT
 // Required to get CMSG_SPACE/CMSG_LEN macros.  See #265.
-// Alternative is to #define COMPAT_43 and use the 
+// Alternative is to #define COMPAT_43 and use the
 // HAVE_STRUCT_MSGHDR_MSG_ACCRIGHTS code instead, but that means
 // fiddling with the configure script too.
 #endif
@@ -15,12 +15,12 @@
 
 #if HAVE_STRUCT_MSGHDR_MSG_CONTROL || HAVE_STRUCT_MSGHDR_MSG_ACCRIGHTS /* until end */
 
-/* 
+/*
  *  Support for transmitting file descriptors.
  *
- *  
+ *
  */
- 
+
 
 /*
  * sendmsg() and recvmsg() wrappers for transmitting
@@ -46,7 +46,7 @@ sendFd(int sock,
   struct cmsghdr *cmsg;
   char ancBuffer[CMSG_SPACE(sizeof(int))];
   char* dPtr;
-  
+
   msg.msg_control = ancBuffer;
   msg.msg_controllen = sizeof(ancBuffer);
 
@@ -55,7 +55,7 @@ sendFd(int sock,
   cmsg->cmsg_type = SCM_RIGHTS;
   cmsg->cmsg_len = CMSG_LEN(sizeof(int));
   dPtr = (char*)CMSG_DATA(cmsg);
-  
+
   *(int*)dPtr = outfd;
   msg.msg_controllen = cmsg->cmsg_len;
 #endif
@@ -66,7 +66,7 @@ sendFd(int sock,
 
   msg.msg_iov = iov;
   msg.msg_iovlen = 1;
-  
+
   return sendmsg(sock,&msg,0);
 }
 
@@ -96,7 +96,7 @@ recvFd(int sock)
   if (cmsg==NULL) {
     return -1;
   }
-  
+
   msg.msg_control = (void *)cmsg;
   msg.msg_controllen = CMSG_LEN(len);
 #else
@@ -117,7 +117,7 @@ recvFd(int sock)
 #endif
     return rc;
   }
-  
+
 #if HAVE_STRUCT_MSGHDR_MSG_CONTROL
   cptr = (struct cmsghdr*)CMSG_FIRSTHDR(&msg);
   fd = *(int*)CMSG_DATA(cptr);
