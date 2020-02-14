@@ -1,13 +1,15 @@
+{-# LANGUAGE BangPatterns #-}
 -- Benchmark that registers N timeouts, adjusts them a number of time
 -- and finally waits for them to expire.
 
 import Args (ljust, parseArgs, nonNegative, positive, theLast)
 import Control.Concurrent (MVar, forkIO, takeMVar, newEmptyMVar, putMVar)
 import Control.Monad (forM_, replicateM, when)
-import Data.Function (on)
 import Data.IORef (IORef, atomicModifyIORef, newIORef)
-import Data.Monoid (Monoid(..), Last(..))
-import System.Event (loop, new, registerTimeout, updateTimeout)
+import Data.Semigroup as Sem hiding (Last, Option)
+import Data.Monoid (Last(..))
+import GHC.Event as ET (timeLoop, newWith, newDefaultBackend,
+                        registerTimeout, updateTimeout)
 import System.Console.GetOpt (ArgDescr(ReqArg), OptDescr(..))
 import System.Environment (getArgs)
 
@@ -22,17 +24,14 @@ defaultConfig = Config
     , cfgNumAdjusts  = ljust 3
     }
 
-instance Monoid Config where
-    mempty = Config
-        { cfgNumTimeouts = mempty
-        , cfgNumAdjusts  = mempty
-        }
+instance Sem.Semigroup Config where
+  (Config cfgNumTimeouts_1 cfgNumAdjusts_1) <>
+    (Config cfgNumTimeouts_2 cfgNumAdjusts_2) =
+    Config (cfgNumTimeouts_1 <> cfgNumTimeouts_2) (cfgNumAdjusts_1 <> cfgNumAdjusts_2)
 
-    mappend a b = Config
-        { cfgNumTimeouts = app cfgNumTimeouts a b
-        , cfgNumAdjusts  = app cfgNumAdjusts a b
-        }
-      where app = on mappend
+instance Monoid Config where
+  mappend = (<>)
+  mempty = Config mempty mempty
 
 defaultOptions :: [OptDescr (IO Config)]
 defaultOptions = [
@@ -59,8 +58,8 @@ main = do
     let numTimeouts = theLast cfgNumTimeouts cfg
         numAdjusts = theLast cfgNumAdjusts cfg
 
-    mgr <- new
-    forkIO $ loop mgr
+    mgr <- ET.newWith =<< ET.newDefaultBackend
+    _ <- forkIO $ ET.timeLoop mgr
     nref <- newIORef 0
     done <- newEmptyMVar
     let finalTimeout = 1  -- ms
