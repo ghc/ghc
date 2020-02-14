@@ -407,7 +407,6 @@ Library
             GHC.Event.Array
             GHC.Event.IntTable
             GHC.Event.IntVar
-            GHC.Event.PSQ
             GHC.Event.Unique
             System.CPUTime.Windows
         c-sources:
@@ -418,6 +417,11 @@ Library
     else
         exposed-modules:
             GHC.Event
+            GHC.Event.Manager
+            GHC.Event.PSQ
+            GHC.Event.Poll
+            GHC.Event.Thread
+            GHC.Event.TimerManager
         other-modules:
             GHC.Event.Arr
             GHC.Event.Array
@@ -427,11 +431,6 @@ Library
             GHC.Event.IntVar
             GHC.Event.Internal
             GHC.Event.KQueue
-            GHC.Event.Manager
-            GHC.Event.PSQ
-            GHC.Event.Poll
-            GHC.Event.Thread
-            GHC.Event.TimerManager
             GHC.Event.Unique
 
             System.CPUTime.Posix.ClockGetTime
