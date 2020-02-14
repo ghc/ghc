@@ -24,7 +24,8 @@ import GHC.Core.Op.OccurAnal
 
 import GHC.Driver.Types
 import PrelNames
-import GHC.Types.Id.Make ( realWorldPrimId )
+import GHC.Types.Id.Make ( realWorldPrimId, mkPrimOpId )
+import PrimOp           ( PrimOp(TouchOp) )
 import GHC.Core.Utils
 import GHC.Core.Arity
 import GHC.Core.FVs
@@ -44,6 +45,7 @@ import GHC.Types.Var.Env
 import GHC.Types.Id
 import GHC.Types.Id.Info
 import TysWiredIn
+import TysPrim          ( realWorldStatePrimTy, primRepToRuntimeRep )
 import GHC.Core.DataCon
 import GHC.Types.Basic
 import GHC.Types.Module
@@ -760,7 +762,8 @@ data ArgInfo = CpeApp  CoreArg
              | CpeCast Coercion
              | CpeTick (Tickish Id)
 
-{- Note [runRW arg]
+{-
+ Note [runRW arg]
 ~~~~~~~~~~~~~~~~~~~
 If we got, say
    runRW# (case bot of {})
@@ -769,6 +772,22 @@ which happened in #11291, we do /not/ want to turn it into
 because that gives a panic in CoreToStg.myCollectArgs, which expects
 only variables in function position.  But if we are sure to make
 runRW# strict (which we do in GHC.Types.Id.Make), this can't happen
+
+
+Note [CorePrep handling of with#]
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+Lower with# applications to touch#. Specifically:
+
+    with# @a @r @b x k s0
+
+is lowered to:
+
+    case k s of _b0 { (# y, s1 #) ->
+      case touch# @a x s1 of s2 { _ ->
+        (# y, s2 #)
+      }
+    }
+
 -}
 
 cpeApp :: CorePrepEnv -> CoreExpr -> UniqSM (Floats, CpeRhs)
@@ -831,6 +850,29 @@ cpeApp top_env expr
         = case arg of
             Lam s body -> cpe_app (extendCorePrepEnv env s realWorldPrimId) body [] 0
             _          -> cpe_app env arg [CpeApp (Var realWorldPrimId)] 1
+    -- See Note [CorePrep handling of with#]
+    cpe_app env (Var f) [CpeApp (Type ty), CpeApp (Type runtimeRep), CpeApp (Type resultTy),
+                         CpeApp x, CpeApp k, CpeApp s0] 3
+        | f `hasKey` withIdKey
+        = do { let voidRepTy = primRepToRuntimeRep VoidRep
+             ; b0 <- newVar $ mkTyConApp (tupleTyCon Unboxed 2)
+                                         [voidRepTy, runtimeRep, realWorldStatePrimTy, resultTy]
+             ; y <- newVar resultTy
+             ; s1 <- newVar realWorldStatePrimTy
+             ; s2 <- newVar realWorldStatePrimTy
+             ; let touchId = mkPrimOpId TouchOp
+
+                   -- @stateResultAlt s y expr@ is a case alternative of the form,
+                   --   (# s, y #) -> expr
+                   stateResultAlt :: Var -> Var -> CoreExpr -> CoreAlt
+                   stateResultAlt stateVar resultVar rhs =
+                     (DataAlt (tupleDataCon Unboxed 2), [stateVar, resultVar], rhs)
+
+                   expr = Case (App k s0) b0 (varType b0) [stateResultAlt s1 y rhs1]
+                   rhs1 = Case (mkApps (Var touchId) [Type ty, x, Var s1]) s1 (varType s1) [(DEFAULT, [], rhs2)]
+                   rhs2 = mkApps (Var $ dataConWrapId $ tupleDataCon Unboxed 2) [Var s2, Var y]
+             ; cpeBody env expr
+             }
     cpe_app env (Var v) args depth
       = do { v1 <- fiddleCCall v
            ; let e2 = lookupCorePrepEnv env v1
