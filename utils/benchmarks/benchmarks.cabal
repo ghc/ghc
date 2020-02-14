@@ -1,0 +1,99 @@
+cabal-version:        3.0
+name:                 benchmarks
+version:              0.1.0.0
+description:          These programs are from the Event package (before it was
+                      made an internal GHC module) and have been modified to be
+                      use as simple executables to benchmark GHC's I/O manager.
+license:              BSD-3-Clause
+license-file:         LICENSE
+synopsis:             Utilities to benchmark GHC's I/O manager
+author:               Bryan O'Sullivan <bos@serpentine.com>
+                      Johan Tibell <johan.tibell@gmail.com>
+maintainer:           TBD
+category:             Testing
+build-type:           Simple
+
+common shared-deps
+  ghc-options:         -threaded -Wall -fno-warn-orphans
+                       -fno-warn-missing-signatures
+                       -fwarn-tabs
+                       -funbox-strict-fields -fno-ignore-asserts
+  build-depends:       base == 4.16.0.0,
+                       network == 3.1.2.1,
+                       unix,
+                       mtl,
+                       attoparsec
+  default-language:    Haskell2010
+
+executable dead-conn
+  import:              shared-deps
+  main-is:             DeadConn.hs
+  other-modules:       Args
+                       EventSocket
+                       EventUtil
+  other-extensions:    CPP,
+                       OverloadedStrings
+  build-depends:       bytestring
+
+executable pong-server
+  import:              shared-deps
+  main-is:             PongServer.hs
+  other-modules:       Args,
+                       EventSocket,
+                       EventUtil
+  other-extensions:    CPP,
+                       OverloadedStrings
+  build-depends:       bytestring
+
+executable static-http
+  import:              shared-deps
+  main-is:             StaticHttp.hs
+  other-modules:       EventFile,
+                       EventSocket,
+                       EventUtil,
+                       NoPush,
+                       RFC2616
+  other-extensions:    CPP,
+                       OverloadedStrings,
+  build-depends:       bytestring
+
+
+executable http-client
+  import:              shared-deps
+  main-is:             HttpClient.hs
+  other-modules:       Args,
+                       EventSocket,
+                       EventUtil,
+                       RFC2616
+  other-extensions:    BangPatterns,
+                       FlexibleContexts,
+                       OverloadedStrings
+  build-depends:       bytestring,
+                       time == 1.11.1.1,
+                       parsec
+
+executable signal
+  import:              shared-deps
+  main-is:             Signal.hs
+  other-extensions:    BangPatterns
+
+executable simple
+  import:              shared-deps
+  main-is:             Simple.hs
+  other-modules:       Args
+  other-extensions:    BangPatterns
+
+executable thread-delay
+  import:              shared-deps
+  main-is:             ThreadDelay.hs
+  other-modules:       Args
+  other-extensions:    CPP,
+                       BangPatterns
+  build-depends:       bytestring,
+                       stm
+
+executable timers
+  import:              shared-deps
+  main-is:             Timers.hs
+  other-modules:       Args
+  other-extensions:    BangPatterns
