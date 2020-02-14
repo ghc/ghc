@@ -31,8 +31,8 @@ typedef struct AcceptData {
  */
 void*
 newAcceptParams(int sock,
-		int sz,
-		void* sockaddr)
+                int sz,
+                void* sockaddr)
 {
     AcceptData* data = (AcceptData*)malloc(sizeof(AcceptData));
     if (!data) return NULL;
@@ -60,13 +60,13 @@ acceptDoProc(void* param)
 
     AcceptData* data = (AcceptData*)param;
     s = accept( data->fdSock,
-		data->sockAddr,
-		&data->size);
+                data->sockAddr,
+                &data->size);
     data->newSock = s;
     if ( s == INVALID_SOCKET ) {
-	return GetLastError();
+        return GetLastError();
     } else {
-	return 0;
+        return 0;
     }
 }
 #endif
