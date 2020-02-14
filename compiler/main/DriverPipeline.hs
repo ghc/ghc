@@ -965,7 +965,7 @@ runPhase (RealPhase (Unlit sf)) input_fn dflags
        -- escape the characters \, ", and ', but don't try to escape
        -- Unicode or anything else (so we don't use Util.charToC
        -- here).  If we get this wrong, then in
-       -- Coverage.isGoodTickSrcSpan where we check that the filename in
+       -- GHC.HsToCore.Coverage.isGoodTickSrcSpan where we check that the filename in
        -- a SrcLoc is the same as the source filenaame, the two will
        -- look bogusly different. See test:
        -- libraries/hpc/tests/function/subdir/tough2.hs
@@ -2308,7 +2308,7 @@ Introduction
 
   4) -fhpc
   At some point during compilation with -fhpc, in the function
-  `deSugar.Coverage.isGoodTickSrcSpan`, we compare the filename that a
+  `GHC.HsToCore.Coverage.isGoodTickSrcSpan`, we compare the filename that a
   `SrcSpan` refers to with the name of the file we are currently compiling.
   For some reason I don't yet understand, they can sometimes legitimally be
   different, and then hpc ignores that SrcSpan.

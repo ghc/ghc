@@ -425,7 +425,7 @@ data HsRecField' id arg = HsRecField {
 --
 -- The renamer produces an Unambiguous result if it can, rather than
 -- just doing the lookup in the typechecker, so that completely
--- unambiguous updates can be represented by 'DsMeta.repUpdFields'.
+-- unambiguous updates can be represented by 'GHC.HsToCore.Quote.repUpdFields'.
 --
 -- For example, suppose we have:
 --

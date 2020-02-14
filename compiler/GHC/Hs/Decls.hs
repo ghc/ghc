@@ -210,10 +210,10 @@ information from an `HsGroup`.
 One might wonder why we even bother separating top-level fixity signatures
 into two places at all. That is, why not just take the fixity signatures
 from `hs_tyclds` and put them into `hs_fixds` so that they are all in one
-location? This ends up causing problems for `DsMeta.repTopDs`, which translates
-each fixity signature in `hs_fixds` and `hs_tyclds` into a Template Haskell
-`Dec`. If there are any duplicate signatures between the two fields, this will
-result in an error (#17608).
+location? This ends up causing problems for `GHC.HsToCore.Quote.repTopDs`,
+which translates each fixity signature in `hs_fixds` and `hs_tyclds` into a
+Template Haskell `Dec`. If there are any duplicate signatures between the two
+fields, this will result in an error (#17608).
 -}
 
 -- | Haskell Group

@@ -1768,6 +1768,10 @@ lhsPriority tv
 Given (a ~ b), should we orient the CTyEqCan as (a~b) or (b~a)?
 This is a surprisingly tricky question!
 
+The question is answered by swapOverTyVars, which is use
+  - in the eager unifier, in TcUnify.uUnfilledVar1
+  - in the constraint solver, in TcCanonical.canEqTyVarHomo
+
 First note: only swap if you have to!
    See Note [Avoid unnecessary swaps]
 
@@ -1777,25 +1781,31 @@ So we look for a positive reason to swap, using a three-step test:
   put 'a' on the left.  See Note [Deeper level on the left]
 
 * Priority.  If the levels are the same, look at what kind of
-  type variable it is, using 'lhsPriority'
+  type variable it is, using 'lhsPriority'.
 
-  - FlatMetaTv: Always put on the left.
-    See Note [Fmv Orientation Invariant]
-    NB: FlatMetaTvs always have the current level, never an
-        outer one.  So nothing can be deeper than a FlatMetaTv
-
-
-  - TyVarTv/TauTv: if we have  tyv_tv ~ tau_tv, put tau_tv
-                   on the left because there are fewer
-                   restrictions on updating TauTvs
-
-  - TyVarTv/TauTv:  put on the left either
-     a) Because it's touchable and can be unified, or
+  Generally speaking we always try to put a MetaTv on the left
+  in preference to SkolemTv or RuntimeUnkTv:
+     a) Because the MetaTv may be touchable and can be unified
      b) Even if it's not touchable, TcSimplify.floatEqualities
         looks for meta tyvars on the left
 
-  - FlatSkolTv: Put on the left in preference to a SkolemTv
-                See Note [Eliminate flat-skols]
+  Tie-breaking rules for MetaTvs:
+  - FlatMetaTv = 4: always put on the left.
+        See Note [Fmv Orientation Invariant]
+
+        NB: FlatMetaTvs always have the current level, never an
+        outer one.  So nothing can be deeper than a FlatMetaTv.
+
+  - TauTv = 3: if we have  tyv_tv ~ tau_tv,
+       put tau_tv on the left because there are fewer
+       restrictions on updating TauTvs.  Or to say it another
+       way, then we won't lose the TyVarTv flag
+
+  - TyVarTv = 2: remember, flat-skols are *only* updated by
+       the unflattener, never unified, so TyVarTvs come next
+
+  - FlatSkolTv = 1: put on the left in preference to a SkolemTv.
+       See Note [Eliminate flat-skols]
 
 * Names. If the level and priority comparisons are all
   equal, try to eliminate a TyVars with a System Name in

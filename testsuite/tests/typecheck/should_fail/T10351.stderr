@@ -3,4 +3,4 @@ T10351.hs:6:1: error:
     • Non type-variable argument in the constraint: C [a]
       (Use FlexibleContexts to permit this)
     • When checking the inferred type
-        f :: forall a. C [a] => a -> ()
+        f :: forall {a}. C [a] => a -> ()

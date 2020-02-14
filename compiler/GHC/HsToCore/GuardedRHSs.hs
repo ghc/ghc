@@ -9,14 +9,14 @@ Matching guarded right-hand-sides (GRHSs)
 {-# LANGUAGE CPP #-}
 {-# LANGUAGE ViewPatterns #-}
 
-module DsGRHSs ( dsGuarded, dsGRHSs, dsGRHS, isTrueLHsExpr ) where
+module GHC.HsToCore.GuardedRHSs ( dsGuarded, dsGRHSs, dsGRHS, isTrueLHsExpr ) where
 
 #include "HsVersions.h"
 
 import GhcPrelude
 
-import {-# SOURCE #-} DsExpr  ( dsLExpr, dsLocalBinds )
-import {-# SOURCE #-} Match   ( matchSinglePatVar )
+import {-# SOURCE #-} GHC.HsToCore.Expr  ( dsLExpr, dsLocalBinds )
+import {-# SOURCE #-} GHC.HsToCore.Match ( matchSinglePatVar )
 
 import GHC.Hs
 import MkCore
@@ -26,8 +26,8 @@ import CoreUtils (bindNonRec)
 import BasicTypes (Origin(FromSource))
 import DynFlags
 import GHC.HsToCore.PmCheck (needToRunPmCheck, addTyCsDs, addPatTmCs, addScrutTmCs)
-import DsMonad
-import DsUtils
+import GHC.HsToCore.Monad
+import GHC.HsToCore.Utils
 import Type   ( Type )
 import Util
 import SrcLoc

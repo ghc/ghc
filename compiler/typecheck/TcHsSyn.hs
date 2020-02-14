@@ -1895,7 +1895,7 @@ zonkTcMethInfoToMethInfoX ze (name, ty, gdm_spec)
 ---------------------------------------
 {- Note [Zonking the LHS of a RULE]
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
-See also DsBinds Note [Free tyvars on rule LHS]
+See also GHC.HsToCore.Binds Note [Free tyvars on rule LHS]
 
 We need to gather the type variables mentioned on the LHS so we can
 quantify over them.  Example:
@@ -1918,7 +1918,7 @@ We do this in two stages.
   ZonkEnv.  (This is in fact the whole reason that the ZonkEnv has a
   UnboundTyVarZonker.)
 
-* In DsBinds, we quantify over it.  See DsBinds
+* In GHC.HsToCore.Binds, we quantify over it.  See GHC.HsToCore.Binds
   Note [Free tyvars on rule LHS]
 
 Quantifying here is awkward because (a) the data type is big and (b)

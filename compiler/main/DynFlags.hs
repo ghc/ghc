@@ -427,7 +427,6 @@ data DumpFlag
    | Opt_D_dump_cmm_split
    | Opt_D_dump_cmm_info
    | Opt_D_dump_cmm_cps
-   | Opt_D_dump_srts
    -- end cmm subflags
    | Opt_D_dump_cfg_weights -- ^ Dump the cfg used for block layout.
    | Opt_D_dump_asm
@@ -464,6 +463,8 @@ data DumpFlag
    | Opt_D_dump_exitify
    | Opt_D_dump_stranal
    | Opt_D_dump_str_signatures
+   | Opt_D_dump_cpranal
+   | Opt_D_dump_cpr_signatures
    | Opt_D_dump_tc
    | Opt_D_dump_tc_ast
    | Opt_D_dump_types
@@ -3358,8 +3359,6 @@ dynamic_flags_deps = [
         (setDumpFlag Opt_D_dump_cmm_info)
   , make_ord_flag defGhcFlag "ddump-cmm-cps"
         (setDumpFlag Opt_D_dump_cmm_cps)
-  , make_ord_flag defGhcFlag "ddump-srts"
-        (setDumpFlag Opt_D_dump_srts)
   , make_ord_flag defGhcFlag "ddump-cfg-weights"
         (setDumpFlag Opt_D_dump_cfg_weights)
   , make_ord_flag defGhcFlag "ddump-core-stats"
@@ -3430,6 +3429,10 @@ dynamic_flags_deps = [
         (setDumpFlag Opt_D_dump_stranal)
   , make_ord_flag defGhcFlag "ddump-str-signatures"
         (setDumpFlag Opt_D_dump_str_signatures)
+  , make_ord_flag defGhcFlag "ddump-cpranal"
+        (setDumpFlag Opt_D_dump_cpranal)
+  , make_ord_flag defGhcFlag "ddump-cpr-signatures"
+        (setDumpFlag Opt_D_dump_cpr_signatures)
   , make_ord_flag defGhcFlag "ddump-tc"
         (setDumpFlag Opt_D_dump_tc)
   , make_ord_flag defGhcFlag "ddump-tc-ast"

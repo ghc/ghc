@@ -338,6 +338,18 @@ subexpression elimination pass.
 
     Dump strictness signatures
 
+.. ghc-flag:: -ddump-cpranal
+    :shortdesc: Dump CPR analysis output
+    :type: dynamic
+
+    Dump Constructed Product Result analysis output
+
+.. ghc-flag:: -ddump-cpr-signatures
+    :shortdesc: Dump CPR signatures
+    :type: dynamic
+
+    Dump Constructed Product Result signatures
+
 .. ghc-flag:: -ddump-cse
     :shortdesc: Dump CSE output
     :type: dynamic

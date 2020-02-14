@@ -1,4 +1,4 @@
 
 T12484.hs:6:1: warning: [-Wmissing-pattern-synonym-signatures (in -Wall)]
     Pattern synonym with no type signature:
-      pattern RP :: forall a. a -> (a, Bool)
+      pattern RP :: forall {a}. a -> (a, Bool)

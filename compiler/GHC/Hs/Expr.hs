@@ -577,8 +577,8 @@ data RecordUpdTc = RecordUpdTc
 
 -- | HsWrap appears only in typechecker output
 -- Invariant: The contained Expr is *NOT* itself an HsWrap.
--- See Note [Detecting forced eta expansion] in DsExpr. This invariant
--- is maintained by GHC.Hs.Utils.mkHsWrap.
+-- See Note [Detecting forced eta expansion] in GHC.HsToCore.Expr.
+-- This invariant is maintained by GHC.Hs.Utils.mkHsWrap.
 -- hs_syn is something like HsExpr or HsCmd
 data HsWrap hs_syn = HsWrap HsWrapper      -- the wrapper
                             (hs_syn GhcTc) -- the thing that is wrapped
@@ -2693,7 +2693,7 @@ data HsMatchContext p
                                 --    (Just b) | Just _ <- x = e
                                 --             | otherwise   = e'
 
-  | RecUpd                      -- ^Record update [used only in DsExpr to
+  | RecUpd                      -- ^Record update [used only in GHC.HsToCore.Expr to
                                 --    tell matchWrapper what sort of
                                 --    runtime error message to generate]
 

@@ -14,7 +14,7 @@ This module exports some utility functions of no great interest.
 {-# LANGUAGE ViewPatterns #-}
 
 -- | Utility functions for constructing Core syntax, principally for desugaring
-module DsUtils (
+module GHC.HsToCore.Utils (
         EquationInfo(..),
         firstPat, shiftEqns,
 
@@ -46,14 +46,14 @@ module DsUtils (
 
 import GhcPrelude
 
-import {-# SOURCE #-} Match  ( matchSimply )
-import {-# SOURCE #-} DsExpr ( dsLExpr )
+import {-# SOURCE #-} GHC.HsToCore.Match ( matchSimply )
+import {-# SOURCE #-} GHC.HsToCore.Expr  ( dsLExpr )
 
 import GHC.Hs
 import TcHsSyn
 import TcType( tcSplitTyConApp )
 import CoreSyn
-import DsMonad
+import GHC.HsToCore.Monad
 
 import CoreUtils
 import MkCore
@@ -172,7 +172,7 @@ In fact, even CoreSubst.simplOptExpr will do this, and simpleOptExpr
 runs on the output of the desugarer, so all is well by the end of
 the desugaring pass.
 
-See also Note [MatchIds] in Match.hs
+See also Note [MatchIds] in GHC.HsToCore.Match
 
 ************************************************************************
 *                                                                      *
@@ -668,7 +668,7 @@ mkSelectorBinds :: [[Tickish Id]] -- ^ ticks to add, possibly
                 -> CoreExpr       -- ^ Expression to which the pattern is bound
                 -> DsM (Id,[(Id,CoreExpr)])
                 -- ^ Id the rhs is bound to, for desugaring strict
-                -- binds (see Note [Desugar Strict binds] in DsBinds)
+                -- binds (see Note [Desugar Strict binds] in GHC.HsToCore.Binds)
                 -- and all the desugared binds
 
 mkSelectorBinds ticks pat val_expr
@@ -923,10 +923,10 @@ and
 
 This adjustment is done by decideBangHood,
 
-  * Just before constructing an EqnInfo, in Match
+  * Just before constructing an EqnInfo, in GHC.HsToCore.Match
       (matchWrapper and matchSinglePat)
 
-  * When desugaring a pattern-binding in DsBinds.dsHsBind
+  * When desugaring a pattern-binding in GHC.HsToCore.Binds.dsHsBind
 
 Note that it is /not/ done recursively.  See the -XStrict
 spec in the user manual.
