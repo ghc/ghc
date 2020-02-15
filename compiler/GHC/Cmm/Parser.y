@@ -902,7 +902,7 @@ getLit _ = panic "invalid literal" -- TODO messy failure
 nameToMachOp :: FastString -> PD (Width -> MachOp)
 nameToMachOp name =
   case lookupUFM machOps name of
-        Nothing -> fail ("unknown primitive " ++ unpackFS name)
+        Nothing -> failMsgPD ("unknown primitive " ++ unpackFS name)
         Just m  -> return m
 
 exprOp :: FastString -> [CmmParse CmmExpr] -> PD (CmmParse CmmExpr)
@@ -1056,12 +1056,12 @@ parseSafety :: String -> PD Safety
 parseSafety "safe"   = return PlaySafe
 parseSafety "unsafe" = return PlayRisky
 parseSafety "interruptible" = return PlayInterruptible
-parseSafety str      = fail ("unrecognised safety: " ++ str)
+parseSafety str      = failMsgPD ("unrecognised safety: " ++ str)
 
 parseCmmHint :: String -> PD ForeignHint
 parseCmmHint "ptr"    = return AddrHint
 parseCmmHint "signed" = return SignedHint
-parseCmmHint str      = fail ("unrecognised hint: " ++ str)
+parseCmmHint str      = failMsgPD ("unrecognised hint: " ++ str)
 
 -- labels are always pointers, so we might as well infer the hint
 inferCmmHint :: CmmExpr -> ForeignHint
@@ -1088,7 +1088,7 @@ happyError = PD $ \_ s -> unP srcParseFail s
 stmtMacro :: FastString -> [CmmParse CmmExpr] -> PD (CmmParse ())
 stmtMacro fun args_code = do
   case lookupUFM stmtMacros fun of
-    Nothing -> fail ("unknown macro: " ++ unpackFS fun)
+    Nothing -> failMsgPD ("unknown macro: " ++ unpackFS fun)
     Just fcode -> return $ do
         args <- sequence args_code
         code (fcode args)
@@ -1189,7 +1189,7 @@ foreignCall conv_string results_code expr_code args_code safety ret
   = do  conv <- case conv_string of
           "C" -> return CCallConv
           "stdcall" -> return StdCallConv
-          _ -> fail ("unknown calling convention: " ++ conv_string)
+          _ -> failMsgPD ("unknown calling convention: " ++ conv_string)
         return $ do
           dflags <- getDynFlags
           results <- sequence results_code
@@ -1265,7 +1265,7 @@ primCall
         -> PD (CmmParse ())
 primCall results_code name args_code
   = case lookupUFM callishMachOps name of
-        Nothing -> fail ("unknown primitive " ++ unpackFS name)
+        Nothing -> failMsgPD ("unknown primitive " ++ unpackFS name)
         Just f  -> return $ do
                 results <- sequence results_code
                 args <- sequence args_code

@@ -41,7 +41,6 @@
 -- Alex "Haskell code fragment top"
 
 {
-{-# LANGUAGE CPP #-}
 {-# LANGUAGE BangPatterns #-}
 {-# LANGUAGE LambdaCase #-}
 {-# LANGUAGE MultiWayIf #-}
@@ -57,7 +56,7 @@ module Lexer (
    allocateComments,
    MonadP(..),
    getRealSrcLoc, getPState, withThisPackage,
-   failLocMsgP, srcParseFail,
+   failMsgP, failLocMsgP, srcParseFail,
    getErrorMessages, getMessages,
    popContext, pushModuleContext, setLastToken, setSrcLoc,
    activeContext, nextIsEOF,
@@ -74,7 +73,6 @@ import GhcPrelude
 
 -- base
 import Control.Monad
-import Control.Monad.Fail as MonadFail
 import Data.Bits
 import Data.Char
 import Data.List
@@ -2154,12 +2152,6 @@ instance Applicative P where
 
 instance Monad P where
   (>>=) = thenP
-#if !MIN_VERSION_base(4,13,0)
-  fail = MonadFail.fail
-#endif
-
-instance MonadFail.MonadFail P where
-  fail = failMsgP
 
 returnP :: a -> P a
 returnP a = a `seq` (P $ \s -> POk s a)
