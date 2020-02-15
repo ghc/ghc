@@ -2122,10 +2122,12 @@ wrapGenSyms binds body@(MkC b)
   = do  { var_ty <- lookupType nameTyConName
         ; go var_ty binds }
   where
-    (_, [elt_ty]) = tcSplitAppTys (exprType b)
+    (_, elt_ty) = tcSplitAppTy (exprType b)
         -- b :: m a, so we can get the type 'a' by looking at the
-        -- argument type. NB: this relies on Q being a data/newtype,
-        -- not a type synonym
+        -- argument type. Need to use `tcSplitAppTy` here as since
+        -- the overloaded quotations patch the type of the expression can
+        -- be something more complicated than just `Q a`.
+        -- See #17839 for when this went wrong with the type `WriterT () m a`
 
     go _ [] = return body
     go var_ty ((name,id) : binds)
